@@ -37,6 +37,7 @@ function paidFeature(input, type) {
   if (op === "remove-bg") return "video.bg-remove";
   if (op === "image-to-3d") return input.settings?.method === "local-sf3d" ? null : "video.3d"; // card S4b: the local way is free
   if (op === "editor-transcribe") return "video.transcribe"; // card ED.10 整片字幕
+  if (op === "music") return "video.music"; // backend/music.cjs 音樂生成
   if (require("./video-enhance.cjs").isAi(input)) return "video.enhance"; // card ED.12.3: before localTool (enhance is also a free ffmpeg op)
   if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || localTool(op)) return null;
   return { image: "video.image", video: "video.motion", audio: "video.tts" }[type] || null;

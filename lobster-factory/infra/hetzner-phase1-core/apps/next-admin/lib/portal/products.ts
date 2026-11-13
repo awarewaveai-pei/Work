@@ -51,7 +51,7 @@ const PRODUCT_DEFINITIONS = [
   { key: "video", name: "影片製作", description: "生成腳本、場景、動態與旁白影片。", subdomain: "video", door: { app: "next-admin", page: "/video", api: ["/api/video", "/api/tools/script-forge"],
       nav: [{ path: "", name: "影片工作台", staff: "tools/video" }, { path: "works", name: "我的作品", staff: "tools/designs" }], uiService: "video-workbench" },
     loginSources: ["local"], standalone: false, status: "coming_soon",
-    features: [quota("video.script", "腳本生成"), quota("video.image", "場景圖生成"), quota("video.motion", "影片動態"), quota("video.tts", "付費旁白"), quota("video.transcribe", "語音轉字幕"), quota("video.bg-remove", "去背"), quota("video.3d", "圖片轉 3D"), quota("video.enhance", "AI 畫質增強")],
+    features: [quota("video.script", "腳本生成"), quota("video.image", "場景圖生成"), quota("video.motion", "影片動態"), quota("video.tts", "付費旁白"), quota("video.transcribe", "語音轉字幕"), quota("video.bg-remove", "去背"), quota("video.3d", "圖片轉 3D"), quota("video.enhance", "AI 畫質增強"), quota("video.music", "音樂生成")],
     accessChannels: ["ui"], modules: { dependsOn: ["content"], optional: ["social"], manifest: "lib/video/MODULE_MANIFEST.json" }, staffPaths: ["tools/video", "tools/script-forge"] },
   { key: "tarot", name: "塔羅製圖", description: "生成塔羅圖片、提示詞與動態。", subdomain: "tarot", door: { app: "next-admin", page: "/tarot", api: ["/api/tools/tarot"],
       nav: [{ path: "", name: "塔羅工作台", staff: "tools/tarot" }, { path: "works", name: "我的作品", staff: "tools/designs" }] },

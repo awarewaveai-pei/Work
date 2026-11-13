@@ -5,15 +5,17 @@ window.VideoWorkbenchMoney = (usd, c = window.VideoWorkbench?.capabilities) => {
   if (!(rate > 0) || !Number.isFinite(n)) return "";
   return "NT$" + (n >= 10 ? n.toFixed(1) : n >= 0.1 ? n.toFixed(2) : String(Number(n.toPrecision(2))));
 };
-// Speech models / transcription engines (capabilities speech.models, transcribe.engines: the server's one list, which
-// already drops retired rows and marks rows without a key available:false). The one rule for which row a page shows as
-// chosen: the saved id while its row is listed AND available, else the server's default (itself the first available
-// row). A row without a key is shown 未啟用 and can never be the chosen one, so it is never sent.
+// Speech / music models and transcription engines (capabilities speech.models, music.models, transcribe.engines: the
+// server's one list, which already drops retired rows and marks rows without a key available:false). The one rule for
+// which row a page shows as chosen: the saved id (or a name the row lists in aliases: what older drafts saved) while its
+// row is listed AND available, else the server's default (itself the first available row). A row without a key is shown
+// 未啟用 and can never be the chosen one, so it is never sent.
 window.VideoWorkbenchProviders = {
-  rows: (kind, c = window.VideoWorkbench?.capabilities) => (kind === "speech" ? c?.speech?.models : c?.transcribe?.engines) || [],
+  rows: (kind, c = window.VideoWorkbench?.capabilities) => (kind === "speech" ? c?.speech?.models : kind === "music" ? c?.music?.models : c?.transcribe?.engines) || [],
   current(kind, saved, c = window.VideoWorkbench?.capabilities) {
-    const rows = this.rows(kind, c), fallback = kind === "speech" ? c?.speech?.defaultModel : c?.transcribe?.defaultEngine;
-    return rows.some((r) => r.id === saved && r.available) ? saved : fallback;
+    const rows = this.rows(kind, c), fallback = kind === "speech" ? c?.speech?.defaultModel : kind === "music" ? c?.music?.defaultModel : c?.transcribe?.defaultEngine;
+    const row = rows.find((r) => r.id === saved || (r.aliases || []).includes(saved));
+    return row?.available ? row.id : fallback;
   },
 };
 (function () {

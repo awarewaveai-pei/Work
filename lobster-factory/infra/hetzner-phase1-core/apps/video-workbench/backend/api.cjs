@@ -20,6 +20,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // Speech and speech-to-text: one list each (backend/speech.cjs, transcribe.cjs); every job names its own row (the
   // page's buttons), none = the default. VW_TRANSCRIBE_CHUNK_BYTES overrides an engine's chunk size.
   const speech = require("./speech.cjs");
+  // 音樂生成: one list (backend/music.cjs); a job names its row in input.musicModel (an older draft's label resolves too).
+  const music = require("./music.cjs");
   const chunkBytes = (engine) => Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || engine.uploadBytes;
   const transcriptsDir = path.join(dataDir, "transcripts");
   // Per-request spend of the sync paid routes (text, transcription): each handler call runs in its own meter.
@@ -181,7 +183,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       );
     return env.OPENAI_API_KEY;
   };
-  const secrets = [env.OPENAI_API_KEY, env.GEMINI_API_KEY, vwEnv(env, "TRANSCRIBE_WORKER_TOKEN"), vwEnv(env, "TTS_SERVICE_TOKEN"), env.REPLICATE_API_TOKEN, env.MEDIA_RENDER_AUTH_TOKEN, env.REMOTION_AUTH_TOKEN].filter((v) => typeof v === "string" && v.trim());
+  const secrets = [env.OPENAI_API_KEY, env.GEMINI_API_KEY, vwEnv(env, "TRANSCRIBE_WORKER_TOKEN"), vwEnv(env, "TTS_SERVICE_TOKEN"), env.REPLICATE_API_TOKEN, env.ELEVENLABS_API_KEY, env.MEDIA_RENDER_AUTH_TOKEN, env.REMOTION_AUTH_TOKEN].filter((v) => typeof v === "string" && v.trim());
   const publicError = (message) =>
     secrets.reduce((text, secret) => text.replaceAll(secret.trim(), "[redacted]"), String(message)).slice(0, 800);
   // Card ED.13 剪輯 Agent: one text() call per message (the one text model, priced and charged like every PAID_ROUTES route).
@@ -301,6 +303,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     "character-voice",
     "region",
     "project-shot",
+    "music",
     ...mediaTools.supported,
   ];
   function jobInput(input) {
@@ -589,6 +592,34 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         persist();
         return;
       }
+      if (job.input.operation === "music") {
+        job.status = "running";
+        persist();
+        // Card music providers: the row the job names, the vendor's song, kept as a /generated file and charged through
+        // settle() on success (job.paid): Lyria = its flat song price; Eleven = per minute of the longer of the length
+        // asked for and the length returned (the vendor bills the length asked for).
+        const asked = music.request(job.input, env),
+          song = await music.generate(asked, { env, fetchImpl, signal });
+        if (job.status === "cancelled") return;
+        if (signal.aborted) throw Error("音樂生成逾時，已停止；請重試。");
+        const url = output(song.audio, song.ext), file = path.join(dataDir, url.slice(1));
+        const info = await require("./media-inspect.cjs").inspectMedia(file, signal).catch(() => null);
+        if (signal.aborted || !info?.audio || !(info.duration > 0)) {
+          fs.rmSync(file, { force: true });
+          if (job.status === "cancelled") return;
+          // A timeout must end the job (failed, retryable), never leave it "running".
+          throw Error(signal.aborted ? "音樂生成逾時，已停止；請重試。" : "音樂結果不是可播放的音訊");
+        }
+        job.result = {
+          url, duration: info.duration,
+          origin: { kind: "ai_generated", model: asked.model.id, provider: asked.model.vendor, costUsd: costs.musicUsd(asked.model.id, Math.max(asked.seconds || 0, info.duration)) },
+        };
+        job.disclosure = "AI 生成音樂";
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        return;
+      }
       const input = job.input,
         { type, prompt } = jobInput(input);
       job.type = type;
@@ -784,6 +815,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   function jobTimeoutMs(input) {
     const op = input?.operation;
     if (videoEnhance.isAi(input)) return videoEnhance.TIMEOUT_MS;
+    if (op === "music") return 900000; // a 5-minute Eleven song is made in one request
     return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? hostTranscribeTimeout(input) : op === "remotion-template" ? 780000 : 600000;
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
@@ -794,7 +826,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       isBlender = blender3d().operations.includes(input.operation),
       isImageTo3d = input.operation === "image-to-3d",
       isTranscribe = input.operation === "editor-transcribe",
-      parsed = isTranscribe
+      isMusic = input.operation === "music",
+      parsed = isMusic
+        ? (music.request(input, env), { type: "audio" })
+        : isTranscribe
         ? (transcribe.plan(input.settings), transcribe.auth(transcribe.pick(input.settings?.engine, env), env), { type: "subtitle" })
         : isBlender
         ? blender3d().request(input)
@@ -813,13 +848,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     }
     const videoModel = !isMedia && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
     if (videoModel) generationPolicy.videoVendor(videoModel.provider).token(env);
+    else if (isMusic) music.key(music.pick(input.musicModel, env), env);
     else if (parsed.type === "audio" && !isMedia) speech.key(speech.pick(input.speechModel, env), env);
     else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe) key();
     // paidFeature on the job: the retry button prices a rerun from it (shared/paid-price.js); the permit needs main.
     const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
-    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance" }[feature] || feature,
-      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution }[feature]);
+    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music" }[feature] || feature,
+      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id }[feature]);
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
     if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });
@@ -1137,6 +1173,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           const { seconds } = await aiEnhanceSource(input);
           videoEnhance.token(env);
           json(res, 200, { quoteId: crypto.randomUUID(), costUsd: costs.enhanceUsd(videoEnhance.resolutionOf(input), seconds), estimate: true });
+          return true;
+        }
+        // 音樂生成: the model's own price for the length asked (Lyria: its flat song price).
+        if (input.operation === "music") {
+          const asked = music.request(input, env);
+          music.key(asked.model, env);
+          json(res, 200, { quoteId: crypto.randomUUID(), costUsd: costs.musicUsd(asked.model.id, asked.seconds || 0), estimate: !!asked.seconds }); // per-minute rows: charged on the longer of asked and returned length
           return true;
         }
         if (jobInput(input).type === "audio") speech.key(speech.pick(input.speechModel, env), env);

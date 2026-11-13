@@ -253,6 +253,18 @@ function toolMusicCompile() {
     .filter(Boolean)
     .join("\n");
 }
+// The chosen music model (/capabilities music.models, backend/music.cjs): the saved id, or the label an older draft saved
+// ("Lyria 3.5"), resolves through VideoWorkbenchProviders; a model without its key is never the chosen one.
+const toolMusicModel = () => VideoWorkbench.capabilities?.music?.models?.find((m) => m.id === wfProviderCurrent("music", values.musicModel));
+// The lengths the chosen model takes (only Eleven Music has them; Lyria decides its own length).
+const toolMusicSeconds = (model) => (model?.seconds?.includes(Number(values.musicSeconds)) ? Number(values.musicSeconds) : model?.seconds?.[1]);
+function toolMusicLengthChoices(model) {
+  if (!model?.seconds) return "";
+  const current = toolMusicSeconds(model);
+  return `<label>音樂長度</label><div class="flow-choices" role="group">${model.seconds
+    .map((s) => `<button type="button" class="btn small ${s === current ? "selected" : ""}" data-flow-choice="musicSeconds" data-flow-value="${s}" data-flow-multiple="false" aria-pressed="${s === current}">${s < 60 ? s + " 秒" : s / 60 + " 分鐘"}</button>`)
+    .join("")}</div>`;
+}
 function toolMusicScreen(t) {
   wfDefaults({
     musicMode: "簡易模式",
@@ -263,20 +275,22 @@ function toolMusicScreen(t) {
     musicKey: "自動／預設調性",
     musicInstruments: ["弦樂重奏", "銅管號角"],
     musicVocals: ["柔美女聲"],
-    musicModel: "Lyria 3.5",
     musicLyricsLanguage: "繁體中文",
     musicLyricsAssist: false,
   });
-  const custom = values.musicMode === "自訂配置";
+  const custom = values.musicMode === "自訂配置",
+    model = toolMusicModel(),
+    lyrics = model?.lyrics && !(custom && values.musicInstrumental);
   const form = custom
     ? `${wfField("musicTitle", "曲目標題（選填）")}${wfArea("musicStyleDescription", "風格描述（選填）", 700)}${wfCheck("musicInstrumental", "純器樂（無人聲）")}<label>音樂曲風</label>${wfChoice("musicGenres", toolMusicGenres, true)}<label>情緒氛圍</label>${wfChoice("musicMoods", toolMusicMoods, true)}${wfField("musicBpm", "節奏速度（BPM）", "number", 'min="40" max="240"')}<div class="flow-choices">${[75, 100, 120, 128, 160].map((bpm) => wfButton(bpm + " BPM", "music-bpm:" + bpm)).join("")}</div>${wfSelect("musicKey", "調性與調式", ["自動／預設調性", "C Major", "C Minor", "C# Minor", "D Major", "D Minor", "Eb Major", "E Major", "E Minor", "F Major", "F Minor", "F# Minor", "G Major", "G Minor", "Ab Major", "A Major", "A Minor", "Bb Major", "B Minor"])}<label>主要配器</label>${wfChoice("musicInstruments", toolMusicInstruments, true)}${!values.musicInstrumental ? "<label>人聲風格</label>" + wfChoice("musicVocals", ["柔美女聲", "渾厚男聲", "虛靈合唱", "親近耳語", "靈魂高亢", "電子聲碼器", "律動說唱"], true) : ""}${wfArea("musicStructure", "曲式結構與段落（選填）")}<div class="flow-choices">${["Intro", "Verse", "Chorus", "Bridge", "Drop", "Instrumental", "Outro", "Fade Out"].map((name) => wfButton("[" + name + "]", "music-section:" + name)).join("")}</div>${wfField("musicNegative", "排除元素／負向提示詞")}<details open><summary>即時提示詞編譯預覽</summary><pre data-music-compiled>${esc(toolMusicCompile())}</pre></details>`
     : `${wfArea("musicPrompt", "音樂提示詞／風格描述", 500)}<label>風格靈感</label><div class="flow-choices">${["輕柔 Lo-Fi", "史詩電影交響", "現代電子舞曲", "溫暖爵士", "輕快流行", "木吉他民謠", "賽博朋克", "冥想氛圍"].map((name) => wfButton(name, "music-preset:" + name)).join("")}</div>`;
   return wfWrap(
     t,
-    `<section class="side flow-wide"><h3>從參考音樂開始（選填）</h3><div class="row">${btn("從素材庫選取音訊", "library:musicref")}${btn("上傳參考音訊", "upload:musicref")}</div>${files.musicref ? `<audio src="${esc(files.musicref.previewUrl || files.musicref.url)}" controls></audio><p>${esc(files.musicref.name)}</p>` : ""}<p class="note">音樂分析與生成服務尚未配置；可先完成並保存提示詞與素材。</p>${wfChoice("musicMode", ["簡易模式", "自訂配置"])}${form}${wfSelect("musicModel", "預備接入模型", ["Lyria 3.5", "Lyria Clip Preview"])}<h3>歌詞（選填）</h3>${wfArea("musicLyrics", "歌詞", 10000)}${wfButton("AI 寫歌詞", "music-lyrics-assist")}${values.musicLyricsAssist ? `${wfArea("musicLyricsTheme", "想寫什麼樣的歌？", 1000)}${wfSelect("musicLyricsLanguage", "歌詞語言", ["繁體中文", "簡體中文", "English", "日本語", "한국어", "ภาษาไทย"])}${wfButton("寫歌詞（文字 API 用量計費）", "music-lyrics-generate", false, "video.script")}` : ""}<div class="row">${wfButton("下載音樂設定", "music-download")}${wfButton("尚未接入音樂生成服務", "music-generate", true)}</div></section>`,
+    `<section class="side flow-wide"><h3>從參考音樂開始（選填）</h3><div class="row">${btn("從素材庫選取音訊", "library:musicref")}${btn("上傳參考音訊", "upload:musicref")}</div>${files.musicref ? `<audio src="${esc(files.musicref.previewUrl || files.musicref.url)}" controls></audio><p>${esc(files.musicref.name)}</p>` : ""}<p class="note">參考音樂只供你對照，不會送給音樂模型。</p>${wfChoice("musicMode", ["簡易模式", "自訂配置"])}${form}${wfProviderChoice("music", "musicModel", "音樂模型")}${toolMusicLengthChoices(model)}${lyrics ? `<h3>歌詞（選填）</h3>${wfArea("musicLyrics", "歌詞", 10000)}${wfButton("AI 寫歌詞", "music-lyrics-assist")}${values.musicLyricsAssist ? `${wfArea("musicLyricsTheme", "想寫什麼樣的歌？", 1000)}${wfSelect("musicLyricsLanguage", "歌詞語言", ["繁體中文", "簡體中文", "English", "日本語", "한국어", "ภาษาไทย"])}${wfButton("寫歌詞（文字 API 用量計費）", "music-lyrics-generate", false, "video.script")}` : ""}` : ""}<div class="row">${wfButton("下載音樂設定", "music-download")}${wfButton(model?.available ? "生成音樂" : "沒有可用的音樂模型", "music-generate", !model?.available, "video.music", model?.id)}</div></section>`,
   );
 }
-let toolMusicLyricsPending = false;
+let toolMusicLyricsPending = false,
+  toolMusicPending = false;
 async function toolMusicAction(action, button) {
   if (tool !== "music") return;
   if (action?.startsWith("music-preset:")) {
@@ -304,6 +318,30 @@ async function toolMusicAction(action, button) {
     values.musicLyricsAssist = !values.musicLyricsAssist;
     saveDraft();
     render();
+  }
+  if (action === "music-generate" && !toolMusicPending) {
+    const model = toolMusicModel(),
+      custom = values.musicMode === "自訂配置",
+      instrumental = custom && values.musicInstrumental === true,
+      style = String(custom ? [values.musicTitle ? "Title: " + values.musicTitle : "", toolMusicCompile()].filter(Boolean).join("\n") : values.musicPrompt || "").trim(),
+      lyrics = model?.lyrics && !instrumental ? String(values.musicLyrics || "").trim() : "";
+    if (!model?.available) throw Error("沒有可用的音樂模型");
+    if (!style && !lyrics) throw Error("請先輸入音樂提示詞");
+    toolMusicPending = true;
+    button.disabled = true;
+    try {
+      const job = await VideoWorkbench.generations.create({
+        type: "audio",
+        operation: "music",
+        prompt: style,
+        musicModel: model.id,
+        settings: { instrumental, ...(lyrics ? { lyrics } : {}), ...(model.seconds ? { seconds: toolMusicSeconds(model) } : {}) },
+      });
+      VideoWorkbench.showJob(job);
+    } finally {
+      toolMusicPending = false;
+      if (button.isConnected) button.disabled = false;
+    }
   }
   if (action === "music-download")
     VideoWorkbench.download("music-settings.json", {

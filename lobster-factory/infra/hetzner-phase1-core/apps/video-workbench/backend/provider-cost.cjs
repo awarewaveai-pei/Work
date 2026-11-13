@@ -87,6 +87,11 @@ function enhanceUsd(resolution, seconds, units) {
   if (!Object.hasOwn(rates.VIDEO_ENHANCE_RATES.resolutions, resolution)) throw unpriced("video-upscale " + resolution);
   return rates.videoEnhanceUsd(resolution, seconds, units);
 }
+// 音樂生成 (backend/music.cjs): next-admin cost-model.ts musicUsd -- a song's flat price, or per minute x seconds.
+function musicUsd(model, seconds) {
+  if (!Object.hasOwn(rates.MUSIC_RATES, model)) throw unpriced(model);
+  return rates.musicUsd(model, seconds);
+}
 const toolUsd = (key) => {
   if (!rates.TOOL_RATES[key]) throw unpriced(key);
   return rates.TOOL_RATES[key].usd;
@@ -101,6 +106,7 @@ function priceOf(kind, model) {
   else if (kind === "transcribe") transcribeUsd(model, 0);
   else if (kind === "remove-bg") toolUsd("bg-remove");
   else if (kind === "enhance") enhanceUsd(model, 0); // model = the job's enhanceResolution
+  else if (kind === "music") musicUsd(model, 0);
   else if (kind === "3d") toolUsd(model); // card S4b: model = the TOOL_RATES key of the image -> 3D way
   else throw unpriced(kind);
 }
@@ -110,15 +116,18 @@ const at = (f) => { try { return f(); } catch { return null; } };
 // Token-billed speech = per minute of audio out (text in, ~US$0.0006 per 1000 characters, left out), marked 約.
 const speechPrice = (audio) => at(() => ("usdPerMChars" in (rates.OPENAI_TTS_RATES[audio] || {}) ? { usd: speechUsd(audio, 1000), unit: "千字" }
   : { usd: speechUsd(audio, 0, 60), unit: "分鐘", estimate: true }));
+// One music model's button price (capabilities music.models[].price): per song, or per minute.
+const musicPrice = (model) => at(() => (rates.MUSIC_RATES[model]?.usdPerSong !== undefined ? { usd: musicUsd(model), unit: "首" } : { usd: musicUsd(model, 60), unit: "分鐘" }));
 const transcribePrice = (model) => at(() => ({ usd: transcribeUsd(model, 60), unit: "分鐘", ...(rates.GEMINI_TRANSCRIBE_RATES[model] ? { estimate: true } : {}) }));
 // Unit prices the buttons show before a click (capabilities.prices -> shared/paid-price.js), from the same functions the
 // charge uses. Text: one call at the 3000-token output cap plus a nominal 20000-char input. An unpriced model = null.
-function displayPrices({ text, image, audio, transcribe }) {
+function displayPrices({ text, image, audio, transcribe, music }) {
   return {
     "video.script": at(() => ({ usd: textUsd(text, null, { inputChars: 20000, maxOutputTokens: 3000 }), unit: "次", estimate: true })),
     "video.image": at(() => ({ usd: imageUsd(image), unit: "張", estimate: true })),
     "video.tts": speechPrice(audio),
     "video.transcribe": transcribePrice(transcribe),
+    "video.music": musicPrice(music),
     // The least one run costs; a run's own estimate comes from POST /generations/quote (its source length).
     "video.enhance": at(() => ({ usd: enhanceUsd("720P", 0), unit: "次起", estimate: true })),
   };
@@ -127,4 +136,4 @@ function displayPrices({ text, image, audio, transcribe }) {
 // Replicate models billed per GPU second (TOOL_RATES usdPerSec): the one function, next-admin cost-model.ts replicateRunUsd.
 const runUsd = (key, predictTimeSec) => rates.replicateRunUsd(key, predictTimeSec);
 
-module.exports = { textUsd, imageUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice };
+module.exports = { textUsd, imageUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };

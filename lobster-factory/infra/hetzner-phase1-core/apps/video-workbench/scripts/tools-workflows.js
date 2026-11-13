@@ -29,11 +29,11 @@ function wfCheck(key, title) {
 function wfButton(title, action, disabled = false, paid = "", paidModel = "") {
   return `<button type="button" class="btn" data-flow-action="${esc(action)}"${paid ? ` data-paid="${esc(paid)}"` : ""}${paidModel ? ` data-paid-model="${esc(paidModel)}"` : ""} ${disabled ? "disabled" : ""}>${esc(title)}</button>`;
 }
-// Speech models / transcription engines from /capabilities (speech.models, transcribe.engines: one list on the server,
-// backend/speech.cjs and transcribe.cjs) as visible buttons: name · price, and the chosen row's pros and cons under them.
-// Which row is chosen: shared/models.js VideoWorkbenchProviders (one rule for every page).
+// Speech / music models and transcription engines from /capabilities (speech.models, music.models, transcribe.engines: one
+// list on the server, backend/speech.cjs, music.cjs and transcribe.cjs) as visible buttons: name · price, and the chosen
+// row's pros and cons under them. Which row is chosen: shared/models.js VideoWorkbenchProviders (one rule for every page).
 function wfProviders(kind) {
-  return { rows: window.VideoWorkbenchProviders.rows(kind), feature: kind === "speech" ? "video.tts" : "video.transcribe" };
+  return { rows: window.VideoWorkbenchProviders.rows(kind), feature: { speech: "video.tts", music: "video.music" }[kind] || "video.transcribe" };
 }
 const wfProviderCurrent = (kind, saved) => window.VideoWorkbenchProviders.current(kind, saved);
 function wfProviderChoice(kind, key, title) {

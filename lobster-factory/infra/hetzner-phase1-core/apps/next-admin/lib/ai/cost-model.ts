@@ -157,6 +157,9 @@ export const MEDIA_MODELS: Record<string, MediaModel> = {
   "gemini-3.5-transcribe":             { vendor: "Google", kind: "tool", status: "active", verifiedAt: "2026-11-10" },
   // video-workbench default video model since 2026-11-10 (GEMINI_VIDEO_RATES; backend/gemini-video.cjs).
   "gemini-omni-1.2-flash":             { vendor: "Google", kind: "video", status: "active", verifiedAt: "2026-11-10" },
+  // video-workbench 音樂生成 (MUSIC_RATES; backend/music.cjs). aistudio.google.com/docs/deprecations 2026-11-13: no shutdown date.
+  "lyria-3.5":                         { vendor: "Google", kind: "tool", status: "active" },
+  "lyria-3-clip-preview":              { vendor: "Google", kind: "tool", status: "active" },
   // video-service default until 2026-10-28; OpenAI: "The model 'dall-e-3' does not exist".
   "dall-e-3":                          { vendor: "OpenAI", kind: "image", status: "retired" },
   "runwayml/gen4-turbo":               { vendor: "Replicate", kind: "video", status: "active", verifiedAt: "2026-10-28" },
@@ -241,6 +244,24 @@ export function videoEnhanceUsd(resolution: string, outputSec: unknown, units?: 
   const measured = Number(units),
     counted = measured > 0 ? measured : Math.max(r.minUnits, Math.ceil(Math.max(0, Number(outputSec) || 0) * row.unitsPerSec - 1e-9));
   return Math.round(counted * r.usdPerUnit * 1e6) / 1e6;
+}
+
+/** video-workbench 音樂生成 (backend/music.cjs), keyed by the id the vendor sees. Google Lyria (aistudio.google.com/docs/pricing
+ *  2026-11-13, Paid Tier only): usdPerSong, one flat price per generated song or clip. ElevenLabs Eleven Music
+ *  (elevenlabs.io/pricing/api 2026-11-13: "$0.15 per minute"): usdPerMinute of the song's length -- the caller passes the
+ *  longer of the length asked for and the length returned, so the charge never falls under the bill. */
+export const MUSIC_RATES: Record<string, { label: string; vendor: "Google" | "ElevenLabs"; usdPerSong?: number; usdPerMinute?: number }> = {
+  "lyria-3.5":            { label: "Lyria 3.5", vendor: "Google", usdPerSong: 0.08 },
+  "lyria-3-clip-preview": { label: "Lyria 3 Clip", vendor: "Google", usdPerSong: 0.04 },
+  "music_v2_5":           { label: "Eleven Music v2.5", vendor: "ElevenLabs", usdPerMinute: 0.15 },
+};
+
+/** USD of one music generation: the song price, or the per-minute price x seconds / 60. */
+export function musicUsd(model: string, seconds?: unknown): number {
+  const rate = MUSIC_RATES[model];
+  if (!rate) throw new Error("not a priced music model: " + model);
+  if (rate.usdPerSong !== undefined) return rate.usdPerSong;
+  return Math.round(Math.max(0, Number(seconds) || 0) / 60 * (rate.usdPerMinute ?? 0) * 1e6) / 1e6;
 }
 
 /** USD of one Replicate run billed per GPU second (a TOOL_RATES row with usdPerSec): predict_time (the prediction's

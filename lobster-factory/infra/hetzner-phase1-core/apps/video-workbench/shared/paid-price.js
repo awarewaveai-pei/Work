@@ -24,6 +24,7 @@
     // A chosen speech model / transcription engine (data-paid-model = its id): that row's own price from the list.
     if (model && feature === "video.tts") return unitText(c.speech?.models?.find((m) => m.id === model)?.price);
     if (model && feature === "video.transcribe") return unitText(c.transcribe?.engines?.find((e) => e.id === model)?.price);
+    if (model && feature === "video.music") return unitText(c.music?.models?.find((m) => m.id === model)?.price);
     return unitText(c.prices?.[feature]);
   }
   // "" = no price known yet (capabilities not loaded) or a feature without a price.

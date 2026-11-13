@@ -367,9 +367,6 @@ function screen(t) {
     case "voice":
       body = `<div class="side" style="margin-top:35px;max-width:1100px">${segmented("voiceMode", ["純聲音", "影片／圖片配音"], "純聲音")}<p class="note">輸入台詞或對話，選好聲音後，AI 直接產出一段聲音。</p>${label("台詞內容")}${chips("voiceScriptMode", ["台詞", "音效"], "台詞")}${ta("voiceText", "輸入想要生成的台詞…", 500)}<div class="metric">口語旁白（建議使用）<span id="voiceCount">${val("voiceText").length}/500</span></div>${label("口語指示（選填）")}<p class="note">也可以在台詞中加入（停頓）、（輕笑）等指示，AI 會把它們當成語氣而不是念出來。</p>${chips("voiceEmotion", ["溫柔關心", "驚訝好奇", "興奮宣布", "生氣質問", "沉靜獨白", "語氣熱情"], "溫柔關心")}${label("我的聲音")}${btn("聲音設定（選填）", "toggle:voiceExtra")}<div id="voiceExtra" class="hidden">${label("語言")}${chips("voiceLang", ["繁體中文", "English"], "繁體中文")}${label("聲音")}${chips("voicePerson", ["女聲", "男聲"], "女聲")}</div>${label("目標長度")}${chips("voiceDuration", ["3 秒", "5 秒", "10 秒", "15 秒", "30 秒", "60 秒", "120 秒"], "5 秒")}<div class="divider"></div>${btn("語氣・語速 / 音調 / 音量", "toggle:voiceAdvanced")}<div id="voiceAdvanced" class="hidden">${range("語速", 100, 50, 150)}${range("音調", 0, -20, 20)}${range("音量", 100, 0, 150)}</div><div class="row" style="justify-content:flex-end">${btn("✣ 產生聲音 · 約 1 點", "submit", "primary")}</div></div>`;
       break;
-    case "music":
-      body = `<div class="side" style="margin-top:35px;max-width:900px">${label("從參考音樂開始（選填）")}<p class="note">選一首音樂，AI 會分析它的曲風、速度、調性、配器與段落，填進下方自訂設定。</p>${btn("↥ 從素材庫選取或上傳音訊", "upload:musicref")}<div class="divider"></div>${segmented("musicMode", ["簡易模式", "自訂配置"], "簡易模式")}${label("音樂提示詞／風格描述")}${ta("musicPrompt", "描述音樂風格、樂器、節奏、氛圍（例如：輕快 Lo-Fi 電子音樂，帶有舒緩鋼琴與微雨聲…）", 500)}<p class="note">Lyria 適合創作音樂短片；請使用曲風、樂器或情緒描述，避免直接輸入知名藝人或作品名稱。</p>${label("風格標籤")}${chips("musicStyle", ["輕柔 Lo-Fi", "史詩電影交響", "現代電子舞曲", "溫暖爵士", "電視流行", "木吉他民謠", "美洲嘻哈", "冥想氛圍"], "輕柔 Lo-Fi")}${label("生成模型")}${chips("musicModel", ["Lyria 3.5", "Lyria Clip Preview", "Mureka V9"], "Lyria 3.5")}<div class="balance"><span class="tag">15 點</span><span>剩餘 90 點</span></div><div class="row" style="justify-content:flex-end">${btn("✣ 生成音樂（15 點）", "submit", "primary")}</div></div>`;
-      break;
     case "separate":
       body = `<div class="two-col">${stage("◖))", "請選取影片或直接上傳（支援 MP4、MOV、WebM）", "從影片中提取並分離出獨立音訊檔，直接存入素材庫供後續配樂或剪輯使用。")} ${side(`<h3>音軌分離說明</h3><ul class="instruction"><li>支援 MP4 · MOV · WebM 影片檔提取音訊</li><li>輸出 48 kHz / 192 kbps 高品質立體聲 MP3</li><li>音檔自動存入素材庫，可供後續剪輯或配樂使用</li></ul>${cost(2, "／次")}`)}</div>`;
       break;
@@ -440,7 +437,6 @@ function render() {
   if (typeof toolEngineHostAfterRender === "function") toolEngineHostAfterRender();
   const unsupported = {
     sfx: "尚未設定配樂分離與畫面音效模型",
-    music: "尚未設定音樂生成模型",
     privacy: "尚未設定人臉偵測與追蹤模型",
     depth: "尚未設定深度影片模型",
   };

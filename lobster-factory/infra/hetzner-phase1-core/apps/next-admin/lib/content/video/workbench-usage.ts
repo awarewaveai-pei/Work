@@ -13,6 +13,7 @@ const ASK: Readonly<Record<string, () => Promise<Grant>>> = {
   "video.bg-remove": () => grantFor("video.bg-remove"),
   "video.3d": () => grantFor("video.3d"),
   "video.enhance": () => grantFor("video.enhance"),
+  "video.music": () => grantFor("video.music"),
 };
 
 /** One delivered workbench action -> charged to its billing account (POST /api/internal/video/workbench/usage). */

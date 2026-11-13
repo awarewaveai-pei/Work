@@ -276,12 +276,14 @@ const evidence = fs.mkdtempSync(
       await p.locator("[data-music-compiled]").innerText(),
       /128 BPM/,
     );
+    // 純器樂 hides the lyrics (none are sent); the lyrics helper needs it off.
+    await p.locator('[data-key="musicInstrumental"]').uncheck();
     await p.locator('[data-flow-action="music-lyrics-assist"]').click();
     await p.getByLabel("想寫什麼樣的歌？").fill("清晨出發的原創歌曲");
     await p.locator('[data-flow-action="music-lyrics-generate"]').click();
     await p.waitForFunction(() => values.musicLyrics?.includes("[Verse]"));
     assert(await p.locator('[data-flow-action="music-generate"]').isDisabled());
-    console.log("PASS 音樂自訂配置編譯、原創歌詞 API；未接音樂模型明示停用");
+    console.log("PASS 音樂自訂配置編譯、原創歌詞 API；沒有音樂金鑰時生成停用");
     await open("short", {
       shortMode: "多支短影音",
       subtitleText: "1\n00:00:01,000 --> 00:00:04,000\nShort clip caption\n",

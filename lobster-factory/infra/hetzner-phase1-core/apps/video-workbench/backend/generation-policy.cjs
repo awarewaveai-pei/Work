@@ -11,8 +11,9 @@ const geminiVideo = require("./gemini-video.cjs");
 const providers = require("./providers.cjs");
 const { videoUsd } = require("./provider-cost.cjs");
 const speech = require("./speech.cjs");
+const music = require("./music.cjs");
 const toolCosts = Object.freeze({ removeBackground: TOOL_RATES["bg-remove"].usd });
-const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: videoModels(env)[0].id, audio: speech.defaultModel(env).id });
+const models = (env) => ({ image: vwEnv(env, "IMAGE_MODEL") || "gpt-image-2.5-flare", video: videoModels(env)[0].id, audio: speech.defaultModel(env).id, music: music.defaultModel(env).id });
 // Video models the vendor shut down (OpenAI GET /v1/models/sora-2: shutdown_date 2026-09-24). A saved setting or an
 // old job naming one runs the default; the page says so once (shared/models.js replaceRetired).
 const RETIRED_VIDEO_MODELS = Object.freeze({ "sora-2": "Sora 2", "sora-2-pro": "Sora 2 Pro" });
@@ -54,6 +55,8 @@ function capabilities(env, localTools) {
     audio: speech.capability(env).models.some((m) => m.available), video: videoModels(env).some((m) => m.available),
     // The live speech models with voices and prices (backend/speech.cjs); pages draw them as buttons.
     speech: speech.capability(env),
+    // The live music models with what each accepts and its price (backend/music.cjs); pages draw them as buttons.
+    music: music.capability(env),
     provider,
     models: models(env),
     videoModels: videoModels(env), retiredVideoModels: RETIRED_VIDEO_MODELS,
