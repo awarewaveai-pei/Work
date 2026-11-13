@@ -1,4 +1,36 @@
 # Worklog
+## 2026-11-14（續1）影音工作台 P6.10 缺陷 1（B 案）：匯出與燒錄字幕改讀固定字型檔 vendor/fonts，中文不再被擋或變方框
+
+- 起因：EXP.2 已隨 887f2e1ae 上正式站；正式站容器沒有中文字型，所以含中文的剪輯器匯出和燒錄字幕全部被 EXP.2 擋下。監工改判缺陷 1 走 B：先把 ED 的字型包搬進 main。
+- **字型包取自 ED 帳號未 commit 的工作（D:\Work），ED 那邊 pull 時，同名的 untracked 檔要先比對再移除**（`scripts/vendor-fonts.cjs`、`tests/editor-fonts.cjs`、`vendor/fonts/sources.json`）；tracked 檔裡同一段的改動 pull 時會跟 ED 本機的修改重疊，以 main 為準。D:\Work 沒動任何檔。
+- 根因（P6.10 缺陷 1）：`backend/editor-export.cjs` 在非 Windows 把 思源黑體 寫成 `sans-serif`，正式站解析成 DejaVu（沒有漢字）；`backend/subtitle-burn.cjs` 同樣是 `sans-serif`。
+- 不變量：匯出和燒錄字幕畫的每個字，都來自 vendor/fonts 裡固定的字型檔（libass fontsdir），不依賴機器上裝了什麼字型。字型檔有就用；兩個檔都沒有的字一律由 EXP.2 擋下。
+- 從 ED 搬過來的（逐段比對 `git diff`，只帶跟字型有關的段）：
+  - `shared/editor-model.js`：FONTS／fontOf／CJK_CHAR／FONT_DIR。
+  - `backend/editor-export.cjs`：fontDir、樣式字型改用 `fontOf(...).family`、ass filter 加 `fontsdir`；刪掉沒人用的 fontFile。
+  - 字型下載：`scripts/vendor-fonts.cjs`＋`vendor/fonts/sources.json`（13 個檔，位元組數＋sha256）；package.json postinstall、Dockerfile `RUN node scripts/vendor-fonts.cjs`、.gitignore、`scripts/package.cjs` 打包清單。
+  - 預覽：`scripts/tools-editor.js` 的 edFontCss／edFontsRegister（@font-face）＋文字 family 那一行；`scripts/editor-panes/text.js` 文字卡 font-family 那一行。
+  - 測試：`tests/editor-fonts.cjs`（加進 gate）；`tests/ed5-text.cjs` 日期戳門檻 30→10（思源等寬筆畫較細）；`tests/ed3-legacy-golden.cjs`＋`fixtures/ed3-legacy/{args,framemd5}.json`（fontsdir 路徑以 `<APP>` 代換，重算畫格雜湊）。
+- 沒搬的（同一個檔裡、跟字型無關或拿不準）：`tools-editor.js` 的 edTextLook／edTextHtml 重構（字幕窗格樣式範例用）和依賴它的 edCjkRuns（預覽裡 Latin 字型內中文的字級校正）；`gate.cjs` 的 alpha-proxy 項；其餘 ED 的檔。
+- ED 包以外、我自己補的：
+  - 燒錄字幕：`subtitle-burn.cjs` 字型改成 思源黑體 的 family；`media.cjs` 的 ass filter 加 `fontsdir`（`editor-export.cjs` 匯出 fontDir）。不補的話，燒錄字幕的中文仍會被 EXP.2 擋下。
+  - critic C1：CI 用 `--ignore-scripts`，沒下載字型，gate 必紅。`.github/workflows/video-workbench-ci.yml` 加 actions/cache（key＝sources.json 雜湊）＋`node scripts/vendor-fonts.cjs`。
+  - critic C2：cjkFallback 原本用 Unicode 範圍判斷，Arial／Georgia 裡的 ★ ① ※（Gelasio 還有 α ♥）會被 EXP.2 擋。改成讀字型檔的 cmap（format 12／4，每個檔讀一次）：本字型沒有、思源黑體有，才換字型。
+  - critic m1：`vendor-fonts.cjs` 下載加 300 秒逾時，最多試 3 次。
+- `tests/export-glyphs.cjs`：第 2 項改成「Arial 內的中文照常匯出」；新增思源黑體中文、★ ① ※ α ♥、燒錄字幕中文三項成功；PUA 字仍必須失敗且不留檔。
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker run node:24.14.0-bookworm-slim（系統中文字型 0 個）：npm ci 由 postinstall 從零下載 vendor/fonts 13 檔、sha256 全對 → node tests/export-glyphs.cjs（7 PASS）＋ tests/editor-fonts.cjs（PASS）；抽格截圖 %TEMP%w-fonts-docker-finalrame-2-out-6.png（Arial 內中文）、frame-4-out-12.png（★ ① ※）、frame-6-out-20.png（燒錄字幕中文），中文正常、沒有方框 | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs（含 export-glyphs、editor-fonts）＋ ed3-legacy-golden／ed5-text／preview-parity／editor-render／ed10-subtitles-backend／ed6-audio | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：cjkFallback 換回 Unicode 範圍版 → export-glyphs「★」被拒（紅）；還原 → 綠 | exit=0 | ms=8000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/0m/1n（critic agent；C1 CI、C2 符號、n1 下載逾時，三項都已修）
+- ORACLE_WAIVED: Codex 額度用完（usage limit，2026-11-14 01:27 才恢復），oracle-quota 已設；改用獨立 critic agent 審查＋突變證據（cmap→Unicode 範圍：★ 測試變紅，還原後變綠）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=coverageCache|vendor-fonts.cjs|fontsdir|sans-serif | hits=13
+- 剩餘風險：
+  1. 預覽裡 Latin 字型內的中文字級跟匯出略有差（edCjkRuns 沒搬，它依賴 ED 未提交的 edTextLook 重構）。
+  2. ED pull 時要處理同名 untracked 檔和重疊的段落。
+  3. 每次 image build 要多下載約 133 MB 字型（有 sha256、逾時、重試）；GitHub 長時間不能連時 build 會失敗，舊容器不受影響。
+  4. 未部署。
+- 避免再發生：輸出用到的字型一律綁定固定檔案（fontsdir），要不要換字型看字型檔自己的 cmap，不靠機器上的字型名稱或 Unicode 範圍。
+- rollback：`git revert` 本 commit。revert 後，正式站的中文匯出會回到被 EXP.2 擋下的狀態。
 ## 2026-11-13（續16）部署：音樂生成、圖片局部編輯器、破框貼文動畫、ElevenLabs 免費額度上線（887f2e1ae）
 
 - 操作者：「現在部署」。

@@ -303,22 +303,100 @@ function tempo(speed) {
   parts.push("atempo=" + remaining);
   return parts.join(",");
 }
-function fontFile(clip) {
-  if (process.platform !== "win32") return null;
-  const file =
-    {
-      Arial: clip.bold ? "arialbd.ttf" : "arial.ttf",
-      Georgia: clip.bold ? "georgiab.ttf" : "georgia.ttf",
-      等寬字: "consola.ttf",
-      思源宋體: "mingliu.ttc",
-      思源黑體: clip.bold ? "msjhbd.ttc" : "msjh.ttc",
-    }[clip.font] || "msjh.ttc";
-  const candidate = path.join(
-    process.env.WINDIR || "C:\\Windows",
-    "Fonts",
-    file,
-  );
-  return fs.existsSync(candidate) ? candidate : null;
+// Which code points a font file draws (its OpenType cmap: format 12 preferred, else format 4), read once per file.
+// cjkFallback decides from the files the export actually uses, not from a Unicode range: Liberation Sans / Gelasio
+// also lack ★ ① ※ and the like, which 思源黑體 has.
+const coverageCache = new Map();
+function coverage(file) {
+  if (coverageCache.has(file)) return coverageCache.get(file);
+  const b = fs.readFileSync(path.join(fontDir(), file));
+  let cmap = -1;
+  for (let i = 0, n = b.readUInt16BE(4); i < n; i++) if (b.toString("latin1", 12 + 16 * i, 16 + 16 * i) === "cmap") cmap = b.readUInt32BE(12 + 16 * i + 8);
+  if (cmap < 0) throw Error("字型檔沒有 cmap：" + file);
+  const subtables = [];
+  for (let i = 0, n = b.readUInt16BE(cmap + 2); i < n; i++) {
+    const at = cmap + 4 + 8 * i,
+      offset = cmap + b.readUInt32BE(at + 4);
+    subtables.push({ platform: b.readUInt16BE(at), format: b.readUInt16BE(offset), offset });
+  }
+  const unicode = (t) => t.platform === 3 || t.platform === 0,
+    pick = subtables.find((t) => t.format === 12 && unicode(t)) || subtables.find((t) => t.format === 4 && unicode(t));
+  if (!pick) throw Error("字型檔沒有 Unicode cmap：" + file);
+  const ranges = []; // [first, last] code points that map to a glyph, ascending
+  const add = (cp) => {
+    const last = ranges[ranges.length - 1];
+    if (last && last[1] === cp - 1) last[1] = cp;
+    else ranges.push([cp, cp]);
+  };
+  if (pick.format === 12) {
+    for (let i = 0, n = b.readUInt32BE(pick.offset + 12); i < n; i++) {
+      const at = pick.offset + 16 + 12 * i;
+      ranges.push([b.readUInt32BE(at), b.readUInt32BE(at + 4)]);
+    }
+  } else {
+    const o = pick.offset,
+      segs = b.readUInt16BE(o + 6) / 2,
+      ends = o + 14,
+      starts = ends + 2 * segs + 2,
+      deltas = starts + 2 * segs,
+      rangeOffsets = deltas + 2 * segs;
+    for (let i = 0; i < segs; i++) {
+      const first = b.readUInt16BE(starts + 2 * i),
+        last = b.readUInt16BE(ends + 2 * i),
+        delta = b.readUInt16BE(deltas + 2 * i),
+        ro = b.readUInt16BE(rangeOffsets + 2 * i);
+      for (let cp = first; cp <= last && cp !== 0xffff; cp++) {
+        const g = ro === 0 ? cp : b.readUInt16BE(rangeOffsets + 2 * i + ro + 2 * (cp - first));
+        if (ro !== 0 && g === 0) continue;
+        if ((g + delta) & 0xffff) add(cp);
+      }
+    }
+  }
+  const has = (cp) => {
+    for (let lo = 0, hi = ranges.length - 1; lo <= hi; ) {
+      const mid = (lo + hi) >> 1;
+      if (cp < ranges[mid][0]) hi = mid - 1;
+      else if (cp > ranges[mid][1]) lo = mid + 1;
+      else return true;
+    }
+    return false;
+  };
+  coverageCache.set(file, has);
+  return has;
+}
+// A Dialogue text whose font lacks a character that 思源黑體 has: those runs switch to 思源黑體's family ({\fn}),
+// override blocks and \N kept as they are. libass would otherwise ask the machine for a font (none with Han on the
+// server image) and EXP.2 refuses the export. A character neither file has stays in the clip's font and is refused.
+function cjkFallback(text, clip) {
+  const face = EditorModel.fontOf(clip.font),
+    cjkFace = EditorModel.FONTS.思源黑體;
+  if (face === cjkFace) return text;
+  const ownHas = coverage(clip.bold ? face.bold : face.regular),
+    cjkHas = coverage(clip.bold ? cjkFace.bold : cjkFace.regular);
+  let out = "",
+    inCjk = false;
+  for (const part of text.split(/(\{[^}]*\}|\\[Nnh])/)) {
+    if (part.startsWith("{") || part.startsWith("\\")) out += part;
+    else
+      for (const ch of part) {
+        const cp = ch.codePointAt(0),
+          c = !ownHas(cp) && cjkHas(cp);
+        if (c !== inCjk) out += `{\\fn${c ? cjkFace.family : face.family}}`;
+        inCjk = c;
+        out += ch;
+      }
+  }
+  return out;
+}
+// The pinned font files (shared/editor-model.js FONTS) the ass filter reads through fontsdir. A missing file would let
+// libass fall back to whatever the machine has (no CJK font on the server image), so the export refuses instead.
+function fontDir() {
+  const dir = path.join(__dirname, "..", EditorModel.FONT_DIR),
+    missing = Object.values(EditorModel.FONTS)
+      .flatMap((f) => [f.regular, f.bold])
+      .filter((file) => !fs.existsSync(path.join(dir, file)));
+  if (missing.length) throw Error("剪輯器字型檔不見了（執行 npm install 會下載）：" + missing.join(", "));
+  return dir;
 }
 // Card P2: a .cube 3D LUT that lut3d can read: text, LUT_3D_SIZE 2..65 and exactly size^3 rows of three numbers.
 function checkCube(text) {
@@ -728,19 +806,7 @@ async function exportEditor(
       let contents = `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n`;
       const events = [];
       textClips.forEach((clip, index) => {
-        const font =
-          {
-            Arial: "Arial",
-            Georgia: "Georgia",
-            等寬字: "Consolas",
-            思源宋體:
-              process.platform === "win32" ? "PMingLiU" : "Noto Serif CJK TC",
-            思源黑體:
-              process.platform === "win32"
-                ? "Microsoft JhengHei"
-                : "sans-serif",
-          }[clip.font] ||
-          (process.platform === "win32" ? "Microsoft JhengHei" : "sans-serif");
+        const font = EditorModel.fontOf(clip.font).family;
         const alpha = Math.round((1 - clip.opacity) * 255)
             .toString(16)
             .padStart(2, "0"),
@@ -769,7 +835,7 @@ async function exportEditor(
           const look = subtitleLook(clip, size, alpha);
           contents += `Style: S${index},${font},${size},${look.primary},${look.secondary},${look.outlineColour},${look.back},${clip.bold ? -1 : 0},${clip.italic ? -1 : 0},0,0,100,100,0,${-clip.rotation},${look.borderStyle},${look.outline},${look.shadow},${alignment},10,10,0,1\n`;
           for (const e of subtitleEvents(clip))
-            events.push(`Dialogue: ${index},${assTime(clip.start + e.start)},${assTime(clip.start + e.end)},S${index},,0,0,0,,${position}${e.text}`);
+            events.push(`Dialogue: ${index},${assTime(clip.start + e.start)},${assTime(clip.start + e.end)},S${index},,0,0,0,,${position}${cjkFallback(e.text, clip)}`);
           return;
         }
         contents += `Style: S${index},${font},${size},${color},${assColor(clip.color, "FF")},${background},${background},${clip.bold ? -1 : 0},${clip.italic ? -1 : 0},0,0,100,100,0,${-clip.rotation},${clip.backgroundColor ? 3 : 1},${clip.backgroundColor ? EditorModel.TEXT_BOX.pad : 0},0,${alignment},10,10,0,1\n`;
@@ -784,7 +850,7 @@ async function exportEditor(
             .join("");
         } else text = text.replace(/\r?\n/g, "\\N");
         events.push(
-          `Dialogue: ${index},${assTime(clip.start)},${assTime(clip.start + clip.duration)},S${index},,0,0,0,,${position}${text}`,
+          `Dialogue: ${index},${assTime(clip.start)},${assTime(clip.start + clip.duration)},S${index},,0,0,0,,${position}${cjkFallback(text, clip)}`,
         );
       });
       contents +=
@@ -793,7 +859,7 @@ async function exportEditor(
         "\n";
       fs.writeFileSync(subtitle.file, contents, "utf8");
       const next = `[video${layer++}]`;
-      graph.push(`${video}ass=filename='${filterPath(subtitle.file)}'${next}`);
+      graph.push(`${video}ass=filename='${filterPath(subtitle.file)}':fontsdir='${filterPath(fontDir())}'${next}`);
       video = next;
     }
     // Overlays composite in BT.601 (FFmpeg's default for untagged RGB<->YUV); convert once to BT.709 TV range,
@@ -938,4 +1004,4 @@ async function exportEditor(
     for (const temp of temporary) fs.rmSync(temp, { force: true });
   }
 }
-module.exports = { exportEditor, validateProject, ratios, filters, checkCube, piecewise, tempo, SUBTITLE_STYLES, subtitleEvents };
+module.exports = { exportEditor, fontDir, validateProject, ratios, filters, checkCube, piecewise, tempo, SUBTITLE_STYLES, subtitleEvents };

@@ -157,7 +157,9 @@ const pass = (m) => console.log("PASS " + m);
         [r, g, b] = want(ordered[i].color);
       let hit = 0;
       for (let k = 0; k < f.length; k += 3) if (Math.abs(f[k] - r) + Math.abs(f[k + 1] - g) + Math.abs(f[k + 2] - b) < 60) hit++;
-      assert(hit > 30, `${names[i]}：匯出的畫面找不到字的顏色 ${ordered[i].color}（${hit} 點）`);
+      // Drawn or not: a missing line (box only, or tofu) has 0 such pixels. The thinnest is 日期戳 (10 digits in
+      // 等寬字 = Noto Sans Mono CJK TC since vendor/fonts, 2026-11-13): 20 points; every other template has 130+.
+      assert(hit > 10, `${names[i]}：匯出的畫面找不到字的顏色 ${ordered[i].color}（${hit} 點）`);
     }
     pass("十五張樣板匯出成 MP4，逐張抽格都有字");
     assert.deepEqual(errors, []);

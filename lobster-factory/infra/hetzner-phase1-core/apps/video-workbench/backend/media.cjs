@@ -93,7 +93,7 @@ async function media(input, { file, output, signal, env, fetchImpl }) {
     const subtitle = output('ass'), result = output('mp4');
     fs.writeFileSync(subtitle.file, buildAss(settings), 'utf8');
     try {
-      await run([...args, '-vf', `ass=filename='${filterPath(subtitle.file)}'`, '-map', '0:v:0', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac', '-movflags', '+faststart', result.file], signal);
+      await run([...args, '-vf', `ass=filename='${filterPath(subtitle.file)}':fontsdir='${filterPath(require('./editor-export.cjs').fontDir())}'`, '-map', '0:v:0', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac', '-movflags', '+faststart', result.file], signal);
       return { type: 'video', url: result.url };
     } catch (e) {
       fs.rmSync(result.file, { force: true }); // a refused burn (EXP.2) leaves no file behind

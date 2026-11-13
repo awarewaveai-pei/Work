@@ -207,7 +207,7 @@ function edTextCard(t) {
     t.bg ? `background:var(${edTextTokens[t.bg]})` : "",
     `font-weight:${t.bold ? 700 : 400}`,
     t.italic ? "font-style:italic" : "",
-    t.font === "思源宋體" ? "font-family:serif" : t.font === "等寬字" ? "font-family:monospace" : "",
+    `font-family:${edFontCss(t.font)}`,
     `font-size:${Math.max(11, Math.min(26, t.size / 4))}px`,
   ]
     .filter(Boolean)

@@ -15,7 +15,7 @@ function include(file) {
   const build = fs.mkdtempSync(path.join(os.tmpdir(), "awarewave-release-"));
   const content = path.join(build, "content"), app = path.join(content, "video-workbench");
   fs.mkdirSync(app, { recursive: true });
-  for (const name of ["index.html", "server.cjs", "config.js", "package.json", "package-lock.json", "start.cmd", "README.md", "LICENSE-DOMPURIFY", "assets", "backend", "pages", "scripts", "shared", "styles", "tests", "docs", "vendor/three", "vendor/blender", ...(lite ? [] : ["node_modules"])])
+  for (const name of ["index.html", "server.cjs", "config.js", "package.json", "package-lock.json", "start.cmd", "README.md", "LICENSE-DOMPURIFY", "assets", "backend", "pages", "scripts", "shared", "styles", "tests", "docs", "vendor/three", "vendor/blender", "vendor/fonts/sources.json", ...(lite ? [] : ["node_modules"])])
     fs.cpSync(path.join(root, name), path.join(app, name), { recursive: true, filter: include });
   if (!lite && !fs.existsSync(path.join(app, "node_modules/ffmpeg-static/ffmpeg.exe"))) throw Error("Install the Windows runtime dependencies before packaging");
   // Card P5: the three.js viewer files ship (vendor/three, MIT); Blender does not (GPL, ~400 MB): the package has

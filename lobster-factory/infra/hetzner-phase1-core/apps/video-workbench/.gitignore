@@ -19,6 +19,9 @@ assets/vision/wasm/
 
 # Downloaded by scripts/vendor-ffprobe.cjs (postinstall), SHA-256 checked against vendor/ffprobe/sources.json (tracked).
 vendor/ffprobe/ffprobe.exe
+# Downloaded by scripts/vendor-fonts.cjs (postinstall, every platform), checked against vendor/fonts/sources.json (tracked).
+vendor/fonts/*
+!vendor/fonts/sources.json
 
 # Copied by scripts/vendor-effectcraft.cjs from the scripts/effectcraft-pro build, checked against engines/effectcraft/VERSION.json (tracked).
 engines/effectcraft/web/

@@ -426,7 +426,27 @@
       return { text: w.text, glue, from, to: w.end };
     });
   }
+  // The editor's five fonts: menu name -> the family inside the pinned files in vendor/fonts/ (vendor/fonts/sources.json,
+  // scripts/vendor-fonts.cjs). The export names `family` in the ASS style with fontsdir = vendor/fonts; the preview loads
+  // the same files as @font-face under `css` (an alias no installed font has), so both read one file per face. An unknown
+  // name falls back to 思源黑體, as the export always did.
+  const FONT_DIR = "vendor/fonts";
+  const FONTS = {
+    思源黑體: { family: "Noto Sans CJK TC", css: "VW Noto Sans CJK TC", regular: "NotoSansCJKtc-Regular.otf", bold: "NotoSansCJKtc-Bold.otf" },
+    思源宋體: { family: "Noto Serif CJK TC", css: "VW Noto Serif CJK TC", regular: "NotoSerifCJKtc-Regular.otf", bold: "NotoSerifCJKtc-Bold.otf" },
+    等寬字: { family: "Noto Sans Mono CJK TC", css: "VW Noto Sans Mono CJK TC", regular: "NotoSansMonoCJKtc-Regular.otf", bold: "NotoSansMonoCJKtc-Bold.otf" },
+    Arial: { family: "Liberation Sans", css: "VW Liberation Sans", regular: "LiberationSans-Regular.ttf", bold: "LiberationSans-Bold.ttf" },
+    Georgia: { family: "Gelasio", css: "VW Gelasio", regular: "Gelasio-Regular.ttf", bold: "Gelasio-Bold.ttf" },
+  };
+  const fontOf = (name) => FONTS[name] || FONTS.思源黑體;
+  // 中文 in a Latin font (Arial / Georgia have no Han glyphs): the preview's CSS falls back to 思源黑體's file, so the
+  // export switches these characters to 思源黑體 too (\fn) instead of letting libass ask the machine for a font.
+  const CJK_CHAR = /[\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef]|[\u{20000}-\u{3ffff}]/u;
   const api = {
+    FONT_DIR,
+    FONTS,
+    fontOf,
+    CJK_CHAR,
     TRANSITION_CURVES,
     transitionProgress,
     TEXT_ANIMATION,

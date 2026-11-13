@@ -29,6 +29,9 @@ COPY . .
 # host's static folder (card FC.4); without them the "專業剪輯／專業特效" cards simply stay hidden.
 RUN npm ci --omit=dev \
     && node scripts/vendor-three.cjs
+# The editor's fonts (postinstall above downloads them): preview and export read these files; the image has no CJK font
+# of its own. Re-run = verify every file's sha256 (vendor/fonts/sources.json), so a missing or changed file fails the build.
+RUN node scripts/vendor-fonts.cjs
 
 RUN node -e "const fs=require('fs');const miss=require('./backend/appearance.cjs').runtimeFiles('.').filter((f)=>!fs.existsSync('.awarewave/'+f));if(miss.length){console.error('.awarewave/ is missing: '+miss.join(', '));process.exit(1)}"
 

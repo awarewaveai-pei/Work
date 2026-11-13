@@ -1,0 +1,99 @@
+{
+  "note": "The editor's fonts (shared/editor-model.js FONTS): preview @font-face and export fontsdir read these files. Downloaded by scripts/vendor-fonts.cjs (postinstall), checked by bytes + sha256. A mismatch means the upstream file changed: stop and investigate, never edit this file to make it pass.",
+  "files": [
+    {
+      "name": "NotoSansCJKtc-Regular.otf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf",
+      "bytes": 16435884,
+      "sha256": "dce08bd4fd91aa8aa76ed8fea4b694c2dfb8550f67871e326843212ddbeb88b4",
+      "license": "OFL-1.1 (noto-OFL.txt)"
+    },
+    {
+      "name": "NotoSansCJKtc-Bold.otf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/OTF/TraditionalChinese/NotoSansCJKtc-Bold.otf",
+      "bytes": 17000768,
+      "sha256": "3ee160e5015106e3ec1a394301df54fa9bbbf8a251519984aec5c0abc50840c0",
+      "license": "OFL-1.1 (noto-OFL.txt)"
+    },
+    {
+      "name": "NotoSerifCJKtc-Regular.otf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/TraditionalChinese/NotoSerifCJKtc-Regular.otf",
+      "bytes": 24541904,
+      "sha256": "234301038e76e7c35c43113785024700c4e4fe7bdce1d1fbbc42fca7e6683798",
+      "license": "OFL-1.1 (noto-OFL.txt)"
+    },
+    {
+      "name": "NotoSerifCJKtc-Bold.otf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/OTF/TraditionalChinese/NotoSerifCJKtc-Bold.otf",
+      "bytes": 25520284,
+      "sha256": "a4441a76dbf56719600c5dcbd5b5e5a068a20944cc41c959487a657133576ee6",
+      "license": "OFL-1.1 (noto-OFL.txt)"
+    },
+    {
+      "name": "NotoSansMonoCJKtc-Regular.otf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/Mono/NotoSansMonoCJKtc-Regular.otf",
+      "bytes": 16392304,
+      "sha256": "82a040aed900bba51b5990bc158a86b264c8ad5071a2d8911e8696350e0794b3",
+      "license": "OFL-1.1 (noto-OFL.txt)"
+    },
+    {
+      "name": "NotoSansMonoCJKtc-Bold.otf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/Mono/NotoSansMonoCJKtc-Bold.otf",
+      "bytes": 16956996,
+      "sha256": "5ea3414e255133ce51aae21bb1e0e428968158bddaaee2597fdfc30cc84bb39a",
+      "license": "OFL-1.1 (noto-OFL.txt)"
+    },
+    {
+      "name": "noto-OFL.txt",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/LICENSE",
+      "bytes": 4301,
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+      "license": "license text"
+    },
+    {
+      "name": "LiberationSans-Regular.ttf",
+      "url": "https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz",
+      "archive": { "bytes": 2385008, "sha256": "7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0", "member": "liberation-fonts-ttf-2.1.5/LiberationSans-Regular.ttf" },
+      "bytes": 410712,
+      "sha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8",
+      "license": "OFL-1.1 (liberation-OFL.txt)"
+    },
+    {
+      "name": "LiberationSans-Bold.ttf",
+      "url": "https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz",
+      "archive": { "bytes": 2385008, "sha256": "7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0", "member": "liberation-fonts-ttf-2.1.5/LiberationSans-Bold.ttf" },
+      "bytes": 414456,
+      "sha256": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173",
+      "license": "OFL-1.1 (liberation-OFL.txt)"
+    },
+    {
+      "name": "liberation-OFL.txt",
+      "url": "https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz",
+      "archive": { "bytes": 2385008, "sha256": "7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0", "member": "liberation-fonts-ttf-2.1.5/LICENSE" },
+      "bytes": 4414,
+      "sha256": "93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b",
+      "license": "license text"
+    },
+    {
+      "name": "Gelasio-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/SorkinType/Gelasio/7ab20e7e5c42791e603b9ee3201a0b49849cfdb2/fonts/ttf/Gelasio-Regular.ttf",
+      "bytes": 147572,
+      "sha256": "48c797fbe0e07c48a18cb962e7bdfa23f19618327dddf54093265328dc9eb39d",
+      "license": "OFL-1.1 (gelasio-OFL.txt); the repo has no release tags, so the URL pins a commit"
+    },
+    {
+      "name": "Gelasio-Bold.ttf",
+      "url": "https://raw.githubusercontent.com/SorkinType/Gelasio/7ab20e7e5c42791e603b9ee3201a0b49849cfdb2/fonts/ttf/Gelasio-Bold.ttf",
+      "bytes": 148380,
+      "sha256": "e0ef3addf1acf35f5c6aef2be00d0a2c01363bf70a5950e16650976051a0c462",
+      "license": "OFL-1.1 (gelasio-OFL.txt)"
+    },
+    {
+      "name": "gelasio-OFL.txt",
+      "url": "https://raw.githubusercontent.com/SorkinType/Gelasio/7ab20e7e5c42791e603b9ee3201a0b49849cfdb2/OFL.txt",
+      "bytes": 4387,
+      "sha256": "b393cb01867c919b44381512120dc3e4c954c7b47e2035c405f3a324799a4d29",
+      "license": "license text"
+    }
+  ]
+}

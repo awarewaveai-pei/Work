@@ -1603,6 +1603,32 @@ const edRgba = (hex, a) => {
   const n = parseInt(String(hex || "#000000").slice(1), 16);
   return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${Number(a.toFixed(4))})`;
 };
+// The editor's fonts (EditorModel.FONTS): the pinned files in vendor/fonts/, the ones the export's ass fontsdir reads,
+// added once as FontFaces under their own alias, so the preview never draws with an installed font of the same name.
+// A Latin font falls back to the CJK sans for 中文 (libass falls back to a font that has the glyph). A face finishing
+// its load re-measures (edAssEm) and repaints.
+function edFontCss(name) {
+  const css = EditorModel.fontOf(name).css,
+    cjk = EditorModel.FONTS.思源黑體.css;
+  return css === cjk || /CJK/.test(css) ? `"${css}"` : `"${css}","${cjk}"`;
+}
+(function edFontsRegister() {
+  if (typeof FontFace !== "function" || !document.fonts) return;
+  const build = document.documentElement.getAttribute("data-vw-build"),
+    // Relative to this file (scripts/tools-editor.js), so the URL is right from index.html and from pages/*.html alike.
+    here = document.currentScript?.src || document.baseURI,
+    url = (file) => new URL(`../${EditorModel.FONT_DIR}/${file}${build ? "?v=" + encodeURIComponent(build) : ""}`, here).href;
+  for (const f of Object.values(EditorModel.FONTS))
+    for (const [file, weight] of [
+      [f.regular, "400"],
+      [f.bold, "700"],
+    ])
+      document.fonts.add(new FontFace(f.css, `url("${url(file)}")`, { weight, display: "block" }));
+  document.fonts.addEventListener("loadingdone", () => {
+    edAssEmCache.clear();
+    if (document.querySelector("[data-ed-stage]")) edPaint();
+  });
+})();
 // An ASS font size is the font's ascent + descent (libass, as VSFilter); a CSS font-size is its em. CSS size per ASS size,
 // measured once per family.
 const edAssEmCache = new Map();
@@ -1629,7 +1655,7 @@ function edPaintText(p, c, el, stage, z) {
     stroke = look && !box ? Math.max(1, Math.round(size * EditorModel.SUBTITLE_EDGE.outline)) : 0,
     fill = look ? look.text : c.color,
     plan = look && EditorModel.subtitleWordPlan(c),
-    family = { 思源黑體: "sans-serif", 思源宋體: "serif", 等寬字: "monospace" }[c.font] || c.font,
+    family = edFontCss(c.font),
     span = (text, css) => Object.assign(document.createElement("span"), { textContent: text, style: css });
   let parts = null;
   if (plan && c.subtitleStyle === "逐字高亮") {

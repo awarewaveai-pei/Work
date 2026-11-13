@@ -73,6 +73,16 @@ jobs:
       - name: Install dependencies
         run: npm ci --omit=dev --ignore-scripts && node node_modules/ffmpeg-static/install.js
 
+      # The editor's pinned fonts (export fontsdir; tests export-glyphs / editor-fonts): skipped by --ignore-scripts above.
+      - name: Cache editor fonts
+        uses: actions/cache@v4
+        with:
+          path: lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/vendor/fonts
+          key: vw-fonts-${{ hashFiles('lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/vendor/fonts/sources.json') }}
+
+      - name: Editor fonts (sha256 checked against vendor/fonts/sources.json)
+        run: node scripts/vendor-fonts.cjs
+
       - name: Bundle .awarewave from the checked-out next-admin
         run: node scripts/bundle-awarewave.cjs ../next-admin
 

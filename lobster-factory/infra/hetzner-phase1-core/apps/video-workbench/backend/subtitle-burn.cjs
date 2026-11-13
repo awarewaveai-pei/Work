@@ -74,8 +74,9 @@ function buildAss(settings) {
     margin = Math.round(
       height * (position === "下方" ? 0.1 : position === "中下" ? 0.25 : 0.08),
     );
-  const font =
-    process.platform === "win32" ? "Microsoft JhengHei" : "sans-serif";
+  // 思源黑體's pinned file (vendor/fonts, read through fontsdir in backend/media.cjs), the editor export's font: the
+  // server image has no CJK font, so a machine font name drew 中文 as boxes (refused since EXP.2).
+  const font = require("../shared/editor-model.js").FONTS.思源黑體.family;
   const header = `[Script Info]\nScriptType: v4.00+\nPlayResX: ${width}\nPlayResY: ${height}\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,${font},${Math.round((height * size) / 1000)},${assColor(color)},${assColor(color)},${box ? back : assColor("#000000")},${back},0,0,0,0,100,100,0,0,${box ? 3 : 1},${border},${style === "白字陰影" ? 3 : 0},${alignment},20,20,${margin},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
   return (
     header +

@@ -32,8 +32,13 @@ ff(["-f", "lavfi", "-i", "color=c=0xc04020:s=320x180", "-frames:v", "1", path.jo
 ff(["-f", "lavfi", "-i", "sine=frequency=660:duration=3", path.join(dir, "tone.wav")]);
 fs.writeFileSync(path.join(dir, "grade.cube"), "LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 .9\n1 0 .9\n0 1 .9\n1 1 .9\n");
 
-const placeholders = [dir, dir.replace(/\\/g, "/"), filterPath(dir)].sort((a, b) => b.length - a.length);
-const scrub = (s) => placeholders.reduce((out, p) => out.split(p).join("<DIR>"), s);
+// <APP> = this app's folder: the export's ass fontsdir points at <APP>/vendor/fonts, which differs per checkout.
+const app = path.join(__dirname, ".."),
+  placeholders = [
+    ...[dir, dir.replace(/\\/g, "/"), filterPath(dir)].map((p) => [p, "<DIR>"]),
+    ...[app, app.replace(/\\/g, "/"), filterPath(app)].map((p) => [p, "<APP>"]),
+  ].sort((a, b) => b[0].length - a[0].length);
+const scrub = (s) => placeholders.reduce((out, [p, name]) => out.split(p).join(name), s);
 const corpus = JSON.parse(fs.readFileSync(path.join(here, "projects.json"), "utf8"));
 
 function firstDifference(want, got) {
