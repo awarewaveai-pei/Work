@@ -224,15 +224,8 @@ const TOOLS = [
     new: 1,
   },
 ];
-const CATS = [
-  ["全部", 15],
-  ["剪輯成片", 4],
-  ["畫質修復", 2],
-  ["聲音", 4],
-  ["品牌與合規", 3],
-  ["生成前置", 2],
-  ["社群", 1],
-];
+// Category order on the tools home; each pill's count is the tools shown in it (home), never a number kept here.
+const CATS = ["全部", "剪輯成片", "畫質修復", "聲音", "品牌與合規", "生成前置", "社群"];
 const $ = (s) => document.querySelector(s),
   esc = (s) =>
     String(s ?? "").replace(
@@ -326,17 +319,14 @@ function header(t, prefix, desc) {
   return `<button class="back" data-act="home">←　返回應用工具</button><div class="eyebrow">${prefix} · ${esc(t.name)}</div><div class="hero"><h1>${esc(t.name)}</h1><div class="lead">${desc || esc(t.desc)}</div></div>`;
 }
 function home() {
-  let filtered = TOOLS.filter(
-    (t) =>
-      (typeof engineToolVisible !== "function" || engineToolVisible(t)) &&
-      (category === "全部" || t.cat === category) &&
-      [t.name, t.desc].join(" ").includes(search),
-  );
-  return `<div class="wrap"><div class="hero"><h1>應用<span class="gradient">工具</span></h1><div class="lead">單一用途的小工具，不用開專案就能用</div></div><div class="controls"><div class="filters">${CATS.map(([c, n]) => `<button class="pill ${c === category ? "active" : ""}" data-act="category:${c}">${c}<small>${n}</small></button>`).join("")}</div><input id="search" class="search" placeholder="⌕  搜尋工具，例如「字幕」「4K」" value="${esc(search)}"></div>${
+  const visible = TOOLS.filter((t) => typeof engineToolVisible !== "function" || engineToolVisible(t)),
+    count = (c) => (c === "全部" ? visible.length : visible.filter((t) => t.cat === c).length);
+  let filtered = visible.filter((t) => (category === "全部" || t.cat === category) && [t.name, t.desc].join(" ").includes(search));
+  return `<div class="wrap"><div class="hero"><h1>應用<span class="gradient">工具</span></h1><div class="lead">單一用途的小工具，不用開專案就能用</div></div><div class="controls"><div class="filters">${CATS.map((c) => `<button class="pill ${c === category ? "active" : ""}" data-act="category:${c}">${c}<small>${count(c)}</small></button>`).join("")}</div><input id="search" class="search" placeholder="⌕  搜尋工具，例如「字幕」「4K」" value="${esc(search)}"></div>${
     filtered.length
       ? CATS.slice(1)
-          .filter(([c]) => category === "全部" || category === c)
-          .map(([c]) => {
+          .filter((c) => category === "全部" || category === c)
+          .map((c) => {
             let a = filtered.filter((t) => t.cat === c);
             return a.length
               ? `<section><div class="section-head"><b>${c}</b><span>${

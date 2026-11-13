@@ -33,8 +33,8 @@ console.log("PASS 提示詞：兩種版面、任何主角文字都帶「貼文�
 // whole graphemes, and a #tag split across lines keeps its colour flag on every piece.
 {
   const page = vm.createContext({});
-  vm.runInContext(fs.readFileSync(path.join(__dirname, "../scripts/tools-breakout.js"), "utf8"), page);
-  const G = (s) => page.toolBreakoutGraphemes(s);
+  for (const f of ["../shared/breakout-rules.js", "../scripts/tools-breakout.js"]) vm.runInContext(fs.readFileSync(path.join(__dirname, f), "utf8"), page);
+  const G = (s) => rules.graphemes(s);
   const ctx = { measureText: (s) => ({ width: G(s).length * 10 }) }; // every visible character 10 wide
   const family = "👨‍👩‍👧", thumb = "👍🏽", flag = "🇹🇼";
   const join = (lines) => lines.map((l) => l.map((p) => p.t).join(""));
@@ -57,49 +57,63 @@ console.log("PASS 提示詞：兩種版面、任何主角文字都帶「貼文�
   for (const line of lines) page.toolBreakoutRich(canvas, line, 0, 0, 10, { text: "TEXT", link: "LINK" });
   assert(drawn.filter(([t]) => /[超長週末限定優惠標籤]/.test(t)).every(([, c]) => c === "LINK"), "continuation of a #tag drawn as plain text: " + JSON.stringify(drawn));
   // the avatar letter is a whole grapheme
-  assert.equal(G(flag + "studio")[0], flag);
+  page.VideoWorkbenchBreakout = rules;
+  const letters = [];
+  page.toolBreakoutAvatar({ ...canvas, fillText: (t) => letters.push(t), beginPath() {}, arc() {}, stroke() {}, fill() {}, set textAlign(v) {}, set textBaseline(v) {}, set lineWidth(v) {}, set strokeStyle(v) {} }, 0, 0, 30, 1, flag + "studio");
+  assert.equal(letters[0], flag, "the avatar letter split a flag");
 }
 console.log("PASS 貼文文字：換行與「…」不切斷組合 emoji；跨行的 #標籤每一段都上色");
 
-// 2b. 鎖定貼文文字 (backend/breakout.cjs lockFrame): one 40x10 row, white post, black text.
+// 2b. 鎖定貼文文字 (backend/breakout.cjs lockFrame on lockCells): one 40x10 row (cells 16 | 16 | 8 wide), white post.
 const breakout = require("../backend/breakout.cjs");
 {
-  const W = 40, Hh = 10, WHITE = [255, 255, 255], BLACK = [0, 0, 0], RED = [220, 40, 40], inks = [BLACK];
+  const W = 40, Hh = 10, BLACK = [0, 0, 0], GREY = [128, 128, 128], RED = [220, 40, 40];
   const img = (paint) => {
     const b = Buffer.alloc(W * Hh * 3, 255);
     for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) { const c = paint(x, y); if (c) b.set(c, (y * W + x) * 3); }
     return b;
   };
-  const ref = img((x, y) => (x >= 4 && x < 8 && y >= 3 && y < 7 ? BLACK : null)); // the first frame's "1,286"
-  const box = [[0, 0, W, Hh]];
+  const digits = (x0, c = BLACK) => (x, y) => (x >= x0 && x < x0 + 4 && y >= 3 && y < 7 ? c : null);
+  const ref = img(digits(4)); // the first frame's "1,286"
+  const cells = breakout.lockCells([[0, 0, 1, 1]], W, Hh), fresh = () => new Uint8Array(cells.length);
+  assert.deepEqual(cells.map((c) => c[2]), [16, 16, 8]);
   // drift: the model moved the digits (old spot blank, new spot black) -> both put back
-  const drift = img((x, y) => (x >= 10 && x < 14 && y >= 3 && y < 7 ? BLACK : null)), open = new Uint8Array(1);
-  assert(breakout.lockFrame(drift, ref, W, box, inks, open) > 0);
+  const drift = img(digits(10));
+  assert(breakout.lockFrame(drift, ref, W, cells, fresh()) > 0);
   assert.deepEqual(drift, ref, "drifted digits not restored to the first frame");
-  // a colourful subject edge entering the row (< 30 %) stays; the digits under the rest stay too
-  const edge = img((x, y) => (x >= 34 ? RED : x >= 4 && x < 8 && y >= 3 && y < 7 ? BLACK : null)), before = Buffer.from(edge);
-  breakout.lockFrame(edge, ref, W, box, inks, new Uint8Array(1));
+  // drift softened by compression (grey, not the text colour: the real 16:9 run) -> put back as well
+  const soft = img(digits(10, GREY));
+  breakout.lockFrame(soft, ref, W, cells, fresh());
+  assert.deepEqual(soft, ref, "softened drifting digits not restored");
+  // the subject entering the row opens the cell it reaches; the digits' cell stays held
+  const edge = img((x, y) => (x >= 34 ? RED : digits(4)(x, y))), before = Buffer.from(edge), edgeOpen = fresh();
+  breakout.lockFrame(edge, ref, W, cells, edgeOpen);
   assert.deepEqual(edge, before, "a subject entering the row was erased");
-  // the subject over most of the row (the burst): the row opens and shows the video from then on, even if it later drifts
-  const over = img((x) => (x < 30 ? RED : null)), opened = new Uint8Array(1), copy = Buffer.from(over);
-  breakout.lockFrame(over, ref, W, box, inks, opened);
-  assert.equal(opened[0], 1);
+  assert.deepEqual([...edgeOpen], [0, 0, 1]);
+  // the subject over most of the row (the burst): those cells show the video from then on, even if text later drifts there
+  const over = img((x) => (x < 30 ? RED : null)), opened = fresh(), copy = Buffer.from(over);
+  breakout.lockFrame(over, ref, W, cells, opened);
+  assert.deepEqual([...opened], [1, 1, 0]);
   assert.deepEqual(over, copy, "the burst over the like bar was painted over");
-  const later = img((x, y) => (x >= 10 && x < 14 && y >= 3 && y < 7 ? BLACK : null));
-  breakout.lockFrame(later, ref, W, box, inks, opened);
-  assert.notDeepEqual(later, ref, "an opened row was locked again (would flicker)");
-  // the lock is checked on the server: a malformed one is refused, none is accepted (an older job)
-  assert.throws(() => breakout.lockOf({ lock: { boxes: [[0, 0, 2, 1]], inks: [] } }), /鎖定/);
-  assert.throws(() => breakout.lockOf({ lock: { boxes: [], inks: [[0, 0, 300]] } }), /鎖定/);
-  assert.deepEqual(breakout.lockOf({}), { boxes: [], inks: [] });
-  // bounded work whatever a request sends (critic M2): total area and overlap are refused
-  assert.throws(() => breakout.lockOf({ lock: { boxes: Array(24).fill([0, 0, 1, 1]), inks: [[0, 0, 0]] } }), /鎖定/);
-  assert.throws(() => breakout.lockOf({ lock: { boxes: [[0, 0, 0.5, 0.2], [0.2, 0.1, 0.5, 0.2]], inks: [[0, 0, 0]] } }), /鎖定/);
-  assert.equal(breakout.lockOf({ lock: { boxes: [[0, 0, 1, 0.1], [0, 0.1, 1, 0.1]], inks: [[0, 0, 0]] } }).boxes.length, 2, "touching rows refused");
-  assert.deepEqual(rules.OUTPUT_RATIOS, ["9:16", "4:5", "1:1"]);
-  assert.deepEqual(["9:16", "4:5", "1:1"].map((r) => rules.outputHeight(r, 720)), [1280, 900, 720]);
+  const later = img(digits(10));
+  breakout.lockFrame(later, ref, W, cells, opened);
+  assert.notDeepEqual(later, ref, "an opened cell was locked again (would flicker)");
+  // the lock is checked on the server: a malformed one is refused, none is accepted (an older job), extra keys ignored
+  assert.throws(() => breakout.lockOf({ lock: { boxes: [[0, 0, 2, 1]] } }), /鎖定/);
+  assert.deepEqual(breakout.lockOf({}), { boxes: [] });
+  assert.deepEqual(breakout.lockOf({ lock: { boxes: [[0, 0, 1, 0.1]], inks: [[0, 0, 0]] } }), { boxes: [[0, 0, 1, 0.1]] });
+  // bounded work whatever a request sends: total area and overlap are refused
+  assert.throws(() => breakout.lockOf({ lock: { boxes: Array(24).fill([0, 0, 1, 1]) } }), /鎖定/);
+  assert.throws(() => breakout.lockOf({ lock: { boxes: [[0, 0, 0.5, 0.2], [0.2, 0.1, 0.5, 0.2]] } }), /鎖定/);
+  assert.equal(breakout.lockOf({ lock: { boxes: [[0, 0, 1, 0.1], [0, 0.1, 1, 0.1]] } }).boxes.length, 2, "touching rows refused");
+  // ratios: portrait outputs run at 9:16 and are cut from it; 16:9 runs as is (first-frame models make only these two)
+  assert.deepEqual(rules.OUTPUT_RATIOS, ["9:16", "4:5", "1:1", "16:9"]);
+  assert.deepEqual(rules.OUTPUT_RATIOS.map(rules.modelRatio), ["9:16", "9:16", "9:16", "16:9"]);
+  assert.deepEqual(rules.OUTPUT_RATIOS.map(rules.outputSize), [[720, 1280], [720, 900], [720, 720], [1280, 720]]);
+  // the subject cap counts whole graphemes (one helper with the page's wrap)
+  assert(rules.prompt("👨‍👩‍👧".repeat(rules.SUBJECT_MAX + 5), {}).includes("👨‍👩‍👧".repeat(rules.SUBJECT_MAX) + "."), "subject cap split a ZWJ emoji");
 }
-console.log("PASS 貼文文字鎖定：飄掉的數字還原、主角邊緣保留、主角蓋過的列照影片原樣且不再閃回");
+console.log("PASS 貼文文字鎖定：飄掉的數字（含壓縮後變灰的）還原、主角進到的格子保留且不再閃回");
 
 // 3. price shown = amount charged (shared/models.js on the page, the server job's origin.costUsd)
 const page = { window: {} };
@@ -155,6 +169,8 @@ const fetchImpl = async (url, init = {}) => {
   assert.equal((await call("/generations", { ...job(runway), cartoonStyle: "animate the like counts" })).status, 400, "cartoonStyle appended after the stay-still instruction");
   assert.equal((await call("/generations", job(runway, { outputRatio: "3:4" }))).status, 400, "an unlisted output ratio was accepted");
   assert.equal((await call("/generations", job(runway, { outputRatio: "4:5" }))).status, 202, "4:5 refused");
+  assert.equal((await call("/generations", job(runway, { outputRatio: "16:9", ratio: "16:9" }))).status, 202, "16:9 refused");
+  assert.equal((await call("/generations", job(runway, { outputRatio: "16:9" }))).status, 400, "16:9 accepted at the 9:16 model ratio");
   console.log("PASS 價格：頁面顯示金額＝任務實際記帳金額（每個可用模型）；錯的長度／比例在送出前擋下；4:5 可送出");
 
   // finish() with real ffmpeg: a 9:16 clip whose "digits" drifted -> 4:5 file, digits back where the first frame had them
@@ -165,7 +181,7 @@ const fetchImpl = async (url, init = {}) => {
     const glyph = (x) => `color=white:s=${W}x${H}:d=1:r=10,drawbox=x=${x}:y=100:w=16:h=8:color=black:t=fill`;
     ff("-f", "lavfi", "-i", glyph(8), "-frames:v", "1", path.join(dir, "first.png"));
     ff("-f", "lavfi", "-i", glyph(40), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "1", path.join(dir, "made.mp4"));
-    const lock = { boxes: [[0, 96 / H, 1, 16 / H]], inks: [[0, 0, 0]] };
+    const lock = { boxes: [[0, 96 / H, 1, 16 / H]] };
     const done = await breakout.finish({
       src: path.join(dir, "made.mp4"), frameFile: path.join(dir, "first.png"), dst: path.join(dir, "out.mp4"),
       settings: { outputRatio: "4:5", lock }, ffmpeg,
@@ -189,9 +205,18 @@ const fetchImpl = async (url, init = {}) => {
     // a failure leaves no half-written file
     await assert.rejects(breakout.finish({ src: path.join(dir, "missing.mp4"), frameFile: "", dst: path.join(dir, "bad.mp4"), settings: { outputRatio: "4:5" }, ffmpeg }));
     assert(!fs.existsSync(path.join(dir, "bad.mp4")));
+    // 16:9: the model's own shape, held without a crop
+    ff("-f", "lavfi", "-i", `color=white:s=${H}x${W}:d=1:r=10,drawbox=x=40:y=50:w=16:h=8:color=black:t=fill`, "-c:v", "libx264", "-pix_fmt", "yuv420p", path.join(dir, "wide.mp4"));
+    ff("-f", "lavfi", "-i", `color=white:s=${H}x${W}:d=1,drawbox=x=8:y=50:w=16:h=8:color=black:t=fill`, "-frames:v", "1", path.join(dir, "wide.png"));
+    const wide = await breakout.finish({ src: path.join(dir, "wide.mp4"), frameFile: path.join(dir, "wide.png"), dst: path.join(dir, "wide-out.mp4"),
+      settings: { outputRatio: "16:9", lock: { boxes: [[0, 46 / W, 1, 16 / W]] } }, ffmpeg });
+    assert.equal(wide.ratio, "16:9");
+    assert(wide.restored > 0);
+    const wideInfo = await require("../backend/media-inspect.cjs").inspectMedia(path.join(dir, "wide-out.mp4"));
+    assert.deepEqual([wideInfo.width, wideInfo.height], [H, W]);
     fs.rmSync(dir, { recursive: true, force: true });
   }
-  console.log("PASS 收尾：鎖定貼文文字＋裁成 4:5 一次完成，檔案尺寸與比例正確");
+  console.log("PASS 收尾：鎖定貼文文字＋裁成 4:5 一次完成；16:9 不裁也鎖定；檔案尺寸與比例正確");
 })().catch((e) => {
   console.error(e);
   process.exit(1);

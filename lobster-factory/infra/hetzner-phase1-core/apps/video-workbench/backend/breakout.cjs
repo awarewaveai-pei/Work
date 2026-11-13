@@ -1,8 +1,8 @@
 // 破框貼文動畫 (tool "breakout") on the server: the page renders the post to a PNG (scripts/tools-breakout.js) and sends
 // it as the first frame of a normal video job; this checks that job, builds its prompt from shared/breakout-rules.js and
 // finishes the downloaded video (finish): the post's text rows are held to the first frame, then the output ratio is cut.
-// No first-frame model makes 4:5 or 1:1 (all 16:9 / 9:16), so those posts are drawn centred in a 9:16 frame and the
-// finished video is cropped to that centred box.
+// First-frame models make only 9:16 / 16:9 (shared/breakout-rules.js modelRatio): a 4:5 or 1:1 post is drawn centred in a
+// 9:16 frame and the finished video is cropped to that centred box; 16:9 runs as is.
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const { Worker, isMainThread, parentPort, workerData } = require("node:worker_threads");
@@ -14,7 +14,7 @@ function prepare(input, env) {
   const s = input.settings || {};
   if (!Object.hasOwn(rules.LAYOUTS, s.layout)) throw Error("請選擇貼文版面");
   if (!rules.OUTPUT_RATIOS.includes(s.outputRatio)) throw Error("輸出比例只支援 " + rules.OUTPUT_RATIOS.join("、"));
-  if (s.ratio !== rules.MODEL_RATIO) throw Error("破框貼文動畫以 9:16 生成");
+  if (s.ratio !== rules.modelRatio(s.outputRatio)) throw Error("破框貼文動畫的 " + s.outputRatio + " 以 " + rules.modelRatio(s.outputRatio) + " 生成");
   const vm = generationPolicy.videoModels(env).find((m) => m.id === s.model);
   if (!vm || !rules.eligible([vm]).length) throw Error("這個影片模型不能保留貼文當第一格畫面，請換一個模型");
   // The length the job runs and is charged for is read like api.cjs does (top-level duration first), not settings alone.
@@ -27,73 +27,72 @@ function prepare(input, env) {
   return rules.prompt(input.prompt, s);
 }
 
-// settings.lock = { boxes: [[x, y, w, h], ...] (0..1 of the 9:16 frame: the post's text rows), inks: [[r, g, b], ...]
-// (the colours text and icons are drawn in) }. None = nothing to hold (a job sent before the lock).
+// settings.lock = { boxes: [[x, y, w, h], ...] }: the post's text rows, 0..1 of the model frame. None = nothing to hold
+// (a job sent before the lock). Other keys are ignored (a page from before the cell rule also sent ink colours).
 // The rows of a post cover well under half the frame and never overlap; a lock asking for more is refused, so the
 // per-frame work stays bounded whatever a request sends (LOCK_MAX_AREA).
 const LOCK_MAX_AREA = 0.6;
 function lockOf(settings) {
   const lock = settings?.lock;
-  if (lock === undefined || lock === null) return { boxes: [], inks: [] };
+  if (lock === undefined || lock === null) return { boxes: [] };
   const unit = (v) => Number.isFinite(v) && v >= 0 && v <= 1;
-  const boxes = Array.isArray(lock.boxes) ? lock.boxes : null,
-    inks = Array.isArray(lock.inks) ? lock.inks : null;
+  const boxes = Array.isArray(lock.boxes) ? lock.boxes : null;
   const bad = () => Error("貼文文字鎖定資料無效");
-  if (!boxes || !inks || boxes.length > rules.LOCK_MAX_BOXES || inks.length > 8 ||
-    !boxes.every((b) => Array.isArray(b) && b.length === 4 && b.every(unit) && b[0] + b[2] <= 1.0001 && b[1] + b[3] <= 1.0001) ||
-    !inks.every((c) => Array.isArray(c) && c.length === 3 && c.every((v) => Number.isInteger(v) && v >= 0 && v <= 255)))
+  if (!boxes || boxes.length > rules.LOCK_MAX_BOXES ||
+    !boxes.every((b) => Array.isArray(b) && b.length === 4 && b.every(unit) && b[0] + b[2] <= 1.0001 && b[1] + b[3] <= 1.0001))
     throw bad();
   if (boxes.reduce((sum, b) => sum + b[2] * b[3], 0) > LOCK_MAX_AREA) throw bad();
   const eps = 1e-6,
     overlap = (a, b) => a[0] + eps < b[0] + b[2] && b[0] + eps < a[0] + a[2] && a[1] + eps < b[1] + b[3] && b[1] + eps < a[1] + a[3];
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) if (overlap(boxes[i], boxes[j])) throw bad();
-  return { boxes, inks };
+  return { boxes };
 }
 
-// A pixel "changed" when its RGB distance (sum of |d|) from the first frame passes CHANGED. A row whose changed share
-// passes OPEN has the subject over it (the burst): from that frame on it shows the video as made. Below that, only the
-// changed pixels that are text-coloured (in either frame) are put back: drifting digits and letters return, a colourful
-// subject edge entering the row stays.
-const LOCK = Object.freeze({ changed: 60, open: 0.3, ink: 70 });
+// Each row is cut into cells about as wide as 1.5 row heights (a few characters). A pixel "changed" when its RGB distance
+// (sum of |d|) from the first frame passes CHANGED. A cell whose changed share passes OPEN has the subject in it (the
+// burst): from that frame on it shows the video as made. Any other cell is put back whole: drifting digits and letters
+// return, however compression softened their edges. Text never fills a cell, so even a whole number shifting (old + new
+// place) stays under half; a subject entering a cell is held back until it covers half of it, then shows from then on.
+const LOCK = Object.freeze({ changed: 60, open: 0.5 });
 let scratch = new Int32Array(0); // reused changed-pixel list (one per thread)
 /**
- * Holds one decoded frame's text rows to the first frame, in place. frame/ref: rgb24 buffers of the same size (width w);
- * boxes in pixels [x, y, w, h]; open: one flag per box, kept across frames (set = the subject has reached that row).
- * Returns the number of pixels put back.
+ * Holds one decoded frame's text cells to the first frame, in place. frame/ref: rgb24 buffers of the same size (width w);
+ * cells in pixels [x, y, w, h] (lockCells); open: one flag per cell, kept across frames. Returns the pixels put back.
  */
-function lockFrame(frame, ref, w, boxes, inks, open) {
-  const near = (buf, i) => inks.some((c) => Math.abs(buf[i] - c[0]) + Math.abs(buf[i + 1] - c[1]) + Math.abs(buf[i + 2] - c[2]) <= LOCK.ink);
+function lockFrame(frame, ref, w, cells, open) {
   let restored = 0;
-  boxes.forEach(([bx, by, bw, bh], b) => {
-    if (open[b] || bw <= 0 || bh <= 0) return;
-    if (scratch.length < bw * bh) scratch = new Int32Array(bw * bh);
+  cells.forEach(([cx, cy, cw, ch], c) => {
+    if (open[c] || cw <= 0 || ch <= 0) return;
+    if (scratch.length < cw * ch) scratch = new Int32Array(cw * ch);
     let n = 0;
-    for (let y = by; y < by + bh; y++)
-      for (let x = bx; x < bx + bw; x++) {
+    for (let y = cy; y < cy + ch; y++)
+      for (let x = cx; x < cx + cw; x++) {
         const i = (y * w + x) * 3;
         if (Math.abs(frame[i] - ref[i]) + Math.abs(frame[i + 1] - ref[i + 1]) + Math.abs(frame[i + 2] - ref[i + 2]) > LOCK.changed) scratch[n++] = i;
       }
-    if (n > LOCK.open * bw * bh) {
-      open[b] = 1;
+    if (n > LOCK.open * cw * ch) {
+      open[c] = 1;
       return;
     }
     for (let k = 0; k < n; k++) {
       const i = scratch[k];
-      if (near(frame, i) || near(ref, i)) {
-        frame[i] = ref[i];
-        frame[i + 1] = ref[i + 1];
-        frame[i + 2] = ref[i + 2];
-        restored++;
-      }
+      frame[i] = ref[i];
+      frame[i + 1] = ref[i + 1];
+      frame[i + 2] = ref[i + 2];
     }
+    restored += n;
   });
   return restored;
 }
 
-function pixelBoxes(boxes, w, h) {
-  return boxes.map(([x, y, bw, bh]) => {
-    const x0 = Math.max(0, Math.floor(x * w)), y0 = Math.max(0, Math.floor(y * h));
-    return [x0, y0, Math.min(w, Math.ceil((x + bw) * w)) - x0, Math.min(h, Math.ceil((y + bh) * h)) - y0];
+/** Rows (0..1) -> cells in pixels of a w x h frame. */
+function lockCells(boxes, w, h) {
+  return boxes.flatMap(([x, y, bw, bh]) => {
+    const x0 = Math.max(0, Math.floor(x * w)), y0 = Math.max(0, Math.floor(y * h)),
+      x1 = Math.min(w, Math.ceil((x + bw) * w)), y1 = Math.min(h, Math.ceil((y + bh) * h)),
+      step = Math.max(16, Math.round((y1 - y0) * 1.5)), cells = [];
+    for (let cx = x0; cx < x1; cx += step) cells.push([cx, y0, Math.min(step, x1 - cx), y1 - y0]);
+    return cells;
   });
 }
 
@@ -123,15 +122,16 @@ const TO_YUV = "scale=out_color_matrix=bt709:in_range=pc:out_range=tv,format=yuv
 const TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
 
 async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
-  const { boxes, inks } = lockOf(settings),
-    ratio = rules.OUTPUT_RATIOS.includes(settings?.outputRatio) ? settings.outputRatio : rules.MODEL_RATIO;
+  const { boxes } = lockOf(settings),
+    ratio = rules.OUTPUT_RATIOS.includes(settings?.outputRatio) ? settings.outputRatio : "9:16",
+    [ma, mb] = rules.modelRatio(ratio).split(":").map(Number);
   const info = await require("./media-inspect.cjs").inspectMedia(src, signal);
   const W = info.width, H = info.height;
   if (!(W > 0 && H > 0)) throw Error("讀不到影片尺寸");
-  // The frame the page drew is 9:16 and the crop is cut from it: another shape or a rotated file would put the rows and
-  // the crop in the wrong place (and result.ratio would not be the file's), so it is refused and the 9:16 kept.
+  // The frame the page drew has the model's shape and the crop is cut from it: another shape or a rotated file would put
+  // the rows and the crop in the wrong place (and result.ratio would not be the file's), so it is refused and kept as made.
   if (info.probe?.rotation) throw Error("影片帶旋轉標記，無法鎖定與裁切");
-  if (Math.abs(H / W - 16 / 9) > 0.02) throw Error(`影片不是 9:16（${W}×${H}）`);
+  if (Math.abs(H / W - mb / ma) > 0.02) throw Error(`影片不是 ${ma}:${mb}（${W}×${H}）`);
   const outH = rules.outputHeight(ratio, W);
   if (outH > H) throw Error("輸出比例超出影片範圍");
   if (!boxes.length && outH === H) return { ratio, restored: 0, untouched: true }; // nothing to hold, nothing to cut
@@ -144,7 +144,7 @@ async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
     await run(ffmpeg, ["-y", "-v", "error", "-i", src, "-map", "0:a?", "-vf", crop + "format=yuv420p", ...out], signal, { stdout: false }).done;
     return { ratio, restored: 0 };
   }
-  const px = pixelBoxes(boxes, W, H), open = new Uint8Array(px.length), size = W * H * 3;
+  const cells = lockCells(boxes, W, H), open = new Uint8Array(cells.length), size = W * H * 3;
   const ref = await run(ffmpeg, ["-v", "error", "-i", frameFile, "-vf", `scale=${W}:${H}:flags=area`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal).done;
   if (ref.length !== size) throw Error("第一格畫面尺寸不符");
   const decoder = run(ffmpeg, ["-v", "error", "-noautorotate", "-i", src, "-vf", TO_RGB, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal);
@@ -163,7 +163,7 @@ async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
       filled += n;
       at += n;
       if (filled === size) {
-        restored += lockFrame(frame, ref, W, px, inks, open);
+        restored += lockFrame(frame, ref, W, cells, open);
         filled = 0;
         if (!encoder.child.stdin.write(Buffer.from(frame))) {
           decoder.child.stdout.pause();
@@ -187,7 +187,7 @@ async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
 const FINISH_TIMEOUT_MS = 5 * 60 * 1000;
 /**
  * The finished breakout video: text rows held to the first frame (settings.lock), then cut to settings.outputRatio's
- * centred box, in one encode. src: the model's 9:16 mp4; frameFile: the first-frame PNG the job sent; dst: output mp4.
+ * centred box, in one encode. src: the model's mp4 (9:16 or 16:9); frameFile: the first-frame PNG the job sent; dst: output mp4.
  * Runs in a worker thread (the per-frame pixel work must not hold the API's event loop), at most FINISH_TIMEOUT_MS.
  * Returns { ratio, restored, untouched? }: ratio = the written file's own ratio; untouched = nothing written, keep src.
  * A failure removes dst.
@@ -224,4 +224,4 @@ if (!isMainThread && workerData?.breakoutFinish) {
     .finally(() => parentPort.close());
 }
 
-module.exports = { prepare, finish, finishHere, lockFrame, lockOf, LOCK, LOCK_MAX_AREA };
+module.exports = { prepare, finish, finishHere, lockFrame, lockCells, lockOf, LOCK, LOCK_MAX_AREA };

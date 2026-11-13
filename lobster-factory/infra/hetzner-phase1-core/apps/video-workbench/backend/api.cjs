@@ -821,7 +821,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         if (job.status === "cancelled") return job;
         job.result = { url: output(video, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds, usage), job.video) };
         // 破框貼文動畫: hold the post's text rows to the first frame, then cut the output ratio (backend/breakout.cjs finish).
-        // The vendor run is already paid, so a failure keeps the model's 9:16 video and says so instead of failing the job.
+        // The vendor run is already paid, so a failure keeps the model's video as made and says so instead of failing the job.
         if (job.input?.operation === "breakout") {
           const src = path.join(dataDir, job.result.url.slice(1)), name = crypto.randomUUID() + ".mp4", dst = path.join(outputs, name);
           try {
@@ -841,7 +841,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             job.result.ratio = done.ratio; // the file's own ratio; readers of a job's ratio take result.ratio first
             job.result.textLock = { restoredPixels: done.restored };
           } catch (e) {
-            job.result.note = "已生成 9:16 影片，但貼文鎖定／裁切失敗：" + publicError(e.message);
+            job.result.note = "已生成 " + (job.input.settings?.ratio || "9:16") + " 影片，但貼文鎖定／裁切失敗：" + publicError(e.message);
           }
         }
         job.progress = 100;

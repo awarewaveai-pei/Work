@@ -19,12 +19,30 @@
   const usd = (m) => (Number.isFinite(m?.usdPerSec) ? m.usdPerSec * seconds(m) : null);
   const byPrice = (models) => [...models].sort((a, b) => (usd(a) ?? Infinity) - (usd(b) ?? Infinity));
   const LAYOUTS = Object.freeze({ burst: "從圖片衝出", float: "浮動貼文卡" });
-  // Every output is cut from the model's 9:16 (no first-frame model makes another portrait ratio): its centred box.
-  const OUTPUT_RATIOS = Object.freeze(["9:16", "4:5", "1:1"]);
-  // Height of an output of width w, even for H.264: 9:16 -> 1280 at 720, 4:5 -> 900, 1:1 -> 720.
-  const outputHeight = (ratio, w = 720) => {
-    const [a, b] = String(ratio).split(":").map(Number);
+  // First-frame models make 9:16 or 16:9 only. A landscape output runs at 16:9; every other output is cut from the
+  // model's 9:16 (its centred box).
+  const OUTPUT_RATIOS = Object.freeze(["9:16", "4:5", "1:1", "16:9"]);
+  const parts = (ratio) => String(ratio).split(":").map(Number);
+  const modelRatio = (ratio) => {
+    const [a, b] = parts(ratio);
+    return a > b ? "16:9" : "9:16";
+  };
+  // Height of an output of width w, even for H.264: 9:16 -> 1280 at 720, 4:5 -> 900, 1:1 -> 720, 16:9 -> 720 at 1280.
+  const outputHeight = (ratio, w) => {
+    const [a, b] = parts(ratio);
     return Math.round((w * b) / a / 2) * 2;
+  };
+  // The canvas size a ratio is drawn at (the page) = the model's 720p frame for 9:16 / 16:9.
+  const outputSize = (ratio) => {
+    const w = modelRatio(ratio) === "16:9" ? 1280 : 720;
+    return [w, outputHeight(ratio, w)];
+  };
+  // Grapheme clusters: what a reader sees as one character (👍🏽, a flag, a ZWJ family) stays whole. Every cut of user
+  // text (the page's wrap and "…", the subject cap here) goes through this; code points would split such emoji.
+  const segmenter = typeof Intl !== "undefined" && typeof Intl.Segmenter === "function" ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+  const graphemes = (text) => {
+    const s = String(text ?? "");
+    return segmenter ? Array.from(segmenter.segment(s), (g) => g.segment) : Array.from(s);
   };
   // 鎖定貼文文字: at most this many rows of the post are watched (scripts/tools-breakout.js lockBoxes).
   const LOCK_MAX_BOXES = 24;
@@ -33,7 +51,7 @@
   const STILL =
     "Keep the social post interface completely still and unchanged: the header, account name, avatar, icons, like bar, counts and caption text never move, never change, never redraw, and no new text, logo or watermark appears. Static camera, one continuous shot, no cuts.";
   function prompt(subject, settings = {}) {
-    const what = Array.from(String(subject || "").replace(/\s+/g, " ").trim()).slice(0, SUBJECT_MAX).join(""); // whole characters
+    const what = graphemes(String(subject || "").replace(/\s+/g, " ").trim()).slice(0, SUBJECT_MAX).join("");
     if (!what) throw Error("請描述衝出畫面的主角");
     const action =
       settings.layout === "float"
@@ -41,7 +59,7 @@
         : `The first frame is a social media post. The subject is: ${what}. It may already be in the post photo, or it emerges from inside the photo. Only this subject moves: it comes alive and bursts out of the photo frame, breaking past the photo's edges and moving in front of the like bar and the caption text below it, as if leaping out of the screen.`;
     return action + " " + STILL;
   }
-  const api = { chineseOrigin, eligible, seconds, usd, byPrice, prompt, STILL, LAYOUTS, OUTPUT_RATIOS, outputHeight, LOCK_MAX_BOXES, SUBJECT_MAX, MODEL_RATIO: "9:16" };
+  const api = { chineseOrigin, eligible, seconds, usd, byPrice, prompt, STILL, LAYOUTS, OUTPUT_RATIOS, modelRatio, outputHeight, outputSize, graphemes, LOCK_MAX_BOXES, SUBJECT_MAX };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.VideoWorkbenchBreakout = api;
 })(typeof window !== "undefined" ? window : globalThis);
