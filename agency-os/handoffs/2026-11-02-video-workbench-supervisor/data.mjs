@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影音工作台監工台',
-  updated: '2026-11-12',
+  updated: '2026-11-13',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/creative-suite-plan-20261102.md',
   req: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/handoff/Claude_Code_handoff_20261102.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-02 續19–續45',
@@ -199,7 +199,7 @@ export const STEPS = [
       done('P6.24', '11-10 批次上線 469e589f0（app＋工作台）：whisper 服務重建、工作台加 Gemini／whisper／Stability 設定；Gemini 儲值 NT$300 後配音預設恢復 Gemini（23eaf31a8）。ED.3.8 最後一個修正 d6ab0a1c6 尚未部署。', '469e589f0'),
       done('P6.25', '11-10 上線 9a6df4a73：頁面腳本改同時下載（應用工具後段 8 秒→1 秒）；瀏覽器保留讀過的素材副本，同一支第二次不經網路（分組織、登出即清）。首屏前段仍約 6 秒（css/js 經 Cloudflare 逐一回應），已提案另查。', '9a6df4a73'),
       done('P6.26', '11-12 上線 8ebf9f507：靜態檔帶版本號存 Cloudflare 邊緣、工具點開才載入（應用工具首屏約 10 秒→約 2 秒，剩下是兩支 API）；Edge 免費配音補回（四個聲音、預設；Edge 掛了自動改 Gemini 照 Gemini 計價），video-service 重建＋compose 兩行（safe-infra-patch）；含另一帳號的 ED.8／ED.10／ED.11。同晚 BOOT.2（9804772b6）：/state 與 /capabilities 同時發，清單約 1.75 秒；剩下是登入確認往返歐洲。', '9804772b6'),
-      todo('P6.16', '（操作者 11-05 說先不用）主題改成 app 存檔才通知 video、使用者切回分頁時重讀，取代現在的「有人開頁面時最多 30 秒問 app 一次」。'),
+      done('P6.16', '11-13 上線：app 存主題就通知工作台（內部端點，無 token 回 401、公開網址 404），開著的分頁切回時重讀；30 秒輪詢刪除，只留 10 分鐘兜底。next-admin 加 VW_SERVICE_URL（safe-infra-patch）。同批上線另一帳號的素材卡、去背不重扣、透明預覽有聲等。', '9f09aba80'),
       done('P6.13', '工作台成品能過送審：剪輯專案的文字或燒進去的字幕自動變成標題、腳本和字幕檢查的依據；上傳時可勾「我有權使用這些素材」。畫面上沒有任何字的影片照實不能送審。用調色檔（LUT）的成品權利檢查會不過（調色檔沒登記到 app），要另外處理。', '1aaa139d5'),
     ] },
   { n: 13, code: 'S4b', title: '圖片轉 3D 換供應商＋自動骨架', plain: '例：上傳一張人物圖，按一下（顯示價格）變成 3D 模型，自動綁好人形骨架，從動作庫挑「走路」套上去。',
