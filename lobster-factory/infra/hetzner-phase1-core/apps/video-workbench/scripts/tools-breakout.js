@@ -140,31 +140,60 @@ function toolBreakoutImage(url) {
 function toolBreakoutFont(px, weight = 400) {
   return `${weight} ${Math.round(px)}px system-ui, "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif`;
 }
-// Line wrap: CJK breaks between any two characters; a #tag or a Latin word stays whole (split only when it alone is wider
-// than the line). At most `max` lines, the last one ending in "…" when text is left over.
-function toolBreakoutWrap(ctx, text, width, max) {
+// Grapheme clusters: what a reader sees as one character (👍🏽, a flag, a ZWJ family) stays whole. Every cut in this file
+// (wrap, "…", the avatar letter) goes through this; code points would split such emoji into broken halves.
+const toolBreakoutSegmenter = typeof Intl !== "undefined" && typeof Intl.Segmenter === "function" ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+function toolBreakoutGraphemes(text) {
+  const s = String(text ?? "");
+  return toolBreakoutSegmenter ? Array.from(toolBreakoutSegmenter.segment(s), (g) => g.segment) : Array.from(s);
+}
+// Line wrap into pieces { t, tag }: CJK breaks between any two characters; a #tag or a Latin word stays whole (split by
+// grapheme only when it alone is wider than the line). tag is decided per token before wrapping and travels with every
+// piece, so a #tag split across lines keeps its colour. At most `max` lines, the last ending in "…" when text is left over.
+function toolBreakoutWrapPieces(ctx, text, width, max) {
+  const units = [];
+  for (const part of String(text || "").replace(/\s*\n\s*/g, " ").split(/(#[^\s#]+|[A-Za-z0-9_.@'’-]+|\s+)/)) {
+    if (!part) continue;
+    const tag = /^#[^\s#]+$/.test(part),
+      whole = tag || /^[A-Za-z0-9_.@'’-]+$/.test(part) || /^\s+$/.test(part);
+    if (whole && ctx.measureText(part).width <= width) units.push({ t: part, tag });
+    else for (const g of toolBreakoutGraphemes(part)) units.push({ t: g, tag });
+  }
+  const text$ = (line) => line.map((p) => p.t).join("");
+  const trimEnd = (line) => {
+    while (line.length && !line.at(-1).t.trim()) line.pop();
+    return line;
+  };
   const lines = [];
-  let line = "";
-  const units = String(text || "").replace(/\s*\n\s*/g, " ").match(/#[^\s#]+|[A-Za-z0-9_.@'’-]+|\s+|[\s\S]/gu) || [];
-  const pieces = units.flatMap((u) => (u.length > 1 && ctx.measureText(u).width > width ? Array.from(u) : [u]));
-  let cut = false; // text left over after the last allowed line (even when the break fell on a space)
-  for (const [i, ch] of pieces.entries()) {
-    if (ctx.measureText(line + ch).width > width && line) {
-      lines.push(line.trimEnd());
-      line = ch.trim() ? ch : "";
+  let line = [],
+    cut = false; // text left over after the last allowed line (even when the break fell on a space)
+  for (const [i, u] of units.entries()) {
+    if (line.length && ctx.measureText(text$(line) + u.t).width > width) {
+      lines.push(trimEnd(line));
+      line = u.t.trim() ? [u] : [];
       if (lines.length === max) {
-        cut = !!line || pieces.slice(i + 1).some((p) => p.trim());
+        cut = line.length > 0 || units.slice(i + 1).some((p) => p.t.trim());
         break;
       }
-    } else line += ch;
+    } else line.push(u);
   }
-  if (lines.length < max && line) lines.push(line);
+  if (lines.length < max && line.length) lines.push(line);
   else if (lines.length === max && cut) {
-    let last = lines[max - 1];
-    while (last && ctx.measureText(last + "…").width > width) last = Array.from(last).slice(0, -1).join(""); // whole characters: never half an emoji
-    lines[max - 1] = last + "…";
+    const last = lines[max - 1].map((p) => ({ ...p }));
+    while (last.length && ctx.measureText(text$(last) + "…").width > width) {
+      const g = toolBreakoutGraphemes(last.at(-1).t);
+      g.pop();
+      if (g.length) last.at(-1).t = g.join("");
+      else last.pop();
+    }
+    last.push({ t: "…", tag: false });
+    lines[max - 1] = last;
   }
   return lines;
+}
+// The same wrap as plain strings (header name, sub line).
+function toolBreakoutWrap(ctx, text, width, max) {
+  return toolBreakoutWrapPieces(ctx, text, width, max).map((line) => line.map((p) => p.t).join(""));
 }
 function toolBreakoutRound(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -221,22 +250,22 @@ function toolBreakoutCompact(n) {
   if (n >= 1e4) return (Math.floor(n / 100) / 10).toString().replace(/\.0$/, "") + "K";
   return n.toLocaleString("en-US");
 }
-// One caption line: an optional bold account name first, #tags in the link colour, the rest plain.
-function toolBreakoutRich(ctx, line, x, y, size, ink, bold = "") {
-  let cx = x;
-  if (bold && line.startsWith(bold)) {
-    ctx.font = toolBreakoutFont(size, 700);
-    ctx.fillStyle = ink.text;
-    ctx.fillText(bold, cx, y);
-    cx += ctx.measureText(bold).width;
-    line = line.slice(bold.length);
-  }
-  ctx.font = toolBreakoutFont(size);
-  for (const part of line.split(/(#[^\s#]+)/)) {
-    if (!part) continue;
-    ctx.fillStyle = part.startsWith("#") ? ink.link : ink.text;
-    ctx.fillText(part, cx, y);
-    cx += ctx.measureText(part).width;
+// One caption line of wrap pieces: an optional bold account name first, #tag pieces in the link colour, the rest plain.
+function toolBreakoutRich(ctx, pieces, x, y, size, ink, bold = "") {
+  let cx = x,
+    left = bold && pieces.map((p) => p.t).join("").startsWith(bold) ? bold.length : 0; // characters still bold
+  const draw = (t, weight, colour) => {
+    if (!t) return;
+    ctx.font = toolBreakoutFont(size, weight);
+    ctx.fillStyle = colour;
+    ctx.fillText(t, cx, y);
+    cx += ctx.measureText(t).width;
+  };
+  for (const p of pieces) {
+    const head = left ? p.t.slice(0, left) : "";
+    left -= head.length;
+    draw(head, 700, ink.text);
+    draw(p.t.slice(head.length), 400, p.tag ? ink.link : ink.text);
   }
 }
 // A generic phone app bar (home, search, add, bag, profile): plain shapes, no product's icon set.
@@ -299,7 +328,7 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, { measure = false, photo =
     capLine = 38 * k,
     navH = nav ? 96 * k : 0;
   ctx.font = toolBreakoutFont(capSize);
-  const capLines = toolBreakoutWrap(ctx, (fb ? "" : o.account + "  ") + o.caption, w - pad * 2, fb ? 3 : 2);
+  const capLines = toolBreakoutWrapPieces(ctx, (fb ? "" : o.account + "  ") + o.caption, w - pad * 2, fb ? 3 : 2);
   const captionH = capLines.length ? capLines.length * capLine + 12 * k : 0;
   const bottom = (fb ? captionH + 64 * k + 2 * k + 84 * k : 76 * k + 44 * k + captionH + 44 * k + 18 * k) + navH;
   const room = maxH - header - bottom;
@@ -325,7 +354,7 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, { measure = false, photo =
   ctx.font = toolBreakoutFont(30 * k, 700);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText((Array.from(o.account.trim())[0] || "A").toUpperCase(), ax, ay + 1 * k);
+  ctx.fillText((toolBreakoutGraphemes(o.account.trim())[0] || "A").toUpperCase(), ax, ay + 1 * k);
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   const tx = ax + ar + 20 * k,

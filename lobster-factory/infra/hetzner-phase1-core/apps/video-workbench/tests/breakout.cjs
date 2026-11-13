@@ -29,6 +29,38 @@ assert.throws(() => rules.prompt("   ", { layout: "burst" }), /主角/);
 assert(rules.prompt("鯊".repeat(500), {}).includes("鯊".repeat(rules.SUBJECT_MAX) + "."), "subject not capped");
 console.log("PASS 提示詞：兩種版面、任何主角文字都帶「貼文介面不動」指令");
 
+// 2a. caption text on the post (scripts/tools-breakout.js, its pure functions run in a bare context): every cut keeps
+// whole graphemes, and a #tag split across lines keeps its colour flag on every piece.
+{
+  const page = vm.createContext({});
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../scripts/tools-breakout.js"), "utf8"), page);
+  const G = (s) => page.toolBreakoutGraphemes(s);
+  const ctx = { measureText: (s) => ({ width: G(s).length * 10 }) }; // every visible character 10 wide
+  const family = "👨‍👩‍👧", thumb = "👍🏽", flag = "🇹🇼";
+  const join = (lines) => lines.map((l) => l.map((p) => p.t).join(""));
+  const whole = (text) => G(text).every((g) => [family, thumb, flag, "…"].includes(g) || Array.from(g).length === 1);
+  // wrap and the "…" cut: no line holds part of a cluster
+  const wrapped = join(page.toolBreakoutWrapPieces(ctx, `好${family}好${thumb}${flag}好好${family}${family}好好好`, 30, 2));
+  assert(wrapped.every(whole), "a multi-code-point emoji was split: " + JSON.stringify(wrapped));
+  assert(wrapped[1].endsWith("…"));
+  assert.equal(G(page.toolBreakoutWrap(ctx, family + "一二三四五", 30, 1)[0]).length, 3, "the cut did not count a ZWJ family as one character");
+  assert(page.toolBreakoutWrap(ctx, family + "一二三四五", 30, 1)[0].startsWith(family + "一"));
+  // a #tag wider than the line is split by grapheme and every piece of it stays a tag; words around it are not tags
+  const lines = page.toolBreakoutWrapPieces(ctx, "買 #超長的週末限定優惠標籤 吧", 50, 5);
+  const tagged = lines.flat().filter((p) => p.t.trim()).map((p) => [p.t, p.tag]);
+  assert(lines.length >= 3, "the long tag did not wrap");
+  assert.deepEqual(tagged.filter(([t]) => "#超長的週末限定優惠標籤".includes(t)).map(([, tag]) => tag).every(Boolean), true, "a wrapped #tag lost its colour");
+  assert.equal(JSON.stringify(tagged.filter(([t]) => t === "買" || t === "吧").map(([, tag]) => tag)), "[false,false]");
+  // what the caption draws: the link colour on every tag piece, also on the continuation line
+  const drawn = [];
+  const canvas = { measureText: ctx.measureText, fillText: (t) => drawn.push([t, canvas.fillStyle]), set font(v) {}, fillStyle: "" };
+  for (const line of lines) page.toolBreakoutRich(canvas, line, 0, 0, 10, { text: "TEXT", link: "LINK" });
+  assert(drawn.filter(([t]) => /[超長週末限定優惠標籤]/.test(t)).every(([, c]) => c === "LINK"), "continuation of a #tag drawn as plain text: " + JSON.stringify(drawn));
+  // the avatar letter is a whole grapheme
+  assert.equal(G(flag + "studio")[0], flag);
+}
+console.log("PASS 貼文文字：換行與「…」不切斷組合 emoji；跨行的 #標籤每一段都上色");
+
 // 3. price shown = amount charged (shared/models.js on the page, the server job's origin.costUsd)
 const page = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/models.js"), "utf8"), page);
