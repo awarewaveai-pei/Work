@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-13（續13）破框貼文動畫對齊參考站＋4:5／16:9＋貼文文字鎖定＋下載後的處理移出狀態請求
+
+- 起因：操作者直接要求破框對齊參考站，並解決「影片裡的按讚數被模型改掉」。Codex 審查 b7c07b6d0 時抓到：下載後的處理（文字鎖定＋裁切）是在狀態請求裡同步做的。
+- 已上 main 的部分：61d036e7b（對齊參考站：浮動卡片、數字簡寫、hashtag 上色、app 頂欄）、8e96572a9（文字依字形切、跨行的 hashtag 保留顏色）。
+- 本次推上：edf132887（4:5、文字鎖定）、c01bacabd（Threads／X 樣式、16:9、按小格鎖定：一格變動 ≤50% 當成數字飄移，還原；>50% 當成主角進來，那格照影片原樣）、6bb3b79c1、dfd4e55e8、9dadaf71e。
+- 不變量：
+  1. 狀態請求不等本機的後處理：下載後的任務在背景處理，狀態是 running＋stage finishing；處理期間用 job.finishing 記錄，job.result 只在處理結束時寫一次。
+  2. 處理中按取消，只停本機處理，不去找供應商；交付原始影片並附說明。worker 回報成功後會再檢查一次是否已取消。
+  3. 供應商那段跑完了，就記一次帳，不管最後是成功、失敗、取消還是重開機（settleOnce／usageReported）。
+- 門檻是 50% 不是 30%：實際尺寸測試發現，30% 會把整串數字位移判成主角進來。
+- REALTEST_EVIDENCE: tool=Bash | cmd=video-workbench node tests/breakout.cjs（8）, p6-main-system, backend, tools-lazy-load, region-edit, elevenlabs-free-tier, music-generation, replicate-video + tests/gate.cjs（疊到 origin/main 197d65789 之後） | exit=0 | ms=900000
+- 突變（session 做的）：拿掉「failed 但已付費」也要記帳的條件 → p6-main-system 新增的那段變紅；還原 → 綠。
+- 真跑：Runway、9:16、IG，US$0.25；處理期間查詢回 stage finishing；抽第 0／40／80／119 格：12.4K 個讚、389 則留言、127 次分享、帳號、文字、#標籤四個時間點完全一樣（舊規則下 389→357、127→120）。這支片主角是從側邊走出去，沒有測到「主角蓋過按讚列時那一格打開」的情況。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/9m/0n
+  - Codex `partialreview-b9de6783`（emoji、hashtag 顏色：8e96572a9 已修）、`-3325a9cf`（3 條同一根因，處理在請求裡：6bb3b79c1 已修）、`-d5a8ad3d`（F2 記帳、F3 取消競態：9dadaf71e 已修；F1 生成影片沒記交付比例，屬於所有工具的既有設計，不在這裡修）、`review-c7e41e6d`（runtime.js 一次只查 50 筆：11/02 d6835f354 就有的程式，這次沒動到，列為後續）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=finishBreakout|job\.finishing|usageReported|result\.ratio | hits=21
+- 剩餘風險：(1) 模型不一定照指令讓主角往下衝（Runway 兩次都沒衝）。(2) 生成的影片不會帶交付比例（main-system.cjs:159 只替剪輯成片寫），所以不會出現在投遞候選清單，所有生成工具都一樣。(3) `shared/runtime.js:404` 待補登記的任務一次只查最後 50 筆，超過時最舊的那筆可能永遠不會再查。
+- rollback：git revert 這 5 個 commit（先退 9dadaf71e→dfd4e55e8→6bb3b79c1，再退功能）。
 ## 2026-11-13（續12）ElevenLabs 免費額度接進配音、字幕辨識、音軌分離、去配樂・重配音效
 
 - 起因：操作者的 ElevenLabs 帳號是免費方案（每月 10,000 點）。實測 `/v1/music` 回 402 paid_plan_required，Eleven Music 先不接（操作者 2026-11-13）。其他功能用掉免費點數。
