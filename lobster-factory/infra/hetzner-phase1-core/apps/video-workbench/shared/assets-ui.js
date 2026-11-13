@@ -7,6 +7,8 @@
     s.onload = s.onerror = resolve;
     document.head.append(s);
   });
+  // styles/asset-card.css (VideoWorkbench.assetCard below) loads from here for the same reason.
+  document.head.append(Object.assign(document.createElement("link"), { rel: "stylesheet", href: new URL("../styles/asset-card.css", document.currentScript.src).href }));
   VideoWorkbench.speak = (text) => {
     if (!("speechSynthesis" in window))
       throw Error("此瀏覽器不支援系統語音試聽");

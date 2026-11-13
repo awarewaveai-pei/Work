@@ -55,25 +55,6 @@ label.rights-confirm input,
 .asset-upload-btn input {
   max-width: 250px;
 }
-/* The one 素材卡 (VideoWorkbench.assetCard, shared/assets-ui.js): 選擇素材, 素材庫 and the editor's 素材 pane. A list sets
-   --asset-card-min for its column width. Selectors are two classes deep to win over ".asset-workspace button" and
-   ".workspace-page button". */
-.asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--asset-card-min, 150px), 1fr)); gap: 12px; margin: 16px 0; }
-.asset-grid .asset-card { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-subtle); color: var(--text-primary); }
-.asset-grid .asset-card:hover { background: var(--bg-hover); }
-.asset-grid .asset-card:has(> .asset-card-main.selected) { border-color: var(--accent); background: var(--ai-bg); }
-.asset-card .asset-card-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
-.asset-card .asset-card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
-.asset-card .asset-card-thumb { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--radius-sm); background: var(--bg-hover); color: var(--text-secondary); font-size: var(--font-size-lg); }
-.asset-card .asset-card-thumb img, .asset-card .asset-card-thumb video { width: 100%; height: 100%; object-fit: cover; }
-.asset-card .asset-card-thumb .asset-card-image { object-fit: contain; }
-.asset-card .asset-card-thumb .asset-card-play { position: absolute; inset: 0; }
-.asset-card .asset-card-length, .asset-card .asset-card-badge { position: absolute; z-index: 1; padding: 0 4px; border-radius: var(--radius-sm); background: var(--btn-primary-bg); color: var(--btn-primary-text); font-style: normal; font-size: var(--font-size-xs); }
-.asset-card .asset-card-length { right: 3px; bottom: 3px; }
-.asset-card .asset-card-badge { top: 3px; left: 3px; }
-.asset-card .asset-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-sm); }
-.asset-card .asset-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-.asset-card .asset-card-actions button { margin: 0; padding: 2px 6px; border: 1px solid var(--btn-secondary-border); border-radius: var(--radius-sm); background: var(--btn-secondary-bg); color: var(--btn-secondary-text); font-size: var(--font-size-xs); cursor: pointer; }
 .asset-workspace .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .asset-workspace [aria-selected="true"], .asset-workspace [aria-pressed="true"] { border-color: var(--accent); background: var(--ai-bg); }
 .picker-preview { position: fixed; inset: 0; z-index: 121; background: var(--body-bg); padding: 24px; overflow: auto; }
