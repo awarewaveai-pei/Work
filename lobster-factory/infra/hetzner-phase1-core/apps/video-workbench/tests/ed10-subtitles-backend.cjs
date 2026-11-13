@@ -123,6 +123,55 @@ async function serve(fetchImpl, extraEnv = {}) {
   near(costs.transcribeUsd("gemini-3.5-transcribe", 60), (60 * gtr.audioTokensPerSec * gtr.audioInPerM + gtr.textTokensPerMin * gtr.textOutPerM) / 1e6, 1e-12, "沒有 usage 用官方估算");
   pass("Gemini 辨識接頭：逐字換成句（標點／停頓切）、無分數＝需校對、依回覆 token 計費");
 
+  // 1c2. One rule for every engine: Chinese comes back Traditional unless 簡體中文 was chosen; times untouched; English and
+  // other languages untouched; the host worker's answer passes as is (it converts on its own). "头"+"发" as two words must
+  // become 頭髮 (phrase context), not 頭發 (word by word).
+  {
+    const said = [["这是", 0.1, 0.5], ["头", 0.5, 0.7], ["发", 0.7, 0.9], ["。", 0.9, 0.9]];
+    const answers = {
+      elevenlabs: (lang) => Response.json({ language_code: lang, words: said.map(([text, start, end]) => ({ text, start, end, type: "word", logprob: -0.01 })) }),
+      gemini: () => {
+        const text = said.map(([w]) => w).join(""), annotations = [];
+        let at = 0;
+        for (const [w, start, end] of said) {
+          const n = Buffer.byteLength(w);
+          if (w !== "。") annotations.push({ type: "word_info", text: w, start_index: at, end_index: at + n, start_offset: start + "s", end_offset: end + "s" });
+          at += n;
+        }
+        return Response.json({ steps: [{ content: [{ type: "text", text, annotations }] }] });
+      },
+      openai: (lang) => Response.json({ language: lang, segments: [{ start: 0.1, end: 0.9, text: "这是头发。", avg_logprob: -0.1 }], words: said.slice(0, 3).map(([word, start, end]) => ({ word, start, end })) }),
+      host: () => Response.json({ language: "zh", segments: [{ start: 0.1, end: 0.9, text: "这是头发。", avg_logprob: -0.1 }], words: said.slice(0, 3).map(([word, start, end]) => ({ word, start, end })) }),
+    };
+    const run = async (id, language, lang = "zho") => transcribe.normalize(await transcribe.recognize({
+      engine: transcribe.ENGINES.find((e) => e.id === id), buffer: Buffer.alloc(16), filename: "a.mp3", mime: "audio/mpeg", language,
+      auth: id === "host" ? { url: "http://whisper.test:8421", token: "t" } : { key: "test-only" }, fetchImpl: async () => answers[id](lang),
+    }));
+    const times = (n) => n.words.map((w) => [w.start, w.end]);
+    for (const id of ["elevenlabs", "gemini", "openai"]) {
+      const simplified = await run(id, "簡體中文"), traditional = await run(id, "繁體中文"), auto = await run(id, "自動偵測", id === "openai" ? "chinese" : "zho");
+      assert.deepEqual(traditional.words.map((w) => w.text), ["這是", "頭", "髮"], id + "：逐字轉繁體，依整句詞組");
+      assert.equal(traditional.segments[0].text, "這是頭髮。", id + "：句子轉繁體");
+      assert.deepEqual([auto.words.map((w) => w.text), auto.segments[0].text], [["這是", "頭", "髮"], "這是頭髮。"], id + "：自動偵測為中文也轉繁體");
+      assert.deepEqual(simplified.words.map((w) => w.text), ["这是", "头", "发"], id + "：選簡體中文維持簡體");
+      assert.equal(simplified.segments[0].text, "这是头发。");
+      assert.deepEqual(times(traditional), times(simplified), id + "：逐字時間不變");
+      assert.deepEqual(traditional.segments.map((s) => [s.start, s.end]), simplified.segments.map((s) => [s.start, s.end]), id + "：句子起訖不變");
+    }
+    const host = await run("host", "繁體中文");
+    assert.deepEqual([host.segments[0].text, host.words.map((w) => w.text)], ["这是头发。", ["这是", "头", "发"]], "主機的回覆原樣通過（主機自己轉）");
+    // English and other languages: never touched (Japanese kanji would change under cn->t).
+    const english = { language: "english", segments: [{ start: 0, end: 1, text: "Hello world, 这" }], words: [{ word: "Hello", start: 0, end: 0.5 }] };
+    assert.equal(transcribe.traditional(english, "English"), english);
+    assert.equal(transcribe.traditional(english, "自動偵測"), english, "自動偵測為英文：不轉");
+    const japanese = { language: null, segments: [{ start: 0, end: 1, text: "会社に行く" }], words: [{ word: "会社", start: 0, end: 0.5 }] };
+    assert.equal(transcribe.traditional(japanese, "自動偵測"), japanese, "沒有語言、含假名：不轉");
+    assert.equal(transcribe.traditional(japanese, "日本語"), japanese);
+    const unnamed = transcribe.traditional({ language: null, segments: [{ start: 0, end: 1, text: "测试 OK" }], words: [{ word: "测试", start: 0, end: 1 }, { word: "OK", start: 1, end: 1.2 }] }, "自動偵測");
+    assert.deepEqual([unnamed.segments[0].text, unnamed.words.map((w) => [w.word, w.start, w.end])], ["測試 OK", [["測試", 0, 1], ["OK", 1, 1.2]]], "沒有語言、只有漢字：轉繁體，英文不動");
+  }
+  pass("每個辨識服務同一規則：中文轉繁體（選簡體中文除外）、逐字依整句詞組、時間不變、英文與日文不動、主機原樣通過");
+
   // 1d. The lists drop a row on its registry retireOn (whisper-1 2027-02-26, gpt-4o-mini-tts 2027-01-06): not offered,
   // and a job naming it is refused (never silently swapped).
   const speech = require("../backend/speech.cjs");

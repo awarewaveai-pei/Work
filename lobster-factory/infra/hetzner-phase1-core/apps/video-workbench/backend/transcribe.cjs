@@ -12,7 +12,11 @@ const { vwEnv } = require("./env-compat.cjs");
 const providers = require("./providers.cjs");
 const { transcribePrice } = require("./provider-cost.cjs");
 const elevenlabs = require("./elevenlabs.cjs");
-const rates = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
+const source = require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env);
+const rates = require(path.join(source, "lib/ai/cost-model.ts"));
+// The house S->T converter (next-admin, opencc-js cn->t + Taiwan preferences); loaded on the first Chinese answer.
+let houseTraditional = null;
+const toTraditional = (s) => (houseTraditional ||= require(path.join(source, "lib/ai/to-traditional.ts")).toTraditional)(s);
 
 const LANGUAGES = { 繁體中文: "zh", 簡體中文: "zh", English: "en", 日本語: "ja", 한국어: "ko", ภาษาไทย: "th" };
 // OpenAI's upload limit is 25 MB; a little under it so the multipart overhead never tips a chunk over.
@@ -29,9 +33,9 @@ const ENGINES = Object.freeze([
     note: "免費、較慢：要等約影片長度的 1.5 倍。聲音不送出主機、繁體輸出、逐字時間；「嗯、呃」多半不會寫進字幕。" }),
   // Free-plan check 2026-11-13: a 5 s clip, 200, 3 credits. Second: on a paid plan its list price is the lowest paid one.
   Object.freeze({ id: "elevenlabs", model: "scribe_v2", provider: "ElevenLabs", label: "ElevenLabs Scribe", uploadBytes: UPLOAD_BYTES,
-    note: "快、逐字時間、每字信心分數；中文輸出簡體（2026-11-13 實測）；聲音送到 ElevenLabs。免費方案每月有額度，用完會失敗、不收費。" }),
+    note: "快、逐字時間、每字信心分數；聲音送到 ElevenLabs。免費方案每月有額度，用完會失敗、不收費。" }),
   Object.freeze({ id: "gemini", model: "gemini-3.5-transcribe", provider: "Google", label: "Gemini 辨識", uploadBytes: GEMINI_UPLOAD_BYTES,
-    note: "快（30 秒的片約 10 秒）、逐字時間。中文常輸出簡體、沒有信心分數（每句都標需校對）；聲音送到 Google，尖峰時段可能忙線。" }),
+    note: "快（30 秒的片約 10 秒）、逐字時間。沒有信心分數（每句都標需校對）；聲音送到 Google，尖峰時段可能忙線。" }),
   Object.freeze({ id: "openai", model: "whisper-1", provider: "OpenAI", label: "OpenAI Whisper", uploadBytes: UPLOAD_BYTES,
     note: "快、依分鐘計費、聲音送到 OpenAI。OpenAI 2027-02-26 停止服務。" }),
 ]);
@@ -132,12 +136,42 @@ function srtTime(seconds) {
 const toSrt = (segments) => segments.map((s, i) => `${i + 1}\n${srtTime(s.start)} --> ${srtTime(s.end)}\n${s.text}\n`).join("\n");
 
 // One call to the engine: whisper verbose_json shape { language, segments, words, usage? } from every connector.
+// Every answer leaves here under one rule: Chinese is Traditional unless the chosen language is 簡體中文 (traditional()).
 async function recognize({ engine = ENGINES[0], buffer, filename, mime, language, auth, fetchImpl, signal }) {
   if (buffer.length > 25 * 1024 * 1024) throw bad("語音辨識的檔案上限為25MB，請先裁短片段");
+  // The host worker converts on its own (traditional=1/0 below): its answer passes as is.
   if (engine.id === "host") return host({ buffer, language, auth, fetchImpl, signal });
-  if (engine.id === "gemini") return gemini({ engine, buffer, mime, language, auth, fetchImpl, signal });
-  if (engine.id === "elevenlabs") return fromScribe(await elevenlabs.transcribe({ apiKey: auth.key, model: engine.model, buffer, filename, mime, language: languageCode(language), fetchImpl, signal }), languageCode(language));
-  return whisper({ engine, buffer, filename, mime, language, key: auth.key, fetchImpl, signal });
+  if (engine.id === "gemini") return traditional(await gemini({ engine, buffer, mime, language, auth, fetchImpl, signal }), language);
+  if (engine.id === "elevenlabs") return traditional(fromScribe(await elevenlabs.transcribe({ apiKey: auth.key, model: engine.model, buffer, filename, mime, language: languageCode(language), fetchImpl, signal }), languageCode(language)), language);
+  return traditional(await whisper({ engine, buffer, filename, mime, language, key: auth.key, fetchImpl, signal }), language);
+}
+// Language names the vendors answer for Chinese (whisper "chinese", Scribe ISO 639-3 "zho"/"cmn"/"yue", BCP-47 "zh-…").
+const CHINESE = /^(zh|zho|chi|cmn|yue|chinese|mandarin|cantonese)(\b|[-_])/i;
+const KANA_HANGUL = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+// Chinese answer -> Traditional, times untouched. opencc cn->t keeps every string's length in code points (all 49,276
+// STPhrases and 3,882 STCharacters pairs checked 2026-11-14), so the words are converted as one joined string (phrase
+// context as in the sentence) and cut back at their own lengths; a length change would fall back to word by word.
+function traditional(verbose, language) {
+  if (language === "簡體中文" || !verbose) return verbose;
+  const code = languageCode(language);
+  if (code && code !== "zh") return verbose;
+  const segments = Array.isArray(verbose.segments) ? verbose.segments : [], words = Array.isArray(verbose.words) ? verbose.words : [];
+  if (!code) {
+    // 自動偵測: the vendor's language when it names one; else Han text without kana or hangul.
+    const named = typeof verbose.language === "string" && verbose.language ? verbose.language : null;
+    const text = segments.map((s) => String(s?.text ?? "")).join("") + words.map((w) => String(w?.word ?? "")).join("");
+    if (named ? !CHINESE.test(named) : !/\p{Script=Han}/u.test(text) || KANA_HANGUL.test(text)) return verbose;
+  }
+  const texts = words.map((w) => String(w?.word ?? "")), joined = [...toTraditional(texts.join(""))];
+  let at = 0;
+  const converted = joined.length === [...texts.join("")].length
+    ? texts.map((t) => { const n = [...t].length, piece = joined.slice(at, at + n).join(""); at += n; return piece; })
+    : texts.map(toTraditional);
+  return {
+    ...verbose,
+    segments: segments.map((s) => (s && typeof s.text === "string" ? { ...s, text: toTraditional(s.text) } : s)),
+    words: words.map((w, i) => (w && typeof w.word === "string" ? { ...w, word: converted[i] } : w)),
+  };
 }
 async function host({ buffer, language, auth, fetchImpl, signal }) {
   const query = new URLSearchParams({ language: languageCode(language) || "", traditional: language === "簡體中文" ? "0" : "1" });
@@ -464,4 +498,4 @@ async function transcribeProject(settings, { localFile, inspect, run, tmpDir, en
   }
 }
 
-module.exports = { ENGINES, live, pick, defaultEngine, auth, capability, LANGUAGES, UPLOAD_BYTES, HOST_UPLOAD_BYTES, GAP, scoreOf, normalize, toSrt, recognize, fromGemini, fromScribe, plan, layout, timelineOf, chunks, prepare, audioSeconds, timeoutMs, quote, transcribeProject };
+module.exports = { ENGINES, live, pick, defaultEngine, auth, capability, LANGUAGES, UPLOAD_BYTES, HOST_UPLOAD_BYTES, GAP, scoreOf, normalize, toSrt, recognize, traditional, fromGemini, fromScribe, plan, layout, timelineOf, chunks, prepare, audioSeconds, timeoutMs, quote, transcribeProject };

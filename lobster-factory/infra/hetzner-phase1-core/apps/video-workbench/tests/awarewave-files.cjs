@@ -5,7 +5,8 @@ const assert = require("node:assert/strict"), fs = require("node:fs"), path = re
 const root = path.join(__dirname, ".."),
   { runtimeFiles, resolveSource } = require("../backend/appearance.cjs"),
   appDir = resolveSource(root, process.env),
-  listed = new Set(runtimeFiles(root));
+  listed = new Set(runtimeFiles(root)),
+  { dependencies = {} } = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
 const sources = ["server.cjs", ...fs.readdirSync(path.join(root, "backend")).filter((f) => f.endsWith(".cjs")).map((f) => "backend/" + f)];
 let reads = 0;
@@ -27,6 +28,12 @@ for (const file of listed) {
     if (/^import\s+type$/.test(kw)) continue;
     const dep = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec)).replace(/^(?!.*\.(?:ts|js|mjs|cjs)$)(.*)$/, "$1.ts"); // keep an explicit extension, else add .ts
     assert.ok(listed.has(dep), `${file} imports ${spec}; add ${dep} to awarewave-files.txt`);
+  }
+  // A package import resolves from this app's node_modules in the image (.awarewave/ has none): it must be a dependency here.
+  for (const [, spec] of text.matchAll(/^\s*(?:import(?!\s+type\b)|export)\b[^"']*?from\s+["']([^."'/][^"']*)["']/gm)) {
+    if (spec.startsWith("node:")) continue;
+    const name = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0];
+    assert.ok(Object.hasOwn(dependencies, name), `${file} imports ${name}; add it to video-workbench package.json dependencies`);
   }
 }
 console.log("awarewave-files ok:", listed.size, "files listed,", reads, "runtime reads covered");
