@@ -16,6 +16,25 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=modelsFor\("fill"\)|replicateId|runPrediction | hits=35
 - 剩餘風險：(1) Ideogram 實測一次沒照指令畫，把框內清掉補背景，可能看不懂指令裡的座標文字。(2) 專業編輯器裡的 Nano Banana 生成填色沒有實際付費跑過。(3) Nano Banana 的 blank（留空指令時能不能補）沒量測，算 no。
 - rollback：git revert 這 5 個 commit；共用清單 nano-banana-2 的 fill 用途隨 5a8e400e7 一起退。
+## 2026-11-13（續11）影音工作台 EXP.2：缺字形的文字不再悄悄輸出方框；elevenlabs.io 跳頁查無工作台來源
+
+- 起因：P6.10 第 1 版成片中文是方框，四項 QA 全過（caption QA passed）；剪輯器裡點時間軸左側後分頁跳到 elevenlabs.io。
+- 根因 1：`backend/media.cjs` run() 只看 ffmpeg 結束碼。libass 找不到字形時只寫 log（`Glyph 0x… not found` → 借別的字型；`failed to find any fallback with glyph 0x…` → 方框），結束碼仍是 0；而且 log 只留最後 16000 字，長匯出時開頭的 libass 行會被截掉。
+- 不變量：libass 燒進畫面的字，一定用樣式指定的字型畫；指定字型缺任何一個字的字形，這次輸出就失敗，不留成品。
+- 做法（選讀 log，不做 cmap 預檢：預檢要重做一次 libass 的字型比對，兩邊會不一致）：
+  - `media.cjs` run() 串流時逐行收集兩種 libass 訊息；只要有就 reject，錯誤訊息列出缺的字和 U+ 碼，並說明「中文 = 伺服器還沒有剪輯器中文字型檔（vendor/fonts）」。剪輯器匯出和燒錄字幕都走這個 run()，一起涵蓋。
+  - `editor-export.cjs`：成品檔先列入暫存，成功才保留，任何失敗都刪掉；`media.cjs` 燒錄字幕失敗也刪成品。
+  - 與 ED 字型包不衝突：字型包進來以前，正式站的中文匯出會被擋下並寫明原因，不會再輸出方框。
+- 第 2 項（elevenlabs.io）：本機用 Playwright 開剪輯器，視窗 1100／1280／1440×639，點 (40,520)：點到的是文字軌軌道名稱 `div.editor-track-name`，不會跳頁，剪輯器 DOM 裡沒有任何外部連結。正式站的工作台容器 `/app`、`/data/library`，以及 nginx 的 `/srv/video-engines`（FilmCraft／EffectCraft），grep 都找不到 elevenlabs。repo 裡唯一會連到 elevenlabs.io 的是 next-admin 的 AI 模型比較頁資料 `lib/ai/model-comparison.ts:332`（TTS_MODEL_SOURCES），不在剪輯器裡。判定：不是剪輯器的元素，所以不改程式（不畫蛇添足）；再發生時請記下點擊前分頁的網址。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/video-workbench && node tests/export-glyphs.cjs（修改前：中文 Arial「Missing expected rejection」紅；修改後 4 PASS） | exit=0 | ms=2434
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs（新增 export-glyphs）＋ editor-render／ed10-subtitles-backend／export-frame-check／media-contract／ed6-audio | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-video-workbench／lobster-nginx grep -rli elevenlabs（/app、/data/library、/srv/video-engines） | exit=0 | ms=5000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex `agency-os/reports/oracle/2026-11-13-review-7f6c5d7f.md`：整個指定字型被換掉、但換上的字型有這些字時，匯出照樣成功。未修：正式容器只有 DejaVu，擋這種情況會連英文匯出都擋掉（卡住主要流程），等 ED 字型包把每套字型綁定到固定檔案後就不會發生。列入剩餘風險。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=沒有字形|MISSING_GLYPH|missingGlyphError|媒體處理失敗 | hits=8
+- 剩餘風險：(1) 部署後、ED 字型包進來前，正式站所有含中文的匯出與燒錄字幕都會失敗並說明原因（以前是輸出方框）；(2) Codex：整個字型被換掉但字形齊全時不擋；(3) ED 的 cjkFallback 進來後，Arial＋中文會改用思源黑體而成功匯出，`tests/export-glyphs.cjs` 的第 2 項斷言要由 ED 改成換用不含漢字的字型；(4) 未部署。
+- 避免再發生：任何把外部工具 log 當訊號的檢查，都要在串流時逐行讀，不能依賴截斷過的 log。
+- rollback：git revert 本 commit。
 ## 2026-11-13（續10）影音工作台 P6.10 缺陷 2：剪輯器匯出「此成果尚未登記到主系統」——伺服器先回 succeeded、登記晚到，瀏覽器副本不再重問
 
 - 現象：正式站 P6.10 實測，editor-export 19dc1d59／d557c27d 的「送審與投遞」顯示「此成果尚未登記到主系統，無法送審」；監工讀的是瀏覽器存的 `/state`。

@@ -17,6 +17,23 @@ const supported = [
   "voice-overlay",
   "editor-export",
 ];
+// Card EXP.2 invariant: text libass burns in is drawn from the font its style names, or the run fails. libass logs
+// both cases at the default level -- "Glyph 0x… not found" (the font lacks it; another font is borrowed) and
+// "failed to find any fallback with glyph 0x…" (a box) -- so the log is read here, the one runner of both burn paths
+// (editor export, 燒錄字幕), instead of a cmap pre-check that would have to re-implement libass's font matching.
+// Collected line by line while streaming: the kept log is only the last 16 000 characters.
+const MISSING_GLYPH = /Glyph 0x([0-9A-F]+) not found|failed to find any fallback with glyph 0x([0-9A-F]+)/gi;
+function missingGlyphError(codes) {
+  const shown = [...codes].slice(0, 12).map((hex) => {
+    const cp = parseInt(hex, 16),
+      ch = cp > 0x20 && !(cp >= 0x7f && cp < 0xa0) ? String.fromCodePoint(cp) : "";
+    return `${ch ? `「${ch}」` : ""}U+${hex.toUpperCase().padStart(4, "0")}`;
+  });
+  return Error(
+    `文字有 ${codes.size} 個字在選用的字型裡沒有字形：${shown.join("、")}${codes.size > 12 ? " 等" : ""}。` +
+      "照原樣輸出會變成方框或換成別的字型，已停止。請改用含這些字的字型；若是中文，表示伺服器還沒有剪輯器的中文字型檔（vendor/fonts）。",
+  );
+}
 function run(args, signal) {
   return new Promise((resolve, reject) => {
     const process = spawn(binary, args, {
@@ -24,16 +41,26 @@ function run(args, signal) {
       stdio: ["ignore", "ignore", "pipe"],
       signal,
     });
-    let log = "";
+    let log = "",
+      line = "";
+    const missing = new Set(),
+      scan = (text) => {
+        for (const m of text.matchAll(MISSING_GLYPH)) missing.add((m[1] || m[2]).toUpperCase());
+      };
     process.stderr.on("data", (c) => {
+      const text = line + c,
+        cut = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
+      scan(text.slice(0, cut + 1));
+      line = text.slice(cut + 1).slice(-1000);
       log = (log + c).slice(-16000);
     });
     process.on("error", reject);
-    process.on("close", (code) =>
-      code === 0
-        ? resolve(log)
-        : reject(Error("媒體處理失敗：" + log.slice(-600))),
-    );
+    process.on("close", (code) => {
+      scan(line);
+      if (code !== 0) reject(Error("媒體處理失敗：" + log.slice(-600)));
+      else if (missing.size) reject(missingGlyphError(missing));
+      else resolve(log);
+    });
   });
 }
 async function media(input, { file, output, signal }) {
@@ -64,6 +91,9 @@ async function media(input, { file, output, signal }) {
     try {
       await run([...args, '-vf', `ass=filename='${filterPath(subtitle.file)}'`, '-map', '0:v:0', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac', '-movflags', '+faststart', result.file], signal);
       return { type: 'video', url: result.url };
+    } catch (e) {
+      fs.rmSync(result.file, { force: true }); // a refused burn (EXP.2) leaves no file behind
+      throw e;
     } finally { fs.rmSync(subtitle.file, { force: true }); }
   } else if (operation === "follow-manual") {
     const start = Number(settings.start), end = Number(settings.end), center = Number(settings.center);

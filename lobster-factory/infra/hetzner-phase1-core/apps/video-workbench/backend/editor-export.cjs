@@ -863,6 +863,7 @@ async function exportEditor(
       } else audioGraph = [`${mixInput}atrim=duration=${total}[audioout]`]; // silent mix: nothing to normalise
     }
     const result = output("mp4");
+    temporary.push(result.file); // a failed render (e.g. missing glyphs, EXP.2) leaves no file; kept below on success
     await run(
       [
         ...args,
@@ -914,12 +915,12 @@ async function exportEditor(
         signal,
       );
     if (!verification.ok) {
-      temporary.push(result.file);
       throw Object.assign(
         Error("輸出驗證失敗：" + verification.findings.map((f) => `${f.code} ${f.message}`).join("；")),
         { findings: verification.findings },
       );
     }
+    temporary.splice(temporary.indexOf(result.file), 1);
     return {
       type: "video",
       url: result.url,
