@@ -38,8 +38,11 @@ function regionScreen() {
   const picture = image
     ? `<div class="region-thumb"><img src="${esc(image.url)}" alt=""><span class="region-thumb-name">${esc(image.name || "已選圖片")}</span>${btn("換一張", "upload:image", "small")}${btn("素材庫", "library:image", "small")}</div>`
     : chooser("image");
-  const models = (c?.models || []).map((r) => {
-    const price = window.VideoWorkbenchPrices?.text("video.image", VideoWorkbench.capabilities, r.id, r.sizes.includes(size) ? size : r.defaultSize) || "";
+  // Cheapest first by the server's price at the chosen resolution (a row without it: its own default), so a price change
+  // reorders the buttons by itself; equal prices keep the server's order.
+  const sizeFor = (r) => (r.sizes.includes(size) ? size : r.defaultSize), usd = (r) => r.prices?.[sizeFor(r)]?.usd ?? Infinity;
+  const models = [...(c?.models || [])].sort((a, b) => usd(a) - usd(b)).map((r) => {
+    const price = window.VideoWorkbenchPrices?.text("video.image", VideoWorkbench.capabilities, r.id, sizeFor(r)) || "";
     return `<button type="button" class="chip ${r.id === m?.id ? "selected" : ""}" data-act="set:regionModel:${esc(r.id)}" aria-pressed="${r.id === m?.id}"${r.available ? "" : " disabled"}>${esc(r.label)}${price ? " · " + esc(price) : ""}${r.available ? "" : "（未設定）"}</button>`;
   }).join("");
   const sizes = (m?.sizes || []).map((s) => `<button type="button" class="chip ${s === size ? "selected" : ""}" data-act="set:regionQuality:${esc(s)}" aria-pressed="${s === size}">${esc(s)}</button>`).join("");

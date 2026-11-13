@@ -118,6 +118,14 @@ const halves = (file) => {
     assert.equal((await p.locator(".side h3 .region-of").textContent()).trim(), "1/1");
     assert.match(await p.locator("#regionMissing").textContent(), /還有 1 個區域沒有填寫指令/);
     assert.deepEqual(await p.locator('[aria-label="解析度"] button').allTextContents(), ["1K"], "default OpenAI: its 4K draft shows as 1K");
+    // Every model button shows its NT$ price, computed here from the charge's own function (provider-cost.cjs
+    // imageEditUsd) through the one money format (shared/models.js), and the buttons run cheapest first.
+    const money = {};
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/models.js"), "utf8"), { window: money, crypto: globalThis.crypto });
+    const label = (m, s) => `${m.label} · 約 ${money.VideoWorkbenchMoney(costs.imageEditUsd(m.id, s), caps)}／張`;
+    const order = (s) => [...rows].sort((a, b) => costs.imageEditUsd(a.id, a.sizes.includes(s) ? s : a.defaultSize) - costs.imageEditUsd(b.id, b.sizes.includes(s) ? s : b.defaultSize));
+    assert.deepEqual(await p.locator('[aria-label="模型"] button').allTextContents(), order("1K").map((m) => label(m, "1K")), "NT$ from the charge's function, cheapest first");
+    assert.equal(order("1K")[0].id, "gemini-nano-banana-2.1");
     const submit = p.locator("[data-act=submit]");
     await p.waitForFunction(() => document.querySelector("[data-act=submit] .paid-price"));
     const openaiPrice = await submit.textContent();
@@ -131,7 +139,11 @@ const halves = (file) => {
     assert.deepEqual(await p.locator('[aria-label="解析度"] button').allTextContents(), ["1K", "2K", "4K"]);
     assert.equal(await p.locator('[aria-label="解析度"] .selected').textContent(), "4K", "the draft's 4K is kept for a model that has it");
     await p.waitForFunction((before) => document.querySelector("[data-act=submit]").textContent !== before, openaiPrice);
+    // The generate button shows the 4K charge source in NT$.
+    const nt4 = "約 " + money.VideoWorkbenchMoney(costs.imageEditUsd("gemini-nano-banana-2.1", "4K"), caps) + "／張";
+    await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt4);
     const g4 = await submit.textContent();
+    assert.deepEqual(await p.locator('[aria-label="模型"] button').allTextContents(), order("4K").map((m) => label(m, m.sizes.includes("4K") ? "4K" : m.defaultSize)), "order follows the price at the chosen resolution");
     await p.locator('[aria-label="解析度"] button', { hasText: "1K" }).click();
     await p.waitForFunction((before) => document.querySelector("[data-act=submit]").textContent !== before, g4);
     console.log("PASS model buttons + resolution buttons change the price on the button");
