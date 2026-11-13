@@ -63,6 +63,19 @@ async function logAction(sb: SupabaseClient, brandId: string, actor: string, act
   if (error) console.error(`[social] log ${action} for ${brandId}: ${error.message}`);
 }
 
+/** The brand's own zone: organizations.default_timezone, the one copy (the ops tenant config PATCH writes the same
+ *  column). The caller has checked the zone (time.ts isTimeZone) and that the caller owns the brand. */
+export async function setBrandTimezone(brandId: string, zone: string, actor: string): Promise<string> {
+  const sb = db();
+  const { data: before, error: readError } = await sb.from("organizations").select("default_timezone").eq("id", brandId).maybeSingle();
+  if (readError) fail(readError, "organization");
+  if (!before) throw new SocialStoreError(404, "no such brand");
+  const { error } = await sb.from("organizations").update({ default_timezone: zone }).eq("id", brandId);
+  if (error) fail(error, "organization time zone");
+  await logAction(sb, brandId, actor, "timezone_setting", { from: (before as { default_timezone: string }).default_timezone, to: zone });
+  return zone;
+}
+
 export function fail(error: { code?: string; message: string }, what: string): never {
   const byCode: Record<string, 400 | 404 | 409> = {
     SC404: 404, SC409: 409, "23505": 409, "23503": 409,

@@ -2,7 +2,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { QA_LABELS, explainFinding } from "@/app/(shell)/tools/video/qa-labels";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
-import { renderSiteVoice, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { renderSiteVoice, siteLanguage, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { listAccounts } from "@/lib/social/store";
 import { textsForAccounts, writerKeysFor, writeSocialPosts } from "@/lib/social/write-posts";
 import { claudeWriter } from "@/lib/social/write-posts-claude";
@@ -91,9 +91,11 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
       const { data: site } = await sb.from("wp_sites").select("content_defaults").eq("organization_id", org).eq("active", true).limit(1).maybeSingle();
       const written = await runForOrg(org, actor, async () => {
         const { ask } = await claudeWriter(await grantFor("content.syndicate"), apiKey, "lib/content/video/project-advance", null);
-        return writeSocialPosts({ article: script, keys, mediaType: "video", voice: renderSiteVoice((site?.content_defaults ?? undefined) as SiteContentDefaults | undefined) }, ask);
+        const defaults = (site?.content_defaults ?? undefined) as SiteContentDefaults | undefined;
+        return writeSocialPosts({ article: script, keys, mediaType: "video", voice: renderSiteVoice(defaults), siteLanguage: siteLanguage(defaults) }, ask);
       });
       if (written.tooLong.length) throw new Error(`社群文案超過平台上限：${written.tooLong.map((t) => `${t.key} ${t.length}/${t.limit}`).join("、")}`);
+      if (written.wrongLanguage.length) throw new Error(`社群文案不是${written.language}：${written.wrongLanguage.join("、")}`);
       const texts = textsForAccounts(written, accounts);
       const items = accounts.filter((a) => texts[a.id]).map((a) => ({ accountId: a.id, text: texts[a.id] }));
       const result = await saveVideoSocialDrafts(draftDeps(sb, org, videoRows, actor), project.title, items);

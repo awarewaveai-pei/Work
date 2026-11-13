@@ -103,14 +103,14 @@ describe("social manager -- the four reported UI defects", () => {
     expect(screen.getAllByRole("link", { name: /查看貼文/ })).toHaveLength(2);
   });
 
-  it("returns the plan date with schedule success so the manager can navigate to that week", async () => {
+  it("returns the planned instant with schedule success so the manager can navigate to that week", async () => {
     const onSaved = vi.fn();
     render(<Editor brand={brand} accounts={[account]} media={[]} post={null} defaults={{ date: "2026-10-15", time: "12:00" }} today="2026-10-14"
       onSaved={onSaved} onMediaAdded={vi.fn()} />);
     await waitFor(() => expect(screen.getByLabelText("貼文內容")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("貼文內容"), { target: { value: "安排好的貼文" } });
     fireEvent.click(screen.getByRole("button", { name: "設定行程" }));
-    await waitFor(() => expect(onSaved).toHaveBeenCalledWith("new-post", expect.stringContaining("已排在"), { date: "2026-10-15" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith("new-post", expect.stringContaining("已排在"), { at: "2026-10-15T04:00:00.000Z" }));
   });
 
   it("shows only real published target links in the published post view", async () => {

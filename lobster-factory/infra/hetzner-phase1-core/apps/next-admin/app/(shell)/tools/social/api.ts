@@ -1,5 +1,6 @@
 // The page's only way to the server: /api/social/* (C4 routes; lib/social/http.ts says what each status means).
 import type { Account, Brand, Post, Tag } from "./model";
+import type { DisplayZone } from "@/lib/social/time";
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string, readonly detail?: unknown) {
@@ -128,6 +129,11 @@ export const api = {
   needs: (brand: string) => call<NeedsResult>("GET", `/api/social/needs?${q({ brand })}`),
   settings: (brand: string) => call<{ requireReview: boolean }>("GET", `/api/social/settings?${q({ brand })}`),
   setRequireReview: (brand: string, requireReview: boolean) => call<{ requireReview: boolean }>("PUT", "/api/social/settings", { brand, requireReview }),
+  /** the signed-in person's display zone (lib/social/prefs.ts): how times are shown, never when a post goes out */
+  prefs: () => call<{ displayTz: DisplayZone }>("GET", "/api/social/prefs"),
+  setDisplayTz: (displayTz: DisplayZone) => call<{ displayTz: DisplayZone }>("PUT", "/api/social/prefs", { displayTz }),
+  /** the organisation's own zone (organizations.default_timezone, the same column the ops tenant config writes); owner only */
+  setOrgTimezone: (brand: string, timezone: string) => call<{ timezone: string }>("PUT", "/api/social/settings", { brand, timezone }),
   members: (brand: string) => call<{ members: Member[] }>("GET", `/api/social/members?${q({ brand })}`),
   addMember: (brand: string, email: string, role: string) => call<{ userId: string }>("POST", "/api/social/members", { brand, email, role }),
   setMemberRole: (brand: string, userId: string, role: string) => call<object>("PATCH", "/api/social/members", { brand, userId, role }),

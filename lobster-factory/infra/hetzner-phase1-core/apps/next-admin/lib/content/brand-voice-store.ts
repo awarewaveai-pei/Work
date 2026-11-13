@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { canAccessOrg } from "@/lib/tenant-guard";
-import { renderSiteVoice, type SiteContentDefaults } from "./brand-voice";
+import { renderSiteVoice, siteLanguage, type SiteContentDefaults } from "./brand-voice";
 
 export interface SiteBrand {
   siteId: string;
@@ -31,10 +31,15 @@ export async function loadSiteBrand(sb: SupabaseClient, siteId: string): Promise
  * null = no such active site or not the caller's (answer 404 either way, so ids are not probed). Throws on a DB error.
  */
 export async function siteVoiceFor(req: Request, siteId: string): Promise<string | null> {
-  if (!siteId) return "";
+  return (await siteWritingFor(req, siteId))?.voice ?? null;
+}
+
+/** siteVoiceFor plus the site's content language (siteLanguage; no siteId = its default, 繁體中文). Same null and throw rules. */
+export async function siteWritingFor(req: Request, siteId: string): Promise<{ voice: string; language: string } | null> {
+  if (!siteId) return { voice: "", language: siteLanguage(undefined) };
   const sb = getSupabaseWriteClient();
   if (!sb) throw new Error("brand_voice:no_supabase_client");
   const site = await loadSiteBrand(sb, siteId);
   if (!site || !canAccessOrg(req, site.organizationId)) return null;
-  return renderSiteVoice(site.defaults);
+  return { voice: renderSiteVoice(site.defaults), language: siteLanguage(site.defaults) };
 }

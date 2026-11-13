@@ -1,6 +1,7 @@
 // Pure helpers for the social manager page (SOCIAL_MANAGER_PLAN.md C6): the brand's time zone, the calendar's dates,
 // the platform marks and the state names. No React, no fetch: tested in __tests__/model.test.ts.
-// Dates are "YYYY-MM-DD" strings in the BRAND's time zone (organizations.default_timezone), never the viewer's.
+// Dates are "YYYY-MM-DD" strings in a named zone: the brand's (organizations.default_timezone) for rules and the
+// composer, the person's display zone (lib/social/time.ts viewZone) for what the calendar, list, bin and log show.
 import type { BrandRole, PostState } from "@/lib/social/state";
 import { repeatSlots, type RepeatRule } from "@/lib/social/repeat-rule";
 
@@ -21,7 +22,7 @@ export interface Tag { id: string; name: string; colour: "a" | "b" | "c" | "d" |
 export interface Post {
   id: string; state: PostState; body: string; scheduled_at: string | null; list_id: string | null; list_position: number | null;
   first_comment: string | null; link_url: string | null; link_utm: boolean; notes: string | null; source_url: string | null;
-  published_at: string | null; deleted_at: string | null; version: number;
+  published_at: string | null; deleted_at: string | null; version: number; created_at: string;
   /** a series template holds repeat; its children carry repeat_of + origin_slot (a computed occurrence with a child is that child) */
   repeat: RepeatRule | null; repeat_of: string | null; origin_slot: string | null; auto_mode: AutoMode;
   targets: Target[]; media: MediaLink[]; comments: PostComment[]; tags: Array<{ tag_id: string }>;
@@ -73,7 +74,7 @@ export const STATE_TOKEN: Record<PostState, string> = {
 // ---- dates in a time zone (lib/social/time.ts: one copy for the server's rotation slots and this page) -----------
 
 import { addDays, weekday } from "@/lib/social/time";
-export { addDays, instantAt, weekday, zoned, type ZonedParts } from "@/lib/social/time";
+export { addDays, DISPLAY_ZONES, instantAt, rezone, viewZone, weekday, zoned, type DisplayZone, type ZonedParts } from "@/lib/social/time";
 
 export const mondayOf = (date: string) => addDays(date, 1 - weekday(date));
 export const monthStart = (date: string) => `${date.slice(0, 7)}-01`;

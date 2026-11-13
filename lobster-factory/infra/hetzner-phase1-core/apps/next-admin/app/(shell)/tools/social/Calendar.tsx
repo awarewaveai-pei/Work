@@ -224,7 +224,9 @@ export function ListView(props: ViewProps & {
   empty: ReactNode;
 }) {
   const { posts, accounts, tz, checked, canWrite } = props;
-  const rows = [...posts].sort((a, b) => (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999"));
+  // by send time; posts with none (drafts) newest first, as the server lists them (store.ts undated query)
+  const rows = [...posts].sort((a, b) => (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999") || (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+  const at = (iso: string) => { const z = zoned(iso, tz); return `${shortDate(z.date)} ${z.time}`; };
   const real = rows.filter((p) => !p.occurrenceOf);
   const all = real.length > 0 && real.every((p) => checked.has(p.id));
   if (!rows.length) return <div className="sm-list">{props.empty}</div>;
@@ -233,14 +235,15 @@ export function ListView(props: ViewProps & {
       <table>
         <thead><tr>
           <th>{canWrite && <input type="checkbox" aria-label="全選" checked={all} onChange={(e) => props.onCheck(real.map((p) => p.id), e.target.checked)} />}</th>
-          <th /><th>時間</th><th>發到</th><th>內容</th><th>狀態</th><th />
+          <th /><th>時間</th><th>建立時間</th><th>發到</th><th>內容</th><th>狀態</th><th />
         </tr></thead>
         <tbody>
           {rows.map((p) => (
             <tr key={p.id}>
               <td>{canWrite && !p.occurrenceOf && <input type="checkbox" aria-label="選取" checked={checked.has(p.id)} onChange={(e) => props.onCheck([p.id], e.target.checked)} />}</td>
               <td><Thumb post={p} accounts={accounts} media={props.media} size="row" /></td>
-              <td>{p.scheduled_at ? (() => { const z = zoned(p.scheduled_at, tz); return `${shortDate(z.date)} ${z.time}`; })() : p.state === "rotation" ? "輪播" : "未排時間"}</td>
+              <td>{p.scheduled_at ? at(p.scheduled_at) : p.state === "rotation" ? "輪播" : "未排時間"}</td>
+              <td className="sm-muted">{p.occurrenceOf || !p.created_at ? "" : at(p.created_at)}</td>
               <td><span className="sm-avs">{platformsOf(p, accounts).map((pf) => <PfMark key={pf} platform={pf} />)}</span>{unconnected(p, accounts) && <span className="sm-err" title="有頻道沒連接"> ⚠</span>}</td>
               <td className="sm-wrap">{titleOf(p).slice(0, 120)}</td>
               <td><span className="sm-pill" style={stateStyle(p.state)}>{STATE_NAMES[p.state]}</span></td>

@@ -2,7 +2,8 @@
 // 設定 -> the brand's channels (mock: #settingsView 社群帳號 + #connectDetail). Connecting opens the platform's
 // authorisation in a new tab (Postiz's OAuth URL, POST /api/social/accounts); this view then asks GET accounts every
 // few seconds, which attaches the new channel to this brand (lib/social/store.ts resolveConnectAttempt). Team and roles
-// are C8; the time zone is the organisation's (organizations.default_timezone), shown, not edited here.
+// are C8; the time zone is the organisation's (organizations.default_timezone), changed here by AwareWave owners/admins
+// (PUT /api/social/settings timezone writes that same column, which the ops tenant config also edits), never stored twice.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SENDABLE_PLATFORMS } from "@/lib/social/compose";
 import { api, ApiError, type UnclaimedIntegration } from "./api";
@@ -24,7 +25,29 @@ const claimMessage = (e: unknown) => {
 // the ones the sender can send (compose.ts SETTINGS), each once: linkedin-page / instagram-standalone are other ways in
 const CONNECTABLE = SENDABLE_PLATFORMS.filter((p) => !["linkedin-page", "instagram-standalone", "mastodon", "telegram"].includes(p));
 
-export default function Settings({ brand, accounts, onAccounts, team }: { brand: Brand; accounts: Account[]; onAccounts: (a: Account[]) => void; team?: React.ReactNode }) {
+/** The organisation zones offered as buttons; a zone set elsewhere (ops console) is shown as its own button too. */
+const ORG_ZONES = ["Asia/Taipei", "UTC"];
+const zoneName = (z: string) => (z === "Asia/Taipei" ? "台灣（Asia/Taipei）" : z);
+
+export default function Settings({ brand, accounts, onAccounts, team, onTimezone }: {
+  brand: Brand; accounts: Account[]; onAccounts: (a: Account[]) => void; team?: React.ReactNode; onTimezone?: (zone: string) => void;
+}) {
+  const [tzBusy, setTzBusy] = useState(false);
+  const [tzNote, setTzNote] = useState<{ text: string; error?: boolean } | null>(null);
+  async function setZone(zone: string) {
+    if (zone === brand.default_timezone) return;
+    setTzBusy(true);
+    setTzNote(null);
+    try {
+      const r = await api.setOrgTimezone(brand.id, zone);
+      onTimezone?.(r.timezone);
+      setTzNote({ text: `組織時區已改成 ${zoneName(r.timezone)}。` });
+    } catch (e) {
+      setTzNote({ text: e instanceof ApiError && e.status === 403 ? "只有 AwareWave 的擁有者或管理員可以改組織時區。" : `沒有改成：${e instanceof Error ? e.message : String(e)}`, error: true });
+    } finally {
+      setTzBusy(false);
+    }
+  }
   const canWrite = brand.role === "owner" || brand.role === "editor";
   const [connecting, setConnecting] = useState<{ id: string; platform: string } | null>(null);
   const [hint, setHint] = useState<{ text: string; error?: boolean } | null>(null);
@@ -154,9 +177,18 @@ export default function Settings({ brand, accounts, onAccounts, team }: { brand:
         {hint && <span className={hint.error ? "sm-err" : "sm-muted"}>{hint.text}</span>}
       </div>
       <div className="sm-sec">
-        <h3>時區</h3>
-        <span>{brand.default_timezone}</span>
-        <span className="sm-muted">行事曆和排程時間都用這個時區（客戶資料裡的時區）。</span>
+        <h3>組織時區</h3>
+        {brand.role === "owner" ? (
+          <span className="sm-seg" role="group" aria-label="組織時區">
+            {[...new Set([...ORG_ZONES, brand.default_timezone])].map((z) => (
+              <button type="button" key={z} disabled={tzBusy} className={z === brand.default_timezone ? "sm-on" : ""} aria-pressed={z === brand.default_timezone}
+                onClick={() => void setZone(z)}>{zoneName(z)}</button>
+            ))}
+          </span>
+        ) : <span>{zoneName(brand.default_timezone)}</span>}
+        <span className="sm-muted">寫貼文時選的時間、週期性安排和自動發布清單的每週時段，都照這個時區的鐘點。改了以後，已經排好的貼文發出時間點不變；週期和清單之後的時段改照新時區。</span>
+        <span className="sm-muted">每個人看日曆用的時區，在排程日曆右上角切換，只改畫面上的顯示。</span>
+        {tzNote && <span className={tzNote.error ? "sm-err" : "sm-muted"}>{tzNote.text}</span>}
       </div>
       {team}
     </div>

@@ -11,7 +11,7 @@ vi.mock("@/lib/content/video/embed-in-post", () => ({ embedVideoInPost }));
 const social = vi.hoisted(() => ({ getPost: vi.fn(), addVideo: vi.fn(), savePost: vi.fn(), listAccounts: vi.fn() }));
 vi.mock("@/lib/social/store", () => social);
 
-const { attachTopicVideo, pollTopicVideo, STALE_PREPARE_MS, topicTargets } = await import("../make");
+const { attachTopicVideo, pollTopicVideo, socialBody, STALE_PREPARE_MS, topicTargets } = await import("../make");
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const t = { id: "a", organization_id: ORG } as Topic;
@@ -59,5 +59,14 @@ describe("topicTargets (P7.2)", () => {
     expect(topicTargets(["article", "youtube"], "youtube")).toBe(true);
     expect(topicTargets(["article", "youtube"], "facebook")).toBe(false);
     expect(topicTargets(["social", "youtube"], "facebook")).toBe(true);
+  });
+});
+
+describe("socialBody: the draft's shared text is in the posts' language", () => {
+  it("an English summary of a Chinese article falls back to the title (the 2026-10-29 draft)", () => {
+    const title = "萬聖節親子活動：用變裝遊戲幫孩子認識情緒";
+    expect(socialBody("萬聖節親子活動 can teach feelings, not just fun. Try 7 simple costume games", title, "繁體中文")).toBe(title);
+    expect(socialBody("萬聖節親子活動不只是要糖果！用5個變裝情緒遊戲，陪孩子認出生氣。", title, "繁體中文")).toBe("萬聖節親子活動不只是要糖果！用5個變裝情緒遊戲，陪孩子認出生氣。");
+    expect(socialBody(undefined, title, "繁體中文")).toBe(title);
   });
 });

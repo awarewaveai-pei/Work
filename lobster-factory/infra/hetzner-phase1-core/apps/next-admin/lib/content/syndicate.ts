@@ -4,7 +4,7 @@ import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { resolveTextRate } from "@/lib/ai/cost-calculator";
 import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { isWriterKey, writeSocialPosts, WriterParseError, type WriterKey } from "@/lib/social/write-posts";
-import { siteVoiceFor } from "./brand-voice-store";
+import { siteWritingFor } from "./brand-voice-store";
 
 /**
  * The article -> per-platform rewrite over HTTP. Content serves it as content.syndicate, social as social.rewrite (its
@@ -37,18 +37,19 @@ async function handlePost(req: Request, grant: Grant, route: string): Promise<Re
     .filter(isWriterKey) as WriterKey[];
   if (keys.length === 0) return new NextResponse("no valid platforms", { status: 400 });
 
-  // siteId = the article's site; its stored brand voice (wp_sites.content_defaults) shapes every post.
-  let voice: string | null;
-  try { voice = await siteVoiceFor(req, typeof body.siteId === "string" ? body.siteId.trim() : ""); }
+  // siteId = the article's site; its stored brand voice (wp_sites.content_defaults) shapes every post, and its content
+  // language decides only when the article is too short to read (lib/social/post-language.ts)
+  let site: Awaited<ReturnType<typeof siteWritingFor>>;
+  try { site = await siteWritingFor(req, typeof body.siteId === "string" ? body.siteId.trim() : ""); }
   catch (e) { console.error("[syndicate] brand voice lookup failed:", e); return new NextResponse("brand voice lookup failed", { status: 500 }); }
-  if (voice === null) return new NextResponse("site not found", { status: 404 });
+  if (site === null) return new NextResponse("site not found", { status: 404 });
 
   const { ask, spent } = await claudeWriter(grant, apiKey, route, role);
 
   try {
     const articleUrl = typeof body.articleUrl === "string" ? body.articleUrl.trim() : "";
-    const { posts, tooLong, missing } = await writeSocialPosts({ article, keys, mediaType, articleUrl, voice }, ask);
-    return NextResponse.json({ ok: true, posts, tooLong, missing, _cost: { usd: spent.usd, model: spent.model, vendor: resolveTextRate(spent.model).rate.vendor } });
+    const { posts, tooLong, missing, wrongLanguage, language } = await writeSocialPosts({ article, keys, mediaType, articleUrl, voice: site.voice, siteLanguage: site.language }, ask);
+    return NextResponse.json({ ok: true, posts, tooLong, missing, wrongLanguage, language, _cost: { usd: spent.usd, model: spent.model, vendor: resolveTextRate(spent.model).rate.vendor } });
   } catch (e) {
     if (e instanceof WriterParseError) return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
     throw e;

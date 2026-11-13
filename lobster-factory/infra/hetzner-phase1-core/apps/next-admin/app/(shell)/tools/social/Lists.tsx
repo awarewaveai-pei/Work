@@ -67,7 +67,7 @@ export function ListsView({ ctx, selectedId }: { ctx: SlotContext; selectedId: s
 
 export function ListDetail({ ctx, listId }: { ctx: SlotContext; listId: string | null }) {
   const { brand, accounts } = ctx;
-  const tz = brand.default_timezone;
+  const tz = brand.default_timezone;   // slots are rules: the organisation's wall clock, whatever zone the calendar shows
   const canWrite = brand.role === "owner" || brand.role === "editor";
   const [list, setList] = useState<ListRow | null>(null);
   const [name, setName] = useState("新清單");

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "../../../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../../../lib/supabase-server";
+import { isTimeZone } from "../../../../../../lib/social/time";
 
 interface PatchTenantConfigBody {
   status?: "active" | "inactive" | "suspended";
@@ -92,6 +93,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   if (patch.status && !SUPPORTED_STATUSES.includes(patch.status as (typeof SUPPORTED_STATUSES)[number])) {
     return NextResponse.json({ ok: false, error: "invalid_status" }, { status: 400 });
+  }
+
+  // every calendar, rotation slot and report formats times in this zone: an unknown one would throw on each of them
+  if (body.defaultTimezone !== undefined && (typeof body.defaultTimezone !== "string" || !isTimeZone(body.defaultTimezone))) {
+    return NextResponse.json({ ok: false, error: "invalid_timezone" }, { status: 400 });
   }
 
   const supabase = getSupabaseWriteClient();

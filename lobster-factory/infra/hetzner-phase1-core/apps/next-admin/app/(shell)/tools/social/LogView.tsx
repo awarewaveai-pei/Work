@@ -13,7 +13,7 @@ export const ACTION_NAMES: Record<string, string> = {
   create: "建立", edit: "編輯", submit: "送審", approve: "核准", reject: "退回", schedule: "排程", unschedule: "取消排程",
   to_rotation: "加入輪播", from_rotation: "移出輪播", delete: "刪除", restore: "還原", publish_now: "立即發佈",
   queue: "交給 Postiz", send: "送出", send_failed: "送出失敗", published: "已發佈", failed: "發佈失敗",
-  rotation_post: "輪播排入", rotation_withdraw: "輪播撤回", rotation_reorder: "輪播排序", review_setting: "審核設定",
+  rotation_post: "輪播排入", rotation_withdraw: "輪播撤回", rotation_reorder: "輪播排序", review_setting: "審核設定", timezone_setting: "組織時區",
   connect_start: "開始連接帳號", connected: "帳號已連接", connect_cancel: "取消連接", unlink: "移除帳號",
   list_save: "儲存輪播清單", list_delete: "刪除輪播清單", media_upload: "上傳媒體",
   member_add: "加入成員", member_role: "改成員角色", member_remove: "移除成員",
@@ -45,12 +45,13 @@ function summary(row: LogRow, tz: string): string {
   if (typeof d.platform === "string") parts.push(platformOf(d.platform).name);
   if (typeof d.posts === "number") parts.push(`${d.posts} 則`);
   if (typeof d.require_review === "boolean") parts.push(d.require_review ? "要先審核" : "不用審核");
+  if (row.action === "timezone_setting" && typeof d.to === "string") parts.push(`${String(d.from ?? "")} → ${d.to}`);
   return parts.join("　");
 }
 
 export default function LogView({ ctx, initialFilter = "all" }: { ctx: SlotContext; initialFilter?: "all" | "needs" }) {
   const { brand } = ctx;
-  const tz = brand.default_timezone;
+  const tz = ctx.viewTz;   // a log is read, not a rule: the person's display zone
   const [filter, setFilter] = useState(initialFilter);
   const [rows, setRows] = useState<LogRow[]>([]);
   const [more, setMore] = useState(false);

@@ -52,6 +52,19 @@ describe("syndicate reads the site's stored brand voice", () => {
     expect(prompt()).toContain("語氣: 溫暖");
   });
 
+  it("a 繁體中文 article is written in 繁體中文, whatever the site's language says; an English answer is never returned", async () => {
+    m.row = { data: { id: "s1", name: "Soulful", organization_id: "org-a", content_defaults: { language: "English" } }, error: null };
+    m.create.mockReset().mockResolvedValue({
+      model: "claude-haiku", usage: { input_tokens: 1, output_tokens: 1 },
+      content: [{ type: "text", text: '{"facebook":"Halloween costumes can teach feelings, not just fun."}' }],
+    });
+    const res = await POST(req({ siteId: "s1", article: "萬聖節親子活動其實是一堂很好的情緒課，孩子戴上面具後更願意說出感受。" }), {} as never);
+    const json = await res.json();
+    expect(prompt()).toContain("Language: write every post in 繁體中文");
+    expect(m.create).toHaveBeenCalledTimes(2);   // the one retry, no more
+    expect(json).toMatchObject({ ok: true, posts: {}, wrongLanguage: ["facebook"], language: "繁體中文" });
+  });
+
   it("a client of another organization gets 404 and no AI call", async () => {
     expect((await POST(req({ siteId: "s1" }, CLIENT_B), {} as never)).status).toBe(404);
     expect(m.create).not.toHaveBeenCalled();

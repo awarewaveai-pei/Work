@@ -63,12 +63,13 @@ export default function ArticleSource({ brand, accounts, siteId, postId, title, 
         body: JSON.stringify({ article: `${a.title}\n\n${a.content || a.excerpt}`, platforms, articleUrl: a.link, mediaType: a.image ? "image" : "text", siteId }),
       });
       if (!res.ok) throw new Error(`AI 改寫失敗（${res.status}）：${(await res.text()).slice(0, 200)}`);
-      const json = (await res.json()) as { ok: boolean; posts?: WriteResult["posts"]; tooLong?: WriteResult["tooLong"]; error?: string };
+      const json = (await res.json()) as { ok: boolean; posts?: WriteResult["posts"]; tooLong?: WriteResult["tooLong"]; wrongLanguage?: string[]; language?: string; error?: string };
       if (!json.ok || !json.posts) throw new Error(json.error ?? "AI 改寫沒有回內容");
       const custom = textsForAccounts({ posts: json.posts, tooLong: json.tooLong ?? [] }, connected);
       const mediaIds = await image(a);
       onPrefill({ for: key, body: a.excerpt || a.title, link: a.link, sourceUrl: a.link, custom, mediaIds });
-      setNote({ text: `AI 替 ${Object.keys(custom).length} 個頻道各寫了一版，看過再存。` });
+      const off = json.wrongLanguage?.length ? `${json.wrongLanguage.length} 個平台寫成別的語言，沒有採用（要${json.language ?? "跟文章同一種語言"}），那些頻道用共用文字。` : "";
+      setNote({ text: `AI 替 ${Object.keys(custom).length} 個頻道各寫了一版，看過再存。${off}`, error: !!off });
     } catch (e) {
       setNote({ text: e instanceof Error ? e.message : String(e), error: true });
     } finally {

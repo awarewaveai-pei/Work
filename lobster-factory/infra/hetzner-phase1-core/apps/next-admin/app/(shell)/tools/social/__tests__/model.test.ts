@@ -33,7 +33,7 @@ describe("social page dates", () => {
 // C22: the calendar draws a series' occurrences before the server has made their children (0105 header)
 const series = (extra: Partial<Post> = {}): Post => ({
   id: "t1", state: "scheduled", body: "每週一句", scheduled_at: "2026-10-14T02:00:00.000Z", list_id: null, list_position: null, first_comment: null, link_url: null, link_utm: false,
-  notes: null, source_url: null, published_at: null, deleted_at: null, version: 1, repeat: { freq: "week", days: [3], end: "never" }, repeat_of: null, origin_slot: null,
+  notes: null, source_url: null, published_at: null, deleted_at: null, version: 1, created_at: "2026-10-13T00:00:00.000Z", repeat: { freq: "week", days: [3], end: "never" }, repeat_of: null, origin_slot: null,
   auto_mode: "brand", targets: [], media: [], comments: [], tags: [], ...extra,
 });
 const NOW = new Date("2026-10-14T05:00:00Z");   // Wed 13:00 in Taipei, after the template's 10:00

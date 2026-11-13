@@ -22,6 +22,7 @@ import { addVideo, getPost, listAccounts, savePost } from "@/lib/social/store";
 import { applyAction } from "@/lib/social/actions";
 import { requiresReview } from "@/lib/social/review";
 import { textsForAccounts, writerKeysFor, writeSocialPosts } from "@/lib/social/write-posts";
+import { inLanguage } from "@/lib/social/post-language";
 import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { articleChecks, reviewOf, socialChecks, type ReviewCheck } from "./review";
 import { claimTopic, dueApproved, inStatus, move, startTopic, type Topic } from "./store";
@@ -125,6 +126,11 @@ async function makeArticle(t: Topic, site: SiteBrand): Promise<NonNullable<Topic
 export const topicTargets = (formats: readonly string[], platform: string) =>
   platform === "youtube" ? formats.includes("youtube") : formats.includes("social");
 
+/** The social draft's shared text: the article's summary (its meta description), or the title when the summary is not in
+ *  the posts' language (2026-10-29 a Chinese article's summary came back in English and went into the draft as it was). */
+export const socialBody = (summary: string | undefined, title: string, language: string) =>
+  summary && inLanguage(summary, language) ? summary : title;
+
 async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["article"], actor: string): Promise<NonNullable<TopicArtifacts["social"]>> {
   const accounts = (await listAccounts(t.organization_id, { hydrateProfile: false }))
     .filter((a) => a.status === "connected" && topicTargets(t.formats, a.platform));
@@ -140,12 +146,13 @@ async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["ar
   // No link yet: the article is still a draft. The post gets its link when the article is published.
   // a topic with a video gets posts written for one (the video is attached to this draft once it is rendered)
   const mediaType = waitsForVideo(t) ? "video" : "text";
-  const w = await writeSocialPosts({ article: source, keys, mediaType, voice: renderSiteVoice(site.defaults) }, ask);
+  const w = await writeSocialPosts({ article: source, keys, mediaType, voice: renderSiteVoice(site.defaults), siteLanguage: siteLanguage(site.defaults) }, ask);
   const custom = textsForAccounts(w, accounts);
-  const saved = await savePost(t.organization_id, null, null, { body: article?.summary || t.title, notes: `自動內容管線：題目「${t.title}」` },
+  const saved = await savePost(t.organization_id, null, null, { body: socialBody(article?.summary, t.title, w.language), notes: `自動內容管線：題目「${t.title}」` },
     accounts.map((a) => ({ account_id: a.id, custom_body: custom[a.id] ?? null })), null, actor);
   const texts = Object.values(custom);
-  const problems = [...w.tooLong.map((x) => `${x.key} 太長（${x.length}/${x.limit}）`), ...w.missing.map((k) => `${k} 沒有寫出來`)];
+  const problems = [...w.tooLong.map((x) => `${x.key} 太長（${x.length}/${x.limit}）`), ...w.missing.map((k) => `${k} 沒有寫出來`),
+    ...w.wrongLanguage.map((k) => `${k} 不是${w.language}，沒有採用`)];
   if (!problems.length && texts.length < accounts.length) problems.push(`${accounts.length - texts.length} 個頻道沒有專屬貼文`);
   return { post_id: saved.id, checks: socialChecks({ texts, channels: accounts.length, problems }, forbidden) };
 }

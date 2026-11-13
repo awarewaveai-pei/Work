@@ -46,3 +46,31 @@ export function weekday(date: string): number {
   const [y, m, d] = date.split("-").map(Number);
   return ((new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7) + 1;
 }
+
+/** An IANA zone this runtime knows: zoned() and instantAt() throw on anything else, so a stored zone is checked first. */
+export function isTimeZone(tz: string): boolean {
+  if (!tz.trim()) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ---- the zone a person READS times in (2026-11-13) ----------------------------------------------------------------
+// A post's time is an instant (UTC in the database). The organisation's zone (organizations.default_timezone) is the
+// zone of the RULES: repeat series, auto-publish list slots, report days, and the composer's date and time inputs. The
+// display zone only changes how instants are shown; it never takes part in making one, so switching it cannot move a post.
+
+/** The display choices, one button each: "org" = the organisation's own zone, whatever it is. */
+export const DISPLAY_ZONES = ["org", "Asia/Taipei", "UTC"] as const;
+export type DisplayZone = (typeof DISPLAY_ZONES)[number];
+export const isDisplayZone = (v: unknown): v is DisplayZone => typeof v === "string" && (DISPLAY_ZONES as readonly string[]).includes(v);
+/** The zone the page shows times in. */
+export const viewZone = (choice: DisplayZone, orgTz: string): string => (choice === "org" ? orgTz : choice);
+/** A wall-clock time read in one zone, as the same instant's date and time in another (a calendar cell -> the composer). */
+export function rezone(date: string, time: string, from: string, to: string): { date: string; time: string } {
+  const z = zoned(instantAt(date, time, from), to);
+  return { date: z.date, time: z.time };
+}

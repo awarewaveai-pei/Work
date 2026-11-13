@@ -4,7 +4,7 @@
 // tabs with the channel list on the left and one toolbar row; the composer is its own page (compose/new, compose/<id>).
 // Every read and write goes through /api/social (C4); this file holds only what is on screen.
 // Views by card: 自動發布清單 C7 (Lists), 貼文素材庫 C9/C31 (library/), 紀錄 C11 (LogView), 審核 C8, 文章 C10.
-import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, type MediaItem, type WpPost } from "./api";
 import { ArticleScheduleContext } from "./ArticleScheduleSlot";
 import ArticleSource, { type Prefill } from "./ArticleSource";
@@ -24,8 +24,8 @@ import Settings from "./Settings";
 import Toolbar, { noFilters, type Filters } from "./Toolbar";
 import TopBar from "./TopBar";
 import {
-  addDays, addMonths, bestFor, bestKey, bestPlatforms, cannotWriteNotice, instantAt, mondayOf, monthGridStart, monthStart, occurrences, ROLE_NAMES, shortDate,
-  STATE_NAMES, takenSlots, zoned, type Account, type Brand, type CalPost, type Post, type Tag,
+  addDays, addMonths, bestFor, bestKey, bestPlatforms, cannotWriteNotice, DISPLAY_ZONES, instantAt, mondayOf, monthGridStart, monthStart, occurrences, rezone, ROLE_NAMES,
+  shortDate, STATE_NAMES, takenSlots, viewZone, zoned, type Account, type Brand, type CalPost, type DisplayZone, type Post, type Tag,
 } from "./model";
 import "./social.css";
 
@@ -44,7 +44,8 @@ export interface Slots {
   section?: (section: OtherSection, ctx: SlotContext) => ReactNode;
 }
 export interface SlotContext {
-  brand: Brand; accounts: Account[]; posts: Post[]; media: MediaItem[]; today: string;
+  /** today = the brand's date (its rules and reports); viewTz = the zone the person reads times in (lib/social/time.ts) */
+  brand: Brand; accounts: Account[]; posts: Post[]; media: MediaItem[]; today: string; viewTz: string;
   select: (s: Selection) => void; reload: () => Promise<void>; say: (t: string, error?: boolean) => void; setView: (v: View) => void;
   /** C9: the post open in the composer can take a library item */
   canAttach: boolean; attach: (mediaId: string) => void; attachMany: (mediaIds: string[]) => void; mediaAdded: (m: MediaItem) => void;
@@ -69,8 +70,15 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const [brandTotal, setBrandTotal] = useState(0);   // > brands.length: staff search the rest in the top bar
   const [brandId, setBrandId] = useState<string | null>(null);
   const brand = brands?.find((b) => b.id === brandId) ?? null;
-  const tz = brand?.default_timezone ?? "UTC";
+  // Two zones (lib/social/time.ts): brandTz = the organisation's, for every rule (repeat series, lists, the composer's
+  // inputs); tz = the person's display zone, for what this page shows. Instants never pass through tz into a save
+  // except where the person picked a cell that the page drew in tz (a drag, a best-time chip): then that cell is read
+  // in tz, the zone it was drawn in.
+  const [displayTz, setDisplayTz] = useState<DisplayZone>("org");
+  const brandTz = brand?.default_timezone ?? "UTC";
+  const tz = viewZone(displayTz, brandTz);
   const today = useMemo(() => zoned(new Date(), tz).date, [tz]);
+  const brandToday = useMemo(() => zoned(new Date(), brandTz).date, [brandTz]);
   const [view, setViewState] = useState<View>(() => { const v = param("view"); return isView(v) ? v : "week"; });
   const [anchor, setAnchor] = useState<string | null>(() => param("date"));
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -94,6 +102,18 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   // (a 「已還原成草稿。」 showed on the bin long after the restore, 2026-11-13); a carried note is the one exception
   useEffect(() => { setNote(carried); carried = null; }, [routeKey]);
   const say = useCallback((text: string, error = false) => setNote({ text, error }), []);
+  // a choice made before the stored one arrives wins: the late read must not paint over it (critic 2026-11-13 m5)
+  const displayTzChosen = useRef(false);
+  useEffect(() => {
+    Promise.resolve().then(() => api.prefs()).then((r) => { if (!displayTzChosen.current) setDisplayTz(r.displayTz); })
+      .catch(() => { /* the default (the organisation's zone) stays */ });
+  }, []);
+  const chooseDisplayTz = useCallback(async (z: DisplayZone) => {
+    displayTzChosen.current = true;
+    const before = displayTz;
+    setDisplayTz(z);
+    try { await api.setDisplayTz(z); } catch (e) { setDisplayTz(before); say(`顯示時區沒有存起來：${e instanceof Error ? e.message : String(e)}`, true); }
+  }, [displayTz, say]);
   const [listsKey, setListsKey] = useState(0);
   const [listId, setListId] = useState<string | null | undefined>(undefined);
   const [logFilter, setLogFilter] = useState<"all" | "needs">(() => (param("log") === "needs" ? "needs" : "all"));
@@ -202,17 +222,18 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
       setComposeSeed(carriedComposeSeed);
       openCompose(s.date, s.time);
     }
-    else if (s.kind === "article") openCompose(undefined, undefined, { site: s.article.siteId, article: String(s.article.id), title: s.article.title, day: (s.article.topic?.scheduledFor ? zoned(s.article.topic.scheduledFor, tz).date : s.article.date.slice(0, 10)) });
+    else if (s.kind === "article") openCompose(undefined, undefined, { site: s.article.siteId, article: String(s.article.id), title: s.article.title, day: (s.article.topic?.scheduledFor ? zoned(s.article.topic.scheduledFor, brandTz).date : s.article.date.slice(0, 10)) });
     else if (s.kind === "list") { setListId(s.id); if (view !== "lists") setView("lists"); }
     else setListId(undefined);
-  }, [goTo, openCompose, view, setView, tz]);
+  }, [goTo, openCompose, view, setView, brandTz]);
 
   // a series' computed occurrences join the real posts (model.ts occurrences); a deleted-after-published template still makes children
   const calPosts = useMemo<CalPost[]>(() => {
     const from = new Date(instantAt(window_.start, "00:00", tz)), until = new Date(instantAt(addDays(window_.start, window_.days), "00:00", tz));
     const taken = takenSlots(posts, trash), now = new Date();
-    return [...posts, ...[...posts, ...trash].flatMap((t) => occurrences(t, tz, now, from, until, taken))];
-  }, [posts, trash, window_, tz]);
+    // a series repeats on the brand's wall clock (server: store.ts series rows), whatever zone the page shows
+    return [...posts, ...[...posts, ...trash].flatMap((t) => occurrences(t, brandTz, now, from, until, taken))];
+  }, [posts, trash, window_, tz, brandTz]);
   const platformsOf = (p: Post) => p.targets.map((t) => accounts.find((a) => a.id === t.account_id)?.platform ?? "?");
   const visible = useMemo(() => calPosts.filter((p) =>
     (!filters.states.size || filters.states.has(p.state))
@@ -230,7 +251,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const editorPost = postId && loadedPost?.id === postId ? loadedPost : null;
   const canAttach = route.kind === "compose" && (!postId || (!!editorPost && ["draft", "review", "scheduled", "error", "rotation"].includes(editorPost.state)));
   const ctx: SlotContext | null = brand ? {
-    brand, accounts, posts, media, today, select, reload: async () => { await reload(); setListsKey((k) => k + 1); }, say, setView,
+    brand, accounts, posts, media, today: brandToday, viewTz: tz, select, reload: async () => { await reload(); setListsKey((k) => k + 1); }, say, setView,
     canAttach, attach: (id) => setAttachRequest((r) => ({ id, n: (r?.n ?? 0) + 1 })),
     attachMany: (ids) => setAttachManyRequest((r) => ({ ids: [...new Set(ids)], n: (r?.n ?? 0) + 1 })),
     mediaAdded: (m) => setMedia((list) => [m, ...list]),
@@ -350,7 +371,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
     const article = param("article") && param("site") ? { siteId: param("site") as string, id: Number(param("article")), title: param("title") ?? "", day: param("day") ?? "" } : null;
     const articleFor = article ? `${article.siteId}:${article.id}` : null;
     // accounts= (the channel menu's 用這個頻道寫) is for C21's channel picker; today's editor starts with every connected channel
-    const defaults = { date: param("date") ?? (article && article.day > today ? article.day : addDays(today, 1)), time: param("time") ?? "12:00" };
+    const defaults = { date: param("date") ?? (article && article.day > brandToday ? article.day : addDays(brandToday, 1)), time: param("time") ?? "12:00" };
     const notice = postId ? null : cannotWriteNotice(brand.role);
     const title = postId ? "編輯貼文" : article ? "文章 → 社群貼文" : notice ? `你的角色：${ROLE_NAMES[brand.role]}` : "建立貼文";
     const library = libraryOpen ? slots.sideView?.("library", ctx) : null;
@@ -374,7 +395,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
           )}
           <section className="sm-panel">
             {notice ? <p className="sm-side">{notice}</p> : postId && !editorPost ? <div className="sm-side sm-muted">載入中…</div> : (
-              <Editor key={postId ? `${postId}:${editorPost?.version}` : `new:${newKey}`} brand={brand} accounts={accounts} media={media} post={editorPost} today={today} lists={lists}
+              <Editor key={postId ? `${postId}:${editorPost?.version}` : `new:${newKey}`} brand={brand} accounts={accounts} media={media} post={editorPost} today={brandToday} lists={lists}
                   attach={attachRequest} attachMany={attachManyRequest} seed={composeSeed} onOpenLibrary={() => setLibraryOpen(true)} defaults={defaults}
                 prefill={articleFor && prefill?.for === articleFor ? prefill : null}
                 reviewBar={editorPost ? <ReviewBar brand={brand} post={editorPost} onDone={async (_id, msg) => { say(msg); setPostKey((k) => k + 1); }} /> : undefined}
@@ -396,7 +417,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
                   // kept compose/new's route under compose/<id>, and Back opened an empty composer that saved a duplicate)
                   carriedComposeSeed = null;
                   setComposeSeed(null);
-                  if (plan) { setViewState("week"); setAnchor(plan.date); goTo({ kind: "plan" }, { date: plan.date }, { text: msg }); }
+                  if (plan) { const d = zoned(plan.at, tz).date; setViewState("week"); setAnchor(d); goTo({ kind: "plan" }, { date: d }, { text: msg }); }
                   else if (id !== postId) goTo({ kind: "compose", postId: id }, {}, { text: msg }, !postId);
                   else { say(msg); setPostKey((k) => k + 1); }
                 }} />
@@ -434,7 +455,11 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   return (
     <div className="sm-app">
       {top}
-      <PlanTabs view={view} onView={setView} right={<span className="sm-r">{statusLine}<span className="sm-muted">時區 {tz}</span></span>} />
+      <PlanTabs view={view} onView={setView} right={<span className="sm-r">{statusLine}
+        <span className="sm-seg" role="group" aria-label="顯示時區" title="只改畫面上看到的時間；貼文發出的時間點不變">
+          {DISPLAY_ZONES.map((z) => <button type="button" key={z} className={displayTz === z ? "sm-on" : ""} aria-pressed={displayTz === z}
+            onClick={() => void chooseDisplayTz(z)}>{z === "org" ? `組織時區（${brandTz}）` : z === "Asia/Taipei" ? "台灣" : "UTC"}</button>)}
+        </span></span>} />
       <main className={`sm-main${calendar ? "" : " sm-full"}${mobileChannels ? " sm-mobile-channels" : ""}`}>
         {calendar && <>
           <ChannelList accounts={accounts} only={only} canWrite={canWrite} onToggle={toggleOnly} onOnly={(id) => { setOnly(new Set([id])); setMobileChannels(false); }}
@@ -447,9 +472,12 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
               bestPlatforms={bestPlatformKeys} best={bestPf} onBest={onBest} canWrite={canWrite} onCreate={() => openCompose()}
               checkedN={checked.size} onBulk={bulk} onMobileChannels={() => setMobileChannels(true)} />
             {nothingYet ? empty : <>
-              {view === "week" && <WeekView {...shared} weekStart={mondayOf(at)} onNew={(date) => openCompose(date)} onMove={move}
+              {view === "week" && <WeekView {...shared} weekStart={mondayOf(at)} onNew={(date) => {
+                // the column was drawn in the display zone: its noon, as the brand's date and time (critic 2026-11-13 M2)
+                const b = rezone(date, "12:00", tz, brandTz); openCompose(b.date, b.time);
+              }} onMove={move}
                 bestTimes={bestPf ? (d) => bestFor(bestPf, d) : null}
-                onBestTime={(date, time) => openCompose(date, time, { accounts: accounts.filter((a) => a.status === "connected" && bestKey(a.platform) === bestPf).map((a) => a.id).join(",") })} />}
+                onBestTime={(date, time) => { const b = rezone(date, time, tz, brandTz); openCompose(b.date, b.time, { accounts: accounts.filter((a) => a.status === "connected" && bestKey(a.platform) === bestPf).map((a) => a.id).join(",") }); }} />}
               {view === "month" && <MonthView {...shared} anchor={at} onPickWeek={(d) => { setAnchor(d); setView("week"); }} />}
               {view === "list" && <ListView {...shared} checked={checked} undatedTruncated={undatedTruncated} empty={empty}
                 onCheck={(ids, on) => setChecked((c) => { const n = new Set(c); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; })} />}
@@ -462,7 +490,8 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
         {view === "lists" && panel("自動發布清單", slots.sideView?.("lists", ctx))}
         {view === "flows" && (slots.sideView?.("flows", ctx) ?? <SectionShell which="flows" />)}
         {view === "log" && panel("需處理的事和紀錄", slots.sideView?.("log", ctx))}
-        {view === "settings" && panel("設定", <Settings brand={brand} accounts={accounts} onAccounts={setAccounts} team={slots.settingsExtra?.(ctx)} />)}
+        {view === "settings" && panel("設定", <Settings brand={brand} accounts={accounts} onAccounts={setAccounts} team={slots.settingsExtra?.(ctx)}
+          onTimezone={(zone) => setBrands((l) => l?.map((b) => (b.id === brand.id ? { ...b, default_timezone: zone } : b)) ?? l)} />)}
       </main>
     </div>
   );

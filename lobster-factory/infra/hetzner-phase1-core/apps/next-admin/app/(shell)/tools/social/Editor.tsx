@@ -41,7 +41,8 @@ export interface EditorProps {
   reviewBar?: ReactNode;
   /** a WordPress article this post starts from (C10) */
   source?: ReactNode;
-  onSaved: (id: string, message: string, plan?: { date: string }) => void;
+  /** plan.at = the instant the post goes out: the calendar shows that week in its own display zone */
+  onSaved: (id: string, message: string, plan?: { at: string }) => void;
   onMediaAdded: (m: MediaItem) => void;
   /** C10: text, link, channel texts and media from a WordPress article; applied when n changes */
   prefill?: import("./ArticleSource").Prefill | null;
@@ -69,7 +70,7 @@ const load = <T,>(read: () => Promise<T>, done: (v: T) => void, fail?: (e: unkno
 
 export default function Editor(props: EditorProps) {
   const { brand, accounts, post } = props;
-  const tz = brand.default_timezone;
+  const tz = brand.default_timezone;   // the date and time typed here and a repeat rule are the organisation's wall clock (DateTimePicker names it)
   const canWrite = brand.role === "owner" || brand.role === "editor";
   const state: PostState = post?.state ?? "draft";
   const sentIds = useMemo(() => new Set((post?.targets ?? []).filter((t) => t.state === "queued" || t.state === "published").map((t) => t.account_id)), [post]);
@@ -330,10 +331,10 @@ export default function Editor(props: EditorProps) {
       } else if (kind === "schedule" || kind === "repeat") {
         await step({ action: "schedule", scheduledAt: when as string }, "scheduled");
         const z = zoned(when as string, tz);
-        props.onSaved(ref.id, kind === "repeat" ? `已設定週期：${repeatText(repeat, z.date, z.time)}。` : `已排在 ${shortDate(z.date)} ${z.time}。按「回排程日曆」看它在哪。`, { date: z.date });
+        props.onSaved(ref.id, kind === "repeat" ? `已設定週期：${repeatText(repeat, z.date, z.time)}。` : `已排在 ${shortDate(z.date)} ${z.time}。按「回排程日曆」看它在哪。`, { at: when as string });
       } else {
         await step({ action: "publish_now", confirmPublishNow: true }, "scheduled");
-        props.onSaved(ref.id, "已交出去，幾分鐘內會看到結果。", { date: zoned(new Date().toISOString(), tz).date });
+        props.onSaved(ref.id, "已交出去，幾分鐘內會看到結果。", { at: new Date().toISOString() });
       }
     } catch (e) {
       say(message(e), true);

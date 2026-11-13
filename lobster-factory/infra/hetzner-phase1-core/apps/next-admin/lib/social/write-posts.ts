@@ -4,6 +4,7 @@
 // there, and every answer is measured with the same bodyLength before anyone may send it. The style lines below carry
 // tone and shape only, never a second length number.
 import { BODY_LIMITS, bodyLength, YOUTUBE_TITLE_MAX } from "./limits";
+import { inLanguage, postLanguage } from "./post-language";
 
 /** How each writer platform is written; `limit` = its BODY_LIMITS key, `perLine` = the limit applies to each line,
  *  `titleLine` = the first line is a title with its own limit (YouTube). */
@@ -91,6 +92,9 @@ export interface WriteInput {
   articleUrl?: string;
   /** Rendered brand voice (lib/content/brand-voice.ts renderSiteVoice); "" = none. */
   voice?: string;
+  /** The site's content language (brand-voice siteLanguage, 繁體中文 when unset). Decides only when the article is too
+   *  short to read: the posts are written in the article's own language (post-language.ts). */
+  siteLanguage: string;
 }
 
 export interface WriteResult {
@@ -99,6 +103,10 @@ export interface WriteResult {
   tooLong: Array<{ key: WriterKey; length: number; limit: number }>;
   /** Asked for but not answered (missing, empty or not text) even after the retry: the caller says so. */
   missing: WriterKey[];
+  /** Answered in another language than `language` even after the retry: left out of posts, never sent. */
+  wrongLanguage: WriterKey[];
+  /** The language every post was asked for and checked against. */
+  language: string;
 }
 
 export class WriterParseError extends Error {}
@@ -106,7 +114,7 @@ export class WriterParseError extends Error {}
 /** AI calls one write may make: the first answer plus one shorter rewrite. Price displays use it for the upper bound. */
 export const MAX_WRITER_CALLS = 2;
 
-export function buildPrompt(input: WriteInput, keys: WriterKey[], shorten: WriteResult["tooLong"] = []): string {
+export function buildPrompt(input: WriteInput, keys: WriterKey[], shorten: WriteResult["tooLong"] = [], language = postLanguage(input.article, input.siteLanguage), relanguage: WriterKey[] = []): string {
   const video = input.mediaType === "video";
   const specs = keys.map((k) => {
     const p: WriterPlatform = PLATFORMS[k];
@@ -122,9 +130,11 @@ export function buildPrompt(input: WriteInput, keys: WriterKey[], shorten: Write
   const shortenBlock = shorten.length
     ? `\nYour previous versions were too long: ${shorten.map((t) => `${t.key} ${t.length}/${t.limit}`).join(", ")}. Write each one clearly shorter than its hard limit.\n`
     : "";
+  const languageLine = `\nLanguage: write every post in ${language}, the article's language. Never translate it into another language (a name or hashtag may stay as it is).`;
+  const relanguageBlock = relanguage.length ? `\nYour previous versions of ${relanguage.join(", ")} were not in ${language}. Write them in ${language}.\n` : "";
   return `Create social media posts from this article for these platforms:
-${specs}${urlLine}${mediaLine}
-${voiceBlock}${shortenBlock}
+${specs}${urlLine}${mediaLine}${languageLine}
+${voiceBlock}${shortenBlock}${relanguageBlock}
 Article (first 3000 chars):
 ${input.article.slice(0, 3000)}
 
@@ -153,21 +163,28 @@ function parsePosts(text: string, keys: WriterKey[], articleUrl?: string): Parti
  */
 export async function writeSocialPosts(input: WriteInput, ask: (prompt: string) => Promise<string>): Promise<WriteResult> {
   const keys = [...new Set(input.keys)];
-  const posts = parsePosts(await ask(buildPrompt(input, keys)), keys, input.articleUrl);
+  const language = postLanguage(input.article, input.siteLanguage);
+  const posts = parsePosts(await ask(buildPrompt(input, keys, [], language)), keys, input.articleUrl);
+  // a post in another language is no answer: it takes the one retry, and is dropped if it is still wrong
+  const offLanguage = () => keys.filter((k) => posts[k] !== undefined && !inLanguage(posts[k]!, language));
   const measure = (ks: WriterKey[]) => ks.flatMap((k) => {
     const o = posts[k] === undefined ? null : overLength(k, posts[k]!);
     return o ? [{ key: k, ...o }] : [];
   });
   const unanswered = () => keys.filter((k) => posts[k] === undefined);
   let tooLong = measure(keys);
-  if (tooLong.length || unanswered().length) {
-    const retryKeys = [...tooLong.map((t) => t.key), ...unanswered()];
+  const wrong = offLanguage();
+  if (tooLong.length || unanswered().length || wrong.length) {
+    const retryKeys = [...new Set([...tooLong.map((t) => t.key), ...unanswered(), ...wrong])];
     try {
-      Object.assign(posts, parsePosts(await ask(buildPrompt(input, retryKeys, tooLong)), retryKeys, input.articleUrl));
+      Object.assign(posts, parsePosts(await ask(buildPrompt(input, retryKeys, tooLong, language, wrong)), retryKeys, input.articleUrl));
       tooLong = measure(keys);
     } catch (e) {
       if (!(e instanceof WriterParseError)) throw e;   // an unreadable retry keeps the first answer
     }
   }
-  return { posts, tooLong, missing: unanswered() };
+  const wrongLanguage = offLanguage();
+  for (const k of wrongLanguage) delete posts[k];
+  tooLong = tooLong.filter((t) => !wrongLanguage.includes(t.key));
+  return { posts, tooLong, missing: unanswered().filter((k) => !wrongLanguage.includes(k)), wrongLanguage, language };
 }
