@@ -29,12 +29,16 @@ const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
   const maskFile = path.join(dir, "mask.png");
   ff(["-f", "lavfi", "-i", "color=c=white:s=40x20,format=rgba", "-vf", "geq=r=255:g=255:b=255:a='if(lt(X,20),0,255)'", "-frames:v", "1", maskFile]);
   const calls = [];
+  let hang = false;
   const server = createServer({
     dataDir: dir,
     env: { OPENAI_API_KEY: "test-only", REPLICATE_API_TOKEN: "test-only" },
     fetchImpl: async (url, options = {}) => {
       calls.push({ url, body: options.body });
-      if (/^https:\/\/api\.replicate\.com\/v1\/(models\/.+\/)?predictions$/.test(url)) return Response.json({ id: "p1", status: "succeeded", output: "https://replicate.delivery/x/out.png" });
+      // hang = the next run stays "processing" until the job is cancelled (rule 2 of replicate-run.cjs).
+      if (/^https:\/\/api\.replicate\.com\/v1\/(models\/.+\/)?predictions$/.test(url)) return Response.json(hang ? { id: "p-hang", status: "processing" } : { id: "p1", status: "succeeded", output: "https://replicate.delivery/x/out.png" });
+      if (url === "https://api.replicate.com/v1/predictions/p-hang") return Response.json({ id: "p-hang", status: "processing" });
+      if (url === "https://api.replicate.com/v1/predictions/p-hang/cancel") return Response.json({ id: "p-hang", status: "canceled" });
       if (url === "https://replicate.delivery/x/out.png") return new Response(red);
       if (url.endsWith("/images/edits")) return Response.json({ data: [{ b64_json: red.toString("base64") }], usage: { input_tokens: 900, input_tokens_details: { text_tokens: 100, image_tokens: 800 }, output_tokens: 1500 } });
       throw Error("unexpected call " + url);
@@ -92,6 +96,16 @@ const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
     assert(form.has("mask"));
     assert.equal(gpt.job.result.origin.costUsd, costs.imageUsd("gpt-image-2.6-sunburst", { input_tokens: 900, input_tokens_details: { text_tokens: 100, image_tokens: 800 }, output_tokens: 1500 }));
     console.log("PASS ideogram (black mask), flux fill (white mask), klein (no mask), gpt 2.6 (alpha mask): only the box changes; charged");
+
+    // A job cancelled while its Replicate run is still processing cancels that run at Replicate (it would keep billing).
+    hang = true;
+    const hung = await (await post("/generations", { type: "image", operation: "region", prompt: "區域 1：改紅", settings: { ...settings, model: "ideogram-4-5-edit-low" }, references: { images: [image] }, mask })).json();
+    for (let i = 0; i < 100 && !calls.some((c) => c.url.endsWith("/predictions/p-hang")); i++) await new Promise((r) => setTimeout(r, 50));
+    await post("/generations/" + hung.id + "/cancel", {});
+    for (let i = 0; i < 100 && !calls.some((c) => c.url.endsWith("/p-hang/cancel")); i++) await new Promise((r) => setTimeout(r, 50));
+    assert(calls.some((c) => c.url === "https://api.replicate.com/v1/predictions/p-hang/cancel"), "the abandoned run is cancelled at Replicate");
+    hang = false;
+    console.log("PASS a job cancelled mid-poll cancels its Replicate run");
 
     // 4 (server). An old job's settings (no model, 2K) run the default row at 1K; a model outside the catalog is refused.
     const old = await poll(await (await post("/generations", { type: "image", operation: "region", prompt: "整張變亮", settings: { ...settings, quality: "2K" }, references: { images: [image] }, mask })).json());

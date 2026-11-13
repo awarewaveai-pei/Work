@@ -14,7 +14,7 @@ const source = require("./appearance.cjs").resolveSource(path.join(__dirname, ".
 const catalog = require(path.join(source, "public/editor-shared/image-models.js"));
 const { MEDIA_MODELS } = require(path.join(source, "lib/ai/cost-model.ts"));
 
-const REPLICATE = "https://api.replicate.com/v1";
+const replicateRun = require("./replicate-run.cjs");
 const pinned = (slug) => MEDIA_MODELS[slug].version;
 // mask: what the vendor wants -- "alpha" = transparent = edit (OpenAI), "white" = white = edit, "black" = black = edit,
 // null = no mask (the instruction names each box; the paste-back keeps the rest).
@@ -77,28 +77,23 @@ function capability(env) {
 const pngSize = (buffer) => (buffer.subarray(1, 4).toString() === "PNG" ? { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) } : null);
 const mp = (s) => (s ? (s.width * s.height) / 1e6 : 1);
 
-// Replicate: create (pinned version or the official model by name), poll, download from replicate.delivery only.
+// Replicate through replicate-run.cjs (one rule for every paid run: a run this job stops waiting for is cancelled there).
+// Created async (no Prefer: wait), so the output is always a replicate.delivery url, never a data: uri.
 async function replicate(call, input, { env, fetchImpl, signal }) {
   const auth = { Authorization: "Bearer " + env.REPLICATE_API_TOKEN };
   const deadline = AbortSignal.timeout(170_000), abort = signal ? AbortSignal.any([signal, deadline]) : deadline;
-  const json = async (url, init = {}) => {
-    const r = await fetchImpl(url, { ...init, headers: { ...auth, ...(init.body ? { "Content-Type": "application/json" } : {}) }, signal: abort });
-    const v = await r.json().catch(() => null);
-    if (!r.ok) throw Object.assign(Error("Replicate " + r.status + "：" + String(v?.detail || "").slice(0, 200)), { status: r.status >= 500 ? 502 : r.status });
-    return v;
+  const fetchCall = async (url, init, label) => {
+    const r = await fetchImpl(url, { ...init, signal: abort }).catch(() => { throw Error(deadline.aborted ? "圖片編輯逾時" : signal?.aborted ? "已取消" : label + "連線失敗"); });
+    if (!r.ok) throw Object.assign(Error(label + "失敗：Replicate " + r.status), { status: r.status >= 500 ? 502 : r.status });
+    return r;
   };
-  let p = await json(call.version ? REPLICATE + "/predictions" : REPLICATE + "/models/" + call.model + "/predictions",
-    { method: "POST", body: JSON.stringify(call.version ? { version: call.version(), input } : { input }) });
-  while (["starting", "processing"].includes(p?.status)) {
-    await new Promise((r, j) => { const t = setTimeout(r, 2000); abort.addEventListener("abort", () => { clearTimeout(t); j(Error(deadline.aborted ? "圖片編輯逾時" : "已取消")); }, { once: true }); });
-    p = await json(REPLICATE + "/predictions/" + encodeURIComponent(p.id));
-  }
-  if (p?.status !== "succeeded") throw Error("圖片編輯失敗：" + String(p?.error || p?.status).slice(0, 200));
-  const url = Array.isArray(p.output) ? p.output[0] : p.output;
-  if (typeof url !== "string" || !/^https:\/\/replicate\.delivery\//.test(url)) throw Error("圖片結果網址不在允許範圍");
-  const r = await fetchImpl(url, { signal: abort });
-  if (!r.ok) throw Error("下載圖片結果失敗：" + r.status);
-  return Buffer.from(await r.arrayBuffer());
+  const prediction = await replicateRun.runPrediction({
+    call: fetchCall, auth, label: "圖片編輯", pollMs: 2000, signal: abort, env, fetchImpl,
+    create: async () => (await fetchCall(call.version ? replicateRun.API + "/predictions" : replicateRun.API + "/models/" + call.model + "/predictions",
+      { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify(call.version ? { version: call.version(), input } : { input }) }, "圖片編輯")).json(),
+    abortError: () => Error(deadline.aborted ? "圖片編輯逾時" : "已取消"),
+  });
+  return Buffer.from(await (await fetchCall(replicateRun.deliveryUrl(prediction, "圖片編輯"), {}, "下載圖片結果")).arrayBuffer());
 }
 // One run of row m on the source PNG with the mask in the vendor's form. Answers { image: Buffer, costUsd }.
 async function run(m, { prompt, image, masks, ratio, env, fetchImpl, signal }) {
