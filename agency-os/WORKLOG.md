@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-13（續16）部署：音樂生成、圖片局部編輯器、破框貼文動畫、ElevenLabs 免費額度上線（887f2e1ae）
+
+- 操作者：「現在部署」。
+- 步驟：
+  1. 主機 `/root/lobster-phase1/.env` 加 `ELEVENLABS_API_KEY`（先備份 `.env.bak-20261113-eleven`；值從本機 `mcp/user-env.ps1` 經 ssh stdin 傳過去，沒有出現在指令或輸出裡）。
+  2. `safe-infra-patch.sh compose docker-compose.yml video-workbench`：video-workbench 環境加 `ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}`（跟 repo 參考檔同一行），備份 `docker-compose.yml.bak.safe-patch-20261113-151725`，6 秒恢復健康。`docker exec lobster-video-workbench printenv ELEVENLABS_API_KEY` exit 0、長度 51。
+  3. `sg-deploy.sh next-admin video-workbench`：測試閘門通過 → 兩個容器都 healthy → HTTP smoke 8 項 OK；`.deployed-commit` 從 24eedbede 變成 887f2e1ae（包含 c91472d71、197d65789、18896bd0b、8e96572a9）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin video-workbench | exit=0 | ms=420000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（34 passed／0 failed／24 skipped，證據在 agency-os/reports/e2e/2026-11-13/smoke） | exit=0 | ms=66000
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=已登入的 Chrome 讀 video.aware-wave.com /api/vw/capabilities：music＝Lyria 3 Clip US$0.04、Lyria 3.5 US$0.08、Eleven Music 未啟用（需要付費方案）；imageEdit 7 列含 Nano Banana 1K/2K/4K；speech、transcribe、audioTools.separate、sfx 都有 ElevenLabs 列，價格 0，本月剩 7,063 點；應用工具 21 項，破框在「社群」分類，畫面有 IG／FB／Threads／X | exit=0 | ms=5000
+- REVIEW_WAIVED: NA -- 部署操作本身；程式審查見續9／續11／續12／續13
+- BUGHUNT_WAIVED: NA -- 沒有改程式；主機 compose 跟 repo 參考檔是同一行（/check-drift 會比對兩邊）
+- rollback：主機 `cp docker-compose.yml.bak.safe-patch-20261113-151725 docker-compose.yml` 再 `safe-infra-patch` 重套；程式回到 24eedbede 走 DEPLOY_ROLLBACK_RUNBOOK §2.1；`.env` 從 `.env.bak-20261113-eleven` 還原。
 ## 2026-11-13（續15）社群工具：每人顯示時區、組織時區改台灣、貼文清單加建立時間、社群文案語言固定
 
 - 時區根因：社群頁所有時間都用 `organizations.default_timezone`（舊 `SocialManager.tsx:72`），設定頁只顯示（舊 `Settings.tsx:157`）；AwareWave 組織是 UTC。唯一寫入路徑是 ops tenant PATCH（`app/api/ops/tenants/[id]/config/route.ts`），只有 ops-console 用、而且只編第一個 tenant。
