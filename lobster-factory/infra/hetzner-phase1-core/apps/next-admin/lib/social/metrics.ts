@@ -326,7 +326,7 @@ export function summarize(rows: readonly DayRow[], accountIds: readonly string[]
 
 export interface AnalyticsAccount { id: string; platform: string; label: string; status: string; picture: string | null; handle: string | null }
 export interface AnalyticsPost {
-  id: string; body: string; published_at: string; account_ids: string[]; thumb: string | null;
+  id: string; body: string; published_at: string; account_ids: string[]; thumb: string | null; thumb_kind: string | null;
   reach: number | null; engagement: number | null; rate: number | null;
 }
 export interface Analytics extends Summary {
@@ -366,10 +366,11 @@ export async function loadAnalytics(brandId: string, tz: string, account: string
   const byPost = new Map<string, PubTarget[]>();
   for (const t of found) byPost.set(t.post_id, [...(byPost.get(t.post_id) ?? []), t]);
   const newest = [...byPost.values()].slice(0, postsCap);   // `found` is newest first, so are the groups
-  type P = { id: string; body: string; published_at: string; media: Array<{ position: number; item: { postiz_path: string | null } | null }> };
+  type P = { id: string; body: string; published_at: string; media: Array<{ position: number; item: { postiz_path: string | null; kind: string | null } | null }> };
+  const firstMedia = (x: P) => [...x.media].sort((a, b) => a.position - b.position)[0]?.item ?? null;
   const detail = new Map<string, P>();
   for (let i = 0; i < newest.length; i += 100) {
-    const { data, error: e2 } = await sb.from("social_posts").select("id, body, published_at, media:social_post_media(position, item:social_media(postiz_path))")
+    const { data, error: e2 } = await sb.from("social_posts").select("id, body, published_at, media:social_post_media(position, item:social_media(postiz_path, kind))")
       .in("id", newest.slice(i, i + 100).map((g) => g[0].post_id));
     if (e2) throw new SocialStoreError(500, `posts: ${e2.message}`);
     for (const x of (data ?? []) as unknown as P[]) detail.set(x.id, x);
@@ -389,7 +390,7 @@ export async function loadAnalytics(brandId: string, tz: string, account: string
     const engPaired = sum(x.targets.map((t) => (pm.get(t.id)?.reach != null ? pm.get(t.id)?.engagement : null)));
     return {
       id: x.id, body: x.body, published_at: x.published_at, account_ids: x.targets.map((t) => t.account_id),
-      thumb: [...x.media].sort((a, b) => a.position - b.position)[0]?.item?.postiz_path ?? null,
+      thumb: firstMedia(x)?.postiz_path ?? null, thumb_kind: firstMedia(x)?.kind ?? null,
       reach, engagement, rate: reachPaired && engPaired != null ? r1((engPaired / reachPaired) * 100) : null,
     };
   });

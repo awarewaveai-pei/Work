@@ -40,7 +40,7 @@ export async function GET(req: Request): Promise<Response> {
     capabilityVersion: row.capability_version,
     reportSha256: row.report_sha256,
     createdAt: row.created_at,
-    findings: summarizeQaFindings(row.report_json),
+    findings: summarizeQaFindings(row.report_json, row.status),
   }));
   return NextResponse.json({ ok: true, items });
 }

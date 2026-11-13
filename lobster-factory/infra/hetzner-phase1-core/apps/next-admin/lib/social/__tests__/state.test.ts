@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { transition, TransitionError, type BrandRole, type PostAction, type PostSnapshot, type PostState } from "../state";
+import { assertCanPurge, transition, TransitionError, type BrandRole, type PostAction, type PostSnapshot, type PostState } from "../state";
 
 const STATES: PostState[] = ["draft", "review", "scheduled", "queued", "published", "error", "rotation", "deleted"];
 const ROLES: BrandRole[] = ["owner", "editor", "reviewer", "client"];
@@ -105,5 +105,22 @@ describe("review required (C8, migration 0102)", () => {
     expect(() => transition(post("error"), "schedule", "editor", { ...INPUT, requireReview: true }, NOW)).toThrow(/needs review/);
     expect(() => transition(post("draft"), "to_rotation", "editor", { ...INPUT, requireReview: true }, NOW)).toThrow(/needs review/);
     expect(() => transition(post("draft"), "to_rotation", "owner", { ...INPUT, requireReview: true }, NOW)).not.toThrow();
+  });
+});
+
+// D (2026-11-13): permanent delete from 已刪除貼文. An erase guard: only a binned post that never went out, and only the
+// roles that may restore it (the same button's rule, RULES.restore).
+describe("assertCanPurge", () => {
+  const binned = { state: "deleted" as PostState, publishedAt: null };
+  it("a binned, never-published post: the restore roles may purge it, no one else", () => {
+    for (const role of ["owner", "editor"] as BrandRole[]) expect(() => assertCanPurge(binned, role)).not.toThrow();
+    for (const role of ["reviewer", "client"] as BrandRole[]) expect(() => assertCanPurge(binned, role)).toThrow(TransitionError);
+  });
+  it.each(["draft", "review", "scheduled", "queued", "published", "error", "rotation"] as PostState[])("a %s post (not in the bin) is refused", (state) => {
+    expect(() => assertCanPurge({ state, publishedAt: null }, "owner")).toThrow(/not in the bin/);
+  });
+  it("a binned post that was published is refused (it went out; the record stays)", () => {
+    expect(() => assertCanPurge({ state: "deleted", publishedAt: "2026-11-01T00:00:00Z" }, "owner")).toThrow(/published/);
+    expect(() => assertCanPurge({ state: "deleted", publishedAt: null, sentTargets: 1 }, "owner")).toThrow(/published/);
   });
 });

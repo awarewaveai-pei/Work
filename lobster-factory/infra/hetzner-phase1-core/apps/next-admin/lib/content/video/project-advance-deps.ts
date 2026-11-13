@@ -1,6 +1,6 @@
 /** The real dependencies of advanceProject (project-advance.ts) for one organization: the video job store, QA, Release and social stores. */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { QA_LABELS, findingLabel } from "@/app/(shell)/tools/video/qa-labels";
+import { QA_LABELS, explainFinding } from "@/app/(shell)/tools/video/qa-labels";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { renderSiteVoice, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { listAccounts } from "@/lib/social/store";
@@ -54,7 +54,7 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
         const q = latest.get(k);
         if (!q) return [`${QA_LABELS[k]}還沒有結果`];
         if (q.status === "passed") return [];
-        const reasons = summarizeQaFindings(q.report_json).slice(0, 3).map((f) => findingLabel(f.rule, f.message)).join("、");
+        const reasons = summarizeQaFindings(q.report_json, q.status).slice(0, 3).map(explainFinding).join("、");
         return [`${QA_LABELS[k]}未通過${reasons ? `（${reasons}）` : ""}`];
       });
       return why.length ? why : [ev.gate.message];

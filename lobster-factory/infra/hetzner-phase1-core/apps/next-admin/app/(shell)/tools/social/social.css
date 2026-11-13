@@ -163,7 +163,7 @@
 .sm-post.sm-article { background: var(--bg-subtle); border-style: dashed; }
 .sm-ctag { position: absolute; left: -1px; right: -1px; top: -1px; height: 4px; border-radius: 8px 8px 0 0; }
 .sm-cthumb { position: relative; flex: none; height: 58px; border-radius: 5px; overflow: hidden; display: grid; place-items: center end; padding-right: 6px; background: var(--bg-subtle); }
-.sm-cthumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sm-cthumb img, .sm-cthumb video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .sm-cthumb.sm-txt { height: 28px; }
 .sm-cthumb.sm-row { width: 44px; height: 40px; padding: 0; place-items: center; }
 .sm-cthumb.sm-row .sm-avs, .sm-cthumb.sm-row .sm-more { display: none; }

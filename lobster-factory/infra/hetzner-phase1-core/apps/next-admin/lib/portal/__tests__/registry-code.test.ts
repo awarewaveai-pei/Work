@@ -177,7 +177,7 @@ describe("registry claims match the code", () => {
     "lib/content/wp-sites.ts": ["listAccessibleWpSites", "resolveWpSite", "siteRowGate"], // canAccessOrg / assertOrgAccess on the site's organization
     "lib/content/social-org.ts": ["resolveSocialOrg"],                        // assertOrgAccess on the named organization
     "lib/content/publish/wordpress-core.ts": ["publishToWordPress"],          // resolveWpSite before it reads a credential
-    "lib/content/video/embed-in-post.ts": ["embedVideoInPost"],               // resolveWpSite before any read or write
+    "lib/content/video/embed-in-post.ts": ["embedVideoInPost", "embedVideoInNewDraft"], // resolveWpSite before any read or write (the new draft via publishToWordPress)
     "lib/content/syndicate.ts": ["syndicateHandler"],                         // its one read, siteVoiceFor, checks the site's organization
     "lib/content/video/timeline-remotion-request.ts": ["prepareTimelineRemotionRequest"], // assertOrgAccess, then reads that org's assets
     // Google's redirect carries no session: the OAuth callback acts only on the connector named in a state HMAC-signed by

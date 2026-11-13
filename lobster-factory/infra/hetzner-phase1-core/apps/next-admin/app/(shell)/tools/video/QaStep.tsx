@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { QA_LABELS, QA_HINTS, STATUS_TEXT, findingLabel } from "./qa-labels";
+import { QA_LABELS, QA_HINTS, STATUS_TEXT, BLOCKED_NOTE, explainFinding } from "./qa-labels";
 
 type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string }; created_at: string; asset_domain: string };
-type QaFinding = { rule: string; severity: string; message: string; format?: string };
+type QaFinding = { rule: string; severity: string; message: string; format?: string; evidence?: Record<string, number | string | null> };
 type QaItem = { id: string; kind: string; status: string; candidateAssetId: string; candidateChecksum: string; profileId: string; profileVersion: string; findings?: QaFinding[] };
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14 };
@@ -96,7 +96,7 @@ export default function QaStep({ organizationId, projectId, onContinue }: { orga
                 <div style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 4 }}>{QA_HINTS[kind]}</div>
                 {findings.map((f, i) => (
                   <div key={i} style={{ fontSize: 10, color, marginTop: 2, textAlign: "left" }}>
-                    {f.format ? `[${f.format}] ` : ""}{findingLabel(f.rule, f.message)}
+                    {f.format ? `[${f.format}] ` : ""}{explainFinding(f)}
                   </div>
                 ))}
               </div>
@@ -110,7 +110,7 @@ export default function QaStep({ organizationId, projectId, onContinue }: { orga
         style={{ padding: "12px 0", borderRadius: 8, border: "none", background: assetId ? "var(--accent)" : "var(--border-subtle)", color: assetId ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: 700, fontSize: 14, cursor: assetId ? "pointer" : "not-allowed", width: 200 }}>
         繼續到 Release →
       </button>
-      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>未通過的項目 Release 步驟會擋下——那裡的閘是最終依據，這裡只是先給你看。</div>
+      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{BLOCKED_NOTE}Release 步驟的閘是最終依據，這裡只是先給你看。</div>
     </div>
   );
 }

@@ -6,7 +6,11 @@ import { resolveWpSite } from "@/lib/content/wp-sites";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET /api/video/wp-posts?siteId= -- the site's newest posts (draft, scheduled, published) for the "embed in an article" picker (V5.3). */
+/**
+ * GET /api/video/wp-posts?siteId= -- the site's newest NOT-live posts (draft, pending) for the release page's
+ * "embed in an article" picker (V5.3). Published and scheduled posts are left out: editing one is a live edit
+ * (WP REST has no draft revision), and the release page must not put anything live (P6.10, 2026-11-13).
+ */
 export async function GET(req: Request): Promise<Response> {
   if (!canCreateAiImageJob(resolveOpsRole(req).role)) return new NextResponse("forbidden", { status: 403 });
   const siteId = new URL(req.url).searchParams.get("siteId")?.trim() ?? "";
@@ -16,7 +20,7 @@ export async function GET(req: Request): Promise<Response> {
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!resolved || !resolved.token) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });
   try {
-    const res = await fetch(`${resolved.site.url.replace(/\/+$/, "")}/wp-json/wp/v2/posts?per_page=30&status=draft,future,publish&orderby=modified&order=desc&context=edit&_fields=id,title,status,modified`, {
+    const res = await fetch(`${resolved.site.url.replace(/\/+$/, "")}/wp-json/wp/v2/posts?per_page=30&status=draft,pending&orderby=modified&order=desc&context=edit&_fields=id,title,status,modified`, {
       headers: { Authorization: resolved.authHeader }, signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return NextResponse.json({ ok: false, error: `WordPress ${res.status}` }, { status: 502 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import OrganizationPicker from "./OrganizationPicker";
-import { QA_LABELS, STATUS_TEXT, findingLabel } from "./qa-labels";
+import { QA_LABELS, STATUS_TEXT, BLOCKED_NOTE, explainFinding } from "./qa-labels";
 import { RATIO_LABEL, ratioFor, ratioOfAsset } from "@/lib/content/video/platform-ratio";
 import { textsForAccounts, writerKeysFor } from "@/lib/social/write-posts";
 
@@ -13,7 +13,7 @@ const chip = (on: boolean): React.CSSProperties => ({ padding: "6px 10px", borde
 
 const KINDS = ["technical", "caption", "editorial", "rights"] as const;
 type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; script?: string; ratio?: string }; created_at: string; asset_domain: string };
-type Qa = { kind: string; status: string; candidateChecksum: string; findings?: Array<{ rule: string; message: string }> };
+type Qa = { kind: string; status: string; candidateChecksum: string; findings?: Array<{ rule: string; message: string; evidence?: Record<string, number | string | null> }> };
 type Account = { id: string; platform: string; label: string; status: string };
 type Site = { id: string; name: string; organization_id?: string | null };
 type WpPost = { id: number; title: string; status: string };
@@ -115,13 +115,15 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
     setWpPosts((await getJson<{ posts?: WpPost[] }>(`/api/video/wp-posts?siteId=${encodeURIComponent(id)}`))?.posts ?? []);
   }
 
-  async function embed(postId: number) {
+  // draftOnly / newDraftTitle: the server refuses anything that is not a draft, so this page cannot put an article live.
+  async function embed(target: { postId: number } | { newDraftTitle: string }) {
     const ratio = ratioFor("wordpress", releasedRatios);
     const row = releasedRows.find((r) => r.ratio === ratio);
     if (!row) return;
     setBusy(true); setMessage("");
-    const res = await postJson("/api/video/embed-to-wp", { siteId, postId, videoUrl: row.object_url, releaseId: released[row.id], variant: "default" });
-    setMessage(res.ok ? "✅ 影片已嵌入文章（文章狀態不變，草稿仍是草稿）。" : String(res.json.error ?? "嵌入失敗"));
+    const res = await postJson("/api/video/embed-to-wp", { siteId, ...target, draftOnly: true, videoUrl: row.object_url, releaseId: released[row.id], variant: "default" });
+    if ("newDraftTitle" in target) void pickSite(siteId);   // the new draft shows in the list, also when the embed into it failed
+    setMessage(res.ok ? "✅ 影片已嵌入草稿文章，到 WordPress 後台檢查後再自己發布。" : String(res.json.error ?? "嵌入失敗"));
     setBusy(false);
   }
 
@@ -151,7 +153,8 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
             {results.map(({ k, q }) => <span key={k}>{QA_LABELS[k]}：{STATUS_TEXT[q?.status ?? "missing"]}</span>)}
           </div>
-          {results.filter((x) => x.q && x.q.status !== "passed").flatMap((x) => (x.q?.findings ?? []).map((f) => <div key={`${x.k}${f.rule}`} style={{ fontSize: 11.5, color: "var(--red)" }}>{QA_LABELS[x.k]}：{findingLabel(f.rule, f.message)}</div>))}
+          {results.filter((x) => x.q && x.q.status !== "passed").flatMap((x) => (x.q?.findings ?? []).map((f, i) => <div key={`${x.k}${f.rule}${i}`} style={{ fontSize: 11.5, color: "var(--red)" }}>{QA_LABELS[x.k]}：{explainFinding(f)}</div>))}
+          {!released[r.id] && results.some((x) => x.q && x.q.status !== "passed") && <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{BLOCKED_NOTE}</div>}
         </div>;
       })}
     </section>
@@ -186,10 +189,12 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
         : <>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{sites.map((s) => <button key={s.id} type="button" onClick={() => void pickSite(s.id)} style={chip(s.id === siteId)}>{s.name}</button>)}</div>
           {siteId && <div style={{ display: "grid", gap: 6 }}>
-            {wpPosts.length === 0 && <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>這個網站沒有可選的文章</span>}
+            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>只列草稿和待審文章；已發布或排程中的文章不列，改它影片就直接上線。</span>
+            <button type="button" disabled={busy} onClick={() => void embed({ newDraftTitle: primary?.metadata?.title || "影片" })} style={btn(!busy)}>建新草稿文章並嵌入</button>
+            {wpPosts.length === 0 && <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>這個網站沒有草稿文章</span>}
             {wpPosts.map((p) => <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}>
-              <span style={{ flex: 1 }}>{p.title}（{p.status === "publish" ? "已發布" : p.status === "future" ? "排程" : "草稿"}）</span>
-              <button type="button" disabled={busy} onClick={() => void embed(p.id)} style={btn(!busy)}>嵌入影片</button>
+              <span style={{ flex: 1 }}>{p.title}（{p.status === "pending" ? "待審" : "草稿"}）</span>
+              <button type="button" disabled={busy} onClick={() => void embed({ postId: p.id })} style={btn(!busy)}>嵌入影片</button>
             </div>)}
           </div>}
         </>}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { QA_LABELS, STATUS_TEXT, findingLabel } from "../qa-labels";
+import { QA_LABELS, STATUS_TEXT, explainFinding } from "../qa-labels";
 import { projectStatus } from "./project-status";
 
 type Scene = { narration?: string };
@@ -9,7 +9,7 @@ type Project = { id: string; organization_id: string; title: string; lifecycle_s
 type Asset = { id: string; object_url: string; created_at: string; metadata?: { title?: string; formats?: Record<string, string>; variantOf?: string; format?: string } };
 type Release = { id: string; candidate_asset_id: string; status: string; created_at: string; approved_at: string | null; withdrawn_at: string | null };
 type Delivery = { id: string; release_id: string; destination: string; variant: string | null; status: string; created_at: string };
-type QaItem = { kind: string; status: string; findings?: { rule: string; message: string; format?: string }[] };
+type QaItem = { kind: string; status: string; findings?: { rule: string; message: string; format?: string; evidence?: Record<string, number | string | null> }[] };
 type Outcome = { id: string; release_id: string; platform: string; maturity: string; observed_at: string; metrics: Record<string, unknown> | null };
 type Detail = { item: Project; assets: Asset[]; releases: Release[]; deliveries: Delivery[]; outcomes?: Outcome[] };
 
@@ -50,7 +50,7 @@ function Qa({ organizationId, assetId }: { organizationId: string; assetId: stri
         return (
           <div key={kind} style={{ border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "8px 10px", background: status === "passed" ? "var(--badge-green-bg)" : "transparent" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color }}>{label}　{STATUS_TEXT[status] ?? status}</div>
-            {findings.map((f, i) => <div key={i} style={{ fontSize: 10, color, marginTop: 2 }}>{f.format ? `[${f.format}] ` : ""}{findingLabel(f.rule, f.message)}</div>)}
+            {findings.map((f, i) => <div key={i} style={{ fontSize: 10, color, marginTop: 2 }}>{f.format ? `[${f.format}] ` : ""}{explainFinding(f)}</div>)}
           </div>
         );
       })}

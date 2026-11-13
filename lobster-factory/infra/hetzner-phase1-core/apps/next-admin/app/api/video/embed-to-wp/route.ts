@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
-import { embedVideoInPost } from "@/lib/content/video/embed-in-post";
+import { embedVideoInPost, embedVideoInNewDraft } from "@/lib/content/video/embed-in-post";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** POST /api/video/embed-to-wp -- shell over embedVideoInPost (lib/content/video/embed-in-post.ts). */
+/**
+ * POST /api/video/embed-to-wp -- shell over embedVideoInPost (lib/content/video/embed-in-post.ts).
+ * draftOnly: true refuses a post that is not a draft; newDraftTitle creates a new draft and embeds into it.
+ */
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
@@ -22,8 +25,16 @@ export async function POST(req: Request): Promise<Response> {
   const rawId    = typeof body.postId   === "number" ? body.postId : parseInt(String(body.postId), 10);
   const postId   = Number.isInteger(rawId) && rawId > 0 ? rawId : NaN;
 
+  const draftOnly = body.draftOnly === true;
+  const newDraftTitle = typeof body.newDraftTitle === "string" ? body.newDraftTitle.trim() : "";
+  const newDraftIntro = typeof body.newDraftIntro === "string" ? body.newDraftIntro : "";
+
   let result;
-  try { result = await embedVideoInPost(req, { siteId, postId, videoUrl, releaseId, variant }); }
+  try {
+    result = newDraftTitle
+      ? await embedVideoInNewDraft(req, { siteId, title: newDraftTitle, intro: newDraftIntro, videoUrl, releaseId, variant })
+      : await embedVideoInPost(req, { siteId, postId, videoUrl, releaseId, variant, draftOnly });
+  }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
   if ("blockedMode" in result) return blockedChangeResponse(result.blockedMode);

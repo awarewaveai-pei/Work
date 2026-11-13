@@ -90,7 +90,9 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const [note, setNote] = useState<Note | null>(null);
   // taken when the route lands: compose/X -> compose/Y keeps this same component, so a mount-time read would miss it
   const routeKey = route.kind === "compose" ? `compose:${route.postId}` : route.kind === "section" ? route.section : "plan";
-  useEffect(() => { if (carried) { setNote(carried); carried = null; } }, [routeKey]);
+  // a status line belongs to the page and tab where its action happened: a new route or tab starts without one
+  // (a 「已還原成草稿。」 showed on the bin long after the restore, 2026-11-13); a carried note is the one exception
+  useEffect(() => { setNote(carried); carried = null; }, [routeKey]);
   const say = useCallback((text: string, error = false) => setNote({ text, error }), []);
   const [listsKey, setListsKey] = useState(0);
   const [listId, setListId] = useState<string | null | undefined>(undefined);
@@ -123,7 +125,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const pickBrand = useCallback((id: string) => { setBrandId(id); setAnchor(null); syncUrl("brand", id); }, [syncUrl]);
   const setView = useCallback((v: View) => {
     if (route.kind !== "plan") return goTo({ kind: "plan" }, { view: v === "week" ? null : v });
-    setViewState(v); setChecked(new Set()); setFilterOpen(false);
+    setViewState(v); setChecked(new Set()); setFilterOpen(false); setNote(null);
     if (v !== "lists") setListId(undefined);
     syncUrl("view", v === "week" ? null : v);
   }, [route.kind, goTo, syncUrl]);
@@ -280,6 +282,17 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
     try {
       await api.setState(brand.id, post.id, post.version, { action: "restore" });
       say(post.published_at ? "已還原（已發佈過的貼文還原後仍是已發佈）。" : "已還原成草稿。");
+      await reload();
+    } catch (e) {
+      say(e instanceof Error ? e.message : String(e), true);
+    }
+  }
+
+  async function purge(post: Post) {
+    if (!brand) return;
+    try {
+      await api.purge(brand.id, post.id, post.version);
+      say("已永久刪除。");
       await reload();
     } catch (e) {
       say(e instanceof Error ? e.message : String(e), true);
@@ -444,7 +457,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
             </>}
           </section>
         </>}
-        {view === "trash" && <Trash posts={trash} deletions={deletions} accounts={accounts} tz={tz} canWrite={canWrite} onRestore={restore} onBack={() => setView("week")} />}
+        {view === "trash" && <Trash posts={trash} deletions={deletions} accounts={accounts} tz={tz} canWrite={canWrite} onRestore={restore} onPurge={purge} onBack={() => setView("week")} />}
         {view === "library" && panel("貼文素材庫", slots.sideView?.("library", ctx))}
         {view === "lists" && panel("自動發布清單", slots.sideView?.("lists", ctx))}
         {view === "flows" && (slots.sideView?.("flows", ctx) ?? <SectionShell which="flows" />)}

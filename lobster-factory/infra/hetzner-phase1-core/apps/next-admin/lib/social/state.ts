@@ -66,6 +66,17 @@ export const RULES: Record<PostAction, Rule> = {
   publish_now: { from: ["draft", "scheduled", "queued", "error"], roles: ["owner"] },
 };
 
+/**
+ * Permanent delete (已刪除貼文 → 永久刪除): an erase, so not a state of the table above. Only a post in the bin that never
+ * went out (a published one stays as the record of what was sent), by the roles that may restore it (RULES.restore).
+ * store.ts purgePost repeats the state and published checks in its DELETE, so a post that changed meanwhile is not erased.
+ */
+export function assertCanPurge(post: { state: PostState; publishedAt: string | null; sentTargets?: number }, role: BrandRole): void {
+  if (!RULES.restore.roles.includes(role)) throw new TransitionError("forbidden", `${role} may not purge`);
+  if (post.state !== "deleted") throw new TransitionError("illegal", `a ${post.state} post is not in the bin`);
+  if (post.publishedAt || (post.sentTargets ?? 0) > 0) throw new TransitionError("illegal", "a published post cannot be purged");
+}
+
 /** The actions after which C5 sends the post to its targets. */
 const SENDS: readonly PostAction[] = ["approve", "schedule", "publish_now"];
 

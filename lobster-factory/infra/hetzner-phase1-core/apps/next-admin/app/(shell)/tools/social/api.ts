@@ -110,6 +110,7 @@ export const api = {
   save: (brand: string, id: string, version: number, input: PostInput) => call<{ post: SavedRef }>("PUT", `/api/social/posts/${id}`, { brand, version, ...input }),
   get: (brand: string, id: string) => call<{ post: Post }>("GET", `/api/social/posts/${id}?${q({ brand })}`),
   setState: (brand: string, id: string, version: number, input: StateInput) => call<{ post: SavedRef }>("PUT", `/api/social/posts/${id}/state`, { brand, version, ...input }),
+  purge: (brand: string, id: string, version: number) => call<{ purged: string }>("DELETE", `/api/social/posts/${id}/purge?${q({ brand, version: String(version) })}`),
   bulk: (brand: string, items: Array<{ id: string; version: number } & StateInput>) =>
     call<{ results: Array<{ id: string; ok: boolean; error?: string; version?: number; state?: string }> }>("POST", "/api/social/posts/bulk", { brand, items }),
   media: (brand: string) => call<{ media: MediaItem[] }>("GET", `/api/social/media?${q({ brand })}`),

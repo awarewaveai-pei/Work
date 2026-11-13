@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/social/posts", () => ({ assertWithinLimits: vi.fn() }));
 vi.mock("@/lib/social/store", () => ({ addVideo: vi.fn(), listAccounts: vi.fn(), savePost: vi.fn() }));
-vi.mock("@/app/(shell)/tools/video/qa-labels", () => ({ QA_LABELS: {}, findingLabel: vi.fn() }));
+vi.mock("@/app/(shell)/tools/video/qa-labels", () => ({ QA_LABELS: {}, explainFinding: vi.fn() }));
 vi.mock("@/lib/entitlements/grant", () => ({ grantFor: vi.fn(), runForOrg: vi.fn() }));
 vi.mock("@/lib/content/brand-voice", () => ({ renderSiteVoice: vi.fn() }));
 vi.mock("@/lib/social/write-posts", () => ({ textsForAccounts: vi.fn(), writerKeysFor: vi.fn(), writeSocialPosts: vi.fn() }));

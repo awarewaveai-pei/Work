@@ -481,6 +481,34 @@ export async function listDeletions(brandId: string, postIds: string[]): Promise
   return out;
 }
 
+/**
+ * Erase a binned post (state.ts assertCanPurge decided who and which). Its targets (and their metrics), media links, tags,
+ * comments and own auto-reply rules go with it (0096/0105 on delete cascade); series children only lose repeat_of (set
+ * null). Media library files stay: the library is the brand's own (MediaView deletes them). The purge row is written first,
+ * so an erased post always has one; the log is append-only (0096: no DELETE for service_role), so when nothing was erased
+ * a purge_aborted row pointing at it follows instead (no single transaction without an RPC).
+ */
+export async function purgePost(brandId: string, id: string, expectedVersion: number, actor: string): Promise<void> {
+  const sb = db();
+  const post = await getPostAt(brandId, id, expectedVersion);
+  const text = post.body.trim() || post.targets.find((t) => t.custom_body?.trim())?.custom_body?.trim() || "";
+  const { data: logged, error: logError } = await sb.from("social_audit_log")
+    .insert({ organization_id: brandId, actor, action: "purge", post_id: id, detail: { excerpt: Array.from(text).slice(0, 50).join(""), version: expectedVersion } })
+    .select("id").single();
+  if (logError) fail(logError, "purge log");
+  const { data, error } = await sb.from("social_posts").delete()
+    .eq("organization_id", brandId).eq("id", id).eq("version", expectedVersion).eq("state", "deleted").is("published_at", null)
+    .select("id");
+  if (error || !data?.length) {
+    const logId = (logged as { id: number }).id;
+    const aborted = await sb.from("social_audit_log").insert({ organization_id: brandId, actor, action: "purge_aborted", post_id: id,
+      detail: { purge_log_id: logId, reason: error ? error.message.slice(0, 300) : "changed or not in the bin" } });
+    if (aborted.error) console.error(`[social] purge of ${id} not done; log row ${logId} has no purge_aborted: ${aborted.error.message}`);
+    if (error) fail(error, "purge");
+    throw new SocialStoreError(409, "這則貼文剛被改過或已不在垃圾桶，重新整理後再試");
+  }
+}
+
 // ---- saved texts (C6 editor 常用文字; 0112 keeps the chosen media order) -----------------------------------------
 
 export async function listTexts(brandId: string): Promise<Array<{ id: string; body: string; mediaIds: string[] }>> {

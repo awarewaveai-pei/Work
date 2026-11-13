@@ -186,7 +186,7 @@ function PostsTable({ data, byId, tz }: { data: Data; byId: Map<string, Account>
             const at = zoned(p.published_at, tz);
             return (
               <tr key={p.id}>
-                <td>{p.thumb ? <img className="an-thumb" src={p.thumb} alt="" /> : <span className="an-thumb">文字</span>}</td>
+                <td>{p.thumb ? p.thumb_kind === "video" ? <video className="an-thumb" src={p.thumb} muted playsInline preload="metadata" /> : <img className="an-thumb" src={p.thumb} alt="" /> : <span className="an-thumb">文字</span>}</td>
                 <td className="an-nowrap">{shortDate(at.date)} {at.time}</td>
                 <td className="an-nowrap">{p.account_ids.map((id) => <PfMark key={id} platform={byId.get(id)?.platform ?? "?"} />)}</td>
                 <td className="an-ttl">{p.body}</td>

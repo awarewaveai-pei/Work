@@ -48,16 +48,18 @@ function useClock(tz: string): { date: string; time: string } {
 const unconnected = (post: Post, accounts: Account[]) => post.state !== "published"
   && post.targets.some((t) => accounts.find((a) => a.id === t.account_id)?.status !== "connected");
 
-const imagesOf = (post: Post, media: MediaItem[]) => [...post.media].sort((a, b) => a.position - b.position)
-  .map((m) => media.find((x) => x.id === m.media_id)?.postiz_path).filter((u): u is string => !!u);
+/** The post's attachments in order with their kind (social_media.kind): a video file in <img> is a broken picture. */
+const mediaOf = (post: Post, media: MediaItem[]) => [...post.media].sort((a, b) => a.position - b.position)
+  .map((m) => media.find((x) => x.id === m.media_id)).filter((m): m is MediaItem & { postiz_path: string } => !!m?.postiz_path);
 
-/** First picture (or the word 文字) with the platform marks on its corner. */
+/** First attachment (a video shows its first frame, as the composer's Writer does) or the word 文字, platform marks on its corner. */
 export function Thumb({ post, accounts, media, size = "card" }: { post: Post; accounts: Account[]; media: MediaItem[]; size?: "card" | "row" }) {
-  const urls = imagesOf(post, media);
+  const first = mediaOf(post, media)[0];
   const n = post.media.length;
   return (
     <div className={`sm-cthumb sm-${size}${n ? "" : " sm-txt"}`}>
-      {urls[0] ? <img src={urls[0]} alt="" loading="lazy" /> : n ? <span className="sm-muted">圖</span> : <span className="sm-muted">文字</span>}
+      {first ? first.kind === "video" ? <video src={first.postiz_path} muted playsInline preload="metadata" /> : <img src={first.postiz_path} alt="" loading="lazy" />
+        : n ? <span className="sm-muted">圖</span> : <span className="sm-muted">文字</span>}
       {n > 1 && <span className="sm-more">+{n - 1}</span>}
       <span className="sm-avs">{platformsOf(post, accounts).map((pf) => <PfMark key={pf} platform={pf} />)}</span>
     </div>
