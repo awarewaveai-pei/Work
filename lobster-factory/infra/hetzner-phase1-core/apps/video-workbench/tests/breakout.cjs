@@ -61,6 +61,46 @@ console.log("PASS 提示詞：兩種版面、任何主角文字都帶「貼文�
 }
 console.log("PASS 貼文文字：換行與「…」不切斷組合 emoji；跨行的 #標籤每一段都上色");
 
+// 2b. 鎖定貼文文字 (backend/breakout.cjs lockFrame): one 40x10 row, white post, black text.
+const breakout = require("../backend/breakout.cjs");
+{
+  const W = 40, Hh = 10, WHITE = [255, 255, 255], BLACK = [0, 0, 0], RED = [220, 40, 40], inks = [BLACK];
+  const img = (paint) => {
+    const b = Buffer.alloc(W * Hh * 3, 255);
+    for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) { const c = paint(x, y); if (c) b.set(c, (y * W + x) * 3); }
+    return b;
+  };
+  const ref = img((x, y) => (x >= 4 && x < 8 && y >= 3 && y < 7 ? BLACK : null)); // the first frame's "1,286"
+  const box = [[0, 0, W, Hh]];
+  // drift: the model moved the digits (old spot blank, new spot black) -> both put back
+  const drift = img((x, y) => (x >= 10 && x < 14 && y >= 3 && y < 7 ? BLACK : null)), open = new Uint8Array(1);
+  assert(breakout.lockFrame(drift, ref, W, box, inks, open) > 0);
+  assert.deepEqual(drift, ref, "drifted digits not restored to the first frame");
+  // a colourful subject edge entering the row (< 30 %) stays; the digits under the rest stay too
+  const edge = img((x, y) => (x >= 34 ? RED : x >= 4 && x < 8 && y >= 3 && y < 7 ? BLACK : null)), before = Buffer.from(edge);
+  breakout.lockFrame(edge, ref, W, box, inks, new Uint8Array(1));
+  assert.deepEqual(edge, before, "a subject entering the row was erased");
+  // the subject over most of the row (the burst): the row opens and shows the video from then on, even if it later drifts
+  const over = img((x) => (x < 30 ? RED : null)), opened = new Uint8Array(1), copy = Buffer.from(over);
+  breakout.lockFrame(over, ref, W, box, inks, opened);
+  assert.equal(opened[0], 1);
+  assert.deepEqual(over, copy, "the burst over the like bar was painted over");
+  const later = img((x, y) => (x >= 10 && x < 14 && y >= 3 && y < 7 ? BLACK : null));
+  breakout.lockFrame(later, ref, W, box, inks, opened);
+  assert.notDeepEqual(later, ref, "an opened row was locked again (would flicker)");
+  // the lock is checked on the server: a malformed one is refused, none is accepted (an older job)
+  assert.throws(() => breakout.lockOf({ lock: { boxes: [[0, 0, 2, 1]], inks: [] } }), /鎖定/);
+  assert.throws(() => breakout.lockOf({ lock: { boxes: [], inks: [[0, 0, 300]] } }), /鎖定/);
+  assert.deepEqual(breakout.lockOf({}), { boxes: [], inks: [] });
+  // bounded work whatever a request sends (critic M2): total area and overlap are refused
+  assert.throws(() => breakout.lockOf({ lock: { boxes: Array(24).fill([0, 0, 1, 1]), inks: [[0, 0, 0]] } }), /鎖定/);
+  assert.throws(() => breakout.lockOf({ lock: { boxes: [[0, 0, 0.5, 0.2], [0.2, 0.1, 0.5, 0.2]], inks: [[0, 0, 0]] } }), /鎖定/);
+  assert.equal(breakout.lockOf({ lock: { boxes: [[0, 0, 1, 0.1], [0, 0.1, 1, 0.1]], inks: [[0, 0, 0]] } }).boxes.length, 2, "touching rows refused");
+  assert.deepEqual(rules.OUTPUT_RATIOS, ["9:16", "4:5", "1:1"]);
+  assert.deepEqual(["9:16", "4:5", "1:1"].map((r) => rules.outputHeight(r, 720)), [1280, 900, 720]);
+}
+console.log("PASS 貼文文字鎖定：飄掉的數字還原、主角邊緣保留、主角蓋過的列照影片原樣且不再閃回");
+
 // 3. price shown = amount charged (shared/models.js on the page, the server job's origin.costUsd)
 const page = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/models.js"), "utf8"), page);
@@ -113,8 +153,45 @@ const fetchImpl = async (url, init = {}) => {
   // the top-level duration is what runs and is charged (critic M1); text after the stay-still instruction (m1)
   assert.equal((await call("/generations", { ...job(runway), duration: 10 })).status, 400, "top-level duration bypassed the breakout length");
   assert.equal((await call("/generations", { ...job(runway), cartoonStyle: "animate the like counts" })).status, 400, "cartoonStyle appended after the stay-still instruction");
-  console.log("PASS 價格：頁面顯示金額＝任務實際記帳金額（每個可用模型）；錯的長度／比例在送出前擋下");
+  assert.equal((await call("/generations", job(runway, { outputRatio: "3:4" }))).status, 400, "an unlisted output ratio was accepted");
+  assert.equal((await call("/generations", job(runway, { outputRatio: "4:5" }))).status, 202, "4:5 refused");
+  console.log("PASS 價格：頁面顯示金額＝任務實際記帳金額（每個可用模型）；錯的長度／比例在送出前擋下；4:5 可送出");
 
+  // finish() with real ffmpeg: a 9:16 clip whose "digits" drifted -> 4:5 file, digits back where the first frame had them
+  {
+    const os = require("node:os"), { spawnSync } = require("node:child_process"), ffmpeg = require("ffmpeg-static");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-breakout-finish-")), W = 72, H = 128;
+    const ff = (...args) => assert.equal(spawnSync(ffmpeg, ["-v", "error", "-y", ...args]).status, 0, args.join(" "));
+    const glyph = (x) => `color=white:s=${W}x${H}:d=1:r=10,drawbox=x=${x}:y=100:w=16:h=8:color=black:t=fill`;
+    ff("-f", "lavfi", "-i", glyph(8), "-frames:v", "1", path.join(dir, "first.png"));
+    ff("-f", "lavfi", "-i", glyph(40), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "1", path.join(dir, "made.mp4"));
+    const lock = { boxes: [[0, 96 / H, 1, 16 / H]], inks: [[0, 0, 0]] };
+    const done = await breakout.finish({
+      src: path.join(dir, "made.mp4"), frameFile: path.join(dir, "first.png"), dst: path.join(dir, "out.mp4"),
+      settings: { outputRatio: "4:5", lock }, ffmpeg,
+    });
+    assert.equal(done.ratio, "4:5");
+    assert(done.restored > 0, "nothing restored");
+    const info = await require("../backend/media-inspect.cjs").inspectMedia(path.join(dir, "out.mp4"));
+    assert.deepEqual([info.width, info.height], [W, rules.outputHeight("4:5", W)]);
+    // the 4:5 box starts (128-90)/2 = 19 rows down: the glyph row y=100 is y=81 in the output
+    const raw = spawnSync(ffmpeg, ["-v", "error", "-i", path.join(dir, "out.mp4"), "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout;
+    const at = (x, y) => raw[y * W + x];
+    assert(at(14, 85) < 60, "first-frame digits not back");
+    assert(at(46, 85) > 200, "drifted digits still there");
+    // colour: the rgb round trip names BT.709 both ways and tags the file (critic M1: untagged BT.601 shifted colours)
+    const tags = spawnSync(require("../backend/media-inspect.cjs").ffprobePath(), ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=color_space,color_primaries,color_transfer", "-of", "csv=p=0", path.join(dir, "out.mp4")], { encoding: "utf8" }).stdout.trim();
+    assert.equal(tags, "bt709,bt709,bt709", "output not tagged BT.709: " + tags);
+    // no lock and 9:16: the file is not touched at all (no re-encode)
+    const plain = await breakout.finish({ src: path.join(dir, "made.mp4"), frameFile: "", dst: path.join(dir, "plain.mp4"), settings: { outputRatio: "9:16" }, ffmpeg });
+    assert.equal(plain.untouched, true);
+    assert(!fs.existsSync(path.join(dir, "plain.mp4")), "a 9:16 job without a lock was re-encoded");
+    // a failure leaves no half-written file
+    await assert.rejects(breakout.finish({ src: path.join(dir, "missing.mp4"), frameFile: "", dst: path.join(dir, "bad.mp4"), settings: { outputRatio: "4:5" }, ffmpeg }));
+    assert(!fs.existsSync(path.join(dir, "bad.mp4")));
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  console.log("PASS 收尾：鎖定貼文文字＋裁成 4:5 一次完成，檔案尺寸與比例正確");
 })().catch((e) => {
   console.error(e);
   process.exit(1);

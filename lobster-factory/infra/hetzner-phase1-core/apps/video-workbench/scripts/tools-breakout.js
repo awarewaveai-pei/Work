@@ -45,7 +45,7 @@ const BREAKOUT_LAYOUT_NOTES = {
     preview: "這張預覽就是影片的第一格；AI 會讓主角在貼文卡的後面和前面穿過。",
   },
 };
-const BREAKOUT_RATIOS = [["9:16", "9:16 直式（限時動態、短影音）"], ["1:1", "1:1 正方形（動態牆）"]];
+const BREAKOUT_RATIOS = [["9:16", "9:16 直式（限時動態、短影音）"], ["4:5", "4:5 直式貼文（動態牆）"], ["1:1", "1:1 正方形（動態牆）"]];
 // Counts are whole numbers. "1,286" (an older draft's text) drops its commas; anything else parses as a number;
 // empty, negative or not a number = the default.
 const toolBreakoutCount = (v, d) => {
@@ -110,7 +110,8 @@ ${wfField("breakoutAccount", "帳號名稱", "text", 'placeholder="awarewave" ma
 <div class="flow-choices">${Object.keys(BREAKOUT_SUBJECTS).map((name) => wfButton(name, "breakout-subject:" + name)).join("")}</div>
 <p class="note">${notes.subject}</p>
 <label>影片模型</label><p class="note">由便宜到貴排列；價格是這一支影片的費用。</p>${models}${sound}
-<p class="note">${seconds} 秒 · 720p · 一支影片${values.breakoutRatio === "1:1" ? "（模型以 9:16 生成，完成後裁成 1:1）" : ""}</p>
+<p class="note">${seconds} 秒 · 720p · 一支影片${values.breakoutRatio !== "9:16" ? `（模型以 9:16 生成，完成後裁成 ${esc(values.breakoutRatio)}）` : ""}</p>
+<p class="note">完成後會把貼文的帳號、數字和文字固定成第一格的樣子；主角衝過去的那幾列照影片原樣。</p>
 <button type="button" class="btn primary" data-flow-action="breakout-generate" data-paid="video.motion"${vm ? ` data-paid-model="${esc(vm.id)}"` : ""} ${ready ? "" : "disabled"}>生成破框影片${vm ? " · " + esc(toolBreakoutPrice(vm)) : ""}</button>
 ${files.image ? "" : '<p class="note">先在左邊選一張圖片。</p>'}${files.image && !String(values.breakoutSubject || "").trim() ? '<p class="note">寫下衝出畫面的主角後才能生成。</p>' : ""}</aside>`;
   // No picture yet: the left side asks for one (the reference's empty state); with one: the live first frame.
@@ -318,7 +319,8 @@ function toolBreakoutNav(ctx, x, y, w, h, k, ink) {
 // One post at (x, y), width w, height up to maxH; returns its height. measure=true only computes it.
 // photo=false: the floating card (header, actions and caption only; the picture is the frame behind it).
 // fill=true: the photo grows so the post fills maxH (a phone screen); nav=true: an app bar at the bottom.
-function toolBreakoutPost(ctx, img, o, x, y, w, maxH, { measure = false, photo = true, fill = false, nav = false } = {}) {
+// boxes: an array that receives every text row drawn, [x, y, w, h] in canvas pixels (the server holds them still).
+function toolBreakoutPost(ctx, img, o, x, y, w, maxH, { measure = false, photo = true, fill = false, nav = false, boxes = null } = {}) {
   const k = w / 720,
     ink = BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色,
     fb = o.style === "FB 風格",
@@ -373,12 +375,17 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, { measure = false, photo =
     ctx.arc(x + w - pad - 36 * k + i * 14 * k, ay, 3.4 * k, 0, Math.PI * 2);
     ctx.fill();
   }
+  const mark = (top, h) => boxes?.push([x, top, w, h]);
+  mark(y, header);
   let cy = y + header;
   const caption = (top) => {
     capLines.forEach((line, i) => toolBreakoutRich(ctx, line, x + pad, top + capLine * (i + 0.75), capSize, ink, !fb && i === 0 ? o.account : ""));
     return top + captionH;
   };
-  if (fb) cy = caption(cy - 8 * k) + 4 * k;
+  if (fb) {
+    mark(cy, captionH - 4 * k); // ends where the next row starts (the caption is drawn from cy - 8k)
+    cy = caption(cy - 8 * k) + 4 * k;
+  }
   if (photoH) {
     if (img) toolBreakoutCover(ctx, img, x, cy, w, photoH);
     else {
@@ -395,6 +402,7 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, { measure = false, photo =
   ctx.lineJoin = "round";
   if (fb) {
     // counts row, divider, three action buttons
+    mark(cy, 64 * k + 2 * k + 84 * k); // counts row + action buttons
     const row = cy + 44 * k;
     ctx.fillStyle = BREAKOUT_ACCENT;
     ctx.beginPath();
@@ -426,6 +434,10 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, { measure = false, photo =
       ctx.fillText(name, sx + 42 * k, mid + 9 * k);
     });
   } else {
+    mark(cy, 76 * k); // action icons
+    mark(cy + 76 * k, 44 * k); // likes
+    if (captionH) mark(cy + 120 * k, captionH);
+    mark(cy + 120 * k + captionH, 62 * k); // comments line
     const iy = cy + 22 * k,
       s = 40 * k;
     toolBreakoutIcon.heart(ctx, x + pad, iy, s);
@@ -441,7 +453,10 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, { measure = false, photo =
     ctx.font = toolBreakoutFont(24 * k);
     ctx.fillText(`查看全部 ${toolBreakoutCompact(o.comments)} 則留言 · ${toolBreakoutCompact(o.shares)} 次分享`, x + pad, cy + 30 * k);
   }
-  if (nav) toolBreakoutNav(ctx, x, y + total - navH, w, navH, k, ink);
+  if (nav) {
+    mark(y + total - navH, navH);
+    toolBreakoutNav(ctx, x, y + total - navH, w, navH, k, ink);
+  }
   return total;
 }
 // Empty fields draw their placeholder, like the reference preview.
@@ -451,7 +466,7 @@ function toolBreakoutOptions() {
     layout: BREAKOUT_LAYOUT[values.breakoutLayout] || "burst",
     style: values.breakoutStyle,
     theme: values.breakoutTheme,
-    ratio: values.breakoutRatio === "1:1" ? "1:1" : "9:16",
+    ratio: VideoWorkbenchBreakout.OUTPUT_RATIOS.includes(values.breakoutRatio) ? values.breakoutRatio : "9:16",
     account: text("breakoutAccount", "awarewave"),
     place: text("breakoutPlace", "台北市"),
     caption: text("breakoutCaption", "新品上架！優惠只到這週末 🔥 #新品 #週末限定"),
@@ -460,23 +475,27 @@ function toolBreakoutOptions() {
     shares: toolBreakoutCount(values.breakoutShares, 127),
   };
 }
-// Paints the preview at the output ratio. frame=true: always 720x1280 (what the 9:16 model gets); a 1:1 frame is the
-// square preview itself, pixel for pixel, centred (the outside is the post background; the 1:1 crop drops it).
-async function toolBreakoutDraw(canvas, frame = false) {
+// Paints the preview at the output ratio. frame=true: always 720x1280 (what the 9:16 model gets); a 4:5 or 1:1 frame is the
+// preview itself, pixel for pixel, centred (the outside is the post background; the server's crop drops it).
+// boxes: receives the post's text rows in this canvas's pixels (shifted with the preview when centred).
+async function toolBreakoutDraw(canvas, frame = false, boxes = null) {
   const o = toolBreakoutOptions();
-  if (frame && o.ratio === "1:1") {
-    const square = await toolBreakoutDraw(document.createElement("canvas"));
+  if (frame && o.ratio !== VideoWorkbenchBreakout.MODEL_RATIO) {
+    const rows = boxes ? [] : null,
+      preview = await toolBreakoutDraw(document.createElement("canvas"), false, rows),
+      top = (BREAKOUT_FRAME.h - preview.height) / 2;
     canvas.width = BREAKOUT_FRAME.w;
     canvas.height = BREAKOUT_FRAME.h;
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = (BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色).bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(square, 0, (canvas.height - square.height) / 2);
+    ctx.drawImage(preview, 0, top);
+    for (const [x, y, w, h] of rows || []) boxes.push([x, y + top, w, h]);
     return canvas;
   }
   const img = await toolBreakoutImage(files.image?.url),
     W = BREAKOUT_FRAME.w,
-    H = o.ratio === "9:16" ? BREAKOUT_FRAME.h : W;
+    H = VideoWorkbenchBreakout.outputHeight(o.ratio, W);
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d"),
@@ -503,13 +522,13 @@ async function toolBreakoutDraw(canvas, frame = false) {
     ctx.save();
     toolBreakoutRound(ctx, cx, cy, cw, ch, r);
     ctx.clip();
-    toolBreakoutPost(ctx, img, o, cx, cy, cw, H, { photo: false });
+    toolBreakoutPost(ctx, img, o, cx, cy, cw, H, { photo: false, boxes });
     ctx.restore();
   } else {
     // The post is the whole screen: the photo grows to fill it, with an app bar at the bottom of a 9:16 screen.
     ctx.fillStyle = ink.bg;
     ctx.fillRect(0, 0, W, H);
-    toolBreakoutPost(ctx, img, o, 0, 0, W, H, { fill: true, nav: o.ratio === "9:16" });
+    toolBreakoutPost(ctx, img, o, 0, 0, W, H, { fill: true, nav: o.ratio === "9:16", boxes });
   }
   return canvas;
 }
@@ -583,7 +602,19 @@ async function toolBreakoutGenerate(button) {
     seconds = VideoWorkbenchBreakout.seconds(vm);
   button.disabled = true;
   try {
-    const canvas = await toolBreakoutDraw(document.createElement("canvas"), true);
+    const rows = [],
+      canvas = await toolBreakoutDraw(document.createElement("canvas"), true, rows),
+      ink = BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色,
+      rgb = (c) => c.match(/\d+/g).slice(0, 3).map(Number);
+    // 鎖定貼文文字 (backend/breakout.cjs finish): the rows as 0..1 of the frame, and the colours text and icons are drawn in.
+    const unit = (v) => Math.min(1, Math.max(0, v));
+    const lock = {
+      boxes: rows.slice(0, VideoWorkbenchBreakout.LOCK_MAX_BOXES).map(([x, y, w, h]) => {
+        const x0 = unit(x / canvas.width), y0 = unit(y / canvas.height);
+        return [x0, y0, unit((x + w) / canvas.width) - x0, unit((y + h) / canvas.height) - y0];
+      }),
+      inks: [ink.text, ink.sub, ink.link, BREAKOUT_ACCENT].map(rgb),
+    };
     const frame = await VideoWorkbench.request("/uploads", { name: "破框貼文-第一格.png", data: canvas.toDataURL("image/png") });
     // paid: video.motion
     const job = await VideoWorkbench.generations.create({
@@ -604,6 +635,7 @@ async function toolBreakoutGenerate(button) {
         theme: o.theme,
         sourceImage: files.image.url,
         post: { account: o.account, place: o.place, caption: o.caption, likes: o.likes, comments: o.comments, shares: o.shares },
+        lock,
       },
     });
     VideoWorkbench.showJob(job);

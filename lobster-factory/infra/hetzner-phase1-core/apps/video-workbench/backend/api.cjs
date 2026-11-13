@@ -820,18 +820,28 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         const { video, usage } = await vendor.download({ output: result.output, fetchImpl });
         if (job.status === "cancelled") return job;
         job.result = { url: output(video, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds, usage), job.video) };
-        // 破框貼文動畫 1:1: the model made 9:16 around a centred square post; keep that square. The vendor run is already
-        // paid, so a failed crop keeps the 9:16 video and says so instead of failing the job.
-        if (job.input?.operation === "breakout" && job.input.settings?.outputRatio === "1:1") {
-          const src = path.join(dataDir, job.result.url.slice(1)), name = crypto.randomUUID() + ".mp4";
+        // 破框貼文動畫: hold the post's text rows to the first frame, then cut the output ratio (backend/breakout.cjs finish).
+        // The vendor run is already paid, so a failure keeps the model's 9:16 video and says so instead of failing the job.
+        if (job.input?.operation === "breakout") {
+          const src = path.join(dataDir, job.result.url.slice(1)), name = crypto.randomUUID() + ".mp4", dst = path.join(outputs, name);
           try {
-            await mediaTools.run(breakout.squareArgs(src, path.join(outputs, name)));
-            if (job.status === "cancelled") return job; // cancelled during the crop: the cancel wins, as after download
-            fs.rmSync(src, { force: true });
-            job.result.url = "/generated/" + name;
-            job.result.ratio = "1:1"; // the file's own ratio; readers of a job's ratio take result.ratio first
+            // finish() runs in a worker with its own time limit and removes dst itself when it fails.
+            const done = await breakout.finish({
+              src, dst, settings: job.input.settings, ffmpeg: require("ffmpeg-static"),
+              frameFile: localFile(job.input.references?.firstFrame?.[0]?.url) || "",
+            });
+            if (job.status === "cancelled") {
+              fs.rmSync(dst, { force: true });
+              return job; // cancelled during the finish: the cancel wins, as after download
+            }
+            if (!done.untouched) {
+              fs.rmSync(src, { force: true });
+              job.result.url = "/generated/" + name;
+            }
+            job.result.ratio = done.ratio; // the file's own ratio; readers of a job's ratio take result.ratio first
+            job.result.textLock = { restoredPixels: done.restored };
           } catch (e) {
-            job.result.note = "已生成 9:16 影片，但裁成 1:1 失敗：" + publicError(e.message);
+            job.result.note = "已生成 9:16 影片，但貼文鎖定／裁切失敗：" + publicError(e.message);
           }
         }
         job.progress = 100;
