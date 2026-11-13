@@ -15,6 +15,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const bgRemove = require("./bg-remove.cjs");
   const videoEnhance = require("./video-enhance.cjs");
   const replicateRun = require("./replicate-run.cjs");
+  const breakout = require("./breakout.cjs");
   const costs = require("./provider-cost.cjs");
   const transcribe = require("./transcribe.cjs"), TranscriptWords = require("../shared/transcript-words.js");
   // Speech and speech-to-text: one list each (backend/speech.cjs, transcribe.cjs); every job names its own row (the
@@ -306,6 +307,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     "region",
     "project-shot",
     "music",
+    "breakout", // 破框貼文動畫: a video job whose first frame is the rendered post (backend/breakout.cjs)
     ...mediaTools.supported,
   ];
   function jobInput(input) {
@@ -346,6 +348,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (settings.voiceSpeed !== undefined && (!Number.isFinite(Number(settings.voiceSpeed)) || Number(settings.voiceSpeed) < .25 || Number(settings.voiceSpeed) > 4) || settings.voicePitch !== undefined && (!Number.isFinite(Number(settings.voicePitch)) || Math.abs(Number(settings.voicePitch)) > 12) || settings.voiceGain !== undefined && (!Number.isFinite(Number(settings.voiceGain)) || Number(settings.voiceGain) < -30 || Number(settings.voiceGain) > 12)) throw Error("語音參數超出範圍");
     }
     generationPolicy.validate(input, type, env);
+    if (operation === "breakout") prompt = breakout.prepare(input, env);
     if (input.cartoonStyle) prompt += "\n風格：" + String(input.cartoonStyle);
     return { type, prompt };
   }
@@ -806,6 +809,19 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         const { video, usage } = await vendor.download({ output: result.output, fetchImpl });
         if (job.status === "cancelled") return job;
         job.result = { url: output(video, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds, usage), job.video) };
+        // 破框貼文動畫 1:1: the model made 9:16 around a centred square post; keep that square. The vendor run is already
+        // paid, so a failed crop keeps the 9:16 video and says so instead of failing the job.
+        if (job.input?.operation === "breakout" && job.input.settings?.outputRatio === "1:1") {
+          const src = path.join(dataDir, job.result.url.slice(1)), name = crypto.randomUUID() + ".mp4";
+          try {
+            await mediaTools.run(breakout.squareArgs(src, path.join(outputs, name)));
+            if (job.status === "cancelled") return job; // cancelled during the crop: the cancel wins, as after download
+            fs.rmSync(src, { force: true });
+            job.result.url = "/generated/" + name;
+          } catch (e) {
+            job.result.note = "已生成 9:16 影片，但裁成 1:1 失敗：" + publicError(e.message);
+          }
+        }
         job.progress = 100;
         job.status = "succeeded";
       }

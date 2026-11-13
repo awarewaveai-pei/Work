@@ -135,6 +135,7 @@ function toolWorkflowScreen(t) {
   } else if (["cta", "watermark"].includes(t.id)) return toolOverlayScreen(t);
   else if (t.id === "voice") return toolVoiceScreen(t);
   else if (t.id === "music") return toolMusicScreen(t);
+  else if (t.id === "breakout") return toolBreakoutScreen(t);
   else return null;
   if (t.id === "short" && files.src) content += toolShortResults();
   return wfWrap(t, `<div class="two-col flow-layout">${content}</div>`);
@@ -270,6 +271,7 @@ function toolWorkflowAfterRender() {
       })
       .catch(VideoWorkbench.reportError);
   if (typeof toolOverlayAfterRender === "function") toolOverlayAfterRender();
+  if (typeof toolBreakoutAfterRender === "function" && tool === "breakout") toolBreakoutAfterRender();
 }
 document.addEventListener("click", async (event) => {
   const button = event.target.closest(
@@ -369,6 +371,8 @@ document.addEventListener("click", async (event) => {
       await toolOverlayAction(action, button);
     if (typeof toolMusicAction === "function")
       await toolMusicAction(action, button);
+    if (typeof toolBreakoutAction === "function")
+      await toolBreakoutAction(action, button);
   } catch (error) {
     VideoWorkbench.reportError(error);
   }

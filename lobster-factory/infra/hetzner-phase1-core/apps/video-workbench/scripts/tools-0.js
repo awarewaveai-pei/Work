@@ -17,6 +17,7 @@ const TOOL_SCRIPTS_ENGINE = ["../shared/subtitle-parse.js", "../shared/project-e
 const TOOL_SCRIPTS_FOLLOW = ["../shared/follow-math.js", "tools-follow.js"];
 const TOOL_SCRIPTS_OVERLAY = ["tools-overlays.js"];
 const TOOL_SCRIPTS_VOICE = ["tools-voice-music.js"];
+const TOOL_SCRIPTS_BREAKOUT = ["../shared/breakout-rules.js", "tools-breakout.js"];
 
 const TOOLS = [
   {
@@ -211,6 +212,17 @@ const TOOLS = [
     io: "影片 → 深度影片",
     new: 1,
   },
+  {
+    // 破框貼文動畫: scripts/tools-breakout.js draws the post (= first frame), backend/breakout.cjs checks the job.
+    id: "breakout",
+    scripts: TOOL_SCRIPTS_BREAKOUT,
+    cat: "社群",
+    icon: "⇱",
+    name: "破框貼文動畫",
+    desc: "把圖片放進一則社群貼文，主角從畫面裡衝出來",
+    io: "圖片 → 5 秒貼文影片",
+    new: 1,
+  },
 ];
 const CATS = [
   ["全部", 15],
@@ -219,6 +231,7 @@ const CATS = [
   ["聲音", 4],
   ["品牌與合規", 3],
   ["生成前置", 2],
+  ["社群", 1],
 ];
 const $ = (s) => document.querySelector(s),
   esc = (s) =>
@@ -333,6 +346,7 @@ function home() {
                     聲音: "生成或拆出配音、音樂與音軌",
                     品牌與合規: "發布前加上標記，或保護入鏡人物",
                     生成前置: "先處理參考素材，讓 AI 生成更好控制",
+                    社群: "把素材做成可以直接發的社群貼文影片",
                   }[c]
                 }</span></div><div class="cards">${a.map((t) => `<div class="tool-card" data-act="open:${t.id}" role="button" tabindex="0"><span class="tool-icon">${t.icon}</span><button aria-label="收藏" class="star ${favorites.has(t.id) ? "on" : ""}" data-act="favorite:${t.id}">${favorites.has(t.id) ? "★" : "☆"}</button><h3>${t.name}${t.new ? '<span class="new">NEW</span>' : ""}</h3><p>${t.desc}</p><footer>${t.io}</footer></div>`).join("")}</div></section>`
               : "";

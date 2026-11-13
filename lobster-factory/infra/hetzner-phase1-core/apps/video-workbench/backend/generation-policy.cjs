@@ -26,6 +26,10 @@ const VIDEO_NOTES = Object.freeze({
   "runway-gen4-turbo": "沒有聲音。最便宜，但一定要放一張圖當第一格畫面。",
   "luma-ray-3-2": "沒有聲音。只能做 5 秒。",
 });
+// Models whose image input is the video's first frame (input schemas in next-admin lib/ai/video-motion-models.ts header:
+// Runway "image", Veo "image" = start frame, Luma "start_image"). Gemini Omni takes the image as a reference among its
+// inputs, not as frame 1, so it is false. Tools that need frame 1 exact (破框貼文動畫, shared/breakout-rules.js) read this.
+const FIRST_FRAME_MODELS = Object.freeze(new Set(["runway-gen4-turbo", "veo-3-1-fast", "veo-3-1", "luma-ray-3-2"]));
 // Video vendor modules by job.video.provider (each: token, create, status, download, cancel); null = none (an old Sora job).
 const VIDEO_VENDORS = Object.freeze({ Google: geminiVideo, Replicate: replicateVideo });
 const videoVendor = (provider) => (Object.hasOwn(VIDEO_VENDORS, provider) ? VIDEO_VENDORS[provider] : null);
@@ -35,7 +39,7 @@ const videoVendor = (provider) => (Object.hasOwn(VIDEO_VENDORS, provider) ? VIDE
 // usdPerSec = the button price (provider-cost.cjs videoUsd, the same function the charge uses). estimate = billed by the
 // finished run's token usage (GEMINI_VIDEO_RATES), so the button price is only an estimate: pages put 約 before it.
 function videoModels(env) {
-  const row = (id, m, extra) => ({ id, durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, audio: m.audio, note: VIDEO_NOTES[id] || "", usdPerSec: videoUsd(id, 1), estimate: Object.hasOwn(GEMINI_VIDEO_RATES, id), free: false, ...extra });
+  const row = (id, m, extra) => ({ id, durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, firstFrame: FIRST_FRAME_MODELS.has(id), audio: m.audio, note: VIDEO_NOTES[id] || "", usdPerSec: videoUsd(id, 1), estimate: Object.hasOwn(GEMINI_VIDEO_RATES, id), free: false, ...extra });
   const rows = [
     ...Object.entries(geminiVideo.MODELS).map(([id, m]) => row(id, m, { label: GEMINI_VIDEO_RATES[id].label, vendor: "Google", provider: "Google", model: id, keyName: "GEMINI_API_KEY", available: !!env.GEMINI_API_KEY })),
     ...Object.entries(replicateVideo.MOTION_MODELS).sort(([a], [b]) => (b === "veo-3-1-fast") - (a === "veo-3-1-fast")).map(([id, m]) =>

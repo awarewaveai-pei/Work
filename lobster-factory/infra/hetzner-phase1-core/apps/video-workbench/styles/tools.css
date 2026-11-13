@@ -937,3 +937,9 @@ body.engine-full #engine-host.engine-stage { flex-direction:row;position:relativ
 .engine-flyout-status { color:var(--text-secondary);font-size:var(--font-size-sm); }
 @keyframes engine-flyout-in { from { transform:translateX(16px);opacity:0; } }
 @media (prefers-reduced-motion: reduce) { .engine-flyout:not([hidden]) { animation:none; } }
+/* 破框貼文動畫 (scripts/tools-breakout.js): the canvas preview = the video's first frame */
+.breakout-stage { display:flex;flex-direction:column;align-items:center;gap:8px; }
+.breakout-preview { width:100%;display:flex;justify-content:center; }
+.breakout-preview canvas { display:block;max-width:100%;max-height:72vh;width:auto;height:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-subtle); }
+.breakout-counts { display:grid;grid-template-columns:repeat(3,1fr);gap:8px; }
+.breakout-help .instruction li { margin:8px 0; }

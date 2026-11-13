@@ -139,7 +139,7 @@
     voice: "sound", music: "sound", sfx: "sound", separate: "sound",
     upscale: "finish", enhance: "finish", watermark: "finish", cta: "finish", privacy: "finish",
     region: "retouch", depth: "retouch",
-    short: "derive", follow: "derive",
+    short: "derive", follow: "derive", breakout: "derive",
   });
   // Same rule as localUrls in backend/main-system.cjs (its LOCAL_URL): every local file url anywhere in a value.
   const LOCAL_URL = /^\/(generated\/[a-f0-9-]+\.[a-z0-9]+|media\/[a-f0-9]{64}\/original\.[a-z0-9]+)$/;
