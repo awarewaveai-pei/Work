@@ -47,19 +47,30 @@
   // 鎖定貼文文字: at most this many rows of the post are watched (scripts/tools-breakout.js lockBoxes).
   const LOCK_MAX_BOXES = 24;
   const SUBJECT_MAX = 200;
-  // Sent with every run, whatever the subject text says (tests/breakout.cjs).
+  // The prompt = SHOT + the layout's scene (with the subject) + STILL; STILL is always last, whatever the subject text
+  // says (tests/breakout.cjs). Written from the reference product's working prompt (2026-11-14): a locked screen
+  // recording, a live 3D scene only in the photo, the interface as a flat printed layer hidden only where the subject
+  // passes in front of it, a still first second then a sudden breakout. Generic words only: no platform is named.
+  // PROMPT_MAX: Runway's API takes at most 1000 characters of prompt. Counted in UTF-16 units (the strictest count an API
+  // may use; one emoji can be several), the subject is cut by whole graphemes until the whole prompt fits.
+  const PROMPT_MAX = 1000;
+  const SHOT = "Locked-off screen recording of one social media post, framed as the first frame throughout; no camera move, zoom, scroll or cut.";
+  const LOOK = "Realistic scale and perspective, lighting matching the photo; debris or motion blur only at the photo edge.";
   const STILL =
-    "Keep the social post interface completely still and unchanged: the header, account name, avatar, icons, like bar, counts and caption text never move, never change, never redraw, and no new text, logo or watermark appears. Static camera, one continuous shot, no cuts.";
+    "The interface (header, icons, likes, caption, navigation) is a flat printed layer frozen pixel for pixel from the first frame: same words, numbers and icons, no new text or logo, hidden only where the subject passes in front. Still for one second, then a sudden fast breakout, then a slow push toward the viewer.";
+  const SCENE = {
+    burst: (what) => `Only the photo is a live 3D scene: the subject — ${what} — (in the photo or emerging from it) bursts out through the photo's border in full 3D toward the viewer, covering part of the interface below.`,
+    float: (what) => `Only the picture behind the still, floating post card is a live 3D scene: the subject — ${what} — (in the picture or appearing from it) passes behind the card, then in front of it toward the viewer in full 3D, covering part of it.`,
+  };
   function prompt(subject, settings = {}) {
-    const what = graphemes(String(subject || "").replace(/\s+/g, " ").trim()).slice(0, SUBJECT_MAX).join("");
-    if (!what) throw Error("請描述衝出畫面的主角");
-    const action =
-      settings.layout === "float"
-        ? `The first frame is a full-screen photo with a social media post card floating still in the middle of it. The subject is: ${what}. It may already be in the photo, or it appears from within the photo's scene. Only this subject moves: it first passes behind the card, then comes around and crosses in front of it toward the viewer.`
-        : `The first frame is a social media post. The subject is: ${what}. It may already be in the post photo, or it emerges from inside the photo. Only this subject moves: it comes alive and bursts out of the photo frame, breaking past the photo's edges and moving in front of the like bar and the caption text below it, as if leaping out of the screen.`;
-    return action + " " + STILL;
+    const scene = SCENE[settings.layout] || SCENE.burst,
+      text = (what) => [SHOT, scene(what), LOOK, STILL].join(" "),
+      parts = graphemes(String(subject || "").replace(/\s+/g, " ").trim()).slice(0, SUBJECT_MAX);
+    while (parts.length && text(parts.join("")).length > PROMPT_MAX) parts.pop();
+    if (!parts.length) throw Error("請描述衝出畫面的主角");
+    return text(parts.join(""));
   }
-  const api = { chineseOrigin, eligible, seconds, usd, byPrice, prompt, STILL, LAYOUTS, OUTPUT_RATIOS, modelRatio, outputHeight, outputSize, graphemes, LOCK_MAX_BOXES, SUBJECT_MAX };
+  const api = { chineseOrigin, eligible, seconds, usd, byPrice, prompt, STILL, PROMPT_MAX, LAYOUTS, OUTPUT_RATIOS, modelRatio, outputHeight, outputSize, graphemes, LOCK_MAX_BOXES, SUBJECT_MAX };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.VideoWorkbenchBreakout = api;
 })(typeof window !== "undefined" ? window : globalThis);

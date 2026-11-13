@@ -26,7 +26,11 @@ for (const layout of Object.keys(rules.LAYOUTS))
     assert(p.includes(subject));
   }
 assert.throws(() => rules.prompt("   ", { layout: "burst" }), /主角/);
-assert(rules.prompt("鯊".repeat(500), {}).includes("鯊".repeat(rules.SUBJECT_MAX) + "."), "subject not capped");
+assert(rules.prompt("鯊".repeat(500), {}).includes("— " + "鯊".repeat(rules.SUBJECT_MAX) + " —"), "subject not capped at SUBJECT_MAX");
+// the whole prompt stays within the model's limit (Runway: 1000), counted in UTF-16 units, for any subject and layout
+for (const layout of Object.keys(rules.LAYOUTS))
+  for (const subject of ["一".repeat(500), "👨‍👩‍👧".repeat(500), "a".repeat(500)])
+    assert(rules.prompt(subject, { layout }).length <= rules.PROMPT_MAX, `${layout}: prompt over ${rules.PROMPT_MAX}`);
 console.log("PASS 提示詞：兩種版面、任何主角文字都帶「貼文介面不動」指令");
 
 // 2a. caption text on the post (scripts/tools-breakout.js, its pure functions run in a bare context): every cut keeps
@@ -112,7 +116,8 @@ const breakout = require("../backend/breakout.cjs");
   assert.deepEqual(rules.OUTPUT_RATIOS.map(rules.modelRatio), ["9:16", "9:16", "9:16", "16:9"]);
   assert.deepEqual(rules.OUTPUT_RATIOS.map(rules.outputSize), [[720, 1280], [720, 900], [720, 720], [1280, 720]]);
   // the subject cap counts whole graphemes (one helper with the page's wrap)
-  assert(rules.prompt("👨‍👩‍👧".repeat(rules.SUBJECT_MAX + 5), {}).includes("👨‍👩‍👧".repeat(rules.SUBJECT_MAX) + "."), "subject cap split a ZWJ emoji");
+  const capped = /— (.*) —/u.exec(rules.prompt("👨‍👩‍👧".repeat(rules.SUBJECT_MAX + 5), {}))[1];
+  assert(capped.length > 0 && rules.graphemes(capped).every((g) => g === "👨‍👩‍👧"), "subject cap split a ZWJ emoji");
 }
 console.log("PASS 貼文文字鎖定：飄掉的數字（含壓縮後變灰的）還原、主角進到的格子保留且不再閃回");
 
