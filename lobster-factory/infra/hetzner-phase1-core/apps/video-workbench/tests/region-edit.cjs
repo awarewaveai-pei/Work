@@ -56,6 +56,10 @@ const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
       assert.equal(m.prices["1K"].usd, catalog.modelsFor("fill").find((r) => r.value === m.id).usd, m.id + " = the catalog price");
     }
     assert.equal(caps.imageEdit.defaultModel, "ideogram-4-5-edit-low", "cheapest row that needs no description");
+    // The paid-job price check (api.cjs start): every fill row and the generator's image model have a price.
+    for (const m of rows) costs.priceOf("fill", m.id);
+    costs.priceOf("image", caps.models.image);
+    assert.throws(() => costs.priceOf("fill", "gemini-nano-banana-2.1"), /尚無價目/);
     console.log("PASS /capabilities imageEdit: " + rows.length + " catalog fill rows, catalog prices, 1K");
 
     // 5. Each vendor's mask form; only the box changes; the charge.
