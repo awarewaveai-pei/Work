@@ -64,7 +64,8 @@ console.log("PASS 提示詞：兩種版面、任何主角文字都帶「貼文�
 }
 console.log("PASS 貼文文字：換行與「…」不切斷組合 emoji；跨行的 #標籤每一段都上色");
 
-// 2b. 鎖定貼文文字 (backend/breakout.cjs lockFrame on lockCells): one 40x10 row (cells 16 | 16 | 8 wide), white post.
+// 2b. 鎖定貼文文字 (backend/breakout.cjs lockFrame on lockGrid): one 40x10 row (cells 16 | 16 | 8 wide), white post; the
+// row's edges are the frame edge (where a subject can come from), the edges between its cells are not.
 const breakout = require("../backend/breakout.cjs");
 {
   const W = 40, Hh = 10, BLACK = [0, 0, 0], GREY = [128, 128, 128], RED = [220, 40, 40];
@@ -75,28 +76,28 @@ const breakout = require("../backend/breakout.cjs");
   };
   const digits = (x0, c = BLACK) => (x, y) => (x >= x0 && x < x0 + 4 && y >= 3 && y < 7 ? c : null);
   const ref = img(digits(4)); // the first frame's "1,286"
-  const cells = breakout.lockCells([[0, 0, 1, 1]], W, Hh), fresh = () => new Uint8Array(cells.length);
-  assert.deepEqual(cells.map((c) => c[2]), [16, 16, 8]);
+  const grid = breakout.lockGrid([[0, 0, 1, 1]], W, Hh), fresh = () => new Uint8Array(grid.cells.length);
+  assert.deepEqual(grid.cells.map((c) => c[2]), [16, 16, 8]);
   // drift: the model moved the digits (old spot blank, new spot black) -> both put back
   const drift = img(digits(10));
-  assert(breakout.lockFrame(drift, ref, W, cells, fresh()) > 0);
+  assert(breakout.lockFrame(drift, ref, W, grid, fresh()) > 0);
   assert.deepEqual(drift, ref, "drifted digits not restored to the first frame");
   // drift softened by compression (grey, not the text colour: the real 16:9 run) -> put back as well
   const soft = img(digits(10, GREY));
-  breakout.lockFrame(soft, ref, W, cells, fresh());
+  breakout.lockFrame(soft, ref, W, grid, fresh());
   assert.deepEqual(soft, ref, "softened drifting digits not restored");
   // the subject entering the row opens the cell it reaches; the digits' cell stays held
   const edge = img((x, y) => (x >= 34 ? RED : digits(4)(x, y))), before = Buffer.from(edge), edgeOpen = fresh();
-  breakout.lockFrame(edge, ref, W, cells, edgeOpen);
+  breakout.lockFrame(edge, ref, W, grid, edgeOpen);
   assert.deepEqual(edge, before, "a subject entering the row was erased");
   assert.deepEqual([...edgeOpen], [0, 0, 1]);
   // the subject over most of the row (the burst): those cells show the video from then on, even if text later drifts there
   const over = img((x) => (x < 30 ? RED : null)), opened = fresh(), copy = Buffer.from(over);
-  breakout.lockFrame(over, ref, W, cells, opened);
+  breakout.lockFrame(over, ref, W, grid, opened);
   assert.deepEqual([...opened], [1, 1, 0]);
   assert.deepEqual(over, copy, "the burst over the like bar was painted over");
   const later = img(digits(10));
-  breakout.lockFrame(later, ref, W, cells, opened);
+  breakout.lockFrame(later, ref, W, grid, opened);
   assert.notDeepEqual(later, ref, "an opened cell was locked again (would flicker)");
   // the lock is checked on the server: a malformed one is refused, none is accepted (an older job), extra keys ignored
   assert.throws(() => breakout.lockOf({ lock: { boxes: [[0, 0, 2, 1]] } }), /鎖定/);
@@ -303,6 +304,60 @@ const fetchImpl = async (url, init = {}) => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
   console.log("PASS 收尾：鎖定貼文文字＋裁成 4:5 一次完成；16:9 不裁也鎖定；檔案尺寸與比例正確");
+
+  // A real encoded clip (made here, nothing checked in): an IG 9:16 burst post at half size (rows: header, photo, icons,
+  // likes, caption, comments, nav), the likes and comment digits drifting 4 px and softening in the first second, then an
+  // opaque red shape coming down out of the photo across the rows (t 1..3.5 s). H.264 yuv420p crf 23 BT.709 like a vendor
+  // file, through the same finish() the server runs. Every frame: drift put back before the shape comes; the shape shown
+  // in every row from the frame it reaches it; a cell it never touches held.
+  {
+    const os = require("node:os"), { spawnSync } = require("node:child_process"), ffmpeg = require("ffmpeg-static");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-breakout-clip-")), W = 360, H = 640, FPS = 24, N = 4 * FPS;
+    const ff = (...args) => assert.equal(spawnSync(ffmpeg, ["-v", "error", "-y", ...args]).status, 0, args.join(" "));
+    const rows = [[0, 56], [457, 38], [495, 22], [517, 44], [561, 31], [592, 48]]; // header, icons, likes, caption, comments, nav
+    const post = [
+      "drawbox=x=58:y=20:w=75:h=11:color=black:t=fill",
+      ...[14, 46, 78, 326].map((x) => `drawbox=x=${x}:y=466:w=20:h=20:color=black:t=fill`),
+      "drawbox=x=14:y=501:w=60:h=10:color=black:t=fill",
+      "drawbox=x=14:y=524:w=300:h=12:color=black:t=fill", "drawbox=x=14:y=543:w=100:h=12:color=0x266ed6:t=fill",
+      "drawbox=x=14:y=570:w=180:h=10:color=0x707278:t=fill",
+      ...[25, 97, 169, 241, 313].map((x) => `drawbox=x=${x}:y=607:w=17:h=17:color=black:t=fill`),
+    ].join(",");
+    ff("-f", "lavfi", "-i", "testsrc2=s=360x401:d=1", "-frames:v", "1", path.join(dir, "photo.png"));
+    ff("-f", "lavfi", "-i", `color=white:s=${W}x${H}:d=1`, "-i", path.join(dir, "photo.png"), "-filter_complex", `[0][1]overlay=0:56,${post}`, "-frames:v", "1", path.join(dir, "first.png"));
+    const drift = "drawbox=x=14:y=501:w=60:h=10:color=white:t=fill:enable='lt(t,1)',drawbox=x=18:y=501:w=60:h=10:color=0x505050:t=fill:enable='lt(t,1)'," +
+      "drawbox=x=14:y=570:w=180:h=10:color=white:t=fill:enable='lt(t,1)',drawbox=x=18:y=570:w=180:h=10:color=0x9a9ca0:t=fill:enable='lt(t,1)'";
+    ff("-loop", "1", "-t", "4", "-r", String(FPS), "-i", path.join(dir, "first.png"), "-f", "lavfi", "-i", `color=0xd8282c:s=120x120:r=${FPS}:d=4`,
+      "-filter_complex", `[0]${drift}[b];[b][1]overlay=x=120:y='280+108*clip(t-1,0,2.5)':enable='gte(t,1)',scale=out_color_matrix=bt709:out_range=tv,format=yuv420p`,
+      "-c:v", "libx264", "-crf", "23", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-t", "4", path.join(dir, "made.mp4"));
+    const done = await breakout.finish({
+      src: path.join(dir, "made.mp4"), frameFile: path.join(dir, "first.png"), dst: path.join(dir, "out.mp4"), ffmpeg,
+      settings: { outputRatio: "9:16", lock: { boxes: rows.map(([y, h]) => [0, y / H, 1, h / H]) } },
+    });
+    assert(done.restored > 0);
+    const all = spawnSync(ffmpeg, ["-v", "error", "-i", path.join(dir, "out.mp4"), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { maxBuffer: 256 << 20 }).stdout;
+    const size = W * H * 3;
+    assert.equal(all.length, N * size, "frame count");
+    const px = (n, x, y) => all.subarray(n * size + (y * W + x) * 3, n * size + (y * W + x) * 3 + 3);
+    const red = (p) => p[0] > 150 && p[1] < 90 && p[2] < 90, dark = (p) => p[0] < 120 && p[1] < 120 && p[2] < 120, white = (p) => p[0] > 200 && p[1] > 200 && p[2] > 200;
+    const bottom = (n) => 280 + 108 * Math.min(2.5, Math.max(0, n / FPS - 1)) + 120;
+    let shown = 0;
+    for (let n = 0; n < N; n++) {
+      if (n < FPS) {
+        assert(dark(px(n, 15, 506)) && white(px(n, 76, 506)), `frame ${n}: drifted likes digits not put back`);
+        assert(!white(px(n, 15, 575)) && white(px(n, 196, 575)), `frame ${n}: drifted comment digits not put back`);
+      }
+      const b = bottom(n);
+      if (n >= FPS && b - 4 > 457 && b - 4 < 640) {
+        assert(red(px(n, 180, Math.round(b) - 4)), `frame ${n}: the shape (bottom ${Math.round(b)}) was held back in the rows`);
+        shown++;
+      }
+      assert(white(px(n, 330, 506)) && dark(px(n, 335, 475)), `frame ${n}: a cell the shape never touches changed`);
+    }
+    assert(shown > 30, "the shape crossed the rows in too few frames to tell: " + shown);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  console.log("PASS 鎖定實片：真實編碼的影片裡，飄移在主角到之前還原；主角到哪一列，那一格當格就照影片顯示；沒碰到的格子一直鎖住");
 })().catch((e) => {
   console.error(e);
   process.exit(1);

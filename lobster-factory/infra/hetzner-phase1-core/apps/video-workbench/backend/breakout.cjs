@@ -49,51 +49,77 @@ function lockOf(settings) {
 }
 
 // Each row is cut into cells about as wide as 1.5 row heights (a few characters). A pixel "changed" when its RGB distance
-// (sum of |d|) from the first frame passes CHANGED. A cell whose changed share passes OPEN has the subject in it (the
-// burst): from that frame on it shows the video as made. Any other cell is put back whole: drifting digits and letters
-// return, however compression softened their edges. Text never fills a cell, so even a whole number shifting (old + new
-// place) stays under half; a subject entering a cell is held back until it covers half of it, then shows from then on.
-const LOCK = Object.freeze({ changed: 60, open: 0.5 });
-let scratch = new Int32Array(0); // reused changed-pixel list (one per thread)
+// (sum of |d|) from the first frame passes CHANGED. The subject arrives from outside the text: a cell opens when its own
+// changed pixels reach an edge the subject can come from (the photo or the outside of the post, or a cell already open),
+// at least TOUCH of them; opening repeats within the frame until nothing more opens (a fast subject crosses several rows
+// in one frame). An open cell shows the video as made from then on. Every other cell is put back where it changed:
+// drifting digits and letters sit inside their row with a margin, so they never reach such an edge, however compression
+// softened them.
+const LOCK = Object.freeze({ changed: 60, touch: 4 });
 /**
- * Holds one decoded frame's text cells to the first frame, in place. frame/ref: rgb24 buffers of the same size (width w);
- * cells in pixels [x, y, w, h] (lockCells); open: one flag per cell, kept across frames. Returns the pixels put back.
+ * The cells of the rows (0..1) in pixels of a w x h frame, and each cell's border: pairs [pixel index, the label of the
+ * pixel just outside it] (label = the neighbouring cell, or -1 for the photo / the outside of the post / the frame edge).
  */
-function lockFrame(frame, ref, w, cells, open) {
-  let restored = 0;
-  cells.forEach(([cx, cy, cw, ch], c) => {
-    if (open[c] || cw <= 0 || ch <= 0) return;
-    if (scratch.length < cw * ch) scratch = new Int32Array(cw * ch);
-    let n = 0;
-    for (let y = cy; y < cy + ch; y++)
-      for (let x = cx; x < cx + cw; x++) {
-        const i = (y * w + x) * 3;
-        if (Math.abs(frame[i] - ref[i]) + Math.abs(frame[i + 1] - ref[i + 1]) + Math.abs(frame[i + 2] - ref[i + 2]) > LOCK.changed) scratch[n++] = i;
-      }
-    if (n > LOCK.open * cw * ch) {
-      open[c] = 1;
-      return;
-    }
-    for (let k = 0; k < n; k++) {
-      const i = scratch[k];
-      frame[i] = ref[i];
-      frame[i + 1] = ref[i + 1];
-      frame[i + 2] = ref[i + 2];
-    }
-    restored += n;
-  });
-  return restored;
-}
-
-/** Rows (0..1) -> cells in pixels of a w x h frame. */
-function lockCells(boxes, w, h) {
-  return boxes.flatMap(([x, y, bw, bh]) => {
+function lockGrid(boxes, w, h) {
+  const cells = boxes.flatMap(([x, y, bw, bh]) => {
     const x0 = Math.max(0, Math.floor(x * w)), y0 = Math.max(0, Math.floor(y * h)),
       x1 = Math.min(w, Math.ceil((x + bw) * w)), y1 = Math.min(h, Math.ceil((y + bh) * h)),
-      step = Math.max(16, Math.round((y1 - y0) * 1.5)), cells = [];
-    for (let cx = x0; cx < x1; cx += step) cells.push([cx, y0, Math.min(step, x1 - cx), y1 - y0]);
-    return cells;
+      step = Math.max(16, Math.round((y1 - y0) * 1.5)), row = [];
+    for (let cx = x0; cx < x1; cx += step) row.push([cx, y0, Math.min(step, x1 - cx), y1 - y0]);
+    return row;
   });
+  const label = new Int32Array(w * h).fill(-1);
+  cells.forEach(([x, y, cw, ch], c) => {
+    for (let yy = y; yy < y + ch; yy++) label.fill(c, yy * w + x, yy * w + x + cw);
+  });
+  const borders = cells.map(([x, y, cw, ch]) => {
+    const b = [];
+    const add = (px, py, nx, ny) => b.push(py * w + px, nx < 0 || ny < 0 || nx >= w || ny >= h ? -1 : label[ny * w + nx]);
+    for (let xx = x; xx < x + cw; xx++) {
+      add(xx, y, xx, y - 1);
+      add(xx, y + ch - 1, xx, y + ch);
+    }
+    for (let yy = y; yy < y + ch; yy++) {
+      add(x, yy, x - 1, yy);
+      add(x + cw - 1, yy, x + cw, yy);
+    }
+    return Int32Array.from(b);
+  });
+  return { cells, borders };
+}
+/**
+ * Holds one decoded frame's text cells to the first frame, in place. frame/ref: rgb24 buffers of the same size (width w);
+ * grid: lockGrid; open: one flag per cell, kept across frames. Returns the pixels put back.
+ */
+function lockFrame(frame, ref, w, grid, open) {
+  const changed = (p) => {
+    const i = p * 3;
+    return Math.abs(frame[i] - ref[i]) + Math.abs(frame[i + 1] - ref[i + 1]) + Math.abs(frame[i + 2] - ref[i + 2]) > LOCK.changed;
+  };
+  for (let again = true; again; ) {
+    again = false;
+    grid.borders.forEach((b, c) => {
+      if (open[c]) return;
+      let touch = 0;
+      for (let k = 0; k < b.length && touch < LOCK.touch; k += 2) if ((b[k + 1] === -1 || open[b[k + 1]]) && changed(b[k])) touch++;
+      if (touch >= LOCK.touch) open[c] = again = 1;
+    });
+  }
+  let restored = 0;
+  grid.cells.forEach(([cx, cy, cw, ch], c) => {
+    if (open[c]) return;
+    for (let y = cy; y < cy + ch; y++)
+      for (let x = cx; x < cx + cw; x++) {
+        const p = y * w + x;
+        if (!changed(p)) continue;
+        const i = p * 3;
+        frame[i] = ref[i];
+        frame[i + 1] = ref[i + 1];
+        frame[i + 2] = ref[i + 2];
+        restored++;
+      }
+  });
+  return restored;
 }
 
 // One ffmpeg child: resolves its stdout, rejects with its stderr tail; killed when signal aborts.
@@ -144,7 +170,7 @@ async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
     await run(ffmpeg, ["-y", "-v", "error", "-i", src, "-map", "0:a?", "-vf", crop + "format=yuv420p", ...out], signal, { stdout: false }).done;
     return { ratio, restored: 0 };
   }
-  const cells = lockCells(boxes, W, H), open = new Uint8Array(cells.length), size = W * H * 3;
+  const grid = lockGrid(boxes, W, H), open = new Uint8Array(grid.cells.length), size = W * H * 3;
   const ref = await run(ffmpeg, ["-v", "error", "-i", frameFile, "-vf", `scale=${W}:${H}:flags=area`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal).done;
   if (ref.length !== size) throw Error("第一格畫面尺寸不符");
   const decoder = run(ffmpeg, ["-v", "error", "-noautorotate", "-i", src, "-vf", TO_RGB, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal);
@@ -163,7 +189,7 @@ async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
       filled += n;
       at += n;
       if (filled === size) {
-        restored += lockFrame(frame, ref, W, cells, open);
+        restored += lockFrame(frame, ref, W, grid, open);
         filled = 0;
         if (!encoder.child.stdin.write(Buffer.from(frame))) {
           decoder.child.stdout.pause();
@@ -237,4 +263,4 @@ if (!isMainThread && workerData?.breakoutFinish) {
     .finally(() => parentPort.close());
 }
 
-module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockCells, lockOf, LOCK, LOCK_MAX_AREA, FINISH_TIMEOUT_MS };
+module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockOf, LOCK, LOCK_MAX_AREA, FINISH_TIMEOUT_MS };
