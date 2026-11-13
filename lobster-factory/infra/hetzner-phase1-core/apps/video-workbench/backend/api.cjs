@@ -669,28 +669,26 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           job.result = { url: '/generated/' + path.basename(destination) };
         }
         job.disclosure = "AI 生成聲音";
-      } else if (type === "image" && input.operation === "region" && !imageEdit.pick(input.settings.model, env).mask) {
-        // A model without a mask (backend/image-edit.cjs): the source + the instruction, then only the boxes go back
-        // onto the original, so nothing outside them changes.
-        const m = imageEdit.pick(input.settings.model, env), size = input.settings.quality,
+      } else if (type === "image" && input.operation === "region") {
+        // backend/image-edit.cjs: the catalog row the job recorded, then only the boxes go back onto the original.
+        const m = imageEdit.pick(input.settings.model, env),
           source = imageReference(flatten(input)[0]?.url || ""), mask = imageReference(input.mask || "");
+        if (!/^data:image\/png;base64,/.test(source)) throw Error("請提供 PNG 原圖");
         if (!/^data:image\/png;base64,/.test(mask)) throw Error("請提供選取區域遮罩");
-        const edited = await imageEdit.gemini(m, { prompt, image: source, width: input.settings.regionWidth, height: input.settings.regionHeight, size, env, fetchImpl, signal });
-        job.costUsd = costs.imageEditUsd(m.id, size, edited.usage);
-        job.imageEdit = { model: m.id, provider: m.vendor };
+        const original = Buffer.from(source.split(",")[1], "base64"), maskPng = Buffer.from(mask.split(",")[1], "base64");
+        const edited = await imageEdit.run(m, { prompt, image: original, masks: await mediaTools.regionMasks(maskPng, signal), ratio: input.settings.regionWidth / input.settings.regionHeight, env, fetchImpl, signal });
+        job.costUsd = edited.costUsd;
+        job.imageEdit = { model: m.value, provider: m.vendor };
         const [width, height] = generationPolicy.imageDimensions(input.settings), filename = crypto.randomUUID() + ".png";
-        await mediaTools.compositeRegions({ original: Buffer.from(source.split(",")[1], "base64"), edited: edited.image, mask: Buffer.from(mask.split(",")[1], "base64"), destination: path.join(outputs, filename), width, height, signal });
+        await mediaTools.compositeRegions({ original, edited: edited.image, mask: maskPng, destination: path.join(outputs, filename), width, height, signal });
         job.result = { url: "/generated/" + filename, width, height, layout: input.settings.imageLayout };
       } else if (type === "image") {
         const refs = flatten(input);
         if (input.character?.references)
           for (const url of input.character.references) refs.push({ url });
         const ratio = input.settings?.imageLayout === 'region-preserve' ? input.settings.regionWidth === input.settings.regionHeight ? '1:1' : input.settings.regionWidth > input.settings.regionHeight ? '16:9' : '9:16' : input.settings?.ratio || input.ratio;
-        // The region tool's chosen row (backend/image-edit.cjs, an OpenAI model that takes a mask); else the server's model.
-        const imageModel = input.operation === "region" ? imageEdit.pick(input.settings?.model, env).id : providerModels.image;
-        if (input.operation === "region") job.imageEdit = { model: imageModel, provider: "OpenAI" };
         const body = {
-          model: imageModel,
+          model: providerModels.image,
           prompt,
           size:
             ["16:9", "4:3"].includes(ratio)
@@ -715,18 +713,6 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
               `reference-${i}.${mime.split("/")[1]}`,
             );
           }
-          if (input.operation === "region") {
-            const mask = imageReference(input.mask || "");
-            if (!/^data:image\/png;base64,/.test(mask))
-              throw Error("請提供選取區域遮罩");
-            form.append(
-              "mask",
-              new Blob([Buffer.from(mask.split(",")[1], "base64")], {
-                type: "image/png",
-              }),
-              "mask.png",
-            );
-          }
           const r = await fetchImpl("https://api.openai.com/v1/images/edits", {
             method: "POST",
             headers: { Authorization: "Bearer " + key() },
@@ -737,7 +723,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           result = await r.json();
         } else result = await provider("/images/generations", body, signal);
         if (!result.data?.[0]?.b64_json) throw Error("圖片服務沒有回傳圖片");
-        job.costUsd = costs.imageUsd(imageModel, result.usage);
+        job.costUsd = costs.imageUsd(providerModels.image, result.usage);
         job.result = {
           url: output(Buffer.from(result.data[0].b64_json, "base64"), "png"),
         };
@@ -914,8 +900,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     // paidFeature on the job: the retry button prices a rerun from it (shared/paid-price.js); the permit needs main.
     const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
-    if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music" }[feature] || feature,
-      { "video.image": editModel ? [editModel.id, input.settings.quality] : providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id }[feature]);
+    if (feature && editModel) costs.priceOf("fill", editModel.value);
+    else if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music" }[feature] || feature,
+      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id }[feature]);
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
     if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });

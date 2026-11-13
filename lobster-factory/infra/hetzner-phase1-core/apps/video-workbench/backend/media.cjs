@@ -230,9 +230,20 @@ async function compositeRegions({ original, edited, mask, destination, width, he
       "-map", "[out]", "-frames:v", "1", "-threads", "1", destination], signal);
   } finally { files.forEach((f) => fs.rmSync(f, { force: true })); }
 }
+// The region tool's mask (white = keep, transparent = the boxes) in the forms the vendors take (backend/image-edit.cjs):
+// alpha = as is, white = boxes white on black, black = boxes black on white.
+async function regionMasks(mask, signal) {
+  const id = crypto.randomUUID(), dir = require("node:os").tmpdir(), file = (k) => path.join(dir, `vw-mask-${id}-${k}.png`);
+  try {
+    fs.writeFileSync(file("in"), mask);
+    await run(["-y", "-hide_banner", "-i", file("in"), "-vf", "format=rgba,alphaextract", "-frames:v", "1", file("black")], signal);
+    await run(["-y", "-hide_banner", "-i", file("in"), "-vf", "format=rgba,alphaextract,negate", "-frames:v", "1", file("white")], signal);
+    return { alpha: mask, black: fs.readFileSync(file("black")), white: fs.readFileSync(file("white")) };
+  } finally { for (const k of ["in", "black", "white"]) fs.rmSync(file(k), { force: true }); }
+}
 async function adjustVoice(source, destination, { pitch, gain, speed = 1, signal }) {
   if (!Number.isFinite(pitch) || Math.abs(pitch) > 12 || !Number.isFinite(gain) || gain < -30 || gain > 12 || !Number.isFinite(speed) || speed < .25 || speed > 4) throw Error('語音語速、音調或音量無效');
   const factor = Math.pow(2, pitch / 12);
   await run(['-y', '-hide_banner', '-i', source, '-af', `aresample=48000,asetrate=${48000 * factor},aresample=48000,atempo=${1 / factor},atempo=${Math.sqrt(speed)},atempo=${Math.sqrt(speed)},volume=${Math.pow(10, gain / 20)}`, '-c:a', 'libmp3lame', destination], signal);
 }
-module.exports = { media, supported, normalizeImage, compositeRegions, adjustVoice, run };
+module.exports = { media, supported, normalizeImage, compositeRegions, regionMasks, adjustVoice, run };

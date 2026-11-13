@@ -112,6 +112,8 @@ const { createServer } = require("../server.cjs");
         type: "image",
         operation: "region",
         prompt: "區域變紅",
+        // The masked OpenAI row of the catalog (backend/image-edit.cjs); the page always sends the source size.
+        settings: { model: "openai-26-edit", imageLayout: "region-preserve", regionWidth: 1, regionHeight: 1 },
         references: {
           images: [{ url: "data:image/png;base64," + png.toString("base64") }],
         },
