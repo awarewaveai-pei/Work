@@ -173,6 +173,76 @@ const fetchImpl = async (url, init = {}) => {
   assert.equal((await call("/generations", job(runway, { outputRatio: "16:9" }))).status, 400, "16:9 accepted at the 9:16 model ratio");
   console.log("PASS 價格：頁面顯示金額＝任務實際記帳金額（每個可用模型）；錯的長度／比例在送出前擋下；4:5 可送出");
 
+  // Finishing runs outside the status request (api.cjs finishBreakout). breakout.finish is swapped for one the test
+  // releases (api.cjs calls it through the module object).
+  {
+    const realFinish = breakout.finish, runs = [];
+    breakout.finish = (opts) =>
+      new Promise((resolve, reject) => {
+        runs.push({ opts, resolve });
+        opts.signal.addEventListener("abort", () => reject(Error("已停止")));
+      });
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const at = (b) => async (route, body) => {
+      const r = await fetch(b + "/api/vw" + route, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json" }, body: body && JSON.stringify(body) });
+      return { status: r.status, body: await r.json() };
+    };
+    const until = async (get, ok) => {
+      for (let i = 0; i < 200; i++) { const v = await get(); if (ok(v)) return v; await sleep(20); }
+      throw Error("timed out waiting");
+    };
+    try {
+      const vendorUrls = [];
+      const { base: b2 } = await isolatedServer("vw-breakout-stage-", { fetchImpl: (url, init) => (vendorUrls.push(url), fetchImpl(url, init)), env: { REPLICATE_API_TOKEN: "test-only" } });
+      const c2 = at(b2), runway2 = (await c2("/capabilities")).body.videoModels.find((m) => m.id === "runway-gen4-turbo");
+      // 1. a status GET during a slow finish answers at once (stage finishing), and later shows the finished file
+      const one = (await c2("/generations", job(runway2, { outputRatio: "4:5" }))).body.id;
+      const finishing = await until(async () => (await c2("/generations/" + one)).body, (v) => v.stage === "finishing");
+      assert.equal(finishing.status, "running");
+      const t0 = Date.now(), again = (await c2("/generations/" + one)).body;
+      assert(Date.now() - t0 < 1000 && again.stage === "finishing", "a status GET waited for local finishing");
+      assert.equal(runs.length, 1, "one runner per job");
+      runs[0].resolve({ ratio: "4:5", restored: 7 });
+      const done = await until(async () => (await c2("/generations/" + one)).body, (v) => v.status === "succeeded");
+      assert.equal(done.result.ratio, "4:5");
+      assert.equal(done.result.textLock.restoredPixels, 7);
+      assert.equal(done.stage, undefined);
+      // 2. cancel while finishing: no vendor call, the runner is stopped, the paid model file is delivered with a note
+      const two = (await c2("/generations", job(runway2))).body.id;
+      await until(async () => (await c2("/generations/" + two)).body, (v) => v.stage === "finishing");
+      const before = vendorUrls.length, cancelled = await c2("/generations/" + two + "/cancel", {});
+      assert.equal(cancelled.status, 200);
+      assert(runs[1].opts.signal.aborted, "the finishing runner was not stopped");
+      assert(!vendorUrls.slice(before).some((u) => u.endsWith("/cancel")), "cancel during finishing called the vendor");
+      const kept = await until(async () => (await c2("/generations/" + two)).body, (v) => v.status === "succeeded");
+      assert.match(kept.result.note, /已停止貼文鎖定.*原始影片/);
+      // 3. a restart resumes a finishing job; one whose model file is gone fails with a message
+      const os = require("node:os"), dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-breakout-restart-"));
+      fs.mkdirSync(path.join(dataDir, "generated"));
+      fs.writeFileSync(path.join(dataDir, "generated", "11111111-1111-1111-1111-111111111111.mp4"), "made");
+      const left = (id, file) => ({
+        id, type: "video", status: "running", stage: "finishing", progress: 95, createdAt: new Date().toISOString(), providerId: "pred-b",
+        video: { id: "runway-gen4-turbo", provider: "Replicate", model: "runwayml/gen4-turbo", seconds: 5 },
+        input: { type: "video", operation: "breakout", prompt: "鯊魚", references: { firstFrame: [{ url: "/generated/f.png" }] }, settings: { outputRatio: "9:16", ratio: "9:16" } },
+        result: { url: "/generated/" + file + ".mp4", origin: { kind: "ai_generated", costUsd: 0.25 } },
+      });
+      fs.writeFileSync(path.join(dataDir, "jobs.json"), JSON.stringify([left("resume", "11111111-1111-1111-1111-111111111111"), left("lost", "22222222-2222-2222-2222-222222222222")]));
+      const restarted = require("../server.cjs").createServer({ dataDir, env: { REPLICATE_API_TOKEN: "test-only" }, fetchImpl });
+      await new Promise((r) => restarted.listen(0, "127.0.0.1", r));
+      restarted.unref();
+      const c3 = at("http://127.0.0.1:" + restarted.address().port);
+      await until(async () => runs.length, (n) => n === 3);
+      runs[2].resolve({ ratio: "9:16", restored: 0, untouched: true });
+      assert.equal((await until(async () => (await c3("/generations/resume")).body, (v) => v.status !== "running")).status, "succeeded");
+      const lost = (await c3("/generations/lost")).body;
+      assert.equal(lost.status, "failed");
+      assert.match(lost.error, /找不到模型生成的影片檔/);
+    } finally {
+      breakout.finish = realFinish;
+    }
+  }
+  console.log("PASS 收尾階段：狀態查詢不等本機處理；處理中取消不呼叫供應商、停止處理並交付原始影片；重啟後接續或說明失敗");
+
   // finish() with real ffmpeg: a 9:16 clip whose "digits" drifted -> 4:5 file, digits back where the first frame had them
   {
     const os = require("node:os"), { spawnSync } = require("node:child_process"), ffmpeg = require("ffmpeg-static");

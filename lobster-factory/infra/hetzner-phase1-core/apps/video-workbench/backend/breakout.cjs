@@ -185,6 +185,19 @@ async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
 }
 
 const FINISH_TIMEOUT_MS = 5 * 60 * 1000;
+// A file's own ratio when finishing could not set it: the listed ratio it matches, else its "w:h" (never assumed).
+async function fileRatio(file) {
+  try {
+    const { width: w, height: h } = await require("./media-inspect.cjs").inspectMedia(file);
+    const match = ["9:16", "16:9", ...rules.OUTPUT_RATIOS].find((r) => {
+      const [a, b] = r.split(":").map(Number);
+      return Math.abs(h / w - b / a) < 0.02;
+    });
+    return match || `${w}:${h}`;
+  } catch {
+    return undefined; // unreadable: readers fall back to the job's settings
+  }
+}
 /**
  * The finished breakout video: text rows held to the first frame (settings.lock), then cut to settings.outputRatio's
  * centred box, in one encode. src: the model's mp4 (9:16 or 16:9); frameFile: the first-frame PNG the job sent; dst: output mp4.
@@ -224,4 +237,4 @@ if (!isMainThread && workerData?.breakoutFinish) {
     .finally(() => parentPort.close());
 }
 
-module.exports = { prepare, finish, finishHere, lockFrame, lockCells, lockOf, LOCK, LOCK_MAX_AREA };
+module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockCells, lockOf, LOCK, LOCK_MAX_AREA, FINISH_TIMEOUT_MS };

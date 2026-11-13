@@ -221,6 +221,20 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       job.error = "Sora 2 已停止服務；請從歷史記錄重新送出，會改用目前的預設影片模型。";
     }
   persist();
+  // A breakout job a restart left finishing resumes: the model's file is on disk and the work is local and repeatable.
+  // Without that file there is nothing to finish from. After this tick, once everything below is defined.
+  setImmediate(() => {
+    for (const job of jobs)
+      if (job.status === "running" && job.stage === "finishing") {
+        if (job.result?.url && fs.existsSync(path.join(dataDir, job.result.url.slice(1)))) finishBreakout(job);
+        else {
+          delete job.stage;
+          job.status = "failed";
+          job.error = "服務重新啟動後找不到模型生成的影片檔，無法完成貼文鎖定；請重新送出。";
+          persist();
+        }
+      }
+  });
   async function provider(route, body, signal, binary = false) {
     const r = await fetchImpl("https://api.openai.com/v1" + route, {
       method: body === undefined ? "GET" : "POST",
@@ -808,10 +822,52 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     refreshes.set(job.id, pending);
     return pending;
   }
+  // 破框貼文動畫 finishing (backend/breakout.cjs finish), outside every request: a status GET never waits for local
+  // post-processing. One runner per job; its AbortController is in `controls`, where cancel looks. The vendor run is
+  // already paid, so the job always ends succeeded and is charged once (settle): with the finished file, or with the
+  // model's file as made and a note (finishing failed, or was stopped by cancel). A restart resumes it (see below).
+  function finishBreakout(job) {
+    if (controls.has(job.id)) return;
+    const controller = new AbortController(),
+      src = path.join(dataDir, job.result.url.slice(1)),
+      name = crypto.randomUUID() + ".mp4";
+    controls.set(job.id, controller);
+    // the browser watches a job until deadlineAt (runtime.js reconcileJobs): long enough for the finishing to end
+    job.deadlineAt = new Date(Math.max(Date.parse(job.deadlineAt) || 0, Date.now() + breakout.FINISH_TIMEOUT_MS + 60000)).toISOString();
+    persist();
+    breakout
+      .finish({
+        src, dst: path.join(outputs, name), settings: job.input.settings, ffmpeg: require("ffmpeg-static"), signal: controller.signal,
+        frameFile: localFile(job.input.references?.firstFrame?.[0]?.url) || "",
+      })
+      .then(
+        (done) => {
+          if (!done.untouched) {
+            fs.rmSync(src, { force: true });
+            job.result.url = "/generated/" + name;
+          }
+          job.result.ratio = done.ratio; // the file's own ratio; readers of a job's ratio take result.ratio first
+          job.result.textLock = { restoredPixels: done.restored };
+        },
+        async (e) => {
+          job.result.ratio = await breakout.fileRatio(src); // the model's file, measured, never assumed
+          job.result.note = (controller.signal.aborted ? "已停止貼文鎖定／裁切" : "貼文鎖定／裁切失敗：" + publicError(e.message)) + "；這是模型生成的原始影片（已計費）。";
+        },
+      )
+      .finally(() => {
+        controls.delete(job.id);
+        delete job.stage;
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        settle(job).catch((e) => console.error("[vw] settle after finishing:", job.id, e.message));
+      });
+  }
   async function refreshOnce(job) {
     const before = job.status;
     const vendor = generationPolicy.videoVendor(job.video?.provider);
-    if (job.providerId && vendor && ["queued", "running"].includes(job.status)) {
+    // A finishing job's vendor run is done (finishBreakout owns it now): nothing to ask the vendor.
+    if (job.providerId && vendor && job.stage !== "finishing" && ["queued", "running"].includes(job.status)) {
       const result = await vendor.status({ id: job.providerId, env, fetchImpl });
       if (job.status === "cancelled") return job; // cancelled while this poll was in flight: the cancel wins
       job.status = result.status === "succeeded" ? "running" : result.status;
@@ -820,29 +876,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         const { video, usage } = await vendor.download({ output: result.output, fetchImpl });
         if (job.status === "cancelled") return job;
         job.result = { url: output(video, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds, usage), job.video) };
-        // 破框貼文動畫: hold the post's text rows to the first frame, then cut the output ratio (backend/breakout.cjs finish).
-        // The vendor run is already paid, so a failure keeps the model's video as made and says so instead of failing the job.
+        // 破框貼文動畫: the text hold + ratio cut run after this answer (finishBreakout); the job stays running meanwhile.
         if (job.input?.operation === "breakout") {
-          const src = path.join(dataDir, job.result.url.slice(1)), name = crypto.randomUUID() + ".mp4", dst = path.join(outputs, name);
-          try {
-            // finish() runs in a worker with its own time limit and removes dst itself when it fails.
-            const done = await breakout.finish({
-              src, dst, settings: job.input.settings, ffmpeg: require("ffmpeg-static"),
-              frameFile: localFile(job.input.references?.firstFrame?.[0]?.url) || "",
-            });
-            if (job.status === "cancelled") {
-              fs.rmSync(dst, { force: true });
-              return job; // cancelled during the finish: the cancel wins, as after download
-            }
-            if (!done.untouched) {
-              fs.rmSync(src, { force: true });
-              job.result.url = "/generated/" + name;
-            }
-            job.result.ratio = done.ratio; // the file's own ratio; readers of a job's ratio take result.ratio first
-            job.result.textLock = { restoredPixels: done.restored };
-          } catch (e) {
-            job.result.note = "已生成 " + (job.input.settings?.ratio || "9:16") + " 影片，但貼文鎖定／裁切失敗：" + publicError(e.message);
-          }
+          job.stage = "finishing";
+          job.progress = 95;
+          persist();
+          finishBreakout(job);
+          return job;
         }
         job.progress = 100;
         job.status = "succeeded";
@@ -1373,6 +1413,12 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         } else if (req.method === "POST" && match[2]) {
           if (!["queued", "running"].includes(job.status))
             throw Object.assign(Error("任務已結束"), { status: 409 });
+          if (job.stage === "finishing") {
+            // The vendor run is done and paid: stop our finishing only (no vendor call); the job ends with the model's file.
+            controls.get(job.id)?.abort();
+            json(res, 200, job);
+            return true;
+          }
           // Vendor video: cancelled only once the vendor accepts, so billing has really stopped.
           const vendor = job.providerId && generationPolicy.videoVendor(job.video?.provider);
           if (vendor && !(await vendor.cancel({ id: job.providerId, env, fetchImpl })))
