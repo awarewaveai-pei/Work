@@ -111,11 +111,19 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
     hang = true;
     const hung = await (await post("/generations", { type: "image", operation: "region", prompt: "區域 1：改紅", settings: { ...settings, model: "ideogram-4-5-edit-low" }, references: { images: [image] }, mask })).json();
     for (let i = 0; i < 100 && !calls.some((c) => c.url.endsWith("/predictions/p-hang")); i++) await new Promise((r) => setTimeout(r, 50));
+    // The run's id is on the job (jobs.json); a server restarted with that job still running cancels it at Replicate.
+    const saved = JSON.parse(fs.readFileSync(path.join(dir, "jobs.json"), "utf8")).find((j) => j.id === hung.id);
+    assert.equal(saved.replicateId, "p-hang");
+    assert(["queued", "running"].includes(saved.status));
+    const restartCalls = [];
+    createServer({ dataDir: dir, env: { REPLICATE_API_TOKEN: "test-only" }, fetchImpl: async (url) => (restartCalls.push(url), Response.json({ id: "p-hang", status: "canceled" })) });
+    for (let i = 0; i < 100 && !restartCalls.length; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(restartCalls, ["https://api.replicate.com/v1/predictions/p-hang/cancel"], "restart cancels the recorded run");
     await post("/generations/" + hung.id + "/cancel", {});
     for (let i = 0; i < 100 && !calls.some((c) => c.url.endsWith("/p-hang/cancel")); i++) await new Promise((r) => setTimeout(r, 50));
     assert(calls.some((c) => c.url === "https://api.replicate.com/v1/predictions/p-hang/cancel"), "the abandoned run is cancelled at Replicate");
     hang = false;
-    console.log("PASS a job cancelled mid-poll cancels its Replicate run");
+    console.log("PASS a region run's replicateId is recorded; a restart and a mid-poll cancel both cancel it at Replicate");
 
     // 4 (server). An old job's settings (no model, 2K) run the default row at 1K; a model outside the catalog is refused.
     const old = await poll(await (await post("/generations", { type: "image", operation: "region", prompt: "整張變亮", settings: { ...settings, quality: "2K" }, references: { images: [image] }, mask })).json());

@@ -212,7 +212,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (["queued", "running"].includes(job.status) && !job.providerId) {
       job.status = "failed";
       job.error = "服務重新啟動，任務已中斷；請從歷史記錄重新送出。";
-      // Nothing polls a 去背／AI 畫質增強 run after a restart, so Replicate stops billing it (replicate-run.cjs rule 2).
+      // Nothing polls a 去背／AI 畫質增強／圖片局部編輯 run after a restart, so Replicate stops billing it (replicate-run.cjs rule 2).
       if (job.replicateId) replicateRun.cancelPrediction({ id: job.replicateId, env, fetchImpl });
     } else if (["queued", "running"].includes(job.status) && !generationPolicy.videoVendor(job.video?.provider)) {
       // A Sora job (OpenAI shut Sora 2 down 2026-09-24): nothing left to poll; a retry runs the default model.
@@ -676,7 +676,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         if (!/^data:image\/png;base64,/.test(source)) throw Error("請提供 PNG 原圖");
         if (!/^data:image\/png;base64,/.test(mask)) throw Error("請提供選取區域遮罩");
         const original = Buffer.from(source.split(",")[1], "base64"), maskPng = Buffer.from(mask.split(",")[1], "base64");
-        const edited = await imageEdit.run(m, { prompt, image: original, masks: await mediaTools.regionMasks(maskPng, signal), ratio: input.settings.regionWidth / input.settings.regionHeight, size: input.settings.quality, env, fetchImpl, signal });
+        const edited = await imageEdit.run(m, { prompt, image: original, masks: await mediaTools.regionMasks(maskPng, signal), ratio: input.settings.regionWidth / input.settings.regionHeight, size: input.settings.quality, env, fetchImpl, signal,
+          // Recorded so a restart cancels the run at Replicate (restart recovery above); region runs are never resumed.
+          onPrediction: (id) => { job.replicateId = id; persist(); } });
         job.costUsd = edited.costUsd;
         job.imageEdit = { model: m.value, provider: m.vendor };
         const [width, height] = generationPolicy.imageDimensions(input.settings), filename = crypto.randomUUID() + ".png";

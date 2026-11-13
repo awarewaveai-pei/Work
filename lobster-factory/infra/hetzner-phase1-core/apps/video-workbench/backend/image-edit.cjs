@@ -84,7 +84,7 @@ const mp = (s) => (s ? (s.width * s.height) / 1e6 : 1);
 
 // Replicate through replicate-run.cjs (one rule for every paid run: a run this job stops waiting for is cancelled there).
 // Created async (no Prefer: wait), so the output is always a replicate.delivery url, never a data: uri.
-async function replicate(call, input, { env, fetchImpl, signal }) {
+async function replicate(call, input, { env, fetchImpl, signal, onPrediction }) {
   const auth = { Authorization: "Bearer " + env.REPLICATE_API_TOKEN };
   const deadline = AbortSignal.timeout(170_000), abort = signal ? AbortSignal.any([signal, deadline]) : deadline;
   const fetchCall = async (url, init, label) => {
@@ -93,7 +93,7 @@ async function replicate(call, input, { env, fetchImpl, signal }) {
     return r;
   };
   const prediction = await replicateRun.runPrediction({
-    call: fetchCall, auth, label: "圖片編輯", pollMs: 2000, signal: abort, env, fetchImpl,
+    call: fetchCall, auth, label: "圖片編輯", pollMs: 2000, signal: abort, env, fetchImpl, onPrediction,
     create: async () => (await fetchCall(call.version ? replicateRun.API + "/predictions" : replicateRun.API + "/models/" + call.model + "/predictions",
       { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify(call.version ? { version: call.version(), input } : { input }) }, "圖片編輯")).json(),
     abortError: () => Error(deadline.aborted ? "圖片編輯逾時" : "已取消"),
@@ -101,7 +101,8 @@ async function replicate(call, input, { env, fetchImpl, signal }) {
   return Buffer.from(await (await fetchCall(replicateRun.deliveryUrl(prediction, "圖片編輯"), {}, "下載圖片結果")).arrayBuffer());
 }
 // One run of row m on the source PNG with the mask in the vendor's form. Answers { image: Buffer, costUsd }.
-async function run(m, { prompt, image, masks, ratio, size = "1K", env, fetchImpl, signal }) {
+// onPrediction(id) = a Replicate run's id, for the caller to record (a restart cancels it: api.cjs restart recovery).
+async function run(m, { prompt, image, masks, ratio, size = "1K", env, fetchImpl, signal, onPrediction }) {
   const call = CALLS[m.value];
   key(m, env);
   if (call.geminiModel) {
@@ -120,7 +121,7 @@ async function run(m, { prompt, image, masks, ratio, size = "1K", env, fetchImpl
     return { image: Buffer.from(result.data[0].b64_json, "base64"), costUsd: fillUsd(m.value, { openaiModel: call.openaiModel, usage: result.usage }) };
   }
   const dataUrl = (b) => "data:image/png;base64," + b.toString("base64");
-  const out = await replicate(call, call.input({ prompt, image: dataUrl(image), mask: call.mask && dataUrl(masks[call.mask]) }), { env, fetchImpl, signal });
+  const out = await replicate(call, call.input({ prompt, image: dataUrl(image), mask: call.mask && dataUrl(masks[call.mask]) }), { env, fetchImpl, signal, onPrediction });
   return { image: out, costUsd: fillUsd(m.value, { inputMp: mp(pngSize(image)), outputMp: mp(pngSize(out)) }) };
 }
 
