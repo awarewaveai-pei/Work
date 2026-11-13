@@ -81,6 +81,32 @@
     subtree: true,
     characterData: true,
   });
+  // Card P6.16: a tab that comes back reads the theme saved on app again (?fresh makes the server ask app too) and
+  // swaps it into the imported sheet in place, so the cascade order stays the same. No timer: only this event.
+  const savedSheet = (sheets) => {
+    for (const s of sheets) {
+      if (s.href && new URL(s.href).pathname === "/awarewave/theme.css") return s;
+      try {
+        const inner = savedSheet([...s.cssRules].map((r) => r.styleSheet).filter(Boolean));
+        if (inner) return inner;
+      } catch {}
+    }
+    return null;
+  };
+  async function reloadSavedTheme() {
+    const sheet = savedSheet([...document.styleSheets]);
+    if (!sheet) return;
+    const r = await fetch("/awarewave/theme.css?fresh=1", { cache: "no-store", credentials: "same-origin" });
+    // Same block shape backend/appearance.cjs cuts from globals.css (its comments contain "<", so no stricter class).
+    const blocks = r.ok ? (await r.text()).match(/:root\s*\{[^}]*\}/g) : null;
+    if (blocks?.length !== 2) return;   // bundled defaults + saved block, or leave the sheet alone
+    while (sheet.cssRules.length) sheet.deleteRule(0);
+    blocks.forEach((block, i) => sheet.insertRule(block, i));
+    refresh();
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") reloadSavedTheme().catch(() => {});
+  });
   window.addEventListener("themechange", refresh);
   window.addEventListener("awarewave:theme-change", refresh);
   window.AwareWaveTheme = {

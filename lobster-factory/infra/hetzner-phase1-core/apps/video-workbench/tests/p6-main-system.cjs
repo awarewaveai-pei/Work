@@ -52,7 +52,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
   const { signPermit } = await import(pathToFileURL(path.join(appDir, "lib/entitlements/permit.ts")).href);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-p6-main-"));
   const calls = { openai: 0, theme: 0, permits: [], assets: [], jobs: [], usage: [], releaseText: [] };
-  let permitMode = "allow", usageDown = false, assetsDown = false, releaseTextDown = false;
+  let permitMode = "allow", themeAnswer = ":root{--body-bg:#112233;}", usageDown = false, assetsDown = false, releaseTextDown = false;
   // next-admin, as its route files answer.
   async function fetchImpl(url, options = {}) {
     url = String(url);
@@ -94,7 +94,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     if (url === BASE + "/api/internal/theme/css") {
       assert.equal(options.headers.Authorization, "Bearer internal-secret");
       calls.theme++;
-      return new Response(":root{--body-bg:#112233;}", { headers: { "Content-Type": "text/css" } });
+      return new Response(themeAnswer, { headers: { "Content-Type": "text/css" } });
     }
     if (url === BASE + "/api/internal/video/workbench/usage") {
       if (usageDown) return Response.json({ ok: false, reason: "infrastructure_error" }, { status: 503 });
@@ -468,22 +468,42 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.match(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /"\/release\?"/);
     if (fullSource) assert(fs.existsSync(path.join(appDir, "app/video/release/page.tsx")), "/release 頁必須存在");
 
-    // 8c. Theme saved on app reaches video.aware-wave.com: appended after the bundled :root (wins), cached 30 s;
-    // local mode never asks; a bad answer keeps the last good block.
+    // 8c. Theme saved on app reaches video.aware-wave.com: appended after the bundled :root (wins). Card P6.16: kept until
+    // app says a save happened (POST /api/internal/theme/invalidate) or a tab comes back (?fresh); no timer.
     const themeCss = (await request(port, "GET", "/awarewave/theme.css")).body;
     assert.match(themeCss, /^:root\s*\{[\s\S]*\}\n:root\{--body-bg:#112233;\}$/);
+    themeAnswer = ":root{--body-bg:#445566;}";
     await request(port, "GET", "/awarewave/theme.css");
-    assert.equal(calls.theme, 1, "30 秒內不重抓");
+    assert.equal(calls.theme, 1, "沒有通知就不重抓");
+    // Guard: the invalidate route refuses without the internal token (and with a wrong one, or GET).
+    for (const [method, headers] of [["POST", {}], ["POST", { Authorization: "Bearer wrong" }], ["GET", { Authorization: "Bearer internal-secret" }]])
+      assert.equal((await request(port, method, "/api/internal/theme/invalidate", headers)).status, 401, "無 token 不得清快取");
+    assert.equal(calls.theme, 1);
+    assert.match((await request(port, "GET", "/awarewave/theme.css")).body, /#112233;\}$/, "被拒的通知不影響快取");
+    // Saved on app -> notice -> the very next theme.css is the new one.
+    assert.equal((await request(port, "POST", "/api/internal/theme/invalidate", { Authorization: "Bearer internal-secret" })).status, 204);
+    assert.match((await request(port, "GET", "/awarewave/theme.css")).body, /\n:root\{--body-bg:#445566;\}$/, "存檔後立刻讀到新 CSS");
+    assert.equal(calls.theme, 2);
+    // Notice lost: a tab coming back (?fresh) still reads the new one from app.
+    themeAnswer = ":root{--body-bg:#778899;}";
+    await new Promise((r) => setTimeout(r, 1100));   // freshFloorMs: at most one forced app read per second
+    assert.match((await request(port, "GET", "/awarewave/theme.css?fresh=1")).body, /\n:root\{--body-bg:#778899;\}$/, "切回分頁重讀");
+    assert.equal(calls.theme, 3);
+    await request(port, "GET", "/awarewave/theme.css?fresh=1");
+    assert.equal(calls.theme, 3, "一秒內的 ?fresh 共用上一次");
+    themeAnswer = ":root{--body-bg:#112233;}";
     const { savedTheme } = require("../backend/appearance.cjs");
     assert.equal(await savedTheme({ env: {}, fetchImpl: () => assert.fail("本機模式不得連主系統") })(), "");
     let clock = 0, answer = ":root{--a:#111;}";
     const linked = savedTheme({ env, now: () => clock, fetchImpl: async () => new Response(answer) });
     assert.equal(await linked(), ":root{--a:#111;}");
-    clock = 31000; answer = "</style><script>x</script>";
+    clock = 600000; answer = "</style><script>x</script>";
     let gate; const slow = savedTheme({ env, fetchImpl: () => new Promise((r) => { gate = () => r(new Response(":root{--b:#222;}")); }) });
     const pair = [slow(), slow()]; gate();
     assert.deepEqual(await Promise.all(pair), [":root{--b:#222;}", ":root{--b:#222;}"], "併發請求共用同一次抓取");
     assert.equal(await linked(), ":root{--a:#111;}", "壞回應保留上一份");
+    clock += 1000; answer = ":root{--a:#333;}";
+    assert.equal(await linked(), ":root{--a:#333;}", "失敗後一秒就重試，不鎖十分鐘");
     if (fullSource) assert.match(fs.readFileSync(path.join(appDir, "app/api/internal/theme/css/route.ts"), "utf8"), /export async function GET/);
 
     // 9. Every name sent exists in the L2 route files.

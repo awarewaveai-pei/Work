@@ -324,6 +324,9 @@ services:
       # /api/internal/video/workbench/*; the SAME values go to the video-workbench service. Empty = 401 (fail closed).
       ENTITLEMENT_ISSUER_TOKEN_VIDEO: ${ENTITLEMENT_ISSUER_TOKEN_VIDEO:-}
       VW_INTERNAL_TOKEN: ${VW_INTERNAL_TOKEN:-}
+      # Card P6.16: a theme save POSTs here (lib/theme/notify-video.ts) so the workbench drops its cached copy at once.
+      # Unset = no notice; the workbench still re-reads when a tab comes back.
+      VW_SERVICE_URL: http://video-workbench:4178
       # Cross-product id reconciliation -> GET /api/internal/reconcile (BACKUP_COVERAGE_PLAN.md B8). The same value
       # sits in /etc/default/awarewave-reconcile for backup-coverage-check.py on the host. Empty = 401 (fail closed).
       RECONCILE_TOKEN: ${RECONCILE_TOKEN:-}

@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canWriteTenantConfig } from "../../../lib/ops-role";
 import { DEFAULT_TOKENS, VALID_TOKEN_NAMES, isSafeTokenValue, type SavedLayout } from "../../../lib/theme/tokens";
 import { getThemeConfig, saveThemeConfig, revalidateThemeCache } from "../../../lib/theme/store";
+import { notifyVideoThemeSaved } from "../../../lib/theme/notify-video";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,5 +82,7 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+  // After the save, outside its try: a notice failure never turns a saved theme into an error.
+  await notifyVideoThemeSaved();
   return NextResponse.json({ ok: true, updated: Object.keys(tokens).length });
 }

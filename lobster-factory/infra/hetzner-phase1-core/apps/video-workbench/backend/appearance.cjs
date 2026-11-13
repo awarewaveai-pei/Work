@@ -26,20 +26,38 @@ function appearance(pathname, appDir) {
 }
 
 // Connected mode: the theme saved on app (next-admin GET /api/internal/theme/css) is appended after the bundled
-// :root so it wins. Cached 30 s; a failed fetch keeps the last good block (or none) -- the page never breaks on it.
-function savedTheme({ env, fetchImpl, ttlMs = 30000, now = Date.now }) {
+// :root so it wins. Card P6.16: the copy is fetched again when next-admin says a save happened (invalidate(), from
+// POST /api/internal/theme/invalidate) or when an open tab comes back (theme.css?fresh, shared/theme.js); no polling.
+// maxAgeMs is only the ceiling for a lost notice on a page that never revisits a tab (next-admin deployed before this
+// server, notice timed out); it is not the freshness path. A failed fetch keeps the last good block (or none).
+function savedTheme({ env, fetchImpl, maxAgeMs = 600000, freshFloorMs = 1000, now = Date.now }) {
   const base = String(env.VW_INTERNAL_BASE || "").trim().replace(/\/+$/, ""), token = String(env.VW_INTERNAL_TOKEN || "").trim();
-  if (!base || !token) return async () => "";
-  let css = "", until = 0, pending = null;
-  // Concurrent requests share one in-flight fetch, so none of them gets the empty pre-fetch value.
-  return () => now() < until ? Promise.resolve(css) : (pending ||= refresh().finally(() => { until = now() + ttlMs; pending = null; }));
+  if (!base || !token) return Object.assign(async () => "", { invalidate() {} });
+  let css = "", fetchedAt = -Infinity, stale = true, failed = false, pending = null, seq = 0, applied = 0;
+  // fresh = an open tab came back. /awarewave/ is public, so a forced fetch reuses one finished < freshFloorMs ago
+  // (at most one next-admin read per second). A failed fetch is retried after freshFloorMs too, not after maxAgeMs.
+  // Concurrent callers share one in-flight fetch.
+  const get = ({ fresh = false } = {}) => {
+    const age = now() - fetchedAt;
+    if (!stale && age < (failed ? freshFloorMs : maxAgeMs) && !(fresh && age >= freshFloorMs)) return pending || Promise.resolve(css);
+    if (!pending) { const p = refresh().finally(() => { if (pending === p) pending = null; }); pending = p; }
+    return pending;
+  };
+  // A fetch already in flight may have read the DB before the save: drop it, so the next call starts a new one.
+  get.invalidate = () => { stale = true; pending = null; };
+  return get;
   async function refresh() {
+    const id = ++seq;
+    stale = false;
+    let ok = false;
     try {
       const r = await fetchImpl(base + "/api/internal/theme/css", { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(3000) });
       const body = r.ok ? await r.text() : "";
-      if (/^:root\{[^{}<]*\}$/.test(body)) css = body;
+      // An older fetch finishing after a newer one never overwrites it.
+      if (/^:root\{[^{}<]*\}$/.test(body)) { ok = true; if (id > applied) { css = body; applied = id; } }
       else console.error("[vw] saved theme fetch:", r.status);
     } catch (e) { console.error("[vw] saved theme fetch:", e.message); }
+    if (id === seq) { fetchedAt = now(); failed = !ok; }
     return css;
   }
 }

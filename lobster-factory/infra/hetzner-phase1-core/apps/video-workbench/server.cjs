@@ -84,6 +84,18 @@ function createServer({
         res.end(req.method === "HEAD" ? undefined : JSON.stringify({ ok: true, version }));
         return;
       }
+      // Card P6.16: next-admin POSTs here after a theme save (lib/theme/notify-video.ts), so the next theme.css is new.
+      // Bearer = VW_INTERNAL_TOKEN; unset or wrong = 401. nginx 404s /api/internal on the public door.
+      if (pathname === "/api/internal/theme/invalidate") {
+        const crypto = require("node:crypto"), digest = (v) => crypto.createHash("sha256").update(v).digest(),
+          expected = String(require("./backend/env-compat.cjs").vwEnv(env, "INTERNAL_TOKEN") || "").trim(),
+          given = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ""))?.[1] || "";
+        const ok = req.method === "POST" && !!expected && !!given && crypto.timingSafeEqual(digest(given), digest(expected));
+        if (ok) savedTheme.invalidate();
+        res.writeHead(ok ? 204 : 401, { "Cache-Control": "no-store" });
+        res.end();
+        return;
+      }
       // P6 L3: VW_CONFIG_MODE=http (container) serves config.js with mode "http"; the file itself stays the local default.
       if (pathname === "/config.js" && env.VW_CONFIG_MODE === "http") {
         const source = fs.readFileSync(path.join(root, "config.js"), "utf8");
@@ -128,7 +140,7 @@ function createServer({
         pathname === "/awarewave/forms.css"
       ) {
         const content = require("./backend/appearance.cjs").appearance(pathname, awareWaveDir) +
-          (pathname === "/awarewave/theme.css" ? "\n" + (await savedTheme()) : "");
+          (pathname === "/awarewave/theme.css" ? "\n" + (await savedTheme({ fresh: new URL(req.url, "http://localhost").searchParams.has("fresh") })) : "");
         res.writeHead(200, {
           "Content-Type": "text/css; charset=utf-8",
           "Cache-Control": "no-store",

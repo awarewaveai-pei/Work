@@ -29,6 +29,8 @@
 ```
 編輯器 page.tsx ──POST──▶ route.ts（驗證+權限）──▶ store.ts ──▶ DB(app_theme)
 每頁開機： layout.tsx ──▶ store.ts ──▶ DB ──▶ 注入 <html style>（server 端，跨裝置、無 FOUC）
+影音工作台：route.ts 存檔後 ──▶ lib/theme/notify-video.ts ──POST──▶ video /api/internal/theme/invalidate（清快取）
+           video 分頁切回 ──▶ /awarewave/theme.css?fresh ──▶ GET /api/internal/theme/css（通知漏掉也追得上；無輪詢）
 ```
 
 ---
