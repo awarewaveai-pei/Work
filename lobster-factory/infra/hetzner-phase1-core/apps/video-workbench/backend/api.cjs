@@ -96,7 +96,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (!main) return;
     if (job.status === "succeeded" && job.result?.url && !job.result.assetId && !job.result.ledger) {
       try {
-        Object.assign(job.result, await register(job.result.url, job.result.origin, { sources: mainSystemTools.localUrls(job.input), costUsd: job.result.origin?.costUsd, jobId: job.id, ratio: job.input?.settings?.ratio || job.input?.settings?.project?.ratio }));
+        Object.assign(job.result, await register(job.result.url, job.result.origin, { sources: mainSystemTools.localUrls(job.input), costUsd: job.result.origin?.costUsd, jobId: job.id, ratio: job.result?.ratio || job.input?.settings?.ratio || job.input?.settings?.project?.ratio }));
         delete job.ledgerError;
       } catch (e) {
         job.ledgerError = publicError(e.message);
@@ -818,6 +818,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             if (job.status === "cancelled") return job; // cancelled during the crop: the cancel wins, as after download
             fs.rmSync(src, { force: true });
             job.result.url = "/generated/" + name;
+            job.result.ratio = "1:1"; // the file's own ratio; readers of a job's ratio take result.ratio first
           } catch (e) {
             job.result.note = "已生成 9:16 影片，但裁成 1:1 失敗：" + publicError(e.message);
           }

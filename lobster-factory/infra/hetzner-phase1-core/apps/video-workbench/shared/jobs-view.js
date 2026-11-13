@@ -9,7 +9,7 @@
     const org = (await caps())?.mainSystem?.organizationId;
     if (!org || !v.result?.assetId) throw Error("此成果尚未登記到主系統，無法送審");
     delivery ||= await VideoWorkbench.request("/delivery-ratios", undefined, "GET");
-    const ratio = v.input?.settings?.ratio || v.input?.settings?.project?.ratio || "16:9", fit = delivery?.ratios?.[ratio];
+    const ratio = v.result?.ratio || v.input?.settings?.ratio || v.input?.settings?.project?.ratio || "16:9", fit = delivery?.ratios?.[ratio];
     if (!fit?.deliverable) throw Error(fit?.note || "此比例尚不能投遞");
     return "/release?" + new URLSearchParams({ organizationId: org, candidateAssetId: v.result.assetId });
   }

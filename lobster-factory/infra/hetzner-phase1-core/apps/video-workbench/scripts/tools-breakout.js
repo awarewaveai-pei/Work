@@ -322,14 +322,23 @@ function toolBreakoutOptions() {
     shares: text("breakoutShares") || "0",
   };
 }
-// Paints the frame. frame=true: always 720x1280 (what the 9:16 model gets), a 1:1 post centred in it; else the output ratio.
+// Paints the preview at the output ratio. frame=true: always 720x1280 (what the 9:16 model gets); a 1:1 frame is the
+// square preview itself, pixel for pixel, centred (the outside is the post background; the 1:1 crop drops it).
 async function toolBreakoutDraw(canvas, frame = false) {
-  const o = toolBreakoutOptions(),
-    img = await toolBreakoutImage(files.image?.url),
+  const o = toolBreakoutOptions();
+  if (frame && o.ratio === "1:1") {
+    const square = await toolBreakoutDraw(document.createElement("canvas"));
+    canvas.width = BREAKOUT_FRAME.w;
+    canvas.height = BREAKOUT_FRAME.h;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = (BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色).bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(square, 0, (canvas.height - square.height) / 2);
+    return canvas;
+  }
+  const img = await toolBreakoutImage(files.image?.url),
     W = BREAKOUT_FRAME.w,
-    H = frame || o.ratio === "9:16" ? BREAKOUT_FRAME.h : W,
-    boxH = o.ratio === "1:1" ? W : H,
-    boxY = (H - boxH) / 2;
+    H = o.ratio === "9:16" ? BREAKOUT_FRAME.h : W;
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d"),
@@ -348,10 +357,10 @@ async function toolBreakoutDraw(canvas, frame = false) {
       ctx.fillRect(0, 0, W, H);
     }
     const cw = W * 0.84,
-      maxH = boxH * 0.88,
+      maxH = H * 0.88,
       ch = toolBreakoutPost(ctx, img, o, 0, 0, cw, maxH, true),
       cx = (W - cw) / 2,
-      cy = boxY + (boxH - ch) / 2,
+      cy = (H - ch) / 2,
       r = 28;
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,.35)";
@@ -369,8 +378,8 @@ async function toolBreakoutDraw(canvas, frame = false) {
   } else {
     ctx.fillStyle = ink.bg;
     ctx.fillRect(0, 0, W, H);
-    const ph = toolBreakoutPost(ctx, img, o, 0, 0, W, boxH, true);
-    toolBreakoutPost(ctx, img, o, 0, boxY + (boxH - ph) / 2, W, boxH);
+    const ph = toolBreakoutPost(ctx, img, o, 0, 0, W, H, true);
+    toolBreakoutPost(ctx, img, o, 0, (H - ph) / 2, W, H);
   }
   return canvas;
 }

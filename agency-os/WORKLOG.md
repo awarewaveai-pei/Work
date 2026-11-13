@@ -1,4 +1,26 @@
 # Worklog
+## 2026-11-13（續9）影音工作台三張卡整合：音樂生成接三模型、圖片局部編輯器補齊、新工具破框貼文動畫
+
+- 起因：操作者對照參考站：音樂生成只有寫死的兩個模型、沒標價；圖片局部編輯器少很多功能；少了破框貼文動畫。要求每個按鈕標台幣、模型照價格由低到高。
+- 派工：三個 Opus session 各在自己的 worktree 做一張卡（music-gen 7d0609b2b／region-editor 1a26774cf＋c7d6d9af7／breakout b3a42c4f7），監工驗收 diff 並重跑各自測試。
+- 整合：本機 main 跟 origin 分岔（本機多出的 7 個 commit 是 origin 已有 commit 的重複版本），而且工作區有別的 session 未提交的改動，剛好動到同幾個檔 → 改在 `D:\Worktrees\Work\integrate-20261113`（detached origin/main）把四個 commit 疊上去，不動 main 工作區。衝突在 api.cjs、provider-cost.cjs、paid-price.js、workspaces.js、generation-policy.cjs、gate.cjs，都是兩邊各加一項，兩邊都保留。
+- 內容摘要：
+  - 音樂：`backend/music.cjs` 一份模型清單（Lyria 3 Clip US$0.04／首、Lyria 3.5 US$0.08／首、Eleven Music US$0.15／分鐘，價目只在 next-admin `cost-model.ts` MUSIC_RATES），經 `/capabilities` 給頁面用按鈕列出；Mureka 刪除。
+  - 局部編輯器：`backend/image-edit.cjs`（GPT Image 2.5／2.6 只開 1K、Nano Banana 2.1 開 1K／2K／4K），Gemini 不吃遮罩 → `media.cjs compositeRegions` 只把框內貼回原圖；頁面 `scripts/tools-region.js` 改成框上小視窗寫指令＋精簡列表＋缺指令紅字。seedream（中國）不列。
+  - 破框：`shared/breakout-rules.js`（只留能把圖當第一格的模型、排除中國模型、5 秒、提示詞固定加「貼文介面不動」）、`backend/breakout.cjs`、`scripts/tools-breakout.js`；1:1 先出 9:16 再裁成正方形。
+- Codex 兩條（皆 CONFIRMED，本 commit 修）：
+  - C1：1:1 破框成品的 `settings.ratio` 是 9:16，送審判斷讀它 → 1:1 被當 9:16 投遞。不變量：工作的比例＝成品檔的比例。裁切成功時寫 `job.result.ratio`；三個讀比例的地方（`shared/jobs-view.js:12`、`backend/api.cjs:99`、`backend/migrate-media.cjs:38`）先讀 result.ratio。裁切失敗時檔案仍是 9:16，比例也維持 9:16。
+  - C2：1:1 浮動卡片的第一格是在 720x1280 上重畫的，模糊背景的裁切跟預覽不同。改成第一格直接用預覽畫好的正方形，置中貼進 9:16；`toolBreakoutDraw` 刪掉第二套版面算法（boxH／boxY）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/video-workbench && node tests/gate.cjs（整合後，含 breakout） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/music-generation.cjs（5）、tests/region-edit.cjs（7）、tests/tools-lazy-load.cjs（39）、tests/breakout.cjs、tests/migrate-media.cjs | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit && npx vitest run lib/ai lib/content/video lib/portal（62 檔 332 測試） | exit=0 | ms=90000
+- 真實扣款（各卡 session 實測）：Lyria 3 Clip 一首 US$0.04＝標價；局部編輯器 Gemini 1K 一次＝標價；破框 Runway 1:1 按鈕 NT$8.00、扣 US$0.25 一致。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - Codex：`agency-os/reports/oracle/2026-11-13-partialreview-26ca8283.md`（2m，本 commit 已修）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=settings\?\.ratio \|\| (v|job)\.input|result\?\.ratio | hits=3
+- 剩餘風險：(1) Eleven Music 本機與主機都沒有 `ELEVENLABS_API_KEY`，目前顯示「未啟用」；操作者正在申請 ElevenLabs（另一條路是 Replicate `elevenlabs/music`，US$8.30／1000 秒）。(2) 破框影片裡的按讚數字會被模型改掉（實測 1,286→1,221），還沒處理。(3) GPT Image 只開 1K，因為 OpenAI 沒公布 2K／4K 計價。(4) 本機 main 分岔＋工作區有別人未提交的改動，需要由那個 session 或操作者收拾；本 session 沒碰。
+- 避免再發生：同一檔多個 session 平行改時，整合一律在獨立 worktree 疊到 origin/main，不在共用 main 工作區合併；worktree 要先補沒進 git 的檔（`vendor/ffprobe/ffprobe.exe`、`fonts`），不然閘門會假紅。
+- rollback：git revert 本段五個 commit（音樂、局部編輯器兩個、破框、修正），彼此獨立，可以單獨退。
 ## 2026-11-13（續8）影音工作台 P6.16：app 存檔就通知工作台＋切回分頁重讀，取代 30 秒輪詢
 
 - 根因：`video-workbench/backend/appearance.cjs` 的 `savedTheme` 每 30 秒到期才重抓 next-admin 主題；app 存檔後工作台最多舊 30 秒，已開分頁要重新整理才看得到。

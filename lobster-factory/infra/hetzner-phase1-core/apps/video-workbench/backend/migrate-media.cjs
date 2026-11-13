@@ -35,7 +35,7 @@ function sources(data, state) {
     const url = job?.status === "succeeded" ? job.result?.url : null;
     if (typeof url !== "string" || !LOCAL_URL.test(url) || rows.has(url)) continue;
     const origin = ORIGINS.has(job.result.origin?.kind) ? job.result.origin : null;
-    rows.set(url, { url, origin, jobId: job.id, sources: [...localUrls(job.input)], costUsd: origin?.costUsd, ratio: job.input?.settings?.ratio || job.input?.settings?.project?.ratio });
+    rows.set(url, { url, origin, jobId: job.id, sources: [...localUrls(job.input)], costUsd: origin?.costUsd, ratio: job.result?.ratio || job.input?.settings?.ratio || job.input?.settings?.project?.ratio });
   }
   for (const a of state?.assets || []) {
     if (typeof a?.url !== "string" || !LOCAL_URL.test(a.url)) continue;
