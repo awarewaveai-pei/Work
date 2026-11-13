@@ -171,7 +171,7 @@ export const STEPS = [
       done('P5.3', '圖片轉 3D（Meshy）；測試。', P5),
     ] },
   { n: 12, code: 'P6', title: '上線 video.aware-wave.com', plain: '例：員工登入 video.aware-wave.com 做好一支片，一鍵送到 Postiz 和 WordPress 成為草稿。',
-    gate: '部署測試全綠；一支成品從工作台到 Postiz 草稿與 WordPress 草稿全程通。', risk: 'High', model: 'Fable 規劃；Opus 執行', status: 'in_progress', depends: ['P5'],
+    gate: '部署測試全綠；一支成品從工作台到 Postiz 草稿與 WordPress 草稿全程通。', risk: 'High', model: 'Fable 規劃；Opus 執行', status: 'done', commit: '4764ad95f', depends: ['P5'],
     decided: '2026-11-03 你已同意上線部署。做法與卡號（L0–L6、D1、H0–H6）見 docs/p6-golive-plan-20261103.md。自用組織不儲值、不設點數上限（11-03 你定）；自用花費上限＝各廠商帳戶的預付餘額。',
     what: 'compose 服務＋七項清單；素材帳冊→media_assets（補組織欄、R2 搬移）；任務新表；1:1 與 4:3 不投遞；許可 can()；QA→release→delivery',
     items: [
