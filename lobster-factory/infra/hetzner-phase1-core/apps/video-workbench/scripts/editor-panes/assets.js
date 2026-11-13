@@ -89,11 +89,6 @@ function edAssetsPickTrack(trackId) {
   edRedraw();
 }
 const edAssetsUses = (p, a) => p.clips.filter((c) => c.asset?.id === a.id).length;
-function edAssetsClock(seconds) {
-  const s = Math.round(Math.max(0, seconds)),
-    pad = (n) => String(n).padStart(2, "0");
-  return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
-}
 function edAssetsVisible(p) {
   const q = edAssets.query.trim().toLowerCase();
   return (edAssets.items || []).filter(
@@ -111,16 +106,21 @@ function edAssetsCard(p, raw, target) {
     uses = edAssetsUses(p, a),
     fav = edAssets.favs.has(a.id),
     add = esc(target ? `加入「${edTrackLabel(p, target)}」` : "加入主視訊末端"),
-    thumb = kind === "image" ? a.previewUrl || a.url : kind === "video" ? edMediaFile(a, "thumb.jpg") : null,
-    length = kind === "image" ? "靜圖" : Number.isFinite(a.duration) ? edAssetsClock(a.duration) : "",
     size = a.width && a.height ? `${a.width}×${a.height}` : { video: "影片", image: "圖片", audio: "音訊" }[kind];
-  return `<article class="editor-asset-card" data-ed-asset="${esc(a.id)}"><div class="editor-asset-main" role="button" tabindex="0" data-ed-asset-add="${esc(a.id)}" aria-label="${esc(name)}，按 Enter ${add}" title="雙擊或按加號${add}"><span class="editor-asset-thumb">${thumb ? `<img src="${esc(VideoWorkbench.safeUrl(thumb))}" alt="" loading="lazy">` : `<span aria-hidden="true">${kind === "audio" ? "♪" : "▣"}</span>`}${uses ? `<i class="editor-asset-used">已用 × ${uses}</i>` : ""}${length ? `<i class="editor-asset-length">${length}</i>` : ""}</span><b class="editor-asset-name">${esc(name)}</b></div><button type="button" class="editor-asset-star${fav ? " selected" : ""}" data-ed-action="assets-fav:${esc(a.id)}" aria-label="${fav ? "移除最愛" : "加入最愛"}" title="${fav ? "移除最愛" : "加入最愛"}" aria-pressed="${fav}">${fav ? "★" : "☆"}</button><span class="editor-asset-meta"><span class="note">${esc(size)}</span>${kind === "video" ? `<button type="button" class="btn small editor-icon-btn" data-ed-action="assets-split:${esc(a.id)}" aria-label="拆出 ${esc(name)} 的音軌" title="拆出音軌：把這支影片的聲音存成獨立音訊素材，之後可搭配其他影片使用">♪</button>` : ""}<button type="button" class="btn small editor-icon-btn" data-ed-action="assets-add:${esc(a.id)}" aria-label="加入 ${esc(name)}" title="${add}">+</button></span></article>`;
+  // The shared 素材卡 (shared/assets-ui.js): picture, length and name; the pane adds its own badge, star and buttons.
+  return VideoWorkbench.assetCard(a, {
+    attrs: `data-ed-asset="${esc(a.id)}"`,
+    main: `data-ed-asset-add="${esc(a.id)}" aria-label="${esc(name)}，按 Enter ${add}" title="雙擊或按加號${add}"`,
+    badges: uses ? `<i class="asset-card-badge">已用 × ${uses}</i>` : "",
+    aside: `<button type="button" class="editor-asset-star${fav ? " selected" : ""}" data-ed-action="assets-fav:${esc(a.id)}" aria-label="${fav ? "移除最愛" : "加入最愛"}" title="${fav ? "移除最愛" : "加入最愛"}" aria-pressed="${fav}">${fav ? "★" : "☆"}</button>`,
+    actions: `<span class="note">${esc(size)}</span>${kind === "video" ? `<button type="button" class="btn small editor-icon-btn" data-ed-action="assets-split:${esc(a.id)}" aria-label="拆出 ${esc(name)} 的音軌" title="拆出音軌：把這支影片的聲音存成獨立音訊素材，之後可搭配其他影片使用">♪</button>` : ""}<button type="button" class="btn small editor-icon-btn" data-ed-action="assets-add:${esc(a.id)}" aria-label="加入 ${esc(name)}" title="${add}">+</button>`,
+  });
 }
 function edAssetsGroup(p, key, title, rows) {
   if (!rows.length) return "";
   const open = !edAssets.folded.has(key),
     target = edAssetsTarget(p);
-  return `<section class="editor-asset-group"><button type="button" class="editor-asset-group-head" data-ed-action="assets-fold:${key}" aria-expanded="${open}"><span aria-hidden="true">${open ? "▾" : "▸"}</span> ${title}（${rows.length}）</button>${open ? `<div class="editor-asset-grid">${rows.map((a) => edAssetsCard(p, a, target)).join("")}</div>` : ""}</section>`;
+  return `<section class="editor-asset-group"><button type="button" class="editor-asset-group-head" data-ed-action="assets-fold:${key}" aria-expanded="${open}"><span aria-hidden="true">${open ? "▾" : "▸"}</span> ${title}（${rows.length}）</button>${open ? `<div class="asset-grid">${rows.map((a) => edAssetsCard(p, a, target)).join("")}</div>` : ""}</section>`;
 }
 function edAssetsList(p) {
   if (!edAssets.items) return '<p class="note">載入素材中…</p>';

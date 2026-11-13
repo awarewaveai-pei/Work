@@ -6,19 +6,11 @@
 .editor-library [data-ed-assets-search] { width:100%;box-sizing:border-box; }
 .editor-asset-group { margin-top:8px; }
 .editor-asset-group-head { width:100%;border:0;background:transparent;color:var(--text-secondary);text-align:left;padding:4px 0;font-size:var(--font-size-sm);cursor:pointer; }
-.editor-asset-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-top:4px; }
-.editor-asset-card { position:relative;display:flex;flex-direction:column;gap:4px;padding:4px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-subtle); }
-.editor-asset-card:hover { background:var(--bg-hover); }
-.editor-asset-main { display:flex;flex-direction:column;gap:4px;padding:0;border:0;background:transparent;color:var(--text-primary);text-align:left;cursor:pointer; }
-.editor-asset-thumb { position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;overflow:hidden;border-radius:var(--radius-sm);background:var(--bg-hover);color:var(--text-secondary); }
-.editor-asset-thumb img { width:100%;height:100%;object-fit:cover; }
-.editor-asset-used,.editor-asset-length { position:absolute;padding:0 4px;border-radius:var(--radius-sm);background:var(--btn-primary-bg);color:var(--btn-primary-text);font-style:normal;font-size:var(--font-size-xs); }
-.editor-asset-used { top:3px;left:3px; }
-.editor-asset-length { right:3px;bottom:3px; }
-.editor-asset-name { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--font-size-sm); }
-.editor-asset-star { position:absolute;top:6px;right:6px;border:0;border-radius:var(--radius-sm);background:var(--bg-subtle);color:var(--text-secondary);cursor:pointer;line-height:1;padding:2px 4px; }
+/* The card itself is the shared 素材卡 (styles/asset-card.css); only this pane's column width, star, size note and
+   icon buttons are styled here. */
+.editor-library .asset-grid { --asset-card-min:104px;gap:8px;margin:4px 0 0; }
+.editor-asset-star { position:absolute;z-index:2;top:6px;right:6px;border:0;border-radius:var(--radius-sm);background:var(--bg-subtle);color:var(--text-secondary);cursor:pointer;line-height:1;padding:2px 4px; }
 .editor-asset-star.selected { color:var(--accent); }
-.editor-asset-meta { display:flex;align-items:center;justify-content:space-between;gap:4px; }
-.editor-asset-meta .editor-icon-btn { min-width:24px;margin:0;padding:2px 4px; }
-.editor-asset-meta .note { margin:0;margin-right:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.editor-asset-main:focus-visible { outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius-sm); }
+.editor-library .asset-card-actions { flex-wrap:nowrap; }
+.editor-library .asset-card-actions .editor-icon-btn { min-width:24px;margin:0;padding:2px 4px; }
+.editor-library .asset-card-actions .note { margin:0;margin-right:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
