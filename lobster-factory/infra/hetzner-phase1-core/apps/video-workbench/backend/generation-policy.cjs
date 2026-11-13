@@ -31,9 +31,10 @@ const videoVendor = (provider) => (Object.hasOwn(VIDEO_VENDORS, provider) ? VIDE
 // Video models a job can pick (card RV): Gemini (cheapest per second with audio, vendor-alternatives-20261110.md), then
 // next-admin's Replicate models (lib/ai/video-motion-models.ts) with Veo 3.1 Fast first, so providers.choose falls back to it
 // when there is no Gemini key. VW_VIDEO_MODEL names the default when it can run. The default comes first in the list.
-// usdPerSec = the button price (provider-cost.cjs videoUsd, the same function the charge uses).
+// usdPerSec = the button price (provider-cost.cjs videoUsd, the same function the charge uses). estimate = billed by the
+// finished run's token usage (GEMINI_VIDEO_RATES), so the button price is only an estimate: pages put 約 before it.
 function videoModels(env) {
-  const row = (id, m, extra) => ({ id, durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, audio: m.audio, note: VIDEO_NOTES[id] || "", usdPerSec: videoUsd(id, 1), free: false, ...extra });
+  const row = (id, m, extra) => ({ id, durations: [...m.durations], defaultDurationSec: m.defaultDurationSec, ratios: [...m.ratios], requiresImage: m.requiresImage, audio: m.audio, note: VIDEO_NOTES[id] || "", usdPerSec: videoUsd(id, 1), estimate: Object.hasOwn(GEMINI_VIDEO_RATES, id), free: false, ...extra });
   const rows = [
     ...Object.entries(geminiVideo.MODELS).map(([id, m]) => row(id, m, { label: GEMINI_VIDEO_RATES[id].label, vendor: "Google", provider: "Google", model: id, keyName: "GEMINI_API_KEY", available: !!env.GEMINI_API_KEY })),
     ...Object.entries(replicateVideo.MOTION_MODELS).sort(([a], [b]) => (b === "veo-3-1-fast") - (a === "veo-3-1-fast")).map(([id, m]) =>

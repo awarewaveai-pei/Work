@@ -14,7 +14,7 @@
     if (!c) return "";
     from = c;
     if (feature === "video.bg-remove") return unitText({ usd: c.toolCosts?.removeBackground, unit: "張", estimate: true });
-    if (feature === "video.motion") return unitText({ usd: window.VideoWorkbenchVideoModels?.get(c, model).usdPerSec, unit: "秒" });
+    if (feature === "video.motion") { const m = window.VideoWorkbenchVideoModels?.get(c, model); return unitText({ usd: m.usdPerSec, unit: "秒", estimate: m.estimate }); }
     if (feature === "video.3d") {
       const way = model && (c.imageTo3d?.methods || []).find((m) => m.id === model);
       if (way) return Number.isFinite(way.usd) && way.usd > 0 ? `${way.estimate ? "約 " : ""}${money(way.usd)}／個` : "";

@@ -133,6 +133,14 @@ for (const [f, text] of Object.entries(src))
     assert.deepEqual(caps.speech.models.find((m) => m.id === "gemini-3.8-flash-lite-tts").price, { usd: 60 * tts.audioTokensPerSec * tp.audioOutPerM / 1e6, unit: "分鐘", estimate: true });
     assert.equal(caps.prices["video.image"].usd, rates.IMAGE_RATES["openai-high"].usd);
     assert.match(window.VideoWorkbenchPrices.text("video.transcribe video.script", caps), /^免費 \+ 約 NT\$[\d.]+／次$/);
+    // Video rows billed by token usage (GEMINI_VIDEO_RATES) carry estimate and show 約; per-second rows do not (both through priceText and the 影片 paid button).
+    for (const m of caps.videoModels) {
+      const metered = Object.hasOwn(rates.GEMINI_VIDEO_RATES, m.id), t = window.VideoWorkbenchVideoModels.priceText(m, 4, 1, caps);
+      assert.equal(m.estimate, metered, m.id + " estimate");
+      assert.equal(t.startsWith("約 NT$"), metered, m.id + " priceText " + t);
+      assert.equal(window.VideoWorkbenchPrices.text("video.motion", caps, m.id).startsWith("約 "), metered, m.id + " paid button");
+    }
+    assert.ok(caps.videoModels.some((m) => m.estimate) && caps.videoModels.some((m) => !m.estimate), "both kinds present");
     // NT$ = USD x next-admin TWD_RATE (image-models.js), the one rate.
     assert.equal(caps.twdRate, rates.TWD_RATE);
     // Format: >= NT$10 one decimal, >= NT$0.1 two decimals, below that two significant digits.

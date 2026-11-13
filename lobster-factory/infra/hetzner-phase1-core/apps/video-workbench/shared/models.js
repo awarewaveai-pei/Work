@@ -115,7 +115,8 @@ window.VideoWorkbenchProviders = {
   const usd = (m, seconds, count = 1) => (Number.isFinite(m?.usdPerSec) ? m.usdPerSec * seconds * count : null);
   const priceText = (m, seconds, count = 1, caps = window.VideoWorkbench?.capabilities) => {
     const v = usd(m, seconds, count);
-    return v === null ? "依實際用量" : window.VideoWorkbenchMoney(v, caps);
+    const t = v === null ? "" : window.VideoWorkbenchMoney(v, caps);
+    return v === null ? "依實際用量" : t && m.estimate ? "約 " + t : t;
   };
   window.VideoWorkbenchVideoModels = { list, get, usd, priceText, replaceRetired };
 })();
