@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-13（續15）社群工具：每人顯示時區、組織時區改台灣、貼文清單加建立時間、社群文案語言固定
+
+- 時區根因：社群頁所有時間都用 `organizations.default_timezone`（舊 `SocialManager.tsx:72`），設定頁只顯示（舊 `Settings.tsx:157`）；AwareWave 組織是 UTC。唯一寫入路徑是 ops tenant PATCH（`app/api/ops/tenants/[id]/config/route.ts`），只有 ops-console 用、而且只編第一個 tenant。
+- 時區做法：兩個時區分開。brandTz＝規則（週期貼文、自動發布清單時段、寫貼文的日期時間、報表日）；顯示時區＝每個人自己選（組織時區／台灣／UTC 按鈕，存 `profiles.metadata.social.display_tz`，`/api/social/prefs`、`lib/social/prefs.ts`）。顯示時區畫出來的格子進寫貼文頁前先換算（新增、最佳時間 chip，`lib/social/time.ts rezone`）；拖曳在畫它的時區讀；存檔後用存下的時間點開那一週（Editor onSaved 改傳 `at`）。紀錄頁跟顯示時區；清單時段、Editor、Review、數據分析維持組織時區。
+- 組織時區：設定頁按鈕（台灣／UTC），`PUT /api/social/settings {timezone}` 寫同一欄位，限 AwareWave 擁有者／管理員（跟 ops PATCH 同一批人，critic m3），寫社群紀錄 `timezone_setting`。ops PATCH 補時區驗證（未知或非字串 400，critic m4）。
+- 組織時區已改：awarewave-ops `UTC → Asia/Taipei`（操作者同意）。Chrome 沒登入 app 打不到 API，改在正式庫用跟 PATCH 相同的寫法（organizations 更新＋ops_audit_events 一列，role_source=agent_on_operator_approval_2026-11-13）。改前查過：該組織沒有自動發布清單、沒有週期貼文，沒有規則會因此移動。
+- 每頻道受眾時區：不做。一則貼文只有一個發出時間點；頻道時區只會讓同一則貼文在畫面上出現兩種鐘點，現在三個頻道是同一批受眾，用個人顯示時區切換就夠。
+- 建立時間：`created_at` API 本來就有回，只是沒顯示。清單加一欄（顯示時區），沒排時間的草稿新到舊。
+- 語言根因：`lib/social/write-posts.ts` prompt 全英文、沒指定語言，模型自己決定。實例 social_posts `092cf08d-a54e-4b04-b4d8-5d6212c5bd81`（2026-10-29 06:52，FB／IG 文案和共用內文都是英文；共用內文來自文章 meta description）；同題 08:07 的 `12cb2020-…` 是中文。
+- 語言做法：`lib/social/post-language.ts` 依字型判斷來源語言（不用 AI、不花錢；漢字每 2 字算 1 詞，英文只算小寫開頭的詞，品牌名不算；程式碼區塊、網址、#tag 不算）。prompt 寫明語言；每篇回來都檢查，錯的用原本那一次重寫機會，仍錯就丟掉並回報 `wrongLanguage`；來源太短才用網站內容語言（`siteLanguage`，預設繁體中文）。共用內文不是該語言時改用題目（`topics/make.ts socialBody`）。呼叫端：syndicate.ts（`siteWritingFor`）、topics/make.ts、video/project-advance-deps.ts（語言錯就報錯，同 tooLong）；ArticleSource 顯示哪幾個沒採用。AI 呼叫次數不變（≤2）。
+- 沒用 `organizations.default_locale`：AwareWave 是 `en`，跟實際中文內容不符；網站內容語言才是文章／題目／影片共用的設定。
+- 英文草稿 `092cf08d-…` 沒動，留給操作者決定。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run lib/social lib/content app/api app/(shell)/tools/social lib/portal lib/schedules（cherry-pick 到 origin/main 887f2e1ae 後重跑，236 檔 1562 綠） | exit=0 | ms=600000
+- MUTATION: occurrences 改用顯示時區 → display-zone.render 紅；新增不換算 → display-zone-new.render 紅；拿掉 wrongLanguage 丟棄 → write-posts 紅；prefs 拿掉無使用者檢查 → prefs.test 紅；settings 拿掉時區驗證 → prefs.test 紅；全部還原後綠
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/5n
+- ORACLE_WAIVED: Codex 額度封鎖到 2026-11-14 01:27（scripts/oracle-quota.ps1 check exit 3）；改走 critic Deep（2M/5m 全修）＋上面 5 個突變；critic M1 的「按詞計」修法本身讓 10/29 那篇英文被判成中文，改成小寫詞規則並加真實文字測試
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=default_timezone|writeSocialPosts|siteVoiceFor|setOrgTimezone|onSaved | hits=164
+- 剩餘風險：(1) 文章本身的 meta description 也曾寫成英文（文章生成那段沒動，社群這邊已擋住）。(2) 判斷是字型層級：英文、西文等同為拉丁字母的語言互相分不出來。(3) 新路由 `/api/social/prefs` 與設定頁組織時區按鈕要等 03:00 上線。
+- rollback：git revert 本 commit；組織時區回 UTC 用設定頁按鈕或 `update organizations set default_timezone='UTC' where slug='awarewave-ops'`。
 ## 2026-11-13（續14）P6.10 實測缺陷 A–D：送審頁 QA 說明、送審頁不讓內容上線、社群影片縮圖、垃圾桶永久刪除
 
 - A 根因：video-workbench `backend/main-system.cjs` renderEvidence 的 signal_qa 只寫 {status, audio, integratedLufs, truePeakDb}、沒有 findings；`qa-findings-summary.ts` 只讀 findings 陣列 → warned 卻零句說明（實例 asset f5caefaf，integratedLufs −70）。修：摘要器對 warned/failed 且無 findings 的區塊用自身量測推出規則（audio.silent／audio.loudness／audio.loudness_unmeasured／audio.true_peak，門檻同產生端），仍讀不到 → qa.unexplained；route 傳 row.status，整份報告非 passed 卻零項也補 qa.unexplained。`qa-labels.ts` 改成 FINDING_TEXT（每條產生端規則＝原因＋怎麼改，原因取自報告 message／evidence）＋ explainFinding；舊 findingLabel／FINDING_LABELS 刪除，四個呼叫端（QaStep、ReleaseDeliveryPanel、ProjectDetail、project-advance-deps）改用同一個。
