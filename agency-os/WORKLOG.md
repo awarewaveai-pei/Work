@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-13（續12）ElevenLabs 免費額度接進配音、字幕辨識、音軌分離、去配樂・重配音效
+
+- 起因：操作者的 ElevenLabs 帳號是免費方案（每月 10,000 點）。實測 `/v1/music` 回 402 paid_plan_required，Eleven Music 先不接（操作者 2026-11-13）。其他功能用掉免費點數。
+- 做法（eleven-free session，監工驗收）：
+  - `backend/elevenlabs.cjs`（新）：唯一的 ElevenLabs 呼叫模組（金鑰、中文錯誤訊息、方案與剩餘點數暫存 10 分鐘）。`music.cjs` 也改用它。Eleven Music 要有金鑰而且不是免費方案才能用。
+  - speech.cjs／transcribe.cjs 各加一列 ElevenLabs；`backend/audio-tools.cjs`（新）放音軌分離和去配樂的服務清單。去配樂原本沒有後端，送出一律 501。
+  - 計費：免費方案 US$0，按鈕標「免費＋本月剩 N 點」；其他方案照 `cost-model.ts ELEVENLABS_RATES` 牌價；查不到方案時也照牌價。
+  - 刪掉：music.cjs 自己的 ElevenLabs 請求與錯誤文字、`wfProviders()` 對照表（按鈕價格改讀每一列自己的價格）。
+- 整合：疊到 origin/main 6c03f533f；`provider-cost.cjs` 的 export 衝突兩邊都保留（區域編輯已移除 imageEditUsd，另加 elevenUsd）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=video-workbench node tests/elevenlabs-free-tier.cjs（8）+ music-generation, tools-workflows, paid-price, region-edit, breakout, ed10-subtitles-backend, voice-mix, backend + tests/gate.cjs | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit && npx vitest run lib/ai lib/studio lib/content/video（652 測試） | exit=0 | ms=150000
+- 真實呼叫（session 實測，免費方案）：配音 200（4 點）、音效 200（10 點）、逐字稿 200（Scribe v2 3 點）、人聲分離 200（5 秒 100 點）；走我們自己的路由 4 個工具都成功、扣款 0。本卡共用 490 點。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - Codex `2026-11-13-review-a2066897`（2m 已修：repo 的 compose 少了金鑰、方案查詢失敗時沿用舊的免費方案）、`-2e316ba2`（1m：主機上那份 compose 不會隨 sg-deploy 同步，屬於部署步驟，見剩餘風險 1）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ELEVENLABS_API_KEY|elevenUsd|wfProviders | hits=24
+- 剩餘風險：(1) 上線前要用 `scripts/safe-infra-patch.sh compose` 把 `ELEVENLABS_API_KEY` 加進主機 video-workbench 的環境（高風險，等操作者 go-ahead），不然正式環境這些列顯示未啟用。(2) Scribe 會把繁體中文辨識成簡體，已寫在那一列的說明。(3) 去配樂不看畫面，要寫音效描述才會配；音效一次最長 22 秒，循環鋪滿。(4) 換成付費方案後，最多 10 分鐘才生效；付費方案下，音軌分離和去配樂的 ElevenLabs 列會關閉（沒有付費計費鍵）。
+- rollback：git revert 本 commit；主機上沒加金鑰時本來就全部顯示未啟用。
 ## 2026-11-13（續11）圖片局部編輯器改讀共用模型清單＋Nano Banana 2.1（2K／4K）＋Replicate 停止規則
 
 - 起因：續9 上線的局部編輯器另寫了一份 3 個模型的清單，跟 next-admin 共用清單 `public/editor-shared/image-models.js` 重複（區域編輯 session 自己發現）。操作者 2026-11-13 決定加 Nano Banana 2.1，局部編輯才有 2K／4K。
