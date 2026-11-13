@@ -213,12 +213,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (["queued", "running"].includes(job.status) && !job.providerId) {
       job.status = "failed";
       job.error = "服務重新啟動，任務已中斷；請從歷史記錄重新送出。";
+      mirror(job);
       // Nothing polls a 去背／AI 畫質增強／圖片局部編輯 run after a restart, so Replicate stops billing it (replicate-run.cjs rule 2).
       if (job.replicateId) replicateRun.cancelPrediction({ id: job.replicateId, env, fetchImpl });
     } else if (["queued", "running"].includes(job.status) && !generationPolicy.videoVendor(job.video?.provider)) {
       // A Sora job (OpenAI shut Sora 2 down 2026-09-24): nothing left to poll; a retry runs the default model.
       job.status = "failed";
       job.error = "Sora 2 已停止服務；請從歷史記錄重新送出，會改用目前的預設影片模型。";
+      mirror(job);
     }
   persist();
   // A breakout job a restart left finishing resumes: the model's file is on disk and the work is local and repeatable.
@@ -226,12 +228,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   setImmediate(() => {
     for (const job of jobs)
       if (job.status === "running" && job.stage === "finishing") {
-        if (job.result?.url && fs.existsSync(path.join(dataDir, job.result.url.slice(1)))) finishBreakout(job);
+        if (job.finishing?.url && fs.existsSync(path.join(dataDir, job.finishing.url.slice(1)))) finishBreakout(job);
         else {
           delete job.stage;
+          delete job.finishing;
           job.status = "failed";
           job.error = "服務重新啟動後找不到模型生成的影片檔，無法完成貼文鎖定；請重新送出。";
           persist();
+          mirror(job);
         }
       }
   });
@@ -823,45 +827,51 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     return pending;
   }
   // 破框貼文動畫 finishing (backend/breakout.cjs finish), outside every request: a status GET never waits for local
-  // post-processing. One runner per job; its AbortController is in `controls`, where cancel looks. The vendor run is
+  // post-processing. job.finishing = { url, origin }: the model's file, kept out of job.result so nothing shows or offers
+  // an unfinished video. One runner per job; its AbortController is in `controls`, where cancel looks. The vendor run is
   // already paid, so the job always ends succeeded and is charged once (settle): with the finished file, or with the
-  // model's file as made and a note (finishing failed, or was stopped by cancel). A restart resumes it (see below).
+  // model's file as made and a note (finishing failed, or was stopped by cancel). A restart resumes it (see above).
   function finishBreakout(job) {
     if (controls.has(job.id)) return;
     const controller = new AbortController(),
-      src = path.join(dataDir, job.result.url.slice(1)),
+      made = job.finishing,
+      src = path.join(dataDir, made.url.slice(1)),
       name = crypto.randomUUID() + ".mp4";
     controls.set(job.id, controller);
     // the browser watches a job until deadlineAt (runtime.js reconcileJobs): long enough for the finishing to end
     job.deadlineAt = new Date(Math.max(Date.parse(job.deadlineAt) || 0, Date.now() + breakout.FINISH_TIMEOUT_MS + 60000)).toISOString();
     persist();
-    breakout
-      .finish({
-        src, dst: path.join(outputs, name), settings: job.input.settings, ffmpeg: require("ffmpeg-static"), signal: controller.signal,
-        frameFile: localFile(job.input.references?.firstFrame?.[0]?.url) || "",
-      })
+    Promise.resolve() // anything thrown below lands in the failure branch, never leaves the job running
+      .then(() =>
+        breakout.finish({
+          src, dst: path.join(outputs, name), settings: job.input.settings, ffmpeg: require("ffmpeg-static"), signal: controller.signal,
+          frameFile: localFile(job.input.references?.firstFrame?.[0]?.url) || "",
+        }),
+      )
       .then(
         (done) => {
-          if (!done.untouched) {
-            fs.rmSync(src, { force: true });
-            job.result.url = "/generated/" + name;
-          }
-          job.result.ratio = done.ratio; // the file's own ratio; readers of a job's ratio take result.ratio first
-          job.result.textLock = { restoredPixels: done.restored };
+          // ratio = the file's own; readers of a job's ratio take result.ratio first
+          job.result = { url: done.untouched ? made.url : "/generated/" + name, origin: made.origin, ratio: done.ratio, textLock: { restoredPixels: done.restored } };
+          if (!done.untouched) fs.rm(src, { force: true }, (e) => e && console.error("[vw] model file left:", src, e.message));
         },
         async (e) => {
-          job.result.ratio = await breakout.fileRatio(src); // the model's file, measured, never assumed
-          job.result.note = (controller.signal.aborted ? "已停止貼文鎖定／裁切" : "貼文鎖定／裁切失敗：" + publicError(e.message)) + "；這是模型生成的原始影片（已計費）。";
+          job.result = {
+            url: made.url, origin: made.origin,
+            ratio: await breakout.fileRatio(src), // the model's file, measured, never assumed
+            note: (controller.signal.aborted ? "已停止貼文鎖定／裁切" : "貼文鎖定／裁切失敗：" + publicError(e.message)) + "；這是模型生成的原始影片（已計費）。",
+          };
         },
       )
       .finally(() => {
         controls.delete(job.id);
         delete job.stage;
+        delete job.finishing;
         job.progress = 100;
         job.status = "succeeded";
         persist();
-        settle(job).catch((e) => console.error("[vw] settle after finishing:", job.id, e.message));
-      });
+        return settle(job);
+      })
+      .catch((e) => console.error("[vw] breakout finishing:", job.id, e.message));
   }
   async function refreshOnce(job) {
     const before = job.status;
@@ -875,15 +885,17 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (result.status === "succeeded") {
         const { video, usage } = await vendor.download({ output: result.output, fetchImpl });
         if (job.status === "cancelled") return job;
-        job.result = { url: output(video, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds, usage), job.video) };
+        const made = { url: output(video, "mp4"), origin: aiOrigin("video", costs.videoUsd(job.video.id, job.video.seconds, usage), job.video) };
         // 破框貼文動畫: the text hold + ratio cut run after this answer (finishBreakout); the job stays running meanwhile.
         if (job.input?.operation === "breakout") {
           job.stage = "finishing";
+          job.finishing = made;
           job.progress = 95;
           persist();
           finishBreakout(job);
           return job;
         }
+        job.result = made;
         job.progress = 100;
         job.status = "succeeded";
       }

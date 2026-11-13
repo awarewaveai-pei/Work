@@ -199,6 +199,7 @@ const fetchImpl = async (url, init = {}) => {
       const one = (await c2("/generations", job(runway2, { outputRatio: "4:5" }))).body.id;
       const finishing = await until(async () => (await c2("/generations/" + one)).body, (v) => v.stage === "finishing");
       assert.equal(finishing.status, "running");
+      assert.equal(finishing.result, undefined, "an unfinished video was offered as the result while finishing");
       const t0 = Date.now(), again = (await c2("/generations/" + one)).body;
       assert(Date.now() - t0 < 1000 && again.stage === "finishing", "a status GET waited for local finishing");
       assert.equal(runs.length, 1, "one runner per job");
@@ -207,6 +208,9 @@ const fetchImpl = async (url, init = {}) => {
       assert.equal(done.result.ratio, "4:5");
       assert.equal(done.result.textLock.restoredPixels, 7);
       assert.equal(done.stage, undefined);
+      assert.equal(done.finishing, undefined);
+      assert.match(done.result.url, /^\/generated\/[a-f0-9-]+\.mp4$/);
+      assert.equal(done.result.origin.costUsd, 0.25, "the charge was lost on the way through finishing");
       // 2. cancel while finishing: no vendor call, the runner is stopped, the paid model file is delivered with a note
       const two = (await c2("/generations", job(runway2))).body.id;
       await until(async () => (await c2("/generations/" + two)).body, (v) => v.stage === "finishing");
@@ -224,7 +228,7 @@ const fetchImpl = async (url, init = {}) => {
         id, type: "video", status: "running", stage: "finishing", progress: 95, createdAt: new Date().toISOString(), providerId: "pred-b",
         video: { id: "runway-gen4-turbo", provider: "Replicate", model: "runwayml/gen4-turbo", seconds: 5 },
         input: { type: "video", operation: "breakout", prompt: "鯊魚", references: { firstFrame: [{ url: "/generated/f.png" }] }, settings: { outputRatio: "9:16", ratio: "9:16" } },
-        result: { url: "/generated/" + file + ".mp4", origin: { kind: "ai_generated", costUsd: 0.25 } },
+        finishing: { url: "/generated/" + file + ".mp4", origin: { kind: "ai_generated", costUsd: 0.25 } },
       });
       fs.writeFileSync(path.join(dataDir, "jobs.json"), JSON.stringify([left("resume", "11111111-1111-1111-1111-111111111111"), left("lost", "22222222-2222-2222-2222-222222222222")]));
       const restarted = require("../server.cjs").createServer({ dataDir, env: { REPLICATE_API_TOKEN: "test-only" }, fetchImpl });

@@ -60,6 +60,13 @@
       cancel.hidden = !["queued", "running"].includes(v.status);
       result.replaceChildren();
       if (v.error) result.textContent = v.error;
+      // A result's own remark (e.g. 破框: finishing stopped, the model's file delivered) is part of what was delivered.
+      if (v.result?.note) {
+        const note = document.createElement("p");
+        note.className = "note";
+        note.textContent = v.result.note;
+        result.append(note);
+      }
       if (v.result?.url) {
         if (v.status === "succeeded") {
           VideoWorkbench.assets.save(VideoWorkbench.jobAsset(v)).catch(VideoWorkbench.reportError);
