@@ -34,16 +34,27 @@ function imageUsd(model, usage) {
     text = d.text_tokens ?? (d.image_tokens === undefined ? usage.input_tokens : tok(usage.input_tokens) - tok(d.image_tokens));
   return round((tok(text) * r.textInPerM + tok(d.image_tokens) * r.imageInPerM + tok(usage.output_tokens) * r.imageOutPerM) / 1e6);
 }
+// Gemini image (cost-model.ts GEMINI_IMAGE_TOKEN_RATES): the reply's own usage; no usage = the button estimate, the size's
+// image tokens at outputPerM + the measured reply's text and thinking tokens at textOutPerM. A size without a token count
+// has no price (it is not offered).
+function geminiImageUsd(model, size, usage = null) {
+  const rate = rates.GEMINI_IMAGE_TOKEN_RATES[model];
+  if (!rate || !Object.hasOwn(rate.imageTokens, size)) throw unpriced(model + " " + size);
+  if (usage && Number.isFinite(Number(usage.total_output_tokens))) return round(rates.geminiMediaUsd(rate, usage));
+  return round((rate.imageTokens[size] * rate.outputPerM + rate.replyTokens * rate.textOutPerM) / 1e6);
+}
 // 生成填色 rows of next-admin's catalog (public/editor-shared/image-models.js modelsFor("fill"); backend/image-edit.cjs).
-// Without a run (the button): the row's catalog usd. After a run: an OpenAI row = its response usage; a per-megapixel row
-// = imageRunUsd on the real input and output sizes; every other row = its per-image usd (Replicate's flat price).
+// A Gemini row = geminiImageUsd at that size (button: estimate; run: its usage). Otherwise, without a run (the button) the
+// row's catalog usd; after a run an OpenAI row = its response usage, a per-megapixel row = imageRunUsd on the real input and
+// output sizes, every other row = its per-image usd (Replicate's flat price).
 const catalog = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "public/editor-shared/image-models.js"));
-function fillUsd(value, run = null) {
+function fillUsd(value, { size = "1K", geminiModel, openaiModel, usage, inputMp, outputMp } = {}) {
   const row = catalog.modelsFor("fill").find((m) => m.value === value);
   if (!row) throw unpriced(value);
-  if (!run) return row.usd;
-  if (run.openaiModel) return imageUsd(run.openaiModel, run.usage);
-  return round(catalog.imageRunUsd(row, { inputMp: run.inputMp, outputMp: run.outputMp }));
+  if (geminiModel) return geminiImageUsd(geminiModel, size, usage);
+  if (openaiModel) return imageUsd(openaiModel, usage);
+  if (inputMp !== undefined) return round(catalog.imageRunUsd(row, { inputMp, outputMp }));
+  return row.usd;
 }
 // next-admin video-motion ids (veo-3-1-fast...): per output second. Gemini video (GEMINI_VIDEO_RATES): the finished
 // interaction's usage (cost-model.ts geminiMediaUsd); no usage = seconds x the 720p video tokens per second.
@@ -148,4 +159,4 @@ function displayPrices({ text, image, audio, transcribe, music }) {
 // Replicate models billed per GPU second (TOOL_RATES usdPerSec): the one function, next-admin cost-model.ts replicateRunUsd.
 const runUsd = (key, predictTimeSec) => rates.replicateRunUsd(key, predictTimeSec);
 
-module.exports = { textUsd, imageUsd, fillUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };
+module.exports = { textUsd, imageUsd, geminiImageUsd, fillUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };

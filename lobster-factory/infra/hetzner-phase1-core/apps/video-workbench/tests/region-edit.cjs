@@ -23,6 +23,8 @@ const halves = (buffer, fmt = "rgb24") => {
   return [[...raw.subarray(0, n)], [...raw.subarray(n, 2 * n)]];
 };
 const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
+// The charge's functions, called here without the server: Nano Banana by size from cost-model.ts, the others the catalog.
+const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemini-nano-banana-2.1", size) : costs.fillUsd(id));
 (async () => {
   const blue = pngOf("blue", "40x20"), red = pngOf("red", "64x36");
   // Mask = the region tool's: white keeps, transparent (left half) is the box.
@@ -30,9 +32,10 @@ const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
   ff(["-f", "lavfi", "-i", "color=c=white:s=40x20,format=rgba", "-vf", "geq=r=255:g=255:b=255:a='if(lt(X,20),0,255)'", "-frames:v", "1", maskFile]);
   const calls = [];
   let hang = false;
+  const geminiUsage = { total_input_tokens: 300, total_output_tokens: 1937, total_thought_tokens: 654, output_tokens_by_modality: [{ modality: "image", tokens: 1680 }] };
   const server = createServer({
     dataDir: dir,
-    env: { OPENAI_API_KEY: "test-only", REPLICATE_API_TOKEN: "test-only" },
+    env: { OPENAI_API_KEY: "test-only", REPLICATE_API_TOKEN: "test-only", GEMINI_API_KEY: "test-only" },
     fetchImpl: async (url, options = {}) => {
       calls.push({ url, body: options.body });
       // hang = the next run stays "processing" until the job is cancelled (rule 2 of replicate-run.cjs).
@@ -40,6 +43,7 @@ const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
       if (url === "https://api.replicate.com/v1/predictions/p-hang") return Response.json({ id: "p-hang", status: "processing" });
       if (url === "https://api.replicate.com/v1/predictions/p-hang/cancel") return Response.json({ id: "p-hang", status: "canceled" });
       if (url === "https://replicate.delivery/x/out.png") return new Response(red);
+      if (url.endsWith("/v1beta/interactions")) return Response.json({ steps: [{ content: [{ type: "image", mime_type: "image/png", data: red.toString("base64") }] }], usage: geminiUsage });
       if (url.endsWith("/images/edits")) return Response.json({ data: [{ b64_json: red.toString("base64") }], usage: { input_tokens: 900, input_tokens_details: { text_tokens: 100, image_tokens: 800 }, output_tokens: 1500 } });
       throw Error("unexpected call " + url);
     },
@@ -55,23 +59,23 @@ const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
     assert.deepEqual(rows.map((m) => m.id), catalog.modelsFor("fill").map((m) => m.value), "the catalog's fill rows, cheapest first");
     assert(rows.length >= 6 && rows.every((m) => m.available), "every fill row is wired: " + rows.filter((m) => !m.available).map((m) => m.id));
     for (const m of rows) {
-      assert.deepEqual(m.sizes, ["1K"]);
-      assert.equal(m.prices["1K"].usd, costs.fillUsd(m.id), m.id + " = the charge's function");
-      assert.equal(m.prices["1K"].usd, catalog.modelsFor("fill").find((r) => r.value === m.id).usd, m.id + " = the catalog price");
+      assert.deepEqual(m.sizes, m.id === "nano-banana-2" ? ["1K", "2K", "4K"] : ["1K"], m.id + " sizes");
+      for (const s of m.sizes) assert.equal(m.prices[s].usd, usdAt(m.id, s), m.id + " " + s + " = the charge's function");
+      if (m.id !== "nano-banana-2") assert.equal(m.prices["1K"].usd, catalog.modelsFor("fill").find((r) => r.value === m.id).usd, m.id + " = the catalog price");
     }
     assert.equal(caps.imageEdit.defaultModel, "ideogram-4-5-edit-low", "cheapest row that needs no description");
     // The paid-job price check (api.cjs start): every fill row and the generator's image model have a price.
     for (const m of rows) costs.priceOf("fill", m.id);
     costs.priceOf("image", caps.models.image);
     assert.throws(() => costs.priceOf("fill", "gemini-nano-banana-2.1"), /尚無價目/);
-    console.log("PASS /capabilities imageEdit: " + rows.length + " catalog fill rows, catalog prices, 1K");
+    console.log("PASS /capabilities imageEdit: " + rows.length + " catalog fill rows; Nano Banana 2.1 1K/2K/4K by cost-model, the rest 1K at the catalog price");
 
     // 5. Each vendor's mask form; only the box changes; the charge.
     const image = { url: "data:image/png;base64," + blue.toString("base64") }, mask = "data:image/png;base64," + fs.readFileSync(maskFile).toString("base64");
     const settings = { imageLayout: "region-preserve", regionWidth: 40, regionHeight: 20 };
-    const runRow = async (model) => {
+    const runRow = async (model, quality) => {
       const from = calls.length;
-      const job = await poll(await (await post("/generations", { type: "image", operation: "region", prompt: "區域 1：改紅", settings: { ...settings, model }, references: { images: [image] }, mask })).json());
+      const job = await poll(await (await post("/generations", { type: "image", operation: "region", prompt: "區域 1：改紅", settings: { ...settings, model, ...(quality ? { quality } : {}) }, references: { images: [image] }, mask })).json());
       assert.equal(job.status, "succeeded", model + ": " + job.error);
       const [left, right] = halves(fs.readFileSync(path.join(dir, job.result.url.slice(1))));
       assert(left[0] > 200 && left[2] < 60, model + ": inside the box = the edit " + left);
@@ -95,7 +99,13 @@ const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
     assert.equal(form.get("model"), "gpt-image-2.6-sunburst");
     assert(form.has("mask"));
     assert.equal(gpt.job.result.origin.costUsd, costs.imageUsd("gpt-image-2.6-sunburst", { input_tokens: 900, input_tokens_details: { text_tokens: 100, image_tokens: 800 }, output_tokens: 1500 }));
-    console.log("PASS ideogram (black mask), flux fill (white mask), klein (no mask), gpt 2.6 (alpha mask): only the box changes; charged");
+    const nano = await runRow("nano-banana-2", "2K"), nanoBody = JSON.parse(nano.sent[0].body);
+    assert.equal(nanoBody.model, "gemini-nano-banana-2.1");
+    assert.equal(nanoBody.response_format.image_size, "2K");
+    assert.equal(nanoBody.response_format.aspect_ratio, catalog.nearestAspectRatio(40, 20));
+    assert.deepEqual([nano.job.result.width, nano.job.result.height], [2048, 1024]);
+    assert.equal(nano.job.result.origin.costUsd, costs.geminiImageUsd("gemini-nano-banana-2.1", "2K", geminiUsage));
+    console.log("PASS ideogram (black mask), flux fill (white mask), klein (no mask), gpt 2.6 (alpha mask), Nano Banana 2K (no mask): only the box changes; charged");
 
     // A job cancelled while its Replicate run is still processing cancels that run at Replicate (it would keep billing).
     hang = true;
@@ -142,9 +152,10 @@ const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
     // Every model button: its NT$ from the charge's function through the one money format, cheapest first.
     const money = {};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/models.js"), "utf8"), { window: money, crypto: globalThis.crypto });
-    const nt = (id) => "約 " + money.VideoWorkbenchMoney(costs.fillUsd(id), caps) + "／張";
-    const byPrice = [...rows].sort((a, b) => costs.fillUsd(a.id) - costs.fillUsd(b.id));
-    assert.deepEqual(await p.locator('[aria-label="模型"] button').allTextContents(), byPrice.map((m) => `${m.label} · ${nt(m.id)}`), "NT$ from the charge's function, cheapest first");
+    const at = (m, s) => (m.sizes.includes(s) ? s : m.defaultSize);
+    const nt = (id, s = "1K") => "約 " + money.VideoWorkbenchMoney(usdAt(id, s), caps) + "／張";
+    const labels = (s) => [...rows].sort((a, b) => usdAt(a.id, at(a, s)) - usdAt(b.id, at(b, s))).map((m) => `${m.label} · ${nt(m.id, at(m, s))}`);
+    assert.deepEqual(await p.locator('[aria-label="模型"] button').allTextContents(), labels("1K"), "NT$ from the charge's function, cheapest first");
     assert.match(await p.locator('[aria-label="模型"] .selected').textContent(), /Ideogram 4\.5 Edit（省）/);
     const submit = p.locator("[data-act=submit]");
     await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("ideogram-4-5-edit-low"));
@@ -156,7 +167,15 @@ const dataOf = (url) => Buffer.from(url.split(",")[1], "base64");
     assert.equal(calls.length, posts, "nothing sent while a box has no instruction");
     await p.getByRole("button", { name: /FLUX Fill Pro/ }).click();
     await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("flux-fill-pro"));
-    console.log("PASS missing-prompt guard; the generate button's NT$ follows the model");
+    // Nano Banana offers 1K/2K/4K; the draft's 4K is kept for it; price and order follow the chosen size.
+    await p.getByRole("button", { name: /Nano Banana 2\.1/ }).click();
+    assert.deepEqual(await p.locator('[aria-label="解析度"] button').allTextContents(), ["1K", "2K", "4K"]);
+    assert.equal(await p.locator('[aria-label="解析度"] .selected').textContent(), "4K");
+    await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("nano-banana-2", "4K"));
+    assert.deepEqual(await p.locator('[aria-label="模型"] button').allTextContents(), labels("4K"), "order follows the price at 4K");
+    await p.getByRole("button", { name: /FLUX Fill Pro/ }).click();
+    await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("flux-fill-pro"));
+    console.log("PASS missing-prompt guard; Nano Banana 1K/2K/4K; the generate button's NT$ follows model x size");
 
     // Draw a third box: its instruction opens next to it.
     const img = await p.locator("#regionBoard img").boundingBox();

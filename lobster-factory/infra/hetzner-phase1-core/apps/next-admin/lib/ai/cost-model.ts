@@ -392,8 +392,11 @@ export const GEMINI_VIDEO_RATES: Record<string, GeminiMediaRate & { label: strin
 /** Gemini image (lib/tarot/image-gen.ts generateGemini), aistudio.google.com/docs/pricing 2026-11-10, Standard tier, USD per 1M
  *  tokens: text/image in $1.50, image out $30, text and thinking out $7.50; 2K = 1,680 image tokens = $0.0504. The reply's
  *  usage is charged (geminiMediaUsd); without it, image-models.js usd (0.057 = the measured 2K reply incl. thinking). */
-export const GEMINI_IMAGE_TOKEN_RATES: Record<string, GeminiMediaRate> = {
-  "gemini-nano-banana-2.1": { inputPerM: 1.5, outputPerM: 30, textOutPerM: 7.5 },
+/** imageTokens = output image tokens per image_size (aistudio.google.com/docs/pricing 2026-11-13: 1K 1,120 / 2K 1,680 /
+ *  4K 3,780); a size not listed is not offered. replyTokens = the text + thinking tokens of the measured 2K reply above
+ *  (257 + 654), added at textOutPerM to the button estimate (video-workbench geminiImageUsd). */
+export const GEMINI_IMAGE_TOKEN_RATES: Record<string, GeminiMediaRate & { imageTokens: Readonly<Record<string, number>>; replyTokens: number }> = {
+  "gemini-nano-banana-2.1": { inputPerM: 1.5, outputPerM: 30, textOutPerM: 7.5, imageTokens: { "1K": 1120, "2K": 1680, "4K": 3780 }, replyTokens: 911 },
 };
 /** Speech with no vendor bill: Edge TTS through our video-service (video-workbench backend/speech.cjs "edge-tts"). */
 export const FREE_TTS_MODELS: readonly string[] = ["edge-tts"];

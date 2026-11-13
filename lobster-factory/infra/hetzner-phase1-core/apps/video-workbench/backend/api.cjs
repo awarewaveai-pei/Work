@@ -676,7 +676,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         if (!/^data:image\/png;base64,/.test(source)) throw Error("請提供 PNG 原圖");
         if (!/^data:image\/png;base64,/.test(mask)) throw Error("請提供選取區域遮罩");
         const original = Buffer.from(source.split(",")[1], "base64"), maskPng = Buffer.from(mask.split(",")[1], "base64");
-        const edited = await imageEdit.run(m, { prompt, image: original, masks: await mediaTools.regionMasks(maskPng, signal), ratio: input.settings.regionWidth / input.settings.regionHeight, env, fetchImpl, signal });
+        const edited = await imageEdit.run(m, { prompt, image: original, masks: await mediaTools.regionMasks(maskPng, signal), ratio: input.settings.regionWidth / input.settings.regionHeight, size: input.settings.quality, env, fetchImpl, signal });
         job.costUsd = edited.costUsd;
         job.imageEdit = { model: m.value, provider: m.vendor };
         const [width, height] = generationPolicy.imageDimensions(input.settings), filename = crypto.randomUUID() + ".png";

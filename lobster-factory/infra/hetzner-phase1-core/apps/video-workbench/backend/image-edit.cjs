@@ -12,7 +12,7 @@ const { vwEnv } = require("./env-compat.cjs");
 const { fillUsd } = require("./provider-cost.cjs");
 const source = require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env);
 const catalog = require(path.join(source, "public/editor-shared/image-models.js"));
-const { MEDIA_MODELS } = require(path.join(source, "lib/ai/cost-model.ts"));
+const { MEDIA_MODELS, GEMINI_IMAGE_TOKEN_RATES } = require(path.join(source, "lib/ai/cost-model.ts"));
 
 const replicateRun = require("./replicate-run.cjs");
 const pinned = (slug) => MEDIA_MODELS[slug].version;
@@ -35,9 +35,13 @@ const CALLS = Object.freeze({
     input: ({ prompt, image, mask }) => ({ image, mask, prompt, output_format: "png", safety_tolerance: 5 }) },
   // lib/tarot/image-gen.ts TAROT_MODELS["openai-26-edit"]: /images/edits, quality high, with the mask
   "openai-26-edit": { keyName: "OPENAI_API_KEY", mask: "alpha", openaiModel: "gpt-image-2.6-sunburst" },
+  // lib/tarot/image-gen.ts generateGemini (Interactions API, image_size): sizes = cost-model.ts imageTokens' keys.
+  "nano-banana-2": { keyName: "GEMINI_API_KEY", mask: null, geminiModel: "gemini-nano-banana-2.1" },
 });
-// Output: the model's whole-image result at ~1 MP; no row states a larger size, so 1K is the one size offered.
-const SIZES = Object.freeze(["1K"]);
+// Sizes: a Gemini row = the sizes cost-model.ts prices (imageTokens); every other row returns ~1 MP and states no larger
+// output, so 1K is its one size. The smallest size is each row's default.
+const sizesOf = (value) => { const g = CALLS[value]?.geminiModel; return g ? Object.keys(GEMINI_IMAGE_TOKEN_RATES[g].imageTokens) : ["1K"]; };
+const priceOf = (value, size) => fillUsd(value, { size, geminiModel: CALLS[value]?.geminiModel });
 
 const rows = (env) => catalog.modelsFor("fill").map((m) => ({ m, id: m.value, available: !!CALLS[m.value] && !!env[CALLS[m.value].keyName], free: false }));
 // Default: the cheapest row that can run here and needs no description (catalog blank "ok"); VW_IMAGE_EDIT_MODEL names another.
@@ -51,10 +55,11 @@ function pick(id, env = process.env) {
   if (!m) throw Object.assign(Error("圖片編輯模型無效"), { status: 400 });
   return m;
 }
-// The job records the row and size it runs, before pricing and storing (an old draft's 2K / another model id included).
+// The job records the row and size it runs, before pricing and storing; a size the row lacks (an old draft's 2K on a
+// 1K row) runs at the row's default.
 function request(input, env) {
-  const m = pick(input.settings?.model, env);
-  input.settings = { ...input.settings, model: m.value, quality: SIZES[0] };
+  const m = pick(input.settings?.model, env), sizes = sizesOf(m.value);
+  input.settings = { ...input.settings, model: m.value, quality: sizes.includes(input.settings?.quality) ? input.settings.quality : sizes[0] };
   return m;
 }
 function key(m, env) {
@@ -68,9 +73,9 @@ function capability(env) {
     defaultModel: defaultRow(env).id,
     ratios: [...catalog.ASPECT_RATIOS], // the page names the source's nearest ratio (參數)
     models: rows(env).map(({ m, available }) => ({
-      id: m.value, vendor: m.vendor, label: m.label, available, sizes: [...SIZES], defaultSize: SIZES[0],
+      id: m.value, vendor: m.vendor, label: m.label, available, sizes: sizesOf(m.value), defaultSize: sizesOf(m.value)[0],
       note: m.note + (catalog.takesChinese(m) ? "" : "。指令請用英文寫"),
-      prices: { [SIZES[0]]: { usd: fillUsd(m.value), unit: "張", estimate: true } },
+      prices: Object.fromEntries(sizesOf(m.value).map((s) => [s, { usd: priceOf(m.value, s), unit: "張", estimate: true }])),
     })),
   };
 }
@@ -96,9 +101,13 @@ async function replicate(call, input, { env, fetchImpl, signal }) {
   return Buffer.from(await (await fetchCall(replicateRun.deliveryUrl(prediction, "圖片編輯"), {}, "下載圖片結果")).arrayBuffer());
 }
 // One run of row m on the source PNG with the mask in the vendor's form. Answers { image: Buffer, costUsd }.
-async function run(m, { prompt, image, masks, ratio, env, fetchImpl, signal }) {
+async function run(m, { prompt, image, masks, ratio, size = "1K", env, fetchImpl, signal }) {
   const call = CALLS[m.value];
   key(m, env);
+  if (call.geminiModel) {
+    const value = await gemini(call.geminiModel, { prompt, image, ratio, size, env, fetchImpl, signal });
+    return { image: value.image, costUsd: fillUsd(m.value, { size, geminiModel: call.geminiModel, usage: value.usage }) };
+  }
   if (call.openaiModel) {
     const form = new FormData();
     for (const [k, v] of Object.entries({ model: call.openaiModel, prompt, size: ratio > 1.2 ? "1536x1024" : ratio < 0.83 ? "1024x1536" : "1024x1024", quality: "high", n: "1" })) form.append(k, v);
@@ -115,4 +124,21 @@ async function run(m, { prompt, image, masks, ratio, env, fetchImpl, signal }) {
   return { image: out, costUsd: fillUsd(m.value, { inputMp: mp(pngSize(image)), outputMp: mp(pngSize(out)) }) };
 }
 
-module.exports = { CALLS, SIZES, pick, request, key, capability, run, pngSize };
+// Gemini Interactions API (same call as next-admin generateGemini): the source + the instruction, at the nearest catalog
+// ratio and the chosen image_size.
+async function gemini(model, { prompt, image, ratio, size, env, fetchImpl, signal }) {
+  const r = await fetchImpl("https://generativelanguage.googleapis.com/v1beta/interactions", {
+    method: "POST",
+    headers: { "x-goog-api-key": env.GEMINI_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, input: [{ type: "text", text: prompt }, { type: "image", mime_type: "image/png", data: image.toString("base64") }],
+      response_format: { type: "image", aspect_ratio: catalog.nearestAspectRatio(ratio, 1), image_size: size }, store: false }),
+    signal,
+  });
+  const value = await r.json().catch(() => null);
+  if (!r.ok) throw Object.assign(Error("圖片編輯失敗：Google " + r.status + "：" + String(value?.error?.message || "").slice(0, 200)), { status: r.status >= 500 ? 502 : r.status });
+  const part = (value?.steps || []).flatMap((s) => s?.content || []).find((c) => c?.type === "image" && typeof c.data === "string");
+  if (!part) throw Error("圖片服務沒有回傳圖片");
+  return { image: Buffer.from(part.data, "base64"), usage: value?.usage || null };
+}
+
+module.exports = { CALLS, pick, request, key, capability, run, pngSize, sizesOf };

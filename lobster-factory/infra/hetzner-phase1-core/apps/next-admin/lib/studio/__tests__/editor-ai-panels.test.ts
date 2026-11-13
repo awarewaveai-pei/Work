@@ -124,7 +124,7 @@ describe("ai-fill：去除／生成填色", () => {
     expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(modelsFor("fill").map((m: { value: string }) => m.value));
     // Ideogram first: the only fill model that honours an empty prompt (prod 2026-11-09, image-models.js comment)
     // Cheapest first, one ordering rule for every panel and the guide (image-models.js modelsFor).
-    expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "ideogram-4-5-edit-low", "flux-fill-pro", "ideogram-4-5-edit", "openai-26-edit"]);
+    expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "ideogram-4-5-edit-low", "flux-fill-pro", "nano-banana-2", "ideogram-4-5-edit", "openai-26-edit"]);
     btns.forEach(priced);
     btns.forEach((b) => noted(b, modelsFor("fill")));
     q(body, "[data-af-model=ideogram-4-5-edit]").click();
