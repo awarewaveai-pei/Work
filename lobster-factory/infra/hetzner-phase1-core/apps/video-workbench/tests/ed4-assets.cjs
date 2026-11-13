@@ -14,12 +14,15 @@ const pass = (m) => console.log("PASS " + m);
     mp4 = path.join(dir, "clip.mp4"),
     png = path.join(dir, "still.png"),
     wav = path.join(dir, "tone.wav"),
-    mute = path.join(dir, "mute.mp4");
+    mute = path.join(dir, "mute.mp4"),
+    alpha = path.join(dir, "alpha.mov");
   for (const args of [
     ["-f", "lavfi", "-i", "color=blue:s=320x180:r=24:d=2", "-f", "lavfi", "-i", "sine=d=2", "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", mp4],
     ["-f", "lavfi", "-i", "color=red:s=64x36", "-frames:v", "1", png],
     ["-f", "lavfi", "-i", "sine=d=1", wav],
     ["-f", "lavfi", "-i", "color=green:s=320x180:r=24:d=1", "-c:v", "libx264", "-preset", "ultrafast", mute],
+    // A see-through video with sound (PNG-in-MOV keeps alpha): the store plays it through proxy.webm.
+    ["-f", "lavfi", "-i", "color=c=red@0.5:s=320x180:r=24:d=2,format=rgba", "-f", "lavfi", "-i", "sine=frequency=500:d=2", "-shortest", "-c:v", "png", "-pix_fmt", "rgba", "-c:a", "aac", alpha],
   ]) {
     const r = spawnSync(ffmpeg, ["-y", "-hide_banner", ...args], { windowsHide: true, encoding: "utf8" });
     assert.equal(r.status, 0, r.stderr);
@@ -173,16 +176,41 @@ const pass = (m) => console.log("PASS " + m);
     await card("mute.mp4").getByRole("button", { name: /拆出 .* 的音軌/ }).click();
     await page.getByText("這支影片沒有聲音，無法拆出音軌").waitFor();
     assert.equal(await page.evaluate(async () => (await VideoWorkbench.assets.list()).some((a) => a.name === "mute.mp4（音軌）")), false);
-    // Codex a88a5794 / 1f604aa8: an alpha video plays a soundless proxy.webm, so it is not split.
-    await page.evaluate(async () => {
-      const v = (await VideoWorkbench.assets.list()).find((a) => a.name === "clip.mp4");
-      await VideoWorkbench.assets.save({ ...v, id: "alpha-src", name: "alpha.mov", previewUrl: v.url.replace(/[^/]+$/, "proxy.webm") });
+    // Invariant (preview sound = original sound): a see-through video with sound plays proxy.webm (VP9 alpha + Opus), so it
+    // splits, and the preview it plays decodes sound.
+    const alphaAsset = await page.evaluate(async (b64) => {
+      const a = await VideoWorkbench.uploadAsset(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], "alpha.mov", { type: "video/quicktime" }));
       await edAssetsLoad();
-    });
+      return a;
+    }, fs.readFileSync(alpha).toString("base64"));
+    assert.match(alphaAsset.previewUrl, /\/proxy\.webm$/);
+    const proxyInfo = await require("../backend/media-inspect.cjs").inspectMedia(path.join(dir, "data", alphaAsset.previewUrl.slice(1)));
+    assert.equal(proxyInfo.audio, true, "透明影片的 proxy.webm 有音軌");
     await card("alpha.mov").getByRole("button", { name: /拆出 .* 的音軌/ }).click();
-    await page.getByText("透明影片的預覽檔沒有聲音，暫時無法拆出音軌").waitFor();
-    assert.equal(await page.evaluate(async () => (await VideoWorkbench.assets.list()).some((a) => a.id === "alpha-src#audio")), false);
-    pass("拆出音軌不覆蓋改過名的音軌；已刪素材離開「本次上傳」與數量；無聲影片與透明影片不拆");
+    await page.waitForFunction((id) => VideoWorkbench.assets.list().then((rows) => rows.some((x) => x.id === id + "#audio")), alphaAsset.id);
+    const decoded = await page.evaluate(async (url) => {
+      const v = document.createElement("video");
+      v.muted = true;
+      v.src = url;
+      await v.play();
+      await new Promise((r) => setTimeout(r, 1200));
+      v.pause();
+      return v.webkitAudioDecodedByteCount;
+    }, alphaAsset.previewUrl);
+    assert(decoded > 0, "預覽檔播得出聲音（解出 " + decoded + " bytes 音訊）");
+    // Codex 1b6ebf9a F1: an old silent alpha preview (made before its sound was kept, not yet backfilled) is not split.
+    const oldDir = path.join(dir, "data", "media", "a".repeat(64));
+    fs.mkdirSync(oldDir, { recursive: true });
+    const cut = spawnSync(ffmpeg, ["-y", "-v", "error", "-i", path.join(dir, "data", alphaAsset.previewUrl.slice(1)), "-map", "0:v:0", "-c:v", "copy", "-an", path.join(oldDir, "proxy.webm")], { windowsHide: true, encoding: "utf8" });
+    assert.equal(cut.status, 0, cut.stderr);
+    await page.evaluate(async (a) => {
+      await VideoWorkbench.assets.save({ ...a, id: "alpha-old", name: "old-alpha.mov", previewUrl: "/media/" + "a".repeat(64) + "/proxy.webm" });
+      await edAssetsLoad();
+    }, alphaAsset);
+    await card("old-alpha.mov").getByRole("button", { name: /拆出 .* 的音軌/ }).click();
+    await page.getByText("透明影片的預覽檔還沒補上聲音，補齊後才能拆出音軌").waitFor();
+    assert.equal(await page.evaluate(async () => (await VideoWorkbench.assets.list()).some((x) => x.id === "alpha-old#audio")), false);
+    pass("拆出音軌不覆蓋改過名的音軌；已刪素材離開「本次上傳」與數量；無聲影片不拆；有聲透明影片的 proxy.webm 有音軌、可拆、播放時解得出聲音；舊的無聲透明預覽不拆");
 
     // From a track's ＋: banner on top, 取消 clears it, the pick goes to that track.
     await page.locator('[data-ed-track="A2"]').getByRole("button", { name: "加入素材到「配樂 A2」", exact: true }).click();

@@ -250,12 +250,18 @@ edRegisterPane("assets", {
     },
   },
 });
-// Invariant: the file the browser plays for this video (previewUrl || url) must hold its sound, since the extracted
-// asset reuses it. Sound comes from the ingest probe (backend/media-store.cjs probe.json: on the record, else beside a
-// /media/<sha256>/ file). An alpha source plays proxy.webm, made with -an (media-store transcode) for an original the
-// store judged not reliably playable (needsProxy), so it has no playable sound. Returns why not, or "".
+// Invariant: the file the browser plays for this video (previewUrl || url) holds the original's sound, since the extracted
+// asset reuses it -- an alpha source's proxy.webm included (backend/media-store.cjs transcode keeps it as Opus; older
+// silent ones: scripts/backfill-alpha-proxy-audio.cjs). Sound comes from the ingest probe (probe.json: on the record,
+// else beside a /media/<sha256>/ file); a proxy.webm is checked itself, since one made before the backfill has none:
+// its track list (first bytes of the WebM) must hold an Opus track. Returns why not, or "".
 async function edAssetsSplitBlocked(a) {
-  if (/\/proxy\.webm$/.test(a.previewUrl || "")) return "透明影片的預覽檔沒有聲音，暫時無法拆出音軌";
+  if (/\/proxy\.webm$/.test(a.previewUrl || "")) {
+    const head = await fetch(a.previewUrl, { headers: { Range: "bytes=0-65535" } })
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .catch(() => null);
+    if (!head || !new TextDecoder("latin1").decode(head).includes("A_OPUS")) return "透明影片的預覽檔還沒補上聲音，補齊後才能拆出音軌";
+  }
   let probe = a.probe;
   const dir = /^(\/media\/[a-f0-9]{64}\/)[^/]+$/.exec(a.url || "")?.[1];
   if (!probe && dir)

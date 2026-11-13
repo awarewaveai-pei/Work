@@ -44,14 +44,15 @@ function needsProxy(probe, ext) {
 const hasAlpha = (probe) => !!probe.video && /^(rgba|bgra|argb|abgr|yuva|gbrap|ya)/.test(probe.pixFmt || "");
 // Browser-playable copy with the short side capped at `short` px (even sizes; portrait = width is the short side);
 // crf is the H.264 quality (the alpha WebM keeps CRF 30).
-// Card P3: an alpha source gets VP9 + alpha WebM (H.264 has no alpha), so the editor preview shows it transparent too.
+// Card P3: an alpha source gets VP9 + alpha WebM (H.264 has no alpha), so the editor preview shows it transparent too; its
+// sound goes along as Opus (a preview must sound like its original; a source without audio stays without).
 function transcode(original, tmp, short, alpha, crf, signal) {
   const scale = `scale=w='if(lte(iw,ih),trunc(min(iw,${short})/2)*2,-2)':h='if(lte(iw,ih),-2,trunc(min(ih,${short})/2)*2)'`;
   return run(
     alpha
       ? ["-y", "-hide_banner", "-i", original, "-map", "0:v:0", "-vf", scale + ",format=yuva420p",
           "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-deadline", "realtime", "-cpu-used", "8", "-b:v", "0", "-crf", "30",
-          "-auto-alt-ref", "0", "-an", tmp]
+          "-auto-alt-ref", "0", "-map", "0:a:0?", "-c:a", "libopus", "-b:a", "128k", tmp]
       : ["-y", "-hide_banner", "-i", original, "-map", "0:v:0", "-map", "0:a:0?", "-vf", scale,
           "-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-pix_fmt", "yuv420p",
           "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", tmp],
@@ -247,6 +248,34 @@ function createMediaStore({ dataDir }) {
     }
     return { previewUrl: null, making: true };
   }
-  return { root, ingest, fileFor, preview };
+  // Alpha previews made before their sound was kept (proxy.webm / preview720.webm with no audio stream while the original
+  // has one) are made again and renamed over the old file, so playback keeps working until each is replaced. Re-runnable:
+  // a preview that already has sound is left alone. scripts/backfill-alpha-proxy-audio.cjs runs it per data folder.
+  async function backfillAlphaAudio(signal) {
+    const done = [];
+    for (const sha of fs.readdirSync(root).filter((n) => /^[a-f0-9]{64}$/.test(n))) {
+      const dir = path.join(root, sha),
+        probeFile = path.join(dir, "probe.json"),
+        original = fs.existsSync(probeFile) && fs.readdirSync(dir).find((f) => /^original\.[a-z0-9]+$/.test(f));
+      if (!original) continue;
+      const probe = JSON.parse(fs.readFileSync(probeFile, "utf8"));
+      if (!hasAlpha(probe) || !probe.audio) continue;
+      for (const [name, short] of [["proxy.webm", 1080], ["preview720.webm", PREVIEW_SHORT]]) {
+        const target = path.join(dir, name);
+        if (!fs.existsSync(target) || (await inspectMedia(target, signal)).audio) continue;
+        const tmp = temp(dir, name);
+        try {
+          await transcode(path.join(dir, original), tmp, short, true, 0, signal);
+          if (!(await inspectMedia(tmp, signal)).audio) throw Error(sha + "/" + name + "：重轉後仍沒有音軌");
+          fs.renameSync(tmp, target);
+          done.push(sha + "/" + name);
+        } finally {
+          fs.rmSync(tmp, { force: true });
+        }
+      }
+    }
+    return done;
+  }
+  return { root, ingest, fileFor, preview, backfillAlphaAudio };
 }
 module.exports = { createMediaStore, needsProxy, hasAlpha };

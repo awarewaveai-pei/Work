@@ -1,4 +1,28 @@
 # Worklog
+## 2026-11-13（續7）透明影片的預覽檔保留聲音（proxy.webm／preview720.webm＝VP9 透明＋Opus）
+
+- 根因：`backend/media-store.cjs` transcode 的透明分支帶 `-an`（2026-11 P3 `40c7b8ebd` 加入；commit 訊息和註解都沒寫理由，當時的來源是無聲的合成器輸出）。
+  - 透明影片播放的 proxy.webm 因此沒有聲音。
+  - 結果一：`scripts/editor-panes/assets.js` 直接擋掉透明影片的「拆出音軌」。
+  - 結果二：tools-editor 的 edDetachAudio 沿用同一個檔，預覽靜音。
+  - 匯出讀原檔，不受影響。
+- 不變量：預覽檔的聲音＝原檔的聲音。
+- 修法：
+  - 透明分支改成 `-map 0:a:0? -c:a libopus -b:a 128k`，原檔沒聲音照舊；720P 預覽走同一個 transcode，一起修好。
+  - assets.js 拿掉一律擋；改成直接檢查 proxy.webm 本身：讀開頭 64 KB 的音軌清單，必須有 `A_OPUS`，所以還沒補齊的舊無聲預覽仍然擋下（Codex F1）。
+  - edDetachAudio 不用改。
+- 舊資料（選腳本，不在播放時重轉）：proxy 是 server.cjs 當靜態檔送出的，送檔途中沒有掛鉤；把轉檔放進播放請求會卡住第一次播放。
+  - `store.backfillAlphaAudio`：probe 寫著透明＋有聲、預覽卻沒有音軌時，重轉並改名蓋過舊檔。可重跑；補好之前舊檔照常播放。
+  - `scripts/backfill-alpha-proxy-audio.cjs`：本機資料夾加上每個 `orgs/<org>` 都跑一次。
+  - 新測試加進部署閘門 `tests/gate.cjs`（Codex F2）。
+- 部署（未做，監工負責）：部署後在主機執行 `docker exec lobster-video-workbench node scripts/backfill-alpha-proxy-audio.cjs`（容器內 VW_DATA_DIR=/data）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed4-assets.cjs（真 Edge：有聲透明 MOV 上傳 → proxy.webm 有音軌、拆出音軌成功、播放 webkitAudioDecodedByteCount>0；舊的無聲透明 webm 擋下並說明）7 PASS | exit=0 | ms=180000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/alpha-proxy-audio-backfill.cjs（組織資料夾的舊無聲 proxy → 補齊後有 Opus、仍是 VP9 alpha_mode=1；重跑 REMADE 0） | exit=0 | ms=900
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-contract.cjs；node tests/ed3-legacy-golden.cjs；node tests/ed3-inspector.cjs；node tests/gate.cjs（新測試 PASS；唯一 FAIL＝storyboards-baseline，原因是別的 session 尚未 commit 的 styles/workspaces.css，與本卡無關） | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-1b6ebf9a 的兩項（補齊前拆出無聲音軌、新測試不在部署閘門）都已修正並有測試；派工限一輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=backfillAlphaAudio|backfill-alpha-proxy-audio|proxy\.webm | hits=25
+- BUGHUNT_SCOPE_NARROW: 命中都在本卡的檔；`docs/engine-route-plan-20261106.md:384` 只寫「自動產 VP9 alpha proxy.webm」，沒有說靜音，不算過時說法
 ## 2026-11-13（續6）影音工作台：去背重複扣點修好，接手／取消規則抽成共用模組 replicate-run.cjs
 
 - 根因：`backend/api.cjs` 去背分支（改前 :454-457）接手「同來源、任何非 succeeded」任務的 replicateId，包含仍在跑的任務，而且不移交 → 兩個同時送出的任務輪詢同一次 Replicate 運算、各扣一次點。去背在逾時、取消、重啟時也沒通知 Replicate 停止（改前 bg-remove.cjs 輪詢迴圈沒有 cancel，重啟只取消 AI 增強，改前 api.cjs:193）。
