@@ -3,18 +3,18 @@
 // browser so the preview and the frame are the same pixels (a server render would need its own CJK fonts and layout).
 // The post is our own generic design: no platform logo, name or brand mark is drawn.
 const BREAKOUT_SUBJECTS = {
-  鯊魚: "一隻鯊魚張大嘴從照片裡衝出來",
-  商品: "商品從照片裡飛出來，在空中旋轉",
-  人物: "照片中的人伸出手，跨步走出照片",
+  鯊魚: "一隻鯊魚張大嘴，捲著浪花朝鏡頭衝出來",
+  商品: "照片裡的商品放大飛出來，在空中轉一圈展示",
+  人物: "照片裡的人跨步走出畫面，朝鏡頭揮手",
   跑車: "跑車加速衝出照片，輪胎揚起煙塵",
-  水花: "水花從照片裡爆開、濺到貼文上",
-  吉祥物: "吉祥物跳出照片，開心揮手",
+  水花: "一大片水花從照片裡潑出來，灑過整則貼文",
+  吉祥物: "可愛的吉祥物從照片裡跳出來，好奇地看著鏡頭",
 };
 const BREAKOUT_LAYOUT = { 從圖片衝出: "burst", 浮動貼文卡: "float" };
 // Colours of the rendered video frame (content, like a photo's pixels), not page chrome: the page itself uses theme tokens.
 const BREAKOUT_INK = {
-  淺色: { bg: "rgb(255,255,255)", text: "rgb(22,22,24)", sub: "rgb(112,114,120)", line: "rgb(228,229,232)", photo: "rgb(214,216,220)" },
-  深色: { bg: "rgb(16,16,18)", text: "rgb(244,244,246)", sub: "rgb(160,162,168)", line: "rgb(52,53,58)", photo: "rgb(58,60,66)" },
+  淺色: { bg: "rgb(255,255,255)", text: "rgb(22,22,24)", sub: "rgb(112,114,120)", line: "rgb(228,229,232)", photo: "rgb(214,216,220)", link: "rgb(38,110,214)" },
+  深色: { bg: "rgb(16,16,18)", text: "rgb(244,244,246)", sub: "rgb(160,162,168)", line: "rgb(52,53,58)", photo: "rgb(58,60,66)", link: "rgb(110,170,255)" },
 };
 const BREAKOUT_ACCENT = "rgb(232,72,92)",
   BREAKOUT_RING = "rgb(124,92,250)";
@@ -32,20 +32,46 @@ function toolBreakoutModel() {
 }
 const toolBreakoutPrice = (m) => VideoWorkbenchVideoModels.priceText(m, VideoWorkbenchBreakout.seconds(m));
 
+// What each layout is, under its buttons, under the subject box and under the preview (one place for the wording).
+const BREAKOUT_LAYOUT_NOTES = {
+  burst: {
+    what: "照片放在貼文裡，主角從照片衝出來，蓋過按讚列和文字。",
+    subject: "只描述主角和它的動作；貼文的介面、文字與數字會保持不動，主角會從照片裡衝出來蓋過按讚列和文字。",
+    preview: "這張預覽就是影片的第一格；AI 從這裡讓主角衝出照片。",
+  },
+  float: {
+    what: "照片鋪滿整個畫面，貼文卡浮在中間；主角先從卡片後面經過，再從卡片前面穿過。",
+    subject: "選一張主角在卡片上方和下方都看得到的場景圖（例如水裡游的魚群、天上飛的鳥）；只描述主角和它的動作，貼文卡會保持不動。",
+    preview: "這張預覽就是影片的第一格；AI 會讓主角在貼文卡的後面和前面穿過。",
+  },
+};
+const BREAKOUT_RATIOS = [["9:16", "9:16 直式（限時動態、短影音）"], ["1:1", "1:1 正方形（動態牆）"]];
+// Counts are whole numbers. "1,286" (an older draft's text) drops its commas; anything else parses as a number;
+// empty, negative or not a number = the default.
+const toolBreakoutCount = (v, d) => {
+  const t = String(v ?? "").trim();
+  const n = /^\d[\d,]*$/.test(t) ? Number(t.replace(/,/g, "")) : Math.floor(Number(t));
+  return t === "" || !Number.isFinite(n) || n < 0 ? d : n;
+};
+
 function toolBreakoutScreen(t) {
   wfDefaults({
     breakoutLayout: "從圖片衝出",
     breakoutStyle: "IG 風格",
     breakoutRatio: "9:16",
     breakoutTheme: "淺色",
-    breakoutAccount: "awarewave.studio",
-    breakoutPlace: "台北市",
-    breakoutCaption: "週末限定！這次真的忍不住了 🔥",
-    breakoutLikes: "1,286",
-    breakoutComments: "48",
-    breakoutShares: "12",
+    breakoutAccount: "",
+    breakoutPlace: "",
+    breakoutCaption: "",
+    breakoutLikes: 12456,
+    breakoutComments: 389,
+    breakoutShares: 127,
     breakoutSubject: "",
   });
+  // An old draft's "1,286" would show as an empty number field while the preview draws 1,286: store the number itself.
+  for (const [k, d] of [["breakoutLikes", 12456], ["breakoutComments", 389], ["breakoutShares", 127]]) values[k] = toolBreakoutCount(values[k], d);
+  const layout =BREAKOUT_LAYOUT[values.breakoutLayout] || "burst",
+    notes = BREAKOUT_LAYOUT_NOTES[layout];
   const rows = toolBreakoutModels(),
     vm = toolBreakoutModel(),
     seconds = vm ? VideoWorkbenchBreakout.seconds(vm) : 5;
@@ -65,25 +91,32 @@ function toolBreakoutScreen(t) {
       ? `<label>聲音</label><div class="flow-choices" role="group">${[["生成音效", true], ["無聲", false]]
           .map(([name, audio]) => `<button type="button" class="btn small ${!!vm?.audio === audio ? "selected" : ""}" data-flow-action="breakout-audio:${audio ? 1 : 0}" aria-pressed="${!!vm?.audio === audio}">${name}</button>`)
           .join("")}</div>`
-      : `<p class="note">聲音：${vm?.audio ? "這個模型會生成音效" : "無聲（目前可用的模型都不產生聲音）"}</p>`;
+      : `<label>聲音</label><p class="note">${vm?.audio ? "這個模型會生成音效。" : "無聲：目前能保留第一格畫面的模型都不產生聲音，要配樂可在完成後到剪輯加上。"}</p>`;
   const ready = files.image && vm && vm.available !== false && String(values.breakoutSubject || "").trim();
-  const side = `<aside class="side"><div class="row" style="justify-content:space-between"><h3>破框設定</h3>${wfButton("使用說明", "breakout-help")}</div>
-<label>圖片</label>${chooser("image")}${files.image ? `<p class="note">已選：${esc(files.image.name || "圖片")}</p>` : ""}
-<label>貼文版面</label>${wfChoice("breakoutLayout", Object.keys(BREAKOUT_LAYOUT))}
+  const ratio = `<div class="flow-choices" role="group">${BREAKOUT_RATIOS.map(([v, name]) => {
+    const on = values.breakoutRatio === v;
+    return `<button type="button" class="btn small ${on ? "selected" : ""}" data-flow-choice="breakoutRatio" data-flow-value="${v}" data-flow-multiple="false" aria-pressed="${on}">${name}</button>`;
+  }).join("")}</div>`;
+  const side = `<aside class="side"><div class="row" style="justify-content:space-between"><h3>貼文版面</h3>${wfButton("使用說明", "breakout-help")}</div>
+${wfChoice("breakoutLayout", Object.keys(BREAKOUT_LAYOUT))}<p class="note">${notes.what}</p>
 <label>貼文樣式</label>${wfChoice("breakoutStyle", ["IG 風格", "FB 風格"])}
 <p class="note">只借用版面排列，不放任何平台標誌或名稱。</p>
-<label>輸出比例</label>${wfChoice("breakoutRatio", ["9:16", "1:1"])}
-<label>顏色</label>${wfChoice("breakoutTheme", ["淺色", "深色"])}
-${wfField("breakoutAccount", "帳號名稱")}${wfField("breakoutPlace", "位置或副標")}${wfArea("breakoutCaption", "貼文文字", 300)}
-<div class="breakout-counts">${wfField("breakoutLikes", "按讚數")}${wfField("breakoutComments", "留言數")}${wfField("breakoutShares", "分享數")}</div>
-${wfArea("breakoutSubject", "衝出畫面的主角", VideoWorkbenchBreakout.SUBJECT_MAX)}
+<label>輸出比例</label>${ratio}
+<label>配色</label>${wfChoice("breakoutTheme", ["淺色", "深色"])}
+${wfField("breakoutAccount", "帳號名稱", "text", 'placeholder="awarewave" maxlength="40"')}${wfField("breakoutPlace", "位置或副標", "text", 'placeholder="台北市" maxlength="40"')}
+<label>貼文文字<textarea data-key="breakoutCaption" aria-label="貼文文字" maxlength="300" placeholder="新品上架！優惠只到這週末 🔥 #新品 #週末限定">${esc(values.breakoutCaption || "")}</textarea></label>
+<div class="breakout-counts">${wfField("breakoutLikes", "按讚數", "number", 'min="0" step="1"')}${wfField("breakoutComments", "留言數", "number", 'min="0" step="1"')}${wfField("breakoutShares", "分享數", "number", 'min="0" step="1"')}</div>
+<label>衝出畫面的主角<textarea data-key="breakoutSubject" aria-label="衝出畫面的主角" maxlength="${VideoWorkbenchBreakout.SUBJECT_MAX}" placeholder="描述要衝出畫面的東西，例如：張大嘴的鯊魚、拿著商品的模特兒、一台跑車">${esc(values.breakoutSubject || "")}</textarea></label>
 <div class="flow-choices">${Object.keys(BREAKOUT_SUBJECTS).map((name) => wfButton(name, "breakout-subject:" + name)).join("")}</div>
-<p class="note">只描述主角和它的動作；貼文的介面、文字與數字會保持不動。</p>
-<label>影片模型</label>${models}${sound}
+<p class="note">${notes.subject}</p>
+<label>影片模型</label><p class="note">由便宜到貴排列；價格是這一支影片的費用。</p>${models}${sound}
 <p class="note">${seconds} 秒 · 720p · 一支影片${values.breakoutRatio === "1:1" ? "（模型以 9:16 生成，完成後裁成 1:1）" : ""}</p>
 <button type="button" class="btn primary" data-flow-action="breakout-generate" data-paid="video.motion"${vm ? ` data-paid-model="${esc(vm.id)}"` : ""} ${ready ? "" : "disabled"}>生成破框影片${vm ? " · " + esc(toolBreakoutPrice(vm)) : ""}</button>
-${files.image ? "" : '<p class="note">先選一張圖片。</p>'}${files.image && !String(values.breakoutSubject || "").trim() ? '<p class="note">寫下衝出畫面的主角後才能生成。</p>' : ""}</aside>`;
-  const preview = `<section class="stage breakout-stage"><div class="breakout-preview" data-breakout-preview data-ratio="${esc(values.breakoutRatio)}"></div><p class="note">預覽＝影片的第一格畫面。</p></section>`;
+${files.image ? "" : '<p class="note">先在左邊選一張圖片。</p>'}${files.image && !String(values.breakoutSubject || "").trim() ? '<p class="note">寫下衝出畫面的主角後才能生成。</p>' : ""}</aside>`;
+  // No picture yet: the left side asks for one (the reference's empty state); with one: the live first frame.
+  const preview = files.image
+    ? `<section class="stage breakout-stage"><div class="breakout-preview" data-breakout-preview data-ratio="${esc(values.breakoutRatio)}"></div><p class="note">${notes.preview}</p><div class="btn-row">${btn("更換圖片（素材庫）", "library:image")}${btn("上傳別張", "upload:image")}</div></section>`
+    : `<section class="stage breakout-stage breakout-empty"><div class="tool-icon">⇱</div><h3>先選一張圖片</h3><p>它會成為貼文裡的畫面。</p>${chooser("image")}</section>`;
   return wfWrap(t, `<div class="two-col flow-layout">${preview}${side}</div>`);
 }
 
@@ -107,19 +140,26 @@ function toolBreakoutImage(url) {
 function toolBreakoutFont(px, weight = 400) {
   return `${weight} ${Math.round(px)}px system-ui, "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif`;
 }
-// Line wrap that works for CJK (break anywhere) and keeps at most `max` lines, the last one ending in "…".
+// Line wrap: CJK breaks between any two characters; a #tag or a Latin word stays whole (split only when it alone is wider
+// than the line). At most `max` lines, the last one ending in "…" when text is left over.
 function toolBreakoutWrap(ctx, text, width, max) {
   const lines = [];
   let line = "";
-  for (const ch of String(text || "").replace(/\s*\n\s*/g, " ")) {
+  const units = String(text || "").replace(/\s*\n\s*/g, " ").match(/#[^\s#]+|[A-Za-z0-9_.@'’-]+|\s+|[\s\S]/gu) || [];
+  const pieces = units.flatMap((u) => (u.length > 1 && ctx.measureText(u).width > width ? Array.from(u) : [u]));
+  let cut = false; // text left over after the last allowed line (even when the break fell on a space)
+  for (const [i, ch] of pieces.entries()) {
     if (ctx.measureText(line + ch).width > width && line) {
-      lines.push(line);
+      lines.push(line.trimEnd());
       line = ch.trim() ? ch : "";
-      if (lines.length === max) break;
+      if (lines.length === max) {
+        cut = !!line || pieces.slice(i + 1).some((p) => p.trim());
+        break;
+      }
     } else line += ch;
   }
   if (lines.length < max && line) lines.push(line);
-  else if (lines.length === max && line) {
+  else if (lines.length === max && cut) {
     let last = lines[max - 1];
     while (last && ctx.measureText(last + "…").width > width) last = Array.from(last).slice(0, -1).join(""); // whole characters: never half an emoji
     lines[max - 1] = last + "…";
@@ -174,20 +214,96 @@ const toolBreakoutIcon = {
     ctx.stroke();
   },
 };
-// One post at (x, y), width w, at most maxH tall; returns its height. measure=true only computes the height.
-function toolBreakoutPost(ctx, img, o, x, y, w, maxH, measure = false) {
+// 12456 -> "12.4K", 1286 -> "1,286" (how feeds print counts).
+function toolBreakoutCompact(n) {
+  n = Math.max(0, Math.floor(Number(n) || 0));
+  if (n >= 1e6) return (Math.floor(n / 1e5) / 10).toString().replace(/\.0$/, "") + "M";
+  if (n >= 1e4) return (Math.floor(n / 100) / 10).toString().replace(/\.0$/, "") + "K";
+  return n.toLocaleString("en-US");
+}
+// One caption line: an optional bold account name first, #tags in the link colour, the rest plain.
+function toolBreakoutRich(ctx, line, x, y, size, ink, bold = "") {
+  let cx = x;
+  if (bold && line.startsWith(bold)) {
+    ctx.font = toolBreakoutFont(size, 700);
+    ctx.fillStyle = ink.text;
+    ctx.fillText(bold, cx, y);
+    cx += ctx.measureText(bold).width;
+    line = line.slice(bold.length);
+  }
+  ctx.font = toolBreakoutFont(size);
+  for (const part of line.split(/(#[^\s#]+)/)) {
+    if (!part) continue;
+    ctx.fillStyle = part.startsWith("#") ? ink.link : ink.text;
+    ctx.fillText(part, cx, y);
+    cx += ctx.measureText(part).width;
+  }
+}
+// A generic phone app bar (home, search, add, bag, profile): plain shapes, no product's icon set.
+function toolBreakoutNav(ctx, x, y, w, h, k, ink) {
+  ctx.fillStyle = ink.bg;
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = ink.line;
+  ctx.fillRect(x, y, w, 2 * k);
+  ctx.strokeStyle = ink.text;
+  ctx.lineWidth = 3.2 * k;
+  const s = 34 * k,
+    cy = y + h / 2 - s / 2,
+    step = w / 5;
+  const at = (i) => x + step * i + step / 2 - s / 2;
+  let ix = at(0); // home
+  ctx.beginPath();
+  ctx.moveTo(ix + s * 0.1, cy + s * 0.45);
+  ctx.lineTo(ix + s / 2, cy + s * 0.08);
+  ctx.lineTo(ix + s * 0.9, cy + s * 0.45);
+  ctx.moveTo(ix + s * 0.2, cy + s * 0.38);
+  ctx.lineTo(ix + s * 0.2, cy + s * 0.92);
+  ctx.lineTo(ix + s * 0.8, cy + s * 0.92);
+  ctx.lineTo(ix + s * 0.8, cy + s * 0.38);
+  ctx.stroke();
+  ix = at(1); // search
+  ctx.beginPath();
+  ctx.arc(ix + s * 0.42, cy + s * 0.42, s * 0.3, 0, Math.PI * 2);
+  ctx.moveTo(ix + s * 0.64, cy + s * 0.64);
+  ctx.lineTo(ix + s * 0.92, cy + s * 0.92);
+  ctx.stroke();
+  ix = at(2); // add
+  toolBreakoutRound(ctx, ix + s * 0.08, cy + s * 0.08, s * 0.84, s * 0.84, 7 * k);
+  ctx.moveTo(ix + s / 2, cy + s * 0.28);
+  ctx.lineTo(ix + s / 2, cy + s * 0.72);
+  ctx.moveTo(ix + s * 0.28, cy + s / 2);
+  ctx.lineTo(ix + s * 0.72, cy + s / 2);
+  ctx.stroke();
+  ix = at(3); // bag
+  toolBreakoutRound(ctx, ix + s * 0.12, cy + s * 0.32, s * 0.76, s * 0.6, 5 * k);
+  ctx.moveTo(ix + s * 0.34, cy + s * 0.32);
+  ctx.arc(ix + s / 2, cy + s * 0.32, s * 0.16, Math.PI, 0);
+  ctx.stroke();
+  ix = at(4); // profile
+  ctx.beginPath();
+  ctx.arc(ix + s / 2, cy + s / 2, s * 0.44, 0, Math.PI * 2);
+  ctx.moveTo(ix + s * 0.66, cy + s * 0.4);
+  ctx.arc(ix + s / 2, cy + s * 0.4, s * 0.16, 0, Math.PI * 2);
+  ctx.stroke();
+}
+// One post at (x, y), width w, height up to maxH; returns its height. measure=true only computes it.
+// photo=false: the floating card (header, actions and caption only; the picture is the frame behind it).
+// fill=true: the photo grows so the post fills maxH (a phone screen); nav=true: an app bar at the bottom.
+function toolBreakoutPost(ctx, img, o, x, y, w, maxH, { measure = false, photo = true, fill = false, nav = false } = {}) {
   const k = w / 720,
     ink = BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色,
     fb = o.style === "FB 風格",
     pad = 28 * k,
     header = 112 * k,
     capSize = 27 * k,
-    capLine = 38 * k;
+    capLine = 38 * k,
+    navH = nav ? 96 * k : 0;
   ctx.font = toolBreakoutFont(capSize);
   const capLines = toolBreakoutWrap(ctx, (fb ? "" : o.account + "  ") + o.caption, w - pad * 2, fb ? 3 : 2);
   const captionH = capLines.length ? capLines.length * capLine + 12 * k : 0;
-  const bottom = fb ? captionH + 64 * k + 2 * k + 84 * k : 76 * k + 44 * k + captionH + 44 * k + 18 * k;
-  const photoH = Math.max(120 * k, Math.min(w * 1.25, maxH - header - bottom));
+  const bottom = (fb ? captionH + 64 * k + 2 * k + 84 * k : 76 * k + 44 * k + captionH + 44 * k + 18 * k) + navH;
+  const room = maxH - header - bottom;
+  const photoH = !photo ? 0 : Math.max(120 * k, fill ? room : Math.min(w * 1.25, room));
   const total = header + photoH + bottom;
   if (measure) return total;
   ctx.fillStyle = ink.bg;
@@ -201,24 +317,26 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, measure = false) {
   ctx.beginPath();
   ctx.arc(ax, ay, ar, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.fillStyle = ink.photo;
+  ctx.fillStyle = BREAKOUT_ACCENT;
   ctx.beginPath();
   ctx.arc(ax, ay, ar - 6 * k, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = ink.text;
+  ctx.fillStyle = "rgb(255,255,255)";
   ctx.font = toolBreakoutFont(30 * k, 700);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText((Array.from(o.account.trim())[0] || "A").toUpperCase(), ax, ay + 1 * k);
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  const tx = ax + ar + 20 * k;
+  const tx = ax + ar + 20 * k,
+    sub = fb ? (o.place ? o.place + " · " : "") + "2 小時" : o.place;
+  ctx.fillStyle = ink.text;
   ctx.font = toolBreakoutFont(29 * k, 700);
-  ctx.fillText(toolBreakoutWrap(ctx, o.account, w - (tx - x) - 80 * k, 1)[0] || "", tx, ay - (o.place ? 4 * k : -10 * k));
-  if (o.place) {
+  ctx.fillText(toolBreakoutWrap(ctx, o.account, w - (tx - x) - 80 * k, 1)[0] || "", tx, ay - (sub ? 4 * k : -10 * k));
+  if (sub) {
     ctx.fillStyle = ink.sub;
     ctx.font = toolBreakoutFont(23 * k);
-    ctx.fillText(toolBreakoutWrap(ctx, fb ? o.place + " · 剛剛" : o.place, w - (tx - x) - 80 * k, 1)[0] || "", tx, ay + 30 * k);
+    ctx.fillText(toolBreakoutWrap(ctx, sub, w - (tx - x) - 80 * k, 1)[0] || "", tx, ay + 30 * k);
   }
   ctx.fillStyle = ink.text;
   for (let i = 0; i < 3; i++) {
@@ -228,32 +346,21 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, measure = false) {
   }
   let cy = y + header;
   const caption = (top) => {
-    ctx.fillStyle = ink.text;
-    ctx.font = toolBreakoutFont(capSize);
-    capLines.forEach((line, i) => {
-      if (!fb && i === 0 && line.startsWith(o.account)) {
-        ctx.font = toolBreakoutFont(capSize, 700);
-        ctx.fillText(o.account, x + pad, top + capLine * (i + 0.75));
-        const wName = ctx.measureText(o.account).width;
-        ctx.font = toolBreakoutFont(capSize);
-        ctx.fillText(line.slice(o.account.length), x + pad + wName, top + capLine * (i + 0.75));
-      } else ctx.fillText(line, x + pad, top + capLine * (i + 0.75));
-    });
+    capLines.forEach((line, i) => toolBreakoutRich(ctx, line, x + pad, top + capLine * (i + 0.75), capSize, ink, !fb && i === 0 ? o.account : ""));
     return top + captionH;
   };
   if (fb) cy = caption(cy - 8 * k) + 4 * k;
-  // the photo
-  if (img) toolBreakoutCover(ctx, img, x, cy, w, photoH);
-  else {
-    ctx.fillStyle = ink.photo;
-    ctx.fillRect(x, cy, w, photoH);
-    ctx.fillStyle = ink.sub;
-    ctx.font = toolBreakoutFont(28 * k);
-    ctx.textAlign = "center";
-    ctx.fillText("選一張圖片", x + w / 2, cy + photoH / 2);
-    ctx.textAlign = "left";
+  if (photoH) {
+    if (img) toolBreakoutCover(ctx, img, x, cy, w, photoH);
+    else {
+      ctx.fillStyle = ink.photo;
+      ctx.fillRect(x, cy, w, photoH);
+    }
+    cy += photoH;
+  } else if (fb) {
+    ctx.fillStyle = ink.line;
+    ctx.fillRect(x + pad, cy, w - pad * 2, 2 * k);
   }
-  cy += photoH;
   ctx.strokeStyle = ink.text;
   ctx.lineWidth = 3.2 * k;
   ctx.lineJoin = "round";
@@ -264,14 +371,14 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, measure = false) {
     ctx.beginPath();
     ctx.arc(x + pad + 14 * k, row - 9 * k, 15 * k, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = ink.bg;
+    ctx.strokeStyle = "rgb(255,255,255)";
     ctx.lineWidth = 2.6 * k;
     toolBreakoutIcon.heart(ctx, x + pad + 4 * k, row - 19 * k, 20 * k);
     ctx.fillStyle = ink.sub;
     ctx.font = toolBreakoutFont(24 * k);
-    ctx.fillText(o.likes, x + pad + 40 * k, row);
+    ctx.fillText(toolBreakoutCompact(o.likes), x + pad + 40 * k, row);
     ctx.textAlign = "right";
-    ctx.fillText(`${o.comments} 則留言　${o.shares} 次分享`, x + w - pad, row);
+    ctx.fillText(`${toolBreakoutCompact(o.comments)} 則留言 · ${toolBreakoutCompact(o.shares)} 次分享`, x + w - pad, row);
     ctx.textAlign = "left";
     cy += 64 * k;
     ctx.fillStyle = ink.line;
@@ -299,27 +406,29 @@ function toolBreakoutPost(ctx, img, o, x, y, w, maxH, measure = false) {
     cy += 76 * k;
     ctx.fillStyle = ink.text;
     ctx.font = toolBreakoutFont(26 * k, 700);
-    ctx.fillText(`${o.likes} 個讚`, x + pad, cy + 30 * k);
+    ctx.fillText(`${toolBreakoutCompact(o.likes)} 個讚`, x + pad, cy + 30 * k);
     cy = caption(cy + 44 * k);
     ctx.fillStyle = ink.sub;
     ctx.font = toolBreakoutFont(24 * k);
-    ctx.fillText(`查看全部 ${o.comments} 則留言 · ${o.shares} 次分享`, x + pad, cy + 30 * k);
+    ctx.fillText(`查看全部 ${toolBreakoutCompact(o.comments)} 則留言 · ${toolBreakoutCompact(o.shares)} 次分享`, x + pad, cy + 30 * k);
   }
+  if (nav) toolBreakoutNav(ctx, x, y + total - navH, w, navH, k, ink);
   return total;
 }
+// Empty fields draw their placeholder, like the reference preview.
 function toolBreakoutOptions() {
-  const text = (k, d = "") => String(values[k] ?? d).trim();
+  const text = (k, d) => String(values[k] ?? "").trim() || d;
   return {
     layout: BREAKOUT_LAYOUT[values.breakoutLayout] || "burst",
     style: values.breakoutStyle,
     theme: values.breakoutTheme,
     ratio: values.breakoutRatio === "1:1" ? "1:1" : "9:16",
-    account: text("breakoutAccount") || "account",
-    place: text("breakoutPlace"),
-    caption: text("breakoutCaption"),
-    likes: text("breakoutLikes") || "0",
-    comments: text("breakoutComments") || "0",
-    shares: text("breakoutShares") || "0",
+    account: text("breakoutAccount", "awarewave"),
+    place: text("breakoutPlace", "台北市"),
+    caption: text("breakoutCaption", "新品上架！優惠只到這週末 🔥 #新品 #週末限定"),
+    likes: toolBreakoutCount(values.breakoutLikes, 12456),
+    comments: toolBreakoutCount(values.breakoutComments, 389),
+    shares: toolBreakoutCount(values.breakoutShares, 127),
   };
 }
 // Paints the preview at the output ratio. frame=true: always 720x1280 (what the 9:16 model gets); a 1:1 frame is the
@@ -344,28 +453,20 @@ async function toolBreakoutDraw(canvas, frame = false) {
   const ctx = canvas.getContext("2d"),
     ink = BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色;
   if (o.layout === "float") {
-    // the picture itself, blurred and dimmed, behind a floating card
-    if (img) {
-      ctx.save();
-      ctx.filter = "blur(36px) saturate(1.2)";
-      toolBreakoutCover(ctx, img, -60, -60, W + 120, H + 120);
-      ctx.restore();
-      ctx.fillStyle = o.theme === "深色" ? "rgba(0,0,0,.45)" : "rgba(255,255,255,.25)";
-      ctx.fillRect(0, 0, W, H);
-    } else {
-      ctx.fillStyle = ink.line;
-      ctx.fillRect(0, 0, W, H);
-    }
-    const cw = W * 0.84,
-      maxH = H * 0.88,
-      ch = toolBreakoutPost(ctx, img, o, 0, 0, cw, maxH, true),
+    // The picture fills the output over an opaque base (a cut-out PNG never sends alpha); a text-only post card floats
+    // in the middle of it.
+    ctx.fillStyle = ink.photo;
+    ctx.fillRect(0, 0, W, H);
+    if (img) toolBreakoutCover(ctx, img, 0, 0, W, H);
+    const cw = W * 0.86,
+      ch = toolBreakoutPost(ctx, img, o, 0, 0, cw, H, { measure: true, photo: false }),
       cx = (W - cw) / 2,
       cy = (H - ch) / 2,
-      r = 28;
+      r = 26;
     ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,.35)";
-    ctx.shadowBlur = 48;
-    ctx.shadowOffsetY = 18;
+    ctx.shadowColor = "rgba(0,0,0,.3)";
+    ctx.shadowBlur = 40;
+    ctx.shadowOffsetY = 14;
     ctx.fillStyle = ink.bg;
     toolBreakoutRound(ctx, cx, cy, cw, ch, r);
     ctx.fill();
@@ -373,13 +474,13 @@ async function toolBreakoutDraw(canvas, frame = false) {
     ctx.save();
     toolBreakoutRound(ctx, cx, cy, cw, ch, r);
     ctx.clip();
-    toolBreakoutPost(ctx, img, o, cx, cy, cw, maxH);
+    toolBreakoutPost(ctx, img, o, cx, cy, cw, H, { photo: false });
     ctx.restore();
   } else {
+    // The post is the whole screen: the photo grows to fill it, with an app bar at the bottom of a 9:16 screen.
     ctx.fillStyle = ink.bg;
     ctx.fillRect(0, 0, W, H);
-    const ph = toolBreakoutPost(ctx, img, o, 0, 0, W, H, true);
-    toolBreakoutPost(ctx, img, o, 0, (H - ph) / 2, W, H);
+    toolBreakoutPost(ctx, img, o, 0, 0, W, H, { fill: true, nav: o.ratio === "9:16" });
   }
   return canvas;
 }
@@ -434,9 +535,10 @@ function toolBreakoutHelp() {
   dialog.className = "editor-dialog breakout-help";
   dialog.setAttribute("aria-label", "破框貼文動畫使用說明");
   dialog.innerHTML = VideoWorkbench.sanitize(
-    `<button type="button" class="editor-dialog-close" aria-label="關閉">×</button><h3>破框貼文動畫怎麼用</h3><ol class="instruction"><li><b>選圖片</b>：從素材庫或上傳一張主角清楚的圖片，它會變成貼文裡的照片。</li><li><b>排好貼文</b>：選版面、樣式、比例與顏色，改帳號名稱、文字和按讚數；左邊的預覽就是影片第一格。</li><li><b>寫主角、生成</b>：只描述衝出來的主角和它的動作（例如「鯊魚張大嘴衝出來」），選模型後按生成；按鈕上的價格就是這次的費用，完成的影片會進素材庫。</li></ol>`,
+    `<button type="button" class="editor-dialog-close" aria-label="關閉">×</button><h3>破框貼文動畫怎麼用</h3><ol class="instruction"><li><b>選圖片</b>：從素材庫或上傳一張主角清楚的圖片，它會變成貼文裡的照片。</li><li><b>排好貼文</b>：選版面、樣式、比例與顏色，改帳號名稱、文字和按讚數；左邊的預覽就是影片第一格。</li><li><b>寫主角、生成</b>：只描述衝出來的主角和它的動作（例如「鯊魚張大嘴衝出來」），選模型後按生成；按鈕上的價格就是這次的費用，完成的影片會進素材庫。</li></ol><p class="note"><b>小提醒</b>：預覽就是影片的第一格；主角描述只寫它是什麼、做什麼動作，貼文介面會保持不動。</p><div class="row" style="justify-content:flex-end"><button type="button" class="btn primary breakout-help-start">開始使用</button></div>`,
   );
   dialog.querySelector(".editor-dialog-close").onclick = () => dialog.close();
+  dialog.querySelector(".breakout-help-start").onclick = () => dialog.close();
   dialog.addEventListener("close", () => dialog.remove());
   document.body.append(dialog);
   dialog.showModal();

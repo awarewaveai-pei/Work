@@ -29,7 +29,7 @@
     if (!what) throw Error("請描述衝出畫面的主角");
     const action =
       settings.layout === "float"
-        ? `The first frame is a social media post card floating over a soft background. Only the main subject inside the post photo moves: ${what}. It comes alive and bursts out of the photo, breaking past the card's edge toward the viewer.`
+        ? `The first frame is a full-screen photo with a social media post card floating still in the middle of it. Only the main subject of the photo moves: ${what}. It first passes behind the card, then comes around and crosses in front of it toward the viewer.`
         : `The first frame is a social media post. Only the main subject inside the post photo moves: ${what}. It comes alive and bursts out of the photo frame, breaking past the photo's edges and moving in front of the like bar and the caption text below it, as if leaping out of the screen.`;
     return action + " " + STILL;
   }
