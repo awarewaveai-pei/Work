@@ -92,7 +92,24 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     else delete job.ledgerSyncError;
   });
   // Job results: a failed registration keeps the (already paid) result and records ledgerError; the next GET retries.
-  async function settle(job) {
+  // Invariant (P6.10): a succeeded job ends with result.assetId, result.ledger (explicit skip) or ledgerError. A GET
+  // waits for the one settle in flight per job (`settling`) up to SETTLE_WAIT_MS (under the browser's 15 s read timeout,
+  // config.js); still registering = answered with ledgerPending: true (never saved) and the browser asks again. A copy
+  // taken mid-registration without either was never asked again and showed 「此成果尚未登記到主系統」.
+  const unsettled = (job) => job.status === "succeeded" && !!job.result && !job.result.assetId && !job.result.ledger && !job.ledgerError;
+  const settling = new Map(),
+    settleWaitMs = Math.max(0, Number(vwEnv(env, "SETTLE_WAIT_MS")) || 10000);
+  function settle(job) {
+    if (settling.has(job.id)) return settling.get(job.id);
+    const run = settleOnce(job).finally(() => settling.delete(job.id));
+    settling.set(job.id, run);
+    return run;
+  }
+  async function settleOnce(job) {
+    if (unsettled(job) && (!main || !job.result.url)) {
+      job.result.ledger = main ? "no_file" : "local_mode";
+      persist();
+    }
     if (!main) return;
     if (job.status === "succeeded" && job.result?.url && !job.result.assetId && !job.result.ledger) {
       try {
@@ -154,7 +171,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   };
   // Invariant: a job still owing the main system something (asset registration, release text) is never pruned by the
   // history limit; its retry lives only in this record.
-  const pending = (j) => ["queued", "running"].includes(j.status) || !!(j.ledgerError || j.releaseTextError);
+  const pending = (j) => ["queued", "running"].includes(j.status) || !!(j.ledgerError || j.releaseTextError) || (!!main && unsettled(j));
   const persist = () => {
     const limit = Math.max(100, Number(vwEnv(env, "JOB_HISTORY_LIMIT")) || 2000),
       terminal = jobs.filter((j) => !pending(j));
@@ -828,7 +845,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       persist();
     }
-    if (main && (job.status !== before || (job.status === "succeeded" && (job.ledgerError || job.releaseTextError)))) await settle(job);
+    if (job.status !== before || unsettled(job) || (main && job.status === "succeeded" && (job.ledgerError || job.releaseTextError))) {
+      let timer;
+      const waited = new Promise((r) => (timer = setTimeout(r, settleWaitMs, false)));
+      const done = await Promise.race([settle(job).then(() => true), waited]);
+      clearTimeout(timer);
+      if (!done && unsettled(job)) return { ...job, ledgerPending: true };
+    }
     return job;
   }
   async function remotionReady(input) {

@@ -1,4 +1,27 @@
 # Worklog
+## 2026-11-13（續10）影音工作台 P6.10 缺陷 2：剪輯器匯出「此成果尚未登記到主系統」——伺服器先回 succeeded、登記晚到，瀏覽器副本不再重問
+
+- 現象：正式站 P6.10 實測，editor-export 19dc1d59／d557c27d 的「送審與投遞」顯示「此成果尚未登記到主系統，無法送審」；監工讀的是瀏覽器存的 `/state`。
+- 根因（實證）：
+  - 正式站伺服器紀錄其實已登記：`/data/orgs/39ad4149…/jobs.json` 兩筆都有 `result.assetId`（0ddef2f0…／f5caefaf…）、`releaseTextSent:true`。不是 settle 靜默失敗。
+  - `backend/api.cjs` finish() 的 editor-export 分支先寫 `status:"succeeded"`＋persist，`.finally(() => settle(job))` 才開始登記（上傳＋render evidence，數秒）。這段時間 GET 回的是「succeeded 但沒有 assetId／ledger／ledgerError」＝第四種狀態。
+  - 瀏覽器收下這份副本後，`shared/runtime.js` reconcileJobs 只重問「還沒有 job-<id> 素材」的任務 → 素材已建好就永遠不再問；`shared/jobs-view.js:10` deliveryUrl 讀這份副本的 `result.assetId` → 拒絕送審。
+- 不變量：每個 succeeded 任務最後只有三種結果：`result.assetId`、`result.ledger`（明確不登記）、`ledgerError`；GET 不回第四種。
+- 修法：
+  - `api.cjs`：settle 每個任務只跑一個（`settling` Map）；refreshOnce 遇到「succeeded 未定案」就等這次登記，最多 `VW_SETTLE_WAIT_MS`（預設 10 s，低於瀏覽器 15 s 讀取逾時）；還沒完就回 `{...job, ledgerPending:true}`（不寫進紀錄）。本機模式寫 `result.ledger="local_mode"`，沒有檔案寫 `"no_file"`。沒定案的連線任務不被 `JOB_HISTORY_LIMIT` 裁掉（Codex F2）。程序在 finish 與 settle 之間停掉的任務，下一次 GET 補登記。
+  - `runtime.js` reconcileJobs：succeeded 卻沒有 assetId／ledger 的副本也要重問；ledgerPending 或問失敗就 5 s 後再問（Codex F1）；一輪最多 50 筆，超過就再排一輪，每筆每次載入只問一次，除非回覆要求再問（Codex round 2）；伺服器已清掉的 ledgerError／releaseTextError／ledgerPending 從副本刪除。
+- 既有兩筆的補登記：伺服器端本來就有 assetId；瀏覽器副本在下一次開頁時由 reconcileJobs 重問補上（選「下一次 GET 自動重試」，不寫一次性腳本）。
+- 缺陷 1 根因 editor-export.cjs:741/743 font=sans-serif → DejaVu，修法在 ED 未 commit 的字型包，等 ED 提交。（正式站實測：`fc-match sans-serif` = DejaVu Sans，容器無 `vendor/fonts`；`cjkFallback`／`fontDir()` 只在 D:\Work 未提交工作區。監工決定選 A，本 commit 不動。）
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/video-workbench && node tests/gate.cjs（含 p6-main-system 新增 §6g a–d 與本機模式 ledger 斷言） | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/p5-review-fixes.cjs（Playwright，reconcileJobs 重載追蹤／補建素材） | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ubuntu@ks-aw-01 docker exec lobster-video-workbench node -（讀 jobs.json：兩筆 editor-export 有 assetId，未登記 0 筆；grep editor-export.cjs 741/743 sans-serif；fc-match sans-serif） | exit=0 | ms=3000
+- 紅→綠：舊 api.cjs 跑新測試 → §6g(a)「登記進行中的 succeeded 任務不得先回給瀏覽器」紅；突變拔 `pending` 的 unsettled → (d) 紅；拔 ledgerPending 回覆 → (c) 紅；還原全綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
+  - Codex：`agency-os/reports/oracle/2026-11-13-review-94ba8474.md`（F1 15 s 逾時後不再問、F2 歷史裁剪）、`-c7e41e6d.md`（>50 筆副本），皆已修；第三輪 `-11c3dba3.md`（1m：最新 50 筆都還在執行時，較舊副本要等它們結束才會被問到；只延遲、不遺失，依監工裁示不修，列剩餘風險）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=ledgerPending|result\.ledger|result\?\.ledger|settleOnce|SETTLE_WAIT_MS | hits=22
+- 剩餘風險：(1) 缺陷 1 未修，等 ED 提交字型包並部署；(2) 登記超過 10 s 時，匯出完成那一刻的面板先看到 ledgerPending，送審鈕要等 reconcile 下一輪（≤5 s）或重開頁面；(3) 同時有 >50 筆任務仍在執行時，較舊的未定案副本要等它們結束才補上（Codex 第三輪，未修）；(4) 未部署，交監工。
+- 避免再發生：伺服器公開的任務狀態要等所有「完成後才寫的欄位」定案；瀏覽器副本是否要重問，看「欄位是否定案」，不能看「素材是否已建」。
+- rollback：git revert 本 commit（伺服器與瀏覽器兩端都相容舊資料；ledgerPending 不落地）。
 ## 2026-11-13（續9）影音工作台三張卡整合：音樂生成接三模型、圖片局部編輯器補齊、新工具破框貼文動畫
 
 - 起因：操作者對照參考站：音樂生成只有寫死的兩個模型、沒標價；圖片局部編輯器少很多功能；少了破框貼文動畫。要求每個按鈕標台幣、模型照價格由低到高。

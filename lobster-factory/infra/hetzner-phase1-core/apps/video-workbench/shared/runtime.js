@@ -389,29 +389,51 @@
   // finished is asked again; succeeded ones without their asset get it. Still-running ones are re-asked every 5 s
   // until the server's own deadline for that job (job.deadlineAt, backend/api.cjs jobTimeoutMs) -- no client limit.
   // Parent page only (children share its db).
+  // A succeeded copy without the server's registration outcome (result.assetId / result.ledger; backend/api.cjs settle)
+  // was taken mid-registration: it is asked again, every 5 s while the server says ledgerPending or the ask failed,
+  // until it has one (送審與投遞 reads result.assetId from this copy). A ledgerError copy is asked once per load.
+  // At most 50 asks per round; more open copies = another round. Each copy is asked once per load unless its last
+  // answer asked for another (`again`: still running, ledgerPending, or the ask failed), so the rounds end.
+  const asked = new Set(),
+    again = new Set();
   async function reconcileJobs() {
-    const open = db.jobs
-      .filter((j) => j?.id && !["failed", "cancelled", "blocked"].includes(j.status) && !db.assets.some((a) => a.id === "job-" + j.id))
-      .slice(-50);
+    const unsettled = (j) => j.status === "succeeded" && j.result && !j.result.assetId && !j.result.ledger;
+    const all = db.jobs.filter(
+        (j) => j?.id && !["failed", "cancelled", "blocked"].includes(j.status) && (unsettled(j) || !db.assets.some((a) => a.id === "job-" + j.id)) && (!asked.has(j.id) || again.has(j.id)),
+      ),
+      open = all.slice(-50);
     let changed = false,
-      running = false;
+      running = all.length > open.length;
+    for (const j of open) {
+      asked.add(j.id);
+      again.delete(j.id);
+    }
     const watch = (x) => ["queued", "running"].includes(x?.status) && Date.now() < Date.parse(x.deadlineAt);
     for (const j of open) {
       let v;
       try {
         v = await adapter.request("/generations/" + encodeURIComponent(j.id), "GET");
       } catch {
+        if ((unsettled(j) && !j.ledgerError) || watch(j)) {
+          again.add(j.id);
+          running = true;
+        }
         continue;
       }
       if (!v || v.status === j.status) {
+        if (watch(v)) again.add(j.id);
         running ||= watch(v);
         if (v?.status !== "succeeded") continue;
       }
+      for (const k of ["ledgerError", "releaseTextError", "ledgerPending"]) if (!(k in v)) delete j[k];   // resolved since
       Object.assign(j, v);
       changed = true;
       if (v.status === "succeeded" && v.result?.url && !db.assets.some((a) => a.id === "job-" + j.id))
         db.assets.push(M.asset(jobAsset(v)));
-      running ||= watch(v);
+      if (watch(v) || v.ledgerPending === true) {
+        again.add(j.id);
+        running = true;
+      }
     }
     // Card PJ.2: every succeeded job linked to an episode lands there (spec §0 F5) -- also one whose asset already
     // exists (the panel saved it, then its own settle failed); the asset is not proof the episode has it.

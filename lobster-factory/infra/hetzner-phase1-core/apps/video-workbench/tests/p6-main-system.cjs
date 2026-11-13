@@ -52,7 +52,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
   const { signPermit } = await import(pathToFileURL(path.join(appDir, "lib/entitlements/permit.ts")).href);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-p6-main-"));
   const calls = { openai: 0, theme: 0, permits: [], assets: [], jobs: [], usage: [], releaseText: [] };
-  let permitMode = "allow", themeAnswer = ":root{--body-bg:#112233;}", usageDown = false, assetsDown = false, releaseTextDown = false;
+  let permitMode = "allow", themeAnswer = ":root{--body-bg:#112233;}", usageDown = false, assetsDown = false, releaseTextDown = false, assetsDelayMs = 0;
   // next-admin, as its route files answer.
   async function fetchImpl(url, options = {}) {
     url = String(url);
@@ -76,6 +76,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.equal(options.headers.Authorization, "Bearer internal-secret");
     if (url === BASE + "/api/internal/video/workbench/assets") {
       if (assetsDown) return Response.json({ ok: false, error: "storage_put_failed" }, { status: 502 });
+      if (assetsDelayMs) await new Promise((r) => setTimeout(r, assetsDelayMs));
       const bytes = Buffer.from(await new Response(options.body).arrayBuffer());
       const meta = JSON.parse(Buffer.from(options.headers["X-VW-Meta"], "base64url").toString("utf8"));
       calls.assets.push({ headers: options.headers, meta, bytes });
@@ -407,6 +408,69 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       rt.close();
     }
 
+    // 6g. Invariant (P6.10 2026-11-13): a succeeded job is never answered unsettled -- it carries result.assetId,
+    // result.ledger (explicit skip) or ledgerError. A browser copy taken mid-registration was never asked again, so the
+    // editor export showed 「此成果尚未登記到主系統」 although the server had registered it.
+    {
+      const settledShape = (j) => !!(j.result?.assetId || j.result?.ledger || j.ledgerError);
+      // (a) registration still running (slow upload) while the page polls: no succeeded answer without the outcome.
+      assetsDelayMs = 600;
+      const raced = JSON.parse((await generate({ ...imageInput, idempotencyKey: "race-1" })).body);
+      let seen;
+      for (let i = 0; i < 400 && seen?.status !== "succeeded"; i++) {
+        seen = JSON.parse((await request(port, "GET", "/api/vw/generations/" + raced.id, who())).body);
+        if (seen.status !== "succeeded") await new Promise((r) => setTimeout(r, 10));
+      }
+      assetsDelayMs = 0;
+      assert.equal(seen.status, "succeeded", JSON.stringify(seen));
+      assert(settledShape(seen), "登記進行中的 succeeded 任務不得先回給瀏覽器：" + JSON.stringify(seen.result));
+      assert.match(seen.result.assetId, /^aaaaaaaa-/);
+      // (b) a succeeded job saved without any outcome (process stopped between finish and settle) is settled by its next GET.
+      const orphanDir = path.join(dir, "orphan"), orphanOrg = path.join(orphanDir, "orgs", ORG);
+      fs.mkdirSync(path.join(orphanOrg, "generated"), { recursive: true });
+      fs.copyFileSync(path.join(dir, "clip.mp4"), path.join(orphanOrg, "generated", "f.mp4"));
+      fs.writeFileSync(path.join(orphanOrg, "jobs.json"), JSON.stringify([{ id: "orphan-1", type: "video", status: "succeeded", createdAt: new Date().toISOString(),
+        result: { url: "/generated/f.mp4", origin: { kind: "render", engine: "workbench-editor" } }, input: { type: "video", operation: "editor-export", settings: {} } }]));
+      const os2 = createServer({ dataDir: orphanDir, env, fetchImpl });
+      await new Promise((r) => os2.listen(0, "127.0.0.1", r));
+      const orphan = JSON.parse((await request(os2.address().port, "GET", "/api/vw/generations/orphan-1", who())).body);
+      assert(settledShape(orphan), "沒有登記結果的 succeeded 任務，下一次 GET 補登記：" + JSON.stringify(orphan));
+      assert.match(orphan.result.assetId, /^aaaaaaaa-/, JSON.stringify(orphan));
+      os2.close();
+      // (c) registration longer than the GET's wait: answered ledgerPending (re-ask), never the bare fourth state; the
+      // record on disk never carries ledgerPending, and a later GET has the asset.
+      const slowDir = path.join(dir, "slow"), slowOrg = path.join(slowDir, "orgs", ORG);
+      fs.mkdirSync(path.join(slowOrg, "generated"), { recursive: true });
+      fs.copyFileSync(path.join(dir, "clip.mp4"), path.join(slowOrg, "generated", "e.mp4"));
+      fs.writeFileSync(path.join(slowOrg, "jobs.json"), JSON.stringify([{ id: "slow-1", type: "video", status: "succeeded", createdAt: new Date().toISOString(),
+        result: { url: "/generated/e.mp4", origin: { kind: "render", engine: "workbench-editor" } }, input: { type: "video", operation: "editor-export", settings: {} } }]));
+      const slow = createServer({ dataDir: slowDir, env: { ...env, VW_SETTLE_WAIT_MS: "100" }, fetchImpl });
+      await new Promise((r) => slow.listen(0, "127.0.0.1", r));
+      assetsDelayMs = 800;
+      const s1 = JSON.parse((await request(slow.address().port, "GET", "/api/vw/generations/slow-1", who())).body);
+      assert.equal(s1.ledgerPending, true, "登記超過等待上限：明確回 ledgerPending：" + JSON.stringify(s1));
+      assert.equal(JSON.parse(fs.readFileSync(path.join(slowOrg, "jobs.json"), "utf8"))[0].ledgerPending, undefined, "ledgerPending 不寫進紀錄");
+      await new Promise((r) => setTimeout(r, 1200));
+      assetsDelayMs = 0;
+      const s2 = JSON.parse((await request(slow.address().port, "GET", "/api/vw/generations/slow-1", who())).body);
+      assert.match(s2.result.assetId, /^aaaaaaaa-/, JSON.stringify(s2));
+      assert.equal(s2.ledgerPending, undefined);
+      slow.close();
+      // (d) history pruning keeps a connected job still owing its registration (its retry lives only in this record).
+      const pruneDir = path.join(dir, "prune"), pruneOrg = path.join(pruneDir, "orgs", ORG);
+      fs.mkdirSync(pruneOrg, { recursive: true });
+      const old = (id) => ({ id, type: "image", status: "succeeded", createdAt: new Date().toISOString(), result: { url: "/generated/b.png", ledger: "unsupported_type" } });
+      fs.writeFileSync(path.join(pruneOrg, "jobs.json"), JSON.stringify([{ ...old("owed-1"), result: { url: "/generated/a.png" } }, ...Array.from({ length: 101 }, (_, i) => old("old-" + i))]));
+      const pruner = createServer({ dataDir: pruneDir, env: { ...env, VW_JOB_HISTORY_LIMIT: "100" }, fetchImpl });
+      await new Promise((r) => pruner.listen(0, "127.0.0.1", r));
+      await request(pruner.address().port, "POST", "/api/vw/generations", who(), JSON.stringify({ ...imageInput, idempotencyKey: "prune-1" }));
+      await wait(() => calls.jobs.some((j) => j.idempotencyKey === "prune-1" && j.status === "succeeded"));
+      const kept = JSON.parse(fs.readFileSync(path.join(pruneOrg, "jobs.json"), "utf8")).map((j) => j.id);
+      assert(kept.includes("owed-1"), "尚未登記的完成任務不得被歷史上限裁掉");
+      assert(!kept.includes("old-0"), "已有結果的舊任務照常裁剪");
+      pruner.close();
+    }
+
     // 6f. Upload rights: only a literal true from the upload dialog is recorded as confirmed; a retry of an unconfirmed
     // upload with the box ticked is sent again so next-admin can upgrade the row (never the reverse).
     {
@@ -445,6 +509,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.equal(lj.status, "succeeded", JSON.stringify(lj));
     assert.equal(localCalls.filter((u) => u.startsWith(BASE)).length, 0, "本機模式不得連主系統");
     assert.equal(lj.result?.assetId, undefined);
+    assert.equal(lj.result?.ledger, "local_mode", "本機模式的完成任務明確標示不登記（6g 不變量）");
     local.close();
 
     // 8. D6: 1:1 / 4:3 delivery = 「此比例尚不能投遞」.
