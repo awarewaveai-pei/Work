@@ -200,6 +200,7 @@ const TOOLS = [
     desc: "在圖片上圈選多處，各自下指令一次改好",
     io: "圖片 → 圖片",
     new: 1,
+    scripts: ["tools-region.js"],
   },
   {
     id: "depth",
@@ -380,7 +381,7 @@ function screen(t) {
       body = `<div class="two-col">${stage("◉", "選一支要保護肖像的影片", "從素材庫挑選，或上傳 MP4 / MOV / WebM 影片（最長 5 分鐘）。原片不會被修改。")} ${side(`<h3>保護設定</h3>${label("保護方式")}${segmented("privacyType", ["馬賽克", "模糊"], "馬賽克")}${label("強度")}${segmented("privacyStrength", ["低", "中", "高"], "中")}${cost(2, "／秒，最低以 10 秒計")}<p class="note">若處理失敗會全額退回點數。側臉、遮擋或太小的臉可能偵測不到，發布前請先檢查成品。</p>`)}</div>`;
       break;
     case "region":
-      body = `<div class="two-col"><div>${stage("▧", "先選一張圖片，接著在畫面上拖曳框出要修改的位置", "", "image")}<div class="out">已標記區域：<span id="regionCount">0</span>／8 <button class="btn small" data-act="resetRegions">清空區域</button></div></div>${side(`<h3>圖片 <span style="color:var(--red)">*</span> <span style="float:right" class="muted">0/1</span></h3>${btn("選擇圖片", "upload:image")}${label("修改區域")}<p class="note">還沒有框選任何區域。在左側圖片上拖曳即可新增；也可以只填寫整體修改指令。</p><div id="regionInstructions"></div>${label("整體修改指令（選填）")}${ta("regionPrompt", "套用到所有選取區域的補充指令")}${label("參數")}<div class="row"><span class="note">${esc(VideoWorkbench.capabilities?.models?.image || "服務端設定模型")}</span>${chips("regionQuality", ["1K", "2K", "4K"], "2K")}</div><button class="btn primary primary-wide" data-act="submit" data-paid="video.image">生成區域編輯（API 計費）</button><p class="note">圖片載入後，可在左側圖片上拖曳框選最多 8 個區域。</p>`)}</div>`;
+      body = regionScreen(); // scripts/tools-region.js
       break;
     case "depth":
       body = `<div class="two-col">${stage("▱", "請先選取影片或直接上傳（最長支援 30 秒）", "支援 MP4 / MOV 影片。深度提取模型將自動重構空間三維幾何，生成黑白深度對照影片。")} ${side(`<h3>轉檔設定與費用</h3><p class="note" style="text-align:center">請先於左側上傳或選取影片</p>${cost(2, "／秒（最低 20 點、最高 60 點）")}<p class="note">* 雲端 GPU 高精度深度推計算。若轉檔失敗將全額自動退回點數。</p>`)}</div>`;
@@ -556,89 +557,6 @@ async function openLibrary(id) {
     VideoWorkbench.reportError(e);
   }
 }
-let toolRegionObserver;
-function regionInstructionsPrompt() {
-  const global = String(values.regionPrompt || "").trim();
-  if (!(selection.regions || []).length) {
-    if (!global) throw Error("請框選區域並填寫指令，或填寫整體修改指令");
-    return global;
-  }
-  if (!(selection.regions || []).every(area => area.prompt?.trim() || global)) throw Error("請為每個區域填寫修改指令，或補上整體指令");
-  return [global, ...(selection.regions || []).map((area, i) => `區域 ${i + 1}（圖片左上角起算，x=${Math.round(area.x * 100)}%、y=${Math.round(area.y * 100)}%、寬=${Math.round(area.w * 100)}%、高=${Math.round(area.h * 100)}%）：${area.prompt || global}`), "只修改選取區域，保留其他內容。"].filter(Boolean).join("\n");
-}
-function setupRegionCanvas() {
-  toolRegionObserver?.disconnect();
-  const st = $("#stage"), img = st?.querySelector("img");
-  if (!img) return;
-  const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
-  const paint = () => {
-    st.querySelectorAll(".region-selection").forEach(el => el.remove());
-    st.style.position = "relative";
-    const r = img.getBoundingClientRect(), base = st.getBoundingClientRect();
-    (selection.regions || []).forEach((area, i) => {
-      const box = document.createElement("div"); box.className = "region-selection"; box.dataset.regionIndex = i;
-      box.style.cssText = `left:${r.left - base.left + area.x * r.width}px;top:${r.top - base.top + area.y * r.height}px;width:${area.w * r.width}px;height:${area.h * r.height}px`;
-      const number = document.createElement("span"); number.textContent = i + 1; box.append(number);
-      for (const direction of ["nw", "n", "ne", "e", "se", "s", "sw", "w"]) {
-        const handle = document.createElement("i"); handle.dataset.regionHandle = direction; box.append(handle);
-      }
-      box.ondblclick = () => document.querySelector(`[data-region-prompt="${i}"]`)?.focus();
-      st.append(box);
-    });
-  };
-  const list = () => {
-    $("#regionCount").textContent = (selection.regions || []).length;
-    const host = $("#regionInstructions");
-    if (!host) return;
-    host.replaceChildren();
-    (selection.regions || []).forEach((area, i) => {
-      const label = document.createElement("label"); label.textContent = `區域 ${i + 1} 修改指令`;
-      const input = document.createElement("textarea"); input.className = "field"; input.dataset.regionPrompt = i; input.value = area.prompt || "";
-      input.oninput = () => { area.prompt = input.value; saveDraft(); };
-      const remove = document.createElement("button"); remove.className = "btn small"; remove.textContent = `刪除區域 ${i + 1}`;
-      remove.onclick = () => { selection.regions.splice(i, 1); paint(); list(); saveDraft(); };
-      label.append(input); host.append(label, remove);
-    });
-  };
-  img.style.cursor = "crosshair"; img.draggable = false; st.style.touchAction = "none";
-  if (img.complete) paint(); else img.onload = paint;
-  list(); toolRegionObserver = new ResizeObserver(paint); toolRegionObserver.observe(img);
-  st.onpointerdown = event => {
-    const box = event.target.closest(".region-selection");
-    if (!box && event.target !== img) return;
-    event.preventDefault();
-    const rect = img.getBoundingClientRect();
-    const start = { x: clamp((event.clientX - rect.left) / rect.width), y: clamp((event.clientY - rect.top) / rect.height) };
-    const index = box ? Number(box.dataset.regionIndex) : -1;
-    const original = index >= 0 ? { ...selection.regions[index] } : null;
-    const handle = event.target.dataset.regionHandle;
-    st.setPointerCapture(event.pointerId);
-    let created = -1;
-    const update = ev => {
-      const x = clamp((ev.clientX - rect.left) / rect.width), y = clamp((ev.clientY - rect.top) / rect.height);
-      selection.regions ??= [];
-      if (!original) {
-        if (Math.abs(x - start.x) < .002 || Math.abs(y - start.y) < .002 || (created < 0 && selection.regions.length >= 8)) return;
-        const area = { x: Math.min(start.x, x), y: Math.min(start.y, y), w: Math.abs(x - start.x), h: Math.abs(y - start.y), prompt: "" };
-        if (created < 0) { created = selection.regions.length; selection.regions.push(area); } else selection.regions[created] = area;
-      } else if (!handle) {
-        Object.assign(selection.regions[index], { x: clamp(original.x + x - start.x, 0, 1 - original.w), y: clamp(original.y + y - start.y, 0, 1 - original.h) });
-      } else {
-        let left = original.x, top = original.y, right = left + original.w, bottom = top + original.h;
-        if (handle.includes("w")) left = clamp(original.x + x - start.x, 0, right - .005);
-        if (handle.includes("e")) right = clamp(original.x + original.w + x - start.x, left + .005, 1);
-        if (handle.includes("n")) top = clamp(original.y + y - start.y, 0, bottom - .005);
-        if (handle.includes("s")) bottom = clamp(original.y + original.h + y - start.y, top + .005, 1);
-        Object.assign(selection.regions[index], { x: left, y: top, w: right - left, h: bottom - top });
-      }
-      paint();
-    };
-    st.onpointermove = update;
-    st.onpointerup = ev => { update(ev); st.onpointermove = st.onpointerup = st.onpointercancel = null; list(); saveDraft(); };
-    st.onpointercancel = () => { st.onpointermove = st.onpointerup = st.onpointercancel = null; list(); saveDraft(); };
-  };
-}
-
 VideoWorkbench.tools = {
   async acceptAsset(payload) {
     if (!TOOLS.some((item) => item.id === payload.tool)) throw Error("工具不存在");
@@ -769,16 +687,6 @@ document.addEventListener("click", (e) => {
   }
   if (action.startsWith("toggle:")) {
     $("#" + action.slice(7))?.classList.toggle("hidden");
-    return;
-  }
-  if (action === "resetRegions") {
-    selection.regions = [];
-    values.regionPrompt = "";
-    const globalPrompt = document.querySelector('[data-key="regionPrompt"]');
-    if (globalPrompt) globalPrompt.value = "";
-    $("#regionCount").textContent = "0";
-    saveDraft();
-    setupRegionCanvas();
     return;
   }
   if (action === "savewatermark") {

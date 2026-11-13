@@ -135,6 +135,8 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
       });
     const image = tools.locator("#stage img");
     await image.waitFor();
+    // The canvas is up to 74vh tall (tools-region.js): bring the whole picture into the 720 px viewport before dragging.
+    await image.evaluate((el) => el.scrollIntoView({ block: "center" }));
     // Opening a tool scrolls to the top smoothly (tools-0.js scrollTo + html scroll-behavior:smooth, ~170 ms): measure
     // only once the picture has stopped moving, or the drag lands at a stale position.
     let box = await image.boundingBox();

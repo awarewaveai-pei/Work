@@ -9,8 +9,9 @@
   const money = (usd) => window.VideoWorkbenchMoney(usd, from);
   // usd 0 = no vendor bill (our own whisper worker): said as 免費, not NT$0.
   const unitText = (p) => (p && p.usd === 0 ? "免費" : p && Number.isFinite(p.usd) && money(p.usd) ? `${p.estimate ? "約 " : ""}${money(p.usd)}／${p.unit}` : "");
-  // model = the video model / 3D way the action runs (data-paid-model; a rerun uses its job's), else the default.
-  function one(feature, c, model) {
+  // model = the video model / 3D way / image-edit row the action runs (data-paid-model; a rerun uses its job's), else the
+  // default. size = an image-edit row's resolution (data-paid-size); none = the row's default.
+  function one(feature, c, model, size) {
     if (!c) return "";
     from = c;
     if (feature === "video.bg-remove") return unitText({ usd: c.toolCosts?.removeBackground, unit: "張", estimate: true });
@@ -21,6 +22,9 @@
       const paid = (c.imageTo3d?.methods || []).map((m) => m.usd).filter((usd) => Number.isFinite(usd) && usd > 0);
       return paid.length ? money(Math.min(...paid)) + " 起／個" : "";
     }
+    // An image-edit row (capabilities imageEdit.models, backend/image-edit.cjs): its price at that resolution.
+    const edit = feature === "video.image" && model && c.imageEdit?.models?.find((m) => m.id === model);
+    if (edit) return unitText(edit.prices?.[edit.sizes.includes(size) ? size : edit.defaultSize]);
     // A chosen speech model / transcription engine (data-paid-model = its id): that row's own price from the list.
     if (model && feature === "video.tts") return unitText(c.speech?.models?.find((m) => m.id === model)?.price);
     if (model && feature === "video.transcribe") return unitText(c.transcribe?.engines?.find((e) => e.id === model)?.price);
@@ -28,13 +32,13 @@
     return unitText(c.prices?.[feature]);
   }
   // "" = no price known yet (capabilities not loaded) or a feature without a price.
-  const text = (features, c = caps(), model) => String(features || "").split(/\s+/).filter(Boolean).map((f) => one(f, c, model)).filter(Boolean).join(" + ");
+  const text = (features, c = caps(), model, size) => String(features || "").split(/\s+/).filter(Boolean).map((f) => one(f, c, model, size)).filter(Boolean).join(" + ");
   function mark(root = document) {
     for (const el of root.querySelectorAll("[data-paid]")) {
       const own = el.querySelector(":scope > .paid-price");
       // A label that already states its price (a quote's NT$ amount, or 免費 for usd 0) gets none added.
       if (/NT\$|免費/.test(String(el.textContent).replace(own?.textContent || "", ""))) { own?.remove(); continue; }
-      const t = text(el.dataset.paid, caps(), el.dataset.paidModel);
+      const t = text(el.dataset.paid, caps(), el.dataset.paidModel, el.dataset.paidSize);
       if (!t) { own?.remove(); continue; }
       if (own?.textContent === " · " + t) continue;
       // pointer-events none: a click still lands on the button itself (handlers test e.target.id).

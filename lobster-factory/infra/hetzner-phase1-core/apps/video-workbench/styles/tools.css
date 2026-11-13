@@ -667,18 +667,42 @@ body {
   overflow-x: hidden;
 }
 
-.region-selection { position: absolute; border: 2px solid var(--accent); cursor: move; }
-.region-selection > span { background: var(--accent); color: var(--card-bg); padding: 2px 5px; pointer-events: none; }
-.region-selection > i { position: absolute; width: 10px; height: 10px; border: 1px solid var(--accent); background: var(--card-bg); }
+/* 圖片局部編輯器 (scripts/tools-region.js): a large canvas, numbered boxes with an × on each, an instruction popover beside
+   the box, compact rows in the side panel. Theme tokens only. */
+.region-layout { grid-template-columns: minmax(0, 1fr) 340px; }
+.region-stage { min-height: 62vh; padding: 16px; justify-content: center; }
+.region-board { position: relative; line-height: 0; max-width: 100%; }
+.region-image { display: block; width: 100%; height: auto; cursor: crosshair; user-select: none; }
+.region-selection { position: absolute; border: 2px solid var(--accent); background: none; cursor: move; line-height: normal; }
+.region-selection.selected { box-shadow: 0 0 0 1px var(--card-bg); }
+.region-badge { position: absolute; left: -2px; top: -26px; min-width: 24px; padding: 2px 7px; border-radius: var(--radius-sm); background: var(--btn-primary-bg); color: var(--btn-primary-text); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); text-align: center; pointer-events: none; }
+.region-close { position: absolute; right: -2px; top: -26px; width: 24px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card-bg); color: var(--text-primary); cursor: pointer; }
+.region-close:hover { border-color: var(--red); color: var(--red); }
+.region-selection > i { position: absolute; width: 8px; height: 8px; border: 1px solid var(--accent); background: var(--card-bg); }
 [data-region-handle="nw"] { left: -5px; top: -5px; cursor: nwse-resize; }
-[data-region-handle="n"] { left: calc(50% - 5px); top: -5px; cursor: ns-resize; }
+[data-region-handle="n"] { left: calc(50% - 4px); top: -5px; cursor: ns-resize; }
 [data-region-handle="ne"] { right: -5px; top: -5px; cursor: nesw-resize; }
-[data-region-handle="e"] { right: -5px; top: calc(50% - 5px); cursor: ew-resize; }
+[data-region-handle="e"] { right: -5px; top: calc(50% - 4px); cursor: ew-resize; }
 [data-region-handle="se"] { right: -5px; bottom: -5px; cursor: nwse-resize; }
-[data-region-handle="s"] { left: calc(50% - 5px); bottom: -5px; cursor: ns-resize; }
+[data-region-handle="s"] { left: calc(50% - 4px); bottom: -5px; cursor: ns-resize; }
 [data-region-handle="sw"] { left: -5px; bottom: -5px; cursor: nesw-resize; }
-[data-region-handle="w"] { left: -5px; top: calc(50% - 5px); cursor: ew-resize; }
-#regionInstructions textarea { width: 100%; display: block; margin: 8px 0; }
+[data-region-handle="w"] { left: -5px; top: calc(50% - 4px); cursor: ew-resize; }
+.region-popover { position: absolute; z-index: 3; width: 260px; padding: 10px; line-height: normal; text-align: left; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius-sm); box-shadow: 0 6px 18px var(--border); }
+.region-popover textarea { display: block; width: 100%; min-height: 96px; resize: vertical; }
+.region-popover-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: var(--font-size-sm); }
+.region-required { color: var(--red); }
+.region-of { float: right; font-weight: var(--font-weight-normal); }
+.region-thumb { display: flex; align-items: center; gap: 8px; }
+.region-thumb img { width: 48px; height: 48px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.region-thumb-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-sm); }
+.region-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
+.region-row.selected { border-color: var(--accent); background: var(--bg-hover); }
+.region-pill { flex: none; min-width: 22px; padding: 1px 6px; border-radius: var(--radius-sm); background: var(--btn-primary-bg); color: var(--btn-primary-text); font-size: var(--font-size-sm); text-align: center; }
+.region-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-sm); }
+.region-trash { flex: none; padding: 2px 6px; }
+.side label .region-reset { float: right; margin-top: -4px; }
+.region-missing { margin: 8px 0 0; color: var(--red); font-size: var(--font-size-sm); }
+.region-missing:empty { display: none; }
 
 /* Tool flows inherit AwareWave tokens; no styles are injected into storyboards. */
 .tool-flow .flow-choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 18px; }

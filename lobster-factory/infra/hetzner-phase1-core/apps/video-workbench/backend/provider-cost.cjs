@@ -34,6 +34,17 @@ function imageUsd(model, usage) {
     text = d.text_tokens ?? (d.image_tokens === undefined ? usage.input_tokens : tok(usage.input_tokens) - tok(d.image_tokens));
   return round((tok(text) * r.textInPerM + tok(d.image_tokens) * r.imageInPerM + tok(usage.output_tokens) * r.imageOutPerM) / 1e6);
 }
+// Gemini image (cost-model.ts GEMINI_IMAGE_TOKEN_RATES): the reply's own usage; no usage = the button estimate, the size's
+// image tokens at outputPerM + the measured reply's text and thinking tokens at textOutPerM. A size without a token count
+// has no price (it is not offered).
+function geminiImageUsd(model, size, usage = null) {
+  const rate = rates.GEMINI_IMAGE_TOKEN_RATES[model];
+  if (!rate || !Object.hasOwn(rate.imageTokens, size)) throw unpriced(model + " " + size);
+  if (usage && Number.isFinite(Number(usage.total_output_tokens))) return round(rates.geminiMediaUsd(rate, usage));
+  return round((rate.imageTokens[size] * rate.outputPerM + rate.replyTokens * rate.textOutPerM) / 1e6);
+}
+// One image-edit run (backend/image-edit.cjs rows): Gemini by size, OpenAI by its usage (no usage = imageUsd's estimate).
+const imageEditUsd = (model, size, usage = null) => (Object.hasOwn(rates.GEMINI_IMAGE_TOKEN_RATES, model) ? geminiImageUsd(model, size, usage) : imageUsd(model, usage));
 // next-admin video-motion ids (veo-3-1-fast...): per output second. Gemini video (GEMINI_VIDEO_RATES): the finished
 // interaction's usage (cost-model.ts geminiMediaUsd); no usage = seconds x the 720p video tokens per second.
 function videoUsd(model, seconds, usage = null) {
@@ -100,7 +111,7 @@ const toolUsd = (key) => {
 // Before a paid job starts: its model must have a price (same tables the charge reads).
 function priceOf(kind, model) {
   if (kind === "text") textRate(model);
-  else if (kind === "image") imageUsd(model);
+  else if (kind === "image") Array.isArray(model) ? imageEditUsd(...model) : imageUsd(model); // [model, size] = an image-edit row
   else if (kind === "video") videoUsd(model, 0);
   else if (kind === "audio") speechUsd(model, 0);
   else if (kind === "transcribe") transcribeUsd(model, 0);
@@ -136,4 +147,4 @@ function displayPrices({ text, image, audio, transcribe, music }) {
 // Replicate models billed per GPU second (TOOL_RATES usdPerSec): the one function, next-admin cost-model.ts replicateRunUsd.
 const runUsd = (key, predictTimeSec) => rates.replicateRunUsd(key, predictTimeSec);
 
-module.exports = { textUsd, imageUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };
+module.exports = { textUsd, imageUsd, geminiImageUsd, imageEditUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };

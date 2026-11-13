@@ -61,58 +61,19 @@ async function submitTool() {
           ? "audio"
           : tool === "region"
             ? "image"
-            : "video",
-      prompt =
-        tool === "voice"
-          ? val("voiceText")
-          : tool === "music"
-            ? val("musicPrompt")
-            : tool === "region"
-              ? regionInstructionsPrompt()
-              : "";
-    let references = files,
+            : "video";
+    let prompt = tool === "voice" ? val("voiceText") : tool === "music" ? val("musicPrompt") : "",
+      references = files,
+      settings = values,
       mask;
-    if (tool === "region") {
-      if (!selection.regions?.length && !String(val("regionPrompt")).trim())
-        throw Error("請先框選區域，或填寫整體修改指令");
-      const image = new Image();
-      image.src = files.image.url;
-      await image.decode();
-      Object.assign(values, { imageLayout: 'region-preserve', quality: val('regionQuality', '2K'), regionWidth: image.naturalWidth, regionHeight: image.naturalHeight });
-      const canvas = document.createElement("canvas");
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(image, 0, 0);
-      const png = await new Promise((r) => canvas.toBlob(r, "image/png"));
-      const reference = await VideoWorkbench.uploadAsset(
-        new File([png], "region-source.png", { type: "image/png" }),
-        { derived: true },
-      );
-      ctx.fillStyle = "white";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      if (!selection.regions?.length) ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (const r of selection.regions || [])
-        ctx.clearRect(
-          r.x * canvas.width,
-          r.y * canvas.height,
-          r.w * canvas.width,
-          r.h * canvas.height,
-        );
-      mask = (
-        await VideoWorkbench.request("/uploads", {
-          name: "region-mask.png",
-          data: canvas.toDataURL("image/png"),
-        })
-      ).url;
-      references = { images: [reference] };
-    }
+    // The region tool's prompt, source, mask and model settings: scripts/tools-region.js.
+    if (tool === "region") ({ prompt, references, settings, mask } = await regionJobInput());
     // paid: video.image (the region tool; the other tools reaching here run locally)
     const job = await VideoWorkbench.generations.create({
       type,
       prompt,
       operation: tool,
-      settings: values,
+      settings,
       references,
       mask,
       selection,

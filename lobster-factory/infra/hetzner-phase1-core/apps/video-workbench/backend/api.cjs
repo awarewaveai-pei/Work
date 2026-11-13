@@ -22,6 +22,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const speech = require("./speech.cjs");
   // 音樂生成: one list (backend/music.cjs); a job names its row in input.musicModel (an older draft's label resolves too).
   const music = require("./music.cjs");
+  const imageEdit = require("./image-edit.cjs");
   const chunkBytes = (engine) => Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || engine.uploadBytes;
   const transcriptsDir = path.join(dataDir, "transcripts");
   // Per-request spend of the sync paid routes (text, transcription): each handler call runs in its own meter.
@@ -167,7 +168,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     ? JSON.parse(fs.readFileSync(stateFile, "utf8"))
     : null;
   const providerModels = generationPolicy.models(env);
-  // vm = the video model that ran (generationPolicy.videoModelOf); other types name the server's model.
+  // vm = the video model that ran (generationPolicy.videoModelOf) or the image-edit row ({ model, provider }); other types
+  // name the server's model.
   const aiOrigin = (type, costUsd, vm) => ({
     kind: "ai_generated",
     model: vm ? vm.model : providerModels[type],
@@ -647,13 +649,28 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           job.result = { url: '/generated/' + path.basename(destination) };
         }
         job.disclosure = "AI 生成聲音";
+      } else if (type === "image" && input.operation === "region" && !imageEdit.pick(input.settings.model, env).mask) {
+        // A model without a mask (backend/image-edit.cjs): the source + the instruction, then only the boxes go back
+        // onto the original, so nothing outside them changes.
+        const m = imageEdit.pick(input.settings.model, env), size = input.settings.quality,
+          source = imageReference(flatten(input)[0]?.url || ""), mask = imageReference(input.mask || "");
+        if (!/^data:image\/png;base64,/.test(mask)) throw Error("請提供選取區域遮罩");
+        const edited = await imageEdit.gemini(m, { prompt, image: source, width: input.settings.regionWidth, height: input.settings.regionHeight, size, env, fetchImpl, signal });
+        job.costUsd = costs.imageEditUsd(m.id, size, edited.usage);
+        job.imageEdit = { model: m.id, provider: m.vendor };
+        const [width, height] = generationPolicy.imageDimensions(input.settings), filename = crypto.randomUUID() + ".png";
+        await mediaTools.compositeRegions({ original: Buffer.from(source.split(",")[1], "base64"), edited: edited.image, mask: Buffer.from(mask.split(",")[1], "base64"), destination: path.join(outputs, filename), width, height, signal });
+        job.result = { url: "/generated/" + filename, width, height, layout: input.settings.imageLayout };
       } else if (type === "image") {
         const refs = flatten(input);
         if (input.character?.references)
           for (const url of input.character.references) refs.push({ url });
         const ratio = input.settings?.imageLayout === 'region-preserve' ? input.settings.regionWidth === input.settings.regionHeight ? '1:1' : input.settings.regionWidth > input.settings.regionHeight ? '16:9' : '9:16' : input.settings?.ratio || input.ratio;
+        // The region tool's chosen row (backend/image-edit.cjs, an OpenAI model that takes a mask); else the server's model.
+        const imageModel = input.operation === "region" ? imageEdit.pick(input.settings?.model, env).id : providerModels.image;
+        if (input.operation === "region") job.imageEdit = { model: imageModel, provider: "OpenAI" };
         const body = {
-          model: providerModels.image,
+          model: imageModel,
           prompt,
           size:
             ["16:9", "4:3"].includes(ratio)
@@ -700,7 +717,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           result = await r.json();
         } else result = await provider("/images/generations", body, signal);
         if (!result.data?.[0]?.b64_json) throw Error("圖片服務沒有回傳圖片");
-        job.costUsd = costs.imageUsd(providerModels.image, result.usage);
+        job.costUsd = costs.imageUsd(imageModel, result.usage);
         job.result = {
           url: output(Buffer.from(result.data[0].b64_json, "base64"), "png"),
         };
@@ -740,7 +757,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         return;
       }
       if (signal.aborted) return;
-      job.result.origin = aiOrigin(type, job.costUsd, type === "audio" ? job.speech : undefined);
+      job.result.origin = aiOrigin(type, job.costUsd, type === "audio" ? job.speech : job.imageEdit);
       job.status = "succeeded";
       job.progress = 100;
       persist();
@@ -820,6 +837,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   async function start(input, res, extra, req) {
+    // The region tool: the job records the image-edit row and size it runs (before validation, pricing and storing).
+    const editModel = input?.operation === "region" ? imageEdit.request(input, env) : null;
     const isMedia = mediaTools.supported.includes(input.operation),
       isRemoveBg = input.operation === "remove-bg",
       isRemotion = input.operation === "remotion-template",
@@ -850,12 +869,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (videoModel) generationPolicy.videoVendor(videoModel.provider).token(env);
     else if (isMusic) music.key(music.pick(input.musicModel, env), env);
     else if (parsed.type === "audio" && !isMedia) speech.key(speech.pick(input.speechModel, env), env);
+    else if (editModel) imageEdit.key(editModel, env);
     else if (!isMedia && !isRemoveBg && !isRemotion && !isBlender && !isImageTo3d && !isTranscribe) key();
     // paidFeature on the job: the retry button prices a rerun from it (shared/paid-price.js); the permit needs main.
     const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
     if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music" }[feature] || feature,
-      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id }[feature]);
+      { "video.image": editModel ? [editModel.id, input.settings.quality] : providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id }[feature]);
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
     if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });
@@ -1110,7 +1130,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         return true;
       }
       if (req.method === "GET" && route === "/capabilities") {
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId } : null });

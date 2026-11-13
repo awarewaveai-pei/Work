@@ -1,6 +1,7 @@
 const { spawn } = require("node:child_process"),
   fs = require("node:fs"),
-  path = require("node:path");
+  path = require("node:path"),
+  crypto = require("node:crypto");
 const binary = require("ffmpeg-static");
 const supported = [
   "edit",
@@ -217,9 +218,21 @@ async function media(input, { file, output, signal }) {
 async function normalizeImage(source, destination, { width, height, signal }) {
   await run(["-y", "-hide_banner", "-i", source, "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase:flags=lanczos,crop=${width}:${height}`, "-frames:v", "1", "-threads", "1", destination], signal);
 }
+// Region edit with a model that takes no mask: the edited image's pixels only where the mask is transparent (the boxes),
+// the original everywhere else, both at width x height (the edit stretched to the source's exact ratio so boxes line up).
+async function compositeRegions({ original, edited, mask, destination, width, height, signal }) {
+  const dir = path.dirname(destination), id = crypto.randomUUID(), files = ["o", "e", "m"].map((k) => path.join(dir, `${id}-${k}.png`));
+  try {
+    [original, edited, mask].forEach((buffer, i) => fs.writeFileSync(files[i], buffer));
+    const fit = `scale=${width}:${height}:flags=lanczos,format=rgba`;
+    await run(["-y", "-hide_banner", "-i", files[0], "-i", files[1], "-i", files[2], "-filter_complex",
+      `[0:v]${fit}[o];[1:v]${fit}[e];[2:v]${fit},alphaextract,negate[a];[e][a]alphamerge[ea];[o][ea]overlay=format=auto[out]`,
+      "-map", "[out]", "-frames:v", "1", "-threads", "1", destination], signal);
+  } finally { files.forEach((f) => fs.rmSync(f, { force: true })); }
+}
 async function adjustVoice(source, destination, { pitch, gain, speed = 1, signal }) {
   if (!Number.isFinite(pitch) || Math.abs(pitch) > 12 || !Number.isFinite(gain) || gain < -30 || gain > 12 || !Number.isFinite(speed) || speed < .25 || speed > 4) throw Error('語音語速、音調或音量無效');
   const factor = Math.pow(2, pitch / 12);
   await run(['-y', '-hide_banner', '-i', source, '-af', `aresample=48000,asetrate=${48000 * factor},aresample=48000,atempo=${1 / factor},atempo=${Math.sqrt(speed)},atempo=${Math.sqrt(speed)},volume=${Math.pow(10, gain / 20)}`, '-c:a', 'libmp3lame', destination], signal);
 }
-module.exports = { media, supported, normalizeImage, adjustVoice, run };
+module.exports = { media, supported, normalizeImage, compositeRegions, adjustVoice, run };
