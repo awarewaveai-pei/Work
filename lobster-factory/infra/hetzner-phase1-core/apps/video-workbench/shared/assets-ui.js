@@ -38,6 +38,53 @@
   const kind = (a) =>
     a.kind === "character" ? "image" : a.kind || a.type?.split("/")[0];
   VideoWorkbench.mediaKind = kind;
+  // Media made by backend/media-store.cjs keep thumb.jpg and waveform.json beside the original; assets saved before
+  // those fields existed still find them from the /media/<sha256>/ url.
+  VideoWorkbench.mediaFile = (a, name) => {
+    const field = name === "thumb.jpg" ? a?.thumbUrl : a?.waveformUrl;
+    if (field) return field;
+    const m = /^(\/media\/[a-f0-9]{64}\/)[^/]+$/.exec(a?.url || "");
+    return m ? m[1] + name : null;
+  };
+  const clock = (seconds) => {
+    const s = Math.round(Math.max(0, seconds)), pad = (n) => String(n).padStart(2, "0");
+    return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+  };
+  // The one 素材卡 (選擇素材 below, 素材庫 in workspaces.js, the editor's 素材 pane). A video shows the 360px thumb.jpg made
+  // at ingest and loads no video bytes until the pointer rests on it; one without a thumb shows its first frame through
+  // preload="metadata". main = the card button's attributes (already escaped); attrs = the article's; badges sit on the
+  // picture, aside next to it, actions in the row under the name.
+  VideoWorkbench.assetCard = (a, { main = "", attrs = "", selected = false, badges = "", aside = "", actions = "" } = {}) => {
+    const k = kind(a),
+      seconds = Number.isFinite(a.duration) ? a.duration : a.probe?.duration,
+      length = k === "image" ? "靜圖" : Number.isFinite(seconds) ? clock(seconds) : "",
+      play = k === "video" ? VideoWorkbench.safeUrl(a.previewUrl || a.url) : "",
+      thumb = VideoWorkbench.safeUrl((k === "image" ? a.previewUrl || a.url : k === "video" ? VideoWorkbench.mediaFile(a, "thumb.jpg") : "") || ""),
+      picture = thumb
+        ? `<img class="asset-card-${k}" src="${escape(thumb)}" alt="" loading="lazy" decoding="async">`
+        : play
+          ? `<video src="${escape(play)}#t=0.1" preload="metadata" muted playsinline></video>`
+          : `<span aria-hidden="true">${k === "audio" ? "♪" : "▣"}</span>`;
+    return `<article class="asset-card"${attrs ? " " + attrs : ""}><button type="button" class="asset-card-main${selected ? " selected" : ""}" ${main}><span class="asset-card-thumb"${play ? ` data-asset-play="${escape(play)}"` : ""}>${picture}${badges}${length ? `<i class="asset-card-length">${length}</i>` : ""}</span><b class="asset-card-name">${escape(a.name || "素材")}</b></button>${aside}${actions ? `<div class="asset-card-actions">${actions}</div>` : ""}</article>`;
+  };
+  // A video card plays its preview file, muted, while the pointer rests on it; leaving stops the download.
+  document.addEventListener("pointerover", (e) => {
+    const box = e.target.closest?.("[data-asset-play]");
+    if (!box || box.querySelector(".asset-card-play")) return;
+    const video = Object.assign(document.createElement("video"), { className: "asset-card-play", src: box.dataset.assetPlay, muted: true, loop: true, playsInline: true });
+    box.append(video);
+    video.play().catch(() => {});
+    box.addEventListener("pointerleave", () => {
+      video.removeAttribute("src");
+      video.load();
+      video.remove();
+    }, { once: true });
+  });
+  // The full-size player shown by 預覽 (選擇素材) and by a 素材庫 card: plays with sound and controls.
+  VideoWorkbench.assetPreviewHtml = (a) => {
+    const url = escape(VideoWorkbench.safeUrl(a.url)), src = escape(VideoWorkbench.safeUrl(a.previewUrl || a.url)), k = kind(a);
+    return `<h3>${escape(a.name)}</h3>${k === "image" ? `<img src="${url}" alt="${escape(a.name)}">` : k === "video" ? `<video src="${src}" controls></video>` : `<audio src="${src}" controls></audio>`}`;
+  };
   // Background removal (backend/bg-remove.cjs): the price comes from /capabilities (generation-policy.cjs toolCosts)
   // and is on the button before the click. The result is saved as a new library asset by showJob (jobs-view.js).
   let caps;
@@ -161,7 +208,7 @@
         selected = new Set(),
         query = "", source = "assets", durationFilter = "all";
       panel.innerHTML = VideoWorkbench.sanitize(
-        '<header><h2>選擇素材</h2><button data-picker-close>返回</button></header><div class="asset-controls"><input data-picker-search placeholder="搜尋素材名稱" aria-label="搜尋素材"><label class="asset-upload-btn">上傳素材<input data-picker-upload type="file" multiple></label>' + VideoWorkbench.rightsCheckbox() + '</div><div data-picker-items class="asset-list"></div><footer><span data-picker-count>已選 0 個</span><button data-picker-confirm>加入選取素材</button></footer>',
+        '<header><h2>選擇素材</h2><button data-picker-close>返回</button></header><div class="asset-controls"><input data-picker-search placeholder="搜尋素材名稱" aria-label="搜尋素材"><label class="asset-upload-btn">上傳素材<input data-picker-upload type="file" multiple></label>' + VideoWorkbench.rightsCheckbox() + '</div><div data-picker-items class="asset-grid"></div><footer><span data-picker-count>已選 0 個</span><button data-picker-confirm>加入選取素材</button></footer>',
       );
       document.body.append(panel);
       if (parityControls) {
@@ -202,7 +249,11 @@
               ? shown
                   .map(
                     (a) =>
-                      `<article><button class="asset-choice ${selected.has(a.id) ? "selected" : ""}" data-picker-id="${escape(a.id)}" aria-pressed="${selected.has(a.id)}">${kind(a) === "image" ? `<img src="${escape(VideoWorkbench.safeUrl(a.url))}" alt="">` : kind(a) === "video" ? "▣" : "♫"}<strong>${escape(a.name)}</strong></button><button data-picker-preview="${escape(a.id)}">預覽</button></article>`,
+                      VideoWorkbench.assetCard(a, {
+                        main: `data-picker-id="${escape(a.id)}" aria-pressed="${selected.has(a.id)}"`,
+                        selected: selected.has(a.id),
+                        actions: `<button type="button" data-picker-preview="${escape(a.id)}">預覽</button>`,
+                      }),
                   )
                   .join("")
               : `<p>${["platform", "licensed"].includes(source) ? "尚未接入此角色來源。外部平台的角色與授權不會轉入本機工作台。" : "目前沒有符合條件的素材，可直接上傳；影片長度未知時只會列在全部長度。"}</p>`,
@@ -258,8 +309,8 @@
           preview.className = "picker-preview";
           const removeBg = kind(asset) === "image" ? await VideoWorkbench.removeBgLabel() : null;
           if (!panel.isConnected) return;
-          const url = escape(VideoWorkbench.safeUrl(asset.url)), previewSrc = escape(VideoWorkbench.safeUrl(asset.previewUrl || asset.url));
-          preview.innerHTML = VideoWorkbench.sanitize(`<button data-picker-preview-close>返回素材選擇</button>${parityControls && url ? `<a href="${url}" download="${escape(asset.name)}" target="_blank" rel="noopener noreferrer">下載／開新分頁</a>` : ""}${removeBg ? `<button data-picker-remove-bg="${escape(asset.id)}">${escape(removeBg)}</button>` : ""}<h3>${escape(asset.name)}</h3>${kind(asset) === "image" ? `<img src="${url}" alt="${escape(asset.name)}">` : kind(asset) === "video" ? `<video src="${previewSrc}" controls></video>` : `<audio src="${previewSrc}" controls></audio>`}`);
+          const url = escape(VideoWorkbench.safeUrl(asset.url));
+          preview.innerHTML = VideoWorkbench.sanitize(`<button data-picker-preview-close>返回素材選擇</button>${parityControls && url ? `<a href="${url}" download="${escape(asset.name)}" target="_blank" rel="noopener noreferrer">下載／開新分頁</a>` : ""}${removeBg ? `<button data-picker-remove-bg="${escape(asset.id)}">${escape(removeBg)}</button>` : ""}${VideoWorkbench.assetPreviewHtml(asset)}`);
           panel.append(preview);
         }
         else if (b.hasAttribute("data-picker-confirm"))

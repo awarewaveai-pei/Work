@@ -36,7 +36,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
     buffer: png,
   });
   await p
-    .locator(".workspace-card h2")
+    .locator(".asset-card-name")
     .filter({ hasText: "可共用的圖片.png" })
     .waitFor();
   const saved = await p.evaluate(() => VideoWorkbench.assets.list());

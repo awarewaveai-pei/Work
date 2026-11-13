@@ -80,7 +80,7 @@ const settle = async (call, id) => {
       await p.waitForFunction(() => window.VideoWorkbench?.router);
       await p.locator("#assetsNav").click();
       await p.locator("#workspaceUpload").setInputFiles({ name: "去背來源.png", mimeType: "image/png", buffer: png });
-      const card = p.locator(".workspace-card").filter({ hasText: "去背來源.png" });
+      const card = p.locator(".asset-card").filter({ hasText: "去背來源.png" });
       const button = card.locator("[data-asset-remove-bg]");
       const shown = await p.evaluate((usd) => VideoWorkbenchMoney(usd), cost); // the page's formatter, cost-model.ts price
       assert.match(shown, /^NT\$\d/);

@@ -31,7 +31,7 @@ const open = async (context, base) => {
       p.on("pageerror", (e) => errors.push(e.message));
       await p.locator("#assetsNav").click();
       await p.locator("#workspaceUpload").setInputFiles({ name: "帳冊測試.png", mimeType: "image/png", buffer: png });
-      await p.locator(".workspace-card h2").filter({ hasText: "帳冊測試.png" }).waitFor();
+      await p.locator(".asset-card-name").filter({ hasText: "帳冊測試.png" }).waitFor();
       await p.evaluate(async () => {
         await VideoWorkbench.projects.save({ id: "ledger-project", title: "帳冊專案", type: "single" });
         await VideoWorkbench.flush();

@@ -2352,8 +2352,8 @@ body.storyboards-open main {
    Iframe workspaces (including storyboards) keep their own layout. */
 .sidebar { position: relative; z-index: 160; }
 #modal:not(.hidden), body > .asset-workspace, body > .job-view,
-body > .asset-workspace .picker-preview { left: 207px; }
+body > .asset-workspace .picker-preview, #workspaceArea .picker-preview { left: 207px; }
 @media (max-width: 850px) {
   #modal:not(.hidden), body > .asset-workspace, body > .job-view,
-  body > .asset-workspace .picker-preview { left: 0; top: 56px; }
+  body > .asset-workspace .picker-preview, #workspaceArea .picker-preview { left: 0; top: 56px; }
 }
