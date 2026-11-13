@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-13（續11）圖片局部編輯器改讀共用模型清單＋Nano Banana 2.1（2K／4K）＋Replicate 停止規則
+
+- 起因：續9 上線的局部編輯器另寫了一份 3 個模型的清單，跟 next-admin 共用清單 `public/editor-shared/image-models.js` 重複（區域編輯 session 自己發現）。操作者 2026-11-13 決定加 Nano Banana 2.1，局部編輯才有 2K／4K。
+- 做法（區域編輯 session，監工驗收）：
+  - bf7e1fb4f：`backend/image-edit.cjs` 只讀共用清單 `modelsFor("fill")`；各家遮罩格式在 `media.cjs regionMasks`；所有模型走同一段流程，最後只把框內貼回原圖。6120a76da 補回重構時誤刪的 `priceOf("image")`，沒補的話一般生圖會被擋。
+  - c15e28907：刪掉自己寫的 Replicate 輪詢迴圈，改用 `replicate-run.cjs runPrediction／deliveryUrl`（工作取消或逾時會通知 Replicate 停止）。
+  - 5a8e400e7：共用清單裡的 nano-banana-2 加上 fill 用途（zh:ok，實測兩次照指令畫；blank:no，沒量測）；尺寸與價格的唯一來源是 `cost-model.ts GEMINI_IMAGE_TOKEN_RATES.imageTokens`。專業編輯器的生成填色也會出現它。
+  - 20a6222b8：工作記下 `replicateId`，伺服器重啟時 `api.cjs` 會通知 Replicate 停止。
+- 不變量：付費的 Replicate 執行，只要我們不再等它（取消、逾時、重啟），就一定通知 Replicate 停止。去背、畫質增強、局部編輯現在都走 replicate-run.cjs 這同一條規則。
+- REALTEST_EVIDENCE: tool=Bash | cmd=video-workbench node tests/region-edit.cjs（7）+ node tests/gate.cjs（疊到 origin/main 24eedbede 之後） | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit && npx vitest run lib/studio lib/ai（43 檔 484 測試） | exit=0 | ms=120000
+- 真實扣款：Ideogram 4.5 Edit（省）一次約 NT$0.96；Nano Banana 2.1 1K 一次 US$0.04032（約 NT$1.29），都只改了框內。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - Codex `2026-11-13-partialreview-489e301b`（data URI 輸出：不適用，因為預測是非同步建立，結果一定是 replicate.delivery 網址）、`-9d579cbe`（沒記 replicateId，重啟後停不掉：20a6222b8 已修）。監工另抓到自寫輪詢沒有取消規則：c15e28907 已修。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=modelsFor\("fill"\)|replicateId|runPrediction | hits=35
+- 剩餘風險：(1) Ideogram 實測一次沒照指令畫，把框內清掉補背景，可能看不懂指令裡的座標文字。(2) 專業編輯器裡的 Nano Banana 生成填色沒有實際付費跑過。(3) Nano Banana 的 blank（留空指令時能不能補）沒量測，算 no。
+- rollback：git revert 這 5 個 commit；共用清單 nano-banana-2 的 fill 用途隨 5a8e400e7 一起退。
 ## 2026-11-13（續10）影音工作台 P6.10 缺陷 2：剪輯器匯出「此成果尚未登記到主系統」——伺服器先回 succeeded、登記晚到，瀏覽器副本不再重問
 
 - 現象：正式站 P6.10 實測，editor-export 19dc1d59／d557c27d 的「送審與投遞」顯示「此成果尚未登記到主系統，無法送審」；監工讀的是瀏覽器存的 `/state`。
