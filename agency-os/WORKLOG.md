@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-13（續14）P6.10 實測缺陷 A–D：送審頁 QA 說明、送審頁不讓內容上線、社群影片縮圖、垃圾桶永久刪除
+
+- A 根因：video-workbench `backend/main-system.cjs` renderEvidence 的 signal_qa 只寫 {status, audio, integratedLufs, truePeakDb}、沒有 findings；`qa-findings-summary.ts` 只讀 findings 陣列 → warned 卻零句說明（實例 asset f5caefaf，integratedLufs −70）。修：摘要器對 warned/failed 且無 findings 的區塊用自身量測推出規則（audio.silent／audio.loudness／audio.loudness_unmeasured／audio.true_peak，門檻同產生端），仍讀不到 → qa.unexplained；route 傳 row.status，整份報告非 passed 卻零項也補 qa.unexplained。`qa-labels.ts` 改成 FINDING_TEXT（每條產生端規則＝原因＋怎麼改，原因取自報告 message／evidence）＋ explainFinding；舊 findingLabel／FINDING_LABELS 刪除，四個呼叫端（QaStep、ReleaseDeliveryPanel、ProjectDetail、project-advance-deps）改用同一個。
+- A warned 擋核准＝規格本來如此，不改：`release-gate.ts:15-17`（只有 passed 能授權 Release，等豁免模型）；`agency-os/docs/video_generator/PHASE_4_MEDIA_QA_AND_RELEASE_GATE_CONTRACT.md:69`（warned → waiver_pending）。畫面加一句「警告和未通過都要先修好才能核准（目前沒有豁免流程）」。
+- B 根因：`/api/video/wp-posts` 列 draft,future,publish；`embedVideoInPost` 直接改寫任何狀態的文章 → 已發布文章一嵌就上線。修：列表只列 draft,pending；`embedVideoInPost` 加 draftOnly（寫入前讀狀態，非 draft/pending 回 409，寫入時帶回讀到的狀態，Codex 67aa39bb F1）；送審頁一律 draftOnly。理由：WP REST 沒有已發布文章的草稿修訂，改它就是上線，所以不列。新增「建新草稿文章並嵌入」：`embedVideoInNewDraft` 走既有 `publishToWordPress`（Bridge 站簽章 /post、其餘標準 REST，publishStatus draft）再 draftOnly 嵌入，沒另開通道；嵌入失敗時錯誤帶草稿編號（Codex c9fa41ed F2）。
+- C 根因：`Calendar.tsx` Thumb 的 imagesOf 不分 social_media.kind 一律塞 `<img>`。修：照 Writer.tsx:84／MediaView.tsx:50 的 kind 判斷，影片用 `<video muted playsInline preload="metadata">`；同類：數據分析頁 `metrics.ts` thumb 加 thumb_kind，Analytics.tsx 同法。Postiz 沒給 poster 欄位，用第一格。
+- D 永久刪除：state.ts assertCanPurge（還原同一組角色 RULES.restore；只限 state=deleted、未發佈、無已發出頻道）；store.ts purgePost（先寫 purge 稽核：誰、何時、原文前 50 字；DELETE 再以 state/published_at/version 擋；刪不到追加 purge_aborted——稽核表對 service_role 只增不刪，0096_social_manager.sql:305）；子表全靠既有 on delete cascade（targets→metrics、media 連結、comments、tags、auto_rules）；媒體庫檔案保留（媒體庫是品牌自己的，MediaView 管刪除）。route `posts/[id]/purge`；Trash.tsx 用既有 sm-dialog 確認「永久刪除，無法還原」。不做「清空垃圾桶」：一次抹掉最多 200 則、無既有批次抹除慣例，逐則確認較安全。
+- D 殘留訊息根因：SocialManager 的 note 換路由（只在有 carried 時才設）與換分頁（setView）都不清 → 「已還原成草稿。」跟著到垃圾桶分頁。修：換路由設成 carried 或空、setView 清空。
+- 未做／剩餘：c9fa41ed F1（GET 與寫入之間有人發布，draftOnly 寫回會把它改回草稿）＝刻意取捨，寧可下線也不讓影片上線；purge 稽核與刪除不在同一交易（需 RPC＝migration，High）；留言附圖仍一律 `<img>`（設計為「加一張圖」）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social app/(shell)/tools/social app/api/social lib/content/video app/api/video app/(shell)/tools/video lib/portal lib/system-modes lib/content/topics lib/content/publish（120 檔 709 綠，rebase 到 c91472d71 後重跑）；bash tests/e2e/social/purge-real-db.sh（真 Postgres＋PostgREST 2/2）；npx tsc --noEmit 0 錯；改前紅：qa-findings-summary 4 紅、embed-in-post 5 紅、thumb-media-kind 1 紅、state assertCanPurge 9 紅 | exit=0 | ms=600000
+- MUTATION: assertCanPurge 拿掉 state 檢查 → state.test 7 紅，還原 18 綠；purgePost DELETE 拿掉 .eq("state","deleted") → purge.e2e 1 紅，還原 2 綠
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=explainFinding|embedVideoInNewDraft|draftOnly | hits=46
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=purgePost|assertCanPurge|thumb_kind | hits=24
+- ORACLE: agency-os/reports/oracle/2026-11-13-review-67aa39bb.md（1 項，已修）、agency-os/reports/oracle/2026-11-13-review-c9fa41ed.md（2 項：F2 已修、F1 刻意取捨）
+- ORACLE_WAIVED: c9fa41ed 之後只改 embedVideoInNewDraft 失敗時的錯誤文字（帶草稿編號）＋送審頁重讀草稿清單；第三輪 Codex 撞額度（重設 2026-11-14 01:27，已 oracle-quota set）；書面自審：只動失敗分支，blockedMode 原樣回傳，無新寫入路徑；新增測試 embed-in-post「draft made but the embed failed」綠
+- rollback：git revert 本 commit（無 migration、無資料變更）。
 ## 2026-11-13（續13）破框貼文動畫對齊參考站＋4:5／16:9＋貼文文字鎖定＋下載後的處理移出狀態請求
 
 - 起因：操作者直接要求破框對齊參考站，並解決「影片裡的按讚數被模型改掉」。Codex 審查 b7c07b6d0 時抓到：下載後的處理（文字鎖定＋裁切）是在狀態請求裡同步做的。
