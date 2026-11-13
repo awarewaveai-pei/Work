@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-13（續6）影音工作台：去背重複扣點修好，接手／取消規則抽成共用模組 replicate-run.cjs
+
+- 根因：`backend/api.cjs` 去背分支（改前 :454-457）接手「同來源、任何非 succeeded」任務的 replicateId，包含仍在跑的任務，而且不移交 → 兩個同時送出的任務輪詢同一次 Replicate 運算、各扣一次點。去背在逾時、取消、重啟時也沒通知 Replicate 停止（改前 bg-remove.cjs 輪詢迴圈沒有 cancel，重啟只取消 AI 增強，改前 api.cjs:193）。
+- 不變量：一次供應商運算最多被一個任務接手、最多扣一次點；本機放棄等待的運算一定送 cancel。
+- 做法：新增 `backend/replicate-run.cjs`（cancelPrediction／takeOver／runPrediction／deliveryUrl）。takeOver 只從 failed/cancelled 任務接手，並在任何 await 之前同步移交（earlier.replicateHandedTo）。runPrediction 只續接 succeeded 的運算，輪詢中任何錯誤都會 cancel。`bg-remove.cjs`、`video-enhance.cjs` 刪掉各自重複的 wait／cancel／輪詢／網址檢查，改用它；`image-to-3d.cjs` 的 cancel 改指向它；`api.cjs` 重啟與取消端點對兩種任務都取消。
+- Codex 審查 2 項（artifact `agency-os/reports/oracle/2026-11-13-partialreview-8fae085a.md`）：①續接查詢時中止會跳過取消（replicate-run.cjs:51）②接手到已取消但還在 processing 的運算，重試會跟著變失敗（:30）。兩項同一根因：被移交的運算如果沒有成功，前一個任務早就送過 cancel。改成只續接 succeeded 的運算，兩項一起關掉。
+- 測試：`tests/remove-bg-money.cjs` 新增第 4、5 項（假 Replicate）。三個同時送出時，pred-1/2/3 各被一個任務使用；輪詢中斷、服務重啟都會送 cancel。突變：takeOver 改回「非 succeeded 都可接手、不移交」→ 第 4 項紅；拔掉 runPrediction 的 cancel → 第 5 項紅；還原後全綠。
+- 未做：replicate-video.cjs 的 cancel（回傳是否接受，語義不同）沒有併入，那邊一個任務只對應一個 providerId，沒有接手問題。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/remove-bg-money.cjs && node tests/ed12-ai-enhance.cjs && node tests/remove-bg.cjs（假 fetchImpl，沒有付費呼叫） | exit=0 | ms=1890
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - external oracle = Codex CLI (codex exec -s read-only)；2 項已修
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=cancelPrediction|takeOver\(|replicateHandedTo | hits=15
+- rollback：git revert 本 commit。
 ## 2026-11-13（續5）影片剪輯 ED 線 13 張卡全部完成並上線（next-admin＋video-workbench 653a6e837、nginx /library/、曲庫 106 檔）
 
 - 觸發：操作者 2026-11-12「下載完後 你部署, 然後接著做,直到13張片完成…醒來要看到你完成13張卡片並部署上線」。監工 session 41c60c5d。

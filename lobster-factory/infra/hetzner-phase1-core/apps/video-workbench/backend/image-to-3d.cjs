@@ -9,7 +9,7 @@ const fs = require("node:fs"),
 const { TOOL_RATES, replicateRunUsd } = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/cost-model.ts"));
 const sf3dLocal = require("./sf3d-local.cjs"),
   meshy = require("./meshy.cjs"),
-  { cancelPrediction } = require("./bg-remove.cjs");
+  { cancelPrediction } = require("./replicate-run.cjs");
 const { vwEnv } = require("./env-compat.cjs");
 
 const MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };

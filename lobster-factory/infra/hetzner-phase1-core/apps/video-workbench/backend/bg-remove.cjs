@@ -1,4 +1,4 @@
-const fs = require("node:fs"), path = require("node:path");
+const fs = require("node:fs"), path = require("node:path"), run = require("./replicate-run.cjs");
 // Same Replicate model, version and limits as next-admin lib/studio/bg-remover.ts (that file imports the gateway
 // and entitlements, so it cannot be loaded here). tests/remove-bg.cjs reads its version const and compares.
 const BG_REMOVER_VERSION_DEFAULT = "a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc"; // 851-labs/background-remover (pinned 2026-06-11)
@@ -16,11 +16,6 @@ function token(env) {
   return env.REPLICATE_API_TOKEN;
 }
 const mimeOf = (file) => MIME[path.extname(file).slice(1).toLowerCase()];
-const wait = (ms, signal) =>
-  new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener("abort", () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
-  });
 
 // Streams the body and stops at the cap: Content-Length may be absent, so arrayBuffer() could exhaust memory first.
 async function capped(response) {
@@ -45,20 +40,9 @@ async function capped(response) {
   return Buffer.concat(parts);
 }
 
-/** Best effort: stops Replicate billing a prediction nobody will collect. */
-async function cancelPrediction({ id, env, fetchImpl }) {
-  if (!id || !env.REPLICATE_API_TOKEN) return;
-  await fetchImpl("https://api.replicate.com/v1/predictions/" + encodeURIComponent(id) + "/cancel", {
-    method: "POST",
-    headers: { Authorization: "Bearer " + env.REPLICATE_API_TOKEN },
-    signal: AbortSignal.timeout(10_000),
-  }).catch(() => {});
-}
-
 /** Transparent PNG of `file` (a local png/jpeg/webp) as { buffer, predictSec } -- predictSec = Replicate's
  *  metrics.predict_time, which the run is billed by. Throws on any provider failure; never returns partial output.
- *  resumeId: an earlier prediction for the same image that may still bill; it is polled instead of paying twice,
- *  and only a canceled/failed/unreadable one leads to a new prediction. onPrediction(id) records the id it uses. */
+ *  resumeId / onPrediction: replicate-run.cjs (takeover and cancel rules). */
 async function removeBackground({ file, env, fetchImpl, signal, resumeId, onPrediction = () => {} }) {
   const auth = { Authorization: "Bearer " + token(env) };
   const mime = mimeOf(file);
@@ -75,39 +59,24 @@ async function removeBackground({ file, env, fetchImpl, signal, resumeId, onPred
     if (!r.ok) throw Error(label + "失敗：Replicate " + r.status);
     return r;
   };
-  let prediction = null;
-  if (resumeId) {
-    try {
-      const earlier = await (await call("https://api.replicate.com/v1/predictions/" + encodeURIComponent(resumeId), { headers: auth }, "去背狀態查詢")).json();
-      if (["starting", "processing", "succeeded"].includes(earlier.status)) prediction = earlier;
-    } catch (e) {
-      if (signal?.aborted) throw e;
-    }
-  }
-  if (!prediction) {
-    const image = "data:" + mime + ";base64," + fs.readFileSync(file).toString("base64");
-    prediction = await (await call("https://api.replicate.com/v1/predictions", {
-      method: "POST",
-      headers: { ...auth, "Content-Type": "application/json" },
-      body: JSON.stringify({ version: version(env), input: { image, format: "png", background_type: "rgba" } }),
-    }, "去背")).json();
-  }
-  if (typeof prediction.id === "string") onPrediction(prediction.id);
-  while (["starting", "processing"].includes(prediction.status)) {
-    await wait(POLL_INTERVAL_MS, abort).catch(() => { throw Error(deadline.aborted ? "去背逾時（55 秒）" : "去背已取消"); });
-    prediction = await (await call("https://api.replicate.com/v1/predictions/" + encodeURIComponent(prediction.id), { headers: auth }, "去背狀態查詢")).json();
-  }
-  if (prediction.status !== "succeeded")
-    throw Error("去背失敗：" + String(prediction.error || prediction.status).slice(0, 200));
-  const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-  // Only Replicate's delivery host, https only (same rule as bg-remover.ts): the url comes from a provider reply.
-  if (typeof outputUrl !== "string" || !/^https:\/\/replicate\.delivery\//.test(outputUrl))
-    throw Error("去背結果網址不在允許範圍");
-  const download = await call(outputUrl, {}, "下載去背結果");
+  const prediction = await run.runPrediction({
+    call, auth, resumeId, label: "去背", pollMs: Number(env.VW_BG_REMOVE_POLL_MS) || POLL_INTERVAL_MS, signal: abort, env, fetchImpl, onPrediction,
+    abortError: () => Error(deadline.aborted ? "去背逾時（55 秒）" : "去背已取消"),
+    create: async () => {
+      const image = "data:" + mime + ";base64," + fs.readFileSync(file).toString("base64");
+      return (await call(run.API + "/predictions", {
+        method: "POST",
+        headers: { ...auth, "Content-Type": "application/json" },
+        body: JSON.stringify({ version: version(env), input: { image, format: "png", background_type: "rgba" } }),
+      }, "去背")).json();
+    },
+  });
+  // Same delivery-host rule as next-admin bg-remover.ts.
+  const download = await call(run.deliveryUrl(prediction, "去背"), {}, "下載去背結果");
   if (Number(download.headers?.get?.("content-length")) > MAX_OUTPUT_BYTES) throw Error("去背結果超過 20MB");
   const buffer = await capped(download);
   if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) throw Error("去背結果不是 PNG 圖片");
   return { buffer, predictSec: prediction.metrics?.predict_time };
 }
 
-module.exports = { removeBackground, cancelPrediction, token, mimeOf, modelLabel, BG_REMOVER_VERSION_DEFAULT };
+module.exports = { removeBackground, token, mimeOf, modelLabel, BG_REMOVER_VERSION_DEFAULT };

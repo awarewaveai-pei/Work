@@ -14,6 +14,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const generationPolicy = require("./generation-policy.cjs");
   const bgRemove = require("./bg-remove.cjs");
   const videoEnhance = require("./video-enhance.cjs");
+  const replicateRun = require("./replicate-run.cjs");
   const costs = require("./provider-cost.cjs");
   const transcribe = require("./transcribe.cjs"), TranscriptWords = require("../shared/transcript-words.js");
   // Speech and speech-to-text: one list each (backend/speech.cjs, transcribe.cjs); every job names its own row (the
@@ -189,8 +190,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (["queued", "running"].includes(job.status) && !job.providerId) {
       job.status = "failed";
       job.error = "服務重新啟動，任務已中斷；請從歷史記錄重新送出。";
-      // Card ED.12.3: nothing polls an AI 畫質增強 run after a restart, so Replicate stops billing it (best effort).
-      if (job.replicateId && videoEnhance.isAi(job.input)) videoEnhance.cancelPrediction({ id: job.replicateId, env, fetchImpl });
+      // Nothing polls a 去背／AI 畫質增強 run after a restart, so Replicate stops billing it (replicate-run.cjs rule 2).
+      if (job.replicateId) replicateRun.cancelPrediction({ id: job.replicateId, env, fetchImpl });
     } else if (["queued", "running"].includes(job.status) && !generationPolicy.videoVendor(job.video?.provider)) {
       // A Sora job (OpenAI shut Sora 2 down 2026-09-24): nothing left to poll; a retry runs the default model.
       job.status = "failed";
@@ -448,16 +449,12 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (job.input.operation === "remove-bg") {
         job.status = "running";
         persist();
-        // Invariant: never pay twice for one image. An earlier unfinished request for the same source (cancelled,
-        // timed out, restarted, or simply resent) is resumed. Field is replicateId, not providerId: providerId
-        // means "OpenAI video" to refresh() and the restart recovery.
-        const src = job.input.references.src.url,
-          earlier = jobs.findLast(
-            (j) => j !== job && j.input?.operation === "remove-bg" && j.input.references?.src?.url === src && j.replicateId && j.status !== "succeeded",
-          );
+        // One Replicate run is charged to at most one job (replicate-run.cjs takeOver). Field is replicateId, not
+        // providerId: providerId means "OpenAI video" to refresh() and the restart recovery.
+        const src = job.input.references.src.url;
         const { buffer, predictSec } = await bgRemove.removeBackground({
           file: removeBgSource(job.input), env, fetchImpl, signal,
-          resumeId: earlier?.replicateId,
+          resumeId: replicateRun.takeOver(jobs, job, (j) => j.input?.operation === "remove-bg" && j.input.references?.src?.url === src, persist),
           onPrediction: (id) => {
             job.replicateId = id;
             persist();
@@ -518,22 +515,18 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (videoEnhance.isAi(job.input)) {
         job.status = "running";
         persist();
-        // Never pay twice for one source: a failed earlier request for the same source and resolution (e.g. its download
-        // broke after Replicate finished) hands its prediction over, once -- a run still in progress is never shared, so
-        // one vendor run is charged to one job.
+        // One Replicate run is charged to at most one job (replicate-run.cjs takeOver): only an ended job for the same
+        // source and resolution (e.g. its download broke after Replicate finished) hands its run over, once.
         const src = job.input.references.src.url,
           resolution = videoEnhance.resolutionOf(job.input),
-          earlier = jobs.findLast(
-            (j) => j !== job && videoEnhance.isAi(j.input) && j.input.references?.src?.url === src && j.input.settings.enhanceResolution === resolution && j.replicateId && j.status === "failed",
-          ),
           name = crypto.randomUUID() + ".mp4",
-          dest = path.join(outputs, name);
+          dest = path.join(outputs, name),
+          file = (await aiEnhanceSource(job.input, signal)).file;
         const { units } = await videoEnhance.upscale({
-          file: (await aiEnhanceSource(job.input, signal)).file, resolution, dest, env, fetchImpl, signal,
-          resumeId: earlier?.replicateId,
+          file, resolution, dest, env, fetchImpl, signal,
+          resumeId: replicateRun.takeOver(jobs, job, (j) => videoEnhance.isAi(j.input) && j.input.references?.src?.url === src && j.input.settings.enhanceResolution === resolution, persist),
           onPrediction: (id) => {
             job.replicateId = id;
-            if (earlier?.replicateId === id) delete earlier.replicateId; // handed over: no third job takes it
             persist();
           },
         });
@@ -1275,7 +1268,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             throw Object.assign(Error(job.video.provider + " 沒有接受取消，影片仍在生成並計費；請稍後再試。"), { status: 502 });
           job.status = "cancelled";
           controls.get(job.id)?.abort();
-          if (job.replicateId) (videoEnhance.isAi(job.input) ? videoEnhance : bgRemove).cancelPrediction({ id: job.replicateId, env, fetchImpl });
+          if (job.replicateId) replicateRun.cancelPrediction({ id: job.replicateId, env, fetchImpl });
           imageTo3d.cancel(job, { env, fetchImpl });
           persist();
           mirror(job);
