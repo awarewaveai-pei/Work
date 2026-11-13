@@ -2,7 +2,7 @@ const assert = require("node:assert/strict"), fs = require("node:fs"), os = requ
 const { chromium } = require("playwright");
 const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-buttons-test-"));
 (async () => {
-  const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: {}, fetchImpl: async () => { throw Error("Provider calls forbidden"); } });
+  const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: { GEMINI_API_KEY: "test-key-not-sent" }, fetchImpl: async () => { throw Error("Provider calls forbidden"); } });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const base = "http://127.0.0.1:" + server.address().port;
   const browser = await chromium.launch({ channel: "msedge", headless: true });
