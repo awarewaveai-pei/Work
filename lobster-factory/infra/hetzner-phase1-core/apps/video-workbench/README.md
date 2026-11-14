@@ -254,6 +254,14 @@ Claude 首次審查提出成果還原與導演生命週期等五項問題，已�
 
 介面的 JSON 備份包含資料與檔案 URL，**不包含媒體實體檔案**。搬電腦時請另備份 `.data`，並匯入 JSON。交付 ZIP 不含使用者 `.data`；原始 `VideoWorkbench_完整整合版.html` 和舊 ZIP 保留。
 
+**瀏覽器素材副本與收回開關**（正式站 http 模式）：瀏覽器用 Service Worker（`scripts/media-cache-sw.js`，邏輯 `shared/media-cache.js`）保留讀過的 `/media/`、`/generated/` 檔，同一份第二次不經網路。出問題要全面收回時，在主機建立旗標檔，不必重啟：
+
+```bash
+docker exec lobster-video-workbench touch /data/media-cache-off
+```
+
+每個瀏覽器下次載入頁面時，就會換成不攔請求的退場 worker、刪掉副本並取消註冊。恢復＝刪掉這個檔（`docker exec lobster-video-workbench rm /data/media-cache-off`）。
+
 本機服務只綁定 127.0.0.1。這不是正式多人服務；正式串接仍需登入／權限、物件儲存、扣點與帳務、資料庫及協作衝突控制。勿直接作為公開伺服器部署。
 
 ## 維護與測試
