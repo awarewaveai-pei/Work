@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-14（續5）破框：入口邊開格、照參考改寫提示詞、頁面畫鎖定遮罩（任務自己的輸入）
+
+- 起因：續13 剩餘風險「主角衝過按讚列沒驗到」。用真的 H.264 測試片（ffmpeg 產生，方塊往下穿過文字列）驗證：舊規則（格子變動超過 50% 才開）會把主角卡在看不見的格線外。
+- commits（main 上的順序）：a04fb4ae8 開格規則改成「碰到入口邊才開」：入口邊是照片、貼文外側、已打開的格子，至少碰到 4 個像素，同一格內反覆判斷到不再有新格子打開。21cf108ed 提示詞照操作者給的參考網站改寫：鏡頭鎖定的螢幕錄影、介面是凍結的平面層，總長 ≤1000 UTF-16，主角描述以字形為單位截斷。6a660b575 頁面用畫貼文的同一套程式畫鎖定遮罩，伺服器只鎖「完全白、而且周圍 2px 也全白」的像素。05dde7d4d、1eebf7035、02bcd4b89 處理遮罩這個輸入本身。
+- 不變量（1eebf7035 寫了不變量分析）：(A) 只有一個函式決定遮罩能不能用（breakout.lockMaskPixels，用 decodePng 以 ffmpeg 原樣解碼，尺寸要等於第一格，鎖定面積 ≤0.6），送出時在扣款許可和任何供應商呼叫之前跑一次，收尾時再跑一次；第一格也用同一個 decodePng。(B) 遮罩跟任務紀錄同生同死：存在 job-inputs/<id>/，重試時複製一份；只有歷史上限把紀錄刪掉時才一起刪。紀錄有鎖定、遮罩卻已不在 → 送出時回 400，不會花錢跑出沒有鎖定的影片。
+- REALTEST_EVIDENCE: tool=Bash | cmd=video-workbench node tests/breakout.cjs（9，含現場產生的 96 格方塊片、照片會動且沒有主角 → 0 格打開）, p6-main-system, tools-lazy-load, backend, region-edit + tests/gate.cjs（origin/main 4aa7e03f5＋6 commits） | exit=0 | ms=900000
+- REALTEST_EVIDENCE: tool=Bash | cmd=真跑 Runway Gen-4 Turbo，走頁面真實流程（IG、從圖片衝出、9:16、鯊魚往下衝）：扣 US$0.25＝按鈕 NT$8.00；第 0／30／60／90／119 格的數字、文字、圖示列、導覽列完全相同；restoredPixels 1,156,511，openedCells 0；處理中有遮罩檔，結束後刪除 | exit=0 | ms=180000
+- 突變（session 做的）：margin 0 → 照片在動的那支片打開 12 格（紅）；送出時不解碼 → 2×2 遮罩被接受（紅）；重試不複製遮罩（紅）；遮罩已清除卻放行、第一格只檢查檔頭各一個（紅）；全部還原 → 綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/12m/0n
+  - critic 子代理（Codex 額度用完時）4 條、Codex `2026-11-14-partialreview-d0147b6b`（3 條）、`-d5d5eecd`（3 條，同一 reviewer 第 2 次報 → 先寫不變量分析）、`-91f0210f`（2 條邊角）。全部已修；最後一輪修完後沒有再送審，監工自己讀過 02bcd4b89 的 diff。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=lockMaskPixels|decodePng|breakoutInputs|job-inputs | hits=25
+- 決定：11/06 那支沒有比例的生成影片不回填（操作者 2026-11-14「不用回填」），續14 的剩餘風險 (1) 結案。
+- 剩餘風險：(1) Runway 真跑 5 次，主角都沒有衝出照片；Luma Ray 3.2（NT$9.6）實測中，Veo 等操作者決定。(2) 主角若不是從照片或邊緣進入文字列，那一格會被當成飄移還原（刻意的取捨）。(3) 沒有能保留第一格的有聲模型。
+- rollback：git revert 這 6 個 commit（先退 02bcd4b89→1eebf7035→05dde7d4d→6a660b575，再退提示詞與開格規則）。
 ## 2026-11-14（續4）社群工具 E：已刪除貼文批次永久刪除——已由 d30d6759a 完成，本 session 只補回報與混合批次測試
 
 - 狀況：監工派 E（垃圾桶勾選、全選、批次永久刪除）時，另一個 session 已在 d30d6759a 上線同一功能（勾選、全選只勾能刪的、單一確認框寫筆數、逐篇走既有 purge route）。本 session 並行做的另一套（98bb1febc：批次 route＋分批送）在 rebase 時發現重複，整份捨棄，只留一條路。
