@@ -60,21 +60,19 @@ function pick(id, env = process.env) {
 function request(input, env) {
   const m = pick(input.settings?.model, env), sizes = sizesOf(m.value);
   input.settings = { ...input.settings, model: m.value, quality: sizes.includes(input.settings?.quality) ? input.settings.quality : sizes[0] };
-  // The page's raw texts (instructions) become this row's instruction; an older job or draft carries its composed prompt.
-  if (input.instructions) input.prompt = instructionText(m, input);
+  // The page's raw texts (instructions) become the instruction; an older job or draft carries its composed prompt.
+  if (input.instructions) input.prompt = instructionText(input);
   return m;
 }
-// The instruction a row is sent. A row with a mask already knows where: only each box's own sentence (+ 整體指令), no
-// coordinates and no 「區域 N」 (2026-11-14 FLUX Fill Pro drew a scene unrelated to the sentence). A row without a mask
-// needs the boxes named: 「區域 N（x、y、寬、高）：sentence」 + keep the rest.
-function instructionText(m, input) {
+// One format for every row: 「區域 N（x、y、寬、高）：sentence」 per box + keep the rest, so with several boxes each sentence
+// stays tied to its box, mask or not (2026-11-14: FLUX Fill Pro missed the sentence with and without the coordinates).
+function instructionText(input) {
   const bad = (message) => Object.assign(Error(message), { status: 400 });
   const global = String(input.instructions.global || "").trim().slice(0, 5000), areas = Array.isArray(input.selection?.regions) ? input.selection.regions : [];
   const texts = Array.isArray(input.instructions.regions) ? input.instructions.regions.map((t) => String(t || "").trim().slice(0, 5000)) : [];
   if (texts.length !== areas.length) throw bad("區域指令與框選數量不符");
   if (!areas.length) { if (!global) throw bad("請框選區域並填寫指令，或填寫整體指令"); return global; }
   if (!global && texts.some((t) => !t)) throw bad("還有區域沒有填寫指令，請補上或填寫整體指令");
-  if (CALLS[m.value]?.mask) return [global, ...texts.filter(Boolean)].filter(Boolean).join("\n");
   const pct = (v) => Math.round(Number(v) * 100);
   return [global, ...areas.map((a, i) => `區域 ${i + 1}（圖片左上角起算，x=${pct(a.x)}%、y=${pct(a.y)}%、寬=${pct(a.w)}%、高=${pct(a.h)}%）：${texts[i] || global}`), "只修改選取區域，保留其他內容。"].filter(Boolean).join("\n");
 }
