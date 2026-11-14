@@ -10,6 +10,7 @@ import { buildSemanticFilename, buildSemanticBase } from "@/lib/studio/semantic-
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
 import { PREVIEW_SLOT, deckSlot, deckReturnIndex } from "./canvas-return-slot";
+import { tarotDeckKey } from "@/lib/tarot/deck-key";
 import { useDoorHref } from "@/app/DoorContext";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type HeroKind, type Couple, type TarotCard } from "./cards";
 import { needsEnglish, translateForDeck } from "@/lib/tarot/translate";
@@ -47,7 +48,7 @@ interface GenResponse {
   error?: string;
 }
 
-type RecentJob = { jobId: string; status: string; completedCards: number; totalCards: number; createdAt: number };
+type RecentJob = { jobId: string; status: string; completedCards: number; totalCards: number; createdAt: number; deckKey: string | null };
 
 interface BatchItem {
   card: TarotCard;
@@ -336,6 +337,9 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   // left a paid batch with no way to load it (2026-10-23). Jobs restored this way have no prompt of this deck.
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
   const restoredJobsRef = useRef<Set<string>>(new Set());
+  // Deck key of the deck locked now (lib/tarot/deck-key.ts); null while unlocked or still computing. restoreJob loads
+  // only a job with this key, so a list left over from another deck can never fill this one.
+  const deckKeyRef = useRef<string | null>(null);
   const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal (batch cards)
   const [savingArt, setSavingArt] = useState(false); // modal "存無框圖" in-flight
   const [savedArt, setSavedArt] = useState<Set<number>>(() => new Set()); // batch indices whose frameless art is saved
@@ -911,7 +915,6 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
     const index = deckReturnIndex(slot, deck, batch);
     if (index == null) return false;
     const card = batch[index].card;
-    patchItem(index, { art: image });
     void frameCardArt(card, index, image, () => deckGenRef.current === deck).catch((e) => {
       // Already acked: the editor saved nothing, so the edit must land in My Designs here.
       void postDesign(image, "tarot-art", { cardName: card.name });
@@ -1019,6 +1022,16 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   }
 
   // Launch a Trigger.dev background batch for all 78 cards (browser can be closed).
+  // The 78 cards a background batch generates for the locked deck; its deck key (lib/tarot/deck-key.ts) is computed
+  // from this same list, so the server's key and the deck panel's key cannot drift.
+  function deckCards() {
+    return TAROT_CARDS.map((card, i) => ({
+      index: i,
+      name: card.name,
+      prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
+    }));
+  }
+
   async function startBackgroundBatch() {
     // The background job carries prompts only (tarot-batch-generate payload); reference images would be dropped
     // silently, and an identity-reference model fails every card without one.
@@ -1039,11 +1052,7 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
     setBgProgress({ done: 0, total: 78 });
     setMessage(null);
     try {
-      const cards = TAROT_CARDS.map((card, i) => ({
-        index: i,
-        name: card.name,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
-      }));
+      const cards = deckCards();
       const res = await fetch("/api/tools/tarot/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
@@ -1070,10 +1079,17 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   }
 
   // The deck panel lists the last finished jobs with images while no job is tracked on this page.
+  // Only batches of the deck locked now (deck key, migration 0162): another style's batch must never fill this deck.
   useEffect(() => {
+    setRecentJobs([]);
+    deckKeyRef.current = null;
     if (!locked || bgStatus !== "idle") return;
     let cancelled = false;
-    fetch("/api/tools/tarot/batch", { headers: { ...roleHeader("operator") } })
+    tarotDeckKey({ model: lockedModel, aspectRatio: "2:3", seed: previewSeed, prompts: deckCards().map((c) => c.prompt) })
+      .then((deck) => {
+        if (!cancelled) deckKeyRef.current = deck;
+        return fetch(`/api/tools/tarot/batch?deck=${deck}`, { headers: { ...roleHeader("operator") } });
+      })
       .then((r) => r.json())
       .then((d: { ok: boolean; jobs?: RecentJob[] }) => {
         if (cancelled || !d.ok || !d.jobs) return;
@@ -1084,6 +1100,11 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   }, [locked, bgStatus]);
 
   function restoreJob(j: RecentJob) {
+    if (!j.deckKey || j.deckKey !== deckKeyRef.current) {
+      setRecentJobs([]);
+      setMessage("這批不是目前鎖定的這副牌，不載入。");
+      return;
+    }
     restoredJobsRef.current.add(j.jobId);
     setBgJob({ id: j.jobId, deck: deckGenRef.current });
     setBgProgress({ done: j.completedCards, total: j.totalCards });

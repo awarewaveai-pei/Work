@@ -7,6 +7,7 @@ import {
 import { fetchTriggerRunStatus } from "../../../../../lib/tarot/batch-run-status";
 import { isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
 import { isR2Configured } from "../../../../../lib/storage/r2";
+import { DECK_KEY_RE, tarotDeckKey } from "../../../../../lib/tarot/deck-key";
 import { effectiveOrgId, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../../lib/tenant-guard";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
@@ -78,12 +79,13 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const seed        = typeof body.seed === "number" ? body.seed : null;
 
   const jobId = randomUUID();
+  const deckKey = await tarotDeckKey({ model, aspectRatio, seed, prompts: cards.map((c) => c.prompt) });
 
   // Trigger Trigger.dev task. No secret or callback URL in the payload (it is stored and shown in the Trigger
   // dashboard): the worker reads BATCH_INTERNAL_SECRET and AWAREWAVE_WEBHOOK_BASE_URL from its own env.
   // The job exists before the run does: the task's first callback must find it (no create-after-trigger race).
   try {
-    await createJob({ jobId, organizationId, createdBy, actor: grant.actor, model, aspectRatio, totalCards: cards.length });
+    await createJob({ jobId, organizationId, createdBy, actor: grant.actor, model, aspectRatio, totalCards: cards.length, deckKey });
   } catch (e) {
     const res = storeUnavailable(e);
     if (res) return res;
@@ -141,8 +143,13 @@ export async function GET(req: Request): Promise<Response> {
   try { organizationId = effectiveOrgId(req, null); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const createdBy = resolveTenant(req).userKind === "staff" ? req.headers.get("x-ops-user-id")?.trim() || null : null;
+  // ?deck=<deck key>: only that deck's jobs (the deck panel's list); without it, all recent jobs as before.
+  const deck = new URL(req.url).searchParams.get("deck");
+  if (deck !== null && !DECK_KEY_RE.test(deck)) {
+    return NextResponse.json({ ok: false, error: "invalid_deck" }, { status: 400 });
+  }
   try {
-    const jobs = await listRecentJobs({ organizationId, createdBy }, 10, { runStatus: fetchTriggerRunStatus });
+    const jobs = await listRecentJobs({ organizationId, createdBy, deckKey: deck ?? undefined }, 10, { runStatus: fetchTriggerRunStatus });
     return NextResponse.json({ ok: true, jobs: jobs.map(toPublicJob) });
   } catch (e) {
     const res = storeUnavailable(e);

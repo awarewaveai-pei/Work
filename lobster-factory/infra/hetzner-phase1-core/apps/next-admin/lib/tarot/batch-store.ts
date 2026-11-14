@@ -40,6 +40,8 @@ export interface BatchJob {
   results: BatchCardResult[];
   failures: BatchCardFailure[];
   runId?: string;
+  /** lib/tarot/deck-key.ts; null for jobs from before migration 0162. */
+  deckKey: string | null;
   createdAt: number;
   updatedAt: number;
   deadlineAt: number;
@@ -85,6 +87,7 @@ export interface JobRow {
   organization_id: string | null;
   created_by: string | null;
   actor?: string | null;
+  deck_key?: string | null;
   run_id: string | null;
   model: string;
   aspect_ratio: string;
@@ -148,6 +151,7 @@ export function summarizeBatch(job: JobRow, cards: CardRow[], now: number, runSt
     results,
     failures,
     runId: job.run_id ?? undefined,
+    deckKey: job.deck_key ?? null,
     createdAt: new Date(job.created_at).getTime(),
     updatedAt: new Date(job.updated_at).getTime(),
     deadlineAt,
@@ -171,6 +175,7 @@ export async function createJob(input: {
   model: string;
   aspectRatio: string;
   totalCards: number;
+  deckKey: string;
   now?: number;
 }): Promise<void> {
   const now = input.now ?? Date.now();
@@ -183,6 +188,7 @@ export async function createJob(input: {
     model: input.model,
     aspect_ratio: input.aspectRatio,
     total_cards: input.totalCards,
+    deck_key: input.deckKey,
     status: "pending",
     deadline_at: new Date(now + PENDING_BUDGET_MS).toISOString(),
   });
@@ -313,7 +319,7 @@ export async function getJob(jobId: string, opts: { now?: number; runStatus?: Ru
  * the route decides the scope (lib/tenant-guard: client -> own org).
  */
 export async function listRecentJobs(
-  scope: { organizationId: string | null; createdBy: string | null },
+  scope: { organizationId: string | null; createdBy: string | null; deckKey?: string },
   limit = 10,
   opts: { now?: number; runStatus?: RunStatusLookup } = {},
 ): Promise<StoredBatchJob[]> {
@@ -322,6 +328,7 @@ export async function listRecentJobs(
   let q = client.from(JOBS).select("*");
   if (scope.organizationId) q = q.eq("organization_id", scope.organizationId);
   if (scope.createdBy) q = q.eq("created_by", scope.createdBy);
+  if (scope.deckKey) q = q.eq("deck_key", scope.deckKey);
   const { data, error } = await q.order("created_at", { ascending: false }).limit(limit);
   if (error) throw new BatchStoreUnavailableError(`batch_store_read_failed: ${error.message}`);
   const rows = (data ?? []) as JobRow[];
