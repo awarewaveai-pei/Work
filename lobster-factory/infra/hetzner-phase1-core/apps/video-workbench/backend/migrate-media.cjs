@@ -6,6 +6,7 @@
 const fs = require("node:fs"),
   path = require("node:path");
 const { createMainSystem, MIME, LOCAL_URL, localUrls } = require("./main-system.cjs");
+const { jobRatio } = require("../shared/jobs-view.js");
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ORIGINS = new Set(["import", "upload", "ai_generated", "render"]);
@@ -35,7 +36,7 @@ function sources(data, state) {
     const url = job?.status === "succeeded" ? job.result?.url : null;
     if (typeof url !== "string" || !LOCAL_URL.test(url) || rows.has(url)) continue;
     const origin = ORIGINS.has(job.result.origin?.kind) ? job.result.origin : null;
-    rows.set(url, { url, origin, jobId: job.id, sources: [...localUrls(job.input)], costUsd: origin?.costUsd, ratio: job.result?.ratio || job.input?.settings?.ratio || job.input?.settings?.project?.ratio });
+    rows.set(url, { url, origin, jobId: job.id, sources: [...localUrls(job.input)], costUsd: origin?.costUsd, ratio: jobRatio(job) });
   }
   for (const a of state?.assets || []) {
     if (typeof a?.url !== "string" || !LOCAL_URL.test(a.url)) continue;

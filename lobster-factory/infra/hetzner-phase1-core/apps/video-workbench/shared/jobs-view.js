@@ -1,4 +1,9 @@
 (function () {
+  // Invariant: the one reader of a finished job's ratio (result.ratio = the file's own, measured; then what the job asked
+  // for; null = unknown, never a default). backend/main-system.cjs records metadata.ratio from this same function, so the
+  // 送審與投遞 button is offered exactly when next-admin's release panel can place the video (platform-ratio.ts ratioOfAsset).
+  const jobRatio = (job) => job?.result?.ratio || job?.input?.settings?.ratio || job?.input?.settings?.project?.ratio || null;
+  if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio });
   // P6.6 送審與投遞: a finished video registered in the main system is released and delivered on next-admin's /release page
   // (same origin; it owns QA, release, social and WordPress drafts). Only 16:9 / 9:16 / 4:5 can be delivered (D6, /delivery-ratios).
   let delivery;
@@ -9,7 +14,9 @@
     const org = (await caps())?.mainSystem?.organizationId;
     if (!org || !v.result?.assetId) throw Error("此成果尚未登記到主系統，無法送審");
     delivery ||= await VideoWorkbench.request("/delivery-ratios", undefined, "GET");
-    const ratio = v.result?.ratio || v.input?.settings?.ratio || v.input?.settings?.project?.ratio || "16:9", fit = delivery?.ratios?.[ratio];
+    const ratio = jobRatio(v);
+    if (!ratio) throw Error("此成果沒有記錄長寬比，無法投遞");
+    const fit = delivery?.ratios?.[ratio];
     if (!fit?.deliverable) throw Error(fit?.note || "此比例尚不能投遞");
     return "/release?" + new URLSearchParams({ organizationId: org, candidateAssetId: v.result.assetId });
   }

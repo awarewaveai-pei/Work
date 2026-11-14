@@ -69,7 +69,7 @@ const JOB = "cccccccc-0000-4000-8000-000000000001";
     const data = fixture("org"), before = snapshot(data), stateBefore = fs.readFileSync(path.join(data, "state.json"), "utf8");
     const dry = await run(data, { dryRun: true, fetchImpl: async () => { throw Error("dry-run must not call the network"); } });
     assert.equal(dry.rows.length, 6);
-    // a job result carries its job's delivery ratio to ingest (recorded for renders; the release panel reads it)
+    // a job result carries its job's delivery ratio to ingest (recorded for every video; the release panel reads it)
     assert.equal(sources(data, JSON.parse(fs.readFileSync(path.join(data, "state.json"), "utf8"))).find((r) => r.url === GJOB).ratio, "9:16");
     assert.deepEqual(dry.counts, { total: 6, "dry-run": 4, skipped: 1, error: 1 });
     assert.equal(dry.rows.filter((r) => r.reason === "unreferenced_media").length, 1);

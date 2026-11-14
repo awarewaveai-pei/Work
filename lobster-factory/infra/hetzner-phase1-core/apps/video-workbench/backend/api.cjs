@@ -32,6 +32,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const spend = (usd) => { const m = meters.getStore(); if (m) m.costUsd += usd; };
   // P6 L3: null in local mode (VW_INTERNAL_BASE / VW_INTERNAL_TOKEN unset); then nothing below changes behaviour.
   const mainSystemTools = require("./main-system.cjs");
+  const { jobRatio } = require("../shared/jobs-view.js"); // the page's 送審與投遞 reads the same
   const main = mainSystemTools.createMainSystem({ env, fetchImpl, appDir, dataDir, orgId });
   fs.mkdirSync(dataDir, { recursive: true });
   const outputs = path.join(dataDir, "generated");
@@ -114,7 +115,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (!main) return;
     if (job.status === "succeeded" && job.result?.url && !job.result.assetId && !job.result.ledger) {
       try {
-        Object.assign(job.result, await register(job.result.url, job.result.origin, { sources: mainSystemTools.localUrls(job.input), costUsd: job.result.origin?.costUsd, jobId: job.id, ratio: job.result?.ratio || job.input?.settings?.ratio || job.input?.settings?.project?.ratio }));
+        Object.assign(job.result, await register(job.result.url, job.result.origin, { sources: mainSystemTools.localUrls(job.input), costUsd: job.result.origin?.costUsd, jobId: job.id, ratio: jobRatio(job) }));
         delete job.ledgerError;
       } catch (e) {
         job.ledgerError = publicError(e.message);

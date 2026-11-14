@@ -256,7 +256,9 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       }
     }
 
-    // 6a2. A render records its delivery ratio from the job settings ("16:9" -> "16x9"); an undeliverable ratio (1:1) is not sent.
+    // 6a2. Invariant: the page offers 送審與投遞 exactly when the main system can place the video. Every registered video
+    // (render or AI-generated) carries its job's ratio from the one shared reader (jobRatio); 1:1 and an unknown ratio are
+    // neither recorded nor offered (no 16:9 default).
     {
       const sent = [];
       const main = require("../backend/main-system.cjs").createMainSystem({
@@ -265,9 +267,29 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
         fetchImpl: async (_url, o) => { sent.push(JSON.parse(Buffer.from(o.headers["X-VW-Meta"], "base64url").toString("utf8"))); return Response.json({ ok: true, assetId: "bbbbbbbb-0000-4000-8000-00000000000" + sent.length, checksumSha256: "x" }, { status: 201 }); },
       });
       const mp4 = path.join(dir, "clip.mp4");
-      for (const [url, ratio] of [["/generated/r1.mp4", "16:9"], ["/generated/r2.mp4", "1:1"]]) await main.ingest({ url, file: mp4, origin: { kind: "render" }, ratio });
-      await main.ingest({ url: "/generated/r3.mp4", file: mp4, origin: { kind: "upload", rightsConfirmed: true }, ratio: "16:9" });
-      assert.deepEqual(sent.map((m) => m.ratio), ["16x9", undefined, undefined]);
+      const { jobRatio } = require("../shared/jobs-view.js");
+      const { deliveryRatios } = require("../backend/delivery-ratios.cjs");
+      const { ratioOfAsset } = await import(pathToFileURL(path.join(appDir, "lib/content/video/platform-ratio.ts")).href);
+      const vm = require("node:vm");
+      const ctx = { VideoWorkbench: { request: async () => deliveryRatios(["16:9", "9:16", "4:5", "1:1", "4:3"]), loadCapabilities: async () => ({ mainSystem: { organizationId: ORG } }) }, document: {}, URLSearchParams };
+      vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), ctx);
+      const cases = [
+        ["ai_generated", { settings: { ratio: "9:16" } }, {}, "9x16"],                               // 生成影片 9:16
+        ["ai_generated", { operation: "breakout", settings: { ratio: "9:16" } }, { ratio: "16:9" }, "16x9"], // the file's own ratio wins
+        ["ai_generated", { settings: { ratio: "1:1" } }, {}, undefined],
+        ["render", { settings: { project: { ratio: "4:5" } } }, {}, "4x5"],
+        ["render", { settings: {} }, {}, undefined],
+      ];
+      for (const [i, [kind, input, extra, want]] of cases.entries()) {
+        const job = { input, result: { url: `/generated/r${i}.mp4`, origin: { kind, model: "m", provider: "p" }, ...extra } };
+        const before = sent.length;
+        await main.ingest({ url: job.result.url, file: mp4, origin: job.result.origin, ratio: jobRatio(job) });
+        // A workbench object is named by its checksum, so only metadata.ratio can place it (platform-ratio.ts ratioOfAsset).
+        const placed = ratioOfAsset({ object_url: `https://cdn.example/video/workbench/${ORG}/${"a".repeat(64)}.mp4`, metadata: sent[before] });
+        assert.equal(placed, want, kind + " " + JSON.stringify(input));
+        const offered = await ctx.VideoWorkbench.deliveryUrl({ ...job, result: { ...job.result, assetId: "a" } }).then(() => true, () => false);
+        assert.equal(offered, placed !== undefined, "頁面提供送審與投遞 ⇔ 主系統能放進投遞：" + JSON.stringify(input));
+      }
     }
 
     // 6b. Per provider kind: real cost from next-admin's tables; a model with no price is refused before the call.
