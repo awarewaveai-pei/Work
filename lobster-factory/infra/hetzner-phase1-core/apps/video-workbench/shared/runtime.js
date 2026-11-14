@@ -351,8 +351,18 @@
     return job;
   }
   // Browser media copy (scripts/media-cache-sw.js): only for the served workbench, where media crosses the network.
-  if (!child && config.mode === "http" && window.isSecureContext && "serviceWorker" in navigator)
-    navigator.serviceWorker.register("/scripts/media-cache-sw.js", { scope: "/" }).catch(() => {});
+  // Kill switch (server <dataDir>/media-cache-off -> config.mediaCache false): update() fetches the retiring worker the server
+  // now serves at the same url, which deletes the copies and unregisters (server.cjs RETIRED_MEDIA_WORKER). Every page load
+  // while the switch is on asks for the delete again, so the copies end up gone even if the worker's own delete was cut short.
+  if (!child && config.mode === "http" && window.isSecureContext && "serviceWorker" in navigator) {
+    if (config.mediaCache === false)
+      navigator.serviceWorker.getRegistration("/")
+        .then((r) => r && /\/scripts\/media-cache-sw\.js$/.test(r.active?.scriptURL || "") && r.update())
+        .catch(() => {})
+        .then(() => indexedDB.deleteDatabase("vw-media-cache"))
+        .catch(() => {});
+    else navigator.serviceWorker.register("/scripts/media-cache-sw.js", { scope: "/" }).catch(() => {});
+  }
   const ready = child
     ? rpc("load").then((v) => {
         db = v;

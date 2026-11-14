@@ -25,19 +25,23 @@ const LATENCY = 300;
   };
   const { bytes, url } = store(6), fresh = store(8); // fresh: never fetched before; its first read is a <video>
 
-  const server = createServer({ dataDir: path.join(dir, "data"), env: { VW_CONFIG_MODE: "http" } });
   const hits = [];
-  const handlers = server.listeners("request");
-  server.removeAllListeners("request");
-  server.on("request", (req, res) => {
-    if (req.url.startsWith("/media/")) {
-      hits.push(req.url + (req.headers.range ? " " + req.headers.range : ""));
-      return setTimeout(() => handlers.forEach((h) => h(req, res)), LATENCY);
-    }
-    handlers.forEach((h) => h(req, res));
-  });
-  await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  const start = async (env, port = 0) => {
+    const s = createServer({ dataDir: path.join(dir, "data"), env: { VW_CONFIG_MODE: "http", ...env } });
+    const handlers = s.listeners("request");
+    s.removeAllListeners("request");
+    s.on("request", (req, res) => {
+      if (req.url.startsWith("/media/")) {
+        hits.push(req.url + (req.headers.range ? " " + req.headers.range : ""));
+        return setTimeout(() => handlers.forEach((h) => h(req, res)), LATENCY);
+      }
+      handlers.forEach((h) => h(req, res));
+    });
+    await new Promise((r) => s.listen(port, "127.0.0.1", r));
+    return s;
+  };
+  let server = await start({});
+  const port = server.address().port, base = `http://127.0.0.1:${port}`;
   const browser = await chromium.launch({ channel: "msedge", headless: true, args: ["--disable-features=WebGPU"] });
   try {
     const page = await browser.newPage();
@@ -92,7 +96,29 @@ const LATENCY = 300;
     assert.equal(afterSecond - afterFirst, 0, "second read (new query string) makes no server request");
     assert.equal(afterVideo - afterSecond, 0, "a <video> after reload plays (and seeks) from the copy");
     assert.ok(video.readyState >= 2 && video.duration > 5);
-    console.log(`media-cache-browser ok: first ${first.ms} ms (server ${afterFirst} request), second ${second.ms} ms (server 0), video+seek ${video.ms} ms (server 0); new file first <video> ${freshFirst.ms} ms (server ${freshHits}), after reload +seek ${freshAgain.ms} ms (server 0)`);
+    // Kill switch: <dataDir>/media-cache-off created on the running server. One reload retires the worker and deletes the copies.
+    fs.writeFileSync(path.join(dir, "data", "media-cache-off"), "");
+    await page.reload();
+    const retired = await page.evaluate(async () => {
+      for (let i = 0; i < 100; i++) {
+        if (!(await navigator.serviceWorker.getRegistrations()).length && !(await indexedDB.databases()).some((d) => d.name === "vw-media-cache")) return true;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return false;
+    });
+    assert.ok(retired, "one page load with media-cache-off removes the worker and the copy database within 10 s");
+    await page.reload(); // the old worker still controlled the tab that triggered the update
+    const off = await page.evaluate(async (u) => ({
+      controller: !!navigator.serviceWorker.controller,
+      registrations: (await navigator.serviceWorker.getRegistrations()).length,
+      databases: (await indexedDB.databases()).map((d) => d.name),
+      cache: (await fetch(u)).headers.get("x-vw-media-cache"),
+    }), url + "?sig=off");
+    const offHits = hits.filter((h) => h.endsWith("?sig=off")).length;
+    console.log(JSON.stringify({ killSwitch: { ...off, serverRequests: offHits } }));
+    assert.deepEqual([off.controller, off.registrations, off.databases.includes("vw-media-cache"), off.cache, offHits], [false, 0, false, null, 1],
+      "media-cache-off: no worker, no copy database, media read from the server");
+    console.log(`media-cache-browser ok: kill switch retired the worker and deleted the copies; first ${first.ms} ms (server ${afterFirst} request), second ${second.ms} ms (server 0), video+seek ${video.ms} ms (server 0); new file first <video> ${freshFirst.ms} ms (server ${freshHits}), after reload +seek ${freshAgain.ms} ms (server 0)`);
   } finally {
     await browser.close();
     server.close();

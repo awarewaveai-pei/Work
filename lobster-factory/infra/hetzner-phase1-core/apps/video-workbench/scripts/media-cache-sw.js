@@ -17,7 +17,14 @@ function db() {
         request.result.createObjectStore(ENTRIES, { keyPath: "id" }).createIndex("scope", "scope");
         request.result.createObjectStore(META);
       };
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => {
+        // A delete or upgrade elsewhere (the kill switch's retiring worker) must never be blocked by this connection.
+        request.result.onversionchange = () => {
+          request.result.close();
+          opened = null;
+        };
+        resolve(request.result);
+      };
       request.onerror = () => reject(request.error);
     }).catch((error) => {
       opened = null; // private window / blocked storage: retried next time, the cache answers from the network meanwhile

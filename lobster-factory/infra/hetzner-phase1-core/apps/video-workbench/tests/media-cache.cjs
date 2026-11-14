@@ -148,6 +148,36 @@ const read = async (cache, url, headers = {}) => {
     assert.deepEqual(calls, ["bytes=0-"], "one network request, no background second download");
     console.log("PASS 影片第一次播放只下載一次，同一份同時存成副本");
   }
+  // Kill switch (server.cjs): while <dataDir>/media-cache-off exists the worker url serves the retiring worker and config.js
+  // stops new registrations; deleting the file restores both. One running server: no restart is needed either way.
+  {
+    const { createServer } = require("../server.cjs"), fs = require("node:fs"), os = require("node:os"), path = require("node:path");
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-media-cache-ks-")), flag = path.join(dataDir, "media-cache-off");
+    const server = createServer({ dataDir, env: { VW_CONFIG_MODE: "http" } });
+    await new Promise((r) => server.listen(0, "127.0.0.1", r));
+    const get = async (url) => {
+      const r = await fetch(`http://127.0.0.1:${server.address().port}${url}`);
+      return { text: await r.text(), cache: r.headers.get("cache-control"), allowed: r.headers.get("service-worker-allowed") };
+    };
+    try {
+      assert.match((await get("/scripts/media-cache-sw.js")).text, /importScripts/);
+      assert.doesNotMatch((await get("/config.js")).text, /mediaCache/);
+      fs.writeFileSync(flag, "");
+      const off = await get("/scripts/media-cache-sw.js");
+      assert.deepEqual([off.cache, off.allowed], ["no-store", "/"]);
+      assert.match(off.text, /deleteDatabase\("vw-media-cache"\)/);
+      assert.match(off.text, /registration\.unregister\(\)/);
+      assert.doesNotMatch(off.text, /addEventListener\("fetch"/);
+      assert.doesNotMatch(off.text, /onblocked/, "a blocked delete must not count as done (Codex 2026-11-14)");
+      assert.match((await get("/config.js")).text, /mediaCache: false/);
+      fs.rmSync(flag);
+      assert.match((await get("/scripts/media-cache-sw.js")).text, /importScripts/, "deleting the file restores the real worker");
+    } finally {
+      server.close();
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+    console.log("PASS 收回開關：資料目錄有 media-cache-off 時同一網址給退場 worker（刪副本、取消註冊、不攔請求）、頁面不再註冊；刪檔即恢復");
+  }
   console.log("media-cache ok");
 })().catch((error) => {
   console.error(error);

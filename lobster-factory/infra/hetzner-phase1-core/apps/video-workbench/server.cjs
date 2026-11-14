@@ -25,6 +25,17 @@ const root = __dirname,
     ".glb": "model/gltf-binary",
     ".bvh": "text/plain; charset=utf-8",
   };
+// Served at /scripts/media-cache-sw.js while <dataDir>/media-cache-off exists (kill switch for shared/media-cache.js): no fetch handler,
+// so nothing is intercepted; it deletes the copy database and unregisters. Same database name as scripts/media-cache-sw.js.
+const RETIRED_MEDIA_WORKER = `"use strict";
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil((async () => {
+  // "blocked" only means a connection is still open (the old worker closes it on versionchange): wait for the real end, so
+  // the copies are gone before the worker unregisters. 10 s cap: unregistering is still right if the delete never ends.
+  await new Promise((done) => { const r = indexedDB.deleteDatabase("vw-media-cache"); r.onsuccess = r.onerror = done; setTimeout(done, 10000); });
+  await self.registration.unregister();
+})()));
+`;
 function createServer({
   dataDir = require("./backend/env-compat.cjs").vwEnv(process.env, "DATA_DIR") || path.join(root, ".data"),
   env = process.env,
@@ -69,6 +80,9 @@ function createServer({
     return forOrg(org);
   };
   const version = require("./package.json").version;
+  // Browser media copy kill switch: a file named media-cache-off in the data directory (on the host volume), checked on each
+  // request -- `touch` it to retire every browser's worker and copies, delete it to allow them again. No restart, no compose edit.
+  const mediaCacheSwitch = path.join(dataDir, "media-cache-off"), mediaCacheOff = () => fs.existsSync(mediaCacheSwitch);
   // Edge-cacheable static files (backend/static-version.cjs). Only where the files cannot change while the server runs (the
   // container image); local start.cmd keeps no-store so an edited file is never pinned under an old ?v=.
   const staticVersion = require("./backend/static-version.cjs");
@@ -96,11 +110,19 @@ function createServer({
         res.end();
         return;
       }
+      // Browser media copy kill switch (<dataDir>/media-cache-off exists): this url answers a worker that deletes every copy and
+      // unregisters itself, and config.js tells pages not to register again. Browsers re-fetch the worker url on each
+      // navigation (no-store), so every open tab retires on its next page load. Unset = the real worker.
+      if (pathname === "/scripts/media-cache-sw.js" && mediaCacheOff()) {
+        res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Service-Worker-Allowed": "/" });
+        res.end(req.method === "HEAD" ? undefined : RETIRED_MEDIA_WORKER);
+        return;
+      }
       // P6 L3: VW_CONFIG_MODE=http (container) serves config.js with mode "http"; the file itself stays the local default.
       if (pathname === "/config.js" && env.VW_CONFIG_MODE === "http") {
         const source = fs.readFileSync(path.join(root, "config.js"), "utf8");
         res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
-        res.end(source.replace(/mode:\s*"local"/, 'mode: "http"'));
+        res.end(source.replace(/mode:\s*"local"/, mediaCacheOff() ? 'mode: "http", mediaCache: false' : 'mode: "http"'));
         return;
       }
       if (pathname.startsWith("/reference/")) {
@@ -216,11 +238,11 @@ function createServer({
         "Accept-Ranges": "bytes",
         "Content-Length": size,
       };
+      // The media copy worker lives under /scripts/ (the public prefix nginx forwards) but controls every page.
+      if (file === path.join(root, "scripts", "media-cache-sw.js")) headers["Service-Worker-Allowed"] = "/";
       // EffectCraft Web (scripts/vendor-effectcraft.cjs): cross-origin isolated on its own path only,
       // so the rest of the workbench keeps loading cross-origin resources without CORP headers. Decided on the
       // resolved file, not the URL: an encoded /engines/effectcraft/%2e%2e/ path must not reach other files.
-      // The media copy worker lives under /scripts/ (the public prefix nginx forwards) but controls every page.
-      if (file === path.join(root, "scripts", "media-cache-sw.js")) headers["Service-Worker-Allowed"] = "/";
       if (file.startsWith(path.join(root, "engines", "effectcraft") + path.sep))
         Object.assign(headers, {
           "Cross-Origin-Opener-Policy": "same-origin",
