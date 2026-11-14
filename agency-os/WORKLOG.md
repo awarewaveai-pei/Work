@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-14（續2）剩餘問題清理：所有字幕辨識輸出繁體＋生成影片記交付比例
+
+- 起因：操作者「這些有問題就去處理好」（續13 剩餘風險）。查證後：「一次只查 50 筆」是誤報（續13 已更正）；下面兩項成立；破框格子打開的驗證另卡處理（1fdcb8bdd，修正進行中）。
+- C1 繁體字幕（transcribe-traditional session，9cf1848ec → main）：
+  - 根因：只有自家 whisper worker 會要求繁體（transcribe.cjs host() traditional=1）；ElevenLabs、Gemini、OpenAI whisper 都回簡體。
+  - 修法：recognize() 對非 host 的回答統一套一次 traditional()。規則：選簡體中文 → 不轉；選其他語言 → 不轉；選繁體中文 → 轉；自動偵測 → 廠商回報是中文，或沒回報但文字是漢字、沒有假名或諺文時才轉。轉換器是 next-admin `lib/ai/to-traditional.ts`（opencc-js），跟 cost-model.ts 一樣在執行期 require；不另寫一份台灣用語對照表。
+  - 時間軸：opencc cn→t 不改變字數（1.3.1 的 49,276 組詞＋3,882 組字都檢查過），所以整串一起轉，再照每個字原本的長度切回去；start／end 不動。
+  - 類別關閉：tests/awarewave-files.cjs 會擋「列進 awarewave-files 的 next-admin 檔案 import 了工作台沒有的套件」。
+- C2 交付比例（delivery-ratio session，監工代為提交）：
+  - 根因：main-system.cjs 只替 workbench_render 記 metadata.ratio；next-admin 投遞面板只靠 metadata.ratio 判斷影片放哪個平台，所以 AI 生成的影片頁面上有送審按鈕，下游卻被略過。頁面在不知道比例時還會預設成 16:9。
+  - 主系統本來就接受 ai_generated：app/api/video/assets/route.ts:22、workbench/assets/route.ts:23,84-86、editorial-rights-qa.ts:104、finalize.ts:117-140。
+  - 修法：shared/jobs-view.js `jobRatio(job)` 是唯一讀比例的函式（result.ratio → settings.ratio → project.ratio，不知道就回 null，不再預設 16:9）；main-system.cjs 對所有影片記比例，可不可投遞仍由 delivery-ratios.cjs 決定；api.cjs settle、migrate-media.cjs 都改讀 jobRatio。
+- REALTEST_EVIDENCE: tool=Bash | cmd=video-workbench node tests/p6-main-system.cjs, migrate-media, elevenlabs-free-tier, ed10-subtitles-backend（15）, breakout, region-edit + tests/gate.cjs（origin/main 7b6d97bf4＋兩卡） | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=curl | cmd=ElevenLabs Scribe（免費方案）走 POST /api/vw/transcriptions，2.6 秒繁中音檔：廠商原文「大家好，这是测试配音。」→ 我們的路由輸出「大家好，這是測試配音。」，字的時間不變 | exit=0 | ms=4000
+- 突變（session 做的）：繁體卡 5 個（拿掉 elevenlabs 規則、改成逐字轉、簡體中文不豁免、拿掉假名檢查、拿掉 opencc-js 相依）都紅→還原綠；比例卡 2 個（main-system 條件改回 workbench_render、jobRatio 預設改回 16:9）都紅→還原綠。
+- REVIEW_WAIVED: NA -- Codex 額度到 2026-11-14 01:27（scripts/oracle-quota.ps1）；兩卡都是書面自審＋突變；監工逐行讀過兩份 diff
+- ORACLE_WAIVED: codex quota blocked until 2026-11-14 01:27；self-review + mutations above
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=jobRatio|settings\?\.ratio \|\| |traditional\( | hits=21
+- 剩餘風險：(1) 正式環境有 1 支 AI 生成影片沒有 metadata.ratio（media_assets 9c39eebd，vwJobId 65f90a4d，2026-11-06），沒有回填；要回填就是寫正式資料庫，屬高風險，等操作者決定。(2) 兩卡還沒部署。
+- rollback：git revert 這兩個 commit，彼此獨立。
 ## 2026-11-14（續1）影音工作台 P6.10 缺陷 1（B 案）：匯出與燒錄字幕改讀固定字型檔 vendor/fonts，中文不再被擋或變方框
 
 - 起因：EXP.2 已隨 887f2e1ae 上正式站；正式站容器沒有中文字型，所以含中文的剪輯器匯出和燒錄字幕全部被 EXP.2 擋下。監工改判缺陷 1 走 B：先把 ED 的字型包搬進 main。
