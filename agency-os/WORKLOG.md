@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-14（續6）影音工作台瀏覽器副本：收回開關（監工要求 RISKS 分類＋kill switch 評估）
+
+- 根因：Service Worker 一旦安裝，退版或刪檔都收不回（更新失敗時舊註冊照留）；上線版本沒有收回手段。
+- RISKS 分類：①超過 256 MB 影片第一次播放仍下載兩次＝可接受（只多耗流量，功能與資料不受影響；常用的生成片段遠小於此）；②SW 範圍 "/" 涵蓋同網域 next-admin＝可接受（只對素材路徑 respondWith）；③未經 SW 的登出最多 60 秒＝可接受（同網域登出即清空；副本只在同一瀏覽器）；④未部署＝已由監工部署。無會壞功能／遺失資料／擋 CI 的項目。
+- 做了（`VW`＝`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench`）：
+  - `VW/server.cjs`：每次請求檢查 `<VW_DATA_DIR>/media-cache-off`（主機 `/data` volume）。存在時 `/scripts/media-cache-sw.js` 改給 `RETIRED_MEDIA_WORKER`（不攔任何請求；刪 IndexedDB `vw-media-cache`，等到真的刪完、上限 10 秒，再取消註冊），`config.js` 帶 `mediaCache: false`。不需重啟、不改 compose。
+  - `VW/shared/runtime.js`：`mediaCache:false` → `registration.update()` 立刻換退場 worker，且開關開著時每次載入頁面都再 `deleteDatabase` 一次（刪除失敗會一直重試到成功）。
+  - `VW/scripts/media-cache-sw.js`：收到 `versionchange` 就關連線，不擋刪除。
+  - 沒用 Clear-Site-Data：會連工作台自己的 localStorage／sessionStorage 一起清掉。操作寫在 `VW/README.md`「瀏覽器素材副本與收回開關」。
+- 不變量分析（Codex 同段第 3 次回報前寫）：開關開著時，①沒有任何人讀得到副本（退場 worker 不攔請求、頁面不註冊）；②副本最後一定刪掉＝刪除不能只靠一次性的 worker，改由每次頁面載入重試。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache.cjs → 6 PASS（新增：同一台執行中的伺服器，無檔＝正式 worker、建檔＝退場 worker＋config mediaCache:false、刪檔＝恢復）；突變「開關永遠不讀」→ 紅，還原綠 | exit=0 | ms=400
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/media-cache-browser.cjs（Edge）→ 副本已在、執行中伺服器建檔、重新載入一次 → registrations 0、無 controller、IndexedDB vw-media-cache 已刪、同一素材改從伺服器讀（1 次） | exit=0 | ms=25000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs → gate ok | exit=0 | ms=20000
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/3m/0n（external oracle = Codex CLI gpt-6-sol；`agency-os/reports/oracle/2026-11-14-review-cb29b59d.md` 環境變數 compose 沒傳 → 改旗標檔；`-32c4ec37` 刪除 blocked 被當完成 → versionchange 關連線＋等真的結束；`-5244ea37` 10 秒上限可能留副本 → 頁面載入重試；`-de9d9b73` NO FINDINGS）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=media-cache-off | hits=13（server.cjs、runtime.js、兩個測試、README、commit 外無其他引用）
 ## 2026-11-14（續5）破框：入口邊開格、照參考改寫提示詞、頁面畫鎖定遮罩（任務自己的輸入）
 
 - 起因：續13 剩餘風險「主角衝過按讚列沒驗到」。用真的 H.264 測試片（ffmpeg 產生，方塊往下穿過文字列）驗證：舊規則（格子變動超過 50% 才開）會把主角卡在看不見的格線外。
