@@ -27,71 +27,82 @@ function prepare(input, env) {
   return rules.prompt(input.prompt, s);
 }
 
-// settings.lock = { boxes: [[x, y, w, h], ...] }: the post's text rows, 0..1 of the model frame. None = nothing to hold
-// (a job sent before the lock). Other keys are ignored (a page from before the cell rule also sent ink colours).
-// The rows of a post cover well under half the frame and never overlap; a lock asking for more is refused, so the
-// per-frame work stays bounded whatever a request sends (LOCK_MAX_AREA).
-const LOCK_MAX_AREA = 0.6;
+// settings.lock = { mask }: a PNG the page draws with the same calls as the post (scripts/tools-breakout.js
+// toolBreakoutDraw): black, the post's text rows white, clipped like the card. It is the one source of what is held: the
+// server knows no layout. A data URL at submit (durableInput then stores it as a /generated file, out of the library).
+// None = nothing to hold (a job sent before the lock; a page from before the mask sent rows as boxes: not held).
 function lockOf(settings) {
-  const lock = settings?.lock;
-  if (lock === undefined || lock === null) return { boxes: [] };
-  const unit = (v) => Number.isFinite(v) && v >= 0 && v <= 1;
-  const boxes = Array.isArray(lock.boxes) ? lock.boxes : null;
-  const bad = () => Error("貼文文字鎖定資料無效");
-  if (!boxes || boxes.length > rules.LOCK_MAX_BOXES ||
-    !boxes.every((b) => Array.isArray(b) && b.length === 4 && b.every(unit) && b[0] + b[2] <= 1.0001 && b[1] + b[3] <= 1.0001))
-    throw bad();
-  if (boxes.reduce((sum, b) => sum + b[2] * b[3], 0) > LOCK_MAX_AREA) throw bad();
-  const eps = 1e-6,
-    overlap = (a, b) => a[0] + eps < b[0] + b[2] && b[0] + eps < a[0] + a[2] && a[1] + eps < b[1] + b[3] && b[1] + eps < a[1] + a[3];
-  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) if (overlap(boxes[i], boxes[j])) throw bad();
-  return { boxes };
+  const mask = settings?.lock?.mask;
+  if (mask === undefined || mask === null) return { mask: null };
+  if (typeof mask !== "string" || !/^(data:image\/png;base64,[A-Za-z0-9+/=]+|\/generated\/[a-f0-9-]+\.png)$/.test(mask)) throw Error("貼文文字鎖定資料無效");
+  return { mask };
 }
 
-// Each row is cut into cells about as wide as 1.5 row heights (a few characters). A pixel "changed" when its RGB distance
-// (sum of |d|) from the first frame passes CHANGED. The subject arrives from outside the text: a cell opens when its own
-// changed pixels reach an edge the subject can come from (the photo or the outside of the post, or a cell already open),
-// at least TOUCH of them; opening repeats within the frame until nothing more opens (a fast subject crosses several rows
-// in one frame). An open cell shows the video as made from then on. Every other cell is put back where it changed:
-// drifting digits and letters sit inside their row with a margin, so they never reach such an edge, however compression
-// softened them.
-const LOCK = Object.freeze({ changed: 60, touch: 4 });
-/**
- * The cells of the rows (0..1) in pixels of a w x h frame, and each cell's border: pairs [pixel index, the label of the
- * pixel just outside it] (label = the neighbouring cell, or -1 for the photo / the outside of the post / the frame edge).
- */
-function lockGrid(boxes, w, h) {
-  const cells = boxes.flatMap(([x, y, bw, bh]) => {
-    const x0 = Math.max(0, Math.floor(x * w)), y0 = Math.max(0, Math.floor(y * h)),
-      x1 = Math.min(w, Math.ceil((x + bw) * w)), y1 = Math.min(h, Math.ceil((y + bh) * h)),
-      step = Math.max(16, Math.round((y1 - y0) * 1.5)), row = [];
-    for (let cx = x0; cx < x1; cx += step) row.push([cx, y0, Math.min(step, x1 - cx), y1 - y0]);
-    return row;
-  });
-  const label = new Int32Array(w * h).fill(-1);
-  cells.forEach(([x, y, cw, ch], c) => {
-    for (let yy = y; yy < y + ch; yy++) label.fill(c, yy * w + x, yy * w + x + cw);
-  });
-  const borders = cells.map(([x, y, cw, ch]) => {
-    const b = [];
-    const add = (px, py, nx, ny) => b.push(py * w + px, nx < 0 || ny < 0 || nx >= w || ny >= h ? -1 : label[ny * w + nx]);
-    for (let xx = x; xx < x + cw; xx++) {
-      add(xx, y, xx, y - 1);
-      add(xx, y + ch - 1, xx, y + ch);
+// Held pixels = mask pixels that are fully white with everything within LOCK.margin of them fully white too. That drops
+// every pixel the page drew as a mix (anti-aliased row edges at fractional coordinates, a rounded card corner) and keeps a
+// margin from the photo, so a model redrawing the photo a pixel or two off never reaches a held pixel. The rows of a post
+// cover well under half the frame; a mask asking for more is refused, so the per-frame work stays bounded (LOCK_MAX_AREA).
+const LOCK_MAX_AREA = 0.6;
+const LOCK = Object.freeze({ changed: 60, touch: 4, margin: 2, tile: 32 });
+function lockPixels(gray, w, h) {
+  const r = LOCK.margin, row = new Uint8Array(w * h), held = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) // horizontal pass: white across [x - r, x + r]
+    for (let x = 0; x < w; x++) {
+      let ok = x >= r && x < w - r;
+      for (let d = -r; ok && d <= r; d++) ok = gray[y * w + x + d] === 255;
+      row[y * w + x] = ok ? 1 : 0;
     }
-    for (let yy = y; yy < y + ch; yy++) {
-      add(x, yy, x - 1, yy);
-      add(x + cw - 1, yy, x + cw, yy);
+  let count = 0;
+  for (let y = r; y < h - r; y++) // vertical pass over the horizontal one: the whole square is white
+    for (let x = 0; x < w; x++) {
+      let ok = true;
+      for (let d = -r; ok && d <= r; d++) ok = row[(y + d) * w + x] === 1;
+      if (ok) (held[y * w + x] = 1), count++;
+    }
+  if (count > LOCK_MAX_AREA * w * h) throw Error("貼文文字鎖定資料無效");
+  return held;
+}
+
+// Held pixels are grouped into cells by LOCK.tile squares (a few characters). A pixel "changed" when its RGB distance (sum
+// of |d|) from the first frame passes CHANGED. The subject arrives from outside the text: a cell opens when at least TOUCH
+// of its own border pixels changed where they face something the subject can come from (a pixel that is not held: the
+// photo, the outside of the post, the frame edge; or a cell already open), each pixel counted once; opening repeats within
+// the frame until nothing more opens (a fast subject crosses several rows in one frame). An open cell shows the video as
+// made from then on. Every other cell is put back where it changed: drifting digits and letters sit inside their row with
+// a margin, so they never reach such a border, however compression softened them.
+/**
+ * cells: held pixel indices per cell; borders: per cell, flat [pixel, k, label1..labelk] for its border pixels, label =
+ * the neighbouring cell or -1 (not held, or the frame edge).
+ */
+function lockGrid(held, w, h, tile = LOCK.tile) {
+  const label = new Int32Array(w * h).fill(-1), ids = new Map(), lists = [], tilesX = Math.ceil(w / tile);
+  for (let p = 0; p < w * h; p++) {
+    if (!held[p]) continue;
+    const t = Math.floor(p / w / tile) * tilesX + Math.floor((p % w) / tile);
+    let c = ids.get(t);
+    if (c === undefined) ids.set(t, (c = lists.push([]) - 1));
+    label[p] = c;
+    lists[c].push(p);
+  }
+  const borders = lists.map((pixels, c) => {
+    const b = [];
+    for (const p of pixels) {
+      const x = p % w, y = (p - x) / w, out = [];
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+        const n = nx < 0 || ny < 0 || nx >= w || ny >= h ? -1 : label[ny * w + nx];
+        if (n !== c) out.push(n);
+      }
+      if (out.length) b.push(p, out.length, ...out);
     }
     return Int32Array.from(b);
   });
-  return { cells, borders };
+  return { cells: lists.map((l) => Int32Array.from(l)), borders };
 }
 /**
- * Holds one decoded frame's text cells to the first frame, in place. frame/ref: rgb24 buffers of the same size (width w);
+ * Holds one decoded frame's text cells to the first frame, in place. frame/ref: rgb24 buffers of the same size;
  * grid: lockGrid; open: one flag per cell, kept across frames. Returns the pixels put back.
  */
-function lockFrame(frame, ref, w, grid, open) {
+function lockFrame(frame, ref, grid, open) {
   const changed = (p) => {
     const i = p * 3;
     return Math.abs(frame[i] - ref[i]) + Math.abs(frame[i + 1] - ref[i + 1]) + Math.abs(frame[i + 2] - ref[i + 2]) > LOCK.changed;
@@ -101,23 +112,25 @@ function lockFrame(frame, ref, w, grid, open) {
     grid.borders.forEach((b, c) => {
       if (open[c]) return;
       let touch = 0;
-      for (let k = 0; k < b.length && touch < LOCK.touch; k += 2) if ((b[k + 1] === -1 || open[b[k + 1]]) && changed(b[k])) touch++;
+      for (let k = 0; k < b.length && touch < LOCK.touch; k += 2 + b[k + 1]) {
+        let entry = false;
+        for (let j = 0; j < b[k + 1] && !entry; j++) entry = b[k + 2 + j] === -1 || open[b[k + 2 + j]] === 1;
+        if (entry && changed(b[k])) touch++;
+      }
       if (touch >= LOCK.touch) open[c] = again = 1;
     });
   }
   let restored = 0;
-  grid.cells.forEach(([cx, cy, cw, ch], c) => {
+  grid.cells.forEach((pixels, c) => {
     if (open[c]) return;
-    for (let y = cy; y < cy + ch; y++)
-      for (let x = cx; x < cx + cw; x++) {
-        const p = y * w + x;
-        if (!changed(p)) continue;
-        const i = p * 3;
-        frame[i] = ref[i];
-        frame[i + 1] = ref[i + 1];
-        frame[i + 2] = ref[i + 2];
-        restored++;
-      }
+    for (const p of pixels) {
+      if (!changed(p)) continue;
+      const i = p * 3;
+      frame[i] = ref[i];
+      frame[i + 1] = ref[i + 1];
+      frame[i + 2] = ref[i + 2];
+      restored++;
+    }
   });
   return restored;
 }
@@ -147,8 +160,8 @@ const TO_RGB = "scale=in_color_matrix=bt709:in_range=tv:out_range=pc";
 const TO_YUV = "scale=out_color_matrix=bt709:in_range=pc:out_range=tv,format=yuv420p";
 const TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
 
-async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
-  const { boxes } = lockOf(settings),
+async function finishHere({ src, frameFile, maskFile, dst, settings, ffmpeg, signal }) {
+  const { mask } = lockOf(settings),
     ratio = rules.OUTPUT_RATIOS.includes(settings?.outputRatio) ? settings.outputRatio : "9:16",
     [ma, mb] = rules.modelRatio(ratio).split(":").map(Number);
   const info = await require("./media-inspect.cjs").inspectMedia(src, signal);
@@ -160,17 +173,20 @@ async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
   if (Math.abs(H / W - mb / ma) > 0.02) throw Error(`影片不是 ${ma}:${mb}（${W}×${H}）`);
   const outH = rules.outputHeight(ratio, W);
   if (outH > H) throw Error("輸出比例超出影片範圍");
-  if (!boxes.length && outH === H) return { ratio, restored: 0, untouched: true }; // nothing to hold, nothing to cut
+  if (!mask && outH === H) return { ratio, restored: 0, opened: 0, untouched: true }; // nothing to hold, nothing to cut
   const rate = info.probe?.avgFrameRate || info.probe?.frameRate, // media-inspect rational { num, den }
     fps = rate?.num > 0 && rate?.den > 0 ? `${rate.num}/${rate.den}` : "24",
     crop = outH < H ? `crop=${W}:${outH}:0:${Math.floor((H - outH) / 4) * 2},` : "",
     out = ["-map", "0:v", "-c:v", "libx264", "-crf", "18", ...TAGS, "-c:a", "copy", "-movflags", "+faststart", dst];
-  if (!boxes.length) {
+  if (!mask) {
     // nothing to hold: one ffmpeg crop straight from the file (no rgb round trip)
     await run(ffmpeg, ["-y", "-v", "error", "-i", src, "-map", "0:a?", "-vf", crop + "format=yuv420p", ...out], signal, { stdout: false }).done;
-    return { ratio, restored: 0 };
+    return { ratio, restored: 0, opened: 0 };
   }
-  const grid = lockGrid(boxes, W, H), open = new Uint8Array(grid.cells.length), size = W * H * 3;
+  // the mask at the video's size, nearest (no new mixed pixels); then the held pixels and their cells
+  const gray = await run(ffmpeg, ["-v", "error", "-i", maskFile, "-vf", `scale=${W}:${H}:flags=neighbor`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], signal).done;
+  if (gray.length !== W * H) throw Error("鎖定遮罩尺寸不符");
+  const grid = lockGrid(lockPixels(gray, W, H), W, H), open = new Uint8Array(grid.cells.length), size = W * H * 3;
   const ref = await run(ffmpeg, ["-v", "error", "-i", frameFile, "-vf", `scale=${W}:${H}:flags=area`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal).done;
   if (ref.length !== size) throw Error("第一格畫面尺寸不符");
   const decoder = run(ffmpeg, ["-v", "error", "-noautorotate", "-i", src, "-vf", TO_RGB, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal);
@@ -189,7 +205,7 @@ async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
       filled += n;
       at += n;
       if (filled === size) {
-        restored += lockFrame(frame, ref, W, grid, open);
+        restored += lockFrame(frame, ref, grid, open);
         filled = 0;
         if (!encoder.child.stdin.write(Buffer.from(frame))) {
           decoder.child.stdout.pause();
@@ -207,7 +223,7 @@ async function finishHere({ src, frameFile, dst, settings, ffmpeg, signal }) {
     throw e;
   }
   if (filled) throw Error("影片解碼後剩下不完整的畫格");
-  return { ratio, restored };
+  return { ratio, restored, opened: open.reduce((n, v) => n + v, 0) };
 }
 
 const FINISH_TIMEOUT_MS = 5 * 60 * 1000;
@@ -231,9 +247,9 @@ async function fileRatio(file) {
  * Returns { ratio, restored, untouched? }: ratio = the written file's own ratio; untouched = nothing written, keep src.
  * A failure removes dst.
  */
-function finish({ src, frameFile, dst, settings, ffmpeg, signal, timeoutMs = FINISH_TIMEOUT_MS }) {
+function finish({ src, frameFile, maskFile, dst, settings, ffmpeg, signal, timeoutMs = FINISH_TIMEOUT_MS }) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(__filename, { workerData: { breakoutFinish: { src, frameFile, dst, settings, ffmpeg } } });
+    const worker = new Worker(__filename, { workerData: { breakoutFinish: { src, frameFile, maskFile, dst, settings, ffmpeg } } });
     let settled = false;
     const end = (fn, value) => {
       if (settled) return;
@@ -263,4 +279,4 @@ if (!isMainThread && workerData?.breakoutFinish) {
     .finally(() => parentPort.close());
 }
 
-module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockOf, LOCK, LOCK_MAX_AREA, FINISH_TIMEOUT_MS };
+module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockPixels, lockOf, LOCK, LOCK_MAX_AREA, FINISH_TIMEOUT_MS };

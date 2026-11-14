@@ -380,12 +380,13 @@ function toolBreakoutNav(ctx, x, y, w, h, k, ink) {
 // One post at (x, y), width w, height up to maxH; returns its height. measure=true only computes it.
 // photo=false: the floating card (header, actions and caption only; the picture is the frame behind it).
 // fill=true: the photo grows so the post fills maxH (a phone screen); nav=true: an app bar at the bottom.
-// boxes: an array that receives every text row drawn, [x, y, w, h] in canvas pixels (the server holds them still).
+// mask: the lock mask's 2D context (toolBreakoutDraw); every text row drawn is filled white in it, where the post draws
+// it (the server holds those pixels still: backend/breakout.cjs lockPixels).
 function toolBreakoutPost(ctx, img, o, x, y, w, maxH, opts = {}) {
   return (BREAKOUT_STYLES[o.style]?.column ? toolBreakoutPostColumn : toolBreakoutPostStacked)(ctx, img, o, x, y, w, maxH, opts);
 }
 // IG / FB: header row, photo the full width, then the action rows.
-function toolBreakoutPostStacked(ctx, img, o, x, y, w, maxH, { measure = false, photo = true, fill = false, nav = false, boxes = null } = {}) {
+function toolBreakoutPostStacked(ctx, img, o, x, y, w, maxH, { measure = false, photo = true, fill = false, nav = false, mask = null } = {}) {
   const k = w / 720,
     ink = BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色,
     fb = o.style === "FB 風格",
@@ -419,7 +420,7 @@ function toolBreakoutPostStacked(ctx, img, o, x, y, w, maxH, { measure = false, 
     ctx.fillText(toolBreakoutWrap(ctx, sub, w - (tx - x) - 80 * k, 1)[0] || "", tx, ay + 30 * k);
   }
   toolBreakoutDots(ctx, x + w - pad, ay, k, ink);
-  const mark = (top, h) => boxes?.push([x, top, w, h]);
+  const mark = (top, h) => mask?.fillRect(x, top, w, h);
   mark(y, header);
   let cy = y + header;
   const caption = (top) => {
@@ -501,7 +502,7 @@ function toolBreakoutPostStacked(ctx, img, o, x, y, w, maxH, { measure = false, 
 }
 // Threads / X: the avatar in a left column; name line, text, a rounded photo and the action row in the column beside it
 // (Threads joins the avatar to the post with a thread line). Same options and return value as the stacked styles.
-function toolBreakoutPostColumn(ctx, img, o, x, y, w, maxH, { measure = false, photo = true, fill = false, nav = false, boxes = null } = {}) {
+function toolBreakoutPostColumn(ctx, img, o, x, y, w, maxH, { measure = false, photo = true, fill = false, nav = false, mask = null } = {}) {
   const k = w / 720,
     ink = BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色,
     xStyle = o.style === "X 風格",
@@ -541,7 +542,7 @@ function toolBreakoutPostColumn(ctx, img, o, x, y, w, maxH, { measure = false, p
   ctx.fillStyle = ink.sub;
   ctx.fillText(toolBreakoutWrap(ctx, xStyle ? `@${handle} · 2 小時` : "2 小時", colW - nameW - 70 * k, 1)[0] || "", colX + nameW + 12 * k, base);
   toolBreakoutDots(ctx, x + w - pad, base - 9 * k, k, ink);
-  const mark = (t, h) => boxes?.push([x, t, w, h]);
+  const mark = (t, h) => mask?.fillRect(x, t, w, h);
   mark(y, pad + nameH);
   let cy = top + nameH;
   if (captionH) {
@@ -605,12 +606,13 @@ function toolBreakoutOptions() {
 }
 // Paints the preview at the output size (VideoWorkbenchBreakout.outputSize). frame=true: the model's frame
 // (modelRatio: 9:16 or 16:9); a 4:5 or 1:1 frame is the preview itself, pixel for pixel, centred in 9:16 (the outside is
-// the post background; the server's crop drops it). boxes: receives the post's text rows in this canvas's pixels.
-async function toolBreakoutDraw(canvas, frame = false, boxes = null) {
+// the post background; the server's crop drops it). mask: a canvas that becomes the lock mask of what is drawn, same size:
+// black, the post's text rows white, drawn by the same calls and clipped like the card, so its edges are the post's own.
+async function toolBreakoutDraw(canvas, frame = false, mask = null) {
   const o = toolBreakoutOptions(),
     model = VideoWorkbenchBreakout.modelRatio(o.ratio);
   if (frame && o.ratio !== model) {
-    const rows = boxes ? [] : null,
+    const rows = mask ? document.createElement("canvas") : null,
       preview = await toolBreakoutDraw(document.createElement("canvas"), false, rows),
       [FW, FH] = VideoWorkbenchBreakout.outputSize(model),
       top = (FH - preview.height) / 2;
@@ -620,7 +622,7 @@ async function toolBreakoutDraw(canvas, frame = false, boxes = null) {
     ctx.fillStyle = (BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色).bg;
     ctx.fillRect(0, 0, FW, FH);
     ctx.drawImage(preview, 0, top);
-    for (const [x, y, w, h] of rows || []) boxes.push([x, y + top, w, h]);
+    if (mask) toolBreakoutMask(mask, FW, FH).drawImage(rows, 0, top);
     return canvas;
   }
   const img = await toolBreakoutImage(files.image?.url),
@@ -629,7 +631,8 @@ async function toolBreakoutDraw(canvas, frame = false, boxes = null) {
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d"),
-    ink = BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色;
+    ink = BREAKOUT_INK[o.theme] || BREAKOUT_INK.淺色,
+    m = mask && toolBreakoutMask(mask, W, H);
   if (o.layout === "float") {
     // The picture fills the output over an opaque base (a cut-out PNG never sends alpha); a text-only post card floats
     // in the middle of it (a card's width, also on a landscape frame).
@@ -649,11 +652,14 @@ async function toolBreakoutDraw(canvas, frame = false, boxes = null) {
     toolBreakoutRound(ctx, cx, cy, cw, ch, r);
     ctx.fill();
     ctx.restore();
-    ctx.save();
-    toolBreakoutRound(ctx, cx, cy, cw, ch, r);
-    ctx.clip();
-    toolBreakoutPost(ctx, img, o, cx, cy, cw, H, { photo: false, boxes });
+    for (const c of m ? [ctx, m] : [ctx]) {
+      c.save();
+      toolBreakoutRound(c, cx, cy, cw, ch, r);
+      c.clip();
+    }
+    toolBreakoutPost(ctx, img, o, cx, cy, cw, H, { photo: false, mask: m });
     ctx.restore();
+    m?.restore();
   } else {
     // The post fills the screen: the photo grows to fill it, with an app bar at the bottom of a 9:16 phone screen. On a
     // landscape frame the post is a centred column, as a feed shows it on a wide screen.
@@ -666,9 +672,19 @@ async function toolBreakoutDraw(canvas, frame = false, boxes = null) {
       ctx.fillRect(px - 2, 0, 2, H);
       ctx.fillRect(px + pw, 0, 2, H);
     }
-    toolBreakoutPost(ctx, img, o, px, 0, pw, H, { fill: true, nav: o.ratio === "9:16", boxes });
+    toolBreakoutPost(ctx, img, o, px, 0, pw, H, { fill: true, nav: o.ratio === "9:16", mask: m });
   }
   return canvas;
+}
+// The lock mask canvas at w x h: black, ready to fill rows white.
+function toolBreakoutMask(mask, w, h) {
+  mask.width = w;
+  mask.height = h;
+  const m = mask.getContext("2d");
+  m.fillStyle = "rgb(0,0,0)";
+  m.fillRect(0, 0, w, h);
+  m.fillStyle = "rgb(255,255,255)";
+  return m;
 }
 let toolBreakoutPainting = 0;
 function toolBreakoutRepaint() {
@@ -740,16 +756,11 @@ async function toolBreakoutGenerate(button) {
     seconds = VideoWorkbenchBreakout.seconds(vm);
   button.disabled = true;
   try {
-    const rows = [],
-      canvas = await toolBreakoutDraw(document.createElement("canvas"), true, rows);
-    // 鎖定貼文文字 (backend/breakout.cjs finish): the post's text rows as 0..1 of the frame.
-    const unit = (v) => Math.min(1, Math.max(0, v));
-    const lock = {
-      boxes: rows.slice(0, VideoWorkbenchBreakout.LOCK_MAX_BOXES).map(([x, y, w, h]) => {
-        const x0 = unit(x / canvas.width), y0 = unit(y / canvas.height);
-        return [x0, y0, unit((x + w) / canvas.width) - x0, unit((y + h) / canvas.height) - y0];
-      }),
-    };
+    // 鎖定貼文文字 (backend/breakout.cjs finish): the lock mask drawn with the frame; sent as a data URL, which the server
+    // stores as a file of the job (not a library asset).
+    const maskCanvas = document.createElement("canvas"),
+      canvas = await toolBreakoutDraw(document.createElement("canvas"), true, maskCanvas),
+      lock = { mask: maskCanvas.toDataURL("image/png") };
     const frame = await VideoWorkbench.request("/uploads", { name: "破框貼文-第一格.png", data: canvas.toDataURL("image/png") });
     // paid: video.motion
     const job = await VideoWorkbench.generations.create({

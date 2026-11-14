@@ -850,6 +850,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         breakout.finish({
           src, dst: path.join(outputs, name), settings: job.input.settings, ffmpeg: require("ffmpeg-static"), signal: controller.signal,
           frameFile: localFile(job.input.references?.firstFrame?.[0]?.url) || "",
+          maskFile: localFile(job.input.settings?.lock?.mask) || "",
         }),
       )
       .then(
@@ -860,7 +861,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             throw Error("已停止");
           }
           // ratio = the file's own; readers of a job's ratio take result.ratio first
-          job.result = { url: done.untouched ? made.url : "/generated/" + name, origin: made.origin, ratio: done.ratio, textLock: { restoredPixels: done.restored } };
+          job.result = { url: done.untouched ? made.url : "/generated/" + name, origin: made.origin, ratio: done.ratio, textLock: { restoredPixels: done.restored, openedCells: done.opened } };
           if (!done.untouched) fs.rm(src, { force: true }, (e) => e && console.error("[vw] model file left:", src, e.message));
         },
       )

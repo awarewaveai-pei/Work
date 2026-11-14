@@ -44,8 +44,6 @@
     const s = String(text ?? "");
     return segmenter ? Array.from(segmenter.segment(s), (g) => g.segment) : Array.from(s);
   };
-  // 鎖定貼文文字: at most this many rows of the post are watched (scripts/tools-breakout.js lockBoxes).
-  const LOCK_MAX_BOXES = 24;
   const SUBJECT_MAX = 200;
   // The prompt = SHOT + the layout's scene (with the subject) + STILL; STILL is always last, whatever the subject text
   // says (tests/breakout.cjs). Written from the reference product's working prompt (2026-11-14): a locked screen
@@ -70,7 +68,7 @@
     if (!parts.length) throw Error("請描述衝出畫面的主角");
     return text(parts.join(""));
   }
-  const api = { chineseOrigin, eligible, seconds, usd, byPrice, prompt, STILL, PROMPT_MAX, LAYOUTS, OUTPUT_RATIOS, modelRatio, outputHeight, outputSize, graphemes, LOCK_MAX_BOXES, SUBJECT_MAX };
+  const api = { chineseOrigin, eligible, seconds, usd, byPrice, prompt, STILL, PROMPT_MAX, LAYOUTS, OUTPUT_RATIOS, modelRatio, outputHeight, outputSize, graphemes, SUBJECT_MAX };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.VideoWorkbenchBreakout = api;
 })(typeof window !== "undefined" ? window : globalThis);

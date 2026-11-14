@@ -80,37 +80,61 @@ const breakout = require("../backend/breakout.cjs");
   };
   const digits = (x0, c = BLACK) => (x, y) => (x >= x0 && x < x0 + 4 && y >= 3 && y < 7 ? c : null);
   const ref = img(digits(4)); // the first frame's "1,286"
-  const grid = breakout.lockGrid([[0, 0, 1, 1]], W, Hh), fresh = () => new Uint8Array(grid.cells.length);
-  assert.deepEqual(grid.cells.map((c) => c[2]), [16, 16, 8]);
+  const grid = breakout.lockGrid(new Uint8Array(W * Hh).fill(1), W, Hh, 16), fresh = () => new Uint8Array(grid.cells.length);
+  assert.deepEqual(grid.cells.map((c) => c.length), [160, 160, 80]);
   // drift: the model moved the digits (old spot blank, new spot black) -> both put back
   const drift = img(digits(10));
-  assert(breakout.lockFrame(drift, ref, W, grid, fresh()) > 0);
+  assert(breakout.lockFrame(drift, ref, grid, fresh()) > 0);
   assert.deepEqual(drift, ref, "drifted digits not restored to the first frame");
   // drift softened by compression (grey, not the text colour: the real 16:9 run) -> put back as well
   const soft = img(digits(10, GREY));
-  breakout.lockFrame(soft, ref, W, grid, fresh());
+  breakout.lockFrame(soft, ref, grid, fresh());
   assert.deepEqual(soft, ref, "softened drifting digits not restored");
   // the subject entering the row opens the cell it reaches; the digits' cell stays held
   const edge = img((x, y) => (x >= 34 ? RED : digits(4)(x, y))), before = Buffer.from(edge), edgeOpen = fresh();
-  breakout.lockFrame(edge, ref, W, grid, edgeOpen);
+  breakout.lockFrame(edge, ref, grid, edgeOpen);
   assert.deepEqual(edge, before, "a subject entering the row was erased");
   assert.deepEqual([...edgeOpen], [0, 0, 1]);
   // the subject over most of the row (the burst): those cells show the video from then on, even if text later drifts there
   const over = img((x) => (x < 30 ? RED : null)), opened = fresh(), copy = Buffer.from(over);
-  breakout.lockFrame(over, ref, W, grid, opened);
+  breakout.lockFrame(over, ref, grid, opened);
   assert.deepEqual([...opened], [1, 1, 0]);
   assert.deepEqual(over, copy, "the burst over the like bar was painted over");
   const later = img(digits(10));
-  breakout.lockFrame(later, ref, W, grid, opened);
+  breakout.lockFrame(later, ref, grid, opened);
   assert.notDeepEqual(later, ref, "an opened cell was locked again (would flicker)");
   // the lock is checked on the server: a malformed one is refused, none is accepted (an older job), extra keys ignored
-  assert.throws(() => breakout.lockOf({ lock: { boxes: [[0, 0, 2, 1]] } }), /鎖定/);
-  assert.deepEqual(breakout.lockOf({}), { boxes: [] });
-  assert.deepEqual(breakout.lockOf({ lock: { boxes: [[0, 0, 1, 0.1]], inks: [[0, 0, 0]] } }), { boxes: [[0, 0, 1, 0.1]] });
-  // bounded work whatever a request sends: total area and overlap are refused
-  assert.throws(() => breakout.lockOf({ lock: { boxes: Array(24).fill([0, 0, 1, 1]) } }), /鎖定/);
-  assert.throws(() => breakout.lockOf({ lock: { boxes: [[0, 0, 0.5, 0.2], [0.2, 0.1, 0.5, 0.2]] } }), /鎖定/);
-  assert.equal(breakout.lockOf({ lock: { boxes: [[0, 0, 1, 0.1], [0, 0.1, 1, 0.1]] } }).boxes.length, 2, "touching rows refused");
+  assert.deepEqual(breakout.lockOf({}), { mask: null });
+  assert.deepEqual(breakout.lockOf({ lock: { boxes: [[0, 0, 1, 0.1]] } }), { mask: null }, "an older page's rows are held");
+  assert.deepEqual(breakout.lockOf({ lock: { mask: "data:image/png;base64,iVBORw0KGgo=" } }), { mask: "data:image/png;base64,iVBORw0KGgo=" });
+  assert.deepEqual(breakout.lockOf({ lock: { mask: "/generated/0f0e-1a.png" } }), { mask: "/generated/0f0e-1a.png" });
+  for (const mask of ["/etc/passwd", "/generated/../x.png", "data:text/html;base64,AA==", 5]) assert.throws(() => breakout.lockOf({ lock: { mask } }), /鎖定/);
+  // held pixels (lockPixels): a rounded, anti-aliased card row as the page draws it (white, an edge band of 128, black
+  // outside). Only pixels white with LOCK.margin of white around them are held: never the edge band, never a rounded
+  // corner's outside. Changes everywhere outside (a moving photo behind the card) open nothing and are never put back.
+  {
+    const w = 60, h = 40, gray = new Uint8Array(w * h);
+    const inside = (x, y, grow) => {
+      const cx = Math.min(Math.max(x, 13), 47), cy = Math.min(Math.max(y, 13), 27); // rounded rect 5..55 x 5..35, r 8
+      return Math.hypot(x - cx, y - cy) <= 8 + grow;
+    };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) gray[y * w + x] = inside(x, y, -1) ? 255 : inside(x, y, 0) ? 128 : 0;
+    const held = breakout.lockPixels(gray, w, h), m = breakout.LOCK.margin;
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++)
+        if (held[y * w + x])
+          for (let dy = -m; dy <= m; dy++) for (let dx = -m; dx <= m; dx++) assert.equal(gray[(y + dy) * w + x + dx], 255, `held (${x},${y}) is within ${m} of a mixed or outside pixel`);
+    assert.equal(held[6 * w + 6], 0, "a rounded corner's outside is held");
+    assert.equal(held[20 * w + 30], 1, "the card's inside is not held");
+    const ref = Buffer.alloc(w * h * 3, 255), frame = Buffer.from(ref);
+    for (let p = 0; p < w * h; p++) if (!held[p]) frame.set([200, 40, 40], p * 3);
+    const before = Buffer.from(frame), grid = breakout.lockGrid(held, w, h, 16), open = new Uint8Array(grid.cells.length);
+    assert.equal(breakout.lockFrame(frame, ref, grid, open), 0);
+    assert.deepEqual([...open], new Array(grid.cells.length).fill(0), "a change outside the held pixels opened a cell");
+    assert.deepEqual(frame, before, "a pixel outside the held ones was put back");
+    // bounded work whatever a request sends: a mask over more than LOCK_MAX_AREA is refused
+    assert.throws(() => breakout.lockPixels(new Uint8Array(100 * 100).fill(255), 100, 100), /鎖定/);
+  }
   // ratios: portrait outputs run at 9:16 and are cut from it; 16:9 runs as is (first-frame models make only these two)
   assert.deepEqual(rules.OUTPUT_RATIOS, ["9:16", "4:5", "1:1", "16:9"]);
   assert.deepEqual(rules.OUTPUT_RATIOS.map(rules.modelRatio), ["9:16", "9:16", "9:16", "16:9"]);
@@ -204,13 +228,15 @@ const fetchImpl = async (url, init = {}) => {
       const { base: b2 } = await isolatedServer("vw-breakout-stage-", { fetchImpl: (url, init) => (vendorUrls.push(url), fetchImpl(url, init)), env: { REPLICATE_API_TOKEN: "test-only" } });
       const c2 = at(b2), runway2 = (await c2("/capabilities")).body.videoModels.find((m) => m.id === "runway-gen4-turbo");
       // 1. a status GET during a slow finish answers at once (stage finishing), and later shows the finished file
-      const one = (await c2("/generations", job(runway2, { outputRatio: "4:5" }))).body.id;
+      // the lock mask travels as a data URL; the server stores it as the job's own file and hands that file to finishing
+      const one = (await c2("/generations", job(runway2, { outputRatio: "4:5", lock: { mask: frame } }))).body.id;
       const finishing = await until(async () => (await c2("/generations/" + one)).body, (v) => v.stage === "finishing");
       assert.equal(finishing.status, "running");
       assert.equal(finishing.result, undefined, "an unfinished video was offered as the result while finishing");
       const t0 = Date.now(), again = (await c2("/generations/" + one)).body;
       assert(Date.now() - t0 < 1000 && again.stage === "finishing", "a status GET waited for local finishing");
       assert.equal(runs.length, 1, "one runner per job");
+      assert(/\.png$/.test(runs[0].opts.maskFile) && fs.existsSync(runs[0].opts.maskFile), "the lock mask did not reach finishing as a file");
       runs[0].resolve({ ratio: "4:5", restored: 7 });
       const done = await until(async () => (await c2("/generations/" + one)).body, (v) => v.status === "succeeded");
       assert.equal(done.result.ratio, "4:5");
@@ -270,13 +296,15 @@ const fetchImpl = async (url, init = {}) => {
     const os = require("node:os"), { spawnSync } = require("node:child_process"), ffmpeg = require("ffmpeg-static");
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-breakout-finish-")), W = 72, H = 128;
     const ff = (...args) => assert.equal(spawnSync(ffmpeg, ["-v", "error", "-y", ...args]).status, 0, args.join(" "));
+    // a lock mask as the page sends it: black, the text rows [x, y, w, h] white
+    const maskPng = (file, w, h, rects) => ff("-f", "lavfi", "-i", `color=black:s=${w}x${h}:d=1,${rects.map(([x, y, rw, rh]) => `drawbox=x=${x}:y=${y}:w=${rw}:h=${rh}:color=white:t=fill`).join(",")}`, "-frames:v", "1", file);
     const glyph = (x) => `color=white:s=${W}x${H}:d=1:r=10,drawbox=x=${x}:y=100:w=16:h=8:color=black:t=fill`;
     ff("-f", "lavfi", "-i", glyph(8), "-frames:v", "1", path.join(dir, "first.png"));
     ff("-f", "lavfi", "-i", glyph(40), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "1", path.join(dir, "made.mp4"));
-    const lock = { boxes: [[0, 96 / H, 1, 16 / H]] };
+    maskPng(path.join(dir, "mask.png"), W, H, [[0, 96, W, 16]]);
     const done = await breakout.finish({
-      src: path.join(dir, "made.mp4"), frameFile: path.join(dir, "first.png"), dst: path.join(dir, "out.mp4"),
-      settings: { outputRatio: "4:5", lock }, ffmpeg,
+      src: path.join(dir, "made.mp4"), frameFile: path.join(dir, "first.png"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, "out.mp4"),
+      settings: { outputRatio: "4:5", lock: { mask: "/generated/0000.png" } }, ffmpeg,
     });
     assert.equal(done.ratio, "4:5");
     assert(done.restored > 0, "nothing restored");
@@ -300,8 +328,9 @@ const fetchImpl = async (url, init = {}) => {
     // 16:9: the model's own shape, held without a crop
     ff("-f", "lavfi", "-i", `color=white:s=${H}x${W}:d=1:r=10,drawbox=x=40:y=50:w=16:h=8:color=black:t=fill`, "-c:v", "libx264", "-pix_fmt", "yuv420p", path.join(dir, "wide.mp4"));
     ff("-f", "lavfi", "-i", `color=white:s=${H}x${W}:d=1,drawbox=x=8:y=50:w=16:h=8:color=black:t=fill`, "-frames:v", "1", path.join(dir, "wide.png"));
-    const wide = await breakout.finish({ src: path.join(dir, "wide.mp4"), frameFile: path.join(dir, "wide.png"), dst: path.join(dir, "wide-out.mp4"),
-      settings: { outputRatio: "16:9", lock: { boxes: [[0, 46 / W, 1, 16 / W]] } }, ffmpeg });
+    maskPng(path.join(dir, "wide-mask.png"), H, W, [[0, 46, H, 16]]);
+    const wide = await breakout.finish({ src: path.join(dir, "wide.mp4"), frameFile: path.join(dir, "wide.png"), maskFile: path.join(dir, "wide-mask.png"), dst: path.join(dir, "wide-out.mp4"),
+      settings: { outputRatio: "16:9", lock: { mask: "/generated/0000.png" } }, ffmpeg });
     assert.equal(wide.ratio, "16:9");
     assert(wide.restored > 0);
     const wideInfo = await require("../backend/media-inspect.cjs").inspectMedia(path.join(dir, "wide-out.mp4"));
@@ -335,11 +364,13 @@ const fetchImpl = async (url, init = {}) => {
     ff("-loop", "1", "-t", "4", "-r", String(FPS), "-i", path.join(dir, "first.png"), "-f", "lavfi", "-i", `color=0xd8282c:s=120x120:r=${FPS}:d=4`,
       "-filter_complex", `[0]${drift}[b];[b][1]overlay=x=120:y='280+108*clip(t-1,0,2.5)':enable='gte(t,1)',scale=out_color_matrix=bt709:out_range=tv,format=yuv420p`,
       "-c:v", "libx264", "-crf", "23", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-t", "4", path.join(dir, "made.mp4"));
-    const done = await breakout.finish({
-      src: path.join(dir, "made.mp4"), frameFile: path.join(dir, "first.png"), dst: path.join(dir, "out.mp4"), ffmpeg,
-      settings: { outputRatio: "9:16", lock: { boxes: rows.map(([y, h]) => [0, y / H, 1, h / H]) } },
+    ff("-f", "lavfi", "-i", `color=black:s=${W}x${H}:d=1,${rows.map(([y, h]) => `drawbox=x=0:y=${y}:w=${W}:h=${h}:color=white:t=fill`).join(",")}`, "-frames:v", "1", path.join(dir, "mask.png"));
+    const finishClip = (made, out) => breakout.finish({
+      src: path.join(dir, made), frameFile: path.join(dir, "first.png"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, out), ffmpeg,
+      settings: { outputRatio: "9:16", lock: { mask: "/generated/0000.png" } },
     });
-    assert(done.restored > 0);
+    const done = await finishClip("made.mp4", "out.mp4");
+    assert(done.restored > 0 && done.opened > 0);
     const all = spawnSync(ffmpeg, ["-v", "error", "-i", path.join(dir, "out.mp4"), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { maxBuffer: 256 << 20 }).stdout;
     const size = W * H * 3;
     assert.equal(all.length, N * size, "frame count");
@@ -360,9 +391,34 @@ const fetchImpl = async (url, init = {}) => {
       assert(white(px(n, 330, 506)) && dark(px(n, 335, 475)), `frame ${n}: a cell the shape never touches changed`);
     }
     assert(shown > 30, "the shape crossed the rows in too few frames to tell: " + shown);
+    // The same post with a live photo (moving pattern, redrawn 2 px lower every other frame, as a model may) and no
+    // subject: no cell opens, the digits are still put back, and nothing in the photo is put back.
+    ff("-loop", "1", "-t", "4", "-r", String(FPS), "-i", path.join(dir, "first.png"), "-f", "lavfi", "-i", `testsrc2=s=360x401:r=${FPS}:d=4`,
+      "-filter_complex", `[0]${drift}[b];[b][1]overlay=x=0:y='56+2*mod(n,2)',scale=out_color_matrix=bt709:out_range=tv,format=yuv420p`,
+      "-c:v", "libx264", "-crf", "23", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-t", "4", path.join(dir, "live.mp4"));
+    const live = await finishClip("live.mp4", "live-out.mp4");
+    assert.equal(live.opened, 0, "a moving photo with no subject opened " + live.opened + " cells");
+    const decode = (file) => spawnSync(ffmpeg, ["-v", "error", "-i", path.join(dir, file), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { maxBuffer: 256 << 20 }).stdout;
+    const made = decode("live.mp4"), held = decode("live-out.mp4"),
+      first = spawnSync(ffmpeg, ["-v", "error", "-i", path.join(dir, "first.png"), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { maxBuffer: 64 << 20 }).stdout;
+    const at = (buf, n, x, y) => buf.subarray(n * size + (y * W + x) * 3, n * size + (y * W + x) * 3 + 3);
+    const dist = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+    let photoChecks = 0;
+    for (let n = 0; n < N; n++) {
+      if (n < FPS) assert(dark(at(held, n, 15, 506)) && white(at(held, n, 76, 506)), `live frame ${n}: drifted digits not put back`);
+      // "put back" = the output looks like the first frame where the photo had changed; it must look like this frame
+      for (let y = 300; y <= 456; y += 39)
+        for (let x = 10; x < W; x += 50) {
+          const m = at(made, n, x, y), o = at(held, n, x, y), f = at(first, 0, x, y);
+          if (dist(m, f) < 120) continue;
+          assert(dist(o, m) < dist(o, f), `live frame ${n}: the photo at (${x},${y}) was put back`);
+          photoChecks++;
+        }
+    }
+    assert(photoChecks > 200, "the photo changed too little to tell: " + photoChecks);
     fs.rmSync(dir, { recursive: true, force: true });
   }
-  console.log("PASS 鎖定實片：真實編碼的影片裡，飄移在主角到之前還原；主角到哪一列，那一格當格就照影片顯示；沒碰到的格子一直鎖住");
+  console.log("PASS 鎖定實片：真實編碼的影片裡，飄移在主角到之前還原；主角到哪一列，那一格當格就照影片顯示；沒碰到的格子一直鎖住；照片在動但沒有主角時，一格都不放行、照片也不被還原");
 })().catch((e) => {
   console.error(e);
   process.exit(1);
