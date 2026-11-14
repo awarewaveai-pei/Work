@@ -19,6 +19,34 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=jobRatio|settings\?\.ratio \|\| |traditional\( | hits=21
 - 剩餘風險：(1) 正式環境有 1 支 AI 生成影片沒有 metadata.ratio（media_assets 9c39eebd，vwJobId 65f90a4d，2026-11-06），沒有回填；要回填就是寫正式資料庫，屬高風險，等操作者決定。(2) 兩卡還沒部署。
 - rollback：git revert 這兩個 commit，彼此獨立。
+## 2026-11-14（續2）社群工具：影片縮圖不再黑、狀態標籤任何配色都看得到字、已刪除貼文可勾選批次永久刪除、兩個時間欄
+
+[根因]
+- C1 黑縮圖：4764ad95f 已把影片附件改成 `<video preload=metadata>`，但它只畫第 0 格；prod 6 則貼文附件全是 video（social_media.kind），影片開頭是黑畫面。實測 6 支 `#t=0` 全空/黑、`#t=1` 全有畫面。
+- C2 「已發佈」黑塊：prod `app_theme.tokens` 的 `--green` 與 `--btn-primary-text` 同為近黑，`.sm-pill` 用後者當字色、前者當底色。
+- 已刪除貼文只有單筆永久刪除（4764ad95f）；操作者 2026-11-14 要勾選＋全選＋批次。
+- 時間欄：「建立時間」9f6ba18b3 已加在貼文清單；已刪除貼文沒有。`social_posts.created_at` not null（`packages/db/migrations/0096_social_manager.sql:109`），prod 0 筆空值。
+
+[改動]
+- 新 `app/(shell)/tools/social/VideoFrame.tsx`：`#t=1`、短於 2 秒取中間、載入失敗顯示「影片」、有 controls 時第一次播放從 0 開始。替換 Calendar Thumb、compose/Previews、compose/Writer、library/MediaView、analytics/Analytics 全部 raw `<video>`。
+- `social.css .sm-pill`：字用 `--text-primary`、底用 `--bg-subtle`；帶 `--sm-state` 的標籤加狀態色外框＋圓點（Inbox/Flows 自己上色的不加）。
+- `Trash.tsx`：列勾選、全選（只含沒發出去過的）、「永久刪除所選（N）」、確認框「永久刪除 N 則貼文，無法還原」；貼文離開垃圾桶就清掉勾選；加排定發布時間＋建立時間欄。`SocialManager.tsx purge(posts)` 逐則呼叫既有 purge route（每則各自過 requireBrandRole、品牌範圍讀取 store.ts:549、assertCanPurge、DELETE 再檢查），失敗的寫出原因、其餘照刪。媒體庫檔案依 4764ad95f 決策保留。
+- `Calendar.tsx ListView`：「時間」改名「排定發布時間」。
+
+[驗證]
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/purge-real-db.sh | exit=0 | ms=35745
+  - 3/3，含新案例：另一品牌的 id `getPostAt`／`purgePost` 都 404、資料列與子表都還在。
+- vitest `app/(shell)/tools/social` + `lib/social`：33 檔／229 passed；`npx tsc --noEmit` 0 錯。
+- 突變：拿掉確認框（按鈕直接 onPurge）→ 2 紅；拿掉勾選清理 → 1 紅；還原皆綠。
+- 縮圖：用 prod 6 支真實影片網址在本機頁面比對 #t=0／#t=1 截圖。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n
+  - critic 3 個 Low（勾選殘留、預覽跳過開頭、圓點套到非狀態標籤）全修；Codex 第 1 輪 293c47de 1 項（同預覽跳過開頭）已修，第 2 輪 098c9237 無發現。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=onPurge | hits=14
+  - 皆在 SocialManager／Trash／新測試；`<video` 在 social 工具內除 VideoFrame 外 0；「No bulk form」0。
+
+[避免再發生]
+- 影片縮圖只走 VideoFrame（一處決定取哪一格）；狀態標籤字色不再借按鈕字色。
+- 未部署（等操作者）。D:\Work 本機 main 與 origin 分岔（本機 7 個 video-workbench commit 未推、落後 61），本次在 detached worktree `D:\Worktrees\social-trash-bulk` 從 origin/main 做並直推 main。
 ## 2026-11-14（續1）影音工作台 P6.10 缺陷 1（B 案）：匯出與燒錄字幕改讀固定字型檔 vendor/fonts，中文不再被擋或變方框
 
 - 起因：EXP.2 已隨 887f2e1ae 上正式站；正式站容器沒有中文字型，所以含中文的剪輯器匯出和燒錄字幕全部被 EXP.2 擋下。監工改判缺陷 1 走 B：先把 ED 的字型包搬進 main。

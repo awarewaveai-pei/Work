@@ -4,6 +4,7 @@
 // marked, the images, then the comments under the post. No made-up counts.
 import { BODY_LIMITS } from "@/lib/social/limits";
 import { PfMark } from "../Calendar";
+import VideoFrame from "../VideoFrame";
 import { formatsOf, type Account } from "../model";
 import { delayText, type CommentDraft } from "./draft";
 
@@ -46,7 +47,7 @@ export default function Previews({ channels, tab, textFor, formats, images, medi
                 {!(ig && story) && <div className="sm-tx"><Text text={textFor(a)} platform={a.platform} /></div>}
                 {images.length > 0 && (
                   <div className={`sm-imgs sm-n${Math.min(images.length, 4)}${story ? " sm-tall" : ""}`}>
-                    {images.slice(0, story ? 1 : 4).map((p, i) => mediaKinds?.[i] === "video" ? <video key={p} src={p} muted controls preload="metadata" /> : <img key={p} src={p} alt="" />)}
+                    {images.slice(0, story ? 1 : 4).map((p, i) => mediaKinds?.[i] === "video" ? <VideoFrame key={p} src={p} controls /> : <img key={p} src={p} alt="" />)}
                   </div>
                 )}
                 {parts.length > 0 && !story && a.platform !== "youtube" && (   /* compose.ts sends no comments to YouTube */

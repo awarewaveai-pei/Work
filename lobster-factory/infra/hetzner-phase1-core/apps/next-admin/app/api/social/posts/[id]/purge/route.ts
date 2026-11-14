@@ -1,6 +1,7 @@
 // DELETE /api/social/posts/[id]/purge?brand=<id>&version=<n> -- erase a post that is in the bin (已刪除貼文 → 永久刪除).
 // Who and which: lib/social/state.ts assertCanPurge (the restore roles; only a binned, never-published post); the erase and
-// its purge audit row: lib/social/store.ts purgePost. No bulk form: each erase is confirmed on its own.
+// its purge audit row: lib/social/store.ts purgePost. Bulk 永久刪除 (Trash.tsx ticked rows) calls this once per post after one
+// confirm dialog, so every post gets these checks; there is deliberately no many-ids route to keep in step with it.
 import { ANY_ROLE, actorOf, requireBrandRole } from "@/lib/social/authz";
 import { handle, postVersion, uuid } from "@/lib/social/http";
 import { assertCanPurge } from "@/lib/social/state";

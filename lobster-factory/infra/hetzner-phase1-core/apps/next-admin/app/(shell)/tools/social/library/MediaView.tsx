@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import { fileDataUrl, uploadTooLarge } from "../media";
 import type { SlotContext } from "../SocialManager";
+import VideoFrame from "../VideoFrame";
 
 export default function MediaView({ ctx, selected, onToggle }: { ctx: SlotContext; selected?: Set<string>; onToggle?: (id: string) => void }) {
   const { brand, media } = ctx;
@@ -47,7 +48,7 @@ export default function MediaView({ ctx, selected, onToggle }: { ctx: SlotContex
         {shown.map((m) => (
           <button type="button" key={m.id} className={`sm-mitem${selected?.has(m.id) ? " sm-sel" : ""}`} disabled={selected ? !canWrite : !ctx.canAttach || !canWrite} aria-pressed={selected ? selected.has(m.id) : undefined} title={m.file_name}
             onClick={() => { if (selected && onToggle) onToggle(m.id); else { ctx.attach(m.id); ctx.say(`已附上 ${m.file_name}。`); } }}>
-            {m.postiz_path ? m.kind === "video" ? <video className="sm-mth" src={m.postiz_path} muted preload="metadata" /> : <img className="sm-mth" src={m.postiz_path} alt="" /> : <span className="sm-mth">{m.kind === "video" ? "影片" : "圖"}</span>}
+            {m.postiz_path ? m.kind === "video" ? <VideoFrame className="sm-mth" src={m.postiz_path} /> : <img className="sm-mth" src={m.postiz_path} alt="" /> : <span className="sm-mth">{m.kind === "video" ? "影片" : "圖"}</span>}
             <span className="sm-ellipsis">{m.file_name}</span>
             <span className="sm-muted">用過 {m.used ?? 0} 次</span>
           </button>

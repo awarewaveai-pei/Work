@@ -16,7 +16,7 @@ const item = (id: string, kind: string): MediaItem => ({ id, kind, file_name: "f
 describe("Thumb -- by attachment kind", () => {
   it("a video attachment renders a <video>, never an <img>", () => {
     const html = renderToStaticMarkup(<Thumb post={post("v1")} accounts={[]} media={[item("v1", "video")]} />);
-    expect(html).toMatch(/<video[^>]*src="https:\/\/cdn.example\/v1"/);
+    expect(html).toMatch(/<video[^>]*src="https:\/\/cdn.example\/v1#t=1"/);   // 2026-11-14: frame 0 of our videos is black
     expect(html).toMatch(/preload="metadata"/);
     expect(html).not.toMatch(/<img/);
   });

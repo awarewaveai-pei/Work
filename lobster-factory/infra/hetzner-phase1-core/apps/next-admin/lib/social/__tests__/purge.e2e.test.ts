@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const REST = process.env.PURGE_REST;
 if (REST && !["127.0.0.1", "localhost"].includes(new URL(REST).hostname)) throw new Error(`PURGE_REST must be local, got ${REST}`);
 const A = "00000000-0000-0000-0000-00000000000a";
+const B = "00000000-0000-0000-0000-00000000000b";   // the 0105 verify's second brand
 const ACTOR = "ops:owner:e2e";
 
 function serviceToken(secret: string): string {
@@ -99,5 +100,15 @@ describe.skipIf(!REST)("永久刪除 against a real database", () => {
     for (const t of CHILDREN) expect(await count(t, "post_id", draft), t).toBe(1);
     const log = await one<Array<{ action: string }>>(sb.from("social_audit_log").select("action").eq("post_id", draft).order("id"), "log");
     expect(log.map((r) => r.action)).toEqual(["purge", "purge_aborted"]);
+  });
+
+  // 2026-11-14 bulk 永久刪除 sends many ids from the browser, one purge call each: an id of another brand must erase nothing.
+  it("another brand's binned post is neither found nor erased under this brand", async () => {
+    const f = await fixtures("purge3");
+    const binned = await seedPost("deleted", "品牌 A 的垃圾桶", f);
+    await expect(store.getPostAt(B, binned, 1)).rejects.toMatchObject({ status: 404 });
+    await expect(store.purgePost(B, binned, 1, ACTOR)).rejects.toMatchObject({ status: 404 });   // its own brand-scoped read
+    expect(await count("social_posts", "id", binned)).toBe(1);
+    for (const t of CHILDREN) expect(await count(t, "post_id", binned), t).toBe(1);
   });
 });

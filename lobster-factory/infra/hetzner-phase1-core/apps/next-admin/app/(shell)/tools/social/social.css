@@ -201,7 +201,12 @@
 .sm-list .sm-chips { flex-wrap: nowrap; }
 .sm-list:has(> .sm-empty) { display: flex; }
 .sm-list td.sm-wrap { white-space: normal; min-width: 0; }
-.sm-pill { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: var(--font-size-base); color: var(--btn-primary-text); background: var(--sm-state, var(--status-ignored)); white-space: nowrap; }
+/* the word is the page's own text colour on the subtle fill; a state pill (style sets --sm-state) adds the state colour as
+   border and dot: a palette whose state colour equals --btn-primary-text (2026-11-14: --green and --btn-primary-text the same
+   near-black) cannot hide the word. Pills that colour themselves inline (Inbox, Flows) get no dot. */
+.sm-pill { display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 999px; font-size: var(--font-size-base); color: var(--text-primary); background: var(--bg-subtle); border: 1px solid transparent; white-space: nowrap; }
+.sm-pill[style*="--sm-state"] { border-color: var(--sm-state); }
+.sm-pill[style*="--sm-state"]::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--sm-state); flex: none; }
 
 /* side views (rotation lists, media, log, settings) */
 .sm-side { flex: 1; min-height: 0; overflow: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }

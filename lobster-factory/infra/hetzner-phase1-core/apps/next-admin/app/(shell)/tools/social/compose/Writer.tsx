@@ -5,6 +5,7 @@ import { useRef, type ReactNode } from "react";
 import { TEXT_RATES, TWD_RATE } from "@/lib/ai/cost-model";
 import { BODY_LIMITS, bodyLength } from "@/lib/social/limits";
 import { PfMark } from "../Calendar";
+import VideoFrame from "../VideoFrame";
 import { platformOf, type Account } from "../model";
 import CIcon from "./icons";
 
@@ -81,7 +82,7 @@ export default function Writer(p: WriterProps) {
                 const path = p.mediaPath(m.media_id);
                 return (
                   <span key={m.media_id} className="sm-mt" title={`第 ${i + 1} 張`}>
-                    {path ? p.mediaKind(m.media_id) === "video" ? <video src={path} muted preload="metadata" /> : <img src={path} alt={m.alt_text ?? ""} /> : <span>{p.mediaKind(m.media_id) === "video" ? "影片" : "圖"}</span>}
+                    {path ? p.mediaKind(m.media_id) === "video" ? <VideoFrame src={path} /> : <img src={path} alt={m.alt_text ?? ""} /> : <span>{p.mediaKind(m.media_id) === "video" ? "影片" : "圖"}</span>}
                     {p.sharedEditable && <span className="sm-morder"><button type="button" aria-label={`第 ${i + 1} 張往前`} disabled={i === 0} onClick={() => p.onMoveMedia(m.media_id, -1)}>↑</button><button type="button" aria-label={`第 ${i + 1} 張往後`} disabled={i === p.media.length - 1} onClick={() => p.onMoveMedia(m.media_id, 1)}>↓</button></span>}
                     {p.sharedEditable && <button type="button" className="sm-x" aria-label={`移除第 ${i + 1} 張`} onClick={() => p.onRemoveMedia(m.media_id)}><CIcon name="x" /></button>}
                   </span>

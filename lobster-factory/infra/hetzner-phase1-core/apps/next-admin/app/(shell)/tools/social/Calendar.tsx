@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import type { PostState } from "@/lib/social/state";
 import Icon from "./Icon";
+import VideoFrame from "./VideoFrame";
 import {
   addDays, monthGridStart, platformOf, shortDate, STATE_NAMES, STATE_TOKEN, TAG_TOKEN, WEEKDAY_NAMES, zoned,
   type Account, type CalPost, type Post, type Tag,
@@ -58,7 +59,7 @@ export function Thumb({ post, accounts, media, size = "card" }: { post: Post; ac
   const n = post.media.length;
   return (
     <div className={`sm-cthumb sm-${size}${n ? "" : " sm-txt"}`}>
-      {first ? first.kind === "video" ? <video src={first.postiz_path} muted playsInline preload="metadata" /> : <img src={first.postiz_path} alt="" loading="lazy" />
+      {first ? first.kind === "video" ? <VideoFrame src={first.postiz_path} /> : <img src={first.postiz_path} alt="" loading="lazy" />
         : n ? <span className="sm-muted">圖</span> : <span className="sm-muted">文字</span>}
       {n > 1 && <span className="sm-more">+{n - 1}</span>}
       <span className="sm-avs">{platformsOf(post, accounts).map((pf) => <PfMark key={pf} platform={pf} />)}</span>
@@ -235,7 +236,7 @@ export function ListView(props: ViewProps & {
       <table>
         <thead><tr>
           <th>{canWrite && <input type="checkbox" aria-label="全選" checked={all} onChange={(e) => props.onCheck(real.map((p) => p.id), e.target.checked)} />}</th>
-          <th /><th>時間</th><th>建立時間</th><th>發到</th><th>內容</th><th>狀態</th><th />
+          <th /><th>排定發布時間</th><th>建立時間</th><th>發到</th><th>內容</th><th>狀態</th><th />
         </tr></thead>
         <tbody>
           {rows.map((p) => (

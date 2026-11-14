@@ -309,15 +309,21 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
     }
   }
 
-  async function purge(post: Post) {
-    if (!brand) return;
-    try {
-      await api.purge(brand.id, post.id, post.version);
-      say("已永久刪除。");
-      await reload();
-    } catch (e) {
-      say(e instanceof Error ? e.message : String(e), true);
+  /** 已刪除貼文 → 永久刪除 (one or the ticked ones, after Trash's dialog): one purge call per post, so the server checks
+   *  each on its own; one that fails (changed meanwhile, went out) is named and the rest still go. */
+  async function purge(posts: Post[]) {
+    if (!brand || !posts.length) return;
+    const failed: string[] = [];
+    for (const post of posts) {
+      try {
+        await api.purge(brand.id, post.id, post.version);
+      } catch (e) {
+        failed.push(e instanceof Error ? e.message : String(e));
+      }
     }
+    const done = posts.length - failed.length;
+    say(failed.length ? `已永久刪除 ${done} 則；${failed.length} 則沒刪掉：${failed[0]}` : `已永久刪除 ${done} 則。`, failed.length > 0);
+    await reload();
   }
 
   async function copy(post: Post) {
