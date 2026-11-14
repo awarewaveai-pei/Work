@@ -22,6 +22,12 @@ RUN set -eu; \
     rm -f /tmp/blender.tar.xz /tmp/blender-sources.json
 
 WORKDIR /app
+# The editor's fonts (~133 MB, sha256-pinned) in their own layer, before COPY . .: rebuilt only when sources.json or
+# the script changes, so a routine deploy neither re-downloads them nor depends on GitHub being reachable.
+# .dockerignore keeps any font files in the build context from overwriting this layer.
+COPY vendor/fonts/sources.json vendor/fonts/sources.json
+COPY scripts/vendor-fonts.cjs scripts/vendor-fonts.cjs
+RUN node scripts/vendor-fonts.cjs
 COPY . .
 
 # postinstall = vendor-vision.cjs (copies from node_modules, SHA-256 checked) + vendor-ffprobe.cjs (skips off Windows).
@@ -29,8 +35,8 @@ COPY . .
 # host's static folder (card FC.4); without them the "專業剪輯／專業特效" cards simply stay hidden.
 RUN npm ci --omit=dev \
     && node scripts/vendor-three.cjs
-# The editor's fonts (postinstall above downloads them): preview and export read these files; the image has no CJK font
-# of its own. Re-run = verify every file's sha256 (vendor/fonts/sources.json), so a missing or changed file fails the build.
+# The editor's fonts (layer above; postinstall finds them in place): preview and export read these files; the image has
+# no CJK font of its own. Re-run = verify every file's sha256, so a missing or changed file fails the build.
 RUN node scripts/vendor-fonts.cjs
 
 RUN node -e "const fs=require('fs');const miss=require('./backend/appearance.cjs').runtimeFiles('.').filter((f)=>!fs.existsSync('.awarewave/'+f));if(miss.length){console.error('.awarewave/ is missing: '+miss.join(', '));process.exit(1)}"

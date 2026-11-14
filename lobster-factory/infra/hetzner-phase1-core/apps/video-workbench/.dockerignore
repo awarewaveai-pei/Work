@@ -6,6 +6,8 @@ tests/
 docs/
 handoff/
 vendor/ffprobe/ffprobe.exe
+vendor/fonts/*
+!vendor/fonts/sources.json
 engines/effectcraft/web/
 engines/effectcraft/web.new/
 engines/filmcraft/web/

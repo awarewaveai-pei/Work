@@ -9,6 +9,28 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=purgeEach | hits=7
 - ORACLE_WAIVED: 監工指示本卡不再開 Codex 新輪（AGENTS.md §4 三輪上限，捨棄方案已跑 4 輪 7794a596／357e64ae／8789c88a／59a90840）；本次只把既有迴圈抽成函式＋訊息加標題，書面自審：呼叫順序與錯誤收集不變（測試驗證 3 篇都呼叫、拒絕不中斷）
 - rollback：git revert 本 commit。
+## 2026-11-14（續4）影音工作台：字型包、EXP.2、缺陷 2 的 RISKS 逐條複查；字型下載拆成獨立 Docker 層
+
+- 起因：監工要求把三張卡（P6.10 缺陷 2、EXP.2、字型包 f8ffef30d）回報的 RISKS 逐條複查。會讓功能壞掉、掉資料、擋住 CI 或主流程的直接修，其餘標「可接受」並說明理由。字型包已部署，正式站實測中文字幕正常。
+- 修了 1 項（會擋主流程）：每次部署都要重新下載約 133 MB 字型。
+  - 根因：`sg-deploy.sh` 從 git rsync，字型檔不在 git 裡；Dockerfile 的 `COPY . .` 每次都讓 `npm ci` 重跑，postinstall 跟著重新下載。GitHub 連不上時部署就失敗。
+  - 改法：`Dockerfile` 在 `COPY . .` 之前，只 COPY `vendor/fonts/sources.json` 和 `scripts/vendor-fonts.cjs`，再 RUN 下載，成為獨立一層，只有這兩個檔變動才重抓。`.dockerignore` 排除 `vendor/fonts/*`（保留 sources.json），本機的字型檔進不了 build context，也就不會覆蓋這一層。
+  - 不變量：一般部署不依賴外部網路取得字型。
+- 標為可接受的：
+  - 缺陷 2（Codex 第 3 輪）：最新 50 筆副本都還在執行時，較舊的未定案副本要延後一輪才補問。只是延遲，不會掉資料，執行中的副本完成後就會補上。
+  - EXP.2「整個字型被換掉、但換上的字型字形齊全時不擋」：已由字型包關閉。所有字型都綁定 vendor/fonts 的固定檔，`tests/editor-fonts.cjs`（gate）檢查 libass 選到的每個字面都來自這些檔。
+  - EXP.2「elevenlabs.io 跳頁來源未知」：剪輯器裡重現不了，正式站也找不到相關程式。沒有可修的對象，再發生時請記下點擊前分頁的網址。
+  - 字型包「預覽裡 Arial／Georgia 文字中的中文字級和匯出略有差」：只影響預覽外觀，匯出正確。修法（edCjkRuns）依賴 ED 尚未提交的重構，等 ED 提交後一起進來。
+  - 字型包「ED pull 時要比對同名 untracked 檔」：屬於流程，已寫在 f8ffef30d 的 commit message 和 WORKLOG 2026-11-14 續1。
+- 已關閉：「沒跑 Codex review」（這次 Codex 有額度，審了這次的 Dockerfile 改動）；「未部署」（字型包已部署）；「部署後中文被擋」（字型包已上線）。
+- 範圍外發現（不是我的卡，回報監工）：main 的 video-workbench CI 從 b80ec92ca 起是紅的。
+  - 原因：263a16450 讓 `next-admin/lib/ai/to-traditional.ts` import `opencc-js`。gate 的 `tests/backend.cjs` 是從 `../next-admin`（canonical，`backend/appearance.cjs:7`）載入這個檔，而 CI 只在 video-workbench 跑 `npm ci`，next-admin 底下沒有這個套件。
+  - 正式站 image 走打包後的 `.awarewave`，從 `/app/node_modules` 解析，所以不受影響。
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker build（從正式 Dockerfile 擷取 WORKDIR 到 COPY . . 這段）兩次：第 1 次字型層下載 13 檔、`COPY . .` 後的 postinstall 0 downloaded、context 15 MB（字型沒進 context）；改一個原始檔後第 2 次 build，字型層 CACHED，`COPY . .` 重建，0 downloaded | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs（export-glyphs、editor-fonts 等 PASS；唯一 FAIL 是 backend.cjs 的 opencc-js，main 上原本就紅，跟本次改動無關） | exit=1 | ms=300000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（Codex `agency-os/reports/oracle/2026-11-14-review-8099780f.md`，files-reviewed 含 Dockerfile、.dockerignore）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=vendor-fonts.cjs|vendor/fonts | hits=12
+- rollback：`git revert` 本 commit（之後每次部署會回到重新下載字型）。
 ## 2026-11-14（續2）剩餘問題清理：所有字幕辨識輸出繁體＋生成影片記交付比例
 
 - 起因：操作者「這些有問題就去處理好」（續13 剩餘風險）。查證後：「一次只查 50 筆」是誤報（續13 已更正）；下面兩項成立；破框格子打開的驗證另卡處理（1fdcb8bdd，修正進行中）。
