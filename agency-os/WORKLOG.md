@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-14（續7）塔羅「載入那批」只列同一副牌（0162 deck_key）；傳回單張套框成功才換無框圖（4aa7e03f5，已部署）
+
+- C1 操作者截圖：鎖定藍貓牌時清單列出 10/23 三批別種風格的批次；按下會套進目前這副並存 77–78 張進 My Designs（不扣 AI 費）。根因：`tarot_batch_jobs` 沒有牌組識別，清單取最近 3 批（`TarotStudio.tsx` 清單 effect），`restoreJob` 直接收進目前這副。
+  - 修：0162 加 `deck_key`（SHA-256 of [model, aspect, seed, 78 張 prompt]，`lib/tarot/deck-key.ts`，伺服器與頁面同一函式）；POST 存、GET `?deck=` 只回該副（格式錯 400）；`deckCards()` 一份給批次與識別；換牌即清空清單、`restoreJob` 比對識別不符拒載。0162 前的舊批次不再列出（圖仍在 R2）。
+- M1（W6 C8.2 RISKS）傳回單張先換 `art` 再套框，套框失敗＝新圖舊框 → 只由 `frameCardArt` 成功時換。
+- 其他工人 RISKS 逐條判定不處理（2 秒回覆已做到、整張 Banner 單向、重生被傳回覆蓋屬設計、AI 合成背景與換圖同、縮圖失敗只是大檔、重新整理改存 My Designs 屬設計）。
+- Codex `2026-11-14-partialreview-d740145e`：F1 重新鎖定期間舊清單仍可按 → 已修（清空＋比對）。
+- 部署：0162 先套（`apply-db-migration 0162` APPLY_OK、ledger 162、psql 見 `deck_key text NULL`＋索引）→ 共用目錄 main 與遠端分岔（ahead 8／behind 72，他人未推 commit），改在 `D:/Worktrees/pc-integ` 從 origin/main 提交推送 → 主機另一部署（b5984f23a）跑完後 sg-deploy `4aa7e03f5` healthy 15s、smoke 5/5；容器 `route.js` 含 `invalid_deck`、chunk 含 `deck_key`。正式站登入後的清單未實測（需登入）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=apply-db-migration 0162 + sg-deploy next-admin 4aa7e03f5 + docker exec grep deck_key | exit=0 | ms=420000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n（Codex F1 已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=deck_key | hits=23
 ## 2026-11-14（續6）影音工作台瀏覽器副本：收回開關（監工要求 RISKS 分類＋kill switch 評估）
 
 - 根因：Service Worker 一旦安裝，退版或刪檔都收不回（更新失敗時舊註冊照留）；上線版本沒有收回手段。
