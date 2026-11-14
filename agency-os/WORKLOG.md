@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-14（續8）影音工作台 MV 模式規格：一首歌 → 完整 MV（只想不做）
+
+- 產出：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/mv-mode-spec-20261114.md`（行號對 origin/main `44f2faf22`）；`docs/creative-suite-plan-20261102.md §4` 加一列 MV 指向它。
+- 盤點更正（監工清單）：分鏡靈感 172 張非 184（`assets/storyboards-data.json` cards）；音樂生成 2026-11-13 `70c1d62d1` 已接三模型、下拉已移除（`backend/music.cjs:40-46`）；ElevenLabs「只留人聲」已接（`backend/audio-tools.cjs:15-16`），MV 只需人聲軌；鏡頭已綁場景＋角色、只缺道具（`projects-0.js:41-45`）；「負面提示詞」只有文案沒欄位（`projects-0.js:149` vs `:352`）；角色兩份儲存互不相連、`characterIds` 伺服器未讀、角色描述從未進 prompt（`api.cjs:382,717`、`projects-0.js:553-561`）；D:\Work 是落後 main 的 checkout（對 origin/main 142 檔 +636/−6084，皆 main 已有），不是 ED 未 commit 的工作。
+- 決定：MV = 一集加 `episode.song`；人聲分離 = 既有 ElevenLabs 免費列先用＋新自家 CPU Demucs 列（MIT 程式，權重無聲明＝灰區只在容器內）；對時 = 自家 whisper words＋新 `shared/lyrics-align.js`；作曲照現況 Lyria 3.5 US$0.08／首；對嘴 = Hedra Character-3 720p US$0.05／s（新金鑰，High）；粗剪 = 新 `scripts/editor-mv.js` 複用 PJ.3 `edArrange` 規則。排除：Suno（無公開 API）、HeyGen（深圳起源）、所有中國模型、MusicGen（CC-BY-NC）、aeneas（AGPL）、AutoLyrixAlign（GPL）、Wav2Lip（非商用）。
+- 特徵鎖定一處：新 `backend/character-lock.cjs` 在 `jobInput()`（`api.cjs:353-394`）後注入 prompt／negative／lockedRefs；三個前端只存欄位。
+- 卡 MV.1–MV.10，順序 3→1→2→4→5→6→9（免費線，上傳的歌可走到粗剪）→7→8→10；共用檔（`api.cjs`、`tools-editor.js`、`paid-price.js`、`music.cjs`、`audio-tools.cjs`）只加掛載行。
+- 供應商價格查詢日 2026-11-14，三個 web-researcher 子代理各一份表，URL 在規格各表；未驗證項列規格 §8。
+- 過程：worktree 原落後 origin/main 約 70 commit（音樂、ElevenLabs、VD 規格都在這段），第一版寫完才發現 → `git reset --hard origin/main` 後逐項重驗、全部行號重對；第一版的「音樂只有外殼」「缺分軌」結論作廢。
+- REALTEST_WAIVED: DOC_ONLY -- 規格文件，無程式改動
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/5m/0n（讀回修 5 處錯行號：generation-policy、tools-editor 1085、music.cjs 83、main-system 40、api.cjs 645）
+- BUGHUNT_WAIVED: DOC_ONLY -- 新檔＋計畫表一列；無 symbol／schema 改動
+- ORACLE_WAIVED: 純文件，不含 source 檔
 ## 2026-11-14（續7）塔羅「載入那批」只列同一副牌（0162 deck_key）；傳回單張套框成功才換無框圖（4aa7e03f5，已部署）
 
 - C1 操作者截圖：鎖定藍貓牌時清單列出 10/23 三批別種風格的批次；按下會套進目前這副並存 77–78 張進 My Designs（不扣 AI 費）。根因：`tarot_batch_jobs` 沒有牌組識別，清單取最近 3 批（`TarotStudio.tsx` 清單 effect），`restoreJob` 直接收進目前這副。

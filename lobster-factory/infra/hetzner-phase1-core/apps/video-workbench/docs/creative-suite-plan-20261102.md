@@ -78,6 +78,7 @@
 | PJ | 專案主線：一支影片一條線 | 見 `docs/engine-route-plan-20261106.md` §6、§9 PJ：專案頁的「集」＝一支影片，底下掛剪輯檔、步驟紀錄、成片；舊剪輯專案原樣收進專案頁；工具做完自動寫回；來源改了標示要重做。等卡 RV.4 結束才動 `scripts/projects-0.js` | 舊資料測試（筆數相同、每筆能開、輸出設定相同）；照 §6 答 1 的例子走完，每一步成品自動出現在下一步 | 設計 Fable；做 Opus |
 | FC | 專業剪輯（FilmCraft 嵌入） | 見同檔 §9 FC.0–FC.4：建置鏈沿用 `scripts/craft-web-build/`；外框頁用上游嵌入橋 `?host=parent` 送檔、收存檔與輸出；輸出當成一筆已完成的任務，入帳與送審走現有路；主機靜態目錄＋nginx（High） | 送素材 → 存檔 → 重開 → 輸出 → 任務紀錄與主系統資產都有、帶來源紀錄 → 送審檢查過；瀏覽器下載零次；內顯電腦看到提醒 | 卡 FC.1 寫死可派；其餘 Opus；FC.4 等操作者 go |
 | EC | 專業特效（EffectCraft 嵌入） | 見同檔 §9 EC：FC 驗收後才開；建置鏈同型，另補嵌入橋（照 `scripts/photocraft-pro/web-host-api.patch` 的做法）；頁面與入帳沿用 FC 的外框與路由 | 同 FC 的流程在 EffectCraft 走通；重開專案素材不離線 | Opus |
+| MV | MV 模式：一首歌 → 完整 MV | 見 `docs/mv-mode-spec-20261114.md`（規格與卡 MV.1–MV.10）：`episode.song` 掛在一集上；人聲分離（已接的 ElevenLabs 列＋自家 CPU Demucs 列）、歌詞對時（自家 whisper）、每鏡綁道具、依段落粗剪免費；作曲沿用 `music.cjs`，唱歌對嘴 Hedra 付費按鈕標 NT$；角色特徵鎖定只在 `backend/character-lock.cjs` 一處注入。共用檔只加掛載行（該檔 §6） | 每卡各自驗收（該檔 §5 表）；到 MV.9 為止用上傳的歌可免費從歌走到粗剪 | 規格 Fable；做 Opus；MV.2／MV.10 卡寫死可派 |
 
 ## 5. 機械閘門（每卡）
 
