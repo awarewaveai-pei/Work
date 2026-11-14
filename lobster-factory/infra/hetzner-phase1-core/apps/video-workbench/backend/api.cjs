@@ -177,11 +177,18 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // Invariant: a job still owing the main system something (asset registration, release text) is never pruned by the
   // history limit; its retry lives only in this record.
   const pending = (j) => ["queued", "running"].includes(j.status) || !!(j.ledgerError || j.releaseTextError) || (!!main && unsettled(j));
+  // Per-job inputs that are not results (破框's lock mask): job-inputs/<job id>/, never served, never library assets. They
+  // live exactly as long as their job is unfinished: every save removes the folders of jobs that ended or are gone
+  // (succeeded, failed, cancelled, a restart's cleanup alike), so no path to an end has to remember them.
+  const jobInputs = path.join(dataDir, "job-inputs");
   const persist = () => {
     const limit = Math.max(100, Number(vwEnv(env, "JOB_HISTORY_LIMIT")) || 2000),
       terminal = jobs.filter((j) => !pending(j));
     const keep = new Set(terminal.slice(-limit).map((j) => j.id));
     writeJson(ledgerFile, jobs.filter((j) => keep.has(j.id) || pending(j)));
+    const open = new Set(jobs.filter((j) => ["queued", "running"].includes(j.status)).map((j) => j.id));
+    for (const id of fs.existsSync(jobInputs) ? fs.readdirSync(jobInputs) : [])
+      if (!open.has(id)) fs.rmSync(path.join(jobInputs, id), { recursive: true, force: true });
   };
   // The browser state (characters/projects/assets/jobs/preferences/selection) lives here, not in localStorage
   // (plan invariant 6). Same contract as shared/adapters.js HttpAdapter: GET /state, PUT /state. Writes carry
@@ -388,7 +395,15 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (settings.voiceSpeed !== undefined && (!Number.isFinite(Number(settings.voiceSpeed)) || Number(settings.voiceSpeed) < .25 || Number(settings.voiceSpeed) > 4) || settings.voicePitch !== undefined && (!Number.isFinite(Number(settings.voicePitch)) || Math.abs(Number(settings.voicePitch)) > 12) || settings.voiceGain !== undefined && (!Number.isFinite(Number(settings.voiceGain)) || Number(settings.voiceGain) < -30 || Number(settings.voiceGain) > 12)) throw Error("語音參數超出範圍");
     }
     generationPolicy.validate(input, type, env);
-    if (operation === "breakout") prompt = breakout.prepare(input, env);
+    if (operation === "breakout")
+      prompt = breakout.prepare(input, env, {
+        frameBytes: (url) => {
+          const data = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(url || "");
+          if (data) return Buffer.from(data[1], "base64");
+          const file = localFile(url, { assets: true });
+          return file ? fs.readFileSync(file) : null;
+        },
+      });
     if (input.cartoonStyle) prompt += "\n風格：" + String(input.cartoonStyle);
     return { type, prompt };
   }
@@ -850,7 +865,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         breakout.finish({
           src, dst: path.join(outputs, name), settings: job.input.settings, ffmpeg: require("ffmpeg-static"), signal: controller.signal,
           frameFile: localFile(job.input.references?.firstFrame?.[0]?.url) || "",
-          maskFile: localFile(job.input.settings?.lock?.mask) || "",
+          maskFile: breakout.maskPath(jobInputs, job.id),
         }),
       )
       .then(
@@ -988,12 +1003,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
     if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });
+    // 破框's lock mask (checked whole in jobInput): leaves the input here and becomes the job's own file below.
+    const lockMask = input.operation === "breakout" ? breakout.readMask(input.settings) : null;
     let job, controller, timeout;
     try {
       job = {
         id: crypto.randomUUID(),
         type: parsed.type,
-        input: durableInput(input),
+        input: durableInput(lockMask ? { ...input, settings: { ...input.settings, lock: { stored: true } } } : input),
         status: "queued",
         progress: 0,
         createdAt: new Date().toISOString(),
@@ -1004,6 +1021,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       };
       const limit = jobTimeoutMs(input); // once, before the job joins the queue (host transcription counts the runs ahead)
       job.deadlineAt = new Date(Date.parse(job.createdAt) + limit).toISOString();
+      if (lockMask) {
+        fs.mkdirSync(path.dirname(breakout.maskPath(jobInputs, job.id)), { recursive: true });
+        fs.writeFileSync(breakout.maskPath(jobInputs, job.id), lockMask);
+      }
       jobs.push(job);
       persist();
       controller = new AbortController();

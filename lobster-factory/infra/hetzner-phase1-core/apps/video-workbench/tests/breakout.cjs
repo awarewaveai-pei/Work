@@ -6,6 +6,22 @@ const { isolatedServer } = require("./isolated-server.cjs");
 const rules = require("../shared/breakout-rules.js");
 const generationPolicy = require("../backend/generation-policy.cjs");
 const { videoUsd } = require("../backend/provider-cost.cjs");
+// A valid 8-bit grey PNG of w x h (every CRC right), for first frames and lock masks.
+const zlib = require("node:zlib");
+function greyPng(w, h) {
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type, "latin1"), data]), out = Buffer.alloc(12 + data.length);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(zlib.crc32(body), 8 + data.length);
+    return out;
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(Buffer.alloc(h * (1 + w)))), chunk("IEND", Buffer.alloc(0))]);
+}
 
 // 1. model list
 const env = { REPLICATE_API_TOKEN: "test-only", GEMINI_API_KEY: "test-only" };
@@ -104,11 +120,17 @@ const breakout = require("../backend/breakout.cjs");
   breakout.lockFrame(later, ref, grid, opened);
   assert.notDeepEqual(later, ref, "an opened cell was locked again (would flicker)");
   // the lock is checked on the server: a malformed one is refused, none is accepted (an older job), extra keys ignored
-  assert.deepEqual(breakout.lockOf({}), { mask: null });
-  assert.deepEqual(breakout.lockOf({ lock: { boxes: [[0, 0, 1, 0.1]] } }), { mask: null }, "an older page's rows are held");
-  assert.deepEqual(breakout.lockOf({ lock: { mask: "data:image/png;base64,iVBORw0KGgo=" } }), { mask: "data:image/png;base64,iVBORw0KGgo=" });
-  assert.deepEqual(breakout.lockOf({ lock: { mask: "/generated/0f0e-1a.png" } }), { mask: "/generated/0f0e-1a.png" });
-  for (const mask of ["/etc/passwd", "/generated/../x.png", "data:text/html;base64,AA==", 5]) assert.throws(() => breakout.lockOf({ lock: { mask } }), /鎖定/);
+  // the lock mask is read whole at submit (readMask -> pngInfo): signature, every CRC, IHDR, the rows IDAT inflates to
+  const onePx = greyPng(1, 1);
+  assert.deepEqual(breakout.pngInfo(onePx), { width: 1, height: 1 });
+  assert.deepEqual(breakout.readMask({ lock: { mask: "data:image/png;base64," + onePx.toString("base64") } }), onePx);
+  for (const settings of [{}, { lock: { boxes: [[0, 0, 1, 0.1]] } }, { lock: { stored: true } }]) assert.equal(breakout.readMask(settings), null, JSON.stringify(settings));
+  const flipped = Buffer.from(onePx);
+  flipped[onePx.indexOf("IDAT") + 5] ^= 0xff; // a byte inside IDAT: its CRC no longer matches
+  for (const mask of ["data:image/png;base64,AAAA", "/generated/0f0e-1a.png", "data:text/html;base64,AA==", 5,
+    "data:image/png;base64," + onePx.subarray(0, 40).toString("base64"), "data:image/png;base64," + flipped.toString("base64"),
+    "data:image/png;base64," + "A".repeat(Math.ceil(breakout.MASK_MAX_BYTES / 3) * 4 + 4)])
+    assert.throws(() => breakout.readMask({ lock: { mask } }), /鎖定遮罩無效/, String(mask).slice(0, 40));
   // held pixels (lockPixels): a rounded, anti-aliased card row as the page draws it (white, an edge band of 128, black
   // outside). Only pixels white with LOCK.margin of white around them are held: never the edge band, never a rounded
   // corner's outside. Changes everywhere outside (a moving photo behind the card) open nothing and are never put back.
@@ -149,7 +171,7 @@ console.log("PASS 貼文文字鎖定：飄掉的數字（含壓縮後變灰的�
 const page = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/models.js"), "utf8"), page);
 const Models = page.window.VideoWorkbenchVideoModels;
-const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64");
+const png = greyPng(1, 1);
 const fetchImpl = async (url, init = {}) => {
   if (/\/v1\/models\/.+\/predictions$/.test(url)) {
     const prompt = JSON.parse(init.body).input.prompt;
@@ -228,15 +250,24 @@ const fetchImpl = async (url, init = {}) => {
       const { base: b2 } = await isolatedServer("vw-breakout-stage-", { fetchImpl: (url, init) => (vendorUrls.push(url), fetchImpl(url, init)), env: { REPLICATE_API_TOKEN: "test-only" } });
       const c2 = at(b2), runway2 = (await c2("/capabilities")).body.videoModels.find((m) => m.id === "runway-gen4-turbo");
       // 1. a status GET during a slow finish answers at once (stage finishing), and later shows the finished file
-      // the lock mask travels as a data URL; the server stores it as the job's own file and hands that file to finishing
-      const one = (await c2("/generations", job(runway2, { outputRatio: "4:5", lock: { mask: frame } }))).body.id;
+      // the lock mask travels as a data URL, is checked whole against the first frame before any vendor call, and is
+      // kept as the job's own input file only while the job runs
+      const asData = (b) => "data:image/png;base64," + b.toString("base64"), mask1 = asData(greyPng(1, 1));
+      for (const [mask, why] of [["data:image/png;base64,AAAA", "not a PNG"], [asData(greyPng(2, 2)), "a 2x2 mask for a 1x1 first frame"]]) {
+        const before = vendorUrls.length, sent = await c2("/generations", job(runway2, { lock: { mask } }));
+        assert.equal(sent.status, 400, why + " was accepted");
+        assert.match(sent.body.error.message, /鎖定遮罩/);
+        assert.equal(vendorUrls.length, before, why + ": a vendor call was made");
+      }
+      const one = (await c2("/generations", job(runway2, { outputRatio: "4:5", lock: { mask: mask1 } }))).body.id;
       const finishing = await until(async () => (await c2("/generations/" + one)).body, (v) => v.stage === "finishing");
       assert.equal(finishing.status, "running");
       assert.equal(finishing.result, undefined, "an unfinished video was offered as the result while finishing");
       const t0 = Date.now(), again = (await c2("/generations/" + one)).body;
       assert(Date.now() - t0 < 1000 && again.stage === "finishing", "a status GET waited for local finishing");
       assert.equal(runs.length, 1, "one runner per job");
-      assert(/\.png$/.test(runs[0].opts.maskFile) && fs.existsSync(runs[0].opts.maskFile), "the lock mask did not reach finishing as a file");
+      assert(/job-inputs/.test(runs[0].opts.maskFile) && fs.existsSync(runs[0].opts.maskFile), "the lock mask did not reach finishing as the job's input file");
+      assert(!JSON.stringify(finishing).includes("base64"), "the mask data stayed in the job record");
       runs[0].resolve({ ratio: "4:5", restored: 7 });
       const done = await until(async () => (await c2("/generations/" + one)).body, (v) => v.status === "succeeded");
       assert.equal(done.result.ratio, "4:5");
@@ -245,8 +276,9 @@ const fetchImpl = async (url, init = {}) => {
       assert.equal(done.finishing, undefined);
       assert.match(done.result.url, /^\/generated\/[a-f0-9-]+\.mp4$/);
       assert.equal(done.result.origin.costUsd, 0.25, "the charge was lost on the way through finishing");
+      assert(!fs.existsSync(runs[0].opts.maskFile), "the lock mask outlived its succeeded job");
       // 2. cancel while finishing: no vendor call, the runner is stopped, the paid model file is delivered with a note
-      const two = (await c2("/generations", job(runway2))).body.id;
+      const two = (await c2("/generations", job(runway2, { lock: { mask: mask1 } }))).body.id;
       await until(async () => (await c2("/generations/" + two)).body, (v) => v.stage === "finishing");
       const before = vendorUrls.length, cancelled = await c2("/generations/" + two + "/cancel", {});
       assert.equal(cancelled.status, 200);
@@ -254,6 +286,7 @@ const fetchImpl = async (url, init = {}) => {
       assert(!vendorUrls.slice(before).some((u) => u.endsWith("/cancel")), "cancel during finishing called the vendor");
       const kept = await until(async () => (await c2("/generations/" + two)).body, (v) => v.status === "succeeded");
       assert.match(kept.result.note, /已停止貼文鎖定.*原始影片/);
+      assert(!fs.existsSync(runs[1].opts.maskFile), "the lock mask outlived its cancelled job");
       // 2b. the worker's success lands after the cancel: the model file is still what is delivered (cancel's promise)
       stopsOnAbort = false;
       const race = (await c2("/generations", job(runway2))).body.id;
@@ -304,7 +337,7 @@ const fetchImpl = async (url, init = {}) => {
     maskPng(path.join(dir, "mask.png"), W, H, [[0, 96, W, 16]]);
     const done = await breakout.finish({
       src: path.join(dir, "made.mp4"), frameFile: path.join(dir, "first.png"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, "out.mp4"),
-      settings: { outputRatio: "4:5", lock: { mask: "/generated/0000.png" } }, ffmpeg,
+      settings: { outputRatio: "4:5" }, ffmpeg,
     });
     assert.equal(done.ratio, "4:5");
     assert(done.restored > 0, "nothing restored");
@@ -330,7 +363,7 @@ const fetchImpl = async (url, init = {}) => {
     ff("-f", "lavfi", "-i", `color=white:s=${H}x${W}:d=1,drawbox=x=8:y=50:w=16:h=8:color=black:t=fill`, "-frames:v", "1", path.join(dir, "wide.png"));
     maskPng(path.join(dir, "wide-mask.png"), H, W, [[0, 46, H, 16]]);
     const wide = await breakout.finish({ src: path.join(dir, "wide.mp4"), frameFile: path.join(dir, "wide.png"), maskFile: path.join(dir, "wide-mask.png"), dst: path.join(dir, "wide-out.mp4"),
-      settings: { outputRatio: "16:9", lock: { mask: "/generated/0000.png" } }, ffmpeg });
+      settings: { outputRatio: "16:9" }, ffmpeg });
     assert.equal(wide.ratio, "16:9");
     assert(wide.restored > 0);
     const wideInfo = await require("../backend/media-inspect.cjs").inspectMedia(path.join(dir, "wide-out.mp4"));
@@ -367,7 +400,7 @@ const fetchImpl = async (url, init = {}) => {
     ff("-f", "lavfi", "-i", `color=black:s=${W}x${H}:d=1,${rows.map(([y, h]) => `drawbox=x=0:y=${y}:w=${W}:h=${h}:color=white:t=fill`).join(",")}`, "-frames:v", "1", path.join(dir, "mask.png"));
     const finishClip = (made, out) => breakout.finish({
       src: path.join(dir, made), frameFile: path.join(dir, "first.png"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, out), ffmpeg,
-      settings: { outputRatio: "9:16", lock: { mask: "/generated/0000.png" } },
+      settings: { outputRatio: "9:16" },
     });
     const done = await finishClip("made.mp4", "out.mp4");
     assert(done.restored > 0 && done.opened > 0);

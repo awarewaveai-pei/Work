@@ -5,12 +5,17 @@
 // 9:16 frame and the finished video is cropped to that centred box; 16:9 runs as is.
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
+const path = require("node:path");
+const zlib = require("node:zlib");
 const { Worker, isMainThread, parentPort, workerData } = require("node:worker_threads");
 const rules = require("../shared/breakout-rules.js");
 const generationPolicy = require("./generation-policy.cjs");
 
-/** Throws a user-facing error unless input is a valid breakout job; returns the prompt the model is sent. */
-function prepare(input, env) {
+/**
+ * Throws a user-facing error unless input is a valid breakout job; returns the prompt the model is sent. frameBytes(url):
+ * the first frame's PNG bytes (api.cjs reads its file), so the lock mask is checked against it before any paid call.
+ */
+function prepare(input, env, { frameBytes } = {}) {
   const s = input.settings || {};
   if (!Object.hasOwn(rules.LAYOUTS, s.layout)) throw Error("請選擇貼文版面");
   if (!rules.OUTPUT_RATIOS.includes(s.outputRatio)) throw Error("輸出比例只支援 " + rules.OUTPUT_RATIOS.join("、"));
@@ -23,19 +28,60 @@ function prepare(input, env) {
   if (input.cartoonStyle !== undefined) throw Error("破框貼文動畫不接受風格附加文字");
   const frames = input.references?.firstFrame;
   if (!Array.isArray(frames) || frames.length !== 1 || !frames[0]?.url) throw Error("缺少貼文第一格畫面");
-  lockOf(s); // throws on a malformed lock
+  const mask = readMask(s);
+  if (mask) {
+    const m = pngInfo(mask), f = pngInfo(frameBytes?.(frames[0].url) ?? Buffer.alloc(0));
+    if (m.width !== f.width || m.height !== f.height) throw Error(`鎖定遮罩 ${m.width}×${m.height} 和第一格 ${f.width}×${f.height} 不一樣大`);
+  }
   return rules.prompt(input.prompt, s);
 }
 
 // settings.lock = { mask }: a PNG the page draws with the same calls as the post (scripts/tools-breakout.js
-// toolBreakoutDraw): black, the post's text rows white, clipped like the card. It is the one source of what is held: the
-// server knows no layout. A data URL at submit (durableInput then stores it as a /generated file, out of the library).
-// None = nothing to hold (a job sent before the lock; a page from before the mask sent rows as boxes: not held).
-function lockOf(settings) {
+// toolBreakoutDraw): black, the post's text rows white, clipped like the card, the first frame's size. It is the one
+// source of what is held: the server knows no layout. A per-job input: checked whole at submit (readMask, pngInfo, size
+// = the first frame), taken out of the job record by api.cjs start into job-inputs/<job>/ (maskPath), used as is (never
+// scaled) and removed when the job ends. None = nothing to hold (a job sent before the lock, an older page's boxes, a
+// retry: its mask went with the first run).
+const MASK_MAX_BYTES = 1 << 20;
+function readMask(settings) {
   const mask = settings?.lock?.mask;
-  if (mask === undefined || mask === null) return { mask: null };
-  if (typeof mask !== "string" || !/^(data:image\/png;base64,[A-Za-z0-9+/=]+|\/generated\/[a-f0-9-]+\.png)$/.test(mask)) throw Error("貼文文字鎖定資料無效");
-  return { mask };
+  if (mask === undefined || mask === null) return null;
+  const m = typeof mask === "string" && /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(mask);
+  if (!m || m[1].length > Math.ceil(MASK_MAX_BYTES / 3) * 4) throw Error("鎖定遮罩無效");
+  const png = Buffer.from(m[1], "base64");
+  pngInfo(png); // the whole file, now: never found unreadable after the paid run
+  return png;
+}
+const maskPath = (dir, jobId) => path.join(dir, String(jobId), "lock-mask.png");
+/**
+ * { width, height } of a PNG this server can read whole: signature, every chunk's CRC, IHDR (8-bit, grey / RGB / grey
+ * + alpha / RGBA, not interlaced), and IDAT data that inflates to exactly the rows IHDR promises; else throws.
+ */
+function pngInfo(png) {
+  const bad = () => Error("鎖定遮罩無效");
+  if (!Buffer.isBuffer(png) || png.length < 8 || png.readUInt32BE(0) !== 0x89504e47 || png.readUInt32BE(4) !== 0x0d0a1a0a) throw bad();
+  let at = 8, ihdr = null, end = false;
+  const idat = [];
+  while (at + 12 <= png.length && !end) {
+    const len = png.readUInt32BE(at), type = png.toString("latin1", at + 4, at + 8);
+    if (at + 12 + len > png.length || zlib.crc32(png.subarray(at + 4, at + 8 + len)) !== png.readUInt32BE(at + 8 + len)) throw bad();
+    const data = png.subarray(at + 8, at + 8 + len);
+    if (type === "IHDR") ihdr = data;
+    else if (type === "IDAT") idat.push(data);
+    else if (type === "IEND") end = true;
+    at += 12 + len;
+  }
+  if (!ihdr || ihdr.length !== 13 || !end || !idat.length) throw bad();
+  const width = ihdr.readUInt32BE(0), height = ihdr.readUInt32BE(4), channels = { 0: 1, 2: 3, 4: 2, 6: 4 }[ihdr[9]];
+  if (!width || !height || width > 4096 || height > 4096 || ihdr[8] !== 8 || !channels || ihdr[12] !== 0) throw bad();
+  let rows;
+  try {
+    rows = zlib.inflateSync(Buffer.concat(idat), { maxOutputLength: height * (1 + width * channels) + 1 });
+  } catch {
+    throw bad();
+  }
+  if (rows.length !== height * (1 + width * channels)) throw bad();
+  return { width, height };
 }
 
 // Held pixels = mask pixels that are fully white with everything within LOCK.margin of them fully white too. That drops
@@ -161,7 +207,7 @@ const TO_YUV = "scale=out_color_matrix=bt709:in_range=pc:out_range=tv,format=yuv
 const TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
 
 async function finishHere({ src, frameFile, maskFile, dst, settings, ffmpeg, signal }) {
-  const { mask } = lockOf(settings),
+  const mask = !!maskFile && fs.existsSync(maskFile),
     ratio = rules.OUTPUT_RATIOS.includes(settings?.outputRatio) ? settings.outputRatio : "9:16",
     [ma, mb] = rules.modelRatio(ratio).split(":").map(Number);
   const info = await require("./media-inspect.cjs").inspectMedia(src, signal);
@@ -183,9 +229,11 @@ async function finishHere({ src, frameFile, maskFile, dst, settings, ffmpeg, sig
     await run(ffmpeg, ["-y", "-v", "error", "-i", src, "-map", "0:a?", "-vf", crop + "format=yuv420p", ...out], signal, { stdout: false }).done;
     return { ratio, restored: 0, opened: 0 };
   }
-  // the mask at the video's size, nearest (no new mixed pixels); then the held pixels and their cells
-  const gray = await run(ffmpeg, ["-v", "error", "-i", maskFile, "-vf", `scale=${W}:${H}:flags=neighbor`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], signal).done;
-  if (gray.length !== W * H) throw Error("鎖定遮罩尺寸不符");
+  // the mask as drawn, never scaled: a video of another size than the first frame cannot be held pixel for pixel
+  const { width: mw, height: mh } = pngInfo(fs.readFileSync(maskFile));
+  if (mw !== W || mh !== H) throw Error(`影片 ${W}×${H} 和第一格 ${mw}×${mh} 不一樣大，無法鎖定貼文文字`);
+  const gray = await run(ffmpeg, ["-v", "error", "-i", maskFile, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], signal).done;
+  if (gray.length !== W * H) throw Error("鎖定遮罩無效");
   const grid = lockGrid(lockPixels(gray, W, H), W, H), open = new Uint8Array(grid.cells.length), size = W * H * 3;
   const ref = await run(ffmpeg, ["-v", "error", "-i", frameFile, "-vf", `scale=${W}:${H}:flags=area`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal).done;
   if (ref.length !== size) throw Error("第一格畫面尺寸不符");
@@ -279,4 +327,4 @@ if (!isMainThread && workerData?.breakoutFinish) {
     .finally(() => parentPort.close());
 }
 
-module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockPixels, lockOf, LOCK, LOCK_MAX_AREA, FINISH_TIMEOUT_MS };
+module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockPixels, readMask, pngInfo, maskPath, LOCK, LOCK_MAX_AREA, MASK_MAX_BYTES, FINISH_TIMEOUT_MS };
