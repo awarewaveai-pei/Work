@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-14（續4）社群工具 E：已刪除貼文批次永久刪除——已由 d30d6759a 完成，本 session 只補回報與混合批次測試
+
+- 狀況：監工派 E（垃圾桶勾選、全選、批次永久刪除）時，另一個 session 已在 d30d6759a 上線同一功能（勾選、全選只勾能刪的、單一確認框寫筆數、逐篇走既有 purge route）。本 session 並行做的另一套（98bb1febc：批次 route＋分批送）在 rebase 時發現重複，整份捨棄，只留一條路。
+- 補的部分：d30d6759a 的狀態列只寫失敗筆數和第一個原因，沒寫哪幾篇被拒；也沒有混合批次測試。SocialManager 的逐篇迴圈搬到 Trash.tsx purgeEach（行為不變：一篇一次 purge、一篇被拒不擋其他），狀態列逐篇寫出被拒貼文的標題與原因。
+- 捨棄方案裡 Codex 找到、現行方案不適用的：100 筆上限（現行逐篇呼叫，無上限問題）。清單「批次動作」posts/bulk 仍是 100 筆上限、清單可能超過 100 篇——未改，列 RISKS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social app/(shell)/tools/social app/api/social lib/portal lib/system-modes（51 檔 377 綠）；npx tsc --noEmit 0 錯；purge-each.test.ts 改前紅（purgeEach 不存在）、改後 2 綠 | exit=0 | ms=300000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=purgeEach | hits=7
+- ORACLE_WAIVED: 監工指示本卡不再開 Codex 新輪（AGENTS.md §4 三輪上限，捨棄方案已跑 4 輪 7794a596／357e64ae／8789c88a／59a90840）；本次只把既有迴圈抽成函式＋訊息加標題，書面自審：呼叫順序與錯誤收集不變（測試驗證 3 篇都呼叫、拒絕不中斷）
+- rollback：git revert 本 commit。
 ## 2026-11-14（續2）剩餘問題清理：所有字幕辨識輸出繁體＋生成影片記交付比例
 
 - 起因：操作者「這些有問題就去處理好」（續13 剩餘風險）。查證後：「一次只查 50 筆」是誤報（續13 已更正）；下面兩項成立；破框格子打開的驗證另卡處理（1fdcb8bdd，修正進行中）。
