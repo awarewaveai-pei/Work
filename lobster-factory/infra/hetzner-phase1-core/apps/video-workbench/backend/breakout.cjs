@@ -67,21 +67,30 @@ function pngSize(png) {
  * scaled), and hold at most LOCK_MAX_AREA (lockPixels). Returns the held pixels; anything it refuses, it refuses at submit.
  */
 async function lockMaskPixels({ maskFile, width, height, ffmpeg, signal }) {
+  const m = await decodePng({ file: maskFile, what: "鎖定遮罩", ffmpeg, signal });
+  if (m.width !== width || m.height !== height) throw Error(`鎖定遮罩 ${m.width}×${m.height} 和畫面 ${width}×${height} 不一樣大`);
+  return lockPixels(m.gray, width, height);
+}
+/**
+ * The one reader of a breakout PNG (the first frame at submit, the lock mask at submit and in finishing): header first
+ * (pngSize: at most MASK_MAX_SIDE a side), then decoded by this server's ffmpeg as is. Returns { width, height, gray };
+ * throws `<what>無效` / `<what>無法解碼`, so whatever cannot be read is refused before any paid call.
+ */
+async function decodePng({ file, what, ffmpeg, signal }) {
   let size;
   try {
-    size = pngSize(fs.readFileSync(maskFile));
+    size = pngSize(fs.readFileSync(file));
   } catch {
-    throw Error("鎖定遮罩無效");
+    throw Error(what + "無效");
   }
-  if (size.width !== width || size.height !== height) throw Error(`鎖定遮罩 ${size.width}×${size.height} 和畫面 ${width}×${height} 不一樣大`);
   let gray;
   try {
-    gray = await run(ffmpeg, ["-v", "error", "-i", maskFile, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], signal).done;
+    gray = await run(ffmpeg, ["-v", "error", "-i", file, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], signal).done;
   } catch {
-    throw Error("鎖定遮罩無法解碼");
+    throw Error(what + "無法解碼");
   }
-  if (gray.length !== width * height) throw Error("鎖定遮罩無法解碼");
-  return lockPixels(gray, width, height);
+  if (gray.length !== size.width * size.height) throw Error(what + "無法解碼");
+  return { ...size, gray };
 }
 
 // Held pixels = mask pixels that are fully white with everything within LOCK.margin of them fully white too. That drops
@@ -105,7 +114,7 @@ function lockPixels(gray, w, h) {
       for (let d = -r; ok && d <= r; d++) ok = row[(y + d) * w + x] === 1;
       if (ok) (held[y * w + x] = 1), count++;
     }
-  if (count > LOCK_MAX_AREA * w * h) throw Error("貼文文字鎖定資料無效");
+  if (count > LOCK_MAX_AREA * w * h) throw Error(`鎖定遮罩範圍過大（超過畫面的 ${LOCK_MAX_AREA * 100}%）`);
   return held;
 }
 
@@ -325,4 +334,4 @@ if (!isMainThread && workerData?.breakoutFinish) {
     .finally(() => parentPort.close());
 }
 
-module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockPixels, lockMaskPixels, readMask, pngSize, maskPath, LOCK, LOCK_MAX_AREA, MASK_MAX_BYTES, FINISH_TIMEOUT_MS };
+module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockPixels, lockMaskPixels, decodePng, readMask, pngSize, maskPath, LOCK, LOCK_MAX_AREA, MASK_MAX_BYTES, FINISH_TIMEOUT_MS };

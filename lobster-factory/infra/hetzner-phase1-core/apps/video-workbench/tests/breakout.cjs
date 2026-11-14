@@ -270,6 +270,14 @@ const fetchImpl = async (url, init = {}) => {
         assert.match(sent.body.error.message, /鎖定遮罩/);
         assert.equal(vendorUrls.length, before, why + ": a vendor call was made");
       }
+      // the first frame is decoded at submit too: a PNG that is only a header (signature + IHDR) is refused, no vendor call
+      const headerOnly = { firstFrame: [{ url: asData(greyPng(1, 1).subarray(0, 33)), type: "image/png" }] };
+      const noFrame = job(runway2);
+      noFrame.references = headerOnly;
+      const vendorBefore = vendorUrls.length, frameSent = await c2("/generations", noFrame);
+      assert.equal(frameSent.status, 400, "a header-only first frame was accepted");
+      assert.match(frameSent.body.error.message, /貼文第一格無法解碼/);
+      assert.equal(vendorUrls.length, vendorBefore, "a header-only first frame reached the vendor");
       const one = (await c2("/generations", job(runway2, { outputRatio: "4:5", lock: { mask: mask1 } }))).body.id;
       const finishing = await until(async () => (await c2("/generations/" + one)).body, (v) => v.stage === "finishing");
       assert.equal(finishing.status, "running");
@@ -348,6 +356,12 @@ const fetchImpl = async (url, init = {}) => {
       assert.equal(runs[4].opts.maskFile, path.join(dataDir, "job-inputs", rerun.body.id, "lock-mask.png"));
       assert.deepEqual(fs.readFileSync(runs[4].opts.maskFile), greyPng(1, 1), "the retry lost the lock");
       runs[4].resolve({ ratio: "9:16", restored: 0, opened: 0 });
+      // a job that had a lock whose mask is gone is refused at submit, never rerun without its lock
+      fs.rmSync(path.join(dataDir, "job-inputs", "lost"), { recursive: true });
+      const vendorAt = vendorUrls.length, unlocked = await c3("/generations/lost/retry", {});
+      assert.equal(unlocked.status, 400, "a retry whose lock mask is gone was accepted");
+      assert.equal(unlocked.body.error.message, "文字鎖定資料已清除，請從破框工具重新生成");
+      assert.equal(vendorUrls.length, vendorAt, "a retry without its lock reached the vendor");
     } finally {
       breakout.finish = realFinish;
     }

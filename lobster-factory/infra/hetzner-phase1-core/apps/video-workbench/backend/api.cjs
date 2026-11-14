@@ -950,25 +950,38 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (op === "music") return 900000; // a 5-minute Eleven song is made in one request
     return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? hostTranscribeTimeout(input) : op === "remotion-template" ? 780000 : 600000;
   }
-  // 破框: the lock mask bytes for a new job (null = none), accepted by lockMaskPixels at the first frame's size; 400 if not.
-  async function breakoutLockMask(input, retryOf) {
+  // 破框's inputs, decided before the permit and any paid call by the readers finishing uses: the first frame decodes
+  // (breakout.decodePng), and the lock mask -- sent with this job, or a retry's copy from the job it reruns -- passes
+  // breakout.lockMaskPixels at the first frame's size. A job that had a lock whose mask is gone (its record went past the
+  // history limit) is refused: a paid run never silently drops the lock. Returns the mask bytes to store (null = no
+  // lock); 400 on any refusal.
+  async function breakoutInputs(input, retryOf) {
+    const refuse = (message) => Object.assign(Error(message), { status: 400 });
     const sent = breakout.readMask(input.settings),
-      kept = !sent && input.settings?.lock?.stored && retryOf ? breakout.maskPath(jobInputs, retryOf) : null,
-      png = sent || (kept && fs.existsSync(kept) ? fs.readFileSync(kept) : null);
-    if (!png) return null;
-    const url = input.references?.firstFrame?.[0]?.url || "",
+      stored = !sent && !!input.settings?.lock?.stored,
+      kept = stored && retryOf ? breakout.maskPath(jobInputs, retryOf) : null;
+    if (stored && !(kept && fs.existsSync(kept))) throw refuse("文字鎖定資料已清除，請從破框工具重新生成");
+    const png = sent || (stored ? fs.readFileSync(kept) : null),
+      url = input.references?.firstFrame?.[0]?.url || "",
       data = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(url),
-      file = !data && localFile(url, { assets: true }),
-      tmp = path.join(os.tmpdir(), "vw-mask-" + crypto.randomUUID() + ".png");
+      tmp = (name) => path.join(os.tmpdir(), "vw-breakout-" + crypto.randomUUID() + "-" + name),
+      frameFile = data ? tmp("frame.png") : localFile(url, { assets: true }),
+      maskFile = png ? tmp("mask.png") : null,
+      ffmpeg = require("ffmpeg-static");
     try {
-      const frame = breakout.pngSize(data ? Buffer.from(data[1], "base64") : fs.readFileSync(file || ""));
-      fs.writeFileSync(tmp, png);
-      await breakout.lockMaskPixels({ maskFile: tmp, width: frame.width, height: frame.height, ffmpeg: require("ffmpeg-static") });
+      if (!frameFile) throw Error("找不到貼文第一格畫面");
+      if (data) fs.writeFileSync(frameFile, Buffer.from(data[1], "base64"));
+      const frame = await breakout.decodePng({ file: frameFile, what: "貼文第一格", ffmpeg });
+      if (png) {
+        fs.writeFileSync(maskFile, png);
+        await breakout.lockMaskPixels({ maskFile, width: frame.width, height: frame.height, ffmpeg });
+      }
       return png;
     } catch (e) {
-      throw Object.assign(Error(/遮罩|PNG/.test(e.message) ? e.message : "鎖定遮罩無效：" + e.message), { status: 400 });
+      throw refuse(e.message);
     } finally {
-      fs.rmSync(tmp, { force: true });
+      if (data) fs.rmSync(frameFile, { force: true });
+      if (maskFile) fs.rmSync(maskFile, { force: true });
     }
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
@@ -1015,9 +1028,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (feature && editModel) costs.priceOf("fill", editModel.value);
     else if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music" }[feature] || feature,
       { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id }[feature]);
-    // 破框's lock mask, sent with this job or (a retry) kept with the job it reruns: read here by the same reader finishing
-    // uses (breakout.lockMaskPixels) against the first frame, so whatever can refuse it refuses now, before any paid call.
-    const lockMask = input.operation === "breakout" ? await breakoutLockMask(input, extra?.retryOf) : null;
+    const lockMask = input.operation === "breakout" ? await breakoutInputs(input, extra?.retryOf) : null;
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
     if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });
