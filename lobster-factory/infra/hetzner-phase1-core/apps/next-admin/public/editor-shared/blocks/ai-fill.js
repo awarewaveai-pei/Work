@@ -162,8 +162,11 @@ export function blendFeathered(orig, ai, alpha) {
   return out;
 }
 /** The whole job on the pixels: crop around the selection, post, blend back → PNG Blob at the source's own size, or
- *  { error } before any paid request when the selection is empty. `post(image, mask)` sends the crop and resolves postStudio's shape. */
-export async function fillSelection(srcBlob, maskBlob, post) {
+ *  { error } before any paid request when the selection is empty. `post(image, mask)` sends the crop and resolves postStudio's shape.
+ *  `opts.asLayer`: return only the generated patch (the crop, feathered to transparent at the selection edge) plus the
+ *  `at` where it belongs, so the caller can place it as a NEW layer and leave the source alone — what Photoshop's
+ *  generative fill does. Without it the whole source comes back with the patch blended in, for callers that replace. */
+export async function fillSelection(srcBlob, maskBlob, post, opts = {}) {
   const src = await createImageBitmap(srcBlob);
   const w = src.width, h = src.height;
   const bytes = await maskBytes(maskBlob, w, h);
@@ -182,8 +185,16 @@ export async function fillSelection(srcBlob, maskBlob, post) {
   const cropBytes = new Uint8Array(r.w * r.h);
   for (let y = 0; y < r.h; y++) cropBytes.set(bytes.subarray((r.y + y) * w + r.x, (r.y + y) * w + r.x + r.w), y * r.w);
   const feather = Math.min(FEATHER.max, Math.max(FEATHER.min, Math.round(Math.max(r.w, r.h) * FEATHER.fraction)));
+  const alpha = featherAlpha(cropBytes, r.w, r.h, feather);
+  if (opts.asLayer) {
+    // The patch alone: the model's pixels, faded to transparent across the same feather band, nothing of the source.
+    const patch = ai.g.getImageData(0, 0, r.w, r.h);
+    for (let p = 0, i = 3; p < alpha.length; p++, i += 4) patch.data[i] = patch.data[i] * alpha[p];
+    const l = surface(r.w, r.h); l.g.putImageData(patch, 0, 0);
+    return { blob: dataUrlToBlob(l.c.toDataURL("image/png")), at: [r.x, r.y], region: r, sent: { width: dw, height: dh } };
+  }
   const od = o.g.getImageData(r.x, r.y, r.w, r.h);
-  od.data.set(blendFeathered(od.data, ai.g.getImageData(0, 0, r.w, r.h).data, featherAlpha(cropBytes, r.w, r.h, feather)));
+  od.data.set(blendFeathered(od.data, ai.g.getImageData(0, 0, r.w, r.h).data, alpha));
   o.g.putImageData(od, r.x, r.y);
   return { blob: dataUrlToBlob(o.c.toDataURL("image/png")), region: r, sent: { width: dw, height: dh } };
 }
@@ -207,6 +218,8 @@ export default {
       + '<button type="button" class="btn btn-ghost" id="afFill" data-af-mode="fill">✨ 生成填色（選哪生哪）</button></div></div>'
       + '<div id="afStep">'
       + '<input id="afPrompt" class="form-input" data-af-prompt placeholder="要生成什麼，例如：一片藍天">'
+      + '<label id="afLayerRow" style="display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12px;">'
+      + '<input type="checkbox" id="afLayer" data-af-layer checked> 放到新圖層（原圖不會被蓋掉）</label>'
       + '<div class="info" style="margin-top:6px;">按模型就開始（按下即扣點）</div>'
       + '<div class="row" id="afModels" style="flex-wrap:wrap;"></div>'
       + '<div class="row" style="margin-top:6px;"><button type="button" class="btn btn-ghost" id="afCancel" data-af-cancel>✖ 取消</button></div></div>'
@@ -223,6 +236,9 @@ export default {
         : "先在圖層選取一張圖片，再" + AREA_HOW + "。";
       $("afRemove").disabled = !hasMask; $("afFill").disabled = !hasMask;
       $("afFields").disabled = busy;
+      // 去除 erases this layer in place; only 生成填色 can hand its result over as a separate layer.
+      const layerRow = $("afLayerRow");
+      if (layerRow) layerRow.style.display = mode === "fill" && typeof ctx.placeImage === "function" ? "flex" : "none";
       const models = $("afModels"); models.replaceChildren();
       for (const m of mode === "fill" ? FILL_MODELS : mode === "remove" ? REMOVE_MODELS : []) {
         const b = modelButton(m, nt, () => run(m));
@@ -252,13 +268,15 @@ export default {
         const sel = await ctx.selectedImage(); if (!sel) { say("先在圖層選取一張圖片。"); return; }
         const maskBlob = await ctx.selectionMask(); if (!maskBlob) { say("請先" + AREA_HOW + "。"); return; }
         say(m.label + " 處理中…", true);
+        const asLayer = mode === "fill" && typeof ctx.placeImage === "function" && !!$("afLayer")?.checked;
         const out = await fillSelection(sel.blob, maskBlob, (image, mask) => mode === "fill"
           ? postStudio(GENFILL_URL, { image, mask, prompt, model: m.value })
-          : postStudio(INPAINT_URL, { image, mask }));
+          : postStudio(INPAINT_URL, { image, mask }), { asLayer });
         if (out.error === "empty_selection") { say("選取範圍是空的，請先" + AREA_HOW + "。"); return; }
         if (out.error) { say("⚠️ " + (out.error || (mode === "fill" ? "生成失敗，請重試" : "去除失敗，請重試"))); return; }
-        await ctx.replaceImage(sel.id, out.blob);
-        say((mode === "fill" ? "✅ 生成填色完成（" : "✅ 已去除選取範圍（") + m.label + "，" + price(m) + "）");
+        if (asLayer) await ctx.placeImage(out.blob, "生成填色.png", { at: [sel.transform[4] + out.at[0], sel.transform[5] + out.at[1]] });
+        else await ctx.replaceImage(sel.id, out.blob);
+        say((mode === "fill" ? (asLayer ? "✅ 生成填色完成，已放到新圖層（" : "✅ 生成填色完成（") : "✅ 已去除選取範圍（") + m.label + "，" + price(m) + "）");
         mode = null;
       } catch (err) { say("⚠️ " + (err && err.message ? err.message : String(err))); }
       finally { setBusy(false); }

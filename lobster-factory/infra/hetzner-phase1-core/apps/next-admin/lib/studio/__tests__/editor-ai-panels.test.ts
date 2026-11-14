@@ -77,7 +77,7 @@ async function mount(rel: string, ctx: ReturnType<typeof mockCtx>) {
   (await loadModule(rel)).default.mount(ctx, body);
   return body;
 }
-const q = (body: HTMLElement, sel: string) => body.querySelector(sel) as HTMLElement & { value: string; click(): void };
+const q = (body: HTMLElement, sel: string) => body.querySelector(sel) as HTMLElement & { value: string; checked: boolean; click(): void };
 const blobText = async (b: Blob) => Buffer.from(await b.arrayBuffer()).toString();
 const sentBody = (i = 0) => JSON.parse((fetchMock.mock.calls[i] as unknown as [string, RequestInit])[1].body as string);
 const sentInit = (i = 0) => (fetchMock.mock.calls[i] as unknown as [string, RequestInit])[1];
@@ -127,15 +127,22 @@ describe("ai-fill：去除／生成填色", () => {
     expect(btns.map((b) => (b as HTMLElement).dataset.afModel)).toEqual(["flux-2-klein-4b", "flux-kontext-fast", "ideogram-4-5-edit-low", "flux-fill-pro", "nano-banana-2", "ideogram-4-5-edit", "openai-26-edit"]);
     btns.forEach(priced);
     btns.forEach((b) => noted(b, modelsFor("fill")));
+    // 放到新圖層 is on by default: the patch goes in with placeImage and the source layer is left alone.
+    expect(q(body, "[data-af-layer]").checked).toBe(true);
     q(body, "[data-af-model=ideogram-4-5-edit]").click();
-    await vi.waitFor(() => expect(ctx.replaceImage).toHaveBeenCalled());
+    await vi.waitFor(() => expect(ctx.placeImage).toHaveBeenCalled());
+    expect(ctx.replaceImage).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls[0][0]).toBe("/api/tools/studio/genfill");
     expect(sentBody()).toEqual({ image: CANVAS_PNG, mask: CANVAS_PNG, prompt: "", model: "ideogram-4-5-edit" });
-    ctx.replaceImage.mockClear();
+    expect((ctx.placeImage.mock.calls[0] as unknown[])[1]).toBe("生成填色.png");
+    ctx.placeImage.mockClear();
+    // Unticked, it goes back to replacing the layer in place.
     q(body, "[data-af-mode=fill]").click();
+    q(body, "[data-af-layer]").checked = false;
     q(body, "[data-af-prompt]").value = "一片藍天";
     q(body, "[data-af-model=openai-26-edit]").click();
     await vi.waitFor(() => expect(ctx.replaceImage).toHaveBeenCalled());
+    expect(ctx.placeImage).not.toHaveBeenCalled();
     expect(sentBody(1)).toEqual({ image: CANVAS_PNG, mask: CANVAS_PNG, prompt: "一片藍天", model: "openai-26-edit" });
   });
   it("連按兩次只送一次付費請求；selectionMask 拒絕 → 面板顯示錯誤、解除忙碌", async () => {
@@ -245,7 +252,7 @@ describe("genfx：擴圖／色調分離", () => {
     expect(dirs).toEqual(["Zoom out 1.5x", "Zoom out 2x", "Make square", "Left outpaint", "Right outpaint", "Top outpaint", "Bottom outpaint"]);
     const models = [...body.querySelectorAll("[data-gf-model]")];
     expect(models.map((b) => (b as HTMLElement).dataset.gfModel)).toEqual(modelsFor("outpaint").map((m: { value: string }) => m.value));
-    expect(models.map((b) => (b as HTMLElement).dataset.gfModel)).toEqual(["bria-expand", "flux-fill-pro"]);
+    expect(models.map((b) => (b as HTMLElement).dataset.gfModel)).toEqual(["bria-expand", "flux-fill-pro", "openai-26-edit"]);
     models.forEach(priced);
     models.forEach((b) => noted(b, modelsFor("outpaint")));
     q(body, "[data-gf-prompt]").value = "海邊草地";

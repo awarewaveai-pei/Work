@@ -51,7 +51,7 @@ export const IMAGE_MODELS = Object.freeze([
   // Measured 2026-11-01 on /v1/images/edits (high, 1024x1536, 2 refs): US$0.062. Keeps the unmasked pixels; prints follow fabric folds.
   { value: "openai-25-edit", label: "GPT-Image-2.5 修圖", group: "OpenAI", vendor: "OpenAI", usd: 0.06, maxRefs: 5, note: "印花貼合衣物皺褶（實測）", uses: ["generate", "edit"] },
   // gpt-image-2.6-sunburst (OpenAI 2026-11-09: "precise edits"), same token rates as 2.5; takes a mask on /images/edits.
-  { value: "openai-26-edit", label: "GPT-Image-2.6 修圖", group: "OpenAI", vendor: "OpenAI", usd: 0.06, maxRefs: 5, note: "條件多、描述長的時候最準", uses: ["generate", "edit", "fill"], zh: "ok", blank: "ok" },
+  { value: "openai-26-edit", label: "GPT-Image-2.6 修圖", group: "OpenAI", vendor: "OpenAI", usd: 0.06, maxRefs: 5, note: "條件多、描述長的時候最準", uses: ["generate", "edit", "fill", "outpaint"], zh: "ok", blank: "ok" },
 ]);
 
 /** `zh` = does a 繁中 instruction work on this button, measured 2026-11-09 on one card with one sentence:

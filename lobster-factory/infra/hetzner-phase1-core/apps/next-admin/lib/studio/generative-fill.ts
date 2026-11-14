@@ -123,6 +123,93 @@ export async function generativeFill(args: GenerativeFillInput): Promise<Generat
 
 /** bria/expand-image: the preset's canvas (outpaintFrame) sent explicitly, so the result IS the frame (no resampling, the source
  *  pixels land where the frame says). A frame over BRIA_EXPAND_MAX_SIDE shrinks the source first (whole frame scaled). */
+/** The three pixel sizes the OpenAI images API returns (lib/tarot/image-gen.ts sizeMap); an outpaint has to land inside
+ *  one of them exactly, so the box is chosen here rather than inferred from the canvas's own ratio. */
+const OPENAI_BOXES = [
+  { ratio: "1:1" as const, w: 1024, h: 1024 },
+  { ratio: "3:2" as const, w: 1536, h: 1024 },
+  { ratio: "2:3" as const, w: 1024, h: 1536 },
+];
+
+export interface OutpaintCanvas {
+  /** The source letterboxed into the chosen OpenAI box, transparent everywhere it may paint. */
+  image: string;
+  /** OUR convention, WHITE = change (lib/tarot/image-gen.ts openaiMask inverts it): white over the new margin only. */
+  mask: string;
+  /** The box to ask the API for. */
+  aspectRatio: "1:1" | "3:2" | "2:3";
+  /** Where the preset's canvas sits inside the returned box, and the size it has to come back as. */
+  crop: { left: number; top: number; width: number; height: number };
+  out: { width: number; height: number };
+}
+
+/** For an outpaint on a model with no `outpaint` input of its own (the OpenAI edit models): the source placed on the
+ *  preset's extended canvas, letterboxed into one of the three sizes the API can return, with the mask that lets it
+ *  paint the new margin only. The letterbox is why this is not just "send the canvas": the API ignores the requested
+ *  geometry and answers in a fixed size, so a 2:1 canvas would come back 3:2 and could not be put back in place
+ *  (Codex review 2026-11-14). The caller crops `crop` out of the answer and resizes it to `out`.
+ *  Measured 2026-11-09: gpt-image-2.6 given a canvas and a margin mask left the card untouched and continued the background. */
+export async function outpaintCanvas(image: string, preset: OutpaintPreset): Promise<OutpaintCanvas | null> {
+  const buf = dataUrlBuffer(image);
+  if (!buf) return null;
+  const { width: w = 0, height: h = 0 } = await sharp(buf).metadata();
+  const f = outpaintFrame(preset, w, h);
+  if (!w || !h || !f) return null;
+  const W = Math.round(f.W), H = Math.round(f.H), x = Math.round(f.x), y = Math.round(f.y);
+  if (W <= w && H <= h) return null; // 補成正方形 on a square image adds no margin: nothing for the model to paint
+
+  // The box that wastes the least area once the canvas is fitted inside it without distortion.
+  const fits = OPENAI_BOXES.map((b) => {
+    const k = Math.min(b.w / W, b.h / H);
+    return { ...b, k, used: (W * k * H * k) / (b.w * b.h) };
+  }).sort((a, b) => b.used - a.used);
+  const box = fits[0];
+
+  const cw = Math.max(1, Math.round(W * box.k)), ch = Math.max(1, Math.round(H * box.k));
+  const ox = Math.floor((box.w - cw) / 2), oy = Math.floor((box.h - ch) / 2);
+  const sw = Math.max(1, Math.round(w * box.k)), sh = Math.max(1, Math.round(h * box.k));
+  const sx = ox + Math.round(x * box.k), sy = oy + Math.round(y * box.k);
+
+  const plate = (r: number, g: number, b: number, alpha: number, width: number, height: number) =>
+    sharp({ create: { width, height, channels: 4, background: { r, g, b, alpha } } }).png().toBuffer();
+  const scaled = await sharp(buf).resize(sw, sh, { fit: "fill" }).png().toBuffer();
+  const canvas = await sharp(await plate(0, 0, 0, 0, box.w, box.h)).composite([{ input: scaled, left: sx, top: sy }]).png().toBuffer();
+  // Black = keep. White only over the preset's new margin: the letterbox bars stay black because they are cropped away.
+  const mask = await sharp(await plate(0, 0, 0, 1, box.w, box.h)).composite([
+    { input: await plate(255, 255, 255, 1, cw, ch), left: ox, top: oy },
+    { input: await plate(0, 0, 0, 1, sw, sh), left: sx, top: sy },
+  ]).png().toBuffer();
+
+  return {
+    image: `data:image/png;base64,${canvas.toString("base64")}`,
+    mask: `data:image/png;base64,${mask.toString("base64")}`,
+    aspectRatio: box.ratio,
+    crop: { left: ox, top: oy, width: cw, height: ch },
+    out: { width: W, height: H },
+  };
+}
+
+/** The model's answer cut back to the preset's canvas at its real size, so the editor can place it like any outpaint. */
+export async function cropOutpaintResult(image: string, c: OutpaintCanvas): Promise<string | null> {
+  const buf = dataUrlBuffer(image);
+  if (!buf) return null;
+  const { width = 0, height = 0 } = await sharp(buf).metadata();
+  if (!width || !height) return null;
+  // The API answers at the requested box; if it ever answers at another scale, the crop follows that scale.
+  const kx = width / (c.crop.left * 2 + c.crop.width), ky = height / (c.crop.top * 2 + c.crop.height);
+  const out = await sharp(buf)
+    .extract({
+      left: Math.min(width - 1, Math.round(c.crop.left * kx)),
+      top: Math.min(height - 1, Math.round(c.crop.top * ky)),
+      width: Math.max(1, Math.min(width - Math.round(c.crop.left * kx), Math.round(c.crop.width * kx))),
+      height: Math.max(1, Math.min(height - Math.round(c.crop.top * ky), Math.round(c.crop.height * ky))),
+    })
+    .resize(c.out.width, c.out.height, { fit: "fill" })
+    .png()
+    .toBuffer();
+  return `data:image/png;base64,${out.toString("base64")}`;
+}
+
 async function expandBria(grant: Awaited<ReturnType<typeof grantFor>>, image: string, prompt: string, preset: OutpaintPreset): Promise<GenerativeFillResult> {
   const buf = dataUrlBuffer(image);
   if (!buf) return { ok: false, error: "invalid_image" };

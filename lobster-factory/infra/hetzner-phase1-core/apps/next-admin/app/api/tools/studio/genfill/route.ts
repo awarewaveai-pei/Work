@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
-import { CONTEXT_FILL_PROMPT, generativeFill, imageSize, isFillTool, OUTPAINT_PRESETS, type OutpaintPreset } from "../../../../../lib/studio/generative-fill";
+import { CONTEXT_FILL_PROMPT, cropOutpaintResult, generativeFill, imageSize, isFillTool, outpaintCanvas, OUTPAINT_PRESETS, type OutpaintPreset } from "../../../../../lib/studio/generative-fill"
+import { outpaintFrame } from "../../../../../lib/studio/outpaint-presets";
 import { generateTarotImage } from "../../../../../lib/tarot/image-gen";
 import { isStudioModel, modelsFor, nearestAspectRatio } from "../../../../../lib/studio/model-options";
 import { holdCost, logImageCost, releaseHold } from "../../../../../lib/ai/log-ai-call";
@@ -69,18 +70,38 @@ async function handlePost(request: Request, grant: Grant) {
   if (!modelsFor(hasOutpaint ? "outpaint" : "fill").some((m) => m.value === model)) {
     return NextResponse.json({ ok: false, error: "invalid_model" }, { status: 400 });
   }
+  // A preset that adds no canvas (補成正方形 on an already-square image) is a paid no-op on every model: refuse it
+  // before any hold. Found by lib/studio/__tests__/outpaint-canvas.test.ts, 2026-11-14.
+  if (hasOutpaint) {
+    const src = await imageSize(body.image);
+    const f = src ? outpaintFrame(body.outpaint as OutpaintPreset, src.width, src.height) : null;
+    if (!src || !f) return NextResponse.json({ ok: false, error: "invalid_image" }, { status: 400 });
+    if (Math.round(f.W) <= src.width && Math.round(f.H) <= src.height) {
+      return NextResponse.json({ ok: false, error: "nothing_to_outpaint" });
+    }
+  }
   const jobId = typeof body._jobId === "string" ? body._jobId : null;
   const prompt = body.prompt?.trim() || CONTEXT_FILL_PROMPT;
 
   // An OpenAI image model edits with the mask through the shared engine, which holds, settles on the reported usage and logs.
   if (isStudioModel(model)) {
-    const size = await imageSize(body.image);
+    // 擴圖: these models have no `outpaint` input, so the extended canvas and its mask are built here and the model
+    // simply fills the transparent margin. 生成填色 passes the caller's own image and mask through unchanged.
+    const built = hasOutpaint ? await outpaintCanvas(body.image, body.outpaint as OutpaintPreset) : null;
+    if (hasOutpaint && !built) return NextResponse.json({ ok: false, error: "invalid_image" }, { status: 400 });
+    const image = built?.image ?? body.image;
+    const size = await imageSize(image);
     if (!size) return NextResponse.json({ ok: false, error: "invalid_image" }, { status: 400 });
     const r = await generateTarotImage({
-      model, prompt, referenceImages: [body.image], mask: body.mask, aspectRatio: nearestAspectRatio(size.width, size.height),
+      model, prompt, referenceImages: [image], mask: built?.mask ?? body.mask,
+      // An outpaint asks for the box its canvas was letterboxed into; anything else comes back a different shape.
+      aspectRatio: built?.aspectRatio ?? nearestAspectRatio(size.width, size.height),
       costLog: { route: ROUTE, tool: "canvas", jobId },
     }, grant);
-    return NextResponse.json(r.ok === false ? { ok: false, error: r.error } : { ok: true, image: r.image });
+    if (r.ok === false) return NextResponse.json({ ok: false, error: r.error });
+    const finished = built ? await cropOutpaintResult(r.image, built) : r.image;
+    if (!finished) return NextResponse.json({ ok: false, error: "genfill_failed" });
+    return NextResponse.json({ ok: true, image: finished });
   }
   if (!isFillTool(model)) return NextResponse.json({ ok: false, error: "invalid_model" }, { status: 400 });
 

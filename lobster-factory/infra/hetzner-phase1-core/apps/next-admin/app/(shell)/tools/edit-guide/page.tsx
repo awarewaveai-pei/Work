@@ -105,7 +105,7 @@ export default function EditGuidePage() {
 
         <p style={{ ...p0, fontSize: 15 }}>
           這一頁回答五件事：按鈕怎麼挑、指令怎麼打、要打中文還是英文、什麼時候可以不打字、一次多少錢。
-          底下 36 張圖全部是真的跑出來的，每一張都標了是哪顆鈕、花多少錢、打了什麼字。
+          底下 40 張圖全部是真的跑出來的，每一張都標了是哪顆鈕、花多少錢、打了什麼字。
         </p>
 
         {/* ---------- 怎麼用 ---------- */}
@@ -150,9 +150,14 @@ export default function EditGuidePage() {
           ])}
         />
         <p style={{ ...p0, fontSize: 14 }}>
-          另外兩個面板各只有一組按鈕。<b>去除不要的部分</b>用 {labelOf("bria-eraser")}（{price("bria-eraser")}，只清掉東西、不會順手加東西，不用打字）。
-          <b>擴圖</b>用 {labelOf("bria-expand")}（{price("bria-expand")}，尺寸精準）和 {labelOf("flux-fill-pro")}（{price("flux-fill-pro")}）。
+          <b>去除不要的部分</b>只有一顆鈕：{labelOf("bria-eraser")}（{price("bria-eraser")}，只清掉東西、不會順手加東西，不用打字）。
         </p>
+        <h3 style={h3}>🔲 擴圖（把畫布往外長）</h3>
+        <Table
+          head={["按鈕", "每次", "什麼時候用"]}
+          rows={modelsFor("outpaint").map((m) => [m.label, `NT$${nt(m.usd).toFixed(2)}`, m.note])}
+        />
+        <p style={{ ...p0, fontSize: 14 }}>擴圖的結果本來就會放成新圖層，原圖留在下面。三顆的差別看第十節。</p>
         <Note>
           中間那兩欄不是我的意見，是跑出來的：<b>可以不打字</b>看第六節，<b>打哪一種語言</b>看第七節。
           畫布上的按鈕也印了同樣的字，所以在裡面不用回來查這一頁。
@@ -267,8 +272,23 @@ export default function EditGuidePage() {
         </Grid>
         <Note>三顆之中兩顆把字改壞了，剩下那顆字是保住了，但筆觸被抹平。這就是第一節那句話的來源：<b>圖上有字就別整張改</b>。</Note>
 
+        <h2 style={h2}>十、實測六：擴圖，三顆鈕的差別</h2>
+        <p style={p0}>
+          把直式的牌往左右各擴一段，變成橫的 16:9。三顆鈕都給同一句英文指令「照原本的背景往外畫，不要加新東西」：
+        </p>
+        <Grid min={230}>
+          <Run src="i-src" model="原圖" verdict="src" note="直式，896×1485。" />
+          <Run src="i-bria" model={labelOf("bria-expand")} cost={price("bria-expand")} verdict="good" note="牌完全沒動，左右的漩渦接得自然。" prompt="（不用打字）" />
+          <Run src="i-flux-fill" model={labelOf("flux-fill-pro")} cost={price("flux-fill-pro")} verdict="bad" note="左右各自己多畫了一張塔羅牌。" prompt="照原本的背景往外畫，不要加新東西（英文）" />
+          <Run src="i-gpt26" model={labelOf("openai-26-edit")} cost={price("openai-26-edit")} verdict="good" note="牌沒動，背景乾淨延伸，沒有多畫東西。" prompt="照原本的背景往外畫，不要加新東西（英文）" />
+        </Grid>
+        <Note>
+          擴圖先按 {labelOf("bria-expand")}，它最穩又最便宜。{labelOf("flux-fill-pro")} 會自己加東西，要盯著看。
+          另外試過 Luma Reframe，同一張圖連試三次都回同一個錯誤，所以沒有收進來。
+        </Note>
+
         {/* ---------- 錢 ---------- */}
-        <h2 style={h2}>十、錢的規則</h2>
+        <h2 style={h2}>十一、錢的規則</h2>
         <Table
           head={["情況", "扣款"]}
           firstCol={230}
@@ -289,7 +309,7 @@ export default function EditGuidePage() {
         </Note>
 
         <p style={{ fontSize: 13.5, ...muted, borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 36 }}>
-          36 張圖全部是 2026-11-09 在同一張塔羅牌上真的跑出來的，沒有示意圖。
+          40 張圖全部是 2026-11-09 在同一張塔羅牌上真的跑出來的，沒有示意圖。
           價格是 Replicate 當天牌價換算新台幣（1 美元 = 32 元）。
           模型規格見 <Link href="/tools/ai-models?tab=image-specs" style={{ color: "var(--accent-text)" }}>AI Models</Link>，
           面板在 <Link href="/tools/photo-pro" style={{ color: "var(--accent-text)" }}>畫布（專業版）</Link>。
