@@ -44,8 +44,8 @@ async function status({ id, env, fetchImpl }) {
   if (s === "failed") return { status: s, error: "影片供應商狀態：" + p.status + (p.error ? "（" + String(p.error).slice(0, 200) + "）" : "") };
   if (s !== "succeeded") return { status: s };
   const outputUrl = Array.isArray(p.output) ? p.output[0] : p.output;
-  // Only Replicate's delivery host, https only (bg-remove.cjs / next-admin image-gen.ts isAllowedOutputUrl).
-  if (typeof outputUrl !== "string" || !/^https:\/\/([a-z0-9-]+\.)*replicate\.delivery\//.test(outputUrl))
+  // Only a Replicate output host, https only (replicate-run.cjs isReplicateOutputUrl = next-admin lib/ai/replicate-output.ts).
+  if (!require("./replicate-run.cjs").isReplicateOutputUrl(outputUrl))
     return { status: "failed", error: "影片結果網址不在允許範圍" };
   return { status: s, output: outputUrl };
 }

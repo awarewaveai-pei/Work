@@ -5,6 +5,9 @@
 //   2. a run this server stops waiting for (timeout, cancel, lost connection, restart) is cancelled at Replicate.
 // The handover is claimed synchronously in takeOver(): two jobs sent at once cannot both see the same earlier run.
 const API = "https://api.replicate.com/v1";
+// The allowed output hosts: next-admin lib/ai/replicate-output.ts, the one list for both apps (awarewave-files.txt).
+const path = require("node:path");
+const { isReplicateOutputUrl } = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/replicate-output.ts"));
 const RUNNING = ["starting", "processing"];
 
 const wait = (ms, signal) =>
@@ -68,11 +71,11 @@ async function runPrediction({ call, auth, create, resumeId, label, pollMs, sign
   return prediction;
 }
 
-/** The first output url, only from Replicate's delivery host over https (the url comes from a provider reply). */
+/** The first output url, only from a Replicate output host over https (the url comes from a provider reply). */
 function deliveryUrl(prediction, label) {
   const url = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-  if (typeof url !== "string" || !/^https:\/\/replicate\.delivery\//.test(url)) throw Error(label + "結果網址不在允許範圍");
+  if (!isReplicateOutputUrl(url)) throw Error(label + "結果網址不在允許範圍");
   return url;
 }
 
-module.exports = { API, cancelPrediction, takeOver, runPrediction, deliveryUrl };
+module.exports = { API, cancelPrediction, takeOver, runPrediction, deliveryUrl, isReplicateOutputUrl };

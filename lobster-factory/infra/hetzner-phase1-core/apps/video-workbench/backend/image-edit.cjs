@@ -83,7 +83,7 @@ const pngSize = (buffer) => (buffer.subarray(1, 4).toString() === "PNG" ? { widt
 const mp = (s) => (s ? (s.width * s.height) / 1e6 : 1);
 
 // Replicate through replicate-run.cjs (one rule for every paid run: a run this job stops waiting for is cancelled there).
-// Created async (no Prefer: wait), so the output is always a replicate.delivery url, never a data: uri.
+// Created async (no Prefer: wait), so the output is always an output-host url (replicate-run.cjs deliveryUrl), never a data: uri.
 async function replicate(call, input, { env, fetchImpl, signal, onPrediction }) {
   const auth = { Authorization: "Bearer " + env.REPLICATE_API_TOKEN };
   const deadline = AbortSignal.timeout(170_000), abort = signal ? AbortSignal.any([signal, deadline]) : deadline;

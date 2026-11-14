@@ -140,8 +140,8 @@ async function trellis({ file, mime, env, fetchImpl, signal, resumeId, beforeCal
   };
   const result = async (prediction) => {
     const url = prediction.output?.model_file;
-    // Only Replicate's delivery host, https only: the url comes from a provider reply (same rule as bg-remove.cjs).
-    if (typeof url !== "string" || !/^https:\/\/replicate\.delivery\//.test(url)) throw Error("TRELLIS 結果網址不在允許範圍");
+    // Only a Replicate output host, https only: the url comes from a provider reply (replicate-run.cjs isReplicateOutputUrl).
+    if (!require("./replicate-run.cjs").isReplicateOutputUrl(url)) throw Error("TRELLIS 結果網址不在允許範圍");
     // Billed per second of predict_time (cost-model.ts replicateRunUsd); without it the estimate stands (usdOf).
     const seconds = Number(prediction.metrics?.predict_time);
     return {

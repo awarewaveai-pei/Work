@@ -1,4 +1,5 @@
 import { providerUrl } from "@/lib/ai/gateway";
+import { isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import type { Grant } from "@/lib/entitlements/can";
 
 /**
@@ -86,10 +87,10 @@ export async function runReplicate(grant: Grant, run: ReplicateRun): Promise<Rep
 
     const out = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
     if (!out) return { ok: false, error: "no_output" };
-    // Replicate proxies outputs through replicate.delivery; sync mode may return a data URI.
+    // Outputs come from Replicate's output hosts (lib/ai/replicate-output.ts); sync mode may return a data URI.
     const predictSec = prediction.metrics?.predict_time;
     if (out.startsWith("data:image/")) return { ok: true, image: out, predictSec };
-    if (!/^https:\/\/replicate\.delivery\//.test(out)) return { ok: false, error: "output_url_not_allowed" };
+    if (!isReplicateOutputUrl(out)) return { ok: false, error: "output_url_not_allowed" };
     try {
       const dl = await fetch(out, { signal: controller.signal });
       if (!dl.ok) return { ok: false, error: `fetch_output_failed_${dl.status}` };

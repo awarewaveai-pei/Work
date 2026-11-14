@@ -11,6 +11,7 @@
 import { putDesignObject } from "../storage/r2";
 import { randomUUID } from "node:crypto";
 import { providerUrl } from "@/lib/ai/gateway";
+import { isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import { grantFor } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { holdCost, logImageCost, releaseHold } from "@/lib/ai/log-ai-call";
@@ -122,7 +123,7 @@ async function runOnePass(
     return { ok: false, error: prediction.error ? String(prediction.error).slice(0, 200) : "upscale_failed" };
   }
   const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-  if (!outputUrl || !/^https:\/\/replicate\.delivery\//.test(outputUrl)) {
+  if (!isReplicateOutputUrl(outputUrl)) {
     return { ok: false, error: "output_url_not_allowed" };
   }
   return { ok: true, outputUrl };

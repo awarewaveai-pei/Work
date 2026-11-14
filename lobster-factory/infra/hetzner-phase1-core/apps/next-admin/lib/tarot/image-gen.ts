@@ -14,6 +14,7 @@ import sharp from "sharp";
 import { getDesignsPublicBase } from "../storage/r2";
 import { MODEL_SPECS } from "./model-specs";
 import { providerUrl } from "@/lib/ai/gateway";
+import { isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import type { Grant } from "@/lib/entitlements/can";
 import { holdCost, logImageResult } from "@/lib/ai/log-ai-call";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
@@ -320,15 +321,6 @@ function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null 
 
 const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
 
-// Only fetch generated images from Replicate's own delivery hosts (SSRF guard).
-export function isAllowedOutputUrl(raw: string): boolean {
-  try {
-    const u = new URL(raw);
-    return u.protocol === "https:" && (u.hostname === "replicate.delivery" || u.hostname.endsWith(".replicate.delivery"));
-  } catch {
-    return false;
-  }
-}
 
 // Inbound reference images may arrive as our own My Designs picks — public R2 URLs
 // (Replicate models fetch those directly; gpt-image-1 needs raw bytes). Only the
@@ -387,7 +379,7 @@ async function ownDesignUrlToBlob(
 }
 
 async function urlToDataUrl(url: string, signal: AbortSignal): Promise<string> {
-  if (!isAllowedOutputUrl(url)) throw new Error("output_url_not_allowed");
+  if (!isReplicateOutputUrl(url)) throw new Error("output_url_not_allowed"); // Replicate output hosts only (SSRF guard)
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`fetch_output_failed_${res.status}`);
   const declared = Number(res.headers.get("content-length") ?? "0");

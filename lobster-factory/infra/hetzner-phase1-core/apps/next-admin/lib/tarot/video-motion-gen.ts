@@ -9,7 +9,8 @@
  * slug 登錄在 lib/ai/cost-model.ts MEDIA_MODELS，價格在同檔 VIDEO_MOTION_RATES。
  */
 
-import { fetchWithRetry429, REPLICATE_POLL_MS, isAllowedOutputUrl } from "./image-gen";
+import { fetchWithRetry429, REPLICATE_POLL_MS } from "./image-gen";
+import { isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
 import { MOTION_MODELS, type VideoMotionModel } from "@/lib/ai/video-motion-models";
@@ -89,7 +90,7 @@ export async function generateVideoMotion(
     if (!outUrl) return { ok: false, error: "replicate_empty_output" };
     // SSRF 防線同 image-gen.ts：只信 Replicate 自己的 delivery host（雖然 outUrl 來自 Replicate JSON
     // 回應非直接使用者輸入，仍照既有慣例守，不因「來源看起來安全」就跳過。
-    if (!isAllowedOutputUrl(outUrl)) return { ok: false, error: "output_url_not_allowed" };
+    if (!isReplicateOutputUrl(outUrl)) return { ok: false, error: "output_url_not_allowed" };
 
     const fileRes = await fetch(outUrl, { signal: controller.signal });
     if (!fileRes.ok) return { ok: false, error: `replicate_download_${fileRes.status}` };

@@ -32,6 +32,9 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
   ff(["-f", "lavfi", "-i", "color=c=white:s=40x20,format=rgba", "-vf", "geq=r=255:g=255:b=255:a='if(lt(X,20),0,255)'", "-frames:v", "1", maskFile]);
   const calls = [];
   let hang = false;
+  // The output url the next Replicate run answers (an official model by name answered with a Replicate R2 bucket url, 2026-11-14).
+  const R2_OUT = "https://ai-gateway-outputs.0d37909e38d3e99c29fa2cd343ac421a.r2.cloudflarestorage.com/provider-outputs/a/b?X-Amz-Signature=x";
+  let outputUrl = "https://replicate.delivery/x/out.png";
   const geminiUsage = { total_input_tokens: 300, total_output_tokens: 1937, total_thought_tokens: 654, output_tokens_by_modality: [{ modality: "image", tokens: 1680 }] };
   const server = createServer({
     dataDir: dir,
@@ -39,10 +42,10 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
     fetchImpl: async (url, options = {}) => {
       calls.push({ url, body: options.body });
       // hang = the next run stays "processing" until the job is cancelled (rule 2 of replicate-run.cjs).
-      if (/^https:\/\/api\.replicate\.com\/v1\/(models\/.+\/)?predictions$/.test(url)) return Response.json(hang ? { id: "p-hang", status: "processing" } : { id: "p1", status: "succeeded", output: "https://replicate.delivery/x/out.png" });
+      if (/^https:\/\/api\.replicate\.com\/v1\/(models\/.+\/)?predictions$/.test(url)) return Response.json(hang ? { id: "p-hang", status: "processing" } : { id: "p1", status: "succeeded", output: outputUrl });
       if (url === "https://api.replicate.com/v1/predictions/p-hang") return Response.json({ id: "p-hang", status: "processing" });
       if (url === "https://api.replicate.com/v1/predictions/p-hang/cancel") return Response.json({ id: "p-hang", status: "canceled" });
-      if (url === "https://replicate.delivery/x/out.png") return new Response(red);
+      if (url === "https://replicate.delivery/x/out.png" || url === R2_OUT) return new Response(red);
       if (url.endsWith("/v1beta/interactions")) return Response.json({ steps: [{ content: [{ type: "image", mime_type: "image/png", data: red.toString("base64") }] }], usage: geminiUsage });
       if (url.endsWith("/images/edits")) return Response.json({ data: [{ b64_json: red.toString("base64") }], usage: { input_tokens: 900, input_tokens_details: { text_tokens: 100, image_tokens: 800 }, output_tokens: 1500 } });
       throw Error("unexpected call " + url);
@@ -105,7 +108,18 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
     assert.equal(nanoBody.response_format.aspect_ratio, catalog.nearestAspectRatio(40, 20));
     assert.deepEqual([nano.job.result.width, nano.job.result.height], [2048, 1024]);
     assert.equal(nano.job.result.origin.costUsd, costs.geminiImageUsd("gemini-nano-banana-2.1", "2K", geminiUsage));
-    console.log("PASS ideogram (black mask), flux fill (white mask), klein (no mask), gpt 2.6 (alpha mask), Nano Banana 2K (no mask): only the box changes; charged");
+    // The R2 output host Replicate answers with is downloaded and charged; a foreign host is refused, and nothing is fetched from it.
+    outputUrl = R2_OUT;
+    const r2 = await runRow("flux-2-klein-4b");
+    assert(r2.sent.some((c) => c.url === R2_OUT), "downloaded from the R2 output host");
+    assert(r2.job.result.origin.costUsd > 0);
+    outputUrl = "https://ai-gateway-outputs.someone-else.r2.cloudflarestorage.com/x.png";
+    const foreign = await poll(await (await post("/generations", { type: "image", operation: "region", prompt: "區域 1：改紅", settings: { ...settings, model: "flux-2-klein-4b" }, references: { images: [image] }, mask })).json());
+    assert.equal(foreign.status, "failed");
+    assert.match(foreign.error, /網址不在允許範圍/);
+    assert(!calls.some((c) => c.url === outputUrl), "nothing fetched from a foreign host");
+    outputUrl = "https://replicate.delivery/x/out.png";
+    console.log("PASS ideogram (black mask), flux fill (white mask), klein (no mask), gpt 2.6 (alpha mask), Nano Banana 2K (no mask): only the box changes; charged; an R2 output host downloads and charges, a foreign host is refused");
 
     // A job cancelled while its Replicate run is still processing cancels that run at Replicate (it would keep billing).
     hang = true;
