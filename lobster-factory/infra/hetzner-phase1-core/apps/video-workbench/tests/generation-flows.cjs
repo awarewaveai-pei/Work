@@ -174,7 +174,8 @@ const fs = require("node:fs"), os = require("node:os"), path = require("node:pat
     assert.match(region.mask, /^\/generated\/[\w-]+\.png$/);
     assert(region.selection.regions[0].w > 0);
     assert(region.selection.regions[0].h > 0);
-    assert.match(region.prompt, /區域 1.*花朵改為淺藍色/);
+    // The page sends the raw texts; the server builds each model's instruction (backend/image-edit.cjs instructionText).
+    assert.deepEqual(region.instructions, { global: "", regions: ["花朵改為淺藍色"] });
     await tools.getByRole('button', { name: '關閉', exact: true }).last().click();
     await tools.getByRole('button', { name: '刪除區域 1', exact: true }).click();
     assert.equal(await tools.locator('.region-selection').count(), 0);

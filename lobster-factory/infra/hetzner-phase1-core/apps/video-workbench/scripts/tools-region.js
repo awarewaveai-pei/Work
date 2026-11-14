@@ -19,14 +19,13 @@ const regionSize = (m = regionModel()) => (m ? (m.sizes.includes(values.regionQu
 const regionGlobal = () => String(values.regionPrompt || "").trim();
 // Boxes without an instruction while there is no 整體指令 to stand in for them.
 const regionMissing = () => (regionGlobal() ? 0 : regionList().filter((a) => !String(a.prompt || "").trim()).length);
-function regionInstructionsPrompt() {
+// The raw texts the server turns into the model's instruction (backend/image-edit.cjs instructionText: with or without
+// the boxes' coordinates, by whether the model takes a mask). Same guard as the red line, before anything is uploaded.
+function regionInstructions() {
   const global = regionGlobal(), areas = regionList();
-  if (!areas.length) {
-    if (!global) throw Error("請框選區域並填寫指令，或填寫整體指令");
-    return global;
-  }
+  if (!areas.length && !global) throw Error("請框選區域並填寫指令，或填寫整體指令");
   if (regionMissing()) throw Error(`還有 ${regionMissing()} 個區域沒有填寫指令，請補上或填寫整體指令`);
-  return [global, ...areas.map((area, i) => `區域 ${i + 1}（圖片左上角起算，x=${Math.round(area.x * 100)}%、y=${Math.round(area.y * 100)}%、寬=${Math.round(area.w * 100)}%、高=${Math.round(area.h * 100)}%）：${String(area.prompt || "").trim() || global}`), "只修改選取區域，保留其他內容。"].filter(Boolean).join("\n");
+  return { global, regions: areas.map((a) => String(a.prompt || "").trim()) };
 }
 function regionScreen() {
   const image = files.image, areas = regionList(), c = regionCaps(), m = regionModel(), size = regionSize(m);
@@ -197,7 +196,7 @@ function setupRegionCanvas() {
 // The job's input: the source as a PNG, the mask (transparent = the boxes; all transparent = no boxes, the whole image),
 // and the settings the server prices and runs (backend/image-edit.cjs request() records model + size).
 async function regionJobInput() {
-  const prompt = regionInstructionsPrompt(), m = regionModel();
+  const instructions = regionInstructions(), m = regionModel();
   if (!m) throw Error("圖片編輯模型尚未載入，請稍候再試");
   const image = new Image();
   image.src = files.image.url;
@@ -215,7 +214,7 @@ async function regionJobInput() {
   for (const r of regionList()) ctx.clearRect(r.x * canvas.width, r.y * canvas.height, r.w * canvas.width, r.h * canvas.height);
   const mask = (await VideoWorkbench.request("/uploads", { name: "region-mask.png", data: canvas.toDataURL("image/png") })).url;
   return {
-    prompt, mask, references: { images: [reference] },
+    prompt: instructions.global, instructions, mask, references: { images: [reference] },
     settings: { ...values, imageLayout: "region-preserve", model: m.id, quality: regionSize(m), regionWidth: image.naturalWidth, regionHeight: image.naturalHeight },
   };
 }

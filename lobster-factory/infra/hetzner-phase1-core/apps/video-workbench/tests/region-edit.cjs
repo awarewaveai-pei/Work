@@ -139,6 +139,25 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
     hang = false;
     console.log("PASS a region run's replicateId is recorded; a restart and a mid-poll cancel both cancel it at Replicate");
 
+    // The instruction each row is sent, built on the server from the page's raw texts (instructions + selection).
+    const sentPrompt = async (model, body) => {
+      const from = calls.length, job = await poll(await (await post("/generations", { type: "image", operation: "region", settings: { ...settings, model }, references: { images: [image] }, mask, ...body })).json());
+      assert.equal(job.status, "succeeded", model + ": " + job.error);
+      const c = calls.slice(from).find((x) => /\/predictions$/.test(x.url));
+      return JSON.parse(c.body).input.prompt;
+    };
+    const box = { selection: { regions: [{ x: 0, y: 0, w: 0.5, h: 1, prompt: "改成滿天星星的夜空" }] }, instructions: { global: "", regions: ["改成滿天星星的夜空"] } };
+    assert.equal(await sentPrompt("ideogram-4-5-edit-low", { prompt: "", ...box }), "改成滿天星星的夜空", "mask row: the sentence only");
+    assert.equal(await sentPrompt("flux-2-klein-4b", { prompt: "", ...box }), "區域 1（圖片左上角起算，x=0%、y=0%、寬=50%、高=100%）：改成滿天星星的夜空\n只修改選取區域，保留其他內容。", "no-mask row: the box named");
+    const both = { selection: { regions: [{ x: 0, y: 0, w: 0.5, h: 1 }] }, instructions: { global: "整體偏暖", regions: [""] } };
+    assert.equal(await sentPrompt("ideogram-4-5-edit-low", { prompt: "整體偏暖", ...both }), "整體偏暖", "an empty box sentence: 整體指令 stands in");
+    const composed = "區域 1（圖片左上角起算，x=0%、y=0%、寬=50%、高=100%）：改紅\n只修改選取區域，保留其他內容。";
+    assert.equal(await sentPrompt("ideogram-4-5-edit-low", { prompt: composed, selection: box.selection }), composed, "an old job's composed prompt runs as it was");
+    const n = calls.length, mismatch = await post("/generations", { type: "image", operation: "region", prompt: "", settings: { ...settings, model: "ideogram-4-5-edit-low" }, references: { images: [image] }, mask, selection: box.selection, instructions: { global: "", regions: [] } });
+    assert.equal(mismatch.status, 400);
+    assert.equal(calls.length, n);
+    console.log("PASS instruction by row: mask rows get the sentence only, no-mask rows get the boxes named; old composed prompts run as they were");
+
     // 4 (server). An old job's settings (no model, 2K) run the default row at 1K; a model outside the catalog is refused.
     const old = await poll(await (await post("/generations", { type: "image", operation: "region", prompt: "整張變亮", settings: { ...settings, quality: "2K" }, references: { images: [image] }, mask })).json());
     assert.equal(old.status, "succeeded", old.error);
@@ -223,9 +242,8 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
     const isFill = (c) => /\/predictions$/.test(c.url) && JSON.parse(c.body).version === MEDIA_MODELS["black-forest-labs/flux-fill-pro"].version;
     for (let i = 0; i < 100 && calls.slice(posts).filter(isFill).length < 1; i++) await p.waitForTimeout(100);
     const text = JSON.parse(calls.slice(posts).filter(isFill).at(-1).body).input.prompt;
-    assert.match(text, /區域 1.*花朵改為淺藍色/);
-    assert.match(text, /區域 2.*把車改成紅色/);
-    assert.match(text, /區域 3.*加一隻小鳥/);
+    // FLUX Fill Pro takes a mask: the three sentences only, no coordinates and no 「區域 N」 (image-edit.cjs instructionText).
+    assert.equal(text, ["花朵改為淺藍色", "把車改成紅色", "加一隻小鳥"].join(String.fromCharCode(10)));
     assert.deepEqual(errors, []);
     console.log("PASS draw a box -> popover, 5000 counter, 完成, then the job carries all three instructions");
   } finally {

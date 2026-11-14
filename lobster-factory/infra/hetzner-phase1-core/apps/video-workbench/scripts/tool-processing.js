@@ -65,9 +65,10 @@ async function submitTool() {
     let prompt = tool === "voice" ? val("voiceText") : tool === "music" ? val("musicPrompt") : "",
       references = files,
       settings = values,
-      mask;
+      mask,
+      instructions;
     // The region tool's prompt, source, mask and model settings: scripts/tools-region.js.
-    if (tool === "region") ({ prompt, references, settings, mask } = await regionJobInput());
+    if (tool === "region") ({ prompt, references, settings, mask, instructions } = await regionJobInput());
     // paid: video.image (the region tool; the other tools reaching here run locally)
     const job = await VideoWorkbench.generations.create({
       type,
@@ -77,6 +78,7 @@ async function submitTool() {
       references,
       mask,
       selection,
+      ...(instructions ? { instructions } : {}),
     });
     VideoWorkbench.showJob(job);
   } catch (e) {
