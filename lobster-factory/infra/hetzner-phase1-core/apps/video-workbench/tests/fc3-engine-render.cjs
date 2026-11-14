@@ -109,6 +109,20 @@ function request(port, pathname, headers, body) {
     assert.equal(calls.jobs.at(-1).kind, "render");
     console.log("PASS render -> one succeeded job, ledger sources = the two inputs, release text = title + two lines");
 
+    // Card VD.1: the finished video carries free cover candidates the server actually serves (images live under /generated).
+    assert.ok(job.result.covers?.length >= 1, "成片有封面候選：" + JSON.stringify(job.result.coverError));
+    for (const c of job.result.covers) {
+      assert.match(c.url, /^\/generated\/[a-f0-9-]+\.jpg$/);
+      assert.equal(c.kind, "auto");
+      const got = await new Promise((resolve, reject) => http.get({ host: "127.0.0.1", port, path: c.url, headers: who() }, (res) => {
+        res.resume();
+        res.on("end", () => resolve({ status: res.statusCode, type: res.headers["content-type"] }));
+      }).on("error", reject));
+      assert.equal(got.status, 200, c.url);
+      assert.match(String(got.type), /^image\/jpeg/);
+    }
+    console.log("PASS render -> cover candidates served as /generated/<uuid>.jpg");
+
     // 2. No source list -> 400 before anything is stored (rights guard).
     const before = { assets: calls.assets.length, jobs: jobsOnDisk().length };
     for (const sources of [undefined, []]) {

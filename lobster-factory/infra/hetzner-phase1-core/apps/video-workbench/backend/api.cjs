@@ -65,6 +65,33 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     const asset = assets && /^\/(assets|examples)\/([\w.-]+)$/.exec(url || "");
     return asset ? path.join(__dirname, "..", asset[1], asset[2]) : null;
   }
+  // Card VD.1: free cover candidates for a finished video (backend/cover.cjs), kept as /generated/<uuid>.jpg like every
+  // image (server.cjs serves images only there; /media/ holds only the media-store layout).
+  // Invariant: covers never decide the video's outcome and never move it: they get at most COVER_MS and always end
+  // COVER_SLACK_MS before the job's deadlineAt (the browser stops watching a job at that time, shared/runtime.js), stop
+  // on cancel, and every stop or failure is only result.coverError. The caller decides the job's state (a cancel wins).
+  // (the numbers: backend/cover.cjs coverBudget)
+  async function addCovers(job, { width, height, duration, title, signal }) {
+    const budget = require("./cover.cjs").coverBudget(job.deadlineAt, Date.now());
+    if (!budget) {
+      job.result.coverError = "影片完成時已接近時限，這次沒有自動產生封面；可在送審頁上傳封面。";
+      return;
+    }
+    try {
+      const made = await require("./cover.cjs").autoCovers(
+        { file: localFile(job.result.url), duration, width, height, title, dir: outputs, signal: signal ? AbortSignal.any([AbortSignal.timeout(budget), signal]) : AbortSignal.timeout(budget) },
+        { run: mediaTools.run, fontDir: require("./editor-export.cjs").fontDir },
+      );
+      job.result.covers = made.map((m) => {
+        const name = crypto.randomUUID() + ".jpg";
+        fs.renameSync(m.file, path.join(outputs, name));
+        return { url: "/generated/" + name, kind: "auto", at: Math.round(m.t * 1000) / 1000 };
+      });
+      delete job.result.coverError;
+    } catch (e) {
+      job.result.coverError = publicError(e.message);
+    }
+  }
   // P6 L3: a finished file goes to the main system's asset ledger (sources = every local url in the job input).
   async function register(url, origin, { sources = [], costUsd, jobId, ratio } = {}) {
     const file = localFile(url);
@@ -637,6 +664,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           fs.rmSync(generated, { force: true });
           if (signal.aborted) return;
           job.result = { url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl, width: result.width, height: result.height, verification: result.verification, origin: exportOrigin(job) };
+          await addCovers(job, { width: result.width, height: result.height, duration: stored.probe?.duration, title: job.input.settings?.project?.title, signal });
+          if (job.status === "cancelled") return; // cancelled while the covers were made: the cancel wins, as everywhere
           job.progress = 100;
           job.status = "succeeded";
           persist();
@@ -1169,6 +1198,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       verification: { ok: true, findings: [] },
       origin: { kind: "render", engine: meta.engine, engineVersion: meta.engineVersion, jobId: job.id, costUsd: 0 },
     };
+    // A transparent clip is a layer for the timeline, not a deliverable: no cover.
+    if (!meta.alpha) await addCovers(job, { width, height, duration: verification.info.duration, title: meta.title });
     jobs.push(job);
     persist();
     await settle(job);
