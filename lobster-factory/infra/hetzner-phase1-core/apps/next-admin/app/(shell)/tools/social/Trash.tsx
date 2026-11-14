@@ -12,6 +12,18 @@ import { shortDate, STATE_NAMES, zoned, type Account, type Post } from "./model"
 
 export type Deletions = Record<string, { actor: string; from: string | null }>;
 
+/** 永久刪除 one or many: one purge call per post, so the server checks each on its own (route -> assertCanPurge ->
+ *  purgePost's own DELETE guard); one refused does not stop the rest, and the line names which ones were refused. */
+export async function purgeEach(posts: Post[], purgeOne: (post: Post) => Promise<unknown>): Promise<{ text: string; error: boolean }> {
+  const refused: Array<{ post: Post; why: string }> = [];
+  for (const post of posts) {
+    try { await purgeOne(post); } catch (e) { refused.push({ post, why: e instanceof Error ? e.message : String(e) }); }
+  }
+  const done = posts.length - refused.length;
+  if (!refused.length) return { text: `已永久刪除 ${done} 則。`, error: false };
+  return { text: `已永久刪除 ${done} 則；${refused.length} 則沒刪掉：${refused.map((r) => `「${titleOf(r.post).slice(0, 20)}」${r.why}`).join("；")}`, error: true };
+}
+
 const when = (iso: string | null, tz: string) => { if (!iso) return ""; const z = zoned(iso, tz); return `${shortDate(z.date)} ${z.time}`; };
 
 /** A binned post that went out (published, or one channel did) stays as the record: no 永久刪除 (state.ts assertCanPurge). */

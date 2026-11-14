@@ -13,7 +13,7 @@ import { copyInput } from "./compose/draft";
 import { ReviewBar } from "./Review";
 import { ListView, MonthView, stateStyle, WeekView } from "./Calendar";
 import EmptyState from "./EmptyState";
-import Trash, { type Deletions } from "./Trash";
+import Trash, { purgeEach, type Deletions } from "./Trash";
 import { useLists } from "./Lists";
 import Editor from "./Editor";
 import Icon from "./Icon";
@@ -313,16 +313,9 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
    *  each on its own; one that fails (changed meanwhile, went out) is named and the rest still go. */
   async function purge(posts: Post[]) {
     if (!brand || !posts.length) return;
-    const failed: string[] = [];
-    for (const post of posts) {
-      try {
-        await api.purge(brand.id, post.id, post.version);
-      } catch (e) {
-        failed.push(e instanceof Error ? e.message : String(e));
-      }
-    }
-    const done = posts.length - failed.length;
-    say(failed.length ? `已永久刪除 ${done} 則；${failed.length} 則沒刪掉：${failed[0]}` : `已永久刪除 ${done} 則。`, failed.length > 0);
+    const b = brand;
+    const line = await purgeEach(posts, (post) => api.purge(b.id, post.id, post.version));
+    say(line.text, line.error);
     await reload();
   }
 
