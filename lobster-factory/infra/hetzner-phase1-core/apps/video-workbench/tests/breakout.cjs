@@ -8,7 +8,7 @@ const generationPolicy = require("../backend/generation-policy.cjs");
 const { videoUsd } = require("../backend/provider-cost.cjs");
 // A valid 8-bit grey PNG of w x h (every CRC right), for first frames and lock masks.
 const zlib = require("node:zlib");
-function greyPng(w, h) {
+function greyPng(w, h, { fill = 0, method = 0 } = {}) {
   const chunk = (type, data) => {
     const body = Buffer.concat([Buffer.from(type, "latin1"), data]), out = Buffer.alloc(12 + data.length);
     out.writeUInt32BE(data.length, 0);
@@ -20,7 +20,10 @@ function greyPng(w, h) {
   ihdr.writeUInt32BE(w, 0);
   ihdr.writeUInt32BE(h, 4);
   ihdr[8] = 8;
-  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(Buffer.alloc(h * (1 + w)))), chunk("IEND", Buffer.alloc(0))]);
+  ihdr[10] = method; // compression method: only 0 exists; 1 makes a file that parses but no decoder reads
+  const rows = Buffer.alloc(h * (1 + w), fill);
+  for (let y = 0; y < h; y++) rows[y * (1 + w)] = 0; // filter byte of each row
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]);
 }
 
 // 1. model list
@@ -120,17 +123,17 @@ const breakout = require("../backend/breakout.cjs");
   breakout.lockFrame(later, ref, grid, opened);
   assert.notDeepEqual(later, ref, "an opened cell was locked again (would flicker)");
   // the lock is checked on the server: a malformed one is refused, none is accepted (an older job), extra keys ignored
-  // the lock mask is read whole at submit (readMask -> pngInfo): signature, every CRC, IHDR, the rows IDAT inflates to
+  // readMask: only the checks that cost nothing (data URL, 1 MB, PNG header, at most 4096 a side); whether the file
+  // decodes is the decoder's call (lockMaskPixels, at submit in api.cjs start -- the stage test below)
   const onePx = greyPng(1, 1);
-  assert.deepEqual(breakout.pngInfo(onePx), { width: 1, height: 1 });
+  assert.deepEqual(breakout.pngSize(onePx), { width: 1, height: 1 });
   assert.deepEqual(breakout.readMask({ lock: { mask: "data:image/png;base64," + onePx.toString("base64") } }), onePx);
   for (const settings of [{}, { lock: { boxes: [[0, 0, 1, 0.1]] } }, { lock: { stored: true } }]) assert.equal(breakout.readMask(settings), null, JSON.stringify(settings));
-  const flipped = Buffer.from(onePx);
-  flipped[onePx.indexOf("IDAT") + 5] ^= 0xff; // a byte inside IDAT: its CRC no longer matches
-  for (const mask of ["data:image/png;base64,AAAA", "/generated/0f0e-1a.png", "data:text/html;base64,AA==", 5,
-    "data:image/png;base64," + onePx.subarray(0, 40).toString("base64"), "data:image/png;base64," + flipped.toString("base64"),
+  const huge = Buffer.from(onePx);
+  huge.writeUInt32BE(20000, 16); // a small file claiming a 20000 px wide frame
+  for (const mask of ["data:image/png;base64,AAAA", "/generated/0f0e-1a.png", "data:text/html;base64,AA==", 5, "data:image/png;base64," + huge.toString("base64"),
     "data:image/png;base64," + "A".repeat(Math.ceil(breakout.MASK_MAX_BYTES / 3) * 4 + 4)])
-    assert.throws(() => breakout.readMask({ lock: { mask } }), /鎖定遮罩無效/, String(mask).slice(0, 40));
+    assert.throws(() => breakout.readMask({ lock: { mask } }), /鎖定遮罩無效|不是 PNG|尺寸無效/, String(mask).slice(0, 40));
   // held pixels (lockPixels): a rounded, anti-aliased card row as the page draws it (white, an edge band of 128, black
   // outside). Only pixels white with LOCK.margin of white around them are held: never the edge band, never a rounded
   // corner's outside. Changes everywhere outside (a moving photo behind the card) open nothing and are never put back.
@@ -253,8 +256,16 @@ const fetchImpl = async (url, init = {}) => {
       // the lock mask travels as a data URL, is checked whole against the first frame before any vendor call, and is
       // kept as the job's own input file only while the job runs
       const asData = (b) => "data:image/png;base64," + b.toString("base64"), mask1 = asData(greyPng(1, 1));
-      for (const [mask, why] of [["data:image/png;base64,AAAA", "not a PNG"], [asData(greyPng(2, 2)), "a 2x2 mask for a 1x1 first frame"]]) {
-        const before = vendorUrls.length, sent = await c2("/generations", job(runway2, { lock: { mask } }));
+      const frame64 = { firstFrame: [{ url: asData(greyPng(64, 64)), type: "image/png" }] };
+      for (const [mask, why, references] of [
+        ["data:image/png;base64,AAAA", "not a PNG"],
+        [asData(greyPng(2, 2)), "a 2x2 mask for a 1x1 first frame"],
+        [asData(greyPng(1, 1, { method: 1 })), "a PNG with compression method 1 (ffmpeg cannot decode it)"],
+        [asData(greyPng(64, 64, { fill: 255 })), "an all-white mask (over the area limit)", frame64],
+      ]) {
+        const input = job(runway2, { lock: { mask } });
+        if (references) input.references = references;
+        const before = vendorUrls.length, sent = await c2("/generations", input);
         assert.equal(sent.status, 400, why + " was accepted");
         assert.match(sent.body.error.message, /鎖定遮罩/);
         assert.equal(vendorUrls.length, before, why + ": a vendor call was made");
@@ -276,7 +287,7 @@ const fetchImpl = async (url, init = {}) => {
       assert.equal(done.finishing, undefined);
       assert.match(done.result.url, /^\/generated\/[a-f0-9-]+\.mp4$/);
       assert.equal(done.result.origin.costUsd, 0.25, "the charge was lost on the way through finishing");
-      assert(!fs.existsSync(runs[0].opts.maskFile), "the lock mask outlived its succeeded job");
+      assert(fs.existsSync(runs[0].opts.maskFile), "the lock mask went before its job's record (a retry needs it)");
       // 2. cancel while finishing: no vendor call, the runner is stopped, the paid model file is delivered with a note
       const two = (await c2("/generations", job(runway2, { lock: { mask: mask1 } }))).body.id;
       await until(async () => (await c2("/generations/" + two)).body, (v) => v.stage === "finishing");
@@ -286,7 +297,7 @@ const fetchImpl = async (url, init = {}) => {
       assert(!vendorUrls.slice(before).some((u) => u.endsWith("/cancel")), "cancel during finishing called the vendor");
       const kept = await until(async () => (await c2("/generations/" + two)).body, (v) => v.status === "succeeded");
       assert.match(kept.result.note, /已停止貼文鎖定.*原始影片/);
-      assert(!fs.existsSync(runs[1].opts.maskFile), "the lock mask outlived its cancelled job");
+      assert(fs.existsSync(runs[1].opts.maskFile), "the lock mask went before its cancelled job's record");
       // 2b. the worker's success lands after the cancel: the model file is still what is delivered (cancel's promise)
       stopsOnAbort = false;
       const race = (await c2("/generations", job(runway2))).body.id;
@@ -304,11 +315,21 @@ const fetchImpl = async (url, init = {}) => {
       const left = (id, file) => ({
         id, type: "video", status: "running", stage: "finishing", progress: 95, createdAt: new Date().toISOString(), providerId: "pred-b",
         video: { id: "runway-gen4-turbo", provider: "Replicate", model: "runwayml/gen4-turbo", seconds: 5 },
-        input: { type: "video", operation: "breakout", prompt: "鯊魚", references: { firstFrame: [{ url: "/generated/f.png" }] }, settings: { outputRatio: "9:16", ratio: "9:16" } },
+        input: { type: "video", operation: "breakout", prompt: "鯊魚", references: { firstFrame: [{ url: "/generated/f.png", type: "image/png" }] },
+          settings: { model: "runway-gen4-turbo", duration: 5, outputRatio: "9:16", ratio: "9:16", layout: "burst", lock: { stored: true } } },
         finishing: { url: "/generated/" + file + ".mp4", origin: { kind: "ai_generated", costUsd: 0.25 } },
       });
-      fs.writeFileSync(path.join(dataDir, "jobs.json"), JSON.stringify([left("resume", "11111111-1111-1111-1111-111111111111"), left("lost", "22222222-2222-2222-2222-222222222222")]));
-      const restarted = require("../server.cjs").createServer({ dataDir, env: { REPLICATE_API_TOKEN: "test-only" }, fetchImpl });
+      // a job's mask lives as long as its record: 101 finished records ahead of these two, the oldest one beyond the
+      // history limit (VW_JOB_HISTORY_LIMIT 100), so the first save drops it and its mask; "lost" keeps its mask and its retry locks again
+      fs.writeFileSync(path.join(dataDir, "generated", "f.png"), greyPng(1, 1));
+      const finishedJob = (id) => ({ id, type: "video", status: "succeeded", createdAt: new Date().toISOString(), input: {}, result: { url: "/generated/x.mp4" } });
+      const finished = Array.from({ length: 101 }, (_, i) => finishedJob("done-" + i));
+      for (const id of ["done-0", "done-100", "lost"]) {
+        fs.mkdirSync(path.join(dataDir, "job-inputs", id), { recursive: true });
+        fs.writeFileSync(path.join(dataDir, "job-inputs", id, "lock-mask.png"), greyPng(1, 1));
+      }
+      fs.writeFileSync(path.join(dataDir, "jobs.json"), JSON.stringify([...finished, left("resume", "11111111-1111-1111-1111-111111111111"), left("lost", "22222222-2222-2222-2222-222222222222")]));
+      const restarted = require("../server.cjs").createServer({ dataDir, env: { REPLICATE_API_TOKEN: "test-only", VW_JOB_HISTORY_LIMIT: "100" }, fetchImpl });
       await new Promise((r) => restarted.listen(0, "127.0.0.1", r));
       restarted.unref();
       const c3 = at("http://127.0.0.1:" + restarted.address().port);
@@ -318,6 +339,15 @@ const fetchImpl = async (url, init = {}) => {
       const lost = (await c3("/generations/lost")).body;
       assert.equal(lost.status, "failed");
       assert.match(lost.error, /找不到模型生成的影片檔/);
+      assert(!fs.existsSync(path.join(dataDir, "job-inputs", "done-0")), "a pruned job's mask stayed");
+      assert(fs.existsSync(path.join(dataDir, "job-inputs", "done-100")), "a kept job's mask was removed");
+      assert(fs.existsSync(path.join(dataDir, "job-inputs", "lost", "lock-mask.png")), "a failed job's mask went before its record");
+      const rerun = await c3("/generations/lost/retry", {});
+      assert.equal(rerun.status, 202, JSON.stringify(rerun.body));
+      await until(async () => (await c3("/generations/" + rerun.body.id)).body, (v) => v.stage === "finishing");
+      assert.equal(runs[4].opts.maskFile, path.join(dataDir, "job-inputs", rerun.body.id, "lock-mask.png"));
+      assert.deepEqual(fs.readFileSync(runs[4].opts.maskFile), greyPng(1, 1), "the retry lost the lock");
+      runs[4].resolve({ ratio: "9:16", restored: 0, opened: 0 });
     } finally {
       breakout.finish = realFinish;
     }

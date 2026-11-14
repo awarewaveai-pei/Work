@@ -6,16 +6,12 @@
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
-const zlib = require("node:zlib");
 const { Worker, isMainThread, parentPort, workerData } = require("node:worker_threads");
 const rules = require("../shared/breakout-rules.js");
 const generationPolicy = require("./generation-policy.cjs");
 
-/**
- * Throws a user-facing error unless input is a valid breakout job; returns the prompt the model is sent. frameBytes(url):
- * the first frame's PNG bytes (api.cjs reads its file), so the lock mask is checked against it before any paid call.
- */
-function prepare(input, env, { frameBytes } = {}) {
+/** Throws a user-facing error unless input is a valid breakout job; returns the prompt the model is sent. */
+function prepare(input, env) {
   const s = input.settings || {};
   if (!Object.hasOwn(rules.LAYOUTS, s.layout)) throw Error("請選擇貼文版面");
   if (!rules.OUTPUT_RATIOS.includes(s.outputRatio)) throw Error("輸出比例只支援 " + rules.OUTPUT_RATIOS.join("、"));
@@ -28,60 +24,64 @@ function prepare(input, env, { frameBytes } = {}) {
   if (input.cartoonStyle !== undefined) throw Error("破框貼文動畫不接受風格附加文字");
   const frames = input.references?.firstFrame;
   if (!Array.isArray(frames) || frames.length !== 1 || !frames[0]?.url) throw Error("缺少貼文第一格畫面");
-  const mask = readMask(s);
-  if (mask) {
-    const m = pngInfo(mask), f = pngInfo(frameBytes?.(frames[0].url) ?? Buffer.alloc(0));
-    if (m.width !== f.width || m.height !== f.height) throw Error(`鎖定遮罩 ${m.width}×${m.height} 和第一格 ${f.width}×${f.height} 不一樣大`);
-  }
+  readMask(s); // the cheap checks; the full one (lockMaskPixels) runs in api.cjs start, also before any paid call
   return rules.prompt(input.prompt, s);
 }
 
 // settings.lock = { mask }: a PNG the page draws with the same calls as the post (scripts/tools-breakout.js
 // toolBreakoutDraw): black, the post's text rows white, clipped like the card, the first frame's size. It is the one
-// source of what is held: the server knows no layout. A per-job input: checked whole at submit (readMask, pngInfo, size
-// = the first frame), taken out of the job record by api.cjs start into job-inputs/<job>/ (maskPath), used as is (never
-// scaled) and removed when the job ends. None = nothing to hold (a job sent before the lock, an older page's boxes, a
-// retry: its mask went with the first run).
-const MASK_MAX_BYTES = 1 << 20;
+// source of what is held: the server knows no layout. A per-job input: api.cjs start takes it out of the job record into
+// job-inputs/<job>/ (maskPath) after the same reader finishing uses has accepted it (lockMaskPixels), a retry copies it,
+// and it is removed when the job's record is (api.cjs persist). None = nothing to hold (a job sent before the lock, an
+// older page's boxes).
+const MASK_MAX_BYTES = 1 << 20, MASK_MAX_SIDE = 4096;
+/** The mask's PNG bytes from settings (null = none), after the checks that cost nothing: data URL, size cap, header. */
 function readMask(settings) {
   const mask = settings?.lock?.mask;
   if (mask === undefined || mask === null) return null;
   const m = typeof mask === "string" && /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(mask);
   if (!m || m[1].length > Math.ceil(MASK_MAX_BYTES / 3) * 4) throw Error("鎖定遮罩無效");
   const png = Buffer.from(m[1], "base64");
-  pngInfo(png); // the whole file, now: never found unreadable after the paid run
+  try {
+    pngSize(png);
+  } catch (e) {
+    throw Error("鎖定遮罩無效：" + e.message);
+  }
   return png;
 }
 const maskPath = (dir, jobId) => path.join(dir, String(jobId), "lock-mask.png");
 /**
- * { width, height } of a PNG this server can read whole: signature, every chunk's CRC, IHDR (8-bit, grey / RGB / grey
- * + alpha / RGBA, not interlaced), and IDAT data that inflates to exactly the rows IHDR promises; else throws.
+ * { width, height } from a PNG's header (signature + IHDR), at most MASK_MAX_SIDE a side, so no decode is ever asked to
+ * make a huge frame from a small file. Whether the file decodes is for the decoder to say (lockMaskPixels).
  */
-function pngInfo(png) {
-  const bad = () => Error("鎖定遮罩無效");
-  if (!Buffer.isBuffer(png) || png.length < 8 || png.readUInt32BE(0) !== 0x89504e47 || png.readUInt32BE(4) !== 0x0d0a1a0a) throw bad();
-  let at = 8, ihdr = null, end = false;
-  const idat = [];
-  while (at + 12 <= png.length && !end) {
-    const len = png.readUInt32BE(at), type = png.toString("latin1", at + 4, at + 8);
-    if (at + 12 + len > png.length || zlib.crc32(png.subarray(at + 4, at + 8 + len)) !== png.readUInt32BE(at + 8 + len)) throw bad();
-    const data = png.subarray(at + 8, at + 8 + len);
-    if (type === "IHDR") ihdr = data;
-    else if (type === "IDAT") idat.push(data);
-    else if (type === "IEND") end = true;
-    at += 12 + len;
-  }
-  if (!ihdr || ihdr.length !== 13 || !end || !idat.length) throw bad();
-  const width = ihdr.readUInt32BE(0), height = ihdr.readUInt32BE(4), channels = { 0: 1, 2: 3, 4: 2, 6: 4 }[ihdr[9]];
-  if (!width || !height || width > 4096 || height > 4096 || ihdr[8] !== 8 || !channels || ihdr[12] !== 0) throw bad();
-  let rows;
-  try {
-    rows = zlib.inflateSync(Buffer.concat(idat), { maxOutputLength: height * (1 + width * channels) + 1 });
-  } catch {
-    throw bad();
-  }
-  if (rows.length !== height * (1 + width * channels)) throw bad();
+function pngSize(png) {
+  if (!Buffer.isBuffer(png) || png.length < 24 || png.readUInt32BE(0) !== 0x89504e47 || png.readUInt32BE(4) !== 0x0d0a1a0a || png.toString("latin1", 12, 16) !== "IHDR")
+    throw Error("不是 PNG 圖檔");
+  const width = png.readUInt32BE(16), height = png.readUInt32BE(20);
+  if (!width || !height || width > MASK_MAX_SIDE || height > MASK_MAX_SIDE) throw Error("PNG 尺寸無效");
   return { width, height };
+}
+/**
+ * The one reader of a lock mask, at submit (api.cjs start, before any paid call) and in finishing: the file must be
+ * width x height (the first frame at submit, the video in finishing), decoded by this server's ffmpeg as is (never
+ * scaled), and hold at most LOCK_MAX_AREA (lockPixels). Returns the held pixels; anything it refuses, it refuses at submit.
+ */
+async function lockMaskPixels({ maskFile, width, height, ffmpeg, signal }) {
+  let size;
+  try {
+    size = pngSize(fs.readFileSync(maskFile));
+  } catch {
+    throw Error("鎖定遮罩無效");
+  }
+  if (size.width !== width || size.height !== height) throw Error(`鎖定遮罩 ${size.width}×${size.height} 和畫面 ${width}×${height} 不一樣大`);
+  let gray;
+  try {
+    gray = await run(ffmpeg, ["-v", "error", "-i", maskFile, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], signal).done;
+  } catch {
+    throw Error("鎖定遮罩無法解碼");
+  }
+  if (gray.length !== width * height) throw Error("鎖定遮罩無法解碼");
+  return lockPixels(gray, width, height);
 }
 
 // Held pixels = mask pixels that are fully white with everything within LOCK.margin of them fully white too. That drops
@@ -229,12 +229,10 @@ async function finishHere({ src, frameFile, maskFile, dst, settings, ffmpeg, sig
     await run(ffmpeg, ["-y", "-v", "error", "-i", src, "-map", "0:a?", "-vf", crop + "format=yuv420p", ...out], signal, { stdout: false }).done;
     return { ratio, restored: 0, opened: 0 };
   }
-  // the mask as drawn, never scaled: a video of another size than the first frame cannot be held pixel for pixel
-  const { width: mw, height: mh } = pngInfo(fs.readFileSync(maskFile));
-  if (mw !== W || mh !== H) throw Error(`影片 ${W}×${H} 和第一格 ${mw}×${mh} 不一樣大，無法鎖定貼文文字`);
-  const gray = await run(ffmpeg, ["-v", "error", "-i", maskFile, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"], signal).done;
-  if (gray.length !== W * H) throw Error("鎖定遮罩無效");
-  const grid = lockGrid(lockPixels(gray, W, H), W, H), open = new Uint8Array(grid.cells.length), size = W * H * 3;
+  // the reader submit used, now at the video's size: a video of another size than the first frame is not held
+  const grid = lockGrid(await lockMaskPixels({ maskFile, width: W, height: H, ffmpeg, signal }), W, H),
+    open = new Uint8Array(grid.cells.length),
+    size = W * H * 3;
   const ref = await run(ffmpeg, ["-v", "error", "-i", frameFile, "-vf", `scale=${W}:${H}:flags=area`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal).done;
   if (ref.length !== size) throw Error("第一格畫面尺寸不符");
   const decoder = run(ffmpeg, ["-v", "error", "-noautorotate", "-i", src, "-vf", TO_RGB, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal);
@@ -327,4 +325,4 @@ if (!isMainThread && workerData?.breakoutFinish) {
     .finally(() => parentPort.close());
 }
 
-module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockPixels, readMask, pngInfo, maskPath, LOCK, LOCK_MAX_AREA, MASK_MAX_BYTES, FINISH_TIMEOUT_MS };
+module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockPixels, lockMaskPixels, readMask, pngSize, maskPath, LOCK, LOCK_MAX_AREA, MASK_MAX_BYTES, FINISH_TIMEOUT_MS };
