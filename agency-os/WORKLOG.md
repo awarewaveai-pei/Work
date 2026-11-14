@@ -402,6 +402,34 @@
 - ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-c0d26946 的唯一發現（換來源不重轉）已照不變量修正，並補指名測試；匯入腳本不屬於隱私／權限守衛，依規則不做突變
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=import-audio-library|\.import\.json | hits=21
 - BUGHUNT_SCOPE_NARROW: 改動只有清單資料與匯入腳本；呼叫者只有 tests/ed6-audio.cjs 和交接文件
+## 2026-11-14（續1）擴圖第三顆鈕（GPT-Image-2.6）＋生成填色改放新圖層；修掉三個會扣錢但無效的路徑
+
+[根因]
+- **C1 擴圖只有兩顆，不是因為只有兩個模型能做**，而是沒人去找。實測四個候選（同一張牌、同一個 16:9 目標）：`bria-expand` 原牌不動、漩渦延伸自然；`flux-fill-pro` 給了指令仍自己多畫兩張塔羅牌；`gpt-image-2.6` 乾淨延伸、沒多畫；`luma/reframe-image` 三次都回同一個 `ModelError E001`，帳號上不可用。
+- **C2 生成填色會蓋掉原圖**：`public/editor-shared/blocks/ai-fill.js` 用 `ctx.replaceImage`，而 `ctx-photocraft.js:451` 的 replaceImage 是「插新圖層＋刪舊圖層」，所以原圖消失。操作者實測發現（「我剛試 不行」）。擴圖本來就走 `placeImage`，不受影響。
+- **M1（Codex 抓到）遮罩方向錯**：第一版 `outpaintCanvas` 回 alpha-only 遮罩，但共用的 `openaiMask`（`lib/tarot/image-gen.ts:679`）先 `removeAlpha().greyscale()` 再 `alpha = 255 - luminance`，所以全圖變成不可改 → 付費拿回原圖。
+- **M2（Codex 抓到）比例對不齊**：OpenAI images API 只回三種尺寸，正方形圖向左擴是 2:1，最近的是 3:2，回來的圖放不回原位。
+- **M3（寫測試時自己抓到，三顆鈕都中）**：正方形圖按「補成正方形」沒有新區域，三顆鈕都會照收費跑一次 no-op。
+
+[步驟]
+- 目錄：`openai-26-edit` 的 `uses` 加 `"outpaint"`（`public/editor-shared/image-models.js`）。
+- 幾何：新 `outpaintCanvas()`（`lib/studio/generative-fill.ts`）把原圖放到 preset 畫布後**再 letterbox 進三種 API 尺寸中最省的那個**，遮罩改成我們的慣例（白＝可改，只蓋新邊）；新 `cropOutpaintResult()` 把畫布原尺寸裁回來。
+- 路由：`genfill/route.ts` 的 OpenAI 分支改用 `built.aspectRatio`（不是畫布自己的比例）並在回傳後裁切；新增「這個 preset 沒有新區域就不扣錢」的守門（`nothing_to_outpaint`），放在任何 hold 之前，三顆鈕共用。
+- 填色新圖層：`fillSelection(..., { asLayer })` 只回框內羽化後的 patch，面板用 `ctx.placeImage` 放在選區原位；核取方塊「放到新圖層（原圖不會被蓋掉）」預設勾選，取消勾選回到舊行為。去除維持 replace（就地擦除本來就是它的用途）。
+- 說明頁新增「十、實測六：擴圖，三顆鈕的差別」四張圖，總圖數 36 → 40。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin grep asLayer/uses/outpaintCanvas | exit=0 | ms=4200 — 部署容器內 `ai-fill.js` 有 6 處 `asLayer`、`openai-26-edit` 的 uses 含 `"outpaint"`、genfill route bundle 含 `outpaintCanvas`
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=2/0/0 — Codex gpt-6-sol 兩個 high 全部自行 grep 驗真後修掉；artifact `agency-os/reports/oracle/2026-11-14-review-48ca36f1.md`
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=outpaintCanvas\|asLayer\|nothing_to_outpaint | hits=0 — 新識別符無其他殘留呼叫端
+- 新測試 `lib/studio/__tests__/outpaint-canvas.test.ts`：7 個 preset × 3 種來源尺寸跑真實像素，驗 box 尺寸、遮罩無灰階、黑白都存在、白色只在新邊、裁回原畫布尺寸，22 passed
+- tsc 0；vitest lib/studio lib/ai app/(shell)/tools app/api/tools/studio = 67 files / 633 passed
+- sg-deploy `b5984f23a`，lobster-next-admin healthy、5/5 smoke OK
+- 花費：擴圖實測四次約 NT$4.8（Luma 失敗不計）
+
+[避免再發生] 任何「模型沒有該功能、由我們用遮罩湊出來」的路徑，遮罩方向與輸出尺寸都要有像素級測試，因為兩者錯了都會**照收費但結果無法使用**；「這次操作有沒有實際改變」的守門要放在 hold 之前，而且放在路由層讓所有模型共用。
+
+[rollback] `git revert b5984f23a` 後重跑 sg-deploy；目錄欄位與新模組都是新增，沒有改動既有呼叫端的簽章。
 ## 2026-11-13（續4）影音工作台 ED.12.3 補測：AI 畫質增強 1 秒 → 4K 實測
 
 - 實測（監工核准，預算 US$0.40）：640×360 30fps 測試片 1 秒，data URI → `topazlabs/video-upscale` target 4k；輸出 3840×2160、1.0 秒，跑 20 秒；metrics.unspecified_billing_metric＝2 units＝US$0.16（prediction f8qgf12bj5rmt0d1t2rvtdd5yg）。
