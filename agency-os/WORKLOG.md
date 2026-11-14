@@ -19,7 +19,7 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=jobRatio|settings\?\.ratio \|\| |traditional\( | hits=21
 - 剩餘風險：(1) 正式環境有 1 支 AI 生成影片沒有 metadata.ratio（media_assets 9c39eebd，vwJobId 65f90a4d，2026-11-06），沒有回填；要回填就是寫正式資料庫，屬高風險，等操作者決定。(2) 兩卡還沒部署。
 - rollback：git revert 這兩個 commit，彼此獨立。
-## 2026-11-14（續2）社群工具：影片縮圖不再黑、狀態標籤任何配色都看得到字、已刪除貼文可勾選批次永久刪除、兩個時間欄
+## 2026-11-14（續3）社群工具：影片縮圖不再黑、狀態標籤任何配色都看得到字、已刪除貼文可勾選批次永久刪除、兩個時間欄
 
 [根因]
 - C1 黑縮圖：4764ad95f 已把影片附件改成 `<video preload=metadata>`，但它只畫第 0 格；prod 6 則貼文附件全是 video（social_media.kind），影片開頭是黑畫面。實測 6 支 `#t=0` 全空/黑、`#t=1` 全有畫面。
