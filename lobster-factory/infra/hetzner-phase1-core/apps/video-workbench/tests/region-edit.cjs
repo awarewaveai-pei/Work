@@ -59,14 +59,15 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
   try {
     // 1. The catalog's fill rows, priced by the charge's function.
     const caps = await (await fetch(api + "/capabilities")).json(), rows = caps.imageEdit.models;
-    assert.deepEqual(rows.map((m) => m.id), catalog.modelsFor("fill").map((m) => m.value), "the catalog's fill rows, cheapest first");
-    assert(rows.length >= 6 && rows.every((m) => m.available), "every fill row is wired: " + rows.filter((m) => !m.available).map((m) => m.id));
+    assert.deepEqual(rows.map((m) => m.id), catalog.modelsFor("fill").filter(catalog.takesChinese).map((m) => m.value), "the catalog's usable fill rows (zh ok), cheapest first");
+    assert(!rows.some((m) => ["flux-fill-pro", "flux-kontext-fast"].includes(m.id)), "rows that ignore a 繁中 instruction are not offered");
+    assert(rows.length >= 5 && rows.every((m) => m.available), "every fill row is wired: " + rows.filter((m) => !m.available).map((m) => m.id));
     for (const m of rows) {
       assert.deepEqual(m.sizes, m.id === "nano-banana-2" ? ["1K", "2K", "4K"] : ["1K"], m.id + " sizes");
       for (const s of m.sizes) assert.equal(m.prices[s].usd, usdAt(m.id, s), m.id + " " + s + " = the charge's function");
       if (m.id !== "nano-banana-2") assert.equal(m.prices["1K"].usd, catalog.modelsFor("fill").find((r) => r.value === m.id).usd, m.id + " = the catalog price");
     }
-    assert.equal(caps.imageEdit.defaultModel, "ideogram-4-5-edit-low", "cheapest row that needs no description");
+    assert.equal(caps.imageEdit.defaultModel, "flux-2-klein-4b", "default = the first usable row, the cheapest");
     // The paid-job price check (api.cjs start): every fill row and the generator's image model have a price.
     for (const m of rows) costs.priceOf("fill", m.id);
     costs.priceOf("image", caps.models.image);
@@ -160,11 +161,11 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
     // 4 (server). An old job's settings (no model, 2K) run the default row at 1K; a model outside the catalog is refused.
     const old = await poll(await (await post("/generations", { type: "image", operation: "region", prompt: "整張變亮", settings: { ...settings, quality: "2K" }, references: { images: [image] }, mask })).json());
     assert.equal(old.status, "succeeded", old.error);
-    assert.deepEqual([old.input.settings.model, old.input.settings.quality], ["ideogram-4-5-edit-low", "1K"]);
+    assert.deepEqual([old.input.settings.model, old.input.settings.quality], ["flux-2-klein-4b", "1K"]);
     const before = calls.length, bad = await post("/generations", { type: "image", operation: "region", prompt: "x", settings: { ...settings, model: "gemini-nano-banana-2.1" }, references: { images: [image] }, mask });
     assert.equal(bad.status, 400);
     assert.equal(calls.length, before);
-    console.log("PASS old job settings run the default at 1K; a model outside the catalog is refused");
+    console.log("PASS old job settings run the default (Klein) at 1K; an old job naming FLUX Fill Pro (no longer offered) still runs; a model outside the catalog is refused");
 
     // 2 + 3 + 4 in the page.
     browser = await chromium.launch({ channel: "msedge", headless: true });
@@ -196,25 +197,25 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
     const nt = (id, s = "1K") => "約 " + money.VideoWorkbenchMoney(usdAt(id, s), caps) + "／張";
     const labels = (s) => [...rows].sort((a, b) => usdAt(a.id, at(a, s)) - usdAt(b.id, at(b, s))).map((m) => `${m.label} · ${nt(m.id, at(m, s))}`);
     assert.deepEqual(await p.locator('[aria-label="模型"] button').allTextContents(), labels("1K"), "NT$ from the charge's function, cheapest first");
-    assert.match(await p.locator('[aria-label="模型"] .selected').textContent(), /Ideogram 4\.5 Edit（省）/);
+    assert.match(await p.locator('[aria-label="模型"] .selected').textContent(), /FLUX 2 Klein 4B/);
     const submit = p.locator("[data-act=submit]");
-    await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("ideogram-4-5-edit-low"));
+    await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("flux-2-klein-4b"));
     console.log("PASS old draft opens: 2 numbered boxes, rows, 2/8, 1/1, ratio, red missing line; NT$ on every model, cheapest first");
 
     const posts = calls.length;
     await submit.click();
     await p.waitForTimeout(300);
     assert.equal(calls.length, posts, "nothing sent while a box has no instruction");
-    await p.getByRole("button", { name: /FLUX Fill Pro/ }).click();
-    await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("flux-fill-pro"));
+    await p.getByRole("button", { name: /Ideogram 4\.5 Edit（細）/ }).click();
+    await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("ideogram-4-5-edit"));
     // Nano Banana offers 1K/2K/4K; the draft's 4K is kept for it; price and order follow the chosen size.
     await p.getByRole("button", { name: /Nano Banana 2\.1/ }).click();
     assert.deepEqual(await p.locator('[aria-label="解析度"] button').allTextContents(), ["1K", "2K", "4K"]);
     assert.equal(await p.locator('[aria-label="解析度"] .selected').textContent(), "4K");
     await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("nano-banana-2", "4K"));
     assert.deepEqual(await p.locator('[aria-label="模型"] button').allTextContents(), labels("4K"), "order follows the price at 4K");
-    await p.getByRole("button", { name: /FLUX Fill Pro/ }).click();
-    await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("flux-fill-pro"));
+    await p.getByRole("button", { name: /Ideogram 4\.5 Edit（細）/ }).click();
+    await p.waitForFunction((t) => document.querySelector("[data-act=submit]").textContent.includes(t), nt("ideogram-4-5-edit"));
     console.log("PASS missing-prompt guard; Nano Banana 1K/2K/4K; the generate button's NT$ follows model x size");
 
     // Draw a third box: its instruction opens next to it.
@@ -237,8 +238,8 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
     if (process.argv[2]) await p.screenshot({ path: process.argv[2], fullPage: true });
     await submit.click();
     await p.waitForFunction(() => document.querySelector(".job-view"));
-    // The page's job reaches FLUX Fill Pro with all three instructions.
-    const isFill = (c) => /\/predictions$/.test(c.url) && JSON.parse(c.body).version === MEDIA_MODELS["black-forest-labs/flux-fill-pro"].version;
+    // The page's job reaches Ideogram 4.5 Edit（細） with all three instructions.
+    const isFill = (c) => /\/predictions$/.test(c.url) && JSON.parse(c.body).input?.quality === "medium"; // Ideogram 4.5 Edit（細）
     for (let i = 0; i < 100 && calls.slice(posts).filter(isFill).length < 1; i++) await p.waitForTimeout(100);
     const text = JSON.parse(calls.slice(posts).filter(isFill).at(-1).body).input.prompt;
     // Each sentence tied to its own box (image-edit.cjs instructionText).

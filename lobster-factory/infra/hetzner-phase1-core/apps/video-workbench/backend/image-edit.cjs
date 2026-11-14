@@ -7,7 +7,6 @@
 // the input shapes follow those files and the pinned versions are read from cost-model.ts MEDIA_MODELS, which next-admin's
 // model-registry test holds. A catalog fill row without a CALLS entry is listed unavailable, never guessed.
 const path = require("node:path");
-const providers = require("./providers.cjs");
 const { vwEnv } = require("./env-compat.cjs");
 const { fillUsd } = require("./provider-cost.cjs");
 const source = require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env);
@@ -43,12 +42,16 @@ const CALLS = Object.freeze({
 const sizesOf = (value) => { const g = CALLS[value]?.geminiModel; return g ? Object.keys(GEMINI_IMAGE_TOKEN_RATES[g].imageTokens) : ["1K"]; };
 const priceOf = (value, size) => fillUsd(value, { size, geminiModel: CALLS[value]?.geminiModel });
 
-const rows = (env) => catalog.modelsFor("fill").map((m) => ({ m, id: m.value, available: !!CALLS[m.value] && !!env[CALLS[m.value].keyName], free: false }));
-// Default: the cheapest row that can run here and needs no description (catalog blank "ok"); VW_IMAGE_EDIT_MODEL names another.
+// The rows the page offers (operator 2026-11-14 「把可以用的都按照價錢順序列出」): the catalog's fill rows that follow a 繁中
+// instruction (zh "ok", measured), cheapest first (modelsFor's order). A row the catalog marks zh "no" is not offered.
+const rows = (env) => catalog.modelsFor("fill").filter(catalog.takesChinese).map((m) => ({ m, id: m.value, available: !!CALLS[m.value] && !!env[CALLS[m.value].keyName], free: false }));
+// Default: the first offered row that can run here, i.e. the cheapest usable one; VW_IMAGE_EDIT_MODEL names another offered row.
 function defaultRow(env) {
   const list = rows(env), wanted = vwEnv(env, "IMAGE_EDIT_MODEL");
-  return list.find((r) => r.id === wanted && r.available) || list.find((r) => r.available && catalog.takesBlankPrompt(r.m)) || providers.choose(list);
+  return list.find((r) => r.id === wanted && r.available) || list.find((r) => r.available) || list[0];
 }
+// Any catalog fill row runs, offered or not: an older job or draft that named a row no longer offered (FLUX Fill Pro,
+// Kontext Fast) reruns as it was saved -- its instruction may be English, and a retry must reproduce a paid result.
 function pick(id, env = process.env) {
   if (id === undefined || id === null || id === "") return defaultRow(env).m;
   const m = catalog.modelsFor("fill").find((x) => x.value === id);
@@ -88,7 +91,7 @@ function capability(env) {
     ratios: [...catalog.ASPECT_RATIOS], // the page names the source's nearest ratio (參數)
     models: rows(env).map(({ m, available }) => ({
       id: m.value, vendor: m.vendor, label: m.label, available, sizes: sizesOf(m.value), defaultSize: sizesOf(m.value)[0],
-      note: m.note + (catalog.takesChinese(m) ? "" : "。指令請用英文寫"),
+      note: m.note, // the catalog's 優／缺 line
       prices: Object.fromEntries(sizesOf(m.value).map((s) => [s, { usd: priceOf(m.value, s), unit: "張", estimate: true }])),
     })),
   };
