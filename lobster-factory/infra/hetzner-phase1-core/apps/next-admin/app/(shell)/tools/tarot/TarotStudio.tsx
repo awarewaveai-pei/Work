@@ -29,6 +29,7 @@ function inGroup(card: TarotCard, key: GroupKey): boolean {
   return key === "all" ? true : card.type === key;
 }
 import { renderPrintCard, applyGradeToDataUrl, CARD_TEMPLATES, type CardTemplate } from "./renderPrintCard";
+import { registerDesign, saveDesign, saveFailureText, uploadToPending, urlToBlob, type RegisterResult } from "@/lib/studio/design-upload";
 // type-only import (erased at build — does not pull the server lib into the client bundle);
 // keeps the model union in sync with the server. maxRefs/cost stay local on purpose.
 import type { TarotModel } from "@/lib/tarot/image-gen";
@@ -56,9 +57,13 @@ interface BatchItem {
   status: "idle" | "pending" | "done" | "error";
   url?: string;
   blob?: Blob;
-  /** Frameless graded artwork (the AI picture WITHOUT the card frame) as a PNG data URL.
-   *  Retained so the large-view modal can save the raw art to My Designs on demand. */
-  art?: string;
+  /** Display / canvas copy of the frameless graded art (<= 2048 px WebP data URL). Never saved: My Designs gets the original. */
+  thumb?: string;
+  /** Card made on this page: its frameless graded original, already PUT to uploads/pending/ -- 「存無框圖」 registers this key,
+   *  so React state holds no original (78 x ~9 MB). */
+  artKey?: string;
+  /** Background-batch card: the original stays on the server; 「存無框圖」 fetches it again with the current grade. */
+  artJob?: { jobId: string; cardIndex: number };
   error?: string;
 }
 
@@ -239,13 +244,9 @@ async function toWebpUnder(png: Blob, maxBytes: number): Promise<Blob> {
   }
 }
 
-// Re-encode a (possibly multi-MB PNG) artwork data URL into a gallery-sized WebP data URL:
-// caps the longest side and recompresses. A raw 2K-model PNG can exceed the gallery API's
-// ~9MB limit (→ HTTP 413 → "save failed"); this keeps it safely under while staying visually
-// faithful (quality 0.9) for collecting / reuse. Full-resolution printing still uses the
-// original art via renderPrintCard — only the gallery copy is capped. Best-effort: any decode /
-// canvas / encode failure falls back to the original data URL (let the API decide).
-async function toGalleryArt(dataUrl: string, maxDim = 2048, quality = 0.9): Promise<string> {
+// The small copy a deck card keeps for the large view and the canvas (longest side <= 2048, WebP 0.9). Display only: what
+// reaches My Designs is the original (PLAN-designs-direct-upload C5). Any decode / canvas / encode failure -> the input.
+async function displayCopy(dataUrl: string, maxDim = 2048, quality = 0.9): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -343,7 +344,9 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   const deckKeyRef = useRef<string | null>(null);
   const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal (batch cards)
   const [savingArt, setSavingArt] = useState(false); // modal "存無框圖" in-flight
-  const [savedArt, setSavedArt] = useState<Set<number>>(() => new Set()); // batch indices whose frameless art is saved
+  // Slots whose frameless art is saved, by the slot's blob URL: a regenerated card gets a new URL, so a save that finishes
+  // after the slot changed never marks the new art (an index would).
+  const [savedArt, setSavedArt] = useState<Set<string>>(() => new Set());
   const [previewZoom, setPreviewZoom] = useState(false); // large-view modal (step-1 preview)
   const [compareZoom, setCompareZoom] = useState<string | null>(null); // large-view modal (compare grid)
   const [previewSig, setPreviewSig] = useState<string | null>(null); // model+style that made the current preview
@@ -808,31 +811,35 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   // styleTags (the picked zh chips) + subject ride along so the gallery can show what was
   // selected and build a meaningful filename. Read from current state — for compare's async
   // loop the chips rarely change mid-run, same posture as lockedModel below.
-  // POST one image to the gallery; resolves true on a 2xx, false on any failure (never throws).
-  // Shared by the fire-and-forget saveToGallery and the modal "存無框圖" button (which awaits
-  // the boolean to show saving / saved / failed feedback).
-  function postDesign(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string; batchJobId?: string; cardIndex?: number }): Promise<boolean> {
-    return fetch("/api/tools/designs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        image,
-        source,
-        prompt: extra?.prompt ?? null,
-        modelName: extra?.model ?? lockedModel,
-        cardName: extra?.cardName ?? null,
-        styleTags: styleTokens,
-        subject: subjectText.trim() || undefined,
-        batchJobId: extra?.batchJobId,
-        cardIndex: extra?.cardIndex,
-      }),
-    })
-      .then((r) => r.ok)
-      .catch(() => false);
+  type DesignExtra = { cardName?: string; prompt?: string; model?: string; batchJobId?: string; cardIndex?: number };
+  function designMeta(source: string, extra?: DesignExtra): Record<string, unknown> {
+    return {
+      source,
+      prompt: extra?.prompt ?? null,
+      modelName: extra?.model ?? lockedModel,
+      cardName: extra?.cardName ?? null,
+      styleTags: styleTokens,
+      subject: subjectText.trim() || undefined,
+      batchJobId: extra?.batchJobId,
+      cardIndex: extra?.cardIndex,
+    };
+  }
+
+  // One picture into My Designs, bytes unchanged (direct upload, lib/studio/design-upload.ts); resolves true / false, never
+  // throws. A failure is said on the page's message line. Shared by the fire-and-forget saveToGallery and the batch load.
+  async function postDesign(image: string | Blob, source: string, extra?: DesignExtra): Promise<boolean> {
+    let r: RegisterResult;
+    try {
+      r = await saveDesign(typeof image === "string" ? await urlToBlob(image) : image, designMeta(source, extra));
+    } catch (e) {
+      r = { ok: false, status: 0, error: e instanceof Error ? e.message : String(e), expired: false };
+    }
+    if (!r.ok) setMessage(saveFailureText(r));
+    return r.ok;
   }
 
   // Fire-and-forget save — never blocks generation or UI.
-  function saveToGallery(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string; batchJobId?: string; cardIndex?: number }) {
+  function saveToGallery(image: string | Blob, source: string, extra?: DesignExtra) {
     void postDesign(image, source, extra);
   }
 
@@ -841,47 +848,36 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   async function frameCardArt(card: TarotCard, index: number, artForPrint: string, live: () => boolean): Promise<void> {
     const blob = await renderPrintCard(card, artForPrint, template);
     const url = URL.createObjectURL(blob);
-    // Gallery-sized copy of the frameless art (capped WebP) for the on-demand "存無框圖" save —
-    // keeps a raw 2K PNG (which can exceed the gallery API's ~9MB limit → 413) safely under it,
-    // and shrinks what we retain in React state. The full-res artForPrint is still used for the
-    // printable card above; only this collected copy is capped.
-    const galleryArt = await toGalleryArt(artForPrint);
+    const thumb = await displayCopy(artForPrint);
     if (!live()) {
       URL.revokeObjectURL(url);
       throw new DOMException("stale card run", "AbortError");
     }
-    // Save the colour-graded card to gallery (洞2 fix): previously saved raw resp.image BEFORE
-    // renderPrintCard, so the gallery always got the ungraded original. Now we convert the graded
-    // blob to a data URL and save that — gallery and download are always in sync.
-    // live() is re-checked inside the async read: stop can land between here and onload.
-    void new Promise<string>((res) => {
-      const reader = new FileReader();
-      reader.onload = () => res(reader.result as string);
-      reader.readAsDataURL(blob);
-    }).then((dataUrl) => {
-      if (!live()) return;
-      saveToGallery(dataUrl, "tarot", {
-        cardName: card.name,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
-      });
+    // The colour-graded framed card to My Designs (洞2 fix: graded, the same bytes as the download).
+    saveToGallery(blob, "tarot", {
+      cardName: card.name,
+      prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
     });
-    // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
-    // on demand — the user collects only the pictures she likes, no auto-flooding the gallery.
     // revoke any prior url for this slot (retry case) before replacing
     setBatch((prev) =>
       prev.map((it, i) => {
         if (i !== index) return it;
         if (it.url) URL.revokeObjectURL(it.url);
-        return { ...it, status: "done", blob, url, art: galleryArt, error: undefined };
+        return { ...it, status: "done", blob, url, thumb, artKey: undefined, artJob: undefined, error: undefined };
       }),
     );
-    // Fresh art for this slot — clear any prior "已存無框圖" mark so the new art can be saved.
-    setSavedArt((prev) => {
-      if (!prev.has(index)) return prev;
-      const next = new Set(prev);
-      next.delete(index);
-      return next;
-    });
+    // The frameless original goes to uploads/pending/ now; 「存無框圖」 only registers it (the user collects the pictures she
+    // likes, no auto-flooding). Kept on the slot only while the slot still shows this card (url unchanged).
+    void urlToBlob(artForPrint)
+      .then((b) => uploadToPending(b, "image"))
+      .then((r) => {
+        if (!r.ok) {
+          if (live()) setMessage(`「${card.name}」無框原圖上傳失敗（「存無框圖」不可用）：${(r as { ok: false; error: string }).error}`);
+          return;
+        }
+        setBatch((prev) => prev.map((it, i) => (i === index && it.url === url ? { ...it, artKey: r.key } : it)));
+      })
+      .catch((e) => { if (live()) setMessage(`「${card.name}」無框原圖上傳失敗：${e instanceof Error ? e.message : String(e)}`); });
   }
 
   // A new preview from an edit (AI 修圖 or canvas 「傳回」): replace the preview, drop the lock and the deck, save the
@@ -1116,6 +1112,15 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   // Load results from a completed background batch into the local batch grid.
   // Results merge only into the deck that launched the job. A job from a previous deck (style was
   // relocked while it ran) is dropped with a message instead of filling the new deck by card index.
+  // A background card's original from the server with the current grade: what the grid shows (load) and what 「存無框圖」
+  // stores for that card -- one path for both.
+  async function gradedBatchArt(jobId: string, cardIndex: number): Promise<string> {
+    const imgRes = await fetch(`/api/tools/tarot/batch/${jobId}/image/${cardIndex}`, { headers: { ...roleHeader("operator") } });
+    if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status}`);
+    const art = await blobToDataUrl(await imgRes.blob());
+    return !grade.neutral ? await applyGradeToDataUrl(art, grade.params).catch(() => art) : art;
+  }
+
   async function loadBatchResults() {
     const job = bgJobRef.current;
     if (!job) return;
@@ -1156,20 +1161,17 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
         if (!isCurrent()) return stopped();
         const card = TAROT_CARDS[r.cardIndex];
         try {
-          const imgRes = await fetch(`/api/tools/tarot/batch/${job.id}/image/${r.cardIndex}`, { headers: { ...roleHeader("operator") } });
-          if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status}`);
-          const art = await blobToDataUrl(await imgRes.blob());
-          const graded = !grade.neutral ? await applyGradeToDataUrl(art, grade.params).catch(() => art) : art;
+          const graded = await gradedBatchArt(job.id, r.cardIndex);
           const blob = await renderPrintCard(card, graded, template);
-          const galleryArt = await toGalleryArt(graded);
+          const thumb = await displayCopy(graded);
           if (!isCurrent()) return stopped();
           const url = URL.createObjectURL(blob);
           setBatch((prev) => prev.map((it, i) => {
             if (i !== r.cardIndex) return it;
             if (it.url?.startsWith("blob:")) URL.revokeObjectURL(it.url);
-            return { ...it, status: "done", blob, url, art: galleryArt, error: undefined };
+            return { ...it, status: "done", blob, url, thumb, artKey: undefined, artJob: { jobId: job.id, cardIndex: r.cardIndex }, error: undefined };
           }));
-          saves.push(postDesign(await blobToDataUrl(blob), "tarot", {
+          saves.push(postDesign(blob, "tarot", {
             cardName: card.name,
             // A restored job was made from another page load: this deck's prompt would mislabel it.
             prompt: restoredJobsRef.current.has(job.id)
@@ -2295,39 +2297,53 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
               >
                 {batchBusy ? "生成中…" : "🔄 重新生成這張"}
               </button>
-              {batch[viewIndex].status === "done" && batch[viewIndex].art && (
+              {batch[viewIndex].status === "done" && (batch[viewIndex].artKey || batch[viewIndex].artJob) && (
                 <button
                   className="btn-secondary"
-                  disabled={savingArt || savedArt.has(viewIndex)}
-                  title="把這張圖（不含牌框 / 標題 / 羅馬數字）存進 My Designs"
+                  disabled={savingArt || savedArt.has(batch[viewIndex].url!)}
+                  title="把這張圖（不含牌框 / 標題 / 羅馬數字）的原圖存進 My Designs"
                   onClick={async () => {
                     const idx = viewIndex;
                     if (idx == null) return;
                     const item = batch[idx];
-                    if (!item?.art || savingArt || savedArt.has(idx)) return;
+                    const slotUrl = item?.url;
+                    if (!item || !slotUrl || (!item.artKey && !item.artJob) || savingArt || savedArt.has(slotUrl)) return;
                     setSavingArt(true);
-                    const ok = await postDesign(item.art, "tarot-art", {
+                    const meta = designMeta("tarot-art", {
                       cardName: item.card.name,
                       prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
                     });
+                    let r: RegisterResult;
+                    try {
+                      // Made here: the original is already in uploads/pending/. Background card: fetch, current grade, upload.
+                      r = item.artKey
+                        ? await registerDesign(item.artKey, meta)
+                        : await saveDesign(await urlToBlob(await gradedBatchArt(item.artJob!.jobId, item.artJob!.cardIndex)), meta);
+                    } catch (e) {
+                      const msg = e instanceof Error ? e.message : String(e);
+                      // A background job's record is kept 7 days (lib/tarot/batch-store.ts TTL): after that its picture is gone.
+                      r = /HTTP 404/.test(msg)
+                        ? { ok: false, status: 404, error: "背景批次的原圖已過期（批次紀錄保留 7 天），請重新生成這張。", expired: false }
+                        : { ok: false, status: 0, error: msg, expired: false };
+                    }
                     setSavingArt(false);
-                    if (ok) setSavedArt((prev) => new Set(prev).add(idx));
-                    else setMessage("無框圖儲存失敗，請稍後再試。");
+                    if (r.ok) setSavedArt((prev) => new Set(prev).add(slotUrl));
+                    else setMessage(saveFailureText(r));
                   }}
                 >
-                  {savingArt ? "儲存中…" : savedArt.has(viewIndex) ? "✓ 已存無框圖" : "🖼 存無框圖"}
+                  {savingArt ? "儲存中…" : savedArt.has(batch[viewIndex].url!) ? "✓ 已存無框圖" : "🖼 存無框圖"}
                 </button>
               )}
-              {canvasHref && batch[viewIndex].status === "done" && batch[viewIndex].art && (
+              {canvasHref && batch[viewIndex].status === "done" && batch[viewIndex].thumb && (
                 <button
                   className="btn-secondary"
                   title="把這張圖（無框、已調色）送進畫布；改完按「傳回」會換掉這張牌"
                   onClick={() => {
                     const idx = viewIndex;
                     const item = idx == null ? undefined : batch[idx];
-                    if (idx == null || !item?.art) return;
+                    if (idx == null || !item?.thumb) return;
                     void openInCanvas(
-                      item.art,
+                      item.thumb,
                       buildSemanticBase({ product: "塔羅卡", subject: subjectText.trim() || undefined, style: stylePrompt.trim() || undefined, track: item.card.name }),
                       canvasHref,
                       undefined,
