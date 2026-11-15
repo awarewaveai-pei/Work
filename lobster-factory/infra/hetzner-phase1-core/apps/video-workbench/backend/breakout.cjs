@@ -118,13 +118,16 @@ function lockPixels(gray, w, h) {
   return held;
 }
 
-// Held pixels are grouped into cells by LOCK.tile squares (a few characters). A pixel "changed" when its RGB distance (sum
-// of |d|) from the first frame passes CHANGED. The subject arrives from outside the text: a cell opens when at least TOUCH
-// of its own border pixels changed where they face something the subject can come from (a pixel that is not held: the
-// photo, the outside of the post, the frame edge; or a cell already open), each pixel counted once; opening repeats within
-// the frame until nothing more opens (a fast subject crosses several rows in one frame). An open cell shows the video as
-// made from then on. Every other cell is put back where it changed: drifting digits and letters sit inside their row with
-// a margin, so they never reach such a border, however compression softened them.
+// Held pixels are grouped into cells by LOCK.tile squares (a few characters). Everything is measured against the MODEL'S
+// OWN first frame as decoded, never the page's PNG: a model re-renders the post (Seedance shifts and rescales it a few
+// pixels, other sharpness), so the page's pixels do not line up with the video; held against them, every row would show
+// doubled edges and would open at frame 0. A pixel "changed" when its RGB distance (sum of |d|) from that frame passes
+// CHANGED. The subject arrives from outside the text: a cell opens when at least TOUCH of its own border pixels changed
+// where they face something the subject can come from (a pixel that is not held: the photo, the outside of the post, the
+// frame edge; or a cell already open), each pixel counted once; opening repeats within the frame until nothing more opens
+// (a fast subject crosses several rows in one frame). An open cell shows the video as made from then on. Every other cell
+// is put back to that first frame where it changed: drifting digits and letters sit inside their row with a margin, so
+// they never reach such a border, however compression softened them.
 /**
  * cells: held pixel indices per cell; borders: per cell, flat [pixel, k, label1..labelk] for its border pixels, label =
  * the neighbouring cell or -1 (not held, or the frame edge).
@@ -154,8 +157,9 @@ function lockGrid(held, w, h, tile = LOCK.tile) {
   return { cells: lists.map((l) => Int32Array.from(l)), borders };
 }
 /**
- * Holds one decoded frame's text cells to the first frame, in place. frame/ref: rgb24 buffers of the same size;
- * grid: lockGrid; open: one flag per cell, kept across frames. Returns the pixels put back.
+ * Holds one decoded frame's text cells to the video's first frame, in place. frame/ref: rgb24 buffers of the same size,
+ * ref = the model's own first frame as decoded (before any lock); grid: lockGrid; open: one flag per cell, kept across
+ * frames. Returns the pixels put back.
  */
 function lockFrame(frame, ref, grid, open) {
   const changed = (p) => {
@@ -215,7 +219,7 @@ const TO_RGB = "scale=in_color_matrix=bt709:in_range=tv:out_range=pc";
 const TO_YUV = "scale=out_color_matrix=bt709:in_range=pc:out_range=tv,format=yuv420p";
 const TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
 
-async function finishHere({ src, frameFile, maskFile, dst, settings, ffmpeg, signal }) {
+async function finishHere({ src, maskFile, dst, settings, ffmpeg, signal }) {
   const mask = !!maskFile && fs.existsSync(maskFile),
     ratio = rules.OUTPUT_RATIOS.includes(settings?.outputRatio) ? settings.outputRatio : "9:16",
     [ma, mb] = rules.modelRatio(ratio).split(":").map(Number);
@@ -242,8 +246,6 @@ async function finishHere({ src, frameFile, maskFile, dst, settings, ffmpeg, sig
   const grid = lockGrid(await lockMaskPixels({ maskFile, width: W, height: H, ffmpeg, signal }), W, H),
     open = new Uint8Array(grid.cells.length),
     size = W * H * 3;
-  const ref = await run(ffmpeg, ["-v", "error", "-i", frameFile, "-vf", `scale=${W}:${H}:flags=area`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal).done;
-  if (ref.length !== size) throw Error("第一格畫面尺寸不符");
   const decoder = run(ffmpeg, ["-v", "error", "-noautorotate", "-i", src, "-vf", TO_RGB, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal);
   const encoder = run(ffmpeg, ["-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", `${W}x${H}`, "-r", fps, "-i", "-", "-i", src,
     "-map", "1:a?", "-vf", crop + TO_YUV, "-shortest", ...out], signal, { stdout: false });
@@ -251,7 +253,7 @@ async function finishHere({ src, frameFile, maskFile, dst, settings, ffmpeg, sig
   // Frames are assembled in one reused buffer (no growing concat per chunk); a frame is written as a copy so the
   // encoder pipe never sees a buffer that is being refilled.
   const frame = Buffer.alloc(size);
-  let filled = 0, restored = 0;
+  let filled = 0, restored = 0, ref = null; // the model's first frame as decoded, before any lock
   decoder.child.stdout.removeAllListeners("data"); // run() collected stdout; here it streams instead
   decoder.child.stdout.on("data", (chunk) => {
     for (let at = 0; at < chunk.length; ) {
@@ -260,6 +262,7 @@ async function finishHere({ src, frameFile, maskFile, dst, settings, ffmpeg, sig
       filled += n;
       at += n;
       if (filled === size) {
+        ref ??= Buffer.from(frame);
         restored += lockFrame(frame, ref, grid, open);
         filled = 0;
         if (!encoder.child.stdin.write(Buffer.from(frame))) {
@@ -297,14 +300,14 @@ async function fileRatio(file) {
 }
 /**
  * The finished breakout video: text rows held to the first frame (settings.lock), then cut to settings.outputRatio's
- * centred box, in one encode. src: the model's mp4 (9:16 or 16:9); frameFile: the first-frame PNG the job sent; dst: output mp4.
+ * centred box, in one encode. src: the model's mp4 (9:16 or 16:9); maskFile: the job's lock mask (none = no hold); dst: output mp4.
  * Runs in a worker thread (the per-frame pixel work must not hold the API's event loop), at most FINISH_TIMEOUT_MS.
  * Returns { ratio, restored, untouched? }: ratio = the written file's own ratio; untouched = nothing written, keep src.
  * A failure removes dst.
  */
-function finish({ src, frameFile, maskFile, dst, settings, ffmpeg, signal, timeoutMs = FINISH_TIMEOUT_MS }) {
+function finish({ src, maskFile, dst, settings, ffmpeg, signal, timeoutMs = FINISH_TIMEOUT_MS }) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(__filename, { workerData: { breakoutFinish: { src, frameFile, maskFile, dst, settings, ffmpeg } } });
+    const worker = new Worker(__filename, { workerData: { breakoutFinish: { src, maskFile, dst, settings, ffmpeg } } });
     let settled = false;
     const end = (fn, value) => {
       if (settled) return;

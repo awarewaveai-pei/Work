@@ -368,19 +368,20 @@ const fetchImpl = async (url, init = {}) => {
   }
   console.log("PASS 收尾階段：狀態查詢不等本機處理；處理中取消不呼叫供應商、停止處理並交付原始影片；重啟後接續或說明失敗");
 
-  // finish() with real ffmpeg: a 9:16 clip whose "digits" drifted -> 4:5 file, digits back where the first frame had them
+  // finish() with real ffmpeg: a 9:16 clip whose "digits" drift after its first frame -> 4:5 file, digits back where the
+  // video's first frame had them
   {
     const os = require("node:os"), { spawnSync } = require("node:child_process"), ffmpeg = require("ffmpeg-static");
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-breakout-finish-")), W = 72, H = 128;
     const ff = (...args) => assert.equal(spawnSync(ffmpeg, ["-v", "error", "-y", ...args]).status, 0, args.join(" "));
     // a lock mask as the page sends it: black, the text rows [x, y, w, h] white
     const maskPng = (file, w, h, rects) => ff("-f", "lavfi", "-i", `color=black:s=${w}x${h}:d=1,${rects.map(([x, y, rw, rh]) => `drawbox=x=${x}:y=${y}:w=${rw}:h=${rh}:color=white:t=fill`).join(",")}`, "-frames:v", "1", file);
-    const glyph = (x) => `color=white:s=${W}x${H}:d=1:r=10,drawbox=x=${x}:y=100:w=16:h=8:color=black:t=fill`;
-    ff("-f", "lavfi", "-i", glyph(8), "-frames:v", "1", path.join(dir, "first.png"));
-    ff("-f", "lavfi", "-i", glyph(40), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "1", path.join(dir, "made.mp4"));
+    // a glyph box at x0 for the first 0.3 s, at x1 after (the drift); w x h frames, 10 fps, 1 s
+    const drifting = (w, h, x0, x1, y) => `color=white:s=${w}x${h}:d=1:r=10,drawbox=x=${x0}:y=${y}:w=16:h=8:color=black:t=fill:enable='lt(t,0.3)',drawbox=x=${x1}:y=${y}:w=16:h=8:color=black:t=fill:enable='gte(t,0.3)'`;
+    ff("-f", "lavfi", "-i", drifting(W, H, 8, 40, 100), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "1", path.join(dir, "made.mp4"));
     maskPng(path.join(dir, "mask.png"), W, H, [[0, 96, W, 16]]);
     const done = await breakout.finish({
-      src: path.join(dir, "made.mp4"), frameFile: path.join(dir, "first.png"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, "out.mp4"),
+      src: path.join(dir, "made.mp4"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, "out.mp4"),
       settings: { outputRatio: "4:5" }, ffmpeg,
     });
     assert.equal(done.ratio, "4:5");
@@ -388,7 +389,8 @@ const fetchImpl = async (url, init = {}) => {
     const info = await require("../backend/media-inspect.cjs").inspectMedia(path.join(dir, "out.mp4"));
     assert.deepEqual([info.width, info.height], [W, rules.outputHeight("4:5", W)]);
     // the 4:5 box starts (128-90)/2 = 19 rows down: the glyph row y=100 is y=81 in the output
-    const raw = spawnSync(ffmpeg, ["-v", "error", "-i", path.join(dir, "out.mp4"), "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "-"]).stdout;
+    const all = spawnSync(ffmpeg, ["-v", "error", "-i", path.join(dir, "out.mp4"), "-f", "rawvideo", "-pix_fmt", "gray", "-"], { maxBuffer: 1 << 24 }).stdout,
+      oh = rules.outputHeight("4:5", W), raw = all.subarray(all.length - W * oh); // the last frame: long after the drift
     const at = (x, y) => raw[y * W + x];
     assert(at(14, 85) < 60, "first-frame digits not back");
     assert(at(46, 85) > 200, "drifted digits still there");
@@ -396,17 +398,16 @@ const fetchImpl = async (url, init = {}) => {
     const tags = spawnSync(require("../backend/media-inspect.cjs").ffprobePath(), ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=color_space,color_primaries,color_transfer", "-of", "csv=p=0", path.join(dir, "out.mp4")], { encoding: "utf8" }).stdout.trim();
     assert.equal(tags, "bt709,bt709,bt709", "output not tagged BT.709: " + tags);
     // no lock and 9:16: the file is not touched at all (no re-encode)
-    const plain = await breakout.finish({ src: path.join(dir, "made.mp4"), frameFile: "", dst: path.join(dir, "plain.mp4"), settings: { outputRatio: "9:16" }, ffmpeg });
+    const plain = await breakout.finish({ src: path.join(dir, "made.mp4"), dst: path.join(dir, "plain.mp4"), settings: { outputRatio: "9:16" }, ffmpeg });
     assert.equal(plain.untouched, true);
     assert(!fs.existsSync(path.join(dir, "plain.mp4")), "a 9:16 job without a lock was re-encoded");
     // a failure leaves no half-written file
-    await assert.rejects(breakout.finish({ src: path.join(dir, "missing.mp4"), frameFile: "", dst: path.join(dir, "bad.mp4"), settings: { outputRatio: "4:5" }, ffmpeg }));
+    await assert.rejects(breakout.finish({ src: path.join(dir, "missing.mp4"), dst: path.join(dir, "bad.mp4"), settings: { outputRatio: "4:5" }, ffmpeg }));
     assert(!fs.existsSync(path.join(dir, "bad.mp4")));
     // 16:9: the model's own shape, held without a crop
-    ff("-f", "lavfi", "-i", `color=white:s=${H}x${W}:d=1:r=10,drawbox=x=40:y=50:w=16:h=8:color=black:t=fill`, "-c:v", "libx264", "-pix_fmt", "yuv420p", path.join(dir, "wide.mp4"));
-    ff("-f", "lavfi", "-i", `color=white:s=${H}x${W}:d=1,drawbox=x=8:y=50:w=16:h=8:color=black:t=fill`, "-frames:v", "1", path.join(dir, "wide.png"));
+    ff("-f", "lavfi", "-i", drifting(H, W, 8, 40, 50), "-c:v", "libx264", "-pix_fmt", "yuv420p", path.join(dir, "wide.mp4"));
     maskPng(path.join(dir, "wide-mask.png"), H, W, [[0, 46, H, 16]]);
-    const wide = await breakout.finish({ src: path.join(dir, "wide.mp4"), frameFile: path.join(dir, "wide.png"), maskFile: path.join(dir, "wide-mask.png"), dst: path.join(dir, "wide-out.mp4"),
+    const wide = await breakout.finish({ src: path.join(dir, "wide.mp4"), maskFile: path.join(dir, "wide-mask.png"), dst: path.join(dir, "wide-out.mp4"),
       settings: { outputRatio: "16:9" }, ffmpeg });
     assert.equal(wide.ratio, "16:9");
     assert(wide.restored > 0);
@@ -417,7 +418,8 @@ const fetchImpl = async (url, init = {}) => {
   console.log("PASS 收尾：鎖定貼文文字＋裁成 4:5 一次完成；16:9 不裁也鎖定；檔案尺寸與比例正確");
 
   // A real encoded clip (made here, nothing checked in): an IG 9:16 burst post at half size (rows: header, photo, icons,
-  // likes, caption, comments, nav), the likes and comment digits drifting 4 px and softening in the first second, then an
+  // likes, caption, comments, nav), the likes and comment digits drifting 4 px and softening from 0.2 s to 1 s (a model's first frame is
+  // the post as given), then an
   // opaque red shape coming down out of the photo across the rows (t 1..3.5 s). H.264 yuv420p crf 23 BT.709 like a vendor
   // file, through the same finish() the server runs. Every frame: drift put back before the shape comes; the shape shown
   // in every row from the frame it reaches it; a cell it never touches held.
@@ -436,14 +438,14 @@ const fetchImpl = async (url, init = {}) => {
     ].join(",");
     ff("-f", "lavfi", "-i", "testsrc2=s=360x401:d=1", "-frames:v", "1", path.join(dir, "photo.png"));
     ff("-f", "lavfi", "-i", `color=white:s=${W}x${H}:d=1`, "-i", path.join(dir, "photo.png"), "-filter_complex", `[0][1]overlay=0:56,${post}`, "-frames:v", "1", path.join(dir, "first.png"));
-    const drift = "drawbox=x=14:y=501:w=60:h=10:color=white:t=fill:enable='lt(t,1)',drawbox=x=18:y=501:w=60:h=10:color=0x505050:t=fill:enable='lt(t,1)'," +
-      "drawbox=x=14:y=570:w=180:h=10:color=white:t=fill:enable='lt(t,1)',drawbox=x=18:y=570:w=180:h=10:color=0x9a9ca0:t=fill:enable='lt(t,1)'";
+    const drift = "drawbox=x=14:y=501:w=60:h=10:color=white:t=fill:enable='between(t,0.2,1)',drawbox=x=18:y=501:w=60:h=10:color=0x505050:t=fill:enable='between(t,0.2,1)'," +
+      "drawbox=x=14:y=570:w=180:h=10:color=white:t=fill:enable='between(t,0.2,1)',drawbox=x=18:y=570:w=180:h=10:color=0x9a9ca0:t=fill:enable='between(t,0.2,1)'";
     ff("-loop", "1", "-t", "4", "-r", String(FPS), "-i", path.join(dir, "first.png"), "-f", "lavfi", "-i", `color=0xd8282c:s=120x120:r=${FPS}:d=4`,
       "-filter_complex", `[0]${drift}[b];[b][1]overlay=x=120:y='280+108*clip(t-1,0,2.5)':enable='gte(t,1)',scale=out_color_matrix=bt709:out_range=tv,format=yuv420p`,
       "-c:v", "libx264", "-crf", "23", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-t", "4", path.join(dir, "made.mp4"));
     ff("-f", "lavfi", "-i", `color=black:s=${W}x${H}:d=1,${rows.map(([y, h]) => `drawbox=x=0:y=${y}:w=${W}:h=${h}:color=white:t=fill`).join(",")}`, "-frames:v", "1", path.join(dir, "mask.png"));
     const finishClip = (made, out) => breakout.finish({
-      src: path.join(dir, made), frameFile: path.join(dir, "first.png"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, out), ffmpeg,
+      src: path.join(dir, made), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, out), ffmpeg,
       settings: { outputRatio: "9:16" },
     });
     const done = await finishClip("made.mp4", "out.mp4");
@@ -493,6 +495,16 @@ const fetchImpl = async (url, init = {}) => {
         }
     }
     assert(photoChecks > 200, "the photo changed too little to tell: " + photoChecks);
+    // A model that re-renders the post 3 px lower than the page drew it (Seedance does, a few px): measured against the
+    // video's own first frame, nothing opens and nothing is put back (held against the page's PNG, every row would open
+    // at frame 0 or show doubled edges)
+    ff("-loop", "1", "-t", "1", "-r", String(FPS), "-i", path.join(dir, "first.png"),
+      "-vf", `crop=${W}:${H - 3}:0:0,pad=${W}:${H}:0:3:white,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p`,
+      "-c:v", "libx264", "-crf", "23", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", path.join(dir, "shifted.mp4"));
+    const shifted = await finishClip("shifted.mp4", "shifted-out.mp4");
+    assert.equal(shifted.opened, 0, "a post re-rendered 3 px lower opened " + shifted.opened + " cells");
+    // only compression flicker is put back: under one row's width per frame (the shift's edges would be thousands)
+    assert(shifted.restored < W * FPS, "a post re-rendered 3 px lower was put back in " + shifted.restored + " pixels");
     fs.rmSync(dir, { recursive: true, force: true });
   }
   console.log("PASS 鎖定實片：真實編碼的影片裡，飄移在主角到之前還原；主角到哪一列，那一格當格就照影片顯示；沒碰到的格子一直鎖住；照片在動但沒有主角時，一格都不放行、照片也不被還原");

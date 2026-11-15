@@ -958,7 +958,6 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       .then(() =>
         breakout.finish({
           src, dst: path.join(outputs, name), settings: job.input.settings, ffmpeg: require("ffmpeg-static"), signal: controller.signal,
-          frameFile: localFile(job.input.references?.firstFrame?.[0]?.url) || "",
           maskFile: breakout.maskPath(jobInputs, job.id),
         }),
       )
