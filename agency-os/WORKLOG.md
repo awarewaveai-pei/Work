@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-15（續2）Replicate 成品網址清單＋每一跳轉址都檢查；局部編輯器只列照中文的模型、Klein 預設、指令由伺服器組
+
+- 起因：局部編輯器 5 模型實測（指令「把框內的天空改成滿天星星的夜空」）發現 FLUX 2 Klein 的成品放在 Replicate 的 R2 網址，我們只認 replicate.delivery → 工作失敗、使用者沒扣款、Replicate 卻照收。操作者 2026-11-14：「Klein 可以用就用吧，把可以用的都按照價錢順序列出，而且要說明其優缺」。
+- commits：7ce8b67e9 成品網址清單只有一份（next-admin `lib/ai/replicate-output.ts`：replicate.delivery 加一個由我們自己的預測回應證實的 R2 主機，只收 https、主機要完全相符），兩個 app 所有讀成品的地方都改讀它。2db923ea3＋1ef405f5d 指令改由伺服器組（image-edit.cjs instructionText），所有模型同一種寫法：每框一行「區域 N（位置）：那句話」。ba2580b06 局部編輯器只列共用清單裡 zh=ok 的模型、便宜的在前、預設＝第一個可執行的（Klein，照規則，不寫死）；FLUX Fill Pro 的 zh 改成 no（兩次實測都沒照做）；note 改成實測得到的一行優缺。8ff422002 每次轉址都重新檢查（Codex）。
+- 不變量：(1) 下載 Replicate 成品時，每一跳都要在共用清單上：fetchReplicateOutput 用 redirect manual，最多 3 跳，每個 Location 都重新檢查，兩個 app 只有這一個下載入口。(2) 一個框的指令永遠對應到那個框（不再依有沒有遮罩分兩種寫法：試過，會讓多框時對不上，而且拿掉座標也沒有讓 Fill Pro 變聽話）。
+- 實測（session 用真實金鑰走我們自己的區域路由）：Klein 約 NT$0.015 照做；Kontext Fast NT$0.32 沒照做；Ideogram（省）NT$0.96 照做（另一次沒照做）；Nano Banana 2.1 NT$1.25 照做、最乾淨；Fill Pro NT$1.60 兩次都沒照做。轉址：2026-11-15 replicate.delivery 新網址 HEAD／GET 都直接 200，沒有轉址。
+- REALTEST_EVIDENCE: tool=Bash | cmd=video-workbench region-edit（8）, remove-bg, remove-bg-money, replicate-video, s4b-image-to-3d, ed12-ai-enhance, ed12-effects-ai, breakout, tools-workflows, generation-flows + tests/gate.cjs（origin/main aba072c52＋5 commits） | exit=0 | ms=900000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit && npx vitest run lib/ai lib/studio lib/tarot（532） | exit=0 | ms=150000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex `2026-11-15-partialreview-ea418494`（轉址可以繞過清單＝SSRF，8ff422002 已修）；監工讀過 fetchReplicateOutput。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=replicate\.delivery|isReplicateOutputUrl|fetchReplicateOutput|fetchOutput | hits=87
+- 剩餘風險：(1) Replicate 如果改用清單以外的主機交成品，一律擋下：工作失敗、Replicate 照收、使用者不扣款，要確認新主機後加進清單。(2) Ideogram（細）和 GPT-Image-2.6 在局部編輯器沒有實測，zh 沿用 2026-11-09 的量測。(3) Nano Banana 的 note「修圖最乾淨」在生圖選單也會出現。(4) 修圖工具的生成填色仍列出 Fill Pro，標成要寫英文。
+- rollback：git revert 這 5 個 commit（8ff422002 可以單獨退）。
 ## 2026-11-14（續8）影音工作台 MV 模式規格：一首歌 → 完整 MV（只想不做）
 
 - 產出：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/mv-mode-spec-20261114.md`（行號對 origin/main `44f2faf22`）；`docs/creative-suite-plan-20261102.md §4` 加一列 MV 指向它。
