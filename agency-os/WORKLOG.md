@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-15（續30）— 編輯器載入／改邊緣／Codex 生圖：卡 C／D／E 驗收、兩次部署、實測（主 session）
+
+**部署**：`sg-deploy.sh next-admin` 10:57Z → `fe6b50ee5`（卡 C：Codex 交件拿號碼）；15:16Z → `f322a8ebf`（卡 E：dock 啟動等待＋改邊緣一次下載）。卡 A `78a3b3dc9`／卡 B `547e92a75` 已在 09:26Z 那輪上線；卡 D `604e85628` 是 Cloudflare 規則＋nginx map，不經 sg-deploy（該卡自行 apply）。
+**根因鏈**（細節在各卡條目：續7 ×2、續17、續27、續28）：
+- 編輯器今早換版（photo-pro 05:23Z／vector-pro 05:33Z 切 `current`）→ 全部瀏覽器重抓 14 MB／33 MB；Cloudflare 預設不快取 `.wasm`／`.part-*`（同目錄 `.js` HIT）→ 每次回歐洲 origin；dock 固定 60／30 秒放棄並叫重新整理 → access log 12:04–12:11 四次整理、每次下載從頭。
+- 改邊緣退化點 `5362617a4`（2026-10-24）：`proxy-image`（max-age=300）→ `designs/download`（no-store），每換筆刷重抓原圖（當日 5 次 × 3.9 MB）。
+**實測**（台灣筆電，線速約 0.5 MB/s）：
+- Codex：`POST /api/tools/studio/generate` model=codex-image → 202＋`X-Codex-Job`；51 秒後 `GET /api/tools/codex-laptop/jobs/<id>` 200 含圖。worker log：改前一張 92 秒者回報 404。
+- Cloudflare：part-aa／vector wasm／boot wasm／`fonts/noto-sans-tc` 第二次 `cf-cache-status: HIT`；`index.html`／`app/photocraft-web.js`（private, no-cache）仍 BYPASS。part-aa 14 MB 下載 61–110 s → 23.7 s。
+- 改邊緣：開面板即下載原圖 1 次（面板顯示「下載原圖中…」，下載中按筆刷等待不報錯）；連按 4 筆刷後 `/api/tools/designs/download` 仍 1 次；換筆刷 < 3 s。
+- 帶入設計：My Designs → 畫布編輯 → 新分頁 `/tools/photo-pro?h=…`，dock「下載帶入的設計…」→「開啟中…」→ PhotoCraft 開啟 `塔羅牌-草間彌生 Yayoi Kusama.png`。
+- 社群：貼文清單縮圖恢復、頂列吃主題（Chrome 截圖於本 session）。
+**未解（待操作者）**：「啟動筆電」從 Chrome 按不動——Windows 直開 `awarewave-codex://start` 工人每次都起；Chrome 點擊後主機未收到任何 claim，Chrome 全部 profile 都沒存下該 protocol 的允許；需確認框截圖。工人閒置 30 分鐘自關 = 設計。
+**之後**（要重建編輯器，不急）：PhotoCraft 頁面自己 20 秒後的「Reload to try again」改掉（`packaging/web` 模板，走 debrand.py）；photo-pro 字型改成像 vector-pro `web-fonts.patch` 的內容雜湊目錄。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -s -o /dev/null -D - https://app.aware-wave.com/photo-pro/current/app/photocraft-web-28840f20f6fcbf69.part-aa (x2) → cf-cache-status: HIT, 14024434B 23.7s; ssh sg-deploy.sh next-admin → deployed commit f322a8ebf | exit=0 | ms=370000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（主 session 逐卡讀 diff：78a3b3dc9／547e92a75／fe6b50ee5／604e85628／f322a8ebf；各卡自帶 oracle artifact）
+- BUGHUNT_WAIVED: NA -- 本條目只記部署與驗收，無程式改動（各卡條目已含 BUGHUNT）
 ## 2026-11-15（續29）— C1 完成：`lobster-designs` 專用 S3 金鑰進 vault＋正式機 next-admin（操作者「全部幫我做」）
 
 - 建立：本機 `CLOUDFLARE_API_TOKEN`（帳號 token，有 Account API Tokens 權限）`POST /accounts/<id>/tokens` 建 `lobster-designs-s3-next-admin`；資源僅 `com.cloudflare.edge.r2.bucket.<acct>_default_lobster-designs`，權限 Workers R2 Storage Bucket Item Read＋Write。S3 Access Key ID＝token id、Secret＝sha256(token value)（Cloudflare R2 tokens 文件）。值全程只在子行程記憶體，未進對話、命令列或檔案。

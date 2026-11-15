@@ -106,6 +106,7 @@
 
 
 ### 未完成
+- [ ] **【待操作者 2026-11-15｜Codex 免費生圖】「啟動筆電」從 Chrome 按不動** — Windows 直開 `awarewave-codex://start` 工人每次都起；Chrome 點擊後主機無 claim、無 profile 存下允許；需操作者在確認框跳出時截圖 → WORKLOG 2026-11-15（續30）。
 - [ ] **【計畫定稿、待開工 2026-11-05｜畫布專業版】PhotoCraft（storytold，Photoshop 開源重製）WASM 網頁版嵌入 app `tools/photo-pro`，取代 Canvas Editor** — 計畫 `agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md` §6（C1–C7，28 項）；監工台 https://claude.ai/artifact/SdDBg3KBHF7A4b6ZSBCHGM；研究 `agency-os/reports/decisions/2026-11-05-canvas-editor-vs-photocraft.md`。介面已定案：用上游 craft-web-api＋craft-web-host，C1.3 先查上游是否已內建。閘：C1.5 spike（圖層像素進出）。待決 1 SVG 面板、待決 2 舊 .design.json（皆有預設）。下一步：操作者說開始 → C1.1。建議模型：Opus 5.5（C1）、驗收 Fable。
 - [ ] **【未開始 2026-11-04｜向量專業版】VectorCraft（storytold，Illustrator 開源重製）WASM 網頁版嵌入 app `tools/vector-pro`＋六個出稿積木抽成共用層** — 計畫 `agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` §6（C1–C7，27 項；獨有 10 項做第二 dock 欄，舊編輯器 C7 退場）；監工台 https://claude.ai/artifact/GKGxtNsXbW65SDhsHiTqRK；研究 `agency-os/reports/decisions/2026-11-04-vector-editor-vs-vectorcraft.md`。待決 1：wasm 靜態檔不經登入。下一步 C1.1 裝 Rust 工具鏈。建議模型：Opus 5.5。
 
