@@ -83,4 +83,23 @@ describe("compose youtube", () => {
     expect(() => compose({ ...base, platform: "youtube", body: `${"題".repeat(101)}\nbody`, media: video })).toThrow("2–100");
     expect(() => compose({ ...base, platform: "youtube", body: "AI <vs> 人類\nbody", media: video })).toThrow("< 或 >");
   });
+
+  // Card VD.6: a video's cover reaches the platforms whose Postiz provider shows one (YouTube, Instagram), nowhere else.
+  it("a video cover: YouTube settings.thumbnail, Instagram item thumbnail, Facebook none, no cover unchanged", () => {
+    const cover = { postizMediaId: "c1", postizPath: "https://p/cover.jpg" };
+    const video = { postizMediaId: "v1", postizPath: "https://p/clip.mp4", altText: null };
+    const yt = compose({ ...base, platform: "youtube", body: "標題\n說明", media: [{ ...video, cover }] });
+    expect(yt.settings).toEqual({ __type: "youtube", type: "public", title: "標題", thumbnail: { id: "c1", path: "https://p/cover.jpg" } });
+    expect(yt.values[0].image).toEqual([{ id: "v1", path: "https://p/clip.mp4" }]);
+    const ig = compose({ ...base, platform: "instagram", format: "reel", media: [{ ...video, cover }] });
+    expect(ig.values[0].image).toEqual([{ id: "v1", path: "https://p/clip.mp4", thumbnail: "https://p/cover.jpg" }]);
+    expect(ig.settings).toEqual({ __type: "instagram", post_type: "post" });
+    const fb = compose({ ...base, platform: "facebook", media: [{ ...video, cover }] });
+    expect(fb.values[0].image).toEqual([{ id: "v1", path: "https://p/clip.mp4" }]);
+    expect(fb.settings).toEqual({ __type: "facebook" });
+    expect(compose({ ...base, platform: "youtube", body: "標題\n說明", media: [video] }).settings).toEqual({ __type: "youtube", type: "public", title: "標題" });
+    // a cover not in Postiz storage yet, or on an image post, is not sent (the post itself still goes)
+    expect(compose({ ...base, platform: "youtube", body: "標題\n說明", media: [{ ...video, cover: { postizMediaId: null, postizPath: null } }] }).settings).not.toHaveProperty("thumbnail");
+    expect(compose({ ...base, platform: "instagram", media: [{ postizMediaId: "i", postizPath: "https://p/1.jpg", altText: null, cover }] }).values[0].image[0]).not.toHaveProperty("thumbnail");
+  });
 });

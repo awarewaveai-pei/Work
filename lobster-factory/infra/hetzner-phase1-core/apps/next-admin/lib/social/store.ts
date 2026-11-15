@@ -818,12 +818,13 @@ export async function recordAutoRuleHit(brandId: string, ruleId: string, actor: 
 // ---- media and log ---------------------------------------------------------------------------------------------
 
 export async function listMedia(brandId: string) {
-  const { data, error } = await db().from("social_media").select("id, kind, file_name, postiz_path, bytes, created_at, uses:social_post_media(count)")
+  const { data, error } = await db().from("social_media").select("id, kind, file_name, postiz_path, bytes, created_at, uses:social_post_media(count), cover:social_media!social_media_cover_fk(postiz_path)")
     .eq("organization_id", brandId).order("created_at", { ascending: false }).limit(200);
   if (error) fail(error, "media");
   // C9: how many posts use each item (the library's 「用過 N 次」); PostgREST answers the embed as [{ count }]
-  return ((data ?? []) as Array<Record<string, unknown> & { uses?: Array<{ count: number }> }>)
-    .map(({ uses, ...m }) => ({ ...m, used: uses?.[0]?.count ?? 0 }));
+  // VD.7: cover_path = the video's cover image (0163), what every list shows instead of a frame of the video
+  return ((data ?? []) as unknown as Array<Record<string, unknown> & { uses?: Array<{ count: number }>; cover?: { postiz_path: string | null } | null }>)
+    .map(({ uses, cover, ...m }) => ({ ...m, used: uses?.[0]?.count ?? 0, cover_path: cover?.postiz_path ?? null }));
 }
 
 /** Uploads through Postiz (its storage holds the file until the media library card moves storage, C9). */
@@ -843,20 +844,39 @@ export async function addImage(brandId: string, imageUrl: string, fileName: stri
   return { ...data, used: 0 };
 }
 
-/** Video counterpart of addImage; kind is stored explicitly so previews do not infer it from a URL. */
-export async function addVideo(brandId: string, videoUrl: string, fileName: string, actor: string) {
+/** Video counterpart of addImage; kind is stored explicitly so previews do not infer it from a URL.
+ *  coverUrl (card VD.5) = the video's cover image: uploaded first as its own image row, the video row points at it
+ *  (0163 cover_media_id); a refused cover upload refuses nothing else -- the video is still added, without a cover. */
+// Codex 819670ab / 3ed81cf7: a cover is optional work inside a request behind a 300 s proxy timeout. It runs only when
+// its worst case (image fetch 20 s + upload 60 s, lib/content/postiz.ts) still ends before `deadline` -- the REQUEST's
+// deadline (one for all ratios of a draft save: lib/content/video/social-drafts.ts), default 240 s from this call.
+export const ADD_VIDEO_BUDGET_MS = 240_000;
+const COVER_WORST_MS = 80_000;
+
+export async function addVideo(brandId: string, videoUrl: string, fileName: string, actor: string, coverUrl?: string | null, deadline?: number, now: () => number = Date.now) {
+  const until = deadline ?? now() + ADD_VIDEO_BUDGET_MS;
   let up: { id: string; path: string };
   try {
     up = await uploadVideo({ videoUrl, filename: fileName });
   } catch (e) {
     throw new SocialStoreError(400, `upload refused: ${e instanceof Error ? e.message : String(e)}`);
   }
+  let coverId: string | null = null;
+  if (coverUrl && now() + COVER_WORST_MS > until) {
+    console.error(`[social] cover skipped for ${fileName}: the video upload left no time for it`);
+  } else if (coverUrl) {
+    try {
+      coverId = String((await addImage(brandId, coverUrl, fileName.replace(/\.[a-z0-9]+$/i, "") + "-cover.jpg", actor)).id);
+    } catch (e) {
+      console.error(`[social] cover not added for ${fileName}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300));
+    }
+  }
   const sb = db();
   const { data, error } = await sb.from("social_media")
-    .insert({ organization_id: brandId, kind: "video", file_name: fileName, storage_path: up.path, postiz_media_id: up.id, postiz_path: up.path, created_by: actor })
+    .insert({ organization_id: brandId, kind: "video", file_name: fileName, storage_path: up.path, postiz_media_id: up.id, postiz_path: up.path, created_by: actor, ...(coverId ? { cover_media_id: coverId, cover_kind: "image" } : {}) })
     .select("id, kind, file_name, postiz_path, created_at").single();
   if (error) fail(error, "media");
-  await logAction(sb, brandId, actor, "media_upload", { media_id: data.id, file_name: fileName, kind: "video" });
+  await logAction(sb, brandId, actor, "media_upload", { media_id: data.id, file_name: fileName, kind: "video", ...(coverId ? { cover_media_id: coverId } : {}) });
   return { ...data, used: 0 };
 }
 

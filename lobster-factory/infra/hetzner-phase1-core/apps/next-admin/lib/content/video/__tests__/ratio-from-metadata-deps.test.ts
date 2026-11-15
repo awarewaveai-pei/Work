@@ -29,7 +29,7 @@ describe("workbench rows (ratio only in metadata)", () => {
     const rows = [{ id: "a1", object_url: WB, checksum_sha256: "sum", metadata: { ratio: "9x16" } }];
     const db = { from: () => chain([{ id: "r1", candidate_asset_id: "a1", candidate_checksum: "sum" }]) };
     const out = await draftDeps(db as never, "org", rows, "me").releases();
-    expect(out).toEqual([{ releaseId: "r1", ratio: "9x16", videoUrl: WB }]);
+    expect(out).toEqual([{ releaseId: "r1", ratio: "9x16", videoUrl: WB, coverUrl: null }]);   // VD.5: no cover row = null
   });
 
   it("project-advance deps rows() finds the ratio", async () => {

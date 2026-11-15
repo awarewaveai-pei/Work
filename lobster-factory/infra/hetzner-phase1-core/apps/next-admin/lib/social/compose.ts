@@ -22,11 +22,12 @@ export interface ComposeInput {
   linkUtm: boolean;
   platform: string;
   format: string;
-  media: Array<{ postizMediaId: string | null; postizPath: string | null; altText: string | null }>;
+  /** cover = the video's cover image (social_media.cover_media_id, card VD.5), already in Postiz storage; absent = none. */
+  media: Array<{ postizMediaId: string | null; postizPath: string | null; altText: string | null; cover?: { postizMediaId: string | null; postizPath: string | null } | null }>;
 }
 
 export interface Composed {
-  values: Array<{ content: string; image: Array<{ id: string; path: string; alt?: string }>; delay?: number }>;
+  values: Array<{ content: string; image: Array<{ id: string; path: string; alt?: string; thumbnail?: string }>; delay?: number }>;
   settings: Record<string, unknown> & { __type: string };
   /** The text as the platform shows it (the adopt check in dispatch.ts compares Postiz's copy against it). */
   text: string;
@@ -101,13 +102,21 @@ export function composeText(input: Pick<ComposeInput, "body" | "customBody" | "l
   return text;
 }
 
+/** Platforms whose Postiz provider shows a video's cover (card VD.6, postiz-app v2.25.1, read 2026-11-14): YouTube takes it as
+ *  settings.thumbnail (youtube.settings.dto.ts:84 -> thumbnails.set, youtube.provider.ts:635); Instagram as the media item's
+ *  thumbnail url (media.dto.ts:21 -> cover_url, instagram.provider.ts:738). Facebook's provider sends no thumbnail at all. */
+export const COVER_PLATFORMS: readonly string[] = ["youtube", "instagram", "instagram-standalone"];
+const coverOf = (m: ComposeInput["media"][number] | undefined) =>
+  m?.cover?.postizMediaId && m.cover.postizPath && isVideo(m.postizPath) ? { id: m.cover.postizMediaId, path: m.cover.postizPath } : null;
+
 export function compose(input: ComposeInput): Composed {
   const settingsOf = SETTINGS[input.platform];
   if (!settingsOf) throw new ComposeError(`${input.platform} needs settings this editor does not collect yet; send it from Postiz`);
   const text = composeText(input);
   const image = input.media.map((m, i) => {
     if (!m.postizMediaId || !m.postizPath) throw new ComposeError(`media item ${i + 1} is not in Postiz storage yet`);
-    return { id: m.postizMediaId, path: m.postizPath, ...(m.altText?.trim() ? { alt: m.altText.trim() } : {}) };
+    const cover = input.platform.startsWith("instagram") ? coverOf(m) : null;
+    return { id: m.postizMediaId, path: m.postizPath, ...(m.altText?.trim() ? { alt: m.altText.trim() } : {}), ...(cover ? { thumbnail: cover.path } : {}) };
   });
   if (!text.trim() && image.length === 0) throw new ComposeError("nothing to send: no text and no media");
   if (input.format === "reel" && !(image.length === 1 && isVideo(image[0].path))) throw new ComposeError("a Reel needs exactly one video");
@@ -115,7 +124,8 @@ export function compose(input: ComposeInput): Composed {
     if (!(image.length === 1 && isVideo(image[0].path))) throw new ComposeError("a YouTube post needs exactly one video");
     const { title, description, problem } = youtubeParts(text);
     if (problem) throw new ComposeError(problem);
-    return { values: [{ content: toPostizHtml(description), image }], settings: { __type: "youtube", ...settingsOf(input.format), title }, text };
+    const cover = coverOf(input.media[0]);
+    return { values: [{ content: toPostizHtml(description), image }], settings: { __type: "youtube", ...settingsOf(input.format), title, ...(cover ? { thumbnail: cover } : {}) }, text };
   }
   const values: Composed["values"] = [{ content: toPostizHtml(text), image }];
   // a story shows no comments (the preview says the same)

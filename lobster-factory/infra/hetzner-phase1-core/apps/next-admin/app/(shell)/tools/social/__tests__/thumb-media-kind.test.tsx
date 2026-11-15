@@ -26,3 +26,12 @@ describe("Thumb -- by attachment kind", () => {
     expect(html).not.toMatch(/<video/);
   });
 });
+
+// Card VD.7: a video attachment with a cover shows the cover in the post list / calendar card.
+describe("Thumb -- video cover", () => {
+  it("a video with a cover renders the cover image, not the video", () => {
+    const html = renderToStaticMarkup(<Thumb post={post("v1")} accounts={[]} media={[{ ...item("v1", "video"), cover_path: "https://cdn.example/c1.jpg" }]} />);
+    expect(html).toMatch(/<img[^>]*src="https:\/\/cdn.example\/c1.jpg"/);
+    expect(html).not.toMatch(/<video/);
+  });
+});

@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import type { PostState } from "@/lib/social/state";
 import Icon from "./Icon";
-import VideoFrame from "./VideoFrame";
+import { MediaStill } from "./VideoFrame";
 import {
   addDays, monthGridStart, platformOf, shortDate, STATE_NAMES, STATE_TOKEN, TAG_TOKEN, WEEKDAY_NAMES, zoned,
   type Account, type CalPost, type Post, type Tag,
@@ -53,14 +53,13 @@ const unconnected = (post: Post, accounts: Account[]) => post.state !== "publish
 const mediaOf = (post: Post, media: MediaItem[]) => [...post.media].sort((a, b) => a.position - b.position)
   .map((m) => media.find((x) => x.id === m.media_id)).filter((m): m is MediaItem & { postiz_path: string } => !!m?.postiz_path);
 
-/** First attachment (a video shows its first frame, as the composer's Writer does) or the word 文字, platform marks on its corner. */
+/** First attachment (a video shows its cover, else its frame at 1 s: MediaStill, card VD.7) or the word 文字, platform marks on its corner. */
 export function Thumb({ post, accounts, media, size = "card" }: { post: Post; accounts: Account[]; media: MediaItem[]; size?: "card" | "row" }) {
   const first = mediaOf(post, media)[0];
   const n = post.media.length;
   return (
     <div className={`sm-cthumb sm-${size}${n ? "" : " sm-txt"}`}>
-      {first ? first.kind === "video" ? <VideoFrame src={first.postiz_path} /> : <img src={first.postiz_path} alt="" loading="lazy" />
-        : n ? <span className="sm-muted">圖</span> : <span className="sm-muted">文字</span>}
+      {first ? <MediaStill item={first} /> : n ? <span className="sm-muted">圖</span> : <span className="sm-muted">文字</span>}
       {n > 1 && <span className="sm-more">+{n - 1}</span>}
       <span className="sm-avs">{platformsOf(post, accounts).map((pf) => <PfMark key={pf} platform={pf} />)}</span>
     </div>

@@ -16,7 +16,8 @@ const SELECT = "id, organization_id, version, state, scheduled_at, updated_at, b
   "comments:social_post_comments(position, body, delay_minutes, item:social_media(postiz_media_id, postiz_path)), " +
   "targets:social_post_targets(id, account_id, custom_body, format, state, postiz_post_id, updated_at, " +
   "account:social_accounts(platform, postiz_integration_id, status)), " +
-  "media:social_post_media(position, alt_text, item:social_media(postiz_media_id, postiz_path))";
+  // cover (0163, card VD.6): the video's cover image row, by the self-referencing FK's name
+  "media:social_post_media(position, alt_text, item:social_media(postiz_media_id, postiz_path, cover:social_media!social_media_cover_fk(postiz_media_id, postiz_path)))";
 
 type Row = {
   id: string; organization_id: string; version: number; state: string; scheduled_at: string; updated_at: string; body: string;
@@ -24,7 +25,7 @@ type Row = {
   comments: Array<{ position: number; body: string; delay_minutes: number; item: { postiz_media_id: string | null; postiz_path: string | null } | null }>;
   targets: Array<{ id: string; account_id: string; custom_body: string | null; format: string; state: QueuedTarget["state"]; postiz_post_id: string | null; updated_at: string;
     account: { platform: string; postiz_integration_id: string; status: string } | null }>;
-  media: Array<{ position: number; alt_text: string | null; item: { postiz_media_id: string | null; postiz_path: string | null } | null }>;
+  media: Array<{ position: number; alt_text: string | null; item: { postiz_media_id: string | null; postiz_path: string | null; cover?: { postiz_media_id: string | null; postiz_path: string | null } | null } | null }>;
 };
 
 function toPost(row: Row): QueuedPost {
@@ -34,7 +35,8 @@ function toPost(row: Row): QueuedPost {
     comments: [...(row.comments ?? [])].sort((a, b) => a.position - b.position)
       .map((c) => ({ body: c.body, delayMinutes: c.delay_minutes, media: c.item ? { postizMediaId: c.item.postiz_media_id, postizPath: c.item.postiz_path } : null })),
     media: [...row.media].sort((a, b) => a.position - b.position)
-      .map((m) => ({ postizMediaId: m.item?.postiz_media_id ?? null, postizPath: m.item?.postiz_path ?? null, altText: m.alt_text })),
+      .map((m) => ({ postizMediaId: m.item?.postiz_media_id ?? null, postizPath: m.item?.postiz_path ?? null, altText: m.alt_text,
+        cover: m.item?.cover ? { postizMediaId: m.item.cover.postiz_media_id, postizPath: m.item.cover.postiz_path } : null })),
     targets: row.targets.map((t) => ({
       id: t.id, accountId: t.account_id, customBody: t.custom_body, format: t.format, state: t.state, postizPostId: t.postiz_post_id, updatedAt: t.updated_at,
       platform: t.account?.platform ?? "", integrationId: t.account?.postiz_integration_id ?? "", accountStatus: t.account?.status ?? "",

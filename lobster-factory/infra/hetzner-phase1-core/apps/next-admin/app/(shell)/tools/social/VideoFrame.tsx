@@ -25,3 +25,11 @@ export default function VideoFrame({ src, className, controls = false }: { src: 
     onLoadedMetadata={short} onError={() => setFailed(src)}
     onPlay={controls ? (e) => { if (!played.current) { played.current = true; e.currentTarget.currentTime = 0; } } : undefined} />;
 }
+
+/** Card VD.7: the one still a list shows for an attachment -- a video's cover image when it has one (social_media
+ *  cover_media_id, 0163), else a frame of the video (VideoFrame); an image as itself; no file = the word. */
+export function MediaStill({ item, className }: { item: { kind: string; postiz_path: string | null; cover_path?: string | null }; className?: string }) {
+  if (!item.postiz_path) return <span className={className}>{item.kind === "video" ? "影片" : "圖"}</span>;
+  if (item.kind !== "video") return <img className={className} src={item.postiz_path} alt="" loading="lazy" />;
+  return item.cover_path ? <img className={className} src={item.cover_path} alt="影片封面" loading="lazy" /> : <VideoFrame className={className} src={item.postiz_path} />;
+}

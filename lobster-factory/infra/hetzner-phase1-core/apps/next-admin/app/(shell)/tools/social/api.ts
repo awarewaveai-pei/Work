@@ -67,7 +67,7 @@ export interface NeedsResult {
 }
 /** /api/social/members (0103); owners only */
 export interface Member { user_id: string; email: string | null; role: import("@/lib/social/state").BrandRole; created_at: string }
-export interface MediaItem { id: string; kind: string; file_name: string; postiz_path: string | null; bytes: number | null; created_at: string; used?: number }
+export interface MediaItem { id: string; kind: string; file_name: string; postiz_path: string | null; bytes: number | null; created_at: string; used?: number; cover_path?: string | null }
 export interface InboxRow {
   accountId: string;
   platform: string;

@@ -14,7 +14,7 @@
 // Ports (dispatch-store.ts) are injected so the decisions are tested without a database or Postiz.
 
 import { PostizApiError, sendKeyOf, type PostizPost, type RawIntegration } from "@/lib/content/postiz";
-import { compose, ComposeError, type ComposeComment, type Composed } from "./compose";
+import { compose, ComposeError, type ComposeComment, type ComposeInput, type Composed } from "./compose";
 
 /** dry_run: read only. draft: the whole pipeline, but Postiz only stores drafts (never publishes) -- the rehearsal on
  *  production (plan C5 acceptance). apply: sends. */
@@ -50,7 +50,7 @@ export interface QueuedPost {
   comments: ComposeComment[];
   linkUrl: string | null;
   linkUtm: boolean;
-  media: Array<{ postizMediaId: string | null; postizPath: string | null; altText: string | null }>;
+  media: ComposeInput["media"];
   targets: QueuedTarget[];
 }
 

@@ -55,6 +55,10 @@ const IMAGE_FETCH_TIMEOUT_MS = 20_000;
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 // Fetch timeout for remote video download (2 min)
 const VIDEO_FETCH_TIMEOUT_MS = 120_000;
+// Invariant (Codex 10974254): no upload to Postiz waits forever -- a hung upload must fail the caller (a cover upload is
+// optional and is dropped; a draft request behind a proxy would otherwise end in a 504 with nothing saved).
+const IMAGE_UPLOAD_TIMEOUT_MS = 60_000;
+const VIDEO_UPLOAD_TIMEOUT_MS = 180_000;
 
 /**
  * Preferred video format per platform.
@@ -178,6 +182,7 @@ export async function uploadMedia(opts: {
     method: "POST",
     headers: { Authorization: cfg.apiKey },
     body: form,
+    signal: AbortSignal.timeout(IMAGE_UPLOAD_TIMEOUT_MS),
   });
   if (!uploadRes.ok) {
     const body = (await uploadRes.text()).slice(0, 200);
@@ -224,6 +229,7 @@ export async function uploadVideo(opts: {
     method: "POST",
     headers: { Authorization: cfg.apiKey },
     body: form,
+    signal: AbortSignal.timeout(VIDEO_UPLOAD_TIMEOUT_MS),
   });
   if (!up.ok) {
     const errText = await up.text().catch(() => "");

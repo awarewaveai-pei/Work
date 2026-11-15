@@ -14,8 +14,8 @@ const accounts = [
 function deps(over: Partial<DraftDeps> = {}) {
   const d = {
     accounts: async () => accounts, releases: async () => releases, assertWithinLimits: vi.fn(async () => {}),
-    addVideo: vi.fn(async (url: string) => ({ id: `media:${url}` })),
-    savePost: vi.fn(async (_f: { body: string }, accountId: string) => ({ id: `post:${accountId}` })),
+    addVideo: vi.fn(async (url: string, _name?: string, _cover?: string | null, _deadline?: number) => ({ id: `media:${url}` })),
+    savePost: vi.fn(async (_f: { body: string }, accountId: string, _media?: string, _alt?: string) => ({ id: `post:${accountId}` })),
   };
   return { ...d, ...over } as typeof d;
 }
@@ -44,5 +44,17 @@ describe("saveVideoSocialDrafts", () => {
     const res = await saveVideoSocialDrafts(d, "t", [{ accountId: "yt", text: "a" }, { accountId: "ig", text: "b" }]);
     expect(res).toMatchObject({ ok: true, drafts: [{ ratio: "16x9" }, { ratio: "16x9" }] });
     expect(d.addVideo).toHaveBeenCalledTimes(1);
+  });
+
+  // Card VD.5: each ratio's draft carries that ratio's own chosen cover and the title as alt text; no cover = as before.
+  it("each ratio uploads with its own cover; alt text = the title; a ratio without a cover gets none", async () => {
+    const d = deps({ releases: async () => [{ ...releases[0], coverUrl: "https://r2/c169.jpg" }, { ...releases[1], coverUrl: null }] });
+    await saveVideoSocialDrafts(d, " 我的影片 ", [{ accountId: "yt", text: "a" }, { accountId: "ig", text: "b" }]);
+    expect(d.addVideo.mock.calls.map((c) => [c[0], c[2]])).toEqual([[releases[0].videoUrl, "https://r2/c169.jpg"], [releases[1].videoUrl, null]]);
+    expect(d.savePost.mock.calls.map((c) => c[3])).toEqual(["我的影片", "我的影片"]);
+    // one deadline for the whole request, shared by every ratio (Codex 3ed81cf7 F2)
+    const deadlines = d.addVideo.mock.calls.map((c) => c[3]);
+    expect(new Set(deadlines).size).toBe(1);
+    expect(deadlines[0]).toBeGreaterThan(Date.now());
   });
 });

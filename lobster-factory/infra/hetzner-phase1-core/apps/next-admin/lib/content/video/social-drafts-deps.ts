@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { assertWithinLimits } from "@/lib/social/posts";
 import { addVideo, listAccounts, savePost } from "@/lib/social/store";
 import { ratioOfAsset } from "./platform-ratio";
+import { chosenCovers } from "./cover";
 import type { DraftDeps } from "./social-drafts";
 
 export type VideoRow = { id: string; object_url: string | null; checksum_sha256: string | null; metadata: { title?: string; script?: string; ratio?: unknown } | null };
@@ -21,19 +22,20 @@ export function draftDeps(db: SupabaseClient, org: string, rows: VideoRow[], act
     releases: async () => {
       const { data: rel } = await db.from("media_releases").select("id, candidate_asset_id, candidate_checksum")
         .eq("organization_id", org).eq("status", "release_approved").in("candidate_asset_id", rows.map((r) => r.id)).order("created_at", { ascending: false });
-      const out: Array<{ releaseId: string; ratio: string; videoUrl: string }> = [];
+      const covers = await chosenCovers(db, org, rows.map((r) => r.id));
+      const out: Array<{ releaseId: string; ratio: string; videoUrl: string; coverUrl: string | null }> = [];
       for (const r of (rel ?? []) as Array<{ id: string; candidate_asset_id: string; candidate_checksum: string }>) {
         const row = rows.find((x) => x.id === r.candidate_asset_id);
         const ratio = row?.object_url ? ratioOfAsset({ object_url: row.object_url, metadata: row.metadata }) : undefined;
         // a Release pins its bytes: one for an older file (after a caption reburn) is not this video any more
-        if (row?.object_url && ratio && row.checksum_sha256 === r.candidate_checksum && !out.some((o) => o.ratio === ratio)) out.push({ releaseId: r.id, ratio, videoUrl: row.object_url });
+        if (row?.object_url && ratio && row.checksum_sha256 === r.candidate_checksum && !out.some((o) => o.ratio === ratio)) out.push({ releaseId: r.id, ratio, videoUrl: row.object_url, coverUrl: covers.get(row.id) ?? null });
       }
       return out;
     },
     assertWithinLimits: (text, accountId) => assertWithinLimits(org, text, [{ account_id: accountId }]),
-    addVideo: (url, fileName) => addVideo(org, url, fileName, actor),
-    savePost: async (fields, accountId, mediaId) => {
-      const saved = await savePost(org, null, null, fields, [{ account_id: accountId }], [{ media_id: mediaId }], actor);
+    addVideo: (url, fileName, coverUrl, deadline) => addVideo(org, url, fileName, actor, coverUrl, deadline),
+    savePost: async (fields, accountId, mediaId, altText) => {
+      const saved = await savePost(org, null, null, fields, [{ account_id: accountId }], [{ media_id: mediaId, ...(altText ? { alt_text: altText } : {}) }], actor);
       return { id: saved.id };
     },
   };
