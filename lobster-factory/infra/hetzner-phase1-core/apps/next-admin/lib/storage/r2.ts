@@ -210,9 +210,34 @@ export async function r2GetObject(
     return { ok: false, error: "r2_network_error" };
   }
   if (!res.ok) return { ok: false, error: res.status === 404 ? "r2_not_found" : `r2_get_failed_${res.status}`, status: res.status };
-  const body = Buffer.from(await res.arrayBuffer());
-  if (opts.maxBytes && body.byteLength > opts.maxBytes) return { ok: false, error: "r2_object_too_large" };
-  return { ok: true, body, contentType: res.headers.get("content-type") ?? "application/octet-stream" };
+  const contentType = res.headers.get("content-type") ?? "application/octet-stream";
+  if (!opts.maxBytes) return { ok: true, body: Buffer.from(await res.arrayBuffer()), contentType };
+  // Capped read: the declared length is checked before any byte is read, then the stream is counted (a missing or
+  // wrong Content-Length cannot make the process hold more than maxBytes).
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > opts.maxBytes) {
+    await res.body?.cancel().catch(() => undefined);
+    return { ok: false, error: "r2_object_too_large" };
+  }
+  if (!res.body) return { ok: true, body: Buffer.alloc(0), contentType };
+  const reader = res.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > opts.maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        return { ok: false, error: "r2_object_too_large" };
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } catch {
+    return { ok: false, error: "r2_network_error" };
+  }
+  return { ok: true, body: Buffer.concat(chunks, total), contentType };
 }
 
 /** 404 = already gone = success (idempotent). */

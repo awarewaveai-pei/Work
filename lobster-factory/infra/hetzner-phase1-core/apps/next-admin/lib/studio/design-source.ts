@@ -45,22 +45,37 @@ export type ParsedSource =
   | { ok: true; name: string; ext: SourceExt; buffer: Buffer }
   | { ok: false; status: 400 | 413; error: string };
 
+const SOURCE_EXTS_TEXT = `${SOURCE_EXTS.slice(0, -1).join(", ")} or ${SOURCE_EXTS[SOURCE_EXTS.length - 1]}`;
+
+/** A file name as stored in metadata.source_name (last path segment, no control characters, <= 160) + its accepted ext. */
+export function cleanSourceName(name: unknown): { name: string; ext: SourceExt } | null {
+  if (typeof name !== "string") return null;
+  const base = name.split(/[\\/]/).pop()!.trim();
+  const ext = SOURCE_EXTS.find((e) => base.toLowerCase().endsWith(e));
+  if (!ext || base.length > 160 || /[\u0000-\u001f]/.test(base)) return null;
+  return { name: base, ext };
+}
+
+/** The bytes really are a file of this kind (both the base64 sourceFile and the direct-upload path check with this). */
+export function sourceBytesMatch(ext: SourceExt, buffer: Buffer): boolean {
+  return buffer.length > 0 && SOURCE_SNIFFERS[ext](buffer);
+}
+
 export function parseDesignSource(raw: unknown, maxBytes: number): ParsedSource {
   const bad = (error: string, status: 400 | 413 = 400): ParsedSource => ({ ok: false, status, error });
   if (!raw || typeof raw !== "object") return bad("source must be { name, data }");
   const { name, data } = raw as { name?: unknown; data?: unknown };
   if (typeof name !== "string" || typeof data !== "string" || !data) return bad("source must be { name: string, data: base64 }");
-  const base = name.split(/[\\/]/).pop()!.trim();
-  const ext = SOURCE_EXTS.find((e) => base.toLowerCase().endsWith(e));
-  if (!ext || base.length > 160 || /[\u0000-\u001f]/.test(base)) return bad(`source file must be ${SOURCE_EXTS.slice(0, -1).join(", ")} or ${SOURCE_EXTS[SOURCE_EXTS.length - 1]}`);
+  const clean = cleanSourceName(name);
+  if (!clean) return bad(`source file must be ${SOURCE_EXTS_TEXT}`);
+  const { ext } = clean;
   if (data.length > Math.ceil((maxBytes * 4) / 3) + 8) return bad("source too large (20 MB limit)", 413);
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return bad("source data must be base64");
   const buffer = Buffer.from(data, "base64");
   if (buffer.length === 0) return bad("source is empty");
   if (buffer.length > maxBytes) return bad("source too large (20 MB limit)", 413);
-  const ok = SOURCE_SNIFFERS[ext](buffer);
-  if (!ok) return bad(`source content is not a ${ext} file`);
-  return { ok: true, name: base, ext, buffer };
+  if (!sourceBytesMatch(ext, buffer)) return bad(`source content is not a ${ext} file`);
+  return { ok: true, name: clean.name, ext, buffer };
 }
 
 /** designs/YYYY-MM/<uuid>.png -> designs/YYYY-MM/<uuid>.<ext> (same prefix and id as the preview). */

@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { buildDesignKey, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
-import { parseDesignSource, SOURCE_CONTENT_TYPE, sourceKeyFor, sourceKeyFromMetadata } from "../../../../lib/studio/design-source";
+import { buildDesignKey, getDesignsPublicBase, isR2Configured, parseImageDataUrl, putDesignObject, sha256Hex } from "../../../../lib/storage/r2";
+import { isR2S3Configured } from "../../../../lib/storage/r2-s3";
+import { claimPendingUpload, discardPendingUpload, discardUnregisteredDesignObjects, parsePendingKey, type PendingKey } from "../../../../lib/studio/design-pending";
+import { cleanSourceName, parseDesignSource, SOURCE_CONTENT_TYPE, sourceBytesMatch, sourceKeyFor, sourceKeyFromMetadata } from "../../../../lib/studio/design-source";
 import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
 import { decodeCursor, listDesigns, type SortOrder, type TimeRange } from "../../../../lib/studio/designs-list";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../lib/tenant-guard";
@@ -112,7 +114,15 @@ interface SaveDesignBody {
    *  (lib/studio/design-source.ts). Stored as its own R2 object; metadata gets source_key / source_name / source_bytes.
    *  Named sourceFile because `source` above already means the originating tool. */
   sourceFile?: { name: string; data: string };
+  /** Direct upload (plan lobster-factory/docs/PLAN-designs-direct-upload.md): the key /api/tools/designs/upload-url handed out,
+   *  after the browser PUT the original there. Instead of `image` / `sourceUrl`. */
+  upload?: { key?: unknown };
+  /** Same for the original file; instead of `sourceFile`. `name` = the file name shown later (defaults to design.<ext>). */
+  sourceUpload?: { key?: unknown; name?: unknown };
 }
+
+type PendingOk = Extract<PendingKey, { ok: true }>;
+const SNIFFED_MIME: Record<string, string> = { png: "image/png", jpeg: "image/jpeg", webp: "image/webp" };
 
 /** Who saved or deletes: a customer is the user middleware authenticated (x-ops-user-id), never a body field; staff keep
  *  the advisory body value. */
@@ -149,10 +159,23 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
+  if (!body || typeof body !== "object") return NextResponse.json({ ok: false, error: "body must be a JSON object" }, { status: 400 });
 
-  // Two input modes: a base64 data URL (`image`), or a Printful mockup CDN URL (`sourceUrl`).
-  let parsed: { mime: string; buffer: Buffer };
-  if (typeof body.sourceUrl === "string" && body.sourceUrl.length > 0) {
+  const hasUpload = body.upload !== undefined && body.upload !== null;
+  const hasSourceUpload = body.sourceUpload !== undefined && body.sourceUpload !== null;
+  if (hasUpload && (body.image !== undefined || body.sourceUrl !== undefined)) {
+    return NextResponse.json({ ok: false, error: "upload cannot be combined with image or sourceUrl" }, { status: 400 });
+  }
+  if (hasSourceUpload && body.sourceFile !== undefined && body.sourceFile !== null) {
+    return NextResponse.json({ ok: false, error: "sourceUpload cannot be combined with sourceFile" }, { status: 400 });
+  }
+
+  // Three input modes: a direct upload (`upload`, checked once the org is known), a base64 data URL (`image`), or a
+  // Printful mockup CDN URL (`sourceUrl`). parsed stays null for `upload`: its bytes are read after the copy.
+  let parsed: { mime: string; buffer: Buffer } | null = null;
+  if (hasUpload) {
+    // checked below, after the org
+  } else if (typeof body.sourceUrl === "string" && body.sourceUrl.length > 0) {
     const fetched = await fetchPrintfulMockup(body.sourceUrl);
     if (!fetched.ok) {
       // tsconfig here does not narrow `!x.ok` — same cast convention as the rest of this route.
@@ -204,6 +227,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "actorUserId must be a UUID when provided" }, { status: 400 });
   }
 
+  // A pending key is registered only by a requester of the org in its path (I3).
+  let pendingImage: Extract<PendingOk, { kind: "image" }> | null = null;
+  let pendingSource: { p: Extract<PendingOk, { kind: "source" }>; name: string } | null = null;
+  if (hasUpload) {
+    const pk = parsePendingKey((body.upload as { key?: unknown }).key, organizationId, "image");
+    if (!pk.ok) { const f = pk as { ok: false; status: number; error: string }; return NextResponse.json({ ok: false, error: f.error }, { status: f.status }); }
+    pendingImage = pk as Extract<PendingOk, { kind: "image" }>;
+  }
+  if (hasSourceUpload) {
+    const su = body.sourceUpload as { key?: unknown; name?: unknown };
+    const pk = parsePendingKey(su.key, organizationId, "source");
+    if (!pk.ok) { const f = pk as { ok: false; status: number; error: string }; return NextResponse.json({ ok: false, error: f.error }, { status: f.status }); }
+    const p = pk as Extract<PendingOk, { kind: "source" }>;
+    const clean = cleanSourceName(su.name ?? `design${p.ext}`);
+    if (!clean || clean.ext !== p.ext) return NextResponse.json({ ok: false, error: `sourceUpload.name must end in ${p.ext}` }, { status: 400 });
+    pendingSource = { p, name: clean.name };
+  }
+  if ((pendingImage || pendingSource) && !isR2S3Configured()) {
+    return NextResponse.json({ ok: false, error: "r2_s3_not_configured", hint: "Set R2_S3_ACCESS_KEY_ID and R2_S3_SECRET_ACCESS_KEY." }, { status: 503 });
+  }
+
   if (!isR2Configured()) {
     return NextResponse.json(
       { ok: false, error: "r2_not_configured", hint: "Set R2_API_TOKEN and R2_ACCOUNT_ID." },
@@ -244,27 +288,54 @@ export async function POST(request: Request) {
     if (existing) return NextResponse.json({ ok: true, asset: existing, reused: true });
   }
 
-  const objectKey = buildDesignKey(parsed.mime);
+  const mime = pendingImage ? pendingImage.mime : parsed!.mime;
+  const objectKey = buildDesignKey(mime);
   if (!objectKey) {
     return NextResponse.json({ ok: false, error: "unsupported_mime" }, { status: 400 });
   }
 
-  const uploaded = await putDesignObject(objectKey, parsed.buffer, parsed.mime);
-  if (!uploaded.ok) {
+  // I4: every designs/ object this request writes is listed here BEFORE it is written (a PUT whose answer is lost may still
+  // have landed), and every failure below deletes them all. Not through the WordPress-reference guard: these keys were minted
+  // in this request and never returned, so no post can show them, and the guard refuses to delete when a site cannot be
+  // scanned (r2-delete-guard.ts) -- which would leave them without a row.
+  const written: string[] = [];
+  const fail = async (status: number, error: string) => {
+    await discardUnregisteredDesignObjects(written);
+    return NextResponse.json({ ok: false, error }, { status });
+  };
+
+  let uploaded: { objectKey: string; publicUrl: string; byteSize: number; checksumSha256: string };
+  if (pendingImage) {
+    written.push(objectKey);
+    const got = await claimPendingUpload(pendingImage, objectKey);
+    if (!got.ok) { const f = got as { ok: false; status: number; error: string }; return fail(f.status, f.error); }
+    // Checked on the formal copy (the bytes kept); the decoded format must be the type the key and Content-Type claim.
+    let format: string | undefined;
+    try { format = (await sharp(got.buffer).metadata()).format; } catch { format = undefined; }
+    if (!format || SNIFFED_MIME[format] !== pendingImage.mime) return fail(400, "upload is not the png/jpeg/webp image its key names");
+    uploaded = { objectKey, publicUrl: `${getDesignsPublicBase()}/${objectKey}`, byteSize: got.buffer.byteLength, checksumSha256: sha256Hex(got.buffer) };
+  } else {
+    written.push(objectKey);
+    const put = await putDesignObject(objectKey, parsed!.buffer, parsed!.mime);
     // Same cast convention as tarot/generate route — tsconfig here does not narrow `!x.ok`.
-    const code = (uploaded as { ok: false; error: string }).error;
-    return NextResponse.json({ ok: false, error: code }, { status: 502 });
+    if (!put.ok) return fail(502, (put as { ok: false; error: string }).error);
+    uploaded = put as { objectKey: string; publicUrl: string; byteSize: number; checksumSha256: string };
   }
 
   let sourceMeta: Record<string, unknown> = {};
   if (sourceFile) {
     const sourceKey = sourceKeyFor(objectKey, sourceFile.ext);
+    written.push(sourceKey);
     const up = await putDesignObject(sourceKey, sourceFile.buffer, SOURCE_CONTENT_TYPE);
-    if (!up.ok) {
-      await deleteUnreferencedAsset(objectKey); // the preview just uploaded: nothing references it yet, so the guard deletes it
-      return NextResponse.json({ ok: false, error: (up as { ok: false; error: string }).error }, { status: 502 });
-    }
+    if (!up.ok) return fail(502, (up as { ok: false; error: string }).error);
     sourceMeta = { source_key: sourceKey, source_name: sourceFile.name, source_bytes: sourceFile.buffer.byteLength };
+  } else if (pendingSource) {
+    const sourceKey = sourceKeyFor(objectKey, pendingSource.p.ext);
+    written.push(sourceKey);
+    const got = await claimPendingUpload(pendingSource.p, sourceKey);
+    if (!got.ok) { const f = got as { ok: false; status: number; error: string }; return fail(f.status, f.error); }
+    if (!sourceBytesMatch(pendingSource.p.ext, got.buffer)) return fail(400, `source content is not a ${pendingSource.p.ext} file`);
+    sourceMeta = { source_key: sourceKey, source_name: pendingSource.name, source_bytes: got.buffer.byteLength };
   }
 
   const traceId = randomUUID(); // node:crypto import — Node 18 on SG has no crypto global
@@ -276,7 +347,7 @@ export async function POST(request: Request) {
       asset_domain: "ai_generated",
       object_key: uploaded.objectKey,
       object_url: uploaded.publicUrl,
-      mime_type: parsed.mime,
+      mime_type: mime,
       byte_size: uploaded.byteSize,
       checksum_sha256: uploaded.checksumSha256,
       // Customers: the authenticated user. Staff: advisory, caller-supplied, validated as UUID shape only.
@@ -303,9 +374,9 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("[designs] media_assets insert failed:", error.message);
-    if (typeof sourceMeta.source_key === "string") await deleteUnreferencedAsset(sourceMeta.source_key); // no row will ever point at it
-    return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 500 });
+    return fail(500, "insert_failed"); // preview and original: no row will ever point at them
   }
+  for (const p of [pendingImage, pendingSource?.p]) if (p) await discardPendingUpload(p.key);
 
   const { error: auditError } = await supabase.from("ops_audit_events").insert({
     organization_id: organizationId,

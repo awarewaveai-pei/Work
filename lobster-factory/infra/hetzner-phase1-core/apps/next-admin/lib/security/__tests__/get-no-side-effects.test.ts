@@ -41,6 +41,8 @@ const PRIMITIVES: Record<string, "*" | Set<string>> = {
   [mod("lib/content/video/qa-persistence")]: "*", // persistAutomaticTechnicalQa -- write-only module
   [mod("lib/content/video/caption-qa-persistence")]: "*", // persistAutomaticCaptionQa -- write-only module
   [mod("lib/storage/r2")]: new Set(["r2PutObject", "r2DeleteObject", "deleteDesignObject", "deleteVideoObjects", "putDesignObject"]), // R2 put/delete; r2GetObject/r2ListObjects/isR2Configured/etc. are reads
+  [mod("lib/storage/r2-s3")]: new Set(["copyObject"]), // S3 CopyObject; presignPut signs only, headObject reads
+  [mod("lib/studio/design-pending")]: new Set(["claimPendingUpload", "discardPendingUpload"]), // copy into designs/, delete pending
 };
 
 // Relative path (forward-slash, from ROOT) -> one-line reason this GET is exempt.
