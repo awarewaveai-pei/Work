@@ -31,14 +31,14 @@ module.exports = {
     if (!segs.some((s) => RE_GIT_COMMIT.test(s))) return null;
     if (/--amend/.test(ctx.commandExpanded)) return null;
 
-    const r = spawnSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR'], { encoding: 'utf8' });
+    const r = spawnSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR'], { cwd: ctx.cwd, encoding: 'utf8' });
     const files = (r.stdout || '').trim().split('\n').filter(Boolean);
     const block = [];
 
     for (const f of files) {
       if (!/\.(js|jsx|ts|tsx|py)$/.test(f)) continue;
       if (SELF_EXEMPT.test(f)) continue;
-      const c = spawnSync('git', ['show', ':' + f], { encoding: 'utf8' }).stdout || '';
+      const c = spawnSync('git', ['show', ':' + f], { cwd: ctx.cwd, encoding: 'utf8' }).stdout || '';
       if (DEBUGGER_RE.test(c)) block.push(`[Hook] ERROR: debugger statement in ${f}`);
       for (const p of SECRETS) {
         if (p.test(c)) block.push(`[Hook] ERROR: potential secret in ${f}`);

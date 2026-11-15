@@ -341,7 +341,8 @@ function logFailOpen(hookName, err) {
 // git-commit-scope-guard.js originally bailed on ANY `cd`/`-C` segment,
 // without checking whether the target was actually different from
 // `ctx.cwd`. This repo's own tooling prefixes nearly every Bash command with
-// `cd /d/Work` (a no-op — already `ctx.cwd`), so that gate was silently
+// `cd /d/Work` (then a no-op: ctx.cwd was the hook process's cwd, D:\Work; since 2026-11-15 ctx.cwd is the tool
+// call's payload.cwd and gates follow cd/-C with effectiveDir()), so that gate was silently
 // inert for the vast majority of real commits between 2026-08-30 (when it
 // was built) and 2026-09-02 (when it failed to catch commit `632dd1913`
 // sweeping another session's staged files — the exact incident class it
@@ -440,6 +441,30 @@ function hasCdElsewhere(segments, cwd, beforeIndex) {
   return false;
 }
 
+// The directory a git invocation actually runs in: start at `baseDir` (ctx.cwd = the tool call's directory), follow
+// every real `cd <dir>` segment strictly before `beforeIndex`, then every `-C <dir>` in that invocation's own flag
+// region (cumulative, like git). null = some target is unresolvable or not an existing directory -- the caller fails
+// open, exactly as hasCdElsewhere() made it do. Gates evaluate git THERE instead of bailing on any `cd` elsewhere
+// (2026-11-15: once ctx.cwd became payload.cwd, a worktree session's `cd /d/Work && git commit` would otherwise
+// skip the scope and shared-file checks for the main checkout -- a gate that used to check now silently not checking).
+function effectiveDir(segments, baseDir, beforeIndex, cFlagRegion) {
+  const toDir = (raw, base) => {
+    const r = resolveShellPath(raw, base);
+    if (r.startsWith('\0')) return null;
+    try { return fs.statSync(r).isDirectory() ? r : null; } catch (_) { return null; }
+  };
+  let dir = baseDir;
+  const limit = typeof beforeIndex === 'number' ? beforeIndex : segments.length;
+  for (let i = 0; i < limit && i < segments.length; i++) {
+    const m = segments[i].match(RE_CD_SEGMENT_TARGET);
+    if (m && !(dir = toDir(m[1], dir))) return null;
+  }
+  for (const t of cFlagTargets(cFlagRegion)) {
+    if (!(dir = toDir(t, dir))) return null;
+  }
+  return dir;
+}
+
 // Extract every `-C <dir>` target from `flagRegionText` (the captured
 // leading-flags substring of a `git <verb>` invocation — see each rule
 // file's `RE_GIT_*` regex, which now captures this region in group 1
@@ -490,4 +515,5 @@ module.exports = {
   isSameDir,
   hasCdElsewhere,
   cFlagTargets,
+  effectiveDir,
 };

@@ -100,9 +100,9 @@ function flagRegionOf(segment, verbRe) {
 
 // `git add -n <flags>` dry-run output lines look like "add 'path/to/file'" or
 // "remove 'path'" — we only want files that would actually be staged.
-function dryRunAddFiles(flags) {
+function dryRunAddFiles(flags, cwd) {
   const args = ['add', '-n', ...flags];
-  const r = spawnSync('git', args, { encoding: 'utf8', timeout: 10000 });
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: 10000 });
   if (r.error || typeof r.status !== 'number' || r.status !== 0) return null; // fail open — caller treats null as "cannot enumerate"
   const files = [];
   for (const line of String(r.stdout || '').split('\n')) {
@@ -148,7 +148,9 @@ function indexSegments(segments, verbRe) {
 // same-named file staged by another session, which would then be wrongly
 // treated as covered.) A segment whose own `-C` resolves elsewhere is
 // simply excluded from the candidate list, same as a broad flag.
-function literalCandidatesUpTo(segments, uptoIndex, shared, cwd) {
+// baseCwd (optional) = the tool call's directory before any `cd` in this command: a candidate add/rm/mv segment
+// counts only when it ran in `cwd` too (effectiveDir), so `git add f && cd /other && git commit` does not credit f.
+function literalCandidatesUpTo(segments, uptoIndex, shared, cwd, baseCwd) {
   const limit = typeof uptoIndex === 'number' ? uptoIndex : segments.length - 1;
   const out = [];
   let sawBroad = false;
@@ -156,7 +158,10 @@ function literalCandidatesUpTo(segments, uptoIndex, shared, cwd) {
     for (const { s, i } of indexSegments(segments, verbRe)) {
       if (i > limit) continue;
       const region = flagRegionOf(s, verbRe) || '';
-      if (cwd && shared.cFlagTargets(region).some((t) => !shared.isSameDir(t, cwd))) continue; // own -C targets elsewhere
+      if (cwd && baseCwd) {
+        const ran = shared.effectiveDir(segments, baseCwd, i, region);
+        if (!ran || !shared.isSameDir(ran, cwd)) continue; // ran elsewhere (cd before it, or its own -C)
+      } else if (cwd && shared.cFlagTargets(region).some((t) => !shared.isSameDir(t, cwd))) continue; // own -C targets elsewhere
       const tokens = tailTokensAfter(s, verbRe, shared);
       if (tokens.some((t) => ENUMERABLE_BROAD.has(t) || t === '.' || NON_ENUMERABLE_BROAD.has(t))) {
         sawBroad = true;
@@ -185,22 +190,18 @@ module.exports = {
     const mvIdx = indexSegments(segments, RE_GIT_MV);
     if (!addIdx.length && !rmIdx.length && !mvIdx.length) return null;
 
-    // -C: check EACH matched verb segment's own captured flag region only —
-    // never the whole segment (v4 fix M1).
-    for (const { s } of [...addIdx, ...rmIdx, ...mvIdx]) {
+    // Where each add/rm/mv really runs: ctx.cwd, then every `cd` strictly before it (v4 fix M2), then its own `-C`
+    // flag region only (v4 fix M1) -- shared.effectiveDir. All in one directory = tracked THERE (2026-11-15: ctx.cwd is
+    // the tool call's payload.cwd, so `cd /d/Work && git add f` from a worktree session is tracked against D:\Work);
+    // different directories or an unresolvable target = bail the whole command, as before.
+    let runDir = null;
+    for (const { s, i } of [...addIdx, ...rmIdx, ...mvIdx]) {
       const region = flagRegionOf(s, RE_GIT_ADD) ?? flagRegionOf(s, RE_GIT_RM) ?? flagRegionOf(s, RE_GIT_MV);
-      for (const target of shared.cFlagTargets(region)) {
-        if (!shared.isSameDir(target, ctx.cwd)) return null; // -C elsewhere — bail whole command
-      }
+      const d = shared.effectiveDir(segments, ctx.cwd, i, region);
+      if (!d || (runDir && !shared.isSameDir(d, runDir))) return null;
+      runDir = runDir || d;
     }
-    // cd: only a `cd` strictly BEFORE the LAST matched verb segment can have
-    // affected where it actually ran (v4 fix M2).
-    const lastVerbIndex = Math.max(
-      addIdx.length ? addIdx[addIdx.length - 1].i : -1,
-      rmIdx.length ? rmIdx[rmIdx.length - 1].i : -1,
-      mvIdx.length ? mvIdx[mvIdx.length - 1].i : -1,
-    );
-    if (shared.hasCdElsewhere(segments, ctx.cwd, lastVerbIndex)) return null;
+    ctx = { ...ctx, cwd: runDir };
 
     if (ctx.event === 'PostToolUse') {
       return handlePost(ctx, shared, addIdx, rmIdx, mvIdx);
@@ -253,7 +254,7 @@ function handlePre(ctx, addIdx) {
       };
     }
     const flagArgsFor = (t) => (t === '.' ? ['.'] : [t]);
-    const dry = dryRunAddFiles(flagArgsFor(enumerableFlag));
+    const dry = dryRunAddFiles(flagArgsFor(enumerableFlag), ctx.cwd);
     if (dry) pendingCandidates.push(...dry);
   }
 
@@ -310,7 +311,7 @@ function handlePost(ctx, shared, addIdx, rmIdx, mvIdx) {
   try {
     // --no-renames: a `git mv` must record BOTH paths; rename detection would list only the new
     // one, and ao-close.ps1 commits only tracked paths (the old side's deletion would be left out).
-    const r = spawnSync('git', ['diff', '--cached', '--no-renames', '--name-only', '-z', '--', ...candidates], { encoding: 'utf8', timeout: 10000 });
+    const r = spawnSync('git', ['diff', '--cached', '--no-renames', '--name-only', '-z', '--', ...candidates], { cwd: ctx.cwd, encoding: 'utf8', timeout: 10000 });
     if (r.error || typeof r.status !== 'number' || r.status !== 0) return null; // fail open — can't verify
     verified = String(r.stdout || '').split('\0').filter(Boolean);
   } catch (_) { return null; }

@@ -107,6 +107,18 @@ function commandSegments(expanded) {
   return segs;
 }
 
+// The directory the TOOL CALL runs in -- every git call and relative path in a rule is evaluated there (ctx.cwd).
+// Claude Code puts it in the payload as `cwd`; the hook PROCESS itself may run in the project root instead (2026-11-15:
+// in a linked worktree session the hook ran in D:\Work, so the private-index commit was checked against the main
+// checkout's HEAD and refused). process.cwd() is only the fallback for a payload without a usable cwd.
+function toolCwd(payload) {
+  const c = payload && typeof payload.cwd === 'string' ? payload.cwd : '';
+  try {
+    if (c && path.isAbsolute(c) && fs.statSync(c).isDirectory()) return c;
+  } catch (_) { /* missing or unreadable -- fall back */ }
+  return process.cwd();
+}
+
 function collectFiles(toolInput) {
   const files = [];
   const add = (f) => { if (f && !files.includes(f)) files.push(f); };
@@ -234,7 +246,7 @@ function main() {
         commandSegments: commandSegments(expanded),
         files: collectFiles(toolInput),
         sid: shared ? shared.getSessionId(payload) : 'no-shared-lib',
-        cwd: process.cwd(),
+        cwd: toolCwd(payload),
         shared,
         flags: null, // set below (lazy require, defensive)
         manifest,

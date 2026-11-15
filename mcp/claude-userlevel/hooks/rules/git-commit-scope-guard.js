@@ -240,8 +240,8 @@ function extractPathspecTail(commitSegment, commandExpanded, shared) {
 
 // v5 (2026-09-05, found live troubleshooting a real blocked commit, not a critic
 // finding): this spawnSync had no `cwd` -- it ran relative to the Node hook process's
-// OWN cwd (`process.cwd()`, captured once as `ctx.cwd` at ctx-construction time in
-// runner.js), which is NOT guaranteed to already be the repo the commit targets (the
+// OWN cwd (`process.cwd()`, at the time also what runner.js captured as `ctx.cwd`; since 2026-11-15 ctx.cwd is the
+// tool call's payload.cwd and check() narrows it further to the commit's effectiveDir), which is NOT guaranteed to already be the repo the commit targets (the
 // whole rest of this file, and lib/shared.js's isSameDir()/hasCdElsewhere(), exists
 // specifically because ctx.cwd can't be assumed correct without checking -- this one
 // function skipped that and always trusted the ambient process cwd instead). A
@@ -511,17 +511,16 @@ module.exports = {
       }
       return null;
     }
-    if (isMidMergeOrCherryPick(ctx.cwd)) return null; // v6 — see isMidMergeOrCherryPick's own header
-
-    // -C: check ONLY the commit segment's own captured flag region (v4 fix M1).
+    // Where the commit really runs: ctx.cwd, then every `cd` strictly BEFORE the commit segment (v4 fix M2), then
+    // the commit segment's own `-C` flag region only (v4 fix M1). Unresolvable = fail open. Since 2026-11-15 the
+    // gate is evaluated THERE (effectiveDir) instead of bailing on any cd/-C elsewhere.
     const cRegionMatch = commitSegment.match(RE_GIT_COMMIT);
     const cRegion = cRegionMatch ? (cRegionMatch[1] || '') : '';
-    for (const target of shared.cFlagTargets(cRegion)) {
-      if (!shared.isSameDir(target, ctx.cwd)) return null; // -C elsewhere — fail open
-    }
-    // cd: only segments strictly BEFORE the commit segment can have
-    // affected where it actually ran (v4 fix M2).
-    if (shared.hasCdElsewhere(segments, ctx.cwd, commitIndex)) return null;
+    const runDir = shared.effectiveDir(segments, ctx.cwd, commitIndex, cRegion);
+    if (!runDir) return null;
+    const baseCwd = ctx.cwd;
+    ctx = { ...ctx, cwd: runDir };
+    if (isMidMergeOrCherryPick(ctx.cwd)) return null; // v6 — see isMidMergeOrCherryPick's own header
 
     if (ctx.event === 'PostToolUse') {
       // Re-derive truth from git instead of trusting the Bash tool's result
@@ -601,7 +600,7 @@ module.exports = {
     // can't yet) recorded them into the persisted tracker (see module
     // header). Re-parses the same command text — no side effect, so no
     // risk of the C1 class of bug this is adjacent to.
-    const selfCover = addTracker.literalCandidatesUpTo(segments, commitIndex - 1, shared, ctx.cwd);
+    const selfCover = addTracker.literalCandidatesUpTo(segments, commitIndex - 1, shared, ctx.cwd, baseCwd);
     const tracked = [...shared.readTracker(tf), ...selfCover.files];
     if (!tracked.length) {
       return {

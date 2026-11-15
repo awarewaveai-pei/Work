@@ -1088,14 +1088,20 @@ test('git-commit-scope-guard M3 fix: `git commit -a`/`--all`/`-am` (auto-stage b
   assert.equal(ok.status, 0, ok.stderr);
 });
 
-test('git-commit-scope-guard cwd-guard: `-C <dir>` targeting a GENUINELY DIFFERENT repo skips the check (fail open)', () => {
+// 2026-11-15: a `cd`/`-C` into a genuinely different repo used to SKIP the check, because ctx.cwd (then the hook
+// process's cwd) could not be trusted as the starting point. ctx.cwd is now the tool call's payload.cwd and the gate
+// follows cd/-C to where git really runs (shared.effectiveDir), so the command gets the verdict it would get if run
+// from that repo directly -- skipping it let a worktree session's `cd /d/Work && git commit` sweep foreign hunks.
+test('git-commit-scope-guard cwd-guard: `-C <dir>` targeting a GENUINELY DIFFERENT repo is checked IN that repo', () => {
   const sid = freshSid('gcsgc');
   const repoA = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } }); // ctx.cwd — irrelevant here
-  const repoB = makeGitRepo({ branch: 'main', files: { 'fileB.md': 'b' } }); // the ACTUAL -C target
-  writeGitStageTracker(sid, []); // would WARN if the check ran
+  const repoB = makeGitRepo({ branch: 'main', files: { 'fileB.md': 'b' } }); // the ACTUAL -C target, fileB.md staged
+  writeGitStageTracker(sid, []); // empty tracker: the check WARNs when it runs
   const r = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: `git -C ${repoB} commit -m x` } }, { cwd: repoA });
-  assert.equal(r.status, 0);
-  assert.doesNotMatch(r.stderr, /with staged files, but this session never recorded/);
+  const direct = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: 'git commit -m x' } }, { cwd: repoB });
+  assert.equal(r.status, direct.status);
+  assert.match(r.stderr, /with staged files, but this session never recorded/);
+  assert.match(direct.stderr, /with staged files, but this session never recorded/);
 });
 
 test('git-commit-scope-guard v3 fix: `-C <dir>` that resolves to ctx.cwd itself (a no-op) does NOT skip the check — this was the OTHER real-world shape of the 632dd1913 bug class (fixed alongside `cd`)', () => {
@@ -1160,17 +1166,18 @@ test('git-commit-scope-guard v3 fix: `cd <same-dir>` in Git-Bash MinGW form (`/c
   assert.match(r.stderr, /fileB\.md/);
 });
 
-test('git-commit-scope-guard v3 fix: `cd <different-dir>` still fails open (regression guard on the v2 behavior this must NOT lose)', () => {
+test('git-commit-scope-guard: `cd <different-dir>` is checked in THAT dir (2026-11-15 effectiveDir; was: fail open) -- BLOCKs a foreign staged file there', () => {
   const sid = freshSid('gcsgv3c');
   const repoA = makeGitRepo({ branch: 'main', files: { 'fileA.md': 'a' } });
-  const repoB = makeGitRepo({ branch: 'main', files: { 'fileB.md': 'b' } }); // genuinely different dir
-  writeGitStageTracker(sid, []); // would WARN if the check ran
+  const repoB = makeGitRepo({ branch: 'main', files: { 'fileB.md': 'b' } }); // genuinely different dir, fileB.md staged
+  writeGitStageTracker(sid, ['fileA.md']); // this session's own file, not fileB.md
   const r = run('PreToolUse', {
     session_id: sid, tool_name: 'Bash',
     tool_input: { command: `cd ${repoB}\ngit commit -m x` },
   }, { cwd: repoA });
-  assert.equal(r.status, 0);
-  assert.doesNotMatch(r.stderr, /with staged files, but this session never recorded|would include files this session never/);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /would include files this session never/);
+  assert.match(r.stderr, /fileB\.md/);
 });
 
 test('git-add-scope-tracker v3 fix (mirror gap): `cd <same-dir>` prefix does not block normal tracking (previously untested — this rule never checked a preceding cd at all)', () => {
@@ -1189,7 +1196,7 @@ test('git-add-scope-tracker v3 fix (mirror gap): `cd <same-dir>` prefix does not
   fs.rmSync(gitStagePathFor(sid), { force: true });
 });
 
-test('git-add-scope-tracker v3 fix (mirror gap): `cd <different-dir> && git add` no longer records phantom paths against the wrong repo', () => {
+test('git-add-scope-tracker: `cd <different-dir> && git add` is verified and recorded against THAT repo (2026-11-15 effectiveDir; was: not recorded at all)', () => {
   const sid = freshSid('gastv3b');
   const repoA = makeGitRepo({ branch: 'main' });
   const repoB = makeGitRepo({ branch: 'main' });
@@ -1198,16 +1205,25 @@ test('git-add-scope-tracker v3 fix (mirror gap): `cd <different-dir> && git add`
   const pre = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: cmd } }, { cwd: repoA });
   assert.equal(pre.status, 0, pre.stderr);
   spawnSync('git', ['add', 'fileA.md'], { cwd: repoB }); // the real add genuinely happens in repoB
-  // PostToolUse still runs with ctx.cwd = repoA (the Bash tool's own cwd
-  // never changes just because the command internally cd'd) — the
-  // cd-elsewhere bail must fire here too, or this session's repoA tracker
-  // would get a phantom "fileA.md" entry despite that file never having
-  // touched repoA's index at all.
+  // PostToolUse with ctx.cwd = repoA: the tracker verifies the candidate in repoB's index (where the cd took the add),
+  // so the later `cd repoB && git commit` this session makes is covered -- same as if both ran from repoB.
   const post = run('PostToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: cmd } }, { cwd: repoA });
   assert.equal(post.status, 0, post.stderr);
   const recorded = (readFileSafe(gitStagePathFor(sid)) || '').split('\n').filter(Boolean);
-  assert.deepEqual(recorded, [], `expected no phantom tracking, got ${JSON.stringify(recorded)}`);
+  assert.deepEqual(recorded, ['fileA.md']);
+  const commit = run('PreToolUse', { session_id: sid, tool_name: 'Bash', tool_input: { command: `cd ${repoB}\ngit commit -m x` } }, { cwd: repoA });
+  assert.equal(commit.status, 0, commit.stderr);
+  // ...and an add that ran in repoB is never verified against repoA's index (a phantom there stays impossible).
+  const sid2 = freshSid('gastv3b2');
+  fs.writeFileSync(path.join(repoA, 'fileA.md'), 'a-in-A');
+  spawnSync('git', ['add', 'fileA.md'], { cwd: repoA }); // repoA has a staged fileA.md of its own
+  fs.writeFileSync(path.join(repoB, 'other.md'), 'o');
+  const cmd2 = `cd ${repoB}\ngit add other.md`;
+  spawnSync('git', ['add', 'other.md'], { cwd: repoB });
+  run('PostToolUse', { session_id: sid2, tool_name: 'Bash', tool_input: { command: cmd2 } }, { cwd: repoA });
+  assert.deepEqual((readFileSafe(gitStagePathFor(sid2)) || '').split('\n').filter(Boolean), ['other.md']);
   fs.rmSync(gitStagePathFor(sid), { force: true });
+  fs.rmSync(gitStagePathFor(sid2), { force: true });
 });
 
 // ---------------------------------------------------------------- git-commit-scope-guard PostToolUse pruning (C1 fix)
@@ -1500,14 +1516,15 @@ test('git-commit-scope-guard v4 fix m2: multiple cumulative `-C` flags are all c
   // would wrongly conclude "targets repoA" and evaluate the wrong repo's
   // git state (repoA, empty) instead of the real target (repoB, where
   // fileB.md is genuinely staged).
+  writeGitStageTracker(sid, ['seed.txt']); // non-empty tracker that does not cover fileB.md -> a real check BLOCKs
   const r = run('PreToolUse', {
     session_id: sid, tool_name: 'Bash',
     tool_input: { command: `git -C ${repoA} -C ${repoB} commit -m x` },
   }, { cwd: repoA });
-  // Either -C target differing from ctx.cwd (repoA) is enough to fail open
-  // — this must NOT evaluate repoB's real state and produce a wrong verdict.
-  assert.equal(r.status, 0, r.stderr);
-  assert.doesNotMatch(r.stderr, /fileB\.md/);
+  // 2026-11-15 (shared.effectiveDir): the -C chain is resolved cumulatively and the check runs in its LAST target,
+  // repoB -- never in repoA, the first -C (which would see nothing staged and wrongly pass).
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /fileB\.md/);
 });
 
 // ---------------------------------------------------------------- session-edit-tracker (2026-09-03, ao-close.ps1 scoped-add)

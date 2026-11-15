@@ -70,7 +70,7 @@ test('linked worktree (.git FILE) is NOT a root: nothing is written into it, fal
   assert.equal(fs.readdirSync(fallback).length, 1);
 });
 
-test('worktree nested INSIDE the main checkout stops the walk at its .git FILE (does not climb to main)', () => {
+test('worktree nested INSIDE the main checkout: never written into, records go to main through its gitdir pointer', () => {
   // What Claude Code's own worktree isolation creates under .claude/worktrees/<name> (Codex 2026-09-27 F1).
   const base = tmpDir('nested');
   const main = path.join(base, 'main');
@@ -83,6 +83,37 @@ test('worktree nested INSIDE the main checkout stops the walk at its .git FILE (
   const home = path.join(base, 'home');
   withHome(home, () => assert.equal(rule.check(ctxFor(path.join(nested, 'scripts'))), null));
   assert.ok(!fs.existsSync(path.join(nested, 'agency-os')), 'nothing written into the nested worktree');
-  assert.ok(!fs.existsSync(path.join(main, 'agency-os')), 'nothing written into the main checkout either');
-  assert.equal(fs.readdirSync(path.join(home, '.claude', 'agent-dispatch')).length, 1, 'fallback to ~/.claude');
+  // 2026-11-15: resolved by the .git FILE's gitdir (main/.git/worktrees/x), not by climbing directories; the main
+  // checkout's report dir is where AO-CLOSE reads dispatches (and where they landed while hooks ran in the project root).
+  assert.equal(fs.readdirSync(path.join(main, 'agency-os', 'reports', 'agent-dispatch')).length, 1, 'record in the main checkout');
+  assert.ok(!fs.existsSync(path.join(home, '.claude', 'agent-dispatch')), 'no ~/.claude fallback');
+});
+
+test('sibling linked worktree whose gitdir points at a real main checkout: record goes to main, never the worktree', () => {
+  const base = tmpDir('sibling');
+  const main = path.join(base, 'main');
+  fs.mkdirSync(path.join(main, '.git', 'worktrees', 'wt'), { recursive: true });
+  sentinel(main);
+  const wt = path.join(base, 'wt');
+  fs.mkdirSync(path.join(wt, 'lib'), { recursive: true });
+  fs.writeFileSync(path.join(wt, '.git'), `gitdir: ${path.join(main, '.git', 'worktrees', 'wt')}\n`);
+  sentinel(wt);
+  const home = path.join(base, 'home');
+  withHome(home, () => assert.equal(rule.check(ctxFor(path.join(wt, 'lib'))), null));
+  assert.ok(!fs.existsSync(path.join(wt, 'agency-os')), 'nothing written into the worktree');
+  assert.equal(fs.readdirSync(path.join(main, 'agency-os', 'reports', 'agent-dispatch')).length, 1);
+});
+
+test('a submodule (.git FILE pointing into .git/modules) is not resolved to anything: ~/.claude fallback', () => {
+  const base = tmpDir('submodule');
+  const sup = path.join(base, 'sup');
+  fs.mkdirSync(path.join(sup, '.git', 'modules', 'sub'), { recursive: true });
+  sentinel(sup);
+  const sub = path.join(sup, 'sub');
+  fs.mkdirSync(sub, { recursive: true });
+  fs.writeFileSync(path.join(sub, '.git'), 'gitdir: ../.git/modules/sub\n');
+  const home = path.join(base, 'home');
+  withHome(home, () => assert.equal(rule.check(ctxFor(sub)), null));
+  assert.ok(!fs.existsSync(path.join(sup, 'agency-os')));
+  assert.equal(fs.readdirSync(path.join(home, '.claude', 'agent-dispatch')).length, 1);
 });

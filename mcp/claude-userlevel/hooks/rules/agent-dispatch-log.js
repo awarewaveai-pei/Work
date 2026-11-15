@@ -53,13 +53,31 @@ function isDirectory(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
 
+// A linked worktree's `.git` FILE says `gitdir: <main>/.git/worktrees/<name>`: its records belong in the MAIN checkout
+// (2026-11-15: ctx.cwd became the tool call's directory, so a worktree session's dispatches otherwise fell back to
+// ~/.claude/agent-dispatch, which AO-CLOSE does not read). Never the worktree itself; a submodule (.git/modules) => null.
+function mainCheckoutOfWorktree(gitFile) {
+  try {
+    const m = /^gitdir:\s*(.+?)\s*$/m.exec(fs.readFileSync(gitFile, 'utf8'));
+    if (!m) return null;
+    const gitdir = path.resolve(path.dirname(gitFile), m[1]);
+    if (path.basename(path.dirname(gitdir)) !== 'worktrees') return null;
+    const common = path.dirname(path.dirname(gitdir));
+    if (path.basename(common) !== '.git' || !isDirectory(common)) return null;
+    const main = path.dirname(common);
+    return fs.existsSync(path.join(main, 'scripts', 'ao-resume.ps1')) ? main : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function findMonorepoRoot(startDir) {
   if (!startDir || !path.isAbsolute(startDir)) return null;
   let cur = startDir;
   for (let i = 0; i < 16; i++) {
     const gitEntry = path.join(cur, '.git');
     if (fs.existsSync(gitEntry)) {
-      if (!isDirectory(gitEntry)) return null;
+      if (!isDirectory(gitEntry)) return mainCheckoutOfWorktree(gitEntry);
       if (fs.existsSync(path.join(cur, 'scripts', 'ao-resume.ps1'))) return cur;
     }
     const parent = path.dirname(cur);

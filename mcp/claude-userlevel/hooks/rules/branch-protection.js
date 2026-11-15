@@ -18,7 +18,7 @@ module.exports = {
 
     let branch = '';
     try {
-      const r = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8', timeout: 5000 });
+      const r = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ctx.cwd, encoding: 'utf8', timeout: 5000 });
       branch = (r.stdout || '').trim();
     } catch (_) { /* not a repo — nothing to warn about */ }
     if (!PROTECTED.test(branch)) return null;

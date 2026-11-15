@@ -1,20 +1,25 @@
 // Stop: check for stray console.log in modified files. Verbatim port.
 const { spawnSync } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 
 const EXCLUDED = [/\.test\.[jt]sx?$/, /\.spec\.[jt]sx?$/, /\.config\.[jt]s$/, /scripts\//, /__tests__\//];
 
 module.exports = {
   check(ctx) {
-    const r = spawnSync('git', ['diff', '--name-only', '--diff-filter=ACMR', 'HEAD'], { encoding: 'utf8' });
+    // git prints repo-top-relative names; ctx.cwd (the tool call's directory) may be a subdirectory, so resolve there.
+    const top = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd: ctx.cwd, encoding: 'utf8' });
+    if (top.status !== 0) return null;
+    const root = (top.stdout || '').trim();
+    const r = spawnSync('git', ['diff', '--name-only', '--diff-filter=ACMR', 'HEAD'], { cwd: root, encoding: 'utf8' });
     if (r.status !== 0) return null;
 
     const files = (r.stdout || '').trim().split('\n')
-      .filter((f) => f && /\.[jt]sx?$/.test(f) && !EXCLUDED.some((p) => p.test(f)) && fs.existsSync(f));
+      .filter((f) => f && /\.[jt]sx?$/.test(f) && !EXCLUDED.some((p) => p.test(f)) && fs.existsSync(path.resolve(root, f)));
 
     const warn = [];
     for (const f of files) {
-      const lines = fs.readFileSync(f, 'utf8').split('\n');
+      const lines = fs.readFileSync(path.resolve(root, f), 'utf8').split('\n');
       const matches = [];
       lines.forEach((line, i) => {
         if (/console\.log\b/.test(line) && !/\/\//.test(line.split('console.log')[0])) {

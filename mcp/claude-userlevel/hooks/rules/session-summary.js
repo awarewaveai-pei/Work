@@ -16,10 +16,10 @@ module.exports = {
     let gitStatus = '';
     let gitLog = '';
     try {
-      gitStatus = (spawnSync('git', ['status', '--short'], { encoding: 'utf8', timeout: 3000 }).stdout || '').trim();
+      gitStatus = (spawnSync('git', ['status', '--short'], { cwd: ctx.cwd, encoding: 'utf8', timeout: 3000 }).stdout || '').trim();
     } catch (_) { /* not a repo */ }
     try {
-      gitLog = (spawnSync('git', ['log', '--oneline', '-10'], { encoding: 'utf8', timeout: 3000 }).stdout || '').trim();
+      gitLog = (spawnSync('git', ['log', '--oneline', '-10'], { cwd: ctx.cwd, encoding: 'utf8', timeout: 3000 }).stdout || '').trim();
     } catch (_) { /* not a repo */ }
 
     const exists = fs.existsSync(file);

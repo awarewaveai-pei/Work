@@ -23,6 +23,27 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（§0「四件」實列三件，已修）
 - BUGHUNT_WAIVED: DOC_ONLY -- 無 symbol 改動；grep `Hedra Character-3，720p` 殘留 0
 - ORACLE_WAIVED: 純文件
+## 2026-11-15（續10）— hooks：worktree session 的 commit 被當成主 checkout 檢查（ctx.cwd = hook 行程 cwd），改用 payload.cwd 並跟隨 cd/-C
+
+**根因**：`mcp/claude-userlevel/hooks/runner.js` 的 `ctx.cwd = process.cwd()`。Claude Code 桌面版在 linked worktree session 把 hook 行程跑在專案根 `D:\Work`，Bash 指令卻在 worktree 執行；`git-commit-scope-guard.js validatePrivateIndex` 因此拿主 checkout 的 HEAD／toplevel 比對 worktree 的私有 index → 「marker root <worktree> is not this repo D:/Work」擋下，`branch-protection.js` 報主 checkout 的分支。卡 A 只能改用 `git -C` 繞過（-C 他處 = fail open）。另：6 個 rule 的 git 呼叫沒帶 cwd，同樣讀錯 repo。
+**不變量**：hook 裡每個 git 呼叫與相對路徑，都在「工具呼叫實際執行的目錄」解析；閘遇到 cd/-C 時跟到 git 真正執行的目錄去檢查，不再跳過。
+**修改**：
+- `runner.js toolCwd()`：`ctx.cwd = payload.cwd`（絕對且存在的目錄），否則 fallback `process.cwd()`。SID fallback（`lib/shared.js` getSessionId 的 process.cwd hash）刻意不動，須與 `verify-sid-shared.ps1` 一致。
+- `lib/shared.js effectiveDir()`：base → 指令前每個 `cd` → 該 git 呼叫自己的 `-C`（累加），回傳實際目錄；無法解析／不存在 = null（fail open，同舊行為）。
+- `git-commit-scope-guard.js`、`git-shared-file-guard.js`、`git-add-scope-tracker.js`：以 effectiveDir 取代「cd/-C 他處就 return null」；`literalCandidatesUpTo` 只算在同一目錄跑的 add。critic M1：只改 payload.cwd 會讓 worktree session 的 `cd /d/Work && git commit` 從「有檢查」變成「跳過」，此項關掉。
+- `branch-protection`／`check-console`／`commit-quality`／`session-summary`／`git-add-scope-tracker` 的 git spawn 全帶 `cwd: ctx.cwd`；`check-console` 以 repo top 解析 git 輸出的路徑（critic M2：從子目錄跑會全部找不到）。
+- `agent-dispatch-log.js mainCheckoutOfWorktree()`：linked worktree 依 `.git` 檔的 gitdir 指回主 checkout 寫 dispatch（AO-CLOSE 只讀主 checkout）；submodule 仍 fallback `~/.claude`；從不寫進 worktree。
+- 測試：新 `tests/hooks/hook-tool-cwd.test.mjs`（主 checkout + linked worktree 私有 index 端到端、branch-protection、fallback、cd/-C 跟進主 checkout、不存在目錄 fail open、子目錄 check-console、靜態掃描所有 git spawn 與 wrapper 呼叫都帶 cwd），登記 `scripts/test-hooks.sh`。
+- 舊測試改寫（決策變更，非放寬）：`runner-parity.test.mjs` 4 條「cd/-C 他處 → fail open」改為「在目標 repo 檢查、結果同於從該 repo 直接跑」；`linked-worktree-root.test.mjs` 巢狀 worktree 改為經 gitdir 寫主 checkout，新增 sibling worktree、submodule 兩案。
+**生效條件**：live hooks 在 `~/.claude/hooks`（由主 checkout 同步）；`D:\Work` pull 到此 commit 後跑 `scripts/sync-claude-userlevel.ps1 -Mode merge` 才生效。
+**剩餘風險**：PostToolUse 的 payload.cwd 若是指令「之後」的目錄，含相對 `cd sub` 的指令 post 端解析不到 → fail open 不記錄（與修前相同，非退化）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh (33 + 404 tests pass, incl. hook-tool-cwd 7/7, runner-parity 172/172, linked-worktree-root 5/5) | exit=0 | ms=93229
+- REALTEST_EVIDENCE: tool=Bash | cmd=simrun.js 以 live runner 重現：proc=worktree + 帶 marker 的私有 index → BLOCK 「private index no longer matches」；修後 hook-tool-cwd 測試以 proc=主 checkout、payload.cwd=worktree 端到端 commit 通過並同步 worktree index | exit=0 | ms=1916
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/2n（M1 cd 他處變跳過、M2 check-console 子目錄、m dispatch log 落 ~/.claude、n 過時註解、n wrapper 掃描盲點：全修）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,tests | grep=ctx.cwd | hits=20
+- BUGHUNT_SCOPE_NARROW: lobster-factory 不含 hooks 程式；`.claude/commands/verify-recent.md:29`「Node hooks run with process.cwd() = repo root」仍正確（只講 SID，SID 未改）
+- ORACLE_WAIVED: codex quota BLOCKED until 16:26（oracle-quota exit 3）；fallback = 獨立 critic + 突變：runner 改回 process.cwd() → 2 條行為測試紅；shared-file-guard 改回「他處就跳過」→ cd 跟進測試紅；皆還原轉綠
 ## 2026-11-15（續7）— 社群發文頂列在部分主題下全黑／看不見：背景改吃 theme 成對 token（卡 B）
 
 **根因**：`social.css:26` `.sm-topbar` 用 `background: var(--text-primary)`（文字色）當底、`color: var(--btn-primary-text)`（主按鈕上的字）當前景；兩個 token 各自為不同表面推導（`lib/theme/palette-derive.ts:139-144`、`:153`），彼此沒有對比保證。淺色主題下 text-primary 近黑、btn-primary-text 若也取黑（accent 偏亮時 `inkOn(accent)`＝黑）就變黑底黑字。同一類寫法另有 3 處。

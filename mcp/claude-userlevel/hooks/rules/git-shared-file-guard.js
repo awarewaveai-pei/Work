@@ -59,13 +59,13 @@ function findings(ctx) {
   if (!commitSegment) return null;
   // --amend is NOT exempt here (unlike the scope guard): an amend re-reads the index / worktree exactly like a
   // fresh commit, so a foreign whole-file add still lands in the amended commit (codex 2026-09-24 r2).
-  if (scope.isMidMergeOrCherryPick(ctx.cwd)) return null;
   const broad = scope.hasBroadCommitFlag(commitSegment, shared); // -a/--all: worktree bytes of every tracked file
   const cRegionMatch = commitSegment.match(scope.RE_GIT_COMMIT);
-  for (const target of shared.cFlagTargets(cRegionMatch ? (cRegionMatch[1] || '') : '')) {
-    if (!shared.isSameDir(target, ctx.cwd)) return null;
-  }
-  if (shared.hasCdElsewhere(segments, ctx.cwd, commitIndex)) return null;
+  // Evaluated where the commit really runs (cd before it, then its own -C), not skipped (2026-11-15, see shared.effectiveDir).
+  const runDir = shared.effectiveDir(segments, ctx.cwd, commitIndex, cRegionMatch ? (cRegionMatch[1] || '') : '');
+  if (!runDir) return null;
+  ctx = { ...ctx, cwd: runDir };
+  if (scope.isMidMergeOrCherryPick(ctx.cwd)) return null;
   const root = git(['rev-parse', '--show-toplevel'], ctx.cwd);
   if (!root) return null; // not a repo -- nothing to guard
   const cwd = root.trim();
