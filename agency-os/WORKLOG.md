@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-15（續23）剪輯器音訊分頁加搜尋（名稱／用途／曲風），操作者「之後我要配音樂怎麼找」
+
+- 根因：內建曲庫有 106 首，音訊分頁只能用曲風按鈕和排序找，不能用用途（旅遊、咖啡廳）或名稱找。
+- 改動：`scripts/editor-panes/audio.js` 在來源按鈕下加搜尋框。
+  - 比對範圍：內建曲比對名稱、用途、曲風 key 與中文標籤；素材庫比對檔名。
+  - 多個詞時每個詞都要符合，不分大小寫；曲風按鈕的數量跟著搜尋結果；找不到時顯示提示。
+- Codex 3 項（`agency-os/reports/oracle/2026-11-15-partialreview-4c768d0d.md`）已修：
+  - F1：被搜尋排除的曲風改回「全部」，畫面和狀態一致。
+  - F2：這個分頁所有重畫都改走 `edAudRedraw`，搜尋框有焦點時保留焦點和游標。
+  - F3：中文輸入法選字中（isComposing）不重畫，compositionend 才套用。
+- 本機試聽頁：`.data/library/試聽清單.html`（不進 git），列出 106 首的中文名、分類、曲風、長度、用途和播放鈕，給操作者人工試聽用。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed6-audio.cjs 10 PASS（搜尋：低傳真／lo-fi／流行／多個詞、找不到提示、輸入框保留內容；F1 清掉搜尋回到全部；F2 重新載入後仍有焦點；F3 選字中搜尋框沒被換掉、選完才套用） | exit=0 | ms=250000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scratchpad/real-search.cjs（真 Edge＋真曲庫 106 首：旅遊 4、咖啡 3、Lo-fi 6，沒有頁面錯誤） | exit=0 | ms=20000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- ORACLE_WAIVED: Codex artifact 2026-11-15-partialreview-4c768d0d 的三項都已修正並補指名測試；搜尋不屬於隱私／權限守衛，依規則不做突變
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=edAudRedraw|data-ed-aud-q|edAudFound | hits=26
+- BUGHUNT_SCOPE_NARROW: 新的 symbol 只用在 audio.js 和 ed6 測試
 ## 2026-11-15（續21）— C2：R2 bucket CORS／lifecycle 腳本（`scripts/r2-designs-bucket-config.ts`），dry-run 已實測、`--apply` 未執行（High，等操作者 go）
 
 - 做了什麼：`npx tsx` 腳本；origin＝`https://`＋`staffHosts()`＋每個 `door.app==="next-admin"` 且 enabled 的 `productHost(p)`，`--dev-origin` 明示才加；CORS 只開 PUT＋content-type、MaxAge 600；lifecycle `uploads/pending/` 1 天刪。Cloudflare REST `r2/buckets/<b>/{cors,lifecycle}`（schema 讀自 OpenAPI spec：CORS `rules[].allowed.{origins,methods,headers}`＋`maxAgeSeconds`；lifecycle `rules[].{id,enabled,conditions.prefix,deleteObjectsTransition.condition{type:Age,maxAge}}`；文件 https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/cors/ 與 `.../lifecycle/`）。

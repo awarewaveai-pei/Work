@@ -28,6 +28,7 @@ const edAudUsages = ["music", "sfx", "dialogue", "ambience"],
     src: "builtin",
     target: "A2",
     genre: "全部",
+    q: "", // search: every word must appear in the name, use or genre
     sort: "人氣",
     items: null, // the user's audio assets
     voiceJobs: new Set(), // asset ids made by a voice job (they count as 台詞 without a tag)
@@ -48,8 +49,20 @@ const edAudUsages = ["music", "sfx", "dialogue", "ambience"],
   edAudPlayer = new Audio();
 edAudPlayer.onended = edAudPlayer.onerror = () => {
   edAudUi.playing = null;
-  if (tool === "edit" && ed.pane === "音訊") edRedraw();
+  if (tool === "edit" && ed.pane === "音訊") edAudRedraw();
 };
+// Every repaint of this pane: a focused search box keeps its focus and caret (a repaint replaces the element), so a list
+// that finishes loading, or a search, never cuts typing off.
+function edAudRedraw() {
+  const box = document.querySelector("[data-ed-aud-q]"),
+    had = !!box && document.activeElement === box,
+    pos = box?.selectionStart ?? 0;
+  edRedraw();
+  if (!had) return;
+  const again = document.querySelector("[data-ed-aud-q]");
+  again?.focus();
+  again?.setSelectionRange(pos, pos);
+}
 async function edAudLoad() {
   edAudUi.items = null;
   const [rows, jobs, favs, catalog] = await Promise.all([
@@ -72,7 +85,7 @@ async function edAudLoad() {
     genres: catalog.genres || {},
     items: Array.isArray(catalog.items) ? catalog.items : [],
   };
-  if (tool === "edit" && ed.pane === "音訊") edRedraw();
+  if (tool === "edit" && ed.pane === "音訊") edAudRedraw();
 }
 const edAudUsage = (a) =>
   (a.tags || []).find((t) => edAudUsages.includes(t)) ||
@@ -213,15 +226,24 @@ function edAudPlayButton(url, name) {
   const on = edAudUi.playing === url;
   return `<button type="button" class="btn small editor-icon-btn${on ? " selected" : ""}" data-ed-action="aud-play:${esc(url)}" aria-pressed="${on}" aria-label="${on ? "停止試聽" : "試聽"} ${esc(name)}" title="${on ? "停止" : "試聽"}">${on ? "■" : "▶"}</button>`;
 }
+// Search: each space-separated word must appear (case-insensitive) in the given texts.
+const edAudFound = (...texts) => {
+  const hay = texts.filter(Boolean).join(" ").toLowerCase();
+  return edAudUi.q.trim().toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+};
+const edAudNoMatch = () => `<p class="note" data-ed-aud-none>找不到符合「${esc(edAudUi.q.trim())}」的音訊。</p>`;
 function edAudBuiltinList() {
   const cat = edAudUi.cat,
-    all = (edAudUi.catalog?.items || []).filter((it) => it.usage === cat),
     genres = edAudUi.catalog?.genres || {},
+    all = (edAudUi.catalog?.items || []).filter((it) => it.usage === cat),
+    found = all.filter((it) => edAudFound(it.title, it.use, genres[it.genre], it.genre)),
     counts = new Map();
-  for (const it of all)
+  for (const it of found)
     if (it.genre) counts.set(it.genre, (counts.get(it.genre) || 0) + 1);
-  const genre = counts.has(edAudUi.genre) ? edAudUi.genre : "全部",
-    rows = all.filter((it) => genre === "全部" || it.genre === genre),
+  // A genre the search left out is no longer selected (what shows = what is kept).
+  if (!counts.has(edAudUi.genre)) edAudUi.genre = "全部";
+  const genre = edAudUi.genre,
+    rows = found.filter((it) => genre === "全部" || it.genre === genre),
     by = {
       人氣: (a, b) =>
         edAudUses(edAudUrl(b)) - edAudUses(edAudUrl(a)) ||
@@ -235,9 +257,10 @@ function edAudBuiltinList() {
     }[edAudUi.sort];
   if (!all.length)
     return `<div class="ed-aud-empty"><p class="note">內建${cat === "music" ? "配樂" : cat === "sfx" ? "音效" : "環境音"}還沒有曲子。可以按下方「${cat === "music" ? "上傳自己的音樂" : "上傳音訊"}」用自己的檔案。</p></div>`;
+  if (!found.length) return edAudNoMatch();
   const genreButtons = counts.size
     ? `<div class="flow-choices" role="group" aria-label="曲風">${[
-        ["全部", all.length],
+        ["全部", found.length],
         ...counts,
       ]
         .map(
@@ -268,13 +291,16 @@ function edAudBuiltinList() {
 }
 function edAudLibraryList() {
   if (!edAudUi.items) return '<p class="note">載入音訊中…</p>';
-  const session = typeof edAssets === "object" ? edAssets.session : new Set(),
-    rows = edAudUi.items.filter(
+  const session = typeof edAssets === "object" ? edAssets.session : new Set();
+  let rows = edAudUi.items.filter(
       (a) =>
         edAudUsage(a) === edAudUi.cat &&
         (edAudUi.src !== "session" || session.has(a.id)) &&
         (edAudUi.src !== "favs" || edAudUi.favs.has(a.id)),
     );
+  const hit = rows.filter((a) => edAudFound(a.name));
+  if (rows.length && !hit.length) return edAudNoMatch();
+  rows = hit;
   if (!rows.length)
     return `<p class="note">${edAudUi.src === "session" ? "這次還沒有上傳音訊。" : edAudUi.src === "favs" ? "還沒有收藏的音訊，按 ☆ 收藏。" : "這個分類還沒有音訊。"}</p>`;
   return `<ul class="ed-aud-list">${rows
@@ -407,7 +433,7 @@ function edAudPane(p, c) {
           )
           .join(
             "",
-          )}</div>${src === "builtin" ? (edAudUi.catalog ? edAudBuiltinList() : '<p class="note">載入內建曲庫中…</p>') : edAudLibraryList()}${edButton(cat === "music" ? "上傳自己的音樂" : "上傳音訊", "aud-upload")}<p class="note">分類依音訊的用途標籤，不看檔名；沒有標籤的在「未分類」。＋＝加到目標軌的播放頭。</p>`;
+          )}</div><input class="text-input" type="search" aria-label="搜尋音訊" placeholder="搜尋名稱、用途或曲風（例：旅遊、咖啡廳、Lo-fi）" data-ed-aud-q value="${esc(edAudUi.q)}">${src === "builtin" ? (edAudUi.catalog ? edAudBuiltinList() : '<p class="note">載入內建曲庫中…</p>') : edAudLibraryList()}${edButton(cat === "music" ? "上傳自己的音樂" : "上傳音訊", "aud-upload")}<p class="note">分類依音訊的用途標籤，不看檔名；沒有標籤的在「未分類」。＋＝加到目標軌的播放頭。</p>`;
   return `<h3>音訊</h3>${tabs}<p class="note">目標軌</p>${target}${body}<hr>${edAudSettingsPane(p)}${edPeakMeter()}${c && ["video", "audio"].includes(c.kind) ? edKeysPane(p, c) : ""}`;
 }
 edRegisterPane("audio", {
@@ -425,23 +451,23 @@ edRegisterPane("audio", {
       edAudUi.target = ["dialogue", "ai"].includes(edAudUi.cat) ? "A1" : "A2";
       edAudUi.src = edAudBuiltin.includes(edAudUi.cat) ? "builtin" : "library";
       edAudUi.genre = "全部";
-      edRedraw();
+      edAudRedraw();
     },
     "aud-src:": async (action) => {
       edAudUi.src = action.slice(8);
-      edRedraw();
+      edAudRedraw();
     },
     "aud-target:": async (action) => {
       edAudUi.target = action.slice(11);
-      edRedraw();
+      edAudRedraw();
     },
     "aud-genre:": async (action) => {
       edAudUi.genre = action.slice(10);
-      edRedraw();
+      edAudRedraw();
     },
     "aud-sort:": async (action) => {
       edAudUi.sort = action.slice(9);
-      edRedraw();
+      edAudRedraw();
     },
     "aud-play:": async (action) => {
       const url = action.slice(9);
@@ -452,7 +478,7 @@ edRegisterPane("audio", {
         edAudPlayer.src = VideoWorkbench.safeUrl(url);
         edAudPlayer.play().catch(() => (edAudUi.playing = null));
       }
-      edRedraw();
+      edAudRedraw();
     },
     "aud-builtin:": async (action, p) => {
       const it = edAudUi.catalog?.items.find((x) => x.id === action.slice(12));
@@ -478,7 +504,7 @@ edRegisterPane("audio", {
       ]);
       edAudUi.favs = favs;
       if (typeof edAssets === "object") edAssets.favs = new Set(favs);
-      edRedraw();
+      edAudRedraw();
     },
     "aud-tag:": async (action) => {
       const [usage, ...rest] = action.slice(8).split(":"),
@@ -547,11 +573,11 @@ edRegisterPane("audio", {
     "aud-vo-model:": async (action) => {
       edAudUi.vo.model = action.slice(13);
       edAudUi.vo.voice = "";
-      edRedraw();
+      edAudRedraw();
     },
     "aud-vo-voice:": async (action) => {
       edAudUi.vo.voice = action.slice(13);
-      edRedraw();
+      edAudRedraw();
     },
     "aud-vo-generate": async (action, p) => {
       const vo = edAudUi.vo,
@@ -625,8 +651,17 @@ edRegisterPane("audio", {
     },
   },
 });
-// AI 旁白 fields keep their text without a repaint (the caret stays).
+// AI 旁白 fields keep their text without a repaint (the caret stays). The search box repaints (edAudRedraw keeps its caret).
 document.addEventListener("input", (e) => {
   const key = e.target.dataset?.edVo;
   if (key && key in edAudUi.vo) edAudUi.vo[key] = e.target.value;
+  // While an input method is composing (注音／拼音), wait for compositionend: a repaint would cut the word off.
+  if (!e.target.matches?.("[data-ed-aud-q]") || e.isComposing) return;
+  edAudUi.q = e.target.value;
+  edAudRedraw();
+});
+document.addEventListener("compositionend", (e) => {
+  if (!e.target.matches?.("[data-ed-aud-q]")) return;
+  edAudUi.q = e.target.value;
+  edAudRedraw();
 });

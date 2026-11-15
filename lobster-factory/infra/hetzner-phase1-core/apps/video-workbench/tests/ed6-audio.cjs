@@ -127,6 +127,38 @@ function ff(args) {
     await genres.getByRole("button", { name: "全部 2", exact: true }).click();
     await lib.getByRole("group", { name: "排序" }).getByRole("button", { name: "最新", exact: true }).click();
     assert.deepEqual(await lib.locator("[data-ed-aud-item]").evaluateAll((els) => els.map((e) => e.dataset.edAudItem)), ["m2", "m1"]);
+    // 搜尋：名稱、用途、曲風（含中文標籤）；多個詞都要符合；找不到有提示；打字不掉內容
+    const search = lib.getByLabel("搜尋音訊"),
+      shown = () => lib.locator("[data-ed-aud-item]").evaluateAll((els) => els.map((e) => e.dataset.edAudItem));
+    for (const [q, want] of [["低傳真", ["m2"]], ["lo-fi", ["m2"]], ["流行", ["m1"]], ["測試 流行", ["m1"]]]) {
+      await search.fill(q);
+      assert.deepEqual((await shown()).sort(), want, "搜尋 " + q);
+      assert.equal(await lib.getByLabel("搜尋音訊").inputValue(), q);
+    }
+    await search.fill("zzz");
+    assert.match(await lib.locator("[data-ed-aud-none]").innerText(), /找不到符合「zzz」/);
+    await lib.getByLabel("搜尋音訊").fill("");
+    assert.equal((await shown()).length, 2);
+    // Codex 4c768d0d：F1 被搜尋排除的曲風不再保持選取；F2 清單重新載入時搜尋框不失焦；F3 中文輸入法選字中不重畫
+    await lib.getByRole("group", { name: "曲風" }).getByRole("button", { name: "Lo-fi 1", exact: true }).click();
+    await lib.getByLabel("搜尋音訊").fill("流行");
+    await lib.getByLabel("搜尋音訊").fill("");
+    assert.equal((await shown()).length, 2, "清掉搜尋後回到全部，不回舊曲風");
+    await lib.getByLabel("搜尋音訊").focus();
+    await page.evaluate(() => edAudLoad());
+    assert.equal(await page.evaluate(() => document.activeElement?.matches("[data-ed-aud-q]")), true, "重新載入後搜尋框仍有焦點");
+    const composing = await page.evaluate(() => {
+      const box = document.querySelector("[data-ed-aud-q]");
+      box.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      box.value = "低傳";
+      box.dispatchEvent(new InputEvent("input", { bubbles: true, isComposing: true, data: "低傳" }));
+      const same = document.querySelector("[data-ed-aud-q]") === box;
+      box.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "低傳" }));
+      return same;
+    });
+    assert.equal(composing, true, "選字中搜尋框沒有被重畫換掉");
+    assert.deepEqual(await shown(), ["m2"], "選字完成後才套用搜尋");
+    await lib.getByLabel("搜尋音訊").fill("");
     assert.equal(await lib.getByRole("button", { name: "上傳自己的音樂", exact: true }).count(), 1, "上傳自己的音樂入口保留");
     await lib.locator(".ed-aud-cats").getByRole("button", { name: "環境音", exact: true }).click();
     assert.match(await lib.locator(".ed-aud-empty").innerText(), /還沒有曲子/);
