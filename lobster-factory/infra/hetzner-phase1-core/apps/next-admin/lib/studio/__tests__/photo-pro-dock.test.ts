@@ -7,6 +7,7 @@ import path from "node:path";
 import { build } from "esbuild";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createPhotocraftCtx, cssColorRgba, fitQuad, scaleFor, toPixels, toQuality } from "../../../public/editor-shared/ctx-photocraft.js";
+import { openHandoff } from "../../../public/editor-shared/dock.js";
 
 const APP = path.resolve(__dirname, "..", "..", "..");
 const read = (rel: string) => fs.readFileSync(path.join(APP, rel), "utf8");
@@ -445,6 +446,53 @@ describe("ctx-photocraft.js 契約（mock photocraft）", () => {
     m.emit({ type: "photocraft:failed", error: "A browser with WebGPU or WebGL2 is required." });
     await new Promise((r) => setTimeout(r, 5));
     await expect(m.ctx.ready()).rejects.toThrow(/WebGL2/);
+  });
+
+  // ---- dock 啟動等待（2026-11-15：首次下載 14 MB 主檔要 1–2 分鐘，舊 dock 60 秒就放棄並叫使用者重新整理，每次整理從頭下載） ----
+  it("編輯器 90 秒後才出現 → openHandoff 照樣開檔；等待中訊息含「請不要重新整理」，沒有一則叫人重新整理頁面", async () => {
+    vi.useFakeTimers();
+    try {
+      const m = mockPc({}, { ctx: { pollMs: 200 } });
+      const api = m.cw.photocraft;
+      delete m.cw.photocraft; // wasm 還在下載
+      setTimeout(() => { m.cw.photocraft = api; }, 90_000);
+      const opened: string[] = [];
+      m.ctx.openFile = async (_b: Blob, name: string) => (opened.push(name), true);
+      let done = false;
+      (globalThis as any).__proEditor = { handoff: Promise.resolve({ url: "/h/1", name: "a.png", done: () => { done = true; } }) };
+      vi.stubGlobal("fetch", async () => ({ ok: true, blob: async () => new Blob(["PNG"]) }));
+      const reports: string[] = [];
+      const p = openHandoff(m.ctx, (msg: string) => reports.push(msg));
+      await vi.advanceTimersByTimeAsync(91_000);
+      expect(await p).toMatchObject({ name: "a.png" });
+      expect(opened).toEqual(["a.png"]);
+      expect(done).toBe(true);
+      expect(reports.some((r) => r.includes("請不要重新整理") && r.includes("已等 89 秒"))).toBe(true);
+      expect(reports.filter((r) => r.includes("重新整理頁面會再試一次"))).toEqual([]);
+      expect(reports.slice(-2)).toEqual(["下載帶入的設計…", "開啟中…"]);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+      delete (globalThis as any).__proEditor;
+    }
+  });
+
+  it("photocraft:failed → openHandoff 立即失敗，訊息是原因、不叫重新整理，交接保留", async () => {
+    try {
+      const m = mockPc({}, { ctx: { pollMs: 5 } });
+      delete m.cw.photocraft;
+      let done = false;
+      (globalThis as any).__proEditor = { handoff: Promise.resolve({ url: "/h/1", name: "a.png", done: () => { done = true; } }) };
+      const reports: string[] = [];
+      const p = openHandoff(m.ctx, (msg: string) => reports.push(msg));
+      m.emit({ type: "photocraft:failed", error: "A browser with WebGPU or WebGL2 is required." });
+      expect(await p).toBeNull();
+      expect(reports.at(-1)).toMatch(/WebGL2/);
+      expect(reports.at(-1)).not.toMatch(/重新整理/);
+      expect(done).toBe(false);
+    } finally {
+      delete (globalThis as any).__proEditor;
+    }
   });
 
   it("純函式：toQuality／toPixels／scaleFor", () => {

@@ -13,6 +13,7 @@ import {
 import { CANVAS_STAFF_HREF, canvasTarget, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
 import { bucketDownloadHref } from "@/lib/storage/download-href";
+import { createOriginalImageCache, type OriginalImageCache } from "@/lib/studio/original-image-cache";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -302,6 +303,15 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editSavedUrl, setEditSavedUrl] = useState<string | null>(null);
+  // The original is downloaded once per opened design (lib/studio/original-image-cache.ts) — brushes and strength
+  // reuse the blob: URL. editOriginalLoading = that first download is still running (panel shows 下載原圖中…).
+  const editOriginal = useRef<OriginalImageCache | null>(null);
+  const originalCache = useCallback(() => (editOriginal.current ??= createOriginalImageCache()), []);
+  // Keyed by opening (sequence), not asset id: closing A mid-download and reopening A must not let the first download's
+  // finally clear the second opening's marker (Codex 2026-11-15).
+  const editOriginalSeq = useRef(0);
+  const [editOriginalLoading, setEditOriginalLoading] = useState<number | null>(null);
+  useEffect(() => () => editOriginal.current?.release(), []);
 
   /* multi-select */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -549,7 +559,17 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
     setEditError(null);
     setEditSavedUrl(null);
     setEditAmount(55);
-  }, []);
+    if (asset.object_url) {
+      // Start the one download now so the first brush does not wait for it. Same-origin route → no canvas taint for the
+      // cross-origin R2 image. The platform download route, not studio's proxy-image: this gallery is a PLATFORM_PAGE
+      // (lib/portal/doors.ts), so it may call only PLATFORM_APIS. A failure here surfaces on the brush click (it retries).
+      const seq = ++editOriginalSeq.current;
+      setEditOriginalLoading(seq);
+      originalCache().get(asset.id, bucketDownloadHref(asset.object_url))
+        .catch(() => {})
+        .finally(() => setEditOriginalLoading((cur) => (cur === seq ? null : cur)));
+    }
+  }, [originalCache]);
 
   const closeEdgeEdit = useCallback(() => {
     setEditAsset(null);
@@ -557,6 +577,8 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
     setEditStyle(null);
     setEditError(null);
     setEditSavedUrl(null);
+    setEditOriginalLoading(null);
+    editOriginal.current?.release();
   }, []);
 
   const applyEdgeStyle = useCallback(async (styleId: EdgeMaskId) => {
@@ -564,10 +586,9 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
     setEditBusy(true);
     setEditError(null);
     try {
-      // Same-origin route → no canvas taint for the cross-origin R2 image. The platform download route, not studio's
-      // proxy-image: this gallery is a PLATFORM_PAGE (lib/portal/doors.ts), so it may call only PLATFORM_APIS.
-      const proxied = bucketDownloadHref(editAsset.object_url);
-      const res = await applyEdgeMask(proxied, styleId, { amount: editAmount, seed: 7 });
+      // The original downloaded once in openEdgeEdit (still in flight → wait for it, no error); then the local blob: URL.
+      const local = await originalCache().get(editAsset.id, bucketDownloadHref(editAsset.object_url));
+      const res = await applyEdgeMask(local, styleId, { amount: editAmount, seed: 7 });
       if (res.ok) {
         setEditResult(res.image);
         setEditStyle(styleId);
@@ -581,7 +602,7 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
     } finally {
       setEditBusy(false);
     }
-  }, [editAsset, editAmount]);
+  }, [editAsset, editAmount, originalCache]);
 
   const saveEdged = useCallback(async (): Promise<string | null> => {
     if (!editResult || !editAsset) return null;
@@ -1498,8 +1519,8 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
                     overflow: "hidden",
                   }}
                 >
-                  {editBusy ? (
-                    <span style={{ fontSize: 13, color: "#333" }}>處理中…</span>
+                  {editBusy || editOriginalLoading !== null ? (
+                    <span style={{ fontSize: 13, color: "#333" }}>{editOriginalLoading !== null ? "下載原圖中…" : "處理中…"}</span>
                   ) : editResult ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={editResult} alt="套邊後" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />

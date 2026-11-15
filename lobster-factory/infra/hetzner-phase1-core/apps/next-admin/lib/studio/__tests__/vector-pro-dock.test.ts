@@ -5,8 +5,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { build } from "esbuild";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createVectorcraftCtx } from "../../../public/editor-shared/ctx-vectorcraft.js";
+import { openHandoff } from "../../../public/editor-shared/dock.js";
 
 const APP = path.resolve(__dirname, "..", "..", "..");
 const read = (rel: string) => fs.readFileSync(path.join(APP, rel), "utf8");
@@ -169,8 +170,38 @@ describe("ctx-vectorcraft.js 契約（mock vectorcraft）", () => {
     ctx.busy(false);
     expect(seen).toEqual([["info", "✅ 完成"], ["busy", true], ["busy", false]]);
     expect(() => mockHost().ctx.info("沒有 dock 也不炸")).not.toThrow();
-    const absent = createVectorcraftCtx({ frame: () => undefined, timeoutMs: 20, pollMs: 5 });
+    // ready() 等的是啟動上限 startupTimeoutMs（預設 10 分鐘），不是單次操作的 timeoutMs
+    const absent = createVectorcraftCtx({ frame: () => undefined, timeoutMs: 20, startupTimeoutMs: 20, pollMs: 5 });
     await expect(absent.ready()).rejects.toThrow(/尚未載入/);
+  });
+});
+
+// ---- dock 啟動等待（2026-11-15：首次下載 33 MB 主檔要 1–2 分鐘，舊 dock 30 秒就放棄並叫使用者重新整理，每次整理從頭下載） ----
+describe("dock.js openHandoff 等編輯器啟動", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    delete (globalThis as any).__proEditor;
+  });
+
+  it("編輯器 90 秒後才出現 → 照樣開檔；等待中訊息含「請不要重新整理」，沒有一則叫人重新整理頁面", async () => {
+    vi.useFakeTimers();
+    const cw: any = {};
+    const opened: string[] = [];
+    setTimeout(() => { cw.vectorcraft = { openFile: (n: string) => (opened.push(n), true) }; }, 90_000);
+    const ctx = createVectorcraftCtx({ frame: () => ({ contentWindow: cw }) as unknown as HTMLIFrameElement, pollMs: 200 });
+    let done = false;
+    (globalThis as any).__proEditor = { handoff: Promise.resolve({ url: "/h/1", name: "a.vectorcraft", done: () => { done = true; } }) };
+    vi.stubGlobal("fetch", async () => ({ ok: true, blob: async () => new Blob(["VC"]) }));
+    const reports: string[] = [];
+    const p = openHandoff(ctx, (m: string) => reports.push(m));
+    await vi.advanceTimersByTimeAsync(91_000);
+    expect(await p).toMatchObject({ name: "a.vectorcraft" });
+    expect(opened).toEqual(["a.vectorcraft"]);
+    expect(done).toBe(true);
+    expect(reports.some((m) => m.includes("請不要重新整理") && m.includes("已等 89 秒"))).toBe(true);
+    expect(reports.filter((m) => m.includes("重新整理頁面會再試一次"))).toEqual([]);
+    expect(reports.slice(-2)).toEqual(["下載帶入的設計…", "開啟中…"]);
   });
 });
 

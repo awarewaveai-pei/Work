@@ -30,10 +30,11 @@ const LEGACY_KEYS = ["vector-pro-dock:v1", "vector-pro-dock:brightness-applied:v
 export const DEFAULT_WORKSPACE = "Essentials Classic";
 const WORKSPACE_FLAG = "vector-pro-dock:workspace-default:v1";
 
-export async function applyDefaultWorkspace(ctx) {
+/** ready：mountDock 已在等（並顯示「已等 N 秒」）的同一個啟動 promise；沒給就自己等。 */
+export async function applyDefaultWorkspace(ctx, ready) {
   try {
     if (localStorage.getItem(WORKSPACE_FLAG)) return;
-    await ctx.ready();
+    await (ready ?? ctx.ready());
     const api = globalThis.__proEditor?.frame?.contentWindow?.vectorcraft;
     if ((await api.inspect())?.ui?.workspace !== DEFAULT_WORKSPACE) {
       await api.request("ui.menu.invoke", { command: "window.workspace", params: { name: DEFAULT_WORKSPACE } });
@@ -53,6 +54,6 @@ if (typeof document !== "undefined") {
   autoMount(
     "vector-pro-dock",
     { makeCtx: createVectorcraftCtx, panelIds: PANEL_IDS, storeKey: STORE, sizes: SIZES },
-    ({ ctx }) => applyDefaultWorkspace(ctx),
+    ({ ctx, ready }) => applyDefaultWorkspace(ctx, ready),
   );
 }

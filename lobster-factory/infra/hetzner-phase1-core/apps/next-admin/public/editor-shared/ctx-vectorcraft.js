@@ -64,25 +64,38 @@ export const VECTORCRAFT_HOST = Object.freeze({
 });
 
 /**
- * @param {{frame: () => (HTMLIFrameElement|undefined), timeoutMs?: number, pollMs?: number,
+ * @param {{frame: () => (HTMLIFrameElement|undefined), timeoutMs?: number, startupTimeoutMs?: number, pollMs?: number,
  *          onInfo?: (msg: string) => void, onBusy?: (on: boolean) => void}} opts
  *   frame（必填）：回傳宿主 iframe；由 dock 外殼明確傳入（頁框掛的 window.__proEditor.frame），這裡不再有全域預設。
  *   onInfo／onBusy：面板的狀態訊息與忙碌顯示，由 dock 決定畫在哪。
+ *   timeoutMs：單次操作等宿主的上限；startupTimeoutMs：ready() 等 wasm 啟動的上限（第一次要下載 33 MB 主檔，慢網路要幾分鐘；
+ *   2026-11-15 固定 30 秒讓 dock 在下載中就放棄並叫使用者重新整理，每次整理都從頭下載）。
  */
 export function createVectorcraftCtx(opts) {
   const frame = opts?.frame;
   if (typeof frame !== "function") throw new Error("createVectorcraftCtx 需要 opts.frame（回傳宿主 iframe 的函式）");
   const timeoutMs = opts.timeoutMs ?? 30000;
+  const startupTimeoutMs = opts.startupTimeoutMs ?? 600000;
   const pollMs = opts.pollMs ?? 200;
   let queue = Promise.resolve(); // ctx 呼叫一次跑一個：選取與 captureDownloads 都是宿主全域狀態
 
-  /** 等到 iframe 內 window.vectorcraft 出現（wasm 啟動前不存在）。同源才讀得到。 */
-  async function vc() {
-    const end = Date.now() + timeoutMs;
+  /** 等到 iframe 內 window.vectorcraft 出現（wasm 啟動前不存在）。同源才讀得到。
+   *  limitMs 到了丟 Error，code = "editor-timeout"、limitMs = 上限（dock 以此分辨啟動逾時與其他失敗）；
+   *  onWaiting(elapsedSeconds) 每過一秒叫一次（第 0 秒也叫），dock 用來顯示「已等 N 秒」。與 ctx-photocraft.js pc() 同一寫法。 */
+  async function vc(limitMs = timeoutMs, onWaiting) {
+    const start = Date.now();
+    const end = start + limitMs;
+    let lastSec = -1;
     for (;;) {
       const api = frame()?.contentWindow?.vectorcraft;
       if (api) return api;
-      if (Date.now() >= end) throw new Error("VectorCraft 尚未載入（window.vectorcraft 不存在）");
+      const now = Date.now();
+      if (now >= end) throw Object.assign(new Error("VectorCraft 尚未載入（window.vectorcraft 不存在）"), { code: "editor-timeout", limitMs });
+      const sec = Math.floor((now - start) / 1000);
+      if (onWaiting && sec !== lastSec) {
+        lastSec = sec;
+        onWaiting(sec);
+      }
       await sleep(pollMs);
     }
   }
@@ -120,7 +133,8 @@ export function createVectorcraftCtx(opts) {
     info: (msg) => opts.onInfo?.(String(msg ?? "")),
     /** 面板告知忙碌中／結束（同步，不排隊）。 */
     busy: (on) => opts.onBusy?.(!!on),
-    ready: () => vc().then(() => true),
+    /** 等宿主啟動（上限 startupTimeoutMs，不是單次操作的 timeoutMs）；o.onWaiting(elapsedSeconds) 每秒一次。 */
+    ready: (o) => vc(startupTimeoutMs, o?.onWaiting).then(() => true),
 
     /** 置入 SVG 字串，置中於視窗；多個物件群組成一個（object.group，engine cmd/object/commands.rs:135）並選取；回 {ids}。 */
     placeSvg: op(async (api, svg, name = "awarewave.svg") => {

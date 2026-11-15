@@ -13,7 +13,7 @@
 | `setArtboardSize({width, height, unit, dpi?})` | `{width, height, created}` | 第一個畫板改尺寸（`artboard.setProps`，pt）；沒文件就 `file.new`；unit `mm/cm/in/pt/px`（px 以 dpi 換算） |
 | `openFile(blob, name)` | `true` | 開成新文件分頁（`vectorcraft.openFile`，同拖檔到分頁列；格式看 `name` 副檔名） |
 | `saveAs()` | `Blob` | 存成 `.vectorcraft`（`file.saveCopy` + `captureDownloads`，不改文件路徑） |
-| `ready()` | `true` | 等 `window.vectorcraft` 出現（預設 30 秒逾時） |
+| `ready({ onWaiting })` | `true` | 等 `window.vectorcraft` 出現；上限 `startupTimeoutMs`（預設 10 分鐘，首次要下載整個編輯器）、不是單次操作的 `timeoutMs`；`onWaiting(elapsedSeconds)` 每秒一次，dock 顯示「已等 N 秒」；逾時 Error 帶 `code: "editor-timeout"` |
 | `info(msg)` / `busy(on)` | — | 面板狀態訊息／忙碌中，同步；dock 畫在浮出層底部（HTML 標籤會被去掉） |
 | `host` | 物件（非函式，必備） | 宿主描述，見下「host」。面板要的編輯器專屬值（存檔標記、原始檔副檔名、清單過濾、文案）只讀這裡，不寫死編輯器名 |
 | `importLegacy(file)` | `{objects}` | **選用。** 舊專案檔（`.design.json`）轉成向量並置入（`placeSvg`）；`objects` = 轉入的物件數；失敗 reject `Error` |

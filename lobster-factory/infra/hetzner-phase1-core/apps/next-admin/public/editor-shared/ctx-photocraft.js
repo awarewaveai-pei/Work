@@ -148,15 +148,18 @@ async function onBackground(png, color, type, quality) {
 }
 
 /**
- * @param {{frame: () => (HTMLIFrameElement|undefined), timeoutMs?: number, saveTimeoutMs?: number, pollMs?: number,
+ * @param {{frame: () => (HTMLIFrameElement|undefined), timeoutMs?: number, startupTimeoutMs?: number, saveTimeoutMs?: number, pollMs?: number,
  *          onInfo?: (msg: string) => void, onBusy?: (on: boolean) => void, download?: (blob: Blob, name: string) => void}} opts
  *   frame（必填）：回傳宿主 iframe（dock 外殼傳 window.__proEditor.frame）。download：面板沒在等的存檔（使用者按原生
  *   另存／匯出）交給父頁下載；預設 <a download>。
+ *   timeoutMs：單次操作等宿主的上限；startupTimeoutMs：ready() 等 wasm 啟動的上限（第一次要下載 14 MB 主檔，慢網路要幾分鐘；
+ *   2026-11-15 固定 60 秒讓 dock 在下載中就放棄並叫使用者重新整理，每次整理都從頭下載）。
  */
 export function createPhotocraftCtx(opts) {
   const frame = opts?.frame;
   if (typeof frame !== "function") throw new Error("createPhotocraftCtx 需要 opts.frame（回傳宿主 iframe 的函式）");
   const timeoutMs = opts.timeoutMs ?? 60000;
+  const startupTimeoutMs = opts.startupTimeoutMs ?? 600000;
   const saveTimeoutMs = opts.saveTimeoutMs ?? 60000;
   const pollMs = opts.pollMs ?? 200;
   const download = opts.download ?? ((blob, name) => {
@@ -219,13 +222,24 @@ export function createPhotocraftCtx(opts) {
     if (i >= 0) waiters.splice(i, 1);
   };
 
-  async function pc() {
-    const end = Date.now() + timeoutMs;
+  /** 等到 iframe 內 window.photocraft 出現（wasm 啟動前不存在）。photocraft:failed（無 WebGPU／WebGL2）→ 立刻以該原因失敗。
+   *  limitMs 到了丟 Error，code = "editor-timeout"、limitMs = 上限（dock 以此分辨啟動逾時與其他失敗）；
+   *  onWaiting(elapsedSeconds) 每過一秒叫一次（第 0 秒也叫），dock 用來顯示「已等 N 秒」。與 ctx-vectorcraft.js vc() 同一寫法。 */
+  async function pc(limitMs = timeoutMs, onWaiting) {
+    const start = Date.now();
+    const end = start + limitMs;
+    let lastSec = -1;
     for (;;) {
-      if (failed) throw new Error(failed);
+      if (failed) throw Object.assign(new Error(failed), { code: "editor-failed" });
       const api = win()?.photocraft;
       if (api) return api;
-      if (Date.now() >= end) throw new Error("PhotoCraft 尚未載入（window.photocraft 不存在）");
+      const now = Date.now();
+      if (now >= end) throw Object.assign(new Error("PhotoCraft 尚未載入（window.photocraft 不存在）"), { code: "editor-timeout", limitMs });
+      const sec = Math.floor((now - start) / 1000);
+      if (onWaiting && sec !== lastSec) {
+        lastSec = sec;
+        onWaiting(sec);
+      }
       await sleep(pollMs);
     }
   }
@@ -383,7 +397,8 @@ export function createPhotocraftCtx(opts) {
     host: PHOTOCRAFT_HOST,
     info: (msg) => opts.onInfo?.(String(msg ?? "")),
     busy: (on) => opts.onBusy?.(!!on),
-    ready: () => pc().then(() => true),
+    /** 等宿主啟動（上限 startupTimeoutMs，不是單次操作的 timeoutMs）；o.onWaiting(elapsedSeconds) 每秒一次。 */
+    ready: (o) => pc(startupTimeoutMs, o?.onWaiting).then(() => true),
 
     /** SVG 置入成向量圖層，置中、為作用中圖層：一個形狀＝一個 Shape 圖層；多個形狀或有文字＝一個群組（Shape 圖層＋文字圖層，
      *  見 splitSvgText／asOneLayer）。1 個 undo 步。 */

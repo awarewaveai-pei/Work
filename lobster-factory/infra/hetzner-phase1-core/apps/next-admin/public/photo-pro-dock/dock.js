@@ -31,10 +31,11 @@ const STORE = "photo-pro-dock:v1";
 export const DEFAULT_LANGUAGE = "zh-hant";
 const LANGUAGE_FLAG = "photo-pro-dock:language-default:v1";
 
-export async function applyDefaultLanguage(ctx) {
+/** ready：mountDock 已在等（並顯示「已等 N 秒」）的同一個啟動 promise；沒給就自己等。 */
+export async function applyDefaultLanguage(ctx, ready) {
   try {
     if (localStorage.getItem(LANGUAGE_FLAG)) return;
-    await ctx.ready();
+    await (ready ?? ctx.ready());
     const api = globalThis.__proEditor?.frame?.contentWindow?.photocraft;
     await api.execute("prefs.set", { path: "interface.language", value: DEFAULT_LANGUAGE });
     localStorage.setItem(LANGUAGE_FLAG, "1");
@@ -47,6 +48,6 @@ if (typeof document !== "undefined") {
   autoMount(
     "photo-pro-dock",
     { makeCtx: createPhotocraftCtx, panelIds: PANEL_IDS, storeKey: STORE, sizes: SIZES },
-    ({ ctx }) => applyDefaultLanguage(ctx),
+    ({ ctx, ready }) => applyDefaultLanguage(ctx, ready),
   );
 }

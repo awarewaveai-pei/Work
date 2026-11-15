@@ -140,9 +140,11 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
 
   let open = null;
   let noticeShown = false; // 浮出層只顯示一則訊息（沒有面板開著），例如帶入的設計開不起來
+  let noticeTitle = null; // 目前那則訊息的標題：啟動等待就緒後只清自己的，不清別人剛顯示的
   const close = () => {
     if (noticeShown) {
       noticeShown = false;
+      noticeTitle = null;
       flyout.hidden = true;
     }
     if (!open) return;
@@ -178,21 +180,33 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
   document.addEventListener("pointerdown", (e) => {
     if ((open || noticeShown) && !flyout.contains(e.target) && !icons.contains(e.target)) close();
   });
-  /** 沒開面板時也看得到的訊息：浮出層只放標題與狀態列。 */
+  /** 沒開面板時也看得到的訊息：浮出層只放標題與狀態列。同一標題再叫只換文字（每秒更新的等待訊息不閃）。 */
   const notice = (title, msg) => {
-    close();
-    for (const b of bodies.children) b.hidden = true;
-    tab.textContent = title;
+    if (!(noticeShown && noticeTitle === title)) {
+      close();
+      for (const b of bodies.children) b.hidden = true;
+      tab.textContent = title;
+      flyout.hidden = false;
+      place();
+      noticeShown = true;
+      noticeTitle = title;
+    }
     status.textContent = String(msg ?? "");
-    flyout.hidden = false;
-    place();
-    noticeShown = true;
   };
   document.addEventListener("keydown", (e) => e.key === "Escape" && close());
   window.addEventListener("resize", () => open && place());
 
+  // 啟動等待（不變量：編輯器還在載入 dock 就等，只在明確失敗或超過 startupTimeoutMs 才放棄，等待中不叫使用者重新整理）：
+  // 一掛好就顯示「已等 N 秒」，就緒後清掉自己那則；失敗顯示原因。使用者開著面板時不蓋掉面板，等面板收起下一秒再顯示。
+  // 同一個 promise 給 openHandoff 與各編輯器的 then（applyDefault*）用，整頁只等一次。
+  const ready = ctx.ready({ onWaiting: (sec) => { if (!open) notice(STARTUP_TITLE, startupWaitMessage(sec)); } });
+  ready.then(
+    () => { if (noticeShown && noticeTitle === STARTUP_TITLE) close(); },
+    (err) => notice(STARTUP_TITLE, startupFailureMessage(err)),
+  );
+
   // C8.1：交接帶「傳回」票、且開成功 → 圖示欄頂端多一顆「傳回 <label>」（可重複按：改了再傳）
-  openHandoff(ctx, (msg) => notice("帶入設計", msg), tag).then((h) => {
+  openHandoff(ctx, (msg) => notice("帶入設計", msg), tag, { ready }).then((h) => {
     if (!h?.ret) return;
     const title = `傳回 ${h.ret.label}`;
     const b = el("button", "btn btn-primary vp-icon vp-return", "↩");
@@ -212,7 +226,26 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
     });
     icons.prepend(b);
   });
-  return { ctx, panels, show, close };
+  return { ctx, panels, show, close, ready };
+}
+
+/** 啟動等待訊息的標題（浮出層分頁）。 */
+export const STARTUP_TITLE = "編輯器";
+
+/** 等編輯器啟動時每秒顯示的訊息。2026-11-15：首次要下載 Photo Pro 14 MB／Vector Pro 33 MB 主檔，操作者網路每秒約 0.5 MB，
+ *  舊 dock 60／30 秒就放棄並叫使用者重新整理，每次整理都讓下載從頭來（主機 access log 12:04–12:11 四次）。 */
+export function startupWaitMessage(elapsedSeconds) {
+  return `編輯器載入中…已等 ${Math.max(0, Math.floor(Number(elapsedSeconds) || 0))} 秒。第一次開啟要下載整個編輯器，網路慢時要等幾分鐘，請不要重新整理。`;
+}
+
+/** 編輯器啟動失敗的訊息：超過上限（ctx 丟 code "editor-timeout"）→ 請確認網路後再開一次；其他（例 photocraft:failed 無 WebGPU）→ 原因。
+ *  兩者都不叫使用者重新整理：整理只會讓下載從頭來。 */
+export function startupFailureMessage(err) {
+  if (err?.code === "editor-timeout") {
+    const min = Math.max(1, Math.round((Number(err.limitMs) || 0) / 60000));
+    return `❌ 編輯器 ${min} 分鐘仍未啟動，請確認網路後再開一次。`;
+  }
+  return `❌ 編輯器無法啟動：${err?.message || err}`;
 }
 
 /** C8.1 傳回：等原分頁 ack 的時間；過了就當原分頁不在，改存 My Designs。 */
@@ -287,21 +320,28 @@ export async function sendBack(ctx, ret, report, { ackMs = RETURN_ACK_MS, save, 
 }
 
 /** C7.1：別的工具送來的設計（門頁的 __proEditor.handoff，canvas-handoff.ts openInCanvas）——編輯器就緒後開成文件，
- *  開成功才 done() 清掉交接並回傳交接（C8.1 帶 ret 時 dock 加「傳回」鈕）；失敗（編輯器逾時、下載失敗、開檔失敗）交接留著，
- *  重新整理會再試，並用 report 顯示訊息、回 null。 */
-export async function openHandoff(ctx, report, tag = "[pro dock]") {
+ *  開成功才 done() 清掉交接並回傳交接（C8.1 帶 ret 時 dock 加「傳回」鈕）；失敗交接留著、回 null。
+ *  階段訊息分開：等編輯器（startupWaitMessage，每秒）→「下載帶入的設計…」→「開啟中…」。只有下載／開檔失敗才說「重新整理頁面會再試一次」；
+ *  編輯器啟動失敗走 startupFailureMessage（整理只會讓編輯器下載從頭來）。opts.ready：mountDock 已在等的同一個 promise，沒給就自己等。 */
+export async function openHandoff(ctx, report, tag = "[pro dock]", { ready } = {}) {
+  let stage = "startup";
   try {
     const h = await globalThis.__proEditor?.handoff;
     if (!h) return null;
-    await ctx.ready();
+    await (ready ?? ctx.ready({ onWaiting: (sec) => report?.(startupWaitMessage(sec)) }));
+    stage = "download";
+    report?.("下載帶入的設計…");
     const r = await fetch(h.url);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    await ctx.openFile(await r.blob(), h.name);
+    const blob = await r.blob();
+    stage = "open";
+    report?.("開啟中…");
+    await ctx.openFile(blob, h.name);
     h.done?.();
     return h;
   } catch (err) {
     console.error(tag, "帶入的設計開不起來", err);
-    report?.(`❌ 帶入的設計開不起來：${err?.message || err}。重新整理頁面會再試一次。`);
+    report?.(stage === "startup" ? startupFailureMessage(err) : `❌ 帶入的設計開不起來：${err?.message || err}。重新整理頁面會再試一次。`);
     return null;
   }
 }
