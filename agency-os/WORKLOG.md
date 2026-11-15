@@ -55,6 +55,7 @@
 - 守衛 `INTENT_TO_ADD_BLOB`：porcelain v2 的 index hash 全 0 = `add -N` 佔位（真 stage 的空檔是 e69de29）→ 視同未 stage，重設到 HEAD；mjs 測試。
 - 文件：`REMOTE_WORKSTATION_STARTUP.md §2.5.1` 新增分歧程序；`ao-resume.md` 第 2–4 步與 `git-safe-ops.ps1:421` 的 `pull --rebase` 建議改為 ff-only／parity-merge／§2.5.1（dirty 共享 checkout 拒絕 rebase）。
 **已生效（18:05）**：`.claude` 是指向 C: 的 junction，faf7ded2c 的 rename 寫入跨磁碟失敗（WinError 17）、`shutil.copyfile` 走 CopyFile2 回 EINVAL → `place()` rename 失敗退回純讀寫複製；之後 D:\Work 以新腳本實際快轉 7 commit（3 檔本地編輯帶過、1 個 eol 幻影檔正規化、0/0），`sync-claude-userlevel -Mode merge` 後 live hooks 6/6 等於 repo。AO-RESUME 每次本就自動跑此同步（`ao-resume.ps1:492-508`），操作者不需記。`.git/parity-merge-q4v3zntr`（2026-11-12 23:30 事故備份，含 2 個 handoff 檔舊編輯）未動。
+**18:12 快轉 b66f0ce8f 時**：ff 成功後寫回合併的 WORKLOG 失敗（EINVAL，rename 與 open 皆被拒，數秒後直接寫入正常 → git 剛 checkout 的檔被短暫擋住）；腳本如實留下備份 `parity-merge-wmkem45f`，`merged-0` 寫回後 43 行本地條目復原、備份刪除。`place()` 改為 rename／複製各重試 6 次（0.2–1.2 s 退避）後才報失敗。
 **未做**：其餘 167 個幻影檔仍在（無害，只讓 `git status` 多 M；parity 每次只正規化上游有改的那些）；`autocrlf=true` 與 `eol=lf` 的矛盾未動；D:\Work `.git` 下 7 個 11-05～11-12 的過期私有 index marker（02b0595d-*）未清。回滾：`git -C D:/Work reset --keep refs/heads/backup/local-main-20261115-165651` 後依 manifest 還原 `ours-*`／`moved-*`。
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=python -I align_keep2.py --root D:/Work --target origin/main --superseded <8 sha> --apply → {"ok":true,"head":"acf79aecd","ahead_of_target":1}；git reset --keep origin/main → rev-list --left-right --count origin/main...HEAD = 0 0；staged 0；sync-claude-userlevel -Mode verify PASS | exit=0 | ms=17785

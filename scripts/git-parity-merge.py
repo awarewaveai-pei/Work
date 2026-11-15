@@ -28,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 
 def main():
@@ -60,14 +61,25 @@ def main():
 
     def place(tmp, path):
         # Rename into place; a target on another volume (D:\Work\.claude is a junction into C:) cannot be renamed to,
-        # so it is copied instead -- still never a truncating open() on the worktree file itself.
-        try:
-            os.replace(tmp, path)
-        except OSError:
-            # not shutil.copyfile: its CopyFile2 fast path fails with EINVAL on this junction path (2026-11-15)
-            with open(tmp, "rb") as src, open(path, "wb") as dst:
-                dst.write(src.read())
-            os.remove(tmp)
+        # so it is copied instead (not shutil.copyfile: its CopyFile2 fast path answers EINVAL on that junction path).
+        # A file git has just checked out can be refused for a moment on Windows (EINVAL, 2026-11-15 18:12: the WORKLOG
+        # write right after the ff), so both forms are retried briefly before the failure is reported.
+        last = None
+        for attempt in range(6):
+            try:
+                os.replace(tmp, path)
+                return
+            except OSError as e:
+                last = e
+            try:
+                with open(tmp, "rb") as src, open(path, "wb") as dst:
+                    dst.write(src.read())
+                os.remove(tmp)
+                return
+            except OSError as e:
+                last = e
+            time.sleep(0.2 * (attempt + 1))
+        raise last
     up = names("diff", "--name-only", "-z", "HEAD", a.target)
     tracked = names("diff", "--name-only", "-z", "HEAD") | names("diff", "--name-only", "-z", "--cached", "HEAD")
     untracked = names("ls-files", "-z", "--others", "--exclude-standard")
