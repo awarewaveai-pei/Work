@@ -31,9 +31,9 @@ const P = {
   sky: "把框內的天空改成滿天星星的夜空",
 } as const;
 
-/** 實測七 only: the video-workbench region editor showed these two at a price different from the photo-pro catalog, so they are the recorded run figures, not catalog values. */
-const KLEIN_REGION = "約 NT$0.015";
-const NANO_REGION = "NT$1.25";
+/** 實測七 only: what these two runs were actually charged in the video-workbench region editor. Recorded facts of the run (WORKLOG 2026-11-13 續11), not list prices. */
+const KLEIN_REGION = "實扣約 NT$0.015";
+const NANO_REGION = "實扣 NT$1.29";
 
 const LINE = "var(--card-border)";
 const h2 = { fontSize: 19, fontWeight: 800, margin: "44px 0 10px", color: "var(--text-primary)" } as const;
@@ -320,8 +320,7 @@ export default function EditGuidePage() {
           ]}
         />
         <Note>
-          {labelOf("nano-banana-2")} 這次實際扣 US$0.04032（約 NT$1.29），比鈕上的標價略高。
-          這兩顆在局部編輯器的標價（{KLEIN_REGION}、{NANO_REGION}）是實測當天編輯器上的數字，和第三節畫布面板的按鈕價不同，以各自畫面上的標價為準。
+          上表那兩顆寫的是這次實際扣的錢；其他三顆的牌價就是實收。局部編輯器和第三節畫布面板的按鈕價不一定相同，以各自畫面上的價錢為準。
           換內容的指令（像這一句）先挑照做的三顆；{labelOf("flux-fill-pro")} 連按兩次都沒照做，不要用它換內容。
         </Note>
 
@@ -335,7 +334,7 @@ export default function EditGuidePage() {
             ["模型回錯誤或逾時", <>不收費。系統會先保留這筆錢，模型失敗或逾時就退回去。</>],
             ["打了中文，但那顆只吃英文", <><b>照扣</b>。圖原封不動回來，錢還是花了——所以先看第三節的表。</>],
             [<>{labelOf("openai-25-edit")} / {labelOf("openai-26-edit")} 跑完才出錯</>, <>會扣。這兩顆是 OpenAI 按字數計價，伺服器算完就計費。</>],
-            [<>{labelOf("openai-26-edit")} 的標價</>, <>是<b>估計值</b>。實測一次 US$0.0475（約 NT$1.52），比鈕上的 {price("openai-26-edit")} 少；描述長、圖大會更貴。</>],
+            [<>{labelOf("openai-26-edit")} 的標價</>, <>是<b>估計值</b>。實測一次約 NT$1.52，比鈕上的 {price("openai-26-edit")} 少；描述長、圖大會更貴。</>],
             ["其他鈕的標價", <>固定牌價，實收就是那個數字。</>],
             ["去背 / 升頻", <>約 NT$0.06 一次。按 GPU 秒數計價，所以是估計值。</>],
             ["色調分離、邊緣遮罩、範本、QR、條碼", <>在妳自己的電腦上算，<b>完全不花錢</b>。</>],

@@ -27,6 +27,18 @@
 - YouTube 帳號未驗證設不了縮圖（影片照傳）；FB 不支援自訂縮圖（Postiz）；字幕需手動上傳。
 
 **避免再發生**：封面規則單一來源 `cover.ts coversOf`；部署順序 0163 migration 先於 next-admin（`dispatch-store.ts` 以 FK 名 `social_media_cover_fk` 嵌入）。
+## 2026-11-15（續3）實測紀錄頁修正：只留 NT$、牌價讀 app 自己的表、補 Luma／Seedance
+
+- 起因：調度 session 回饋：(1) 頁面不得出現 US$；(2) 牌價不得打字；(3) Luma Ray 3.2 已在 11-15 真跑；(4) edit-guide 第十一節要對照 region 卡後的目錄。
+- 做法：
+  - `MeasuredRuns.tsx`：Lyria 兩列的價錢改由 `cost-model.ts musicUsd` ＋ `nt()` 算出 NT$；Veo 列不再打字標價；新增 Luma Ray 3.2 實測列（NT$9.60＝按鈕，主角走到邊緣後以半透明霧狀蓋住下方貼文）與 Seedance 2.0 Fast 列（標 不採用：中國模型，有人照片被拒、沒人照片乾淨衝出，費用 Replicate 沒回報）。
+  - `edit-guide/page.tsx`：局部編輯器兩顆的金額改寫成「實扣」的實測事實（常數 `KLEIN_REGION`／`NANO_REGION`），刪掉「標價」說法與 US$；順手把第十二節裡舊的 US$0.0475 改成只寫 NT$1.52。
+  - 目錄（region 卡後：Fill Pro zh＝no、優／缺備註）本頁只讀標籤與牌價，不需改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit ＋ next dev 後 curl 兩頁（200、無 US$、含 NT$1.28／NT$2.56、半透明） | exit=0 | ms=120000
+- REVIEW_WAIVED: DOC_ONLY -- 靜態表格與文字
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=musicUsd|KLEIN_REGION|MeasuredRuns | hits=5
+- 剩餘風險：(1) Grok 影片實測沒有取得可引用的數字，沒寫進頁面；Seedance 日期與出處也要等破框 session 補寫 WORKLOG。(2) 瀏覽器窗格與 Chrome 都連不到 localhost，沒有截圖，只驗證伺服器渲染。
+- rollback：git revert 本 commit。
 ## 2026-11-15（續2）Replicate 成品網址清單＋每一跳轉址都檢查；局部編輯器只列照中文的模型、Klein 預設、指令由伺服器組
 
 - 起因：局部編輯器 5 模型實測（指令「把框內的天空改成滿天星星的夜空」）發現 FLUX 2 Klein 的成品放在 Replicate 的 R2 網址，我們只認 replicate.delivery → 工作失敗、使用者沒扣款、Replicate 卻照收。操作者 2026-11-14：「Klein 可以用就用吧，把可以用的都按照價錢順序列出，而且要說明其優缺」。

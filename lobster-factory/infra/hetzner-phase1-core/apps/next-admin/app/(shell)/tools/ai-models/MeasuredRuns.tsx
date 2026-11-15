@@ -2,6 +2,11 @@
 // Every figure is a recorded run (WORKLOG heading in the 出處 column); no catalog value is read or changed here.
 // Within each tool the rows are cheapest first. Region-edit (圖片局部編輯) is on /tools/edit-guide section 十一, not repeated here.
 import Link from "next/link";
+import { MUSIC_RATES, musicUsd } from "@/lib/ai/cost-model";
+import { nt } from "@/lib/studio/model-options";
+
+/** NT$ of one song from the app's own music price table, so a list price here cannot drift from the app. */
+const songNt = (id: keyof typeof MUSIC_RATES) => `NT$${nt(musicUsd(id)).toFixed(2)}`;
 
 const LINE = "var(--card-border)";
 type Row = { date: string; model: string; asked: string; money: string; result: string; src: string; verdict?: "good" | "bad" | "todo" };
@@ -18,16 +23,17 @@ const GROUPS: Group[] = [
     rows: [
       { date: "2026-11-13/14", model: "Runway Gen-4 Turbo", asked: "照片裡的主角衝出貼文框，真跑 5 次", money: "實扣 NT$8.00，標價 NT$8.00（一致）",
         result: "5 次主角都沒離開照片。文字列「12.4K／389／127」在第 0／30／60／90／119 格完全相同（有鎖定時）。", src: W5, verdict: "bad" },
-      { date: "尚未實測", model: "Luma Ray 3.2", asked: "—", money: "標價 NT$9.60", result: "還沒跑。", src: W5, verdict: "todo" },
-      { date: "尚未實測", model: "Veo 3.1 Fast", asked: "—", money: "標價 NT$19.20", result: "還沒跑。", src: W5, verdict: "todo" },
+      { date: "2026-11-15", model: "Luma Ray 3.2", asked: "同一個流程，主角衝出照片", money: "實扣 NT$9.60，標價 NT$9.60（一致）", result: "主角走到照片邊緣，之後以半透明的霧狀蓋住下方貼文，不是乾淨地衝出去。主角蓋上去之前，文字都鎖住。", src: W5, verdict: "bad" },
+      { date: "尚未實測", model: "Veo 3.1 Fast", asked: "—", money: "—", result: "還沒跑。", src: W5, verdict: "todo" },
+      { date: "（日期未記）", model: "Seedance 2.0 Fast（不採用：中國模型）", asked: "同一個流程，兩張照片各一次", money: "Replicate 沒回報費用", result: "有人的照片被拒絕；沒有人的照片，主角乾淨地衝出照片。因為是中國模型，不提供給使用者。", src: "破框 session 回報（WORKLOG 還沒寫）", verdict: "bad" },
     ],
     image: { src: "/guides/breakout-frames.jpg", alt: "Runway 破框貼文動畫的第 0、30、60、90、119 格", caption: "Runway 第 5 次：第 0／30／60／90／119 格。照片裡的鯊魚一直在照片內，下方文字列每一格都一樣。" },
   },
   {
     title: "音樂生成",
     rows: [
-      { date: "2026-11-13", model: "Lyria 3 Clip", asked: "生成一首歌", money: "實扣 US$0.04，標價 US$0.04（一致）", result: "成功。", src: W9, verdict: "good" },
-      { date: "尚未實測", model: "Lyria 3.5", asked: "—", money: "標價 US$0.08／首", result: "還沒跑。", src: W9, verdict: "todo" },
+      { date: "2026-11-13", model: "Lyria 3 Clip", asked: "生成一首歌", money: `實扣 ${songNt("lyria-3-clip-preview")}，標價 ${songNt("lyria-3-clip-preview")}（一致）`, result: "成功。", src: W9, verdict: "good" },
+      { date: "尚未實測", model: "Lyria 3.5", asked: "—", money: `標價 ${songNt("lyria-3.5")}／首`, result: "還沒跑。", src: W9, verdict: "todo" },
       { date: "2026-11-13", model: "Eleven Music", asked: "生成音樂（免費方案帳號）", money: "實扣 0 點", result: "被拒：402 paid_plan_required。這個模型需要付費的 ElevenLabs 方案，目前不接。", src: W12, verdict: "bad" },
     ],
   },
@@ -54,7 +60,7 @@ export default function MeasuredRuns() {
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>實測紀錄</h2>
-          <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>2026-11-13／14 真實呼叫 · 1 美元 = 32 元新台幣</span>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>2026-11-13／14 真實呼叫</span>
         </div>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0, maxWidth: 900 }}>
           這一頁只放真的跑過的紀錄：哪一天、哪個模型、做了什麼、實際扣多少、標價是多少、結果如何。每個工具內便宜的排前面。
