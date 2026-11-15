@@ -533,6 +533,16 @@
 - ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-c0d26946 的唯一發現（換來源不重轉）已照不變量修正，並補指名測試；匯入腳本不屬於隱私／權限守衛，依規則不做突變
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=import-audio-library|\.import\.json | hits=21
 - BUGHUNT_SCOPE_NARROW: 改動只有清單資料與匯入腳本；呼叫者只有 tests/ed6-audio.cjs 和交接文件
+## 2026-11-15（續5）BRAND.2 上線：vector-pro／photo-pro 切到拿掉 ArtCraft／Discord 的新版（操作者「可以，上正式站」）
+
+- 主機 `/root/lobster-phase1/static/`：上傳 `vector-pro/4cce336-cfa938d`、`photo-pro/98bcbfa-28d83c6`（先放 `.upload-<時間>`，`sha256sum -c` 全過才改名，擁有者 root）；`current` 兩個都切新版。nginx／compose 不動（掛載上層資料夾，連結切換即生效）。
+- 第一次 smoke 失敗：`e2e/smoke/05-vector-pro.spec.ts` 的「公開版啟動並回答 ui.inspect」等 `window.vectorcraft` 超過 150 s → 依約定立刻 `ln -sfn 4cce336-7303550 vector-pro/current` 回退；舊版重跑 smoke 2 passed。查因：新版本機啟動正常、console 無錯；正式站直接開 `/vector-pro/4cce336-cfa938d/index.html` 62 s 啟動；新舊 wasm 都約 32.6 MB、下載約 54 s、Cloudflare 都 DYNAMIC（不是快取差異）→ 判定為當下網路慢。再切新版重跑 smoke：2 passed（58.9 s），保留新版。
+- 回退：`ln -sfn 4cce336-7303550 vector-pro/current`、`ln -sfn 98bcbfa-f007c95 photo-pro/current`（舊版都在）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=tar|ssh 上傳＋sha256sum -c（SUMS-OK ×2）＋ln -sfn；readlink current → 4cce336-cfa938d／98bcbfa-28d83c6；curl https://app.aware-wave.com/{vector-pro,photo-pro}/current/SHA256SUMS 雜湊＝新版（405594d7…、0b8aab53…） | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=BASE_URL=https://app.aware-wave.com npx playwright test smoke/05-vector-pro.spec.ts --project=smoke → 第一次 1 failed（回退）、舊版 2 passed、再切新版 2 passed | exit=0 | ms=58900
+- REALTEST_EVIDENCE: tool=curl | cmd=從正式站抓 vector-pro index.html／js／wasm 與 photo-pro index.html／boot js+wasm／app js／parts.txt＋part-aa → craft_name_scan（served.py 把分段解壓成 31,203,281 bytes 的 \0asm）→ vector-pro 3 檔、photo-pro 6 檔，artcraft／discord 0 次 | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 只上線已審過的產物（程式見同日 BRAND.2 條）
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-15（續4）BRAND.2：VectorCraft／PhotoCraft 拿掉 ArtCraft 名稱與 Discord；品牌檢查收成 lib.sh 一個入口，四個 Craft 建置都呼叫
 
 - 根因：FC.5 只把名稱掃描接在 FilmCraft／EffectCraft；VectorCraft（已上線 /tools/vector-pro）與 PhotoCraft 的建置連標誌圖掃描都沒呼叫。另一個更深的洞：掃描讀磁碟上的位元組，PhotoCraft 的 app wasm 是一條 gzip 串流切成 `app/*.part-*`，壓縮後字串看不到——舊版 PhotoCraft 產物掃描只抓到 README，wasm 裡的 ArtCraft／Discord 漏掉。
