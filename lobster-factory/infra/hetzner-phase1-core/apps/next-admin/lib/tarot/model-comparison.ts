@@ -42,6 +42,7 @@ export const TAROT_MODEL_SOURCES = {
   openaiImages: "https://developers.openai.com/api/docs/guides/image-generation",
   openaiVision: "https://developers.openai.com/api/docs/guides/images-vision",
   openaiPricing: "https://openai.com/index/image-generation-api/",
+  codexPricing: "https://learn.chatgpt.com/codex/pricing",
 } as const;
 
 /** Per-image USD comes from the catalog (public/editor-shared/image-models.js via IMAGE_RATES) -- this table used to carry
@@ -380,6 +381,28 @@ const ROWS: readonly Omit<TarotModelComparison, "costUsd">[] = [
     strengths: "語意理解與編修自然度強，適合少量高價圖",
     tradeoffs: "此頁最貴之一；大量批次成本高",
     sourceKeys: ["openaiImages", "openaiVision", "openaiPricing"],
+  },
+  {
+    id: "codex-image",
+    label: "Codex 免費生圖",
+    provider: "OpenAI",
+    tier: "editing",
+    bestFor: "自己用的草稿、試構圖、改色改細節（不花錢）",
+    avoidFor: "客戶自己按的生成（只限擁有者本人）、局部重繪（不吃遮罩）、趕時間",
+    publicPrice: "NT$0：用 ChatGPT Plus 的 Codex 額度；實測 1 張 = 5 小時額度 5–12%、每週額度約 1%（2026-11-15）",
+    speed: "慢；實測 47–115 秒；本系統上限 90 秒（Cloudflare 100 秒會切斷），超過算逾時",
+    speedRank: 4,
+    promptLimit: "Codex 對話，沒有固定上限",
+    referenceInput: "可帶參考圖（實測改色成功，其他部分保持不變）",
+    appReferenceLimit: "最多 4 張",
+    aspectRatios: "實測 1:1 = 1254×1254、2:3 = 1024×1536；其他比例取最接近的",
+    appOutput: "PNG；畫完的檔案也留一份在筆電 ~/.codex/generated_images",
+    styleControl: "只有文字描述與參考圖",
+    seedSupport: "不支援 seed",
+    textRendering: "強",
+    strengths: "不花錢；畫質與 GPT-Image 同級；可以帶參考圖改圖",
+    tradeoffs: "一次一張、每張 1–2 分鐘；吃掉的是寫程式也在用的同一份 Codex 額度",
+    sourceKeys: ["codexPricing"],
   },
 ];
 

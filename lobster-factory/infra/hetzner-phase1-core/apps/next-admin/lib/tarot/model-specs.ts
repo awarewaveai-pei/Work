@@ -209,4 +209,12 @@ export const MODEL_SPECS: Record<TarotModel, ModelSpec> = {
     notes: "gpt-image-2.5-sunburst via /images/edits: edits one photo while keeping the rest; prints follow fabric folds (Mockup Studio 2026-11-01)",
     sources: [OPENAI_IMG, OPENAI_GUIDE],
   },
+  "codex-image": {
+    label: "Codex 免費生圖", vendor: "Codex（訂閱）",
+    promptLimit: "the Codex prompt (no stated limit)", promptOrder: "style-second", referenceRole: "edit", usesDeckPreview: false,
+    rewrite: "Codex may restate the prompt to its image tool", seed: false, negativePrompt: "no field",
+    vendorOrder: "what to draw or change, what stays identical, constraints",
+    notes: "Codex's built-in image tool on the operator's laptop (lib/tarot/codex-bridge.ts); 1024x1536 for 2:3, measured 2026-11-14",
+    sources: [OPENAI_GUIDE],
+  },
 };

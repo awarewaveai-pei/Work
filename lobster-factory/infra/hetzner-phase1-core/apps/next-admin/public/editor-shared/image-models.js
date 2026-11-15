@@ -55,6 +55,10 @@ export const IMAGE_MODELS = Object.freeze([
   // Measured 2026-11-01 on /v1/images/edits (high, 1024x1536, 2 refs): US$0.062. Keeps the unmasked pixels; prints follow fabric folds.
   { value: "openai-25-edit", label: "GPT-Image-2.5 修圖", group: "OpenAI", vendor: "OpenAI", usd: 0.06, maxRefs: 5, note: "印花貼合衣物皺褶（實測）", uses: ["generate", "edit"] },
   // gpt-image-2.6-sunburst (OpenAI 2026-11-09: "precise edits"), same token rates as 2.5; takes a mask on /images/edits.
+  // The operator's laptop draws it with Codex on her ChatGPT plan (lib/tarot/codex-bridge.ts): no per-image bill, so usd 0.
+  // Operator only (the server refuses anyone else); needs scripts/codex-image-worker.mjs running. 1024x1536 for 2:3
+  // (measured 2026-11-14/15, 47-115 s per picture). No mask, so no fill / remove / outpaint.
+  { value: "codex-image", label: "Codex 免費生圖", group: "OpenAI", vendor: "Codex（訂閱）", usd: 0, maxRefs: 4, note: "優：免費；缺：限擁有者、要開筆電", uses: ["generate", "edit"], operatorOnly: true },
   { value: "openai-26-edit", label: "GPT-Image-2.6 修圖", group: "OpenAI", vendor: "OpenAI", usd: 0.06, maxRefs: 5, note: "優：條件多、描述長最準；缺：最貴之一", uses: ["generate", "edit", "fill", "outpaint"], zh: "ok", blank: "ok" },
 ]);
 

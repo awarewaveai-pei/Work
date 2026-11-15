@@ -7,6 +7,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { FREE_QUOTAS, INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
 import { loadFreeQuotaUsage } from "@/lib/ai/free-quota";
 import { FreeQuotaCard } from "./FreeQuotaCard";
+import { CodexQuotaCard } from "./CodexQuotaCard";
+import { loadCodexImageUsage } from "@/lib/ai/codex-usage";
 import { loadOrgNames, loadSpendRows } from "@/lib/ai/spend-loader";
 import {
   groupLedger, liveSpend, monthlyReports, rowsSince, summarizeSpend, taipeiDayStartIso, taipeiMonthStartIso,
@@ -69,6 +71,7 @@ export default async function CostsPage() {
   const quotaUsage = supabase
     ? await loadFreeQuotaUsage(supabase, new Date())
     : FREE_QUOTAS.map((quota) => ({ quota, used: null }));
+  const codexUsage = supabase ? await loadCodexImageUsage(supabase, new Date()) : { last24h: null, last7d: null, latest: null };
   const monthlyInfraUsd = INFRA_MONTHLY.reduce((s, i) => s + i.usdPerMonth, 0);
 
   return (
@@ -91,6 +94,7 @@ export default async function CostsPage() {
       </div>
 
       <FreeQuotaCard usage={quotaUsage} />
+      <CodexQuotaCard usage={codexUsage} />
       <CostsTabs data={data} monthlyInfraUsd={monthlyInfraUsd} />
     </div>
   );

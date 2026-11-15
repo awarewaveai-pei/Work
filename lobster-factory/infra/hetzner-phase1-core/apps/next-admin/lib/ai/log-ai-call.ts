@@ -313,7 +313,7 @@ export function releaseHold(hold: Hold | null | undefined, route: string): void 
 
 /** One lib/tarot/image-gen.ts result. Logged when the provider charged: on success, and on a failure after the provider
  *  finished (`billed`, e.g. the download of a finished image failed). Vendor and price come from IMAGE_RATES. */
-export function logImageResult(result: { ok: boolean; billed?: boolean; costUsd?: number }, args: { route: string; model: string; jobId?: string | null; tool?: string | null; grant: Grant; hold?: Hold }): void {
+export function logImageResult(result: { ok: boolean; billed?: boolean; costUsd?: number }, args: { route: string; model: string; jobId?: string | null; tool?: string | null; grant: Grant; hold?: Hold; metadata?: Record<string, unknown> }): void {
   if (!result.ok && !result.billed) return releaseHold(args.hold, args.route);
   const rate = IMAGE_RATES[args.model] ?? IMAGE_RATES[DEFAULT_IMAGE_MODEL];
   // A provider that reports usage (OpenAI images bill by token) gives the exact cost; others use the per-image price.

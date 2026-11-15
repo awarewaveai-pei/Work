@@ -24,7 +24,8 @@ export type StudioModel =
   | "ideogram-character"
   | "nano-banana-2"
   | "nano-banana-pro"
-  | "flux-2-max";
+  | "flux-2-max"
+  | "codex-image";
 
 /** Mask / canvas tools of the genfill and inpaint routes (image-models.js EDIT_TOOLS). */
 export type EditTool = "flux-fill-pro" | "ideogram-4-5-edit" | "ideogram-4-5-edit-low" | "bria-eraser" | "bria-expand";

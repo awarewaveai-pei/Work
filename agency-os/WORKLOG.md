@@ -513,6 +513,59 @@
 - ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-c0d26946 的唯一發現（換來源不重轉）已照不變量修正，並補指名測試；匯入腳本不屬於隱私／權限守衛，依規則不做突變
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=import-audio-library|\.import\.json | hits=21
 - BUGHUNT_SCOPE_NARROW: 改動只有清單資料與匯入腳本；呼叫者只有 tests/ed6-audio.cjs 和交接文件
+## 2026-11-15（續3）Codex 免費生圖：擁有者本人的生圖改由筆電上的 Codex（ChatGPT Plus 額度）畫，NT$0；用量進 AI Costs
+
+[根因]
+- 操作者失業中、不想花錢：Codex 生圖吃 ChatGPT 方案額度不另收費，但平台所有生圖都走按張計費的 API（Replicate／OpenAI／Gemini），因為主機上沒有她的 Codex 登入。
+- 能接的位置只有一處：`generateTarotImage`（`lib/tarot/image-gen.ts`）被塔羅、Studio、AI 修圖、內容配圖、影片畫面圖、架站預設圖共用。繞過它的：`replicate-run.ts`（局部重繪／生成填色／去背，需要遮罩）、video-workbench `backend/api.cjs:662`、video-service `pipeline.py:209`——本次不接（Codex 內建 image_gen 不吃遮罩；影片工作台另議）。
+- 條款邊界：個人方案不得共用／轉供他人 → 只限擁有者本人（actor `ops:<role>:<CODEX_IMAGE_OWNER_USER_ID>`），客戶與其他員工一律拒絕。
+
+[步驟]
+- C1 `lib/tarot/codex-bridge.ts`（新）：程序記憶體佇列（等圖的請求與佇列同一程序同生命週期，重啟兩者同滅、不需 DB 表）；`codexAllowed` 失效關閉；45 秒沒輪詢 = 筆電離線，立即回 `codex_worker_offline`；4 分鐘租期。
+- C2 `image-gen.ts` 第五家供應商 `codex`、模型 `codex-image`（timeout 240 s、costUsd 0、mask → `codex_no_mask`）；`TarotGenResult.logMeta` 經 `logImageResult` 寫進 `ai_call_logs.metadata`（`log-ai-call.ts` 只加可選 metadata 透傳）。
+- C3 內部路由 `app/api/internal/codex-images/{claim,complete}`：Bearer `CODEX_WORKER_SECRET`（未設 = 全拒）；claim 長輪詢 ≤25 s；complete 只收 png/jpeg/webp data URL ≤30 MB、usage 只收已知數字欄位。
+- C4 `scripts/codex-image-worker.mjs`（新，筆電）：`codex exec --json --sandbox read-only -c mcp_servers={}`，不經 shell（直接 node 跑 npm 套件的 codex.js）；只送 `~/.codex/generated_images` 底下的檔；從 Codex 自己的 session 紀錄讀 rate_limits 後刪除該紀錄；額度用完 exit 3（不扣 credits；credits 餘額 0）。
+- C5 登記：`image-models.js` 列（usd 0、uses generate/edit、operatorOnly）、`StudioModel`、`model-specs.ts`、`model-comparison.ts`（AI Models 比較表，含實測）；`/ops/costs` 新卡 `CodexQuotaCard`（`lib/ai/codex-usage.ts`：近 24 h／7 天張數 + 最近一張的 5 小時／每週額度 %）。
+- C6 正式機：`.env` 加兩值（safe-infra-patch file，備份 `.env.bak.safe-patch-20261115-041209`）；compose next-admin 加兩行（safe-infra-patch compose，備份 `docker-compose.yml.bak.safe-patch-20261115-041245`，healthy 15 s）；repo compose 對照檔同步；筆電 `mcp/user-env.ps1` 加 `CODEX_WORKER_SECRET`。
+
+[Codex 審查 round 1（`agency-os/reports/oracle/2026-11-15-partialreview-dfaae957.md`，4 項）]
+- F1 正式機 compose 沒有兩個新變數 → 不成立：已用 safe-infra-patch 加上，`docker exec lobster-next-admin printenv CODEX_IMAGE_OWNER_USER_ID` 有值、`CODEX_WORKER_SECRET` 非空。
+- F2 成立：app 經 Cloudflare（`Server: cloudflare`），約 100 s 未開始回應就 524，改圖實測 115 s 會丟圖。不變量 = 瀏覽器同步請求必須在 100 s 內結束 → `codex-image` timeoutMs 240 s → 90 s（含排隊），超過回 `generation_timeout`。治本（改成 202 + 輪詢，同 `outreach/messages`）未做，見剩餘風險。
+- F3 成立：工人作畫期間不輪詢 > 45 s，第二張被判離線。`workerOnline` 改為「最近輪詢 或 持有租期內的工作」，`completeJob` 也刷新；新測試＋突變（拔掉 → 紅）。
+- F4 成立（部分處理）：AI 修圖面板對所有員工都顯示此鈕；瀏覽器端不知道是否為擁有者，未隱藏。改為鈕上寫「限擁有者」＋ `friendlyImageError` 補 codex_* 中文訊息。
+
+[Codex 審查 round 2（`2026-11-15-partialreview-83803113.md`，3 項全成立）＋ 不變量分析（同一 reviewer 對 codex-bridge 連報兩次）]
+- 不變量 1：只在呼叫者還收得到時才畫 → `CODEX_WAIT_MS` 90 s 單一常數同時給 image-gen timeout 與佇列；剩餘 < `MIN_DRAW_MS` 45 s 的工作不發給筆電，立即回 `codex_worker_busy`（R2-F2：排在第一張後面的第二張會白燒額度）。
+- 不變量 2：「在線」⇔ 工人很快會回應 → 最近輪詢或持有租期內的工作；回報 `codex_quota_exhausted`（工人隨即 exit 3）後立即離線（R2-F3：原本 completeJob 一律刷新 lastPollAt，額度用完後 45 s 內的新工作會空等 90 s）。
+- 不變量 3：帳本每列說真話 → Codex 列 cost 0 並帶 `metadata.free=true`（R2-F1：`spend-report.ts:104` 把沒標 free 的 0 元列算成「漏記價格」警示）。
+- 三項各有指名測試（codex-bridge.test.ts 共 10 個）。
+
+[Codex 審查 round 3–5（`…-02bd9261`、`…-0ea1b546`、`…-c6637ddc`）]
+- R3-F1 = R1-F1（正式機 compose）不成立，同上。R3-F2 使用者關頁後生成仍繼續：所有模型共有（route 未把 request.signal 傳進 generateTarotImage），非本次引入 → 剩餘風險。R3-F3 額度用完時已排隊者要等滿 90 s → 改：stop-error 時清空佇列。
+- R4-F1 第一張已逾時才回報額度用完，佇列沒被清 → 改：先處理 stop-error 再查工作；並把「只在呼叫者收得到時才畫」延伸到筆電：claim 帶 `timeLeftMs`，工人到時停手。
+- R5-F1 Windows 上 `child.kill()` 只殺 codex.js 啟動器、原生 codex 繼續畫 → 改 `taskkill /T /F` 殺整棵程序樹。R5-F2 `timeLeftMs` 從排隊時刻算、沒扣掉抓參考圖的時間 → 改傳呼叫者自己的 `deadlineAt`。
+- R5 修正後 Codex 5 小時額度用完（5 輪審查本身耗掉；重設 16:26），無法再送審 → 書面自審：deadlineAt 由 generateCodex 在 runGeneration 計時器啟動後立即取得（同一 tick），只會比真實期限早不會晚；taskkill 在非 Windows 走原本 child.kill()；突變：拔掉「太晚不發」守衛 → 指名測試紅、還原綠。
+- 實測意外驗到額度用完路徑：工人 11 s 判出 `codex_quota_exhausted`（Codex 原文 “You’ve hit your usage limit … try again at 4:26 PM”）、exit 3、沒扣 credits。taskkill 殺樹因額度用完未能實測。
+
+[剩餘風險]
+- 超過 90 s 的改圖會失敗（已畫的部分仍耗 Codex 額度）；治本需各面板改成 202 + 輪詢（同 `outreach/messages`）。
+- 非擁有者員工看得到按鈕（按下會被擋，不花錢）。
+- 使用者關頁後生成仍繼續（所有模型共有）。
+- Codex 審查本身很吃 Codex 額度：本次 5 輪就用完 5 小時額度，生圖與審查會互搶。
+
+[實測（Plus，2026-11-14/15）]
+- 文字生圖 47–83 s、帶參考圖改圖 76–115 s；1:1 = 1254×1254、2:3 = 1024×1536；每張輸入約 3.5 萬 token（mcp_servers={} 前 11 萬）。
+- 額度：1 張 = 5 小時額度 5%（另一次 12%，同時段可能有其他 Codex 使用）、每週約 1%。
+
+[避免再發生]
+- 新的生圖入口一律走 `generateTarotImage`，Codex 與成本紀錄才自動涵蓋；`replicate-run.ts`／video-workbench 是已知旁路。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/codex-image-worker.mjs --once 對本機假主機（真 Codex）× 3：文字 2:3 66 s、參考圖改色 115 s、最終版 56 s 帶回 usage{codex_5h_used_pct:62,codex_week_used_pct:38}；ssh docker exec lobster-next-admin printenv CODEX_IMAGE_OWNER_USER_ID | exit=0 | ms=56000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/tarot lib/studio lib/ai app（1475 passed；3 個無關測試全套負載下逾時、單獨重跑 36 passed）＋ 突變：拔 codexAllowed 守衛 → codex-bridge.test 3 failed，還原 → 綠 | exit=0 | ms=60000
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=codex-image|CODEX_WORKER_SECRET|CODEX_IMAGE_OWNER_USER_ID | hits=11
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/13m/0n
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，5 輪）；R1-F1/R3-F1 不成立，R3-F2 列剩餘風險，其餘已修並各有測試
+- ORACLE_WAIVED: Codex 5 小時額度於第 5 輪後用完（oracle-quota BLOCKED 至 2026-11-15 16:26），R5 修正（deadlineAt、taskkill /T）以書面自審＋突變證據代替
 ## 2026-11-15（續2）冷開發研究收尾 timeline 帶抓取摘要 `metadata.crawl`（關掉續1 的量測盲點）
 
 - 根因：`lib/outreach/research.ts` 收尾事件只記 sink 結果，`runLeadResearch` 回的 `RunReport` 被丟掉；315 筆 `research_insufficient` 分不出「讀到沒 email」與「站擋我們」，續1 只能外部 curl 161 站量。

@@ -7,6 +7,7 @@
 //   nano-banana-2     → Google Gemini Nano Banana 2.1, direct (half the price of Replicate's Nano Banana 2, ranked higher; 2026-11-10)
 //   nano-banana-pro   → Google Gemini Image via Replicate
 //   flux-2-max        → BFL Flux.2 Max via Replicate
+//   codex-image       → the operator's laptop, Codex on her ChatGPT plan (lib/tarot/codex-bridge.ts; free, operator only)
 // Returns uniform `data:image/png;base64,...` so the client treats all models the same.
 // Prompts arrive in English: the studio translates non-English subject/style once per deck (lib/tarot/translate.ts), never here.
 
@@ -18,6 +19,7 @@ import { fetchReplicateOutput } from "@/lib/ai/replicate-output";
 import type { Grant } from "@/lib/entitlements/can";
 import { holdCost, logImageResult } from "@/lib/ai/log-ai-call";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
+import { CODEX_WAIT_MS, codexAllowed, runOnLaptop, type CodexRef } from "./codex-bridge";
 import { IMAGE_MODELS, imageRunUsd } from "../../public/editor-shared/image-models.js";
 import { GEMINI_IMAGE_TOKEN_RATES, OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES, geminiMediaUsd, type GeminiMediaUsage } from "@/lib/ai/cost-model";
 
@@ -49,7 +51,8 @@ export type TarotModel =
   | "ideogram-character"
   | "nano-banana-2"
   | "nano-banana-pro"
-  | "flux-2-max";
+  | "flux-2-max"
+  | "codex-image";
 
 /** Canonical aspect ratio options. "2:3" is the traditional tarot portrait format. */
 export type AspectRatio = "2:3" | "3:2" | "4:5" | "1:1" | "9:16" | "4:3" | "3:4" | "16:9";
@@ -63,7 +66,7 @@ export interface BuildInputParams {
 }
 
 interface ModelConfig {
-  provider: "flux" | "openai" | "replicate" | "gemini";
+  provider: "flux" | "openai" | "replicate" | "gemini" | "codex";
   /** Gemini model id (provider "gemini"; GEMINI_IMAGE_TOKEN_RATES key). */
   geminiModel?: string;
   /** Replicate slug for legacy flux models (owner/name). */
@@ -274,6 +277,10 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
       output_format: "png",
     }),
   },
+  // The operator's laptop (codex-bridge.ts). 90 s, queue included: the browser's request passes Cloudflare, which cuts any
+  // response not started within ~100 s (524). Measured 47-83 s to draw, 76-115 s to edit with a reference: a slow edit
+  // ends as generation_timeout rather than a 524 with the picture lost (codex review 2026-11-15 F2).
+  "codex-image": { provider: "codex", supportsImg2img: true, timeoutMs: CODEX_WAIT_MS },
 };
 
 export function isTarotModel(v: unknown): v is TarotModel {
@@ -309,7 +316,7 @@ export interface TarotGenParams {
 
 export type TarotGenResult =
   /** costUsd: the exact charge when the provider reports usage (OpenAI images); otherwise the per-image price applies. */
-  | { ok: true; image: string; seed: number | null; costUsd?: number }
+  | { ok: true; image: string; seed: number | null; costUsd?: number; /** extra ledger facts (Codex: tokens, plan quota %) */ logMeta?: Record<string, number | boolean> }
   /** billed: the provider finished (and charged) before the failure, so the caller still logs the cost. */
   | { ok: false; error: string; billed?: boolean; costUsd?: number };
 
@@ -707,8 +714,28 @@ export async function generateTarotImage(params: TarotGenParams, grant: Grant): 
   // The one place an image's cost is logged: only here are all of its facts known -- whether the provider charged
   // (ok, or billed after a failed download), the model that ran, and the account the grant bills. Callers pass costLog.
   logImageResult(result, { route: params.costLog?.route ?? "tarot/image-gen", model: params.model, tool: params.costLog?.tool ?? "image",
-    jobId: params.costLog?.jobId ?? null, grant, hold });
+    jobId: params.costLog?.jobId ?? null, grant, hold, ...(result.ok && result.logMeta ? { metadata: result.logMeta } : {}) });
   return result;
+}
+
+/** Codex on the operator's laptop: free, so never billed; refused to anyone but her (codexAllowed). No mask: the
+ *  built-in Codex image tool takes none (its SKILL.md: masks are the API-key CLI path only), so a masked call is refused
+ *  rather than silently repainting the whole picture. */
+async function generateCodex(params: TarotGenParams, signal: AbortSignal, grant: Grant): Promise<TarotGenResult> {
+  const deadlineAt = Date.now() + CODEX_WAIT_MS; // runGeneration's timer started just before this call
+  if (!codexAllowed(grant.actor)) return { ok: false, error: "codex_operator_only" };
+  if (params.mask) return { ok: false, error: "codex_no_mask" };
+  const refs: CodexRef[] = [];
+  for (const ref of params.referenceImages ?? []) {
+    const own = parseDataUrl(ref) || !isAllowedInputUrl(ref) ? null : await ownDesignUrlToBlob(ref, signal);
+    const parsed = parseDataUrl(ref) ?? (own ? { mime: own.blob.type, buffer: Buffer.from(await own.blob.arrayBuffer()) } : null);
+    if (!parsed) return { ok: false, error: "invalid_reference_image" };
+    refs.push({ mime: parsed.mime, b64: parsed.buffer.toString("base64") });
+  }
+  const r = await runOnLaptop({ prompt: params.prompt, aspectRatio: params.aspectRatio ?? "2:3", refs }, signal, Date.now(), deadlineAt);
+  if ("error" in r) return { ok: false, error: r.error };
+  if (!parseDataUrl(r.image)) return { ok: false, error: "codex_empty_output" };
+  return { ok: true, image: r.image, seed: null, costUsd: 0, logMeta: { ...r.usage, free: true } };
 }
 
 /** Megapixels of images together, read from their own bytes (sharp): a data URL, or an own My Designs URL fetched
@@ -738,6 +765,7 @@ async function runGeneration(params: TarotGenParams, grant: Grant): Promise<Taro
     if (config.provider === "flux") return await generateFlux(params, config, controller.signal, grant);
     if (config.provider === "replicate") return await generateReplicate(params, config, controller.signal, grant);
     if (config.provider === "gemini") return await generateGemini(params, config, controller.signal, grant);
+    if (config.provider === "codex") return await generateCodex(params, controller.signal, grant);
     return await generateOpenai(params, config, controller.signal, grant);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -438,6 +438,9 @@ services:
       TRIGGER_API_URL: ${TRIGGER_API_URL:-https://api.trigger.dev}
       BATCH_INTERNAL_SECRET: ${BATCH_INTERNAL_SECRET:-}
       TAROT_DAILY_LIMIT: ${TAROT_DAILY_LIMIT:-300}
+      # Codex 免費生圖: the operator's laptop worker token, and the one account allowed to use it (lib/tarot/codex-bridge.ts).
+      CODEX_WORKER_SECRET: ${CODEX_WORKER_SECRET:-}
+      CODEX_IMAGE_OWNER_USER_ID: ${CODEX_IMAGE_OWNER_USER_ID:-}
       PRINTFUL_API_KEY: ${PRINTFUL_API_KEY:-}
       PRINTFUL_STORE_ID: ${PRINTFUL_STORE_ID:-}
       PRINTFUL_NATIVE_STORE_ID: ${PRINTFUL_NATIVE_STORE_ID:-}
