@@ -15,7 +15,8 @@
  * Rollback deletes of objects uploaded moments ago (never published) do not need this and call r2.ts directly;
  * __tests__/r2-delete-guard.test.ts fails if deleteVideoObjects is called anywhere but here.
  */
-import { deleteDesignObject, deleteVideoObjects, r2DeleteObject } from "@/lib/storage/r2";
+import { deleteDesignObject, deleteVideoObjects, isContentAddressedKey, r2DeleteObject, r2ListObjects } from "@/lib/storage/r2";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 import { bridgeRead, listBridgeClients, wpSiteKey } from "@/lib/payments/woo";
 
@@ -24,7 +25,7 @@ export type AssetReference = { site: string; type: string; id: number; status: s
 export type ReferenceScan = { ok: true; references: AssetReference[] } | { ok: false; error: string };
 
 export type GuardedDelete =
-  | { ok: true; deleted: number }
+  | { ok: true; deleted: number; kept?: "shared" }
   | { ok: false; error: "asset_in_use"; references: AssetReference[]; message: string }
   | { ok: false; error: string; message: string };
 
@@ -32,8 +33,13 @@ const MAX_PAGES = 20; // 2000 hits per type and needle; more than that is not a 
 
 /**
  * What a reference to this object looks like in post content, and how to delete it.
- * `video/<dir>/<format>.mp4`: every format shares the folder, so the folder is the reference and the whole
- * folder is deleted. Any other known prefix: the key itself, in the bucket its prefix belongs to.
+ * The key's own shape decides (card R2DEL, 2026-11-15):
+ * - content-addressed (`.../<sha256>.<ext>`, r2.ts isContentAddressedKey -- e.g. the video workbench's
+ *   video/workbench/<org>/<sha>.mp4): ONE object, shared by every row with the same bytes. Never a folder: its folder
+ *   is everything the organization ever made (deleting it erased other videos, images and covers).
+ * - `video/<dir>/<format>.mp4` (one folder per video): every format shares the folder, so the folder is the reference
+ *   and the whole folder is deleted.
+ * - any other known prefix: the key itself, in the bucket its prefix belongs to.
  */
 export type AssetTarget = { bucket: "video" | "designs"; prefixDelete: boolean; search: string[]; match: string[] };
 
@@ -48,6 +54,10 @@ const VIDEO_BUCKET_PREFIXES = ["remotion"];
 export function assetTarget(objectKey: string): AssetTarget | null {
   const dec = (s: string) => { try { return decodeURIComponent(s); } catch { return null; } };
   const both = (s: string) => [...new Set([s, s.split("/").map(encodeURIComponent).join("/")])];
+  const raw = dec(objectKey);
+  if (raw && isContentAddressedKey(raw) && raw.startsWith("video/") && !raw.includes("..")) {
+    return { bucket: "video", prefixDelete: false, search: both(raw.slice(raw.lastIndexOf("/") + 1)), match: both(raw) };
+  }
   const v = /^video\/(.+)\/[^/]+\.mp4$/.exec(objectKey);
   if (v) {
     const dir = dec(v[1]);
@@ -144,9 +154,44 @@ function sameSite(a: string, b: string): boolean {
   return k !== null && k === wpSiteKey(b);
 }
 
-export async function deleteUnreferencedAsset(objectKey: string): Promise<GuardedDelete> {
+/** Rows other than `exceptAssetIds` whose media_assets.object_key is this key (raw or percent-encoded); null = could not check. */
+async function otherRowsUsing(key: string, exceptAssetIds: readonly string[]): Promise<number | null> {
+  const db = getSupabaseWriteClient();
+  if (!db) return null;
+  const forms = [...new Set([key, key.split("/").map(encodeURIComponent).join("/")])];
+  const { data, error } = await db.from("media_assets").select("id").in("object_key", forms).limit(exceptAssetIds.length + 1);
+  if (error || !Array.isArray(data)) return null;
+  return data.filter((r: { id: unknown }) => !exceptAssetIds.includes(String(r.id))).length;
+}
+
+/**
+ * exceptAssetIds = the media_assets rows the caller is deleting with this object. A content-addressed object is shared by
+ * every row with the same bytes: it is removed from R2 only when no OTHER row uses it (answer `kept: "shared"` otherwise,
+ * so the caller still removes its own row). Without exceptAssetIds, or when the check cannot run, nothing is deleted.
+ */
+export async function deleteUnreferencedAsset(objectKey: string, opts: { exceptAssetIds?: readonly string[] } = {}): Promise<GuardedDelete> {
   const target = assetTarget(objectKey);
   if (!target) return { ok: false, error: "unsupported_object_key", message: `無法辨識的檔案位置，未刪除（${objectKey}）` };
+  const raw = (() => { try { return decodeURIComponent(objectKey); } catch { return objectKey; } })();
+  const shared = isContentAddressedKey(raw);
+  // An upload of the same bytes writes the object first and its row after (workbench assets route): the object's own
+  // last_modified is read before the reference check and again right before DELETE; any change = a re-upload is in
+  // flight -> kept (Codex 2a61a510; R2's clock both times, never ours).
+  const videoBucket = process.env.R2_VIDEO_BUCKET ?? "lobster-videos";
+  const stamp = async (): Promise<string | null | undefined> => {   // ISO, null = gone, undefined = could not read
+    const l = await r2ListObjects(videoBucket, raw, { timeoutMs: 15_000 });
+    if ("error" in l) return undefined;
+    const o = l.objects.find((x) => x.key === raw);
+    return o ? (o.lastModified?.toISOString() ?? undefined) : null;
+  };
+  const before = shared ? await stamp() : null;
+  if (shared && before === undefined) return { ok: false, error: "reference_check_failed", message: `無法確認檔案狀態，未刪除（${objectKey}）` };
+  if (shared) {
+    if (!opts.exceptAssetIds) return { ok: false, error: "reference_check_required", message: `共用檔案需指定要刪的資料列，未刪除（${objectKey}）` };
+    const others = await otherRowsUsing(raw, opts.exceptAssetIds);
+    if (others === null) return { ok: false, error: "reference_check_failed", message: `無法確認檔案是否仍被其他資料使用，未刪除（${objectKey}）` };
+    if (others > 0) return { ok: true, deleted: 0, kept: "shared" };
+  }
   const scan = await findAssetReferences(target);
   if ("error" in scan) return { ok: false, error: scan.error, message: `無法確認檔案是否仍被文章使用，未刪除（${scan.error}）` };
   if (scan.references.length > 0) {
@@ -158,11 +203,21 @@ export async function deleteUnreferencedAsset(objectKey: string): Promise<Guarde
       message: `檔案仍被 ${scan.references.length} 篇文章使用，未刪除。先從文章移除再刪：${list}`,
     };
   }
+  if (shared) {
+    if (before === null) return { ok: true, deleted: 0 };   // already gone
+    const after = await stamp();
+    if (after === undefined) return { ok: false, error: "reference_check_failed", message: `無法確認檔案狀態，未刪除（${objectKey}）` };
+    if (after === null) return { ok: true, deleted: 0 };
+    if (after !== before) return { ok: true, deleted: 0, kept: "shared" };
+  }
   const r = target.prefixDelete
     ? await deleteVideoObjects(objectKey)
     : target.bucket === "designs"
       ? await deleteDesignObject(decodeURIComponent(objectKey))
-      : await r2DeleteObject(process.env.R2_VIDEO_BUCKET ?? "lobster-videos", decodeURIComponent(objectKey));
+      : await r2DeleteObject(videoBucket, decodeURIComponent(objectKey));
   if ("error" in r) return { ok: false, error: r.error, message: `R2 刪除失敗（${r.error}）` };
+  // Residual window = one LIST->DELETE: a row registered in it now points at a deleted object. Say so loudly.
+  if (shared && opts.exceptAssetIds && (await otherRowsUsing(raw, opts.exceptAssetIds)) !== 0)
+    console.error(`[r2-delete-guard] ${raw} deleted while another row registered it meanwhile (or the recheck failed): re-upload needed`);
   return { ok: true, deleted: "deleted" in r ? (r as { deleted: number }).deleted : 1 };
 }

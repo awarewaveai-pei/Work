@@ -306,6 +306,16 @@ export async function deleteDesignObject(
   return "error" in r ? { ok: false, error: r.error } : { ok: true };
 }
 
+/** A content-addressed key: its file name is the sha256 of its bytes (`.../<64 hex>.<ext>`, e.g. the video workbench's
+ *  video/workbench/<org>/<sha>.mp4). Such an object is shared by every row with those bytes and its folder holds unrelated
+ *  objects, so it is only ever deleted alone (card R2DEL). */
+/** video/<name>/ folders that hold many unrelated objects (never one video's folder). */
+export const SHARED_VIDEO_FOLDERS: readonly string[] = ["workbench", "subtitles"];
+
+export function isContentAddressedKey(key: string): boolean {
+  return /\/[0-9a-f]{64}\.[a-z0-9]+$/i.test(key);
+}
+
 /**
  * media_assets.object_key for a video is `video/<dir>/<format>.mp4` percent-encoded (videoObjectKey uses URL.pathname, so CJK
  * becomes %E9…). Anything that hands the key to R2 or video-service needs the raw form; null = not a video key.
@@ -341,7 +351,12 @@ export async function deleteVideoObjects(
   // while leaving the files in the bucket (orphan → reconcile re-inserts every ~15 min).
   const decoded = decodeVideoObjectKey(objectKey);
   if (!decoded) return { ok: false, error: "invalid_video_object_key" };
+  // Invariant (R2DEL): a folder is deleted only when it IS one video's folder: video/<one segment>/<format>.mp4 (the
+  // video-service writes exactly that). A deeper or shared folder (video/workbench/<org>/..., video/subtitles/...) is a
+  // library of unrelated objects, never "this video" -- whatever its file names look like.
+  if (isContentAddressedKey(decoded)) return { ok: false, error: "content_addressed_key_not_a_folder" };
   const dir = /^video\/(.+)\/[^/]+\.mp4$/.exec(decoded)![1];
+  if (dir.includes("/") || SHARED_VIDEO_FOLDERS.includes(dir)) return { ok: false, error: "not_a_single_video_folder" };
 
   const bucket = process.env.R2_VIDEO_BUCKET ?? "lobster-videos";
   const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}`;

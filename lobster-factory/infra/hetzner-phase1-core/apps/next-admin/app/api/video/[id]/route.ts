@@ -47,17 +47,20 @@ export async function DELETE(
   }
 
   // Per-ratio variant rows (V4.1) go with the primary row; each one passes the same embed guard.
-  const { data: variants } = await supabase
+  const { data: variants, error: variantsErr } = await supabase
     .from("media_assets").select("id, object_url")
     .eq("organization_id", (asset as Record<string, unknown>).organization_id as string)
     .eq("metadata->>variantOf", id);
+  // A failed lookup must not delete the folder while its other ratio rows stay pointing at it (R2DEL review).
+  if (variantsErr) return NextResponse.json({ ok: false, error: "variant_lookup_failed" }, { status: 502 });
   const targets = [{ id, object_url: asset.object_url as string }, ...((variants ?? []) as { id: string; object_url: string | null }[]).filter((v) => v.object_url) as { id: string; object_url: string }[]];
 
   // Refuses while any WordPress post/page still embeds the video (r2-delete-guard.ts). On refusal or R2 failure
   // the DB row stays, so the gallery still shows the video and the caller can retry.
   let r2Deleted = 0;
   for (const t of targets) {
-    const r2Result = await deleteUnreferencedAsset(videoObjectKey(t.object_url));
+    // R2DEL: the rows deleted here together; a content-addressed object another row still uses stays in R2.
+    const r2Result = await deleteUnreferencedAsset(videoObjectKey(t.object_url), { exceptAssetIds: targets.map((x) => x.id) });
     if ("error" in r2Result) {
       console.error("[video/id] video delete refused:", r2Result.error);
       const references = "references" in r2Result ? r2Result.references : undefined;

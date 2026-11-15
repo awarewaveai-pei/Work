@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
   let deleted = 0;
   const kept: { id: string; reason: string }[] = [];
   for (const asset of old) {
-    const r = await deleteUnreferencedAsset(videoObjectKey(asset.object_url));
+    // R2DEL: only this row is going; a content-addressed object another row still uses stays in R2.
+    const r = await deleteUnreferencedAsset(videoObjectKey(asset.object_url), { exceptAssetIds: [String(asset.id)] });
     if ("error" in r) { kept.push({ id: asset.id, reason: r.error }); continue; }
     const { error: delErr } = await supabase.from("media_assets").delete().eq("id", asset.id);
     if (delErr) { kept.push({ id: asset.id, reason: `db_delete_failed:${delErr.message}` }); continue; }

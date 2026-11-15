@@ -6,7 +6,8 @@ const deleteVideoObjects = vi.hoisted(() => vi.fn(async () => ({ ok: true as con
 const deleteDesignObject = vi.hoisted(() => vi.fn(async () => ({ ok: true as const })));
 const r2DeleteObject = vi.hoisted(() => vi.fn(async () => ({ ok: true as const })));
 const getWpSites = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/storage/r2", () => ({ deleteVideoObjects, deleteDesignObject, r2DeleteObject }));
+vi.mock("@/lib/storage/r2", async (orig) => ({ deleteVideoObjects, deleteDesignObject, r2DeleteObject,
+  isContentAddressedKey: (await orig<typeof import("@/lib/storage/r2")>()).isContentAddressedKey }));
 vi.mock("@/lib/content/wp-sites", () => ({ getWpSites, wpAuthHeader: () => "Basic x" }));
 const listBridgeClients = vi.hoisted(() => vi.fn((): Array<{ id: string; name: string; baseUrl: string }> => []));
 const bridgeRead = vi.hoisted(() => vi.fn());

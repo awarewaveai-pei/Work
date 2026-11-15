@@ -373,7 +373,9 @@ export async function DELETE(request: Request) {
 
   // A file still shown by a WordPress post/page is refused and the row stays (r2-delete-guard.ts picks the bucket
   // from the key: video/ and remotion/ -> R2_VIDEO_BUCKET, designs/ captions/ web/ -> R2_DESIGNS_BUCKET).
-  const r2Result = await deleteUnreferencedAsset(asset.object_key);
+  // R2DEL: this row is the one going; a content-addressed object (e.g. a workbench file, ai_generated too) that another
+  // row still uses stays in R2.
+  const r2Result = await deleteUnreferencedAsset(asset.object_key, { exceptAssetIds: [String(asset.id)] });
   if ("error" in r2Result) {
     console.error("[designs] delete refused:", r2Result.error);
     const references = "references" in r2Result ? r2Result.references : undefined;
