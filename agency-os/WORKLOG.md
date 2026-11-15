@@ -24,6 +24,18 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio/__tests__/image-upload-limit.test.ts (green equal, red 12 MiB) + 40 files 454 passed + npx tsc --noEmit + browser uploadableDataUrl 19.8M->5.07M chars + ssh prod log/psql media_assets | exit=0 | ms=60000
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/2n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=uploadableDataUrl | hits=17
+## 2026-11-15（續18）— 報告寫入者全部改走 Write-RepoTextFile（eol 幻影檔的來源關掉）＋機械檢查器
+
+**根因**：21 支 `scripts/*.ps1` 自行寫 `agency-os/reports/**`（status `*-LATEST.md/.json`、月報／歸檔副本、oracle artifact、AO-RESUME／AO-CLOSE 報告）：`Set-Content -Value ($x -join "`r`n")`／`WriteAllText($sb.ToString())`（StringBuilder.AppendLine = CRLF）／`[Environment]::NewLine`。`.gitattributes` 規定 `eol=lf`，commit 後 blob 是 LF、工作目錄留 CRLF → git 以大小差判 M（續13 的 168 個幻影檔來源）。`scripts/lib/repo-text.ps1 Write-RepoTextFile`（2026-10-03）就是為此而寫，這些腳本沒用。
+**不變量**：腳本寫 repo 內文字檔只經 `Write-RepoTextFile`（LF、保留既有 BOM 狀態、`-Atomic` 可選）；對 `agency-os/reports/**` 機械強制。
+**修改**：21 支腳本的 27 個寫入點改 `Write-RepoTextFile -Path … -Content …`；未載入 helper 的補 dot-source `lib\repo-text.ps1`（check-cloudflare-security／supabase-memory-monthly／routine-freshness／change-impact-matrix-drift／governance-docs-drift／generate-integrated-status-report／phase4-weekly-check／update-client-wp-plugins／system-health-check／codex-oracle／write-oracle-artifact／ao-close／ao-resume）；只為此用的 `$utf8NoBom`／`$utf8`／`$utf8Bom` 刪 8 處；`ao-close.ps1` 的 tmp＋Move-Item 改 `-Atomic`，不再加 BOM（CLAUDE.md：repo 內 .md 免 BOM）。既有檔的 BOM 狀態由 helper 保留，不翻動。
+**檢查器** `tests/hooks/repo-text-writers.test.mjs`（登記 `test-hooks.sh`）：掃 `scripts/**/*.ps1`（排除 `test-*.ps1` fixture 寫入者）；原生寫入（Set-Content／Out-File／Add-Content／Export-*／WriteAll*／AppendAll*／StreamWriter／`>` 重導）的目標若為字面 `-LATEST.`／`$reportDir|$statusDir|$reportsDir`，或變數鏈（賦值含 `agency-os\reports`／`reports\(oracle|status|governance)`、或以 `Join-Path $v`／`"$v\…"` 從已認定變數構造，遞迴到穩定）→ 紅；變數名不分大小寫；用 `Write-RepoTextFile` 的檔必須有真正的 dot-source 行。oracle 三輪逐步補強：變數路徑、大小寫、鏈式、註解誤判、載入誤判、寫入形式。
+**未做**：`.agency-state/`（gitignore）寫入者不在範圍；`core.autocrlf=true` 不動。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/check-routine-freshness.ps1 -WorkRoot <worktree>、scripts/check-governance-docs-drift.ps1 真跑 → 輸出 crlf=0、BOM 保留；改後的 codex-oracle.ps1 真跑產生 artifact 44b9c086 crlf=0（修前 artifact 17 CRLF／12 LF 混合）；21 支 .ps1 Parser 零錯誤 | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test tests/hooks/repo-text-writers.test.mjs 3/3；突變：字面路徑放回 staging-orphans → 紅、變數路徑（含大小寫 `$OutPath`）放回 routine-freshness → 紅、`$oracleDir→$artifact` 鏈放回 codex-oracle → 紅，皆還原綠；bash scripts/test-hooks.sh 33+408 pass | exit=0 | ms=90077
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/7m/0n（Codex oracle 四輪：0ff8cd73 2、27f107b5 2、44b9c086 1、6f187d19 1（`->` 箭頭誤判為重導：修）、ec4852ae 2（regex 範圍 nit：字面路徑重導、reports 外的 repo 檔，無實例，接受為邊界）；全修。0ff8cd73／27f107b5 的 artifact 檔被我清理測試輸出時誤刪，review 原文在 session scratchpad）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=utf8NoBom | hits=28（餘為仍有他用的定義／非 repo 路徑寫入）
 ## 2026-11-15（續17）— 塔羅 FLUX 2 Max「replicate_poll_502」：Replicate 跑完也收費，我們卻因一次 502 放棄；狀態查詢改為暫時錯誤就再查
 
 **根因**：Replicate 18:20–18:25 間歇 502（Cloudflare `replicate.com | 502: Bad gateway`，prod log `lobster-next-admin` 10:25:40Z 起）。我們的狀態查詢（冪等 GET）一遇非 2xx 就結束：`lib/tarot/image-gen.ts` `pollPrediction`、`lib/tarot/video-motion-gen.ts`、`lib/studio/replicate-run.ts`、`lib/studio/upscaler.ts` 同寫法。Replicate `/v1/predictions` 顯示 flux-2-max 10:20:20Z（27.3s）、10:21:28Z（20.5s）皆 succeeded＝已收費、操作者沒拿到圖。Ideogram 3 筆是 create（POST）502，Replicate 無對應 prediction＝未收費，18:26 重試成功。

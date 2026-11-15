@@ -109,6 +109,7 @@ Write-Host "Client  : $($config.clientSlug)  Site: $($config.siteUrl)"
 # ── Hosting profile (config "host.profile") ──────────────────────────────────
 # Where the site lives decides HOW every remote step runs; the update flow below is identical for both.
 #   ks-aw-01-docker : our host (scripts/lib/prod-host.ps1); WP-CLI via `docker exec -u www-data <wpContainer>`,
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 #                     DB dump/restore as root inside <dbContainer> (its own MARIADB_ROOT_PASSWORD) -- the site's
 #                     DB password is never read.
 #   shared-ssh      : a client host reached by ssh with WP-CLI on PATH (e.g. shared hosting).
@@ -503,8 +504,8 @@ $report = [pscustomobject]@{
 $suffix    = "${ClientSlug}-${fileGroup}-${timestamp}"
 $rptFile   = if ($ReportPath) { $ReportPath } else { Join-Path $reportsDir "wp-update-${suffix}.json" }
 $latestFile = Join-Path $reportsDir "wp-update-${ClientSlug}-LATEST.json"
-$report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $rptFile   -Encoding UTF8
-$report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $latestFile -Encoding UTF8
+Write-RepoTextFile -Path $rptFile -Content ($report | ConvertTo-Json -Depth 5)
+Write-RepoTextFile -Path $latestFile -Content ($report | ConvertTo-Json -Depth 5)
 
 Write-Host "Report  : $rptFile"
 

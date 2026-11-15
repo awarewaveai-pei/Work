@@ -349,8 +349,7 @@ $jsonPath = Join-Path $statusDir "backup-health-LATEST.json"
 # FAILURES are written to WORKLOG with root cause, which is where anyone actually looks.
 # Retention for whatever does accumulate here now lives in agency-os/reports/retention.json,
 # enforced by scripts/prune-reports.ps1.
-$utf8NoBom = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText($latestPath, $markdown.ToString(), $utf8NoBom)
+Write-RepoTextFile -Path $latestPath -Content $markdown.ToString()
 
 # measured = backup pipelines whose probe answered (ok) + the coverage status file when it was read and parsed.
 $measured = @(@($sg, $eu, $ks) | Where-Object { $null -ne $_ -and $_.ok }).Count + [int](($null -ne $coverage) -and $coverage.Contains("generated_at"))

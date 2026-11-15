@@ -363,8 +363,7 @@ $lines += ""
 $lines += "Pattern: ``runbooks/ADD-PERIODIC-HEALTH-CHECK.md``"
 
 $content = ($lines -join "`n") + "`n"
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText((Join-Path $reportDir "ci-LATEST.md"), $content, $utf8NoBom)
+Write-RepoTextFile -Path (Join-Path $reportDir "ci-LATEST.md") -Content $content
 
 $payload = [ordered]@{
     schemaVersion  = 1

@@ -4,6 +4,7 @@
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 . (Join-Path $PSScriptRoot 'lib\repo-roots.ps1')
 
@@ -1039,7 +1040,7 @@ $lines += "- Keep score at 100% for production-grade operations (aligns with AO-
 $lines += "- Resolve failed checks before major delivery milestones."
 $lines += "- Critical Gate must be PASS for release readiness."
 
-Set-Content -Path $reportPath -Value ($lines -join "`r`n") -Encoding UTF8
+Write-RepoTextFile -Path $reportPath -Content ($lines -join "`n")
 $summary = [ordered]@{
     schemaVersion     = 1
     generatedAtUtc    = (Get-Date).ToUniversalTime().ToString("o")
@@ -1051,7 +1052,7 @@ $summary = [ordered]@{
     critical_failures = @($criticalFailures | Sort-Object -Unique)
     checks            = $checks
 }
-Set-Content -Path $jsonPath -Value ($summary | ConvertTo-Json -Depth 12) -Encoding UTF8
+Write-RepoTextFile -Path $jsonPath -Content ($summary | ConvertTo-Json -Depth 12)
 
 Write-Output ("Health report: reports/health/" + [System.IO.Path]::GetFileName($reportPath))
 Write-Output ("Score: " + $score + "% (" + $passed + "/" + $total + ")")

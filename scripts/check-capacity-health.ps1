@@ -702,8 +702,7 @@ if ($renderError) {
 [void]$md.AppendLine("")
 [void]$md.Append($body.ToString())
 
-$utf8NoBom = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText($latestPath, $md.ToString(), $utf8NoBom)
+Write-RepoTextFile -Path $latestPath -Content $md.ToString()
 
 # measured = hosts whose probe answered (ok); unreachable/timeout/ssh-missing = 0.
 $measured = @($results.Values | Where-Object { $_.ok }).Count

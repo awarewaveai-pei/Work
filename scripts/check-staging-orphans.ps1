@@ -254,7 +254,7 @@ $sshCmd = "ssh -i `"$KsAw01PrivateKey`" -p $KsAw01SshPort $KsAw01SshUser@$KsAw01
 [void]$md.Add('```')
 [void]$md.Add("")
 [void]$md.Add('`db_only` 用 `--db`：只接受 staging 命名、不是主站 DB、且沒有任何 staging wp-config 指向它；先 dump 備份再 DROP（含同名帳號）。')
-Set-Content -Path (Join-Path $reportDir "staging-orphans-LATEST.md") -Value ($md -join "`r`n") -Encoding UTF8
+Write-RepoTextFile -Path (Join-Path $reportDir "staging-orphans-LATEST.md") -Content ($md -join "`n")
 
 Write-Host "staging-orphans: verdict=$verdict orphans=$orphanTotal disk=${diskMb}MB blind_spots=$($blindSpots.Count)"
 if ($verdict -eq "OK") { exit 0 } else { exit 1 }

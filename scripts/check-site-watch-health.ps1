@@ -272,8 +272,7 @@ if ($blindSpots.Count -gt 0) {
 [void]$md.AppendLine("")
 [void]$md.AppendLine("What to do per verdict: agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md section 11 (AO-RESUME site-watch row).")
 
-$utf8NoBom = New-Object System.Text.UTF8Encoding $false
-[System.IO.File]::WriteAllText((Join-Path $statusDir "site-watch-LATEST.md"), $md.ToString(), $utf8NoBom)
+Write-RepoTextFile -Path (Join-Path $statusDir "site-watch-LATEST.md") -Content $md.ToString()
 # measured = probes that produced a real verdict from data; SKIP (nothing to watch) and UNKNOWN (blind) do not count.
 $measured = @($probes.Values | Where-Object { $_.verdict -in @("PASS", "WARN", "FAIL") }).Count
 $payload = [ordered]@{

@@ -52,6 +52,7 @@ $ErrorActionPreference = "Stop"
 # Unconditional on purpose: the git-safe-ops dot-source below is Test-Path-guarded, so relying
 # on it transitively would leave Invoke-WithUtf8Console undefined exactly when the lib is absent.
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 if ($WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
@@ -1497,14 +1498,10 @@ Repair it first, then re-run:
                     "## Tomorrow priorities",
                     "- (agent fills)"
                 ) -join [Environment]::NewLine
-                # Atomic write (tmp + Move-Item -Force) to match the ao-close-last.txt house standard below:
-                # WriteAllText is truncate-then-write (~ms 0-byte window). The Test-Path guard already makes
-                # double-writes rare, but a parallel-session second close in the same minute could race — so
-                # write to .tmp then atomically rename (NTFS same-volume Move is atomic). (critic 2nd-pass Minor#1)
-                $utf8Bom = New-Object System.Text.UTF8Encoding $true
-                $rptTmp = "$rptFile.tmp"
-                [System.IO.File]::WriteAllText($rptTmp, $skel + [Environment]::NewLine, $utf8Bom)
-                Move-Item -LiteralPath $rptTmp -Destination $rptFile -Force
+                # Atomic (tmp + rename, NTFS same-volume: a parallel second close in the same minute cannot leave a
+                # 0-byte file -- critic 2nd-pass Minor#1) and LF with no BOM, like every other repo text file: the
+                # BOM + CRLF this used to write made the report an eol phantom in `git status` (2026-11-15).
+                Write-RepoTextFile -Path $rptFile -Content ($skel + [Environment]::NewLine) -Atomic
                 Write-Host ("AO-CLOSE: report skeleton written -> agency-os/reports/ao-close/{0}.md" -f $rptStamp) -ForegroundColor Cyan
                 Write-Host ("AO-CLOSE: OVERWRITE that file with the full four-section report (do not leave the AUTO-SKELETON stub)." ) -ForegroundColor Yellow
 

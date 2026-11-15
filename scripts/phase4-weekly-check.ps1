@@ -31,6 +31,7 @@ Set-StrictMode -Version Latest
 # 2026-08-26: was SilentlyContinue. That is precisely how the old Check 3 could skip its
 # whole drill branch on malformed input and still report health (reproduced 2026-08-26).
 $ErrorActionPreference = "Continue"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 . (Join-Path $PSScriptRoot '_console-encoding-helpers.ps1')
 
@@ -78,9 +79,8 @@ function Write-SkipReport {
         "- 整體: ⚠️ 0 項需注意, 4 項 SKIP"
     )
     $body = ($lines -join "`n") + "`n"
-    $utf8 = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($latestPath,  $body, $utf8)
-    [System.IO.File]::WriteAllText($archivePath, $body, $utf8)
+    Write-RepoTextFile -Path $latestPath -Content $body
+    Write-RepoTextFile -Path $archivePath -Content $body
     Write-Host "WARN: checker 無法執行 — $Reason" -ForegroundColor Red
     return $body
 }

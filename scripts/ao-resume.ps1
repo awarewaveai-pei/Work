@@ -41,6 +41,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 # Shared-worktree-safe parity (fetch + ff-only). SSOT: scripts/lib/git-safe-ops.ps1.
 . (Join-Path $PSScriptRoot "lib\git-safe-ops.ps1")
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 function Show-AoResumeQuickFix {
     param(
@@ -1414,7 +1415,7 @@ try {
 ## 8. 下一步
 （待 Claude 填寫）
 "@
-            [System.IO.File]::WriteAllText($arPath, $arBody, $utf8NoBom)
+            Write-RepoTextFile -Path $arPath -Content $arBody
             Write-Host ("AO-RESUME archive skeleton written: agency-os/reports/ao-resume/{0} (Claude Step 3 overwrites with real report)" -f $arName) -ForegroundColor DarkGray
         }
     }

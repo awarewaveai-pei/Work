@@ -79,6 +79,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 if (-not $WorkRoot) {
     if ($PSScriptRoot) {
@@ -108,7 +109,7 @@ if (-not (Test-Path -LiteralPath $matrixPath)) {
         "- Generated: " + (Get-Date).ToString("yyyy-MM-dd HH:mm:ss zzz")
         "- Status: **FAIL** (docs/CHANGE_IMPACT_MATRIX.md missing; cannot continue)"
     )
-    Set-Content -LiteralPath $reportPath -Value ($lines -join "`n") -Encoding UTF8
+    Write-RepoTextFile -Path $reportPath -Content ($lines -join "`n")
     Write-Host "Drift report written: $reportPath" -ForegroundColor Red
     exit 2
 }
@@ -240,7 +241,7 @@ if ($rowsParsed -eq 0) {
         "- Generated: " + (Get-Date).ToString("yyyy-MM-dd HH:mm:ss zzz")
         "- Status: **FAIL** (parsed 0 rows from docs/CHANGE_IMPACT_MATRIX.md -- table format may have changed; this script's row regex needs updating)"
     )
-    Set-Content -LiteralPath $reportPath -Value ($lines -join "`n") -Encoding UTF8
+    Write-RepoTextFile -Path $reportPath -Content ($lines -join "`n")
     Write-Host "Drift report written: $reportPath" -ForegroundColor Red
     exit 2
 }
@@ -306,14 +307,14 @@ $summary.Add("- Designed for monthly invocation alongside check-governance-docs-
 $summary.Add("- Owner doc: this script + docs/CHANGE_IMPACT_MATRIX.md. Trigger: ``scripts\check-change-impact-matrix-drift.ps1``.") | Out-Null
 
 $reportText = ($summary -join "`n")
-Set-Content -LiteralPath $reportPath -Value $reportText -Encoding UTF8
+Write-RepoTextFile -Path $reportPath -Content $reportText
 
 $latestPath = Join-Path $reportDir "impact-matrix-drift-LATEST.md"
-Set-Content -LiteralPath $latestPath -Value $reportText -Encoding UTF8
+Write-RepoTextFile -Path $latestPath -Content $reportText
 
 $statusDir = Join-Path $agencyRoot "reports/status"
 $null = New-Item -ItemType Directory -Force -Path $statusDir
-Set-Content -LiteralPath (Join-Path $statusDir "impact-matrix-drift-LATEST.md") -Value $reportText -Encoding UTF8
+Write-RepoTextFile -Path (Join-Path $statusDir "impact-matrix-drift-LATEST.md") -Content $reportText
 
 Write-Host "Drift report written: $reportPath" -ForegroundColor $(if ($worst -eq "PASS") { "Green" } elseif ($worst -eq "WARN") { "Yellow" } else { "Red" })
 Write-Host "Overall: $worst  (rows=$rowsParsed pairs=$($pairs.Count) warn=$($warnPairs.Count) fail=$($failPairs.Count) skipped=$($skipped.Count))"

@@ -357,7 +357,7 @@ function Invoke-Once {
                 $report += ('- FAIL: `{0}` duplicates owner marker from `{1}` (rule: `{2}`)' -f $v.file, $v.owner, $v.rule_id)
             }
         }
-        Set-Content -Path $reportPath -Value ($report -join "`r`n") -Encoding UTF8
+        Write-RepoTextFile -Path $reportPath -Content ($report -join "`n")
         Write-Output ("Checklist report: " + (To-RelPath -Root $Root -PathValue $reportPath))
     }
 

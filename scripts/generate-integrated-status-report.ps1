@@ -9,6 +9,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot 'lib\repo-roots.ps1')
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 function Ensure-Dir {
     param([string]$Path)
@@ -280,10 +281,8 @@ if (Test-Path $worklogPath) {
 
 $text = $sb.ToString()
 # [System.IO.File]::WriteAllText with explicit UTF-8-NoBOM encoder is PS5/PS7 consistent.
-# Set-Content -Encoding UTF8 writes WITH BOM on PS5 but WITHOUT BOM on PS7.
-$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-[System.IO.File]::WriteAllText($outFile,    $text, $utf8NoBom)
-[System.IO.File]::WriteAllText($latestFile, $text, $utf8NoBom)
+Write-RepoTextFile -Path $outFile -Content $text
+Write-RepoTextFile -Path $latestFile -Content $text
 
 Write-Output ("Integrated status report: reports/status/" + [System.IO.Path]::GetFileName($outFile))
 Write-Output ("Also written to: reports/status/integrated-status-LATEST.md")

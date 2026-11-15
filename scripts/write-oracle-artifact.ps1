@@ -94,6 +94,7 @@ if (Get-Command Invoke-WithUtf8Console -ErrorAction SilentlyContinue) {
     exit 2
 }
 . (Join-Path $PSScriptRoot 'oracle-capture-policy.ps1')
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 $capturePolicy = Get-OracleCapturePolicy
 
 function Fail {
@@ -358,7 +359,7 @@ $meta = @(
     '',
     $Answer
 )
-Set-Content -LiteralPath $artifact -Value ($meta -join [Environment]::NewLine) -Encoding UTF8
+Write-RepoTextFile -Path $artifact -Content ($meta -join [Environment]::NewLine)
 Write-Host ("write-oracle-artifact: artifact -> {0}" -f $artifact) -ForegroundColor DarkGray
 
 if ($Mode -eq 'review') {

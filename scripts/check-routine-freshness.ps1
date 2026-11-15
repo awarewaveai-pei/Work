@@ -24,6 +24,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 # Resolve $WorkRoot robustly. ao-resume.ps1 always passes -WorkRoot; the fallback only
 # matters for standalone runs. ($PSScriptRoot can be empty during param-default binding,
@@ -71,7 +72,7 @@ $lines += ("- overall: " + $(if ($anyStale) { "WARN (one or more routines stale/
 $statusDir = Join-Path $WorkRoot "agency-os\reports\status"
 if (-not (Test-Path -LiteralPath $statusDir)) { New-Item -ItemType Directory -Force -Path $statusDir | Out-Null }
 $outPath = Join-Path $statusDir "routine-freshness-LATEST.md"
-Set-Content -LiteralPath $outPath -Value ($lines -join "`r`n") -Encoding UTF8
+Write-RepoTextFile -Path $outPath -Content ($lines -join "`n")
 
 $lines | ForEach-Object { Write-Host $_ }
 

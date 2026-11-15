@@ -84,6 +84,7 @@ $Path = @($Path | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() 
 $encHelpers = Join-Path $PSScriptRoot '_console-encoding-helpers.ps1'
 if (Test-Path -LiteralPath $encHelpers) { . $encHelpers }
 . (Join-Path $PSScriptRoot 'oracle-capture-policy.ps1')
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 $capturePolicy = Get-OracleCapturePolicy
 
 function Invoke-Git {
@@ -602,7 +603,7 @@ $meta = @(
     '',
     $answer
 )
-Set-Content -LiteralPath $artifact -Value ($meta -join [Environment]::NewLine) -Encoding UTF8
+Write-RepoTextFile -Path $artifact -Content ($meta -join [Environment]::NewLine)
 Write-Host ("codex-oracle: artifact -> {0}" -f $artifact) -ForegroundColor DarkGray
 
 if ($Mode -eq 'review') {

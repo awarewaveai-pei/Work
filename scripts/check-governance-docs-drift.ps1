@@ -48,6 +48,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 if (-not $WorkRoot) {
     if ($PSScriptRoot) {
@@ -99,7 +100,7 @@ if ($missing.Count -gt 0) {
         ""
         "## Findings"
     ) + $findings
-    Set-Content -LiteralPath $reportPath -Value ($lines -join "`n") -Encoding UTF8
+    Write-RepoTextFile -Path $reportPath -Content ($lines -join "`n")
     Write-Host "Drift report written: $reportPath" -ForegroundColor Red
     exit 1
 }
@@ -269,16 +270,16 @@ $summary += "- mcp_set_consistency uses a known-name allowlist; if a new MCP is 
 $summary += "- Designed for monthly invocation by ``AgencyOS-MonthlyReview`` routine; also runnable manually."
 $summary += "- Owner doc: this script. Trigger: ``scripts\check-governance-docs-drift.ps1``."
 
-Set-Content -LiteralPath $reportPath -Value ($summary -join "`n") -Encoding UTF8
+Write-RepoTextFile -Path $reportPath -Content ($summary -join "`n")
 
 # Also write LATEST to reports/governance/ for archive access.
 $latestPath = Join-Path $reportDir "drift-LATEST.md"
-Set-Content -LiteralPath $latestPath -Value ($summary -join "`n") -Encoding UTF8
+Write-RepoTextFile -Path $latestPath -Content ($summary -join "`n")
 
 # Write LATEST to reports/status/ — canonical location for all LATEST files (same pattern as smoke/backup/auto-reboot).
 $statusDir = Join-Path $WorkRoot "agency-os\reports\status"
 $null = New-Item -ItemType Directory -Force -Path $statusDir
-Set-Content -LiteralPath (Join-Path $statusDir "governance-drift-LATEST.md") -Value ($summary -join "`n") -Encoding UTF8
+Write-RepoTextFile -Path (Join-Path $statusDir "governance-drift-LATEST.md") -Content ($summary -join "`n")
 
 Write-Host "Drift report written: $reportPath" -ForegroundColor $(if ($worst -eq "PASS") { "Green" } elseif ($worst -eq "WARN") { "Yellow" } else { "Red" })
 Write-Host "Overall: $worst"

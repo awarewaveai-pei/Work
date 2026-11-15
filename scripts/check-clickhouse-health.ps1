@@ -529,8 +529,7 @@ $lines += ""
 $lines += "Config SSOT: ``lobster-factory/infra/trigger/clickhouse/override.xml``"
 
 $content = ($lines -join "`n") + "`n"
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText((Join-Path $reportDir "clickhouse-LATEST.md"), $content, $utf8NoBom)
+Write-RepoTextFile -Path (Join-Path $reportDir "clickhouse-LATEST.md") -Content $content
 
 $payload = [ordered]@{
     schemaVersion   = 2

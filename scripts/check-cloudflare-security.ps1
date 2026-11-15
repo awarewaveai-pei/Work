@@ -49,6 +49,7 @@ $ErrorActionPreference = "SilentlyContinue"
 
 # ssh with keepalive + hard total deadline (scripts/lib/ssh-deadline.ps1).
 . (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 function Resolve-Root {
     param([string]$InputRoot)
@@ -423,7 +424,7 @@ if ($blindChecks.Count -gt 0) {
     $lines += '- Re-run this script after fixing and confirm Overall != BLIND.'
 }
 if ($errorMsg) { $lines += ""; $lines += "## Errors"; $lines += "- $errorMsg" }
-Set-Content -Path (Join-Path $reportDir "cf-security-LATEST.md") -Value ($lines -join "`r`n") -Encoding UTF8
+Write-RepoTextFile -Path (Join-Path $reportDir "cf-security-LATEST.md") -Content ($lines -join "`n")
 
 $colour = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } elseif ($overall -eq "BLIND") { "Red" } else { "Yellow" }
 Write-Host "== Cloudflare security: $overall (bot=$botMode, rules=$ruleCount, xmlrpc=$xmlrpcOk, wplogin_challenge=$wpLoginChallengeOk, lockdown=$lockdownStatus) ==" -ForegroundColor $colour
