@@ -1,7 +1,7 @@
 // POST /api/internal/codex-images/complete  { id, image } | { id, error }
 //
 // The operator's laptop hands back a claimed Codex picture (data:image/png|jpeg|webp;base64,...) or why it failed.
-// 404 = the job is unknown or its caller already gave up (timeout): the worker just drops the picture.
+// 404 = the job is unknown or expired (its lease ran out, codex-bridge.ts RUN_LEASE_MS): the worker just drops the picture.
 // Own token CODEX_WORKER_SECRET (see ../claim/route.ts).
 
 import { NextResponse } from "next/server";

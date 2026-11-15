@@ -6,6 +6,7 @@ import type { Grant } from "@/lib/entitlements/can";
 import { generateTarotImage, isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
 import { checkAndConsumeQuota } from "../../../../../lib/tarot/quota";
 import { MAX_REFS_PER_REQUEST } from "../../../../../lib/tarot/model-specs";
+import { deferIfCodex } from "@/lib/tarot/codex-bridge";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -85,21 +86,26 @@ async function handlePost(request: Request, grant: Grant): Promise<Response> {
     );
   }
 
-  const result = await generateTarotImage({
-    model: body.model,
-    prompt: body.prompt,
-    referenceImages,
-    seed: body.seed ?? null,
-    aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
-    printQuality: body.printQuality === true,
-    costLog: { route: "tools/tarot/generate", tool: "tarot", jobId: typeof body._jobId === "string" ? body._jobId : null },
-  }, grant);
+  // Codex: answered 202 at once and drawn detached; the browser polls for this same response (codex-bridge.ts).
+  const model = body.model; // narrowed above (a closure would lose it)
+  return deferIfCodex(model, grant.actor, async () => {
+    const result = await generateTarotImage({
+      model,
+      prompt: body.prompt,
+      referenceImages,
+      seed: body.seed ?? null,
+      aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
+      printQuality: body.printQuality === true,
+      costLog: { route: "tools/tarot/generate", tool: "tarot", jobId: typeof body._jobId === "string" ? body._jobId : null },
+    }, grant);
 
-  if (result.ok) {
-    return NextResponse.json(result);
-  }
-  // Return HTTP 200 with ok:false so the JSON reaches the browser. A 5xx here would let
-  // nginx error_page replace the body with an HTML page → client sees "Unexpected token '<'".
-  const code = (result as { ok: false; error: string }).error;
-  return NextResponse.json({ ok: false, error: friendlyError(code), code });
+    if (result.ok) {
+      return NextResponse.json(result);
+    }
+    // Return HTTP 200 with ok:false so the JSON reaches the browser. A 5xx here would let
+    // nginx error_page replace the body with an HTML page → client sees "Unexpected token '<'".
+    const code = (result as { ok: false; error: string }).error;
+    return NextResponse.json({ ok: false, error: friendlyError(code), code });
+  });
+
 }

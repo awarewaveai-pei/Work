@@ -142,7 +142,8 @@ async function draw(job) {
       await writeFile(f, Buffer.from(ref.b64, "base64"));
       files.push(f);
     }
-    // Stop when the app stops waiting for this picture (timeLeftMs): drawing on would only spend the plan's allowance.
+    // Stop at the job's lease (timeLeftMs, codex-bridge.ts RUN_LEASE_MS): after it the app has given the picture up, so
+    // drawing on would only spend the plan's allowance. An older app sent its caller's remaining wait here; same meaning.
     const timeoutMs = Math.min(CODEX_TIMEOUT_MS, Number.isFinite(job.timeLeftMs) ? Math.max(job.timeLeftMs, 0) : CODEX_TIMEOUT_MS);
     const { code, out } = await runCodex(buildPrompt(job), files, dir, timeoutMs);
     const last = (await readFile(path.join(dir, "last.txt"), "utf8").catch(() => "")).trim();

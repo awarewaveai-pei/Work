@@ -11,6 +11,7 @@ import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-hando
 import { useDoorHref } from "@/app/DoorContext";
 import ImageLightbox from "./ImageLightbox";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
+import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 
 
 export default function ModelMockupPanel({ designRef, designName, photos, onOpenLibrary }: {
@@ -50,7 +51,7 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
     await inPairs(targets, async (photo, i) => {
       let shot: Shot;
       try {
-        const res = await fetch("/api/tools/studio/fabric-print", {
+        const res = await fetchAwaitingCodex("/api/tools/studio/fabric-print", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -10,6 +10,7 @@ import {
 } from "../../../../../lib/studio/image-provider";
 import { getDesignsPublicBase } from "../../../../../lib/storage/r2";
 import { friendlyImageError as friendlyError } from "@/lib/studio/image-errors";
+import { deferIfCodex } from "@/lib/tarot/codex-bridge";
 
 export const runtime = "nodejs";
 // Must cover the slowest model this route can run: the OpenAI edit models set timeoutMs 110_000
@@ -105,20 +106,25 @@ async function handlePost(request: Request, grant: Grant): Promise<Response> {
     return NextResponse.json({ ok: false, error: "seed must be a non-negative integer" }, { status: 400 });
   }
 
-  const result = await generateImage({
-    model: body.model,
-    prompt: body.prompt,
-    referenceImages,
-    seed: body.seed ?? null,
-    aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
-    costLog: { route: "tools/studio/generate", tool: "studio", jobId: typeof body._jobId === "string" ? body._jobId : null },
-  }, grant);
+  // Codex: answered 202 at once and drawn detached; the browser polls for this same response (codex-bridge.ts).
+  const model = body.model; // narrowed above (a closure would lose it)
+  return deferIfCodex(model, grant.actor, async () => {
+    const result = await generateImage({
+      model,
+      prompt: body.prompt,
+      referenceImages,
+      seed: body.seed ?? null,
+      aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
+      costLog: { route: "tools/studio/generate", tool: "studio", jobId: typeof body._jobId === "string" ? body._jobId : null },
+    }, grant);
 
-  if (result.ok) {
-    return NextResponse.json(result);
-  }
-  // HTTP 200 with ok:false so the JSON reaches the browser (nginx error_page would
-  // otherwise replace a 5xx body with HTML → client sees "Unexpected token '<'").
-  const code = (result as { ok: false; error: string }).error;
-  return NextResponse.json({ ok: false, error: friendlyError(code), code });
+    if (result.ok) {
+      return NextResponse.json(result);
+    }
+    // HTTP 200 with ok:false so the JSON reaches the browser (nginx error_page would
+    // otherwise replace a 5xx body with HTML → client sees "Unexpected token '<'").
+    const code = (result as { ok: false; error: string }).error;
+    return NextResponse.json({ ok: false, error: friendlyError(code), code });
+  });
+
 }

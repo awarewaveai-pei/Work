@@ -22,6 +22,29 @@
 - 剩餘（舊行為，未改；Codex f3fbab34 F1）：upscaler 放棄的第二趟不在 Replicate cancel，且 `passes` 只在成功時 +1（`upscaler.ts:184`，舊碼 :179）→ ai_call_logs 少記該趟成本。不變量應為「我們的成本＝每個建立的 prediction；客戶只付交付的趟數」；目前 `logImageCost` 一個 `costUsd` 同時當兩者，拆開屬計費（High），另案。
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/1n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=replicate_poll_ | hits=9
+## 2026-11-15（續17）Codex 免費生圖改「交件拿號碼 → 前端輪詢取圖」：不再被 Cloudflare ~100 秒切斷
+
+- 根因：瀏覽器的生成請求同步等 Codex 畫完，上限 `CODEX_WAIT_MS = 90_000`（因 app.aware-wave.com 走 Cloudflare，請求 >~100 秒被切）；Codex 一張 47–115 秒 → 慢的圖必定 `generation_timeout`，worker 交圖得 404；錯誤字串還叫操作者改用 FLUX schnell。
+- 不變量：沒有任何瀏覽器請求同步等 Codex。機械保證：`generateCodex` 只在 `deferCodexWork` 的 AsyncLocalStorage 範圍內執行，否則回 `codex_not_deferred`（`lib/tarot/image-gen.ts` generateCodex）。
+- 做法（重用同一套，不另造）：
+  - `lib/tarot/codex-bridge.ts`：`deferIfCodex(model, actor, work)` → 擁有者＋codex-image 時把 route 尾段（生成＋後處理）脫離請求執行，立即回 202 + `X-Codex-Job`；結果（route 自己的 status/body）記憶體暫存，TTL 10 分，取走即刪，只給同一 actor。job 存活＝排隊 4 分（`QUEUE_WAIT_MS`）＋租約 4 分（`RUN_LEASE_MS`，計時器），`MIN_DRAW_MS`／`CODEX_WAIT_MS` 刪除；backstop `CODEX_JOB_MS`。
+  - 取件 `GET /api/tools/codex-laptop/jobs/[id]`（owner only，`codexAllowed` + actor 相符；他人＝`codex_job_gone`）。
+  - 前端 `public/editor-shared/codex-wait.js` `fetchAwaitingCodex`（TS 門 `lib/studio/codex-wait.ts`）：202 就輪詢，右下角「Codex 繪製中…（N 秒）」，主題 token、零 hex。
+  - 計費：`logImageResult` 仍只在 `generateTarotImage` 內一次，輪詢只讀暫存結果。
+- 入口清單（每條都走新流程）：
+  - route：`app/api/tools/studio/generate`、`app/api/tools/tarot/generate`、`app/api/tools/studio/fabric-print`（ai 引擎；codex maxRefs 4 ≥2 可選）、`app/api/content/image`（含 R2／標題後處理）→ 皆 `deferIfCodex`。
+  - 前端：StudioWorkbench、BannerStudio、MockupStudio、ModelLibraryStudio、ModelMockupPanel、TarotStudio、ImageEditPromptPanel、ContentStudio ×3、editor-shared `ai-fill.js postStudio`（ai-edit／genfx／dock 共用）→ 皆 `fetchAwaitingCodex`。
+  - 不能選 codex：`studio/genfill`（codex 無 fill/outpaint use）；`tools/tarot/batch` 改為直接拒絕 codex（Trigger 每張 65 秒同步 callback，等不了）；video-pipeline／content topics／provision 固定其他模型或 UI 不給 codex，萬一送進來得 `codex_not_deferred`。
+- worker：協定不變；`timeLeftMs` 語意改為租約（240 秒），舊 worker 照用（只改註解）。
+- 錯誤字串：`codex_timeout`／`codex_worker_timeout`／`codex_job_gone`／`codex_not_deferred` 專屬中文，不再建議 FLUX schnell。
+- 測試（只寫點名的）：`lib/tarot/__tests__/codex-bridge.test.ts`（假時鐘 120 秒到圖、只記帳一次、取件 owner 檢查、外部呼叫拒絕；舊測試對新語意改寫）；`app/api/tools/codex-laptop/jobs/[id]/route.test.ts`（真 route：generate 202 → 輪詢 120 秒 → 拿到圖；他人取不到）。
+- 突變：拔「結果暫存」(`entry.result = result`) → 4 測試紅；拔「取件 owner 檢查」(`entry.actor !== actor`) → 2 測試紅；還原 16/16 綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit && npx vitest run lib/tarot/__tests__/codex-bridge.test.ts app/api/tools/codex-laptop "app/(shell)/tools/content" "app/(shell)/tools/mockup/__tests__" lib/studio/__tests__ lib/tarot/__tests__/batch-store-durable.test.ts app/api/tools/studio/fabric-print lib/tarot/__tests__/image-gen-cost-log.test.ts lib/__tests__/middleware-portal-guards.test.ts lib/portal/__tests__ app/api/tools/tarot lib/security/__tests__/get-no-side-effects.test.ts lib/entitlements | exit=0 | ms=~90000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+  - 書面對抗自審：重複記帳（`logImageResult` 只在 `generateTarotImage` 內，輪詢只讀暫存）否；結果遺失（取走即刪；輪詢回應在網路中掉失會失圖＝已知、成本 0）；洩漏（running 必由 `CODEX_JOB_MS` backstop 結束，done 由 TTL 清）否；非擁有者（不 defer，立即 `codex_operator_only`）；漏網 fetch（grep 全部 codex 可選入口皆 `fetchAwaitingCodex`）否。
+- ORACLE_WAIVED: codex-oracle.ps1 review 跑超過 5 分鐘未回（主 session 指示不再等），改書面對抗自審＋上列兩個守衛突變證據
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin,agency-os,scripts,.claude | grep=CODEX_WAIT_MS|MIN_DRAW_MS|runOnLaptop|codex_worker_busy | hits=21
+- 剩餘風險：部署重啟時正在畫的圖會遺失（記憶體，輪詢回 `codex_job_gone`，成本 0）；未部署（主 session 部署）。
 ## 2026-11-15（續16）部署閘擋下來源清單改動：`registry-code.test.ts` 未登記來源 API
 
 - 根因：`app/api/content/sources/route.ts` 為讀 `builtinSearchSources()` 引入 `trending-sources.ts`，import 閉包碰到 `content.trending`（Apify／AI ask），`UNSCOPED_ROUTES` 守衛要求列出理由；我本機只跑了 content 範圍測試，sg-deploy 全套 npm test 才抓到（09:22Z 中止，prod 未變）。

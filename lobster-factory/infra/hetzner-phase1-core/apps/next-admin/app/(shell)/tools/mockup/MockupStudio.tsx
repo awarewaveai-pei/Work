@@ -29,6 +29,7 @@ import {
 import { buildSemanticBase, buildUniqueFilename, extOfDataUrl } from "@/lib/studio/semantic-filename";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
+import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 
 
 // 平拍 sends the design as a reference image: a model that takes none would ignore it, and Ideogram Character reads
@@ -387,7 +388,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     setSaveState("idle");
     try {
       const processedRef = await applyDesignOpacity(designRef, designOpacity);
-      const res = await fetch("/api/tools/studio/generate", {
+      const res = await fetchAwaitingCodex("/api/tools/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model, prompt: effectivePrompt, referenceImages: [processedRef], aspectRatio: aspect, _jobId: jobIdRef.current }),

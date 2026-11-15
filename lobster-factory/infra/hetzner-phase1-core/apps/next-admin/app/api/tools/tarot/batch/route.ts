@@ -11,6 +11,7 @@ import { DECK_KEY_RE, tarotDeckKey } from "../../../../../lib/tarot/deck-key";
 import { effectiveOrgId, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../../lib/tenant-guard";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
+import { friendlyImageError } from "@/lib/studio/image-errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +62,10 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const model = body.model as string;
   if (!isTarotModel(model)) {
     return NextResponse.json({ ok: false, error: "invalid_model" }, { status: 400 });
+  }
+  // Each card is one in-request call from the Trigger task (65 s timeout); Codex never runs in-request (codex-bridge.ts).
+  if (model === "codex-image") {
+    return NextResponse.json({ ok: false, error: friendlyImageError("codex_not_deferred"), code: "codex_not_deferred" }, { status: 400 });
   }
 
   const cards = body.cards as BatchCard[] | undefined;

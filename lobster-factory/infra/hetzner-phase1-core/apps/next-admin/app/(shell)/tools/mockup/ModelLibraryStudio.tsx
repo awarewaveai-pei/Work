@@ -26,6 +26,7 @@ import { STUDIO_MODEL_OPTIONS, type AspectRatio } from "@/lib/studio/model-optio
 import { isPrintBox, type Point, type PrintBox } from "@/lib/studio/fabric-print";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 import ImageLightbox from "./ImageLightbox";
+import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 
 // nano-banana-2 takes up to 14 reference images (lib/studio/model-options.ts), enough for a model's whole library.
 const GEN_MODEL = "nano-banana-2";
@@ -49,7 +50,7 @@ function boxOf(q: Quad): PrintBox {
 
 async function generatePhoto(prompt: string, referenceImages: string[], aspectRatio: AspectRatio): Promise<Shot> {
   try {
-    const res = await fetch("/api/tools/studio/generate", {
+    const res = await fetchAwaitingCodex("/api/tools/studio/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: GEN_MODEL, prompt, referenceImages, aspectRatio }),

@@ -1,7 +1,7 @@
 // Codex pictures run on the operator's own plan: only she may queue one, the laptop's answer reaches the caller, and a
 // laptop that is off fails fast instead of holding the request for 4 minutes.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { claimJob, codexAllowed, completeJob, resetCodexBridgeForTests, runOnLaptop, workerLeft, workerOnline } from "../codex-bridge";
+import { claimJob, codexAllowed, completeJob, deferCodexWork, QUEUE_WAIT_MS, resetCodexBridgeForTests, RUN_LEASE_MS, runOnLaptop, takeCodexResult, workerLeft, workerOnline } from "../codex-bridge";
 
 vi.mock("@/lib/ai/gateway", () => ({ providerUrl: () => "https://unused.invalid" }));
 const logged = vi.hoisted(() => [] as Record<string, unknown>[]);
@@ -14,7 +14,7 @@ const OWNER = "11111111-2222-3333-4444-555555555555";
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 
 beforeEach(() => { resetCodexBridgeForTests(); vi.stubEnv("CODEX_IMAGE_OWNER_USER_ID", OWNER); });
-afterEach(() => { vi.unstubAllEnvs(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 
 describe("codexAllowed", () => {
   it("lets only the operator acting herself through", () => {
@@ -46,21 +46,27 @@ describe("laptop queue", () => {
   });
 
   it("counts a worker busy drawing (no poll for over 45 s) as online", async () => {
-    const t0 = Date.now();
-    await claimJob(0, () => t0);
-    void runOnLaptop({ prompt: "first", aspectRatio: "2:3", refs: [] }, new AbortController().signal, t0);
-    expect(await claimJob(0, () => t0)).toMatchObject({ prompt: "first" }); // now drawing, not polling
-    const second = runOnLaptop({ prompt: "second", aspectRatio: "2:3", refs: [] }, new AbortController().signal, t0 + 60_000);
-    const raced = await Promise.race([second, new Promise((r) => setTimeout(() => r("queued"), 20))]);
+    vi.useFakeTimers();
+    await claimJob(0);
+    void runOnLaptop({ prompt: "first", aspectRatio: "2:3", refs: [] }, new AbortController().signal);
+    expect(await claimJob(0)).toMatchObject({ prompt: "first" }); // now drawing, not polling
+    vi.advanceTimersByTime(60_000);
+    const second = runOnLaptop({ prompt: "second", aspectRatio: "2:3", refs: [] }, new AbortController().signal);
+    const raced = await Promise.race([second, Promise.resolve("queued")]);
     expect(raced).toBe("queued");
   });
 
-  it("does not hand out a job too late to draw in time; its caller hears so at once", async () => {
-    const t0 = Date.now();
-    await claimJob(0, () => t0);
-    const late = runOnLaptop({ prompt: "late", aspectRatio: "2:3", refs: [] }, new AbortController().signal, t0);
-    expect(await claimJob(0, () => t0 + 50_000)).toBeNull(); // 40 s left < 45 s minimum
-    await expect(late).resolves.toEqual({ ok: false, error: "codex_worker_busy" });
+  it("a job the laptop never takes fails after the queue wait, not on the caller's clock", async () => {
+    vi.useFakeTimers();
+    await claimJob(0);
+    void runOnLaptop({ prompt: "first", aspectRatio: "2:3", refs: [] }, new AbortController().signal);
+    await claimJob(0); // drawing the first
+    const late = runOnLaptop({ prompt: "late", aspectRatio: "2:3", refs: [] }, new AbortController().signal);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(await Promise.race([late, Promise.resolve("waiting")])).toBe("waiting");
+    await vi.advanceTimersByTimeAsync(QUEUE_WAIT_MS - 120_000);
+    // The first job's lease ran out too and the worker never polled again: it is offline by now, and says so.
+    await expect(late).resolves.toEqual({ ok: false, error: "codex_worker_offline" });
   });
 
   it("is offline at once after the worker reports a spent allowance (it exits)", async () => {
@@ -79,7 +85,7 @@ describe("laptop queue", () => {
     const ctl = new AbortController();
     void runOnLaptop({ prompt: "first", aspectRatio: "2:3", refs: [] }, ctl.signal);
     const first = await claimJob(0);
-    expect(first!.timeLeftMs).toBeGreaterThan(80_000); // the worker stops drawing after this
+    expect(first!.timeLeftMs).toBe(RUN_LEASE_MS); // the worker stops drawing after this
     const queued = runOnLaptop({ prompt: "queued", aspectRatio: "2:3", refs: [] }, new AbortController().signal);
     ctl.abort(); // first caller gave up
     expect(completeJob(first!.id, { ok: false, error: "codex_quota_exhausted" })).toBe(false); // 404 to the worker
@@ -91,7 +97,7 @@ describe("laptop queue", () => {
     const ctl = new AbortController();
     const waiting = runOnLaptop({ prompt: "p", aspectRatio: "2:3", refs: [] }, ctl.signal);
     ctl.abort();
-    await expect(waiting).resolves.toEqual({ ok: false, error: "generation_timeout" });
+    await expect(waiting).resolves.toEqual({ ok: false, error: "codex_timeout" });
     expect(await claimJob(0)).toBeNull();
   });
 });
@@ -107,17 +113,43 @@ describe("generateTarotImage codex-image", () => {
     expect(await claimJob(0)).toBeNull();
   });
 
-  it("returns the operator's picture at no cost, and writes Codex's quota reading to the ledger row", async () => {
+  it("refuses to wait in-request: only a deferred caller may run it (no browser request waits for Codex)", async () => {
     const { generateTarotImage } = await import("../image-gen");
     await claimJob(0);
-    const pending = generateTarotImage({ model: "codex-image", prompt: "p", aspectRatio: "2:3" }, grant(`ops:owner:${OWNER}`));
-    let job = null;
-    for (let i = 0; i < 50 && !job; i++) { job = await claimJob(0); if (!job) await new Promise((r) => setTimeout(r, 5)); }
-    expect(job).not.toBeNull();
+    const r = await generateTarotImage({ model: "codex-image", prompt: "p" }, grant(`ops:owner:${OWNER}`));
+    expect(r).toEqual({ ok: false, error: "codex_not_deferred" });
+    expect(await claimJob(0)).toBeNull();
+  });
+
+  // Acceptance (2026-11-15): Codex took 92 s and the app had already given up at 90 s. Fake clock, 120 s draw.
+  it("a picture that takes 120 s reaches its caller, logged once at no cost, and only once", async () => {
+    vi.useFakeTimers();
+    const { generateTarotImage } = await import("../image-gen");
+    const actor = `ops:owner:${OWNER}`;
+    await claimJob(0);
     logged.length = 0;
-    completeJob(job!.id, { ok: true, image: PNG, usage: { codex_input_tokens: 34653, codex_5h_used_pct: 50, codex_week_used_pct: 37 } });
-    await expect(pending).resolves.toMatchObject({ ok: true, image: PNG, seed: null, costUsd: 0 });
-    expect(logged.at(-1)).toMatchObject({ model: "codex-image", metadata: { codex_input_tokens: 34653, codex_5h_used_pct: 50, codex_week_used_pct: 37, free: true } });
+    const accepted = deferCodexWork(actor, async () => Response.json(await generateTarotImage({ model: "codex-image", prompt: "p", aspectRatio: "2:3" }, grant(actor))));
+    expect(accepted.status).toBe(202);
+    const id = accepted.headers.get("X-Codex-Job")!;
+    let job = null;
+    for (let i = 0; i < 50 && !job; i++) { job = await claimJob(0); if (!job) await vi.advanceTimersByTimeAsync(1); }
+    expect(job).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(takeCodexResult(id, actor)).toEqual({ state: "running" });
+    expect(completeJob(job!.id, { ok: true, image: PNG, usage: { codex_input_tokens: 34653, codex_5h_used_pct: 50, codex_week_used_pct: 37 } })).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(takeCodexResult(id, actor)).toMatchObject({ state: "done", status: 200, body: { ok: true, image: PNG, seed: null, costUsd: 0 } });
+    expect(takeCodexResult(id, actor)).toEqual({ state: "unknown" }); // taken = dropped
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatchObject({ model: "codex-image", metadata: { codex_input_tokens: 34653, codex_5h_used_pct: 50, codex_week_used_pct: 37, free: true } });
+  });
+
+  it("a deferred result is handed only to the person who asked for it", async () => {
+    const actor = `ops:owner:${OWNER}`;
+    const id = deferCodexWork(actor, async () => Response.json({ ok: true, image: PNG })).headers.get("X-Codex-Job")!;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(takeCodexResult(id, "ops:owner:99999999-2222-3333-4444-555555555555")).toEqual({ state: "unknown" });
+    expect(takeCodexResult(id, actor)).toMatchObject({ state: "done", body: { ok: true, image: PNG } });
   });
 });
 

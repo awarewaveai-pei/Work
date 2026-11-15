@@ -38,6 +38,7 @@ import { STUDIO_MODEL_OPTIONS } from "@/lib/studio/model-options";
 // Each model gets the prompt order its reading limit needs (lib/tarot/model-specs.ts).
 const orderOf = (m: TarotModel) => MODEL_SPECS[m].promptOrder;
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
+import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 
 type Mode = "text" | "image";
 
@@ -156,7 +157,7 @@ async function callGenerate(body: {
   printQuality?: boolean;
   _jobId?: string | null;
 }, signal?: AbortSignal): Promise<GenResponse> {
-  const res = await fetch("/api/tools/tarot/generate", {
+  const res = await fetchAwaitingCodex("/api/tools/tarot/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...roleHeader("operator") },
     body: JSON.stringify(body),

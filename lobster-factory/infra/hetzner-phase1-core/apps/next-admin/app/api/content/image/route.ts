@@ -11,6 +11,7 @@ import {
 } from "@/lib/tarot/image-gen";
 import { makeContentImage } from "@/lib/content/image/make-image";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
+import { deferIfCodex } from "@/lib/tarot/codex-bridge";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -123,32 +124,36 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
     if (refs.length > 0) referenceImages = refs;
   }
 
-  const result = await makeContentImage({
-    model, prompt, aspectRatio, seed, referenceImages,
-    imageStyle: typeof body.imageStyle === "string" ? body.imageStyle : "",
-    titleText: typeof body.titleText === "string" ? body.titleText.trim() : "",
-    featuredImageFont: typeof body.featuredImageFont === "string" ? body.featuredImageFont.trim() : "sans",
-    featuredImageTitlePosition: typeof body.featuredImageTitlePosition === "string" ? body.featuredImageTitlePosition.trim() : "bottom",
-    costLog: { route: "content/image", tool: "content", jobId: typeof body._jobId === "string" ? body._jobId : null },
-  }, grant);
-  if (!result.ok) {
-    const code = (result as { ok: false; code: string }).code;
-    return NextResponse.json({ ok: false, error: friendlyError(code), code }, { status: 200 });
-  }
-  const imageUrl = result.imageUrl;
+  // Codex: answered 202 at once and drawn detached; the browser polls for this same response (codex-bridge.ts).
+  return deferIfCodex(model, grant.actor, async () => {
+    const result = await makeContentImage({
+      model, prompt, aspectRatio, seed, referenceImages,
+      imageStyle: typeof body.imageStyle === "string" ? body.imageStyle : "",
+      titleText: typeof body.titleText === "string" ? body.titleText.trim() : "",
+      featuredImageFont: typeof body.featuredImageFont === "string" ? body.featuredImageFont.trim() : "sans",
+      featuredImageTitlePosition: typeof body.featuredImageTitlePosition === "string" ? body.featuredImageTitlePosition.trim() : "bottom",
+      costLog: { route: "content/image", tool: "content", jobId: typeof body._jobId === "string" ? body._jobId : null },
+    }, grant);
+    if (!result.ok) {
+      const code = (result as { ok: false; code: string }).code;
+      return NextResponse.json({ ok: false, error: friendlyError(code), code }, { status: 200 });
+    }
+    const imageUrl = result.imageUrl;
 
-  const costUsd = imageCostUsd(model);
+    const costUsd = imageCostUsd(model);
 
-  return NextResponse.json({
-    ok: true,
-    imageUrl,
-    model,
-    platform,
-    aspectRatio,
-    seed: result.seed,
-    spec: { label: spec.label, width: spec.width, height: spec.height, aspect: aspectRatio, note: spec.note },
-    cost_usd: costUsd,
+    return NextResponse.json({
+      ok: true,
+      imageUrl,
+      model,
+      platform,
+      aspectRatio,
+      seed: result.seed,
+      spec: { label: spec.label, width: spec.width, height: spec.height, aspect: aspectRatio, note: spec.note },
+      cost_usd: costUsd,
+    });
   });
+
 }
 
 // GET: return platform specs reference (no auth needed for spec list)

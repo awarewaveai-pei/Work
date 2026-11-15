@@ -39,6 +39,7 @@ import {
 import { AI_TEXT_MODEL_GROUPS, AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
 import { EVENT_ALL_COUNTRIES_FILTER, EVENT_COUNTRY_FILTER_GROUPS } from "@/lib/events/countries";
 import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pricing";
+import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 
 // suffix describes the FLAT print-ready ARTWORK (not the physical product) so literal models
 // (Nano Banana / Ideogram) don't render a t-shirt/mug. The aspect ratio still tailors the
@@ -839,7 +840,7 @@ export default function StudioWorkbench() {
       const refsForModel = effRefMode === "none" ? [] : refImages.slice(0, mOption?.maxRefs ?? 0).map((r) => r.url);
 
       try {
-        const res = await fetch("/api/tools/studio/generate", {
+        const res = await fetchAwaitingCodex("/api/tools/studio/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ model: m, prompt: requestPrompt, referenceImages: refsForModel, aspectRatio: aspect, _jobId: jobIdRef.current }),

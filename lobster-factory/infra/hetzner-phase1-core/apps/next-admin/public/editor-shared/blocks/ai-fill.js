@@ -10,6 +10,7 @@
 import { OPS_ROLE_HEADER } from "/editor-shared/bg-remove.js";
 import { modelsFor, nt, takesBlankPrompt, takesChinese } from "/editor-shared/image-models.js";
 import { modelButton } from "/editor-shared/block-ui.js";
+import { fetchAwaitingCodex } from "/editor-shared/codex-wait.js";
 
 export const INPAINT_URL = "/api/tools/studio/inpaint";
 export const GENFILL_URL = "/api/tools/studio/genfill";
@@ -49,7 +50,8 @@ export function dataUrlToBlob(url) {
  *  Resolves { ok:true, image } (data URL) or { ok:false, error } — never throws. */
 export async function postStudio(url, payload) {
   try {
-    const res = await fetch(url, {
+    // Codex 免費生圖 answers 202 and draws for 1-2 min: wait it out (codex-wait.js); any other answer is as before.
+    const res = await fetchAwaitingCodex(url, {
       method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json", ...OPS_ROLE_HEADER },
       body: JSON.stringify(payload),

@@ -9,6 +9,7 @@ import { PHOTO_PRINT_MODELS, nearestAspectRatio, type StudioModel } from "@/lib/
 import { compositeOnFabric, isPrintBox, printCorners } from "@/lib/studio/fabric-print";
 import { buildPrintOntoPhotoPrompt } from "@/lib/studio/mockup-prompt";
 import { friendlyImageError } from "@/lib/studio/image-errors";
+import { deferIfCodex } from "@/lib/tarot/codex-bridge";
 
 // Prints a design onto a saved plain-garment pose photo. Two engines:
 //   ai   (default) -- gpt-image-2.5 edits the photo: the print follows the folds and the torso; ~NT$2, charged to
@@ -108,21 +109,24 @@ async function handleAi(_request: Request, grant: Grant, { body, scale }: Parsed
     if (!meta?.width || !meta.height) return NextResponse.json({ ok: false, error: "姿勢照無法讀取" }, { status: 422 });
     const rotated = (meta.orientation ?? 1) >= 5;
     const aspectRatio = nearestAspectRatio(rotated ? meta.height : meta.width, rotated ? meta.width : meta.height);
-    const result = await generateImage({
-      model,
-      prompt: buildPrintOntoPhotoPrompt({
-        designScale: scale,
-        placement: typeof body.placement === "string" ? body.placement : undefined,
-        garmentColor: typeof body.garmentColor === "string" ? body.garmentColor : undefined,
-      }),
-      referenceImages: [photo, design],
-      aspectRatio,
-      costLog: { route: "tools/studio/fabric-print", tool: "mockup" },
-    }, grant);
-    if (result.ok) return NextResponse.json({ ok: true, image: result.image, engine: "ai", model });
-    const code = (result as { ok: false; error: string }).error;
-    // HTTP 200 with ok:false so the JSON reaches the browser (same convention as /api/tools/studio/generate).
-    return NextResponse.json({ ok: false, error: friendlyImageError(code), code });
+    // Codex: answered 202 at once and drawn detached; the browser polls for this same response (codex-bridge.ts).
+    return deferIfCodex(model, grant.actor, async () => {
+      const result = await generateImage({
+        model,
+        prompt: buildPrintOntoPhotoPrompt({
+          designScale: scale,
+          placement: typeof body.placement === "string" ? body.placement : undefined,
+          garmentColor: typeof body.garmentColor === "string" ? body.garmentColor : undefined,
+        }),
+        referenceImages: [photo, design],
+        aspectRatio,
+        costLog: { route: "tools/studio/fabric-print", tool: "mockup" },
+      }, grant);
+      if (result.ok) return NextResponse.json({ ok: true, image: result.image, engine: "ai", model });
+      const code = (result as { ok: false; error: string }).error;
+      // HTTP 200 with ok:false so the JSON reaches the browser (same convention as /api/tools/studio/generate).
+      return NextResponse.json({ ok: false, error: friendlyImageError(code), code });
+    });
   }
 }
 

@@ -18,6 +18,7 @@ import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS, D
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { ARTICLE_VIDEO_DEFAULTS, parseVoiceModel } from "@/lib/content/video/defaults";
+import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 
 // ─── Video config constants (mirrors VideoStudio) ────────────────────────────
 
@@ -1182,7 +1183,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
     if (!imgPrompt.trim()) return;
     setImgLoading(true); setImgError(""); setImgResult(null);
     try {
-      const res  = await fetch("/api/content/image", {
+      const res  = await fetchAwaitingCodex("/api/content/image", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: imgPrompt, platform: imgPlatform }),
       });
@@ -1528,7 +1529,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
       const altText = m[1].trim() || form.keyword;
       const n = m[2];
       try {
-        const res = await fetch("/api/content/image", {
+        const res = await fetchAwaitingCodex("/api/content/image", {
           method: "POST", headers: { "Content-Type": "application/json" },
           // form.media.imageSize is now a flux aspect_ratio (e.g. "16:9") — pass it so the chosen
           // ratio actually applies to body images (previously hardcoded twitter_post → ignored → 1:1).
@@ -1582,7 +1583,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
     if (!prompt) return;
     setHeroLoading(true);
     try {
-      const res = await fetch("/api/content/image", {
+      const res = await fetchAwaitingCodex("/api/content/image", {
         method: "POST", headers: { "Content-Type": "application/json" },
         // Hero/featured = 16:9 (Google Discover + OG preview both favour the wide ratio). Same model +
         // style + seed + reference image as the body images so the hero matches the article's look.

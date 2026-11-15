@@ -20,7 +20,7 @@ import { fetchReplicateOutput } from "@/lib/ai/replicate-output";
 import type { Grant } from "@/lib/entitlements/can";
 import { holdCost, logImageResult } from "@/lib/ai/log-ai-call";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
-import { CODEX_WAIT_MS, codexAllowed, runOnLaptop, type CodexRef } from "./codex-bridge";
+import { CODEX_JOB_MS, codexAllowed, codexDeferred, runOnLaptop, type CodexRef } from "./codex-bridge";
 import { IMAGE_MODELS, imageRunUsd } from "../../public/editor-shared/image-models.js";
 import { GEMINI_IMAGE_TOKEN_RATES, OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES, geminiMediaUsd, type GeminiMediaUsage } from "@/lib/ai/cost-model";
 
@@ -278,10 +278,9 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
       output_format: "png",
     }),
   },
-  // The operator's laptop (codex-bridge.ts). 90 s, queue included: the browser's request passes Cloudflare, which cuts any
-  // response not started within ~100 s (524). Measured 47-83 s to draw, 76-115 s to edit with a reference: a slow edit
-  // ends as generation_timeout rather than a 524 with the picture lost (codex review 2026-11-15 F2).
-  "codex-image": { provider: "codex", supportsImg2img: true, timeoutMs: CODEX_WAIT_MS },
+  // The operator's laptop (codex-bridge.ts). Runs only detached from the browser's request (deferCodexWork), so its time
+  // is the bridge's queue wait + lease, not Cloudflare's ~100 s: measured 47-83 s to draw, 76-115 s to edit with a reference.
+  "codex-image": { provider: "codex", supportsImg2img: true, timeoutMs: CODEX_JOB_MS },
 };
 
 export function isTarotModel(v: unknown): v is TarotModel {
@@ -724,8 +723,9 @@ export async function generateTarotImage(params: TarotGenParams, grant: Grant): 
  *  built-in Codex image tool takes none (its SKILL.md: masks are the API-key CLI path only), so a masked call is refused
  *  rather than silently repainting the whole picture. */
 async function generateCodex(params: TarotGenParams, signal: AbortSignal, grant: Grant): Promise<TarotGenResult> {
-  const deadlineAt = Date.now() + CODEX_WAIT_MS; // runGeneration's timer started just before this call
   if (!codexAllowed(grant.actor)) return { ok: false, error: "codex_operator_only" };
+  // A picture takes up to ~2 min: only a caller that answered the browser already (deferIfCodex) may wait for one.
+  if (!codexDeferred()) return { ok: false, error: "codex_not_deferred" };
   if (params.mask) return { ok: false, error: "codex_no_mask" };
   const refs: CodexRef[] = [];
   for (const ref of params.referenceImages ?? []) {
@@ -734,7 +734,7 @@ async function generateCodex(params: TarotGenParams, signal: AbortSignal, grant:
     if (!parsed) return { ok: false, error: "invalid_reference_image" };
     refs.push({ mime: parsed.mime, b64: parsed.buffer.toString("base64") });
   }
-  const r = await runOnLaptop({ prompt: params.prompt, aspectRatio: params.aspectRatio ?? "2:3", refs }, signal, Date.now(), deadlineAt);
+  const r = await runOnLaptop({ prompt: params.prompt, aspectRatio: params.aspectRatio ?? "2:3", refs }, signal);
   if ("error" in r) return { ok: false, error: r.error };
   if (!parseDataUrl(r.image)) return { ok: false, error: "codex_empty_output" };
   return { ok: true, image: r.image, seed: null, costUsd: 0, logMeta: { ...r.usage, free: true } };

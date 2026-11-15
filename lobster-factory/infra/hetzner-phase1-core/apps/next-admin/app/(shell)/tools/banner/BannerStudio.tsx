@@ -10,6 +10,7 @@ import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref } from "@/app/DoorContext";
+import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 
 // ---------------------------------------------------------------------------
 // Size presets & constants
@@ -1239,7 +1240,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
           `Keep clean, uncluttered negative space for a headline.`;
       }
 
-      const res  = await fetch("/api/tools/studio/generate", {
+      const res  = await fetchAwaitingCodex("/api/tools/studio/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
         body:    JSON.stringify({

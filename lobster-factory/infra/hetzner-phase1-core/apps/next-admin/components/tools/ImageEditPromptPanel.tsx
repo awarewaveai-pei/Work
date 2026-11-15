@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AI_TEXT_MODEL_GROUPS, AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL, type AiTextModel } from "@/lib/ai/text-model-options";
 import { roleHeader } from "@/lib/ops-role";
 import { modelSupportsRefs, type AspectRatio, type StudioModel } from "@/lib/studio/model-options";
+import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 
 interface EditPromptResponse {
   ok: boolean;
@@ -114,7 +115,7 @@ export default function ImageEditPromptPanel({
     setGenerateBusy(true);
     setMessage(null);
     try {
-      const res = await fetch(generateEndpoint, {
+      const res = await fetchAwaitingCodex(generateEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...roleHeader("operator") },
         body: JSON.stringify({
