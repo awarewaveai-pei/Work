@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-15（續29）— C1 完成：`lobster-designs` 專用 S3 金鑰進 vault＋正式機 next-admin（操作者「全部幫我做」）
+
+- 建立：本機 `CLOUDFLARE_API_TOKEN`（帳號 token，有 Account API Tokens 權限）`POST /accounts/<id>/tokens` 建 `lobster-designs-s3-next-admin`；資源僅 `com.cloudflare.edge.r2.bucket.<acct>_default_lobster-designs`，權限 Workers R2 Storage Bucket Item Read＋Write。S3 Access Key ID＝token id、Secret＝sha256(token value)（Cloudflare R2 tokens 文件）。值全程只在子行程記憶體，未進對話、命令列或檔案。
+- 範圍實測（aws4fetch SigV4）：PUT `lobster-designs/uploads/pending/c1-probe-*` 200 → GET 同位元組 → DELETE 204；LIST `lobster-backup` 403（碰不到備份桶）。
+- 存放：vault `R2_S3_ACCESS_KEY_ID`／`R2_S3_SECRET_ACCESS_KEY`（`secrets-vault.ps1 set`，值經子行程 env）；主機 `/root/lobster-phase1/.env` 追加兩行（先備份 `.env.bak-c1-20261115152409`；第一次在 `cd /root/...` 權限不足即失敗，未寫入）；compose next-admin env 加兩行走 `safe-infra-patch.sh compose`（備份 `docker-compose.yml.bak.safe-patch-20261115-152440`，healthy 15s PASS）；repo compose 同步（`composeVarDrift` 空）。
+- 驗證：`docker exec lobster-next-admin printenv R2_S3_ACCESS_KEY_ID`／`R2_S3_SECRET_ACCESS_KEY` exit 0、長度 32／64；容器 healthy。
+- 坑：本機 IPv6 連 `api.cloudflare.com` 逾時（IPv4 0.3s）→ node 加 `--dns-result-order=ipv4first`。
+- 回滾：Cloudflare 刪 token `lobster-designs-s3-next-admin`；主機 `.env`／compose 還原上列備份（compose 走 safe-infra-patch）。
+- C5／C6 已交 designs-upload-api session；C3／C4 真實 presign→PUT→登記測試現在可跑。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv R2_S3_ACCESS_KEY_ID (+ S3 PUT/GET/DELETE on lobster-designs, LIST lobster-backup 403) | exit=0 | ms=18000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=R2_S3_ACCESS_KEY_ID | hits=16
 ## 2026-11-15（續27）— 卡 E：專業版 dock 等編輯器啟動不再固定 60／30 秒；改邊緣一次開啟只下載一次原圖
 
 - 根因 A：`ctx-photocraft.js:159` `timeoutMs` 60 s／`ctx-vectorcraft.js:75` 30 s 同時當「單次操作逾時」與「啟動等待」用。2026-11-15 早上兩個編輯器換新版，首次要下載 Photo Pro 14 MB／Vector Pro 33 MB，操作者網路約 0.5 MB/s、Cloudflare 當時未快取 → 下載 1–2 分鐘；dock 60 s 就丟「尚未載入」，`openHandoff`（dock.js:304）叫「重新整理頁面會再試一次」，主機 access log 12:04:48／12:05:06／12:10:30／12:11:22 四次整理，每次 14 MB 從頭來。
