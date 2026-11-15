@@ -1,7 +1,7 @@
 // 改圖怎麼挑 — the explainer behind the photo-pro AI panels.
-// Shape: how to use it (1-4), then the five things that were actually measured (5-9), then the money (10).
+// Shape: how to use it (1-4), then the things that were actually measured (5-11), then the money (12).
 // One question per section, no fact written twice, every list of buttons ordered cheapest first.
-// All 36 figures are real runs of 2026-11-09 on one of the operator's own tarot cards (WORKLOG 續1/續2/續4).
+// Figures 1-40 are real runs of 2026-11-09 on one of the operator's own tarot cards (WORKLOG 續1/續2/續4); 41-47 (section 11) are 2026-11-13/14 runs of the video-workbench region editor (WORKLOG 2026-11-13 續11, 2026-11-14).
 // Labels, prices, 留空 and 語言 all come from the catalog (lib/studio/model-options.ts) and are never typed here.
 import Link from "next/link";
 import { EDIT_TOOLS, STUDIO_MODEL_OPTIONS, modelsFor, nt, takesBlankPrompt, takesChinese } from "@/lib/studio/model-options";
@@ -27,7 +27,13 @@ const P = {
   whole: "把整張的光線調柔一點，邊緣修乾淨，維持原本的畫風與配色。",
   blank: "（什麼都不打）",
   typed: "照周圍補",
+  /** 實測七 (video-workbench 圖片局部編輯器): the one instruction all five buttons received. */
+  sky: "把框內的天空改成滿天星星的夜空",
 } as const;
+
+/** 實測七 only: the video-workbench region editor showed these two at a price different from the photo-pro catalog, so they are the recorded run figures, not catalog values. */
+const KLEIN_REGION = "約 NT$0.015";
+const NANO_REGION = "NT$1.25";
 
 const LINE = "var(--card-border)";
 const h2 = { fontSize: 19, fontWeight: 800, margin: "44px 0 10px", color: "var(--text-primary)" } as const;
@@ -99,13 +105,13 @@ export default function EditGuidePage() {
     <>
       <div className="topbar">
         <span className="topbar-title">改圖怎麼挑</span>
-        <span className="topbar-env">2026-11-09 實測</span>
+        <span className="topbar-env">2026-11-09、11-14 實測</span>
       </div>
       <div style={{ padding: "18px clamp(16px, 4vw, 32px) 64px", maxWidth: 820, lineHeight: 1.75, color: "var(--text-secondary)" }}>
 
         <p style={{ ...p0, fontSize: 15 }}>
           這一頁回答五件事：按鈕怎麼挑、指令怎麼打、要打中文還是英文、什麼時候可以不打字、一次多少錢。
-          底下 40 張圖全部是真的跑出來的，每一張都標了是哪顆鈕、花多少錢、打了什麼字。
+          底下 47 張圖全部是真的跑出來的，每一張都標了是哪顆鈕、花多少錢、打了什麼字。
         </p>
 
         {/* ---------- 怎麼用 ---------- */}
@@ -287,8 +293,40 @@ export default function EditGuidePage() {
           另外試過 Luma Reframe，同一張圖連試三次都回同一個錯誤，所以沒有收進來。
         </Note>
 
+        <h2 style={h2}>十一、實測七：影音工作台的「圖片局部編輯器」，五顆鈕的差別（2026-11-13/14）</h2>
+        <p style={p0}>
+          這一節跟前面不同：前面是畫布專業版的按鈕，這一節是<b>影音工作台的圖片局部編輯器</b>，用的是同一批填色模型。
+          同一張圖（480×480）、同一個框（右上角，寬 18%、高 28%）、同一句指令、1K，各按一次。
+          圖只截框附近，框外的部分五顆都沒變。
+        </p>
+        <CopyPrompt text={P.sky} note="局部編輯器收到的指令。框的座標由編輯器自己附上。" />
+        <Grid min={170}>
+          <Run src="m-src" model="原圖" verdict="src" note="框裡是藍天和白雲。" />
+          <Run src="m-klein" model={labelOf("flux-2-klein-4b")} cost={KLEIN_REGION} verdict="good" note="照做：黑色星空，星星很多。第一次按失敗，原因是我們自己的輸出網址設定，已修好。" prompt={P.sky} />
+          <Run src="m-kontext-fast" model={labelOf("flux-kontext-fast")} cost={price("flux-kontext-fast")} verdict="bad" note="沒照做：框裡幾乎沒變。" prompt={P.sky} />
+          <Run src="m-ideogram-low" model={labelOf("ideogram-4-5-edit-low")} cost={price("ideogram-4-5-edit-low")} verdict="good" note="照做：深藍星空，框邊有一圈細的藍邊。另一次實測是把框清掉補背景，兩次裡一次照做。" prompt={P.sky} />
+          <Run src="m-nano21" model={labelOf("nano-banana-2")} cost={NANO_REGION} verdict="good" note="照做，接縫最乾淨。" prompt={P.sky} />
+          <Run src="m-flux-fill-1" model={labelOf("flux-fill-pro")} cost={`${price("flux-fill-pro")}・第一次`} verdict="bad" note="沒照做：框裡長出一個紅色遮雨棚。" prompt={P.sky} />
+          <Run src="m-flux-fill-2" model={labelOf("flux-fill-pro")} cost={`${price("flux-fill-pro")}・第二次`} verdict="bad" note="沒照做：框裡變成樹葉和雲。把指令裡的座標拿掉再試，一樣不行。" prompt={P.sky} />
+        </Grid>
+        <Table
+          head={["按鈕", "每次", "有沒有照做"]}
+          rows={[
+            [labelOf("flux-2-klein-4b"), KLEIN_REGION, <Yes>有</Yes>],
+            [labelOf("flux-kontext-fast"), price("flux-kontext-fast"), <No>沒有</No>],
+            [labelOf("ideogram-4-5-edit-low"), price("ideogram-4-5-edit-low"), <Yes>有（兩次裡一次）</Yes>],
+            [labelOf("nano-banana-2"), NANO_REGION, <Yes>有，最乾淨</Yes>],
+            [labelOf("flux-fill-pro"), price("flux-fill-pro"), <No>沒有（兩次）</No>],
+          ]}
+        />
+        <Note>
+          {labelOf("nano-banana-2")} 這次實際扣 US$0.04032（約 NT$1.29），比鈕上的標價略高。
+          這兩顆在局部編輯器的標價（{KLEIN_REGION}、{NANO_REGION}）是實測當天編輯器上的數字，和第三節畫布面板的按鈕價不同，以各自畫面上的標價為準。
+          換內容的指令（像這一句）先挑照做的三顆；{labelOf("flux-fill-pro")} 連按兩次都沒照做，不要用它換內容。
+        </Note>
+
         {/* ---------- 錢 ---------- */}
-        <h2 style={h2}>十一、錢的規則</h2>
+        <h2 style={h2}>十二、錢的規則</h2>
         <Table
           head={["情況", "扣款"]}
           firstCol={230}
@@ -309,7 +347,7 @@ export default function EditGuidePage() {
         </Note>
 
         <p style={{ fontSize: 13.5, ...muted, borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 36 }}>
-          40 張圖全部是 2026-11-09 在同一張塔羅牌上真的跑出來的，沒有示意圖。
+          47 張圖全部是真的跑出來的，沒有示意圖：前 40 張是 2026-11-09 在同一張塔羅牌上，後 7 張是 2026-11-13/14 在影音工作台的圖片局部編輯器上。
           價格是 Replicate 當天牌價換算新台幣（1 美元 = 32 元）。
           模型規格見 <Link href="/tools/ai-models?tab=image-specs" style={{ color: "var(--accent-text)" }}>AI Models</Link>，
           面板在 <Link href="/tools/photo-pro" style={{ color: "var(--accent-text)" }}>畫布（專業版）</Link>。

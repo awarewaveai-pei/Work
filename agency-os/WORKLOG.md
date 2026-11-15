@@ -12,6 +12,18 @@
 - REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/5m/0n（讀回修 5 處錯行號：generation-policy、tools-editor 1085、music.cjs 83、main-system 40、api.cjs 645）
 - BUGHUNT_WAIVED: DOC_ONLY -- 新檔＋計畫表一列；無 symbol／schema 改動
 - ORACLE_WAIVED: 純文件，不含 source 檔
+## 2026-11-15（續1）AI Models & Costs：2026-11-13/14 實測紀錄上頁（edit-guide 第十一節、ai-models「實測紀錄」分頁）
+
+- 起因：操作者要 11-13/14 的真實測試放在「AI Models & Costs」找得到的地方，同一件事只寫一處。
+- 內容：
+  - `/tools/edit-guide` 新增第十一節（局部編輯器五顆鈕、7 張圖 `public/guides/edit/m-*.jpg`），舊「錢的規則」改第十二節；標籤與標價讀目錄，Klein／Nano 在局部編輯器的標價（約 NT$0.015／NT$1.25）是實測當天的數字，寫成常數 `KLEIN_REGION`／`NANO_REGION`。
+  - `/tools/ai-models?tab=measured` 新分頁 `MeasuredRuns.tsx`：影片（Runway 真跑 5 次，Luma／Veo 尚未跑）、音樂（Lyria 3 Clip、Eleven Music 402）、ElevenLabs 免費方案四項；出處欄寫 WORKLOG 日期標題；破框影格圖 `public/guides/breakout-frames.jpg`（94 KB）。
+- 沒改目錄與價格。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（next-admin）＋ next dev -p 3901 後 curl /tools/ai-models?tab=measured 與 /tools/edit-guide，內容含新段落 | exit=0 | ms=60000
+- REVIEW_WAIVED: DOC_ONLY -- 靜態表格與圖，無邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=tab=measured|edit-guide|MeasuredRuns | hits=6
+- 剩餘風險：(1) 目錄與實測不一致：FLUX Fill Pro 標 `zh: ok` 但中文指令兩次沒照做；Ideogram（省）`zh: ok` 兩次裡一次照做；Klein／Nano 的局部編輯器標價與畫布目錄不同。(2) 瀏覽器窗格拒絕連 localhost，沒有截圖（桌面／375px），只以 curl 驗證伺服器渲染。
+- rollback：git revert 本 commit（只新增檔與兩頁修改）。
 ## 2026-11-14（續7）塔羅「載入那批」只列同一副牌（0162 deck_key）；傳回單張套框成功才換無框圖（4aa7e03f5，已部署）
 
 - C1 操作者截圖：鎖定藍貓牌時清單列出 10/23 三批別種風格的批次；按下會套進目前這副並存 77–78 張進 My Designs（不扣 AI 費）。根因：`tarot_batch_jobs` 沒有牌組識別，清單取最近 3 批（`TarotStudio.tsx` 清單 effect），`restoreJob` 直接收進目前這副。

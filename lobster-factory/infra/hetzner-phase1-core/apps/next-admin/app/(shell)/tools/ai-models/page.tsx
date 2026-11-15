@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AiModelsClient from "./AiModelsClient";
 import ImageModelSpecs from "./ImageModelSpecs";
+import MeasuredRuns from "./MeasuredRuns";
 
 export const metadata = { title: "AI Model Guide · Lobster Factory" };
 
@@ -18,11 +19,12 @@ function SummaryCard({ label, value, detail }: { label: string; value: string; d
 const TABS = [
   { key: "compare", label: "模型比較" },
   { key: "image-specs", label: "圖片模型規格" },
+  { key: "measured", label: "實測紀錄" },
 ] as const;
 
 export default async function AiModelGuidePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab } = await searchParams;
-  const active = tab === "image-specs" ? "image-specs" : "compare";
+  const active = tab === "image-specs" ? "image-specs" : tab === "measured" ? "measured" : "compare";
   return (
     <>
       <div className="topbar">
@@ -41,7 +43,7 @@ export default async function AiModelGuidePage({ searchParams }: { searchParams:
           ))}
         </div>
 
-        {active === "image-specs" ? <ImageModelSpecs /> : <>
+        {active === "image-specs" ? <ImageModelSpecs /> : active === "measured" ? <MeasuredRuns /> : <>
         <div style={{ marginBottom:16 }}>
           <h1 style={{ fontSize:22, margin:"0 0 4px" }}>AI 模型比較</h1>
           <p className="form-hint">
