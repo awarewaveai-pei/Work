@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-15（續8）影音工作台 MV 規格修訂：對嘴改選用、免對嘴景別、對嘴比價表
+
+- 起因：操作者說對嘴（Hedra 720p 每秒 NT$1.6）太貴（監工 2026-11-15 轉達）。
+- 改 `apps/video-workbench/docs/mv-mode-spec-20261114.md`：§0／§2／§5 MV 預設流程不對嘴，演唱段鏡頭限免對嘴景別（遠景、背影、側臉剪影、樂器與手部特寫、道具空景、歌詞字卡），規則進 MV.6（`/director/shots` 系統提示＋`SHOT_SIZES` 三個新 chip，伺服器把有歌詞鏡頭的「近景」改掉）與 MV.9（沒對嘴的演唱行照鏡頭排）；MV.8 改「選用，最後」，按鈕「唱歌對嘴 · 每秒 NT$x · 此鏡 N 秒 ≈ NT$y」＋「只建議用在副歌特寫幾秒」；順序改 …→MV.9→MV.7→MV.10→MV.8。
+- §3.3 換成比價表（查詢日 2026-11-15，NT$／秒 = USD×32）：fal `veed/lipsync` 0.21、fal `sync-lipsync` v1 0.37、Hedra 540p 0.80、Sync 直連 lipsync-2 1.28–1.60（月費 US$5–249）、fal sync v2 1.60、Hedra 720p／1080p 1.60／2.00、lipsync-2-pro 2.14–2.67、Creatify Aurora 2.24／4.48、Captions Mirage 4.80；Replicate sync 與 Tavus 查不到價；HeyGen 與全部中國模型排除。本機開源（RTX 5060 8 GB）無一同時滿足商用授權＋非中國＋8 GB（Wav2Lip 禁商用；KeySync／IP_LAP Apache-2.0 但權重授權／來源國／VRAM 未證實）。決定：有影片的鏡頭走 fal veed（開工先確認 VEED 所在國，否則 fal sync v1），只有圖的走 Hedra 540p。
+- `creative-suite-plan-20261102.md §4` MV 列同步改「對嘴選用」。
+- REALTEST_WAIVED: DOC_ONLY -- 規格文件
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（§0「四件」實列三件，已修）
+- BUGHUNT_WAIVED: DOC_ONLY -- 無 symbol 改動；grep `Hedra Character-3，720p` 殘留 0
+- ORACLE_WAIVED: 純文件
 ## 2026-11-15（續7）— 社群發文頂列在部分主題下全黑／看不見：背景改吃 theme 成對 token（卡 B）
 
 **根因**：`social.css:26` `.sm-topbar` 用 `background: var(--text-primary)`（文字色）當底、`color: var(--btn-primary-text)`（主按鈕上的字）當前景；兩個 token 各自為不同表面推導（`lib/theme/palette-derive.ts:139-144`、`:153`），彼此沒有對比保證。淺色主題下 text-primary 近黑、btn-primary-text 若也取黑（accent 偏亮時 `inkOn(accent)`＝黑）就變黑底黑字。同一類寫法另有 3 處。

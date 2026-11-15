@@ -8,8 +8,8 @@
 
 - 現有「專案（PJ）」一集 = 一支影片（`docs/pj-project-spine-spec-20261106.md §1`）。MV = 一集加一個 `episode.song` 欄位，不另建模式、不另建頁。
 - 監工盤點寫成「缺」的六項，main 上已有兩項半：**作曲已接**（`backend/music.cjs`，Lyria 3.5／Lyria 3 Clip／Eleven Music，2026-11-13 `70c1d62d1`）；**人聲分離已接**（`backend/audio-tools.cjs` 音軌分離的 ElevenLabs「只留人聲」列，免費方案額度內 US$0）；場景＋角色已綁在鏡頭卡，只缺道具。
-- 真正要新寫的只有四件：角色特徵鎖定注入（一處，`backend/character-lock.cjs`）、歌詞對時（自家 whisper words ＋ `shared/lyrics-align.js`，免費）、唱歌對嘴（Hedra Character-3，720p US$0.05／s ≈ NT$1.6／s，新金鑰）、依歌曲段落粗剪（新 `scripts/editor-mv.js`，複用 PJ.3 `edArrange` 規則）。其餘是把現有件串到 `episode.song`。
-- 免費線（上傳自己的歌 → 人聲分離 → 對時 → 分鏡依段落 → 鏡頭圖／影片 → 粗剪 → 輸出）七張卡做完就能走通，不新增任何供應商；作曲、對嘴兩張付費卡在後。
+- 真正要新寫的只有三件：角色特徵鎖定注入（一處，`backend/character-lock.cjs`）、歌詞對時（自家 whisper words ＋ `shared/lyrics-align.js`，免費）、依歌曲段落粗剪（新 `scripts/editor-mv.js`，複用 PJ.3 `edArrange` 規則）。其餘是把現有件串到 `episode.song`。**對嘴是選用、排最後**（操作者 2026-11-15：每秒 NT$1.6 太貴）：MV 預設流程用「免對嘴鏡頭」拍演唱段（§3.3 規則），整條線不付任何對嘴費也做得出完整 MV。
+- 免費線（上傳自己的歌 → 人聲分離 → 對時 → 分鏡依段落 → 鏡頭圖／影片 → 粗剪 → 輸出）七張卡做完就能走通，不新增任何供應商；作曲時間軸歌詞一張小卡在後；對嘴（MV.8）選用、最後。
 - ED 線在 main 已標 13/13 完成（`feb6fa278`）；D:\Work 只是落後 main 的舊 checkout，不是 ED 未 commit 的證據（§6）。MV 新程式仍一律放新檔，共用檔只加掛載行。
 
 ## 1. 現況盤點（監工清單逐項驗證）
@@ -66,8 +66,9 @@ type Song = {
 | 角色／場景／道具綁定 | 場景、角色已綁；加道具 chips；三者 refs 都進參考圖（4 張上限 `api.cjs:10`，順序 場景→角色→道具） | `projects-0.js:41-45,543-548` | MV.2 | `shot.propIds` | 沒有 propIds = 現行行為 |
 | 特徵鎖定 | §4 | 新 `backend/character-lock.cjs` | MV.1／MV.2 | 角色記錄 | 沒有欄位 = 不加字 |
 | 鏡頭影片 ≤ 15 s | 既有鏡頭卡影片生成（PJ.2 `shot.video`）。MV 一律選**無聲**模型（Veo 3.1 Fast 等）或 Omni 後在粗剪靜音 | `generation-policy.cjs:41-56`、`validate:99` | — | `shot.video` | — |
-| 唱歌對嘴 | 從 `song.vocals` 用 ffmpeg 切該鏡 `[start,end]`（free）→ Hedra Character-3（圖 = 該鏡角色鎖定參考圖，音 = 人聲片段）→ `shot.lipsync` | 新 `backend/lipsync.cjs`、`media.cjs` 加 `trim-audio` 操作 | MV.8 | `shot.lipsync` 任務成品 | 沒對嘴 = 用 `shot.video ?? shot.image` |
-| 粗剪 | `edArrangeSong(p, episode)`：主軌每行一段（`shot.lipsync ?? shot.video ?? shot.image`，長度 = 行長，影片靜音）；音樂軌整首 `song.audio`；字幕軌 = `lines`（帶 `words` → 可選「卡拉 OK」樣式，`editor-model.js:393`）；可重做（`slot` 規則同 PJ.3） | 新 `scripts/editor-mv.js`，`tools-editor.js:1085` 頂列 `data-ed-spine` 群組加一顆按鈕 | MV.9 | 剪輯檔（`preferences["tools.editor.projects"]`） | 非 MV 集看不到按鈕；`edArrange` 不動 |
+| 演唱段鏡頭（預設免對嘴） | 分鏡時凡 `line` 有歌詞的鏡頭，景別限「免對嘴景別」：遠景、背影、側臉／逆光剪影、樂器與手部特寫、道具／空景、唱片機／歌詞字卡；不用正面近景。規則在 `/director/shots` 系統提示＋`SHOT_SIZES` 加「背影／剪影／手部」三個 chip（`projects-0.js:33-39`） | `api.cjs:1613`、`projects-0.js:33-39` | MV.6 | `shot.shotSize` | 舊鏡頭不受限 |
+| 唱歌對嘴（選用，最後） | 使用者對單一鏡頭按「唱歌對嘴 · 每秒 NT$x」：從 `song.vocals` 用 ffmpeg 切該鏡 `[start,end]`（free）→ 對嘴供應商（圖 = 該鏡角色鎖定參考圖，音 = 人聲片段）→ `shot.lipsync` | 新 `backend/lipsync.cjs`、`media.cjs` 加 `trim-audio` 操作 | MV.8 | `shot.lipsync` 任務成品 | 沒對嘴 = 用 `shot.video ?? shot.image`（預設） |
+| 粗剪 | `edArrangeSong(p, episode)`：主軌每行一段（`shot.lipsync ?? shot.video ?? shot.image`，長度 = 行長，影片靜音；沒有對嘴的演唱行照原鏡頭排，不空）；音樂軌整首 `song.audio`；字幕軌 = `lines`（帶 `words` → 可選「卡拉 OK」樣式，`editor-model.js:393`）；可重做（`slot` 規則同 PJ.3） | 新 `scripts/editor-mv.js`，`tools-editor.js:1085` 頂列 `data-ed-spine` 群組加一顆按鈕 | MV.9 | 剪輯檔（`preferences["tools.editor.projects"]`） | 非 MV 集看不到按鈕；`edArrange` 不動 |
 | 輸出 | 既有輸出對話框（ED.8）→ 任務 → 送審投遞；封面等交付包照 VD 規格 | `editor-export.cjs`、`editor-export-dialog.js` | — | `episode.outputs` | — |
 
 ## 3. 缺口選項與決定
@@ -101,22 +102,50 @@ type Song = {
 
 **決定 A 預設，B 同一組 `transcribe.engines` 按鈕（`providers.order` 免費在前，`backend/providers.cjs:7`），C 不接（要再寫一個 ElevenLabs 端點，收益只有省掉比對）。** 比對演算法自寫在 `shared/lyrics-align.js`（純函式、Node 與瀏覽器共用，照 `shared/episode-spine.js` 寫法）：正規化（去標點、全半形、簡轉繁 `NA/lib/ai/to-traditional.ts` 已有）→ 歌詞每行的字元序列對 words 的字元序列做 Needleman-Wunsch（gap 罰分），取每行第一與最後對上字的 `start/end`；對不上的行（段落標記、重複副歌漏辨）用前後行線性內插並標 `words:null`。Lyria 成品若回時間軸歌詞（§3.4）直接用，跳過 A。
 
-### 3.3 唱歌對嘴數字人
+### 3.3 唱歌對嘴數字人（選用；操作者 2026-11-15：每秒 NT$1.6 太貴）
 
-| 供應商 | 公司／國（創辦人） | 排除？ | 官方價 | 輸入 | 唱歌 | 最長 | 來源 |
+**預設不對嘴。** 演唱段用免對嘴景別（遠景、背影、側臉／逆光剪影、樂器與手部特寫、道具／空景、歌詞字卡），規則寫進 MV.6 分鏡與 MV.9 粗剪；只有使用者在單一鏡頭按「唱歌對嘴 · 每秒 NT$x」才付費，按鈕下固定提示「只建議用在副歌特寫幾秒」。
+
+比價表（查詢日 2026-11-15；NT$／秒 = USD × 32；「公司／國」只寫官方頁有載或已確認的，否則「查不到」；中國公司全排除）：
+
+| 供應商／通道 | 公司／國 | 輸入 | 官方價 | **NT$／秒** | 月費門檻 | 商用授權 | 來源 |
 |---|---|---|---|---|---|---|---|
-| **A. Hedra Character-3** | Hedra，美國舊金山 | 否 | 540p US$0.025／s、**720p US$0.05／s（NT$1.6／s）**、1080p US$0.0625／s | **圖＋音訊** | 官方模型頁列 「talking and singing video」 | 10 分（另一頁寫 5 分，矛盾） | hedra.com/models/video/hedra/character-3；hedra.com/docs/pages/studio/getting-started/video-models |
-| B. Sync Labs lipsync-2／2-pro | Sync，美國舊金山（Wav2Lip 作者團隊） | 否 | lipsync-2 US$0.04–0.05／s；2-pro US$0.067–0.083／s；fal 代管 US$3–5／分；Replicate `sync/lipsync-2-pro` 只寫 usage-based | **影片＋音訊**（不收圖） | 官方只建議先分離人聲，未宣稱唱歌 | 依方案 | sync.so/pricing；fal.ai/models/fal-ai/sync-lipsync/v2/pro |
-| C. Captions Mirage Avatar X | Captions，美國紐約（第三方） | 否 | US$0.15／s（6 秒計費單位）≈ NT$4.8／s | 圖或影片＋音訊 | 查不到 | 未列 | captions.ai/help/docs/api/pricing |
-| ✗ HeyGen | 2020 深圳創立（原 Surreal），2023 撤銷深圳實體，現洛杉磯 | **排除（中國起源）** | 第三方 US$3／分 | 圖 | 查不到 | — | research.contrary.com/company/heygen |
-| ✗ Runway Act-Two | Runway（美） | 否 | US$0.05／s | 需**驅動表演影片**，不吃音訊 | 不適用 | — | docs.dev.runwayml.com/guides/pricing |
-| ✗ Veo 3.1／Gemini Omni 1.2 | Google | 否 | — | **沒有音訊輸入**，不能驅動對嘴 | — | — | aistudio.google.com/docs/video |
-| ✗ Tavus／D-ID | 美／以色列 | 否 | 官方價頁抓不到 | Tavus 要先訓練 replica | 查不到 | — | tavus.io/pricing |
-| ✗ Kling、OmniHuman、LatentSync、MuseTalk、Sonic、SadTalker、Hallo、LivePortrait | 中國 | **排除** | — | — | — | — | — |
-| ✗ Wav2Lip | IIIT Hyderabad | 非商用（README「any form of commercial use is strictly prohibited」） | — | — | — | — | github.com/Rudrabha/Wav2Lip |
-| 自架可商用非中國開源 | **查不到** | — | — | — | — | — | — |
+| fal `veed/lipsync` | VEED；國家官方頁未載（查不到） | 影片＋音訊 | US$0.4／分 | **0.21** | fal 按量，無月費 | fal 頁標「Commercial use」「Partner」，條款全文未讀到 | fal.ai/models/veed/lipsync |
+| fal `fal-ai/sync-lipsync`（v1） | Sync Labs（synchronicity labs inc.；Wav2Lip 作者團隊，總部頁面未載） | 影片＋音訊 | US$0.7／分 | **0.37** | 無 | 「Commercial use via fal partnership」 | fal.ai/models/fal-ai/sync-lipsync |
+| Hedra Character-3 API 540p | Hedra；總部頁面未載（查不到） | **圖**＋音訊 | US$0.025／s | **0.80** | 無（API 按量） | 模型頁只連 Terms，內容未讀到（查不到） | hedra.com/models/video/hedra/character-3 |
+| Sync Labs lipsync-2（sync.so 直連） | 同 Sync Labs | 影片＋音訊 | Scale US$0.04／s；Hobbyist／Creator US$0.05／s；Growth US$0.0475 | **1.28–1.60** | US$5／19／49／249 月費；Hobbyist 有浮水印 | 官方支援文：所有訂閱方案含完整商用權 | sync.so/pricing；support.sync.so/articles/2618163041 |
+| fal `fal-ai/sync-lipsync/v2` | 同 Sync Labs | 影片＋音訊 | US$3／分 | **1.60** | 無 | 「Commercial use permitted with Partner designation」 | fal.ai/models/fal-ai/sync-lipsync/v2 |
+| Hedra Character-3 API 720p／1080p | 同 Hedra | 圖＋音訊 | US$0.05／US$0.0625／s | **1.60／2.00** | 無 | 同上 | 同上 |
+| Hedra 訂閱（Play） | 同 Hedra | 圖＋音訊 | Basic US$20／月 2,000 credits；Pro US$50／7,200；Ultra US$100 起／18,000；Teams US$75／14,400 | **查不到**（每秒耗多少 credits 頁面未載） | US$20 起 | 每方案列「Commercial use」 | hedra.com/play/pricing |
+| Sync Labs lipsync-2-pro（sync.so 直連） | 同 Sync Labs | 影片＋音訊 | Scale US$0.06675／s … Hobbyist US$0.08325／s | **2.14–2.66** | 同上 | 同上 | sync.so/pricing |
+| fal `fal-ai/sync-lipsync/v2/pro` | 同 Sync Labs | 影片＋音訊 | US$5／分 | **2.67** | 無 | 頁面只有「Commercial use」標籤 | fal.ai/models/fal-ai/sync-lipsync/v2/pro |
+| fal `fal-ai/creatify/aurora` | Creatify；國家查不到 | 圖＋音訊（頭像生成，非換嘴型） | 480p US$0.07／s；720p US$0.14／s | **2.24／4.48** | 無 | 「Commercial use」標籤 | fal.ai/models/fal-ai/creatify/aurora |
+| Captions Mirage Avatar X | Captions（美，第三方來源） | 圖或影片＋音訊 | US$0.15／s（6 秒計費單位） | **4.80** | 無 | 查不到 | captions.ai/help/docs/api/pricing |
+| Replicate `sync/lipsync-2`／`-2-pro` | 同 Sync Labs | 影片＋音訊 | **查不到**（頁面只寫 usage-based；pro 需 Sync Scale 方案） | 查不到 | — | 依 Sync 條款 | replicate.com/sync/lipsync-2-pro |
+| fal `fal-ai/tavus/hummingbird-lipsync` | Tavus；國家查不到 | 影片＋音訊 | **查不到**（頁面 404） | 查不到 | — | 查不到 | — |
+| ✗ HeyGen | 2020 深圳創立（原 Surreal），現洛杉磯 | 圖 | — | — | — | **排除（中國起源）** | research.contrary.com/company/heygen |
+| ✗ Kling、PixVerse、OmniHuman、LatentSync、MuseTalk、Sonic、SadTalker、Hallo、EchoMimic、AniPortrait、VideoReTalking、LivePortrait、Ditto、JoyVASA、Linly-Talker | 中國 | — | — | — | — | **排除** | — |
+| ✗ Runway Act-Two | Runway（美） | 需驅動表演影片，不吃音訊 | US$0.05／s | 1.60 | — | 不適用 | docs.dev.runwayml.com/guides/pricing |
+| ✗ Veo 3.1／Gemini Omni 1.2 | Google | 沒有音訊輸入 | — | — | — | 不能驅動對嘴 | aistudio.google.com/docs/video |
 
-**決定 A（Hedra Character-3，720p）。** 理由：唯一官方寫「singing」且吃「圖＋音訊」的非中國供應商；每鏡 15 s ≈ NT$24，按鈕標示；圖直接用該鏡角色的鎖定參考圖（§4），音用人聲軌切段（免費），所以嘴型對的是歌聲不是伴奏。B 留作第二期「對已生成的鏡頭影片對嘴」（輸入影片；若走 Replicate 可用 `backend/replicate-run.cjs` 的取消規則）。免費預設 = 不對嘴（用鏡頭影片）。Hedra 積分制（3–8 credits／s）與美元價頁面矛盾，MV.8 開工前先打一次 1 秒測試記實價（同 ED.12.3 做法，WORKLOG 2026-11-13 續4）。
+本機開源（RTX 5060 8 GB）——**沒有一個同時滿足「可商用授權＋非中國來源＋README 寫明 8 GB 可跑」**：
+
+| 模型 | 來源／國 | 授權 | VRAM | 判定 | URL |
+|---|---|---|---|---|---|
+| Wav2Lip | IIIT Hyderabad（印度）；作者即 Sync Labs 團隊 | README：僅限個人／研究／非商用，「any form of commercial use is strictly prohibited」（LRS2 訓練資料） | 未載 | ✗ 禁商用 | github.com/Rudrabha/Wav2Lip |
+| KeySync | Imperial College London＋Wrocław 大學 | 程式 Apache-2.0；**權重與訓練資料授權未寫** | 未載（只寫 CUDA GPU） | 最接近，但權重授權與 8 GB 都未證實 | github.com/antonibigata/keysync |
+| IP_LAP | 機構／國家未載（查不到） | Apache-2.0 | 作者用 4×24 GB；下限未載 | 來源國與 8 GB 未證實 | github.com/Weizhi-Zhong/IP_LAP |
+| Diff2Lip | 作者名單屬 Maryland 大學（README 未載，未驗證） | CC BY-NC 4.0 | 未載 | ✗ 非商用 | github.com/soumik-kanad/diff2lip |
+| FLOAT | DeepBrain AI（南韓，README 暗示） | CC BY-NC-ND 4.0 | 未載 | ✗ 非商用 | github.com/deepbrainai-research/float |
+| TalkLip | 機構未載 | 無 LICENSE 檔 | 訓練約 24 GB | ✗ 無授權 | github.com/Sxjdwang/TalkLip |
+| MEMO | 機構未載；背景未查證 | Apache-2.0，但自述「preview model for research purposes」 | 測 H100／4090 | 不採用 | github.com/memoavatar/memo |
+| DINet | 機構未載 | 查不到 | 未載 | 不採用 | github.com/MRzzm/DINet |
+
+**決定（MV.8 若開工）**：
+- 鏡頭已有影片（`shot.video`）→ 第一列 **fal `veed/lipsync` NT$0.21／秒**；開工第 0 步先確認 VEED 公司所在國（官方頁未載）；確認不了就改 **fal `fal-ai/sync-lipsync` v1 NT$0.37／秒**（Sync Labs，Wav2Lip 作者團隊，非中國）。兩者都走 fal（美，按量、無月費），新金鑰一把 `FAL_KEY`。
+- 鏡頭只有圖（`shot.image`）→ **Hedra Character-3 540p NT$0.80／秒**（唯一吃「圖＋音訊」且官方寫 singing 的非中國供應商；720p NT$1.6 是操作者嫌貴的那個價，不預設）。
+- 不接 sync.so 直連（月費 US$5–249 加浮水印層級）、不接 Replicate（無價）、不自架（上表無合格模型）。
+- 按鈕一律「唱歌對嘴 · 每秒 NT$x · 此鏡 N 秒 ≈ NT$y」＋提示「只建議用在副歌特寫幾秒」；費率從 `cost-model.ts` `TOOL_RATES`（usdPerSec）讀，不寫死。
 
 ### 3.4 作曲
 
@@ -179,13 +208,13 @@ type Song = {
 | MV.3 | `episode.song` 與專案頁「歌曲」區 | `shared/episode-spine.js`（Song 型別、`isMv(episode)`、`sectionsOf(lines)` 純函式）；`scripts/projects-0.js`（集頁新區：上傳／素材庫選歌、貼歌詞、AI 寫歌詞走既有 `/tools/music/lyrics` 帶 `video.script` 價格、「作曲」開既有音樂工具帶 `link.target="song"` 與 `lyrics`，成品經 settle 寫 `song.audio`；「分離人聲」「對時」先 disabled 寫「下一張卡接入」） | 一集能掛一首歌＋歌詞並存回 `/state`；作曲成品自動掛回；非 MV 集畫面不變 | 新 `tests/mv3-song.cjs`：① `sectionsOf` 把 `[Verse]/[Chorus]` 與 8 s 空白切段 ② 存歌後 `/state` 有 `song` ③ `spineSignature` 不因 song 變動重繪（`projects-0.js:63`）④ music job settle → `song.audio` | Low | Opus | 無 |
 | MV.4 | 人聲分離接到歌曲＋自家 Demucs 列 | `backend/audio-tools.cjs`（`separate` 接受音訊素材：`info.audio` 已查、只放寬 UI 的來源種類；新列 `{ id:"host-demucs", vendor:"AwareWave 主機", label:"人聲／伴奏", price 0 }` 呼叫 `VW_STEMS_WORKER_URL`）；新 `apps/video-stems-worker/`（Dockerfile、`app.py` FastAPI `POST /v1/separate` two-stems htdemucs CPU、`requirements.lock`、`docker-compose.stems.yml`，照 `video-whisper-worker`）；`scripts/projects-0.js` 「分離人聲」按鈕送既有 `operation:"separate"` job 帶 `link.target="vocals"` → `song.vocals` | 歌 → 人聲軌（ElevenLabs 免費列或自家列）→ `song.vocals`；compose 多兩個 env | 新 `tests/mv4-vocals.cjs`（假 worker）：① 音訊素材可送 separate ② 自家列成功寫內容定址檔、失敗不留半檔 ③ 無 env → 列不可用、ElevenLabs 列仍在。容器真跑一次 4 分鐘歌記秒數進 WORKLOG | Medium；**部署 High**（新容器 `safe-infra-patch.sh compose`） | Opus | MV.3 |
 | MV.5 | 歌詞對時 | 新 `shared/lyrics-align.js`；新 `backend/mv-routes.cjs`（`/tools/music/align`：吃 `song.vocals`＋`lyrics`＋`engine`，host 免費預設，按鈕價格同 `transcribe.capability`，回 `lines`；`main-system.cjs` `PAID_ROUTES` 加此路由 → `video.transcribe`）；`api.cjs` 1 行掛 | 一首 4 分鐘中文歌，每行有 start/end，副歌重複行不錯位；手改一行 → `words:null` | 新 `tests/mv5-align.cjs`：① fixture（20 行歌詞＋假 words）全對上 ② 漏一句 → 內插且 `words:null` ③ 簡體歌詞對繁體 words 仍對上。突變：拔正規化 → ③ 紅 | Medium | Opus | MV.4 |
-| MV.6 | 分鏡依段落 | `api.cjs:1613-1636` `/director/shots` 接 `sections`（每段 N 鏡、單鏡 ≤ 15 s、回 `sectionId`）；`scripts/projects-0.js` 鏡頭格依段落分組顯示 | 有 song 的集 AI 分鏡後，每段鏡頭秒數和 = 段長 ±1 s | 新 `tests/mv6-section-shots.cjs`：① 假模型回 shots → 伺服器修正秒數和、拒 > 15 s ② 無 sections 行為 = 現行（`pj3-arrange` 重跑） | Medium | Opus | MV.5 |
+| MV.6 | 分鏡依段落＋免對嘴景別 | `api.cjs:1613-1636` `/director/shots` 接 `sections`（每段 N 鏡、單鏡 ≤ 15 s、回 `sectionId`；系統提示加「有歌詞的鏡頭只用免對嘴景別：遠景、背影、側臉剪影、樂器與手部特寫、道具空景、歌詞字卡，不寫正面唱歌嘴型」，回 `shotSize` 只許免對嘴值）；`scripts/projects-0.js` 鏡頭格依段落分組顯示、`SHOT_SIZES` 加「背影」「剪影」「手部特寫」chip，有歌詞的鏡頭卡把「近景」chip 標「會露嘴型，需另付對嘴」 | 有 song 的集 AI 分鏡後，每段鏡頭秒數和 = 段長 ±1 s；有歌詞的鏡頭 `shotSize` 全在免對嘴集合 | 新 `tests/mv6-section-shots.cjs`：① 假模型回 shots → 伺服器修正秒數和、拒 > 15 s ② 假模型回「近景」給有歌詞鏡頭 → 伺服器改成「側臉剪影」並記 `adjusted` ③ 無 sections 行為 = 現行（`pj3-arrange` 重跑） | Medium | Opus | MV.5 |
 | MV.7 | Lyria 時間軸歌詞 | `backend/music.cjs` `lyria()` 讀回應裡的時間軸歌詞（第 0 步實測看 schema）回 `{ audio, ext, lines? }`；`api.cjs:683-698` 成品多存 `result.lines`；`scripts/projects-0.js` settle 時有 `lines` 就寫 `song.lines`、`alignedBy:"lyria"` | 用 Lyria 作的歌不用對時就有 `lines` | 新 `tests/mv7-lyria-lines.cjs`：① 假回應含時間軸 → `song.lines` ② 無時間軸 → `lines:null`、對時按鈕可按；`music-generation` 重跑。**第 0 步**：真打 1 首繁中歌詞（NT$2.6）記中文歌聲結果與回應欄位 | Low | Opus | MV.3 |
-| MV.8 | 唱歌對嘴（Hedra） | 新 `backend/lipsync.cjs`（token、create、status、download、cancel，照 `replicate-video.cjs` 介面）；`backend/media.cjs` 加 `trim-audio`；`api.cjs` 1 行掛 `operation:"lipsync"`；`cost-model.ts` `TOOL_RATES["hedra-character-3"]`（usdPerSec 0.05）；`products.ts:54` `quota("video.lipsync","唱歌對嘴")`；`main-system.cjs` `paidFeature` 加一行；`scripts/projects-0.js` 鏡頭卡按鈕「唱歌對嘴 · NT$<秒×1.6>」 | 一鏡 → 人聲切段 → Hedra → `shot.lipsync.url`；成品經 `character-lock.apply`（用 lockedRef 當圖） | 新 `tests/mv8-lipsync.cjs`：① 假 Hedra → 入帳按秒計 ② 無 `HEDRA_API_KEY` → 按鈕未啟用 ③ 無 `song.vocals` → 拒並提示先分離人聲；`paid-price` 重跑。**第 0 步**真打 1 秒記實價 | **High**（新供應商金鑰、金流） | Opus；等操作者 go | MV.4、MV.1 |
-| MV.9 | 依段落粗剪 | 新 `scripts/editor-mv.js`（`edArrangeSong`、`edSongSubtitles`）；`scripts/tools-editor.js:1085` 加 1 顆按鈕（只在 `isMv`）；`scripts/tools-0.js` TOOLS.edit.scripts 加新檔 | 按一下：主軌每行一段（對嘴 > 影片 > 圖）靜音、音樂軌整首、字幕軌每行＋words；重做不動手加片段；一步可復原 | 新 `tests/mv9-rough-cut.cjs`（照 `pj3-arrange.cjs`）：① 3 行 2 鏡 → 片段起迄 = 行時間 ② 重做保留手動片段 ③ 影片片段 `muted` ④ 字幕片段帶 words。重跑 `pj3-arrange`、`ed10-subtitles-ui` | Medium | Opus | MV.5 |
+| MV.8 | 唱歌對嘴（選用，最後；供應商照 §3.3 比價表定） | 新 `backend/lipsync.cjs`（供應商列表照 `speech.cjs` 寫法：fal `veed/lipsync`／fal `sync-lipsync` v1 吃影片、Hedra 540p 吃圖；token、create、status、download、cancel）；`backend/media.cjs` 加 `trim-audio`；`api.cjs` 1 行掛 `operation:"lipsync"`；`cost-model.ts` `TOOL_RATES` 三列 usdPerSec（0.00667／0.01167／0.025）；`products.ts:54` `quota("video.lipsync","唱歌對嘴")`；`main-system.cjs` `paidFeature` 加一行；`scripts/projects-0.js` 鏡頭卡按鈕「唱歌對嘴 · 每秒 NT$<費率>」，按鈕下一行固定提示「只建議用在副歌特寫幾秒；其他演唱段用免對嘴鏡頭就夠」；只在有歌詞的鏡頭出現 | 一鏡 → 人聲切段 → Hedra → `shot.lipsync.url`；成品經 `character-lock.apply`（用 lockedRef 當圖） | 新 `tests/mv8-lipsync.cjs`：① 假 Hedra → 入帳按秒計 ② 無 `FAL_KEY`／`HEDRA_API_KEY` → 該列不可用、按鈕未啟用 ③ 無 `song.vocals` → 拒並提示先分離人聲；`paid-price` 重跑。**第 0 步**真打 1 秒記實價 | **High**（新供應商金鑰、金流）；**選用**，不在免費線 | Opus；等操作者 go | MV.4、MV.1、MV.9 |
+| MV.9 | 依段落粗剪 | 新 `scripts/editor-mv.js`（`edArrangeSong`、`edSongSubtitles`）；`scripts/tools-editor.js:1085` 加 1 顆按鈕（只在 `isMv`）；`scripts/tools-0.js` TOOLS.edit.scripts 加新檔 | 按一下：主軌每行一段（對嘴 > 影片 > 圖）靜音、音樂軌整首、字幕軌每行＋words；沒有對嘴的演唱行照鏡頭排、不留空；重做不動手加片段；一步可復原 | 新 `tests/mv9-rough-cut.cjs`（照 `pj3-arrange.cjs`）：① 3 行 2 鏡 → 片段起迄 = 行時間 ② 重做保留手動片段 ③ 影片片段 `muted` ④ 字幕片段帶 words。重跑 `pj3-arrange`、`ed10-subtitles-ui` | Medium | Opus | MV.5 |
 | MV.10 | 4／6／9 格分鏡參考圖 | `scripts/projects-0.js` 集頁按鈕「分鏡格 · NT$」→ `/generations` image `operation:"storyboard-sheet"`（prompt 由 `mv-routes.cjs` 組：N 格、每格一鏡文字、場景／角色鎖定圖當參考）；成品存 `episode.sheet` | 一張 N 格圖，格數 = 選的 4／6／9（按鈕） | 新 `tests/mv10-sheet.cjs`：① 格數 ≠ 4/6/9 拒 ② prompt 含每鏡文字且經 `character-lock` | Low | Codex `/codex-do`（卡寫死） | MV.1、MV.5 |
 
-順序（每張做完都能單獨上線）：**MV.3 → MV.1 → MV.2 → MV.4 → MV.5 → MV.6 → MV.9**（到此全免費、用上傳的歌就能從歌到粗剪）→ **MV.7 → MV.8 → MV.10**。MV.1／MV.2／MV.3 互不撞檔可並行；其餘依前置。
+順序（每張做完都能單獨上線）：**MV.3 → MV.1 → MV.2 → MV.4 → MV.5 → MV.6 → MV.9**（到此全免費、用上傳的歌就能從歌到完整 MV，演唱段全用免對嘴鏡頭）→ **MV.7 → MV.10 → MV.8（選用，最後）**。MV.1／MV.2／MV.3 互不撞檔可並行；其餘依前置。
 
 每卡 commit 訊息與 WORKLOG 照 AGENTS §1 四行證據；`.ts` 改動（MV.1、MV.8 的 NA 檔）`npx tsc --noEmit`；`tests/gate.cjs:6` 清單加新的純 node 測試。
 
@@ -213,12 +242,13 @@ type Song = {
 6. 角色有兩份互不相連的儲存；專案頁送的 `characterIds` 伺服器沒讀；角色文字描述從未進 prompt（§1、§4）。
 7. 「D:\Work 裡有 ED 還沒 commit 的檔」：那是落後 main 的 checkout（§6）。
 8. 參考產品用 Suno：Suno 沒有公開 API，第三方轉接不可用（§3.4）。
+9. 對嘴不必是預設：免對嘴景別做得出完整 MV；要對嘴時最便宜的商用通道是 NT$0.21／秒，不是 NT$1.6（§3.3）。
 
 ## 8. 未驗證、要操作者或開工時定
 
 - Lyria 3.5 繁中歌聲品質與回應是否含時間軸歌詞（MV.7 第 0 步實測 1 首，NT$2.6）。
-- Hedra 實際每秒價（積分頁與美元頁矛盾；MV.8 第 0 步 1 秒實測）。
+- 對嘴供應商：VEED 公司所在國（官方頁未載）；Hedra 積分頁與美元頁矛盾；MV.8 若開工，第 0 步各打 1 秒記實價。
 - Demucs 權重授權（Meta 無聲明；只影響容器內權重檔，不進程式交付）。
 - 分軌 CPU 耗時（估 1.5× 曲長；MV.4 真跑一次記 WORKLOG）。
 - ElevenLabs 免費方案月額度夠不夠 MV 用量（頁面會顯示剩餘點數；不夠就靠 MV.4 自家列）。
-- MV.8 為 High：新供應商金鑰進 `mcp/user-env.ps1` 與 compose，等操作者 go。
+- MV.8 為選用＋High：操作者 2026-11-15 說對嘴太貴；只有她點名要做才開，新供應商金鑰進 `mcp/user-env.ps1` 與 compose。
