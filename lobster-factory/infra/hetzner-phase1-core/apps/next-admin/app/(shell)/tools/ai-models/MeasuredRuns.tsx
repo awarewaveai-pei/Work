@@ -9,7 +9,7 @@ import { nt } from "@/lib/studio/model-options";
 const songNt = (id: keyof typeof MUSIC_RATES) => `NT$${nt(musicUsd(id)).toFixed(2)}`;
 
 const LINE = "var(--card-border)";
-type Row = { date: string; model: string; asked: string; money: string; result: string; src: string; verdict?: "good" | "bad" | "todo" };
+type Row = { date: string; model: string; asked: string; money: string; result: string; src: string; verdict?: "good" | "bad" | "todo"; plain?: boolean };
 type Group = { title: string; intro?: string; rows: Row[]; image?: { src: string; alt: string; caption: string } };
 
 const W9 = "2026-11-13（續9）影音工作台三張卡整合：音樂生成接三模型、圖片局部編輯器補齊、新工具破框貼文動畫";
@@ -23,9 +23,10 @@ const GROUPS: Group[] = [
     rows: [
       { date: "2026-11-13/14", model: "Runway Gen-4 Turbo", asked: "照片裡的主角衝出貼文框，真跑 5 次", money: "實扣 NT$8.00，標價 NT$8.00（一致）",
         result: "5 次主角都沒離開照片。文字列「12.4K／389／127」在第 0／30／60／90／119 格完全相同（有鎖定時）。", src: W5, verdict: "bad" },
-      { date: "2026-11-15", model: "Luma Ray 3.2", asked: "同一個流程，主角衝出照片", money: "實扣 NT$9.60，標價 NT$9.60（一致）", result: "主角走到照片邊緣，之後以半透明的霧狀蓋住下方貼文，不是乾淨地衝出去。主角蓋上去之前，文字都鎖住。", src: W5, verdict: "bad" },
+      { date: "2026-11-15", model: "Luma Ray 3.2", asked: "同一個流程，從工具頁面送出", money: "實扣 NT$9.60，標價 NT$9.60（一致）", result: "鯊魚出現了，但沒有乾淨衝出照片框，後段變成一層霧蓋過貼文。同一天另用全英文提示詞直接在 Replicate 跑一次：第 30 格衝出照片框，之後模型把貼文下方的文字整塊抹掉（這次扣款沒對帳）。", src: "Replicate 帳單畫面與各次 prediction 回應（WORKLOG 沒寫）", verdict: "bad", plain: true },
+      { date: "2026-11-15", model: "Grok Imagine Video", asked: "5 秒、720p、9:16，用有人物的貼文照片", money: "估約 NT$11.20（依模型頁牌價估，實扣沒對帳）", result: "接受有人物的照片。鯊魚的鰭越過照片下緣，蓋到圖示列。", src: "Replicate 帳單畫面與各次 prediction 回應（WORKLOG 沒寫）", verdict: "bad", plain: true },
+      { date: "2026-11-15", model: "Seedance 2.0 Fast（不採用：中國模型）", asked: "同一個流程，兩次", money: "第一次沒收費；第二次帳單約 NT$24.00", result: "第一次失敗（E005）：照片裡有看起來像真人的人物。第二次用沒有人的拿鐵照片，5 秒、720p、無聲，鯊魚乾淨地衝出照片框。因為是中國模型，不提供給使用者。", src: "Replicate 帳單畫面與各次 prediction 回應（WORKLOG 沒寫）", verdict: "bad", plain: true },
       { date: "尚未實測", model: "Veo 3.1 Fast", asked: "—", money: "—", result: "還沒跑。", src: W5, verdict: "todo" },
-      { date: "（日期未記）", model: "Seedance 2.0 Fast（不採用：中國模型）", asked: "同一個流程，兩張照片各一次", money: "Replicate 沒回報費用", result: "有人的照片被拒絕；沒有人的照片，主角乾淨地衝出照片。因為是中國模型，不提供給使用者。", src: "破框 session 回報（WORKLOG 還沒寫）", verdict: "bad" },
     ],
     image: { src: "/guides/breakout-frames.jpg", alt: "Runway 破框貼文動畫的第 0、30、60、90、119 格", caption: "Runway 第 5 次：第 0／30／60／90／119 格。照片裡的鯊魚一直在照片內，下方文字列每一格都一樣。" },
   },
@@ -84,7 +85,7 @@ export default function MeasuredRuns() {
                     <td style={td}>{r.asked}</td>
                     <td style={{ ...td, fontVariantNumeric: "tabular-nums" }}>{r.money}</td>
                     <td style={td}>{r.result}</td>
-                    <td style={{ ...td, fontSize: 12, color: "var(--text-muted)" }}>WORKLOG {r.src}</td>
+                    <td style={{ ...td, fontSize: 12, color: "var(--text-muted)" }}>{r.plain ? r.src : `WORKLOG ${r.src}`}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-15（續4）實測紀錄頁：補 Luma／Grok／Seedance 的 11-15 實測（來源＝Replicate 帳單與 prediction 回應）
+
+- 起因：破框 session 回報 11-15 三個影片模型的真跑結果；這些沒寫進 WORKLOG（該 session 不能改），所以頁面的出處欄寫「Replicate 帳單畫面與各次 prediction 回應」。
+- 內容：`MeasuredRuns.tsx` 影片組：Luma Ray 3.2（NT$9.60＝按鈕；工具頁面送出的那次霧狀蓋住貼文；另一次全英文提示詞在 Replicate 直接跑，第 30 格衝出後模型抹掉下方文字、扣款沒對帳）、Grok Imagine Video（估約 NT$11.20，實扣沒對帳；鰭蓋到圖示列）、Seedance 2.0 Fast（不採用：中國模型；有人照片 E005 失敗沒收費，沒人照片帳單約 NT$24.00、乾淨衝出）；列依價錢由低到高，未跑的 Veo 放最後。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit | exit=0 | ms=60000
+- REVIEW_WAIVED: DOC_ONLY -- 靜態表格文字
+- BUGHUNT_WAIVED: DOC_ONLY -- 只改表格列內容，沒有新符號或路由
+- 剩餘風險：(1) Grok 的 NT$11.20 是依牌價估的，Luma 英文提示詞那次扣款也沒對帳。(2) 沒有螢幕截圖（瀏覽器連不到 localhost）。
+- rollback：git revert 本 commit。
 ## 2026-11-15（續3）— 成片交付包 VD.1–VD.10：封面從匯出接到送審頁、社群、YouTube/IG、WordPress；文案免費預設＋NT$；字幕檔
 
 **根因**：系統沒有「封面」；社群清單縮圖用影片第一格，而成片多半黑畫面開頭（2026-11-14 操作者看到整排黑方塊）。規格 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-deliverable-pack-spec-20261114.md`（§4b 實作紀錄）。
