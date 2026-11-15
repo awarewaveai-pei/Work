@@ -1,4 +1,29 @@
 # Worklog
+## 2026-11-15（續18）— 塔羅大圖沒進「我的設計」：Next middleware 10 MiB 截斷請求；前端改縮到放得下
+
+**根因**：Next 15.5.14（`package-lock.json` 自 2026-04-06）`experimental.middlewareClientMaxBodySize` 預設 10 MiB（`node_modules/next/dist/server/body-streams.js:30,82-105`），超過即截斷、route 讀到殘缺 JSON；`designs/route.ts:16` 宣稱 12M 字元圖，超過 10 MiB 的部分從未生效。`TarotStudio.tsx` `postDesign` fire-and-forget → 無聲失敗。證據：prod log 4 筆 `Request body exceeded 10MB for /api/tools/designs`（10:27:14Z、10:28:19Z、10:48:43Z、10:51:23Z）；`media_assets` 最後一筆 tarot-preview 18:26:15（ideogram-v3-balanced），之後 Ideogram 大圖皆未存。
+
+**不變量**：瀏覽器送出的圖要縮到 middleware 能完整放行的大小；縮，不丟。
+
+**決策**：
+- 不調高 middleware 上限（critic M1：Next 在 middleware 驗身分前就把 body 複製兩份 `body-streams.js:82-105`，50 MiB → 每個未登入請求約 100 MB，容器 1G）。
+- 不動 route 上限：全平台以 12M 為準（約 10 個 route＋`public/editor-shared/blocks/{my-designs,ai-fill,bg-remove}.js` 11.5M），只降 3 個 route 會讓 10.0–10.48M 原本成功的存檔改收 413（Codex b17cee36 F2/F3）。
+
+**[已修改]**（`next-admin/`）
+- 新 `lib/studio/image-upload-limit.ts`：`REQUEST_BODY_MAX_BYTES`（＝Next 實際上限）＋ `uploadableDataUrl`（自 `CanvasEditor.tsx` 原樣搬出；放得下不動，否則 WebP 降像素；目標 上限−512 KiB）。
+- `TarotStudio.tsx` `postDesign` 送出前縮；`CanvasEditor.tsx` 刪本地副本改 import（目標 11.5M→9.96M）。
+- 新 `lib/studio/__tests__/image-upload-limit.test.ts`：Next `loadConfig` 讀實際上限（註解掉＝未設），須等於 `REQUEST_BODY_MAX_BYTES`。
+
+**[驗證結果]**
+- 測試：相等綠；常數改 12 MiB 紅。tsc exit 0；`vitest app/api/tools/designs lib/studio tarot canvas page-rules` 40 files／454 passed。
+- 瀏覽器實測（內建瀏覽器，同函式本體）：2816×1536 雜訊 PNG 19,842,294 字元 → WebP 5,069,291 字元、尺寸不變、≤ 9,961,472、0.9 s；小圖原樣返回。
+- 審查：critic M1→不調高；m1/Codex F1·F2（測試讀註解）→ 改 `loadConfig`；m2 自動存檔失敗無畫面提示 → 未改（需新 UI），根因已關；Codex b17cee36 F2/F3 → 撤回 route 降限；Codex e9767b8d F1（無 2D context 回原超限圖）＋446179bf F1（canvas 超裝置上限 `toDataURL`→`data:,` 被當合格）同函式連報 2 次 → 不變量：只回「≤ 上限且為 `data:image/`」的結果，否則 throw（繁中訊息）；`data:,` 視為尚未放得下、繼續縮；短輸入仍原樣返回（呼叫端也傳一般圖片網址）。瀏覽器實測：模擬 >2000px 回 `data:,` → 縮到 1729px WebP；一般網址不變；放不下 → throw。
+
+**[剩餘／待決定（High）]** 同類：middleware 後 request body 上限 >10 MiB 者超過即無聲截斷：`studio/{generate,inpaint,genfill,remove-bg,mockup,fabric-print}`、`tarot/generate`、`content/image`、`designs`、`presets`、`image/process`（各 12M 字元）、`studio/generate` 參考圖合計 24M、`video/upload-asset` 45 MB（formData）、`designs` sourceFile 20 MB（PSD 原檔，Codex b17cee36 F1）；前端 11.5M 目標：`my-designs.js:7`、`ai-fill.js:18`、`bg-remove.js:9`。（`publish` 60 MB、`tarot/batch/.../image` 25 MB 是伺服器端下載上限，不屬此類。）治本二選一需操作者：(a) nginx 先擋未登入的大 body、只在上傳路由開大，再調高 `middlewareClientMaxBodySize`；(b) 大檔改瀏覽器直傳 R2（presigned），JSON 只帶 key。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio/__tests__/image-upload-limit.test.ts (green equal, red 12 MiB) + 40 files 454 passed + npx tsc --noEmit + browser uploadableDataUrl 19.8M->5.07M chars + ssh prod log/psql media_assets | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/2n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=uploadableDataUrl | hits=17
 ## 2026-11-15（續17）— 塔羅 FLUX 2 Max「replicate_poll_502」：Replicate 跑完也收費，我們卻因一次 502 放棄；狀態查詢改為暫時錯誤就再查
 
 **根因**：Replicate 18:20–18:25 間歇 502（Cloudflare `replicate.com | 502: Bad gateway`，prod log `lobster-next-admin` 10:25:40Z 起）。我們的狀態查詢（冪等 GET）一遇非 2xx 就結束：`lib/tarot/image-gen.ts` `pollPrediction`、`lib/tarot/video-motion-gen.ts`、`lib/studio/replicate-run.ts`、`lib/studio/upscaler.ts` 同寫法。Replicate `/v1/predictions` 顯示 flux-2-max 10:20:20Z（27.3s）、10:21:28Z（20.5s）皆 succeeded＝已收費、操作者沒拿到圖。Ideogram 3 筆是 create（POST）502，Replicate 無對應 prediction＝未收費，18:26 重試成功。

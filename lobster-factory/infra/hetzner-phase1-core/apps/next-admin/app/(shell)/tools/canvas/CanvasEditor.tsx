@@ -33,6 +33,7 @@ import { posterizeDataUrl } from "@/lib/studio/posterize";
 import { OUTPAINT_PRESETS, OUTPAINT_LABELS, type OutpaintPreset } from "@/lib/studio/outpaint-presets";
 import { EDGE_MASK_STYLES, applyEdgeMask, buildMaskSvg, type EdgeMaskId } from "@/lib/studio/edge-mask";
 import { fitDisplayScale, convertUnit } from "@/lib/studio/canvas-fit";
+import { uploadableDataUrl } from "@/lib/studio/image-upload-limit";
 
 // Edge-mask chip previews (asset → PNG maskUrl; procedural → tiny SVG). Computed once at import.
 const EDGE_PREVIEWS = EDGE_MASK_STYLES.map((s) => ({
@@ -193,29 +194,6 @@ function readDesignMeta(raw: unknown): DesignMeta | null {
     bgColor: typeof m.bgColor === "string" && /^#[0-9a-f]{6}$/i.test(m.bgColor) ? m.bgColor : undefined,
     transparent: typeof m.transparent === "boolean" ? m.transparent : undefined,
   };
-}
-
-// app/api/tools/designs/route.ts MAX_IMAGE_CHARS = 12_000_000 → shrink the data URL under it (WebP, then fewer
-// pixels) instead of letting the save fail with 413 (Codex 32bc17ad F1, same class as vector-editor.html).
-const UPLOAD_MAX_CHARS = 11_500_000;
-async function uploadableDataUrl(url: string): Promise<string> {
-  if (url.length <= UPLOAD_MAX_CHARS) return url;
-  const img = new Image();
-  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("decode failed")); img.src = url; });
-  const oc = document.createElement("canvas");
-  const g = oc.getContext("2d");
-  if (!g) return url;
-  let sc = 1;
-  let out = url;
-  while (out.length > UPLOAD_MAX_CHARS && sc > 0.05) {
-    oc.width = Math.max(1, Math.round(img.width * sc));
-    oc.height = Math.max(1, Math.round(img.height * sc));
-    g.clearRect(0, 0, oc.width, oc.height);
-    g.drawImage(img, 0, 0, oc.width, oc.height);
-    out = oc.toDataURL("image/webp", 0.92);
-    sc *= 0.85;
-  }
-  return out;
 }
 
 function triggerDownload(href: string, filename: string, revoke = false) {

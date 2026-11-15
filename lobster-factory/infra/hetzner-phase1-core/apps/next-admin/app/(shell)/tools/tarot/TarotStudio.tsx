@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { roleHeader } from "@/lib/ops-role";
+import { uploadableDataUrl } from "@/lib/studio/image-upload-limit";
 import ColorGradePanel, { useColorGrade } from "@/components/tools/ColorGradePanel";
 import OutputTrackBar from "@/components/tools/OutputTrackBar";
 import GradedPreview from "@/components/tools/GradedPreview";
@@ -811,12 +812,19 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
   // POST one image to the gallery; resolves true on a 2xx, false on any failure (never throws).
   // Shared by the fire-and-forget saveToGallery and the modal "存無框圖" button (which awaits
   // the boolean to show saving / saved / failed feedback).
-  function postDesign(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string; batchJobId?: string; cardIndex?: number }): Promise<boolean> {
+  // A raw model output can be larger than the route takes (Ideogram, 2026-11-15): shrink to fit, never drop it.
+  async function postDesign(image: string, source: string, extra?: { cardName?: string; prompt?: string; model?: string; batchJobId?: string; cardIndex?: number }): Promise<boolean> {
+    let fitted: string;
+    try {
+      fitted = await uploadableDataUrl(image);
+    } catch {
+      return false;
+    }
     return fetch("/api/tools/designs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        image,
+        image: fitted,
         source,
         prompt: extra?.prompt ?? null,
         modelName: extra?.model ?? lockedModel,
