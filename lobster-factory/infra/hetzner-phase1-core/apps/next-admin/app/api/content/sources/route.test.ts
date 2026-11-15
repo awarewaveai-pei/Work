@@ -31,6 +31,12 @@ describe("content sources for a customer", () => {
   it("reads the shared list", async () => {
     expect((await GET(new Request(at, { headers: client }))).status).toBe(200);
   });
+  it("lists the built-in sources from the registry, not a hand-written list", async () => {
+    const { builtins } = await (await GET(new Request(at, { headers: staff }))).json() as { builtins: Array<{ id: string }> };
+    const { byKind } = await import("@/lib/content/blocks/registry");
+    expect(builtins.map((b) => b.id)).toEqual(byKind("search").map((b) => b.id));
+    expect(builtins.map((b) => b.id)).toContain("search/reddit");
+  });
   it("may not add a source", async () => {
     expect((await add(client)).status).toBe(403);
     expect(db.writes).toEqual([]);

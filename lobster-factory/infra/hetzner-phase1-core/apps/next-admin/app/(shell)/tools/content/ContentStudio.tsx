@@ -463,6 +463,9 @@ export interface ContentVideoApi {
   embed(body: { postId: number; siteId?: string; videoUrl: string }): Promise<{ ok: boolean; error?: string }>;
 }
 
+// Region names for the source lists (the region <select> names the same seven).
+const GEO_NAME_ZH: Record<string, string> = { TW: "台灣", HK: "香港", SG: "新加坡", US: "美國", GB: "英國", JP: "日本", AU: "澳洲" };
+
 export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   const { canUse, why } = usePaidFeatures();
   const searchParams = useSearchParams();
@@ -537,7 +540,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   // Trending keywords panel
   const [showTrending,    setShowTrending]    = useState(false);
   const [trendGeo,        setTrendGeo]        = useState("TW");
-  const [trendingItems,   setTrendingItems]   = useState<Array<{ title: string; traffic: string; relatedQueries: string[]; source?: string }>>([]);
+  const [trendingItems,   setTrendingItems]   = useState<Array<{ title: string; traffic: string; category?: string; relatedQueries: string[]; source?: string }>>([]);
   const [trendLoading,    setTrendLoading]    = useState(false);
   const [suggestResults,  setSuggestResults]  = useState<string[]>([]);
   const [questionResults, setQuestionResults] = useState<string[]>([]);
@@ -545,6 +548,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
 
   // Operator-managed trending sources (migration 0042 / /api/content/sources)
   const [trendSources,    setTrendSources]    = useState<Array<{ id: string; label: string; url: string; geos: string[] | "*"; enabled: boolean }>>([]);
+  const [builtinSources,  setBuiltinSources]  = useState<Array<{ id: string; title: string; icon: string; geos: string[] | "*" }>>([]);
   const [sourcesLoading,  setSourcesLoading]  = useState(false);
   const [sourcesError,    setSourcesError]    = useState("");
   const [newSourceLabel,  setNewSourceLabel]  = useState("");
@@ -963,7 +967,8 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
     setSourcesLoading(true); setSourcesError("");
     try {
       const res  = await fetch("/api/content/sources");
-      const json = await res.json() as { ok: boolean; sources?: typeof trendSources; error?: string };
+      const json = await res.json() as { ok: boolean; sources?: typeof trendSources; builtins?: typeof builtinSources; error?: string };
+      if (json.builtins) setBuiltinSources(json.builtins); // sent even when the custom list cannot be read
       if (json.ok && json.sources) setTrendSources(json.sources);
       else setSourcesError(json.error ?? "讀取失敗");
     } catch { setSourcesError("網路錯誤，請重試"); }
@@ -1010,7 +1015,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
 
   // Load sources when the management subtab opens.
   useEffect(() => {
-    if (showTrending && trendTab === "sources") void loadSources();
+    if (showTrending && (trendTab === "sources" || (trendTab === "trending" && builtinSources.length === 0))) void loadSources();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showTrending, trendTab]);
 
@@ -2038,7 +2043,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
                       <button onClick={() => pickTrendKeyword(item.title)}
                         style={{ padding: "5px 10px", background: "none", border: "none", cursor: "pointer",
                           fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", fontWeight: 500 }}
-                        title={`點擊使用此關鍵字${item.relatedQueries.length > 0 ? "；相關：" + item.relatedQueries.slice(0, 3).join("、") : ""}`}>
+                        title={`點擊使用此關鍵字${item.category ? "；分類／出處：" + item.category : ""}${item.relatedQueries.length > 0 ? "；相關：" + item.relatedQueries.slice(0, 3).join("、") : ""}`}>
                         {item.title}
                       </button>
                       {item.traffic && (
@@ -2053,7 +2058,11 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             )}
             {trendTab === "trending" && trendingItems.length === 0 && !trendLoading && (
               <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                點擊「搜尋」載入這個地區今日的熱搜（內建新聞、社群與搜尋趨勢來源{onDoor ? "" : "，加上你在「⚙️ 管理來源」新增的 RSS"}）
+                點擊「搜尋」載入這個地區今日的熱搜。
+                {builtinSources.length > 0 && (
+                  <> 這個地區的來源：{builtinSources.filter(b => b.geos === "*" || b.geos.includes(trendGeo)).map(b => `${b.icon} ${b.title}`).join(" · ")}
+                    {trendSources.some(s => s.enabled && (s.geos === "*" || s.geos.includes(trendGeo))) ? `，加上自訂：${trendSources.filter(s => s.enabled && (s.geos === "*" || s.geos.includes(trendGeo))).map(s => s.label).join("、")}` : ""}。</>
+                )}
               </div>
             )}
 
@@ -2098,8 +2107,9 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             {!onDoor && trendTab === "sources" && (
               <div>
                 <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "10px", lineHeight: 1.6 }}>
-                  內建來源：📰 Google News · 👽 Reddit · 🗣️ PTT · 🔍 Serper（不可刪）。
-                  下方可新增自訂 RSS / Atom feed（須為公開 https 網址），會跟內建來源一起出現在「今日熱搜」。
+                  內建來源（不可刪，括號內是適用地區）：
+                  {builtinSources.length === 0 ? " 讀取中…" : builtinSources.map(b => ` ${b.icon} ${b.title}（${b.geos === "*" ? "全部地區" : b.geos.map(g => GEO_NAME_ZH[g] ?? g).join("、")}）`).join(" ·")}。
+                  <br />下方可新增自訂 RSS / Atom feed（須為公開 https 網址），會跟內建來源一起出現在「今日熱搜」。
                 </div>
 
                 {/* Add form */}

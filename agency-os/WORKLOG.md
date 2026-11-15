@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-15（續15）內容工具「熱門搜尋」來源清單改由登記表產生（操作者：沒有清楚寫來源）
+
+- 根因：`ContentStudio.tsx`「管理來源」手寫「Google News · Reddit · PTT · Serper」，實際 10 個內建積木；「今日熱搜」說明先前（5b340a8a6）因同樣漂移改成不寫來源。另 Serper 項目標籤是媒體名（Sky Sports、富途牛牛），看不出是 Serper 抓的。
+- 不變量：頁面上的來源清單只來自 `byKind("search")`，不再有手寫副本。
+  - `trending-sources.ts` `builtinSearchSources()`；`GET /api/content/sources` 回 `builtins`（無 DB 的 503 也帶）
+  - 「今日熱搜」說明列出所選地區適用的來源＋已啟用自訂來源；「管理來源」列全部內建來源與適用地區（中文地名）
+  - Serper 項目 `source: "Serper 即時"`，媒體名移到 `category`，熱詞 tooltip 顯示「分類／出處」
+- 已知小影響（Codex F2）：`content_trends` hash 含 source，若當天手動重新收集，Serper 同標題會以新標籤再存一筆；只影響切換當天的手動重收，不做資料改寫。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit && npx vitest run app/api/content lib/content/__tests__/trending-social.test.ts lib/content/__tests__/trending-feed-fetch.test.ts lib/content/topics "app/(shell)/tools/content" | exit=0 | ms=~60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - Codex `agency-os/reports/oracle/2026-11-15-partialreview-ca816e73.md`：F1 無 Supabase 時 503 拿不到內建清單＝已修（503 也回 `builtins`，頁面不看 ok 也讀）；F2 見上，接受
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin,agency-os,scripts | grep=內建來源|builtinSearchSources|Serper 即時 | hits=11
+- 測試：`app/api/content/sources/route.test.ts` +1（`builtins` 等於登記表的 search 積木）
 ## 2026-11-15（續14）— D:\Work main 對齊 origin 後逐檔稽核：本機改動無遺失；3 個舊草稿已被 origin 重做取代，不還原
 
 - 背景：D:\Work main 曾 ahead 13／behind 124；13 個 commit 皆已以改寫副本在 origin（7 個改動行逐字相同、5 個 `git cherry` 為 `-`、1b4eb18a3 只差 3 行措辭，origin 56adb909c 較新）。16:56–16:58 由另一 session reset 到 origin/main，備份 `.git/align-keep-20261115-165651/`（manifest.json）＋ `refs/heads/backup/local-main-20261115-165651`（=01a707f3e）。

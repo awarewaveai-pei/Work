@@ -338,9 +338,10 @@ searchBlock({
         .map(item => ({
           title: item.title!,
           traffic: "",
-          category: "",
           relatedQueries: [],
-          source: item.source ?? "Serper",
+          // The chip names the source the operator manages (this block), not the publisher it found.
+          category: item.source ?? "",
+          source: "Serper 即時",
         }));
     } catch { return []; }
   },
@@ -526,6 +527,14 @@ for (const def of APIFY_TRENDS) {
 })();
 
 // ─── 對外入口（編排器 / route 用） ───────────────────────────────────────────
+
+export interface BuiltinSource { id: string; title: string; icon: string; geos: string[] | "*" }
+
+/** The built-in sources as registered (enabled ones only): the page lists these, so a new block appears there
+ *  without anyone editing a hand-written list (2026-11-15: the list named 4 of 10). */
+export function builtinSearchSources(): BuiltinSource[] {
+  return byKind("search").map((b) => ({ id: b.id, title: b.title, icon: b.icon ?? "🔗", geos: b.geos ?? "*" }));
+}
 
 /**
  * 搜尋積木的彙整入口：跑所有啟用且符合 geo 的 search block。

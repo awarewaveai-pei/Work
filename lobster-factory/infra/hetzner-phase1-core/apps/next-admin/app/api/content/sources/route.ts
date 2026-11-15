@@ -4,6 +4,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { staffOnly } from "@/lib/tenant-guard";
 import { TRENDING_GEOS } from "@/lib/content/geos";
+import { builtinSearchSources } from "@/lib/content/trending-sources";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,7 +64,7 @@ export async function GET(req: Request): Promise<Response> {
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
   const supabase = getSupabaseWriteClient();
-  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured" }, { status: 503 });
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured", builtins: builtinSearchSources() }, { status: 503 });
 
   const { data, error } = await supabase
     .from("content_sources")
@@ -72,7 +73,8 @@ export async function GET(req: Request): Promise<Response> {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   const sources = (data as SourceRow[]).map(toItem);
-  return NextResponse.json({ ok: true, sources });
+  // builtins: the registered search blocks, so the page never keeps its own copy of the list.
+  return NextResponse.json({ ok: true, sources, builtins: builtinSearchSources() });
 }
 
 // POST /api/content/sources — add a source. Body { label, url, geos?: "*" | string[] }.
