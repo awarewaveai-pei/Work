@@ -831,13 +831,9 @@ function edTrackHead(p, t) {
     overlay = edOverlay(p, t.id);
   return `<div class="editor-track-name"><span class="editor-track-label" title="${esc(label)}"><span aria-hidden="true">${icon}</span>${esc(label)}</span><span class="editor-track-tools">${edIconButton(add, "+", "track-clip:" + t.id)}${t.id === edMain(p) ? "" : edIconButton("刪除軌道", "✕", "track-delete:" + t.id)}${edIconButton((t.hidden ? "顯示" : "隱藏") + noun, t.hidden ? "◌" : "◉", "track-hidden:" + t.id, t.hidden)}${overlay ? edIconButton("上移" + noun, "▲", "track-up:" + t.id, undefined, !edOverlayNeighbour(p, t.id, 1)) + edIconButton("下移" + noun, "▼", "track-down:" + t.id, undefined, !edOverlayNeighbour(p, t.id, -1)) : ""}${t.kind !== "text" ? edIconButton(t.muted ? "取消靜音" : "靜音軌道", t.muted ? "∅" : "♪", "track-muted:" + t.id, t.muted) : ""}${t.kind === "audio" ? edIconButton(t.normalize ? "取消均衡" : "均衡", "≋", "track-normalize:" + t.id, t.normalize) : ""}</span></div>`;
 }
-// Media made by backend/media-store.cjs keep thumb.jpg and waveform.json beside the original; assets saved before
-// those fields existed still find them from the /media/<sha256>/ url.
+// thumb.jpg / waveform.json beside a stored file: one rule, shared with the 素材卡 (shared/assets-ui.js).
 function edMediaFile(a, name) {
-  const field = name === "thumb.jpg" ? a?.thumbUrl : a?.waveformUrl;
-  if (field) return field;
-  const m = /^(\/media\/[a-f0-9]{64}\/)[^/]+$/.exec(a?.url || "");
-  return m ? m[1] + name : null;
+  return VideoWorkbench.mediaFile(a, name);
 }
 function edClipHtml(p, c, picked, stale = new Map()) {
   const name = c.text || c.asset?.name || "片段",
