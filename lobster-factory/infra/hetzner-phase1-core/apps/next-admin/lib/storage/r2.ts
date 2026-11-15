@@ -26,6 +26,11 @@ export interface R2PutError {
   error: string;
 }
 
+/** The designs bucket name (REST helpers here and the S3 client in r2-s3.ts address the same bucket). */
+export function designsBucket(): string {
+  return process.env.R2_DESIGNS_BUCKET ?? DEFAULT_DESIGNS_BUCKET;
+}
+
 function getR2Config(): { apiToken: string; accountId: string; bucket: string; publicBase: string } | null {
   const apiToken = process.env.R2_API_TOKEN;
   const accountId = process.env.R2_ACCOUNT_ID;
@@ -33,7 +38,7 @@ function getR2Config(): { apiToken: string; accountId: string; bucket: string; p
   return {
     apiToken,
     accountId,
-    bucket: process.env.R2_DESIGNS_BUCKET ?? DEFAULT_DESIGNS_BUCKET,
+    bucket: designsBucket(),
     publicBase: (process.env.R2_DESIGNS_PUBLIC_BASE || DEFAULT_PUBLIC_BASE).replace(/\/+$/, ""),
   };
 }
