@@ -6,6 +6,8 @@
 - C1（S3 token＋env）、C2（bucket CORS／lifecycle）為 High，待操作者 go；TASKS「🎨 Image Output Pipeline」下加子項。
 - Fable 複檢（操作者「再檢查一次」）→ 計畫 v2：① 否決替代路「上傳路由排除 middleware matcher」——`tenant-guard.ts:37,153` 無 header 即 fail-open staff 跨組織、`ops-role.ts:37` 讀請求 `x-ops-simulated-role`、nginx 不剝 `x-ops-*`；② 刪 HMAC token＋新 secret：授權＝presigned URL＋key 路徑帶 org（`uploads/pending/<org>/`）；③ C5 原版「state 存原圖 Blob」會把 78×9 MB 塞進 React state（`toGalleryArt` 存在的理由）→ 改成一出圖就 PUT 到 pending、state 只留 key；批次卡原圖已在 R2（`batch/[jobId]/image/[index]/route.ts:3-12`）→ 伺服器端 CopyObject，不經瀏覽器；④ 正式 key 用 S3 CopyObject，不再從 app 上傳第二次；⑤ C6 明定刪除清單（base64 `image` 輸入、`image-upload-limit.ts`、`toGalleryArt`）。
 - v2 Codex 98183ab1 F1–F3 皆驗實併入 → v3：F1 presigned PUT 到期前可重用 → 「驗 pending 再複製」有競態 → 改先 CopyObject 到正式 key、從正式 key 驗；F2 `staffHosts()`／`productHost()` 回裸主機名，CORS 要 `https://`；F3 批次卡載入是「同源路由取原圖→套調色→無框圖」（`TarotStudio.tsx:1159-1164`），`fromAsset` 複製伺服器原圖會與使用者所見不同 → 刪 `fromAsset`，點擊時重走同一段，全程一條路。
+- 派工：C3+C4 → session designs-upload-api（Opus）；C2 → r2-bucket-config（Sonnet，只到 dry-run）；C5/C6 等 C3 API 上 main 再開。
+- C1 金鑰決定（操作者「你決定」）：憑證檔 §6.2 有兩組 S3 配對，一組 Admin 帳號全域（可建刪 bucket，同帳號有 `lobster-backup` 備份桶）、一組限 `new-lobster-video-staging`；容器現有 `R2_API_TOKEN`＝§6.2 第 809 行 REST token（雜湊比對），簽不了 presigned URL。→ 新建只限 `lobster-designs`、Object R/W 的 S3 配對；Admin 配對不上伺服器。只有操作者能在 Cloudflare 建，金鑰不經對話。
 - REALTEST_WAIVED: DOC_ONLY -- 只寫計畫文件與 TASKS 子項，無程式改動
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PLAN-designs-direct-upload | hits=6
