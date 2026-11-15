@@ -56,6 +56,7 @@ vi.mock("@/lib/content/video/editorial-rights-persist", () => ({
 }));
 import { createHash } from "node:crypto";
 import { POST } from "./route";
+import { DELIVERY_RATIOS } from "@/lib/content/video/platform-ratio";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(16, 1)]);
@@ -126,7 +127,9 @@ describe("POST /api/internal/video/workbench/assets", () => {
 
   it("records a deliverable ratio in metadata and refuses any other value", async () => {
     const meta = (m: object) => ({ "x-vw-meta": Buffer.from(JSON.stringify(m)).toString("base64url") });
-    expect((await post({ ...auth, ...meta({ ratio: "1x1" }) })).status).toBe(400);
+    // 21x9 is not deliverable; 1x1 became deliverable in 949a4a0f0 (DELIVERY_RATIOS is the one list, not this test)
+    expect(DELIVERY_RATIOS).not.toContain("21x9");
+    expect((await post({ ...auth, ...meta({ ratio: "21x9" }) })).status).toBe(400);
     expect((await post({ ...auth, ...meta({ ratio: "16:9" }) })).status).toBe(400);
     expect(state.inserts).toEqual([]);
     expect((await post({ ...auth, ...meta({ ratio: "9x16" }) })).status).toBe(201);
