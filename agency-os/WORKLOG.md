@@ -1,4 +1,32 @@
 # Worklog
+## 2026-11-15（續3）— 成片交付包 VD.1–VD.10：封面從匯出接到送審頁、社群、YouTube/IG、WordPress；文案免費預設＋NT$；字幕檔
+
+**根因**：系統沒有「封面」；社群清單縮圖用影片第一格，而成片多半黑畫面開頭（2026-11-14 操作者看到整排黑方塊）。規格 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-deliverable-pack-spec-20261114.md`（§4b 實作紀錄）。
+
+**[已修改]**
+- VD.1 76b03ff24：工作台匯出產生 3 張免費封面（`video-workbench/backend/cover.cjs`：黑白格剔除、對比排序 best-first、≤2 MB、標題用 ASS）；封面不決定、不延後成片（min(120 s, deadline−5 s)、取消優先）。
+- VD.2 dee6e6c03：封面登記 media_assets（`coverOf`/`coverKind`）；選中規則只在 `next-admin/lib/content/video/cover.ts`（最新 chosenAt → 最早登記的 auto → 最舊；有界查詢）；影片列不寫；欠主系統的（release text／封面）由伺服器自己退避重送＋重啟重排。
+- VD.3+VD.9 8950056a8：送審頁看／換／上傳封面（`/api/video/cover`，先驗權限與長度、sharp 真解碼、權利每張重勾）；勾頻道預設帶標題＋腳本第一行（免費），AI 改寫按鈕 NT$（cost-model syndicate × TWD_RATE）。
+- VD.4 5179a469f（與 VD.10 同一 commit）：工作台「AI 設計封面」按鈕（image-edit fill 列，NT$ 來自 /capabilities），AI 不寫字；已完成的供應商執行不論成功／失敗／取消／重啟都記一次用量，欠用量的任務不被歷史上限裁掉。
+- VD.5+6+7 4e179f144：migration 0163（`social_media.cover_media_id`＋`cover_kind`，DB 保證封面是同組織圖片；down 兩份）**未套用正式 DB**；社群草稿帶封面與 alt；YouTube settings.thumbnail、IG cover_url、FB 不帶；清單／行事曆／媒體庫縮圖用封面。
+- VD.8 c3dfaa8ec：WordPress 嵌入有封面時用 core/video 區塊帶 poster（只用同組織、仍核准、正是這支影片的 Release 的封面）。
+- VD.10 5179a469f：字幕軌（只取字幕片段）存 SRT＋VTT 到 R2 `video/subtitles/<org>/<sha>`（不在孤兒清掃範圍），送審頁下載連結；Postiz 不上傳字幕，平台手動。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/gate.cjs (video-workbench; incl. cover, cover-ai, cover-ai-api) | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/fc3-engine-render.cjs && node tests/p6-main-system.cjs | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/video lib/social app/(shell)/tools/social app/(shell)/tools/video app/api/video app/api/internal/video (555 passed) | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest -q packages/db/tests/test_0163_social_media_cover.py (Postgres 15.8 docker, 4 passed) | exit=0 | ms=12000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/39m/0n
+  - external oracle = Codex CLI, 21 rounds（7 批各 3 輪，artifacts agency-os/reports/oracle/2026-11-14/15-partialreview-*）；第 3 輪後的修正以突變證據（拔掉守衛 → 指名測試變紅 → 還原變綠）代替第 4 輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=coverOf|cover_media_id|captionFiles | hits=29
+
+**已知風險／未做**
+- 既有資料遺失 bug（非 VD 造成，已回報監工，未修）：影片庫刪工作台影片時 `next-admin/lib/storage/r2.ts:344` 把 `video/workbench/<org>/` 整個刪掉；該修正也要一併清 `video/subtitles/<org>/<sha>.*`。
+- 單支影片下載＋上傳 Postiz 最長可近 300 s 代理逾時（既有）；封面只在同請求剩餘時間夠才做。
+- YouTube 帳號未驗證設不了縮圖（影片照傳）；FB 不支援自訂縮圖（Postiz）；字幕需手動上傳。
+
+**避免再發生**：封面規則單一來源 `cover.ts coversOf`；部署順序 0163 migration 先於 next-admin（`dispatch-store.ts` 以 FK 名 `social_media_cover_fk` 嵌入）。
 ## 2026-11-15（續2）Replicate 成品網址清單＋每一跳轉址都檢查；局部編輯器只列照中文的模型、Klein 預設、指令由伺服器組
 
 - 起因：局部編輯器 5 模型實測（指令「把框內的天空改成滿天星星的夜空」）發現 FLUX 2 Klein 的成品放在 Replicate 的 R2 網址，我們只認 replicate.delivery → 工作失敗、使用者沒扣款、Replicate 卻照收。操作者 2026-11-14：「Klein 可以用就用吧，把可以用的都按照價錢順序列出，而且要說明其優缺」。
