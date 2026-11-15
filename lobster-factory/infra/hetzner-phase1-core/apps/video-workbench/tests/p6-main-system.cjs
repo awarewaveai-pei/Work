@@ -257,7 +257,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     }
 
     // 6a2. Invariant: the page offers 送審與投遞 exactly when the main system can place the video. Every registered video
-    // (render or AI-generated) carries its job's ratio from the one shared reader (jobRatio); 1:1 and an unknown ratio are
+    // (render or AI-generated) carries its job's ratio from the one shared reader (jobRatio); 2:1 and an unknown ratio are
     // neither recorded nor offered (no 16:9 default).
     {
       const sent = [];
@@ -271,12 +271,14 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       const { deliveryRatios } = require("../backend/delivery-ratios.cjs");
       const { ratioOfAsset } = await import(pathToFileURL(path.join(appDir, "lib/content/video/platform-ratio.ts")).href);
       const vm = require("node:vm");
-      const ctx = { VideoWorkbench: { request: async () => deliveryRatios(["16:9", "9:16", "4:5", "1:1", "4:3"]), loadCapabilities: async () => ({ mainSystem: { organizationId: ORG } }) }, document: {}, URLSearchParams };
+      const ctx = { VideoWorkbench: { request: async () => deliveryRatios(["16:9", "9:16", "4:5", "1:1", "4:3", "2:1"]), loadCapabilities: async () => ({ mainSystem: { organizationId: ORG } }) }, document: {}, URLSearchParams };
       vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), ctx);
       const cases = [
         ["ai_generated", { settings: { ratio: "9:16" } }, {}, "9x16"],                               // 生成影片 9:16
         ["ai_generated", { operation: "breakout", settings: { ratio: "9:16" } }, { ratio: "16:9" }, "16x9"], // the file's own ratio wins
-        ["ai_generated", { settings: { ratio: "1:1" } }, {}, undefined],
+        ["ai_generated", { settings: { ratio: "1:1" } }, {}, "1x1"],
+        ["render", { settings: { ratio: "4:3" } }, {}, "4x3"],
+        ["ai_generated", { operation: "breakout", settings: { ratio: "9:16" } }, { ratio: "2:1" }, undefined], // measured odd file
         ["render", { settings: { project: { ratio: "4:5" } } }, {}, "4x5"],
         ["render", { settings: {} }, {}, undefined],
       ];
@@ -363,11 +365,11 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     // 6c. 送審與投遞 links to next-admin's /release for the registered asset; an undeliverable ratio gets no link.
     {
       const vm = require("node:vm");
-      const ratios = { "16:9": { deliverable: true }, "1:1": { deliverable: false, note: "此比例尚不能投遞" } };
+      const ratios = { "16:9": { deliverable: true }, "2:1": { deliverable: false, note: "此比例尚不能投遞" } };
       const ctx = { VideoWorkbench: { request: async () => ({ ratios }), loadCapabilities: async () => ({ mainSystem: { organizationId: ORG } }) }, document: {}, URLSearchParams };
       vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), ctx);
       const job = (ratio) => ({ result: { assetId: "a" }, input: { settings: { ratio } } });
-      await assert.rejects(ctx.VideoWorkbench.deliveryUrl(job("1:1")), /尚不能投遞/);
+      await assert.rejects(ctx.VideoWorkbench.deliveryUrl(job("2:1")), /尚不能投遞/);
       assert.equal(await ctx.VideoWorkbench.deliveryUrl(job("16:9")), "/release?organizationId=" + ORG + "&candidateAssetId=a");
       assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /window\.open\(/, "彈窗在 await 後會被瀏覽器擋掉，用連結");
     }
@@ -545,11 +547,11 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.equal(lj.result?.ledger, "local_mode", "本機模式的完成任務明確標示不登記（6g 不變量）");
     local.close();
 
-    // 8. D6: 1:1 / 4:3 delivery = 「此比例尚不能投遞」.
+    // 8. D6: 1:1 and 4:3 are deliverable; any other ratio = 「此比例尚不能投遞」.
     const { deliveryRatios } = require("../backend/delivery-ratios.cjs");
-    const ratios = (await deliveryRatios(["16:9", "1:1", "4:3"])).ratios;
-    assert.equal(ratios["16:9"].deliverable, true);
-    for (const r of ["1:1", "4:3"]) assert.deepEqual([ratios[r].deliverable, ratios[r].note], [false, "此比例尚不能投遞"]);
+    const ratios = (await deliveryRatios(["16:9", "1:1", "4:3", "2:1"])).ratios;
+    for (const r of ["16:9", "1:1", "4:3"]) assert.equal(ratios[r].deliverable, true, r);
+    assert.deepEqual([ratios["2:1"].deliverable, ratios["2:1"].note], [false, "此比例尚不能投遞"]);
     assert.match(fs.readFileSync(path.join(__dirname, "../scripts/editor-export-dialog.js"), "utf8"), /delivery\?\.note \|\| "此比例尚不能投遞"/);
 
     // 8b. Container mode: config.js says http; the file on disk stays local. Costs come from next-admin cost-model.ts.

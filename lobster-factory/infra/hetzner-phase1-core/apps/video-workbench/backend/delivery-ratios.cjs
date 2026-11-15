@@ -1,7 +1,7 @@
 // Card P2: which platforms a finished project fits, read from the main system's RATIO_PREFERENCE / ratioFor
 // (imported, never copied; no second preference table here). The only translation is the ratio spelling
-// "16:9" (workbench) <-> "16x9" (main system). P6 D6: 1:1 and 4:3 have no main-system key; delivery is refused
-// for them until card D-R widens the contract.
+// "16:9" (workbench) <-> "16x9" (main system). Deliverable = 16:9, 9:16, 4:5, 1:1, 4:3 (platform-ratio.ts
+// DELIVERY_RATIOS); any other ratio (e.g. a measured 2:1 file) is refused.
 const path = require("node:path"),
   { pathToFileURL } = require("node:url");
 const contractFile = path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/content/video/platform-ratio.ts");

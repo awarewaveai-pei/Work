@@ -158,7 +158,7 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
     const size = fs.statSync(file).size;
     // Invariant: every registered video (render, AI-generated or imported) carries its job's ratio (shared/jobs-view.js jobRatio,
     // "16:9" -> "16x9"), never parsed from a file name later: the release panel places a video only by metadata.ratio.
-    // Deliverability comes from the main system's own list (delivery-ratios.cjs); an undeliverable ratio (1:1) is simply not recorded.
+    // Deliverability comes from the main system's own list (delivery-ratios.cjs); an undeliverable ratio (e.g. 2:1) is simply not recorded.
     if (mime.startsWith("video/") && typeof ratio === "string") {
       const fit = (await require("./delivery-ratios.cjs").deliveryRatios([ratio])).ratios[ratio];
       if (fit?.deliverable) meta.ratio = fit.key;

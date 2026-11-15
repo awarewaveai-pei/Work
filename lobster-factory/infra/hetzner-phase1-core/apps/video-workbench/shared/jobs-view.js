@@ -5,7 +5,7 @@
   const jobRatio = (job) => job?.result?.ratio || job?.input?.settings?.ratio || job?.input?.settings?.project?.ratio || null;
   if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio });
   // P6.6 送審與投遞: a finished video registered in the main system is released and delivered on next-admin's /release page
-  // (same origin; it owns QA, release, social and WordPress drafts). Only 16:9 / 9:16 / 4:5 can be delivered (D6, /delivery-ratios).
+  // (same origin; it owns QA, release, social and WordPress drafts). Only 16:9 / 9:16 / 4:5 / 1:1 / 4:3 can be delivered (D6, /delivery-ratios).
   let delivery;
   const caps = async () => VideoWorkbench.capabilities || (await VideoWorkbench.loadCapabilities());
   // The page opens through a real link (href resolved before the click), never window.open after an await: browsers
