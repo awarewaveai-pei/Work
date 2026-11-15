@@ -37,6 +37,7 @@ build.sh 機械檢查（任一不過即 FATAL，不出產物）：補丁 `git ap
 
 | 檔 | 做什麼 |
 |---|---|
+| `no-artcraft-marks.patch` | （BRAND.2，2026-11-15）同上授權：拿掉 Discord 按鈕（About）、起始畫面左欄 Website／Discord、Help 選單 Join the ArtCraft Discord／PhotoCraft Website／ArtCraft Website（`engine/src/shell_commands.rs`、`links.rs`）；About 只留 GitHub；教學連結改指 GitHub。翻譯表由 `debrand.py` 刪（185 列）；`build.sh` 另拿掉上游 `README.md`（package.sh 會複製，內含 ArtCraft／Discord）；最後 `craft_brand_check` 擋產物 |
 | `web-host-api.patch` | 只動 `apps/photocraft-web/Cargo.toml`（加 `craft-web-api`、`craft-web-host`、`serde_json`）與 `apps/photocraft-web/src/web.rs`：`window.photocraft`（`PageApi`，走 desktop 控制伺服器同一條 `with_control` 通道；60 s＝`control::REPLY_DEADLINE` 到期時用請求的 `Dispatch::give_up()` 作廢，未執行的請求不會在分頁回前景後又跑一次（上游 #3662，與 TCP 傳輸相同）；`docInspect` 不裝：PhotoCraft 的 `document.inspect` 是引擎指令，用 `execute('document.inspect', {})`）；`?host=parent` 時 `photocraft:open` 進開檔 inbox、存檔／匯出改 `photocraft:save`（不下載）、`photocraft:dirty`、`photocraft:ready`。啟動失敗（無 WebGPU／WebGL2）時送 `photocraft:failed`，宿主不會一直等 `ready`。沒有宿主時行為與上游相同。`Cargo.lock` 不放進補丁（只多兩個套件，cargo 自己補，既有版本不動）。上游 PR 草稿：`UPSTREAM-PR.md`（未送） |
 
 升級：每次先查上游是否已內建（`gh api repos/storytold/photocraft/contents/apps/photocraft-web/src` 有 `window.photocraft`／`?host=parent` 的接線 → 刪補丁）→ 改 `PIN.json` → `build.ps1` → 下方「驗證」的 smoke → 交 C2 上線（主機 `ln -sfn <新版> current`；失敗切回上一版；保留最近 2 版）。補丁 `git apply --check` 失敗＝上游改了網頁殼 → 重排補丁，正式站不受影響。

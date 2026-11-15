@@ -31,7 +31,7 @@ TRUNK_VERSION=$(pin "['trunk']")
 REV7=${REV:0:7}
 PATCHES=$(cd "$SCRIPT_DIR" && ls -1 ./*.patch 2>/dev/null | sed 's|^\./||' | sort || true)
 # Dist dir identity covers every build input: a font, patch or pin change gets a new directory.
-INPUTS7=$( (cat "$PIN" "$CRAFT_WEB_FONTS_JSON"; for p in $PATCHES; do cat "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
+INPUTS7=$( (cat "$PIN" "$CRAFT_WEB_FONTS_JSON" "$CRAFT_WEB_BUILD_DIR/debrand.py"; for p in $PATCHES; do cat "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
 DIST_NAME="$REV7-$INPUTS7"
 
 # The Trunk upstream CI and release builds use (TRUNK_VERSION in .github/workflows/ci.yml), kept
@@ -56,6 +56,7 @@ for p in $PATCHES; do
   git -C "$SRC" apply --check "$SCRIPT_DIR/$p" || { echo "FATAL: $p no longer applies at $REV — rebase the patch (or drop it if upstream has it)" >&2; exit 1; }
   git -C "$SRC" apply "$SCRIPT_DIR/$p"
 done
+python3 "$CRAFT_WEB_BUILD_DIR/debrand.py" "$SRC" "crates/ui-egui/src/i18n/*.tsv" || exit 1
 
 # Upstream's web CI builds without CRAFT_FONTS_DIR: set, it would embed every craft-fonts face in
 # the wasm. Our fonts are served beside the app instead (fetched when first used).
@@ -121,6 +122,11 @@ done
   echo "extra fonts from scripts/craft-web-build/fonts.json (OFL-1.1 / Apache-2.0, licence beside each in fonts/)"
   echo "local patches: ${PATCHES:-none} (scripts/photocraft-pro/)"
 } >> "$STAGE/NOTICE"
+# Upstream's README (copied by package.sh copy_docs) advertises ArtCraft and its Discord; the site does not need it.
+rm -f "$STAGE/README.md"
+# ArtCraft marks, name, getartcraft and Discord must not ship in a modified build (docs/brand/LICENSE-brand.txt):
+# no-artcraft-marks.patch takes them out of the UI, debrand.py out of the catalogs; this proves it on what the site serves.
+craft_brand_check "$SRC" "$STAGE"
 ( cd "$STAGE" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c --quiet SHA256SUMS )
 # Same name rebuilt: keep the old dist until the new one is in place (a failed mv on /mnt/c, e.g.
 # a file held open by a preview server, must not leave neither).

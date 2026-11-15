@@ -1,0 +1,87 @@
+diff --git a/crates/engine/src/shell_commands.rs b/crates/engine/src/shell_commands.rs
+index 3b52c03a0..3a74c692d 100644
+--- a/crates/engine/src/shell_commands.rs
++++ b/crates/engine/src/shell_commands.rs
+@@ -90,9 +90,6 @@ pub const SHELL_COMMANDS: &[(&str, &str, &[&str], Option<&str>)] = &[
+     ("window.theme.softLight", "Soft", &["Window", "Theme", "Light Theme"], None),
+     ("window.theme.system", "Sync with system", &["Window", "Theme"], None),
+     ("edit.search", "Search…", &["Edit"], Some("Cmd+F")),
+-    ("help.discord", "Join the ArtCraft Discord…", &["Help"], None),
+-    ("help.website", "PhotoCraft Website", &["Help"], None),
+-    ("help.artcraftWebsite", "ArtCraft Website", &["Help"], None),
+     ("help.github", "PhotoCraft on GitHub", &["Help"], None),
+     ("help.reportIssue", "Report an Issue…", &["Help"], None),
+     ("help.systemInfo", "System Info…", &["Help"], None),
+diff --git a/crates/ui-egui/src/canvas/start_screen.rs b/crates/ui-egui/src/canvas/start_screen.rs
+index cbf3c5235..5bd3fe8fa 100644
+--- a/crates/ui-egui/src/canvas/start_screen.rs
++++ b/crates/ui-egui/src/canvas/start_screen.rs
+@@ -167,8 +167,6 @@ fn render_start_rail(app: &mut PhotocraftApp, ui: &mut egui::Ui, rail_w: f32) {
+ 
+     ui.add_space(8.0);
+ 
+-    render_rail_link(app, ui, rail_w, tl!("Website"), "link", crate::links::APP_PAGE);
+-    render_rail_link(app, ui, rail_w, tl!("Discord"), "message-square", crate::links::DISCORD);
+     render_rail_link(app, ui, rail_w, tl!("GitHub"), "link-2", crate::links::GITHUB);
+ }
+ 
+diff --git a/crates/ui-egui/src/dialogs.rs b/crates/ui-egui/src/dialogs.rs
+index fc0c26809..ae68a826b 100644
+--- a/crates/ui-egui/src/dialogs.rs
++++ b/crates/ui-egui/src/dialogs.rs
+@@ -794,8 +794,6 @@ fn about_tab_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, tab: &str) {
+             ui.label(crate::i18n::fmt(tl!("Version {version}"), &[("version", &photocraft_engine::build_info::long_version())]));
+             ui.add_space(12.0);
+             ui.vertical_centered(|ui| {
+-                crate::links::discord_button(app, ui, 220.0);
+-                ui.add_space(8.0);
+                 crate::links::link_row(app, ui);
+             });
+             ui.add_space(10.0);
+diff --git a/crates/ui-egui/src/links.rs b/crates/ui-egui/src/links.rs
+index dc935b3da..497694538 100644
+--- a/crates/ui-egui/src/links.rs
++++ b/crates/ui-egui/src/links.rs
+@@ -6,16 +6,14 @@ use serde_json::{Value, json};
+ 
+ use crate::PhotocraftApp;
+ 
+-pub const DISCORD: &str = "https://discord.gg/artcraft";
+-pub const ARTCRAFT_WEBSITE: &str = "https://getartcraft.com";
+-pub const APP_PAGE: &str = "https://getartcraft.com/apps/photocraft";
+-pub const TUTORIALS: &str = "https://getartcraft.com/tutorials";
++// AwareWave build: no ArtCraft name / Discord / getartcraft links (docs/brand/LICENSE-brand.txt); tutorials point at the repository.
+ pub const GITHUB: &str = "https://github.com/storytold/photocraft";
++pub const TUTORIALS: &str = GITHUB;
+ pub const ISSUES: &str = "https://github.com/storytold/photocraft/issues";
+ 
+ /// Help-menu link commands: (id, url). Labels live in `menus::UI_COMMANDS`.
+ pub const COMMANDS: &[(&str, &str)] =
+-    &[("help.discord", DISCORD), ("help.website", APP_PAGE), ("help.artcraftWebsite", ARTCRAFT_WEBSITE), ("help.github", GITHUB), ("help.reportIssue", ISSUES)];
++    &[("help.github", GITHUB), ("help.reportIssue", ISSUES)];
+ 
+ pub fn url_for(id: &str) -> Option<&'static str> {
+     COMMANDS.iter().find(|c| c.0 == id).map(|c| c.1)
+@@ -33,20 +31,11 @@ pub fn open(app: &mut PhotocraftApp, ctx: &egui::Context, url: &str) -> Value {
+     json!({"url": url})
+ }
+ 
+-/// The prominent "Join us on Discord" button.
+-pub fn discord_button(app: &mut PhotocraftApp, ui: &mut egui::Ui, min_width: f32) -> egui::Response {
+-    let r = crate::widgets::primary_button(ui, tl!("Join us on Discord"), min_width).on_hover_text(DISCORD);
+-    if r.clicked() {
+-        open(app, ui.ctx(), DISCORD);
+-    }
+-    r
+-}
+-
+-/// "PhotoCraft website · GitHub · ArtCraft" as links, centred. Clicks route through [`open`] (the
++/// The source-code link, centred. Clicks route through [`open`] (the
+ /// platform browser service) rather than `ui.hyperlink_to`, which uses the unreliable `ctx.open_url`.
+ pub fn link_row(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+     let t = crate::theme::Tokens::get(ui.ctx());
+-    let links = [(tl!("PhotoCraft website"), APP_PAGE), (tl!("GitHub"), GITHUB), (tl!("ArtCraft"), ARTCRAFT_WEBSITE)];
++    let links = [(tl!("GitHub"), GITHUB)];
+     let font = egui::FontId::proportional(12.5);
+     let sep = "  ·  ";
+     let width: f32 = links.iter().map(|(l, _)| ui.painter().layout_no_wrap((*l).into(), font.clone(), t.text).size().x).sum::<f32>()

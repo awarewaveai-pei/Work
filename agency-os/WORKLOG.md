@@ -513,6 +513,25 @@
 - ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-c0d26946 的唯一發現（換來源不重轉）已照不變量修正，並補指名測試；匯入腳本不屬於隱私／權限守衛，依規則不做突變
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=import-audio-library|\.import\.json | hits=21
 - BUGHUNT_SCOPE_NARROW: 改動只有清單資料與匯入腳本；呼叫者只有 tests/ed6-audio.cjs 和交接文件
+## 2026-11-15（續4）BRAND.2：VectorCraft／PhotoCraft 拿掉 ArtCraft 名稱與 Discord；品牌檢查收成 lib.sh 一個入口，四個 Craft 建置都呼叫
+
+- 根因：FC.5 只把名稱掃描接在 FilmCraft／EffectCraft；VectorCraft（已上線 /tools/vector-pro）與 PhotoCraft 的建置連標誌圖掃描都沒呼叫。另一個更深的洞：掃描讀磁碟上的位元組，PhotoCraft 的 app wasm 是一條 gzip 串流切成 `app/*.part-*`，壓縮後字串看不到——舊版 PhotoCraft 產物掃描只抓到 README，wasm 裡的 ArtCraft／Discord 漏掉。
+- 上游位置（file:line，checkout 4cce3363d／98bcbfab9）：
+  - VectorCraft：`crates/ui-egui/src/chrome.rs:91,113-116`（標題列 Discord 鈕）、`crates/ui-egui/src/community.rs:11-50,67-72`（Discord 鈕、ArtCraft 網站／getartcraft 連結）、`crates/engine/src/cmd/help.rs:10-30`（DISCORD_URL、WEBSITE_URL、help.discord／website／appPage）、`crates/ui-egui/src/menus/tree.rs:23,697-699`、`crates/ui-egui/src/menus/invoke.rs:152`、`crates/ui-egui/src/dialogs/about.rs:67`（Part of ArtCraft）；翻譯表 `crates/ui-egui/src/i18n/*.tsv`。`apps/vectorcraft/src/host_services.rs:485-670` 的 `ArtCraft\PhotoCraft` 是桌面版安裝路徑，不進網頁版。
+  - PhotoCraft：`crates/ui-egui/src/links.rs:9-18,37-49`（DISCORD、ARTCRAFT_WEBSITE、APP_PAGE、TUTORIALS、Discord 鈕、連結列）、`crates/engine/src/shell_commands.rs:93-95`（Help 選單）、`crates/ui-egui/src/canvas/start_screen.rs:170-171`（左欄 Website／Discord）、`crates/ui-egui/src/dialogs.rs:797`（About 的 Discord 鈕）；翻譯表；上游 `README.md`（package.sh 複製進 site）。兩個引擎都沒有把 docs/brand 圖編進程式。
+- 做了：
+  - `scripts/vectorcraft-pro/no-artcraft-marks.patch`、`scripts/photocraft-pro/no-artcraft-marks.patch`（新）：拿掉上列 UI；GitHub 原始碼連結保留；PhotoCraft 教學連結改指 GitHub。
+  - `scripts/craft-web-build/served.py`（新）：還原瀏覽器實際拿到的內容——gzip 開頭的檔解壓、`*.part-*` 依序接起來再解壓；解不開＝錯誤，不當成乾淨。`lib.sh` 的 `craft_brand_scan`、`craft_name_scan` 都改用它。
+  - `scripts/craft-web-build/lib.sh` `craft_brand_check`＝標誌圖＋名稱，唯一入口；四個 `build.sh`（filmcraft／effectcraft 原本兩行改成它；vectorcraft／photocraft 新接）都呼叫。vectorcraft／photocraft 也接上 `debrand.py`（226／185 列）並把它計入產物名稱雜湊；photocraft 建置拿掉上游 `README.md`。
+  - 新產物：VectorCraft `4cce336-cfa938d`（177 檔）、PhotoCraft `98bcbfa-28d83c6`（144 檔）。兩份 build README 補丁表更新。
+- 同時間別的 session：最近 3 天 photo-pro／vector-pro 的 commit 都在 next-admin 外框與面板（`public/editor-shared/blocks/*`、`app/api/tools/studio/*`），沒有人動 `scripts/{vector,photo}craft-pro` 或引擎 wasm；本卡不碰那些檔。
+- 部署（**沒做**，交監工）：VectorCraft → 主機 `/root/lobster-phase1/static/vector-pro/4cce336-cfa938d`、PhotoCraft → `/root/lobster-phase1/static/photo-pro/98bcbfa-28d83c6`；主機 `sha256sum -c SHA256SUMS` 後 `ln -sfn <新版> current`；nginx／compose 不用動（alias current）。回退：`ln -sfn 4cce336-7303550 current`（vector-pro）、`ln -sfn 98bcbfa-f007c95 current`（photo-pro）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=scan4.sh：craft_brand_check 對四個引擎舊產物（46763a8-b7f3040、df4cc09-4fe4255、4cce336-7303550、98bcbfa-f007c95）全部 exit 1（PhotoCraft 抓到 README.md 與 app/…part-*）；新產物（46763a8-4265c64、df4cc09-e5261e3、4cce336-cfa938d、98bcbfa-28d83c6）全部 exit 0 | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=build.ps1 vectorcraft／photocraft → debrand 226／185 列、name scan 173／139 檔、OK 4cce336-cfa938d、98bcbfa-28d83c6 | exit=0 | ms=1232000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：served.py 不接分段、不解壓 → 舊 PhotoCraft 只剩 README 命中（wasm 漏掉）→ 還原後 README＋app/…part-* 都命中 | exit=1 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面對抗自審：非 gzip 二進位不會誤解壓（wasm/otf/ttf/png 開頭都不是 1f8b）；分段依 (長度, 字尾) 排序；NOTICE 裡的補丁檔名含 artcraft 但屬例外檔；README 在 SHA256SUMS 之前拿掉，清單一致；FC/EC 只是兩行併成一個入口）
+- ORACLE_WAIVED: Codex 額度斷路器（scripts/oracle-quota.ps1：BLOCKED until 2026-11-15 16:26）；改用書面對抗自審＋上列突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=craft_brand_check | hits=8（lib.sh 定義、四個 build.sh、兩份 build README、本條）
 ## 2026-11-15（續3）Codex 免費生圖：擁有者本人的生圖改由筆電上的 Codex（ChatGPT Plus 額度）畫，NT$0；用量進 AI Costs
 
 [根因]

@@ -45,6 +45,7 @@ powershell -ExecutionPolicy Bypass -File D:\Work\scripts\vectorcraft-pro\build.p
 
 | 檔 | 做什麼 |
 |---|---|
+| `no-artcraft-marks.patch` | （BRAND.2，2026-11-15）上游 `docs/brand/LICENSE-brand.txt`：改過的版本要拿掉 ArtCraft 名稱與標誌。拿掉標題列 Discord 按鈕（`chrome.rs`、`community.rs`）、Help 選單 Join Our Discord／ArtCraft Website／VectorCraft on getartcraft.com（`menus/tree.rs`、`engine/src/cmd/help.rs`、`menus/invoke.rs`）、About 的「Part of ArtCraft」；GitHub 原始碼連結保留。翻譯表同類句子由 `scripts/craft-web-build/debrand.py` 在套完補丁後刪（226 列）；建置最後 `craft_brand_check`（標誌圖＋名稱，`lib.sh`）擋產物。上游 `cargo test` 的 links 斷言未跟著改（網頁建置不編測試） |
 | `web-fonts.patch` | `crates/text/web-fonts.txt` 加 51 行 `background \| <family> \| Regular`（`fonts.json` `webFonts[]` 全部；manifest 列由 `lib.sh` 動態追加到 craft-fonts checkout）。**startup vs background**（`crates/text/web-fonts.txt:2-4`）：startup 在 app 啟動前抓（擋首載，`apps/vectorcraft-web/src/fonts.rs:27-35`）；background 在啟動後抓（4 併發、不擋首載，`fonts.rs:38-60`）——上游**沒有**「點選才載」的真按需，background 是全部延後抓；CJK 大字型因此全走 background，首載只付 wasm |
 
 已移除（2026-11-05 晚）：`api-addfont.patch`（字型面板取消後無人呼叫，`550764e16`）、`api-settheme.patch`＋`awarewave-theme-receiver.js`＋父頁 `lib/theme/frame-theme.ts`（操作者：Craft 編輯器不套 app 主題，用自己的深色／淺色）。線上 dist `4cce336-7303550` 建於移除前，仍帶 `addFont`／`setTheme` 與接收端，但已無人呼叫；下次升級重建即消失。

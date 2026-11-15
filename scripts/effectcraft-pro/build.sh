@@ -102,9 +102,7 @@ for ps in NotoSansTC-Regular NotoSerifTC-Regular; do
 done
 # ArtCraft marks must not ship in a modified build, as files or compiled into the wasm
 # (no-artcraft-marks.patch removes the include_bytes!; this proves it, and catches a new one).
-craft_brand_scan "$SRC" "$DIST"
-# ... and the ArtCraft name / its Discord nowhere in what the site serves (docs/brand/LICENSE-brand.txt).
-craft_name_scan "$DIST"
+craft_brand_check "$SRC" "$DIST"
 
 # Assemble in a staging dir, verify, then swap in atomically: a failed build never touches the
 # existing dist, and a half-copied tree is never left under the real name.

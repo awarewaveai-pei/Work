@@ -11,7 +11,7 @@ OUT_BASE="${1:?output base dir required}"
 PIN="$SCRIPT_DIR/PIN.json"
 SRC="$HOME/awarewave/vectorcraft-src"
 FONTS="$HOME/awarewave/craft-fonts"
-PATCHES="web-fonts.patch"
+PATCHES="no-artcraft-marks.patch web-fonts.patch"
 
 [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
 for tool in cargo trunk git python3 sha256sum gzip; do
@@ -28,7 +28,7 @@ CF_REV=$(pin "['craftFontsRev']")
 REV7=${REV:0:7}
 # Dist dir identity covers EVERY build input, not just the vectorcraft rev: a font or patch
 # change with the same rev must get a new directory (C6 keeps the last 2 versions).
-INPUTS7=$(cat "$PIN" "$CRAFT_WEB_FONTS_JSON" $(for p in $PATCHES; do echo "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
+INPUTS7=$(cat "$PIN" "$CRAFT_WEB_FONTS_JSON" "$CRAFT_WEB_BUILD_DIR/debrand.py" $(for p in $PATCHES; do echo "$SCRIPT_DIR/$p"; done) | sha256sum | cut -c1-7)
 DIST_NAME="$REV7-$INPUTS7"
 
 checkout_patched "$SRC" "$REPO" "$REV"
@@ -42,6 +42,7 @@ for p in $PATCHES; do
   git -C "$SRC" apply --check "$SCRIPT_DIR/$p" || { echo "FATAL: $p no longer applies at $REV — rebase the patch" >&2; exit 1; }
   git -C "$SRC" apply "$SCRIPT_DIR/$p"
 done
+python3 "$CRAFT_WEB_BUILD_DIR/debrand.py" "$SRC" "crates/ui-egui/src/i18n/*.tsv" || exit 1
 
 export CRAFT_FONTS_DIR="$FONTS"
 ( cd "$SRC/apps/vectorcraft-web" && trunk build --release )
@@ -96,6 +97,9 @@ done
   echo "local patches: $PATCHES (scripts/vectorcraft-pro/)"
 } >> "$STAGE/NOTICE"
 find "$STAGE" \( -name '*.wasm' -o -name '*.js' -o -name '*.otf' -o -name '*.ttf' \) -exec gzip -k -9 {} \;
+# ArtCraft marks, name, getartcraft and Discord must not ship in a modified build (docs/brand/LICENSE-brand.txt):
+# no-artcraft-marks.patch takes them out of the UI, debrand.py out of the catalogs; this proves it on what the site serves.
+craft_brand_check "$SRC" "$STAGE"
 ( cd "$STAGE" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c --quiet SHA256SUMS )
 # Same name rebuilt: keep the old dist until the new one is in place (a failed mv on /mnt/c, e.g.
 # a file held open by a preview server, must not leave neither).

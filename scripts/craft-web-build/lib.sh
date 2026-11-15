@@ -74,7 +74,7 @@ EOF
 craft_brand_scan() {
   local SRC=$1; shift
   [ -d "$SRC/docs/brand" ] || { echo "FATAL: $SRC/docs/brand missing — cannot check the build for brand assets" >&2; exit 1; }
-  python3 - "$SRC/docs/brand" "$@" <<'EOF' || { echo "FATAL: the build contains ArtCraft brand assets (see HIT lines) — remove them with a patch" >&2; exit 1; }
+  CRAFT_WEB_BUILD_DIR="$CRAFT_WEB_BUILD_DIR" python3 - "$SRC/docs/brand" "$@" <<'EOF' || { echo "FATAL: the build contains ArtCraft brand assets (see HIT lines) — remove them with a patch" >&2; exit 1; }
 import os, sys
 wins = []
 for root, _, files in os.walk(sys.argv[1]):
@@ -88,19 +88,19 @@ for root, _, files in os.walk(sys.argv[1]):
                 wins.append((f, w))
 if not wins:
     sys.exit("no brand windows: docs/brand holds no mark files?")
+sys.path.insert(0, os.environ["CRAFT_WEB_BUILD_DIR"])
+from served import served, read_one  # content as the browser gets it (gzip and split parts undone)
 def targets(args):
     for a in args:
         if os.path.isdir(a):
-            for root, _, files in os.walk(a):
-                for f in files:
-                    yield os.path.join(root, f)
+            for rel, data in served(a):
+                yield os.path.join(a, rel), data
         elif os.path.isfile(a):
-            yield a
+            yield a, read_one(a)
         else:
             sys.exit("brand scan: no such file or directory: " + a)
 bad = 0
-for p in targets(sys.argv[2:]):
-    data = open(p, "rb").read()
+for p, data in targets(sys.argv[2:]):
     names = sorted({n for n, w in wins if w in data})
     if names:
         bad += 1
@@ -110,36 +110,40 @@ EOF
 }
 # craft_name_scan <dist dir>
 # Same licence, the name half: a modified build must not name ArtCraft nor send users to its community. Every file the
-# app serves (wasm, js, html, worklets) is searched, case-insensitively, for "artcraft" (getartcraft included) and
+# app serves (wasm, js, html, worklets; gzip copies and split parts as served.py rebuilds them) is searched, case-insensitively, for "artcraft" (getartcraft included) and
 # "discord"; any hit is FATAL. NOTICE, LICENSE-*, ATTRIBUTION.md and licenses/ are exempt: they keep upstream's
 # plain-text attribution ("based on FilmCraft by the ArtCraft team" is what the licence allows). The names are taken
 # out by no-artcraft-marks.patch (UI) and debrand.py (translation catalogs).
 craft_name_scan() {
-  python3 - "$1" <<'PY' || { echo "FATAL: the build still names ArtCraft/Discord (see HIT lines) — extend no-artcraft-marks.patch or debrand.py" >&2; exit 1; }
+  CRAFT_WEB_BUILD_DIR="$CRAFT_WEB_BUILD_DIR" python3 - "$1" <<'PY' || { echo "FATAL: the build still names ArtCraft/Discord (see HIT lines) — extend no-artcraft-marks.patch or debrand.py" >&2; exit 1; }
 import os, re, sys
 root = sys.argv[1]
 if not os.path.isdir(root):
     sys.exit("name scan: no such directory: " + root)
 word = re.compile(rb"artcraft|discord", re.I)
 exempt = re.compile(r"^(NOTICE|LICENSE-[A-Z]+|ATTRIBUTION\.md|SHA256SUMS|licenses/.*|\.sha256sums-sha256)$")
+sys.path.insert(0, os.environ["CRAFT_WEB_BUILD_DIR"])
+from served import served  # content as the browser gets it (gzip and split parts undone)
 bad, files = 0, 0
-for d, _, names in os.walk(root):
-    for n in names:
-        rel = os.path.relpath(os.path.join(d, n), root).replace(os.sep, "/")
-        if exempt.match(rel):
-            continue
-        files += 1
-        data = open(os.path.join(d, n), "rb").read()
-        if n.endswith(".gz"):  # a compressed copy hides its text from a byte search
-            import gzip
-            data = gzip.decompress(data)
-        hits = {m.group(0).lower() for m in word.finditer(data)}
-        if hits:
-            bad += 1
-            print("HIT", rel, sorted(h.decode() for h in hits), file=sys.stderr)
+for rel, data in served(root):
+    if exempt.match(rel):
+        continue
+    files += 1
+    hits = {m.group(0).lower() for m in word.finditer(data)}
+    if hits:
+        bad += 1
+        print("HIT", rel, sorted(h.decode() for h in hits), file=sys.stderr)
 if not files:
     sys.exit("name scan: nothing to scan in " + root)
 print(f"name scan: {files} files clean" if not bad else "", end="\n" if not bad else "")
 sys.exit(1 if bad else 0)
 PY
+}
+
+# craft_brand_check <upstream checkout> <dist dir>
+# THE brand check every Craft build calls (filmcraft, effectcraft, vectorcraft, photocraft -pro/build.sh): no ArtCraft mark
+# file (craft_brand_scan) and no ArtCraft name / getartcraft / Discord text (craft_name_scan) in what the site serves.
+craft_brand_check() {
+  craft_brand_scan "$1" "$2"
+  craft_name_scan "$2"
 }
