@@ -1676,7 +1676,7 @@ pre {
 }
 
 .onboard-regen-btn:hover {
-  background: var(--text-primary);
+  background: var(--btn-primary-bg);
   color: var(--btn-primary-text);
 }
 

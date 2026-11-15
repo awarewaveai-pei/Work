@@ -1,4 +1,28 @@
 # Worklog
+## 2026-11-15（續7）— 社群發文頂列在部分主題下全黑／看不見：背景改吃 theme 成對 token（卡 B）
+
+**根因**：`social.css:26` `.sm-topbar` 用 `background: var(--text-primary)`（文字色）當底、`color: var(--btn-primary-text)`（主按鈕上的字）當前景；兩個 token 各自為不同表面推導（`lib/theme/palette-derive.ts:139-144`、`:153`），彼此沒有對比保證。淺色主題下 text-primary 近黑、btn-primary-text 若也取黑（accent 偏亮時 `inkOn(accent)`＝黑）就變黑底黑字。同一類寫法另有 3 處。
+
+**不變量**：背景與前景必須來自「同一組成對 token」——`--topbar-bg`／`--card-bg` ↔ `--text-primary`／`--text-muted`（palette-derive 以 `inkOnAll([bg,card,subtle,hover])` 保證）；`--btn-primary-bg` ↔ `--btn-primary-text`（`inkOn(accent)`）；`--badge-red-bg` ↔ `--badge-red-text`（固定對）。絕不拿 `--text-*` 當背景。
+
+**[已修改]**（路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`）
+- `app/(shell)/tools/social/social.css`：`.sm-topbar` 改 `--topbar-bg`＋`--text-primary`＋底線 `--card-border`（與 shell `.topbar` 一致的淺色列）；`.sm-sections button` 預設 `--text-muted`、hover `--text-primary`＋`--bg-hover`、選中 `--btn-primary-bg`＋`--btn-primary-text`（不再靠 opacity 降對比）；`.sm-hb` 邊框 `--btn-secondary-border`、字 `--text-primary`；`.sm-hright .sm-ibtn` 字 `--text-primary`、hover `--bg-hover`；`.sm-bell b` 改 `--badge-red-bg`/`--badge-red-text`＋`--red` 框；`.sm-day.sm-today .sm-dh` 底改 `--btn-primary-bg`。
+- 整類掃描（`background: var(--text-*` ）另 2 處同類一併修：`app/(shell)/tools/social/(sections)/reporting/reporting.css:17` `.rp-logo`、`app/globals.css:1679` `.onboard-regen-btn:hover`，底都改 `--btn-primary-bg`（字本來就是 `--btn-primary-text`）。修後殘餘 4 處皆已查、合理不動：`social.css:241` 無文字遮罩（.58 透明）；`public/editor-shared/blocks/edge-mask.js:33` 無文字預覽方塊；`video-workbench/styles/editor-pane-subtitles.css:19` 是 `--text-primary` 底配 `--card-bg` 字（text/card 保證對的反向，對比相同）；`video-workbench/styles/tools.css:820` 2px 線條。
+- `lobster-factory/docs/social/mockups/social-manager-mock.html`：header／`.top`／`.hb`／`.ibtn`／`.bell b`／`.day.today .dh` 同步同一組 token；並以 `sync-app-theme.py` 重生 app-theme 區塊（該區塊在我動手前就已落後 globals.css，與本卡無關）。
+- 未碰 `lib/social/store.ts`、`lib/social/dispatch-store.ts`；未加 hex；未部署（next-admin 每日 03:00 自動部署 main，或由派工者統一部署）。
+
+**[驗證結果]**
+- 實測：用真的 `globals.css`＋`social.css`＋與 `TopBar.tsx` 同 class 的標記，對 `PALETTES` 37 組色盤 × 24 種角色分配 = 888 種主題（token 由 `paletteToTokens` 實算）逐一在 Chromium 套用，量 computed color 對 background 的對比：舊 CSS 2920 項 <3:1（最差 1.00:1，p01 等）；新 CSS 0 項 <3:1，最差 4.51:1（選中分頁／今日格，p19）、其餘最差 ≥4.81:1（標題 5.86、未選分頁 4.81、品牌鈕 5.86、齒輪 5.86、鈴鐺徽章 6.80）。截圖（舊／新）`…/scratchpad/th/shots/social-topbar-OLD-500-p25.png`／`social-topbar-500-p25.png`：舊＝黑底黑字，新＝淺青列字清楚。腳本 `scratchpad/th/verify.cjs`、`run.mts`（臨時，未入庫）。
+- 未做：登入後的 `npm run dev` 真頁面（需登入＋DB，未跑）；上述驗證是真 CSS＋同 class 標記的 harness，非整頁。
+- `python lobster-factory/docs/social/mockups/check-social-mocks.py`：`1 page(s), 0 finding(s)`（本機 worktree 無 `tests/node_modules`，用 `NODE_PATH` 指向主 checkout 的 playwright）；`sync-app-theme.py --check`：up to date（exit 0）。
+- 只動 CSS／HTML 樣稿，未跑 `tsc`、未跑全套測試（任務邊界）。
+- 備註：本機 `claude/social-topbar-theme-9a8927` 分支起點含 13 個尚未推上 origin 的無關 commit，`git rebase origin/main` 衝突（影音工作台檔）；已中止，改在 detached HEAD 從 `origin/main`（bff3dac0c）工作，未動該 13 個 commit。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=NODE_PATH=…/tests/node_modules node verify2.cjs (888 theme variants, real globals.css+social.css, old vs new) | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=background: var(--text-primary) | hits=4
+
+**[剩餘風險]** `--btn-primary-bg` 與 `--accent` 在使用者手動編輯主題時可能被個別改色（palette 衍生時兩者相同）；頂列選中態採 `--btn-primary-bg`/`--btn-primary-text` 這對，與 `.sm-app button.sm-on`（用 `--accent`）有微小不一致，若將來兩 token 分家應一併統一。**[rollback]** `git revert` 本 commit（純 CSS／樣稿，無資料）。
 ## 2026-11-15（續6）— R2DEL：刪一支工作台影片會清空整個組織的工作台 R2 檔案（正式環境資料遺失風險）已修 7678690f4
 
 **根因**：`next-admin/lib/storage/r2.ts` `deleteVideoObjects` 用 `/^video\/(.+)\/[^/]+\.mp4$/` 取資料夾；工作台 key `video/workbench/<org>/<sha256>.mp4` 取到 `workbench/<org>`，於是整個組織的工作台物件（其他影片、圖片、封面）被 list 後刪除，DB 列還在。入口三個：影片庫 `DELETE /api/video/[id]`、設計庫 `DELETE /api/tools/designs`（ai_generated 的工作台列）、未排程的 `/api/internal/video/cleanup`。

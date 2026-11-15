@@ -14,7 +14,7 @@
 .rp-page { position: relative; border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 14px; background: var(--bg-card); display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
 .rp-band { position: absolute; left: 0; right: 0; top: 0; height: 6px; }
 .rp-ph1 { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
-.rp-logo { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--text-primary); color: var(--btn-primary-text); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex: none; }
+.rp-logo { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--btn-primary-bg); color: var(--btn-primary-text); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex: none; }
 .rp-mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .rp-mini div { display: flex; flex-direction: column; }
 .rp-mini b { font-size: var(--font-size-xl); }
