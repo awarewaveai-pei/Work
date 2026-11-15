@@ -1,5 +1,5 @@
 /**
- * Original file kept next to a My Designs preview image (POST /api/tools/designs `sourceFile`): a .vectorcraft, .svg or .psd.
+ * Original file kept next to a My Designs preview image (POST /api/tools/designs `sourceUpload`): a .vectorcraft, .svg or .psd.
  * Stored as its own R2 object; the media_assets row keeps only metadata.source_key / source_name / source_bytes (no schema change).
  * The extension is a label, the bytes are checked (same rule as the image path in route.ts: a label never decides what the bucket hosts).
  */
@@ -41,12 +41,6 @@ export const SOURCE_EXTS = Object.keys(SOURCE_SNIFFERS) as readonly SourceExt[];
 /** Uploaded as this, never as image/svg+xml or text/html: no origin may run a stored file as a document. */
 export const SOURCE_CONTENT_TYPE = "application/octet-stream";
 
-export type ParsedSource =
-  | { ok: true; name: string; ext: SourceExt; buffer: Buffer }
-  | { ok: false; status: 400 | 413; error: string };
-
-const SOURCE_EXTS_TEXT = `${SOURCE_EXTS.slice(0, -1).join(", ")} or ${SOURCE_EXTS[SOURCE_EXTS.length - 1]}`;
-
 /** A file name as stored in metadata.source_name (last path segment, no control characters, <= 160) + its accepted ext. */
 export function cleanSourceName(name: unknown): { name: string; ext: SourceExt } | null {
   if (typeof name !== "string") return null;
@@ -56,26 +50,9 @@ export function cleanSourceName(name: unknown): { name: string; ext: SourceExt }
   return { name: base, ext };
 }
 
-/** The bytes really are a file of this kind (both the base64 sourceFile and the direct-upload path check with this). */
+/** The bytes really are a file of this kind (the label never decides what the bucket hosts). */
 export function sourceBytesMatch(ext: SourceExt, buffer: Buffer): boolean {
   return buffer.length > 0 && SOURCE_SNIFFERS[ext](buffer);
-}
-
-export function parseDesignSource(raw: unknown, maxBytes: number): ParsedSource {
-  const bad = (error: string, status: 400 | 413 = 400): ParsedSource => ({ ok: false, status, error });
-  if (!raw || typeof raw !== "object") return bad("source must be { name, data }");
-  const { name, data } = raw as { name?: unknown; data?: unknown };
-  if (typeof name !== "string" || typeof data !== "string" || !data) return bad("source must be { name: string, data: base64 }");
-  const clean = cleanSourceName(name);
-  if (!clean) return bad(`source file must be ${SOURCE_EXTS_TEXT}`);
-  const { ext } = clean;
-  if (data.length > Math.ceil((maxBytes * 4) / 3) + 8) return bad("source too large (20 MB limit)", 413);
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return bad("source data must be base64");
-  const buffer = Buffer.from(data, "base64");
-  if (buffer.length === 0) return bad("source is empty");
-  if (buffer.length > maxBytes) return bad("source too large (20 MB limit)", 413);
-  if (!sourceBytesMatch(ext, buffer)) return bad(`source content is not a ${ext} file`);
-  return { ok: true, name: clean.name, ext, buffer };
 }
 
 /** designs/YYYY-MM/<uuid>.png -> designs/YYYY-MM/<uuid>.<ext> (same prefix and id as the preview). */

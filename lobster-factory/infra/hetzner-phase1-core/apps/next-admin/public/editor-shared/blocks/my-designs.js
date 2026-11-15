@@ -1,20 +1,24 @@
 // Block: My Designs（存入 + 開啟 + 選用的匯入舊專案）. Save moved from public/vector-editor.html:1003-1032 (saveDesign) and :1009-1016 (uploadableDataUrl).
 // Editor-specific values (source tag, original-file name/extension, which rows belong here, labels) come from ctx.host (ctx-contract.md); nothing here names an editor.
-// API (app/api/tools/designs/route.ts): POST takes the preview as `image` (png/jpeg/webp data URL, <= 12M chars) and the original file as
-// `sourceFile:{name,data(base64)}` (<= 20 MB, content-sniffed by extension -> metadata.source_key); GET rows carry source_url + metadata.source_name.
+// API (app/api/tools/designs/route.ts, plan lobster-factory/docs/PLAN-designs-direct-upload.md): both files go straight to R2 -- POST
+// /api/tools/designs/upload-url {kind,mime|ext} -> PUT to the presigned URL -- then POST /api/tools/designs {upload:{key}, sourceUpload:{key,name}}
+// registers them (<= 64 MiB each, content-sniffed -> metadata.source_key). Same three steps as lib/studio/design-upload.ts (the editors
+// cannot import it). GET rows carry source_url + metadata.source_name.
 // 開啟: row with source_url -> ctx.openFile(blob,name); row without -> ctx.placeImage(preview). 匯入舊專案: only when ctx.importLegacy exists (the host owns that conversion).
 
-const UPLOAD_MAX_CHARS = 11500000; // route MAX_IMAGE_CHARS minus headroom
-const SOURCE_MAX_BYTES = 20 * 1024 * 1024; // route MAX_SOURCE_BYTES
-const blobToDataUrl = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
+const MAX_UPLOAD_BYTES = 64 * 1024 * 1024; // lib/studio/design-pending.ts MAX_UPLOAD_BYTES
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-/** Keep the data URL under the route limit: re-encode as WebP, then fewer pixels; null when it cannot fit (caller refuses with a message). */
-async function uploadableDataUrl(png) {
-  if (png.length <= UPLOAD_MAX_CHARS) return png;
-  const img = new Image(); await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = png; });
-  const oc = document.createElement("canvas"), g = oc.getContext("2d"); let sc = 1, url = png;
-  while (url.length > UPLOAD_MAX_CHARS && sc > 0.05) { oc.width = Math.max(1, Math.round(img.width * sc)); oc.height = Math.max(1, Math.round(img.height * sc)); g.clearRect(0, 0, oc.width, oc.height); g.drawImage(img, 0, 0, oc.width, oc.height); url = oc.toDataURL("image/webp", 0.92); sc *= 0.85; }
-  return url.length > UPLOAD_MAX_CHARS ? null : url;
+const MB = (n) => Math.round(n / 1048576);
+/** ①② one Blob to uploads/pending/ -> its key; throws a person-readable Error. */
+async function uploadToPending(blob, kind, ext) {
+  const res = await fetch("/api/tools/designs/upload-url", { method: "POST", credentials: "same-origin", headers,
+    body: JSON.stringify({ kind, mime: kind === "image" ? blob.type : undefined, ext }) });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.ok) throw new Error(j.error || "HTTP " + res.status);
+  // Content-Type is signed into the URL: exactly what the server answered.
+  const put = await fetch(j.putUrl, { method: "PUT", headers: { "Content-Type": j.contentType }, body: blob });
+  if (!put.ok) throw new Error("上傳到儲存空間失敗（HTTP " + put.status + "）");
+  return j.key;
 }
 // The R2 public host sends no CORS headers, so a browser fetch of it fails ("Failed to fetch"): same-origin proxy (app/api/tools/designs/download/route.ts, host allowlist).
 const viaProxy = (publicUrl) => "/api/tools/designs/download?url=" + encodeURIComponent(publicUrl);
@@ -22,19 +26,19 @@ const headers = { "Content-Type": "application/json", "x-ops-simulated-role": "o
 /**
  * 存入 My Designs＝預覽 PNG＋可編輯原檔（ctx.saveAs）。面板的「存入」與 dock 的「傳回」退路（editor-shared/dock.js，C8.1）共用這一個。
  * png：已匯出的預覽（傳回時已有，不再匯出一次）；沒給就以 150 ppi 匯出。回 { ok: true, previewOnly? } 或 { ok: false, message }（給人看的原因）。
- * opts.previewOnlyIfTooBig：原檔超過 20MB 時不拒絕，改只存預覽圖（傳回的退路用：圖一定要落地一處）→ previewOnly: true。
+ * opts.previewOnlyIfTooBig：原檔超過 64MB 時不拒絕，改只存預覽圖（傳回的退路用：圖一定要落地一處）→ previewOnly: true。
  */
 export async function saveToMyDesigns(ctx, png, opts = {}) {
   const host = ctx.host;
   try {
     const [preview, file] = await Promise.all([png ? Promise.resolve(png) : ctx.exportArtboard({ format: "png", ppi: 150 }), ctx.saveAs()]);
-    const tooBig = file.size > SOURCE_MAX_BYTES;
-    if (tooBig && !opts.previewOnlyIfTooBig) return { ok: false, message: "⚠️ 原檔超過 20MB 上限（" + Math.round(file.size / 1048576) + " MB），無法存入。請精簡內嵌圖片後再存。" };
-    const image = await uploadableDataUrl(await blobToDataUrl(preview));
-    if (!image) return { ok: false, message: "⚠️ 預覽圖太大（超過約 9MB 上限），請縮小畫板再存。" };
-    const sourceFile = tooBig ? undefined : { name: host.sourceName, data: (await blobToDataUrl(file)).split(",")[1] };
+    const tooBig = file.size > MAX_UPLOAD_BYTES;
+    if (tooBig && !opts.previewOnlyIfTooBig) return { ok: false, message: "⚠️ 原檔超過 64MB 上限（" + MB(file.size) + " MB），無法存入。請精簡內嵌圖片後再存。" };
+    if (preview.size > MAX_UPLOAD_BYTES) return { ok: false, message: "⚠️ 預覽圖超過 64MB 上限（" + MB(preview.size) + " MB），請縮小畫板再存。" };
+    const [key, sourceKey] = await Promise.all([uploadToPending(preview, "image"), tooBig ? Promise.resolve(null) : uploadToPending(file, "source", host.sourceExt)]);
     const res = await fetch("/api/tools/designs", { method: "POST", credentials: "same-origin", headers,
-      body: JSON.stringify({ image, sourceFile, prompt: host.saveTag.prompt, modelName: host.saveTag.modelName, source: host.saveTag.source }) });
+      body: JSON.stringify({ upload: { key }, sourceUpload: sourceKey ? { key: sourceKey, name: host.sourceName } : undefined,
+        prompt: host.saveTag.prompt, modelName: host.saveTag.modelName, source: host.saveTag.source }) });
     const out = await res.json().catch(() => ({ ok: false, error: "HTTP " + res.status }));
     return out.ok ? (tooBig ? { ok: true, previewOnly: true } : { ok: true }) : { ok: false, message: "⚠️ 儲存失敗：" + (out.error || ("HTTP " + res.status)) };
   } catch (err) {

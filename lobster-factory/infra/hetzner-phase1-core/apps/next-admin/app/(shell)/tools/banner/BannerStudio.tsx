@@ -11,6 +11,7 @@ import { resolveStylePrompt } from "../tarot/cards";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref } from "@/app/DoorContext";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
+import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 
 // ---------------------------------------------------------------------------
 // Size presets & constants
@@ -1288,18 +1289,13 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     setS((prev) => ({ ...prev, saving: true, error: null }));
     try {
       const png = await exportToPng(s);
-      const res = await fetch("/api/tools/designs", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body:    JSON.stringify({
-          image:     png,
-          source:    "banner",
-          prompt:    s.headline || (s.bgMode === "ai" ? effectiveBgPrompt : undefined) || undefined,
-          modelName: s.bgMode === "ai" ? s.aiBgModel : undefined,
-          subject:   s.preset,
-        }),
+      const res = await saveDesign(await urlToBlob(png), {
+        source:    "banner",
+        prompt:    s.headline || (s.bgMode === "ai" ? effectiveBgPrompt : undefined) || undefined,
+        modelName: s.bgMode === "ai" ? s.aiBgModel : undefined,
+        subject:   s.preset,
       });
-      if (!res.ok) throw new Error(`save_failed_${res.status}`);
+      if (!res.ok) throw new Error((res as { ok: false; error: string }).error);
       setS((prev) => ({ ...prev, saving: false, saved: true }));
     } catch (err) {
       setS((prev) => ({ ...prev, saving: false, error: String(err) }));

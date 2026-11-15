@@ -40,6 +40,7 @@ import { AI_TEXT_MODEL_GROUPS, AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai
 import { EVENT_ALL_COUNTRIES_FILTER, EVENT_COUNTRY_FILTER_GROUPS } from "@/lib/events/countries";
 import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pricing";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
+import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 
 // suffix describes the FLAT print-ready ARTWORK (not the physical product) so literal models
 // (Nano Banana / Ideogram) don't render a t-shirt/mug. The aspect ratio still tailors the
@@ -952,21 +953,15 @@ export default function StudioWorkbench() {
   const saveToDesigns = useCallback(async (model: StudioModel, image: string) => {
     setSaveStates((prev) => ({ ...prev, [model]: "saving" }));
     try {
-      const res = await fetch("/api/tools/designs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image,
-          prompt: effectivePrompt,
-          modelName: model,
-          source: "pod-studio",
-          productType: productType !== "none" ? productType : undefined,
-          theme: theme.trim() || undefined,
-          styleTags: style ? [style] : [],
-          subject: subject.trim() || undefined,
-        }),
+      const json = await saveDesign(await urlToBlob(image), {
+        prompt: effectivePrompt,
+        modelName: model,
+        source: "pod-studio",
+        productType: productType !== "none" ? productType : undefined,
+        theme: theme.trim() || undefined,
+        styleTags: style ? [style] : [],
+        subject: subject.trim() || undefined,
       });
-      const json = (await res.json()) as { ok: boolean; error?: string };
       setSaveStates((prev) => ({ ...prev, [model]: json.ok ? "saved" : "error" }));
     } catch { setSaveStates((prev) => ({ ...prev, [model]: "error" })); }
   }, [effectivePrompt, productType, theme, style, subject]);

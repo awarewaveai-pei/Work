@@ -281,7 +281,7 @@ export function postReturn(id, image, ackMs = RETURN_ACK_MS) {
 /**
  * C8.1 不變量：按「傳回」後圖一定落地一處——原分頁那一格收下（ack），或存進 My Designs。
  * 匯出整張 PNG → postReturn → 沒 ack 就 save(ctx, png, {previewOnlyIfTooBig})（= blocks/my-designs.js saveToMyDesigns，與面板同一個；
- * 原檔超過 20MB 改只存預覽）→ 存也失敗（網路／伺服器）→ PNG 下載到電腦（最後一道落地）。
+ * 原檔超過 64MB 改只存預覽）→ 存也失敗（網路／伺服器）→ PNG 下載到電腦（最後一道落地）。
  * report(msg) 顯示結果；回 "returned" | "saved" | "downloaded" | "failed"（"failed" = 連匯出都失敗，沒有圖可落地）。
  * @param {{ exportArtboard: (o: object) => Promise<Blob> }} ctx
  * @param {{ id: string, label: string }} ret
@@ -306,7 +306,7 @@ export async function sendBack(ctx, ret, report, { ackMs = RETURN_ACK_MS, save, 
       r = { ok: false, message: err?.message || String(err) };
     }
     if (r?.ok) {
-      report?.(r.previewOnly ? "原分頁已關，已存進我的設計（原檔超過 20MB，只存了預覽圖）" : "原分頁已關，已存進我的設計");
+      report?.(r.previewOnly ? "原分頁已關，已存進我的設計（原檔超過 64MB，只存了預覽圖）" : "原分頁已關，已存進我的設計");
       return "saved";
     }
     download(png, `${ret.label || "傳回"}.png`);

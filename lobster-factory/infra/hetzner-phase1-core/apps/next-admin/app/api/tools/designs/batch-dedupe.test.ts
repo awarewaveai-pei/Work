@@ -20,12 +20,16 @@ vi.mock("../../../../lib/content/r2-delete-guard", () => ({ deleteUnreferencedAs
 vi.mock("../../../../lib/studio/designs-list", () => ({ decodeCursor: vi.fn(), listDesigns: vi.fn() }));
 vi.mock("../../../../lib/storage/r2", () => ({
   isR2Configured: () => true,
-  buildDesignKey: () => "designs/x.png",
-  parseImageDataUrl: () => ({ mime: "image/png", buffer: Buffer.from("png") }),
-  putDesignObject: async (key: string) => {
-    db.puts++;
-    return { ok: true, objectKey: key, publicUrl: `https://r2.test/${key}`, byteSize: 3, checksumSha256: "x" };
-  },
+  buildDesignKey: () => "designs/2026-11/11111111-1111-4111-8111-111111111111.png",
+  getDesignsPublicBase: () => "https://r2.test",
+  sha256Hex: () => "x",
+}));
+vi.mock("../../../../lib/storage/r2-s3", () => ({ isR2S3Configured: () => true }));
+// The direct upload itself is covered by upload.test.ts; here every registered picture counts as one copy into designs/.
+vi.mock("../../../../lib/studio/design-pending", async (orig) => ({
+  ...(await orig<typeof import("../../../../lib/studio/design-pending")>()),
+  claimPendingUpload: async () => { db.puts++; return { ok: true, buffer: Buffer.from("png") }; },
+  discardPendingUpload: async () => undefined,
 }));
 vi.mock("../../../../lib/supabase-server", () => ({
   getSupabaseReadClient: () => null,
@@ -59,7 +63,8 @@ const save = (extra: Record<string, unknown>) =>
   POST(new Request("http://localhost/api/tools/designs", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ image: "data:image/png;base64,cG5n", source: "tarot", organizationId: ORG, cardName: "THE FOOL", ...extra }),
+    // each save is a new upload (a fresh pending key), as in the studio
+    body: JSON.stringify({ upload: { key: `uploads/pending/${ORG}/${crypto.randomUUID()}.png` }, source: "tarot", organizationId: ORG, cardName: "THE FOOL", ...extra }),
   }));
 
 describe("POST /api/tools/designs batch card", () => {

@@ -30,6 +30,7 @@ import { buildSemanticBase, buildUniqueFilename, extOfDataUrl } from "@/lib/stud
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
+import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 
 
 // 平拍 sends the design as a reference image: a model that takes none would ignore it, and Ideogram Character reads
@@ -507,12 +508,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     if (gen.status !== "done" || !gen.image) return;
     setSaveState("saving");
     try {
-      const res = await fetch("/api/tools/designs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: gen.image, prompt: `[mockup:${mode}:${color}] ${effectivePrompt}`, modelName: model, source: "mockup" }),
-      });
-      const json = (await res.json()) as { ok: boolean };
+      const json = await saveDesign(await urlToBlob(gen.image), { prompt: `[mockup:${mode}:${color}] ${effectivePrompt}`, modelName: model, source: "mockup" });
       setSaveState(json.ok ? "saved" : "error");
     } catch { setSaveState("error"); }
   }, [gen, mode, color, effectivePrompt, model]);

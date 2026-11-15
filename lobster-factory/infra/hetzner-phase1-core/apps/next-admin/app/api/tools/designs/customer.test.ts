@@ -11,6 +11,15 @@ vi.mock("../../../../lib/storage/r2", async (orig) => ({
   putDesignObject: async () => ({ ok: true, objectKey: "designs/x.png", publicUrl: "https://r2.example/x.png", byteSize: 10, checksumSha256: "c" }),
 }));
 vi.mock("../../../../lib/content/r2-delete-guard", () => ({ deleteUnreferencedAsset: async () => ({ ok: true }) }));
+vi.mock("../../../../lib/storage/r2-s3", () => ({ isR2S3Configured: () => true }));
+// What the browser PUT to uploads/pending/ (the copy-then-read itself is covered by upload.test.ts).
+const pending = vi.hoisted(() => ({ bytes: Buffer.alloc(0) as Buffer }));
+vi.mock("../../../../lib/studio/design-pending", async (orig) => ({
+  ...(await orig<typeof import("../../../../lib/studio/design-pending")>()),
+  claimPendingUpload: async () => ({ ok: true, buffer: pending.bytes }),
+  discardPendingUpload: async () => undefined,
+  discardUnregisteredDesignObjects: async () => undefined,
+}));
 vi.mock("../../../../lib/supabase-server", () => ({
   getSupabaseReadClient: () => null,
   getSupabaseWriteClient: () => ({
@@ -19,7 +28,7 @@ vi.mock("../../../../lib/supabase-server", () => ({
         (table === "media_assets" ? db.inserted : db.audits).push(row);
         return { select: () => ({ single: async () => ({ data: { id: "a1", object_key: "designs/x.png", byte_size: 10 }, error: null }) }), then: (ok: (v: unknown) => unknown) => ok({ error: null }) };
       },
-      select: () => { const q = { eq: () => q, single: async () => ({ data: db.asset, error: db.asset ? null : { message: "none" } }) }; return q; },
+      select: () => { const q = { eq: () => q, limit: () => q, maybeSingle: async () => ({ data: null, error: null }), single: async () => ({ data: db.asset, error: db.asset ? null : { message: "none" } }) }; return q; },
       delete: () => ({ eq: async () => { db.deleted = true; return { error: null }; } }),
     }),
   }),
@@ -30,7 +39,11 @@ const ORG = "11111111-1111-4111-8111-111111111111";
 const ME = "22222222-2222-4222-8222-222222222222";
 const STAFF_USER = "33333333-3333-4333-8333-333333333333";
 const client = { "x-ops-user-kind": "client", "x-ops-org-id": ORG, "x-ops-user-id": ME };
-const png = async () => `data:image/png;base64,${(await sharp({ create: { width: 2, height: 2, channels: 3, background: "#fff" } }).png().toBuffer()).toString("base64")}`;
+// An uploaded picture: its bytes become what the pending object holds; the body names the key (org = the requester's).
+const png = async (bytes?: Buffer, org = ORG) => {
+  pending.bytes = bytes ?? (await sharp({ create: { width: 2, height: 2, channels: 3, background: "#fff" } }).png().toBuffer());
+  return { key: `uploads/pending/${org}/55555555-5555-4555-8555-555555555555.png` };
+};
 const post = (body: object, headers: Record<string, string> = client) =>
   POST(new Request("https://tarot.aware-wave.com/api/tools/designs", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) }));
 const del = (headers: Record<string, string> = client) => DELETE(new Request("https://tarot.aware-wave.com/api/tools/designs?id=44444444-4444-4444-8444-444444444444", { method: "DELETE", headers }));
@@ -40,14 +53,14 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("designs for a customer", () => {
   it("saves under its own organization and its authenticated user, whatever the body claims", async () => {
-    const res = await post({ image: await png(), organizationId: "99999999-9999-4999-8999-999999999999", actorUserId: STAFF_USER });
+    const res = await post({ upload: await png(), organizationId: "99999999-9999-4999-8999-999999999999", actorUserId: STAFF_USER });
     expect(res.status).toBe(200);
     expect(db.inserted[0]).toMatchObject({ organization_id: ORG, created_by: ME });
     expect(db.audits[0]).toMatchObject({ actor_user_id: ME, payload: { role_source: "client" } });
   });
 
   it("refuses bytes that are not an image even when labelled as one", async () => {
-    const res = await post({ image: `data:image/png;base64,${Buffer.from("not an image at all").toString("base64")}` });
+    const res = await post({ upload: await png(Buffer.from("not an image at all")) });
     expect(res.status).toBe(400);
     expect(db.inserted).toEqual([]);
   });
@@ -63,7 +76,7 @@ describe("designs for a customer", () => {
 
   it("staff keep the advisory actor and may delete any asset of an organization", async () => {
     const staff = { "x-ops-user-kind": "staff", "x-ops-claims-role": "operator" };
-    expect((await post({ image: await png(), organizationId: ORG, actorUserId: STAFF_USER }, staff)).status).toBe(200);
+    expect((await post({ upload: await png(), organizationId: ORG, actorUserId: STAFF_USER }, staff)).status).toBe(200);
     expect(db.inserted[0]).toMatchObject({ created_by: STAFF_USER });
     db.asset = { id: "a", object_key: "designs/x.png", mime_type: "image/png", organization_id: ORG, created_by: ME, metadata: {} };
     expect((await del(staff)).status).toBe(200);

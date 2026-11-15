@@ -12,6 +12,7 @@ import { useDoorHref } from "@/app/DoorContext";
 import ImageLightbox from "./ImageLightbox";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
+import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 
 
 export default function ModelMockupPanel({ designRef, designName, photos, onOpenLibrary }: {
@@ -72,13 +73,11 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
     if (!item || item.shot.status !== "done" || item.saved === "saving" || item.saved === "saved") return;
     const mark = (saved: "saving" | "saved" | "error") => setResults((prev) => prev.map((r) => (r.photo.id === id ? { ...r, saved } : r)));
     mark("saving");
-    const res = await fetch("/api/tools/designs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: item.shot.image, prompt: `[mockup:model] ${item.photo.metadata?.preset_name ?? ""}`,
-        modelName: item.engine === "ai" ? item.model : "fabric-print", source: "mockup" }),
-    }).catch(() => null);
-    const ok = res ? ((await res.json().catch(() => ({}))) as { ok?: boolean }).ok === true : false;
+    const res = await urlToBlob(item.shot.image)
+      .then((blob) => saveDesign(blob, { prompt: `[mockup:model] ${item.photo.metadata?.preset_name ?? ""}`,
+        modelName: item.engine === "ai" ? item.model : "fabric-print", source: "mockup" }))
+      .catch(() => null);
+    const ok = res?.ok === true;
     mark(ok ? "saved" : "error");
   }
 

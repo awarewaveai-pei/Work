@@ -3,10 +3,10 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { buildDesignKey, getDesignsPublicBase, isR2Configured, parseImageDataUrl, putDesignObject, sha256Hex } from "../../../../lib/storage/r2";
+import { buildDesignKey, getDesignsPublicBase, isR2Configured, putDesignObject, sha256Hex } from "../../../../lib/storage/r2";
 import { isR2S3Configured } from "../../../../lib/storage/r2-s3";
 import { claimPendingUpload, discardPendingUpload, discardUnregisteredDesignObjects, parsePendingKey, type PendingKey } from "../../../../lib/studio/design-pending";
-import { cleanSourceName, parseDesignSource, SOURCE_CONTENT_TYPE, sourceBytesMatch, sourceKeyFor, sourceKeyFromMetadata } from "../../../../lib/studio/design-source";
+import { cleanSourceName, sourceBytesMatch, sourceKeyFor, sourceKeyFromMetadata } from "../../../../lib/studio/design-source";
 import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
 import { decodeCursor, listDesigns, type SortOrder, type TimeRange } from "../../../../lib/studio/designs-list";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../lib/tenant-guard";
@@ -14,8 +14,7 @@ import { effectiveOrgId, assertOrgAccess, OrgAccessError, resolveTenant, toOrgAc
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// Same ceiling as the tarot reference-image path (~9 MB of base64).
-const MAX_IMAGE_CHARS = 12_000_000;
+// A Printful mockup fetched by sourceUrl (server-to-server, not a request body).
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 
 // `sourceUrl` lets the client persist a Printful mockup (temporary S3 URL — note the
@@ -84,8 +83,7 @@ function isUuid(value: string): boolean {
 }
 
 interface SaveDesignBody {
-  image?: string;
-  /** Alternative to `image`: a Printful mockup CDN URL to persist into My Designs. */
+  /** Alternative to `upload`: a Printful mockup CDN URL to persist into My Designs. */
   sourceUrl?: string;
   prompt?: string;
   modelName?: string;
@@ -110,14 +108,12 @@ interface SaveDesignBody {
    *  first row instead of adding a copy (the studio saves on every 「載入批次結果」). */
   batchJobId?: string;
   cardIndex?: number;
-  /** The original file behind the preview `image`: { name: "x.vectorcraft" | "x.svg", data: base64 }, <= MAX_SOURCE_BYTES, content-sniffed
-   *  (lib/studio/design-source.ts). Stored as its own R2 object; metadata gets source_key / source_name / source_bytes.
-   *  Named sourceFile because `source` above already means the originating tool. */
-  sourceFile?: { name: string; data: string };
-  /** Direct upload (plan lobster-factory/docs/PLAN-designs-direct-upload.md): the key /api/tools/designs/upload-url handed out,
-   *  after the browser PUT the original there. Instead of `image` / `sourceUrl`. */
+  /** The picture (plan lobster-factory/docs/PLAN-designs-direct-upload.md): the key /api/tools/designs/upload-url handed out,
+   *  after the browser PUT the original bytes there. Pictures never travel in this request's body (Next's middleware cuts
+   *  bodies over 10 MiB), so there is no base64 `image` input. */
   upload?: { key?: unknown };
-  /** Same for the original file; instead of `sourceFile`. `name` = the file name shown later (defaults to design.<ext>). */
+  /** The original file behind the picture (.vectorcraft / .svg / .psd), uploaded the same way; content-sniffed
+   *  (lib/studio/design-source.ts); metadata gets source_key / source_name / source_bytes. `name` defaults to design.<ext>. */
   sourceUpload?: { key?: unknown; name?: unknown };
 }
 
@@ -163,15 +159,12 @@ export async function POST(request: Request) {
 
   const hasUpload = body.upload !== undefined && body.upload !== null;
   const hasSourceUpload = body.sourceUpload !== undefined && body.sourceUpload !== null;
-  if (hasUpload && (body.image !== undefined || body.sourceUrl !== undefined)) {
-    return NextResponse.json({ ok: false, error: "upload cannot be combined with image or sourceUrl" }, { status: 400 });
-  }
-  if (hasSourceUpload && body.sourceFile !== undefined && body.sourceFile !== null) {
-    return NextResponse.json({ ok: false, error: "sourceUpload cannot be combined with sourceFile" }, { status: 400 });
+  if (hasUpload && body.sourceUrl !== undefined) {
+    return NextResponse.json({ ok: false, error: "upload cannot be combined with sourceUrl" }, { status: 400 });
   }
 
-  // Three input modes: a direct upload (`upload`, checked once the org is known), a base64 data URL (`image`), or a
-  // Printful mockup CDN URL (`sourceUrl`). parsed stays null for `upload`: its bytes are read after the copy.
+  // Two input modes: a direct upload (`upload`, checked once the org is known) or a Printful mockup CDN URL (`sourceUrl`).
+  // parsed stays null for `upload`: its bytes are read after the copy.
   let parsed: { mime: string; buffer: Buffer } | null = null;
   if (hasUpload) {
     // checked below, after the org
@@ -186,32 +179,10 @@ export async function POST(request: Request) {
     const converted = await toWebpOptimized(fetched.buffer);
     parsed = { mime: converted.mime, buffer: converted.buffer };
   } else {
-    if (!body.image || typeof body.image !== "string") {
-      return NextResponse.json({ ok: false, error: "image (base64 data URL) or sourceUrl is required" }, { status: 400 });
-    }
-    if (body.image.length > MAX_IMAGE_CHARS) {
-      return NextResponse.json({ ok: false, error: "image too large (~9MB limit)" }, { status: 413 });
-    }
-    const p = parseImageDataUrl(body.image);
-    if (!p) {
-      return NextResponse.json(
-        { ok: false, error: "image must be a png/jpeg/webp base64 data URL" },
-        { status: 400 },
-      );
-    }
-    // The data URL prefix is only a label: the bytes must decode as an image, or the bucket hosts arbitrary files.
-    try { await sharp(p.buffer).metadata(); }
-    catch { return NextResponse.json({ ok: false, error: "image must be a png/jpeg/webp base64 data URL" }, { status: 400 }); }
-    parsed = p;
-  }
-  let sourceFile: Extract<ReturnType<typeof parseDesignSource>, { ok: true }> | null = null;
-  if (body.sourceFile !== undefined && body.sourceFile !== null) {
-    const ps = parseDesignSource(body.sourceFile, MAX_SOURCE_BYTES);
-    if (!ps.ok) {
-      const f = ps as { ok: false; status: 400 | 413; error: string };
-      return NextResponse.json({ ok: false, error: f.error }, { status: f.status });
-    }
-    sourceFile = ps;
+    return NextResponse.json(
+      { ok: false, error: "upload {key} (from /api/tools/designs/upload-url) or sourceUrl is required" },
+      { status: 400 },
+    );
   }
   let organizationId: string | null;
   try { organizationId = effectiveOrgId(request, body.organizationId ?? defaultOrganizationId()); }
@@ -287,6 +258,22 @@ export async function POST(request: Request) {
     }
     if (existing) return NextResponse.json({ ok: true, asset: existing, reused: true });
   }
+  // Registering a key is idempotent: the row is inserted and the pending object deleted before the answer goes out, so a
+  // browser that lost that answer and asks again finds the row here instead of a misleading "upload expired".
+  if (pendingImage) {
+    const { data: existing, error: findErr } = await supabase
+      .from("media_assets")
+      .select("id,object_key,object_url,mime_type,byte_size,created_at")
+      .eq("organization_id", organizationId)
+      .eq("metadata->>upload_key", pendingImage.key)
+      .limit(1)
+      .maybeSingle();
+    if (findErr) {
+      console.error("[designs] upload_key lookup failed:", findErr.message);
+      return NextResponse.json({ ok: false, error: "lookup_failed" }, { status: 500 });
+    }
+    if (existing) return NextResponse.json({ ok: true, asset: existing, reused: true });
+  }
 
   const mime = pendingImage ? pendingImage.mime : parsed!.mime;
   const objectKey = buildDesignKey(mime);
@@ -323,13 +310,7 @@ export async function POST(request: Request) {
   }
 
   let sourceMeta: Record<string, unknown> = {};
-  if (sourceFile) {
-    const sourceKey = sourceKeyFor(objectKey, sourceFile.ext);
-    written.push(sourceKey);
-    const up = await putDesignObject(sourceKey, sourceFile.buffer, SOURCE_CONTENT_TYPE);
-    if (!up.ok) return fail(502, (up as { ok: false; error: string }).error);
-    sourceMeta = { source_key: sourceKey, source_name: sourceFile.name, source_bytes: sourceFile.buffer.byteLength };
-  } else if (pendingSource) {
+  if (pendingSource) {
     const sourceKey = sourceKeyFor(objectKey, pendingSource.p.ext);
     written.push(sourceKey);
     const got = await claimPendingUpload(pendingSource.p, sourceKey);
@@ -364,6 +345,7 @@ export async function POST(request: Request) {
         subject: body.subject?.trim() || null,
         ...sourceMeta,
         ...(batchKey ? { batch_job_id: batchKey.job, card_index: batchKey.card } : {}),
+        ...(pendingImage ? { upload_key: pendingImage.key } : {}),
         actor_role: resolved.role,
         role_source: resolved.source,
         trace_id: traceId,
@@ -454,7 +436,7 @@ export async function DELETE(request: Request) {
       { status: r2Result.error === "asset_in_use" ? 409 : 502 });
   }
 
-  // The original file saved with the preview (sourceFile): same guarded delete. A failure keeps the row so a retry finishes the job
+  // The original file saved with the preview (sourceUpload): same guarded delete. A failure keeps the row so a retry finishes the job
   // (the preview delete above treats an already-gone object as ok).
   const sourceKey = sourceKeyFromMetadata((asset as Record<string, unknown>).metadata);
   if (sourceKey) {

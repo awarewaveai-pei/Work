@@ -1,17 +1,19 @@
 // design-source.ts: one extension -> sniffer table drives the accepted formats (C5.1). .psd = real ZIP with a root manifest.json.
 import { describe, expect, it } from "vitest";
 import { gzipSync } from "node:zlib";
-import { parseDesignSource, SOURCE_EXTS, sourceKeyFor, sourceKeyFromMetadata, withSourceUrls } from "../design-source";
+import { cleanSourceName, SOURCE_EXTS, sourceBytesMatch, sourceKeyFor, sourceKeyFromMetadata, withSourceUrls } from "../design-source";
 
-const MAX = 20 * 1024 * 1024;
-const b64 = (b: Buffer | string) => Buffer.from(b).toString("base64");
-const parse = (name: string, data: Buffer | string) => parseDesignSource({ name, data: b64(data) }, MAX);
+// What POST /api/tools/designs checks for a sourceUpload: the name's extension, then the bytes against it.
+const parse = (name: string, data: Buffer | string) => {
+  const c = cleanSourceName(name);
+  if (!c) return { ok: false as const, error: "bad name" };
+  return sourceBytesMatch(c.ext, Buffer.from(data)) ? { ok: true as const, name: c.name, ext: c.ext } : { ok: false as const, error: `source content is not a ${c.ext} file` };
+};
 
 describe("SOURCE_EXTS is the single list", () => {
-  it("has the three formats; the error text names exactly them", () => {
+  it("has the three formats; any other extension is refused", () => {
     expect([...SOURCE_EXTS]).toEqual([".vectorcraft", ".svg", ".psd"]);
-    const r = parse("a.exe", "x");
-    expect(r).toMatchObject({ ok: false, status: 400, error: "source file must be .vectorcraft, .svg or .psd" });
+    expect(cleanSourceName("a.exe")).toBeNull();
   });
 });
 
@@ -26,7 +28,7 @@ describe(".psd sniffer", () => {
     const badReserved = psd(); badReserved[8] = 1;
     const wrongMagic = psd(); wrongMagic.write("8BPX", 0, "latin1");
     for (const data of [wrongMagic, psd(3), psd(0), badReserved, psd(1, 20), Buffer.from("8BPS")]) {
-      expect(parse("a.psd", data)).toMatchObject({ ok: false, status: 400, error: "source content is not a .psd file" });
+      expect(parse("a.psd", data)).toMatchObject({ ok: false, error: "source content is not a .psd file" });
     }
   });
 

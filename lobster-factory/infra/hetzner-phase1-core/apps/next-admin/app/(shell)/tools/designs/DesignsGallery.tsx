@@ -14,6 +14,7 @@ import { CANVAS_STAFF_HREF, canvasTarget, openInCanvas } from "@/components/tool
 import { useDoorHref } from "@/app/DoorContext";
 import { bucketDownloadHref } from "@/lib/storage/download-href";
 import { createOriginalImageCache, type OriginalImageCache } from "@/lib/studio/original-image-cache";
+import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -610,27 +611,21 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
     setEditError(null);
     try {
       const styleLabel = editStyle ? EDGE_MASK_STYLES.find((s) => s.id === editStyle)?.label ?? editStyle : null;
-      const res = await fetch("/api/tools/designs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: editResult,
-          source: "edge-mask",
-          productType: editAsset.metadata?.product_type ?? undefined,
-          theme: editAsset.metadata?.theme ?? undefined,
-          prompt: editAsset.metadata?.prompt ?? undefined,
-          subject: editAsset.metadata?.subject ?? editAsset.metadata?.card_name ?? undefined,
-          styleTags: styleLabel ? [`邊緣｜${styleLabel}`] : undefined,
-        }),
+      const json = await saveDesign(await urlToBlob(editResult), {
+        source: "edge-mask",
+        productType: editAsset.metadata?.product_type ?? undefined,
+        theme: editAsset.metadata?.theme ?? undefined,
+        prompt: editAsset.metadata?.prompt ?? undefined,
+        subject: editAsset.metadata?.subject ?? editAsset.metadata?.card_name ?? undefined,
+        styleTags: styleLabel ? [`邊緣｜${styleLabel}`] : undefined,
       });
-      const json = (await res.json()) as { ok: boolean; asset?: { object_url?: string }; error?: string };
       if (json.ok) {
         const u = json.asset?.object_url ?? null;
         setEditSavedUrl(u);
         void load("refresh");
         return u;
       }
-      setEditError(`儲存失敗：${json.error ?? "unknown"}`);
+      setEditError(`儲存失敗：${(json as { ok: false; error: string }).error ?? "unknown"}`);
       return null;
     } catch {
       setEditError("儲存失敗（網路錯誤）");

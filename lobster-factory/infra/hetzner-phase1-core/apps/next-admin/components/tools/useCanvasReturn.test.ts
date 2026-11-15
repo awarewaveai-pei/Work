@@ -68,19 +68,25 @@ describe("編輯器 sendBack", () => {
     expect(download).toHaveBeenCalledWith(expect.any(Blob), "塔羅預覽.png");
   });
 
-  it("沒 ack 時退路要求原檔過大只存預覽（不因 20MB 上限而失敗）", async () => {
+  it("沒 ack 時退路要求原檔過大只存預覽（不因 64MB 上限而失敗）", async () => {
     const { saveToMyDesigns } = await import("../../public/editor-shared/blocks/my-designs.js");
     const posts: any[] = [];
-    vi.stubGlobal("fetch", async (_u: string, init: RequestInit) => { posts.push(JSON.parse(String(init.body))); return { ok: true, status: 200, json: async () => ({ ok: true }) }; });
-    const big = { size: 21 * 1024 * 1024 } as Blob;
+    const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+    vi.stubGlobal("fetch", async (u: string, init: RequestInit) => {
+      if (u === "/api/tools/designs/upload-url") return ok({ ok: true, key: "k", putUrl: "https://r2.put/x", contentType: "image/png" });
+      if (init.method === "PUT") return ok({});
+      posts.push(JSON.parse(String(init.body)));
+      return ok({ ok: true });
+    });
+    const big = { size: 65 * 1024 * 1024 } as Blob;
     const host = { sourceName: "design.psd", saveTag: { source: "canvas", modelName: "canvas", prompt: "canvas edit" } };
     const c = { host, saveAs: async () => big, exportArtboard: ctx.exportArtboard };
     const save = vi.fn((cc: any, png: Blob, o: any) => saveToMyDesigns(cc, png, o));
     const report = vi.fn();
     expect(await sendBack(c, { id: "gone", label: "x" }, report, { ackMs: 50, save })).toBe("saved");
-    expect(posts[0].sourceFile).toBeUndefined();
-    expect(posts[0].image).toMatch(/^data:image\/png;base64,/);
-    expect(report).toHaveBeenLastCalledWith("原分頁已關，已存進我的設計（原檔超過 20MB，只存了預覽圖）");
+    expect(posts[0].sourceUpload).toBeUndefined();
+    expect(posts[0].upload).toEqual({ key: "k" });
+    expect(report).toHaveBeenLastCalledWith("原分頁已關，已存進我的設計（原檔超過 64MB，只存了預覽圖）");
     expect(await saveToMyDesigns(c, new Blob(["p"], { type: "image/png" }))).toMatchObject({ ok: false }); // 面板照舊拒絕
   });
 

@@ -1,5 +1,5 @@
 import { AwsClient } from "aws4fetch";
-import { designsBucket, isSafeObjectKey } from "./r2";
+import { designsBucket, isSafeObjectKey, readCappedBody } from "./r2";
 
 /**
  * R2 through its S3 API (SigV4, aws4fetch) -- only for what the Cloudflare REST API in r2.ts cannot do: presigned
@@ -85,4 +85,22 @@ export async function copyObject(srcKey: string, dstKey: string): Promise<{ ok: 
   const text = await res.text().catch(() => "");
   if (!/<CopyObjectResult[\s>]/.test(text)) return { ok: false, error: "r2_copy_failed_body" };
   return { ok: true };
+}
+
+/** GET with a byte cap (r2.ts readCappedBody). Faster than the Cloudflare REST read of r2GetObject (it proxies the bytes):
+ *  measured 2026-11-15 on a 9 MB object from the laptop, S3 19 s vs REST 32 s. 404 = r2_not_found. */
+export async function getObject(key: string, opts: { maxBytes: number; timeoutMs?: number }): Promise<{ ok: true; body: Buffer } | Fail> {
+  const cfg = s3Config();
+  if (!cfg) return { ok: false, error: "r2_s3_not_configured" };
+  const url = objectUrl(cfg.endpoint, cfg.bucket, key);
+  if (!url) return { ok: false, error: "r2_bad_key" };
+  let res: Response;
+  try {
+    res = await cfg.client.fetch(url, { signal: AbortSignal.timeout(opts.timeoutMs ?? 45_000) });
+  } catch {
+    return { ok: false, error: "r2_s3_network_error" };
+  }
+  if (!res.ok) return { ok: false, error: res.status === 404 ? "r2_not_found" : `r2_get_failed_${res.status}`, status: res.status };
+  const body = await readCappedBody(res, opts.maxBytes);
+  return Buffer.isBuffer(body) ? { ok: true, body } : body;
 }

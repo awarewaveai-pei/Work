@@ -212,14 +212,21 @@ export async function r2GetObject(
   if (!res.ok) return { ok: false, error: res.status === 404 ? "r2_not_found" : `r2_get_failed_${res.status}`, status: res.status };
   const contentType = res.headers.get("content-type") ?? "application/octet-stream";
   if (!opts.maxBytes) return { ok: true, body: Buffer.from(await res.arrayBuffer()), contentType };
-  // Capped read: the declared length is checked before any byte is read, then the stream is counted (a missing or
-  // wrong Content-Length cannot make the process hold more than maxBytes).
+  const body = await readCappedBody(res, opts.maxBytes);
+  return "error" in body ? body : { ok: true, body, contentType };
+}
+
+/**
+ * Capped read of a response body: the declared length is checked before any byte is read, then the stream is counted (a
+ * missing or wrong Content-Length cannot make the process hold more than maxBytes). Shared by r2GetObject and r2-s3.ts getObject.
+ */
+export async function readCappedBody(res: Response, maxBytes: number): Promise<Buffer | R2Fail> {
   const declared = Number(res.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > opts.maxBytes) {
+  if (Number.isFinite(declared) && declared > maxBytes) {
     await res.body?.cancel().catch(() => undefined);
     return { ok: false, error: "r2_object_too_large" };
   }
-  if (!res.body) return { ok: true, body: Buffer.alloc(0), contentType };
+  if (!res.body) return Buffer.alloc(0);
   const reader = res.body.getReader();
   const chunks: Buffer[] = [];
   let total = 0;
@@ -228,7 +235,7 @@ export async function r2GetObject(
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
-      if (total > opts.maxBytes) {
+      if (total > maxBytes) {
         await reader.cancel().catch(() => undefined);
         return { ok: false, error: "r2_object_too_large" };
       }
@@ -237,7 +244,7 @@ export async function r2GetObject(
   } catch {
     return { ok: false, error: "r2_network_error" };
   }
-  return { ok: true, body: Buffer.concat(chunks, total), contentType };
+  return Buffer.concat(chunks, total);
 }
 
 /** 404 = already gone = success (idempotent). */

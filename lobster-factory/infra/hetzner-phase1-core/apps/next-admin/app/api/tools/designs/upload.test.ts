@@ -44,12 +44,6 @@ vi.mock("../../../../lib/storage/r2", async (orig) => ({
     if (st.putLost) return { ok: false, error: "r2_network_error" };
     return { ok: true, objectKey: key, publicUrl: `https://r2.test/${key}`, byteSize: body.length, checksumSha256: "x" };
   },
-  r2GetObject: async (_b: string, key: string, opts: { maxBytes?: number }) => {
-    const o = st.bucket.get(key);
-    if (!o) return { ok: false, error: "r2_not_found", status: 404 };
-    if (opts.maxBytes && o.body.length > opts.maxBytes) return { ok: false, error: "r2_object_too_large" };
-    return { ok: true, body: o.body, contentType: o.type };
-  },
   r2DeleteObject: async (_b: string, key: string) => { st.bucket.delete(key); return { ok: true }; },
   deleteDesignObject: async (key: string) => { st.bucket.delete(key); return { ok: true }; },
 }));
@@ -58,6 +52,12 @@ vi.mock("../../../../lib/storage/r2-s3", () => ({
   headObject: async (key: string) => {
     const o = st.bucket.get(key);
     return o ? { ok: true, contentLength: o.size ?? o.body.length, contentType: o.type } : { ok: false, error: "r2_not_found" };
+  },
+  getObject: async (key: string, opts: { maxBytes: number }) => {
+    const o = st.bucket.get(key);
+    if (!o) return { ok: false, error: "r2_not_found", status: 404 };
+    if (o.body.length > opts.maxBytes) return { ok: false, error: "r2_object_too_large" };
+    return { ok: true, body: o.body };
   },
   copyObject: async (src: string, dst: string) => {
     st.copies.push([src, dst]);
@@ -70,6 +70,13 @@ vi.mock("../../../../lib/supabase-server", () => ({
   getSupabaseReadClient: () => null,
   getSupabaseWriteClient: () => ({
     from: (table: string) => ({
+      // upload_key lookup (registration is idempotent): a row already inserted for that key
+      select: () => {
+        const f: Record<string, string> = {};
+        const q = { eq: (c: string, v: string) => ((f[c] = v), q), limit: () => q,
+          maybeSingle: async () => ({ data: st.rows.find((r) => (r.metadata as Record<string, unknown>)?.upload_key === f["metadata->>upload_key"]) ? { id: "a1" } : null, error: null }) };
+        return q;
+      },
       insert: (row: Record<string, unknown>) => {
         if (table === "media_assets") st.rows.push(row);
         return {
@@ -110,6 +117,16 @@ describe("POST upload:{key}", () => {
     expect(sha(formal)).not.toBe(sha(pending));
     expect(st.bucket.has(P_IMG)).toBe(false);
     expect(designsKeys()).toEqual([KEY]);
+  });
+
+  it("registering the same key again (answer lost) returns the saved row, not 'expired'", async () => {
+    st.bucket.set(P_IMG, { body: await png(1), type: "image/png" });
+    expect((await save({ upload: { key: P_IMG } })).status).toBe(200);
+    expect(st.bucket.has(P_IMG)).toBe(false);
+    const again = await save({ upload: { key: P_IMG } });
+    expect(again.status).toBe(200);
+    expect(await again.json()).toMatchObject({ ok: true, reused: true });
+    expect(st.rows).toHaveLength(1);
   });
 
   it("Content-Length over 64 MiB: refused before any copy", async () => {
@@ -167,17 +184,15 @@ describe("insert failure deletes every formal object of the request", () => {
     expect(designsKeys()).toEqual([]);
   });
 
-  it("base64 PUT stored but its answer lost: the object is removed", async () => {
+  it("Printful mockup PUT stored but its answer lost: the object is removed", async () => {
     st.putLost = true;
-    const image = `data:image/png;base64,${(await png(1)).toString("base64")}`;
-    expect((await save({ image })).status).toBe(502);
-    expect(designsKeys()).toEqual([]);
-  });
-
-  it("base64 image + sourceFile: preview and original both removed", async () => {
-    st.insertError = { message: "boom" };
-    const image = `data:image/png;base64,${(await png(1)).toString("base64")}`;
-    expect((await save({ image, sourceFile: { name: "a.psd", data: psd().toString("base64") } })).status).toBe(500);
+    const body = await png(1);
+    vi.stubGlobal("fetch", async () => new Response(new Uint8Array(body), { status: 200, headers: { "content-type": "image/png" } }));
+    try {
+      expect((await save({ sourceUrl: "https://files.cdn.printful.com/x.png" })).status).toBe(502);
+    } finally {
+      vi.unstubAllGlobals();
+    }
     expect(designsKeys()).toEqual([]);
   });
 });

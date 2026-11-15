@@ -34,6 +34,7 @@ import { OUTPAINT_PRESETS, OUTPAINT_LABELS, type OutpaintPreset } from "@/lib/st
 import { EDGE_MASK_STYLES, applyEdgeMask, buildMaskSvg, type EdgeMaskId } from "@/lib/studio/edge-mask";
 import { fitDisplayScale, convertUnit } from "@/lib/studio/canvas-fit";
 import { uploadableDataUrl } from "@/lib/studio/image-upload-limit";
+import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 
 // Edge-mask chip previews (asset → PNG maskUrl; procedural → tiny SVG). Computed once at import.
 const EDGE_PREVIEWS = EDGE_MASK_STYLES.map((s) => ({
@@ -1971,15 +1972,10 @@ export default function CanvasEditor() {
     setError(null);
     const seq = editSeqRef.current;
     try {
-      const png = await uploadableDataUrl(full);
-      const res = await fetch("/api/tools/designs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body: JSON.stringify({ image: png, prompt: "canvas edit", modelName: "canvas", source: "canvas" }),
-      });
-      const json = (await res.json()) as { ok: boolean; error?: string };
+      // The full-size export, bytes unchanged (direct upload; no shrinking to fit a request body).
+      const json = await saveDesign(await urlToBlob(full), { prompt: "canvas edit", modelName: "canvas", source: "canvas" });
       setSaveState(json.ok ? (editSeqRef.current === seq ? "saved" : "idle") : "error");
-      if (!json.ok) setError(json.error ?? "儲存失敗");
+      if (!json.ok) setError((json as { ok: false; error: string }).error || "儲存失敗");
     } catch (err) {
       setSaveState("error");
       setError(err instanceof Error ? err.message : String(err));

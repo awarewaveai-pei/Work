@@ -31,6 +31,9 @@ beforeEach(() => {
   posts = []; rows = ROWS;
   vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
     const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body, blob: async () => new Blob(["bytes"]) });
+    // Direct upload: ① upload-url hands out a key + presigned URL, ② PUT, ③ POST /api/tools/designs registers (what posts holds).
+    if (url === "/api/tools/designs/upload-url") { const b = JSON.parse(String(init!.body)); return ok({ ok: true, key: `k-${b.kind}`, putUrl: `https://r2.put/${b.kind}`, contentType: b.mime ?? "application/octet-stream" }); }
+    if (init?.method === "PUT") return ok({});
     if (init?.method === "POST") { posts.push(JSON.parse(String(init.body))); return ok({ ok: true }); }
     if (String(url).startsWith("/api/tools/designs?")) return ok({ ok: true, assets: rows, nextCursor: null });
     return ok({}); // download proxy
@@ -62,7 +65,8 @@ describe.each([
     expect(body.querySelector("#mdInfo")!.textContent).toContain(host.sourceExt);
     (body.querySelector("#saveDesign") as HTMLButtonElement).click();
     await vi.waitFor(() => expect(posts).toHaveLength(1));
-    expect(posts[0].sourceFile.name).toBe(sourceName);
+    expect(posts[0].upload).toEqual({ key: "k-image" });
+    expect(posts[0].sourceUpload).toEqual({ key: "k-source", name: sourceName });
     expect({ source: posts[0].source, modelName: posts[0].modelName, prompt: posts[0].prompt }).toEqual(tag);
   });
 

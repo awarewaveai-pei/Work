@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { deleteDesignObject, designsBucket, isSafeObjectKey, r2DeleteObject, r2GetObject } from "../storage/r2";
-import { copyObject, headObject } from "../storage/r2-s3";
+import { deleteDesignObject, designsBucket, isSafeObjectKey, r2DeleteObject } from "../storage/r2";
+import { copyObject, getObject, headObject } from "../storage/r2-s3";
 import { SOURCE_CONTENT_TYPE, SOURCE_EXTS, type SourceExt } from "./design-source";
 
 /**
@@ -90,7 +90,7 @@ export async function claimPendingUpload(
   }
   const copied = await copyObject(p.key, formalKey);
   if (!copied.ok) return { ok: false, status: 502, error: (copied as { ok: false; error: string }).error };
-  const got = await r2GetObject(designsBucket(), formalKey, { maxBytes: MAX_UPLOAD_BYTES, timeoutMs: 45_000 });
+  const got = await getObject(formalKey, { maxBytes: MAX_UPLOAD_BYTES, timeoutMs: 45_000 });
   if ("error" in got) {
     return got.error === "r2_object_too_large" ? { ok: false, status: 413, error: "upload too large (64 MiB limit)" } : { ok: false, status: 502, error: got.error };
   }
