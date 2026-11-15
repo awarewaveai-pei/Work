@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-15（續5）破框：鎖定基準改成模型自己的第 0 格，並在第 0 格不是貼文時不鎖定
+
+- 起因：Seedance 2.0 Fast 實片（操作者在破框 session 直接要求測試；中國模型，未開放）第 0 格就打開 23 格。用文字列做最佳擬合：模型第 0 格＝貼文以中心放大 1.022、上移 14、左移 8 px（誤差 15.3→5.6）；Grok、Luma 擬合結果都是 1.000、位移 0。所以原因是模型重繪，不是色域或重新編碼。
+- a20d66129：判斷主角進來、還原文字，一律以模型解碼出的第 0 格為基準，不再用我們畫的貼文圖。不選「容差內才用」或「忽略整格位移」：兩者都要多一個可調門檻，而且放大的情況仍會疊錯。
+- 63df26232 防呆：只在遮罩的文字像素上，比對模型第 0 格和我們送出的貼文（都縮到影片尺寸），每通道平均差 >60 就不鎖，交付原始影片並附說明（費用保留，走既有的不鎖定路徑）。60 怎麼來的：同一算法實測 Grok 1.1、Luma 1.8、Seedance 16.0、全黑第一格 247；這是防呆，不是要調的參數。
+- REALTEST_EVIDENCE: tool=Bash | cmd=video-workbench node tests/breakout.cjs（9，新增：貼文下移 3 px、黑畫面淡入 → 不鎖並附說明）, p6-main-system, backend, tools-lazy-load + tests/gate.cjs（origin/main f52c76fa2＋2 commits） | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機用 Seedance 實片重跑收尾（不呼叫模型）：第 0–54 格打開 0 格（之前 23–58），第 60 格起才打開（78→360）；第 30、54 格文字沒有重影；差異 16.0 < 60 | exit=0 | ms=60000
+- 突變（session 做的）：故意弄壞基準 → 紅；拿掉界線檢查 → 紅；API 不傳貼文圖 → 紅；還原 → 綠。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+  - 監工讀過兩個 commit 的設計和數據；防呆是監工要求補的（原本的 RISK「第 0 格不是貼文時會把文字鎖成那一格」）。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=frame0|firstFrame|lockMaskPixels | hits=41
+- 剩餘風險：(1) 「主角離開後文字回來」不做：4 支實片量過，沒有任何畫面規則分得出主角擋住和模型抹掉（會讓文字蓋到主角身上）。(2) Seedance 是否開中國模型例外，等操作者決定；它也會拒收有人物的照片。
+- rollback：git revert 63df26232 a20d66129。
 ## 2026-11-15（續4）實測紀錄頁：補 Luma／Grok／Seedance 的 11-15 實測（來源＝Replicate 帳單與 prediction 回應）
 
 - 起因：破框 session 回報 11-15 三個影片模型的真跑結果；這些沒寫進 WORKLOG（該 session 不能改），所以頁面的出處欄寫「Replicate 帳單畫面與各次 prediction 回應」。
