@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-15（續13）prod next-admin 加 `APIFY_API_TOKEN`（操作者 2026-11-15 同意「好，加上去」）
+
+- 原因：熱門社群來源（Dcard／X／TikTok／IG，見本日前一筆）與冷開發 IG/FB Apify 層都讀 `APIFY_API_TOKEN`；prod 容器 `printenv` exit 1，兩者一直沒開。
+- 做法：主機 `.env` 追加值（先備份 `.env.bak-apify-20261115-085836`，值從筆電 `mcp/user-env.ps1` 傳過去，未印出）；`docker-compose.yml` next-admin `environment:` 在 `YOUTUBE_API_KEY` 下加 `APIFY_API_TOKEN: ${APIFY_API_TOKEN:-}`，走 `safe-infra-patch.sh compose ... next-admin`（備份 `docker-compose.yml.bak.safe-patch-20261115-085836`，healthy PASS 15 s）。repo 對照檔同步加一行（`check-deploy-drift.ps1` 比對用）。
+- 生效：新程式（d65f41fcc）今晚 03:00 自動部署；之後下一個 UTC 日（台灣 08:00 起）第一次收集才會出現四個新來源與 Reddit 各地區。
+- rollback：主機 `cp docker-compose.yml.bak.safe-patch-20261115-085836 docker-compose.yml` 後走 safe-infra-patch；`.env` 用同名備份還原。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv APIFY_API_TOKEN | exit=0 | ms=~2000
+- REVIEW_WAIVED: NA -- 一行 env 透傳，與相鄰 SERPER/YOUTUBE 同型；safe-infra-patch 已驗 compose config + healthy
+- BUGHUNT_WAIVED: NA -- 無程式 symbol 改動
+- ORACLE_WAIVED: 無 source 檔改動（只有 compose 與 WORKLOG）
 ## 2026-11-15（續12）Codex 免費生圖：app 左下角「啟動筆電」按鈕，筆電不常駐、閒置 30 分鐘自己關
 
 [根因]
