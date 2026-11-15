@@ -1,13 +1,12 @@
 # Worklog
-## 2026-11-15（續14）— D:\Work main 對齊 origin 後，3 個未提交草稿只剩備份（非過時，待擁有者決定）
+## 2026-11-15（續14）— D:\Work main 對齊 origin 後逐檔稽核：本機改動無遺失；3 個舊草稿已被 origin 重做取代，不還原
 
 - 背景：D:\Work main 曾 ahead 13／behind 124；13 個 commit 皆已以改寫副本在 origin（7 個改動行逐字相同、5 個 `git cherry` 為 `-`、1b4eb18a3 只差 3 行措辭，origin 56adb909c 較新）。16:56–16:58 由另一 session reset 到 origin/main，備份 `.git/align-keep-20261115-165651/`（manifest.json）＋ `refs/heads/backup/local-main-20261115-165651`（=01a707f3e）。
 - C1 對齊前後逐檔比對（cats 分類 440 項）：本機改動在 origin 未改檔者全數保留（64+174+4 刪除）；`(shell)/layout.tsx` 已入 origin 366382433；12 個 video-workbench 檔的本機內容＝origin 某舊版（真過時）。
-- C2 manifest 把下列標 STALE／moved，但內容 **不在 origin**（origin 無 `edTextLook`、無 `CJK_CHAR`）＝ 11/13 未完成的影音剪輯草稿，現只在備份：
-  - `video-workbench/backend/editor-export.cjs` → `ours-23`（中文段落換思源黑體 `{\fn}`，7 行）
-  - `video-workbench/scripts/tools-editor.js` → `ours-33`（`edTextLook` 文字外觀單一函式，47 行）
-  - `video-workbench/scripts/vendor-fonts.cjs` → `moved-11`（1 行 `fetch(url)`）
-  - 取回：`cp .git/align-keep-20261115-165651/ours-33 <path>` 後與 origin 三方合併；歸 video-editor parity 線判斷要不要。
+- C2 3 個 11/13 未提交草稿（位元組不在 origin，只在備份）＝同功能的早期版，origin 已重做上線 → 不還原：
+  - `video-workbench/backend/editor-export.cjs`（`ours-23`，中文段換思源黑體 `{\fn}`）→ origin `editor-export.cjs:367-384`（f8ffef30d、6c03f533f，改以字形判斷）
+  - `video-workbench/scripts/tools-editor.js`（`ours-33`，`edTextLook`）→ origin `tools-editor.js:1648-1669`（af652bbdf：動畫、高亮、卡拉 OK clip-path）
+  - `video-workbench/scripts/vendor-fonts.cjs`（`moved-11`，無逾時 `fetch(url)`）→ origin `vendor-fonts.cjs:23`（含 `AbortSignal.timeout`）
 - C3 類別根因：D:\Work 永遠 dirty → `git pull --rebase` 無法執行；在別處 rebase 後推 `HEAD:main` 會讓本機 main 留在舊 hash。`scripts/lib/git-safe-ops.ps1:421` 的 diverged 提示「AO-CLOSE git pull --rebase」在此情境無效（未改，避免與正在處理同事的 session 衝突）。
 
 - REALTEST_WAIVED: QUERY_ONLY -- 只讀比對（git show／hash 比對 D:\Work 工作區與 origin、備份檔 grep），未改任何程式
