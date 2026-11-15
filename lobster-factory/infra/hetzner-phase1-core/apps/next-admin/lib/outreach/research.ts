@@ -14,6 +14,7 @@ import { isPlatformHost } from "./normalize";
 import { LEAD_RESEARCH_BUDGET } from "@/lib/collect/run";
 import { createBudget, createProviderCall } from "@/lib/collect";
 import type { ProviderCall } from "@/lib/collect/net/providers";
+import type { RunReport } from "@/lib/collect/types";
 import { socialResearch, socialTarget, type SocialOutcome } from "./social-research";
 import type { FoundEmail } from "./research-extract";
 
@@ -53,6 +54,22 @@ async function timeline(db: SupabaseClient, lead: ResearchLead, event_type: stri
   if (error) errors.push(`timeline ${event_type}: ${error.message}`);
 }
 
+/** The own-site crawl in one timeline field, so "read but no address" and "the site refused us" are told apart in SQL.
+ *  Counts and the first word of each reason only: the classification itself is the orchestrator's. */
+export interface CrawlSummary { fetched: number; refused: number; disallowed: number; gone: number; stopped_by: RunReport["stoppedBy"];
+  top_reason: string | null; fetch_failed: string[] }
+
+function crawlSummary(report: RunReport): CrawlSummary {
+  const tally = new Map<string, number>();
+  // reason "all_strategies_failed:Error: HTTP 403 https://…" -- the URL after the colon would make every row unique
+  for (const d of report.dirty) { const k = d.reason.split(":")[0]; tally.set(k, (tally.get(k) ?? 0) + 1); }
+  let top_reason: string | null = null;
+  for (const [k, n] of tally) if (top_reason === null || n > tally.get(top_reason)!) top_reason = k;
+  return { fetched: report.fetched, refused: report.dirty.length + report.quarantined.length, disallowed: report.disallowed.length,
+    gone: report.gone.length, stopped_by: report.stoppedBy, top_reason,
+    fetch_failed: [...new Set(report.aside.map((a) => a.reason).filter((c) => c.startsWith("fetch_failed")))].slice(0, 5) };
+}
+
 /** The website a research run may read: http(s) with a host, the scheme added when the operator typed a bare domain.
  *  A social network, link page or marketplace is not the business's own site (SPEC D20): refused. */
 export function researchUrl(website: string | null): { url: string } | { reason: "no_website" | "platform_website" } {
@@ -75,7 +92,7 @@ export async function researchLead(db: SupabaseClient, lead: ResearchLead,
   const social = socialTarget(lead.social_url) ?? ("reason" in target && target.reason === "platform_website" ? socialTarget(lead.website) : null);
   if ("reason" in target && !social) {
     const title = target.reason === "platform_website" ? "網站欄是平台頁，不是對方自己的網站，也不是能讀的 IG／FB 頁：不研究" : "沒有網站可研究";
-    await timeline(db, lead, "research_insufficient", title, { reason: target.reason, website: lead.website }, errors);
+    await timeline(db, lead, "research_insufficient", title, { reason: target.reason, website: lead.website, crawl: null }, errors);
     return { ...base, status: target.reason };
   }
   let url = "url" in target ? target.url : null;
@@ -124,11 +141,13 @@ export async function researchLead(db: SupabaseClient, lead: ResearchLead,
   const sink = createOutreachResearchSink({ db, lead: { ...lead, website: url }, grant: opts.grant,
     deadline: Date.now() + LEAD_RESEARCH_BUDGET.ms + EXTRACTION_GRACE_MS, admit });
   let sinkErrors: string[] = [];
+  let crawl: CrawlSummary | null = null;
   if (url) {
     try {
       const r = await runLeadResearch({ website: url, sink, tenantRef, runKey: opts.runKey, grantContext: opts.grantContext, log: opts.log });
       sinkErrors = r.sink.errors ?? [];
       base.written = r.sink.written;
+      crawl = r.report ? crawlSummary(r.report) : null;
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
       await timeline(db, lead, "research_failed", "研究失敗", { url, error: error.slice(0, 300) }, errors);
@@ -201,6 +220,6 @@ export async function researchLead(db: SupabaseClient, lead: ResearchLead,
   await timeline(db, lead, status === "done" ? "research_done" : "research_insufficient",
     status === "done" ? `研究完成：${base.written} 條新證據` : base.pending ? `有 ${base.pending} 條證據等人核准` : "網站上找不到可用的事實",
     { url, written: base.written, approved: base.approved, evidence: base.evidence, pending: base.pending, late: sink.late, stale: sink.stale, revived: sink.revived,
-      errors: sinkErrors.slice(0, 5) }, errors);
+      errors: sinkErrors.slice(0, 5), crawl }, errors);
   return { ...base, status };
 }

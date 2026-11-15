@@ -15,13 +15,14 @@ const m = vi.hoisted(() => ({
   evidenceUpdates: [] as unknown[],
   existing: [] as Array<Record<string, unknown>>,
   invalid: [] as string[],
+  report: null as unknown,
 }));
 vi.mock("@/lib/ai/cheap-json", () => ({ generateCheapJsonText: m.cheap }));
 vi.mock("@/lib/collect/run", () => ({
   LEAD_RESEARCH_BUDGET: { fetches: 15, ms: 60_000 },
   runLeadResearch: async (o: { sink: { run: (d: unknown[], c: unknown) => Promise<{ written: number; errors?: string[] }> } }) => {
     const sink = await o.sink.run(m.crawlDocs, { tenantRef: "t", runId: "r", log: () => {} });
-    return { report: {}, sink };
+    return { report: m.report, sink };
   },
 }));
 vi.mock("../verify-email", async (orig) => ({ ...(await orig<typeof import("../verify-email")>()), verifyEmails: async (_db: unknown, _o: unknown, e: string[]) => {
@@ -52,7 +53,7 @@ const lead = (extra: Record<string, unknown> = {}) => ({ id: "lead-1", organizat
 const run = (l = lead()) => researchLead(db, l, { grant: {} as never, grantContext: {} as never, runKey: "k" });
 
 beforeEach(() => { m.upserts.length = 0; m.leadUpdates.length = 0; m.timeline.length = 0; m.verified.length = 0; m.crawlDocs = [];
-  m.evidenceUpdates.length = 0; m.existing = []; m.invalid = []; m.cheap.mockClear(); });
+  m.evidenceUpdates.length = 0; m.existing = []; m.invalid = []; m.report = null; m.cheap.mockClear(); });
 
 describe("verifiedClaims", () => {
   it("keeps a claim only when its excerpt is on the page (whitespace folded), at most three", () => {
@@ -216,6 +217,18 @@ describe("researchLead", () => {
     const o = await run(lead({ email: "owner@tree.example" }));
     expect(o.emailFound).toBeNull();
     expect(m.leadUpdates).toEqual([]);
+  });
+
+  it("the closing timeline row carries the crawl summary: pages read, refusals by first reason, the HTTP codes", async () => {
+    m.report = { fetched: 1, outOfScope: 0, unhandled: [], gone: [], quarantined: [], disallowed: [], offEntity: [], retried: 0, stoppedBy: "frontier_empty",
+      channels: [], dirty: [{ uri: "https://tree.example/a", reason: "all_strategies_failed:Error: HTTP 403 x" },
+        { uri: "https://tree.example/b", reason: "all_strategies_failed:Error: HTTP 403 x" }, { uri: "https://tree.example/c", reason: "too_short" }],
+      aside: [{ url: "https://tree.example/a", title: "", reason: "fetch_failed:http_403" }] };
+    await run();
+    const last = m.timeline.at(-1) as unknown as { event_type: string; metadata: { crawl: unknown } };
+    expect(last.event_type).toBe("research_insufficient");
+    expect(last.metadata.crawl).toEqual({ fetched: 1, refused: 3, disallowed: 0, gone: 0, stopped_by: "frontier_empty", top_reason: "all_strategies_failed",
+      fetch_failed: ["fetch_failed:http_403"] });
   });
 
   it("no website = no crawl, and the reason is on the timeline", async () => {

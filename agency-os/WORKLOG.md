@@ -500,6 +500,39 @@
 - ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-c0d26946 的唯一發現（換來源不重轉）已照不變量修正，並補指名測試；匯入腳本不屬於隱私／權限守衛，依規則不做突變
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=import-audio-library|\.import\.json | hits=21
 - BUGHUNT_SCOPE_NARROW: 改動只有清單資料與匯入腳本；呼叫者只有 tests/ed6-audio.cjs 和交接文件
+## 2026-11-15（續2）冷開發研究收尾 timeline 帶抓取摘要 `metadata.crawl`（關掉續1 的量測盲點）
+
+- 根因：`lib/outreach/research.ts` 收尾事件只記 sink 結果，`runLeadResearch` 回的 `RunReport` 被丟掉；315 筆 `research_insufficient` 分不出「讀到沒 email」與「站擋我們」，續1 只能外部 curl 161 站量。
+- 做法（Opus 工人實作，主 session 驗收）：
+  - `research.ts` 新增 `crawlSummary(report)` → `{fetched, refused(dirty+quarantined), disallowed, gone, stopped_by, top_reason(dirty 最常見 reason 冒號前段), fetch_failed(aside 的 fetch_failed* 去重 ≤5)}`；分類沿用 orchestrator，不重寫。
+  - `research_done`／`research_insufficient` 收尾列帶 `crawl`；沒抓自家站（無網站提早結束 `research.ts:95`、或 report 缺）為 `crawl: null`。
+  - 讀端只有 `pipeline-store.ts:96` 用 `event_type` 計數，不讀 metadata，不受影響。
+- 往後查比例：`select metadata->'crawl'->>'top_reason', count(*) from co_timeline_events where event_type='research_insufficient' group by 1;`
+- 生效：推 main → 當晚 03:00 自動部署；之後跑的研究才有欄位，舊列不回填。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit && npx vitest run lib/outreach/__tests__/research.test.ts | exit=0 | ms=~40000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex oracle `agency-os/reports/oracle/2026-11-15-partialreview-fdcfce65.md`：提早結束那筆缺 `crawl` 鍵 → 已補 `crawl: null`（`research.ts:95`），重跑 tsc／29 測試綠
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app | grep=research_insufficient|research_done | hits=3
+- BUGHUNT_SCOPE_NARROW: 事件名只存在 next-admin；agency-os／scripts 無程式讀 co_timeline_events
+- 測試：research.test.ts 28 → 29（只補卡片點名的一個）
+## 2026-11-15（續1）量測：Scrapling 這類「繞 403／Cloudflare」工具對我們的價值 ≈ 3% 的冷開發 lead，不值一個新容器
+
+- 問題：操作者問 Scrapling（Python 爬蟲框架，102k stars）能不能用。它唯一我們沒有的能力是隱形瀏覽器過 Cloudflare 驗證頁；要不要加取決於「蒐集梯子因 403／驗證頁而失敗」的比例，之前沒人量過。
+- 資料源 1（蒐集梯子 `lib/collect`，供 /ops/collect、COS 研究、HCI30）：prod `collection_runs`／`collection_issues` 全期（2026-09-12 起）15 runs、479 頁讀成、227 筆 issue；近 30 天 0 run。403 共 27 筆，全是學術付費牆（wiley／tandfonline／mdpi／researchgate／annualreviews…），PDF 不支援 12 筆，`blocked_page`（防火牆 200 擋頁）0 筆。9 月 9 筆 `*_no_heavier_tier` 是當時 renderer 未設；現 `RENDERER_SHARED_SECRET` 64 字元、`lobster-renderer` healthy。
+- 資料源 2（冷開發 `outreach/research.ts`）：`co_timeline_events` 2026-11-04～11-11 研究 449 筆 lead，done 134（30%）、insufficient 329（73%）；315 筆 metadata `errors=[]、written=0`，**看不出是讀不到還是讀到但沒 email**（timeline 不記 RunReport，也不寫 `collection_runs`）→ 只能外部探測。
+- 探測：161 個 distinct 網址，同一支 `probe.sh`（curl -L、Chrome UA、15 s）分別從筆電與 ks-aw-01 跑；以主機結果為準：
+  - 99（61%）HTTP 200 正文可讀 → 頁面有字、沒可用 email：內容問題，爬蟲換什麼都一樣
+  - 40（25%）0 bytes（DNS 失敗／拒連／逾時）→ 死站
+  - 10（6%）403：8 筆 Cloudflare 標記（含 104.com.tw 求職頁，非自家站）、2 筆其他 WAF；另 429 一筆、JS 空殼 2 筆
+  - 7 平台頁（wix／facebook／udn blog／cyberbiz／simplybook）、2 筆 404
+  - 筆電視角 403 只有 3 筆：資料中心 IP 確實多被擋，但量級仍小
+- 結論：Scrapling 能解的那一類 = 13/161 insufficient = **13/449 ≈ 3% 的 lead**；蒐集梯子 0 筆 Cloudflare。不加 Python sidecar；若日後要補，位置是 `extract-provider.ts` 第二層第三個 vendor，HCI30 target 在 `match()` 排除（合規邊界）。
+- 量測盲點（建議開卡）：`research_insufficient` 的 metadata 應帶 RunReport 摘要（fetched、dirty 首因、aside code），下次這個比例直接 SQL 可得，不必外部探測。
+- 連帶觀察：蒐集梯子近 30 天 0 run → /ops/collect 與 COS 研究目前沒人在用。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ks-aw-01 docker exec supabase-db psql（collection_runs／collection_issues／co_timeline_events 四組查詢）＋ ssh bash -s probe.sh × 161 URL | exit=0 | ms=~240000
+- REVIEW_WAIVED: NA -- 只讀查詢與探測，無程式改動
+- BUGHUNT_WAIVED: NA -- 無 symbol 改動
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-14（續1）擴圖第三顆鈕（GPT-Image-2.6）＋生成填色改放新圖層；修掉三個會扣錢但無效的路徑
 
 [根因]
