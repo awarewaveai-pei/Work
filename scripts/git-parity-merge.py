@@ -57,6 +57,17 @@ def main():
         return 0 if ok else 1
 
     lf = lambda b: b.replace(b"\r\n", b"\n")
+
+    def place(tmp, path):
+        # Rename into place; a target on another volume (D:\Work\.claude is a junction into C:) cannot be renamed to,
+        # so it is copied instead -- still never a truncating open() on the worktree file itself.
+        try:
+            os.replace(tmp, path)
+        except OSError:
+            # not shutil.copyfile: its CopyFile2 fast path fails with EINVAL on this junction path (2026-11-15)
+            with open(tmp, "rb") as src, open(path, "wb") as dst:
+                dst.write(src.read())
+            os.remove(tmp)
     up = names("diff", "--name-only", "-z", "HEAD", a.target)
     tracked = names("diff", "--name-only", "-z", "HEAD") | names("diff", "--name-only", "-z", "--cached", "HEAD")
     untracked = names("ls-files", "-z", "--others", "--exclude-standard")
@@ -188,7 +199,7 @@ def main():
             with open(os.path.join(side, f"base-{i}"), "wb") as t:   # rename into place: a failed write never truncates
                 t.write(base)
             wrote[path] = base
-            os.replace(os.path.join(side, f"base-{i}"), path)
+            place(os.path.join(side, f"base-{i}"), path)
         if renorm:                                   # paths on stdin: 168 of them would overrun a Windows command line
             for p, path, ours in renorm:
                 still_ours(p, path, ours)
@@ -210,7 +221,7 @@ def main():
             # Written in the backup directory, then renamed: a failed write never truncates a worktree file.
             with open(os.path.join(side, f"merged-{i}"), "wb") as t:
                 t.write(merged)
-            os.replace(os.path.join(side, f"merged-{i}"), path)
+            place(os.path.join(side, f"merged-{i}"), path)
             written.append(p)
     except Exception as e:
         return done(False, f"fast-forwarded; local edits carried into {written or 'no file'}, then writing failed ({e})",
