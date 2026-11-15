@@ -50,14 +50,14 @@
 - 測試：`video-workbench/tests/cover.cjs`（ffmpeg 合成黑頭＋彩條影片；全黑影片退回中點；無標題不疊字），加進 gate。
 
 **VD.2 登記封面到 media_assets**（video-workbench main-system＋next-admin assets 路由）
-- 改：`video-workbench/backend/api.cjs:110-140` settleOnce 在影片登記後登記候選（`vwJobId = cover:<jobId>:<i>`，失敗記 `coverError`、下次 GET 重試，比照 releaseText）；`video-workbench/backend/main-system.cjs:141-188` ingest 帶 `coverOf/coverKind`；`next-admin/app/api/internal/video/workbench/assets/route.ts:59-97` parseMeta 收 `coverOf`(uuid)/`coverKind`，`:206-222` 寫 metadata，驗 coverOf 同 org 且是影片，影片列無 coverAssetId 時設第一張。
-- 完成：一次匯出 → 1 影片列＋3 封面列，影片列 `coverAssetId` 指第 1 張；重送不重複。
+- 改：`video-workbench/backend/api.cjs:110-140` settleOnce 在影片登記後登記候選（`vwJobId = cover:<jobId>:<i>`，失敗記 `coverError`、下次 GET 重試，比照 releaseText）；`video-workbench/backend/main-system.cjs:141-188` ingest 帶 `coverOf/coverKind`；`next-admin/app/api/internal/video/workbench/assets/route.ts:59-97` parseMeta 收 `coverOf`(uuid)/`coverKind`，`:206-222` 寫 metadata，驗 coverOf 同 org 且是影片。影片列不寫（見 §2：選中的封面由 `cover.ts chosenCover` 從封面列決定，影片列不會有 `coverAssetId` 這個 key）。
+- 完成：一次匯出 → 1 影片列＋最多 3 封面列（`coverOf`＝影片列 id），`chosenCover` 選到候選 0；重送不重複。驗收用 `GET /api/video/cover?organizationId=…&assetIds=<影片列 id>`，看 `chosen: true` 那張。
 - 測試：`next-admin/app/api/internal/video/workbench/assets/route.test.ts` 加：他 org 的 coverOf 被拒、第二張不覆蓋已選、非影片 coverOf 被拒；工作台既有 main-system 測試加 cover 重試一案。
 
 **VD.3 送審頁：預覽與換封面**（next-admin）
 - 改：新增 `next-admin/app/api/video/cover/route.ts`（GET 候選＋已選；POST `{organizationId, assetId, coverAssetId}` 換選；POST multipart 上傳自己的圖 → R2＋`coverKind:"upload"` 列；全部 `assertOrgAccess`，比照 `next-admin/app/api/video/release/route.ts:20`）；`ReleaseDeliveryPanel.tsx:143-166` 每個比例列顯示選中封面＋候選小圖按鈕（點＝選）＋「上傳自己的封面」按鈕。
 - 完成：送審頁看得到封面、點候選即換、上傳後成為選中。
-- 測試：`next-admin/app/api/video/cover/route.test.ts`（他影片的封面被拒、他 org 被拒、換選寫入 coverAssetId）。
+- 測試：`next-admin/app/api/video/cover/route.test.ts`（他影片的封面被拒、他 org 被拒、換選寫入封面列的 chosenAt）。
 
 **VD.4 工作台：AI 設計封面（付費）**（video-workbench）
 - 改：成片卡（`video-workbench/shared/jobs-view.js` 送審按鈕旁）加「AI 設計封面」按鈕列，每個模型一顆按鈕、`data-paid="video.image" data-paid-model=<row>` 顯示 NT$（`video-workbench/shared/paid-price.js:28-29`）；後端用 `video-workbench/backend/image-edit.cjs` 的 fill 列對全畫面選區改圖（指令：保留主體、做吸睛封面背景、不寫任何字），再由 `cover.cjs` 疊標題；結果走 VD.2 登記為 `coverKind:"ai"`、帶 costUsd，經既有 permit＋settle 扣點一次。
@@ -65,7 +65,7 @@
 - 測試：`video-workbench/tests/cover-ai.cjs`（fetch stub：價格來自 capabilities、無 permit 不呼叫、成功只 settle 一次、輸出有疊字）。
 
 **VD.5 社群草稿帶封面與 alt**（next-admin social＋migration）
-- 改：migration `lobster-factory/packages/db/migrations/0163_social_media_cover.sql`（＋down）：`social_media.cover_media_id uuid` + `cover_kind text`，FK `(cover_media_id, organization_id, cover_kind) → social_media(id, organization_id, kind)`，CHECK 兩者同時有或同時無且 kind＝image（資料庫保證封面是同組織的圖片）；`next-admin/lib/social/store.ts:846-860` addVideo 收 coverUrl → `uploadMedia`（`next-admin/lib/content/postiz.ts:149`）存成 image 列並回寫 cover_media_id；`next-admin/lib/content/video/social-drafts.ts:16-17,42-43` releases 帶 coverUrl、savePost 帶 alt；`social-drafts-deps.ts:18-38` 從影片列 coverAssetId 查 object_url，alt＝標題。
+- 改：migration `lobster-factory/packages/db/migrations/0163_social_media_cover.sql`（＋down）：`social_media.cover_media_id uuid` + `cover_kind text`，FK `(cover_media_id, organization_id, cover_kind) → social_media(id, organization_id, kind)`，CHECK 兩者同時有或同時無且 kind＝image（資料庫保證封面是同組織的圖片）；`next-admin/lib/social/store.ts:846-860` addVideo 收 coverUrl → `uploadMedia`（`next-admin/lib/content/postiz.ts:149`）存成 image 列並回寫 cover_media_id；`next-admin/lib/content/video/social-drafts.ts:16-17,42-43` releases 帶 coverUrl、savePost 帶 alt；`social-drafts-deps.ts:18-38` 用 `chosenCovers` 從封面列取選中的那張的 object_url，alt＝標題。
 - 完成：存草稿後影片 media 有 cover_media_id；沒有封面時行為同今天。
 - 測試：`next-admin/lib/content/video/__tests__/social-drafts.test.ts`（每比例帶自己的封面；無封面不上傳圖；alt＝標題）。
 
@@ -80,7 +80,7 @@
 - 測試：`next-admin/app/(shell)/tools/social/__tests__/still-of.test.ts`。
 
 **VD.8 WordPress 嵌入帶 poster**（next-admin）
-- 改：`next-admin/lib/content/video/embed-in-post.ts:134-143`：有封面時插 `core/video` 區塊 `<!-- wp:video --><figure class="wp-block-video"><video controls poster="…" src="…"></video></figure><!-- /wp:video -->`（屬性跳脫），沒有封面維持裸 URL；封面由伺服器從 releaseId → 影片列 coverAssetId → object_url 查，不收客戶端 URL；`once` 判斷仍以 videoUrl。
+- 改：`next-admin/lib/content/video/embed-in-post.ts:134-143`：有封面時插 `core/video` 區塊 `<!-- wp:video --><figure class="wp-block-video"><video controls poster="…" src="…"></video></figure><!-- /wp:video -->`（屬性跳脫），沒有封面維持裸 URL；封面由伺服器從 releaseId → `coverForRelease` → `chosenCover` → object_url 查，不收客戶端 URL；`once` 判斷仍以 videoUrl。
 - 完成：新草稿文章的影片有 poster；無封面行為同今天。
 - 測試：`next-admin/app/api/video/embed-to-wp/route.test.ts` 加：有封面含 poster、無封面為裸 URL、URL 含 `"` 被跳脫。
 
