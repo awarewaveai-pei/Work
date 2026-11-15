@@ -1,4 +1,24 @@
 # Worklog
+## 2026-11-15（續6）— R2DEL：刪一支工作台影片會清空整個組織的工作台 R2 檔案（正式環境資料遺失風險）已修 7678690f4
+
+**根因**：`next-admin/lib/storage/r2.ts` `deleteVideoObjects` 用 `/^video\/(.+)\/[^/]+\.mp4$/` 取資料夾；工作台 key `video/workbench/<org>/<sha256>.mp4` 取到 `workbench/<org>`，於是整個組織的工作台物件（其他影片、圖片、封面）被 list 後刪除，DB 列還在。入口三個：影片庫 `DELETE /api/video/[id]`、設計庫 `DELETE /api/tools/designs`（ai_generated 的工作台列）、未排程的 `/api/internal/video/cleanup`。
+
+**[已修改]**（不變量：刪一支影片只刪屬於它的物件；不刪共用前綴、不刪別的列還在用的物件）
+- `r2.ts`：`isContentAddressedKey`（檔名＝sha256）＝單一共用物件；`deleteVideoObjects` 只刪 `video/<單一段>/`，拒絕共用資料夾（workbench、subtitles）與 content-addressed key。
+- `r2-delete-guard.ts`：content-addressed 只刪該物件，且需 `exceptAssetIds`、查 `media_assets` 沒有其他列在用；刪前後讀 R2 自己的 last_modified，有變就保留（並行上傳）。
+- 三個呼叫端都傳 `exceptAssetIds`；影片庫 variant 查詢失敗回 502 不刪。
+
+**[驗證結果]**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/__tests__/r2-delete-shape.test.ts r2-delete-guard.test.ts app/api/video app/api/tools/designs (123 passed on rebased main; 7 mutations each red) | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql (read-only) workbench media_assets rows + curl -I each R2 object | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/5m/0n
+  - Codex 2a61a510（1 修）；第 2 輪 Codex 額度用完 → critic agent（4 修、1 列為後續）＋突變證據
+- ORACLE_WAIVED: codex quota blocked until 2026-11-15 16:26 (scripts/oracle-quota.ps1)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=deleteVideoObjects|r2DeleteObject|deleteDesignObject | hits=14
+
+**正式環境受害檢查（唯讀）**：唯一有工作台列的組織 39ad4149-5044-4077-8d9a-b6b916de0e21，19 列（2026-11-05～11-13），R2 HEAD 全部 200，**缺 0 個**。容器 2026-11-15 04:12 UTC 重建，之前的 log 已不在；之後沒有刪除紀錄。主機 crontab 沒有排 `/api/internal/video/cleanup`。
+
+**後續**：工作台影片刪除後 `video/subtitles/<org>/<sha>.srt|vtt` 會殘留（無資料列、清掃不掃此前綴）。部署：next-admin（監工手動）。
 ## 2026-11-15（續5）破框：鎖定基準改成模型自己的第 0 格，並在第 0 格不是貼文時不鎖定
 
 - 起因：Seedance 2.0 Fast 實片（操作者在破框 session 直接要求測試；中國模型，未開放）第 0 格就打開 23 格。用文字列做最佳擬合：模型第 0 格＝貼文以中心放大 1.022、上移 14、左移 8 px（誤差 15.3→5.6）；Grok、Luma 擬合結果都是 1.000、位移 0。所以原因是模型重繪，不是色域或重新編碼。
