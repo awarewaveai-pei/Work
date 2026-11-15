@@ -427,6 +427,12 @@ function validatePrivateIndex(indexPath, marker, cwd) {
 // (marker.base) or the committed blob; anything else was staged by another session in the commit/PostToolUse
 // window and is left alone (codex r2 F3). A failed reset (index.lock held by another git process) keeps index +
 // marker and says so, instead of deleting them over a stale shared index (codex r2 F4).
+// What `git add -N` stages: the empty blob as a placeholder, no content. `status --porcelain=v2` reports such an entry
+// with an all-zero index hash (a real staged empty file reports e69de29...), whether or not HEAD has the path yet. After
+// the private-index commit the path is in HEAD, so the placeholder is reset to it like an entry nobody touched
+// (2026-11-15: it was left behind as `DA` for every session).
+const INTENT_TO_ADD_BLOB = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391';
+
 function syncSharedIndexAfterPrivateCommit(indexPath, marker, cwd) {
   for (const [p, blob] of Object.entries(marker.entries)) {
     if (gitOut(['rev-parse', '--verify', '-q', `HEAD:${p}`], cwd) !== blob) return { done: false, warn: [] }; // commit did not happen; keep for a retry
@@ -468,7 +474,9 @@ function syncSharedIndexAfterPrivateCommit(indexPath, marker, cwd) {
     const cur = gitOut(['rev-parse', '--verify', '-q', `:${p}`], cwd); // null = not in the shared index
     const committed = gitOut(['rev-parse', '--verify', '-q', `HEAD:${p}`], cwd);
     const hasBase = Object.prototype.hasOwnProperty.call(base, p);
-    if (cur === null || cur === committed || (hasBase && cur === base[p])) toReset.push(p);
+    const placeholder = cur === INTENT_TO_ADD_BLOB
+      && /^1 \S+ \S+ \S+ \S+ \S+ \S+ 0{40} /.test(gitOut(['status', '--porcelain=v2', '--', p], cwd) || '');
+    if (cur === null || cur === committed || placeholder || (hasBase && cur === base[p])) toReset.push(p);
     else warn.push(`[Hook] ${p}: the shared index holds content staged by another session since this commit was prepared -- left untouched`);
   }
   let failed = false;

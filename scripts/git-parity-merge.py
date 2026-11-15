@@ -14,7 +14,10 @@ Invariant (2026-11-12: a cross-drive os.replace failed AFTER ten files were rewr
 lived only in memory): before the first file changes, every local byte this run will change is saved in a backup
 directory inside the repo's .git (same drive, so moves are renames) with a manifest; any failure restores all of it;
 a killed process leaves that directory, whose path every failure message prints. The run touches no worktree path
-but the files it merges: new bytes are written in that directory and renamed into place.
+but the files it merges: new bytes are written in that directory and renamed into place. Every file is re-read right
+before its own write and must still equal the bytes saved in the backup, else the run stops and restores; the shared
+checkout has no file locks, so an edit landing inside that read-to-write instant, or between a write and a later
+failure's restore, is the one window left (critic + Codex 2026-11-15).
 
   python scripts/git-parity-merge.py --root <repo> --target origin/main     prints one JSON line, exit 0 = caught up
 """
@@ -33,8 +36,8 @@ def main():
     ap.add_argument("--target", required=True)
     a = ap.parse_args()
 
-    def git(*args, check=True):
-        r = subprocess.run(["git", "-C", a.root, "-c", "core.quotepath=false", *args], capture_output=True)
+    def git(*args, check=True, inp=None):
+        r = subprocess.run(["git", "-C", a.root, "-c", "core.quotepath=false", *args], capture_output=True, input=inp)
         if check and r.returncode:
             raise RuntimeError(f"git {' '.join(args)}: {r.stderr.decode('utf-8', 'replace').strip()}")
         return r
@@ -62,11 +65,12 @@ def main():
         r = git(*args, check=False)
         return r.stdout.decode().split()[1] if args[0] == "ls-files" and r.stdout else r.stdout.decode().strip()
 
-    plan, moved, staged = [], [], []
+    plan, moved, staged, idx_seen = [], [], [], {}
     for p in sorted(up & tracked):
         path = os.path.join(a.root, p)
         # The merge reads the worktree only: staged bytes that differ from it would be lost by the index reset.
         idx, head = oid("ls-files", "-s", "--", p), oid("rev-parse", f"HEAD:{p}")
+        idx_seen[p] = idx
         if idx != head:
             if not os.path.exists(path) or idx != oid("hash-object", "--", path):
                 return done(False, f"{p}: staged content differs from the file")
@@ -90,11 +94,32 @@ def main():
         plan.append((p, path, base, merged, ours))
     for p in sorted(up & untracked):
         path = os.path.join(a.root, p)
-        theirs = blob(a.target, p)
-        if theirs is None or lf(open(path, "rb").read()) != lf(theirs):
+        theirs, ours = blob(a.target, p), open(path, "rb").read()
+        if theirs is None or lf(ours) != lf(theirs):
             return done(False, f"{p}: untracked local file differs from {a.target}")
-        moved.append((p, path))
-    if not plan and not moved:
+        moved.append((p, path, ours))                   # ours: the exact bytes, re-checked before the move
+    # eol phantom: `git status` calls a file modified on SIZE alone (worktree CRLF, eol=lf blob) although its normalized
+    # content equals the index, and ff-only then refuses it as "not uptodate" -- nothing local is in it. 2026-11-15:
+    # D:\Work had 168 such files; one in every upstream change set kept the checkout 123 commits behind for days.
+    # Rewritten from the index (git's canonical bytes) before the ff; the bytes go into the backup like every other.
+    status_m, skip = set(), False
+    for x in git("status", "--porcelain=v1", "-z").stdout.decode("utf-8").split("\0"):
+        if skip:                                     # a rename/copy record is followed by its source path, no XY prefix
+            skip = False; continue
+        if x[:2] == " M":                            # staged entries are already in `tracked` (plan), never phantoms
+            status_m.add(x[3:])
+        skip = x[:1] in ("R", "C")
+    renorm = []
+    for p in sorted((up & status_m) - tracked):
+        path = os.path.join(a.root, p)
+        # "normalized hash == index" proves nothing local only when the clean path is eol-only: a clean filter, ident
+        # or a working-tree encoding could hide local output behind an equal hash (critic 2026-11-15)
+        if git("check-attr", "filter", "ident", "working-tree-encoding", "--", p).stdout.decode().count(": unspecified") != 3:
+            continue
+        idx = git("ls-files", "-s", "--", p).stdout.decode().split()
+        if len(idx) >= 2 and idx[1] == git("hash-object", f"--path={p}", "--", path).stdout.decode().strip():
+            renorm.append((p, path, open(path, "rb").read()))
+    if not plan and not moved and not renorm:
         return done(False, "nothing local blocks the fast-forward")
 
     # Backup first, on the repo's own drive: nothing below may change a file whose bytes are not already saved here.
@@ -104,42 +129,76 @@ def main():
         for i, (p, path, *_, ours) in enumerate(plan):
             with open(os.path.join(side, f"ours-{i}"), "wb") as b:
                 b.write(ours)
+        for i, (p, path, ours) in enumerate(renorm):
+            open(os.path.join(side, f"renorm-{i}"), "wb").write(ours)
         with open(os.path.join(side, "manifest.json"), "w", encoding="utf-8") as m:
             json.dump({"plan": {f"ours-{i}": p for i, (p, *_) in enumerate(plan)},
-                       "moved": {f"moved-{i}": p for i, (p, _) in enumerate(moved)}}, m, ensure_ascii=False)
+                       "moved": {f"moved-{i}": p for i, (p, *_) in enumerate(moved)},
+                       "renorm": {f"renorm-{i}": p for i, (p, *_) in enumerate(renorm)}}, m, ensure_ascii=False)
     except Exception as e:
         shutil.rmtree(side, ignore_errors=True)
         return done(False, f"backup failed, nothing touched: {e}")
     gone = []                                       # untracked files already moved into `side`
+    wrote = {}                                      # path -> the bytes this run put there (plan: HEAD's; renorm: the index's)
 
     def restore():
+        # A file is put back only while it still holds what this run wrote (or was never written): another writer's
+        # newer bytes are left in place and named, and the backup directory stays for the pre-run bytes.
+        kept = []
         for i, path in gone:
+            if os.path.exists(path):
+                kept.append(os.path.relpath(path, a.root).replace(os.sep, "/")); continue
             shutil.move(os.path.join(side, f"moved-{i}"), path)
-        for p, path, *_, ours in plan:
+        for p, path, *_, ours in list(plan) + list(renorm):
+            if open(path, "rb").read() != wrote.get(path, ours):
+                kept.append(p); continue
             open(path, "wb").write(ours)
         if staged:
             git("add", "--", *staged)          # staged == worktree bytes (checked above), so this restores the index
+        return kept
+
+    def fail(msg):
+        try:
+            kept = restore()
+        except Exception as e2:
+            return done(False, f"{msg}; restore failed too ({e2})", backup=side)
+        if kept:
+            return done(False, f"{msg}; {len(kept)} file(s) another writer changed meanwhile were left as they are, "
+                               f"their pre-run bytes stay in the backup: {', '.join(kept)}", backup=side)
+        shutil.rmtree(side, ignore_errors=True)
+        return done(False, msg)
 
     try:
+        # A save by another session or an editor after the planning read would be overwritten with the backup holding
+        # stale bytes: each file is re-read in the instant before its own write; a difference raises, and the except
+        # below restores everything written so far.
+        def still_ours(p, path, ours):
+            if open(path, "rb").read() != ours:
+                raise RuntimeError(f"{p} changed while this run was writing")
+        for p, *_ in plan:                           # a stage by another session since planning would be dropped by the reset
+            if oid("ls-files", "-s", "--", p) != idx_seen[p]:
+                raise RuntimeError(f"{p}: the shared index changed while this run was planning")
         if plan:
             git("reset", "-q", "--", *[p for p, *_ in plan])
-        for p, path, base, *_ in plan:
+        for p, path, base, _, ours in plan:
+            still_ours(p, path, ours)
             open(path, "wb").write(base)
-        for i, (p, path) in enumerate(moved):
+            wrote[path] = base
+        if renorm:                                   # paths on stdin: 168 of them would overrun a Windows command line
+            for p, path, ours in renorm:
+                still_ours(p, path, ours)
+            git("checkout-index", "-f", "-z", "--stdin", inp=b"\0".join(p.encode("utf-8") for p, *_ in renorm) + b"\0")
+            for p, path, _ in renorm:
+                wrote[path] = open(path, "rb").read()
+        for i, (p, path, ours) in enumerate(moved):
+            still_ours(p, path, ours)
             shutil.move(path, os.path.join(side, f"moved-{i}"))
             gone.append((i, path))
         ff = git("merge", "--ff-only", a.target, check=False)
         if ff.returncode:
-            restore()
-            shutil.rmtree(side, ignore_errors=True)
-            return done(False, "ff-only still refused: " + ff.stderr.decode("utf-8", "replace").strip())
+            return fail("ff-only still refused: " + ff.stderr.decode("utf-8", "replace").strip())
     except Exception as e:
-        try:
-            restore()
-            shutil.rmtree(side, ignore_errors=True)
-            return done(False, f"failed before the fast-forward, local files restored: {e}")
-        except Exception as e2:
-            return done(False, f"failed ({e}); restore failed too ({e2})", backup=side)
+        return fail(f"failed before the fast-forward, local files restored: {e}")
     written = []
     try:
         for i, (p, path, _, merged, _) in enumerate(plan):
@@ -152,8 +211,9 @@ def main():
         return done(False, f"fast-forwarded; local edits carried into {written or 'no file'}, then writing failed ({e})",
                     backup=side, forwarded=True)
     shutil.rmtree(side, ignore_errors=True)         # untracked copies equal the target's files, now tracked
-    return done(True, f"fast-forwarded; local edits carried forward in {len(plan)} file(s), {len(moved)} identical untracked file(s) now tracked",
-                [p for p, *_ in plan] + [p for p, _ in moved])
+    return done(True, f"fast-forwarded; local edits carried forward in {len(plan)} file(s), {len(moved)} identical untracked file(s) now tracked, "
+                      f"{len(renorm)} eol-only file(s) renormalized",
+                [p for p, *_ in plan] + [p for p, *_ in moved] + [p for p, *_ in renorm])
 
 
 if __name__ == "__main__":

@@ -316,6 +316,21 @@ test('codex r4: undo never rewinds a commit that landed on top of the stale one;
   assert.ok(fs.existsSync(idx) && fs.existsSync(`${idx}.json`), 'index + marker kept for the manual repair');
 });
 
+test('an `add -N` placeholder for an own file is cleared from the shared index after the private-index commit (no DA left behind)', () => {
+  const { dir, scratch } = makeRepo();
+  dirtyBoth(dir);
+  g(dir, ['add', '-N', '--', 'own.txt']);
+  const s1 = helper(dir, scratch, ['stage', WORKLOG, '--worklog-entry', '2', '--date', '2026-09-23', '--', 'own.txt']);
+  const idx = (s1.out.match(/^private index: (.+)$/m) || [])[1];
+  assert.ok(idx, s1.out + s1.err);
+  const cmd = `GIT_INDEX_FILE=${idx} git commit -q -m mine`;
+  assert.equal(verdict(bash('PreToolUse', cmd, dir, scratch)).deny, false);
+  assert.equal(g(dir, ['commit', '-q', '-m', 'mine'], { GIT_INDEX_FILE: idx }).status, 0);
+  const post = bash('PostToolUse', cmd, dir, scratch);
+  assert.doesNotMatch(post.stderr, /own\.txt: the shared index holds content staged by another session/);
+  assert.equal(g(dir, ['status', '--porcelain', '--', 'own.txt']).out, '', 'placeholder reset to HEAD: own.txt clean');
+});
+
 test('GIT_INDEX_FILE without a marker is judged like the shared index (shared file staged -> BLOCK)', () => {
   const { dir, scratch } = makeRepo();
   dirtyBoth(dir);

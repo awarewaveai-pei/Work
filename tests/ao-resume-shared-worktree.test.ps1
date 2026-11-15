@@ -217,6 +217,35 @@ try {
     Assert-Eq (G $f.Wt @('rev-parse', 'HEAD')) $headBefore 'P16 HEAD unchanged'
     Assert-Eq @(Get-ChildItem (Join-Path $f.Wt '.git') -Directory -Filter 'parity-merge-*').Count 0 'P16 backup directory removed after the restore'
 
+    # P17 eol phantom (2026-11-15): worktree CRLF while the blob is LF (text=auto eol=lf) -> `git status` says modified on
+    # size alone, `git diff` says clean, ff-only refuses "not uptodate". Nothing local is in the file: renormalize and ff.
+    $f = New-Fixture 'p17'; Set-File (Join-Path $f.Wt '.gitattributes') "* text=auto eol=lf`n"
+    G $f.Wt @('add', '-A') | Out-Null; G $f.Wt @('commit', '-q', '-m', 'attrs') | Out-Null; G $f.Wt @('push', '-q', 'origin', 'main') | Out-Null
+    G $f.Other @('pull', '-q', '--ff-only') | Out-Null; Advance-Origin $f 'a.txt' "a2`n"
+    Set-File (Join-Path $f.Wt 'a.txt') "a1`r`n"
+    Assert-Eq (G $f.Wt @('status', '--porcelain', '--', 'a.txt')) 'M a.txt' 'P17 fixture: the CRLF copy reads as modified (G trims the leading space)'
+    Assert-Eq (G $f.Wt @('-c', 'core.safecrlf=false', 'diff', '--name-only', 'HEAD', '--', 'a.txt')) '' 'P17 fixture: diff sees no content change'
+    $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
+    Assert-Eq $r.Action 'fast-forward' 'P17 action'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'a.txt')) "a2`n" 'P17 file is the origin version'
+    Assert-Eq (G $f.Wt @('status', '--porcelain', '--untracked-files=no')) '' 'P17 nothing left modified'
+
+    # P17b the same phantom, but a later step fails (an untracked file locked, as in P16) -> its CRLF bytes come back,
+    # HEAD unchanged, no backup directory left behind
+    $f = New-Fixture 'p17b'; Set-File (Join-Path $f.Wt '.gitattributes') "* text=auto eol=lf`n"
+    G $f.Wt @('add', '-A') | Out-Null; G $f.Wt @('commit', '-q', '-m', 'attrs') | Out-Null; G $f.Wt @('push', '-q', 'origin', 'main') | Out-Null
+    G $f.Other @('pull', '-q', '--ff-only') | Out-Null
+    Set-File (Join-Path $f.Other 'a.txt') "a2`n"; Set-File (Join-Path $f.Other 'c.txt') "c-origin`n"
+    G $f.Other @('add', '-A') | Out-Null; G $f.Other @('commit', '-q', '-m', 'origin a+c') | Out-Null; G $f.Other @('push', '-q', 'origin', 'main') | Out-Null
+    Set-File (Join-Path $f.Wt 'a.txt') "a1`r`n"; Set-File (Join-Path $f.Wt 'c.txt') "c-origin`n"
+    $headBefore = G $f.Wt @('rev-parse', 'HEAD')
+    $lock = [IO.File]::Open((Join-Path $f.Wt 'c.txt'), 'Open', 'Read', 'Read')
+    try { $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt } finally { $lock.Dispose() }
+    Assert-True (-not $r.Ok) 'P17b not ok'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'a.txt')) "a1`r`n" 'P17b CRLF bytes restored after the failed step'
+    Assert-Eq (G $f.Wt @('rev-parse', 'HEAD')) $headBefore 'P17b HEAD unchanged'
+    Assert-Eq @(Get-ChildItem (Join-Path $f.Wt '.git') -Directory -Filter 'parity-merge-*').Count 0 'P17b backup directory removed'
+
     # ---------------- I3: hooks act on the MAIN checkout only (2026-09-27) ----------------
     # A linked worktree (git worktree add) has `.git` as a FILE. Accepting it as the root wrote hook
     # state / reports into D:\tmp\<wt> and ensure-claude-junction replaced the worktree's tracked

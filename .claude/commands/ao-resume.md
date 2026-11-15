@@ -31,7 +31,7 @@ git rev-list --count HEAD..origin/main
     ```
     ⛔ AO-RESUME ABORTED — git pull failed. Report would be based on stale data.
     Error: [paste exact git error]
-    Fix: resolve manually (e.g. git pull --rebase origin main), then re-trigger AO-RESUME.
+    Fix: resolve manually (ff-only; diverged -> REMOTE_WORKSTATION_STARTUP.md §2.5.1 分歧程序), then re-trigger AO-RESUME.
     ```
 
 **Hard limits: one fetch, one conditional pull. No loops. No re-running ao-resume.ps1.**
@@ -83,19 +83,16 @@ Read `log_tail` from `ao-resume-hook-last.json`. If it contains `"non-fast-forwa
    ```bash
    git -C "<WORK_ROOT>" rev-list --count HEAD..origin/main
    ```
-2. **If behind > 0** → run immediately:
+2. **If behind > 0** → the same path the hook takes (a dirty shared checkout refuses `pull --rebase`; never stash / reset / checkout):
    ```bash
-   git -C "<WORK_ROOT>" pull --rebase origin main
+   git -C "<WORK_ROOT>" merge --ff-only origin/main
    ```
-3. **If rebase conflict** → check which files:
-   - Conflict in `*-LATEST.md` / `*-LATEST.json` / `*-LATEST.txt` only → auto-resolve each with local version:
-     ```bash
-     git -C "<WORK_ROOT>" checkout --theirs -- <file>
-     git -C "<WORK_ROOT>" add -- <file>
-     ```
-     Then: `git -C "<WORK_ROOT>" rebase --continue`
-   - Conflict in ANY other file → `git -C "<WORK_ROOT>" rebase --abort` → list conflicts → stop and ask user
-4. **After successful pull --rebase** → `git -C "<WORK_ROOT>" push origin main`
+3. **If the ff is refused** (a local edit in a file origin also changed) → carry the edits forward, nothing else touched:
+   ```bash
+   python "<WORK_ROOT>/scripts/git-parity-merge.py" --root "<WORK_ROOT>" --target origin/main
+   ```
+   Still refused (a real conflict) or **ahead > 0** (diverged) → `REMOTE_WORKSTATION_STARTUP.md` §2.5.1 分歧程序 → stop and ask user.
+4. **Only push at AO-CLOSE** (ao-close.ps1 fetches and refuses while behind).
 5. **Only after git state is clean**, proceed to Step 0c.
 
 **Why Step 0b exists**: Since 2026-09-23 the hook never commits, stashes, resets or pushes. `ahead` means commits (this or another session's) that AO-CLOSE has not pushed yet; the automatic parity step (`Invoke-SharedWorktreeParity`: fetch + `merge --ff-only`) only reports `action=ahead|diverged|ff-refused` and continues, so state files ARE generated. Step 0b is for the operator to push or rebase when section 1 shows that state.

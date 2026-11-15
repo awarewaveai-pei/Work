@@ -418,7 +418,7 @@ function Invoke-SharedWorktreeParity {
         $r.Ok = $true
     } elseif ($r.Ahead -gt 0) {
         $r.Action = 'diverged'
-        $r.Message = "ahead $($r.Ahead) / behind $($r.Behind) vs $Remote/$Branch; resolve at AO-CLOSE (git pull --rebase); nothing touched"
+        $r.Message = "ahead $($r.Ahead) / behind $($r.Behind) vs $Remote/$Branch; a dirty shared checkout refuses pull --rebase: follow REMOTE_WORKSTATION_STARTUP.md §2.5.1 分歧程序; nothing touched"
     } else {
         $ff = Invoke-SafeGitCapture -GitArgs @('merge', '--ff-only', "$Remote/$Branch") -WorkRoot $WorkRoot
         if ($ff.ExitCode -eq 0) {

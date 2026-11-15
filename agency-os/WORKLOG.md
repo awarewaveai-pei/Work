@@ -43,6 +43,25 @@
 - REVIEW_WAIVED: NA -- 一行 env 透傳，與相鄰 SERPER/YOUTUBE 同型；safe-infra-patch 已驗 compose config + healthy
 - BUGHUNT_WAIVED: NA -- 無程式 symbol 改動
 - ORACLE_WAIVED: 無 source 檔改動（只有 compose 與 WORKLOG）
+## 2026-11-15（續13）— D:\Work 對齊 origin/main（分歧 13 commit／落後 126）＋快轉長期失敗的兩個機械根因
+
+**現況**：`D:\Work` main 分歧（ahead 13／behind 126），431 筆未提交，2 個 session 正在其中工作。13 個本地 commit：5 個 `git cherry` 判等價；8 個 subject 對得上 origin 的 rebase 版，7 個 +/- 行完全相同、1 個（1b4eb18a3）origin 版較新（`model-options.ts` 4 行量測更新）→ 全部已被取代。
+**根因 A（機械，長期）**：eol 幻影檔。`.gitattributes` `* text=auto eol=lf` 但工作目錄 168 檔被工具寫成 CRLF（26 純 CRLF／133 混合）；git 以大小差直接判 M 不比內容（`git diff` 乾淨、`hash-object --path` 等於 index），`merge --ff-only`／`reset --keep` 視為 not uptodate 拒絕。`scripts/git-parity-merge.py` 以 `diff --name-only HEAD` 收集 dirty 檔，看不到幻影 → 每日 AO-RESUME parity 永遠 ff-refused → 落後累積到 126。
+**根因 B（殘留）**：`git-commit-scope-guard.js syncSharedIndexAfterPrivateCommit` 對 `add -N` 空 blob 佔位符不重設（既非 HEAD blob 也非 base）→ 私有 index commit 後共享 index 留 `DA`。
+**對齊程序（一次性腳本 `align_keep2.py`，備份目錄 `D:\Work\.git\align-keep-20261115-165651\manifest.json`）**：backup ref `refs/heads/backup/local-main-20261115-{164343,164513,165651}` → 重疊檔逐檔分類：39 同上游、9 可三方合併（WORKLOG 走 union）、9 證明過時的 video-workbench 舊快照（mtime 11-13 20:26–20:54；7 個等於上游歷史 blob，`editor-export.cjs`／`tools-editor.js` 的 CJK 字型邏輯已被 origin `editor-export.cjs:367-384`／`tools-editor.js:1663-1669` 取代）、1 幻影、16 未追蹤搬備份（14 同上游、2 舊快照、daily = 上游 scaffold＋本地 verify-ack）、1 index 殘留 → 未被取代的本地 commit（Scrapling session 16:49 的 01a707f3e）以 `merge-tree --merge-base=<parent>`＋`commit-tree` 重做 → `git reset --keep <tip>`。兩次被拒（stat 快取 not uptodate／幻影）皆整體還原，73 檔逐位元組等於備份。該 session 在 dry-run 與 apply 之間已 push 同一 commit（d65f41fcc，patch 零差異）→ 帶過去的成為空重複，`reset --keep origin/main`（tree 相同）收掉。
+**結果**：HEAD == origin/main（0/0）、staged 0、hooks 目錄乾淨、`sync-claude-userlevel -Mode verify` PASS；9 個合併檔「少掉」的 16 行全為上游刪改（base 有、tip 無），本地獨有行遺失 0；WORKLOG 43 行本地條目保留。
+**關整類**：
+- `git-parity-merge.py` 新 `renorm`：上游變更 ∩ status ` M` − diff dirty、`filter`/`ident`/`working-tree-encoding` 皆 unspecified、`hash-object --path` == index hash → 備份後 `checkout-index -f -z --stdin`，ff 後即正規。critic Major：覆寫前逐檔重讀，任一 plan／renorm／moved 檔與備份不同 → 整批不動（關掉「規劃與寫入之間別人存檔」整類）。P17（成功）＋P17b（寫入後失敗 → CRLF 原 bytes 還原、HEAD 不動、備份目錄刪）。
+- 守衛 `INTENT_TO_ADD_BLOB`：porcelain v2 的 index hash 全 0 = `add -N` 佔位（真 stage 的空檔是 e69de29）→ 視同未 stage，重設到 HEAD；mjs 測試。
+- 文件：`REMOTE_WORKSTATION_STARTUP.md §2.5.1` 新增分歧程序；`ao-resume.md` 第 2–4 步與 `git-safe-ops.ps1:421` 的 `pull --rebase` 建議改為 ff-only／parity-merge／§2.5.1（dirty 共享 checkout 拒絕 rebase）。
+**未做**：其餘 167 個幻影檔仍在（無害，只讓 `git status` 多 M；parity 每次只正規化上游有改的那些）；`autocrlf=true` 與 `eol=lf` 的矛盾未動；D:\Work `.git` 下 7 個 11-05～11-12 的過期私有 index marker（02b0595d-*）未清。回滾：`git -C D:/Work reset --keep refs/heads/backup/local-main-20261115-165651` 後依 manifest 還原 `ours-*`／`moved-*`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -I align_keep2.py --root D:/Work --target origin/main --superseded <8 sha> --apply → {"ok":true,"head":"acf79aecd","ahead_of_target":1}；git reset --keep origin/main → rev-list --left-right --count origin/main...HEAD = 0 0；staged 0；sync-claude-userlevel -Mode verify PASS | exit=0 | ms=17785
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell tests/ao-resume-shared-worktree.test.ps1 → 100 passed 0 failed（P17、P17b 新）；突變關 renorm → P17 3 斷言紅；bash scripts/test-hooks.sh → 33+405 pass（新守衛測試綠；diff --cached 版判定曾讓它紅 → 改 porcelain v2） | exit=0 | ms=114826
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/6n（Major 覆寫競態、filter/ident、argv 長度、佔位判定、P17b、-z rename、死條件：全修）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=syncSharedIndexAfterPrivateCommit | hits=5
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=pull --rebase | hits=4（git-safe-ops.ps1:421、ao-resume.md:34,88,98 → 全改）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n（Codex oracle 三輪：82acfdfb 2／4c875e7d 1／16b8aff8 2，全修：moved 原始 bytes 重讀、WORKLOG 指向、單檔寫入前重讀、restore 只還原仍等於本輪寫入的檔、reset 前重驗 index；第四輪 artifact 待回，額度中斷）
 ## 2026-11-15（續12）Codex 免費生圖：app 左下角「啟動筆電」按鈕，筆電不常駐、閒置 30 分鐘自己關
 
 [根因]
