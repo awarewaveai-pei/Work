@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-15（續31）— 「我的設計」直傳 R2：C5（塔羅）、C6（其餘呼叫端＋刪 base64 輸入）；C3／C4 真實 R2 實測通過
+
+- C5：新 `lib/studio/design-upload.ts`（瀏覽器 ①upload-url ②PUT ③登記；`urlToBlob` 跨源網址走 `/api/tools/designs/download` 代理）。`TarotStudio.tsx`：所有存檔原位元組直傳；牌卡 state 只留 `artKey`（出圖即 PUT 到 pending）或 `artJob`（背景批次：點「存無框圖」才重抓＋套目前調色，與載入共用 `gradedBatchArt`）＋≤2048 顯示用 `thumb`（大圖與畫布）；`toGalleryArt` 刪除；存檔失敗／pending 過期顯示在頁內訊息列。
+- C6：StudioWorkbench／BannerStudio／CanvasEditor／MockupStudio／ModelMockupPanel／DesignsGallery、`public/editor-shared/blocks/my-designs.js`（PSD 走 `kind:"source"`，上限 64 MB）改直傳；designs POST 刪 base64 `image` 與 `sourceFile` 輸入（`parseDesignSource` 刪，`sourceUrl` 保留）；`source／customer／batch-dedupe／my-designs-host／useCanvasReturn／design-source` 測試改走 upload。
+- 偏離計畫（已查證）：`lib/studio/image-upload-limit.ts` 未刪——仍被 `CanvasEditor.tsx:1595` 去背（`/api/tools/studio/remove-bg`，計畫 §4 另案）使用；`ai-fill.js`／`bg-remove.js` 的 `uploadableDataUrl` 同屬 §4。C6 grep 驗收在 designs 路徑 0 命中，其餘屬 §4。
+- 真實 R2（C1 金鑰，`r2-real.mts` 走出貨函式）：9,376,393 B PNG presign PUT 200 → `claimPendingUpload`（HEAD→Copy→讀正式 key）sha256 相同；錯 Content-Type PUT 403；他組織 key 403；清除後 pending／正式皆 404。實測發現 Cloudflare REST 讀 9 MB 筆電 32 s（撞 45 s timeout），讀正式 key 改 S3 GET（`r2-s3.ts getObject`，共用 `r2.ts readCappedBody`）；正式機到 Cloudflare 64 MiB 0.39 s。
+- Codex f57c11be F1／F2 驗實已修：F1 登記成功但回應遺失、重試被報「過期」→ 列記 `metadata.upload_key`、先查再登記（冪等）；F2 舊存檔完成把重生的新圖標成已存 → `savedArt` 以格子 blob URL 為鍵。
+- Codex 926ab02b：F1 批次紀錄 7 天清除後舊卡「存無框圖」404 → 驗實，改明確過期訊息；F2 同 key 並行登記會重複 → 驗實但現有呼叫端不自動重試、存檔中按鈕停用，碰不到，不修（若日後加自動重試：正式 key 由 pending key 決定＋唯一索引，23505 視為已存）。
+- commit：e453f151a（C5）、8f54f62f3（C6，含 C4 讀取改 S3 與冪等登記）。
+- 突變 8/8 紅（org 檢查、讀正式 key、64 MiB、insert 清理、冪等登記、PUT 遺失登記、回滾刪除、嗅探清理）。
+- 剩餘：完整路由（瀏覽器→upload-url→PUT→登記）與塔羅真實操作（Ideogram 大圖、兩種存無框圖、斷網提示）要等部署後在頁面上跑；畫布編輯沿用 ≤2048 顯示副本（與先前相同）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=secrets-vault run -> npx tsx r2-real.mts (real R2: presign PUT 9.4 MB, claimPendingUpload sha256 equal, wrong type 403) | exit=0 | ms=55554
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/4m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=uploadableDataUrl | hits=17
+- BUGHUNT_SCOPE_NARROW: 剩餘 uploadableDataUrl 命中皆為 §4 其他路由（remove-bg／ai-fill／bg-remove），非 designs
 ## 2026-11-15（續30）— 編輯器載入／改邊緣／Codex 生圖：卡 C／D／E 驗收、兩次部署、實測（主 session）
 
 **部署**：`sg-deploy.sh next-admin` 10:57Z → `fe6b50ee5`（卡 C：Codex 交件拿號碼）；15:16Z → `f322a8ebf`（卡 E：dock 啟動等待＋改邊緣一次下載）。卡 A `78a3b3dc9`／卡 B `547e92a75` 已在 09:26Z 那輪上線；卡 D `604e85628` 是 Cloudflare 規則＋nginx map，不經 sg-deploy（該卡自行 apply）。
