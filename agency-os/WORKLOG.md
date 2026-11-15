@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-15（續21）— C2：R2 bucket CORS／lifecycle 腳本（`scripts/r2-designs-bucket-config.ts`），dry-run 已實測、`--apply` 未執行（High，等操作者 go）
+
+- 做了什麼：`npx tsx` 腳本；origin＝`https://`＋`staffHosts()`＋每個 `door.app==="next-admin"` 且 enabled 的 `productHost(p)`，`--dev-origin` 明示才加；CORS 只開 PUT＋content-type、MaxAge 600；lifecycle `uploads/pending/` 1 天刪。Cloudflare REST `r2/buckets/<b>/{cors,lifecycle}`（schema 讀自 OpenAPI spec：CORS `rules[].allowed.{origins,methods,headers}`＋`maxAgeSeconds`；lifecycle `rules[].{id,enabled,conditions.prefix,deleteObjectsTransition.condition{type:Age,maxAge}}`；文件 https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/cors/ 與 `.../lifecycle/`）。
+- 設計：PUT 會整份取代 → 以規則 `id` 合併（換自己的、保留其他，lifecycle 已有 `Default Multipart Abort Rule` 被保留）；`--apply` 先備份到 `agency-os/reports/r2/<bucket>-<UTC>.json`、PUT、讀回比對（自己的規則一致＋其他規則沒遺失）；不印 token／帳號 ID。
+- 實測事實：① 本機 `mcp/user-env.ps1` 沒有 `R2_API_TOKEN`／`R2_ACCOUNT_ID`（只有 `CLOUDFLARE_API_TOKEN`／`CLOUDFLARE_ACCOUNT_ID`，不同憑證，未使用）→ dry-run 的 R2 憑證與 `R2_DESIGNS_BUCKET` 由 ssh→`docker exec lobster-next-admin printenv | grep` 只進子行程 env、未顯示。② 現有 `R2_API_TOKEN` 對 cors／lifecycle GET 回 200（讀得到；PUT 權限未試，apply 時才會知道，403 腳本印「需操作者臨時給 bucket 設定權限的 token」並 exit 3）。③ 容器沒有 `STAFF_HOSTS`／`PRODUCT_HOST_*`／`PUBLIC_BASE_DOMAIN`（printenv 名稱列表只有 R2_*）→ 程式預設值即正式值，腳本的「沒給」警告在此情況是誤報但無害。④ bucket 現況：CORS 0 條、lifecycle 1 條（Default Multipart Abort Rule）。
+- dry-run 輸出（帳號 ID 本就不輸出）：origin 8 個＝`https://{app,content,design,outreach,social,studio,tarot,video}.aware-wave.com`；CORS `[新增] awarewave-designs-direct-upload`；lifecycle `[保留] Default Multipart Abort Rule`＋`[新增] awarewave-designs-pending-1d`（prefix `uploads/pending/`、Age 86400）；結論「有差異」。只送了 2 個 GET。
+- Codex 審查 `agency-os/reports/oracle/2026-11-15-review-6505b6e4.md`：3 個 finding 皆 CONFIRMED 並已修：F1 printenv 說明漏 `R2_DESIGNS_BUCKET`（容器若指向別的 bucket 會設錯）→ 補進指令並在未給時警告；F2 `printenv PRODUCT_HOST_*` 不展開 → 改 `printenv | grep -E`；F3 讀回只驗自己的規則 → 加 `lostRules` 檢查其他規則沒遺失。
+- 未做：`--apply`（High）。回滾＝用備份檔 JSON 的 `cors.rules`／`lifecycle.rules` PUT 回去（或 Cloudflare 控制台）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=tsx scripts/r2-designs-bucket-config.ts --dry-run (env from prod container, read only) | exit=0 | ms=1471
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=r2-designs-bucket-config | hits=14
 ## 2026-11-15（續20）— 計畫：「我的設計」原檔直傳 R2（`lobster-factory/docs/PLAN-designs-direct-upload.md`，C1–C6，未開工）
 
 - 操作者「你決定」→ 選 presigned 直傳：位元組不經 app request（不調高 middleware 上限）；伺服器登記時才讀、先驗長度（I3）；`designs/` 只放已登記物件，孤兒在 `uploads/pending/` 由 lifecycle 清（I4）。
