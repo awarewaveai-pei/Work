@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-15（續26）— C2 已套用：`lobster-designs` CORS＋`uploads/pending/` 1 天 lifecycle 上線（操作者「你幫我」＝go 建議 1）
+
+- 憑證：沿用正式機容器 `R2_API_TOKEN`（REST 改 bucket 設定只接受 Admin 級 token，無法只綁單一 bucket；Cloudflare R2 troubleshooting／tokens 文件）；未申請新 token、未用 `AWARE_WAVE_CREDENTIALS.md` 的 `lobster-backup-r2-token`。
+- `--apply`：備份 `agency-os/reports/r2/lobster-designs-2026-11-15T14-56-06-161Z.json`（套用前：CORS 0 條、lifecycle 僅 Default Multipart Abort Rule）→ PUT → 讀回「CORS 一致、lifecycle 一致、其他規則遺失 0 條」。
+- 驗收（計畫 C2）：S3 端點 OPTIONS preflight：`app`／`tarot`／`studio`.aware-wave.com＋PUT＋content-type → 204 且 `allow-origin` 回原 origin、`allow-methods=PUT`；`https://evil.example.com`、`http://localhost:3000`、DELETE → 403。`check-deploy-drift.ps1` → `r2DesignsConfig: in_sync`。
+- 回滾：備份檔的 `cors.rules`／`lifecycle.rules` PUT 回去（CORS 原本為空＝刪除設定）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=tsx scripts/r2-designs-bucket-config.ts --apply (container env) + OPTIONS preflight x6 + check-deploy-drift.ps1 | exit=0 | ms=3626
+- REVIEW_WAIVED: NA -- 本 entry 不改程式碼；只執行已審（critic 4m/3n 已修）的腳本並提交其備份檔
+- BUGHUNT_WAIVED: NA -- 無程式碼或字串改動
 ## 2026-11-15（續24）— 剪輯器字型卡剩餘部分：預覽文字外觀一個函式（字幕樣式小樣同源）、缺字換字型的字級對齊輸出、字型檔 MIME、start.cmd 全量核對
 
 - 背景：字型包本體（vendor/fonts、fontsdir、@font-face、golden 重錄）已由 P6.10 在 `f8ffef30d` 提交；它沒拿的是預覽重構與以下各項。路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`。

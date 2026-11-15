@@ -1,0 +1,22 @@
+{
+  "bucket": "lobster-designs",
+  "savedAtUtc": "2026-11-15T14:56:06.162Z",
+  "cors": {
+    "rules": []
+  },
+  "lifecycle": {
+    "rules": [
+      {
+        "id": "Default Multipart Abort Rule",
+        "enabled": true,
+        "conditions": {},
+        "abortMultipartUploadsTransition": {
+          "condition": {
+            "type": "Age",
+            "maxAge": 604800
+          }
+        }
+      }
+    ]
+  }
+}
