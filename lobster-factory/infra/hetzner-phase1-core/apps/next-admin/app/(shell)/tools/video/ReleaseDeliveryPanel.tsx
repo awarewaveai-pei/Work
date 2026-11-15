@@ -5,6 +5,7 @@ import OrganizationPicker from "./OrganizationPicker";
 import { QA_LABELS, STATUS_TEXT, BLOCKED_NOTE, explainFinding } from "./qa-labels";
 import { RATIO_LABEL, ratioFor, ratioOfAsset } from "@/lib/content/video/platform-ratio";
 import { textsForAccounts, writerKeysFor } from "@/lib/social/write-posts";
+import { defaultCopy, syndicateCostTwd } from "@/lib/content/video/release-copy";
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14, display: "grid", gap: 9 };
 const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: 8, borderRadius: 6, border: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", color: "var(--text-primary)", fontSize: 12 };
@@ -13,6 +14,8 @@ const chip = (on: boolean): React.CSSProperties => ({ padding: "6px 10px", borde
 
 const KINDS = ["technical", "caption", "editorial", "rights"] as const;
 type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; script?: string; ratio?: string }; created_at: string; asset_domain: string };
+type Cover = { id: string; url: string; kind: "auto" | "ai" | "upload"; chosen: boolean };
+const COVER_KIND: Record<Cover["kind"], string> = { auto: "自動", ai: "AI", upload: "上傳" };
 type Qa = { kind: string; status: string; candidateChecksum: string; findings?: Array<{ rule: string; message: string; evidence?: Record<string, number | string | null> }> };
 type Account = { id: string; platform: string; label: string; status: string };
 type Site = { id: string; name: string; organization_id?: string | null };
@@ -39,6 +42,8 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
   const [released, setReleased] = useState<Record<string, string>>({});   // ratio row id -> approved Release id
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [covers, setCovers] = useState<Record<string, Cover[]>>({});   // ratio row id -> its covers (VD.3)
+  const [coverRights, setCoverRights] = useState(false);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [ticked, setTicked] = useState<string[]>([]);
@@ -64,6 +69,10 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
     return () => { cancelled = true; };
   }, [org]);
 
+  // Another video = nothing of the last one's channels, texts or covers carries over (a default text is written only
+  // into an EMPTY box, so a kept text would be posted with the wrong video; Codex 63d19a26 F3).
+  useEffect(() => { setTicked([]); setTexts({}); setCovers({}); setCoverRights(false); }, [candidateId]);
+
   // Every ratio row gets its editorial/rights QA computed (it reads the row's own metadata), then its QA reports and Release are read back.
   async function refresh() {
     if (!org || rows.length === 0) return;
@@ -74,6 +83,33 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
     const out: Record<string, string> = {};
     for (const r of rel?.items ?? []) if (rows.find((x) => x.id === r.candidate_asset_id)?.checksum_sha256 === r.candidate_checksum && !out[r.candidate_asset_id]) out[r.candidate_asset_id] = r.id;
     setReleased(out);
+    await loadCovers();
+  }
+
+  // Card VD.3: each ratio row's covers (lib/content/video/cover.ts decides the chosen one; this page only shows and picks).
+  async function loadCovers() {
+    if (!org || rows.length === 0) return;
+    const j = await getJson<{ covers?: Record<string, Cover[]> }>(`/api/video/cover?organizationId=${encodeURIComponent(org)}&assetIds=${rows.map((r) => r.id).join(",")}`);
+    setCovers(j?.covers ?? {});
+  }
+  async function chooseCover(rowId: string, coverAssetId: string) {
+    setBusy(true); setMessage("");
+    const res = await postJson("/api/video/cover", { organizationId: org, assetId: rowId, coverAssetId });
+    if (res.ok) await loadCovers(); else setMessage(String(res.json.error ?? "換封面失敗"));
+    setBusy(false);
+  }
+  async function uploadCover(rowId: string, file: File | undefined) {
+    if (!file) return;
+    setBusy(true); setMessage("");
+    const form = new FormData();
+    form.set("assetId", rowId); form.set("rightsConfirmed", coverRights ? "true" : "false"); form.set("file", file);
+    try {
+      const r = await fetch(`/api/video/cover?organizationId=${encodeURIComponent(org)}`, { method: "POST", body: form });
+      const json = await r.json().catch(() => ({})) as Record<string, unknown>;
+      if (r.ok && json.ok !== false) { await loadCovers(); setMessage("✅ 已換成你上傳的封面"); } else setMessage(String(json.error ?? "上傳封面失敗"));
+    } catch { setMessage("網路錯誤"); }
+    finally { setCoverRights(false); }   // the rights box is about ONE image, whatever happened to it (Codex 9bea8a27 F2, 08e0141d F2)
+    setBusy(false);
   }
   useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [candidateId, assets]);
 
@@ -155,6 +191,23 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
           </div>
           {results.filter((x) => x.q && x.q.status !== "passed").flatMap((x) => (x.q?.findings ?? []).map((f, i) => <div key={`${x.k}${f.rule}${i}`} style={{ fontSize: 11.5, color: "var(--red)" }}>{QA_LABELS[x.k]}：{explainFinding(f)}</div>))}
           {!released[r.id] && results.some((x) => x.q && x.q.status !== "passed") && <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{BLOCKED_NOTE}</div>}
+          <div style={{ display: "grid", gap: 6 }}>
+            <span style={{ fontSize: 12 }}>封面（YouTube 縮圖、IG 封面、網站影片預覽圖都用這張）</span>
+            {(covers[r.id] ?? []).length === 0 ? <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>這支影片還沒有封面；可上傳一張。</span>
+              : <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                {(covers[r.id] ?? []).map((c) => <button key={c.id} type="button" disabled={busy || c.chosen} aria-pressed={c.chosen} onClick={() => void chooseCover(r.id, c.id)}
+                  title={c.chosen ? "目前的封面" : "改用這張"} style={{ padding: 2, borderRadius: 6, border: `2px solid ${c.chosen ? "var(--accent)" : "var(--border-subtle)"}`, background: "var(--card-bg)", cursor: c.chosen ? "default" : "pointer", display: "grid", gap: 2, justifyItems: "center" }}>
+                  <img src={c.url} alt={c.chosen ? "目前的封面" : "封面候選"} loading="lazy" style={{ display: "block", height: c.chosen ? 96 : 56, maxWidth: 200, objectFit: "contain" }} />
+                  <span style={{ fontSize: 10.5, color: "var(--text-secondary)" }}>{c.chosen ? "使用中" : COVER_KIND[c.kind]}</span>
+                </button>)}
+              </div>}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 11.5 }}>
+              <label style={{ display: "flex", gap: 4, alignItems: "center" }}><input type="checkbox" checked={coverRights} onChange={(e) => setCoverRights(e.target.checked)} />我有權使用要上傳的圖</label>
+              <label style={{ ...btn(!busy && coverRights), display: "inline-block" }}>上傳自己的封面（JPG／PNG，最大 2 MB，免費）
+                <input type="file" accept="image/jpeg,image/png" disabled={busy || !coverRights} style={{ display: "none" }} onChange={(e) => { void uploadCover(r.id, e.target.files?.[0]); e.target.value = ""; }} />
+              </label>
+            </div>
+          </div>
         </div>;
       })}
     </section>
@@ -168,13 +221,18 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
             {accounts.map((a) => {
               const ratio = ratioFor(a.platform, releasedRatios);
               return <label key={a.id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}>
-                <input type="checkbox" checked={ticked.includes(a.id)} onChange={(e) => setTicked((t) => e.target.checked ? [...t, a.id] : t.filter((x) => x !== a.id))} />
+                <input type="checkbox" checked={ticked.includes(a.id)} onChange={(e) => {
+                  const on = e.target.checked;
+                  setTicked((t) => on ? [...t, a.id] : t.filter((x) => x !== a.id));
+                  // VD.9: free first -- a newly ticked channel starts with the title and the script's first line
+                  if (on) setTexts((t) => (t[a.id] ?? "").trim() ? t : { ...t, [a.id]: defaultCopy(primary?.metadata?.title, primary?.metadata?.script) });
+                }} />
                 {a.label}（{a.platform}）→ {ratio ? RATIO_LABEL[ratio] : "沒有可用比例"}
               </label>;
             })}
           </div>
           {ticked.length > 0 && <>
-            <button type="button" disabled={busy} onClick={() => void writeCopy()} style={btn(!busy)}>用 AI 寫各頻道文案（Claude Haiku，約 US$0.01）</button>
+            <button type="button" disabled={busy} onClick={() => void writeCopy()} style={btn(!busy)}>用 AI 改寫各頻道文案（Claude Haiku，約 NT${syndicateCostTwd()}）</button>
             {ticked.map((id) => <label key={id} style={{ fontSize: 11 }}>{accounts.find((a) => a.id === id)?.label} 的文案
               <textarea value={texts[id] ?? ""} onChange={(e) => setTexts((t) => ({ ...t, [id]: e.target.value }))} rows={3} style={{ ...field, marginTop: 4 }} /></label>)}
             <button type="button" disabled={busy || !tickedAll} onClick={() => void saveDrafts()} style={btn(!busy && tickedAll)}>存成社群草稿</button>
