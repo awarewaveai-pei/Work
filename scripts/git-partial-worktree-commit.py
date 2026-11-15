@@ -36,6 +36,7 @@ import re
 import secrets
 import subprocess
 import sys
+import time
 
 SCRATCH = os.environ.get("PARTIAL_COMMIT_SCRATCH") or os.path.join(os.environ.get("TEMP", "/tmp"), "git-partial-worktree-commit")
 HUNK = re.compile(rb"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$")
@@ -153,8 +154,50 @@ def head_blob(rel):
     return r.stdout.decode().strip() if r.returncode == 0 else None
 
 
+STALE_AFTER_S = 24 * 3600
+
+
+def prune_stale(root):
+    """A refused or abandoned stage leaves <tag>-<rand>.index (+ .json) behind, and the commit guard refuses them once
+    HEAD has moved -- dead weight (2026-11-15: 24 of them, 38 MB, back to 11-05). Removed when older than a day and:
+    the marker's root is gone (a removed worktree) or its HEAD is no longer that root's HEAD (asked of the root itself,
+    so an abandoned worktree that never stages again is covered too); an .index or .json without its partner. An
+    unattributable orphan .index (no marker, another root's tag) goes after a week."""
+    now, tag = time.time(), root_tag(root)
+    heads = {}
+
+    def head_of(r):
+        if r not in heads:
+            x = subprocess.run(["git", "-C", r, "rev-parse", "HEAD"], capture_output=True)
+            heads[r] = x.stdout.decode().strip() if x.returncode == 0 else None
+        return heads[r]
+
+    for name in os.listdir(SCRATCH):
+        if not (name.endswith(".index") or name.endswith(".index.json")):
+            continue
+        idx = os.path.join(SCRATCH, name[:-5] if name.endswith(".json") else name)
+        mk = marker_path(idx)
+        try:
+            age = now - max(os.path.getmtime(p) for p in (idx, mk) if os.path.exists(p))
+            mine = name.startswith(tag + "-")
+            if os.path.exists(idx) and os.path.exists(mk):
+                marker = load_marker(idx)
+                r = str(marker.get("root", ""))
+                dead = not os.path.isdir(r) or (head_of(r) is not None and marker.get("head") != head_of(r))
+                if not dead or age < STALE_AFTER_S:
+                    continue
+            elif age < (STALE_AFTER_S if mine or os.path.exists(mk) else 7 * STALE_AFTER_S):
+                continue
+            for p in (idx, mk):
+                if os.path.exists(p):
+                    os.unlink(p)
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+
+
 def new_index(root):
     os.makedirs(SCRATCH, exist_ok=True)
+    prune_stale(root)
     index_path = os.path.join(SCRATCH, f"{root_tag(root)}-{secrets.token_hex(4)}.index").replace("\\", "/")
     run("git", "read-tree", "HEAD", env=index_env(index_path))
     # head: the tree this index was read from -- a commit on a moved HEAD would silently revert whatever landed in

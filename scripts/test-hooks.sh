@@ -28,6 +28,8 @@
 #   tests/hooks/mass-delete-pre-commit.test.mjs — git-native pre-commit refuses a commit deleting more than half of HEAD (empty-index incident 2026-10-26)
 #   tests/hooks/hook-tool-cwd.test.mjs — rules run git in the tool call's directory (payload.cwd), not the hook process's (worktree incident 2026-11-15)
 #   tests/hooks/repo-text-writers.test.mjs — every *-LATEST.* report is written through Write-RepoTextFile (LF); raw Set-Content/WriteAllText writers made 166 CRLF phantoms (2026-11-15)
+#   tests/hooks/worklog-entry-number.test.mjs — 續N is free in origin/main and every linked worktree, not only this file (two sessions got 續7, 2026-11-15)
+#   tests/hooks/partial-commit-prune.test.mjs — a fresh private index prunes this root's stale (HEAD moved, >24 h) indexes and markers
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -46,4 +48,4 @@ fi
 # is not the place every new gate has to edit.
 "$NODE_BIN" --test tests/hooks/governance-pointers.test.mjs tests/hooks/trigger-index.test.mjs
 
-"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/worktree-reparse-guard.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs tests/hooks/codex-adapter.test.mjs tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/shared-file-guard.test.mjs tests/hooks/linked-worktree-root.test.mjs tests/hooks/file-claim-guard.test.mjs tests/hooks/suggest-compact-rule.test.mjs tests/hooks/read-sweep-to-codex-rule.test.mjs tests/hooks/mass-delete-pre-commit.test.mjs tests/hooks/hook-tool-cwd.test.mjs tests/hooks/repo-text-writers.test.mjs
+"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/worktree-reparse-guard.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs tests/hooks/codex-adapter.test.mjs tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/shared-file-guard.test.mjs tests/hooks/linked-worktree-root.test.mjs tests/hooks/file-claim-guard.test.mjs tests/hooks/suggest-compact-rule.test.mjs tests/hooks/read-sweep-to-codex-rule.test.mjs tests/hooks/mass-delete-pre-commit.test.mjs tests/hooks/hook-tool-cwd.test.mjs tests/hooks/repo-text-writers.test.mjs tests/hooks/worklog-entry-number.test.mjs tests/hooks/partial-commit-prune.test.mjs

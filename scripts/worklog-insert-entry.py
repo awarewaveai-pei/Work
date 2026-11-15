@@ -13,7 +13,29 @@ import argparse
 import datetime
 import os
 import re
+import subprocess
 import sys
+
+
+def other_copies(rel):
+    """origin/main's blob and the file in every other worktree of this repository (read-only; a failure skips that copy)."""
+    out = []
+    r = subprocess.run(["git", "show", f"origin/main:{rel}"], capture_output=True)
+    if r.returncode == 0:
+        out.append(r.stdout.decode("utf-8", "replace"))
+    here = os.path.normcase(os.path.abspath(rel))
+    for line in subprocess.run(["git", "worktree", "list", "--porcelain"], capture_output=True).stdout.decode("utf-8", "replace").splitlines():
+        if not line.startswith("worktree "):
+            continue
+        p = os.path.join(line[len("worktree "):], rel)
+        if os.path.normcase(os.path.abspath(p)) == here or not os.path.exists(p):
+            continue
+        try:
+            with open(p, "rb") as f:
+                out.append(f.read().decode("utf-8", "replace"))
+        except OSError:
+            pass
+    return out
 
 
 def main():
@@ -31,7 +53,12 @@ def main():
     # The header line decides: another session's uncommitted hunk can leave stray CRLF lines in an LF file.
     nl = b"\r\n" if b.split(b"\n", 1)[0].endswith(b"\r") else b"\n"
     text = b.decode("utf-8")
-    used = [int(m) for m in re.findall(r"^## " + re.escape(a.date) + r"（續(\d+)）", text, re.M)]
+    numbers = lambda t: [int(m) for m in re.findall(r"^## " + re.escape(a.date) + r"（續(\d+)）", t, re.M)]
+    # 2026-11-15: two worktree sessions were each handed 續7 -- each saw only its own file. The number is taken
+    # above every copy this checkout can see: this file, origin/main's (as last fetched), every linked worktree's.
+    used = numbers(text)
+    for other in other_copies(os.path.relpath(os.path.abspath(a.worklog), root).replace(os.sep, "/")):   # repo-relative, whatever --worklog was
+        used += numbers(other)
     n = (max(used) + 1) if used else 1
     entry = entry.replace("續NNN", f"續{n}")
     if not entry.endswith("\n"):

@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-15（續19）— 共享 worktree 衛生：WORKLOG 跨 worktree 配號、過期私有 index 自動清理、舊備份與 autocrlf 的處置
+
+**根因 1**：`scripts/worklog-insert-entry.py` 只讀自己 worktree 的 WORKLOG 取最大 續N → 兩個 worktree session 同時配到 續7（卡 A／卡 B，皆已在 main）。**修**：取最大值的範圍改為「本檔 ∪ `origin/main:agency-os/WORKLOG.md`（上次 fetch）∪ `git worktree list --porcelain` 每個 worktree 的未提交副本」；任一來源讀不到就跳過該來源。
+**根因 2**：`git-partial-worktree-commit.py` 的 index／marker 只在 commit 成功時由守衛刪除；被拒或放棄的 stage 永久留在 `$TEMP/git-partial-worktree-commit`（25 個 .index、38 MB、回溯到 11-05；守衛對 HEAD 已移動的 marker 一律拒絕，是死檔）。**修**：`new_index()` 先 `prune_stale(root)`，對 scratch 目錄所有條目：最新 mtime > 24 h 且（marker 的 root 目錄已不存在、或 marker 的 head ≠ 該 root 自己的 HEAD（`git -C <root> rev-parse HEAD`，有快取）、或 index／marker 缺一）→ 刪；無法歸屬的孤兒 index（無 marker、他 root 的 tag）滿 7 天才刪。
+**備份目錄**：`D:\Work\.git\parity-merge-q4v3zntr`（2026-11-12 23:30 事故）內 `data.mjs`／`supervisor.html` 的 19＋25 行舊內容 = 監工台較舊狀態（ED.10／ED.11 `no`，HEAD 已 `yes` 附 11-13 證據；ED.10.4 HEAD 已 `done`）→ 已被取代，刪除。
+**autocrlf**：`D:\Work` 的 `core.autocrlf=true` 無任何 SSOT／稽核規定；`.gitattributes` `* text=auto eol=lf` 已主宰轉換，該設定只剩產生警告 → 不改（改了無處記錄，效益僅警告）。
+**測試**：`tests/hooks/worklog-entry-number.test.mjs`（origin 有 續5、本地 續3 → 配 6；另一 worktree 未提交 續7 → 配 8，反向再配 9；無 origin 時本地獨決）、`tests/hooks/partial-commit-prune.test.mjs`（過期且 HEAD 移動／孤兒 index／孤兒 marker → 刪；過期但 HEAD 相符、新鮮但 HEAD 移動、其他 root → 留），皆登記 `test-hooks.sh`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test worklog-entry-number + partial-commit-prune → 4/4；bash scripts/test-hooks.sh → 33+412 pass；本條目配號即用新工具（看得到 origin/main 與其他 worktree）；本次 stage 實際清掉 `$TEMP` 內 20（25→5，38 MB→7.8 MB） 個過期 marker | exit=0 | ms=88183
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/1n（Codex oracle 9e316371 2、96fa7b9e 2、2dd8f25e 1；前四項修：絕對路徑 --worklog 時其他副本被跳過、非本 root 的 marker 永不清、root 已刪的 marker、孤兒 index；最後一項同一瞬間兩 session 配號的 read-then-write 空窗為固有殘餘，守衛 hook 擋同檔重號、跨 worktree 靠 push 時合併發現）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=worklog-insert-entry | hits=29（AGENTS.md §8、ao-close／commands 文件引用，行為描述仍正確）
 ## 2026-11-15（續18）— 塔羅大圖沒進「我的設計」：Next middleware 10 MiB 截斷請求；前端改縮到放得下
 
 **根因**：Next 15.5.14（`package-lock.json` 自 2026-04-06）`experimental.middlewareClientMaxBodySize` 預設 10 MiB（`node_modules/next/dist/server/body-streams.js:30,82-105`），超過即截斷、route 讀到殘缺 JSON；`designs/route.ts:16` 宣稱 12M 字元圖，超過 10 MiB 的部分從未生效。`TarotStudio.tsx` `postDesign` fire-and-forget → 無聲失敗。證據：prod log 4 筆 `Request body exceeded 10MB for /api/tools/designs`（10:27:14Z、10:28:19Z、10:48:43Z、10:51:23Z）；`media_assets` 最後一筆 tarot-preview 18:26:15（ideogram-v3-balanced），之後 Ideogram 大圖皆未存。
