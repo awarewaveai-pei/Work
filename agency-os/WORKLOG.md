@@ -10,6 +10,20 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=tsx scripts/r2-designs-bucket-config.ts --dry-run (env from prod container, read only) | exit=0 | ms=1471
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=r2-designs-bucket-config | hits=14
+## 2026-11-15（續22）— 「我的設計」原檔直傳 R2：C3（upload-url＋presign）、C4（登記走正式 key、失敗清光）
+
+- 根因：Next 15.5 middleware >10 MiB request body 無聲截斷（`node_modules/next/dist/server/body-streams.js:30,82-105`），base64 大圖存不進；計畫 `lobster-factory/docs/PLAN-designs-direct-upload.md` C3／C4。路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`。
+- C3：`lib/storage/r2-s3.ts`（aws4fetch：`presignPut` 以 `allHeaders` 簽入 content-type——aws4fetch 預設把 content-type 列為不簽；`headObject`；`copyObject` 只認 `<CopyObjectResult>`）；`lib/studio/design-pending.ts`（mime／ext 白名單、mint `uploads/pending/<org>/<uuid>.<ext>`）；`app/api/tools/designs/upload-url/route.ts`（同 designs POST 的 `resolveOpsRole`＋`canCreateAiImageJob`＋`effectiveOrgId`；`default_viewer`＝無身分 → 401；回應另附 `contentType` 供 C5 PUT 用）。
+- C4：`r2GetObject` 先比 Content-Length 再串流計數（`r2.ts`）；designs POST 新輸入 `upload:{key}`／`sourceUpload:{key,name?}`（與 `image`／`sourceUrl`、`sourceFile` 互斥）：key org 段≠請求者 → 403；HEAD 長度 ≤64 MiB＋content-type 相符 → CopyObject → **從正式 key** 讀、sharp 格式須等於 key 類型／`sourceBytesMatch`（`design-source.ts` 抽出，base64 路徑同用）→ insert → 刪 pending。`written[]`＋`fail()`：任一失敗刪本次全部正式物件（含 base64 路徑 insert 失敗時的主圖，原本只刪 source）。
+- 契約補充（加法，不改名）：`sourceUpload.name` 選填（預設 `design.<ext>`），upload-url 回 `contentType`。
+- Codex b1500728 F1–F3 皆驗實已修：F1 回滾原走 `deleteUnreferencedAsset`，WP 站掃不到時拒刪（`lib/content/r2-delete-guard.ts:195-196`）→ 改 `design-pending.ts` `discardUnregisteredDesignObjects`（只刪本請求 mint 的 `designs/YYYY-MM/<uuid>.<ext>`，未回給客戶、無列）；已存資產刪除仍只經 guard（`r2-delete-guard.test.ts:188-196` 不變量不動）。F2 base64 PUT 回應遺失 → key 先登記再 PUT。F3 JSON `null` body → 兩路由 400。pending 刪除 `discardPendingUpload` 只接受 `uploads/pending/`。GET 無副作用檢查器登記 `copyObject`／`claimPendingUpload`／`discardPendingUpload`。
+- commit：a145d5137（C3）、199cc4664（C4）。
+- 突變（拔守衛→指名測試變紅→還原）：org 檢查、讀正式 key、64 MiB 上限、insert 失敗清理、嗅探失敗清理 ＋修正後 PUT 遺失登記、回滾刪除，7/7 皆紅。`r2GetObject` 以 tsx 臨時腳本實跑：宣告過大不讀、無長度／長度說謊於超過時中止、未設 maxBytes 行為不變。
+- 剩餘：真實 presign→PUT→登記（9 MB PNG sha256 相同）要等 C1 金鑰進容器＋C2 CORS；C5／C6 前端未接，現行存檔仍走 base64。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/storage app/api/tools/designs lib/content/__tests__/r2-delete-guard.test.ts lib/security/__tests__/get-no-side-effects.test.ts (70 passed) | exit=0 | ms=2400
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=r2GetObject | hits=15
+- ORACLE_WAIVED: Codex 第一輪 b1500728 已審全部改動；修正後第二輪撞 usage limit（21:26 重設，oracle-quota 已 set）→ 書面對抗自審（回滾只刪本請求 mint 的 key，publicUrl 僅成功時回傳）＋突變 7/7
 ## 2026-11-15（續20）— 計畫：「我的設計」原檔直傳 R2（`lobster-factory/docs/PLAN-designs-direct-upload.md`，C1–C6，未開工）
 
 - 操作者「你決定」→ 選 presigned 直傳：位元組不經 app request（不調高 middleware 上限）；伺服器登記時才讀、先驗長度（I3）；`designs/` 只放已登記物件，孤兒在 `uploads/pending/` 由 lifecycle 清（I4）。
