@@ -139,7 +139,7 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
   }
 
   // POST /api/internal/video/workbench/assets: body = the file bytes (streamed), metadata in X-VW-* headers.
-  async function ingest({ url, file, origin, sources = [], costUsd, jobId, ratio }) {
+  async function ingest({ url, file, origin, sources = [], costUsd, jobId, ratio, coverOf, coverKind }) {
     // An upload registered unconfirmed that is now sent confirmed goes through again (next-admin upgrades the row).
     const sentUnconfirmed = (index[url]?.rightsSources || []).length > 0 && index[url].rightsSources.every((e) => e.kind === "upload" && e.url === url) && index[url].rightsSources.some((e) => e.rightsConfirmed !== true);
     if (index[url] && !(origin?.kind === "upload" && origin.rightsConfirmed === true && sentUnconfirmed)) return { ...index[url], existing: true };
@@ -153,6 +153,8 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
     if (parents.length) meta.parentAssetIds = parents;
     if (Number.isFinite(costUsd) && costUsd >= 0) meta.costUsd = costUsd;
     if (JOB_ID.test(String(jobId || ""))) meta.vwJobId = jobId;
+    // Card VD.2: a cover candidate names the registered video it belongs to (next-admin lib/content/video/cover.ts).
+    if (UUID.test(String(coverOf || "")) && ["auto", "ai", "upload"].includes(coverKind)) Object.assign(meta, { coverOf, coverKind });
     const size = fs.statSync(file).size;
     // Invariant: every registered video (render, AI-generated or imported) carries its job's ratio (shared/jobs-view.js jobRatio,
     // "16:9" -> "16x9"), never parsed from a file name later: the release panel places a video only by metadata.ratio.

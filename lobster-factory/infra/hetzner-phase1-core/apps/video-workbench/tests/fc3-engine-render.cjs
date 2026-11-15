@@ -36,13 +36,23 @@ function request(port, pathname, headers, body) {
   const render = clip("out.mp4", ["-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30", "-f", "lavfi", "-i", "sine=frequency=550:sample_rate=48000", "-af", "loudnorm=I=-16:TP=-2:LRA=7"]);
   const silent = clip("silent.mp4", ["-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]);
 
-  const calls = { assets: [], releaseText: [], jobs: [] };
+  const calls = { assets: [], covers: [], releaseText: [], jobs: [] };
   async function fetchImpl(url, options = {}) {
     url = String(url);
     assert(url.startsWith(BASE + "/api/internal/"), "只打 next-admin 內部路由：" + url);
     if (url === BASE + "/api/internal/video/workbench/assets") {
       const bytes = Buffer.from(await new Response(options.body).arrayBuffer());
       const meta = JSON.parse(Buffer.from(options.headers["X-VW-Meta"], "base64url").toString("utf8"));
+      // Card VD.2: cover images are kept apart, so every count below stays about the videos themselves.
+      if (meta.coverOf) {
+        if (calls.failCovers > 0) {
+          calls.failCovers--;
+          return Response.json({ ok: false, error: "asset_registration_failed" }, { status: 502 });
+        }
+        calls.covers.push({ meta, bytes, type: options.headers["Content-Type"] });
+        const coverId = "cccccccc-0000-4000-8000-" + String(calls.covers.length).padStart(12, "0");
+        return Response.json({ ok: true, existing: false, assetId: coverId, checksumSha256: crypto.createHash("sha256").update(bytes).digest("hex"), objectUrl: "https://cdn.test/" + coverId, qa: {} }, { status: 201 });
+      }
       calls.assets.push({ meta, bytes });
       const assetId = "aaaaaaaa-0000-4000-8000-" + String(calls.assets.length).padStart(12, "0");
       return Response.json({ ok: true, existing: false, assetId, checksumSha256: crypto.createHash("sha256").update(bytes).digest("hex"), objectUrl: "https://cdn.test/" + assetId, qa: {} }, { status: 201 });
@@ -57,7 +67,7 @@ function request(port, pathname, headers, body) {
     }
     throw Error("unexpected " + url);
   }
-  const env = { VW_TRUST_PROXY_IDENTITY: "1", VW_ALLOWED_HOSTS: "127.0.0.1:*", VW_INTERNAL_BASE: BASE + "/", VW_INTERNAL_TOKEN: "internal-secret" };
+  const env = { VW_SETTLE_RETRY_MS: "400", VW_TRUST_PROXY_IDENTITY: "1", VW_ALLOWED_HOSTS: "127.0.0.1:*", VW_INTERNAL_BASE: BASE + "/", VW_INTERNAL_TOKEN: "internal-secret" };
   const dataDir = path.join(dir, "data");
   const server = createServer({ dataDir, env, fetchImpl });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -123,6 +133,22 @@ function request(port, pathname, headers, body) {
     }
     console.log("PASS render -> cover candidates served as /generated/<uuid>.jpg");
 
+    // Card VD.2: each candidate is registered once, in order, as a JPEG cover of THIS video (coverOf = its asset id),
+    // job-keyed cover:<job>:<i>, with the video as its only rights source; the job records each cover's asset id.
+    const mine = calls.covers.filter((c) => c.meta.coverOf === job.result.assetId);
+    assert.equal(mine.length, job.result.covers.length);
+    assert.deepEqual(mine.map((c) => c.meta.vwJobId), job.result.covers.map((_, i) => `cover:${job.id}:${i}`));
+    for (const c of mine) {
+      assert.equal(c.type, "image/jpeg");
+      assert.equal(c.meta.coverKind, "auto");
+      // a cover is a frame of the video: its rights are the video's own sources (main-system.cjs rightsFor expands them)
+      assert.deepEqual(c.meta.rightsSources.map((s) => s.url).sort(), [a.url, b.url].sort());
+    }
+    const settled = jobsOnDisk().find((j) => j.id === job.id);
+    assert.ok(settled.result.covers.every((c) => /^cccccccc-/.test(c.assetId)), "每張封面記下主系統 id");
+    assert.equal(settled.coverRegisterError, undefined);
+    console.log("PASS render -> covers registered as images of that video (coverOf), in order, once");
+
     // 2. No source list -> 400 before anything is stored (rights guard).
     const before = { assets: calls.assets.length, jobs: jobsOnDisk().length };
     for (const sources of [undefined, []]) {
@@ -145,8 +171,25 @@ function request(port, pathname, headers, body) {
     // 4. EffectCraft (card EC.3), same route: its Render Queue has no loudness setting and a motion piece may be silent, so a
     // silent picture is accepted; the source list is required the same way; a broken file is refused.
     const ec = { engine: "effectcraft", engineVersion: "0.21.1", title: "專業特效成片", ratio: "16:9", width: 1920, height: 1080, sources: [{ url: a.url, id: a.id, name: "來源甲.mp4" }] };
+    calls.failCovers = 1; // card VD.2: the first cover registration of this render fails once
     const ecOk = await send(ec, silent);
     assert.equal(ecOk.status, 201, JSON.stringify(ecOk.body));
+    {
+      const id = ecOk.body.id, before = jobsOnDisk().find((j) => j.id === id);
+      assert.ok(before.coverRegisterError, "封面登記失敗要記下");
+      assert.ok(before.result.covers.every((c) => !c.assetId), "失敗的那張起全部留待重送");
+      // Codex 8ccdf230: no GET at all -- the server retries on its own (VW_SETTLE_RETRY_MS) and the covers arrive.
+      let after;
+      for (let i = 0; i < 100; i++) {
+        after = jobsOnDisk().find((j) => j.id === id);
+        if (!after.coverRegisterError && after.result.covers.every((c) => c.assetId)) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      assert.equal(after.coverRegisterError, undefined, "伺服器自己重送成功，不靠瀏覽器 GET");
+      assert.ok(after.result.covers.length >= 1 && after.result.covers.every((c) => /^cccccccc-/.test(c.assetId)));
+      assert.equal(calls.covers.filter((c) => c.meta.coverOf === ecOk.body.result.assetId).length, after.result.covers.length, "每張只登記一次");
+      console.log("PASS cover registration failure -> recorded, retried by the server itself (no GET), each cover once");
+    }
     assert.equal(ecOk.body.input.settings.engine, "effectcraft");
     assert.equal(ecOk.body.result.origin.engine, "effectcraft");
     assert.deepEqual(calls.assets.at(-1).meta.rightsSources.map((s) => s.url), [a.url], "主系統收到的來源正好是那一個");

@@ -29,12 +29,14 @@ const size = (file) => {
 };
 
 (async () => {
-  // Pure ranking: dark/white frames dropped, highest contrast first, kept >= 2 s apart, returned in time order.
+  // Pure ranking: dark/white frames dropped, kept >= 2 s apart, returned best (highest contrast) first: index 0 is the
+  // default cover (Codex 84855502).
   assert.deepEqual(pickTimes([
     { t: 0, YAVG: 5, YLOW: 0, YHIGH: 10 }, { t: 1, YAVG: 120, YLOW: 20, YHIGH: 220 }, { t: 2, YAVG: 120, YLOW: 10, YHIGH: 230 },
     { t: 5, YAVG: 240, YLOW: 200, YHIGH: 255 }, { t: 6, YAVG: 100, YLOW: 60, YHIGH: 140 },
   ], 3), [2, 6]);
   assert.deepEqual(pickTimes([{ t: 0, YAVG: 3 }], 3), []);
+  assert.deepEqual(pickTimes([{ t: 10, YAVG: 120, YLOW: 60, YHIGH: 160 }, { t: 20, YAVG: 120, YLOW: 10, YHIGH: 240 }], 3), [20, 10], "the better frame is candidate 0 even when it comes later");
   assert.equal(titleSize(1920, 1080), 80);
   assert.equal(titleSize(1080, 1920), 45);
   // Covers end 5 s before the job's deadline (the browser stops watching then), take at most 120 s, and are skipped

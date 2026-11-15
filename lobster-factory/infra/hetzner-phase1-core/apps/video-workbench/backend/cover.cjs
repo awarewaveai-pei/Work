@@ -27,7 +27,8 @@ function parseStats(text) {
   return frames.filter((f) => Number.isFinite(f.YAVG));
 }
 
-// Pure: the times (seconds in the video) of up to `count` frames worth showing; [] = none passed.
+// Pure: the times (seconds in the video) of up to `count` frames worth showing, BEST FIRST (index 0 = the default cover,
+// next-admin lib/content/video/cover.ts candidate 0); [] = none passed.
 function pickTimes(frames, count, offset = 0) {
   const ranked = frames
     .filter((f) => f.YAVG >= DARK && f.YAVG <= BRIGHT)
@@ -38,7 +39,7 @@ function pickTimes(frames, count, offset = 0) {
     if (out.length >= count) break;
     if (out.every((t) => Math.abs(t - f.t) >= MIN_GAP)) out.push(f.t);
   }
-  return out.sort((a, b) => a - b);
+  return out;
 }
 
 // ASS font size is per-mille of the height (subtitle-burn.cjs buildAss): 8 % of the short side, clamped to its range.
@@ -65,21 +66,9 @@ async function autoCovers({ file, duration, width, height, title = "", dir, sign
       times = pickTimes(parseStats(fs.existsSync(stats) ? fs.readFileSync(stats, "utf8") : ""), count, 1);
     }
     if (!times.length) times = [Math.max(0, (Number(duration) || 0) / 2)];
-    const text = String(title || "").trim().slice(0, 200);
-    if (text) fs.writeFileSync(assFile, buildAss({ cues: [{ start: 0, end: 3600, text }], width, height, size: titleSize(width, height), style: "半透明底框", position: "下方" }));
     for (const t of times) {
       const out = (writing = path.join(dir, `cover-${id}-${made.length}.jpg`));
-      const vf = [`scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`];
-      if (text) vf.push(`ass=filename='${filterPath(assFile)}':fontsdir='${filterPath(fontDir())}'`);
-      // q 3 is near-lossless; a busy 4K-ish frame can pass 2 MB, so the quality steps down until it fits.
-      for (const q of [3, 5, 8, 12, 18, 25, 31]) {
-        await run(["-y", "-hide_banner", "-ss", t.toFixed(3), "-i", file, "-frames:v", "1", "-an", "-vf", vf.join(","), "-q:v", String(q), out], signal);
-        if (fs.statSync(out).size <= MAX_BYTES) break;
-      }
-      if (fs.statSync(out).size > MAX_BYTES) {
-        fs.rmSync(out, { force: true });
-        continue;
-      }
+      if (!(await stillJpeg({ input: file, seek: t, width, height, title, out, assFile, signal }, { run, fontDir }))) continue;
       made.push({ file: out, t });
       writing = null;
     }
@@ -94,6 +83,30 @@ async function autoCovers({ file, duration, width, height, title = "", dir, sign
   }
 }
 
+// One cover JPEG from `input` (a video at `seek` seconds, or an image): scaled into width x height (padded, never
+// cropped), the title drawn when there is one, stepped down in quality until <= 2 MB. false = it cannot fit (removed).
+async function stillJpeg({ input, seek, width, height, title = "", out, assFile, signal }, { run, fontDir }) {
+  const text = String(title || "").trim().slice(0, 200);
+  if (text && !fs.existsSync(assFile)) fs.writeFileSync(assFile, buildAss({ cues: [{ start: 0, end: 3600, text }], width, height, size: titleSize(width, height), style: "半透明底框", position: "下方" }));
+  const vf = [`scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`];
+  if (text) vf.push(`ass=filename='${filterPath(assFile)}':fontsdir='${filterPath(fontDir())}'`);
+  // q 3 is near-lossless; a busy 4K-ish frame can pass 2 MB, so the quality steps down until it fits.
+  for (const q of [3, 5, 8, 12, 18, 25, 31]) {
+    await run(["-y", "-hide_banner", ...(seek === undefined ? [] : ["-ss", Number(seek).toFixed(3)]), "-i", input, "-frames:v", "1", "-an", "-vf", vf.join(","), "-q:v", String(q), out], signal);
+    if (fs.statSync(out).size <= MAX_BYTES) return true;
+  }
+  fs.rmSync(out, { force: true });
+  return false;
+}
+
+// Card VD.4: the AI cover's input -- the frame at `seek` WITHOUT a title (the model must not see or redraw text), as a PNG
+// of at most 1280 px on the long side (the models bill or cap by megapixels; ~0.9 MP for 16:9).
+async function framePng({ file, seek, width, height, out, signal }, { run }) {
+  const long = 1280, w = width >= height ? long : Math.round((long * width) / height / 2) * 2, h = width >= height ? Math.round((long * height) / width / 2) * 2 : long;
+  await run(["-y", "-hide_banner", "-ss", Number(seek || 0).toFixed(3), "-i", file, "-frames:v", "1", "-an", "-vf", `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1`, out], signal);
+  return { width: w, height: h };
+}
+
 // Time the covers may take (ms), 0 = none: at most COVER_MS, ending COVER_SLACK_MS before the job's deadline (the
 // browser stops watching a job then, shared/runtime.js); under COVER_MIN_MS left = not worth starting. No deadline = COVER_MS.
 const COVER_MS = 120000, COVER_SLACK_MS = 5000, COVER_MIN_MS = 3000;
@@ -103,4 +116,4 @@ function coverBudget(deadlineAt, now) {
   return budget >= COVER_MIN_MS ? budget : 0;
 }
 
-module.exports = { autoCovers, pickTimes, parseStats, titleSize, coverBudget, MAX_BYTES };
+module.exports = { autoCovers, stillJpeg, framePng, pickTimes, parseStats, titleSize, coverBudget, MAX_BYTES };

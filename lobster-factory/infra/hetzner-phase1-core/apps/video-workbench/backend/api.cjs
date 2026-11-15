@@ -93,10 +93,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     }
   }
   // P6 L3: a finished file goes to the main system's asset ledger (sources = every local url in the job input).
-  async function register(url, origin, { sources = [], costUsd, jobId, ratio } = {}) {
+  async function register(url, origin, { sources = [], costUsd, jobId, ratio, coverOf, coverKind } = {}) {
     const file = localFile(url);
     if (!file) throw Object.assign(Error("找不到要登記的檔案"), { status: 502 });
-    const r = await main.ingest({ url, file, origin, sources, costUsd, jobId, ratio });
+    const r = await main.ingest({ url, file, origin, sources, costUsd, jobId, ratio, coverOf, coverKind });
     return r.skipped ? { ledger: r.skipped } : { assetId: r.assetId, checksumSha256: r.checksumSha256 };
   }
   // Upload-style responses: registered before the answer; a failed registration fails the request.
@@ -166,6 +166,25 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         persist();
       }
     }
+    // Card VD.2: each cover candidate is registered as an image of the registered video (coverOf), one at a time in order
+    // (index 0 = the best frame, the default cover: next-admin lib/content/video/cover.ts); a failure is recorded and
+    // retried by the next GET, already registered ones are not sent again.
+    if (job.status === "succeeded" && job.result?.assetId && (job.result.covers || []).some((c) => !c.assetId && !c.ledger)) {
+      try {
+        for (const [i, c] of job.result.covers.entries()) {
+          if (c.assetId || c.ledger) continue;
+          const r = await register(c.url, { kind: c.kind === "ai" ? "ai_generated" : "render" }, {
+            sources: [job.result.url], costUsd: c.costUsd ?? 0, jobId: `cover:${job.id}:${i}`, coverOf: job.result.assetId, coverKind: c.kind,
+          });
+          Object.assign(c, r);
+          persist();
+        }
+        delete job.coverRegisterError;
+      } catch (e) {
+        job.coverRegisterError = publicError(e.message);
+      }
+      persist();
+    }
     // Paid work is charged once the vendor run it paid for completed (job.paid = the permit's account, set at creation):
     // a delivered job, or a job that failed after its vendor run (job.finishing kept: 破框 finishing lost its file). The
     // record goes to the main-system usage outbox, which owns delivery and retries; usageReported = durably recorded,
@@ -183,6 +202,21 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       persist();
     }
     mirror(job);
+    retryOwed(job);
+  }
+  // Invariant (VD.2, Codex 8ccdf230): what a finished job still owes the main system (release text, covers) is retried by
+  // the server itself -- never only when a browser happens to GET the job again (a page that already has the asset never
+  // does). Backoff from VW_SETTLE_RETRY_MS (default 30 s) doubling to 1 h; a restart re-arms it (setImmediate below).
+  const retryBase = Math.max(10, Number(vwEnv(env, "SETTLE_RETRY_MS")) || 30000),
+    retries = new Map();
+  function retryOwed(job) {
+    if (!main || job.status !== "succeeded" || !(job.releaseTextError || job.coverRegisterError)) { retries.delete(job.id); return; }
+    const prev = retries.get(job.id);
+    if (prev?.timer) return;
+    const n = prev ? prev.n + 1 : 0, entry = { n, timer: null };
+    entry.timer = setTimeout(() => { entry.timer = null; settle(job); }, Math.min(retryBase * 2 ** n, 3600000));
+    entry.timer.unref?.();
+    retries.set(job.id, entry);
   }
   // D5: paid work asks the issuer first; no permit = refused before any provider call.
   // Returns who pays (job.paid) so the delivered work can be charged; null = local mode or free work.
@@ -204,7 +238,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   };
   // Invariant: a job still owing the main system something (asset registration, release text) is never pruned by the
   // history limit; its retry lives only in this record.
-  const pending = (j) => ["queued", "running"].includes(j.status) || !!(j.ledgerError || j.releaseTextError) || (!!main && unsettled(j));
+  const pending = (j) => ["queued", "running"].includes(j.status) || !!(j.ledgerError || j.releaseTextError || j.coverRegisterError) || (!!main && unsettled(j));
   // Per-job inputs that are not results (破框's lock mask): job-inputs/<job id>/, never served, never library assets. They
   // live exactly as long as their job's record: a retry reruns from the record and copies them; the history limit here is
   // the one place a record goes, and every save drops the folders of records it no longer keeps (bounded by the limit).
@@ -266,6 +300,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // A breakout job a restart left finishing resumes: the model's file is on disk and the work is local and repeatable.
   // Without that file there is nothing to finish from. After this tick, once everything below is defined.
   setImmediate(() => {
+    for (const job of jobs) retryOwed(job); // VD.2: owed release text / covers from before a restart
     for (const job of jobs)
       if (job.status === "running" && job.stage === "finishing") {
         if (job.finishing?.url && fs.existsSync(path.join(dataDir, job.finishing.url.slice(1)))) finishBreakout(job);
@@ -949,7 +984,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       persist();
     }
-    if (job.status !== before || unsettled(job) || (main && job.status === "succeeded" && (job.ledgerError || job.releaseTextError))) {
+    if (job.status !== before || unsettled(job) || (main && job.status === "succeeded" && (job.ledgerError || job.releaseTextError || job.coverRegisterError))) {
       let timer;
       const waited = new Promise((r) => (timer = setTimeout(r, settleWaitMs, false)));
       const done = await Promise.race([settle(job).then(() => true), waited]);

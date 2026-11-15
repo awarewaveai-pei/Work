@@ -209,4 +209,25 @@ describe("POST /api/internal/video/workbench/assets", () => {
     expect(r2.puts).toHaveLength(1);
     expect(r2.deletes).toEqual([]);
   });
+
+  // Card VD.2: a cover is an image of one of this org's videos; the video row itself is never written.
+  it("cover: registered with coverOf/coverKind; other org, non-video target, non-image or half the pair refused before upload", async () => {
+    const VIDEO = "22222222-2222-4222-8222-222222222222", IMAGE = "33333333-3333-4333-8333-333333333333";
+    state.rows.push({ id: VIDEO, organization_id: ORG, mime_type: "video/mp4", metadata: { title: "t" } },
+      { id: IMAGE, organization_id: ORG, mime_type: "image/png", metadata: {} },
+      { id: "44444444-4444-4444-8444-444444444444", organization_id: "99999999-9999-4999-8999-999999999999", mime_type: "video/mp4", metadata: {} });
+    const meta = (m: object) => Buffer.from(JSON.stringify(m)).toString("base64url");
+    const cover = (m: object, extra: Record<string, string> = {}) => post({ ...auth, "x-vw-origin": "workbench_render", "x-vw-meta": meta(m), ...extra });
+    expect((await cover({ coverOf: "44444444-4444-4444-8444-444444444444", coverKind: "auto", vwJobId: "cover:j:0" })).status).toBe(400);
+    expect((await cover({ coverOf: IMAGE, coverKind: "auto", vwJobId: "cover:j:0" })).status).toBe(400);
+    expect((await cover({ coverOf: VIDEO })).status).toBe(400);
+    expect((await cover({ coverOf: VIDEO, coverKind: "best" })).status).toBe(400);
+    expect(r2.puts).toEqual([]);
+    const ok = await cover({ coverOf: VIDEO, coverKind: "auto", vwJobId: "cover:j:0" });
+    expect(ok.status).toBe(201);
+    const row = state.rows.find((r) => r.id === (state.rows[state.rows.length - 1].id));
+    expect(row?.metadata).toMatchObject({ coverOf: VIDEO, coverKind: "auto", vwJobId: "cover:j:0", source: "video_workbench" });
+    expect(state.rows.find((r) => r.id === VIDEO)?.metadata).toEqual({ title: "t" });
+    expect(state.updates).toEqual([]);
+  });
 });

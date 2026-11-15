@@ -401,13 +401,14 @@
   // Parent page only (children share its db).
   // A succeeded copy without the server's registration outcome (result.assetId / result.ledger; backend/api.cjs settle)
   // was taken mid-registration: it is asked again, every 5 s while the server says ledgerPending or the ask failed,
-  // until it has one (送審與投遞 reads result.assetId from this copy). A ledgerError copy is asked once per load.
+  // until it has one (送審與投遞 reads result.assetId from this copy). A ledgerError copy is asked once per load, and so is a
+  // registered copy whose release text or covers failed to reach the main system (the server retries those only on a GET).
   // At most 50 asks per round; more open copies = another round. Each copy is asked once per load unless its last
   // answer asked for another (`again`: still running, ledgerPending, or the ask failed), so the rounds end.
   const asked = new Set(),
     again = new Set();
   async function reconcileJobs() {
-    const unsettled = (j) => j.status === "succeeded" && j.result && !j.result.assetId && !j.result.ledger;
+    const unsettled = (j) => j.status === "succeeded" && j.result && ((!j.result.assetId && !j.result.ledger) || !!(j.releaseTextError || j.coverRegisterError));
     const all = db.jobs.filter(
         (j) => j?.id && !["failed", "cancelled", "blocked"].includes(j.status) && (unsettled(j) || !db.assets.some((a) => a.id === "job-" + j.id)) && (!asked.has(j.id) || again.has(j.id)),
       ),
@@ -435,7 +436,7 @@
         running ||= watch(v);
         if (v?.status !== "succeeded") continue;
       }
-      for (const k of ["ledgerError", "releaseTextError", "ledgerPending"]) if (!(k in v)) delete j[k];   // resolved since
+      for (const k of ["ledgerError", "releaseTextError", "coverRegisterError", "ledgerPending"]) if (!(k in v)) delete j[k];   // resolved since
       Object.assign(j, v);
       changed = true;
       if (v.status === "succeeded" && v.result?.url && !db.assets.some((a) => a.id === "job-" + j.id))

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { DELIVERY_RATIOS } from "@/lib/content/video/platform-ratio";
+import { COVER_KINDS, type CoverKind } from "@/lib/content/video/cover";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,8 @@ export const maxDuration = 300;
  * VW holds no Supabase or R2 key). Bearer = VW_INTERNAL_TOKEN; unset = every call 401.
  * Body = the raw file bytes. Headers: Content-Type (mime), X-VW-Org-Id (uuid), X-VW-Origin (ai_generated |
  * real_footage | workbench_render), X-VW-Meta (base64url JSON: rightsSources, parentAssetIds, costUsd, vwJobId,
- * ratio (render delivery ratio: 16x9 | 9x16 | 4x5, stored in metadata), render {outputs, outputMeta} = the render worker's QA evidence for a video).
+ * ratio (render delivery ratio: 16x9 | 9x16 | 4x5, stored in metadata), render {outputs, outputMeta} = the render worker's QA evidence for a video),
+ * coverOf + coverKind (card VD.2: an image registered as a cover candidate of one of this org's videos; lib/content/video/cover.ts).
  * Idempotent by the caller's key: same org + origin + vwJobId (or, without a job, origin + checksum) -> that row, nothing
  * uploaded. The same bytes under another origin or job get their own row (own origin/rights/cost) over the shared
  * content-addressed object, as the next `version` of its key (unique org+backend+key+version, migration 0038).
@@ -54,7 +56,7 @@ function maxBytes(): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_MAX_BYTES;
 }
 
-type Meta = { rightsSources?: unknown[]; parentAssetIds?: string[]; costUsd?: number; vwJobId?: string; ratio?: string; render?: { outputs: Record<string, string>; outputMeta?: Record<string, unknown> } };
+type Meta = { rightsSources?: unknown[]; parentAssetIds?: string[]; costUsd?: number; vwJobId?: string; ratio?: string; coverOf?: string; coverKind?: CoverKind; render?: { outputs: Record<string, string>; outputMeta?: Record<string, unknown> } };
 
 function parseMeta(raw: string | null): Meta | null {
   if (!raw) return {};
@@ -84,6 +86,12 @@ function parseMeta(raw: string | null): Meta | null {
   if (m.ratio !== undefined) {
     if (typeof m.ratio !== "string" || !DELIVERY_RATIOS.includes(m.ratio)) return null;
     out.ratio = m.ratio;
+  }
+  // A cover names its video and how it was made, both or neither (lib/content/video/cover.ts COVER_KINDS).
+  if (m.coverOf !== undefined || m.coverKind !== undefined) {
+    if (typeof m.coverOf !== "string" || !UUID.test(m.coverOf) || !COVER_KINDS.includes(m.coverKind as CoverKind)) return null;
+    out.coverOf = m.coverOf;
+    out.coverKind = m.coverKind as CoverKind;
   }
   if (m.render !== undefined) {
     const r = m.render as Record<string, unknown> | null;
@@ -158,6 +166,13 @@ export async function POST(req: Request): Promise<Response> {
 
   const db = getSupabaseWriteClient();
   if (!db) return fail(503, "db_unavailable");
+  // Invariant (VD.2): a cover is an image of one of THIS org's videos; anything else is refused before any byte is stored.
+  if (meta.coverOf) {
+    if (!mime.startsWith("image/")) return fail(400, "invalid_cover");
+    const target = await db.from("media_assets").select("id, mime_type").eq("id", meta.coverOf).eq("organization_id", organizationId).maybeSingle();
+    if (target.error) return fail(502, "asset_lookup_failed", target.error);
+    if (!target.data || !String(target.data.mime_type ?? "").startsWith("video/")) return fail(400, "invalid_cover_target");
+  }
   // Invariant: idempotency is by the caller's key, never by bytes alone (a row found by checksum may carry another origin).
   const findMine = () => {
     const q = db.from("media_assets").select("id, object_url, metadata")
@@ -220,6 +235,7 @@ export async function POST(req: Request): Promise<Response> {
         ...(meta.costUsd !== undefined ? { costUsd: meta.costUsd } : {}),
         ...(meta.vwJobId ? { vwJobId: meta.vwJobId } : {}),
         ...(meta.ratio ? { ratio: meta.ratio } : {}),
+        ...(meta.coverOf ? { coverOf: meta.coverOf, coverKind: meta.coverKind } : {}),
       },
     }).select("id").single();
     if (!inserted.error && inserted.data) break;
