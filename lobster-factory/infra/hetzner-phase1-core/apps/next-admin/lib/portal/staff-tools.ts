@@ -61,7 +61,8 @@ export const STAFF_PLATFORM: { pages: readonly string[]; apis: readonly string[]
   // locally next.config.ts rewrites; our dock in public/vector-pro-dock/). No data, like /editor-shared. /photo-pro, /photo-pro-dock:
   // the same for /tools/photo-pro (PhotoCraft build; our dock in public/photo-pro-dock/).
   pages: ["/$", "/no-access$", "/editor-shared", "/vector-pro", "/vector-pro-dock", "/photo-pro", "/photo-pro-dock"],
-  apis: [...PLATFORM_APIS, "/api/ops/build-id", "/api/ops/analytics-context"],
+  // /api/tools/codex-laptop: the sidebar's 「啟動筆電」 status on every page; the route itself answers the owner only (codexAllowed).
+  apis: [...PLATFORM_APIS, "/api/ops/build-id", "/api/ops/analytics-context", "/api/tools/codex-laptop"],
 };
 
 /** The STAFF_API_OWNERS patterns that name `key`, as listed (toolsFor applies specificity). */
