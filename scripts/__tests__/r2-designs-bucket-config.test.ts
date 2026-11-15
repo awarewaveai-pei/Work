@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  buildOrigins, desiredCorsRule, desiredLifecycleRule, diffRules, lostRules, main, mergeRules, normalizeOrigin, parseArgs,
+  buildOrigins, configState, wasApplied, desiredCorsRule, desiredLifecycleRule, diffRules, lostRules, main, mergeRules, normalizeOrigin, parseArgs,
   CORS_RULE_ID, type Rule,
 } from "../r2-designs-bucket-config";
 
@@ -53,8 +53,33 @@ test("read-back: a foreign rule that vanished after the PUT is reported", () => 
   assert.deepEqual(lostRules([a], [a], "ours"), []);
 });
 
+test("check state: in_sync / not_applied / drift (stale origin list or only one rule applied)", () => {
+  const c = desiredCorsRule(["https://a.test"]), l = desiredLifecycleRule();
+  const st = (curC: Rule[], curL: Rule[], wantC = c) =>
+    configState(diffRules(curC, mergeRules(curC, wantC), wantC), diffRules(curL, mergeRules(curL, l), l), c.id as string, l.id as string);
+  assert.equal(st([c], [l]), "in_sync");
+  assert.equal(st([], []), "not_applied");
+  assert.equal(st([desiredCorsRule(["https://old.test"])], [l], c), "drift");
+  assert.equal(st([c], []), "drift");
+});
+
+test("check mode: exit 6 when not applied, exit 0 when in sync, never PUTs", async () => {
+  const calls: string[] = [];
+  const mk = (cors: Rule[], life: Rule[]) => (async (url: string, init?: RequestInit) => {
+    calls.push(String(init?.method));
+    return cfJson({ rules: String(url).endsWith("/cors") ? cors : life });
+  }) as unknown as typeof fetch;
+  const a = await runMain(["--check"], mk([], []));
+  assert.equal(a.code, 6);
+  assert.match(a.out, /CHECK_STATE=not_applied/);
+  const b = await runMain(["--check"], mk([desiredCorsRule(buildOrigins(env))], [desiredLifecycleRule()]));
+  assert.equal(b.code, 0);
+  assert.ok(calls.every((m) => m === "GET"));
+});
+
 test("args: --apply with --dry-run refused; unknown flag refused", () => {
   assert.throws(() => parseArgs(["--apply", "--dry-run"]));
+  assert.throws(() => parseArgs(["--apply", "--check"]));
   assert.throws(() => parseArgs(["--nope"]));
   assert.equal(parseArgs([]).apply, false);
 });
@@ -95,4 +120,33 @@ test("dry-run: 403 → exit 3 with the 'need a bucket-settings token' message, n
   assert.equal(n, 1);
   assert.match(out, /需操作者臨時給 bucket 設定權限的 token/);
   assert.ok(!out.includes("SECRET-TOKEN-VALUE"));
+});
+
+const cfErr = (status: number, code: number) => new Response(JSON.stringify({ success: false, errors: [{ code, message: "x" }], result: null }), { status });
+
+test("missing bucket (404 code 10006) is an error, never 'not applied'; 404 code 10059 (no CORS config) = no rules", async () => {
+  await assert.rejects(runMain(["--check"], (async () => cfErr(404, 10006)) as unknown as typeof fetch));
+  const ok = await runMain(["--check"], (async (url: string) =>
+    String(url).endsWith("/cors") ? cfErr(404, 10059) : cfJson({ rules: [] })) as unknown as typeof fetch);
+  assert.equal(ok.code, 6);
+});
+
+test("auth failure sent as HTTP 400 code 9106 → exit 3", async () => {
+  const r = await runMain(["--check"], (async () => cfErr(400, 9106)) as unknown as typeof fetch);
+  assert.equal(r.code, 3);
+});
+
+test("wasApplied: a backup for this bucket in the report dir means --apply ran before", async () => {
+  const fs = await import("node:fs"), os = await import("node:os"), path = await import("node:path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-r2-"));
+  try {
+    assert.equal(wasApplied("lobster-designs", dir), false);
+    fs.writeFileSync(path.join(dir, "other-bucket-2026.json"), "{}");
+    assert.equal(wasApplied("lobster-designs", dir), false);
+    fs.writeFileSync(path.join(dir, "lobster-designs-2026-11-15T00-00-00-000Z.json"), "{}");
+    assert.equal(wasApplied("lobster-designs", dir), true);
+    assert.equal(wasApplied("x", path.join(dir, "nope")), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
 });

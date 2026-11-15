@@ -76,6 +76,8 @@ Set-StrictMode -Version Latest
 
 # ssh with keepalive + hard total deadline; decodes stdout as UTF-8 itself (scripts/lib/ssh-deadline.ps1).
 . (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+# R2 designs bucket CORS/lifecycle vs container env + products.ts (step 4.6).
+. (Join-Path $PSScriptRoot "lib\r2-designs-config-check.ps1")
 
 function Resolve-RepoRoot {
     $here = $PSScriptRoot
@@ -296,6 +298,12 @@ if ($composeProbe.ExitCode -ne 0 -or $serverVars.Count -eq 0) {
     }
 }
 
+# 4.6 R2 designs bucket CORS/lifecycle drift (PLAN-designs-direct-upload.md C2). A new product door or a changed
+# domain leaves the bucket's origin list stale; browser direct uploads then die at the R2 preflight with no other
+# signal. not_applied (the operator has not run --apply yet) is data only, never a WARN; unmeasured is BLIND, same
+# rule as the compose axis: an axis we could not read must not look healthy.
+$r2Cfg = Get-R2DesignsConfigState -RepoRoot $repoRoot -InvokeSsh { param($Cmd) Invoke-Ssh -Cmd $Cmd }
+
 # 4.8 Deploy hold (2026-09-23). DEPLOY_HOLD on origin/main means the drift is deliberate --
 # unfinished work is parked on main on purpose and sg-deploy.sh step 1.85 refuses to ship it. The
 # verdict below still reports the real drift (a hold must not hide it), but every message that would
@@ -345,6 +353,8 @@ $data = @{
     composeVarDrift = $composeVarDrift
     composeVarDriftCheckError = $composeVarDriftCheckError
     deployHold      = $deployHold
+    r2DesignsConfig = $r2Cfg.state
+    r2DesignsConfigNote = $r2Cfg.note
 }
 
 if ($behind -ge $FailAt) {
@@ -358,6 +368,11 @@ if ($composeVarDriftCheckError) {
     $status = if ($Strict) { "FAIL" } else { "BLIND" }
     Emit-Result -Status $status -ExitCode $code -Message ("Compose-variable drift NOT measured (commit {0}, behind={1}): {2}" -f $deployedCommit.Substring(0,7), $behind, $composeVarDriftCheckError) -Data $data
 }
+if ($r2Cfg.state -eq 'unmeasured') {
+    $code = if ($Strict) { 2 } else { 3 }
+    $status = if ($Strict) { "FAIL" } else { "BLIND" }
+    Emit-Result -Status $status -ExitCode $code -Message ("R2 designs bucket CORS/lifecycle NOT measured (commit {0}, behind={1}): {2}" -f $deployedCommit.Substring(0,7), $behind, $r2Cfg.note) -Data $data
+}
 if ($behind -ge $WarnAt) {
     $code = if ($Strict) { 2 } else { 1 }
     $status = if ($Strict) { "FAIL" } else { "WARN" }
@@ -367,5 +382,10 @@ if ($composeVarDrift) {
     $code = if ($Strict) { 2 } else { 1 }
     $status = if ($Strict) { "FAIL" } else { "WARN" }
     Emit-Result -Status $status -ExitCode $code -Message ("Production is at origin/main (commit {0}), but docker-compose.yml declares different variables than repo (server-only: {1}; repo-only: {2}). Fix via safe-infra-patch.sh, NOT sg-deploy.sh -- see composeVarDrift." -f $deployedCommit.Substring(0,7), $composeVarDrift.onlyOnServer.Count, $composeVarDrift.onlyInRepo.Count) -Data $data
+}
+if ($r2Cfg.state -eq 'drift') {
+    $code = if ($Strict) { 2 } else { 1 }
+    $status = if ($Strict) { "FAIL" } else { "WARN" }
+    Emit-Result -Status $status -ExitCode $code -Message ("Production is at origin/main (commit {0}), but the R2 designs bucket CORS/lifecycle is stale: {1}" -f $deployedCommit.Substring(0,7), $r2Cfg.note) -Data $data
 }
 Emit-Result -Status "PASS" -ExitCode 0 -Message (("Production is at origin/main (commit {0})." -f $deployedCommit.Substring(0,7)) + $holdNote) -Data $data

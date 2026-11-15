@@ -1606,6 +1606,10 @@ Repair it first, then re-run:
             # never applied (sg-deploy.sh does not sync that file). Checked separately so this hint
             # is not silently swallowed by the -gt 0 guard above, which is exactly the incident this
             # check exists to catch.
+            # r2DesignsConfig drift (PLAN-designs-direct-upload.md C2) is also independent of $behind.
+            if ($driftObj -and $driftObj.PSObject.Properties.Name -contains "r2DesignsConfig" -and $driftObj.r2DesignsConfig -eq "drift") {
+                Write-Host "DEPLOY HINT: R2 designs bucket CORS/lifecycle is stale (new product door or domain?): rerun scripts/r2-designs-bucket-config.ts --dry-run with the container env, then --apply on the operator go; NOT sg-deploy.sh." -ForegroundColor Yellow
+            }
             if ($driftObj -and $driftObj.composeVarDrift) {
                 Write-Host ("DEPLOY HINT: docker-compose.yml differs from production (server-only: {0}; repo-only: {1}). Fix via safe-infra-patch.sh compose, NOT sg-deploy.sh." -f @($driftObj.composeVarDrift.onlyOnServer).Count, @($driftObj.composeVarDrift.onlyInRepo).Count) -ForegroundColor Yellow
             }

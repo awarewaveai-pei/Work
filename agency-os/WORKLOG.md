@@ -27,6 +27,18 @@
 - ORACLE_WAIVED: Codex artifact 2026-11-15-partialreview-4c768d0d 的三項都已修正並補指名測試；搜尋不屬於隱私／權限守衛，依規則不做突變
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=edAudRedraw|data-ed-aud-q|edAudFound | hits=26
 - BUGHUNT_SCOPE_NARROW: 新的 symbol 只用在 audio.js 和 ed6 測試
+## 2026-11-15（續25）— C2 後續：R2 designs bucket 的 CORS／lifecycle 漂移接進 `/check-drift`（`--check`＋`scripts/lib/r2-designs-config-check.ps1`）
+
+- 根因：CORS origin 清單由 `STAFF_HOSTS`／`PRODUCT_HOST_*`／`products.ts` 算出；`--apply` 之後新增產品門或換網域，bucket 清單不會跟著變，瀏覽器直傳在 R2 preflight 失敗且無任何警示（操作者問「risks 不用處理嗎」→ 同類問題一次關掉）。
+- 做法：`r2-designs-bucket-config.ts --check`（只讀；exit 0 同步／5 已套用但過期或只套一半／6 尚未套用；印 `CHECK_STATE=`）；`scripts/lib/r2-designs-config-check.ps1` 經 ssh 讀容器 `printenv`、只留白名單名稱、以子行程環境跑 `tsx --check`、結束還原；`check-deploy-drift.ps1` 步驟 4.6：`drift`→WARN（`-Strict` FAIL）、`unmeasured`→BLIND（`-Strict` FAIL，同 compose 軸規則：沒量到不得看起來健康）、`not_applied`→只進 data（`--apply` 還在等操作者 go，不算漂移）。note 不含任何 env 值。`.claude/commands/check-drift.md` 加 `r2DesignsConfig` 說明。
+- 風險取捨：worktree 沒有 `node_modules` → lib 往主 checkout（git common dir 的上層）找 `tsx`；找不到＝`unmeasured`（BLIND），不靜默。
+- 實測：`check-deploy-drift.ps1 -AppCodeOnly` 實跑 → `r2DesignsConfig: not_applied`（bucket 現況 CORS 0／lifecycle 無本腳本規則）、整體 WARN 僅因既有的 behind=2；以 stub 讓 ssh 回 exit 255 → `unmeasured`，輸出不含 stub 的 `SECRETVALUE`。
+- 突變：`configState` 的 `a==="add" && b==="add"` 改成 `||` → 指名測試「check state…」紅，還原變綠（`tsx --test` 10/10，修後 13/13）。
+- critic（獨立 agent）7 項全修：M1 404 一律當「沒設定」→ 只有 code 10059 類算空，bucket 不存在（10006，實測）丟錯＝unmeasured；M2 套用後規則被刪仍報 not_applied → 有 `agency-os/reports/r2/<bucket>-*.json` 備份即改判 drift；M3 `system-health-check.ps1`／`ao-close.ps1` 加 r2 drift 分支（不叫人跑 sg-deploy）；M4 容器 token 讀權限已實測（--check 拿到 6）；m5 本機殘留 `R2_DESIGNS_BUCKET`／`PRODUCT_HOST_*` 會漏進子行程 → 白名單名稱容器沒有就清掉（實測帶 `R2_DESIGNS_BUCKET=local-leftover` 跑仍 not_applied）；m6 `process.exit` 在 Windows 觸發 libuv 斷言 → 改 `process.exitCode`，HTTP 400＋9106 歸 exit 3；m7 檔頭路徑修正。`tsx --test` 13/13。
+- ORACLE_WAIVED: Codex 額度擋到 21:26（`oracle-quota.ps1` BLOCKED，另一 session 撞到）；改以獨立 critic agent 讀改動＋上列突變證據。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/check-deploy-drift.ps1 -AppCodeOnly -SkipFetch with leftover local R2_DESIGNS_BUCKET (ssh → printenv → tsx --check on the real bucket, read only) | exit=0 | ms=15123
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/4m/3n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=r2DesignsConfig | hits=10
 ## 2026-11-15（續21）— C2：R2 bucket CORS／lifecycle 腳本（`scripts/r2-designs-bucket-config.ts`），dry-run 已實測、`--apply` 未執行（High，等操作者 go）
 
 - 做了什麼：`npx tsx` 腳本；origin＝`https://`＋`staffHosts()`＋每個 `door.app==="next-admin"` 且 enabled 的 `productHost(p)`，`--dev-origin` 明示才加；CORS 只開 PUT＋content-type、MaxAge 600；lifecycle `uploads/pending/` 1 天刪。Cloudflare REST `r2/buckets/<b>/{cors,lifecycle}`（schema 讀自 OpenAPI spec：CORS `rules[].allowed.{origins,methods,headers}`＋`maxAgeSeconds`；lifecycle `rules[].{id,enabled,conditions.prefix,deleteObjectsTransition.condition{type:Age,maxAge}}`；文件 https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/cors/ 與 `.../lifecycle/`）。

@@ -10,7 +10,8 @@
  *          docker exec lobster-next-admin printenv | grep -E '^(STAFF_HOSTS|PRODUCT_HOST_|PUBLIC_BASE_DOMAIN|R2_DESIGNS_BUCKET)='
  *          (printenv does not expand PRODUCT_HOST_*; unset = the code defaults of lib/portal/hosts.ts / lobster-designs,
  *          and the script says so in its output). A container that sets R2_DESIGNS_BUCKET to another bucket MUST pass it.
- * Flags:   --dry-run (default; read only) | --apply (HIGH: backs current config up to agency-os/reports/r2/, PUTs, reads back)
+ * Flags:   --dry-run (default; read only) | --check (read only; exit 0 in sync, 5 applied but stale, 6 not applied yet;
+ *          scripts/lib/r2-designs-config-check.ps1 runs it from /check-drift) | --apply (HIGH: backs current config up to agency-os/reports/r2/, PUTs, reads back)
  *          --dev-origin <http(s)://host[:port]>  extra origin, only when given (never added silently)
  *          --bucket <name>
  * Cloudflare REST (account-scoped Bearer R2_API_TOKEN; schema checked against the OpenAPI spec 2026-11-15):
@@ -111,6 +112,25 @@ export function diffRules(current: Rule[], merged: Rule[], ours: Rule): RuleDiff
   return out;
 }
 
+/** in_sync = both our rules already match; not_applied = neither exists yet; drift = anything in between (stale or half). */
+export function configState(dCors: RuleDiff[], dLife: RuleDiff[], corsId: string, lifeId: string): "in_sync" | "not_applied" | "drift" {
+  const st = (d: RuleDiff[], id: string) => d.find((x) => x.id === id)?.status;
+  const [a, b] = [st(dCors, corsId), st(dLife, lifeId)];
+  if (a === "same" && b === "same") return "in_sync";
+  if (a === "add" && b === "add") return "not_applied";
+  return "drift";
+}
+
+/** --apply leaves a backup in agency-os/reports/r2/; once one exists, "neither rule present" means they were removed. */
+export const REPORT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../agency-os/reports/r2");
+export function wasApplied(bucket: string, dir = REPORT_DIR): boolean {
+  try {
+    return fs.readdirSync(dir).some((f) => f.startsWith(`${bucket}-`) && f.endsWith(".json"));
+  } catch {
+    return false;
+  }
+}
+
 export const changed = (d: RuleDiff[]) => d.some((x) => x.status === "add" || x.status === "change");
 
 // ── Cloudflare REST ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -145,24 +165,27 @@ async function cf(c: Cfg, what: "cors" | "lifecycle", method: "GET" | "PUT", bod
   return parsed.result ?? null;
 }
 
-/** GET → rules[]; a bucket with no config answers 404 (NoSuchCORSConfiguration / NoSuchLifecycleConfiguration) = []. */
+/** GET → rules[]; "no config" answers 404 (CORS: code 10059, measured 2026-11-15) = []. A missing bucket is also a 404
+ *  (code 10006, measured) and must throw: reading a wrong bucket name as "not applied" would look healthy. */
+export const BUCKET_MISSING_CODE = 10006;
 export async function readRules(c: Cfg, what: "cors" | "lifecycle"): Promise<Rule[]> {
   try {
     const r = (await cf(c, what, "GET")) as { rules?: Rule[] } | null;
     return r?.rules ?? [];
   } catch (e) {
-    if (e instanceof CfError && e.status === 404) return [];
+    if (e instanceof CfError && e.status === 404 && !e.codes.includes(BUCKET_MISSING_CODE)) return [];
     throw e;
   }
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 export function parseArgs(argv: string[]) {
-  const a = { apply: false, dryRun: false, devOrigin: undefined as string | undefined, bucket: undefined as string | undefined };
+  const a = { apply: false, dryRun: false, check: false, devOrigin: undefined as string | undefined, bucket: undefined as string | undefined };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === "--apply") a.apply = true;
     else if (k === "--dry-run") a.dryRun = true;
+    else if (k === "--check") a.check = true;
     else if (k === "--dev-origin" || k === "--bucket") {
       const v = argv[++i];
       if (!v || v.startsWith("--")) throw new Error(`${k} 需要一個值`);
@@ -170,7 +193,7 @@ export function parseArgs(argv: string[]) {
       else a.bucket = v;
     } else throw new Error(`未知參數：${k}`);
   }
-  if (a.apply && a.dryRun) throw new Error("--apply 與 --dry-run 不能同時給");
+  if (a.apply && (a.dryRun || a.check)) throw new Error("--apply 不能與 --dry-run／--check 同時給");
   return a;
 }
 
@@ -210,7 +233,7 @@ export async function main(argv: string[], env: Env = process.env): Promise<numb
   };
 
   const origins = buildOrigins(env, args.devOrigin);
-  console.log(`模式：${args.apply ? "--apply（寫入）" : "--dry-run（只讀）"}　bucket：${cfg.bucket}`);
+  console.log(`模式：${args.apply ? "--apply（寫入）" : args.check ? "--check（只讀）" : "--dry-run（只讀）"}　bucket：${cfg.bucket}`);
   console.log(`CORS origins（${origins.length}）：\n${origins.map((o) => `  ${o}`).join("\n")}`);
 
   const cors = desiredCorsRule(origins);
@@ -220,7 +243,8 @@ export async function main(argv: string[], env: Env = process.env): Promise<numb
   try {
     [curCors, curLife] = [await readRules(cfg, "cors"), await readRules(cfg, "lifecycle")];
   } catch (e) {
-    if (e instanceof CfError && (e.status === 401 || e.status === 403)) {
+    // 9106 = Cloudflare "Authentication failed", sent as HTTP 400 (measured with a bad token).
+    if (e instanceof CfError && (e.status === 401 || e.status === 403 || e.codes.includes(9106))) {
       console.error(`\n讀取被拒（${e.message}）。現有 R2_API_TOKEN 沒有 bucket 設定權限：需操作者臨時給 bucket 設定權限的 token，本腳本不會自己換其他憑證。`);
       return 3;
     }
@@ -234,10 +258,19 @@ export async function main(argv: string[], env: Env = process.env): Promise<numb
   printSection("Lifecycle", dLife, curLife.length);
   const any = changed(dCors) || changed(dLife);
   console.log(`\n結論：${any ? "有差異，--apply 會套用上面標「新增／變更」的規則" : "bucket 已與期望一致，無需變更"}`);
+  if (args.check) {
+    let state = configState(dCors, dLife, cors.id as string, life.id as string);
+    if (state === "not_applied" && wasApplied(cfg.bucket)) {
+      console.log(`agency-os/reports/r2/ 有 ${cfg.bucket} 的 --apply 備份，但 bucket 上兩條規則都不在 → 被刪了，算漂移。`);
+      state = "drift";
+    }
+    console.log(`CHECK_STATE=${state}`);
+    return state === "in_sync" ? 0 : state === "not_applied" ? 6 : 5;
+  }
   if (!args.apply) return 0;
   if (!any) return 0;
 
-  const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../agency-os/reports/r2");
+  const dir = REPORT_DIR;
   fs.mkdirSync(dir, { recursive: true });
   const backup = path.join(dir, `${cfg.bucket}-${utcStamp()}.json`);
   // LF on purpose: agency-os/reports writers must not produce CRLF (see Write-RepoTextFile).
@@ -261,10 +294,13 @@ export async function main(argv: string[], env: Env = process.env): Promise<numb
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main(process.argv.slice(2)).then(
-    (code) => process.exit(code),
+    // exitCode, not process.exit(): exiting while a fetch handle closes trips a libuv assert on Windows (crash code).
+    (code) => {
+      process.exitCode = code;
+    },
     (e) => {
       console.error(e instanceof Error ? e.message : String(e));
-      process.exit(1);
+      process.exitCode = 1;
     },
   );
 }

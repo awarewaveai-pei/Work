@@ -505,6 +505,9 @@ if (Test-Path $driftScript) {
             # cannot fix a compose-only drift.
             if ($driftObj.composeVarDrift -and $driftObj.behind -eq 0) {
                 Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("WARN: docker-compose.yml differs from production (server-only: " + @($driftObj.composeVarDrift.onlyOnServer).Count + "; repo-only: " + @($driftObj.composeVarDrift.onlyInRepo).Count + "); fix via safe-infra-patch.sh compose, NOT sg-deploy.sh")
+            } elseif ($driftObj.r2DesignsConfig -eq "drift" -and $driftObj.behind -eq 0) {
+                # Same reason as the compose branch: r2DesignsConfig drift is the only WARN cause, sg-deploy.sh cannot fix it.
+                Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("WARN: R2 designs bucket CORS/lifecycle is stale (new product door or domain?): rerun scripts/r2-designs-bucket-config.ts --dry-run with the container env, then --apply on the operator go; NOT sg-deploy.sh")
             } else {
                 Add-Check -Name "Deploy drift (SG next-admin)" -Pass $true -Detail ("WARN: " + $driftObj.behind + " app-code commit(s) behind origin/main; run /root/lobster-phase1/scripts/sg-deploy.sh on SG when ready")
             }
