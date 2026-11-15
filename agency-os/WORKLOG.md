@@ -47,6 +47,7 @@
 - 測試：新 `tests/hooks/hook-tool-cwd.test.mjs`（主 checkout + linked worktree 私有 index 端到端、branch-protection、fallback、cd/-C 跟進主 checkout、不存在目錄 fail open、子目錄 check-console、靜態掃描所有 git spawn 與 wrapper 呼叫都帶 cwd），登記 `scripts/test-hooks.sh`。
 - 舊測試改寫（決策變更，非放寬）：`runner-parity.test.mjs` 4 條「cd/-C 他處 → fail open」改為「在目標 repo 檢查、結果同於從該 repo 直接跑」；`linked-worktree-root.test.mjs` 巢狀 worktree 改為經 gitdir 寫主 checkout，新增 sibling worktree、submodule 兩案。
 **生效條件**：live hooks 在 `~/.claude/hooks`（由主 checkout 同步）；`D:\Work` pull 到此 commit 後跑 `scripts/sync-claude-userlevel.ps1 -Mode merge` 才生效。
+**已上線（16:17）**：D:\Work 本地 main 與 origin 分歧（本地 8 commit 皆已在 origin，未提交 431 檔與上游重疊 → 不移 HEAD）；只 `git restore --source=origin/main --worktree -- mcp/claude-userlevel`（與 HEAD 差異 = 本 commit 10 檔，index 未動），再於 D:\Work 跑 `sync-claude-userlevel.ps1 -Mode merge`（PASS，backup `agency-os/Backups/claude-userlevel-20261115-161743`），live hooks 10/10 同 repo。D:\Work 那 10 檔顯示 M 屬正常，下次 fast-forward 時等於目標、自動帶過；還原：`git -C D:/Work restore --worktree -- mcp/claude-userlevel`。
 **剩餘風險**：PostToolUse 的 payload.cwd 若是指令「之後」的目錄，含相對 `cd sub` 的指令 post 端解析不到 → fail open 不記錄（與修前相同，非退化）。
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh (33 + 404 tests pass, incl. hook-tool-cwd 7/7, runner-parity 172/172, linked-worktree-root 5/5) | exit=0 | ms=93229
