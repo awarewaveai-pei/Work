@@ -28,6 +28,8 @@ vi.mock("@/lib/content/video/editorial-rights-persist", () => ({
 vi.mock("@/lib/content/video/caption-qa-persistence", () => ({
   persistAutomaticCaptionQa: async (p: unknown) => { state.captions.push(p); if (state.captionFail) return null; return { id: "cap-1", status: "passed" }; },
 }));
+const r2 = vi.hoisted(() => ({ puts: [] as Array<{ key: string; body: string; type: string }> }));
+vi.mock("@/lib/storage/r2", () => ({ isR2Configured: () => true, r2PutObject: async (_b: string, key: string, body: Buffer, type: string) => { r2.puts.push({ key, body: body.toString("utf8"), type }); return { ok: true }; } }));
 import { POST } from "./route";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -39,7 +41,9 @@ const post = (body: unknown, headers: Record<string, string> = { authorization: 
   POST(new Request("http://next-admin:3000/api/internal/video/workbench/assets/release-text", { method: "POST", headers, body: JSON.stringify(body) }));
 
 beforeEach(() => {
-  Object.assign(state, { rows: [{ id: ASSET, organization_id: ORG, mime_type: "video/mp4", checksum_sha256: SHA, metadata: { source: "video_workbench", vwJobId: "j1", rightsSources: [] } }], updates: [], rights: [], captions: [], rightsFail: false, captionFail: false });
+  r2.puts = [];
+  vi.stubEnv("R2_VIDEO_PUBLIC_BASE", "https://videos.example");
+  Object.assign(state, { rows: [{ id: ASSET, organization_id: ORG, mime_type: "video/mp4", checksum_sha256: SHA, object_key: `video/workbench/${ORG}/${SHA}.mp4`, metadata: { source: "video_workbench", vwJobId: "j1", rightsSources: [] } }], updates: [], rights: [], captions: [], rightsFail: false, captionFail: false });
   vi.stubEnv("VW_INTERNAL_TOKEN", "right-token");
   vi.stubEnv("MEDIA_PRODUCTION_PERSISTENCE_ENABLED", "true");
 });
@@ -93,5 +97,26 @@ describe("POST /api/internal/video/workbench/assets/release-text", () => {
   it("bad shapes are 400", async () => {
     for (const bad of [{ ...good, title: "x".repeat(201) }, { ...good, captions: [{ startMs: "0", endMs: 1, text: "a" }] }, { ...good, assetId: "nope" }, { ...good, script: 5 }])
       expect((await post(bad)).status).toBe(400);
+  });
+
+  // Card VD.10: the spoken lines become the video's SRT + VTT beside it in R2, recorded as metadata.captionFiles.
+  it("subtitles: SRT + VTT stored beside the video and recorded; none = no files and none recorded", async () => {
+    expect((await post(good)).status).toBe(200);
+    expect(r2.puts).toEqual([]);
+    expect(state.rows[0].metadata).not.toHaveProperty("captionFiles");
+    const res = await post({ ...good, subtitles: [{ startMs: 0, endMs: 1500, text: "嗨" }, { startMs: 1500, endMs: 3000, text: "再見" }] });
+    expect(res.status).toBe(200);
+    const base = `video/subtitles/${ORG}/${SHA}`;   // outside the workbench orphan sweep's prefix
+    const { WORKBENCH_PREFIX } = await import("@/lib/content/video/workbench-sweep");
+    expect(base.startsWith(WORKBENCH_PREFIX)).toBe(false);
+    expect(r2.puts.map((p) => [p.key, p.type])).toEqual([[`${base}.srt`, "application/x-subrip; charset=utf-8"], [`${base}.vtt`, "text/vtt; charset=utf-8"]]);
+    expect(r2.puts[0].body).toBe("1\n00:00:00,000 --> 00:00:01,500\n嗨\n\n2\n00:00:01,500 --> 00:00:03,000\n再見\n");
+    expect(r2.puts[1].body.startsWith("WEBVTT\n\nc1\n00:00:00.000 --> 00:00:01.500\n嗨")).toBe(true);
+    expect((state.rows[0].metadata as Row).captionFiles).toEqual({ srt: `https://videos.example/${base}.srt`, vtt: `https://videos.example/${base}.vtt`, cues: 2 });
+    expect((state.rows[0].metadata as Row).title).toBe("春季新品");
+    // overlapping lines are refused, nothing stored
+    r2.puts = [];
+    expect((await post({ ...good, subtitles: [{ startMs: 0, endMs: 2000, text: "a" }, { startMs: 1000, endMs: 3000, text: "b" }] })).status).toBe(400);
+    expect(r2.puts).toEqual([]);
   });
 });

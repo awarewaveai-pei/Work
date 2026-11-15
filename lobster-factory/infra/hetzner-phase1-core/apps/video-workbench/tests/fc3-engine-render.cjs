@@ -116,6 +116,7 @@ function request(port, pathname, headers, body) {
     assert.deepEqual(text.captions, [{ startMs: 0, endMs: 500, text: "第一句" }, { startMs: 500, endMs: 1000, text: "第二句" }]);
     assert.equal(calls.releaseText.at(-1).title, "專業剪輯成片", "送審文字送到主系統");
     assert.equal(calls.releaseText.at(-1).captions.length, 2);
+    assert.deepEqual(calls.releaseText.at(-1).subtitles, [{ startMs: 0, endMs: 500, text: "第一句" }, { startMs: 500, endMs: 1000, text: "第二句" }], "VD.10: the spoken lines go along for the SRT/VTT files");
     assert.equal(calls.jobs.at(-1).kind, "render");
     console.log("PASS render -> one succeeded job, ledger sources = the two inputs, release text = title + two lines");
 

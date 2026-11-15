@@ -13,7 +13,7 @@ const btn = (on: boolean): React.CSSProperties => ({ width: "fit-content", paddi
 const chip = (on: boolean): React.CSSProperties => ({ padding: "6px 10px", borderRadius: 7, border: `1px solid ${on ? "var(--accent)" : "var(--border-subtle)"}`, background: on ? "var(--bg-subtle)" : "var(--card-bg)", color: "var(--text-primary)", fontSize: 12, cursor: "pointer", textAlign: "left" });
 
 const KINDS = ["technical", "caption", "editorial", "rights"] as const;
-type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; script?: string; ratio?: string }; created_at: string; asset_domain: string };
+type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; script?: string; ratio?: string; captionFiles?: { srt?: string; vtt?: string; cues?: number } }; created_at: string; asset_domain: string };
 type Cover = { id: string; url: string; kind: "auto" | "ai" | "upload"; chosen: boolean };
 const COVER_KIND: Record<Cover["kind"], string> = { auto: "自動", ai: "AI", upload: "上傳" };
 type Qa = { kind: string; status: string; candidateChecksum: string; findings?: Array<{ rule: string; message: string; evidence?: Record<string, number | string | null> }> };
@@ -191,6 +191,13 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
           </div>
           {results.filter((x) => x.q && x.q.status !== "passed").flatMap((x) => (x.q?.findings ?? []).map((f, i) => <div key={`${x.k}${f.rule}${i}`} style={{ fontSize: 11.5, color: "var(--red)" }}>{QA_LABELS[x.k]}：{explainFinding(f)}</div>))}
           {!released[r.id] && results.some((x) => x.q && x.q.status !== "passed") && <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{BLOCKED_NOTE}</div>}
+          {r.metadata?.captionFiles?.srt && <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 12 }}>
+            {/* VD.10: the spoken lines as files; YouTube Studio / Facebook take them by hand (the Postiz providers upload none) */}
+            <span>字幕檔（{r.metadata.captionFiles.cues ?? 0} 句，上傳到 YouTube／Facebook 用）：</span>
+            {/* same-origin attachment (app/api/video/subtitles): <a download> is ignored on the cross-origin bucket */}
+            <a href={`/api/video/subtitles?organizationId=${encodeURIComponent(org)}&assetId=${r.id}&format=srt`} style={{ color: "var(--accent-text)" }}>下載 SRT</a>
+            {r.metadata.captionFiles.vtt && <a href={`/api/video/subtitles?organizationId=${encodeURIComponent(org)}&assetId=${r.id}&format=vtt`} style={{ color: "var(--accent-text)" }}>下載 VTT</a>}
+          </div>}
           <div style={{ display: "grid", gap: 6 }}>
             <span style={{ fontSize: 12 }}>封面（YouTube 縮圖、IG 封面、網站影片預覽圖都用這張）</span>
             {(covers[r.id] ?? []).length === 0 ? <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>這支影片還沒有封面；可上傳一張。</span>

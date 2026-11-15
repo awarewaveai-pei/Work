@@ -21,7 +21,7 @@
 ## 2. 封面資料模型（決定）
 
 - 封面＝一列 `media_assets`（image/jpeg），`metadata.coverOf = <影片列 id>`、`metadata.coverKind = auto | ai | upload`。工作台產的走既有登記路由，`asset_domain`：auto=`workbench_render`、ai=`ai_generated`、upload=`real_footage`（rights 記 upload confirmed）。
-- 選中的封面＝影片列 `metadata.coverAssetId`。第一張 auto 候選登記時若影片列還沒有 coverAssetId 就設它；之後只由使用者「換一張」改。
+- 選中的封面由封面列自己決定（實作時改，2026-11-14）：最新的 `metadata.chosenAt` 勝；沒有人選過＝最早登記的 auto 候選（工作台候選是由好到壞依序登記的，所以就是最好的那格）；都沒有＝最舊的封面。規則只在 `next-admin/lib/content/video/cover.ts` `coversOf`，查詢用 `chosenCover`（最多 3 個有上限的查詢）。影片列一律不寫，所以選封面不會蓋掉 release-text 寫的 title/script。下文的 `coverAssetId` 一律讀作「`coversOf` 選中的那張」。
 - 每個比例列各有自己的封面（從該比例影片本身截，尺寸＝影片尺寸：16:9→1920×1080、9:16→1080×1920、4:5→1080×1350）。不另外裁切。
 - 封面不在 Release 的 checksum 裡：換封面不讓 QA 失效；社群草稿、WordPress 嵌入取「當下選中的」封面。
 - 不變量：封面只能指向同組織、同一支影片的列（路由驗證 coverOf 與 coverAssetId 的 org 與 coverOf 一致），客戶端傳來的 URL 一律不信，伺服器用 id 查 `object_url`。
@@ -65,7 +65,7 @@
 - 測試：`video-workbench/tests/cover-ai.cjs`（fetch stub：價格來自 capabilities、無 permit 不呼叫、成功只 settle 一次、輸出有疊字）。
 
 **VD.5 社群草稿帶封面與 alt**（next-admin social＋migration）
-- 改：migration `lobster-factory/packages/db/migrations/0162_social_media_cover.sql`（＋down）：`social_media.cover_media_id uuid`，FK `(cover_media_id, organization_id) → social_media(id, organization_id)`；`next-admin/lib/social/store.ts:846-860` addVideo 收 coverUrl → `uploadMedia`（`next-admin/lib/content/postiz.ts:149`）存成 image 列並回寫 cover_media_id；`next-admin/lib/content/video/social-drafts.ts:16-17,42-43` releases 帶 coverUrl、savePost 帶 alt；`social-drafts-deps.ts:18-38` 從影片列 coverAssetId 查 object_url，alt＝標題。
+- 改：migration `lobster-factory/packages/db/migrations/0163_social_media_cover.sql`（＋down）：`social_media.cover_media_id uuid` + `cover_kind text`，FK `(cover_media_id, organization_id, cover_kind) → social_media(id, organization_id, kind)`，CHECK 兩者同時有或同時無且 kind＝image（資料庫保證封面是同組織的圖片）；`next-admin/lib/social/store.ts:846-860` addVideo 收 coverUrl → `uploadMedia`（`next-admin/lib/content/postiz.ts:149`）存成 image 列並回寫 cover_media_id；`next-admin/lib/content/video/social-drafts.ts:16-17,42-43` releases 帶 coverUrl、savePost 帶 alt；`social-drafts-deps.ts:18-38` 從影片列 coverAssetId 查 object_url，alt＝標題。
 - 完成：存草稿後影片 media 有 cover_media_id；沒有封面時行為同今天。
 - 測試：`next-admin/lib/content/video/__tests__/social-drafts.test.ts`（每比例帶自己的封面；無封面不上傳圖；alt＝標題）。
 
@@ -93,6 +93,12 @@
 - 改：`next-admin/app/api/internal/video/workbench/assets/release-text/route.ts:63-75`：captions 非空 → `toSrt/toVtt`（`caption-formats.ts:34,39`）存 R2 `<影片 key>.srt/.vtt`，metadata `captionFiles`；送審頁列「下載字幕 SRT／VTT」；VD.8 區塊加 `<track kind="captions">`（先確認 R2 公開網域 CORS，否則不加 track）。只取字幕軌的句子（實作前 grep 剪輯器字幕軌 kind；`release-text.cjs` 目前收所有可見文字）。
 - 完成：有字幕的成片可下載 SRT/VTT。
 - 測試：release-text `route.test.ts` 加：有字幕存兩檔、無字幕不存。
+
+## 4b. 實作紀錄（2026-11-15）
+- 上 main：VD.1 76b03ff24、VD.2 dee6e6c03、VD.8 c3dfaa8ec、VD.5–7 4e179f144、VD.3+9 8950056a8；VD.4、VD.10 見 WORKLOG。
+- 部署順序：migration 0163 先於 next-admin（`dispatch-store.ts` 以 FK 名 `social_media_cover_fk` 嵌入）。
+- 既有問題（非 VD 造成，已回報監工）：影片工作室影片庫刪工作台影片時，`next-admin/lib/storage/r2.ts:344` 把 `video/workbench/<org>/` 當成單支影片資料夾整個刪除（含其他影片與封面）。
+- 既有限制：單支影片下載＋上傳 Postiz 最長可近 300 s 代理逾時；封面只在同一請求剩餘時間夠時才做（`store.ts addVideo` deadline）。
 
 ## 5. 不做（理由已在 §1）
 章節（#4）、響度改 −14（#5）、字幕自動上傳平台（#3）、FB 自訂縮圖（Postiz 不支援，§3 A3）、社群編輯器手動貼文選封面（另議）。

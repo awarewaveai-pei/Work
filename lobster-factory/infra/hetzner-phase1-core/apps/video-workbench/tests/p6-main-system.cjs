@@ -393,8 +393,14 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       assert.deepEqual(editor.captions, [{ startMs: 0, endMs: 1000, text: "A" }, { startMs: 1000, endMs: 2000, text: "A\nB" }, { startMs: 2000, endMs: 4000, text: "B" }]);
       let end = 0;
       for (const c of editor.captions) { assert(c.startMs >= end && c.endMs > c.startMs && c.text.trim(), "caption QA order rule"); end = c.endMs; }
+      // Card VD.10: subtitles (the SRT/VTT source) = subtitle clips only; titles and other text stay in captions only.
+      assert.deepEqual(editor.subtitles, [], "no subtitle clip = no subtitle file");
+      const spoken = releaseText({ input: { operation: "editor-export", settings: { project: { ...project, clips: [...project.clips, text("s1", "T", "說話", 0, 30, { subtitleStyle: "白字黑邊" })] }, quality: "720p" } } });
+      assert.deepEqual(spoken.subtitles, [{ startMs: 0, endMs: 1000, text: "說話" }]);
+      assert.ok(spoken.captions.some((c) => c.text.includes("A")), "the title text is still caption-QA'd");
       const burn = releaseText({ input: { operation: "subtitle-burn", settings: { cues: [{ start: 0, end: 1.5, text: "嗨" }, { start: 1.5, end: 3, text: "再見" }] }, references: { src: { name: "旅行.mp4" } } } });
       assert.deepEqual([burn.title, burn.script, burn.captions], ["旅行.mp4", "嗨\n再見", [{ startMs: 0, endMs: 1500, text: "嗨" }, { startMs: 1500, endMs: 3000, text: "再見" }]]);
+      assert.deepEqual(burn.subtitles, burn.captions, "every burned cue is a spoken line");
       assert.equal(releaseText({ input: { operation: "subtitle-burn", settings: { cues: [{ start: 0, end: 1, text: "x" }] } } }).title, "", "no source name = empty title, not invented");
       assert.equal(releaseText({ type: "video", input: { type: "video", prompt: "一隻貓在跑" } }), null, "AI video has no words: nothing sent, prompt is not a script");
       assert.equal(releaseText({ input: { operation: "remotion-template", settings: {} } }), null);
@@ -482,7 +488,10 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       const pruneDir = path.join(dir, "prune"), pruneOrg = path.join(pruneDir, "orgs", ORG);
       fs.mkdirSync(pruneOrg, { recursive: true });
       const old = (id) => ({ id, type: "image", status: "succeeded", createdAt: new Date().toISOString(), result: { url: "/generated/b.png", ledger: "unsupported_type" } });
-      fs.writeFileSync(path.join(pruneOrg, "jobs.json"), JSON.stringify([{ ...old("owed-1"), result: { url: "/generated/a.png" } }, ...Array.from({ length: 101 }, (_, i) => old("old-" + i))]));
+      // owed-usage: a billed vendor run (VD.4 AI cover) not yet in usage, behind 101 newer finished jobs (Codex 94927dcb F2)
+      const owedUsage = { id: "owed-usage", type: "image", status: "failed", createdAt: new Date().toISOString(), paid: { feature: "video.image", billingOrgId: BILLING, userId: USER },
+        input: { type: "image", operation: "cover-ai", prompt: "封面", settings: {} }, finishing: { origin: { kind: "ai_generated", costUsd: 0.06 } } };
+      fs.writeFileSync(path.join(pruneOrg, "jobs.json"), JSON.stringify([owedUsage, { ...old("owed-1"), result: { url: "/generated/a.png" } }, ...Array.from({ length: 101 }, (_, i) => old("old-" + i))]));
       const pruner = createServer({ dataDir: pruneDir, env: { ...env, VW_JOB_HISTORY_LIMIT: "100" }, fetchImpl });
       await new Promise((r) => pruner.listen(0, "127.0.0.1", r));
       await request(pruner.address().port, "POST", "/api/vw/generations", who(), JSON.stringify({ ...imageInput, idempotencyKey: "prune-1" }));
@@ -490,6 +499,8 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       const kept = JSON.parse(fs.readFileSync(path.join(pruneOrg, "jobs.json"), "utf8")).map((j) => j.id);
       assert(kept.includes("owed-1"), "尚未登記的完成任務不得被歷史上限裁掉");
       assert(!kept.includes("old-0"), "已有結果的舊任務照常裁剪");
+      await wait(() => calls.usage.some((u) => u.job_id === "owed-usage"));
+      assert.equal(calls.usage.filter((u) => u.job_id === "owed-usage").length, 1, "尚未記帳的已付費執行不被裁掉，記一次用量");
       pruner.close();
     }
 
@@ -737,6 +748,28 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       assert.match(lost.error, /找不到模型生成的影片檔/);
       await new Promise((r) => setTimeout(r, 100));
       assert.deepEqual(calls.usage.filter((u) => u.job_id === "breakout-lost"), [{ organization_id: BILLING, feature_key: "video.motion", actor: "video:" + USER, job_id: "breakout-lost", cost_usd: 0.25 }], "破框：已付費的模型執行記一次用量");
+      restarted.close();
+    }
+
+    // Card VD.4 (Codex f3ab08e3): an AI cover whose vendor run completed (job.finishing) is charged once whether a restart
+    // cut its local finishing (running -> failed at start) or the user cancelled after the vendor answered.
+    {
+      const coverDir = path.join(dir, "cover-ai-lost"), orgDir = path.join(coverDir, "orgs", ORG);
+      fs.mkdirSync(path.join(orgDir, "generated"), { recursive: true });
+      const job = (id, status) => ({
+        id, type: "image", status, progress: 50, createdAt: new Date().toISOString(),
+        paid: { feature: "video.image", billingOrgId: BILLING, userId: USER },
+        input: { type: "image", operation: "cover-ai", prompt: "封面", settings: { model: "nano-banana-2", forJob: "e1" } },
+        finishing: { origin: { kind: "ai_generated", model: "nano-banana-2", provider: "Google", costUsd: 0.057 } },
+      });
+      fs.writeFileSync(path.join(orgDir, "jobs.json"), JSON.stringify([job("cover-restart", "running"), job("cover-cancelled", "cancelled")]));
+      const restarted = createServer({ dataDir: coverDir, env, fetchImpl });
+      await new Promise((r) => restarted.listen(0, "127.0.0.1", r));
+      await request(restarted.address().port, "GET", "/api/vw/generations/cover-restart", who());
+      await wait(() => ["cover-restart", "cover-cancelled"].every((id) => calls.usage.some((u) => u.job_id === id)));
+      await new Promise((r) => setTimeout(r, 100));
+      for (const id of ["cover-restart", "cover-cancelled"])
+        assert.deepEqual(calls.usage.filter((u) => u.job_id === id), [{ organization_id: BILLING, feature_key: "video.image", actor: "video:" + USER, job_id: id, cost_usd: 0.057 }], "AI 封面：已完成的供應商執行記一次用量：" + id);
       restarted.close();
     }
 

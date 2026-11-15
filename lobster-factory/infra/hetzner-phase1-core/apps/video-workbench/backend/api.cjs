@@ -189,7 +189,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     // a delivered job, or a job that failed after its vendor run (job.finishing kept: 破框 finishing lost its file). The
     // record goes to the main-system usage outbox, which owns delivery and retries; usageReported = durably recorded,
     // never queued twice.
-    const ran = job.status === "succeeded" || (job.status === "failed" && !!job.finishing);
+    // Invariant (VD.4, Codex f3ab08e3): a vendor run recorded as completed (job.finishing) is charged once however the job
+    // ended -- failed after it, cancelled after it, or stopped by a restart (re-settled at start, below).
+    const ran = job.status === "succeeded" || (["failed", "cancelled"].includes(job.status) && !!job.finishing);
     if (ran && job.paid && !job.usageReported) {
       try {
         main.usage({ ...job.paid, jobId: job.id, costUsd: job.result?.origin?.costUsd ?? job.finishing?.origin?.costUsd });
@@ -238,7 +240,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   };
   // Invariant: a job still owing the main system something (asset registration, release text) is never pruned by the
   // history limit; its retry lives only in this record.
-  const pending = (j) => ["queued", "running"].includes(j.status) || !!(j.ledgerError || j.releaseTextError || j.coverRegisterError) || (!!main && unsettled(j));
+  // ...nor a paid job whose completed vendor run is not yet in usage (Codex 94927dcb F2: pruned = never charged).
+  const owesUsage = (j) => !!j.paid && !j.usageReported && (j.status === "succeeded" || (["failed", "cancelled"].includes(j.status) && !!j.finishing));
+  const pending = (j) => ["queued", "running"].includes(j.status) || !!(j.ledgerError || j.releaseTextError || j.coverRegisterError) || (!!main && unsettled(j)) || owesUsage(j);
   // Per-job inputs that are not results (破框's lock mask): job-inputs/<job id>/, never served, never library assets. They
   // live exactly as long as their job's record: a retry reruns from the record and copies them; the history limit here is
   // the one place a record goes, and every save drops the folders of records it no longer keeps (bounded by the limit).
@@ -301,6 +305,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // Without that file there is nothing to finish from. After this tick, once everything below is defined.
   setImmediate(() => {
     for (const job of jobs) retryOwed(job); // VD.2: owed release text / covers from before a restart
+    // A paid vendor run that completed before a restart cut its local finishing (VD.4 AI cover) is still charged once.
+    for (const job of jobs)
+      if (["failed", "cancelled"].includes(job.status) && job.finishing && job.paid && !job.usageReported && job.stage !== "finishing")
+        settle(job).catch((e) => console.error("[vw] settle of a completed vendor run after restart:", job.id, e.message));
     for (const job of jobs)
       if (job.status === "running" && job.stage === "finishing") {
         if (job.finishing?.url && fs.existsSync(path.join(dataDir, job.finishing.url.slice(1)))) finishBreakout(job);
@@ -416,6 +424,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     "character-test",
     "character-voice",
     "region",
+    "cover-ai", // card VD.4: a paid AI cover for a finished export (backend/cover-ai.cjs)
     "project-shot",
     "music",
     "breakout", // 破框貼文動畫: a video job whose first frame is the rendered post (backend/breakout.cjs)
@@ -770,6 +779,33 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           job.result = { url: '/generated/' + path.basename(destination) };
         }
         job.disclosure = "AI 生成聲音";
+      } else if (type === "image" && input.operation === "cover-ai") {
+        // Card VD.4 (backend/cover-ai.cjs): one image-edit row redraws the export's best frame, ffmpeg draws the title, and
+        // the result becomes one more cover of THAT export job, registered with it (settle -> VD.2). This job's own file
+        // is not registered again (ledger "cover"); it is charged once through settle like any image-edit run.
+        const coverAi = require("./cover-ai.cjs"), target = coverAi.exportFor(jobs, input.settings.forJob), m = imageEdit.pick(input.settings.model, env);
+        const made = await coverAi.makeAiCover(
+          { exportJob: target, model: m, size: input.settings.quality, env, fetchImpl, signal, dir: outputs, videoFile: localFile(target.result.url),
+            onPrediction: (id) => { job.replicateId = id; persist(); },
+            // The vendor run is done and billed from here on: a local failure after it still charges it once (settle:
+            // a failed job with job.finishing, as 破框 finishing; Codex ccdf770d F1).
+            onVendorDone: (costUsd) => { job.finishing = { origin: { kind: "ai_generated", model: m.value, provider: m.vendor, costUsd } }; persist(); } },
+          { imageEdit, run: mediaTools.run, regionMasks: mediaTools.regionMasks, fontDir: require("./editor-export.cjs").fontDir },
+        );
+        if (signal.aborted || job.status === "cancelled") { fs.rmSync(made.file, { force: true }); return; }
+        const name = crypto.randomUUID() + ".jpg";
+        fs.renameSync(made.file, path.join(outputs, name));
+        job.costUsd = made.costUsd;
+        job.imageEdit = { model: m.value, provider: m.vendor };
+        target.result.covers.push({ url: "/generated/" + name, kind: "ai", costUsd: made.costUsd, model: m.value });
+        job.result = { url: "/generated/" + name, width: target.result.width, height: target.result.height, ledger: "cover", coverOf: target.id };
+        job.disclosure = "AI 生成封面";
+        // job.finishing stays: until the job is saved succeeded it is the only record that the billed run happened (a
+        // restart in between turns the job failed and charges it from finishing; Codex 94927dcb F1).
+        persist();
+        // A settle of the export already running may have passed its cover loop: register after it, never inside it
+        // (Codex ccdf770d F2). A failure there is coverRegisterError -> the server's own retry (retryOwed).
+        Promise.resolve(settling.get(target.id)).finally(() => settle(target));
       } else if (type === "image" && input.operation === "region") {
         // backend/image-edit.cjs: the catalog row the job recorded, then only the boxes go back onto the original.
         const m = imageEdit.pick(input.settings.model, env),
@@ -1050,10 +1086,13 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
   async function start(input, res, extra, req) {
+    // VD.4: refused before any outside call (permit, account refresh, vendor) unless it names a finished export of this
+    // workbench with its covers (Codex ccdf770d F3).
+    if (input?.operation === "cover-ai") require("./cover-ai.cjs").exportFor(jobs, input.settings?.forJob);
     // The ElevenLabs plan decides an ElevenLabs row's price and whether it may run (cached; one call per 10 min at most).
     if (elevenlabs.keyOf(env)) await elevenlabs.account(env, fetchImpl);
     // The region tool: the job records the image-edit row and size it runs (before validation, pricing and storing).
-    const editModel = input?.operation === "region" ? imageEdit.request(input, env) : null;
+    const editModel = input?.operation === "region" || input?.operation === "cover-ai" ? imageEdit.request(input, env) : null;
     const isMedia = mediaTools.supported.includes(input.operation),
       isRemoveBg = input.operation === "remove-bg",
       isRemotion = input.operation === "remotion-template",

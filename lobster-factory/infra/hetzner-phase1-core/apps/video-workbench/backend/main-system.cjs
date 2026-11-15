@@ -197,7 +197,7 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
       r = await fetchImpl(base + "/api/internal/video/workbench/assets/release-text", {
         method: "POST",
         headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-        body: JSON.stringify({ organizationId: org(), assetId, checksumSha256, title: text.title, script: text.script, captions: text.captions }),
+        body: JSON.stringify({ organizationId: org(), assetId, checksumSha256, title: text.title, script: text.script, captions: text.captions, ...(text.subtitles?.length ? { subtitles: text.subtitles } : {}) }),
         signal: AbortSignal.timeout(60000),
       });
     } catch (e) {

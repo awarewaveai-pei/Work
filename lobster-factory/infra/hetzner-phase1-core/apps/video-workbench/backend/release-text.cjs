@@ -29,13 +29,13 @@ function fromEditor(settings) {
     // Only text the render shows: hidden pieces/tracks and fully transparent text (opacity 0) never reach the picture.
     .filter((c) => c.kind === "text" && !c.hidden && !hidden.get(c.track) && c.opacity > 0 && c.text.trim())
     .sort((a, b) => index.get(a.track) - index.get(b.track) || a.startFrame - b.startFrame)
-    .map((c) => ({ startMs: ms(c.startFrame), endMs: ms(c.startFrame + c.durationFrames), text: c.text.trim() }));
+    .map((c) => ({ startMs: ms(c.startFrame), endMs: ms(c.startFrame + c.durationFrames), text: c.text.trim(), subtitle: !!c.subtitleStyle }));
   return { title: String(settings.project.title ?? ""), pieces };
 }
 
 // Subtitle burn and the professional editor's render (card FC.3) both carry cues in seconds.
 function fromCues(cues, title) {
-  const pieces = (cues || []).map((c) => ({ startMs: Math.round(c.start * 1000), endMs: Math.round(c.end * 1000), text: String(c.text).trim() })).filter((p) => p.text);
+  const pieces = (cues || []).map((c) => ({ startMs: Math.round(c.start * 1000), endMs: Math.round(c.end * 1000), text: String(c.text).trim(), subtitle: true })).filter((p) => p.text);
   return { title: String(title ?? ""), pieces };
 }
 
@@ -48,7 +48,10 @@ function releaseText(job) {
     : op === "engine-render" ? fromCues(settings.cues, settings.title)
     : fromCues(settings.cues, job.input.references?.src?.name);
   const script = [...new Set([...pieces].sort((a, b) => a.startMs - b.startMs).map((p) => p.text))].join("\n").slice(0, MAX_SCRIPT);
-  return { title: title.trim().slice(0, MAX_TITLE), script, captions: timeline(pieces) };
+  // Card VD.10: subtitles = the spoken-line cues only (editor subtitle clips, i.e. with a subtitleStyle; every cue of a
+  // burn or engine render), the timeline the main system turns into the video's SRT/VTT files. Titles and other
+  // on-screen text stay in captions (caption QA) only.
+  return { title: title.trim().slice(0, MAX_TITLE), script, captions: timeline(pieces), subtitles: timeline(pieces.filter((p) => p.subtitle)) };
 }
 
 module.exports = { releaseText };

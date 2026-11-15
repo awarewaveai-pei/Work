@@ -41,6 +41,38 @@
     }, (error) => { refusal = error; link.title = error.message; });
     actions.append(link);
   }
+  // Card VD.4: a finished video's covers. The free ones come with the export (backend/cover.cjs) and are the default;
+  // an AI cover is opt-in, one button per image-edit row with its price on it (data-paid -> shared/paid-price.js, NT$
+  // from /capabilities). The model redraws the best frame without any text; the title is drawn by ffmpeg afterwards.
+  function coverButtons(v, actions) {
+    if (!v.result?.covers?.length || !["editor-export", "engine-render"].includes(v.input?.operation)) return;
+    const box = document.createElement("div");
+    box.className = "job-cover-actions";
+    const label = document.createElement("span");
+    label.textContent = "封面：已自動做好 " + v.result.covers.length + " 張（免費，送審頁可換）。要 AI 重新設計：";
+    box.append(label);
+    caps().then((c) => {
+      for (const m of (c?.imageEdit?.models || []).filter((row) => row.available)) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "AI 設計封面 · " + m.label;
+        button.dataset.paid = "video.image";
+        button.dataset.paidModel = m.id;
+        button.onclick = async () => {
+          button.disabled = true;
+          try {
+            const next = await VideoWorkbench.generations.create({ type: "image", operation: "cover-ai", prompt: "封面", settings: { model: m.id, forJob: v.id } });
+            VideoWorkbench.showJob(next);
+          } catch (error) {
+            button.disabled = false;
+            VideoWorkbench.reportError(error);
+          }
+        };
+        box.append(button);
+      }
+    }, VideoWorkbench.reportError);
+    actions.append(box);
+  }
   VideoWorkbench.deliveryUrl = deliveryUrl;
   VideoWorkbench.showJob = (job, options = {}) => {
     let panel = document.createElement("section");
@@ -164,7 +196,10 @@
               action("編輯圖片", () => VideoWorkbench.generator.import({ intent: "open-tool", tool: "region", asset }));
               action("配音", () => VideoWorkbench.generator.import({ intent: "open-tool", tool: "voice" }));
             }
-            if (v.type === "video") reviewButton(v, actions);
+            if (v.type === "video") {
+              reviewButton(v, actions);
+              coverButtons(v, actions);
+            }
             result.append(actions);
           }
         }
