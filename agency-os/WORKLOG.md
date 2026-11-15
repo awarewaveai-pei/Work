@@ -4,6 +4,8 @@
 - 操作者「你決定」→ 選 presigned 直傳：位元組不經 app request（不調高 middleware 上限）；伺服器登記時才讀、先驗長度（I3）；`designs/` 只放已登記物件，孤兒在 `uploads/pending/` 由 lifecycle 清（I4）。
 - 設計審查 Codex 733e6616 F1–F5 皆 grep 驗證屬實並併入：`r2GetObject` 先整包讀（`r2.ts:208-209`）→ C4 先比 Content-Length＋串流上限；PSD 需 `kind:"source"`；insert 失敗留主圖（`designs/route.ts:304-307`）→ I4；CORS origin 取 `hosts.ts` 實際主機（`:17-27`，容器內跑）；塔羅無框原圖未保留（`TarotStudio.tsx:875,2306-2309`）→ C5 改存 `artBlob`。
 - C1（S3 token＋env）、C2（bucket CORS／lifecycle）為 High，待操作者 go；TASKS「🎨 Image Output Pipeline」下加子項。
+- Fable 複檢（操作者「再檢查一次」）→ 計畫 v2：① 否決替代路「上傳路由排除 middleware matcher」——`tenant-guard.ts:37,153` 無 header 即 fail-open staff 跨組織、`ops-role.ts:37` 讀請求 `x-ops-simulated-role`、nginx 不剝 `x-ops-*`；② 刪 HMAC token＋新 secret：授權＝presigned URL＋key 路徑帶 org（`uploads/pending/<org>/`）；③ C5 原版「state 存原圖 Blob」會把 78×9 MB 塞進 React state（`toGalleryArt` 存在的理由）→ 改成一出圖就 PUT 到 pending、state 只留 key；批次卡原圖已在 R2（`batch/[jobId]/image/[index]/route.ts:3-12`）→ 伺服器端 CopyObject，不經瀏覽器；④ 正式 key 用 S3 CopyObject，不再從 app 上傳第二次；⑤ C6 明定刪除清單（base64 `image` 輸入、`image-upload-limit.ts`、`toGalleryArt`）。
+- v2 Codex 98183ab1 F1–F3 皆驗實併入 → v3：F1 presigned PUT 到期前可重用 → 「驗 pending 再複製」有競態 → 改先 CopyObject 到正式 key、從正式 key 驗；F2 `staffHosts()`／`productHost()` 回裸主機名，CORS 要 `https://`；F3 批次卡載入是「同源路由取原圖→套調色→無框圖」（`TarotStudio.tsx:1159-1164`），`fromAsset` 複製伺服器原圖會與使用者所見不同 → 刪 `fromAsset`，點擊時重走同一段，全程一條路。
 - REALTEST_WAIVED: DOC_ONLY -- 只寫計畫文件與 TASKS 子項，無程式改動
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PLAN-designs-direct-upload | hits=6
