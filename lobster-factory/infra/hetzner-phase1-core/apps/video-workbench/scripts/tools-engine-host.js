@@ -715,6 +715,7 @@ async function engineSubmitRender(base) {
         body: new Blob([head, job.video]),
       });
       value = await response.json().catch(() => ({}));
+      if (response.status === 401) VideoWorkbenchAdapters.signedOut();
       if (!response.ok) throw Error(value.error?.message || "成片入帳失敗（" + response.status + "）");
     }
     engineStatus("成片已存進素材庫");

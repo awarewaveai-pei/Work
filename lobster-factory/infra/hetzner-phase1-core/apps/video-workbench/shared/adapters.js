@@ -101,6 +101,16 @@
       return data;
     }
   }
+  // 401 = not signed in (nginx 302s only the .html request itself; a page that outlived its session or came from cache gets
+  // here through its first /api/vw call). The one place every page learns it: top-level goes to the login page carrying the
+  // page it was on (nginx @vw_login uses the same ?next=); framed, the embedding page is told on the vw:v1 channel and
+  // decides, so a frame never navigates itself to a login page. 403 is not handled here: it stays "no permission".
+  // Pages that call /api/vw with their own fetch (chunked upload, engine render) call VideoWorkbenchAdapters.signedOut() on 401.
+  function signedOut() {
+    const next = location.pathname + location.search + location.hash;
+    if (window.top !== window) window.top.postMessage({ channel: "vw:v1", action: "unauthorized", payload: { next } }, "*");
+    else location.assign("/login?next=" + encodeURIComponent(next));
+  }
   class HttpAdapter {
     constructor(config) {
       this.config = config;
@@ -142,6 +152,7 @@
           } catch {
             data = undefined;
           }
+          if (xhr.status === 401) signedOut();
           if (xhr.status < 200 || xhr.status >= 300)
             // Same contract as LocalAdapter: the server's own message reaches the user (a refusal never shows as a bare
             // status code), and a 409 carries the host's current state for runtime.js to adopt.
@@ -166,5 +177,5 @@
       return this.request("/state", "PUT", v);
     }
   }
-  window.VideoWorkbenchAdapters = { LocalAdapter, HttpAdapter, ServiceError };
+  window.VideoWorkbenchAdapters = { LocalAdapter, HttpAdapter, ServiceError, signedOut };
 })();

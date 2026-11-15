@@ -138,6 +138,7 @@
             body: bytes,
           });
           if (response.ok) break;
+          if (response.status === 401) VideoWorkbenchAdapters.signedOut();
           const value = await response.json().catch(() => ({}));
           throw Object.assign(Error(value.error?.message || "分段上傳失敗（" + response.status + "）"), { status: response.status });
         } catch (error) {
