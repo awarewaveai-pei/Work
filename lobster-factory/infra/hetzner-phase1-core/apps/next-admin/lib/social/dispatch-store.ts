@@ -8,6 +8,7 @@ import { EntitlementRequired } from "@/lib/entitlements/can";
 import { grantFor } from "@/lib/entitlements/grant";
 import { createPost, deletePost, listAllIntegrations, listPosts } from "@/lib/content/postiz";
 import { LEASE, type DispatchPorts, type LeaseResult, type QueuedPost, type QueuedTarget } from "./dispatch";
+import { coverKey, loadCoverRows, type CoverRow } from "./cover-rows";
 
 const ACTOR = "system:social-dispatch";
 const INSTANCE = "ks-aw-01";   // 0096 default: the one Postiz every brand shares
@@ -16,8 +17,9 @@ const SELECT = "id, organization_id, version, state, scheduled_at, updated_at, b
   "comments:social_post_comments(position, body, delay_minutes, item:social_media(postiz_media_id, postiz_path)), " +
   "targets:social_post_targets(id, account_id, custom_body, format, state, postiz_post_id, updated_at, " +
   "account:social_accounts(platform, postiz_integration_id, status)), " +
-  // cover (0163, card VD.6): the video's cover image row, by the self-referencing FK's name
-  "media:social_post_media(position, alt_text, item:social_media(postiz_media_id, postiz_path, cover:social_media!social_media_cover_fk(postiz_media_id, postiz_path)))";
+  // cover (0163, card VD.6): only the id here; the cover rows come from a second query (withCovers), never an embed of
+  // social_media into itself -- lib/social/cover-rows.ts says why
+  "media:social_post_media(position, alt_text, item:social_media(postiz_media_id, postiz_path, cover_media_id))";
 
 type Row = {
   id: string; organization_id: string; version: number; state: string; scheduled_at: string; updated_at: string; body: string;
@@ -25,10 +27,14 @@ type Row = {
   comments: Array<{ position: number; body: string; delay_minutes: number; item: { postiz_media_id: string | null; postiz_path: string | null } | null }>;
   targets: Array<{ id: string; account_id: string; custom_body: string | null; format: string; state: QueuedTarget["state"]; postiz_post_id: string | null; updated_at: string;
     account: { platform: string; postiz_integration_id: string; status: string } | null }>;
-  media: Array<{ position: number; alt_text: string | null; item: { postiz_media_id: string | null; postiz_path: string | null; cover?: { postiz_media_id: string | null; postiz_path: string | null } | null } | null }>;
+  media: Array<{ position: number; alt_text: string | null; item: { postiz_media_id: string | null; postiz_path: string | null; cover_media_id: string | null } | null }>;
 };
 
-function toPost(row: Row): QueuedPost {
+function toPost(row: Row, covers: Map<string, CoverRow>): QueuedPost {
+  const coverOf = (item: NonNullable<Row["media"][number]["item"]>) => {
+    const c = item.cover_media_id ? covers.get(coverKey(row.organization_id, item.cover_media_id)) : undefined;
+    return c ? { postizMediaId: c.postiz_media_id, postizPath: c.postiz_path } : null;
+  };
   return {
     id: row.id, organizationId: row.organization_id, version: row.version, state: row.state, scheduledAt: row.scheduled_at, updatedAt: row.updated_at,
     body: row.body, linkUrl: row.link_url, linkUtm: row.link_utm,
@@ -36,7 +42,7 @@ function toPost(row: Row): QueuedPost {
       .map((c) => ({ body: c.body, delayMinutes: c.delay_minutes, media: c.item ? { postizMediaId: c.item.postiz_media_id, postizPath: c.item.postiz_path } : null })),
     media: [...row.media].sort((a, b) => a.position - b.position)
       .map((m) => ({ postizMediaId: m.item?.postiz_media_id ?? null, postizPath: m.item?.postiz_path ?? null, altText: m.alt_text,
-        cover: m.item?.cover ? { postizMediaId: m.item.cover.postiz_media_id, postizPath: m.item.cover.postiz_path } : null })),
+        cover: m.item ? coverOf(m.item) : null })),
     targets: row.targets.map((t) => ({
       id: t.id, accountId: t.account_id, customBody: t.custom_body, format: t.format, state: t.state, postizPostId: t.postiz_post_id, updatedAt: t.updated_at,
       platform: t.account?.platform ?? "", integrationId: t.account?.postiz_integration_id ?? "", accountStatus: t.account?.status ?? "",
@@ -47,6 +53,13 @@ function toPost(row: Row): QueuedPost {
 function check<T>(res: { data: T; error: { message: string } | null }, what: string): T {
   if (res.error) throw new Error(`${what}: ${res.error.message}`);
   return res.data;
+}
+
+/** The posts' rows plus their videos' cover rows, resolved in one more query across every organization in the batch. */
+async function withCovers(sb: SupabaseClient, rows: Row[]): Promise<QueuedPost[]> {
+  const refs = rows.flatMap((r) => (r.media ?? []).map((m) => ({ organization_id: r.organization_id, cover_media_id: m.item?.cover_media_id ?? null })));
+  const covers = await loadCoverRows(sb, refs);
+  return rows.map((r) => toPost(r, covers));
 }
 
 export function dispatchPorts(sb: SupabaseClient | null = getSupabaseWriteClient()): DispatchPorts {
@@ -67,11 +80,11 @@ export function dispatchPorts(sb: SupabaseClient | null = getSupabaseWriteClient
     async loadDue(until, limit) {
       const data = check(await sb.from("social_posts").select(SELECT).eq("state", "scheduled").lte("scheduled_at", until.toISOString())
         .order("scheduled_at").limit(limit), "due posts");
-      return (data as unknown as Row[]).map(toPost);
+      return withCovers(sb, data as unknown as Row[]);
     },
     async loadQueued(limit) {
       const data = check(await sb.from("social_posts").select(SELECT).eq("state", "queued").order("scheduled_at").limit(limit), "queued posts");
-      return (data as unknown as Row[]).map(toPost);
+      return withCovers(sb, data as unknown as Row[]);
     },
     async beginSend(post, targetId) {
       const rows = check(await sb.rpc("social_begin_send", { ...ids(post), p_target_id: targetId, p_lease: LEASE }), "begin send") as Array<{ lease: LeaseResult; send_key: string | null }>;

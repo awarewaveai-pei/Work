@@ -10,6 +10,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { selectAll } from "@/lib/supabase-paging";
 import { ACCOUNT_COPY } from "@/lib/accounts/invite-copy";
 import { connectUrl, listAllIntegrations, uploadMedia, uploadVideo, type RawIntegration } from "@/lib/content/postiz";
+import { coverKey, loadCoverRows, type CoverRow } from "./cover-rows";
 import { repeatSlots, type RepeatRule } from "./repeat-rule";
 import type { BrandRole, PostSnapshot, PostState, Transition } from "./state";
 
@@ -818,13 +819,26 @@ export async function recordAutoRuleHit(brandId: string, ruleId: string, actor: 
 // ---- media and log ---------------------------------------------------------------------------------------------
 
 export async function listMedia(brandId: string) {
-  const { data, error } = await db().from("social_media").select("id, kind, file_name, postiz_path, bytes, created_at, uses:social_post_media(count), cover:social_media!social_media_cover_fk(postiz_path)")
+  const sb = db();
+  const { data, error } = await sb.from("social_media").select("id, kind, file_name, postiz_path, bytes, created_at, cover_media_id, uses:social_post_media(count)")
     .eq("organization_id", brandId).order("created_at", { ascending: false }).limit(200);
   if (error) fail(error, "media");
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown> & { cover_media_id: string | null; uses?: Array<{ count: number }> }>;
+  // VD.7: cover_path = the video's cover image (0163), what every list shows instead of a frame of the video. A second
+  // query, never an embed of social_media into itself (lib/social/cover-rows.ts says why).
+  // A cover is only a thumbnail: if its lookup fails the list still comes back, without covers (an empty library is the
+  // symptom this two-query shape fixed). The sender (dispatch-store) keeps the hard failure instead.
+  let covers = new Map<string, CoverRow>();
+  try {
+    covers = await loadCoverRows(sb, rows.map((r) => ({ organization_id: brandId, cover_media_id: r.cover_media_id })));
+  } catch (e) {
+    console.error(`[social] media covers not loaded for ${brandId}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300));
+  }
   // C9: how many posts use each item (the library's 「用過 N 次」); PostgREST answers the embed as [{ count }]
-  // VD.7: cover_path = the video's cover image (0163), what every list shows instead of a frame of the video
-  return ((data ?? []) as unknown as Array<Record<string, unknown> & { uses?: Array<{ count: number }>; cover?: { postiz_path: string | null } | null }>)
-    .map(({ uses, cover, ...m }) => ({ ...m, used: uses?.[0]?.count ?? 0, cover_path: cover?.postiz_path ?? null }));
+  return rows.map(({ uses, cover_media_id, ...m }) => ({
+    ...m, used: uses?.[0]?.count ?? 0,
+    cover_path: cover_media_id ? covers.get(coverKey(brandId, cover_media_id))?.postiz_path ?? null : null,
+  }));
 }
 
 /** Uploads through Postiz (its storage holds the file until the media library card moves storage, C9). */

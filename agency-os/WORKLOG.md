@@ -23,6 +23,24 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=background: var(--text-primary) | hits=4
 
 **[剩餘風險]** `--btn-primary-bg` 與 `--accent` 在使用者手動編輯主題時可能被個別改色（palette 衍生時兩者相同）；頂列選中態採 `--btn-primary-bg`/`--btn-primary-text` 這對，與 `.sm-app button.sm-on`（用 `--accent`）有微小不一致，若將來兩 token 分家應一併統一。**[rollback]** `git revert` 本 commit（純 CSS／樣稿，無資料）。
+## 2026-11-15（續7）— 社群媒體清單全空／縮圖變「圖」字：PostgREST 不認 0163 封面 FK 的自我參照嵌入，改兩段查詢（卡 A）
+
+**根因**：VD.5–VD.7（4e179f144）在 `lib/social/store.ts listMedia` 與 `lib/social/dispatch-store.ts SELECT` 以 FK 名嵌入 social_media 自己（複合自我參照 FK `social_media_cover_fk`）。prod PostgREST v14.6 對 M2O 方向回 400 PGRST200（所有 hint 寫法皆同；無 hint 只暴露反方向），`GET /api/social/media` 400 → `SocialManager.tsx` `.catch(() => setMedia([]))` 清空 → 所有縮圖／編輯器預覽退成占位字。dispatch 同一條嵌入，排程貼文到點會載不進佇列（當時 prod 0 筆 scheduled，未炸）。資料完好。
+**不變量**：任何查詢都不經自我參照 FK 嵌入 social_media 自己；封面一律第二段查詢解析。
+**修改**：
+- 新 `lib/social/cover-rows.ts` `loadCoverRows`：`.in("id")` 每 100 一批，只收與影片同 org 的封面列。
+- `store.ts listMedia`：取 `cover_media_id`→第二段查詢→`cover_path`；封面查詢失敗只記 log、清單照回（縮圖不得再清空媒體庫）。回傳形狀不變。
+- `dispatch-store.ts`：`item:social_media(postiz_media_id, postiz_path, cover_media_id)`＋`withCovers` 批次解析；封面查詢失敗整批拋錯（不送沒封面的影片）。`QueuedPost` 形狀不變。
+- 守衛 `lib/social/__tests__/no-self-embed.test.ts`：掃 `lib/social`＋`lib/content` 去空白／去字串串接後拒 `social_media!`、`cover_media_id(`、`cover_kind(`。
+- `video-deliverable-pack-spec-20261114.md:73,99` 過時主張改為兩段查詢。
+- migration 0163 FK 保留，未動 DB；未部署（派工 session 統一部署）。
+**避免再發生**：守衛測試關整類；自我參照／複合 FK 一律不嵌入。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh -p 58122 ubuntu@145.239.195.47 bash -s < probe.sh (service-role curl, read-only: social_media?select=...,cover_media_id,uses:social_post_media(count) org=39ad4149 → http=200 rows 11 with_cover 2, video 86a80e2d→cover 3b98bacb; social_media?id=in.(3b98bacb...) → http=200 same org postiz_path present; social_posts?select=...item:social_media(postiz_media_id,postiz_path,cover_media_id) → http=200 posts 3) | exit=0 | ms=5711
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run cover-rows/no-self-embed/add-video-cover/dispatch/compose/media-still/thumb-media-kind (183 passed) + npx tsc --noEmit (clean) | exit=0 | ms=700
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/3n (2m guard spelling gaps + stale spec, 2n list degrade + error test: fixed; 1n plain Error in listMedia moot after degrade)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=social_media_cover_fk | hits=9
+- ORACLE_WAIVED: codex quota BLOCKED until 16:26 (oracle-quota exit 3); fallback = independent critic agent + mutations: reinsert embed in dispatch-store → no-self-embed red; drop cross-org check in cover-rows → "another organization" test red; both restored green
 ## 2026-11-15（續6）— R2DEL：刪一支工作台影片會清空整個組織的工作台 R2 檔案（正式環境資料遺失風險）已修 7678690f4
 
 **根因**：`next-admin/lib/storage/r2.ts` `deleteVideoObjects` 用 `/^video\/(.+)\/[^/]+\.mp4$/` 取資料夾；工作台 key `video/workbench/<org>/<sha256>.mp4` 取到 `workbench/<org>`，於是整個組織的工作台物件（其他影片、圖片、封面）被 list 後刪除，DB 列還在。入口三個：影片庫 `DELETE /api/video/[id]`、設計庫 `DELETE /api/tools/designs`（ai_generated 的工作台列）、未排程的 `/api/internal/video/cleanup`。

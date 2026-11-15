@@ -70,7 +70,7 @@
 - 測試：`next-admin/lib/content/video/__tests__/social-drafts.test.ts`（每比例帶自己的封面；無封面不上傳圖；alt＝標題）。
 
 **VD.6 發送時把封面交給 Postiz**（next-admin social）
-- 改：`next-admin/lib/social/dispatch-store.ts:19,27` select 加 `cover:social_media!cover_media_id(postiz_media_id, postiz_path)`；`next-admin/lib/social/compose.ts:17-26,104-133`：youtube → `settings.thumbnail = {id, path}`（§3 A1）；instagram／instagram-standalone → 媒體項目 `thumbnail: <cover postiz_path>`（§3 A2/A5）；facebook 與其他 → 不帶（§3 A3）。
+- 改：`next-admin/lib/social/dispatch-store.ts:19,27` select 加 `cover_media_id`，封面列由第二段查詢 `lib/social/cover-rows.ts loadCoverRows` 解析（2026-11-15：PostgREST 不認這條複合自我參照 FK 的嵌入，回 400 PGRST200；守衛 `__tests__/no-self-embed.test.ts`）；`next-admin/lib/social/compose.ts:17-26,104-133`：youtube → `settings.thumbnail = {id, path}`（§3 A1）；instagram／instagram-standalone → 媒體項目 `thumbnail: <cover postiz_path>`（§3 A2/A5）；facebook 與其他 → 不帶（§3 A3）。
 - 完成：預覽與發送同一函式，YouTube/IG 帶封面、FB 不帶、無封面同今天。
 - 測試：`next-admin/lib/social/__tests__/compose.test.ts` 四案（YT 有封面、IG 有封面、FB 有封面不帶、無封面不變）。
 
@@ -96,7 +96,7 @@
 
 ## 4b. 實作紀錄（2026-11-15）
 - 上 main：VD.1 76b03ff24、VD.2 dee6e6c03、VD.8 c3dfaa8ec、VD.5–7 4e179f144、VD.3+9 8950056a8；VD.4、VD.10 見 WORKLOG。
-- 部署順序：migration 0163 先於 next-admin（`dispatch-store.ts` 以 FK 名 `social_media_cover_fk` 嵌入）。
+- 部署順序：migration 0163 先於 next-admin（`dispatch-store.ts`／`store.ts listMedia` 讀 `cover_media_id` 欄）。
 - 既有問題（非 VD 造成，已回報監工）：影片工作室影片庫刪工作台影片時，`next-admin/lib/storage/r2.ts:344` 把 `video/workbench/<org>/` 當成單支影片資料夾整個刪除（含其他影片與封面）。
 - 既有限制：單支影片下載＋上傳 Postiz 最長可近 300 s 代理逾時；封面只在同一請求剩餘時間夠時才做（`store.ts addVideo` deadline）。
 
