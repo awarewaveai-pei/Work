@@ -52,7 +52,8 @@ async function status({ id, env, fetchImpl }) {
 
 /** { video: Buffer } from status().output. Streams and stops at the cap: Content-Length may be absent. */
 async function download({ output, fetchImpl }) {
-  const r = await fetchImpl(output, { signal: AbortSignal.timeout(180_000) });
+  // Every redirect hop on the Replicate output list (replicate-run.cjs fetchOutput).
+  const r = await require("./replicate-run.cjs").fetchOutput(output, "影片", (u, init) => fetchImpl(u, { ...init, signal: AbortSignal.timeout(180_000) }));
   if (!r.ok) throw Error("下載影片失敗：Replicate " + r.status);
   if (Number(r.headers?.get?.("content-length")) > MAX_VIDEO_BYTES) throw Error("影片超過 80MB");
   const reader = r.body?.getReader?.();

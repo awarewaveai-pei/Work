@@ -56,7 +56,7 @@ async function removeBackground({ file, env, fetchImpl, signal, resumeId, onPred
     } catch (e) {
       throw Error(deadline.aborted ? "去背逾時（55 秒）" : label + "連線失敗");
     }
-    if (!r.ok) throw Error(label + "失敗：Replicate " + r.status);
+    if (!r.ok && !run.passesRedirect(r, init)) throw Error(label + "失敗：Replicate " + r.status);
     return r;
   };
   const prediction = await run.runPrediction({
@@ -72,7 +72,7 @@ async function removeBackground({ file, env, fetchImpl, signal, resumeId, onPred
     },
   });
   // Same delivery-host rule as next-admin bg-remover.ts.
-  const download = await call(run.deliveryUrl(prediction, "去背"), {}, "下載去背結果");
+  const download = await run.fetchOutput(run.deliveryUrl(prediction, "去背"), "去背", (u, init) => call(u, init, "下載去背結果"));
   if (Number(download.headers?.get?.("content-length")) > MAX_OUTPUT_BYTES) throw Error("去背結果超過 20MB");
   const buffer = await capped(download);
   if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) throw Error("去背結果不是 PNG 圖片");

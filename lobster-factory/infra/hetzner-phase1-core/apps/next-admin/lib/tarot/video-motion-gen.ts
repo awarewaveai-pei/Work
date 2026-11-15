@@ -10,7 +10,7 @@
  */
 
 import { fetchWithRetry429, REPLICATE_POLL_MS } from "./image-gen";
-import { isReplicateOutputUrl } from "@/lib/ai/replicate-output";
+import { ReplicateOutputError, fetchReplicateOutput, isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
 import { MOTION_MODELS, type VideoMotionModel } from "@/lib/ai/video-motion-models";
@@ -92,7 +92,13 @@ export async function generateVideoMotion(
     // 回應非直接使用者輸入，仍照既有慣例守，不因「來源看起來安全」就跳過。
     if (!isReplicateOutputUrl(outUrl)) return { ok: false, error: "output_url_not_allowed" };
 
-    const fileRes = await fetch(outUrl, { signal: controller.signal });
+    let fileRes: Response;
+    try {
+      fileRes = await fetchReplicateOutput(outUrl, fetch, { signal: controller.signal }); // every redirect hop re-checked
+    } catch (e) {
+      if (e instanceof ReplicateOutputError) return { ok: false, error: e.code };
+      throw e;
+    }
     if (!fileRes.ok) return { ok: false, error: `replicate_download_${fileRes.status}` };
     if (Number(fileRes.headers.get("content-length") ?? "0") > MAX_VIDEO_BYTES) return { ok: false, error: "output_too_large" };
     // 串流邊讀邊擋上限（image-gen.ts urlToDataUrl 同款理由）：content-length 在 chunked 回應可能缺，

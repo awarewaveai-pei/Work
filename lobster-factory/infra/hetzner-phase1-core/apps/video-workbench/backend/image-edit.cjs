@@ -106,7 +106,7 @@ async function replicate(call, input, { env, fetchImpl, signal, onPrediction }) 
   const deadline = AbortSignal.timeout(170_000), abort = signal ? AbortSignal.any([signal, deadline]) : deadline;
   const fetchCall = async (url, init, label) => {
     const r = await fetchImpl(url, { ...init, signal: abort }).catch(() => { throw Error(deadline.aborted ? "圖片編輯逾時" : signal?.aborted ? "已取消" : label + "連線失敗"); });
-    if (!r.ok) throw Object.assign(Error(label + "失敗：Replicate " + r.status), { status: r.status >= 500 ? 502 : r.status });
+    if (!r.ok && !replicateRun.passesRedirect(r, init)) throw Object.assign(Error(label + "失敗：Replicate " + r.status), { status: r.status >= 500 ? 502 : r.status });
     return r;
   };
   const prediction = await replicateRun.runPrediction({
@@ -115,7 +115,7 @@ async function replicate(call, input, { env, fetchImpl, signal, onPrediction }) 
       { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify(call.version ? { version: call.version(), input } : { input }) }, "圖片編輯")).json(),
     abortError: () => Error(deadline.aborted ? "圖片編輯逾時" : "已取消"),
   });
-  return Buffer.from(await (await fetchCall(replicateRun.deliveryUrl(prediction, "圖片編輯"), {}, "下載圖片結果")).arrayBuffer());
+  return Buffer.from(await (await replicateRun.fetchOutput(replicateRun.deliveryUrl(prediction, "圖片編輯"), "圖片編輯", (u, init) => fetchCall(u, init, "下載圖片結果"))).arrayBuffer());
 }
 // One run of row m on the source PNG with the mask in the vendor's form. Answers { image: Buffer, costUsd }.
 // onPrediction(id) = a Replicate run's id, for the caller to record (a restart cancels it: api.cjs restart recovery).

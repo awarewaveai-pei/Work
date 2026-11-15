@@ -46,6 +46,9 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
       if (url === "https://api.replicate.com/v1/predictions/p-hang") return Response.json({ id: "p-hang", status: "processing" });
       if (url === "https://api.replicate.com/v1/predictions/p-hang/cancel") return Response.json({ id: "p-hang", status: "canceled" });
       if (url === "https://replicate.delivery/x/out.png" || url === R2_OUT) return new Response(red);
+      // Redirects: to another allowed host (followed), to an internal address (refused, never fetched).
+      if (url === "https://replicate.delivery/x/moved.png") return new Response(null, { status: 302, headers: { location: R2_OUT } });
+      if (url === "https://replicate.delivery/x/evil.png") return new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data/" } });
       if (url.endsWith("/v1beta/interactions")) return Response.json({ steps: [{ content: [{ type: "image", mime_type: "image/png", data: red.toString("base64") }] }], usage: geminiUsage });
       if (url.endsWith("/images/edits")) return Response.json({ data: [{ b64_json: red.toString("base64") }], usage: { input_tokens: 900, input_tokens_details: { text_tokens: 100, image_tokens: 800 }, output_tokens: 1500 } });
       throw Error("unexpected call " + url);
@@ -119,8 +122,18 @@ const usdAt = (id, size) => (id === "nano-banana-2" ? costs.geminiImageUsd("gemi
     assert.equal(foreign.status, "failed");
     assert.match(foreign.error, /網址不在允許範圍/);
     assert(!calls.some((c) => c.url === outputUrl), "nothing fetched from a foreign host");
+    // Every redirect hop is re-checked (replicate-run.cjs fetchOutput): allowed -> allowed downloads, allowed -> internal is
+    // refused before the internal address is fetched.
+    outputUrl = "https://replicate.delivery/x/moved.png";
+    const moved = await runRow("flux-2-klein-4b");
+    assert.deepEqual(moved.sent.filter((c) => /replicate\.delivery|r2\.cloudflarestorage/.test(c.url)).map((c) => c.url), [outputUrl, R2_OUT]);
+    outputUrl = "https://replicate.delivery/x/evil.png";
+    const evil = await poll(await (await post("/generations", { type: "image", operation: "region", prompt: "區域 1：改紅", settings: { ...settings, model: "flux-2-klein-4b" }, references: { images: [image] }, mask })).json());
+    assert.equal(evil.status, "failed");
+    assert.match(evil.error, /結果網址不在允許範圍/);
+    assert(!calls.some((c) => c.url.startsWith("http://169.254.169.254")), "the internal address is never fetched");
     outputUrl = "https://replicate.delivery/x/out.png";
-    console.log("PASS ideogram (black mask), flux fill (white mask), klein (no mask), gpt 2.6 (alpha mask), Nano Banana 2K (no mask): only the box changes; charged; an R2 output host downloads and charges, a foreign host is refused");
+    console.log("PASS ideogram (black mask), flux fill (white mask), klein (no mask), gpt 2.6 (alpha mask), Nano Banana 2K (no mask): only the box changes; charged; an R2 output host downloads and charges, a foreign host is refused; a redirect to an allowed host is followed, to an internal address refused unfetched");
 
     // A job cancelled while its Replicate run is still processing cancels that run at Replicate (it would keep billing).
     hang = true;

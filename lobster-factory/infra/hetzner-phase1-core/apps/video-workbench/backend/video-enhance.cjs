@@ -46,7 +46,7 @@ async function upscale({ file, resolution, dest, env, fetchImpl, signal, resumeI
       if (signal?.aborted) throw e;
       throw Error(label + "連線失敗");
     }
-    if (!r.ok) throw Error(label + "失敗：Replicate " + r.status);
+    if (!r.ok && !run.passesRedirect(r, init)) throw Error(label + "失敗：Replicate " + r.status);
     return r;
   };
   const prediction = await run.runPrediction({
@@ -60,7 +60,7 @@ async function upscale({ file, resolution, dest, env, fetchImpl, signal, resumeI
       }, "畫質增強")).json();
     },
   });
-  const download = await call(run.deliveryUrl(prediction, "畫質增強"), {}, "下載畫質增強結果");
+  const download = await run.fetchOutput(run.deliveryUrl(prediction, "畫質增強"), "畫質增強", (u, init) => call(u, init, "下載畫質增強結果"));
   if (Number(download.headers?.get?.("content-length")) > MAX_OUTPUT_BYTES) throw Error("畫質增強結果超過 4GB");
   let size = 0;
   const capped = async function* (source) {

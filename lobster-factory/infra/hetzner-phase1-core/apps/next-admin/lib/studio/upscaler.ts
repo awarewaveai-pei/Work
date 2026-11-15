@@ -11,7 +11,7 @@
 import { putDesignObject } from "../storage/r2";
 import { randomUUID } from "node:crypto";
 import { providerUrl } from "@/lib/ai/gateway";
-import { isReplicateOutputUrl } from "@/lib/ai/replicate-output";
+import { ReplicateOutputError, fetchReplicateOutput, isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import { grantFor } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { holdCost, logImageCost, releaseHold } from "@/lib/ai/log-ai-call";
@@ -182,13 +182,13 @@ export async function upscaleToPrintFile(
     if (passes === 0) return { ok: false, error: "upscale_no_pass_ran" };
     let buffer: Buffer;
     try {
-      const dl = await fetch(currentUrl, { signal: controller.signal });
+      const dl = await fetchReplicateOutput(currentUrl, fetch, { signal: controller.signal }); // every redirect hop re-checked
       if (!dl.ok) return { ok: false, error: `fetch_output_failed_${dl.status}` };
       const ab = await dl.arrayBuffer();
       if (ab.byteLength > MAX_OUTPUT_BYTES) return { ok: false, error: "output_too_large" };
       buffer = Buffer.from(ab);
-    } catch {
-      return { ok: false, error: controller.signal.aborted ? "upscale_timeout" : "fetch_output_network_error" };
+    } catch (e) {
+      return { ok: false, error: e instanceof ReplicateOutputError ? e.code : controller.signal.aborted ? "upscale_timeout" : "fetch_output_network_error" };
     }
 
     // Measure the REAL output — authoritative over arithmetic.

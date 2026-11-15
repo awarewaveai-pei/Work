@@ -7,7 +7,7 @@
 const API = "https://api.replicate.com/v1";
 // The allowed output hosts: next-admin lib/ai/replicate-output.ts, the one list for both apps (awarewave-files.txt).
 const path = require("node:path");
-const { isReplicateOutputUrl } = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/replicate-output.ts"));
+const { isReplicateOutputUrl, fetchReplicateOutput, ReplicateOutputError } = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "lib/ai/replicate-output.ts"));
 const RUNNING = ["starting", "processing"];
 
 const wait = (ms, signal) =>
@@ -78,4 +78,19 @@ function deliveryUrl(prediction, label) {
   return url;
 }
 
-module.exports = { API, cancelPrediction, takeOver, runPrediction, deliveryUrl, isReplicateOutputUrl };
+// The ONE way this app downloads a Replicate output: next-admin replicate-output.ts fetchReplicateOutput -- every redirect hop
+// is re-checked against the list, so an allowed host redirecting elsewhere is refused before that address is fetched.
+// fetchOnce(url, init) = the caller's own single request (its fetchImpl, signal, error wording); it must pass a 3xx through
+// when init.redirect is "manual". A refused hop throws 「<label>結果網址不在允許範圍」 or 「<label>結果轉址過多」.
+async function fetchOutput(url, label, fetchOnce) {
+  try {
+    return await fetchReplicateOutput(url, fetchOnce);
+  } catch (e) {
+    if (e instanceof ReplicateOutputError) throw Error(label + (e.code === "output_url_not_allowed" ? "結果網址不在允許範圍" : "結果轉址過多"));
+    throw e;
+  }
+}
+// A 3xx a caller's own request wrapper lets through: only when fetchOutput asked for it (redirect "manual").
+const passesRedirect = (r, init) => init?.redirect === "manual" && r.status >= 300 && r.status < 400;
+
+module.exports = { API, cancelPrediction, takeOver, runPrediction, deliveryUrl, isReplicateOutputUrl, fetchOutput, passesRedirect };

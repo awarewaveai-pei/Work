@@ -1,5 +1,5 @@
 import { providerUrl } from "@/lib/ai/gateway";
-import { isReplicateOutputUrl } from "@/lib/ai/replicate-output";
+import { ReplicateOutputError, fetchReplicateOutput, isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import type { Grant } from "@/lib/entitlements/can";
 
 /**
@@ -92,15 +92,15 @@ export async function runReplicate(grant: Grant, run: ReplicateRun): Promise<Rep
     if (out.startsWith("data:image/")) return { ok: true, image: out, predictSec };
     if (!isReplicateOutputUrl(out)) return { ok: false, error: "output_url_not_allowed" };
     try {
-      const dl = await fetch(out, { signal: controller.signal });
+      const dl = await fetchReplicateOutput(out, fetch, { signal: controller.signal }); // every redirect hop re-checked
       if (!dl.ok) return { ok: false, error: `fetch_output_failed_${dl.status}` };
       const ab = await dl.arrayBuffer();
       if (ab.byteLength > MAX_OUTPUT_BYTES) return { ok: false, error: "output_too_large" };
       const type = dl.headers.get("content-type");
       const mime = type?.startsWith("image/") ? type : "image/png";
       return { ok: true, image: `data:${mime};base64,${Buffer.from(ab).toString("base64")}`, predictSec };
-    } catch {
-      return { ok: false, error: timedOut("fetch_output_network_error") };
+    } catch (e) {
+      return { ok: false, error: e instanceof ReplicateOutputError ? e.code : timedOut("fetch_output_network_error") };
     }
   } finally {
     clearTimeout(killer);

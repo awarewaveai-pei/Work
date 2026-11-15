@@ -14,7 +14,7 @@ import sharp from "sharp";
 import { getDesignsPublicBase } from "../storage/r2";
 import { MODEL_SPECS } from "./model-specs";
 import { providerUrl } from "@/lib/ai/gateway";
-import { isReplicateOutputUrl } from "@/lib/ai/replicate-output";
+import { fetchReplicateOutput } from "@/lib/ai/replicate-output";
 import type { Grant } from "@/lib/entitlements/can";
 import { holdCost, logImageResult } from "@/lib/ai/log-ai-call";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
@@ -379,8 +379,8 @@ async function ownDesignUrlToBlob(
 }
 
 async function urlToDataUrl(url: string, signal: AbortSignal): Promise<string> {
-  if (!isReplicateOutputUrl(url)) throw new Error("output_url_not_allowed"); // Replicate output hosts only (SSRF guard)
-  const res = await fetch(url, { signal });
+  // Replicate output hosts only, on every redirect hop (SSRF guard); a refusal throws output_url_not_allowed.
+  const res = await fetchReplicateOutput(url, fetch, { signal });
   if (!res.ok) throw new Error(`fetch_output_failed_${res.status}`);
   const declared = Number(res.headers.get("content-length") ?? "0");
   if (declared > MAX_OUTPUT_BYTES) throw new Error("output_too_large");

@@ -210,7 +210,8 @@ async function run(job, ctx) {
     ctx.persist();
   };
   const download = async (url) => {
-    const r = await ctx.fetchImpl(url, { signal: ctx.signal });
+    // Every redirect hop on the Replicate output list (replicate-run.cjs fetchOutput).
+    const r = await require("./replicate-run.cjs").fetchOutput(url, "TRELLIS ", (u, init) => ctx.fetchImpl(u, { ...init, signal: ctx.signal }));
     if (!r.ok) throw Error("GLB 下載失敗：HTTP " + r.status);
     return capped(r, "GLB");
   };
