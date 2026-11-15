@@ -15,6 +15,7 @@ import sharp from "sharp";
 import { getDesignsPublicBase } from "../storage/r2";
 import { MODEL_SPECS } from "./model-specs";
 import { providerUrl } from "@/lib/ai/gateway";
+import { readPrediction } from "@/lib/ai/replicate-poll";
 import { fetchReplicateOutput } from "@/lib/ai/replicate-output";
 import type { Grant } from "@/lib/entitlements/can";
 import { holdCost, logImageResult } from "@/lib/ai/log-ai-call";
@@ -430,9 +431,10 @@ async function pollPrediction(start: Prediction, token: string, signal: AbortSig
       if (!prediction.urls?.get) break;
       await new Promise((r) => setTimeout(r, REPLICATE_POLL_MS));
       if (signal.aborted) throw new Error("The operation was aborted.");
-      const pollRes = await fetch(prediction.urls.get, { headers: { Authorization: `Bearer ${token}` }, signal });
-      if (!pollRes.ok) return { failed: { ok: false, error: `replicate_poll_${pollRes.status}`, billed: true } };
-      prediction = await pollRes.json();
+      const read = await readPrediction<Prediction>(prediction.urls.get, token, signal);
+      if (!read) continue;
+      if (read.ok === false) return { failed: { ok: false, error: `replicate_poll_${read.status}`, billed: true } };
+      prediction = read.prediction;
     }
     return { prediction };
   } catch (e: unknown) {

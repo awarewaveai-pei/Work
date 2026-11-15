@@ -12,6 +12,7 @@
 import { fetchWithRetry429, REPLICATE_POLL_MS } from "./image-gen";
 import { ReplicateOutputError, fetchReplicateOutput, isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import { providerUrl } from "@/lib/ai/gateway";
+import { readPrediction } from "@/lib/ai/replicate-poll";
 import type { Grant } from "@/lib/entitlements/can";
 import { MOTION_MODELS, type VideoMotionModel } from "@/lib/ai/video-motion-models";
 
@@ -77,9 +78,11 @@ export async function generateVideoMotion(
     while (prediction.status === "starting" || prediction.status === "processing") {
       if (!prediction.urls?.get) break;
       await new Promise((r) => setTimeout(r, REPLICATE_POLL_MS));
-      const pollRes = await fetch(prediction.urls.get, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
-      if (!pollRes.ok) return { ok: false, error: `replicate_poll_${pollRes.status}` };
-      prediction = await pollRes.json();
+      if (controller.signal.aborted) return { ok: false, error: "video_motion_timeout" };
+      const read = await readPrediction<typeof prediction>(prediction.urls.get, token, controller.signal);
+      if (!read) continue;
+      if (read.ok === false) return { ok: false, error: `replicate_poll_${read.status}` };
+      prediction = read.prediction;
     }
 
     if (prediction.status !== "succeeded") {

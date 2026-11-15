@@ -1,4 +1,27 @@
 # Worklog
+## 2026-11-15（續17）— 塔羅 FLUX 2 Max「replicate_poll_502」：Replicate 跑完也收費，我們卻因一次 502 放棄；狀態查詢改為暫時錯誤就再查
+
+**根因**：Replicate 18:20–18:25 間歇 502（Cloudflare `replicate.com | 502: Bad gateway`，prod log `lobster-next-admin` 10:25:40Z 起）。我們的狀態查詢（冪等 GET）一遇非 2xx 就結束：`lib/tarot/image-gen.ts` `pollPrediction`、`lib/tarot/video-motion-gen.ts`、`lib/studio/replicate-run.ts`、`lib/studio/upscaler.ts` 同寫法。Replicate `/v1/predictions` 顯示 flux-2-max 10:20:20Z（27.3s）、10:21:28Z（20.5s）皆 succeeded＝已收費、操作者沒拿到圖。Ideogram 3 筆是 create（POST）502，Replicate 無對應 prediction＝未收費，18:26 重試成功。
+
+**不變量**：讀一個還在跑的 prediction 是冪等讀取；會過去的失敗（429、5xx、網路、非 JSON）不得結束 run，只由呼叫端自己的期限結束；明確拒絕（其他 4xx）才結束。create（POST）不重試（無冪等鍵，重送可能雙重收費）。
+
+**[已修改]**（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`）
+- 新 `lib/ai/replicate-poll.ts` `readPrediction`：上述規則唯一一份；只在我們自己 abort 時 throw。
+- 4 個輪詢迴圈改用它（暫時錯誤 `continue`，期限照舊：image-gen 逾時仍 cancel＋billed）；`replicate_poll_network_error` 不再產生（grep 全 repo 無 UI／測試對照）。
+- `tsconfig` `strict:false`：`!read.ok` 不會收窄，呼叫端用 `read.ok === false` 並明示 `PredictionRead<T>` 型別（否則 `let read` 變 any）。
+- video-workbench `backend/replicate-run.cjs` 不改：輪詢失敗即 cancel，重試以 `takeOver`/`resumeId` 接回已成功 run，不重複收費（`replicate-run.cjs:33-46`）。
+
+**[驗證結果]**
+- 新 `lib/ai/__tests__/replicate-poll.test.ts`（經 `runReplicate` 真迴圈）：502＋斷線後交圖／404 照舊結束／持續 502 到期限＝`generation_timeout`。舊 `replicate-run.ts` 跑同檔：2 紅（`replicate_poll_502`＝操作者看到的錯），新碼 3 綠。
+- `npx vitest run lib/ai/__tests__ lib/studio lib/tarot`：52 files／548 passed；`npx tsc --noEmit` exit 0。
+- 未部署（next-admin 每日 03:00 自動部署 main）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai/__tests__ lib/studio lib/tarot (548 passed; replicate-poll.test.ts red on old replicate-run.ts) + npx tsc --noEmit | exit=0 | ms=45000
+- critic m1（已修）：`video-motion-gen.ts` 迴圈原只靠 `readPrediction` 的 rethrow 結束 → sleep 後補 `controller.signal.aborted` 檢查，四個迴圈各自有界。
+- Codex e1ee3879 F1（已修）：`upscaler.ts` 第二趟查不到時會重讀到 110s 總期限，第一趟已完成的輸出下載用到已中止 signal → `upscale_timeout`。不變量：每趟在總期限前 `DELIVERY_RESERVE_MS`（20s）結束（自己的 controller），留時間交付已完成的輸出（舊碼慢的第二趟也有此缺陷）。新測試 `upscaler-charge.test.ts`「second pass」：改回總期限 signal → 紅，還原 → 綠。
+- 剩餘（舊行為，未改；Codex f3fbab34 F1）：upscaler 放棄的第二趟不在 Replicate cancel，且 `passes` 只在成功時 +1（`upscaler.ts:184`，舊碼 :179）→ ai_call_logs 少記該趟成本。不變量應為「我們的成本＝每個建立的 prediction；客戶只付交付的趟數」；目前 `logImageCost` 一個 `costUsd` 同時當兩者，拆開屬計費（High），另案。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=replicate_poll_ | hits=9
 ## 2026-11-15（續16）部署閘擋下來源清單改動：`registry-code.test.ts` 未登記來源 API
 
 - 根因：`app/api/content/sources/route.ts` 為讀 `builtinSearchSources()` 引入 `trending-sources.ts`，import 閉包碰到 `content.trending`（Apify／AI ask），`UNSCOPED_ROUTES` 守衛要求列出理由；我本機只跑了 content 範圍測試，sg-deploy 全套 npm test 才抓到（09:22Z 中止，prod 未變）。

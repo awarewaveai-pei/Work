@@ -1,4 +1,5 @@
 import { providerUrl } from "@/lib/ai/gateway";
+import { readPrediction, type PredictionRead } from "@/lib/ai/replicate-poll";
 import { ReplicateOutputError, fetchReplicateOutput, isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import type { Grant } from "@/lib/entitlements/can";
 
@@ -70,16 +71,15 @@ export async function runReplicate(grant: Grant, run: ReplicateRun): Promise<Rep
     while (prediction.status === "starting" || prediction.status === "processing") {
       if (Date.now() > deadline) return { ok: false, error: "generation_timeout" };
       await sleep(POLL_INTERVAL_MS);
+      let read: PredictionRead<PredictionResponse>;
       try {
-        const poll = await fetch(providerUrl(grant, "replicate", `/v1/predictions/${prediction.id}`), {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal,
-        });
-        if (!poll.ok) return { ok: false, error: `replicate_poll_${poll.status}` };
-        prediction = (await poll.json()) as PredictionResponse;
+        read = await readPrediction<PredictionResponse>(providerUrl(grant, "replicate", `/v1/predictions/${prediction.id}`), token, controller.signal);
       } catch {
-        return { ok: false, error: timedOut("replicate_poll_network_error") };
+        return { ok: false, error: "generation_timeout" }; // readPrediction throws only on our own abort
       }
+      if (!read) continue;
+      if (read.ok === false) return { ok: false, error: `replicate_poll_${read.status}` };
+      prediction = read.prediction;
     }
     if (prediction.status !== "succeeded") {
       return { ok: false, error: prediction.error ? String(prediction.error).slice(0, 200) : run.failCode };

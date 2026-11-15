@@ -11,6 +11,7 @@
 import { putDesignObject } from "../storage/r2";
 import { randomUUID } from "node:crypto";
 import { providerUrl } from "@/lib/ai/gateway";
+import { readPrediction, type PredictionRead } from "@/lib/ai/replicate-poll";
 import { ReplicateOutputError, fetchReplicateOutput, isReplicateOutputUrl } from "@/lib/ai/replicate-output";
 import { grantFor } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
@@ -22,6 +23,9 @@ const REALESRGAN_VERSION_DEFAULT =
 
 const POLL_INTERVAL_MS = 3_000;
 const TOTAL_TIMEOUT_MS = 110_000; // route maxDuration (120s) must exceed this
+/** Every pass ends this long before the total deadline: the output a pass already made still has to be downloaded and
+ *  stored, so a slow or unreadable second pass cannot spend the first pass's delivery time. */
+const DELIVERY_RESERVE_MS = 20_000;
 const MAX_OUTPUT_BYTES = 60 * 1024 * 1024;
 const MAX_PASSES = 2;
 
@@ -108,16 +112,15 @@ async function runOnePass(
   while (prediction.status === "starting" || prediction.status === "processing") {
     if (signal.aborted) return { ok: false, error: "upscale_timeout" };
     await sleep(POLL_INTERVAL_MS);
+    let read: PredictionRead<PredictionResponse>;
     try {
-      const poll = await fetch(providerUrl(grant, "replicate", `/v1/predictions/${prediction.id}`), {
-        headers: { Authorization: `Bearer ${token}` },
-        signal,
-      });
-      if (!poll.ok) return { ok: false, error: `replicate_poll_${poll.status}` };
-      prediction = (await poll.json()) as PredictionResponse;
+      read = await readPrediction<PredictionResponse>(providerUrl(grant, "replicate", `/v1/predictions/${prediction.id}`), token, signal);
     } catch {
-      return { ok: false, error: signal.aborted ? "upscale_timeout" : "replicate_poll_network_error" };
+      return { ok: false, error: "upscale_timeout" }; // readPrediction throws only on our own abort
     }
+    if (!read) continue;
+    if (read.ok === false) return { ok: false, error: `replicate_poll_${read.status}` };
+    prediction = read.prediction;
   }
   if (prediction.status !== "succeeded") {
     return { ok: false, error: prediction.error ? String(prediction.error).slice(0, 200) : "upscale_failed" };
@@ -149,6 +152,8 @@ export async function upscaleToPrintFile(
 
   const controller = new AbortController();
   const killer = setTimeout(() => controller.abort(), TOTAL_TIMEOUT_MS);
+  const passesEnd = new AbortController(); // fires before `killer`, so it also covers the total deadline
+  const passKiller = setTimeout(() => passesEnd.abort(), TOTAL_TIMEOUT_MS - DELIVERY_RESERVE_MS);
   let passes = 0;
   let delivered = false;
   try {
@@ -168,7 +173,7 @@ export async function upscaleToPrintFile(
     while (passes < MAX_PASSES && (currentEdge === null ? passes < 1 : currentEdge < targetLongEdge)) {
       const known = currentEdge ?? 2048;
       const scale = Math.max(2, Math.min(4, Math.ceil(targetLongEdge / known)));
-      const pass = await runOnePass(grant, token, version, currentUrl, scale, controller.signal);
+      const pass = await runOnePass(grant, token, version, currentUrl, scale, passesEnd.signal);
       if (!pass.ok) {
         // First pass failing is fatal; a failed second pass falls back to pass-1 output.
         if (passes === 0) return { ok: false, error: (pass as { ok: false; error: string }).error };
@@ -212,6 +217,7 @@ export async function upscaleToPrintFile(
     };
   } finally {
     clearTimeout(killer);
+    clearTimeout(passKiller);
     // Replicate billed every pass that ran; the customer pays only for a print file it received.
     if (passes > 0) void logImageCost({ route: "studio/upscale", model: "real-esrgan", vendor: "Replicate", costUsd: toolCostUsd("upscale") * passes, tool: "studio", grant, delivered, hold });
     else releaseHold(hold, "studio/upscale");

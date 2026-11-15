@@ -32,3 +32,28 @@ describe("upscale cost row", () => {
     expect(m.logged).toEqual([expect.objectContaining({ route: "studio/upscale", delivered: false })]);
   });
 });
+
+describe("upscale second pass", () => {
+  it("a second pass Replicate cannot be read on leaves time to deliver the first pass", async () => {
+    vi.useFakeTimers();
+    try {
+      m.put = { ok: true, publicUrl: "https://cdn/x.png", byteSize: 3 };
+      const png = Buffer.alloc(24);   // 1000x800 PNG header: pass 1 (4x) reaches 4000 < 4800, so a second pass runs
+      png.writeUInt32BE(0x89504e47, 0); png.writeUInt32BE(1000, 16); png.writeUInt32BE(800, 20);
+      let created = 0;
+      vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.signal?.aborted) throw new DOMException("aborted", "AbortError");
+        if (url.endsWith("/v1/predictions")) return ++created === 1
+          ? json({ id: "p1", status: "succeeded", output: "https://replicate.delivery/pass1.png" })
+          : json({ id: "p2", status: "processing" });
+        if (url.endsWith("/v1/predictions/p2")) return new Response("bad gateway", { status: 502 });
+        return new Response(url.endsWith("pass1.png") ? new Uint8Array([1, 2, 3]) : png, { status: 200 });
+      }));
+      const p = upscaleToPrintFile("https://in/x.png", null);
+      await vi.advanceTimersByTimeAsync(115_000);
+      expect(await p).toEqual(expect.objectContaining({ ok: true, passes: 1 }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
