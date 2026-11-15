@@ -281,6 +281,7 @@ describe("registry claims match the code", () => {
     "app/api/ops/clients/[slug]/cs-knowledge-folders/route.ts": "CRUD on KB folder rows (@/lib/kb barrel)",
     "app/api/ops/clients/[slug]/schedules/[job]/route.ts": "writes a client_schedules row; the job runs later in /api/internal/schedules/run-due",
     "app/api/ops/schedules/route.ts": "reads the schedules view",
+    "app/api/content/sources/route.ts": "lists the registered search blocks' names and regions (builtinSearchSources in lib/content/trending-sources.ts); never runs a block",
     "app/api/social/reports/monthly/route.ts": "toggles a client_schedules row; reads job defaults from lib/schedules/jobs.ts, never runs a job",
     "app/api/video/[id]/route.ts": "deletes a video row and its unreferenced object (videoObjectKey only)",
     "app/api/internal/video/cleanup/route.ts": "deletes unreferenced R2 objects (videoObjectKey only)",

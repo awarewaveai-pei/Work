@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-15（續16）部署閘擋下來源清單改動：`registry-code.test.ts` 未登記來源 API
+
+- 根因：`app/api/content/sources/route.ts` 為讀 `builtinSearchSources()` 引入 `trending-sources.ts`，import 閉包碰到 `content.trending`（Apify／AI ask），`UNSCOPED_ROUTES` 守衛要求列出理由；我本機只跑了 content 範圍測試，sg-deploy 全套 npm test 才抓到（09:22Z 中止，prod 未變）。
+- 修法：`lib/portal/__tests__/registry-code.test.ts` `UNSCOPED_ROUTES` 加一列：只列已註冊積木名稱與地區，不執行積木（與同區「reach paid code only through an import」條目同型，宣稱為真：route 只呼叫 `builtinSearchSources`）。
+- 避免再發生：改 API route 的 import 後，部署前跑全套 `npx vitest run`（本次補跑 542 檔綠）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit && npx vitest run | exit=0 | ms=~120000
+- REVIEW_WAIVED: NA -- 測試登記表一列，宣稱已讀 route 驗證（GET 只呼叫 builtinSearchSources）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin,agency-os,scripts | grep=content/sources/route.ts | hits=5
 ## 2026-11-15（續15）內容工具「熱門搜尋」來源清單改由登記表產生（操作者：沒有清楚寫來源）
 
 - 根因：`ContentStudio.tsx`「管理來源」手寫「Google News · Reddit · PTT · Serper」，實際 10 個內建積木；「今日熱搜」說明先前（5b340a8a6）因同樣漂移改成不寫來源。另 Serper 項目標籤是媒體名（Sky Sports、富途牛牛），看不出是 Serper 抓的。
