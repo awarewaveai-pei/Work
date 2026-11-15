@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-15（續24）— 剪輯器字型卡剩餘部分：預覽文字外觀一個函式（字幕樣式小樣同源）、缺字換字型的字級對齊輸出、字型檔 MIME、start.cmd 全量核對
+
+- 背景：字型包本體（vendor/fonts、fontsdir、@font-face、golden 重錄）已由 P6.10 在 `f8ffef30d` 提交；它沒拿的是預覽重構與以下各項。路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`。
+- C1 字幕樣式小樣是第三份樣式定義（手寫 CSS 8 條，`styles/editor-pane-subtitles.css`）→ 刪掉；`scripts/tools-editor.js` 拆出 `edTextLook(c, t, k)`（純函式：css＋parts），舞台 `edPaintText` 與 `scripts/editor-panes/subtitles.js` `edSubSample` 都用它；樣式清單改用 `EditorModel.SUBTITLE_STYLES`（刪重複清單）。
+- C2 Arial／Georgia 裡的缺字（中文、★①）：輸出依字型檔 cmap 換思源黑體，libass 依各字面自己的 ascent+descent 定字級；預覽原本用 Latin 字型的 em → 字寬 0.233 vs 0.197。修：`edCjkRuns` 給這些字思源黑體＋自己的 ASS→CSS 字級；「字型有沒有這個字」用 canvas 判斷（`edHasGlyph`：同字配兩種不同備援字型畫出來相同＝字型自己有），與輸出讀 cmap 同一判準。Codex `2026-11-15-partialreview-40aa5608` F1（原用 Unicode 範圍，★ 不一致）即此修。
+- C3 `server.cjs` 字型檔 MIME：`.otf` font/otf、`.ttf` font/ttf（原為 application/octet-stream＋nosniff）。
+- C4 `start.cmd` 原只查一個代表檔 → 每次啟動跑 `scripts/vendor-fonts.cjs`（已在者核 sha256、缺者下載，失敗停）。Codex `2026-11-13-partialreview-114be317` F2。F1（離線包只帶 sources.json、離線首次啟動裝不了）未改：與 vendor/ffprobe 同模式，列剩餘風險。
+- 測試：`tests/preview-parity.cjs` 加 3 格逐格比對（思源黑體中文、等寬字、Arial 中文★①）：字寬差 ≤3%、字高 ≤8%、字形 IoU ≥0.6。突變：等寬字預覽改 monospace → 紅（0.331 vs 0.223）；缺字判斷改回 Unicode 範圍 → Arial 格紅（0.273 vs 0.255）；還原 → 綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/preview-parity.cjs (18 PASS) + ed10-subtitles-ui (8) + ed5-text (6) + editor-fonts + ed3-legacy-golden (9) + theme-tokens + gate.cjs | exit=0 | ms=420000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=edPaintText|edTextLook|ed-sub-sample|edCjkRuns | hits=21
 ## 2026-11-15（續23）剪輯器音訊分頁加搜尋（名稱／用途／曲風），操作者「之後我要配音樂怎麼找」
 
 - 根因：內建曲庫有 106 首，音訊分頁只能用曲風按鈕和排序找，不能用用途（旅遊、咖啡廳）或名稱找。

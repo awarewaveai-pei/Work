@@ -24,6 +24,8 @@ const root = __dirname,
     ".cube": "text/plain; charset=utf-8",
     ".glb": "model/gltf-binary",
     ".bvh": "text/plain; charset=utf-8",
+    ".otf": "font/otf",
+    ".ttf": "font/ttf",
   };
 // Served at /scripts/media-cache-sw.js while <dataDir>/media-cache-off exists (kill switch for shared/media-cache.js): no fetch handler,
 // so nothing is intercepted; it deletes the copy database and unregisters. Same database name as scripts/media-cache-sw.js.

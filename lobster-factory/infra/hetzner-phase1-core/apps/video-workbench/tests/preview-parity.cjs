@@ -46,9 +46,18 @@ function ink(img) {
       out.sum += d;
       out.x0 = Math.min(out.x0, x);
       out.x1 = Math.max(out.x1, x);
-      out.pixels.push({ x, p });
+      out.pixels.push({ x, y, p });
     }
   return out;
+}
+// Ink pixels as a set of x,y; IoU of two frames' ink (same position on both sides = same glyphs drawn in the same place).
+const inkSet = (m) => m.set || (m.set = new Set(m.pixels.map(({ x, y }) => y * W + x)));
+const inkAt = (m, x, y) => inkSet(m).has(y * W + x);
+function iou(a, b) {
+  const [sa, sb] = [inkSet(a), inkSet(b)];
+  let both = 0;
+  for (const k of sa) if (sb.has(k)) both++;
+  return both / (sa.size + sb.size - both);
 }
 // The most common colour (16 levels per channel) among the pixels passing `keep`, as its bin centre.
 function dominant(m, keep = () => true) {
@@ -143,14 +152,19 @@ const yellow = (p) => p[0] > 170 && p[1] > 140 && p[2] < 110;
       styles = ["白字暗底", "白底黑字", "品牌色", "白字黑邊", "黃字黑邊", "逐字高亮", "卡拉 OK", "色塊標題"],
       text = (i, fields) => ({ text: { text: "ABCDEFGHIJKLMNOP", font: "Arial", fontSize: 90, y: 50, start: 3 * i, duration: 3, ...fields } }),
       words = [["Hello", 0.3, 0.8], ["brave", 0.9, 1.4], ["new", 1.5, 2.0], ["world", 2.1, 2.6]].map(([t, start, end]) => ({ text: t, start, end })),
+      // The pinned vendor/fonts files (EditorModel.FONTS): 思源黑體 and 等寬字 with 中文, Latin and digits; 中文 and ★① (not in
+      // Liberation Sans) inside Arial
+      // (preview: 思源黑體's file at its own size, edCjkRuns; export: an fn override tag to it, editor-export.cjs cjkFallback).
+      cjk = [["思源黑體", "中文黑體字幕測試 Aa"], ["等寬字", "等寬字 Mono 0123"], ["Arial", "Arial 中文★①混排"]],
       subtitle = (i, style) => ({ text: { text: "Hello brave new world", font: "Arial", fontSize: 120, y: 50, start: 3 * i, duration: 3, subtitleStyle: style, color: "#e11d48", words } });
     const tx = await exportOf(
       await build([
-        { video: solid(BG, 42), seconds: 42 },
+        { video: solid(BG, 51), seconds: 51 },
         ...anims.map((animation, i) => text(i, { animation })),
         text(4, { backgroundColor: "#ff0000" }),
         ...styles.map((s, k) => subtitle(5 + k, s)),
         text(13, { align: "靠左", backgroundColor: "#ff0000", text: "ABCDEFGH" }),
+        ...cjk.map(([font, line], k) => text(14 + k, { font, text: line, fontSize: 80 })),
       ]),
     );
     // [preview, output] ink of clip i, n frames into it.
@@ -212,6 +226,21 @@ const yellow = (p) => p[0] > 170 && p[1] > 140 && p[2] < 110;
         [lp, lo] = [p.x0 / W, o.x0 / W];
       assert.ok(Math.abs(lp - lo) <= 0.02 && lo > 0.45, `靠左 左緣：預覽 ${lp} ／輸出 ${lo}`);
       pass(`文字靠左：左緣 預覽 ${lp.toFixed(3)} ／輸出 ${lo.toFixed(3)} 畫面寬（容許 0.02）`);
+    }
+    for (const [k, [font]] of cjk.entries()) {
+      // Frame by frame (frame 45 of the clip), same font file both sides: the ink's box and the ink itself overlap.
+      const [p, o] = await settled(14 + k),
+        rows = (m) => {
+          const ys = [];
+          for (let y = 4; y < H - 4; y++) for (let x = m.x0; x <= m.x1; x++) if (inkAt(m, x, y)) ys.push(y);
+          return [Math.min(...ys), Math.max(...ys)];
+        },
+        [[py0, py1], [oy0, oy1]] = [rows(p), rows(o)],
+        [wp, wo, hp, ho] = [(p.x1 - p.x0) / W, (o.x1 - o.x0) / W, (py1 - py0) / H, (oy1 - oy0) / H],
+        overlap = iou(p, o);
+      assert.ok(Math.abs(wp - wo) <= 0.03 * wo && Math.abs(hp - ho) <= 0.08 * ho, `${font} 字框：預覽 ${wp}×${hp} ／輸出 ${wo}×${ho}`);
+      assert.ok(overlap >= 0.6, `${font} 字形重疊（IoU）：${overlap}`);
+      pass(`${font}（vendor/fonts）：字寬 預覽 ${wp.toFixed(3)} ／輸出 ${wo.toFixed(3)}，字高 ${hp.toFixed(3)} ／${ho.toFixed(3)}，字形重疊 IoU ${overlap.toFixed(2)}`);
     }
     assert.deepEqual(errors, []);
   } finally {

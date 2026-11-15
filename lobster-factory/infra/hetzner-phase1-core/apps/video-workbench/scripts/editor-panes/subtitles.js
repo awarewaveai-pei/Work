@@ -65,17 +65,8 @@ const edSubLangs = [
     "한국어",
     "ภาษาไทย",
   ],
-  // = backend/editor-export.cjs SUBTITLE_STYLES; the two word styles need word times.
-  edSubStyles = [
-    "白字暗底",
-    "白底黑字",
-    "品牌色",
-    "白字黑邊",
-    "黃字黑邊",
-    "逐字高亮",
-    "卡拉 OK",
-    "色塊標題",
-  ],
+  // The eight looks (shared/editor-model.js, the exporter's own list); the two word styles need word times.
+  edSubStyles = EditorModel.SUBTITLE_STYLES,
   // whisper answers the language as a code or an English name; anything else stays 原文.
   edSubDetected = {
     zh: "繁體中文",
@@ -344,6 +335,23 @@ function edSubRows(p, t) {
     })
     .join("")}</ol>`;
 }
+// A style button's sample: this track's look in style s, drawn by the preview's own edTextLook (so the sample is the
+// burnt line). The word styles show their first word lit / half sung.
+function edSubSample(look, s) {
+  const words = [
+      { start: 0, end: 0.5, text: "字幕" },
+      { start: 0.5, end: 1, text: "Aa" },
+    ],
+    c = Object.assign(edText(TranscriptWords.joinWords(words.map((w) => w.text)), 0, 1, null), look, {
+      subtitleStyle: s,
+      words,
+      opacity: 1,
+      scale: 1,
+      animation: "無",
+    }),
+    { parts, css } = edTextLook(c, 0.25, 15 / c.fontSize);
+  return `<span class="ed-sub-sample" data-look="${esc(s)}" style="${esc(css)}">${parts ? edTextHtml(parts) : esc(c.text)}</span>`;
+}
 function edSubStylePane(p, t) {
   const cues = edSubCues(p, t.id),
     look = edSubLook(p, t.id),
@@ -352,7 +360,7 @@ function edSubStylePane(p, t) {
   return `<p class="note">樣式套用到此軌全部 ${cues.length} 句。</p><div class="ed-sub-styles" role="group" aria-label="字幕樣式">${edSubStyles
     .map(
       (s) =>
-        `<button type="button" class="ed-sub-style${look.subtitleStyle === s ? " selected" : ""}" data-ed-action="sub-style:${s}" aria-pressed="${look.subtitleStyle === s}" ${off}><span class="ed-sub-sample" data-look="${s}">字幕 Aa</span>${s}</button>`,
+        `<button type="button" class="ed-sub-style${look.subtitleStyle === s ? " selected" : ""}" data-ed-action="sub-style:${s}" aria-pressed="${look.subtitleStyle === s}" ${off}>${edSubSample(look, s)}${s}</button>`,
     )
     .join(
       "",

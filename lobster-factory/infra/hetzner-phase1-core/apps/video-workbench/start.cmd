@@ -27,5 +27,12 @@ if defined VW_INSTALL (
     exit /b 1
   )
 )
+rem Every editor font file (vendor/fonts/sources.json): present ones are sha256-checked, missing ones downloaded.
+"%VW_NODE%" scripts\vendor-fonts.cjs
+if errorlevel 1 (
+  echo Editor fonts are missing or changed. Check the network and try again.
+  pause
+  exit /b 1
+)
 "%VW_NODE%" scripts\launch.cjs
 pause

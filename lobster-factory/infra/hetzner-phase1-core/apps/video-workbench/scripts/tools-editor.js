@@ -1622,6 +1622,7 @@ function edFontCss(name) {
       document.fonts.add(new FontFace(f.css, `url("${url(file)}")`, { weight, display: "block" }));
   document.fonts.addEventListener("loadingdone", () => {
     edAssEmCache.clear();
+    edGlyphCache.clear();
     if (document.querySelector("[data-ed-stage]")) edPaint();
   });
 })();
@@ -1638,10 +1639,11 @@ function edAssEm(family) {
   }
   return edAssEmCache.get(family);
 }
-function edPaintText(p, c, el, stage, z) {
-  const k = stage.clientWidth / edRatios[p.ratio][0],
-    t = ed.time - c.start,
-    anim = EditorModel.textAnimationAt(c, t),
+// One text clip's look t seconds into it, k CSS px per output px: `css` (font, colours, box, outline; no placement),
+// `parts` (null = the plain text, else strings and spans { text, css, over? }), `inset` (the box padding) and the
+// animation. The preview stage and the 字幕 pane's style samples both draw from this one function.
+function edTextLook(c, t, k) {
+  const anim = EditorModel.textAnimationAt(c, t),
     look = c.subtitleStyle ? EditorModel.subtitleLook(c) : null,
     alpha = 1 - Math.round((1 - c.opacity) * 255) / 255,
     size = Math.max(8, Math.round(c.fontSize * c.scale)),
@@ -1651,34 +1653,106 @@ function edPaintText(p, c, el, stage, z) {
     stroke = look && !box ? Math.max(1, Math.round(size * EditorModel.SUBTITLE_EDGE.outline)) : 0,
     fill = look ? look.text : c.color,
     plan = look && EditorModel.subtitleWordPlan(c),
-    family = edFontCss(c.font),
-    span = (text, css) => Object.assign(document.createElement("span"), { textContent: text, style: css });
+    family = edFontCss(c.font);
   let parts = null;
   if (plan && c.subtitleStyle === "逐字高亮") {
     const lit = plan.findIndex((w) => t >= w.from && t < w.to);
-    parts = plan.flatMap((w, i) => [w.glue, span(w.text, `color:${edRgba(i === lit ? EditorModel.SUBTITLE_HIGHLIGHT : fill, alpha)}`)]);
+    parts = plan.flatMap((w, i) => [w.glue, { text: w.text, css: `color:${edRgba(i === lit ? EditorModel.SUBTITLE_HIGHLIGHT : fill, alpha)}` }]);
   } else if (plan) {
     // 卡拉 OK: the word in its not-yet-sung colour, the sung colour laid over it cut to the part already sung.
     parts = plan.flatMap((w) => {
-      const f = Math.max(0, Math.min(1, (t - w.from) / Math.max(0.01, w.to - w.from))) * 100,
-        word = span(w.text, `position:relative;color:${edRgba(look.secondary, alpha)}`);
-      if (f > 0) word.append(span(w.text, `position:absolute;left:0;top:0;white-space:nowrap;color:${edRgba(fill, alpha)};clip-path:inset(0 ${100 - f}% 0 0)`));
-      return [w.glue, word];
+      const f = Math.max(0, Math.min(1, (t - w.from) / Math.max(0.01, w.to - w.from))) * 100;
+      return [
+        w.glue,
+        {
+          text: w.text,
+          css: `position:relative;color:${edRgba(look.secondary, alpha)}`,
+          over: f > 0 ? `position:absolute;left:0;top:0;white-space:nowrap;color:${edRgba(fill, alpha)};clip-path:inset(0 ${100 - f}% 0 0)` : null,
+        },
+      ];
     });
   } else if (Number.isFinite(anim.shown)) {
     const chars = [...c.text];
     let cut = 0;
     for (let shown = 0; cut < chars.length && (chars[cut] === "\n" || shown++ < anim.shown); ) cut++;
-    parts = [chars.slice(0, cut).join(""), span(chars.slice(cut).join(""), "color:transparent")];
+    parts = [chars.slice(0, cut).join(""), { text: chars.slice(cut).join(""), css: "color:transparent" }];
   }
-  if (parts) el.replaceChildren(...parts);
+  parts = edCjkRuns(c, parts);
+  return {
+    anim,
+    parts,
+    inset: box ? px(pad) : "0px",
+    css: `font-size:${c.fontSize * k * edAssEm(family)}px;color:${edRgba(fill, alpha)};font-family:${family};font-weight:${c.bold ? "bold" : "normal"};font-style:${c.italic ? "italic" : "normal"};text-align:${c.align === "靠左" ? "left" : c.align === "靠右" ? "right" : "center"};background:${box ? edRgba(box[0], 1 - parseInt(box[1], 16) / 255) : "transparent"};padding:${box ? px(pad) : 0};-webkit-text-stroke:${stroke ? `${px(2 * stroke)} ${edRgba("#000000", alpha)}` : 0};paint-order:stroke fill;white-space:pre-wrap`,
+  };
+}
+// Does this face draw ch itself? The export decides from the file's own cmap (backend/editor-export.cjs cjkFallback);
+// here the same file is asked through the canvas: ch drawn with the face first and two different fallbacks behind it
+// comes out the same only when the face has it. Cached per face and weight; cleared when a face finishes loading.
+const edGlyphCache = new Map();
+function edHasGlyph(css, bold, ch) {
+  const key = `${css}|${bold ? 7 : 4}|${ch}`;
+  if (!edGlyphCache.has(key)) {
+    const pixels = (fallback) => {
+      const ctx = Object.assign(document.createElement("canvas"), { width: 48, height: 48 }).getContext("2d", { willReadFrequently: true });
+      ctx.font = `${bold ? "bold " : ""}32px "${css}","${fallback}"`;
+      ctx.textBaseline = "top";
+      ctx.fillText(ch, 4, 4);
+      return ctx.getImageData(0, 0, 48, 48).data;
+    };
+    const F = EditorModel.FONTS,
+      [one, two] = [pixels(F.思源黑體.css), pixels(css === F.思源宋體.css ? F.等寬字.css : F.思源宋體.css)];
+    edGlyphCache.set(key, one.every((v, i) => v === two[i]));
+  }
+  return edGlyphCache.get(key);
+}
+// A character the clip's face lacks: the export switches it to 思源黑體 ({\fn}) and libass sizes every face by its own
+// ascent + descent, so here such runs get 思源黑體's family at its own ASS-to-CSS size (em of the clip's). A karaoke
+// word (`over`) is not split: its fill would no longer cover the whole word.
+function edCjkRuns(c, parts) {
+  const own = EditorModel.fontOf(c.font),
+    cjk = EditorModel.FONTS.思源黑體;
+  if (own === cjk) return parts;
+  const css = `font-family:"${cjk.css}";font-size:${(edAssEm(`"${cjk.css}"`) / edAssEm(edFontCss(c.font))).toFixed(4)}em`,
+    lacks = (ch) => !/\s/.test(ch) && !edHasGlyph(own.css, c.bold, ch),
+    split = (text, base) => {
+      const runs = [];
+      for (const ch of text) {
+        const out = lacks(ch),
+          last = runs.at(-1);
+        if (last && last.out === out) last.text += ch;
+        else runs.push({ out, text: ch });
+      }
+      return runs.map(({ out, text: run }) => (out ? { text: run, css: (base ? base + ";" : "") + css } : base === null ? run : { text: run, css: base }));
+    };
+  return (parts || [c.text]).flatMap((x) =>
+    typeof x === "string" ? split(x, null) : x.over ? ([...x.text].every(lacks) ? [{ ...x, css: x.css + ";" + css }] : [x]) : split(x.text, x.css),
+  );
+}
+// edTextLook parts as DOM nodes (the stage) or as HTML (a pane's markup).
+const edTextNodes = (parts) =>
+  parts.map((x) => {
+    if (typeof x === "string") return x;
+    const el = Object.assign(document.createElement("span"), { textContent: x.text, style: x.css });
+    if (x.over) el.append(Object.assign(document.createElement("span"), { textContent: x.text, style: x.over }));
+    return el;
+  });
+const edTextHtml = (parts) =>
+  parts
+    .map((x) =>
+      typeof x === "string" ? esc(x) : `<span style="${esc(x.css)}">${esc(x.text)}${x.over ? `<span style="${esc(x.over)}">${esc(x.text)}</span>` : ""}</span>`,
+    )
+    .join("");
+function edPaintText(p, c, el, stage, z) {
+  const k = stage.clientWidth / edRatios[p.ratio][0],
+    { anim, parts, inset, css } = edTextLook(c, ed.time - c.start, k),
+    px = (n) => `${((n * k) / c.scale).toFixed(2)}px`;
+  if (parts) el.replaceChildren(...edTextNodes(parts));
   else el.textContent = c.text;
   // ASS alignment 4 / 5 / 6 with \pos: x is the text's left edge / centre / right edge (a box pads around it), and the
   // line rotates about that point.
-  const inset = box ? px(pad) : "0px",
-    [shift, origin] =
-      c.align === "靠左" ? [`calc(-1 * ${inset})`, inset] : c.align === "靠右" ? [`calc(${inset} - 100%)`, `calc(100% - ${inset})`] : ["-50%", "50%"];
-  el.style.cssText = `position:absolute;left:${c.x}%;top:${c.y}%;transform-origin:${origin} 50%;transform:translate(${shift},-50%) rotate(${c.rotation}deg) scale(${c.scale * anim.scale});font-size:${c.fontSize * k * edAssEm(family)}px;color:${edRgba(fill, alpha)};font-family:${family};font-weight:${c.bold ? "bold" : "normal"};font-style:${c.italic ? "italic" : "normal"};text-align:${c.align === "靠左" ? "left" : c.align === "靠右" ? "right" : "center"};background:${box ? edRgba(box[0], 1 - parseInt(box[1], 16) / 255) : "transparent"};padding:${box ? px(pad) : 0};-webkit-text-stroke:${stroke ? `${px(2 * stroke)} ${edRgba("#000000", alpha)}` : 0};paint-order:stroke fill;opacity:${anim.opacity};white-space:pre-wrap;width:max-content;max-width:${px(edRatios[p.ratio][0] - 20)};z-index:${z}`;
+  const [shift, origin] =
+    c.align === "靠左" ? [`calc(-1 * ${inset})`, inset] : c.align === "靠右" ? [`calc(${inset} - 100%)`, `calc(100% - ${inset})`] : ["-50%", "50%"];
+  el.style.cssText = `position:absolute;left:${c.x}%;top:${c.y}%;transform-origin:${origin} 50%;transform:translate(${shift},-50%) rotate(${c.rotation}deg) scale(${c.scale * anim.scale});${css};opacity:${anim.opacity};width:max-content;max-width:${px(edRatios[p.ratio][0] - 20)};z-index:${z}`;
 }
 function edPaint() {
   const p = edProject(),
