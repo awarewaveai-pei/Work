@@ -1,6 +1,6 @@
 import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
-import { logAiCall } from "@/lib/ai/log-ai-call";
+import { holdCost, logAiCall, logToolCost } from "@/lib/ai/log-ai-call";
 import { isSafePublicHttps } from "./public-https";
 import { fetchRemoteFile } from "@/lib/collect/net/remote-file";
 /**
@@ -146,6 +146,22 @@ interface RssBlockDef {
   stripPublisherSuffix?: boolean;
   headers?: Record<string, string>;
   source?: string;
+  /** A host that allows one request per window from our IP (Reddit: one per ~6 s, x-ratelimit-reset): every fetch to
+   *  this feed's host waits for the previous one plus this gap, and a failed fetch is tried once more after the gap. */
+  minGapMs?: number;
+}
+
+// One queue per host for feeds with minGapMs. Collects run geos three at a time and the trending route can collect at the
+// same moment: without the queue a host that allows one request per window answers all but one of them 429.
+const hostQueue = new Map<string, Promise<void>>();
+
+export async function spacedByHost<T>(host: string, gapMs: number, fn: () => Promise<T>): Promise<T> {
+  const prev = hostQueue.get(host) ?? Promise.resolve();
+  let release!: () => void;
+  const mine = new Promise<void>((r) => { release = r; });
+  hostQueue.set(host, prev.then(() => mine));
+  await prev;
+  try { return await fn(); } finally { setTimeout(release, gapMs); }
 }
 
 /** Build (but do NOT register) a kind:"search" block from an RSS/Atom feed def. */
@@ -161,8 +177,11 @@ function makeRssBlock(opts: RssBlockDef): ContentBlock<TrendingItem[]> {
       const geo = String(ctx.geo ?? "TW");
       const url = typeof opts.url === "function" ? opts.url(geo) : opts.url;
       if (!isSafePublicHttps(url)) return [];
+      const gap = opts.minGapMs;
+      const once = () => fetchFeedText(url, opts.headers);
+      const get = gap ? () => spacedByHost(new URL(url).host, gap, once) : once;
       try {
-        const xml = await fetchFeedText(url, opts.headers);
+        const xml = await get().catch((e) => { if (!gap) throw e; return get(); });
         return extractFeedItems(xml, {
           limit: opts.limit ?? 20,
           source: opts.source ?? opts.title,
@@ -246,7 +265,9 @@ rssSearchBlock({
   },
 });
 
-// ② Reddit Atom RSS（必須帶描述性 UA，否則 Reddit 403/429 → 整源變空）
+// ② Reddit Atom RSS. Unauthenticated, Reddit allows our IP one request per ~6 s (x-ratelimit-reset: 6, measured from the
+// host 2026-11-15): seven geos fetched together got 429 on all but one (14 days to 11-15: US/GB/JP/AU 0 days, TW 9 of 15).
+// minGapMs spaces them; the UA is collect's own (the gated fetcher drops a caller's user-agent).
 rssSearchBlock({
   id: "search/reddit",
   title: "Reddit",
@@ -254,10 +275,8 @@ rssSearchBlock({
   geos: "*",
   limit: 10,
   source: "Reddit",
-  headers: {
-    "User-Agent": "ContentStudio/1.0 (educational aggregator; +https://aware-wave.com)",
-    Accept: "application/rss+xml, application/xml, text/xml",
-  },
+  minGapMs: 7000,
+  headers: { Accept: "application/rss+xml, application/xml, text/xml" },
   url: (geo) => {
     const subs = (REDDIT_GEO_SUBS[geo] ?? REDDIT_GEO_SUBS.US).join("+");
     return `https://www.reddit.com/r/${subs}.rss?limit=20`;
@@ -361,7 +380,127 @@ searchBlock({
   },
 });
 
-// ⑦ 營運自訂 feed（env，免改 code 增刪；未來 DB/UI 走同一條 register）
+// ⑦ 社群熱門（Apify actor；APIFY_API_TOKEN 在才啟用）
+// Dcard, X, TikTok and Instagram refuse our host (Cloudflare 403 even through the renderer) or need a login, so a public
+// actor reads them on Apify's side. Each call holds its ceiling in credits, caps the vendor charge at the same ceiling
+// (maxTotalChargeUsd) and logs one ai_call_logs row. Actors, geos and prices measured live 2026-11-15 on the FREE plan:
+// about US$0.125 a day for all of them, inside the account's US$5 monthly cap. Left out after the same test: Threads
+// (keyword search returns year-old posts at US$0.14 a keyword; no trending list exists) and TikTok TW/HK (TW's
+// Creative Center list is Russian and Indonesian tags from two different actors; HK has none). X lists no TW/HK trends.
+
+const APIFY_ORIGIN = "https://api.apify.com";
+const APIFY_TIMEOUT_S = 90;
+
+export interface ApifyTrendDef {
+  id: string;
+  title: string;
+  icon: string;
+  geos: string[];
+  actor: string;
+  /** USD per run start and per dataset item, the actor's FREE-plan event prices. */
+  price: { start: number; item: number };
+  maxItems: number;
+  input: (geo: string) => Record<string, unknown>;
+  map: (items: Array<Record<string, unknown>>, geo: string) => TrendingItem[];
+}
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+const item = (title: string, source: string, traffic = "", category = ""): TrendingItem => ({ title, traffic, category, relatedQueries: [], source });
+
+/** One actor run for one geo. Nothing is called without a hold; the cost logged is the events the items imply, capped. */
+export async function runApifyTrend(def: ApifyTrendDef, geo: string, fetchImpl: typeof fetch = fetch): Promise<TrendingItem[]> {
+  const token = process.env.APIFY_API_TOKEN;
+  if (!token || !def.geos.includes(geo)) return [];
+  const ceiling = Number((def.price.start + def.price.item * def.maxItems).toFixed(4));
+  let grant;
+  try { grant = await grantFor("content.trending"); } catch { return []; }
+  const hold = await holdCost(grant, ceiling);
+  if (!hold) return [];
+  let ran = false;
+  let lost = false;
+  let rows: Array<Record<string, unknown>> = [];
+  try {
+    const q = new URLSearchParams({ timeout: String(APIFY_TIMEOUT_S), maxItems: String(def.maxItems), maxTotalChargeUsd: String(ceiling) });
+    const res = await fetchImpl(`${APIFY_ORIGIN}/v2/acts/${def.actor}/run-sync-get-dataset-items?${q}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(def.input(geo)),
+      signal: AbortSignal.timeout((APIFY_TIMEOUT_S + 15) * 1000),
+    });
+    // 408 = the run hit its timeout: it started and was charged; a 4xx before that never ran.
+    ran = res.ok || res.status === 408;
+    if (res.ok) {
+      const body = await res.json() as unknown;
+      rows = (Array.isArray(body) ? body : []).filter((r): r is Record<string, unknown> => !!r && typeof r === "object").slice(0, def.maxItems);
+    }
+  } catch {
+    // Our side gave up (timeout, dropped connection): Apify keeps the run going and charges it, so the cost is unknown
+    // up to the ceiling the URL capped it at. Recorded as the ceiling, our cost, never the customer's (delivered false).
+    lost = true;
+  }
+  const items = rows.length ? def.map(rows, geo) : [];
+  const costUsd = lost ? ceiling : ran ? Math.min(ceiling, def.price.start + def.price.item * rows.length) : 0;
+  await logToolCost({ route: "content/trending", model: `apify.${def.id}`, vendor: "Apify", tool: "content", grant, hold,
+    costUsd, delivered: items.length > 0, metadata: { actor: def.actor, geo, items: rows.length } });
+  return items;
+}
+
+const views = (v: unknown) => { const n = num(v); return n === null ? "" : `${n.toLocaleString("en-US")} 次觀看`; };
+
+const X_LOCATION: Record<string, string> = { US: "united-states", GB: "united-kingdom", JP: "japan", AU: "australia", SG: "singapore" };
+
+export const APIFY_TRENDS: ApifyTrendDef[] = [
+  {
+    id: "dcard", title: "Dcard 熱門", icon: "🎓", geos: ["TW"], actor: "bakos_bence~dcard-posts",
+    price: { start: 0.01, item: 0.00269 }, maxItems: 10,
+    input: () => ({ popular: true, forums: [], maxItems: 10, resultsLimit: 10, includeNsfw: false }),
+    map: (rows) => rows.filter((r) => r.nsfw !== true).flatMap((r) => {
+      const t = text(r.title);
+      const likes = num(r.likeCount);
+      return t.length > 3 ? [item(t, "Dcard", likes === null ? "" : `${likes}讚`, text(r.forumName))] : [];
+    }),
+  },
+  {
+    id: "x", title: "X 熱門", icon: "𝕏", geos: Object.keys(X_LOCATION), actor: "automation-lab~twitter-trends-scraper",
+    price: { start: 0.003, item: 0.0002 }, maxItems: 15,
+    input: (geo) => ({ locations: [X_LOCATION[geo]], maxTrendsPerLocation: 15 }),
+    map: (rows) => rows.filter((r) => r.isPromoted !== true).flatMap((r) => {
+      const t = text(r.name);
+      const vol = num(r.tweetVolume);
+      return t.length > 1 ? [item(t, "X", vol === null ? "" : `${vol.toLocaleString("en-US")} 則`)] : [];
+    }),
+  },
+  {
+    id: "tiktok", title: "TikTok 熱門標籤", icon: "🎵", geos: ["US", "JP"], actor: "rastriq~tiktok-trends-scraper",
+    price: { start: 0.01, item: 0.001 }, maxItems: 8,
+    input: (geo) => ({ countries: [geo], period: "7", maxItemsPerType: 8, trendTypes: ["hashtags"] }),
+    map: (rows) => rows.flatMap((r) => {
+      const t = text(r.hashtag_name);
+      return t ? [item(`#${t}`, "TikTok", views(r.video_views), text(r.industry))] : [];
+    }),
+  },
+  {
+    // instagram.com/popular takes no country and reads as US topics (2026-11-15: FAA, Southwest Airlines, Mavericks).
+    id: "instagram", title: "Instagram 熱門話題", icon: "📸", geos: ["US"], actor: "s-r~instagram-trending-scraper",
+    price: { start: 0, item: 0.0022 }, maxItems: 10,
+    input: () => ({ maxKeywords: 10 }),
+    map: (rows) => rows.flatMap((r) => { const t = text(r.topic); return t.length > 1 ? [item(t, "Instagram")] : []; }),
+  },
+];
+
+for (const def of APIFY_TRENDS) {
+  searchBlock({
+    id: `search/${def.id}`,
+    title: def.title,
+    icon: def.icon,
+    geos: def.geos,
+    enabled: !!process.env.APIFY_API_TOKEN,
+    run: (geo) => runApifyTrend(def, geo),
+  });
+}
+
+// ⑧ 營運自訂 feed（env，免改 code 增刪；未來 DB/UI 走同一條 register）
 (function registerEnvCustomFeeds() {
   const raw = process.env.CONTENT_TRENDING_FEEDS;
   if (!raw) return;

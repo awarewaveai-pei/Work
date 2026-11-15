@@ -661,6 +661,25 @@
 - ORACLE_WAIVED: Codex artifact 2026-11-13-partialreview-c0d26946 的唯一發現（換來源不重轉）已照不變量修正，並補指名測試；匯入腳本不屬於隱私／權限守衛，依規則不做突變
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=import-audio-library|\.import\.json | hits=21
 - BUGHUNT_SCOPE_NARROW: 改動只有清單資料與匯入腳本；呼叫者只有 tests/ed6-audio.cjs 和交接文件
+## 2026-11-15（續6）熱門來源：Reddit 修好 6/7 地區抓不到；新增 Dcard／X／TikTok／IG（Apify），Threads 不接
+
+- 根因（Reddit）：未登入的 Reddit 對同一 IP 約 6 秒放行 1 次（主機實測 `x-ratelimit-reset: 6`，同時 7 個地區 → 6 個 429）。`collect-trends.ts` 一次跑 3 個地區 → 11-01～11-15 US/GB/JP/AU 0 天有 Reddit、TW 9/15 天。另：`fetchRemoteFile` 丟掉呼叫端 UA，舊註解「必帶描述性 UA」不成立。
+- 修法：`trending-sources.ts` RSS 積木加 `minGapMs`：同 host 排隊間隔 + 失敗重試一次（`spacedByHost`）；Reddit 7000 ms。關掉整類「單 IP 限速 host」，不是只對 Reddit 加 sleep。
+- 新來源（主機直連 Dcard／trends24 全 Cloudflare 403，自架 renderer 也 403；Threads 要登入）→ Apify actor，主機不碰對方：
+  - Dcard 熱門（TW）`bakos_bence~dcard-posts` 10 篇
+  - X 熱門（US/GB/JP/AU/SG；X 無 TW/HK）`automation-lab~twitter-trends-scraper` 15 條
+  - TikTok 熱門標籤（US/JP）`rastriq~tiktok-trends-scraper` 8 個；TW 不開：兩個不同 actor 回同一份俄文／印尼文標籤＝TikTok 官方 TW 榜本身沒用；HK 無資料
+  - Instagram 熱門話題（US）`s-r~instagram-trending-scraper` 10 個（instagram.com/popular，不分國，內容偏美國）
+  - Threads 不接：沒有熱門榜；關鍵字搜尋回一兩年前舊文，1 個關鍵字 US$0.14（實測 0.144／0.152）
+- 費用控管：每次呼叫先 `holdCost` 上限，URL `maxTotalChargeUsd` = 同一上限，`logToolCost` 記 `content/trending`／`apify.<id>`；逾時記上限（Codex F3）。全部約 US$0.125／天 ≈ NT$120／月，在 Apify FREE 每月 US$5 上限內（11 月已用 US$0.50，含本次實測約 US$0.46）。
+- **未生效**：prod `next-admin` 容器 `printenv APIFY_API_TOKEN` exit 1（冷開發 IG/FB Apify 層在 prod 也一直沒開）。加 env 屬憑證變更 = High，等操作者同意走 `safe-infra-patch.sh compose`；沒加之前四個新來源 `enabled:false`，不呼叫不收費。
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 curl Reddit 7 地區併發（6×429）＋ Apify run-sync 實跑 9 次（Dcard／X×2／TikTok×3／IG×2／Threads×2）讀輸出與 usageTotalUsd | exit=0 | ms=~600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit && npx vitest run lib/content/__tests__/trending-social.test.ts lib/content/__tests__/trending-feed-fetch.test.ts app/api/content/trending lib/content/topics | exit=0 | ms=~60000
+- 突變：拔 `if (!hold) return [];` → `does not call the vendor when the hold is refused` 紅，還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - Codex `agency-os/reports/oracle/2026-11-15-partialreview-ba9c30f9.md`：F1 compose 缺 token＝確認，即上面「未生效」，等操作者；F2 GET 記內部帳＝設計如此（content_trends 全平台共用、每地區每天一次，`collect-trends.ts:1-3`；GET 限員工角色 `route.ts:113`），不改；F3 逾時記 0＝已修＋測試
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin,agency-os,scripts | grep=search/reddit|minGapMs|APIFY_TRENDS|runApifyTrend | hits=18
+- 測試：新增 `lib/content/__tests__/trending-social.test.ts` 6 個（間隔、重試、無 hold 不呼叫、上限＋成本、逾時記上限、未執行記 0）
 ## 2026-11-15（續5）BRAND.2 上線：vector-pro／photo-pro 切到拿掉 ArtCraft／Discord 的新版（操作者「可以，上正式站」）
 
 - 主機 `/root/lobster-phase1/static/`：上傳 `vector-pro/4cce336-cfa938d`、`photo-pro/98bcbfa-28d83c6`（先放 `.upload-<時間>`，`sha256sum -c` 全過才改名，擁有者 root）；`current` 兩個都切新版。nginx／compose 不動（掛載上層資料夾，連結切換即生效）。
