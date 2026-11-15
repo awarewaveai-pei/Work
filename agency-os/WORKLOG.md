@@ -10,6 +10,16 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=node --test worklog-entry-number + partial-commit-prune → 4/4；bash scripts/test-hooks.sh → 33+412 pass；本條目配號即用新工具（看得到 origin/main 與其他 worktree）；本次 stage 實際清掉 `$TEMP` 內 20（25→5，38 MB→7.8 MB） 個過期 marker | exit=0 | ms=88183
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/1n（Codex oracle 9e316371 2、96fa7b9e 2、2dd8f25e 1；前四項修：絕對路徑 --worklog 時其他副本被跳過、非本 root 的 marker 永不清、root 已刪的 marker、孤兒 index；最後一項同一瞬間兩 session 配號的 read-then-write 空窗為固有殘餘，守衛 hook 擋同檔重號、跨 worktree 靠 push 時合併發現）
 - BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=worklog-insert-entry | hits=29（AGENTS.md §8、ao-close／commands 文件引用，行為描述仍正確）
+## 2026-11-15（續19）— 撤回塔羅存檔的 WebP 縮圖（05374e443）：「我的設計」是操作者日後挑印刷檔的原檔庫，必須存原始 PNG
+
+- 操作者：不會當下決定哪張送印；「我的設計」下載回來是 PNG（已確認）。→ 不變量：存進「我的設計」的＝原始位元組，不得有損轉檔。
+- 05374e443 讓塔羅 `postDesign` 在超過約 9.96M 字元時轉 WebP q0.92 → 違反上述不變量（會存成非原檔，日後誤當印刷原稿）。撤回 `TarotStudio.tsx` 該段（`git show 05374e443 -- TarotStudio.tsx | git apply -R`），回到送原圖。
+- 保留：`lib/studio/image-upload-limit.ts`＋測試（CanvasEditor 原本就轉 WebP，行為不變，只是目標改為實際上限）。
+- 現況：>10 MiB（base64 後）的塔羅圖仍存不進「我的設計」（例：8,936 KB PNG → 編碼約 12.2 MB）。治本＝瀏覽器直傳 R2 原檔（續18「剩餘」(b)），牽涉 bucket CORS／簽發上傳網址＝High，待操作者 go。
+- 同類舊行為（Codex 8d48a4fd F1，未改）：「存無框圖」與整副牌存檔走 `toGalleryArt`（`TarotStudio.tsx:248`，≤2048px WebP q0.9，`:848`、`:1164`、`:2309`）→ 也不是原檔；與直傳 R2 一起改（原檔常 >10 MiB，單獨改會變成存不進去）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit + npx vitest run tarot image-upload-limit page-rules (24 passed) | exit=0 | ms=50000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=uploadableDataUrl | hits=19
 ## 2026-11-15（續18）— 塔羅大圖沒進「我的設計」：Next middleware 10 MiB 截斷請求；前端改縮到放得下
 
 **根因**：Next 15.5.14（`package-lock.json` 自 2026-04-06）`experimental.middlewareClientMaxBodySize` 預設 10 MiB（`node_modules/next/dist/server/body-streams.js:30,82-105`），超過即截斷、route 讀到殘缺 JSON；`designs/route.ts:16` 宣稱 12M 字元圖，超過 10 MiB 的部分從未生效。`TarotStudio.tsx` `postDesign` fire-and-forget → 無聲失敗。證據：prod log 4 筆 `Request body exceeded 10MB for /api/tools/designs`（10:27:14Z、10:28:19Z、10:48:43Z、10:51:23Z）；`media_assets` 最後一筆 tarot-preview 18:26:15（ideogram-v3-balanced），之後 Ideogram 大圖皆未存。
@@ -265,7 +275,7 @@
 - 備註：本機 `claude/social-topbar-theme-9a8927` 分支起點含 13 個尚未推上 origin 的無關 commit，`git rebase origin/main` 衝突（影音工作台檔）；已中止，改在 detached HEAD 從 `origin/main`（bff3dac0c）工作，未動該 13 個 commit。
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=NODE_PATH=…/tests/node_modules node verify2.cjs (888 theme variants, real globals.css+social.css, old vs new) | exit=0 | ms=60000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=background: var(--text-primary) | hits=4
 
 **[剩餘風險]** `--btn-primary-bg` 與 `--accent` 在使用者手動編輯主題時可能被個別改色（palette 衍生時兩者相同）；頂列選中態採 `--btn-primary-bg`/`--btn-primary-text` 這對，與 `.sm-app button.sm-on`（用 `--accent`）有微小不一致，若將來兩 token 分家應一併統一。**[rollback]** `git revert` 本 commit（純 CSS／樣稿，無資料）。
@@ -315,7 +325,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=video-workbench node tests/breakout.cjs（9，新增：貼文下移 3 px、黑畫面淡入 → 不鎖並附說明）, p6-main-system, backend, tools-lazy-load + tests/gate.cjs（origin/main f52c76fa2＋2 commits） | exit=0 | ms=600000
 - REALTEST_EVIDENCE: tool=Bash | cmd=本機用 Seedance 實片重跑收尾（不呼叫模型）：第 0–54 格打開 0 格（之前 23–58），第 60 格起才打開（78→360）；第 30、54 格文字沒有重影；差異 16.0 < 60 | exit=0 | ms=60000
 - 突變（session 做的）：故意弄壞基準 → 紅；拿掉界線檢查 → 紅；API 不傳貼文圖 → 紅；還原 → 綠。
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
   - 監工讀過兩個 commit 的設計和數據；防呆是監工要求補的（原本的 RISK「第 0 格不是貼文時會把文字鎖成那一格」）。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=frame0|firstFrame|lockMaskPixels | hits=41
 - 剩餘風險：(1) 「主角離開後文字回來」不做：4 支實片量過，沒有任何畫面規則分得出主角擋住和模型抹掉（會讓文字蓋到主角身上）。(2) Seedance 是否開中國模型例外，等操作者決定；它也會拒收有人物的照片。
@@ -453,7 +463,7 @@
 - 補的部分：d30d6759a 的狀態列只寫失敗筆數和第一個原因，沒寫哪幾篇被拒；也沒有混合批次測試。SocialManager 的逐篇迴圈搬到 Trash.tsx purgeEach（行為不變：一篇一次 purge、一篇被拒不擋其他），狀態列逐篇寫出被拒貼文的標題與原因。
 - 捨棄方案裡 Codex 找到、現行方案不適用的：100 筆上限（現行逐篇呼叫，無上限問題）。清單「批次動作」posts/bulk 仍是 100 筆上限、清單可能超過 100 篇——未改，列 RISKS。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social app/(shell)/tools/social app/api/social lib/portal lib/system-modes（51 檔 377 綠）；npx tsc --noEmit 0 錯；purge-each.test.ts 改前紅（purgeEach 不存在）、改後 2 綠 | exit=0 | ms=300000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=purgeEach | hits=7
 - ORACLE_WAIVED: 監工指示本卡不再開 Codex 新輪（AGENTS.md §4 三輪上限，捨棄方案已跑 4 輪 7794a596／357e64ae／8789c88a／59a90840）；本次只把既有迴圈抽成函式＋訊息加標題，書面自審：呼叫順序與錯誤收集不變（測試驗證 3 篇都呼叫、拒絕不中斷）
 - rollback：git revert 本 commit。
@@ -2169,7 +2179,7 @@
 
 - REALTEST_EVIDENCE: tool=SSH | cmd=psql update organizations set status='inactive' where slug='wp-member-7' returning (wp-member-7|inactive) + sg-deploy ca8d619e5 npm test passed smoke OK + browser 外聯選單 Soulful 只 1 個 | exit=0 | ms=300000
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/__tests__/organizations-bounded.test.ts app/api/ops lib/social app/__tests__ lib/outreach (76 files 567 passed) | exit=0 | ms=6000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - ORACLE_WAIVED: one-line query filter ×7 + scanner test; no logic branch to review beyond the test
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=limit\(NAV_FIRST\)|limit\(NAV_SEARCH_LIMIT\) | hits=7
 ## 2026-11-06（續24）影片剪輯 ED.3：media-contract 回歸修好、舊專案黃金測試、輸出端新效果（`4a3620f79`、`5d10097a0`、`c9574d507`）
@@ -2899,7 +2909,7 @@
 - 部署 b9038d692（smoke all OK；容器 printenv OPENAI_API_KEY 存在）。真測：1 筆名單一輪內研究→產信（gpt-5.4-mini）→自動核准→Gmail 草稿；草稿與資料已刪，0 殘留。監工台 v38。
 
 - REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST http://127.0.0.1:3002/api/internal/outreach/gmail-sync + psql ai_model=gpt-5.4-mini-2026-03-17 | exit=0 | ms=60000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=OPENAI_API_KEY|gemini_agency | hits=53
 - ORACLE_WAIVED: 一個分支（無 connector 時讀既有平台金鑰），判定與權限不變；真測已證實走 OpenAI
 ## 2026-11-04（續11）外聯 C15.4 完成：量產管線正式站真測（草稿模式，D26）＋真測抓到的 3 個 bug＋Connectors 頁補齊
@@ -3072,7 +3082,7 @@
 - 部署 2dc645a40 後真測：fallback 打 gemini-3.5-flash-lite 回 400 INVALID_ARGUMENT。直打驗證：lite＋thinkingConfig{thinkingBudget:0} → 400；不帶 → 200。
 - ai-gemini.ts：thinkingConfig 只給非 lite 模型；fallback 測試加斷言（第一次有、第二次沒有 thinkingConfig）。
 - REALTEST_EVIDENCE: tool=curl | cmd=gemini-probe2.ps1（lite with-thinking0 400、no-thinking ok）＋vitest 460 passed | exit=0 | ms=40000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=thinkingBudget | hits=12（code 只有 ai-gemini.ts:53,55＋其測試；cs／ops-inbox 用 lite 但不送 thinkingConfig；其餘為 WORKLOG 敘述）
 - ORACLE_WAIVED: 一行條件；測試斷言 body 欄位
 ## 2026-11-03（續12）外聯：Gemini 過載時改用 lite 模型
@@ -3080,7 +3090,7 @@
 - 現象：開關真測的測試名單（+t1）連 40 分鐘產信失敗；tick errors `503 ai_unavailable:gemini_failed:gemini 503 … overloaded` 與 240s timeout。直打 API：gemini-flash-latest 503、gemini-3.8-flash 503、gemini-pro-latest 429；gemini-flash-lite-latest 1s、gemini-3.5-flash 2s 正常。
 - 不變量：單一模型過載不得停掉整條外聯管線 → ai-gemini.ts：預設模型回 503／429 時改打一次 GEMINI_LITE_MODEL（lib/ai/gemini-models.ts，已有 cost-model 價格列）；timeout 不轉（會在 tick 內等兩倍），交下一 tick 重試（續8 unattended）。
 - REALTEST_EVIDENCE: tool=curl | cmd=gemini-probe.ps1 五模型直打（503/503/429/200/200）＋vitest lib/outreach app/api/outreach app/api/internal lib/ai 460 passed | exit=0 | ms=60000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=GEMINI_LITE_MODEL | hits=28（同一常數供 cs、ops-inbox、outreach 三個 fallback，價格列 cost-model.ts:70-72＋cost-calculator.test 守；舊 WORKLOG／oracle 敘述不改）
 - ORACLE_WAIVED: 單檔 try/catch 改道＋2 測試（503/429 轉 lite、400 不轉）；突變＝拿掉 catch，測試必紅
 ## 2026-11-03（續11）外聯：測試寄送放寬給連續測試用
@@ -3090,7 +3100,7 @@
 - 每日上限 sender-pool.ts mailboxCap：池信箱＝stageCap，測試窗＝TEST_DAILY_CAP 100（runAutoSend quota 與 sendCaps→co_begin_send 同一來源）。
 - 時效加 168 小時（7 天）：senders route TEST_HOURS、SendersCard 按鈕「開 7 天」；UI 說明 + 地址用法。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/outreach app/api/outreach app/api/internal → 385 passed（+tag 被寄、名單外留草稿、102 封寄 100、hours 168 開 7 天）；tsc 0 | exit=0 | ms=40000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=mailboxCap | hits=6（code 4：sender-pool.ts:43,66、send-adapter.ts:28,188；WORKLOG 本條目 2）
 - ORACLE_WAIVED: 兩個純函式＋常數；舊測試「上限 20」照新規則先紅後改綠
 ## 2026-11-03（續10）外聯：主信箱「測試自動寄送」開關（0157）
@@ -5358,7 +5368,7 @@
 - **C 根因**：findings m4——頂部「目標平台」與底部「多平台轉換」畫面沒說差異。**做法**：`ScriptForge.tsx` `PlatGrid`（所有模組共用的主平台選擇）加一行「寫這支腳本時的主平台…寫完後可用結果頁的『多平台轉換』」；`ScriptResult` 的「🔄 多平台轉換」標題下加一行「另改成其他平台版本（原版保留…點選的那版用來送出）」。改共用元件＝每個模組一次到位，不逐模組補。
 - **D**：findings「處理狀態」改成 2026-10-28 現況一行；redesign 檔三處過時句（狀態行「設計草案」、D5 成效分頁、V4.8 覆寫同 key）。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run script-forge ScriptForge＋`npx tsc --noEmit`（非 .next 錯誤 0） | exit=0 | ms=40000。畫面未目視（純文字一行，無新邏輯）。
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=目標平台 | hits=8（ScriptForge 內 PlatGrid 呼叫處皆走同一元件；ContentStudio 的「目標平台 / 尺寸」是另一頁，不在 m4 範圍）
 - ORACLE_WAIVED: Codex 本輪不可用；文案與文件，無資料路徑。
 - **Rollback**：`git revert <此 commit>`。
@@ -5367,7 +5377,7 @@
 - **根因**：D5 定「營運不再是步驟」，但成效（`media_outcome_snapshots`，webhook `api/webhooks/video-outcome` 寫入）只有 `api/video/outcomes` 一支儀表板 API，專案頁看不到。
 - **做法**：`api/video/projects/route.ts` GET ?id 多回 `outcomes`（該專案各 Release 的快照，按 `organization_id` ＋ `release_id` 篩，新到舊 200 筆）；`ProjectDetail.tsx` 每個「平台＋成熟度」顯示最新一筆，數字用中文標籤；`outcomes` 為空整區不出現。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/video/projects（3 passed，新增有／無快照）＋`npx tsc --noEmit` 非 .next 錯誤 0 | exit=0 | ms=40000。UI 未目視：本機無快照資料，條件為空時不渲染，只驗 API 形狀與型別。
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=media_outcome_snapshots | hits=5（migration、webhook 寫入、outcomes route、本 route、down 腳本；查詢皆帶 organization_id）
 - ORACLE_WAIVED: Codex 本輪不可用；書面自審：讀取已先過 `assertOrgAccess`（專案所屬 org）、查詢再帶該 org；只讀不寫；metrics 只顯示數值型欄位。
 - **Rollback**：`git revert <此 commit>`；無 migration。
@@ -5459,7 +5469,7 @@
 - **做了**：新 `RightsCheckbox.tsx`；草稿審核（`VideoStudio` DraftEditor）與 FootageEditor 沒勾時上傳鍵停用、送 `rightsConfirmed=true`；`upload-asset` 伺服器沒收到 `rightsConfirmed=true` 回 400、不寫 R2（守衛在讀檔之前），metadata 一律記 `rights_status: cleared`。同時加 §7 V4.8／V4.9 卡與監工台項目。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/video lib/content/video "app/(shell)/tools/video" lib/content/blocks`（next-admin）＋`npx tsc --noEmit` | exit=0 | ms=3586 | 54 files 229 passed；tsc 本卡檔案 0 錯（`.next/types` 的 calendar 缺檔為別 session 的既有錯）
 - 突變（同意守衛，一次）：`upload-asset/route.ts` 的 `if (!rightsConfirmed)` 改成 `if (false && …)` → `upload-asset/route.test.ts`「沒勾不上傳」變紅（1 failed）；還原變綠（2 passed）。
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=rightsConfirmed | hits=8（呼叫端只有 VideoStudio 與 FootageEditor，皆已送；`asset-origin`／`editorial-rights-qa` 讀簽章來源不受影響）
 - ORACLE_WAIVED: Codex 本輪不可用；書面自審：守衛在任何 R2 寫入之前；舊前端（不送欄位）會得到 400 而非靜默通過——兩個呼叫端同 commit 更新，無其他呼叫者。
 - **Rollback**：`git revert <此 commit>`。
@@ -5821,7 +5831,7 @@
 - 瀏覽器：三站client各7/7 PASS；系統smoke26 PASS/6原有skip/0FAIL，未宣稱涵蓋skip的登入後wizard。證據=agency-os/reports/e2e/2026-10-27/php-security/；命令與原始log=%TEMP%/aw-php-security-20261027/。部署後三PHP容器log無Fatal/Parse/Uncaught/segfault。
 - 邊界：整份live root compose掃描另報node-api/hci-app舊staging Dockerfile的2個I7 npm install無鎖；不是本次PHP服務，未更改或宣稱全stack I7通過。對本次3服務逐項套既有checker均0問題；其餘正式服務未重啟。
 - 文件：DEPLOY_ROLLBACK_RUNBOOK服務表與Soulful ENVIRONMENT_REGISTRY更新現況；舊部署與Discovery快照不追改。doc-sync完成、跨機BOM139/139；部署後 /health 100%（320/320），報告health-20261027-091925.md。本機Docker11個運行中映像為Trigger/COS資料庫與建置服務，未見PHP映像；無php/php-cgi/httpd行程或IIS服務。
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
   - 兩份現況文件逐欄對照SSH/MainWP/備份證據，回滾不還原無改動的DB；本次只提交文件，先前7檔source審查artifact維持2026-10-27-review-be906f48.md。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=session\.upload_progress\.enabled（排除WORKLOG/JSON/log/node_modules/.next/vendor/.venv） | hits=6（5個source設定/斷言檔＋原oracle記錄，無漏修運行環境）
 - ORACLE_WAIVED: DOC_ONLY -- 本次僅部署證據、操作正本與環境表；source已於cfd5fdf07經Claude SDK API獨立審查，不重複審查未改動程式碼。
@@ -5887,7 +5897,7 @@
 - 備份：`C:/Users/user1115/AppData/Local/AwareWave/backups/cloudflared-20261027-083301/` 內分別保留 system/worker 的 2026.8.3 exe；舊版僅供緊急診斷，恢復會重新引入已知風險，勿日常使用。來源檔和備份大小一致。
 - 避免再發生：每次更新需同查 WinGet 系統版與 worker runtime，僅升系統版不會覆蓋 worker 的獨立 exe。
 - REALTEST_EVIDENCE: tool=Bash | cmd=兩個完整路徑 cloudflared.exe --version；winget list --id Cloudflare.cloudflared --exact；Get-FileHash SHA256 | exit=0 | ms=356
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-whisper-worker | grep=cloudflared|2026\.8\.3|video-whisper-worker（排除 WORKLOG、每檔至多兩行） | hits=5
 - ORACLE_WAIVED: DOC_ONLY -- 僅安全套件操作紀錄，無 source code 改動；Quick 自審核對實測版本、官方 digest、桌面路徑與服務關閉狀態。
 - WORKLOG_DONE: 本條。跨機 BOM audit 139/139 通過。
@@ -6082,7 +6092,7 @@
 - **保存核對**：操作者確認 Claude 已處理；核對下方續10：18 項已逐一審查並 drop，內容為已過時／可重產資料與 10/19 已刪除的舊 client。Git 保留物件找回 `ef1b0f311424aaa47c9e0ef677ec3d680cc16685` 後曾補回 stash 索引，確認結案後撤掉這個重複索引；未套回工作區。兩個 recovery stash 保留。
 - **避免再發生**：私有 index 使用 helper 印出的正斜線絕對路徑與規定 commit 形式；提交前檢查 HEAD／index 樹檔數、刪除數與確切路徑，不自行轉成反斜線或 WSL 路徑。本次預檢 9134／9134、0 刪除、僅 3 個收尾檔。Claude 的 git 原生防大量刪檔檢查已提交 `d161d2ae9`／`7681287eb`，驗證見續10。
 - REALTEST_EVIDENCE: tool=Bash | cmd=git status --short --branch; git rev-parse HEAD origin/main; git ls-tree -r --name-only HEAD | exit=0 | ms=2700
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_WAIVED: DOC_ONLY -- 本次補寫清理與復原紀錄；不修改程式、權限、金流或正式機設定。
 - **本輪收尾**：補寫 CONVERSATION_MEMORY／daily，執行 ao-close.ps1 原生完整 gate，將實測結果與保存核對寫入正式四段 archive 後推送。
 - **收尾 gate 修復**：舊 archive 的 META 引用指向 TASKS 的子條目，不是 open 主行；改指唯一社群 V1 主項，保留原需求，`verify-archive-tasks-lift.ps1` 實測 6/6 pass。Claude 設定漂移經 ao-close 內建 backup-first merge 修復，sync-check pass。跨機 memory BOM audit 已備份補齊 64 檔，0 error。
@@ -7239,7 +7249,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit | exit=0 | ms=0（未計時）
 - REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx vitest run lib/schedules app/api/ops → 20 files / 180 passed | exit=0 | ms=3000
 - REALTEST_EVIDENCE: tool=Bash | cmd=本機 next dev＋fetch mock：分頁列＝「自動爬取 0｜社群報告自動寄出 3｜自動內容管線 0」；進分頁先顯示週報（日期欄不出現，星期欄出現），按月報 → 表格換成月報，出現日期欄 | exit=0 | ms=0（未計時）
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - ORACLE_WAIVED: 只改分頁分組（同一個 JobTable，資料和寫入路徑都不變），已用真實渲染逐一切換驗證
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=社群週報自動寄出|tabJobs|group?.key | hits=6
 
@@ -7563,7 +7573,7 @@
 - `lib/entitlements/__tests__/entitlements.e2e.test.ts`：internal 帳戶改由 harness 種子建立，beforeAll 只建 CUSTOMER；掃描測試移到最後（掃完 internal 有全功能權利，會遮住「零點數 → no_credits」路徑），並斷言 `all_features_added > 0`、全功能列只屬於 internal／edd／soulful（客戶沒有）、第二次掃描 0。客戶帳戶的斷言一個沒改弱。
 **驗證**：兩個套件都 exit 0；`npx tsc --noEmit` 只剩另一個 session 的 `app/api/webhooks/payments/[provider]/route.test.ts(7,146)`。
 - REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py (+ --suite payments) | exit=0 | ms=9000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=entitlements-real-db | hits=8
 - ORACLE_WAIVED: 只動 e2e 測試與其 harness，無 production source 變更
 ## 2026-10-25（續3）自動內容：每天最多開始幾題改成每個客戶自己設（0125）；題目的日期和時間建立後可以改（Claude）
@@ -7764,7 +7774,7 @@
 **驗證結果**
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=0（未計時）
 - REALTEST_EVIDENCE: tool=Bash | cmd=本機 next dev（無 Supabase）＋fetch mock，逐一切分頁讀表頭：自動爬取＝網站|開關|頻率|星期|台北時間|上次結果；社群月報／網站巡檢／自動內容管線＝無星期 | exit=0 | ms=1600
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - ORACLE_WAIVED: 純版面欄位條件（一個布林決定是否畫欄），已用真實渲染逐分頁驗證
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app | grep=JOB_GRID | hits=0
 - BUGHUNT_SCOPE_NARROW: 常數只在這個檔案；agency-os/scripts 無 UI
@@ -7777,7 +7787,7 @@
 - **做了什麼**：`agency-os/docs/architecture/decisions/019-staff-tool-grants.md`＋`ADR_INDEX.md` 一列；`APP_AWARE_WAVE_CURRENT_STATE.md` §1.1 加一條；`RUNNABLE_DEMOS.md` 一列（四個測試檔指令、部署後開 /ops/staff、正式機 `docker logs … | grep '\[staff-tools\]'`）；監工台 C4 打勾（3976fa73f）。
 - **驗證**：ADR 引用的檔皆存在（`lib/staff-access.ts`、`lib/portal/staff-tools.ts`、`lib/supabase/session-cache.ts`、`app/sidebar-sections.ts`）；`node scripts/verify-governance-pointers.mjs` PASSED；`node build.mjs && node check.mjs` ok。
 - REALTEST_WAIVED: DOC_ONLY -- 只改文件與監工台資料
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=staff_tools|STAFF_TOOLS_MODE | hits=54
 - ORACLE_WAIVED: 本 commit 只有文件，無 source 檔。
 - **rollback**：`git revert <本 commit>`。
@@ -7814,7 +7824,7 @@
 **驗證結果**
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit | exit=0 | ms=0（未計時）
 - REALTEST_EVIDENCE: tool=Bash | cmd=本機 next dev（無 Supabase）＋fetch mock，把 --card-bg 設成 rgba(255,255,255,0.15)、--body-bg #f2f0eb 重現操作者主題，打開小時表 → computed background-color rgb(242,240,235)、截圖浮層完全蓋住底下深綠側欄 | exit=0 | ms=300
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - ORACLE_WAIVED: 單一 CSS 背景值，改動本身已用真實渲染（半透明主題重現）驗證；無邏輯分支
 - BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/components | grep=position: "(fixed|absolute)".*var\(--card-bg\) | hits=0
 - BUGHUNT_SCOPE_NARROW: 只有 next-admin 的 TSX 會用這個主題變數做浮層；agency-os/scripts 無 UI
@@ -7887,7 +7897,7 @@
   - 突變：route.ts 加回 `export const MAX_CONVERSIONS = 2;` → 新測試紅（指名該檔與名稱）；還原綠。
   - `next build`：在乾淨的 detached worktree（HEAD＋本修正 4 檔，不含其他 session 未提交的改動）跑：exit 0，81 秒（Compiled with warnings；唯一警告是 Windows 複製 standalone 時建立符號連結的 EPERM，屬建置環境）。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx next build (clean detached worktree of HEAD + this fix) | exit=0 | ms=81000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=MAX_CONVERSIONS|conversion-slots | hits=8
 - ORACLE_WAIVED: 止血型建置修正，行為與續42 相同（同一個上限搬到 lib）；以突變＋真實 `next build` 取代跨模型審查。
 - **避免再發生**：`route-exports.test.ts`；本機驗證清單裡「改 route 檔」要求跑一次 `next build` 或這條測試。
@@ -10529,7 +10539,7 @@
 - 步驟：(1) 刪 21 個重述 AGENTS.md／已過時的 memory 檔，MEMORY.md 重寫為分組短索引（21312→8876 bytes；備份 %TEMP%/mem-backup-2026-10-22，不進 git）。(2) mcp/registry.template.json 對 copilot、work-global 加 clients.workspace.exclude=true＋note（canva 前例），跑 scripts/sync-mcp-config.ps1；Codex／Copilot／Gemini 保留。
 - 避免再發生：memory 只放 repo 沒記的事（auto-memory 規則）；新增 MCP 前查是否與內建工具或既有 server 重複。
 - REALTEST_EVIDENCE: tool=Bash | cmd=python mcpdiff.py mcp-before.json .mcp.json | exit=0 | ms=200
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude | grep=work-global|copilot | hits=42（files；mcp__work-global__/mcp__copilot__ 於 .claude/scripts/mcp 呼叫點 0）
 - ORACLE_WAIVED: config-only change (two exclude flags + notes), no source code
 - 驗證：.mcp.json before 13 after 11，removed ['copilot','work-global']；~/.codex/config.toml 仍含兩者（grep -c=3）；MEMORY.md 所有連結檔存在（0 BROKEN）。
@@ -10880,7 +10890,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . (next-admin) | exit=0 | ms=90000
 - 測試：`app/api/tools/designs/route.test.ts` 兩個（第二頁接續無重複無缺漏；計數＝總數 81／flux-schnell 78，非頁內 60）。fake 依 route 實際送出的 eq/in/or 樹/order/limit/HEAD count 對記憶體資料求值。
 - 突變（可見範圍守衛，一次）：`countWhere` 改傳 `organizationId: null` → 「counts are DB totals…」紅（expected 86 to be 81）；還原 2/2 綠。
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
   - 自讀 diff（route GET、designs-list.ts、DesignsGallery.tsx、PublishWizard 註解）；Codex 審查另行。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api/tools/designs | hits=54
   - GET 呼叫者：DesignsGallery、PublishWizard（?group=，只讀 assets，相容）、MockupStudio:320（相容）；其餘為 POST/DELETE。PublishWizard:190 舊註解提 LIST_LIMIT → 改指 PAGE_SIZE。
@@ -10922,7 +10932,7 @@
 - 測試：此頁無 component test（`grep -r TarotStudio __tests__` 0），依規不新建。
 - REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx vitest run lib/tarot app | exit=0 | ms=10916
 - REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit -p . | exit=0 | ms=10303
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands,.claude/agents | grep=generateOne(|callGenerate(|中文自動轉英 | hits=8
 - ORACLE_WAIVED: Codex review 由派工方另行執行
 ## 2026-10-21（續19）智慧連結點擊防重複改由資料庫保證（0113，Codex df9ef06d5 → main e0e10cde9）＋監工台「數據分析有真數字」→ yes
@@ -11032,7 +11042,7 @@
 **[rollback]**：`git revert <本 commit>`。
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=powershell -ExecutionPolicy Bypass -File ./scripts/verify-build-gates.ps1 | exit=0 | ms=105118
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - ORACLE_WAIVED: 一行字串修正，操作者指定不開 /codex-review；修前修後實測 exit code 為證
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=-ExecutionPolicy Bypass -Command $ | hits=2
 
@@ -11770,7 +11780,7 @@
 - 主程式全部卡片Acceptance與R0證據見續13；完整WORKLOG證據閘另在乾淨隔離snapshot、僅本session證據上exit0，避免共享WORKLOG其他session的歷史hits=0觸發全repo node_modules遞迴。未修改偵測器或他人證據。
 - 操作者指示：私人預覽網址的重發由下一個Claude session執行；本session沒有發布。既有operator memory BOM漂移53檔另屬既有狀態。
 - REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs | exit=0 | ms=188
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts | grep=1ef1ee419 | hits=2
 - ORACLE_WAIVED: DOC_ONLY -- only supervisor status/commit literals and generated HTML; implementation source reviewed by Claude in 2026-10-18-review-b17ee8b5.md.
 - AUTO_TASK_DONE: ADR017 step1 done; supervisor 1/9, same private preview URL pending Claude republish.
@@ -11845,7 +11855,7 @@
 - AUTO_TASK_DONE: next-admin 03:00 自動部署失敗修復（social.css color-mix）＋手動 sg-deploy 7afe37e37＋collect 測試環境隔離
 - 詳見本日（續2）：根因、修法、部署證據
 - REALTEST_EVIDENCE: tool=SSH | cmd=主機 sg-deploy.sh next-admin（test gate 307 檔 2809 passed、healthy 10s、smoke 5/5 200）；本機 npx vitest run app/(shell)/tools/social 35 passed、collect-sources-store 9 passed | exit=0 | ms=120000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=color-mix | hits=1
 - ORACLE_WAIVED: CSS 3 行與測試 env stub 2 行；以既有測試為判準，部署 test gate 全綠
 
@@ -13410,7 +13420,7 @@ C12 成員管理（續38→續4→續12→續16）全部結案；TASKS C12 該�
 **驗證結果**:
 - REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_absent_is_none tests.unit.test_ci_postgres tests.unit.test_tool_page_template → Ran 13 OK（改前 test_absent_is_none FAIL：`blocks/ai.py:_background found 1 listed 0`） | exit=0 | ms=11531
 - REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run → Ran 1482 tests OK | exit=0 | ms=1182395
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
   - 讀回兩處 diff：`ai.py` 只改 178 行、型別註記 `ai.py:108` 為 `dict | None`；checkout-only 清單由 `test_ci_postgres.py:104-110` 驗集合一致（OK）。
 - ORACLE_WAIVED: 兩行修正，各由一個既有指名測試由紅轉綠；部署閘門在主機上再跑一次 image 測試
 - REALTEST_EVIDENCE: tool=SSH | cmd=主機 /opt/cognitive-os ff-only → fcc494eb4；deploy/deploy.sh（/tmp/cos-deploy-20261015b.out：測試閘門 PASS、build web/api、smoke local／web local／database／public 全 PASS，08:32:43Z done；`.green-sha`=fcc494eb4；cognitive-os-api／web×3 healthy） | exit=0 | ms=1800000
@@ -14792,7 +14802,7 @@ C12 成員管理（續38→續4→續12→續16）全部結案；TASKS C12 該�
 
 **驗證結果**:
 - REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/sync-mcp-config.ps1; grep -c -E '"(chatgpt|gemini|grok)-(fast|latest)"' .mcp.json | exit=0 | ms=9000
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=.claude/commands,.claude/agents,.claude/skills,scripts,agency-os/docs,mcp,lobster-factory/docs | grep=(chatgpt|gemini|grok)-(fast|latest) | hits=7
 - ORACLE_WAIVED: config-only flag flip, no source logic changed
 
@@ -16097,7 +16107,7 @@ C12 成員管理（續38→續4→續12→續16）全部結案；TASKS C12 該�
   - H6 `agency-os/AGENTS.md:73`：Workflow tool 那段機制說明縮成一行。禁用已由 `permissions.deny` 強制、由 `tests/hooks/settings-deny-parity.test.mjs` 守；完整說明原本就在 `docs/operations/AGENTS_APPENDIX.md:631`，每輪注入只需要規則本身。
 - 未 commit：AGENTS.md 的 `_Last synced` 那一行屬於另一個 session 的改動。
 - REALTEST_EVIDENCE: tool=Bash | cmd=cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit | exit=0 | ms=4517
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - ORACLE_WAIVED: `scripts/codex-oracle.ps1 -Mode review -Path <2 files>` 在 900s 後 timeout（log `%TEMP%/codex-oracle-log-165d7767.txt`）；改用書面對抗自審。變更是刪兩段 prompt/規則文字，沒有程式邏輯。兩段刪除文字的內容都有別處承接：標題規則在 `keywordInstruction`，Workflow 說明在 APPENDIX:631。
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app,lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib,tests,mcp | grep=mechanically insert a comma-separated|Workflow tool 已在 | hits=1（AGENTS_APPENDIX.md:631，是完整說明的正本，保留）
 - 避免再發生：prompt-audit 的 diff 產出後很快就會過時，因為並行 session 會先套用或改寫同一批檔。套用前先對每個檔跑 `git apply -R --check` / `--check`，分出「已套用 / 可套用 / 衝突」三類再動手。
@@ -21550,7 +21560,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=7479 | result=3954 PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests` (cwd=`Projects/internal/cognitive-engineering-os`) | exit=0 | ms=409 | result=PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=499 | result=PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=`create_only|WORKFLOW_RUN_EXISTS_REQUIRES_RESUME|WORKFLOW_JOURNAL_EXISTS_REQUIRES_RESUME|test_concurrent_new_runs_atomically_claim_one_journal` | hits=13
 - WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
 - rollback：`git revert <atomic-run-claim-commit>`；不涉及 schema、DB、密鑰或部署。
@@ -21565,7 +21575,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
   - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=7281 | result=3954 PASS
   - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests` (cwd=`Projects/internal/cognitive-engineering-os`) | exit=0 | ms=384 | result=PASS
   - REALTEST_EVIDENCE: tool=Bash | cmd=`bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=513 | result=PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`recipe_run_status|_journal_run_summary|WORKFLOW_RUN_NOT_FOUND|WORKFLOW_RUN_ID_INVALID|recipe-status-btn` | hits=API/helper/tests/dashboard/runnable demo/worklog；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
 - rollback：回退本次 run status commit 即可；既有 POST run、journal、resume 與 tenant path helper 不受影響。
@@ -21579,7 +21589,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=7337 | result=3954 PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests` (cwd=`Projects/internal/cognitive-engineering-os`) | exit=0 | ms=226 | result=PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | result=PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`recipe-run-id|recipe-resume|run_id|resume` | hits=Dashboard/API/test/runnable demo/worklog；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
 - rollback：回退本次 Dashboard commit 即可；API run identity／resume 後端能力不受影響。
@@ -21592,7 +21602,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_ir_and_resolver tests.unit.test_workflow_executor tests.unit.test_run_recipe_cli -q` | exit=0 | ms=163353 | result=40 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=31419 | result=3954 PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests`; `bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=469 | result=compile 與 bughunt PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`_RECIPE_SCHEMA|compile_recipe_to_workflow_ir|recipe_compiler_rejects_schema_invalid` | hits=compiler/test/runnable demo/worklog；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
 - rollback：回退本次 compiler schema boundary commit 即可；不涉及 schema 檔、DB、auth 或 deploy。
@@ -21606,7 +21616,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor tests.unit.test_workflow_ir_and_resolver -q` | exit=0 | ms=47488 | result=31 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=26068 | result=3954 PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego tests`; `bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=505+ | result=compile 與 bughunt PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`run_id|resume|WORKFLOW_JOURNAL_INPUT_MISMATCH` | hits=runner/test/runnable demo/worklog；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目保留於既有 dirty Worklog，未納入本次 code commit
 - rollback：回退 `feat(cli): add durable recipe resume` 即可；不涉及 schema、DB、deploy 或既有 journal 格式。
@@ -21617,7 +21627,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - 修改：新增 integration test，覆蓋 transcribe（pre-transcribed）→雙 coder→offline literature→Trusted Compute statistics→triangulation→research memo；不新增外部 provider 或 publication claim。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_run_recipe_cli -v` | exit=0 | ms=8873 | result=7 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego/apps/recipe_runtime.py ai_lego/apps/api/main.py ai_lego/apps/cli/run_recipe.py tests/unit/test_run_recipe_cli.py` | exit=0 | ms=約2秒
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`research-qualitative-v1|research_workflow_integrity|build_registered_workflow_gate_registry` | hits=CLI test/Recipe/API/runnable demo/worklog；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
 - rollback：回退本次 EdD generic CLI coverage commit；既有 generic runtime 與 API Research Recipe 不受影響。
@@ -21630,7 +21640,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=182974 | result=56 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約45秒 | result=3954 PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego/apps/recipe_runtime.py ai_lego/apps/api/main.py ai_lego/apps/cli/run_recipe.py tests/unit/test_run_recipe_cli.py` | exit=0 | ms=約2秒
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`build_registered_workflow_gate_registry|art_therapy_project_safety|research_workflow_integrity` | hits=shared factory/API/CLI/tests/runnable demo/worklog；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
 - rollback：回退本輪 shared gate registry commit；API/CLI 回到各自 gate registry，Recipe contract 與 domain gate implementation 不變。
@@ -21644,7 +21654,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=142878 | result=56 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約30秒 | result=3954 PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ...; powershell -ExecutionPolicy Bypass -File D:\Work\scripts\bughunt-oracle.ps1 -WorkRoot D:\Work` | exit=0 | ms=約2秒
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`build_registered_capability_adapters|edd-literature-search-v1|CLI_CAPABILITY_PLAN_NOT_EXECUTABLE` | hits=shared factory/API/CLI/tests/fixture/demo/worklog；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
 - rollback：回退本次 capability CLI commit；generic CLI 回到 method-only，API existing adapter path 需同步回退同一 commit。
@@ -21655,7 +21665,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - 修改：新增 generic CLI 測試，實際覆蓋 `edd-research-evidence-v1` 的 assumption mapping → evidence matrix → Toulmin 三步鏈；同步登記可操作命令。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_run_recipe_cli -v` | exit=0 | ms=3985 | result=3 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego/apps/recipe_runtime.py ai_lego/apps/api/main.py ai_lego/apps/cli/run_recipe.py` | exit=0 | ms=約1秒
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`edd-research-evidence-v1|run_recipe|epistemic.assumption_mapping` | hits=CLI test/runnable demo/API test/Recipe；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
 - rollback：回退本次 EdD generic CLI test/demo commit；既有 EdD API Recipe 與 generic runtime 不受影響。
@@ -21668,7 +21678,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=82687 | result=56 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約8秒 | result=3954 PASS
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m compileall -q ai_lego/apps/recipe_runtime.py ai_lego/apps/api/main.py ai_lego/apps/cli/run_recipe.py` | exit=0 | ms=約1秒
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`build_method_components|method_runtime|api.recipe|generic-recipe-cli` | hits=shared factory/API/CLI/tests/worklog；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
 - rollback：回退本次 shared runtime factory commit；API/CLI 會回到各自內嵌組裝，既有 Recipe/Workflow contract 不變。
@@ -21681,7 +21691,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor tests.unit.test_workflow_ir_and_resolver tests.unit.test_run_recipe_cli -v` | exit=0 | ms=約16秒 | result=33 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -v` | exit=0 | ms=58669 | result=56 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約7秒 | result=3954 PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`run_recipe|CLI_RECIPE_CAPABILITY_UNSUPPORTED|generic-recipe-cli` | hits=runner/test/demo/worklog；bughunt-oracle exit=0
 - WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
 - rollback：回退本次 generic Recipe CLI commit；既有 API、Dashboard、executor 與 Recipes 不受影響。
@@ -21692,7 +21702,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - 修改：新增 `business-planning-review-v1`；14 個既有 ACTIVE methods 以 compiled IR 與 explicit bindings 串成單一鏈，保留 TOWS→SWOT 上游依賴與 BMC `UNVALIDATED_HYPOTHESIS` 邊界；不建立 ADR-008 已標 pending 的 `finance.financial_assumptions` stub。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=57691 | result=56 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約8秒 | result=3954 PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`business-planning-review-v1|business_planning_review_source|test_business_review_recipe` | hits=Recipe/API test/golden/blueprint/worklog
 - WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
 - rollback：回退本次 review Recipe/test/golden/blueprint commit；既有 strategy、feasibility、EdD、life、Art Therapy Recipe 不受影響。
@@ -21703,7 +21713,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - 修改：新增 `business-planning-strategy-v1`；以同一 compiled IR/executor 串 `framing.problem_statement` → `insight.empathy_map` → `strategy.swot` → `strategy.pestel` → `strategy.porter_five_forces` → `strategy.stp` → `strategy.business_model_canvas`；所有 source 與上游依賴均為 explicit bindings，BMC 保留 `UNVALIDATED_HYPOTHESIS`。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=58161 | result=55 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約8秒 | result=3952 PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`business-planning-strategy-v1|business_planning_strategy_source|test_business_strategy_recipe` | hits=Recipe/API test/golden/blueprint/runnable demo/worklog
 - WORKLOG_DONE: 本條目（本檔保留既有 dirty 變更，未納入本次 code commit）
 - rollback：回退本次 strategy Recipe/test/golden/blueprint commit；既有 business foundation/feasibility、EdD、life、Art Therapy Recipe 不受影響。
@@ -21714,7 +21724,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - 修改：新增 `life-decision-v1`；runtime 以 compiled/projection IR、MethodCatalog、atomic journal 串接 framing → SWOT → WDM；CLI 支援 `--input-json` 真實資料。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest discover -s tests/unit -p 'test_life_decision_slice.py'` | exit=0 | ms=4428
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | ms=約30秒 | 結果=3936 PASS / 0 FAIL
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`life-decision-v1|run_life_decision_slice|outputs.SWOT_analysis` | hits=跨檔命中 Recipe/CLI/test/demo/worklog
 - WORKLOG_DONE: 本條目
 - rollback：回退 commits `bb06ddb71`、`4c73722db`；不觸碰既有 dirty worktree。
@@ -21725,7 +21735,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - 修改：Recipe/Workflow IR 新增 `bindings`；compiler passthrough；executor 解析 binding、把缺失 path fail-closed，保留既有 handler payload 相容性。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_workflow_executor tests.unit.test_workflow_ir_and_resolver -v` | exit=0 | result=19 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` | exit=0 | result=3936 PASS / 0 FAIL
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`bindings|WORKFLOW_BINDINGS_INVALID|_resolve_bindings` | hits=IR schema/compiler/executor/tests/worklog；未發現第二套 binding resolver
 - WORKLOG_DONE: 本條目
 - rollback：回退本次 bindings commit；既有 Recipe 未使用 bindings，行為維持相容。
@@ -21738,7 +21748,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main -q` | exit=0 | ms=171481 | result=30 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=7275 | result=3936 PASS / 0 FAIL
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m ai_lego.apps.cli.run_life_decision_slice --runtime-dir .runtime/life-decision-api-ui-smoke` | exit=0 | result=3 steps PASS
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`/recipes/{recipe_id}/run|Run Recipe|WORKFLOW_BINDINGS_REQUIRED|tenant_key` | hits=API/Dashboard/tests/demo/worklog；tenant path 使用穩定 opaque hash，未把 tenant id 寫入路徑
 - WORKLOG_DONE: 本條目
 - rollback：回退本次 API/Dashboard commit；既有 `/methods/*` 與 CLI runtime 不受影響。
@@ -21749,7 +21759,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - 修改：新增 `edd-research-evidence-v1`：assumption mapping → evidence matrix → Toulmin argument；三步皆用 ACTIVE contract、explicit bindings、同一 executor、gate 與 journal。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.RecipeRunTests -v` | exit=0 | ms=16957 | result=4 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約17秒 | result=3938 PASS / 0 FAIL
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`edd-research-evidence-v1|epistemic\.assumption_mapping|epistemic\.evidence_matrix|epistemic\.toulmin_model` | hits=Recipe/API/test/demo/worklog/contract catalog；無第二套 runner
 - WORKLOG_DONE: 本條目
 - rollback：回退本次 EdD Recipe/test/golden commit；既有 research CLI 與 life decision API 不受影響。
@@ -21760,7 +21770,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - 修改：新增 `art-therapy-creative-reflection-v1`：random stimulus → mind map；API 共用 Workflow runner，明確禁止 diagnosis/crisis/treatment inference。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.RecipeRunTests.test_art_reflection_recipe_preserves_non_diagnostic_boundary -v` | exit=0 | ms=1341 | result=1 test OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/run_golden_tests.py` (cwd=`agency-os/docs/AI_LEGO_Cognitive_Engineering_OS`) | exit=0 | ms=約17秒 | result=3940 PASS / 0 FAIL
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`art-therapy-creative-reflection-v1|divergent\.random_stimulus|association\.mind_map|diagnos` | hits=Recipe/API/test/demo/worklog/contract catalog；未發現 clinical inference runner
 - WORKLOG_DONE: 本條目
 - rollback：回退本次 Art Therapy Recipe/test/golden commit；不移除既有 creative method contracts。
@@ -21771,7 +21781,7 @@ Brief：獨立複現 Task 3/4/6/7/8/9 聲稱的 ADR-0029 gate 6 相關六道閘�
 - 修改：`configure_cors` 讀 `COGNITIVE_OS_CORS_ORIGINS`；空值 default-off，拒絕 `*`/非 HTTP(S)，只允許 GET/POST、Content-Type，credentials 只對明確 origin 開啟；部署 blueprint 同步更新。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main.CorsConfigurationTests -v` | exit=0 | ms=14 | result=3 tests OK
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile ai_lego/apps/api/main.py` | exit=0 | ms=約1秒
-- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
 - BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os, agency-os, scripts | grep=`COGNITIVE_OS_CORS_ORIGINS|configure_cors|allow_credentials|allow_origins` | hits=API/tests/blueprint/worklog；未發現 wildcard fallback
 - WORKLOG_DONE: 本條目
 - rollback：回退本次 CORS/API test/blueprint commit；空值配置仍回到無 CORS headers。
