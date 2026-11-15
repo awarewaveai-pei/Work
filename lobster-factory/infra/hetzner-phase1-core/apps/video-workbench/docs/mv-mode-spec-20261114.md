@@ -110,9 +110,10 @@ type Song = {
 
 | 供應商／通道 | 公司／國 | 輸入 | 官方價 | **NT$／秒** | 月費門檻 | 商用授權 | 來源 |
 |---|---|---|---|---|---|---|---|
-| fal `veed/lipsync` | VEED；國家官方頁未載（查不到） | 影片＋音訊 | US$0.4／分 | **0.21** | fal 按量，無月費 | fal 頁標「Commercial use」「Partner」，條款全文未讀到 | fal.ai/models/veed/lipsync |
+| fal `veed/lipsync` | Veed Limited，倫敦（英；privacy 頁郵寄地址＋ICO 登記，未明寫國名） | 影片＋音訊 | US$0.4／分 | **0.21** | fal 按量，無月費 | fal 頁標「Commercial use」「Partner」，條款全文未讀到 | fal.ai/models/veed/lipsync；veed.io/privacy |
 | fal `fal-ai/sync-lipsync`（v1） | Sync Labs（synchronicity labs inc.；Wav2Lip 作者團隊，總部頁面未載） | 影片＋音訊 | US$0.7／分 | **0.37** | 無 | 「Commercial use via fal partnership」 | fal.ai/models/fal-ai/sync-lipsync |
 | Hedra Character-3 API 540p | Hedra；總部頁面未載（查不到） | **圖**＋音訊 | US$0.025／s | **0.80** | 無（API 按量） | 模型頁只連 Terms，內容未讀到（查不到） | hedra.com/models/video/hedra/character-3 |
+| Replicate `prunaai/p-video-avatar` | Pruna AI GmbH，慕尼黑（德；legal-notice 只寫地址與 Handelsregister，未明寫國名；創辦人 Charpentier／Nait Mazi／Rachwan／Günnemann） | **圖**＋音訊（或 `voice_script` TTS） | 720p US$0.025／s；1080p US$0.045／s | **0.80／1.44** | 無（Replicate 按量） | **查不到**（頁面與 readme 無授權文字）；**底層模型查不到**（只寫「Pruna's first avatar model」，無法排除包了中國來源模型） | replicate.com/prunaai/p-video-avatar；pruna.ai/legal-notice |
 | Sync Labs lipsync-2（sync.so 直連） | 同 Sync Labs | 影片＋音訊 | Scale US$0.04／s；Hobbyist／Creator US$0.05／s；Growth US$0.0475 | **1.28–1.60** | US$5／19／49／249 月費；Hobbyist 有浮水印 | 官方支援文：所有訂閱方案含完整商用權 | sync.so/pricing；support.sync.so/articles/2618163041 |
 | fal `fal-ai/sync-lipsync/v2` | 同 Sync Labs | 影片＋音訊 | US$3／分 | **1.60** | 無 | 「Commercial use permitted with Partner designation」 | fal.ai/models/fal-ai/sync-lipsync/v2 |
 | Hedra Character-3 API 720p／1080p | 同 Hedra | 圖＋音訊 | US$0.05／US$0.0625／s | **1.60／2.00** | 無 | 同上 | 同上 |
@@ -121,12 +122,15 @@ type Song = {
 | fal `fal-ai/sync-lipsync/v2/pro` | 同 Sync Labs | 影片＋音訊 | US$5／分 | **2.67** | 無 | 頁面只有「Commercial use」標籤 | fal.ai/models/fal-ai/sync-lipsync/v2/pro |
 | fal `fal-ai/creatify/aurora` | Creatify；國家查不到 | 圖＋音訊（頭像生成，非換嘴型） | 480p US$0.07／s；720p US$0.14／s | **2.24／4.48** | 無 | 「Commercial use」標籤 | fal.ai/models/fal-ai/creatify/aurora |
 | Captions Mirage Avatar X | Captions（美，第三方來源） | 圖或影片＋音訊 | US$0.15／s（6 秒計費單位） | **4.80** | 無 | 查不到 | captions.ai/help/docs/api/pricing |
-| Replicate `sync/lipsync-2`／`-2-pro` | 同 Sync Labs | 影片＋音訊 | **查不到**（頁面只寫 usage-based；pro 需 Sync Scale 方案） | 查不到 | — | 依 Sync 條款 | replicate.com/sync/lipsync-2-pro |
+| Replicate `sync/lipsync-2`／`-2-pro` | 同 Sync Labs | 影片（MP4／MOV／WEBM／M4V／GIF）＋音訊（MP3／OGG／WAV／M4A／AAC 或 TTS） | **查不到**（lipsync-2 頁無價；pro 只寫 usage-based、指向 sync.so/pricing；「A Scale plan or higher is required for API access」＝月費 US$249） | 查不到 | US$249（Scale） | sync.so/terms（頁面稱其管轄商用） | replicate.com/sync/lipsync-2；replicate.com/sync/lipsync-2-pro |
 | fal `fal-ai/tavus/hummingbird-lipsync` | Tavus；國家查不到 | 影片＋音訊 | **查不到**（頁面 404） | 查不到 | — | 查不到 | — |
-| ✗ HeyGen | 2020 深圳創立（原 Surreal），現洛杉磯 | 圖 | — | — | — | **排除（中國起源）** | research.contrary.com/company/heygen |
-| ✗ Kling、PixVerse、OmniHuman、LatentSync、MuseTalk、Sonic、SadTalker、Hallo、EchoMimic、AniPortrait、VideoReTalking、LivePortrait、Ditto、JoyVASA、Linly-Talker | 中國 | — | — | — | — | **排除** | — |
+| ✗ HeyGen（含 Replicate `heygen/lipsync-speed`） | 2020 深圳創立（原 Surreal），2023 撤銷深圳實體，現洛杉磯 | 影片＋音訊（Replicate 列）；圖（Photo Avatar） | Replicate US$0.0333／s | 1.07（僅供參考） | — | **排除：中國起源**；Replicate 頁無授權文字 | replicate.com/heygen/lipsync-speed；research.contrary.com/company/heygen |
+| ✗ Replicate `bytedance/latentsync` | ByteDance（中） | 影片＋音訊 | — | — | — | **排除：中國公司**；頁面無授權文字 | replicate.com/bytedance/latentsync |
+| ✗ Kling、PixVerse、OmniHuman、MuseTalk、Sonic、SadTalker、Hallo、EchoMimic、AniPortrait、VideoReTalking、LivePortrait、Ditto、JoyVASA、Linly-Talker | 中國 | — | — | — | — | **排除：中國公司或實驗室**（價格不列） | — |
 | ✗ Runway Act-Two | Runway（美） | 需驅動表演影片，不吃音訊 | US$0.05／s | 1.60 | — | 不適用 | docs.dev.runwayml.com/guides/pricing |
 | ✗ Veo 3.1／Gemini Omni 1.2 | Google | 沒有音訊輸入 | — | — | — | 不能驅動對嘴 | aistudio.google.com/docs/video |
+
+**總成本提醒**：吃「影片＋音訊」的通道（veed、Sync、Replicate sync、HeyGen）要先有該鏡影片；影片若是生成的，要把影片費加上（Veo 3.1 Fast US$0.10／s ≈ NT$3.2／s，Omni 1.2 Flash ≈ NT$2.2／s，`cost-model.ts` VIDEO_MOTION_RATES／GEMINI_VIDEO_RATES），所以「圖＋音訊」的 Hedra 540p／Pruna 720p（NT$0.80／s）在沒有鏡頭影片時反而便宜。鏡頭影片本來就要做（MV 免費線第 3 步）時，對嘴只多 NT$0.21–0.37／s。
 
 本機開源（RTX 5060 8 GB）——**沒有一個同時滿足「可商用授權＋非中國來源＋README 寫明 8 GB 可跑」**：
 
@@ -142,9 +146,9 @@ type Song = {
 | DINet | 機構未載 | 查不到 | 未載 | 不採用 | github.com/MRzzm/DINet |
 
 **決定（MV.8 若開工）**：
-- 鏡頭已有影片（`shot.video`）→ 第一列 **fal `veed/lipsync` NT$0.21／秒**；開工第 0 步先確認 VEED 公司所在國（官方頁未載）；確認不了就改 **fal `fal-ai/sync-lipsync` v1 NT$0.37／秒**（Sync Labs，Wav2Lip 作者團隊，非中國）。兩者都走 fal（美，按量、無月費），新金鑰一把 `FAL_KEY`。
-- 鏡頭只有圖（`shot.image`）→ **Hedra Character-3 540p NT$0.80／秒**（唯一吃「圖＋音訊」且官方寫 singing 的非中國供應商；720p NT$1.6 是操作者嫌貴的那個價，不預設）。
-- 不接 sync.so 直連（月費 US$5–249 加浮水印層級）、不接 Replicate（無價）、不自架（上表無合格模型）。
+- 鏡頭已有影片（`shot.video`）→ 第一列 **fal `veed/lipsync` NT$0.21／秒**（Veed Limited，倫敦）；fal 頁面若無完整商用條款就改 **fal `fal-ai/sync-lipsync` v1 NT$0.37／秒**（Sync Labs，Wav2Lip 作者團隊，非中國）。兩者都走 fal（美，按量、無月費），新金鑰一把 `FAL_KEY`。
+- 鏡頭只有圖（`shot.image`）→ **Hedra Character-3 540p NT$0.80／秒**（吃「圖＋音訊」且官方寫 singing；720p NT$1.6 是操作者嫌貴的那個價，不預設）。Replicate `prunaai/p-video-avatar` 720p 同價 NT$0.80 且畫質較高，但授權與底層模型都查不到，**先不列**；開工第 0 步問 Pruna 一次（授權、底層模型），兩項都清楚且非中國來源就換它當圖→影片的第一列。
+- 不接 sync.so 直連與 Replicate sync（月費 US$5–249，Replicate 版還要 Scale US$249）、不接 HeyGen／ByteDance（中國起源）、不自架（上表無合格模型）。
 - 按鈕一律「唱歌對嘴 · 每秒 NT$x · 此鏡 N 秒 ≈ NT$y」＋提示「只建議用在副歌特寫幾秒」；費率從 `cost-model.ts` `TOOL_RATES`（usdPerSec）讀，不寫死。
 
 ### 3.4 作曲
@@ -247,7 +251,7 @@ type Song = {
 ## 8. 未驗證、要操作者或開工時定
 
 - Lyria 3.5 繁中歌聲品質與回應是否含時間軸歌詞（MV.7 第 0 步實測 1 首，NT$2.6）。
-- 對嘴供應商：VEED 公司所在國（官方頁未載）；Hedra 積分頁與美元頁矛盾；MV.8 若開工，第 0 步各打 1 秒記實價。
+- 對嘴供應商：fal veed 的完整商用條款未讀到；Pruna p-video-avatar 的授權與底層模型查不到；Hedra 積分頁與美元頁矛盾；MV.8 若開工，第 0 步各打 1 秒記實價。
 - Demucs 權重授權（Meta 無聲明；只影響容器內權重檔，不進程式交付）。
 - 分軌 CPU 耗時（估 1.5× 曲長；MV.4 真跑一次記 WORKLOG）。
 - ElevenLabs 免費方案月額度夠不夠 MV 用量（頁面會顯示剩餘點數；不夠就靠 MV.4 自家列）。

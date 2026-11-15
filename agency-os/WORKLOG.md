@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-15（續9）影音工作台 MV 規格：對嘴比價表補 Replicate 選項（官方頁核對）
+
+- 監工補四個 Replicate 列，逐一到官方頁核對後寫進 `apps/video-workbench/docs/mv-mode-spec-20261114.md §3.3`：
+  - `prunaai/p-video-avatar`：Pruna AI GmbH 慕尼黑（德，legal-notice 只寫地址）；一張圖＋音訊（或 TTS）直接出片；720p US$0.025／s＝NT$0.80、1080p US$0.045／s＝NT$1.44；**授權與底層模型頁面都查不到**（無法排除包了中國模型）→ 列入表、不列為預設；開工第 0 步問 Pruna。
+  - `sync/lipsync-2`／`-2-pro`：影片＋音訊；Replicate 無每秒價，pro 寫 usage-based 且「Scale plan or higher」（US$249／月）；條款 sync.so/terms。
+  - `heygen/lipsync-speed`：US$0.0333／s＝NT$1.07，保持排除，排除欄寫「中國起源（2020 深圳創立）」。
+  - `bytedance/latentsync`：排除，ByteDance。
+- 加「總成本提醒」：吃影片的通道要先有鏡頭影片（Veo 3.1 Fast ≈ NT$3.2／s、Omni ≈ NT$2.2／s），所以沒有鏡頭影片時「圖＋音訊」的 Hedra 540p／Pruna 720p（NT$0.80）反而便宜。
+- VEED 所在國補上：Veed Limited，倫敦（privacy 頁地址＋ICO 登記）；決定第一列維持 fal `veed/lipsync` NT$0.21／s。
+- 中國方案只在排除欄寫原因，不列價格（監工 2026-11-15）。
+- REALTEST_WAIVED: DOC_ONLY -- 規格文件
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（9 處替換全部命中，fence 成對）
+- BUGHUNT_WAIVED: DOC_ONLY -- 無 symbol 改動
+- ORACLE_WAIVED: 純文件
 ## 2026-11-15（續8）影音工作台 MV 規格修訂：對嘴改選用、免對嘴景別、對嘴比價表
 
 - 起因：操作者說對嘴（Hedra 720p 每秒 NT$1.6）太貴（監工 2026-11-15 轉達）。
