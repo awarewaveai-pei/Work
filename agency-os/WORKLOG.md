@@ -1,4 +1,33 @@
 # Worklog
+## 2026-11-15（續12）Codex 免費生圖：app 左下角「啟動筆電」按鈕，筆電不常駐、閒置 30 分鐘自己關
+
+[根因]
+- 操作者不一定會生圖，不要常駐背景程式，也不要每次開 PowerShell 打指令；但 Codex 工人必須在筆電上跑（她的 ChatGPT 登入在那）。
+- 能選 Codex 的面板 ≥6 個（Studio、Banner、Mockup、AI 修圖 `ai-edit.js`、塔羅、內容），各自顯示錯誤字串，沒有共用元件 → 按鈕放各面板 = 6 處散改且新面板會漏。不變量：擁有者在 app 任何頁都能一鍵開筆電 → 放 shell 側欄一處；錯誤訊息只指路。
+
+[步驟]
+- C1 `app/api/tools/codex-laptop/route.ts`（新）：GET `{online: workerOnline()}`，`codexAllowed(requestActor(req))` 否則 403。
+- C2 `app/CodexLaptopButton.tsx`（新）：在線／離線／啟動中＋ `awarewave-codex://start` 連結；平時 30 s 查一次，按下後 3 s 查 60 s。`app/(shell)/layout.tsx` 只對擁有者渲染（側欄底部）；`CodexQuotaCard` 同元件。
+- C3 錯誤字串一處：`image-errors.ts` codex_worker_offline →「按左下角『啟動筆電』」；塔羅 route 自己那份 friendlyError（少 codex_* 與 no_credits）刪掉改用共用版；內容 route 的 codex_* 交給共用版。
+- C4 `scripts/codex-image-worker.mjs`：`--idle-min`（預設 30，0 = 不關）；單一實例鎖 `%LOCALAPPDATA%\awarewave\codex-image-worker.pid`（死鎖檔接手）；環境沒有 secret 時讀 `HKCU\Environment`（瀏覽器開的程序繼承的是瀏覽器啟動時的環境）。
+- C5 `scripts/codex-image-worker-install.ps1`（新，UTF-8 BOM）：HKCU 註冊 `awarewave-codex:` → `cmd /c start "Codex 生圖" /min node worker`；URL 參數不傳入；`-Uninstall`。筆電已安裝。
+
+[Codex 審查 round 1（`agency-os/reports/oracle/2026-11-15-partialreview-6bb0fff7.md`，3 項）]
+- F1 筆電 HKCU 沒有 secret → 不成立：`Get-ItemProperty HKCU:\Environment` 有 `CODEX_WORKER_SECRET`，實測無環境變數的工人從登錄讀到並連上。安裝腳本加檢查：沒有就印提示。
+- F2 成立：閒置自關前最後一次 claim 刷新 lastPollAt，之後 ≤45 s 主機仍判在線，新圖空等 90 s。不變量 = 工人主動停止時主機立刻知道 → `codex-bridge.workerLeft()`（lastPollAt=0、佇列內工作回 `codex_worker_offline`），claim 收 `{leaving:true}`，工人自關前送出；指名測試＋突變（拔 lastPollAt 重設 → 紅）。
+- F3 成立：`wx` 建檔到寫 pid 之間檔案是空的，第二個實例會當死鎖刪掉 → 兩個都跑。改：空檔且 <10 s = 另一個正在啟動，退出；檔案消失則重試。
+- 自審：`workerLeft` 原有「還在畫就不動」守衛，突變沒變紅（租期本來就讓它在線、工人只在閒置時離開）→ 刪掉，不留無作用守衛。
+
+[剩餘風險]
+- 任何網頁都能觸發 `awarewave-codex://`：最多開起同一個工人（只連 app.aware-wave.com），瀏覽器第一次會先問。
+- 按下後要等工人第一次輪詢（約 1–3 s）才顯示在線。
+- Ctrl+C／直接關視窗不會送 leaving，主機最多 45 s 後才判離線（與先前相同）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=install.ps1 後 `cmd /c start "" awarewave-codex://start` → 程序 4248 視窗「Codex 生圖」（標題碼位 0x751f 0x5716 驗過）；`env -u CODEX_WORKER_SECRET node worker --idle-min 0.05` 從登錄讀到密鑰連上主機、第二個實例印「已經有一個…」結束、閒置後「自動關閉」且鎖檔移除 | exit=0 | ms=45000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio lib/tarot app/api/tools/tarot app/api/content app/api/tools app/api/internal（712 passed）；tsc --noEmit 0；突變：拔 codex-laptop 擁有者守衛 → 2 failed，還原 → 3 passed | exit=0 | ms=8000
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=codex_worker_offline|codex-image-worker.mjs|friendlyError | hits=25
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI（codex-oracle.ps1 review，1 輪）；F1 不成立（已驗），F2/F3 已修並有測試或實測
 ## 2026-11-15（續11）影音工作台 MV 規格：對嘴三項決定定案（操作者同意）
 
 - 寫進 `apps/video-workbench/docs/mv-mode-spec-20261114.md` §0／§3.3「決定」／MV.8 卡／§8：

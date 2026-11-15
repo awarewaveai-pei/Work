@@ -135,6 +135,14 @@ export async function claimJob(waitMs: number, now: () => number = Date.now): Pr
   return take();
 }
 
+/** Worker side: the worker is stopping (idle). Offline at once, and anything queued since its last claim fails fast
+ *  (otherwise for up to WORKER_STALE_MS new pictures would be queued for a worker that is gone, each waiting 90 s). */
+export function workerLeft(): void {
+  const b = bridge();
+  b.lastPollAt = 0;
+  for (const job of b.queue.splice(0)) job.resolve({ ok: false, error: "codex_worker_offline" });
+}
+
 /** Worker side: hand back a claimed job's picture (PNG/JPEG/WebP data URL) or its error. false = unknown or expired id. */
 export function completeJob(id: string, outcome: CodexOutcome): boolean {
   const b = bridge();

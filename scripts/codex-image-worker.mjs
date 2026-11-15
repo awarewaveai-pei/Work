@@ -4,20 +4,38 @@
 //
 //   node scripts/codex-image-worker.mjs            # loop until Ctrl+C
 //   node scripts/codex-image-worker.mjs --once     # one claim (smoke test)
+//   node scripts/codex-image-worker.mjs --idle-min 0   # never stop on its own (default: stop after 30 idle minutes)
+//
+// Started on demand from the app's 「啟動筆電」 button (awarewave-codex:// link, registered once by
+// scripts/codex-image-worker-install.ps1): nothing runs while no pictures are wanted. Only one copy runs at a time.
 //
 // Env: CODEX_WORKER_SECRET (required, same value as the app's), CODEX_WORKER_BASE (default https://app.aware-wave.com).
 // The laptop only dials out; nothing listens here. One picture at a time (Codex took 47-83 s each, 2026-11-14).
 // Codex runs read-only, with no MCP servers, in a fresh temp folder per job. Not --ephemeral: the plan-quota figures
 // (rate_limits) are only in Codex's own session record, so the worker reads them from it and then deletes that record.
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const BASE = (process.env.CODEX_WORKER_BASE || "https://app.aware-wave.com").replace(/\/+$/, "");
-const SECRET = process.env.CODEX_WORKER_SECRET?.trim();
 const ONCE = process.argv.includes("--once");
+const idleArg = process.argv.indexOf("--idle-min");
+const IDLE_MS = (idleArg > 0 ? Number(process.argv[idleArg + 1]) : 30) * 60_000;
+
+/** A browser-launched worker inherits the browser's environment, which predates mcp/user-env.ps1 persisting the secret:
+ *  fall back to the user's stored environment (HKCU\Environment) on Windows. */
+function readSecret() {
+  const fromEnv = process.env.CODEX_WORKER_SECRET?.trim();
+  if (fromEnv || process.platform !== "win32") return fromEnv;
+  try {
+    const out = execFileSync("reg", ["query", "HKCU\\Environment", "/v", "CODEX_WORKER_SECRET"], { encoding: "utf8", windowsHide: true });
+    return out.match(/CODEX_WORKER_SECRET\s+REG_\w+\s+(\S+)/)?.[1];
+  } catch { return undefined; }
+}
+const SECRET = readSecret();
 const CODEX_TIMEOUT_MS = 5 * 60_000;
 const GENERATED = path.join(homedir(), ".codex", "generated_images");
 // npm global install of @openai/codex (Windows: %APPDATA%\npm); elsewhere `codex` is a real executable on PATH.
@@ -139,10 +157,44 @@ async function draw(job) {
   }
 }
 
+const LOCK = path.join(process.env.LOCALAPPDATA || tmpdir(), "awarewave", "codex-image-worker.pid");
+
+/** One worker per laptop: a second start (the button pressed twice) exits at once. A lock whose process is gone is taken over. */
+function takeLock() {
+  mkdirSync(path.dirname(LOCK), { recursive: true });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const fd = openSync(LOCK, "wx");
+      writeSync(fd, String(process.pid));
+      closeSync(fd);
+      const release = () => { try { if (readFileSync(LOCK, "utf8") === String(process.pid)) rmSync(LOCK); } catch { /* gone */ } };
+      process.on("exit", release);
+      for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => process.exit(0));
+      return true;
+    } catch {
+      let pid = 0, ageMs = Infinity;
+      try { pid = Number(readFileSync(LOCK, "utf8").trim()); ageMs = Date.now() - statSync(LOCK).mtimeMs; } catch { continue; }
+      // Empty = another worker is between creating the file and writing its pid: it is starting, not dead.
+      if (!(pid > 0)) { if (ageMs < 10_000) return false; }
+      else { try { process.kill(pid, 0); return false; } catch { /* that process is gone: stale lock */ } }
+      rmSync(LOCK, { force: true });
+    }
+  }
+  return false;
+}
+
 async function main() {
   if (!SECRET) { console.error("CODEX_WORKER_SECRET 沒設定（請先載入 mcp/user-env.ps1）"); process.exit(2); }
-  log(`Codex 生圖工人啟動，連線 ${BASE}`);
+  if (!ONCE && !takeLock()) { log("已經有一個 Codex 生圖工人在跑，這個結束。"); return; }
+  log(`Codex 生圖工人啟動，連線 ${BASE}` + (IDLE_MS > 0 ? `（${IDLE_MS / 60_000} 分鐘沒有工作會自己關掉）` : ""));
+  let lastWorkAt = Date.now();
   for (;;) {
+    if (!ONCE && IDLE_MS > 0 && Date.now() - lastWorkAt >= IDLE_MS) {
+      // Tell the app at once; otherwise it would count this laptop online for up to 45 s more (codex-bridge workerLeft).
+      await api("claim", { leaving: true }, 10_000).catch(() => {});
+      log("閒置太久，自動關閉。");
+      return;
+    }
     let claim;
     try {
       claim = await api("claim", { waitMs: 25_000 }, 40_000);
@@ -156,6 +208,7 @@ async function main() {
     const job = claim.json?.job;
     if (job) {
       const started = Date.now();
+      lastWorkAt = started;
       log(`領到工作 ${job.id.slice(0, 8)}（${job.aspectRatio}，參考圖 ${job.refs.length} 張）`);
       const result = await draw(job).catch((e) => ({ error: "codex_exec_failed", detail: String(e) }));
       const done = await api("complete", { id: job.id, ...result }, 60_000).catch((e) => ({ status: 0, json: { error: String(e) } }));
@@ -163,6 +216,7 @@ async function main() {
       log(result.image ? "完成" : `失敗 ${result.error}`, `${Math.round((Date.now() - started) / 1000)} 秒，回報 ${done.status}`,
         q === undefined ? "" : `，Codex 5 小時額度已用 ${q}%、本週 ${result.usage.codex_week_used_pct}%`);
       if (result.error === "codex_quota_exhausted") { console.error("Codex 額度用完，停止（不改用付費 credits）"); process.exit(3); }
+      lastWorkAt = Date.now();
     }
     if (ONCE) return;
   }

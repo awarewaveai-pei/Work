@@ -1,4 +1,5 @@
 import type { CodexImageUsage } from "@/lib/ai/codex-usage";
+import { CodexLaptopButton } from "../../../CodexLaptopButton";
 
 const twTime = (unixS: number) =>
   new Date(unixS * 1000).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -33,6 +34,7 @@ export function CodexQuotaCard({ usage }: { usage: CodexImageUsage }) {
         </span>
         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>近 24 小時 {n(usage.last24h)} · 近 7 天 {n(usage.last7d)}</span>
       </div>
+      <CodexLaptopButton variant="page" />
       {usage.latest ? (
         <>
           <Bar label="5 小時額度" pct={usage.latest.pct5h} resets={usage.latest.resets5h} />

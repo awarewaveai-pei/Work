@@ -1,7 +1,7 @@
 // Codex pictures run on the operator's own plan: only she may queue one, the laptop's answer reaches the caller, and a
 // laptop that is off fails fast instead of holding the request for 4 minutes.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { claimJob, codexAllowed, completeJob, resetCodexBridgeForTests, runOnLaptop } from "../codex-bridge";
+import { claimJob, codexAllowed, completeJob, resetCodexBridgeForTests, runOnLaptop, workerLeft, workerOnline } from "../codex-bridge";
 
 vi.mock("@/lib/ai/gateway", () => ({ providerUrl: () => "https://unused.invalid" }));
 const logged = vi.hoisted(() => [] as Record<string, unknown>[]);
@@ -118,5 +118,15 @@ describe("generateTarotImage codex-image", () => {
     completeJob(job!.id, { ok: true, image: PNG, usage: { codex_input_tokens: 34653, codex_5h_used_pct: 50, codex_week_used_pct: 37 } });
     await expect(pending).resolves.toMatchObject({ ok: true, image: PNG, seed: null, costUsd: 0 });
     expect(logged.at(-1)).toMatchObject({ model: "codex-image", metadata: { codex_input_tokens: 34653, codex_5h_used_pct: 50, codex_week_used_pct: 37, free: true } });
+  });
+});
+
+describe("worker stopping on its own", () => {
+  it("is offline at once and fails what was queued since its last claim", async () => {
+    await claimJob(0);
+    const pending = runOnLaptop({ prompt: "a cat", aspectRatio: "1:1", refs: [] }, new AbortController().signal);
+    workerLeft();
+    expect(workerOnline()).toBe(false);
+    await expect(pending).resolves.toEqual({ ok: false, error: "codex_worker_offline" });
   });
 });

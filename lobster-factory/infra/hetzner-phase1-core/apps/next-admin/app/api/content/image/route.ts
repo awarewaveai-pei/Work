@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { friendlyImageError } from "@/lib/studio/image-errors";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
@@ -64,7 +65,7 @@ function friendlyError(code: string): string {
     case "output_too_large":            return "生成的圖片過大，請重試";
     case "output_url_not_allowed":      return "圖片來源不被允許（安全防護）";
     case "unknown_model":               return "未知的圖片模型";
-    default:                            return `圖片生成失敗：${code}`;
+    default:                            return code.startsWith("codex_") ? friendlyImageError(code) : `圖片生成失敗：${code}`;
   }
 }
 
