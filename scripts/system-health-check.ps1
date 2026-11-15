@@ -684,6 +684,35 @@ if (Test-Path $cfScript) {
     Add-Check -Name "Cloudflare security (bot+WAF)" -Pass $true -Detail "Skipped: check-cloudflare-security.ps1 not present"
 }
 
+# 9b) Cloudflare cache rule for the embedded editors (warn-only, same promotion rule as 9).
+# Exit codes are the script's contract: 0 rule present and as desired, 1 missing/different, 2 no token,
+# 3 token rejected (401 invalid / 403 lacks Zone > Cache Rules > Edit), 4 other API failure. Without the rule the editors' wasm
+# goes back to DYNAMIC (every load from the origin), so a non-zero code names the fix.
+$cfCacheScript = Join-Path $monoRoot "scripts/cloudflare-cache-rules.ps1"
+$cfCacheName = "Cloudflare cache rule editor-static-respect-origin (cloudflare-cache-rules.ps1)"
+if (Test-Path -LiteralPath $cfCacheScript) {
+    try {
+        $prevEapCc = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $ccOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $cfCacheScript -Action check -WorkRoot $monoRoot 2>&1 | Out-String
+        $ccExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEapCc
+        $ccLine = ($ccOut -split "`r?`n" | Where-Object { $_ -match '^RESULT:' } | Select-Object -First 1)
+        if (-not $ccLine) { $ccLine = "no RESULT line in output" }
+        switch ($ccExit) {
+            0 { Add-Check -Name $cfCacheName -Pass $true -Detail $ccLine.Trim() }
+            2 { Add-Check -Name $cfCacheName -Pass $true -Detail "Skipped: no API token" }
+            1 { Add-Check -Name $cfCacheName -Pass $true -Detail ("WARN: " + $ccLine.Trim() + " - run scripts/cloudflare-cache-rules.ps1 -Action apply") }
+            3 { Add-Check -Name $cfCacheName -Pass $true -Detail ("WARN: " + $ccLine.Trim() + " - token invalid/expired (401) or lacks Zone > Cache Rules > Edit (403)") }
+            default { Add-Check -Name $cfCacheName -Pass $true -Detail ("WARN: exit=" + $ccExit + " " + $ccLine.Trim()) }
+        }
+    } catch {
+        Add-Check -Name $cfCacheName -Pass $true -Detail ("Skipped: " + $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length)))
+    }
+} else {
+    Add-Check -Name $cfCacheName -Pass $true -Detail "Skipped: cloudflare-cache-rules.ps1 not present"
+}
+
 # 10) Memory index integrity (warn-only).
 # Checks that every MEMORY.md link resolves to a real file, and no file is unindexed.
 # Pass=$true even on drift so this never blocks AO-CLOSE — agent fixes at session start.

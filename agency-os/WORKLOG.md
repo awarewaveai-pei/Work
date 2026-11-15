@@ -24,6 +24,37 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=tsx scripts/r2-designs-bucket-config.ts --apply (container env) + OPTIONS preflight x6 + check-deploy-drift.ps1 | exit=0 | ms=3626
 - REVIEW_WAIVED: NA -- 本 entry 不改程式碼；只執行已審（critic 4m/3n 已修）的腳本並提交其備份檔
 - BUGHUNT_WAIVED: NA -- 無程式碼或字串改動
+## 2026-11-15（續28）— 編輯器大檔走 Cloudflare 邊緣：一條「照 origin 標頭辦」的 Cache Rule＋Photo Pro 字型公開快取一天
+
+- 根因：Cloudflare（Free，零條 Cache Rule）只快取預設副檔名；`.wasm` 與 `.part-*` 不在內，所以 Photo Pro 14 MB 分段檔、Vector Pro wasm 每次都 DYNAMIC 回歐洲 origin（台灣 61–110 秒）。字型 `fonts/**` 落在 `map $photo_pro_cache` 的 default `private, no-cache` → BYPASS，第一次用文字工具抓 22 MB。
+- 不變量：哪些檔可快取、快多久只由 nginx 一處決定；Cloudflare 規則只說「可快取＋edge/browser TTL respect_origin」，不帶任何 TTL。
+- 做了：
+  - `scripts/cloudflare-cache-rules.ps1 -Action check|apply|remove`：zone `http_request_cache_settings` entrypoint 一條規則（description `editor-static-respect-origin`）。entrypoint 404 才 PUT 建；已有 → 單條 POST／PATCH／DELETE，不碰其他規則；寫後讀回比對。exit 0 相符且在最後／1 缺、不同或不在最後／2 無 token／3 token 被拒（401 失效、403 印要加 Zone › Cache Rules › Edit）／4 其他錯誤。API 形狀以 Cloudflare OpenAPI＋cache-rules/create-api 文件核對。
+  - 主機清單不寫死：每次從 repo nginx `default.conf` 讀「有 `location ^~ /photo-pro/` 或 `/vector-pro/` 的 server block」的 server_name（app＋social/tarot/studio/design/content/outreach 六個產品門；編輯器 frame 用相對路徑，門上也從自己網域抓檔，brief 原寫只有 app，門上實測仍 DYNAMIC → 一起關）。aware-wave.com（WordPress）不在內：沒有 Cache-Control 時 respect_origin 會用 CF 預設 2 小時。nginx 加門 → check 變 mismatch。
+  - `scripts/system-health-check.ps1` 9b：依 exit code Add-Check（warn-only，同 cf-security）；`scripts/README.md` 一列。
+  - nginx `map $photo_pro_cache` 加 `"~^/photo-pro/[^/]+/fonts/" "public, max-age=86400"`（檔名無雜湊、經 `current` symlink → 一天，不 immutable）；map 上方註解同步。主機現行檔與 repo HEAD 先 diff 相同，再 `safe-infra-patch.sh nginx` stdin 套用，exit 0。
+- 驗證（本機 curl 完整 GET 兩次，`-o /dev/null`）：
+  | URL | Cache-Control | 第 1 次 | 第 2 次 |
+  |---|---|---|---|
+  | photo-pro `photocraft-web-28840f20f6fcbf69.part-aa`（14.0 MB） | public, max-age=31536000, immutable | MISS | HIT |
+  | vector-pro `vectorcraft-web-639710e4c9888051_bg.wasm` | max-age=31536000 | MISS | HIT |
+  | fonts `NotoSansTC-Regular.otf`（5.7 MB） | public, max-age=86400 | MISS | HIT |
+  | photo-pro `index.html` | private, no-cache | BYPASS | BYPASS |
+  | photo-pro `app/photocraft-web.js` | private, no-cache（改前被 CF 改寫成 private, max-age=14400） | BYPASS | BYPASS |
+  | design.aware-wave.com part-aa／index.html | 同上 | MISS→HIT／BYPASS | |
+  - `-Action check` exit 0；`-Action apply` 連跑兩次第二次 `unchanged`（冪等）；舊 expression 時 check exit 1 mismatch，apply 走 PATCH `updated-rule`。
+  - `system-health-check.ps1`：本項 PASS（`status=ok`）；整體 320/321，唯一紅項是 `.claude` junction 同步（linked worktree 無 junction，CLAUDE.md R1 已註明，與本卡無關）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/cloudflare-cache-rules.ps1 -Action check (after apply) | exit=0 | ms=2500
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -sS -o /dev/null -D - https://app.aware-wave.com/<5 URLs> x2 + design.aware-wave.com x2 | exit=0 | ms=430000
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh nginx /root/lobster-phase1/nginx/default.conf (stdin = repo file) | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - Codex `agency-os/reports/oracle/2026-11-15-review-0d35b90b.md` 兩項屬實已修：F1 後面的 Cache Rule 會蓋掉本條（last match wins）而 check 仍報 OK → check／apply 要求本條在 ruleset 最後，apply 以 PATCH `position.after` 移到最後；F2 401 被說成缺權限 → 401 改報 token 失效需輪替、403 才報缺 Zone › Cache Rules › Edit。複審 `2026-11-15-review-9dd4f322.md` NO FINDINGS。
+  - 「不在最後」與 401 兩條路徑沒有在正式 zone 實跑（要另建一條規則或換一把壞 token），只讀回改後程式碼；不屬隱私／權限守衛，不做突變。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=photo_pro_cache|editor-static-respect-origin|cloudflare-cache-rules | hits=22
+  - `agency-os/handoffs/2026-11-05-photocraft-pro/R0-PLAN.md:84` 仍寫 fonts `private, no-cache`：歷史計畫，依 AGENTS §9 舊檔不回改；現況以 default.conf 註解為準。
+- Rollback：規則 `powershell -NoProfile -File scripts/cloudflare-cache-rules.ps1 -Action remove`（只刪這條；ruleset `034f0bfb28774552a19d912772176108` 留空殼無作用）；nginx 備份 `/root/lobster-phase1/nginx/default.conf.bak.safe-patch-20261115-145433`，還原用 `sudo cat <backup> | sudo /root/lobster-phase1/scripts/safe-infra-patch.sh nginx /root/lobster-phase1/nginx/default.conf` 並 revert repo 該 commit。
+- 剩餘風險：Free 方案邊緣快取依熱度淘汰，冷門節點可能再回源（MISS 一次）；第二次 HIT 時筆電下載時間與 MISS 相近（vector wasm 189 秒、part-aa 29 秒）＝瓶頸已轉為本機網路，origin 往返已省。Vector wasm 依 Accept-Encoding 分兩份快取（curl 不帶 → 89 MB 原檔；瀏覽器帶 gzip → 32.6 MB），各自第一次 MISS。
+- 避免再發生：新增靜態大檔路徑時，只改 nginx 的 Cache-Control；若是新網域／新 location，`cloudflare-cache-rules.ps1 -Action check` 會在 health-check 轉 WARN mismatch，跑 `-Action apply` 即可。
 ## 2026-11-15（續24）— 剪輯器字型卡剩餘部分：預覽文字外觀一個函式（字幕樣式小樣同源）、缺字換字型的字級對齊輸出、字型檔 MIME、start.cmd 全量核對
 
 - 背景：字型包本體（vendor/fonts、fontsdir、@font-face、golden 重錄）已由 P6.10 在 `f8ffef30d` 提交；它沒拿的是預覽重構與以下各項。路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`。
