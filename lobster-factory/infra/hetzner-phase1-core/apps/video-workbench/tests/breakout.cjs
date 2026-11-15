@@ -236,7 +236,7 @@ const fetchImpl = async (url, init = {}) => {
     let stopsOnAbort = true;
     breakout.finish = (opts) =>
       new Promise((resolve, reject) => {
-        runs.push({ opts, resolve });
+        runs.push({ opts, resolve, reject });
         if (stopsOnAbort) opts.signal.addEventListener("abort", () => reject(Error("已停止")));
       });
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -316,6 +316,15 @@ const fetchImpl = async (url, init = {}) => {
       assert.match(raced.result.note, /已停止貼文鎖定.*原始影片/, "a finish that landed after cancel was delivered");
       assert.equal(raced.result.textLock, undefined);
       stopsOnAbort = true;
+      // 2c. the video's first frame is not the post (finishing refuses to lock): the paid model file is delivered, with why
+      const faded = (await c2("/generations", job(runway2, { lock: { mask: mask1 } }))).body.id;
+      await until(async () => (await c2("/generations/" + faded)).body, (v) => v.stage === "finishing");
+      assert(fs.existsSync(runs[3].opts.frameFile), "finishing was not given the post the job sent");
+      runs[3].reject(Error("模型影片的第一格不是送出的貼文（差異 247），未鎖定文字"));
+      const unlocked0 = await until(async () => (await c2("/generations/" + faded)).body, (v) => v.status === "succeeded");
+      assert.match(unlocked0.result.note, /第一格不是送出的貼文.*未鎖定文字.*原始影片/);
+      assert.equal(unlocked0.result.textLock, undefined);
+      assert.equal(unlocked0.result.origin.costUsd, 0.25, "the charge was lost when the lock was refused");
       // 3. a restart resumes a finishing job; one whose model file is gone fails with a message
       const os = require("node:os"), dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "vw-breakout-restart-"));
       fs.mkdirSync(path.join(dataDir, "generated"));
@@ -341,8 +350,8 @@ const fetchImpl = async (url, init = {}) => {
       await new Promise((r) => restarted.listen(0, "127.0.0.1", r));
       restarted.unref();
       const c3 = at("http://127.0.0.1:" + restarted.address().port);
-      await until(async () => runs.length, (n) => n === 4);
-      runs[3].resolve({ ratio: "9:16", restored: 0, untouched: true });
+      await until(async () => runs.length, (n) => n === 5);
+      runs[4].resolve({ ratio: "9:16", restored: 0, untouched: true });
       assert.equal((await until(async () => (await c3("/generations/resume")).body, (v) => v.status !== "running")).status, "succeeded");
       const lost = (await c3("/generations/lost")).body;
       assert.equal(lost.status, "failed");
@@ -353,9 +362,9 @@ const fetchImpl = async (url, init = {}) => {
       const rerun = await c3("/generations/lost/retry", {});
       assert.equal(rerun.status, 202, JSON.stringify(rerun.body));
       await until(async () => (await c3("/generations/" + rerun.body.id)).body, (v) => v.stage === "finishing");
-      assert.equal(runs[4].opts.maskFile, path.join(dataDir, "job-inputs", rerun.body.id, "lock-mask.png"));
-      assert.deepEqual(fs.readFileSync(runs[4].opts.maskFile), greyPng(1, 1), "the retry lost the lock");
-      runs[4].resolve({ ratio: "9:16", restored: 0, opened: 0 });
+      assert.equal(runs[5].opts.maskFile, path.join(dataDir, "job-inputs", rerun.body.id, "lock-mask.png"));
+      assert.deepEqual(fs.readFileSync(runs[5].opts.maskFile), greyPng(1, 1), "the retry lost the lock");
+      runs[5].resolve({ ratio: "9:16", restored: 0, opened: 0 });
       // a job that had a lock whose mask is gone is refused at submit, never rerun without its lock
       fs.rmSync(path.join(dataDir, "job-inputs", "lost"), { recursive: true });
       const vendorAt = vendorUrls.length, unlocked = await c3("/generations/lost/retry", {});
@@ -379,9 +388,10 @@ const fetchImpl = async (url, init = {}) => {
     // a glyph box at x0 for the first 0.3 s, at x1 after (the drift); w x h frames, 10 fps, 1 s
     const drifting = (w, h, x0, x1, y) => `color=white:s=${w}x${h}:d=1:r=10,drawbox=x=${x0}:y=${y}:w=16:h=8:color=black:t=fill:enable='lt(t,0.3)',drawbox=x=${x1}:y=${y}:w=16:h=8:color=black:t=fill:enable='gte(t,0.3)'`;
     ff("-f", "lavfi", "-i", drifting(W, H, 8, 40, 100), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "1", path.join(dir, "made.mp4"));
+    ff("-f", "lavfi", "-i", drifting(W, H, 8, 40, 100), "-frames:v", "1", path.join(dir, "first.png")); // the post the page sent
     maskPng(path.join(dir, "mask.png"), W, H, [[0, 96, W, 16]]);
     const done = await breakout.finish({
-      src: path.join(dir, "made.mp4"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, "out.mp4"),
+      src: path.join(dir, "made.mp4"), frameFile: path.join(dir, "first.png"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, "out.mp4"),
       settings: { outputRatio: "4:5" }, ffmpeg,
     });
     assert.equal(done.ratio, "4:5");
@@ -406,8 +416,9 @@ const fetchImpl = async (url, init = {}) => {
     assert(!fs.existsSync(path.join(dir, "bad.mp4")));
     // 16:9: the model's own shape, held without a crop
     ff("-f", "lavfi", "-i", drifting(H, W, 8, 40, 50), "-c:v", "libx264", "-pix_fmt", "yuv420p", path.join(dir, "wide.mp4"));
+    ff("-f", "lavfi", "-i", drifting(H, W, 8, 40, 50), "-frames:v", "1", path.join(dir, "wide.png"));
     maskPng(path.join(dir, "wide-mask.png"), H, W, [[0, 46, H, 16]]);
-    const wide = await breakout.finish({ src: path.join(dir, "wide.mp4"), maskFile: path.join(dir, "wide-mask.png"), dst: path.join(dir, "wide-out.mp4"),
+    const wide = await breakout.finish({ src: path.join(dir, "wide.mp4"), frameFile: path.join(dir, "wide.png"), maskFile: path.join(dir, "wide-mask.png"), dst: path.join(dir, "wide-out.mp4"),
       settings: { outputRatio: "16:9" }, ffmpeg });
     assert.equal(wide.ratio, "16:9");
     assert(wide.restored > 0);
@@ -445,7 +456,7 @@ const fetchImpl = async (url, init = {}) => {
       "-c:v", "libx264", "-crf", "23", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-t", "4", path.join(dir, "made.mp4"));
     ff("-f", "lavfi", "-i", `color=black:s=${W}x${H}:d=1,${rows.map(([y, h]) => `drawbox=x=0:y=${y}:w=${W}:h=${h}:color=white:t=fill`).join(",")}`, "-frames:v", "1", path.join(dir, "mask.png"));
     const finishClip = (made, out) => breakout.finish({
-      src: path.join(dir, made), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, out), ffmpeg,
+      src: path.join(dir, made), frameFile: path.join(dir, "first.png"), maskFile: path.join(dir, "mask.png"), dst: path.join(dir, out), ffmpeg,
       settings: { outputRatio: "9:16" },
     });
     const done = await finishClip("made.mp4", "out.mp4");
@@ -505,6 +516,13 @@ const fetchImpl = async (url, init = {}) => {
     assert.equal(shifted.opened, 0, "a post re-rendered 3 px lower opened " + shifted.opened + " cells");
     // only compression flicker is put back: under one row's width per frame (the shift's edges would be thousands)
     assert(shifted.restored < W * FPS, "a post re-rendered 3 px lower was put back in " + shifted.restored + " pixels");
+    // A video whose first frame is not the post (it fades in from black): nothing is locked to that frame -- finishing
+    // refuses, and the server keeps the model's video with this message as its note (api.cjs finishBreakout)
+    ff("-loop", "1", "-t", "1", "-r", String(FPS), "-i", path.join(dir, "first.png"),
+      "-vf", "fade=in:st=0:d=0.5,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p",
+      "-c:v", "libx264", "-crf", "23", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", path.join(dir, "fade.mp4"));
+    await assert.rejects(finishClip("fade.mp4", "fade-out.mp4"), /第一格不是送出的貼文/);
+    assert(!fs.existsSync(path.join(dir, "fade-out.mp4")), "a refused finish left a file");
     fs.rmSync(dir, { recursive: true, force: true });
   }
   console.log("PASS 鎖定實片：真實編碼的影片裡，飄移在主角到之前還原；主角到哪一列，那一格當格就照影片顯示；沒碰到的格子一直鎖住；照片在動但沒有主角時，一格都不放行、照片也不被還原");

@@ -98,7 +98,7 @@ async function decodePng({ file, what, ffmpeg, signal }) {
 // margin from the photo, so a model redrawing the photo a pixel or two off never reaches a held pixel. The rows of a post
 // cover well under half the frame; a mask asking for more is refused, so the per-frame work stays bounded (LOCK_MAX_AREA).
 const LOCK_MAX_AREA = 0.6;
-const LOCK = Object.freeze({ changed: 60, touch: 4, margin: 2, tile: 32 });
+const LOCK = Object.freeze({ changed: 60, touch: 4, margin: 2, tile: 32, sameFirstFrame: 60 });
 function lockPixels(gray, w, h) {
   const r = LOCK.margin, row = new Uint8Array(w * h), held = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) // horizontal pass: white across [x - r, x + r]
@@ -155,6 +155,21 @@ function lockGrid(held, w, h, tile = LOCK.tile) {
     return Int32Array.from(b);
   });
   return { cells: lists.map((l) => Int32Array.from(l)), borders };
+}
+// The video's first frame is held only when it IS the post the page sent: compared on the held pixels (the mask's text
+// rows), mean RGB difference per channel. Measured (2026-11-15, real vendor clips): Grok 1.1, Luma 1.8, Seedance 16.0
+// (it returns the post zoomed 2.2%); a frame of another picture over white text rows is far off (black: 247). The bound,
+// 60, is almost 4x the worst real case and a quarter of a black frame: a fail-safe against a fade-in or a title card, not a
+// knob. Over it, nothing is locked (finishing keeps the model's video and says why).
+function firstFrameError(first, post, held) {
+  let sum = 0, n = 0;
+  for (let p = 0; p < held.length; p++) {
+    if (!held[p]) continue;
+    const i = p * 3;
+    sum += Math.abs(first[i] - post[i]) + Math.abs(first[i + 1] - post[i + 1]) + Math.abs(first[i + 2] - post[i + 2]);
+    n++;
+  }
+  return n ? sum / n / 3 : 0;
 }
 /**
  * Holds one decoded frame's text cells to the video's first frame, in place. frame/ref: rgb24 buffers of the same size,
@@ -219,7 +234,7 @@ const TO_RGB = "scale=in_color_matrix=bt709:in_range=tv:out_range=pc";
 const TO_YUV = "scale=out_color_matrix=bt709:in_range=pc:out_range=tv,format=yuv420p";
 const TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
 
-async function finishHere({ src, maskFile, dst, settings, ffmpeg, signal }) {
+async function finishHere({ src, frameFile, maskFile, dst, settings, ffmpeg, signal }) {
   const mask = !!maskFile && fs.existsSync(maskFile),
     ratio = rules.OUTPUT_RATIOS.includes(settings?.outputRatio) ? settings.outputRatio : "9:16",
     [ma, mb] = rules.modelRatio(ratio).split(":").map(Number);
@@ -243,9 +258,16 @@ async function finishHere({ src, maskFile, dst, settings, ffmpeg, signal }) {
     return { ratio, restored: 0, opened: 0 };
   }
   // the reader submit used, now at the video's size: a video of another size than the first frame is not held
-  const grid = lockGrid(await lockMaskPixels({ maskFile, width: W, height: H, ffmpeg, signal }), W, H),
-    open = new Uint8Array(grid.cells.length),
+  const held = await lockMaskPixels({ maskFile, width: W, height: H, ffmpeg, signal }),
     size = W * H * 3;
+  // the model's first frame (the reference every frame is held to) and the post the page sent, both at the video's size
+  const ref = await run(ffmpeg, ["-v", "error", "-noautorotate", "-i", src, "-vf", TO_RGB, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal).done,
+    post = await run(ffmpeg, ["-v", "error", "-i", frameFile, "-vf", `scale=${W}:${H}:flags=area`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal).done;
+  if (ref.length !== size || post.length !== size) throw Error("讀不到第一格畫面");
+  const off = firstFrameError(ref, post, held);
+  if (off > LOCK.sameFirstFrame) throw Error(`模型影片的第一格不是送出的貼文（差異 ${Math.round(off)}），未鎖定文字`);
+  const grid = lockGrid(held, W, H),
+    open = new Uint8Array(grid.cells.length);
   const decoder = run(ffmpeg, ["-v", "error", "-noautorotate", "-i", src, "-vf", TO_RGB, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], signal);
   const encoder = run(ffmpeg, ["-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", `${W}x${H}`, "-r", fps, "-i", "-", "-i", src,
     "-map", "1:a?", "-vf", crop + TO_YUV, "-shortest", ...out], signal, { stdout: false });
@@ -253,7 +275,7 @@ async function finishHere({ src, maskFile, dst, settings, ffmpeg, signal }) {
   // Frames are assembled in one reused buffer (no growing concat per chunk); a frame is written as a copy so the
   // encoder pipe never sees a buffer that is being refilled.
   const frame = Buffer.alloc(size);
-  let filled = 0, restored = 0, ref = null; // the model's first frame as decoded, before any lock
+  let filled = 0, restored = 0;
   decoder.child.stdout.removeAllListeners("data"); // run() collected stdout; here it streams instead
   decoder.child.stdout.on("data", (chunk) => {
     for (let at = 0; at < chunk.length; ) {
@@ -262,7 +284,6 @@ async function finishHere({ src, maskFile, dst, settings, ffmpeg, signal }) {
       filled += n;
       at += n;
       if (filled === size) {
-        ref ??= Buffer.from(frame);
         restored += lockFrame(frame, ref, grid, open);
         filled = 0;
         if (!encoder.child.stdin.write(Buffer.from(frame))) {
@@ -300,14 +321,15 @@ async function fileRatio(file) {
 }
 /**
  * The finished breakout video: text rows held to the first frame (settings.lock), then cut to settings.outputRatio's
- * centred box, in one encode. src: the model's mp4 (9:16 or 16:9); maskFile: the job's lock mask (none = no hold); dst: output mp4.
+ * centred box, in one encode. src: the model's mp4 (9:16 or 16:9); frameFile: the post PNG the job sent (checked against the
+ * video's first frame); maskFile: the job's lock mask (none = no hold); dst: output mp4.
  * Runs in a worker thread (the per-frame pixel work must not hold the API's event loop), at most FINISH_TIMEOUT_MS.
  * Returns { ratio, restored, untouched? }: ratio = the written file's own ratio; untouched = nothing written, keep src.
  * A failure removes dst.
  */
-function finish({ src, maskFile, dst, settings, ffmpeg, signal, timeoutMs = FINISH_TIMEOUT_MS }) {
+function finish({ src, frameFile, maskFile, dst, settings, ffmpeg, signal, timeoutMs = FINISH_TIMEOUT_MS }) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(__filename, { workerData: { breakoutFinish: { src, maskFile, dst, settings, ffmpeg } } });
+    const worker = new Worker(__filename, { workerData: { breakoutFinish: { src, frameFile, maskFile, dst, settings, ffmpeg } } });
     let settled = false;
     const end = (fn, value) => {
       if (settled) return;
@@ -337,4 +359,4 @@ if (!isMainThread && workerData?.breakoutFinish) {
     .finally(() => parentPort.close());
 }
 
-module.exports = { prepare, finish, finishHere, fileRatio, lockFrame, lockGrid, lockPixels, lockMaskPixels, decodePng, readMask, pngSize, maskPath, LOCK, LOCK_MAX_AREA, MASK_MAX_BYTES, FINISH_TIMEOUT_MS };
+module.exports = { prepare, finish, finishHere, fileRatio, firstFrameError, lockFrame, lockGrid, lockPixels, lockMaskPixels, decodePng, readMask, pngSize, maskPath, LOCK, LOCK_MAX_AREA, MASK_MAX_BYTES, FINISH_TIMEOUT_MS };
