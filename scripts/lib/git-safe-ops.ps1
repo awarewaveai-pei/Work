@@ -440,9 +440,10 @@ function Invoke-SharedWorktreeParity {
             } else {
                 $r.Action = 'ff-refused'
                 $why = if ($carry) { $carry.message } else { 'merge helper unavailable' }
-                # backup = the helper failed after changing files: the local edits are only in that directory.
+                # backup = the helper changed files and could not put every one back (restore failed, or another writer's
+                # newer bytes were left in place): the pre-run bytes of each changed file are in that directory.
                 $backup = if ($carry) { $carry.PSObject.Properties['backup'] } else { $null }
-                $state = if ($backup) { "LOCAL EDITS ARE NOT IN THE FILES: restore them from $($backup.Value) (manifest.json)" } else { 'nothing touched' }
+                $state = if ($backup) { "backup kept at $($backup.Value) (manifest.json) -- the helper message says which files were not put back" } else { 'nothing touched' }
                 if ($backup -and $carry.fastForwarded) {
                     $r.Action = 'carry-failed'
                     $r.Message = "fast-forwarded $($r.Behind) commit(s) to $Remote/$Branch, but carrying the local edits failed ($why); $state"

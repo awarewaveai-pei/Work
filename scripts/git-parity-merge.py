@@ -150,12 +150,15 @@ def main():
                 kept.append(os.path.relpath(path, a.root).replace(os.sep, "/")); continue
             shutil.move(os.path.join(side, f"moved-{i}"), path)
         for p, path, *_, ours in list(plan) + list(renorm):
-            if open(path, "rb").read() != wrote.get(path, ours):
+            cur = open(path, "rb").read()
+            if cur != ours and cur != wrote.get(path, ours):   # neither untouched nor this run's bytes: someone else's
                 kept.append(p); continue
-            open(path, "wb").write(ours)
-        if staged:
-            git("add", "--", *staged)          # staged == worktree bytes (checked above), so this restores the index
-        return kept
+            if cur != ours:
+                open(path, "wb").write(ours)
+        back = [p for p in staged if p not in kept]
+        if back:
+            git("add", "--", *back)            # staged == worktree bytes (checked above), so this restores the index;
+        return kept                            # a kept file is never re-staged: that would stage the other writer's bytes
 
     def fail(msg):
         try:
@@ -180,10 +183,12 @@ def main():
                 raise RuntimeError(f"{p}: the shared index changed while this run was planning")
         if plan:
             git("reset", "-q", "--", *[p for p, *_ in plan])
-        for p, path, base, _, ours in plan:
+        for i, (p, path, base, _, ours) in enumerate(plan):
             still_ours(p, path, ours)
-            open(path, "wb").write(base)
+            with open(os.path.join(side, f"base-{i}"), "wb") as t:   # rename into place: a failed write never truncates
+                t.write(base)
             wrote[path] = base
+            os.replace(os.path.join(side, f"base-{i}"), path)
         if renorm:                                   # paths on stdin: 168 of them would overrun a Windows command line
             for p, path, ours in renorm:
                 still_ours(p, path, ours)

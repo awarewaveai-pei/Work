@@ -61,7 +61,7 @@
 - REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/6n（Major 覆寫競態、filter/ident、argv 長度、佔位判定、P17b、-z rename、死條件：全修）
 - BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=syncSharedIndexAfterPrivateCommit | hits=5
 - BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=pull --rebase | hits=4（git-safe-ops.ps1:421、ao-resume.md:34,88,98 → 全改）
-- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n（Codex oracle 三輪：82acfdfb 2／4c875e7d 1／16b8aff8 2，全修：moved 原始 bytes 重讀、WORKLOG 指向、單檔寫入前重讀、restore 只還原仍等於本輪寫入的檔、reset 前重驗 index；第四輪 artifact 待回，額度中斷）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n（Codex oracle 三輪：82acfdfb 2／4c875e7d 1／16b8aff8 2，全修：moved 原始 bytes 重讀、WORKLOG 指向、單檔寫入前重讀、restore 只還原仍等於本輪寫入的檔、reset 前重驗 index；第四輪 977f876b 3（截斷寫入、restore 誤 re-stage 他人內容、PS 訊息誤導：全修於後續 commit）；第五輪 efc4b502 零 finding）
 ## 2026-11-15（續12）Codex 免費生圖：app 左下角「啟動筆電」按鈕，筆電不常駐、閒置 30 分鐘自己關
 
 [根因]
