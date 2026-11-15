@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-15（續11）影音工作台 MV 規格：對嘴三項決定定案（操作者同意）
+
+- 寫進 `apps/video-workbench/docs/mv-mode-spec-20261114.md` §0／§3.3「決定」／MV.8 卡／§8：
+  1. 預設不對嘴，演唱段用免對嘴景別。
+  2. MV.8 第 0 步 = 用 Hedra Character-3 540p（NT$0.80／秒）實測 1 秒唱歌（約 NT$1），嘴型跟得上才接；Hedra 540p 是唯一付費選項，720p／1080p 不列按鈕，測試第 ④ 條守。不通過 → MV.8 不做。
+  3. Pruna `p-video-avatar` 720p 暫不採用，列 §8 OPEN（待操作者）：等官方商用授權條款或書面說明（附 URL）再評估；agent 不自行聯絡廠商。
+- 其餘通道（fal veed／sync、sync.so、Replicate sync、HeyGen／ByteDance、自架）本輪不接，比價留作紀錄。
+- REALTEST_WAIVED: DOC_ONLY -- 規格文件
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（替換命中計數檢查）
+- BUGHUNT_WAIVED: DOC_ONLY -- 無 symbol 改動
+- ORACLE_WAIVED: 純文件
 ## 2026-11-15（續9）影音工作台 MV 規格：對嘴比價表補 Replicate 選項（官方頁核對）
 
 - 監工補四個 Replicate 列，逐一到官方頁核對後寫進 `apps/video-workbench/docs/mv-mode-spec-20261114.md §3.3`：
