@@ -14,6 +14,23 @@ import {
   recordDeliveryReceipt,
   type DeliveryReceipt,
 } from "@/lib/content/video/delivery-receipts";
+import { coverForRelease } from "@/lib/content/video/cover";
+
+const attr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** What goes into the post for one video (card VD.8): with a cover, WordPress's own video block with it as the poster
+ *  (the still shown before play); without one, the bare URL on its own line as before (WP autoembed). */
+export function videoMarkup(videoUrl: string, posterUrl: string | null): string {
+  if (!posterUrl) return videoUrl;
+  return `<!-- wp:video -->\n<figure class="wp-block-video"><video controls poster="${attr(posterUrl)}" src="${attr(videoUrl)}"></video></figure>\n<!-- /wp:video -->`;
+}
+
+/** Whether a post already holds this video: as the bare URL (as before), or as the src of the video block where the url
+ *  is attribute-escaped (`&` is `&amp;`), so a repeat of the content pipeline never embeds it twice. Only the block's
+ *  src="..." counts in escaped form: a link to the same file elsewhere in the article is not the video (Codex 4f5f2286). */
+export function alreadyEmbedded(content: string, videoUrl: string): boolean {
+  return content.includes(videoUrl) || content.includes(` src="${attr(videoUrl)}"`);
+}
 
 export type EmbedResult =
   | { ok: true; postId: number; videoUrl: string; idempotent?: true; delivery?: DeliveryReceipt }
@@ -131,15 +148,24 @@ export async function embedVideoInPost(
   }
 
   // once: a caller that may repeat after a crash (the content pipeline) must not append the same video twice
-  if (input.once && currentContent.includes(videoUrl)) return { ok: true, postId, videoUrl };
+  if (input.once && alreadyEmbedded(currentContent, videoUrl)) return { ok: true, postId, videoUrl };
+  // VD.8: the Release's chosen cover as the poster, looked up by the server from the Release (never a url from the
+  // client). A failed lookup embeds without a poster: the cover is optional, the delivery is not.
+  let poster: string | null = null;
+  const posterDb = releaseId && resolved.site.organizationId ? getSupabaseWriteClient() : null;
+  if (posterDb) {
+    try { poster = await coverForRelease(posterDb, resolved.site.organizationId as string, releaseId, videoUrl); }
+    catch (err) { console.error("[video/embed-to-wp] cover lookup failed; embedding without a poster", err); }
+  }
+  const markup = videoMarkup(videoUrl, poster);
   if (!currentContent.includes("<!-- VIDEO_PLACEHOLDER -->")) {
     // Placeholder not found — append video at end instead of failing
-    currentContent = currentContent.trimEnd() + `\n\n${videoUrl}\n`;
+    currentContent = currentContent.trimEnd() + `\n\n${markup}\n`;
   } else {
-    // Replace ALL placeholders with the bare video URL (WP autoembed → responsive iframe).
+    // Replace ALL placeholders with the video (bare URL: WP autoembed; with a cover: the video block).
     // Global regex + function replacer: replaces every occurrence (not just the first) AND prevents
     // $ in the URL being interpreted as a replacement pattern. The needle has no regex-special chars.
-    currentContent = currentContent.replace(/<!-- VIDEO_PLACEHOLDER -->/g, () => videoUrl);
+    currentContent = currentContent.replace(/<!-- VIDEO_PLACEHOLDER -->/g, () => markup);
   }
 
   // PATCH the post content back

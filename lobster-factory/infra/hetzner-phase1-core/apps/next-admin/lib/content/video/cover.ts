@@ -60,10 +60,12 @@ export async function chosenCovers(db: SupabaseClient, organizationId: string, v
 }
 
 /** The chosen cover of the video an approved Release delivers (card VD.8: the WordPress poster); null = none.
- *  Invariant: the Release belongs to the organization AND delivers the very file being embedded (its candidate row's
+ *  Invariant: the Release belongs to the organization, is still approved (a withdrawn one gives nothing, Codex 4f5f2286),
+ *  AND delivers the very file being embedded (its candidate row's
  *  object_url = videoUrl); a release id from the client never puts another video's cover on this one (Codex 52914185). */
 export async function coverForRelease(db: SupabaseClient, organizationId: string, releaseId: string, videoUrl: string): Promise<string | null> {
-  const { data, error } = await db.from("media_releases").select("candidate_asset_id").eq("id", releaseId).eq("organization_id", organizationId).maybeSingle();
+  const { data, error } = await db.from("media_releases").select("candidate_asset_id").eq("id", releaseId).eq("organization_id", organizationId)
+    .eq("status", "release_approved").maybeSingle();
   if (error) throw new Error(`release lookup failed: ${error.message}`);
   const video = (data as { candidate_asset_id?: string } | null)?.candidate_asset_id;
   if (!video) return null;
