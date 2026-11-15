@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-15（續20）— 計畫：「我的設計」原檔直傳 R2（`lobster-factory/docs/PLAN-designs-direct-upload.md`，C1–C6，未開工）
+
+- 操作者「你決定」→ 選 presigned 直傳：位元組不經 app request（不調高 middleware 上限）；伺服器登記時才讀、先驗長度（I3）；`designs/` 只放已登記物件，孤兒在 `uploads/pending/` 由 lifecycle 清（I4）。
+- 設計審查 Codex 733e6616 F1–F5 皆 grep 驗證屬實並併入：`r2GetObject` 先整包讀（`r2.ts:208-209`）→ C4 先比 Content-Length＋串流上限；PSD 需 `kind:"source"`；insert 失敗留主圖（`designs/route.ts:304-307`）→ I4；CORS origin 取 `hosts.ts` 實際主機（`:17-27`，容器內跑）；塔羅無框原圖未保留（`TarotStudio.tsx:875,2306-2309`）→ C5 改存 `artBlob`。
+- C1（S3 token＋env）、C2（bucket CORS／lifecycle）為 High，待操作者 go；TASKS「🎨 Image Output Pipeline」下加子項。
+- REALTEST_WAIVED: DOC_ONLY -- 只寫計畫文件與 TASKS 子項，無程式改動
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PLAN-designs-direct-upload | hits=6
 ## 2026-11-15（續19）— 共享 worktree 衛生：WORKLOG 跨 worktree 配號、過期私有 index 自動清理、舊備份與 autocrlf 的處置
 
 **根因 1**：`scripts/worklog-insert-entry.py` 只讀自己 worktree 的 WORKLOG 取最大 續N → 兩個 worktree session 同時配到 續7（卡 A／卡 B，皆已在 main）。**修**：取最大值的範圍改為「本檔 ∪ `origin/main:agency-os/WORKLOG.md`（上次 fetch）∪ `git worktree list --porcelain` 每個 worktree 的未提交副本」；任一來源讀不到就跳過該來源。

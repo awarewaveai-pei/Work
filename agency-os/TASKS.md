@@ -402,6 +402,7 @@
   4. **flatlay AI 裝飾背景 bgUrl 的 UI 選擇器**：`publish` route `flatlay` action 已支援 `bgUrl`（從 My Designs 選無圖案的 AI 背景圖當底），但 PublishWizard UI 只有純色背景；待補背景圖選擇器（`app/tools/publish/PublishWizard.tsx` runFlatlay）。
   5. **`copy` action LLM 成本 rate-limit**：`app/api/tools/publish/route.ts` 的 AI 文案 action 僅 role gate 無 rate-limit/每日 cap（內部 ops 用戶，blast=Anthropic 成本非資料）；規模大時加 token-bucket/daily cap。
 - [ ] **🎨 Image Output Pipeline**（SSOT: `lobster-factory/docs/PLAN-tarot-pod-image-output-pipeline-plus.md`）Tarot/POD: 色調→WebP/CMYK PDF(Japan Color 2001 Coated)/Fabric.js Canvas；Printful 走 sRGB `upscaler.ts` 不動；Canva Phase 1.5 POC
+  - [ ] **原檔直傳 R2**（SSOT: `lobster-factory/docs/PLAN-designs-direct-upload.md`，C1–C6；C1/C2 High 待 go）：「我的設計」存原始 PNG（印刷挑選來源），>~7.5 MB 原檔目前存不進（Next middleware 10 MiB）。WORKLOG 2026-11-15 續18/續19
   - **印刷積木 SSOT**：`PrintDestination` 矩陣（tw-local/mpc/tgc/printninja）；國際標準 70×121mm；TGC=sRGB PNG（CMYK 退件）；情境 A 直送印刷廠。**已查證**：pdf-lib 無 OutputIntent（PR#1512 closed）→ Ghostscript 套 ICC；Printful 走 sRGB upscaler.ts 不動
   - **Phase 0 POC（2/5 本機 PASS；證據 `d:\tmp\cmyk-poc\poc3.mjs`）**
   - [~] **[0-b]** Fabric.js + Next 15 — dynamic import ssr:false=文件化✓；R2 CORS taint **併入 [1-i]** integration test（真 R2+Playwright）。**Phase 0 技術風險已退（3 本機 PASS + 2 介面隔離/部署閘）→ Phase 1 程式碼可開始**
