@@ -20,6 +20,10 @@ on:
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/video/workbench/**'
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts'
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/cost-model.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/replicate-output.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/to-traditional.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/video-motion-models.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/image-models.js'
       - '.github/workflows/video-workbench-ci.yml'
   pull_request:
     branches:
@@ -35,6 +39,10 @@ on:
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/video/workbench/**'
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts'
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/cost-model.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/replicate-output.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/to-traditional.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/video-motion-models.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/image-models.js'
       - '.github/workflows/video-workbench-ci.yml'
   workflow_dispatch:
 
@@ -86,7 +94,16 @@ jobs:
       - name: Bundle .awarewave from the checked-out next-admin
         run: node scripts/bundle-awarewave.cjs ../next-admin
 
+      # The image has no ../next-admin: it reads the bundled .awarewave/, whose imports resolve from this app's node_modules.
+      # Same here, so a next-admin file needing a package this app does not install fails in CI as it would on the host.
       - name: Gate
         env:
           FFPROBE_PATH: /usr/bin/ffprobe
+          AWAREWAVE_APP_DIR: .awarewave
         run: node tests/gate.cjs
+
+      # CI-only extra: the next-admin route/page contracts p6-main-system checks when the full next-admin source is present.
+      - name: next-admin contracts (full checkout)
+        env:
+          FFPROBE_PATH: /usr/bin/ffprobe
+        run: node tests/p6-main-system.cjs

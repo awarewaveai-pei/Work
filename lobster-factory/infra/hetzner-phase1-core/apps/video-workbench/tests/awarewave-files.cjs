@@ -36,4 +36,18 @@ for (const file of listed) {
     assert.ok(Object.hasOwn(dependencies, name), `${file} imports ${name}; add it to video-workbench package.json dependencies`);
   }
 }
+// Every listed file triggers the CI gate (video-workbench-ci.yml push + pull_request paths). The image has no repo
+// around it, so this part runs in CI and locally only.
+const ci = path.join(root, "../../../../../.github/workflows/video-workbench-ci.yml");
+if (fs.existsSync(ci)) {
+  const yml = fs.readFileSync(ci, "utf8"),
+    block = (from, to) => yml.slice(yml.indexOf("\n  " + from + ":"), yml.indexOf("\n  " + to + ":")),
+    watched = (text) => [...text.matchAll(/^\s*-\s*'lobster-factory\/infra\/hetzner-phase1-core\/apps\/next-admin\/([^']+)'/gm)].map((m) => m[1]);
+  for (const [event, text] of [["push", block("push", "pull_request")], ["pull_request", block("pull_request", "workflow_dispatch")]]) {
+    const paths = watched(text);
+    assert.ok(paths.length, `video-workbench-ci.yml: no next-admin paths under ${event}`);
+    for (const file of listed)
+      assert.ok(paths.some((w) => w === file || (w.endsWith("/**") && file.startsWith(w.slice(0, -2)))), `${file} is bundled but not in the ${event} paths of video-workbench-ci.yml`);
+  }
+}
 console.log("awarewave-files ok:", listed.size, "files listed,", reads, "runtime reads covered");

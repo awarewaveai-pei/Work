@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-16（續2）R1：video-workbench CI 部署關卡連紅 25 次修好——CI 改用映像檔的讀法
+
+- 根因：CI 的 checkout 有 `../next-admin`，`resolveSource()`（video-workbench `backend/appearance.cjs:3-9`）就直接讀 `next-admin/lib/ai/to-traditional.ts`，裡面的 `opencc-js` 要到 `next-admin/node_modules` 找，CI 從沒裝那裡 → `tests/backend.cjs` 紅（263a16450 起）。映像檔沒有 next-admin，讀打包的 `.awarewave/`，套件從工作台自己的 `node_modules` 找（opencc-js 1.3.1 已在依賴與 lock），所以主機過、CI 紅。
+- 不變量：CI 用跟映像檔同一種讀法跑 gate。
+- 做法（`.github/workflows/video-workbench-ci.yml`）：
+  - Gate 步驟設 `AWAREWAVE_APP_DIR: .awarewave`（前一步本來就打包好）。
+  - 新增一步，對完整 checkout 跑 `tests/p6-main-system.cjs`：next-admin 路由／頁面合約檢查只在有完整原始碼時才跑，不能因上面的改動消失。
+  - push 與 pull_request 觸發清單補上 4 個漏列的打包檔：`lib/ai/replicate-output.ts`、`to-traditional.ts`、`video-motion-models.ts`、`public/editor-shared/image-models.js`。
+- 整類關掉：`tests/awarewave-files.cjs` 新檢查——每個打包檔都要分別出現在 push 與 pull_request 兩份清單（映像檔裡沒有 repo，所以這段只在 CI 和本機跑）。
+- Codex 審查 2 項都成立、都已修（artifact `agency-os/reports/oracle/2026-11-16-partialreview-aad3857d.md`）：①只設環境變數會讓 p6 的完整原始碼合約檢查被跳過 → 加上第二步；②原本把兩份清單合併計數 → 改成分開檢查。
+- 突變：拿掉觸發清單裡的 `to-traditional.ts` 一行（兩份都拿掉，或只拿掉 PR 那份）→ awarewave-files 紅；還原後綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=AWAREWAVE_APP_DIR=.awarewave node tests/gate.cjs（先跑 bundle-awarewave.cjs） | exit=0 | ms=49290
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/p6-main-system.cjs（完整 checkout） | exit=0 | ms=9698
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - external oracle = Codex CLI (codex exec -s read-only)；2 項已修
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,.github | grep=AWAREWAVE_APP_DIR | hits=7
+- GitHub CI 結果：見本 commit 的 video-workbench-ci run（推送後確認）。
+- rollback：git revert 本 commit。
 ## 2026-11-16（續1）— 「改邊緣」積木邊太厚：程式筆刷內縮 15%→3.4%／筆刷 PNG 裁掉空白邊（操作者「修掉的邊都太厚了」）
 
 - 根因（`public/editor-shared/edge-mask.js`，Studio／我的設計／canvas／修圖 dock 共用一份）：
