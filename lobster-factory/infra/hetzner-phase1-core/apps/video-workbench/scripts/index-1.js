@@ -12,11 +12,13 @@
       "assets",
       "history",
       "works",
+      "review-release",
     ],
     loaded = new Set();
   // Pages shown in a frame: name -> source. pages/*.html are the workbench's own; /works is next-admin's
   // app/video/(wb)/works, same host (nginx sends every non-workbench path there), which runs this runtime as a child
-  // page and, opened on its own, comes back here as /?open=works.
+  // page and, opened on its own, comes back here as /?open=works. review-release (plan U6) has no sidebar entry: it opens
+  // from a finished video (activate with the page's query), and always loads fresh, since each open names another video.
   const FRAMES = {
     tools: "pages/tools.html",
     characters: "pages/characters.html",
@@ -24,10 +26,11 @@
     projects: "pages/projects.html",
     storyboards: "pages/storyboards.html",
     works: "/works",
+    "review-release": "/review-release",
   };
   const $ = (id) => document.getElementById(id);
   let active = "generator";
-  function activate(name, fromDirector = false) {
+  function activate(name, fromDirector = false, query = "") {
     if (!names.includes(name)) return;
     // Use each overlay's close handler so picker promises and polling settle.
     document.querySelectorAll('body > .asset-workspace [data-picker-close], body > .job-view [data-job-close]').forEach(button => button.click());
@@ -35,8 +38,8 @@
     $("popover").classList.add("hidden");
     document.querySelectorAll('button[data-panel]').forEach(button => button.setAttribute("aria-expanded", "false"));
     window.generatorCloseMentions?.();
-    if (FRAMES[name] && !loaded.has(name)) {
-      $(name + "Frame").src = FRAMES[name];
+    if (FRAMES[name] && (query || !loaded.has(name))) {
+      $(name + "Frame").src = FRAMES[name] + (query ? "?" + query : "");
       loaded.add(name);
     }
     for (const n of names) {
@@ -128,11 +131,13 @@
   };
   // 作品 is the main system's library: shown only when this server is connected to it (capabilities.mainSystem).
   // ?open=<name> (a framed page opened on its own is sent back here) opens that page once the check has answered.
-  const opening = new URLSearchParams(location.search).get("open");
+  const params = new URLSearchParams(location.search),
+    opening = params.get("open");
+  params.delete("open");
   VideoWorkbench.loadCapabilities()
     .then((caps) => {
       $("worksNav").hidden = !caps?.mainSystem;
-      if (names.includes(opening) && !$(opening + "Nav")?.hidden) activate(opening);
+      if (names.includes(opening) && !$(opening + "Nav")?.hidden) activate(opening, false, params.toString());
     })
     .catch(VideoWorkbench.reportError);
   VideoWorkbench.router = {

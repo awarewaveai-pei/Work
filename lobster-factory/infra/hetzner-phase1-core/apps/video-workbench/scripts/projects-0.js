@@ -160,8 +160,28 @@ function render() {
 function renderHome() {
   const count = state.projects.length;
   $("home").innerHTML = VideoWorkbench.sanitize(
-    `<div class="eyebrow">專案 · PROJECTS</div><h1>在同一個世界觀裡，一次又一次開拍。</h1><p class="sub">把角色、場景與道具定義成可複用的元件，套用鎖定的視覺風格 —— 讓長片與系列作品的每一個鏡頭都保持一致。</p>${!count ? `<div class="project-empty"><div class="bigicon">⊞</div><h2>還沒有專案</h2><p>建立第一個專案，開始打造你的世界觀。</p><button class="btn primary" data-action="create">＋　建立新專案</button></div>` : `<div class="split"><h2 style="margin:0">我的專案 <span class="quiet">${count} 個</span></h2><button class="btn primary" data-action="create">＋　建立新專案</button></div><div class="project-grid">${state.projects.map((p) => `<button class="project-card" data-action="openProject" data-id="${esc(p.id)}"><div class="project-cover">${p.cover ? `<img src="${esc(p.cover)}" alt="專案封面" style="width:100%;height:100%;object-fit:cover">` : "▦"}</div><div class="desc"><strong>${esc(p.title)}</strong><span class="badge">${esc(fmtType(p.type))}</span> <span class="badge">${esc(p.ratio)}</span><p class="quiet">${p.episodes.length} 集 · ${esc(STYLE_NAMES[p.style])}</p></div></button>`).join("")}</div>`}`,
+    `<div class="eyebrow">專案 · PROJECTS</div><h1>在同一個世界觀裡，一次又一次開拍。</h1><p class="sub">把角色、場景與道具定義成可複用的元件，套用鎖定的視覺風格 —— 讓長片與系列作品的每一個鏡頭都保持一致。</p>${!count ? `<div class="project-empty"><div class="bigicon">⊞</div><h2>還沒有專案</h2><p>建立第一個專案，開始打造你的世界觀。</p><button class="btn primary" data-action="create">＋　建立新專案</button></div>` : `<div class="split"><h2 style="margin:0">我的專案 <span class="quiet">${count} 個</span></h2><button class="btn primary" data-action="create">＋　建立新專案</button></div><div class="project-grid">${state.projects.map((p) => `<button class="project-card" data-action="openProject" data-id="${esc(p.id)}"><div class="project-cover">${p.cover ? `<img src="${esc(p.cover)}" alt="專案封面" style="width:100%;height:100%;object-fit:cover">` : "▦"}</div><div class="desc"><strong>${esc(p.title)}</strong><span class="badge">${esc(fmtType(p.type))}</span> <span class="badge">${esc(p.ratio)}</span><p class="quiet">${p.episodes.length} 集 · ${esc(STYLE_NAMES[p.style])}</p></div></button>`).join("")}</div>`}${legacySection()}`,
   );
+}
+// Plan U6 (§1.6, one project list): what the main system already had before the workbench made its rows (a row without
+// source_ref: made by the old pipeline, 腳本工具 or 選題), listed here read only. A card opens its videos in the 審片與發布
+// panel; the rows stay where they are.
+const LEGACY_SOURCE = { manual: "手動", script_forge: "腳本工具", content_topic: "選題" };
+let legacy = { org: "", items: [] };
+const legacySection = () =>
+  legacy.items.length
+    ? `<div class="split" style="margin-top:28px"><h2 style="margin:0">主系統裡的舊專案 <span class="quiet">${legacy.items.length} 個 · 唯讀</span></h2></div><div class="project-grid">${legacy.items.map((p) => `<button class="project-card" data-action="openLegacy" data-id="${esc(p.id)}"><div class="project-cover">▦</div><div class="desc"><strong>${esc(p.title || "（未命名）")}</strong><span class="badge">${esc(LEGACY_SOURCE[p.source] || p.source)}</span><p class="quiet">${esc(new Date(p.updated_at).toLocaleDateString())}</p></div></button>`).join("")}</div>`
+    : "";
+async function loadLegacyProjects() {
+  try {
+    const org = (await VideoWorkbench.loadCapabilities())?.mainSystem?.organizationId,
+      res = org && (await fetch("/api/video/projects?organizationId=" + encodeURIComponent(org), { credentials: "same-origin" }));
+    if (!res?.ok) return;
+    legacy = { org, items: ((await res.json()).items || []).filter((p) => !p.source_ref) };
+    if (!project()) renderHome();
+  } catch {
+    // no main system or no access: the list is the workbench's own projects only
+  }
 }
 function renderWorkbench() {
   const p = project();
@@ -175,9 +195,9 @@ function renderWorkbench() {
   );
   wireReviewLinks();
 }
-// Card PJ.2: the episode's 11 steps and its cuts (spec §6). States come from EpisodeSpine.stepStates; the edit file's
+// Card PJ.2: the episode's 12 steps and its cuts (spec §6). States come from EpisodeSpine.stepStates; the edit file's
 // title is read from the edit file itself, never copied here (card PJ.1).
-const STEP_NAMES = ["專案", "腳本與分鏡", "鏡頭畫面", "修圖", "片頭與動畫", "剪輯", "聲音", "字幕", "輸出", "修復與品牌", "送審"],
+const STEP_NAMES = ["專案", "腳本與分鏡", "鏡頭畫面", "修圖", "片頭與動畫", "剪輯", "聲音", "字幕", "輸出", "修復與品牌", "審片", "發布"],
   STEP_BADGE = { todo: "還沒做", done: "做好了", optional: "選用", stale: "要重做" },
   FINISH_TOOLS = [["watermark", "加浮水印"], ["cta", "CTA 按鈕"], ["upscale", "畫質增強"], ["enhance", "影音增強"], ["privacy", "肖像權保護"]],
   DERIVE_TOOLS = [["short", "剪成短影音"], ["follow", "人物跟拍"]],
@@ -217,13 +237,14 @@ function episodeSteps(e) {
     // Plan U5 (D3): 快速輸出 = the main system renders the shots' pictures and lines; 剪輯輸出 = the edit file's timeline.
     button("quickRender", "快速輸出") + button("openEdit", "剪輯輸出", ' data-intent="export"') + note("快速輸出用鏡頭的畫面和旁白直接出片；剪輯輸出照剪輯檔的時間軸出片。"),
     outputs.length ? FINISH_TOOLS.map(([tool, label]) => button("outputTool", label, ` data-tool="${tool}" data-index="${last}"`)).join("") + note("選用。做完會成為新的一版成片，舊的保留。") : "",
-    outputs.length ? reviewLink(outputs[last]) + note("送審結果在主系統的送審頁。") : "",
+    outputs.length ? reviewButton(outputs[last], "qa", "審片") + note("四項檢查，在這裡看結果。") : "",
+    outputs.length ? reviewButton(outputs[last], "release", "發布") + note("核准、封面、社群草稿、網站文章。") : "",
   ];
   return `<div class="row" role="list" aria-label="製作步驟" style="align-items:stretch;margin-bottom:16px">${STEP_NAMES.map((name, i) => `<div class="panel step" role="listitem" data-step="${i + 1}" style="flex:1 1 150px;padding:8px 10px"><div class="row"><span class="circle">${i + 1}</span><strong>${name}</strong><span class="badge">${STEP_BADGE[states[i]]}</span></div><div class="row">${body[i]}</div></div>`).join("")}</div>${outputs.length ? outputList(e) : ""}`;
 }
-// 送審與投遞: the url is resolved after render (VideoWorkbench.deliveryUrl, shared/jobs-view.js), so the click is a
-// real link -- a popup opened after an await is blocked.
-const reviewLink = (o) => `<a class="btn small outline" data-review="${esc(o.jobId)}" aria-disabled="true">送審與投遞</a>`;
+// 審片與發布 (plan U6): the shell opens next-admin's panel at `section` (VideoWorkbench.openReview, shared/jobs-view.js).
+// Offered once wireReviewLinks has checked the video can be placed.
+const reviewButton = (o, section, label) => `<button class="btn small outline" data-review="${esc(o.jobId)}" data-section="${section}" aria-disabled="true">${label}</button>`;
 function outputList(e) {
   const outputs = e.outputs,
     rows = editRows(e),
@@ -240,36 +261,66 @@ function outputList(e) {
   return `<section class="panel" style="padding:12px;margin-bottom:16px" aria-label="成片"><strong>成片 ${outputs.length} 支</strong><div class="shot-grid" style="margin-top:10px">${outputs
     .map((o, i) => {
       const parent = o.derivedFrom ? outputs.findIndex((x) => x.url === o.derivedFrom) : -1;
-      return `<div class="shot" data-output="${i}"><video src="${esc(o.url)}" controls preload="metadata" style="width:100%;max-height:220px"></video><div class="tiny">${parent >= 0 ? `從第 ${parent + 1} 版${esc(TOOL_LABEL[toolOf(o)] || "")}` : `第 ${i + 1} 版`}</div>${redo(o)}<div class="row">${reviewLink(o)}<button class="btn small outline" data-action="lineage" data-index="${i}">怎麼做的</button>${[...FINISH_TOOLS, ...DERIVE_TOOLS].map(([tool, label]) => `<button class="btn small outline" data-action="outputTool" data-tool="${tool}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
+      return `<div class="shot" data-output="${i}"><video src="${esc(o.url)}" controls preload="metadata" style="width:100%;max-height:220px"></video><div class="tiny">${parent >= 0 ? `從第 ${parent + 1} 版${esc(TOOL_LABEL[toolOf(o)] || "")}` : `第 ${i + 1} 版`}</div>${redo(o)}<div class="row">${reviewButton(o, "qa", "審片與發布")}<button class="btn small outline" data-action="lineage" data-index="${i}">怎麼做的</button>${[...FINISH_TOOLS, ...DERIVE_TOOLS].map(([tool, label]) => `<button class="btn small outline" data-action="outputTool" data-tool="${tool}" data-index="${i}">${label}</button>`).join("")}</div><p class="tiny" data-published="${esc(o.jobId)}"></p></div>`;
     })
     .join("")}</div></section>`;
 }
-// The job record already on this page (a finished job does not change), so a redraw asks the server nothing; a
-// professional-editor render is recorded only on the server (backend/api.cjs POST /engine/renders), so it is asked.
+// 審片與發布 (plan U6), wired after each draw. The video behind a button is the job record already on this page (a
+// finished job does not change), so a redraw asks the server nothing for it; a professional-editor render is recorded
+// only on the server (backend/api.cjs POST /engine/renders), so it is asked. What the main system says (QA passed,
+// Release approved, where it went) is read again at every draw and whenever this page is shown again after the panel
+// (the shell hides this frame, and showing it resizes it); a read answered less than 5 s ago is reused.
+const reads = new Map();
+const read = (key, load) => {
+  const hit = reads.get(key);
+  if (hit && Date.now() - hit.at < 5000) return hit.value;
+  const value = load();
+  reads.set(key, { at: Date.now(), value });
+  value.catch(() => reads.delete(key));
+  return value;
+};
 function wireReviewLinks() {
-  const links = [...$("workbench").querySelectorAll("[data-review]")];
-  if (!links.length) return;
-  const jobs = VideoWorkbench.generations.list();
-  for (const a of links)
-    jobs
-      .then((list) => list.find((j) => j.id === a.dataset.review) || VideoWorkbench.generations.get(a.dataset.review))
-      .then(VideoWorkbench.deliveryUrl)
-      .then(
-        (url) => {
-          a.href = url;
-          a.target = "_blank";
-          a.rel = "noopener";
-          a.setAttribute("aria-disabled", "false");
-        },
-        (error) => {
-          a.title = error.message;
-          a.onclick = (event) => {
-            event.preventDefault();
-            VideoWorkbench.reportError(error);
-          };
-        },
-      );
+  const root = $("workbench"),
+    buttons = [...root.querySelectorAll("[data-review]")],
+    lines = [...root.querySelectorAll("[data-published]")];
+  if (!buttons.length && !lines.length) return;
+  const jobs = VideoWorkbench.generations.list(),
+    videoOf = (id) => read("job:" + id, () => jobs.then((list) => list.find((j) => j.id === id) || VideoWorkbench.generations.get(id)));
+  for (const b of buttons) {
+    let refusal = null;
+    b.onclick = () => (refusal ? VideoWorkbench.reportError(refusal) : videoOf(b.dataset.review).then((v) => VideoWorkbench.openReview(v, b.dataset.section)).catch(VideoWorkbench.reportError));
+    videoOf(b.dataset.review).then(VideoWorkbench.reviewQuery).then(
+      () => b.setAttribute("aria-disabled", "false"),
+      (error) => {
+        refusal = error;
+        b.title = error.message;
+      },
+    );
+  }
+  for (const line of lines)
+    videoOf(line.dataset.published)
+      .then((v) => read("published:" + v.id, () => VideoWorkbench.readPublished(v)))
+      .then((where) => {
+        if (where) line.textContent = "發布到哪：" + (where.join("；") || "還沒發布");
+      }, () => {});
+  // The steps follow the newest cut (the one step 11 and 12 open on).
+  const last = buttons.find((b) => b.dataset.section === "qa" && b.closest("[data-step]"));
+  if (last)
+    videoOf(last.dataset.review)
+      .then((v) => read("review:" + v.id, () => VideoWorkbench.readReview(v)))
+      .then((review) => {
+        if (!review) return;
+        for (const [n, done] of [[11, review.reviewed], [12, review.released]]) {
+          const badge = root.querySelector('[data-step="' + n + '"] .badge');
+          if (badge) badge.textContent = STEP_BADGE[done ? "done" : "todo"];
+        }
+      }, () => {});
 }
+let shown;
+window.addEventListener("resize", () => {
+  clearTimeout(shown);
+  shown = setTimeout(() => !$("workbench").hidden && wireReviewLinks(), 400);
+});
 function entityList(kind, p) {
   let labels = {
     character: ["♧", "角色", "新增角色"],
@@ -712,6 +763,9 @@ async function action(a, button) {
   switch (a) {
     case "create":
       newProject();
+      break;
+    case "openLegacy":
+      VideoWorkbench.navigate("review-release", new URLSearchParams({ organizationId: legacy.org, project: button.dataset.id, section: "qa" }).toString()).catch(VideoWorkbench.reportError);
       break;
     case "chooseType":
       snapshotCreate();
@@ -1247,4 +1301,5 @@ document.addEventListener("change", (e) => {
   if (t.id === "quick-auto" && dialog?.type === "quickRender") dialog.autonomy = t.checked;
 });
 render();
+loadLegacyProjects();
 replaceRetiredModel();

@@ -291,7 +291,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
         // A workbench object is named by its checksum, so only metadata.ratio can place it (platform-ratio.ts ratioOfAsset).
         const placed = ratioOfAsset({ object_url: `https://cdn.example/video/workbench/${ORG}/${"a".repeat(64)}.mp4`, metadata: sent[before] });
         assert.equal(placed, want, kind + " " + JSON.stringify(input));
-        const offered = await ctx.VideoWorkbench.deliveryUrl({ ...job, result: { ...job.result, assetId: "a" } }).then(() => true, () => false);
+        const offered = await ctx.VideoWorkbench.reviewQuery({ ...job, result: { ...job.result, assetId: "a" } }).then(() => true, () => false);
         assert.equal(offered, placed !== undefined, "頁面提供送審與投遞 ⇔ 主系統能放進投遞：" + JSON.stringify(input));
       }
     }
@@ -364,16 +364,35 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
       assert.equal((await slow.request("/uploads", "POST", { data: "x" })).id, "slow");
     }
 
-    // 6c. 送審與投遞 links to next-admin's /release for the registered asset; an undeliverable ratio gets no link.
+    // 6c. 送審與投遞 opens next-admin's 審片與發布 page in the shell for the registered asset; an undeliverable ratio is
+    // refused. A video made in a workbench project is first linked to that project's row (one POST, the project's own
+    // id and title); a video with no project is not.
     {
       const vm = require("node:vm");
       const ratios = { "16:9": { deliverable: true }, "2:1": { deliverable: false, note: "此比例尚不能投遞" } };
-      const ctx = { VideoWorkbench: { request: async () => ({ ratios }), loadCapabilities: async () => ({ mainSystem: { organizationId: ORG } }) }, document: {}, URLSearchParams };
+      const opened = [], posts = [];
+      const ctx = {
+        VideoWorkbench: {
+          request: async () => ({ ratios }), loadCapabilities: async () => ({ mainSystem: { organizationId: ORG } }),
+          projects: { list: async () => [{ id: "proj-1", title: "我的系列" }] },
+          navigate: async (target, params) => void opened.push([target, params]),
+        },
+        fetch: async (url, init) => (posts.push([url, JSON.parse(init.body)]), Response.json({ ok: true, item: { id: "row-1" } })),
+        document: {}, URLSearchParams,
+      };
       vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), ctx);
-      const job = (ratio) => ({ result: { assetId: "a" }, input: { settings: { ratio } } });
-      await assert.rejects(ctx.VideoWorkbench.deliveryUrl(job("2:1")), /尚不能投遞/);
-      assert.equal(await ctx.VideoWorkbench.deliveryUrl(job("16:9")), "/release?organizationId=" + ORG + "&candidateAssetId=a");
-      assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /window\.open\(/, "彈窗在 await 後會被瀏覽器擋掉，用連結");
+      const job = (ratio, link) => ({ result: { assetId: "a" }, input: { settings: { ratio }, ...(link ? { link } : {}) } });
+      await assert.rejects(ctx.VideoWorkbench.reviewQuery(job("2:1")), /尚不能投遞/);
+      assert.deepEqual({ ...(await ctx.VideoWorkbench.reviewQuery(job("16:9"))) }, { organizationId: ORG, asset: "a" });
+      await ctx.VideoWorkbench.openReview(job("16:9"), "release");
+      assert.deepEqual(opened.at(-1), ["review-release", "organizationId=" + ORG + "&asset=a&section=release"]);
+      assert.equal(posts.length, 0, "沒有專案的成片不建專案列");
+      await ctx.VideoWorkbench.openReview(job("16:9", { projectId: "proj-1", episodeId: "ep-1" }));
+      assert.deepEqual({ ...posts[0][1] }, { organizationId: ORG, title: "我的系列", productionMode: "quick_video", source: "video_workbench", sourceRef: "proj-1", attachAssetIds: ["a"] });
+      assert.equal(opened.at(-1)[1], "organizationId=" + ORG + "&asset=a&section=qa");
+      await assert.rejects(ctx.VideoWorkbench.openReview(job("2:1")), /尚不能投遞/);
+      assert.equal(opened.length, 2, "不能投遞的比例不開面板");
+      assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /window\.open\(/);
     }
 
     // 6. Upload: registered as real_footage before the answer; the response carries the asset id.
@@ -567,8 +586,8 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "../backend/generation-policy.cjs"), "utf8"), /removeBackground:\s*0\./, "成本不得手抄");
     const caps = JSON.parse((await request(port, "GET", "/api/vw/capabilities", who())).body);
     assert.deepEqual(caps.mainSystem, { organizationId: ORG, externalAudioAllowed: true });
-    assert.match(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /"\/release\?"/);
-    if (fullSource) assert(fs.existsSync(path.join(appDir, "app/video/(door)/release/page.tsx")), "/release 頁必須存在");
+    assert.match(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /"review-release"/);
+    if (fullSource) assert(fs.existsSync(path.join(appDir, "app/video/(wb)/review-release/page.tsx")), "審片與發布頁必須存在");
 
     // 8c. Theme saved on app reaches video.aware-wave.com: appended after the bundled :root (wins). Card P6.16: kept until
     // app says a save happened (POST /api/internal/theme/invalidate) or a tab comes back (?fresh); no timer.

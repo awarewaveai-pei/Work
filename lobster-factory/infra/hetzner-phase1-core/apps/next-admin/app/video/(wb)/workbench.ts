@@ -16,14 +16,16 @@ export interface Workbench {
   request(path: string, body?: unknown, method?: string): Promise<unknown>;
 }
 
-type Host = { parent: unknown; location: Pick<Location, "pathname" | "replace">; document: Pick<Document, "createElement" | "body">; VideoWorkbench?: Workbench };
+type Host = { parent: unknown; location: Pick<Location, "pathname" | "search" | "replace">; document: Pick<Document, "createElement" | "body">; VideoWorkbench?: Workbench };
 
 let loading: Promise<Workbench> | null = null;
 
 /** Starts the runtime once per document; null = not inside the shell (already sent there). */
 export function enterWorkbench(host: Host = window as unknown as Host): Promise<Workbench> | null {
   if (host.parent === host) {
-    host.location.replace(`/?open=${encodeURIComponent(host.location.pathname.split("/").filter(Boolean).pop() ?? "")}`);
+    // The page's own query goes along: the shell passes it to the frame it opens (review-release names its video that way).
+    const rest = host.location.search.replace(/^\?/, "");
+    host.location.replace(`/?open=${encodeURIComponent(host.location.pathname.split("/").filter(Boolean).pop() ?? "")}${rest ? `&${rest}` : ""}`);
     return null;
   }
   // All tags at once, async = false: the downloads overlap and the files still run in list order (runtime.js loadScripts).

@@ -24,10 +24,18 @@ describe("bare door shell", () => {
 describe("enterWorkbench", () => {
   it("a (wb) page opened on its own goes to the shell, which opens it by name, and loads nothing", () => {
     const replace = vi.fn(), createElement = vi.fn();
-    const host = { location: { pathname: "/works", replace }, document: { createElement, body: { append: vi.fn() } } } as unknown as Parameters<typeof enterWorkbench>[0] & { parent: unknown };
+    const host = { location: { pathname: "/works", search: "", replace }, document: { createElement, body: { append: vi.fn() } } } as unknown as Parameters<typeof enterWorkbench>[0] & { parent: unknown };
     host.parent = host;
     expect(enterWorkbench(host)).toBeNull();
     expect(replace).toHaveBeenCalledWith("/?open=works");
     expect(createElement).not.toHaveBeenCalled();
+  });
+
+  it("keeps the page's query for the shell", () => {
+    const replace = vi.fn();
+    const host = { location: { pathname: "/review-release", search: "?organizationId=o&asset=a&section=release", replace }, document: {} } as unknown as Parameters<typeof enterWorkbench>[0] & { parent: unknown };
+    host.parent = host;
+    expect(enterWorkbench(host)).toBeNull();
+    expect(replace).toHaveBeenCalledWith("/?open=review-release&organizationId=o&asset=a&section=release");
   });
 });

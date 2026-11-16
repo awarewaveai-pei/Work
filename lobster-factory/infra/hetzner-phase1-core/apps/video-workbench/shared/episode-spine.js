@@ -297,7 +297,7 @@
     return [...rows.values()].sort((a, b) => (b.n ?? 99) - (a.n ?? 99));
   }
 
-  // The 11 steps of spec §6, each "todo" | "done" | "optional" | "stale". Read from what the episode has, so an episode
+  // The 12 steps of spec §6 (plan U6 splits the last, 送審, into 審片 and 發布), each "todo" | "done" | "optional" | "stale". Read from what the episode has, so an episode
   // without steps/outputs (spec §3.2) shows what its shots and edit file imply.
   function stepStates(episode, editRows) {
     const shots = episode?.shots || [],
@@ -324,7 +324,10 @@
       or(made("subtitle") || clips.some((c) => c.kind === "text" && c.slot) ? "done" : "todo", staleIn((c) => c.kind === "text")),
       or(outputs.length ? "done" : "todo", outputs.some((o) => o.derivedFrom == null && outputStale(episode, o, editRows))),
       or(made("finish") ? "done" : "optional", outputs.some((o) => TOOL_STEP[toolOf(episode, o)] === "finish" && outputStale(episode, o, editRows))),
-      "optional", // review is decided on the main system's /release page; this page cannot see the result
+      // 審片 and 發布 are decided on the main system (plan U6); the page reads them (scripts/projects-0.js reviewStates)
+      // and shows them in place of these. Until it has, a cut that exists is not known to be reviewed.
+      outputs.length ? "todo" : "optional",
+      outputs.length ? "todo" : "optional",
     ];
   }
 

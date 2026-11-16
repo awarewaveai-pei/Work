@@ -247,7 +247,7 @@
       return perform("navigate", { target: "projects" });
     }
     if (action === "navigate") {
-      document.getElementById(payload.target + "Nav")?.click();
+      window.VideoWorkbench.router?.activate(payload.target, false, payload.params);
       return true;
     }
     throw new Error("未知頁面指令");
@@ -735,8 +735,9 @@
         document.dispatchEvent(new CustomEvent("vw:changed"));
       },
     },
-    navigate: (target) =>
-      child ? rpc("navigate", { target }) : perform("navigate", { target }),
+    // params: the query string of a framed next-admin page (plan U6: review-release names its video that way).
+    navigate: (target, params) =>
+      child ? rpc("navigate", { target, params }) : perform("navigate", { target, params }),
     // Card PJ.1: the episode spine's actions; children ask the top page, which alone changes spine fields.
     // Card PJ.2 adds settle(job); card U4 setShot.
     spine: Object.fromEntries(

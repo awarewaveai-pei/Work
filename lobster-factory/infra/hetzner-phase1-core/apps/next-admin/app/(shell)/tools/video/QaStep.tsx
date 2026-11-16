@@ -15,7 +15,8 @@ const card: React.CSSProperties = { ...cardStyle(), padding: 14 };
  * 現在拉出來當自己的可見步驟。不在這裡硬擋下一步：Release（⑨）本身在 API 層對每個
  * candidate 都會重新驗證同一份證據，這裡重複硬擋只是同一個檢查做兩次、還可能不同步。
  */
-export default function QaStep({ organizationId, projectId, onContinue }: { organizationId: string; projectId?: string; onContinue: (candidateAssetId: string, candidateChecksum: string) => void }) {
+// initialAssetId: the one video to review (the workbench opens its own cut); includeWorkbench: workbench renders count as candidates too.
+export default function QaStep({ organizationId, projectId, initialAssetId, includeWorkbench = false, onContinue }: { organizationId: string; projectId?: string; initialAssetId?: string; includeWorkbench?: boolean; onContinue: (candidateAssetId: string, candidateChecksum: string) => void }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetId, setAssetId] = useState("");
   const [checksum, setChecksum] = useState("");
@@ -26,14 +27,14 @@ export default function QaStep({ organizationId, projectId, onContinue }: { orga
     const org = organizationId.trim();
     if (!org) { setAssets([]); return; }
     let cancelled = false;
-    // Only this project's videos (main row per video; ratio rows are read through it), newest first, the first one preselected.
-    fetch(`/api/video/assets?organizationId=${encodeURIComponent(org)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ""}`)
+    // Only this project's videos (main row per video; ratio rows are read through it), newest first; a named video is the only one listed; a project's first is preselected.
+    fetch(`/api/video/assets?organizationId=${encodeURIComponent(org)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ""}${includeWorkbench ? "&includeWorkbench=1" : ""}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((j: { items?: Asset[] }) => {
         if (cancelled) return;
-        const list = (j.items ?? []).filter((a) => !a.metadata?.variantOf);
+        const list = (j.items ?? []).filter((a) => !a.metadata?.variantOf && (!initialAssetId || a.id === initialAssetId));
         setAssets(list);
-        if (projectId && list[0]) void pick(list[0].id, list);
+        if ((initialAssetId || projectId) && list[0]) void pick(list[0].id, list);
       })
       .catch(() => { if (!cancelled) setAssets([]); });
     return () => { cancelled = true; };

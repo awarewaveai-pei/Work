@@ -3,14 +3,65 @@
   // for; null = unknown, never a default). backend/main-system.cjs records metadata.ratio from this same function, so the
   // 送審與投遞 button is offered exactly when next-admin's release panel can place the video (platform-ratio.ts ratioOfAsset).
   const jobRatio = (job) => job?.result?.ratio || job?.input?.settings?.ratio || job?.input?.settings?.project?.ratio || null;
-  if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio });
-  // P6.6 送審與投遞: a finished video registered in the main system is released and delivered on next-admin's /release page
-  // (same origin; it owns QA, release, social and WordPress drafts). Only 16:9 / 9:16 / 4:5 / 1:1 / 4:3 can be delivered (D6, /delivery-ratios).
+  // Plan U6: where a finished video stands in 審片 (all four QA kinds passed on every ratio file) and 發布 (some ratio file has
+  // an approved Release), read from the main system. get(path) = the JSON of a same-origin GET, null when it failed: then the
+  // answer is null (unknown), never "not done". Same rules as next-admin's ReleaseDeliveryPanel: a QA result or a Release
+  // counts only for the checksum of the file it was made on.
+  const QA_KINDS = ["technical", "caption", "editorial", "rights"];
+  async function readReview(get, organizationId, assetId) {
+    const org = encodeURIComponent(organizationId),
+      assets = await get("/api/video/assets?organizationId=" + org + "&includeWorkbench=1"),
+      rows = (assets?.items || []).filter((a) => a.id === assetId || a.metadata?.variantOf === assetId);
+    if (!rows.length) return null;
+    const reports = await Promise.all(rows.map((r) => get("/api/video/qa/reports?organizationId=" + org + "&candidateAssetId=" + encodeURIComponent(r.id)))),
+      releases = await get("/api/video/release?organizationId=" + org + "&candidateAssetIds=" + rows.map((r) => encodeURIComponent(r.id)).join(","));
+    if (!releases || reports.includes(null)) return null;
+    return {
+      reviewed: rows.every((r, i) => QA_KINDS.every((kind) => (reports[i].items || []).find((q) => q.kind === kind && q.candidateChecksum === r.checksum_sha256)?.status === "passed")),
+      released: rows.some((r) => (releases.items || []).some((x) => x.candidate_asset_id === r.id && x.candidate_checksum === r.checksum_sha256)),
+    };
+  }
+  // Where a finished video went (plan U6 「發布到哪」): its Releases, their delivery attempts and the newest outcome per
+  // platform, from the main system's project row of the workbench project (GET /api/video/projects?id=). null = unknown;
+  // [] = never released (also when the project has no row yet: the first open of the panel makes it).
+  const METRIC = { views: "觀看", impressions: "曝光", reach: "觸及", likes: "讚", comments: "留言", shares: "分享", saves: "收藏", clicks: "點擊", completion_rate: "完成率 %" },
+    MATURITY = { "24h": "24 小時", "7d": "7 天", "30d": "30 天" };
+  async function readPublished(get, organizationId, workbenchProjectId, assetId) {
+    const org = encodeURIComponent(organizationId),
+      list = await get("/api/video/projects?organizationId=" + org + "&sourceRef=" + encodeURIComponent(workbenchProjectId));
+    if (!list) return null;
+    const row = (list.items || [])[0];
+    if (!row) return [];
+    const detail = await get("/api/video/projects?id=" + encodeURIComponent(row.id));
+    if (!detail) return null;
+    const mine = new Set((detail.assets || []).filter((a) => a.id === assetId || a.metadata?.variantOf === assetId).map((a) => a.id)),
+      releases = (detail.releases || []).filter((r) => mine.has(r.candidate_asset_id)),
+      ids = new Set(releases.map((r) => r.id)),
+      seen = new Set();
+    return [
+      ...(detail.deliveries || []).filter((d) => ids.has(d.release_id)).map((d) => d.destination + (d.variant ? "／" + d.variant : "") + "：" + d.status),
+      // rows arrive newest first: the first one per platform and maturity is the current one
+      ...(detail.outcomes || []).filter((o) => ids.has(o.release_id) && !seen.has(o.platform + o.maturity) && seen.add(o.platform + o.maturity))
+        .map((o) => o.platform + " 成效（發布後 " + (MATURITY[o.maturity] || o.maturity) + "）：" + (Object.entries(o.metrics || {}).filter(([, n]) => typeof n === "number").map(([k, n]) => (METRIC[k] || k) + " " + n).join("　") || "尚無數字")),
+      ...(releases.length && !(detail.deliveries || []).some((d) => ids.has(d.release_id)) ? ["已核准，還沒投遞"] : []),
+    ];
+  }
+  if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio, readReview, readPublished });
+  // Plan U6 審片與發布: a finished video registered in the main system is reviewed and released in next-admin's
+  // /review-release page (same origin; it owns QA, release, social and WordPress drafts), framed by the shell like the
+  // other pages. Only 16:9 / 9:16 / 4:5 / 1:1 / 4:3 can be delivered (D6, /delivery-ratios).
   let delivery;
   const caps = async () => VideoWorkbench.capabilities || (await VideoWorkbench.loadCapabilities());
-  // The page opens through a real link (href resolved before the click), never window.open after an await: browsers
-  // block a popup that is not opened synchronously by the click, silently.
-  async function deliveryUrl(v) {
+  const getJson = async (path) => {
+    try {
+      const r = await fetch(path, { credentials: "same-origin" });
+      return r.ok ? await r.json() : null;
+    } catch {
+      return null;
+    }
+  };
+  // The page's query for this video, or the reason it cannot be reviewed.
+  async function reviewQuery(v) {
     const org = (await caps())?.mainSystem?.organizationId;
     if (!org || !v.result?.assetId) throw Error("此成果尚未登記到主系統，無法送審");
     delivery ||= await VideoWorkbench.request("/delivery-ratios", undefined, "GET");
@@ -18,28 +69,45 @@
     if (!ratio) throw Error("此成果沒有記錄長寬比，無法投遞");
     const fit = delivery?.ratios?.[ratio];
     if (!fit?.deliverable) throw Error(fit?.note || "此比例尚不能投遞");
-    return "/release?" + new URLSearchParams({ organizationId: org, candidateAssetId: v.result.assetId });
+    return { organizationId: org, asset: v.result.assetId };
+  }
+  // Opens the panel in the shell at `section` ("qa" = 審片, "release" = 發布). A video made inside a workbench project is
+  // first linked to that project's row in the main system (one row per project, made on the first ask; plan §1.5), so
+  // the panel and the project list see it; a video made on the generator page has no project and stays without one.
+  async function openReview(v, section = "qa") {
+    const query = await reviewQuery(v),
+      projectId = v.input?.link?.projectId,
+      project = projectId ? (await VideoWorkbench.projects.list()).find((p) => p.id === projectId) : null;
+    if (project) {
+      const res = await fetch("/api/video/projects", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: query.organizationId,
+          title: String(project.title || "").trim().slice(0, 180) || "未命名專案",
+          productionMode: "quick_video",
+          source: "video_workbench",
+          sourceRef: project.id,
+          attachAssetIds: [query.asset],
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw Error("無法把成片掛到專案：" + (body.error || res.status));
+    }
+    await VideoWorkbench.navigate("review-release", new URLSearchParams({ ...query, section }).toString());
   }
   function reviewButton(v, actions) {
     if (!v.result?.assetId) return;   // local mode registers nothing: no button
-    const link = document.createElement("a");
-    link.textContent = "送審與投遞";
-    link.className = "button";
-    link.dataset.jobReview = v.id;
-    link.setAttribute("aria-disabled", "true");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "送審與投遞";
+    button.dataset.jobReview = v.id;
+    button.setAttribute("aria-disabled", "true");
     let refusal = null;
-    link.onclick = (event) => {
-      if (link.getAttribute("aria-disabled") === "false") return;   // native navigation to /release in a new tab
-      event.preventDefault();
-      if (refusal) VideoWorkbench.reportError(refusal);
-    };
-    deliveryUrl(v).then((url) => {
-      link.href = url;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.setAttribute("aria-disabled", "false");
-    }, (error) => { refusal = error; link.title = error.message; });
-    actions.append(link);
+    button.onclick = () => (refusal ? VideoWorkbench.reportError(refusal) : openReview(v).catch(VideoWorkbench.reportError));
+    reviewQuery(v).then(() => button.setAttribute("aria-disabled", "false"), (error) => { refusal = error; button.title = error.message; });
+    actions.append(button);
   }
   // Card VD.4: a finished video's covers. The free ones come with the export (backend/cover.cjs) and are the default;
   // an AI cover is opt-in, one button per image-edit row with its price on it (data-paid -> shared/paid-price.js, NT$
@@ -103,7 +171,10 @@
     };
     actions.append(edit);
   }
-  VideoWorkbench.deliveryUrl = deliveryUrl;
+  VideoWorkbench.reviewQuery = reviewQuery;
+  VideoWorkbench.openReview = openReview;
+  VideoWorkbench.readReview = (v) => reviewQuery(v).then((q) => readReview(getJson, q.organizationId, q.asset));
+  VideoWorkbench.readPublished = (v) => reviewQuery(v).then((q) => (v.input?.link?.projectId ? readPublished(getJson, q.organizationId, v.input.link.projectId, q.asset) : []));
   VideoWorkbench.showJob = (job, options = {}) => {
     let panel = document.createElement("section");
     panel.className = "job-view";
