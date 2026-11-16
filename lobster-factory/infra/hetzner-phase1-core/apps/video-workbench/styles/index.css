@@ -57,6 +57,7 @@ button:disabled {
   border-radius: var(--radius-sm);
   margin: 2px 0;
 }
+.nav[hidden] { display: none; }
 .nav:hover {
   background: var(--sidebar-hover);
   color: var(--sidebar-text-hover);
@@ -725,14 +726,14 @@ body.templates-open #templatesArea {
 }
 
 /* Project integration only; all existing views stay unchanged. */
-#projectsArea[hidden] {
+#projectsArea[hidden], #worksArea[hidden] {
   display: none;
 }
-#projectsArea {
+#projectsArea, #worksArea {
   width: 100%;
   max-width: none;
 }
-#projectsFrame {
+#projectsFrame, #worksFrame {
   background: var(--body-bg);
 }
 
@@ -2213,7 +2214,7 @@ body.templates-open main {
   overflow: hidden;
   padding: 0;
 }
-body.projects-open main {
+body.projects-open main, body.works-open main {
   height: 100dvh;
   overflow: hidden;
   padding: 0;
@@ -2238,7 +2239,7 @@ body.storyboards-open main {
   min-height: 0;
   overflow: hidden;
 }
-#projectsArea {
+#projectsArea, #worksArea {
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
@@ -2269,7 +2270,7 @@ body.storyboards-open main {
   border: 0;
   display: block;
 }
-#projectsFrame {
+#projectsFrame, #worksFrame {
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -2322,7 +2323,7 @@ body.storyboards-open main {
   body.templates-open main {
     height: calc(100dvh - 56px);
   }
-  body.projects-open main {
+  body.projects-open main, body.works-open main {
     height: calc(100dvh - 56px);
   }
   body.storyboards-open main {
@@ -2337,7 +2338,7 @@ body.storyboards-open main {
   #templatesArea {
     height: 100%;
   }
-  #projectsArea {
+  #projectsArea, #worksArea {
     height: 100%;
   }
   #storyboardsArea {

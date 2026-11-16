@@ -5,7 +5,7 @@ export const LOGIN_SOURCES: readonly LoginSource[] = ["local", "awarewave-wp", "
 // anonymous: path prefixes served with no login, on this product's own door only (pages and GET/HEAD routes;
 // lib/portal/__tests__/products.test.ts reads the files under them).
 // nav: a multi-page door's menu (ADR 018 §2 rule 3), rendered by app/ProductDoorShell.tsx. path: the page below the door
-// ("" = its home), served from app<page>/<path>/page.tsx; staff: the staff page showing the same component, so
+// ("" = its home), served from app<page>/<path>/page.tsx (route groups such as app/video/(wb) add no segment); staff: the staff page showing the same component, so
 // useDoorHref (app/DoorContext.tsx) can turn a shared component's staff link into the door link.
 export interface DoorNavItem { path: string; name: string; staff: string }
 // uiService: a separate UI container that owns this door's host except next-admin's login, /_next and API paths (P6 D1,

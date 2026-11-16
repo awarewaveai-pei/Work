@@ -5,12 +5,12 @@ import { describe, expect, it } from "vitest";
 import { PLATFORM_PAGES, RESERVED_SUBDOMAINS, STAFF_ROUTE_GROUPS, nextAdminProducts, productHost, servedNextAdminProducts } from "../doors";
 import { STAFF_PLATFORM, covers } from "../staff-tools";
 import { BACK_OFFICE, STAFF_UTILITIES, LOGIN_SOURCES, PRODUCTS } from "../products";
+import { APP_DIR, doorPageUrls, pageUrls } from "./app-pages";
 
 // The registry is the one list of products (ADR 012 §5).
 const under = (p: string, prefix: string) => p === prefix || p.startsWith(`${prefix}/`);
 
 // Top-level route segments of the staff door (app/ and its route groups), so a product's page prefix cannot shadow one.
-const APP_DIR = path.join(__dirname, "../../../app");
 // First path segments other routes already use. A door's own top-level directory (app/<page>) is not a clash; a
 // directory inside a route group such as app/(shell)/<page> always is (both would answer /<page>).
 function staffSegments(ownPages: string[]): string[] {
@@ -54,7 +54,7 @@ describe("product registry", () => {
       if (p.door.enabled !== false) expect(staff, p.key).not.toContain(p.door.page.slice(1));
       if (p.status === "available") {
         expect(p.door.enabled, p.key).not.toBe(false);
-        expect(existsSync(path.join(APP_DIR, p.door.page.slice(1), "page.tsx")), p.key).toBe(true);
+        expect(doorPageUrls(p.door.page), p.key).toContain(p.door.page);
       }
       for (const a of p.door.api) expect(a, p.key).toMatch(/^\/api\/[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*$/);
     }
@@ -89,22 +89,19 @@ describe("product registry", () => {
   // page that mirrors one of the product's staff pages or a platform page (useDoorHref maps links by it), and no staff page answers a
   // built door page's path (a reserved, unbuilt door may still share one, see the shadowing test above).
   it("every door.nav page is built and mirrors one of the product's staff pages or a platform page; no staff page shares a door page's path", () => {
-    const pageUrls = (dir: string, url: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-      e.isDirectory() ? (e.name.startsWith("_") ? [] : pageUrls(path.join(dir, e.name), e.name.startsWith("(") ? url : `${url}/${e.name}`))
-        : e.name === "page.tsx" ? [url || "/"] : []);
     const staffUrls = new Set(STAFF_ROUTE_GROUPS.flatMap((g) => pageUrls(path.join(APP_DIR, g), "")));
     for (const p of nextAdminProducts()) {
       const nav = p.door.nav ?? [];
+      const doorUrls = doorPageUrls(p.door.page);
       expect(new Set(nav.map((n) => n.path)).size, p.key).toBe(nav.length);
       for (const n of nav) {
         expect(n.path, p.key).toMatch(/^(?:[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*)?$/);
         expect(n.name.trim(), `${p.key} nav ${n.path}`).not.toBe("");
-        expect(existsSync(path.join(APP_DIR, p.door.page.slice(1), ...n.path.split("/").filter(Boolean), "page.tsx")), `${p.key} nav ${n.path}: no page`).toBe(true);
+        expect(doorUrls, `${p.key} nav ${n.path}: no page`).toContain(n.path ? `${p.door.page}/${n.path}` : p.door.page);
         expect(p.staffPaths.some((s) => under(n.staff, s)) || PLATFORM_PAGES.includes(n.staff), `${p.key} nav ${n.path}: ${n.staff} is neither its staff path nor a platform page`).toBe(true);
         expect(staffUrls.has(`/${n.staff}`), `${p.key} nav ${n.path}: no staff page ${n.staff}`).toBe(true);
       }
-      const doorDir = path.join(APP_DIR, p.door.page.slice(1));
-      for (const url of existsSync(doorDir) ? pageUrls(doorDir, p.door.page) : []) expect(staffUrls.has(url), `${p.key}: a staff page answers door page ${url}`).toBe(false);
+      for (const url of doorUrls) expect(staffUrls.has(url), `${p.key}: a staff page answers door page ${url}`).toBe(false);
     }
   });
 

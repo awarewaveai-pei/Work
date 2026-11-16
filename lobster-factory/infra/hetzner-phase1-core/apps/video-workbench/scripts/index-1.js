@@ -11,8 +11,20 @@
       "skills",
       "assets",
       "history",
+      "works",
     ],
     loaded = new Set();
+  // Pages shown in a frame: name -> source. pages/*.html are the workbench's own; /works is next-admin's
+  // app/video/(wb)/works, same host (nginx sends every non-workbench path there), which runs this runtime as a child
+  // page and, opened on its own, comes back here as /?open=works.
+  const FRAMES = {
+    tools: "pages/tools.html",
+    characters: "pages/characters.html",
+    templates: "pages/templates.html",
+    projects: "pages/projects.html",
+    storyboards: "pages/storyboards.html",
+    works: "/works",
+  };
   const $ = (id) => document.getElementById(id);
   let active = "generator";
   function activate(name, fromDirector = false) {
@@ -23,13 +35,8 @@
     $("popover").classList.add("hidden");
     document.querySelectorAll('button[data-panel]').forEach(button => button.setAttribute("aria-expanded", "false"));
     window.generatorCloseMentions?.();
-    if (
-      ["tools", "characters", "templates", "projects", "storyboards"].includes(
-        name,
-      ) &&
-      !loaded.has(name)
-    ) {
-      $(name + "Frame").src = "pages/" + name + ".html";
+    if (FRAMES[name] && !loaded.has(name)) {
+      $(name + "Frame").src = FRAMES[name];
       loaded.add(name);
     }
     for (const n of names) {
@@ -46,13 +53,7 @@
       "assets",
       "history",
     ].includes(name);
-    for (const n of [
-      "tools",
-      "characters",
-      "templates",
-      "projects",
-      "storyboards",
-    ])
+    for (const n of Object.keys(FRAMES))
       document.body.classList.toggle(n + "-open", name === n);
     if (["workflows", "skills", "assets", "history"].includes(name))
       VideoWorkbench.workspaces.open(name).catch(VideoWorkbench.reportError);
@@ -125,6 +126,15 @@
       VideoWorkbench.reportError(e);
     }
   };
+  // 作品 is the main system's library: shown only when this server is connected to it (capabilities.mainSystem).
+  // ?open=<name> (a framed page opened on its own is sent back here) opens that page once the check has answered.
+  const opening = new URLSearchParams(location.search).get("open");
+  VideoWorkbench.loadCapabilities()
+    .then((caps) => {
+      $("worksNav").hidden = !caps?.mainSystem;
+      if (names.includes(opening) && !$(opening + "Nav")?.hidden) activate(opening);
+    })
+    .catch(VideoWorkbench.reportError);
   VideoWorkbench.router = {
     activate,
     get active() {

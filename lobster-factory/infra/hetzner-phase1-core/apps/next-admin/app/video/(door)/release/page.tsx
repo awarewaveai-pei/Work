@@ -1,4 +1,4 @@
-import ReleaseDeliveryPanel from "../../(shell)/tools/video/ReleaseDeliveryPanel";
+import ReleaseDeliveryPanel from "../../../(shell)/tools/video/ReleaseDeliveryPanel";
 
 export const metadata = { title: "送審與投遞" };
 

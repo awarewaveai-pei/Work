@@ -1,4 +1,4 @@
-import DesignsGallery from "../../(shell)/tools/designs/DesignsGallery";
+import DesignsGallery from "../../../(shell)/tools/designs/DesignsGallery";
 
 export const metadata = { title: "我的作品" };
 

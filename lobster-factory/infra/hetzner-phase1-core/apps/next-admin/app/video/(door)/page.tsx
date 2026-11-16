@@ -1,5 +1,5 @@
-import VideoTabs from "../(shell)/tools/video/VideoTabs";
-import VideoPipeline from "../(shell)/tools/video/VideoPipeline";
+import VideoTabs from "../../(shell)/tools/video/VideoTabs";
+import VideoPipeline from "../../(shell)/tools/video/VideoPipeline";
 
 export const metadata = { title: "影片製作" };
 

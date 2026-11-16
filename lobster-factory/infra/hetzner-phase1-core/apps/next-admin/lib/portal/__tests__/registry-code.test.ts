@@ -13,6 +13,7 @@ import { ROUTE_FEATURES } from "../../entitlements/route-features";
 import { PLATFORM_APIS, PLATFORM_PAGES, STAFF_ROUTE_GROUPS, doorApis, nextAdminProducts, type NextAdminProduct } from "../doors";
 import { PRODUCTS, type PortalProduct } from "../products";
 import { ROOT, under, sources, scan, FILES, resolve, isRoute, importClosure } from "./code-scan";
+import { doorPageUrls } from "./app-pages";
 
 // Code a product owns: lib/<key>/, its staff paths, its door page and door API directories (longest prefix wins).
 const OWNED = PRODUCTS.flatMap((p) => [`lib/${p.key}`, ...p.staffPaths.flatMap((s) => STAFF_ROUTE_GROUPS.map((g) => `app/${g}/${s}`)),
@@ -35,7 +36,7 @@ const loginPages = (p: NextAdminProduct) => [`app${p.door.page}/`];
 const allPages = (p: NextAdminProduct) => [...loginPages(p), ...(p.door.anonymous ?? []).map((a) => `app/(public)${a}/`)];
 /** Doors whose page exists, open or not: the gates hold from the day a door page is built, before it goes live
  *  (going live = enabled + DNS + nginx, middleware-portal-guards.test.ts). */
-const builtDoors = () => nextAdminProducts().filter((p) => existsSync(path.join(ROOT, "app", p.door.page.slice(1), "page.tsx")));
+const builtDoors = () => nextAdminProducts().filter((p) => doorPageUrls(p.door.page).includes(p.door.page));
 function doorFiles(roots: readonly string[]): Set<string> {
   return importClosure([...FILES.keys()].filter((f) => roots.some((r) => f.startsWith(r)) && !isRoute(f)));
 }

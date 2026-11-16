@@ -1,7 +1,8 @@
 // The frame every product door renders in (ADR 018 §2): no staff sidebar, the registry's door.nav menu for a multi-page
 // product, the product's own app, a sign-out foot. Each app/<door.page>/layout.tsx wraps its children in this with its
 // product key; staff open the same app inside the (shell) layout. A customer whose account does not hold the product
-// gets only the "not enabled" page (lib/portal/door-access.ts).
+// gets only the "not enabled" page (lib/portal/door-access.ts). bare: a page the product's own UI frames (the video
+// workbench shell, app/video/(wb)) -- same access check, no menu and no sign-out foot (the framing UI has both).
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
 import { PRODUCTS, type ProductKey } from "@/lib/portal/products";
@@ -11,7 +12,7 @@ import { DoorProvider } from "./DoorContext";
 import { DoorNav } from "./DoorNav";
 import { LogoutButton } from "./LogoutButton";
 
-export async function ProductDoorShell({ productKey, children }: { productKey: ProductKey; children: ReactNode }) {
+export async function ProductDoorShell({ productKey, bare = false, children }: { productKey: ProductKey; bare?: boolean; children: ReactNode }) {
   const product = PRODUCTS.find((p) => p.key === productKey);
   const door = product?.door;
   if (door?.app !== "next-admin") throw new Error(`${productKey}: no next-admin door`);
@@ -38,10 +39,10 @@ export async function ProductDoorShell({ productKey, children }: { productKey: P
     <div className="shell">
       <div className="door-main">
         <DoorProvider nav={door.nav ?? []}>
-          <DoorNav page={door.page} name={product!.name} features={product!.features.map((f) => ({ key: f.feature_key, name: f.name }))} />
+          {!bare && <DoorNav page={door.page} name={product!.name} features={product!.features.map((f) => ({ key: f.feature_key, name: f.name }))} />}
           <div className="door-content">
             {children}
-            <div className="door-foot"><LogoutButton variant="page" /></div>
+            {!bare && <div className="door-foot"><LogoutButton variant="page" /></div>}
           </div>
         </DoorProvider>
       </div>

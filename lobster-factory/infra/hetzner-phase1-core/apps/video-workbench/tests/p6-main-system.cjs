@@ -566,7 +566,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     const caps = JSON.parse((await request(port, "GET", "/api/vw/capabilities", who())).body);
     assert.deepEqual(caps.mainSystem, { organizationId: ORG });
     assert.match(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /"\/release\?"/);
-    if (fullSource) assert(fs.existsSync(path.join(appDir, "app/video/release/page.tsx")), "/release 頁必須存在");
+    if (fullSource) assert(fs.existsSync(path.join(appDir, "app/video/(door)/release/page.tsx")), "/release 頁必須存在");
 
     // 8c. Theme saved on app reaches video.aware-wave.com: appended after the bundled :root (wins). Card P6.16: kept until
     // app says a save happened (POST /api/internal/theme/invalidate) or a tab comes back (?fresh); no timer.
