@@ -1,4 +1,32 @@
 # Worklog
+## 2026-11-16（續9）— 影片工具融合：計畫 §8–§13（操作者實走、片頭接合、一路走到底、一鍵與全自動、兩次自審）、第二次部署、片頭服務上線
+
+**範圍**：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md`；監工台 `agency-os/handoffs/2026-11-16-video-unify-supervisor/`（29/49）。接續同日續8。
+
+[已修改]
+- C1 計畫 §8：操作者 11 張截圖的 20 個功能逐列對照；§3 漏列 5 項歸卡（U4.4、U4.5、U5.3、U8.3、複製連結）。
+- C2 計畫 §9：片頭是一集的設定（`episode.intro|outro`），自動接成一支＋轉場、成片卡編輯／重生／加入；U5.4、U5.5、U8.5。
+- C3 計畫 §10：第一次自審，矛盾 X1–X4、缺口 G1–G10（R2 匯入來源、video-service 部署路徑、DEPLOY_HOLD 規則）。
+- C4 計畫 §11：一路走到底，`nextAction` 只讀既有 `stepStates`；U6.4、U11.5。
+- C5 計畫 §12：一鍵三級＋全自動；一個執行器一個停點；對外發布只走話題佇列；U3.5、U3.6、U6.5。
+- C6 計畫 §13：第二次自審。C1＝專案頁唯讀卡篩選錯（`VW/scripts/projects-0.js:180` `!p.source_ref` 濾掉 `L/topic-project.ts:17` 帶 ref 的話題專案）→ U6.6；C2＝排程不含 WordPress 嵌入（`L/project-advance-deps.ts` grep `embedVideoInPost` 0）→ 改成確認框選項；C3 `full_auto` 只由話題佇列設；C4 整趟報價在伺服器；派工順序表為唯一正本。
+- C7 併入並部署：U5 commit 2 `dab070ccd`、U6 `58050a441`、U3 `fb790d851`（第二次部署 next-admin＋video-workbench `fb790d851`，smoke 全過）；U8.4 `646f1698b` 上線（細節在續8）。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=整合 worktree 併入 U3 後：video-workbench `node tests/gate.cjs` → gate ok；next-admin `npx tsc --noEmit` → 0；`npm test` → 556 files / 4730 passed | exit=0 | ms=420000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`、`sg-deploy.sh video-workbench` → deployed commit fb790d851、healthy、smoke all endpoints OK | exit=0 | ms=400000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node check.mjs`（監工台）→ ok: 12 cards bound to plan §4, 49 items (29 done), 1 open, page fresh | exit=0 | ms=2000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/5n（監工自審兩輪：§10 4 矛盾 10 缺口、§13 8 更正；每條附 grep 證據。各卡的 Codex 紀錄 `agency-os/reports/oracle/2026-11-16-review-*.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=embedVideoInPost | hits=4
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=full_auto | hits=6
+
+[剩餘風險]
+- U6.6 的篩選錯誤已在正式站：選題建的影片專案不會出現在專案頁唯讀卡（不影響舊頁與內容工具，資料未動）。
+- 已上線畫面未用登入瀏覽器實點（續8 同）；§13 批 0。
+- §12、§13 的做法尚未實作；`video-service` 的部署路徑未查（§10 G3）。
+
+[rollback] 計畫與監工台為文件，`git revert` 即可；部署還原同續8。
+- AUTO_TASK_DONE: 影片工具融合計畫補完至 §13；狀態正本＝監工台 data.mjs；派工順序正本＝計畫 §13 表
 ## 2026-11-16（續8）— 影片工具融合 U 線：計畫 v4、9 張卡上線、片頭渲染修正、D:\Work 快轉兩個根因
 
 **範圍**：舊影片工具（next-admin `/tools/video`、`/tools/script-forge`）併進影音工作台。計畫 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md`（§4 卡、§8 操作者實走 20 列＝U11 驗收表、§9 片頭接進主片）。監工台 `agency-os/handoffs/2026-11-16-video-unify-supervisor/`（29/42）。續接 `agency-os/handoffs/2026-11-16-1400-video-unify-supervisor.md`。
