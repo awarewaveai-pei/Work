@@ -277,9 +277,25 @@ async function edSubApply(jobId) {
     throw Error("這份字幕屬於另一個剪輯專案，請打開該專案再套用");
   let language;
   await edSubEdit(p, () => (language = edSubPlace(p, t)));
-  VideoWorkbench.notify(
-    `已放進「${language}」字幕軌：${t.segments?.length || 0} 句${t.segments?.some((s) => s.needsReview) ? "，標「需校對」的句子請檢查" : ""}`,
-  );
+  const said = `已放進「${language}」字幕軌：${t.segments?.length || 0} 句${t.segments?.some((s) => s.needsReview) ? "，標「需校對」的句子請檢查" : ""}`;
+  VideoWorkbench.notify(said);
+  return said;
+}
+// One paid run of the 字幕 / 剪贅字 panes as "ed:paid" events, the ones the 剪輯 Agent follows (scripts/editor-agent.js):
+// started before the paid request goes out (kind = its propose_paid kind, language = what was asked for), then exactly
+// one end -- work() resolves { text, failed? }, or throws (failed, rethrown).
+async function edPaidRun(kind, language, work) {
+  const id = crypto.randomUUID(),
+    say = (status, text = "") =>
+      document.dispatchEvent(new CustomEvent("ed:paid", { detail: { kind, language, id, status, text } }));
+  say("started");
+  try {
+    const end = await work();
+    say(end.failed ? "failed" : "succeeded", end.text);
+  } catch (e) {
+    say("failed", e.message);
+    throw e;
+  }
 }
 // The running job's line in the pane is updated in place (a full redraw would take the caret out of a cue being typed).
 const edSubJobText = () => {
@@ -309,14 +325,17 @@ async function edSubWatch(jobId) {
     if (v.status === "succeeded") {
       edSubUi.results = null;
       // Placed only into its own project while it is open; otherwise 找回已完成的字幕結果 has it.
-      if (edProject()?.id === edSubUi.job.projectId) await edSubApply(jobId);
-      else if (tool === "edit") edRedraw();
-      return;
+      if (edProject()?.id === edSubUi.job.projectId) return { text: await edSubApply(jobId) };
+      if (tool === "edit") edRedraw();
+      return { text: "辨識完成；打開這個專案後，到「找回已完成的字幕結果」放進時間軸" };
     }
-    if (!["queued", "running"].includes(v.status))
-      return tool === "edit" && edRedraw();
+    if (!["queued", "running"].includes(v.status)) {
+      if (tool === "edit") edRedraw();
+      return { failed: true, text: `${edSubJobText()}；沒有扣點` };
+    }
     await new Promise((r) => setTimeout(r, 1500));
   }
+  return { failed: true, text: "這次辨識已不在追蹤；完成後可到「找回已完成的字幕結果」查看" };
 }
 // ---- the three tabs ----
 function edSubRows(p, t) {
@@ -624,19 +643,21 @@ edRegisterPane("subtitles", {
       }
       if (!edSubPriced(edSubUi.quote.costUsd))
         throw Error("價格還沒載入，請稍候再按");
-      const job = await VideoWorkbench.request("/editor/transcriptions", {
-        settings,
-        idempotencyKey: crypto.randomUUID(),
-      });
-      edSubUi.quote = null;
-      edSubUi.job = {
-        id: job.id,
-        projectId: p.id,
-        status: job.status,
-        progress: 0,
-      };
-      edRedraw();
-      edSubWatch(job.id).catch(VideoWorkbench.reportError);
+      edPaidRun("transcribe", settings.language, async () => {
+        const job = await VideoWorkbench.request("/editor/transcriptions", {
+          settings,
+          idempotencyKey: crypto.randomUUID(),
+        });
+        edSubUi.quote = null;
+        edSubUi.job = {
+          id: job.id,
+          projectId: p.id,
+          status: job.status,
+          progress: 0,
+        };
+        edRedraw();
+        return edSubWatch(job.id);
+      }).catch(VideoWorkbench.reportError);
     },
     "sub-results": async (action, p) => {
       edSubUi.results =
@@ -709,35 +730,37 @@ edRegisterPane("subtitles", {
       edSubUi.busy = true;
       edRedraw();
       try {
-        for (const batch of edSubBatches(cues)) {
-          const result = await VideoWorkbench.request(
-            "/tools/subtitles/translate",
-            { language, cues: batch.map((c) => ({ id: c.id, text: c.text })) },
-          );
-          for (const r of result.cues) out[r.id] = r.text;
-        }
-        if (edProject() !== p || sig() !== before)
-          throw Error("翻譯期間來源字幕改過了，時間軸保持原樣，請重新翻譯");
-        await edSubEdit(p, () => {
-          const id =
-            edSubTracks(p).find(
-              (x) => x.language === language && x.translatedFrom === from.id,
-            )?.id || edSubNewTrack(p, language, true, from.id);
-          edSubFill(
-            p,
-            id,
-            cues.map((c) => ({
-              start: c.start,
-              end: edSubEnd(c),
-              text: out[c.id],
-            })),
-            edSubLook(p, from.id),
-          );
-          edSubUi.track = id;
+        await edPaidRun("translate", language, async () => {
+          for (const batch of edSubBatches(cues)) {
+            const result = await VideoWorkbench.request(
+              "/tools/subtitles/translate",
+              { language, cues: batch.map((c) => ({ id: c.id, text: c.text })) },
+            );
+            for (const r of result.cues) out[r.id] = r.text;
+          }
+          if (edProject() !== p || sig() !== before)
+            throw Error("翻譯期間來源字幕改過了，時間軸保持原樣，請重新翻譯");
+          await edSubEdit(p, () => {
+            const id =
+              edSubTracks(p).find(
+                (x) => x.language === language && x.translatedFrom === from.id,
+              )?.id || edSubNewTrack(p, language, true, from.id);
+            edSubFill(
+              p,
+              id,
+              cues.map((c) => ({
+                start: c.start,
+                end: edSubEnd(c),
+                text: out[c.id],
+              })),
+              edSubLook(p, from.id),
+            );
+            edSubUi.track = id;
+          });
+          const text = `已翻譯成 ${language}（${cues.length} 句），新的字幕軌預設隱藏，可在時間軸顯示`;
+          VideoWorkbench.notify(text);
+          return { text };
         });
-        VideoWorkbench.notify(
-          `已翻譯成 ${language}（${cues.length} 句），新的字幕軌預設隱藏，可在時間軸顯示`,
-        );
       } finally {
         edSubUi.busy = false;
         if (tool === "edit") edRedraw();

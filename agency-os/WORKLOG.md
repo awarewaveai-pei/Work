@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-16（續5）— R4：剪輯 Agent 的付費卡片接回對話（確認後的辨識／翻譯／剪贅字結果回報在對話裡）
+
+- 根因：`scripts/editor-agent.js` 舊版 `edAgentPaid` 只呼叫 `edAction("pane:…")` 切到分頁；分頁跑完付費工作後自己放回時間軸，Agent 對話不知道結果，下一則訊息的 history 也沒有（risk-audit-20261115.md R4）。路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`。
+- 不變量：付費工作只走分頁自己的確認鈕與路由；每次付費執行在送出請求前發一次 `ed:paid` started，之後只發一次結束（succeeded／failed）；Agent 只把「同種類、語言相符」的執行當成卡片的結果，並把結果寫成一句對話。
+- 做法：
+  - `scripts/editor-panes/subtitles.js` `edPaidRun(kind, language, work)`：started → work() → 唯一一次結束（例外也算 failed 並重拋）。`sub-run`、`sub-translate` 走它；`edSubWatch` 回傳 `{ text, failed }`，`edSubApply` 回傳放進字幕軌的那句話。
+  - `scripts/editor-panes/fillers.js` `fc-run` 走 `edPaidRun("fillers", …)`；`fcWatch` 回傳結果。
+  - `scripts/editor-agent.js`：卡片狀態 waiting／running／done／failed／cancelled；「前往確認」設 waiting，「取消」只在送出前出現（對話說明「沒有執行，也沒有扣點」）；`ed:paid` 監聽把結果用 `edAgentPaidSay` 寫成 assistant 一句，下一則訊息的 history 帶著。結果仍由分頁自己的套用放回（`edSubEdit` 一個 checkpoint），Ctrl+Z 一次還原。
+- Codex 審查 3 項都成立、都已修（artifact `agency-os/reports/oracle/2026-11-16-partialreview-950fe25a.md`）：①送出後回應前仍可取消 → started 改在送出請求前發；②只按種類配對會把別的語言的翻譯算進卡片 → 比對語言；③剪贅字讀結果失敗時卡片永遠停在進行中 → `edPaidRun` 保證唯一結束。
+- 測試 `tests/ed13-agent-ui.cjs` 新增 3 段（假的付費回應，不呼叫供應商）：確認後結果接回對話＋history 帶著＋Ctrl+Z 一次還原；送出中卡片改為進行中且沒有取消鈕、別的語言的翻譯不算；送出前取消有說明且沒有付費請求。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/ed13-agent-ui.cjs（12 PASS）＋ ed13-agent、ed10-subtitles-backend（15）、ed10-subtitles-ui（8）、ed11-fillers（5）、gate（27） | exit=0 | ms=66000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI (codex exec -s read-only)；3 項已修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=edPaidRun|edPaidEvent|ed:paid|edAgentPaid | hits=29
+- 剩餘：翻譯分多批送出，中途失敗時已回來的批次仍各自計費（既有行為，對話只說時間軸沒有改變，不宣稱沒有扣點）。
+- rollback：git revert 本 commit。
 ## 2026-11-16（續4）內建曲庫試聽結果：106 首全部保留，拿掉 a006／a007／a008「待人工試聽」註記
 
 - 做了什麼：操作者用 `.data/library/試聽清單.html` 試聽後回覆「不刪 不換」。`assets/audio-library.json` 拿掉 a006 城市街景、a007 咖啡廳、a008 人群的 note；音檔不變，正式站 `/data/library` 不用補放檔案。

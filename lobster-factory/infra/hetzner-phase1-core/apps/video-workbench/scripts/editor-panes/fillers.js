@@ -209,10 +209,11 @@ else {
       : fcRecognise(p, ui);
     return `<h3>剪贅字</h3><p class="note">找出語氣詞和過長的停頓，主影片、旁白、字幕一起剪掉並補上空隙；配樂不剪，照常連續播放。只在同一段錄音內剪，可復原。</p>${controls}${body}`;
   }
+  // Ends as edPaidRun's { text, failed? } (subtitles.js).
   async function fcWatch(jobId) {
     while (fcUi.job?.id === jobId) {
       const v = await VideoWorkbench.generations.get(jobId);
-      if (fcUi.job?.id !== jobId) return;
+      if (fcUi.job?.id !== jobId) break;
       Object.assign(fcUi.job, { status: v.status, progress: v.progress, error: v.error });
       const line = document.querySelector("[data-ed-fc-job]");
       if (line) line.textContent = fcJobText();
@@ -221,17 +222,23 @@ else {
           p = edProject();
         fcUi.job = null;
         // Placed only into its own project while it is open; otherwise 字幕 › 找回已完成的字幕結果 has it.
-        if (p && p.id === t.projectId)
+        if (p && p.id === t.projectId) {
           await edSubEdit(p, () => {
             const id = edSubTracks(p).find((x) => x.language === FillerCut.TRACK)?.id || edSubNewTrack(p, FillerCut.TRACK, true);
             edSubFill(p, id, (t.segments || []).map((s) => ({ start: s.start, end: s.end, text: s.text, words: s.words })));
           });
-        else if (tool === "edit") edRedraw();
-        return;
+          return { text: "已取得逐字時間；「剪贅字」分頁列出要剪的地方，按「剪掉」完成（免費，可復原）" };
+        }
+        if (tool === "edit") edRedraw();
+        return { text: "辨識完成；打開這個專案後，到「字幕」›「找回已完成的字幕結果」放進時間軸" };
       }
-      if (!["queued", "running"].includes(v.status)) return tool === "edit" && edRedraw();
+      if (!["queued", "running"].includes(v.status)) {
+        if (tool === "edit") edRedraw();
+        return { failed: true, text: `${fcJobText()}；沒有扣點` };
+      }
       await new Promise((r) => setTimeout(r, 1500));
     }
+    return { failed: true, text: "這次辨識已不在追蹤；完成後可到「字幕」›「找回已完成的字幕結果」查看" };
   }
   const fcSettings = (p) => ({ ...edSubSettings(p), language: fcUi.language });
   edRegisterPane("fillers", {
@@ -258,11 +265,13 @@ else {
           throw Error("時間軸改過了，請重新查看費用");
         }
         if (!edSubPriced(fcUi.quote.costUsd)) return;
-        const job = await VideoWorkbench.request("/editor/transcriptions", { settings, idempotencyKey: crypto.randomUUID() });
-        fcUi.quote = null;
-        fcUi.job = { id: job.id, projectId: p.id, status: job.status, progress: job.progress || 0 };
-        edRedraw();
-        fcWatch(job.id).catch(VideoWorkbench.reportError);
+        edPaidRun("fillers", settings.language, async () => {
+          const job = await VideoWorkbench.request("/editor/transcriptions", { settings, idempotencyKey: crypto.randomUUID() });
+          fcUi.quote = null;
+          fcUi.job = { id: job.id, projectId: p.id, status: job.status, progress: job.progress || 0 };
+          edRedraw();
+          return fcWatch(job.id);
+        }).catch(VideoWorkbench.reportError);
       },
       "fc-cut": async (action, p) => {
         const plan = FillerCut.plan(p, fcUi);

@@ -5,8 +5,10 @@
 // editor operations. The list runs on a copy through the same tool functions the buttons use (edAgentTools below ->
 // tools-editor.js and the pane files); any failing step voids the whole round and the project stays as it was. A good round replaces the
 // project after one edCheckpoint, so one Ctrl+Z undoes it all. Paid work is only proposed: its card opens the pane whose
-// own priced button runs it. The conversation lives in memory only and is never saved with the project.
-const edAgent = { open: false, busy: false, turns: [], x: null, y: null, draft: "" };
+// own priced button runs it, and the pane's "ed:paid" events (started / succeeded / failed) bring the outcome back into
+// the conversation. The conversation lives in memory only and is never saved with the project.
+// waiting = the card whose pane is open, until that pane starts a run of the card's kind (or the card is cancelled).
+const edAgent = { open: false, busy: false, turns: [], x: null, y: null, draft: "", waiting: null };
 const edAgentQuick = ["整片上字幕", "刪語氣詞與停頓", "改成直式 9:16", "配樂淡出＋讓位旁白", "中英雙語字幕"];
 // propose_paid kind -> the left pane that runs it with its own price and confirm (ED.10 字幕, ED.11 剪贅字).
 const edAgentPaidPane = { transcribe: "字幕", translate: "字幕", fillers: "剪贅字" };
@@ -31,10 +33,18 @@ function edAgentClose() {
 function edAgentTurn(t) {
   if (t.role === "user") return `<div class="editor-agent-msg user">${esc(t.text)}</div>`;
   const cards = (t.paid || [])
-    .map(
-      (a, i) =>
-        `<div class="editor-agent-card"><b>需要另計費用：${esc(edAgentPaidText[a.kind](a))}</b><p class="note">費用在下一步的按鈕上顯示，按下確認才會開始。</p><button type="button" class="btn small" data-ed-agent-paid="${t.id}:${i}">前往確認</button></div>`,
-    )
+    .map((a, i) => {
+      const ref = `${t.id}:${i}`,
+        open = !a.state || a.state === "waiting",
+        state = {
+          waiting: `請在左側「${edAgentPaidPane[a.kind]}」分頁看費用並按確認；完成後結果會回到這裡。`,
+          running: "進行中，完成後結果會回到這裡。",
+          done: "已完成。",
+          failed: "沒有完成。",
+          cancelled: "已取消，沒有扣點。",
+        }[a.state] || "費用在下一步的按鈕上顯示，按下確認才會開始。";
+      return `<div class="editor-agent-card" data-ed-agent-card="${ref}"><b>需要另計費用：${esc(edAgentPaidText[a.kind](a))}</b><p class="note">${state}</p>${open ? `<button type="button" class="btn small" data-ed-agent-paid="${ref}">前往確認</button>` : ""}${a.state === "waiting" ? `<button type="button" class="btn small" data-ed-agent-paid-cancel="${ref}">取消</button>` : ""}</div>`;
+    })
     .join("");
   return `<div class="editor-agent-msg agent${t.error ? " error" : ""}">${esc(t.text)}${t.error ? `<p class="editor-agent-error">${esc(t.error)}</p>` : ""}${t.applied ? `<p class="note">已套用 ${t.applied} 個操作；按 Ctrl+Z 一次可整輪還原。</p>` : ""}${cards}</div>`;
 }
@@ -181,25 +191,66 @@ async function edAgentSend(message) {
   edAgent.busy = false;
   edAgentPaint();
 }
+const edAgentCard = (ref) => {
+  const [id, i] = String(ref || "").split(":");
+  return edAgent.turns.find((t) => t.id === id)?.paid?.[Number(i)];
+};
+// The outcome of a proposal, as an agent line of the conversation (so the next message's history carries it).
+function edAgentPaidSay(a, text) {
+  edAgent.turns.push({ id: crypto.randomUUID(), role: "assistant", text: `「${edAgentPaidText[a.kind](a)}」${text}` });
+  edAgentPaint();
+}
 function edAgentPaid(ref) {
-  const [id, i] = ref.split(":"),
-    a = edAgent.turns.find((t) => t.id === id)?.paid?.[Number(i)];
-  if (!a) return;
+  const a = edAgentCard(ref);
+  if (!a || (a.state && a.state !== "waiting")) return;
+  const before = edAgentCard(edAgent.waiting);
+  if (before && before !== a) delete before.state;
+  a.state = "waiting";
+  edAgent.waiting = ref;
   if (a.kind !== "fillers" && typeof edSubUi === "object") {
     edSubUi.tab = "辨識翻譯";
     if (a.language) edSubUi.language = a.language;
   }
+  edAgentPaint();
   edAction("pane:" + edAgentPaidPane[a.kind]).catch(VideoWorkbench.reportError);
 }
+function edAgentPaidCancel(ref) {
+  const a = edAgentCard(ref);
+  if (a?.state !== "waiting") return;
+  a.state = "cancelled";
+  edAgent.waiting = null;
+  edAgentPaidSay(a, "已取消，沒有執行，也沒有扣點。");
+}
+// The language a card asked for (fillers: none -- the card does not set the 剪贅字 pane's language).
+const edAgentPaidLanguage = (a) => (a.kind === "translate" ? a.target : a.kind === "transcribe" ? a.language : null);
+// The panes' paid runs (subtitles.js edPaidRun; started goes out before the paid request): a run of what the waiting
+// card proposed (same kind, and its language when the card named one) becomes that card's job; its one end is said in
+// the conversation. Runs started from a pane on its own, or for something else, are not followed.
+document.addEventListener("ed:paid", (e) => {
+  const { kind, language, id, status, text } = e.detail || {};
+  if (status === "started") {
+    const a = edAgentCard(edAgent.waiting);
+    if (a?.kind !== kind || (edAgentPaidLanguage(a) && edAgentPaidLanguage(a) !== language)) return;
+    Object.assign(a, { state: "running", job: id });
+    edAgent.waiting = null;
+    return edAgentPaint();
+  }
+  const a = edAgent.turns.flatMap((t) => t.paid || []).find((x) => x.state === "running" && x.job === id);
+  if (!a) return;
+  a.state = status === "succeeded" ? "done" : "failed";
+  edAgentPaidSay(a, (status === "succeeded" ? "完成：" : "沒有完成：") + text);
+});
 document.addEventListener("click", (e) => {
   const box = e.target.closest?.("[data-ed-agent]");
   if (!box) return;
   const act = e.target.closest("[data-ed-agent-do]")?.dataset.edAgentDo,
     quick = e.target.closest("[data-ed-agent-quick]")?.dataset.edAgentQuick,
-    paid = e.target.closest("[data-ed-agent-paid]")?.dataset.edAgentPaid;
+    paid = e.target.closest("[data-ed-agent-paid]")?.dataset.edAgentPaid,
+    cancel = e.target.closest("[data-ed-agent-paid-cancel]")?.dataset.edAgentPaidCancel;
   if (act === "close") edAgentClose();
   if (act === "new") {
     edAgent.turns = [];
+    edAgent.waiting = null;
     edAgent.draft = "";
     box.querySelector("textarea").value = "";
     edAgentPaint();
@@ -216,6 +267,7 @@ document.addEventListener("click", (e) => {
   if (act === "send") edAgentSend(box.querySelector("textarea").value);
   if (quick) edAgentSend(quick);
   if (paid) edAgentPaid(paid);
+  if (cancel) edAgentPaidCancel(cancel);
 });
 document.addEventListener("keydown", (e) => {
   if (!e.target.matches?.("[data-ed-agent] textarea") || e.key !== "Enter" || e.shiftKey || e.isComposing) return;
