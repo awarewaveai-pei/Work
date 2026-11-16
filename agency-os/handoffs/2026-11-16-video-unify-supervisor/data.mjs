@@ -111,18 +111,18 @@ export const STEPS = [
     files: [`${NA}app/api/internal/video/workbench/quick-render/`, `${API}render-draft/route.ts`, L, `${VW}backend/quick-render.cjs`, `${VW}scripts/editor-export-dialog.js`, `${VW}scripts/projects-0.js`],
     items: [
       done('U5.1', 'commit 1：舊渲染引擎包成工作台任務；成片回到工作台素材庫，主系統只有一列。限制：每個鏡頭一定要有旁白（鏡頭長度＝旁白長度）；最多 30 個鏡頭；單一素材 200MB 以內。', '2f26d7dac'),
-      todo('U5.2', 'commit 2：第 9 步分成「快速輸出」「剪輯輸出」；比例可以複選，每個比例一個任務；確認框列出成本明細（NT$）。'),
+      done('U5.2', 'commit 2：第 9 步分成「快速輸出」「剪輯輸出」；比例可以複選，每個比例一個任務；確認框列出成本明細（NT$）。', 'dab070ccd'),
       todo('U5.3', 'commit 3：「一鍵成片」：先補齊缺的圖再快速輸出，按之前顯示總價；頁面關掉再開會接著做。'),
     ] },
   { n: 7, code: 'U6', title: '審片與發布併進成片', plain: '例：成片卡按「審片」勾完四項檢查，接著在「發布」寫 IG 與 FB 各一版文案，存成社群草稿。',
     gate: '勾兩個不同平台會存成兩份各自的文案草稿；從一集打開只列這一集的成片；一筆舊專案在專案頁看得到、成片能播、能核准。',
-    risk: 'Medium', model: 'fullstack-engineer（Sonnet）', status: 'not_started', depends: ['U2', 'U0'],
+    risk: 'Medium', model: 'fullstack-engineer（Sonnet）', status: 'done', commit: '58050a441', depends: ['U2', 'U0'],
     what: 'WB/review-release/page.tsx（QaStep＋ReleaseDeliveryPanel，鎖定組織）；(door)/release 導回殼；jobs-view「送審與投遞」改開殼內面板；步驟列第 11 步審片、第 12 步發布，狀態每次讀鏈；成片卡「發布到哪」；舊專案唯讀卡',
     files: [`${WB}review-release/page.tsx`, `${V}QaStep.tsx`, `${V}ReleaseDeliveryPanel.tsx`, `${NA}app/video/(door)/release/`, `${VW}shared/jobs-view.js`, `${VW}scripts/projects-0.js`, `${VW}shared/episode-spine.js`],
     items: [
-      todo('U6.1', '審片與發布面板：上半四項檢查與「有權使用」，下半核准、封面、社群草稿、WP 嵌入；舊的 /release 導回工作台。'),
-      todo('U6.2', '步驟列第 11 步「審片」、第 12 步「發布」，打勾與否每次讀真實結果。'),
-      todo('U6.3', '成片卡顯示「發布到哪」與成效；舊專案以唯讀卡列在專案頁。'),
+      done('U6.1', '審片與發布面板：上半四項檢查與「有權使用」，下半核准、封面、社群草稿、WP 嵌入；舊的 /release 導回工作台。', '58050a441'),
+      done('U6.2', '步驟列第 11 步「審片」、第 12 步「發布」，打勾與否每次讀真實結果。', '58050a441'),
+      done('U6.3', '成片卡顯示「發布到哪」與成效；舊專案以唯讀卡列在專案頁。成片清單只列最新 200 支（舊發布頁本來就這樣）。', '58050a441'),
     ] },
   { n: 8, code: 'U7', title: '字幕與音檔', plain: '例：把客戶設成「音檔不可外送」後，按 OpenAI 轉錄會被擋下；改按「改用自家主機（免費）重試」就能轉。',
     gate: '設成不可外送時，每個會把音檔送出主機的工作都被拒、而且沒有對外請求；查不到設定也拒（拿掉檢查，測試會紅）；改一句字幕重燒後成片字幕跟著更新。',
@@ -175,5 +175,5 @@ export const STEPS = [
 ];
 
 export const OPEN = [
-  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；之後的卡上線前一樣要說 go。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
+  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；U5 第二段、U6 已在 main，還沒部署；上線前一樣要說 go。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
 ];

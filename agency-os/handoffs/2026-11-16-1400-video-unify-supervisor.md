@@ -17,7 +17,10 @@ source_session_summary: "監工派工 U0–U11（舊影片工具併進影音工�
 - 在 origin/main：U0 `79ab5f321`、U1 `dd64b4a18`、U4 `df5640559`（U4.4 FLUX 選模型未做：工作台無 FLUX 文生圖供應商模組）、U7 `ea91b5819`、登記表補洞 `880a7943d`。migration 0164 已套正式庫。next-admin 隨 03:00 自動部署；**影音工作台未部署（High，要操作者 go）**。
 - 第二批已在 origin/main（2026-11-16 驗收：gate ok、tsc 0、npm test 4720 過）：U8 `a878b713a`、U10 `2f0b08bb8`、U5 commit 1 `2f26d7dac`、U2 `3a3ad4565`。
   - 未結：U2.3 原生頁對門頁的畫面比對沒跑；U5 Codex F1（素材 >200MB 在渲染服務才失敗）、F3（重啟會掉執行中的快速輸出，與 remotion 同）；U10 子組織登入時顯示誰的方案要後端改；U5 引擎限制（每鏡頭必有旁白、≤30 鏡頭）要進 commit 2 對話框。
-  - 監工台 20/36。下一批可派：U3、U6（U2 已在）、U5 commit 2。
+  - 2026-11-16 已部署 next-admin＋video-workbench（4b5daf721）。之後併入、尚未部署：U5 commit 2 `dab070ccd`、U6 `58050a441`。
+  - U3 分支 `claude/awesome-nash-f50132`（session local_ecd6ec68）：等 Codex 審查，未 commit；已交代鎖定組織、刪 style-contract 對 OrganizationPicker 的豁免。
+  - risks 兩批清查都在監工台資料夾（risk-triage-*.md）：現在修 0 條。
+  - 監工台 24/36。剩：U3 驗收、U5 commit 3（一鍵成片）、U9（需 U3）、U2.3 畫面比對、U4.4 FLUX、U11 收尾。
 - risks 清查：`agency-os/handoffs/2026-11-16-video-unify-supervisor/risk-triage-u0-u1-u4-u7.md`（在 `D:\Work`，未 commit）— 現在修 0、後面卡處理 4、不用處理 21。
 - `D:\Work` 落後根因已修（`scripts/git-parity-merge.py`：上游舊快照規則＋eol=crlf 檔由 git 寫回），`D:\Work` 已 0/0。
 
