@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-16（續10）— U6.6：工作台專案頁漏列選題專案（已修、已上線）
+
+[根因] 唯讀卡清單用 `!p.source_ref` 當「不是工作台的專案」，但話題佇列建的列帶 `source_ref`＝話題 id（`lib/content/video/topic-project.ts:17`）→ 正式站 3 個 `content_topic` 專案不出現。兩份清單的分界是 `source`，不是 `source_ref`。
+[已修改] `688d397a5`：`GET /api/video/projects?excludeSource=<source>`（比對 SOURCES，`app/api/video/projects/route.ts`）在伺服器排除，上限 100 筆只算要列的那一類；工作台 `scripts/projects-0.js` 帶 `excludeSource=video_workbench`，自己不再篩。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin`、`sg-deploy.sh video-workbench` → deployed 688d397a5、healthy、smoke all OK；psql `media_production_projects` 依 source：content_topic 3（3 帶 ref）、manual 6、script_forge 4 → 修正後 13 張全列 | exit=0 | ms=360000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node tests/u6-legacy-projects.cjs` PASS；`npx vitest run app/api/video/projects` 6 passed；突變拿掉 `.neq("source", …)` → 1 failed，還原 6 passed；`node tests/gate.cjs` ok；`npx tsc --noEmit` 0 | exit=0 | ms=200000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（Codex `2026-11-16-review-76ec2b20`：只在前端篩會被 100 筆上限截掉 → 改伺服器排除）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=excludeSource | hits=6
+[剩餘風險] 未用登入瀏覽器看專案頁（同續8、續9）。 [rollback] `git revert 688d397a5` 後兩邊重新部署。
+- AUTO_TASK_DONE: U6.6
 ## 2026-11-16（續9）— 影片工具融合：計畫 §8–§13（操作者實走、片頭接合、一路走到底、一鍵與全自動、兩次自審）、第二次部署、片頭服務上線
 
 **範圍**：`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md`；監工台 `agency-os/handoffs/2026-11-16-video-unify-supervisor/`（29/49）。接續同日續8。
