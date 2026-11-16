@@ -269,6 +269,7 @@ describe("registry claims match the code", () => {
     "app/api/webhooks/meta/route.ts": "auto-reply asks can() for the page asset's org (lib/social/meta-auto-reply.ts)",
     "app/api/internal/video/workbench/usage/route.ts": "video-workbench reports work it delivered; the ask runs inside runForOrg for the billing account its permit named (lib/entitlements/service-usage.ts)",
     "app/api/internal/video/workbench/caption-reburn/route.ts": "video-workbench re-burns edited captions onto a video its own org already owns; no paid ask (lib/content/video/caption-reburn.ts only submits to our render service) -- the closure reaches video.* through videoObjectKey's module",
+    "app/api/internal/video/workbench/quick-render/route.ts": "video-workbench renders an episode from its own org's assets; the paid narration ask (video.tts in render-client.ts submitRender) runs inside runForOrg for that org, as the staff route's withFeature does",
     "app/api/internal/social/dispatch/route.ts": "dispatch-store asks social.dispatch for each post's org (lib/social/dispatch-store.ts)",
     "app/api/content/topics/overview/route.ts": "asks content.plan for each visible site's org only to show 未開通 (grantFor never debits, can.ts:151); the caller is authorized by canAccessOrg per site",
     "app/api/internal/schedules/run-due/route.ts": "each due job runs for its client org (lib/schedules/jobs.ts runCollection({ organizationId })); KB ingest embeds for that org",

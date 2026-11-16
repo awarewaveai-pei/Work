@@ -7,7 +7,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ROUTE = "/api/internal/video/workbench/caption-reburn",
   POLL_MS = 4000,
   POLL_LIMIT_MS = 10 * 60 * 1000;
-const fail = (message, status) => Object.assign(Error(message), status ? { status } : {});
+const { fail, refusal, tryCall, poll } = require("./main-route-vendor.cjs");
 
 // settings { assetId, cues: [{ start, end, text }] in seconds } -> the route's body (whole ms). Checked before the job is
 // accepted; main = backend/main-system.cjs (null in local mode: refused, nothing to burn onto).
@@ -28,15 +28,6 @@ function request(input, main) {
   };
 }
 
-function sleep(ms, signal) {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) return reject(signal.reason);
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener("abort", () => (clearTimeout(timer), reject(signal.reason)), { once: true });
-  });
-}
-const refusal = (what, r) => fail(what + "：" + String(r.value?.error || "HTTP " + r.status).slice(0, 200));
-
 // Submits one render-service job per ratio, then polls each until done. Answers { assetId, ratios }.
 async function run(input, { main, signal, onRemoteJobs = () => {} }) {
   const { assetId, cues } = request(input, main), organizationId = main.organizationId();
@@ -44,23 +35,20 @@ async function run(input, { main, signal, onRemoteJobs = () => {} }) {
   if (!submitted.ok || submitted.value.ok !== true || !Array.isArray(submitted.value.jobs) || !submitted.value.jobs.length) throw refusal("主系統拒絕重燒字幕", submitted);
   const jobs = submitted.value.jobs;
   onRemoteJobs(jobs);
-  const pending = new Set(jobs.map((j) => j.jobId)), deadline = Date.now() + POLL_LIMIT_MS;
-  while (pending.size) {
-    await sleep(POLL_MS, signal);
-    if (Date.now() > deadline) throw fail("重燒字幕逾時（超過 10 分鐘）");
-    for (const job of jobs) {
-      if (!pending.has(job.jobId)) continue;
-      let r;
-      try {
-        r = await main.call(ROUTE, { method: "POST", body: { organizationId, assetId: job.assetId, jobId: job.jobId }, signal, timeoutMs: 120000 });
-      } catch (e) {
-        if (signal.aborted) throw e;
-        continue; // transient network error: poll again
+  const pending = new Set(jobs.map((j) => j.jobId));
+  await poll({
+    signal, everyMs: POLL_MS, limitMs: POLL_LIMIT_MS, timeout: "重燒字幕逾時（超過 10 分鐘）",
+    step: async () => {
+      for (const job of jobs) {
+        if (!pending.has(job.jobId)) continue;
+        const r = await tryCall(main, ROUTE, { method: "POST", body: { organizationId, assetId: job.assetId, jobId: job.jobId }, signal, timeoutMs: 120000 });
+        if (!r) continue; // transient network error: poll again
+        if (!r.ok || r.value.ok !== true || r.value.status === "error") throw refusal("重燒字幕失敗", r);
+        if (r.value.status === "done") pending.delete(job.jobId);
       }
-      if (!r.ok || r.value.ok !== true || r.value.status === "error") throw refusal("重燒字幕失敗", r);
-      if (r.value.status === "done") pending.delete(job.jobId);
-    }
-  }
+      return !pending.size;
+    },
+  });
   return { assetId, ratios: jobs.length };
 }
 

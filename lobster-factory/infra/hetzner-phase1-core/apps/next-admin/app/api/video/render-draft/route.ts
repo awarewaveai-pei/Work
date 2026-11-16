@@ -17,7 +17,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import type { VideoServiceCapability } from "@/lib/content/video/render-client";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { thenRun, withFeature } from "@/lib/entitlements/grant";
@@ -112,28 +111,10 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
   }
 
-  // Major: validate all asset URLs to our known origins — prevents using EU box as open fetch-proxy.
-  // Assets come from: R2 designs bucket public base OR Pexels CDN. 多格式時驗每格式每張。
-  const { getDesignsPublicBase } = await import("@/lib/storage/r2");
-  const r2PublicBase = getDesignsPublicBase();
-  const R2_VIDEO_PUBLIC_BASE = (process.env.R2_VIDEO_PUBLIC_BASE ?? "").replace(/\/+$/, "");
-  const ALLOWED_HOSTS = new Set<string>([
-    new URL(r2PublicBase).hostname,
-    ...(R2_VIDEO_PUBLIC_BASE ? [new URL(R2_VIDEO_PUBLIC_BASE).hostname] : []),
-    "images.pexels.com",
-    "videos.pexels.com",
-    "player.vimeo.com",  // Pexels API 舊影片 host（Vimeo-sourced clips）
-  ]);
-  for (const url of allUrls) {
-    try {
-      const h = new URL(url).hostname;
-      if (!ALLOWED_HOSTS.has(h)) {
-        return NextResponse.json({ ok: false, error: `imageUrl 非允許的素材來源：${h}` }, { status: 400 });
-      }
-    } catch {
-      return NextResponse.json({ ok: false, error: `imageUrl 格式無效：${url}` }, { status: 400 });
-    }
-  }
+  // Major: validate all asset URLs to our known origins — prevents using EU box as open fetch-proxy. 多格式時驗每格式每張。
+  const { renderAssetHostError, submitDraftRender } = await import("@/lib/content/video/draft-render");
+  const hostError = await renderAssetHostError(allUrls);
+  if (hostError) return NextResponse.json({ ok: false, error: hostError }, { status: 400 });
 
   // Major: don't trust client r2Keys for deletion — re-derive from all R2 imageUrls.
   // Only paths matching buildDesignKey format (designs/YYYY-MM/<uuid>.<ext>) should be deleted.
@@ -151,73 +132,21 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   const submit = async (): Promise<Response> => {
-    const { createJob, finishJob } = await import("@/lib/content/video/job-store");
-
-    // 收斂到 video/render 積木（D 接線）：本 route 仍負責素材 host 白名單 + r2Keys 重導（安全閘），
-    // 僅把「提交 EU 渲染」這步委派給積木（submitRender 的單一入口）。
-    await import("@/lib/content/blocks/register-all");
-    const { byId } = await import("@/lib/content/blocks/registry");
-    const render = byId("video/render");
-    if (!render) {
-      return NextResponse.json({ ok: false, error: "video/render 積木未註冊" }, { status: 500 });
-    }
-    const sub = (await render.run({
-      scenes: scenes.map((s) => ({ id: s.id, narration: s.narration })),
-      // 多格式 → 傳 formatAssets+formats（EU 原生多格式）；否則舊單組 assets。
+    const sub = await submitDraftRender({
+      organizationId: orgId,
+      scenes,
       ...(useMulti ? { formatAssets: urlGroups, formats: bodyFormats } : { assets: imageUrls }),
       title,
-      organizationId: orgId,   // 積木用來組帶租戶身分的 out_name
       ttsProvider: body.ttsProvider,
       ttsVoice: body.ttsVoice,
       introTitle: body.introTitle,
       introDuration: body.introDuration,
-    })) as
-      | { ok: true; jobId: string; serviceCapability?: VideoServiceCapability }
-      | { ok: false; status: number; error: string };
-
-    if (!sub.ok) {
-      const err = sub as { ok: false; status: number; error: string };
-      return NextResponse.json({ ok: false, error: err.error }, { status: err.status });
-    }
-
-    // orgId 已在提交 EU 之前解析（見上方 effectiveOrgId 區塊），此處寫進列 → /api/video/status
-    // 的租戶閘有東西可讀（同 generate route；不可改用稍後的 recordParams，理由見 job-store.ts）。
-    let job: Awaited<ReturnType<typeof createJob>>;
-    try {
-      job = await createJob(orgId);
-    } catch (e: unknown) {
-      // EU 渲染已於上方 render.run() 提交，這裡失敗＝「算力已花但沒有進度票」。刻意不試圖取消 EU：
-      // 影片仍會落到 R2。**後盾只在 orgId 非 null 時成立** —— 那時 out_name 帶 org 前綴
-      // （:147 傳入），對帳 sweep 反解得出擁有者並補記（reconcile.ts:95-98）；orgId 為 null 時
-      // out_name 走 `noorg_` 分支，sweep 一律 fail-closed 跳過，影片會成為永久孤兒。
-      // 另：本輪 r2Keys 也不會被 /status 清理（無 job 可掛），留給既有的 age-based 清理。
-      // 回 500 讓失敗可見，不假裝成功。
-      console.error("[video/render-draft] createJob failed (EU render already submitted):", e);
-      return NextResponse.json(
-        { ok: false, error: "無法建立影片工作（job 儲存失敗）；渲染仍在進行，稍後可於歷史紀錄查看" },
-        { status: 500 },
-      );
-    }
-    await finishJob(job.id, {
-      status: "running",
-      euJobId: sub.jobId,
       r2Keys,
-      recordParams: orgId
-        ? {
-            title,
-            sceneCount: scenes.length,
-            rightsSources: rightsSourcesFor(allUrls, body.assetOrigins),
-            script: scenes.map((s) => s.narration).join("\n"),
-            organizationId: orgId,
-            formats: useMulti ? bodyFormats : undefined,
-            source: "draft",
-            serviceCapability: sub.serviceCapability,
-            ...(projectId ? { projectId } : {}),
-          }
-        : undefined,
+      rightsSources: rightsSourcesFor(allUrls, body.assetOrigins),
+      ...(projectId ? { projectId } : {}),
     });
-
-    return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
+    if (sub.ok === false) return NextResponse.json({ ok: false, error: sub.error }, { status: sub.status });
+    return NextResponse.json({ ok: true, jobId: sub.jobId }, { status: 202 });
   };
   // Paid narration is billed to the video's org (ADR 017 §0 代操), the one render-client meters; other voices ask nothing.
   return body.ttsProvider === "openai" ? withFeature("video.tts", thenRun, { org: () => orgId })(req, submit) : submit();

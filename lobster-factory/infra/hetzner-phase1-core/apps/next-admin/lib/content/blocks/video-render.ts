@@ -4,7 +4,7 @@
  * 薄包裝 submitRender（單一 SSOT）。吃 `video/prepare` 輸出的場景 + 素材；渲染在 EU 背景 thread 跑、
  * 由 /api/video/status 輪詢收尾（next-admin 不做背景工作）。
  *
- * 接線狀態（D2）：/api/video/render-draft 已收斂到本積木（byId("video/render").run）委派提交。
+ * 接線狀態（D2）：/api/video/render-draft 與工作台快速輸出經 lib/content/video/draft-render.ts 收斂到本積木（byId("video/render").run）。
  * /api/video/generate 仍走 video/pipeline 複合積木（內含 submitRender）。
  */
 import { register, type BlockCtx } from "./registry";

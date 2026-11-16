@@ -39,6 +39,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // Plan U7: work that sends a client's sound out asks the client's setting first (backend/audio-policy.cjs).
   const audioPolicy = require("./audio-policy.cjs"), soundPolicy = audioPolicy.createAudioPolicy({ main, orgId });
   const captionReburn = require("./caption-reburn.cjs");
+  const quickRender = require("./quick-render.cjs"); // plan U5 快速輸出
   fs.mkdirSync(dataDir, { recursive: true });
   const outputs = path.join(dataDir, "generated");
   fs.mkdirSync(outputs, { recursive: true });
@@ -645,6 +646,23 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         persist();
         return;
       }
+      if (job.input.operation === "quick-render") {
+        job.status = "running";
+        persist();
+        const result = await quickRender.run(job, {
+          main, fetchImpl, mediaStore, signal,
+          onRemoteJob: (id) => {
+            job.quickRenderJobId = id; // shown in the job record
+            persist();
+          },
+        });
+        if (signal.aborted) return;
+        job.result = result; // registered by the main system itself: settle() finds the row (main.adopt)
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        return;
+      }
       if (job.input.operation === "remotion-template") {
         job.status = "running";
         persist();
@@ -1094,7 +1112,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     const op = input?.operation;
     if (videoEnhance.isAi(input)) return videoEnhance.TIMEOUT_MS;
     if (op === "music") return 900000; // a 5-minute Eleven song is made in one request
-    return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? hostTranscribeTimeout(input) : op === "remotion-template" || op === "caption-reburn" ? 780000 : 600000;
+    return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? hostTranscribeTimeout(input) : op === "remotion-template" || op === "caption-reburn" ? 780000 : op === "quick-render" ? quickRender.POLL_LIMIT_MS + 300000 : 600000;
   }
   // 破框's inputs, decided before the permit and any paid call by the readers finishing uses: the first frame decodes
   // (breakout.decodePng), and the lock mask -- sent with this job, or a retry's copy from the job it reruns -- passes
@@ -1144,6 +1162,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       isRemoveBg = input.operation === "remove-bg",
       isRemotion = input.operation === "remotion-template",
       isReburn = input.operation === "caption-reburn",
+      isQuick = input.operation === "quick-render",
       isBlender = blender3d().operations.includes(input.operation),
       isImageTo3d = input.operation === "image-to-3d",
       isTranscribe = input.operation === "editor-transcribe",
@@ -1164,17 +1183,19 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             ? (remotion.request(input, mediaReference), { type: "video" })
             : isReburn
               ? (captionReburn.request(input, main), { type: "video" })
-              : jobInput(input);
+              : isQuick
+                ? (quickRender.request(input, main), { type: "video" })
+                : jobInput(input);
     if (videoEnhance.isAi(input)) {
       await aiEnhanceSource(input);
       videoEnhance.token(env);
     }
-    const videoModel = !isMedia && !isRemotion && !isReburn && !isBlender && !isImageTo3d && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
+    const videoModel = !isMedia && !isRemotion && !isReburn && !isQuick && !isBlender && !isImageTo3d && !isTranscribe && parsed.type === "video" ? generationPolicy.videoModelOf(input, env) : null;
     if (videoModel) generationPolicy.videoVendor(videoModel.provider).token(env);
     else if (isMusic) music.key(music.pick(input.musicModel, env), env);
     else if (parsed.type === "audio" && !isMedia) speech.key(speech.pick(input.speechModel, env), env);
     else if (editModel) imageEdit.key(editModel, env);
-    else if (!isMedia && !isRemoveBg && !isRemotion && !isReburn && !isBlender && !isImageTo3d && !isTranscribe) key();
+    else if (!isMedia && !isRemoveBg && !isRemotion && !isReburn && !isQuick && !isBlender && !isImageTo3d && !isTranscribe) key();
     // paidFeature on the job: the retry button prices a rerun from it (shared/paid-price.js); the permit needs main.
     const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
