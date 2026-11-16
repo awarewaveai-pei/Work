@@ -394,6 +394,8 @@ export async function buildSceneAsset(
   const forcePexelsVideo = opts.imageModel === "pexels-video";
   const forcePexels = opts.imageModel === "pexels-all";
   const fluxModel = (!opts.imageModel || opts.imageModel === "pexels-all" || opts.imageModel === "pexels-video") ? "flux-schnell" : opts.imageModel;
+  // An explicit Pexels mode never becomes a paid AI picture -- also without the key (same rule as a failed search below).
+  if ((forcePexels || forcePexelsVideo) && !pexelsKey) return { ok: false, status: 503, error: "PEXELS_API_KEY 未設定，無法搜尋圖庫" };
 
   // pexels-video 模式：抓 Pexels 影片片段（MP4 URL → EU stream_loop）
   if (forcePexelsVideo && pexelsKey) {

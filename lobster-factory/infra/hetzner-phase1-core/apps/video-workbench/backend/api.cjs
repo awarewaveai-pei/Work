@@ -26,6 +26,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const music = require("./music.cjs");
   const audioTools = require("./audio-tools.cjs"), elevenlabs = require("./elevenlabs.cjs");
   const imageEdit = require("./image-edit.cjs");
+  const urlImport = require("./url-import.cjs");
   const chunkBytes = (engine) => Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || engine.uploadBytes;
   const transcriptsDir = path.join(dataDir, "transcripts");
   // Per-request spend of the sync paid routes (text, transcription): each handler call runs in its own meter.
@@ -115,10 +116,11 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   };
   const chunkedType = (type) => Object.hasOwn(UPLOAD_EXT, type) && !type.startsWith("image/");
   // One library upload (bytes from /uploads or a joined chunked file): stored, registered, answered in one shape.
-  async function storeUpload({ type, buffer, file, size, name, rightsConfirmed }) {
+  // Card U4: a URL import (POST /stock/import) is stored the same way and names its own origin.
+  async function storeUpload({ type, buffer, file, size, name, rightsConfirmed, origin = { kind: "upload", rightsConfirmed: rightsConfirmed === true } }) {
     const ext = UPLOAD_EXT[type], kind = ext === "glb" ? "model" : ext === "bvh" ? "motion" : type.split("/")[0];
     const stored = kind === "image" ? { id: crypto.randomUUID(), url: output(buffer, ext) } : await mediaStore.ingest({ buffer, file, ext });
-    return registered({ ...stored, origin: { kind: "upload", rightsConfirmed: rightsConfirmed === true },
+    return registered({ ...stored, origin,
       name: String(name || { model: "3D 模型", motion: "動作" }[kind] || "素材"), kind, type, size });
   }
   const mirror = (job) => main?.mirror(job, (e) => {
@@ -1833,14 +1835,19 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         const input = await body(req);
         json(res, 200, await require("./product-inspect.cjs").inspect(input.url)); return true;
       }
+      // URL imports (backend/url-import.cjs): a shop's picture from any public host; a stock image or clip only from the
+      // stock hosts (card U4: Pexels, recorded as Pexels).
       if (req.method === "POST" && route === "/products/image") {
         const input = await body(req);
-        const image = await require("./product-inspect.cjs").publicGet(input.url, { maxBytes: 8000000, accept: ["image/png", "image/jpeg", "image/webp"] });
-        const ext = image.contentType === "image/jpeg" ? "jpg" : image.contentType.split("/")[1];
-        const bytes = image.bytes;
-        const valid = ext === "png" ? bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) : ext === "jpg" ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 : bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
-        if (!valid) throw Error("商品圖片格式不正確，請改用本機上傳");
-        json(res, 201, await registered({ name: "商品參考圖", kind: "image", type: image.contentType, url: output(bytes, ext), origin: { kind: "import" } })); return true;
+        const image = await urlImport.fetchMedia(input.url, { kinds: ["image"] });
+        json(res, 201, await registered({ name: "商品參考圖", kind: "image", type: image.type, url: output(image.bytes, image.ext), origin: { kind: "import" } })); return true;
+      }
+      if (req.method === "POST" && route === "/stock/import") {
+        const input = await body(req);
+        const got = await urlImport.fetchMedia(input.url, { kinds: ["image", "video"], hosts: urlImport.stockHosts() });
+        json(res, 201, await storeUpload({ type: got.type, buffer: got.bytes, size: got.bytes.length, name: String(input.name || "圖庫素材").slice(0, 120),
+          origin: { kind: "pexels", sourceRef: String(input.url) } }));
+        return true;
       }
       throw Object.assign(Error("找不到服務"), { status: 404 });
     } catch (e) {

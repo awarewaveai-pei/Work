@@ -231,6 +231,14 @@
       }
       return true;
     }
+    // Card U4: a picture from the library or the stock search onto one shot; children never write a shot's picture.
+    if (action === "spine-set-shot") {
+      if (!Spine?.setShot(db.projects, payload)) throw new Error("找不到這個鏡頭");
+      await persistRedo(() => Spine.setShot(db.projects, payload));
+      broadcast();
+      document.dispatchEvent(new CustomEvent("vw:changed"));
+      return true;
+    }
     if (action === "spine-open") {
       const index = db.projects.find((p) => p.id === payload.projectId)?.episodes.findIndex((e) => e.id === payload.episodeId) ?? -1;
       if (index < 0) throw new Error("找不到這一集");
@@ -730,9 +738,9 @@
     navigate: (target) =>
       child ? rpc("navigate", { target }) : perform("navigate", { target }),
     // Card PJ.1: the episode spine's actions; children ask the top page, which alone changes spine fields.
-    // Card PJ.2 adds settle(job).
+    // Card PJ.2 adds settle(job); card U4 setShot.
     spine: Object.fromEntries(
-      [["attachEdit", "spine-attach-edit"], ["open", "spine-open"], ["settle", "spine-settle"]].map(([name, action]) => [
+      [["attachEdit", "spine-attach-edit"], ["open", "spine-open"], ["settle", "spine-settle"], ["setShot", "spine-set-shot"]].map(([name, action]) => [
         name,
         async (payload = {}) => {
           await ready;

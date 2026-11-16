@@ -1,7 +1,7 @@
 // Local adapter following AwareWave collect/net: validate every redirect and pin
 // the TLS connection to the validated DNS answer. No cookies or credentials.
 const https = require('node:https'), dns = require('node:dns/promises'), net = require('node:net');
-const refused = () => Object.assign(Error('只接受公開 HTTPS 網址；無法讀取時可使用手動商品資料。'), { status: 400 });
+const refused = () => Object.assign(Error('只接受公開 HTTPS 網址'), { status: 400 });
 function publicAddress(address) {
   if (net.isIP(address) === 4) {
     const [a, b] = address.split('.').map(Number);
@@ -17,30 +17,31 @@ async function gate(raw, lookup = dns.lookup) {
   if (!records.length || records.some(r => !publicAddress(r.address))) throw refused();
   return { url, record: records.find(r => r.family === 4) || records[0] };
 }
-async function publicGet(raw, { maxBytes = 2000000, accept = ['text/html', 'application/xhtml+xml'], lookup, request = https.request } = {}) {
-  const deadline = Date.now() + 20000;
+// Shared by the product page and backend/url-import.cjs (card U4), so its messages name no particular site.
+async function publicGet(raw, { maxBytes = 2000000, accept = ['text/html', 'application/xhtml+xml'], timeoutMs = 20000, lookup, request = https.request } = {}) {
+  const deadline = Date.now() + timeoutMs;
   let current = raw;
   for (let hop = 0; hop <= 4; hop++) {
     let timer;
-    const checked = await Promise.race([gate(current, lookup), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('商品網站回應逾時')), Math.max(1, deadline - Date.now())); })]).finally(() => clearTimeout(timer));
-    const remaining = deadline - Date.now(); if (remaining <= 0) throw Error('商品網站回應逾時');
+    const checked = await Promise.race([gate(current, lookup), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('網站回應逾時')), Math.max(1, deadline - Date.now())); })]).finally(() => clearTimeout(timer));
+    const remaining = deadline - Date.now(); if (remaining <= 0) throw Error('網站回應逾時');
     const response = await new Promise((resolve, reject) => {
       const req = request(checked.url, {
         agent: false, headers: { Accept: accept.join(','), 'User-Agent': 'AwareWave-ProductPreview/1.0', 'Accept-Encoding': 'identity' },
         lookup: (_host, options, callback) => options?.all ? callback(null, [checked.record]) : callback(null, checked.record.address, checked.record.family),
       }, res => {
         if ([301, 302, 303, 307, 308].includes(res.statusCode)) { res.destroy(); resolve({ redirect: res.headers.location }); return; }
-        if (res.statusCode !== 200 || !accept.includes(String(res.headers['content-type'] || '').split(';')[0].trim().toLowerCase()) || !['', 'identity'].includes(res.headers['content-encoding'] || '')) { res.destroy(); reject(Error('商品網站未提供可讀取的公開內容；可改用手動輸入。')); return; }
+        if (res.statusCode !== 200 || !accept.includes(String(res.headers['content-type'] || '').split(';')[0].trim().toLowerCase()) || !['', 'identity'].includes(res.headers['content-encoding'] || '')) { res.destroy(); reject(Error('網站未提供可讀取的公開內容')); return; }
         let size = 0; const chunks = [];
-        res.on('data', chunk => { size += chunk.length; if (size > maxBytes) { req.destroy(Error('商品內容過大，請改用手動輸入')); return; } chunks.push(chunk); });
+        res.on('data', chunk => { size += chunk.length; if (size > maxBytes) { req.destroy(Error('內容過大')); return; } chunks.push(chunk); });
         res.on('end', () => resolve({ bytes: Buffer.concat(chunks), contentType: res.headers['content-type'].split(';')[0].trim().toLowerCase(), url: checked.url.href }));
         res.on('error', reject);
       });
-      const timeout = setTimeout(() => req.destroy(Error('商品網站回應逾時')), remaining);
+      const timeout = setTimeout(() => req.destroy(Error('網站回應逾時')), remaining);
       req.on('close', () => clearTimeout(timeout)); req.on('error', reject); req.end();
     });
     if (!('redirect' in response)) return response;
-    if (!response.redirect || hop === 4) throw Error('商品網站轉址次數過多');
+    if (!response.redirect || hop === 4) throw Error('轉址次數過多');
     current = new URL(response.redirect, checked.url).href;
   }
 }

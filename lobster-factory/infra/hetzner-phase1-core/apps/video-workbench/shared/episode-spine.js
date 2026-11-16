@@ -151,6 +151,33 @@
     return out;
   }
 
+  // What a shot shows = its newest picture. A new still replaces the moving version made from the old one (that version
+  // stays in the episode's steps); a new video plays over the still it was made from -- only while that still is the
+  // shot's picture (madeFrom = the shot's key the job was sent with): a video of a replaced still stays a step only.
+  function land(shot, output, madeFrom) {
+    if (!shot) return;
+    if (output.kind === "video" && madeFrom != null && shot.image !== madeFrom) return;
+    if (output.kind === "image") {
+      shot.image = output.url;
+      delete shot.video;
+    }
+    if (output.kind === "video") shot.video = output.url;
+  }
+  // Card U4: a picture put on a shot without a job (換圖 from the library, 圖庫素材) -- one step without a job (spec §1.2
+  // Step.id), landed like a job's. Same in-place contract as settle; false = no such shot.
+  function setShot(projects, { projectId, episodeId, shotId, url, assetId = null, kind, tool }) {
+    const episode = (projects || []).find((p) => p.id === projectId)?.episodes?.find((e) => e.id === episodeId),
+      shot = (episode?.shots || []).find((s) => s?.id === shotId);
+    if (!shot || typeof url !== "string" || !url || !["image", "video"].includes(kind)) return false;
+    const output = { url, assetId: assetId ?? null, kind };
+    episode.steps = [
+      ...(episode.steps || []),
+      { id: newId(), step: "shot", tool: tool ?? null, jobId: null, from: [], sources: [...localUrls(url)], settings: {}, target: "shot:" + shotId, output, at: new Date().toISOString() },
+    ];
+    land(shot, output);
+    return true;
+  }
+
   // A succeeded job whose input.link names an existing episode becomes one Step of it and lands on its target
   // (spec §2 PJ.2 settle rules 1-6). Changes `projects` in place; true = changed. The same job twice changes nothing,
   // so the job panel and the top page's reconcile may both call it.
@@ -170,11 +197,8 @@
       ...(episode.steps || []),
       { id: job.id, step: link.step ?? TOOL_STEP[link.tool] ?? null, tool: link.tool ?? null, jobId: job.id, from, sources: [...localUrls(job.input)], settings, target, output, at },
     ];
-    if (typeof target === "string" && target.startsWith("shot:")) {
-      const shot = (episode.shots || []).find((s) => s?.id === target.slice(5));
-      if (shot && output.kind === "image") shot.image = output.url;
-      if (shot && output.kind === "video") shot.video = output.url;
-    } else if (target === "output")
+    if (typeof target === "string" && target.startsWith("shot:")) land((episode.shots || []).find((s) => s?.id === target.slice(5)), output, from.find((f) => f.slot === target)?.key);
+    else if (target === "output")
       // derivedFrom = the cut it was made from (its "export" source, spec §1.3 example); an export from the edit has none.
       episode.outputs = [
         ...(episode.outputs || []),
@@ -287,7 +311,7 @@
     ];
   }
 
-  const api = { editId, editTitle, adopt, keepSpine, findByEdit, TOOL_STEP, settle, current, isStale, staleClip, outputStale, lineage, stepStates };
+  const api = { editId, editTitle, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, current, isStale, staleClip, outputStale, lineage, stepStates };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

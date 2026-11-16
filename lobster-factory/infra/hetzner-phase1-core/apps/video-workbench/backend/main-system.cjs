@@ -113,8 +113,10 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
       }
       return out;
     }
+    // Card U4: a stock file keeps its Pexels page as its rights source (next-admin asset-origin.ts AssetOrigin "pexels").
     const own = origin.kind === "ai_generated"
       ? { kind: "ai_generated", model: String(origin.model || ""), provider: String(origin.provider || "") }
+      : origin.kind === "pexels" ? { kind: "pexels", sourceRef: String(origin.sourceRef || "") }
       : { kind: "upload", rightsConfirmed: origin.rightsConfirmed === true };
     const { rightsSourcesFromOrigins } = await contract("lib/content/video/asset-origin.ts");
     return rightsSourcesFromOrigins([url], { [url]: own });
@@ -145,7 +147,7 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
     if (index[url] && !(origin?.kind === "upload" && origin.rightsConfirmed === true && sentUnconfirmed)) return { ...index[url], existing: true };
     const ext = path.extname(file || "").slice(1).toLowerCase(), mime = MIME[ext];
     if (!mime) return { skipped: "unsupported_type" };
-    const domain = { ai_generated: "ai_generated", render: "workbench_render", upload: "real_footage", import: "real_footage" }[origin?.kind];
+    const domain = { ai_generated: "ai_generated", render: "workbench_render", upload: "real_footage", import: "real_footage", pexels: "real_footage" }[origin?.kind];
     if (!domain) throw fail("資產來源不明，無法登記到主系統", 502);
     const srcs = [...sources].filter((s) => s !== url);
     const meta = { rightsSources: await rightsFor(url, origin, srcs) };
