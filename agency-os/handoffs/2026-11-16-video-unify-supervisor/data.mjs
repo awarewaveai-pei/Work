@@ -7,7 +7,7 @@ export const META = {
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-16',
   self: 'agency-os/handoffs/2026-11-16-video-unify-supervisor/',
-  url: 'https://claude.ai/artifact/44ZLNFx32ZtLhQniaM79S5',
+  url: 'https://claude.ai/artifact/Gq8RK8udeJR2SGvmjKpQr2', // 這個帳號的頁；前一個帳號的頁 44ZLNFx32ZtLhQniaM79S5 無權更新（2026-11-16）,
 };
 
 export const COPY = {
