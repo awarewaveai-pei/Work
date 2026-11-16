@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-16（續4）內建曲庫試聽結果：106 首全部保留，拿掉 a006／a007／a008「待人工試聽」註記
+
+- 做了什麼：操作者用 `.data/library/試聽清單.html` 試聽後回覆「不刪 不換」。`assets/audio-library.json` 拿掉 a006 城市街景、a007 咖啡廳、a008 人群的 note；音檔不變，正式站 `/data/library` 不用補放檔案。
+- 同步：`agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/progress-ed6.md` 改成試聽結果；監工的 `risk-audit-20261115.md:22`（R5）由監工自己結案，worker 沒有改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/import-audio-library.cjs → ITEMS 106 MISSING 0（沒有重轉；清單 JSON 有效） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=待人工試聽 | hits=2
+- BUGHUNT_SCOPE_NARROW: 兩個命中是交接文件（progress-ed6.md 已改、risk-audit 屬監工）；程式與測試沒有依賴 note
 ## 2026-11-16（續3）— R2：字型下載成敗只看收到的檔對不對，不看網速（沒收到資料才算逾時＋Range 續傳）
 
 - 根因：`scripts/vendor-fonts.cjs` 每次嘗試限 300 秒下完整個檔、最多 3 次；筆電連 GitHub raw 實測 24.5 KB/s 時 NotoSerifCJKtc-Bold.otf（25.5 MB）需約 1,040 秒，必然逾時 → 乾淨 checkout 跑 gate 紅 5 項（`agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/risk-audit-20261115.md` R2 列）。
