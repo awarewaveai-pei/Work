@@ -20,7 +20,8 @@ source_session_summary: "監工派工 U0–U11（舊影片工具併進影音工�
   - 2026-11-16 第二次部署 next-admin＋video-workbench（fb790d851）：U3 `fb790d851`、U5 commit 2 `dab070ccd`、U6 `58050a441` 上線，smoke 全過；尚未用登入的瀏覽器實點。
   - 計畫 §8（操作者實走舊流程 20 列）＝U11 驗收表；新增項 U4.5、U8.3、U8.4。
   - U8.4 已上線（646f1698b）：remotion-service 從 repo 重建（映像 23e2a2344a8e，回滾 tag `rollback-20261116`），compose `/root/render-services/docker-compose.yml` 加卷 `lobster-remotion-jobs`（備份 `.bak.safe-patch-20261116-071735`）；實送一支 86 s done、峰值 627 MiB、restarts=0。步驟檔 `u8-4-deploy-steps.md`。
-  - 監工台 29/39。剩：U8.3、U4.4、U4.5、U2.3、U5 commit 3、U9（含 U3 留下的角色綁定兩件）、U11。
+  - 計畫 §9（片頭接進主片：自動接成一支＋轉場、成片卡編輯／重生／加入）＝新項 U5.4、U5.5、U8.5，U5.3 對話框一起做。
+  - 監工台 29/42。剩：U5.4、U5.5、U8.5、U8.3、U4.4、U4.5、U2.3、U5 commit 3、U9（含 U3 留下的角色綁定兩件）、U11。
 - risks 清查：`agency-os/handoffs/2026-11-16-video-unify-supervisor/risk-triage-u0-u1-u4-u7.md`（在 `D:\Work`，未 commit）— 現在修 0、後面卡處理 4、不用處理 21。
 - `D:\Work` 落後根因已修（`scripts/git-parity-merge.py`：上游舊快照規則＋eol=crlf 檔由 git 寫回），`D:\Work` 已 0/0。
 
