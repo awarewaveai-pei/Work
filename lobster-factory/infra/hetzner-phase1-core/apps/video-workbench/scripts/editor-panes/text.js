@@ -13,15 +13,22 @@ function edTitleBlocked(p) {
     return "片頭模板不支援 " + p.ratio + " 比例";
   if (!edTitleFps.includes(Timebase.fps(p.timebase)))
     return "片頭模板只支援 24、25、30、60 fps";
-  if (!ed.title.image) return "請先選一張背景圖";
-  return "";
+  const missing = (edTitleTemplate()?.fields || []).find((f) => f.required && edTitleMedia(f) && !ed.title.picks[f.key]);
+  return missing ? "請先選「" + missing.label + "」" : "";
 }
+const edTitleMedia = (f) => f.type === "image" || f.type === "audio",
+  edTitleSeconds = (t) => ed.title.seconds ?? t.seconds.def;
 async function edTitleRefresh() {
   const rows = await VideoWorkbench.assets.list();
   ed.title.images = rows.filter(
     (a) =>
       VideoWorkbench.mediaKind(a) === "image" &&
       /^\/(generated|media)\/[^?#]+\.(png|jpe?g|webp)$/i.test(a.url || ""),
+  );
+  ed.title.audios = rows.filter(
+    (a) =>
+      VideoWorkbench.mediaKind(a) === "audio" &&
+      /^\/(generated|media|library)\/[^?#]+\.(mp3|wav|m4a|ogg)$/i.test(a.url || ""),
   );
   ed.title.done = ed.title.jobId
     ? rows.find((a) => a.id === "job-" + ed.title.jobId) || null
@@ -34,9 +41,11 @@ function edTitlePane(p) {
     ed.title = {
       templateId: null,
       fields: {},
-      image: null,
+      picks: {},
+      seconds: null,
       jobId: null,
       images: null,
+      audios: null,
       done: null,
       projectId: p.id,
     };
@@ -45,28 +54,43 @@ function edTitlePane(p) {
     list = VideoWorkbench.capabilities?.remotionTemplates || [];
   if (!ed.title.images) {
     ed.title.images = [];
+    ed.title.audios = [];
     edTitleRefresh().catch(VideoWorkbench.reportError);
   }
-  return `<h3>片頭</h3><p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}），長度 5 秒。</p><div class="flow-choices">${list
+  // One control per field of the template's table (backend/remotion.cjs): text, number, colour, or a library picker.
+  const control = (f) => {
+    const label = esc(f.label) + (f.required ? "" : '<span class="note">（選填）</span>');
+    if (f.type === "image" || f.type === "audio") {
+      const rows = f.type === "image" ? ed.title.images : ed.title.audios,
+        picked = ed.title.picks[f.key];
+      return `<p class="note">${label}（從素材庫選擇）</p><div class="flow-choices" role="group" aria-label="${esc(f.label)}">${f.required ? "" : `<button type="button" class="btn small ${picked ? "" : "selected"}" data-ed-action="title-pick:${esc(f.key)}:" aria-pressed="${!picked}">不使用</button>`}${
+        rows
+          .map((a) => {
+            const on = picked?.id === a.id,
+              name = esc(a.name || (f.type === "image" ? "圖片" : "音樂"));
+            return `<button type="button" class="btn small ${on ? "selected" : ""}" data-ed-action="title-pick:${esc(f.key)}:${esc(a.id)}" aria-pressed="${on}" title="${name}">${f.type === "image" ? `<img src="${esc(a.thumbUrl || a.url)}" alt="${name}" width="64" height="40" style="object-fit:cover">` : name}</button>`;
+          })
+          .join("") || `<span class="note">素材庫沒有${f.type === "image" ? "圖片" : "音樂"}，請先上傳。</span>`
+      }</div>`;
+    }
+    const attrs = `class="text-input" aria-label="${esc(f.label)}" data-ed-title-field="${esc(f.key)}"`,
+      value = esc(ed.title.fields[f.key] ?? "");
+    return `<label>${label}${
+      f.multiline
+        ? `<textarea ${attrs} maxlength="${f.max}">${value}</textarea>`
+        : f.type === "number"
+          ? `<input ${attrs} type="number" min="${f.min}" max="${f.max}" step="1" value="${value}">`
+          : `<input ${attrs} maxlength="${f.type === "color" ? 7 : f.max}" value="${value}">`
+    }</label>`;
+  };
+  return `<h3>片頭</h3><p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}）。</p><div class="flow-choices">${list
     .map(
       (x) =>
         `<button type="button" class="btn small ${x.id === t?.id ? "selected" : ""}" data-ed-action="title-template:${esc(x.id)}" aria-pressed="${x.id === t?.id}">${esc(x.label)}</button>`,
     )
-    .join("")}</div>${(t?.fields || [])
-    .map(
-      (f) =>
-        `<label>${esc(f.label)}<input class="text-input" aria-label="${esc(f.label)}" data-ed-title-field="${esc(f.key)}" maxlength="${f.max}" value="${esc(ed.title.fields[f.key] ?? "")}"></label>`,
-    )
-    .join("")}${
+    .join("")}</div>${
     t
-      ? `<p class="note">${esc(t.image.label)}（從素材庫選擇）</p><div class="flow-choices">${
-          ed.title.images
-            .map(
-              (a) =>
-                `<button type="button" class="btn small ${ed.title.image?.id === a.id ? "selected" : ""}" data-ed-action="title-image:${esc(a.id)}" aria-pressed="${ed.title.image?.id === a.id}" title="${esc(a.name || "圖片")}"><img src="${esc(a.thumbUrl || a.url)}" alt="${esc(a.name || "圖片")}" width="64" height="40" style="object-fit:cover"></button>`,
-            )
-            .join("") || '<span class="note">素材庫沒有圖片，請先上傳。</span>'
-        }</div>`
+      ? `<label>長度（秒，${t.seconds.min}–${t.seconds.max}）<input class="text-input" type="number" aria-label="片頭長度（秒）" data-ed-title-seconds min="${t.seconds.min}" max="${t.seconds.max}" step="1" value="${edTitleSeconds(t)}"></label>${t.fields.map(control).join("")}`
       : ""
   }<button type="button" class="btn primary small" data-ed-action="title-generate" ${blocked ? "disabled" : ""}>產生片頭（免費）</button>${blocked ? `<p class="note" data-ed-title-blocked>${esc(blocked)}</p>` : ""}${ed.title.done ? edButton("放到時間軸開頭", "title-insert") : ""}`;
 }
@@ -282,12 +306,21 @@ edRegisterPane("text", {
     },
     "title-template:": async (action, p, c) => {
       ed.title.templateId = action.slice(15);
+      ed.title.seconds = null;
       edRender();
       return;
     },
-    "title-image:": async (action, p, c) => {
-      ed.title.image =
-        ed.title.images?.find((a) => String(a.id) === action.slice(12)) || null;
+    // title-pick:<field key>:<asset id>; an empty id clears an optional field.
+    "title-pick:": async (action, p, c) => {
+      const rest = action.slice(11),
+        cut = rest.indexOf(":"),
+        key = rest.slice(0, cut),
+        id = rest.slice(cut + 1),
+        field = edTitleTemplate()?.fields.find((f) => f.key === key),
+        pick = (field?.type === "audio" ? ed.title.audios : ed.title.images).find((a) => String(a.id) === id);
+      if (!field) return;
+      if (pick) ed.title.picks[key] = pick;
+      else delete ed.title.picks[key];
       edRender();
       return;
     },
@@ -302,12 +335,15 @@ edRegisterPane("text", {
         settings: {
           templateId: t.id,
           fields: Object.fromEntries(
-            t.fields.map((f) => [f.key, String(ed.title.fields[f.key] || "")]),
+            t.fields.filter((f) => !edTitleMedia(f)).map((f) => [f.key, String(ed.title.fields[f.key] || "")]),
           ),
+          seconds: edTitleSeconds(t),
           ratio: p.ratio,
           fps: Timebase.fps(p.timebase),
         },
-        references: { image: { url: ed.title.image.url, id: ed.title.image.id } },
+        references: Object.fromEntries(
+          t.fields.filter((f) => ed.title.picks[f.key]).map((f) => [f.key, { url: ed.title.picks[f.key].url, id: ed.title.picks[f.key].id }]),
+        ),
       });
       ed.title.jobId = job.id;
       ed.title.done = null;
@@ -329,6 +365,9 @@ edRegisterPane("text", {
       return;
     },
   },
+});
+document.addEventListener("input", (e) => {
+  if (e.target.matches?.("[data-ed-title-seconds]")) ed.title.seconds = e.target.value === "" ? null : Number(e.target.value);
 });
 // Search box: filter the grid, keep the caret.
 document.addEventListener("input", (e) => {

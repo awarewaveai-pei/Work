@@ -31,14 +31,14 @@ const pass = (label) => {
 };
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 // Fake remotion-service: statuses = what successive GET /status answers return (last one repeats).
-function fakeService(statuses) {
+function fakeService(statuses, file = () => mp4) {
   const calls = [];
   let polls = 0;
   const fetchImpl = async (url, init = {}) => {
     calls.push({ url: String(url), init });
     if (url === SERVICE + "/render") return reply({ jobId: "remote-1" });
     if (url === SERVICE + "/status/remote-1") return reply(statuses[Math.min(polls++, statuses.length - 1)]);
-    if (url === "https://r2.test/out.mp4") return new Response(mp4, { status: 200, headers: { "Content-Type": "video/mp4", "Content-Length": String(mp4.length) } });
+    if (url === "https://r2.test/out.mp4") return new Response(file(), { status: 200, headers: { "Content-Type": "video/mp4", "Content-Length": String(file().length) } });
     throw Error("unexpected fetch " + url);
   };
   return { calls, fetchImpl };
@@ -55,7 +55,7 @@ async function upload(base) {
 const titleInput = (image) => ({
   type: "video", operation: "remotion-template", prompt: "片頭",
   settings: { templateId: "scale-bg-text-slideup", fields: { text: "歡迎收看" }, ratio: "16:9", fps: 30 },
-  references: { image: { url: image.url, id: image.id } },
+  references: { imageUrl: { url: image.url, id: image.id } },
 });
 async function wait(base, id, done = ["succeeded", "failed", "cancelled"]) {
   for (let i = 0; i < 400; i++) {
@@ -124,6 +124,62 @@ const configured = { REMOTION_SERVICE_URL: SERVICE, MEDIA_RENDER_AUTH_TOKEN: TOK
     pass("已設定：POST /render 帶 templateId/props/outputFormat/fps 與 X-Render-Token；pending→rendering→done；下載入素材庫、驗證通過、origin engine=remotion＋parentAssetId");
   }
 
+  // (g) card U8: every template renders through the fake service, at a length other than 5 s; picked music is kept in
+  // the output, no music = video stream only; the field table's limits refuse out-of-range input before a job exists.
+  {
+    const media = (f) => f.type === "image" || f.type === "audio",
+      audioWav = make("tone.wav", ["-f", "lavfi", "-i", "sine=f=440:d=3"]);
+    let current;
+    const fake = fakeService([{ status: "done", progress: 100, url: "https://r2.test/out.mp4" }], () => current);
+    const { base, dataDir } = await isolatedServer("vw-remotion-all-", { fetchImpl: fake.fetchImpl, env: configured });
+    const image = await upload(base),
+      sound = await api(base, "/uploads", "POST", { name: "音樂.wav", data: "data:audio/wav;base64," + fs.readFileSync(audioWav).toString("base64") });
+    assert.equal(sound.status, 201, JSON.stringify(sound.body));
+    assert.deepEqual(remotion.catalog.map((t) => t.id), ["scale-bg-text-slideup", "circle-mask-text-slideup-reveal", "pan-slide-text-left-3scenes", "product-review-typewriter", "photo-highlights-slides-zoom"]);
+    for (const t of remotion.catalog) {
+      const seconds = t.id === "scale-bg-text-slideup" ? 8 : t.seconds.def,
+        music = t.id === "scale-bg-text-slideup",
+        audio = music ? ["-f", "lavfi", "-t", seconds + 0.056, "-i", "sine=f=330", "-c:a", "aac"] : ["-f", "lavfi", "-t", seconds + 0.056, "-i", "anullsrc=r=48000:cl=stereo", "-c:a", "aac"];
+      current = fs.readFileSync(make(t.id + ".mp4", ["-f", "lavfi", "-i", "color=c=navy:s=1920x1080:r=24:d=" + seconds, ...audio, "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"]));
+      const sent0 = fake.calls.length,
+        created = await api(base, "/generations", "POST", {
+          type: "video", operation: "remotion-template", prompt: t.label,
+          settings: {
+            templateId: t.id, ratio: "16:9", fps: 24, seconds,
+            fields: Object.fromEntries(t.fields.filter((f) => !media(f)).map((f) => [f.key, f.type === "number" ? "4" : f.type === "color" ? "#336699" : "測試"])),
+          },
+          references: Object.fromEntries(t.fields.filter((f) => f.type === "image" || (music && f.type === "audio")).map((f) => [f.key, f.type === "image" ? { url: image.url, id: image.id } : { url: sound.body.url, id: sound.body.id }])),
+        });
+      assert.equal(created.status, 202, t.id + " " + JSON.stringify(created.body));
+      const job = await wait(base, created.body.id);
+      assert.equal(job.status, "succeeded", t.id + " " + job.error);
+      const sent = JSON.parse(fake.calls.slice(sent0).find((c) => c.url === SERVICE + "/render").init.body);
+      assert.equal(sent.templateId, t.id);
+      assert.equal(sent.durationInFrames, seconds * 24, t.id);
+      for (const f of t.fields) {
+        if (f.type === "image") assert.equal(sent.props[f.key], "data:image/png;base64," + png.toString("base64"), t.id + " " + f.key);
+        else if (f.type === "audio") assert.match(sent.props[f.key] || "", music ? /^data:audio\/wav;base64,/ : /^$/, t.id + " " + f.key);
+        else assert.equal(sent.props[f.key], f.type === "number" ? 4 : f.type === "color" ? "#336699" : "測試", t.id + " " + f.key);
+      }
+      assert.deepEqual(job.result.verification, { ok: true, findings: [] }, t.id);
+      assert.equal(job.result.origin.parentAssetId, image.id);
+      const streams = spawnSync(require("../backend/media-inspect.cjs").ffprobePath(), ["-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", path.join(dataDir, job.result.url.slice(1))], { encoding: "utf8" }).stdout.trim().split(/\s+/).sort().join();
+      assert.equal(streams, music ? "audio,video" : "video", t.id + " streams");
+    }
+    pass("五個模板各渲染一支（假服務）：欄位表的每個欄位都送到 props、長度非 5 秒（8、10、20、22）按秒數送影格、驗證通過；選了音樂就保留音軌，沒選只留影像");
+    for (const [settings, message] of [
+      [{ templateId: "pan-slide-text-left-3scenes", seconds: 10 }, /20–30/],
+      [{ templateId: "scale-bg-text-slideup", seconds: 31 }, /3–30/],
+      [{ templateId: "scale-bg-text-slideup", seconds: 5.5 }, /3–30/],
+      [{ templateId: "product-review-typewriter", fields: { reviewerName: "a", reviewDate: "b", reviewText: "c", starCount: "6" } }, /1–5/],
+      [{ templateId: "photo-highlights-slides-zoom", fields: { text1: "a", text2: "b", text3: "c", backgroundColor: "red" } }, /#rrggbb/],
+    ]) {
+      const images = Object.fromEntries(["backgroundImageUrl", "productImageUrl", "imageUrl1", "imageUrl2", "imageUrl3", "imageUrl"].map((k) => [k, { url: image.url, id: image.id }]));
+      assert.throws(() => remotion.request({ settings: { ratio: "16:9", fps: 24, fields: { text: "a" }, ...settings }, references: images }, () => "x"), (e) => e.status === 400 && message.test(e.message), JSON.stringify(settings));
+    }
+    pass("欄位表的界線：長度超出範圍／非整數、星星數 6、主題色格式錯，都在收單前 400");
+  }
+
   // (c) remote error: failed, 繁中, token absent from job JSON and the ledger on disk.
   {
     const fake = fakeService([{ status: "rendering" }, { status: "error", error: "Render failed " + TOKEN }]);
@@ -175,6 +231,13 @@ const configured = { REMOTION_SERVICE_URL: SERVICE, MEDIA_RENDER_AUTH_TOKEN: TOK
       assert.equal(await page.locator(".editor-library button", { hasText: "背景放大＋標題上滑" }).count(), 1);
       const generate = page.getByRole("button", { name: "產生片頭（免費）", exact: true });
       assert.ok(await generate.isDisabled());
+      assert.equal(await page.locator("[data-ed-title-blocked]").textContent(), "片頭模板服務未設定");
+      // The form follows the template's field table: pan = 3 scene texts, 3 required pickers + logo/music, a length box.
+      await page.locator(".editor-library button", { hasText: "三場景平移＋文字" }).click();
+      assert.equal(await page.locator(".editor-library [data-ed-title-field]").count(), 3);
+      assert.equal(await page.getByRole("group", { name: "場景 3 圖片", exact: true }).count(), 1);
+      assert.equal(await page.getByRole("group", { name: "背景音樂", exact: true }).count(), 1);
+      assert.equal(await page.locator("[data-ed-title-seconds]").getAttribute("min"), "20");
       assert.equal(await page.locator("[data-ed-title-blocked]").textContent(), "片頭模板服務未設定");
       assert.deepEqual(errors, []);
       pass("UI：片頭面板沒有下拉選單；服務未設定時按鈕停用並顯示「片頭模板服務未設定」");

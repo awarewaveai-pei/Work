@@ -48,8 +48,32 @@ function edExportProject(p, ratio, mark) {
   });
   return native;
 }
+// 匯出時間軸 v1: the project as MediaTimelineV1 (backend /editor/timeline-v1) sent to the main system's structural check
+// (same-origin POST /api/video/timeline/validate). state = { busy } | { error } | { exported, remote }; one line per issue.
+function edTimelineReport(state) {
+  if (!state) return "";
+  const line = (text) => `<p class="note" data-ed-timeline-issue>${esc(text)}</p>`;
+  if (state.busy) return line("檢查中…");
+  if (state.error) return line("時間軸 v1：" + state.error);
+  const { exported, remote } = state,
+    losses = exported.losses || [],
+    issues = remote.ok ? [] : remote.errors?.length ? remote.errors.map((e) => e.path + "：" + e.message) : [remote.error || "主系統無法檢查（HTTP " + remote.status + "）"];
+  return (
+    line(remote.ok ? "主系統結構檢查通過（只檢查結構，還不能渲染）" : "主系統結構檢查未通過：") +
+    issues.map(line).join("") +
+    (losses.length ? line("匯出到 Timeline v1 會丟失 " + losses.length + " 項：") + losses.slice(0, 30).map((l) => line(l.message + (l.clipId ? "（片段 " + l.clipId + "）" : ""))).join("") + (losses.length > 30 ? line("…還有 " + (losses.length - 30) + " 項") : "") : "")
+  );
+}
+async function edTimelineCheck(p) {
+  const organizationId = VideoWorkbench.capabilities?.mainSystem?.organizationId;
+  if (!organizationId) throw Error("需要連上主系統並選好組織");
+  const exported = await VideoWorkbench.request("/editor/timeline-v1", { organizationId, project: edNative(p) }),
+    r = await fetch("/api/video/timeline/validate", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ timeline: exported.timeline }) }),
+    body = await r.json().catch(() => ({}));
+  return { exported, remote: { ok: r.ok && body.ok === true, status: r.status, errors: body.errors, error: typeof body.error === "string" ? body.error : "" } };
+}
 function edExportDialog(p) {
-  const st = { platform: "自訂", instagram: "1:1", mark: null, useMark: false, busy: false },
+  const st = { platform: "自訂", instagram: "1:1", mark: null, useMark: false, busy: false, timeline: null },
     target = () => {
       const [, ratio] = edExportPlatforms.find(([name]) => name === st.platform);
       return {
@@ -88,6 +112,7 @@ ${quality === "4K" && small ? '<p class="note" data-ed-upscale>來源低於 4K�
           ? esc(delivery.platforms.map((x) => x.platform + (x.preferred ? "（首選）" : "")).join("、"))
           : esc(delivery?.note || "此比例尚不能投遞")
     }</p>
+<p class="note">時間軸交換格式</p><div><button type="button" class="btn small" data-ed-timeline${st.timeline?.busy ? " disabled" : ""}>匯出時間軸 v1</button></div>${edTimelineReport(st.timeline)}
 <div class="editor-export-actions"><button class="btn" type="button" data-ed-export-cancel>取消</button><button class="btn primary" type="button" data-ed-export${st.busy ? " disabled" : ""}>開始匯出</button></div>`;
   };
   const d = edDialog(`<div data-ed-export-body>${body()}</div>`),
@@ -130,6 +155,16 @@ ${quality === "4K" && small ? '<p class="note" data-ed-upscale>來源低於 4K�
       d.close();
       document.querySelector('[data-ed-pane="貼圖"]')?.click();
     });
+    d.querySelector("[data-ed-timeline]").onclick = async () => {
+      st.timeline = { busy: true };
+      refresh();
+      try {
+        st.timeline = await edTimelineCheck(p);
+      } catch (err) {
+        st.timeline = { error: err.message };
+      }
+      refresh();
+    };
     d.querySelector("[data-ed-export-cancel]").onclick = () => d.close();
     d.querySelector("[data-ed-export]").onclick = async (e) => {
       e.target.disabled = st.busy = true; // a late reload of the watermark / delivery rebuilds the body: it must not re-enable the button

@@ -23,13 +23,16 @@ const ed = {
   undo: [],
   redo: [],
   queue: Promise.resolve(),
-  // 片頭 pane (card P1): chosen template, its text fields, background image, last job and the library images.
+  // 片頭 pane (card P1): chosen template, its text fields, picked library media by field key, length (null = the
+  // template's default), last job and the library images and sounds.
   title: {
     templateId: null,
     fields: {},
-    image: null,
+    picks: {},
+    seconds: null,
     jobId: null,
     images: null,
+    audios: null,
     done: null,
   },
   // Card P2: 調色 before/after preview toggle, LUT assets in the library, export quality, delivery ratios.

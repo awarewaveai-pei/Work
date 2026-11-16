@@ -6,28 +6,76 @@
 const path = require("node:path"),
   { pathToFileURL } = require("node:url");
 // Every id must exist in ../remotion-service/src/server.ts TEMPLATE_MAP (tests/remotion-template.cjs reads it).
-// Text fields only, plus the background image both templates require (sent as a data: URI: the service cannot
-// reach this laptop's urls).
+// One field table per template; the editor's 片頭 form is generated from it (scripts/editor-panes/text.js), so a field is
+// declared once, here. field.key = the composition prop name (and, for image/audio, the key of input.references).
+//   type "text" (default): max chars, required, multiline | "number": integer min..max | "color": #rrggbb
+//   type "image"/"audio": picked from the local library and sent as a data: URI (the service cannot reach this
+//   laptop's urls). Optional unless required.
+// seconds = the length range; a template whose scenes start at fixed times (pan, photo) cannot go below its natural length.
+const logo = { key: "logoUrl", label: "Logo", type: "image" },
+  music = { key: "audioUrl", label: "背景音樂", type: "audio" },
+  scene = (n) => [
+    { key: "imageUrl" + n, label: "場景 " + n + " 圖片", type: "image", required: true },
+    { key: "text" + n, label: "場景 " + n + " 文字", max: 20, required: true },
+  ];
 const catalog = [
   {
     id: "scale-bg-text-slideup",
     label: "背景放大＋標題上滑",
-    fields: [{ key: "text", label: "標題", max: 80, required: true }],
-    image: { key: "imageUrl", label: "背景圖" },
+    seconds: { min: 3, def: 5, max: 30 },
+    fields: [{ key: "imageUrl", label: "背景圖", type: "image", required: true }, { key: "text", label: "標題", max: 80, required: true }, logo, music],
   },
   {
     id: "circle-mask-text-slideup-reveal",
     label: "圓形揭露＋品牌標語",
+    seconds: { min: 10, def: 20, max: 30 },
     fields: [
+      { key: "imageUrl", label: "背景圖", type: "image", required: true },
       { key: "headline", label: "主標題", max: 80, required: true },
       { key: "brand", label: "品牌名稱", max: 40 },
       { key: "tagline", label: "標語", max: 80 },
+      logo,
+      music,
     ],
-    image: { key: "imageUrl", label: "背景圖" },
+  },
+  {
+    id: "pan-slide-text-left-3scenes",
+    label: "三場景平移＋文字",
+    seconds: { min: 20, def: 20, max: 30 },
+    fields: [...scene(1), ...scene(2), ...scene(3), logo, music],
+  },
+  {
+    id: "product-review-typewriter",
+    label: "產品評論打字機",
+    seconds: { min: 8, def: 10, max: 30 },
+    fields: [
+      { key: "backgroundImageUrl", label: "背景圖片", type: "image", required: true },
+      { key: "productImageUrl", label: "產品圖片", type: "image", required: true },
+      { key: "profileImageUrl", label: "評論人大頭照", type: "image" },
+      { key: "reviewerName", label: "評論人姓名", max: 20, required: true },
+      { key: "reviewDate", label: "日期", max: 20, required: true },
+      { key: "reviewText", label: "評論內容", max: 80, required: true, multiline: true },
+      { key: "starCount", label: "星星數（1–5）", type: "number", min: 1, max: 5 },
+      logo,
+      music,
+    ],
+  },
+  {
+    id: "photo-highlights-slides-zoom",
+    label: "相片精選幻燈片",
+    seconds: { min: 22, def: 22, max: 30 },
+    fields: [
+      ...[1, 2, 3].flatMap((n) => [
+        { key: "imageUrl" + n, label: "相片 " + n, type: "image", required: true },
+        { key: "text" + n, label: "相片 " + n + " 說明", max: 20, required: true },
+      ]),
+      logo,
+      { key: "backgroundColor", label: "主題色（#rrggbb）", type: "color" },
+      music,
+    ],
   },
 ];
-const SECONDS = 5,
-  POLL_MS = 2000,
+const POLL_MS = 2000,
   POLL_LIMIT_MS = 10 * 60 * 1000,
   MAX_BODY = 3.5 * 1024 * 1024,
   MAX_DOWNLOAD = 300 * 1024 * 1024;
@@ -47,8 +95,9 @@ async function configured(env, appDir) {
   return !!baseUrl(env) && (await resolveAuth(env, appDir)).ok === true;
 }
 
-// Checks and builds the POST /render body before the job is accepted. imageData(url) -> data: URI of a local asset.
-function request(input, imageData) {
+// Checks and builds the POST /render body before the job is accepted. mediaData(url, type) -> data: URI of a local
+// image/audio asset.
+function request(input, mediaData) {
   const s = input.settings || {},
     template = catalog.find((t) => t.id === s.templateId);
   if (!template) throw fail("片頭模板不存在", 400);
@@ -56,21 +105,48 @@ function request(input, imageData) {
   if (!format) throw fail("片頭模板只支援 16:9、9:16、4:5、1:1 比例", 400);
   const fps = Number(s.fps);
   if (![24, 25, 30, 60].includes(fps)) throw fail("片頭模板只支援 24、25、30、60 fps；請先調整專案影格率", 400);
+  const { min, def, max } = template.seconds,
+    seconds = s.seconds === undefined ? def : Number(s.seconds);
+  if (!Number.isInteger(seconds) || seconds < min || seconds > max) throw fail("片頭長度需為 " + min + "–" + max + " 秒的整數", 400);
   const props = {};
   for (const field of template.fields) {
+    if (field.type === "image" || field.type === "audio") {
+      const ref = input.references?.[field.key];
+      if (!ref?.url) {
+        if (field.required) throw fail("請從素材庫選「" + field.label + "」", 400);
+        continue;
+      }
+      props[field.key] = mediaData(ref.url, field.type);
+      continue;
+    }
     const value = typeof s.fields?.[field.key] === "string" ? s.fields[field.key].trim() : "";
-    if (field.required && !value) throw fail("請填寫「" + field.label + "」", 400);
-    if (value.length > field.max) throw fail("「" + field.label + "」最多 " + field.max + " 字", 400);
-    if (value) props[field.key] = value;
+    if (!value) {
+      if (field.required) throw fail("請填寫「" + field.label + "」", 400);
+      continue;
+    }
+    if (field.type === "number") {
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < field.min || n > field.max) throw fail("「" + field.label + "」需為 " + field.min + "–" + field.max + " 的整數", 400);
+      props[field.key] = n;
+    } else if (field.type === "color") {
+      if (!/^#[\da-f]{6}$/i.test(value)) throw fail("「" + field.label + "」格式為 #rrggbb", 400);
+      props[field.key] = value;
+    } else {
+      if (value.length > field.max) throw fail("「" + field.label + "」最多 " + field.max + " 字", 400);
+      props[field.key] = value;
+    }
   }
-  const image = input.references?.image;
-  if (!image?.url) throw fail("請從素材庫選一張「" + template.image.label + "」", 400);
-  props[template.image.key] = imageData(image.url);
-  const body = { templateId: template.id, props, outputFormat: format[0], fps, durationInFrames: SECONDS * fps };
+  const body = { templateId: template.id, props, outputFormat: format[0], fps, durationInFrames: seconds * fps };
   if (Buffer.byteLength(JSON.stringify(body)) > MAX_BODY)
-    throw fail("背景圖太大（送出內容超過 3.5 MB），請選較小的圖片", 413);
-  return { body, expect: { duration: SECONDS, fps, width: format[1], height: format[2] } };
+    throw fail("圖片與音樂太大（送出內容超過 3.5 MB），請選較小的檔案", 413);
+  return { body, expect: { duration: seconds, fps, width: format[1], height: format[2], audio: "audioUrl" in props, audible: "audioUrl" in props } };
 }
+// The first picked image is the title's parent asset (lineage); null when the template picked none.
+const parentAssetId = (input) => {
+  for (const field of catalog.find((t) => t.id === input.settings?.templateId)?.fields || [])
+    if (field.type === "image" && typeof input.references?.[field.key]?.id === "string") return input.references[field.key].id;
+  return null;
+};
 
 function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
@@ -82,11 +158,11 @@ function sleep(ms, signal) {
 const within = (signal, ms) => AbortSignal.any([signal, AbortSignal.timeout(ms)]);
 
 // Submits, polls every 2 s up to 10 min, downloads the finished file. Returns the mp4 bytes.
-async function render(input, { env, appDir, fetchImpl, signal, imageData, onRemoteJob }) {
+async function render(input, { env, appDir, fetchImpl, signal, mediaData, onRemoteJob }) {
   const auth = await resolveAuth(env, appDir),
     base = baseUrl(env);
   if (!base || !auth.ok) throw fail("片頭模板服務未設定", 503);
-  const { body } = request(input, imageData);
+  const { body } = request(input, mediaData);
   let r, reply;
   try {
     r = await fetchImpl(base + "/render", {
@@ -138,5 +214,4 @@ async function render(input, { env, appDir, fetchImpl, signal, imageData, onRemo
   return buffer;
 }
 
-const publicCatalog = catalog.map(({ id, label, fields, image }) => ({ id, label, fields, image: { label: image.label } }));
-module.exports = { catalog, publicCatalog, configured, request, render, SECONDS };
+module.exports = { catalog, configured, request, parentAssetId, render };

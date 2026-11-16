@@ -404,6 +404,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       fs.readFileSync(file).toString("base64")
     );
   }
+  // A picked library sound as a data: URI (the Remotion title's music; same shape as imageReference).
+  function audioReference(url) {
+    const file = localFile(url, { assets: true }),
+      mime = { mp3: "mpeg", wav: "wav", m4a: "mp4", ogg: "ogg" }[path.extname(file || "").slice(1).toLowerCase()];
+    if (!mime) throw Error("背景音樂需先上傳至本機素材庫，且僅支援 MP3、WAV、M4A、OGG");
+    return "data:audio/" + mime + ";base64," + fs.readFileSync(file).toString("base64");
+  }
+  const mediaReference = (url, type) => (type === "audio" ? audioReference(url) : imageReference(url));
   async function text(instructions, input, json = false, images = []) {
     const content = typeof input === "string" ? input : JSON.stringify(input);
     const userContent = [{ type: "input_text", text: content }, ...images.map((asset) => ({ type: "input_image", image_url: imageReference(asset.url), detail: "auto" }))];
@@ -641,7 +649,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         job.status = "running";
         persist();
         const buffer = await remotion.render(job.input, {
-          env, appDir, fetchImpl, signal, imageData: imageReference,
+          env, appDir, fetchImpl, signal, mediaData: mediaReference,
           onRemoteJob: (id) => {
             job.remotionJobId = id;
             persist();
@@ -649,25 +657,25 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         });
         if (signal.aborted) return;
         // Remotion muxes a silent AAC track padded past the last frame (real 5 s render: video 5.000 s, file 5.056 s).
-        // P1 templates send no audio, so keep the video stream only; the clip then ends on its last frame.
-        const tmp = path.join(dataDir, "tmp-" + job.id);
+        // Without picked music keep the video stream only (the clip then ends on its last frame); with music keep its
+        // track and cut it at the length asked for (-t), so a short sound cannot shorten the video.
+        const { expect } = remotion.request(job.input, () => ""),
+          tmp = path.join(dataDir, "tmp-" + job.id);
         fs.writeFileSync(tmp + "-in.mp4", buffer);
         let stored;
         try {
-          await mediaTools.run(["-y", "-hide_banner", "-i", tmp + "-in.mp4", "-map", "0:v:0", "-c", "copy", "-movflags", "+faststart", tmp + "-out.mp4"], signal);
+          await mediaTools.run(["-y", "-hide_banner", "-i", tmp + "-in.mp4", "-map", "0:v:0", ...(expect.audio ? ["-map", "0:a:0", "-t", String(expect.duration)] : []), "-c", "copy", "-movflags", "+faststart", tmp + "-out.mp4"], signal);
           stored = await mediaStore.ingest({ file: tmp + "-out.mp4", ext: "mp4", signal });
         } finally {
           fs.rmSync(tmp + "-in.mp4", { force: true });
           fs.rmSync(tmp + "-out.mp4", { force: true });
         }
         if (signal.aborted) return;
-        const
-          { expect } = remotion.request(job.input, () => ""),
-          verification = await verifyOutput(mediaStore.fileFor(stored.url), expect, signal);
+        const verification = await verifyOutput(mediaStore.fileFor(stored.url), expect, signal);
         if (signal.aborted) return;
         if (!verification.ok)
           throw Object.assign(Error("輸出驗證失敗：" + verification.findings.map((f) => f.code + " " + f.message).join("；")), { findings: verification.findings });
-        const parentAssetId = job.input.references.image.id;
+        const parentAssetId = remotion.parentAssetId(job.input);
         job.result = {
           url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl, width: expect.width, height: expect.height,
           verification: { ok: true, findings: [] },
@@ -1153,7 +1161,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         : isRemoveBg
           ? (removeBgSource(input), bgRemove.token(env), { type: "image" })
           : isRemotion
-            ? (remotion.request(input, imageReference), { type: "video" })
+            ? (remotion.request(input, mediaReference), { type: "video" })
             : isReburn
               ? (captionReburn.request(input, main), { type: "video" })
               : jobInput(input);
@@ -1446,7 +1454,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (req.method === "GET" && route === "/capabilities") {
         await elevenlabs.account(env, fetchImpl); // the plan + credits the ElevenLabs rows price by (cached 10 min)
         const soundOut = await soundPolicy.allowed(); // plan U7: rows that send sound out are off for a client who keeps it here
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env, undefined, { soundOut }), audioTools: audioTools.capability(env, { soundOut }), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.publicCatalog,
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env, undefined, { soundOut }), audioTools: audioTools.capability(env, { soundOut }), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.catalog,
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId, externalAudioAllowed: soundOut } : null });
