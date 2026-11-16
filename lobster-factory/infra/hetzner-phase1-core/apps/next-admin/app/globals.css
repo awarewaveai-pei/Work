@@ -74,6 +74,8 @@
   --badge-gray-text: #475569;
   --badge-yellow-bg: #fef3c7;
   --badge-yellow-text: #92400e;
+  /* flat mid grey behind transparent previews: a checkerboard hides cut edges; mid grey shows light and dark pixels alike */
+  --backdrop-transparent: #8c8c8c;
   --icon-ops-bg: #eff6ff;
   --icon-prov-bg: #f0fdf4;
   --icon-infra-bg: #f5f3ff;

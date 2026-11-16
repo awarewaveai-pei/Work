@@ -47,6 +47,8 @@ export const COLOR_GROUPS: TokenGroup[] = [
       { name: "--bg-subtle", default: "#f5f7fd", type: "color" },
       { name: "--bg-hover", default: "#eef1f9", type: "color" },
       { name: "--surface-2", default: "#f5f7fd", type: "color" },
+      // behind transparent previews (My Designs 改邊緣): flat mid grey, not a checkerboard, so cut edges show
+      { name: "--backdrop-transparent", default: "#8c8c8c", type: "color" },
     ],
   },
   {

@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-16（續6）— 改邊緣預覽背板：棋盤格 → 灰色（操作者「透明用方格表示會影響我看邊緣效果，背板換成灰色，下載還是要透明」）
+
+- 改：`DesignsGallery.tsx`「套邊後（透明）」預覽框背景由棋盤格改 `var(--backdrop-transparent)`；新 token 在 `app/globals.css` :root（#8c8c8c 中灰，淺色深色像素都看得出邊），並登記進 `lib/theme/tokens.ts` Backgrounds 群組（主題編輯器可改）。
+- 不變：存檔／下載仍是 `applyEdgeMask` 產出的透明 PNG，背景只在預覽框 CSS。
+- 其他棋盤格：canvas 工作區（編輯器底）、Banner 預覽，非改邊緣結果預覽，未動。
+- Codex m1（第一輪）：token 未登記主題系統 → 已登記，第二輪 NO FINDINGS。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . && npx vitest run lib/theme app/api/theme + 32 related test files (worktree on origin/main) | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-16-partialreview-64da4336.md，files-reviewed 3 檔，NO FINDINGS；前一輪 m1 已修）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin,agency-os,scripts | grep=backdrop-transparent | hits=3
 ## 2026-11-16（續5）— R4：剪輯 Agent 的付費卡片接回對話（確認後的辨識／翻譯／剪贅字結果回報在對話裡）
 
 - 根因：`scripts/editor-agent.js` 舊版 `edAgentPaid` 只呼叫 `edAction("pane:…")` 切到分頁；分頁跑完付費工作後自己放回時間軸，Agent 對話不知道結果，下一則訊息的 history 也沒有（risk-audit-20261115.md R4）。路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`。

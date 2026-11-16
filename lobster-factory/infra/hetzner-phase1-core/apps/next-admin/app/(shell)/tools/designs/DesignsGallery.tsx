@@ -1506,11 +1506,7 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: "#fff",
-                    backgroundImage:
-                      "linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%)",
-                    backgroundSize: "20px 20px",
-                    backgroundPosition: "0 0,0 10px,10px -10px,-10px 0px",
+                    background: "var(--backdrop-transparent)", // preview only — the saved/downloaded PNG stays transparent
                     overflow: "hidden",
                   }}
                 >
