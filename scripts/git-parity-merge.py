@@ -11,7 +11,7 @@ version upstream committed after HEAD is an old snapshot and takes the target's 
 directory, which is then kept and named in the message (equal bytes cannot tell a snapshot from a deliberate return to
 that version, Codex 2026-11-16). Any other conflict, add/delete on one
 side, or a differing untracked file -> nothing is touched. Otherwise: index entries of those paths -> HEAD, files
--> HEAD bytes, ff-only, files -> merged bytes. No stash, no reset of other paths, no push.
+-> HEAD (written by git), ff-only, files -> merged bytes. No stash, no reset of other paths, no push.
 
 Invariant (2026-11-12: a cross-drive os.replace failed AFTER ten files were rewritten to HEAD, and the merged bytes
 lived only in memory): before the first file changes, every local byte this run will change is saved in a backup
@@ -127,7 +127,8 @@ def main():
                 return done(False, f"{p}: local edits conflict with {a.target}")
             out = lf(theirs)                         # nothing local in it: the target's version replaces the old one
             stale.append(p)
-        merged = out.replace(b"\n", b"\r\n") if b"\r\n" in ours else out
+        # None = the result is the target's own content: the ff checks that file out, nothing is written after it
+        merged = None if out == lf(theirs) else out.replace(b"\n", b"\r\n") if b"\r\n" in ours else out
         plan.append((p, path, base, merged, ours))
     for p in sorted(up & untracked):
         path = os.path.join(a.root, p)
@@ -188,7 +189,8 @@ def main():
             shutil.move(os.path.join(side, f"moved-{i}"), path)
         for p, path, *_, ours in list(plan) + list(renorm):
             cur = open(path, "rb").read()
-            if cur != ours and cur != wrote.get(path, ours):   # neither untouched nor this run's bytes: someone else's
+            mine = wrote.get(path, ours)             # None: git was writing this file when the run failed
+            if cur != ours and mine is not None and cur != mine:   # neither untouched nor this run's bytes: someone else's
                 kept.append(p); continue
             if cur != ours:
                 open(path, "wb").write(ours)
@@ -220,18 +222,15 @@ def main():
                 raise RuntimeError(f"{p}: the shared index changed while this run was planning")
         if plan:
             git("reset", "-q", "--", *[p for p, *_ in plan])
-        for i, (p, path, base, _, ours) in enumerate(plan):
+        # plan (index now = HEAD) and renorm files are written by git itself, so each gets its own worktree form:
+        # HEAD's blob bytes written raw left an eol=crlf file "modified" and the ff refused it (start.cmd, 2026-11-16).
+        # One file per call: the re-read sits right before that file's own write, and a failure part-way leaves `wrote`
+        # naming exactly the files already rewritten, so restore puts each back (Codex 2026-11-16).
+        for p, path, ours in [(p, path, ours) for p, path, *_, ours in plan] + renorm:
             still_ours(p, path, ours)
-            with open(os.path.join(side, f"base-{i}"), "wb") as t:   # rename into place: a failed write never truncates
-                t.write(base)
-            wrote[path] = base
-            place(os.path.join(side, f"base-{i}"), path)
-        if renorm:                                   # paths on stdin: 168 of them would overrun a Windows command line
-            for p, path, ours in renorm:
-                still_ours(p, path, ours)
-            git("checkout-index", "-f", "-z", "--stdin", inp=b"\0".join(p.encode("utf-8") for p, *_ in renorm) + b"\0")
-            for p, path, _ in renorm:
-                wrote[path] = open(path, "rb").read()
+            wrote[path] = None                       # written-or-not is unknown until git returns: restore treats any
+            git("checkout-index", "-f", "--", p)     # bytes other than `ours` as this run's, see below
+            wrote[path] = open(path, "rb").read()
         for i, (p, path, ours) in enumerate(moved):
             still_ours(p, path, ours)
             shutil.move(path, os.path.join(side, f"moved-{i}"))
@@ -244,6 +243,8 @@ def main():
     written = []
     try:
         for i, (p, path, _, merged, _) in enumerate(plan):
+            if merged is None:
+                continue
             # Written in the backup directory, then renamed: a failed write never truncates a worktree file.
             with open(os.path.join(side, f"merged-{i}"), "wb") as t:
                 t.write(merged)

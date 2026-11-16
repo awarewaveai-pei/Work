@@ -266,6 +266,17 @@ try {
     Assert-True ($r.Action -ne 'fast-forward') 'P18b a local edit that upstream never had is not replaced'
     Assert-Eq (Read-File (Join-Path $f.Wt 'a.txt')) "mine`n" 'P18b local edit untouched'
 
+    # P19 eol=crlf file (2026-11-16, start.cmd): a local edit in a file whose worktree form is CRLF. Writing HEAD's blob
+    # bytes raw (LF) left it "modified" and the ff refused; git writes it now. Here the edit equals origin's content.
+    $f = New-Fixture 'p19'; Set-File (Join-Path $f.Wt '.gitattributes') "*.cmd text eol=crlf`n"; Set-File (Join-Path $f.Wt 's.cmd') "one`r`n"
+    G $f.Wt @('add', '-A') | Out-Null; G $f.Wt @('commit', '-q', '-m', 'cmd') | Out-Null; G $f.Wt @('push', '-q', 'origin', 'main') | Out-Null
+    G $f.Other @('pull', '-q', '--ff-only') | Out-Null; Advance-Origin $f 's.cmd' "one`r`ntwo`r`n"
+    Set-File (Join-Path $f.Wt 's.cmd') "one`ntwo`n"
+    $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
+    Assert-Eq $r.Action 'fast-forward' 'P19 action'
+    Assert-Eq (Read-File (Join-Path $f.Wt 's.cmd')) "one`r`ntwo`r`n" 'P19 file is the origin version in its CRLF form'
+    Assert-Eq (G $f.Wt @('status', '--porcelain', '--untracked-files=no')) '' 'P19 nothing left modified'
+
     # ---------------- I3: hooks act on the MAIN checkout only (2026-09-27) ----------------
     # A linked worktree (git worktree add) has `.git` as a FILE. Accepting it as the root wrote hook
     # state / reports into D:\tmp\<wt> and ensure-claude-junction replaced the worktree's tracked
