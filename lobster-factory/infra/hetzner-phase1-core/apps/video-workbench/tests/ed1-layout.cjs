@@ -43,6 +43,13 @@ const pass = (m) => console.log("PASS " + m);
     assert.equal(await page.locator("[data-ed-stage]").evaluate((el) => el.style.getPropertyValue("--ed-aspect")), "1080/1080");
     await page.locator(".editor-topbar").getByRole("group", { name: "輸出比例" }).getByRole("button", { name: "9:16", exact: true }).click();
     await page.waitForFunction(() => edProject().ratio === "9:16");
+    // A focused control owns Space: it changes the ratio and does not play.
+    await topRatio.getByRole("button", { name: "1:1", exact: true }).focus();
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => edProject().ratio === "1:1");
+    assert.equal(await page.evaluate(() => ed.playing), false);
+    await topRatio.getByRole("button", { name: "9:16", exact: true }).click();
+    await page.waitForFunction(() => edProject().ratio === "9:16");
     pass("頂列比例＝按鈕（無下拉）：鍵盤 Enter 改 1:1 寫回專案、整片設定同步、舞台比例跟著變；再點改回 9:16");
     assert.equal(await page.locator("[data-ed-pane]").count(), 8);
     assert.equal(await page.locator("[data-ed-total]").textContent(), "00:00.00");

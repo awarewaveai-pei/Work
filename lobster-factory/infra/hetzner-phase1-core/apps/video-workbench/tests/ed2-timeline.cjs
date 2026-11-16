@@ -351,6 +351,23 @@ const pass = (m) => console.log("PASS " + m);
     await page.keyboard.press("k");
     pass("L 1×→2×→4×、K 停、J 倒播 2×（靜音），時間旁顯示倍速");
 
+    // Space: a focused control keeps it (ED.1 ratio button); focus on a timeline clip, like no focus, plays.
+    await page.evaluate(() => { ed.time = 0; edPaint(); });
+    await clip((await state()).clips[0].id).focus();
+    await page.keyboard.press("Space");
+    assert.equal(await page.evaluate(() => ed.playing), true, "時間軸片段上按 Space 要播放");
+    await page.keyboard.press("Space");
+    assert.equal(await page.evaluate(() => ed.playing), false);
+    await page.locator("[data-ed-ruler]").focus();
+    await page.keyboard.press("Space");
+    assert.equal(await page.evaluate(() => ed.playing), true, "播放頭（slider）上按 Space 要播放");
+    await page.keyboard.press("Space");
+    await page.evaluate(() => { ed.time = 1; edPaint(); });
+    await page.locator("[data-ed-ruler]").focus();
+    await page.keyboard.press("ArrowRight");
+    assert((await page.evaluate(() => ed.time)) > 1, "播放頭上 → 仍移動播放頭");
+    pass("焦點在時間軸片段上按 Space＝播放／暫停（控制項上的 Space 歸控制項，見 ed1-layout）");
+
     // Help notes and the keyboard table.
     for (const [name, title] of [["查看說明：磁性時間軸與吸附", "磁性時間軸與吸附"], ["查看說明：多選與批次編輯", "多選與批次編輯"], ["查看說明：播放快捷鍵", "播放快捷鍵"]]) {
       await page.getByRole("button", { name, exact: true }).click();

@@ -3226,6 +3226,8 @@ document.addEventListener("pointerdown", (e) => {
   };
 });
 document.addEventListener("fullscreenchange", () => tool === "edit" && edPaint());
+// Everything a key press can operate; the one list the shortcut handler below defers to.
+const ED_CONTROL = "button,a[href],summary,[role=button],[role=checkbox],[role=radio],[role=switch],[role=slider],[role=tab],[role=menuitem],[role=option]";
 document.addEventListener("keydown", (e) => {
   const handle = e.target.closest?.("[data-ed-resize]");
   if (handle && /^Arrow/.test(e.key)) {
@@ -3251,6 +3253,12 @@ document.addEventListener("keydown", (e) => {
     edRedraw();
     return;
   }
+  // A focused control owns Space and Enter (a ratio button pressed with Space must change the ratio, not play); a slider,
+  // radio or tab also owns the arrows. Timeline clips (role=button) and the playhead ruler (role=slider) are
+  // not controls here: they keep Space and the arrows (the track + buttons are controls). Letters (J K L M ...) are no
+  // control's key, so they stay shortcuts.
+  const control = e.target.closest?.(ED_CONTROL);
+  if (control && !control.closest("[data-ed-clip],[data-ed-ruler]") && (e.code === "Space" || e.key === "Enter" || (/^Arrow/.test(e.key) && /^(slider|radio|tab)$/.test(control.getAttribute("role") || "")))) return;
   // A focused clip: Enter selects it, Shift／Ctrl／Cmd+Enter adds it (reference clip keyboard).
   const focusedClip = e.target.closest?.("[data-ed-clip]");
   if (e.key === "Enter" && focusedClip && !e.target.closest("[data-ed-volume]")) {
