@@ -1,0 +1,259 @@
+# 舊影片工具 × 影音工作台 融合計畫（U 卡）— 2026-11-16 v4 定稿
+
+讀者 = AI agent。事實附 `file:line`；行號以 checkout `779f4d164` 為準，開卡前 grep 一次。舊系統的行號本版逐一查過；新系統（工作台）的行號來自一次只讀盤點，抽查 24 處屬實，其餘開卡先 grep。標「未驗」＝沒有查到證據。
+前綴：`NA` = `apps/next-admin`，`V/` = `NA/app/(shell)/tools/video/`，`API/` = `NA/app/api/video/`，`L/` = `NA/lib/content/video/`，`VW` = `apps/video-workbench`，`MIG/` = `lobster-factory/packages/db/migrations/`，`WB/` = `NA/app/video/(wb)/`（本計畫新增）。
+硬規則：繁中、付費標 NT$（`TWD_RATE=32`）、不用下拉、不用中國公司模型、正本在伺服器、UI 只用 globals class＋theme token（零 hex）。
+
+操作者前提（全部定案）：
+1. 舊系統好用、確定可用、連著很多工具，有些比新的完善。
+2. 新系統有舊的沒有的東西。
+3. 舊的功能要完美融合進新系統，結果是一個工具。
+4. 一開始就以無縫為目標。
+5. 不喜歡進頁面先要建專案。
+6. 生成頁直接出的片不自動變專案卡。
+7. 腳本頁的功能、模組、流程不改；不是「可以永遠留在另一個網站」。
+8. 影片送社群以新系統做法為準（每個社群各一版文案、自動配比例）。
+9. 「送去做影片」改成開工作台的一集。
+10. **融合＝併進新系統的功能，不是在新系統裡多放一個舊系統**（2026-11-16）。
+
+## 融合規則
+
+**一件事只有一條路。** 每件事以新系統做這件事的功能為主體；舊系統的能力以三種方式進來，舊畫面退場：
+- **補**：新功能缺的選項，加在新功能上（例：鏡頭卡加「圖庫素材」）。
+- **接**：舊後端當成新功能背後的供應商，跟 OpenAI、Replicate 同一層（例：舊渲染引擎變成一集的「快速輸出」）。
+- **併**：兩邊資料是同一件事的，改成同一份（例：Story Bible 與製作聖經）。
+
+新系統完全沒有對應功能的三件事（寫多場景腳本、審片、發布），舊元件直接成為新系統的那個功能，不重寫。
+
+v3 的錯：把舊畫面各自放進側欄一頁，同一件事變兩條路（做片：集的步驟 vs 快速影片頁；專案：專案頁 vs 發布紀錄；字幕：字幕工具 vs 舊字幕步驟）。v4 全部收成一條。
+
+## 0. 事實
+
+舊系統：
+
+| # | 事實 | 證據 |
+|---|---|---|
+| F1 | 舊的做片＝「草稿」：場景清單（旁白＋圖）→ 逐場重生／上傳替換／改旁白 → 送渲染。渲染在伺服器做：配音、燒字幕、片頭標題、一次可出 16x9／9x16／4x5、可帶 `projectId` | `V/VideoStudio.tsx:391-640,1331-1491`；`API/render-draft/route.ts:26-46` |
+| F2 | 舊渲染只收自家 R2 與 Pexels 的素材網址；每張素材要帶簽過的來源 | `API/render-draft/route.ts:28,112-136` |
+| F3 | 舊的素材來源有三種：AI 生圖（FLUX）、Pexels 圖片、Pexels 影片；每場景可加 AI 動態 | `API/draft/route.ts:18-41`；`L/video-cost.ts:40-48` |
+| F4 | 舊流程 5 步只是編排；模式選擇、費用確認、先建專案表單都在編排層 | `V/VideoPipeline.tsx:136-186,203-225` |
+| F5 | 舊實拍剪輯＝逐檔上傳、手填入出點、串接渲染，沒有 AI | `V/FootageEditor.tsx:43-61`；`API/footage/compile/route.ts:25`；`L/edit-plan-timeline.ts:14-19` |
+| F6 | 舊片頭模板 5 個，長度 6–22 秒，有 logo 與背景音樂欄位 | `V/VideoStudio.tsx:1827-1907` |
+| F7 | 舊字幕步驟：對已登記成片改字幕後重燒（每個比例）、主機或 OpenAI 轉錄且失敗自動改主機、客戶層級「音檔不可外送」開關、下載 SRT／VTT | `V/CaptionsStep.tsx:24-65,77-120,235,269-300` |
+| F8 | 舊審片＝四項 QA＋「有權使用」；舊發布＝每比例核准、封面、社群草稿（每頻道一版文案、自動配比例）、WP 嵌入。兩個元件都只吃 `organizationId`、`projectId` 或資產 id | `V/QaStep.tsx:18`；`V/ReleaseDeliveryPanel.tsx:37,127-145,229,241-245` |
+| F9 | 舊專案＝`media_production_projects`；送審鏈四表綁資產不綁專案；`source` 有 check constraint | `API/projects/route.ts:9-15,49-69`；`MIG/0065_media_production_persistence.sql`；`MIG/0138_media_projects_v2.sql:16-18` |
+| F10 | 自動完成排程只認舊引擎的渲染工作，取專案全部影片逐支 QA→核准→社群草稿 | `L/project-advance-deps.ts:26-41`；`NA/lib/schedules/jobs.ts:142-163` |
+| F11 | ScriptForge 24 個入口；接點由外層傳入（`onSendToVideo`、`saveSocialDraft`）；Story Bible 是不可變版本＋核准 | `V/ScriptForge.tsx:56-59,222-246,1086`；`API/story-bibles/route.ts:33-57` |
+| F12 | 內容工具的文章配片直接打 `API/generate`，不經畫面 | `NA/app/(shell)/tools/content/ContentStudio.tsx:1686-1743` |
+| F13 | 舊方案／點數／成效面板 33 行，讀 `API/billing`、`API/outcomes` | `V/MediaOperationsPanel.tsx:16-17` |
+
+新系統：
+
+| # | 事實 | 證據 |
+|---|---|---|
+| G1 | 一集＝鏡頭清單（畫面描述、旁白、秒數、圖、影片）。鏡頭卡能生成畫面、修這張、綁場景與角色；**不能**上傳或從素材庫換圖，**沒有**圖庫素材，**沒有**讓鏡頭變影片的按鈕 | `VW/scripts/projects-0.js:149,544-574,885-900`；`VW/shared/episode-spine.js:173-176` |
+| G2 | 排成時間軸、照旁白逐句配音、用旁白產生字幕都已上線；配音不帶聲線設定，用預設 | `VW/scripts/tools-editor.js:936-967,969-992,1007-1032`；`VW/backend/speech.cjs:105-136` |
+| G3 | 剪輯輸出在伺服器用 ffmpeg 做，是一個工作台任務；一次只出一個比例 | `VW/backend/editor-export.cjs:467-509`；`VW/scripts/editor-export-dialog.js:5-11,138-147` |
+| G4 | 沒有一鍵串接：「工作流」只是把提示詞一行一行帶進生成頁 | `VW/scripts/workspaces.js:71,101-128` |
+| G5 | 外部服務當供應商已有先例：片頭模板由後端送 Remotion 服務、輪詢、下載、驗證，包成一個工作台任務 | `VW/backend/remotion.cjs:85-139`；`VW/scripts/editor-panes/text.js:294-311` |
+| G6 | 片頭模板只有 2 個，固定 5 秒，沒有 logo 與音樂欄位；與舊的重疊 2 個 | `VW/backend/remotion.cjs:11-29` |
+| G7 | 字幕工具與剪輯器字幕面板已有：四個轉錄引擎、逐句改、翻譯、燒字幕、SRT／VTT。引擎失敗不自動改用別的 | `VW/scripts/tools-subtitles.js:97-115,322-440`；`VW/backend/transcribe.cjs:31-40,51` |
+| G8 | 成片之後工作台自己沒有 QA、核准、社群草稿、WP 嵌入的畫面；只有一條連去 `/release` 的連結；第 11 步「送審」永遠顯示「選用」 | `VW/shared/jobs-view.js:13-22`；`VW/shared/episode-spine.js:286` |
+| G9 | 用量只有一行固定文字「API · 依實際用量」 | `VW/index.html:55` |
+| G10 | 網址匯入只收公開 HTTPS 的圖片（≤8 MB）；影片與音訊不能用網址匯入。已登記過的本機檔不會重複登記 | `VW/backend/api.cjs:1836-1843`；`VW/backend/product-inspect.cjs:4-46`；`VW/backend/main-system.cjs:144-145` |
+| G11 | AI 導演只產純文字腳本，不能變成專案或鏡頭；AI 分鏡把大綱拆成鏡頭（含旁白） | `VW/backend/api.cjs:1686-1733`；`VW/scripts/projects-0.js:863-870` |
+| G12 | 製作聖經（角色、場景、道具，含參考圖）存在工作台專案裡；角色頁另有一份 | `VW/scripts/projects-0.js:337,469`；`mv-mode-spec-20261114.md` §1 末段 |
+| G13 | 殼用同源 frame 掛每個子頁，子頁經 `vw:v1` 通道呼叫殼；影片網域允許同源 frame；兩邊讀同一份主題與 `globals.css` | `VW/index.html:75-104`；`VW/shared/runtime.js:4-6,44,247-281`；`nginx/default.conf:565,681-693`；`VW/awarewave-files.txt:4`；`NA/app/layout.tsx:18-23` |
+
+## 1. 不變量
+
+1. **一件事一條路**：每件事在工具裡只有一個入口、一個畫面、一份資料。
+2. **一集的鏡頭清單是做片的唯一模型**。舊的「草稿場景」不再存在；腳本、分鏡、生圖、換圖、配音、輸出都作用在鏡頭上。
+3. **舊後端是供應商，不是平台**：從工作台叫用舊引擎一律包成工作台任務，結果是工作台的資產、任務紀錄、一集的步驟與成片（跟其他供應商一樣）。
+4. **成片只有一種**：不論哪種輸出法，都出現在同一個成片區，走同一個審片與發布、同一條血統與過期判斷。
+5. **不先建專案**；生成頁直接出的片不自動成卡；Postgres 專案列一律由系統建，連結只存一處（列的 `source='video_workbench'`＋`source_ref`）。
+6. **專案清單只有一份**（專案頁）。沒有工作台集的舊專案以唯讀卡出現在同一份清單。
+7. **聖經只有一份正本**：Postgres 的版本鏈。腳本頁與製作聖經是同一條鏈的兩個編輯面。
+8. **一套樣式，可機械檢查**：零 hex 字面值、零自訂字體、零下拉；按鈕、輸入框、卡片的 computed style 全工具相同。
+9. **功能不減損**：§3 每一列舊能力都有去處；腳本頁的 24 個入口與流程不變。
+10. **價格只來自 `NA/lib/ai/cost-model.ts` 與 `L/video-cost.ts`**；按鈕上標 NT$。
+11. **客戶音檔不外送**：設定為不可外送時，工作台後端擋下每一個把音檔送出主機的工作；查不到設定＝擋。
+12. **`media_project_id` 只掛成片**，只做 `null → 本列`，限同組織；排程每個比例只取最新一支。
+
+## 2. 決定（選了什麼｜代價）
+
+- **D1 做片只留「一集」這一條路；舊的快速影片頁、草稿編輯、5 步流程全部退場。** 舊能力拆成三處進來：鏡頭卡補來源（D2）、輸出步驟接舊引擎（D3）、一鍵成片（D4）。代價：舊畫面 2,262 行的 `VideoStudio.tsx` 不再使用，要靠 §3 的對照表逐項驗收不漏。
+- **D2 鏡頭卡補四樣**：換圖（素材庫或上傳）、圖庫素材（Pexels 圖片與影片）、讓這鏡動起來（圖生影片，用現有影片模型）、生圖模型可選（含 FLUX）。代價：鏡頭卡變大；圖庫素材要放寬網址匯入到 Pexels 的影片。
+- **D3 舊渲染引擎＝第 9 步的「快速輸出」**，與「剪輯輸出」並列在同一個輸出步驟。它是一個工作台任務（寫法照片頭模板那個供應商，G5）：送鏡頭的圖與旁白，伺服器配音、燒字幕、加片頭標題，完成後成片回到工作台。代價：同一集有兩種輸出法，畫面不會完全一樣；快速輸出的聲線只有舊引擎支援的那幾個。
+- **D4 「一鍵成片」＝補齊缺圖的鏡頭 → 快速輸出**，按之前顯示一次總價。代價：補圖階段要開著頁面（跟現在的批次生成一樣）；關掉再開會從缺的那幾張接著做。
+- **D5 輸出多比例**：快速輸出與剪輯輸出的對話框都能複選比例，每個比例一個任務。代價：付費聲線的配音會依比例重算一次，對話框照實標價。
+- **D6 自動完成跟著快速輸出走**（勾選後由既有排程做 QA→核准→社群草稿）。不擴到剪輯輸出。代價：剪輯輸出的成片要手動審片、發布。
+- **D7 寫腳本＝ScriptForge 成為新系統的腳本功能**（新系統沒有多場景腳本工具，G11），同一個元件、去外框、換樣式。兩個接點：側欄「腳本」的「送去做影片」開新的一集；一集第 2 步的「寫腳本」把結果寫回這一集。AI 分鏡留著，定位是「只有大綱時」的另一種輸入。代價：影片產品有一個 React 頁，用契約與檢查器約束。
+- **D8 審片與發布＝成片卡上的一個面板**（第 11、12 步開同一個面板）。內容是舊的 `QaStep`＋`ReleaseDeliveryPanel` 同一元件。舊字幕步驟不搬：它的功能併進字幕工具（D9）。代價：同 D7。
+- **D9 字幕只留字幕工具與剪輯器字幕面板。** 補三樣：吃主系統成片的字幕並重燒（給快速輸出的成片改字幕用）、下載主系統存的 SRT／VTT、引擎失敗時給一顆「改用自家主機（免費）重試」。不做自動改用（工作台的規則是不默默換引擎）。代價：失敗時多按一下。
+- **D10 片頭模板併進剪輯器**：補舊的 3 個模板、logo 與背景音樂欄位、可調長度。舊片頭頁退場。代價：無。
+- **D11 實拍剪輯由多軌剪輯器取代**，不搬：舊的做法是剪輯器功能的子集（F5）。代價：無。
+- **D12 聖經併成一條版本鏈**：製作聖經「存成核准版本」寫進 Story Bible 的版本鏈；製作聖經「套用核准版本」從鏈讀回；腳本頁的 Story Bible 模組本來就讀寫這條鏈，不用改。專案記住它用的是哪個系列。代價：兩邊欄位不完全相同，各自不認得的欄位原樣保留。
+- **D13 專案清單合一**：舊專案（沒有工作台集的列）以唯讀卡列在專案頁；每張成片卡顯示它發布到哪、成效如何。舊專案清單與專案頁退場。代價：無。
+- **D14 用量與方案放在殼右上那行文字的位置**，點開看方案、點數、成效。代價：無。
+- **D15 「送社群」＝影片 API 新路由**，與社群工具共用同一個權限檢查與存檔函式；社群模組沒安裝時按鈕隱藏。代價：多一條路由。
+- **D16 腳本歷史維持存在瀏覽器**；app 網域那一份在員工入口第一次開殼時用 `postMessage` 搬到影片網域。代價：歷史仍不跨裝置。
+- **D17 內容工具的文章配片不動**（F12）；它產的片出現在歷史與作品。代價：舊引擎的全自動流程與工作台的一鍵成片是兩個入口、同一個引擎。
+- **D18 不做**：用 vanilla 重寫腳本、審片、發布；工作台 state 搬 Postgres；第三套登入或主題；對客戶開放；AI 導演接專案（新系統自己的缺口，與融合無關）；角色頁與製作聖經合一（MV 規格的卡）。
+
+## 3. 舊能力 → 新功能（逐項）
+
+| 舊能力 | 證據 | 併進哪個新功能 | 方式 | 卡 |
+|---|---|---|---|---|
+| ScriptForge 24 個入口、腳本歷史、品牌語氣 | F11 | 側欄「腳本」＝新系統的腳本功能 | 同元件 | U3 |
+| 送去做影片 | `V/ScriptForge.tsx:89-96` | 開新的一集（鏡頭與角色帶入） | 接 | U3 |
+| （新接點）在一集裡寫腳本 | G11 | 第 2 步「寫腳本」，結果寫回這一集 | 接 | U3 |
+| 送社群 | `V/ScriptForge.tsx:56-70` | 同一顆按鈕 | 新路由 | U3 |
+| 草稿逐場重生 | `V/VideoStudio.tsx:501` | 鏡頭卡「生成畫面」（已有） | — | — |
+| 草稿上傳替換、「有權使用」 | `V/VideoStudio.tsx:557,1377` | 鏡頭卡「換圖」 | 補 | U4 |
+| 圖庫素材（Pexels 圖片／影片） | F3 | 鏡頭卡「圖庫素材」 | 補 | U4 |
+| 每場景 AI 動態 | F3 | 鏡頭卡「讓這鏡動起來」 | 補 | U4 |
+| FLUX 生圖 | F3 | 鏡頭生圖模型可選 | 補 | U4 |
+| 草稿改旁白 | `V/VideoStudio.tsx:1331-1491` | 鏡頭卡「旁白」（已有） | — | — |
+| 主題或文章直接出片 | `API/generate/route.ts:19-37` | 腳本頁或 AI 分鏡 → 一鍵成片 | 接 | U5 |
+| 伺服器渲染：配音、燒字幕、片頭標題 | F1 | 第 9 步「快速輸出」 | 接 | U5 |
+| 一次出多比例 | F1 | 輸出對話框複選比例（兩種輸出法都有） | 補 | U5 |
+| 成本明細、費用確認 | `V/VideoStudio.tsx:238-243,1257`；`V/CostGateStep.tsx` | 快速輸出與一鍵成片的確認框 | 補 | U5 |
+| 生成並自動完成 | `V/VideoStudio.tsx:599-632` | 快速輸出的選項 | 接 | U5 |
+| 生成記錄、批次刪除 | `API/history`、`API/[id]` | 工作台「歷史紀錄」（快速輸出是工作台任務） | 接 | U5 |
+| 模式選擇 | `V/ModeSelectStep.tsx` | 沒有模式：一集就是一集；片頭在剪輯器、實拍在剪輯器 | 退場 | U11 |
+| 5 步流程、續做 | F4 | 一集的步驟列 | 退場 | U11 |
+| 先建專案表單 | `V/VideoPipeline.tsx:203-225` | 沒有（前提 5） | 退場 | U11 |
+| 四項 QA、「有權使用」 | F8 | 成片卡「審片與發布」面板上半（第 11 步） | 同元件 | U6 |
+| 核准、封面、社群草稿、WP 嵌入 | F8 | 同一面板下半（第 12 步） | 同元件 | U6 |
+| 專案頁全鏈（發布去向、成效） | `API/projects/route.ts:49-69` | 成片卡上的「發布到哪」；舊專案＝專案頁的唯讀卡 | 併 | U6 |
+| 改字幕重燒（每比例） | F7 | 字幕工具（來源＝主系統成片） | 接 | U7 |
+| 主機／OpenAI 轉錄 | F7 | 字幕工具（已有四引擎） | — | — |
+| 失敗自動改主機 | F7 | 失敗時一顆「改用自家主機重試」 | 補 | U7 |
+| 下載 SRT／VTT | F7 | 成片卡與字幕工具 | 補 | U7 |
+| 音檔不可外送開關 | F7 | 工作台設定＋後端守衛 | 併 | U7 |
+| Remotion 5 個模板 | F6 | 剪輯器片頭模板 | 補 | U8 |
+| 時間軸 v1 檢查 | `V/TimelineValidationPanel.tsx` | 剪輯器「匯出時間軸 v1」（接上已有但沒人呼叫的路由） | 補 | U8 |
+| 實拍素材剪輯 | F5 | 多軌剪輯器（已涵蓋） | 退場 | U11 |
+| Story Bible、定裝照、連續性與一致性比對 | F11；`V/VideoStudio.tsx:473` | 一條版本鏈；一致性比對在第 3 步 | 併 | U9 |
+| 方案／點數／成效 | F13 | 殼右上的用量 | 併 | U10 |
+| 我的作品 | `NA/app/video/works/page.tsx` | 側欄「作品」 | 同元件 | U1 |
+| 文章配片 | F12 | 不動 | — | — |
+
+## 4. 卡片
+
+共通：`npx tsc --noEmit`（動到 next-admin）＋`node tests/gate.cjs`（動到工作台）＋本卡點名的測試＋`/codex-review`。next-admin 推上 main 當晚 03:00 上線；工作台另行部署。兩邊都動的卡，上線順序＝next-admin 先、工作台後。員工門的舊頁在 U11 之前完全不動，所以每張卡都能單獨上線、單獨 revert。突變只做在標「突變」的守衛。
+順序：U0、U1、U4、U7、U8、U10 互不相依。U2 在 U1 後。U3、U6 在 U2 後（U6 另需 U0）。U5 需 U0、U4。U9 需 U3。U11 最後。
+
+**U0 專案列「建或取回」（後端；Medium；migration 先過 db-expert；critic Deep）**
+- migration（開卡取號，現最新 0163）：`media_production_projects_source_check` 加 `'video_workbench'`；`unique index (organization_id, source_ref) where source = 'video_workbench'`。down 兩處（照 0138）。
+- `L/projects.ts` 加 `ensureWorkbenchProject(db, org, sourceRef, title)`：查 → 沒有就 insert → 撞 23505 重查（寫法照 `NA/app/api/internal/video/workbench/assets/route.ts:245`）→ 標題不同就更新。
+- `API/projects/route.ts`：`SOURCES` 加值（`:13`）；POST 在 `source==="video_workbench"` 時走它；收選填 `attachAssetIds`（≤50），只更新「同組織、影片、`media_project_id is null`」的資產；GET 加 `sourceRef` 篩選。
+- `L/project-advance-deps.ts:37-41` 的 `rows()`：每個比例只留最新一支。
+- 舊資料：既有列與資產不動。
+- 測試：同一 `sourceRef` 兩次只有一列；`attachAssetIds` 只做 null→本列，**突變**：拿掉組織條件 → 變紅；`rows()` 同比例兩版只回新的，**突變**：拿掉去重 → 變紅。
+- 回退：revert；migration 的 down 在沒有新值的列時可跑。
+
+**U1 門頁機制＋側欄「作品」（Medium）**
+- next-admin：`NA/app/video/` 分兩個 route group（網址不變）。`(door)` 放現有 layout 與頁面；`(wb)` 的 layout＝`ProductDoorShell` 加 `bare` 參數（保留開通檢查，不畫導覽與登出列），依 `VW/pages/projects.html:17-24` 的順序載入工作台子頁 script，不在殼內時導向 `/?open=<名字>`。`works/` 搬進 `(wb)`。`WB/workbench.ts` 提供 `useWorkbench()`。
+- 工作台：`scripts/index-1.js:2-13,26-35` 的子頁清單改成「名字 → 來源」表；讀 `?open=`；側欄加「作品」。
+- `products.ts:52` 的 `door.nav` 與登記表測試對門頁資料夾的規則未驗；Next 頁內載入工作台 runtime 沒有先例，本卡用「作品」實測並在頁內呼叫一次導覽。不通就停在這張，U3、U6 不開。
+- 測試：`bare` 版面沒有導覽；直接開 `/works` 被導回殼；原生頁行為不變（`tests/sidebar-overlays.cjs`）。
+- 回退：revert。
+
+**U2 一套樣式（Medium）**
+- `NA/components/tools/panel-primitives.ts` 補齊按鈕、輸入框、卡片、選項鈕，值只讀 token（先量工作台原生頁的 computed style；不是 token 的補成 token）。`V/ScriptForge.tsx:250-264` 的十個小元件、`StoryBibleWorkbench`、`QaStep`、`ReleaseDeliveryPanel`、`RightsCheckbox` 改用它。
+- 去掉 `DM Serif Display`（52 處）、hex 字面值（`V/ScriptForge.tsx:266,309,1012`）、`<select>`（ScriptForge 7、QaStep 1）改按鈕組。`OrganizationPicker` 不改：門頁一律鎖定組織、不顯示。
+- 檢查器 `WB/__tests__/style-contract.test.ts`：從 `(wb)` 的 import 圖算出用到的元件檔，斷言 0 hex、0 `fontFamily`、0 `<select`。另一支 Playwright 比對原生頁與門頁的按鈕、輸入框、卡片 computed style。
+- 腳本頁外觀會變成工作台的樣子；模組、欄位、流程、文案不變，由 `ScriptForgePage.render.test.tsx`、`script-forge-errors.test.ts`、`release-panel*.test.tsx` 守。
+- 回退：revert。
+
+**U3 腳本＝新系統的腳本功能（Medium；新路由 → critic Deep）**
+- `WB/script-forge/page.tsx`：`<ScriptForge sideMenu videoNeedsClient={false} …/>`；側欄加「腳本」。
+- `V/video-handoff.ts` 加 `shotsFromScript(script)`（→ `shots[{id,text,seconds,line}]`，旁白沿用同檔 `stripStageDirections`）與 `charactersFromStoryBible(doc, refMap)`。
+- 「送去做影片」→ `VideoWorkbench.spine.create({title, ratio, shots, characters, storyBibleSeries})` → 開到新的一集。工作台：`shared/episode-spine.js:57-78` 的專案形狀抽成 `newProject()`，與 `adopt` 共用；`shared/runtime.js` 加主頁動作 `spine-create`。
+- 「在這一集寫腳本」：第 2 步加按鈕，帶 `?episode=` 開腳本頁；這時「送去做影片」的字改成「寫回這一集」，呼叫主頁動作 `spine-set-shots`（已有鏡頭時先確認「會取代現有鏡頭」）。
+- 「送社群」：`NA/app/api/social/posts/route.ts:68-76` 的核心抽成 `lib/social` 的一個函式，原路由與新路由 `API/social-drafts/text/route.ts` 共用；社群沒安裝時不傳 `saveSocialDraft`（按鈕自動隱藏，`V/ScriptForge.tsx:59`）；`:69` 的連結改成社群門網址（`productHost`，`NA/lib/portal/hosts.ts:26`）。
+- 測試：新路由「別組織的品牌被拒」，**突變**：拿掉權限檢查 → 變紅；`shotsFromScript` 不丟對白與畫面、去掉舞台指示；送去做影片 → 多一集、鏡頭數等於場景數；寫回這一集 → 集數不變、鏡頭被取代。
+- 回退：revert。
+
+**U4 鏡頭卡補齊（Medium）**
+- 換圖：鏡頭卡加「換圖」，開現有素材選擇器（素材庫＋上傳，含「有權使用」勾選）；寫回走新主頁動作 `spine-set-shot`（沒有任務的步驟照 PJ 規格 `:37` 記一筆），不讓子頁直接改主線欄位。
+- 圖庫素材：鏡頭卡加「圖庫素材」，填關鍵字 → 同源打 `API/regenerate-image`（`visual:"broll"`）取得 Pexels 素材網址 → 工作台匯入成素材 → `spine-set-shot`。工作台的網址匯入（`VW/backend/api.cjs:1836-1843`）改成共用函式，來源白名單加 Pexels 三個主機與自家 R2，並允許影片（上限另訂）。
+- 讓這鏡動起來：有圖的鏡頭加按鈕，以該圖為首幀建影片任務（`target:"shot:<id>"`），完成後由既有 `settle` 寫 `shot.video`（`VW/shared/episode-spine.js:176`）。按鈕標每秒 NT$。
+- 生圖模型可選：鏡頭的生成畫面可選圖片模型（清單來自 `/capabilities`，補 FLUX；`NA/public/editor-shared/image-models.js` 已在契約清單）。FLUX 走哪個供應商模組未驗。
+- 測試：換圖後剪輯片段標示過期（`tests/pj4-stale.cjs` 的規則）；圖庫素材來源不在白名單被拒，**突變**：拿掉白名單 → 變紅；有圖的鏡頭生影片後 `shot.video` 有值。
+- 回退：revert；已寫的 `shot.video` 留著，舊程式不讀。
+
+**U5 快速輸出、多比例、一鍵成片（Large；分三個 commit；critic Deep）**
+- commit 1（供應商）：新內部路由 `POST|GET /api/internal/video/workbench/quick-render`（Bearer `VW_INTERNAL_TOKEN`）。收 `{organizationId, sourceRef, title, scenes:[{narration, assetId}], ratio, tts, intro, autonomy}`；伺服器用資產 id 查網址與來源紀錄（不收客戶端網址，照 VD 規格的不變量）、`ensureWorkbenchProject`、送舊引擎渲染（把 `API/render-draft/route.ts` 的送渲染段抽成 `L/` 的函式，原路由改呼叫它）、`autonomy` 有值就寫列。GET 回狀態與成片的資產 id、網址、比例。
+- commit 1：`VW/backend/quick-render.cjs`（照 `backend/remotion.cjs:85-139`）：送出、輪詢、下載成片進素材庫，並把本機檔對應到主系統已登記的那一列（不重複登記，`main-system.cjs:144-145`）。任務 `operation:"quick-render"`，`link` 的 `target:"output"`、`step:"export"`，所以歷史紀錄、成片區、血統、過期判斷都照舊運作。
+- commit 2（畫面）：第 9 步「輸出」變成兩顆：「快速輸出」「剪輯輸出」。快速輸出對話框：比例複選（16:9、9:16、4:5）、聲線（舊引擎支援的，按鈕組）、片頭標題、自動完成、成本明細（伺服器用 `computeVideoCost` 算）。缺圖或缺旁白的鏡頭列出來，缺就不能送。剪輯輸出對話框的比例改成可複選，每個比例一個任務（`VW/scripts/editor-export-dialog.js:138-147`）。
+- commit 3（一鍵成片）：一集頁一顆「一鍵成片」。確認框顯示總價（缺圖張數×單價＋快速輸出）。按下後記 `episode.autoRun`（主頁 runtime 寫），先跑既有批次生成（`VW/scripts/projects-0.js:885-900`），鏡頭都有圖就送快速輸出；頁面關掉再開，runtime 看到 `autoRun` 就接著做。
+- 舊引擎對沒有旁白的場景、對每比例只給一組圖時怎麼處理未驗，commit 1 開工先讀 `L/` 的渲染入口再定對話框的限制。
+- 測試：內部路由「別組織的資產 id 被拒」，**突變**：拿掉組織條件 → 變紅；假渲染服務下快速輸出完成 → 成片區多一支、歷史紀錄有任務、主系統只有一列；複選兩個比例 → 兩個任務；一鍵成片中途重開頁面會接著做，且已有圖的鏡頭不重生。
+- 回退：三個 commit 各自 revert；已產的成片留著。
+
+**U6 審片與發布併進成片（Medium）**
+- `WB/review-release/page.tsx`：上半 `QaStep`、下半 `ReleaseDeliveryPanel`（鎖定組織、預帶影片），收 `project` 或 `asset`；`QaStep` 加選填 `initialAssetId`。`(door)/release` 改成導回殼並開這個面板。
+- 工作台：成片卡與任務面板的「送審與投遞」（`VW/shared/jobs-view.js:13-22`）改成在殼內開面板；步驟列第 11 步改名「審片」、加第 12 步「發布」（`VW/scripts/projects-0.js:155`），都開同一個面板的對應段。開之前 `POST API/projects`（帶這一集已登記成片的資產 id）。兩步的狀態每次讀鏈（四項 QA 都過；有核准的 Release），取代 `episode-spine.js:286` 的固定「選用」。
+- 成片卡加「發布到哪」：Release、投遞、成效（`API/projects?id=` 已回，`route.ts:54-69`）。
+- 專案頁清單加舊專案的唯讀卡（`API/projects` 中沒有 `source_ref` 的列，標來源），點開看它的成片與同一個面板。
+- 必留（前提 8）：每頻道一版文案且可各自改、AI 依平台各寫一版、自動配比例、超過上限提示（`V/ReleaseDeliveryPanel.tsx:127-139,229,241-245`）。
+- 測試：勾兩個不同平台 → 兩份文案各自存成草稿；從一集開只列這一集的成片；舊資料：一筆 `source=manual` 的舊專案在專案頁看得到、成片能播、能核准。
+- 回退：revert；連結回到 `/release`。
+
+**U7 字幕與音檔（Medium；critic Deep）**
+- 字幕工具加來源「主系統成片」：讀 `API/subtitles` 的字幕 → 逐句改 → 快速輸出的成片走 `API/captions/reburn`（包成工作台任務，寫法同 U5 的供應商），其他成片照舊燒字幕。成片卡加「改字幕」「下載 SRT／VTT」。
+- 轉錄失敗且當下不是自家主機引擎時，錯誤訊息旁加「改用自家主機（免費）重試」。
+- 音檔不外送：新 `GET /api/internal/video/workbench/audio-policy`（回 `externalAudioAllowed`，`L/transcription.ts:29-34`）；工作台後端在每個外送音檔的 operation 開始前檢查（開卡 grep 全列，至少 `VW/backend/transcribe.cjs:35,39`、`VW/backend/audio-tools.cjs:16,20`）；`/capabilities` 把這些列標成不可用；開關放在工作台設定，寫入沿用 `API/transcription/options` PATCH。
+- 測試：不可外送時每個外送 operation 被拒且沒有對外請求、查詢失敗＝拒，**突變**：拿掉檢查 → 變紅；改一句字幕重燒後成片字幕更新。
+- 回退：revert；舊派送路由照舊擋。
+
+**U8 片頭模板與時間軸 v1（Low）**
+- `VW/backend/remotion.cjs:11-29` 的模板表補 `pan-slide-text-left-3scenes`、`product-review-typewriter`、`photo-highlights-slides-zoom`；加 `logoUrl`、`audioUrl` 欄位與可調長度（欄位定義抄 `V/VideoStudio.tsx:1827-1907`）；文字面板表單跟著表產生。
+- 剪輯器加「匯出時間軸 v1」：呼叫已有的 `/editor/timeline-v1`（`VW/backend/api.cjs:1571-1579`），結果送 `API/timeline/validate` 並顯示問題清單。
+- 測試：五個模板各渲染一支（假服務）；長度非 5 秒可送。
+- 回退：revert。
+
+**U9 一本聖經（Medium；需 U3）**
+- 專案加 `storyBibleSeries`（主頁 runtime 寫）。製作聖經卡加兩顆：「存成核准版本」（`POST API/story-bibles {organizationId, storyBible}`＋`[id]/approve`；不帶 `projectId`，因為那條路只收短劇專案，`route.ts:40-44`）、「套用核准版本」（讀最新核准版寫回製作聖經；定裝照經 U4 的網址匯入成為參考圖）。
+- 製作聖經 ↔ Story Bible 文件的對照寫成 `L/story-bible.ts` 旁的一對純函式，兩邊不認得的欄位原樣保留；文件 schema 未驗，開卡先讀。
+- 第 3 步加「一致性比對」（`API/story-bibles/visual-consistency-check`，輸入＝鏡頭圖＋核准版）。
+- 測試：存成核准版 → 腳本頁的 Story Bible 清單看得到；套用後再存，不認得的欄位沒有掉。
+- 回退：revert；版本不可變，留著。
+
+**U10 用量與方案（Low）**
+- `VW/index.html:55` 那行文字改成讀 `API/billing`；點開一個小面板：方案、點數、已用量、成效（`API/outcomes`）。內容對照 `V/MediaOperationsPanel.tsx` 逐項。
+- 測試：有方案與沒方案兩種回應各顯示正確。
+- 回退：revert。
+
+**U11 收尾（Medium；兩個 commit）**
+- 驗收表：§3 每一列在工作台實際走一遍，全部通過才進本卡。
+- commit 1（入口）：`V/page.tsx` 與 `NA/app/(shell)/tools/script-forge/page.tsx` 改成「開啟影音工作台」。同一次點擊開殼，收到殼的就緒訊息後 `postMessage` 這台瀏覽器的 `sf_history`；殼只收來源在員工門清單內的訊息（`staffHosts`，`NA/lib/portal/hosts.ts:17`），併入影片網域的 `sf_history`（依 id 去重、上限 50）；原資料不刪。`NA/app/sidebar-sections.ts:61,63` 合成一項；`NA/app/(shell)/tools/theme/page.tsx:183` 改指它。
+- commit 2（刪除）：§5 清單；`(door)/page.tsx` 導向 `/`；`products.ts:52,55` 與登記表測試；文件：`V/CONTEXT.md`、`creative-suite-plan-20261102.md` §4、`pj-project-spine-spec-20261106.md` §6。
+- 測試：來源不在清單的訊息被丟棄，**突變**：拿掉來源檢查 → 變紅；刪除後 `tsc` 與登記表測試綠。
+- 回退：兩個 commit 各自 revert。
+
+## 5. 淘汰與保留
+
+刪（U11）：`V/VideoPipeline.tsx`、`VideoTabs.tsx`、`VideoStudio.tsx`、`ModeSelectStep.tsx`、`CostGateStep.tsx`、`CaptionsStep.tsx`、`FootageEditor.tsx`、`TimelineValidationPanel.tsx`、`MediaOperationsPanel.tsx`、`V/projects/*`、`V/__tests__/CaptionsStep.render.test.tsx`、`NA/app/(shell)/tools/script-forge/ScriptForgePage.tsx`、`NA/app/(shell)/tools/seedstar/page.tsx`。
+保留（成為新系統的功能）：`V/ScriptForge.tsx`、`StoryBibleWorkbench.tsx`、`OrganizationPicker.tsx`、`QaStep.tsx`、`ReleaseDeliveryPanel.tsx`、`RightsCheckbox.tsx`、`video-handoff.ts`、`qa-labels.ts`、其餘測試。
+保留（後端）：全部 `API/*`、`L/*`、`NA/lib/script-forge/*`。刪畫面後沒有畫面呼叫的路由（`API/draft`、`footage/*`、`remotion-render`、`timeline/compile|submit` 等）不在本計畫刪，另案查呼叫者後清理。
+
+## 6. 風險與回退
+
+- 最大的一張是 U5。它把舊引擎包成工作台任務，風險在兩邊帳要對得上（一支成片在主系統只能有一列）；用測試守，並分三個 commit。
+- D1 刪掉 `VideoStudio.tsx`：靠 §3 對照表與 U11 的驗收表防漏。員工門舊頁在 U11 之前不動，隨時可回到今天的狀態。
+- 門頁內載入工作台 runtime 沒有先例（U1）：不通就停，腳本與審片發布改列為待重新設計，其餘卡（U0、U4、U5、U7、U8、U10）不受影響。
+- U2 會改腳本頁的外觀（字體、按鈕、卡片、下拉變按鈕列），功能由既有測試守。
+- U0 的 migration 與工作台部署屬 High，照 AGENTS §3 在執行當下取得同意。
+- 舊成片不回填；第一次開審片與發布面板時補掛。
+- 兩個渲染引擎並存（快速輸出用舊的、剪輯輸出用新的）是 D3 的已知代價；內容工具改接之前不會只剩一個。
+
+## 7. 建議模型
+
+- U0、U5 commit 1、U7、U3 的新路由：Opus 5.5＋critic Deep；U0 另過 db-expert。
+- U1、U4、U5 commit 2–3、U9、U11 commit 1：Opus 5.5。
+- U2：Opus 5.5 定 primitive 與檢查器，逐檔替換派 `fullstack-engineer`（Sonnet）或 Codex。
+- U6、U8、U10、U11 commit 2：`fullstack-engineer`（Sonnet）。
