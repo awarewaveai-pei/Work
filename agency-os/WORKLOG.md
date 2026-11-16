@@ -1,4 +1,38 @@
 # Worklog
+## 2026-11-16（續8）— 影片工具融合 U 線：計畫 v4、9 張卡上線、片頭渲染修正、D:\Work 快轉兩個根因
+
+**範圍**：舊影片工具（next-admin `/tools/video`、`/tools/script-forge`）併進影音工作台。計畫 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md`（§4 卡、§8 操作者實走 20 列＝U11 驗收表、§9 片頭接進主片）。監工台 `agency-os/handoffs/2026-11-16-video-unify-supervisor/`（29/42）。續接 `agency-os/handoffs/2026-11-16-1400-video-unify-supervisor.md`。
+
+[已修改]（工人各在 worktree 做、監工讀 diff 後 cherry-pick 進 main）
+- C1 U0 `79ab5f321`：migration 0164（已套正式庫，`apply-db-migration.mjs 0164` → APPLY_OK 1/1）、`ensureWorkbenchProject`、`attachAssetIds`、`rows()` 每比例取最新。
+- C2 U1 `dd64b4a18`：`app/video/(door)|(wb)`、`useWorkbench()`、工作台側欄「作品」；Next 門頁載入工作台 runtime 實測可行。
+- C3 U4 `df5640559`：鏡頭卡換圖／圖庫素材（Pexels 白名單）／讓這鏡動起來。未做：U4.4 多家生圖模型、U4.5 動態模型可選。
+- C4 U7 `ea91b5819`＋`880a7943d`：音檔不外送守衛（7 個外送 operation）、主系統成片改字幕重燒。
+- C5 U8 `a878b713a`、U10 `2f0b08bb8`、U5 commit 1 `2f26d7dac`、U2 `3a3ad4565`。
+- C6 U5 commit 2 `dab070ccd`、U6 `58050a441`、U3 `fb790d851`（U3 與 U6 各做一套「開子頁帶參數」，退回工人只留 U6 那套）。
+- C7 U8.4 `646f1698b`：片頭渲染服務。根因＝ffmpeg 照主機 32 核開執行緒，在 1 GiB 容器被 cgroup OOM 殺掉，Remotion 於未 await 的 callback 丟例外使整個行程退出，任務表在記憶體；next-admin 回 502 使頁面輪詢到 15 分鐘。修：每支渲染在 fork 的 worker、資源照 cgroup、任務表落檔、失敗回 200+原因。
+- C8 `scripts/git-parity-merge.py` `11c0f6d10`、`6751cfc27`：D:\Work ff-refused 的兩個根因——(a) 本機檔等於上游 HEAD..target 的歷史版（在 D:\Work 改、從別的 checkout commit）遇上游再改同一行即衝突 → 視為舊快照取上游版、本機位元組留備份並點名；(b) eol=crlf 檔寫回 HEAD blob 原始位元組仍被判 modified → 改由 `git checkout-index` 逐檔寫。
+
+[部署]
+- next-admin＋video-workbench：`4b5daf721`、`fb790d851`、next-admin `dda80a22a`（sg-deploy，smoke 全過）。
+- remotion-service：映像自 repo 重建（`23e2a2344a8e`，回滾 tag `rollback-20261116`）；`safe-infra-patch.sh compose /root/render-services/docker-compose.yml` 加卷 `lobster-remotion-jobs:/app/data`（備份 `.bak.safe-patch-20261116-071735`）。步驟 `agency-os/handoffs/2026-11-16-video-unify-supervisor/u8-4-deploy-steps.md`。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機對 127.0.0.1:8733 送一支 16:9、180 幀 scale-bg-text-slideup 片頭並輪詢 /status → done 86 s、memory.peak 657231872、restarts=0、journalctl 無 oom、R2 mp4 HTTP 200 340787 bytes | exit=0 | ms=86000
+- REALTEST_EVIDENCE: tool=Bash | cmd=整合 worktree（origin/main＋全部卡）：video-workbench `node tests/gate.cjs` → gate ok；next-admin `npx tsc --noEmit` → 0；`npm test` → 556 files / 4730 passed | exit=0 | ms=420000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/git-parity-merge.py --root D:/Work --target origin/main` → fast-forwarded 36 commits、34 檔帶過、1 舊快照取代（備份 `.git/parity-merge-0arhwt3i`）、rev-list 0/0；`tests/ao-resume-shared-worktree.test.ps1` → 111 passed（P18、P18b、P19 新；突變拿掉 upstream_had → P18 3 斷言紅） | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（parity：Codex `2026-11-16-review-7426303e` 1 high＝刻意改回舊版會被取代 → 改為保留備份並點名；`2026-11-16-review-6f409216` 2＝批次寫入的競態與部分失敗 → 改逐檔。各卡的 Codex 紀錄在 `agency-os/reports/oracle/2026-11-16-review-*.md`，由工人處理後 commit）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=upstream_had | hits=3
+- 風險清查：`risk-triage-u0-u1-u4-u7.md`、`risk-triage-u2-u5-u8-u10.md`（48 條，現在修 0）；第三批 6 條由監工判定，歸 U9／U11 或不處理（監工台有列）。
+
+[剩餘風險]
+- 新畫面未用登入的瀏覽器實點：本 session 的 Chrome 工具呼叫未獲自動安全檢查放行；U11 驗收表（計畫 §8）實走時補。
+- remotion-service 的模板自 7 月映像換成 repo 版；工作台 → 服務的網路路徑（lobster-net vs lobster-video-net）未單獨驗。
+- `tests/gate.cjs` 測試清單是一整行，每張卡都衝突；改一行一個（待沒有工人動工作台時做）。
+- `pj1-legacy-ui` 在 main 上本來就逾時（不在 gate）。
+
+[rollback] 各卡單獨 `git revert`；migration 0164 down 在沒有 video_workbench 列時可跑；remotion：retag `rollback-20261116` 後 `docker compose -p render-services up -d lobster-remotion-service`；parity：revert 兩個 commit。
+- AUTO_TASK_DONE: 影片工具融合 U0 U1 U3 U6 U7 U10 完成；U2 U4 U5 U8 部分完成；U9 U11 未開始（狀態正本＝監工台 data.mjs）
 ## 2026-11-16（續7）— remote-weekly-agent: weekly summary generated
 
 - 01:09 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-11-16.md
