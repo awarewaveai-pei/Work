@@ -11,7 +11,9 @@ export const dynamic = "force-dynamic";
  * GET /api/video/subtitles?organizationId&assetId&format=srt|vtt -- card VD.10: a video's subtitle file as a one-click
  * download from our own origin (<a download> is ignored on the cross-origin bucket; the designs download proxy is behind
  * the POD flag, Codex 6ae3db97). The file url comes only from that video row's metadata.captionFiles (written by the
- * release-text route), never from the request, and must be one of our bucket objects.
+ * release-text route), never from the request, and must be one of our bucket objects. A video the old render service
+ * made (script captions) keeps its file text inline (metadata.captionSrt / captionVtt, rewritten by a caption reburn):
+ * answered from there, so the workbench's 字幕 tool reads every finished video's subtitles from this one route (plan U7).
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TYPES = { srt: "application/x-subrip; charset=utf-8", vtt: "text/vtt; charset=utf-8" } as const;
@@ -27,13 +29,17 @@ export async function GET(req: Request): Promise<Response> {
   const db = getSupabaseWriteClient(); if (!db) return fail(503, "db_unavailable");
   const { data, error } = await db.from("media_assets").select("metadata").eq("id", assetId).eq("organization_id", organizationId).maybeSingle();
   if (error) return fail(502, "asset_lookup_failed");
-  const meta = (data?.metadata ?? {}) as { captionFiles?: Record<string, unknown>; title?: unknown };
-  const url = meta.captionFiles?.[format];
-  if (typeof url !== "string" || !isPublicBucketAsset(url)) return fail(404, "no_subtitles");
-  let res: Response;
-  try { res = await fetch(url, { signal: AbortSignal.timeout(20_000) }); } catch { return fail(502, "subtitle_fetch_failed"); }
-  if (!res.ok) return fail(502, "subtitle_fetch_failed");
-  const body = Buffer.from(await res.arrayBuffer());
+  const meta = (data?.metadata ?? {}) as { captionFiles?: Record<string, unknown>; captionSrt?: unknown; captionVtt?: unknown; title?: unknown };
+  const url = meta.captionFiles?.[format], inline = format === "srt" ? meta.captionSrt : meta.captionVtt;
+  let body: Buffer<ArrayBuffer>;
+  if (meta.captionFiles) {
+    if (typeof url !== "string" || !isPublicBucketAsset(url)) return fail(404, "no_subtitles");
+    let res: Response;
+    try { res = await fetch(url, { signal: AbortSignal.timeout(20_000) }); } catch { return fail(502, "subtitle_fetch_failed"); }
+    if (!res.ok) return fail(502, "subtitle_fetch_failed");
+    body = Buffer.from(await res.arrayBuffer());
+  } else if (typeof inline === "string" && inline.trim()) body = Buffer.from(inline, "utf8");
+  else return fail(404, "no_subtitles");
   if (body.length > MAX_BYTES) return fail(502, "subtitle_too_large");
   // ASCII-only name in the header (no injection); the title's own name travels as RFC 5987 filename*.
   const title = typeof meta.title === "string" && meta.title.trim() ? meta.title.trim().slice(0, 80) : "video";

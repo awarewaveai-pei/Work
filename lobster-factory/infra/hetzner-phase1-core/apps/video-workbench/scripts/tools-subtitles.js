@@ -94,10 +94,14 @@ function toolSubtitleScreen(t) {
   }
   const cues = values.subtitleCues,
     translations = values.subtitleTranslations;
-  const preview = `<section class="subtitle-preview">${files.src ? `<div class="subtitle-video-box">${wfSource()}<div data-subtitle-overlay aria-live="off"></div></div><div class="row">${wfButton("倒退 0.1 秒", "subtitle-back")}${wfButton("前進 0.1 秒", "subtitle-forward")}<span data-subtitle-clock>0:00.000</span></div>` : wfChoice("subtitleSourceKind", ["影片", "音檔"]) + wfSource("src", values.subtitleSourceKind === "音檔" ? "audio" : "video")}<div class="row">${btn("匯入 SRT／VTT 字幕檔（免費）", "upload:subtitlefile")}${wfButton("SRT", "subtitle-download:srt", !cues.length)}${wfButton("VTT", "subtitle-download:vtt", !cues.length)}</div><details><summary>貼上或檢查字幕原文</summary>${ta("subtitleText", "貼上 SRT 或 VTT 時間碼與內容")}${wfButton("載入貼上的字幕", "subtitle-import-text")}</details>${values.subtitleImportError ? `<p role="alert">${esc(values.subtitleImportError)}</p>` : ""}</section>`;
+  // Plan U7: 主系統成片 = a finished video of the main system (connected mode only); its subtitles come from there.
+  const connected = !!VideoWorkbench.capabilities?.mainSystem,
+    mainKind = connected && values.subtitleSourceKind === "主系統成片";
+  if (!mainKind) delete values.subtitleMain;
+  const preview = `<section class="subtitle-preview">${files.src ? `<div class="subtitle-video-box">${wfSource()}<div data-subtitle-overlay aria-live="off"></div></div><div class="row">${wfButton("倒退 0.1 秒", "subtitle-back")}${wfButton("前進 0.1 秒", "subtitle-forward")}<span data-subtitle-clock>0:00.000</span></div>` : wfChoice("subtitleSourceKind", connected ? ["影片", "音檔", "主系統成片"] : ["影片", "音檔"]) + (mainKind ? toolSubtitleMainSource() : wfSource("src", values.subtitleSourceKind === "音檔" ? "audio" : "video"))}${mainKind && files.src ? toolSubtitleMainSource() : ""}<div class="row">${btn("匯入 SRT／VTT 字幕檔（免費）", "upload:subtitlefile")}${wfButton("SRT", "subtitle-download:srt", !cues.length)}${wfButton("VTT", "subtitle-download:vtt", !cues.length)}</div><details><summary>貼上或檢查字幕原文</summary>${ta("subtitleText", "貼上 SRT 或 VTT 時間碼與內容")}${wfButton("載入貼上的字幕", "subtitle-import-text")}</details>${values.subtitleImportError ? `<p role="alert">${esc(values.subtitleImportError)}</p>` : ""}</section>`;
   let body;
   if (!cues.length)
-    body = `<h3>產生字幕</h3>${wfSelect("subtitleLanguage", "辨識語言", wfLanguages())}<p>先選影片或音檔，辨識語音後逐行校對；也可免費匯入既有字幕檔。</p>${wfProviderChoice("transcribe", "subtitleEngine", "辨識方式")}${wfButton("辨識字幕", "subtitle-transcribe", !files.src, "video.transcribe", wfProviderCurrent("transcribe", values.subtitleEngine))}`;
+    body = `<h3>產生字幕</h3>${wfSelect("subtitleLanguage", "辨識語言", wfLanguages())}<p>先選影片或音檔，辨識語音後逐行校對；也可免費匯入既有字幕檔。</p>${wfProviderChoice("transcribe", "subtitleEngine", "辨識方式")}${toolSubtitleSoundSetting()}${wfButton("辨識字幕", "subtitle-transcribe", !files.src, "video.transcribe", wfProviderCurrent("transcribe", values.subtitleEngine))}${toolSubtitleFailure()}`;
   else if (values.subtitleTab === "校對")
     body = `<div class="row">${wfButton("在目前時間新增一行", "subtitle-add")}${wfButton("清除字幕重新開始", "subtitle-clear")}</div><ol class="subtitle-cues">${cues.map((cue, i) => `<li data-subtitle-row="${esc(cue.id)}"><button class="btn small" data-subtitle-seek="${i}" aria-label="從第 ${i + 1} 行播放">▶ ${i + 1}</button><div class="row"><label>開始<input class="text-input" data-subtitle-start="${i}" aria-label="第 ${i + 1} 行開始時間" value="${toolSubtitleStamp(cue.start)}"></label><label>結束<input class="text-input" data-subtitle-end="${i}" aria-label="第 ${i + 1} 行結束時間" value="${toolSubtitleStamp(cue.end)}"></label></div><textarea data-subtitle-text="${i}" aria-label="第 ${i + 1} 行字幕">${esc(values.subtitleFirstLine !== "原文" ? (translations[values.subtitleFirstLine]?.[cue.id] ?? cue.text) : cue.text)}</textarea><div class="row"><button class="btn small" data-subtitle-shift="${i}" data-delta="-0.1">整行往前移 0.1 秒</button><button class="btn small" data-subtitle-shift="${i}" data-delta="0.1">整行往後移 0.1 秒</button><button class="btn small" data-subtitle-delete="${i}">刪除這一行</button></div></li>`).join("")}</ol>`;
   else if (values.subtitleTab === "翻譯")
@@ -115,7 +119,7 @@ function toolSubtitleScreen(t) {
       )}</div>${wfField("subtitleColor", "自訂顏色", "color")}${range("subtitleSize", 52, 20, 100, 1, " / 1000 畫面高度")}<label>位置</label>${wfChoice("subtitlePosition", ["下方", "中下", "中間", "上方"])}<p class="note">匯入字幕沒有逐字時間碼；逐字高亮及卡拉 OK 尚未啟用。</p>`;
   return wfWrap(
     t,
-    `<div class="two-col flow-layout">${preview}<aside class="side">${wfChoice("subtitleTab", ["校對", "翻譯", "樣式"])}${body}<p class="note">${cues.length} 行字幕 · 時間與文字會隨草稿保存。</p>${wfButton("燒錄字幕成新影片", "subtitle-burn", !cues.length || !files.src || !String(files.src.type).startsWith("video/"))}</aside></div>`,
+    `<div class="two-col flow-layout">${preview}<aside class="side">${wfChoice("subtitleTab", ["校對", "翻譯", "樣式"])}${body}<p class="note">${cues.length} 行字幕 · 時間與文字會隨草稿保存。</p>${toolSubtitleBurnButton(cues)}</aside></div>`,
   );
 }
 function toolSubtitleAfterRender() {
@@ -201,6 +205,133 @@ function toolSubtitlePreview() {
     "px";
 }
 let toolSubtitlePending = false;
+// ---- Plan U7: 主系統成片, 重燒字幕, the client's sound setting, 改用自家主機重試 ------------------------------------------
+// The main system's finished videos that have subtitles (GET /api/video/assets, same origin): null = not read yet.
+let toolSubtitleMainList = null,
+  toolSubtitleMainLoading = null,
+  toolSubtitleMainError = "";
+// The last failed recognition { message, engine } (cleared by the next try); its retry button runs on our host worker.
+let toolSubtitleFailed = null;
+// GET /api/video/transcription/options for this org: { externalAllowed, canChangeSetting }; null = not read yet.
+let toolSubtitleOptions = null;
+const toolSubtitleOrg = () => VideoWorkbench.capabilities?.mainSystem?.organizationId || "";
+async function toolSubtitleJson(url, init) {
+  const r = await fetch(url, { credentials: "same-origin", ...init });
+  const value = await r.json().catch(() => ({}));
+  if (!r.ok || value.ok === false) throw Error("主系統回應失敗（" + (value.error || r.status) + "）");
+  return value;
+}
+function toolSubtitleMainLoad() {
+  return (toolSubtitleMainLoading ||= toolSubtitleJson("/api/video/assets?" + new URLSearchParams({ organizationId: toolSubtitleOrg(), includeWorkbench: "1" }))
+    .then((j) => {
+      toolSubtitleMainError = "";
+      // A ratio row (variantOf) is reburned with its primary; only rows that have subtitles are listed.
+      toolSubtitleMainList = (j.items || []).filter((a) => !a.metadata?.variantOf && (a.metadata?.captionFiles?.srt || a.metadata?.captionSrt)).map((a) => ({
+        id: a.id,
+        title: a.metadata?.title || "成片 " + new Date(a.created_at).toLocaleString(),
+        // Made by the old render service with its caption-less copy kept: the main system burns the new lines (every ratio).
+        reburnable: !!(a.metadata?.cleanUrl && a.metadata?.captionCues?.length),
+      }));
+    }, (error) => {
+      toolSubtitleMainList = [];
+      toolSubtitleMainError = error.message;
+    })
+    .finally(() => {
+      toolSubtitleMainLoading = null;
+      if (tool === "subtitle") render();
+    }));
+}
+function toolSubtitleMainSource() {
+  // Opened from a finished video's 改字幕 (shared/jobs-view.js): read that video's subtitles once.
+  if (values.subtitleMainPending) {
+    const id = values.subtitleMainPending;
+    delete values.subtitleMainPending;
+    toolSubtitleMainOpen(id).catch(VideoWorkbench.reportError);
+  }
+  const picked = values.subtitleMain;
+  if (picked) return `<div class="flow-media-meta"><b>${esc(picked.title)}</b><span>主系統成片${picked.reburnable ? " · 改完可重燒每個比例" : ""}</span>${wfButton("換一支成片", "subtitle-main-list")}</div>`;
+  if (toolSubtitleMainList === null) toolSubtitleMainLoad();
+  if (!toolSubtitleMainList?.length)
+    return `<p class="note" role="status">${toolSubtitleMainList === null ? "正在讀取主系統成片…" : toolSubtitleMainError ? esc(toolSubtitleMainError) : "主系統還沒有帶字幕的成片。"}</p>`;
+  return `<section class="stage"><h3>選一支主系統成片</h3><div class="flow-choices" role="group">${toolSubtitleMainList.map((a) => wfButton(a.title, "subtitle-main:" + a.id)).join("")}</div></section>`;
+}
+// Reads the video's subtitles from the main system (GET /api/video/subtitles, the one route for every finished video).
+async function toolSubtitleMainOpen(assetId) {
+  if (!toolSubtitleMainList?.some((a) => a.id === assetId)) await toolSubtitleMainLoad();
+  // The list holds the newest 200 videos; an older one still opens (its subtitles come from the route below), as not
+  // reburnable here -- only the list knows whether it kept a caption-less copy.
+  const picked = toolSubtitleMainList?.find((a) => a.id === assetId) || { id: assetId, title: "主系統成片", reburnable: false };
+  const r = await fetch("/api/video/subtitles?" + new URLSearchParams({ organizationId: toolSubtitleOrg(), assetId, format: "srt" }), { credentials: "same-origin" });
+  if (!r.ok) throw Error(r.status === 404 ? "這支成片沒有字幕" : "讀取字幕失敗（" + r.status + "）");
+  values.subtitleCues = toolSubtitleParse(await r.text());
+  values.subtitleTranslations = {};
+  values.subtitleFirstLine = "原文";
+  values.subtitleMain = { assetId, title: picked.title, reburnable: picked.reburnable };
+  delete values.subtitleImportError;
+  toolSubtitleCommit();
+  render();
+}
+// The burn button: a reburnable main-system video -> the main system burns every ratio; a local video -> burned here.
+function toolSubtitleBurnButton(cues) {
+  const main = values.subtitleSourceKind === "主系統成片" && values.subtitleMain;
+  if (main?.reburnable) return wfButton("重燒字幕（每個比例）", "subtitle-reburn", !cues.length);
+  if (main && !files.src) return `<p class="note">這支成片沒有保留無字幕底片，不能重燒；改好的字幕可以下載 SRT／VTT，或回剪輯器改字幕後重新輸出。</p>`;
+  return wfButton("燒錄字幕成新影片", "subtitle-burn", !cues.length || !files.src || !String(files.src.type).startsWith("video/"));
+}
+function toolSubtitleFailure() {
+  if (!toolSubtitleFailed) return "";
+  const host = window.VideoWorkbenchProviders.rows("transcribe").find((r) => r.id === "host");
+  return `<p role="alert">${esc(toolSubtitleFailed.message)}</p>${toolSubtitleFailed.engine !== "host" && host?.available ? wfButton("改用自家主機（免費）重試", "subtitle-transcribe-host", !files.src) : ""}`;
+}
+// The client's setting (plan U7): read and written by the main system's route; the switch shows to whoever may change the
+// client's settings. The engine rows already follow it (/capabilities marks the rows that send sound out).
+function toolSubtitleSoundSetting() {
+  if (!toolSubtitleOrg()) return "";
+  if (toolSubtitleOptions === null) {
+    toolSubtitleOptions = {};
+    toolSubtitleJson("/api/video/transcription/options?" + new URLSearchParams({ organizationId: toolSubtitleOrg() }))
+      .then((j) => { toolSubtitleOptions = { externalAllowed: j.externalAllowed === true, canChangeSetting: j.canChangeSetting === true }; }, () => {})
+      .finally(() => tool === "subtitle" && render());
+  }
+  const kept = VideoWorkbench.capabilities.mainSystem.externalAudioAllowed !== true;
+  return (kept ? `<p class="note">這個客戶的聲音不送出主機（或目前查不到這項設定），只能用自家主機辨識。</p>` : "") +
+    (toolSubtitleOptions.canChangeSetting ? wfButton(toolSubtitleOptions.externalAllowed ? "設為：這個客戶的聲音不可送出主機" : "設為：這個客戶的聲音可以送到外部服務", "subtitle-sound-setting") : "");
+}
+async function toolSubtitleRecognize(button, engine) {
+  if (toolSubtitlePending) return;
+  if (!files.src) throw Error("請先選取影片或音檔");
+  if (files.src.duration > 1200) throw Error("字幕辨識單次最長 20 分鐘");
+  const originalFile = files.src,
+    originalText = values.subtitleText;
+  toolSubtitlePending = true;
+  toolSubtitleFailed = null;
+  button.disabled = true;
+  try {
+    let srt;
+    try {
+      srt = await wfTranscribe(originalFile, values.subtitleLanguage, engine);
+    } catch (error) {
+      toolSubtitleFailed = { message: "字幕辨識失敗：" + error.message, engine: wfProviderCurrent("transcribe", engine) };
+      if (tool === "subtitle") render();
+      return;
+    }
+    if (
+      files.src !== originalFile ||
+      values.subtitleText !== originalText
+    ) {
+      VideoWorkbench.notify("來源或字幕已改變，保留目前內容，請重新辨識。");
+      return;
+    }
+    values.subtitleCues = toolSubtitleParse(srt);
+    values.subtitleTranslations = {};
+    delete values.subtitleImportError;
+    toolSubtitleCommit();
+    if (tool === "subtitle") render();
+  } finally {
+    toolSubtitlePending = false;
+    if (button.isConnected) button.disabled = false;
+  }
+}
 document.addEventListener("input", (event) => {
   const index = event.target.dataset.subtitleText;
   if (index !== undefined && values.subtitleCues?.[index]) {
@@ -331,32 +462,44 @@ document.addEventListener("click", async (event) => {
         "text/plain;charset=utf-8",
       );
     }
-    if (action === "subtitle-transcribe") {
-      if (toolSubtitlePending) return;
-      if (!files.src) throw Error("請先選取影片或音檔");
-      if (files.src.duration > 1200) throw Error("字幕辨識單次最長 20 分鐘");
-      const originalFile = files.src,
-        originalText = values.subtitleText;
-      toolSubtitlePending = true;
+    if (action === "subtitle-transcribe") await toolSubtitleRecognize(button, values.subtitleEngine);
+    if (action === "subtitle-transcribe-host") {
+      values.subtitleEngine = "host";
+      saveDraft();
+      await toolSubtitleRecognize(button, "host");
+    }
+    if (action === "subtitle-main-list") {
+      delete values.subtitleMain;
+      delete files.src;
+      toolSubtitleMainList = null;
+      values.subtitleCues = [];
+      values.subtitleTranslations = {};
+      toolSubtitleCommit();
+      render();
+    }
+    if (action?.startsWith("subtitle-main:")) {
+      delete files.src;
+      await toolSubtitleMainOpen(action.slice(14));
+    }
+    if (action === "subtitle-sound-setting") {
       button.disabled = true;
-      try {
-        const srt = await wfTranscribe(originalFile, values.subtitleLanguage, values.subtitleEngine);
-        if (
-          files.src !== originalFile ||
-          values.subtitleText !== originalText
-        ) {
-          VideoWorkbench.notify("來源或字幕已改變，保留目前內容，請重新辨識。");
-          return;
-        }
-        values.subtitleCues = toolSubtitleParse(srt);
-        values.subtitleTranslations = {};
-        delete values.subtitleImportError;
-        toolSubtitleCommit();
-        if (tool === "subtitle") render();
-      } finally {
-        toolSubtitlePending = false;
-        if (button.isConnected) button.disabled = false;
-      }
+      const externalAllowed = !toolSubtitleOptions.externalAllowed;
+      await toolSubtitleJson("/api/video/transcription/options", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ organizationId: toolSubtitleOrg(), externalAllowed }) });
+      toolSubtitleOptions.externalAllowed = externalAllowed;
+      VideoWorkbench.capabilities = await VideoWorkbench.request("/capabilities", undefined, "GET");
+      render();
+    }
+    if (action === "subtitle-reburn") {
+      const main = values.subtitleMain;
+      if (!main?.reburnable) throw Error("這支成片不能重燒字幕");
+      const line = values.subtitleFirstLine === "原文" ? null : values.subtitleTranslations[values.subtitleFirstLine];
+      const job = await VideoWorkbench.generations.create({
+        type: "video",
+        operation: "caption-reburn",
+        prompt: "重燒字幕",
+        settings: { assetId: main.assetId, cues: cues.map((cue) => ({ start: cue.start, end: cue.end, text: line?.[cue.id] || cue.text })) },
+      });
+      VideoWorkbench.showJob(job);
     }
     if (action?.startsWith("subtitle-translate:")) {
       if (toolSubtitlePending) return;

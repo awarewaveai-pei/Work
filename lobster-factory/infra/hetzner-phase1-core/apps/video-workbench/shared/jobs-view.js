@@ -73,6 +73,36 @@
     }, VideoWorkbench.reportError);
     actions.append(box);
   }
+  // Plan U7: a finished video registered in the main system -- its subtitle files (GET /api/video/subtitles, same origin,
+  // the one route for every finished video) and 改字幕 = the 字幕 tool opened on it (source 主系統成片). A subtitle burn made
+  // here also hands the tool its own source video, so the new lines are burned on the clean picture, not over the old ones.
+  function subtitleButtons(v, actions) {
+    if (!v.result?.assetId) return;
+    for (const format of ["srt", "vtt"]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "下載 " + format.toUpperCase();
+      button.onclick = async () => {
+        try {
+          const org = (await caps())?.mainSystem?.organizationId || "";
+          const r = await fetch("/api/video/subtitles?" + new URLSearchParams({ organizationId: org, assetId: v.result.assetId, format }), { credentials: "same-origin" });
+          if (!r.ok) throw Error(r.status === 404 ? "這支成片沒有字幕檔" : "下載字幕失敗（" + r.status + "）");
+          VideoWorkbench.download("subtitles." + format, await r.text(), "text/plain;charset=utf-8");
+        } catch (error) {
+          VideoWorkbench.reportError(error);
+        }
+      };
+      actions.append(button);
+    }
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.textContent = "改字幕";
+    edit.onclick = () => {
+      const src = v.input?.operation === "subtitle-burn" ? v.input.references?.src : null;
+      VideoWorkbench.generator.import({ intent: "open-tool", tool: "subtitle", settings: { subtitleSourceKind: "主系統成片", subtitleMainPending: v.result.assetId }, ...(src?.url ? { asset: src } : {}) }).catch(VideoWorkbench.reportError);
+    };
+    actions.append(edit);
+  }
   VideoWorkbench.deliveryUrl = deliveryUrl;
   VideoWorkbench.showJob = (job, options = {}) => {
     let panel = document.createElement("section");
@@ -199,6 +229,7 @@
             if (v.type === "video") {
               reviewButton(v, actions);
               coverButtons(v, actions);
+              subtitleButtons(v, actions);
             }
             result.append(actions);
           }

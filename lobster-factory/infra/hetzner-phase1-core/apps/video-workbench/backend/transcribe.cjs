@@ -43,9 +43,10 @@ const day = (at) => new Date(at ?? Date.now()).toISOString().slice(0, 10);
 const retireOn = (e) => rates.MEDIA_MODELS[e.model]?.retireOn || null;
 const live = (at) => ENGINES.filter((e) => !retireOn(e) || retireOn(e) > day(at));
 // Live rows with what providers.cjs decides by (order and default, free first; VW_TRANSCRIBE_ENGINE names the wanted row).
-const rows = (env, at) => live(at).map((e) => {
+// soundOut false (plan U7, backend/audio-policy.cjs: this client keeps its sound here) = only the host worker can run.
+const rows = (env, at, soundOut = true) => live(at).map((e) => {
   const price = transcribePrice(e.model);
-  return { e, id: e.id, available: available(e, env), free: price?.usd === 0, price };
+  return { e, id: e.id, available: available(e, env) && (soundOut || e.id === "host"), free: price?.usd === 0, price };
 });
 const defaultEngine = (env = process.env, at) => providers.choose(rows(env, at), vwEnv(env, "TRANSCRIBE_ENGINE"))?.e;
 // The engine a job runs: its named live row, else the default. A retired or unknown name is refused, never swapped.
@@ -72,13 +73,15 @@ function auth(engine, env = process.env) {
   return { url, token };
 }
 // /capabilities: the live rows in providers.cjs order; price = provider-cost.cjs transcribePrice (same rule as the charge).
-function capability(env, at) {
-  const list = rows(env, at);
+function capability(env, at, { soundOut = true } = {}) {
+  const list = rows(env, at, soundOut);
   return {
     defaultEngine: providers.choose(list, vwEnv(env, "TRANSCRIBE_ENGINE"))?.id,
-    engines: providers.order(list).map(({ e, available, free, price }) => ({ id: e.id, model: e.model, provider: e.provider, label: e.label, note: e.provider === "ElevenLabs" && elevenlabs.creditsNote() ? e.note + " " + elevenlabs.creditsNote() : e.note, retireOn: retireOn(e), available, free, price })),
+    engines: providers.order(list).map(({ e, available, free, price }) => ({ id: e.id, model: e.model, provider: e.provider, label: e.label, note: (e.provider === "ElevenLabs" && elevenlabs.creditsNote() ? e.note + " " + elevenlabs.creditsNote() : e.note) + (soundOut || e.id === "host" ? "" : " " + KEPT_HERE), retireOn: retireOn(e), available, free, price })),
   };
 }
+// Beside a row that would send sound out while the client keeps it here (plan U7).
+const KEPT_HERE = "這個客戶設定聲音不可送出主機，此方式停用。";
 const GAP = 1; // seconds of silence between two separate stretches of sound in the mixed file
 const MERGE = 0.3; // clips closer than this on the timeline are one stretch (a cut between two clips is not a pause)
 
@@ -498,4 +501,4 @@ async function transcribeProject(settings, { localFile, inspect, run, tmpDir, en
   }
 }
 
-module.exports = { ENGINES, live, pick, defaultEngine, auth, capability, LANGUAGES, UPLOAD_BYTES, HOST_UPLOAD_BYTES, GAP, scoreOf, normalize, toSrt, recognize, traditional, fromGemini, fromScribe, plan, layout, timelineOf, chunks, prepare, audioSeconds, timeoutMs, quote, transcribeProject };
+module.exports = { KEPT_HERE, ENGINES, live, pick, defaultEngine, auth, capability, LANGUAGES, UPLOAD_BYTES, HOST_UPLOAD_BYTES, GAP, scoreOf, normalize, toSrt, recognize, traditional, fromGemini, fromScribe, plan, layout, timelineOf, chunks, prepare, audioSeconds, timeoutMs, quote, transcribeProject };

@@ -7,6 +7,7 @@ const fs = require("node:fs"), path = require("node:path"), crypto = require("no
 const providers = require("./providers.cjs");
 const { elevenUsd } = require("./provider-cost.cjs");
 const elevenlabs = require("./elevenlabs.cjs");
+const { KEPT_HERE } = require("./transcribe.cjs");
 
 const at = (f) => { try { return f(); } catch { return null; } };
 const TOOLS = Object.freeze({
@@ -30,10 +31,11 @@ const rows = (tool, env) => TOOLS[tool].map((r) => {
   return { r, id: r.id, free: price?.usd === 0, price, available: !!r.credential(env) && price?.usd === 0 };
 });
 const note = (r) => (r.vendor === "ElevenLabs" && elevenlabs.creditsNote() ? r.note + " " + elevenlabs.creditsNote() : r.note);
-function capability(env) {
+// soundOut false (plan U7, backend/audio-policy.cjs: this client keeps its sound here) = only the local row can run.
+function capability(env, { soundOut = true } = {}) {
   return Object.fromEntries(Object.keys(TOOLS).map((tool) => {
-    const list = rows(tool, env);
-    return [tool, { defaultEngine: providers.choose(list)?.id, engines: providers.order(list).map(({ r, available, free, price }) => ({ id: r.id, vendor: r.vendor, label: r.label, note: note(r), available, free, price })) }];
+    const list = rows(tool, env).map((x) => (soundOut || x.id === "local" ? x : { ...x, available: false, kept: true }));
+    return [tool, { defaultEngine: providers.choose(list)?.id, engines: providers.order(list).map(({ r, available, free, price, kept }) => ({ id: r.id, vendor: r.vendor, label: r.label, note: note(r) + (kept ? " " + KEPT_HERE : ""), available, free, price })) }];
   }));
 }
 // The row a job runs: its named row, else the default. Unknown = refused; a row that cannot run here = 503 before the job.
@@ -48,6 +50,12 @@ function pick(tool, id, env) {
   return row.r;
 }
 const handles = (input) => Object.hasOwn(TOOLS, input?.operation);
+// The row a job names, else the default -- without asking whether it can run now (backend/audio-policy.cjs: where the
+// sound would go must not depend on an account cache). Unknown name = null (pick refuses it).
+const rowOf = (input, env) => {
+  const id = input.settings?.[KEY[input.operation]];
+  return id === undefined || id === null || id === "" ? providers.choose(rows(input.operation, env))?.r : TOOLS[input.operation].find((r) => r.id === id) || null;
+};
 // Before the job is recorded: the row exists and can run.
 const check = (input, env) => pick(input.operation, input.settings?.[KEY[input.operation]], env);
 const runsLocally = (input, env) => input?.operation === "separate" && check(input, env).id === "local";
@@ -101,4 +109,4 @@ async function run(input, { file, output, signal, run: ffmpeg, inspect, env, fet
   }
 }
 
-module.exports = { TOOLS, KEY, MAX_SECONDS, capability, pick, check, handles, runsLocally, run };
+module.exports = { TOOLS, KEY, MAX_SECONDS, capability, pick, check, handles, rowOf, runsLocally, run };

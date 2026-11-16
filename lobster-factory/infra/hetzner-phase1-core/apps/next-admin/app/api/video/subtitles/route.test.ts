@@ -15,7 +15,7 @@ vi.stubGlobal("fetch", async (url: string) => { fetched.push(url); return new Re
 import { GET } from "./route";
 
 const ORG = "123e4567-e89b-42d3-a456-426614174001", OTHER = "123e4567-e89b-42d3-a456-426614174009";
-const VIDEO = "123e4567-e89b-42d3-a456-426614174002", BARE = "123e4567-e89b-42d3-a456-426614174003", EVIL = "123e4567-e89b-42d3-a456-426614174004";
+const VIDEO = "123e4567-e89b-42d3-a456-426614174002", OLD = "123e4567-e89b-42d3-a456-426614174005", BARE = "123e4567-e89b-42d3-a456-426614174003", EVIL = "123e4567-e89b-42d3-a456-426614174004";
 const staff = { "x-ops-claims-role": "owner", "x-ops-user-kind": "staff" };
 const get = (q: string, headers: Record<string, string> = staff) => GET(new NextRequest(`http://localhost/api/video/subtitles?${q}`, { headers }));
 
@@ -26,6 +26,7 @@ beforeEach(() => {
   state.rows = [
     { id: VIDEO, organization_id: ORG, metadata: { title: "春季新品", captionFiles: { srt: "https://videos.example/video/subtitles/o/a.srt", vtt: "https://videos.example/video/subtitles/o/a.vtt", cues: 1 } } },
     { id: BARE, organization_id: ORG, metadata: {} },
+    { id: OLD, organization_id: ORG, metadata: { captionSrt: ["1", "00:00:00,000 --> 00:00:01,500", "改過的第一句", ""].join("\n") } },
     { id: EVIL, organization_id: ORG, metadata: { captionFiles: { srt: "https://evil.example/x.srt" } } },
   ];
 });
@@ -39,6 +40,13 @@ describe("GET /api/video/subtitles", () => {
     expect(res.headers.get("content-type")).toMatch(/^application\/x-subrip/);
     expect(await res.text()).toContain("嗨");
     expect(fetched).toEqual(["https://videos.example/video/subtitles/o/a.srt"]);
+  });
+  it("a video of the old render service answers its own inline captions (plan U7), nothing fetched", async () => {
+    const res = await get(`organizationId=${ORG}&assetId=${OLD}&format=srt`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("改過的第一句");
+    expect((await get(`organizationId=${ORG}&assetId=${OLD}&format=vtt`)).status).toBe(404);
+    expect(fetched).toEqual([]);
   });
   it("no subtitles, a url outside our buckets, or a bad format: refused, nothing fetched", async () => {
     expect((await get(`organizationId=${ORG}&assetId=${BARE}&format=srt`)).status).toBe(404);

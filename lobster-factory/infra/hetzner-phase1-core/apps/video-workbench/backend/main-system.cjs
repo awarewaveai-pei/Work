@@ -39,7 +39,7 @@ function paidFeature(input, type) {
   if (op === "editor-transcribe") return "video.transcribe"; // card ED.10 整片字幕
   if (op === "music") return "video.music"; // backend/music.cjs 音樂生成
   if (require("./video-enhance.cjs").isAi(input)) return "video.enhance"; // card ED.12.3: before localTool (enhance is also a free ffmpeg op)
-  if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || localTool(op)) return null;
+  if (op === "remotion-template" || op === "caption-reburn" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || localTool(op)) return null;
   return { image: "video.image", video: "video.motion", audio: "video.tts" }[type] || null;
 }
 
@@ -49,7 +49,7 @@ function ledgerKind(job) {
   if (op === "image-to-3d" || op === "meshy-image-to-3d") return "3d"; // meshy-image-to-3d: jobs recorded before card S4b
   if (op === "editor-transcribe") return "transcribe";
   if (require("./video-enhance.cjs").isAi(job.input)) return "video"; // card ED.12.3: an AI-made video (jobs/route.ts KINDS)
-  if (op === "remotion-template" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || op === "engine-render" || localTool(op)) return "render";
+  if (op === "remotion-template" || op === "caption-reburn" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || op === "engine-render" || localTool(op)) return "render";
   return ["image", "video", "audio"].includes(job.type) ? job.type : "render";
 }
 
@@ -324,10 +324,23 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
     }
     flush();
   }
+  // Plan U7: one call to a main-system internal route, for this org's work (audio-policy.cjs, caption-reburn.cjs).
+  // Answers { ok, status, value }; a network failure throws (the caller decides what it means).
+  async function call(route, { method = "GET", body, signal, timeoutMs = 30000 } = {}) {
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const r = await fetchImpl(base + route, {
+      method,
+      headers: { Authorization: "Bearer " + token, ...(body ? { "Content-Type": "application/json" } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    });
+    return { ok: r.ok, status: r.status, value: await answer(r) };
+  }
+
   if (outbox.length) flush();
   setInterval(flush, Number(env.VW_USAGE_RETRY_MS) > 0 ? Number(env.VW_USAGE_RETRY_MS) : 60000).unref();
 
-  return { ingest, releaseText, mirror, permit, usage, flush, pendingUsage: () => outbox.length, idle: () => Promise.all([...chains.values(), flushing]) };
+  return { ingest, releaseText, mirror, permit, usage, flush, call, organizationId: org, pendingUsage: () => outbox.length, idle: () => Promise.all([...chains.values(), flushing]) };
 }
 
 module.exports = { createMainSystem, configured, paidFeature, ledgerKind, localUrls, PAID_ROUTES, MIME, LOCAL_URL };
