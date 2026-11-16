@@ -84,14 +84,14 @@ export const STEPS = [
     ] },
   { n: 4, code: 'U3', title: '腳本＝新系統的腳本功能', plain: '例：在側欄「腳本」寫好一支三場景腳本，按「送去做影片」，工作台多一集，鏡頭已經排好。',
     gate: '別組織的品牌送社群被拒（拿掉權限檢查，測試會紅）；送去做影片後多一集、鏡頭數等於場景數；寫回這一集後集數不變、鏡頭被取代；對白與畫面不掉、舞台指示去掉。',
-    risk: 'Medium', model: 'Opus 5.5；新路由加 critic Deep', status: 'not_started', depends: ['U2'],
+    risk: 'Medium', model: 'Opus 5.5；新路由加 critic Deep', status: 'done', commit: 'fb790d851', depends: ['U2'],
     what: 'WB/script-forge/page.tsx 掛 ScriptForge；video-handoff.ts 加 shotsFromScript、charactersFromStoryBible；runtime 主頁動作 spine-create、spine-set-shots；episode-spine newProject() 與 adopt 共用；API/social-drafts/text 與 social/posts 共用 lib/social 函式',
     files: [`${WB}script-forge/page.tsx`, `${V}video-handoff.ts`, `${VW}shared/episode-spine.js`, `${VW}shared/runtime.js`, `${NA}app/api/social/posts/route.ts`, `${API}social-drafts/text/route.ts`, `${NA}lib/portal/hosts.ts`],
     items: [
-      todo('U3.1', '側欄「腳本」＝原本腳本頁的同一個元件，入口與流程不變。'),
-      todo('U3.2', '「送去做影片」開工作台的新一集，鏡頭與角色帶進去。'),
-      todo('U3.3', '一集第 2 步「寫腳本」；寫完按「寫回這一集」，已有鏡頭時先確認會取代。'),
-      todo('U3.4', '「送社群」走影片 API 新路由，跟社群工具同一個權限檢查；社群沒裝時按鈕不出現。'),
+      done('U3.1', '側欄「腳本」＝原本腳本頁的同一個元件，入口與流程不變。', 'fb790d851'),
+      done('U3.2', '「送去做影片」開工作台的新一集，鏡頭與角色帶進去。', 'fb790d851'),
+      done('U3.3', '一集第 2 步「寫腳本」；寫完按「寫回這一集」，已有鏡頭時先確認會取代。', 'fb790d851'),
+      done('U3.4', '「送社群」走影片 API 新路由，跟社群工具同一個權限檢查；社群沒裝時按鈕不出現。', 'fb790d851'),
     ] },
   { n: 5, code: 'U4', title: '鏡頭卡補齊', plain: '例：在鏡頭卡按「圖庫素材」打「海邊日落」，選一張 Pexels 照片換上；再按「讓這鏡動起來」變成一段影片。',
     gate: '換圖後剪輯裡的片段標示過期；白名單外的圖庫來源被拒（拿掉白名單，測試會紅）；有圖的鏡頭生影片後鏡頭帶著影片。',
@@ -152,7 +152,7 @@ export const STEPS = [
     what: '專案加 storyBibleSeries；製作聖經「存成核准版本」（POST API/story-bibles＋approve，不帶 projectId）、「套用核准版本」；L/story-bible.ts 旁一對對照純函式；第 3 步一致性比對',
     files: [`${API}story-bibles/`, `${L}story-bible.ts`, `${VW}scripts/projects-0.js`, `${VW}shared/runtime.js`],
     items: [
-      todo('U9.1', '製作聖經加「存成核准版本」「套用核准版本」，跟腳本頁的 Story Bible 是同一條版本鏈；不認得的欄位原樣保留。'),
+      todo('U9.1', '製作聖經加「存成核准版本」「套用核准版本」，跟腳本頁的 Story Bible 是同一條版本鏈；不認得的欄位原樣保留。另補 U3 留下的兩件：「寫回這一集」要把角色綁回去；轉成其他平台版本的腳本要保留角色對應。'),
       todo('U9.2', '第 3 步加「一致性比對」：鏡頭圖對核准版。'),
     ] },
   { n: 11, code: 'U10', title: '用量與方案', plain: '例：點工作台右上角的用量，看到目前方案、剩下的點數和成效。',
@@ -171,12 +171,12 @@ export const STEPS = [
     what: '驗收表（§3 每列實走）；commit 1 入口改「開啟影音工作台」＋sf_history postMessage（只收 staffHosts）＋側欄合一；commit 2 刪 §5 清單、(door)/page.tsx 導向 /、products.ts 與登記表、文件',
     files: [`${V}page.tsx`, `${NA}app/(shell)/tools/script-forge/page.tsx`, `${NA}app/sidebar-sections.ts`, `${NA}app/(shell)/tools/theme/page.tsx`, `${NA}lib/portal/hosts.ts`, `${NA}lib/portal/products.ts`],
     items: [
-      todo('U11.1', '驗收：計畫 §3 每一列舊能力都在工作台實際走一遍，全過才往下。驗收以計畫 §8 的 20 列為準。'),
+      todo('U11.1', '驗收：計畫 §3 每一列舊能力都在工作台實際走一遍，全過才往下。驗收以計畫 §8 的 20 列為準。既有測試 pj1-legacy-ui 在 main 上本來就逾時（不在總閘內），驗收時修好或刪掉。'),
       todo('U11.2', 'commit 1：舊入口改成「開啟影音工作台」，這台瀏覽器的腳本歷史搬過去（只收員工門來的訊息，原資料不刪）。'),
       todo('U11.3', 'commit 2：刪掉退場的舊畫面、舊入口登記與過時文件。'),
     ] },
 ];
 
 export const OPEN = [
-  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；U5 第二段、U6 已在 main，還沒部署；上線前一樣要說 go。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
+  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；U3、U5 第二段、U6 於 2026-11-16 第二次部署上線；之後的卡上線前一樣要說 go。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
 ];
