@@ -76,6 +76,12 @@ export async function GET(req: Request): Promise<Response> {
   if (organizationId) projects = projects.eq("organization_id", organizationId);
   const sourceRef = url.searchParams.get("sourceRef")?.trim();
   if (sourceRef) projects = projects.eq("source_ref", sourceRef);
+  // The workbench lists the projects it did not make: excluded here, so the 100 newest are 100 of those.
+  const excludeSource = url.searchParams.get("excludeSource");
+  if (excludeSource !== null) {
+    if (!SOURCES.has(excludeSource)) return bad("invalid excludeSource");
+    projects = projects.neq("source", excludeSource);
+  }
   const { data, error } = await projects;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, items: data ?? [] });

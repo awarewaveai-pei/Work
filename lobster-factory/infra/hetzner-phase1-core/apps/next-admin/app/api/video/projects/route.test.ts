@@ -117,6 +117,18 @@ describe("/api/video/projects", () => {
     expect((await postWb({ sourceRef: "" })).status).toBe(400);
   });
 
+  it("GET ?excludeSource= leaves that source out (a 選題 row with its own source_ref stays); an unknown value is 400", async () => {
+    const tables = { media_production_projects: [
+      { id: "p-wb", organization_id: org, source: "video_workbench", source_ref: "vw-1", lifecycle_stage: "produce" },
+      { id: "p-topic", organization_id: org, source: "content_topic", source_ref: "topic-7", lifecycle_stage: "produce" },
+      { id: "p-manual", organization_id: org, source: "manual", source_ref: null, lifecycle_stage: "create" },
+    ] };
+    getSupabaseWriteClient.mockReturnValue(memoryDb(tables));
+    const res = await GET(asStaff(`http://localhost/api/video/projects?organizationId=${org}&excludeSource=video_workbench`));
+    expect(((await res.json()) as { items: Array<{ id: string }> }).items.map((p) => p.id).sort()).toEqual(["p-manual", "p-topic"]);
+    expect((await GET(asStaff(`http://localhost/api/video/projects?organizationId=${org}&excludeSource=nope`))).status).toBe(400);
+  });
+
   it("POST attachAssetIds links only this org's unlinked video assets (null -> this project)", async () => {
     const a = (n: number) => `123e4567-e89b-42d3-a456-4266141741${String(n).padStart(2, "0")}`;
     const assets = [

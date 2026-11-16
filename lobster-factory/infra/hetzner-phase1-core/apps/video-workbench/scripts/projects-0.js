@@ -163,8 +163,9 @@ function renderHome() {
     `<div class="eyebrow">專案 · PROJECTS</div><h1>在同一個世界觀裡，一次又一次開拍。</h1><p class="sub">把角色、場景與道具定義成可複用的元件，套用鎖定的視覺風格 —— 讓長片與系列作品的每一個鏡頭都保持一致。</p>${!count ? `<div class="project-empty"><div class="bigicon">⊞</div><h2>還沒有專案</h2><p>建立第一個專案，開始打造你的世界觀。</p><button class="btn primary" data-action="create">＋　建立新專案</button></div>` : `<div class="split"><h2 style="margin:0">我的專案 <span class="quiet">${count} 個</span></h2><button class="btn primary" data-action="create">＋　建立新專案</button></div><div class="project-grid">${state.projects.map((p) => `<button class="project-card" data-action="openProject" data-id="${esc(p.id)}"><div class="project-cover">${p.cover ? `<img src="${esc(p.cover)}" alt="專案封面" style="width:100%;height:100%;object-fit:cover">` : "▦"}</div><div class="desc"><strong>${esc(p.title)}</strong><span class="badge">${esc(fmtType(p.type))}</span> <span class="badge">${esc(p.ratio)}</span><p class="quiet">${p.episodes.length} 集 · ${esc(STYLE_NAMES[p.style])}</p></div></button>`).join("")}</div>`}${legacySection()}`,
   );
 }
-// Plan U6 (§1.6, one project list): what the main system already had before the workbench made its rows (a row without
-// source_ref: made by the old pipeline, 腳本工具 or 選題), listed here read only. A card opens its videos in the 審片與發布
+// Plan U6 (§1.6, one project list): the main system's projects the workbench did not make (source other than
+// video_workbench: the old pipeline, 腳本工具, 選題 -- a 選題 row carries its topic id in source_ref), listed here read only.
+// The main system leaves the workbench's own rows out (excludeSource), so its 100 newest are 100 of these. A card opens its videos in the 審片與發布
 // panel; the rows stay where they are.
 const LEGACY_SOURCE = { manual: "手動", script_forge: "腳本工具", content_topic: "選題" };
 let legacy = { org: "", items: [] };
@@ -175,9 +176,9 @@ const legacySection = () =>
 async function loadLegacyProjects() {
   try {
     const org = (await VideoWorkbench.loadCapabilities())?.mainSystem?.organizationId,
-      res = org && (await fetch("/api/video/projects?organizationId=" + encodeURIComponent(org), { credentials: "same-origin" }));
+      res = org && (await fetch("/api/video/projects?excludeSource=video_workbench&organizationId=" + encodeURIComponent(org), { credentials: "same-origin" }));
     if (!res?.ok) return;
-    legacy = { org, items: ((await res.json()).items || []).filter((p) => !p.source_ref) };
+    legacy = { org, items: ((await res.json()).items || []) };
     if (!project()) renderHome();
   } catch {
     // no main system or no access: the list is the workbench's own projects only
