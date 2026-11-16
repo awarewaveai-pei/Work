@@ -1,109 +1,126 @@
-# Weekly Summary 2026-11-09
+# Weekly Summary 2026-11-16
 
-> Period: 2026-11-03 → 2026-11-09 | Generated: 2026-11-09 01:14 UTC by remote-weekly-agent
+> Period: 2026-11-10 → 2026-11-16 | Generated: 2026-11-16 01:09 UTC by remote-weekly-agent
 
 ---
 
 ## Completed this week
 
-### 影音工作台（Video Workbench）— 大批次上線（2026-11-06）
-- **ED.1.4** 預覽畫質 720P／1080P：剪輯器新增「正在產生 720P 預覽檔…」提示，播放中切換解析度即時生效（`836de9121`、`2edb0c645`、`87f6021ec`）
-- **ED.3.0** 舊專案黃金測試（9 個 fixture，逐 frame md5 鎖定）＋ **ED.3.4** 輸出端光漏/震動/顆粒/旋轉效果（`4a3620f79`、`5d10097a0`、`c9574d507`）
-- **ED.3.1** 整片設定（比例/影格率/濾鏡/音量四組右側面板）＋ **ED.3.6** 可收合分組與數字欄位（`afc1d90ba`、`6ded608d6`）
-- **ED.3.2** 片段濾鏡/光漏/震動/顆粒＋預覽、 **ED.3.3** 變形關鍵影格/分離音訊/旁白閃避、 **ED.3.5** 速度/音量/文字/取色；ED.3 七張子卡全部完成（`61ac8cd09`、`8331ce93e`、`af1517238`）
-- **EC.2＋EC.3**「專業特效」EffectCraft 頁上線，與專業剪輯共用外框，真實 EffectCraft 0.21.1 端到端實測（`VW/tests/ec-real.cjs` PASS；`71aea42f2` 後合進）
-- **PJ.1** 一支影片＝一集，舊剪輯專案收進專案頁，剪輯器清單改讀各集（`71aea42f2`）
-- **FC.2/FC.3、EC.2/EC.3、PJ.1、ED.1–ED.3** 整批 sg-deploy 至正式機（`96ddd7f70`），Playwright smoke 34 pass；引擎靜態檔 SHA256 鎖定驗證
-- **RV.4** 正式站實測：Runway Gen-4 Turbo 5 秒試跑成功，mp4 播放 5.04 s、1280×720，cost US$0.25
+### 我的設計直傳 R2（主線，2026-11-15）
+- **C1**：`lobster-designs` 專用 S3 金鑰建立，注入 vault＋正式機 compose；容器 `printenv` 驗收 PASS（续29）
+- **C2**：`lobster-designs` CORS（3 origin）＋ `uploads/pending/` 1 天 lifecycle 套用；preflight 實測 PASS（续26）
+- **C5**（塔羅）：所有存檔改直傳 R2；牌卡 state 改用 `artKey`／`artJob`，刪 `toGalleryArt`（续31）
+- **C6**（其餘呼叫端）：StudioWorkbench／BannerStudio／CanvasEditor／MockupStudio 改直傳；designs POST 刪 base64 輸入（续31）
+- 真實 R2 實測（C1 金鑰，9 MB presign PUT 200，claimPendingUpload sha256 一致，錯 Content-Type 403，他組織 key 403）
+- Cloudflare 讀正式 key 由 REST 改 S3 GET（64 MiB 在正式機 0.39 s）
 
-### 畫布專業版（PhotoCraft C8）
-- **C8「傳回原工具」** 三工人完成（W5/W6/W7）：Tarot 預覽/單張、Studio 結果/參考圖、Banner 商品圖/背景，不落錯格不遺失；合進 main（`64f616b1c`）
-- **C8 sg-deploy 正式站實測**（`8239d222b`）：Banner/Studio 參考圖/Tarot 預覽三條路徑傳回驗收全 PASS（`8239d222b`）
-- **第三批上線**（`809a1ac9c`）：條碼修復（PhotoCraft SVG rect→群組）、AI 去除框內保留原像素、擴圖 `placeImage {at}` 對齊、AI 修圖面板（Nano Banana 2）；正式站真打驗收
+### 編輯器載入體驗改善（2026-11-15）
+- **卡 E**：dock 等待從固定 60/30 秒改為 `startupTimeoutMs`（預設 600 s），等待中顯示「請不要重新整理」訊息；改邊緣同一張圖只下載一次（`createOriginalImageCache`）（续27）
+- **兩次 sg-deploy**：`f322a8ebf`（卡 E + 改邊緣快取）、`fe6b50ee5`（卡 C Codex 生圖號碼牌）驗收 PASS（续30）
+- Cloudflare 快取修復：part-aa / .wasm / 字型第二次 HIT，14 MB 下載由 61 s 降至 23.7 s
 
-### 外聯系統（Outreach）
-- **客戶自有 Gemini 金鑰** 適用所有外聯 AI 步驟（研究/查證/寫信/回信分類），不再只限寫信；`outreachGeminiKey` + `outreachJson`，Codex 補審 4 項全修（`0fcdc1b34`，已部署）
-- **外聯手冊＋客戶頁冷開發分頁** 改接外聯 v2 狀態（寄件信箱/名單/花費/功能開通），刪舊無用設定分頁（`08076e969`）
-- **Soulful 開始用外聯**：寄件信箱 soulfulexpression01@gmail.com 草稿模式、服務檔「喜悅卡長輩藝術療癒團體課」manual review（`9f73e483`）
-- 監工台稽核：Soulful 隱私頁填上（`9f73e483`），AW 正式服務檔待決
-
-### MCP 優化
-- **MCP 不再經 npx**：7 套件鎖版本裝進 `mcp-local-wrappers`，6 server 合計 29→14 程序、1452→883 MB（每 session 省 ~570 MB）；`sync-mcp-config.ps1` 加 guard 擋 npx 寫法（`同日 commit`）
-
-### 其他維運
-- **重複 Soulful 停用**：wp-member-7 設 `status='inactive'`；7 處客戶選單加 `.neq("status","inactive")` guard（`ca8d619e5`，已部署）
-- **MONGOLIA-03 停用**（`mongolia-03-6fc1c8`，可改回）
-- **C8.3 Soulful 隱私頁**：`co_service_profiles.privacy_url` 填真實 URL（curl 200 驗證）
+### Video Workbench 修復（2026-11-16）
+- **CI 連紅 25 次修復**（续2）：根因 — CI checkout 有 `../next-admin`，`opencc-js` 找不到；解法 — gate 步驟設 `AWAREWAVE_APP_DIR=.awarewave`，另加第二步對完整 checkout 跑 `p6-main-system.cjs`；`awarewave-files.cjs` 新增觸發清單完整性檢查（整類關掉）
+- **字型下載 Range 續傳**（续3）：`vendor-fonts.cjs` 改為不限整檔時間、只在 60 s 無資料時中止，送 `Range: bytes=<已有>-` 續傳，最多 8 次；實測乾淨 checkout 13 檔 18.6 s 全部驗證通過
+- **剪輯 Agent 付費卡片接回對話**（续5）：`edPaidRun` 保證唯一結束事件；Agent 把「同種類＋語言符」的結果寫成 assistant 一句並帶進 history；Ctrl+Z 一次還原；3 段新測試 12 PASS
+- **內建曲庫試聽**（续4）：106 首全部保留，拿掉 a006/a007/a008「待人工試聽」標記
+- **改邊緣積木邊太厚**（续1）：程式筆刷 `insetFrom` 15% → 3.4%；PNG 筆刷改用 `maskBounds` 鋪滿實際筆觸範圍；實測各邊保留 83–87%
+- **預覽背板改灰色**（续6）：棋盤格改 `var(--backdrop-transparent)`（#8c8c8c）；主題系統 token 登記；下載仍透明 PNG
 
 ---
 
 ## Open tasks
 
-### A. ⏰ 有外部時鐘（逾期 / 近期觸發）
-- **【≈2026-11-01 逾期】員工逐工具權限**：看 7 天 `[staff-tools]` 紀錄再決定要不要開始擋。需操作者到 `/ops/staff` 完成勾選
-- **【≈2026-11-06 觸發】DMARC 升級第三階段**（`p=quarantine → p=reject`）：10-23 起 rua 報表零未解釋失敗才改
+### A. ⏰ 有外部時鐘（⚠️ 以下兩項已逾期）
+- [ ] **【≈2026-11-01 逾期】** 員工逐工具權限：操作者需先到 `/ops/staff` 勾工具；再看 `docker logs` 決定是否開 enforce
+- [ ] **【≈2026-11-06 逾期】** aware-wave.com DMARC 升級第三階段（p=quarantine → p=reject）：需查 10-23 起 rua 報表無未解釋失敗後才改
 
-### B. 🔒 卡在你（需人工操作）
-- 買冷信次網域＋開池信箱（C11.1）：解鎖 C11.4/C8.5/C15.4
-- Soulful 網域轉 Cloudflare Registrar（付到 2028，無急迫性）
-- Postiz OAuth App Review（Meta IG+FB；Reddit/LinkedIn 卡資格）
-- POD A1 真實 e2e 瀏覽器驗收（操作者驅動）
-- Mockup Studio 功能異常：需操作者給截圖＋F12 console/network
-- Canvas 編輯器整輪瀏覽器實測（Redo、生成填色、群組/設計檔）
-- Soulful 常見問答正式資料（8 條待定案）
-- Chatwoot：操作者勾 Soulful 排程格 + 標籤/預設回覆/營業時間
+### B. 🔒 卡在你
+- [ ] **【Codex 生圖｜新 2026-11-15】** Chrome 點「啟動筆電」無回應，需操作者截圖確認框
+- [ ] **【外聯 v2】** 買冷信次網域＋開池信箱（C11.1）→ 解鎖 C11.4、C8.5、C15.4
+- [ ] Soulful 搬站後收尾：網域轉 Cloudflare Registrar
+- [ ] 社群管理平台 V1：樣稿 v16 定案後開 C19–C31
+- [ ] POD A1 e2e：操作者驅動瀏覽器 → Printful 建品驗收
 
-### D–G. 可直接做（無阻塞）
-- **【F 產品】PhotoCraft（画布专业版）C1.1**：計畫 `handoffs/2026-11-05-photocraft-pro/R0-PLAN.md` 已定稿，等操作者說開始
-- **【F 產品】VectorCraft（向量專業版）C1.1**：計畫 `handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` 定稿，等 go-ahead
-- **【F 產品】社群管理平台 V1 C19–C31**：樣稿 v16 定案後照 `SOCIAL_MANAGER_PLAN.md §1b` 開始
-- **【E 治理】`upsertIncidentAtomic`** collection 事件不走原子更新（`lib/collect/report-store.ts:166`）
-- **【G 基建】影片歸屬持久化** `outName → organization_id`（2026-08-25 開出）
-- **【G 基建】`/api/video/regenerate-image` 502**（2026-09-11 開出，需付費測試）
-- **【F 產品】ADR 017 第一個方案列**（plans 0 筆，訂閱付款前必須）
-- Soulful 課程類 AI 自動回覆：考試閘已寫好，剩部署→匯入→考試
-- 危機訊息「真人接手中也回一句」0104 上線後實測
-- Cognitive OS P4 決策：報告核准角色與來源搜尋規模
-- Research lines 操作者定門檻（P2 DOD 已 8/8）
+### C. 🔒 卡在外部
+- [ ] Scenery Travel Mongolia：等客戶刷卡
+- [ ] 研究線：操作者定 P2 門檻（DOD-2 已過）
+- [ ] Cognitive OS P4：操作者決定報告核准角色與來源搜尋規模
+- [ ] Postiz OAuth app 審核（Meta App Review、商家驗證）
 
-### H. 🧊 只記錄、不排工
-- POD A2 confirm（金流紅線，測試結束+操作者明示才做）
-- 會議服務網路版（待操作者下指令）
-- Composable AI Commerce OS（先預留）
-- `/api/hci/v1/cases` TOCTOU 窗口（非阻塞 minor）
-- mutability matrix SSOT 漂移（非阻塞）
+### D–G. ▶️ 無阻塞（依優先序）
+
+**D 安全**
+- [ ] collection 事件不走 `upsertIncidentAtomic`（`lib/collect/report-store.ts:166`）
+- [ ] `queryAsTenant()` 缺明確 transaction 包裹
+- [ ] `POST /api/hci/v1/cases` active-authorization TOCTOU 窗口
+
+**E 治理**
+- [ ] Codex 佇列驗收 check 在沙箱外跑
+- [ ] 欠的 review：commit `f2eb6cefa`
+
+**F 產品**
+- [ ] **PhotoCraft 專業版**（計畫定稿待開工）：C1.1 開始，計畫 `handoffs/2026-11-05-photocraft-pro/R0-PLAN.md` §6
+- [ ] **VectorCraft 專業版**（未開始）：計畫 `handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md` §6
+- [ ] ADR 017 第一個方案列（plans 0 筆）
+- [ ] ADR 017 4b 對帳報表（`/ops/billing`）
+- [ ] 生圖額度三軸五對象共用層（刪 `checkAndConsumeQuota`）
+- [ ] Soulful 課程類 AI 自動回覆（考試閘已寫，剩部署+匯入 JSON）
+- [ ] Canvas 編輯器整輪瀏覽器實測（Redo、生成填色、群組、.design.json）
+- [ ] POD A2 confirm phase（🔴 金流紅線，待操作者批准）
+- [ ] density 單獨否決權設計決策
+- [ ] /api/video/regenerate-image 502（需操作者登入後點一次）
+- [ ] Mockup Studio 診斷（需操作者提供 F12 console + network）
+
+**G 基建**
+- [ ] `provenance`/`author` 到 KB sink 斷鏈
+- [ ] 影片歸屬持久化 `outName → organization_id` mapping
+- [ ] env 設定的 WP 站與 bridge 站綁 org
+- [ ] HCI30 快照未存 HTTP header charset
+- [ ] KB migration 0076 critic 五個延後項
+- [ ] `.runtime` run lock 只增不刪
+- [ ] WP 站手動新增拿不到租戶歸屬
+
+### H. 🧊 只記錄
+- [ ] 會議服務網路版（無 GPU，待下指令）
+- [ ] Composable AI Commerce OS（先預留）
+- [ ] POD A2 confirm step（金流紅線，測試結束後再議）
 
 ---
 
 ## System health
 
-> 最新整合狀態報告：2026-10-30（`reports/status/integrated-status-LATEST.md`）；本週未重新執行 `/health`，以下基於 2026-11-06 部署驗收結果推斷。
+> 注意：integrated-status-LATEST.md 為 2026-10-30 生成（2.5 週前），未反映本週狀態。
 
-- **next-admin**：最新部署 `96ddd7f70`（2026-11-06），sg-deploy healthy、Playwright smoke 34 pass；`check-deploy-drift.ps1` 無 `composeVarDrift`（2026-10-27 結案）
-- **video-workbench**：最新部署 `96ddd7f70`，smoke 8 項 OK，引擎靜態檔 SHA256 全過
-- **MCP servers**：6 個 server 改不走 npx，記憶體使用 ~883 MB（較前省 570 MB/session）
-- **外聯**：Soulful 開始草稿模式寄件；AW 測試資料（289 名單/505 信件）2026-11-06 C16.2 量完後待清
+**基於 WORKLOG 2026-11-15 sg-deploy 實測**：
+- next-admin 正式站：`f322a8ebf`（2026-11-15 15:16Z 部署），healthy
+- Playwright smoke：11-15 deploy 後 26 pass / 6 skip / 0 fail（WORKLOG 续30）
+- Video-workbench CI：**剛修復（续2）**，2026-11-16 推送後首次應為綠
+- Cloudflare 快取：part-aa / .wasm / 字型已確認 HIT（2026-11-15）
+
+**待確認**：
+- smoke-LATEST.json 未在此次讀取範圍內
+- 員工工具 `STAFF_TOOLS_MODE` 仍為 shadow（非 enforce），7 天窗口已過（11-01）
 
 ---
 
 ## Risks & blockers
 
-| 風險 | 嚴重度 | 備註 |
-|---|---|---|
-| 員工工具權限逾期未評估 | 🟠 中 | 2026-11-01 應看 7 天紀錄，仍未動；操作者需主動看 `/ops/staff` |
-| DMARC 升級觸發（≈11-06）| 🟠 中 | 需操作者確認 rua 報表無未解釋失敗後才改 |
-| PhotoCraft / VectorCraft 計畫停在等開始 | 🟡 低 | 操作者說「開始」即可動工，計畫已完整 |
-| AW 正式服務檔待決（監工台 OPEN 兩項）| 🟡 低 | C16.2 測試資料量完後需清理 |
-| Soulful 常見問答 8 條暫撤 | 🟡 低 | 客服 AI 遇問題全轉真人，不影響安全但降低自動化率 |
-| Canvas 整輪瀏覽器實測待操作者 | 🟡 低 | 程式已部署，驗收債 |
+| 等級 | 項目 | 說明 |
+|------|------|------|
+| 🔴 高 | 員工逐工具權限逾期 | 2026-11-01 窗口已過；需操作者確認 `docker logs` 後決定是否 enforce |
+| 🔴 高 | DMARC 升級逾期 | 2026-11-06 觸發日已過；需查 rua 報表零失敗後才可升 p=reject |
+| 🟠 中 | Codex Chrome protocol handler 卡 | 操作者需提供確認框截圖；影響 Codex 免費生圖啟動流程 |
+| 🟠 中 | PhotoCraft/VectorCraft 待開工 | 計畫已定稿，待操作者說開始 |
+| 🟡 低 | integrated-status-LATEST.md 過期 | 需在筆電環境重新跑 `generate-integrated-status-report.ps1` |
+| 🟡 低 | 我的設計直傳 C5 塔羅完整瀏覽器實測 | 大圖存無框圖、斷網提示等需部署後頁面操作驗收 |
 
 ---
 
 ## Memory highlights
 
-- **2026-11-06 高密度工作日**：38 個 WORKLOG 連續條目，幾乎全為影音工作台（ED.3、EC、PJ）+ 畫布專業版（C8）的大批次完工＋部署；是本專案近幾週最高密度的一日
-- **MCP 記憶體優化**：每 session 節省 ~570 MB，改善多 session 並行時筆電 80% 記憶體壓力
-- **外聯系統正式啟動 Soulful 客戶**：第一個非 AwareWave 本身的客戶開始使用外聯草稿模式，里程碑
-- **客戶 BYO Gemini 金鑰**：研究/查證/回信分類全覆蓋，不再只限寫信；平台免費 API 500 次/天的壓力大幅降低
-- **ADR 017 客戶模型**：4b/4c 系列完成，但「第一個方案列」仍為 0 筆，訂閱付款路徑尚未開通
-- **PhotoCraft / VectorCraft**：R0 計畫已定稿，等操作者一聲令下即可開工
+- **商業架構（2026-10-30 AO-CLOSE）**：ADR 017 客戶模型落地，`b22ce2277` 每個收銀台用自己鑰匙驗付款；月結依 `paid_at` 付款月份計；content.aware-wave.com 門上線；待決：4b-6 買 WCS/TapPay、第一個方案列（plans 0 筆）。
+- **影片工具**：影片工作台已是正式產品（ED.1–ED.3、EC.2–EC.3、PJ.1 本月上線）；字幕雙引擎、Runway Gen-4 Turbo 實測通過。
+- **設計工具**：PhotoCraft（photo-pro）＋ VectorCraft（vector-pro）兩個 WASM 編輯器已換版上線（11-15 05:23Z/05:33Z），直傳 R2 本週完成 C1-C6。
+- **Soulful 客服**：AI 客服 U0–U5 live，考試閘已寫，0104 危機訊息已部署；正式問答 8 條待操作者確認後才可發佈。
+- **主機現況**：唯一主機 `ks-aw-01`（145.239.195.47，SSH -p 58122），next-admin 每日 03:00 TPE 自動部署 main。

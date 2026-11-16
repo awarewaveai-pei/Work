@@ -1,4 +1,7 @@
 # Worklog
+## 2026-11-16（續7）— remote-weekly-agent: weekly summary generated
+
+- 01:09 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-11-16.md
 ## 2026-11-16（續6）— 改邊緣預覽背板：棋盤格 → 灰色（操作者「透明用方格表示會影響我看邊緣效果，背板換成灰色，下載還是要透明」）
 
 - 改：`DesignsGallery.tsx`「套邊後（透明）」預覽框背景由棋盤格改 `var(--backdrop-transparent)`；新 token 在 `app/globals.css` :root（#8c8c8c 中灰，淺色深色像素都看得出邊），並登記進 `lib/theme/tokens.ts` Backgrounds 群組（主題編輯器可改）。
