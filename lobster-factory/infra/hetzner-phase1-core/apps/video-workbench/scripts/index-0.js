@@ -607,6 +607,7 @@ async function panel(p) {
   if (p === "presets") return generatorPresetPanel();
   if (p === "subtitle") return pop(generatorSubtitlePanel());
   if (p === "skill") return generatorSkillPanel();
+  if (p === "usage") return usagePanel();
   if (p === "settings") pop(settings());
   if (p === "model") {
     // Video modes: every model the server offers, each button with its price for the current length (card RV).

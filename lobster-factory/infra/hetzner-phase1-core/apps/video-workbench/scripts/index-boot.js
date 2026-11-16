@@ -12,6 +12,7 @@
     "generator-controls.js",
     "generator-results.js",
     "generator-conversation.js",
+    "usage-panel.js",
     "index-0.js",
     "workspaces.js",
     "index-1.js",
