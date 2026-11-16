@@ -54,7 +54,7 @@ describe("standalone ScriptForge page", () => {
     fireEvent.click(screen.getByRole("button", { name: /生成品牌故事腳本/ }));
     expect(await screen.findByText(/要送去做影片，先在上方「載入客戶」選一個客戶/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /送去做影片/ })).toBeNull();
-    fireEvent.change(await screen.findByDisplayValue("👤 載入客戶…"), { target: { value: "s1" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Client A" }));
     fireEvent.click(await screen.findByRole("button", { name: "🎬 送去做影片" }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(JSON.parse(posts[0].body)).toMatchObject({ organizationId: "org-1", source: "script_forge", brief: { title: "T" } });

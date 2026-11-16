@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { buttonStyle, cardStyle, optionStyle } from "@/components/tools/panel-primitives";
 import { QA_LABELS, QA_HINTS, STATUS_TEXT, BLOCKED_NOTE, explainFinding } from "./qa-labels";
 
 type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string }; created_at: string; asset_domain: string };
 type QaFinding = { rule: string; severity: string; message: string; format?: string; evidence?: Record<string, number | string | null> };
 type QaItem = { id: string; kind: string; status: string; candidateAssetId: string; candidateChecksum: string; profileId: string; profileVersion: string; findings?: QaFinding[] };
 
-const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14 };
-const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: 8, borderRadius: 6, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)", fontSize: 12 };
+const card: React.CSSProperties = { ...cardStyle(), padding: 14 };
 
 /**
  * ⑧ 技術 QA + 編輯 QA——之前這些證據被埋在 Release 表單裡的一個唯讀 <pre> 區塊；
@@ -73,12 +73,13 @@ export default function QaStep({ organizationId, projectId, onContinue }: { orga
       </div>
 
       <div style={card}>
-        <label style={{ fontSize: 11 }}>候選影片／實拍資產
-          <select value={assetId} onChange={(e) => void pick(e.target.value)} style={{ ...field, marginTop: 5 }} disabled={!assets.length}>
-            <option value="">{assets.length ? "選擇 media_assets" : organizationId ? "此租戶尚無素材" : "先選租戶"}</option>
-            {assets.map((a) => <option key={a.id} value={a.id}>{a.metadata?.title ?? a.asset_domain} · {new Date(a.created_at).toLocaleString()} · {a.id.slice(0, 8)}</option>)}
-          </select>
-        </label>
+        <div style={{ fontSize: 11 }}>候選影片／實拍資產</div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 5 }}>{assets.length ? "選擇 media_assets" : organizationId ? "此租戶尚無素材" : "先選租戶"}</div>
+        {assets.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 5 }}>
+            {assets.map((a) => <button key={a.id} type="button" aria-pressed={assetId === a.id} onClick={() => void pick(a.id)} style={optionStyle(assetId === a.id)}>{a.metadata?.title ?? a.asset_domain} · {new Date(a.created_at).toLocaleString()} · {a.id.slice(0, 8)}</button>)}
+          </div>
+        )}
       </div>
 
       {assetId && (
@@ -107,7 +108,7 @@ export default function QaStep({ organizationId, projectId, onContinue }: { orga
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>QA 是出片前的檢查報告，不會出現在影片裡；四項都通過才能建立 Release。</div>
 
       <button type="button" onClick={() => onContinue(assetId, checksum)} disabled={!assetId}
-        style={{ padding: "12px 0", borderRadius: 8, border: "none", background: assetId ? "var(--accent)" : "var(--border-subtle)", color: assetId ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: 700, fontSize: 14, cursor: assetId ? "pointer" : "not-allowed", width: 200 }}>
+        style={{ ...buttonStyle({ tone: "primary", disabled: !assetId }), width: 200 }}>
         繼續到 Release →
       </button>
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{BLOCKED_NOTE}Release 步驟的閘是最終依據，這裡只是先給你看。</div>

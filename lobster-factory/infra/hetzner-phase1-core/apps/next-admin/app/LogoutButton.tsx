@@ -28,7 +28,7 @@ export function LogoutButton({ variant = "sidebar" }: { variant?: "sidebar" | "p
       onClick={logout}
       disabled={busy}
       style={{
-        background: variant === "page" ? "var(--card-bg)" : "#fff",
+        background: "var(--card-bg)",
         border: variant === "page" ? "1px solid var(--card-border)" : "1px solid var(--sidebar-border)",
         borderRadius: 6,
         color: variant === "page" ? "var(--text-primary)" : "var(--sidebar-text)",

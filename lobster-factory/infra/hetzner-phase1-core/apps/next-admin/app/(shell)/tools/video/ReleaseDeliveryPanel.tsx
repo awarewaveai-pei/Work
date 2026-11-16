@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import OrganizationPicker from "./OrganizationPicker";
+import { buttonStyle, cardStyle, inputStyle, optionStyle } from "@/components/tools/panel-primitives";
 import { QA_LABELS, STATUS_TEXT, BLOCKED_NOTE, explainFinding } from "./qa-labels";
 import { RATIO_LABEL, ratioFor, ratioOfAsset } from "@/lib/content/video/platform-ratio";
 import { textsForAccounts, writerKeysFor } from "@/lib/social/write-posts";
 import { defaultCopy, syndicateCostTwd } from "@/lib/content/video/release-copy";
 
-const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 14, display: "grid", gap: 9 };
-const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: 8, borderRadius: 6, border: "1px solid var(--border-subtle)", background: "var(--bg-subtle)", color: "var(--text-primary)", fontSize: 12 };
-const btn = (on: boolean): React.CSSProperties => ({ width: "fit-content", padding: "8px 12px", border: 0, borderRadius: 7, background: on ? "var(--accent)" : "var(--border-subtle)", color: on ? "var(--btn-primary-text)" : "var(--text-muted)", fontWeight: 700, cursor: on ? "pointer" : "not-allowed" });
-const chip = (on: boolean): React.CSSProperties => ({ padding: "6px 10px", borderRadius: 7, border: `1px solid ${on ? "var(--accent)" : "var(--border-subtle)"}`, background: on ? "var(--bg-subtle)" : "var(--card-bg)", color: "var(--text-primary)", fontSize: 12, cursor: "pointer", textAlign: "left" });
+const card: React.CSSProperties = { ...cardStyle(), padding: 14, display: "grid", gap: 9 };
+const field = inputStyle();
+const btn = (on: boolean): React.CSSProperties => ({ ...buttonStyle({ tone: "primary", disabled: !on }), width: "fit-content" });
+const chip = (on: boolean): React.CSSProperties => ({ ...optionStyle(on), textAlign: "left" });
 
 const KINDS = ["technical", "caption", "editorial", "rights"] as const;
 type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; script?: string; ratio?: string; captionFiles?: { srt?: string; vtt?: string; cues?: number } }; created_at: string; asset_domain: string };

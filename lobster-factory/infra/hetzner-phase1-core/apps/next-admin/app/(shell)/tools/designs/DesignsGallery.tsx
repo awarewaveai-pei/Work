@@ -979,7 +979,7 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
                       controls
                       preload="metadata"
                       className="designs-img"
-                      style={{ objectFit: "contain", background: "#000" }}
+                      style={{ objectFit: "contain", background: "var(--backdrop-transparent)" }}
                     />
                   </div>
                 ) : (
@@ -1475,7 +1475,7 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "var(--color-background-primary, #1c1c1c)",
+              background: "var(--color-background-primary)",
               border: "1px solid rgba(127,127,127,0.3)",
               borderRadius: 12,
               width: "min(1400px, 97vw)",
@@ -1511,12 +1511,12 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
                   }}
                 >
                   {editBusy || editOriginalLoading !== null ? (
-                    <span style={{ fontSize: 13, color: "#333" }}>{editOriginalLoading !== null ? "下載原圖中…" : "處理中…"}</span>
+                    <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{editOriginalLoading !== null ? "下載原圖中…" : "處理中…"}</span>
                   ) : editResult ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={editResult} alt="套邊後" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                   ) : (
-                    <span style={{ fontSize: 13, color: "#555" }}>選右側的筆刷 →</span>
+                    <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>選右側的筆刷 →</span>
                   )}
                 </div>
               </div>
@@ -1566,7 +1566,7 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
                       }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={pv.svg} alt={pv.zh} style={{ width: "100%", aspectRatio: "1", background: "#3a3a3a", borderRadius: 4 }} />
+                      <img src={pv.svg} alt={pv.zh} style={{ width: "100%", aspectRatio: "1", background: "var(--backdrop-transparent)", borderRadius: 4 }} />
                       <span style={{ fontSize: 9, opacity: 0.8, lineHeight: 1.05, textAlign: "center" }}>{pv.zh}</span>
                     </button>
                   );
