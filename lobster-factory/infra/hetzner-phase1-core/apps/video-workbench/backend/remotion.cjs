@@ -5,7 +5,7 @@
 // no imports, so it is import()ed and stays the one place that names the token variables.
 const path = require("node:path"),
   { pathToFileURL } = require("node:url");
-// Every id must exist in ../remotion-service/src/server.ts TEMPLATE_MAP (tests/remotion-template.cjs reads it).
+// Every id must exist in ../remotion-service/src/app.ts TEMPLATE_MAP (tests/remotion-template.cjs reads it).
 // One field table per template; the editor's 片頭 form is generated from it (scripts/editor-panes/text.js), so a field is
 // declared once, here. field.key = the composition prop name (and, for image/audio, the key of input.references).
 //   type "text" (default): max chars, required, multiline | "number": integer min..max | "color": #rrggbb

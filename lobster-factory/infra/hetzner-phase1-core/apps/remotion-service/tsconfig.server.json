@@ -12,6 +12,6 @@
     "jsx": "react",
     "lib": ["ES2022"]
   },
-  "include": ["src/server.ts"],
+  "include": ["src/server.ts", "src/render-worker.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -36,7 +36,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   if (poll.status === "error") {
     await finishJob(job.id, { status: "error", error: poll.error, statusCode: 502 });
-    return NextResponse.json({ ok: false, status: "error", error: poll.error }, { status: 502 });
+    // 200, not 502: a failed render is this poll's answer, not a gateway fault. Cloudflare swaps an
+    // origin 502 body for its HTML page, the browser's r.json() threw and the page re-polled for
+    // 15 minutes instead of showing the reason (2026-11-16, 147 polls answered 502).
+    return NextResponse.json({ ok: false, status: "error", error: poll.error });
   }
   return NextResponse.json({ ok: true, ...poll });
 }

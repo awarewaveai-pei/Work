@@ -32,6 +32,15 @@ describe("tenant-safe Remotion job status", () => {
     expect(pollRemotion).not.toHaveBeenCalled();
   });
 
+  it("a failed render answers 200 with the reason, so Cloudflare cannot swap the body for its 502 page", async () => {
+    getJob.mockResolvedValue({ id: "j1", status: "running", organizationId: "123e4567-e89b-42d3-a456-426614174001", euJobId: "eu1" });
+    pollRemotion.mockResolvedValue({ status: "error", error: "渲染失敗：影片編碼程序被系統終止（記憶體不足）" });
+    const response = await POST(req("staff"));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: false, status: "error", error: "渲染失敗：影片編碼程序被系統終止（記憶體不足）" });
+    expect(finishJob).toHaveBeenCalledWith("j1", expect.objectContaining({ status: "error" }));
+  });
+
   it("T20: no GET is exported -- Next.js answers a raw GET to this route 405 on its own", async () => {
     const mod = await import("./route");
     expect((mod as Record<string, unknown>).GET).toBeUndefined();

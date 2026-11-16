@@ -69,7 +69,7 @@ const configured = { REMOTION_SERVICE_URL: SERVICE, MEDIA_RENDER_AUTH_TOKEN: TOK
 
 (async () => {
   // (e) catalog ids exist in the service's TEMPLATE_MAP (one source of truth for ids).
-  const serverTs = fs.readFileSync(path.join(__dirname, "../../remotion-service/src/server.ts"), "utf8"),
+  const serverTs = fs.readFileSync(path.join(__dirname, "../../remotion-service/src/app.ts"), "utf8"),
     map = /const TEMPLATE_MAP[^{]*\{([\s\S]*?)\};/.exec(serverTs)[1],
     ids = [...map.matchAll(/^\s*"([\w-]+)"\s*:/gm)].map((m) => m[1]);
   assert.ok(ids.length >= 5, map);

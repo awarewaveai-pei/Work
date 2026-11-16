@@ -12,7 +12,7 @@ import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { createJob, finishJob } from "@/lib/content/video/job-store";
 
-/** All templateIds the EU remotion-service accepts (mirrors TEMPLATE_MAP in server.ts). */
+/** All templateIds the EU remotion-service accepts (mirrors TEMPLATE_MAP in remotion-service src/app.ts). */
 const ALLOWED_TEMPLATE_IDS = new Set([
   "scale-bg-text-slideup",
   "pan-slide-text-left-3scenes",

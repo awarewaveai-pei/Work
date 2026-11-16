@@ -4,3 +4,4 @@ dist
 .env.remotion
 .git
 *.md
+data
