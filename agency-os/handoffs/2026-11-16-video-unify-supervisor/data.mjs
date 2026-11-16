@@ -36,11 +36,12 @@ export const NOW = [
     ev: '計畫 F11：V/ScriptForge.tsx:89-96 送去舊草稿；計畫 G11：AI 導演只產純文字（VW/backend/api.cjs:1686-1733）。U3 補。' },
   { what: '腳本的場景與工作台的鏡頭格式相通。', state: 'no',
     ev: 'V/video-handoff.ts:45 只有 stripStageDirections，還沒有 shotsFromScript；鏡頭形狀在 VW/shared/episode-spine.js:173-176。U3 補。' },
-  { what: '鏡頭卡能換圖、用圖庫素材、讓這鏡動起來。', state: 'no',
-    ev: '計畫 G1：VW/scripts/projects-0.js:544-574、885-900 只有生成畫面與修這張。U4 補。' },
+  { what: '鏡頭卡能換圖、用圖庫素材、讓這鏡動起來。', state: 'yes',
+    ev: 'U4（df5640559）已在 main，工作台還沒部署到正式站。選圖片模型（含 FLUX）還沒做。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
+const done = (id, plain, commit) => ({ id, plain, status: 'done', commit });
 const NA = 'apps/next-admin/';
 const V = `${NA}app/(shell)/tools/video/`;
 const API = `${NA}app/api/video/`;
@@ -51,26 +52,25 @@ const VW = 'apps/video-workbench/';
 export const STEPS = [
   { n: 1, code: 'U0', title: '專案列「建或取回」', plain: '例：同一集按兩次「送審」，主系統的專案清單只多一列，不會變兩列。',
     gate: '同一集建兩次只有一列；掛成片只掛同組織、還沒掛過的（拿掉組織條件，測試會紅）；同一比例有兩版時排程只取新的（拿掉去重，測試會紅）。',
-    risk: 'Medium', model: 'Opus 5.5＋critic Deep；migration 另過 db-expert', status: 'not_started', depends: [],
-    before: 'migration 套正式資料庫要你點頭（待決 1）',
+    risk: 'Medium', model: 'Opus 5.5＋critic Deep；migration 另過 db-expert', status: 'done', commit: '79ab5f321', depends: [],
     what: 'migration：source check 加 video_workbench＋(organization_id, source_ref) 部分唯一索引；L/projects.ts ensureWorkbenchProject；API/projects POST／GET 加 attachAssetIds、sourceRef；project-advance-deps rows() 每比例取最新',
     files: ['lobster-factory/packages/db/migrations/（開卡取號，現最新 0163）', `${L}projects.ts`, `${API}projects/route.ts`, `${L}project-advance-deps.ts`],
     items: [
-      todo('U0.1', 'migration：專案來源加「影片工作台」，同組織同一集只能有一列；down 寫兩處。'),
-      todo('U0.2', '「建或取回」函式：沒有就建，同時建撞到就重查，標題不同就更新。'),
-      todo('U0.3', '專案 API 收工作台來源；可順手掛成片（只掛同組織、還沒掛專案的）；可用集的代號查。'),
-      todo('U0.4', '自動完成排程每個比例只取最新一支。'),
+      done('U0.1', 'migration：專案來源加「影片工作台」，同組織同一集只能有一列；down 寫兩處。', '79ab5f321'),
+      done('U0.2', '「建或取回」函式：沒有就建，同時建撞到就重查，標題不同就更新。', '79ab5f321'),
+      done('U0.3', '專案 API 收工作台來源；可順手掛成片（只掛同組織、還沒掛專案的）；可用集的代號查。', '79ab5f321'),
+      done('U0.4', '自動完成排程每個比例只取最新一支。', '79ab5f321'),
     ] },
   { n: 2, code: 'U1', title: '門頁機制＋側欄「作品」', plain: '例：在影音工作台左側點「作品」，看到的就是原本的「我的作品」，不用另開網站。',
     gate: '工作台用的頁沒有導覽列；直接開「作品」網址會被導回工作台；工作台原生頁的行為不變。',
-    risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: [],
-    before: '工作台第一次部署要你點頭（待決 2）',
+    risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'dd64b4a18', depends: [],
+    before: '工作台第一次部署要你點頭（待決 1）',
     what: 'NA/app/video/ 分 (door)／(wb) 兩個 route group（網址不變）；(wb) layout＝ProductDoorShell bare；index-1.js 子頁清單改成名字→來源表、讀 ?open=；works/ 搬進 (wb)；不通就停，U3、U6 不開',
     files: [`${NA}app/video/(door)/`, WB, `${WB}workbench.ts`, `${VW}scripts/index-1.js`, `${NA}lib/portal/products.ts`],
     items: [
-      todo('U1.1', '影片門的頁分成兩組（網址不變）；給工作台用的那組不畫導覽與登出列，保留開通檢查。'),
-      todo('U1.2', '工作台子頁清單改成一張表，讀網址上的 ?open=，側欄加「作品」。'),
-      todo('U1.3', '實測：在 Next 頁裡載入工作台並導覽一次；不通就停在這張，腳本與審片發布的卡不開。'),
+      done('U1.1', '影片門的頁分成兩組（網址不變）；給工作台用的那組不畫導覽與登出列，保留開通檢查。', 'dd64b4a18'),
+      done('U1.2', '工作台子頁清單改成一張表，讀網址上的 ?open=，側欄加「作品」。', 'dd64b4a18'),
+      done('U1.3', '實測：在 Next 頁裡載入工作台並導覽一次；不通就停在這張，腳本與審片發布的卡不開。', 'dd64b4a18'),
     ] },
   { n: 3, code: 'U2', title: '一套樣式', plain: '例：腳本頁的按鈕、輸入框、卡片跟工作台其他頁長得一樣，原本的下拉選單變成一排按鈕。',
     gate: '檢查器量到零個 hex 色碼、零個自訂字體、零個下拉；按鈕、輸入框、卡片的樣式跟原生頁相同；腳本頁既有測試全綠。',
@@ -95,14 +95,14 @@ export const STEPS = [
     ] },
   { n: 5, code: 'U4', title: '鏡頭卡補齊', plain: '例：在鏡頭卡按「圖庫素材」打「海邊日落」，選一張 Pexels 照片換上；再按「讓這鏡動起來」變成一段影片。',
     gate: '換圖後剪輯裡的片段標示過期；白名單外的圖庫來源被拒（拿掉白名單，測試會紅）；有圖的鏡頭生影片後鏡頭帶著影片。',
-    risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: [],
+    risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: [],
     what: '換圖走素材選擇器＋主頁動作 spine-set-shot；圖庫素材打 API/regenerate-image（visual:"broll"）→ 網址匯入改共用函式＋Pexels／R2 白名單＋允許影片；圖生影片 target:"shot:<id>"；生圖模型清單補 FLUX',
     files: [`${VW}scripts/projects-0.js`, `${VW}backend/api.cjs`, `${VW}shared/episode-spine.js`, `${API}regenerate-image/`, `${NA}public/editor-shared/image-models.js`],
     items: [
-      todo('U4.1', '「換圖」：從素材庫選或上傳，含「有權使用」勾選。'),
-      todo('U4.2', '「圖庫素材」：用關鍵字找 Pexels 圖片或影片；網址匯入只收白名單來源。'),
-      todo('U4.3', '「讓這鏡動起來」：用這張圖當第一格生成影片，按鈕標每秒 NT$。'),
-      todo('U4.4', '生成畫面時可以選圖片模型，含 FLUX。'),
+      done('U4.1', '「換圖」：從素材庫選或上傳，含「有權使用」勾選。', 'df5640559'),
+      done('U4.2', '「圖庫素材」：用關鍵字找 Pexels 圖片或影片；網址匯入只收白名單來源。', 'df5640559'),
+      done('U4.3', '「讓這鏡動起來」：用這張圖當第一格生成影片，按鈕標每秒 NT$。', 'df5640559'),
+      todo('U4.4', '生成畫面時可以選圖片模型，含 FLUX。還沒做：工作台沒有 FLUX 文生圖的供應商模組，要先決定接哪一家。'),
     ] },
   { n: 6, code: 'U5', title: '快速輸出、多比例、一鍵成片', plain: '例：在一集按「一鍵成片」，看到總價 NT$ 後確認；缺的圖自動補齊，接著出 16:9 和 9:16 兩支成片。',
     gate: '別組織的素材被拒（拿掉組織條件，測試會紅）；快速輸出完成後成片區多一支、歷史紀錄有任務、主系統只有一列；選兩個比例出兩個任務；一鍵成片中途重開頁面會接著做，已有圖的鏡頭不重生。',
@@ -126,13 +126,13 @@ export const STEPS = [
     ] },
   { n: 8, code: 'U7', title: '字幕與音檔', plain: '例：把客戶設成「音檔不可外送」後，按 OpenAI 轉錄會被擋下；改按「改用自家主機（免費）重試」就能轉。',
     gate: '設成不可外送時，每個會把音檔送出主機的工作都被拒、而且沒有對外請求；查不到設定也拒（拿掉檢查，測試會紅）；改一句字幕重燒後成片字幕跟著更新。',
-    risk: 'Medium', model: 'Opus 5.5＋critic Deep', status: 'not_started', depends: [],
+    risk: 'Medium', model: 'Opus 5.5＋critic Deep', status: 'done', commit: 'ea91b5819', depends: [],
     what: '字幕工具來源加「主系統成片」→ API/captions/reburn 包成工作台任務；轉錄失敗給自家主機重試鈕；內部路由 audio-policy＋工作台後端每個外送音檔 operation 前檢查；/capabilities 標不可用',
     files: [`${VW}scripts/tools-subtitles.js`, `${API}captions/reburn/`, `${NA}app/api/internal/video/workbench/audio-policy/`, `${VW}backend/transcribe.cjs`, `${VW}backend/audio-tools.cjs`, `${L}transcription.ts`],
     items: [
-      todo('U7.1', '字幕工具讀主系統成片的字幕，逐句改完重燒；成片卡加「改字幕」「下載 SRT／VTT」。'),
-      todo('U7.2', '轉錄失敗時，錯誤旁邊出現「改用自家主機（免費）重試」。'),
-      todo('U7.3', '音檔不外送：開關放工作台設定；後端每個外送音檔的工作先查設定，查不到就擋。'),
+      done('U7.1', '字幕工具讀主系統成片的字幕，逐句改完重燒；成片卡加「改字幕」「下載 SRT／VTT」。（新按鈕只跑過測試，還沒在瀏覽器點過）', 'ea91b5819'),
+      done('U7.2', '轉錄失敗時，錯誤旁邊出現「改用自家主機（免費）重試」。', 'ea91b5819'),
+      done('U7.3', '音檔不外送：開關放工作台設定；後端每個外送音檔的工作先查設定，查不到就擋。', 'ea91b5819'),
     ] },
   { n: 9, code: 'U8', title: '片頭模板與時間軸 v1', plain: '例：在剪輯器文字面板選「商品評測打字機」片頭，放上 logo 和配樂，長度調成 8 秒。',
     gate: '五個模板各出一支（假服務）；長度不是 5 秒也能送出。',
@@ -175,6 +175,5 @@ export const STEPS = [
 ];
 
 export const OPEN = [
-  { n: 1, what: 'U0 的資料庫 migration 套到正式資料庫。屬 High，執行當下要你說 go。', before: 'U0', src: '計畫 §6；AGENTS §3' },
-  { n: 2, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，第一次在 U1。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
+  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，U1、U4、U7 已在 main，等部署。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
 ];
