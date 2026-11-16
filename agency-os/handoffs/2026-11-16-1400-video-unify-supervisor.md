@@ -17,9 +17,9 @@ source_session_summary: "監工派工 U0–U11（舊影片工具併進影音工�
 - 在 origin/main：U0 `79ab5f321`、U1 `dd64b4a18`、U4 `df5640559`（U4.4 FLUX 選模型未做：工作台無 FLUX 文生圖供應商模組）、U7 `ea91b5819`、登記表補洞 `880a7943d`。migration 0164 已套正式庫。next-admin 隨 03:00 自動部署；**影音工作台未部署（High，要操作者 go）**。
 - 第二批（各在自己分支，未併入）：
   - U10 `98d5619d6` 分支 `claude/recursing-jang-f14f2d`：已 commit；RISK「計費組織 ID 需後端改動」未判。
-  - U8 分支 `claude/reverent-goldwasser-fd865d`：等 Codex 審查，未 commit。
-  - U2 分支 `claude/elegant-shirley-877971`：ScriptForge 替換的子代理還在跑，未 commit。
-  - U5 commit 1 分支 `claude/elated-darwin-0aaa98`：進行中。
+  - U8 `37642ebfc` 分支 `claude/reverent-goldwasser-fd865d`：已 commit（該 worktree 的 gate 只因缺 opencc-js 紅，整合 worktree 重跑）。
+  - U2 分支 `claude/elegant-shirley-877971`：等 Codex 審查，未 commit（session local_1c25dda7）。
+  - U5 commit 1 `06ba109d7` 分支 `claude/elated-darwin-0aaa98`：已 commit；Codex F1、F3 列為已知風險未判（讀該 commit message）。
 - risks 清查：`agency-os/handoffs/2026-11-16-video-unify-supervisor/risk-triage-u0-u1-u4-u7.md`（在 `D:\Work`，未 commit）— 現在修 0、後面卡處理 4、不用處理 21。
 - `D:\Work` 落後根因已修（`scripts/git-parity-merge.py`：上游舊快照規則＋eol=crlf 檔由 git 寫回），`D:\Work` 已 0/0。
 
