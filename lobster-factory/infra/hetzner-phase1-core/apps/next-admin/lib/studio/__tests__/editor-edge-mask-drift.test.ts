@@ -57,7 +57,8 @@ describe("TS doors are the shared modules (types only)", () => {
 describe("mask output unchanged by the move", () => {
   // sha256 of every style × 3 sizes × 6 amounts × 3 seeds, taken from lib/studio/edge-mask.ts as it was before the move (HEAD 7c61c7ffc)
   // and byte-identical from the shared module. A deliberate change to the masks updates this hash in the same commit.
-  const GOLDEN = "3c0db91187fc2c67652ba466264b5bd87e590af5321bb5599469daeb486c8a23";
+  // 2026-11-15: thin edges (inset 1.5–5%, half the displacement, corner radius 3%) — the old masks cut ~15% off every side.
+  const GOLDEN = "e1e6232d65126e34ff8534c641aa7b96e4158c00334901fdab0fd3198572403c";
   it("buildMaskSvg / registry dump hashes to the pre-move golden", () => {
     const parts = [
       JSON.stringify(shared.DEFAULT_EDGE_PARAMS),

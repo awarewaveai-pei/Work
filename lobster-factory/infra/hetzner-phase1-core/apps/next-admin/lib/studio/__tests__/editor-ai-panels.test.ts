@@ -293,6 +293,8 @@ describe("edge-mask：邊緣遮罩", () => {
     expect(ctx.replaceImage.mock.calls[0][0]).toBe("L1");
     expect(q(body, '[data-em-style="dry-brush"]').classList.contains("tab--active")).toBe(true);
     sel = { id: "L2", blob: new Blob(["MASKED"], { type: "image/png" }) }; // host now selects the replaced layer
+    const T = [0, 0, 0, 0], O = [255, 255, 255, 255];
+    maskPixels = [...T, ...O, ...O, ...O, ...T, ...O, ...O, ...O]; // 4×2 brush PNG whose left column is empty margin
     q(body, '[data-em-style="mask-03"]').click();
     await vi.waitFor(() => expect(ctx.replaceImage).toHaveBeenCalledTimes(2));
     expect(ctx.replaceImage.mock.calls[1][0]).toBe("L2");
@@ -301,11 +303,12 @@ describe("edge-mask：邊緣遮罩", () => {
     expect(imageSrcs.some((s) => s.includes(Buffer.from("MASKED").toString("base64")))).toBe(false);
     expect(imageSrcs).toContain("/edge-masks/mask-03.png");
     // compositing (applyEdgeMask, CE:1535): source drawn normally, then the mask with destination-in; procedural mask covers the
-    // whole 4×2 image, an asset mask is inset by amount 55 → scale 1 − 0.55·0.28 = 0.846 (strokes never clipped by the edge)
-    expect(draws.map((d) => d.op)).toEqual(["source-over", "destination-in", "source-over", "destination-in"]);
+    // whole 4×2 image. An asset mask is first read for its drawn area (the empty left column is cropped away), then that area is
+    // drawn inset by amount 55 → scale 1 − 0.55·0.08 = 0.956 (thin edge; strokes never clipped by the canvas edge)
+    expect(draws.map((d) => d.op)).toEqual(["source-over", "destination-in", "source-over", "source-over", "destination-in"]);
     expect(draws[1].args).toEqual([0, 0, 4, 2]);
-    const [mx, my, mw, mh] = draws[3].args;
-    expect([mx, my, mw, mh].map((n) => +n.toFixed(3))).toEqual([0.308, 0.154, 3.384, 1.692]);
+    expect(draws[4].args.slice(0, 4)).toEqual([1, 0, 3, 2]);
+    expect(draws[4].args.slice(4).map((n) => +n.toFixed(3))).toEqual([0.088, 0.044, 3.824, 1.912]);
     expect(q(body, '[data-em-style="mask-03"]').classList.contains("tab--active")).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });

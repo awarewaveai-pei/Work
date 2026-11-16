@@ -18,15 +18,16 @@ export const DEFAULT_EDGE_PARAMS = { amount: 55, seed: 7 };
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
-/** amount(0–100) → fractional inset (margin) from the box edge: 5%…18%. */
-const insetFrom = (amount) => 0.05 + (clamp(amount, 0, 100) / 100) * 0.13;
+/** amount(0–100) → fractional inset (margin) from the box edge: 1.5%…5%. The brush edge is a thin band — the old 5%…18% plus per-style
+ *  extras cut ~15% off every side at the default amount. Keep inset ≥ the displacement swing, or the rough edge runs off the canvas. */
+const insetFrom = (amount) => 0.015 + (clamp(amount, 0, 100) / 100) * 0.035;
 
 const f1 = (n) => n.toFixed(1);
 
 /** Rounded-rect path inset into the box (base shape for the procedural dry-brush family). */
 function roundedRect(w, h, inset) {
   const m = Math.min(w, h) * inset;
-  const r = Math.min(w, h) * 0.06;
+  const r = Math.min(w, h) * 0.03;
   const x0 = m;
   const y0 = m;
   const x1 = w - m;
@@ -98,8 +99,8 @@ export const EDGE_MASK_STYLES = [
     kind: "texture",
     build: (w, h, p) => {
       const uid = `em-brush-${p.seed}`;
-      const path = roundedRect(w, h, insetFrom(p.amount) + 0.03);
-      const scale = Math.min(w, h) * (0.04 + p.amount / 1400);
+      const path = roundedRect(w, h, insetFrom(p.amount));
+      const scale = Math.min(w, h) * (0.02 + p.amount / 2800);
       const filter = turbFilter(uid, "0.006 0.12", 2, scale, p.seed % 90, 0, true);
       return `${filter}<g filter="url(#${uid})" fill="${MASK_FILL}"><path d="${path}"/></g>`;
     },
@@ -112,8 +113,8 @@ export const EDGE_MASK_STYLES = [
     build: (w, h, p) => {
       const uid = `em-soft-${p.seed}`;
       const md = Math.min(w, h);
-      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
-      const filter = brushFilter(uid, "0.01 0.02", 2, md * (0.04 + p.amount / 1300), p.seed % 90, { blur: md * 0.012 });
+      const shape = roundedRect(w, h, insetFrom(p.amount));
+      const filter = brushFilter(uid, "0.01 0.02", 2, md * (0.02 + p.amount / 2600), p.seed % 90, { blur: md * 0.006 });
       return `${filter}<g filter="url(#${uid})" fill="${MASK_FILL}"><path d="${shape}"/></g>`;
     },
   },
@@ -125,9 +126,9 @@ export const EDGE_MASK_STYLES = [
     build: (w, h, p) => {
       const uid = `em-flat-${p.seed}`;
       const md = Math.min(w, h);
-      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
+      const shape = roundedRect(w, h, insetFrom(p.amount));
       // anisotropic displacement → broad flat-brush drag streaks
-      const filter = brushFilter(uid, "0.004 0.09", 2, md * (0.05 + p.amount / 1100), p.seed % 90, { alphaTable: "0 1 1" });
+      const filter = brushFilter(uid, "0.004 0.09", 2, md * (0.025 + p.amount / 2200), p.seed % 90, { alphaTable: "0 1 1" });
       return `${filter}<g filter="url(#${uid})" fill="${MASK_FILL}"><path d="${shape}"/></g>`;
     },
   },
@@ -139,8 +140,8 @@ export const EDGE_MASK_STYLES = [
     build: (w, h, p) => {
       const uid = `em-comb-${p.seed}`;
       const md = Math.min(w, h);
-      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.02);
-      const filter = brushFilter(uid, "0.003 0.26", 2, md * 0.05, p.seed % 90, { alphaTable: "0 0 1 1" });
+      const shape = roundedRect(w, h, insetFrom(p.amount));
+      const filter = brushFilter(uid, "0.003 0.26", 2, md * 0.025, p.seed % 90, { alphaTable: "0 0 1 1" });
       return `${filter}<g filter="url(#${uid})" fill="${MASK_FILL}"><path d="${shape}"/></g>`;
     },
   },
@@ -152,8 +153,8 @@ export const EDGE_MASK_STYLES = [
     build: (w, h, p) => {
       const uid = `em-calli-${p.seed}`;
       const md = Math.min(w, h);
-      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.05);
-      const filter = brushFilter(uid, "0.006 0.05", 2, md * (0.06 + p.amount / 1000), p.seed % 90, { alphaTable: "0 1" });
+      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.01);
+      const filter = brushFilter(uid, "0.006 0.05", 2, md * (0.03 + p.amount / 2000), p.seed % 90, { alphaTable: "0 1" });
       return `${filter}<g filter="url(#${uid})" fill="${MASK_FILL}"><path d="${shape}"/></g>`;
     },
   },
@@ -165,8 +166,8 @@ export const EDGE_MASK_STYLES = [
     build: (w, h, p) => {
       const uid = `em-chalk-${p.seed}`;
       const md = Math.min(w, h);
-      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
-      const filter = brushFilter(uid, "0.05 0.05", 3, md * 0.04, p.seed % 90, { turbType: "turbulence", alphaTable: "0 0 0 1 1" });
+      const shape = roundedRect(w, h, insetFrom(p.amount));
+      const filter = brushFilter(uid, "0.05 0.05", 3, md * 0.02, p.seed % 90, { turbType: "turbulence", alphaTable: "0 0 0 1 1" });
       return `${filter}<g filter="url(#${uid})" fill="${MASK_FILL}"><path d="${shape}"/></g>`;
     },
   },
@@ -178,8 +179,8 @@ export const EDGE_MASK_STYLES = [
     build: (w, h, p) => {
       const uid = `em-stipple-${p.seed}`;
       const md = Math.min(w, h);
-      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
-      const filter = brushFilter(uid, "0.09 0.09", 2, md * 0.03, p.seed % 90, { turbType: "turbulence", alphaTable: "0 0 0 1" });
+      const shape = roundedRect(w, h, insetFrom(p.amount));
+      const filter = brushFilter(uid, "0.09 0.09", 2, md * 0.015, p.seed % 90, { turbType: "turbulence", alphaTable: "0 0 0 1" });
       return `${filter}<g filter="url(#${uid})" fill="${MASK_FILL}"><path d="${shape}"/></g>`;
     },
   },
@@ -191,8 +192,8 @@ export const EDGE_MASK_STYLES = [
     build: (w, h, p) => {
       const uid = `em-scratch-${p.seed}`;
       const md = Math.min(w, h);
-      const shape = roundedRect(w, h, insetFrom(p.amount) + 0.03);
-      const filter = brushFilter(uid, "0.004 0.2", 2, md * (0.06 + p.amount / 1000), p.seed % 90, { alphaTable: "0 1 0 1 1" });
+      const shape = roundedRect(w, h, insetFrom(p.amount));
+      const filter = brushFilter(uid, "0.004 0.2", 2, md * (0.03 + p.amount / 2000), p.seed % 90, { alphaTable: "0 1 0 1 1" });
       return `${filter}<g filter="url(#${uid})" fill="${MASK_FILL}"><path d="${shape}"/></g>`;
     },
   },
@@ -228,6 +229,35 @@ function loadImage(src, cors) {
     img.onerror = () => reject(new Error("image_load_failed"));
     img.src = src;
   });
+}
+
+const boundsCache = new Map();
+
+/** Bounding box of a mask PNG's visible pixels (alpha > 8), cached per URL; whole image if it cannot be read. */
+function maskBounds(img, key) {
+  const hit = boundsCache.get(key);
+  if (hit) return hit;
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  let box = { x: 0, y: 0, w: iw, h: ih };
+  const c = document.createElement("canvas");
+  c.width = iw;
+  c.height = ih;
+  const cx = c.getContext("2d");
+  if (cx) {
+    cx.drawImage(img, 0, 0);
+    const a = cx.getImageData(0, 0, iw, ih).data;
+    let x0 = iw, y0 = ih, x1 = -1, y1 = -1;
+    for (let y = 0; y < ih; y++) for (let x = 0; x < iw; x++) if (a[(y * iw + x) * 4 + 3] > 8) {
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+    if (x1 >= x0 && y1 >= y0) box = { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  }
+  boundsCache.set(key, box);
+  return box;
 }
 
 /** Guard against pathological canvases (model output is ≪ this; R2 art could be larger). */
@@ -269,13 +299,13 @@ export async function applyEdgeMask(sourceUrl, id, params) {
 
     ctx.globalCompositeOperation = "destination-in"; // keep source only where mask is opaque
     if (style.maskUrl) {
-      // amount=10 → scale 0.97 (barely touches edge, ~1.5% each side); amount=90 → scale 0.75 (~12.5% each side).
-      // Scale is always ≤ 1.0 so the mask never overflows the canvas and brush strokes stay complete
-      // (a scale > 1 clipped the brush PNG edges at the canvas boundary → incomplete stroke shapes).
-      const scale = 1.0 - (params.amount / 100) * 0.28;
+      // The brush PNGs carry empty transparent margins (up to ~8% a side, off-centre) → stretch only the drawn area to the canvas,
+      // then shrink by amount: 10 → ~0.4% a side, 55 → ~2.2%, 90 → ~3.6%. Scale stays ≤ 1 so brush strokes are never clipped.
+      const b = maskBounds(mask, style.maskUrl);
+      const scale = 1.0 - (clamp(params.amount ?? DEFAULT_EDGE_PARAMS.amount, 0, 100) / 100) * 0.08;
       const mx = (w * (1 - scale)) / 2;
       const my = (h * (1 - scale)) / 2;
-      ctx.drawImage(mask, mx, my, w * scale, h * scale);
+      ctx.drawImage(mask, b.x, b.y, b.w, b.h, mx, my, w * scale, h * scale);
     } else {
       ctx.drawImage(mask, 0, 0, w, h);
     }

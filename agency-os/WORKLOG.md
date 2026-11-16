@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-16（續1）— 「改邊緣」積木邊太厚：程式筆刷內縮 15%→3.4%／筆刷 PNG 裁掉空白邊（操作者「修掉的邊都太厚了」）
+
+- 根因（`public/editor-shared/edge-mask.js`，Studio／我的設計／canvas／修圖 dock 共用一份）：
+  - C1 程式筆刷 8 種：`insetFrom` 5–18% 再加每種 +2–5%，預設 amount 55 每邊吃約 15%；位移幅度又大。
+  - C2 筆刷 1–16 PNG 本身留空白邊（09–16 右側 ~8% 下側 ~5%，01/07 上下帶狀空白），原樣鋪滿畫布。
+  - C3 PNG 再依 amount×0.28 縮小（55 → 每邊 7.7%）。
+- 修法：`insetFrom` 改 1.5–5%、去掉各樣式額外內縮（書法留 +1%）、位移／模糊減半、圓角 6%→3%；PNG 先依 alpha 算出實際筆觸範圍（`maskBounds`，每個 URL 快取）再只把那塊鋪滿，縮放改 amount×0.08（55 → 每邊 2.2%）。縮放仍 ≤1，筆觸不被畫布裁掉。
+- 測試：`editor-edge-mask-drift.test.ts` golden hash 更新（刻意改遮罩數學）；`editor-ai-panels.test.ts` 假遮罩左欄透明 → 斷言 drawImage 來源框 `[1,0,3,2]`＋目的框 `[0.088,0.044,3.824,1.912]`。
+- 實測（headless Chromium，純色 1000² 圖，amount 55，新舊模組並跑）：程式筆刷每邊 13.6–16.9% → 3.1–4.7%（保留 43–51% → 83–87%）；筆刷 1–16 每邊 8.3–18.5% → 2.4–11.7%。剩下較多的（5、15）是筆刷圖案本身的潑濺形狀。
+- Codex m1（未修）：golden 測試不讀真實筆刷 PNG，換 PNG 素材時測試不會變紅；此缺口改動前即存在，換素材屬刻意行為，裁切邏輯已有指名斷言。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/studio/edge-mask.test.ts lib/studio/__tests__/editor-edge-mask-drift.test.ts lib/studio/__tests__/editor-ai-panels.test.ts lib/studio/__tests__/photo-pro-dock.test.ts (worktree on origin/main 115314f9f) | exit=0 | ms=9000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-16-partialreview-e4e82fa5.md，files-reviewed 含 3 檔）
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin,agency-os,scripts | grep=0\.28|5%…18%|0\.846 | hits=1
+  - 唯一命中為新註解本身（edge-mask.js:21 說明舊值）；呼叫端 DesignsGallery/StudioWorkbench/CanvasEditor/blocks 只傳 amount，不依賴內縮數值
+- 避免再發生：遮罩邊寬以「每邊被刮百分比」實測（本條數字），不再只看 hash。
 ## 2026-11-15（續31）— 「我的設計」直傳 R2：C5（塔羅）、C6（其餘呼叫端＋刪 base64 輸入）；C3／C4 真實 R2 實測通過
 
 - C5：新 `lib/studio/design-upload.ts`（瀏覽器 ①upload-url ②PUT ③登記；`urlToBlob` 跨源網址走 `/api/tools/designs/download` 代理）。`TarotStudio.tsx`：所有存檔原位元組直傳；牌卡 state 只留 `artKey`（出圖即 PUT 到 pending）或 `artJob`（背景批次：點「存無框圖」才重抓＋套目前調色，與載入共用 `gradedBatchArt`）＋≤2048 顯示用 `thumb`（大圖與畫布）；`toGalleryArt` 刪除；存檔失敗／pending 過期顯示在頁內訊息列。
