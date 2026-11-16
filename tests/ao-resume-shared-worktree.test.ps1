@@ -246,6 +246,26 @@ try {
     Assert-Eq (G $f.Wt @('rev-parse', 'HEAD')) $headBefore 'P17b HEAD unchanged'
     Assert-Eq @(Get-ChildItem (Join-Path $f.Wt '.git') -Directory -Filter 'parity-merge-*').Count 0 'P17b backup directory removed'
 
+    # P18 old upstream snapshot (2026-11-16): the file was edited here but committed from another checkout, so the local
+    # bytes equal a version upstream already has; upstream then changed the same line again -> the 3-way merge conflicts
+    # although nothing local is in the file. It takes the target's version. Mutation: drop upstream_had -> conflict.
+    $f = New-Fixture 'p18'; Advance-Origin $f 'a.txt' "a2`n"; Advance-Origin $f 'a.txt' "a3`n"
+    Set-File (Join-Path $f.Wt 'a.txt') "a2`n"
+    $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
+    Assert-Eq $r.Action 'fast-forward' 'P18 action'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'a.txt')) "a3`n" 'P18 the old snapshot became the origin version'
+    Assert-Eq (G $f.Wt @('status', '--porcelain', '--untracked-files=no')) '' 'P18 nothing left modified'
+    $kept = @(Get-ChildItem (Join-Path $f.Wt '.git') -Directory -Filter 'parity-merge-*')
+    Assert-Eq $kept.Count 1 'P18 the replaced bytes stay in a backup directory'
+    Assert-Eq (Read-File (Join-Path $kept[0].FullName 'ours-0')) "a2`n" 'P18 backup holds the local bytes'
+    Assert-True ($r.Message -like '*parity-merge-*a.txt*') 'P18 the message names the backup and the file'
+    # P18b a real local edit on the same line still stops the run untouched
+    $f = New-Fixture 'p18b'; Advance-Origin $f 'a.txt' "a2`n"; Advance-Origin $f 'a.txt' "a3`n"
+    Set-File (Join-Path $f.Wt 'a.txt') "mine`n"
+    $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
+    Assert-True ($r.Action -ne 'fast-forward') 'P18b a local edit that upstream never had is not replaced'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'a.txt')) "mine`n" 'P18b local edit untouched'
+
     # ---------------- I3: hooks act on the MAIN checkout only (2026-09-27) ----------------
     # A linked worktree (git worktree add) has `.git` as a FILE. Accepting it as the root wrote hook
     # state / reports into D:\tmp\<wt> and ensure-claude-junction replaced the worktree's tracked

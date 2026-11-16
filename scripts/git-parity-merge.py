@@ -6,7 +6,10 @@ local bytes already equal the target. In D:\\Work some session nearly always has
 origin also changes (agency-os/WORKLOG.md, TASKS.md), so the checkout never caught up and every commit made in it
 was refused on push (2026-10-22: one commit = 22 model calls).
 
-Per blocking file: 3-way merge (base = HEAD, ours = worktree, theirs = target). Any conflict, add/delete on one
+Per blocking file: 3-way merge (base = HEAD, ours = worktree, theirs = target); a conflicting file whose bytes equal a
+version upstream committed after HEAD is an old snapshot and takes the target's -- its local bytes stay in the backup
+directory, which is then kept and named in the message (equal bytes cannot tell a snapshot from a deliberate return to
+that version, Codex 2026-11-16). Any other conflict, add/delete on one
 side, or a differing untracked file -> nothing is touched. Otherwise: index entries of those paths -> HEAD, files
 -> HEAD bytes, ff-only, files -> merged bytes. No stash, no reset of other paths, no push.
 
@@ -59,6 +62,13 @@ def main():
 
     lf = lambda b: b.replace(b"\r\n", b"\n")
 
+    def upstream_had(p, ours):
+        # True when the local bytes are exactly a version of p that upstream committed between HEAD and the target:
+        # a snapshot of work that was committed from another checkout, not a local edit. 2026-11-16: three such files
+        # in D:\Work (edited there, committed from a worktree) blocked the ff once upstream changed the same line again.
+        return any(lf(blob(c, p) or b"") == ours
+                   for c in git("log", "--format=%H", f"HEAD..{a.target}", "--", p).stdout.decode().split())
+
     def place(tmp, path):
         # Rename into place; a target on another volume (D:\Work\.claude is a junction into C:) cannot be renamed to,
         # so it is copied instead (not shutil.copyfile: its CopyFile2 fast path answers EINVAL on that junction path).
@@ -88,7 +98,7 @@ def main():
         r = git(*args, check=False)
         return r.stdout.decode().split()[1] if args[0] == "ls-files" and r.stdout else r.stdout.decode().strip()
 
-    plan, moved, staged, idx_seen = [], [], [], {}
+    plan, moved, staged, idx_seen, stale = [], [], [], {}, []
     for p in sorted(up & tracked):
         path = os.path.join(a.root, p)
         # The merge reads the worktree only: staged bytes that differ from it would be lost by the index reset.
@@ -111,9 +121,13 @@ def main():
             # keeps both sides; every other file must merge without overlap.
             union = git("check-attr", "merge", "--", p).stdout.decode().strip().endswith(": union")
             r = subprocess.run(["git", "merge-file", "-p", *(["--union"] if union else []), *fs], capture_output=True)
+        out = r.stdout
         if r.returncode:
-            return done(False, f"{p}: local edits conflict with {a.target}")
-        merged = r.stdout.replace(b"\n", b"\r\n") if b"\r\n" in ours else r.stdout
+            if not upstream_had(p, lf(ours)):
+                return done(False, f"{p}: local edits conflict with {a.target}")
+            out = lf(theirs)                         # nothing local in it: the target's version replaces the old one
+            stale.append(p)
+        merged = out.replace(b"\n", b"\r\n") if b"\r\n" in ours else out
         plan.append((p, path, base, merged, ours))
     for p in sorted(up & untracked):
         path = os.path.join(a.root, p)
@@ -238,9 +252,11 @@ def main():
     except Exception as e:
         return done(False, f"fast-forwarded; local edits carried into {written or 'no file'}, then writing failed ({e})",
                     backup=side, forwarded=True)
-    shutil.rmtree(side, ignore_errors=True)         # untracked copies equal the target's files, now tracked
-    return done(True, f"fast-forwarded; local edits carried forward in {len(plan)} file(s), {len(moved)} identical untracked file(s) now tracked, "
-                      f"{len(renorm)} eol-only file(s) renormalized",
+    kept = f" (local bytes kept in {side}: {', '.join(stale)})" if stale else ""
+    if not stale:
+        shutil.rmtree(side, ignore_errors=True)     # untracked copies equal the target's files, now tracked
+    return done(True, f"fast-forwarded; local edits carried forward in {len(plan) - len(stale)} file(s), {len(stale)} old upstream snapshot(s) "
+                      f"replaced{kept}, {len(moved)} identical untracked file(s) now tracked, {len(renorm)} eol-only file(s) renormalized",
                 [p for p, *_ in plan] + [p for p, *_ in moved] + [p for p, *_ in renorm])
 
 
