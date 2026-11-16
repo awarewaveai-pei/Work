@@ -37,4 +37,4 @@ source_session_summary: "監工派工 U0–U11（舊影片工具併進影音工�
 
 ### 6. 相關資源
 - **Files**: 計畫（上）；監工台 `$WORK_ROOT/agency-os/handoffs/2026-11-16-video-unify-supervisor/`；規則記憶 `feedback_supervisor_dispatch_up_to_four_sessions`、`feedback_everything_on_supervisor`。
-- **Known landmines**: 整合 worktree 有 node_modules junction（next-admin、video-workbench）與複製來的 `vendor/` 忽略檔，刪 worktree 前先移除 junction；新內部路由要過 `lib/portal/__tests__/registry-code.test.ts`；WORKLOG 今日條目尚未寫（AO-CLOSE 時補：U 線四張卡＋parity 修正，證據在各 commit message）。
+- **Known landmines**: 整合 worktree 有 node_modules junction（next-admin、video-workbench）與複製來的 `vendor/` 忽略檔，刪 worktree 前先移除 junction；新內部路由要過 `lib/portal/__tests__/registry-code.test.ts`；WORKLOG 2026-11-16（續8）已寫（237bd314b）；之後的卡另開條目。新畫面未用登入的瀏覽器實點（本 session 的 Chrome 工具未獲放行）→ 新監工第一件事：開 video.aware-wave.com 照計畫 §8 點「作品」「腳本」、鏡頭卡三顆、第 9 步快速輸出對話框、成片卡審片／發布、剪輯器片頭送一支。
