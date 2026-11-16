@@ -39,6 +39,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const outputs = path.join(dataDir, "generated");
   fs.mkdirSync(outputs, { recursive: true });
   const mediaStore = require("./media-store.cjs").createMediaStore({ dataDir });
+  const UUID_RE = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+    GENERATED_VIDEO = new RegExp(`^/generated/${UUID_RE}\\.(mp4|webm|mov)$`),
+    GENERATED_THUMB = new RegExp(`^/generated/${UUID_RE}\\.thumb\\.jpg$`),
+    THUMB_WAIT_MS = 20000;
   // Card P6.20: files above one request's size arrive in chunks (this org's own sessions and quota). Created with the api,
   // so chunks left from before a restart are removed at start, not at this org's next upload.
   const uploads = require("./chunked-upload.cjs").createChunkedUploads({ dataDir, limits: {
@@ -140,7 +144,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       job.result.ledger = main ? "no_file" : "local_mode";
       persist();
     }
-    if (!main) return;
+    if (!main) return thumbnailOf(job);
     if (job.status === "succeeded" && job.result?.url && !job.result.assetId && !job.result.ledger) {
       try {
         Object.assign(job.result, await register(job.result.url, job.result.origin, { sources: mainSystemTools.localUrls(job.input), costUsd: job.result.origin?.costUsd, jobId: job.id, ratio: jobRatio(job) }));
@@ -203,8 +207,19 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       persist();
     }
+    await thumbnailOf(job); // after charging, before retryOwed arms a timer that would join this settle
     mirror(job);
     retryOwed(job);
+  }
+  // R26: a finished AI video's thumbnail, the last step of settleOnce (registration and charging never wait on ffmpeg;
+  // nothing outlives the settle). The card finds the same url from the video url alone (shared/assets-ui.js mediaFile).
+  async function thumbnailOf(job) {
+    const video = job.status === "succeeded" && !job.result?.thumbUrl && GENERATED_VIDEO.exec(job.result?.url || "");
+    const thumbUrl = video && (await mediaStore.generatedThumb(video[1]));
+    if (thumbUrl) {
+      job.result.thumbUrl = thumbUrl;
+      persist();
+    }
   }
   // Invariant (VD.2, Codex 8ccdf230): what a finished job still owes the main system (release text, covers) is retried by
   // the server itself -- never only when a browser happens to GET the job again (a page that already has the asset never
@@ -1358,6 +1373,16 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       return true;
     }
     const route = url.pathname.replace("/api/vw", "");
+    // R26: an AI video's thumbnail is made in this org's folder the first time it is asked for; server.cjs then sends
+    // the file like any /generated file (or 404 when the video is missing, gave none, or is still queued after
+    // THUMB_WAIT_MS -- well under nginx's 300 s read timeout; the making goes on and the next read gets the file).
+    const thumb = ["GET", "HEAD"].includes(req.method) && GENERATED_THUMB.exec(url.pathname);
+    if (thumb) {
+      let timer;
+      await Promise.race([mediaStore.generatedThumb(thumb[1]), new Promise((r) => (timer = setTimeout(r, THUMB_WAIT_MS)))]);
+      clearTimeout(timer);
+      return false;
+    }
     if (!url.pathname.startsWith("/api/vw/")) return false;
     try {
       const host = req.headers.host;

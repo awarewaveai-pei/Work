@@ -15,6 +15,7 @@ const WAVEFORM_POINTS = 1000,
   WAVEFORM_RATE = 8000,
   PREVIEW_SHORT = 720,
   EXT = /^[a-z0-9]{2,5}$/,
+  UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
   // Card P5: 3D files are stored like media (content-addressed, fresh asset id) but are not probed by ffprobe.
   MODELS = new Set(["glb", "bvh"]);
 // A GLB starts with "glTF", version 2, and its header length equals the file size; a BVH starts with HIERARCHY.
@@ -46,6 +47,19 @@ const hasAlpha = (probe) => !!probe.video && /^(rgba|bgra|argb|abgr|yuva|gbrap|y
 // crf is the H.264 quality (the alpha WebM keeps CRF 30).
 // Card P3: an alpha source gets VP9 + alpha WebM (H.264 has no alpha), so the editor preview shows it transparent too; its
 // sound goes along as Opus (a preview must sound like its original; a source without audio stays without).
+// The one thumbnail every stored picture or video gets (media/<sha256>/thumb.jpg, /generated/<uuid>.thumb.jpg): the frame
+// at 1 s (the first frame of a clip up to 1 s), at most 360 px high.
+const probeOf = async (file, signal) => {
+  const info = await inspectMedia(file, signal);
+  return { ...info, probe: undefined, ...info.probe };
+};
+function thumbnail(original, probe, tmp, signal) {
+  return run(
+    ["-y", "-hide_banner", ...(probe.video && probe.duration > 1 ? ["-ss", "1"] : []), "-i", original,
+      "-frames:v", "1", "-vf", "scale=-2:'min(360,ih)'", "-q:v", "4", tmp],
+    signal,
+  );
+}
 function transcode(original, tmp, short, alpha, crf, signal) {
   const scale = `scale=w='if(lte(iw,ih),trunc(min(iw,${short})/2)*2,-2)':h='if(lte(iw,ih),-2,trunc(min(ih,${short})/2)*2)'`;
   return run(
@@ -141,24 +155,14 @@ function createMediaStore({ dataDir }) {
       await derive(dir, "probe.json", async (tmp) => fs.writeFileSync(tmp, JSON.stringify(probe, null, 2)));
       return { checksum_sha256: sha, url: "/media/" + sha + "/" + originalName, previewUrl: null, probe, thumbUrl: null, waveformUrl: null };
     }
-    await derive(dir, "probe.json", async (tmp) => {
-      const info = await inspectMedia(original, signal);
-      fs.writeFileSync(tmp, JSON.stringify({ ...info, probe: undefined, ...info.probe }, null, 2));
-    });
+    await derive(dir, "probe.json", async (tmp) => fs.writeFileSync(tmp, JSON.stringify(await probeOf(original, signal), null, 2)));
     const probe = JSON.parse(fs.readFileSync(path.join(dir, "probe.json"), "utf8"));
     // Output always reads the original; the proxy is only what the editor plays.
     const proxy = needsProxy(probe, path.extname(originalName).slice(1)),
       alpha = hasAlpha(probe);
     if (proxy) await derive(dir, alpha ? "proxy.webm" : "proxy.mp4", (tmp) => transcode(original, tmp, 1080, alpha, 20, signal));
     const visual = probe.video || /^(png|jpg|jpeg|webp|gif)$/.test(ext);
-    if (visual)
-      await derive(dir, "thumb.jpg", (tmp) =>
-        run(
-          ["-y", "-hide_banner", ...(probe.video && probe.duration > 1 ? ["-ss", "1"] : []), "-i", original,
-            "-frames:v", "1", "-vf", "scale=-2:'min(360,ih)'", "-q:v", "4", tmp],
-          signal,
-        ),
-      );
+    if (visual) await derive(dir, "thumb.jpg", (tmp) => thumbnail(original, probe, tmp, signal));
     if (probe.audio)
       await derive(dir, "waveform.json", async (tmp) =>
         fs.writeFileSync(tmp, JSON.stringify(await waveform(original, probe.duration, signal))),
@@ -248,6 +252,42 @@ function createMediaStore({ dataDir }) {
     }
     return { previewUrl: null, making: true };
   }
+  // R26: an AI-made video in <dataDir>/generated/ (<uuid>.mp4|webm|mov, backend/api.cjs) gets the same thumbnail beside
+  // it, <uuid>.thumb.jpg. Requests for one video share one promise, the store makes one at a time, and a video that
+  // failed is not tried again for THUMB_RETRY_MS (no ffmpeg per request; a passing fault still heals). Resolves to its
+  // url, or null; never rejects.
+  const generatedDir = path.join(dataDir, "generated"),
+    thumbJobs = new Map(),
+    thumbFailed = new Map(),
+    THUMB_RETRY_MS = 10 * 60 * 1000;
+  let thumbQueue = Promise.resolve();
+  function generatedThumb(id) {
+    if (!UUID.test(id || "")) return Promise.resolve(null);
+    const name = id + ".thumb.jpg";
+    if (fs.existsSync(path.join(generatedDir, name))) return Promise.resolve("/generated/" + name);
+    if (Date.now() - (thumbFailed.get(id) ?? -Infinity) < THUMB_RETRY_MS) return Promise.resolve(null);
+    thumbFailed.delete(id);
+    if (!thumbJobs.has(id)) {
+      const video = ["mp4", "webm", "mov"].map((ext) => path.join(generatedDir, id + "." + ext)).find((f) => fs.existsSync(f));
+      if (!video) return Promise.resolve(null);
+      const job = thumbQueue
+        .then(async () => {
+          const probe = await probeOf(video, AbortSignal.timeout(120000));
+          if (!probe.video) throw Error("沒有影像軌");
+          await derive(generatedDir, name, (tmp) => thumbnail(video, probe, tmp, AbortSignal.timeout(120000)));
+          return "/generated/" + name;
+        })
+        .catch((e) => {
+          thumbFailed.set(id, Date.now());
+          console.error("[vw] 生成影片縮圖產生失敗：", id, String(e?.message || e).slice(-300));
+          return null;
+        })
+        .finally(() => thumbJobs.delete(id));
+      thumbQueue = job;
+      thumbJobs.set(id, job);
+    }
+    return thumbJobs.get(id);
+  }
   // Alpha previews made before their sound was kept (proxy.webm / preview720.webm with no audio stream while the original
   // has one) are made again and renamed over the old file, so playback keeps working until each is replaced. Re-runnable:
   // a preview that already has sound is left alone. scripts/backfill-alpha-proxy-audio.cjs runs it per data folder.
@@ -276,6 +316,6 @@ function createMediaStore({ dataDir }) {
     }
     return done;
   }
-  return { root, ingest, fileFor, preview, backfillAlphaAudio };
+  return { root, ingest, fileFor, preview, generatedThumb, backfillAlphaAudio };
 }
 module.exports = { createMediaStore, needsProxy, hasAlpha };

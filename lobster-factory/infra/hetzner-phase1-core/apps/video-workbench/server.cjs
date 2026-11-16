@@ -176,7 +176,9 @@ function createServer({
       if (
         /^\/generated\/[a-f0-9-]+\.(png|jpg|webp|gif|mp3|wav|m4a|mp4|webm|mov|cube)$/.test(
           pathname,
-        )
+        ) ||
+        // R26: an AI video's thumbnail, made beside it by this org's api (backend/media-store.cjs generatedThumb).
+        /^\/generated\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.thumb\.jpg$/.test(pathname)
       )
         file = path.join(dataDir, pathname.slice(1));
       else if (pathname.startsWith("/media/")) {

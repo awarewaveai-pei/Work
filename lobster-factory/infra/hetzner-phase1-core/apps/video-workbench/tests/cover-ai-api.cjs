@@ -66,6 +66,14 @@ const ff = (args) => assert.equal(spawnSync(ffmpeg, ["-y", "-hide_banner", ...ar
     assert.equal(img.status, 200);
     assert.match(img.headers.get("content-type"), /^image\/jpeg/);
     assert.deepEqual(calls.filter((u) => u.endsWith("/interactions")).length, 1, "one vendor call");
+    // R26: the cover's settle of e1 (saved before thumbnails) also makes e1's thumbnail; it is awaited here so the folder
+    // is not deleted while ffmpeg reads the video.
+    let e1 = exp;
+    for (let i = 0; i < 100 && !e1.result.thumbUrl; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      e1 = await (await fetch(api + "/generations/e1")).json();
+    }
+    assert.equal(e1.result.thumbUrl, e1.result.url.replace(/\.mp4$/, ".thumb.jpg"));
     // Codex 94927dcb F2: a paid job whose billed run is not yet in usage is never pruned by the history limit (pruned =
     // never charged). Local mode keeps it owed (nothing settles), so the restart's prune is what is tested.
     const pruneDir = path.join(dir, "prune");
