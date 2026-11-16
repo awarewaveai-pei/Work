@@ -9,6 +9,7 @@ import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { persistEditorialRightsQa } from "./editorial-rights-persist";
 import { finalizeVideoJob } from "./finalize";
 import { readJob } from "./job-store";
+import { FINISHED_VIDEO_MIME } from "./projects";
 import { ratioOfAsset } from "./platform-ratio";
 import type { AdvanceDeps } from "./project-advance";
 import { REQUIRED_RELEASE_QA_KINDS, loadAuthoritativeReleaseEvidence } from "./release-evidence";
@@ -34,10 +35,17 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
       return r.status === "done" ? { state: "done" } : { state: "none" };
     },
 
+    // One row per ratio, the newest: a re-rendered or re-attached video replaces the older one of its ratio (plan U0).
     async rows(projectId) {
-      const { data, error } = await sb.from("media_assets").select("id, object_url, checksum_sha256, metadata").eq("organization_id", org).eq("media_project_id", projectId).eq("is_current", true).eq("mime_type", "video/mp4");
+      const { data, error } = await sb.from("media_assets").select("id, object_url, checksum_sha256, metadata").eq("organization_id", org).eq("media_project_id", projectId).eq("is_current", true).eq("mime_type", FINISHED_VIDEO_MIME).order("created_at", { ascending: false });
       if (error) fail("media_assets", error);
-      return (data ?? []).flatMap((a) => { const ratio = a.object_url ? ratioOfAsset({ object_url: String(a.object_url), metadata: a.metadata as { ratio?: unknown } | null }) : undefined; return ratio && a.checksum_sha256 ? [{ id: String(a.id), ratio, checksum: String(a.checksum_sha256) }] : []; });
+      const seen = new Set<string>();
+      return (data ?? []).flatMap((a) => {
+        const ratio = a.object_url ? ratioOfAsset({ object_url: String(a.object_url), metadata: a.metadata as { ratio?: unknown } | null }) : undefined;
+        if (!ratio || !a.checksum_sha256 || seen.has(ratio)) return [];
+        seen.add(ratio);
+        return [{ id: String(a.id), ratio, checksum: String(a.checksum_sha256) }];
+      });
     },
 
     async qaProblems(row) {

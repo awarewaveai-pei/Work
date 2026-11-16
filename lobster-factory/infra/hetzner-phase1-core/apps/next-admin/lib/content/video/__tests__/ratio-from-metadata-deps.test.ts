@@ -36,4 +36,13 @@ describe("workbench rows (ratio only in metadata)", () => {
     const db = { from: () => chain([{ id: "a1", object_url: WB, checksum_sha256: "sum", metadata: { ratio: "9x16" } }]) };
     expect(await advanceDeps(db as never, "org", "me").rows("p1")).toEqual([{ id: "a1", ratio: "9x16", checksum: "sum" }]);
   });
+
+  it("project-advance deps rows() keeps only the newest video of each ratio (rows arrive newest first)", async () => {
+    const db = { from: () => chain([
+      { id: "new916", object_url: WB, checksum_sha256: "s3", metadata: { ratio: "9x16" } },
+      { id: "only169", object_url: WB, checksum_sha256: "s2", metadata: { ratio: "16x9" } },
+      { id: "old916", object_url: WB, checksum_sha256: "s1", metadata: { ratio: "9x16" } },
+    ]) };
+    expect((await advanceDeps(db as never, "org", "me").rows("p1")).map((r) => r.id)).toEqual(["new916", "only169"]);
+  });
 });

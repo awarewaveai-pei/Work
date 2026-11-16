@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { attachVideoAssets, ensureWorkbenchProject, PROJECT_COLUMNS as COLUMNS } from "@/lib/content/video/projects";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,9 +11,8 @@ const MODES = new Set(["quick_video", "short_drama", "footage_edit"]);
 const STAGES = new Set(["create", "produce", "review", "release", "measure", "archived"]);
 // Same values as the 0138 check constraints; a bad value is a 400 here, not a 500 from the database.
 const AUTONOMY = new Set(["guided", "auto_after_render", "full_auto"]);
-const SOURCES = new Set(["manual", "script_forge", "content_topic"]);
+const SOURCES = new Set(["manual", "script_forge", "content_topic", "video_workbench"]);   // 0164
 const FORMATS = new Set(["16x9", "9x16", "4x5"]);
-const COLUMNS = "id, organization_id, title, production_mode, lifecycle_stage, autonomy, source, source_ref, formats, last_error, brief_json, active_story_bible_revision_id, active_candidate_asset_id, active_release_id, created_at, updated_at";
 
 function guard(req: Request): Response | null { return canCreateAiImageJob(resolveOpsRole(req).role) ? null : NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
 function denied(error: unknown): Response | null { return error instanceof OrgAccessError ? toOrgAccessResponse(error) : null; }
@@ -74,6 +74,8 @@ export async function GET(req: Request): Promise<Response> {
   let projects = db.from("media_production_projects").select(COLUMNS).order("updated_at", { ascending: false }).limit(100);
   if (url.searchParams.get("includeArchived") !== "1") projects = projects.neq("lifecycle_stage", "archived");
   if (organizationId) projects = projects.eq("organization_id", organizationId);
+  const sourceRef = url.searchParams.get("sourceRef")?.trim();
+  if (sourceRef) projects = projects.eq("source_ref", sourceRef);
   const { data, error } = await projects;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, items: data ?? [] });
@@ -90,13 +92,27 @@ export async function POST(req: Request): Promise<Response> {
   const source = body.source === undefined ? "manual" : String(body.source);
   if (!SOURCES.has(source)) return bad("invalid source");
   const sourceRef = typeof body.sourceRef === "string" && body.sourceRef.trim() ? body.sourceRef.trim().slice(0, 200) : null;
+  if (source === "video_workbench" && !sourceRef) return bad("sourceRef required for video_workbench");
+  const attach = body.attachAssetIds === undefined ? [] : body.attachAssetIds;
+  if (!Array.isArray(attach) || attach.length > 50 || !attach.every((x) => typeof x === "string" && UUID.test(x))) return bad("attachAssetIds must be at most 50 asset ids");
   const db = getSupabaseWriteClient(); if (!db) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
-  const inserted = await db.from("media_production_projects").insert({
-    lifecycle_stage: "create", brief_json: {}, ...fields,
-    organization_id: organizationId, production_mode: productionMode, source, source_ref: sourceRef,
-  }).select(COLUMNS).single();
-  if (inserted.error) return NextResponse.json({ ok: false, error: inserted.error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, item: inserted.data }, { status: 201 });
+  let item: Record<string, unknown>; let created = true;
+  if (source === "video_workbench") {
+    // The workbench asks every time it needs its project: one row per (org, sourceRef), created on first ask.
+    const ensured = await ensureWorkbenchProject(db, organizationId, sourceRef!, String(fields.title), { ...fields, production_mode: productionMode });
+    if (ensured.ok === false) return NextResponse.json({ ok: false, error: ensured.error }, { status: 500 });
+    item = ensured.item; created = ensured.created;
+  } else {
+    const inserted = await db.from("media_production_projects").insert({
+      lifecycle_stage: "create", brief_json: {}, ...fields,
+      organization_id: organizationId, production_mode: productionMode, source, source_ref: sourceRef,
+    }).select(COLUMNS).single();
+    if (inserted.error) return NextResponse.json({ ok: false, error: inserted.error.message }, { status: 500 });
+    item = inserted.data;
+  }
+  const attached = await attachVideoAssets(db, organizationId, String(item.id), attach as string[]);
+  if (attached.ok === false) return NextResponse.json({ ok: false, error: attached.error, item }, { status: 500 });
+  return NextResponse.json({ ok: true, item, attached: attached.attached }, { status: created ? 201 : 200 });
 }
 
 export async function PATCH(req: Request): Promise<Response> {
