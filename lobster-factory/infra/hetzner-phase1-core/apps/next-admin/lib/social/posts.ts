@@ -1,7 +1,8 @@
 // Post payloads for POST /api/social/posts and PUT /api/social/posts/[id]: what may be sent, and the body limits.
+import { WRITE_ROLES, actorOf, requireBrandRole } from "./authz";
 import { BadRequest, uuid } from "./http";
 import { commentsOverLimit, overLimit, youtubeParts } from "./limits";
-import { accountPlatforms, type AutoMode, type CommentInput, type MediaInput, type PostChildren, type PostFields, type TargetInput } from "./store";
+import { accountPlatforms, savePost, type AutoMode, type CommentInput, type MediaInput, type PostChildren, type PostFields, type SavedPost, type TargetInput } from "./store";
 import { commentTakesMedia, composeText, ComposeError } from "./compose";
 import { parseRepeat, RepeatError } from "./repeat-rule";
 
@@ -125,4 +126,17 @@ export async function assertWithinLimits(brandId: string, body: string, targets:
   const noImage = [...new Set(targets.map((t) => platforms.get(t.account_id) as string))].filter((p) => !commentTakesMedia(p));
   const imageOnly = comments.findIndex((c) => c.media_id && !c.body.trim());
   if (imageOnly >= 0 && noImage.length) throw new BadRequest(`comment ${imageOnly + 1} is an image only, and ${noImage.join(", ")} comments carry no image`, { commentImageOnly: { comment: imageOnly + 1, platforms: noImage } });
+}
+
+/** A new draft of the brand `body.brand`, for a caller who may write for it: POST /api/social/posts and the video
+ *  tool's 「送社群」 (/api/video/social-drafts/text) share this one check and save. */
+export async function createDraftPost(req: Request, body: Record<string, unknown>): Promise<SavedPost> {
+  const brand = uuid(body.brand, "brand");
+  await requireBrandRole(req, brand, WRITE_ROLES);
+  const payload = parsePostPayload(body);
+  if (payload.targets?.length) {
+    await assertWithinLimits(brand, payload.fields.body ?? "", payload.targets, { url: payload.fields.link_url ?? null, utm: payload.fields.link_utm ?? false },
+      payload.children.comments ?? []);
+  }
+  return savePost(brand, null, null, payload.fields, payload.targets, payload.media, actorOf(req), payload.children);
 }

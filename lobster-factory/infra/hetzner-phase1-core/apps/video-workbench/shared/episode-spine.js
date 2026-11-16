@@ -22,6 +22,32 @@
       (p.episodes || []).map((episode) => ({ project: p, episode })),
     );
 
+  // A project the spine makes, with one episode: adopt (an edit file) and card U3's spine-create (a script sent from 腳本).
+  // The projects page's own 建立新專案 asks type and style first and builds its own. `extra` = more project fields
+  // (U3: storyBibleSeries, the Story Bible series the script used).
+  function newProject({ id, title, ratio = "16:9", assets = [], episode = {}, ...extra }) {
+    return {
+      id, title, type: "single", ratio, style: 8, customStyle: "", createdAt: Date.now(), cover: "", assets,
+      settings: { model: "", lockModel: true, videoPrompt: "" }, // "" = the default video model (shared/models.js get)
+      ...extra,
+      episodes: [{ name: title, outline: "", shots: [], steps: [], outputs: [], ...episode }],
+    };
+  }
+  // Card U3: a shot from a script scene, with a new id. Its picture is never taken from the caller: settle and setShot
+  // alone put one on a shot (this file's invariant).
+  function newShot(s) {
+    const n = Math.round(Number(s?.seconds));
+    return { id: newId(), text: String(s?.text ?? ""), seconds: Number.isFinite(n) ? Math.min(120, Math.max(1, n)) : 5, line: String(s?.line ?? "") };
+  }
+  // Card U3 「寫回這一集」: the episode's shots become the script's. Old pictures go with their shots; the steps that made
+  // them stay (history). Same in-place contract as setShot; false = no such episode.
+  function setShots(projects, { projectId, episodeId, shots }) {
+    const episode = (projects || []).find((p) => p.id === projectId)?.episodes?.find((e) => e.id === episodeId);
+    if (!episode || !Array.isArray(shots)) return false;
+    episode.shots = shots.slice(0, 200).map(newShot);
+    return true;
+  }
+
   // Every edit file not yet linked to an episode becomes a project with one episode pointing at it (spec §2 PJ.1
   // "adopt 的輸入輸出形狀"). The rows are only read: the content stays where it is, byte for byte (spec §3.1).
   // Card PJ.5 (spec §3.4): an edit file is adopted once, the first time it is seen unlinked. `known` = the ids ever
@@ -53,30 +79,7 @@
       if (!id) return void skipped++;
       if (linked.has(id)) return;
       linked.add(id);
-      const title = editTitle(row);
-      out.push({
-        id: "project-ed-" + id,
-        title,
-        type: "single",
-        ratio: editRatio(row),
-        style: 8,
-        customStyle: "",
-        createdAt: Date.now(),
-        cover: "",
-        assets: [],
-        settings: { model: "", lockModel: true, videoPrompt: "" }, // "" = the default video model (shared/models.js get)
-        episodes: [
-          {
-            id: "ep-ed-" + id,
-            name: title,
-            outline: "",
-            shots: [],
-            edit: { engine, projectId: id },
-            steps: [],
-            outputs: [],
-          },
-        ],
-      });
+      out.push(newProject({ id: "project-ed-" + id, title: editTitle(row), ratio: editRatio(row), episode: { id: "ep-ed-" + id, edit: { engine, projectId: id } } }));
       added++;
     };
     for (const row of Array.isArray(editorRows) ? editorRows : [])
@@ -331,7 +334,7 @@
     ];
   }
 
-  const api = { editId, editTitle, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs, current, isStale, staleClip, outputStale, lineage, stepStates };
+  const api = { editId, editTitle, newProject, newShot, setShots, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs, current, isStale, staleClip, outputStale, lineage, stepStates };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

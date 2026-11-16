@@ -20,8 +20,6 @@ const ROOTS = [
     .map((n) => path.join(APP, `app/(shell)/tools/video/${n}.tsx`)),
 ];
 
-// Plan §4 U2: the door always locks the organization, so this picker never shows inside the workbench.
-const EXEMPT = new Set(["app/(shell)/tools/video/OrganizationPicker.tsx"]);
 
 function resolveImport(from: string, spec: string): string | null {
   const base = spec.startsWith("@/") ? path.join(APP, spec.slice(2)) : spec.startsWith(".") ? path.resolve(path.dirname(from), spec) : null;
@@ -52,13 +50,12 @@ const FILES = importGraph(ROOTS);
 // Components draw the screen; plain .ts modules hold data (tarot card colors feed image prompts) -- except the style source.
 const PRIMITIVES = "components/tools/panel-primitives.ts";
 const hits = (re: RegExp) =>
-  FILES.filter((f) => (f.endsWith(".tsx") || f === PRIMITIVES) && !EXEMPT.has(f)).flatMap((f) =>
+  FILES.filter((f) => (f.endsWith(".tsx") || f === PRIMITIVES)).flatMap((f) =>
     fs.readFileSync(path.join(APP, f), "utf8").split("\n").flatMap((line, i) => (re.test(line) ? [`${f}:${i + 1}`] : [])));
 
 describe("video tool style contract", () => {
   it("walks the workbench pages and the components they will mount", () => {
     expect(FILES).toEqual(expect.arrayContaining(["app/(shell)/tools/video/ScriptForge.tsx", PRIMITIVES]));
-    for (const f of EXEMPT) expect(FILES).toContain(f); // a stale exemption fails here
   });
 
   it("no hex color literal", () => {

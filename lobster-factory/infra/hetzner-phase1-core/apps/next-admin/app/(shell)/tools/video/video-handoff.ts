@@ -27,13 +27,25 @@ export interface RemotionInput {
   customScenes?: number;
 }
 
-/** brief_json of a project: the source script plus both engines' inputs. */
+/** A workbench project character (VW scripts/projects-0.js project.assets.character): refs = reference image urls;
+ *  key = its Story Bible character id, which a shot's `character` names. */
+export interface WorkbenchCharacter { key: string; name: string; role: string; refs: string[] }
+
+/** brief_json of a project: the source script plus both engines' inputs. storyBible: the approved Story Bible the script
+ *  was written with (card U3: the workbench episode takes its series and cast). */
 export interface VideoHandoff {
   title: string;
   script?: unknown;
   production?: ProductionInput;
   remotion?: RemotionInput;
+  storyBible?: { seriesId: string; characters: WorkbenchCharacter[] };
+  /** the platform the script was written for (ScriptForge PLATFORMS id): the workbench project's ratio (ratioForPlatform) */
+  platform?: string;
 }
+
+/** One shot of a workbench episode (VW shared/episode-spine.js newShot): text = what is shown, line = what is said;
+ *  character = the Story Bible character id the scene names (the workbench binds the shot to that character). */
+export interface WorkbenchShot { text: string; seconds: number; line: string; character?: string }
 
 export function clampCustomScenes(n: number, sceneCount: number) {
   if (!Number.isFinite(n)) return 0;
@@ -41,9 +53,10 @@ export function clampCustomScenes(n: number, sceneCount: number) {
 }
 
 // dialogue goes straight to TTS: a stage direction the model left in it (「(旁白/字幕)」) would be read aloud
-// (operator 2026-09-12). The prompt forbids it; this strips any bracketed text regardless.
+// (operator 2026-09-12). The prompt forbids it; this strips any bracketed text regardless, and the host script's
+// 【停】【加重】 delivery marks (lib/script-forge/modules.ts host task).
 function stripStageDirections(text: string): string {
-  return text.replace(/[（(][^）)]*[）)]/g, "").replace(/\s+/g, " ").trim();
+  return text.replace(/[（(][^）)]*[）)]/g, "").replace(/【[^】]*】/g, "").replace(/\s+/g, " ").trim();
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -96,4 +109,37 @@ export function handoffFromScript(script: any, opts: { customScenes: number; cha
       customScenes: clampCustomScenes(opts.customScenes, scenesIn.length),
     },
   };
+}
+
+// A scene's time span, as the script prompts ask for it: "0-3秒" (scenes[].time) or "0-15秒" (host segments[].duration).
+function spanSeconds(span: unknown): number | undefined {
+  const m = String(span ?? "").match(/(\d+(?:\.\d+)?)\s*[-~～–—]\s*(\d+(?:\.\d+)?)/);
+  const n = m ? Number(m[2]) - Number(m[1]) : NaN;
+  return n > 0 ? n : undefined;
+}
+
+/** Card U3: a ScriptForge script -> the shots of a workbench episode, one per scene (scenes[], or the host script's
+ *  segments[]). The picture description and every spoken line stay; stage directions leave the spoken line. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function shotsFromScript(script: any): WorkbenchShot[] {
+  const rows: unknown[] = Array.isArray(script?.scenes) ? script.scenes : Array.isArray(script?.segments) ? script.segments : [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.map((s: any) => ({
+    text: String(s?.visual ?? s?.imagePrompt ?? s?.image_prompt ?? "").trim(),
+    seconds: spanSeconds(s?.time ?? s?.duration) ?? 5,
+    line: stripStageDirections(String(s?.dialogue ?? s?.narration ?? s?.marked_text ?? "")),
+    ...(typeof s?.character_id === "string" && s.character_id ? { character: s.character_id } : {}),
+  })).filter((s) => s.text || s.line);
+}
+
+/** Card U3: an approved Story Bible's characters -> workbench project characters; refMap = character id -> reference
+ *  image url (ScriptForge buildCharacterRefMap). */
+export function charactersFromStoryBible(doc: { characters?: { id: string; name: string; role?: string }[] } | undefined,
+  refMap: Record<string, string> = {}): WorkbenchCharacter[] {
+  return (doc?.characters ?? []).filter((c) => c?.name?.trim()).map((c) => ({ key: c.id, name: c.name.trim(), role: c.role ?? "", refs: refMap[c.id] ? [refMap[c.id]] : [] }));
+}
+
+/** Card U3: a ScriptForge platform -> the workbench project ratio; undefined = the project's default. */
+export function ratioForPlatform(platform: string | undefined): "9:16" | "16:9" | undefined {
+  return platform === "reels" || platform === "tiktok" || platform === "shorts" ? "9:16" : platform === "youtube" ? "16:9" : undefined;
 }

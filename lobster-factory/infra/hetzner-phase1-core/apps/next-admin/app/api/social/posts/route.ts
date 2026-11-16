@@ -8,10 +8,10 @@ import { listAccessibleWpSites } from "@/lib/content/wp-sites";
 import { fetchSitePosts } from "@/lib/content/wp-calendar";
 import { canReschedule, topicsByWpPost } from "@/lib/content/topics/store";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { ANY_ROLE, WRITE_ROLES, actorForViewer, actorOf, requireBrandRole } from "@/lib/social/authz";
+import { ANY_ROLE, WRITE_ROLES, actorForViewer, requireBrandRole } from "@/lib/social/authz";
 import { BadRequest, handle, jsonBody, uuid } from "@/lib/social/http";
-import { assertWithinLimits, parsePostPayload } from "@/lib/social/posts";
-import { listDeletions, listPosts, listTags, listTrash, savePost } from "@/lib/social/store";
+import { createDraftPost } from "@/lib/social/posts";
+import { listDeletions, listPosts, listTags, listTrash } from "@/lib/social/store";
 import { resolveTenant } from "@/lib/tenant-guard";
 
 export const runtime = "nodejs";
@@ -64,15 +64,5 @@ export async function GET(req: Request): Promise<Response> {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  return handle(async () => {
-    const body = await jsonBody(req);
-    const brand = uuid(body.brand, "brand");
-    await requireBrandRole(req, brand, WRITE_ROLES);
-    const payload = parsePostPayload(body);
-    if (payload.targets?.length) {
-      await assertWithinLimits(brand, payload.fields.body ?? "", payload.targets, { url: payload.fields.link_url ?? null, utm: payload.fields.link_utm ?? false },
-        payload.children.comments ?? []);
-    }
-    return { post: await savePost(brand, null, null, payload.fields, payload.targets, payload.media, actorOf(req), payload.children) };
-  });
+  return handle(async () => ({ post: await createDraftPost(req, await jsonBody(req)) }));
 }

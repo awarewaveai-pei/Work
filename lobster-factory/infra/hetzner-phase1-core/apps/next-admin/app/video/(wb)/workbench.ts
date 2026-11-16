@@ -4,6 +4,7 @@
 // VideoWorkbench.* reaches the shell over the vw:v1 channel exactly as pages/*.html do. Opened on its own it goes to
 // the shell instead, which frames it again: /?open=<last path segment> (scripts/index-1.js PAGES).
 import { useEffect, useState } from "react";
+import type { WorkbenchCharacter, WorkbenchShot } from "../../(shell)/tools/video/video-handoff";
 
 // pages/projects.html's order: config.js first (runtime.js reads VW_CONFIG when it loads), purify.js before security.js.
 export const RUNTIME_SCRIPTS: readonly string[] = ["/config.js", "/shared/models.js", "/shared/adapters.js", "/shared/purify.js",
@@ -12,8 +13,17 @@ export const RUNTIME_SCRIPTS: readonly string[] = ["/config.js", "/shared/models
 /** The part of shared/runtime.js's window.VideoWorkbench these pages use. */
 export interface Workbench {
   ready: Promise<void>;
-  navigate(target: string): Promise<unknown>;
+  /** params: the framed page's query string, without "?" (shared/runtime.js navigate). */
+  navigate(target: string, params?: string): Promise<unknown>;
   request(path: string, body?: unknown, method?: string): Promise<unknown>;
+  /** mainSystem = the main system this workbench is connected to; null = none. */
+  loadCapabilities(): Promise<{ mainSystem?: { organizationId: string } | null }>;
+  storage: { getItem(key: string): string | null };
+  /** shared/runtime.js spine-create / spine-set-shots (card U3); both end on the projects page with that episode open. */
+  spine: {
+    create(payload: { title: string; ratio?: string; shots: WorkbenchShot[]; characters: WorkbenchCharacter[]; storyBibleSeries?: string }): Promise<{ projectId: string; episodeId: string }>;
+    setShots(payload: { projectId: string; episodeId: string; shots: WorkbenchShot[] }): Promise<unknown>;
+  };
 }
 
 type Host = { parent: unknown; location: Pick<Location, "pathname" | "search" | "replace">; document: Pick<Document, "createElement" | "body">; VideoWorkbench?: Workbench };

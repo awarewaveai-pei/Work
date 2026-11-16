@@ -15,8 +15,9 @@ const card: React.CSSProperties = { ...cardStyle(), padding: 14 };
 function strings(value: string): string[] { return value.split("\n").map((x) => x.trim()).filter(Boolean); }
 function list(value: string[]): string { return value.join("\n"); }
 
-export default function StoryBibleWorkbench() {
-  const [organizationId, setOrganizationId] = useState("");
+/** locked: the video workbench's 腳本 (card U3) works for one organization, so the organization picker never shows. */
+export default function StoryBibleWorkbench({ organizationId: locked }: { organizationId?: string } = {}) {
+  const [organizationId, setOrganizationId] = useState(locked ?? "");
   const [bible, setBible] = useState<Bible>(emptyBible);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
@@ -78,7 +79,7 @@ export default function StoryBibleWorkbench() {
         <div style={{ marginTop: 4, color: "var(--text-muted)" }}>角色參考素材（含自動生成的定裝照）在下方「角色」區塊的勾選清單裡管理；清單抓的是這個租戶已登錄的素材，沒看到想要的照片代表還沒登錄進系統。</div>
       </div>
     </div>
-    <div style={{ ...card, display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap" }}><label style={{ flex: "1 1 360px", fontSize: 12, color: "var(--text-secondary)" }}>租戶<div style={{ marginTop: 4 }}><OrganizationPicker value={organizationId} onChange={(id) => { setOrganizationId(id); setBible((v) => ({ ...v, organizationId: id })); }} /></div></label><button type="button" onClick={() => void load()} disabled={busy} style={buttonStyle({ disabled: busy })}>載入版本</button><span style={{ fontSize: 11, color: "var(--text-muted)" }}>{message}</span></div>
+    <div style={{ ...card, display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap" }}>{!locked && <label style={{ flex: "1 1 360px", fontSize: 12, color: "var(--text-secondary)" }}>租戶<div style={{ marginTop: 4 }}><OrganizationPicker value={organizationId} onChange={(id) => { setOrganizationId(id); setBible((v) => ({ ...v, organizationId: id })); }} /></div></label>}<button type="button" onClick={() => void load()} disabled={busy} style={buttonStyle({ disabled: busy })}>載入版本</button><span style={{ fontSize: 11, color: "var(--text-muted)" }}>{message}</span></div>
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 330px", gap: 14, alignItems: "start" }}><div style={{ display: "grid", gap: 14 }}>
       <div style={card}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><label style={{ fontSize: 12 }}>系列 ID<input style={{ ...input, marginTop: 4 }} value={bible.seriesId} onChange={(e) => setBible((v) => ({ ...v, seriesId: e.target.value }))} /></label><label style={{ fontSize: 12 }}>分集 ID<input style={{ ...input, marginTop: 4 }} value={bible.episode.episodeId} onChange={(e) => setBible((v) => ({ ...v, episode: { ...v.episode, episodeId: e.target.value } }))} /></label></div><label style={{ display: "block", marginTop: 10, fontSize: 12 }}>本集前提<textarea style={{ ...input, marginTop: 4, minHeight: 62 }} value={bible.episode.premise} onChange={(e) => setBible((v) => ({ ...v, episode: { ...v.episode, premise: e.target.value } }))} /></label><label style={{ display: "block", marginTop: 10, fontSize: 12 }}>結尾鉤子<textarea style={{ ...input, marginTop: 4, minHeight: 50 }} value={bible.episode.hook} onChange={(e) => setBible((v) => ({ ...v, episode: { ...v.episode, hook: e.target.value } }))} /></label><label style={{ display: "block", marginTop: 10, fontSize: 12 }}>節拍（每行一個）<textarea style={{ ...input, marginTop: 4, minHeight: 90 }} value={list(bible.episode.beats)} onChange={(e) => setBible((v) => ({ ...v, episode: { ...v.episode, beats: strings(e.target.value) } }))} /></label></div>
       {group("角色", "characters")}{group("地點", "locations")}{group("道具", "props")}

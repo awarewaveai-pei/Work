@@ -225,7 +225,8 @@ function episodeSteps(e) {
     editFile = `<p class="tiny">${!e.edit ? "還沒有剪輯檔。" : row ? "剪輯檔：" + esc(EpisodeSpine.editTitle(row)) : "剪輯檔已刪除。"}</p>`;
   const body = [
     "",
-    button("storyboard", "AI 分鏡"),
+    // Card U3: 寫腳本 opens 腳本 for this episode; its 「寫回這一集」 replaces the shots. 腳本 needs the main system.
+    button("storyboard", "AI 分鏡") + (VideoWorkbench.capabilities?.mainSystem ? button("writeScript", "寫腳本") : ""),
     button("batch", "批次生成", ' data-paid="video.image"') + note("每個鏡頭也可以在下方單獨生成。"),
     note("選用。在鏡頭卡上按『修這張』。"),
     button("openTool", "開啟動畫合成", ' data-tool="compose"') + note("選用。做好後在動畫合成按『放到剪輯』，選這一集。"),
@@ -945,6 +946,9 @@ async function action(a, button) {
       p.cover = "";
       save();
       renderDialog();
+      break;
+    case "writeScript":
+      VideoWorkbench.navigate("script-forge", new URLSearchParams({ project: p.id, episode: ep().id }).toString()).catch(VideoWorkbench.reportError);
       break;
     case "storyboard":
       showDialog("storyboard", {

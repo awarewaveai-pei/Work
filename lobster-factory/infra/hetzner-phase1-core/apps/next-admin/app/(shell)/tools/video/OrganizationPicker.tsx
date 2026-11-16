@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { inputStyle, optionStyle } from "@/components/tools/panel-primitives";
 
 type Org = { id: string; name: string; slug: string };
-
-const select: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "8px 9px", borderRadius: 7, border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)", fontSize: 12 };
 
 /**
  * Shared org picker for video-tool panels. Backed by the existing
@@ -61,19 +60,21 @@ export default function OrganizationPicker({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="organization UUID（租戶清單載入失敗或為空，改手動輸入）"
-        style={{ ...select, fontFamily: "ui-monospace, monospace" }}
+        style={inputStyle()}
         disabled={disabled}
       />
     );
   }
+  // Visible buttons, no dropdown (video-unify-plan-20261116 hard rule; style contract app/video/(wb)/__tests__).
+  if (status === "loading") return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>載入租戶清單…</span>;
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled || status === "loading"} style={select}>
-      <option value="">{status === "loading" ? "載入租戶清單…" : "選擇租戶"}</option>
+    <div role="group" aria-label="選擇租戶" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
       {orgs.map((o) => (
-        <option key={o.id} value={o.id}>
+        <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)} disabled={disabled}
+          style={{ ...optionStyle(value === o.id), opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer" }}>
           {o.name}（{o.slug}）
-        </option>
+        </button>
       ))}
-    </select>
+    </div>
   );
 }

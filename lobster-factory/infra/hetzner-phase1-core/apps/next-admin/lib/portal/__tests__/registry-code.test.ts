@@ -175,6 +175,7 @@ describe("registry claims match the code", () => {
   const AUTHORIZERS: Readonly<Record<string, readonly string[]>> = {
     "lib/tenant-guard.ts": ["assertOrgAccess", "canAccessOrg", "effectiveOrgId", "requireClientOrg", "staffOnly"],
     "lib/social/authz.ts": ["actorFor", "callerOf", "requireBrandRole", "requireStaffForNewChannel"],
+    "lib/social/posts.ts": ["createDraftPost"],                               // requireBrandRole(WRITE_ROLES) on the brand before it saves
     "lib/content/wp-sites.ts": ["listAccessibleWpSites", "resolveWpSite", "siteRowGate"], // canAccessOrg / assertOrgAccess on the site's organization
     "lib/content/social-org.ts": ["resolveSocialOrg"],                        // assertOrgAccess on the named organization
     "lib/content/publish/wordpress-core.ts": ["publishToWordPress"],          // resolveWpSite before it reads a credential
