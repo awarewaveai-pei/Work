@@ -119,13 +119,14 @@ export const STEPS = [
     ] },
   { n: 7, code: 'U6', title: '審片與發布併進成片', plain: '例：成片卡按「審片」勾完四項檢查，接著在「發布」寫 IG 與 FB 各一版文案，存成社群草稿。',
     gate: '勾兩個不同平台會存成兩份各自的文案草稿；從一集打開只列這一集的成片；一筆舊專案在專案頁看得到、成片能播、能核准。',
-    risk: 'Medium', model: 'fullstack-engineer（Sonnet）', status: 'done', commit: '58050a441', depends: ['U2', 'U0'],
+    risk: 'Medium', model: 'fullstack-engineer（Sonnet）', status: 'in_progress', depends: ['U2', 'U0'],
     what: 'WB/review-release/page.tsx（QaStep＋ReleaseDeliveryPanel，鎖定組織）；(door)/release 導回殼；jobs-view「送審與投遞」改開殼內面板；步驟列第 11 步審片、第 12 步發布，狀態每次讀鏈；成片卡「發布到哪」；舊專案唯讀卡',
     files: [`${WB}review-release/page.tsx`, `${V}QaStep.tsx`, `${V}ReleaseDeliveryPanel.tsx`, `${NA}app/video/(door)/release/`, `${VW}shared/jobs-view.js`, `${VW}scripts/projects-0.js`, `${VW}shared/episode-spine.js`],
     items: [
       done('U6.1', '審片與發布面板：上半四項檢查與「有權使用」，下半核准、封面、社群草稿、WP 嵌入；舊的 /release 導回工作台。', '58050a441'),
       done('U6.2', '步驟列第 11 步「審片」、第 12 步「發布」，打勾與否每次讀真實結果。', '58050a441'),
       done('U6.3', '成片卡顯示「發布到哪」與成效；舊專案以唯讀卡列在專案頁。成片清單只列最新 200 支（舊發布頁本來就這樣）。', '58050a441'),
+      todo('U6.4', '一路走到底：一集頁頂、成片卡、任務完成通知都只亮一顆「下一步」（寫腳本 → 一鍵成片 → 審片 → 發布 → 完成）。不自動跳頁，不自動送出要花錢或對外發表的動作。需一鍵成片先做好。'),
     ] },
   { n: 8, code: 'U7', title: '字幕與音檔', plain: '例：把客戶設成「音檔不可外送」後，按 OpenAI 轉錄會被擋下；改按「改用自家主機（免費）重試」就能轉。',
     gate: '設成不可外送時，每個會把音檔送出主機的工作都被拒、而且沒有對外請求；查不到設定也拒（拿掉檢查，測試會紅）；改一句字幕重燒後成片字幕跟著更新。',
@@ -178,6 +179,7 @@ export const STEPS = [
       todo('U11.2', 'commit 1：舊入口改成「開啟影音工作台」，這台瀏覽器的腳本歷史搬過去（只收員工門來的訊息，原資料不刪）。'),
       todo('U11.3', 'commit 2：刪掉退場的舊畫面、舊入口登記與過時文件。影片門首頁改導向工作台要跟刪除同一次做。'),
       todo('U11.4', '工作台測試清單改成一行一個（現在寫成一整行，每張卡併入都衝突）。'),
+      todo('U11.5', '驗收：用一支真的腳本在正式站只按「下一步」，從腳本走到社群草稿與 WordPress 草稿文章；記下點擊次數、總花費 NT$、每段時間。這條過了才換掉舊入口。'),
     ] },
 ];
 
