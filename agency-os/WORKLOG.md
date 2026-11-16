@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-16（續3）— R2：字型下載成敗只看收到的檔對不對，不看網速（沒收到資料才算逾時＋Range 續傳）
+
+- 根因：`scripts/vendor-fonts.cjs` 每次嘗試限 300 秒下完整個檔、最多 3 次；筆電連 GitHub raw 實測 24.5 KB/s 時 NotoSerifCJKtc-Bold.otf（25.5 MB）需約 1,040 秒，必然逾時 → 乾淨 checkout 跑 gate 紅 5 項（`agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/risk-audit-20261115.md` R2 列）。
+- 不變量：下載成功與否只取決於最後的檔案大小＋sha256。路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`。
+- 做法（`scripts/vendor-fonts.cjs` `fetchVerified`／`fetchInto`）：不限整檔時間，只在 60 秒沒收到任何 byte（含等標頭）時中止；寫進 `<檔>.part`，下次（同次重試或重跑）送 `Range: bytes=<已有>-`，206 核對 Content-Range 起點、200 從頭、416 交給大小檢查；最多 8 次、間隔遞增；完整但雜湊不符 → 刪 .part、不重試；4xx（408／429 除外）不重試。壓縮檔（Liberation tar.gz）有自己的 .part。`.part` 在 `vendor/fonts/*` gitignore 內。核對標準不變（bytes＋sha256）。
+- 測試 `tests/vendor-fonts-download.cjs`（本機伺服器扮網路，已加入 `tests/gate.cjs`，gate 為 `--network=none` 仍可跑 127.0.0.1）：慢速 2.0 秒（逾時上限 0.4 秒的 5 倍）成功；中途斷線留下 114,688 bytes、重跑送 `Range bytes=114688-` 只再收 147,456 bytes；同次重試也續傳；伺服器不支援 Range 回 200 → 從頭重下；卡住不送資料 0.4 秒判失敗並保留已收部分；同大小差 1 byte → 擋下、刪暫存、不重試。
+- 實測真網路：GitHub raw／github.com/files 三種來源對 `-r 1000-1999` 都回 206；放 10,000,000 bytes 的 .part 跑腳本 → 實際請求 `Range: bytes=10000000-` → 206 `bytes 10000000-25520283/25520284`，結果與原檔 cmp 相同；origin/main＋本改動的乾淨 worktree 刪光字型從零下載 13 檔 18.6 秒全部核對通過，gate ok。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/vendor-fonts-download.cjs (6 PASS) + clean worktree node scripts/vendor-fonts.cjs (13 downloaded) + node tests/gate.cjs | exit=0 | ms=18584
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=vendor-fonts | hits=31
 ## 2026-11-16（續2）R1：video-workbench CI 部署關卡連紅 25 次修好——CI 改用映像檔的讀法
 
 - 根因：CI 的 checkout 有 `../next-admin`，`resolveSource()`（video-workbench `backend/appearance.cjs:3-9`）就直接讀 `next-admin/lib/ai/to-traditional.ts`，裡面的 `opencc-js` 要到 `next-admin/node_modules` 找，CI 從沒裝那裡 → `tests/backend.cjs` 紅（263a16450 起）。映像檔沒有 next-admin，讀打包的 `.awarewave/`，套件從工作台自己的 `node_modules` 找（opencc-js 1.3.1 已在依賴與 lock），所以主機過、CI 紅。
