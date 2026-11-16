@@ -394,6 +394,8 @@ v3 的錯：把舊畫面各自放進側欄一頁，同一件事變兩條路（�
 - C6 **D4、D6、D10、D17 的範圍已被後文擴充**：D4 一鍵成片含片頭、補畫面方式、停點（§9、§8 #4、§12）；D6 自動完成仍只跟快速輸出；D10 片頭不只在剪輯器（§9）；D17 全自動仍只有內容工具一個入口，工作台只顯示狀態與連結（不變量 1 不破）。
 - C7 **§8 #15「複製連結」歸 U5.5**（§10 G1），不是 U6。
 - C8 **第 1 級用哪個模組**：能產出多場景腳本、且有「送去做影片」的那個入口（開卡 grep `onSendToVideo` 的呼叫處確定模組 id）；不新增模組。
+- C9 **U4.4 的接法（2026-11-16 工人查證後監工定案）。** §4 U4「瀏覽器打 `regenerate-image` 再網址匯入」做不到也不該做：AI 圖在 R2（工作台白名單沒有，`VW/backend/url-import.cjs:22-25`），且來源 `ai_generated{model}` 會變成瀏覽器宣稱。改為 NA 內部路由 `POST /api/internal/video/workbench/scene-image`（Bearer、同 quick-render 的組織守衛、計費同 `video.image`、呼叫 `NA/lib/content/blocks/video-pipeline.ts:370 buildSceneAsset`、回 url＋伺服器產的 origin＋costUsd）＋工作台 `backend/scene-image.cjs` 當 project-shot 的供應商（不變量 3）。`buildSceneAsset` 不吃參考圖：不擴充，畫面寫明。兩邊都動 → `DEPLOY_HOLD`。
+- C10 **風格清單拆成 U4.6。** §8 #7「缺就補在 U4.5 同一 commit」作廢：兩份不是同一份（工作台 9 個 `VW/scripts/projects-0.js:16-26`，存索引 `p.style`；舊＝`V/VideoStudio.tsx:20-27` 3 個＋`tarot/tarotStyles.ts` 103 個）。U4.6 單獨一個 commit，Opus 5.5，需 U4.4＋U4.5 先併入；舊專案的 `p.style` 要搬且有舊資料測試。
 
 派工順序（唯一正本；取代 §4「順序」行與 §10 G2）：
 
