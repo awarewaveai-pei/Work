@@ -175,5 +175,5 @@ export const STEPS = [
 ];
 
 export const OPEN = [
-  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，U1、U4、U5 第一段、U7、U8、U10 已在 main，等部署。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
+  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；之後的卡上線前一樣要說 go。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
 ];
