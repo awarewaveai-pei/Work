@@ -5,7 +5,7 @@ hint: "影片工具融合監工：換帳號接手"
 source_session_summary: "監工派工 U0–U11（舊影片工具併進影音工作台）；U0/U1/U4/U7 已在 main，第二批驗收中"
 ---
 
-**續接語**：「續做 影片工具融合監工：讀 `$WORK_ROOT/agency-os/handoffs/2026-11-16-1400-video-unify-supervisor.md`，從 §5 第 1 步開始；完成 = 監工台 36/36、工作台部署經我同意。你是監工派工者，最多 4 個工人 session，回報一律繁中。建議模型：Fable 5.2」
+**續接語**：「續做 影片工具融合監工：讀 `$WORK_ROOT/agency-os/handoffs/2026-11-16-1400-video-unify-supervisor.md`，從 §5 第 1 步開始，派工照計畫 §13 的表；完成 = 監工台 36/36、工作台部署經我同意。你是監工派工者，最多 4 個工人 session，回報一律繁中。建議模型：Fable 5.2」
 
 ### 1. 任務目標
 舊影片工具（next-admin `/tools/video`、`/tools/script-forge`）併進影音工作台，結果一個工具。計畫正本 `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md`（§4 卡 U0–U11；檔首十條操作者前提全部定案，不再問她設計題）。
@@ -20,6 +20,7 @@ source_session_summary: "監工派工 U0–U11（舊影片工具併進影音工�
   - 2026-11-16 第二次部署 next-admin＋video-workbench（fb790d851）：U3 `fb790d851`、U5 commit 2 `dab070ccd`、U6 `58050a441` 上線，smoke 全過；尚未用登入的瀏覽器實點。
   - 計畫 §8（操作者實走舊流程 20 列）＝U11 驗收表；新增項 U4.5、U8.3、U8.4。
   - U8.4 已上線（646f1698b）：remotion-service 從 repo 重建（映像 23e2a2344a8e，回滾 tag `rollback-20261116`），compose `/root/render-services/docker-compose.yml` 加卷 `lobster-remotion-jobs`（備份 `.bak.safe-patch-20261116-071735`）；實送一支 86 s done、峰值 627 MiB、restarts=0。步驟檔 `u8-4-deploy-steps.md`。
+  - **計畫 §13＝第二次自審＋派工順序唯一正本（表）**：優先序 §13＞§12＞§11＞§10＞§9＞§8＞§0–§7；照它的批次派工。含 U6.6（唯讀卡篩選錯，已在正式站）。
   - 計畫 §12＝一鍵完成與全自動（操作者定案）：一個執行器＋一個停點（腳本／成片／草稿）；人按的一鍵最遠到草稿；全自動沿用內容工具的話題佇列。新項 U3.5、U3.6、U6.5，U5.3 與 U11.5 擴充。派工前先讀 §10–§12。
   - 計畫 §11＝一路走到底（操作者定案）：新項 U6.4「下一步」按鈕（由既有 stepStates 算，需 U5.3）、U11.5 真腳本走到 WordPress 草稿的驗收。
   - 計畫 §10＝自審（矛盾 X1–X4、缺口 G1–G10）：與前文衝突時 §10 勝；派工前先讀。含新項的模型與相依（G2）、video-service 部署路徑（G3）、DEPLOY_HOLD 規則（G4）。
