@@ -15,11 +15,9 @@ source_session_summary: "監工派工 U0–U11（舊影片工具併進影音工�
 
 ### 3. 已試過（狀態）
 - 在 origin/main：U0 `79ab5f321`、U1 `dd64b4a18`、U4 `df5640559`（U4.4 FLUX 選模型未做：工作台無 FLUX 文生圖供應商模組）、U7 `ea91b5819`、登記表補洞 `880a7943d`。migration 0164 已套正式庫。next-admin 隨 03:00 自動部署；**影音工作台未部署（High，要操作者 go）**。
-- 第二批（各在自己分支，未併入）：
-  - U10 `98d5619d6` 分支 `claude/recursing-jang-f14f2d`：已 commit；RISK「計費組織 ID 需後端改動」未判。
-  - U8 `37642ebfc` 分支 `claude/reverent-goldwasser-fd865d`：已 commit（該 worktree 的 gate 只因缺 opencc-js 紅，整合 worktree 重跑）。
-  - U2 `c78dd24cb` 分支 `claude/elegant-shirley-877971`：已 commit；Playwright 畫面比對沒跑（原生頁 vs 門頁 computed style），驗收時補或列風險。
-  - U5 commit 1 `06ba109d7` 分支 `claude/elated-darwin-0aaa98`：已 commit；Codex F1、F3 列為已知風險未判（讀該 commit message）。
+- 第二批已在 origin/main（2026-11-16 驗收：gate ok、tsc 0、npm test 4720 過）：U8 `a878b713a`、U10 `2f0b08bb8`、U5 commit 1 `2f26d7dac`、U2 `3a3ad4565`。
+  - 未結：U2.3 原生頁對門頁的畫面比對沒跑；U5 Codex F1（素材 >200MB 在渲染服務才失敗）、F3（重啟會掉執行中的快速輸出，與 remotion 同）；U10 子組織登入時顯示誰的方案要後端改；U5 引擎限制（每鏡頭必有旁白、≤30 鏡頭）要進 commit 2 對話框。
+  - 監工台 20/36。下一批可派：U3、U6（U2 已在）、U5 commit 2。
 - risks 清查：`agency-os/handoffs/2026-11-16-video-unify-supervisor/risk-triage-u0-u1-u4-u7.md`（在 `D:\Work`，未 commit）— 現在修 0、後面卡處理 4、不用處理 21。
 - `D:\Work` 落後根因已修（`scripts/git-parity-merge.py`：上游舊快照規則＋eol=crlf 檔由 git 寫回），`D:\Work` 已 0/0。
 
@@ -28,7 +26,7 @@ source_session_summary: "監工派工 U0–U11（舊影片工具併進影音工�
 
 ### 5. 下一步指令
 1. 整合一律在 worktree `D:/Worktrees/Work/u-integrate`（detached，`git fetch origin && git rebase origin/main`）；`D:\Work` 有別的 session 的未提交改動，不在那裡 cherry-pick。
-2. 逐張驗收第二批：`git diff origin/main...<分支>` 讀 diff → `git cherry-pick <commit>`（`tests/gate.cjs` 的測試清單是一整行，必衝突：保留 HEAD 清單再加新測試名）→ 在整合 worktree 跑 `node tests/gate.cjs`（video-workbench）、`npx tsc --noEmit`＋`npm test`（next-admin）→ `git push origin HEAD:main`。工人分支若沒 commit：該分支的 worktree 在 `D:/Worktrees/Work/<名>`，另一帳號開新 session 進該資料夾續做，或把卡重派。
+2. 驗收流程（第二批已照做完）：`git diff origin/main...<分支>` 讀 diff → `git cherry-pick <commit>`（`tests/gate.cjs` 的測試清單是一整行，必衝突：保留 HEAD 清單再加新測試名）→ 在整合 worktree 跑 `node tests/gate.cjs`（video-workbench）、`npx tsc --noEmit`＋`npm test`（next-admin）→ `git push origin HEAD:main`。工人分支若沒 commit：該分支的 worktree 在 `D:/Worktrees/Work/<名>`，另一帳號開新 session 進該資料夾續做，或把卡重派。
 3. 每併一張：改 `agency-os/handoffs/2026-11-16-video-unify-supervisor/data.mjs`（`todo(` → `done(id, 文字, commit)`；卡的 `status` 由完成項數決定，check 會指出）→ `node build.mjs && node check.mjs` → commit、push → Artifact 重新發布同網址。工人的 RISKS 全部上監工台。
 4. 之後派工順序（計畫 §4「順序」、§7 模型）：U3、U6（需 U2）；U5 commit 2、3；U9（需 U3）；U11 最後。順手把 `tests/gate.cjs` 清單改成一行一個（等沒有工人在動工作台時做）。
 5. 工人 brief 樣板：見本 session 已派的八張（背景＋「只做一張卡、commit 在自己分支、不 push 不部署、回報 COMMIT/FILES/TESTS/RISKS/白話、context 80% 自己 /compact」）。新工人的 worktree 從本機 main 切，`D:\Work` 現在已對齊。
