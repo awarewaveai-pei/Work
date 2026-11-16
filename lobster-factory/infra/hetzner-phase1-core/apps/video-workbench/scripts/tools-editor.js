@@ -410,12 +410,14 @@ function edInput(key, title, value, type = "number", attrs = "") {
 function edColor(key, title, value) {
   return edInput(key, title, value, "color") + (typeof window.EyeDropper === "function" ? edButton("取色", "eyedrop:" + key) : "");
 }
-// Card P2: choices are visible buttons (aria-pressed), never <select>.
+// Card P2: choices are visible buttons (aria-pressed), never <select>. value = the chosen option, or an array of the
+// chosen ones for a multi-choice.
 function edChoices(label, action, value, options, text = (o) => o) {
+  const on = (o) => (Array.isArray(value) ? value.includes(o) : o === value);
   return `<div class="flow-choices" role="group" aria-label="${esc(label)}">${options
     .map(
       (o) =>
-        `<button type="button" class="btn small ${o === value ? "selected" : ""}" data-ed-action="${esc(action + ":" + o)}" aria-pressed="${o === value}">${esc(text(o))}</button>`,
+        `<button type="button" class="btn small ${on(o) ? "selected" : ""}" data-ed-action="${esc(action + ":" + o)}" aria-pressed="${on(o)}">${esc(text(o))}</button>`,
     )
     .join("")}</div>`;
 }

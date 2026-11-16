@@ -207,6 +207,23 @@
     return true;
   }
 
+  // Plan U5 快速輸出 (step 9): what the render service gets from an episode -- per shot its clip or picture and its
+  // line -- and one job per chosen ratio (plan D5). The cut remembers the shot pictures it was made from (lineage).
+  // choice = { ratios: ["16:9" | "9:16" | "4:5"], tts?, intro?: { title, seconds }, autonomy? } (backend/quick-render.cjs).
+  const QUICK_RATIOS = ["16:9", "9:16", "4:5"];
+  const quickScenes = (episode) => (episode?.shots || []).map((s) => ({ narration: String(s?.line ?? "").trim(), url: s?.video || s?.image || "" }));
+  function quickRenderJobs(project, episode, choice) {
+    const scenes = quickScenes(episode),
+      from = (episode.shots || []).filter((s) => s?.id && (s.video || s.image)).map((s) => ({ slot: "shot:" + s.id, key: s.video || s.image }));
+    return QUICK_RATIOS.filter((ratio) => (choice.ratios || []).includes(ratio)).map((ratio) => ({
+      type: "video",
+      operation: "quick-render",
+      prompt: "快速輸出 " + ratio,
+      settings: { ratio, title: project.title, scenes, ...(choice.tts ? { tts: choice.tts } : {}), ...(choice.intro ? { intro: choice.intro } : {}), autonomy: choice.autonomy === true },
+      link: { projectId: project.id, episodeId: episode.id, tool: "quick-render", step: "export", target: "output", from },
+    }));
+  }
+
   // Card PJ.4 (spec §4): the one staleness rule of the workbench. A key recorded when something was made against a
   // place's key now; an unknown key now (place gone, engine without revisions) is never stale.
   const isStale = (recordedKey, currentKey) => currentKey != null && recordedKey !== currentKey;
@@ -311,7 +328,7 @@
     ];
   }
 
-  const api = { editId, editTitle, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, current, isStale, staleClip, outputStale, lineage, stepStates };
+  const api = { editId, editTitle, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs, current, isStale, staleClip, outputStale, lineage, stepStates };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

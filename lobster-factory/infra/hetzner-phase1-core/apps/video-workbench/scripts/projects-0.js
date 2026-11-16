@@ -183,7 +183,7 @@ const STEP_NAMES = ["專案", "腳本與分鏡", "鏡頭畫面", "修圖", "片�
   DERIVE_TOOLS = [["short", "剪成短影音"], ["follow", "人物跟拍"]],
   TOOL_LABEL = Object.fromEntries([...FINISH_TOOLS, ...DERIVE_TOOLS]),
   // Card PJ.4: the tools' names as the tools page shows them (TOOLS in scripts/tools-0.js; that page is another frame).
-  TOOL_NAME = { generator: "鏡頭生成", region: "圖片局部編輯器", depth: "影片轉深度影片", compose: "動畫合成", rig: "角色綁定", "3d": "3D", edit: "影片剪輯", "edit-pro": "專業剪輯", voice: "配音生成", music: "音樂生成", sfx: "去配樂・重配音效", separate: "音軌分離", subtitle: "字幕與逐字稿", watermark: "影片浮水印", cta: "影片 CTA 按鈕", upscale: "畫質增強", enhance: "影音增強與消除字幕", privacy: "肖像權保護", short: "智能短影音剪輯", follow: "人物跟拍剪輯" };
+  TOOL_NAME = { "quick-render": "快速輸出", generator: "鏡頭生成", region: "圖片局部編輯器", depth: "影片轉深度影片", compose: "動畫合成", rig: "角色綁定", "3d": "3D", edit: "影片剪輯", "edit-pro": "專業剪輯", voice: "配音生成", music: "音樂生成", sfx: "去配樂・重配音效", separate: "音軌分離", subtitle: "字幕與逐字稿", watermark: "影片浮水印", cta: "影片 CTA 按鈕", upscale: "畫質增強", enhance: "影音增強與消除字幕", privacy: "肖像權保護", short: "智能短影音剪輯", follow: "人物跟拍剪輯" };
 function editRows(e) {
   try {
     const rows = JSON.parse(VideoWorkbench.storage.getItem(e.edit?.engine === "filmcraft" ? "tools.engine.projects" : "tools.editor.projects") || "[]");
@@ -214,7 +214,8 @@ function episodeSteps(e) {
     // so it is the one sound placed by hand.
     button("openEdit", "配音", ' data-intent="voice"') + button("openTool", "配樂", ' data-tool="music"') + note("配音會照每一鏡的旁白逐句產生。配樂做好後，要自己放到音樂軌。"),
     button("openEdit", "產生字幕", ' data-intent="subtitle"') + note("用旁白對時間，不用語音辨識，不收費。"),
-    button("openEdit", "輸出"),
+    // Plan U5 (D3): 快速輸出 = the main system renders the shots' pictures and lines; 剪輯輸出 = the edit file's timeline.
+    button("quickRender", "快速輸出") + button("openEdit", "剪輯輸出", ' data-intent="export"') + note("快速輸出用鏡頭的畫面和旁白直接出片；剪輯輸出照剪輯檔的時間軸出片。"),
     outputs.length ? FINISH_TOOLS.map(([tool, label]) => button("outputTool", label, ` data-tool="${tool}" data-index="${last}"`)).join("") + note("選用。做完會成為新的一版成片，舊的保留。") : "",
     outputs.length ? reviewLink(outputs[last]) + note("送審結果在主系統的送審頁。") : "",
   ];
@@ -449,6 +450,23 @@ function renderDialog() {
       `<label>關鍵字</label><input id="stock-keyword" value="${esc(dialog.keyword || "")}" placeholder="例如：city night rain（英文的結果比較多）"><div class="row" role="group" aria-label="素材種類">${[["image", "圖片"], ["video", "影片"]].map(([k, label]) => `<button class="btn small ${dialog.kind === k ? "primary" : "outline"}" data-action="stockKind" data-value="${k}" aria-pressed="${dialog.kind === k}">${label}</button>`).join("")}</div><p class="tiny">從 Pexels 免費圖庫找一個放到鏡頭 ${dialog.index + 1}，不收費。找不到影片時會改放圖片。</p>`,
       btnCancel + '<button class="btn primary" data-action="stockSearch">找一個放上去</button>',
     );
+  } else if (dialog.type === "quickRender") {
+    const q = dialog.quote,
+      n = dialog.ratios.length,
+      money = (usd) => (usd === 0 ? "免費" : window.VideoWorkbenchMoney(usd) || "價格讀取失敗"),
+      pick = (act, value, label, on, off = false) => `<button class="btn small ${on ? "primary" : "outline"}" data-action="${act}" data-value="${esc(value)}" aria-pressed="${on}"${off ? ' disabled title="主機沒有設定 OpenAI 金鑰"' : ""}>${esc(label)}</button>`;
+    html = modal(
+      "快速輸出",
+      `<p class="tiny">用每個鏡頭的畫面和旁白直接出片：主系統配音、燒字幕、加片頭標題，成片回到這一集。每個鏡頭都要有畫面和旁白，鏡頭長度跟著旁白的配音（時長欄不使用）；一集最多 30 個鏡頭，每個素材 200 MB 以內。</p><label>比例（可複選，每個比例一個任務）</label><div class="row" role="group" aria-label="比例">${EpisodeSpine.QUICK_RATIOS.map((r) => pick("quickRatio", r, r, dialog.ratios.includes(r))).join("")}</div><label>聲線</label><div class="row" role="group" aria-label="聲線">${q ? q.voices.map((v, i) => pick("quickVoice", String(i), v.label, dialog.tts?.provider === v.provider && dialog.tts?.voice === v.voice, v.available === false)).join("") : '<span class="tiny">讀取中…</span>'}</div><label>片頭標題</label><input id="quick-intro" maxlength="80" placeholder="留空就不加片頭" value="${esc(dialog.introTitle)}"><p class="tiny">有填的話，片頭顯示 3 秒。</p><label><input type="checkbox" id="quick-auto" style="width:auto" ${dialog.autonomy ? "checked" : ""}> 自動完成</label><p class="tiny">勾選後，成片由排程自動做品質檢查、核准、建立社群草稿。</p><div class="settings-section" data-quick-cost><h3>成本明細</h3>${
+        dialog.error
+          ? `<p class="tiny">${esc(dialog.error)}</p>`
+          : !q
+            ? '<p class="tiny">讀取中…</p>'
+            : q.lines.map((l) => `<div class="split"><span>${esc(l.label)}（${esc(l.tool)}）</span><span>${money(l.usd)}</span></div>`).join("") +
+              `<div class="split"><strong>每個比例 ${money(q.perRatioUsd)} × ${n} 個比例</strong><strong>合計 ${money(q.totalUsd)}</strong></div>`
+      }</div>${q?.problems.length ? `<div class="settings-section" data-quick-problems><h3>還不能送出</h3>${q.problems.map((t) => `<p class="tiny">${esc(t)}</p>`).join("")}</div>` : ""}`,
+      btnCancel + `<button class="btn primary" data-action="quickSend"${q && !q.problems.length && n && !dialog.busy ? "" : " disabled"}>送出 ${n} 個任務</button>`,
+    );
   } else if (dialog.type === "editEpisode") {
     html = modal(
       "編輯本集",
@@ -658,6 +676,26 @@ async function motionShot(index) {
     link: { projectId: p.id, episodeId: e.id, shotId: shot.id, tool: "generator", step: "shot", target: "shot:" + shot.id, from: [{ slot: "shot:" + shot.id, key: shot.image }] },
   });
   VideoWorkbench.showJob(job);
+}
+// Plan U5 快速輸出: what keeps the shots from rendering and what the chosen ratios and voice cost, asked of the server
+// again on every change (backend/quick-render.cjs quote); only the newest answer is drawn.
+async function quickQuote() {
+  const d = dialog,
+    asked = (d.asked = (d.asked || 0) + 1);
+  d.quote = null;
+  d.error = d.ratios.length ? "" : "請至少選一個比例";
+  renderDialog();
+  if (!d.ratios.length) return;
+  try {
+    const q = await VideoWorkbench.request("/quick-render/quote", { scenes: EpisodeSpine.quickScenes(ep()), ratios: d.ratios, ...(d.tts ? { tts: d.tts } : {}) });
+    if (dialog !== d || d.asked !== asked) return;
+    d.quote = q;
+    d.tts ||= { provider: q.voices[0].provider, voice: q.voices[0].voice };
+  } catch (err) {
+    if (dialog !== d || d.asked !== asked) return;
+    d.error = err.message;
+  }
+  renderDialog();
 }
 // Card PJ.2: a tool opened for this episode; what it makes comes back here (shared/episode-spine.js settle).
 function openTool(tool, link, asset) {
@@ -931,6 +969,46 @@ async function action(a, button) {
     case "lineage":
       showDialog("lineage", { index });
       break;
+    case "quickRender":
+      showDialog("quickRender", { ratios: [EpisodeSpine.QUICK_RATIOS.includes(p.ratio) ? p.ratio : "16:9"], tts: null, introTitle: "", autonomy: false });
+      quickQuote();
+      break;
+    case "quickRatio": {
+      const r = button.dataset.value;
+      dialog.ratios = dialog.ratios.includes(r) ? dialog.ratios.filter((x) => x !== r) : [...dialog.ratios, r];
+      quickQuote();
+      break;
+    }
+    case "quickVoice": {
+      const v = dialog.quote?.voices[Number(button.dataset.value)];
+      if (v) dialog.tts = { provider: v.provider, voice: v.voice };
+      quickQuote();
+      break;
+    }
+    case "quickSend": {
+      // One job per ratio (plan D5); a ratio leaves the dialog once its job is accepted, so a retry after an error
+      // sends only the rest.
+      const d = dialog,
+        title = d.introTitle.trim(),
+        jobs = EpisodeSpine.quickRenderJobs(p, ep(), { ratios: d.ratios, tts: d.tts, ...(title ? { intro: { title, seconds: 3 } } : {}), autonomy: d.autonomy });
+      d.busy = button.disabled = true;
+      let job;
+      try {
+        for (const input of jobs) {
+          // paid: none (the main system prices and bills 快速輸出 itself; the dialog shows its quote; backend/main-system.cjs paidFeature)
+          job = await VideoWorkbench.generations.create(input);
+          d.ratios = d.ratios.filter((r) => r !== input.settings.ratio);
+        }
+        closeDialog();
+        VideoWorkbench.showJob(job);
+        if (jobs.length > 1) notify(`已送出 ${jobs.length} 個快速輸出任務，每個比例一個。`);
+      } catch (err) {
+        d.busy = false;
+        quickQuote(); // the ratios left, priced again
+        VideoWorkbench.reportError(err);
+      }
+      break;
+    }
     case "exportJson":
       downloadJson(
         `${p.title.replace(/[^\p{L}\p{N}_-]/gu, "_")}_project.json`,
@@ -1149,6 +1227,7 @@ document.addEventListener("input", (e) => {
   }
   if (target.id === "create-name") modalDraft.name = target.value;
   if (target.id === "stock-keyword" && dialog?.type === "stock") dialog.keyword = target.value;
+  if (target.id === "quick-intro" && dialog?.type === "quickRender") dialog.introTitle = target.value;
   if (target.id === "style-hint") modalDraft.styleText = target.value;
   if (target.dataset.settings) {
     const key = target.dataset.settings;
@@ -1165,6 +1244,7 @@ document.addEventListener("change", (e) => {
     project().settings.lockModel = t.checked;
     save();
   }
+  if (t.id === "quick-auto" && dialog?.type === "quickRender") dialog.autonomy = t.checked;
 });
 render();
 replaceRetiredModel();

@@ -74,6 +74,15 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     const asset = assets && /^\/(assets|examples)\/([\w.-]+)$/.exec(url || "");
     return asset ? path.join(__dirname, "..", asset[1], asset[2]) : null;
   }
+  // Plan U5 快速輸出: a shot file's size on this host (the render service refuses big ones); null = not a local file.
+  function localSize(url) {
+    const file = localFile(url);
+    try {
+      return file ? fs.statSync(file).size : null;
+    } catch {
+      return null;
+    }
+  }
   // Card VD.1: free cover candidates for a finished video (backend/cover.cjs), kept as /generated/<uuid>.jpg like every
   // image (server.cjs serves images only there; /media/ holds only the media-store layout).
   // Invariant: covers never decide the video's outcome and never move it: they get at most COVER_MS and always end
@@ -650,7 +659,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         job.status = "running";
         persist();
         const result = await quickRender.run(job, {
-          main, fetchImpl, mediaStore, signal,
+          main, fetchImpl, mediaStore, signal, sizeOf: localSize,
           onRemoteJob: (id) => {
             job.quickRenderJobId = id; // shown in the job record
             persist();
@@ -1184,7 +1193,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             : isReburn
               ? (captionReburn.request(input, main), { type: "video" })
               : isQuick
-                ? (quickRender.request(input, main), { type: "video" })
+                ? (quickRender.request(input, main, localSize), { type: "video" })
                 : jobInput(input);
     if (videoEnhance.isAi(input)) {
       await aiEnhanceSource(input);
@@ -1615,6 +1624,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       if (req.method === "POST" && route === "/rig/pose-stills") {
         json(res, 201, await registered(renders().poseStill(await body(req))));
+        return true;
+      }
+      if (req.method === "POST" && route === "/quick-render/quote") {
+        json(res, 200, await quickRender.quote(await body(req), main, localSize));
         return true;
       }
       if (req.method === "GET" && route === "/delivery-ratios") {

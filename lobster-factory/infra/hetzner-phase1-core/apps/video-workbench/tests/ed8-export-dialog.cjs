@@ -86,8 +86,12 @@ const ff = (args, encoding = "utf8") => spawnSync(ffmpeg, ["-y", "-hide_banner",
     const sizes = [];
     for (const [platform, want] of [["TikTok／Reels", "9:16 · 1080×1920"], ["YouTube Shorts", "9:16 · 1080×1920"], ["YouTube 推薦", "16:9 · 1920×1080"], ["Instagram 貼文", "1:1 · 1080×1080"], ["自訂", "16:9 · 1280×720"]]) {
       await open();
-      await dlg.getByRole("button", { name: platform, exact: true }).click();
+      // 輸出到 is a multi-choice (plan U5 D5) that starts at 自訂: a preset alone = add it, take 自訂 off.
       if (platform === "自訂") await dlg.locator('[data-ed-action="quality:720p"]').click();
+      else {
+        await dlg.getByRole("button", { name: platform, exact: true }).click();
+        await dlg.getByRole("button", { name: "自訂", exact: true }).click();
+      }
       const label = await dlg.locator("[data-ed-export-spec]").innerText();
       assert(label.startsWith(want), `${platform}：標示 ${label}`);
       const file = await exportNow();
@@ -95,8 +99,22 @@ const ff = (args, encoding = "utf8") => spawnSync(ffmpeg, ["-y", "-hide_banner",
       assert.equal(size(file), want.split(" · ")[1], `${platform}：檔案 ${size(file)} 與標示 ${label} 不同`);
     }
     pass("五個平台預設各真實匯出一次，檔案尺寸與標示相同：" + sizes.map((s) => s.join(" ")).join("、"));
+    // Two ratios chosen -> two export jobs, one per ratio; two platforms of one ratio are one job.
+    await open();
+    for (const name of ["TikTok／Reels", "YouTube Shorts", "YouTube 推薦", "自訂"]) await dlg.getByRole("button", { name, exact: true }).click();
+    assert.deepEqual((await dlg.locator("[data-ed-export-spec]").allInnerTexts()).map((t) => t.split(" · ").slice(0, 3).join(" · ")), ["9:16 · 1080×1920 · 1080P", "16:9 · 1920×1080 · 1080P"]);
+    const exports = () => page.evaluate(() => VideoWorkbench.generations.list().then((l) => l.filter((j) => j.input?.operation === "editor-export").map((j) => ({ id: j.id, ratio: j.input.settings.project.ratio }))));
+    const seen = new Set((await exports()).map((j) => j.id));
+    await dlg.locator("[data-ed-export]").click();
+    await page.waitForFunction((n) => VideoWorkbench.generations.list().then((l) => l.filter((j) => j.input?.operation === "editor-export").length === n + 2), seen.size);
+    const sent = (await exports()).filter((j) => !seen.has(j.id)).map((j) => j.ratio).sort();
+    assert.deepEqual(sent, ["16:9", "9:16"]);
+    await page.waitForFunction(() => document.querySelector(".job-view")?.textContent.match(/succeeded|failed/), null, { timeout: 240000 });
+    await page.locator(".job-view").getByRole("button", { name: "關閉" }).click();
+    pass("複選 TikTok、Shorts、YouTube 推薦：兩個比例 → 兩個匯出任務（9:16 只一個）");
     await open();
     await dlg.getByRole("button", { name: "Instagram 貼文", exact: true }).click();
+    await dlg.getByRole("button", { name: "自訂", exact: true }).click();
     await dlg.getByRole("button", { name: "4:5", exact: true }).click();
     assert.match(await dlg.locator("[data-ed-export-spec]").innerText(), /^4:5 · 1080×1350/);
     await dlg.locator("[data-ed-export-cancel]").click();

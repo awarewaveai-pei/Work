@@ -15,14 +15,32 @@ const ROUTE = "/api/internal/video/workbench/quick-render",
   // poll as long as its ticket lives (next-admin job-store.ts TTL 1 h); past that the main system no longer knows it.
   POLL_LIMIT_MS = 55 * 60 * 1000,
   MAX_SHOTS = 30,
+  MAX_ASSET_BYTES = 200 * 1024 * 1024, // video-service RENDER_MAX_ASSET_MB: a bigger picture or clip fails there
   MAX_DOWNLOAD = 500 * 1024 * 1024; // = the main system's asset intake default
 const RATIOS = { "16:9": "16x9", "9:16": "9x16", "4:5": "4x5" };
 const VOICE = /^[A-Za-z0-9:._-]{0,64}$/, REF = /^[A-Za-z0-9._:-]{1,200}$/;
 
+// What keeps an episode's shots from rendering, one line each ([] = it can be sent): the dialog lists them before
+// sending (quote) and request() refuses the job on the first. scenes = [{ narration, url }]; sizeOf(url) = bytes | null.
+function problems(scenes, main, sizeOf) {
+  const shots = Array.isArray(scenes) ? scenes : [];
+  if (!shots.length) return ["這一集還沒有鏡頭"];
+  const out = shots.length > MAX_SHOTS ? ["快速輸出最多 " + MAX_SHOTS + " 個鏡頭，這一集有 " + shots.length + " 個"] : [];
+  shots.forEach((shot, i) => {
+    const n = "第 " + (i + 1) + " 個鏡頭", narration = String(shot?.narration ?? "").trim(), url = String(shot?.url || "");
+    if (!url) out.push(n + "沒有畫面");
+    else if (!main.assetOf(url)) out.push(n + "的畫面還沒登記到主系統，請稍後再試");
+    else if (sizeOf(url) > MAX_ASSET_BYTES) out.push(n + "的素材超過 200 MB");
+    if (!narration) out.push(n + "沒有旁白（快速輸出的鏡頭長度跟著旁白配音）");
+    else if (narration.length > 2000) out.push(n + "的旁白超過 2000 字");
+  });
+  return out;
+}
+
 // settings { ratio, title, scenes: [{ narration, url }], tts?: { provider, voice }, intro?: { title, seconds }, autonomy? }
 // + input.link (the episode it belongs to) -> the route's body. A shot's url must be a file this workbench registered
 // (main.assetOf): the route takes asset ids only. Checked before the job is accepted; main = null (local mode) refuses.
-function request(input, main) {
+function request(input, main, sizeOf) {
   if (!main) throw fail("快速輸出需要連上主系統", 503);
   const s = input?.settings || {};
   const sourceRef = String(input?.link?.projectId || "");
@@ -31,14 +49,9 @@ function request(input, main) {
   if (!ratio) throw fail("快速輸出只支援 16:9、9:16、4:5", 400);
   const title = String(s.title ?? "").trim();
   if (!title || title.length > 180) throw fail("片名要有 1 到 180 字", 400);
-  const shots = Array.isArray(s.scenes) ? s.scenes : [];
-  if (!shots.length || shots.length > MAX_SHOTS) throw fail("快速輸出需要 1 到 " + MAX_SHOTS + " 個鏡頭", 400);
-  const scenes = shots.map((shot, i) => {
-    const narration = String(shot?.narration ?? "").trim(), assetId = main.assetOf(String(shot?.url || ""));
-    if (!narration || narration.length > 2000) throw fail("第 " + (i + 1) + " 個鏡頭沒有旁白（快速輸出的鏡頭長度跟著旁白配音）", 400);
-    if (!assetId) throw fail("第 " + (i + 1) + " 個鏡頭的畫面還沒登記到主系統，請稍後再試", 400);
-    return { narration, assetId };
-  });
+  const bad = problems(s.scenes, main, sizeOf);
+  if (bad.length) throw fail(bad[0] + (bad.length > 1 ? "（另有 " + (bad.length - 1) + " 個問題）" : ""), 400);
+  const scenes = s.scenes.map((shot) => ({ narration: String(shot.narration).trim(), assetId: main.assetOf(String(shot.url)) }));
   const tts = { provider: s.tts?.provider ?? "edge", voice: s.tts?.voice ?? "" };
   if (!["edge", "openai"].includes(tts.provider) || typeof tts.voice !== "string" || !VOICE.test(tts.voice)) throw fail("聲線無效", 400);
   let intro;
@@ -49,10 +62,27 @@ function request(input, main) {
   return { sourceRef, title, ratio, scenes, tts, ...(intro ? { intro } : {}), autonomy: s.autonomy === true ? "auto_after_render" : "guided" };
 }
 
+// The dialog's numbers: { problems, voices, lines, perRatioUsd, totalUsd }, priced by the main system (computeVideoCost,
+// /quick-render/quote); this file only counts the narration it would speak. settings { scenes, ratios, tts? }.
+async function quote(settings, main, sizeOf) {
+  if (!main) throw fail("快速輸出需要連上主系統", 503);
+  const s = settings || {}, scenes = Array.isArray(s.scenes) ? s.scenes : [];
+  const ratios = [...new Set(Array.isArray(s.ratios) ? s.ratios : [])].map((r) => RATIOS[r]);
+  if (!ratios.length || ratios.some((r) => !r)) throw fail("請選 16:9、9:16、4:5 其中至少一個比例", 400);
+  const chars = scenes.reduce((n, shot) => n + Math.min(2000, String(shot?.narration ?? "").trim().length), 0);
+  const r = await main.call(ROUTE + "/quote", {
+    method: "POST",
+    body: { organizationId: main.organizationId(), scenes: Math.min(MAX_SHOTS, Math.max(1, scenes.length)), ttsChars: Math.min(MAX_SHOTS * 2000, chars), ratios, ...(s.tts ? { tts: s.tts } : {}) },
+  });
+  if (!r.ok || r.value.ok !== true) throw refusal("主系統無法估價", r);
+  const { voices, lines, perRatioUsd, totalUsd } = r.value;
+  return { problems: problems(scenes, main, sizeOf), voices, lines, perRatioUsd, totalUsd };
+}
+
 // Submits, polls until the main system recorded the video, downloads it into the media store. Answers the job result.
-async function run(job, { main, fetchImpl, mediaStore, signal, onRemoteJob = () => {} }) {
+async function run(job, { main, fetchImpl, mediaStore, signal, sizeOf, onRemoteJob = () => {} }) {
   const organizationId = main.organizationId();
-  const body = { organizationId, ...request(job.input, main), ...(job.createdBy ? { userId: job.createdBy } : {}) };
+  const body = { organizationId, ...request(job.input, main, sizeOf), ...(job.createdBy ? { userId: job.createdBy } : {}) };
   const submitted = await main.call(ROUTE, { method: "POST", body, signal, timeoutMs: 60000 });
   if (!submitted.ok || submitted.value.ok !== true || typeof submitted.value.jobId !== "string") throw refusal("主系統拒絕快速輸出", submitted);
   const remoteJobId = submitted.value.jobId;
@@ -82,4 +112,4 @@ async function run(job, { main, fetchImpl, mediaStore, signal, onRemoteJob = () 
   };
 }
 
-module.exports = { request, run, RATIOS, POLL_LIMIT_MS };
+module.exports = { problems, request, quote, run, RATIOS, POLL_LIMIT_MS };

@@ -73,47 +73,47 @@ async function edTimelineCheck(p) {
   return { exported, remote: { ok: r.ok && body.ok === true, status: r.status, errors: body.errors, error: typeof body.error === "string" ? body.error : "" } };
 }
 function edExportDialog(p) {
-  const st = { platform: "自訂", instagram: "1:1", mark: null, useMark: false, busy: false, timeline: null },
-    target = () => {
-      const [, ratio] = edExportPlatforms.find(([name]) => name === st.platform);
-      return {
-        ratio: st.platform === "Instagram 貼文" ? st.instagram : ratio || p.ratio,
-        quality: st.platform === "自訂" ? ed.quality : "1080p",
-      };
+  const st = { platforms: ["自訂"], instagram: "1:1", mark: null, useMark: false, busy: false, timeline: null, sent: [] },
+    // Plan U5 (D5): 輸出到 is a multi-choice and each ratio is one export job -- two platforms of one ratio are one job;
+    // a preset is 1080P, 自訂 sets its ratio's quality.
+    targets = () => {
+      const out = new Map();
+      for (const [name, preset] of edExportPlatforms) {
+        if (!st.platforms.includes(name)) continue;
+        const ratio = name === "Instagram 貼文" ? st.instagram : preset || p.ratio;
+        if (!out.has(ratio) || name === "自訂") out.set(ratio, { ratio, quality: name === "自訂" ? ed.quality : "1080p" });
+      }
+      return [...out.values()];
     },
+    // A ratio accepted earlier in this dialog is not sent again when a later one failed and the user retries.
+    pending = () => targets().filter((t) => !st.sent.includes(t.ratio)),
     size = (ratio, quality) => edRatios[ratio].map((v) => Math.round((v * EditorModel.QUALITIES[quality]) / 2) * 2);
   const body = () => {
-    const { ratio, quality } = target(),
-      [w, h] = size(ratio, quality),
-      k4 = size(ratio, "4K"),
-      small = p.clips.some(
-        (c) =>
-          ["video", "image"].includes(c.kind) &&
-          !(c.asset?.width >= k4[0] && c.asset?.height >= k4[1]),
-      ),
-      delivery = ed.delivery?.ratios?.[ratio],
-      custom = st.platform === "自訂";
+    const list = targets(),
+      small = (ratio) => {
+        const k4 = size(ratio, "4K");
+        return p.clips.some((c) => ["video", "image"].includes(c.kind) && !(c.asset?.width >= k4[0] && c.asset?.height >= k4[1]));
+      },
+      fit = (ratio) => {
+        const delivery = ed.delivery?.ratios?.[ratio];
+        return delivery?.platforms ? delivery.platforms.map((x) => x.platform + (x.preferred ? "（首選）" : "")).join("、") : delivery?.note || "此比例尚不能投遞";
+      },
+      custom = st.platforms.includes("自訂");
     return `<h3>匯出影片</h3>
-<p class="note">輸出到</p>${edChoices("輸出到", "platform", st.platform, edExportPlatforms.map(([name]) => name))}
-${st.platform === "Instagram 貼文" ? edChoices("Instagram 比例", "instagram", st.instagram, ["1:1", "4:5"]) : ""}
-<p data-ed-export-spec>${esc(`${ratio} · ${w}×${h} · ${quality === "1080p" ? "1080P" : quality === "720p" ? "720P" : "4K"} · ${Timebase.label(p.timebase)} · MP4`)}</p>
-${custom ? `<p class="note">畫質</p>${edChoices("畫質", "quality", ed.quality, Object.keys(EditorModel.QUALITIES), (q) => edExportQualityText[q] + "（" + size(ratio, q).join("×") + "）")}` : ""}
-${quality === "4K" && small ? '<p class="note" data-ed-upscale>來源低於 4K，會放大</p>' : ""}
+<p class="note">輸出到（可複選，每個比例一個任務）</p>${edChoices("輸出到", "platform", st.platforms, edExportPlatforms.map(([name]) => name))}
+${st.platforms.includes("Instagram 貼文") ? edChoices("Instagram 比例", "instagram", st.instagram, ["1:1", "4:5"]) : ""}
+${list.length ? list.map(({ ratio, quality }) => `<p data-ed-export-spec>${esc(`${ratio} · ${size(ratio, quality).join("×")} · ${quality === "1080p" ? "1080P" : quality === "720p" ? "720P" : "4K"} · ${Timebase.label(p.timebase)} · MP4`)}</p>`).join("") : '<p class="note">請至少選一個輸出目標</p>'}
+${custom ? `<p class="note">畫質</p>${edChoices("畫質", "quality", ed.quality, Object.keys(EditorModel.QUALITIES), (q) => edExportQualityText[q] + "（" + size(p.ratio, q).join("×") + "）")}` : ""}
+${list.some((t) => t.quality === "4K" && small(t.ratio)) ? '<p class="note" data-ed-upscale>來源低於 4K，會放大</p>' : ""}
 <p class="note">影片浮水印</p>${
       st.mark
         ? edChoices("影片浮水印", "watermark", st.useMark ? "套用" : "不套用", ["不套用", "套用"]) + (st.useMark ? `<p class="note" data-ed-watermark-name>${esc(st.mark.name || "浮水印")}，右下角、整段影片</p>` : "")
         : `${edChoices("影片浮水印", "watermark", "不套用", ["不套用"])}<p class="note">尚未設定浮水印。<button type="button" class="btn small" data-ed-watermark-setup>前往設定浮水印 ↗</button></p>`
     }
 <p data-ed-export-total>剪輯總時長：<b>${edClockText(edTotal())}</b>　預估費用：<b data-ed-export-cost>免費（本機輸出，不扣點）</b></p>
-<p class="note" data-ed-delivery>適合投遞：${
-      !ed.delivery
-        ? "讀取中…"
-        : delivery?.platforms
-          ? esc(delivery.platforms.map((x) => x.platform + (x.preferred ? "（首選）" : "")).join("、"))
-          : esc(delivery?.note || "此比例尚不能投遞")
-    }</p>
+<p class="note" data-ed-delivery>適合投遞：${!ed.delivery ? "讀取中…" : esc(list.map(({ ratio }) => (list.length > 1 ? ratio + " " : "") + fit(ratio)).join("；"))}</p>
 <p class="note">時間軸交換格式</p><div><button type="button" class="btn small" data-ed-timeline${st.timeline?.busy ? " disabled" : ""}>匯出時間軸 v1</button></div>${edTimelineReport(st.timeline)}
-<div class="editor-export-actions"><button class="btn" type="button" data-ed-export-cancel>取消</button><button class="btn primary" type="button" data-ed-export${st.busy ? " disabled" : ""}>開始匯出</button></div>`;
+<div class="editor-export-actions"><button class="btn" type="button" data-ed-export-cancel>取消</button><button class="btn primary" type="button" data-ed-export${st.busy || !pending().length ? " disabled" : ""}>開始匯出${pending().length > 1 ? "（" + pending().length + " 個任務）" : ""}</button></div>`;
   };
   const d = edDialog(`<div data-ed-export-body>${body()}</div>`),
     refresh = () => {
@@ -147,7 +147,7 @@ ${quality === "4K" && small ? '<p class="note" data-ed-upscale>來源低於 4K�
       };
     });
   function wire() {
-    choose("platform", (v) => (st.platform = v));
+    choose("platform", (v) => (st.platforms = st.platforms.includes(v) ? st.platforms.filter((x) => x !== v) : [...st.platforms, v]));
     choose("instagram", (v) => (st.instagram = v));
     choose("quality", (v) => (ed.quality = v));
     choose("watermark", (v) => (st.useMark = v === "套用"));
@@ -170,7 +170,8 @@ ${quality === "4K" && small ? '<p class="note" data-ed-upscale>來源低於 4K�
       e.target.disabled = st.busy = true; // a late reload of the watermark / delivery rebuilds the body: it must not re-enable the button
       try {
         p.clips.forEach(edValidate);
-        const { ratio, quality } = target(),
+        let job;
+        for (const { ratio, quality } of pending()) {
           job = await VideoWorkbench.generations.create({
             type: "video",
             operation: "editor-export",
@@ -180,11 +181,14 @@ ${quality === "4K" && small ? '<p class="note" data-ed-upscale>來源低於 4K�
               projectRevision: p.revision || 0,
             },
           });
+          st.sent.push(ratio);
+        }
         d.close();
-        VideoWorkbench.showJob(job);
+        if (job) VideoWorkbench.showJob(job);
       } catch (err) {
         VideoWorkbench.reportError(err);
-        e.target.disabled = st.busy = false;
+        st.busy = false;
+        refresh();
       }
     };
   }

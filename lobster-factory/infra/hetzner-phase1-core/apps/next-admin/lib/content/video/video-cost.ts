@@ -52,6 +52,19 @@ export const OPENAI_TTS_RATES_USD_PER_1M_CHARS: Record<string, number> = {
   "tts-1-hd": 30,
 };
 
+/** The voices our render service speaks with (render-client ttsProvider / ttsVoice); OpenAI voice = "model:voice". */
+export const DRAFT_VOICES: ReadonlyArray<{ provider: "edge" | "openai"; voice: string; label: string }> = [
+  { provider: "edge", voice: "zh-TW-HsiaoChenNeural", label: "繁中女聲" },
+  { provider: "edge", voice: "zh-TW-YunJheNeural", label: "繁中男聲" },
+  { provider: "edge", voice: "en-US-JennyNeural", label: "English 女聲" },
+  { provider: "edge", voice: "en-US-GuyNeural", label: "English 男聲" },
+  { provider: "openai", voice: "tts-1:nova", label: "OpenAI nova（自然）" },
+  { provider: "openai", voice: "tts-1:shimmer", label: "OpenAI shimmer（柔和女聲）" },
+  { provider: "openai", voice: "tts-1:alloy", label: "OpenAI alloy" },
+  { provider: "openai", voice: "tts-1:onyx", label: "OpenAI onyx（低沉男聲）" },
+  { provider: "openai", voice: "tts-1-hd:nova", label: "OpenAI nova HD" },
+];
+
 export function openAiTtsModelFromVoice(ttsVoice?: string): string {
   const model = (ttsVoice ?? "").split(":")[0];
   return model in OPENAI_TTS_RATES_USD_PER_1M_CHARS ? model : "tts-1";

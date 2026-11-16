@@ -1,7 +1,8 @@
 // Plan U5 快速輸出: an episode's shots go to the main system's render service as one workbench job. With a fake main
 // system: the job succeeds, the finished video lands in the episode's 成片 (EpisodeSpine.settle), the job is in the
 // history (GET /generations/<id>, mirrored to the job ledger), and the video has ONE main-system row (the row the main
-// system made; the workbench never registers the downloaded file again).
+// system made; the workbench never registers the downloaded file again). Commit 2 (the step-9 dialog): two ratios chosen
+// = two jobs, one per ratio; a shot without a picture or a line is listed by the quote and its job is refused.
 const assert = require("node:assert/strict"), fs = require("node:fs"), os = require("node:os"), path = require("node:path"), http = require("node:http");
 const crypto = require("node:crypto"), { spawnSync } = require("node:child_process"), ffmpeg = require("ffmpeg-static");
 const appDir = require("../backend/appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env);
@@ -23,12 +24,16 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
   assert.equal(spawnSync(ffmpeg, ["-y", "-hide_banner", "-f", "lavfi", "-i", "testsrc=size=270x480:rate=10", "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", mp4], { windowsHide: true }).status, 0);
   const bytes = fs.readFileSync(mp4), sha = crypto.createHash("sha256").update(bytes).digest("hex");
 
-  const submitted = [], registered = [], ledger = [];
+  const submitted = [], registered = [], ledger = [], quoted = [];
   async function fetchImpl(url, options = {}) {
     url = String(url);
     if (url === R2) return new Response(bytes, { headers: { "content-length": String(bytes.length) } });
     assert.ok(url.startsWith(BASE), "unexpected " + url);
     assert.equal(options.headers.Authorization, "Bearer internal-secret");
+    if (url === BASE + "/api/internal/video/workbench/quick-render/quote") {
+      quoted.push(JSON.parse(options.body));
+      return Response.json({ ok: true, voices: [{ provider: "edge", voice: "zh-TW-HsiaoChenNeural", label: "繁中女聲" }], lines: [{ label: "旁白配音", tool: "Edge TTS", usd: 0 }], perRatioUsd: 0, totalUsd: 0 });
+    }
     if (url === BASE + "/api/internal/video/workbench/quick-render") {
       submitted.push(JSON.parse(options.body));
       return Response.json({ ok: true, jobId: REMOTE, projectId: "77777777-7777-4777-8777-777777777777" }, { status: 202 });
@@ -80,6 +85,40 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
     // 歷史紀錄: the job is kept, and its succeeded state reached the job ledger.
     await new Promise((res) => setTimeout(res, 200));
     assert.ok(ledger.some((l) => l.status === "succeeded" && l.input.operation === "quick-render" && l.resultAssetId === VIDEO), JSON.stringify(ledger));
+
+    // Commit 2: the dialog's two ratios -> two jobs (EpisodeSpine.quickRenderJobs), each its own render.
+    const post = async (route, body) => {
+      const res = await fetch(at + route, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      return { status: res.status, value: await res.json() };
+    };
+    const proj = { id: "proj-1", title: "第一集" }, ready = { id: "ep-1", shots: [{ id: "s1", image: shotUrl, line: "第一句旁白" }] };
+    const priced = await post("/quick-render/quote", { scenes: spine.quickScenes(ready), ratios: ["16:9", "9:16"] });
+    assert.equal(priced.status, 200, JSON.stringify(priced.value));
+    assert.deepEqual(priced.value.problems, []);
+    assert.deepEqual(quoted.at(-1), { organizationId: ORG, scenes: 1, ttsChars: 5, ratios: ["16x9", "9x16"] });
+    const jobs = spine.quickRenderJobs(proj, ready, { ratios: ["9:16", "16:9"], tts: priced.value.voices[0] });
+    assert.equal(jobs.length, 2);
+    const before = submitted.length;
+    for (const input of jobs) {
+      const sent = await post("/generations", input);
+      assert.equal(sent.status, 202, JSON.stringify(sent.value));
+      let j = sent.value;
+      for (let i = 0; i < 200 && !["succeeded", "failed"].includes(j.status); i++) {
+        await new Promise((res) => setTimeout(res, 100));
+        j = await (await fetch(at + "/generations/" + j.id)).json();
+      }
+      assert.equal(j.status, "succeeded", JSON.stringify(j.error || j));
+    }
+    assert.deepEqual(submitted.slice(before).map((b) => b.ratio), ["16x9", "9x16"]);
+
+    // A shot without a line and one without a picture: both listed, and the job is refused before any render call.
+    const missing = { id: "ep-1", shots: [{ id: "s1", image: shotUrl, line: " " }, { id: "s2", line: "第二句" }] };
+    const listed = await post("/quick-render/quote", { scenes: spine.quickScenes(missing), ratios: ["16:9"] });
+    assert.deepEqual(listed.value.problems, ["第 1 個鏡頭沒有旁白（快速輸出的鏡頭長度跟著旁白配音）", "第 2 個鏡頭沒有畫面"]);
+    const refused = await post("/generations", spine.quickRenderJobs(proj, missing, { ratios: ["16:9"] })[0]);
+    assert.equal(refused.status, 400);
+    assert.match(refused.value.error.message, /第 1 個鏡頭沒有旁白.*另有 1 個問題/);
+    assert.equal(submitted.length, before + 2);
     console.log("u5-quick-render ok");
   } finally {
     server.close();
