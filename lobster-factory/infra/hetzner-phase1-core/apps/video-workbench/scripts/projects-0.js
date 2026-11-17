@@ -50,23 +50,55 @@ const shotMedia = (s) =>
     : s.image
       ? `<img src="${esc(s.image)}" alt="生成畫面" style="width:100%;max-height:220px;object-fit:contain">`
       : "";
-// Card U4: the video model 讓這鏡動起來 runs -- the project's own when it starts from the picture (its first frame), else
-// the first such model that can run (generation-policy.cjs videoModels order); null = none fits this ratio. Its per-second
-// NT$ goes on the button by data-paid (shared/paid-price.js).
-function motionModel(p) {
-  const caps = VideoWorkbench.capabilities,
-    fits = (m) => m.firstFrame && m.available !== false && (m.ratios || []).includes(p.ratio),
-    own = VideoWorkbenchVideoModels.get(caps, p.settings?.model);
-  return fits(own) ? own : VideoWorkbenchVideoModels.list(caps).find(fits) || null;
+// Card U4.5: the video models 讓這鏡動起來 offers -- every one that starts from the picture (its first frame), can run, and
+// makes this ratio, in generation-policy.cjs videoModels order. One button each; a click sends that model, no click sends
+// nothing (the old tool's 「不要」).
+const motionSeconds = (m) => m.defaultDurationSec || m.durations[0];
+function motionModels(p) {
+  const fits = (m) => m.firstFrame && m.available !== false && (m.ratios || []).includes(p.ratio);
+  return VideoWorkbenchVideoModels.list(VideoWorkbench.capabilities).filter(fits);
 }
 // Card U4: where else a shot's picture can come from. 圖庫素材 searches through the main system (same origin), so it is
-// offered only when the workbench is connected to it.
+// offered only when the workbench is connected to it. Each motion button: label · seconds, and its NT$／秒 by data-paid
+// (shared/paid-price.js).
 function shotSources(p, s, i) {
   const button = (act, label, extra = "") => `<button class="btn small outline" data-action="${act}" data-index="${i}"${extra}>${label}</button>`,
-    m = s.image ? motionModel(p) : null;
-  return `<div class="row">${button("swapShot", "換圖")}${VideoWorkbench.capabilities?.mainSystem ? button("stockShot", "圖庫素材") : ""}${
-    !s.image ? "" : m ? button("motionShot", `讓這鏡動起來 · ${esc(m.label)}`, ` data-paid="video.motion" data-paid-model="${esc(m.id)}"`) : button("motionShot", "讓這鏡動起來", ' disabled title="這個畫面比例沒有能從圖片開始的影片模型"')
-  }</div>`;
+    models = s.image ? motionModels(p) : [];
+  const motion = !s.image
+    ? ""
+    : `<div class="row" role="group" aria-label="讓這鏡動起來"><span class="tiny">讓這鏡動起來</span>${
+        models.length
+          ? models.map((m) => button("motionShot", `${esc(m.label)} · ${esc(motionSeconds(m))} 秒`, ` data-value="${esc(m.id)}" data-paid="video.motion" data-paid-model="${esc(m.id)}"`)).join("")
+          : '<span class="tiny">這個畫面比例沒有能從圖片開始的影片模型</span>'
+      }</div>`;
+  return `<div class="row">${button("swapShot", "換圖")}${VideoWorkbench.capabilities?.mainSystem ? button("stockShot", "圖庫素材") : ""}</div>${motion}`;
+}
+// The reference pictures a shot's own picture uses: the chosen scene's, then the chosen cast's; every project reference
+// when nothing is chosen. At most 4 (the workbench image model's limit).
+function shotReferences(p, shot) {
+  const scene = (p.assets.scene || []).find((a) => a.id === shot.sceneId),
+    cast = (p.assets.character || []).filter((a) => (shot.characterIds || []).includes(a.id)),
+    chosen = scene || cast.length ? [scene, ...cast].filter(Boolean) : Object.values(p.assets || {}).flat();
+  return chosen.flatMap((a) => (a.refs || []).map((url) => ({ url }))).slice(0, 4);
+}
+// Card U4.4: the main system's scene model a shot is drawn with (capabilities sceneImage, next-admin image-models.js
+// VIDEO_SCENE_MODELS), or null = the workbench's own model. A saved model this ratio or this host cannot run is null.
+function sceneModel(p, s) {
+  const cap = VideoWorkbench.capabilities?.sceneImage;
+  if (!s?.imageModel || !cap?.available || !cap.ratios.includes(p.ratio)) return null;
+  return cap.groups.flatMap((g) => g.models).find((m) => m.id === s.imageModel) || null;
+}
+// Card U4.4: 生圖模型 buttons -- 預設 + one per vendor group, then the open group's models with their NT$／張
+// (shared/paid-price.js data-paid-model "scene:<id>"). Those models take no reference pictures: said when the shot has some.
+function imageModelRow(p, s, i) {
+  const cap = VideoWorkbench.capabilities?.sceneImage;
+  if (!cap?.available) return "";
+  if (!cap.ratios.includes(p.ratio)) return '<p class="tiny">這個畫面比例只能用預設生圖模型</p>';
+  const now = sceneModel(p, s), open = now && cap.groups.find((g) => g.models.includes(now)),
+    chip = (act, value, label, on, extra = "") => `<button class="btn small ${on ? "primary" : "outline"}" data-action="${act}" data-index="${i}" data-value="${esc(value)}" aria-pressed="${on}"${extra}>${esc(label)}</button>`;
+  return `<div class="row" role="group" aria-label="生圖模型"><span class="tiny">生圖模型</span>${chip("shotImageGroup", "", "預設", !open)}${cap.groups.map((g) => chip("shotImageGroup", g.group, g.group, open === g)).join("")}</div>${
+    open ? `<div class="row" role="group" aria-label="${esc(open.group)} 模型">${open.models.map((m) => chip("shotImageModel", m.id, m.label, m === now, ` data-paid="video.image" data-paid-model="scene:${esc(m.id)}" title="${esc(m.note)}"`)).join("")}</div>${shotReferences(p, s).length ? '<p class="tiny">這個模型不會參考角色與場景圖</p>' : ""}` : ""
+  }`;
 }
 function makeEpisode(n, title = "") {
   return {
@@ -121,9 +153,13 @@ document.addEventListener("vw:changed", () => {
   } catch {}
   if (spineSignature(s) === spineSeen) return;
   loadState();
-  if (!dialog) render();
+  // A top-page write always reaches the screen: drawn now, or when the open dialog closes (closeDialog). The 圖庫素材
+  // dialog stays open across its own spine-set-shot, so its picture used to wait for a page reload.
+  if (dialog) spineUndrawn = true;
+  else render();
 });
 let dialog = null;
+let spineUndrawn = false;
 let selectedFileTarget = null;
 let modalDraft = {};
 let snackbarTimeout = null;
@@ -192,7 +228,7 @@ function renderWorkbench() {
   const total = e.shots.length;
   const menu = `<div class="row"><button class="btn small outline" data-action="preview">◉　預覽整集</button><button class="btn small outline" data-action="export">↓　匯出片段 · 0</button><button class="btn small outline" data-action="cover">▧　更換封面</button><button class="btn small outline" data-action="settings">☷　生成設定</button></div>`;
   $("workbench").innerHTML = VideoWorkbench.sanitize(
-    `<div class="work-nav"><button class="btn small outline" data-action="backHome">←　專案列表</button><span class="eyebrow" style="color:var(--text-muted)">AWAREWAVE · 專案</span><span class="quiet">本機專案 · AI 依 API 用量計費</span></div><div class="work-grid"><aside class="bible"><div class="eyebrow">— 製作聖經 · BIBLE</div><h2>${esc(p.title)}</h2><div class="quiet">${esc(p.type === "series" ? "短影集" : "單支影片")} · ${p.episodes.length} 集 · ${esc(p.ratio)}</div><div class="fixed">♙　卡司、場景與風格定義一次，在所有鏡頭間保持一致。</div>${["character", "scene", "prop"].map((k) => entityList(k, p)).join("")}<div class="entity-group"><div class="entity-header">◉　風格錨點</div><div class="style-record"><h3>${esc(STYLE_NAMES[p.style])}</h3><div class="muted">${esc(styleText(p))}</div></div></div><button class="btn" style="width:100%;margin-top:20px" data-action="settings">☷　生成設定　⌃</button><p class="tiny">風格與負面提示詞的專案／本集兩層設定，會合成後用於實際內容。</p></aside><main class="work-content"><div class="work-top"><div><div class="quiet">專案　›　${esc(p.title)}</div><h1>第 ${state.episode + 1} 集 · ${esc(state.episode === 0 ? p.title : e.name)}</h1><div class="tiny">${total} 個鏡頭 · 約 ${e.shots.reduce((v, s) => v + Number(s.seconds || 5), 0)} 秒 · ${esc(p.ratio)} · ${e.shots.filter((s) => s.image).length}/${total} 已生成</div></div><div class="work-actions"><button class="btn primary" data-action="storyboard">✧　AI 分鏡</button><button class="btn" data-paid="video.image" data-action="batch">▤　批次生成</button><button class="btn" data-action="fullVideo">✧　帶入影片生成</button><div style="position:relative"><button class="btn" data-action="toggleMore">⋯　更多</button><div class="panel" id="more-menu" hidden style="position:absolute;right:0;top:43px;z-index:4;width:205px;padding:7px">${menu}</div></div></div></div>${episodeSteps(e)}<div class="outline-box"><label>□ 本集大綱</label><textarea data-bind="episode.outline" placeholder="用幾句話寫下這一集的故事：誰、在哪裡、發生什麼、怎麼收尾">${esc(e.outline)}</textarea><div class="tiny">AI 分鏡會從這裡開始。改了大綱之後可以重新分鏡。</div></div><div class="episode-tabs">${p.episodes.map((x, i) => `<button class="${i === state.episode ? "on" : ""}" data-action="episode" data-index="${i}">EP${i + 1}　${esc(x.name)} ${x.shots.length}</button>`).join("")}<button data-action="addEpisode" aria-label="新增一集">＋</button></div>${total ? `<div class="split" style="margin-bottom:16px"><strong>本集鏡頭 <span class="quiet">${total} 個</span></strong><button class="btn small primary" data-action="addShot">＋　新增鏡頭</button></div><div class="shot-grid">${e.shots.map((s, i) => `<div class="shot"><div class="split"><h3>鏡頭 ${String(i + 1).padStart(2, "0")}</h3><button class="btn small danger" data-action="deleteShot" data-index="${i}" title="刪除鏡頭">×</button></div>${shotMedia(s)}<label>畫面描述</label><textarea data-bind="shot.${i}.text" placeholder="描述鏡頭內的動作與構圖">${esc(s.text)}</textarea><label>旁白</label><textarea data-bind="shot.${i}.line" placeholder="這一鏡要念的一句話（配音和字幕照它做）">${esc(s.line || "")}</textarea>${shotControls(p, s, i)}<div class="row"><label style="margin:0">時長 <input aria-label="鏡頭時長" style="width:70px;padding:6px" type="number" min="1" max="120" data-bind="shot.${i}.seconds" value="${esc(s.seconds)}"></label><span class="tiny">秒</span><button class="btn small" data-paid="video.image" data-action="shotGenerate" data-index="${i}">生成畫面</button>${s.image ? `<button class="btn small outline" data-action="fixShot" data-index="${i}">修這張</button>` : ""}</div>${shotSources(p, s, i)}</div>`).join("")}</div>` : `<div class="work-empty panel"><h3>這一集還沒有鏡頭，從這裡開始</h3><div class="step"><span class="circle">1</span><div><strong>先建立角色與場景</strong><p>每個角色、場景、道具都可以上傳參考圖。鏡頭鎖定它們之後，長相與環境才會每一鏡都一致。</p><button class="btn small outline" data-action="asset" data-kind="character">♧　建立角色</button></div></div><div class="step"><span class="circle">2</span><div><strong>寫下大綱，讓 AI 分鏡</strong><p>AI 導演會先問幾個問題，再把故事拆成一顆一顆鏡頭，你可以逐鏡修改後再建立。</p><button class="btn small outline" data-action="storyboard">✧　AI 分鏡</button></div></div><div class="step"><span class="circle">3</span><div><strong>或者自己加一顆鏡頭</strong><p>想手動控制每一鏡的細節與鏡頭，就直接開始寫。</p><button class="btn small outline" data-action="addShot">＋　新增鏡頭</button></div></div></div>`}</main></div>`,
+    `<div class="work-nav"><button class="btn small outline" data-action="backHome">←　專案列表</button><span class="eyebrow" style="color:var(--text-muted)">AWAREWAVE · 專案</span><span class="quiet">本機專案 · AI 依 API 用量計費</span></div><div class="work-grid"><aside class="bible"><div class="eyebrow">— 製作聖經 · BIBLE</div><h2>${esc(p.title)}</h2><div class="quiet">${esc(p.type === "series" ? "短影集" : "單支影片")} · ${p.episodes.length} 集 · ${esc(p.ratio)}</div><div class="fixed">♙　卡司、場景與風格定義一次，在所有鏡頭間保持一致。</div>${["character", "scene", "prop"].map((k) => entityList(k, p)).join("")}<div class="entity-group"><div class="entity-header">◉　風格錨點</div><div class="style-record"><h3>${esc(STYLE_NAMES[p.style])}</h3><div class="muted">${esc(styleText(p))}</div></div></div><button class="btn" style="width:100%;margin-top:20px" data-action="settings">☷　生成設定　⌃</button><p class="tiny">風格與負面提示詞的專案／本集兩層設定，會合成後用於實際內容。</p></aside><main class="work-content"><div class="work-top"><div><div class="quiet">專案　›　${esc(p.title)}</div><h1>第 ${state.episode + 1} 集 · ${esc(state.episode === 0 ? p.title : e.name)}</h1><div class="tiny">${total} 個鏡頭 · 約 ${e.shots.reduce((v, s) => v + Number(s.seconds || 5), 0)} 秒 · ${esc(p.ratio)} · ${e.shots.filter((s) => s.image).length}/${total} 已生成</div></div><div class="work-actions"><button class="btn primary" data-action="storyboard">✧　AI 分鏡</button><button class="btn" data-paid="video.image" data-action="batch">▤　批次生成</button><button class="btn" data-action="fullVideo">✧　帶入影片生成</button><div style="position:relative"><button class="btn" data-action="toggleMore">⋯　更多</button><div class="panel" id="more-menu" hidden style="position:absolute;right:0;top:43px;z-index:4;width:205px;padding:7px">${menu}</div></div></div></div>${episodeSteps(e)}<div class="outline-box"><label>□ 本集大綱</label><textarea data-bind="episode.outline" placeholder="用幾句話寫下這一集的故事：誰、在哪裡、發生什麼、怎麼收尾">${esc(e.outline)}</textarea><div class="tiny">AI 分鏡會從這裡開始。改了大綱之後可以重新分鏡。</div></div><div class="episode-tabs">${p.episodes.map((x, i) => `<button class="${i === state.episode ? "on" : ""}" data-action="episode" data-index="${i}">EP${i + 1}　${esc(x.name)} ${x.shots.length}</button>`).join("")}<button data-action="addEpisode" aria-label="新增一集">＋</button></div>${total ? `<div class="split" style="margin-bottom:16px"><strong>本集鏡頭 <span class="quiet">${total} 個</span></strong><button class="btn small primary" data-action="addShot">＋　新增鏡頭</button></div><div class="shot-grid">${e.shots.map((s, i) => `<div class="shot"><div class="split"><h3>鏡頭 ${String(i + 1).padStart(2, "0")}</h3><button class="btn small danger" data-action="deleteShot" data-index="${i}" title="刪除鏡頭">×</button></div>${shotMedia(s)}<label>畫面描述</label><textarea data-bind="shot.${i}.text" placeholder="描述鏡頭內的動作與構圖">${esc(s.text)}</textarea><label>旁白</label><textarea data-bind="shot.${i}.line" placeholder="這一鏡要念的一句話（配音和字幕照它做）">${esc(s.line || "")}</textarea>${shotControls(p, s, i)}${imageModelRow(p, s, i)}<div class="row"><label style="margin:0">時長 <input aria-label="鏡頭時長" style="width:70px;padding:6px" type="number" min="1" max="120" data-bind="shot.${i}.seconds" value="${esc(s.seconds)}"></label><span class="tiny">秒</span><button class="btn small" data-paid="video.image"${sceneModel(p, s) ? ` data-paid-model="scene:${esc(sceneModel(p, s).id)}"` : ""} data-action="shotGenerate" data-index="${i}">生成畫面</button>${s.image ? `<button class="btn small outline" data-action="fixShot" data-index="${i}">修這張</button>` : ""}</div>${shotSources(p, s, i)}</div>`).join("")}</div>` : `<div class="work-empty panel"><h3>這一集還沒有鏡頭，從這裡開始</h3><div class="step"><span class="circle">1</span><div><strong>先建立角色與場景</strong><p>每個角色、場景、道具都可以上傳參考圖。鏡頭鎖定它們之後，長相與環境才會每一鏡都一致。</p><button class="btn small outline" data-action="asset" data-kind="character">♧　建立角色</button></div></div><div class="step"><span class="circle">2</span><div><strong>寫下大綱，讓 AI 分鏡</strong><p>AI 導演會先問幾個問題，再把故事拆成一顆一顆鏡頭，你可以逐鏡修改後再建立。</p><button class="btn small outline" data-action="storyboard">✧　AI 分鏡</button></div></div><div class="step"><span class="circle">3</span><div><strong>或者自己加一顆鏡頭</strong><p>想手動控制每一鏡的細節與鏡頭，就直接開始寫。</p><button class="btn small outline" data-action="addShot">＋　新增鏡頭</button></div></div></div>`}</main></div>`,
   );
   wireReviewLinks();
 }
@@ -347,11 +383,12 @@ function showDialog(type, more = {}) {
   renderDialog();
 }
 function closeDialog() {
-  const wasCreate = dialog?.type === "create";
+  const redraw = dialog?.type === "create" || spineUndrawn;
   dialog = null;
+  spineUndrawn = false;
   $("overlay").hidden = true;
   $("overlay").innerHTML = VideoWorkbench.sanitize("");
-  if (wasCreate) render();
+  if (redraw) render();
 }
 const modal = (title, body, foot = "", size = "") =>
   `<div class="dialog ${size}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="dialog-head"><h2>${esc(title)}</h2><button class="dialog-x" data-action="close" aria-label="關閉">×</button></div><div class="dialog-body">${body}</div><div class="dialog-foot">${foot || '<button class="btn" data-action="close">關閉</button>'}</div></div>`;
@@ -642,13 +679,11 @@ async function generateShot(index) {
   const projectId = p.id,
     episodeId = episode.id,
     shotId = shot.id;
-  // The chosen scene's refs first, then the chosen characters'; all project refs only when nothing is chosen.
   const scene = (p.assets.scene || []).find((a) => a.id === shot.sceneId),
     cast = (p.assets.character || []).filter((a) => (shot.characterIds || []).includes(a.id)),
-    chosen = scene || cast.length ? [scene, ...cast].filter(Boolean) : Object.values(p.assets || {}).flat();
-  const references = chosen
-    .flatMap((a) => (a.refs || []).map((url) => ({ url })))
-    .slice(0, 4);
+    // Card U4.4: a main-system scene model draws from the words alone (backend/scene-image.cjs); the card said so.
+    model = sceneModel(p, shot),
+    references = model ? [] : shotReferences(p, shot);
   const job = await VideoWorkbench.generations.create({
     type: "image",
     operation: "project-shot",
@@ -665,6 +700,7 @@ async function generateShot(index) {
       .join("\n"),
     ratio: p.ratio,
     references: { images: references },
+    ...(model ? { settings: { imageModel: model.id, ratio: p.ratio } } : {}),
     projectId,
     episodeId,
     shotId,
@@ -709,15 +745,15 @@ async function stockShot(index, kind, keyword) {
   await putOnShot(index, asset, "stock");
 }
 // Card U4: 讓這鏡動起來 -- the shot's picture as the first frame of a video job; settle puts the video on the shot.
-async function motionShot(index) {
+async function motionShot(index, modelId) {
   const p = project(),
     e = ep(),
     shot = e.shots[index],
-    m = motionModel(p);
+    m = motionModels(p).find((x) => x.id === modelId);
   if (!shot?.image) throw Error("這個鏡頭還沒有畫面");
   if (!shot.text?.trim()) throw Error("請先填寫鏡頭畫面描述");
-  if (!m) throw Error("這個畫面比例沒有能從圖片開始的影片模型");
-  const seconds = m.defaultDurationSec || m.durations[0];
+  if (!m) throw Error("這個影片模型不能從這張圖開始，請換一個");
+  const seconds = motionSeconds(m);
   const job = await VideoWorkbench.generations.create({
     type: "video",
     prompt: [shot.text, styleText(p), p.settings?.videoPrompt, e.videoPrompt].filter(Boolean).join("\n"),
@@ -827,6 +863,18 @@ async function action(a, button) {
       const shot = ep().shots[index], field = a === "shotScene" ? "sceneId" : "shotSize";
       if (!shot) break;
       shot[field] = shot[field] === button.dataset.value ? undefined : button.dataset.value;
+      save();
+      renderWorkbench();
+      break;
+    }
+    case "shotImageGroup":
+    case "shotImageModel": {
+      const shot = ep().shots[index], v = button.dataset.value,
+        group = VideoWorkbench.capabilities?.sceneImage?.groups.find((g) => g.group === v);
+      if (!shot) break;
+      if (a === "shotImageModel") shot.imageModel = v;
+      else if (group) shot.imageModel = group.models[0]?.id;
+      else delete shot.imageModel;
       save();
       renderWorkbench();
       break;
@@ -1098,7 +1146,7 @@ async function action(a, button) {
     case "swapShot":
     case "motionShot":
       try {
-        if (a === "motionShot") await motionShot(index);
+        if (a === "motionShot") await motionShot(index, button.dataset.value);
         else {
           const [asset] = await VideoWorkbench.pickAssets({ kind: "image", limit: 1 });
           if (asset) await putOnShot(index, asset, "library");

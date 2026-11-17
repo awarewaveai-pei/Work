@@ -40,6 +40,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const audioPolicy = require("./audio-policy.cjs"), soundPolicy = audioPolicy.createAudioPolicy({ main, orgId });
   const captionReburn = require("./caption-reburn.cjs");
   const quickRender = require("./quick-render.cjs"); // plan U5 快速輸出
+  const sceneImage = require("./scene-image.cjs"); // card U4.4 鏡頭生圖模型（主系統供應商）
   fs.mkdirSync(dataDir, { recursive: true });
   const outputs = path.join(dataDir, "generated");
   fs.mkdirSync(outputs, { recursive: true });
@@ -655,6 +656,17 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         persist();
         return;
       }
+      if (sceneImage.modelOf(job.input)) {
+        job.status = "running";
+        persist();
+        const result = await sceneImage.run(job, { main, fetchImpl, mediaStore, signal, onPaid: (paid) => ((job.finishing = paid), persist()) });
+        if (signal.aborted) return;
+        job.result = result; // settle() registers it with the origin next-admin answered (billed there, not here)
+        job.progress = 100;
+        job.status = "succeeded";
+        persist();
+        return;
+      }
       if (job.input.operation === "quick-render") {
         job.status = "running";
         persist();
@@ -1172,6 +1184,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       isRemotion = input.operation === "remotion-template",
       isReburn = input.operation === "caption-reburn",
       isQuick = input.operation === "quick-render",
+      isScene = !!sceneImage.modelOf(input),
       isBlender = blender3d().operations.includes(input.operation),
       isImageTo3d = input.operation === "image-to-3d",
       isTranscribe = input.operation === "editor-transcribe",
@@ -1194,7 +1207,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
               ? (captionReburn.request(input, main), { type: "video" })
               : isQuick
                 ? (quickRender.request(input, main, localSize), { type: "video" })
-                : jobInput(input);
+                : isScene
+                  ? (sceneImage.request(input, main), { type: "image" })
+                  : jobInput(input);
     if (videoEnhance.isAi(input)) {
       await aiEnhanceSource(input);
       videoEnhance.token(env);
@@ -1204,7 +1219,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     else if (isMusic) music.key(music.pick(input.musicModel, env), env);
     else if (parsed.type === "audio" && !isMedia) speech.key(speech.pick(input.speechModel, env), env);
     else if (editModel) imageEdit.key(editModel, env);
-    else if (!isMedia && !isRemoveBg && !isRemotion && !isReburn && !isQuick && !isBlender && !isImageTo3d && !isTranscribe) key();
+    else if (!isMedia && !isRemoveBg && !isRemotion && !isReburn && !isQuick && !isScene && !isBlender && !isImageTo3d && !isTranscribe) key();
     // paidFeature on the job: the retry button prices a rerun from it (shared/paid-price.js); the permit needs main.
     const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
@@ -1212,6 +1227,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     else if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music" }[feature] || feature,
       { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id }[feature]);
     const lockMask = input.operation === "breakout" ? await breakoutInputs(input, extra?.retryOf) : null;
+    // Card U4.4: a retry of a scene picture next-admin already drew and billed takes that picture (sceneImage.kept).
+    const keptScene = isScene && extra?.retryOf ? sceneImage.kept(jobs.find((j) => j.id === extra.retryOf)) : null;
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
     if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });
@@ -1228,6 +1245,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         ...(main && req?.vwIdentity?.userId ? { createdBy: req.vwIdentity.userId } : {}),
         ...(paid ? { paid } : {}),
         ...(paidFeature ? { paidFeature } : {}),
+        ...(keptScene ? { finishing: keptScene } : {}),
       };
       const limit = jobTimeoutMs(input); // once, before the job joins the queue (host transcription counts the runs ahead)
       job.deadlineAt = new Date(Date.parse(job.createdAt) + limit).toISOString();
@@ -1484,7 +1502,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (req.method === "GET" && route === "/capabilities") {
         await elevenlabs.account(env, fetchImpl); // the plan + credits the ElevenLabs rows price by (cached 10 min)
         const soundOut = await soundPolicy.allowed(); // plan U7: rows that send sound out are off for a client who keeps it here
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env, undefined, { soundOut }), audioTools: audioTools.capability(env, { soundOut }), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.catalog,
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env, undefined, { soundOut }), audioTools: audioTools.capability(env, { soundOut }), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.catalog, sceneImage: sceneImage.capability(main),
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           mainSystem: main ? { organizationId: orgId, externalAudioAllowed: soundOut } : null });
@@ -1683,6 +1701,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         } else if (req.method === "POST" && match[2]) {
           if (!["queued", "running"].includes(job.status))
             throw Object.assign(Error("任務已結束"), { status: 409 });
+          // Card U4.4: next-admin draws and bills a scene picture to the end once asked; it lands in the library instead.
+          if (job.status === "running" && sceneImage.modelOf(job.input))
+            throw Object.assign(Error("主系統正在生成這張圖並已計費，無法取消；完成後會放進素材庫。"), { status: 409 });
           if (job.stage === "finishing") {
             // The vendor run is done and paid: stop our finishing only (no vendor call); the job ends with the model's file.
             controls.get(job.id)?.abort();

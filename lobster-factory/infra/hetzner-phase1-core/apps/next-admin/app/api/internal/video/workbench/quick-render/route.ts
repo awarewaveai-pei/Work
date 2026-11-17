@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
+import { workbenchAuthorized } from "@/lib/content/video/workbench-internal";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { runForOrg } from "@/lib/entitlements/grant";
 import type { RightsSource } from "@/lib/content/video/asset-origin";
@@ -30,11 +30,7 @@ const AUTONOMY = new Set(["guided", "auto_after_render"]);
 type Body = Record<string, unknown>;
 const obj = (v: unknown): Body | null => (v && typeof v === "object" && !Array.isArray(v) ? v as Body : null);
 
-function authorized(req: Request): boolean {
-  const expected = process.env.VW_INTERNAL_TOKEN;
-  const bearer = req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
-  return !!expected && !!bearer && timingSafeEqual(bearer, expected);
-}
+const authorized = workbenchAuthorized;
 const fail = (status: number, error: string) => NextResponse.json({ ok: false, error }, { status });
 
 type Parsed = {

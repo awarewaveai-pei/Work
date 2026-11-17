@@ -22,6 +22,11 @@
       const paid = (c.imageTo3d?.methods || []).map((m) => m.usd).filter((usd) => Number.isFinite(usd) && usd > 0);
       return paid.length ? money(Math.min(...paid)) + " 起／個" : "";
     }
+    // Card U4.4: a main-system scene model (capabilities sceneImage, data-paid-model "scene:<id>"): its NT$／張.
+    if (feature === "video.image" && String(model || "").startsWith("scene:")) {
+      const m = (c.sceneImage?.groups || []).flatMap((g) => g.models).find((x) => x.id === model.slice(6));
+      return m ? unitText({ usd: m.usd, unit: "張", estimate: m.estimate }) : "";
+    }
     // An image-edit row (capabilities imageEdit.models, backend/image-edit.cjs): its price at that resolution.
     const edit = feature === "video.image" && model && c.imageEdit?.models?.find((m) => m.id === model);
     if (edit) return unitText(edit.prices?.[edit.sizes.includes(size) ? size : edit.defaultSize]);

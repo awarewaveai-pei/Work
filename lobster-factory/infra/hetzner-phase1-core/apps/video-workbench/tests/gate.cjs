@@ -38,6 +38,7 @@ const tests = [
   "u5-quick-render",
   "u6-review-state",
   "u8-title-form",
+  "u4-scene-image",
 ];
 const checks = [
   "server.cjs",

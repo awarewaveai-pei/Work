@@ -39,6 +39,8 @@ function paidFeature(input, type) {
   if (op === "editor-transcribe") return "video.transcribe"; // card ED.10 整片字幕
   if (op === "music") return "video.music"; // backend/music.cjs 音樂生成
   if (require("./video-enhance.cjs").isAi(input)) return "video.enhance"; // card ED.12.3: before localTool (enhance is also a free ffmpeg op)
+  // Card U4.4: a shot drawn by a main-system scene model is billed by next-admin itself (scene-image route, runForOrg).
+  if (require("./scene-image.cjs").modelOf(input)) return null;
   if (op === "remotion-template" || op === "caption-reburn" || op === "quick-render" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || localTool(op)) return null;
   return { image: "video.image", video: "video.motion", audio: "video.tts" }[type] || null;
 }

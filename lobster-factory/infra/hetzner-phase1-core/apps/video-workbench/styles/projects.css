@@ -488,6 +488,16 @@ label {
 .shot .row {
   margin-top: 10px;
 }
+/* A shot card is as narrow as its grid column (245px): no button may run past its right edge -- a long label
+   (a model name, its NT$ price) wraps inside the button instead (B2, 2026-11-16). */
+.shot {
+  min-width: 0;
+}
+.shot .btn {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 /* Dialogs */
 #overlay[hidden] {
   display: none;

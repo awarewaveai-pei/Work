@@ -62,6 +62,16 @@ export const IMAGE_MODELS = Object.freeze([
   { value: "openai-26-edit", label: "GPT-Image-2.6 修圖", group: "OpenAI", vendor: "OpenAI", usd: 0.06, maxRefs: 5, note: "優：條件多、描述長最準；缺：最貴之一", uses: ["generate", "edit", "fill", "outpaint"], zh: "ok", blank: "ok" },
 ]);
 
+/** The models a video scene / shot picture can be drawn with, by vendor group (the old 快速影片 picker's two levels; the
+ *  video-workbench shot card offers the same list): lib/content/blocks/video-pipeline.ts buildSceneAsset runs them, the
+ *  internal route api/internal/video/workbench/scene-image accepts only these. Prices = the rows above. */
+export const VIDEO_SCENE_MODELS = Object.freeze({
+  FLUX: Object.freeze(["flux-schnell", "flux-dev", "flux-kontext-dev", "flux-kontext-pro", "flux-2-max"]),
+  Ideogram: Object.freeze(["ideogram-v2a-turbo", "ideogram-v3-balanced", "ideogram-v4-turbo", "ideogram-v4-quality", "ideogram-character"]),
+  Google: Object.freeze(["nano-banana-2", "nano-banana-pro"]),
+  OpenAI: Object.freeze(["openai-low", "openai-medium", "openai-high"]),
+});
+
 /** `zh` = does a 繁中 instruction work on this button, measured 2026-11-09 on one card with one sentence:
  *  Ideogram 4.5 Edit low and FLUX 2 Klein 4B removed the object, FLUX Kontext Fast left it in place twice and
  *  removed it from the same English sentence. "no" = write the instruction in English; the guide prints one.

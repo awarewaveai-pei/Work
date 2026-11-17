@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VIDEO_PIPELINE_STEPS, computeVideoCost } from "@/lib/content/video/video-cost";
 import { IMAGE_RATES, DEFAULT_IMAGE_MODEL, VIDEO_MOTION_RATES } from "@/lib/ai/cost-model";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
+import { VIDEO_SCENE_MODELS } from "@/public/editor-shared/image-models.js";
 import type { VideoHistoryItem } from "@/app/api/video/history/route";
 import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
 import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
@@ -27,13 +28,8 @@ const VIDEO_PRESET_BY_LABEL = new Map(VIDEO_STYLE_PRESETS.map((p) => [p.zh, p.pr
 const VIDEO_STYLE_CATALOG = [...VIDEO_STYLE_PRESETS, ...STYLE_CATALOG];
 const VIDEO_STYLE_GROUPS = Array.from(new Set(VIDEO_STYLE_CATALOG.map((s) => s.group)));
 
-// 生圖模型廠商分組（外層 tab → 內層 chip 兩層選擇器）。
-const IMAGE_VENDOR_GROUPS: Record<string, string[]> = {
-  "FLUX":      ["flux-schnell", "flux-dev", "flux-kontext-dev", "flux-kontext-pro", "flux-2-max"],
-  "Ideogram":  ["ideogram-v2a-turbo", "ideogram-v3-balanced", "ideogram-v4-turbo", "ideogram-v4-quality", "ideogram-character"],
-  "Google":    ["nano-banana-2", "nano-banana-pro"],
-  "OpenAI":    ["openai-low", "openai-medium", "openai-high"],
-};
+// 生圖模型廠商分組（外層 tab → 內層 chip 兩層選擇器）：單一來源 image-models.js VIDEO_SCENE_MODELS（工作台鏡頭卡同一份）。
+const IMAGE_VENDOR_GROUPS: Readonly<Record<string, readonly string[]>> = VIDEO_SCENE_MODELS;
 function vendorForModel(model: string): string {
   for (const [v, ids] of Object.entries(IMAGE_VENDOR_GROUPS)) {
     if (ids.includes(model)) return v;
