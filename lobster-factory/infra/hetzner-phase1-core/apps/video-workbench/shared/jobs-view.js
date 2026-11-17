@@ -319,11 +319,11 @@
     let timer,
       closed = false;
     const update = (v) => {
-      status.textContent = v.id + " · " + v.status;
+      status.textContent = ({ queued: "排隊中", running: "處理中", succeeded: "已完成", failed: "失敗", cancelled: "已取消", blocked: "已停止" })[v.status] || "處理中";
       progress.value = Number(v.progress) || 0;
       cancel.hidden = !["queued", "running"].includes(v.status);
       result.replaceChildren();
-      if (v.error) result.textContent = v.error;
+      if (v.error) result.textContent = v.error.message || v.error;
       // A result's own remark (e.g. 破框: finishing stopped, the model's file delivered) is part of what was delivered.
       if (v.result?.note) {
         const note = document.createElement("p");

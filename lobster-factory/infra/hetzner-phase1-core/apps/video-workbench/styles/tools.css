@@ -769,7 +769,7 @@ body {
 .editor-player { display:flex;flex-direction:column;min-width:0;min-height:0;padding:12px; }
 .editor-stage-frame { flex:1;min-height:120px;container-type:size;display:flex;align-items:center;justify-content:center;background:var(--body-bg); }
 .editor-stage-frame:fullscreen { background:var(--body-bg); }
-.editor-stage { position:relative;overflow:hidden;background:#000;aspect-ratio:var(--ed-aspect,16/9);width:min(100cqw,calc(100cqh * var(--ed-ar,1.7778))); }
+.editor-stage { position:relative;isolation:isolate;overflow:hidden;background:#000;aspect-ratio:var(--ed-aspect,16/9);width:min(100cqw,calc(100cqh * var(--ed-ar,1.7778))); }
 .editor-stage-empty { position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px;text-align:center;background:var(--bg-subtle);color:var(--text-primary); }
 .editor-lane-hint { position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;font-size:var(--font-size-sm);color:var(--text-muted);pointer-events:none; }
 .editor-transport { display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:8px; }

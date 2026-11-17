@@ -39,6 +39,17 @@ const STORE = 'awarewave-projects-screenshot-frontend-v1', ORG = '11111111-1111-
     phase = 3; await page.evaluate(() => window.postMessage({ type: 'vw:workflow-changed' }, location.origin));
     await frame.locator('[data-vw-next-surface=header]').filter({ hasText: '主系統狀態暫時讀不到' }).waitFor();
     await page.locator('[data-vw-next-surface=notification]').filter({ hasText: '主系統狀態暫時讀不到' }).waitFor();
+    await page.evaluate(async () => {
+      await new Promise((resolve) => { const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/styles/tools.css'; css.onload = resolve; document.head.append(css); });
+      const stage = document.createElement('div'); stage.className = 'editor-stage'; stage.style.cssText = 'position:fixed;left:300px;top:100px;width:200px;height:150px';
+      const text = document.createElement('div'); text.textContent = '剪輯文字'; text.style.cssText = 'position:absolute;inset:0;z-index:120'; stage.append(text); document.body.append(stage);
+      VideoWorkbench.showJob({ id: 'technical-long-job-id', type: 'video', status: 'running', input: {} });
+    });
+    await page.locator('.job-view').filter({ hasText: '處理中' }).waitFor();
+    const overlay = await page.evaluate(() => ({ covers: document.querySelector('.job-view').contains(document.elementFromPoint(400, 150)), text: document.querySelector('.job-view').textContent }));
+    assert.equal(overlay.covers, true, '剪輯文字不得穿透任務面板');
+    assert.doesNotMatch(overlay.text, /technical-long-job-id|running/);
+    await page.locator('[data-job-close]').click();
     assert.equal(paid, 0); assert.deepEqual(errors, []);
     console.log('PASS U6.4 Playwright: header, card and completion notice change together; unknown state, no paid submission');
   } finally { await browser.close(); }
