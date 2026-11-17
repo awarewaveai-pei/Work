@@ -2,10 +2,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const finishJob = vi.hoisted(() => vi.fn());
+const saveTopicVideoScenes = vi.hoisted(() => vi.fn());
+vi.mock("../topic-project", () => ({ saveTopicVideoScenes }));
 vi.mock("@/lib/content/video/job-store", () => ({ createJob: async () => ({ id: "j1" }), finishJob, updateJobStep: async () => {} }));
 vi.mock("@/lib/content/blocks/register-all", () => ({}));
 vi.mock("@/lib/content/blocks/video-pipeline", () => ({ cleanupVideoInputKeys: async () => {} }));
-vi.mock("@/lib/content/blocks/registry", () => ({ byId: () => ({ run: async () => ({ ok: true, euJobId: "e1", r2Keys: [], title: "t", sceneCount: 1 }) }) }));
+vi.mock("@/lib/content/blocks/registry", () => ({ byId: () => ({ run: async () => ({ ok: true, euJobId: "e1", r2Keys: [], title: "t", sceneCount: 1, videoScenes: [{ narration: "一句", image_prompt: "海" }] }) }) }));
 
 const { startVideoJob } = await import("../start");
 const input = { topic: "t", language: "繁體中文", brandVoice: "" };
@@ -16,6 +18,7 @@ describe("startVideoJob projectFor", () => {
   it("records the project id with the running job", async () => {
     expect(await startVideoJob("o1", input, { projectFor: async () => "p1" })).toEqual({ ok: true, jobId: "j1" });
     expect(finishJob).toHaveBeenCalledWith("j1", expect.objectContaining({ status: "running", recordParams: expect.objectContaining({ projectId: "p1" }) }));
+    expect(saveTopicVideoScenes).toHaveBeenCalledWith("o1", "p1", [{ narration: "一句", image_prompt: "海" }]);
   });
 
   it("a project that failed to be made is logged and the video still starts, without a project id", async () => {

@@ -31,6 +31,7 @@ interface PrepareResult {
   title?: string;
   sceneCount?: number;
   script?: string;
+  videoScenes?: { narration: string; image_prompt: string }[];
   rightsSources?: import("@/lib/content/video/asset-origin").RightsSource[];
   formats?: string[];
   visualBreakdown?: { custom: number; broll: number };
@@ -88,6 +89,10 @@ export async function startVideoJob(orgId: string | null, input: VideoStartInput
   }
 
   if (prep.ok && prep.euJobId) {
+    if (orgId && projectId && prep.videoScenes?.length) {
+      const { saveTopicVideoScenes } = await import("./topic-project");
+      await saveTopicVideoScenes(orgId, projectId, prep.videoScenes);
+    }
     await finishJob(job.id, {
       status: "running",
       euJobId: prep.euJobId,

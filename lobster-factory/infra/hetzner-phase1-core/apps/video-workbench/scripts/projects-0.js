@@ -209,7 +209,7 @@ const LEGACY_SOURCE = { manual: "手動", script_forge: "腳本工具", content_
 let legacy = { org: "", items: [] };
 const legacySection = () =>
   legacy.items.length
-    ? `<div class="split" style="margin-top:28px"><h2 style="margin:0">主系統裡的舊專案 <span class="quiet">${legacy.items.length} 個 · 唯讀</span></h2></div><div class="project-grid">${legacy.items.map((p) => `<button class="project-card" data-action="openLegacy" data-id="${esc(p.id)}"><div class="project-cover">▦</div><div class="desc"><strong>${esc(p.title || "（未命名）")}</strong><span class="badge">${esc(LEGACY_SOURCE[p.source] || p.source)}</span><p class="quiet">${esc(new Date(p.updated_at).toLocaleDateString())}</p></div></button>`).join("")}</div>`
+    ? `<div class="split" style="margin-top:28px"><h2 style="margin:0">主系統裡的舊專案 <span class="quiet">${legacy.items.length} 個 · 唯讀</span></h2></div><div class="project-grid">${legacy.items.map((p) => `<article class="project-card"><button class="btn" data-action="openLegacy" data-id="${esc(p.id)}">${esc(p.title || "（未命名）")} · 查看與審片</button><div class="desc"><span class="badge">${esc(LEGACY_SOURCE[p.source] || p.source)}</span><p class="quiet">${esc(new Date(p.updated_at).toLocaleDateString())}</p>${p.source === "content_topic" ? `<button class="btn small" data-action="adoptLegacy" data-id="${esc(p.id)}">接手編輯</button>` : ""}</div></article>`).join("")}</div>`
     : "";
 async function loadLegacyProjects() {
   try {
@@ -1031,6 +1031,9 @@ async function action(a, button) {
       break;
     case "openLegacy":
       VideoWorkbench.navigate("review-release", new URLSearchParams({ organizationId: legacy.org, project: button.dataset.id, section: "qa" }).toString()).catch(VideoWorkbench.reportError);
+      break;
+    case "adoptLegacy":
+      VideoWorkbench.navigate("schedule", new URLSearchParams({ project: button.dataset.id }).toString()).catch(VideoWorkbench.reportError);
       break;
     case "chooseType":
       snapshotCreate();

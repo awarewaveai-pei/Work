@@ -266,6 +266,13 @@
     // names a cast member (shot.character = its key) is bound to it, so the shot's picture uses that one's references.
     if (action === "spine-create") {
       if (!Spine) throw new Error("影音工作台沒有載入專案主線");
+      // U6.5: reopening the same scheduled movie resumes its editable copy. Never starts an automatic run.
+      const sourceProjectId = typeof payload.sourceProjectId === "string" && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(payload.sourceProjectId) ? payload.sourceProjectId : null;
+      if (sourceProjectId) {
+        if (payload.autoRun) throw Error("接手編輯不能啟動自動排程");
+        const old = db.projects.find((p) => p.importedFrom === sourceProjectId);
+        if (old) { const target = { projectId: old.id, episodeId: old.episodes[0].id }; await perform("spine-open", target); return target; }
+      }
       if (payload.autoRun?.runId) {
         const old = db.projects.flatMap((p) => (p.episodes || []).map((e) => ({ p, e }))).find(({ e }) => e.autoRun?.runId === payload.autoRun.runId);
         if (old) { const target = { projectId: old.p.id, episodeId: old.e.id }; await perform("spine-open", target); return target; }
@@ -283,6 +290,7 @@
       }));
       // U3.6: the script handoff starts the same U5 run atomically, before the projects page can observe it.
       const target = { projectId: p.id, episodeId: p.episodes[0].id };
+      if (sourceProjectId) p.importedFrom = sourceProjectId;
       if (payload.autoRun !== undefined) {
         if (payload.autoRun?.until !== "drafts" || !Spine.setAutoRun([p], { ...target, autoRun: payload.autoRun })) throw Error("一鍵到草稿的執行設定無效");
         if (!Spine.setBookends([p], { ...target, intro: payload.intro, outro: payload.outro })) throw Error("片頭／片尾設定無效");

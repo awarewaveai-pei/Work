@@ -14,6 +14,7 @@
       "works",
       "review-release",
       "script-forge",
+      "schedule",
     ];
   // Pages shown in a frame: name -> source. pages/*.html are the workbench's own; /works, /script-forge and
   // /review-release are next-admin's app/video/(wb) pages, same host (nginx sends every non-workbench path there), which
@@ -29,6 +30,7 @@
     works: "/works",
     "review-release": "/review-release",
     "script-forge": "/script-forge",
+    schedule: "/schedule",
   };
   const $ = (id) => document.getElementById(id);
   let active = "generator";
@@ -140,6 +142,7 @@
   VideoWorkbench.loadCapabilities()
     .then(async (caps) => {
       $("worksNav").hidden = $("script-forgeNav").hidden = !caps?.mainSystem;
+      $("scheduleNav").hidden = !caps?.mainSystem;
       if (opening === "projects" && params.get("project") && params.get("episode"))
         await VideoWorkbench.spine.open({ projectId: params.get("project"), episodeId: params.get("episode") });
       else if (names.includes(opening) && !$(opening + "Nav")?.hidden) activate(opening, false, params.toString());

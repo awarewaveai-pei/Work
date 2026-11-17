@@ -341,6 +341,7 @@ export interface VideoPipelinePending {
   title: string;
   sceneCount: number;
   script?: string;
+  videoScenes?: { narration: string; image_prompt: string }[];
   rightsSources?: RightsSource[];
   formats: string[];
   visualBreakdown: { custom: number; broll: number };
@@ -774,6 +775,7 @@ register({
       r2Keys,
       title,
       sceneCount: scenes.length,
+      videoScenes: scenes.map((s) => ({ narration: s.narration, image_prompt: s.image_prompt })),
       rightsSources: rightsSourcesFromOrigins(Object.values(formatAssets).flat(), origins),
       script: scenes.map((s) => s.narration).filter(Boolean).join("\n"),
       formats,

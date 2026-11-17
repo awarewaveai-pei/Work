@@ -4,6 +4,25 @@
  * still drives the video and its embeds. One project per topic, found again by source_ref on a retry.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+
+/** Keep the actual generated scenes after temporary render inputs and the job expire. Old rows stay intact. */
+export async function saveTopicVideoScenes(org: string, project: string, scenes: { narration: string; image_prompt: string }[]): Promise<void> {
+  try {
+    const sb = getSupabaseWriteClient();
+    if (!sb) throw Error("db unavailable");
+    for (let i = 0; i < 3; i++) {
+      const row = await sb.from("media_production_projects").select("brief_json,updated_at").eq("id", project).eq("organization_id", org).eq("source", "content_topic").maybeSingle();
+      if (row.error) throw Error(row.error.message);
+      if (!row.data) return;
+      const saved = await sb.from("media_production_projects").update({ brief_json: { ...row.data.brief_json, videoScenes: scenes }, updated_at: new Date().toISOString() })
+        .eq("id", project).eq("organization_id", org).eq("source", "content_topic").eq("updated_at", row.data.updated_at).select("id");
+      if (saved.error) throw Error(saved.error.message);
+      if (saved.data?.length) return;
+    }
+    throw Error("project changed during scene save");
+  } catch (e) { console.warn("[topic-project] scenes not saved; editing unavailable:", e instanceof Error ? e.message : e); }
+}
 
 type TopicRef = { id: string; organization_id: string; title: string };
 
