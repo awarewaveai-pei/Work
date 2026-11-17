@@ -145,7 +145,7 @@ export const STEPS = [
     ] },
   { n: 9, code: 'U8', title: '片頭模板與時間軸 v1', plain: '例：在剪輯器文字面板選「商品評測打字機」片頭，放上 logo 和配樂，長度調成 8 秒。',
     gate: '五個模板各出一支（假服務）；長度不是 5 秒也能送出。',
-    risk: 'Low', model: 'fullstack-engineer（Sonnet）', status: 'in_progress', depends: [],
+    risk: 'Low', model: 'fullstack-engineer（Sonnet）', status: 'done', commit: 'a38ee5101', depends: [],
     what: 'remotion.cjs 模板表補三個舊模板＋logoUrl、audioUrl、可調長度；文字面板表單跟表產生；剪輯器「匯出時間軸 v1」接 /editor/timeline-v1 → API/timeline/validate',
     files: [`${VW}backend/remotion.cjs`, `${VW}scripts/editor-panes/text.js`, `${VW}backend/api.cjs`, `${API}timeline/validate/`],
     items: [
@@ -153,7 +153,7 @@ export const STEPS = [
       done('U8.2', '剪輯器「匯出時間軸 v1」，送去檢查並列出問題。', 'a878b713a'),
       done('U8.3', '片頭表單從這一集預填標題與副標，保留已填或清空的文字；顯示字數上限，圖片欄位可直接生成並顯示每張 NT$。整合後工作台總閘通過，尚未部署。', '1372ac8d9'),
       done('U8.4', '片頭渲染服務當掉時任務不再消失。原因：編碼程式照整台主機的規格開執行緒，在 1GB 容器裡被系統殺掉，連帶拖垮服務。2026-11-16 已上線：實送一支 6 秒片頭 86 秒完成，記憶體高峰 627MB，服務沒重啟。', '646f1698b'),
-      todo('U8.5', '剪輯器「放到時間軸開頭」後自動加預設轉場；片頭面板顯示這一集目前的片頭設定。'),
+      done('U8.5', '片頭表單讀本集已存模板、文字、圖片與長度；放到時間軸後同步平移主片與旁白、套用預設轉場並寫回本集。同參數重用片頭，阻擋重複插入。gate 與實際表單／插入函式測試通過；未部署，Claude 審查額度限制仍在。', 'a38ee5101'),
     ] },
   { n: 10, code: 'U9', title: '一本聖經', plain: '例：在製作聖經按「存成核准版本」，到腳本頁的 Story Bible 清單就看得到同一版。',
     gate: '存成核准版後腳本頁看得到；套用後再存，兩邊不認得的欄位沒有掉。',
