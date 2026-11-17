@@ -10,6 +10,8 @@
 - `node tests/u6-next-action.cjs`：五種狀態、未知、只有核准但沒草稿，全部正確。
 - `node tests/u6-next-ui.cjs`：本機 Edge Playwright 真實載入工作台；一集頁、成片卡、完成通知同步從審片→發布→完成；主系統 503 後都不顯示下一步，沒有 POST 付費任務、沒有頁面例外。
 - `node tests/gate.cjs` 全過；`npx tsc --noEmit` 通過。
+- 整合 gate 再次全過；批 2 NA `npm test`：564 個檔案通過、19 skipped；4,762 案通過、60 skipped、2 todo（30.02 秒，僅程序 PATH 前置 Git Bash）。
+- 畫面用字與堆疊收尾（1f66f2cf2）後，整合 gate 全過，NA 全套同為 4,762 pass（29.72 秒）；另見 u6-4-ui-verification.md。
 - NA 受影響測試：draft-outcome 2、social-drafts 4、embed-in-post 12、embed-to-wp 4、embed-poster 6、review-release 原 4＋新 QA checksum 1，共 33 案通過。
 - 擁有權突變：僅記憶體移除 draft-outcome 的 primary organization_id 篩選，跨組織案例變紅（1 fail／1 pass）；原檔 2 pass。沒有移除正式守衛。
 - `git diff --check` 通過；自審對照下一步、步驟徽章、QA checksum、草稿來源、刪除狀態與回執 checksum、通知／跨 frame 更新、只開確認框的 intent 路徑。
