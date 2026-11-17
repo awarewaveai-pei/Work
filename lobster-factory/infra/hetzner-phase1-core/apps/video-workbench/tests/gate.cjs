@@ -47,6 +47,7 @@ const tests = [
   "u8-title-form",
   "u8-bookends",
   "u4-scene-image",
+  "u4-visual-styles",
   "u9-bible",
 ];
 const checks = [

@@ -13,21 +13,12 @@ const esc = (v) =>
         "'": "&#39;",
       })[k],
   );
-const STYLE_NAMES = [
-  "日系電影感",
-  "賽博霓虹",
-  "清透紀實",
-  "復古膠片",
-  "卡通動漫",
-  "黑白電影",
-  "黃金時刻",
-  "夢幻粉彩",
-  "自訂",
-];
-const JAPANESE_PROMPT =
-  "暖色調 · 低對比 · Kodak Portra · 35mm · 淺景深 · 細膩顆粒 · 柔和逆光 · 溫馨 · 生活感";
-// Our own example pictures (examples/styles.json, public): display only, never sent as a generation reference.
-const stylePicture = (i) => "/examples/style-proj-" + (i + 1) + ".webp";
+const Styles = window.VideoWorkbenchStyles;
+const JAPANESE_PROMPT = Styles.prompt("legacy-0");
+const stylePicture = (id) => { const i = Styles.get(id)?.legacyIndex; return i >= 0 && i < 8 ? "/examples/style-proj-" + (i + 1) + ".webp" : ""; };
+function styleChoices(current, action) {
+  return [...new Set(Styles.rows().map(s => s.group))].map(group => `<section><h3>${esc(group)}</h3><div class="styles-grid">${Styles.rows().filter(s => s.group === group).map(s => `<button class="style-tile ${Styles.get(current)?.id === s.id ? "on" : ""}" data-action="${action}" data-value="${esc(s.id)}" aria-pressed="${Styles.get(current)?.id === s.id}">${stylePicture(s.id) ? `<img src="${stylePicture(s.id)}" alt="${esc(s.zh)}">` : ""}<span>${esc(s.zh)}</span></button>`).join("")}</div></section>`).join("");
+}
 const STORE = "awarewave-projects-screenshot-frontend-v1";
 // Shot size chips (buttons, no dropdown) and the phrase each adds to the shot prompt.
 const SHOT_SIZES = {
@@ -136,6 +127,9 @@ function loadState() {
         ...state,
         ...s,
       };
+    let migrated = false;
+    for (const p of state.projects) if (Styles.migrate(p)) migrated = true;
+    if (migrated) VideoWorkbench.storage.setItem(STORE, JSON.stringify(state));
   } catch {}
 }
 loadState();
@@ -198,7 +192,7 @@ function render() {
 function renderHome() {
   const count = state.projects.length;
   $("home").innerHTML = VideoWorkbench.sanitize(
-    `<div class="eyebrow">專案 · PROJECTS</div><h1>在同一個世界觀裡，一次又一次開拍。</h1><p class="sub">把角色、場景與道具定義成可複用的元件，套用鎖定的視覺風格 —— 讓長片與系列作品的每一個鏡頭都保持一致。</p>${!count ? `<div class="project-empty"><div class="bigicon">⊞</div><h2>還沒有專案</h2><p>建立第一個專案，開始打造你的世界觀。</p><button class="btn primary" data-action="create">＋　建立新專案</button></div>` : `<div class="split"><h2 style="margin:0">我的專案 <span class="quiet">${count} 個</span></h2><button class="btn primary" data-action="create">＋　建立新專案</button></div><div class="project-grid">${state.projects.map((p) => `<button class="project-card" data-action="openProject" data-id="${esc(p.id)}"><div class="project-cover">${p.cover ? `<img src="${esc(p.cover)}" alt="專案封面" style="width:100%;height:100%;object-fit:cover">` : "▦"}</div><div class="desc"><strong>${esc(p.title)}</strong><span class="badge">${esc(fmtType(p.type))}</span> <span class="badge">${esc(p.ratio)}</span><p class="quiet">${p.episodes.length} 集 · ${esc(STYLE_NAMES[p.style])}</p></div></button>`).join("")}</div>`}${legacySection()}`,
+    `<div class="eyebrow">專案 · PROJECTS</div><h1>在同一個世界觀裡，一次又一次開拍。</h1><p class="sub">把角色、場景與道具定義成可複用的元件，套用鎖定的視覺風格 —— 讓長片與系列作品的每一個鏡頭都保持一致。</p>${!count ? `<div class="project-empty"><div class="bigicon">⊞</div><h2>還沒有專案</h2><p>建立第一個專案，開始打造你的世界觀。</p><button class="btn primary" data-action="create">＋　建立新專案</button></div>` : `<div class="split"><h2 style="margin:0">我的專案 <span class="quiet">${count} 個</span></h2><button class="btn primary" data-action="create">＋　建立新專案</button></div><div class="project-grid">${state.projects.map((p) => `<button class="project-card" data-action="openProject" data-id="${esc(p.id)}"><div class="project-cover">${p.cover ? `<img src="${esc(p.cover)}" alt="專案封面" style="width:100%;height:100%;object-fit:cover">` : "▦"}</div><div class="desc"><strong>${esc(p.title)}</strong><span class="badge">${esc(fmtType(p.type))}</span> <span class="badge">${esc(p.ratio)}</span><p class="quiet">${p.episodes.length} 集 · ${esc(Styles.name(p.styleId ?? p.style))}</p></div></button>`).join("")}</div>`}${legacySection()}`,
   );
 }
 // Plan U6 (§1.6, one project list): the main system's projects the workbench did not make (source other than
@@ -230,7 +224,7 @@ function renderWorkbench() {
   const total = e.shots.length;
   const menu = `<div class="row"><button class="btn small outline" data-action="preview">◉　預覽整集</button><button class="btn small outline" data-action="export">↓　匯出片段 · 0</button><button class="btn small outline" data-action="cover">▧　更換封面</button><button class="btn small outline" data-action="settings">☷　生成設定</button></div>`;
   $("workbench").innerHTML = VideoWorkbench.sanitize(
-    `<div class="work-nav"><button class="btn small outline" data-action="backHome">←　專案列表</button><span class="eyebrow" style="color:var(--text-muted)">AWAREWAVE · 專案</span><span class="quiet">本機專案 · AI 依 API 用量計費</span></div><div class="work-grid"><aside class="bible"><div class="eyebrow">— 製作聖經 · BIBLE</div><h2>${esc(p.title)}</h2><div class="quiet">${esc(p.type === "series" ? "短影集" : "單支影片")} · ${p.episodes.length} 集 · ${esc(p.ratio)}</div><div class="fixed">♙　卡司、場景與風格定義一次，在所有鏡頭間保持一致。</div>${["character", "scene", "prop"].map((k) => entityList(k, p)).join("")}<div class="entity-group"><div class="entity-header">◉　風格錨點</div><div class="style-record"><h3>${esc(STYLE_NAMES[p.style])}</h3><div class="muted">${esc(styleText(p))}</div></div></div><button class="btn" style="width:100%;margin-top:20px" data-action="settings">☷　生成設定　⌃</button><p class="tiny">風格與負面提示詞的專案／本集兩層設定，會合成後用於實際內容。</p></aside><main class="work-content"><div class="work-top"><div><div class="quiet">專案　›　${esc(p.title)}</div><h1>第 ${state.episode + 1} 集 · ${esc(state.episode === 0 ? p.title : e.name)}</h1><div class="tiny">${total} 個鏡頭 · 約 ${e.shots.reduce((v, s) => v + Number(s.seconds || 5), 0)} 秒 · ${esc(p.ratio)} · ${e.shots.filter((s) => s.image).length}/${total} 已生成</div></div><div class="work-actions"><button class="btn primary" data-action="storyboard">✧　AI 分鏡</button><button class="btn" data-paid="video.image" data-action="batch">▤　批次生成</button><button class="btn" data-action="oneClick">✦　一鍵成片</button><button class="btn" data-action="fullVideo">✧　帶入影片生成</button><div style="position:relative"><button class="btn" data-action="toggleMore">⋯　更多</button><div class="panel" id="more-menu" hidden style="position:absolute;right:0;top:43px;z-index:4;width:205px;padding:7px">${menu}</div></div></div></div>${autoRunBanner(e)}${episodeSteps(e)}<div class="outline-box"><label>□ 本集大綱</label><textarea data-bind="episode.outline" placeholder="用幾句話寫下這一集的故事：誰、在哪裡、發生什麼、怎麼收尾">${esc(e.outline)}</textarea><div class="tiny">AI 分鏡會從這裡開始。改了大綱之後可以重新分鏡。</div></div><div class="episode-tabs">${p.episodes.map((x, i) => `<button class="${i === state.episode ? "on" : ""}" data-action="episode" data-index="${i}">EP${i + 1}　${esc(x.name)} ${x.shots.length}</button>`).join("")}<button data-action="addEpisode" aria-label="新增一集">＋</button></div>${total ? `<div class="split" style="margin-bottom:16px"><strong>本集鏡頭 <span class="quiet">${total} 個</span></strong><button class="btn small primary" data-action="addShot">＋　新增鏡頭</button></div><div class="shot-grid">${e.shots.map((s, i) => `<div class="shot"><div class="split"><h3>鏡頭 ${String(i + 1).padStart(2, "0")}</h3><button class="btn small danger" data-action="deleteShot" data-index="${i}" title="刪除鏡頭">×</button></div>${shotMedia(s)}<label>畫面描述</label><textarea data-bind="shot.${i}.text" placeholder="描述鏡頭內的動作與構圖">${esc(s.text)}</textarea><label>旁白</label><textarea data-bind="shot.${i}.line" placeholder="這一鏡要念的一句話（配音和字幕照它做）">${esc(s.line || "")}</textarea>${shotControls(p, s, i)}${imageModelRow(p, s, i)}<div class="row"><label style="margin:0">時長 <input aria-label="鏡頭時長" style="width:70px;padding:6px" type="number" min="1" max="120" data-bind="shot.${i}.seconds" value="${esc(s.seconds)}"></label><span class="tiny">秒</span><button class="btn small" data-paid="video.image"${sceneModel(p, s) ? ` data-paid-model="scene:${esc(sceneModel(p, s).id)}"` : ""} data-action="shotGenerate" data-index="${i}">生成畫面</button>${s.image ? `<button class="btn small outline" data-action="fixShot" data-index="${i}">修這張</button>` : ""}</div>${shotSources(p, s, i)}</div>`).join("")}</div>` : `<div class="work-empty panel"><h3>這一集還沒有鏡頭，從這裡開始</h3><div class="step"><span class="circle">1</span><div><strong>先建立角色與場景</strong><p>每個角色、場景、道具都可以上傳參考圖。鏡頭鎖定它們之後，長相與環境才會每一鏡都一致。</p><button class="btn small outline" data-action="asset" data-kind="character">♧　建立角色</button></div></div><div class="step"><span class="circle">2</span><div><strong>寫下大綱，讓 AI 分鏡</strong><p>AI 導演會先問幾個問題，再把故事拆成一顆一顆鏡頭，你可以逐鏡修改後再建立。</p><button class="btn small outline" data-action="storyboard">✧　AI 分鏡</button></div></div><div class="step"><span class="circle">3</span><div><strong>或者自己加一顆鏡頭</strong><p>想手動控制每一鏡的細節與鏡頭，就直接開始寫。</p><button class="btn small outline" data-action="addShot">＋　新增鏡頭</button></div></div></div>`}</main></div>`,
+    `<div class="work-nav"><button class="btn small outline" data-action="backHome">←　專案列表</button><span class="eyebrow" style="color:var(--text-muted)">AWAREWAVE · 專案</span><span class="quiet">本機專案 · AI 依 API 用量計費</span></div><div class="work-grid"><aside class="bible"><div class="eyebrow">— 製作聖經 · BIBLE</div><h2>${esc(p.title)}</h2><div class="quiet">${esc(p.type === "series" ? "短影集" : "單支影片")} · ${p.episodes.length} 集 · ${esc(p.ratio)}</div><div class="fixed">♙　卡司、場景與風格定義一次，在所有鏡頭間保持一致。</div>${["character", "scene", "prop"].map((k) => entityList(k, p)).join("")}<div class="entity-group"><div class="entity-header">◉　風格錨點</div><div class="style-record"><h3>${esc(Styles.name(p.styleId ?? p.style))}</h3><div class="muted">${esc(styleText(p))}</div></div></div><button class="btn" style="width:100%;margin-top:20px" data-action="settings">☷　生成設定　⌃</button><p class="tiny">風格與負面提示詞的專案／本集兩層設定，會合成後用於實際內容。</p></aside><main class="work-content"><div class="work-top"><div><div class="quiet">專案　›　${esc(p.title)}</div><h1>第 ${state.episode + 1} 集 · ${esc(state.episode === 0 ? p.title : e.name)}</h1><div class="tiny">${total} 個鏡頭 · 約 ${e.shots.reduce((v, s) => v + Number(s.seconds || 5), 0)} 秒 · ${esc(p.ratio)} · ${e.shots.filter((s) => s.image).length}/${total} 已生成</div></div><div class="work-actions"><button class="btn primary" data-action="storyboard">✧　AI 分鏡</button><button class="btn" data-paid="video.image" data-action="batch">▤　批次生成</button><button class="btn" data-action="oneClick">✦　一鍵成片</button><button class="btn" data-action="fullVideo">✧　帶入影片生成</button><div style="position:relative"><button class="btn" data-action="toggleMore">⋯　更多</button><div class="panel" id="more-menu" hidden style="position:absolute;right:0;top:43px;z-index:4;width:205px;padding:7px">${menu}</div></div></div></div>${autoRunBanner(e)}${episodeSteps(e)}<div class="outline-box"><label>□ 本集大綱</label><textarea data-bind="episode.outline" placeholder="用幾句話寫下這一集的故事：誰、在哪裡、發生什麼、怎麼收尾">${esc(e.outline)}</textarea><div class="tiny">AI 分鏡會從這裡開始。改了大綱之後可以重新分鏡。</div></div><div class="episode-tabs">${p.episodes.map((x, i) => `<button class="${i === state.episode ? "on" : ""}" data-action="episode" data-index="${i}">EP${i + 1}　${esc(x.name)} ${x.shots.length}</button>`).join("")}<button data-action="addEpisode" aria-label="新增一集">＋</button></div>${total ? `<div class="split" style="margin-bottom:16px"><strong>本集鏡頭 <span class="quiet">${total} 個</span></strong><button class="btn small primary" data-action="addShot">＋　新增鏡頭</button></div><div class="shot-grid">${e.shots.map((s, i) => `<div class="shot"><div class="split"><h3>鏡頭 ${String(i + 1).padStart(2, "0")}</h3><button class="btn small danger" data-action="deleteShot" data-index="${i}" title="刪除鏡頭">×</button></div>${shotMedia(s)}<label>畫面描述</label><textarea data-bind="shot.${i}.text" placeholder="描述鏡頭內的動作與構圖">${esc(s.text)}</textarea><label>旁白</label><textarea data-bind="shot.${i}.line" placeholder="這一鏡要念的一句話（配音和字幕照它做）">${esc(s.line || "")}</textarea>${shotControls(p, s, i)}${imageModelRow(p, s, i)}<div class="row"><label style="margin:0">時長 <input aria-label="鏡頭時長" style="width:70px;padding:6px" type="number" min="1" max="120" data-bind="shot.${i}.seconds" value="${esc(s.seconds)}"></label><span class="tiny">秒</span><button class="btn small" data-paid="video.image"${sceneModel(p, s) ? ` data-paid-model="scene:${esc(sceneModel(p, s).id)}"` : ""} data-action="shotGenerate" data-index="${i}">生成畫面</button>${s.image ? `<button class="btn small outline" data-action="fixShot" data-index="${i}">修這張</button>` : ""}</div>${shotSources(p, s, i)}</div>`).join("")}</div>` : `<div class="work-empty panel"><h3>這一集還沒有鏡頭，從這裡開始</h3><div class="step"><span class="circle">1</span><div><strong>先建立角色與場景</strong><p>每個角色、場景、道具都可以上傳參考圖。鏡頭鎖定它們之後，長相與環境才會每一鏡都一致。</p><button class="btn small outline" data-action="asset" data-kind="character">♧　建立角色</button></div></div><div class="step"><span class="circle">2</span><div><strong>寫下大綱，讓 AI 分鏡</strong><p>AI 導演會先問幾個問題，再把故事拆成一顆一顆鏡頭，你可以逐鏡修改後再建立。</p><button class="btn small outline" data-action="storyboard">✧　AI 分鏡</button></div></div><div class="step"><span class="circle">3</span><div><strong>或者自己加一顆鏡頭</strong><p>想手動控制每一鏡的細節與鏡頭，就直接開始寫。</p><button class="btn small outline" data-action="addShot">＋　新增鏡頭</button></div></div></div>`}</main></div>`,
   );
   wireReviewLinks();
   ProjectBible.mount(p, e); // card U9: the approved-version block and step 3's check results (scripts/projects-bible.js)
@@ -395,7 +389,7 @@ function entityList(kind, p) {
 function styleText(p) {
   return (
     p.customStyle?.trim() ||
-    (p.style === 0 ? JAPANESE_PROMPT : STYLE_NAMES[p.style])
+    Styles.prompt(p.styleId ?? p.style)
   );
 }
 function showDialog(type, more = {}) {
@@ -440,7 +434,7 @@ function renderCreatePage() {
       )
       .join(
         "",
-      )}</div></section><section class="create-section"><h2>風格錨點</h2><p class="hint">選一個整個專案都能沿用的視覺方向。之後仍可在製作聖經裡調整。</p><div class="create-styles">${STYLE_NAMES.map((v, i) => `<button class="create-style ${d.style === i ? "on" : ""} ${i === 8 ? "custom" : ""}" data-action="chooseStyle" data-index="${i}">${i < 8 && stylePicture(i) ? `<img src="${stylePicture(i)}" alt="${esc(v)}">` : i < 8 ? "" : "＋"}<span>${esc(v)}</span></button>`).join("")}</div><label>風格提示</label><textarea id="style-hint" rows="3" placeholder="補充色彩、光線、材質或時代感">${esc(d.styleText || "")}</textarea></section></div><aside class="create-summary"><section class="create-section"><h2>專案預覽</h2><div class="summary-icon">✦</div><dl><dt>名稱</dt><dd>${esc(d.name || "尚未命名")}</dd><dt>類型</dt><dd>${d.type === "series" ? "系列 / 短影集" : "單支影片"}</dd><dt>比例</dt><dd>${esc(d.ratio)}</dd><dt>風格</dt><dd>${esc(STYLE_NAMES[d.style] || "自訂")}</dd></dl></section></aside></div><div class="create-actions"><button class="btn outline" data-action="close">取消</button><button class="btn primary" data-action="saveProject">＋　建立專案</button></div></div>`,
+      )}</div></section><section class="create-section"><h2>風格錨點</h2><p class="hint">選一個整個專案都能沿用的視覺方向。之後仍可在製作聖經裡調整。</p><div class="style-catalog">${styleChoices(d.style, "chooseStyle")}</div><label>風格提示</label><textarea id="style-hint" rows="3" placeholder="補充色彩、光線、材質或時代感">${esc(d.styleText || "")}</textarea></section></div><aside class="create-summary"><section class="create-section"><h2>專案預覽</h2><div class="summary-icon">✦</div><dl><dt>名稱</dt><dd>${esc(d.name || "尚未命名")}</dd><dt>類型</dt><dd>${d.type === "series" ? "系列 / 短影集" : "單支影片"}</dd><dt>比例</dt><dd>${esc(d.ratio)}</dd><dt>風格</dt><dd>${esc(Styles.name(d.style) || "自訂")}</dd></dl></section></aside></div><div class="create-actions"><button class="btn outline" data-action="close">取消</button><button class="btn primary" data-action="saveProject">＋　建立專案</button></div></div>`,
   );
 }
 function renderDialog() {
@@ -504,7 +498,7 @@ function renderDialog() {
   } else if (dialog.type === "editStyle") {
     html = modal(
       "編輯風格",
-      `<label>風格錨點</label><div class="styles-grid">${STYLE_NAMES.map((name, i) => `<button class="style-tile ${p.style === i ? "on" : ""} ${i === 8 ? "custom" : ""}" data-action="setProjectStyle" data-index="${i}">${i < 8 && stylePicture(i) ? `<img src="${stylePicture(i)}" alt="${esc(name)}">` : i < 8 ? "" : "＋"}<span>${esc(name)}</span></button>`).join("")}</div><label>風格提示</label><textarea id="project-style-input">${esc(p.customStyle || styleText(p))}</textarea>`,
+      `<label>風格錨點</label><div class="style-catalog">${styleChoices(p.styleId ?? p.style, "setProjectStyle")}</div><label>風格提示</label><textarea id="project-style-input">${esc(p.customStyle || styleText(p))}</textarea>`,
       btnCancel +
         '<button class="btn primary" data-action="saveProjectStyle">儲存</button>',
       "mid",
@@ -653,7 +647,7 @@ function newProject() {
     name: "",
     type: "series",
     ratio: "16:9",
-    style: 0,
+    style: "legacy-0",
     styleText: JAPANESE_PROMPT,
   };
   showDialog("create");
@@ -671,7 +665,8 @@ function createProject() {
     title,
     type: modalDraft.type,
     ratio: modalDraft.ratio,
-    style: modalDraft.style,
+    style: Styles.get(modalDraft.style)?.legacyIndex ?? 8,
+    styleId: modalDraft.style,
     customStyle: modalDraft.styleText,
     createdAt: Date.now(),
     cover: "",
@@ -1047,9 +1042,8 @@ async function action(a, button) {
       break;
     case "chooseStyle":
       snapshotCreate();
-      modalDraft.style = index;
-      modalDraft.styleText =
-        index === 0 ? JAPANESE_PROMPT : index === 8 ? "" : STYLE_NAMES[index];
+      modalDraft.style = button.dataset.value;
+      modalDraft.styleText = Styles.prompt(modalDraft.style);
       renderDialog();
       break;
     case "saveProject":
@@ -1288,8 +1282,8 @@ async function action(a, button) {
       showDialog("editStyle");
       break;
     case "setProjectStyle":
-      p.customStyle = $("project-style-input")?.value || p.customStyle;
-      p.style = index;
+      Styles.select(p, button.dataset.value);
+      p.customStyle = Styles.prompt(p.styleId ?? p.style);
       save();
       renderDialog();
       break;

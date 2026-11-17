@@ -179,7 +179,7 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 | 參考圖壓縮 | `downscaleImageFile()` | 上傳圖縮到 1024px JPEG，避免 request body 超過 10MB |
 | 角色 / 主角描述 | `subjectText` | 可指定人物、動物、物件或角色；若上傳真人/角色照可留空，讓模型照圖 |
 | 風格 chip catalog | `STYLE_CATALOG` / `STYLE_PRESETS` | 103 個風格 chip；中文顯示、英文 prompt 進模型 |
-| 風格分類 | `tarotStyles.ts` | 西方畫家 29、亞洲畫家 26、媒材 16、風格 32 |
+| 風格分類 | `public/editor-shared/art-styles.js`（`tarotStyles.ts` 相容匯出） | 西方畫家 29、亞洲畫家 26、媒材 16、風格 32 |
 | 英文 prompt 解析 | `resolveStylePrompt()` | zh label → 英文 prompt；畫家類會 lead with `In the style of <name>.` |
 | Prompt 組裝 | `buildCardPrompt()` | 順序 hero+pose（＋動物直立句）→ style（capped 1200 chars）→ RWS faithful scene → grounding → style recap；pose 放最前，避免換主角後動作被長 style 擠掉 |
 | AI prompt 建議 | `/api/tools/tarot/suggest-prompt` | brief → 英文 art-direction prompt；使用者可手動覆寫最終英文 |
@@ -188,7 +188,7 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 | 預覽與圖庫 | `generatePreview()`, `saveToGallery()` | 預覽圖寫入 My Designs / R2 gallery，不阻塞 UI |
 | Tarot 專用批次延伸 | Step 2 / background batch | Tarot 專用：鎖定後可分組生成或 Trigger.dev 背景批次整副牌；一般 POD / Studio 不需要 78 張批次 |
 
-風格 catalog 正本是 `app/tools/tarot/tarotStyles.ts`。`cards.ts` 只負責把風格轉成生圖 prompt 並保留 Tarot/RWS 的牌面場景；風格 prompt 不應描述「畫什麼」，只描述「怎麼畫」。
+風格 catalog 正本是 `public/editor-shared/art-styles.js`；`app/(shell)/tools/tarot/tarotStyles.ts` 保留相容匯出。影片的 `public/editor-shared/video-styles.js` 合併該 103 項、3 個影片 preset 與工作台原有 9 項，工作台從 capabilities 讀同一份。`cards.ts` 只負責把風格轉成生圖 prompt 並保留 Tarot/RWS 的牌面場景；風格 prompt 不應描述「畫什麼」，只描述「怎麼畫」。
 
 ### 影像處理 / 設計工具積木
 

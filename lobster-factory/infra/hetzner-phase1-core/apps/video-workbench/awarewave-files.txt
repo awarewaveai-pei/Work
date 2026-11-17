@@ -14,4 +14,6 @@ lib/ai/cost-model.ts
 lib/ai/replicate-output.ts
 lib/ai/to-traditional.ts
 public/editor-shared/image-models.js
+public/editor-shared/video-styles.js
+public/editor-shared/art-styles.js
 lib/ai/video-motion-models.ts

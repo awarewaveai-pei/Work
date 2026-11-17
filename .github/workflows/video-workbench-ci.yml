@@ -24,6 +24,8 @@ on:
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/to-traditional.ts'
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/video-motion-models.ts'
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/image-models.js'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/video-styles.js'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/art-styles.js'
       - '.github/workflows/video-workbench-ci.yml'
   pull_request:
     branches:
@@ -43,6 +45,8 @@ on:
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/to-traditional.ts'
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/video-motion-models.ts'
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/image-models.js'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/video-styles.js'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/art-styles.js'
       - '.github/workflows/video-workbench-ci.yml'
   workflow_dispatch:
 

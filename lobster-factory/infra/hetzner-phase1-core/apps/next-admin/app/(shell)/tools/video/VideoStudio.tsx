@@ -6,8 +6,7 @@ import { IMAGE_RATES, DEFAULT_IMAGE_MODEL, VIDEO_MOTION_RATES } from "@/lib/ai/c
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { VIDEO_SCENE_MODELS } from "@/public/editor-shared/image-models.js";
 import type { VideoHistoryItem } from "@/app/api/video/history/route";
-import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
-import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
+import { VIDEO_STYLE_CATALOG, VIDEO_STYLE_GROUPS, resolveVideoStyle } from "@/public/editor-shared/video-styles.js";
 import { tabStyle, chipStyle } from "@/components/tools/panel-primitives";
 import TimelineValidationPanel from "./TimelineValidationPanel";
 import FootageEditor from "./FootageEditor";
@@ -17,17 +16,6 @@ import MediaOperationsPanel from "./MediaOperationsPanel";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import type { ProductionInput, RemotionInput } from "./video-handoff";
 
-// 影片專屬攝影風格 preset（放最前 = 預設組）。值為英文 prompt，直接送 Flux。
-const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
-  { zh: "電影感", group: "影片風格", prompt: "Cinematic wide-angle 16:9, dramatic lighting, rich color grade" },
-  { zh: "紀錄片", group: "影片風格", prompt: "Documentary photography, natural light, authentic moment" },
-  { zh: "商業攝影", group: "影片風格", prompt: "Clean commercial photography, studio lighting, professional" },
-];
-const VIDEO_PRESET_BY_LABEL = new Map(VIDEO_STYLE_PRESETS.map((p) => [p.zh, p.prompt]));
-// 影片 preset + tarot/studio 103 風格合併（preset 在前 → 預設組）。
-const VIDEO_STYLE_CATALOG = [...VIDEO_STYLE_PRESETS, ...STYLE_CATALOG];
-const VIDEO_STYLE_GROUPS = Array.from(new Set(VIDEO_STYLE_CATALOG.map((s) => s.group)));
-
 // 生圖模型廠商分組（外層 tab → 內層 chip 兩層選擇器）：單一來源 image-models.js VIDEO_SCENE_MODELS（工作台鏡頭卡同一份）。
 const IMAGE_VENDOR_GROUPS: Readonly<Record<string, readonly string[]>> = VIDEO_SCENE_MODELS;
 function vendorForModel(model: string): string {
@@ -35,11 +23,6 @@ function vendorForModel(model: string): string {
     if (ids.includes(model)) return v;
   }
   return "FLUX";
-}
-
-// preset 直接回英文 prompt；其餘走 tarot resolveStylePrompt（zh label → 英文）。
-function resolveVideoStyle(label: string): string {
-  return VIDEO_PRESET_BY_LABEL.get(label) ?? resolveStylePrompt(label);
 }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
