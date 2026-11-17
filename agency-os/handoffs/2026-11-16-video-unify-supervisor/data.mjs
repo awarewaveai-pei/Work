@@ -110,7 +110,7 @@ export const STEPS = [
     ] },
   { n: 6, code: 'U5', title: '快速輸出、多比例、一鍵成片', plain: '例：在一集按「一鍵成片」，看到總價 NT$ 後確認；缺的圖自動補齊，接著出 16:9 和 9:16 兩支成片。',
     gate: '別組織的素材被拒（拿掉組織條件，測試會紅）；快速輸出完成後成片區多一支、歷史紀錄有任務、主系統只有一列；選兩個比例出兩個任務；一鍵成片中途重開頁面會接著做，已有圖的鏡頭不重生。',
-    risk: 'High', model: 'commit 1：Opus 5.5＋critic Deep；commit 2、3：Opus 5.5', status: 'in_progress', depends: ['U0', 'U4'],
+    risk: 'High', model: 'commit 1：Opus 5.5＋critic Deep；commit 2、3：Opus 5.5', status: 'done', commit: 'ec63ae734', depends: ['U0', 'U4'],
     what: '內部路由 quick-render（Bearer VW_INTERNAL_TOKEN，只收資產 id）＋render-draft 送渲染段抽成 L/ 函式；VW/backend/quick-render.cjs 照 remotion.cjs 的供應商寫法；第 9 步兩種輸出、比例複選；episode.autoRun 一鍵成片',
     files: [`${NA}app/api/internal/video/workbench/quick-render/`, `${API}render-draft/route.ts`, L, `${VW}backend/quick-render.cjs`, `${VW}scripts/editor-export-dialog.js`, `${VW}scripts/projects-0.js`],
     items: [
@@ -118,7 +118,7 @@ export const STEPS = [
       done('U5.2', 'commit 2：第 9 步分成「快速輸出」「剪輯輸出」；比例可以複選，每個比例一個任務；確認框列出成本明細（NT$）。', 'dab070ccd'),
       done('U5.3', '一鍵補圖到成片或社群草稿，含片頭片尾、多比例與網站草稿選項；每鏡按實選模型報價，文案呼叫前守上限，重開及併發重送不重複，等真正完成才標完成。gate、型別與主系統全套 4758 案通過；未部署，Claude 額度不足的審查限制見 u5-verification.md。', '43ecdcaf4'),
       done('U5.4', '快速與剪輯輸出共用本集片頭片尾，模板重用、失敗停下可重試，新版保留舊版；剪輯輸出副本保留旁白對齊。Linux 實渲染 7 案、跨組織素材守衛突變通過；部署步驟備妥，正式驗收仍待當下同意。', '43ecdcaf4'),
-      todo('U5.5', '成片卡「片頭」：編輯、重新生成、加入這支影片。換片頭不重生鏡頭，出新版本，舊版保留。成片卡另加「複製連結」。'),
+      done('U5.5', '成片卡與一集頁顯示本集片頭，能編輯、自動渲染、重新生成及加入影片；重用已配音主片、同步字幕時間，新版保留舊版，另可複製連結。gate、型別、15 案與 Linux 真渲染 9 案通過；未部署，Claude 審查額度限制及舊片重接限制見驗證檔。', 'ec63ae734'),
     ] },
   { n: 7, code: 'U6', title: '審片與發布併進成片', plain: '例：成片卡按「審片」勾完四項檢查，接著在「發布」寫 IG 與 FB 各一版文案，存成社群草稿。',
     gate: '勾兩個不同平台會存成兩份各自的文案草稿；從一集打開只列這一集的成片；一筆舊專案在專案頁看得到、成片能播、能核准。',
