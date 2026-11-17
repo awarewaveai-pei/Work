@@ -122,7 +122,7 @@ export const STEPS = [
     ] },
   { n: 7, code: 'U6', title: '審片與發布併進成片', plain: '例：成片卡按「審片」勾完四項檢查，接著在「發布」寫 IG 與 FB 各一版文案，存成社群草稿。',
     gate: '勾兩個不同平台會存成兩份各自的文案草稿；從一集打開只列這一集的成片；一筆舊專案在專案頁看得到、成片能播、能核准。',
-    risk: 'Medium', model: 'fullstack-engineer（Sonnet）', status: 'in_progress', depends: ['U2', 'U0'],
+    risk: 'Medium', model: 'fullstack-engineer（Sonnet）', status: 'done', commit: '1bf6bbb65', depends: ['U2', 'U0'],
     what: 'WB/review-release/page.tsx（QaStep＋ReleaseDeliveryPanel，鎖定組織）；(door)/release 導回殼；jobs-view「送審與投遞」改開殼內面板；步驟列第 11 步審片、第 12 步發布，狀態每次讀鏈；成片卡「發布到哪」；舊專案唯讀卡',
     files: [`${WB}review-release/page.tsx`, `${V}QaStep.tsx`, `${V}ReleaseDeliveryPanel.tsx`, `${NA}app/video/(door)/release/`, `${VW}shared/jobs-view.js`, `${VW}scripts/projects-0.js`, `${VW}shared/episode-spine.js`],
     items: [
@@ -130,7 +130,7 @@ export const STEPS = [
       done('U6.2', '步驟列第 11 步「審片」、第 12 步「發布」，打勾與否每次讀真實結果。', '58050a441'),
       done('U6.3', '成片卡顯示「發布到哪」與成效；舊專案以唯讀卡列在專案頁。成片清單只列最新 200 支（舊發布頁本來就這樣）。', '58050a441'),
       done('U6.4', '一集頁、成片卡與完成通知共用下一步；以真實草稿與嵌入回執判斷完成，未知不猜，付費前仍開確認框。四項審片過才亮繼續到發布；任務改繁中狀態，剪輯文字不透出面板，移除舊編號與技術用字。整合 gate、Playwright、擁有權突變、型別與全套 4762 案通過；未部署，Claude 審查額度限制仍在。主功能 57daf343b、畫面收尾如下。', '1f66f2cf2'),
-      todo('U6.5', '全自動（給任務 → 找話題 → 生成 → 發布）沿用內容工具已有的話題排程；工作台側欄加「自動排程」看狀態，排程出的片可以「接手編輯」。'),
+      done('U6.5', '側欄「自動排程」顯示同品牌話題佇列與停下原因，連回內容設定；排程專案卡可接手成一集，重送開回同一集、不啟動自動工作。後續影片保留逐場景描述；無場景資料的舊片保留查看與審片，明示不能還原。型別、14 案、Edge、擁有權突變與整合總閘通過；未部署，Claude 額度限制見驗證檔。', '1bf6bbb65'),
       done('U6.6', '專案頁的舊專案卡現在會列出「選題」建的專案（原本 3 個被漏掉）。由主系統直接排除工作台自己的專案，清單上限不會被擠掉。2026-11-16 已上線。', '688d397a5'),
     ] },
   { n: 8, code: 'U7', title: '字幕與音檔', plain: '例：把客戶設成「音檔不可外送」後，按 OpenAI 轉錄會被擋下；改按「改用自家主機（免費）重試」就能轉。',

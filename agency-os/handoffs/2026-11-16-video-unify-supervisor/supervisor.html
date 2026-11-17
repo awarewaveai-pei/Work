@@ -80,11 +80,11 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>影片工具融合監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-17</span></p>
-  <div class="bar" data-computed><i class="d" style="width:66.66666666666666%"></i><i class="g" style="width:33.33333333333333%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>8</span>／<span data-computed>12</span> 完成</small></a><a href="#open"><span>要你點頭</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:75%"></i><i class="g" style="width:25%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>卡片與工作</span><small><span data-computed>9</span>／<span data-computed>12</span> 完成</small></a><a href="#open"><span>要你點頭</span><small><span data-computed>1</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">舊影片工具併進影音工作台，變成一個工具。共 <span data-computed>12</span> 張卡、<span data-computed>50</span> 項工作，已完成 <span data-computed>43</span> 項。</p>
+<p class="sub">舊影片工具併進影音工作台，變成一個工具。共 <span data-computed>12</span> 張卡、<span data-computed>50</span> 項工作，已完成 <span data-computed>44</span> 項。</p>
 <section id="now"><h2>現況</h2><p class="lead">兩套系統今天已經接上與還沒接上的地方（計畫 §0，行號以 779f4d164 為準）。</p><ul class="yn"><li class="yes"><b>可以</b><span>兩套畫面在同一個影片網域、同一個登入下，主題與樣式讀同一份。<small>計畫 G13：VW/index.html:75-104；VW/shared/runtime.js:4-6；nginx/default.conf:565（同源 frame）；NA/app/layout.tsx:18-23。</small></span></li><li class="yes"><b>可以</b><span>工作台會排時間軸、照旁白逐句配音、用旁白產生字幕。<small>計畫 G2：VW/scripts/tools-editor.js:936-967、969-992、1007-1032。</small></span></li><li class="yes"><b>可以</b><span>外部服務包成工作台任務已有先例（片頭模板送 Remotion 服務）。<small>計畫 G5：VW/backend/remotion.cjs:85-139；舊渲染引擎照這個寫法接進來（U5）。</small></span></li><li class="yes"><b>可以</b><span>工作台的成片可以送審與投遞，但只到舊的 /release 頁；第 11 步「送審」永遠顯示「選用」。<small>計畫 G8：VW/shared/jobs-view.js:13-22；VW/shared/episode-spine.js:286。</small></span></li><li class="no"><b>還不行</b><span>工作台做出的成片在主系統有專案列（能送審、能排程自動完成）。<small>計畫 F9：MIG/0138_media_projects_v2.sql:16-18 的來源只收 manual、script_forge、content_topic；API/projects/route.ts:13 同。U0 補。</small></span></li><li class="no"><b>還不行</b><span>腳本頁「送去做影片」開成工作台的一集。<small>計畫 F11：V/ScriptForge.tsx:89-96 送去舊草稿；計畫 G11：AI 導演只產純文字（VW/backend/api.cjs:1686-1733）。U3 補。</small></span></li><li class="no"><b>還不行</b><span>腳本的場景與工作台的鏡頭格式相通。<small>V/video-handoff.ts:45 只有 stripStageDirections，還沒有 shotsFromScript；鏡頭形狀在 VW/shared/episode-spine.js:173-176。U3 補。</small></span></li><li class="yes"><b>可以</b><span>鏡頭卡能換圖、用圖庫素材、讓這鏡動起來。<small>U4（df5640559）已在 main，工作台還沒部署到正式站。選圖片模型（含 FLUX）還沒做。</small></span></li></ul></section>
 
 <section id="steps"><h2>卡片與工作</h2><p class="lead">照相依順序做。U0、U1、U4、U7、U8、U10 互不相依，可以同時開工。U11 最後做，把舊畫面收掉。風險 High 的卡經你同意才上線。</p><ol class="steps"><li class="step done" id="U0">
@@ -169,18 +169,19 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md §4 U5</code></p>
         <p><b>完成於：</b><code>ec63ae734</code></p>
       </details>
-    </div></li><li class="step doing" id="U6">
+    </div></li><li class="step done" id="U6">
     <div class="n">7</div>
     <div class="b">
       <p class="plain">例：成片卡按「審片」勾完四項檢查，接著在「發布」寫 IG 與 FB 各一版文案，存成社群草稿。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：fullstack-engineer（Sonnet）</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：fullstack-engineer（Sonnet）</span></p>
       <p class="donewhen"><b>完成的樣子：</b>勾兩個不同平台會存成兩份各自的文案草稿；從一集打開只列這一集的成片；一筆舊專案在專案頁看得到、成片能播、能核准。</p>
-      <ul class="items"><li class="done"><b>✓</b><span><code>U6.1</code> 審片與發布面板：上半四項檢查與「有權使用」，下半核准、封面、社群草稿、WP 嵌入；舊的 /release 導回工作台。 <small>完成於 <code>58050a441</code></small></span></li><li class="done"><b>✓</b><span><code>U6.2</code> 步驟列第 11 步「審片」、第 12 步「發布」，打勾與否每次讀真實結果。 <small>完成於 <code>58050a441</code></small></span></li><li class="done"><b>✓</b><span><code>U6.3</code> 成片卡顯示「發布到哪」與成效；舊專案以唯讀卡列在專案頁。成片清單只列最新 200 支（舊發布頁本來就這樣）。 <small>完成於 <code>58050a441</code></small></span></li><li class="done"><b>✓</b><span><code>U6.4</code> 一集頁、成片卡與完成通知共用下一步；以真實草稿與嵌入回執判斷完成，未知不猜，付費前仍開確認框。四項審片過才亮繼續到發布；任務改繁中狀態，剪輯文字不透出面板，移除舊編號與技術用字。整合 gate、Playwright、擁有權突變、型別與全套 4762 案通過；未部署，Claude 審查額度限制仍在。主功能 57daf343b、畫面收尾如下。 <small>完成於 <code>1f66f2cf2</code></small></span></li><li class="todo"><b>○</b><span><code>U6.5</code> 全自動（給任務 → 找話題 → 生成 → 發布）沿用內容工具已有的話題排程；工作台側欄加「自動排程」看狀態，排程出的片可以「接手編輯」。</span></li><li class="done"><b>✓</b><span><code>U6.6</code> 專案頁的舊專案卡現在會列出「選題」建的專案（原本 3 個被漏掉）。由主系統直接排除工作台自己的專案，清單上限不會被擠掉。2026-11-16 已上線。 <small>完成於 <code>688d397a5</code></small></span></li></ul>
+      <ul class="items"><li class="done"><b>✓</b><span><code>U6.1</code> 審片與發布面板：上半四項檢查與「有權使用」，下半核准、封面、社群草稿、WP 嵌入；舊的 /release 導回工作台。 <small>完成於 <code>58050a441</code></small></span></li><li class="done"><b>✓</b><span><code>U6.2</code> 步驟列第 11 步「審片」、第 12 步「發布」，打勾與否每次讀真實結果。 <small>完成於 <code>58050a441</code></small></span></li><li class="done"><b>✓</b><span><code>U6.3</code> 成片卡顯示「發布到哪」與成效；舊專案以唯讀卡列在專案頁。成片清單只列最新 200 支（舊發布頁本來就這樣）。 <small>完成於 <code>58050a441</code></small></span></li><li class="done"><b>✓</b><span><code>U6.4</code> 一集頁、成片卡與完成通知共用下一步；以真實草稿與嵌入回執判斷完成，未知不猜，付費前仍開確認框。四項審片過才亮繼續到發布；任務改繁中狀態，剪輯文字不透出面板，移除舊編號與技術用字。整合 gate、Playwright、擁有權突變、型別與全套 4762 案通過；未部署，Claude 審查額度限制仍在。主功能 57daf343b、畫面收尾如下。 <small>完成於 <code>1f66f2cf2</code></small></span></li><li class="done"><b>✓</b><span><code>U6.5</code> 側欄「自動排程」顯示同品牌話題佇列與停下原因，連回內容設定；排程專案卡可接手成一集，重送開回同一集、不啟動自動工作。後續影片保留逐場景描述；無場景資料的舊片保留查看與審片，明示不能還原。型別、14 案、Edge、擁有權突變與整合總閘通過；未部署，Claude 額度限制見驗證檔。 <small>完成於 <code>1bf6bbb65</code></small></span></li><li class="done"><b>✓</b><span><code>U6.6</code> 專案頁的舊專案卡現在會列出「選題」建的專案（原本 3 個被漏掉）。由主系統直接排除工作台自己的專案，清單上限不會被擠掉。2026-11-16 已上線。 <small>完成於 <code>688d397a5</code></small></span></li></ul>
       <details><summary>工程細節：U6 審片與發布併進成片</summary>
         <p>WB/review-release/page.tsx（QaStep＋ReleaseDeliveryPanel，鎖定組織）；(door)/release 導回殼；jobs-view「送審與投遞」改開殼內面板；步驟列第 11 步審片、第 12 步發布，狀態每次讀鏈；成片卡「發布到哪」；舊專案唯讀卡</p>
         <p><b>需先完成：</b><a href="#U2">U2</a>、<a href="#U0">U0</a></p>
         <p><b>檔案：</b><code>apps/next-admin/app/video/(wb)/review-release/page.tsx</code> <code>apps/next-admin/app/(shell)/tools/video/QaStep.tsx</code> <code>apps/next-admin/app/(shell)/tools/video/ReleaseDeliveryPanel.tsx</code> <code>apps/next-admin/app/video/(door)/release/</code> <code>apps/video-workbench/shared/jobs-view.js</code> <code>apps/video-workbench/scripts/projects-0.js</code> <code>apps/video-workbench/shared/episode-spine.js</code></p>
         <p><b>做法：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md §4 U6</code></p>
+        <p><b>完成於：</b><code>1bf6bbb65</code></p>
       </details>
     </div></li><li class="step done" id="U7">
     <div class="n">8</div>
