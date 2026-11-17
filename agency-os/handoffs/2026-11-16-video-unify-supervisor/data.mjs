@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影片工具融合監工台',
-  updated: '2026-11-16',
+  updated: '2026-11-17',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-16',
   self: 'agency-os/handoffs/2026-11-16-video-unify-supervisor/',
@@ -92,7 +92,7 @@ export const STEPS = [
       done('U3.2', '「送去做影片」開工作台的新一集，鏡頭與角色帶進去。', 'fb790d851'),
       done('U3.3', '一集第 2 步「寫腳本」；寫完按「寫回這一集」，已有鏡頭時先確認會取代。', 'fb790d851'),
       done('U3.4', '「送社群」走影片 API 新路由，跟社群工具同一個權限檢查；社群沒裝時按鈕不出現。', 'fb790d851'),
-      todo('U3.5', '腳本一鍵完成：填主題按一顆，直接得到完整腳本，停在腳本頁可以改。'),
+      done('U3.5', '腳本一鍵完成：「手動生成」填主題頁多一顆「主題 → 完整腳本（一鍵）」，按一次直接寫出完整腳本，停在腳本頁可以改；按之前顯示約多少 NT$。還沒在瀏覽器點過。', 'd4a254662'),
       todo('U3.6', '一鍵到草稿：腳本 → 影片 → 審片 → 社群草稿，按一次；可勾「同時建一篇網站草稿文章並嵌入」。送出前顯示整趟 NT$ 並設上限，失敗就停在那一步。'),
     ] },
   { n: 5, code: 'U4', title: '鏡頭卡補齊', plain: '例：在鏡頭卡按「圖庫素材」打「海邊日落」，選一張 Pexels 照片換上；再按「讓這鏡動起來」變成一段影片。',
