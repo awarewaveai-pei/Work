@@ -4,6 +4,8 @@ import { DRAFT_VOICES, VIDEO_PIPELINE_STEPS, computeVideoCost } from "@/lib/cont
 import { optionalRendererAuthHeaders } from "@/lib/content/video/renderer-auth";
 import { IMAGE_RATES, OPENAI_TOKEN_PRICED_IMAGE_MODELS } from "@/lib/ai/cost-model";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
+import { TWD_RATE } from "@/lib/ai/cost-model";
+import { forgeRunUpperTwd } from "@/lib/script-forge/run-budget";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { listAccounts } from "@/lib/social/store";
 import { writerKeysFor } from "@/lib/social/write-posts";
@@ -104,6 +106,21 @@ export async function POST(req: Request): Promise<Response> {
     totalScenes: scenes, customScenes: 0, brollScenes: 0, includeScriptCost: false,
     ttsProvider: voice.provider, ttsVoice: voice.voice, ttsChars,
   }, STEPS);
+  let scriptUpperTwd = 0;
+  if (b.scriptPlan !== undefined) {
+    const plan = b.scriptPlan as { model?: string; fields?: Record<string, unknown>; siteId?: string; lang?: string; sceneCount?: number; customScenes?: number };
+    if (!plan || typeof plan !== "object" || !Number.isInteger(plan.sceneCount) || plan.sceneCount! < 1 || plan.sceneCount! > 20 || !plan.fields || typeof plan.fields !== "object") return fail(400, "invalid script plan");
+    let brand = null;
+    if (plan.siteId) {
+      if (!db) return fail(503, "db_unavailable");
+      const site = await db.from("wp_sites").select("name, content_defaults").eq("organization_id", b.organizationId).eq("id", plan.siteId).maybeSingle();
+      if (site.error || !site.data) return fail(404, "script site not found");
+      const defaults = site.data.content_defaults as SiteContentDefaults;
+      brand = { voice: renderSiteVoice(defaults) || site.data.name, forbidden: defaults?.marketing?.forbiddenClaims || "" };
+    }
+    scriptUpperTwd = forgeRunUpperTwd(plan, { lang: plan.lang || "繁體中文", sceneCount: plan.sceneCount!, customScenes: Math.max(0, Math.min(plan.sceneCount!, Number(plan.customScenes) || 0)), brand });
+  }
+  const scriptUsd = scriptUpperTwd / TWD_RATE;
   return NextResponse.json({
     ok: true,
     voices,
@@ -112,8 +129,9 @@ export async function POST(req: Request): Promise<Response> {
     perRatioTwd: usdToNtd(cost.totalUsd),
     fill,
     draftsUsd,
-    totalUsd: fill.usd + cost.totalUsd * ratios.length + draftsUsd,
-    totalTwd: usdToNtd(fill.usd + cost.totalUsd * ratios.length + draftsUsd),
+    ...(b.scriptPlan !== undefined ? { scriptUpperTwd } : {}),
+    totalUsd: fill.usd + cost.totalUsd * ratios.length + draftsUsd + scriptUsd,
+    totalTwd: usdToNtd(fill.usd + cost.totalUsd * ratios.length + draftsUsd + scriptUsd),
     sites: sites.map((s) => ({ id: String(s.id), name: String(s.name) })),
   });
 }

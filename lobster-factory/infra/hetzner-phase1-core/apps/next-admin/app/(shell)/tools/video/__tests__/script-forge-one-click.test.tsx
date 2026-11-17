@@ -7,7 +7,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import ScriptForge from "../ScriptForge";
+import ScriptForge, { type AutoDraftRequest } from "../ScriptForge";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -18,14 +18,18 @@ let container: HTMLDivElement;
 let root: Root;
 let calls: { module: string; task: string; fields: Record<string, string> }[];
 
-async function mount(scriptStatus: number) {
+async function mount(scriptStatus: number, onStartDrafts?: (request: AutoDraftRequest) => Promise<void>, lostFirstBudgetStream = false) {
   calls = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { body?: string }) => {
     if (url === "/api/tools/script-forge") {
       const req = JSON.parse(init?.body ?? "{}");
       calls.push(req);
       if (req.task === "script" && scriptStatus !== 200) return new Response("boom", { status: scriptStatus });
-      return new Response(JSON.stringify(req.task === "script" ? SCRIPT : SCORE), { status: 200 });
+      if (lostFirstBudgetStream && req.autoBudget && req.task === "script") {
+        if (calls.filter((c) => c.task === "script").length === 1) return new Response(new ReadableStream({ start(c) { c.error(Error("connection lost")); } }), { headers: { "X-SF-Reserved-Twd": "10" } });
+        return new Response(JSON.stringify(SCRIPT) + '\n[SF_BUDGET]{"spentTwd":1,"estimated":false}', { headers: { "X-SF-Reserved-Twd": "1" } });
+      }
+      return new Response(JSON.stringify(req.task === "script" ? SCRIPT : SCORE) + (req.autoBudget ? "\n[SF_BUDGET]" + JSON.stringify({ spentTwd: req.autoBudget.spentTwd + 1, estimated: false }) : ""), { status: 200, ...(req.autoBudget ? { headers: { "X-SF-Reserved-Twd": String(req.autoBudget.spentTwd + 10) } } : {}) });
     }
     if (url.startsWith("/api/content/sites")) return new Response(JSON.stringify({ ok: true, sites: [] }), { status: 200 });
     return new Response(JSON.stringify({}), { status: 200 });
@@ -33,7 +37,7 @@ async function mount(scriptStatus: number) {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => { root.render(<ScriptForge onSendToVideo={async () => true} />); });
+  await act(async () => { root.render(<ScriptForge onSendToVideo={async () => true} onStartDrafts={onStartDrafts} />); });
   await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
 }
 
@@ -42,10 +46,10 @@ function type(el: HTMLTextAreaElement, value: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-async function fillTopicAndPress() {
+async function fillTopicAndPress(action = "one-click") {
   const topic = container.querySelector("textarea") as HTMLTextAreaElement;
   await act(async () => { type(topic, "新手如何開始學畫畫"); });
-  const button = container.querySelector('[data-testid="one-click"]') as HTMLButtonElement;
+  const button = container.querySelector('[data-testid="' + action + '"]') as HTMLButtonElement;
   await act(async () => { button.click(); await new Promise((r) => setTimeout(r, 20)); });
 }
 
@@ -56,6 +60,30 @@ afterEach(() => {
 });
 
 describe("主題 → 完整腳本", () => {
+  it("a lost response can recover the server's cached script and lower actual balance", async () => {
+    let completed = false;
+    await mount(200, async (request) => {
+      const budget = { runId: "run-one", budgetTwd: 100, spentTwd: 0 };
+      await expect(request.generate(budget)).rejects.toThrow("connection lost");
+      expect(budget.spentTwd).toBe(10);
+      expect((await request.generate(budget)).title).toBe("新手畫畫三步");
+      expect(budget.spentTwd).toBe(2); completed = true;
+    }, true);
+    await fillTopicAndPress("one-click-drafts"); expect(completed).toBe(true);
+  });
+  it("to drafts reuses the two U3.5 tasks and actual budget receipts; retry does not regenerate finished stages", async () => {
+    let result;
+    await mount(200, async (request) => {
+      const budget = { runId: "run-one", budgetTwd: 100, spentTwd: 0 };
+      result = await request.generate(budget);
+      expect(budget.spentTwd).toBe(2);
+      await request.generate(budget);
+      expect(calls).toHaveLength(2);
+    });
+    await fillTopicAndPress("one-click-drafts");
+    expect(result.title).toBe("新手畫畫三步");
+    expect(calls.map((c) => c.module + "/" + c.task)).toEqual(["manual/script", "result/score"]);
+  });
   it("is disabled until a topic is typed and shows the price in NT$ before the press", async () => {
     await mount(200);
     const button = container.querySelector('[data-testid="one-click"]') as HTMLButtonElement;

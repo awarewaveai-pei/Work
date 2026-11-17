@@ -102,13 +102,14 @@ async function quote(settings, main, sizeOf, imageModel) {
     body: {
       organizationId: main.organizationId(), scenes: Math.min(MAX_SHOTS, Math.max(1, scenes.length)), ttsChars: Math.min(MAX_SHOTS * 2000, chars), ratios, ...(s.tts ? { tts: s.tts } : {}),
       until: s.until || "video", scriptText: scenes.map((x) => String(x?.narration || "")).join("\n"),
+      ...(s.scriptPlan ? { scriptPlan: s.scriptPlan } : {}),
       ...(s.fill ? { fill: { mode: s.fill, pictures: Math.min(MAX_SHOTS, scenes.filter((x) => !x?.url).length), imageModel,
         shots: scenes.flatMap((x, i) => x?.url ? [] : [{ id: String(s.shotModels?.[i]?.id || i), imageModel: s.shotModels?.[i]?.imageModel || imageModel }]) } } : {}),
     },
   });
   if (!r.ok || r.value.ok !== true) throw refusal("主系統無法估價", r);
-  const { voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, totalUsd, totalTwd, sites } = r.value;
-  return { problems: problems(scenes, main, sizeOf, !!s.fill), voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, totalUsd, totalTwd, sites: sites || [] };
+  const { voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, scriptUpperTwd, totalUsd, totalTwd, sites } = r.value;
+  return { problems: problems(scenes, main, sizeOf, !!s.fill), voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, ...(scriptUpperTwd !== undefined ? { scriptUpperTwd } : {}), totalUsd, totalTwd, sites: sites || [] };
 }
 
 // Submits, polls until the main system recorded the video, downloads it into the media store. Answers the job result.

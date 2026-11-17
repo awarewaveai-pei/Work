@@ -42,6 +42,7 @@ const tests = [
   "u6-review-state",
   "u6-next-action",
   "u6-next-ui",
+  "u3-one-click-runtime",
   "u8-title-form",
   "u8-bookends",
   "u4-scene-image",

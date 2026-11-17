@@ -3,11 +3,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ORG = vi.hoisted(() => "11111111-1111-4111-8111-111111111111");
-const sent = vi.hoisted(() => ({ calls: [] as Array<{ system: string; messages: Array<{ content: string }> }> }));
+const sent = vi.hoisted(() => ({ calls: [] as Array<{ system: string; messages: Array<{ content: string }> }>, options: [] as Array<{ maxRetries?: number }> }));
 vi.mock("@/lib/entitlements/grant", () => ({ withFeature: (_k: string, h: (r: Request, g: unknown) => Promise<Response>) => (r: Request) => h(r, {}) }));
 vi.mock("@/lib/ai/gateway", () => ({
   claudeParams: () => ({}), claudeFallback: () => ({}), providerUrl: () => "http://x",
   loadAnthropic: async () => class {
+    constructor(options: { maxRetries?: number }) { sent.options.push(options); }
     beta = { messages: { stream: (p: { system: string; messages: Array<{ content: string }> }) => {
       sent.calls.push(p);
       const events = (async function* () { yield { type: "content_block_delta", delta: { type: "text_delta", text: '{"hooks":[]}' } }; })();
@@ -17,6 +18,13 @@ vi.mock("@/lib/ai/gateway", () => ({
   },
 }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
+vi.mock("@/lib/script-forge/run-store", () => ({
+  reserveScriptRun: async (_db: unknown, org: string, budget: { budgetTwd: number; spentTwd: number }, key: string, reserved: number) => {
+    if (budget.spentTwd + reserved > budget.budgetTwd) throw Object.assign(Error("已到上限"), { status: 409 });
+    return { kind: "claim", org, key, reserved, spentTwd: budget.spentTwd + reserved };
+  },
+  finishScriptRun: async (_db: unknown, claim: { spentTwd: number; reserved: number }, _text: string, actual: number | null) => ({ spentTwd: claim.spentTwd - claim.reserved + (actual ?? claim.reserved), estimated: actual === null }),
+}));
 const logged = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>> }));
 vi.mock("@/lib/ai/log-ai-call", async (orig) => ({
   ...(await orig<typeof import("@/lib/ai/log-ai-call")>()),
@@ -34,9 +42,27 @@ const post = (b: object) => POST(new Request("https://video.aware-wave.com/api/t
   method: "POST", headers: { "content-type": "application/json", ...client }, body: JSON.stringify(b),
 }));
 
-beforeEach(() => { vi.stubEnv("ANTHROPIC_API_KEY", "k"); sent.calls = []; logged.calls = []; });
+beforeEach(() => { vi.stubEnv("ANTHROPIC_API_KEY", "k"); sent.calls = []; sent.options = []; logged.calls = []; });
 
 describe("POST /api/tools/script-forge", () => {
+  it("cannot read or bill a different organization's script run", async () => {
+    const res = await post({ module: "manual", task: "script", fields: { topic: "主題" }, autoBudget: { organizationId: "22222222-2222-4222-8222-222222222222", runId: "run-one", budgetTwd: 10000, spentTwd: 0 } });
+    expect(res.status).toBe(404); expect(sent.calls).toEqual([]);
+  });
+  it("one-click budget zero refuses before a provider call", async () => {
+    const res = await post({ module: "manual", task: "script", fields: { topic: "主題" }, model: "claude-haiku-5-5", autoBudget: { organizationId: ORG, runId: "run-one", budgetTwd: 0, spentTwd: 0 } });
+    expect(res.status).toBe(409); expect(sent.calls).toEqual([]);
+  });
+  it("budgeted streams return reserved and actual usage without changing ordinary streams", async () => {
+    const res = await post({ module: "manual", task: "script", fields: { topic: "主題" }, model: "claude-haiku-5-5", autoBudget: { organizationId: ORG, runId: "run-one", budgetTwd: 10000, spentTwd: 1 } });
+    expect(res.status).toBe(200);
+    const reserved = Number(res.headers.get("X-SF-Reserved-Twd")), body = await res.text(), parts = body.split("\n[SF_BUDGET]");
+    expect(parts[0]).toBe('{"hooks":[]}');
+    const receipt = JSON.parse(parts[1]);
+    expect(receipt.estimated).toBe(false); expect(receipt.spentTwd).toBeGreaterThanOrEqual(1); expect(receipt.spentTwd).toBeLessThanOrEqual(reserved);
+    expect(sent.calls[0]).not.toHaveProperty("fallbacks");
+    expect(sent.options[0].maxRetries).toBe(0);
+  });
   it("an unknown module or task is 400 and calls no AI", async () => {
     expect((await post({ module: "nope", task: "x", fields: {} })).status).toBe(400);
     expect((await post({ module: "hook", task: "nope", fields: {} })).status).toBe(400);

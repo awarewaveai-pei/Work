@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { fakeDb } from "@/lib/content/video/__tests__/fake-db";
-vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => fakeDb(() => ({ wp_sites: [] })) }));
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => fakeDb(() => ({ wp_sites: [
+  { id: "foreign-site", organization_id: "other", name: "他人的網站", active: true, content_defaults: {} },
+] })) }));
 vi.mock("@/lib/social/store", () => ({ listAccounts: async () => [{ id: "fb", platform: "facebook", status: "connected" }] }));
 import { POST } from "./route";
 beforeEach(() => {
@@ -22,4 +24,20 @@ it("includes social writer calls only when the stop point is drafts", async () =
   const q = await call("drafts");
   expect(q.draftsUsd).toBeGreaterThan(0);
   expect(q.totalUsd).toBe(q.fill.usd + q.perRatioUsd + q.draftsUsd);
+});
+it("adds script and score to the server's whole-trip total", async () => {
+  const res = await POST(new Request("http://localhost/quote", { method: "POST", headers: { authorization: "Bearer test-only" }, body: JSON.stringify({
+    organizationId: "123e4567-e89b-42d3-a456-426614174001", scenes: 2, ttsChars: 4, ratios: ["16x9"],
+    scriptPlan: { model: "claude-haiku-5-5", sceneCount: 2, fields: { topic: "主題" } },
+  }) }));
+  const q = await res.json();
+  expect(q.scriptUpperTwd).toBeGreaterThan(0);
+  expect(q.totalTwd).toBeGreaterThanOrEqual(q.scriptUpperTwd);
+});
+it("refuses a script site's brand from another organization before quoting", async () => {
+  const res = await POST(new Request("http://localhost/quote", { method: "POST", headers: { authorization: "Bearer test-only" }, body: JSON.stringify({
+    organizationId: "123e4567-e89b-42d3-a456-426614174001", scenes: 2, ttsChars: 4, ratios: ["16x9"],
+    scriptPlan: { model: "claude-haiku-5-5", sceneCount: 2, fields: { topic: "主題" }, siteId: "foreign-site" },
+  }) }));
+  expect(res.status).toBe(404);
 });

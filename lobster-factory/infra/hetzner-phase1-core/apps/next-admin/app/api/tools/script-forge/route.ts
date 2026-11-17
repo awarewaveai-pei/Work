@@ -11,6 +11,11 @@ import { canAccessOrg } from "@/lib/tenant-guard";
 import { loadSiteBrand } from "@/lib/content/brand-voice-store";
 import { renderSiteVoice } from "@/lib/content/brand-voice";
 import { forgePrompt, type ForgeCtx } from "@/lib/script-forge/modules";
+import { FORGE_MAX_PROMPT_CHARS, FORGE_MAX_TOKENS, forgeCallUpperTwd } from "@/lib/script-forge/run-budget";
+import { parseAutoBudget } from "@/lib/content/video/auto-run-budget";
+import { textCallCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
+import { createHash } from "node:crypto";
+import { reserveScriptRun, finishScriptRun } from "@/lib/script-forge/run-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,8 +32,8 @@ export const maxDuration = 120;
 //   - 回 text/plain ReadableStream，保留逐字串流 UX（前端逐塊累加後 JSON.parse）
 // model 由前端從 lib/ai/text-model-options.ts 的同一份選單挑（Content Studio 共用）。
 
-const MAX_PROMPT_CHARS = 24000;
-const MAX_TOKENS = 4000;
+const MAX_PROMPT_CHARS = FORGE_MAX_PROMPT_CHARS;
+const MAX_TOKENS = FORGE_MAX_TOKENS;
 const LANGS = ["繁體中文", "English", "簡體中文", "日本語", "한국어", "Español", "Bahasa Melayu"];
 
 interface ScriptForgeBody {
@@ -40,6 +45,7 @@ interface ScriptForgeBody {
   sceneCount?: number;
   customScenes?: number;
   model?: string;
+  autoBudget?: unknown;
 }
 
 const intIn = (v: unknown, lo: number, hi: number, d: number) =>
@@ -55,7 +61,12 @@ async function brandFor(req: Request, siteId: string): Promise<ForgeCtx["brand"]
   return { voice: renderSiteVoice(site.defaults) || site.name, forbidden: (site.defaults.marketing?.forbiddenClaims ?? "").trim() };
 }
 
-export const POST = withFeature("video.script", handlePost);
+export const POST = withFeature("video.script", handlePost, {
+  org: async (req) => {
+    const b = await req.clone().json().catch(() => null) as { autoBudget?: { organizationId?: unknown } } | null;
+    return typeof b?.autoBudget?.organizationId === "string" ? b.autoBudget.organizationId : null;
+  },
+});
 async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
@@ -87,11 +98,26 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   // model 白名單化（非清單值 → DEFAULT_AI_TEXT_MODEL）。決定供應商與所需金鑰。
   const model: AiTextModel = normalizeAiTextModel(body.model);
   const useOpenAi = isOpenAiTextModel(model);
-
   const apiKey = useOpenAi ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     const which = useOpenAi ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY";
     return new NextResponse(`${which} not configured`, { status: 503 });
+  }
+  const budget = body.autoBudget === undefined ? null : parseAutoBudget(body.autoBudget);
+  if (body.autoBudget !== undefined && !budget) return new NextResponse("一鍵執行預算無效", { status: 400 });
+  if (budget && !((body.module === "manual" && body.task === "script") || (body.module === "result" && body.task === "score"))) return new NextResponse("一鍵執行只接受腳本與評分步驟", { status: 400 });
+  const reserved = budget ? forgeCallUpperTwd(model, system, prompt) : 0;
+  const budgetDb = budget ? getSupabaseWriteClient() : null;
+  let claim: Extract<Awaited<ReturnType<typeof reserveScriptRun>>, { kind: "claim" }> | null = null;
+  if (budget) {
+    const org = (body.autoBudget as { organizationId?: string }).organizationId || "";
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(org) || !canAccessOrg(req, org)) return new NextResponse("organization not found", { status: 404 });
+    if (!budgetDb) return new NextResponse("執行預算暫時無法儲存", { status: 503 });
+    try {
+      const key = createHash("sha256").update(JSON.stringify([body.module, body.task, model, system, prompt])).digest("hex"), saved = await reserveScriptRun(budgetDb, org, budget, key, reserved);
+      if (saved.kind === "cached") return new Response(saved.text + "\n[SF_BUDGET]" + JSON.stringify({ spentTwd: saved.spentTwd, estimated: saved.estimated }), { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache", "X-SF-Reserved-Twd": String(saved.spentTwd) } });
+      claim = saved;
+    } catch (e) { return new NextResponse(e instanceof Error ? e.message : "無法保留執行預算", { status: (e as { status?: number }).status || 503 }); }
   }
 
   // Abort plumbing — 與 content/generate 同樣的 belt-and-suspenders：req.signal 監聽 + ReadableStream
@@ -103,19 +129,33 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const readable = new ReadableStream<Uint8Array>({
     async start(controller) {
       const encoder = new TextEncoder();
+      let actualUsd: number | null = null;
+      let failed = false;
+      const chunks: Uint8Array[] = [], capture = { enqueue: (chunk: Uint8Array) => { if (claim) chunks.push(chunk); controller.enqueue(chunk); } } as ReadableStreamDefaultController<Uint8Array>;
+      const used = budget ? (usd: number) => { actualUsd = usd; } : undefined;
       try {
         if (useOpenAi) {
-          await streamOpenAi(controller, encoder, model, system, prompt, apiKey, ac.signal, grant);
+          await streamOpenAi(capture, encoder, model, system, prompt, apiKey, ac.signal, grant, used);
         } else {
-          await streamAnthropic(controller, encoder, model, system, prompt, apiKey, ac.signal, grant);
+          await streamAnthropic(capture, encoder, model, system, prompt, apiKey, ac.signal, grant, used);
         }
       } catch (err) {
+        failed = true;
         // 串流已開始 → 無法改 HTTP status；把錯誤塞進串流尾端讓前端 JSON.parse 失敗時可見。
         if (!ac.signal.aborted) {
           const msg = err instanceof Error ? err.message : "script generation failed";
           controller.enqueue(encoder.encode(`\n[ERROR] ${msg}`));
         }
       } finally {
+        if (claim && budgetDb) {
+          try {
+            const text = Buffer.concat(chunks).toString("utf8");
+            let valid = false;
+            try { const parsed = JSON.parse(text.replace(/```json|```/g, "").trim()); valid = body.task === "script" ? Array.isArray(parsed?.scenes) && parsed.scenes.length > 0 : Number.isFinite(parsed?.total); } catch { /* do not cache a malformed result: explicit retry may regenerate it within the same budget */ }
+            const receipt = await finishScriptRun(budgetDb, claim, text, actualUsd === null ? null : usdToNtd(actualUsd), valid && !failed && !ac.signal.aborted && !text.includes("\n[ERROR]"));
+            if (!ac.signal.aborted) controller.enqueue(encoder.encode("\n[SF_BUDGET]" + JSON.stringify(receipt)));
+          } catch { if (!ac.signal.aborted) controller.enqueue(encoder.encode("\n[ERROR] 用量回執尚未存妥，已停下並保留額度，請稍後確認")); }
+        }
         controller.close();
       }
     },
@@ -129,6 +169,7 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-cache",
       "X-Accel-Buffering": "no",
+      ...(claim ? { "X-SF-Reserved-Twd": String(claim.spentTwd) } : {}),
     },
   });
 }
@@ -143,14 +184,15 @@ async function streamAnthropic(
   apiKey: string,
   signal: AbortSignal,
   grant: Grant,
+  used?: (usd: number) => void,
 ): Promise<void> {
   const Anthropic = await loadAnthropic(grant);
-  const client = new Anthropic({ apiKey });
+  const client = new Anthropic({ apiKey, ...(used ? { maxRetries: 0 } : {}) });
   // The SDK stream accumulates the message: it relabels the model when a fallback serves the answer and overwrites the
   // cumulative usage counters. A completed stream hands it to finalMessage() (currentMessage is cleared at the end);
   // an aborted one leaves the partial snapshot in currentMessage.
   const stream = client.beta.messages.stream(
-    { ...claudeParams(model, MAX_TOKENS), ...claudeFallback(model), system, messages: [{ role: "user", content: prompt }] },
+    { ...claudeParams(model, MAX_TOKENS), ...(used ? {} : claudeFallback(model)), system, messages: [{ role: "user", content: prompt }] },
     { signal },
   );
   try {
@@ -163,6 +205,7 @@ async function streamAnthropic(
   } finally {
     const billed = stream.currentMessage ?? (await stream.finalMessage().catch(() => undefined));
     if (billed) void logAiCall({ route: "/api/tools/script-forge", response: billed, grant, tool: "video" });
+    if (billed) used?.(textCallCostUsd({ model: billed.model || model, inputTokens: billed.usage?.input_tokens || 0, outputTokens: billed.usage?.output_tokens || 0, cacheReadTokens: billed.usage?.cache_read_input_tokens || 0, cacheWriteTokens: billed.usage?.cache_creation_input_tokens || 0 }));
   }
 }
 
@@ -177,6 +220,7 @@ async function streamOpenAi(
   apiKey: string,
   signal: AbortSignal,
   grant: Grant,
+  used?: (usd: number) => void,
 ): Promise<void> {
   const res = await fetch(providerUrl(grant, "openai", "/v1/chat/completions"), {
     method: "POST",
@@ -235,6 +279,7 @@ async function streamOpenAi(
     // Also when the connection breaks after the final usage frame arrived: that usage was billed.
     if (usageFrame) {
       void logAiCall({ route: "/api/tools/script-forge", model, ...openaiUsageTokens(usageFrame), grant, tool: "video" });
+      used?.(textCallCostUsd({ model, ...openaiUsageTokens(usageFrame) }));
     }
   }
 }

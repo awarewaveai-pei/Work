@@ -853,6 +853,7 @@ function bookendProblems(d) {
   return out;
 }
 function openQuickRender(oneClick) {
+  if (ep()?.autoRun?.status === "running") { notify("這一集正在執行，請先停止這趟，再開始新的"); return; }
   const p = project(),
     e = ep(),
     draft = (b) => (b ? structuredClone(b) : { kind: "none" });
@@ -1374,6 +1375,7 @@ async function action(a, button) {
         e = ep();
       d.busy = button.disabled = true;
       try {
+        if (e.autoRun?.status === "running") throw Error("這一集正在執行，請先停止這趟，再開始新的");
         await VideoWorkbench.spine.setBookends({ projectId: p.id, episodeId: e.id, intro: savedBookend(d, "intro"), outro: savedBookend(d, "outro") });
         await VideoWorkbench.spine.setAutoRun({
           projectId: p.id,

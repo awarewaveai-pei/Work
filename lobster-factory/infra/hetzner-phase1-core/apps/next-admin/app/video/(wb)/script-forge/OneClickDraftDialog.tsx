@@ -1,0 +1,77 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { buttonStyle, inputStyle, optionStyle } from "@/components/tools/panel-primitives";
+import { shotsFromScript } from "../../../(shell)/tools/video/video-handoff";
+import type { AutoDraftRequest, AutoScriptBudget } from "../../../(shell)/tools/video/ScriptForge";
+import type { Workbench } from "../workbench";
+
+type Quote = { totalTwd: number; scriptUpperTwd: number; perRatioTwd: number; problems?: string[]; fill: { twd: number; perPictureTwd: number }; voices: { provider: string; voice: string; label: string; available?: boolean }[]; sites: { id: string; name: string }[] };
+export default function OneClickDraftDialog({ request, workbench, close }: { request: AutoDraftRequest; workbench: Workbench; close: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null), budgetEdited = useRef(false), runBudget = useRef<AutoScriptBudget | null>(null),
+    [ratios, setRatios] = useState([request.platform === "youtube" ? "16:9" : "9:16"]),
+    [fill, setFill] = useState("ai"), [tts, setTts] = useState<{ provider: string; voice: string } | null>(null),
+    [quote, setQuote] = useState<Quote | null>(null), [budget, setBudget] = useState<number | null>(null),
+    [embed, setEmbed] = useState(false), [siteId, setSiteId] = useState(""),
+    [intro, setIntro] = useState("title"), [transition, setTransition] = useState("crossfade"),
+    [caps, setCaps] = useState<Awaited<ReturnType<Workbench["loadCapabilities"]>> | null>(null),
+    [busy, setBusy] = useState(false), [error, setError] = useState("");
+  useEffect(() => { const d = dialog.current; if (d?.showModal) d.showModal(); else d?.setAttribute("open", ""); void workbench.loadCapabilities().then(setCaps); }, [workbench]);
+  useEffect(() => {
+    let live = true; setQuote(null); setError("");
+    if (ratios.length) void workbench.request("/quick-render/quote", {
+      scenes: Array.from({ length: request.sceneCount }, () => ({ narration: "文".repeat(2000), url: "" })),
+      ratios, fill, until: "drafts", ...(tts ? { tts } : {}), scriptPlan: request.plan,
+    }).then((value) => {
+      if (!live) return; const q = value as Quote;
+      if (!Number.isFinite(q.scriptUpperTwd) || !Number.isFinite(q.totalTwd)) { setError("主系統尚未提供有效的整趟報價，已停下"); return; }
+      setQuote(q); if (!budgetEdited.current) setBudget(Math.ceil(q.totalTwd));
+    }, (e) => live && setError(e.message));
+    return () => { live = false; };
+  }, [request, workbench, ratios, fill, tts]);
+  const template = caps?.remotionTemplates?.find((t) => t.id === intro),
+    unsupported = template && ratios.some((r) => !(template.ratios || ["16:9", "9:16", "4:5", "1:1"]).includes(r)),
+    invalid = !quote || !caps?.mainSystem?.organizationId || !ratios.length || budget === null || !Number.isFinite(budget) || budget < 0 || (embed && !siteId) || unsupported || (!!template && !caps?.remotion);
+  async function start() {
+    if (invalid || busy) return;
+    setBusy(true); setError("");
+    const autoBudget = runBudget.current ||= { runId: crypto.randomUUID(), budgetTwd: budget!, spentTwd: 0, organizationId: caps!.mainSystem!.organizationId, model: request.plan.model, lang: request.plan.lang, siteId: request.plan.siteId, sceneCount: request.plan.sceneCount, customScenes: request.plan.customScenes };
+    autoBudget.budgetTwd = budget!;
+    try {
+      const handoff = await request.generate(autoBudget), shots = shotsFromScript(handoff.script);
+      if (autoBudget.estimated) throw Error("腳本用量回執不完整，已停在腳本；請取消並檢查腳本後手動接續");
+      if (!shots.length) throw Error("腳本沒有可製作的場景，已停下，尚未送影片");
+      if (autoBudget.spentTwd > autoBudget.budgetTwd) throw Error("腳本花費已達上限，已停下，尚未送影片");
+      const actual = await workbench.request("/quick-render/quote", { scenes: shots.map((s) => ({ narration: s.line, url: "" })), ratios, fill, until: "drafts", ...(tts ? { tts } : {}) }) as Quote;
+      if (actual.problems?.length) throw Error("請取消並先修改腳本：" + actual.problems.join("；"));
+      if (!Number.isFinite(actual.fill?.perPictureTwd) || !Number.isFinite(actual.perRatioTwd)) throw Error("無法確認實際腳本的影片費用，已停下");
+      const end = intro === "none" ? { kind: "none" } : intro === "title"
+        ? { kind: "title", fields: { title: (handoff.title || request.topic).slice(0, 80) }, seconds: 3, transition, transitionSeconds: .5 }
+        : { kind: "template", templateId: intro, fields: {}, seconds: template!.seconds.def, transition, transitionSeconds: .5 };
+      await workbench.spine.create({ title: handoff.title || request.topic, ratio: ratios[0], shots,
+        characters: handoff.storyBible?.characters || [], storyBibleSeries: handoff.storyBible?.seriesId, intro: end,
+        autoRun: { runId: autoBudget.runId, until: "drafts", budgetTwd: budget, spentTwd: autoBudget.spentTwd, baseSpentTwd: autoBudget.spentTwd,
+          fill, ratios, tts: tts || actual.voices.find((v) => v.available !== false) || null, embedSiteId: embed ? siteId : null,
+          prices: { perPictureTwd: actual.fill.perPictureTwd, perRatioTwd: actual.perRatioTwd } },
+      });
+      close();
+    } catch (e) { setError(e instanceof Error ? e.message : "執行失敗，已停下"); setBusy(false); }
+  }
+  return <dialog ref={dialog} aria-label="一鍵到草稿確認" onCancel={(e) => { e.preventDefault(); if (!busy) close(); }} style={{ background: "var(--card-bg)", color: "var(--text-primary)", border: "1px solid var(--border)", borderRadius: "var(--radius)", maxWidth: 640, width: "90vw", padding: 24 }}>
+    <h2>一鍵到草稿</h2><p>建立新的一集：主題 → 完整腳本 → 補畫面 → 影片 → 審片 → 社群草稿。任何一步失敗就停下。</p>
+    <p>使用已選的模型、品牌語氣與故事設定；額外的連續性檢查與定裝照可稍後手動補。</p>
+    <p>輸出比例</p><div role="group" aria-label="輸出比例">{["16:9", "9:16", "4:5"].map((r) => <button type="button" key={r} disabled={busy} aria-pressed={ratios.includes(r)} style={optionStyle(ratios.includes(r))} onClick={() => setRatios(ratios.includes(r) ? ratios.filter((x) => x !== r) : [...ratios, r])}>{r}</button>)}</div>
+    <p>缺的畫面</p><div role="group" aria-label="補畫面">{[["ai", "AI 生圖"], ["stock-video", "圖庫影片"], ["stock-photo", "圖庫照片"]].map(([id, label]) => <button key={id} type="button" disabled={busy} style={optionStyle(fill === id)} onClick={() => setFill(id)}>{label}</button>)}</div>
+    <p>配音</p><div role="group" aria-label="配音">{quote?.voices.map((v) => <button type="button" key={v.provider + v.voice} disabled={busy || v.available === false} style={optionStyle(tts ? tts.provider === v.provider && tts.voice === v.voice : v === quote.voices.find((x) => x.available !== false))} onClick={() => setTts({ provider: v.provider, voice: v.voice })}>{v.label}</button>)}</div>
+    <p>片頭</p><div role="group" aria-label="片頭">{[["none", "不要"], ["title", "標題卡"], ...(caps?.remotionTemplates || []).map((t) => [t.id, t.label])].map(([id, label]) => <button type="button" key={id} disabled={busy} style={optionStyle(intro === id)} onClick={() => setIntro(id)}>{label}</button>)}</div>
+    <div role="group" aria-label="轉場">{[["none", "無轉場"], ["crossfade", "交叉淡化"], ["fade-black", "淡黑"]].map(([id, label]) => <button type="button" key={id} disabled={busy} style={optionStyle(transition === id)} onClick={() => setTransition(id)}>{label}</button>)}</div>
+    {unsupported && <p role="alert">片頭模板不支援所選比例，請改比例或選標題卡。</p>}
+    {!!template && !caps?.remotion && <p role="alert">片頭模板服務尚未設定，請選標題卡或不要。</p>}
+    <p><label><input type="checkbox" checked={embed} disabled={busy || !quote?.sites.length} onChange={(e) => { setEmbed(e.target.checked); if (e.target.checked && !siteId) setSiteId(quote?.sites[0]?.id || ""); }} />同時建一篇網站草稿文章並嵌入</label></p>
+    {embed && <div role="group" aria-label="網站">{quote?.sites.map((s) => <button type="button" key={s.id} disabled={busy} style={optionStyle(siteId === s.id)} onClick={() => setSiteId(s.id)}>{s.name}</button>)}</div>}
+    <p>{quote ? `整趟最多 NT$${quote.totalTwd.toFixed(2)}（腳本與評分最多 NT$${quote.scriptUpperTwd.toFixed(2)}）` : "正在取得整趟報價…"}</p>
+    <p>腳本尚未生成，以所選鏡頭數的上限計價；完成後按回報用量記帳。網站文章與社群都只存草稿。</p>
+    <label>花費上限 NT$<input aria-label="花費上限 NT$" type="number" min="0" step="0.01" disabled={busy} value={budget ?? ""} style={inputStyle()} onChange={(e) => { budgetEdited.current = true; setBudget(e.target.value === "" ? null : Number(e.target.value)); }} /></label>
+    {error && <p role="alert">{error}</p>}
+    <div><button type="button" disabled={busy} style={buttonStyle()} onClick={close}>取消</button><button type="button" disabled={invalid || busy} style={buttonStyle({ tone: "primary", disabled: invalid || busy })} onClick={() => void start()}>{busy ? "正在生成腳本…" : "確認，開始到草稿"}</button></div>
+  </dialog>;
+}

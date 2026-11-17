@@ -3,7 +3,8 @@
 // words unchanged. It works for the organization the workbench is connected to (capabilities.mainSystem), so no
 // organization picker shows. 「送去做影片」 makes a new episode; opened from an episode, it writes the shots back instead.
 import { useEffect, useState } from "react";
-import ScriptForge from "../../../(shell)/tools/video/ScriptForge";
+import ScriptForge, { type AutoDraftRequest } from "../../../(shell)/tools/video/ScriptForge";
+import OneClickDraftDialog from "./OneClickDraftDialog";
 import { ratioForPlatform, shotsFromScript, type VideoHandoff } from "../../../(shell)/tools/video/video-handoff";
 import { useWorkbench, type Workbench } from "../workbench";
 
@@ -46,6 +47,7 @@ export default function ScriptForgeWorkbench({ episode, socialHref }: { episode:
   const workbench = useWorkbench();
   // undefined = still asking; null = this workbench is not connected to the main system
   const [organizationId, setOrganizationId] = useState<string | null | undefined>(undefined);
+  const [pending, setPending] = useState<{ request: AutoDraftRequest; resolve: () => void } | null>(null);
   useEffect(() => {
     if (!workbench) return;
     let live = true;
@@ -55,8 +57,10 @@ export default function ScriptForgeWorkbench({ episode, socialHref }: { episode:
   if (!workbench || organizationId === undefined) return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>載入中…</p>;
   if (!organizationId) return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>這個影音工作台沒有連上主系統，腳本無法使用。</p>;
   return (
-    <ScriptForge sideMenu videoNeedsClient={false} organizationId={organizationId}
+    <><ScriptForge sideMenu videoNeedsClient={false} organizationId={organizationId}
       onSendToVideo={(h) => send(workbench, episode, h)} videoVerb={episode ? "寫回這一集" : undefined}
+      onStartDrafts={(request) => new Promise<void>((resolve) => setPending({ request, resolve }))}
       saveSocialDraft={socialHref ? saveSocialDraft : undefined} socialHref={socialHref ?? undefined} />
+      {pending && <OneClickDraftDialog request={pending.request} workbench={workbench} close={() => { pending.resolve(); setPending(null); }} />}</>
   );
 }

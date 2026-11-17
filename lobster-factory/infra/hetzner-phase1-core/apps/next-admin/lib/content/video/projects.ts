@@ -23,11 +23,11 @@ export async function projectBelongsTo(projectId: string, orgId: string): Promis
  * `insert` (production_mode etc.). 0164's unique index decides a race: the loser's 23505 reads the winner's row.
  * A changed title is written back; nothing else on an existing row changes.
  */
-export async function ensureWorkbenchProject(db: SupabaseClient, org: string, sourceRef: string, title: string, insert: Row): Promise<{ ok: true; item: Row; created: boolean } | Failure> {
+export async function ensureWorkbenchProject(db: SupabaseClient, org: string, sourceRef: string, title: string, insert: Row, options: { retitle?: boolean } = {}): Promise<{ ok: true; item: Row; created: boolean } | Failure> {
   const find = () => db.from("media_production_projects").select(PROJECT_COLUMNS)
     .eq("organization_id", org).eq("source", "video_workbench").eq("source_ref", sourceRef).maybeSingle();
   const retitle = async (row: Row): Promise<{ ok: true; item: Row; created: false } | Failure> => {
-    if (row.title === title) return { ok: true, item: row, created: false };
+    if (row.title === title || options.retitle === false) return { ok: true, item: row, created: false };
     const updated = await db.from("media_production_projects").update({ title, updated_at: new Date().toISOString() })
       .eq("id", String(row.id)).eq("organization_id", org).select(PROJECT_COLUMNS).single();
     return updated.error ? { ok: false, error: updated.error.message } : { ok: true, item: updated.data as Row, created: false };

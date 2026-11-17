@@ -243,7 +243,11 @@
     // of each, written here only, so 快速輸出, 一鍵成片 and the editor read the same setting.
     if (action === "spine-set-bookends" || action === "spine-set-auto-run") {
       const templates = window.VideoWorkbench.capabilities?.remotionTemplates,
-        change = () => (action === "spine-set-bookends" ? Spine?.setBookends(db.projects, payload, templates) : Spine?.setAutoRun(db.projects, payload));
+        change = () => {
+          const old = db.projects.find((p) => p.id === payload.projectId)?.episodes?.find((e) => e.id === payload.episodeId)?.autoRun;
+          if (action === "spine-set-auto-run" && old?.status === "running" && payload.autoRun && payload.autoRun.runId !== old.runId) throw Error("這一集正在執行，請先停止這趟，再開始新的");
+          return action === "spine-set-bookends" ? Spine?.setBookends(db.projects, payload, templates) : Spine?.setAutoRun(db.projects, payload);
+        };
       if (!change()) throw new Error(action === "spine-set-bookends" ? "片頭或片尾設定無效" : "一鍵成片設定無效");
       await persistRedo(change);
       broadcast();
@@ -262,17 +266,27 @@
     // names a cast member (shot.character = its key) is bound to it, so the shot's picture uses that one's references.
     if (action === "spine-create") {
       if (!Spine) throw new Error("影音工作台沒有載入專案主線");
+      if (payload.autoRun?.runId) {
+        const old = db.projects.flatMap((p) => (p.episodes || []).map((e) => ({ p, e }))).find(({ e }) => e.autoRun?.runId === payload.autoRun.runId);
+        if (old) { const target = { projectId: old.p.id, episodeId: old.e.id }; await perform("spine-open", target); return target; }
+      }
       // Card U9: the cast keeps its Story Bible key (EpisodeSpine.castOf), so 寫回 and 存成核准版本 pair with it later.
       const shots = Array.isArray(payload.shots) ? payload.shots : [],
         cast = Spine.castOf(payload.characters),
-        id = crypto.randomUUID(),
+        id = typeof payload.autoRun?.runId === "string" && /^[A-Za-z0-9-]{1,64}$/.test(payload.autoRun.runId) ? payload.autoRun.runId : crypto.randomUUID(),
         series = typeof payload.storyBibleSeries === "string" && payload.storyBibleSeries ? { storyBibleSeries: payload.storyBibleSeries } : {};
       const p = M.project(Spine.newProject({
         id: "project-" + id, title: String(payload.title ?? "").trim() || "未命名影片",
-        ratio: ["9:16", "16:9", "1:1"].includes(payload.ratio) ? payload.ratio : "16:9",
+        ratio: ["9:16", "16:9", "4:5", "1:1"].includes(payload.ratio) ? payload.ratio : "16:9",
         assets: { character: cast, scene: [], prop: [] }, ...series,
         episode: { id: "ep-" + id, shots: Spine.castShots(shots, cast) },
       }));
+      // U3.6: the script handoff starts the same U5 run atomically, before the projects page can observe it.
+      const target = { projectId: p.id, episodeId: p.episodes[0].id };
+      if (payload.autoRun !== undefined) {
+        if (payload.autoRun?.until !== "drafts" || !Spine.setAutoRun([p], { ...target, autoRun: payload.autoRun })) throw Error("一鍵到草稿的執行設定無效");
+        if (!Spine.setBookends([p], { ...target, intro: payload.intro, outro: payload.outro })) throw Error("片頭／片尾設定無效");
+      }
       db.projects.unshift(p);
       await perform("spine-open", { projectId: p.id, episodeId: p.episodes[0].id });
       return { projectId: p.id, episodeId: p.episodes[0].id };
