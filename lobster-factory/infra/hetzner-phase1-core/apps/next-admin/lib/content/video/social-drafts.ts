@@ -16,7 +16,7 @@ export interface DraftDeps {
   /** deadline = this save's one time limit (ms epoch): a cover is attempted only if it still fits (store.addVideo). */
   addVideo(videoUrl: string, fileName: string, coverUrl: string | null, deadline: number): Promise<{ id: string }>;
   /** altText = the video's title (card VD.5): the description a screen reader gets where the platform takes one. */
-  savePost(fields: { body: string; notes: string }, accountId: string, mediaId: string, altText: string): Promise<{ id: string }>;
+  savePost(fields: { body: string; notes: string; source_url?: string }, accountId: string, mediaId: string, altText: string): Promise<{ id: string }>;
 }
 export type DraftResult =
   | { ok: true; drafts: Array<{ accountId: string; postId: string; ratio: string; platform: string }> }
@@ -43,7 +43,7 @@ export async function saveVideoSocialDrafts(deps: DraftDeps, title: string, item
   const drafts: Array<{ accountId: string; postId: string; ratio: string; platform: string }> = [];
   for (const p of plan) {
     if (!media.has(p.ratio)) media.set(p.ratio, (await deps.addVideo(p.videoUrl, `${p.ratio}.mp4`, p.coverUrl, deadline)).id);
-    const post = await deps.savePost({ body: p.text, notes: `影片：${title}`.slice(0, 500) }, p.accountId, media.get(p.ratio)!, title.trim().slice(0, 1000));
+    const post = await deps.savePost({ body: p.text, notes: `影片：${title}`.slice(0, 500), source_url: p.videoUrl }, p.accountId, media.get(p.ratio)!, title.trim().slice(0, 1000));
     drafts.push({ accountId: p.accountId, postId: post.id, ratio: p.ratio, platform: p.platform });
   }
   return { ok: true, drafts };

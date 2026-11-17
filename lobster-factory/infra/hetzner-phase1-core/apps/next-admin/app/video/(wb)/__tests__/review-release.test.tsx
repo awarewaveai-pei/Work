@@ -12,8 +12,9 @@ const PASSED = ["technical", "caption", "editorial", "rights"].map((kind) => ({ 
 const ACCOUNTS = [{ id: "acc-yt", platform: "youtube", label: "頻道甲", status: "active" }, { id: "acc-ig", platform: "instagram", label: "頻道乙", status: "active" }];
 
 type Call = { url: string; body?: unknown };
-function stubServer(assets: unknown[], released: string[] = []) {
+function stubServer(assets: unknown[], released: string[] = [], reports = PASSED) {
   const calls: Call[] = [];
+  let saved = false;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const u = String(url);
     calls.push({ url: u, body: init?.body ? JSON.parse(String(init.body)) : undefined });
@@ -21,10 +22,11 @@ function stubServer(assets: unknown[], released: string[] = []) {
     if (u.startsWith("/api/video/assets")) return ok({ items: u.includes("projectId=" + PROJECT) ? assets.filter((a) => (a as { id: string }).id === CUT) : assets });
     if (u.startsWith("/api/video/social-channels")) return ok({ accounts: ACCOUNTS });
     if (u.startsWith("/api/content/sites")) return ok({ sites: [] });
-    if (u.startsWith("/api/video/qa/")) return ok(init?.method === "POST" ? { ok: true } : { items: PASSED });
+    if (u.startsWith("/api/video/qa/")) return ok(init?.method === "POST" ? { ok: true } : { items: reports });
     if (u.startsWith("/api/video/release")) return ok(init?.method === "POST" ? { ok: true, release: { id: "rel-1" } } : { items: released.map((id) => ({ id: "rel-" + id, candidate_asset_id: id, candidate_checksum: "a".repeat(64) })) });
     if (u.startsWith("/api/video/cover")) return ok({ covers: {} });
-    if (u.startsWith("/api/video/social-drafts")) return ok({ ok: true, drafts: [{}, {}] });
+    if (u.startsWith("/api/video/draft-outcome")) return ok({ drafts: saved ? [{ id: "d1" }, { id: "d2" }] : [], articles: [], socialUrl: "https://social.example/" });
+    if (u.startsWith("/api/video/social-drafts")) { saved = true; return ok({ ok: true, drafts: [{}, {}] }); }
     throw new Error("unexpected " + u);
   }));
   return calls;
@@ -32,6 +34,13 @@ function stubServer(assets: unknown[], released: string[] = []) {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("ReviewRelease", () => {
+  it("does not offer continue until all four reports pass on the selected checksum", async () => {
+    stubServer([video(CUT, "第一集")], [], PASSED.map((q) => q.kind === "rights" ? { ...q, candidateChecksum: "old" } : q));
+    render(<ReviewRelease organizationId={ORG} assetId={CUT} section="qa" />);
+    const button = await screen.findByText("繼續到發布 →");
+    await screen.findAllByText(/第一集/);
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+  });
   it("two channels on different platforms: each keeps its own text and is saved as its own draft", async () => {
     const calls = stubServer([video(CUT, "第一集")], [CUT]);
     render(<ReviewRelease organizationId={ORG} assetId={CUT} section="release" />);
@@ -44,6 +53,8 @@ describe("ReviewRelease", () => {
     await waitFor(() => expect(calls.some((c) => c.url.startsWith("/api/video/social-drafts"))).toBe(true));
     const saved = calls.find((c) => c.url.startsWith("/api/video/social-drafts"))!.body as { items: { accountId: string; text: string }[] };
     expect(saved.items).toEqual([{ accountId: "acc-yt", text: "給 YouTube 的長文案" }, { accountId: "acc-ig", text: "給 IG 的短文案" }]);
+    expect(await screen.findByText("完成：已建 2 個社群草稿")).toBeTruthy();
+    expect(screen.getByText("查看社群草稿").getAttribute("href")).toBe("https://social.example/");
   });
 
   it("opened from a cut it lists that one video, not the client's others", async () => {
@@ -58,7 +69,7 @@ describe("ReviewRelease", () => {
     render(<ReviewRelease organizationId={ORG} projectId={PROJECT} section="qa" />);
     await screen.findAllByText(/舊專案影片/);
     expect(screen.queryByText(/別的影片/)).toBeNull();
-    fireEvent.click(await screen.findByText("繼續到 Release →"));
+    fireEvent.click(await screen.findByText("繼續到發布 →"));
     const play = await screen.findByText("播放");
     expect(play.getAttribute("href")).toBe(`https://r2.example/video/${CUT}/9x16.mp4`);
     const approve = await screen.findByText("核准這個比例發布");

@@ -13,11 +13,11 @@ export default function ReviewRelease({ organizationId, assetId, projectId, sect
   useEffect(() => { if (section === "release" || candidate !== assetId) half.current?.scrollIntoView?.(); }, [section, candidate, assetId]);
   if (!organizationId || (!assetId && !projectId)) return <p style={{ padding: "24px 28px", fontSize: 12, color: "var(--text-secondary)" }}>請從一支成片或一個專案打開審片與發布。</p>;
   return <>
-    <QaStep organizationId={organizationId} projectId={assetId ? undefined : projectId} initialAssetId={assetId} includeWorkbench onContinue={(id) => setCandidate(id)} />
+    <QaStep organizationId={organizationId} projectId={assetId ? undefined : projectId} initialAssetId={assetId} includeWorkbench onContinue={(id) => { setCandidate(id); half.current?.scrollIntoView?.({ behavior: "smooth" }); }} />
     <div ref={half}>
       {candidate
         ? <ReleaseDeliveryPanel key={candidate} organizationLocked initialOrganizationId={organizationId} initialCandidateAssetId={candidate} />
-        : <p style={{ padding: "0 28px 24px", fontSize: 12, color: "var(--text-secondary)" }}>在上面選一支影片，按「繼續到 Release」，這裡就是它的發布。</p>}
+        : <p style={{ padding: "0 28px 24px", fontSize: 12, color: "var(--text-secondary)" }}>在上面選一支影片，四項檢查通過後按「繼續到發布」，這裡就是它的發布。</p>}
     </div>
   </>;
 }

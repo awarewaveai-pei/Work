@@ -1,0 +1,11 @@
+const assert = require('node:assert/strict'), S = require('../shared/episode-spine.js');
+const next = (episode, review) => S.nextAction(S.stepStates(episode, [], review));
+assert.equal(next({ shots: [] }).key, 'script');
+assert.equal(next({ shots: [{ image: '/shot.png' }] }).key, 'video');
+const rendered = { shots: [{ image: '/shot.png' }], outputs: [{ url: '/cut.mp4', jobId: 'j', editRevision: null }] };
+assert.equal(next(rendered, { reviewed: false, drafted: false }).key, 'review');
+assert.equal(next(rendered, { reviewed: true, released: true, drafted: false }).key, 'release', '只有核准、沒有草稿，仍是發布');
+assert.equal(next(rendered, { reviewed: true, drafted: true }).key, 'done');
+assert.equal(next(rendered, null), null, '讀不到主系統不猜');
+assert.equal(S.nextAction(null), null);
+console.log('PASS U6.4 nextAction: five states, unknown and approval alone');

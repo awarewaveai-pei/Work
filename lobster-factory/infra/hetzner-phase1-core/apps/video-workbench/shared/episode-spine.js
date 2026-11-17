@@ -536,7 +536,7 @@
 
   // The 12 steps of spec §6 (plan U6 splits the last, 送審, into 審片 and 發布), each "todo" | "done" | "optional" | "stale". Read from what the episode has, so an episode
   // without steps/outputs (spec §3.2) shows what its shots and edit file imply.
-  function stepStates(episode, editRows) {
+  function stepStates(episode, editRows, review) {
     const shots = episode?.shots || [],
       steps = episode?.steps || [],
       outputs = episode?.outputs || [],
@@ -563,13 +563,24 @@
       or(made("finish") ? "done" : "optional", outputs.some((o) => TOOL_STEP[toolOf(episode, o)] === "finish" && outputStale(episode, o, editRows))),
       // 審片 and 發布 are decided on the main system (plan U6); the page reads them (scripts/projects-0.js reviewStates)
       // and shows them in place of these. Until it has, a cut that exists is not known to be reviewed.
-      outputs.length ? "todo" : "optional",
-      outputs.length ? "todo" : "optional",
+      outputs.length ? (arguments.length < 3 ? "todo" : review ? review.reviewed ? "done" : "todo" : "unknown") : "optional",
+      outputs.length ? (arguments.length < 3 ? "todo" : review ? review.drafted ? "done" : "todo" : "unknown") : "optional",
     ];
+  }
+  // U6.4: every surface consumes this exact result from the shared step states. No local workflow judgments.
+  function nextAction(states) {
+    if (!Array.isArray(states) || states.length !== 12) return null;
+    if ([1, 2, 8].some((i) => !["done", "todo", "stale"].includes(states[i]))) return null;
+    if (states[1] !== "done") return { key: "script", label: "寫腳本", target: "script" };
+    if (states[2] !== "done" || states[8] !== "done") return { key: "video", label: "一鍵成片", target: "video" };
+    if ([states[10], states[11]].some((s) => !["done", "todo"].includes(s))) return null;
+    if (states[10] !== "done") return { key: "review", label: "審片", target: "qa" };
+    if (states[11] !== "done") return { key: "release", label: "發布", target: "release" };
+    return { key: "done", label: "完成", target: "done" };
   }
 
   const api = { editId, editTitle, newProject, newShot, castOf, castShots, setShots, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs,
-    TRANSITIONS, TEMPLATE_RATIOS, normalizeBookend, setBookends, bookendJob, bookendKey, bookendState, normalizeAutoRun, setAutoRun, autoRunNext, current, isStale, staleClip, outputStale, lineage, stepStates };
+    TRANSITIONS, TEMPLATE_RATIOS, normalizeBookend, setBookends, bookendJob, bookendKey, bookendState, normalizeAutoRun, setAutoRun, autoRunNext, current, isStale, staleClip, outputStale, lineage, stepStates, nextAction };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

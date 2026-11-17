@@ -125,6 +125,7 @@ export async function embedVideoInPost(
   // Fetch current post content
   let currentContent = "";
   let draftStatus: string | null = null;   // draftOnly: the not-live status read, written back with the content
+  let postTitle = "文章 #" + postId;
   try {
     const getRes = await fetch(`${base}/wp-json/wp/v2/posts/${postId}?context=edit`, {
       headers: { Authorization: authHdr },
@@ -135,7 +136,8 @@ export async function embedVideoInPost(
       await markReceipt(false, undefined, { phase: "fetch", status: getRes.status, error: e.message });
       return { ok: false, status: getRes.status, error: e.message ?? `WP GET error ${getRes.status}` };
     }
-    const post = await getRes.json() as { status?: string; content?: { raw?: string } };
+    const post = await getRes.json() as { status?: string; content?: { raw?: string }; title?: { raw?: string; rendered?: string } };
+    postTitle = post.title?.raw || post.title?.rendered || postTitle;
     if (input.draftOnly && !NOT_LIVE_STATUSES.includes(String(post.status))) {
       await markReceipt(false, undefined, { phase: "fetch", refused: "not_draft", postStatus: post.status });
       return { ok: false, status: 409, error: "這篇文章已發布或已排程，嵌入會直接上線；請改用「建新草稿文章並嵌入」" };
@@ -192,7 +194,7 @@ export async function embedVideoInPost(
     return { ok: false, status: 502, error: "Failed to update post in WordPress" };
   }
 
-  await markReceipt(true, String(postId), { postId, videoUrl });
+  await markReceipt(true, String(postId), { postId, videoUrl, postTitle, editUrl: resolved.site.url.replace(/\/$/, "") + "/wp-admin/post.php?post=" + postId + "&action=edit" });
   return { ok: true, postId, videoUrl };
 }
 

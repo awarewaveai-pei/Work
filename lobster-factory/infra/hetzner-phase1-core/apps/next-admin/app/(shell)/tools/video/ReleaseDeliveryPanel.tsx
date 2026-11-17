@@ -43,6 +43,7 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
   const [released, setReleased] = useState<Record<string, string>>({});   // ratio row id -> approved Release id
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [outcome, setOutcome] = useState<{ drafts: { id: string }[]; articles: { title: string; editUrl: string | null }[]; socialUrl?: string } | null>(null);
   const [covers, setCovers] = useState<Record<string, Cover[]>>({});   // ratio row id -> its covers (VD.3)
   const [coverRights, setCoverRights] = useState(false);
 
@@ -54,6 +55,12 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
   const [wpPosts, setWpPosts] = useState<WpPost[]>([]);
 
   const org = organizationId.trim();
+  async function loadOutcome() {
+    if (!org || !candidateId) return;
+    setOutcome(await getJson(`/api/video/draft-outcome?organizationId=${encodeURIComponent(org)}&candidateAssetId=${encodeURIComponent(candidateId)}`));
+  }
+  useEffect(() => { setOutcome(null); void loadOutcome(); }, [org, candidateId]);
+  const changed = () => window.parent.postMessage({ type: "vw:workflow-changed" }, window.location.origin);
   const primaries = useMemo(() => assets.filter((a) => !a.metadata?.variantOf), [assets]);
   const primary = assets.find((a) => a.id === candidateId);
   const rows = useMemo(() => assets.filter((a) => a.id === candidateId || a.metadata?.variantOf === candidateId)
@@ -144,6 +151,7 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
     const res = await postJson("/api/video/social-drafts", { organizationId: org, candidateAssetId: candidateId, items: ticked.map((id) => ({ accountId: id, text: texts[id] ?? "" })) });
     const drafts = (res.json.drafts as unknown[] | undefined)?.length ?? 0;
     setMessage(res.ok ? `✅ 已存成 ${drafts} 個社群草稿，到社群工具查看與發布。` : String(res.json.error ?? "存草稿失敗"));
+    if (res.ok) { await loadOutcome(); changed(); }
     setBusy(false);
   }
 
@@ -161,11 +169,17 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
     const res = await postJson("/api/video/embed-to-wp", { siteId, ...target, draftOnly: true, videoUrl: row.object_url, releaseId: released[row.id], variant: "default" });
     if ("newDraftTitle" in target) void pickSite(siteId);   // the new draft shows in the list, also when the embed into it failed
     setMessage(res.ok ? "✅ 影片已嵌入草稿文章，到 WordPress 後台檢查後再自己發布。" : String(res.json.error ?? "嵌入失敗"));
+    if (res.ok) { await loadOutcome(); changed(); }
     setBusy(false);
   }
 
   const tickedAll = ticked.length > 0 && ticked.every((id) => (texts[id] ?? "").trim());
   return <div style={{ padding: "20px 28px", display: "grid", gap: 14 }}>
+    {!!(outcome?.drafts.length || outcome?.articles.length) && <section style={card} role="status">
+      <b>完成：已建 {outcome.drafts.length} 個社群草稿</b>
+      {!!outcome.drafts.length && outcome.socialUrl?.startsWith("https://") && <a href={outcome.socialUrl} target="_blank" rel="noopener noreferrer">查看社群草稿</a>}
+      {outcome.articles.map((a, i) => <div key={i}>已嵌入〈{a.title}〉{a.editUrl?.startsWith("https://") && <> · <a href={a.editUrl} target="_blank" rel="noopener noreferrer">開啟草稿文章</a></>}</div>)}
+    </section>}
     <div><b style={{ fontSize: 15 }}>發布</b><p style={{ margin: "4px 0", fontSize: 12, color: "var(--text-secondary)" }}>四項檢查都通過的比例才能核准發布；核准後可存成社群草稿，或嵌進網站文章。都是草稿，不會直接上線。</p></div>
 
     <section style={card}>

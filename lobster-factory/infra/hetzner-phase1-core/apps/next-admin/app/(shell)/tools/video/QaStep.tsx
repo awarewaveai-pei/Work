@@ -65,6 +65,7 @@ export default function QaStep({ organizationId, projectId, initialAssetId, incl
   // qaItems 是新→舊排序：每個 kind 只留第一筆（最新）。
   const byKind = new Map<string, QaItem>();
   for (const q of qaItems) if (!byKind.has(q.kind)) byKind.set(q.kind, q);
+  const allPassed = Object.keys(QA_LABELS).every((kind) => byKind.get(kind)?.status === "passed" && byKind.get(kind)?.candidateChecksum === checksum);
 
   return (
     <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 640 }}>
@@ -108,9 +109,9 @@ export default function QaStep({ organizationId, projectId, initialAssetId, incl
       )}
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>QA 是出片前的檢查報告，不會出現在影片裡；四項都通過才能建立 Release。</div>
 
-      <button type="button" onClick={() => onContinue(assetId, checksum)} disabled={!assetId}
-        style={{ ...buttonStyle({ tone: "primary", disabled: !assetId }), width: 200 }}>
-        繼續到 Release →
+      <button type="button" onClick={() => onContinue(assetId, checksum)} disabled={!assetId || !allPassed}
+        style={{ ...buttonStyle({ tone: "primary", disabled: !assetId || !allPassed }), width: 200 }}>
+        繼續到發布 →
       </button>
       <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{BLOCKED_NOTE}Release 步驟的閘是最終依據，這裡只是先給你看。</div>
     </div>

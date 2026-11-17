@@ -158,6 +158,7 @@ document.addEventListener("vw:changed", () => {
   if (dialog) spineUndrawn = true;
   else render();
   driveAutoRuns();
+  consumeNextIntent();
 });
 let dialog = null;
 let spineUndrawn = false;
@@ -233,6 +234,9 @@ function renderWorkbench() {
   );
   wireReviewLinks();
   ProjectBible.mount(p, e); // card U9: the approved-version block and step 3's check results (scripts/projects-bible.js)
+  const next = document.createElement("div"); next.dataset.vwNextSurface = "header"; next.className = "row";
+  $("workbench").querySelector(".work-top")?.after(next);
+  VideoWorkbench.renderNext(next, p, e, editRows(e), () => openQuickRender(true));
 }
 // Card PJ.2: the episode's 12 steps and its cuts (spec §6). States come from EpisodeSpine.stepStates; the edit file's
 // title is read from the edit file itself, never copied here (card PJ.1).
@@ -291,7 +295,7 @@ function bookendCard(e, o, i) {
   const end = e.intro, templates = VideoWorkbench.capabilities?.remotionTemplates || [],
     name = !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + (TRANSITION_LABEL[end.transition] || ""),
     preview = end ? `<span data-intro-preview="${esc(o.jobId)}"></span>` : "";
-  return `<div class="panel"><strong>本集片頭：${esc(name)}</strong>${preview}<div class="row">${[["bookendEdit", "編輯片頭"], ["bookendRender", "重新生成片頭 · 免費"], ["bookendJoin", "加入這支影片 · 免費"], ["copyOutput", "複製連結"]].map(([act, label]) => `<button class="btn small outline" data-action="${act}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
+  return `<div class="row" data-output-next data-vw-next-surface="card"></div><div class="panel"><strong>本集片頭：${esc(name)}</strong>${preview}<div class="row">${[["bookendEdit", "編輯片頭"], ["bookendRender", "重新生成片頭 · 免費"], ["bookendJoin", "加入這支影片 · 免費"], ["copyOutput", "複製連結"]].map(([act, label]) => `<button class="btn small outline" data-action="${act}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
 }
 function outputList(e) {
   const outputs = e.outputs,
@@ -336,6 +340,7 @@ function wireReviewLinks() {
   if (!buttons.length && !lines.length) return;
   const jobs = VideoWorkbench.generations.list(),
     videoOf = (id) => read("job:" + id, () => jobs.then((list) => list.find((j) => j.id === id) || VideoWorkbench.generations.get(id)));
+  for (const box of root.querySelectorAll("[data-output-next]")) VideoWorkbench.renderNext(box, project(), ep(), editRows(ep()), () => openQuickRender(true));
   for (const box of root.querySelectorAll("[data-intro-preview]"))
     videoOf(box.dataset.introPreview).then(VideoWorkbench.bookendPreview).then((job) => {
       if (!job?.result?.url || !box.isConnected) return;
@@ -363,12 +368,12 @@ function wireReviewLinks() {
   const last = buttons.find((b) => b.dataset.section === "qa" && b.closest("[data-step]"));
   if (last)
     videoOf(last.dataset.review)
-      .then((v) => read("review:" + v.id, () => VideoWorkbench.readReview(v)))
+      .then((v) => read("review:" + v.id, () => VideoWorkbench.readProgress(v)))
       .then((review) => {
-        if (!review) return;
-        for (const [n, done] of [[11, review.reviewed], [12, review.released]]) {
+        const states = EpisodeSpine.stepStates(ep(), editRows(ep()), review);
+        for (const n of [11, 12]) {
           const badge = root.querySelector('[data-step="' + n + '"] .badge');
-          if (badge) badge.textContent = STEP_BADGE[done ? "done" : "todo"];
+          if (badge) badge.textContent = STEP_BADGE[states[n - 1]] || "狀態未知";
         }
       }, () => {});
 }
@@ -865,6 +870,12 @@ function openQuickRender(oneClick) {
     budgetTwd: null,
   });
   quickQuote();
+}
+let nextIntentSeen = null;
+function consumeNextIntent() {
+  if (state.intent !== "video" || !state.open || nextIntentSeen === state.open || !project()) return;
+  nextIntentSeen = state.open;
+  openQuickRender(true); // only opens the quoted confirmation; never submits it
 }
 // Plan U5 快速輸出: what keeps the shots from rendering and what the chosen ratios and voice cost, asked of the server
 // again on every change (backend/quick-render.cjs quote); only the newest answer is drawn.
@@ -1655,3 +1666,4 @@ render();
 loadLegacyProjects();
 replaceRetiredModel();
 driveAutoRuns();
+consumeNextIntent();

@@ -253,7 +253,7 @@
     if (action === "spine-open") {
       const index = db.projects.find((p) => p.id === payload.projectId)?.episodes.findIndex((e) => e.id === payload.episodeId) ?? -1;
       if (index < 0) throw new Error("找不到這一集");
-      db.selection = { current: payload.projectId, episode: index, open: (db.selection?.open || 0) + 1 };
+      db.selection = { current: payload.projectId, episode: index, open: (db.selection?.open || 0) + 1, ...(payload.intent === "video" ? { intent: "video" } : {}) };
       await spineChanged();
       return perform("navigate", { target: "projects" });
     }
@@ -484,10 +484,12 @@
         if (v?.status !== "succeeded") continue;
       }
       for (const k of ["ledgerError", "releaseTextError", "coverRegisterError", "ledgerPending"]) if (!(k in v)) delete j[k];   // resolved since
+      const justCompleted = ["queued", "running"].includes(j.status) && v.status === "succeeded";
       Object.assign(j, v);
       changed = true;
       if (v.status === "succeeded" && v.result?.url && !db.assets.some((a) => a.id === "job-" + j.id))
         db.assets.push(M.asset(jobAsset(v)));
+      if (justCompleted) document.dispatchEvent(new CustomEvent("vw:job-completed", { detail: v }));
       if (watch(v) || v.ledgerPending === true) {
         again.add(j.id);
         running = true;

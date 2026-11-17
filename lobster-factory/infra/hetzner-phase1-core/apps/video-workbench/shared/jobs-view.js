@@ -47,7 +47,11 @@
       ...(releases.length && !(detail.deliveries || []).some((d) => ids.has(d.release_id)) ? ["已核准，還沒投遞"] : []),
     ];
   }
-  if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio, readReview, readPublished });
+  async function readProgress(get, org, asset) {
+    const [review, outcome] = await Promise.all([readReview(get, org, asset), get("/api/video/draft-outcome?" + new URLSearchParams({ organizationId: org, candidateAssetId: asset }))]);
+    return review && outcome ? { ...review, drafted: !!(outcome.drafts?.length || outcome.articles?.length), drafts: outcome.drafts || [], articles: outcome.articles || [], socialUrl: outcome.socialUrl } : null;
+  }
+  if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio, readReview, readPublished, readProgress });
   VideoWorkbench.bookendAction = async (v, action) => {
     if (!VideoWorkbench.bookends) await VideoWorkbench.loadScripts(["bookends.js"], sharedBase);
     const api = VideoWorkbench.bookends;
@@ -211,8 +215,91 @@
   VideoWorkbench.reviewQuery = reviewQuery;
   VideoWorkbench.openReview = openReview;
   VideoWorkbench.readReview = (v) => reviewQuery(v).then((q) => readReview(getJson, q.organizationId, q.asset));
+  VideoWorkbench.readProgress = (v) => reviewQuery(v).then((q) => readProgress(getJson, q.organizationId, q.asset));
   VideoWorkbench.readPublished = (v) => reviewQuery(v).then((q) => (v.input?.link?.projectId ? readPublished(getJson, q.organizationId, v.input.link.projectId, q.asset) : []));
+  VideoWorkbench.episodeProgress = async (p, e, edits = []) => {
+    if (e.edit) {
+      try { edits = JSON.parse(VideoWorkbench.storage.getItem(e.edit.engine === "filmcraft" ? "tools.engine.projects" : "tools.editor.projects") || "[]"); } catch { edits = []; }
+    }
+    let review;
+    const last = e.outputs?.at(-1);
+    if (last) {
+      try {
+        const v = (await VideoWorkbench.generations.list()).find((j) => j.id === last.jobId) || await VideoWorkbench.generations.get(last.jobId);
+        review = await VideoWorkbench.readProgress(v);
+      } catch { review = null; }
+    }
+    const states = EpisodeSpine.stepStates(e, edits, review);
+    return { states, action: EpisodeSpine.nextAction(states), review };
+  };
+  const nextBoxes = new Set();
+  VideoWorkbench.renderJobNext = async (v, box) => {
+    const link = v.input?.link, p = (await VideoWorkbench.projects.list()).find((x) => x.id === link?.projectId), e = p?.episodes?.find((x) => x.id === link?.episodeId);
+    if (e) VideoWorkbench.renderNext(box, p, e);
+  };
+  VideoWorkbench.renderNext = (box, p, e, edits = [], local) => {
+    box.dataset.vwNextSurface ||= "card";
+    let revision = 0;
+    const refresh = async () => {
+      const asked = ++revision;
+      const projects = await VideoWorkbench.projects.list(), latestP = projects.find((x) => x.id === p.id), latestE = latestP?.episodes?.find((x) => x.id === e.id);
+      if (!latestE) { if (box.isConnected) box.textContent = "這一集已不存在"; return; }
+      const progress = await VideoWorkbench.episodeProgress(latestP, latestE, edits);
+      if (asked !== revision || !box.isConnected) return;
+      box.replaceChildren();
+      const next = progress.action;
+      if (!next) { box.textContent = "主系統狀態暫時讀不到，無法確認下一步"; return; }
+      const button = document.createElement("button"); button.type = "button"; button.className = "btn primary";
+      button.textContent = next.label; button.dataset.nextKey = next.key; box.append(button);
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          if (next.key === "script") await VideoWorkbench.navigate("script-forge", new URLSearchParams({ project: p.id, episode: e.id }).toString());
+          else if (next.key === "video") local ? await local("video") : await VideoWorkbench.spine.open({ projectId: p.id, episodeId: e.id, intent: "video" });
+          else if (["review", "release"].includes(next.key)) {
+            const last = latestE.outputs.at(-1), v = await VideoWorkbench.generations.get(last.jobId); await openReview(v, next.target);
+          }
+        } catch (error) { VideoWorkbench.reportError(error); }
+        finally { button.disabled = false; }
+      };
+      if (next.key === "done") {
+        button.disabled = true;
+        button.textContent = "完成：已建 " + (progress.review?.drafts.length || 0) + " 個社群草稿";
+        for (const article of progress.review?.articles || []) {
+          const a = document.createElement("a"); a.textContent = "已嵌入〈" + article.title + "〉";
+          if (article.editUrl && VideoWorkbench.safeUrl(article.editUrl)) { a.href = VideoWorkbench.safeUrl(article.editUrl); a.target = "_blank"; a.rel = "noopener noreferrer"; } box.append(a);
+        }
+        if (progress.review?.drafts.length && VideoWorkbench.safeUrl(progress.review.socialUrl)) { const a = document.createElement("a"); a.href = VideoWorkbench.safeUrl(progress.review.socialUrl); a.textContent = "查看社群草稿"; a.target = "_blank"; a.rel = "noopener noreferrer"; box.append(a); }
+      }
+    };
+    for (const item of nextBoxes) if (!item.box.isConnected) nextBoxes.delete(item);
+    nextBoxes.add({ box, refresh }); refresh().catch(VideoWorkbench.reportError);
+  };
+  const refreshNext = () => { for (const item of nextBoxes) item.box.isConnected ? item.refresh().catch(VideoWorkbench.reportError) : nextBoxes.delete(item); };
+  document.addEventListener?.("vw:changed", refreshNext);
+  document.addEventListener?.("vw:workflow-changed", refreshNext);
+  if (typeof window === "object") {
+  window.addEventListener("focus", refreshNext);
+  window.addEventListener("message", (event) => {
+    if (event.origin !== location.origin || event.data?.type !== "vw:workflow-changed") return;
+    refreshNext();
+    if (!event.data.relay) for (const frame of document.querySelectorAll("iframe")) frame.contentWindow?.postMessage({ type: "vw:workflow-changed", relay: true }, location.origin);
+  });
+  }
+  const notified = new Set();
+  VideoWorkbench.notifyNext = async (v) => {
+    if (notified.has(v.id) || v.type !== "video" || v.input?.link?.target !== "output") return;
+    notified.add(v.id);
+    const link = v.input.link, p = (await VideoWorkbench.projects.list()).find((x) => x.id === link.projectId), e = p?.episodes?.find((x) => x.id === link.episodeId);
+    if (!e) return;
+    const box = document.createElement("div"), title = document.createElement("p"), next = document.createElement("div");
+    box.className = "service-error"; box.setAttribute("role", "status"); next.dataset.vwNextSurface = "notification";
+    title.textContent = "影片已完成 · " + p.title + "／" + e.name; box.append(title, next); document.body.append(box);
+    VideoWorkbench.renderNext(next, p, e); setTimeout(() => box.remove(), 30000);
+  };
+  document.addEventListener?.("vw:job-completed", (ev) => VideoWorkbench.notifyNext(ev.detail).catch(VideoWorkbench.reportError));
   VideoWorkbench.showJob = (job, options = {}) => {
+    let completionNotice = ["queued", "running"].includes(job.status);
     let panel = document.createElement("section");
     panel.className = "job-view";
     panel.setAttribute("role", "status");
@@ -248,7 +335,9 @@
         if (v.status === "succeeded") {
           VideoWorkbench.assets.save(VideoWorkbench.jobAsset(v)).catch(VideoWorkbench.reportError);
           // Card PJ.2: back to its episode; a closed panel leaves it to the top page's reconcile (same settle, once).
-          VideoWorkbench.spine?.settle(v).catch(VideoWorkbench.reportError);
+          VideoWorkbench.spine?.settle(v).then(() => {
+            if (completionNotice) { completionNotice = false; VideoWorkbench.notifyNext(v).catch(VideoWorkbench.reportError); }
+          }).catch(VideoWorkbench.reportError);
           if (options.onSuccess) {
             options.onSuccess(v);
             options.onSuccess = null;
@@ -335,6 +424,8 @@
               action("配音", () => VideoWorkbench.generator.import({ intent: "open-tool", tool: "voice" }));
             }
             if (v.type === "video") {
+              const next = document.createElement("div"); next.dataset.vwNextSurface = "card"; actions.append(next);
+              VideoWorkbench.renderJobNext(v, next).catch(VideoWorkbench.reportError);
               action("複製連結", async () => { await navigator.clipboard.writeText(new URL(url, location.origin).href); VideoWorkbench.notify("已複製影片連結；需登入同一工作台才能開啟"); });
               bookendButtons(v, actions);
               reviewButton(v, actions);
