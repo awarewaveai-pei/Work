@@ -16,7 +16,9 @@ function edTitleBlocked(p) {
   const missing = (edTitleTemplate()?.fields || []).find((f) => f.required && edTitleMedia(f) && !ed.title.picks[f.key]);
   return missing ? "請先選「" + missing.label + "」" : "";
 }
-const edTitleMedia = (f) => f.type === "image" || f.type === "audio",
+// 「AI 生成」 sits on the template's picture fields, not on a logo or a reviewer's photo.
+const edTitleGeneratable = (f) => !/logo|profile/i.test(f.key),
+  edTitleMedia = (f) => f.type === "image" || f.type === "audio",
   edTitleSeconds = (t) => ed.title.seconds ?? t.seconds.def;
 async function edTitleRefresh() {
   const rows = await VideoWorkbench.assets.list();
@@ -52,6 +54,13 @@ function edTitlePane(p) {
   const t = edTitleTemplate(),
     blocked = edTitleBlocked(p),
     list = VideoWorkbench.capabilities?.remotionTemplates || [];
+  // Card U8.3: an untouched text field starts from this episode (title; the first shot's line for the tagline).
+  const hit = edSpineHit(p);
+  if (t)
+    ed.title.fields = EditorModel.titlePrefill(ed.title.fields, t, {
+      title: hit?.episode?.name?.trim() || hit?.project?.title || p.title,
+      line: edLines(hit?.episode)[0]?.line,
+    });
   if (!ed.title.images) {
     ed.title.images = [];
     ed.title.audios = [];
@@ -63,7 +72,7 @@ function edTitlePane(p) {
     if (f.type === "image" || f.type === "audio") {
       const rows = f.type === "image" ? ed.title.images : ed.title.audios,
         picked = ed.title.picks[f.key];
-      return `<p class="note">${label}（從素材庫選擇）</p><div class="flow-choices" role="group" aria-label="${esc(f.label)}">${f.required ? "" : `<button type="button" class="btn small ${picked ? "" : "selected"}" data-ed-action="title-pick:${esc(f.key)}:" aria-pressed="${!picked}">不使用</button>`}${
+      return `<p class="note">${label}（從素材庫選擇）</p><div class="flow-choices" role="group" aria-label="${esc(f.label)}">${f.required ? "" : `<button type="button" class="btn small ${picked ? "" : "selected"}" data-ed-action="title-pick:${esc(f.key)}:" aria-pressed="${!picked}">不使用</button>`}${f.type === "image" && edTitleGeneratable(f) ? `<button type="button" class="btn small" data-ed-action="title-image:${esc(f.key)}" data-paid="video.image">AI 生成</button>` : ""}${
         rows
           .map((a) => {
             const on = picked?.id === a.id,
@@ -74,8 +83,9 @@ function edTitlePane(p) {
       }</div>`;
     }
     const attrs = `class="text-input" aria-label="${esc(f.label)}" data-ed-title-field="${esc(f.key)}"`,
-      value = esc(ed.title.fields[f.key] ?? "");
-    return `<label>${label}${
+      value = esc(ed.title.fields[f.key] ?? ""),
+      count = (f.type || "text") === "text" ? ` <span class="note" data-ed-title-count="${esc(f.key)}">${EditorModel.titleCount(ed.title.fields[f.key], f.max)}</span>` : "";
+    return `<label>${label}${count}${
       f.multiline
         ? `<textarea ${attrs} maxlength="${f.max}">${value}</textarea>`
         : f.type === "number"
@@ -324,6 +334,28 @@ edRegisterPane("text", {
       edRender();
       return;
     },
+    // title-image:<field key>: the workbench's own image job (generations, type image; showJob shows it and its price came
+    // from the button's data-paid); when it succeeds the picture is picked into that field.
+    "title-image:": async (action, p) => {
+      const key = action.slice(12),
+        t = edTitleTemplate(),
+        field = t?.fields.find((f) => f.key === key && f.type === "image" && edTitleGeneratable(f));
+      if (!field) return;
+      const hit = edSpineHit(p),
+        prompt = EditorModel.titleImagePrompt(ed.title.fields, key, hit?.episode?.name?.trim() || hit?.project?.title || p.title);
+      if (!prompt) throw Error("請先填標題，才知道要生成什麼畫面");
+      const job = await VideoWorkbench.generations.create({ type: "image", prompt, ratio: p.ratio });
+      VideoWorkbench.showJob(job, {
+        onSuccess: (v) => {
+          if (ed.title.projectId !== p.id) return;
+          const asset = VideoWorkbench.jobAsset(v);
+          ed.title.picks[key] = asset;
+          if (!(ed.title.images || []).some((a) => a.id === asset.id)) ed.title.images = [...(ed.title.images || []), asset];
+          setTimeout(() => edTitleRefresh().catch(VideoWorkbench.reportError), 300);
+          if (tool === "edit" && ed.pane === "文字") edRender();
+        },
+      });
+    },
     "title-generate": async (action, p, c) => {
       const t = edTitleTemplate(),
         blocked = edTitleBlocked(p);
@@ -367,6 +399,10 @@ edRegisterPane("text", {
   },
 });
 document.addEventListener("input", (e) => {
+  if (e.target.matches?.("[data-ed-title-field]")) {
+    const n = document.querySelector(`[data-ed-title-count="${CSS.escape(e.target.dataset.edTitleField)}"]`);
+    if (n && e.target.maxLength > 0) n.textContent = EditorModel.titleCount(e.target.value, e.target.maxLength);
+  }
   if (e.target.matches?.("[data-ed-title-seconds]")) ed.title.seconds = e.target.value === "" ? null : Number(e.target.value);
 });
 // Search box: filter the grid, keep the caret.

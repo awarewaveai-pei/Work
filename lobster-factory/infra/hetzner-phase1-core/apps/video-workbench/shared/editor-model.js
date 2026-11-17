@@ -442,8 +442,38 @@
   // 中文 in a Latin font (Arial / Georgia have no Han glyphs): the preview's CSS falls back to 思源黑體's file, so the
   // export switches these characters to 思源黑體 too (\fn) instead of letting libass ask the machine for a font.
   const CJK_CHAR = /[\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef]|[\u{20000}-\u{3ffff}]/u;
+  // Card U8.3: the 片頭 form (scripts/editor-panes/text.js; fields come from backend/remotion.cjs). A text field the user has
+  // not touched (no value yet; "" after they cleared it counts as touched) is filled from the episode: the title fields
+  // take its title, the tagline its first shot's line, each cut to the field's max. Other fields stay empty.
+  const TITLE_KEYS = ["text", "headline"],
+    LINE_KEYS = ["tagline"];
+  const oneLine = (v, max) => {
+    const s = String(v ?? "").replace(/\s+/g, " ").trim();
+    return Number.isFinite(max) ? s.slice(0, max) : s;
+  };
+  function titlePrefill(fields, template, { title, line } = {}) {
+    const out = { ...fields };
+    for (const f of template?.fields || []) {
+      if ((f.type || "text") !== "text" || out[f.key] !== undefined) continue;
+      const v = oneLine(TITLE_KEYS.includes(f.key) ? title : LINE_KEYS.includes(f.key) ? line : "", f.max);
+      if (v) out[f.key] = v;
+    }
+    return out;
+  }
+  // "12/20": characters typed / the field's max (the same UTF-16 count the input's maxlength stops at).
+  const titleCount = (value, max) => String(value ?? "").length + "/" + max;
+  // The picture prompt for an image field of the form: its own scene's text (imageUrl2 -> text2), else the title, else the
+  // episode's title; no text in the picture, since the template draws the words.
+  function titleImagePrompt(fields, key, fallback) {
+    const n = /\d+$/.exec(String(key))?.[0],
+      topic = oneLine((n && fields?.["text" + n]) || fields?.headline || fields?.text || fallback);
+    return topic ? "片頭畫面，畫面中不要出現任何文字：" + topic : "";
+  }
   const api = {
     FONT_DIR,
+    titlePrefill,
+    titleCount,
+    titleImagePrompt,
     FONTS,
     fontOf,
     CJK_CHAR,

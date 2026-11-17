@@ -37,6 +37,7 @@ const tests = [
   "u10-usage-panel",
   "u5-quick-render",
   "u6-review-state",
+  "u8-title-form",
 ];
 const checks = [
   "server.cjs",
