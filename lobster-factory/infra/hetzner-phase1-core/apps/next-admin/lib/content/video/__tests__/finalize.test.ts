@@ -63,12 +63,14 @@ describe("finalizeVideoJob", () => {
   });
 
   it("poll done valid: job marked done+recorded, input keys cleaned", async () => {
-    pollRenderJob.mockResolvedValue({ status: "done", outputs: OUT, out_dir: "x", outputMeta: { "16x9": { width: 1920, height: 1080 } } });
+    const mainOutputs = { "16x9": "https://cdn.example/videomain/16x9.mp4" };
+    pollRenderJob.mockResolvedValue({ status: "done", outputs: OUT, out_dir: "x", mainOutputs, outputMeta: { "16x9": { width: 1920, height: 1080 } } });
     const job = runningJob();
     const res = await finalizeVideoJob(job);
     expect(res).toMatchObject({ status: "done", title: "T" });
     expect(finishJob).toHaveBeenCalledWith("j1", expect.objectContaining({ status: "done", recorded: true }));
     expect(cleanupVideoInputKeys).toHaveBeenCalledWith(job.r2Keys);
+    expect(recordVideoAsset).toHaveBeenCalledWith(expect.objectContaining({ mainOutputs }));
   });
 
   it("a render of a project records the asset under that project", async () => {

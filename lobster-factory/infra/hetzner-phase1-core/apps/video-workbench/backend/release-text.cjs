@@ -30,7 +30,14 @@ function fromEditor(settings) {
     .filter((c) => c.kind === "text" && !c.hidden && !hidden.get(c.track) && c.opacity > 0 && c.text.trim())
     .sort((a, b) => index.get(a.track) - index.get(b.track) || a.startFrame - b.startFrame)
     .map((c) => ({ startMs: ms(c.startFrame), endMs: ms(c.startFrame + c.durationFrames), text: c.text.trim(), subtitle: !!c.subtitleStyle }));
-  return { title: String(settings.project.title ?? ""), pieces };
+  // U5.5: a main clip already has its script captions burned in. Rejoining shifts their QA/SRT timeline without
+  // drawing them a second time; the native text clips above still describe captions made in the editor itself.
+  const reused = settings.reusedText, totalMs = ms(project.totalFrames);
+  for (const c of Array.isArray(reused?.captions) ? reused.captions.slice(0, 2000) : []) {
+    if (!Number.isFinite(c.startMs) || !Number.isFinite(c.endMs) || c.startMs < 0 || c.endMs <= c.startMs || c.endMs > totalMs + 100 || typeof c.text !== "string") throw Error("重接主片的字幕時間無效");
+    pieces.push({ startMs: Math.round(c.startMs), endMs: Math.round(c.endMs), text: c.text.slice(0, MAX_CUE_TEXT), subtitle: true });
+  }
+  return { title: String(settings.project.title ?? reused?.title ?? ""), pieces, reusedScript: typeof reused?.script === "string" ? reused.script : "" };
 }
 
 // Subtitle burn and the professional editor's render (card FC.3) both carry cues in seconds.
@@ -43,11 +50,11 @@ function releaseText(job) {
   const op = job?.input?.operation;
   if (op !== "editor-export" && op !== "subtitle-burn" && op !== "engine-render") return null;
   const settings = job.input.settings || {};
-  const { title, pieces } =
+  const { title, pieces, reusedScript = "" } =
     op === "editor-export" ? fromEditor(settings)
     : op === "engine-render" ? fromCues(settings.cues, settings.title)
     : fromCues(settings.cues, job.input.references?.src?.name);
-  const script = [...new Set([...pieces].sort((a, b) => a.startMs - b.startMs).map((p) => p.text))].join("\n").slice(0, MAX_SCRIPT);
+  const script = [...new Set([reusedScript, ...[...pieces].sort((a, b) => a.startMs - b.startMs).map((p) => p.text)].filter(Boolean))].join("\n").slice(0, MAX_SCRIPT);
   // Card VD.10: subtitles = the spoken-line cues only (editor subtitle clips, i.e. with a subtitleStyle; every cue of a
   // burn or engine render), the timeline the main system turns into the video's SRT/VTT files. Titles and other
   // on-screen text stay in captions (caption QA) only.

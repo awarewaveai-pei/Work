@@ -1,4 +1,4 @@
-# U5.3＋U5.4 部署步驟 — video-service 片頭接合＋next-admin＋工作台
+# U5.3＋U5.4＋U5.5 部署步驟 — video-service 片頭接合＋next-admin＋工作台
 
 主機 ks-aw-01（145.239.195.47，SSH 58122）。以下在已有 root 權限的 SSH session 執行。High：每次部署前取得操作者當下同意。三邊順序＝**video-service → next-admin → 工作台**。併入 main 保留 `DEPLOY_HOLD`，三邊驗收後才移除；這份文件不是部署授權。
 
@@ -30,7 +30,7 @@ rollback_video() {
   "$patch" compose "$compose" video-service < "$compose"
 }
 if ! "$patch" compose "$compose" video-service < "$compose"; then rollback_video; exit 1; fi
-if ! curl -fsS http://127.0.0.1:8732/health | python -c 'import json,sys; assert json.load(sys.stdin)["capabilities"]["bookends"] is True'; then rollback_video; exit 1; fi
+if ! curl -fsS http://127.0.0.1:8732/health | python -c 'import json,sys; c=json.load(sys.stdin)["capabilities"]; assert c["bookends"] is True and c["bookend_main"] is True'; then rollback_video; exit 1; fi
 ```
 - 單元測試必須全綠；在隔離新容器跑，不對正式容器跑測試。test_bookends 含三支真 ffmpeg 渲染。
 - 重建前必須由主系統 `video_jobs` 列出 running 工作，逐一查其服務端 job 終態，確認沒有執行中的渲染。只看 logs 不能證明空閒；無法確認就停止部署。
@@ -51,6 +51,7 @@ curl -s http://127.0.0.1:8732/health | grep -o '"bookends": true'      # 必須�
 - **不帶片頭的片輸出不變**（內容工具文章配片也用這個服務）：工作台一集按「快速輸出」，片頭片尾都選「不要」送一支 16:9。成片長度＝各鏡頭配音長度＋每鏡 0.5 秒，字幕第一句從 0 秒附近開始；`sudo docker logs --since 10m lobster-video-service | grep -c bookend` ＝ 0。另在內容工具用文章配片送一支（或等下一支排程配片），能播、有字幕。
 - **有片頭**：同一集「一鍵成片」，片頭選標題卡、片尾選標題卡、轉場「交叉淡化」，比例 16:9＋9:16。每個比例一支成片；長度＝片頭＋主片＋片尾−2×0.5 秒；字幕第一句約在片頭秒數−0.5 秒出現。
 - **模板片頭只渲染一次**：再按一次一鍵成片（同設定），歷史紀錄裡 `remotion-template` 任務數不變。
+- **只換片頭、不重生鏡頭或配音**：成片卡「編輯片頭」儲存後自動渲染；按「加入這支影片」新增一版，舊版保留；鏡頭與配音供應商呼叫數不變。主片在 videomain/ 保留，字幕相對原主片從零開始；接兩次也不疊片頭或累加字幕位移。舊的、已含片頭但沒有主片或原時間軸的成片會明確拒絕，要求從原剪輯輸出一次。
 - **做到草稿**：選「草稿」並勾「同時建一篇網站草稿文章並嵌入」→ 排程跑過後專案有社群草稿，WordPress 多一篇**草稿**（不是發佈）文章含影片；`media_production_projects.brief_json` 有 `autoEmbedded`。
 
 ## 5. 還原

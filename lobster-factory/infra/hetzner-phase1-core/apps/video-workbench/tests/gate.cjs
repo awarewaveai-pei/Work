@@ -38,6 +38,7 @@ const tests = [
   "u5-quick-render",
   "u5-one-click",
   "u5-editor-bookends",
+  "u5-bookend-card",
   "u6-review-state",
   "u8-title-form",
   "u8-bookends",

@@ -112,14 +112,15 @@ async function quote(settings, main, sizeOf, imageModel) {
 }
 
 // Submits, polls until the main system recorded the video, downloads it into the media store. Answers the job result.
-async function run(job, { main, fetchImpl, mediaStore, signal, sizeOf, onRemoteJob = () => {} }) {
+async function run(job, { main, fetchImpl, mediaStore, signal, sizeOf, onRemoteJob = () => {}, onRemoteReady = () => {} }) {
   const organizationId = main.organizationId();
   const body = { organizationId, ...request(job.input, main, sizeOf), ...(job.createdBy ? { userId: job.createdBy } : {}) };
+  let done = job.quickRenderDone, remoteJobId = done?.jobId;
+  if (!done) {
   const submitted = await main.call(ROUTE, { method: "POST", body, signal, timeoutMs: 60000 });
   if (!submitted.ok || submitted.value.ok !== true || typeof submitted.value.jobId !== "string") throw refusal("主系統拒絕快速輸出", submitted);
-  const remoteJobId = submitted.value.jobId;
+  remoteJobId = submitted.value.jobId;
   onRemoteJob(remoteJobId);
-  let done;
   const query = ROUTE + "?organizationId=" + encodeURIComponent(organizationId) + "&jobId=" + encodeURIComponent(remoteJobId);
   await poll({
     signal, everyMs: POLL_MS, limitMs: POLL_LIMIT_MS, timeout: "快速輸出逾時（超過 55 分鐘）",
@@ -132,14 +133,27 @@ async function run(job, { main, fetchImpl, mediaStore, signal, sizeOf, onRemoteJ
       return true;
     },
   });
+  done = { ...done, jobId: remoteJobId };
+  onRemoteReady(done);
+  }
   if (!/^https:\/\//.test(String(done.url || ""))) throw fail("快速輸出完成，但沒有可下載的網址");
   const buffer = await download(done.url, { fetchImpl, signal, max: MAX_DOWNLOAD, what: "快速輸出成片" });
   const sha = crypto.createHash("sha256").update(buffer).digest("hex");
   if (done.checksumSha256 && done.checksumSha256 !== sha) throw fail("下載的成片與主系統登記的不一致，請重試");
   const stored = await mediaStore.ingest({ buffer, ext: "mp4", signal });
   main.adopt(stored.url, { assetId: done.assetId, checksumSha256: sha, objectUrl: done.url, rightsSources: done.rightsSources });
+  let mainUrl;
+  if (done.mainUrl) {
+    // This URL came from the org-scoped internal route's recorded render metadata, never from browser input.
+    const mainBuffer = await download(done.mainUrl, { fetchImpl, signal, max: MAX_DOWNLOAD, what: "保留主片" });
+    mainUrl = (await mediaStore.ingest({ buffer: mainBuffer, ext: "mp4", signal })).url;
+    await main.ingest({ url: mainUrl, file: mediaStore.fileFor(mainUrl), origin: { kind: "render", engine: "quick-render-main" },
+      sources: [stored.url], costUsd: 0, jobId: "main:" + job.id, ratio: job.input.settings.ratio });
+  }
   return {
     url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl,
+    ...(mainUrl ? { mainUrl } : {}),
+    mainCaptionCues: done.mainCaptionCues?.length ? done.mainCaptionCues : done.captionCues || [], title: done.title || "", script: done.script || "",
     origin: { kind: "render", engine: "quick-render", jobId: job.id, remoteJobId, costUsd: 0 },
   };
 }

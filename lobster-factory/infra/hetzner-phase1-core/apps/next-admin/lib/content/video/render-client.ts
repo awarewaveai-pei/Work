@@ -295,7 +295,7 @@ export interface RenderCaptions {
 
 export type RenderPoll =
   | { status: "running" }
-  | { status: "done"; outputs: RenderOutputs; out_dir: string; outputMeta?: RenderOutputMeta; storage?: string; captions?: RenderCaptions; cleanOutputs?: RenderOutputs }
+  | { status: "done"; outputs: RenderOutputs; out_dir: string; outputMeta?: RenderOutputMeta; storage?: string; captions?: RenderCaptions; cleanOutputs?: RenderOutputs; mainOutputs?: RenderOutputs; mainCaptionCues?: RenderCaptions["cues"] }
   | { status: "error"; error: string };
 
 /** 查一次 EU /job 狀態（單一短請求，給 /status 每輪呼叫；不阻塞、不輪詢）。 */
@@ -316,6 +316,8 @@ export async function pollRenderJob(jobId: string, baseUrl?: string): Promise<Re
       output_meta?: RenderOutputMeta;
       storage?: string;
       clean_outputs?: RenderOutputs;
+      main_outputs?: RenderOutputs;
+      main_caption_cues?: RenderCaptions["cues"];
       caption_source?: string;
       caption_cues?: RenderCaptions["cues"];
       caption_srt?: string;
@@ -327,7 +329,7 @@ export async function pollRenderJob(jobId: string, baseUrl?: string): Promise<Re
       const captions = job.caption_source === "script_tts" && Array.isArray(job.caption_cues) && job.caption_cues.length > 0
         ? { source: "script_tts" as const, cues: job.caption_cues, srt: job.caption_srt ?? "", vtt: job.caption_vtt ?? "" }
         : undefined;
-      return { status: "done", outputs: job.outputs, out_dir: job.out_dir, outputMeta: job.output_meta, storage: job.storage, ...(captions ? { captions } : {}), ...(job.clean_outputs ? { cleanOutputs: job.clean_outputs } : {}) };
+      return { status: "done", outputs: job.outputs, out_dir: job.out_dir, outputMeta: job.output_meta, storage: job.storage, ...(captions ? { captions } : {}), ...(job.clean_outputs ? { cleanOutputs: job.clean_outputs } : {}), ...(job.main_outputs ? { mainOutputs: job.main_outputs } : {}), ...(job.main_caption_cues ? { mainCaptionCues: job.main_caption_cues } : {}) };
     }
     if (job.status === "error") return { status: "error", error: job.error ?? "render 失敗" };
     return { status: "running" };

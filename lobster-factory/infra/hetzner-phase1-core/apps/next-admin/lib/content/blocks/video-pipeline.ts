@@ -176,6 +176,8 @@ export async function recordVideoAsset(params: {
   captions?: { source: "script_tts" | "transcription"; srt?: string; vtt?: string; cues?: { startMs: number; endMs: number; text: string }[] };
   /** V4.8: caption-less video per ratio (videoclean/…); with captions.cues it lets the review step edit captions and burn them again. */
   cleanOutputs?: Record<string, string>;
+  mainOutputs?: Record<string, string>;
+  mainCaptionCues?: { startMs: number; endMs: number; text: string }[];
   /**
    * True only for the caller that holds the REAL render metadata (/api/video/status,
    * which has recordParams: title, sceneCount, formats, visualBreakdown, imageModel).
@@ -239,6 +241,8 @@ export async function recordVideoAsset(params: {
         ...(params.rightsSources ? { rightsSources: params.rightsSources } : {}),
         ...(params.captions ? { captionSource: params.captions.source, captionSrt: params.captions.srt, captionVtt: params.captions.vtt, ...(params.captions.cues ? { captionCues: params.captions.cues } : {}) } : {}),
         ...(params.cleanOutputs?.[primaryFormat ?? ""] ? { cleanUrl: params.cleanOutputs[primaryFormat ?? ""] } : {}),
+        ...(params.mainOutputs?.[primaryFormat ?? ""] ? { mainUrl: params.mainOutputs[primaryFormat ?? ""] } : {}),
+        ...(params.mainCaptionCues ? { mainCaptionCues: params.mainCaptionCues } : {}),
         visualBreakdown: params.visualBreakdown,
         imageModel: params.imageModel,
         source: params.source,
@@ -301,6 +305,8 @@ export async function recordVideoAsset(params: {
           ...(params.rightsSources ? { rightsSources: params.rightsSources } : {}),
           ...(params.captions?.cues ? { captionSource: params.captions.source, captionCues: params.captions.cues } : {}),
           ...(params.cleanOutputs?.[format] ? { cleanUrl: params.cleanOutputs[format] } : {}),
+          ...(params.mainOutputs?.[format] ? { mainUrl: params.mainOutputs[format] } : {}),
+          ...(params.mainCaptionCues ? { mainCaptionCues: params.mainCaptionCues } : {}),
           source: params.source,
           outputMeta: meta ? { [format]: meta } : undefined,
           renderedAt: new Date().toISOString(),

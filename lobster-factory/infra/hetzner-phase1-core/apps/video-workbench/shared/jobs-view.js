@@ -1,4 +1,5 @@
 (function () {
+  const sharedBase = typeof document === "object" && document.currentScript?.src ? document.currentScript.src.replace(/[^/]*$/, "") : "/shared/";
   // Invariant: the one reader of a finished job's ratio (result.ratio = the file's own, measured; then what the job asked
   // for; null = unknown, never a default). backend/main-system.cjs records metadata.ratio from this same function, so the
   // 送審與投遞 button is offered exactly when next-admin's release panel can place the video (platform-ratio.ts ratioOfAsset).
@@ -47,6 +48,42 @@
     ];
   }
   if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio, readReview, readPublished });
+  VideoWorkbench.bookendAction = async (v, action) => {
+    if (!VideoWorkbench.bookends) await VideoWorkbench.loadScripts(["bookends.js"], sharedBase);
+    const api = VideoWorkbench.bookends;
+    if (action === "edit") return api.edit(v);
+    if (action === "join") return api.join(v);
+    const hit = await api.current(v);
+    if (!hit?.e.intro) throw Error("請先編輯片頭");
+    return api.render(hit.p, hit.e, "intro", jobRatio(v) || hit.p.ratio, true);
+  };
+  VideoWorkbench.bookendPreview = async (v) => {
+    if (!VideoWorkbench.bookends) await VideoWorkbench.loadScripts(["bookends.js"], sharedBase);
+    const hit = await VideoWorkbench.bookends.current(v);
+    return hit?.e.intro ? VideoWorkbench.bookends.peek(hit.p, hit.e, "intro", jobRatio(v) || hit.p.ratio) : null;
+  };
+  function bookendButtons(v, actions) {
+    const box = document.createElement("div"), note = document.createElement("p");
+    box.className = "job-bookend-actions"; note.textContent = "片頭：讀取中…"; box.append(note);
+    const refresh = () => VideoWorkbench.loadScripts(["bookends.js"], sharedBase).then(async () => {
+      const hit = await VideoWorkbench.bookends.current(v);
+      note.textContent = "本集片頭：" + VideoWorkbench.bookends.label(hit?.e.intro, VideoWorkbench.capabilities?.remotionTemplates || []);
+      box.querySelectorAll('[data-bookend-preview]').forEach((el) => el.remove());
+      if (hit?.e.intro) {
+        const latest = await VideoWorkbench.bookendPreview(v);
+        if (latest?.result?.url) {
+          const preview = document.createElement(latest.result.thumbUrl ? "img" : "video");
+          preview.src = VideoWorkbench.safeUrl(latest.result.thumbUrl || latest.result.url); preview.setAttribute("aria-label", "本集片頭縮圖"); preview.dataset.bookendPreview = ""; preview.width = 128; preview.preload = "metadata"; box.prepend(preview);
+        }
+      }
+    }).catch(VideoWorkbench.reportError);
+    refresh();
+    for (const [action, title] of [["edit", "編輯片頭"], ["render", "重新生成片頭 · 免費"], ["join", "加入這支影片 · 免費"]]) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = title;
+      b.onclick = async () => { b.disabled = true; try { await VideoWorkbench.bookendAction(v, action); } catch (error) { VideoWorkbench.reportError(error); } finally { b.disabled = false; refresh(); } }; box.append(b);
+    }
+    actions.append(box);
+  }
   // Plan U6 審片與發布: a finished video registered in the main system is reviewed and released in next-admin's
   // /review-release page (same origin; it owns QA, release, social and WordPress drafts), framed by the shell like the
   // other pages. Only 16:9 / 9:16 / 4:5 / 1:1 / 4:3 can be delivered (D6, /delivery-ratios).
@@ -298,6 +335,8 @@
               action("配音", () => VideoWorkbench.generator.import({ intent: "open-tool", tool: "voice" }));
             }
             if (v.type === "video") {
+              action("複製連結", async () => { await navigator.clipboard.writeText(new URL(url, location.origin).href); VideoWorkbench.notify("已複製影片連結；需登入同一工作台才能開啟"); });
+              bookendButtons(v, actions);
               reviewButton(v, actions);
               coverButtons(v, actions);
               subtitleButtons(v, actions);

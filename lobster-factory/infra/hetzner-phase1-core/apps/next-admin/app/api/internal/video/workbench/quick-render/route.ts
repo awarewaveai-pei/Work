@@ -197,5 +197,8 @@ export async function GET(req: Request): Promise<Response> {
   return NextResponse.json({
     ok: true, status: "done", ratio, assetId: String(row.data.id), checksumSha256: row.data.checksum_sha256 ?? null,
     url: String(row.data.object_url), rightsSources: obj(row.data.metadata)?.rightsSources ?? [],
+    ...(typeof obj(row.data.metadata)?.mainUrl === "string" ? { mainUrl: obj(row.data.metadata)?.mainUrl } : {}),
+    captionCues: obj(row.data.metadata)?.captionCues ?? [], mainCaptionCues: obj(row.data.metadata)?.mainCaptionCues ?? [],
+    title: obj(row.data.metadata)?.title ?? "", script: obj(row.data.metadata)?.script ?? "",
   });
 }

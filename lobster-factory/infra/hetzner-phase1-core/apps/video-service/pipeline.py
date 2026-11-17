@@ -863,7 +863,8 @@ def render_video(scenes: list, visual_files: list, out_name: str,
 def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
                              tts_provider: str = "edge", tts_voice: str = "",
                              intro_title: str = "", intro_duration: float = 3.0, caption_sink: "dict | None" = None,
-                             clean_sink: "dict | None" = None, bookends: "dict | None" = None):
+                             clean_sink: "dict | None" = None, bookends: "dict | None" = None,
+                             main_sink: "dict | None" = None):
     """多格式「原生」輸出：每個比例用『自己那組視覺素材』+『自己的目標尺寸』各跑一次 compose
     （per-scene cover-fit/zoompan 直接填滿目標比例）→ 無 export_all_formats 的 pad letterbox、無黑邊。
 
@@ -906,6 +907,20 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
             intro_title=intro_title, intro_duration=intro_duration, burn_captions=not keep_clean,
             bookends=bookends,
         )
+        # U5.5: keep the exact already-voiced main cut before its bookends. Rejoining must never call TTS again.
+        if main_sink is not None and (bookends is not None or intro_title):
+            main_path = str(out_dir / f"{fmt}.main.mp4")
+            raw_main = str(config.TEMP_DIR / f"{safe_name}_{fmt}_main.mp4")
+            _concat_uniform([str(config.TEMP_DIR / f"scene_{i:03d}.mp4") for i in range(len(scenes))], "main_concat.txt", raw_main)
+            if keep_clean:
+                lead = bookend_lead_s(bookends) if bookends is not None else intro_duration if intro_title else 0
+                cues = [{**c, "startMs": max(0, c["startMs"] - round(lead * 1000)),
+                         "endMs": max(0, c["endMs"] - round(lead * 1000))} for c in caption_sink["cues"]]
+                caption_sink["mainCues"] = cues
+                burn_script_captions(raw_main, cues, main_path, h)
+            else:
+                shutil.move(raw_main, main_path)
+            main_sink[fmt] = main_path
         out_path = str(out_dir / f"{fmt}.mp4")
         if keep_clean:
             clean_path = str(out_dir / f"{fmt}.clean.mp4")

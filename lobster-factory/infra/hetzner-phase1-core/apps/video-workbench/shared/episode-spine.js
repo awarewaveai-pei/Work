@@ -169,7 +169,7 @@
     compose: "motion", rig: "motion", "3d": "motion",
     subtitle: "subtitle",
     voice: "sound", music: "sound", sfx: "sound", separate: "sound",
-    upscale: "finish", enhance: "finish", watermark: "finish", cta: "finish", privacy: "finish",
+    upscale: "finish", enhance: "finish", watermark: "finish", cta: "finish", privacy: "finish", bookends: "finish",
     region: "retouch", depth: "retouch",
     short: "derive", follow: "derive", breakout: "derive",
   });

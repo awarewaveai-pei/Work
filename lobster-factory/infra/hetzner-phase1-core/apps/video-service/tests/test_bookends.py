@@ -108,6 +108,36 @@ class BookendRender(unittest.TestCase):
         self.assertAlmostEqual(_length(self.compose(b)), 3.0 + 5.0, delta=0.15)
         self.assertEqual(pipeline.bookend_lead_s(b), 3.0)
 
+    def test_keeps_the_already_voiced_main_for_rejoining(self):
+        main = {}
+        b = {"intro": {"asset": self.intro}, "outro": None, "transition": "crossfade", "transition_s": 0.5}
+        with mock.patch.object(pipeline, "generate_audio", return_value=[self.voice]) as voice, \
+                mock.patch.object(pipeline, "_audio_duration", return_value=2.5), \
+                mock.patch.object(pipeline.config, "OUTPUT_DIR", pathlib.Path(self.dir)), \
+                mock.patch.dict(pipeline.config.FORMATS, {"16x9": (640, 360)}):
+            outputs, _ = pipeline.render_video_multiformat([{"id": 1, "narration": "原旁白"}],
+                {"16x9": [self.photo]}, "rejoin", bookends=b, main_sink=main)
+        self.assertEqual(voice.call_count, 1)
+        self.assertAlmostEqual(_length(main["16x9"]), 2.5, delta=0.15)
+        self.assertAlmostEqual(_length(outputs["16x9"]), 5.0, delta=0.15)
+
+    def test_saved_main_captions_start_at_zero_not_at_the_old_intro(self):
+        def voice(scenes, **kwargs):
+            kwargs["cues_out"].append([{"startMs": 0, "endMs": 900, "text": "原旁白"}])
+            return [self.voice]
+        main, clean, captions = {}, {}, {}
+        b = {"intro": {"asset": self.intro}, "outro": None, "transition": "crossfade", "transition_s": 0.5}
+        with mock.patch.object(pipeline, "generate_audio", side_effect=voice), \
+                mock.patch.object(pipeline, "_audio_duration", return_value=2.5), \
+                mock.patch.object(pipeline.config, "OUTPUT_DIR", pathlib.Path(self.dir)), \
+                mock.patch.dict(pipeline.config.FORMATS, {"16x9": (640, 360)}), \
+                mock.patch.object(pipeline, "burn_script_captions", wraps=pipeline.burn_script_captions) as burn:
+            pipeline.render_video_multiformat([{"id": 1, "narration": "原旁白"}], {"16x9": [self.photo]},
+                "captioned_main", bookends=b, main_sink=main, clean_sink=clean, caption_sink=captions)
+        self.assertEqual(burn.call_args_list[0].args[1][0]["startMs"], 0)
+        self.assertEqual(burn.call_args_list[1].args[1][0]["startMs"], 2500)
+        self.assertAlmostEqual(_length(main["16x9"]), 2.5, delta=0.15)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -373,6 +373,7 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
     （原生比例、無 pad）；False：assets 為單組，走舊 render_video（base+pad export）。"""
     caption_sink: dict = {}
     clean_sink: dict = {}  # fmt -> caption-less video (V4.8), filled only for script-caption multiformat renders
+    main_sink: dict = {}  # U5.5: voiced, captioned main without bookends
     with _render_lock:  # 序列化：materialize(下載)+render 全程獨佔 TEMP_DIR（防並行撞檔）
         try:
             if multiformat:
@@ -389,7 +390,7 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                     scenes, format_files, out_name,
                     tts_provider=tts_provider, tts_voice=tts_voice,
                     intro_title=intro_title, intro_duration=intro_duration, caption_sink=caption_sink,
-                    clean_sink=clean_sink, bookends=_materialize_bookends(bookends, _idx),
+                    clean_sink=clean_sink, bookends=_materialize_bookends(bookends, _idx), main_sink=main_sink,
                 )
             else:
                 visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
@@ -403,6 +404,8 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
             caption_fields = ({"caption_source": "script_tts", "caption_cues": caption_sink["cues"],
                                "caption_srt": caption_sink["srt"], "caption_vtt": caption_sink["vtt"]}
                               if caption_sink.get("cues") else {})
+            if caption_sink.get("mainCues"):
+                caption_fields["main_caption_cues"] = caption_sink["mainCues"]
             # 跨機：產出上傳 R2 → 回 public URL。未設 R2 = 本機路徑（dev）。
             if _r2_video_configured():
                 base_key = "video/" + os.path.basename(str(out_dir))
@@ -422,13 +425,20 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                             f"videoclean/{os.path.basename(str(out_dir))}/{fmt}.mp4", fh.read(), "video/mp4",
                             R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE,
                         )
+                main_urls = {}
+                for fmt, path in main_sink.items():
+                    with open(path, "rb") as fh:
+                        main_urls[fmt] = _r2_put(f"videomain/{os.path.basename(str(out_dir))}/{fmt}.mp4", fh.read(),
+                                                 "video/mp4", R2_VIDEO_BUCKET, R2_VIDEO_PUBLIC_BASE)
                 return {"outputs": urls, "out_dir": str(out_dir), "storage": "r2", "output_meta": output_meta,
+                        **({"main_outputs": main_urls} if main_urls else {}),
                         **({"clean_outputs": clean_urls} if clean_urls else {}), **caption_fields}
             return {
                 "outputs": {k: str(v) for k, v in outputs.items()},
                 "out_dir": str(out_dir),
                 "storage": "local",
                 "output_meta": output_meta,
+                **({"main_outputs": {k: str(v) for k, v in main_sink.items()}} if main_sink else {}),
                 **({"clean_outputs": {k: str(v) for k, v in clean_sink.items()}} if clean_sink else {}),
                 **caption_fields,
             }
@@ -837,6 +847,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "footage_render": True,
                     "caption_reburn": True,
                     "bookends": True,  # plan U5.4: intro/outro/transition; next-admin refuses to send them without this
+                    "bookend_main": True,  # U5.5: retained main and original caption times for rejoining
                     "tts": True,
                 },
                 "formats": list(config.FORMATS.keys()),

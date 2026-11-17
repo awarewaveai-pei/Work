@@ -679,6 +679,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
             job.quickRenderJobId = id; // shown in the job record
             persist();
           },
+          onRemoteReady: (done) => { job.quickRenderDone = done; persist(); },
         });
         if (signal.aborted) return;
         job.result = result; // registered by the main system itself: settle() finds the row (main.adopt)
@@ -1243,6 +1244,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     const lockMask = input.operation === "breakout" ? await breakoutInputs(input, extra?.retryOf) : null;
     // Card U4.4: a retry of a scene picture next-admin already drew and billed takes that picture (sceneImage.kept).
     const keptScene = isScene && extra?.retryOf ? sceneImage.kept(jobs.find((j) => j.id === extra.retryOf)) : null;
+    const keptQuick = input.operation === "quick-render" && extra?.retryOf ? jobs.find((j) => j.id === extra.retryOf)?.quickRenderDone : null;
     const paid = await requirePermit(req, feature);
     const release = isBlender ? blender3d().claim() : isImageTo3d ? imageTo3d.claim(input) : null;
     if ((isBlender || isImageTo3d) && !release) throw Object.assign(Error(isBlender ? "3D 渲染進行中，請等目前的工作完成再送出" : "本機 SF3D 正在處理另一張圖，請等它完成再送出"), { status: 409 });
@@ -1260,6 +1262,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         ...(paid ? { paid } : {}),
         ...(paidFeature ? { paidFeature } : {}),
         ...(keptScene ? { finishing: keptScene } : {}),
+        ...(keptQuick ? { quickRenderDone: keptQuick } : {}),
       };
       const limit = jobTimeoutMs(input); // once, before the job joins the queue (host transcription counts the runs ahead)
       job.deadlineAt = new Date(Date.parse(job.createdAt) + limit).toISOString();

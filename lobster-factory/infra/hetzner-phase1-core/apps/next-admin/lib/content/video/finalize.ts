@@ -93,6 +93,8 @@ export async function finalizeVideoJob(job: VideoJob): Promise<FinalizeResult> {
               ? { source: "script_tts", srt: poll.captions.srt, vtt: poll.captions.vtt, cues: poll.captions.cues }
               : job.recordParams.rendererKind === "footage" ? { source: "transcription" } : undefined,
             cleanOutputs: poll.cleanOutputs,
+            mainOutputs: poll.mainOutputs,
+            mainCaptionCues: poll.mainCaptionCues,
             formats: job.recordParams.formats,
             visualBreakdown: job.recordParams.visualBreakdown,
             imageModel: job.recordParams.imageModel,

@@ -243,6 +243,8 @@ const STEP_NAMES = ["專案", "腳本與分鏡", "鏡頭畫面", "修圖", "片�
   TOOL_LABEL = Object.fromEntries([...FINISH_TOOLS, ...DERIVE_TOOLS]),
   // Card PJ.4: the tools' names as the tools page shows them (TOOLS in scripts/tools-0.js; that page is another frame).
   TOOL_NAME = { "quick-render": "快速輸出", generator: "鏡頭生成", region: "圖片局部編輯器", depth: "影片轉深度影片", compose: "動畫合成", rig: "角色綁定", "3d": "3D", edit: "影片剪輯", "edit-pro": "專業剪輯", voice: "配音生成", music: "音樂生成", sfx: "去配樂・重配音效", separate: "音軌分離", subtitle: "字幕與逐字稿", watermark: "影片浮水印", cta: "影片 CTA 按鈕", upscale: "畫質增強", enhance: "影音增強與消除字幕", privacy: "肖像權保護", short: "智能短影音剪輯", follow: "人物跟拍剪輯" };
+TOOL_LABEL.bookends = "重接片頭／片尾";
+TOOL_NAME.bookends = "重接片頭／片尾";
 function editRows(e) {
   try {
     const rows = JSON.parse(VideoWorkbench.storage.getItem(e.edit?.engine === "filmcraft" ? "tools.engine.projects" : "tools.editor.projects") || "[]");
@@ -285,6 +287,12 @@ function episodeSteps(e) {
 // 審片與發布 (plan U6): the shell opens next-admin's panel at `section` (VideoWorkbench.openReview, shared/jobs-view.js).
 // Offered once wireReviewLinks has checked the video can be placed.
 const reviewButton = (o, section, label) => `<button class="btn small outline" data-review="${esc(o.jobId)}" data-section="${section}" aria-disabled="true">${label}</button>`;
+function bookendCard(e, o, i) {
+  const end = e.intro, templates = VideoWorkbench.capabilities?.remotionTemplates || [],
+    name = !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + (TRANSITION_LABEL[end.transition] || ""),
+    preview = end ? `<span data-intro-preview="${esc(o.jobId)}"></span>` : "";
+  return `<div class="panel"><strong>本集片頭：${esc(name)}</strong>${preview}<div class="row">${[["bookendEdit", "編輯片頭"], ["bookendRender", "重新生成片頭 · 免費"], ["bookendJoin", "加入這支影片 · 免費"], ["copyOutput", "複製連結"]].map(([act, label]) => `<button class="btn small outline" data-action="${act}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
+}
 function outputList(e) {
   const outputs = e.outputs,
     rows = editRows(e),
@@ -297,11 +305,13 @@ function outputList(e) {
         ? ""
         : o.derivedFrom == null
           ? `<p class="tiny">剪輯改過了，要重新輸出。</p><button class="btn small outline" data-action="openEdit" data-intent="export">重新輸出</button>`
-          : `<p class="tiny">成片換過了，這一版要重做。</p><button class="btn small outline" data-action="outputTool" data-tool="${esc(toolOf(o))}" data-index="${cut}">開啟${esc(TOOL_NAME[toolOf(o)] || toolOf(o))}</button>`;
+          : toolOf(o) === "bookends"
+            ? `<p class="tiny">主片換過了，可以用新版重接。</p><button class="btn small outline" data-action="bookendJoin" data-index="${cut}">用最新主片重接 · 免費</button>`
+            : `<p class="tiny">成片換過了，這一版要重做。</p><button class="btn small outline" data-action="outputTool" data-tool="${esc(toolOf(o))}" data-index="${cut}">開啟${esc(TOOL_NAME[toolOf(o)] || toolOf(o))}</button>`;
   return `<section class="panel" style="padding:12px;margin-bottom:16px" aria-label="成片"><strong>成片 ${outputs.length} 支</strong><div class="shot-grid" style="margin-top:10px">${outputs
     .map((o, i) => {
       const parent = o.derivedFrom ? outputs.findIndex((x) => x.url === o.derivedFrom) : -1;
-      return `<div class="shot" data-output="${i}"><video src="${esc(o.url)}" controls preload="metadata" style="width:100%;max-height:220px"></video><div class="tiny">${parent >= 0 ? `從第 ${parent + 1} 版${esc(TOOL_LABEL[toolOf(o)] || "")}` : `第 ${i + 1} 版`}</div>${redo(o)}<div class="row">${reviewButton(o, "qa", "審片與發布")}<button class="btn small outline" data-action="lineage" data-index="${i}">怎麼做的</button>${[...FINISH_TOOLS, ...DERIVE_TOOLS].map(([tool, label]) => `<button class="btn small outline" data-action="outputTool" data-tool="${tool}" data-index="${i}">${label}</button>`).join("")}</div><p class="tiny" data-published="${esc(o.jobId)}"></p></div>`;
+      return `<div class="shot" data-output="${i}"><video src="${esc(o.url)}" controls preload="metadata" style="width:100%;max-height:220px"></video><div class="tiny">${parent >= 0 ? `從第 ${parent + 1} 版${esc(TOOL_LABEL[toolOf(o)] || "")}` : `第 ${i + 1} 版`}</div>${redo(o)}${bookendCard(e, o, i)}<div class="row">${reviewButton(o, "qa", "審片與發布")}<button class="btn small outline" data-action="lineage" data-index="${i}">怎麼做的</button>${[...FINISH_TOOLS, ...DERIVE_TOOLS].map(([tool, label]) => `<button class="btn small outline" data-action="outputTool" data-tool="${tool}" data-index="${i}">${label}</button>`).join("")}</div><p class="tiny" data-published="${esc(o.jobId)}"></p></div>`;
     })
     .join("")}</div></section>`;
 }
@@ -326,6 +336,12 @@ function wireReviewLinks() {
   if (!buttons.length && !lines.length) return;
   const jobs = VideoWorkbench.generations.list(),
     videoOf = (id) => read("job:" + id, () => jobs.then((list) => list.find((j) => j.id === id) || VideoWorkbench.generations.get(id)));
+  for (const box of root.querySelectorAll("[data-intro-preview]"))
+    videoOf(box.dataset.introPreview).then(VideoWorkbench.bookendPreview).then((job) => {
+      if (!job?.result?.url || !box.isConnected) return;
+      const preview = document.createElement(job.result.thumbUrl ? "img" : "video");
+      preview.src = VideoWorkbench.safeUrl(job.result.thumbUrl || job.result.url); preview.width = 128; preview.preload = "metadata"; preview.setAttribute("aria-label", "本集片頭縮圖"); box.replaceChildren(preview);
+    }).catch(VideoWorkbench.reportError);
   for (const b of buttons) {
     let refusal = null;
     b.onclick = () => (refusal ? VideoWorkbench.reportError(refusal) : videoOf(b.dataset.review).then((v) => VideoWorkbench.openReview(v, b.dataset.section)).catch(VideoWorkbench.reportError));
@@ -1284,6 +1300,17 @@ async function action(a, button) {
     case "oneClick":
       openQuickRender(a === "oneClick");
       break;
+    case "copyOutput":
+      await navigator.clipboard.writeText(new URL(ep().outputs[index].url, location.origin).href);
+      notify("已複製影片連結；連結需登入同一個工作台才能開啟");
+      break;
+    case "bookendEdit":
+    case "bookendRender":
+    case "bookendJoin": {
+      const output = ep().outputs[index], job = await VideoWorkbench.generations.get(output.jobId);
+      await VideoWorkbench.bookendAction(job, { bookendEdit: "edit", bookendRender: "render", bookendJoin: "join" }[a]);
+      break;
+    }
     case "quickRatio":
     case "quickRatioAll": {
       const r = button.dataset.value,
