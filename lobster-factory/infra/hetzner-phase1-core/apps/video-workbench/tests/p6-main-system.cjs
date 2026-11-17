@@ -104,6 +104,8 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     }
     // Plan U7 (audio-policy/route.ts): this client lets its sound go out.
     if (url === BASE + "/api/internal/video/workbench/audio-policy?organizationId=" + ORG) return Response.json({ ok: true, externalAudioAllowed: true });
+    // Plan X3 (storage/route.ts GET): our storage's public bases.
+    if (url === BASE + "/api/internal/video/workbench/storage") return Response.json({ ok: true, publicBases: ["https://pub-test.r2.dev"] });
     throw Error("unexpected " + url);
   }
   // Gemini speech (backend/speech.cjs): 0.2 s of 24 kHz mono 16-bit silence + the usage the charge must read.
@@ -585,7 +587,7 @@ const IMAGE_USAGE = { input_tokens: 50, output_tokens: 4160, input_tokens_detail
     assert.equal(require("../backend/generation-policy.cjs").toolCosts.removeBackground, TOOL_RATES["bg-remove"].usd);
     assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "../backend/generation-policy.cjs"), "utf8"), /removeBackground:\s*0\./, "成本不得手抄");
     const caps = JSON.parse((await request(port, "GET", "/api/vw/capabilities", who())).body);
-    assert.deepEqual(caps.mainSystem, { organizationId: ORG, externalAudioAllowed: true });
+    assert.deepEqual(caps.mainSystem, { organizationId: ORG, externalAudioAllowed: true, storageBases: ["https://pub-test.r2.dev"] });
     assert.match(fs.readFileSync(path.join(__dirname, "../shared/jobs-view.js"), "utf8"), /"review-release"/);
     if (fullSource) assert(fs.existsSync(path.join(appDir, "app/video/(wb)/review-release/page.tsx")), "審片與發布頁必須存在");
 

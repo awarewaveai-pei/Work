@@ -251,19 +251,16 @@
     // names a cast member (shot.character = its key) is bound to it, so the shot's picture uses that one's references.
     if (action === "spine-create") {
       if (!Spine) throw new Error("影音工作台沒有載入專案主線");
-      const shots = Array.isArray(payload.shots) ? payload.shots.slice(0, 200) : [],
-        url = (u) => typeof u === "string" && /^(https:\/\/|\/(?!\/))/.test(u),
-        cast = (Array.isArray(payload.characters) ? payload.characters.slice(0, 50) : [])
-          .filter((c) => typeof c?.name === "string" && c.name.trim())
-          .map((c) => ({ id: crypto.randomUUID(), key: typeof c.key === "string" ? c.key : "", name: c.name.trim(), role: String(c.role ?? ""), descr: "", refs: (Array.isArray(c.refs) ? c.refs : []).filter(url).slice(0, 8) })),
-        castId = new Map(cast.filter((c) => c.key).map((c) => [c.key, c.id])),
+      // Card U9: the cast keeps its Story Bible key (EpisodeSpine.castOf), so 寫回 and 存成核准版本 pair with it later.
+      const shots = Array.isArray(payload.shots) ? payload.shots : [],
+        cast = Spine.castOf(payload.characters),
         id = crypto.randomUUID(),
         series = typeof payload.storyBibleSeries === "string" && payload.storyBibleSeries ? { storyBibleSeries: payload.storyBibleSeries } : {};
       const p = M.project(Spine.newProject({
         id: "project-" + id, title: String(payload.title ?? "").trim() || "未命名影片",
         ratio: ["9:16", "16:9", "1:1"].includes(payload.ratio) ? payload.ratio : "16:9",
-        assets: { character: cast.map(({ key, ...c }) => c), scene: [], prop: [] }, ...series,
-        episode: { id: "ep-" + id, shots: shots.map((s) => ({ ...Spine.newShot(s), ...(castId.has(s?.character) ? { characterIds: [castId.get(s.character)] } : {}) })) },
+        assets: { character: cast, scene: [], prop: [] }, ...series,
+        episode: { id: "ep-" + id, shots: Spine.castShots(shots, cast) },
       }));
       db.projects.unshift(p);
       await perform("spine-open", { projectId: p.id, episodeId: p.episodes[0].id });
@@ -271,6 +268,7 @@
     }
     // Card U3 「寫回這一集」: 腳本 opened from an episode's step 2 replaces that episode's shots, then opens it. spine-open
     // bumps the open counter, so the projects page reloads instead of writing its old shots back.
+    // Card U9: the script's cast joins the project and the shots are bound to it (EpisodeSpine.setShots).
     if (action === "spine-set-shots") {
       if (!Spine?.setShots(db.projects, payload)) throw new Error("找不到這一集");
       await perform("spine-open", payload);

@@ -22,7 +22,7 @@ export interface Workbench {
   /** shared/runtime.js spine-create / spine-set-shots (card U3); both end on the projects page with that episode open. */
   spine: {
     create(payload: { title: string; ratio?: string; shots: WorkbenchShot[]; characters: WorkbenchCharacter[]; storyBibleSeries?: string }): Promise<{ projectId: string; episodeId: string }>;
-    setShots(payload: { projectId: string; episodeId: string; shots: WorkbenchShot[] }): Promise<unknown>;
+    setShots(payload: { projectId: string; episodeId: string; shots: WorkbenchShot[]; characters?: WorkbenchCharacter[]; storyBibleSeries?: string }): Promise<unknown>;
   };
 }
 

@@ -113,6 +113,13 @@ describe("ScriptForge module registry", () => {
     expect(forgePrompt("result", "platform", { plat: "Podcast", platformId: "podcast" }, ctx)?.prompt).not.toContain("不得超過");
   });
 
+  it("card U9: a Story Bible script's lines go to the platform rewrite with their character ids, and the output asks for them back", () => {
+    const withCast = forgePrompt("result", "platform", { plat: "TikTok", platformId: "tiktok", dialogues: ["你好", "再見"], characterIds: ["char_1", ""] }, ctx)?.prompt ?? "";
+    expect(withCast).toContain("[char_1]你好；再見");
+    expect(withCast).toContain('"character_id"');
+    expect(forgePrompt("result", "platform", { plat: "TikTok", platformId: "tiktok", dialogues: ["你好"] }, ctx)?.prompt).not.toContain("character_id");
+  });
+
   it("result-card rewrites count scenes from the script, not the toolbar, and put the script after the output format", () => {
     const script = { title: "t", hook: "h", cta: "c", scenes: [1, 2, 3].map((n) => ({ time: `${n}`, dialogue: `d${n}`, character_id: "x" })) };
     const one = forgePrompt("result", "scenes", { script, indices: [2] }, ctx)!.prompt;

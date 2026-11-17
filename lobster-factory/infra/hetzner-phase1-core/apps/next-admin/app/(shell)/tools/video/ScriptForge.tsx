@@ -5,7 +5,7 @@ import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-optio
 import { buttonStyle, cardStyle, inputStyle, optionStyle } from "@/components/tools/panel-primitives";
 import StoryBibleWorkbench from "./StoryBibleWorkbench";
 import OrganizationPicker from "./OrganizationPicker";
-import { charactersFromStoryBible, clampCustomScenes, handoffFromScript, type VideoHandoff } from "./video-handoff";
+import { charactersFromStoryBible, clampCustomScenes, handoffFromScript, keepCharacterIds, type VideoHandoff } from "./video-handoff";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { renderSiteVoice } from "@/lib/content/brand-voice";
 import { FORGE_NAV } from "@/lib/script-forge/nav";
@@ -486,7 +486,7 @@ function ScriptResult({script,score,onReset,extraTop,autoSaveTag,sbCharacterRefs
     if(versions[pid]&&!forceNew){setSel(pid);return;}
     setRepLoading(true);setRepErr("");const gen=draftGen.current;
     const plat=PLATFORMS.find(p=>p.id===pid)?.label||pid;
-    try{const raw=await forge("result","platform",{plat,platformId:pid,title:orig.title,hook:orig.hook,dialogues:orig.scenes?.map(s=>s.dialogue),cta:orig.cta});if(gen===draftGen.current){setVersions(v=>({...v,[pid]:pj(raw)}));setSel(pid);}}catch(e){if(gen===draftGen.current)setRepErr(errText(e));}
+    try{const raw=await forge("result","platform",{plat,platformId:pid,title:orig.title,hook:orig.hook,dialogues:orig.scenes?.map(s=>s.dialogue),characterIds:orig.scenes?.map(s=>s.character_id||""),cta:orig.cta});if(gen===draftGen.current){setVersions(v=>({...v,[pid]:keepCharacterIds(orig,pj(raw))}));setSel(pid);}}catch(e){if(gen===draftGen.current)setRepErr(errText(e));}
     setRepLoading(false);
   }
 

@@ -348,10 +348,31 @@ function createMainSystem({ env, fetchImpl, appDir, dataDir, orgId, inspect = re
     return { ok: r.ok, status: r.status, value: await answer(r) };
   }
 
+  // Plan X3: the public bases of our storage, as next-admin answers them (lib/storage/r2.ts publicBucketBases). Kept 10
+  // minutes; a failed answer is not kept (the next caller asks again) and is thrown, never replaced by a guess.
+  let bases = null;
+  async function storageBases() {
+    if (bases && Date.now() - bases.at < 600000) return bases.list;
+    const { ok, value } = await call("/api/internal/video/workbench/storage", { timeoutMs: 10000 });
+    if (!ok || value.ok !== true || !Array.isArray(value.publicBases)) throw fail("讀不到主系統的儲存位置", 502);
+    bases = { at: Date.now(), list: value.publicBases.filter((b) => typeof b === "string" && /^https:\/\//.test(b)) };
+    return bases.list;
+  }
+  // Card U9: this organization's own rows among the asset ids / object urls named ([{ assetId, objectUrl, checksumSha256 }]);
+  // a row of another organization is not answered (next-admin filters by this server's org).
+  async function ownAssets({ assetIds = [], objectUrls = [] }) {
+    const { ok, value } = await call("/api/internal/video/workbench/storage", { method: "POST", body: { organizationId: org(), assetIds, objectUrls } });
+    if (!ok || value.ok !== true || !Array.isArray(value.items)) throw fail("主系統素材查詢失敗：" + String(value.error || "unknown"), 502);
+    return value.items.filter((r) => UUID.test(String(r?.assetId || "")) && typeof r.objectUrl === "string");
+  }
+  // What a local url was registered as ({ assetId, objectUrl, ... }), or null; and the local urls of one asset.
+  const entryOf = (url) => index[url] || null;
+  const localsOf = (assetId) => Object.keys(index).filter((u) => index[u].assetId === assetId && LOCAL_URL.test(u));
+
   if (outbox.length) flush();
   setInterval(flush, Number(env.VW_USAGE_RETRY_MS) > 0 ? Number(env.VW_USAGE_RETRY_MS) : 60000).unref();
 
-  return { ingest, adopt, assetOf, releaseText, mirror, permit, usage, flush, call, organizationId: org, pendingUsage: () => outbox.length, idle: () => Promise.all([...chains.values(), flushing]) };
+  return { ingest, adopt, assetOf, entryOf, localsOf, storageBases, ownAssets, releaseText, mirror, permit, usage, flush, call, organizationId: org, pendingUsage: () => outbox.length, idle: () => Promise.all([...chains.values(), flushing]) };
 }
 
 module.exports = { createMainSystem, configured, paidFeature, ledgerKind, localUrls, PAID_ROUTES, MIME, LOCAL_URL };

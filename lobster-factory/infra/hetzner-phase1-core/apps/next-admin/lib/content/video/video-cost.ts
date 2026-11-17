@@ -12,7 +12,7 @@
  * 定價來源唯一：`lib/ai/cost-model.ts`（TEXT_FEATURES / IMAGE_RATES / TWD_RATE）。改價只動那檔。
  */
 import { TEXT_FEATURES, IMAGE_RATES, DEFAULT_IMAGE_MODEL, VIDEO_MOTION_RATES } from "../../ai/cost-model";
-import { featureUnitCostUsd, imageCostUsd, usdToNtd } from "../../ai/cost-calculator";
+import { featureUnitCostUsd, imageCostUsd, textCallCostUsd, usdToNtd } from "../../ai/cost-calculator";
 
 /** 一步的成本如何隨設定縮放。 */
 export type StepCostKind =
@@ -179,4 +179,14 @@ export function computeVideoCost(
     imageModel,
     imageModelLabel: (IMAGE_RATES[imageModel] ?? IMAGE_RATES[DEFAULT_IMAGE_MODEL]).label,
   };
+}
+
+/** Story Bible 畫面一致性比對 (app/api/video/story-bibles/visual-consistency-check): one vision call, every pair's two
+ *  pictures in it. The estimate shown before the click is its upper bound: each picture at the vendor's largest
+ *  per-image size (~1,600 tokens), the instruction text, and the route's whole output cap. */
+export const VISUAL_CONSISTENCY = { maxPairs: 12, tokensPerImage: 1600, textTokens: 400, maxOutputTokens: 1024 } as const;
+export function visualConsistencyUsd(pairs: number, model: string): number {
+  const n = Math.max(0, Math.min(VISUAL_CONSISTENCY.maxPairs, Math.floor(Number(pairs) || 0)));
+  if (!n) return 0;
+  return textCallCostUsd({ model, inputTokens: n * 2 * VISUAL_CONSISTENCY.tokensPerImage + VISUAL_CONSISTENCY.textTokens, outputTokens: VISUAL_CONSISTENCY.maxOutputTokens });
 }

@@ -33,7 +33,8 @@ async function send(workbench: Workbench, episode: Target | null, h: VideoHandof
     }
     const n = shotCount(workbench, episode);
     if (n > 0 && !window.confirm(`這一集已有 ${n} 個鏡頭，寫回會取代現有鏡頭。確定寫回？`)) return false;
-    await workbench.spine.setShots({ ...episode, shots });
+    // Card U9: the script's cast comes along, so the shots that name a character are bound to it again.
+    await workbench.spine.setShots({ ...episode, shots, characters: h.storyBible?.characters ?? [], storyBibleSeries: h.storyBible?.seriesId });
     return true;
   } catch (e) {
     window.alert(`${episode ? "寫回這一集" : "建立影片"}失敗：${e instanceof Error ? e.message : String(e)}`);

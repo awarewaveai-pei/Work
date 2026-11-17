@@ -331,7 +331,13 @@ ${DIALOGUE_RULE}
         build: (f) => {
           const limit = BODY_LIMITS[PLATFORM_PROVIDER[s(f.platformId)] ?? ""];
           const rule = limit ? `貼文文字（標題、鉤子、台詞、CTA 合計）不得超過 ${limit} 字；` : "";
-          return `將以下腳本改寫成「${s(f.plat)}」版本，${rule}依該平台的慣例調整語氣、節奏與長度，並給 5-10 個適合該平台的 hashtags（不含 #）。原版：標題:${s(f.title)} 鉤子:${s(f.hook)} 台詞:${arr(f.dialogues).join("；")} CTA:${s(f.cta)}\n純JSON：{"platform":"${s(f.plat)}","title":"","hook":"","scenes":[{"time":"","visual":"","dialogue":"","subtitle":"","shoot_tip":"","edit_tip":""}],"cta":"","hashtags":["tag"],"key_changes":"3個主要差異"}`;
+          // Card U9 (U3 leftover): a Story Bible script's scenes name their character (character_id); each line goes in
+          // with its id and the version's scenes give it back (the caller keeps only ids the original had).
+          const ids = arr(f.characterIds).map(s);
+          const cast = ids.some(Boolean);
+          const lines = arr(f.dialogues).map((d, i) => (cast && ids[i] ? `[${ids[i]}]` : "") + s(d));
+          const castRule = cast ? "台詞前的 [id] 是說這句的角色；每個 scene 的 character_id 填該場說話角色的 id（只能用原版出現的 id），沒有角色則空字串。" : "";
+          return `將以下腳本改寫成「${s(f.plat)}」版本，${rule}依該平台的慣例調整語氣、節奏與長度，並給 5-10 個適合該平台的 hashtags（不含 #）。${castRule}原版：標題:${s(f.title)} 鉤子:${s(f.hook)} 台詞:${lines.join("；")} CTA:${s(f.cta)}\n純JSON：{"platform":"${s(f.plat)}","title":"","hook":"","scenes":[{"time":"","visual":"","dialogue":"",${cast ? `"character_id":"",` : ""}"subtitle":"","shoot_tip":"","edit_tip":""}],"cta":"","hashtags":["tag"],"key_changes":"3個主要差異"}`;
         },
       },
     } }),

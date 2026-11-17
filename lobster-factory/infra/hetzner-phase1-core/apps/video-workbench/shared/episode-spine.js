@@ -39,12 +39,39 @@
     const n = Math.round(Number(s?.seconds));
     return { id: newId(), text: String(s?.text ?? ""), seconds: Number.isFinite(n) ? Math.min(120, Math.max(1, n)) : 5, line: String(s?.line ?? "") };
   }
+  // Card U3: a script's Story Bible cast as project characters. key = the Bible character id a shot's `character` names
+  // (card U9: kept, so a later 寫回 or 存成核准版本 pairs with the same character); refs only https or same-origin paths.
+  const refUrl = (u) => typeof u === "string" && /^(https:\/\/|\/(?!\/))/.test(u);
+  function castOf(characters) {
+    return (Array.isArray(characters) ? characters.slice(0, 50) : [])
+      .filter((c) => typeof c?.name === "string" && c.name.trim())
+      .map((c) => ({ id: newId(), ...(typeof c.key === "string" && c.key ? { key: c.key } : {}), name: c.name.trim(), role: String(c.role ?? ""), descr: "", refs: (Array.isArray(c.refs) ? c.refs : []).filter(refUrl).slice(0, 8) }));
+  }
+  // shots -> episode shots with new ids; a shot naming a cast key (shot.character) is bound to that character.
+  const castShots = (shots, characters) => {
+    const byKey = new Map((characters || []).filter((c) => c?.key).map((c) => [c.key, c.id]));
+    return shots.slice(0, 200).map((s) => ({ ...newShot(s), ...(byKey.has(s?.character) ? { characterIds: [byKey.get(s.character)] } : {}) }));
+  };
   // Card U3 「寫回這一集」: the episode's shots become the script's. Old pictures go with their shots; the steps that made
-  // them stay (history). Same in-place contract as setShot; false = no such episode.
-  function setShots(projects, { projectId, episodeId, shots }) {
-    const episode = (projects || []).find((p) => p.id === projectId)?.episodes?.find((e) => e.id === episodeId);
+  // them stay (history). Same in-place contract as setShot; false = no such episode. Card U9: the script's cast joins the
+  // project (a character already there by its key stays as the project has it) and each shot is bound to the one its
+  // scene names; storyBibleSeries is set when the project has none.
+  function setShots(projects, { projectId, episodeId, shots, characters, storyBibleSeries }) {
+    const project = (projects || []).find((p) => p.id === projectId),
+      episode = project?.episodes?.find((e) => e.id === episodeId);
     if (!episode || !Array.isArray(shots)) return false;
-    episode.shots = shots.slice(0, 200).map(newShot);
+    // Two shapes hold a project's items: the top page's store (shared/models.js project: one array, each with `kind` and
+    // `references`) and the projects page's ({ character: [...], ... }, refs). A new character is added in the shape found.
+    const flat = Array.isArray(project.assets),
+      assets = flat ? project.assets : project.assets && typeof project.assets === "object" ? project.assets : (project.assets = { character: [], scene: [], prop: [] }),
+      have = flat ? assets.filter((a) => a?.kind === "character") : Array.isArray(assets.character) ? assets.character : (assets.character = []);
+    for (const c of castOf(characters))
+      if (!c.key || !have.some((h) => h?.key === c.key)) {
+        have.push(c);
+        if (flat) assets.push({ ...c, kind: "character", references: c.refs });
+      }
+    episode.shots = castShots(shots, have);
+    if (typeof storyBibleSeries === "string" && storyBibleSeries && !project.storyBibleSeries) project.storyBibleSeries = storyBibleSeries;
     return true;
   }
 
@@ -334,7 +361,7 @@
     ];
   }
 
-  const api = { editId, editTitle, newProject, newShot, setShots, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs, current, isStale, staleClip, outputStale, lineage, stepStates };
+  const api = { editId, editTitle, newProject, newShot, castOf, castShots, setShots, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs, current, isStale, staleClip, outputStale, lineage, stepStates };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

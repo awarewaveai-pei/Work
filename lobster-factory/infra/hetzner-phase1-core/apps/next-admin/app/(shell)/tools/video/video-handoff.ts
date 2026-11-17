@@ -143,3 +143,18 @@ export function charactersFromStoryBible(doc: { characters?: { id: string; name:
 export function ratioForPlatform(platform: string | undefined): "9:16" | "16:9" | undefined {
   return platform === "reels" || platform === "tiktok" || platform === "shorts" ? "9:16" : platform === "youtube" ? "16:9" : undefined;
 }
+
+/** Card U9 (U3 leftover): a platform version keeps the original's character mapping. A version scene's character_id
+ *  stays when the original names that id; an id the original never had (or none) takes the original scene's at the same
+ *  place when both have the same number of scenes, else none. The version's other fields are untouched. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function keepCharacterIds(original: any, version: any): any {
+  const from: unknown[] = Array.isArray(original?.scenes) ? original.scenes : [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const idOf = (s: any) => (typeof s?.character_id === "string" ? s.character_id : "");
+  const known = new Set(from.map(idOf).filter(Boolean));
+  if (!known.size || !Array.isArray(version?.scenes)) return version;
+  const same = version.scenes.length === from.length;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { ...version, scenes: version.scenes.map((s: any, i: number) => ({ ...s, character_id: known.has(idOf(s)) ? idOf(s) : same ? idOf(from[i]) : "" })) };
+}

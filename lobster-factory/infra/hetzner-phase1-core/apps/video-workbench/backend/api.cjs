@@ -41,6 +41,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const captionReburn = require("./caption-reburn.cjs");
   const quickRender = require("./quick-render.cjs"); // plan U5 快速輸出
   const sceneImage = require("./scene-image.cjs"); // card U4.4 鏡頭生圖模型（主系統供應商）
+  // Card U9 製作聖經 <-> Story Bible (backend/story-bible.cjs); output / localFile are function declarations below.
+  const storyBible = require("./story-bible.cjs").createStoryBible({ main, appDir, urlImport: require("./url-import.cjs"),
+    store: (bytes, ext) => output(bytes, ext), exists: (url) => { const f = localFile(url); return !!f && fs.existsSync(f); } });
   fs.mkdirSync(dataDir, { recursive: true });
   const outputs = path.join(dataDir, "generated");
   fs.mkdirSync(outputs, { recursive: true });
@@ -1505,7 +1508,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env, undefined, { soundOut }), audioTools: audioTools.capability(env, { soundOut }), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.catalog, sceneImage: sceneImage.capability(main),
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
-          mainSystem: main ? { organizationId: orgId, externalAudioAllowed: soundOut } : null });
+          // Plan X3: storageBases = our own storage (next-admin r2.ts publicBucketBases); [] when it cannot be read now.
+          mainSystem: main ? { organizationId: orgId, externalAudioAllowed: soundOut, storageBases: await main.storageBases().catch(() => []) } : null });
         return true;
       }
       if (req.method === "POST" && route === "/engine/renders") {
@@ -1932,6 +1936,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         const image = await urlImport.fetchMedia(input.url, { kinds: ["image"] });
         json(res, 201, await registered({ name: "商品參考圖", kind: "image", type: image.type, url: output(image.bytes, image.ext), origin: { kind: "import" } })); return true;
       }
+      // Card U9: 製作聖經 and the Story Bible chain (backend/story-bible.cjs).
+      if (req.method === "POST" && route === "/bible/apply") { json(res, 200, await storyBible.apply(await body(req))); return true; }
+      if (req.method === "POST" && route === "/bible/draft") { json(res, 200, await storyBible.draft(await body(req))); return true; }
+      if (req.method === "POST" && route === "/bible/public-urls") { json(res, 200, await storyBible.publicUrls(await body(req))); return true; }
       if (req.method === "POST" && route === "/stock/import") {
         const input = await body(req);
         const got = await urlImport.fetchMedia(input.url, { kinds: ["image", "video"], hosts: urlImport.stockHosts() });

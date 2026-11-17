@@ -1,8 +1,8 @@
 // Card U4 (docs/video-unify-plan-20261116.md §4 U4): the one way a public URL becomes a library file. Every hop goes through
 // product-inspect.cjs publicGet (public HTTPS only, each redirect re-checked, the connection pinned to the checked address);
 // this file decides which kinds a caller takes, how big each may be, and that the bytes are what the header says.
-// A caller that names `hosts` takes only URLs on those hosts (the stock import: Pexels). The product page
-// names none: a shop's picture can be on any public host.
+// A caller that names `hosts` takes only URLs on those hosts (the stock import: Pexels); one that names `bases` only URLs
+// under them (the Story Bible import: our own R2). The product page names neither: a shop's picture can be on any host.
 const { publicGet } = require("./product-inspect.cjs");
 
 const KINDS = Object.freeze({
@@ -20,10 +20,19 @@ const hostOf = (raw) => {
     return null;
   }
 };
-// Only Pexels for now. Our R2 (plan U4 / U9 定裝照) is not listed: the workbench container is not given next-admin's
-// R2 public base, and next-admin itself falls back to a built-in default (lib/storage/r2.ts:14,52) -- a host list built
-// here would disagree with it. The card that first imports from R2 adds it from one shared source.
 const stockHosts = () => [...PEXELS_HOSTS];
+// Plan X3 (U9 定裝照): our own storage = the public bases next-admin answers (lib/storage/r2.ts publicBucketBases, through
+// main-system.cjs storageBases); none is written here. A URL is ours only under a base with a `/` boundary on the exact
+// https host -- the same test as r2.ts isUnderBase, so `https://<base-host>.attacker.tld/x` is not.
+const underBase = (raw, base) => {
+  if (typeof raw !== "string" || typeof base !== "string" || !base || !raw.startsWith(base + "/")) return false;
+  try {
+    const u = new URL(raw), b = new URL(base);
+    return u.protocol === "https:" && u.host === b.host;
+  } catch {
+    return false;
+  }
+};
 
 const valid = (ext, b) =>
   ext === "png" ? b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
@@ -33,10 +42,12 @@ const valid = (ext, b) =>
   : false;
 
 // { bytes, type, ext, kind, url } of one public file of one of `kinds`. `lookup` / `request` = test doubles (publicGet's).
-async function fetchMedia(raw, { kinds, hosts = null, lookup, request } = {}) {
+// hosts / bases: when either is named, the URL must be on one of the hosts or under one of the bases.
+async function fetchMedia(raw, { kinds, hosts = null, bases = null, lookup, request } = {}) {
   const wanted = (Array.isArray(kinds) ? kinds : []).filter((k) => Object.hasOwn(KINDS, k));
   if (!wanted.length) throw Error("未指定可匯入的素材種類");
-  if (hosts && !hosts.includes(hostOf(raw))) throw Object.assign(Error("這個網址不是可匯入的素材來源"), { status: 400 });
+  if ((hosts || bases) && !(hosts || []).includes(hostOf(raw)) && !(bases || []).some((b) => underBase(raw, b)))
+    throw Object.assign(Error("這個網址不是可匯入的素材來源"), { status: 400 });
   const types = Object.fromEntries(wanted.flatMap((k) => Object.entries(KINDS[k].types).map(([type, ext]) => [type, { ext, kind: k }])));
   const got = await publicGet(raw, {
     maxBytes: Math.max(...wanted.map((k) => KINDS[k].maxBytes)),
@@ -51,4 +62,4 @@ async function fetchMedia(raw, { kinds, hosts = null, lookup, request } = {}) {
   return { bytes: got.bytes, type: got.contentType, ext, kind, url: got.url };
 }
 
-module.exports = { KINDS, PEXELS_HOSTS, stockHosts, fetchMedia };
+module.exports = { KINDS, PEXELS_HOSTS, stockHosts, underBase, fetchMedia };

@@ -4,6 +4,7 @@
 app/globals.css
 public/awarewave/forms.css
 lib/content/video/asset-origin.ts
+lib/content/video/story-bible-production.ts
 lib/content/video/caption-formats.ts
 lib/content/video/platform-ratio.ts
 lib/content/video/renderer-auth.ts

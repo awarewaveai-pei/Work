@@ -39,6 +39,7 @@ const tests = [
   "u6-review-state",
   "u8-title-form",
   "u4-scene-image",
+  "u9-bible",
 ];
 const checks = [
   "server.cjs",

@@ -62,9 +62,16 @@ export function isDesignsAsset(url: unknown): url is string {
   return isUnderBase(url, getDesignsPublicBase());
 }
 
+/** The public bases of our buckets: designs, and video when R2_VIDEO_PUBLIC_BASE is set (no trailing slash). The one
+ *  list: isPublicBucketAsset here, and the video workbench's own-storage import (plan X3, internal route
+ *  /api/internal/video/workbench/storage) both read it. */
+export function publicBucketBases(): string[] {
+  return [getDesignsPublicBase(), (process.env.R2_VIDEO_PUBLIC_BASE ?? "").replace(/\/+$/, "")].filter(Boolean);
+}
+
 /** True iff `url` is a public object of the designs bucket or the video bucket (R2_VIDEO_PUBLIC_BASE), same guard. */
 export function isPublicBucketAsset(url: unknown): url is string {
-  return isDesignsAsset(url) || isUnderBase(url, (process.env.R2_VIDEO_PUBLIC_BASE ?? "").replace(/\/+$/, ""));
+  return publicBucketBases().some((base) => isUnderBase(url, base));
 }
 
 function isUnderBase(url: unknown, base: string): url is string {
