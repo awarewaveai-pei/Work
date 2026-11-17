@@ -39,18 +39,20 @@ async function edTitleRefresh() {
 }
 function edTitlePane(p) {
   // The pane's state belongs to one project: another project's finished title must not be offered here.
-  if (ed.title.projectId !== p.id)
+  if (ed.title.projectId !== p.id) {
+    const intro = edSpineHit(p)?.episode?.intro;
     ed.title = {
-      templateId: null,
-      fields: {},
-      picks: {},
-      seconds: null,
+      templateId: intro?.templateId || null,
+      fields: structuredClone(intro?.fields || {}),
+      picks: structuredClone(intro?.references || {}),
+      seconds: intro?.seconds || null,
       jobId: null,
       images: null,
       audios: null,
       done: null,
       projectId: p.id,
     };
+  }
   const t = edTitleTemplate(),
     blocked = edTitleBlocked(p),
     list = VideoWorkbench.capabilities?.remotionTemplates || [];
@@ -93,7 +95,8 @@ function edTitlePane(p) {
           : `<input ${attrs} maxlength="${f.type === "color" ? 7 : f.max}" value="${value}">`
     }</label>`;
   };
-  return `<h3>片頭</h3><p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}）。</p><div class="flow-choices">${list
+  const intro = hit?.episode?.intro;
+  return `<h3>片頭</h3>${intro ? `<p class="note" data-ed-current-intro>本集：${esc(intro.kind === "title" ? "標題卡「" + intro.fields.title + "」" : list.find((x) => x.id === intro.templateId)?.label || "模板")} · ${intro.seconds} 秒 · ${esc({ none: "無轉場", crossfade: "交叉淡化", "fade-black": "淡黑" }[intro.transition])}</p>` : '<p class="note">本集尚未設定片頭。</p>'}<p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}）。</p><div class="flow-choices">${list
     .map(
       (x) =>
         `<button type="button" class="btn small ${x.id === t?.id ? "selected" : ""}" data-ed-action="title-template:${esc(x.id)}" aria-pressed="${x.id === t?.id}">${esc(x.label)}</button>`,
@@ -106,15 +109,22 @@ function edTitlePane(p) {
 }
 // Puts the finished title on V1 at frame 0; every clip on every track moves later by its length, so the
 // existing cut keeps its sync.
-async function edTitleInsert(p, asset) {
+async function edTitleInsert(p, asset, bookend = ed.title.renderedBookend) {
   const a = await edProbe(asset);
   if (!ed.projects.includes(p)) return;
+  const hit = edSpineHit(p),
+    end = EpisodeSpine.normalizeBookend(bookend || hit?.episode?.intro || edTitleBookend(p));
+  if (p.clips.some((row) => row.bookend === "intro")) throw Error("時間軸已有片頭，請先移除舊片頭再加入，避免重複");
+  const first = p.clips.filter((row) => row.track === edMain(p)).sort((a, b) => a.startFrame - b.startFrame)[0];
+  if (first && first.startFrame !== 0) throw Error("請先把主影片軌開頭對齊，再加入片頭轉場");
+  if (hit) await VideoWorkbench.spine.setBookends({ projectId: hit.project.id, episodeId: hit.episode.id, intro: end });
   edCheckpoint();
   if (!p.assets.some((x) => x.id === a.id)) p.assets.push(a);
   const c = edTime(
     p,
     {
       id: crypto.randomUUID(),
+      bookend: "intro",
       kind: "video",
       asset: a,
       track: edMain(p),
@@ -137,10 +147,20 @@ async function edTitleInsert(p, asset) {
   );
   for (const row of p.clips)
     edTime(p, row, { startFrame: row.startFrame + c.durationFrames });
+  if (first && end.transition !== "none") {
+    first.transition = end.transition === "fade-black" ? "黑場" : "溶解";
+    first.transitionFrames = Timebase.toFrames(end.transitionSeconds, p.timebase);
+  }
   p.clips.push(c);
   ed.selected = c.id;
   ed.time = 0;
   await edCommit(p);
+}
+function edTitleBookend(p) {
+  const t = edTitleTemplate(), old = edSpineHit(p)?.episode?.intro;
+  return EpisodeSpine.normalizeBookend({ kind: "template", templateId: t.id, fields: structuredClone(ed.title.fields),
+    references: Object.fromEntries(Object.entries(ed.title.picks).map(([k, a]) => [k, { url: a.url, ...(a.id ? { id: a.id } : {}) }])),
+    seconds: edTitleSeconds(t), transition: old?.transition || "crossfade", transitionSeconds: old?.transitionSeconds ?? 0.5 });
 }
 // ---- ED.5: 樣板／純文字／品牌字型 ----
 // Template looks are made of theme tokens only: the preview card paints them with var(--token), and a clip gets the
@@ -360,7 +380,7 @@ edRegisterPane("text", {
       const t = edTitleTemplate(),
         blocked = edTitleBlocked(p);
       if (!t || blocked) throw Error(blocked || "片頭模板服務未設定");
-      const job = await VideoWorkbench.generations.create({
+      const end = edTitleBookend(p), input = {
         type: "video",
         operation: "remotion-template",
         prompt: t.label,
@@ -376,8 +396,12 @@ edRegisterPane("text", {
         references: Object.fromEntries(
           t.fields.filter((f) => ed.title.picks[f.key]).map((f) => [f.key, { url: ed.title.picks[f.key].url, id: ed.title.picks[f.key].id }]),
         ),
-      });
+      }, key = EpisodeSpine.bookendKey(input),
+        previous = (await VideoWorkbench.generations.list()).filter((j) => j.input?.operation === "remotion-template" && EpisodeSpine.bookendKey(j.input) === key).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))).at(-1);
+      // paid: none (Remotion template rendering is local).
+      const job = previous && !["failed", "cancelled", "blocked"].includes(previous.status) ? previous : await VideoWorkbench.generations.create({ ...input, bookendKey: key });
       ed.title.jobId = job.id;
+      ed.title.renderedBookend = end;
       ed.title.done = null;
       edRender();
       VideoWorkbench.showJob(job, {
@@ -385,7 +409,7 @@ edRegisterPane("text", {
           setTimeout(() => edTitleRefresh().catch(VideoWorkbench.reportError), 300),
         apply: async (v) => {
           if (v.status !== "succeeded") return false;
-          await edTitleInsert(p, VideoWorkbench.jobAsset(v));
+          await edTitleInsert(p, VideoWorkbench.jobAsset(v), end);
         },
         applyLabel: "放到時間軸開頭",
       });

@@ -40,6 +40,7 @@ const tests = [
   "u5-editor-bookends",
   "u6-review-state",
   "u8-title-form",
+  "u8-bookends",
   "u4-scene-image",
   "u9-bible",
 ];
