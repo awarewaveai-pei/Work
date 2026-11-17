@@ -122,8 +122,8 @@ const spineSignature = (s) =>
     s?.open ?? 0,
     (s?.projects || []).flatMap((p) =>
       (p.episodes || [])
-        .map((e) => [p.id, e.id, e.edit ?? null, e.steps ?? null, e.outputs ?? null, (e.shots || []).filter((x) => x?.image || x?.video).map((x) => [x.id, x.image ?? null, x.video ?? null])])
-        .filter(([, , edit, steps, outputs, pictures]) => edit || steps || outputs || pictures.length),
+        .map((e) => [p.id, e.id, e.edit ?? null, e.steps ?? null, e.outputs ?? null, (e.shots || []).filter((x) => x?.image || x?.video).map((x) => [x.id, x.image ?? null, x.video ?? null]), e.intro ?? null, e.outro ?? null, e.autoRun ?? null])
+        .filter(([, , edit, steps, outputs, pictures, intro, outro, run]) => edit || steps || outputs || pictures.length || intro || outro || run),
     ),
   ]);
 let spineSeen = "";
@@ -157,6 +157,7 @@ document.addEventListener("vw:changed", () => {
   // dialog stays open across its own spine-set-shot, so its picture used to wait for a page reload.
   if (dialog) spineUndrawn = true;
   else render();
+  driveAutoRuns();
 });
 let dialog = null;
 let spineUndrawn = false;
@@ -228,7 +229,7 @@ function renderWorkbench() {
   const total = e.shots.length;
   const menu = `<div class="row"><button class="btn small outline" data-action="preview">◉　預覽整集</button><button class="btn small outline" data-action="export">↓　匯出片段 · 0</button><button class="btn small outline" data-action="cover">▧　更換封面</button><button class="btn small outline" data-action="settings">☷　生成設定</button></div>`;
   $("workbench").innerHTML = VideoWorkbench.sanitize(
-    `<div class="work-nav"><button class="btn small outline" data-action="backHome">←　專案列表</button><span class="eyebrow" style="color:var(--text-muted)">AWAREWAVE · 專案</span><span class="quiet">本機專案 · AI 依 API 用量計費</span></div><div class="work-grid"><aside class="bible"><div class="eyebrow">— 製作聖經 · BIBLE</div><h2>${esc(p.title)}</h2><div class="quiet">${esc(p.type === "series" ? "短影集" : "單支影片")} · ${p.episodes.length} 集 · ${esc(p.ratio)}</div><div class="fixed">♙　卡司、場景與風格定義一次，在所有鏡頭間保持一致。</div>${["character", "scene", "prop"].map((k) => entityList(k, p)).join("")}<div class="entity-group"><div class="entity-header">◉　風格錨點</div><div class="style-record"><h3>${esc(STYLE_NAMES[p.style])}</h3><div class="muted">${esc(styleText(p))}</div></div></div><button class="btn" style="width:100%;margin-top:20px" data-action="settings">☷　生成設定　⌃</button><p class="tiny">風格與負面提示詞的專案／本集兩層設定，會合成後用於實際內容。</p></aside><main class="work-content"><div class="work-top"><div><div class="quiet">專案　›　${esc(p.title)}</div><h1>第 ${state.episode + 1} 集 · ${esc(state.episode === 0 ? p.title : e.name)}</h1><div class="tiny">${total} 個鏡頭 · 約 ${e.shots.reduce((v, s) => v + Number(s.seconds || 5), 0)} 秒 · ${esc(p.ratio)} · ${e.shots.filter((s) => s.image).length}/${total} 已生成</div></div><div class="work-actions"><button class="btn primary" data-action="storyboard">✧　AI 分鏡</button><button class="btn" data-paid="video.image" data-action="batch">▤　批次生成</button><button class="btn" data-action="fullVideo">✧　帶入影片生成</button><div style="position:relative"><button class="btn" data-action="toggleMore">⋯　更多</button><div class="panel" id="more-menu" hidden style="position:absolute;right:0;top:43px;z-index:4;width:205px;padding:7px">${menu}</div></div></div></div>${episodeSteps(e)}<div class="outline-box"><label>□ 本集大綱</label><textarea data-bind="episode.outline" placeholder="用幾句話寫下這一集的故事：誰、在哪裡、發生什麼、怎麼收尾">${esc(e.outline)}</textarea><div class="tiny">AI 分鏡會從這裡開始。改了大綱之後可以重新分鏡。</div></div><div class="episode-tabs">${p.episodes.map((x, i) => `<button class="${i === state.episode ? "on" : ""}" data-action="episode" data-index="${i}">EP${i + 1}　${esc(x.name)} ${x.shots.length}</button>`).join("")}<button data-action="addEpisode" aria-label="新增一集">＋</button></div>${total ? `<div class="split" style="margin-bottom:16px"><strong>本集鏡頭 <span class="quiet">${total} 個</span></strong><button class="btn small primary" data-action="addShot">＋　新增鏡頭</button></div><div class="shot-grid">${e.shots.map((s, i) => `<div class="shot"><div class="split"><h3>鏡頭 ${String(i + 1).padStart(2, "0")}</h3><button class="btn small danger" data-action="deleteShot" data-index="${i}" title="刪除鏡頭">×</button></div>${shotMedia(s)}<label>畫面描述</label><textarea data-bind="shot.${i}.text" placeholder="描述鏡頭內的動作與構圖">${esc(s.text)}</textarea><label>旁白</label><textarea data-bind="shot.${i}.line" placeholder="這一鏡要念的一句話（配音和字幕照它做）">${esc(s.line || "")}</textarea>${shotControls(p, s, i)}${imageModelRow(p, s, i)}<div class="row"><label style="margin:0">時長 <input aria-label="鏡頭時長" style="width:70px;padding:6px" type="number" min="1" max="120" data-bind="shot.${i}.seconds" value="${esc(s.seconds)}"></label><span class="tiny">秒</span><button class="btn small" data-paid="video.image"${sceneModel(p, s) ? ` data-paid-model="scene:${esc(sceneModel(p, s).id)}"` : ""} data-action="shotGenerate" data-index="${i}">生成畫面</button>${s.image ? `<button class="btn small outline" data-action="fixShot" data-index="${i}">修這張</button>` : ""}</div>${shotSources(p, s, i)}</div>`).join("")}</div>` : `<div class="work-empty panel"><h3>這一集還沒有鏡頭，從這裡開始</h3><div class="step"><span class="circle">1</span><div><strong>先建立角色與場景</strong><p>每個角色、場景、道具都可以上傳參考圖。鏡頭鎖定它們之後，長相與環境才會每一鏡都一致。</p><button class="btn small outline" data-action="asset" data-kind="character">♧　建立角色</button></div></div><div class="step"><span class="circle">2</span><div><strong>寫下大綱，讓 AI 分鏡</strong><p>AI 導演會先問幾個問題，再把故事拆成一顆一顆鏡頭，你可以逐鏡修改後再建立。</p><button class="btn small outline" data-action="storyboard">✧　AI 分鏡</button></div></div><div class="step"><span class="circle">3</span><div><strong>或者自己加一顆鏡頭</strong><p>想手動控制每一鏡的細節與鏡頭，就直接開始寫。</p><button class="btn small outline" data-action="addShot">＋　新增鏡頭</button></div></div></div>`}</main></div>`,
+    `<div class="work-nav"><button class="btn small outline" data-action="backHome">←　專案列表</button><span class="eyebrow" style="color:var(--text-muted)">AWAREWAVE · 專案</span><span class="quiet">本機專案 · AI 依 API 用量計費</span></div><div class="work-grid"><aside class="bible"><div class="eyebrow">— 製作聖經 · BIBLE</div><h2>${esc(p.title)}</h2><div class="quiet">${esc(p.type === "series" ? "短影集" : "單支影片")} · ${p.episodes.length} 集 · ${esc(p.ratio)}</div><div class="fixed">♙　卡司、場景與風格定義一次，在所有鏡頭間保持一致。</div>${["character", "scene", "prop"].map((k) => entityList(k, p)).join("")}<div class="entity-group"><div class="entity-header">◉　風格錨點</div><div class="style-record"><h3>${esc(STYLE_NAMES[p.style])}</h3><div class="muted">${esc(styleText(p))}</div></div></div><button class="btn" style="width:100%;margin-top:20px" data-action="settings">☷　生成設定　⌃</button><p class="tiny">風格與負面提示詞的專案／本集兩層設定，會合成後用於實際內容。</p></aside><main class="work-content"><div class="work-top"><div><div class="quiet">專案　›　${esc(p.title)}</div><h1>第 ${state.episode + 1} 集 · ${esc(state.episode === 0 ? p.title : e.name)}</h1><div class="tiny">${total} 個鏡頭 · 約 ${e.shots.reduce((v, s) => v + Number(s.seconds || 5), 0)} 秒 · ${esc(p.ratio)} · ${e.shots.filter((s) => s.image).length}/${total} 已生成</div></div><div class="work-actions"><button class="btn primary" data-action="storyboard">✧　AI 分鏡</button><button class="btn" data-paid="video.image" data-action="batch">▤　批次生成</button><button class="btn" data-action="oneClick">✦　一鍵成片</button><button class="btn" data-action="fullVideo">✧　帶入影片生成</button><div style="position:relative"><button class="btn" data-action="toggleMore">⋯　更多</button><div class="panel" id="more-menu" hidden style="position:absolute;right:0;top:43px;z-index:4;width:205px;padding:7px">${menu}</div></div></div></div>${autoRunBanner(e)}${episodeSteps(e)}<div class="outline-box"><label>□ 本集大綱</label><textarea data-bind="episode.outline" placeholder="用幾句話寫下這一集的故事：誰、在哪裡、發生什麼、怎麼收尾">${esc(e.outline)}</textarea><div class="tiny">AI 分鏡會從這裡開始。改了大綱之後可以重新分鏡。</div></div><div class="episode-tabs">${p.episodes.map((x, i) => `<button class="${i === state.episode ? "on" : ""}" data-action="episode" data-index="${i}">EP${i + 1}　${esc(x.name)} ${x.shots.length}</button>`).join("")}<button data-action="addEpisode" aria-label="新增一集">＋</button></div>${total ? `<div class="split" style="margin-bottom:16px"><strong>本集鏡頭 <span class="quiet">${total} 個</span></strong><button class="btn small primary" data-action="addShot">＋　新增鏡頭</button></div><div class="shot-grid">${e.shots.map((s, i) => `<div class="shot"><div class="split"><h3>鏡頭 ${String(i + 1).padStart(2, "0")}</h3><button class="btn small danger" data-action="deleteShot" data-index="${i}" title="刪除鏡頭">×</button></div>${shotMedia(s)}<label>畫面描述</label><textarea data-bind="shot.${i}.text" placeholder="描述鏡頭內的動作與構圖">${esc(s.text)}</textarea><label>旁白</label><textarea data-bind="shot.${i}.line" placeholder="這一鏡要念的一句話（配音和字幕照它做）">${esc(s.line || "")}</textarea>${shotControls(p, s, i)}${imageModelRow(p, s, i)}<div class="row"><label style="margin:0">時長 <input aria-label="鏡頭時長" style="width:70px;padding:6px" type="number" min="1" max="120" data-bind="shot.${i}.seconds" value="${esc(s.seconds)}"></label><span class="tiny">秒</span><button class="btn small" data-paid="video.image"${sceneModel(p, s) ? ` data-paid-model="scene:${esc(sceneModel(p, s).id)}"` : ""} data-action="shotGenerate" data-index="${i}">生成畫面</button>${s.image ? `<button class="btn small outline" data-action="fixShot" data-index="${i}">修這張</button>` : ""}</div>${shotSources(p, s, i)}</div>`).join("")}</div>` : `<div class="work-empty panel"><h3>這一集還沒有鏡頭，從這裡開始</h3><div class="step"><span class="circle">1</span><div><strong>先建立角色與場景</strong><p>每個角色、場景、道具都可以上傳參考圖。鏡頭鎖定它們之後，長相與環境才會每一鏡都一致。</p><button class="btn small outline" data-action="asset" data-kind="character">♧　建立角色</button></div></div><div class="step"><span class="circle">2</span><div><strong>寫下大綱，讓 AI 分鏡</strong><p>AI 導演會先問幾個問題，再把故事拆成一顆一顆鏡頭，你可以逐鏡修改後再建立。</p><button class="btn small outline" data-action="storyboard">✧　AI 分鏡</button></div></div><div class="step"><span class="circle">3</span><div><strong>或者自己加一顆鏡頭</strong><p>想手動控制每一鏡的細節與鏡頭，就直接開始寫。</p><button class="btn small outline" data-action="addShot">＋　新增鏡頭</button></div></div></div>`}</main></div>`,
   );
   wireReviewLinks();
   ProjectBible.mount(p, e); // card U9: the approved-version block and step 3's check results (scripts/projects-bible.js)
@@ -274,7 +275,7 @@ function episodeSteps(e) {
     button("openEdit", "配音", ' data-intent="voice"') + button("openTool", "配樂", ' data-tool="music"') + note("配音會照每一鏡的旁白逐句產生。配樂做好後，要自己放到音樂軌。"),
     button("openEdit", "產生字幕", ' data-intent="subtitle"') + note("用旁白對時間，不用語音辨識，不收費。"),
     // Plan U5 (D3): 快速輸出 = the main system renders the shots' pictures and lines; 剪輯輸出 = the edit file's timeline.
-    button("quickRender", "快速輸出") + button("openEdit", "剪輯輸出", ' data-intent="export"') + note("快速輸出用鏡頭的畫面和旁白直接出片；剪輯輸出照剪輯檔的時間軸出片。"),
+    button("oneClick", "一鍵成片") + button("quickRender", "快速輸出") + button("openEdit", "剪輯輸出", ' data-intent="export"') + note("一鍵成片先補齊缺的畫面再快速輸出；快速輸出用鏡頭的畫面和旁白直接出片；剪輯輸出照剪輯檔的時間軸出片。"),
     outputs.length ? FINISH_TOOLS.map(([tool, label]) => button("outputTool", label, ` data-tool="${tool}" data-index="${last}"`)).join("") + note("選用。做完會成為新的一版成片，舊的保留。") : "",
     outputs.length ? reviewButton(outputs[last], "qa", "審片") + note("四項檢查，在這裡看結果。") : "",
     outputs.length ? reviewButton(outputs[last], "release", "發布") + note("核准、封面、社群草稿、網站文章。") : "",
@@ -542,21 +543,37 @@ function renderDialog() {
       btnCancel + '<button class="btn primary" data-action="stockSearch">找一個放上去</button>',
     );
   } else if (dialog.type === "quickRender") {
-    const q = dialog.quote,
-      n = dialog.ratios.length,
+    // Plan U5 快速輸出 and U5.3 一鍵成片: one dialog; both hand the episode to the runner (driveAutoRuns), which renders a
+    // template intro/outro first when one is chosen. Every number comes from the server's quote (§13 C4).
+    const d = dialog,
+      q = d.quote,
+      n = d.ratios.length,
+      missing = (ep()?.shots || []).filter((s) => !s.image && !s.video).length,
       money = (usd) => (usd === 0 ? "免費" : window.VideoWorkbenchMoney(usd) || "價格讀取失敗"),
-      pick = (act, value, label, on, off = false) => `<button class="btn small ${on ? "primary" : "outline"}" data-action="${act}" data-value="${esc(value)}" aria-pressed="${on}"${off ? ' disabled title="主機沒有設定 OpenAI 金鑰"' : ""}>${esc(label)}</button>`;
+      bad = [...(q?.problems || []), ...bookendProblems(d)],
+      ready = q && !bad.length && n && !d.busy && (!d.oneClick || d.budgetTwd >= 0) && (!d.embed || d.siteId);
     html = modal(
-      "快速輸出",
-      `<p class="tiny">用每個鏡頭的畫面和旁白直接出片：主系統配音、燒字幕、加片頭標題，成片回到這一集。每個鏡頭都要有畫面和旁白，鏡頭長度跟著旁白的配音（時長欄不使用）；一集最多 30 個鏡頭，每個素材 200 MB 以內。</p><label>比例（可複選，每個比例一個任務）</label><div class="row" role="group" aria-label="比例">${EpisodeSpine.QUICK_RATIOS.map((r) => pick("quickRatio", r, r, dialog.ratios.includes(r))).join("")}</div><label>聲線</label><div class="row" role="group" aria-label="聲線">${q ? q.voices.map((v, i) => pick("quickVoice", String(i), v.label, dialog.tts?.provider === v.provider && dialog.tts?.voice === v.voice, v.available === false)).join("") : '<span class="tiny">讀取中…</span>'}</div><label>片頭標題</label><input id="quick-intro" maxlength="80" placeholder="留空就不加片頭" value="${esc(dialog.introTitle)}"><p class="tiny">有填的話，片頭顯示 3 秒。</p><label><input type="checkbox" id="quick-auto" style="width:auto" ${dialog.autonomy ? "checked" : ""}> 自動完成</label><p class="tiny">勾選後，成片由排程自動做品質檢查、核准、建立社群草稿。</p><div class="settings-section" data-quick-cost><h3>成本明細</h3>${
-        dialog.error
-          ? `<p class="tiny">${esc(dialog.error)}</p>`
-          : !q
-            ? '<p class="tiny">讀取中…</p>'
-            : q.lines.map((l) => `<div class="split"><span>${esc(l.label)}（${esc(l.tool)}）</span><span>${money(l.usd)}</span></div>`).join("") +
-              `<div class="split"><strong>每個比例 ${money(q.perRatioUsd)} × ${n} 個比例</strong><strong>合計 ${money(q.totalUsd)}</strong></div>`
-      }</div>${q?.problems.length ? `<div class="settings-section" data-quick-problems><h3>還不能送出</h3>${q.problems.map((t) => `<p class="tiny">${esc(t)}</p>`).join("")}</div>` : ""}`,
-      btnCancel + `<button class="btn primary" data-action="quickSend"${q && !q.problems.length && n && !dialog.busy ? "" : " disabled"}>送出 ${n} 個任務</button>`,
+      d.oneClick ? "一鍵成片" : "快速輸出",
+      (d.oneClick
+        ? `<p class="tiny">先把缺畫面的鏡頭補齊，再用每個鏡頭的畫面和旁白直接出片。頁面關掉再開會接著做；已有畫面的鏡頭不會重做。每個鏡頭都要有旁白，鏡頭長度跟著旁白的配音。</p><label>缺的畫面怎麼補（${missing} 個鏡頭）</label><div class="row" role="group" aria-label="缺的畫面怎麼補">${FILL_MODES.map(([k, label]) => chip("quickFill", k, label, d.fill === k)).join("")}</div>`
+        : `<p class="tiny">用每個鏡頭的畫面和旁白直接出片：主系統配音、燒字幕、接上片頭片尾，成片回到這一集。每個鏡頭都要有畫面和旁白，鏡頭長度跟著旁白的配音（時長欄不使用）；一集最多 30 個鏡頭，每個素材 200 MB 以內。</p>`) +
+        `<label>比例（可複選，每個比例一個任務）</label><div class="row" role="group" aria-label="比例">${EpisodeSpine.QUICK_RATIOS.map((r) => chip("quickRatio", r, r, d.ratios.includes(r))).join("")}${chip("quickRatioAll", "all", "全選", n === EpisodeSpine.QUICK_RATIOS.length)}</div><label>聲線</label><div class="row" role="group" aria-label="聲線">${q ? q.voices.map((v, i) => chip("quickVoice", String(i), v.label, d.tts?.provider === v.provider && d.tts?.voice === v.voice, v.available === false ? "主機沒有設定 OpenAI 金鑰" : "")).join("") : '<span class="tiny">讀取中…</span>'}</div>` +
+        bookendControls(d) +
+        `<label>做到哪裡停</label><div class="row" role="group" aria-label="做到哪裡停">${[["video", "成片"], ["drafts", "草稿"]].map(([k, label]) => chip("quickUntil", k, label, d.until === k)).join("")}</div><p class="tiny">${d.until === "drafts" ? "成片後由排程自動做品質檢查、核准、建立社群草稿；只到草稿，不會對外發布。" : "做到成片就停，審片與發布由你決定。"}</p>${d.until === "drafts" ? embedControls(d) : ""}` +
+        `<div class="settings-section" data-quick-cost><h3>成本明細</h3>${
+          d.error
+            ? `<p class="tiny">${esc(d.error)}</p>`
+            : !q
+              ? '<p class="tiny">讀取中…</p>'
+              : (q.fill?.pictures ? `<div class="split"><span>補畫面 ${q.fill.pictures} 張</span><span>${money(q.fill.usd)}</span></div>` : "") +
+                q.lines.map((l) => `<div class="split"><span>${esc(l.label)}（${esc(l.tool)}）</span><span>${money(l.usd)}</span></div>`).join("") +
+                (d.intro.kind !== "none" || d.outro.kind !== "none" ? `<div class="split"><span>片頭／片尾（同樣內容只渲染一次）</span><span>免費</span></div>` : "") +
+                (q.draftsUsd ? `<div class="split"><span>社群草稿文案（含一次修正的費用上界）</span><span>${money(q.draftsUsd)}</span></div>` : "") +
+                `<div class="split"><strong>輸出每個比例 ${money(q.perRatioUsd)} × ${n} 個比例</strong><strong>合計 ${money(q.totalUsd)}</strong></div>`
+        }</div>` +
+        (d.oneClick ? `<label>花費上限（NT$）</label><input id="quick-budget" type="number" min="0" step="1" value="${esc(d.budgetTwd ?? "")}"><p class="tiny">實際花費到上限就停在當步，不會自動加碼。</p>` : "") +
+        (bad.length ? `<div class="settings-section" data-quick-problems><h3>還不能送出</h3>${bad.map((t) => `<p class="tiny">${esc(t)}</p>`).join("")}</div>` : ""),
+      btnCancel + `<button class="btn primary" data-action="quickSend"${ready ? "" : " disabled"}>${d.oneClick ? "開始一鍵成片" : "送出 " + n + " 個任務"}</button>`,
     );
   } else if (dialog.type === "editEpisode") {
     html = modal(
@@ -671,10 +688,8 @@ function downloadJson(name, data) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
-async function generateShot(index) {
-  const p = project(),
-    episode = ep(),
-    shot = episode.shots[index];
+async function generateShot(index, p = project(), episode = ep(), show = true, submission = {}) {
+  const shot = episode.shots[index];
   if (!shot?.text?.trim()) throw Error("請先填寫鏡頭畫面描述");
   shot.id ||= crypto.randomUUID();
   const projectId = p.id,
@@ -688,6 +703,7 @@ async function generateShot(index) {
   const job = await VideoWorkbench.generations.create({
     type: "image",
     operation: "project-shot",
+    ...submission,
     prompt: [
       shot.text,
       scene && "場景：" + [scene.name, scene.descr, scene.time && "時間 " + scene.time].filter(Boolean).join("，"),
@@ -713,14 +729,13 @@ async function generateShot(index) {
   });
   shot.jobId = job.id;
   save();
-  VideoWorkbench.showJob(job);
+  if (show) VideoWorkbench.showJob(job);
+  return job;
 }
 // Card U4: a library or stock picture onto a shot. The top page writes it (spine-set-shot) and records the step; this
 // page only asks, like a job's picture (settle).
-async function putOnShot(index, asset, tool) {
-  const p = project(),
-    e = ep(),
-    shot = e.shots[index];
+async function putOnShot(index, asset, tool, p = project(), e = ep()) {
+  const shot = e.shots[index];
   if (!shot || !asset?.url) return;
   if (!shot.id) {
     shot.id = crypto.randomUUID();
@@ -731,10 +746,9 @@ async function putOnShot(index, asset, tool) {
 }
 // Card U4: Pexels through the main system's regenerate-image (plan §4 U4); the file comes in through the stock import
 // (backend/url-import.cjs host list). pexels-all / pexels-video never fall back to a paid AI picture.
-async function stockShot(index, kind, keyword) {
+async function stockShot(index, kind, keyword, p = project(), e = ep()) {
   if (!keyword) throw Error("請先輸入關鍵字");
-  const p = project(),
-    r = await fetch("/api/video/regenerate-image", {
+  const r = await fetch("/api/video/regenerate-image", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -743,7 +757,7 @@ async function stockShot(index, kind, keyword) {
     found = await r.json().catch(() => ({}));
   if (!r.ok || !found.ok || !found.imageUrl) throw Error("圖庫找不到素材：" + (found.error || found.code || r.status));
   const asset = await VideoWorkbench.assets.save({ ...(await VideoWorkbench.request("/stock/import", { url: found.imageUrl, name: "圖庫：" + keyword })), createdAt: new Date().toISOString() });
-  await putOnShot(index, asset, "stock");
+  await putOnShot(index, asset, "stock", p, e);
 }
 // Card U4: 讓這鏡動起來 -- the shot's picture as the first frame of a video job; settle puts the video on the shot.
 async function motionShot(index, modelId) {
@@ -767,6 +781,75 @@ async function motionShot(index, modelId) {
   });
   VideoWorkbench.showJob(job);
 }
+// Plan U5.3: the dialog's button groups (no dropdowns). off = a reason the button cannot be pressed.
+const chip = (act, value, label, on, off = "", extra = "") => `<button class="btn small ${on ? "primary" : "outline"}" data-action="${act}" data-value="${esc(value)}" aria-pressed="${on}"${off ? ` disabled title="${esc(off)}"` : ""}${extra}>${esc(label)}</button>`;
+const FILL_MODES = [["ai", "AI 生圖"], ["stock-video", "圖庫影片"], ["stock-photo", "圖庫照片"]],
+  TRANSITION_LABEL = { none: "無", crossfade: "交叉淡化 0.5 秒", "fade-black": "淡黑 0.5 秒" },
+  END_LABEL = { intro: "片頭", outro: "片尾" };
+// 片頭／片尾／轉場: the episode's one setting (EpisodeSpine.normalizeBookend), edited here as a draft and written on send.
+function bookendControls(d) {
+  const caps = VideoWorkbench.capabilities,
+    templates = caps?.remotionTemplates || [],
+    part = (which) => {
+      const b = d[which],
+        on = (v) => (v === "none" || v === "title" ? b.kind === v : b.kind === "template" && b.templateId === v);
+      return `<label>${END_LABEL[which]}</label><div class="row" role="group" aria-label="${END_LABEL[which]}">${[["none", "不要"], ["title", "標題卡"], ...templates.map((t) => [t.id, t.label])]
+        .map(([v, label]) => chip("bookendKind", v, label, on(v), v !== "none" && v !== "title" && !caps?.remotion ? "片頭模板服務未設定" : "", ` data-which="${which}"`))
+        .join("")}</div>${
+        b.kind === "title"
+          ? `<input id="bookend-${which}" maxlength="80" value="${esc(b.fields?.title || "")}" placeholder="標題卡文字"><p class="tiny">標題卡顯示 ${b.seconds} 秒。</p>`
+          : b.kind === "template"
+            ? `<p class="tiny">模板的文字和圖片用片名、旁白和鏡頭畫面自動帶入，長度 ${b.seconds} 秒；同樣的內容只渲染一次。</p>`
+            : ""
+      }`;
+    };
+  return part("intro") + part("outro") + `<label>轉場</label><div class="row" role="group" aria-label="轉場">${EpisodeSpine.TRANSITIONS.map((t) => chip("bookendTransition", t, TRANSITION_LABEL[t], d.transition === t)).join("")}</div>`;
+}
+function embedControls(d) {
+  const sites = d.quote?.sites || [];
+  return `<label><input type="checkbox" id="quick-embed" style="width:auto" ${d.embed ? "checked" : ""}${sites.length ? "" : " disabled"}> 同時建一篇網站草稿文章並嵌入</label>${
+    !sites.length ? '<p class="tiny">這個品牌沒有連上的網站。</p>' : d.embed ? `<div class="row" role="group" aria-label="網站">${sites.map((x) => chip("quickSite", x.id, x.name, d.siteId === x.id)).join("")}</div>` : ""
+  }`;
+}
+// A bookend as the episode stores it ({ kind: "none" } removes it).
+const savedBookend = (d, which) => (d[which].kind === "none" ? { kind: "none" } : { ...d[which], transition: d.transition, transitionSeconds: 0.5 });
+// What stops sending before any render (§9: a template that cannot make a chosen ratio is listed here, not at render time).
+// 一鍵成片 will fill the missing pictures first, so they count as there.
+function bookendProblems(d) {
+  const p = project(),
+    e = ep(),
+    out = [],
+    shots = (e?.shots || []).map((s) => (d.oneClick && !s.image && !s.video ? { ...s, image: "/generated/pending.png" } : s));
+  for (const which of ["intro", "outro"]) {
+    const b = d[which];
+    if (b.kind === "title" && !String(b.fields?.title || "").trim()) out.push(END_LABEL[which] + "標題卡要有文字");
+    if (b.kind !== "template") continue;
+    for (const ratio of d.ratios) {
+      const job = EpisodeSpine.bookendJob(p, { ...e, shots, [which]: savedBookend(d, which) }, which, ratio, VideoWorkbench.capabilities?.remotionTemplates || []);
+      if (job?.problem && !out.includes(job.problem)) out.push(job.problem);
+    }
+  }
+  return out;
+}
+function openQuickRender(oneClick) {
+  const p = project(),
+    e = ep(),
+    draft = (b) => (b ? structuredClone(b) : { kind: "none" });
+  showDialog("quickRender", {
+    oneClick,
+    ratios: [EpisodeSpine.QUICK_RATIOS.includes(p.ratio) ? p.ratio : "16:9"],
+    tts: e.autoRun?.tts || null,
+    fill: "ai",
+    until: "video",
+    intro: draft(e.intro),
+    outro: draft(e.outro),
+    transition: (e.intro || e.outro)?.transition || "crossfade",
+    embed: false,
+    siteId: null,
+    budgetTwd: null,
+  });
+  quickQuote();
+}
 // Plan U5 快速輸出: what keeps the shots from rendering and what the chosen ratios and voice cost, asked of the server
 // again on every change (backend/quick-render.cjs quote); only the newest answer is drawn.
 async function quickQuote() {
@@ -777,15 +860,130 @@ async function quickQuote() {
   renderDialog();
   if (!d.ratios.length) return;
   try {
-    const q = await VideoWorkbench.request("/quick-render/quote", { scenes: EpisodeSpine.quickScenes(ep()), ratios: d.ratios, ...(d.tts ? { tts: d.tts } : {}) });
+    const q = await VideoWorkbench.request("/quick-render/quote", { scenes: EpisodeSpine.quickScenes(ep()), shotModels: (ep()?.shots || []).map((s) => ({ id: s.id, imageModel: s.imageModel })), until: d.until, ratios: d.ratios, ...(d.tts ? { tts: d.tts } : {}), ...(d.oneClick ? { fill: d.fill } : {}) });
     if (dialog !== d || d.asked !== asked) return;
     d.quote = q;
     d.tts ||= { provider: q.voices[0].provider, voice: q.voices[0].voice };
+    if (d.oneClick && !d.budgetEdited) d.budgetTwd = Math.ceil(Number(q.totalTwd) || 0);
   } catch (err) {
     if (dialog !== d || d.asked !== asked) return;
     d.error = err.message;
   }
   renderDialog();
+}
+// Plan U5.3 一鍵成片 (§12: one runner, one stop point). The next move of every running episode comes from
+// EpisodeSpine.autoRunNext; this page only does it. Runs whenever this page is open (load, every change, every 5 s while
+// a job is awaited): closing the page pauses, opening it again goes on. It never publishes; the furthest it goes is a
+// quick render that stops at the cut or at drafts.
+let driving = false,
+  driveLater = null;
+const sharedProjects = () => {
+  try {
+    return JSON.parse(VideoWorkbench.storage.getItem(STORE) || "null")?.projects || [];
+  } catch {
+    return [];
+  }
+};
+// A change to a run, made on the newest copy (a step may have changed it since this round read it). patch = fields, or
+// fresh run -> fields.
+function runPatch(p, e, patch) {
+  const fresh = sharedProjects().find((x) => x.id === p.id)?.episodes?.find((x) => x.id === e.id)?.autoRun || e.autoRun;
+  return VideoWorkbench.spine.setAutoRun({ projectId: p.id, episodeId: e.id, autoRun: { ...fresh, ...(typeof patch === "function" ? patch(fresh) : patch) } });
+}
+// Every job the run sends is remembered at once (EpisodeSpine.autoRunNext knows the run's jobs by id).
+const remember = (p, e, job) => job?.id && runPatch(p, e, (r) => ({ jobIds: [...(r.jobIds || []), job.id] }));
+const runSubmission = (r, step) => ({ runId: r.runId, runAttempt: r.attempt, idempotencyKey: r.runId + ":" + step + ":" + r.attempt });
+async function autoRunStep(p, e, next) {
+  const run = e.autoRun,
+    announce = (text) => VideoWorkbench.notify(text + " · " + p.title + "／" + e.name + " · " + location.origin + "/?open=projects&project=" + encodeURIComponent(p.id) + "&episode=" + encodeURIComponent(e.id)),
+    stop = async (step, reason) => { await runPatch(p, e, { status: "stopped", stop: { step, reason } }); announce("停在" + (STOP_STEP[step] || "這一步") + "：" + reason); };
+  if (next.do === "stop") return stop(next.step, next.reason);
+  if (next.do === "done") { await runPatch(p, e, { status: "done", stop: null }); announce("一鍵成片已完成"); return; }
+  try {
+    if (next.do === "fill") {
+      await runPatch(p, e, { spentTwd: Math.round((run.spentTwd + next.costTwd) * 100) / 100 });
+      for (const id of next.shotIds) {
+        const i = e.shots.findIndex((s) => s.id === id);
+        if (run.fill === "ai") await remember(p, e, await generateShot(i, p, e, false, runSubmission(run, "fill:" + id)));
+        else await stockShot(i, run.fill === "stock-video" ? "video" : "image", String(e.shots[i].text || "").trim() || p.title, p, e);
+      }
+    } else if (next.do === "bookend") {
+      // paid: none (the template renders on our own Remotion service, backend/remotion.cjs)
+      await remember(p, e, await VideoWorkbench.generations.create({ ...next.input, ...runSubmission(run, next.which + ":" + next.ratio) }));
+    } else if (next.do === "render") {
+      await runPatch(p, e, { spentTwd: Math.round((run.spentTwd + next.costTwd) * 100) / 100 });
+      for (const input of EpisodeSpine.quickRenderJobs(p, e, { ratios: next.ratios, tts: run.tts, until: run.until, embedSiteId: run.embedSiteId, bookends: next.bookends }))
+        // paid: none (the main system prices and bills 快速輸出 itself; the dialog shows its quote; backend/main-system.cjs paidFeature)
+        await remember(p, e, await VideoWorkbench.generations.create({ ...input, ...runSubmission(run, "render:" + input.settings.ratio), settings: { ...input.settings, autoBudget: { runId: run.runId, episodeId: e.id, budgetTwd: run.budgetTwd, spentTwd: run.spentTwd + next.costTwd, renderRatios: run.ratios.map((r) => r.replace(":", "x")) } } }));
+    } else if (next.do === "drafts") {
+      const org = VideoWorkbench.capabilities?.mainSystem?.organizationId;
+      const response = await fetch("/api/video/projects?organizationId=" + encodeURIComponent(org) + "&sourceRef=" + encodeURIComponent(p.id), { credentials: "same-origin", cache: "no-store" });
+      if (!response.ok) throw Error("讀不到草稿執行狀態，已停止自動執行");
+      const row = ((await response.json()).items || [])[0];
+      if (!row || row.brief_json?.autoBudget?.runId !== run.runId) throw Error("主系統的草稿執行代號不符，請檢查執行紀錄");
+      if (row.last_error) return stop("drafts", row.last_error);
+      if (row.lifecycle_stage !== "measure") return false;
+      await runPatch(p, e, { status: "done", stop: null, spentTwd: Number(row.brief_json.autoBudget.spentTwd) });
+      announce("社群草稿與選用的網站草稿已完成");
+    }
+  } catch (err) {
+    await stop(next.do === "render" ? "render" : next.do === "bookend" ? next.which : next.do === "drafts" ? "drafts" : "fill", err.message || String(err));
+  }
+}
+async function driveAutoRuns(skipFailed = false) {
+  if (driving) return;
+  driving = true;
+  clearTimeout(driveLater);
+  let waiting = false;
+  try {
+    await VideoWorkbench.ready;
+    for (let round = 0; round < 40; round++) {
+      const failed = (j) => ["failed", "cancelled", "blocked"].includes(j.status),
+        // 從這裡繼續: the failed jobs of the stopped step are left out once, so that step is sent again.
+        jobs = (await VideoWorkbench.generations.list()).filter((j) => !(skipFailed && round === 0 && failed(j))),
+        templates = VideoWorkbench.capabilities?.remotionTemplates || [];
+      let acted = false;
+      waiting = false;
+      for (const p of sharedProjects())
+        for (const e of p.episodes || []) {
+          const run = e.autoRun;
+          if (run?.status === "running") {
+            const rate = Number(VideoWorkbench.capabilities?.twdRate), seen = new Set();
+            let spent = run.baseSpentTwd || 0;
+            for (const j of jobs.filter((j) => j.input?.runId === run.runId && !seen.has(j.id) && seen.add(j.id))) {
+              if (j.input.operation === "project-shot") {
+                const actual = j.result?.origin?.costUsd ?? j.finishing?.origin?.costUsd;
+                spent += Number.isFinite(actual) && rate > 0 ? actual * rate : run.prices.byShotTwd?.[j.input.shotId] ?? run.prices.perPictureTwd;
+              } else if (j.input.operation === "quick-render") spent += run.prices.perRatioTwd;
+            }
+            spent = Math.round(spent * 100) / 100;
+            if (spent !== run.spentTwd) { await runPatch(p, e, { spentTwd: spent }); e.autoRun.spentTwd = spent; }
+          }
+          const next = EpisodeSpine.autoRunNext(p, e, jobs, templates);
+          if (!next) continue;
+          if (next.do === "wait") waiting = true;
+          else {
+            if (await autoRunStep(p, e, next) === false) waiting = true;
+            else acted = true;
+          }
+        }
+      if (!acted) break;
+    }
+  } catch (err) {
+    VideoWorkbench.reportError(err);
+  } finally {
+    driving = false;
+  }
+  if (waiting) driveLater = setTimeout(() => driveAutoRuns(), 5000);
+}
+const STOP_STEP = { fill: "補畫面", intro: "片頭", outro: "片尾", render: "輸出", drafts: "草稿" };
+function autoRunBanner(e) {
+  const r = e.autoRun;
+  if (!r || r.status === "done") return "";
+  const used = `已用 NT$${r.spentTwd}／上限 NT$${r.budgetTwd}`;
+  if (r.status === "running") return `<div class="panel" style="padding:10px;margin-bottom:12px" data-autorun="running"><div class="row"><strong>一鍵成片進行中</strong><span class="tiny">${used} · 頁面關掉再開會接著做</span><button class="btn small outline" data-action="autoRunStop">停止</button></div></div>`;
+  const end = r.stop?.step === "intro" || r.stop?.step === "outro" ? r.stop.step : null;
+  return `<div class="panel" style="padding:10px;margin-bottom:12px" data-autorun="stopped"><strong>一鍵成片停在「${STOP_STEP[r.stop?.step] || "這一步"}」</strong><p class="tiny">${esc(r.stop?.reason || "")}（${used}）</p><div class="row"><label style="margin:0">上限 NT$ <input id="autorun-budget" aria-label="花費上限" type="number" min="0" step="1" style="width:90px;padding:6px" value="${esc(r.budgetTwd)}"></label><button class="btn small primary" data-action="autoRunResume">${end ? "重試" + END_LABEL[end] : "從這裡繼續"}</button>${end ? `<button class="btn small outline" data-action="autoRunSkipEnd" data-which="${end}">不加${END_LABEL[end]}先出片</button>` : ""}<button class="btn small outline" data-action="autoRunClear">關閉</button></div></div>`;
 }
 // Card PJ.2: a tool opened for this episode; what it makes comes back here (shared/episode-spine.js settle).
 function openTool(tool, link, asset) {
@@ -1083,12 +1281,14 @@ async function action(a, button) {
       showDialog("lineage", { index });
       break;
     case "quickRender":
-      showDialog("quickRender", { ratios: [EpisodeSpine.QUICK_RATIOS.includes(p.ratio) ? p.ratio : "16:9"], tts: null, introTitle: "", autonomy: false });
-      quickQuote();
+    case "oneClick":
+      openQuickRender(a === "oneClick");
       break;
-    case "quickRatio": {
-      const r = button.dataset.value;
-      dialog.ratios = dialog.ratios.includes(r) ? dialog.ratios.filter((x) => x !== r) : [...dialog.ratios, r];
+    case "quickRatio":
+    case "quickRatioAll": {
+      const r = button.dataset.value,
+        all = EpisodeSpine.QUICK_RATIOS;
+      dialog.ratios = a === "quickRatioAll" ? (dialog.ratios.length === all.length ? [] : [...all]) : dialog.ratios.includes(r) ? dialog.ratios.filter((x) => x !== r) : [...dialog.ratios, r];
       quickQuote();
       break;
     }
@@ -1098,30 +1298,82 @@ async function action(a, button) {
       quickQuote();
       break;
     }
+    case "quickFill":
+      dialog.fill = button.dataset.value;
+      quickQuote();
+      break;
+    case "quickUntil":
+      dialog.until = button.dataset.value;
+      if (dialog.until !== "drafts") dialog.embed = false;
+      quickQuote();
+      break;
+    case "quickSite":
+      dialog.siteId = button.dataset.value;
+      renderDialog();
+      break;
+    case "bookendKind": {
+      const which = button.dataset.which,
+        v = button.dataset.value,
+        was = dialog[which],
+        t = (VideoWorkbench.capabilities?.remotionTemplates || []).find((x) => x.id === v);
+      dialog[which] =
+        v === "none" ? { kind: "none" }
+        : v === "title" ? { kind: "title", fields: { title: was.kind === "title" ? was.fields?.title || "" : which === "intro" ? p.title : "謝謝收看" }, seconds: 3 }
+        : was.kind === "template" && was.templateId === v ? was
+        : { kind: "template", templateId: v, fields: {}, references: {}, seconds: t?.seconds.def ?? 5 };
+      renderDialog();
+      break;
+    }
+    case "bookendTransition":
+      dialog.transition = button.dataset.value;
+      renderDialog();
+      break;
     case "quickSend": {
-      // One job per ratio (plan D5); a ratio leaves the dialog once its job is accepted, so a retry after an error
-      // sends only the rest.
+      // The episode's bookends and run are written by the top page (spine-set-bookends, spine-set-auto-run); the runner
+      // sends the jobs. 快速輸出 = a run with nothing to fill whose limit is its own quote.
       const d = dialog,
-        title = d.introTitle.trim(),
-        jobs = EpisodeSpine.quickRenderJobs(p, ep(), { ratios: d.ratios, tts: d.tts, ...(title ? { intro: { title, seconds: 3 } } : {}), autonomy: d.autonomy });
+        q = d.quote,
+        e = ep();
       d.busy = button.disabled = true;
-      let job;
       try {
-        for (const input of jobs) {
-          // paid: none (the main system prices and bills 快速輸出 itself; the dialog shows its quote; backend/main-system.cjs paidFeature)
-          job = await VideoWorkbench.generations.create(input);
-          d.ratios = d.ratios.filter((r) => r !== input.settings.ratio);
-        }
+        await VideoWorkbench.spine.setBookends({ projectId: p.id, episodeId: e.id, intro: savedBookend(d, "intro"), outro: savedBookend(d, "outro") });
+        await VideoWorkbench.spine.setAutoRun({
+          projectId: p.id,
+          episodeId: e.id,
+          autoRun: {
+            until: d.until, budgetTwd: d.oneClick ? d.budgetTwd : Number(q.totalTwd), fill: d.fill, ratios: d.ratios, tts: d.tts,
+            embedSiteId: d.until === "drafts" && d.embed ? d.siteId : null,
+            prices: { perPictureTwd: q.fill?.perPictureTwd ?? 0, perRatioTwd: q.perRatioTwd, byShotTwd: q.fill?.byShotTwd || {} },
+          },
+        });
         closeDialog();
-        VideoWorkbench.showJob(job);
-        if (jobs.length > 1) notify(`已送出 ${jobs.length} 個快速輸出任務，每個比例一個。`);
+        notify(d.oneClick ? "一鍵成片開始了；頁面關掉再開會接著做。" : `已開始快速輸出，每個比例一個任務。`);
+        driveAutoRuns();
       } catch (err) {
         d.busy = false;
-        quickQuote(); // the ratios left, priced again
+        renderDialog();
         VideoWorkbench.reportError(err);
       }
       break;
     }
+    case "autoRunStop":
+      await runPatch(p, ep(), { status: "stopped", stop: { step: "", reason: "已手動停止" } }).catch(VideoWorkbench.reportError);
+      break;
+    case "autoRunResume":
+    case "autoRunSkipEnd":
+      try {
+        const e = ep(),
+          budget = Number($("autorun-budget")?.value);
+        if (a === "autoRunSkipEnd") await VideoWorkbench.spine.setBookends({ projectId: p.id, episodeId: e.id, [button.dataset.which]: { kind: "none" } });
+        await runPatch(p, e, (r) => ({ status: "running", stop: null, attempt: (r.attempt || 0) + 1, ...(budget >= 0 ? { budgetTwd: budget } : {}) }));
+        await driveAutoRuns(true);
+      } catch (err) {
+        VideoWorkbench.reportError(err);
+      }
+      break;
+    case "autoRunClear":
+      await VideoWorkbench.spine.setAutoRun({ projectId: p.id, episodeId: ep().id, autoRun: null }).catch(VideoWorkbench.reportError);
+      break;
     case "exportJson":
       downloadJson(
         `${p.title.replace(/[^\p{L}\p{N}_-]/gu, "_")}_project.json`,
@@ -1340,7 +1592,15 @@ document.addEventListener("input", (e) => {
   }
   if (target.id === "create-name") modalDraft.name = target.value;
   if (target.id === "stock-keyword" && dialog?.type === "stock") dialog.keyword = target.value;
-  if (target.id === "quick-intro" && dialog?.type === "quickRender") dialog.introTitle = target.value;
+  if (dialog?.type === "quickRender" && (target.id === "bookend-intro" || target.id === "bookend-outro")) {
+    dialog[target.id.slice(8)].fields = { title: target.value };
+    const send = document.querySelector('[data-action="quickSend"]');
+    if (send && !target.value.trim()) send.disabled = true;
+  }
+  if (target.id === "quick-budget" && dialog?.type === "quickRender") {
+    dialog.budgetTwd = target.value === "" ? null : Number(target.value);
+    dialog.budgetEdited = true;
+  }
   if (target.id === "style-hint") modalDraft.styleText = target.value;
   if (target.dataset.settings) {
     const key = target.dataset.settings;
@@ -1357,8 +1617,14 @@ document.addEventListener("change", (e) => {
     project().settings.lockModel = t.checked;
     save();
   }
-  if (t.id === "quick-auto" && dialog?.type === "quickRender") dialog.autonomy = t.checked;
+  if (t.id === "quick-embed" && dialog?.type === "quickRender") {
+    dialog.embed = t.checked;
+    dialog.siteId = t.checked ? dialog.siteId || dialog.quote?.sites?.[0]?.id || null : null;
+    renderDialog();
+  }
+  if (dialog?.type === "quickRender" && (t.id === "bookend-intro" || t.id === "bookend-outro" || t.id === "quick-budget")) renderDialog(); // problems and the send button follow
 });
 render();
 loadLegacyProjects();
 replaceRetiredModel();
+driveAutoRuns();

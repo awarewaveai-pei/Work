@@ -95,7 +95,7 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
     const priced = await post("/quick-render/quote", { scenes: spine.quickScenes(ready), ratios: ["16:9", "9:16"] });
     assert.equal(priced.status, 200, JSON.stringify(priced.value));
     assert.deepEqual(priced.value.problems, []);
-    assert.deepEqual(quoted.at(-1), { organizationId: ORG, scenes: 1, ttsChars: 5, ratios: ["16x9", "9x16"] });
+    assert.deepEqual(quoted.at(-1), { organizationId: ORG, scenes: 1, ttsChars: 5, ratios: ["16x9", "9x16"], until: "video", scriptText: "第一句旁白" });
     const jobs = spine.quickRenderJobs(proj, ready, { ratios: ["9:16", "16:9"], tts: priced.value.voices[0] });
     assert.equal(jobs.length, 2);
     const before = submitted.length;

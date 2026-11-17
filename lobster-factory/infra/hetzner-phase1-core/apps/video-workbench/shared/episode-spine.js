@@ -4,7 +4,9 @@
 // Invariant (spec §0): the spine fields of an episode are changed only by the top page's runtime; a child page's
 // whole-list write keeps the top page's copy of them (keepSpine), so a stale copy can never overwrite them.
 (function (root) {
-  const SPINE = ["edit", "steps", "outputs"],
+  // Plan U5.3: intro / outro / autoRun are spine fields too (written only by the top page: spine-set-bookends,
+  // spine-set-auto-run), so a child's stale whole-list write can never undo a choice or a run's progress.
+  const SPINE = ["edit", "steps", "outputs", "intro", "outro", "autoRun"],
     SHOT_SPINE = ["image", "video"];
   const newId = () => globalThis.crypto.randomUUID();
   // The editor's rows keep their id inside native (shared/project-envelope.js wrap); a Craft engine's row carries
@@ -239,19 +241,224 @@
 
   // Plan U5 快速輸出 (step 9): what the render service gets from an episode -- per shot its clip or picture and its
   // line -- and one job per chosen ratio (plan D5). The cut remembers the shot pictures it was made from (lineage).
-  // choice = { ratios: ["16:9" | "9:16" | "4:5"], tts?, intro?: { title, seconds }, autonomy? } (backend/quick-render.cjs).
+  // choice = { ratios: ["16:9" | "9:16" | "4:5"], tts?, until?: "video" | "drafts", embedSiteId?, bookends?: { [ratio]:
+  // { intro, outro, transition, transitionSeconds } } } (backend/quick-render.cjs request). A bookend part is
+  // { kind: "title", title, seconds } or { kind: "template", url } (the finished remotion-template video of that ratio).
   const QUICK_RATIOS = ["16:9", "9:16", "4:5"];
   const quickScenes = (episode) => (episode?.shots || []).map((s) => ({ narration: String(s?.line ?? "").trim(), url: s?.video || s?.image || "" }));
   function quickRenderJobs(project, episode, choice) {
     const scenes = quickScenes(episode),
       from = (episode.shots || []).filter((s) => s?.id && (s.video || s.image)).map((s) => ({ slot: "shot:" + s.id, key: s.video || s.image }));
-    return QUICK_RATIOS.filter((ratio) => (choice.ratios || []).includes(ratio)).map((ratio) => ({
-      type: "video",
-      operation: "quick-render",
-      prompt: "快速輸出 " + ratio,
-      settings: { ratio, title: project.title, scenes, ...(choice.tts ? { tts: choice.tts } : {}), ...(choice.intro ? { intro: choice.intro } : {}), autonomy: choice.autonomy === true },
-      link: { projectId: project.id, episodeId: episode.id, tool: "quick-render", step: "export", target: "output", from },
-    }));
+    return QUICK_RATIOS.filter((ratio) => (choice.ratios || []).includes(ratio)).map((ratio) => {
+      const b = choice.bookends?.[ratio],
+        ends = b ? ["intro", "outro"].filter((k) => b[k]?.kind === "template").map((k) => ({ slot: k, key: b[k].url })) : [];
+      return {
+        type: "video",
+        operation: "quick-render",
+        prompt: "快速輸出 " + ratio,
+        settings: {
+          ratio, title: project.title, scenes, ...(choice.tts ? { tts: choice.tts } : {}), ...(b && (b.intro || b.outro) ? { bookends: b } : {}),
+          until: choice.until === "drafts" ? "drafts" : "video", ...(choice.until === "drafts" && choice.embedSiteId ? { embedSiteId: choice.embedSiteId } : {}),
+        },
+        link: { projectId: project.id, episodeId: episode.id, tool: "quick-render", step: "export", target: "output", from: [...from, ...ends] },
+      };
+    });
+  }
+
+  // ── Plan U5.3 / U5.4: the episode's intro and outro (§9: one setting, read by 快速輸出, 一鍵成片 and the editor) ──
+  // EpisodeBookend = { kind: "none"|"title"|"template", templateId?, fields?, references?, seconds, transition:
+  // "none"|"crossfade"|"fade-black", transitionSeconds }. Absent = kind "none". templates = capabilities.remotionTemplates.
+  const TRANSITIONS = ["none", "crossfade", "fade-black"],
+    TEMPLATE_RATIOS = ["16:9", "9:16", "4:5", "1:1"]; // backend/remotion.cjs formats; a template may list fewer (t.ratios)
+  const bookendOn = (b) => b?.kind === "title" || b?.kind === "template";
+  // A valid bookend or null (= refused). templates may be omitted (top page without capabilities): then the id is only
+  // checked for shape, and the template's own checks run when its job is sent.
+  function normalizeBookend(v, templates) {
+    if (v == null || v.kind === "none") return null;
+    const transition = TRANSITIONS.includes(v.transition) ? v.transition : "crossfade",
+      ts = v.transitionSeconds === undefined ? 0.5 : Number(v.transitionSeconds),
+      base = { transition, transitionSeconds: ts };
+    if (!(ts >= 0.2 && ts <= 2)) return null;
+    const strings = (o) => Object.fromEntries(Object.entries(o && typeof o === "object" ? o : {}).filter(([k, x]) => /^[A-Za-z0-9]{1,40}$/.test(k) && typeof x === "string").map(([k, x]) => [k, x.slice(0, 200)]));
+    if (v.kind === "title") {
+      const title = String(v.fields?.title ?? "").trim(), seconds = Number(v.seconds ?? 3);
+      if (!title || title.length > 80 || !(seconds > 0 && seconds <= 15)) return null;
+      return { kind: "title", fields: { title }, seconds, ...base };
+    }
+    if (v.kind !== "template" || typeof v.templateId !== "string") return null;
+    const t = Array.isArray(templates) ? templates.find((x) => x.id === v.templateId) : { seconds: { min: 1, def: 5, max: 30 } };
+    if (!t) return null;
+    const seconds = v.seconds === undefined ? t.seconds.def : Number(v.seconds);
+    if (!Number.isInteger(seconds) || seconds < t.seconds.min || seconds > t.seconds.max) return null;
+    const refs = Object.fromEntries(Object.entries(v.references && typeof v.references === "object" ? v.references : {})
+      .filter(([k, r]) => /^[A-Za-z0-9]{1,40}$/.test(k) && typeof r?.url === "string" && r.url)
+      .map(([k, r]) => [k, { url: r.url, ...(typeof r.id === "string" ? { id: r.id } : {}) }]));
+    return { kind: "template", templateId: v.templateId, fields: strings(v.fields), references: refs, seconds, ...base };
+  }
+  // Card U5.3: the episode's bookends, set by the top page only. Same in-place contract as setShot; false = no such
+  // episode or an invalid bookend. intro/outro undefined = left as it is; null or kind "none" = removed.
+  function setBookends(projects, { projectId, episodeId, intro, outro }, templates) {
+    const episode = (projects || []).find((p) => p.id === projectId)?.episodes?.find((e) => e.id === episodeId);
+    if (!episode) return false;
+    const next = {};
+    for (const [k, v] of [["intro", intro], ["outro", outro]]) {
+      if (v === undefined) continue;
+      const b = normalizeBookend(v, templates);
+      if (v && v.kind !== "none" && !b) return false;
+      next[k] = b;
+    }
+    for (const [k, b] of Object.entries(next)) b ? (episode[k] = b) : delete episode[k];
+    return true;
+  }
+  // What a template bookend renders for one ratio: the remotion-template job input (scripts/editor-panes/text.js
+  // title-generate shape). Fields left empty are filled from the episode: the first text field = the project title,
+  // later ones = the shots' lines; image fields = the shots' pictures in order. { input } or { problem }.
+  function bookendJob(project, episode, which, ratio, templates) {
+    const b = episode?.[which];
+    if (b?.kind !== "template") return null;
+    const t = (templates || []).find((x) => x.id === b.templateId);
+    if (!t) return { problem: "片頭模板「" + b.templateId + "」已不存在" };
+    if (!(t.ratios || TEMPLATE_RATIOS).includes(ratio)) return { problem: (which === "intro" ? "片頭" : "片尾") + "模板「" + t.label + "」不支援 " + ratio + "，請改選標題卡" };
+    const lines = (episode.shots || []).map((s) => String(s?.line ?? "").trim()).filter(Boolean),
+      pictures = (episode.shots || []).filter((s) => s?.image).map((s) => s.image),
+      fields = {}, references = {};
+    let text = 0, image = 0;
+    for (const f of t.fields) {
+      if (f.type === "image" || f.type === "audio") {
+        const r = b.references?.[f.key] || (f.type === "image" && f.required ? (pictures[image++] ? { url: pictures[image - 1] } : null) : null);
+        if (r) references[f.key] = r;
+        else if (f.required) return { problem: (which === "intro" ? "片頭" : "片尾") + "模板「" + t.label + "」需要更多鏡頭畫面" };
+        continue;
+      }
+      const given = String(b.fields?.[f.key] ?? "").trim(),
+        auto = !f.type || f.type === "text" ? (text++ === 0 ? project.title : lines[text - 2] || project.title) : "";
+      const value = (given || (f.required ? auto : "")).slice(0, f.max || 200);
+      if (value) fields[f.key] = value;
+    }
+    return {
+      input: {
+        type: "video", operation: "remotion-template", prompt: t.label,
+        settings: { templateId: t.id, fields, seconds: b.seconds, ratio, fps: 30 },
+        references,
+        link: { projectId: project.id, episodeId: episode.id, tool: "remotion", step: "motion", target: which },
+      },
+    };
+  }
+  // One bookend is rendered once (§9): the same template, fields, pictures, seconds and ratio = the same video, reused.
+  const bookendKey = (input) => JSON.stringify([input?.settings?.templateId, input?.settings?.fields, Object.entries(input?.references || {}).map(([k, r]) => [k, r?.url]).sort(), input?.settings?.seconds, input?.settings?.ratio]);
+  // The newest job of that key: { state: "none" | "running" | "done" | "failed", url?, error? }.
+  function bookendState(jobs, input) {
+    const key = bookendKey(input),
+      job = (jobs || []).filter((j) => j?.input?.operation === "remotion-template" && bookendKey(j.input) === key).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))).at(-1);
+    if (!job) return { state: "none" };
+    // done = registered on the main system too (result.assetId): 快速輸出 sends asset ids only (backend/quick-render.cjs).
+    if (job.status === "succeeded" && job.result?.url && job.result.assetId) return { state: "done", url: job.result.url };
+    if (["failed", "cancelled", "blocked"].includes(job.status)) return { state: "failed", error: job.error?.message || job.error || "片頭模板渲染失敗" };
+    return { state: "running" };
+  }
+
+  // ── Plan U5.3 一鍵成片 / §12: one runner, one stop point ──
+  // EpisodeAutoRun = { until: "script"|"video"|"drafts", budgetTwd, fill: "ai"|"stock-video"|"stock-photo", ratios,
+  // tts, embedSiteId, prices: { perPictureTwd, perRatioTwd } (the server's quote at start), status: "running"|"stopped"|
+  // "done", stop: { step, reason } | null, spentTwd, startedAt, jobIds }. A writer sends the first seven; the rest are the
+  // runtime's. jobIds = the jobs this run sent (not a time window: a job's createdAt is the server's clock).
+  const UNTIL = ["script", "video", "drafts"], FILL = ["ai", "stock-video", "stock-photo"];
+  function normalizeAutoRun(v, now = new Date().toISOString()) {
+    if (v == null) return null;
+    const ratios = QUICK_RATIOS.filter((r) => (v.ratios || []).includes(r)),
+      budgetTwd = Number(v.budgetTwd), spentTwd = v.spentTwd === undefined ? 0 : Number(v.spentTwd),
+      price = (n) => (Number.isFinite(Number(n)) && Number(n) >= 0 ? Number(n) : null),
+      prices = { perPictureTwd: price(v.prices?.perPictureTwd), perRatioTwd: price(v.prices?.perRatioTwd),
+        byShotTwd: Object.fromEntries(Object.entries(v.prices?.byShotTwd || {}).filter(([, n]) => price(n) !== null).map(([id, n]) => [id, price(n)])) };
+    if (!UNTIL.includes(v.until) || !FILL.includes(v.fill) || !Number.isFinite(budgetTwd) || !(budgetTwd >= 0) || !Number.isFinite(spentTwd) || !(spentTwd >= 0)) return null;
+    if (v.until !== "script" && (!ratios.length || prices.perPictureTwd === null || prices.perRatioTwd === null)) return null;
+    const tts = v.tts && typeof v.tts === "object" && ["edge", "openai"].includes(v.tts.provider) && typeof v.tts.voice === "string" ? { provider: v.tts.provider, voice: v.tts.voice } : null;
+    return {
+      runId: typeof v.runId === "string" && /^[A-Za-z0-9-]{1,64}$/.test(v.runId) ? v.runId : newId(),
+      attempt: Number.isSafeInteger(v.attempt) && v.attempt >= 0 ? v.attempt : 0,
+      until: v.until, budgetTwd, fill: v.fill, ratios, tts,
+      embedSiteId: v.until === "drafts" && typeof v.embedSiteId === "string" && v.embedSiteId ? v.embedSiteId : null,
+      prices, status: ["running", "stopped", "done"].includes(v.status) ? v.status : "running",
+      stop: v.stop && typeof v.stop.reason === "string" ? { step: String(v.stop.step || ""), reason: v.stop.reason.slice(0, 500) } : null,
+      spentTwd, startedAt: typeof v.startedAt === "string" ? v.startedAt : now,
+      baseSpentTwd: Number.isFinite(v.baseSpentTwd) && v.baseSpentTwd >= 0 ? v.baseSpentTwd : 0,
+      jobIds: (Array.isArray(v.jobIds) ? v.jobIds : []).filter((x) => typeof x === "string").slice(-300),
+    };
+  }
+  // spine-set-auto-run: autoRun null = removed. False = no such episode or an invalid run.
+  function setAutoRun(projects, { projectId, episodeId, autoRun }) {
+    const episode = (projects || []).find((p) => p.id === projectId)?.episodes?.find((e) => e.id === episodeId);
+    if (!episode) return false;
+    if (autoRun == null) return delete episode.autoRun, true;
+    const run = normalizeAutoRun(autoRun);
+    if (!run) return false;
+    episode.autoRun = run;
+    return true;
+  }
+  // The runner's next move for a running episode (pure; the projects page does it, then asks again). One of:
+  // null (nothing running) | { do: "wait" } | { do: "stop", step, reason } | { do: "done" } |
+  // { do: "fill", shotIds, costTwd } | { do: "bookend", which, ratio, input } | { do: "render", ratios, costTwd, bookends }.
+  // Never a publish: the furthest a run goes is a quick render whose until is "video" or "drafts" (§12: a pressed
+  // button ends at drafts; outward publishing is only the topic queue).
+  function autoRunNext(project, episode, jobs, templates) {
+    const run = episode?.autoRun;
+    if (!run || run.status !== "running") return null;
+    if (run.until === "script") return { do: "done" };
+    if (run.spentTwd > run.budgetTwd + 1e-9) return { do: "stop", step: "fill", reason: "實際花費已到上限 NT$" + run.budgetTwd };
+    const ids = new Set(run.jobIds || []),
+      mine = (jobs || []).filter((j) => ids.has(j?.id) || (run.runId && j?.input?.runId === run.runId))
+        .filter((j) => !["failed", "cancelled", "blocked"].includes(j.status) || !Number.isInteger(j.input?.runAttempt) || j.input.runAttempt === run.attempt)
+        .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))),
+      over = (cost, step) => (run.spentTwd + cost > run.budgetTwd + 1e-9 ? { do: "stop", step, reason: "已到上限 NT$" + run.budgetTwd + "，下一步要 NT$" + Math.round(cost * 100) / 100 } : null);
+    const shots = episode.shots || [];
+    if (!shots.length) return { do: "stop", step: "fill", reason: "這一集還沒有鏡頭" };
+    const unlined = shots.findIndex((s) => !String(s?.line ?? "").trim());
+    if (unlined >= 0) return { do: "stop", step: "render", reason: "第 " + (unlined + 1) + " 個鏡頭沒有旁白" };
+    // 1. Missing pictures. A shot that has one is never made again; a job already sent for a shot is waited for.
+    const missing = shots.filter((s) => !s?.image && !s?.video), wait = [], todo = [];
+    for (const s of missing) {
+      const j = mine.filter((x) => x.input?.link?.target === "shot:" + s.id).at(-1);
+      if (!j) todo.push(s);
+      else if (["failed", "cancelled", "blocked"].includes(j.status)) return { do: "stop", step: "fill", reason: "第 " + (shots.indexOf(s) + 1) + " 個鏡頭的畫面沒做成：" + (j.error?.message || j.error || j.status) };
+      else wait.push(s);
+    }
+    if (todo.length) {
+      if (run.fill === "ai" && todo.some((s) => !String(s.text ?? "").trim())) return { do: "stop", step: "fill", reason: "缺畫面的鏡頭要有畫面描述才能 AI 生圖" };
+      const cost = run.fill === "ai" ? todo.reduce((sum, s) => sum + (run.prices.byShotTwd?.[s.id] ?? run.prices.perPictureTwd), 0) : 0;
+      return over(cost, "fill") || { do: "fill", shotIds: todo.map((s) => s.id), costTwd: cost };
+    }
+    if (wait.length) return { do: "wait" };
+    // 2. Template bookends, one per ratio, each rendered once (reused when one with the same key exists).
+    const bookends = {};
+    for (const ratio of run.ratios) {
+      const b = { transition: (episode.intro || episode.outro)?.transition || "none", transitionSeconds: (episode.intro || episode.outro)?.transitionSeconds || 0.5 };
+      for (const which of ["intro", "outro"]) {
+        const end = episode[which];
+        if (!bookendOn(end)) continue;
+        if (end.kind === "title") { b[which] = { kind: "title", title: end.fields.title, seconds: end.seconds }; continue; }
+        const job = bookendJob(project, episode, which, ratio, templates);
+        if (job.problem) return { do: "stop", step: which, reason: job.problem };
+        const st = bookendState(jobs, job.input);
+        if (st.state === "none") return { do: "bookend", which, ratio, input: job.input };
+        if (st.state === "running") return { do: "wait" };
+        if (st.state === "failed") return { do: "stop", step: which, reason: (which === "intro" ? "片頭" : "片尾") + "失敗：" + st.error };
+        b[which] = { kind: "template", url: st.url };
+      }
+      if (b.intro || b.outro) bookends[ratio] = b;
+    }
+    // 3. The quick renders not sent yet in this run (a ratio already sent is never sent twice; its newest job failing
+    // stops the run there).
+    const sent = new Map();
+    for (const j of mine) if (j.input?.operation === "quick-render") sent.set(j.input.settings?.ratio, j);
+    for (const [ratio, j] of sent)
+      if (["failed", "cancelled", "blocked"].includes(j.status)) return { do: "stop", step: "render", reason: ratio + " 輸出失敗：" + (j.error?.message || j.error || j.status) };
+    const left = run.ratios.filter((r) => !sent.has(r));
+    if (!left.length) {
+      if ([...sent.values()].some((j) => j.status !== "succeeded")) return { do: "wait" };
+      return { do: run.until === "drafts" ? "drafts" : "done" };
+    }
+    const cost = run.prices.perRatioTwd * left.length;
+    return over(cost, "render") || { do: "render", ratios: left, costTwd: cost, bookends };
   }
 
   // Card PJ.4 (spec §4): the one staleness rule of the workbench. A key recorded when something was made against a
@@ -361,7 +568,8 @@
     ];
   }
 
-  const api = { editId, editTitle, newProject, newShot, castOf, castShots, setShots, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs, current, isStale, staleClip, outputStale, lineage, stepStates };
+  const api = { editId, editTitle, newProject, newShot, castOf, castShots, setShots, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs,
+    TRANSITIONS, TEMPLATE_RATIOS, normalizeBookend, setBookends, bookendJob, bookendKey, bookendState, normalizeAutoRun, setAutoRun, autoRunNext, current, isStale, staleClip, outputStale, lineage, stepStates };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

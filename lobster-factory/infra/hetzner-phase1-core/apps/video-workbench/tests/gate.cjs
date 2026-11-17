@@ -36,6 +36,8 @@ const tests = [
   "u7-audio-policy",
   "u10-usage-panel",
   "u5-quick-render",
+  "u5-one-click",
+  "u5-editor-bookends",
   "u6-review-state",
   "u8-title-form",
   "u4-scene-image",

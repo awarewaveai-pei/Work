@@ -522,7 +522,8 @@ def _render_intro_scene(title: str, duration: float, out_path: str, w: int, h: i
 
 def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_name: str,
                        w: "int | None" = None, h: "int | None" = None, fps: "int | None" = None,
-                       intro_title: str = "", intro_duration: float = 3.0, burn_captions: bool = True) -> str:
+                       intro_title: str = "", intro_duration: float = 3.0, burn_captions: bool = True,
+                       bookends: "dict | None" = None) -> str:
     """純 ffmpeg 合成：每場景獨立 render 成統一參數 mp4，再 concat demuxer (-c copy) 秒級合併。
     靜圖走 zoompan Ken Burns、實拍走 cover-fit；混合由 _render_scene_ffmpeg 依副檔名派發。
     w/h/fps 省略 → config 預設（BASE_WIDTH/HEIGHT/FPS）= 舊單格式行為；多格式入口傳各格式尺寸，
@@ -540,16 +541,109 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
         scene_paths.append(intro_path)
         print(f"   intro ({intro_duration:.1f}s): {intro_title[:40]}")
 
+    main_s = 0.0
     for i, (scene, asset_path, audio_path) in enumerate(zip(scenes, visual_files, audio_files)):
         duration = _audio_duration(audio_path)
         sp = str(config.TEMP_DIR / f"scene_{i:03d}.mp4")
         _render_scene_ffmpeg(asset_path, scene["narration"], audio_path, duration, sp, w, h, fps, scene_id=i, burn_captions=burn_captions)
         scene_paths.append(sp)
+        main_s += duration
         print(f"   scene {scene.get('id', i)} ({duration:.1f}s)")
 
     # 所有場景同編碼參數 → concat demuxer -c copy（無重新編碼，秒級）
     base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
-    return _concat_uniform(scene_paths, "concat.txt", base_path)
+    if bookends is None:
+        return _concat_uniform(scene_paths, "concat.txt", base_path)
+    return _join_bookends(scene_paths, main_s, bookends, base_path, w, h, fps)
+
+
+# ── Plan U5.4 片頭／片尾接成一支 ──
+# bookends = {"intro": seg | None, "outro": seg | None, "transition": "none" | "crossfade" | "fade-black",
+# "transition_s": float}; seg = {"title": str, "duration": float} (a title card) or {"asset": local path} (a rendered
+# template video; "duration" is filled by resolve_bookends). bookends None = the old path, untouched (concat only).
+_XFADE = {"crossfade": "fade", "fade-black": "fadeblack"}
+
+
+def _media_info(path: str) -> tuple:
+    """(duration s, has audio) from ffmpeg's own input banner, so no ffprobe is needed."""
+    res = subprocess.run(["ffmpeg", "-hide_banner", "-i", path], capture_output=True, timeout=60)
+    err = res.stderr.decode("utf-8", "ignore")
+    m = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", err)
+    if not m:
+        raise RuntimeError(f"片頭／片尾影片讀不到長度: {os.path.basename(path)}")
+    return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)), bool(re.search(r"Stream #[^\n]*: Audio:", err))
+
+
+def resolve_bookends(bookends: "dict | None") -> "dict | None":
+    """Fills each asset segment's duration (once per render, shared by every ratio). Returns the same dict."""
+    for key in ("intro", "outro"):
+        seg = (bookends or {}).get(key)
+        if seg and seg.get("asset") and "duration" not in seg:
+            seg["duration"], seg["has_audio"] = _media_info(seg["asset"])
+    return bookends
+
+
+def bookend_lead_s(bookends: "dict | None") -> float:
+    """Where the main video starts on the finished timeline: the intro's length, less the transition into it."""
+    seg = (bookends or {}).get("intro")
+    if not seg:
+        return 0.0
+    t = float(bookends.get("transition_s", 0)) if bookends.get("transition") in _XFADE else 0.0
+    return max(0.0, float(seg["duration"]) - t)
+
+
+def _bookend_segment(seg: dict, name: str, w: int, h: int, fps: int) -> str:
+    """A bookend in the scenes' encoding (w x h, fps, h264 yuv420p, aac 44100 stereo), so it joins like a scene."""
+    out = str(config.TEMP_DIR / f"scene_{name}.mp4")
+    if seg.get("title"):
+        _render_intro_scene(seg["title"], float(seg["duration"]), out, w, h, fps)
+        return out
+    silent = [] if seg.get("has_audio") else ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+    _run_ffmpeg([
+        "ffmpeg", "-y", "-i", seg["asset"], *silent,
+        "-filter_complex", f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},fps={fps},setsar=1[v]",
+        "-map", "[v]", "-map", "0:a" if seg.get("has_audio") else "1:a",
+        "-t", f"{float(seg['duration']):.3f}", "-r", str(fps),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+        out,
+    ], f"{name} normalize failed")
+    return out
+
+
+def _join_bookends(scene_paths: list, main_s: float, bookends: dict, out_path: str, w: int, h: int, fps: int) -> str:
+    """intro -> main -> outro as one video. No transition: one concat (every part has the scenes' encoding). With one:
+    the scenes are concatenated as before, then xfade joins the bookends to that main video. Audio: the intro's music
+    fades out inside the transition while the narration plays at full volume from the first shot (acrossfade c2=nofade);
+    into the outro the narration stays full and the outro fades in."""
+    intro, outro = bookends.get("intro"), bookends.get("outro")
+    parts = ([_bookend_segment(intro, "intro", w, h, fps)] if intro else []) + scene_paths + \
+            ([_bookend_segment(outro, "outro", w, h, fps)] if outro else [])
+    kind = _XFADE.get(bookends.get("transition", "none"))
+    if not kind or not (intro or outro):
+        return _concat_uniform(parts, "concat.txt", out_path)
+    t = float(bookends["transition_s"])
+    main_path = _concat_uniform(scene_paths, "concat.txt", str(config.TEMP_DIR / "bookend_main.mp4"))
+    segs = ([(parts[0], float(intro["duration"]), "intro")] if intro else []) + [(main_path, main_s, "main")] + \
+           ([(parts[-1], float(outro["duration"]), "outro")] if outro else [])
+    if any(d <= t for _, d, _ in segs):
+        raise RuntimeError(f"轉場 {t:.1f} 秒比片頭、片尾或主片還長")
+    inputs, chain, length = [], [], segs[0][1]
+    for p, _, _ in segs:
+        inputs += ["-i", p]
+    v, a = "[0:v]", "[0:a]"
+    for i in range(1, len(segs)):
+        curves = "c1=tri:c2=nofade" if segs[i - 1][2] == "intro" else "c1=nofade:c2=tri"
+        chain.append(f"{v}[{i}:v]xfade=transition={kind}:duration={t:.3f}:offset={length - t:.3f}[v{i}]")
+        chain.append(f"{a}[{i}:a]acrossfade=d={t:.3f}:{curves}[a{i}]")
+        v, a, length = f"[v{i}]", f"[a{i}]", length + segs[i][1] - t
+    _run_ffmpeg([
+        "ffmpeg", "-y", *inputs, "-filter_complex", ";".join(chain), "-map", v, "-map", a, "-r", str(fps),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+        out_path,
+    ], "bookend join failed")
+    return out_path
 
 
 def _concat_uniform(segment_paths: list, list_name: str, out_path: str) -> str:
@@ -729,11 +823,14 @@ def cleanup():
 # ═══════════════════════════════════════════
 # Render-only 入口（給 next-admin video/pipeline 積木呼叫）
 # ═══════════════════════════════════════════
-def _caption_result(sink: "dict | None", scene_cues: list, audio_files: list, intro_title: str, intro_duration: float) -> None:
-    """Fill sink with absolute cues + SRT/VTT for the finished video (same timeline in every ratio)."""
+def _caption_result(sink: "dict | None", scene_cues: list, audio_files: list, intro_title: str, intro_duration: float,
+                    lead_s: "float | None" = None) -> None:
+    """Fill sink with absolute cues + SRT/VTT for the finished video (same timeline in every ratio). lead_s = where the
+    main video starts when bookends are joined (bookend_lead_s); None = the old title-card offset."""
     if sink is None:
         return
-    cues = caption_utils.assemble(scene_cues, [_audio_duration(a) - 0.5 for a in audio_files], intro_duration if intro_title else 0.0)
+    cues = caption_utils.assemble(scene_cues, [_audio_duration(a) - 0.5 for a in audio_files],
+                                  lead_s if lead_s is not None else (intro_duration if intro_title else 0.0))
     sink.update({"cues": cues, "srt": caption_utils.to_srt(cues), "vtt": caption_utils.to_vtt(cues)})
 
 
@@ -766,7 +863,7 @@ def render_video(scenes: list, visual_files: list, out_name: str,
 def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
                              tts_provider: str = "edge", tts_voice: str = "",
                              intro_title: str = "", intro_duration: float = 3.0, caption_sink: "dict | None" = None,
-                             clean_sink: "dict | None" = None):
+                             clean_sink: "dict | None" = None, bookends: "dict | None" = None):
     """多格式「原生」輸出：每個比例用『自己那組視覺素材』+『自己的目標尺寸』各跑一次 compose
     （per-scene cover-fit/zoompan 直接填滿目標比例）→ 無 export_all_formats 的 pad letterbox、無黑邊。
 
@@ -791,7 +888,9 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
     # 配音與比例無關 → 只生一次，三格式共用。
     scene_cues = []
     audio_files = generate_audio(scenes, tts_provider=tts_provider, tts_voice=tts_voice, cues_out=scene_cues)
-    _caption_result(caption_sink, scene_cues, audio_files, intro_title, intro_duration)
+    resolve_bookends(bookends)
+    _caption_result(caption_sink, scene_cues, audio_files, intro_title, intro_duration,
+                    lead_s=bookend_lead_s(bookends) if bookends is not None else None)
 
     # V4.8: with script captions and a clean_sink, keep the caption-less video per ratio ({fmt}.clean.mp4) and burn the
     # cues onto a copy, so an edited caption can be burned again (burn_script_captions) without re-rendering.
@@ -805,6 +904,7 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
         base_video = compose_base_video(
             scenes, format_assets[fmt], audio_files, f"{safe_name}_{fmt}", w, h, config.FPS,
             intro_title=intro_title, intro_duration=intro_duration, burn_captions=not keep_clean,
+            bookends=bookends,
         )
         out_path = str(out_dir / f"{fmt}.mp4")
         if keep_clean:

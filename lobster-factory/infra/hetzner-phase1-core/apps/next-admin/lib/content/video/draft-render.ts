@@ -4,7 +4,7 @@
  * The caller authorizes the org, validates the scenes and decides which input objects may be deleted afterwards;
  * this module checks the asset hosts and submits. Finishing is /api/video/status -> finalize.ts (job-store row).
  */
-import type { VideoServiceCapability } from "./render-client";
+import type { RenderBookends, VideoServiceCapability } from "./render-client";
 import type { RightsSource } from "./asset-origin";
 
 /**
@@ -41,11 +41,14 @@ export interface DraftRender {
   ttsVoice?: string;
   introTitle?: string;
   introDuration?: number;
+  /** Plan U5.4: intro / outro / transition joined by the service (multi-format only); asset urls already host-checked. */
+  bookends?: RenderBookends;
   /** Input objects deleted once the render finished (finalize.ts); [] = delete nothing. */
   r2Keys: string[];
   rightsSources: RightsSource[];
   /** media_production_projects.id, already checked to belong to organizationId. */
   projectId?: string;
+  autoRunId?: string;
 }
 
 /** Submits the render and records its job row (running, with the record payload). 202-style answer: the job id. */
@@ -68,6 +71,7 @@ export async function submitDraftRender(p: DraftRender): Promise<{ ok: true; job
     ttsVoice: p.ttsVoice,
     introTitle: p.introTitle,
     introDuration: p.introDuration,
+    ...(p.bookends ? { bookends: p.bookends } : {}),
   })) as
     | { ok: true; jobId: string; serviceCapability?: VideoServiceCapability }
     | { ok: false; status: number; error: string };
@@ -100,6 +104,7 @@ export async function submitDraftRender(p: DraftRender): Promise<{ ok: true; job
           source: "draft",
           serviceCapability: sub.serviceCapability,
           ...(p.projectId ? { projectId: p.projectId } : {}),
+          ...(p.autoRunId ? { autoRunId: p.autoRunId } : {}),
         }
       : undefined,
   });

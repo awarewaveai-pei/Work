@@ -11,8 +11,8 @@ const edExportPlatforms = [
 ];
 const edExportQualityText = { "720p": "720P HD", "1080p": "1080P Full HD 推薦", "4K": "4K" };
 // The exported copy: the target ratio, plus the watermark as an overlay image on its own top track for the whole length.
-function edExportProject(p, ratio, mark) {
-  const native = edNative(p);
+function edExportProject(p, ratio, mark, prepared) {
+  const native = prepared || edNative(p);
   native.ratio = ratio;
   if (!mark) return native;
   const used = new Set(native.tracks.map((t) => t.id)),
@@ -47,6 +47,71 @@ function edExportProject(p, ratio, mark) {
     width: 18,
   });
   return native;
+}
+// Only the export copy changes. Existing timeline transitions are centred on adjacent cuts, so bookends use that same rule.
+function edAddBookends(native, ends, assets) {
+  const main = EditorModel.mainTrack(native.tracks),
+    clip = (which, startFrame) => ({ id: crypto.randomUUID(), kind: "video", track: main, asset: assets[which], bookend: which,
+      startFrame, durationFrames: Timebase.toFrames(assets[which].duration, native.timebase), sourceStartFrame: 0,
+      speed: 1, volume: 1, opacity: 1, scale: 1, x: 0, y: 0, rotation: 0, width: 25, fadeIn: 0, fadeOut: 0, transition: "無" }),
+    transition = (incoming, end) => {
+      if (!end || end.transition === "none") return;
+      incoming.transition = end.transition === "fade-black" ? "黑場" : "溶解";
+      incoming.transitionFrames = Timebase.toFrames(end.transitionSeconds, native.timebase);
+    };
+  if (assets.intro && !native.clips.some((c) => c.bookend === "intro")) {
+    const intro = clip("intro", 0), first = native.clips.filter((c) => c.track === main).sort((a, b) => a.startFrame - b.startFrame)[0];
+    if (!first || (ends.intro.transition !== "none" && first.startFrame !== 0)) throw Error("主影片軌開頭有空隙，請先對齊，才能接片頭轉場");
+    for (const c of native.clips) c.startFrame += intro.durationFrames;
+    transition(first, ends.intro);
+    native.clips.push(intro);
+  }
+  if (assets.outro && !native.clips.some((c) => c.bookend === "outro")) {
+    const end = Math.max(...native.clips.map((c) => c.startFrame + c.durationFrames)),
+      previous = native.clips.filter((c) => c.track === main).sort((a, b) => a.startFrame - b.startFrame).at(-1), outro = clip("outro", end);
+    if (ends.outro.transition !== "none" && previous.startFrame + previous.durationFrames !== end) throw Error("主影片軌結尾有空隙，請先對齊，才能接片尾轉場");
+    transition(outro, ends.outro);
+    native.clips.push(outro);
+  }
+  return native;
+}
+async function edExportWithBookends(p, ratio, mark) {
+  const hit = edSpineHit(p), native = edNative(p), assets = {};
+  native.ratio = ratio;
+  if (!hit) return edExportProject(p, ratio, mark, native);
+  for (const which of ["intro", "outro"]) {
+    const end = hit.episode[which];
+    if (!end || end.kind === "none" || native.clips.some((c) => c.bookend === which)) continue;
+    let input;
+    if (end.kind === "template") {
+      const made = EpisodeSpine.bookendJob(hit.project, hit.episode, which, ratio, VideoWorkbench.capabilities?.remotionTemplates || []);
+      if (made.problem) throw Error(made.problem);
+      input = made.input;
+    } else {
+      input = { type: "video", operation: "editor-export", prompt: which === "intro" ? "片頭標題卡" : "片尾標題卡",
+        settings: { quality: "1080p", project: { ratio, timebase: p.timebase,
+          tracks: [{ id: "V1", kind: "video" }, { id: "T1", kind: "text" }],
+          clips: [{ id: "bookend-text", kind: "text", track: "T1", text: end.fields.title, font: "思源黑體", fontSize: 64,
+            startFrame: 0, durationFrames: Timebase.toFrames(end.seconds, p.timebase), sourceStartFrame: 0, x: 50, y: 50, animation: "淡入淡出" }] } },
+        link: { projectId: hit.project.id, episodeId: hit.episode.id, target: which, tool: "editor-export", step: "motion" } };
+    }
+    const key = end.kind === "template" ? EpisodeSpine.bookendKey(input) : JSON.stringify(input.settings),
+      list = await VideoWorkbench.generations.list();
+    let job = list.findLast((j) => !["failed", "cancelled", "blocked"].includes(j.status) &&
+      (end.kind === "template" ? j.input?.operation === "remotion-template" && EpisodeSpine.bookendKey(j.input) === key : j.input?.bookendKey === key));
+    // paid: none (both branches render locally: Remotion template or editor-export title card).
+    if (!job) job = await VideoWorkbench.generations.create({ ...input, bookendKey: key });
+    VideoWorkbench.showJob(job);
+    const until = Date.now() + 20 * 60 * 1000;
+    while (job.status !== "succeeded") {
+      if (["failed", "cancelled", "blocked"].includes(job.status)) throw Error((which === "intro" ? "片頭" : "片尾") + "失敗：" + (job.error?.message || job.error || job.status));
+      if (Date.now() > until) throw Error("片頭／片尾仍在處理，請稍後重新匯出；會重用已送的任務");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      job = await VideoWorkbench.generations.get(job.id);
+    }
+    assets[which] = await edProbe(VideoWorkbench.jobAsset(job));
+  }
+  return edExportProject(p, ratio, mark, edAddBookends(native, hit.episode, assets));
 }
 // 匯出時間軸 v1: the project as MediaTimelineV1 (backend /editor/timeline-v1) sent to the main system's structural check
 // (same-origin POST /api/video/timeline/validate). state = { busy } | { error } | { exported, remote }; one line per issue.
@@ -177,7 +242,7 @@ ${list.some((t) => t.quality === "4K" && small(t.ratio)) ? '<p class="note" data
             operation: "editor-export",
             settings: {
               quality,
-              project: edExportProject(p, ratio, st.useMark ? st.mark : null),
+              project: await edExportWithBookends(p, ratio, st.useMark ? st.mark : null),
               projectRevision: p.revision || 0,
             },
           });
@@ -194,3 +259,4 @@ ${list.some((t) => t.quality === "4K" && small(t.ratio)) ? '<p class="note" data
   }
   wire();
 }
+if (typeof module === "object" && module.exports) module.exports = { edAddBookends };

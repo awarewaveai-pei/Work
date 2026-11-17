@@ -239,6 +239,17 @@
       document.dispatchEvent(new CustomEvent("vw:changed"));
       return true;
     }
+    // Plan U5.3: an episode's intro/outro (EpisodeSpine.setBookends) and its 一鍵成片 run (setAutoRun) -- the one shape
+    // of each, written here only, so 快速輸出, 一鍵成片 and the editor read the same setting.
+    if (action === "spine-set-bookends" || action === "spine-set-auto-run") {
+      const templates = window.VideoWorkbench.capabilities?.remotionTemplates,
+        change = () => (action === "spine-set-bookends" ? Spine?.setBookends(db.projects, payload, templates) : Spine?.setAutoRun(db.projects, payload));
+      if (!change()) throw new Error(action === "spine-set-bookends" ? "片頭或片尾設定無效" : "一鍵成片設定無效");
+      await persistRedo(change);
+      broadcast();
+      document.dispatchEvent(new CustomEvent("vw:changed"));
+      return true;
+    }
     if (action === "spine-open") {
       const index = db.projects.find((p) => p.id === payload.projectId)?.episodes.findIndex((e) => e.id === payload.episodeId) ?? -1;
       if (index < 0) throw new Error("找不到這一集");
@@ -338,7 +349,7 @@
     try {
       // One key per submission: a resend after a network failure gets the first job back instead of a second
       // provider call (backend/api.cjs POST /generations). Only the local server is known to honour the key.
-      const idempotencyKey = crypto.randomUUID(),
+      const idempotencyKey = input.idempotencyKey || crypto.randomUUID(),
         send = () =>
           adapter.request("/generations", "POST", { ...input, idempotencyKey });
       job.idempotencyKey = idempotencyKey;
@@ -769,7 +780,7 @@
     // Card PJ.1: the episode spine's actions; children ask the top page, which alone changes spine fields.
     // Card PJ.2 adds settle(job); card U4 setShot; card U3 create and setShots.
     spine: Object.fromEntries(
-      [["attachEdit", "spine-attach-edit"], ["open", "spine-open"], ["settle", "spine-settle"], ["setShot", "spine-set-shot"], ["create", "spine-create"], ["setShots", "spine-set-shots"]].map(([name, action]) => [
+      [["attachEdit", "spine-attach-edit"], ["open", "spine-open"], ["settle", "spine-settle"], ["setShot", "spine-set-shot"], ["create", "spine-create"], ["setShots", "spine-set-shots"], ["setBookends", "spine-set-bookends"], ["setAutoRun", "spine-set-auto-run"]].map(([name, action]) => [
         name,
         async (payload = {}) => {
           await ready;

@@ -33,8 +33,20 @@ export interface VideoServiceCapability {
   output_dimensions: boolean;
   openai_tts?: boolean;
   footage_timeline?: boolean;
+  /** Plan U5.4: joins intro / outro / transition (video-service server.py _validate_bookends). */
+  bookends?: boolean;
   formats: string[];
 }
+
+/** Plan U5.4: a title card, or a rendered template video (an https url the service fetches like a scene asset). */
+export type BookendSegment = { title: string; duration: number } | { assetUrl: string };
+export interface RenderBookends {
+  intro?: BookendSegment;
+  outro?: BookendSegment;
+  transition: "none" | "crossfade" | "fade-black";
+  transitionSeconds: number;
+}
+const segmentBody = (s: BookendSegment) => ("assetUrl" in s ? { asset_url: s.assetUrl } : { title: s.title, duration: s.duration });
 
 export type RenderResult =
   | { ok: true; outputs: RenderOutputs; out_dir: string }
@@ -64,7 +76,7 @@ async function assertNativeMultiformat(base: string, formats: string[]): Promise
     });
     const body = (await r.json().catch(() => ({}))) as {
       ok?: boolean;
-      capabilities?: { native_multiformat?: boolean; format_assets?: boolean; output_dimensions?: boolean; openai_tts?: boolean };
+      capabilities?: { native_multiformat?: boolean; format_assets?: boolean; output_dimensions?: boolean; openai_tts?: boolean; bookends?: boolean };
       formats?: string[];
     };
     const serviceFormats = new Set(body.formats ?? []);
@@ -83,6 +95,7 @@ async function assertNativeMultiformat(base: string, formats: string[]): Promise
           native_multiformat: true,
           format_assets: true,
           output_dimensions: true,
+          bookends: body.capabilities?.bookends === true,
           formats: body.formats ?? [],
         },
       };
@@ -114,6 +127,8 @@ export interface RenderOpts {
   formatAssets?: Record<string, string[]>;
   /** 要輸出的格式（如 ["16x9","9x16","4x5"]）；formatAssets 的鍵集。 */
   formats?: string[];
+  /** Plan U5.4 片頭／片尾接成一支; multi-format only, and only to a service that says it joins them. */
+  bookends?: RenderBookends;
 }
 
 export async function submitRender(
@@ -135,6 +150,10 @@ export async function submitRender(
     const capability = await assertNativeMultiformat(base, opts!.formats!);
     if (capability.ok === false) return { ok: false, status: 503, error: capability.error };
     serviceCapability = capability.capability;
+  }
+  // An older service ignores unknown fields: it would deliver the video without its intro, silently (plan §9 invariant).
+  if (opts?.bookends && !(useMulti && serviceCapability?.bookends)) {
+    return { ok: false, status: 503, error: "video-service 尚未部署片頭接合版本（/health 需回報 bookends）；請先更新 video-service，或不加片頭先出片。" };
   }
   // OpenAI narration is the paid voice (video-cost.ts "openai"); video-service calls it out of process, behind no
   // in-process seam, so the render asks here and meters when it submits (like a seam: reaching the paid work counts).
@@ -163,6 +182,12 @@ export async function submitRender(
         ...(opts?.ttsVoice && { tts_voice: opts.ttsVoice }),
         ...(opts?.introTitle && { intro_title: opts.introTitle }),
         ...(opts?.introDuration && { intro_duration: opts.introDuration }),
+        ...(opts?.bookends && {
+          ...(opts.bookends.intro && { intro: segmentBody(opts.bookends.intro) }),
+          ...(opts.bookends.outro && { outro: segmentBody(opts.bookends.outro) }),
+          transition: opts.bookends.transition,
+          transition_duration: opts.bookends.transitionSeconds,
+        }),
       }),
       signal: AbortSignal.timeout(30_000),
     });

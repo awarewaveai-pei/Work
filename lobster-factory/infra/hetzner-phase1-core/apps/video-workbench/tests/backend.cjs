@@ -73,6 +73,12 @@ const { createServer } = require("../server.cjs");
     assert.equal(job.status, "succeeded");
     assert(fs.readFileSync(path.join(dir, job.result.url)).equals(png));
     console.log("PASS 腳本與圖片後端契約、成果實體保存");
+    const beforeImages = calls.filter((c) => c.url.endsWith("/images/generations")).length;
+    const repeated = await Promise.all(Array.from({ length: 3 }, () => post("/generations", { type: "image", prompt: "重開同一步", runId: "run-reopen", idempotencyKey: "run-reopen:fill:s1:0" })));
+    assert.equal(new Set(repeated.map((j) => j.id)).size, 1, "同執行同一步併發重送只能有一個任務");
+    await poll(repeated[0]);
+    assert.equal(calls.filter((c) => c.url.endsWith("/images/generations")).length - beforeImages, 1, "不得重複呼叫付費供應商");
+    console.log("PASS 同一執行步驟併發重送只接受一次、只呼叫一次供應商");
     const audio = await poll(
       await post("/generations", { type: "audio", prompt: "你好" }),
     );

@@ -18,17 +18,22 @@ const ROUTE = "/api/internal/video/workbench/quick-render",
   MAX_ASSET_BYTES = 200 * 1024 * 1024, // video-service RENDER_MAX_ASSET_MB: a bigger picture or clip fails there
   MAX_DOWNLOAD = 500 * 1024 * 1024; // = the main system's asset intake default
 const RATIOS = { "16:9": "16x9", "9:16": "9x16", "4:5": "4x5" };
-const VOICE = /^[A-Za-z0-9:._-]{0,64}$/, REF = /^[A-Za-z0-9._:-]{1,200}$/;
+const VOICE = /^[A-Za-z0-9:._-]{0,64}$/, REF = /^[A-Za-z0-9._:-]{1,200}$/, UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// The stop point (plan §12): a quick render a person sends ends at the cut ("video") or at drafts. Nothing else maps:
+// full_auto (outward publishing) is the topic queue's alone, so no setting here can reach it (§13 C3).
+const AUTONOMY = Object.freeze({ video: "guided", drafts: "auto_after_render" });
+const TRANSITIONS = ["none", "crossfade", "fade-black"];
 
 // What keeps an episode's shots from rendering, one line each ([] = it can be sent): the dialog lists them before
 // sending (quote) and request() refuses the job on the first. scenes = [{ narration, url }]; sizeOf(url) = bytes | null.
-function problems(scenes, main, sizeOf) {
+// toBeMade = 一鍵成片 makes the missing pictures first, so a shot without one is not a problem yet.
+function problems(scenes, main, sizeOf, toBeMade = false) {
   const shots = Array.isArray(scenes) ? scenes : [];
   if (!shots.length) return ["這一集還沒有鏡頭"];
   const out = shots.length > MAX_SHOTS ? ["快速輸出最多 " + MAX_SHOTS + " 個鏡頭，這一集有 " + shots.length + " 個"] : [];
   shots.forEach((shot, i) => {
     const n = "第 " + (i + 1) + " 個鏡頭", narration = String(shot?.narration ?? "").trim(), url = String(shot?.url || "");
-    if (!url) out.push(n + "沒有畫面");
+    if (!url) { if (!toBeMade) out.push(n + "沒有畫面"); }
     else if (!main.assetOf(url)) out.push(n + "的畫面還沒登記到主系統，請稍後再試");
     else if (sizeOf(url) > MAX_ASSET_BYTES) out.push(n + "的素材超過 200 MB");
     if (!narration) out.push(n + "沒有旁白（快速輸出的鏡頭長度跟著旁白配音）");
@@ -37,9 +42,21 @@ function problems(scenes, main, sizeOf) {
   return out;
 }
 
-// settings { ratio, title, scenes: [{ narration, url }], tts?: { provider, voice }, intro?: { title, seconds }, autonomy? }
-// + input.link (the episode it belongs to) -> the route's body. A shot's url must be a file this workbench registered
-// (main.assetOf): the route takes asset ids only. Checked before the job is accepted; main = null (local mode) refuses.
+// settings { ratio, title, scenes: [{ narration, url }], tts?: { provider, voice }, bookends?: { intro?, outro?,
+// transition, transitionSeconds }, until?: "video" | "drafts", embedSiteId? } (EpisodeSpine.quickRenderJobs) + input.link
+// (the episode it belongs to) -> the route's body. A shot's url and a template bookend's url must be files this workbench
+// registered (main.assetOf): the route takes asset ids only. Checked before the job is accepted; main = null refuses.
+function bookendPart(v, main, name) {
+  if (v == null) return undefined;
+  if (v.kind === "template") {
+    const assetId = main.assetOf(String(v.url || ""));
+    if (!assetId) throw fail(name + "影片還沒登記到主系統，請稍後再試", 400);
+    return { kind: "template", assetId };
+  }
+  const title = String(v.title ?? "").trim(), seconds = Number(v.seconds);
+  if (v.kind !== "title" || !title || title.length > 80 || !(seconds > 0 && seconds <= 15)) throw fail(name + "標題卡要有 1 到 80 字、0 到 15 秒", 400);
+  return { kind: "title", title, seconds };
+}
 function request(input, main, sizeOf) {
   if (!main) throw fail("快速輸出需要連上主系統", 503);
   const s = input?.settings || {};
@@ -54,17 +71,27 @@ function request(input, main, sizeOf) {
   const scenes = s.scenes.map((shot) => ({ narration: String(shot.narration).trim(), assetId: main.assetOf(String(shot.url)) }));
   const tts = { provider: s.tts?.provider ?? "edge", voice: s.tts?.voice ?? "" };
   if (!["edge", "openai"].includes(tts.provider) || typeof tts.voice !== "string" || !VOICE.test(tts.voice)) throw fail("聲線無效", 400);
-  let intro;
-  if (s.intro != null) {
-    intro = { title: String(s.intro.title ?? "").trim(), seconds: Number(s.intro.seconds) };
-    if (!intro.title || intro.title.length > 80 || !(intro.seconds > 0 && intro.seconds <= 15)) throw fail("片頭標題要有 1 到 80 字、0 到 15 秒", 400);
+  const until = s.until ?? "video";
+  if (!Object.hasOwn(AUTONOMY, until)) throw fail("做到哪裡停只能是成片或草稿", 400);
+  let ends = {};
+  if (s.bookends != null) {
+    const b = s.bookends, transition = b.transition ?? "none", transitionSeconds = b.transitionSeconds === undefined ? 0.5 : Number(b.transitionSeconds);
+    if (!TRANSITIONS.includes(transition) || (transition !== "none" && !(transitionSeconds >= 0.2 && transitionSeconds <= 2))) throw fail("轉場設定無效", 400);
+    const intro = bookendPart(b.intro, main, "片頭"), outro = bookendPart(b.outro, main, "片尾");
+    if (intro || outro) ends = { ...(intro ? { intro } : {}), ...(outro ? { outro } : {}), transition, transitionSeconds };
   }
-  return { sourceRef, title, ratio, scenes, tts, ...(intro ? { intro } : {}), autonomy: s.autonomy === true ? "auto_after_render" : "guided" };
+  if (s.embedSiteId != null && (until !== "drafts" || !UUID.test(String(s.embedSiteId)))) throw fail("網站草稿文章只在「做到草稿」時能選", 400);
+  const autoBudget = s.autoBudget;
+  if (until === "drafts" && (!autoBudget || typeof autoBudget.runId !== "string" || !Number.isFinite(autoBudget.budgetTwd) || !Number.isFinite(autoBudget.spentTwd))) throw fail("一鍵到草稿缺少執行預算", 400);
+  return { sourceRef, title, ratio, scenes, tts, ...ends, autonomy: AUTONOMY[until], ...(autoBudget ? { autoBudget } : {}), ...(s.embedSiteId != null ? { embedSiteId: String(s.embedSiteId) } : {}) };
 }
 
-// The dialog's numbers: { problems, voices, lines, perRatioUsd, totalUsd }, priced by the main system (computeVideoCost,
-// /quick-render/quote); this file only counts the narration it would speak. settings { scenes, ratios, tts? }.
-async function quote(settings, main, sizeOf) {
+// The dialog's numbers: { problems, voices, lines, perRatioUsd, perRatioTwd, fill, totalUsd, totalTwd, sites }, priced by
+// the main system (computeVideoCost, /quick-render/quote; plan §13 C4: the whole run, never summed here); this file only
+// counts the narration it would speak and the pictures missing. settings { scenes, ratios, tts?, fill?: "ai" |
+// "stock-video" | "stock-photo" } -- with fill, a shot without a picture is to be made, not a problem. imageModel = the
+// model 一鍵成片 draws missing pictures with (generation-policy.cjs models().image).
+async function quote(settings, main, sizeOf, imageModel) {
   if (!main) throw fail("快速輸出需要連上主系統", 503);
   const s = settings || {}, scenes = Array.isArray(s.scenes) ? s.scenes : [];
   const ratios = [...new Set(Array.isArray(s.ratios) ? s.ratios : [])].map((r) => RATIOS[r]);
@@ -72,11 +99,16 @@ async function quote(settings, main, sizeOf) {
   const chars = scenes.reduce((n, shot) => n + Math.min(2000, String(shot?.narration ?? "").trim().length), 0);
   const r = await main.call(ROUTE + "/quote", {
     method: "POST",
-    body: { organizationId: main.organizationId(), scenes: Math.min(MAX_SHOTS, Math.max(1, scenes.length)), ttsChars: Math.min(MAX_SHOTS * 2000, chars), ratios, ...(s.tts ? { tts: s.tts } : {}) },
+    body: {
+      organizationId: main.organizationId(), scenes: Math.min(MAX_SHOTS, Math.max(1, scenes.length)), ttsChars: Math.min(MAX_SHOTS * 2000, chars), ratios, ...(s.tts ? { tts: s.tts } : {}),
+      until: s.until || "video", scriptText: scenes.map((x) => String(x?.narration || "")).join("\n"),
+      ...(s.fill ? { fill: { mode: s.fill, pictures: Math.min(MAX_SHOTS, scenes.filter((x) => !x?.url).length), imageModel,
+        shots: scenes.flatMap((x, i) => x?.url ? [] : [{ id: String(s.shotModels?.[i]?.id || i), imageModel: s.shotModels?.[i]?.imageModel || imageModel }]) } } : {}),
+    },
   });
   if (!r.ok || r.value.ok !== true) throw refusal("主系統無法估價", r);
-  const { voices, lines, perRatioUsd, totalUsd } = r.value;
-  return { problems: problems(scenes, main, sizeOf), voices, lines, perRatioUsd, totalUsd };
+  const { voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, totalUsd, totalTwd, sites } = r.value;
+  return { problems: problems(scenes, main, sizeOf, !!s.fill), voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, totalUsd, totalTwd, sites: sites || [] };
 }
 
 // Submits, polls until the main system recorded the video, downloads it into the media store. Answers the job result.

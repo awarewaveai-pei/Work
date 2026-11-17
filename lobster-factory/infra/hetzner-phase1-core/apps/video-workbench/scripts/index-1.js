@@ -138,9 +138,11 @@
     opening = params.get("open");
   params.delete("open");
   VideoWorkbench.loadCapabilities()
-    .then((caps) => {
+    .then(async (caps) => {
       $("worksNav").hidden = $("script-forgeNav").hidden = !caps?.mainSystem;
-      if (names.includes(opening) && !$(opening + "Nav")?.hidden) activate(opening, false, params.toString());
+      if (opening === "projects" && params.get("project") && params.get("episode"))
+        await VideoWorkbench.spine.open({ projectId: params.get("project"), episodeId: params.get("episode") });
+      else if (names.includes(opening) && !$(opening + "Nav")?.hidden) activate(opening, false, params.toString());
     })
     .catch(VideoWorkbench.reportError);
   VideoWorkbench.router = {

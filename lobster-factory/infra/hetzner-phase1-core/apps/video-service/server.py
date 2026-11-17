@@ -306,8 +306,68 @@ def _build_output_meta(outputs: dict) -> dict:
     return meta
 
 
+_TRANSITIONS = ("none", "crossfade", "fade-black")
+
+
+def _validate_bookends(payload: dict):
+    """Plan U5.4: intro / outro / transition -> the bookends dict pipeline.compose_base_video joins, or None when the
+    payload names neither (the old path, unchanged). A segment is {"title", "duration"} (title card) or {"asset_url"}
+    (a rendered template video, https only, fetched like a scene asset). Refused with the legacy intro_title (one intro)."""
+    intro, outro = payload.get("intro"), payload.get("outro")
+    if intro is None and outro is None:
+        return None
+    if payload.get("intro_title"):
+        raise ValueError("intro 與 intro_title 只能擇一")
+    if payload.get("format_assets") is None:
+        raise ValueError("片頭／片尾只支援 format_assets（原生多比例）路徑")
+
+    def seg(v, name):
+        if v is None:
+            return None
+        if not isinstance(v, dict):
+            raise ValueError(f"{name} 必須是物件")
+        if v.get("asset_url") is not None:
+            url = v["asset_url"]
+            if not isinstance(url, str) or not url.startswith("https://"):
+                raise ValueError(f"{name}.asset_url 必須是 https:// URL")
+            return {"asset_url": url}
+        title = v.get("title")
+        if not isinstance(title, str) or not title.strip() or len(title) > 80:
+            raise ValueError(f"{name}.title 需 1–80 字")
+        try:
+            duration = float(v.get("duration"))
+        except (TypeError, ValueError):
+            raise ValueError(f"{name}.duration 必須是數字")
+        if not math.isfinite(duration) or duration <= 0 or duration > 15:
+            raise ValueError(f"{name}.duration 需 0–15 秒")
+        return {"title": title.strip(), "duration": duration}
+
+    transition = payload.get("transition", "none")
+    if transition not in _TRANSITIONS:
+        raise ValueError(f"transition 必須是 {_TRANSITIONS}")
+    try:
+        transition_s = float(payload.get("transition_duration", 0.5))
+    except (TypeError, ValueError):
+        raise ValueError("transition_duration 必須是數字")
+    if transition != "none" and (not math.isfinite(transition_s) or transition_s < 0.2 or transition_s > 2):
+        raise ValueError("transition_duration 需 0.2–2 秒")
+    return {"intro": seg(intro, "intro"), "outro": seg(outro, "outro"), "transition": transition, "transition_s": transition_s}
+
+
+def _materialize_bookends(bookends, first_idx: int):
+    """Downloads each asset segment once (shared by every ratio): asset_url -> asset (a local path)."""
+    if bookends is None:
+        return None
+    out = dict(bookends)
+    for i, key in enumerate(("intro", "outro")):
+        seg = bookends.get(key)
+        if seg and seg.get("asset_url"):
+            out[key] = {"asset": _materialize_asset(seg["asset_url"], first_idx + i)}
+    return out
+
+
 def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
-               intro_title="", intro_duration=3.0, multiformat=False) -> dict:
+               intro_title="", intro_duration=3.0, multiformat=False, bookends=None) -> dict:
     """重活：序列化 materialize+render+R2 上傳。回 {outputs,out_dir,storage}。
     multiformat=True：assets 為 {fmt:[urls]}，每格式各 materialize 後走 render_video_multiformat
     （原生比例、無 pad）；False：assets 為單組，走舊 render_video（base+pad export）。"""
@@ -329,7 +389,7 @@ def _do_render(scenes, assets, out_name, tts_provider="edge", tts_voice="",
                     scenes, format_files, out_name,
                     tts_provider=tts_provider, tts_voice=tts_voice,
                     intro_title=intro_title, intro_duration=intro_duration, caption_sink=caption_sink,
-                    clean_sink=clean_sink,
+                    clean_sink=clean_sink, bookends=_materialize_bookends(bookends, _idx),
                 )
             else:
                 visual_files = [_materialize_asset(a, i) for i, a in enumerate(assets)]
@@ -391,12 +451,12 @@ def _prune_jobs():
 
 def _run_job(job_id: str, scenes, assets, out_name,
              tts_provider="edge", tts_voice="", intro_title="", intro_duration=3.0,
-             multiformat=False):
+             multiformat=False, bookends=None):
     try:
         result = _do_render(scenes, assets, out_name,
                             tts_provider=tts_provider, tts_voice=tts_voice,
                             intro_title=intro_title, intro_duration=intro_duration,
-                            multiformat=multiformat)
+                            multiformat=multiformat, bookends=bookends)
         with _jobs_lock:
             _JOBS[job_id] = {"status": "done", **result, "ts": time.time()}
     except Exception as e:  # noqa: BLE001
@@ -420,13 +480,14 @@ def submit_render(payload: dict) -> str:
     if not math.isfinite(intro_duration) or intro_duration <= 0:
         raise ValueError("intro_duration must be a positive finite number")
     intro_duration = min(intro_duration, 15.0)  # cap at 15s to prevent runaway renders
+    bookends = _validate_bookends(payload)
     job_id = uuid.uuid4().hex
     with _jobs_lock:
         _prune_jobs()
         _JOBS[job_id] = {"status": "running", "ts": time.time()}
     threading.Thread(
         target=_run_job,
-        args=(job_id, scenes, assets, out_name, tts_provider, tts_voice, intro_title, intro_duration, multiformat),
+        args=(job_id, scenes, assets, out_name, tts_provider, tts_voice, intro_title, intro_duration, multiformat, bookends),
         daemon=True,
     ).start()
     return job_id
@@ -775,6 +836,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "openai_tts": bool(config.OPENAI_API_KEY),
                     "footage_render": True,
                     "caption_reburn": True,
+                    "bookends": True,  # plan U5.4: intro/outro/transition; next-admin refuses to send them without this
                     "tts": True,
                 },
                 "formats": list(config.FORMATS.keys()),

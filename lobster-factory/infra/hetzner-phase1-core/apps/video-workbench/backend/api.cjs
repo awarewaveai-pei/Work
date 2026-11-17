@@ -1173,7 +1173,18 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     }
   }
   // Validates, records and answers 202 before any provider call (runtime.js treats 501/503 as "never sent").
+  const submissionLocks = new Map();
   async function start(input, res, extra, req) {
+    const key = extra?.idempotencyKey;
+    while (key && submissionLocks.has(key)) await submissionLocks.get(key);
+    const existing = key && jobs.find((j) => j.idempotencyKey === key);
+    if (existing) return json(res, 200, existing);
+    let unlock;
+    if (key) submissionLocks.set(key, new Promise((resolve) => { unlock = resolve; }));
+    try { return await startUnique(input, res, extra, req); }
+    finally { if (key) { submissionLocks.delete(key); unlock(); } }
+  }
+  async function startUnique(input, res, extra, req) {
     // VD.4: refused before any outside call (permit, account refresh, vendor) unless it names a finished export of this
     // workbench with its covers (Codex ccdf770d F3).
     if (input?.operation === "cover-ai") require("./cover-ai.cjs").exportFor(jobs, input.settings?.forJob);
@@ -1649,7 +1660,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         return true;
       }
       if (req.method === "POST" && route === "/quick-render/quote") {
-        json(res, 200, await quickRender.quote(await body(req), main, localSize));
+        json(res, 200, await quickRender.quote(await body(req), main, localSize, providerModels.image));
         return true;
       }
       if (req.method === "GET" && route === "/delivery-ratios") {

@@ -8,7 +8,7 @@
  * /api/video/generate 仍走 video/pipeline 複合積木（內含 submitRender）。
  */
 import { register, type BlockCtx } from "./registry";
-import { submitRender } from "../video/render-client";
+import { submitRender, type RenderBookends } from "../video/render-client";
 import { buildVideoOutName } from "./video-pipeline";
 
 register({
@@ -50,6 +50,7 @@ register({
         ttsVoice: ctx.ttsVoice as string | undefined,
         introTitle: ctx.introTitle as string | undefined,
         introDuration: ctx.introDuration as number | undefined,
+        ...(ctx.bookends ? { bookends: ctx.bookends as RenderBookends } : {}),
         ...(useMulti ? { formats, formatAssets } : {}),
       },
     );
