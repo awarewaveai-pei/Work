@@ -84,7 +84,7 @@ export const STEPS = [
     ] },
   { n: 4, code: 'U3', title: '腳本＝新系統的腳本功能', plain: '例：在側欄「腳本」寫好一支三場景腳本，按「送去做影片」，工作台多一集，鏡頭已經排好。',
     gate: '別組織的品牌送社群被拒（拿掉權限檢查，測試會紅）；送去做影片後多一集、鏡頭數等於場景數；寫回這一集後集數不變、鏡頭被取代；對白與畫面不掉、舞台指示去掉。',
-    risk: 'Medium', model: 'Opus 5.5；新路由加 critic Deep', status: 'in_progress', depends: ['U2'],
+    risk: 'Medium', model: 'Opus 5.5；新路由加 critic Deep', status: 'done', commit: '4179eabf3', depends: ['U2'],
     what: 'WB/script-forge/page.tsx 掛 ScriptForge；video-handoff.ts 加 shotsFromScript、charactersFromStoryBible；runtime 主頁動作 spine-create、spine-set-shots；episode-spine newProject() 與 adopt 共用；API/social-drafts/text 與 social/posts 共用 lib/social 函式',
     files: [`${WB}script-forge/page.tsx`, `${V}video-handoff.ts`, `${VW}shared/episode-spine.js`, `${VW}shared/runtime.js`, `${NA}app/api/social/posts/route.ts`, `${API}social-drafts/text/route.ts`, `${NA}lib/portal/hosts.ts`],
     items: [
@@ -93,7 +93,7 @@ export const STEPS = [
       done('U3.3', '一集第 2 步「寫腳本」；寫完按「寫回這一集」，已有鏡頭時先確認會取代。', 'fb790d851'),
       done('U3.4', '「送社群」走影片 API 新路由，跟社群工具同一個權限檢查；社群沒裝時按鈕不出現。', 'fb790d851'),
       done('U3.5', '腳本一鍵完成：「手動生成」填主題頁多一顆「主題 → 完整腳本（一鍵）」，按一次直接寫出完整腳本，停在腳本頁可以改；按之前顯示約多少 NT$。還沒在瀏覽器點過。', 'd4a254662'),
-      todo('U3.6', '一鍵到草稿：腳本 → 影片 → 審片 → 社群草稿，按一次；可勾「同時建一篇網站草稿文章並嵌入」。送出前顯示整趟 NT$ 並設上限，失敗就停在那一步。'),
+      done('U3.6', '腳本一鍵接到同一份草稿流程，可選比例、畫面、配音、片頭與網站草稿。送出前顯示整趟 NT$ 上限，伺服器保留及核算腳本費用，重試取回已完成結果；失敗停下。型別、35 案、整合 28 案、工作台總閘與擁有權／同意突變通過；未部署，正式整趟驗收仍在 U11.5，Claude 額度限制見驗證檔。', '4179eabf3'),
     ] },
   { n: 5, code: 'U4', title: '鏡頭卡補齊', plain: '例：在鏡頭卡按「圖庫素材」打「海邊日落」，選一張 Pexels 照片換上；再按「讓這鏡動起來」變成一段影片。',
     gate: '換圖後剪輯裡的片段標示過期；白名單外的圖庫來源被拒（拿掉白名單，測試會紅）；有圖的鏡頭生影片後鏡頭帶著影片。',
