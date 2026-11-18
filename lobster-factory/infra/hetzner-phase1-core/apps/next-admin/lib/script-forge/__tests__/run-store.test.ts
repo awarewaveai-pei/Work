@@ -39,6 +39,14 @@ describe("server script run budget", () => {
     expect(await finishScriptRun(db, claim, "partial", null, false)).toEqual({ spentTwd: 7, estimated: true });
     await expect(reserveScriptRun(db, "org", budget, "script", 7)).rejects.toThrow("已到上限");
   });
+  it("a reservation older than the route's stream limit lost its process: cost kept, run estimated, the call may be claimed again", async () => {
+    await reserveScriptRun(db, "org", budget, "script", 3);
+    row.brief_json.autoScriptCalls.script.at = new Date(Date.now() - 121_000).toISOString();
+    const again = await reserveScriptRun(db, "org", budget, "script", 3);
+    expect(again).toMatchObject({ kind: "claim", spentTwd: 6 });
+    expect(row.brief_json.autoBudget.estimated).toBe(true);
+    await expect(reserveScriptRun(db, "org", budget, "script", 3)).rejects.toThrow("不會重送");
+  });
   it("an invalid response may retry, with its billed cost retained", async () => {
     const claim = await reserveScriptRun(db, "org", budget, "script", 7);
     if (claim.kind !== "claim") throw Error("expected claim");

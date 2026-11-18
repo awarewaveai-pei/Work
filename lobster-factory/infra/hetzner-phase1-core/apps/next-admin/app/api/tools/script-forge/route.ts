@@ -195,6 +195,7 @@ async function streamAnthropic(
     { ...claudeParams(model, MAX_TOKENS), ...(used ? {} : claudeFallback(model)), system, messages: [{ role: "user", content: prompt }] },
     { signal },
   );
+  let failure: unknown;
   try {
     for await (const event of stream) {
       if (signal.aborted) break;
@@ -202,10 +203,16 @@ async function streamAnthropic(
         controller.enqueue(encoder.encode(event.delta.text));
       }
     }
+  } catch (e) {
+    failure = e;
+    throw e;
   } finally {
     const billed = stream.currentMessage ?? (await stream.finalMessage().catch(() => undefined));
     if (billed) void logAiCall({ route: "/api/tools/script-forge", response: billed, grant, tool: "video" });
-    if (billed) used?.(textCallCostUsd({ model: billed.model || model, inputTokens: billed.usage?.input_tokens || 0, outputTokens: billed.usage?.output_tokens || 0, cacheReadTokens: billed.usage?.cache_read_input_tokens || 0, cacheWriteTokens: billed.usage?.cache_creation_input_tokens || 0 }));
+    // output_tokens is final only with message_delta, which also sets stop_reason; before it the usage is a lower bound, so the cost stays unknown.
+    if (billed?.stop_reason) used?.(textCallCostUsd({ model: billed.model || model, inputTokens: billed.usage?.input_tokens || 0, outputTokens: billed.usage?.output_tokens || 0, cacheReadTokens: billed.usage?.cache_read_input_tokens || 0, cacheWriteTokens: billed.usage?.cache_creation_input_tokens || 0 }));
+    // An HTTP error status (APIError.status) means the API refused the request: nothing was generated or billed.
+    else if (!billed && typeof (failure as { status?: unknown } | undefined)?.status === "number") used?.(0);
   }
 }
 
@@ -238,6 +245,7 @@ async function streamOpenAi(
     signal,
   });
   if (!res.ok || !res.body) {
+    if (!res.ok) used?.(0); // an HTTP error response is not billed
     controller.enqueue(encoder.encode(`\n[ERROR] OpenAI API error (${res.status})`));
     return;
   }

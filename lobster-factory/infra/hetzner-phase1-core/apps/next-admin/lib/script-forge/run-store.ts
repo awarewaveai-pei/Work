@@ -7,6 +7,10 @@ type Row = Record<string, any>;
 type Claim = { kind: "claim"; projectId: string; org: string; runId: string; key: string; token: string; reserved: number; spentTwd: number };
 type Cached = { kind: "cached"; text: string; spentTwd: number; estimated: boolean };
 const fail = (status: number, message: string): never => { throw Object.assign(Error(message), { status }); };
+// The route's declared stream limit (script-forge route maxDuration). An older reservation lost its process (restart, crash):
+// its usage is unknown, so the reserved cost stays and the run is marked estimated. Should a stream still outlive this, its
+// receipt is refused (token changed) and the cost already counted stays, so spentTwd remains an upper bound.
+const STALE_RESERVATION_MS = 120_000;
 const read = async (db: SupabaseClient, org: string, id: string): Promise<Row> => {
   const r = await db.from("media_production_projects").select(PROJECT_COLUMNS).eq("organization_id", org).eq("id", id).maybeSingle();
   if (r.error || !r.data) return fail(503, "無法讀取執行預算"); return r.data;
@@ -25,18 +29,19 @@ export async function reserveScriptRun(db: SupabaseClient, org: string, budget: 
   const projectId = String(ensured.item.id);
   for (let n = 0; n < 8; n++) {
     const row = await read(db, org, projectId), brief = row.brief_json || {}, previous = brief.autoBudget,
-      spent = previous?.runId === budget.runId ? Number(previous.spentTwd) : 0, call = brief.autoScriptCalls?.[key];
+      spent = previous?.runId === budget.runId ? Number(previous.spentTwd) : 0, call = brief.autoScriptCalls?.[key],
+      stale = call?.status === "reserved" && !(Date.now() - Date.parse(call.at) < STALE_RESERVATION_MS);
     if (previous?.runId && previous.runId !== budget.runId) return fail(409, "這個專案已有另一趟執行，請重新開始");
     if (!Number.isFinite(spent) || spent < 0) return fail(503, "執行預算紀錄無效");
     if (call?.status === "done") {
       if (typeof call.text !== "string") return fail(503, "腳本回執尚未完整");
       return { kind: "cached", text: call.text, spentTwd: spent, estimated: previous?.estimated === true || call.estimated === true || Object.values(brief.autoScriptCalls || {}).some((c: any) => c.status === "reserved") };
     }
-    if (call?.status === "reserved") return fail(409, "這一步已送出，仍在處理或確認用量；不會重送計費");
+    if (call?.status === "reserved" && !stale) return fail(409, "這一步已送出，仍在處理或確認用量；不會重送計費");
     if (spent + reserved > budget.budgetTwd + 1e-9) return fail(409, `已到上限 NT$${budget.budgetTwd}，下一次腳本呼叫最多需要 NT$${reserved}`);
     const token = randomUUID(), spentTwd = Math.round((spent + reserved) * 100) / 100;
-    const next = { ...brief, autoBudget: { ...previous, runId: budget.runId, budgetTwd: budget.budgetTwd, spentTwd, startedAt: previous?.startedAt || new Date().toISOString() },
-      autoScriptCalls: { ...brief.autoScriptCalls, [key]: { status: "reserved", token, reserved } } };
+    const next = { ...brief, autoBudget: { ...previous, runId: budget.runId, budgetTwd: budget.budgetTwd, spentTwd, startedAt: previous?.startedAt || new Date().toISOString(), ...(stale ? { estimated: true } : {}) },
+      autoScriptCalls: { ...brief.autoScriptCalls, [key]: { status: "reserved", token, reserved, at: new Date().toISOString() } } };
     if (await write(db, row, org, next)) return { kind: "claim", projectId, org, runId: budget.runId, key, token, reserved, spentTwd };
   }
   return fail(409, "執行預算同時更新，請稍後再試");

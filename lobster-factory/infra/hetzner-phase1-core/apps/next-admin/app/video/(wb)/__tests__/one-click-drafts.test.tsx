@@ -14,7 +14,7 @@ function setup(generate = vi.fn(async (budget) => { budget.spentTwd = 5; return 
   render(<OneClickDraftDialog request={request} workbench={workbench} close={close} />);
   return { create, close, generate };
 }
-afterEach(cleanup);
+afterEach(() => { cleanup(); localStorage.clear(); });
 describe("one click to drafts", () => {
   it("quotes before generation; hands actual script cost and the optional website to the U5 runner", async () => {
     const { create, generate, close } = setup();
@@ -36,6 +36,18 @@ describe("one click to drafts", () => {
     await screen.findByText(/整趟最多/); fireEvent.click(screen.getByText("確認，開始到草稿"));
     await screen.findByText("評分失敗"); expect(create).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("確認，開始到草稿")); await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+  });
+  it("a closed dialog's paid run resumes with the same run id (server cache = free), then is forgotten once handed off", async () => {
+    let first = "";
+    setup(vi.fn(async (budget) => { first = budget.runId; throw Error("評分失敗"); }));
+    await screen.findByText(/整趟最多/); fireEvent.click(screen.getByText("確認，開始到草稿"));
+    await screen.findByText("評分失敗"); cleanup();
+    const resumed = setup(vi.fn(async (budget) => { expect(budget.runId).toBe(first); return handoff; }));
+    await screen.findByText(/整趟最多/); fireEvent.click(await screen.findByText("續接上一趟"));
+    await waitFor(() => expect(resumed.create).toHaveBeenCalledTimes(1));
+    expect(resumed.create.mock.calls[0][0].autoRun).toMatchObject({ runId: first }); cleanup();
+    setup(); await screen.findByText(/整趟最多/);
+    expect(screen.queryByText("續接上一趟")).toBeNull(); expect(screen.getByText("確認，開始到草稿")).toBeTruthy();
   });
   it("cancels before generating anything", async () => {
     const { create, close, generate } = setup(); await screen.findByText(/整趟最多/);

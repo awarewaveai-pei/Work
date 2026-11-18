@@ -5,6 +5,14 @@ import { shotsFromScript } from "../../../(shell)/tools/video/video-handoff";
 import type { AutoDraftRequest, AutoScriptBudget } from "../../../(shell)/tools/video/ScriptForge";
 import type { Workbench } from "../workbench";
 
+// Per viewer: {organization + script plan -> runId} of a run not yet handed to the workbench (last 20). The server run is
+// the truth; this only lets a reopened dialog send the same runId, whose paid script and score come back from the server cache.
+const RUNS = "video.one-click.unfinished-runs";
+function readRuns(): Record<string, unknown> { try { const m = JSON.parse(localStorage.getItem(RUNS) || "{}"); return m && typeof m === "object" ? m : {}; } catch { return {}; } }
+function rememberRun(key: string, runId: string | null) {
+  try { const m = readRuns(); delete m[key]; if (runId) m[key] = runId; localStorage.setItem(RUNS, JSON.stringify(Object.fromEntries(Object.entries(m).slice(-20)))); } catch { /* storage unavailable: resuming is then not offered */ }
+}
+
 type Quote = { totalTwd: number; scriptUpperTwd: number; perRatioTwd: number; problems?: string[]; fill: { twd: number; perPictureTwd: number }; voices: { provider: string; voice: string; label: string; available?: boolean }[]; sites: { id: string; name: string }[] };
 export default function OneClickDraftDialog({ request, workbench, close }: { request: AutoDraftRequest; workbench: Workbench; close: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), budgetEdited = useRef(false), runBudget = useRef<AutoScriptBudget | null>(null),
@@ -14,8 +22,10 @@ export default function OneClickDraftDialog({ request, workbench, close }: { req
     [embed, setEmbed] = useState(false), [siteId, setSiteId] = useState(""),
     [intro, setIntro] = useState("title"), [transition, setTransition] = useState("crossfade"),
     [caps, setCaps] = useState<Awaited<ReturnType<Workbench["loadCapabilities"]>> | null>(null),
-    [busy, setBusy] = useState(false), [error, setError] = useState("");
+    [busy, setBusy] = useState(false), [error, setError] = useState(""), [unfinished, setUnfinished] = useState<string | null>(null);
   useEffect(() => { const d = dialog.current; if (d?.showModal) d.showModal(); else d?.setAttribute("open", ""); void workbench.loadCapabilities().then(setCaps); }, [workbench]);
+  const org = caps?.mainSystem?.organizationId, runKey = org ? JSON.stringify([org, request.plan]) : "";
+  useEffect(() => { const saved = runKey && readRuns()[runKey]; setUnfinished(typeof saved === "string" ? saved : null); }, [runKey]);
   useEffect(() => {
     let live = true; setQuote(null); setError("");
     if (ratios.length) void workbench.request("/quick-render/quote", {
@@ -30,12 +40,14 @@ export default function OneClickDraftDialog({ request, workbench, close }: { req
   }, [request, workbench, ratios, fill, tts]);
   const template = caps?.remotionTemplates?.find((t) => t.id === intro),
     unsupported = template && ratios.some((r) => !(template.ratios || ["16:9", "9:16", "4:5", "1:1"]).includes(r)),
-    invalid = !quote || !caps?.mainSystem?.organizationId || !ratios.length || budget === null || !Number.isFinite(budget) || budget < 0 || (embed && !siteId) || unsupported || (!!template && !caps?.remotion);
-  async function start() {
+    invalid = !quote || !org || !ratios.length || budget === null || !Number.isFinite(budget) || budget < 0 || (embed && !siteId) || unsupported || (!!template && !caps?.remotion);
+  async function start(resumeRunId?: string) {
     if (invalid || busy) return;
     setBusy(true); setError("");
-    const autoBudget = runBudget.current ||= { runId: crypto.randomUUID(), budgetTwd: budget!, spentTwd: 0, organizationId: caps!.mainSystem!.organizationId, model: request.plan.model, lang: request.plan.lang, siteId: request.plan.siteId, sceneCount: request.plan.sceneCount, customScenes: request.plan.customScenes };
+    if (resumeRunId && runBudget.current?.runId !== resumeRunId) runBudget.current = null;
+    const autoBudget = runBudget.current ||= { runId: resumeRunId || crypto.randomUUID(), budgetTwd: budget!, spentTwd: 0, organizationId: org!, model: request.plan.model, lang: request.plan.lang, siteId: request.plan.siteId, sceneCount: request.plan.sceneCount, customScenes: request.plan.customScenes };
     autoBudget.budgetTwd = budget!;
+    rememberRun(runKey, autoBudget.runId); setUnfinished(null);
     try {
       const handoff = await request.generate(autoBudget), shots = shotsFromScript(handoff.script);
       if (autoBudget.estimated) throw Error("腳本用量回執不完整，已停在腳本；請取消並檢查腳本後手動接續");
@@ -53,6 +65,7 @@ export default function OneClickDraftDialog({ request, workbench, close }: { req
           fill, ratios, tts: tts || actual.voices.find((v) => v.available !== false) || null, embedSiteId: embed ? siteId : null,
           prices: { perPictureTwd: actual.fill.perPictureTwd, perRatioTwd: actual.perRatioTwd } },
       });
+      rememberRun(runKey, null);
       close();
     } catch (e) { setError(e instanceof Error ? e.message : "執行失敗，已停下"); setBusy(false); }
   }
@@ -71,7 +84,8 @@ export default function OneClickDraftDialog({ request, workbench, close }: { req
     <p>{quote ? `整趟最多 NT$${quote.totalTwd.toFixed(2)}（腳本與評分最多 NT$${quote.scriptUpperTwd.toFixed(2)}）` : "正在取得整趟報價…"}</p>
     <p>腳本尚未生成，以所選鏡頭數的上限計價；完成後按回報用量記帳。網站文章與社群都只存草稿。</p>
     <label>花費上限 NT$<input aria-label="花費上限 NT$" type="number" min="0" step="0.01" disabled={busy} value={budget ?? ""} style={inputStyle()} onChange={(e) => { budgetEdited.current = true; setBudget(e.target.value === "" ? null : Number(e.target.value)); }} /></label>
+    {unfinished && <p>這份腳本設定上次的一鍵到草稿還沒完成。續接上一趟會沿用已付費的腳本與評分，不重複計費；重新開始會重新生成並計費。</p>}
     {error && <p role="alert">{error}</p>}
-    <div><button type="button" disabled={busy} style={buttonStyle()} onClick={close}>取消</button><button type="button" disabled={invalid || busy} style={buttonStyle({ tone: "primary", disabled: invalid || busy })} onClick={() => void start()}>{busy ? "正在生成腳本…" : "確認，開始到草稿"}</button></div>
+    <div><button type="button" disabled={busy} style={buttonStyle()} onClick={close}>取消</button>{unfinished && <button type="button" disabled={invalid || busy} style={buttonStyle({ disabled: invalid || busy })} onClick={() => void start(unfinished)}>續接上一趟</button>}<button type="button" disabled={invalid || busy} style={buttonStyle({ tone: "primary", disabled: invalid || busy })} onClick={() => void start()}>{busy ? "正在生成腳本…" : unfinished ? "重新開始到草稿" : "確認，開始到草稿"}</button></div>
   </dialog>;
 }

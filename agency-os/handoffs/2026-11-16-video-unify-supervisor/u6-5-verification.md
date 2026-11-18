@@ -4,7 +4,7 @@
 
 做法：側欄「自動排程」讀同組織既有 content_topics 最近更新 200 筆，顯示排隊、進行中、已發布、停下原因，連到有權使用的內容工具設定；不另建排程或發布器。內容工具未開通時明示由品牌管理者設定。專案頁 content_topic 卡加「接手編輯」，經現有組織檢查的專案 API 讀場景，走 spine-create 建一集；相同來源重送開回同一集，不啟動 autoRun。畫面明示原排程依原設定繼續，若要停發布須到內容設定。
 
-舊資料：既有專案與成片不改，保留查看／審片。保存過 production.scenes 的舊資料可接手；沒有逐場景資料的舊片明示無法還原，不以旁白句子冒充原場景。後續排程產片把實際旁白及畫面描述寫入原專案 brief_json.videoScenes；組織與來源條件、updated_at 比對，並保留既有 topicId 等欄位。只保存描述，臨時圖片仍按原流程清除；接手後按需生成畫面。
+舊資料：既有專案與成片不改，保留查看／審片。話題列的 brief_json 只有 title、topicId（`NA/lib/content/video/topic-project.ts:37`），從未寫入 production.scenes；且 production.scenes 的 `visual` 是 custom／broll 類別，經 shotsFromScript 會被當成畫面描述，故 2026-11-18 刪除該後備（U3.6 修正 commit）。沒有 videoScenes 的舊片明示無法還原，不以旁白句子冒充原場景。後續排程產片把實際旁白及畫面描述寫入原專案 brief_json.videoScenes；組織與來源條件、updated_at 比對，並保留既有 topicId 等欄位。只保存描述，臨時圖片仍按原流程清除；接手後按需生成畫面。
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run schedule route/component style-contract topic-scenes start-project | exit=0 | ms=9219
 - Edge 與總閘：`node tests/u6-schedule.cjs`、`node tests/gate.cjs` exit=0；各自耗時未另記。

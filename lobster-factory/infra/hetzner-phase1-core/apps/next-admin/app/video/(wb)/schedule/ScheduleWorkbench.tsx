@@ -12,7 +12,7 @@ export async function adoptTopic(workbench: Workbench, id: string, org: string) 
   if (!res.ok) throw Error("無法讀取這支影片");
   const { item } = await res.json();
   if (item?.organization_id !== org || item?.source !== "content_topic") throw Error("這不是這個品牌的排程影片");
-  const scenes = item.brief_json?.videoScenes ?? item.brief_json?.production?.scenes;
+  const scenes = item.brief_json?.videoScenes;
   if (!Array.isArray(scenes) || !scenes.length) throw Error("這支舊片沒有保存逐場景資料，可回專案卡查看與審片；後續排程生成的影片才可接手編輯。");
   const shots = shotsFromScript({ scenes });
   if (shots.length !== scenes.length) throw Error("場景資料不完整，未建立新的一集");
