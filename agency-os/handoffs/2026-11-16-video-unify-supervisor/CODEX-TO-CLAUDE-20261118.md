@@ -114,3 +114,9 @@
 - 部署更新：worker cb2241a21→整合/main 300396496；2026-11-18 台灣13:28兩容器 healthy、HTTP smoke全綠、部署後瀏覽器34 pass/24 skip。CLI等待300秒逾時但遠端同次部署正常完成，未重送。
 - 正式 CUA 已按切換→Soulful Expression Art Therapy；腳本品牌 Soulful Expression。已送第一支英文腳本 A Creative Pause: Notice, Draw, Reflect，4場/0AI（UI最少4，計畫3場須結果編輯再確認）、YT Shorts/30秒、溫柔親切。尚未成片/發布。
 - DEPLOY_HOLD：同批NA/VW完成後移除；未授權任何下一批部署。
+
+- 實點進度：已生成、編輯旁白、送去影片；在專案按一鍵成片→圖庫影片、全選16:9/9:16/4:5、English女聲、標題卡片頭、直到成片、NT$10上限。三個quick-render於05:32:31/32/34 UTC建立（225d744d-aaec-4b23-a75a-e5dd1d9dd409、ff632ef0-19e6-4e9c-a422-3c8fa3e06dc8、ae77ee1e-4592-4ef5-a1e8-db2e80ee2bc6）。UI仍queued，未重送。
+- 下一步：原videoTab歷史紀錄已開任務狀態overlay；等原三任務→實看影片/字幕→四QA→四社群與WP實際立即發布。source main b0721a93b、部署source300396496；HOLD已移除。
+
+- 操作者要求先交Claude複核，已停在未部署修正：完整報告 C:/Users/user1115/Documents/Codex/2026-11-17/d-work-agency-os-handoffs-2026/outputs/SOULFUL-LIVE-REVIEW-20261118.md；同目錄 CLAUDE-REVIEW-START-20261118.md 是可直接貼的聲明。另有原始OOM/測試log、六檔pending-fixes.diff＋SHA256。
+- 最終確認三比例全failed，kernel第三筆05:38:41 UTC OOM。修正版1.5GiB14pass峰值868679680；4GiB30秒3pass峰值889663488。正式仍1.5GiB，無新部署、無公開發布。

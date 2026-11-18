@@ -177,7 +177,7 @@ export const STEPS = [
     gate: '來源不在員工門清單的訊息被丟掉（拿掉來源檢查，測試會紅）；刪除後型別檢查與登記表測試全綠。',
     risk: 'Medium', model: 'commit 1：Opus 5.5；commit 2：fullstack-engineer（Sonnet）', status: 'in_progress',
     depends: ['U0', 'U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9', 'U10'],
-    before: '正式站驗收前先看交叉審查留下的風險（待決 2）；客戶代操要先能切換客戶（待決 3）',
+    before: '正式站驗收前先看交叉審查留下的風險（待決 2）；客戶代操要先能切換客戶（待決 3）；Soulful 片頭接合 OOM 與歷史狀態更新須修正（待決 4）',
     what: '驗收表（§3 每列實走）；commit 1 入口改「開啟影音工作台」＋sf_history postMessage（只收 staffHosts）＋側欄合一；commit 2 刪 §5 清單、(door)/page.tsx 導向 /、products.ts 與登記表、文件',
     files: [`${V}page.tsx`, `${NA}app/(shell)/tools/script-forge/page.tsx`, `${NA}app/sidebar-sections.ts`, `${NA}app/(shell)/tools/theme/page.tsx`, `${NA}lib/portal/hosts.ts`, `${NA}lib/portal/products.ts`],
     items: [
@@ -193,4 +193,5 @@ export const OPEN = [
   { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；U3、U5 第二段、U6 於 2026-11-16 第二次部署上線，U6.6 第三次部署上線（688d397a5）；2026-11-18 第四次部署：影片服務（片頭接合）、主系統 1fe9adedd、工作台 3078141e4，健康與 smoke 全過，部署暫停檔已移除（efc52f804）；之後的卡上線前一樣要說 go。兩邊都動的卡，工作台那一半還沒上線時，會先放部署暫停檔擋住每晚的自動上線，兩邊一起上線後再拿掉。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
   { n: 2, what: 'Codex 接手做的卡已由 Claude 交叉審查（2026-11-18）。修好：按停止沒停到主系統、續做重付已完成的成片、腳本串流中斷少記費用、一次沒收費的錯誤讓整趟作廢、關頁後重付腳本、生圖先扣錢才擋模型、審片面板英文與亂碼 id。修正再經 Codex 審，找到的問題也已修。仍留的風險：停止前已送出的成片照常完成並計費；回覆在途中遺失時重試會再扣一次（所有付費呼叫皆同）；主系統專案清單會多出「一鍵腳本」空列；工作台「關閉」草稿執行要主系統在線。', before: 'U11', src: 'commit 2d73bc117、70a9bf8ea、eb69c2afa、191aed8a8；agency-os/reports/oracle/2026-11-18-partialreview-3aafd334.md' },
   { n: 3, what: '客戶切換已部署 300396496，正式站已實際按按鈕切至 Soulful，腳本頁品牌正確。部署後瀏覽器檢查 34 pass／24 skip／0 fail。固定每頁客戶、直接上傳與媒體隔離、跨分頁作業鎖；主系統全套 4807 案、工作台總閘、真實 Edge 切換與快取測試通過。操作者已同意本批部署與立即公開發布，Claude 無額度，由 Codex 負責。Soulful 第一支腳本已送出；完整生成、審片及發布仍待完成，U2.3／U11.1／U11.5 保持未完成。', before: 'U11', src: 'NA/app/api/video/workbench/organization/route.ts:23；VW/shared/adapters.js:115；CODEX-TO-CLAUDE-20261118.md §10' },
+  { n: 4, what: 'Soulful 正式實跑三比例都在片頭接合被記憶體上限 1.5GiB 砍掉（三次，時間見來源）；歷史清單停在 queued。Claude 複核後的修法：影片服務容器只看得到它被分配的 2 顆核心（ffmpeg 原本照主機 32 顆開執行緒才爆記憶體），記憶體上限改 3GiB；隔離實測原版 OOM、同原版只限核心就通過（峰值約 1.0GB），14 案通過；歷史清單改由同一個狀態追蹤器即時更新。已併 main、尚未部署（影片服務要經 safe-infra-patch 改 compose，工作台走 sg-deploy），部署要你說 go；之後從原 Soulful 專案重試，U11.5 仍未通過。', before: 'U11', src: 'commit 476a4c1f5（影片服務 cpuset＋3GiB）、1340eeff4（歷史狀態）；kernel 05:35:04/05:36:55/05:38:41 UTC CONSTRAINT_MEMCG ffmpeg' },
 ];
