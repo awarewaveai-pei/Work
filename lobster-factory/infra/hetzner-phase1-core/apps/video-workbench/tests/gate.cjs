@@ -41,14 +41,9 @@ const tests = [
   "u5-bookend-card",
   "u6-review-state",
   "u6-next-action",
-  "u6-next-ui",
-  "u6-schedule",
-  "u3-one-click-runtime",
   "u8-title-form",
   "u8-bookends",
   "u4-scene-image",
-  "u4-visual-styles",
-  "u9-bible",
 ];
 const checks = [
   "server.cjs",
@@ -67,6 +62,12 @@ const run = (label, args) => {
   const t0 = Date.now(), bad = checks.filter((f) => spawnSync(process.execPath, ["--check", f], { cwd: root }).status !== 0);
   console.log(`${bad.length ? "FAIL" : "PASS"} node --check x${checks.length} (server.cjs, backend/*.cjs, scripts/*.cjs) (${Date.now() - t0} ms)`);
   if (bad.length) { failed++; console.log("syntax error in: " + bad.join(", ")); }
+}
+// The gate image has no browser: a listed test that loads playwright would only fail on the host at deploy time.
+{
+  const browser = tests.filter((n) => /["']playwright["']/.test(fs.readFileSync(path.join(__dirname, n + ".cjs"), "utf8")));
+  console.log(`${browser.length ? "FAIL" : "PASS"} no browser test listed`);
+  if (browser.length) { failed++; console.log("needs a browser, run it outside the gate: " + browser.join(", ")); }
 }
 for (const name of tests) run(`tests/${name}.cjs`, [`tests/${name}.cjs`]);
 console.log(failed ? `gate FAILED: ${failed} step(s)` : "gate ok");

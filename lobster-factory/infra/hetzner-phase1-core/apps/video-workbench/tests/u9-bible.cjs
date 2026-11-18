@@ -66,7 +66,7 @@ const request = (url, options, onResponse) => {
     entryOf: (url) => index[url] || null,
   };
   let fetched = 0, n = 0;
-  const bible = createStoryBible({ main, appDir: path.join(__dirname, "../../next-admin"), store: () => "/generated/" + "0".repeat(8) + "-" + ++n + ".jpg", exists: () => true,
+  const bible = createStoryBible({ main, appDir: require("../backend/appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), store: () => "/generated/" + "0".repeat(8) + "-" + ++n + ".jpg", exists: () => true,
     urlImport: { underBase: require("../backend/url-import.cjs").underBase, fetchMedia: async (url, o) => (fetched++, fetchMedia(url, { ...o, lookup, request })) } });
   const doc = { schemaVersion: "1.0.0", seriesId: "series_1", characters: [{ id: "char_1", name: "小美", role: "主角", referenceAssetIds: [OURS, THEIRS], rightsNote: "自拍" }], locations: [], props: [],
     continuity: { currentState: [], prohibitions: ["短髮"], openThreads: [] }, episode: { episodeId: "ep_1", premise: "x", hook: "x", beats: ["x"], stateDelta: {} }, provenance: { capabilityVersion: "1.0.0", sourceArtifactIds: [] } };
