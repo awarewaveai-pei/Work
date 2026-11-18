@@ -176,7 +176,7 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
   const tickedAll = ticked.length > 0 && ticked.every((id) => (texts[id] ?? "").trim());
   return <div style={{ padding: "20px 28px", display: "grid", gap: 14 }}>
     {!!(outcome?.drafts.length || outcome?.articles.length) && <section style={card} role="status">
-      <b>完成：已建 {outcome.drafts.length} 個社群草稿</b>
+      <b>完成：已建 {[[outcome.drafts.length, "個社群草稿"], [outcome.articles.length, "篇文章"]].filter(([n]) => n).map(([n, u]) => `${n} ${u}`).join("、")}</b>
       {!!outcome.drafts.length && outcome.socialUrl?.startsWith("https://") && <a href={outcome.socialUrl} target="_blank" rel="noopener noreferrer">查看社群草稿</a>}
       {outcome.articles.map((a, i) => <div key={i}>已嵌入〈{a.title}〉{a.editUrl?.startsWith("https://") && <> · <a href={a.editUrl} target="_blank" rel="noopener noreferrer">開啟草稿文章</a></>}</div>)}
     </section>}

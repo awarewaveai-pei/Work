@@ -4,6 +4,7 @@ import { EntitlementRequired } from "@/lib/entitlements/can";
 import { imageCostUsd } from "@/lib/ai/cost-calculator";
 import { workbenchAuthorized } from "@/lib/content/video/workbench-internal";
 import { VIDEO_SCENE_MODELS } from "@/public/editor-shared/image-models.js";
+import { isTarotModel } from "@/lib/tarot/image-gen";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ function parse(b: Body | null): Parsed | string {
   const ratio = typeof b.ratio === "string" ? b.ratio : "";
   if (!UUID.test(organizationId)) return "organizationId required";
   if (!prompt || prompt.length > MAX_PROMPT) return `prompt must be 1-${MAX_PROMPT} characters`;
-  if (!MODELS.has(imageModel)) return "imageModel is not a video scene model";
+  if (!MODELS.has(imageModel) || !isTarotModel(imageModel)) return "imageModel is not a video scene model";
   if (!RATIOS.has(ratio)) return "ratio must be 16x9, 9x16 or 4x5";
   if (b.userId !== undefined && (typeof b.userId !== "string" || !UUID.test(b.userId))) return "invalid userId";
   return { organizationId, prompt, imageModel, ratio, actor: "video:" + (b.userId ?? "workbench") };

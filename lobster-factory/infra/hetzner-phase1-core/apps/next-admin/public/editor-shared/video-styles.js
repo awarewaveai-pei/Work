@@ -19,6 +19,9 @@ function key(label) {
 export const WORKBENCH_LEGACY_STYLES = legacy.map(([zh, prompt], i) => ({ id: "legacy-" + i, zh, prompt, group: "工作台原有風格", legacyIndex: i }));
 export const VIDEO_STYLE_CATALOG = [...VIDEO_STYLE_PRESETS, ...STYLE_CATALOG.map(s => ({ ...s, id: key(s.zh) })), ...WORKBENCH_LEGACY_STYLES];
 export const VIDEO_STYLE_GROUPS = [...new Set(VIDEO_STYLE_CATALOG.map(s => s.group))];
+// The staff VideoStudio picker: the same catalog without the workbench-only legacy group (its empty 自訂 and duplicate 日系電影感).
+export const STAFF_VIDEO_STYLE_CATALOG = VIDEO_STYLE_CATALOG.filter(s => s.group !== "工作台原有風格");
+export const STAFF_VIDEO_STYLE_GROUPS = [...new Set(STAFF_VIDEO_STYLE_CATALOG.map(s => s.group))];
 export function videoStyle(value) {
   return typeof value === "number" ? WORKBENCH_LEGACY_STYLES[value] : VIDEO_STYLE_CATALOG.find(s => s.id === value || s.zh === value);
 }

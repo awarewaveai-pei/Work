@@ -6,7 +6,7 @@ import { IMAGE_RATES, DEFAULT_IMAGE_MODEL, VIDEO_MOTION_RATES } from "@/lib/ai/c
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { VIDEO_SCENE_MODELS } from "@/public/editor-shared/image-models.js";
 import type { VideoHistoryItem } from "@/app/api/video/history/route";
-import { VIDEO_STYLE_CATALOG, VIDEO_STYLE_GROUPS, resolveVideoStyle } from "@/public/editor-shared/video-styles.js";
+import { STAFF_VIDEO_STYLE_CATALOG, STAFF_VIDEO_STYLE_GROUPS, resolveVideoStyle } from "@/public/editor-shared/video-styles.js";
 import { tabStyle, chipStyle } from "@/components/tools/panel-primitives";
 import TimelineValidationPanel from "./TimelineValidationPanel";
 import FootageEditor from "./FootageEditor";
@@ -227,7 +227,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
   const [articleContent, setArticleContent] = useState(initial?.articleContent ?? "");
   const [language, setLanguage] = useState("繁體中文");
   const [videoStyle, setVideoStyle] = useState("");
-  const [videoStyleGroup, setVideoStyleGroup] = useState(VIDEO_STYLE_GROUPS[0] ?? "");
+  const [videoStyleGroup, setVideoStyleGroup] = useState(STAFF_VIDEO_STYLE_GROUPS[0] ?? "");
   const [genStatus, setGenStatus] = useState<GenStatus>("idle");
   const [genStep, setGenStep] = useState("");
   const [genError, setGenError] = useState("");
@@ -963,7 +963,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                     </summary>
                     <div style={{ padding: "10px 14px" }}>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-                        {VIDEO_STYLE_GROUPS.map(g => (
+                        {STAFF_VIDEO_STYLE_GROUPS.map(g => (
                           <button key={g} type="button" onClick={() => setVideoStyleGroup(g)} disabled={isBusy}
                             style={tabStyle(videoStyleGroup === g)}>
                             {g}
@@ -971,7 +971,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
                         ))}
                       </div>
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
-                        {VIDEO_STYLE_CATALOG.filter(item => item.group === videoStyleGroup).map(item => {
+                        {STAFF_VIDEO_STYLE_CATALOG.filter(item => item.group === videoStyleGroup).map(item => {
                           const active = videoStyle === item.zh;
                           return (
                             <button key={item.zh} type="button" onClick={() => setVideoStyle(active ? "" : item.zh)} disabled={isBusy}

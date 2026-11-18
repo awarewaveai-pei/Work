@@ -4,7 +4,8 @@
 // media store and settle() registers it with the origin next-admin answered (the model that actually ran), never one the
 // page sent. A project-shot job without settings.imageModel is the workbench's own picture (generation-policy.cjs) and
 // never comes here. No reference pictures: the shot card says so when the shot has some.
-// Invariant: one paid picture per job, never lost after next-admin charged it. The call is not cancellable (next-admin
+// Invariant: next-admin's answer, once received, is kept on the job and never drawn twice. A reply lost in transit (timeout,
+// VW restart) is drawn and billed again on retry, like every paid vendor call. The call is not cancellable (next-admin
 // runs it to the end and bills; api.cjs refuses a cancel while it runs); its answer is kept on the job (job.finishing)
 // before anything local can fail, and a retry of that job takes the kept picture instead of drawing (and paying) again.
 const path = require("node:path");

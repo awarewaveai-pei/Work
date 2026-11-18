@@ -5,7 +5,10 @@
   window.VideoWorkbenchStyles = {
     rows, get,
     name: value => get(value)?.zh || "自訂（既有風格）",
-    prompt: value => get(value)?.prompt || "",
+    prompt: value => {
+      if (!rows().length) throw Error("風格清單尚未載入，請重新整理頁面");
+      return get(value)?.prompt || "";
+    },
     select(project, id) {
       const row = get(id);
       if (!row) throw Error("風格清單已變更，請重新開啟");

@@ -124,7 +124,7 @@ export default function ProjectDetail({ id }: { id: string }) {
               ? <Qa organizationId={item.organization_id} assetId={a.id} />
               : formats.map(([fmt, url]) => { const row = rowOf(fmt, url); return row && (
                 <div key={fmt} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <div style={{ ...muted, fontWeight: 700 }}>{fmt} QA</div>
+                  <div style={{ ...muted, fontWeight: 700 }}>{fmt} 檢查</div>
                   <Qa organizationId={item.organization_id} assetId={row.id} />
                 </div>
               ); })}

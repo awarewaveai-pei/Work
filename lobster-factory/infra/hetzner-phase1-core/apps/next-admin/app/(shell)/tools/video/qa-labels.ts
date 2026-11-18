@@ -1,4 +1,4 @@
-export const QA_LABELS: Record<string, string> = { technical: "技術 QA", caption: "字幕 QA", editorial: "編輯 QA", rights: "版權 QA" };
+export const QA_LABELS: Record<string, string> = { technical: "技術檢查", caption: "字幕檢查", editorial: "編輯檢查", rights: "版權檢查" };
 export const QA_HINTS: Record<string, string> = {
   technical: "檔案能播、無黑畫面／凍結、音量合格",
   caption: "字幕與聲音對得上（需先產生字幕）",

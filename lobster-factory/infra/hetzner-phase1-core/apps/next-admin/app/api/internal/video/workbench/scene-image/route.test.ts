@@ -15,6 +15,8 @@ vi.mock("@/lib/content/blocks/video-pipeline", () => ({
 }));
 
 import { POST } from "./route";
+import { isTarotModel } from "@/lib/tarot/image-gen";
+import { VIDEO_SCENE_MODELS } from "@/public/editor-shared/image-models.js";
 
 const org = "123e4567-e89b-42d3-a456-426614174001";
 const url = "https://pub.example.r2.dev/designs/2026-11/a.png";
@@ -47,5 +49,10 @@ describe("POST /api/internal/video/workbench/scene-image", () => {
     expect(buildSceneAsset).not.toHaveBeenCalled();
     buildSceneAsset.mockResolvedValueOnce({ ok: true, asset: url, origin: { kind: "ai_generated", model: "flux-schnell", provider: "flux" } });
     expect((await call({})).status).toBe(502);
+  });
+
+  it("every listed video scene model is one buildSceneAsset keeps (it swaps any other id to flux-schnell after billing)", () => {
+    const ids = Object.values(VIDEO_SCENE_MODELS).flat();
+    expect(ids.filter((id) => !isTarotModel(id))).toEqual([]);
   });
 });

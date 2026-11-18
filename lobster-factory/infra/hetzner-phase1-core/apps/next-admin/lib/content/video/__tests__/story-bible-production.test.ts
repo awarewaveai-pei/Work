@@ -51,4 +51,15 @@ describe("製作聖經 <-> Story Bible", () => {
     expect(missing).toEqual(["/generated/own.png"]);
     expect(() => prepareStoryBibleDraft(document, ORG, 1)).not.toThrow();
   });
+
+  it("an old keyless item pairs with the same-name entry of its kind, takes its key, and is not duplicated either way", () => {
+    const old = { character: [{ id: "c1", name: "小美", descr: "舊的" }], scene: [{ id: "s1", name: "小美" }] };
+    const applied = productionFromStoryBible(bible, old, () => undefined, () => "new");
+    expect(applied.character!.filter((c) => c.name === "小美")).toHaveLength(1);
+    expect(applied.character!.find((c) => c.id === "c1")).toMatchObject({ key: "char_1", descr: "舊的" });
+    expect(applied.scene!.map((x) => x.id)).toEqual(["s1", "new"]);
+    const saved = storyBibleFromProduction(bible, old, { organizationId: ORG, seriesId: "series_1", title: "t", assetIdOf: () => undefined });
+    expect(saved.keys.c1).toBe("char_1");
+    expect((saved.document.characters as { name: string }[]).filter((c) => c.name === "小美")).toHaveLength(1);
+  });
 });

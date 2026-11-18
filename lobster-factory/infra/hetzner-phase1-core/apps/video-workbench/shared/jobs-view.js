@@ -264,7 +264,7 @@
       };
       if (next.key === "done") {
         button.disabled = true;
-        button.textContent = "完成：已建 " + (progress.review?.drafts.length || 0) + " 個社群草稿";
+        button.textContent = "完成：已建 " + [[progress.review?.drafts.length, " 個社群草稿"], [progress.review?.articles?.length, " 篇文章"]].filter(([n]) => n).map(([n, u]) => n + u).join("、");
         for (const article of progress.review?.articles || []) {
           const a = document.createElement("a"); a.textContent = "已嵌入〈" + article.title + "〉";
           if (article.editUrl && VideoWorkbench.safeUrl(article.editUrl)) { a.href = VideoWorkbench.safeUrl(article.editUrl); a.target = "_blank"; a.rel = "noopener noreferrer"; } box.append(a);
@@ -323,7 +323,7 @@
       progress.value = Number(v.progress) || 0;
       cancel.hidden = !["queued", "running"].includes(v.status);
       result.replaceChildren();
-      if (v.error) result.textContent = v.error.message || v.error;
+      if (v.error) result.textContent = typeof v.error === "string" ? v.error : String(v.error.message ?? "失敗");
       // A result's own remark (e.g. 破框: finishing stopped, the model's file delivered) is part of what was delivered.
       if (v.result?.note) {
         const note = document.createElement("p");

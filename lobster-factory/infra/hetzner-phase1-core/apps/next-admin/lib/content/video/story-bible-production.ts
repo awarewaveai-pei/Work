@@ -32,9 +32,10 @@ export function productionFromStoryBible(doc: StoryBibleDocument, production: Pr
     const items = itemsOf(production, kind).map((i) => ({ ...i }));
     for (const entry of entriesOf(doc, group)) {
       const refs = (Array.isArray(entry.referenceAssetIds) ? entry.referenceAssetIds : []).map(urlOf).filter((u): u is string => !!u);
-      const item = items.find((i) => i.key === entry.id);
+      // An old local item with no key pairs with the same-name, same-kind entry (and takes its key below), not a duplicate.
+      const item = items.find((i) => i.key === entry.id) ?? items.find((i) => i.key === undefined && typeof i.name === "string" && i.name.trim() === entry.name);
       const role = typeof entry.role === "string" ? { role: entry.role } : {};
-      if (item) Object.assign(item, { name: entry.name, ...role, refs: unique([...refs, ...(Array.isArray(item.refs) ? item.refs : [])]).slice(0, MAX_REFS) });
+      if (item) Object.assign(item, { key: entry.id, name: entry.name, ...role, refs: unique([...refs, ...(Array.isArray(item.refs) ? item.refs : [])]).slice(0, MAX_REFS) });
       else items.push({ id: newId(), key: entry.id, name: entry.name, ...role, descr: "", refs: unique(refs).slice(0, MAX_REFS) });
     }
     out[kind] = items;
@@ -64,7 +65,8 @@ export function storyBibleFromProduction(base: StoryBibleDocument | null, produc
   for (const [group, kind] of BIBLE_GROUPS) {
     const entries = entriesOf(base, group).map((e) => ({ ...e }));
     const used = new Set(entries.map((e) => e.id));
-    for (const item of itemsOf(production, kind)) {
+    const all = itemsOf(production, kind), claimed = new Set(all.map((i) => i.key));
+    for (const item of all) {
       const name = typeof item.name === "string" ? item.name.trim() : "";
       if (!name) continue;
       const referenceAssetIds: string[] = [];
@@ -74,7 +76,9 @@ export function storyBibleFromProduction(base: StoryBibleDocument | null, produc
         else missing.push(String(url));
       }
       const role = typeof item.role === "string" ? { role: item.role } : {};
-      let entry = typeof item.key === "string" ? entries.find((e) => e.id === item.key) : undefined;
+      let entry = typeof item.key === "string" ? entries.find((e) => e.id === item.key)
+        : entries.find((e) => e.name === name && !claimed.has(e.id)); // keyless old item: same name + kind pairs, never a duplicate
+      if (entry && typeof item.key !== "string") claimed.add(entry.id);
       if (entry) Object.assign(entry, { name, ...role, referenceAssetIds: unique(referenceAssetIds) });
       else {
         let id = typeof item.key === "string" && ID.test(item.key) && !used.has(item.key) ? item.key : "";

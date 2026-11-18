@@ -96,7 +96,7 @@ window.ProjectBible = (() => {
   }
 
   // Resolve references from the approved document; local edits must never become the approved comparison baseline.
-  async function check(p, e, ui) {
+  async function runCheck(p, e, ui) {
     const approved = p.storyBibleSeries && newest(await load(true), p.storyBibleSeries, "approved");
     if (!approved) return ui.notify("先存成或套用核准版本，才有可以比對的定裝照。");
     const { production } = await window.VideoWorkbench.request("/bible/apply", { document: approved.document_json, production: {} });
@@ -114,11 +114,18 @@ window.ProjectBible = (() => {
     if (!quote.ok) return ui.notify("比對報價失敗：" + (quote.j.error || quote.status));
     const price = window.VideoWorkbenchPrices.unit({ usd: quote.j.usd, unit: "次", estimate: true });
     if (!window.confirm(`比對 ${quote.j.pairs} 個鏡頭與核准版的角色參考圖，${price || "會產生費用"}。確定比對？`)) return;
-    checks.set(e.id, { busy: true });
     ui.render();
     const run = await post("/api/video/story-bibles/visual-consistency-check", { pairs });
     checks.set(e.id, run.ok ? { results: run.j.results || [] } : { error: "比對失敗：" + (run.j.error || run.status) });
     ui.render();
+  }
+
+  async function check(p, e, ui) {
+    if (checks.get(e.id)?.busy) return;
+    const prior = checks.get(e.id);
+    checks.set(e.id, { busy: true });
+    try { await runCheck(p, e, ui); }
+    finally { if (checks.get(e.id)?.busy) { prior ? checks.set(e.id, prior) : checks.delete(e.id); ui.render(); } }
   }
 
   // ui = { save, render, notify } of the projects page.

@@ -70,7 +70,7 @@ export default function QaStep({ organizationId, projectId, initialAssetId, incl
     <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 640 }}>
       <div>
         <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>審片 · 四項檢查</div>
-        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>選候選素材，查看伺服器端已核發的 QA 證據。</div>
+        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>選候選素材，查看伺服器端已核發的檢查證據。</div>
       </div>
 
       <div style={card}>
@@ -78,7 +78,7 @@ export default function QaStep({ organizationId, projectId, initialAssetId, incl
         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 5 }}>{assets.length ? "選擇影片素材" : organizationId ? "這個客戶還沒有素材" : "先選客戶"}</div>
         {assets.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 5 }}>
-            {assets.map((a) => <button key={a.id} type="button" aria-pressed={assetId === a.id} onClick={() => void pick(a.id)} style={optionStyle(assetId === a.id)}>{a.metadata?.title ?? a.asset_domain} · {new Date(a.created_at).toLocaleString()} · {a.id.slice(0, 8)}</button>)}
+            {assets.map((a) => <button key={a.id} type="button" aria-pressed={assetId === a.id} onClick={() => void pick(a.id)} style={optionStyle(assetId === a.id)}>{a.metadata?.title ?? a.asset_domain} · {new Date(a.created_at).toLocaleString()}</button>)}
           </div>
         )}
       </div>
