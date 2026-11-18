@@ -651,7 +651,8 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
     # 所有場景同編碼參數 → concat demuxer -c copy（無重新編碼，秒級）
     base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
     if bookends is None:
-        return _concat_uniform(scene_paths, "concat.txt", base_path)
+        return _concat_uniform(scene_paths, "concat.txt", base_path,
+                               _stills_tag([(0.0, float(intro_duration))] if intro_title else []))
     return _join_bookends(scene_paths, scene_s, bookends, base_path, w, h, fps)
 
 
@@ -660,6 +661,28 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
 # "transition_s": float}; seg = {"title": str, "duration": float} (a title card) or {"asset": local path} (a rendered
 # template video; "duration" is filled by resolve_bookends). bookends None = the old path, untouched (concat only).
 _XFADE = {"crossfade": "fade", "fade-black": "fadeblack"}
+
+# ── Intended stills: spans a render made still on purpose (title cards, template intro / outro) ──
+# Written into the video's own `comment` tag by the step that makes them; ffmpeg keeps global metadata through every
+# later copy (caption burn, reburn of the clean video, format export), so the signal QA reads them from the very file it
+# measures. Freeze / black wholly inside them is not a defect (2026-11-18 Soulful: the 3 s title card warned
+# "picture.freeze" on every ratio, and a black title card counts as black frames).
+_STILLS_PREFIX = "awarewave:stills="
+
+
+def _stills_tag(windows: list) -> list:
+    return ["-metadata", "comment=" + _STILLS_PREFIX + ";".join(f"{a:.3f}-{b:.3f}" for a, b in windows)] if windows else []
+
+
+def still_windows(probe: dict) -> list:
+    """[(start_s, end_s)] read back from a probe that includes format_tags=comment; [] when absent or malformed."""
+    comment = str(((probe.get("format") or {}).get("tags") or {}).get("comment") or "")
+    if not comment.startswith(_STILLS_PREFIX):
+        return []
+    try:
+        return [(float(a), float(b)) for a, b in (part.split("-") for part in comment[len(_STILLS_PREFIX):].split(";"))]
+    except ValueError:
+        return []
 
 
 def _media_info(path: str) -> tuple:
@@ -723,8 +746,10 @@ def _join_bookends(scene_paths: list, scene_s: list, bookends: dict, out_path: s
     kind = _XFADE.get(bookends.get("transition", "none"))
     main_s = sum(scene_s)
     planned = (float(intro["duration"]) if intro else 0.0) + main_s + (float(outro["duration"]) if outro else 0.0)
+    stills = lambda length: ([(0.0, float(intro["duration"]))] if intro else []) + \
+        ([(length - float(outro["duration"]), length)] if outro else [])
     if not kind or not (intro or outro):
-        _concat_uniform(parts, "concat.txt", out_path)
+        _concat_uniform(parts, "concat.txt", out_path, _stills_tag(stills(planned)))
         return _check_joined_length(out_path, planned)
     t = float(bookends["transition_s"])
     main_path = _concat_uniform(scene_paths, "concat.txt", str(config.TEMP_DIR / "bookend_main.mp4"))
@@ -750,7 +775,7 @@ def _join_bookends(scene_paths: list, scene_s: list, bookends: dict, out_path: s
         "ffmpeg", "-y", *inputs, "-filter_complex", ";".join(chain), "-map", v, "-map", a, "-r", str(fps),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
         "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
-        out_path,
+        *_stills_tag(stills(planned - t * (len(segs) - 1))), out_path,
     ], "bookend join failed")
     return _check_joined_length(out_path, planned - t * (len(segs) - 1))
 
@@ -779,7 +804,7 @@ def _check_joined_length(path: str, expected_s: float) -> str:
     return path
 
 
-def _concat_uniform(segment_paths: list, list_name: str, out_path: str) -> str:
+def _concat_uniform(segment_paths: list, list_name: str, out_path: str, extra: "list | None" = None) -> str:
     """concat demuxer -c copy。呼叫端保證所有 segment 已是同編碼參數（codec/尺寸/取樣率一致），
     否則 -c copy 會產出壞檔或直接失敗。"""
     list_path = config.TEMP_DIR / list_name
@@ -790,7 +815,7 @@ def _concat_uniform(segment_paths: list, list_name: str, out_path: str) -> str:
             f.write("file '%s'\n" % safe)
     try:
         res = subprocess.run(
-            ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-c", "copy", out_path],
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_path), "-c", "copy", *(extra or []), out_path],
             capture_output=True, timeout=_FFMPEG_TIMEOUT_S,
         )
     except subprocess.TimeoutExpired:

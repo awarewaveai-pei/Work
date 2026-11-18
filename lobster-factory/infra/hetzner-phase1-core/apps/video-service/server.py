@@ -225,7 +225,7 @@ def _probe_video(path: str) -> dict:
     res = subprocess.run(
         [
             "ffprobe", "-v", "error",
-            "-show_entries", "stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt:format=duration,size",
+            "-show_entries", "stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt:format=duration,size:format_tags=comment",
             "-of", "json",
             path,
         ],
@@ -247,8 +247,24 @@ def _probe_video(path: str) -> dict:
     return parsed
 
 
-def _signal_probe(path: str, duration: float) -> dict:
-    """Collect black/freeze/loudness evidence with one bounded ffmpeg pass."""
+_STILL_EDGE_S = 0.1  # detector edges land up to a frame or two past a still span's planned edge
+
+
+def _inside(span: tuple, stills: list) -> bool:
+    start, end = span
+    return any(a - _STILL_EDGE_S <= start and end <= b + _STILL_EDGE_S for a, b in stills)
+
+
+def _outside_seconds(span: tuple, stills: list) -> float:
+    start, end = span
+    return 0.0 if _inside(span, stills) else (end - start) - sum(max(0.0, min(end, b) - max(start, a)) for a, b in stills)
+
+
+def _signal_probe(path: str, duration: float, stills: "list | None" = None) -> dict:
+    """Collect black/freeze/loudness evidence with one bounded ffmpeg pass. stills = spans the render made still on
+    purpose (pipeline.still_windows): a freeze wholly inside one is not counted, black inside them is not black time.
+    A freeze that runs past a still span, or any freeze in the main video, still counts."""
+    stills = stills or []
     res = subprocess.run(
         ["ffmpeg", "-hide_banner", "-nostats", "-i", path,
          "-vf", "blackdetect=d=0.5:pic_th=0.98:pix_th=0.10,freezedetect=n=-60dB:d=0.5",
@@ -256,8 +272,18 @@ def _signal_probe(path: str, duration: float) -> dict:
         capture_output=True, text=True, timeout=60,
     )
     output = f"{res.stdout}\n{res.stderr}"
-    black_seconds = sum(float(end) - float(start) for start, end in re.findall(r"black_start:\s*([0-9.]+).*?black_end:\s*([0-9.]+)", output))
-    freeze_events = len(re.findall(r"freeze_start:\s*[0-9.]+", output))
+    blacks = [(float(start), float(end)) for start, end in re.findall(r"black_start:\s*([0-9.]+).*?black_end:\s*([0-9.]+)", output)]
+    black_seconds = sum(_outside_seconds(span, stills) for span in blacks)
+    freezes, start = [], None
+    for kind, value in re.findall(r"freeze_(start|end):\s*([0-9.]+)", output):
+        if kind == "start":
+            start = float(value)
+        elif start is not None:
+            freezes.append((start, float(value)))
+            start = None
+    if start is not None:
+        freezes.append((start, duration))  # frozen up to the last frame
+    freeze_events = sum(1 for span in freezes if not _inside(span, stills))
     lufs = [float(value) for value in re.findall(r"\bI:\s*(-?[0-9]+(?:\.[0-9]+)?)\s+LUFS", output)]
     peaks = [float(value) for value in re.findall(r"\b(?:Peak|Peak level):\s*(-?[0-9]+(?:\.[0-9]+)?)\s+dBFS", output)]
     return {
@@ -266,6 +292,7 @@ def _signal_probe(path: str, duration: float) -> dict:
         "integratedLufs": lufs[-1] if lufs else None,
         "truePeakDb": peaks[-1] if peaks else None,
         "ffmpegExitCode": res.returncode,
+        **({"stillWindows": [[a, b] for a, b in stills]} if stills else {}),
     }
 
 
@@ -298,7 +325,8 @@ def _build_output_meta(outputs: dict) -> dict:
                 )
         qa = evaluate_probe(probe, expected)
         item["technical_qa"] = qa
-        signal_qa = evaluate_signal_quality(probe, _signal_probe(str(path), float((probe.get("format") or {}).get("duration") or 0)))
+        signal_qa = evaluate_signal_quality(probe, _signal_probe(str(path), float((probe.get("format") or {}).get("duration") or 0),
+                                                                 pipeline.still_windows(probe)))
         item["signal_qa"] = signal_qa
         # A failed QA report is returned with the video (next-admin records both and shows why); throwing here
         # discarded a finished, paid-for render. Dimension mismatch above stays an exception: that is a broken render.
