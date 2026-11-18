@@ -49,8 +49,9 @@
     let switching = false;
     for (const org of organizations) {
       const choice = document.createElement("button");
-      choice.type = "button"; choice.className = "nav"; choice.textContent = org.name;
+      choice.type = "button"; choice.className = "minor"; choice.textContent = org.name; // dialog surface: the sidebar "nav" class is white text
       choice.disabled = org.id === identity.organizationId;
+      choice.setAttribute("aria-pressed", String(choice.disabled));
       choice.onclick = async () => {
         if (switching) return;
         switching = true;
