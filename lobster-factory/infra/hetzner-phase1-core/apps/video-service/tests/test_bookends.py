@@ -185,6 +185,7 @@ class StockVideoScenesJoin(unittest.TestCase):
                   self.stock("rec709", "25", "853x481", "range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709", audio=True),
                   self.stock("full601", "60000/1001", "481x853", "range=pc:colorspace=smpte170m"),
                   self.stock("pq", "24", "1920x1080", "range=tv:color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc"),
+                  self.stock("sdr2020", "25", "960x540", "range=tv:color_primaries=bt2020:color_trc=bt709:colorspace=bt2020nc"),
                   photo]
         b = {"intro": {"title": "片頭", "duration": 2.0}, "outro": {"title": "謝謝收看", "duration": 2.0},
              "transition": "crossfade", "transition_s": 0.5}
@@ -192,13 +193,40 @@ class StockVideoScenesJoin(unittest.TestCase):
         with mock.patch.object(pipeline, "_audio_duration", return_value=2.5):
             out = pipeline.compose_base_video(scenes, assets, [self.voice] * len(assets), "v", 640, 360, 24,
                                               burn_captions=False, bookends=b)
-        want = 2.0 + 5 * 2.5 + 2.0 - 2 * 0.5
+        want = 2.0 + 6 * 2.5 + 2.0 - 2 * 0.5
         got = _streams(out)
         self.assertAlmostEqual(float(got["video"]["duration"]), want, delta=0.15)
         self.assertAlmostEqual(float(got["audio"]["duration"]), want, delta=0.15)
         tags = {(s["video"].get("color_space"), s["video"].get("color_range"))
                 for s in (_streams(f"{self.dir}/scene_{i:03d}.mp4") for i in range(len(assets)))}
         self.assertEqual(tags, {("bt709", "tv")}, "every concatenated scene carries one color signature")
+
+    def test_other_gamut_is_converted_not_relabelled(self):
+        probe = [{"codec_type": "video", "color_primaries": "bt2020", "color_transfer": "bt709", "color_space": "bt2020nc"}]
+        with mock.patch.object(pipeline, "_probe_streams", return_value=probe):
+            chain = pipeline._fit_bt709("sdr2020.mp4", 640, 360, 24)
+        self.assertIn("pin=bt2020", chain)
+        self.assertIn("p=bt709", chain)
+
+    def test_scenes_off_the_frame_grid_keep_their_place(self):
+        """Codex 2026-11-18: a 2.51 s scene at 24 fps is 61 frames = 2.542 s of picture; concat places the next scene
+        after the longer stream, so every scene pushed the rest ~30 ms and the length check failed real renders."""
+        photo = f"{self.dir}/p.png"
+        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=640x360", "-frames:v", "1", photo], check=True, capture_output=True)
+        for transition in ("none", "crossfade"):
+            b = {"intro": {"title": "片頭", "duration": 2.0}, "outro": None, "transition": transition, "transition_s": 0.5}
+            with self.subTest(transition), mock.patch.object(pipeline, "_audio_duration", return_value=2.51):
+                out = pipeline.compose_base_video([{"narration": "一"}] * 7, [photo] * 7, [self.voice] * 7, "v", 640, 360, 24,
+                                                  burn_captions=False, bookends=b)
+                want = 2.0 + 7 * 2.5 - (0.5 if transition == "crossfade" else 0)
+                got = _streams(out)
+                self.assertAlmostEqual(float(got["video"]["duration"]), want, delta=0.05)
+                self.assertAlmostEqual(float(got["audio"]["duration"]), want, delta=0.05)
+        sink = {}
+        with mock.patch.object(pipeline, "_audio_duration", return_value=2.51), \
+                mock.patch.object(pipeline.config, "FPS", 24):
+            pipeline._caption_result(sink, [[{"startMs": 0, "endMs": 100, "text": "a"}]] * 7, [self.voice] * 7, "", 0.0, lead_s=0.0)
+        self.assertEqual(sink["cues"][-1]["startMs"], 6 * 2500, "captions follow the same frame-aligned scenes")
 
     def test_template_whose_music_stops_early_still_joins(self):
         intro = f"{self.dir}/intro.mp4"

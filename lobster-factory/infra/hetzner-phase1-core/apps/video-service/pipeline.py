@@ -19,6 +19,7 @@ pipeline.py — 文章 → 卡通影片 → 多尺寸輸出 → YouTube + WordPr
 import os
 import re
 import json
+import math
 import base64
 import asyncio
 import requests
@@ -374,6 +375,8 @@ _BT709_TAG = "setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspac
 _HDR_TRC = {"arib-std-b67", "smpte2084"}
 _SWS_MATRIX = {"bt709": "bt709", "fcc": "fcc", "bt470bg": "bt470", "smpte170m": "smpte170m", "smpte240m": "smpte240m",
                "bt2020nc": "bt2020", "bt2020c": "bt2020"}
+_ZIMG_MATRIX = {"bt709", "fcc", "bt470bg", "smpte170m", "bt2020nc", "bt2020c"}
+_MATRIX_OF_PRIMARIES = {"bt2020": "bt2020nc", "bt470bg": "bt470bg", "smpte170m": "smpte170m"}
 
 
 def _probe_streams(path: str) -> list:
@@ -389,20 +392,33 @@ def _fit_bt709(src: str, w: int, h: int, fps: int) -> str:
     """Cover-fit a video source to w x h at fps, converted to the one color signature above."""
     v = next((s for s in _probe_streams(src) if s.get("codec_type") == "video"), {})
     known = lambda k, default: v[k] if v.get(k) not in (None, "", "unknown", "reserved") else default
-    trc, space = known("color_transfer", ""), known("color_space", "")
-    crop = f"crop={w}:{h},fps={fps},setsar=1"
-    if trc in _HDR_TRC:
-        tags = (f"pin={known('color_primaries', 'bt2020')}:min={space or 'bt2020nc'}:"
+    prim, trc, space = known("color_primaries", ""), known("color_transfer", ""), known("color_space", "")
+    fit = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},fps={fps},setsar=1"
+    if trc in _HDR_TRC or prim not in ("", "bt709"):
+        prim = prim or "bt2020"
+        tags = (f"pin={prim}:min={space if space in _ZIMG_MATRIX else _MATRIX_OF_PRIMARIES.get(prim, 'bt709')}:"
                 f"rin={'pc' if v.get('color_range') == 'pc' else 'tv'}")
-        # HLG is made to be watched on SDR as is (BT.2100 compatibility): keep its curve, map only the gamut. A tone
-        # curve on HLG came out visibly darker on the 2026-11-18 phone clip. PQ has no SDR reading and is tone-mapped.
-        tone = (f"zscale=tin=bt709:{tags}:t=bt709:p=bt709:m=bt709:r=tv,format=yuv420p" if trc == "arib-std-b67" else
-                f"zscale=tin={trc}:{tags}:t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
-                "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p")
-        return f"scale={w}:{h}:force_original_aspect_ratio=increase,{crop},{tone},{_BT709_TAG}"
-    # untagged = bt709 in and out: no matrix change, only the range is brought to tv
+        # Another gamut (BT.2020 SDR, SD primaries) and HLG keep an SDR curve and only have their gamut mapped: HLG is made
+        # to be watched on SDR as is (BT.2100); a tone curve on it came out visibly darker on the 2026-11-18 phone clip.
+        # PQ has no SDR reading and is tone-mapped.
+        conv = (f"zscale=tin={trc}:{tags}:t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
+                "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p" if trc == "smpte2084" else
+                f"zscale=tin=bt709:{tags}:t=bt709:p=bt709:m=bt709:r=tv,format=yuv420p")
+        return f"{fit},{conv},{_BT709_TAG}"
+    # bt709 or untagged gamut: untagged matrix = bt709 in and out (no change), only other matrices / full range convert
     return (f"scale={w}:{h}:force_original_aspect_ratio=increase:in_color_matrix={_SWS_MATRIX.get(space, 'bt709')}:"
-            f"out_color_matrix=bt709:out_range=tv,{crop},{_BT709_TAG}")
+            f"out_color_matrix=bt709:out_range=tv,crop={w}:{h},fps={fps},setsar=1,{_BT709_TAG}")
+
+
+def _scene_seconds(audio_path: str, fps: int) -> float:
+    """A scene's length = its voice + tail, on the frame grid. concat places each scene at its file length (the longer
+    stream), so a picture one part-frame longer than its sound pushed every later scene and caption (~30 ms each)."""
+    return round(_audio_duration(audio_path) * fps) / fps
+
+
+def _ffmpeg_t(seconds: float) -> str:
+    """-t rounded down to the microsecond: 61/24 printed as 2.542 would let frame 61 (2.5417) through as a 62nd frame."""
+    return f"{math.floor(seconds * 1e6) / 1e6:.6f}"
 
 
 def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, w, h, fps, scene_id=0, burn_captions=True):
@@ -503,7 +519,7 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
         "ffmpeg", "-y", *inputs,
         "-filter_complex", filter_complex,
         "-map", final_v_tag, "-map", "[aud]",
-        "-t", f"{duration:.3f}", "-r", str(fps),
+        "-t", _ffmpeg_t(duration), "-r", str(fps),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
         "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
         out_path,
@@ -582,7 +598,7 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
 
     scene_s = [float(intro_duration)] if intro_title else []
     for i, (scene, asset_path, audio_path) in enumerate(zip(scenes, visual_files, audio_files)):
-        duration = _audio_duration(audio_path)
+        duration = _scene_seconds(audio_path, fps)
         sp = str(config.TEMP_DIR / f"scene_{i:03d}.mp4")
         _render_scene_ffmpeg(asset_path, scene["narration"], audio_path, duration, sp, w, h, fps, scene_id=i, burn_captions=burn_captions)
         scene_paths.append(sp)
@@ -903,7 +919,8 @@ def _caption_result(sink: "dict | None", scene_cues: list, audio_files: list, in
     main video starts when bookends are joined (bookend_lead_s); None = the old title-card offset."""
     if sink is None:
         return
-    cues = caption_utils.assemble(scene_cues, [_audio_duration(a) - 0.5 for a in audio_files],
+    cues = caption_utils.assemble(scene_cues,
+                                  [_scene_seconds(a, config.FPS) - caption_utils.SCENE_TAIL_S for a in audio_files],
                                   lead_s if lead_s is not None else (intro_duration if intro_title else 0.0))
     sink.update({"cues": cues, "srt": caption_utils.to_srt(cues), "vtt": caption_utils.to_vtt(cues)})
 
