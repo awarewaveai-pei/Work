@@ -24,6 +24,7 @@ use AwareWave\WpBridge\Operation\SetOptionOperation;
 use AwareWave\WpBridge\Content\AssetReferenceFinder;
 use AwareWave\WpBridge\Content\BlockLibrary;
 use AwareWave\WpBridge\Content\MediaSideloader;
+use AwareWave\WpBridge\Post\DraftPostEditor;
 use AwareWave\WpBridge\Post\PostCreator;
 use AwareWave\WpBridge\Product\ProductCreator;
 use AwareWave\WpBridge\Newsletter\NewsletterCreator;
@@ -66,6 +67,39 @@ final class RestController {
 				'methods'             => 'POST',
 				'permission_callback' => '__return_true',
 				'callback'            => array( $this, 'createPost' ),
+			)
+		);
+
+		// DraftPostEditor: list not-live posts + read a post (read scope), replace a not-live post's content (write scope,
+		// compare-and-set on the content read). The video embed on a bridge site reads and writes the draft it made
+		// through POST /post here, never through /wp/v2.
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/drafts',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'listDrafts' ),
+			)
+		);
+
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/post/read',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'readPost' ),
+			)
+		);
+
+		register_rest_route(
+			AWBRIDGE_REST_NAMESPACE,
+			'/draft/update',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'updateDraft' ),
 			)
 		);
 
@@ -305,6 +339,108 @@ final class RestController {
 		$status = ( $result['status'] === 'committed' ) ? 201 : 409;
 		$result['ok'] = ( $result['status'] === 'committed' );
 		return new \WP_REST_Response( $result, $status );
+	}
+
+	/** The site's newest not-live posts (draft, pending). Signed read. */
+	public function listDrafts( $request ) {
+		$auth = $this->authenticate( $request, KeyRecord::SCOPE_READ );
+		if ( ! $auth->authenticated() ) {
+			$this->audit( 'auth_denied', array( 'reason' => $auth->auditReason() ) );
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => $auth->reason() ), $auth->httpStatus() );
+		}
+		$result       = $this->draftEditor()->listDrafts();
+		$result['ok'] = true;
+		return new \WP_REST_Response( $result, 200 );
+	}
+
+	/** One blog post's raw content + status + content_sha256 (the precondition for /draft/update). Signed read. */
+	public function readPost( $request ) {
+		$auth = $this->authenticate( $request, KeyRecord::SCOPE_READ );
+		if ( ! $auth->authenticated() ) {
+			$this->audit( 'auth_denied', array( 'reason' => $auth->auditReason() ) );
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => $auth->reason() ), $auth->httpStatus() );
+		}
+		$postId = DraftPostEditor::postId( json_decode( (string) $request->get_body(), true ) );
+		if ( $postId === null ) {
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'invalid_payload' ), 400 );
+		}
+		$result       = $this->draftEditor()->read( $postId );
+		$result['ok'] = ( $result['status'] === 'ok' );
+		return new \WP_REST_Response( $result, $result['ok'] ? 200 : $this->draftErrorStatus( $result['reason'] ) );
+	}
+
+	/** Replace a not-live post's content if it is still what was read. Signed write; a live post or a post changed since
+	 * the read is refused (409), the status never changes. */
+	public function updateDraft( $request ) {
+		$auth = $this->authenticate( $request, KeyRecord::SCOPE_WRITE );
+		if ( ! $auth->authenticated() ) {
+			$this->audit( 'auth_denied', array( 'reason' => $auth->auditReason() ) );
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => $auth->reason() ), $auth->httpStatus() );
+		}
+		$payload = json_decode( (string) $request->get_body(), true );
+		$postId  = DraftPostEditor::postId( $payload );
+		if ( $postId === null ) {
+			return new \WP_REST_Response( array( 'ok' => false, 'error' => 'invalid_payload' ), 400 );
+		}
+		$result = $this->draftEditor()->update( $postId, $payload['content'] ?? null, $payload['expect_sha256'] ?? null );
+		$this->audit( 'draft_update', array( 'key' => $auth->keyId(), 'post_id' => $postId, 'status' => $result['status'], 'reason' => $result['reason'] ) );
+		$result['ok'] = ( $result['status'] === 'committed' );
+		return new \WP_REST_Response( $result, $result['ok'] ? 200 : $this->draftErrorStatus( $result['reason'] ) );
+	}
+
+	private function draftEditor(): DraftPostEditor {
+		return new DraftPostEditor(
+			static function ( int $id ) {
+				return get_post( $id );
+			},
+			static function ( array $args ) {
+				// wp_update_post() wp_unslash()es its input (see PostCreator); a WP_Error is the failure. Saved unfiltered,
+				// like a wp-admin editor: a signed request has no user, so kses would rewrite the draft's own markup
+				// (it collapses "--" inside block comments); kses_init() puts the filters back as they were.
+				kses_remove_filters();
+				try {
+					return wp_update_post( wp_slash( $args ), true );
+				} finally {
+					kses_init();
+				}
+			},
+			static function ( int $limit ): array {
+				$posts = get_posts(
+					array(
+						'post_type'        => 'post',
+						'post_status'      => DraftPostEditor::EDITABLE_STATUSES,
+						'numberposts'      => $limit,
+						'orderby'          => 'modified',
+						'order'            => 'DESC',
+						'suppress_filters' => true,
+					)
+				);
+				return array_map(
+					static function ( $p ) {
+						return (object) array(
+							'ID'            => $p->ID,
+							'post_title'    => $p->post_title,
+							'post_status'   => $p->post_status,
+							'post_modified' => mysql_to_rfc3339( $p->post_modified ), // the /wp/v2 "modified" format
+						);
+					},
+					$posts
+				);
+			}
+		);
+	}
+
+	/** Map a DraftPostEditor refusal/failure reason to an HTTP status. */
+	private function draftErrorStatus( string $reason ): int {
+		switch ( $reason ) {
+			case 'post_not_found':
+				return 404;
+			case 'content_required':
+			case 'expect_sha256_required':
+				return 400;
+			default: // post_not_draft, content_changed, update_failed, status_changed, verify_failed
+				return 409;
+		}
 	}
 
 	/** Create a WooCommerce product (simple or variable), atomic + verified. Description accepts a
