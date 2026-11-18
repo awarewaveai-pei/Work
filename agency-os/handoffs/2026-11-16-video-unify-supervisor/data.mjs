@@ -37,7 +37,7 @@ export const NOW = [
   { what: '腳本的場景與工作台的鏡頭格式相通。', state: 'no',
     ev: 'V/video-handoff.ts:45 只有 stripStageDirections，還沒有 shotsFromScript；鏡頭形狀在 VW/shared/episode-spine.js:173-176。U3 補。' },
   { what: '鏡頭卡能換圖、用圖庫素材、讓這鏡動起來。', state: 'yes',
-    ev: 'U4（df5640559）已在 main，工作台還沒部署到正式站。選圖片模型（含 FLUX）還沒做。' },
+    ev: 'U4.1–U4.6 已上線（2026-11-18 第四次部署）；生圖可選 FLUX、Ideogram、Google、OpenAI。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -190,6 +190,6 @@ export const STEPS = [
 ];
 
 export const OPEN = [
-  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；U3、U5 第二段、U6 於 2026-11-16 第二次部署上線，U6.6 第三次部署上線（688d397a5）；之後的卡上線前一樣要說 go。兩邊都動的卡，工作台那一半還沒上線時，會先放部署暫停檔擋住每晚的自動上線，兩邊一起上線後再拿掉。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
+  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；U3、U5 第二段、U6 於 2026-11-16 第二次部署上線，U6.6 第三次部署上線（688d397a5）；2026-11-18 第四次部署：影片服務（片頭接合）、主系統 1fe9adedd、工作台 3078141e4，健康與 smoke 全過，部署暫停檔已移除（efc52f804）；之後的卡上線前一樣要說 go。兩邊都動的卡，工作台那一半還沒上線時，會先放部署暫停檔擋住每晚的自動上線，兩邊一起上線後再拿掉。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
   { n: 2, what: 'Codex 接手做的卡已由 Claude 交叉審查（2026-11-18）。修好：按停止沒停到主系統、續做重付已完成的成片、腳本串流中斷少記費用、一次沒收費的錯誤讓整趟作廢、關頁後重付腳本、生圖先扣錢才擋模型、審片面板英文與亂碼 id。修正再經 Codex 審，找到的問題也已修。仍留的風險：停止前已送出的成片照常完成並計費；回覆在途中遺失時重試會再扣一次（所有付費呼叫皆同）；主系統專案清單會多出「一鍵腳本」空列；工作台「關閉」草稿執行要主系統在線。', before: 'U11', src: 'commit 2d73bc117、70a9bf8ea、eb69c2afa、191aed8a8；agency-os/reports/oracle/2026-11-18-partialreview-3aafd334.md' },
 ];
