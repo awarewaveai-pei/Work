@@ -371,7 +371,7 @@
     const label = AUTO_RUN_STEP[step] || "這一步", end = step === "intro" || step === "outro",
       what = shot ? "第 " + shot + " 個鏡頭的畫面" : (ratio ? ratio + " 的" : "") + label,
       retry = end ? "按「重試" + label + "」再做一次，或「不加" + label + "先出片」" : "按「從這裡繼續」再試一次",
-      said = error instanceof Error && error.name === "Error" && !(error.status >= 500) && String(error.message || "").trim();
+      said = typeof error === "object" && error?.name === "Error" && !(error.status >= 500) && String(error.message || "").trim(); // not instanceof: an Error may come from another frame
     jobId = typeof jobId === "string" && jobId ? jobId : null;
     if (said) return { step, jobId, reason: (what + "沒有完成：" + said.slice(0, 200)).replace(/[。.]?$/, "。") + "處理好之後" + retry + "。", detail: "" };
     return {

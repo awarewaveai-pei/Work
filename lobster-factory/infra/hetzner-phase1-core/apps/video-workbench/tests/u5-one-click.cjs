@@ -115,6 +115,8 @@ plain(spine.autoRunFailure("drafts", {}, "wordpress 401: invalid token"), "草�
 const credits = Object.assign(new Error("點數不足，無法執行此功能。"), { status: 403 });
 assert.deepEqual(spine.autoRunFailure("fill", {}, credits), { step: "fill", jobId: null, detail: "",
   reason: "補畫面沒有完成：點數不足，無法執行此功能。處理好之後按「從這裡繼續」再試一次。" });
+const otherFrame = require("node:vm").runInNewContext('new Error("網路連線失敗")'); // an Error of another frame's realm
+assert.equal(spine.autoRunFailure("render", {}, otherFrame).detail, "", "an Error from another frame is still read as written for people");
 assert.equal(spine.autoRunFailure("render", {}, Object.assign(new Error("upstream exploded"), { status: 502 })).detail, "upstream exploded", "a 5xx is raw");
 assert.equal(spine.autoRunFailure("render", {}, new TypeError("Failed to fetch")).detail, "Failed to fetch", "a TypeError is raw");
 for (const stop of [{ step: "", reason: "已手動停止" }, { step: "fill", reason: "已到上限 NT$3，下一步要 NT$4" }, { step: "drafts", reason: "主系統的草稿執行代號不符，請檢查執行紀錄" }])
