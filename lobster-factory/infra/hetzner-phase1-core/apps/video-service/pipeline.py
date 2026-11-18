@@ -309,7 +309,9 @@ def _split_narration(text: str, max_len: int = 28) -> list:
             else:
                 if buf:
                     chunks.append(buf)
-                buf = w if len(w) <= max_len else w[:max_len]
+                # a word longer than a segment (a URL) is split, never cut short
+                chunks.extend(w[k:k + max_len] for k in range(0, len(w) - max_len, max_len))
+                buf = w[(len(w) - 1) // max_len * max_len:]
         if buf:
             chunks.append(buf)
         return chunks or [s[:max_len]]
@@ -336,15 +338,115 @@ def _split_narration(text: str, max_len: int = 28) -> list:
     return result or [text[:max_len]]
 
 
-def _write_subtitle_textfiles(segments: list, scene_id) -> list:
-    """Write each segment to a temp textfile, return list of paths."""
-    paths = []
-    for i, seg in enumerate(segments):
-        p = str(config.TEMP_DIR / f"sub_{scene_id}_{i}.txt")
-        with open(p, 'w', encoding='utf-8') as f:
-            f.write(seg)
-        paths.append(p)
-    return paths
+# ── Text drawn into the picture (title cards, captions): one helper for every drawtext ──
+# Sized from the frame's SHORT side and wrapped to its width by real glyph widths. Sizing by height and splitting by a
+# character count drew 96 px captions and a one-line 106 px title on 1080-wide 9:16 / 4:5 frames, cut at both edges
+# (2026-11-18 Soulful). 16:9 keeps its sizes: its short side is the height.
+_FONT_FILES = ("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+               "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+               "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc")
+_SAFE_MARGIN = 0.05  # of the frame, each side
+_LINE_GAP = 0.25     # extra space between wrapped lines, of the font size
+_MIN_SHRINK = 0.6    # a word wider than a line shrinks the text at most to this, then is broken
+_CJK = "\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff"
+_FULLWIDTH = "\u3000-\u303f\uff00-\uffef"
+# a CJK character with the punctuation that must not start a line / a full-width mark / a Latin word / whitespace
+_TEXT_TOKEN = re.compile(f"[{_CJK}][{_FULLWIDTH}]*|[{_FULLWIDTH}]+|[^\\s{_CJK}{_FULLWIDTH}]+|\\s+")
+
+
+def _font_path() -> str:
+    return next((fp for fp in _FONT_FILES if os.path.exists(fp)), "")
+
+
+def _font(size: int):
+    path = _font_path()
+    return ImageFont.truetype(path, size) if path else ImageFont.load_default(size)
+
+
+def _break_word(word: str, font, max_w: int) -> list:
+    if font.getlength(word) <= max_w:
+        return [word]
+    out, cur = [], ""
+    for ch in word:
+        if cur and font.getlength(cur + ch) > max_w:
+            out.append(cur)
+            cur = ""
+        cur += ch
+    return out + [cur]
+
+
+def _wrap(text: str, font, max_w: int) -> list:
+    lines = []
+    for para in text.split("\n"):
+        line = ""
+        for tok in _TEXT_TOKEN.findall(para.strip()):
+            if tok.isspace():
+                line += " " if line else ""
+                continue
+            for piece in _break_word(tok, font, max_w):
+                if line.strip() and font.getlength(line + piece) > max_w:
+                    lines.append(line.rstrip())
+                    line = piece
+                else:
+                    line += piece
+        if line.strip():
+            lines.append(line.rstrip())
+    return lines
+
+
+def _fit_text(text: str, size: int, max_w: int, max_h: int) -> tuple:
+    """(lines, size): text wrapped at word boundaries (CJK between characters) into lines no wider than max_w px. The
+    size shrinks only when one word is wider than a line (down to _MIN_SHRINK, then the word is broken) or the
+    lines are taller than max_h."""
+    font = _font(size)
+    widest = max((font.getlength(t) for t in _TEXT_TOKEN.findall(text) if not t.isspace()), default=0)
+    if widest > max_w:
+        size = max(int(size * max_w / widest), math.ceil(size * _MIN_SHRINK))
+        font = _font(size)
+    lines = _wrap(text, font, max_w)
+    while size > 12 and _text_height(len(lines), font, size) > max_h:
+        size = int(size * 0.9)
+        font = _font(size)
+        lines = _wrap(text, font, max_w)
+    return lines, size
+
+
+def _text_height(n_lines: int, font, size: int) -> int:
+    ascent, descent = font.getmetrics()
+    return n_lines * (ascent + descent) + (n_lines - 1) * round(size * _LINE_GAP)
+
+
+def _text_box(kind: str, w: int, h: int) -> dict:
+    """Style of a text kind on a w x h frame, and the room its text may take (max_w / max_h, borders included)."""
+    short, side = min(w, h), round(min(w, h) * _SAFE_MARGIN)
+    if kind == "caption":
+        st = {"size": max(48, short // 20), "border": 3, "box": max(4, short // 270), "bottom": max(40, h // 30)}
+        st["max_h"] = h // 2 - st["bottom"]  # captions keep to the lower half
+    else:  # title card
+        st = {"size": max(36, short // 18), "border": 2, "box": 0}
+        st["max_h"] = h - 2 * side
+    st["max_w"] = w - 2 * side - 2 * (st["box"] + st["border"])
+    return st
+
+
+def _drawtext(in_tag: str, out_tag: str, text: str, text_path: str, w: int, h: int, kind: str, enable: str = "") -> str:
+    """One drawtext filter for text inside the picture, wrapped and sized to stay within the frame's safe margin."""
+    st = _text_box(kind, w, h)
+    lines, size = _fit_text(text, st["size"], st["max_w"], st["max_h"])
+    with open(text_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    font = _font_path()
+    opts = ([f"fontfile={font.replace(':', '\\:')}"] if font else []) + [
+        f"textfile={text_path.replace(chr(92), '/').replace(':', '\\:')}", f"fontsize={size}",
+        f"line_spacing={round(size * _LINE_GAP)}", "text_align=C", "fontcolor=white",
+        f"borderw={st['border']}", "bordercolor=black", "x=(w-text_w)/2"]
+    if kind == "caption":
+        opts += ["box=1", "boxcolor=black@0.45", f"boxborderw={st['box']}", f"y=h-text_h-{st['bottom']}"]
+    else:
+        opts += ["alpha='if(lt(t,0.8),t/0.8,1)'", "y=(h-text_h)/2"]
+    if enable:
+        opts.append(f"enable='{enable}'")
+    return f"{in_tag}drawtext={':'.join(opts)}{out_tag}"
 
 
 def _audio_duration(audio_path: str) -> float:
@@ -381,7 +483,7 @@ _MATRIX_OF_PRIMARIES = {"bt2020": "bt2020nc", "bt470bg": "bt470bg", "smpte170m":
 
 def _probe_streams(path: str) -> list:
     res = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
-                          "stream=codec_type,duration,color_space,color_transfer,color_primaries,color_range",
+                          "stream=codec_type,width,height,duration,color_space,color_transfer,color_primaries,color_range",
                           "-of", "json", path], capture_output=True, text=True, timeout=60)
     if res.returncode != 0:
         raise RuntimeError(f"ffprobe failed ({os.path.basename(path)}): {res.stderr[-300:]}")
@@ -423,24 +525,12 @@ def _ffmpeg_t(seconds: float) -> str:
 
 def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, w, h, fps, scene_id=0, burn_captions=True):
     """單場景 → 統一參數 mp4。字幕改用 drawtext+textfile（timed per segment，取代 PIL PNG overlay）。"""
-    # Find CJK-capable font
-    font_path = ""
-    for fp in [
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
-    ]:
-        if os.path.exists(fp):
-            font_path = fp
-            break
-
     # Split narration into timed segments
     segments = _split_narration(narration)
     n = len(segments)
     # Distribute time proportionally by char count
     char_counts = [max(len(s), 1) for s in segments]
     total_chars = sum(char_counts)
-    seg_files = _write_subtitle_textfiles(segments, scene_id)
 
     # Calculate timing: leave 0.1s gap before first, 0.2s at end
     usable = max(duration - 0.3, duration * 0.9)
@@ -479,34 +569,9 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
                   f"fade=t=in:st=0:d={fade_dur:.3f},"
                   f"fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}[bg0]")
 
-    # Build chained drawtext filters
-    font_size = max(48, h // 20)  # 字幕字級加大（1080p≈54px；舊 h//54≈22px 太小，9:16 縮放後幾乎看不到）
-    margin_v = max(40, h // 30)
-    box_border = max(4, h // 270)
-    dt_filters = []
-    for i, (seg_file, (start, end)) in enumerate(zip(seg_files, times)):
-        in_tag = f"[bg{i}]"
-        out_tag = f"[bg{i+1}]"
-        # Escape path for FFmpeg (replace backslash, colon)
-        safe_path = seg_file.replace("\\", "/").replace(":", "\\:")
-        font_arg = f"fontfile={font_path.replace(':', '\\:')}:" if font_path else ""
-        dt = (
-            f"{in_tag}drawtext="
-            f"{font_arg}"
-            f"textfile={safe_path}:"
-            f"fontsize={font_size}:"
-            f"fontcolor=white:"
-            f"borderw=3:"
-            f"bordercolor=black:"
-            f"box=1:"
-            f"boxcolor=black@0.45:"
-            f"boxborderw={box_border}:"
-            f"x=(w-text_w)/2:"
-            f"y=h-text_h-{margin_v}:"
-            f"enable='between(t,{start:.3f},{end:.3f})'"
-            f"{out_tag}"
-        )
-        dt_filters.append(dt)
+    dt_filters = [_drawtext(f"[bg{i}]", f"[bg{i + 1}]", seg, str(config.TEMP_DIR / f"sub_{scene_id}_{i}.txt"), w, h,
+                            "caption", f"between(t,{start:.3f},{end:.3f})")
+                  for i, (seg, (start, end)) in enumerate(zip(segments, times))] if burn_captions else []
 
     if burn_captions:
         final_v_tag = f"[bg{n}]"
@@ -532,32 +597,8 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
 
 def _render_intro_scene(title: str, duration: float, out_path: str, w: int, h: int, fps: int) -> None:
     """Render a title card: black background + white text that fades in over 0.8s."""
-    font_path = ""
-    for fp in [
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    ]:
-        if os.path.exists(fp):
-            font_path = fp
-            break
-
-    title_file = str(config.TEMP_DIR / "intro_title.txt")
-    with open(title_file, "w", encoding="utf-8") as f:
-        f.write(title)
-
-    safe_path = title_file.replace("\\", "/").replace(":", "\\:")
-    font_arg = f"fontfile={font_path.replace(':', '\\:')}:" if font_path else ""
-    font_size = max(36, h // 18)
-
-    dt_filter = (
-        f"[0:v]drawtext={font_arg}"
-        f"textfile={safe_path}:"
-        f"fontsize={font_size}:"
-        f"fontcolor=white:"
-        f"alpha='if(lt(t,0.8),t/0.8,1)':"
-        f"borderw=2:bordercolor=black:"
-        f"x=(w-text_w)/2:y=(h-text_h)/2,format=yuv420p,{_BT709_TAG}[v]"
-    )
+    dt_filter = _drawtext("[0:v]", "", title, str(config.TEMP_DIR / "intro_title.txt"), w, h, "title") + \
+        f",format=yuv420p,{_BT709_TAG}[v]"
 
     cmd = [
         "ffmpeg", "-y",
@@ -1008,7 +1049,7 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
                 cues = [{**c, "startMs": max(0, c["startMs"] - round(lead * 1000)),
                          "endMs": max(0, c["endMs"] - round(lead * 1000))} for c in caption_sink["cues"]]
                 caption_sink["mainCues"] = cues
-                burn_script_captions(raw_main, cues, main_path, h)
+                burn_script_captions(raw_main, cues, main_path)
             else:
                 shutil.move(raw_main, main_path)
             main_sink[fmt] = main_path
@@ -1016,7 +1057,7 @@ def render_video_multiformat(scenes: list, format_assets: dict, out_name: str,
         if keep_clean:
             clean_path = str(out_dir / f"{fmt}.clean.mp4")
             shutil.move(base_video, clean_path)
-            burn_script_captions(clean_path, caption_sink["cues"], out_path, h)
+            burn_script_captions(clean_path, caption_sink["cues"], out_path)
             clean_sink[fmt] = clean_path
         else:
             # base_video 已是目標尺寸 + 統一編碼（per-scene 已 crf 21 / yuv420p）→ 直接搬，免二次轉碼。
@@ -1102,49 +1143,16 @@ def _mux_audio_track(video_path: str, audio_path: str, out_path: str) -> None:
     _run_ffmpeg(cmd, "audio mux failed")
 
 
-def _burn_captions_ffmpeg(in_path: str, cues: list, out_path: str, h: int) -> None:
+def _burn_captions_ffmpeg(in_path: str, cues: list, out_path: str) -> None:
     """依絕對時間（start_ms/end_ms）燒入字幕 cue，非依旁白字數比例切分（與 _render_scene_ffmpeg
     的字幕邏輯不同源，因為 caption cue 時間已由呼叫端 Timeline v1 驗證過，不需重新切分）。
-    音訊直接 copy passthrough。"""
-    font_path = ""
-    for fp in [
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
-    ]:
-        if os.path.exists(fp):
-            font_path = fp
-            break
-
-    font_size = max(48, h // 20)
-    margin_v = max(40, h // 30)
-    box_border = max(4, h // 270)
-    dt_filters = []
-    for i, cue in enumerate(cues):
-        seg_path = str(config.TEMP_DIR / f"fcaption_{i}.txt")
-        with open(seg_path, "w", encoding="utf-8") as f:
-            f.write(cue["text"])
-        safe_path = seg_path.replace("\\", "/").replace(":", "\\:")
-        font_arg = f"fontfile={font_path.replace(':', '\\:')}:" if font_path else ""
-        start_s = cue["start_ms"] / 1000.0
-        end_s = cue["end_ms"] / 1000.0
-        in_tag = "[0:v]" if i == 0 else f"[cap{i}]"
-        out_tag = f"[cap{i + 1}]" if i < len(cues) - 1 else "[capout]"
-        dt_filters.append(
-            f"{in_tag}drawtext={font_arg}"
-            f"textfile={safe_path}:"
-            f"fontsize={font_size}:"
-            f"fontcolor=white:"
-            f"borderw=3:"
-            f"bordercolor=black:"
-            f"box=1:"
-            f"boxcolor=black@0.45:"
-            f"boxborderw={box_border}:"
-            f"x=(w-text_w)/2:"
-            f"y=h-text_h-{margin_v}:"
-            f"enable='between(t,{start_s:.3f},{end_s:.3f})'"
-            f"{out_tag}"
-        )
+    音訊直接 copy passthrough。字幕依這支影片自己的寬高排版（不靠呼叫端傳尺寸）。"""
+    v = next(s for s in _probe_streams(in_path) if s.get("codec_type") == "video")
+    w, h = int(v["width"]), int(v["height"])
+    dt_filters = [_drawtext("[0:v]" if i == 0 else f"[cap{i}]", f"[cap{i + 1}]" if i < len(cues) - 1 else "[capout]",
+                            cue["text"], str(config.TEMP_DIR / f"fcaption_{i}.txt"), w, h, "caption",
+                            f"between(t,{cue['start_ms'] / 1000.0:.3f},{cue['end_ms'] / 1000.0:.3f})")
+                  for i, cue in enumerate(cues)]
 
     cmd = [
         "ffmpeg", "-y", "-i", in_path,
@@ -1157,14 +1165,14 @@ def _burn_captions_ffmpeg(in_path: str, cues: list, out_path: str, h: int) -> No
     _run_ffmpeg(cmd, "caption burn failed")
 
 
-def burn_script_captions(clean_path: str, cues: list, out_path: str, h: int) -> None:
+def burn_script_captions(clean_path: str, cues: list, out_path: str) -> None:
     """Burn script/voice-timed cues [{startMs,endMs,text}] onto a caption-less video. No cues = a plain copy."""
     burn = caption_utils.burn_cues(cues, _split_narration)
     if not burn:
         import shutil
         shutil.copyfile(clean_path, out_path)
         return
-    _burn_captions_ffmpeg(clean_path, burn, out_path, h)
+    _burn_captions_ffmpeg(clean_path, burn, out_path)
 
 
 def render_footage_multiformat(clips: list, formats: list, out_name: str,
@@ -1217,7 +1225,7 @@ def render_footage_multiformat(clips: list, formats: list, out_name: str,
         _mux_audio_track(base_video, audio_path, muxed_path)
         final_path = str(out_dir / f"{fmt}.mp4")
         if captions:
-            _burn_captions_ffmpeg(muxed_path, captions, final_path, h)
+            _burn_captions_ffmpeg(muxed_path, captions, final_path)
         else:
             shutil.move(muxed_path, final_path)
         outputs[fmt] = final_path

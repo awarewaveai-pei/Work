@@ -691,7 +691,7 @@ def _do_reburn(clean_url: str, cues: list, fmt: str, object_key: str) -> dict:
         try:
             clean = _materialize_asset(clean_url, 0)
             out_path = str(config.TEMP_DIR / f"reburn_{fmt}.mp4")
-            pipeline.burn_script_captions(clean, cues, out_path, config.FORMATS[fmt][1])
+            pipeline.burn_script_captions(clean, cues, out_path)
             output_meta = _build_output_meta({fmt: out_path})
             # New key per burn: overwriting object_key would leave CDN/browsers (and posts that embed the old URL) on the old bytes.
             out_key = _reburn_key(object_key, fmt)
