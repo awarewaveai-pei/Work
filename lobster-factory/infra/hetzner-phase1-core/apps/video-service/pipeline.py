@@ -965,7 +965,7 @@ def _run_ffmpeg(cmd: list, on_fail_prefix: str) -> None:
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"{on_fail_prefix}: 逾時（>{_FFMPEG_TIMEOUT_S}s）")
     if res.returncode != 0:
-        raise RuntimeError(f"{on_fail_prefix}: {res.stderr.decode('utf-8', 'ignore')[-500:]}")
+        raise RuntimeError(f"{on_fail_prefix} (exit={res.returncode}): {res.stderr.decode('utf-8', 'ignore')[-500:]}")
 
 
 def _trim_clip_video(src: str, start_ms: float, duration_ms: float, out_path: str, w: int, h: int, fps: int) -> None:

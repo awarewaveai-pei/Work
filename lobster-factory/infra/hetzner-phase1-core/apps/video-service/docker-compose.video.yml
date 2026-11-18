@@ -52,14 +52,18 @@ services:
     networks:
       - video-net
       - lobster-net    # n8n (lobster-net) → video-service:8732 直連，不過 host loopback
+    # cpuset = as many cores as cpus: ffmpeg/x264 size thread pools from the CPUs they can SEE, not the quota. Seeing all 32
+    # host cores, a 1080p three-input join (片頭+主片+片尾) took 1.4 GiB and was OOM-killed (2026-11-18); seeing 2, ~1.1 GiB.
+    # tests/test_bookends.py ComposeCpuBudget keeps the two equal. Renders are serialized (server.py _render_lock).
+    cpuset: "30,31"
     deploy:
       resources:
         limits:
-          memory: 1536M   # EU 有 ~2.5G available；render 為 ffmpeg 模式記憶體溫和，1.5G 留足餘裕
+          memory: 3072M   # one render at a time, measured peak ~1.1 GiB at 1080p; the limit only stops a runaway
           pids: 256
           cpus: "2.00"
     logging: *video-logging
-    memswap_limit: 1536M
+    memswap_limit: 3072M
     init: true
 
 networks:

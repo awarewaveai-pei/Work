@@ -1,6 +1,8 @@
 """Plan U5.4 片頭／片尾接成一支: validation of the new payload fields, the old path untouched when none are sent, and
 (with ffmpeg) one video whose length is intro + main - transition with the captions moved to where the main video starts."""
 import pathlib
+import json
+import os
 import re
 import shutil
 import subprocess
@@ -57,6 +59,11 @@ class OldPathUnchanged(unittest.TestCase):
         self.assertNotIn("acrossfade", text)
         self.assertEqual(calls[-1][:5], ["ffmpeg", "-y", "-f", "concat", "-safe"])
         self.assertEqual(len(calls), 4)  # title card, 2 scenes, concat -- as before U5.4
+
+    def test_killed_encoder_keeps_the_exit_signal_in_the_error(self):
+        with mock.patch.object(pipeline.subprocess, "run", return_value=subprocess.CompletedProcess([], -9, b"", b"last frame")):
+            with self.assertRaisesRegex(RuntimeError, r"bookend join failed \(exit=-9\)"):
+                pipeline._run_ffmpeg(["ffmpeg"], "bookend join failed")
 
 
 def _length(path: str) -> float:
@@ -137,6 +144,98 @@ class BookendRender(unittest.TestCase):
         self.assertEqual(burn.call_args_list[0].args[1][0]["startMs"], 0)
         self.assertEqual(burn.call_args_list[1].args[1][0]["startMs"], 2500)
         self.assertAlmostEqual(_length(main["16x9"]), 2.5, delta=0.15)
+
+
+class ComposeCpuBudget(unittest.TestCase):
+    """ffmpeg/x264 size thread pools from the CPUs they can see; cpuset must show exactly the cores the quota allows."""
+
+    def test_visible_cores_equal_the_cpu_limit(self):
+        text = (pathlib.Path(__file__).resolve().parent.parent / "docker-compose.video.yml").read_text(encoding="utf-8")
+        cpus = float(re.search(r'^\s+cpus:\s*"([0-9.]+)"', text, re.M).group(1))
+        cpuset = re.search(r'^\s+cpuset:\s*"([0-9,\-]+)"', text, re.M).group(1)
+        cores = sum(int(b) - int(a) + 1 if "-" in part else 1 for part in cpuset.split(",") for a, _, b in [part.partition("-")])
+        self.assertEqual(cores, cpus, "cpuset must list as many cores as the cpus limit")
+
+
+@unittest.skipUnless(os.getenv("RUN_RESOURCE_TESTS") == "1", "opt-in: run in the production-sized isolated container")
+class BookendResourceBudget(unittest.TestCase):
+    """Real three-input joins, including the original production resolution and container memory accounting."""
+
+    def join(self, fmt):
+        root = pathlib.Path("/sys/fs/cgroup")
+        self.assertEqual((root / "memory.max").read_text().strip(), "3221225472")
+        self.assertEqual((root / "memory.swap.max").read_text().strip(), "0")
+        self.assertEqual((root / "pids.max").read_text().strip(), "256")
+        quota, period = (root / "cpu.max").read_text().split()
+        self.assertEqual(int(quota) / int(period), 2)
+        self.assertEqual(len(os.sched_getaffinity(0)), 2, "run with --cpuset-cpus of two cores, as the compose file")
+        w, h = pipeline.config.FORMATS[fmt]
+        out_dir = pipeline.config.OUTPUT_DIR / ("bookend-budget-" + fmt)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(pipeline.config, "TEMP_DIR", pathlib.Path(directory)):
+            def segment(name, seconds, color, caption=False):
+                path = str(pathlib.Path(directory) / (name + ".mp4"))
+                vf = "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='MAIN CAPTION':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=h-100" if caption else "null"
+                subprocess.run(["ffmpeg", "-y", "-hide_banner", "-filter_threads", "1",
+                    "-f", "lavfi", "-i", f"color=c={color}:s={w}x{h}:r=24:d={seconds}",
+                    "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", str(seconds), "-vf", vf,
+                    "-c:v", "libx264", "-threads", "2", "-preset", "fast", "-crf", "21", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-ar", "44100", "-ac", "2", path], check=True, capture_output=True)
+                return path
+
+            intro = segment("intro", 3, "red")
+            main = segment("main", 12, "0x205020", caption=True)
+            outro = segment("outro", 3, "blue")
+            bookends = {"intro": {"asset": intro, "duration": 3, "has_audio": True},
+                        "outro": {"asset": outro, "duration": 3, "has_audio": True},
+                        "transition": "crossfade", "transition_s": 0.5}
+            output = str(out_dir / "joined.mp4")
+            try:
+                pipeline._join_bookends([main], 12, bookends, output, w, h, 24)
+            finally:
+                print(json.dumps({"format": fmt, "memory_peak": (root / "memory.peak").read_text().strip(),
+                                  "memory_events": (root / "memory.events").read_text().strip()}), flush=True)
+            self.assertLess(int((root / "memory.peak").read_text()), 1280 * 1024 * 1024,
+                            "measured ~1.1 GiB with two visible cores; more means the join regressed")
+            self.assertIn("oom_kill 0", (root / "memory.events").read_text())
+            self.assertAlmostEqual(_length(output), 17, delta=0.15)
+            self.assertEqual(pipeline.bookend_lead_s(bookends), 2.5)
+            info = json.loads(subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-of", "json", output],
+                              capture_output=True, text=True, check=True).stdout)["streams"]
+            video, audio = next(s for s in info if s["codec_type"] == "video"), next(s for s in info if s["codec_type"] == "audio")
+            self.assertEqual((video["codec_name"], video["width"], video["height"], video["pix_fmt"], video["r_frame_rate"]),
+                             ("h264", w, h, "yuv420p", "24/1"))
+            self.assertEqual((audio["codec_name"], audio["sample_rate"], audio["channels"]), ("aac", "44100", 2))
+            from PIL import Image
+            frames = []
+            for name, timestamp in [("intro", 1), ("fade-in", 2.75), ("main", 3.5), ("fade-out", 14.25), ("outro", 16)]:
+                frame = out_dir / (name + ".png")
+                subprocess.run(["ffmpeg", "-y", "-hide_banner", "-threads", "1", "-ss", str(timestamp), "-i", output,
+                                "-frames:v", "1", "-threads", "1", str(frame)], capture_output=True, check=True)
+                with Image.open(frame) as image:
+                    rgb = image.convert("RGB")
+                    red, green, blue = rgb.getpixel((w // 2, h // 2))
+                    if name == "fade-in":
+                        self.assertTrue(red > 60 and green > 10 and blue < 50, "intro and main are blended at the first join")
+                    if name == "fade-out":
+                        self.assertTrue(blue > 60 and green > 10 and red < 50, "main and outro are blended at the second join")
+                    if name == "main":
+                        self.assertGreater(sum(min(pixel) > 200 for pixel in rgb.crop((0, h - 110, w, h - 40)).getdata()), 100,
+                                           "main caption survives the join at its unchanged position")
+                    frames.append(rgb.resize((360, round(h * 360 / w))))
+            sheet = Image.new("RGB", (len(frames) * 360, frames[0].height))
+            for index, frame in enumerate(frames):
+                sheet.paste(frame, (index * 360, 0))
+            sheet.save(out_dir / "contact.png")
+
+    def test_three_input_16x9(self):
+        self.join("16x9")
+
+    def test_three_input_9x16(self):
+        self.join("9x16")
+
+    def test_three_input_4x5(self):
+        self.join("4x5")
 
 
 if __name__ == "__main__":
