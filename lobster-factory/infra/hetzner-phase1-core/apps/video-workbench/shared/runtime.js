@@ -181,6 +181,10 @@
         location.origin,
       );
   }
+  function jobsChanged() {
+    broadcast();
+    document.dispatchEvent(new CustomEvent("vw:changed"));
+  }
   async function perform(action, payload) {
     if (action === "load") {
       await ready;
@@ -194,6 +198,7 @@
       return VideoWorkbench.generator.import(payload);
     if (action === "job-get") return VideoWorkbench.generations.get(payload.id);
     if (action === "job-cancel") return VideoWorkbench.generations.cancel(payload.id);
+    if (action === "jobs-sync") return reconcileJobs(true);
     if (action === "service-request")
       return adapter.request(
         payload.path,
@@ -417,13 +422,14 @@
         : "未收到服務端確認，任務可能已送出；請先確認任務紀錄，避免重複計費。 " +
           e.message;
       await persist().catch(() => {});
-      broadcast();
+      jobsChanged();
       throw e;
     }
     await persist().catch((e) =>
       reportError(new Error("任務已送出，但本機紀錄保存失敗：" + e.message)),
     );
-    broadcast();
+    jobsChanged();
+    reconcileJobs().catch(reportError);
     return job;
   }
   // Browser media copy (scripts/media-cache-sw.js): only for the served workbench, where media crosses the network.
@@ -483,7 +489,27 @@
   // answer asked for another (`again`: still running, ledgerPending, or the ask failed), so the rounds end.
   const asked = new Set(),
     again = new Set();
-  async function reconcileJobs() {
+  let reconcileTimer = null, reconcilePending = null, reconcileAgain = false;
+  function reconcileJobs(fresh = false) {
+    if (fresh) asked.clear();
+    if (reconcilePending) { reconcileAgain = true; return reconcilePending; }
+    clearTimeout(reconcileTimer);
+    reconcileTimer = null;
+    // One runner owns all rounds. A submission during a request wakes the next round, never a second loop.
+    reconcilePending = (async () => {
+      let running;
+      do {
+        reconcileAgain = false;
+        running = await reconcileRound();
+      } while (reconcileAgain);
+      if (running) reconcileTimer = setTimeout(() => {
+        reconcileTimer = null;
+        reconcileJobs().catch(reportError);
+      }, 5000);
+    })().finally(() => { reconcilePending = null; });
+    return reconcilePending;
+  }
+  async function reconcileRound() {
     const unsettled = (j) => j.status === "succeeded" && j.result && ((!j.result.assetId && !j.result.ledger) || !!(j.releaseTextError || j.coverRegisterError));
     const all = db.jobs.filter(
         (j) => j?.id && !["failed", "cancelled", "blocked"].includes(j.status) && (unsettled(j) || !db.assets.some((a) => a.id === "job-" + j.id)) && (!asked.has(j.id) || again.has(j.id)),
@@ -529,10 +555,9 @@
     for (const j of db.jobs) if (Spine?.settle(db.projects, j)) changed = true;
     if (changed) {
       await persist().catch(reportError);
-      broadcast();
-      document.dispatchEvent(new CustomEvent("vw:changed"));
+      jobsChanged();
     }
-    if (running) setTimeout(() => reconcileJobs().catch(reportError), 5000);
+    return running;
   }
   if (!child) ready.then(() => reconcileJobs()).catch(reportError);
   const storage = {
@@ -685,6 +710,7 @@
           ? rpc("service-request", { path: "/generations/quote", body: input })
           : adapter.request("/generations/quote", "POST", input),
       create: generate,
+      sync: () => child ? rpc("jobs-sync") : reconcileJobs(true),
       refresh: (job) =>
         job.serverAccepted === false ||
         (!job.serverAccepted && ["blocked", "submitting"].includes(job.status))
@@ -746,7 +772,7 @@
         );
         if (cached) Object.assign(cached, job);
         await persist().catch(reportError);
-        broadcast();
+        jobsChanged();
         return job;
       },
       cancel: async (id) => {
@@ -758,7 +784,7 @@
         const cached = db.jobs.find((j) => j.id === id);
         if (cached) Object.assign(cached, job);
         await persist().catch(reportError);
-        broadcast();
+        jobsChanged();
         return job;
       },
     },

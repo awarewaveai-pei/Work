@@ -133,7 +133,10 @@
       if (b.dataset.kind) {
         kind = b.dataset.kind;
         await render();
-      } else if (b.hasAttribute("data-refresh")) await render();
+      } else if (b.hasAttribute("data-refresh")) {
+        if (current === "history") await VideoWorkbench.generations.sync();
+        await render();
+      }
       else if (b.hasAttribute("data-backup-export"))
         VideoWorkbench.download(
           "awarewave-video-backup.json",
@@ -293,6 +296,9 @@
         $("workspaceSearch").setSelectionRange(cursor, cursor);
       });
     }
+  });
+  document.addEventListener("vw:changed", () => {
+    if (current === "history") render().catch(VideoWorkbench.reportError);
   });
   VideoWorkbench.workspaces = {
     open: async (name) => {

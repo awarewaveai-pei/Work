@@ -21,6 +21,7 @@ const tests = [
   "media-cache",
   "static-version",
   "capabilities-boot",
+  "job-status-sync",
   "ed13-agent",
   "alpha-proxy-audio-backfill",
   "p616-theme-refresh",
