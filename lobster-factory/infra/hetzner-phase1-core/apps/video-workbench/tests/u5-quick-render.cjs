@@ -25,7 +25,7 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
   const bytes = fs.readFileSync(mp4), sha = crypto.createHash("sha256").update(bytes).digest("hex");
 
   const submitted = [], registered = [], ledger = [], quoted = [];
-  let corrupt = false;
+  let corrupt = false, lookupDown = true;
   async function fetchImpl(url, options = {}) {
     url = String(url);
     if (url === R2 && corrupt) { corrupt = false; return new Response("bad", { headers: { "content-length": "3" } }); }
@@ -44,6 +44,8 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
       const q = new URL(url).searchParams;
       assert.equal(q.get("organizationId"), ORG);
       assert.equal(q.get("jobId"), REMOTE);
+      // a 5xx is the main system not answering now (a failed DB read): the poll asks again, the render is not failed
+      if (lookupDown) { lookupDown = false; return Response.json({ ok: false, error: "job_lookup_failed" }, { status: 502 }); }
       return Response.json({ ok: true, status: "done", ratio: "9x16", assetId: VIDEO, checksumSha256: sha, url: R2, rightsSources: [] });
     }
     if (url === BASE + "/api/internal/video/workbench/assets") { registered.push(options.headers["X-VW-Origin"]); return Response.json({ ok: false, error: "must not be called" }, { status: 500 }); }

@@ -11,10 +11,12 @@ function sleep(ms, signal) {
   });
 }
 
-// One main.call; a network error answers null (poll again) unless the job was cancelled.
+// One main.call; null = ask again: a network error, or a 5xx (the main system could not answer now, e.g. a failed DB read;
+// 2026-11-18 one 502 job_lookup_failed failed two finished Soulful renders). poll's limitMs still bounds it. A cancelled job throws.
 async function tryCall(main, route, options) {
   try {
-    return await main.call(route, options);
+    const r = await main.call(route, options);
+    return r.status >= 500 ? null : r;
   } catch (e) {
     if (options.signal?.aborted) throw e;
     return null;
