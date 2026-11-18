@@ -3,7 +3,7 @@
 
 export const META = {
   title: '影片工具融合監工台',
-  updated: '2026-11-17',
+  updated: '2026-11-18',
   plan: 'lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md',
   worklog: 'agency-os/WORKLOG.md 2026-11-16',
   self: 'agency-os/handoffs/2026-11-16-video-unify-supervisor/',
@@ -97,7 +97,7 @@ export const STEPS = [
     ] },
   { n: 5, code: 'U4', title: '鏡頭卡補齊', plain: '例：在鏡頭卡按「圖庫素材」打「海邊日落」，選一張 Pexels 照片換上；再按「讓這鏡動起來」變成一段影片。',
     gate: '換圖後剪輯裡的片段標示過期；白名單外的圖庫來源被拒（拿掉白名單，測試會紅）；有圖的鏡頭生影片後鏡頭帶著影片。',
-    risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: [],
+    risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '69baf3acc', depends: [],
     what: '換圖走素材選擇器＋主頁動作 spine-set-shot；圖庫素材打 API/regenerate-image（visual:"broll"）→ 網址匯入改共用函式＋Pexels／R2 白名單＋允許影片；圖生影片 target:"shot:<id>"；生圖模型清單補 FLUX',
     files: [`${VW}scripts/projects-0.js`, `${VW}backend/api.cjs`, `${VW}shared/episode-spine.js`, `${API}regenerate-image/`, `${NA}public/editor-shared/image-models.js`],
     items: [
@@ -106,7 +106,7 @@ export const STEPS = [
       done('U4.3', '「讓這鏡動起來」：用這張圖當第一格生成影片，按鈕標每秒 NT$。', 'df5640559'),
       done('U4.4', '生成畫面可選 FLUX、Ideogram、Google、OpenAI，每顆標每張 NT$；由主系統生成並記錄來源，已計費圖片下載失敗可取回而不重扣。不使用角色與場景圖的限制有顯示。型別、受影響測試與工作台總閘通過；已放部署暫停檔，尚未部署。', '0a378fc3e'),
       done('U4.5', '「讓這鏡動起來」可選符合比例的首幀影片模型，每顆標秒數與每秒 NT$。圖庫換圖即時更新、按鈕不超出卡片；瀏覽器測試四項通過，尚未部署。', '0a378fc3e'),
-      todo('U4.6', '視覺風格清單併成一份：舊的有 3 個影片風格加 103 個畫家／媒材風格，工作台只有 9 個，不是同一份。併的時候舊專案已選的風格不能掉。從 U4.5 拆出來單獨做。'),
+      done('U4.6', '影片頁、藝術與工作台原有風格共用清單，原提示逐字保留；舊專案數字索引、自訂提示與鏡頭保留，新風格另存穩定代號並相容舊版回滾。型別、15 案、Edge 舊資料與重開實測、整合總閘通過；未部署，正式驗收與恢復額度後的 Claude 審查由交接續做。', '69baf3acc'),
     ] },
   { n: 6, code: 'U5', title: '快速輸出、多比例、一鍵成片', plain: '例：在一集按「一鍵成片」，看到總價 NT$ 後確認；缺的圖自動補齊，接著出 16:9 和 9:16 兩支成片。',
     gate: '別組織的素材被拒（拿掉組織條件，測試會紅）；快速輸出完成後成片區多一支、歷史紀錄有任務、主系統只有一列；選兩個比例出兩個任務；一鍵成片中途重開頁面會接著做，已有圖的鏡頭不重生。',
@@ -184,7 +184,7 @@ export const STEPS = [
       todo('U11.2', 'commit 1：舊入口改成「開啟影音工作台」，這台瀏覽器的腳本歷史搬過去（只收員工門來的訊息，原資料不刪）。'),
       todo('U11.3', 'commit 2：刪掉退場的舊畫面、舊入口登記與過時文件。影片門首頁改導向工作台要跟刪除同一次做。'),
       done('U11.4', '工作台測試清單改成一行一個（原本寫成一整行，每張卡併入都衝突）。', '65dc535cd'),
-      todo('U11.5', '驗收：用一支真的腳本在正式站只按「下一步」，從腳本走到社群草稿與 WordPress 草稿文章；記下點擊次數、總花費 NT$、每段時間。這條過了才換掉舊入口。另外實跑一次「一鍵到草稿」，以及一個話題的全自動到已排程，核對花費與上限。'),
+      todo('U11.5', '驗收：用一支真的腳本在正式站只按「下一步」，從腳本走到社群草稿與 WordPress 草稿文章；記下點擊次數、總花費 NT$、每段時間。這條過了才換掉舊入口。另外實跑一次「一鍵到草稿」，以及一個話題的全自動到已排程，核對花費與上限。Claude 接手先讀 CODEX-TO-CLAUDE-20261118.md 第 5 節：停止、雙頁重送、腳本關頁恢復及子組織用量歸屬尚須查證；先前額度不足的審查尚未補做。'),
     ] },
 ];
 

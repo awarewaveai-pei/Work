@@ -1,5 +1,7 @@
 # Codex 接手：影片工具融合監工（U 卡）
 
+> 2026-11-18 更新：Codex 已依操作者指示收尾停下，交回 Claude；目前 45／50。先讀同目錄 `CODEX-TO-CLAUDE-20261118.md`，不要從本檔 §3 的歷史表重做。最新未完成列以 data.mjs 為準；部署仍須操作者當下同意。
+
 續接語：「接手影片工具融合：讀 `D:\Work\agency-os\handoffs\2026-11-16-video-unify-supervisor\CODEX-TAKEOVER.md`，從 §3 表第一個未完成列開始；完成＝`data.mjs` 全部 done、每次部署經操作者當下同意。回報一律繁體中文。」
 
 ## 1. 正本（只讀這些）
