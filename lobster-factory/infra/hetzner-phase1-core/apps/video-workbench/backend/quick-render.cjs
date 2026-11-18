@@ -154,10 +154,20 @@ async function run(job, { main, fetchImpl, mediaStore, signal, sizeOf, onRemoteJ
   return {
     url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl,
     width: stored.probe?.displayWidth, height: stored.probe?.displayHeight, duration: stored.probe?.duration, // for the covers (api.cjs addCovers)
+    // the main system's caption-less copy (org-scoped internal route, never browser input): the covers' frame source
+    ...(/^https:\/\//.test(String(done.cleanUrl || "")) ? { cleanUrl: done.cleanUrl } : {}),
     ...(mainUrl ? { mainUrl } : {}),
     mainCaptionCues: done.mainCaptionCues?.length ? done.mainCaptionCues : done.captionCues || [], title: done.title || "", script: done.script || "",
     origin: { kind: "render", engine: "quick-render", jobId: job.id, remoteJobId, costUsd: 0 },
   };
 }
 
-module.exports = { problems, request, quote, run, RATIOS, POLL_LIMIT_MS };
+/** The caption-less copy downloaded to a temporary file in `dir` (the caller removes it); used only to cut covers from. */
+async function cleanCopy(url, { fetchImpl, signal, dir }) {
+  const buffer = await download(url, { fetchImpl, signal, max: MAX_DOWNLOAD, what: "無字幕版" });
+  const file = require("node:path").join(dir, "clean-" + crypto.randomUUID() + ".mp4");
+  require("node:fs").writeFileSync(file, buffer);
+  return file;
+}
+
+module.exports = { problems, request, quote, run, cleanCopy, RATIOS, POLL_LIMIT_MS };

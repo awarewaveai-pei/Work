@@ -23,6 +23,11 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
   const mp4 = path.join(dir, "render.mp4");
   assert.equal(spawnSync(ffmpeg, ["-y", "-hide_banner", "-f", "lavfi", "-i", "testsrc=size=270x480:rate=10", "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", mp4], { windowsHide: true }).status, 0);
   const bytes = fs.readFileSync(mp4), sha = crypto.createHash("sha256").update(bytes).digest("hex");
+  // The caption-less copy: a plain red video, so a cover cut from it is red and one cut from the testsrc render is not.
+  const cleanMp4 = path.join(dir, "clean.mp4");
+  assert.equal(spawnSync(ffmpeg, ["-y", "-hide_banner", "-f", "lavfi", "-i", "color=c=red:size=270x480:rate=10", "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", cleanMp4], { windowsHide: true }).status, 0);
+  const cleanBytes = fs.readFileSync(cleanMp4), R2_CLEAN = "https://r2.test/videoclean/abc/9x16.mp4";
+  let cleanFetched = 0;
 
   const submitted = [], registered = [], ledger = [], quoted = [], covers = [];
   let corrupt = false, lookupDown = true;
@@ -30,6 +35,7 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
     url = String(url);
     if (url === R2 && corrupt) { corrupt = false; return new Response("bad", { headers: { "content-length": "3" } }); }
     if (url === R2) return new Response(bytes, { headers: { "content-length": String(bytes.length) } });
+    if (url === R2_CLEAN) { cleanFetched++; return new Response(cleanBytes, { headers: { "content-length": String(cleanBytes.length) } }); }
     assert.ok(url.startsWith(BASE), "unexpected " + url);
     assert.equal(options.headers.Authorization, "Bearer internal-secret");
     if (url === BASE + "/api/internal/video/workbench/quick-render/quote") {
@@ -46,7 +52,7 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
       assert.equal(q.get("jobId"), REMOTE);
       // a 5xx is the main system not answering now (a failed DB read): the poll asks again, the render is not failed
       if (lookupDown) { lookupDown = false; return Response.json({ ok: false, error: "job_lookup_failed" }, { status: 502 }); }
-      return Response.json({ ok: true, status: "done", ratio: "9x16", assetId: VIDEO, checksumSha256: sha, url: R2, rightsSources: [] });
+      return Response.json({ ok: true, status: "done", ratio: "9x16", assetId: VIDEO, checksumSha256: sha, url: R2, cleanUrl: R2_CLEAN, rightsSources: [] });
     }
     if (url === BASE + "/api/internal/video/workbench/assets") {
       const meta = JSON.parse(Buffer.from(options.headers["X-VW-Meta"], "base64url").toString("utf8"));
@@ -97,6 +103,12 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
     assert.ok(job.result.covers.every((c) => c.kind === "auto" && c.assetId), JSON.stringify(job.result.covers));
     assert.equal(covers.length, job.result.covers.length);
     assert.ok(covers.every((c) => c.meta.coverOf === VIDEO && c.meta.coverKind === "auto" && c.type === "image/jpeg"), JSON.stringify(covers));
+    // ...cut from the caption-less copy (red), not the captioned render; the temporary copy is gone afterwards.
+    assert.ok(cleanFetched >= 1);
+    const coverFile = path.join(dir, job.result.covers[0].url.slice(1));
+    const px = spawnSync(ffmpeg, ["-hide_banner", "-i", coverFile, "-vf", "format=rgb24,crop=1:1:5:5", "-f", "rawvideo", "-"], { windowsHide: true }).stdout;
+    assert.ok(px[0] > 200 && px[1] < 60 && px[2] < 60, "cover pixel " + [...px.subarray(0, 3)]);
+    assert.deepEqual(fs.readdirSync(path.join(dir, "generated")).filter((f) => f.startsWith("clean-")), []);
     // 成片: the job lands in the episode's outputs.
     const projects = [{ id: "proj-1", episodes: [{ id: "ep-1", shots: [], steps: [], outputs: [] }] }];
     assert.equal(spine.settle(projects, job), true);

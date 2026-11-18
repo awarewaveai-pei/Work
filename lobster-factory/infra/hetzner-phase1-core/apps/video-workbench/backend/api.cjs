@@ -93,7 +93,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // COVER_SLACK_MS before the job's deadlineAt (the browser stops watching a job at that time, shared/runtime.js), stop
   // on cancel, and every stop or failure is only result.coverError. The caller decides the job's state (a cancel wins).
   // (the numbers: backend/cover.cjs coverBudget)
-  async function addCovers(job, { width, height, duration, title, signal }) {
+  // `file` = the frames' source when it is not the deliverable itself (a quick render's caption-less copy).
+  async function addCovers(job, { width, height, duration, title, signal, file }) {
     const budget = require("./cover.cjs").coverBudget(job.deadlineAt, Date.now());
     if (!budget) {
       job.result.coverError = "影片完成時已接近時限，這次沒有自動產生封面；可在送審頁上傳封面。";
@@ -101,7 +102,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     }
     try {
       const made = await require("./cover.cjs").autoCovers(
-        { file: localFile(job.result.url), duration, width, height, title, dir: outputs, signal: signal ? AbortSignal.any([AbortSignal.timeout(budget), signal]) : AbortSignal.timeout(budget) },
+        { file: file || localFile(job.result.url), duration, width, height, title, dir: outputs, signal: signal ? AbortSignal.any([AbortSignal.timeout(budget), signal]) : AbortSignal.timeout(budget) },
         { run: mediaTools.run, fontDir: require("./editor-export.cjs").fontDir },
       );
       job.result.covers = made.map((m) => {
@@ -684,8 +685,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         if (signal.aborted) return;
         job.result = result; // registered by the main system itself: settle() finds the row (main.adopt)
         // VD.1: every deliverable render gets its free covers (Soulful 2026-11-18: quick renders had none, so social
-        // drafts and the WordPress embed went out without a cover).
-        await addCovers(job, { width: result.width, height: result.height, duration: result.duration, title: result.title || job.input.settings?.title, signal });
+        // drafts and the WordPress embed went out without a cover). Frames come from the caption-less copy when the main
+        // system made one: a cover cut from the captioned file shows a caption line under the title. No copy -> the video.
+        const clean = result.cleanUrl ? await quickRender.cleanCopy(result.cleanUrl, { fetchImpl, signal, dir: outputs }).catch(() => null) : null;
+        try {
+          await addCovers(job, { width: result.width, height: result.height, duration: result.duration, title: result.title || job.input.settings?.title, signal, file: clean });
+        } finally {
+          if (clean) fs.rmSync(clean, { force: true });
+        }
         if (job.status === "cancelled") return; // cancelled while the covers were made: the cancel wins, as everywhere
         job.progress = 100;
         job.status = "succeeded";
