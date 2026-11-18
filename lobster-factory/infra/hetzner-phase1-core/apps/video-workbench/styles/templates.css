@@ -197,7 +197,7 @@ textarea:focus {
   top: 10px;
   left: 10px;
   background: color-mix(in srgb, var(--body-bg) 80%, transparent);
-  color: white;
+  color: var(--text-primary);
   border-radius: calc(var(--radius) * 2);
   padding: 4px 8px;
   font-size: var(--font-size-xs);

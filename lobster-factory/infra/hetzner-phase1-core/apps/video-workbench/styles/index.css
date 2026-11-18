@@ -538,15 +538,15 @@ textarea::placeholder {
 .subtitle-preview[data-position="上方"] { align-items: start; }
 .subtitle-preview[data-position="中間"] { align-items: center; }
 .subtitle-preview[data-position="中下"] { align-items: center; padding-top: 45px; }
-.subtitle-preview span { color: white; text-shadow: -1px -1px black, 1px 1px black; text-align: center; }
+.subtitle-preview span { color: var(--picture-white); text-shadow: -1px -1px var(--picture-black), 1px 1px var(--picture-black); text-align: center; }
 .subtitle-preview[data-size="小"] span { font-size: 12px; }
 .subtitle-preview[data-size="中"] span { font-size: 16px; }
 .subtitle-preview[data-size="大"] span { font-size: 22px; }
-.subtitle-preview[data-style="白字灰底"] span { background: #555; text-shadow: none; }
-.subtitle-preview[data-style="黑底白字"] span { background: black; text-shadow: none; }
-.subtitle-preview[data-style="白底黑字"] span { background: white; color: black; text-shadow: none; }
-.subtitle-preview[data-style="白字陰影"] span { text-shadow: 1px 2px 3px black; }
-.subtitle-preview[data-style="黃字黑邊"] span { color: yellow; }
+.subtitle-preview[data-style="白字灰底"] span { background: var(--picture-subtitle-grey); text-shadow: none; }
+.subtitle-preview[data-style="黑底白字"] span { background: var(--picture-black); text-shadow: none; }
+.subtitle-preview[data-style="白底黑字"] span { background: var(--picture-white); color: var(--picture-black); text-shadow: none; }
+.subtitle-preview[data-style="白字陰影"] span { text-shadow: 1px 2px 3px var(--picture-black); }
+.subtitle-preview[data-style="黃字黑邊"] span { color: var(--picture-yellow); }
 .pop-title {
   margin: 0 0 10px;
   font-weight: var(--font-weight-semibold);
@@ -2042,10 +2042,10 @@ body.templates-open #templatesArea {
   position: absolute;
   left: 20px;
   bottom: 18px;
-  color: white;
+  color: var(--picture-white);
   font-size: calc(var(--font-size-xl) * 0.9166666666666666);
   font-weight: var(--font-weight-bold);
-  text-shadow: 0 1px 4px var(--body-bg);
+  text-shadow: 0 1px 4px var(--picture-black);
 }
 .director-result-actions {
   display: flex;

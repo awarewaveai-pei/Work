@@ -259,7 +259,7 @@ async function edFxResults(p) {
 function edFxResultsHtml(p) {
   const r = edFxUi.results?.projectId === p.id ? edFxUi.results.jobs : null;
   return `<h3>完成的結果</h3>${edButton("找回已完成的結果", "fx-results")}${
-    !r ? "" : r.length ? `<ul class="ed-fx-results">${r.map((j) => `<li><span>${j.input.editorFx.kind === "regen" ? "重新生成" : j.input.operation === "enhance" ? "AI 畫質增強" : "放大畫質"} · ${esc(new Date(j.createdAt).toLocaleString())}</span>${edButton("替換", "fx-apply:" + j.id)}</li>`).join("")}</ul>` : '<p class="note">沒有尚未替換的結果。</p>'
+    !r ? "" : r.length ? `<ul class="ed-fx-results">${r.map((j) => `<li><span>${j.input.editorFx.kind === "regen" ? "重新生成" : j.input.operation === "enhance" ? "AI 畫質增強" : "放大畫質"} · ${esc(VideoWorkbench.jobTime(j.createdAt))}</span>${edButton("替換", "fx-apply:" + j.id)}</li>`).join("")}</ul>` : '<p class="note">沒有尚未替換的結果。</p>'
   }`;
 }
 function edFxWatch(job, apply, label) {

@@ -1,6 +1,17 @@
 @import url("/awarewave/theme.css");
 @import url("/awarewave/forms.css");
 
+/* Picture colours: drawn on or inside the video frame (letterbox, burned-in subtitle samples, overlays on the
+   picture), so they stay the same in every theme. UI chrome uses the app theme tokens, never these. */
+:root {
+  --picture-black: #000;
+  --picture-white: #fff;
+  --picture-yellow: #ff0;
+  --picture-subtitle-grey: #555;
+  --picture-scrim: #0008;
+  --picture-outline: #fff8;
+}
+
 .vw-organization-dialog {
   background: var(--card-bg);
   color: var(--text-primary);

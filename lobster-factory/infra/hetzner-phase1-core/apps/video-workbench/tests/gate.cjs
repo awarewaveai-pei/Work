@@ -46,6 +46,7 @@ const tests = [
   "u8-title-form",
   "u8-bookends",
   "u4-scene-image",
+  "style-literals",
 ];
 const checks = [
   "server.cjs",

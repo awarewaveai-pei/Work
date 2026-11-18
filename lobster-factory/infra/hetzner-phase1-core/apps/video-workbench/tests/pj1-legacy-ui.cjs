@@ -37,6 +37,9 @@ const STORE = "awarewave-projects-screenshot-frontend-v1";
     await p.goto(base);
     await p.waitForFunction(() => window.VideoWorkbench?.router);
     await p.locator("#toolsNav").click(); // the frames get their page on first visit
+    // The tools page loads a tool's code only when it opens (TOOLS[].scripts, tests/tools-lazy-load.cjs): load 影片剪輯's.
+    await p.waitForFunction(() => document.getElementById("toolsFrame").contentWindow?.toolScripts);
+    await p.evaluate(() => document.getElementById("toolsFrame").contentWindow.eval("toolScripts(TOOLS.find((t) => t.id === 'edit'))"));
     await p.waitForFunction(() => document.getElementById("toolsFrame").contentWindow?.edNative);
     // The values the editor computes from each seed before anything is adopted (pure functions of the tools page).
     const expected = await p.evaluate(

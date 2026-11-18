@@ -5,11 +5,7 @@ html {
   margin: 0;
   background: var(--body-bg);
   color: var(--text-primary);
-  font:
-    13px/1.55 system-ui,
-    -apple-system,
-    "Noto Sans TC",
-    sans-serif;
+  font: 13px/1.55 var(--font-family-base);
   min-height: 100%;
   overflow-x: hidden;
 }
@@ -17,11 +13,7 @@ body {
   margin: 0;
   background: var(--body-bg);
   color: var(--text-primary);
-  font:
-    13px/1.55 system-ui,
-    -apple-system,
-    "Noto Sans TC",
-    sans-serif;
+  font: 13px/1.55 var(--font-family-base);
   min-height: 100%;
   overflow-x: hidden;
 }
@@ -612,12 +604,7 @@ td:first-child {
   border-radius: calc(var(--radius) * 0.75);
   color: var(--btn-secondary-text);
   min-height: 92px;
-  font:
-    11.5px/1.55 ui-monospace,
-    Consolas,
-    Monaco,
-    "JetBrains Mono",
-    monospace;
+  font: 11.5px/1.55 var(--font-family-mono);
   white-space: pre-wrap;
   word-break: break-word;
   overflow: auto;
@@ -626,11 +613,7 @@ td:first-child {
 }
 .prompt-code.missing {
   color: var(--text-secondary);
-  font-family:
-    system-ui,
-    -apple-system,
-    "Noto Sans TC",
-    sans-serif;
+  font-family: var(--font-family-base);
   font-size: var(--font-size-sm);
   max-height: none;
 }
@@ -675,9 +658,7 @@ td:first-child {
   border-radius: calc(var(--radius) * 0.75);
   background: var(--body-bg);
   color: var(--text-primary);
-  font:
-    11.5px/1.55 ui-monospace,
-    monospace;
+  font: 11.5px/1.55 var(--font-family-mono);
   display: block;
   margin: 0 0 14px;
 }

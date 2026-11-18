@@ -51,7 +51,33 @@
     const [review, outcome] = await Promise.all([readReview(get, org, asset), get("/api/video/draft-outcome?" + new URLSearchParams({ organizationId: org, candidateAssetId: asset }))]);
     return review && outcome ? { ...review, drafted: !!(outcome.drafts?.length || outcome.articles?.length), drafts: outcome.drafts || [], articles: outcome.articles || [], socialUrl: outcome.socialUrl } : null;
   }
-  if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio, readReview, readPublished, readProgress });
+  // A job as people read it (歷史紀錄 and the job panel): a Chinese name, status and local time, never the raw operation,
+  // id or ISO string. Names follow the tools page (TOOLS in scripts/tools-0.js); an unknown operation reads as its type.
+  const JOB_STATUS = { submitting: "送出中", queued: "排隊中", running: "處理中", succeeded: "已完成", failed: "失敗", cancelled: "已取消", blocked: "已停止" },
+    JOB_OPERATION = {
+      "quick-render": "快速輸出", "project-shot": "鏡頭生成", "image-output": "圖片尺寸轉換", "cover-ai": "AI 封面",
+      edit: "影片剪輯", "editor-export": "影片剪輯輸出", "editor-transcribe": "字幕與逐字稿", "engine-render": "專業剪輯輸出",
+      "remotion-template": "片頭／片尾模板", compose: "動畫合成", region: "圖片局部編輯器", depth: "影片轉深度影片",
+      breakout: "破框貼文動畫", "remove-bg": "去背", reshoot: "拍片智能體",
+      voice: "配音生成", "voice-overlay": "影片／圖片配音", music: "音樂生成", sfx: "去配樂・重配音效", separate: "音軌分離",
+      subtitle: "字幕與逐字稿", "subtitle-burn": "字幕燒錄", "caption-reburn": "字幕重新燒錄",
+      watermark: "影片浮水印", cta: "影片 CTA 按鈕", upscale: "畫質增強", enhance: "影音增強與消除字幕", privacy: "肖像權保護",
+      short: "智能短影音剪輯", "follow-track": "人物跟拍剪輯", "follow-manual": "人物跟拍剪輯",
+      rig: "角色綁定", autorig: "自動綁骨", "blender-autorig": "自動綁骨", retarget: "動作重定向", "blender-retarget": "動作重定向",
+      "blender-render": "3D 算圖", "image-to-3d": "圖片轉 3D",
+      "character-image": "角色圖片", "character-voice": "角色配音", "character-test": "角色試拍",
+    },
+    JOB_TYPE = { image: "圖片生成", video: "影片生成", audio: "音訊生成", text: "文字生成", model: "3D 模型", subtitle: "字幕" };
+  const jobStatusLabel = (status) => JOB_STATUS[status] || "處理中",
+    jobTitle = (job) => JOB_OPERATION[job?.input?.operation] || JOB_TYPE[job?.type] || "生成任務",
+    jobTime = (iso, timeZone) => {
+      const d = new Date(iso || NaN);
+      return isNaN(d) ? "" : d.toLocaleString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone });
+    };
+  if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio, readReview, readPublished, readProgress, jobStatusLabel, jobTitle, jobTime });
+  VideoWorkbench.jobStatusLabel = jobStatusLabel;
+  VideoWorkbench.jobTitle = jobTitle;
+  VideoWorkbench.jobTime = jobTime;
   VideoWorkbench.bookendAction = async (v, action) => {
     if (!VideoWorkbench.bookends) await VideoWorkbench.loadScripts(["bookends.js"], sharedBase);
     const api = VideoWorkbench.bookends;
@@ -309,7 +335,7 @@
       result = document.createElement("div"),
       cancel = document.createElement("button"),
       close = document.createElement("button");
-    title.textContent = "生成任務";
+    title.textContent = jobTitle(job);
     progress.max = 100;
     cancel.textContent = "取消任務";
     close.textContent = "關閉";
@@ -319,7 +345,7 @@
     let timer,
       closed = false;
     const update = (v) => {
-      status.textContent = ({ queued: "排隊中", running: "處理中", succeeded: "已完成", failed: "失敗", cancelled: "已取消", blocked: "已停止" })[v.status] || "處理中";
+      status.textContent = jobStatusLabel(v.status);
       progress.value = Number(v.progress) || 0;
       cancel.hidden = !["queued", "running"].includes(v.status);
       result.replaceChildren();

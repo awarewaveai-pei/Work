@@ -3,6 +3,15 @@ const assert = require("node:assert/strict"), fs = require("node:fs"), path = re
 const root = path.join(__dirname, ".."), tick = () => new Promise(setImmediate);
 const clone = (v) => structuredClone(v);
 async function settle() { for (let i = 0; i < 8; i++) await tick(); }
+// U11.1: a history card reads 中文名稱 / 中文狀態 · local time; the job id stays only in its buttons' data attributes.
+function card(html, id) {
+  const one = html.split("<article").find((a) => a.includes(`data-job-open="${id}"`));
+  assert(one, "no history card for " + id);
+  const [, title, line] = /<h2>(.*?)<\/h2><p>(.*?)<\/p>/.exec(one);
+  assert.doesNotMatch(title + line, new RegExp(id + "|quick-render|\\d{4}-\\d{2}-\\d{2}T"), "raw id, operation or ISO time shown");
+  assert.match(line, /^\S+ · \d{4}\/\d{2}\/\d{2}\s\d{2}:\d{2}$/);
+  return { title, status: line.split(" · ")[0] };
+}
 function page(oldJobs = []) {
   const timers = new Map(), handlers = new Map(), server = new Map(oldJobs.map((j) => [j.id, clone(j)])), requests = [], errors = [];
   let timerId = 0, serial = 0, active = 0, peak = 0, hold = null;
@@ -20,7 +29,7 @@ function page(oldJobs = []) {
     async request(route, method = "GET", body) {
       if (route === "/capabilities") return {};
       if (route === "/generations" && method === "POST") {
-        const job = { id: "job-" + ++serial, status: "queued", type: "video", input: clone(body), deadlineAt: new Date(Date.now() + 60000).toISOString() };
+        const job = { id: "job-" + ++serial, status: "queued", type: "video", input: clone(body), createdAt: "2026-11-16T15:18:23.818Z", deadlineAt: new Date(Date.now() + 60000).toISOString() };
         server.set(job.id, job); return clone(job);
       }
       const match = /^\/generations\/([^/]+)(\/cancel)?$/.exec(route);
@@ -45,6 +54,7 @@ function page(oldJobs = []) {
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(root, "shared/runtime.js"), "utf8"), sandbox);
   const api = window.VideoWorkbench;
+  vm.runInContext(fs.readFileSync(path.join(root, "shared/jobs-view.js"), "utf8"), sandbox); // the history line's labels
   api.reportError = (e) => errors.push(e); api.sanitize = (s) => s; api.showJob = () => { throw Error("test must not open a panel"); };
   vm.runInContext(fs.readFileSync(path.join(root, "scripts/workspaces.js"), "utf8"), sandbox);
   return { api, server, requests, errors, timers, host, get peak() { return peak; },
@@ -62,12 +72,12 @@ function page(oldJobs = []) {
   assert.equal(p.timers.size, 0, "empty boot stops watching");
   await p.api.workspaces.open("history");
   const job = await p.api.generations.create({ operation: "quick-render" }); await settle();
-  assert.match(p.host.innerHTML, /queued/);
+  assert.deepEqual(card(p.host.innerHTML, job.id), { title: "快速輸出", status: "排隊中" });
   assert.equal(p.timers.size, 1, "new job restarts the idle runner");
   Object.assign(p.server.get(job.id), { status: "failed", error: "bookend join failed" });
   await p.advance();
   assert.equal((await p.api.generations.list())[0].status, "failed");
-  assert.match(p.host.innerHTML, /failed/); assert.match(p.host.innerHTML, /bookend join failed/);
+  assert.equal(card(p.host.innerHTML, job.id).status, "失敗"); assert.match(p.host.innerHTML, /bookend join failed/);
   assert.equal(p.timers.size, 0, "closed-panel failure ends the runner");
 
   const manual = await p.api.generations.create({ operation: "quick-render" }); await settle();
@@ -75,18 +85,18 @@ function page(oldJobs = []) {
   const before = p.requests.length;
   await p.api.generations.refresh((await p.api.generations.list()).find((j) => j.id === manual.id)); await settle();
   assert.equal(p.requests.length, before + 1, "manual check reads only its one job");
-  assert.match(p.host.innerHTML, new RegExp(manual.id + " · failed"));
+  assert.equal(card(p.host.innerHTML, manual.id).status, "失敗");
   await p.advance();
 
   const refreshing = await p.api.generations.create({ operation: "quick-render" }); await settle();
   p.server.get(refreshing.id).status = "failed";
   await p.refreshButton();
-  assert.match(p.host.innerHTML, new RegExp(refreshing.id + " · failed"), "history refresh obtains fresh state");
+  assert.equal(card(p.host.innerHTML, refreshing.id).status, "失敗", "history refresh obtains fresh state");
   assert.equal(p.timers.size, 0);
 
   const cancelling = await p.api.generations.create({ operation: "quick-render" }); await settle();
   await p.api.generations.cancel(cancelling.id); await settle();
-  assert.match(p.host.innerHTML, new RegExp(cancelling.id + " · cancelled"), "cancel updates the same history view");
+  assert.equal(card(p.host.innerHTML, cancelling.id).status, "已取消", "cancel updates the same history view");
   await p.advance(); assert.equal(p.timers.size, 0);
 
   const parallel = page(); await parallel.api.ready; await settle();
@@ -107,5 +117,13 @@ function page(oldJobs = []) {
   assert.equal((await legacy.api.assets.list())[0].id, "job-legacy", "finished result survives with panel closed");
   assert.equal(legacy.timers.size, 0);
   assert.deepEqual([...p.errors, ...parallel.errors, ...legacy.errors], []);
+  // A job named after a tool reads exactly as the tools page names it (TOOLS in scripts/tools-0.js).
+  const { jobTitle } = require("../shared/jobs-view.js"),
+    tools = [...fs.readFileSync(path.join(root, "scripts/tools-0.js"), "utf8").matchAll(/\bid: "([\w-]+)",[^{}]*?\bname: "([^"]+)"/g)];
+  assert(tools.length >= 20, "TOOLS not found in scripts/tools-0.js");
+  for (const [, id, name] of tools) {
+    const title = jobTitle({ input: { operation: id } });
+    if (title !== "生成任務") assert.equal(title, name, "history name of " + id + " differs from the tools page");
+  }
   console.log("job-status-sync ok: idle wake, closed panel, history events/manual refresh, one runner, old saved job");
 })().catch((error) => { console.error(error); process.exitCode = 1; });
