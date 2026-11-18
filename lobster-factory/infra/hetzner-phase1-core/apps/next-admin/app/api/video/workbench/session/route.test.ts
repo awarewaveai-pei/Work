@@ -67,6 +67,23 @@ describe("GET /api/video/workbench/session", () => {
     expect([none.status, none.headers.get("x-vw-org-id"), none.headers.get("x-vw-billing-org-id")]).toEqual([204, INTERNAL, INTERNAL]);
   });
 
+  it("staff selection pins the session and rejects stale document context", async () => {
+    const selected = await call(staff("operator", { cookie: `__Host-vw-organization=${CHILD}` }));
+    expect([selected.status, selected.headers.get("x-vw-org-id"), selected.headers.get("x-vw-billing-org-id")]).toEqual([204, CHILD, ORG]);
+    const stale = await call(staff("operator", { cookie: `__Host-vw-organization=${CHILD}`, "x-vw-org": OTHER }));
+    expect(stale.status).toBe(403);
+    expect(await stale.json()).toMatchObject({ error: "org_context_changed" });
+    for (const cookie of ["__Host-vw-organization=", "__Host-vw-organization=%", `__Host-vw-organization=${CHILD}; __Host-vw-organization=${OTHER}`]) {
+      expect((await call(staff("owner", { cookie }))).status).toBe(403);
+    }
+  });
+
+  it("client ignores a previous staff cookie while foreign explicit pins remain forbidden", async () => {
+    const own = await call(client(CHILD, { cookie: `__Host-vw-organization=${OTHER}` }));
+    expect([own.status, own.headers.get("x-vw-org-id")]).toEqual([204, CHILD]);
+    expect((await call(client(CHILD, { cookie: `__Host-vw-organization=${CHILD}`, "x-vw-org": OTHER }))).status).toBe(403);
+  });
+
   it("signs the identity with VW_INTERNAL_TOKEN over the canonical string, expiring in ~120 s", async () => {
     const res = await call(client(CHILD));
     const expires = res.headers.get("x-vw-expires")!;

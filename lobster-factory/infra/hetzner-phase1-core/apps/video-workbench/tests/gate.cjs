@@ -7,6 +7,7 @@ const root = path.join(__dirname, "..");
 const tests = [
   "awarewave-files",
   "tenancy",
+  "organization-context",
   "p6-main-system",
   "replicate-video",
   "migrate-media",

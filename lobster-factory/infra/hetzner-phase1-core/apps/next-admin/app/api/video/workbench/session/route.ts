@@ -3,10 +3,10 @@ import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, resolveTenant } from "@/lib/tenant-guard";
 import { resolveSubject } from "@/lib/entitlements/subject";
+import { HEADER_NAME, UUID_RE, readOrganizationCookie } from "@/public/editor-shared/video-organization.cjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** nginx auth_request target for video-workbench (P6 D2): 204 + the X-VW-* identity headers nginx forwards, or a deny.
  *  nginx must call it with `proxy_method GET` and treats anything but 2xx/401/403 as 500, so every failure denies.
@@ -23,9 +23,13 @@ export async function GET(req: Request): Promise<Response> {
   const resolved = resolveOpsRole(req);
   if (!canCreateAiImageJob(resolved.role)) return deny(403, "forbidden");
   const tenant = resolveTenant(req);
-  const asked = req.headers.get("x-vw-org")?.trim() ?? "";
-  if (asked && !UUID.test(asked)) return deny(403, "invalid_org");
-  const orgHint = asked || (tenant.userKind === "client" ? tenant.orgId : null);
+  const asked = req.headers.get(HEADER_NAME)?.trim().toLowerCase() ?? "";
+  if (asked && !UUID_RE.test(asked)) return deny(403, "invalid_org");
+  // A client remains bound to its account even after using the same browser as staff.
+  const selected = tenant.userKind === "staff" ? readOrganizationCookie(req.headers.get("cookie")) : null;
+  if (selected !== null && !UUID_RE.test(selected)) return deny(403, "invalid_org");
+  if (selected && asked && selected !== asked) return deny(403, "org_context_changed");
+  const orgHint = asked || selected || (tenant.userKind === "client" ? tenant.orgId : null);
   if (tenant.userKind === "client" && !orgHint) return deny(403, "client_without_org");
   if (orgHint) {
     try { assertOrgAccess(req, orgHint); } catch (e) { if (e instanceof OrgAccessError) return deny(403, "org_forbidden"); throw e; }

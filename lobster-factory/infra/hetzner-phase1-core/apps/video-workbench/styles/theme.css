@@ -1,6 +1,18 @@
 @import url("/awarewave/theme.css");
 @import url("/awarewave/forms.css");
 
+.vw-organization-dialog {
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: min(640px, 90vw);
+  max-height: 85dvh;
+  overflow: auto;
+  font: inherit;
+}
+
 html[data-awarewave-embedded] .app { display: flex; flex-direction: column; }
 html[data-awarewave-embedded] .sidebar { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 4px; width: auto; height: auto; min-height: 0; overflow: visible; border: 0; border-bottom: 1px solid var(--sidebar-border); padding: 8px; }
 html[data-awarewave-embedded] .sidebar .nav { width: auto; margin: 0; }

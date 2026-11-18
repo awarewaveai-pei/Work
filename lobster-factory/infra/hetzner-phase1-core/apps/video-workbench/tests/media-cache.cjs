@@ -39,9 +39,9 @@ function network(bodyFor) {
   return { calls, fetchImpl };
 }
 const limits = async () => ({ maxBytes: 1e6, entryMaxBytes: 5e5 });
-const read = async (cache, url, headers = {}) => {
+const read = async (cache, url, headers = {}, context) => {
   const waits = [];
-  const response = await cache.respond(new Request(url, { headers }), (p) => waits.push(p));
+  const response = await cache.respond(new Request(url, { headers }), (p) => waits.push(p), context);
   const text = await response.text();
   await Promise.all(waits);
   await cache.flush();
@@ -95,6 +95,153 @@ const read = async (cache, url, headers = {}) => {
     assert.equal(b.text, "bytes-of-org-B");
     assert.equal(net.calls.length, 2);
     console.log("PASS A 組織的副本，B 組織讀不到（清除失敗時也一樣）");
+  }
+
+  // A request owns its scope even while another request changes the worker's housekeeping scope.
+  {
+    const A = { scope: "scope-A", organizationId: "11111111-1111-4111-8111-111111111111" };
+    const B = { scope: "scope-B", organizationId: "22222222-2222-4222-8222-222222222222" };
+    const store = memoryStore({ failWipe: true });
+    let cookieOrg = A.organizationId;
+    const seen = [];
+    const fetchImpl = async (input, init) => {
+      const headers = typeof input === "string" ? new Headers(init?.headers) : input.headers;
+      seen.push(headers.get("x-vw-org"));
+      if (headers.get("x-vw-org") !== cookieOrg) return new Response(null, { status: 403 });
+      return new Response(cookieOrg === A.organizationId ? "A bytes" : "B bytes");
+    };
+    const cache = createMediaCache({ store, fetchImpl, origin: ORIGIN, limits });
+    await read(cache, BASE, {}, A);
+    cookieOrg = B.organizationId;
+    const firstB = await read(cache, BASE, {}, B);
+    assert.deepEqual([firstB.hit, firstB.text], [false, "B bytes"]);
+    let releaseA, enteredA;
+    const entered = new Promise((resolve) => { enteredA = resolve; });
+    const get = store.get;
+    store.get = async (id) => {
+      if (id.startsWith(A.scope)) {
+        enteredA();
+        await new Promise((resolve) => { releaseA = resolve; });
+      }
+      return get(id);
+    };
+    const pendingA = cache.respond(new Request(BASE), () => {}, A);
+    await entered;
+    const responseB = await cache.respond(new Request(BASE), () => {}, B);
+    releaseA();
+    const responseA = await pendingA;
+    assert.deepEqual([await responseA.text(), await responseB.text()], ["A bytes", "B bytes"]);
+    assert.equal((await read(cache, BASE, { "X-VW-Org": B.organizationId }, A)).status, 403,
+      "an explicit request pin must not be silently replaced by another identity");
+    // The cookie changes after identity resolution but before an uncached network read: the pinned request is denied.
+    store.get = get;
+    const changed = await read(cache, BASE.replace(SHA, "b".repeat(64)), {}, A);
+    assert.equal(changed.status, 403);
+    assert.equal(store.rows.size, 2, "a rejected media read must never populate a cache entry");
+    assert.deepEqual(seen, [A.organizationId, B.organizationId, A.organizationId]);
+    console.log("PASS 並發請求各自固定 scope；cookie 中途切換時固定 org 的網路讀取拒絕、不寫副本");
+  }
+
+  // A partial range needs a full background fill; both network requests retain the same organization pin.
+  {
+    const context = { scope: "scope-A", organizationId: "11111111-1111-4111-8111-111111111111" }, calls = [];
+    const cache = createMediaCache({ store: memoryStore(), origin: ORIGIN, limits, fetchImpl: async (input, init) => {
+      const headers = typeof input === "string" ? new Headers(init?.headers) : input.headers;
+      calls.push([headers.get("x-vw-org"), headers.get("range")]);
+      return headers.has("range")
+        ? new Response("234", { status: 206, headers: { "Content-Range": "bytes 2-4/10" } })
+        : new Response("0123456789");
+    } });
+    await read(cache, BASE, { Range: "bytes=2-4" }, context);
+    assert.deepEqual(calls, [[context.organizationId, "bytes=2-4"], [context.organizationId, null]]);
+    assert.equal((await read(cache, BASE, {}, context)).text, "0123456789");
+    console.log("PASS Range 背景補檔保留 org header，清除 Range 後完整保存");
+  }
+
+  // Run the actual worker listener with a memory store: every hit revalidates identity, unknown identities fail closed,
+  // and a MessageChannel handshake proves the controlling worker implements the pinned-context protocol.
+  {
+    const vm = require("node:vm"), fs = require("node:fs"), path = require("node:path");
+    const listeners = {}, store = memoryStore({ failWipe: true }), calls = [];
+    const A = "11111111-1111-4111-8111-111111111111", B = "22222222-2222-4222-8222-222222222222";
+    let org = A, documentOrg = A, unavailable = false, signedOut = false, malformed = false, identityCalls = 0, deferredIdentities = null;
+    const worker = {
+      location: { origin: ORIGIN }, clients: { claim: async () => {}, get: async (id) => id === "page" ? {
+        url: ORIGIN + "/video/projects",
+        postMessage: (message, ports) => {
+          assert.equal(message.type, "vw:document-organization");
+          ports[0].postMessage({ organizationId: documentOrg });
+        },
+      } : id === "silent" ? { url: ORIGIN + "/video/projects", postMessage: () => {} } : null }, skipWaiting: async () => {},
+      addEventListener: (type, handler) => { listeners[type] = handler; },
+    };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../scripts/media-cache-sw.js"), "utf8"), {
+      self: worker, importScripts: () => {}, Request, Response, Headers, URL, AbortController, MessageChannel, setTimeout, clearTimeout,
+      navigator: { storage: { estimate: async () => ({ quota: 1e6 }) } },
+      VwMediaCache: { budget: () => ({ maxBytes: 1e6, entryMaxBytes: 5e5 }),
+        createMediaCache: (options) => createMediaCache({ ...options, store }) },
+      fetch: async (input, init) => {
+        if (input === "/api/vw/identity") {
+          identityCalls++;
+          if (unavailable) throw Error("offline");
+          if (signedOut) return new Response(null, { status: 401 });
+          const body = { scope: "scope-" + org, ...(malformed ? {} : { organizationId: org }) };
+          if (deferredIdentities) return new Promise((resolve) => deferredIdentities.push(() => resolve(Response.json(body))));
+          return Response.json(body);
+        }
+        const headers = typeof input === "string" ? new Headers(init?.headers) : input.headers;
+        calls.push(headers.get("x-vw-org"));
+        return new Response(headers.get("x-vw-org") === org ? org : null,
+          { status: headers.get("x-vw-org") === org ? 200 : 403 });
+      },
+    });
+    const workerRead = async (clientId = "page") => {
+      let response;
+      const waits = [];
+      listeners.fetch({ clientId, request: new Request(BASE), respondWith: (value) => { response = value; }, waitUntil: (p) => waits.push(p) });
+      const result = await response;
+      const body = await result.text();
+      await Promise.all(waits);
+      return { status: result.status, body, hit: result.headers.get("x-vw-media-cache") };
+    };
+    assert.equal((await workerRead()).body, A);
+    assert.equal((await workerRead()).hit, "hit");
+    org = B;
+    assert.equal((await workerRead()).status, 403, "an old A document cannot follow the new B cookie");
+    assert.equal((await workerRead("")).status, 503, "a remote media read needs an identified client");
+    documentOrg = null;
+    assert.equal((await workerRead()).status, 503, "a locked document cannot read media");
+    documentOrg = B;
+    const switched = await workerRead();
+    assert.deepEqual([switched.body, switched.hit, identityCalls], [B, null, 6]);
+    deferredIdentities = [];
+    org = A;
+    documentOrg = A;
+    const oldRead = workerRead();
+    org = B;
+    documentOrg = B;
+    const newRead = workerRead();
+    assert.equal(deferredIdentities.length, 2);
+    deferredIdentities[1](); // the newer B identity completes before the older A answer
+    assert.equal((await newRead).body, B);
+    deferredIdentities[0]();
+    assert.equal((await oldRead).status, 403, "late A identity cannot override the B document's context");
+    deferredIdentities = null;
+    assert.equal((await workerRead("silent")).status, 503, "an old document without the protocol times out closed");
+    unavailable = true;
+    assert.equal((await workerRead()).status, 503, "offline identity must not reveal a cached body");
+    unavailable = false;
+    malformed = true;
+    assert.equal((await workerRead()).status, 503, "remote identity without org is incompatible and fails closed");
+    malformed = false;
+    signedOut = true;
+    assert.equal((await workerRead()).status, 401);
+    assert.equal(store.rows.size, 0);
+    assert.deepEqual(calls, [A, B]);
+    let ack;
+    listeners.message({ data: { type: "vw:media-context", version: 1 }, ports: [{ postMessage: (reply) => { ack = reply; } }] });
+    assert.equal(JSON.stringify(ack), JSON.stringify({ type: "vw:media-context", version: 1, ok: true }));
+    console.log("PASS 實際 worker 每次命中前查身份、切換隔離、離線/不相容/登出拒絕、版本握手");
   }
 
   // Logout and the size cap (LRU) -- invariants 3 and 4.

@@ -56,6 +56,7 @@ function createServer({
   // X-VW-User-Id + X-VW-Org-Id that nginx auth_request set, and each org gets its own <dataDir>/orgs/<orgId>/.
   // Local mode (unset) keeps the single dataDir exactly as before. One createApi per org (own queue, state, ledger).
   const trustProxy = env.VW_TRUST_PROXY_IDENTITY === "1";
+  const organization = trustProxy ? require(path.join(awareWaveDir, "public/editor-shared/video-organization.cjs")) : null;
   const savedTheme = require("./backend/appearance.cjs").savedTheme({ env, fetchImpl });
   const orgs = new Map();
   const local = trustProxy ? null : { dir: dataDir, api: createApi(dataDir) };
@@ -155,6 +156,16 @@ function createServer({
           res.writeHead(401, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
           res.end(JSON.stringify({ error: { message: "需要登入" } }));
           return;
+        }
+        if (pathname !== "/api/vw/identity") {
+          const pin = String(req.headers[organization.HEADER_NAME] || "").trim().toLowerCase();
+          const selected = organization.readOrganizationCookie(req.headers.cookie);
+          // Old documents must fail closed after selection, including direct uploads that bypass the state queue.
+          if ((selected !== null && !pin) || (pin && pin !== req.vwIdentity.orgId)) {
+            res.writeHead(403, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+            res.end(JSON.stringify({ error: { code: "org_context_changed", message: "客戶已切換，請重新載入此頁。" } }));
+            return;
+          }
         }
       }
       if (tenant && (await tenant.api(req, res))) return;

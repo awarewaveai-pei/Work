@@ -16,4 +16,5 @@ lib/ai/to-traditional.ts
 public/editor-shared/image-models.js
 public/editor-shared/video-styles.js
 public/editor-shared/art-styles.js
+public/editor-shared/video-organization.cjs
 lib/ai/video-motion-models.ts

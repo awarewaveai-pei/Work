@@ -1,9 +1,8 @@
 // Service worker for the browser media copy (logic + invariants: shared/media-cache.js). Registered by shared/runtime.js
 // with scope "/" (server.cjs sends Service-Worker-Allowed: / for this file). It answers only same-origin GET
 // /media/<sha256>/... and /generated/<uuid>.<ext>; every other request (pages, API, engines, next-admin) is untouched.
-// Identity: each workbench page navigation asks GET /api/vw/identity in parallel with the page; media reads wait for that
-// answer, and an identity older than 60 s is asked again before a read. Any /login or /logout request or a 401 from a
-// media read deletes every copy.
+// Every media read checks identity first and pins that request's cache scope and network org together. Cookie changes
+// between that check and the network read are denied by the session gate instead of storing bytes under another org.
 "use strict";
 importScripts("/shared/media-cache.js");
 
@@ -76,22 +75,61 @@ const store = {
   setScope: (scope) => tx(META, "readwrite", (s) => s.put(scope, "scope")),
 };
 
-const askIdentity = () =>
-  fetch("/api/vw/identity", { credentials: "same-origin", cache: "no-store" }).then(async (r) =>
-    r.status === 401 ? "logout" : r.ok ? (await r.json()).scope : null,
-  );
+const askIdentity = async () => {
+  const response = await fetch("/api/vw/identity", { credentials: "same-origin", cache: "no-store" });
+  if (!response.ok) return { status: response.status === 401 ? 401 : 503 };
+  const context = await response.json();
+  if (typeof context.scope !== "string" || !context.scope ||
+      (context.scope !== "local" && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(context.organizationId || "")))
+    return { status: 503 };
+  return { scope: context.scope, organizationId: context.organizationId };
+};
 const cache = VwMediaCache.createMediaCache({
   store,
-  checkIdentity: askIdentity,
   origin: self.location.origin,
   fetchImpl: (input, init) => fetch(input, init),
   limits: async () => VwMediaCache.budget(await navigator.storage?.estimate?.().catch(() => null)),
 });
-const identityNow = () => cache.identify(askIdentity());
-const WORKBENCH_PAGE = /^\/(?:index\.html|pages\/[a-z0-9-]+\.html)?$/;
+async function documentOrganization(clientId) {
+  const client = clientId && await self.clients.get(clientId);
+  if (!client || new URL(client.url).origin !== self.location.origin) return null;
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const finish = (organizationId) => {
+      clearTimeout(timer);
+      channel.port1.close();
+      channel.port2.close();
+      resolve(organizationId || null);
+    };
+    const timer = setTimeout(() => finish(null), 3000);
+    channel.port1.onmessage = (event) => finish(event.data?.organizationId);
+    try { client.postMessage({ type: "vw:document-organization" }, [channel.port2]); }
+    catch { finish(null); }
+  });
+}
+async function media(request, background, clientId) {
+  let context;
+  try { context = await askIdentity(); } catch { context = { status: 503 }; }
+  if (context.status) {
+    await cache.identify(context.status === 401 ? "logout" : null);
+    return new Response(null, { status: context.status, headers: { "Cache-Control": "no-store" } });
+  }
+  if (context.scope !== "local") {
+    let organizationId;
+    try { organizationId = await documentOrganization(clientId); } catch { organizationId = null; }
+    if (!organizationId || organizationId !== context.organizationId)
+      return new Response(null, { status: organizationId ? 403 : 503, headers: { "Cache-Control": "no-store" } });
+  }
+  return cache.respond(request, background, context);
+}
 
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim().then(identityNow)));
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+// Switching clients must first confirm that this protocol is implemented by the controlling worker.
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "vw:media-context" && event.data.version === 1)
+    event.ports?.[0]?.postMessage({ type: "vw:media-context", version: 1, ok: true });
+});
 self.addEventListener("fetch", (event) => {
   const request = event.request, url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
@@ -100,9 +138,5 @@ self.addEventListener("fetch", (event) => {
     event.waitUntil(cache.identify("logout"));
     return;
   }
-  if (request.mode === "navigate") {
-    if (request.destination === "document" && WORKBENCH_PAGE.test(url.pathname)) event.waitUntil(identityNow());
-    return;
-  }
-  if (cache.handles(request)) event.respondWith(cache.respond(request, (p) => event.waitUntil(p)));
+  if (cache.handles(request)) event.respondWith(media(request, (p) => event.waitUntil(p), event.clientId));
 });

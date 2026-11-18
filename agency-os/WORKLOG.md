@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-18（續1）— Soulful 代操客戶切換（部署前）
+
+- 根因：工作台未送 org；舊頁／直接上傳／媒體快取未固定 document org。修正沿用 session、HMAC、root billing；不搬舊資料、不改 RLS。VW/shared/adapters.js:115、server.cjs:160、scripts/media-cache-sw.js:93。
+- REALTEST_EVIDENCE: tool=Bash | cmd=tsc --noEmit; vitest full --maxWorkers=2 --minWorkers=1 (4807 passed); node tests/gate.cjs; node tests/organization-browser.cjs; node tests/media-cache-browser.cjs | exit=0 | ms=110000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/0m/0n
+- ORACLE_WAIVED: 操作者兩次確認 Claude 額度耗盡；使用獨立 Codex 只讀審查、對抗自審與 ownership 守衛記憶體突變。沒有宣稱跨模型通過。
+- 自審：舊頁 pin、iframe 同 context、直接 chunk/render、client 忽略 staff cookie、active/root billing、CSRF、SW document pin/接管、雙擊互斥、跨頁上傳鎖均有反例測試。拔 server pin 比對→tenancy:70 紅200≠403；原 source 綠且SHA不變。證據在本 chat work/org-pin-ownership-{red,green}.txt。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=withSwitchLock|X-VW-Org|organizationPicker | hits=45
+- 剩餘：尚未部署／正式 Soulful 實點及公開發布。操作者已同意這批部署與立即公開發布。僅本批 NA→VW 協調部署；回滾兩邊 source，cookie 舊版忽略，資料留原目錄。Claude vu-org-switch / vu-u23-u111 工作樹保留未整合。
 ## 2026-11-16（續10）— U6.6：工作台專案頁漏列選題專案（已修、已上線）
 
 [根因] 唯讀卡清單用 `!p.source_ref` 當「不是工作台的專案」，但話題佇列建的列帶 `source_ref`＝話題 id（`lib/content/video/topic-project.ts:17`）→ 正式站 3 個 `content_topic` 專案不出現。兩份清單的分界是 `source`，不是 `source_ref`。

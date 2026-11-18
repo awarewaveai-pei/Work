@@ -111,6 +111,71 @@
     if (window.top !== window) window.top.postMessage({ channel: "vw:v1", action: "unauthorized", payload: { next } }, "*");
     else location.assign("/login?next=" + encodeURIComponent(next));
   }
+  // One immutable organization per document, established before state or capabilities.
+  // Framed workspaces share their parent's context even after another tab switches the cookie.
+  const connected = window.VW_CONFIG?.mode === "http" && window.VW_CONFIG.apiBaseUrl?.replace(/\/$/, "") === "/api/vw";
+  let context;
+  try { if (window.parent !== window) context = window.parent.VideoWorkbenchAdapters?.context; } catch {}
+  context ||= (() => {
+    let active = 0, locked = false;
+    const ready = connected ? fetch("/api/vw/identity", { credentials: "same-origin", cache: "no-store" }).then(async (r) => {
+      if (r.status === 401) signedOut();
+      if (!r.ok) throw new ServiceError("IDENTITY_ERROR", "無法確認目前客戶，請重新整理", r.status);
+      const value = await r.json();
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.organizationId || ""))
+        throw new ServiceError("IDENTITY_ERROR", "服務尚未提供客戶識別，請重新整理");
+      return Object.freeze({ organizationId: value.organizationId.toLowerCase() });
+    }) : Promise.resolve(null);
+    ready.catch(() => {}); // The adapter reports the failure to the existing error UI.
+    return {
+      ready,
+      get locked() { return locked; },
+      get busy() { return active > 0; },
+      invalidate() { locked = true; },
+      lock() {
+        if (locked) throw Error("客戶已切換或正在切換，請重新整理頁面");
+        if (active) throw Error("仍在傳送或儲存資料，請完成後再切換客戶");
+        locked = true;
+      },
+      unlock() { locked = false; },
+      async withSwitchLock(action) {
+        if (!navigator.locks) throw Error("此瀏覽器無法安全切換客戶，請使用最新版 Chrome 或 Edge");
+        return navigator.locks.request("vw-organization-work", { mode: "exclusive", ifAvailable: true }, (lock) => {
+          if (!lock) throw Error("其他分頁仍在傳送或儲存資料，請完成後再切換客戶");
+          return action();
+        });
+      },
+      async run(action) {
+        if (locked) throw Error("客戶已切換或正在切換，請重新整理頁面");
+        active++;
+        try {
+          const invoke = async () => {
+            if (locked) throw Error("客戶已切換或正在切換，請重新整理頁面");
+            return action(await ready);
+          };
+          return connected && navigator.locks
+            ? await navigator.locks.request("vw-organization-work", { mode: "shared" }, invoke)
+            : await invoke();
+        } finally { active--; }
+      },
+    };
+  })();
+  if (connected && window.addEventListener) window.addEventListener("message", async (event) => {
+    if (event.data?.type !== "vw:document-organization" || !event.ports?.[0] || event.source !== navigator.serviceWorker?.controller) return;
+    const identity = await context.ready.catch(() => null);
+    event.ports[0].postMessage({ organizationId: context.locked ? null : identity?.organizationId || null });
+  });
+  async function fetchApi(input, init = {}) {
+    const url = new URL(typeof input === "string" ? input : input.url, location.href);
+    if (url.origin !== location.origin || !url.pathname.startsWith("/api/vw/")) return fetch(input, init);
+    return context.run(async (identity) => {
+      const headers = new Headers(init.headers || (typeof input === "object" ? input.headers : undefined));
+      if (identity) headers.set("X-VW-Org", identity.organizationId);
+      const response = await fetch(input, { ...init, headers });
+      if (response.status === 401) signedOut();
+      return response;
+    });
+  }
   class HttpAdapter {
     constructor(config) {
       this.config = config;
@@ -121,6 +186,9 @@
     // giving up does not stop the server, it only leaves the user not knowing whether it worked. A stalled
     // upload is cut by nginx client_body_timeout and arrives here as an HTTP error.
     request(path, method = "GET", body) {
+      return context.run((identity) => this.send(path, method, body, identity));
+    }
+    send(path, method, body, identity) {
       const json = body === undefined ? undefined : JSON.stringify(body),
         { timeoutMs } = this.config,
         limit = json === undefined ? timeoutMs : this.config.gatewayTimeoutMs || 300000;
@@ -137,6 +205,7 @@
         };
         xhr.open(method, this.config.apiBaseUrl.replace(/\/$/, "") + path);
         xhr.setRequestHeader("Content-Type", "application/json");
+        if (identity) xhr.setRequestHeader("X-VW-Org", identity.organizationId);
         xhr.upload.onprogress = () => wait(limit);
         xhr.onabort = () =>
           reject(new ServiceError(timedOut ? "TIMEOUT" : "ABORTED", timedOut ? `連線逾時：${Math.round(limit / 1000)} 秒沒有任何進度` : "連線已中斷"));
@@ -177,5 +246,5 @@
       return this.request("/state", "PUT", v);
     }
   }
-  window.VideoWorkbenchAdapters = { LocalAdapter, HttpAdapter, ServiceError, signedOut };
+  window.VideoWorkbenchAdapters = { LocalAdapter, HttpAdapter, ServiceError, signedOut, context, fetchApi };
 })();

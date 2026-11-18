@@ -38,6 +38,10 @@ async function listen(options) {
       return { "X-VW-User-Id": f.userId, "X-VW-Org-Id": f.orgId, "X-VW-Billing-Org-Id": f.billingOrgId, "X-VW-User-Kind": f.userKind, "X-VW-Role": f.role, "X-VW-Expires": f.expires, "X-VW-Signature": sign(TOKEN, f) };
     };
     const as = (org, extra = {}) => ({ ...signed(org), ...extra });
+    const identity = await request(proxy.port, "GET", "/api/vw/identity", as(A));
+    assert.equal(JSON.parse(identity.body).organizationId, A);
+    assert.equal(JSON.parse(identity.body).userKind, "staff");
+    assert.equal(JSON.parse((await request(local.port, "GET", "/api/vw/identity")).body).organizationId, undefined);
     const upload = async (org, data, name) => {
       const res = await request(proxy.port, "POST", "/api/vw/uploads", as(org, { "Content-Type": "application/json" }), JSON.stringify({ data, name }));
       assert.equal(res.status, 201, res.body.toString());
@@ -58,6 +62,21 @@ async function listen(options) {
       assert.equal((await request(proxy.port, "GET", url, as(A))).status, 200, "org A 讀自己的檔案");
       assert.equal((await request(proxy.port, "GET", url, as(B))).status, 404, "org B 不能讀 org A 的檔案");
     }
+    // A new selection invalidates old unpinned pages before any handler, including raw-byte uploads/renders.
+    for (const [method, url] of [["GET", "/api/vw/state"], ["PUT", "/api/vw/state"], ["POST", "/api/vw/uploads"],
+      ["POST", "/api/vw/uploads/sessions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/chunks/0"], ["POST", "/api/vw/engine/renders"]]) {
+      for (const pin of [null, A]) {
+        const refused = await request(proxy.port, method, url, as(B, { Cookie: `__Host-vw-organization=${B}`, ...(pin ? { "X-VW-Org": pin } : {}), "Content-Type": "application/json" }), method === "GET" ? undefined : "{}");
+        assert.equal(refused.status, 403, `old document refused: ${method} ${url} pin=${pin}`);
+        assert.equal(JSON.parse(refused.body).error.code, "org_context_changed");
+      }
+    }
+    assert.equal((await request(proxy.port, "GET", "/api/vw/state", as(B, { Cookie: `__Host-vw-organization=${B}`, "X-VW-Org": B }))).status, 200);
+    assert.equal((await request(proxy.port, "GET", "/api/vw/state", as(B, { "X-VW-Org": A }))).status, 403, "a supplied pin must match even without a cookie");
+    assert.equal((await request(proxy.port, "GET", "/api/vw/identity", as(B, { Cookie: `__Host-vw-organization=${B}` }))).status, 200, "identity bootstraps without a pin");
+    assert.equal((await request(proxy.port, "GET", image, as(A, { Cookie: `__Host-vw-organization=${A}` }))).status, 403, "uncontrolled media request after selection fails closed");
+    assert.equal((await request(proxy.port, "GET", image, as(A, { Cookie: `__Host-vw-organization=${A}`, "X-VW-Org": A }))).status, 200, "service-worker pinned media remains readable");
+    assert.equal((await request(proxy.port, "GET", image, as(A, { "X-VW-Org": B }))).status, 403, "wrong media pin fails without cookie too");
     for (const url of ["/api/vw/state", image, motion]) {
       assert.equal((await request(proxy.port, "GET", url)).status, 401, "缺身分 header = 401：" + url);
       assert.equal((await request(proxy.port, "GET", url, { "X-VW-User-Id": "u" })).status, 401, "缺 org header = 401");

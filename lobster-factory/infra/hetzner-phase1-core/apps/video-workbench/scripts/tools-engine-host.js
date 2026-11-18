@@ -708,7 +708,7 @@ async function engineSubmitRender(base) {
     else {
       const head = new TextEncoder().encode(JSON.stringify(meta));
       const api = String(window.VW_CONFIG?.apiBaseUrl || "/api/vw").replace(/\/$/, "");
-      const response = await fetch(api + "/engine/renders", {
+      const response = await VideoWorkbenchAdapters.fetchApi(api + "/engine/renders", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/octet-stream", "X-VW-Meta-Length": String(head.byteLength) },

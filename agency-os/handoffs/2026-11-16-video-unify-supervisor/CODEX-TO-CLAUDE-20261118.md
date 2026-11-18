@@ -100,3 +100,13 @@
 - 原始全套高併發失敗 log 保留，成功 log 是 `work/video-unify-batch3-full-test-bounded.log`；不可只截成功片段掩蓋先前結果。
 - REVIEW：本次只做文件回讀與引用核對，跨模型審查仍列第 5 節待接手；不偽稱 oracle 通過。git diff --check 通過。
 - 交付前將文件／狀態提交並 push main，確認整合與重用工人樹無未提交改動；無部署、無正式站付費驗收、DEPLOY_HOLD 保留。本檔是使用者要求的停點交接，不是全專案完工聲明。
+
+## 10. 最新續做（2026-11-18）
+
+- 操作者重新指定 Codex 負責；Claude 額度耗盡。已授權本批部署與 Soulful 立即公開發布。§1–9 是先前交接歷史。
+- OPEN3 實作在 eager-northcutt-4fe6a1，待整合至 u-integrate。NA+VW，無 migration/nginx/VS 改動；原資料不搬。
+- 不變量：document org 固定；API/chunk/render/media pin；SW 每請求校對 document 與 signed identity；跨頁 shared/exclusive 作業鎖；client 忽略 staff cookie。
+- 證據：本日 WORKLOG 續1；NA 4807 pass，VW gate、organization-browser、media-cache-browser 通過；ownership 記憶體突變紅→綠。
+- 待做：通過部署前治理檢查→整合/push→已授權 NA/VW 部署→正式 CUA Soulful 切換、生成、QA、四社群含 YouTube 與 Kadence WordPress 公開發布。45/50 不變。
+- 已實點：Soulful 四渠道存在（Bluesky/Facebook/Instagram/YouTube）；WP active Kadence；相同尺寸原生/門頁按鈕與輸入框樣式一致，未為誤報改樣式。未建立或發布測試內容。
+- Claude vu-org-switch-379dad、vu-u23-u111-dfa6ae 工作樹保留不碰，避免重複版本。

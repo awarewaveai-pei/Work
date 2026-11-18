@@ -1510,10 +1510,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         });
       }
       // Browser media copy scope (shared/media-cache.js invariant 3): one opaque value per user + organization, so the
-      // service worker can keep identities apart without seeing the ids. Local mode has one identity.
+      // service worker can keep identities apart. organizationId also pins this document's subsequent API requests.
       if (req.method === "GET" && route === "/identity") {
         const who = req.vwIdentity;
-        json(res, 200, { scope: who ? crypto.createHash("sha256").update(["vw-media-cache-v1", who.userId, who.orgId].join("\n")).digest("hex").slice(0, 32) : "local" });
+        json(res, 200, { scope: who ? crypto.createHash("sha256").update(["vw-media-cache-v1", who.userId, who.orgId].join("\n")).digest("hex").slice(0, 32) : "local", ...(who ? { organizationId: who.orgId, userKind: who.userKind } : {}) });
         return true;
       }
       if (req.method === "GET" && route === "/capabilities") {

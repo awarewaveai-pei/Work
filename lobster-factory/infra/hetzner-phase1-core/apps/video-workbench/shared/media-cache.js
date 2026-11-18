@@ -129,13 +129,15 @@
     }
 
     // A ranged miss (a <video> element) is answered from the network; the full file is fetched once in the background.
-    function fill(scope, key, url) {
+    function fill(scope, key, request) {
       const id = entryId(scope, key);
       if (fills.has(id)) return fills.get(id);
       const job = (async () => {
         const { entryMaxBytes } = await limits();
         const controller = typeof AbortController === "function" ? new AbortController() : null;
-        const response = await fetchImpl(url, { credentials: "same-origin", ...(controller ? { signal: controller.signal } : {}) });
+        const headers = new Headers(request.headers);
+        headers.delete("range");
+        const response = await fetchImpl(request.url, { headers, credentials: "same-origin", ...(controller ? { signal: controller.signal } : {}) });
         if (response.status !== 200 || Number(response.headers.get("content-length")) > entryMaxBytes) {
           controller?.abort();
           return;
@@ -153,11 +155,24 @@
       return request.method === "GET" && !!identityKey(request.url, origin);
     }
     // background(promise) keeps the worker alive for saves (FetchEvent.waitUntil).
-    async function respond(request, background = () => {}) {
+    async function respond(request, background = () => {}, context) {
       const key = identityKey(request.url, origin),
         rangeHeader = request.headers.get("range");
-      if (key && checkIdentity && now() - checkedAt > maxAgeMs) identify(checkIdentity()); // one check per burst of reads
-      const scope = await scopeReady;
+      // The worker supplies an identity checked for this request. Keep it local: concurrent identity answers must not
+      // select another request's cache entries. The optional argument preserves the older local/test caller API.
+      let scope;
+      if (context !== undefined) {
+        scope = typeof context?.scope === "string" && context.scope ? context.scope : null;
+        await identify(scope);
+        if (context?.organizationId && key) {
+          const headers = new Headers(request.headers);
+          if (headers.has("X-VW-Org") && headers.get("X-VW-Org") !== context.organizationId)
+            return new Response(null, { status: 403, headers: { "Cache-Control": "no-store" } });
+          headers.set("X-VW-Org", context.organizationId);
+          request = new Request(request, { headers, mode: "same-origin" });
+        }
+      } else if (key && checkIdentity && now() - checkedAt > maxAgeMs) scope = await identify(checkIdentity());
+      else scope = await scopeReady;
       if (!key || !scope) return fetchImpl(request);
       const id = entryId(scope, key);
       let record = null;
@@ -181,7 +196,7 @@
       else if (rangeHeader && (response.status === 206 || response.status === 200)) {
         const teed = await teeWholeFile(scope, key, response, background);
         if (teed) return teed;
-        background(fill(scope, key, request.url));
+        background(fill(scope, key, request));
       }
       return response;
     }

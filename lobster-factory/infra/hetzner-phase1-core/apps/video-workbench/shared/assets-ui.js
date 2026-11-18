@@ -130,7 +130,7 @@
   // three times; sending the same key again resumes its session and skips a chunk only when the server holds the same
   // bytes (sha256), so a different file with the same name, size and date is never mixed in.
   const openUploads = new Map();
-  VideoWorkbench.uploadChunked = async (blob, open, finish = {}, key = null) => {
+  const uploadChunked = async (blob, open, finish = {}, key = null) => {
     let session = key && openUploads.has(key)
       ? await VideoWorkbench.request("/uploads/sessions/" + openUploads.get(key), undefined, "GET").catch(() => null)
       : null;
@@ -144,7 +144,7 @@
       if (have.get(i) === hash) continue;
       for (let attempt = 1; ; attempt++) {
         try {
-          const response = await fetch(`${api}/uploads/sessions/${session.id}/chunks/${i}`, {
+          const response = await VideoWorkbenchAdapters.fetchApi(`${api}/uploads/sessions/${session.id}/chunks/${i}`, {
             method: "POST",
             credentials: "same-origin",
             headers: { "Content-Type": "application/octet-stream", "X-VW-Chunk-Sha256": hash },
@@ -164,10 +164,11 @@
     if (key) openUploads.delete(key);
     return done;
   };
+  VideoWorkbench.uploadChunked = (...args) => VideoWorkbenchAdapters.context.run(() => uploadChunked(...args));
   // Video, audio and engine renders above one chunk (= the server's 16 MiB) go up in chunks; base64 JSON would pass
   // 100 MB near 75 MB. Smaller files keep their one request.
   const CHUNKED_ABOVE = (VideoWorkbench.chunkedAbove = 16 * 1024 * 1024);
-  VideoWorkbench.uploadAsset = async (file, { derived = false } = {}) => {
+  const uploadAsset = async (file, { derived = false } = {}) => {
     const videoTypes = { mov: 'video/quicktime', mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm' };
     const extension = String(file.name || '').split('.').at(-1).toLowerCase();
     const type = /^(image|video|audio)\//.test(file.type) ? file.type : Object.hasOwn(videoTypes, extension) ? videoTypes[extension] : file.type;
@@ -192,6 +193,7 @@
       createdAt: new Date().toISOString(),
     });
   };
+  VideoWorkbench.uploadAsset = (...args) => VideoWorkbenchAdapters.context.run(() => uploadAsset(...args));
   VideoWorkbench.download = (name, data, type = "application/json") => {
     const blob =
         data instanceof Blob
