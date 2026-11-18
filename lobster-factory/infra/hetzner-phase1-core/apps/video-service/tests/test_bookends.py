@@ -146,6 +146,82 @@ class BookendRender(unittest.TestCase):
         self.assertAlmostEqual(_length(main["16x9"]), 2.5, delta=0.15)
 
 
+def _streams(path: str) -> dict:
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,duration,color_space,color_range",
+                          "-of", "json", path], capture_output=True, text=True, check=True).stdout
+    return {s["codec_type"]: s for s in json.loads(out)["streams"]}
+
+
+@unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg not installed (runs in the video-service container)")
+class StockVideoScenesJoin(unittest.TestCase):
+    """2026-11-18 Soulful: an HLG phone clip among bt709 stock shots made the main change colorspace mid-stream; ffmpeg
+    rebuilt the xfade/acrossfade graph there and the join ended early with exit 0 (31.9 s planned, 22.5 s video, 9.5 s
+    audio). Stock-shaped sources: HLG / PQ / bt709 / full-range bt601 tags, 29.97 / 25 / 59.94 fps, odd sizes, plus a photo."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.temp = mock.patch.object(pipeline.config, "TEMP_DIR", pathlib.Path(self.dir))
+        self.temp.start()
+        self.voice = f"{self.dir}/v.wav"
+        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-f", "lavfi", "-i", "sine=frequency=440:duration=2", self.voice],
+                       check=True, capture_output=True)
+
+    def tearDown(self):
+        self.temp.stop()
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def stock(self, name, rate, size, tags, audio=False):
+        path = f"{self.dir}/{name}.mp4"
+        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-f", "lavfi", "-i", f"testsrc2=size={size}:rate={rate}",
+                        *(["-f", "lavfi", "-i", "sine=frequency=220:sample_rate=48000"] if audio else []), "-t", "4",
+                        "-vf", f"setparams={tags}", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                        *(["-c:a", "aac"] if audio else ["-an"]), path], check=True, capture_output=True)
+        return path
+
+    def test_mixed_color_stock_scenes_join_full_length(self):
+        photo = f"{self.dir}/p.png"
+        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=640x360", "-frames:v", "1", photo], check=True, capture_output=True)
+        assets = [self.stock("hlg", "30000/1001", "1279x719", "range=tv:color_primaries=bt2020:color_trc=arib-std-b67:colorspace=bt2020nc"),
+                  self.stock("rec709", "25", "853x481", "range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709", audio=True),
+                  self.stock("full601", "60000/1001", "481x853", "range=pc:colorspace=smpte170m"),
+                  self.stock("pq", "24", "1920x1080", "range=tv:color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc"),
+                  photo]
+        b = {"intro": {"title": "片頭", "duration": 2.0}, "outro": {"title": "謝謝收看", "duration": 2.0},
+             "transition": "crossfade", "transition_s": 0.5}
+        scenes = [{"narration": f"第{i}句"} for i in range(len(assets))]
+        with mock.patch.object(pipeline, "_audio_duration", return_value=2.5):
+            out = pipeline.compose_base_video(scenes, assets, [self.voice] * len(assets), "v", 640, 360, 24,
+                                              burn_captions=False, bookends=b)
+        want = 2.0 + 5 * 2.5 + 2.0 - 2 * 0.5
+        got = _streams(out)
+        self.assertAlmostEqual(float(got["video"]["duration"]), want, delta=0.15)
+        self.assertAlmostEqual(float(got["audio"]["duration"]), want, delta=0.15)
+        tags = {(s["video"].get("color_space"), s["video"].get("color_range"))
+                for s in (_streams(f"{self.dir}/scene_{i:03d}.mp4") for i in range(len(assets)))}
+        self.assertEqual(tags, {("bt709", "tv")}, "every concatenated scene carries one color signature")
+
+    def test_template_whose_music_stops_early_still_joins(self):
+        intro = f"{self.dir}/intro.mp4"
+        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=3", "-f", "lavfi", "-i",
+                        "sine=frequency=880:duration=1.5", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", intro],
+                       check=True, capture_output=True)
+        b = pipeline.resolve_bookends({"intro": {"asset": intro}, "outro": None, "transition": "crossfade", "transition_s": 0.5})
+        with mock.patch.object(pipeline, "_audio_duration", return_value=2.5):
+            out = pipeline.compose_base_video([{"narration": "一"}], [self.stock("s", "25", "853x481", "range=tv")],
+                                              [self.voice], "v", 640, 360, 24, burn_captions=False, bookends=b)
+        got = _streams(out)
+        self.assertAlmostEqual(float(got["video"]["duration"]), 3.0 + 2.5 - 0.5, delta=0.15)
+        self.assertAlmostEqual(float(got["audio"]["duration"]), 3.0 + 2.5 - 0.5, delta=0.15)
+
+    def test_short_join_is_an_error_not_a_finished_video(self):
+        seg = f"{self.dir}/short.mp4"
+        subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=64x64:r=24:d=3", "-f", "lavfi", "-i",
+                        "anullsrc=r=44100:cl=stereo", "-t", "3", "-c:v", "libx264", "-c:a", "aac", seg], check=True, capture_output=True)
+        self.assertEqual(pipeline._check_joined_length(seg, 3.0), seg)
+        with self.assertRaisesRegex(RuntimeError, "長度不符"):
+            pipeline._check_joined_length(seg, 9.5)
+
+
 class ComposeCpuBudget(unittest.TestCase):
     """ffmpeg/x264 size thread pools from the CPUs they can see; cpuset must show exactly the cores the quota allows."""
 
@@ -191,7 +267,7 @@ class BookendResourceBudget(unittest.TestCase):
                         "transition": "crossfade", "transition_s": 0.5}
             output = str(out_dir / "joined.mp4")
             try:
-                pipeline._join_bookends([main], 12, bookends, output, w, h, 24)
+                pipeline._join_bookends([main], [12], bookends, output, w, h, 24)
             finally:
                 print(json.dumps({"format": fmt, "memory_peak": (root / "memory.peak").read_text().strip(),
                                   "memory_events": (root / "memory.events").read_text().strip()}), flush=True)

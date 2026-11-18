@@ -365,6 +365,46 @@ def _ken_burns_zoom(frames: int, out: bool) -> str:
     return f"1+{total:.4f}*on/{frames}"
 
 
+# ── One color signature for every segment that is later concatenated ──
+# A joined stream whose frames change colorspace/range mid-way makes ffmpeg rebuild the filtergraph there; in a
+# multi-input graph (xfade/acrossfade) the rebuilt graph finds the intro already at EOF and the output ends early with
+# exit 0 (2026-11-18: an HLG stock shot cut a 31.9 s join to 22.5 s video / 9.5 s audio). So every segment encoder emits
+# bt709 tv-range SDR, converting HDR and other matrices/ranges first so the label matches the pixels.
+_BT709_TAG = "setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709"
+_HDR_TRC = {"arib-std-b67", "smpte2084"}
+_SWS_MATRIX = {"bt709": "bt709", "fcc": "fcc", "bt470bg": "bt470", "smpte170m": "smpte170m", "smpte240m": "smpte240m",
+               "bt2020nc": "bt2020", "bt2020c": "bt2020"}
+
+
+def _probe_streams(path: str) -> list:
+    res = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                          "stream=codec_type,duration,color_space,color_transfer,color_primaries,color_range",
+                          "-of", "json", path], capture_output=True, text=True, timeout=60)
+    if res.returncode != 0:
+        raise RuntimeError(f"ffprobe failed ({os.path.basename(path)}): {res.stderr[-300:]}")
+    return json.loads(res.stdout or "{}").get("streams", [])
+
+
+def _fit_bt709(src: str, w: int, h: int, fps: int) -> str:
+    """Cover-fit a video source to w x h at fps, converted to the one color signature above."""
+    v = next((s for s in _probe_streams(src) if s.get("codec_type") == "video"), {})
+    known = lambda k, default: v[k] if v.get(k) not in (None, "", "unknown", "reserved") else default
+    trc, space = known("color_transfer", ""), known("color_space", "")
+    crop = f"crop={w}:{h},fps={fps},setsar=1"
+    if trc in _HDR_TRC:
+        tags = (f"pin={known('color_primaries', 'bt2020')}:min={space or 'bt2020nc'}:"
+                f"rin={'pc' if v.get('color_range') == 'pc' else 'tv'}")
+        # HLG is made to be watched on SDR as is (BT.2100 compatibility): keep its curve, map only the gamut. A tone
+        # curve on HLG came out visibly darker on the 2026-11-18 phone clip. PQ has no SDR reading and is tone-mapped.
+        tone = (f"zscale=tin=bt709:{tags}:t=bt709:p=bt709:m=bt709:r=tv,format=yuv420p" if trc == "arib-std-b67" else
+                f"zscale=tin={trc}:{tags}:t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
+                "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p")
+        return f"scale={w}:{h}:force_original_aspect_ratio=increase,{crop},{tone},{_BT709_TAG}"
+    # untagged = bt709 in and out: no matrix change, only the range is brought to tv
+    return (f"scale={w}:{h}:force_original_aspect_ratio=increase:in_color_matrix={_SWS_MATRIX.get(space, 'bt709')}:"
+            f"out_color_matrix=bt709:out_range=tv,{crop},{_BT709_TAG}")
+
+
 def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, w, h, fps, scene_id=0, burn_captions=True):
     """單場景 → 統一參數 mp4。字幕改用 drawtext+textfile（timed per segment，取代 PIL PNG overlay）。"""
     # Find CJK-capable font
@@ -412,15 +452,14 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
     is_video = os.path.splitext(asset_path)[1].lower() in _VIDEO_EXTS
     if is_video:
         inputs = ["-stream_loop", "-1", "-i", asset_path, "-i", audio_path]
-        vchain = (f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
-                  f"crop={w}:{h},fps={fps},setsar=1,"
+        vchain = (f"[0:v]{_fit_bt709(asset_path, w, h, fps)},"
                   f"fade=t=in:st=0:d={fade_dur:.3f},"
                   f"fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}[bg0]")
     else:
         inputs = ["-loop", "1", "-i", asset_path, "-i", audio_path]
         vchain = (f"[0:v]scale={w * 2}:{h * 2}:force_original_aspect_ratio=increase,crop={w * 2}:{h * 2},"
                   f"zoompan=z='{kb_z}':d={frames}:"
-                  f"x='{kb_x}':y='{kb_y}':s={w}x{h}:fps={fps},"
+                  f"x='{kb_x}':y='{kb_y}':s={w}x{h}:fps={fps},format=yuv420p,{_BT709_TAG},"
                   f"fade=t=in:st=0:d={fade_dur:.3f},"
                   f"fade=t=out:st={fade_out_st:.3f}:d={fade_dur:.3f}[bg0]")
 
@@ -501,7 +540,7 @@ def _render_intro_scene(title: str, duration: float, out_path: str, w: int, h: i
         f"fontcolor=white:"
         f"alpha='if(lt(t,0.8),t/0.8,1)':"
         f"borderw=2:bordercolor=black:"
-        f"x=(w-text_w)/2:y=(h-text_h)/2[v]"
+        f"x=(w-text_w)/2:y=(h-text_h)/2,format=yuv420p,{_BT709_TAG}[v]"
     )
 
     cmd = [
@@ -541,20 +580,20 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
         scene_paths.append(intro_path)
         print(f"   intro ({intro_duration:.1f}s): {intro_title[:40]}")
 
-    main_s = 0.0
+    scene_s = [float(intro_duration)] if intro_title else []
     for i, (scene, asset_path, audio_path) in enumerate(zip(scenes, visual_files, audio_files)):
         duration = _audio_duration(audio_path)
         sp = str(config.TEMP_DIR / f"scene_{i:03d}.mp4")
         _render_scene_ffmpeg(asset_path, scene["narration"], audio_path, duration, sp, w, h, fps, scene_id=i, burn_captions=burn_captions)
         scene_paths.append(sp)
-        main_s += duration
+        scene_s.append(duration)
         print(f"   scene {scene.get('id', i)} ({duration:.1f}s)")
 
     # 所有場景同編碼參數 → concat demuxer -c copy（無重新編碼，秒級）
     base_path = str(config.TEMP_DIR / f"{out_name}_base.mp4")
     if bookends is None:
         return _concat_uniform(scene_paths, "concat.txt", base_path)
-    return _join_bookends(scene_paths, main_s, bookends, base_path, w, h, fps)
+    return _join_bookends(scene_paths, scene_s, bookends, base_path, w, h, fps)
 
 
 # ── Plan U5.4 片頭／片尾接成一支 ──
@@ -593,17 +632,20 @@ def bookend_lead_s(bookends: "dict | None") -> float:
 
 
 def _bookend_segment(seg: dict, name: str, w: int, h: int, fps: int) -> str:
-    """A bookend in the scenes' encoding (w x h, fps, h264 yuv420p, aac 44100 stereo), so it joins like a scene."""
+    """A bookend in the scenes' encoding (w x h, fps, h264 yuv420p, aac 44100 stereo), so it joins like a scene.
+    Both streams last exactly its duration (last frame held, silence added), as the join's length check expects."""
     out = str(config.TEMP_DIR / f"scene_{name}.mp4")
     if seg.get("title"):
         _render_intro_scene(seg["title"], float(seg["duration"]), out, w, h, fps)
         return out
     silent = [] if seg.get("has_audio") else ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+    d = float(seg["duration"])
     _run_ffmpeg([
         "ffmpeg", "-y", "-i", seg["asset"], *silent,
-        "-filter_complex", f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},fps={fps},setsar=1[v]",
-        "-map", "[v]", "-map", "0:a" if seg.get("has_audio") else "1:a",
-        "-t", f"{float(seg['duration']):.3f}", "-r", str(fps),
+        "-filter_complex", f"[0:v]{_fit_bt709(seg['asset'], w, h, fps)},tpad=stop_mode=clone:stop_duration={d:.3f}[v];"
+                           f"[{0 if seg.get('has_audio') else 1}:a]apad[a]",
+        "-map", "[v]", "-map", "[a]",
+        "-t", f"{d:.3f}", "-r", str(fps),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
         "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
         out,
@@ -611,31 +653,39 @@ def _bookend_segment(seg: dict, name: str, w: int, h: int, fps: int) -> str:
     return out
 
 
-def _join_bookends(scene_paths: list, main_s: float, bookends: dict, out_path: str, w: int, h: int, fps: int) -> str:
+def _join_bookends(scene_paths: list, scene_s: list, bookends: dict, out_path: str, w: int, h: int, fps: int) -> str:
     """intro -> main -> outro as one video. No transition: one concat (every part has the scenes' encoding). With one:
     the scenes are concatenated as before, then xfade joins the bookends to that main video. Audio: the intro's music
     fades out inside the transition while the narration plays at full volume from the first shot (acrossfade c2=nofade);
-    into the outro the narration stays full and the outro fades in."""
+    into the outro the narration stays full and the outro fades in. scene_s = each scene's planned length."""
     intro, outro = bookends.get("intro"), bookends.get("outro")
     parts = ([_bookend_segment(intro, "intro", w, h, fps)] if intro else []) + scene_paths + \
             ([_bookend_segment(outro, "outro", w, h, fps)] if outro else [])
     kind = _XFADE.get(bookends.get("transition", "none"))
+    main_s = sum(scene_s)
+    planned = (float(intro["duration"]) if intro else 0.0) + main_s + (float(outro["duration"]) if outro else 0.0)
     if not kind or not (intro or outro):
-        return _concat_uniform(parts, "concat.txt", out_path)
+        _concat_uniform(parts, "concat.txt", out_path)
+        return _check_joined_length(out_path, planned)
     t = float(bookends["transition_s"])
     main_path = _concat_uniform(scene_paths, "concat.txt", str(config.TEMP_DIR / "bookend_main.mp4"))
+    main_audio = _concat_audio_exact(scene_paths, scene_s, str(config.TEMP_DIR / "bookend_main_audio.wav"))
     segs = ([(parts[0], float(intro["duration"]), "intro")] if intro else []) + [(main_path, main_s, "main")] + \
            ([(parts[-1], float(outro["duration"]), "outro")] if outro else [])
     if any(d <= t for _, d, _ in segs):
         raise RuntimeError(f"轉場 {t:.1f} 秒比片頭、片尾或主片還長")
-    inputs, chain, length = [], [], segs[0][1]
-    for p, _, _ in segs:
-        inputs += ["-i", p]
-    v, a = "[0:v]", "[0:a]"
+    # every audio is cut to its planned length: acrossfade counts samples, so AAC padding would push the outro late
+    inputs, chain, src = [], [], []
+    for n, (p, d, name) in enumerate(segs):
+        vi = len(inputs) // 2
+        inputs += ["-i", p] + (["-i", main_audio] if name == "main" else [])
+        chain.append(f"[{vi + (name == 'main')}:a]atrim=end={d:.6f},asetpts=PTS-STARTPTS[s{n}]")
+        src.append((f"[{vi}:v]", f"[s{n}]"))
+    (v, a), length = src[0], segs[0][1]
     for i in range(1, len(segs)):
         curves = "c1=tri:c2=nofade" if segs[i - 1][2] == "intro" else "c1=nofade:c2=tri"
-        chain.append(f"{v}[{i}:v]xfade=transition={kind}:duration={t:.3f}:offset={length - t:.3f}[v{i}]")
-        chain.append(f"{a}[{i}:a]acrossfade=d={t:.3f}:{curves}[a{i}]")
+        chain.append(f"{v}{src[i][0]}xfade=transition={kind}:duration={t:.3f}:offset={length - t:.3f}[v{i}]")
+        chain.append(f"{a}{src[i][1]}acrossfade=d={t:.3f}:{curves}[a{i}]")
         v, a, length = f"[v{i}]", f"[a{i}]", length + segs[i][1] - t
     _run_ffmpeg([
         "ffmpeg", "-y", *inputs, "-filter_complex", ";".join(chain), "-map", v, "-map", a, "-r", str(fps),
@@ -643,7 +693,31 @@ def _join_bookends(scene_paths: list, main_s: float, bookends: dict, out_path: s
         "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
         out_path,
     ], "bookend join failed")
+    return _check_joined_length(out_path, planned - t * (len(segs) - 1))
+
+
+def _concat_audio_exact(paths: list, lengths: list, out_path: str) -> str:
+    """The scenes' audio as one PCM track of exactly sum(lengths). Decoding a -c copy concat keeps every AAC segment's
+    priming and end padding (~31 ms per scene), which the join would turn into narration drifting late."""
+    graph = ";".join(f"[{i}:a]atrim=end={d:.6f},asetpts=PTS-STARTPTS[a{i}]" for i, d in enumerate(lengths))
+    graph += ";" + "".join(f"[a{i}]" for i in range(len(paths))) + f"concat=n={len(paths)}:v=0:a=1[a]"
+    _run_ffmpeg(["ffmpeg", "-y", *sum((["-i", p] for p in paths), []), "-filter_complex", graph, "-map", "[a]",
+                 "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2", out_path], "main audio join failed")
     return out_path
+
+
+_JOIN_TOLERANCE_S = 0.15
+
+
+def _check_joined_length(path: str, expected_s: float) -> str:
+    """Both streams of a joined video must last intro + main + outro - transitions. ffmpeg can end a join early and still
+    exit 0 (filtergraph rebuilt mid-stream), so a short video is an error here, never a finished render."""
+    got = {s.get("codec_type"): float(s.get("duration") or 0) for s in _probe_streams(path)}
+    bad = {k: round(got.get(k, 0.0), 2) for k in ("video", "audio")
+           if abs(got.get(k, 0.0) - expected_s) > _JOIN_TOLERANCE_S}
+    if bad:
+        raise RuntimeError(f"片頭片尾接合長度不符：應為 {expected_s:.2f} 秒，實際 {bad}")
+    return path
 
 
 def _concat_uniform(segment_paths: list, list_name: str, out_path: str) -> str:
@@ -973,7 +1047,7 @@ def _trim_clip_video(src: str, start_ms: float, duration_ms: float, out_path: st
     start_s, dur_s = start_ms / 1000.0, duration_ms / 1000.0
     cmd = [
         "ffmpeg", "-y", "-ss", f"{start_s:.3f}", "-i", src, "-t", f"{dur_s:.3f}",
-        "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},fps={fps},setsar=1",
+        "-vf", _fit_bt709(src, w, h, fps),
         "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
         out_path,
     ]
