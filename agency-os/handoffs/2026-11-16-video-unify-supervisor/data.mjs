@@ -177,6 +177,7 @@ export const STEPS = [
     gate: '來源不在員工門清單的訊息被丟掉（拿掉來源檢查，測試會紅）；刪除後型別檢查與登記表測試全綠。',
     risk: 'Medium', model: 'commit 1：Opus 5.5；commit 2：fullstack-engineer（Sonnet）', status: 'in_progress',
     depends: ['U0', 'U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8', 'U9', 'U10'],
+    before: '正式站驗收前先看交叉審查留下的風險（待決 2）',
     what: '驗收表（§3 每列實走）；commit 1 入口改「開啟影音工作台」＋sf_history postMessage（只收 staffHosts）＋側欄合一；commit 2 刪 §5 清單、(door)/page.tsx 導向 /、products.ts 與登記表、文件',
     files: [`${V}page.tsx`, `${NA}app/(shell)/tools/script-forge/page.tsx`, `${NA}app/sidebar-sections.ts`, `${NA}app/(shell)/tools/theme/page.tsx`, `${NA}lib/portal/hosts.ts`, `${NA}lib/portal/products.ts`],
     items: [
@@ -190,4 +191,5 @@ export const STEPS = [
 
 export const OPEN = [
   { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；U3、U5 第二段、U6 於 2026-11-16 第二次部署上線，U6.6 第三次部署上線（688d397a5）；之後的卡上線前一樣要說 go。兩邊都動的卡，工作台那一半還沒上線時，會先放部署暫停檔擋住每晚的自動上線，兩邊一起上線後再拿掉。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
+  { n: 2, what: 'Codex 接手做的卡已由 Claude 交叉審查（2026-11-18）。修好：按停止沒停到主系統、續做重付已完成的成片、腳本串流中斷少記費用、一次沒收費的錯誤讓整趟作廢、關頁後重付腳本、生圖先扣錢才擋模型、審片面板英文與亂碼 id。修正再經 Codex 審，找到的問題也已修。仍留的風險：停止前已送出的成片照常完成並計費；回覆在途中遺失時重試會再扣一次（所有付費呼叫皆同）；主系統專案清單會多出「一鍵腳本」空列；工作台「關閉」草稿執行要主系統在線。', before: 'U11', src: 'commit 2d73bc117、70a9bf8ea、eb69c2afa、191aed8a8；agency-os/reports/oracle/2026-11-18-partialreview-3aafd334.md' },
 ];
