@@ -4,7 +4,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { runForOrg } from "@/lib/entitlements/grant";
 import { parseAutoBudget, type AutoBudget } from "@/lib/content/video/auto-run-budget";
 import type { RightsSource } from "@/lib/content/video/asset-origin";
-import { ensureWorkbenchProject } from "@/lib/content/video/projects";
+import { ensureWorkbenchProject, updateProjectRow } from "@/lib/content/video/projects";
 import { renderAssetHostError, submitDraftRender } from "@/lib/content/video/draft-render";
 import { finalizeVideoJob } from "@/lib/content/video/finalize";
 import { readJob } from "@/lib/content/video/job-store";
@@ -26,7 +26,8 @@ export const dynamic = "force-dynamic";
  * one video by the service. An intro without kind = the old title card (intro_title), unchanged.
  * Plan U5.3: embedSiteId? (with autonomy auto_after_render only) = after the schedule's social drafts, a new WordPress
  * draft on this org's site with the video embedded (project-advance-deps drafts). autonomy never takes full_auto: a
- * button a person presses goes at most to drafts (plan §12, §13 C3).
+ * button a person presses goes at most to drafts (plan §12, §13 C3). A run a person stopped (brief_json.autoStop = its
+ * runId, PATCH /api/video/projects) is refused 409 before any render and never re-arms the row.
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REF = /^[A-Za-z0-9._:-]{1,200}$/;
@@ -140,6 +141,9 @@ export async function POST(req: Request): Promise<Response> {
   const project = await ensureWorkbenchProject(db, p.organizationId, p.sourceRef, p.title, { production_mode: "quick_video" });
   if (project.ok === false) return fail(500, "project_failed");
   const projectId = String(project.item.id);
+  // A person stopped this run (PATCH /api/video/projects autoRun stop): its renders not yet sent are not sent, nor billed.
+  const stoppedRun = (row: Record<string, unknown>) => !!p.autoBudget && obj(row.brief_json)?.autoStop === p.autoBudget.runId;
+  if (stoppedRun(project.item)) return fail(409, "這趟一鍵執行已停止");
   const submit = () => submitDraftRender({
     organizationId: p.organizationId,
     scenes: p.scenes.map((s, i) => ({ id: i + 1, narration: s.narration })),
@@ -158,22 +162,19 @@ export async function POST(req: Request): Promise<Response> {
   if (sub.ok === false) return fail(sub.status, sub.error);
   // The project remembers how far it runs on its own (old VideoStudio: written once the render was accepted), and whether
   // the schedule also embeds the video in a new WordPress draft (brief_json.autoEmbed, read by project-advance-deps).
-  let brief: Record<string, unknown> | null = null;
-  if (p.autonomy) {
-    const r = await db.from("media_production_projects").select("brief_json").eq("id", projectId).eq("organization_id", p.organizationId).maybeSingle();
-    const oldBrief = (obj(r.data?.brief_json) ?? {}) as Record<string, unknown>;
+  // Merged on a fresh read: a stop that landed while this render was submitted keeps the row unarmed.
+  const saved = await updateProjectRow(db, p.organizationId, projectId, (row) => {
+    if (!p.autonomy) return { lifecycle_stage: "produce" };
+    const oldBrief = (obj(row.brief_json) ?? {}) as Record<string, unknown>;
     const sameRun = p.autoBudget && obj(oldBrief.autoBudget)?.runId === p.autoBudget.runId;
     const { autoEmbed: _old, ...rest } = oldBrief;
     void _old;
     if (p.autoBudget && !sameRun) { delete rest.autoDrafts; delete rest.autoEmbedded; }
     if (p.autoBudget) rest.autoBudget = { ...p.autoBudget, startedAt: sameRun ? obj(oldBrief.autoBudget)?.startedAt : new Date().toISOString(), spentTwd: sameRun ? Math.max(p.autoBudget.spentTwd, Number(obj(oldBrief.autoBudget)?.spentTwd) || 0) : p.autoBudget.spentTwd };
-    brief = p.embedSiteId ? { ...rest, autoEmbed: { siteId: p.embedSiteId } } : rest;
-  }
-  const { error } = await db.from("media_production_projects").update({
-    lifecycle_stage: "produce", updated_at: new Date().toISOString(),
-    ...(p.autonomy ? { autonomy: p.autonomy, last_error: null, brief_json: brief } : {}),
-  }).eq("id", projectId).eq("organization_id", p.organizationId);
-  if (error) console.warn("[vw-quick-render] project stage update failed:", error.message);
+    const brief = p.embedSiteId ? { ...rest, autoEmbed: { siteId: p.embedSiteId } } : rest;
+    return { lifecycle_stage: "produce", brief_json: brief, ...(stoppedRun(row) ? {} : { autonomy: p.autonomy, last_error: null }) };
+  });
+  if (saved.ok === false) console.warn("[vw-quick-render] project stage update failed:", saved.error);
   return NextResponse.json({ ok: true, jobId: sub.jobId, projectId }, { status: 202 });
 }
 

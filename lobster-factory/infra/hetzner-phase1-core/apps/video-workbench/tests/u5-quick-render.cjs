@@ -25,8 +25,10 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
   const bytes = fs.readFileSync(mp4), sha = crypto.createHash("sha256").update(bytes).digest("hex");
 
   const submitted = [], registered = [], ledger = [], quoted = [];
+  let corrupt = false;
   async function fetchImpl(url, options = {}) {
     url = String(url);
+    if (url === R2 && corrupt) { corrupt = false; return new Response("bad", { headers: { "content-length": "3" } }); }
     if (url === R2) return new Response(bytes, { headers: { "content-length": String(bytes.length) } });
     assert.ok(url.startsWith(BASE), "unexpected " + url);
     assert.equal(options.headers.Authorization, "Bearer internal-secret");
@@ -119,6 +121,26 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
     assert.equal(refused.status, 400);
     assert.match(refused.value.error.message, /第 1 個鏡頭沒有旁白.*另有 1 個問題/);
     assert.equal(submitted.length, before + 2);
+
+    // U5 C2: the main system finished (and billed) the render, the download here failed. Resent with retryOf = that job,
+    // the render is reused (no second submission); a retryOf of another ratio is refused.
+    const settled = async (j) => {
+      for (let i = 0; i < 200 && !["succeeded", "failed"].includes(j.status); i++) {
+        await new Promise((res) => setTimeout(res, 100));
+        j = await (await fetch(at + "/generations/" + j.id)).json();
+      }
+      return j;
+    };
+    corrupt = true;
+    const lost = await settled((await post("/generations", jobs[0])).value);
+    assert.equal(lost.status, "failed", JSON.stringify(lost));
+    assert.ok(lost.quickRenderDone, "the main system's finished render is kept on the failed job");
+    const sentBefore = submitted.length;
+    assert.equal((await post("/generations", { ...jobs[1], retryOf: lost.id })).status, 409);
+    const reused = await settled((await post("/generations", { ...jobs[0], retryOf: lost.id })).value);
+    assert.equal(reused.status, "succeeded", JSON.stringify(reused.error || reused));
+    assert.equal(reused.retryOf, lost.id);
+    assert.equal(submitted.length, sentBefore, "a reused render is never submitted (or billed) again");
     console.log("u5-quick-render ok");
   } finally {
     server.close();

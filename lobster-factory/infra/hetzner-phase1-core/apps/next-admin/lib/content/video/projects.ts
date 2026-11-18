@@ -46,6 +46,27 @@ export async function ensureWorkbenchProject(db: SupabaseClient, org: string, so
   return retitle(winner.data as Row);
 }
 
+/**
+ * The one way to change a project row's brief_json (or a field that must agree with it): change() gets a fresh read and
+ * answers the fields to write (null = write nothing); the write is a compare-and-set on updated_at, re-read and re-run on a
+ * lost race, so two writers merge instead of the later one erasing the earlier one's keys. A throw in change() propagates.
+ */
+export async function updateProjectRow(db: SupabaseClient, org: string, id: string, change: (row: Row) => Row | null): Promise<{ ok: true; item: Row } | Failure> {
+  for (let n = 0; n < 8; n++) {
+    const read = await db.from("media_production_projects").select(PROJECT_COLUMNS).eq("organization_id", org).eq("id", id).maybeSingle();
+    if (read.error) return { ok: false, error: read.error.message };
+    if (!read.data) return { ok: false, error: "not_found" };
+    const row = read.data as Row, fields = change(row);
+    if (!fields) return { ok: true, item: row };
+    const at = new Date(Math.max(Date.now(), Date.parse(String(row.updated_at)) + 1 || 0)).toISOString();
+    const written = await db.from("media_production_projects").update({ ...fields, updated_at: at })
+      .eq("organization_id", org).eq("id", id).eq("updated_at", row.updated_at).select(PROJECT_COLUMNS).maybeSingle();
+    if (written.error) return { ok: false, error: written.error.message };
+    if (written.data) return { ok: true, item: written.data as Row };
+  }
+  return { ok: false, error: "concurrent_update" };
+}
+
 /** Links finished videos to a project: only org's own mp4 assets still unlinked (null → projectId, never a move). */
 export async function attachVideoAssets(db: SupabaseClient, org: string, projectId: string, assetIds: string[]): Promise<{ ok: true; attached: string[] } | Failure> {
   if (!assetIds.length) return { ok: true, attached: [] };

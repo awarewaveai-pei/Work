@@ -9,10 +9,10 @@ import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { persistEditorialRightsQa } from "./editorial-rights-persist";
 import { finalizeVideoJob } from "./finalize";
 import { readJob } from "./job-store";
-import { FINISHED_VIDEO_MIME } from "./projects";
+import { FINISHED_VIDEO_MIME, updateProjectRow } from "./projects";
 import { ratioOfAsset } from "./platform-ratio";
 import type { AdvanceDeps, AdvanceProject } from "./project-advance";
-import { WAIT_LIMIT_MS } from "./project-advance";
+import { RunChanged, WAIT_LIMIT_MS } from "./project-advance";
 import { embedVideoInNewDraft } from "./embed-in-post";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { parseAutoBudget, reserveDraftCall } from "./auto-run-budget";
@@ -27,24 +27,49 @@ import { saveVideoSocialDrafts } from "./social-drafts";
 import { draftDeps, loadVideoRows } from "./social-drafts-deps";
 
 const fail = (what: string, e: { message: string }): never => { throw new Error(`${what}: ${e.message}`); };
+type Row = Record<string, unknown>;
+
+// A firing works for the run in brief_json.autoBudget when it read the row (runId; undefined = a run without a budget).
+// Checked on a fresh row: a newer run ends this firing quietly (RunChanged), and right before anything is paid or sent out
+// so does a person's stop (autonomy back to guided). A write that only records what already happened checks the run only.
+function assertRun(row: Row, runId: string | undefined, beforeSpending: boolean) {
+  if (runId !== undefined && (row.brief_json as { autoBudget?: { runId?: unknown } } | null)?.autoBudget?.runId !== runId) throw new RunChanged("一鍵執行已被更新，停止舊執行");
+  if (beforeSpending && row.autonomy !== "auto_after_render") throw new RunChanged("一鍵執行已停止");
+}
 
 export function advanceDeps(sb: SupabaseClient, org: string, actor: string): AdvanceDeps {
+  // Every brief_json write merges on a fresh read (updateProjectRow): a stop, a new run or another render's write that
+  // landed meanwhile is kept instead of being erased by this firing's older copy.
+  async function patchBrief(projectId: string, change: (brief: Row, row: Row) => Row) {
+    const r = await updateProjectRow(sb, org, projectId, (row) => ({ brief_json: change((row.brief_json ?? {}) as Row, row) }));
+    if (r.ok === false) fail("media_production_projects", { message: r.error });
+  }
+  async function freshRow(projectId: string): Promise<Row> {
+    const { data, error } = await sb.from("media_production_projects").select("autonomy, brief_json").eq("id", projectId).eq("organization_id", org).single();
+    if (error) fail("media_production_projects", error);
+    return (data ?? {}) as Row;
+  }
+  // The project's primary finished video (not a ratio variant), newest first: what the social copy and the site draft use.
+  async function primaryVideo(projectId: string) {
+    const { data, error } = await sb.from("media_assets").select("id, object_url, checksum_sha256, metadata").eq("organization_id", org).eq("media_project_id", projectId).eq("is_current", true).eq("mime_type", FINISHED_VIDEO_MIME).order("created_at", { ascending: false });
+    if (error) fail("media_assets", error);
+    return ((data ?? []) as Array<{ id: string; object_url: string | null; checksum_sha256: string | null; metadata: { variantOf?: string } | null }>).find((a) => !a.metadata?.variantOf && a.object_url);
+  }
+
   // The brand's social drafts, once per project (brief_json.autoDrafts).
   async function socialDrafts(project: AdvanceProject): Promise<string> {
     const { data: proj, error } = await sb.from("media_production_projects").select("brief_json").eq("id", project.id).eq("organization_id", org).single();
     if (error) fail("media_production_projects", error);
     const brief = (proj?.brief_json ?? {}) as Record<string, unknown>;
     if (brief.autoDrafts) return "社群草稿先前已建立";
-    const mark = async (count: number) => {
-      const { error: e } = await sb.from("media_production_projects").update({ brief_json: { ...brief, autoDrafts: { at: new Date().toISOString(), count } } }).eq("id", project.id).eq("organization_id", org);
-      if (e) fail("media_production_projects", e);
-    };
+    let budget = parseAutoBudget(brief.autoBudget);
+    const runId = budget?.runId;
+    const mark = (count: number) => patchBrief(project.id, (now, row) => (assertRun(row, runId, false), { ...now, autoDrafts: { at: new Date().toISOString(), count } }));
     const accounts = (await listAccounts(org, { hydrateProfile: false })).filter((a) => a.status === "connected");
     const keys = writerKeysFor(accounts.map((a) => a.platform));
     if (!keys.length) { await mark(0); return accounts.length ? "已連頻道的平台都還不能自動寫文案，沒建草稿" : "沒有連上的社群頻道，已核准發布但沒建草稿"; }
 
-    const { data: assets } = await sb.from("media_assets").select("id, metadata").eq("organization_id", org).eq("media_project_id", project.id).eq("is_current", true);
-    const primaryId = ((assets ?? []) as Array<{ id: string; metadata: { variantOf?: string } | null }>).find((a) => !a.metadata?.variantOf)?.id;
+    const primaryId = (await primaryVideo(project.id))?.id;
     if (!primaryId) throw new Error("找不到主成片，沒建社群草稿");
     const videoRows = await loadVideoRows(sb, org, primaryId);
     const script = videoRows.find((r) => r.id === primaryId)?.metadata?.script ?? project.title;
@@ -53,24 +78,18 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
     const { data: site } = await sb.from("wp_sites").select("content_defaults").eq("organization_id", org).eq("active", true).limit(1).maybeSingle();
     const written = await runForOrg(org, actor, async () => {
       const writer = await claudeWriter(await grantFor("content.syndicate"), apiKey, "lib/content/video/project-advance", null);
-      let budget = parseAutoBudget(brief.autoBudget);
-      const saveBudget = async () => {
-        const current = await sb.from("media_production_projects").select("brief_json").eq("id", project.id).eq("organization_id", org).single();
-        if (current.error) fail("media_production_projects", current.error);
-        const now = (current.data?.brief_json ?? {}) as Record<string, unknown>;
-        if ((now.autoBudget as { runId?: string } | undefined)?.runId !== budget?.runId) throw Error("一鍵執行已被更新，停止舊執行");
-        const { error } = await sb.from("media_production_projects").update({ brief_json: { ...now, autoBudget: budget } }).eq("id", project.id).eq("organization_id", org);
-        if (error) fail("media_production_projects", error);
-        brief.autoBudget = budget;
-      };
+      const saveBudget = (beforeSpending: boolean) => patchBrief(project.id, (now, row) => {
+        assertRun(row, runId, beforeSpending);
+        return { ...now, autoBudget: { ...(now.autoBudget as Row), spentTwd: budget!.spentTwd } };
+      });
       const ask = async (prompt: string) => {
         if (!budget) return writer.ask(prompt); // Existing topic/legacy runs have their own controls.
         const before = { ...budget }, used = writer.spent.usd;
         budget = reserveDraftCall(budget, prompt);
-        await saveBudget(); // Reserve before the paid call; an interrupted call keeps this conservative reservation.
+        await saveBudget(true); // Reserve before the paid call; an interrupted call keeps this conservative reservation.
         const answer = await writer.ask(prompt);
         budget = { ...budget, spentTwd: Math.round((before.spentTwd + usdToNtd(writer.spent.usd - used)) * 100) / 100 };
-        await saveBudget();
+        await saveBudget(false);
         return answer;
       };
       const defaults = (site?.content_defaults ?? undefined) as SiteContentDefaults | undefined;
@@ -93,15 +112,15 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
     if (error) fail("media_production_projects", error);
     const brief = (proj?.brief_json ?? {}) as Record<string, unknown>, ask = brief.autoEmbed as { siteId?: unknown } | undefined;
     if (typeof ask?.siteId !== "string" || brief.autoEmbedded) return null;
-    const { data: assets } = await sb.from("media_assets").select("id, object_url, checksum_sha256, metadata").eq("organization_id", org).eq("media_project_id", project.id).eq("is_current", true).eq("mime_type", FINISHED_VIDEO_MIME).order("created_at", { ascending: false });
-    const primary = ((assets ?? []) as Array<{ id: string; object_url: string | null; checksum_sha256: string | null; metadata: { variantOf?: string } | null }>).find((a) => !a.metadata?.variantOf && a.object_url);
+    const runId = parseAutoBudget(brief.autoBudget)?.runId;
+    const primary = await primaryVideo(project.id);
     if (!primary) throw new Error("找不到主成片，沒建網站草稿文章");
     const { data: rel } = await sb.from("media_releases").select("id").eq("organization_id", org).eq("candidate_asset_id", primary.id).eq("status", "release_approved").limit(1);
+    assertRun(await freshRow(project.id), runId, true);
     const r = await embedVideoInNewDraft(orgIdentity(org), { siteId: ask.siteId, title: project.title, videoUrl: String(primary.object_url), releaseId: rel?.[0]?.id ? String(rel[0].id) : undefined, variant: "default" });
     if ("blockedMode" in r) throw new Error(`網站草稿文章沒建成：系統目前是「${r.blockedMode}」模式`);
     if (r.ok === false) throw new Error(`網站草稿文章沒建成：${r.error}`);
-    const { error: e } = await sb.from("media_production_projects").update({ brief_json: { ...brief, autoEmbedded: { at: new Date().toISOString(), postId: r.postId } } }).eq("id", project.id).eq("organization_id", org);
-    if (e) fail("media_production_projects", e);
+    await patchBrief(project.id, (now, row) => (assertRun(row, runId, false), { ...now, autoEmbedded: { at: new Date().toISOString(), postId: r.postId } }));
     return `已嵌入網站草稿文章 #${r.postId}`;
   }
 
@@ -206,10 +225,9 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
             const notifier = buildOperatorTelegramNotifier(), host = productHost(PRODUCTS.find((p) => p.key === "video")!);
             const url = "https://" + host + "/?" + new URLSearchParams({ open: "projects", project: String(p?.source_ref || ""), episode: budget.episodeId || "" });
             const delivery = notifier ? await notifier.sendText(`${String(p?.title || "影片")}：${result}\n已用 NT$${budget.spentTwd}／上限 NT$${budget.budgetTwd}\n${url}`) : { kind: "rejected" as const, code: "notifier_disabled" };
-            if (delivery.kind === "sent" || delivery.kind === "uncertain") {
-              const saved = await sb.from("media_production_projects").update({ brief_json: { ...brief, autoNotification: { key, at: new Date().toISOString(), status: delivery.kind } } }).eq("id", projectId).eq("organization_id", org);
-              if (saved.error) fail("media_production_projects", saved.error);
-            } else console.warn("[video-auto-run] outcome notification not delivered:", delivery.code);
+            if (delivery.kind === "sent" || delivery.kind === "uncertain")
+              await patchBrief(projectId, (now) => ({ ...now, autoNotification: { key, at: new Date().toISOString(), status: delivery.kind } }));
+            else console.warn("[video-auto-run] outcome notification not delivered:", delivery.code);
           }
         }
       }

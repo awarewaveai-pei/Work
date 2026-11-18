@@ -244,8 +244,15 @@
     if (action === "spine-set-bookends" || action === "spine-set-auto-run") {
       const templates = window.VideoWorkbench.capabilities?.remotionTemplates,
         change = () => {
-          const old = db.projects.find((p) => p.id === payload.projectId)?.episodes?.find((e) => e.id === payload.episodeId)?.autoRun;
+          const episodes = db.projects.find((p) => p.id === payload.projectId)?.episodes || [],
+            old = episodes.find((e) => e.id === payload.episodeId)?.autoRun;
+          if (action === "spine-set-bookends" && old?.status === "running") throw Error("這一集正在執行一鍵成片，請先停止這趟，再改片頭片尾");
           if (action === "spine-set-auto-run" && old?.status === "running" && payload.autoRun && payload.autoRun.runId !== old.runId) throw Error("這一集正在執行，請先停止這趟，再開始新的");
+          // The main system keeps ONE row per workbench project, holding one run's drafts budget and stop point: a run that
+          // goes to drafts never runs beside another run of the same project (either one's renders would rewrite it).
+          const starting = action === "spine-set-auto-run" && payload.autoRun && !["stopped", "done"].includes(payload.autoRun.status) && old?.status !== "running";
+          if (starting && episodes.some((e) => e.id !== payload.episodeId && e.autoRun?.status === "running" && (e.autoRun.until === "drafts" || payload.autoRun.until === "drafts")))
+            throw Error("這個專案的另一集正在執行一鍵成片；做到草稿時一個專案一次只能跑一趟，請等它完成或先停止");
           return action === "spine-set-bookends" ? Spine?.setBookends(db.projects, payload, templates) : Spine?.setAutoRun(db.projects, payload);
         };
       if (!change()) throw new Error(action === "spine-set-bookends" ? "片頭或片尾設定無效" : "一鍵成片設定無效");
@@ -698,6 +705,12 @@
           throw Error("任務仍在執行，請先檢視任務，不會重複送出。");
         if (["queued", "running", "submitting"].includes(job.status))
           return current;
+        // A quick render the main system already finished and billed (quickRenderDone) is sent as its retry: the server
+        // reuses that render (backend/api.cjs retryOf -> keptQuick) instead of rendering and billing it again.
+        if (current.quickRenderDone) {
+          const { idempotencyKey: _old, ...input } = current.input;
+          return generate({ ...input, retryOf: current.id });
+        }
         const sourceUrl = current.result?.sourceUrl;
         return generate(
           current.status === "failed" &&

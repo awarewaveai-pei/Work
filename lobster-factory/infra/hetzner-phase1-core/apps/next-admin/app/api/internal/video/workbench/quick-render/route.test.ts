@@ -8,7 +8,7 @@ const submitDraftRender = vi.hoisted(() => vi.fn());
 const ensureWorkbenchProject = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient }));
 vi.mock("@/lib/content/video/draft-render", () => ({ submitDraftRender, renderAssetHostError: async () => null }));
-vi.mock("@/lib/content/video/projects", () => ({ ensureWorkbenchProject }));
+vi.mock("@/lib/content/video/projects", async (actual) => ({ ...(await actual<typeof import("@/lib/content/video/projects")>()), ensureWorkbenchProject }));
 
 import { POST } from "./route";
 
@@ -25,7 +25,7 @@ const tables = () => ({
     { id: myIntro, organization_id: org, object_url: "https://v.example.com/video/workbench/intro.mp4", mime_type: "video/mp4", metadata: {} },
     { id: theirIntro, organization_id: other, object_url: "https://v.example.com/video/workbench/x.mp4", mime_type: "video/mp4", metadata: {} },
   ],
-  media_production_projects: [{ id: project, organization_id: org, brief_json: { autoDrafts: { count: 1 } } }],
+  media_production_projects: [{ id: project, organization_id: org, updated_at: "2026-11-18T00:00:00.000Z", autonomy: "guided", brief_json: { autoDrafts: { count: 1 } } as Record<string, unknown> }],
   wp_sites: [{ id: site, organization_id: org }],
 });
 const call = (assetId: string, more: Record<string, unknown> = {}) => POST(new Request("http://localhost/api/internal/video/workbench/quick-render", {
@@ -95,5 +95,20 @@ describe("POST /api/internal/video/workbench/quick-render", () => {
     expect(t.media_production_projects[0].brief_json).toHaveProperty("autoEmbedded.postId", 8);
     await call(mine, { autonomy: "auto_after_render", autoBudget: { ...budget, runId: "run-two" }, embedSiteId: site });
     expect(t.media_production_projects[0].brief_json).not.toHaveProperty("autoEmbedded");
+  });
+
+  // U5 C1: a run a person stopped (brief_json.autoStop) sends no render; a stop that lands while a render is submitted is
+  // kept (merged on a fresh read), so that render never re-arms the row.
+  it("a stopped run: refused before any render; a stop landing during the submit leaves the row unarmed", async () => {
+    const budget = { runId: "run-one", budgetTwd: 20, spentTwd: 0 };
+    ensureWorkbenchProject.mockResolvedValueOnce({ ok: true, item: { id: project, brief_json: { autoStop: "run-one" } }, created: false });
+    expect((await call(mine, { autonomy: "auto_after_render", autoBudget: budget })).status).toBe(409);
+    expect(submitDraftRender).not.toHaveBeenCalled();
+    submitDraftRender.mockImplementationOnce(async () => {
+      Object.assign(t.media_production_projects[0], { autonomy: "guided", updated_at: "2026-11-18T00:00:01.000Z", brief_json: { ...t.media_production_projects[0].brief_json, autoStop: "run-one" } });
+      return { ok: true, jobId: "123e4567-e89b-42d3-a456-426614174005" };
+    });
+    expect((await call(mine, { autonomy: "auto_after_render", autoBudget: budget })).status).toBe(202);
+    expect(t.media_production_projects[0]).toMatchObject({ autonomy: "guided", brief_json: { autoStop: "run-one", autoBudget: { runId: "run-one" } } });
   });
 });

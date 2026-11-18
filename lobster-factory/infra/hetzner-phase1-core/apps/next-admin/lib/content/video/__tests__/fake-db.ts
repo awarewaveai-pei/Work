@@ -28,6 +28,13 @@ export function fakeDb(tables: () => Record<string, Row[]>, log: FakeLog = { upd
         });
         return list.slice(0, limit);
       };
+      // update().select().maybeSingle() applies the patch to the matched rows, then answers the first.
+      const one = async () => {
+        log.reads++;
+        const hit = rows();
+        if (patch) for (const row of hit) { log.updates.push({ table, id: row.id, patch }); Object.assign(row, patch); }
+        return { data: hit[0] ?? null, error: null };
+      };
       const q = {
         select: () => q,
         eq: (k: string, v: unknown) => { tests.push((r) => col(r, k) === v); return q; },
@@ -43,8 +50,9 @@ export function fakeDb(tables: () => Record<string, Row[]>, log: FakeLog = { upd
         limit: (n: number) => { limit = n; return q; },
         update: (p: Row) => { patch = p; return q; },
         insert: (r: Row) => { insertRow = r; return q; },
-        maybeSingle: async () => { log.reads++; return { data: rows()[0] ?? null, error: null }; },
+        maybeSingle: one,
         single: async () => {
+          if (!insertRow) return one(); // a read (or update) of one row
           const row = { id: `new-${log.inserts.length + 1}`, created_at: new Date().toISOString(), ...insertRow };
           log.inserts.push({ table, row });
           tables()[table]?.push(row);

@@ -1684,7 +1684,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         return true;
       }
       if (req.method === "POST" && (route === "/generations" || route === "/tools/remove-bg")) {
-        const { idempotencyKey, ...sent } = await body(req);
+        const { idempotencyKey, retryOf, ...sent } = await body(req);
         const input = route === "/generations" ? sent : { type: "image", operation: "remove-bg", prompt: "去背", references: { src: { url: sent.url, ...(typeof sent.parentAssetId === "string" ? { id: sent.parentAssetId } : {}) } } };
         if (
           idempotencyKey !== undefined &&
@@ -1701,8 +1701,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           json(res, 200, existing);
           return true;
         }
+        // A quick render sent with retryOf = its failed job (same episode and ratio) reuses the render the main system
+        // already finished and billed (start keptQuick); the new input keeps the run's current attempt. Any other retryOf is refused.
+        const prior = retryOf === undefined ? null : jobs.find((j) => j.id === retryOf);
+        if (retryOf !== undefined && !(route === "/generations" && input.operation === "quick-render" && prior?.input?.operation === "quick-render" && ["failed", "cancelled"].includes(prior.status)
+          && prior.input.settings?.ratio === input.settings?.ratio && prior.input.link?.projectId === input.link?.projectId && prior.input.link?.episodeId === input.link?.episodeId))
+          throw Object.assign(Error("只能接續同一集、同一比例、已失敗的快速輸出"), { status: 409 });
         await remotionReady(input);
-        await start(input, res, idempotencyKey ? { idempotencyKey } : {}, req);
+        await start(input, res, { ...(idempotencyKey ? { idempotencyKey } : {}), ...(prior ? { retryOf } : {}) }, req);
         return true;
       }
       const match = /^\/generations\/([\w-]+)(\/cancel|\/retry)?$/.exec(route);

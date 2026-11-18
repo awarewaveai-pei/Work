@@ -30,6 +30,10 @@ export type AdvanceOutcome = { projectId: string; result: "waiting" | "done" | "
 /** A project whose render never shows up (job gone, nothing recorded) is stopped after this long instead of waiting forever. */
 export const WAIT_LIMIT_MS = 2 * 60 * 60 * 1000;
 
+/** Thrown by a dep when the run this firing works for was stopped by a person or replaced by a newer run: the firing ends
+ * without writing anything, so it never stops the newer run (the next firing reads the row afresh). */
+export class RunChanged extends Error {}
+
 export async function advanceProject(deps: AdvanceDeps, p: AdvanceProject): Promise<AdvanceOutcome> {
   const stop = async (stage: Stage, why: string): Promise<AdvanceOutcome> => {
     await deps.update(p.id, { lifecycleStage: stage, autonomy: "guided", lastError: why.slice(0, 1000) });
@@ -54,6 +58,7 @@ export async function advanceProject(deps: AdvanceDeps, p: AdvanceProject): Prom
     await deps.update(p.id, { lifecycleStage: "measure", lastError: null });
     return { projectId: p.id, result: "done", note };
   } catch (e) {
+    if (e instanceof RunChanged) return { projectId: p.id, result: "waiting", note: e.message };
     return stop("review", e instanceof Error ? e.message : String(e));
   }
 }

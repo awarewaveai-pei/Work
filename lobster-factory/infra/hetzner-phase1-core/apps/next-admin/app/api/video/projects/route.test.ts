@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getSupabaseWriteClient = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient }));
 
-import { GET, POST } from "./route";
+import { GET, PATCH, POST } from "./route";
 
 const org = "123e4567-e89b-42d3-a456-426614174001";
 const other = "123e4567-e89b-42d3-a456-426614174009";
@@ -145,5 +145,42 @@ describe("/api/video/projects", () => {
     expect(((await res.json()) as { attached: string[] }).attached).toEqual([a(1)]);
     expect(assets.map((x) => x.media_project_id)).toEqual([project, null, projectId, null, null]);
     expect((await postWb({ attachAssetIds: Array.from({ length: 51 }, (_, i) => a(i)) })).status).toBe(400);
+  });
+
+  // U5 C1/M1: the workbench's 停止／從這裡繼續 change the server half of ONE run (brief_json.autoBudget.runId); a stop of
+  // another run never disarms the row (mutation: drop the runId condition -> "a stop of an older run" goes red).
+  describe("PATCH autoRun", () => {
+    const row = (over: Record<string, unknown> = {}) => ({ id: projectId, organization_id: org, autonomy: "auto_after_render", last_error: "停下", updated_at: "2026-11-18T00:00:00.000Z",
+      brief_json: { autoBudget: { runId: "run-new", budgetTwd: 20, spentTwd: 5 }, autoDrafts: { count: 1 } }, ...over });
+    const patch = (autoRun: unknown, extra: object = {}) => PATCH(asStaff("http://localhost/api/video/projects", { method: "PATCH", body: JSON.stringify({ id: projectId, autoRun, ...extra }) }));
+
+    it("a stop of the row's run disarms it and records the stop; a stop of an older run only records that run's stop", async () => {
+      const tables = { media_production_projects: [row()] };
+      getSupabaseWriteClient.mockReturnValue(memoryDb(tables));
+      expect((await patch({ runId: "run-old", action: "stop" })).status).toBe(200);
+      expect(tables.media_production_projects[0]).toMatchObject({ autonomy: "auto_after_render", brief_json: { autoStop: "run-old", autoDrafts: { count: 1 } } });
+      expect((await patch({ runId: "run-new", action: "stop" })).status).toBe(200);
+      expect(tables.media_production_projects[0]).toMatchObject({ autonomy: "guided", brief_json: { autoStop: "run-new", autoBudget: { runId: "run-new" } } });
+    });
+
+    it("resume re-arms the same run with the new limit and no old stop reason; never below what was spent", async () => {
+      const tables = { media_production_projects: [row({ autonomy: "guided", brief_json: { autoBudget: { runId: "run-new", budgetTwd: 20, spentTwd: 5, renderRatios: ["16x9"] }, autoStop: "run-new" } })] };
+      getSupabaseWriteClient.mockReturnValue(memoryDb(tables));
+      expect((await patch({ runId: "run-new", action: "resume", budgetTwd: 4 })).status).toBe(409);
+      expect(tables.media_production_projects[0].autonomy).toBe("guided");
+      const res = await patch({ runId: "run-new", action: "resume", budgetTwd: 30 });
+      expect(((await res.json()) as { armed: boolean }).armed).toBe(true);
+      expect(tables.media_production_projects[0]).toMatchObject({ autonomy: "auto_after_render", last_error: null, brief_json: { autoBudget: { runId: "run-new", budgetTwd: 30, spentTwd: 5 } } });
+      expect(tables.media_production_projects[0].brief_json).not.toHaveProperty("autoStop");
+      const other = await patch({ runId: "run-old", action: "resume" });
+      expect(((await other.json()) as { armed: boolean }).armed).toBe(false);
+    });
+
+    it("autoRun alone: with another field, or without a runId/action, it is 400", async () => {
+      getSupabaseWriteClient.mockReturnValue(memoryDb({ media_production_projects: [row()] }));
+      expect((await patch({ runId: "run-new", action: "stop" }, { autonomy: "guided" })).status).toBe(400);
+      expect((await patch({ runId: "run-new", action: "publish" })).status).toBe(400);
+      expect((await patch({ runId: "run-new", action: "stop", budgetTwd: 3 })).status).toBe(400);
+    });
   });
 });

@@ -1,6 +1,6 @@
 // V6.1: all four QA passed -> Releases and drafts; any failed QA -> stops at review with the reason and nothing released.
 import { describe, expect, it, vi } from "vitest";
-import { advanceProject, type AdvanceDeps } from "../project-advance";
+import { advanceProject, RunChanged, type AdvanceDeps } from "../project-advance";
 
 const p = { id: "p1", organizationId: "o1", title: "t", updatedAtMs: 0 };
 const rows = [{ id: "a169", ratio: "16x9", checksum: "c1" }, { id: "a45", ratio: "4x5", checksum: "c2" }];
@@ -35,5 +35,12 @@ describe("advanceProject", () => {
     const d = deps({ drafts: vi.fn(async () => { throw new Error("文案超過平台上限"); }) });
     expect(await advanceProject(d, p)).toMatchObject({ result: "stopped", note: "文案超過平台上限" });
     expect(d.update).toHaveBeenCalledWith("p1", expect.objectContaining({ autonomy: "guided" }));
+  });
+
+  // U5 m1: the old firing of a replaced or stopped run ends without writing: it never stops the new run on the same row.
+  it("a run that changed under the firing ends quietly: nothing written, nothing stopped", async () => {
+    const d = deps({ drafts: vi.fn(async () => { throw new RunChanged("一鍵執行已被更新，停止舊執行"); }) });
+    expect(await advanceProject(d, p)).toMatchObject({ result: "waiting" });
+    expect(d.update).not.toHaveBeenCalledWith("p1", expect.objectContaining({ autonomy: "guided" }));
   });
 });

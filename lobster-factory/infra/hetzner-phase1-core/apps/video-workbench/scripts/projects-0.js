@@ -871,6 +871,9 @@ let nextIntentSeen = null;
 function consumeNextIntent() {
   if (state.intent !== "video" || !state.open || nextIntentSeen === state.open || !project()) return;
   nextIntentSeen = state.open;
+  // Consumed once: the saved selection drops it (runtime write keeps current/episode/open only), so a reload never reopens.
+  delete state.intent;
+  save();
   openQuickRender(true); // only opens the quoted confirmation; never submits it
 }
 // Plan U5 快速輸出: what keeps the shots from rendering and what the chosen ratios and voice cost, asked of the server
@@ -916,7 +919,21 @@ function runPatch(p, e, patch) {
 // Every job the run sends is remembered at once (EpisodeSpine.autoRunNext knows the run's jobs by id).
 const remember = (p, e, job) => job?.id && runPatch(p, e, (r) => ({ jobIds: [...(r.jobIds || []), job.id] }));
 const runSubmission = (r, step) => ({ runId: r.runId, runAttempt: r.attempt, idempotencyKey: r.runId + ":" + step + ":" + r.attempt });
-async function autoRunStep(p, e, next) {
+// 停止／關閉／從這裡繼續 of a run that goes to drafts also reach that run's server half (the schedule that writes the drafts,
+// PATCH /api/video/projects autoRun). The row is ensured first (POST, one per project), so a stop made before the first
+// render still refuses that render. Answers whether the row now runs this run.
+async function serverRun(p, run, action, budgetTwd) {
+  const call = async (method, body) => {
+    const r = await fetch("/api/video/projects", { method, credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.ok !== true) throw Error("主系統沒有" + (action === "stop" ? "停下" : "接續") + "這趟草稿執行：" + (data.error || r.status));
+    return data;
+  };
+  const { item } = await call("POST", { organizationId: VideoWorkbench.capabilities?.mainSystem?.organizationId, title: p.title, productionMode: "quick_video", source: "video_workbench", sourceRef: p.id });
+  return (await call("PATCH", { id: item.id, autoRun: { runId: run.runId, action, ...(budgetTwd >= 0 ? { budgetTwd } : {}) } })).armed === true;
+}
+const FAILED = ["failed", "cancelled", "blocked"];
+async function autoRunStep(p, e, next, all) {
   const run = e.autoRun,
     announce = (text) => VideoWorkbench.notify(text + " · " + p.title + "／" + e.name + " · " + location.origin + "/?open=projects&project=" + encodeURIComponent(p.id) + "&episode=" + encodeURIComponent(e.id)),
     stop = async (step, reason) => { await runPatch(p, e, { status: "stopped", stop: { step, reason } }); announce("停在" + (STOP_STEP[step] || "這一步") + "：" + reason); };
@@ -934,10 +951,20 @@ async function autoRunStep(p, e, next) {
       // paid: none (the template renders on our own Remotion service, backend/remotion.cjs)
       await remember(p, e, await VideoWorkbench.generations.create({ ...next.input, ...runSubmission(run, next.which + ":" + next.ratio) }));
     } else if (next.do === "render") {
-      await runPatch(p, e, { spentTwd: Math.round((run.spentTwd + next.costTwd) * 100) / 100 });
+      // A ratio whose earlier job of this run failed after the main system finished (and billed) its render is resent with
+      // retryOf = that job: the server reuses the render (backend/api.cjs keptQuick), so it costs nothing again.
+      const kept = {};
+      for (const ratio of next.ratios) {
+        const prior = all.filter((j) => j.input?.runId === run.runId && j.input.operation === "quick-render" && j.input.settings?.ratio === ratio && FAILED.includes(j.status))
+          .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))).at(-1);
+        if (prior && (await VideoWorkbench.generations.get(prior.id)).quickRenderDone) kept[ratio] = prior.id;
+      }
+      const costTwd = next.costTwd - run.prices.perRatioTwd * Object.keys(kept).length;
+      await runPatch(p, e, { spentTwd: Math.round((run.spentTwd + costTwd) * 100) / 100 });
       for (const input of EpisodeSpine.quickRenderJobs(p, e, { ratios: next.ratios, tts: run.tts, until: run.until, embedSiteId: run.embedSiteId, bookends: next.bookends }))
         // paid: none (the main system prices and bills 快速輸出 itself; the dialog shows its quote; backend/main-system.cjs paidFeature)
-        await remember(p, e, await VideoWorkbench.generations.create({ ...input, ...runSubmission(run, "render:" + input.settings.ratio), settings: { ...input.settings, autoBudget: { runId: run.runId, episodeId: e.id, budgetTwd: run.budgetTwd, spentTwd: run.spentTwd + next.costTwd, renderRatios: run.ratios.map((r) => r.replace(":", "x")) } } }));
+        await remember(p, e, await VideoWorkbench.generations.create({ ...input, ...runSubmission(run, "render:" + input.settings.ratio), ...(kept[input.settings.ratio] ? { retryOf: kept[input.settings.ratio] } : {}),
+          settings: { ...input.settings, autoBudget: { runId: run.runId, episodeId: e.id, budgetTwd: run.budgetTwd, spentTwd: run.spentTwd + costTwd, renderRatios: run.ratios.map((r) => r.replace(":", "x")) } } }));
     } else if (next.do === "drafts") {
       const org = VideoWorkbench.capabilities?.mainSystem?.organizationId;
       const response = await fetch("/api/video/projects?organizationId=" + encodeURIComponent(org) + "&sourceRef=" + encodeURIComponent(p.id), { credentials: "same-origin", cache: "no-store" });
@@ -961,9 +988,9 @@ async function driveAutoRuns(skipFailed = false) {
   try {
     await VideoWorkbench.ready;
     for (let round = 0; round < 40; round++) {
-      const failed = (j) => ["failed", "cancelled", "blocked"].includes(j.status),
+      const all = await VideoWorkbench.generations.list(),
         // 從這裡繼續: the failed jobs of the stopped step are left out once, so that step is sent again.
-        jobs = (await VideoWorkbench.generations.list()).filter((j) => !(skipFailed && round === 0 && failed(j))),
+        jobs = all.filter((j) => !(skipFailed && round === 0 && FAILED.includes(j.status))),
         templates = VideoWorkbench.capabilities?.remotionTemplates || [];
       let acted = false;
       waiting = false;
@@ -977,7 +1004,7 @@ async function driveAutoRuns(skipFailed = false) {
               if (j.input.operation === "project-shot") {
                 const actual = j.result?.origin?.costUsd ?? j.finishing?.origin?.costUsd;
                 spent += Number.isFinite(actual) && rate > 0 ? actual * rate : run.prices.byShotTwd?.[j.input.shotId] ?? run.prices.perPictureTwd;
-              } else if (j.input.operation === "quick-render") spent += run.prices.perRatioTwd;
+              } else if (j.input.operation === "quick-render") spent += j.retryOf ? 0 : run.prices.perRatioTwd; // retryOf = a reused render
             }
             spent = Math.round(spent * 100) / 100;
             if (spent !== run.spentTwd) { await runPatch(p, e, { spentTwd: spent }); e.autoRun.spentTwd = spent; }
@@ -986,7 +1013,7 @@ async function driveAutoRuns(skipFailed = false) {
           if (!next) continue;
           if (next.do === "wait") waiting = true;
           else {
-            if (await autoRunStep(p, e, next) === false) waiting = true;
+            if (await autoRunStep(p, e, next, all) === false) waiting = true;
             else acted = true;
           }
         }
@@ -1394,22 +1421,36 @@ async function action(a, button) {
       break;
     }
     case "autoRunStop":
-      await runPatch(p, ep(), { status: "stopped", stop: { step: "", reason: "已手動停止" } }).catch(VideoWorkbench.reportError);
+    case "autoRunClear":
+      try {
+        const e = ep(),
+          run = e.autoRun;
+        // The runner stops here first; then the server half, so the schedule writes no drafts for this run (a failure
+        // shows, and 關閉 sends the stop again). 關閉 removes the run only once the server half is stopped.
+        if (a === "autoRunStop") await runPatch(p, e, { status: "stopped", stop: { step: "", reason: "已手動停止" } });
+        if (run?.until === "drafts") await serverRun(p, run, "stop");
+        if (a === "autoRunClear") await VideoWorkbench.spine.setAutoRun({ projectId: p.id, episodeId: e.id, autoRun: null });
+      } catch (err) {
+        VideoWorkbench.reportError(err);
+      }
       break;
     case "autoRunResume":
     case "autoRunSkipEnd":
       try {
         const e = ep(),
+          run = e.autoRun,
           budget = Number($("autorun-budget")?.value);
         if (a === "autoRunSkipEnd") await VideoWorkbench.spine.setBookends({ projectId: p.id, episodeId: e.id, [button.dataset.which]: { kind: "none" } });
-        await runPatch(p, e, (r) => ({ status: "running", stop: null, attempt: (r.attempt || 0) + 1, ...(budget >= 0 ? { budgetTwd: budget } : {}) }));
+        // The server half of a drafts run goes on with it (same run, the new limit, the old stop reason cleared) before the
+        // runner does, so a render it sends is not refused as stopped; if the runner may not go on, the server half stops again.
+        const drafts = run?.until === "drafts";
+        if (drafts && !(await serverRun(p, run, "resume", budget)) && run.stop?.step === "drafts") throw Error("主系統的草稿執行代號不符，請檢查執行紀錄");
+        await runPatch(p, e, (r) => ({ status: "running", stop: null, attempt: (r.attempt || 0) + 1, ...(budget >= 0 ? { budgetTwd: budget } : {}) }))
+          .catch(async (err) => { if (drafts) await serverRun(p, run, "stop"); throw err; });
         await driveAutoRuns(true);
       } catch (err) {
         VideoWorkbench.reportError(err);
       }
-      break;
-    case "autoRunClear":
-      await VideoWorkbench.spine.setAutoRun({ projectId: p.id, episodeId: ep().id, autoRun: null }).catch(VideoWorkbench.reportError);
       break;
     case "exportJson":
       downloadJson(

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { attachVideoAssets, ensureWorkbenchProject, PROJECT_COLUMNS as COLUMNS } from "@/lib/content/video/projects";
+import { attachVideoAssets, ensureWorkbenchProject, PROJECT_COLUMNS as COLUMNS, updateProjectRow } from "@/lib/content/video/projects";
+import { parseAutoBudget } from "@/lib/content/video/auto-run-budget";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,6 +122,37 @@ export async function POST(req: Request): Promise<Response> {
   return NextResponse.json({ ok: true, item, attached: attached.attached }, { status: created ? 201 : 200 });
 }
 
+/**
+ * Plan U5 一鍵到草稿 (§12): the workbench's 停止／關閉／從這裡繼續 reach the server half of ONE run, named by its runId.
+ * stop: brief_json.autoStop = runId (a later render of that run is refused and never re-arms the row: quick-render route),
+ * and when the row's autoBudget is that run, autonomy guided (the schedule leaves it; project-advance-deps re-checks before
+ * paying). resume: that run's autoStop removed; when the row's autoBudget is that run, budgetTwd = the new limit (never
+ * below what was spent) and, once its renders reached the server (renderRatios), autonomy auto_after_render with
+ * last_error cleared. armed = the row now runs that run.
+ */
+async function autoRunChange(db: NonNullable<ReturnType<typeof getSupabaseWriteClient>>, org: string, id: string, raw: unknown): Promise<Response> {
+  const run = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+  const runId = typeof run.runId === "string" && /^[A-Za-z0-9-]{1,64}$/.test(run.runId) ? run.runId : "";
+  const budgetTwd = run.budgetTwd === undefined ? undefined : Number(run.budgetTwd);
+  if (!runId || (run.action !== "stop" && run.action !== "resume")) return bad("autoRun needs a runId and action stop or resume");
+  if (budgetTwd !== undefined && (run.action !== "resume" || !Number.isFinite(budgetTwd) || budgetTwd < 0)) return bad("budgetTwd is a limit >= 0 on resume only");
+  let armed = false, refused = "";
+  const saved = await updateProjectRow(db, org, id, (row) => {
+    const brief = { ...((row.brief_json ?? {}) as Record<string, unknown>) }, budget = parseAutoBudget(brief.autoBudget);
+    armed = false;
+    if (run.action === "stop") return { brief_json: { ...brief, autoStop: runId }, ...((brief.autoBudget as { runId?: unknown } | undefined)?.runId === runId ? { autonomy: "guided" } : {}) };
+    if (brief.autoStop === runId) delete brief.autoStop;
+    if (budget?.runId !== runId) return { brief_json: brief };
+    if (budgetTwd !== undefined && budgetTwd < budget.spentTwd) { refused = `上限不能低於已用的 NT$${budget.spentTwd}`; return null; }
+    const next = { ...brief, autoBudget: { ...(brief.autoBudget as Record<string, unknown>), ...(budgetTwd !== undefined ? { budgetTwd } : {}) } };
+    armed = !!budget.renderRatios?.length; // before its renders reached the server (quick-render route) they arm it themselves
+    return armed ? { brief_json: next, autonomy: "auto_after_render", last_error: null } : { brief_json: next };
+  });
+  if (saved.ok === false) return NextResponse.json({ ok: false, error: saved.error }, { status: saved.error === "concurrent_update" ? 409 : 500 });
+  if (refused) return NextResponse.json({ ok: false, error: refused }, { status: 409 });
+  return NextResponse.json({ ok: true, item: saved.item, armed });
+}
+
 export async function PATCH(req: Request): Promise<Response> {
   const fail = guard(req); if (fail) return fail;
   let body: Record<string, unknown>; try { body = await req.json() as Record<string, unknown>; } catch { return bad("invalid_json"); }
@@ -132,6 +164,10 @@ export async function PATCH(req: Request): Promise<Response> {
   if (existing.error) return NextResponse.json({ ok: false, error: existing.error.message }, { status: 500 });
   if (!existing.data) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   try { assertOrgAccess(req, existing.data.organization_id); } catch (error) { return denied(error) ?? NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 }); }
+  if (body.autoRun !== undefined) {
+    if (Object.keys(fields).length) return bad("autoRun cannot be combined with other fields");
+    return autoRunChange(db, String(existing.data.organization_id), id, body.autoRun);
+  }
   const updated = await db.from("media_production_projects").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id).select(COLUMNS).single();
   if (updated.error) return NextResponse.json({ ok: false, error: updated.error.message }, { status: 500 });
   return NextResponse.json({ ok: true, item: updated.data });
