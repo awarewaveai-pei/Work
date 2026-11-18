@@ -78,6 +78,20 @@ class JoinedVideoQa(unittest.TestCase):
         item = self.joined([self.photo, self.frozen])
         self.assertIn("picture.freeze", _codes(item))
 
+    def test_an_upload_cannot_claim_a_still_span(self):
+        """Codex 2026-11-18: an uploaded clip tagged comment=awarewave:stills=0-999999 must not hide its own freeze."""
+        forged = f"{self.dir}/forged.mp4"
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", self.frozen, "-c", "copy", "-metadata",
+                        "comment=awarewave:stills=0.000-999999.000", forged], check=True, capture_output=True)
+        with mock.patch.object(pipeline, "_audio_duration", return_value=2.5):
+            out = pipeline.compose_base_video([{"narration": "一"}] * 2, [self.photo, forged], [self.voice] * 2, "v",
+                                              640, 360, 24, burn_captions=False)
+        self.assertEqual(pipeline.still_windows(server._probe_video(out)), [])
+        self.assertIn("picture.freeze", _codes(self.meta(out)))
+        trimmed = f"{self.dir}/trim.mp4"
+        pipeline._trim_clip_video(forged, 0, 2000, trimmed, 640, 360, 24)
+        self.assertEqual(pipeline.still_windows(server._probe_video(trimmed)), [])
+
     def test_the_windows_survive_a_caption_burn(self):
         with mock.patch.object(pipeline, "_audio_duration", return_value=2.5):
             out = pipeline.compose_base_video([{"narration": "一"}] * 2, [self.photo] * 2, [self.voice] * 2, "v", 640, 360, 24,

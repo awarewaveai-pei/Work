@@ -583,7 +583,7 @@ def _render_scene_ffmpeg(asset_path, narration, audio_path, duration, out_path, 
         filter_complex = f"{vchain};[1:a]apad[aud]"
 
     cmd = [
-        "ffmpeg", "-y", *inputs,
+        "ffmpeg", "-y", *inputs, "-map_metadata", "-1",  # an asset's own tags never reach our files (see _STILLS_PREFIX)
         "-filter_complex", filter_complex,
         "-map", final_v_tag, "-map", "[aud]",
         "-t", _ffmpeg_t(duration), "-r", str(fps),
@@ -663,10 +663,12 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
 _XFADE = {"crossfade": "fade", "fade-black": "fadeblack"}
 
 # ── Intended stills: spans a render made still on purpose (title cards, template intro / outro) ──
-# Written into the video's own `comment` tag by the step that makes them; ffmpeg keeps global metadata through every
-# later copy (caption burn, reburn of the clean video, format export), so the signal QA reads them from the very file it
-# measures. Freeze / black wholly inside them is not a defect (2026-11-18 Soulful: the 3 s title card warned
-# "picture.freeze" on every ratio, and a black title card counts as black frames).
+# Written into the video's own `comment` tag by the step that makes them, and ONLY there: every step that reads an
+# outside file (scene asset, template, footage) drops its metadata, so an upload cannot claim a still span (Codex
+# 2026-11-18). ffmpeg keeps global metadata through every later copy (caption burn, reburn of the clean video, format
+# export), so the signal QA reads them from the very file it measures. Freeze / black wholly inside them is not a
+# defect (2026-11-18 Soulful: the 3 s title card warned "picture.freeze" on every ratio, and a black title card counts
+# as black frames).
 _STILLS_PREFIX = "awarewave:stills="
 
 
@@ -723,7 +725,7 @@ def _bookend_segment(seg: dict, name: str, w: int, h: int, fps: int) -> str:
     silent = [] if seg.get("has_audio") else ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
     d = float(seg["duration"])
     _run_ffmpeg([
-        "ffmpeg", "-y", "-i", seg["asset"], *silent,
+        "ffmpeg", "-y", "-i", seg["asset"], *silent, "-map_metadata", "-1",
         "-filter_complex", f"[0:v]{_fit_bt709(seg['asset'], w, h, fps)},tpad=stop_mode=clone:stop_duration={d:.3f}[v];"
                            f"[{0 if seg.get('has_audio') else 1}:a]apad[a]",
         "-map", "[v]", "-map", "[a]",
@@ -1131,7 +1133,7 @@ def _trim_clip_video(src: str, start_ms: float, duration_ms: float, out_path: st
     """單一 clip 依 [start_ms, start_ms+duration_ms) 剪出畫面（無音軌），cover-fit 填滿目標尺寸。"""
     start_s, dur_s = start_ms / 1000.0, duration_ms / 1000.0
     cmd = [
-        "ffmpeg", "-y", "-ss", f"{start_s:.3f}", "-i", src, "-t", f"{dur_s:.3f}",
+        "ffmpeg", "-y", "-ss", f"{start_s:.3f}", "-i", src, "-t", f"{dur_s:.3f}", "-map_metadata", "-1",
         "-vf", _fit_bt709(src, w, h, fps),
         "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "21",
         out_path,
@@ -1145,7 +1147,7 @@ def _trim_clip_audio(src: str, start_ms: float, duration_ms: float, out_path: st
     start_s, dur_s = start_ms / 1000.0, duration_ms / 1000.0
     if _probe_has_audio(src):
         cmd = [
-            "ffmpeg", "-y", "-ss", f"{start_s:.3f}", "-i", src, "-t", f"{dur_s:.3f}",
+            "ffmpeg", "-y", "-ss", f"{start_s:.3f}", "-i", src, "-t", f"{dur_s:.3f}", "-map_metadata", "-1",
             "-vn", "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
             out_path,
         ]
