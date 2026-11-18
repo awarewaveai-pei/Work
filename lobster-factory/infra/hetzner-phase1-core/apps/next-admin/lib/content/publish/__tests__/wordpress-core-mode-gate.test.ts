@@ -36,12 +36,15 @@ const bridge = vi.hoisted(() => ({
   base: "https://acme.example",
   createPost: vi.fn(async (): Promise<{ ok: boolean; error?: string; blockedMode?: string; value?: unknown }> => ({ ok: true, value: {} })),
 }));
-vi.mock("@/lib/payments/woo", async (orig) => ({
-  wpSiteKey: (await orig<typeof import("@/lib/payments/woo")>()).wpSiteKey,
-  isBridgeConfigured: () => bridge.configured,
-  bridgeBaseUrl: () => (bridge.configured ? bridge.base : null),
-  createPost: bridge.createPost,
-}));
+// bridgeClientForSite's own matching (install = origin + path, extra clients) is covered in
+// lib/studio/__tests__/wp-bridge-client-mode-gate.test.ts; here one default client at bridge.base.
+vi.mock("@/lib/payments/woo", async (orig) => {
+  const { wpSiteKey } = await orig<typeof import("@/lib/payments/woo")>();
+  return {
+    bridgeClientForSite: (url: string) => (bridge.configured && wpSiteKey(url) === wpSiteKey(bridge.base) ? "" : null),
+    createPost: bridge.createPost,
+  };
+});
 
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.stubGlobal("fetch", fetchMock);
@@ -103,6 +106,14 @@ describe("publishToWordPress -- system-mode gate", () => {
     await publishToWordPress(INPUT, req());
     expect(bridge.createPost).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("bridge path: the draft is created through the matched bridge client", async () => {
+    bridge.configured = true;
+    await publishToWordPress(INPUT, req());
+    expect(bridge.createPost).toHaveBeenCalledTimes(1);
+    expect((bridge.createPost.mock.calls[0] as unknown[])[1]).toBe("");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("bridge path: any other bridge failure stays 502", async () => {

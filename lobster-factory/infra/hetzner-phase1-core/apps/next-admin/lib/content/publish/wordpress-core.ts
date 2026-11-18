@@ -11,7 +11,7 @@
  */
 import { resolveWpSite, getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 import { OrgAccessError } from "@/lib/tenant-guard";
-import { isBridgeConfigured, bridgeBaseUrl, createPost, wpSiteKey } from "@/lib/payments/woo";
+import { bridgeClientForSite, createPost } from "@/lib/payments/woo";
 import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 import { decodeWpEntities } from "@/lib/content/wp-entities";
 import { normalizeManyForWp } from "@/lib/studio/wp-web-image";
@@ -355,7 +355,9 @@ export async function publishToWordPress(
     wpToken  = process.env.WORDPRESS_JWT_TOKEN;
   }
 
-  if (!wpApiUrl || !wpToken) {
+  // The channel for this site (see the Bridge path below); the REST credential is needed only without a bridge.
+  const bridgeClient = wpApiUrl ? bridgeClientForSite(wpApiUrl) : null;
+  if (!wpApiUrl || (!wpToken && bridgeClient === null)) {
     return { ok: false, status: 503, error: "WP_API_URL or WORDPRESS_JWT_TOKEN not configured", wire: "text" };
   }
 
@@ -389,19 +391,14 @@ export async function publishToWordPress(
     .map(t => String(t).trim()).filter(Boolean);
 
   // ── WP Bridge path ───────────────────────────────────────────────────────
-  // When the target site IS the configured bridge site, route through the signed /post endpoint:
+  // When the target site IS a configured bridge site, route through the signed /post endpoint:
   // the plugin composes real Kadence blocks, sideloads in-article images into the media library,
   // and persists Rank Math SEO meta server-side (standard WP REST silently drops the unregistered
-  // rank_math_focus_keyword meta). Gate on the same install (woo.ts wpSiteKey: origin + path) so an article for a
-  // NON-bridge site -- a staging install under a path of the bridge host included -- is never mis-published to the
-  // bridge site; non-bridge sites keep the standard-REST path below.
-  const bridgeBase = isBridgeConfigured() ? bridgeBaseUrl() : null;
-  let bridgeHostMatch = false;
-  if (bridgeBase) {
-    const k = wpSiteKey(bridgeBase);
-    bridgeHostMatch = k !== null && k === wpSiteKey(base);
-  }
-  if (bridgeHostMatch) {
+  // rank_math_focus_keyword meta). bridgeClientForSite matches the same install (woo.ts wpSiteKey: origin + path) so an
+  // article for a NON-bridge site -- a staging install under a path of the bridge host included -- is never
+  // mis-published to the bridge site; non-bridge sites keep the standard-REST path below. The video embed
+  // (lib/content/video/embed-in-post.ts) asks the same function, so it edits the post through the identity that made it.
+  if (bridgeClient !== null) {
     // Bridge supports "draft" and "publish". Scheduled posts ("future") require the WP date field
     // which the plugin's PostCreator does not yet support → fall through to standard-REST for those.
     if (publishStatus === "future") {
@@ -451,7 +448,7 @@ export async function publishToWordPress(
       featured_image_url: featuredImageUrl,
       featured_image_alt: featuredImageAlt,
       internal_link_keywords: internalLinkKeywords.length > 0 ? internalLinkKeywords : undefined,
-    });
+    }, bridgeClient);
     if (!result.ok) {
       // tsconfig has strict:false → discriminated-union narrowing via `!result.ok` does not
       // expose `.error`; cast to the error arm (same idiom as app/api/tools/publish/route.ts:292).

@@ -159,6 +159,17 @@ export function listBridgeClients(): BridgeClient[] {
 }
 
 /**
+ * Which channel writes to a WordPress site: the id of the configured bridge client on the same install (wpSiteKey),
+ * or null = no bridge, standard REST. Every write path (create, embed, the draft list) asks this one function, so one
+ * site is never written through two identities.
+ */
+export function bridgeClientForSite(siteUrl: string): string | null {
+  const site = wpSiteKey(siteUrl);
+  if (!site) return null;
+  return listBridgeClients().find((c) => wpSiteKey(c.baseUrl) === site)?.id ?? null;
+}
+
+/**
  * Signed POST to a bridge route. `path` is relative to the namespace, e.g. "/product".
  * dryRun is ONLY honored by the /option route (RestController:167) — /product and
  * /post COMMIT regardless (live-verified 2026-06-11: a "dry-run" create produced
@@ -314,6 +325,41 @@ export interface BridgePostSpec {
  */
 export function createPost(
   spec: BridgePostSpec,
+  clientId?: string,
 ): Promise<BridgeResult<BridgePostResponse>> {
-  return bridgePost<BridgePostResponse>("/post", { status: "draft", ...spec }, { timeoutMs: 90_000 });
+  return bridgePost<BridgePostResponse>("/post", { status: "draft", ...spec }, { timeoutMs: 90_000, clientId });
+}
+
+/** A blog post as the bridge's /post/read returns it (plugin 0.22.0, DraftPostEditor); content_sha256 is the
+ *  precondition updateDraftPost sends back. */
+export interface BridgePostRead {
+  post_id: number;
+  post_status: string;
+  title: string;
+  content: string;
+  content_sha256: string;
+}
+
+/** The site's newest draft/pending posts. Read scope, no gate (writes nothing). */
+export function listDraftPosts(
+  clientId: string,
+): Promise<BridgeResult<{ posts?: Array<{ id: number; title: string; status: string; modified: string }> }>> {
+  return bridgeRead("/drafts", {}, { clientId });
+}
+
+/** One blog post's raw content and status (any status; only updateDraftPost is limited to not-live posts). */
+export function readBridgePost(postId: number, clientId: string): Promise<BridgeResult<BridgePostRead>> {
+  return bridgeRead<BridgePostRead>("/post/read", { post_id: postId }, { clientId });
+}
+
+/** Replace a draft/pending post's content if it is still the content read (expectSha256 = readBridgePost's
+ *  content_sha256). The plugin refuses a live post ("post_not_draft") or one edited since ("content_changed") and never
+ *  changes the status. Answer `content` = what WordPress saved (a save filter may have changed it), for the caller to check. */
+export function updateDraftPost(
+  postId: number,
+  content: string,
+  expectSha256: string,
+  clientId: string,
+): Promise<BridgeResult<{ status: string; post_id?: number; post_status?: string; content?: string }>> {
+  return bridgePost("/draft/update", { post_id: postId, content, expect_sha256: expectSha256 }, { timeoutMs: 30_000, clientId });
 }

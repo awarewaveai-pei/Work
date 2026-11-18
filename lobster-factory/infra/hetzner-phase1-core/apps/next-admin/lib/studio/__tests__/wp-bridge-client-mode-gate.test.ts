@@ -32,7 +32,7 @@ vi.stubGlobal("fetch", fetchMock);
 const SEED_B64 = Buffer.alloc(32, 7).toString("base64");
 const savedEnv = { ...process.env };
 
-const { bridgePost } = await import("../../payments/woo");
+const { bridgePost, bridgeClientForSite } = await import("../../payments/woo");
 
 beforeEach(() => {
   checkProductionChangeAllowed.mockClear();
@@ -113,5 +113,22 @@ describe("bridgePost -- system-mode gate", () => {
     db.on = false;
     await bridgePost("/post", { title: "x" });
     expect(checkProductionChangeAllowed).toHaveBeenCalledWith(null, null);
+  });
+});
+
+describe("bridgeClientForSite -- the one channel choice for a site", () => {
+  it("the configured client on the same install, else null (standard REST)", () => {
+    process.env.WPBRIDGE_SITE_2_BASE_URL = "https://two.example/";
+    process.env.WPBRIDGE_SITE_2_KEY_ID = "key-2";
+    process.env.WPBRIDGE_SITE_2_PRIVATE_KEY = SEED_B64;
+    expect(bridgeClientForSite("https://BRIDGE.example/")).toBe("");
+    expect(bridgeClientForSite("https://two.example")).toBe("2");
+    expect(bridgeClientForSite("https://bridge.example/staging/x")).toBeNull();   // another install on the bridge host
+    expect(bridgeClientForSite("https://other.example")).toBeNull();
+    expect(bridgeClientForSite("not a url")).toBeNull();
+  });
+  it("no bridge configured: every site is REST", () => {
+    delete process.env.WPBRIDGE_BASE_URL;
+    expect(bridgeClientForSite("https://bridge.example")).toBeNull();
   });
 });

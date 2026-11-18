@@ -3,10 +3,11 @@
  * the pipeline clock embed through the same code (AUTO_CONTENT I4). Kept apart from finalize.ts so the
  * embed route does not reach video-pipeline's product features.
  */
-import { resolveWpSite } from "@/lib/content/wp-sites";
+import { resolveWpSite, type ResolvedWpSite } from "@/lib/content/wp-sites";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { publishToWordPress } from "@/lib/content/publish/wordpress-core";
+import { bridgeClientForSite, listDraftPosts, readBridgePost, updateDraftPost } from "@/lib/payments/woo";
 import {
   ensureDeliveryReceipt,
   claimDeliveryReceipt,
@@ -39,6 +40,122 @@ export type EmbedResult =
 
 /** WordPress statuses nobody outside wp-admin sees. Anything else (publish, future, private) is or becomes live on edit. */
 const NOT_LIVE_STATUSES = ["draft", "pending"];
+
+const DRAFT_ONLY_REFUSAL = "這篇文章已發布或已排程，嵌入會直接上線；請改用「建新草稿文章並嵌入」";
+const BRIDGE_LIVE_REFUSAL = "這篇文章已發布或已排程；這個網站經 WP Bridge 只能改草稿或待審文章，影片沒有嵌入";
+
+const CHANGED_SINCE_READ = "這篇草稿剛被別人改過，影片沒有嵌入；請重新整理後再按一次";
+
+/**
+ * One site, one channel (bridgeClientForSite, the same choice publishToWordPress makes): a bridge site is read and
+ * written only through the plugin's signed /post/read + /draft/update, which refuses a live post itself and writes only
+ * over the content read (sha256); REST only without a bridge.
+ * Soulful 2026-11-18: the draft was made through the bridge, the embed went to /wp/v2 with a dead application password.
+ */
+type PostRead =
+  | { ok: true; status: string; title: string; content: string; sha256?: string }
+  | { ok: false; status: number; error: string; receipt: Record<string, unknown> };
+
+/** A plugin older than 0.22.0 has no /draft routes: WordPress answers rest_no_route, which signedPost reports as bridge_404. */
+function bridgeError(error: string): string {
+  return error === "bridge_404" ? "這個網站的 WP Bridge 外掛版本太舊（需要 0.22.0 以上才能改草稿），請先更新外掛" : `bridge: ${error}`;
+}
+
+async function readPost(resolved: ResolvedWpSite, bridgeClient: string | null, postId: number): Promise<PostRead> {
+  if (bridgeClient !== null) {
+    const r = await readBridgePost(postId, bridgeClient);
+    if (r.ok) return { ok: true, status: r.value.post_status, title: r.value.title, content: r.value.content ?? "", sha256: r.value.content_sha256 };
+    const error = (r as { error: string }).error;   // strict:false: no narrowing on !ok
+    const status = error === "post_not_found" ? 404 : 502;
+    return { ok: false, status, error: bridgeError(error), receipt: { status, error } };
+  }
+  try {
+    const getRes = await fetch(`${resolved.site.url.replace(/\/+$/, "")}/wp-json/wp/v2/posts/${postId}?context=edit`, {
+      headers: { Authorization: resolved.authHeader },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!getRes.ok) {
+      const e = await getRes.json().catch(() => ({})) as { message?: string };
+      return { ok: false, status: getRes.status, error: e.message ?? `WP GET error ${getRes.status}`, receipt: { status: getRes.status, error: e.message } };
+    }
+    const post = await getRes.json() as { status?: string; content?: { raw?: string }; title?: { raw?: string; rendered?: string } };
+    return { ok: true, status: String(post.status), title: post.title?.raw || post.title?.rendered || "", content: post.content?.raw ?? "" };
+  } catch {
+    return { ok: false, status: 502, error: "Failed to fetch post from WordPress", receipt: { error: "network" } };
+  }
+}
+
+type PostWrite =
+  | { ok: true }
+  | { ok: false; status: number; error: string; receipt: Record<string, unknown> }
+  | { ok: false; blockedMode: string; receipt: Record<string, unknown> };
+
+async function writePost(
+  resolved: ResolvedWpSite, bridgeClient: string | null, postId: number, content: string, readSha256: string,
+  draftStatus: string | null, draftOnly: boolean, videoUrl: string,
+): Promise<PostWrite> {
+  if (bridgeClient !== null) {
+    const r = await updateDraftPost(postId, content, readSha256, bridgeClient);
+    // the plugin returns what WordPress saved: a save filter that dropped the video is a failed delivery, not a receipt (Codex 66c620ce F2)
+    if (r.ok) {
+      return alreadyEmbedded(r.value.content ?? "", videoUrl)
+        ? { ok: true }
+        : { ok: false, status: 502, error: "WordPress 儲存時把影片拿掉了，影片沒有嵌進文章", receipt: { status: 502, error: "video_not_saved" } };
+    }
+    const failed = r as { error: string; blockedMode?: string };   // strict:false
+    if (failed.blockedMode !== undefined) return { ok: false, blockedMode: failed.blockedMode, receipt: { blockedMode: failed.blockedMode } };
+    if (failed.error === "post_not_draft") {
+      return { ok: false, status: 409, error: draftOnly ? DRAFT_ONLY_REFUSAL : BRIDGE_LIVE_REFUSAL, receipt: { refused: "not_draft" } };
+    }
+    if (failed.error === "content_changed") return { ok: false, status: 409, error: CHANGED_SINCE_READ, receipt: { refused: "content_changed" } };
+    return { ok: false, status: 502, error: bridgeError(failed.error), receipt: { status: 502, error: failed.error } };
+  }
+  try {
+    const patchRes = await fetch(`${resolved.site.url.replace(/\/+$/, "")}/wp-json/wp/v2/posts/${postId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: resolved.authHeader,
+        "X-HTTP-Method-Override": "PUT",
+      },
+      // draftOnly sends the status it read: a post published between the GET and this write (WP has no
+      // conditional update) goes back to that status instead of going live with the video (Codex 67aa39bb F1).
+      body: JSON.stringify(draftStatus ? { content, status: draftStatus } : { content }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    const pj = await patchRes.json().catch(() => ({})) as { message?: string };
+    if (!patchRes.ok) {
+      return { ok: false, status: patchRes.status, error: pj.message ?? `WP PATCH error ${patchRes.status}`, receipt: { status: patchRes.status, error: pj.message } };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, status: 502, error: "Failed to update post in WordPress", receipt: { error: "network" } };
+  }
+}
+
+/** The release page's draft picker: the site's newest not-live posts (draft, pending), through the site's one channel. */
+export async function listNotLiveDrafts(
+  resolved: ResolvedWpSite,
+): Promise<{ ok: true; posts: Array<{ id: number; title: string; status: string; modified: string }> } | { ok: false; status: number; error: string }> {
+  const name = (id: number, title: string | undefined) => title || `（無標題 #${id}）`;
+  const bridgeClient = bridgeClientForSite(resolved.site.url);
+  if (bridgeClient !== null) {
+    const r = await listDraftPosts(bridgeClient);
+    if (!r.ok) return { ok: false, status: 502, error: bridgeError((r as { error: string }).error) };
+    return { ok: true, posts: (r.value.posts ?? []).map((p) => ({ id: p.id, title: name(p.id, p.title), status: p.status, modified: p.modified })) };
+  }
+  if (!resolved.token) return { ok: false, status: 404, error: "Site not found" };
+  try {
+    const res = await fetch(`${resolved.site.url.replace(/\/+$/, "")}/wp-json/wp/v2/posts?per_page=30&status=draft,pending&orderby=modified&order=desc&context=edit&_fields=id,title,status,modified`, {
+      headers: { Authorization: resolved.authHeader }, signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return { ok: false, status: 502, error: `WordPress ${res.status}` };
+    const rows = await res.json() as Array<{ id: number; title?: { raw?: string }; status: string; modified: string }>;
+    return { ok: true, posts: rows.map((p) => ({ id: p.id, title: name(p.id, p.title?.raw), status: p.status, modified: p.modified })) };
+  } catch {
+    return { ok: false, status: 502, error: "Failed to reach WordPress" };
+  }
+}
 
 /**
  * Fetches a WP post's content, replaces <!-- VIDEO_PLACEHOLDER --> with the video URL
@@ -75,7 +192,8 @@ export async function embedVideoInPost(
   // Resolve site auth
   const resolved = await resolveWpSite(identity, siteId);
   if (!resolved) return { ok: false, status: 404, error: "Site not found" };
-  if (!resolved.token) return { ok: false, status: 503, error: "No token for site" };
+  const bridgeClient = bridgeClientForSite(resolved.site.url);
+  if (bridgeClient === null && !resolved.token) return { ok: false, status: 503, error: "No token for site" };
 
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), resolved.site.organizationId);
   if (!gate.allowed) {
@@ -119,38 +237,29 @@ export async function embedVideoInPost(
       console.error("[video/embed-to-wp] receipt persistence failed", err);
     }
   };
-  const authHdr = resolved.authHeader;
-  const base = resolved.site.url.replace(/\/+$/, "");
 
   // Fetch current post content
-  let currentContent = "";
-  let draftStatus: string | null = null;   // draftOnly: the not-live status read, written back with the content
-  let postTitle = "文章 #" + postId;
-  try {
-    const getRes = await fetch(`${base}/wp-json/wp/v2/posts/${postId}?context=edit`, {
-      headers: { Authorization: authHdr },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!getRes.ok) {
-      const e = await getRes.json().catch(() => ({})) as { message?: string };
-      await markReceipt(false, undefined, { phase: "fetch", status: getRes.status, error: e.message });
-      return { ok: false, status: getRes.status, error: e.message ?? `WP GET error ${getRes.status}` };
-    }
-    const post = await getRes.json() as { status?: string; content?: { raw?: string }; title?: { raw?: string; rendered?: string } };
-    postTitle = post.title?.raw || post.title?.rendered || postTitle;
-    if (input.draftOnly && !NOT_LIVE_STATUSES.includes(String(post.status))) {
-      await markReceipt(false, undefined, { phase: "fetch", refused: "not_draft", postStatus: post.status });
-      return { ok: false, status: 409, error: "這篇文章已發布或已排程，嵌入會直接上線；請改用「建新草稿文章並嵌入」" };
-    }
-    if (input.draftOnly) draftStatus = String(post.status);
-    currentContent = post.content?.raw ?? "";
-  } catch {
-    await markReceipt(false, undefined, { phase: "fetch", error: "network" });
-    return { ok: false, status: 502, error: "Failed to fetch post from WordPress" };
+  const read = await readPost(resolved, bridgeClient, postId);
+  if (!read.ok) {
+    const failed = read as Extract<PostRead, { ok: false }>;   // strict:false: no narrowing on !ok
+    await markReceipt(false, undefined, { phase: "fetch", ...failed.receipt });
+    return { ok: false, status: failed.status, error: failed.error };
   }
+  const postTitle = read.title || "文章 #" + postId;
+  if (input.draftOnly && !NOT_LIVE_STATUSES.includes(read.status)) {
+    await markReceipt(false, undefined, { phase: "fetch", refused: "not_draft", postStatus: read.status });
+    return { ok: false, status: 409, error: DRAFT_ONLY_REFUSAL };
+  }
+  const draftStatus = input.draftOnly ? read.status : null;   // draftOnly: the not-live status read, written back with the content
+  let currentContent = read.content;
 
   // once: a caller that may repeat after a crash (the content pipeline) must not append the same video twice
   if (input.once && alreadyEmbedded(currentContent, videoUrl)) return { ok: true, postId, videoUrl };
+  // the bridge changes only not-live posts (DraftPostEditor refuses the rest too); said here, before any write
+  if (bridgeClient !== null && !NOT_LIVE_STATUSES.includes(read.status)) {
+    await markReceipt(false, undefined, { phase: "fetch", refused: "not_draft", postStatus: read.status });
+    return { ok: false, status: 409, error: BRIDGE_LIVE_REFUSAL };
+  }
   // VD.8: the Release's chosen cover as the poster, looked up by the server from the Release (never a url from the
   // client). A failed lookup embeds without a poster: the cover is optional, the delivery is not.
   let poster: string | null = null;
@@ -171,27 +280,12 @@ export async function embedVideoInPost(
   }
 
   // PATCH the post content back
-  try {
-    const patchRes = await fetch(`${base}/wp-json/wp/v2/posts/${postId}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHdr,
-        "X-HTTP-Method-Override": "PUT",
-      },
-      // draftOnly sends the status it read: a post published between the GET and this write (WP has no
-      // conditional update) goes back to that status instead of going live with the video (Codex 67aa39bb F1).
-      body: JSON.stringify(draftStatus ? { content: currentContent, status: draftStatus } : { content: currentContent }),
-      signal: AbortSignal.timeout(12_000),
-    });
-    const pj = await patchRes.json().catch(() => ({})) as { message?: string };
-    if (!patchRes.ok) {
-      await markReceipt(false, undefined, { phase: "patch", status: patchRes.status, error: pj.message });
-      return { ok: false, status: patchRes.status, error: pj.message ?? `WP PATCH error ${patchRes.status}` };
-    }
-  } catch {
-    await markReceipt(false, undefined, { phase: "patch", error: "network" });
-    return { ok: false, status: 502, error: "Failed to update post in WordPress" };
+  const written = await writePost(resolved, bridgeClient, postId, currentContent, read.sha256 ?? "", draftStatus, input.draftOnly === true, videoUrl);
+  if (!written.ok) {
+    const failed = written as Exclude<PostWrite, { ok: true }>;   // strict:false
+    await markReceipt(false, undefined, { phase: "patch", ...failed.receipt });
+    if ("blockedMode" in failed) return { ok: false, blockedMode: failed.blockedMode };
+    return { ok: false, status: failed.status, error: failed.error };
   }
 
   await markReceipt(true, String(postId), { postId, videoUrl, postTitle, editUrl: resolved.site.url.replace(/\/$/, "") + "/wp-admin/post.php?post=" + postId + "&action=edit" });
