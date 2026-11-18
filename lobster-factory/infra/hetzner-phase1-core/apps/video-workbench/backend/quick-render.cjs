@@ -153,6 +153,7 @@ async function run(job, { main, fetchImpl, mediaStore, signal, sizeOf, onRemoteJ
   }
   return {
     url: stored.url, previewUrl: stored.previewUrl, thumbUrl: stored.thumbUrl,
+    width: stored.probe?.displayWidth, height: stored.probe?.displayHeight, duration: stored.probe?.duration, // for the covers (api.cjs addCovers)
     ...(mainUrl ? { mainUrl } : {}),
     mainCaptionCues: done.mainCaptionCues?.length ? done.mainCaptionCues : done.captionCues || [], title: done.title || "", script: done.script || "",
     origin: { kind: "render", engine: "quick-render", jobId: job.id, remoteJobId, costUsd: 0 },

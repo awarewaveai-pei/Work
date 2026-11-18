@@ -12,10 +12,11 @@ const cover = require("./cover.cjs");
 const PROMPT = "Redesign this video frame as an eye-catching video thumbnail. Keep the main subject recognisable and in the same place, " +
   "make the lighting and colour bolder, simplify the background and give it one strong focal point. Do not add any text, letters, numbers, logos or watermarks.";
 
-/** The export job a cover-ai job is for: a finished video of this workbench that already has its free covers. */
+/** The job a cover-ai job is for: a finished video of this workbench that already has its free covers. Only a deliverable
+ *  render gets free covers (api.cjs addCovers), so having them is the test -- no operation list to fall out of step. */
 function exportFor(jobs, forJob) {
   const job = jobs.find((j) => j.id === forJob);
-  if (!job || job.status !== "succeeded" || !["editor-export", "engine-render"].includes(job.input?.operation) || !job.result?.url || !job.result?.covers?.length)
+  if (!job || job.status !== "succeeded" || !job.result?.url || !job.result?.covers?.length)
     throw Object.assign(Error("找不到可以做封面的成片（成片要先完成並有自動封面）"), { status: 400 });
   return job;
 }

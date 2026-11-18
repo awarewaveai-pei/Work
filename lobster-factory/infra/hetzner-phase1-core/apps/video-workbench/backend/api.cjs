@@ -683,6 +683,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         });
         if (signal.aborted) return;
         job.result = result; // registered by the main system itself: settle() finds the row (main.adopt)
+        // VD.1: every deliverable render gets its free covers (Soulful 2026-11-18: quick renders had none, so social
+        // drafts and the WordPress embed went out without a cover).
+        await addCovers(job, { width: result.width, height: result.height, duration: result.duration, title: result.title || job.input.settings?.title, signal });
+        if (job.status === "cancelled") return; // cancelled while the covers were made: the cancel wins, as everywhere
         job.progress = 100;
         job.status = "succeeded";
         persist();

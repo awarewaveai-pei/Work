@@ -24,7 +24,7 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
   assert.equal(spawnSync(ffmpeg, ["-y", "-hide_banner", "-f", "lavfi", "-i", "testsrc=size=270x480:rate=10", "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", mp4], { windowsHide: true }).status, 0);
   const bytes = fs.readFileSync(mp4), sha = crypto.createHash("sha256").update(bytes).digest("hex");
 
-  const submitted = [], registered = [], ledger = [], quoted = [];
+  const submitted = [], registered = [], ledger = [], quoted = [], covers = [];
   let corrupt = false, lookupDown = true;
   async function fetchImpl(url, options = {}) {
     url = String(url);
@@ -48,7 +48,18 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
       if (lookupDown) { lookupDown = false; return Response.json({ ok: false, error: "job_lookup_failed" }, { status: 502 }); }
       return Response.json({ ok: true, status: "done", ratio: "9x16", assetId: VIDEO, checksumSha256: sha, url: R2, rightsSources: [] });
     }
-    if (url === BASE + "/api/internal/video/workbench/assets") { registered.push(options.headers["X-VW-Origin"]); return Response.json({ ok: false, error: "must not be called" }, { status: 500 }); }
+    if (url === BASE + "/api/internal/video/workbench/assets") {
+      const meta = JSON.parse(Buffer.from(options.headers["X-VW-Meta"], "base64url").toString("utf8"));
+      // VD.1/VD.2: a quick render's free covers are registered as images OF the main system's row; the video never is.
+      if (meta.coverOf) {
+        const bytes = Buffer.from(await new Response(options.body).arrayBuffer());
+        covers.push({ meta, type: options.headers["Content-Type"] });
+        const coverId = "cccccccc-0000-4000-8000-" + String(covers.length).padStart(12, "0");
+        return Response.json({ ok: true, existing: false, assetId: coverId, checksumSha256: crypto.createHash("sha256").update(bytes).digest("hex"), objectUrl: "https://cdn.test/" + coverId, qa: {} }, { status: 201 });
+      }
+      registered.push(options.headers["X-VW-Origin"]);
+      return Response.json({ ok: false, error: "must not be called" }, { status: 500 });
+    }
     if (url === BASE + "/api/internal/video/workbench/jobs") { ledger.push(JSON.parse(options.body)); return Response.json({ ok: true, job: {} }); }
     if (url.startsWith(BASE + "/api/internal/video/workbench/audio-policy?")) return Response.json({ ok: true, externalAudioAllowed: true });
     throw Error("unexpected " + url);
@@ -81,6 +92,11 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
     assert.equal(job.result.assetId, VIDEO);
     assert.equal(job.result.checksumSha256, sha);
     assert.deepEqual(registered, []);
+    // VD.1: the quick render has its free covers (Soulful 2026-11-18 had none), each registered as a cover of VIDEO.
+    assert.ok(job.result.covers?.length >= 1, JSON.stringify(job.result.coverError || job.result));
+    assert.ok(job.result.covers.every((c) => c.kind === "auto" && c.assetId), JSON.stringify(job.result.covers));
+    assert.equal(covers.length, job.result.covers.length);
+    assert.ok(covers.every((c) => c.meta.coverOf === VIDEO && c.meta.coverKind === "auto" && c.type === "image/jpeg"), JSON.stringify(covers));
     // 成片: the job lands in the episode's outputs.
     const projects = [{ id: "proj-1", episodes: [{ id: "ep-1", shots: [], steps: [], outputs: [] }] }];
     assert.equal(spine.settle(projects, job), true);

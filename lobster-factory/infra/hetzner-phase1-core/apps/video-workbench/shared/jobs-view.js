@@ -177,11 +177,12 @@
     reviewQuery(v).then(() => button.setAttribute("aria-disabled", "false"), (error) => { refusal = error; button.title = error.message; });
     actions.append(button);
   }
-  // Card VD.4: a finished video's covers. The free ones come with the export (backend/cover.cjs) and are the default;
-  // an AI cover is opt-in, one button per image-edit row with its price on it (data-paid -> shared/paid-price.js, NT$
-  // from /capabilities). The model redraws the best frame without any text; the title is drawn by ffmpeg afterwards.
+  // Card VD.4: a finished video's covers. The free ones come with every deliverable render (backend/api.cjs addCovers)
+  // and are the default; having them is what makes a job a cover target (no operation list here). An AI cover is opt-in,
+  // one button per image-edit row with its price on it (data-paid -> shared/paid-price.js, NT$ from /capabilities). The
+  // model redraws the best frame without any text; the title is drawn by ffmpeg afterwards.
   function coverButtons(v, actions, notes) {
-    if (!v.result?.covers?.length || !["editor-export", "engine-render"].includes(v.input?.operation)) return;
+    if (!v.result?.covers?.length) return;
     const box = document.createElement("div");
     box.className = "job-cover-actions";
     const label = document.createElement("p");
