@@ -420,7 +420,9 @@ def _text_box(kind: str, w: int, h: int) -> dict:
     """Style of a text kind on a w x h frame, and the room its text may take (max_w / max_h, borders included)."""
     short, side = min(w, h), round(min(w, h) * _SAFE_MARGIN)
     if kind == "caption":
-        st = {"size": max(48, short // 20), "border": 3, "box": max(4, short // 270), "bottom": max(40, h // 30)}
+        st = {"size": max(48, short // 20), "border": 3, "box": max(4, short // 270)}
+        # 16:9 keeps its old bottom margin; portrait frames keep the box itself inside the safe margin
+        st["bottom"] = max(40, h // 30) if w > h else max(h // 30, side + st["box"])
         st["max_h"] = h // 2 - st["bottom"]  # captions keep to the lower half
     else:  # title card
         st = {"size": max(36, short // 18), "border": 2, "box": 0}
@@ -438,7 +440,7 @@ def _drawtext(in_tag: str, out_tag: str, text: str, text_path: str, w: int, h: i
     font = _font_path()
     opts = ([f"fontfile={font.replace(':', '\\:')}"] if font else []) + [
         f"textfile={text_path.replace(chr(92), '/').replace(':', '\\:')}", f"fontsize={size}",
-        f"line_spacing={round(size * _LINE_GAP)}", "text_align=C", "fontcolor=white",
+        f"line_spacing={round(size * _LINE_GAP)}", "text_align=C", "expansion=none", "fontcolor=white",
         f"borderw={st['border']}", "bordercolor=black", "x=(w-text_w)/2"]
     if kind == "caption":
         opts += ["box=1", "boxcolor=black@0.45", f"boxborderw={st['box']}", f"y=h-text_h-{st['bottom']}"]

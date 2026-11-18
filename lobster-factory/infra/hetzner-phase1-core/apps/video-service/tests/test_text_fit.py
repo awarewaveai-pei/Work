@@ -21,7 +21,8 @@ TITLES = ["A 30-Second Creative Pause: Notice, Draw, Reflect",
 NARRATION = ("Notice one colour nearby. Notice how the moment feels, and let your hand follow it slowly across the page. "
              "Find more pauses like this at soulfulexpression dot com. 留意身邊的一種顏色，感受此刻，讓手慢慢跟著它在紙上移動。")
 CUES = ["Notice one colour nearby", "Notice how the moment feels, and let your hand follow it",
-        "at soulfulexpression dot com", "soulfulexpression.com/creative-pause-notice-draw-reflect"]
+        "at soulfulexpression dot com", "soulfulexpression.com/creative-pause-notice-draw-reflect",
+        "Save 100% of your focus \\ now"]  # drawtext's default %-expansion drew nothing at all for this
 SAFE_MARGIN = 0.05  # the contract: text keeps 5 % of the short side clear on each edge
 HAS_FONT = bool(pipeline._font_path())
 
@@ -87,8 +88,10 @@ class DrawnTextInsideTheFrame(unittest.TestCase):
         left, top, right, bottom = box
         self.assertGreaterEqual(left, side, f"{what}: text box {box} crosses the left margin {side}")
         self.assertLessEqual(right, w - side, f"{what}: text box {box} crosses the right margin {w - side}")
-        self.assertGreater(top, 0, f"{what}: {box}")
-        self.assertLess(bottom, h, f"{what}: {box}")
+        self.assertGreaterEqual(top, side, f"{what}: text box {box} crosses the top margin {side}")
+        # 16:9 captions keep their old 40 px bottom margin (operator: keep the 16:9 look)
+        floor = h - (40 if w > h and "caption" in what else side)
+        self.assertLessEqual(bottom, floor, f"{what}: text box {box} crosses the bottom margin {floor}")
 
     def test_title_card_every_format(self):
         for fmt, (w, h) in pipeline.config.FORMATS.items():
