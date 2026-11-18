@@ -110,3 +110,7 @@
 - 待做：通過部署前治理檢查→整合/push→已授權 NA/VW 部署→正式 CUA Soulful 切換、生成、QA、四社群含 YouTube 與 Kadence WordPress 公開發布。45/50 不變。
 - 已實點：Soulful 四渠道存在（Bluesky/Facebook/Instagram/YouTube）；WP active Kadence；相同尺寸原生/門頁按鈕與輸入框樣式一致，未為誤報改樣式。未建立或發布測試內容。
 - Claude vu-org-switch-379dad、vu-u23-u111-dfa6ae 工作樹保留不碰，避免重複版本。
+
+- 部署更新：worker cb2241a21→整合/main 300396496；2026-11-18 台灣13:28兩容器 healthy、HTTP smoke全綠、部署後瀏覽器34 pass/24 skip。CLI等待300秒逾時但遠端同次部署正常完成，未重送。
+- 正式 CUA 已按切換→Soulful Expression Art Therapy；腳本品牌 Soulful Expression。已送第一支英文腳本 A Creative Pause: Notice, Draw, Reflect，4場/0AI（UI最少4，計畫3場須結果編輯再確認）、YT Shorts/30秒、溫柔親切。尚未成片/發布。
+- DEPLOY_HOLD：同批NA/VW完成後移除；未授權任何下一批部署。
