@@ -353,16 +353,47 @@
     if (!job) return { state: "none" };
     // done = registered on the main system too (result.assetId): 快速輸出 sends asset ids only (backend/quick-render.cjs).
     if (job.status === "succeeded" && job.result?.url && job.result.assetId) return { state: "done", url: job.result.url };
-    if (["failed", "cancelled", "blocked"].includes(job.status)) return { state: "failed", error: job.error?.message || job.error || "片頭模板渲染失敗" };
+    if (["failed", "cancelled", "blocked"].includes(job.status)) return { state: "failed", error: job.error?.message || job.error || "片頭模板渲染失敗", jobId: job.id };
     return { state: "running" };
   }
 
   // ── Plan U5.3 一鍵成片 / §12: one runner, one stop point ──
   // EpisodeAutoRun = { until: "script"|"video"|"drafts", budgetTwd, fill: "ai"|"stock-video"|"stock-photo", ratios,
   // tts, embedSiteId, prices: { perPictureTwd, perRatioTwd } (the server's quote at start), status: "running"|"stopped"|
-  // "done", stop: { step, reason } | null, spentTwd, startedAt, jobIds }. A writer sends the first seven; the rest are the
+  // "done", stop: { step, reason, jobId, detail } | null, spentTwd, startedAt, jobIds }. A writer sends the first seven; the rest are the
   // runtime's. jobIds = the jobs this run sent (not a time window: a job's createdAt is the server's clock).
   const UNTIL = ["script", "video", "drafts"], FILL = ["ai", "stock-video", "stock-photo"];
+  const AUTO_RUN_STEP = { fill: "補畫面", intro: "片頭", outro: "片尾", render: "輸出", drafts: "草稿" };
+  // The one stop sentence for a step that failed: what stopped and what to do. Raw output (job.error such as an ffmpeg
+  // tail, the server's last_error, a TypeError, a 5xx) is never the sentence: it stays with the job (檢視任務, jobId)
+  // and in detail. An Error written for people (our own throw, a 4xx such as 點數不足) is the sentence's middle part.
+  function autoRunFailure(step, { ratio, shot } = {}, error, jobId) {
+    const label = AUTO_RUN_STEP[step] || "這一步", end = step === "intro" || step === "outro",
+      what = shot ? "第 " + shot + " 個鏡頭的畫面" : (ratio ? ratio + " 的" : "") + label,
+      retry = end ? "按「重試" + label + "」再做一次，或「不加" + label + "先出片」" : "按「從這裡繼續」再試一次",
+      said = error instanceof Error && error.name === "Error" && !(error.status >= 500) && String(error.message || "").trim();
+    jobId = typeof jobId === "string" && jobId ? jobId : null;
+    if (said) return { step, jobId, reason: (what + "沒有完成：" + said.slice(0, 200)).replace(/[。.]?$/, "。") + "處理好之後" + retry + "。", detail: "" };
+    return {
+      step, jobId,
+      reason: what + "沒有完成。" + retry + "；再不行請聯絡客服，並附上" + (jobId ? "「檢視任務」裡" : "下方") + "的錯誤原文。",
+      detail: String((typeof error === "object" && error ? error.message : error) ?? "").slice(0, 2000),
+    };
+  }
+  // A saved stop as the page shows it. Stops written before they carried detail held a job's raw error in the reason in
+  // exactly these three forms (old autoRunNext): they read as the sentence above, the error moved to detail. Any other
+  // old reason (a caught error, the drafts error) cannot be told from a sentence and shows as it was saved.
+  function readStop(stop) {
+    if (!stop || typeof stop.reason !== "string") return null;
+    const step = String(stop.step || "");
+    if (typeof stop.detail === "string")
+      return { step, reason: stop.reason.slice(0, 500), jobId: typeof stop.jobId === "string" && /^[\w-]{1,80}$/.test(stop.jobId) ? stop.jobId : null, detail: stop.detail.slice(0, 2000) };
+    let m;
+    if (step === "render" && (m = /^(\S+) 輸出失敗：([\s\S]*)$/.exec(stop.reason))) return autoRunFailure(step, { ratio: m[1] }, m[2]);
+    if ((step === "intro" || step === "outro") && (m = /^(?:片頭|片尾)失敗：([\s\S]*)$/.exec(stop.reason))) return autoRunFailure(step, {}, m[1]);
+    if (step === "fill" && (m = /^第 (\d+) 個鏡頭的畫面沒做成：([\s\S]*)$/.exec(stop.reason))) return autoRunFailure(step, { shot: Number(m[1]) }, m[2]);
+    return { step, reason: stop.reason.slice(0, 500), jobId: null, detail: "" };
+  }
   function normalizeAutoRun(v, now = new Date().toISOString()) {
     if (v == null) return null;
     const ratios = QUICK_RATIOS.filter((r) => (v.ratios || []).includes(r)),
@@ -379,7 +410,7 @@
       until: v.until, budgetTwd, fill: v.fill, ratios, tts,
       embedSiteId: v.until === "drafts" && typeof v.embedSiteId === "string" && v.embedSiteId ? v.embedSiteId : null,
       prices, status: ["running", "stopped", "done"].includes(v.status) ? v.status : "running",
-      stop: v.stop && typeof v.stop.reason === "string" ? { step: String(v.stop.step || ""), reason: v.stop.reason.slice(0, 500) } : null,
+      stop: readStop(v.stop),
       spentTwd, startedAt: typeof v.startedAt === "string" ? v.startedAt : now,
       baseSpentTwd: Number.isFinite(v.baseSpentTwd) && v.baseSpentTwd >= 0 ? v.baseSpentTwd : 0,
       jobIds: (Array.isArray(v.jobIds) ? v.jobIds : []).filter((x) => typeof x === "string").slice(-300),
@@ -419,7 +450,7 @@
     for (const s of missing) {
       const j = mine.filter((x) => x.input?.link?.target === "shot:" + s.id).at(-1);
       if (!j) todo.push(s);
-      else if (["failed", "cancelled", "blocked"].includes(j.status)) return { do: "stop", step: "fill", reason: "第 " + (shots.indexOf(s) + 1) + " 個鏡頭的畫面沒做成：" + (j.error?.message || j.error || j.status) };
+      else if (["failed", "cancelled", "blocked"].includes(j.status)) return { do: "stop", ...autoRunFailure("fill", { shot: shots.indexOf(s) + 1 }, j.error || j.status, j.id) };
       else wait.push(s);
     }
     if (todo.length) {
@@ -441,7 +472,7 @@
         const st = bookendState(jobs, job.input);
         if (st.state === "none") return { do: "bookend", which, ratio, input: job.input };
         if (st.state === "running") return { do: "wait" };
-        if (st.state === "failed") return { do: "stop", step: which, reason: (which === "intro" ? "片頭" : "片尾") + "失敗：" + st.error };
+        if (st.state === "failed") return { do: "stop", ...autoRunFailure(which, { ratio }, st.error, st.jobId) };
         b[which] = { kind: "template", url: st.url };
       }
       if (b.intro || b.outro) bookends[ratio] = b;
@@ -451,7 +482,7 @@
     const sent = new Map();
     for (const j of mine) if (j.input?.operation === "quick-render") sent.set(j.input.settings?.ratio, j);
     for (const [ratio, j] of sent)
-      if (["failed", "cancelled", "blocked"].includes(j.status)) return { do: "stop", step: "render", reason: ratio + " 輸出失敗：" + (j.error?.message || j.error || j.status) };
+      if (["failed", "cancelled", "blocked"].includes(j.status)) return { do: "stop", ...autoRunFailure("render", { ratio }, j.error || j.status, j.id) };
     const left = run.ratios.filter((r) => !sent.has(r));
     if (!left.length) {
       if ([...sent.values()].some((j) => j.status !== "succeeded")) return { do: "wait" };
@@ -580,7 +611,7 @@
   }
 
   const api = { editId, editTitle, newProject, newShot, castOf, castShots, setShots, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs,
-    TRANSITIONS, TEMPLATE_RATIOS, normalizeBookend, setBookends, bookendJob, bookendKey, bookendState, normalizeAutoRun, setAutoRun, autoRunNext, current, isStale, staleClip, outputStale, lineage, stepStates, nextAction };
+    TRANSITIONS, TEMPLATE_RATIOS, normalizeBookend, setBookends, bookendJob, bookendKey, bookendState, AUTO_RUN_STEP, autoRunFailure, readStop, normalizeAutoRun, setAutoRun, autoRunNext, current, isStale, staleClip, outputStale, lineage, stepStates, nextAction };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

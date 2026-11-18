@@ -92,18 +92,19 @@
     const hit = await VideoWorkbench.bookends.current(v);
     return hit?.e.intro ? VideoWorkbench.bookends.peek(hit.p, hit.e, "intro", jobRatio(v) || hit.p.ratio) : null;
   };
-  function bookendButtons(v, actions) {
-    const box = document.createElement("div"), note = document.createElement("p");
-    box.className = "job-bookend-actions"; note.textContent = "片頭：讀取中…"; box.append(note);
+  // The job panel's buttons share one row (.job-result-actions); what a group says about itself goes to notes above it.
+  function bookendButtons(v, actions, notes) {
+    const box = document.createElement("div"), about = document.createElement("div"), note = document.createElement("p");
+    box.className = "job-bookend-actions"; note.textContent = "片頭：讀取中…"; about.append(note); notes.append(about);
     const refresh = () => VideoWorkbench.loadScripts(["bookends.js"], sharedBase).then(async () => {
       const hit = await VideoWorkbench.bookends.current(v);
       note.textContent = "本集片頭：" + VideoWorkbench.bookends.label(hit?.e.intro, VideoWorkbench.capabilities?.remotionTemplates || []);
-      box.querySelectorAll('[data-bookend-preview]').forEach((el) => el.remove());
+      about.querySelectorAll('[data-bookend-preview]').forEach((el) => el.remove());
       if (hit?.e.intro) {
         const latest = await VideoWorkbench.bookendPreview(v);
         if (latest?.result?.url) {
           const preview = document.createElement(latest.result.thumbUrl ? "img" : "video");
-          preview.src = VideoWorkbench.safeUrl(latest.result.thumbUrl || latest.result.url); preview.setAttribute("aria-label", "本集片頭縮圖"); preview.dataset.bookendPreview = ""; preview.width = 128; preview.preload = "metadata"; box.prepend(preview);
+          preview.src = VideoWorkbench.safeUrl(latest.result.thumbUrl || latest.result.url); preview.setAttribute("aria-label", "本集片頭縮圖"); preview.dataset.bookendPreview = ""; preview.width = 128; preview.preload = "metadata"; about.prepend(preview);
         }
       }
     }).catch(VideoWorkbench.reportError);
@@ -179,13 +180,13 @@
   // Card VD.4: a finished video's covers. The free ones come with the export (backend/cover.cjs) and are the default;
   // an AI cover is opt-in, one button per image-edit row with its price on it (data-paid -> shared/paid-price.js, NT$
   // from /capabilities). The model redraws the best frame without any text; the title is drawn by ffmpeg afterwards.
-  function coverButtons(v, actions) {
+  function coverButtons(v, actions, notes) {
     if (!v.result?.covers?.length || !["editor-export", "engine-render"].includes(v.input?.operation)) return;
     const box = document.createElement("div");
     box.className = "job-cover-actions";
-    const label = document.createElement("span");
-    label.textContent = "封面：已自動做好 " + v.result.covers.length + " 張（免費，送審頁可換）。要 AI 重新設計：";
-    box.append(label);
+    const label = document.createElement("p");
+    label.textContent = "封面：已自動做好 " + v.result.covers.length + " 張（免費，送審頁可換）。";
+    notes.append(label);
     caps().then((c) => {
       for (const m of (c?.imageEdit?.models || []).filter((row) => row.available)) {
         const button = document.createElement("button");
@@ -418,12 +419,13 @@
             result.append(apply);
           }
           if (v.status === "succeeded") {
-            const detail = document.createElement("details"), summary = document.createElement("summary"), prompt = document.createElement("p"), parameters = document.createElement("p"), actions = document.createElement("div");
+            const detail = document.createElement("details"), summary = document.createElement("summary"), prompt = document.createElement("p"), parameters = document.createElement("p"), notes = document.createElement("div"), actions = document.createElement("div");
             summary.textContent = "提示詞與生成參數";
             prompt.textContent = v.input?.prompt || "無提示詞";
             const settings = v.input?.settings || {};
             parameters.textContent = [settings.model, settings.ratio, settings.quality, settings.duration ? settings.duration + " 秒" : "", v.result.width && v.result.height ? v.result.width + " × " + v.result.height : ""].filter(Boolean).join(" · ");
             detail.append(summary, prompt, parameters); result.append(detail);
+            notes.className = "job-result-notes";
             actions.className = "job-result-actions";
             const action = (name, callback) => {
               const button = document.createElement("button"); button.textContent = name;
@@ -450,15 +452,15 @@
               action("配音", () => VideoWorkbench.generator.import({ intent: "open-tool", tool: "voice" }));
             }
             if (v.type === "video") {
-              const next = document.createElement("div"); next.dataset.vwNextSurface = "card"; actions.append(next);
+              const next = document.createElement("div"); next.dataset.vwNextSurface = "card"; actions.prepend(next); // the next step leads the row
               VideoWorkbench.renderJobNext(v, next).catch(VideoWorkbench.reportError);
               action("複製連結", async () => { await navigator.clipboard.writeText(new URL(url, location.origin).href); VideoWorkbench.notify("已複製影片連結；需登入同一工作台才能開啟"); });
-              bookendButtons(v, actions);
+              bookendButtons(v, actions, notes);
               reviewButton(v, actions);
-              coverButtons(v, actions);
+              coverButtons(v, actions, notes);
               subtitleButtons(v, actions);
             }
-            result.append(actions);
+            result.append(notes, actions);
           }
         }
       }

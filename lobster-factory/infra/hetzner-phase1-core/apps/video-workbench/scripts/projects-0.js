@@ -936,8 +936,8 @@ const FAILED = ["failed", "cancelled", "blocked"];
 async function autoRunStep(p, e, next, all) {
   const run = e.autoRun,
     announce = (text) => VideoWorkbench.notify(text + " · " + p.title + "／" + e.name + " · " + location.origin + "/?open=projects&project=" + encodeURIComponent(p.id) + "&episode=" + encodeURIComponent(e.id)),
-    stop = async (step, reason) => { await runPatch(p, e, { status: "stopped", stop: { step, reason } }); announce("停在" + (STOP_STEP[step] || "這一步") + "：" + reason); };
-  if (next.do === "stop") return stop(next.step, next.reason);
+    stop = async ({ step, reason, jobId, detail }) => { await runPatch(p, e, { status: "stopped", stop: { step, reason, jobId, detail } }); announce("停在" + (STOP_STEP[step] || "這一步") + "：" + reason); };
+  if (next.do === "stop") return stop(next);
   if (next.do === "done") { await runPatch(p, e, { status: "done", stop: null }); announce("一鍵成片已完成"); return; }
   try {
     if (next.do === "fill") {
@@ -971,13 +971,14 @@ async function autoRunStep(p, e, next, all) {
       if (!response.ok) throw Error("讀不到草稿執行狀態，已停止自動執行");
       const row = ((await response.json()).items || [])[0];
       if (!row || row.brief_json?.autoBudget?.runId !== run.runId) throw Error("主系統的草稿執行代號不符，請檢查執行紀錄");
-      if (row.last_error) return stop("drafts", row.last_error);
+      if (row.last_error) return stop(EpisodeSpine.autoRunFailure("drafts", {}, row.last_error));
       if (row.lifecycle_stage !== "measure") return false;
       await runPatch(p, e, { status: "done", stop: null, spentTwd: Number(row.brief_json.autoBudget.spentTwd) });
       announce("社群草稿與選用的網站草稿已完成");
     }
   } catch (err) {
-    await stop(next.do === "render" ? "render" : next.do === "bookend" ? next.which : next.do === "drafts" ? "drafts" : "fill", err.message || String(err));
+    const step = next.do === "render" ? "render" : next.do === "bookend" ? next.which : next.do === "drafts" ? "drafts" : "fill";
+    await stop(EpisodeSpine.autoRunFailure(step, { ratio: next.ratio || (next.ratios?.length === 1 ? next.ratios[0] : "") }, err));
   }
 }
 async function driveAutoRuns(skipFailed = false) {
@@ -1026,14 +1027,15 @@ async function driveAutoRuns(skipFailed = false) {
   }
   if (waiting) driveLater = setTimeout(() => driveAutoRuns(), 5000);
 }
-const STOP_STEP = { fill: "補畫面", intro: "片頭", outro: "片尾", render: "輸出", drafts: "草稿" };
+const STOP_STEP = EpisodeSpine.AUTO_RUN_STEP;
 function autoRunBanner(e) {
   const r = e.autoRun;
   if (!r || r.status === "done") return "";
   const used = `已用 NT$${r.spentTwd}／上限 NT$${r.budgetTwd}`;
   if (r.status === "running") return `<div class="panel" style="padding:10px;margin-bottom:12px" data-autorun="running"><div class="row"><strong>一鍵成片進行中</strong><span class="tiny">${used} · 頁面關掉再開會接著做</span><button class="btn small outline" data-action="autoRunStop">停止</button></div></div>`;
-  const end = r.stop?.step === "intro" || r.stop?.step === "outro" ? r.stop.step : null;
-  return `<div class="panel" style="padding:10px;margin-bottom:12px" data-autorun="stopped"><strong>一鍵成片停在「${STOP_STEP[r.stop?.step] || "這一步"}」</strong><p class="tiny">${esc(r.stop?.reason || "")}（${used}）</p><div class="row"><label style="margin:0">上限 NT$ <input id="autorun-budget" aria-label="花費上限" type="number" min="0" step="1" style="width:90px;padding:6px" value="${esc(r.budgetTwd)}"></label><button class="btn small primary" data-action="autoRunResume">${end ? "重試" + END_LABEL[end] : "從這裡繼續"}</button>${end ? `<button class="btn small outline" data-action="autoRunSkipEnd" data-which="${end}">不加${END_LABEL[end]}先出片</button>` : ""}<button class="btn small outline" data-action="autoRunClear">關閉</button></div></div>`;
+  const s = EpisodeSpine.readStop(r.stop) || { step: "", reason: "", jobId: null, detail: "" },
+    end = s.step === "intro" || s.step === "outro" ? s.step : null;
+  return `<div class="panel" style="padding:10px;margin-bottom:12px" data-autorun="stopped"><strong>一鍵成片停在「${STOP_STEP[s.step] || "這一步"}」</strong><p class="tiny">${esc(s.reason)}（${used}）</p>${!s.jobId && s.detail ? `<details class="tiny"><summary>錯誤原文（給客服看）</summary>${esc(s.detail)}</details>` : ""}<div class="row"><label style="margin:0">上限 NT$ <input id="autorun-budget" aria-label="花費上限" type="number" min="0" step="1" style="width:90px;padding:6px" value="${esc(r.budgetTwd)}"></label><button class="btn small primary" data-action="autoRunResume">${end ? "重試" + END_LABEL[end] : "從這裡繼續"}</button>${end ? `<button class="btn small outline" data-action="autoRunSkipEnd" data-which="${end}">不加${END_LABEL[end]}先出片</button>` : ""}${s.jobId ? `<button class="btn small outline" data-action="autoRunJob" data-job="${esc(s.jobId)}">檢視任務</button>` : ""}<button class="btn small outline" data-action="autoRunClear">關閉</button></div></div>`;
 }
 // Card PJ.2: a tool opened for this episode; what it makes comes back here (shared/episode-spine.js settle).
 function openTool(tool, link, asset) {
@@ -1433,6 +1435,9 @@ async function action(a, button) {
       } catch (err) {
         VideoWorkbench.reportError(err);
       }
+      break;
+    case "autoRunJob":
+      VideoWorkbench.generations.get(button.dataset.job).then(VideoWorkbench.showJob, VideoWorkbench.reportError);
       break;
     case "autoRunResume":
     case "autoRunSkipEnd":

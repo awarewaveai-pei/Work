@@ -3,6 +3,8 @@
 // - missing pictures are made, a shot that has one never again; reopening the page mid-run sends nothing twice
 // - a template intro renders once per (template, fields, pictures, seconds, ratio): a second output reuses it
 // - an intro that failed stops the run there (retryable), with no quick render sent
+// - a step that failed stops with one sentence (what, where, what to do), never the raw error: that stays with the job
+//   (jobId -> 檢視任務) and in detail; stops saved in the old raw form read the same way
 // - until "script" | "video" | "drafts" each stop where they should; the limit stops the run at the step that would pass it
 // - a button a person presses never reaches publishing: autonomy is guided or auto_after_render, never full_auto
 const assert = require("node:assert/strict");
@@ -43,7 +45,15 @@ e.autoRun.spentTwd = 4;
 assert.deepEqual(spine.autoRunNext(project, e, fills, TEMPLATES), { do: "wait" }, "page reopened while the pictures are made: wait, send nothing");
 fills[0].status = "failed";
 fills[0].error = { message: "供應商錯誤" };
-assert.equal(spine.autoRunNext(project, e, fills, TEMPLATES).do, "stop", "a picture that failed stops the run");
+// The stop a person reads: what failed and what to do, in words; the raw error only in detail / the job (檢視任務).
+const RAW = "快速輸出失敗：bookend join failed: frame= 171 fps=5.6 q=26.0 size= 2304KiB time=00:00:07.04 bitrate=2680.9kbits/s";
+const plain = (stop, what, jobId, detail) => {
+  assert.equal(stop.reason.startsWith(what + "沒有完成。"), true, stop.reason);
+  assert.match(stop.reason, /再試一次|再做一次/);
+  assert.doesNotMatch(stop.reason, /[A-Za-z]{3}|frame=|：/, "raw error text in the stop sentence");
+  assert.deepEqual([stop.jobId, stop.detail], [jobId, detail]);
+};
+plain(spine.autoRunNext(project, e, fills, TEMPLATES), "第 2 個鏡頭的畫面", "f2", "供應商錯誤");
 fills[0].status = "succeeded";
 e.shots[1].image = pic(2);
 e.shots[2].image = pic(3);
@@ -64,7 +74,9 @@ const renderBookends = next.bookends;
 const failedIntro = job("bad-intro", { ...earlier.input }, "failed");
 failedIntro.error = { message: "片頭模板渲染失敗：逾時" };
 next = spine.autoRunNext(project, e, [...fills, failedIntro], TEMPLATES);
-assert.deepEqual(next, { do: "stop", step: "intro", reason: "片頭失敗：片頭模板渲染失敗：逾時" });
+assert.deepEqual([next.do, next.step], ["stop", "intro"]);
+plain(next, "16:9 的片頭", "bad-intro", "片頭模板渲染失敗：逾時");
+assert.match(next.reason, /「重試片頭」.*「不加片頭先出片」/, "an end names its own two buttons");
 // a template that cannot make the chosen ratio is caught before anything is sent
 assert.match(spine.bookendJob(project, { ...e, intro: { kind: "template", templateId: "square-only", seconds: 5 } }, "intro", "16:9", TEMPLATES).problem, /不支援 16:9/);
 
@@ -83,7 +95,30 @@ function readyShots() { return [{ id: "s1", text: "圖", line: "旁白", image: 
 const accepted = job("accepted", { ...spine.quickRenderJobs(project, forgotten, { ratios: ["16:9"] })[0], runId: forgotten.autoRun.runId });
 assert.deepEqual(spine.autoRunNext(project, forgotten, [accepted], TEMPLATES), { do: "wait" }, "回應遺失、jobIds 還沒寫入，也能由 runId 找回已接受任務");
 accepted.status = "failed";
-assert.equal(spine.autoRunNext(project, forgotten, [accepted], TEMPLATES).do, "stop", "已送任務之後失敗，仍顯示停點");
+accepted.error = RAW;
+const renderStop = spine.autoRunNext(project, forgotten, [accepted], TEMPLATES);
+assert.equal(renderStop.do, "stop", "已送任務之後失敗，仍顯示停點");
+plain(renderStop, "16:9 的輸出", "accepted", RAW);
+assert.match(renderStop.reason, /「檢視任務」/);
+// What the page keeps (normalizeAutoRun) and shows (readStop) is the same stop; a thrown error has no job: 下方 detail.
+const kept2 = run({ status: "stopped", stop: renderStop });
+assert.deepEqual(kept2.stop, { step: "render", reason: renderStop.reason, jobId: "accepted", detail: RAW });
+const thrown = spine.autoRunFailure("render", { ratio: "9:16" }, new TypeError("Failed to fetch"));
+plain(thrown, "9:16 的輸出", null, "Failed to fetch");
+assert.match(thrown.reason, /下方的錯誤原文/);
+// Stops saved before this change held the raw error in the reason (live 2026-11-18): they read as the sentence too.
+plain(spine.readStop({ step: "render", reason: "16:9 輸出失敗：" + RAW }), "16:9 的輸出", null, RAW);
+plain(spine.readStop({ step: "outro", reason: "片尾失敗：timeout" }), "片尾", null, "timeout");
+plain(spine.readStop({ step: "fill", reason: "第 3 個鏡頭的畫面沒做成：provider 500" }), "第 3 個鏡頭的畫面", null, "provider 500");
+plain(spine.autoRunFailure("drafts", {}, "wordpress 401: invalid token"), "草稿", null, "wordpress 401: invalid token");
+// An error written for people (our own throw, the main system's 4xx) is what the person reads, nothing hidden.
+const credits = Object.assign(new Error("點數不足，無法執行此功能。"), { status: 403 });
+assert.deepEqual(spine.autoRunFailure("fill", {}, credits), { step: "fill", jobId: null, detail: "",
+  reason: "補畫面沒有完成：點數不足，無法執行此功能。處理好之後按「從這裡繼續」再試一次。" });
+assert.equal(spine.autoRunFailure("render", {}, Object.assign(new Error("upstream exploded"), { status: 502 })).detail, "upstream exploded", "a 5xx is raw");
+assert.equal(spine.autoRunFailure("render", {}, new TypeError("Failed to fetch")).detail, "Failed to fetch", "a TypeError is raw");
+for (const stop of [{ step: "", reason: "已手動停止" }, { step: "fill", reason: "已到上限 NT$3，下一步要 NT$4" }, { step: "drafts", reason: "主系統的草稿執行代號不符，請檢查執行紀錄" }])
+  assert.deepEqual(spine.readStop(stop), { ...stop, jobId: null, detail: "" }, "a stop that is already a sentence stays as it is");
 accepted.status = "succeeded";
 forgotten.autoRun.until = "drafts";
 assert.deepEqual(spine.autoRunNext(project, forgotten, [accepted], TEMPLATES), { do: "drafts" }, "出片成功後仍要等草稿");

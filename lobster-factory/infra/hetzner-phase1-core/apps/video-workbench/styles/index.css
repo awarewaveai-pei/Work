@@ -516,13 +516,11 @@ textarea::placeholder {
 .generator-clear-notice { position: fixed; bottom: 18px; right: 18px; z-index: 150; display: flex; gap: 16px; align-items: center; padding: 12px 18px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card-bg); color: var(--text-primary); }
 .generator-clear-notice button, .actor-choice { background: transparent; color: inherit; border: 0; cursor: pointer; }
 .actor-choice { display: flex; flex: 1; align-items: center; gap: 12px; text-align: left; }
-.job-result-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0; }
 .director-message { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card-bg); margin: 16px 0; }
 .director-message.user { background: var(--bg-hover); margin-left: 8%; }
 .director-message-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; margin: 10px 0; }
 .director-conversation textarea { width: 100%; margin-top: 16px; }
 .director-conversation .director-script-actions { flex-wrap: wrap; }
-.job-result-actions button { border: 1px solid var(--btn-secondary-border); background: var(--btn-secondary-bg); color: var(--btn-secondary-text); border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer; }
 .reference-selected .reference-preview, #modalContent .reference-preview { max-width: 100%; max-height: 60vh; object-fit: contain; }
 .popover .chips { flex-wrap: wrap; }
 .popover .chips button { flex: 0 1 auto; }
