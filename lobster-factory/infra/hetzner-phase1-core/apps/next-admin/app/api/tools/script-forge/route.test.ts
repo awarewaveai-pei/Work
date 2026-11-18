@@ -6,6 +6,7 @@ const ORG = vi.hoisted(() => "11111111-1111-4111-8111-111111111111");
 const sent = vi.hoisted(() => ({ calls: [] as Array<{ system: string; messages: Array<{ content: string }> }>, options: [] as Array<{ maxRetries?: number }> }));
 // Set = the real SDK stream accumulates this provider response (usage and stop_reason exactly as the SDK snapshots them).
 const provider = vi.hoisted(() => ({ fetch: null as null | (() => Promise<Response>) }));
+const limit = vi.hoisted(() => ({ ms: 110_000 }));
 vi.mock("@/lib/entitlements/grant", () => ({ withFeature: (_k: string, h: (r: Request, g: unknown) => Promise<Response>) => (r: Request) => h(r, {}) }));
 vi.mock("@/lib/ai/gateway", () => ({
   claudeParams: () => ({ model: "claude-haiku-5-5", max_tokens: 10 }), claudeFallback: () => ({}), providerUrl: () => "http://x",
@@ -23,6 +24,7 @@ vi.mock("@/lib/ai/gateway", () => ({
 }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
 vi.mock("@/lib/script-forge/run-store", () => ({
+  get SCRIPT_STREAM_LIMIT_MS() { return limit.ms; },
   reserveScriptRun: async (_db: unknown, org: string, budget: { budgetTwd: number; spentTwd: number }, key: string, reserved: number) => {
     if (budget.spentTwd + reserved > budget.budgetTwd) throw Object.assign(Error("已到上限"), { status: 409 });
     return { kind: "claim", org, key, reserved, spentTwd: budget.spentTwd + reserved };
@@ -46,7 +48,7 @@ const post = (b: object) => POST(new Request("https://video.aware-wave.com/api/t
   method: "POST", headers: { "content-type": "application/json", ...client }, body: JSON.stringify(b),
 }));
 
-beforeEach(() => { vi.stubEnv("ANTHROPIC_API_KEY", "k"); sent.calls = []; sent.options = []; logged.calls = []; provider.fetch = null; });
+beforeEach(() => { vi.stubEnv("ANTHROPIC_API_KEY", "k"); sent.calls = []; sent.options = []; logged.calls = []; provider.fetch = null; limit.ms = 110_000; });
 const budgeted = (extra: object = {}) => post({ module: "manual", task: "script", fields: { topic: "主題" }, model: "claude-haiku-5-5", autoBudget: { organizationId: ORG, runId: "run-one", budgetTwd: 10000, spentTwd: 1 }, ...extra });
 const receiptOf = async (res: Response) => { const reserved = Number(res.headers.get("X-SF-Reserved-Twd")), parts = (await res.text()).split("\n[SF_BUDGET]"); return { reserved, text: parts[0], receipt: JSON.parse(parts[1]) }; };
 const sse = (events: object[]) => events.map((e) => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`).join("");
@@ -81,6 +83,20 @@ describe("POST /api/tools/script-forge", () => {
     const { reserved, text, receipt } = await receiptOf(await budgeted());
     expect(text).toContain('{"scenes":[{"vis'); expect(text).toContain("[ERROR]");
     expect(receipt).toEqual({ spentTwd: reserved, estimated: true });
+  });
+  // Oracle 2026-11-18 F1: self-hosted Next does not enforce maxDuration; the route cuts a budgeted stream itself, so a
+  // reservation can only go stale (run-store) after its stream is gone and a retry never runs beside it.
+  it("a budgeted stream that outlives the limit is cut by the route: an error line, the reservation kept", async () => {
+    limit.ms = 50;
+    const enc = new TextEncoder(), head = sse([
+      { type: "message_start", message: { id: "m", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 9, output_tokens: 1 } } },
+      { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "{\"sce" } },
+    ]);
+    let pulls = 0;
+    provider.fetch = (async (_u: unknown, init?: { signal?: AbortSignal }) => new Response(new ReadableStream<Uint8Array>({ pull(c) { if (!pulls++) c.enqueue(enc.encode(head)); else return new Promise<void>((_, no) => init?.signal?.addEventListener("abort", () => no(new Error("aborted")))); } }), { status: 200, headers: { "content-type": "text/event-stream" } })) as () => Promise<Response>;
+    const { reserved, text, receipt } = await receiptOf(await budgeted());
+    expect(text).toContain("[ERROR] 超過 0.05 秒"); expect(receipt).toEqual({ spentTwd: reserved, estimated: true });
   });
   it("a provider HTTP 429 was not billed: actual NT$0, not estimated (Anthropic and OpenAI)", async () => {
     provider.fetch = async () => Response.json({ type: "error", error: { type: "rate_limit_error", message: "slow down" } }, { status: 429 });

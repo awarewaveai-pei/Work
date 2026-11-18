@@ -170,7 +170,11 @@ export async function POST(req: Request): Promise<Response> {
     const { autoEmbed: _old, ...rest } = oldBrief;
     void _old;
     if (p.autoBudget && !sameRun) { delete rest.autoDrafts; delete rest.autoEmbedded; }
-    if (p.autoBudget) rest.autoBudget = { ...p.autoBudget, startedAt: sameRun ? obj(oldBrief.autoBudget)?.startedAt : new Date().toISOString(), spentTwd: sameRun ? Math.max(p.autoBudget.spentTwd, Number(obj(oldBrief.autoBudget)?.spentTwd) || 0) : p.autoBudget.spentTwd };
+    // Same run: the row's limit wins (a resume may have raised it while this render was submitted); spent only grows.
+    const kept = sameRun ? obj(oldBrief.autoBudget) : null;
+    if (p.autoBudget) rest.autoBudget = { ...p.autoBudget, startedAt: kept ? kept.startedAt : new Date().toISOString(),
+      budgetTwd: kept && Number.isFinite(Number(kept.budgetTwd)) ? Number(kept.budgetTwd) : p.autoBudget.budgetTwd,
+      spentTwd: kept ? Math.max(p.autoBudget.spentTwd, Number(kept.spentTwd) || 0) : p.autoBudget.spentTwd };
     const brief = p.embedSiteId ? { ...rest, autoEmbed: { siteId: p.embedSiteId } } : rest;
     return { lifecycle_stage: "produce", brief_json: brief, ...(stoppedRun(row) ? {} : { autonomy: p.autonomy, last_error: null }) };
   });

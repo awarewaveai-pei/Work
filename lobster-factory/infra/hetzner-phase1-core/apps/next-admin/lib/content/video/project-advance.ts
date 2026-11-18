@@ -7,7 +7,8 @@
  */
 import { RATIO_LABEL } from "./platform-ratio";
 
-export interface AdvanceProject { id: string; organizationId: string; title: string; updatedAtMs: number }
+/** runId = brief_json.autoBudget.runId when the firing read the row (undefined = a run without a budget). */
+export interface AdvanceProject { id: string; organizationId: string; title: string; updatedAtMs: number; runId?: string }
 export interface RatioRow { id: string; ratio: string; checksum: string }
 export type RenderState = { state: "none" | "running" | "done" } | { state: "error"; error: string };
 export type Stage = "create" | "produce" | "review" | "release" | "measure";
@@ -22,7 +23,8 @@ export interface AdvanceDeps {
   release(row: RatioRow): Promise<void>;
   /** Social drafts for the brand's connected channels, once per project; returns a one-line note. */
   drafts(project: AdvanceProject, rows: RatioRow[]): Promise<string>;
-  update(projectId: string, patch: { lifecycleStage?: Stage; autonomy?: "guided"; lastError?: string | null }): Promise<void>;
+  /** Throws RunChanged when the row now belongs to another run than `runId`: a stale firing never writes over a newer run. */
+  update(projectId: string, patch: { lifecycleStage?: Stage; autonomy?: "guided"; lastError?: string | null }, runId: string | undefined): Promise<void>;
   now(): number;
 }
 export type AdvanceOutcome = { projectId: string; result: "waiting" | "done" | "stopped"; note: string };
@@ -36,7 +38,12 @@ export class RunChanged extends Error {}
 
 export async function advanceProject(deps: AdvanceDeps, p: AdvanceProject): Promise<AdvanceOutcome> {
   const stop = async (stage: Stage, why: string): Promise<AdvanceOutcome> => {
-    await deps.update(p.id, { lifecycleStage: stage, autonomy: "guided", lastError: why.slice(0, 1000) });
+    try {
+      await deps.update(p.id, { lifecycleStage: stage, autonomy: "guided", lastError: why.slice(0, 1000) }, p.runId);
+    } catch (e) {
+      if (e instanceof RunChanged) return { projectId: p.id, result: "waiting", note: e.message };
+      throw e;
+    }
     return { projectId: p.id, result: "stopped", note: why };
   };
   try {
@@ -53,9 +60,9 @@ export async function advanceProject(deps: AdvanceDeps, p: AdvanceProject): Prom
     for (const r of rows) for (const why of await deps.qaProblems(r)) problems.push(`${RATIO_LABEL[r.ratio] ?? r.ratio}：${why}`);
     if (problems.length) return await stop("review", problems.join("；"));
     for (const r of rows) await deps.release(r);
-    await deps.update(p.id, { lifecycleStage: "release", lastError: null });
+    await deps.update(p.id, { lifecycleStage: "release", lastError: null }, p.runId);
     const note = await deps.drafts(p, rows);
-    await deps.update(p.id, { lifecycleStage: "measure", lastError: null });
+    await deps.update(p.id, { lifecycleStage: "measure", lastError: null }, p.runId);
     return { projectId: p.id, result: "done", note };
   } catch (e) {
     if (e instanceof RunChanged) return { projectId: p.id, result: "waiting", note: e.message };

@@ -7,10 +7,11 @@ type Row = Record<string, any>;
 type Claim = { kind: "claim"; projectId: string; org: string; runId: string; key: string; token: string; reserved: number; spentTwd: number };
 type Cached = { kind: "cached"; text: string; spentTwd: number; estimated: boolean };
 const fail = (status: number, message: string): never => { throw Object.assign(Error(message), { status }); };
-// The route's declared stream limit (script-forge route maxDuration). An older reservation lost its process (restart, crash):
-// its usage is unknown, so the reserved cost stays and the run is marked estimated. Should a stream still outlive this, its
-// receipt is refused (token changed) and the cost already counted stays, so spentTwd remains an upper bound.
-const STALE_RESERVATION_MS = 120_000;
+// The route cuts a budgeted stream at SCRIPT_STREAM_LIMIT_MS itself (self-hosted Next does not enforce maxDuration), so a
+// reservation older than STALE_RESERVATION_MS has no live stream: it lost its process (restart, crash), its usage is unknown,
+// the reserved cost stays and the run is marked estimated.
+export const SCRIPT_STREAM_LIMIT_MS = 110_000;
+const STALE_RESERVATION_MS = SCRIPT_STREAM_LIMIT_MS + 30_000;
 const read = async (db: SupabaseClient, org: string, id: string): Promise<Row> => {
   const r = await db.from("media_production_projects").select(PROJECT_COLUMNS).eq("organization_id", org).eq("id", id).maybeSingle();
   if (r.error || !r.data) return fail(503, "無法讀取執行預算"); return r.data;

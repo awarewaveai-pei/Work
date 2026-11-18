@@ -17,14 +17,14 @@ describe("advanceProject", () => {
     const d = deps();
     expect(await advanceProject(d, p)).toMatchObject({ result: "done", note: "2 個草稿" });
     expect(d.release).toHaveBeenCalledTimes(2);
-    expect(d.update).toHaveBeenLastCalledWith("p1", { lifecycleStage: "measure", lastError: null });
+    expect(d.update).toHaveBeenLastCalledWith("p1", { lifecycleStage: "measure", lastError: null }, undefined);
   });
 
   it("one failed check -> stops at review with the reason, autonomy back to guided, nothing released or drafted", async () => {
     const d = deps({ qaProblems: vi.fn(async (r) => (r.ratio === "4x5" ? ["字幕 QA未通過：沒有字幕片段"] : [])) });
     const out = await advanceProject(d, p);
     expect(out).toMatchObject({ result: "stopped", note: "直式 4:5：字幕 QA未通過：沒有字幕片段" });
-    expect(d.update).toHaveBeenCalledWith("p1", { lifecycleStage: "review", autonomy: "guided", lastError: "直式 4:5：字幕 QA未通過：沒有字幕片段" });
+    expect(d.update).toHaveBeenCalledWith("p1", { lifecycleStage: "review", autonomy: "guided", lastError: "直式 4:5：字幕 QA未通過：沒有字幕片段" }, undefined);
     expect(d.release).not.toHaveBeenCalled();
     expect(d.drafts).not.toHaveBeenCalled();
   });
@@ -34,7 +34,7 @@ describe("advanceProject", () => {
     expect((await advanceProject(deps({ renderState: vi.fn(async () => ({ state: "error" as const, error: "boom" })) }), p)).note).toBe("影片生成失敗：boom");
     const d = deps({ drafts: vi.fn(async () => { throw new Error("文案超過平台上限"); }) });
     expect(await advanceProject(d, p)).toMatchObject({ result: "stopped", note: "文案超過平台上限" });
-    expect(d.update).toHaveBeenCalledWith("p1", expect.objectContaining({ autonomy: "guided" }));
+    expect(d.update).toHaveBeenCalledWith("p1", expect.objectContaining({ autonomy: "guided" }), undefined);
   });
 
   // U5 m1: the old firing of a replaced or stopped run ends without writing: it never stops the new run on the same row.
@@ -42,5 +42,12 @@ describe("advanceProject", () => {
     const d = deps({ drafts: vi.fn(async () => { throw new RunChanged("一鍵執行已被更新，停止舊執行"); }) });
     expect(await advanceProject(d, p)).toMatchObject({ result: "waiting" });
     expect(d.update).not.toHaveBeenCalledWith("p1", expect.objectContaining({ autonomy: "guided" }));
+  });
+
+  // Oracle 2026-11-18 F3: a failed check of the old run never stops the run that replaced it (update is runId-guarded).
+  it("a stop over a newer run ends quietly: the guarded update refuses, the outcome is waiting", async () => {
+    const d = deps({ qaProblems: vi.fn(async () => ["字幕檢查未通過"]), update: vi.fn(async () => { throw new RunChanged("一鍵執行已被更新，停止舊執行"); }) });
+    expect(await advanceProject(d, { ...p, runId: "run-old" })).toMatchObject({ result: "waiting" });
+    expect(d.update).toHaveBeenCalledWith("p1", expect.objectContaining({ autonomy: "guided" }), "run-old");
   });
 });

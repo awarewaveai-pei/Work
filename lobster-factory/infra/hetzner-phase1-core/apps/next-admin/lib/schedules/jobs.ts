@@ -148,13 +148,13 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     async run(organizationId) {
       const sb = getSupabaseWriteClient();
       if (!sb) throw new Error("video_project_advance:no_supabase_client");
-      const [{ advanceProject }, { advanceDeps }] = await Promise.all([import("@/lib/content/video/project-advance"), import("@/lib/content/video/project-advance-deps")]);
-      const { data, error } = await sb.from("media_production_projects").select("id, title, updated_at").eq("organization_id", organizationId)
+      const [{ advanceProject }, { advanceDeps }, { parseAutoBudget }] = await Promise.all([import("@/lib/content/video/project-advance"), import("@/lib/content/video/project-advance-deps"), import("@/lib/content/video/auto-run-budget")]);
+      const { data, error } = await sb.from("media_production_projects").select("id, title, updated_at, brief_json").eq("organization_id", organizationId)
         .eq("autonomy", "auto_after_render").in("lifecycle_stage", ["create", "produce", "review", "release"]).order("updated_at").limit(3);
       if (error) throw new Error(`video_project_advance:${error.message}`);
       const deps = advanceDeps(sb, organizationId, "schedule:video_project_advance");
       const outcomes = [];
-      for (const p of data ?? []) outcomes.push(await advanceProject(deps, { id: String(p.id), organizationId, title: String(p.title), updatedAtMs: Date.parse(String(p.updated_at)) }));
+      for (const p of data ?? []) outcomes.push(await advanceProject(deps, { id: String(p.id), organizationId, title: String(p.title), updatedAtMs: Date.parse(String(p.updated_at)), runId: parseAutoBudget((p.brief_json as { autoBudget?: unknown } | null)?.autoBudget)?.runId }));
       // a stopped project is already recorded on the project; raising it here is how the operator hears about it
       const stopped = outcomes.filter((o) => o.result === "stopped");
       if (stopped.length) throw new Error(`video_project_advance: ${stopped.map((o) => `${o.projectId} ${o.note}`).join(" | ")}`);

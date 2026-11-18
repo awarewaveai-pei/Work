@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 const ensure = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/content/video/projects", () => ({ PROJECT_COLUMNS: "*", ensureWorkbenchProject: ensure }));
-import { reserveScriptRun, finishScriptRun } from "../run-store";
+import { reserveScriptRun, finishScriptRun, SCRIPT_STREAM_LIMIT_MS } from "../run-store";
 let row: Record<string, any>, writes: number;
 beforeEach(() => {
   row = { id: "project-row", organization_id: "org", updated_at: "2026-11-17T00:00:00.000Z", brief_json: {} }; writes = 0;
@@ -41,7 +41,7 @@ describe("server script run budget", () => {
   });
   it("a reservation older than the route's stream limit lost its process: cost kept, run estimated, the call may be claimed again", async () => {
     await reserveScriptRun(db, "org", budget, "script", 3);
-    row.brief_json.autoScriptCalls.script.at = new Date(Date.now() - 121_000).toISOString();
+    row.brief_json.autoScriptCalls.script.at = new Date(Date.now() - SCRIPT_STREAM_LIMIT_MS - 31_000).toISOString();
     const again = await reserveScriptRun(db, "org", budget, "script", 3);
     expect(again).toMatchObject({ kind: "claim", spentTwd: 6 });
     expect(row.brief_json.autoBudget.estimated).toBe(true);

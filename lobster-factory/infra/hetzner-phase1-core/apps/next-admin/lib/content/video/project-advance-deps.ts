@@ -207,14 +207,13 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
       return embedded ? `${social}；${embedded}` : social;
     },
 
-    async update(projectId, patch) {
-      const { error } = await sb.from("media_production_projects").update({
+    async update(projectId, patch, runId) {
+      const saved = await updateProjectRow(sb, org, projectId, (row) => (assertRun(row, runId, false), {
         ...(patch.lifecycleStage ? { lifecycle_stage: patch.lifecycleStage } : {}),
         ...(patch.autonomy ? { autonomy: patch.autonomy } : {}),
         ...(patch.lastError !== undefined ? { last_error: patch.lastError } : {}),
-        updated_at: new Date().toISOString(),
-      }).eq("id", projectId).eq("organization_id", org);
-      if (error) fail("media_production_projects", error);
+      }));
+      if (saved.ok === false) fail("media_production_projects", { message: saved.error });
       if (patch.lifecycleStage === "measure" || patch.lastError) {
         const { data: p, error: readError } = await sb.from("media_production_projects").select("title, source_ref, brief_json").eq("id", projectId).eq("organization_id", org).maybeSingle();
         if (readError) fail("media_production_projects", readError);

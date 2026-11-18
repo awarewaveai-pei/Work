@@ -111,4 +111,15 @@ describe("POST /api/internal/video/workbench/quick-render", () => {
     expect((await call(mine, { autonomy: "auto_after_render", autoBudget: budget })).status).toBe(202);
     expect(t.media_production_projects[0]).toMatchObject({ autonomy: "guided", brief_json: { autoStop: "run-one", autoBudget: { runId: "run-one" } } });
   });
+
+  // Oracle 2026-11-18 F2: a resume raised the limit while this render was submitted; the request's older limit never wins.
+  it("same run: the row's raised limit is kept, spent only grows", async () => {
+    const budget = { runId: "run-one", budgetTwd: 10, spentTwd: 4 };
+    submitDraftRender.mockImplementationOnce(async () => {
+      Object.assign(t.media_production_projects[0], { updated_at: "2026-11-18T00:00:01.000Z", brief_json: { ...t.media_production_projects[0].brief_json, autoBudget: { runId: "run-one", budgetTwd: 20, spentTwd: 6 } } });
+      return { ok: true, jobId: "123e4567-e89b-42d3-a456-426614174005" };
+    });
+    expect((await call(mine, { autonomy: "auto_after_render", autoBudget: budget })).status).toBe(202);
+    expect(t.media_production_projects[0].brief_json).toMatchObject({ autoBudget: { runId: "run-one", budgetTwd: 20, spentTwd: 6 } });
+  });
 });

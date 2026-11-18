@@ -15,7 +15,7 @@ import { FORGE_MAX_PROMPT_CHARS, FORGE_MAX_TOKENS, forgeCallUpperTwd } from "@/l
 import { parseAutoBudget } from "@/lib/content/video/auto-run-budget";
 import { textCallCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { createHash } from "node:crypto";
-import { reserveScriptRun, finishScriptRun } from "@/lib/script-forge/run-store";
+import { reserveScriptRun, finishScriptRun, SCRIPT_STREAM_LIMIT_MS } from "@/lib/script-forge/run-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -125,6 +125,10 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const ac = new AbortController();
   if (req.signal.aborted) ac.abort();
   else req.signal.addEventListener("abort", () => ac.abort());
+  // A budgeted call never outlives its reservation (run-store STALE_RESERVATION_MS): cut here, the reserved cost stays.
+  let timedOut = false;
+  const deadline = claim ? setTimeout(() => { timedOut = true; ac.abort(); }, SCRIPT_STREAM_LIMIT_MS) : undefined;
+  const talking = () => !ac.signal.aborted || timedOut;
 
   const readable = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -139,22 +143,24 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
         } else {
           await streamAnthropic(capture, encoder, model, system, prompt, apiKey, ac.signal, grant, used);
         }
+        if (timedOut) throw new Error("timeout"); // a cut stream may end quietly; it is still a failed call
       } catch (err) {
         failed = true;
         // 串流已開始 → 無法改 HTTP status；把錯誤塞進串流尾端讓前端 JSON.parse 失敗時可見。
-        if (!ac.signal.aborted) {
-          const msg = err instanceof Error ? err.message : "script generation failed";
+        if (talking()) {
+          const msg = timedOut ? `超過 ${SCRIPT_STREAM_LIMIT_MS / 1000} 秒，已停下；費用按保留額計` : err instanceof Error ? err.message : "script generation failed";
           controller.enqueue(encoder.encode(`\n[ERROR] ${msg}`));
         }
       } finally {
+        clearTimeout(deadline);
         if (claim && budgetDb) {
           try {
             const text = Buffer.concat(chunks).toString("utf8");
             let valid = false;
             try { const parsed = JSON.parse(text.replace(/```json|```/g, "").trim()); valid = body.task === "script" ? Array.isArray(parsed?.scenes) && parsed.scenes.length > 0 : Number.isFinite(parsed?.total); } catch { /* do not cache a malformed result: explicit retry may regenerate it within the same budget */ }
             const receipt = await finishScriptRun(budgetDb, claim, text, actualUsd === null ? null : usdToNtd(actualUsd), valid && !failed && !ac.signal.aborted && !text.includes("\n[ERROR]"));
-            if (!ac.signal.aborted) controller.enqueue(encoder.encode("\n[SF_BUDGET]" + JSON.stringify(receipt)));
-          } catch { if (!ac.signal.aborted) controller.enqueue(encoder.encode("\n[ERROR] 用量回執尚未存妥，已停下並保留額度，請稍後確認")); }
+            if (talking()) controller.enqueue(encoder.encode("\n[SF_BUDGET]" + JSON.stringify(receipt)));
+          } catch { if (talking()) controller.enqueue(encoder.encode("\n[ERROR] 用量回執尚未存妥，已停下並保留額度，請稍後確認")); }
         }
         controller.close();
       }
