@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-19（續3）— 影片監工台併入下一階段：五批 20 張新卡＋6 個沿用項、待決 7–13（操作者「併進監工台」）
+
+- 範圍：`agency-os/handoffs/2026-11-16-video-unify-supervisor/` 的 `data.mjs`、`build.mjs`、`check.mjs`、`supervisor.html`；同一網址重新發布（https://claude.ai/artifact/44ZLNFx32ZtLhQniaM79S5，Version 23）。
+- C1 `data.mjs`：`META.next` 指向 `NEXT-PHASE-PLAN-20261119.md`；STEPS 加 批0–批4（`next: true`，26 項皆 todo）；OPEN 加待決 7–13（各附選項與建議 ★）；NOW 改成下一階段開工前的現況（4 有、7 沒有）；副標與說明改寫。
+- C2 `build.mjs`：批的「做法」指向 `META.next §8`；檔案區多一列下一階段計畫。
+- C3 `check.mjs`：U 卡仍綁計畫 §4；新增「下一階段計畫 §8 的批、卡號、所屬批 ＝ 監工台」的綁定，§8 不得寫狀態。
+- 卡數更正：前一則回覆寫 18 張，實際 20 張（N1b、N5a／N5b 各自一張）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs → ok: 12 cards bound to plan §4, 5 batches bound to next-phase §8, 76 items (50 done), 13 open, page fresh；反向：N15 改成 N99 → FAIL exit=1，還原後 ok | exit=0 | ms=4000
+- REVIEW_WAIVED: NA -- 監工台頁面的產生器與資料，不是產品程式；已讀線上版全文與本次改動，反向測試見上
+- ORACLE_WAIVED: 只動監工台的 data／build／check（文件工具），沒有產品 source；新綁定以真實資料正反各跑一次
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=META.next|s.next | hits=6（都在本資料夾三個檔；`scripts/supervisor-kit` 未改，其他監工台不受影響）
+- 剩餘風險：發布後的頁面沒有在瀏覽器裡看過排版（只過 check）；待決 7–13 未答前批 0 的預設值與批 1–3 的做法未定。
+- rollback：`git revert` 本 commit 後 `node build.mjs` 再發布同一網址。
 ## 2026-11-19（續2）— 影音平台下一階段評估：融合度、順暢度、離全自動日更的差距與卡片（只產文件，Claude Fable 5.2）
 
 - 產出：`agency-os/handoffs/2026-11-16-video-unify-supervisor/NEXT-PHASE-PLAN-20261119.md`（§1 結論五行、§2 不變量新 1–7、§3 A1–A12、§4 S1–S12、§5 差距表、§8 卡 N1–N18、§10 七天順序、§11 待決 O1–O7）。沒改程式、沒對外發布。

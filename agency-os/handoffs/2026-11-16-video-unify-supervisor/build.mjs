@@ -13,10 +13,12 @@ export function render() {
   const sub = t(COPY.sub, { total: STEPS.length, items: items.length, itemsDone: items.filter((it) => it.status === 'done').length });
   const body = [
     section('now', COPY.now, yesNo(NOW, COPY.label)),
-    section('steps', COPY.steps, stepList(STEPS, COPY.label, (s) => `${META.plan} §4 ${s.code}`)),
+    // U 卡的做法在計畫 §4；下一階段的批（step.next）在 META.next §8
+    section('steps', COPY.steps, stepList(STEPS, COPY.label, (s) => (s.next ? `${META.next} §8 ${s.code}` : `${META.plan} §4 ${s.code}`))),
     section('open', COPY.open, openList(OPEN, STEPS, COPY.open)),
     section('paths', { h: P.h }, pathRows([
       [P.plan, code(`${META.plan} §1、§4`)],
+      [P.next, code(`${META.next} §2、§8`)],
       [P.track, code(META.worklog)],
       [P.self, `<span>${code(META.self)}<br>${esc(P.howto)}</span>`],
     ])),
