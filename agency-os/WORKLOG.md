@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-19（續17）— 影片下一階段：N2、N9 驗收併入 main（不部署）；migration 0168 已套；B1 退回補第二段
+
+- 驗收：N2 `0f6654926`（migration 改號 0167→0168 後）、B1 `dd95bdcb3`、N9 `1358894f2` 讀報告與 diff 後 cherry-pick → `82d23c5ef`、`4b1ce4067`、`f28af6832`。這一輪起不逐輪部署（操作者 19:10），等批次。
+- migration：`node scripts/apply-db-migration.mjs 0168`（`client_schedules.per_topic_cap_twd int null check 1–1000`，純加法，db-expert 已審）→ `APPLY_OK 1/1`，`--status` 168 筆 applied。先套再推，避免 03:00 migration 閘擋部署。
+- RISKS 處置：
+  - B1 RISK 1 查證為真 → 退回工人補第二段：正式庫近三天工作台專案成片 3／1／12 支、`metadata ? 'variantOf'` 全 0（每個比例是獨立主片），所以從各成片卡打開發布頁仍只看到自己的比例。修法：有 `media_project_id` 時用專案每比例最新一支（重用 `project-advance-deps.ts` rows），三處一致。B1 在監工台維持未完成。
+  - N2：單步用估價預留、最多超出上限一步 → 接受（硬上限會讓預設 NT$15 每題第一步就停）；同品牌共用上限、舊題目從固定時間點起算、帳本漏記雙重故障 → 接受，寫在監工台該項。
+  - N9：兩個 `.or()` 疊加沒對真實庫跑 → PostgREST 重複的 `or` 參數為 AND（各為獨立 filter），接受；首次每月提案時看 log 的 skipped 行。
+  - db-expert 指出六個舊 down 檔漏刪 schema_migrations 列 → 尚未處理（非影片線，下一輪一併修）。
+- 派工：N5a（線 A，Opus，含 0169 migration）、N3（線 B）；N1b（線 D）、B1 第二段（線 C）進行中。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit` exit 0；`npx vitest run lib/content lib/schedules app/api/content app/api/ops/clients app/video "app/(shell)/tools/video" "app/(shell)/ops/schedules" app/api/video lib/social` → 187 files / 1333 tests passed；`apply-db-migration.mjs 0168` APPLY_OK；正式庫只讀 psql 查 variantOf；`node build.mjs && node check.mjs` ok（75 items，66 done） | exit=0 | ms=420000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/0n（m1 B1 未解工作台多比例獨立主片 → 退回；N2 六輪 Codex、N9 兩項、B1 無發現，皆工人於交回前處理）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/packages/db/migrations | grep=per_topic_cap_twd|recentTopics|reserveStep|TOPIC_BUDGET_EPOCH | hits=31
+- ORACLE_WAIVED: 本 commit 只有監工台資料檔與 WORKLOG；程式改動的 oracle artifact 隨各工人 commit
+- rollback：`git revert f28af6832 4b1ce4067 82d23c5ef`；migration down＝`0168_client_schedules_per_topic_cap.down.sql`（先退程式）。
 ## 2026-11-19（續16）— 社群權杖「無期限」：Meta 本來就永久，Postiz 寫死 59 天造成假過期；Google 要改發布狀態（Claude 監工）
 
 - 操作者：「權杖到期 我要用無期限的」。查證（不是推測）：Graph `debug_token` 四個 Meta 頻道（兩 Facebook 粉專、兩 Instagram）`is_valid`、`expires_at=0`（永不過期）、`type=PAGE`、Facebook `profile_id`＝Postiz `internalId`；`data_access_expires_at` 2027-01-23（Meta 90 天資料存取期，對粉專發文的影響未實測）。
