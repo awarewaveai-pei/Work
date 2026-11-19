@@ -186,7 +186,7 @@ describe("POST /api/internal/schedules/run-due", () => {
 
   // 「做到草稿」 is the consent: its projects advance every firing with no client_schedules row at all.
   const project = (id: string, organizationId: string, autonomy: string, lifecycle_stage = "review") =>
-    ({ id, organization_id: organizationId, autonomy, lifecycle_stage, title: id, updated_at: "2026-11-19T00:00:00Z", brief_json: {} });
+    ({ id, organization_id: organizationId, autonomy, lifecycle_stage, title: id, source_ref: `ref-${id}`, updated_at: "2026-11-19T00:00:00Z", brief_json: { autoBudget: { runId: "r1", budgetTwd: 100, spentTwd: 0, episodeId: `ep-${id}` } } });
 
   it("with no client_schedules rows, a 做到草稿 project is still advanced, by the system actor, after the answer", async () => {
     listEnabledSchedules.mockResolvedValue([]);
@@ -205,15 +205,32 @@ describe("POST /api/internal/schedules/run-due", () => {
     expect(advanceProject).not.toHaveBeenCalled();
   });
 
-  it("a stopped project raises one incident for its organization; the schedules' result stays green", async () => {
+  it("a stopped project raises a Chinese notice naming the video, the step, why and the link; the schedules' result stays green", async () => {
     listEnabledSchedules.mockResolvedValue([dueSchedule(ORG_B)]);
-    projects.push(project("p-auto", ORG_A, "auto_after_render"));
-    advanceProject.mockResolvedValue({ projectId: "p-auto", result: "stopped", note: "權利檢查沒過" });
+    projects.push({ ...project("p-auto", ORG_A, "auto_after_render"), title: "春季新品" });
+    advanceProject.mockResolvedValue({ projectId: "p-auto", result: "stopped", note: "權利檢查沒過", stage: "review" });
     const res = await sweep();
     expect(res.status).toBe(200);
     expect(run).toHaveBeenCalledTimes(1);
     expect(ingestIncident).toHaveBeenCalledTimes(1);
-    expect(ingestIncident).toHaveBeenCalledWith(sb, expect.objectContaining({ fingerprint: `schedule:video_project_advance:${ORG_A}`, message: expect.stringContaining("p-auto 權利檢查沒過") }));
+    expect(ingestIncident).toHaveBeenCalledWith(sb, expect.objectContaining({
+      fingerprint: "video_project_advance:p-auto:review",
+      title: "影片〈春季新品〉停在審核：權利檢查沒過",
+      message: expect.stringMatching(/處理：https:\/\/video\.[^/]+\/\?open=projects&project=ref-p-auto&episode=ep-p-auto/),
+    }));
+  });
+
+  it("the same project stopping at the same step twice has one fingerprint; another step has another", async () => {
+    listEnabledSchedules.mockResolvedValue([]);
+    projects.push(project("p-auto", ORG_A, "auto_after_render"));
+    advanceProject.mockResolvedValue({ projectId: "p-auto", result: "stopped", note: "x", stage: "review" });
+    await sweep();
+    await sweep();
+    advanceProject.mockResolvedValue({ projectId: "p-auto", result: "stopped", note: "y", stage: "produce" });
+    await sweep();
+    expect(ingestIncident.mock.calls.map((c) => c[1].fingerprint)).toEqual([
+      "video_project_advance:p-auto:review", "video_project_advance:p-auto:review", "video_project_advance:p-auto:produce",
+    ]);
   });
 
   it("client_schedules unreadable: still a 500, and the 做到草稿 projects still advance", async () => {
@@ -267,7 +284,7 @@ describe("POST /api/internal/schedules/run-due", () => {
     projects.push(project("p-auto", ORG_A, "auto_after_render"));
     advanceProject.mockRejectedValue(new Error("db down"));
     await sweep();
-    expect(ingestIncident).toHaveBeenCalledWith(sb, expect.objectContaining({ fingerprint: `schedule:video_project_advance:${ORG_A}`, message: expect.stringContaining("db down") }));
+    expect(ingestIncident).toHaveBeenCalledWith(sb, expect.objectContaining({ fingerprint: `schedule:video_project_advance:${ORG_A}`, title: expect.stringContaining("排程"), message: expect.stringContaining("db down") }));
   });
 
   it("a store that cannot be read is a 500, never a green 'nothing due'", async () => {

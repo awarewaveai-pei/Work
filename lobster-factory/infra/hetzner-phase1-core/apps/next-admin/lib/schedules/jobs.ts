@@ -11,6 +11,7 @@ import { REPORT_JOBS, runPeriodReport, type ReportKind } from "@/lib/social/repo
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import { planCostUsd, topicCostUsd } from "@/lib/content/topics/cost";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
+import { raiseNotice, withTopicStopNotices } from "./stop-notice";
 import type { JobMeta } from "./types";
 import type { Frequency } from "./schedule";
 import type { StoredSchedule } from "./store";
@@ -133,7 +134,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
       // B3: a firing that plans a site's month does not tick (plan ~90 s + tick 200 s would pass run-due's 300 s); the next
       // firing, 5 minutes on, finds the month planned and ticks. A plan failure propagates: no tick, recorded + incident.
       const summary = (await planIfDue(planDueDeps(sb, organizationId, "schedule:content_pipeline"), new Date()))
-        ?? await tickTopics(topicDeps(sb, organizationId, "schedule:content_pipeline"), { cap: schedule?.dailyLimit ?? DAILY_START_CAP });
+        ?? await tickTopics(withTopicStopNotices(topicDeps(sb, organizationId, "schedule:content_pipeline"), (n) => raiseNotice(sb, organizationId, n)), { cap: schedule?.dailyLimit ?? DAILY_START_CAP });
       if (trendsError) throw new Error(`${summary}; content_pipeline:trends:${trendsError}`);
       return summary;
     },

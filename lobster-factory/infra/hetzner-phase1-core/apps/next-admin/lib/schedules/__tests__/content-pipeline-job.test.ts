@@ -24,9 +24,9 @@ beforeEach(() => { tickTopics.mockClear(); collectTrendsIfDue.mockClear(); planI
 describe("content_pipeline job", () => {
   it("passes the client's stored limit to the tick, and the default when the row sets none", async () => {
     await job.run("o", "rk", { dailyLimit: 5 } as never);
-    expect(tickTopics).toHaveBeenLastCalledWith({}, { cap: 5 });
+    expect(tickTopics).toHaveBeenLastCalledWith(expect.objectContaining({ move: expect.any(Function) }), { cap: 5 });
     await job.run("o", "rk", { dailyLimit: null } as never);
-    expect(tickTopics).toHaveBeenLastCalledWith({}, { cap: DAILY_START_CAP });
+    expect(tickTopics).toHaveBeenLastCalledWith(expect.objectContaining({ move: expect.any(Function) }), { cap: DAILY_START_CAP });
   });
 
   it("collects trends for the geos of the client's active sites, skipping a market with no trending source", async () => {

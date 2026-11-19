@@ -26,6 +26,7 @@ import { claimScheduleRun, listEnabledSchedules, recordScheduleError, recordSche
 import { NotDueYet, isDueNow, scheduledRunKey } from "@/lib/schedules/schedule";
 import { asRegistered, clientJob } from "@/lib/schedules/jobs";
 import { refreshClaimReviewIfDue } from "@/lib/collect/lookups/answer";
+import { raiseNotice, videoStopNotice } from "@/lib/schedules/stop-notice";
 import { advanceAutoProjects, autoAdvanceDeps, autoAdvanceOrganizations } from "@/lib/content/video/advance-auto-projects";
 
 export const runtime = "nodejs";
@@ -52,7 +53,7 @@ async function raiseIncident(schedule: Pick<StoredSchedule, "jobKey" | "organiza
     severity: "medium",
     service: "schedules",
     environment: process.env.NODE_ENV === "production" ? "production" : "development",
-    title: `Scheduled job ${schedule.jobKey} failed`,
+    title: `排程「${schedule.jobKey}」執行失敗：${error}`.slice(0, 200),
     message: `run=${runKey}\n${error}`,
     raw: { job_key: schedule.jobKey, organization_id: schedule.organizationId, run_key: runKey, error },
     tags: { job_key: schedule.jobKey },
@@ -89,7 +90,10 @@ async function startAutoAdvance(now: Date): Promise<{ organizations: string[] } 
     if (!sb) throw new Error("no_supabase_client");
     const organizations = await autoAdvanceOrganizations(sb);
     const runKey = `video_project_advance:${now.toISOString()}`;
-    if (organizations.length) after(() => advanceAutoProjects(autoAdvanceDeps(sb, (organizationId, error) => raiseIncident({ jobKey: "video_project_advance", organizationId }, runKey, error)), organizations));
+    if (organizations.length) after(() => advanceAutoProjects(autoAdvanceDeps(sb, async (organizationId, r) => {
+      if (r.kind === "failed") return raiseIncident({ jobKey: "video_project_advance", organizationId }, runKey, r.error);
+      await raiseNotice(sb, organizationId, videoStopNotice(r));
+    }), organizations));
     return { organizations };
   } catch (e) {
     const error = String(e).slice(0, 200);

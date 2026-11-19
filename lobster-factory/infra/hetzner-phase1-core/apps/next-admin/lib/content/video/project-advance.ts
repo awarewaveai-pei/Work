@@ -27,7 +27,7 @@ export interface AdvanceDeps {
   update(projectId: string, patch: { lifecycleStage?: Stage; autonomy?: "guided"; lastError?: string | null }, runId: string | undefined): Promise<void>;
   now(): number;
 }
-export type AdvanceOutcome = { projectId: string; result: "waiting" | "done" | "stopped"; note: string };
+export type AdvanceOutcome = { projectId: string; result: "waiting" | "done" | "stopped"; note: string; /** where a stopped project stopped */ stage?: Stage };
 
 /** A project whose render never shows up (job gone, nothing recorded) is stopped after this long instead of waiting forever. */
 export const WAIT_LIMIT_MS = 2 * 60 * 60 * 1000;
@@ -52,7 +52,7 @@ export async function advanceProject(deps: AdvanceDeps, p: AdvanceProject): Prom
       if (e instanceof RunChanged) return { projectId: p.id, result: "waiting", note: e.message };
       throw e;
     }
-    return { projectId: p.id, result: "stopped", note: why };
+    return { projectId: p.id, result: "stopped", note: why, stage };
   };
   try {
     const render = await deps.renderState(p.id);
