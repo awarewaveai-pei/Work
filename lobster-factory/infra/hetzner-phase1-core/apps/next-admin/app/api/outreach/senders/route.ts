@@ -78,7 +78,7 @@ export async function GET(req: Request): Promise<Response> {
     const state = r.connector_id ? sync.get(r.connector_id) : undefined;
     const id = r.id;
     return { ...r, default_signature: defaultSignature(r, r.organization_id ? names.get(r.organization_id) ?? null : null),
-      last_sync_at: state?.last_ok_at ?? null, rescan_days: state?.rescan_days ?? null,
+      last_sync_at: state?.last_ok_at ?? null, rescan_days: state?.rescan_days ?? null, reauth_needed: state?.auth?.status === "expired",
       today_claims: claims.get(id) ?? null, bounce_rate_7d: bounce.get(id) ?? null };
   });
   return NextResponse.json({ ok: true, senders });

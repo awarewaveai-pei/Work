@@ -34,7 +34,9 @@ export const SENDING_STALE_MS = 30 * 60_000;
  *  are still to read (seen = the ones in that last second already handled, so a tick always moves on); history_id
  *  becomes the cursor when it is done; rescan = the 補掃 request it serves. */
 export interface GmailScan { since: number; before?: number; seen?: string[]; history_id: string; rescan?: number }
-export interface GmailSyncState { history_id?: string; last_ok_at?: string; rescan_days?: number; scan?: GmailScan | null }
+/** auth = the token-endpoint mirror (connector-auth.ts): absent = connected; null in a patch removes it. */
+export interface GmailSyncState { history_id?: string; last_ok_at?: string; rescan_days?: number; scan?: GmailScan | null;
+  auth?: { status: "expired"; since: string; why: string } | null }
 export interface SyncConnector {
   id: string;
   organization_id: string | null;

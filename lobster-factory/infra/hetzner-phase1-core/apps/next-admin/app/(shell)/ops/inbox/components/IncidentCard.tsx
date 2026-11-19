@@ -58,6 +58,8 @@ function getSourceUrl(incident: Incident): string | null {
       return "/ops/schedules";
     case "payments":
       return "/ops/billing";
+    case "outreach":
+      return "/tools/outreach/connectors";
     default:
       return null;
   }

@@ -100,6 +100,14 @@ const REPAIR_SOURCE_POLICY_BY_SOURCE = {
     rationale: "WooCommerce 付款事件被控制面拒收（lib/payments/woo-billing.ts）：多半已收到錢，但帳號歸屬對不上（訪客結帳、email 已是別的帳號、會員不認得）；由操作者用事件編號找訂單、對帳，必要時用 record-payment.mjs 人工登記。",
     can_escalate_to_pr: false,
   },
+  outreach: {
+    source: "outreach",
+    label: "外聯信箱",
+    policy: "human_only",
+    family: "manual",
+    rationale: "外聯 Gmail 連接器的 Google 授權失效（invalid_grant，lib/outreach/connector-auth.ts）：只有信箱主人能在連接器頁按「重新連接」重新授權，程式無法代做；授權恢復後下一輪同步自動結案。",
+    can_escalate_to_pr: false,
+  },
   manual: {
     source: "manual",
     label: "手動",

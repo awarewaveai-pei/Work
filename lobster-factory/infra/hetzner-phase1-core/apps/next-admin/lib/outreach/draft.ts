@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSecret, connectorSecretRef } from "@/lib/secret-vault";
+import { GmailReauthRequired, isInvalidGrant } from "@/lib/outreach/connector-auth";
 import { buildRfc2822Message, createGmailDraft, GmailDraftError, refreshAccessToken, replySubject, toBase64Url, type GmailDraft } from "@/lib/outreach/google-oauth";
 import { gmailApi, GmailNotFound, header } from "@/lib/outreach/gmail-api";
 import { contactBlock } from "@/lib/outreach/contact-guard";
@@ -220,7 +221,9 @@ export async function draftMessage(supabase: SupabaseClient, messageId: string, 
     const tokens = await refreshAccessToken({ refreshToken, clientId, clientSecret });
     accessToken = tokens.access_token;
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "token refresh failed" }, { status: 502 });
+    // The mirror and incident are the reply sync's (connector-auth.ts, main database); here only the readable answer.
+    const error = isInvalidGrant(e) ? new GmailReauthRequired(connector.id).message : e instanceof Error ? e.message : "token refresh failed";
+    return NextResponse.json({ ok: false, error }, { status: 502 });
   }
 
   // A follow-up replies in the thread of our last SENT mail to the lead (C5.2, SPEC §5.7): its RFC Message-ID becomes

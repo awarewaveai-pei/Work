@@ -6,7 +6,8 @@
 // sync (reconciliation first), the pipeline tick (lib/outreach/pipeline.ts, card C15: research, write, review policy,
 // Gmail drafts, follow-up drafts -- never sends), then the automatic send of the sender pool (lib/outreach/send-adapter.ts, card C8.4) with
 // the paid verifier under the outreach.verify grant (lib/outreach/mailbox-verify.ts).
-// Answers 502 ok:false when a mailbox could not be read (an expired grant, Gmail down): /ops/schedules turns red.
+// Answers 502 ok:false when a mailbox could not be read (an expired grant, Gmail down): /ops/schedules turns red. An
+// expired grant (invalid_grant) also marks the connector and raises one incident per connector (lib/outreach/connector-auth.ts).
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
@@ -15,6 +16,7 @@ import { getSecret, connectorSecretRef } from "@/lib/secret-vault";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { EntitlementRequired } from "@/lib/entitlements/can";
 import { refreshAccessToken } from "@/lib/outreach/google-oauth";
+import { guardedRefresh, supabaseAuthMirror } from "@/lib/outreach/connector-auth";
 import { gmailApi } from "@/lib/outreach/gmail-api";
 import { classifyReply, runGmailSync, supabaseSyncStore } from "@/lib/outreach/gmail-sync";
 import { pipelineDeps } from "@/lib/outreach/pipeline-store";
@@ -59,11 +61,13 @@ async function syncOnce(): Promise<Response> {
   if (!clientId || !clientSecret) return NextResponse.json({ ok: false, error: "oauth client not configured" }, { status: 503 });
   const telegram = buildOperatorTelegramNotifier();
   const started = Date.now();
-  const refresh = async (connectorId: string): Promise<string> => {
+  // Every refresh (sync and send) mirrors Google's answer into the connector and its incident (connector-auth.ts).
+  const mirrorErrors: string[] = [];
+  const refresh = guardedRefresh(async (connectorId: string): Promise<string> => {
     const refreshToken = await getSecret(connectorSecretRef(connectorId));
-    if (!refreshToken) throw new Error("no stored refresh token -- reconnect this Gmail on the Connectors page");
+    if (!refreshToken) throw new Error("沒有存好的 Google 授權：到 /tools/outreach/connectors 在這個信箱按「🔗 重新連接」");
     return (await refreshAccessToken({ refreshToken, clientId, clientSecret })).access_token;
-  };
+  }, supabaseAuthMirror(sb), (text) => mirrorErrors.push(text));
   const result = await runGmailSync({
     store: supabaseSyncStore(sb),
     gmailFor: async (connector) => gmailApi(await refresh(connector.id)),
@@ -99,6 +103,6 @@ async function syncOnce(): Promise<Response> {
     notify: async (text) => { if (telegram) await telegram.sendText(text); },
     deadline: started + BUDGET_MS,
   });
-  const errors = [...result.errors, ...pipeline.errors, ...sending.errors];
+  const errors = [...result.errors, ...pipeline.errors, ...sending.errors, ...mirrorErrors];
   return NextResponse.json({ ok: errors.length === 0, ...result, errors, pipeline: { ...pipeline, errors: undefined }, send: { ...sending, errors: undefined } }, { status: errors.length ? 502 : 200 });
 }

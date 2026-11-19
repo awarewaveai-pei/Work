@@ -21,6 +21,7 @@ interface Sender {
   dns_checked_at: string | null;
   last_sync_at: string | null;
   rescan_days: number | null;
+  reauth_needed?: boolean;
   today_claims: number | null;
   bounce_rate_7d: number | null;
   test_send_until: string | null;
@@ -244,6 +245,7 @@ export default function SendersCard({ org }: { org: string | null }) {
                 回信同步：{s.last_sync_at ? `上次 ${new Date(s.last_sync_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false })}` : "還沒同步過"}
                 {s.rescan_days ? `・補掃 ${s.rescan_days} 天排隊中` : ""}
               </span>
+              {s.reauth_needed && <span className="card-badge badge-red" role="alert">需要重新授權：到上方「已連接」這個 Gmail 按「🔗 重新連接」</span>}
               {[1, 3, 7].map((d) => (
                 <button key={d} type="button" className="btn-secondary" disabled={busy === s.id} onClick={() => void rescan(s.id, d)}>補掃 {d} 天</button>
               ))}

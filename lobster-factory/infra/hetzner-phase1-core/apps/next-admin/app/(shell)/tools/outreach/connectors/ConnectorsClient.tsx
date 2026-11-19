@@ -12,7 +12,7 @@ interface Connector {
   connector_type: string;
   is_enabled: boolean;
   credentials_ref: string | null;
-  settings: { email?: string; gmail_sync?: { last_ok_at?: string } } | null;
+  settings: { email?: string; gmail_sync?: { last_ok_at?: string; auth?: { status?: string; since?: string } | null } } | null;
   organization_id: string | null;
   organizations?: { name: string | null } | null;
   created_at: string;
@@ -26,6 +26,7 @@ const BUILTIN_LABEL: Record<string, string> = {
   google_oauth: "Google OAuth 用戶端（連 Gmail 用）",
 };
 const labelOf = (name: string): string => KNOWN.find((k) => k.name === name)?.label ?? name;
+const reauthNeeded = (c: Connector): boolean => c.connector_name === "gmail" && c.settings?.gmail_sync?.auth?.status === "expired";
 const taipei = (iso: string): string => new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false });
 
 // Every name a runtime reader looks up in co_connector_accounts (generate.ts AI_PROVIDERS, mailbox-verify.ts
@@ -222,9 +223,13 @@ export default function ConnectorsClient() {
                       {c.is_enabled ? "enabled" : "disabled"}
                     </span>
                     {c.connector_name === "gmail" ? (
-                      <span className={`card-badge ${c.credentials_ref ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 4 }}>
-                        {c.credentials_ref ? `✅ 已連接 ${c.settings?.email ?? ""}` : "未連接"}
-                      </span>
+                      reauthNeeded(c) ? (
+                        <span className="card-badge badge-red" role="alert" style={{ marginLeft: 4 }}>⚠ {c.settings?.email ?? ""} 需要重新授權</span>
+                      ) : (
+                        <span className={`card-badge ${c.credentials_ref ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 4 }}>
+                          {c.credentials_ref ? `✅ 已連接 ${c.settings?.email ?? ""}` : "未連接"}
+                        </span>
+                      )
                     ) : (
                       <span className={`card-badge ${c.credentials_ref ? "badge-green" : "badge-gray"}`} style={{ marginLeft: 4 }}>
                         {c.credentials_ref ? "🔑 已設金鑰" : "未設金鑰"}
@@ -255,6 +260,12 @@ export default function ConnectorsClient() {
                     <button type="button" className="btn-secondary" onClick={() => void remove(c.id)}>移除</button>
                   </span>
                 </div>
+                {c.connector_name === "gmail" && reauthNeeded(c) && (
+                  <p className="card-sub" role="alert" style={{ color: "var(--color-error)" }}>
+                    需要重新授權：Google 說這個信箱的授權已失效或被撤銷{c.settings?.gmail_sync?.auth?.since ? `（${taipei(c.settings.gmail_sync.auth.since)} 起）` : ""}，回信同步與自動寄出都停了。
+                    按右邊「🔗 重新連接」，用 {c.settings?.email ?? "這個信箱的"} Google 帳號登入並同意權限；10 分鐘內下一輪同步成功後這行會消失。
+                  </p>
+                )}
                 {c.connector_name === "gmail" && c.credentials_ref && (
                   <p className="card-sub">上次同步成功：{c.settings?.gmail_sync?.last_ok_at ? taipei(c.settings.gmail_sync.last_ok_at) : "還沒同步過"}</p>
                 )}

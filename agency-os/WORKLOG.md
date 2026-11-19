@@ -20,6 +20,16 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=brandDay|orgTimeZone|stop-notice|topicLane|deliveryEventForPostStatus|expandedOutputs|readArticleStatus | hits=37
 - ORACLE_WAIVED: 本 commit 只有監工台資料檔、DISPATCH.md 與 WORKLOG；程式改動的 oracle artifact 見上列四檔；`9d7548f89` 只改一支測試的等待方式（斷言不變）
 - rollback：`git revert ec537ff78 67f097a51 c1acadd30 fd0d963b4 9d7548f89`；部署 rollback 由 `sg-deploy.sh` 自動或 `rollback` 子命令（快照見主機 log）。
+## 2026-11-19（續12）— OUT-GMAIL-REAUTH：外聯 Gmail 連接器授權失效變成看得到、做得到（未部署，監工整合）
+
+- 根因：`outreach_gmail_sync` 每 10 分鐘 502（awarewaveai@、soulfulexpression01@ `invalid_grant`），但 route 只回 JSON（`app/api/internal/outreach/gmail-sync/route.ts` 末行 status 502），沒有任何 incident；`co_connector_accounts` 無狀態欄，設定頁照樣顯示「✅ 已連接」。
+- 不變量：連接器能否收發＝Google token 端點說的；`settings.gmail_sync.auth`（不存在＝connected，`{status:"expired",since,why}`＝invalid_grant）只是鏡像。所有同步與自動寄出的 token 刷新走 `lib/outreach/connector-auth.ts guardedRefresh`：invalid_grant 且無未結案 incident → 先開 incident（`source:"outreach"`、fingerprint `outreach:sender:<connector id>`、medium、標題「<信箱> Gmail 需要重新授權」、訊息含 `/tools/outreach/connectors` 三步）再標 expired；有未結案的就不重開（人工結案後仍失效 → 下一輪重開）；刷新成功 → 清標記＋resolve（每次成功都 resolve：重新連接時 OAuth callback 整個覆寫 settings，標記會先消失）。
+- 改：migration 0167（`ops_incidents_source_check` 加 `outreach`；`repair_runs_source_check` 補成同一份完整清單；down 兩處）；`IncidentSource`／policy 型錄／收件匣連結；設定頁連接器列紅字＋寄件信箱卡紅標（沿用「🔗 重新連接」）；同步錯誤、`draft.ts` 刷新失敗、無 refresh token、排程頁 `host-jobs.ts` fail 文字改中文可操作。不用新狀態欄：沿用既有 `co_merge_gmail_sync` 合併 RPC，零 schema 改動於 co_*。`draft.ts` 只改文字不寫鏡像（其 client 可能是租戶庫，沒有 ops_incidents）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run lib/outreach app/api/internal/outreach lib/repair-center app/api/outreach (63 files 588 tests); 突變：去重守衛拿掉 → connector-auth.test 紅（incidents 2≠1），還原綠；修後 63 files 589 tests | exit=0 | ms=200000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n（Codex oracle 兩輪 ea221aca、0f83024c。修：F1 `repair_runs_source_check` 自 0059 停在 deploy，collection／site_watch／schedule／social／payments／outreach 事件按「開始處理」都插入失敗 → 0167 一併補成完整 IncidentSource；F3 人工結案後仍失效不重開 → 去重改看未結案 incident（`hasUnresolved`），補測試。接受：主機同步只讀主庫連接器（租戶自有庫 Gmail 本來就不同步）；既有 OAuth callback 重連會整個覆寫 settings（清游標，斷線 >14 天會漏信，補掃上限 7 天）且一般重連不驗是否同一 Google 帳號——兩者屬 callback，本卡不動 OAuth，另列）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=Gmail 授權失效或讀不到信|reconnect this Gmail on the Connectors page|GmailReauthRequired|connector-auth | hits=6（皆本次新檔與改檔；舊字串 0 殘留）
+- 剩餘風險：未部署、migration 0167 未套正式庫（須先於程式上線，否則 incident 寫入被 check 擋，回報為 mirrorErrors、不標 expired、每輪重試）；每輪失效多一次 incident 查詢；客戶門（outreach door）GET 不帶 settings，客戶看不到紅字；callback 重連清游標／不驗同帳號（見上）。
+- rollback：`git revert <commit>`；DB `0167_ops_incidents_outreach_source.down.sql`（先結案所有 source='outreach' incident）。
 ## 2026-11-19（續9）— 影片下一階段：N12 驗收併入 main；第一批（N1、N15、N13、N12）部署
 
 - 驗收：N12 工人交回 `7693224e4`（worktree `recursing-jang-f14f2d`），監工讀 FILES／TESTS／RISKS 與 diff 後 cherry-pick 進 main → `6317f6d8a`。機制：`lib/script-forge/run-quote.ts` 用 `VW_INTERNAL_TOKEN` 派生的 HMAC 簽整趟最多（綁組織、模型、場景數，24h），`run-store.ts checkStart` 在建列／預留／付費前比對上限；`quick-render/quote/route.ts` 回 `typicalTwd`／`maxTwd`／`runQuote`，VW `backend/quick-render.cjs` 原樣帶過。
