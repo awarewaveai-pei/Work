@@ -30,16 +30,17 @@ export function laneCounts(topics: Row[], now: Date): Record<LaneFilter, number>
   return c;
 }
 
-export type NextStep = { action: "approve" | "reject" | "retry" | "view"; label: string };
+export type NextStep = { action: "approve" | "reject" | "retry" | "publish"; label: string };
 
-/** The one button on a row, or null when nothing is for a person to do (the status says what is going on). The actions are
- *  the ones the topic PATCH route already has (approve / reject / retry); "view" only opens the draft. */
+/** The one button on a row, or null when nothing is for a person to do (the status says what is going on). approve /
+ *  reject / retry are the topic PATCH route's; publish (N6) is POST [id]/publish, behind a confirmation that names
+ *  where it goes (publishTargets). */
 export function nextStep(t: Row, now: Date): NextStep | null {
   const lane = topicLane(t, now);
   if (lane === "overdue") return { action: "reject", label: "退回" };
   if (t.status === "proposed") return { action: "approve", label: "核准" };
   if (t.status === "failed") return { action: "retry", label: "重試" };
-  if (t.status === "reviewed") return { action: "view", label: "看草稿" };
+  if (t.status === "reviewed") return { action: "publish", label: "發布" };
   return null;
 }
 
@@ -61,3 +62,16 @@ export function draftUrl(t: Pick<Topic, "artifacts">): string | null {
   const url = article?.wp_edit_url;
   return typeof url === "string" && /^https:\/\//.test(url) ? url : null;
 }
+
+/** Where 「發布」 sends a reviewed topic, in the order it goes (publish-steps.ts): the confirmation's lines. */
+export function publishTargets(t: Pick<Topic, "formats" | "artifacts">, youtubeUnlisted: boolean): string[] {
+  const a = t.artifacts as { article?: { wp_post_id?: unknown; published?: unknown }; social?: { post_id?: unknown; youtube_post_id?: unknown; sent?: unknown }; publish?: { youtube?: { url?: unknown } } } | null;
+  const out: string[] = [];
+  if (a?.social?.youtube_post_id && !a.publish?.youtube?.url) out.push(`YouTube（網站設定：${youtubeUnlisted ? "不公開" : "公開"}）`);
+  if (t.formats.includes("article") && a?.article?.wp_post_id && !a.article.published) out.push("網站文章（WordPress 草稿改成公開）");
+  if (a?.social?.post_id && !a.social.sent) out.push("其他社群頻道（排在文章上線後）");
+  return out;
+}
+
+/** The social tool's post list of the topic's brand, where its social drafts are (the tool opens no single post by link). */
+export const socialDraftsUrl = (organizationId: string) => `/tools/social?brand=${encodeURIComponent(organizationId)}&view=list`;

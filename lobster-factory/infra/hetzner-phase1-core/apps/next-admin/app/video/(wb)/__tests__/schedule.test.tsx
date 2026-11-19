@@ -45,10 +45,10 @@ it("filters by lane (an old October proposal is 過期), and a row's one button 
   expect(JSON.parse(String(patch.body))).toEqual({ action: "approve", version: 4 });
 });
 
-it("看草稿 opens the content tool on that topic's site, month and topic", async () => {
+it("發布 opens the content tool on that topic's site, month and topic (the confirmation is there)", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ items: [{ id: "v", title: "待看", status: "reviewed", site_id: "s1", scheduled_for: "2026-11-25T01:00:00Z", version: 2 }] })));
   render(<ScheduleWorkbench settingsHref="https://content.example/topics" />);
-  const link = await screen.findByRole("link", { name: "看草稿" });
+  const link = await screen.findByRole("link", { name: "發布" });
   expect(link.getAttribute("href")).toBe("https://content.example/topics?site=s1&month=2026-11&topic=v");
 });
 

@@ -21,7 +21,9 @@ export interface PublishStep {
   /** YouTube: the wait for its link counts from here (sent_at, or the start of this publish run on a retry) */
   since?: string;
 }
-export interface PublishLog { youtube?: PublishStep; article?: PublishStep; social?: PublishStep }
+/** requestedBy / requestedAt: the person who pressed 發布 (N6) for this run into 'publishing' -- the only way a topic of
+ *  a site set to human review goes out (make.ts publishDrafts reads it; tick.ts publishNow clears it on an auto entry). */
+export interface PublishLog { youtube?: PublishStep; article?: PublishStep; social?: PublishStep; requestedBy?: string; requestedAt?: string }
 
 export const YOUTUBE_LIVE_TIMEOUT_MS = 60 * 60_000;
 /** A step recorded as started (started_at, no sent_at) less than this ago is another run's, still at its outside write:

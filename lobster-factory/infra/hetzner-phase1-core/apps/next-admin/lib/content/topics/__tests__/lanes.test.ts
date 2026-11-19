@@ -28,7 +28,7 @@ describe("topic lanes", () => {
     expect(nextStep(row("proposed", "2026-11-25T01:00:00Z"), now)).toEqual({ action: "approve", label: "核准" });
     expect(nextStep(row("proposed", "2026-10-12T01:00:00Z"), now)).toEqual({ action: "reject", label: "退回" });
     expect(nextStep(row("failed"), now)).toEqual({ action: "retry", label: "重試" });
-    expect(nextStep(row("reviewed"), now)).toEqual({ action: "view", label: "看草稿" });
+    expect(nextStep(row("reviewed"), now)).toEqual({ action: "publish", label: "發布" });
     expect(nextStep(row("generating"), now)).toBeNull();
     expect(nextStep(row("published"), now)).toBeNull();
   });

@@ -98,14 +98,15 @@ export default function ScheduleWorkbench({ settingsHref }: { settingsHref: stri
       const next = nextStep(t, now);
       const overdue = topicLane(t, now) === "overdue";
       const start = approvedStartText(t, now, t.scheduled_for ? taipei(t.scheduled_for) : "");
-      const canAct = next && (next.action === "view" ? !!settingsHref : t.version !== undefined);
+      // 發布 asks first, naming where it goes: on the content tool's topic page, where the site's settings are
+      const canAct = next && (next.action === "publish" ? !!settingsHref : t.version !== undefined);
       return <article key={t.id} style={{ ...cardStyle(), padding: 16, marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
         <div style={{ flex: "1 1 280px", minWidth: 0 }}><h2 style={{ overflowWrap: "anywhere" }}>{t.title}</h2>
           <p>{overdue ? "過期・時間已過，還沒決定" : (STATUS[t.status] ?? "狀態未知")}{t.scheduled_for ? ` · ${taipei(t.scheduled_for)}` : ""}</p>
           {start && <p>{start}</p>}
           {t.last_error && <p>停下原因：{t.last_error}</p>}
         </div>
-        {canAct && next && (next.action === "view"
+        {canAct && next && (next.action === "publish"
           ? <a href={topicHref(settingsHref!, t)} target="_blank" rel="noreferrer" style={buttonStyle({ tone: "primary" })}>{next.label}</a>
           : <button type="button" style={buttonStyle({ tone: "primary" })} disabled={busy} onClick={() => void step(t, next.action as "approve" | "reject" | "retry")}>{next.label}</button>)}
       </article>;

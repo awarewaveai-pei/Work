@@ -38,7 +38,7 @@ import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/li
 import { TOPIC_ARTICLE_IMAGES } from "./cost";
 import { DEFAULT_TOPIC_CAP_TWD, reserveStep, settleStep, spentSince, stepUpperTwd, topicBudget, type TopicBudget } from "./budget";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
-import { MakeError, NOW_FORMATS, brandDay, waitsForVideo, type Made, type Published, type PublishRun, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
+import { MakeError, NOW_FORMATS, brandDay, personAsked, waitsForVideo, type Made, type Published, type PublishRun, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
 import { publishSteps, type PublishLog, type YoutubeLook } from "./publish-steps";
 
 /** What content_topics.artifacts holds: one entry per made part; `published` / `sent` once auto publish put it out. */
@@ -267,11 +267,14 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
   const site = await siteFor(sb, t);
   // nothing went out in this run: the failed row keeps what earlier runs recorded (a MakeError carries it)
   if (typeof site === "string") throw new MakeError(site, t.artifacts);
-  // the gate in tick.ts read the setting a moment ago; read again at the write, so a switch back to human review wins
-  if (!autoPublishes(site.defaults)) throw new MakeError("網站已改成人工審核，沒有再往下發布（還沒發的都還是草稿）", t.artifacts);
+  // N6: out only when the site publishes by itself or a person pressed 發布 for this run (tick.ts requestPublish). The
+  // gate in tick.ts read the setting a moment ago; read again at every step's run, so a switch back to human review wins
+  // over auto publish (never over a person's press).
+  if (!autoPublishes(site.defaults) && !personAsked(t.artifacts)) throw new MakeError("網站是人工審核，沒有人按「發布」，沒有往下發布（還沒發的都還是草稿）", t.artifacts);
   // N1b: paragraphs the site asks for now but this article was never checked for (added after it was made) stop it here,
   // before any step -- YouTube included -- goes out
   const a = (t.artifacts as TopicArtifacts).article;
+  if (t.formats.includes("article") && !a?.published && !a?.wp_post_id) throw new MakeError("沒有 WordPress 草稿編號，沒有發布（YouTube 與其他貼文也都沒發）", t.artifacts);
   if (t.formats.includes("article") && a && !a.published) {
     const unchecked = uncheckedRequired(a.required, requiredBlocks(site.defaults));
     if (unchecked.length) throw new MakeError(`網站後來新增了必附段落，這篇沒有檢查過（${unchecked.join("、")}），沒有發布（草稿還在）`, t.artifacts);

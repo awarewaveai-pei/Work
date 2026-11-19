@@ -278,6 +278,7 @@ describe("registry claims match the code", () => {
     "app/api/internal/schedules/run-due/route.ts": "each due job runs for its client org (lib/schedules/jobs.ts runCollection({ organizationId })); KB ingest embeds for that org",
     "app/api/internal/collect/runs/execute/route.ts": "Cognitive OS research run for a project, no client org on the request: collect.fetch bills internal (lib/collect/run.ts runResearchCollection)",
     // reach paid code only through an import; the handler runs no paid call
+    "app/api/content/topics/[id]/publish/route.ts": "「發布」 runs only tick.ts continuePublishing -> make.ts publishDrafts (WordPress publish, social schedule, the YouTube swap); no AI call -- the closure reaches the makers through topicDeps; the scheduled posts' sends ask social.dispatch for the post's org",
     "app/api/internal/cognitive-os/import-project-sources/route.ts": "reads KB sources (@/lib/kb barrel) and sends them to our own Cognitive OS",
     "app/api/ops/clients/[slug]/cognitive-os-import/route.ts": "reads KB sources (@/lib/kb barrel) and sends them to our own Cognitive OS",
     "app/api/ops/clients/[slug]/hci-import/route.ts": "reads KB sources (@/lib/kb barrel) and sends them to our own HCI service",

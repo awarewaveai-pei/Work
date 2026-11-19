@@ -9,10 +9,10 @@ import { DAILY_START_CAP, makesNow } from "@/lib/content/topics/tick";
 import { GridPicker } from "@/components/tools/GridPicker";
 import type { TopicReview } from "@/lib/content/topics/review";
 import type { TopicArtifacts } from "@/lib/content/topics/make";
-import { autoPublishes, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { autoPublishes, youtubePrivacy, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
-import { LANE_LABEL, LANE_ORDER, approvedStartText, draftUrl, inLane, laneCounts, nextStep, topicLane, type LaneFilter } from "@/lib/content/topics/lanes";
+import { LANE_LABEL, LANE_ORDER, approvedStartText, draftUrl, inLane, laneCounts, nextStep, publishTargets, socialDraftsUrl, topicLane, type LaneFilter } from "@/lib/content/topics/lanes";
 import { FlowCells, OverviewTable } from "./AutoContentOverview";
 
 const T = {
@@ -58,6 +58,14 @@ const T = {
   movedTo: (m: string) => `已改到 ${m}，切到那個月就看得到。`,
   review: "規則審核",
   wpDraft: "打開 WordPress 草稿",
+  socialDrafts: "打開社群草稿（社群工具）",
+  publish: "發布",
+  publishHint: "按了才會發出去；誰按的、什麼時候按的會記在題目上。",
+  publishConfirm: (title: string, to: string[], reviewFailed: boolean) =>
+    [`確定發布「${title}」？`, "", "會依序發到：", ...to.map((x, i) => `${i + 1}. ${x}`),
+      ...(reviewFailed ? ["", "注意：規則審核沒通過，發布前請先看過草稿。"] : []), "", "發出去之後不會自動收回。"].join("\n"),
+  publishNothing: "這個題目沒有可以發布的草稿。",
+  publishing: "已開始發布；YouTube 上線後才會發文章，約 5–10 分鐘後重新整理看狀態。",
 };
 /** A search-run folder is named "<keyword> <YYYYMMDDHHmm>" (lib/collect/sinks/kb.ts); the keyword is the topic. */
 const folderKeyword = (name: string) => name.replace(/\s*\d{12}$/, "").trim() || name;
@@ -199,16 +207,24 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
     } finally { await load(); setBusy(false); }
   }
 
-  /** The button on a row: the same PATCH actions as the detail panel; "view" opens the WordPress draft, or the detail when there is none. */
-  async function rowStep(t: Topic, action: "approve" | "reject" | "retry" | "view") {
-    if (action === "view") {
-      const url = draftUrl(t);
-      if (url) window.open(url, "_blank", "noopener");
-      else setSelId(t.id);
-      return;
-    }
+  /** The button on a row: the same actions as the detail panel. */
+  async function rowStep(t: Topic, action: "approve" | "reject" | "retry" | "publish") {
+    if (action === "publish") { setSelId(t.id); await publish(t); return; }
     setBusy(true); setNote("");
     try { await act(t, action); } finally { await load(); setBusy(false); }
+  }
+
+  /** N6 「發布」: names where it goes (YouTube's privacy is the site's) and asks once; the route records who pressed it. */
+  async function publish(t: Topic) {
+    const to = publishTargets(t, youtubePrivacy(site?.contentDefaults) === "unlisted");
+    if (!to.length) { setNote(T.publishNothing); return; }
+    if (!window.confirm(T.publishConfirm(t.title, to, (t.review as TopicReview | null)?.pass !== true))) return;
+    setBusy(true); setNote("");
+    try {
+      const r = await fetch(`/api/content/topics/${t.id}/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: t.version }) });
+      const j = await r.json().catch(() => ({ ok: false })) as { ok: boolean; error?: string };
+      setNote(j.ok ? T.publishing : r.status === 409 && !j.error?.startsWith("只有") && !j.error?.startsWith("要先在排程頁") ? T.reload : (j.error ?? `失敗（${r.status}）`));
+    } finally { await load(); setBusy(false); }
   }
 
   async function one(action: string, formats?: TopicFormat[]) {
@@ -431,11 +447,17 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
                 )}
               </div>
               {sel.last_error && <p style={{ margin: 0, fontSize: "var(--font-size-sm)", color: "var(--red)" }}>{T.error}：{sel.last_error}</p>}
-              {(() => {
-                const url = (sel.artifacts as TopicArtifacts).article?.wp_edit_url;
-                return typeof url === "string" && /^https:\/\//.test(url)
-                  ? <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: "var(--font-size-sm)" }}>{T.wpDraft}</a> : null;
-              })()}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: "var(--font-size-sm)" }}>
+                {draftUrl(sel) && <a href={draftUrl(sel)!} target="_blank" rel="noreferrer">{T.wpDraft}</a>}
+                {((sel.artifacts as TopicArtifacts).social?.post_id || (sel.artifacts as TopicArtifacts).social?.youtube_post_id) &&
+                  <a href={socialDraftsUrl(sel.organization_id)} target="_blank" rel="noreferrer">{T.socialDrafts}</a>}
+              </div>
+              {sel.status === "reviewed" && (
+                <div style={{ display: "grid", gap: 4 }}>
+                  <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void publish(sel)}>{T.publish}</button>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.publishHint}</span>
+                </div>
+              )}
               {sel.review && (
                 <div style={{ display: "grid", gap: 4, fontSize: "var(--font-size-sm)" }}>
                   <div>{T.review}：<span style={{ color: (sel.review as TopicReview).pass ? "var(--green)" : "var(--red)" }}>{(sel.review as TopicReview).pass ? "通過" : "沒通過"}</span></div>

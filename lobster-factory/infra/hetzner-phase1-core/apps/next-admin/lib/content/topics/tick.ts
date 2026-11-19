@@ -8,10 +8,13 @@
 // publish them. One whose day is still ahead waits as 'scheduled' with nothing sent, and a later firing publishes it
 // on its day -- WordPress's own scheduler (wp-cron, runs only on visits) and a social post timed ahead of the article
 // are never relied on, so a social post never links to an article that is not live yet.
+// A site set to human review: its reviewed topics go out only by a person's 「發布」 (N6, requestPublish), through the
+// same steps.
 // Going out is in steps (N5a, publish-steps.ts): the topic moves to 'publishing', YouTube goes first, the article only
 // once YouTube's link is back, the other posts last; each firing moves a 'publishing' topic as far as it can.
 import type { Topic, TopicFormat, TopicStatus } from "./store";
 import type { TopicReview } from "./review";
+import type { PublishLog } from "./publish-steps";
 import { zoned } from "@/lib/social/time";
 import { expiredReason, isExpiredProposal } from "./waiting";
 
@@ -89,11 +92,33 @@ const failedPatch = (e: unknown) => ({ last_error: e instanceof Error ? e.messag
 export const waitsForDay = (t: Pick<Topic, "scheduled_for">, now: Date) =>
   !!t.scheduled_for && Date.parse(t.scheduled_for) > now.getTime();
 
+/** A person pressed 發布 for the topic's current run into 'publishing' (N6, artifacts.publish.requestedBy/At). */
+export function personAsked(artifacts: unknown): boolean {
+  const p = (artifacts as { publish?: PublishLog } | null)?.publish;
+  return typeof p?.requestedBy === "string" && !!p.requestedBy && typeof p.requestedAt === "string" && !!p.requestedAt;
+}
+
 /** reviewed|scheduled -> publishing (the move takes the row: of two overlapping firings only one wins), then as far
- *  as it goes now. */
+ *  as it goes now. An auto entry drops a request left by an earlier, failed run (retry keeps the artifacts): the
+ *  request belongs to the run it started, so it never carries a later switch back to human review past the gate. */
 async function publishNow(deps: TickDeps, row: Topic): Promise<PublishOutcome> {
-  const t = await deps.move(row, "publishing");
+  const stale = personAsked(row.artifacts);
+  const { requestedBy: _by, requestedAt: _at, ...log } = (row.artifacts as { publish?: PublishLog }).publish ?? {};
+  const t = await deps.move(row, "publishing", stale ? { artifacts: { ...row.artifacts, publish: log } } : undefined);
   return t ? continuePublishing(deps, t, true) : "moved_elsewhere";
+}
+
+/** N6 「發布」: reviewed -> publishing with who pressed it and when (the move is guarded by the version the page showed:
+ *  two presses move it once). null = not reviewed any more, or someone else moved it. The publishing itself is
+ *  continuePublishing, the same steps auto publish runs (publish-steps.ts), every gate in make.ts publishDrafts included. */
+export async function requestPublish(deps: TickDeps, row: Topic, by: string): Promise<Topic | null> {
+  if (row.status !== "reviewed" || !by) return null;
+  const log = (row.artifacts as { publish?: PublishLog }).publish ?? {};
+  const at = deps.now().toISOString();
+  // a YouTube post sent by an earlier run and still without its link gets a new hour from this press, whichever of the
+  // route's run and the 5-minute schedule (fresh=false) takes the row first
+  const youtube = log.youtube?.sent_at && !log.youtube.url ? { youtube: { ...log.youtube, since: at } } : {};
+  return deps.move(row, "publishing", { artifacts: { ...row.artifacts, publish: { ...log, ...youtube, requestedBy: by, requestedAt: at } } });
 }
 
 type PublishOutcome = "publishing" | "published" | "failed" | "moved_elsewhere";
@@ -101,7 +126,7 @@ type PublishOutcome = "publishing" | "published" | "failed" | "moved_elsewhere";
 /** One run of a 'publishing' topic: claimed first, so two overlapping firings never both write to WordPress and the
  *  social tool for one row; each step is recorded by claiming again with it. Done -> published; a step still
  *  waiting -> stays 'publishing'; a failure -> failed with what already went out. */
-async function continuePublishing(deps: TickDeps, row: Topic, fresh: boolean): Promise<PublishOutcome> {
+export async function continuePublishing(deps: TickDeps, row: Topic, fresh: boolean): Promise<PublishOutcome> {
   const claimed = await deps.claim(row);
   if (!claimed) return "moved_elsewhere";
   const cur: { row: Topic } = { row: claimed };
