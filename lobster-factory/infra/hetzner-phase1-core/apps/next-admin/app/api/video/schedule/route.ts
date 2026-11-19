@@ -12,7 +12,7 @@ export async function GET(req: Request): Promise<Response> {
   try { assertOrgAccess(req, org); } catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const db = getSupabaseWriteClient();
   if (!db) return NextResponse.json({ error: "無法讀取排程" }, { status: 503 });
-  const { data, error } = await db.from("content_topics").select("id,title,status,scheduled_for,last_error,formats,site_id")
+  const { data, error } = await db.from("content_topics").select("id,title,status,scheduled_for,last_error,formats,site_id,version")
     .eq("organization_id", org).order("updated_at", { ascending: false }).limit(200);
   if (error) return NextResponse.json({ error: "無法讀取排程，請重試" }, { status: 500 });
   return NextResponse.json({ items: data ?? [] });

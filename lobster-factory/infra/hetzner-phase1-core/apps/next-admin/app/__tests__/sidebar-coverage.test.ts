@@ -67,9 +67,10 @@ describe("sidebar coverage", () => {
     expect(out2.find((s) => s.id === "content-tools")!.items.map(itemKey)).toEqual(design);
   });
 
-  it("sidebar labels are English only (operator 2026-10-23: no mixed languages; Chinese goes in title)", () => {
+  it("sidebar labels are Traditional Chinese; only an external tool's own name stays Latin (operator 2026-10-25)", () => {
+    const TOOL_NAMES = new Set(["Chatwoot", "n8n", "Uptime Kuma", "Trigger.dev", "WordPress"]);
     const labels = DEFAULT_SECTIONS.flatMap((s) => [s.label, ...s.items.map((i) => i.label)]);
-    expect(labels.filter((l) => /[^\x20-\x7E]/.test(l))).toEqual([]);
+    expect(labels.filter((l) => !TOOL_NAMES.has(l) && !/[一-鿿]/.test(l))).toEqual([]);
   });
 
   it("item keys are unique within every section", () => {

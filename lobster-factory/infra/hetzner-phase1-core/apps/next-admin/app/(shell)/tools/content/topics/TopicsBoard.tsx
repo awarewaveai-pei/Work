@@ -2,7 +2,7 @@
 // Control page body: all-sites table, the picked site's five steps, then one month's topic list on the left, the clicked topic on the right (same layout as /ops/schedules).
 // Buttons and checkboxes only, no dropdowns (memory feedback_no_dropdowns_multiselect). Every change goes through
 // /api/content/topics*, which checks the site's organization; a stale page gets 409 and reloads.
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MAX_BULK_TOPICS, NEXT, TOPIC_FORMATS, canReschedule, daysIn, taipeiParts, type Topic, type TopicFormat, type TopicStatus } from "@/lib/content/topics/store";
 import { planCostTwd, topicCostTwd } from "@/lib/content/topics/cost";
 import { DAILY_START_CAP, makesNow } from "@/lib/content/topics/tick";
@@ -12,14 +12,16 @@ import type { TopicArtifacts } from "@/lib/content/topics/make";
 import { autoPublishes, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
+import { LANE_LABEL, LANE_ORDER, approvedStartText, draftUrl, inLane, laneCounts, nextStep, topicLane, type LaneFilter } from "@/lib/content/topics/lanes";
 import { FlowCells, OverviewTable } from "./AutoContentOverview";
 
 const T = {
-  noSites: "還沒有可用的客戶網站，先到 WordPress Sites 加一個。",
+  noSites: "還沒有可用的客戶網站，先到「客戶網站」加一個。",
   plan: "AI 提案本月題目",
   planning: "AI 規劃中…",
   approveSel: "核准所選",
   rejectSel: "退回所選",
+  laneEmpty: "這個分類沒有題目。",
   empty: "這個月還沒有題目。按「AI 提案本月題目」，或在下面自己加一題。",
   pick: "點左邊一個題目，這裡會顯示細節。",
   add: "加題目",
@@ -93,6 +95,14 @@ const whenText = (t: Topic) => {
   const p = taipeiParts(t.scheduled_for);
   return `${p.day}日 ${String(p.hour).padStart(2, "0")}:00`;
 };
+/** A new topic starts today (Taipei) in the month being looked at, at the next hour once 09:00 is past; another month starts on the 1st at 09:00. */
+const addDefaults = (month: string, now: Date) => {
+  const p = taipeiParts(now.toISOString());
+  if (p.month !== month) return { day: 1, hour: 9 };
+  // after 22:xx today has no hour left: tomorrow 09:00 (the last day of the month keeps 23:00)
+  if (p.hour >= 22) return p.day < daysIn(month) ? { day: p.day + 1, hour: 9 } : { day: p.day, hour: 23 };
+  return { day: p.day, hour: Math.max(9, p.hour + 1) };
+};
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 const dayText = (d: number) => `${d} 日`;
@@ -109,10 +119,11 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [draftFormats, setDraftFormats] = useState<TopicFormat[] | null>(null);
-  const [add, setAdd] = useState({ day: 1, hour: 9, title: "", keyword: "", angle: "", formats: ["article", "social"] as TopicFormat[] });
+  const [add, setAdd] = useState<{ day: number | null; hour: number | null; title: string; keyword: string; angle: string; formats: TopicFormat[] }>({ day: null, hour: null, title: "", keyword: "", angle: "", formats: ["article", "social"] });
   /** The selected topic's time being edited (Taipei); null = unchanged. */
   const [draftWhen, setDraftWhen] = useState<{ month: string; day: number; hour: number } | null>(null);
   const [dailyCap, setDailyCap] = useState(DAILY_START_CAP);
+  const [lane, setLane] = useState<LaneFilter>("all");
   const [many, setMany] = useState(false);
   const [lines, setLines] = useState("");
   const [fromFolder, setFromFolder] = useState<{ id: string; name: string } | null>(null);
@@ -128,18 +139,40 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
     })();
   }, []);
 
+  // a link from the workbench's 自動排程 (?site=&month=&topic=) opens that site, month and topic
+  const wantTopic = useRef("");
+  const looking = useRef("");
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const s = q.get("site"), m = q.get("month"), tp = q.get("topic");
+    if (!s || !overview.rows.some((r) => r.siteId === s)) return;
+    setSiteId(s);
+    if (m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m)) setMonth(m);
+    wantTopic.current = tp ?? "";
+  }, [overview.rows]);
+
   const load = useCallback(async () => {
     if (!siteId) return;
+    const key = `${siteId}|${month}`;
+    looking.current = key;
     const r = await fetch(`/api/content/topics?siteId=${encodeURIComponent(siteId)}&month=${month}&folders=1`);
     const j = await r.json() as { ok: boolean; topics?: Topic[]; folders?: Array<{ id: string; name: string }>; dailyCap?: number; error?: string };
+    if (looking.current !== key) return;   // the site or month changed while this was loading
     if (!j.ok) { setNote(j.error ?? `讀取失敗（${r.status}）`); return; }
     setTopics(j.topics ?? []);
+    if (wantTopic.current && j.topics?.some((x) => x.id === wantTopic.current)) { setSelId(wantTopic.current); wantTopic.current = ""; }
     if (typeof j.dailyCap === "number") setDailyCap(j.dailyCap);
     setFolders(j.folders ?? []);
     setChecked(new Set());
   }, [siteId, month]);
   useEffect(() => { setSelId(""); setNote(""); void load(); }, [load]);
 
+  const now = new Date();
+  const addDef = addDefaults(month, now);
+  const addDay = Math.min(add.day ?? addDef.day, daysIn(month));
+  const addHour = add.hour ?? addDef.hour;
+  const shown = inLane(topics, lane, now);
+  const laneN = laneCounts(topics, now);
   const sel = topics.find((t) => t.id === selId);
   useEffect(() => { setDraftFormats(null); setDraftWhen(null); }, [selId]);
   const counts = useMemo(() => {
@@ -164,6 +197,18 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
     try {
       for (const t of topics.filter((x) => checked.has(x.id) && x.status === "proposed")) await act(t, action);
     } finally { await load(); setBusy(false); }
+  }
+
+  /** The button on a row: the same PATCH actions as the detail panel; "view" opens the WordPress draft, or the detail when there is none. */
+  async function rowStep(t: Topic, action: "approve" | "reject" | "retry" | "view") {
+    if (action === "view") {
+      const url = draftUrl(t);
+      if (url) window.open(url, "_blank", "noopener");
+      else setSelId(t.id);
+      return;
+    }
+    setBusy(true); setNote("");
+    try { await act(t, action); } finally { await load(); setBusy(false); }
   }
 
   async function one(action: string, formats?: TopicFormat[]) {
@@ -205,9 +250,9 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
     setBusy(true); setNote("");
     try {
       const r = await fetch("/api/content/topics", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteId, month, ...add, ...(fromFolder ? { source: "kb", sourceRef: { folder_id: fromFolder.id, text: fromFolder.name } } : {}) }) });
+        body: JSON.stringify({ siteId, month, ...add, day: addDay, hour: addHour, ...(fromFolder ? { source: "kb", sourceRef: { folder_id: fromFolder.id, text: fromFolder.name } } : {}) }) });
       const j = await r.json() as { ok: boolean; error?: string };
-      if (j.ok) { setAdd({ day: 1, hour: 9, title: "", keyword: "", angle: "", formats: ["article", "social"] }); setFromFolder(null); }
+      if (j.ok) { setAdd({ day: null, hour: null, title: "", keyword: "", angle: "", formats: ["article", "social"] }); setFromFolder(null); }
       else setNote(j.error ?? `失敗（${r.status}）`);
     } finally { await load(); setBusy(false); }
   }
@@ -219,7 +264,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
     setBusy(true); setNote("");
     try {
       const r = await fetch("/api/content/topics", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteId, month, keywords, fromDay: Math.min(add.day, daysIn(month)), hour: add.hour, formats: add.formats }) });
+        body: JSON.stringify({ siteId, month, keywords, fromDay: addDay, hour: addHour, formats: add.formats }) });
       const j = await r.json() as { ok: boolean; added?: number; skipped?: string[]; error?: string };
       if (j.ok) { setNote(T.manyDone(j.added ?? 0, j.skipped ?? [])); setLines(""); }
       else setNote(j.error ?? `失敗（${r.status}）`);
@@ -261,26 +306,35 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
       {note && <p style={{ margin: 0, color: "var(--yellow)", fontSize: "var(--font-size-sm)" }}>{note}</p>}
 
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 560px", minWidth: 0, display: "grid", gap: 10 }}>
+        <div style={{ flex: "999 1 480px", minWidth: 0, display: "grid", gap: 10 }}>
           <div style={{ display: "flex", gap: 8 }}>
             <button type="button" className="btn btn-secondary" disabled={busy || !checked.size} onClick={() => void batch("approve")}>{T.approveSel}</button>
             <button type="button" className="btn btn-ghost" disabled={busy || !checked.size} onClick={() => void batch("reject")}>{T.rejectSel}</button>
           </div>
-          <div style={{ ...card, padding: 0, overflowX: "auto" }}>
+          <div role="group" aria-label="篩選" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {LANE_ORDER.map((l) => <button key={l} type="button" aria-pressed={lane === l} style={chip(lane === l)} onClick={() => setLane(l)}>{LANE_LABEL[l]} {laneN[l]}</button>)}
+          </div>
+          <div style={{ ...card, padding: 0 }}>
             {!topics.length && <p style={{ margin: 0, padding: 14, color: "var(--text-muted)" }}>{T.empty}</p>}
-            {topics.map((t) => (
+            {!!topics.length && !shown.length && <p style={{ margin: 0, padding: 14, color: "var(--text-muted)" }}>{T.laneEmpty}</p>}
+            {shown.map((t) => (
               <div key={t.id} onClick={() => setSelId(t.id)}
-                style={{ display: "grid", gridTemplateColumns: "28px 84px minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: "9px 12px",
+                style={{ display: "grid", gridTemplateColumns: "28px minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: "9px 12px",
                   borderTop: "1px solid var(--border)", cursor: "pointer", background: t.id === selId ? "var(--bg-hover)" : undefined }}>
                 <input type="checkbox" aria-label={t.title} disabled={t.status !== "proposed"} checked={checked.has(t.id)}
                   onClick={(e) => e.stopPropagation()}
                   onChange={(e) => setChecked((c) => { const n = new Set(c); if (e.target.checked) n.add(t.id); else n.delete(t.id); return n; })} />
-                <span style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{whenText(t)}</span>
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", color: "var(--text-primary)" }}>{t.title}</span>
-                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{t.formats.map((f) => FORMAT[f]).join("、")} · {SOURCE[t.source]}</span>
+                  <span style={{ display: "block", color: "var(--text-primary)", overflowWrap: "anywhere" }}>{t.title}</span>
+                  <span style={{ display: "block", fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>
+                    {whenText(t)} · {t.formats.map((f) => FORMAT[f]).join("、")} · {SOURCE[t.source]}
+                  </span>
+                  {approvedStartText(t, now, whenText(t)) && <span style={{ display: "block", fontSize: "var(--font-size-xs)", color: "var(--accent-text)" }}>{approvedStartText(t, now, whenText(t))}</span>}
                 </span>
-                <span style={{ fontSize: "var(--font-size-xs)", color: STATUS[t.status][1], whiteSpace: "nowrap" }}>{STATUS[t.status][0]}</span>
+                <span style={{ display: "grid", justifyItems: "end", gap: 4 }}>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: STATUS[t.status][1], whiteSpace: "nowrap" }}>{topicLane(t, now) === "overdue" ? "過期" : STATUS[t.status][0]}</span>
+                  {nextStep(t, now) && <button type="button" className="btn btn-secondary" disabled={busy} onClick={(e) => { e.stopPropagation(); void rowStep(t, nextStep(t, now)!.action); }}>{nextStep(t, now)!.label}</button>}
+                </span>
               </div>
             ))}
           </div>
@@ -297,8 +351,8 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
                 <textarea id="topic-add-many" rows={6} placeholder={T.manyPlaceholder} value={lines} onChange={(e) => setLines(e.target.value)} />
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <span style={{ fontSize: "var(--font-size-sm)" }}>{T.fromDay}</span>
-                  <GridPicker value={Math.min(add.day, daysIn(month))} options={daysOf(month)} format={dayText} label={T.pickDay} columns={7} disabled={busy} onChange={(d) => setAdd({ ...add, day: d })} />
-                  <GridPicker value={add.hour} options={HOURS} format={hh} label={T.pickHour} disabled={busy} onChange={(h) => setAdd({ ...add, hour: h })} />
+                  <GridPicker value={addDay} options={daysOf(month)} format={dayText} label={T.pickDay} columns={7} disabled={busy} onChange={(d) => setAdd({ ...add, day: d })} />
+                  <GridPicker value={addHour} options={HOURS} format={hh} label={T.pickHour} disabled={busy} onChange={(h) => setAdd({ ...add, hour: h })} />
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                   {TOPIC_FORMATS.map((f) => <button key={f} type="button" style={chip(add.formats.includes(f))}
@@ -311,8 +365,8 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
             )}
             {!many && <>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <GridPicker value={Math.min(add.day, daysIn(month))} options={daysOf(month)} format={dayText} label={T.pickDay} columns={7} disabled={busy} onChange={(d) => setAdd({ ...add, day: d })} />
-              <GridPicker value={add.hour} options={HOURS} format={hh} label={T.pickHour} disabled={busy} onChange={(h) => setAdd({ ...add, hour: h })} />
+              <GridPicker value={addDay} options={daysOf(month)} format={dayText} label={T.pickDay} columns={7} disabled={busy} onChange={(d) => setAdd({ ...add, day: d })} />
+              <GridPicker value={addHour} options={HOURS} format={hh} label={T.pickHour} disabled={busy} onChange={(h) => setAdd({ ...add, hour: h })} />
               <input id="topic-add-title" placeholder={T.title} value={add.title} style={{ flex: "2 1 220px", minWidth: 0 }} onChange={(e) => setAdd({ ...add, title: e.target.value })} />
               <input id="topic-add-keyword" placeholder={T.keyword} value={add.keyword} style={{ flex: "1 1 160px", minWidth: 0 }} onChange={(e) => setAdd({ ...add, keyword: e.target.value })} />
             </div>
@@ -336,7 +390,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
           </div>
         </div>
 
-        <aside style={{ ...card, flex: "0 1 340px", minWidth: 0, display: "grid", gap: 10 }}>
+        <aside style={{ ...card, flex: "1 1 320px", minWidth: 0, display: "grid", gap: 10 }}>
           {!sel && <p style={{ margin: 0, color: "var(--text-muted)" }}>{T.pick}</p>}
           {sel && (
             <>

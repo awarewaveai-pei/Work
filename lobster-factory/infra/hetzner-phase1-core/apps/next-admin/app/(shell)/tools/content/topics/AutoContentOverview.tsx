@@ -16,7 +16,8 @@ import TopicModeButtons from "../sites/TopicModeButtons";
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 12 };
 const muted: React.CSSProperties = { color: "var(--text-muted)", fontSize: "var(--font-size-xs)" };
-const GRID = "minmax(150px,1.3fr) minmax(70px,0.6fr) 56px 56px 56px 120px 64px 64px 64px 70px 90px";
+// Each site is one block of labelled cells that wrap, so the page never scrolls sideways at any width.
+const CELLS = "repeat(auto-fit, minmax(104px, 1fr))";
 
 const T = {
   heading: "全部客戶一覽",
@@ -32,40 +33,43 @@ const taipeiText = (iso: string | null) => (iso ? new Date(iso).toLocaleString("
 
 export function OverviewTable({ rows, selected, onPick, note }: { rows: OverviewRow[]; selected: string; onPick: (siteId: string) => void; note: string | null }) {
   return (
-    <section style={{ ...card, padding: 0, overflowX: "auto" }} aria-label={T.heading}>
+    <section style={{ ...card, padding: 0 }} aria-label={T.heading}>
       <div style={{ padding: "10px 12px 6px" }}>
         <div className="section-title" style={{ margin: 0 }}>{T.heading}</div>
         <div style={muted}>{T.hint}</div>
         {note && <div style={{ ...muted, color: "var(--yellow)" }}>{note}</div>}
       </div>
-      <div style={{ minWidth: 980 }}>
-        <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 8, padding: "6px 12px", ...muted, fontWeight: 600 }}>
-          {T.cols.map((c) => <span key={c}>{c}</span>)}
-        </div>
-        {rows.map((r) => (
-          <button key={r.siteId} type="button" onClick={() => onPick(r.siteId)} aria-pressed={r.siteId === selected}
-            style={{ display: "grid", gridTemplateColumns: GRID, gap: 8, alignItems: "center", width: "100%", textAlign: "left", padding: "8px 12px", cursor: "pointer",
-              border: 0, borderTop: "1px solid var(--border)", color: "var(--text-primary)", fontSize: "var(--font-size-sm)",
-              background: r.siteId === selected ? "var(--bg-hover)" : r.problem ? "color-mix(in srgb, var(--red) 6%, transparent)" : "transparent" }}>
-            <span style={{ minWidth: 0 }}>
-              <span style={{ display: "block", fontWeight: 600 }}>{r.orgName}</span>
-              <span style={muted}>{r.siteName}</span>
-              {r.lastError && <span style={{ display: "block", ...muted, color: "var(--red)" }}>{r.lastError}</span>}
+      <div>
+        {rows.map((r) => {
+          const cell = (i: number, v: ReactNode, color?: string) => (
+            <span key={i} style={{ display: "grid", gap: 2, minWidth: 0 }}>
+              <span style={muted}>{T.cols[i]}</span>
+              <span style={{ color, fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}>{v}</span>
             </span>
-            <span style={{ color: r.enabled ? "var(--green)" : "var(--text-muted)" }}>{r.enabled ? T.on : T.off}</span>
-            <span>{r.dailyLimit ?? DAILY_START_CAP}</span>
-            <span>{r.topicGate === "ai" ? T.ai : T.human}</span>
-            <span>{r.publishGate === "auto" ? T.auto : T.review}</span>
-            <span style={{ ...muted, color: r.proposedThisMonth ? "var(--text-primary)" : "var(--text-muted)" }}>
-              {r.proposedThisMonth ? T.proposed : T.notProposed}<br />{taipeiText(r.attemptedAt)}
-            </span>
-            <span style={{ color: r.pending ? "var(--accent-text)" : "var(--text-muted)" }}>{r.pending}</span>
-            <span>{r.inProgress}</span>
-            <span style={{ color: r.failed ? "var(--red)" : "var(--text-muted)" }}>{r.failed}</span>
-            <span style={{ color: r.notOpened ? "var(--red)" : "var(--text-muted)" }}>{r.notOpened ? T.notOpened : T.ok}</span>
-            <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmtUsd(r.spendUsd)}</span>
-          </button>
-        ))}
+          );
+          return (
+            <button key={r.siteId} type="button" onClick={() => onPick(r.siteId)} aria-pressed={r.siteId === selected}
+              style={{ display: "grid", gridTemplateColumns: CELLS, gap: 8, alignItems: "start", width: "100%", textAlign: "left", padding: "8px 12px", cursor: "pointer",
+                border: 0, borderTop: "1px solid var(--border)", color: "var(--text-primary)", fontSize: "var(--font-size-sm)",
+                background: r.siteId === selected ? "var(--bg-hover)" : r.problem ? "color-mix(in srgb, var(--red) 6%, transparent)" : "transparent" }}>
+              <span style={{ gridColumn: "1 / -1", minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 600 }}>{r.orgName}</span>
+                <span style={muted}>{r.siteName}</span>
+                {r.lastError && <span style={{ display: "block", ...muted, color: "var(--red)" }}>{r.lastError}</span>}
+              </span>
+              {cell(1, r.enabled ? T.on : T.off, r.enabled ? "var(--green)" : "var(--text-muted)")}
+              {cell(2, r.dailyLimit ?? DAILY_START_CAP)}
+              {cell(3, r.topicGate === "ai" ? T.ai : T.human)}
+              {cell(4, r.publishGate === "auto" ? T.auto : T.review)}
+              {cell(5, <>{r.proposedThisMonth ? T.proposed : T.notProposed}<br />{taipeiText(r.attemptedAt)}</>, r.proposedThisMonth ? "var(--text-primary)" : "var(--text-muted)")}
+              {cell(6, r.pending, r.pending ? "var(--accent-text)" : "var(--text-muted)")}
+              {cell(7, r.inProgress)}
+              {cell(8, r.failed, r.failed ? "var(--red)" : "var(--text-muted)")}
+              {cell(9, r.notOpened ? T.notOpened : T.ok, r.notOpened ? "var(--red)" : "var(--text-muted)")}
+              {cell(10, fmtUsd(r.spendUsd))}
+            </button>
+          );
+        })}
       </div>
       <div style={{ padding: "6px 12px 10px" }}><a href="/ops/costs" style={{ fontSize: "var(--font-size-xs)" }}>{T.costLink}</a></div>
     </section>
