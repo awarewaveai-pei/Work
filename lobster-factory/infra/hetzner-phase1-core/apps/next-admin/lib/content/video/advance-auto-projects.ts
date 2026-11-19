@@ -7,8 +7,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdvanceOutcome } from "./project-advance";
 
 export const AUTO_ADVANCE_STAGES = ["create", "produce", "review", "release"] as const;
-/** Projects advanced per organization per firing, oldest update first (as the client job did). */
+/** Projects that actually move (done or stopped) per organization per firing, oldest update first (as the client job did). */
 export const AUTO_ADVANCE_PER_ORG = 3;
+/** Candidates read per page. A project still `waiting` for its video does not use up a slot, so a firing reads page after
+ *  page (oldest update first) until three have moved or none are left: a fixed cap would let that many waiting
+ *  projects hide every later one forever. Paged because PostgREST returns at most 1000 rows per request. */
+export const AUTO_ADVANCE_CANDIDATES = 20;
 export const AUTO_ADVANCE_ACTOR = "system:video_project_advance";
 
 /** An outcome plus what the operator notice needs to name the project. */
@@ -55,7 +59,8 @@ export async function advanceAutoProjects(deps: AutoAdvanceDeps, organizations: 
         await deps.report(org, { kind: "stopped", projectId: o.projectId, title: o.title, stage: o.stage ?? "review", why: o.note, sourceRef: o.sourceRef, episodeId: o.episodeId })
           .catch((x) => deps.log(`[video_project_advance] incident not raised: ${String(x)}`));
       }
-      lines.push(`${org.slice(0, 8)}: ${outcomes.map((o) => `${o.projectId.slice(0, 8)} ${o.result}`).join(", ") || "no projects"}`);
+      const waiting = outcomes.filter((o) => o.result === "waiting").length;
+      lines.push(`${org.slice(0, 8)}: ${outcomes.map((o) => `${o.projectId.slice(0, 8)} ${o.result}`).join(", ") || "no projects"}${waiting ? ` (skipped ${waiting} waiting)` : ""}`);
     } catch (e) {
       const error = String(e).slice(0, 200);
       lines.push(`${org.slice(0, 8)}: error ${error}`);
@@ -74,12 +79,23 @@ export function autoAdvanceDeps(sb: SupabaseClient, raise: (organizationId: stri
   return {
     async advanceOrganization(organizationId) {
       const [{ advanceProject }, { advanceDeps }, { parseAutoBudget }] = await Promise.all([import("./project-advance"), import("./project-advance-deps"), import("./auto-run-budget")]);
-      const { data, error } = await sb.from("media_production_projects").select("id, title, source_ref, updated_at, brief_json").eq("organization_id", organizationId)
-        .eq("autonomy", "auto_after_render").in("lifecycle_stage", [...AUTO_ADVANCE_STAGES]).order("updated_at").limit(AUTO_ADVANCE_PER_ORG);
-      if (error) throw new Error(`video_project_advance:${error.message}`);
       const deps = advanceDeps(sb, organizationId, AUTO_ADVANCE_ACTOR);
       const outcomes: ProjectOutcome[] = [];
-      for (const p of data ?? []) outcomes.push({ ...await advanceProject(deps, { id: String(p.id), organizationId, title: String(p.title), updatedAtMs: Date.parse(String(p.updated_at)), runId: parseAutoBudget((p.brief_json as { autoBudget?: unknown } | null)?.autoBudget)?.runId }), title: String(p.title), sourceRef: String(p.source_ref ?? ""), episodeId: parseAutoBudget((p.brief_json as { autoBudget?: unknown } | null)?.autoBudget)?.episodeId ?? "" });
+      let moved = 0;
+      let waiting = 0; // moved projects leave the auto set (stage measure / guided), waiting ones stay: the next page starts after them
+      while (moved < AUTO_ADVANCE_PER_ORG) {
+        const { data, error } = await sb.from("media_production_projects").select("id, title, source_ref, updated_at, brief_json").eq("organization_id", organizationId)
+          .eq("autonomy", "auto_after_render").in("lifecycle_stage", [...AUTO_ADVANCE_STAGES]).order("updated_at").order("id").range(waiting, waiting + AUTO_ADVANCE_CANDIDATES - 1);
+        if (error) throw new Error(`video_project_advance:${error.message}`);
+        const page = data ?? [];
+        for (const p of page) {
+          if (moved >= AUTO_ADVANCE_PER_ORG) break;
+          const outcome: ProjectOutcome = { ...await advanceProject(deps, { id: String(p.id), organizationId, title: String(p.title), updatedAtMs: Date.parse(String(p.updated_at)), runId: parseAutoBudget((p.brief_json as { autoBudget?: unknown } | null)?.autoBudget)?.runId }), title: String(p.title), sourceRef: String(p.source_ref ?? ""), episodeId: parseAutoBudget((p.brief_json as { autoBudget?: unknown } | null)?.autoBudget)?.episodeId ?? "" };
+          outcomes.push(outcome);
+          if (outcome.result === "waiting") waiting++; else moved++;
+        }
+        if (page.length < AUTO_ADVANCE_CANDIDATES) break;
+      }
       return outcomes;
     },
     report: raise,
