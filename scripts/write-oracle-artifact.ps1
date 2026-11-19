@@ -93,6 +93,7 @@ if (Get-Command Invoke-WithUtf8Console -ErrorAction SilentlyContinue) {
     [Console]::Error.WriteLine("write-oracle-artifact: missing dependency _console-encoding-helpers.ps1 next to this script -- refusing to run without UTF-8-safe git output capture (CP950 mangling risk).")
     exit 2
 }
+Set-Utf8ConsoleOutput
 . (Join-Path $PSScriptRoot 'oracle-capture-policy.ps1')
 . (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 $capturePolicy = Get-OracleCapturePolicy

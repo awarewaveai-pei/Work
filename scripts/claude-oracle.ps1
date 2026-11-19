@@ -61,6 +61,9 @@ if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+$encHelpers = Join-Path $PSScriptRoot '_console-encoding-helpers.ps1'
+if (Test-Path -LiteralPath $encHelpers) { . $encHelpers; Set-Utf8ConsoleOutput }
+
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $tmp = Join-Path $env:TEMP "claude-oracle-$stamp"
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null

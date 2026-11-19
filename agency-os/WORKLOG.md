@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-19（續10）— ORACLE-ENC：oracle 腳本 stdout 回顯一律 UTF-8
+
+- 根因（實測）：`powershell.exe -File x.ps1 | xxd` 在 zh-TW 主控台（`[Console]::OutputEncoding`=950）下，`Write-Host '新增排程'` 輸出 `b7 73 bc 57 b1 c6 b5 7b`（CP950），UTF-8 讀者（Git Bash／監工 session）看到「�s�W�Ƶ{」。**artifact 檔本身是對的**：`agency-os/reports/oracle/2026-11-19-review-7d126eb5.md`、`-28374f69.md` 位元組 UTF-8 可解、0 個 U+FFFD（`Write-RepoTextFile` 以 UTF-8 寫）；掃整個目錄無一份亂碼。亂碼只在 `codex-oracle.ps1:553` `Write-Host $answer`（與 `claude-oracle.ps1:190`）的畫面回顯，此前只有「接 child stdout」的方向有 `Invoke-WithUtf8Console`，「寫出 stdout」方向沒有。「後面 artifact 正常」= 讀者改讀檔案而非回顯，不是 Codex 回答長短。
+- 修（整類）：`scripts/_console-encoding-helpers.ps1` 新增 `Set-Utf8ConsoleOutput`（process 級設 `[Console]::OutputEncoding`／`$OutputEncoding` 為無 BOM UTF-8）；`codex-oracle.ps1`、`claude-oracle.ps1`、`write-oracle-artifact.ps1` 開頭各呼叫一次。Codex 子行程原本就以 `-o` 檔＋`Get-Content -Encoding UTF8` 讀、artifact 以 UTF-8 寫，不需改。
+- 受影響歷史：無亂碼 artifact 需列；2026-11-19 十多份 review 檔內容皆正常，不回改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/oracle-console-utf8.test.ps1（子 powershell 經 Start-Process 導檔，位元組 = E6-96-B0-E5-A2-9E-E6-8E-92-E7-A8-8B；拿掉呼叫時位元組變 CP950，突變證據在測試內） | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 4 檔共 24 行加法，輸出編碼設定，無邏輯分支
+- BUGHUNT_DONE: scope=agency-os,scripts,tests | grep=Set-Utf8ConsoleOutput | hits=9
+- ORACLE_WAIVED: 只動 stdout 編碼設定；測試含突變證據
+- rollback：`git revert <本 commit>`。
 ## 2026-11-19（續9）— 影片下一階段：N12 驗收併入 main；第一批（N1、N15、N13、N12）部署
 
 - 驗收：N12 工人交回 `7693224e4`（worktree `recursing-jang-f14f2d`），監工讀 FILES／TESTS／RISKS 與 diff 後 cherry-pick 進 main → `6317f6d8a`。機制：`lib/script-forge/run-quote.ts` 用 `VW_INTERNAL_TOKEN` 派生的 HMAC 簽整趟最多（綁組織、模型、場景數，24h），`run-store.ts checkStart` 在建列／預留／付費前比對上限；`quick-render/quote/route.ts` 回 `typicalTwd`／`maxTwd`／`runQuote`，VW `backend/quick-render.cjs` 原樣帶過。

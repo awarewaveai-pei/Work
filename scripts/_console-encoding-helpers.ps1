@@ -64,3 +64,22 @@ function Invoke-WithUtf8Console {
         }
     }
 }
+
+function Set-Utf8ConsoleOutput {
+    <#
+    .SYNOPSIS
+      Make everything THIS process writes to stdout (Write-Host, Write-Output) UTF-8, not the
+      console code page.
+    .DESCRIPTION
+      Invoke-WithUtf8Console fixes capturing a child's stdout; this is the other direction.
+      Under a zh-TW console [Console]::OutputEncoding is CP950, so a script run from Git Bash as
+      `powershell.exe -File x.ps1` echoed Chinese as CP950 bytes (0xB7 0x73 = U+65B0) into a
+      UTF-8 reader: the oracle scripts' on-screen answer was mojibake while the artifact file
+      (written by Write-RepoTextFile, UTF-8) was fine. Call once near the top of any script whose
+      stdout a UTF-8 caller reads. Process-scoped, so no restore is needed when the script is its
+      own powershell.exe process; failure (no console) is ignored.
+    #>
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    try { [Console]::OutputEncoding = $utf8 } catch { }
+    try { $global:OutputEncoding = $utf8 } catch { }
+}

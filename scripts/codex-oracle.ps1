@@ -83,6 +83,7 @@ $Path = @($Path | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() 
 # Big5 console is the CP950 trap that audit-cp950-traps.ps1 exists to catch.
 $encHelpers = Join-Path $PSScriptRoot '_console-encoding-helpers.ps1'
 if (Test-Path -LiteralPath $encHelpers) { . $encHelpers }
+if (Get-Command Set-Utf8ConsoleOutput -ErrorAction SilentlyContinue) { Set-Utf8ConsoleOutput }
 . (Join-Path $PSScriptRoot 'oracle-capture-policy.ps1')
 . (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 $capturePolicy = Get-OracleCapturePolicy
