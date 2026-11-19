@@ -84,7 +84,7 @@ describe("planIfDue", () => {
 function fakeSb(result: { data?: unknown; error?: { message: string } | null }) {
   const calls: Array<[string, unknown[]]> = [];
   const q: Record<string, unknown> = {};
-  for (const k of ["select", "eq", "neq", "or", "update", "limit", "order"]) q[k] = (...a: unknown[]) => { calls.push([k, a]); return q; };
+  for (const k of ["select", "eq", "neq", "is", "or", "update", "limit", "order"]) q[k] = (...a: unknown[]) => { calls.push([k, a]); return q; };
   q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: result.data ?? null, error: result.error ?? null }).then(res);
   return { sb: { from: vi.fn(() => q) } as never, calls };
 }
@@ -102,10 +102,10 @@ describe("planDueDeps", () => {
     await expect(d.canPlan()).rejects.toThrow("db down");
   });
 
-  it("hasProposal asks for a non-manual topic of this site and month", async () => {
+  it("hasProposal asks for a non-manual, non-daily (N8) topic of this site and month", async () => {
     const { sb, calls } = fakeSb({ data: [{ id: "t" }] });
     expect(await planDueDeps(sb, "o", "a").hasProposal("s1", "2026-11-01")).toBe(true);
-    expect(calls.filter(([k]) => ["eq", "neq"].includes(k))).toEqual([["eq", ["site_id", "s1"]], ["eq", ["month", "2026-11-01"]], ["neq", ["source", "manual"]]]);
+    expect(calls.filter(([k]) => ["eq", "neq", "is"].includes(k))).toEqual([["eq", ["site_id", "s1"]], ["eq", ["month", "2026-11-01"]], ["neq", ["source", "manual"]], ["is", ["source_ref->>daily_on", null]]]);
     expect(await planDueDeps(fakeSb({ data: [] }).sb, "o", "a").hasProposal("s1", "2026-11-01")).toBe(false);
     await expect(planDueDeps(fakeSb({ error: { message: "x" } }).sb, "o", "a").hasProposal("s1", "m")).rejects.toThrow("content_plan_due:has_proposal:x");
   });

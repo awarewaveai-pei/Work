@@ -36,6 +36,8 @@ export const MAX_REQUIRED_BLOCK_CHARS = 500;
 export interface SiteContentDefaults {
   publishMode?: PublishMode;
   topicMode?: TopicMode;
+  /** N8: each brand day, up to 3 trend topics scored for the brand (lib/content/topics/daily.ts). Off unless exactly true. */
+  dailyTrendTopics?: boolean;
   trendFeeds?: string[];
   requiredBlocks?: string[];
   language?: string;
@@ -133,6 +135,15 @@ export function siteLanguage(d: SiteContentDefaults | undefined): string {
 /** Only the exact stored value lets the schedule approve its own proposals: missing, misspelt or any other value = a person picks. */
 export function aiPicksTopics(d: SiteContentDefaults | undefined): boolean {
   return d?.topicMode === "ai_pick";
+}
+
+/** Most daily trend topics a site gets per day, and the least relevance score one needs (operator O6, 2026-11-19). */
+export const DAILY_TOPICS = 3;
+export const DAILY_MIN_SCORE = 70;
+
+/** Only the exact stored true turns the daily trend topics on (N8): missing (every site before it), false or any other value = off. */
+export function dailyTrendTopicsOn(d: SiteContentDefaults | undefined): boolean {
+  return d?.dailyTrendTopics === true;
 }
 
 /** The site's must-carry paragraphs, trimmed, blanks and repeats dropped; [] for a site that never set any (old data). */

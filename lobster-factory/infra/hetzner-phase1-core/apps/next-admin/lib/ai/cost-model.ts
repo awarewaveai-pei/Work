@@ -319,6 +319,8 @@ export const TEXT_FEATURES: FeatureProfile[] = [
   { key: "keywords",    label: "LSI/NLP 關鍵字 (20)",        route: "/api/content/keywords", model: "claude-haiku-5-5", inputTok: 300, outputTok: 600 },
   { key: "market-analysis", label: "競業與痛點分析",      route: "/api/content/market-analysis", model: "claude-opus-5-5", inputTok: 320, outputTok: 750 },
   { key: "content-plan", label: "每月題目規劃（28 題）",    route: "/api/content/topics/plan", model: "claude-opus-5-5", inputTok: 1800, outputTok: 3500 },
+  // lib/content/topics/daily.ts: 30 trend titles + the brand voice in, a score and reason each + 3 titles out
+  { key: "content-daily", label: "每日熱題打分（30 則）",    route: "lib/schedules/content_pipeline:daily", model: "claude-haiku-5-5", inputTok: 2500, outputTok: 2500 },
   { key: "hook-brief",  label: "Hook Brief 草稿（批次）",     route: "/api/content/hook-brief", model: "claude-haiku-5-5", inputTok: 600, outputTok: 500 },
   { key: "syndicate",   label: "社群多平台改寫",             route: "/api/content/syndicate", model: "claude-haiku-5-5", inputTok: 1500, outputTok: 2000 },
   { key: "tarot-prompt",label: "塔羅 prompt 建議",           route: "/api/tools/tarot/suggest-prompt", model: "claude-haiku-5-5", inputTok: 500, outputTok: 400 },

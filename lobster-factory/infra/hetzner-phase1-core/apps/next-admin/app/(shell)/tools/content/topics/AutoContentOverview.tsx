@@ -14,6 +14,7 @@ import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import PublishModeButtons from "../sites/PublishModeButtons";
 import TopicModeButtons from "../sites/TopicModeButtons";
+import DailyTrendButtons from "../sites/DailyTrendButtons";
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 12 };
 const muted: React.CSSProperties = { color: "var(--text-muted)", fontSize: "var(--font-size-xs)" };
@@ -120,6 +121,7 @@ export function FlowCells({ site, row, cell, topics, month, schedule, planButton
           <p style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>待核准 {pending} 題；目前由{row.topicGate === "ai" ? " AI 挑" : "人挑"}。</p>
           <span style={muted}>勾選核准或退回在下面的題目清單。</span>
           <TopicModeButtons site={site} onSaved={onSiteSaved} readOnly={onDoor} />
+          <DailyTrendButtons site={site} onSaved={onSiteSaved} readOnly={onDoor} />
         </Step>
         <Step n="④" title="製作" wide={!onDoor && !!schedule}>
           <p style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>總開關{row.enabled ? "開" : "關"}；每天最多開始 {row.dailyLimit ?? DAILY_START_CAP} 題；進行中 {row.inProgress} 題。</p>

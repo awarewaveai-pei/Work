@@ -1,5 +1,6 @@
 // The schedule's monthly proposal (AUTO_CONTENT P9.2). Invariants B1-B4, B8 live here and nowhere else:
 //  B1 a site with any non-manual topic this Taipei month is done (a person's button proposal counts, `source='plan'` would re-plan monthly);
+//     a daily trend topic (daily.ts, source_ref.daily_on) does not count, or the first one of a month would cancel its plan;
 //  B2 the paid step is claimed in the DB (wp_sites.content_plan_attempted_at, 0139) BEFORE the AI call, at most once per 24 h;
 //  B3 one firing plans at most one site and then does not tick (the caller returns the summary);
 //  B4 topics are approved only for ai_pick sites, never because of publishMode;
@@ -63,7 +64,8 @@ export function planDueDeps(sb: SupabaseClient, organizationId: string, actor: s
       return ((data ?? []) as Array<{ id: string; content_defaults: SiteContentDefaults | null }>).map((r) => ({ id: r.id, defaults: r.content_defaults ?? {} }));
     },
     async hasProposal(siteId, month) {
-      const { data, error } = await sb.from("content_topics").select("id").eq("site_id", siteId).eq("month", month).neq("source", "manual").limit(1);
+      const { data, error } = await sb.from("content_topics").select("id").eq("site_id", siteId).eq("month", month).neq("source", "manual")
+        .is("source_ref->>daily_on", null).limit(1);
       if (error) fail("has_proposal", error);
       return (data ?? []).length > 0;
     },

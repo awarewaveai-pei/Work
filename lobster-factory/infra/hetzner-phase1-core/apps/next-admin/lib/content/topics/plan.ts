@@ -11,7 +11,7 @@ import { renderSiteVoice, siteLanguage } from "@/lib/content/brand-voice";
 import { loadSiteBrand } from "@/lib/content/brand-voice-store";
 import { listFolders } from "@/lib/kb/folders";
 import { eventsForMonth } from "@/lib/events/for-month";
-import { isGlobalMarket, TRENDING_GEOS, type TrendingGeo } from "@/lib/content/geos";
+import { trendGeosFor, type TrendingGeo } from "@/lib/content/geos";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { buildDbSearchBlocks, runBlocks } from "@/lib/content/trending-sources";
 import { norm, recentTrends } from "./trends";
@@ -24,20 +24,12 @@ const PLAN_SPARE = 4;
 const COVERED_IN_PROMPT = 80;
 const DEFAULT_FORMATS: TopicFormat[] = ["article", "social"];
 
-/** content_defaults.targetCountry (the article tool's list) -> the trending geos a site plans from. A global site
- *  (isGlobalMarket) gets every geo; a named country with no trending source gets none -- it plans from its brand and
- *  knowledge base, never from another country's trends. */
-const GEO_FOR_COUNTRY: Record<string, TrendingGeo> = { 台灣: "TW", 香港: "HK", 新加坡: "SG", 美國: "US", 英國: "GB", 日本: "JP", 澳洲: "AU" };
-export function trendGeosFor(country: string | undefined): TrendingGeo[] {
-  if (isGlobalMarket(country)) return [...TRENDING_GEOS];
-  const geo = GEO_FOR_COUNTRY[(country ?? "").trim()];
-  return geo ? [geo] : [];
-}
+export { trendGeosFor };   // moved to geos.ts (browser-safe: the daily switch reads it); callers keep this path
 
-/** Last 30 days of trends for these geos, at most `limit`: taken in turns (each geo's next-hottest), so every geo gets
- *  its share and a headline several geos share (Reddit worldnews) counts once. */
-async function trendsFor(sb: SupabaseClient, geos: TrendingGeo[], limit = 50) {
-  const lists = await Promise.all(geos.map((g) => recentTrends(sb, g, 30, limit)));
+/** Last `days` days of trends for these geos (the month's plan: 30; the daily topics, daily.ts: 2), at most `limit`: taken
+ *  in turns (each geo's next-hottest), so every geo gets its share and a headline several geos share (Reddit worldnews) counts once. */
+export async function trendsFor(sb: SupabaseClient, geos: TrendingGeo[], limit = 50, days = 30) {
+  const lists = await Promise.all(geos.map((g) => recentTrends(sb, g, days, limit)));
   const seen = new Set<string>();
   const out: Awaited<ReturnType<typeof recentTrends>> = [];
   for (let i = 0; out.length < limit && lists.some((l) => i < l.length); i++) {

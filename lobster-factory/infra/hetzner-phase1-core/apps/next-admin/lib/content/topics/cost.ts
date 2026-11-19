@@ -20,6 +20,13 @@ export function planCostTwd(): number {
   return Math.ceil(featureUnitCostUsd(f) * TWD_RATE * 10) / 10;
 }
 
+/** One day's trend scoring of one site (daily.ts, the cheap model), NT$. */
+export function dailyCostTwd(): number {
+  const f = TEXT_FEATURES.find((x) => x.key === "content-daily");
+  if (!f) throw new Error("cost-model has no content-daily feature");
+  return Math.ceil(featureUnitCostUsd(f) * TWD_RATE * 10) / 10;
+}
+
 /** One topic made by the pipeline, in USD, for the formats it makes (default article + social): the article with its
  *  images (TOPIC_ARTICLE_IMAGES), the social rewrite (max = with the one shorter rewrite) and the video at the article page's default settings. */
 export function topicCostUsd(formats: readonly string[] = ["article", "social"]): { usual: number; max: number } {

@@ -418,6 +418,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
               </div>
               <div style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
                 {T.source}：{SOURCE[sel.source]}{typeof sel.source_ref.text === "string" && sel.source_ref.text ? `（${sel.source_ref.text}）` : ""}
+                {typeof sel.source_ref.score === "number" && <>；每日熱題相關分數 {sel.source_ref.score}{typeof sel.source_ref.reason === "string" && sel.source_ref.reason ? `：${sel.source_ref.reason}` : ""}</>}
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <div style={{ fontSize: "var(--font-size-sm)" }}>{T.formats}</div>

@@ -11,3 +11,13 @@ export function isGlobalMarket(country: string | undefined | null): boolean {
   const c = (country ?? "").trim();
   return !c || c === "Global" || c === "全球（不指定）";
 }
+
+/** content_defaults.targetCountry (the article tool's list) -> the trending geos a site plans from. A global site
+ *  (isGlobalMarket) gets every geo; a named country with no trending source gets none -- it plans from its brand and
+ *  knowledge base, never from another country's trends (and gets no daily trend topics, N8). */
+const GEO_FOR_COUNTRY: Record<string, TrendingGeo> = { 台灣: "TW", 香港: "HK", 新加坡: "SG", 美國: "US", 英國: "GB", 日本: "JP", 澳洲: "AU" };
+export function trendGeosFor(country: string | undefined): TrendingGeo[] {
+  if (isGlobalMarket(country)) return [...TRENDING_GEOS];
+  const geo = GEO_FOR_COUNTRY[(country ?? "").trim()];
+  return geo ? [geo] : [];
+}

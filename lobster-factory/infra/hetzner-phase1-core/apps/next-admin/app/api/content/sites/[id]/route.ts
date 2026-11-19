@@ -10,6 +10,7 @@ import { isSafePublicHttps } from "@/lib/content/public-https";
 const GATE_MODES = [
   { field: "publishMode", allowed: PUBLISH_MODES },
   { field: "topicMode", allowed: TOPIC_MODES },
+  { field: "dailyTrendTopics", allowed: [true, false] },   // N8: the schedule scores and proposes trend topics each day
 ] as const;
 
 export const runtime = "nodejs";
@@ -51,9 +52,9 @@ export async function PATCH(
   if (typeof body.username === "string" && body.username.trim()) patch.username = body.username.trim();
   // Token/AppPassword only updated when explicitly provided and non-empty
   if (typeof body.token    === "string" && body.token.trim()) patch.token = body.token.trim();
-  // Content Studio per-site defaults (full replace -- caller sends complete object), except the two gate modes: each is set
+  // Content Studio per-site defaults (full replace -- caller sends complete object), except the gate modes: each is set
   // only by its own field, staff only (publishMode sends to the customer's site and social channels without a person;
-  // topicMode spends the customer's money without one), and the write is conditional on the modes read here -- a save
+  // topicMode and dailyTrendTopics spend the customer's money without one), and the write is conditional on the modes read here -- a save
   // racing a mode switch gets 409 instead of undoing it. The gates are independent (B4): switching one never moves the other.
   const defaultsGiven = typeof body.contentDefaults === "object" && body.contentDefaults !== null && !Array.isArray(body.contentDefaults);
   for (const g of GATE_MODES) {
