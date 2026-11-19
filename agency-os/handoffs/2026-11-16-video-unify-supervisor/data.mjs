@@ -211,7 +211,7 @@ export const STEPS = [
   { n: 14, code: '批1', next: true, title: '發布順序：YouTube 先發', plain: '例：影片先上 YouTube，拿到連結後文章才嵌入並上線，其他社群貼文最後帶著文章連結發出。',
     gate: 'YouTube 發布失敗時，文章和其他貼文都還是草稿（拿掉「等 YouTube 連結」，測試會紅）；沒人按、也沒開自動的網站不會發布（拿掉判斷，測試會紅）；發布後的文章只有 YouTube 連結，沒有影片檔。',
     risk: 'High', model: 'Opus 5.5＋critic Deep；N7、N17 派 fullstack-engineer（Sonnet）', status: 'not_started', depends: ['批0'],
-    before: '已定：加發布鈕（待決 7）；提案七天過期、已審核三天標紅（待決 8）；在 E2E-Verify-0704 測試網站實測（待決 10）；YouTube 預設公開、每個網站可改（待決 13）',
+    before: '已定：加發布鈕（待決 7）；提案七天過期、已審核三天標紅（待決 8）；不另設測試網站，AwareWave 第一則真的發布就是驗收（待決 10）；YouTube 預設公開、每個網站可改（待決 13）',
     what: 'N5a：makeSocial 把 YouTube 拆成自己一則；題目新增「發布中」狀態（資料庫的狀態限制一起改）；每步記 artifacts.publish；每五分鐘讀 social_post_targets.release_url，六十分鐘沒有就 failed；YouTube 公開設定改讀網站設定（預設公開）。N5b：embed-in-post.ts 加 swapEmbeddedVideo（同一條 bridge 通道、帶 sha256），發布前把 R2 影片換成 YouTube 網址。N6：TopicsBoard 已審核列加「發布」與草稿連結；publishDrafts 的門改成「網站自動，或這次有人按」。N7：每日排程報告多一行，過期提案自動退回。N17：事件標題改中文、帶標題與連結，同一停點只通知一次。',
     files: [`${NA}lib/content/topics/tick.ts`, `${NA}lib/content/topics/make.ts`, `${NA}lib/content/topics/store.ts`, `${NA}lib/social/store.ts`, `${NA}lib/social/compose.ts`, `${L}embed-in-post.ts`, `${NA}app/(shell)/tools/content/topics/TopicsBoard.tsx`, `${NA}app/api/content/topics/`, `${NA}lib/schedules/alerts.ts`, `${NA}app/api/internal/schedules/run-due/route.ts`, `${L}advance-auto-projects.ts`],
     items: [
@@ -270,7 +270,7 @@ export const OPEN = [
   { n: 7, what: '已定（2026-11-19，操作者「你決定」）：加「發布」鈕。人工審核的網站，題目到「已審核」後按一顆，就照同一串發出去（YouTube、文章、其他社群）；有人按才發，並記下誰按的。原題：現在題目到「已審核」後只剩「退回重做」，要自己到 WordPress 和社群工具找草稿來發。', before: '批1', src: 'NEXT-PHASE-PLAN-20261119.md §11 O1；TopicsBoard.tsx:75' },
   { n: 8, what: '已定（2026-11-19）：提案過了排定日七天自動退回並寫原因；已審核的題目三天沒人按就在每天早上的排程報告標紅，不會自動發。原題：現在不會過期，清單裡還有上個月沒處理的提案。', before: '批1', src: 'NEXT-PHASE-PLAN-20261119.md §11 O2' },
   { n: 9, what: '已定（2026-11-19）：會員信每週一封，寄出一律由人在 FluentCRM 按，系統不會自己寄。每週的排程本身就是頻率上限，所以原本的「名單人數與頻率上限」那張卡不做，外掛也不用發新版。原題：每天一支影片就每天一封，容易被退訂。', before: '批3', src: 'NEXT-PHASE-PLAN-20261119.md §11 O3；WP_BRIDGE_CONTROL_PLANE_DESIGN.md:95；NA/lib/schedules/jobs.ts:43-52' },
-  { n: 10, what: '已定（2026-11-19）：在既有的測試網站 E2E-Verify-0704 實測「自動發布開著」的整趟，YouTube 用不公開，不動 aware-wave.com 正站。你要做的只有一件：實測前到社群工具按「加頻道」，把 YouTube 頻道連到 E2E-Verify-0704 這個品牌（授權只能你本人按）。', before: '批1', src: 'NEXT-PHASE-PLAN-20261119.md §11 O4；wp_sites：aware-wave.com/staging/e2e-verify-0704-6e2b91' },
+  { n: 10, what: '已定（2026-11-19，你說只用 Soulful 和 AwareWave）：不另設測試網站。驗收就是 AwareWave 第一則真的發布：一個你核准過的真題目，按「發布」發出去，YouTube 先設成不公開；你看過沒問題，再改成公開。你要做的只有一件：那一則要發布的當下說 go。之後何時把 aware-wave.com 切成自動發布，也由你決定。', before: '批1', src: 'NEXT-PHASE-PLAN-20261119.md §11 O4' },
   { n: 11, what: '已定（2026-11-19）：AwareWave 先開每日自動；Soulful 維持人工審核，不開自動發布。原因：Soulful 的內容不能寫療效，每篇要附免責聲明和危機專線。', before: '批2', src: 'NEXT-PHASE-PLAN-20261119.md §11 O5；CONTENT_STRATEGY.md:19-21' },
   { n: 12, what: '已定（2026-11-19）：每題花費上限 NT$15、每天一題、熱搜相關性門檻七十分。實測一題含文章約 NT$10.2，上限留五成餘裕；每個品牌每月約 NT$310 以內。', before: '批0', src: 'NEXT-PHASE-PLAN-20261119.md §11 O6、§9' },
   { n: 13, what: '已定（2026-11-19）：YouTube 預設公開，改成每個網站可以設定公開或不公開（現在程式寫死公開）。實測要用不公開，所以一定要能改。', before: '批1', src: 'NEXT-PHASE-PLAN-20261119.md §11 O7；NA/lib/social/compose.ts:60' },

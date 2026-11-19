@@ -208,7 +208,7 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 | 4 | N5a | `npx vitest run lib/content/topics lib/social`（假 Postiz：YouTube 錯 → 其餘無動作） |
 | 5 | N5b、N6 | `npx vitest run lib/content/video lib/content/topics app/api/content`；部署後 `curl -s -o /dev/null -w "%{http_code}" https://app.aware-wave.com/tools/content/topics` → 200 |
 | 6 | N9、N8、N7 | `npx vitest run lib/content/topics lib/schedules`；psql：`select title, count(*) from content_topics where organization_id='<org>' and created_at>now()-interval '90 days' group by 1 having count(*)>1;` → 0 列 |
-| 7 | N10、部署、第 4 級重跑（`E2E-Verify-0704` 測試站＋YouTube 不公開，O4） | `npx vitest run lib/crm lib/schedules app/api/content/newsletter`；psql：`select status, artifacts->'publish' from content_topics where id='<題目>';` 三步都有時間；`curl -s https://<測試站>/?p=<id> \| grep -c youtube.com` ≥ 1、`grep -c '\.mp4'` = 0 |
+| 7 | N10、部署、AwareWave 第一則真的發布當驗收（YouTube 不公開，操作者說 go，O4） | `npx vitest run lib/crm lib/schedules app/api/content/newsletter`；psql：`select status, artifacts->'publish' from content_topics where id='<題目>';` 三步都有時間；`curl -s https://aware-wave.com/?p=<id> \| grep -c youtube.com` ≥ 1、`grep -c '\.mp4'` = 0 |
 
 批 4 其餘（N16、B19、B24–B26、B1、R1）排在第 7 天之後，不擋全自動。
 
@@ -218,12 +218,12 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 - O1 加「發布」鈕（N6）。沒有它，人工審核的站走到已審核就斷線（S7）；有人按才發，記誰按的。
 - O2 提案過排定日 7 天自動退回；已審核 72 小時標紅、不自動發（N7）。現況 53 筆提案沒人清。
 - O3 會員信每週一封、寄出一律人按（N10）。日更每天寄會被退訂；每週排程本身就是頻率上限，所以原 N11（人數與頻率路由）不做，外掛不用發版。
-- O4 在既有測試站 `E2E-Verify-0704`（`https://aware-wave.com/staging/e2e-verify-0704-6e2b91`，psql `wp_sites` 2026-11-19）實測，YouTube 用不公開。不動 aware-wave.com 正站。
+- O4 不另設測試站（操作者 2026-11-19：只用 Soulful 和 AwareWave，`E2E-Verify-0704` 已不用）。驗收＝AwareWave 第一則真的發布：一個操作者核准的真題目，用 N6 的「發布」鈕發（跟自動發布同一串程式），YouTube 先設不公開；看過沒問題再把站台設定改公開。
 - O5 AwareWave 先開每日自動；Soulful 維持人工審核，不開自動發布（`CONTENT_STRATEGY.md:19-21`）。
 - O6 每題上限 NT$15、每天 1 題、相關性門檻 70。實測一題 NT$10.2，上限留五成餘裕。
 - O7 YouTube 預設公開，改成每站設定（`public`｜`unlisted`），併 N5a。O4 的實測要用不公開，所以不能寫死。
 
-只剩一件要操作者動手：O4 實測前，到社群工具「加頻道」把 YouTube 頻道連到 `E2E-Verify-0704` 這個品牌（授權只能本人按）。
+要操作者動手的：第一則發布當下說 go（High）；看過後決定何時把 aware-wave.com 切成自動發布。
 
 沒做到或無法驗證：
 - 路線 (a) 一鍵到草稿沒有走完：第一次腳本呼叫後停在上限預留。我在頁面點模型與 AI 生圖時版面位移、沒點中，實際用了 Opus（NT$2.01），加話題 NT$0.014 共 **NT$2.02，超過你給的 NT$2 上限 NT$0.02**；之後沒有再花。點擊數與時間沿用 11-19 10:10 那次（12 點擊、7 分 45 秒）。

@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-19（續5）— 影片監工台：待決 10 更正，不用 E2E 測試站（操作者「只有用 soulful 和 AW」）
+
+- 根因：續4 把驗收地點定在 `E2E-Verify-0704`，依據只有 `wp_sites.active=t`；操作者已不用該站。資料表有列 ≠ 還在用。
+- 更正（`NEXT-PHASE-PLAN-20261119.md` §11 O4、§10 第 7 天；`data.mjs` 待決 10、批1 before）：不另設測試站；驗收＝AwareWave 第一則真的發布（操作者核准的真題目，N6「發布」鈕，YouTube 先不公開），發布當下要操作者說 go。原「把 YouTube 連到 E2E 品牌」那件事取消。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs → ok: 12 cards, 5 batches, 75 items (50 done), 13 open, page fresh；同一網址重新發布 | exit=0 | ms=3000
+- REVIEW_WAIVED: DOC_ONLY -- 兩個文件檔各改一項決定
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=E2E-Verify-0704 | hits=1（計畫檔 §11 O4 的說明；本 WORKLOG 續4 為歷史不回改）
+- 避免再發：選客戶或站台當實測對象前，先問操作者在用哪幾個，不以資料表的啟用旗標判斷。
+- rollback：`git revert` 本 commit 後 `node build.mjs` 再發布。
 ## 2026-11-19（續4）— 影片監工台：下一階段待決 7–13 定案（操作者「你決定」）
 
 - 定案（正本 `agency-os/handoffs/2026-11-16-video-unify-supervisor/NEXT-PHASE-PLAN-20261119.md` §11）：O1 加發布鈕｜O2 提案 7 天退回、已審核 72 小時標紅｜O3 會員信每週一封、人按寄出｜O4 在 `E2E-Verify-0704` 測試站實測、YouTube 不公開｜O5 AwareWave 先開、Soulful 維持人工｜O6 每題 NT$15、每天 1 題、門檻 70｜O7 YouTube 預設公開、每站可設。
