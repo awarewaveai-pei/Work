@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-19（續18）— Meta 資料存取期限預警（續16 的未確認項）；Google 發布狀態卡在專案擁有者帳號
+
+- 操作者：「還沒確認的兩件事 也去處理好」。①Meta `data_access_expires_at`（四頻道皆 2027-01-23）：Meta 文件未明確說它是否擋粉專發文，改成必定看得到——`postiz_meta_token_truth` 每日檢查，可發文的頻道（Meta 有效、Postiz 未標記）在期限前 21 天內、期限仍在未來時，經既有 `scripts/notify.sh` 發一則 Telegram＋Slack，列頻道與「設定頁該列按重新連接」（`Settings.tsx:139`）；不改旗標，通知失敗 exit 1。commit `24c97046c`，主機已同步（dry-run warn=0；以 70 天視窗模擬 warn=4、訊息文字正確）。②我推 WORKLOG 時一併推上的另一條線 3 個 commit（82d23c5ef N2、4b1ce4067 B1、f28af6832 N9）：該線監工回覆三張已驗收、tsc＋1333 測試綠、0168 已套，今晚 03:00 自動部署照常；B1 第一段單獨上線安全。
+- Google：專案 749365809116（YouTube 與 Gmail 兩個 OAuth 用戶端同專案）。操作者 Chrome 只登入 peijingartstudio@gmail.com，Console 回「需要額外存取權」（缺 oauthconfig.*、resourcemanager.projects.get）→ 專案在另一個 Google 帳號。要操作者在 Chrome 加登擁有者帳號（不代輸入密碼），之後由監工在 Console 按「發布應用程式」並代走重新連接流程。
+- REALTEST_EVIDENCE: tool=SSH | cmd=postiz-meta-token-truth.sh --dry-run（預設 warn=0；DATA_ACCESS_WARN_DAYS=70 warn=4）; sync-host-scripts 24c97046c (1 installed) | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/5m/0n（Codex c298849d 三條修；f14f261d 一條修、未認領頻道一條接受：四頻道皆已認領）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=data_access_expires_at|DATA_ACCESS_WARN_DAYS | hits=6
+- rollback：`git revert 24c97046c` 後 sync-host-scripts。
 ## 2026-11-19（續17）— 影片下一階段：N2、N9 驗收併入 main（不部署）；migration 0168 已套；B1 退回補第二段
 
 - 驗收：N2 `0f6654926`（migration 改號 0167→0168 後）、B1 `dd95bdcb3`、N9 `1358894f2` 讀報告與 diff 後 cherry-pick → `82d23c5ef`、`4b1ce4067`、`f28af6832`。這一輪起不逐輪部署（操作者 19:10），等批次。
