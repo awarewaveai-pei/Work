@@ -8,6 +8,7 @@ export default defineConfig({
   esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
+    setupFiles: ["./vitest.setup.ts"],   // jsdom tests wait 5 s for async UI (see the file)
   },
   resolve: {
     alias: {

@@ -7,10 +7,7 @@
 // `?? wpSites[0]` silent fallback). This file mounts the real component (react-dom via
 // @testing-library/react, per-file `jsdom` environment -- global stays "node") to close that
 // gap: it proves the wiring, not just the pure function `pick-initial-site.test.ts` already covers.
-import { cleanup, configure, render, screen, waitFor, within } from "@testing-library/react";
-// In the full suite (600+ files in parallel) the default 1 s wait is too short for this page to settle; alone it passes.
-// 5 s keeps the same assertions (deploy gate runs the full suite: a load flake aborts the deploy).
-configure({ asyncUtilTimeout: 5000 });
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import ContentStudio from "../ContentStudio";

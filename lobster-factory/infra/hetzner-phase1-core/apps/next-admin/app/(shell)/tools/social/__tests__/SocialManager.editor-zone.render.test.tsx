@@ -3,10 +3,7 @@
 // B19 (2026-11-18 live run): organisation zone UTC, display zone 台灣. The list drew a post at 12:00 and the editor's
 // picker opened it at 04:00 (the organisation's wall clock): choosing 12:00 there saved 20:00 Taipei. A one-off time is
 // read and typed in the display zone everywhere; only a repeat series keeps the organisation's zone.
-import { cleanup, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-// In the full suite (600+ files in parallel) the default 1 s wait is too short for this page to settle; alone it passes.
-// 5 s keeps the same assertions (deploy gate runs the full suite: a load flake aborts the deploy).
-configure({ asyncUtilTimeout: 5000 });
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Account, Brand } from "../model";
 
