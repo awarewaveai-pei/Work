@@ -29,6 +29,7 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
   "/api/ops/clients/[slug]/outreach-summary": ["outreach"],
   "/api/ops/clients/[slug]/schedules": ["ops/schedules", "ops/clients"],
   "/api/ops/schedules": ["ops/schedules", "ops/clients"],
+  "/api/ops/costs": ["ops/costs"],   // fx-rates (+ /fetch): the monthly accounting rate behind 月報 (FX1)
   "/api/cognitive-os/open": ["ops/clients", "collect", "cs"],
   "/api/ops/inbox": ["ops/inbox", "ops/repairs"],
   "/api/ops/repairs": ["ops/repairs", "ops/inbox"],
