@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { approvedStartText, draftUrl, inLane, laneCounts, minutesToNextRun, nextStep, topicLane } from "../lanes";
+import { approvedStartText, draftPrivacy, draftUrl, inLane, laneCounts, minutesToNextRun, nextStep, publishConfirmText, publishTargets, topicLane,
+  youtubePrivacyMismatch } from "../lanes";
 
 const now = new Date("2026-11-19T03:02:00Z");
 const row = (status: string, scheduled_for: string | null = null) => ({ status, scheduled_for });
@@ -46,5 +47,20 @@ describe("topic lanes", () => {
     expect(draftUrl({ artifacts: { article: { wp_edit_url: "https://wp.example/edit" } } })).toBe("https://wp.example/edit");
     expect(draftUrl({ artifacts: { article: { wp_edit_url: "javascript:alert(1)" } } })).toBeNull();
     expect(draftUrl({ artifacts: {} })).toBeNull();
+  });
+
+  // N6 risk fix: the YouTube line names the draft's own privacy (fixed when the draft was made), not the site's setting now
+  it("the 發布 confirmation names the YouTube draft's privacy; a site changed since gets a reminder; unreadable = says so", () => {
+    const t = { formats: ["article", "video"] as never, artifacts: { social: { youtube_post_id: "yt-1" }, article: { wp_post_id: 5 } } };
+    // the draft was made public, the site was switched to 不公開 afterwards
+    const draft = draftPrivacy([{ format: "post" }]);
+    const to = publishTargets(t, draft);
+    const text = publishConfirmText("題目", to, false, youtubePrivacyMismatch(draft, "unlisted"));
+    expect(to[0]).toBe("YouTube（這則草稿：公開）");
+    expect(text).toContain("提醒：網站設定現在是「不公開」，但這則 YouTube 草稿是「公開」");
+    // unreadable draft: no guess, no reminder
+    const unknown = publishTargets(t, draftPrivacy(undefined));
+    expect(unknown[0]).toBe("YouTube（這則草稿：無法確認，請到社群草稿看）");
+    expect(publishConfirmText("題目", unknown, false, youtubePrivacyMismatch(null, "unlisted"))).not.toContain("提醒");
   });
 });

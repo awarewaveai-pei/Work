@@ -12,7 +12,8 @@ import type { TopicArtifacts } from "@/lib/content/topics/make";
 import { autoPublishes, youtubePrivacy, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
-import { LANE_LABEL, LANE_ORDER, approvedStartText, draftUrl, inLane, laneCounts, nextStep, publishTargets, socialDraftsUrl, topicLane, type LaneFilter } from "@/lib/content/topics/lanes";
+import { LANE_LABEL, LANE_ORDER, approvedStartText, draftPrivacy, draftUrl, inLane, laneCounts, nextStep, pendingYoutubePostId, publishConfirmText, publishTargets,
+  socialDraftsUrl, topicLane, youtubePrivacyMismatch, type DraftPrivacy, type LaneFilter } from "@/lib/content/topics/lanes";
 import { FlowCells, OverviewTable } from "./AutoContentOverview";
 
 const T = {
@@ -61,12 +62,19 @@ const T = {
   socialDrafts: "打開社群草稿（社群工具）",
   publish: "發布",
   publishHint: "按了才會發出去；誰按的、什麼時候按的會記在題目上。",
-  publishConfirm: (title: string, to: string[], reviewFailed: boolean) =>
-    [`確定發布「${title}」？`, "", "會依序發到：", ...to.map((x, i) => `${i + 1}. ${x}`),
-      ...(reviewFailed ? ["", "注意：規則審核沒通過，發布前請先看過草稿。"] : []), "", "發出去之後不會自動收回。"].join("\n"),
+  fixDraft: "到社群草稿修改",
   publishNothing: "這個題目沒有可以發布的草稿。",
   publishing: "已開始發布；YouTube 上線後才會發文章，約 5–10 分鐘後重新整理看狀態。",
 };
+/** The privacy the topic's YouTube draft will really go out with (its targets' format, lanes.ts draftPrivacy);
+ *  null when it cannot be read -- the confirmation then says so instead of guessing. */
+async function readDraftPrivacy(t: Topic, postId: string): Promise<DraftPrivacy> {
+  try {
+    const r = await fetch(`/api/social/posts/${encodeURIComponent(postId)}?brand=${encodeURIComponent(t.organization_id)}`);
+    const j = await r.json() as { ok: boolean; post?: { targets?: Array<{ format?: string | null }> } };
+    return j.ok ? draftPrivacy(j.post?.targets) : null;
+  } catch { return null; }
+}
 /** A search-run folder is named "<keyword> <YYYYMMDDHHmm>" (lib/collect/sinks/kb.ts); the keyword is the topic. */
 const folderKeyword = (name: string) => name.replace(/\s*\d{12}$/, "").trim() || name;
 const STATUS: Record<TopicStatus, [string, string]> = {
@@ -136,6 +144,8 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
   const [lines, setLines] = useState("");
   const [fromFolder, setFromFolder] = useState<{ id: string; name: string } | null>(null);
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([]);
+  /** The picked topic's YouTube draft privacy, read from the draft itself (N6 confirmation). */
+  const [ytDraft, setYtDraft] = useState<{ topicId: string; privacy: DraftPrivacy } | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -183,6 +193,15 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
   const laneN = laneCounts(topics, now);
   const sel = topics.find((t) => t.id === selId);
   useEffect(() => { setDraftFormats(null); setDraftWhen(null); }, [selId]);
+  // a reviewed topic's YouTube draft is read once picked, so a privacy that differs from the site's shows before 發布
+  const selYoutube = sel?.status === "reviewed" ? pendingYoutubePostId(sel) : null;
+  useEffect(() => {
+    if (!sel || !selYoutube) return;
+    let live = true;
+    void readDraftPrivacy(sel, selYoutube).then((privacy) => { if (live) setYtDraft({ topicId: sel.id, privacy }); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-read only when the picked topic or its draft changes
+  }, [sel?.id, selYoutube]);
   const counts = useMemo(() => {
     const c: Partial<Record<TopicStatus, number>> = {};
     for (const t of topics) c[t.status] = (c[t.status] ?? 0) + 1;
@@ -214,11 +233,16 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
     try { await act(t, action); } finally { await load(); setBusy(false); }
   }
 
-  /** N6 「發布」: names where it goes (YouTube's privacy is the site's) and asks once; the route records who pressed it. */
+  /** N6 「發布」: names where it goes and asks once; the route records who pressed it. YouTube's privacy is read from the
+   *  draft at this moment (fixed when the draft was made), never taken from the site's current setting. */
   async function publish(t: Topic) {
-    const to = publishTargets(t, youtubePrivacy(site?.contentDefaults) === "unlisted");
+    const ytId = pendingYoutubePostId(t);
+    const privacy = ytId ? await readDraftPrivacy(t, ytId) : null;
+    if (ytId) setYtDraft({ topicId: t.id, privacy });
+    const to = publishTargets(t, privacy);
     if (!to.length) { setNote(T.publishNothing); return; }
-    if (!window.confirm(T.publishConfirm(t.title, to, (t.review as TopicReview | null)?.pass !== true))) return;
+    const mismatch = ytId ? youtubePrivacyMismatch(privacy, youtubePrivacy(site?.contentDefaults)) : null;
+    if (!window.confirm(publishConfirmText(t.title, to, (t.review as TopicReview | null)?.pass !== true, mismatch))) return;
     setBusy(true); setNote("");
     try {
       const r = await fetch(`/api/content/topics/${t.id}/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: t.version }) });
@@ -454,6 +478,12 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
               </div>
               {sel.status === "reviewed" && (
                 <div style={{ display: "grid", gap: 4 }}>
+                  {selYoutube && ytDraft?.topicId === sel.id && youtubePrivacyMismatch(ytDraft.privacy, youtubePrivacy(site?.contentDefaults)) && (
+                    <span role="note" style={{ fontSize: "var(--font-size-sm)", color: "var(--yellow)" }}>
+                      {youtubePrivacyMismatch(ytDraft.privacy, youtubePrivacy(site?.contentDefaults))}{" "}
+                      <a href={socialDraftsUrl(sel.organization_id)} target="_blank" rel="noreferrer">{T.fixDraft}</a>
+                    </span>
+                  )}
                   <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void publish(sel)}>{T.publish}</button>
                   <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.publishHint}</span>
                 </div>

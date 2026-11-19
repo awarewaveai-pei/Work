@@ -63,14 +63,53 @@ export function draftUrl(t: Pick<Topic, "artifacts">): string | null {
   return typeof url === "string" && /^https:\/\//.test(url) ? url : null;
 }
 
-/** Where 「發布」 sends a reviewed topic, in the order it goes (publish-steps.ts): the confirmation's lines. */
-export function publishTargets(t: Pick<Topic, "formats" | "artifacts">, youtubeUnlisted: boolean): string[] {
-  const a = t.artifacts as { article?: { wp_post_id?: unknown; published?: unknown }; social?: { post_id?: unknown; youtube_post_id?: unknown; sent?: unknown }; publish?: { youtube?: { url?: unknown } } } | null;
+type PublishArts = { article?: { wp_post_id?: unknown; published?: unknown }; social?: { post_id?: unknown; youtube_post_id?: unknown; sent?: unknown }; publish?: { youtube?: { url?: unknown } } } | null;
+
+/** The YouTube draft 「發布」 would still send (its id), or null when there is none or it is already on YouTube. */
+export function pendingYoutubePostId(t: Pick<Topic, "artifacts">): string | null {
+  const a = t.artifacts as PublishArts;
+  const id = a?.social?.youtube_post_id;
+  return typeof id === "string" && id && !a?.publish?.youtube?.url ? id : null;
+}
+
+/** null = the draft could not be read; "mixed" = its YouTube channels differ. */
+export type DraftPrivacy = "public" | "unlisted" | "mixed" | null;
+
+/** The privacy the YouTube draft goes out with: its targets' format, written when the draft was made (N5a make.ts
+ *  youtubeFormat) and read by the sender (lib/social/compose.ts: "unlisted" -> unlisted, anything else public).
+ *  Changing the site's setting later does not touch it. No targets = unknown. */
+export function draftPrivacy(targets: ReadonlyArray<{ format?: string | null }> | null | undefined): DraftPrivacy {
+  if (!targets?.length) return null;
+  const n = targets.filter((x) => x.format === "unlisted").length;
+  return n === targets.length ? "unlisted" : n === 0 ? "public" : "mixed";
+}
+
+const PRIVACY_TEXT: Record<"public" | "unlisted", string> = { public: "公開", unlisted: "不公開" };
+const draftText = (d: DraftPrivacy) => (d === null ? "無法確認，請到社群草稿看" : d === "mixed" ? "各頻道不同，請到社群草稿看" : PRIVACY_TEXT[d]);
+
+/** Where 「發布」 sends a reviewed topic, in the order it goes (publish-steps.ts): the confirmation's lines. YouTube's
+ *  privacy is the draft's own (draftPrivacy), never the site's current setting. */
+export function publishTargets(t: Pick<Topic, "formats" | "artifacts">, youtube: DraftPrivacy): string[] {
+  const a = t.artifacts as PublishArts;
   const out: string[] = [];
-  if (a?.social?.youtube_post_id && !a.publish?.youtube?.url) out.push(`YouTube（網站設定：${youtubeUnlisted ? "不公開" : "公開"}）`);
+  if (pendingYoutubePostId(t)) out.push(`YouTube（這則草稿：${draftText(youtube)}）`);
   if (t.formats.includes("article") && a?.article?.wp_post_id && !a.article.published) out.push("網站文章（WordPress 草稿改成公開）");
   if (a?.social?.post_id && !a.social.sent) out.push("其他社群頻道（排在文章上線後）");
   return out;
+}
+
+/** The reminder when the YouTube draft's privacy is not the site's current setting (the draft wins); null when they
+ *  match or the draft could not be read (publishTargets already says so). */
+export function youtubePrivacyMismatch(draft: DraftPrivacy, site: "public" | "unlisted"): string | null {
+  if (draft === null || draft === site) return null;
+  return `網站設定現在是「${PRIVACY_TEXT[site]}」，但這則 YouTube 草稿是「${draftText(draft)}」，會照草稿發出；要改請到社群草稿修改。`;
+}
+
+/** The text of 「發布」's confirmation. */
+export function publishConfirmText(title: string, to: string[], reviewFailed: boolean, mismatch: string | null): string {
+  return [`確定發布「${title}」？`, "", "會依序發到：", ...to.map((x, i) => `${i + 1}. ${x}`),
+    ...(mismatch ? ["", `提醒：${mismatch}`] : []),
+    ...(reviewFailed ? ["", "注意：規則審核沒通過，發布前請先看過草稿。"] : []), "", "發出去之後不會自動收回。"].join("\n");
 }
 
 /** The social tool's post list of the topic's brand, where its social drafts are (the tool opens no single post by link). */
