@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-19（續22）— Google OAuth 改正式版、四個 Google 授權重連；「重新連接」傳錯 refresh 參數（從沒成功過）修正上線
+
+- 操作者：「Google：YouTube、Gmail 要妳改一個設定 你去處理」。Google Cloud 專案 AwareWave-Media（749365809116，awarewaveai@gmail.com 擁有；Postiz YouTube 與外聯 Gmail 兩個 OAuth 用戶端同專案）發布狀態確為「測試」→ 7 天權杖失效的根因成立。在「品牌」頁補首頁 `https://aware-wave.com/`、隱私權 `/privacy-policy/`、服務條款 `/terms-of-service/`（三頁 curl 200）後「發布應用程式」→「實際運作中」。操作者在 Chrome 自行登入 awarewaveai@、soulfulexpression01@（監工不碰密碼）。
+- 重連：awarewaveai@ Gmail、soulfulexpression01@ Gmail（外聯連接器頁按重新連接，同意 gmail.readonly＋compose）；Aware Wave YouTube（@AwareWaveAI，awarewaveai 個人頻道）；Soulful YouTube（@soulfulexpression-art，soulfulexpression01 底下的品牌帳戶「Soulful Expression」，Google 的品牌選擇頁要選它）。結果：7 個頻道全 connected，4 筆重新授權 incident（2 social、2 outreach）自動 resolved，gmail_sync 恢復。
+- 根因（程式）：我們的「重新連接」把 Postiz 資料列 id 當 `?refresh=` 傳，但 Postiz 自己 UI 傳 `integration.internalId`，`youtube.provider.ts reConnect` 要求 refresh 在剛授權帳號的頻道 id 之中 → 每次都「Channel not found」（Aware Wave YouTube 實測 3 次）；改用頻道 id 直接向 Postiz 要網址即「Channel Connected」。修（`ff6590549`）：migration 0171 `social_accounts.postiz_internal_id`（已套 APPLY_OK）；主機鏡像腳本帶 `internalId`；`channel-health.ts` 嚴格解析並在不同時寫入（含停用帳號，經 `selectAll` 分頁讀全部）；`store.ts startConnect` 改送頻道 id，未同步時 409 且不建 attempt。上線後 Soulful YouTube 直接在頁面按「重新連接」成功＝端到端驗證。
+- 失敗貼文 e596df20（Soulful YouTube）重新排程到台北 2026-11-20 12:00（04:00Z；貼文 updated_at 晚於 target → dispatcher 會重送）；同批其他三平台 11/19 已發，不重送。
+- REALTEST_EVIDENCE: tool=SSH | cmd=apply-db-migration 0171 (APPLY_OK); sg-deploy next-admin ff6590549 (smoke all OK, 快照 rollback-20261119-154020, npm test 4981 passed); cron-run social_channel_health → 7 channels, postiz_internal_id 全填; cron-run outreach_gmail_sync exit 0; psql ops_incidents 4 resolved; social_posts e596df20 scheduled 2026-11-20 04:00Z | exit=0 | ms=900000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; vitest lib/social app/api/social app/api/internal/social lib/portal lib/system-modes (46 files 516) | exit=0 | ms=200000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n（Codex af10cceb：未分頁讀帳號，改用 selectAll）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=connectUrl\(|refresh: refreshId|postiz_internal_id | hits=9（connectUrl 只剩 store.ts 一處呼叫）
+- 剩餘風險：存檔後社群行事曆瞬間顯示「還沒連接社群帳號」（重新載入正常，UI 小瑕疵未修）；Google 授權頁仍會顯示「未經驗證」（正式版未送驗證，100 位使用者上限，自用足夠）。
+- rollback：`git revert ff6590549` 後部署；DB `0171_social_accounts_postiz_internal_id.down.sql`；Google 發布狀態可在 Console「返回測試應用程式」（會恢復 7 天失效）。
 ## 2026-11-19（續21）— 影片下一階段：N5a 併入 main、0169 已套；全套測試兩支不穩已修；派最後四張（N6→N5b、N10、R1）
 
 - 驗收：N5a 兩次 rebase（第一次 rebase 時 N8 尚未進 main，再衝突一次）後 `7eb250247`＋`3ed550a9d` cherry-pick → `fd6eb2c13`（分步發布）、`6c68633a2`（0169 down 第二處）。教訓：同一批會動同一組檔（`make.ts`、`brand-voice.ts`、`sites/[id]/route.ts`、`SiteManager.tsx`）的卡不要並行；最後一批已把 N6、N5b 排在同一條線依序做。
