@@ -1,7 +1,7 @@
 // N10 weekly member newsletter (lib/crm/member-newsletter.ts M1-M5), on fake deps: no DB, no bridge, no FluentCRM.
 import { describe, expect, it, vi } from "vitest";
 import type { BridgeNewsletterSpec } from "@/lib/crm/fluentcrm";
-import { lastBrandWeek, newsletterItem, runMemberNewsletter, type MemberNewsletterDeps, type NewsletterItem, type NewsletterSite } from "@/lib/crm/member-newsletter";
+import { lastBrandWeek, newsletterItem, runMemberNewsletter, weeklyNewsletter, type MemberNewsletterDeps, type NewsletterItem, type NewsletterSite } from "@/lib/crm/member-newsletter";
 import { clientJob } from "@/lib/schedules/jobs";
 import { isDueNow } from "@/lib/schedules/schedule";
 
@@ -91,5 +91,23 @@ describe("member_newsletter", () => {
     const job = clientJob("member_newsletter")!;
     const cell = { ...job.defaults, enabled: false, lastRunAt: null };   // what a client with no row reads as (view.ts)
     expect(isDueNow(cell, new Date(Date.UTC(2026, 10, 16, job.defaults.hourUtc)))).toBe(false);
+  });
+
+  // N10 risk fix: the email's fixed words follow the site's language (an English site got Chinese headings and buttons)
+  it("an English site's fixed words are all English; a Chinese site's are as before, word for word", () => {
+    const week = { monday: "2026-11-09", sunday: "2026-11-15" };
+    const items = [item({ title: "Breathing basics", summary: "Five minutes" }), item({ title: "Calm evenings", summary: "", isVideo: false, link: "https://soulful.example/a" })];
+    const en = weeklyNewsletter({ id: "s2", name: "Soulful", url: "https://soulful.example", defaults: { language: "English" } }, week, items);
+    expect(JSON.stringify(en)).not.toMatch(/\p{Script=Han}/u);
+    expect(en.subject).toBe("Soulful: new this week (11/9–11/15)");
+    expect(en.body_html).toContain("Watch the video →");
+    expect(en.body_html).toContain("Read the article →");
+
+    const zh = weeklyNewsletter(SITE, week, [item(), item({ title: "呼吸練習", isVideo: false, link: "https://aware-wave.com/a" })]);
+    expect(zh.subject).toBe("覺知波 本週新內容（11/9–11/15）");
+    expect(zh.title).toBe("每週會員信 覺知波 2026-11-09");
+    expect(zh.preview).toBe("冥想入門、呼吸練習");
+    expect(zh.body_html).toContain("觀看影片 →");
+    expect(zh.body_html).toContain("閱讀文章 →");
   });
 });

@@ -14,7 +14,8 @@
 //  M5 a draft made = one business notice (Telegram) per site and week: 「會員信草稿已備好」, never an error.
 // Everything outside the decisions is injected (MemberNewsletterDeps), so tests need no DB and no bridge.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { requiredBlocks, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { requiredBlocks, siteLanguage, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { scriptOfLanguage } from "@/lib/social/post-language";
 import { orgTimeZone } from "@/lib/content/topics/store";
 import { bridgeClientForSite, type BridgeResult } from "@/lib/payments/woo";
 import { addDays, instantAt, weekday, zoned } from "@/lib/social/time";
@@ -79,27 +80,53 @@ const inWeek = (at: string, week: { from: string; to: string }) => {
   return t >= Date.parse(week.from) && t < Date.parse(week.to);
 };
 
+/** The email's fixed words, in the site's content language (siteLanguage): 繁體中文 or English; any other language,
+ *  Simplified Chinese included, gets English. Every fixed word of the email is here, nowhere else. */
+const NEWSLETTER_TEXT = {
+  zh: {
+    subject: (name: string, range: string) => `${name} 本週新內容（${range}）`,
+    title: (name: string, monday: string) => `每週會員信 ${name} ${monday}`,
+    watch: "觀看影片 →",
+    read: "閱讀文章 →",
+    previewJoin: "、",
+  },
+  en: {
+    subject: (name: string, range: string) => `${name}: new this week (${range})`,
+    title: (name: string, monday: string) => `Weekly member newsletter ${name} ${monday}`,
+    watch: "Watch the video →",
+    read: "Read the article →",
+    previewJoin: " · ",
+  },
+} as const;
+
+export function newsletterText(d: SiteContentDefaults | undefined): (typeof NEWSLETTER_TEXT)[keyof typeof NEWSLETTER_TEXT] {
+  const lang = siteLanguage(d);
+  return scriptOfLanguage(lang) === "zh" && !/簡|简|simplified|hans|zh[-_]?cn/i.test(lang) ? NEWSLETTER_TEXT.zh : NEWSLETTER_TEXT.en;
+}
+
 const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
-/** The email: the week's topics (title, summary, link) then the site's must-carry paragraphs. Simple inline-styled HTML. */
+/** The email: the week's topics (title, summary, link) then the site's must-carry paragraphs. Simple inline-styled HTML;
+ *  its fixed words follow the site's language (newsletterText). */
 export function weeklyNewsletter(site: NewsletterSite, week: { monday: string; sunday: string }, items: NewsletterItem[]): BridgeNewsletterSpec {
+  const text = newsletterText(site.defaults);
   const range = `${md(week.monday)}–${md(week.sunday)}`;
-  const subject = `${site.name} 本週新內容（${range}）`;
+  const subject = text.subject(site.name, range);
   const parts = [EMAIL_FRAME_OPEN, `<h1 style="${EMAIL_H1}">${escapeHtml(subject)}</h1>`];
   for (const it of items) {
     parts.push(`<h2 style="font-size:19px;line-height:1.35;margin:24px 0 8px;color:#111827;font-weight:700;"><a href="${safeUrl(it.link)}" style="color:#111827;text-decoration:none;">${escapeHtml(it.title)}</a></h2>`);
     if (it.summary) parts.push(`<p style="${EMAIL_P}">${escapeHtml(it.summary)}</p>`);
-    parts.push(`<p style="${EMAIL_P}"><a href="${safeUrl(it.link)}" style="${EMAIL_LINK}">${it.isVideo ? "觀看影片 →" : "閱讀文章 →"}</a></p>`);
+    parts.push(`<p style="${EMAIL_P}"><a href="${safeUrl(it.link)}" style="${EMAIL_LINK}">${it.isVideo ? text.watch : text.read}</a></p>`);
   }
   for (const block of requiredBlocks(site.defaults)) {
     parts.push(`<p style="${EMAIL_P}">${escapeHtml(block).replace(/\r?\n/g, "<br />")}</p>`);
   }
   parts.push("</div>");
   return {
-    title: `每週會員信 ${site.name} ${week.monday}`,
+    title: text.title(site.name, week.monday),
     subject,
     // whole characters: a cut surrogate pair makes PHP json_decode fail and the plugin refuse the whole body
-    preview: Array.from(items.map((i) => i.title).join("、")).slice(0, 120).join(""),
+    preview: Array.from(items.map((i) => i.title).join(text.previewJoin)).slice(0, 120).join(""),
     body_html: parts.join("\n"),
   };
 }
