@@ -4,13 +4,15 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { siteRowGate, siteUrlWriteGate } from "@/lib/content/wp-sites";
 import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, YOUTUBE_PRIVACIES, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 
+// youtubePrivacy (N5a): who sees the auto-made videos -- outward like the two modes, so set the same way
 const GATE_MODES = [
   { field: "publishMode", allowed: PUBLISH_MODES },
   { field: "topicMode", allowed: TOPIC_MODES },
   { field: "dailyTrendTopics", allowed: [true, false] },   // N8: the schedule scores and proposes trend topics each day
+  { field: "youtubePrivacy", allowed: YOUTUBE_PRIVACIES },
 ] as const;
 
 export const runtime = "nodejs";

@@ -8,6 +8,8 @@
 // publish them. One whose day is still ahead waits as 'scheduled' with nothing sent, and a later firing publishes it
 // on its day -- WordPress's own scheduler (wp-cron, runs only on visits) and a social post timed ahead of the article
 // are never relied on, so a social post never links to an article that is not live yet.
+// Going out is in steps (N5a, publish-steps.ts): the topic moves to 'publishing', YouTube goes first, the article only
+// once YouTube's link is back, the other posts last; each firing moves a 'publishing' topic as far as it can.
 import type { Topic, TopicFormat, TopicStatus } from "./store";
 import type { TopicReview } from "./review";
 import { zoned } from "@/lib/social/time";
@@ -27,6 +29,8 @@ export const VIDEO_TIMEOUT_MS = 60 * 60 * 1000;
 export interface Made { artifacts: Record<string, unknown>; review: TopicReview }
 /** What went out (the article's link, the social post's state), kept on the row. */
 export interface Published { artifacts: Record<string, unknown> }
+/** A publish run: done=false = a step waits (YouTube's link not back yet); the next firing goes on. */
+export interface PublishRun extends Published { done: boolean }
 /** A making that failed after some parts were made: they are kept on the failed row, so a retry does not make them again. */
 export class MakeError extends Error {
   constructor(message: string, readonly artifacts: Record<string, unknown>) { super(message); }
@@ -54,9 +58,11 @@ export interface TickDeps {
   make(t: Topic): Promise<Made>;
   /** The topic's site is set to publish without a person (brand-voice.ts autoPublishes, read now). */
   autoPublishes(t: Topic): Promise<boolean>;
-  /** Puts a topic's drafts out now (article live, then the social post with its link), re-reading the site's mode first.
-   *  Throws when anything failed (a MakeError keeps what already went out, so a retry does not send it twice). */
-  publish(t: Topic): Promise<Published>;
+  /** Moves a 'publishing' topic's drafts out as far as it can (publish-steps.ts: YouTube, then the article, then the
+   *  other posts), re-reading the site's mode first. `save(artifacts)` records each step on the row before and after its
+   *  outside write (false = the row was taken). `fresh` = the topic entered 'publishing' in this run. Throws when
+   *  anything failed (a MakeError keeps what already went out, so a retry does not send it twice). */
+  publish(t: Topic, save: (artifacts: Record<string, unknown>) => Promise<boolean>, fresh: boolean): Promise<PublishRun>;
   /** Starts the topic's video (start.ts startVideoJob): `record(jobId)` runs once the job row exists and before anything
    *  is paid for; false = another firing has the topic, nothing is prepared. Throws when no job could be started. */
   startVideo(t: Topic, record: (jobId: string) => Promise<boolean>): Promise<void>;
@@ -83,27 +89,44 @@ const failedPatch = (e: unknown) => ({ last_error: e instanceof Error ? e.messag
 export const waitsForDay = (t: Pick<Topic, "scheduled_for">, now: Date) =>
   !!t.scheduled_for && Date.parse(t.scheduled_for) > now.getTime();
 
-/** reviewed|scheduled -> published, or failed with what already went out. Claimed first: two overlapping firings never
- *  both write to WordPress and the social tool for one row. */
-async function publishNow(deps: TickDeps, row: Topic): Promise<"published" | "failed" | "moved_elsewhere"> {
-  const t = await deps.claim(row);
-  if (!t) return "moved_elsewhere";
-  let out: Published;
+/** reviewed|scheduled -> publishing (the move takes the row: of two overlapping firings only one wins), then as far
+ *  as it goes now. */
+async function publishNow(deps: TickDeps, row: Topic): Promise<PublishOutcome> {
+  const t = await deps.move(row, "publishing");
+  return t ? continuePublishing(deps, t, true) : "moved_elsewhere";
+}
+
+type PublishOutcome = "publishing" | "published" | "failed" | "moved_elsewhere";
+
+/** One run of a 'publishing' topic: claimed first, so two overlapping firings never both write to WordPress and the
+ *  social tool for one row; each step is recorded by claiming again with it. Done -> published; a step still
+ *  waiting -> stays 'publishing'; a failure -> failed with what already went out. */
+async function continuePublishing(deps: TickDeps, row: Topic, fresh: boolean): Promise<PublishOutcome> {
+  const claimed = await deps.claim(row);
+  if (!claimed) return "moved_elsewhere";
+  const cur: { row: Topic } = { row: claimed };
+  const save = async (artifacts: Record<string, unknown>) => {
+    const r = await deps.claim(cur.row, { artifacts });
+    if (r) cur.row = r;
+    return !!r;
+  };
+  let out: PublishRun;
   try {
-    out = await deps.publish(t);
+    out = await deps.publish(cur.row, save, fresh);
   } catch (e) {
-    return (await deps.move(t, "failed", failedPatch(e))) ? "failed" : "moved_elsewhere";
+    return (await deps.move(cur.row, "failed", failedPatch(e))) ? "failed" : "moved_elsewhere";
   }
+  if (!out.done) return "publishing";
   try {
-    return (await deps.move(t, "published", { artifacts: out.artifacts })) ? "published" : "moved_elsewhere";
+    return (await deps.move(cur.row, "published", { artifacts: out.artifacts })) ? "published" : "moved_elsewhere";
   } catch (e) {   // it went out but the row could not say so: keep what went out in the log, for a person to reconcile
-    console.error(`[content/topics] ${t.id} published but not recorded: ${JSON.stringify(out.artifacts).slice(0, 2000)}`);
+    console.error(`[content/topics] ${cur.row.id} published but not recorded: ${JSON.stringify(out.artifacts).slice(0, 2000)}`);
     throw e;
   }
 }
 
 /** I5: a reviewed topic goes out only with a passed review AND a site set to auto publish; otherwise it stays a draft. */
-export async function publishReviewed(deps: TickDeps, reviewed: Topic): Promise<"reviewed" | "published" | "scheduled" | "failed" | "moved_elsewhere"> {
+export async function publishReviewed(deps: TickDeps, reviewed: Topic): Promise<"reviewed" | "scheduled" | PublishOutcome> {
   if ((reviewed.review as TopicReview | null)?.pass !== true) return "reviewed";
   let auto: boolean;
   try {
@@ -117,7 +140,7 @@ export async function publishReviewed(deps: TickDeps, reviewed: Topic): Promise<
   return publishNow(deps, reviewed);
 }
 
-type Outcome = "reviewed" | "drafted" | "published" | "scheduled" | "failed" | "moved_elsewhere" | "video_started";
+type Outcome = "reviewed" | "drafted" | "scheduled" | "video_started" | PublishOutcome;
 
 const videoOf = (t: Pick<Topic, "artifacts">) => (t.artifacts as { video?: VideoArtifact }).video;
 const failRow = async (deps: TickDeps, t: Topic, e: unknown): Promise<Outcome> =>
@@ -216,7 +239,7 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
   const budget = opts.budgetMs ?? TICK_BUDGET_MS;
   const t0 = deps.now();
   const n = { interrupted: 0, reviewed: 0, started: 0, drafted: 0, failed: 0, returned: 0, published: 0, scheduled: 0,
-    video_started: 0, expired: 0 };
+    video_started: 0, expired: 0, publishing: 0 };
 
   // A proposal nobody approved seven days after its day is returned (rejected = the 退回 button's move) with the reason;
   // a person who changes the date and approves it again starts it over. Rejected rows are not read again: once per topic.
@@ -225,7 +248,7 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
     if (await deps.move(t, "rejected", { last_error: expiredReason(t.scheduled_for!) })) n.expired++;
   }
 
-  for (const t of await deps.inStatus(["generating", "drafted", "waiting_video", "embedded", "scheduled"])) {
+  for (const t of await deps.inStatus(["generating", "drafted", "waiting_video", "embedded", "scheduled", "publishing"])) {
     if (t.status === "generating" && t0.getTime() - Date.parse(t.updated_at) >= STALE_GENERATING_MS) {
       if (await deps.move(t, "failed", { last_error: "做到一半中斷了（伺服器重新啟動），按重試會重新製作" })) n.interrupted++;
     } else if (t.status === "drafted" && !waitsForVideo(t)) {
@@ -242,6 +265,8 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
     } else if (t.status === "scheduled" && !waitsForDay(t, t0)) {
       // its day came: publish re-reads the site's mode, so a switch back to human review wins (the row fails, drafts kept)
       count(n, await publishNow(deps, t));
+    } else if (t.status === "publishing") {   // a step was waiting (YouTube's link): go on from what the row recorded
+      count(n, await continuePublishing(deps, t, false));
     }
   }
 

@@ -7,6 +7,7 @@ import { FUNNEL_STAGES, MAX_REQUIRED_BLOCKS, MAX_TREND_FEEDS, PRICE_POSITIONS, t
 import PublishModeButtons from "./PublishModeButtons";
 import TopicModeButtons from "./TopicModeButtons";
 import DailyTrendButtons from "./DailyTrendButtons";
+import YoutubePrivacyButtons from "./YoutubePrivacyButtons";
 
 const MKT_PRESETS: Record<string, string[]> = {
   audience: ["台灣 30-45 歲女性", "有焦慮/壓力的上班族", "正在尋找自我療癒的成人", "對心理健康有興趣的父母", "藝術愛好者（非專業）", "身心科/諮商後進階探索者"],
@@ -837,6 +838,11 @@ export default function SiteManager() {
               readOnly={onDoor}
             />
             <DailyTrendButtons
+              site={sites.find(x => x.id === site.id) ?? site}
+              onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
+              readOnly={onDoor}
+            />
+            <YoutubePrivacyButtons
               site={sites.find(x => x.id === site.id) ?? site}
               onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
               readOnly={onDoor}

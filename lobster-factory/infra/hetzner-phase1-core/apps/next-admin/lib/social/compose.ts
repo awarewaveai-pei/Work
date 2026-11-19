@@ -56,8 +56,10 @@ const SETTINGS: Record<string, (format: string) => Record<string, unknown>> = {
   instagram: (f) => ({ post_type: f === "story" ? "story" : "post" }),
   "instagram-standalone": (f) => ({ post_type: f === "story" ? "story" : "post" }),
   facebook: (f) => (f === "story" ? { post_type: "story" } : {}),
-  // youtube.settings.dto.ts (v2.25.1): title 2-100 and type public|private|unlisted are required; compose() adds the title
-  youtube: () => ({ type: "public" }),
+  // youtube.settings.dto.ts (v2.25.1): title 2-100 and type public|private|unlisted are required; compose() adds the title.
+  // The target's format carries the privacy (N5a: the auto pipeline writes the site's youtubePrivacy, brand-voice.ts
+  // youtubeFormat; the editor's 公開／不公開 buttons write the same); anything but "unlisted" is public.
+  youtube: (f) => ({ type: f === "unlisted" ? "unlisted" : "public" }),
 };
 
 

@@ -37,7 +37,7 @@ export interface OverviewRow {
   problem: boolean;
 }
 
-const IN_PROGRESS: ReadonlySet<TopicStatus> = new Set(["generating", "drafted", "waiting_video", "embedded"]);
+const IN_PROGRESS: ReadonlySet<TopicStatus> = new Set(["generating", "drafted", "waiting_video", "embedded", "publishing"]);
 
 export function buildOverview(input: OverviewInput): OverviewRow[] {
   const schedule = new Map(input.schedules.map((s) => [s.organizationId, s]));

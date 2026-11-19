@@ -77,6 +77,10 @@ describe("compose youtube", () => {
     expect(c.settings).toEqual({ __type: "youtube", type: "public", title: "藝術治療入門" });
     expect(c.values).toEqual([{ content: toPostizHtml("五分鐘看懂\n#art"), image: [{ id: "v1", path: "https://p/v.mp4" }] }]);
   });
+  it("N5a: the target's format carries the site's privacy -- unlisted only when it says so", () => {
+    expect(compose({ ...base, platform: "youtube", format: "unlisted", body: "標題\n內容", media: video }).settings.type).toBe("unlisted");
+    expect(compose({ ...base, platform: "youtube", format: "post", body: "標題\n內容", media: video }).settings.type).toBe("public");
+  });
   it("refused before Postiz: no video, or a title outside 2-100 characters", () => {
     expect(() => compose({ ...base, platform: "youtube", body: "title\nbody" })).toThrow("exactly one video");
     expect(() => compose({ ...base, platform: "youtube", body: "x\nbody", media: video })).toThrow(ComposeError);

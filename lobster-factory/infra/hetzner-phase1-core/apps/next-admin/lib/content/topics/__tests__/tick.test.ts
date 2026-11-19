@@ -2,7 +2,8 @@
 // the start under the per-day cap (0121 content_topics_start).
 import { describe, expect, it } from "vitest";
 import { NEXT, type Topic, type TopicStatus } from "../store";
-import { DAILY_START_CAP, MakeError, brandDay, STALE_GENERATING_MS, VIDEO_TIMEOUT_MS, tickTopics, type Made, type Published, type TickDeps, type VideoPoll } from "../tick";
+import { DAILY_START_CAP, MakeError, brandDay, STALE_GENERATING_MS, VIDEO_TIMEOUT_MS, tickTopics, type Made, type Published, type PublishRun, type TickDeps, type VideoPoll } from "../tick";
+import { publishSteps, STEP_LEASE_MS, YOUTUBE_LIVE_TIMEOUT_MS, YOUTUBE_TIMEOUT_TEXT, type PublishPorts, type YoutubeLook } from "../publish-steps";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const NOW = new Date("2026-11-03T02:00:00Z");
@@ -17,7 +18,8 @@ function topic(id: string, over: Partial<Topic> = {}): Topic {
 }
 
 /** auto = the site's publish mode is AI review auto publish; publish = what putting the drafts out does. */
-interface Pub { auto?: boolean | (() => Promise<boolean>); publish?: (t: Topic) => Promise<Published> }
+type Save = (artifacts: Record<string, unknown>) => Promise<boolean>;
+interface Pub { auto?: boolean | (() => Promise<boolean>); publish?: (t: Topic, save: Save, fresh: boolean) => Promise<PublishRun> }
 
 function queue(rows: Topic[], make: (t: Topic) => Promise<Made> = async () => ({ artifacts: { wp_post_id: 1 }, review }),
   blocker = async (_t: Topic): Promise<string | null> => null, pub: Pub = {}) {
@@ -55,7 +57,10 @@ function queue(rows: Topic[], make: (t: Topic) => Promise<Made> = async () => ({
     },
     make: async (t) => { made.push(t.id); return make(t); },
     autoPublishes: async () => (typeof pub.auto === "function" ? pub.auto() : pub.auto === true),
-    publish: async (t) => { published.push(t.id); return (pub.publish ?? (async () => ({ artifacts: { ...t.artifacts, live: true } })))(t); },
+    publish: async (t, save, fresh) => {
+      published.push(t.id);
+      return (pub.publish ?? (async (x: Topic) => ({ artifacts: { ...x.artifacts, live: true }, done: true })))(t, save, fresh);
+    },
     startVideo: async (t, record) => {
       const jobId = `job${++jobs}`;
       if (await record(jobId)) video.prepared.push(jobId); else video.abandoned.push(jobId);
@@ -93,7 +98,7 @@ describe("tickTopics: expiry backlog", () => {
 describe("tickTopics", () => {
   it("starts what is due, makes it and moves it to reviewed with its artifacts and review", async () => {
     const q = queue([topic("a")]);
-    expect(await tickTopics(q.deps)).toBe("interrupted=0 reviewed=1 started=1 drafted=0 failed=0 returned=0 published=0 scheduled=0 video_started=0 expired=0");
+    expect(await tickTopics(q.deps)).toBe("interrupted=0 reviewed=1 started=1 drafted=0 failed=0 returned=0 published=0 scheduled=0 video_started=0 expired=0 publishing=0");
     expect(q.db.get("a")).toMatchObject({ status: "reviewed", artifacts: { wp_post_id: 1 }, review, started_on: "2026-11-03" });
   });
 
@@ -327,5 +332,103 @@ describe("video (P6)", () => {
     q.advance(VIDEO_TIMEOUT_MS);
     await tickTopics(q.deps);
     expect(q.db.get("a")).toMatchObject({ status: "failed", last_error: expect.stringContaining("超過一小時") });
+  });
+});
+
+// N5a: YouTube first; the article only once YouTube's link is back; the other posts last. The real publishSteps runs
+// against a fake Postiz / WordPress (nothing leaves the test).
+describe("publish in steps (N5a)", () => {
+  const LINK = "https://site.example/p";
+  const YT = "https://youtu.be/abc";
+  /** calls = every outside write / read in order; look = what the YouTube post answers. */
+  function fake(q: ReturnType<typeof queue>) {
+    const calls: string[] = [];
+    const state = { look: { state: "waiting" } as YoutubeLook };
+    const ports: PublishPorts = {
+      now: () => q.deps.now(),
+      sendPost: async (id, link, now) => { calls.push(`send:${id}${link ? `:${link}` : ""}`); return { state: "scheduled", scheduled_at: now.toISOString(), at: now.toISOString() }; },
+      lookYoutube: async () => { calls.push("look"); return state.look; },
+      publishArticle: async (id) => { calls.push(`article:${id}`); return { status: "publish", link: LINK }; },
+    };
+    q.deps.publish = (t, save, fresh) => publishSteps(t, ports, save, fresh);
+    return { calls, state };
+  }
+  const split = { article: { wp_post_id: 7 }, social: { post_id: "p", youtube_post_id: "y" } };
+  const due = (over: Partial<Topic> = {}) => topic("a", { status: "scheduled", review, formats: ["article", "social", "youtube"],
+    scheduled_for: new Date(NOW.getTime() - 60_000).toISOString(), artifacts: split, ...over });
+
+  it("order: YouTube is sent, the article waits for its link, then the article, then the other posts with the article's link", async () => {
+    const q = queue([due()], undefined, undefined, { auto: true });
+    const f = fake(q);
+    expect(await tickTopics(q.deps)).toContain("publishing=1");
+    expect(f.calls).toEqual(["send:y", "look"]);
+    expect(q.db.get("a")).toMatchObject({ status: "publishing", artifacts: { publish: { youtube: { post_id: "y", sent_at: NOW.toISOString() } } } });
+    f.state.look = { state: "live", url: YT };
+    q.advance(5 * 60_000);
+    expect(await tickTopics(q.deps)).toContain("published=1");
+    expect(f.calls).toEqual(["send:y", "look", "look", "article:7", `send:p:${LINK}`]);
+    expect(q.db.get("a")).toMatchObject({ status: "published", artifacts: { article: { published: { link: LINK } }, social: { sent: { state: "scheduled" } },
+      publish: { youtube: { url: YT }, article: { url: LINK }, social: { post_id: "p", state: "scheduled" } } } });
+  });
+
+  it("YouTube not live: the article is not published and the other posts are not sent", async () => {
+    const q = queue([due()], undefined, undefined, { auto: true });
+    const f = fake(q);
+    await tickTopics(q.deps);
+    q.advance(30 * 60_000);
+    await tickTopics(q.deps);
+    expect(f.calls).toEqual(["send:y", "look", "look"]);
+    expect(q.db.get("a")).toMatchObject({ status: "publishing" });
+    expect((q.db.get("a")!.artifacts as typeof split & { article: { published?: unknown } }).article.published).toBeUndefined();
+  });
+
+  it("YouTube still not live an hour after it was sent: failed in Chinese, the article and the other posts still drafts", async () => {
+    const q = queue([due()], undefined, undefined, { auto: true });
+    const f = fake(q);
+    await tickTopics(q.deps);
+    q.advance(YOUTUBE_LIVE_TIMEOUT_MS);
+    expect(await tickTopics(q.deps)).toContain("failed=1");
+    expect(q.db.get("a")).toMatchObject({ status: "failed", last_error: YOUTUBE_TIMEOUT_TEXT, artifacts: { publish: { youtube: { post_id: "y" } } } });
+    expect(f.calls.filter((c) => c !== "look")).toEqual(["send:y"]);
+  });
+
+  it("YouTube refused by Postiz: failed at once, nothing else sent", async () => {
+    const q = queue([due()], undefined, undefined, { auto: true });
+    const f = fake(q);
+    f.state.look = { state: "error", error: "YouTube 頻道需要重新授權" };
+    expect(await tickTopics(q.deps)).toContain("failed=1");
+    expect(q.db.get("a")?.last_error).toContain("YouTube 發布失敗");
+    expect(f.calls).toEqual(["send:y", "look"]);
+  });
+
+  it("restart: a step already recorded is not done again", async () => {
+    const at = new Date(NOW.getTime() - 10 * 60_000).toISOString();
+    const q = queue([topic("a", { status: "publishing", review, formats: ["article", "social", "youtube"], artifacts: {
+      article: { wp_post_id: 7, published: { status: "publish", link: LINK, at } }, social: { post_id: "p", youtube_post_id: "y" },
+      publish: { youtube: { post_id: "y", started_at: at, sent_at: at, since: at, url: YT }, article: { started_at: at, sent_at: at, url: LINK } },
+    } })], undefined, undefined, { auto: true });
+    const f = fake(q);
+    expect(await tickTopics(q.deps)).toContain("published=1");
+    expect(f.calls).toEqual([`send:p:${LINK}`]);
+  });
+
+  it("a step another run started a moment ago is left to it; one older than the lease (that run died) is done", async () => {
+    const at = new Date(NOW.getTime() - 2 * 60_000).toISOString();
+    const q = queue([topic("a", { status: "publishing", review, formats: ["article", "social"], artifacts: {
+      article: { wp_post_id: 7 }, social: { post_id: "p" }, publish: { article: { started_at: at } } } })], undefined, undefined, { auto: true });
+    const f = fake(q);
+    expect(await tickTopics(q.deps)).toContain("publishing=1");
+    expect(f.calls).toEqual([]);
+    q.advance(STEP_LEASE_MS);
+    expect(await tickTopics(q.deps)).toContain("published=1");
+    expect(f.calls).toEqual(["article:7", `send:p:${LINK}`]);
+  });
+
+  it("old data: a topic made before the split (one social draft) goes out as before -- article, then that draft", async () => {
+    const q = queue([topic("a", { status: "drafted", review, artifacts: { article: { wp_post_id: 7 }, social: { post_id: "p" } } })], undefined, undefined, { auto: true });
+    const f = fake(q);
+    expect(await tickTopics(q.deps)).toContain("published=1");
+    expect(f.calls).toEqual(["article:7", `send:p:${LINK}`]);
+    expect(q.db.get("a")?.status).toBe("published");
   });
 });

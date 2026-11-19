@@ -25,6 +25,11 @@ export type PublishMode = (typeof PUBLISH_MODES)[number];
 export const TOPIC_MODES = ["human_pick", "ai_pick"] as const;
 export type TopicMode = (typeof TOPIC_MODES)[number];
 
+/** Who sees the site's auto-made YouTube videos (N5a, plan O7): public by default, unlisted = only people with the link.
+ *  Set the same way as the two modes above: its own PATCH field, staff only. */
+export const YOUTUBE_PRIVACIES = ["public", "unlisted"] as const;
+export type YoutubePrivacy = (typeof YOUTUBE_PRIVACIES)[number];
+
 /** The brand's own industry RSS feeds (AUTO_CONTENT P9.4): https URLs, read at planning time into that brand's prompt only. */
 export const MAX_TREND_FEEDS = 10;
 
@@ -38,6 +43,7 @@ export interface SiteContentDefaults {
   topicMode?: TopicMode;
   /** N8: each brand day, up to 3 trend topics scored for the brand (lib/content/topics/daily.ts). Off unless exactly true. */
   dailyTrendTopics?: boolean;
+  youtubePrivacy?: YoutubePrivacy;
   trendFeeds?: string[];
   requiredBlocks?: string[];
   language?: string;
@@ -131,6 +137,15 @@ export function autoPublishes(d: SiteContentDefaults | undefined): boolean {
 export function siteLanguage(d: SiteContentDefaults | undefined): string {
   return t(d?.language) || "繁體中文";
 }
+
+/** Only the exact stored value makes the site's videos unlisted: missing or any other value = public (plan O7). */
+export function youtubePrivacy(d: SiteContentDefaults | undefined): YoutubePrivacy {
+  return d?.youtubePrivacy === "unlisted" ? "unlisted" : "public";
+}
+
+/** The YouTube target's format, which carries its privacy to the sender (lib/social/compose.ts: "unlisted" -> unlisted,
+ *  anything else -> public; "post" is every platform's plain format). */
+export const youtubeFormat = (d: SiteContentDefaults | undefined) => (youtubePrivacy(d) === "unlisted" ? "unlisted" : "post");
 
 /** Only the exact stored value lets the schedule approve its own proposals: missing, misspelt or any other value = a person picks. */
 export function aiPicksTopics(d: SiteContentDefaults | undefined): boolean {

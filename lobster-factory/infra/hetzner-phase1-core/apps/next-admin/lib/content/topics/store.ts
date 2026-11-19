@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isTimeZone } from "@/lib/social/time";
 
 export const TOPIC_STATUSES = ["proposed", "approved", "rejected", "generating", "drafted", "waiting_video", "embedded",
-  "reviewed", "scheduled", "published", "failed"] as const;
+  "reviewed", "scheduled", "publishing", "published", "failed"] as const;
 export type TopicStatus = (typeof TOPIC_STATUSES)[number];
 export const TOPIC_FORMATS = ["article", "social", "video", "youtube"] as const;
 export type TopicFormat = (typeof TOPIC_FORMATS)[number];
@@ -21,8 +21,10 @@ export const NEXT: Readonly<Record<TopicStatus, readonly TopicStatus[]>> = {
   drafted: ["waiting_video", "reviewed", "failed"],
   waiting_video: ["embedded", "failed"],
   embedded: ["reviewed", "failed"],
-  reviewed: ["approved", "scheduled", "published", "failed"],   // approved = a person sends it back to be made again (redo.ts)
-  scheduled: ["published", "failed"],
+  reviewed: ["approved", "scheduled", "publishing", "failed"],   // approved = a person sends it back to be made again (redo.ts)
+  scheduled: ["publishing", "failed"],
+  // auto publish in steps (publish-steps.ts, N5a): YouTube, then the article, then the other posts; each step is claimed
+  publishing: ["published", "failed"],
   published: [],
   failed: ["approved"],
 };

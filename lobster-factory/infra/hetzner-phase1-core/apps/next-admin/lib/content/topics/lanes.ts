@@ -15,7 +15,7 @@ type Row = { status: string; scheduled_for: string | null };
  *  等你處理 = a person's move is next. approved / rejected / scheduled / published are in no lane (only 全部). */
 export function topicLane(t: Row, now: Date): TopicLane | null {
   if (t.status === "proposed" && t.scheduled_for && Date.parse(t.scheduled_for) < now.getTime()) return "overdue";
-  if (["generating", "drafted", "waiting_video", "embedded"].includes(t.status)) return "running";
+  if (["generating", "drafted", "waiting_video", "embedded", "publishing"].includes(t.status)) return "running";
   if (["proposed", "reviewed", "failed"].includes(t.status)) return "waiting";
   return null;
 }

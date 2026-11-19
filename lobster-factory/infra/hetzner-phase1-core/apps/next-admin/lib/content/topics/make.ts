@@ -3,16 +3,18 @@
 // every AI call bills that organization as the named actor, and publishes with orgIdentity, so the WordPress write
 // passes the same organization check a customer's own request does (plan I7). A part already made (kept on the row by
 // an earlier failed attempt) is not made again: a retry after the social step failed does not write a second article.
-// Auto publish (gated in tick.ts publishReviewed, always "now") changes those same drafts: the WordPress draft to
-// publish through the calendar's core, then the social draft gets the live article's link and is scheduled a moment
-// ahead as an editor would -- a brand that requires social review gets it submitted instead. Only staff set a site to
-// auto publish (sites/[id] route), so acting as editor here is that staff decision, not the starting person's role.
+// Auto publish (gated in tick.ts publishReviewed, always "now") changes those same drafts in steps (publish-steps.ts,
+// N5a): the YouTube draft (its own post since N5a) is scheduled first; once YouTube's public link is back the WordPress
+// draft is published through the calendar's core; then the other channels' draft gets the live article's link and is
+// scheduled a moment ahead as an editor would -- a brand that requires social review gets it submitted instead. Only
+// staff set a site to auto publish (sites/[id] route), so acting as editor here is that staff decision, not the
+// starting person's role. YouTube's privacy is the site's youtubePrivacy, carried on the YouTube target's format.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
-import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteLanguage, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteLanguage, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
 import { parseArticleMeta } from "@/lib/content/article/meta";
@@ -36,7 +38,8 @@ import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/li
 import { TOPIC_ARTICLE_IMAGES } from "./cost";
 import { DEFAULT_TOPIC_CAP_TWD, reserveStep, settleStep, spentSince, stepUpperTwd, topicBudget, type TopicBudget } from "./budget";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
-import { MakeError, NOW_FORMATS, brandDay, waitsForVideo, type Made, type Published, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
+import { MakeError, NOW_FORMATS, brandDay, waitsForVideo, type Made, type Published, type PublishRun, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
+import { publishSteps, type PublishLog, type YoutubeLook } from "./publish-steps";
 
 /** What content_topics.artifacts holds: one entry per made part; `published` / `sent` once auto publish put it out. */
 export interface TopicArtifacts {
@@ -46,10 +49,14 @@ export interface TopicArtifacts {
     required?: string[];
     published?: { status: string; link: string; at: string };
   };
-  /** post_id null = no channel the writer can write for (the checks say so). */
-  social?: { post_id: string | null; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string } };
-  /** The topic's video job; url once it finished, then when it went into the article and onto the social draft. */
-  video?: VideoArtifact & { embedded_at?: string; media_id?: string };
+  /** post_id = the draft of every channel but YouTube (null = none, or no channel the writer can write for: the checks
+   *  say so); youtube_post_id = the YouTube channels' own draft (N5a; absent on a topic made before, whose post_id draft
+   *  may hold YouTube too and goes out as before). */
+  social?: { post_id: string | null; youtube_post_id?: string | null; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string } };
+  /** The topic's video job; url once it finished, then when it went into the article and onto each social draft. */
+  video?: VideoArtifact & { embedded_at?: string; media_id?: string; youtube_media_id?: string };
+  /** N5a: each publish step, recorded before and after its outside write (publish-steps.ts). */
+  publish?: PublishLog;
   /** N2: when this topic's spending cap began, the cap and the spend last read (budget.ts; the ledger is the source). */
   budget?: TopicBudget;
 }
@@ -176,13 +183,27 @@ async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["ar
   const mediaType = waitsForVideo(t) ? "video" : "text";
   const w = await writeSocialPosts({ article: source, keys, mediaType, voice: renderSiteVoice(site.defaults), siteLanguage: siteLanguage(site.defaults) }, ask);
   const custom = textsForAccounts(w, accounts);
-  const saved = await savePost(t.organization_id, null, null, { body: socialBody(article?.summary, t.title, w.language), notes: `自動內容管線：題目「${t.title}」` },
-    accounts.map((a) => ({ account_id: a.id, custom_body: custom[a.id] ?? null })), null, actor);
+  // YouTube is its own draft (N5a): it goes out first and the article waits for its link; every other channel shares one
+  const fields = { body: socialBody(article?.summary, t.title, w.language), notes: `自動內容管線：題目「${t.title}」` };
+  const draft = async (group: typeof accounts, format?: string) => group.length
+    ? (await savePost(t.organization_id, null, null, fields,
+      group.map((a) => ({ account_id: a.id, custom_body: custom[a.id] ?? null, ...(format ? { format } : {}) })), null, actor)).id
+    : null;
+  const postId = await draft(accounts.filter((a) => a.platform !== "youtube"));
+  const youtubePostId = await draft(accounts.filter((a) => a.platform === "youtube"), youtubeFormat(site.defaults)).catch(async (e) => {
+    // the topic records neither draft (this throws): the first one goes to the trash, or a retry would leave it behind
+    if (postId) {
+      await getPost(t.organization_id, postId)
+        .then((p) => applyAction(t.organization_id, p, "delete", "editor", {}, actor, { source: "content_pipeline", topic_id: t.id }))
+        .catch((d) => console.error(`[content/topics] ${t.id} social draft ${postId} left behind: ${d instanceof Error ? d.message : d}`));
+    }
+    throw e;
+  });
   const texts = Object.values(custom);
   const problems = [...w.tooLong.map((x) => `${x.key} 太長（${x.length}/${x.limit}）`), ...w.missing.map((k) => `${k} 沒有寫出來`),
     ...w.wrongLanguage.map((k) => `${k} 不是${w.language}，沒有採用`)];
   if (!problems.length && texts.length < accounts.length) problems.push(`${accounts.length - texts.length} 個頻道沒有專屬貼文`);
-  return { post_id: saved.id, checks: socialChecks({ texts, channels: accounts.length, problems }, forbidden) };
+  return { post_id: postId, ...(youtubePostId ? { youtube_post_id: youtubePostId } : {}), checks: socialChecks({ texts, channels: accounts.length, problems }, forbidden) };
 }
 
 /** The topic's cap guard: each check reads the ledger (budget.ts) and records the spend on `artifacts.budget`. */
@@ -231,30 +252,41 @@ async function sendSocial(t: Topic, postId: string, link: string | undefined, no
   return { state: done.state, scheduled_at: review ? null : scheduledAt, at: now.toISOString() };
 }
 
-async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string): Promise<Published> {
+/** The YouTube draft as publish-steps reads it: every target's release_url back = live (the first link); a failed
+ *  target or a deleted post = it will not come. */
+export async function lookYoutube(orgId: string, postId: string): Promise<YoutubeLook> {
+  const post = await getPost(orgId, postId);
+  if (post.state === "deleted") return { state: "error", error: "YouTube 貼文被刪除了" };
+  const failed = post.targets.find((x) => x.state === "error");
+  if (failed) return { state: "error", error: failed.error || "Postiz 沒有說原因" };
+  const urls = post.targets.map((x) => x.release_url);
+  return urls.length && urls.every((u): u is string => !!u) ? { state: "live", url: urls[0] } : { state: "waiting" };
+}
+
+async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: (a: Record<string, unknown>) => Promise<boolean>, fresh: boolean): Promise<PublishRun> {
   const site = await siteFor(sb, t);
-  if (typeof site === "string") throw new Error(site);
+  // nothing went out in this run: the failed row keeps what earlier runs recorded (a MakeError carries it)
+  if (typeof site === "string") throw new MakeError(site, t.artifacts);
   // the gate in tick.ts read the setting a moment ago; read again at the write, so a switch back to human review wins
-  if (!autoPublishes(site.defaults)) throw new Error("網站已改成人工審核，沒有發布（草稿都在）");
-  const now = new Date();
-  const artifacts: TopicArtifacts = { ...(t.artifacts as TopicArtifacts) };
-  try {
-    const a = artifacts.article;
-    if (t.formats.includes("article") && !a?.published) {
-      if (!a?.wp_post_id || !t.site_id) throw new Error("沒有 WordPress 草稿編號，無法發布");
-      // N1b: paragraphs the site asks for now but this article was never checked for (added after it was made) stop it here
-      const unchecked = uncheckedRequired(a.required, requiredBlocks(site.defaults));
-      if (unchecked.length) throw new Error(`網站後來新增了必附段落，這篇沒有檢查過（${unchecked.join("、")}），沒有發布（草稿還在）`);
-      const r = await updateWpPost(orgIdentity(t.organization_id), t.site_id, a.wp_post_id, { status: "publish" });
-      if (!r.ok) throw new Error(`WordPress 發布失敗：${(r as Extract<typeof r, { ok: false }>).error}`);   // strict:false
-      artifacts.article = { ...a, published: { status: r.post.status, link: r.post.link, at: now.toISOString() } };
-    }
-    const s = artifacts.social;
-    if (s?.post_id && !s.sent) artifacts.social = { ...s, sent: await sendSocial(t, s.post_id, artifacts.article?.published?.link, now, actor) };
-  } catch (e) {
-    throw new MakeError(e instanceof Error ? e.message : String(e), artifacts as Record<string, unknown>);
+  if (!autoPublishes(site.defaults)) throw new MakeError("網站已改成人工審核，沒有再往下發布（還沒發的都還是草稿）", t.artifacts);
+  // N1b: paragraphs the site asks for now but this article was never checked for (added after it was made) stop it here,
+  // before any step -- YouTube included -- goes out
+  const a = (t.artifacts as TopicArtifacts).article;
+  if (t.formats.includes("article") && a && !a.published) {
+    const unchecked = uncheckedRequired(a.required, requiredBlocks(site.defaults));
+    if (unchecked.length) throw new MakeError(`網站後來新增了必附段落，這篇沒有檢查過（${unchecked.join("、")}），沒有發布（草稿還在）`, t.artifacts);
   }
-  return { artifacts: artifacts as Record<string, unknown> };
+  return publishSteps(t, {
+    now: () => new Date(),
+    sendPost: (postId, link, now) => sendSocial(t, postId, link, now, actor),
+    lookYoutube: (postId) => lookYoutube(t.organization_id, postId),
+    publishArticle: async (wpPostId) => {
+      if (!t.site_id) throw new Error("沒有 WordPress 草稿編號，無法發布");
+      const r = await updateWpPost(orgIdentity(t.organization_id), t.site_id, wpPostId, { status: "publish" });
+      if (!r.ok) throw new Error(`WordPress 發布失敗：${(r as Extract<typeof r, { ok: false }>).error}`);   // strict:false
+      return { status: r.post.status, link: r.post.link };
+    },
+  }, save, fresh);
 }
 
 /** A video job row older than this with nothing submitted is a prepare that died (a prepare takes under ~100s). */
@@ -325,15 +357,17 @@ export async function attachTopicVideo(t: Topic, url: string, actor: string, sav
       await step();
     }
     const s = artifacts.social;
-    if (s?.post_id && !video.media_id) {
-      const post = await getPost(t.organization_id, s.post_id);
+    // each social draft (the other channels', then YouTube's own since N5a) gets the video once; one upload serves both
+    for (const [postId, key] of [[s?.post_id, "media_id"], [s?.youtube_post_id, "youtube_media_id"]] as const) {
+      if (!postId || video[key]) continue;
+      const post = await getPost(t.organization_id, postId);
       // scheduled, submitted or deleted by a person: theirs, left as it is; media already there: an earlier attempt's
       if (post.state === "draft" && !post.media.length) {
-        const media = await addVideo(t.organization_id, url, `topic-${t.id}.mp4`, actor);
-        await savePost(t.organization_id, post.id, post.version, {}, null, [{ media_id: media.id, position: 0 }], actor);
-        video.media_id = media.id;
-      } else if (post.media.length) video.media_id = post.media[0].media_id;
-      if (video.media_id) await step();
+        const mediaId = video.media_id ?? video.youtube_media_id ?? (await addVideo(t.organization_id, url, `topic-${t.id}.mp4`, actor)).id;
+        await savePost(t.organization_id, post.id, post.version, {}, null, [{ media_id: mediaId, position: 0 }], actor);
+        video[key] = mediaId;
+      } else if (post.media.length) video[key] = post.media[0].media_id;
+      if (video[key]) await step();
     }
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);
@@ -377,7 +411,7 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
     claim: (t, patch) => { own(t); return claimTopic(sb, t, patch); },
     make: (t) => { own(t); return runForOrg(organizationId, actor, () => makeDrafts(sb, t, actor, capTwd)); },
     autoPublishes: async (t) => { own(t); const s = await siteFor(sb, t); return typeof s !== "string" && autoPublishes(s.defaults); },
-    publish: (t) => { own(t); return publishDrafts(sb, t, actor); },
+    publish: (t, save, fresh) => { own(t); return publishDrafts(sb, t, actor, save, fresh); },
     startVideo: (t, record) => { own(t); return runForOrg(organizationId, actor, () => startTopicVideo(sb, t, record, capTwd)); },
     pollVideo: (t, jobId) => { own(t); return pollTopicVideo(t, jobId); },
     attachVideo: (t, url, save) => { own(t); return attachTopicVideo(t, url, actor, save); },

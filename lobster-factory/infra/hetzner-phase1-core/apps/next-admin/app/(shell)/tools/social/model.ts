@@ -51,6 +51,8 @@ export const FORMATS: Record<string, Array<{ key: string; label: string; off?: s
   facebook: [{ key: "post", label: "貼文" }, { key: "reel", label: "Reel" }, { key: "story", label: "限時動態" }],
   linkedin: [{ key: "post", label: "貼文" }, { key: "document", label: "文件輪播", off: "文件輪播要上傳 PDF，一頁一張。這個功能還沒開放。" }],
   "linkedin-page": [{ key: "post", label: "貼文" }, { key: "document", label: "文件輪播", off: "文件輪播要上傳 PDF，一頁一張。這個功能還沒開放。" }],
+  // YouTube's format is its privacy (compose.ts): 公開 = "post", like every platform's plain format
+  youtube: [{ key: "post", label: "公開" }, { key: "unlisted", label: "不公開" }],
 };
 export const formatsOf = (p: string) => FORMATS[p] ?? [{ key: "post", label: "貼文" }];
 

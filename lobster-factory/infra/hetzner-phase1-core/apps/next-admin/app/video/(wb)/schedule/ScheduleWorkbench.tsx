@@ -7,7 +7,7 @@ import { shotsFromScript } from "../../../(shell)/tools/video/video-handoff";
 import { useWorkbench, type Workbench } from "../workbench";
 
 type Topic = { id: string; title: string; status: string; scheduled_for: string | null; last_error: string | null; version?: number; site_id?: string | null };
-const STATUS: Record<string, string> = { proposed: "排隊・待確認", approved: "排隊", generating: "進行中・生成內容", drafted: "進行中・草稿已建立", waiting_video: "進行中・製作影片", embedded: "進行中・影片已嵌入", reviewed: "待決定發布", scheduled: "排隊・待發布", published: "已發布", failed: "已停下", rejected: "已停下・未採用" };
+const STATUS: Record<string, string> = { proposed: "排隊・待確認", approved: "排隊", generating: "進行中・生成內容", drafted: "進行中・草稿已建立", waiting_video: "進行中・製作影片", embedded: "進行中・影片已嵌入", reviewed: "待決定發布", scheduled: "排隊・待發布", publishing: "進行中・發布中", published: "已發布", failed: "已停下", rejected: "已停下・未採用" };
 
 /** The content tool's topics page opened on this topic's site, month and topic (TopicsBoard reads the query). */
 const topicHref = (base: string, t: Topic) => {
