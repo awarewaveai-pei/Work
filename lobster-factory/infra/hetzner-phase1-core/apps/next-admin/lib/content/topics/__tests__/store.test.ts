@@ -1,12 +1,12 @@
 // content_topics store: moves only along NEXT, guarded by the status and version read; DB errors throw.
 import { describe, expect, it, vi } from "vitest";
-import { NEXT, TOPIC_STATUSES, TopicMoveRefused, canReschedule, fromTaipei, monthKey, move, proposeTopics, reschedule, spreadDays, startTopic, startedOn, taipeiParts } from "../store";
+import { NEXT, TOPIC_STATUSES, TopicMoveRefused, canReschedule, fromTaipei, monthKey, move, proposeTopics, recentTopics, reschedule, spreadDays, startTopic, startedOn, taipeiParts } from "../store";
 
 /** A query builder that records every filter and answers with `result`. */
 function fakeSb(result: { data?: unknown; error?: { message: string } | null; count?: number }) {
   const calls: Array<[string, unknown[]]> = [];
   const q: Record<string, unknown> = {};
-  for (const k of ["select", "eq", "gt", "update", "upsert", "order"]) q[k] = (...a: unknown[]) => { calls.push([k, a]); return q; };
+  for (const k of ["select", "eq", "gt", "update", "upsert", "order", "or", "range"]) q[k] = (...a: unknown[]) => { calls.push([k, a]); return q; };
   q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: result.data ?? null, error: result.error ?? null, count: result.count }).then(res);
   return { sb: { from: vi.fn(() => q) } as never, calls };
 }
@@ -131,5 +131,38 @@ describe("spreadDays", () => {
     const late = spreadDays("2026-11", 5, 29);
     expect(late).toHaveLength(5);
     expect(late.every((d) => d >= 29 && d <= 30)).toBe(true);
+  });
+});
+
+describe("recentTopics", () => {
+  it("N9: the window is 90 days back (a 91-day-old topic is outside it), site topics plus site-less ones, newest first, limited", async () => {
+    const now = new Date("2026-11-19T00:00:00.000Z");
+    const { sb, calls } = fakeSb({ data: [{ title: "a", keyword: "b" }] });
+    expect(await recentTopics(sb, "org", "site-1", now)).toEqual([{ title: "a", keyword: "b" }]);
+    const since = "2026-08-21T00:00:00.000Z";   // 90 days before; 2026-08-20 (91 days) is before it
+    expect(Date.parse(since)).toBe(now.getTime() - 90 * 86_400_000);
+    expect(calls.filter(([k]) => k === "eq").map(([, a]) => a)).toEqual([["organization_id", "org"]]);
+    expect(calls.filter(([k]) => k === "or").map(([, a]) => a[0])).toEqual([
+      "site_id.eq.site-1,site_id.is.null",
+      `created_at.gte.${since},scheduled_for.gte.${since}`,
+    ]);
+    expect(calls.find(([k]) => k === "range")![1]).toEqual([0, 999]);
+  });
+
+  it("reads every page: a full page is followed by the next, so nothing inside the window is cut off", async () => {
+    const full = Array.from({ length: 1000 }, (_, i) => ({ title: `t${i}`, keyword: `k${i}` }));
+    const pages = [full, [{ title: "last", keyword: "last" }]];
+    const ranges: unknown[] = [];
+    const q: Record<string, unknown> = {};
+    for (const k of ["select", "eq", "or", "order"]) q[k] = () => q;
+    q.range = (...a: unknown[]) => { ranges.push(a); return q; };
+    q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: pages[ranges.length - 1], error: null }).then(res);
+    const rows = await recentTopics({ from: () => q } as never, "org", "s");
+    expect(rows).toHaveLength(1001);
+    expect(ranges).toEqual([[0, 999], [1000, 1999]]);
+  });
+
+  it("a DB error throws", async () => {
+    await expect(recentTopics(fakeSb({ error: { message: "boom" } }).sb, "org", "s")).rejects.toThrow("content_topics:recent:boom");
   });
 });

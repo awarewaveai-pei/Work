@@ -6,14 +6,15 @@ vi.mock("@/lib/content/trending-sources", () => ({
   buildDbSearchBlocks: (rows: unknown[]) => rows,
   runBlocks: async (blocks: unknown[]) => { feed.blocks = blocks; return feed.items; },
 }));
-const m = vi.hoisted(() => ({ site: null as unknown, trends: [] as unknown[], folders: [] as unknown[], proposed: [] as unknown[], byGeo: {} as Record<string, unknown[]>, eventArgs: [] as unknown[], events: [] as string[], taken: [] as string[] }));
+const m = vi.hoisted(() => ({ site: null as unknown, trends: [] as unknown[], folders: [] as unknown[], proposed: [] as unknown[], byGeo: {} as Record<string, unknown[]>, eventArgs: [] as unknown[], events: [] as string[], taken: [] as string[], recent: [] as Array<{ title: string; keyword: string }>, recentArgs: [] as unknown[] }));
 vi.mock("@/lib/events/for-month", () => ({ eventsForMonth: async (_sb: unknown, month: string, country: string | null) => { m.eventArgs = [month, country]; return m.events; } }));
 vi.mock("@/lib/content/brand-voice-store", () => ({ loadSiteBrand: async () => m.site }));
 vi.mock("@/lib/kb/folders", () => ({ listFolders: async () => m.folders }));
 vi.mock("../trends", async (orig) => ({ ...(await orig<typeof import("../trends")>()), saveTrends: async () => { feed.saved++; return 0; },
   recentTrends: async (_sb: unknown, geo: string) => { m.trends.push(geo); return m.byGeo[geo] ?? [{ title: "感恩日記", source: "Google News", days: 1 }]; } }));
 vi.mock("../store", async (orig) => ({ ...(await orig<typeof import("../store")>()), proposeTopics: async (_sb: unknown, rows: unknown[]) => { m.proposed = rows; return rows; },
-  listTopics: async () => m.taken.map((keyword) => ({ keyword })) }));
+  listTopics: async () => m.taken.map((keyword) => ({ keyword })),
+  recentTopics: async (_sb: unknown, org: string, site: string) => { m.recentArgs = [org, site]; return m.recent; } }));
 
 import { buildPlanPrompt, parsePlan, proposeMonth, trendGeosFor } from "../plan";
 
@@ -91,6 +92,38 @@ describe("proposeMonth", () => {
     await proposeMonth({} as never, { organizationId: "org-a", siteId: "s2", month: "2026-11", actor: "x" }, ask);
     m.taken = [];
     expect(ask.mock.calls[0][0]).toContain("這個客戶本月已排的關鍵字（不得再用）：\n- 感恩日記\n- 藝術治療");
+  });
+
+  it("N9: a title or keyword covered in the last 90 days (any case, width or spacing) is skipped, the next candidate fills in", async () => {
+    m.site = { siteId: "s", organizationId: "org-a", name: "Soulful", defaults: {} };
+    m.recent = [{ title: "十月的 A 題", keyword: "ａ題" }, { title: "Old Title", keyword: "oldkw" }];
+    const topics = [
+      { day: 1, title: "十月的  A 題", keyword: "fresh1" },      // title repeats (spacing differs)
+      { day: 2, title: "Brand new", keyword: "A題" },            // keyword repeats (full-width vs half-width)
+      { day: 3, title: "OLD TITLE", keyword: "fresh3" },         // title repeats (case differs)
+      { day: 4, title: "Second new", keyword: "fresh4" },
+    ];
+    const ask = vi.fn(async (_p: string) => JSON.stringify({ topics }));
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
+      expect((m.proposed as Array<{ keyword: string }>).map((r) => r.keyword)).toEqual(["fresh4"]);
+      expect(m.recentArgs).toEqual(["org-a", "s"]);
+      expect(ask.mock.calls[0][0]).toContain("共 32 個");               // 4 spares asked for, so skips can be filled
+      expect(ask.mock.calls[0][0]).toContain("近 90 天已寫過或提過的題目與關鍵字（不得重複，換不同的題目）：\n- 十月的 A 題\n- ａ題\n- Old Title\n- oldkw");
+      expect(log).toHaveBeenCalledWith(expect.stringContaining("skipped 3 topic(s)"));
+    } finally { m.recent = []; log.mockRestore(); }
+  });
+
+  it("N9: nothing covered, nothing skipped and no log line", async () => {
+    m.site = { siteId: "s", organizationId: "org-a", name: "Soulful", defaults: {} };
+    const ask = vi.fn(async () => JSON.stringify({ topics: [{ day: 1, title: "t1", keyword: "k1" }, { day: 2, title: "t2", keyword: "k2" }] }));
+    const log = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      await proposeMonth({} as never, { organizationId: "org-a", siteId: "s", month: "2026-11", actor: "x" }, ask);
+      expect(m.proposed).toHaveLength(2);
+      expect(log).not.toHaveBeenCalled();
+    } finally { log.mockRestore(); }
   });
 
   it("refuses a site of another organization before any AI call", async () => {

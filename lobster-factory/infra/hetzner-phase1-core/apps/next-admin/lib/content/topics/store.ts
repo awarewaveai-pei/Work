@@ -104,6 +104,36 @@ export async function listTopics(sb: SupabaseClient, organizationId: string, mon
   return (data ?? []) as Topic[];
 }
 
+/** Days a title or keyword stays "already covered": a topic proposed or scheduled in the last 90 days (any status, rejected
+ *  and published included) is not proposed again. */
+export const RECENT_TOPIC_DAYS = 90;
+/** Rows per read of recentTopics: PostgREST cuts one read at 1000 by itself, so the window is read in pages of this size. */
+const RECENT_TOPIC_PAGE = 1000;
+/** Pages read at most (10 000 rows = ~100x what one site plans in 90 days); past it something is wrong and we throw, because
+ *  a silently cut list would let a covered topic through. */
+const RECENT_TOPIC_MAX_PAGES = 10;
+
+/** Title and keyword of the site's topics from the last RECENT_TOPIC_DAYS, plus its organization's topics with no site.
+ *  "Last" = the later of created_at and scheduled_for is inside the window (a topic proposed in October for a late
+ *  November date counts until late February; one created long ago for a date far ahead counts too). Reads every page. */
+export async function recentTopics(sb: SupabaseClient, organizationId: string, siteId: string, now = new Date()): Promise<Array<Pick<Topic, "title" | "keyword">>> {
+  const since = new Date(now.getTime() - RECENT_TOPIC_DAYS * 86_400_000).toISOString();
+  const out: Array<Pick<Topic, "title" | "keyword">> = [];
+  for (let page = 0; page < RECENT_TOPIC_MAX_PAGES; page++) {
+    const { data, error } = await sb.from("content_topics").select("title,keyword")
+      .eq("organization_id", organizationId)
+      .or(`site_id.eq.${siteId},site_id.is.null`)
+      .or(`created_at.gte.${since},scheduled_for.gte.${since}`)
+      .order("created_at", { ascending: false }).order("id", { ascending: true })
+      .range(page * RECENT_TOPIC_PAGE, (page + 1) * RECENT_TOPIC_PAGE - 1);
+    if (error) fail("recent", error);
+    const rows = (data ?? []) as Array<Pick<Topic, "title" | "keyword">>;
+    out.push(...rows);
+    if (rows.length < RECENT_TOPIC_PAGE) return out;
+  }
+  throw new Error(`content_topics:recent:more_than_${RECENT_TOPIC_MAX_PAGES * RECENT_TOPIC_PAGE}_rows`);
+}
+
 /** One topic by id, any organization: the caller checks access on topic.organization_id before using it. */
 export async function topicById(sb: SupabaseClient, id: string): Promise<Topic | null> {
   const { data, error } = await sb.from("content_topics").select("*").eq("id", id).maybeSingle();

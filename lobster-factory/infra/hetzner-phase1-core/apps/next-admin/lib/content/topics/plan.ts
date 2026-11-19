@@ -15,9 +15,13 @@ import { isGlobalMarket, TRENDING_GEOS, type TrendingGeo } from "@/lib/content/g
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { buildDbSearchBlocks, runBlocks } from "@/lib/content/trending-sources";
 import { norm, recentTrends } from "./trends";
-import { listTopics, monthKey, proposeTopics, TOPIC_FORMATS, type NewTopic, type Topic, type TopicFormat } from "./store";
+import { listTopics, monthKey, proposeTopics, RECENT_TOPIC_DAYS, recentTopics, TOPIC_FORMATS, type NewTopic, type Topic, type TopicFormat } from "./store";
 
 export const PLAN_TOPICS = 28;
+/** Extra topics asked for so a few covered ones (N9) can be dropped and the month still gets PLAN_TOPICS. */
+const PLAN_SPARE = 4;
+/** Most covered lines put in the prompt (newest first); the filter after the answer still sees all of them. */
+const COVERED_IN_PROMPT = 80;
 const DEFAULT_FORMATS: TopicFormat[] = ["article", "social"];
 
 /** content_defaults.targetCountry (the article tool's list) -> the trending geos a site plans from. A global site
@@ -67,6 +71,7 @@ export interface PlanContext {
   trends: string[];
   folders: string[];
   taken: string[];             // keywords this organization already planned this month (unique per org+month+keyword, 0121)
+  covered?: string[];          // titles and keywords of the last 90 days (N9); the AI is asked not to repeat them
 }
 
 export function buildPlanPrompt(c: PlanContext, n = PLAN_TOPICS): string {
@@ -87,7 +92,10 @@ ${list(c.trends)}
 品牌知識庫的資料夾（代表品牌已蒐集過的主題）：
 ${list(c.folders)}
 
-${c.taken.length ? `這個客戶本月已排的關鍵字（不得再用）：
+${c.covered?.length ? `近 90 天已寫過或提過的題目與關鍵字（不得重複，換不同的題目）：
+${list(c.covered)}
+
+` : ""}${c.taken.length ? `這個客戶本月已排的關鍵字（不得再用）：
 ${list(c.taken)}
 
 ` : ""}規則：title、keyword、angle 一律用${c.language}；keyword 是一個人會拿去搜尋的短詞，彼此不得重複；title 是文章標題；angle 一句話說明切入角度；
@@ -163,18 +171,26 @@ export async function proposeMonth(sb: SupabaseClient, input: ProposeMonthInput,
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
   // one market = its country's events (+ worldwide); global (every geo) or a market with no source = no country filter
   const geos = trendGeosFor(site.defaults.targetCountry);
-  const [trends, folders, events, industry, planned] = await Promise.all([
+  const [trends, folders, events, industry, planned, recent] = await Promise.all([
     trendsFor(sb, geos),
     listFolders(input.organizationId),
     eventsForMonth(sb, month, geos.length === 1 ? geos[0] : null),
     industryTitles(site.siteId, site.defaults.trendFeeds, geos[0] ?? "TW"),
     listTopics(sb, input.organizationId, month),
+    recentTopics(sb, input.organizationId, input.siteId),
   ]);
   const ctx: PlanContext = {
     siteName: site.name, language: siteLanguage(site.defaults), voice: renderSiteVoice(site.defaults), month, daysInMonth, events, industry,
     trends: trends.map((t) => `${t.title}（${t.source}）`), folders: folders.slice(0, 30).map((f) => f.name),
     taken: planned.map((t) => t.keyword),
+    covered: [...new Set(recent.flatMap((t) => [t.title, t.keyword]))].slice(0, COVERED_IN_PROMPT),
   };
-  const rows = parsePlan(await ask(buildPlanPrompt(ctx)), ctx);
+  // Not again within 90 days (the unique key only stops the same month): read extra candidates, drop the covered ones,
+  // keep the first PLAN_TOPICS that are new. Same norm() as trends, so case, width and spacing do not hide a repeat.
+  const covered = new Set(recent.flatMap((t) => [norm(t.title), norm(t.keyword)]));
+  const candidates = parsePlan(await ask(buildPlanPrompt(ctx, PLAN_TOPICS + PLAN_SPARE)), ctx, PLAN_TOPICS * 2);
+  const fresh = candidates.filter((r) => !covered.has(norm(r.title)) && !covered.has(norm(r.keyword)));
+  const rows = fresh.slice(0, PLAN_TOPICS);
+  if (fresh.length < candidates.length) console.info(`[content/topics] plan ${month.slice(0, 7)} site ${input.siteId}: skipped ${candidates.length - fresh.length} topic(s) already covered in the last ${RECENT_TOPIC_DAYS} days`);
   return proposeTopics(sb, rows.map((r) => ({ ...r, organization_id: input.organizationId, site_id: input.siteId, created_by: input.actor })));
 }
