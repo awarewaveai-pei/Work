@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-20（續1）— 影片下一階段：最後一批 N6、N5b、N10、R1 併入 main（75 項全數完成）；本批 RISKS 一起判；全套測試不穩整類關掉
+
+- 驗收：整批交回後一次併入——N6 `f15648458` → `ffbab1070`、N5b `c248b5345` → `b42f169e5`、N10 `78d9e447a` → `e998eb480`、R1 `d3316823f` → `68da3ef7d`，無衝突（N6／N5b 排同一條線依序做的效果）。批 1、批 3、批 4 完成；`data.mjs` 75 項全 done。未部署。
+- Codex 額度用完（工人回報 23:45 重設），N6／N5b／N10 改由 critic 審；監工自己重讀兩個對外守衛：N6 `make.ts` 的 `!autoPublishes(site.defaults) && !personAsked(t.artifacts)`＋`tick.ts requestPublish`（version 搶、auto 進場會丟掉上一輪殘留的 request）＋`publish/route.ts`（`requireBrandRole(WRITE_ROLES)`、狀態必為 reviewed）；N10 `fluentcrm.ts createNewsletter`（只抄白名單欄位、`status` 常數 draft、回應非 draft 即失敗、型別 `status?: never`）。兩者皆有突變紅轉綠。R1 的 9:16 實際渲染圖監工打開看過（大字、不像字幕）。
+- migration：N10 的 0171 與已上 main／正式庫的 `0171_social_accounts_postiz_internal_id` 撞號 → 改 0172（`bda85778e`，兩份 down 與一處註解一併改）；讀 SQL（`wp_sites add column member_newsletter_week date`）後 `apply-db-migration.mjs 0172` APPLY_OK，172 筆 applied。
+- 全套測試不穩整類：工人各自的全套 run 都有不同的畫面測試逾時（N6／N5b 七支、N10 兩支），單跑皆綠；根因＝testing-library 預設只等 1 秒。改成 `next-admin/vitest.setup.ts` 對所有 jsdom 測試設 `asyncUtilTimeout: 5000`（`vitest.config.ts setupFiles`），移除 `9764d45b6` 的兩個逐檔覆寫；全套連跑兩次皆 600 檔綠（剩兩檔紅＝他線 untracked `tools/seedstar/`）。VW gate 第一次跑有一步紅、重跑 ok（同屬滿載）。
+- 本批 RISKS 一起判：
+  - 處理（派線 A，brief `briefs/final-risk-fixes.md`）：(1) N6 發布確認視窗寫的 YouTube 公開／不公開讀的是網站現設定，不是那則草稿實際的 format——第一則真發布的驗收靠「先不公開」把關，不能寫錯；(2) N5b 文章已被人手動發布時影片沒換、只寫在伺服器 log → 題目上要看得到；(3) N10 信的固定文字寫死中文，Soulful 是英文站 → 照網站語言。
+  - 部署後實看（一次）：R1 對真的 Remotion 服務出一張封面（含正式機字型）；B1 發布頁、N1b 設定頁、N3 話題頁、N12 對話框、B25 真實 Pexels 影片、N6 發布鈕。
+  - 接受：N6 按發布要求「自動內容管線」排程開著；規則審核沒過也能由人按（有警告）。N5b REST 站讀寫之間被人發布的既有缺口（兩個現役站都走 Bridge）；舊交付紀錄未標已取代。N10 漏跑的週不補、只收 published、每封一筆 business 事件。R1 封面 JPEG 留在 R2 `remotion/`、Remotion 一次一個工作時封面可能退回舊樣式、`tsconfig.compositions.json` 既有型別錯。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit`（僅 `.next/types` 6 個舊產物錯誤）；全套 `npm test` ×2 → 600 files passed／2 failed（他線 untracked 目錄）；video-workbench `node tests/gate.cjs` gate ok；remotion-service `npm test` 13/13；`node --test scripts/__tests__/down-migration-copies.test.mjs` 2/2；`apply-db-migration.mjs 0172` APPLY_OK（172 applied）；`node build.mjs && node check.mjs` ok（75 items，75 done） | exit=0 | ms=1500000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（三個 m 即上列「處理」三項，已派修；Codex 無額度，守衛由監工重讀＋突變證據）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,lobster-factory/packages/db | grep=personAsked|requestPublish|swapEmbeddedVideo|NEWSLETTER_STATUS|member_newsletter_week|coverStill | hits=41
+- ORACLE_WAIVED: Codex 額度用完（斷路器已記）；對外發布與寄信守衛有突變證據（拔 guard → 指名測試紅 → 還原綠）並經監工逐行重讀；監工自己的改動＝測試設定與 migration 改號
+- rollback：`git revert` 對應 commit（N6 `ffbab1070`、N5b `b42f169e5`、N10 `e998eb480`、R1 `68da3ef7d`、改號 `bda85778e`）；0172 down＝先退程式再跑 `0172_wp_sites_member_newsletter_week.down.sql`。
 ## 2026-11-19（續22）— Google OAuth 改正式版、四個 Google 授權重連；「重新連接」傳錯 refresh 參數（從沒成功過）修正上線
 
 - 操作者：「Google：YouTube、Gmail 要妳改一個設定 你去處理」。Google Cloud 專案 AwareWave-Media（749365809116，awarewaveai@gmail.com 擁有；Postiz YouTube 與外聯 Gmail 兩個 OAuth 用戶端同專案）發布狀態確為「測試」→ 7 天權杖失效的根因成立。在「品牌」頁補首頁 `https://aware-wave.com/`、隱私權 `/privacy-policy/`、服務條款 `/terms-of-service/`（三頁 curl 200）後「發布應用程式」→「實際運作中」。操作者在 Chrome 自行登入 awarewaveai@、soulfulexpression01@（監工不碰密碼）。
