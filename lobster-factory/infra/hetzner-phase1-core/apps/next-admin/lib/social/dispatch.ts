@@ -236,7 +236,7 @@ export async function runDispatch(ports: DispatchPorts, opts: { mode: DispatchMo
         return;
       }
     }
-    // the mirror first (lib/social/channel-health.ts, hourly from Postiz's own refreshNeeded): no Postiz call for a
+    // the mirror first (lib/social/channel-health.ts, every 5 min from Postiz's own refreshNeeded): no Postiz call for a
     // channel Postiz already says cannot post. Only the mirror sets an expired channel back to connected.
     if (t.accountStatus === "disabled") return refuse(failureText.disabledHere(t.platform));
     if (t.accountStatus === "expired") return refuse(failureText.channelGone(t.platform, "Postiz 回報授權失效"));
@@ -249,8 +249,11 @@ export async function runDispatch(ports: DispatchPorts, opts: { mode: DispatchMo
     try {
       composed = composeFor(post, t);
     } catch (e) {
-      // anything compose cannot build is this target's failure, never a run error that would leave its lease hanging
-      return refuse(e instanceof ComposeError ? e.message : `could not build the post: ${String(e).slice(0, 200)}`);
+      // anything compose cannot build is this target's failure, never a run error that would leave its lease hanging;
+      // like every other refusal it says what to do; the ComposeError text is the specific reason (missing media, a
+      // Reel without a video, a platform this editor cannot set up…), so the guidance points at it (Codex 2026-11-19)
+      const why = e instanceof ComposeError ? e.message : String(e).slice(0, 200);
+      return refuse(`貼文內容無法送出（${why}）：請打開這則貼文，依括號內的原因修正後重新排程`);
     }
     if (clock() - started > RUN_BUDGET_MS) {   // the checks above took the rest of the run: give the lease back, unsent
       await ports.recordSend(post, t.id, null, null);

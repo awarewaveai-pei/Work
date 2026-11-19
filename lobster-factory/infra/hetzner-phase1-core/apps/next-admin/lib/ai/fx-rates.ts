@@ -68,10 +68,11 @@ export function latestRateByMonth(rows: FxRate[]): Map<string, FxRate> {
   return out;
 }
 
-/** A month's automatic average counts only with at least this many trading days (Taiwan has 15–23 a month; February with
- *  the New Year holiday is the low end). Fewer = the month is still running or the CBC file has not finished it, so the
- *  average is shown as partial and never booked (Codex review 2026-11-19: one published day must not become a month). */
-export const MIN_AUTO_DAYS = 15;
+/** A month's automatic average counts only with at least this many trading days. Taiwan has 14–23 a month: the CBC file
+ *  holds 14 for 2026-02 (New Year holiday), so the floor is 10 and the month-end rule below does the real work. Fewer =
+ *  the month is still running or the CBC file has not finished it, so the average is shown as partial and never booked
+ *  (Codex review 2026-11-19: one published day must not become a month). */
+export const MIN_AUTO_DAYS = 10;
 /** …and its newest day must fall on or after this day of the month: a file that stops mid-month can still hold 15 days
  *  (Codex review round 4). Taiwan's last trading day is on or after the 25th in every month. */
 export const MIN_LAST_DAY = 25;
