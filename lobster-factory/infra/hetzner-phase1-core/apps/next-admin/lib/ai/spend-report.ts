@@ -8,6 +8,8 @@
  * while image/video spend was already logged here — 2026-10-23).
  */
 
+import { buildFxTable, rateFor, type FxTable, type MonthFx } from "./fx-rates";
+
 export type SpendKind = "text" | "image" | "video" | "tool";
 
 export interface SpendRow {
@@ -147,10 +149,13 @@ export function groupLedger(rows: SpendRow[]): LedgerGroup[] {
 export interface MonthReport {
   month: string; // YYYY-MM, Asia/Taipei
   summary: SpendSummary;
+  /** Accounting rate for this month (fx-rates.ts rateFor); every NT$ in 月報 / CSV uses it. */
+  fx: MonthFx;
+  totalNtd: number;
 }
 
-/** Newest month first. Every row lands in exactly one month. */
-export function monthlyReports(rows: SpendRow[]): MonthReport[] {
+/** Newest month first. Every row lands in exactly one month; each month converts at its own accounting rate. */
+export function monthlyReports(rows: SpendRow[], fx: FxTable = buildFxTable([])): MonthReport[] {
   const byMonth = new Map<string, SpendRow[]>();
   for (const r of rows) {
     const m = taipeiMonth(r.created_at);
@@ -160,7 +165,11 @@ export function monthlyReports(rows: SpendRow[]): MonthReport[] {
   }
   return [...byMonth.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
-    .map(([month, list]) => ({ month, summary: summarizeSpend(list) }));
+    .map(([month, list]) => {
+      const summary = summarizeSpend(list);
+      const rate = rateFor(month, fx);
+      return { month, summary, fx: rate, totalNtd: summary.totalUsd * rate.rate };
+    });
 }
 
 /** DB timestamps carry `+00:00`, JS ISO strings `Z` — compare instants, never strings. */

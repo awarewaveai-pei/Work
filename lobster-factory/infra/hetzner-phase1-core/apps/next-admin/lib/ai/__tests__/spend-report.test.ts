@@ -5,6 +5,8 @@ import {
   type SpendRow,
 } from "../spend-report";
 import { loadSpendRows, MAX_ROWS } from "../spend-loader";
+import { buildFxTable } from "../fx-rates";
+import { TWD_RATE } from "../cost-model";
 
 let n = 0;
 function row(p: Partial<SpendRow>): SpendRow {
@@ -81,6 +83,21 @@ describe("monthly report", () => {
     expect(months.map((m) => m.month)).toEqual(["2026-10", "2026-09"]);
     expect(months.reduce((s, m) => s + m.summary.totalUsd, 0)).toBeCloseTo(total, 9);
     expect(months[1].summary.totalUsd).toBeCloseTo(0.004, 9);
+  });
+
+  it("each month converts at its own accounting rate; a month with none uses TWD_RATE and says so", () => {
+    const fx = buildFxTable(
+      [{ id: "f1", month: "2026-10-01", base: "USD", quote: "TWD", rate: "31.5", source: "card_statement", note: null, created_by: null, created_at: "2026-11-02T00:00:00Z" }],
+      // 16 September days reaching the 29th: 8 at 30 and 8 at 31 — a complete month averaging 30.5
+      [...Array.from({ length: 15 }, (_, i) => ({ day: `2026-09-${String(i + 1).padStart(2, "0")}`, rate: i < 8 ? 30 : 31 })), { day: "2026-09-29", rate: 31 }],
+    );
+    const withAug = [...rows, row({ cost_usd: 1, created_at: "2026-08-10T00:00:00Z" })];
+    const [oct, sep, aug] = monthlyReports(withAug, fx);
+    expect(oct.totalNtd).toBeCloseTo(oct.summary.totalUsd * 31.5, 9);
+    expect(sep.totalNtd).toBeCloseTo(sep.summary.totalUsd * 30.5, 9);
+    expect(sep.fx).toMatchObject({ source: "auto_monthly_avg", days: 16 });
+    expect(aug.fx).toMatchObject({ source: "fallback", fallback: true, rate: TWD_RATE });
+    expect(aug.totalNtd).toBeCloseTo(1 * TWD_RATE, 9);
   });
 
   it("month start is 00:00 Taipei on the 1st", () => {

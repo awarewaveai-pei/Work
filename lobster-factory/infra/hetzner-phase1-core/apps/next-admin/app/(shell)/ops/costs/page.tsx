@@ -10,8 +10,10 @@ import { FreeQuotaCard } from "./FreeQuotaCard";
 import { CodexQuotaCard } from "./CodexQuotaCard";
 import { loadCodexImageUsage } from "@/lib/ai/codex-usage";
 import { loadOrgNames, loadSpendRows } from "@/lib/ai/spend-loader";
+import { loadFxDaily, loadFxRates } from "@/lib/ai/fx-loader";
+import { buildFxTable } from "@/lib/ai/fx-rates";
 import {
-  groupLedger, liveSpend, monthlyReports, rowsSince, summarizeSpend, taipeiDayStartIso, taipeiMonthStartIso,
+  groupLedger, liveSpend, monthlyReports, rowsSince, summarizeSpend, taipeiDayStartIso, taipeiMonth, taipeiMonthStartIso,
   type SpendRow,
 } from "@/lib/ai/spend-report";
 import { CostsTabs, type CostsData } from "./CostsTabs";
@@ -32,7 +34,7 @@ async function loadCosts(): Promise<CostsData> {
   const historySince = taipeiDayStartIso(now, WINDOW_DAYS - 1 + 14);
   const empty = summarizeSpend([]);
   const base: CostsData = {
-    windowDays: WINDOW_DAYS, window: empty, live: liveSpend([], now), ledger: [], ledgerGroupCount: 0, months: [], orgNames: {},
+    windowDays: WINDOW_DAYS, window: empty, live: liveSpend([], now), ledger: [], ledgerGroupCount: 0, months: [], orgNames: {}, fxRows: [],
   };
   const supabase = getSupabaseWriteClient();
   if (!supabase) return { ...base, note: "Supabase service-role 未設定 — 無法讀取真實花費。" };
@@ -41,6 +43,9 @@ async function loadCosts(): Promise<CostsData> {
   const since = reportSince < historySince ? reportSince : historySince;
   const load = await loadSpendRows(supabase, since);
   const orgNames = await loadOrgNames(supabase, load.rows);
+  // 月報 converts each month at its own accounting rate (lib/ai/fx-rates.ts); read once for every month shown.
+  const fxSince = `${taipeiMonth(reportSince)}-01`; // reportSince is a UTC instant: 16:00Z on the day before the 1st
+  const [fxManual, fxDaily] = await Promise.all([loadFxRates(supabase, fxSince), loadFxDaily(supabase, fxSince)]);
 
   const windowRows = rowsSince(load.rows, windowSince);
   const groups = groupLedger(windowRows);
@@ -51,6 +56,9 @@ async function loadCosts(): Promise<CostsData> {
 
   const notes: string[] = [];
   if (load.error) notes.push(`ai_call_logs 讀取失敗：${load.error}（下列數字只含已讀到的 ${load.rows.length} 筆）`);
+  // A failed read is carried into the table: those months show 不可入帳 instead of a wrong rate (fx-rates.ts rateFor).
+  if (fxManual.error) notes.push(`fx_rates 讀取失敗：${fxManual.error}（月報 NT$ 暫以參考價 ${TWD_RATE} 計，不可入帳）`);
+  if (fxDaily.error) notes.push(`fx_daily_rates 讀取失敗：${fxDaily.error}（沒有人工匯率的月份不可入帳）`);
   if (load.truncated) notes.push(`資料超過讀取上限，只讀到前 ${load.rows.length} 筆 — 總額偏低。`);
 
   return {
@@ -60,8 +68,9 @@ async function loadCosts(): Promise<CostsData> {
     live: liveSpend(load.rows, now),
     ledger,
     ledgerGroupCount: groups.length,
-    months: monthlyReports(rowsSince(load.rows, reportSince)),
+    months: monthlyReports(rowsSince(load.rows, reportSince), buildFxTable(fxManual.rows, fxDaily.rows, { manual: fxManual.error, daily: fxDaily.error })),
     orgNames,
+    fxRows: fxManual.rows,
   };
 }
 
@@ -83,7 +92,7 @@ export default async function CostsPage() {
             AI &amp; 工具成本
           </h1>
           <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>
-            匯率 USD→NT$ = {TWD_RATE} · SSOT: cost-model.ts
+            報價匯率 {TWD_RATE}（cost-model.ts）；會計匯率見月報（央行月平均，可人工覆蓋）
           </span>
         </div>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>

@@ -14,6 +14,7 @@
 # outreach_gmail_sync: every 10 min, sent detection and replies / unsubscribes / bounces from each connected Gmail (lib/outreach/gmail-sync.ts).
 # trigger_slots_check: a Trigger.dev concurrency slot held by a run that is not running (C3; the 2026-10-23 outage).
 # auth_profiles_check: an auth.users row without a profiles row, or a 0161 auth.users trigger missing / disabled (count-only).
+# fx_fetch_cbc: 17:00 Taipei, the central bank's NT$/USD closing rates into fx_daily_rates for /ops/costs 月報 (lib/ai/fx-cbc.ts).
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh host_schedules_report 'python3 /root/lobster-phase1/scripts/report-host-schedules.py >> /var/log/host-schedules.log 2>&1'
@@ -29,6 +30,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 30 0 * * * root /root/lobster-phase1/scripts/cron-run.sh outreach_sender_health '/root/lobster-phase1/scripts/poke.sh outreach_sender_health /api/internal/outreach/sender-health OUTREACH_SYNC_TOKEN'
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh outreach_gmail_sync '/root/lobster-phase1/scripts/poke.sh outreach_gmail_sync /api/internal/outreach/gmail-sync OUTREACH_SYNC_TOKEN'
 20 1 * * * root /root/lobster-phase1/scripts/cron-run.sh billing_reconcile '/root/lobster-phase1/scripts/poke.sh billing_reconcile /api/internal/billing/reconcile SCHEDULE_INGEST_TOKEN'
+0 9 * * * root /root/lobster-phase1/scripts/cron-run.sh fx_fetch_cbc '/root/lobster-phase1/scripts/poke.sh fx_fetch_cbc /api/internal/fx/fetch SCHEDULE_INGEST_TOKEN'
 5 * * * * root /root/lobster-phase1/scripts/cron-run.sh site_watch_tick '/root/lobster-phase1/scripts/site-watch-tick.sh'
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh dispatch_action_run '/root/lobster-phase1/scripts/trigger-task.sh dispatch_action_run dispatch-action-run'
 0 4 * * * root /root/lobster-phase1/scripts/cron-run.sh ao_infrastructure_check '/root/lobster-phase1/scripts/trigger-task.sh ao_infrastructure_check ao-infrastructure-check'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cronCadence } from "../cron-cadence";
@@ -173,6 +173,14 @@ describe("hostScheduleRowsFrom", () => {
   it("cron file drift is its own failed row", () => {
     const rows = hostScheduleRowsFrom(doc([], { cron_files_drift: ["lobster-backup"] }), NOW);
     expect(row(rows, "host_cron_drift")).toMatchObject({ state: "failed" });
+  });
+});
+
+describe("fx_fetch_cbc registration", () => {
+  it("is registered here and rung from cron.d at 17:00 Taipei through the internal fx route", () => {
+    expect(HOST_JOBS.fx_fetch_cbc?.label).toBeTruthy();
+    const cron = readFileSync(join(__dirname, "../../../../../scripts/cron.d/awarewave-schedules"), "utf8");
+    expect(cron).toMatch(/^0 9 \* \* \* root \S+cron-run\.sh fx_fetch_cbc '\S+poke\.sh fx_fetch_cbc \/api\/internal\/fx\/fetch SCHEDULE_INGEST_TOKEN'$/m);
   });
 });
 

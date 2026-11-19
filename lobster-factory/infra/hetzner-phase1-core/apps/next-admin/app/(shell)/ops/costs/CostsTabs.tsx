@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { featureUnitCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { TEXT_FEATURES, IMAGE_RATES, TOOL_RATES, VIDEO_MOTION_RATES, INFRA_MONTHLY, TWD_RATE } from "@/lib/ai/cost-model";
 import {
   spendKind, DAY_SPIKE_RATIO, ROUTE_SPIKE_RATIO,
   type LedgerGroup, type LiveSpend, type MonthReport, type SpendAnomaly, type SpendKind, type SpendSummary,
 } from "@/lib/ai/spend-report";
+import { describeFx, fmtRate, MANUAL_FX_SOURCES, SOURCE_LABEL, type FxRate, type ManualFxSource, type MonthFx } from "@/lib/ai/fx-rates";
 import { CostEstimator } from "./CostEstimator";
 import AiModelsClient from "@/app/(shell)/tools/ai-models/AiModelsClient";
 
@@ -26,6 +28,8 @@ export interface CostsData {
   /** 月報 — Asia/Taipei calendar months, newest first. */
   months: MonthReport[];
   orgNames: Record<string, string>;
+  /** Manual accounting-rate rows (fx_rates), newest first: the audit trail shown under each month. */
+  fxRows: FxRate[];
 }
 
 interface Props {
@@ -37,8 +41,9 @@ type Tab = "spend" | "rates" | "estimator" | "models" | "ledger" | "monthly";
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
 
-const NT = (usd: number) => {
-  const n = usdToNtd(usd);
+/** `rate` = a month's accounting rate (月報); omitted = the quoting rate TWD_RATE. */
+const NT = (usd: number, rate?: number) => {
+  const n = rate === undefined ? usdToNtd(usd) : usd * rate;
   return `NT$${n.toLocaleString("zh-TW", { maximumFractionDigits: n < 1 ? 4 : 0 })}`;
 };
 const USD = (usd: number) =>
@@ -47,8 +52,8 @@ const USD = (usd: number) =>
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function StatCard({
-  label, usd, sub, accent,
-}: { label: string; usd: number; sub: string; accent?: boolean }) {
+  label, usd, sub, accent, rate,
+}: { label: string; usd: number; sub: string; accent?: boolean; rate?: number }) {
   return (
     <div style={{
       background: accent ? "var(--accent)" : "var(--card-bg)",
@@ -58,7 +63,7 @@ function StatCard({
       display: "flex", flexDirection: "column", gap: 4,
     }}>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", opacity: accent ? 0.8 : 0.55 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>{NT(usd)}</div>
+      <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1 }}>{NT(usd, rate)}</div>
       <div style={{ fontSize: 12, opacity: accent ? 0.85 : 0.6 }}>{USD(usd)} · {sub}</div>
     </div>
   );
@@ -163,11 +168,11 @@ function Warn({ children }: { children: React.ReactNode }) {
 }
 
 /** Rows whose figure is not trustworthy — said out loud, never silently folded into a clean total. */
-function QualityNotes({ s }: { s: SpendSummary }) {
+function QualityNotes({ s, rate }: { s: SpendSummary; rate?: number }) {
   if (s.fallbackPricedCount === 0 && s.zeroCostCount === 0) return null;
   return (
     <Warn>
-      {s.fallbackPricedCount > 0 && <>{s.fallbackPricedCount} 筆模型不在費率表，用預設費率估價（{NT(s.fallbackPricedUsd)}，可能不準）。</>}
+      {s.fallbackPricedCount > 0 && <>{s.fallbackPricedCount} 筆模型不在費率表，用預設費率估價（{NT(s.fallbackPricedUsd, rate)}，可能不準）。</>}
       {s.zeroCostCount > 0 && <> {s.zeroCostCount} 筆記為 $0（沒有對應單價），實際花費可能沒算進來。</>}
     </Warn>
   );
@@ -273,7 +278,7 @@ function SpendTab({ live, note }: { live: LiveSpend; note?: string }) {
       <p style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.7, margin: 0 }}>
         這頁看「現在花多快、有沒有異常」；某個月的總帳、依廠商／客戶分項看「月報」，每一筆看「流水帳」。三頁同一份資料（<code>ai_call_logs</code>）。
         月底推估 = 本月至今 ÷ 本月已過的比例，只是速度估算。暴增判準：單日 ≥ 前 14 天中位數 {DAY_SPIKE_RATIO} 倍且 ≥ US$0.5；單一功能今天 ≥ 前 7 天日均 {ROUTE_SPIKE_RATIO} 倍且 ≥ US$0.2。
-        金額是用量 × 公開單價，不是廠商帳單。匯率 USD→NT$ = {TWD_RATE}。
+        金額是用量 × 公開單價，不是廠商帳單。本頁 NT$ 用報價匯率 {TWD_RATE}（cost-model.ts）；記帳用的會計匯率見「月報」（央行收盤月平均，可人工覆蓋），月報與 CSV 按各月會計匯率換算。
       </p>
     </div>
   );
@@ -515,8 +520,8 @@ function pct(part: number, whole: number) {
   return whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : "—";
 }
 
-function BreakdownCard({ title, buckets, total, label }: {
-  title: string; buckets: { key: string; count: number; usd: number }[]; total: number; label?: (k: string) => string;
+function BreakdownCard({ title, buckets, total, label, rate }: {
+  title: string; buckets: { key: string; count: number; usd: number }[]; total: number; label?: (k: string) => string; rate: number;
 }) {
   return (
     <Card>
@@ -525,35 +530,147 @@ function BreakdownCard({ title, buckets, total, label }: {
         ? <EmptyState text="本月無記錄。" />
         : <Table
             head={["項目", "筆數", "占比", "NT$", "USD"]}
-            rows={buckets.map((b) => [label ? label(b.key) : b.key, b.count.toLocaleString(), pct(b.usd, total), NT(b.usd), USD(b.usd)])}
+            rows={buckets.map((b) => [label ? label(b.key) : b.key, b.count.toLocaleString(), pct(b.usd, total), NT(b.usd, rate), USD(b.usd)])}
           />
       }
     </Card>
   );
 }
 
-/** One CSV per month for the bookkeeper: every breakdown, USD and NT$, with the basis stated. */
+/** One CSV per month for the bookkeeper: every breakdown, USD and NT$ at the month's accounting rate, basis stated. */
 function monthCsv(m: MonthReport, orgName: (id: string) => string): string {
   const s = m.summary;
+  const rate = m.fx.rate;
+  const ntd = (usd: number) => (usd * rate).toFixed(2);
   const lines = [["section", "item", "count", "usd", "ntd"].join(",")];
   const q = (v: string) => `"${v.replace(/"/g, '""')}"`;
   const push = (section: string, b: { key: string; count: number; usd: number }[], label = (k: string) => k) => {
-    for (const x of b) lines.push([section, q(label(x.key)), x.count, x.usd.toFixed(6), usdToNtd(x.usd).toFixed(2)].join(","));
+    for (const x of b) lines.push([section, q(label(x.key)), x.count, x.usd.toFixed(6), ntd(x.usd)].join(","));
   };
-  lines.push(["total", q(`${m.month} AI 用量（用量×公開單價，非廠商帳單）`), s.count, s.totalUsd.toFixed(6), usdToNtd(s.totalUsd).toFixed(2)].join(","));
+  lines.push(["fx", q(`USD→TWD 匯率 ${describeFx(m.fx)}`), 1, fmtRate(rate), ""].join(","));
+  lines.push(["total", q(`${m.month} AI 用量（用量×公開單價，非廠商帳單；匯率 ${fmtRate(rate)}${m.fx.fallback ? "，不可入帳" : ""}）`), s.count, s.totalUsd.toFixed(6), ntd(s.totalUsd)].join(","));
   push("kind", s.byKind, (k) => KIND_LABEL[k as SpendKind] ?? k);
   push("vendor", s.byVendor);
   push("model", s.byModel);
   push("feature", s.byTool, (k) => TOOL_LABEL[k] ?? k);
   push("client", s.byOrg, orgName);
   for (const i of INFRA_MONTHLY) {
-    lines.push(["infra_current", q(`${i.label}${i.estimate ? "（估算）" : "（帳單）"}`), 1, i.usdPerMonth.toFixed(2), usdToNtd(i.usdPerMonth).toFixed(2)].join(","));
+    lines.push(["infra_current", q(`${i.label}${i.estimate ? "（估算）" : "（帳單）"}`), 1, i.usdPerMonth.toFixed(2), ntd(i.usdPerMonth)].join(","));
   }
   return "﻿" + lines.join("\n");
 }
 
-function MonthlyTab({ months, orgNames, monthlyInfraUsd, note }: {
-  months: MonthReport[]; orgNames: Record<string, string>; monthlyInfraUsd: number; note?: string;
+/** 「立刻抓匯率」: runs the daily fx_fetch_cbc job now (lib/ai/fx-cbc.ts), then reloads the report. */
+function FetchFxButton() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch("/api/ops/costs/fx-rates/fetch", { method: "POST" });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; upserted?: number; latestDay?: string | null };
+      if (!res.ok || !j.ok) { setMsg(`抓取失敗：${j.error ?? res.status}`); return; }
+      setMsg(`已更新 ${j.upserted ?? 0} 天，最新 ${j.latestDay ?? "—"}`);
+      router.refresh();
+    } catch (e) {
+      setMsg(`抓取失敗：${String(e).slice(0, 80)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span style={{ marginLeft: "auto", display: "inline-flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--text-secondary)" }}>
+      {msg && <span>{msg}</span>}
+      <button
+        type="button" onClick={run} disabled={busy}
+        style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12.5, cursor: busy ? "wait" : "pointer", border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)" }}
+      >
+        {busy ? "抓取中…" : "立刻抓匯率"}
+      </button>
+    </span>
+  );
+}
+
+/** The month's accounting rate, the form that appends a new one, and the month's earlier rows (audit trail). */
+function FxPanel({ month, fx, history }: { month: string; fx: MonthFx; history: FxRate[] }) {
+  const router = useRouter();
+  const [rate, setRate] = useState("");
+  const [source, setSource] = useState<ManualFxSource>("bot_monthly_avg");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const save = async () => {
+    const n = Number(rate);
+    if (!(n > 0)) { setMsg("請填大於 0 的匯率數字。"); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch("/api/ops/costs/fx-rates", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ month, rate: n, source, note: note.trim() || null }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) { setMsg(`存入失敗：${j.error ?? res.status}`); return; }
+      setRate(""); setNote(""); setMsg("已存入。");
+      router.refresh();
+    } catch (e) {
+      setMsg(`存入失敗：${String(e).slice(0, 80)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const btn = (active: boolean): React.CSSProperties => ({
+    padding: "5px 10px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+    border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+    background: active ? "var(--accent)" : "var(--card-bg)",
+    color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
+    fontWeight: active ? 700 : 500,
+  });
+  const input: React.CSSProperties = {
+    padding: "5px 8px", borderRadius: 8, fontSize: 12.5, border: "1px solid var(--border-subtle)",
+    background: "var(--bg-canvas)", color: "var(--text-primary)",
+  };
+
+  return (
+    <Card>
+      <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {fx.source === "unavailable"
+          ? <Warn>匯率表讀取失敗（{fx.error}）：{month} 的 NT$ 暫以參考價 {TWD_RATE} 計，不可入帳。</Warn>
+          : fx.source === "auto_partial"
+          ? <Warn>{month} 的會計匯率 {describeFx(fx)}；要入帳請等央行補齊或在下面人工填。</Warn>
+          : fx.fallback
+          ? <Warn>尚未填 {month} 的會計匯率，暫以參考價 {TWD_RATE} 計。</Warn>
+          : <div style={{ fontSize: 13, color: "var(--text-primary)" }}>會計匯率 <b>{describeFx(fx)}</b></div>}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", fontSize: 12.5, color: "var(--text-secondary)" }}>
+          <span>人工填 {month} 會計匯率（信用卡帳單或臺銀牌告請在這裡手填；填了就覆蓋自動值）</span>
+          <input aria-label="匯率" inputMode="decimal" placeholder="例如 31.85" value={rate} onChange={(e) => setRate(e.target.value)} style={{ ...input, width: 100 }} />
+          {MANUAL_FX_SOURCES.map((k) => (
+            <button key={k} type="button" onClick={() => setSource(k)} style={btn(source === k)}>{SOURCE_LABEL[k]}</button>
+          ))}
+          <input aria-label="備註" placeholder="備註（選填）" value={note} onChange={(e) => setNote(e.target.value)} style={{ ...input, flex: "1 1 160px" }} />
+          <button type="button" onClick={save} disabled={busy} style={{ ...btn(true), cursor: busy ? "wait" : "pointer" }}>{busy ? "存入中…" : "存入"}</button>
+          {msg && <span>{msg}</span>}
+        </div>
+        {history.length > 0 && (
+          <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.7 }}>
+            {month} 填過的匯率（新到舊，最新一筆生效；舊的保留不改）：
+            {history.map((h) => (
+              <div key={h.id}>
+                {new Date(h.created_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false })} · {String(Number(h.rate))} · {SOURCE_LABEL[h.source] ?? h.source}
+                {h.created_by ? ` · ${h.created_by}` : ""}{h.note ? ` · ${h.note}` : ""}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function MonthlyTab({ months, orgNames, monthlyInfraUsd, note, fxRows }: {
+  months: MonthReport[]; orgNames: Record<string, string>; monthlyInfraUsd: number; note?: string; fxRows: FxRate[];
 }) {
   const [picked, setPicked] = useState(months[0]?.month ?? "");
   const m = months.find((x) => x.month === picked) ?? months[0];
@@ -564,6 +681,7 @@ function MonthlyTab({ months, orgNames, monthlyInfraUsd, note }: {
     return <div style={{ padding: "40px 0", textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>近 12 個月尚無花費記錄。</div>;
   }
   const s = m.summary;
+  const rate = m.fx.rate;
 
   const download = () => {
     const blob = new Blob([monthCsv(m, orgName)], { type: "text/csv;charset=utf-8" });
@@ -595,42 +713,46 @@ function MonthlyTab({ months, orgNames, monthlyInfraUsd, note }: {
             {x.month}
           </button>
         ))}
+        <FetchFxButton />
         <button
           onClick={download}
-          style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)" }}
+          style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", border: "1px solid var(--border-subtle)", background: "var(--card-bg)", color: "var(--text-primary)" }}
         >
           Download CSV
         </button>
       </div>
 
-      <QualityNotes s={s} />
+      <FxPanel month={m.month} fx={m.fx} history={fxRows.filter((r) => r.month.slice(0, 7) === m.month)} />
+
+      <QualityNotes s={s} rate={rate} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-        <StatCard label={`${m.month} AI 用量`} usd={s.totalUsd} sub={`${s.count.toLocaleString()} 筆 · 用量×公開單價`} accent />
-        <StatCard label="固定月費（現行設定）" usd={monthlyInfraUsd} sub={infraEstimated > 0 ? `含估算 ${USD(infraEstimated)}` : "全部為帳單金額"} />
-        <StatCard label="AI + 固定月費" usd={s.totalUsd + monthlyInfraUsd} sub="固定月費套用現行設定" />
+        <StatCard label={`${m.month} AI 用量`} usd={s.totalUsd} rate={rate} sub={`${s.count.toLocaleString()} 筆 · 用量×公開單價`} accent />
+        <StatCard label="固定月費（現行設定）" usd={monthlyInfraUsd} rate={rate} sub={infraEstimated > 0 ? `含估算 ${USD(infraEstimated)}` : "全部為帳單金額"} />
+        <StatCard label="AI + 固定月費" usd={s.totalUsd + monthlyInfraUsd} rate={rate} sub="固定月費套用現行設定" />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <BreakdownCard title="依廠商" buckets={s.byVendor} total={s.totalUsd} />
-        <BreakdownCard title="依類型" buckets={s.byKind} total={s.totalUsd} label={(k) => KIND_LABEL[k as SpendKind] ?? k} />
-        <BreakdownCard title="依功能" buckets={s.byTool} total={s.totalUsd} label={(k) => TOOL_LABEL[k] ?? k} />
-        <BreakdownCard title="依客戶" buckets={s.byOrg} total={s.totalUsd} label={orgName} />
+        <BreakdownCard rate={rate} title="依廠商" buckets={s.byVendor} total={s.totalUsd} />
+        <BreakdownCard rate={rate} title="依類型" buckets={s.byKind} total={s.totalUsd} label={(k) => KIND_LABEL[k as SpendKind] ?? k} />
+        <BreakdownCard rate={rate} title="依功能" buckets={s.byTool} total={s.totalUsd} label={(k) => TOOL_LABEL[k] ?? k} />
+        <BreakdownCard rate={rate} title="依客戶" buckets={s.byOrg} total={s.totalUsd} label={orgName} />
       </div>
-      <BreakdownCard title="依模型" buckets={s.byModel} total={s.totalUsd} label={(k) => IMAGE_RATES[k]?.label ?? k} />
+      <BreakdownCard rate={rate} title="依模型" buckets={s.byModel} total={s.totalUsd} label={(k) => IMAGE_RATES[k]?.label ?? k} />
 
       <Card>
         <CardHead title="各月比較（Asia/Taipei 月份）" />
         <Table
-          head={["月份", "筆數", "文字", "圖片", "影片", "工具", "AI 合計 NT$", "AI 合計 USD"]}
+          head={["月份", "會計匯率", "筆數", "文字", "圖片", "影片", "工具", "AI 合計 NT$", "AI 合計 USD"]}
           rows={months.map((x) => [
             x.month,
+            describeFx(x.fx),
             x.summary.count.toLocaleString(),
-            NT(kindUsd(x.summary, "text").usd),
-            NT(kindUsd(x.summary, "image").usd),
-            NT(kindUsd(x.summary, "video").usd),
-            NT(kindUsd(x.summary, "tool").usd),
-            NT(x.summary.totalUsd),
+            NT(kindUsd(x.summary, "text").usd, x.fx.rate),
+            NT(kindUsd(x.summary, "image").usd, x.fx.rate),
+            NT(kindUsd(x.summary, "video").usd, x.fx.rate),
+            NT(kindUsd(x.summary, "tool").usd, x.fx.rate),
+            NT(x.summary.totalUsd, x.fx.rate),
             USD(x.summary.totalUsd),
           ])}
         />
@@ -639,7 +761,7 @@ function MonthlyTab({ months, orgNames, monthlyInfraUsd, note }: {
       <p style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.7, margin: 0 }}>
         金額依據：<b>AI 用量</b> = <code>ai_call_logs</code> 每筆呼叫 × <code>cost-model.ts</code> 公開單價（呼叫當下算好存檔），<b>不是廠商帳單</b>；
         與「真實花費」「流水帳」同一份資料。<b>固定月費</b> = <code>INFRA_MONTHLY</code> 現行設定，每月都用同一組數字（過去月份的主機費可能不同），標「估算」者未對過帳單。
-        沒有記錄的花費（例如直接在廠商後台用掉的額度、訂閱費）不在此表。月份以台灣時間切。匯率 USD→NT$ = {TWD_RATE}。
+        沒有記錄的花費（例如直接在廠商後台用掉的額度、訂閱費）不在此表。月份以台灣時間切。<b>匯率</b>：每月用該月的會計匯率（人工填的優先，其次央行銀行間收盤月平均（每天 17:00 自動抓）；都沒有時暫用報價匯率 {TWD_RATE} 並標示）；報價、試算、按鈕價格仍用報價匯率 {TWD_RATE}（cost-model.ts）。
       </p>
     </div>
   );
@@ -690,7 +812,7 @@ export function CostsTabs({ data, monthlyInfraUsd }: Props) {
       {tab === "estimator" && <CostEstimator />}
       {tab === "models"    && <ModelsTab />}
       {tab === "ledger"    && <LedgerTab groups={data.ledger} groupCount={data.ledgerGroupCount} s={data.window} windowDays={data.windowDays} />}
-      {tab === "monthly"   && <MonthlyTab months={data.months} orgNames={data.orgNames} monthlyInfraUsd={monthlyInfraUsd} note={data.note} />}
+      {tab === "monthly"   && <MonthlyTab months={data.months} orgNames={data.orgNames} monthlyInfraUsd={monthlyInfraUsd} note={data.note} fxRows={data.fxRows} />}
     </div>
   );
 }
