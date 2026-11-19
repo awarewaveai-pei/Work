@@ -53,7 +53,7 @@ describe("content_pipeline job", () => {
   });
 
   it("the cell's cost text names the monthly plan price (B6)", () => {
-    expect(job.cost).toMatch(/每個網站每月第一次提案另約 [\d.]+ 美元/);
+    expect(job.cost).toMatch(/每個網站每月第一次提案另約 NT\$[\d.]+。/);
   });
 
   it("a trends failure still ticks, then reports both the tick summary and the failure", async () => {

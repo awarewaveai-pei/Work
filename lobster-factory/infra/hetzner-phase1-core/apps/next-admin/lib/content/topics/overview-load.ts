@@ -7,6 +7,8 @@ import { eventsForMonth } from "@/lib/events/for-month";
 import { loadSpendRows } from "@/lib/ai/spend-loader";
 import { summarizeSpend, taipeiMonthStartIso } from "@/lib/ai/spend-report";
 import { planDueDeps } from "./plan-due";
+import { recentTopicActual } from "./actual-cost";
+import type { TopicActual } from "./cost";
 import { trendGeosFor } from "./plan";
 import { buildOverview, type OverviewRow } from "./overview";
 import { monthKey, taipeiParts, type TopicSource, type TopicStatus } from "./store";
@@ -20,7 +22,11 @@ export interface TrendCell {
   sources: string[];
   events: number;
 }
-export interface OverviewData { month: string; rows: OverviewRow[]; cells: Record<string, TrendCell>; spendNote: string | null }
+export interface OverviewData {
+  month: string; rows: OverviewRow[]; cells: Record<string, TrendCell>; spendNote: string | null;
+  /** organizationId -> (formats key -> median real spend of the last 30 days' finished topics, N3); a combination without 5 topics is absent. */
+  actual: Record<string, Record<string, TopicActual>>;
+}
 
 const JOB = "content_pipeline";
 const fail = (what: string, e: { message: string }): never => { throw new Error(`content_overview:${what}:${e.message}`); };
@@ -54,7 +60,7 @@ export async function loadOverview(sb: SupabaseClient, mayRead: (organizationId:
   }>).filter((s) => mayRead(s.organization_id));
   const orgIds = [...new Set(sites.map((s) => s.organization_id))];
   const siteIds = sites.map((s) => s.id);
-  if (!sites.length) return { month, rows: [], cells: {}, spendNote: null };
+  if (!sites.length) return { month, rows: [], cells: {}, spendNote: null, actual: {} };
 
   const schedRes = await sb.from("client_schedules").select("organization_id, enabled, daily_limit, last_error").eq("job_key", JOB).in("organization_id", orgIds);
   if (schedRes.error) fail("schedules", schedRes.error);
@@ -69,6 +75,10 @@ export async function loadOverview(sb: SupabaseClient, mayRead: (organizationId:
     topics.push(...page);
     from += page.length;
   }
+
+  // N3: what a topic really costs here; a failed read gives null and the page shows the price list (never blocks the page)
+  const actual: Record<string, Record<string, TopicActual>> = {};
+  await Promise.all(orgIds.map(async (o) => { actual[o] = await recentTopicActual(sb, o, now); }));
 
   const canPlan: Record<string, boolean> = {};
   await Promise.all(orgIds.map(async (o) => { canPlan[o] = await planDueDeps(sb, o, "page:content_overview").canPlan(); }));
@@ -111,5 +121,5 @@ export async function loadOverview(sb: SupabaseClient, mayRead: (organizationId:
       events: events.get(geos.length === 1 ? geos[0] : "") ?? 0,
     };
   }
-  return { month, rows, cells, spendNote };
+  return { month, rows, cells, spendNote, actual };
 }

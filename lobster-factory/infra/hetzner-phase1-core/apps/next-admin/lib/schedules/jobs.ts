@@ -9,13 +9,17 @@ import { loadCis } from "@/lib/cs/cis";
 import { applyChatwootBaseline } from "@/lib/cs/chatwoot-baseline";
 import { REPORT_JOBS, runPeriodReport, type ReportKind } from "@/lib/social/reports";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
-import { planCostUsd, topicCostUsd } from "@/lib/content/topics/cost";
+import { planCostTwd, topicCostTwd } from "@/lib/content/topics/cost";
+import { TWD_RATE } from "@/lib/ai/cost-model";
 import { DEFAULT_TOPIC_CAP_TWD } from "@/lib/content/topics/budget";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 import { raiseNotice, withTopicStopNotices } from "./stop-notice";
 import type { JobMeta } from "./types";
 import type { Frequency } from "./schedule";
 import type { StoredSchedule } from "./store";
+
+/** A fixed USD price shown in NT$ (the page rule: every amount a person reads is NT$). */
+const ntd = (usd: number) => Math.ceil(usd * TWD_RATE * 10) / 10;
 
 /** What view.ts knows about a client when deciding whether a job can run there. */
 export interface JobClientFacts {
@@ -61,7 +65,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     description: "定期整理客戶核准的網頁內容，更新客服知識庫。",
     // Prices 2026-10: OpenAI text-embedding-3-small 0.02 USD/1M tokens, Serper ~0.001, Brave ~0.005 per query;
     // caps: DEFAULT_BUDGET 200 fetches (lib/collect/run.ts), MAX_QUERIES 16 (lib/collect/search/query-plan.ts).
-    cost: "網頁抓取免費；新增或變更頁面每次最多約 0.02 美元。有實體檔案來源時，每次最多約 0.12 美元。",
+    cost: `網頁抓取免費；新增或變更頁面每次最多約 NT$${ntd(0.02)}。有實體檔案來源時，每次最多約 NT$${ntd(0.12)}。`,
     frequencies: DAILY_WEEKLY,
     defaults: { frequency: "weekly", hourUtc: 3, dayOfWeekUtc: 1, dayOfMonth: 1 },
     async run(organizationId, runKey) {
@@ -110,7 +114,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     label: "自動內容管線",
     description: "隨時檢查題目：已核准的題目到了排定時間，就依它選的格式做成 WordPress 草稿和社群草稿；選了影片的，影片做好後自動嵌進文章、附到社群貼文，再跑規則審核。網站設成「AI 審核後自動發布」且審核全部通過才會發布，其餘留在草稿。每月自動提題目；題目和排定時間在「自動內容」頁設定。",
     // Prices: lib/ai/cost-model.ts TEXT_FEATURES article + syndicate (lib/content/topics/cost.ts).
-    cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元），選了影片的題目再加約 ${topicCostUsd(["video"]).usual} 美元（腳本；畫面用免費實拍、配音免費）。一天最多花到「每天最多開始」的題數；每一題花到「每題上限」就停在那一步（預設 NT$${DEFAULT_TOPIC_CAP_TWD}）。每個網站每月第一次提案另約 ${planCostUsd()} 美元。沒有到期題目時免費。`,
+    cost: `每題約 NT$${topicCostTwd().usual}（價目表估價，含配圖；文章＋社群改寫，社群太長要重寫時最多 NT$${topicCostTwd().max}），選了影片的題目再加約 NT$${topicCostTwd(["video"]).usual}（腳本；畫面用免費實拍、配音免費）。一天最多花到「每天最多開始」的題數；每一題花到「每題上限」就停在那一步（預設 NT$${DEFAULT_TOPIC_CAP_TWD}）。每個網站每月第一次提案另約 NT$${planCostTwd()}。沒有到期題目時免費。`,
     // every_5m is how often it looks, not a choice: the page shows no frequency for a job with one fixed cadence
     frequencies: [{ value: "every_5m", label: "每 5 分鐘", usesHour: false, usesDay: false }],
     dailyLimit: { label: "每天最多開始", unit: "題", options: Array.from({ length: 10 }, (_, i) => i + 1), default: DAILY_START_CAP },

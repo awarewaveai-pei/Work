@@ -33,6 +33,7 @@ import { finalizeVideoJob } from "@/lib/content/video/finalize";
 import { embedVideoInPost } from "@/lib/content/video/embed-in-post";
 import { releaseTopicVideo } from "./video-release";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
+import { TOPIC_ARTICLE_IMAGES } from "./cost";
 import { DEFAULT_TOPIC_CAP_TWD, reserveStep, settleStep, spentSince, stepUpperTwd, topicBudget, type TopicBudget } from "./budget";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { MakeError, NOW_FORMATS, brandDay, waitsForVideo, type Made, type Published, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
@@ -59,8 +60,7 @@ type Guard = ((upperTwd: number, step: string) => Promise<void>) & { settle(rese
 /** The social post is due this far ahead (state.ts schedule needs a future time; the sender looks 10 min ahead). */
 export const SOCIAL_NOW_LEAD_MS = 2 * 60_000;
 
-/** Images per automatic article (the cheapest model, ~US$0.003 each): the article writes this many placeholders. */
-export const TOPIC_ARTICLE_IMAGES = 3;
+export { TOPIC_ARTICLE_IMAGES };   // defined in cost.ts (the price counts the same images)
 const IMAGE_PLACEHOLDER = /!\[([^\]]*)\]\(IMAGE_PLACEHOLDER_\d+\)/g;
 
 /** Each image placeholder becomes a stored image (alt text = its prompt) or is removed; nothing unresolved reaches WordPress.
