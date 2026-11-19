@@ -14,7 +14,7 @@
 - `PHASE_2_ASSET_RELEASE_REFERENCE_CONTRACT.md`：既有素材、Timeline、Release 與安全刪除的資料契約及 migration gate。
 - `PHASE_4_WHISPER_TRANSCRIPT_AND_CAPTION_CONTRACT.md`：本機 Whisper 轉錄、可校對字幕、審片與 Release 接線契約；目前仍需 worker 接線。
 - `PHASE_4_MEDIA_QA_AND_RELEASE_GATE_CONTRACT.md`：技術／字幕／編輯／權利 QA 的證據、waiver 與 Release gate 契約；尚未執行媒體分析或阻擋發布。
-- `PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md`：短劇 Bible 與實拍 Edit Decision Plan 契約；VideoStudio 已有實拍 EDP 草稿 UI，renderer convergence 仍待完成。
+- `PHASE_5_SHORT_DRAMA_AND_FOOTAGE_EDIT_CONTRACT.md`：短劇 Bible 與實拍 Edit Decision Plan 契約；實拍剪輯畫面已由影音工作台多軌剪輯器取代（舊 VideoStudio 於 2026-11-19 刪除，video-unify-plan-20261116 §4 U11）。
 - `PHASE_6_DELIVERY_OUTCOMES_AND_COMMERCIAL_CONTRACT.md`：WordPress、Postiz、成效回饋、自用／SaaS／企業 BYO API 的交付與治理契約；receipt/billing/outcome API 已在 code，啟用仍需 migration rehearsal。
 - `LIVE_DEPLOYMENT_BASELINE_AND_STAGING_GAP.md`：正式環境盤點與 staging 建置條件。
 - `PHASE_1A_IMPLEMENTATION_RECEIPT.md`、`PHASE_1B_1_LIFECYCLE_CONTRACT_RECEIPT.md`、`PHASE_3A_TIMELINE_V1_CONTRACT_RECEIPT.md`：已整合至 `main`、尚未部署的程式交付。
@@ -29,4 +29,4 @@
 
 `_archive_legacy_p7_2026-09-06/` 儲存不再作為現行操作、設計或部署依據的 P7 單機原型文件。不得依據其中內容執行 Python、SQL、cron、直接 WordPress 發佈或直接社群發佈。
 
-現行發布路徑是：WordPress 經 wp-bridge；社群經 Postiz；影片產物需經既有 VideoStudio 與後續 Release/QA 流程。
+現行發布路徑是：WordPress 經 wp-bridge；社群經 Postiz；影片產物在影音工作台做，經成片卡的「審片與發布」面板（QaStep＋ReleaseDeliveryPanel，video-unify-plan-20261116 §4 U6）。

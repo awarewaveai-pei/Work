@@ -25,7 +25,7 @@ export function sources(dir: string): string[] {
 // prefixCalls: the calls whose URL is a template, so only its leading "/api/..." text is known (a prefix, not a route).
 // templates: those calls as route patterns -- each path segment holding a substitution becomes "[x]"
 // (`/api/ops/clients/${slug}/cs-knowledge` -> "/api/ops/clients/[x]/cs-knowledge"); query and hash dropped.
-export interface Scan { asked: string[]; apis: string[]; calls: string[]; prefixCalls: string[]; templates: Array<{ prefix: string; route: string }>; called: string[]; db: boolean; imports: string[]; meters: boolean }
+export interface Scan { asked: string[]; apis: string[]; calls: string[]; prefixCalls: string[]; templates: Array<{ prefix: string; route: string }>; called: string[]; db: boolean; imports: string[]; meters: boolean; doors: string[] }
 
 const HOLE = "\u0000";
 /** A template URL as a route pattern, or null when it does not start with "/api/". */
@@ -49,7 +49,7 @@ export const typeOnly = (n: ts.ImportDeclaration | ts.ExportDeclaration) => ts.i
     && n.importClause.namedBindings.elements.every((e) => e.isTypeOnly)));
 export function scan(file: string, text: string): Scan {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.tsx$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const out: Scan = { asked: [], apis: [], calls: [], prefixCalls: [], templates: [], called: [], db: false, imports: [], meters: false };
+  const out: Scan = { asked: [], apis: [], calls: [], prefixCalls: [], templates: [], called: [], db: false, imports: [], meters: false, doors: [] };
   const call = (node: ts.Node | undefined) => {
     const u = apiText(node);
     if (!u) return;
@@ -87,6 +87,9 @@ export function scan(file: string, text: string): Scan {
         if (ts.isIdentifier(n.expression) && ["grantFor", "withFeature"].includes(n.expression.text)) out.asked.push(arg.text);
       }
       if (ts.isPropertyAccessExpression(n.expression) && n.expression.name.text === "recordUse") out.meters = true;
+      // doorApiDenial(headers, "social"): a route serving one door that applies another product's door rule reaches that product.
+      const doorArg = n.arguments[1];
+      if (ts.isIdentifier(n.expression) && ["doorApiDenial", "doorAccess"].includes(n.expression.text) && doorArg && ts.isStringLiteralLike(doorArg)) out.doors.push(doorArg.text);
       const featureArg = n.arguments[1];
       if (ts.isIdentifier(n.expression) && n.expression.text === "can" && featureArg && ts.isStringLiteralLike(featureArg)) out.asked.push(featureArg.text);
     }

@@ -21,7 +21,6 @@ const NEEDS_OTHER_TOOL: Readonly<Record<string, Readonly<Record<string, string>>
     "/api/ops/clients/[x]/schedules": "自動內容頁的「製作」步驟內嵌排程表，沒有排程工具的人看不到",
   },
   tarot: { "/api/tools/studio/edit-prompt": "修圖提示詞面板用商品設計工作室的功能" },
-  video: { "/api/social/posts": "ScriptForge 的「送社群」用社群發文的功能" },
   "ops/clients": {
     "/api/content/sites": "客戶中心的網站分頁用內容行銷的功能",
     "/api/content/social-admin": "客戶中心的社群連線分頁用內容行銷的功能",

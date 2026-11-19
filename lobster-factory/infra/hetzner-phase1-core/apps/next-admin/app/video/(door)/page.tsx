@@ -1,10 +1,10 @@
-import VideoTabs from "../../(shell)/tools/video/VideoTabs";
-import VideoPipeline from "../../(shell)/tools/video/VideoPipeline";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "影片製作" };
 
-// video.<base domain>/ -> /video (middleware.ts); the same pipeline staff open at /tools/video, ?advanced=1 included.
-export default async function VideoDoorPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const params = await searchParams;
-  return params.advanced === "1" ? <VideoTabs /> : <VideoPipeline />;
+// video.<base domain>/ is the video workbench's shell (nginx/default.conf video block: `location = /` -> video-workbench).
+// The old pipeline that answered here is gone (video-unify-plan-20261116 §4 U11); a request that still reaches this
+// page (door menu, old link) goes to the workbench.
+export default function VideoDoorPage(): never {
+  redirect("/");
 }

@@ -50,6 +50,7 @@ function edges(): Array<{ from: string; to: string; why: string }> {
     const add = (to: string | null | undefined, why: string) => { if (to && to !== from) out.push({ from, to, why: `${rel}: ${why}` }); };
     for (const u of s.apis) add(ownerOfApi(u), u);
     for (const k of s.asked) add(FEATURE_OWNER.get(k), `asks ${k}`);
+    for (const d of s.doors) add(PRODUCTS.some((p) => p.key === d) ? d : null, `asks door ${d}`);
     for (const r of s.imports) {
       const f = resolve(r);
       const to = f && ownerOfFile(f);
@@ -317,8 +318,8 @@ describe("registry claims match the code", () => {
   });
 
   it("the scanner sees literal asks, URLs in templates, and keys in an imported file", () => {
-    const s = scan("lib/x/a.ts", 'import { g } from "@/lib/tarot/b"; await grantFor("studio.image"); fetch(`/api/tools/studio/x?y=${1}`); const s = "/api/social/";');
-    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], calls: ["/api/tools/studio/x"], prefixCalls: ["/api/tools/studio/x"], templates: [{ prefix: "/api/tools/studio/x", route: "/api/tools/studio/x" }], called: [], db: false, imports: ["lib/tarot/b"], meters: false });
+    const s = scan("lib/x/a.ts", 'import { g } from "@/lib/tarot/b"; await grantFor("studio.image"); fetch(`/api/tools/studio/x?y=${1}`); const s = "/api/social/"; await doorApiDenial(h, "social");');
+    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], calls: ["/api/tools/studio/x"], prefixCalls: ["/api/tools/studio/x"], templates: [{ prefix: "/api/tools/studio/x", route: "/api/tools/studio/x" }], called: [], db: false, imports: ["lib/tarot/b"], meters: false, doors: ["social"] });
     expect(scan("lib/x/a.ts", 'import { g as h, k } from "@/lib/b"; import type { C } from "@supabase/supabase-js"; h(); k;').called).toEqual(["lib/b#g"]);
     expect(scan("lib/x/a.ts", 'import type { C } from "@supabase/supabase-js";').db).toBe(false);
     expect(scan("lib/x/a.ts", 'import { createClient } from "@supabase/supabase-js";').db).toBe(true);

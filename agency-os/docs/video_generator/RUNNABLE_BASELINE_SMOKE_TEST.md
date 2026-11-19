@@ -1,5 +1,7 @@
 # VideoStudio runnable-baseline smoke test
 
+> **已退場（2026-11-19）**：本檔測的 `/tools/video` VideoStudio 畫面已刪（`lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/docs/video-unify-plan-20261116.md` §4 U11）；`/tools/video` 現在只開影音工作台。舊引擎改由工作台第 9 步「快速輸出」呼叫（同計畫 U5）。以下內容僅作歷史記錄，不可照做。
+
 **Status:** TEST PLAN — not executed by this document
 **Purpose:** prove the existing Quick Engine path first. Manual Remotion template rendering is a separate optional check.
 **Safety:** use a disposable staging tenant, a neutral test prompt, a new test article only if required, and never call WordPress embed, Postiz draft/now, cleanup or delete endpoints.
