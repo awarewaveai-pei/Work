@@ -9,6 +9,17 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,tests | grep=Set-Utf8ConsoleOutput | hits=9
 - ORACLE_WAIVED: 只動 stdout 編碼設定；測試含突變證據
 - rollback：`git revert <本 commit>`。
+## 2026-11-19（續11）— 影片下一階段：N4、N17、N14、N16 驗收併入 main；第二批部署；工人線撞訂閱上限
+
+- 驗收：四條線交回 N4 `ed5078490`、N17 `21c01dbd3`、N14 `3c0a81dcf`、N16 `723ad7bf6`，監工讀 FILES／TESTS／RISKS 與完整 diff 後 cherry-pick 進 main → `fd0d963b4`（N4）、`c1acadd30`（N17）、`67f097a51`（N14）、`ec537ff78`（N16）。N16 與 N12 在 `ScriptForge.tsx` 衝突：保留 N12 的兩數字版面、只拿掉 S11 那句舊說明；`sidebar-coverage.test.ts` 有另一 session 未提交的 seedstar hunk，先 `git show HEAD:` 還原、cherry-pick 後 `git apply --3way` 放回、index 只放 N16 版本（commit 不含 seedstar）。
+- 監工決定（操作者授權）：N4 切換當天東於 UTC 的品牌可能多開一次上限、不回填；N14 讀不到文章狀態時以「網站草稿」為準；N16 過期題目主按鈕＝退回、「進行中」含 drafted、腳本頁單站客戶唯讀顯示；B26 做法定案（見 DISPATCH.md 已定段）。
+- 部署第二批（第六次）：14:26 第一次在主機 npm test 閘被擋（`one-click-drafts.test.tsx:37` 元素一出現就比對文字、未等報價載完，4956 支跑 30 秒時 flaky）→ 正式站未動；修成 `waitFor` 等文字（`9d7548f89`，本機連跑三次綠，同目錄無第二處同寫法）；14:33 重跑時筆電 SSH 中斷把腳本殺掉（build 中）→ 正式站仍未動；14:44 改 `setsid nohup` 脫離連線重跑。18:12 完成：npm test 綠、`.deployed-commit = 9d7548f89`（previous 6317f6d8a），兩容器 healthy（16s／1s），HTTP smoke 八項 OK，主機 log `/root/lobster-phase1/logs/sg-deploy-manual-batch2.log`。教訓：長部署一律 `setsid nohup` 脫離 SSH 連線再看守。
+- 工人線：14:40 四條線（N2、B26、B24、N18）都撞到訂閱 5 小時上限（18:00 台北重設），皆未改檔、未 commit；N2 讀碼交接在 side-session-notes `N2-handoff.md`；B26 的前提問題（`outputStale` 只比 `editRevision`）已答覆並寫進 DISPATCH.md。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit` exit 0；`npx vitest run lib/content/topics lib/content/video lib/schedules app/api/internal/schedules app/api/content/topics app/api/video app/video "app/(shell)/tools/content/topics" "app/(shell)/tools/video" app/__tests__ "app/(shell)/tools/outreach"` → 116 files / 647 tests passed；video-workbench `node tests/gate.cjs` gate ok；`node build.mjs && node check.mjs` ok（75 items，58 done）；Playwright smoke（第二批部署後）34 passed／0 failed／24 skipped，2.1 分，證據 `agency-os/reports/e2e/2026-11-19/smoke/`；24 個 skipped＝10 個要 OPS_TEST_EMAIL／PASSWORD、4 個要 OPS_API_TOKEN（vault 都沒有）、8 個只在開發機跑（PHOTO_PRO_NO_AUTH）、2 個 onboard `test.fixme` | exit=0 | ms=420000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/12n（Codex 共十二項皆由工人修於併入前：N4 兩輪 `2026-11-19-review-515cd531.md`／`ab4c0fb9.md`、N14 `review-11845446.md`、N16 `review-0cf16420.md`；監工逐 file:line 讀 diff 複核，N4 另兩項 Codex 發現（當天中途改時區、算完日期才跨午夜）記為已知風險）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=brandDay|orgTimeZone|stop-notice|topicLane|deliveryEventForPostStatus|expandedOutputs|readArticleStatus | hits=37
+- ORACLE_WAIVED: 本 commit 只有監工台資料檔、DISPATCH.md 與 WORKLOG；程式改動的 oracle artifact 見上列四檔；`9d7548f89` 只改一支測試的等待方式（斷言不變）
+- rollback：`git revert ec537ff78 67f097a51 c1acadd30 fd0d963b4 9d7548f89`；部署 rollback 由 `sg-deploy.sh` 自動或 `rollback` 子命令（快照見主機 log）。
 ## 2026-11-19（續9）— 影片下一階段：N12 驗收併入 main；第一批（N1、N15、N13、N12）部署
 
 - 驗收：N12 工人交回 `7693224e4`（worktree `recursing-jang-f14f2d`），監工讀 FILES／TESTS／RISKS 與 diff 後 cherry-pick 進 main → `6317f6d8a`。機制：`lib/script-forge/run-quote.ts` 用 `VW_INTERNAL_TOKEN` 派生的 HMAC 簽整趟最多（綁組織、模型、場景數，24h），`run-store.ts checkStart` 在建列／預留／付費前比對上限；`quick-render/quote/route.ts` 回 `typicalTwd`／`maxTwd`／`runQuote`，VW `backend/quick-render.cjs` 原樣帶過。

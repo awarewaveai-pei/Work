@@ -40,3 +40,6 @@
 - N12：上限是硬保證（照最大值預留）；上限 < 整趟最大值不得起跑。計畫原寫「上限預設＝預估×2」作廢。
 - 上線前閘是流程：批 0 標完成前不切 `ai_review_auto`。
 - 對外發布與寄信：第一則 AwareWave 真發布前，監工在監工台留一行再做；Soulful 不開自動。
+- B26（監工 2026-11-19 14:45 定案，回答工人的問題）：`outputStale` 只比 `editRevision`，快速輸出成片一律 false，所以**要新增**純函式（放 `episode-spine.js`）：拿最新成片 step 的 `from[{slot:"shot:<id>",key}]` 逐鏡頭與 `current(episode,"shot:<id>")` 用 `isStale` 比，任一變了＝成片過期；resume 時過期 → `attempt`＋1 並讓「成功但過期」的舊 job 不算已送，重送出片；停點面板加「鏡頭已換，會先重新出片再審」。「畫面凍結」是主系統審片擋的，工作台停點 step 先查清再掛。
+- N2 交接：線 A 讀碑結論在 `C:\Users\user1115\AppData\Roaming\Claude\side-session-notes\local_ad3f6c23-9f15-4337-b3f8-3511404da6ba\N2-handoff.md`（付費呼叫點、預算樣板、dailyLimit 流向）；續做從派 db-expert 審 schema 開始。
+- 2026-11-19 14:40 四條工人線都撞到訂閱 5 小時上限（18:00 台北重設）；N2、B26、B24、N18 都沒改檔、沒 commit。恢復後用同一份 brief 重派（brief 在各 session 第一則訊息）。
