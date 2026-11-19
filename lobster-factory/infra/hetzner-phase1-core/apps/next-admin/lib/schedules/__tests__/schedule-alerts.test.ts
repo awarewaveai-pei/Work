@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { formatDigest, planAlerts, runScheduleAlerts, type AlertDeps, type OpenEpisode } from "../alerts";
+import { formatDigest, planAlerts, runScheduleAlerts, runScheduleDigest, type AlertDeps, type OpenEpisode } from "../alerts";
 import type { SystemRow } from "../types";
 
 const row = (key: string, state: SystemRow["state"], detail = ""): SystemRow => ({
@@ -102,5 +102,28 @@ describe("formatDigest", () => {
     const t = formatDigest([row("a", "ok"), row("b", "missing")], "u");
     expect(t).toContain("1 個需要注意");
     expect(t).toContain("L-b：尚無資料"); // same words as the page
+  });
+});
+
+describe("daily report content line", () => {
+  const now = new Date("2026-11-19T00:00:00Z");
+  const t = (status: string, daysAgo: number, scheduled_for: string | null = null) => ({ status, scheduled_for, updated_at: new Date(now.getTime() - daysAgo * 86_400_000).toISOString() });
+  const send = () => vi.fn(async (_x: string) => ({ delivered: true, complete: true, channels: { telegram: "sent" } }));
+
+  it("counts waiting-for-approval and waiting-for-publish and marks the oldest red from three days", async () => {
+    const s = send();
+    await runScheduleDigest({ rows: async () => [row("a", "ok")], send: s, pageUrl: "u", now: () => now,
+      topics: async () => [t("proposed", 1), t("proposed", 4, "2026-11-10T00:00:00Z"), t("reviewed", 2), t("published", 9)] });
+    expect(s.mock.calls[0][0]).toContain("🔴 內容：等核准 2 題（其中 1 題已過排定日）、等發布 1 題，最舊等了 4 天");
+    const s2 = send();
+    await runScheduleDigest({ rows: async () => [row("a", "ok")], send: s2, pageUrl: "u", now: () => now, topics: async () => [t("reviewed", 2)] });
+    expect(s2.mock.calls[0][0]).toContain("內容：等核准 0 題、等發布 1 題，最舊等了 2 天");
+    expect(s2.mock.calls[0][0]).not.toContain("🔴");
+  });
+
+  it("a failed topic read leaves the report as it was", async () => {
+    const s = send();
+    await runScheduleDigest({ rows: async () => [row("a", "ok")], send: s, pageUrl: "u", topics: async () => { throw new Error("db"); } });
+    expect(s.mock.calls[0][0]).not.toContain("內容：");
   });
 });

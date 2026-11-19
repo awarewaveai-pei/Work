@@ -10,7 +10,7 @@ import type { TickDeps } from "@/lib/content/topics/tick";
 /** lifecycle_stage of a video project, as the operator knows the step. */
 export const VIDEO_STAGE_LABEL: Record<string, string> = { create: "建立", produce: "製作影片", review: "審核", release: "發布", measure: "成效" };
 /** The topic statuses that stop a topic and ask for a person. */
-export const TOPIC_STOP_LABEL: Record<string, string> = { failed: "失敗", proposed: "退回待確認" };
+export const TOPIC_STOP_LABEL: Record<string, string> = { failed: "失敗", proposed: "退回待確認", rejected: "已退回（過期）" };
 
 export interface Notice { title: string; message: string; fingerprint: string; jobKey: string; raw: Record<string, unknown> }
 
@@ -70,7 +70,7 @@ export function withTopicStopNotices(deps: TickDeps, raise: (n: Notice) => Promi
     async move(t, to, patch) {
       const moved = await deps.move(t, to, patch);
       const why = patch?.last_error;
-      if (moved && why && (to === "failed" || to === "proposed")) {
+      if (moved && why && (to === "failed" || to === "proposed" || to === "rejected")) {
         await raise(topicStopNotice({ id: moved.id, title: moved.title, status: to, why })).catch((e) => console.error(`[content_pipeline] notice not raised: ${String(e)}`));
       }
       return moved;

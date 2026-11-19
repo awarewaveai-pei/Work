@@ -6,6 +6,9 @@
 // 15 min (notify/rules.ts duplicate_occurrence), which is exactly the repeat this must not do (same as site_watch).
 import { HOST_UI } from "./host-jobs";
 import type { SystemRow } from "./types";
+import { waitingLine, waitingSummary } from "@/lib/content/topics/waiting";
+
+type WaitingRow = Parameters<typeof waitingSummary>[0][number];
 
 export const ALERT_STATES: ReadonlyArray<SystemRow["state"]> = ["failed", "stale"];
 export const FINGERPRINT_PREFIX = "host-schedule:";
@@ -73,7 +76,7 @@ export function formatChange(plan: AlertPlan, pageUrl: string): string {
 }
 
 /** Rows that need a look: anything not ok, except the two states that are not faults (untracked = by design). */
-export function formatDigest(rows: SystemRow[], pageUrl: string): string {
+export function formatDigest(rows: SystemRow[], pageUrl: string, contentLine: string | null = null): string {
   const quiet = (r: SystemRow) => !!r.group && QUIET_GROUPS.includes(r.group);
   const off = (r: SystemRow) => r.state !== "ok" && r.state !== "untracked";
   const attention = rows.filter((r) => off(r) && !quiet(r));
@@ -82,7 +85,7 @@ export function formatDigest(rows: SystemRow[], pageUrl: string): string {
     ? `📋 每日排程報告：共 ${rows.length} 個排程，${attention.length} 個需要注意`
     : `📋 每日排程報告：${rows.length} 個排程全部正常`;
   const note = quietOff ? [HOST_UI.digest_quiet.replace("{n}", String(quietOff))] : [];
-  return [head, ...attention.map(line), ...note, "", pageUrl].join("\n");
+  return [head, ...attention.map(line), ...note, ...(contentLine ? [contentLine] : []), "", pageUrl].join("\n");
 }
 
 export interface Delivery {
@@ -137,10 +140,12 @@ export async function runScheduleAlerts(deps: AlertDeps): Promise<AlertResult> {
   }
 }
 
-export async function runScheduleDigest(deps: Pick<AlertDeps, "rows" | "send" | "pageUrl">): Promise<AlertResult> {
+export async function runScheduleDigest(deps: Pick<AlertDeps, "rows" | "send" | "pageUrl"> & { topics?: () => Promise<WaitingRow[]>; now?: () => Date }): Promise<AlertResult> {
   try {
     const rows = await deps.rows();
-    const d = await deps.send(formatDigest(rows, deps.pageUrl));
+    // the content line is extra: a failed topic read leaves the report as it was
+    const contentLine = deps.topics ? await deps.topics().then((t) => waitingLine(waitingSummary(t, (deps.now ?? (() => new Date()))())), () => null) : null;
+    const d = await deps.send(formatDigest(rows, deps.pageUrl, contentLine));
     return { ok: d.complete, red: rows.filter(isRed).length, recovered: 0, channels: d.channels };
   } catch (e) {
     return { ok: false, red: 0, recovered: 0, errors: [String(e).slice(0, 200)] };

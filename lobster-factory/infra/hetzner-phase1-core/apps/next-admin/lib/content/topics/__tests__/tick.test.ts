@@ -70,10 +70,30 @@ function queue(rows: Topic[], make: (t: Topic) => Promise<Made> = async () => ({
   return { db, deps, made, published, video, zone, advance: (ms: number) => { clock += ms; } };
 }
 
+describe("tickTopics: seven-day return of an unapproved proposal", () => {
+  it("an October proposal is returned once with a dated reason; the second round leaves it; a fresh one stays", async () => {
+    const q = queue([topic("o", { status: "proposed", scheduled_for: "2026-10-19T17:00:00Z" }), topic("n", { status: "proposed", scheduled_for: "2026-10-30T01:00:00Z" })]);
+    expect(await tickTopics(q.deps)).toContain("expired=1");
+    expect(q.db.get("o")).toMatchObject({ status: "rejected", last_error: "排定日 2026-10-20 過了七天沒人核准，已退回；要做請改日期再核准" });
+    expect(q.db.get("n")!.status).toBe("proposed");
+    const v = q.db.get("o")!.version;
+    expect(await tickTopics(q.deps)).toContain("expired=0");
+    expect(q.db.get("o")!.version).toBe(v);
+  });
+});
+
+describe("tickTopics: expiry backlog", () => {
+  it("returns at most 10 per firing; the next firing takes the rest", async () => {
+    const q = queue(Array.from({ length: 12 }, (_, i) => topic(`x${i}`, { status: "proposed", scheduled_for: "2026-10-01T00:00:00Z" })));
+    expect(await tickTopics(q.deps)).toContain("expired=10");
+    expect(await tickTopics(q.deps)).toContain("expired=2");
+  });
+});
+
 describe("tickTopics", () => {
   it("starts what is due, makes it and moves it to reviewed with its artifacts and review", async () => {
     const q = queue([topic("a")]);
-    expect(await tickTopics(q.deps)).toBe("interrupted=0 reviewed=1 started=1 drafted=0 failed=0 returned=0 published=0 scheduled=0 video_started=0");
+    expect(await tickTopics(q.deps)).toBe("interrupted=0 reviewed=1 started=1 drafted=0 failed=0 returned=0 published=0 scheduled=0 video_started=0 expired=0");
     expect(q.db.get("a")).toMatchObject({ status: "reviewed", artifacts: { wp_post_id: 1 }, review, started_on: "2026-11-03" });
   });
 

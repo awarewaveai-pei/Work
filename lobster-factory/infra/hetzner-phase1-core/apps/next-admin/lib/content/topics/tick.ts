@@ -11,6 +11,7 @@
 import type { Topic, TopicFormat, TopicStatus } from "./store";
 import type { TopicReview } from "./review";
 import { zoned } from "@/lib/social/time";
+import { expiredReason, isExpiredProposal } from "./waiting";
 
 /** Topics a brand may start per day (its own day, brandDay) when its content_pipeline row sets no limit (plan D5; 0125 daily_limit, 1-10). */
 export const DAILY_START_CAP = 2;
@@ -19,6 +20,8 @@ export const STALE_GENERATING_MS = 30 * 60 * 1000;
 /** run-due runs jobs one after another; this leaves room under the host cron's 5 minutes. */
 export const TICK_BUDGET_MS = 200_000;
 /** A video still not done this long after it was started has failed (renders take minutes; video_jobs rows live 1h). */
+/** Expired proposals returned per firing (the October backlog is ~37 topics, one notice each). */
+export const EXPIRE_PER_TICK = 10;
 export const VIDEO_TIMEOUT_MS = 60 * 60 * 1000;
 
 export interface Made { artifacts: Record<string, unknown>; review: TopicReview }
@@ -213,7 +216,14 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
   const budget = opts.budgetMs ?? TICK_BUDGET_MS;
   const t0 = deps.now();
   const n = { interrupted: 0, reviewed: 0, started: 0, drafted: 0, failed: 0, returned: 0, published: 0, scheduled: 0,
-    video_started: 0 };
+    video_started: 0, expired: 0 };
+
+  // A proposal nobody approved seven days after its day is returned (rejected = the 退回 button's move) with the reason;
+  // a person who changes the date and approves it again starts it over. Rejected rows are not read again: once per topic.
+  // At most EXPIRE_PER_TICK per firing: the first run over a backlog spreads its notices over several 5-minute firings.
+  for (const t of (await deps.inStatus(["proposed"])).filter((x) => isExpiredProposal(x, t0)).slice(0, EXPIRE_PER_TICK)) {
+    if (await deps.move(t, "rejected", { last_error: expiredReason(t.scheduled_for!) })) n.expired++;
+  }
 
   for (const t of await deps.inStatus(["generating", "drafted", "waiting_video", "embedded", "scheduled"])) {
     if (t.status === "generating" && t0.getTime() - Date.parse(t.updated_at) >= STALE_GENERATING_MS) {

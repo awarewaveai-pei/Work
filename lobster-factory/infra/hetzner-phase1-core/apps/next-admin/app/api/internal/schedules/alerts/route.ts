@@ -60,7 +60,15 @@ export async function POST(request: Request) {
       .eq("source", "schedule").eq("environment", environment).like("fingerprint", `${FINGERPRINT_PREFIX}%`);
 
   const result = new URL(request.url).searchParams.get("digest")
-    ? await runScheduleDigest({ rows, send, pageUrl })
+    ? await runScheduleDigest({
+        rows, send, pageUrl,
+        // all brands: what waits for approval / publish (the report is one message, not per brand)
+        topics: async () => {
+          const { data, error } = await sb.from("content_topics").select("status, scheduled_for, updated_at").in("status", ["proposed", "reviewed"]).limit(5000);
+          if (error) throw new Error(`topics:${error.message}`);
+          return data ?? [];
+        },
+      })
     : await runScheduleAlerts({
         rows,
         pageUrl,
