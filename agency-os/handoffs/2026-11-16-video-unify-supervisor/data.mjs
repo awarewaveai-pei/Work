@@ -215,7 +215,7 @@ export const STEPS = [
     what: 'N5a：makeSocial 把 YouTube 拆成自己一則；題目新增「發布中」狀態（資料庫的狀態限制一起改）；每步記 artifacts.publish；每五分鐘讀 social_post_targets.release_url，六十分鐘沒有就 failed；YouTube 公開設定改讀網站設定（預設公開）。N5b：embed-in-post.ts 加 swapEmbeddedVideo（同一條 bridge 通道、帶 sha256），發布前把 R2 影片換成 YouTube 網址。N6：TopicsBoard 已審核列加「發布」與草稿連結；publishDrafts 的門改成「網站自動，或這次有人按」。N7：每日排程報告多一行，過期提案自動退回。N17：事件標題改中文、帶標題與連結，同一停點只通知一次。',
     files: [`${NA}lib/content/topics/tick.ts`, `${NA}lib/content/topics/make.ts`, `${NA}lib/content/topics/store.ts`, `${NA}lib/social/store.ts`, `${NA}lib/social/compose.ts`, `${L}embed-in-post.ts`, `${NA}app/(shell)/tools/content/topics/TopicsBoard.tsx`, `${NA}app/api/content/topics/`, `${NA}lib/schedules/alerts.ts`, `${NA}app/api/internal/schedules/run-due/route.ts`, `${L}advance-auto-projects.ts`],
     items: [
-      todo('N5a', '發布拆成三步並逐步記錄：YouTube → 文章 → 其他社群。YouTube 一小時沒上線就停，其他都還是草稿。YouTube 公開或不公開可以每個網站設定。'),
+      done('N5a', '發布拆成三步並逐步記錄：YouTube → 文章 → 其他社群。YouTube 一小時沒上線就停，其他都還是草稿。YouTube 公開或不公開可以每個網站設定。2026-11-19：題目多一個「發布中」狀態，逐步記錄：YouTube 先送出，拿到上線連結才發文章，文章成功才發其他社群；YouTube 一小時沒上線就停，文章與其他貼文都還是草稿。每一步有十分鐘租約，兩輪排程不會各做一次。YouTube 公開或不公開可在網站設定選（預設公開），社群編輯器也多了這兩顆按鈕。已知：社群佇列塞住時題目可能被誤判逾時而停（不會亂發）；YouTube 先發，所以影片說明不附文章連結；選了 YouTube 但網站沒連頻道時直接發文章與社群。migration 0169 已套到正式庫。全套測試綠、突變紅轉綠。還沒部署。', 'fd6eb2c13'),
       todo('N5b', '發布時把文章裡的影片檔換成 YouTube 連結；沒連 YouTube 的網站維持現在的做法。另外：一鍵成片重新出片後，網站草稿文章裡嵌的舊影片也要換成新的（B26 第二段留下的）。'),
       todo('N6', '人工審核的網站：題目到「已審核」後多一顆「發布」，旁邊列出各草稿的連結。'),
       done('N7', '每天早上的排程報告多一行：幾題等核准、幾題等發布、最舊的等了幾天；過期的提案自動退回。2026-11-19：報告多一行「內容：等核准、等發布、最舊等了幾天」，三天以上標紅；排定日過了七天沒人核准的提案自動退回並寫原因（改日期再核准就能重做），每輪最多退十題。正式庫現有三十七題會在上線後約二十分鐘內退完。監工決定：過期退回不逐題發通知（否則一次湧出三十七則），由每日報告那一行呈現。', '861e1e0fe'),

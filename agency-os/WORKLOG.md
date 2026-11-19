@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-19（續21）— 影片下一階段：N5a 併入 main、0169 已套；全套測試兩支不穩已修；派最後四張（N6→N5b、N10、R1）
+
+- 驗收：N5a 兩次 rebase（第一次 rebase 時 N8 尚未進 main，再衝突一次）後 `7eb250247`＋`3ed550a9d` cherry-pick → `fd6eb2c13`（分步發布）、`6c68633a2`（0169 down 第二處）。教訓：同一批會動同一組檔（`make.ts`、`brand-voice.ts`、`sites/[id]/route.ts`、`SiteManager.tsx`）的卡不要並行；最後一批已把 N6、N5b 排在同一條線依序做。
+- migration：讀過 `0169_content_topics_publishing.sql`（先驗只有一個名為 `content_topics_status_check` 的 status check，drop 後加回、多允許 `publishing`；`lock_timeout 5s`；只放寬不改資料；正式站舊程式不寫新狀態）→ `apply-db-migration.mjs 0169` APPLY_OK，170 筆 applied。
+- 全套測試（每批一次）：N5a 併入後 `npm test` 4 檔紅 → `ContentStudio.site-wiring.test.tsx`、`SocialManager.editor-zone.render.test.tsx` 單跑與按目錄跑皆綠、全套 614 檔平行時連兩次紅（testing-library 預設只等 1 秒）→ 兩檔 `configure({ asyncUtilTimeout: 5000 })`（`9764d45b6`），斷言不變；再跑全套 593 檔綠。剩 `lib/portal/__tests__/products.test.ts`、`staff-tools.test.ts` 兩檔紅＝另一條線未提交的 `app/(shell)/tools/seedstar/`（untracked，不在 git，已通知該線）。
+- 派工（brief 皆為檔案，`agency-os/handoffs/2026-11-16-video-unify-supervisor/briefs/`）：線 A `N6-then-N5b.md`（Opus）、線 D `N10.md`（Opus）、線 C `R1.md`（改 Opus）；線 B 無卡。N5b 併入 B26 第二段留下的「網站草稿嵌入影片換片後不更新」。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit`（僅 `.next/types` 6 個舊產物錯誤）；全套 `npm test` → 593 files passed／2 failed（他線 untracked 目錄）；`node --test scripts/__tests__/down-migration-copies.test.mjs` 2/2；`apply-db-migration.mjs 0169` APPLY_OK（170 applied）；`node build.mjs && node check.mjs` ok（75 items，71 done） | exit=0 | ms=900000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n（N5a：db-expert warn 三點已修、Codex 兩輪四項修二其餘接受並記於監工台；監工讀 0169 SQL 全文後才套）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/packages/db | grep=publishSteps|youtubePrivacy|asyncUtilTimeout|content_topics_status_check | hits=22
+- ORACLE_WAIVED: 監工修正只有兩支測試的等待時間設定（斷言不變）；N5a 的 oracle artifact 隨工人 commit
+- rollback：`git revert 9764d45b6 6c68633a2 fd6eb2c13`；0169 down＝先退程式再跑 `0169_content_topics_publishing.down.sql`（順序不可反：舊版話題頁遇到「發布中」會壞）。
 ## 2026-11-19（續20）— 影片下一階段：N8、B26 第二段、down 檔整類修正併入 main；批 2 完成；本批 RISKS 一起判；N5a 退回 rebase
 
 - 驗收：N8 `fd83835a0` → `4375809a8`；B26 第二段 `a8bb65e9a` → `7decd94ad`；down 檔修正 `4e3856600` → `3df37a62d`（`migrations/` 9 個＋`scripts/` 35 個舊 down 補刪帳本列，0165／0166／0168 補 `scripts/` 鏡像，檢查器接在 `bootstrap-validate.mjs`）。N5a `9b85f395d` 與已併入的 N1b／N3／N8 在 `make.ts`、`sites/[id]/route.ts` 衝突 → 退回原工人 rebase，未併入。
