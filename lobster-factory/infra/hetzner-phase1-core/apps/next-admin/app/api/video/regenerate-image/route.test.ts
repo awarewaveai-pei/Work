@@ -42,4 +42,13 @@ describe("POST /api/video/regenerate-image old-image deletion", () => {
     expect(deleteDesignObject).not.toHaveBeenCalled();
     expect(buildSceneAsset).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ excludeAssets: [OLD] }));
   });
+
+  // Card B25: stock clips the workbench found frozen are skipped by the next Pexels search (https strings only).
+  it("excludeUrls joins the excluded list: https strings only, no duplicates, none = undefined", async () => {
+    const A = "https://videos.pexels.com/video-files/1/a.mp4", B = "https://videos.pexels.com/video-files/2/b.mp4";
+    await post({ imagePrompt: "a cat", deleteOld: false, excludeUrls: [A, B, A, "http://x/c.mp4", 7] });
+    expect(buildSceneAsset).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ excludeAssets: [A, B] }));
+    await post({ imagePrompt: "a cat", deleteOld: false });
+    expect(buildSceneAsset).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ excludeAssets: undefined }));
+  });
 });

@@ -575,8 +575,8 @@ function renderDialog() {
   } else if (dialog.type === "stock") {
     html = modal(
       "圖庫素材",
-      `<label>關鍵字</label><input id="stock-keyword" value="${esc(dialog.keyword || "")}" placeholder="例如：city night rain（英文的結果比較多）"><div class="row" role="group" aria-label="素材種類">${[["image", "圖片"], ["video", "影片"]].map(([k, label]) => `<button class="btn small ${dialog.kind === k ? "primary" : "outline"}" data-action="stockKind" data-value="${k}" aria-pressed="${dialog.kind === k}">${label}</button>`).join("")}</div><p class="tiny">從 Pexels 免費圖庫找一個放到鏡頭 ${dialog.index + 1}，不收費。找不到影片時會改放圖片。</p>`,
-      btnCancel + '<button class="btn primary" data-action="stockSearch">找一個放上去</button>',
+      `<label>關鍵字</label><input id="stock-keyword" value="${esc(dialog.keyword || "")}" placeholder="例如：city night rain（英文的結果比較多）"><div class="row" role="group" aria-label="素材種類">${[["image", "圖片"], ["video", "影片"]].map(([k, label]) => `<button class="btn small ${dialog.kind === k ? "primary" : "outline"}" data-action="stockKind" data-value="${k}" aria-pressed="${dialog.kind === k}">${label}</button>`).join("")}</div><p class="tiny">從 Pexels 免費圖庫找一個放到鏡頭 ${dialog.index + 1}，不收費。影片若有靜止（畫面不動）的片段會自動換下一支，找不到可用的影片時會改放圖片。</p>${dialog.done ? `<div class="note" role="status">已放到鏡頭 ${dialog.index + 1}。${esc(dialog.done)}</div>` : ""}`,
+      dialog.done ? '<button class="btn primary" data-action="close">完成</button>' : btnCancel + '<button class="btn primary" data-action="stockSearch">找一個放上去</button>',
     );
   } else if (dialog.type === "quickRender") {
     // Plan U5 快速輸出 and U5.3 一鍵成片: one dialog; both hand the episode to the runner (driveAutoRuns), which renders a
@@ -783,18 +783,34 @@ async function putOnShot(index, asset, tool, p = project(), e = ep()) {
 }
 // Card U4: Pexels through the main system's regenerate-image (plan §4 U4); the file comes in through the stock import
 // (backend/url-import.cjs host list). pexels-all / pexels-video never fall back to a paid AI picture.
+// Card B25: a clip with a frozen stretch (the review's own freezedetect, backend/stock-freeze.cjs) is never put on the shot:
+// the import answers { frozen } without storing it, the next search skips it (excludeUrls), and after StockPick.MAX_CANDIDATES
+// frozen clips a picture goes on instead. Returns the sentence for the dialog ("" = nothing was swapped).
 async function stockShot(index, kind, keyword, p = project(), e = ep()) {
   if (!keyword) throw Error("請先輸入關鍵字");
-  const r = await fetch("/api/video/regenerate-image", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imagePrompt: keyword, brollKeyword: keyword, visual: "broll", imageModel: kind === "video" ? "pexels-video" : "pexels-all", format: { "9:16": "9x16", "4:5": "4x5" }[p.ratio] || "16x9", organizationId: VideoWorkbench.capabilities?.mainSystem?.organizationId, deleteOld: false }),
-    }),
-    found = await r.json().catch(() => ({}));
-  if (!r.ok || !found.ok || !found.imageUrl) throw Error("圖庫找不到素材：" + (found.error || found.code || r.status));
-  const asset = await VideoWorkbench.assets.save({ ...(await VideoWorkbench.request("/stock/import", { url: found.imageUrl, name: "圖庫：" + keyword })), createdAt: new Date().toISOString() });
+  const search = async (model, excludeUrls) => {
+    const r = await fetch("/api/video/regenerate-image", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imagePrompt: keyword, brollKeyword: keyword, visual: "broll", imageModel: model, format: { "9:16": "9x16", "4:5": "4x5" }[p.ratio] || "16x9", organizationId: VideoWorkbench.capabilities?.mainSystem?.organizationId, deleteOld: false, ...(excludeUrls.length ? { excludeUrls } : {}) }),
+      }),
+      found = await r.json().catch(() => ({}));
+    if (!r.ok || !found.ok || !found.imageUrl) throw Error("圖庫找不到素材：" + (found.error || found.code || r.status));
+    return found.imageUrl;
+  };
+  const tried = [];
+  let imported = null;
+  for (let step = StockPick.nextAction({ kind, tried }); !imported; step = StockPick.nextAction({ kind, tried })) {
+    const photo = step.do === "photo";
+    const url = await search(photo ? "pexels-all" : "pexels-video", step.exclude || []);
+    const got = await VideoWorkbench.request("/stock/import", { url, name: "圖庫：" + keyword, ...(photo ? {} : { checkFreeze: true }) });
+    if (got.frozen) tried.push(url);
+    else imported = got;
+  }
+  const asset = await VideoWorkbench.assets.save({ ...imported, createdAt: new Date().toISOString() });
   await putOnShot(index, asset, "stock", p, e);
+  return StockPick.resultNote({ kind, tried, importedKind: imported.kind });
 }
 // Card U4: 讓這鏡動起來 -- the shot's picture as the first frame of a video job; settle puts the video on the shot.
 async function motionShot(index, modelId) {
@@ -1532,8 +1548,9 @@ async function action(a, button) {
         keyword = $("stock-keyword")?.value.trim();
       button.disabled = true;
       try {
-        await stockShot(at, wanted, keyword);
-        closeDialog();
+        const said = await stockShot(at, wanted, keyword);
+        // B25: a swap the person did not ask for is told in the dialog, which then stays until closed.
+        if (said && dialog?.type === "stock") { dialog.keyword = keyword; dialog.done = said; renderDialog(); } else if (!said) closeDialog();
       } catch (e) {
         button.disabled = false;
         VideoWorkbench.reportError(e);

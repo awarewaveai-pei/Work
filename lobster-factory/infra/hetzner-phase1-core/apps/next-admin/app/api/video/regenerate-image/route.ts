@@ -29,6 +29,15 @@ interface RegenBody {
   deleteOld?: boolean;
   /** VideoPipeline wizard 帶入的租戶（同 render-draft）；未帶 = 預設租戶。 */
   organizationId?: string;
+  /** Pexels clips the caller already turned down (card B25: frozen stretch); skipped like oldImageUrl. At most 10. */
+  excludeUrls?: unknown;
+}
+
+/** oldImageUrl plus excludeUrls, https strings only, deduplicated, capped (the list reaches a Pexels search filter). */
+function excludeList(body: RegenBody): string[] | undefined {
+  const extra = Array.isArray(body.excludeUrls) ? body.excludeUrls.filter((u): u is string => typeof u === "string" && u.startsWith("https://")).slice(0, 10) : [];
+  const all = [...(typeof body.oldImageUrl === "string" && body.oldImageUrl ? [body.oldImageUrl] : []), ...extra];
+  return all.length ? [...new Set(all)] : undefined;
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -70,7 +79,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         aspectRatio: spec.aspectRatio,
         orientation: spec.orientation,
         framing: spec.framing,
-        excludeAssets: typeof body.oldImageUrl === "string" && body.oldImageUrl ? [body.oldImageUrl] : undefined,
+        excludeAssets: excludeList(body),
       },
     );
 

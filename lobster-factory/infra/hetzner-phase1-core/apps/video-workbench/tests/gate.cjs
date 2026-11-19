@@ -48,6 +48,7 @@ const tests = [
   "n13-quick-output-steps",
   "n14-output-card",
   "b26-resume-rerender",
+  "b25-stock-freeze",
   "u4-scene-image",
   "style-literals",
 ];

@@ -1,9 +1,12 @@
+/** Card B25: a stock clip's frozen-stretch check (shared/stock-pick.js freezeRecord); absent on assets imported before it.
+ *  checked:false = the check could not run (never counts as frozen). Kept on the workbench asset only (the ledger rebuilds origins). */
+export interface StockFreeze { v: 1; checked: boolean; frozen: boolean; count: number; spans: [number, number][]; durationS?: number | null; reason?: string; filter: string; ms: number; checkedAt: string }
 /** Same JSON shape as next-admin lib/content/video/asset-origin.ts:9-12 `AssetOrigin` (not imported; P6 writes it
  *  to media_assets.metadata.rightsSources), plus the workbench's own kinds: `render` = output of a local edit or
  *  tool job, `import` = arrived without a record (`legacy` = saved before origins existed). */
 export type AssetOrigin = (
   | { kind: "ai_generated"; model: string; provider: string; parentAssetId?: string }
-  | { kind: "pexels"; sourceRef: string }
+  | { kind: "pexels"; sourceRef: string; freeze?: StockFreeze }
   | { kind: "upload"; rightsConfirmed: boolean }
   | { kind: "render"; jobId: string; parentAssetId?: string }
   | { kind: "import"; legacy?: boolean }

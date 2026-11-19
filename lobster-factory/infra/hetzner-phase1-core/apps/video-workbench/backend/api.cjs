@@ -26,7 +26,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   const music = require("./music.cjs");
   const audioTools = require("./audio-tools.cjs"), elevenlabs = require("./elevenlabs.cjs");
   const imageEdit = require("./image-edit.cjs");
-  const urlImport = require("./url-import.cjs");
+  const urlImport = require("./url-import.cjs"), stockFreeze = require("./stock-freeze.cjs"), StockPick = require("../shared/stock-pick.js");
   const chunkBytes = (engine) => Number(vwEnv(env, "TRANSCRIBE_CHUNK_BYTES")) || engine.uploadBytes;
   const transcriptsDir = path.join(dataDir, "transcripts");
   // Per-request spend of the sync paid routes (text, transcription): each handler call runs in its own meter.
@@ -1974,8 +1974,15 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (req.method === "POST" && route === "/stock/import") {
         const input = await body(req);
         const got = await urlImport.fetchMedia(input.url, { kinds: ["image", "video"], hosts: urlImport.stockHosts() });
+        // Card B25: checkFreeze = a clip with a frozen stretch is answered 200 { frozen, freeze, kind } and NOT stored (the page
+        // asks for the next candidate); one that passes keeps its record on the asset's origin. Images and old callers: as before.
+        let freeze;
+        if (input.checkFreeze === true && got.kind === "video") {
+          freeze = await stockFreeze.measure(got.bytes);
+          if (StockPick.isFrozen(freeze)) { json(res, 200, { frozen: true, freeze, kind: got.kind }); return true; }
+        }
         json(res, 201, await storeUpload({ type: got.type, buffer: got.bytes, size: got.bytes.length, name: String(input.name || "圖庫素材").slice(0, 120),
-          origin: { kind: "pexels", sourceRef: String(input.url) } }));
+          origin: { kind: "pexels", sourceRef: String(input.url), ...(freeze ? { freeze } : {}) } }));
         return true;
       }
       throw Object.assign(Error("找不到服務"), { status: 404 });
