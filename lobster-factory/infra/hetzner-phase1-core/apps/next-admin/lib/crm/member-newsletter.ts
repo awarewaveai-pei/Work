@@ -4,7 +4,7 @@
 // Invariants:
 //  M1 draft only: every campaign goes through createNewsletter, which sends the constant draft status and fails on any
 //     other answer; a non-draft answer here is thrown (recorded + incident), never reported as ready;
-//  M2 one draft per site per brand week: the week is claimed in the DB (wp_sites.member_newsletter_week, 0171) BEFORE the
+//  M2 one draft per site per brand week: the week is claimed in the DB (wp_sites.member_newsletter_week, 0172) BEFORE the
 //     bridge call; a firing that loses the claim does nothing; a failed call after the claim waits for next week;
 //  M3 a week with nothing published claims nothing and calls nothing;
 //  M4 a site without a bridge, without FluentCRM, or whose bridge does not answer is skipped with the reason in the summary

@@ -6,7 +6,7 @@ set local lock_timeout = '5s';
 do $$
 begin
   if to_regclass('public.schema_migrations') is not null then
-    delete from public.schema_migrations where filename = '0171_wp_sites_member_newsletter_week.sql';
+    delete from public.schema_migrations where filename = '0172_wp_sites_member_newsletter_week.sql';
   end if;
 end $$;
 
