@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvedStartText, draftPrivacy, draftUrl, inLane, laneCounts, minutesToNextRun, nextStep, publishConfirmText, publishTargets, topicLane,
+import { approvedStartText, draftPrivacy, draftUrl, inLane, laneCounts, minutesToNextRun, nextStep, publishConfirm, publishTargets, topicLane,
   youtubePrivacyMismatch } from "../lanes";
 
 const now = new Date("2026-11-19T03:02:00Z");
@@ -55,12 +55,12 @@ describe("topic lanes", () => {
     // the draft was made public, the site was switched to 不公開 afterwards
     const draft = draftPrivacy([{ format: "post" }]);
     const to = publishTargets(t, draft);
-    const text = publishConfirmText("題目", to, false, youtubePrivacyMismatch(draft, "unlisted"));
+    const confirm = publishConfirm("題目", to, false, youtubePrivacyMismatch(draft, "unlisted"));
     expect(to[0]).toBe("YouTube（這則草稿：公開）");
-    expect(text).toContain("提醒：網站設定現在是「不公開」，但這則 YouTube 草稿是「公開」");
+    expect(confirm.reminder).toContain("提醒：網站設定現在是「不公開」，但這則 YouTube 草稿是「公開」");
     // unreadable draft: no guess, no reminder
     const unknown = publishTargets(t, draftPrivacy(undefined));
     expect(unknown[0]).toBe("YouTube（這則草稿：無法確認，請到社群草稿看）");
-    expect(publishConfirmText("題目", unknown, false, youtubePrivacyMismatch(null, "unlisted"))).not.toContain("提醒");
+    expect(publishConfirm("題目", unknown, false, youtubePrivacyMismatch(null, "unlisted")).reminder).toBeNull();
   });
 });

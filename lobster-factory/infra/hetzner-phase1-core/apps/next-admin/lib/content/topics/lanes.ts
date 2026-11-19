@@ -105,11 +105,18 @@ export function youtubePrivacyMismatch(draft: DraftPrivacy, site: "public" | "un
   return `網站設定現在是「${PRIVACY_TEXT[site]}」，但這則 YouTube 草稿是「${draftText(draft)}」，會照草稿發出；要改請到社群草稿修改。`;
 }
 
-/** The text of 「發布」's confirmation. */
-export function publishConfirmText(title: string, to: string[], reviewFailed: boolean, mismatch: string | null): string {
-  return [`確定發布「${title}」？`, "", "會依序發到：", ...to.map((x, i) => `${i + 1}. ${x}`),
-    ...(mismatch ? ["", `提醒：${mismatch}`] : []),
-    ...(reviewFailed ? ["", "注意：規則審核沒通過，發布前請先看過草稿。"] : []), "", "發出去之後不會自動收回。"].join("\n");
+export type PublishConfirm = { question: string; steps: string[]; reminder: string | null; reviewWarning: string | null; closing: string };
+
+/** The pieces of 「發布」's in-page confirmation (TopicsBoard renders them inside the topic's card, with the link to the
+ *  social drafts beside the reminder). */
+export function publishConfirm(title: string, to: string[], reviewFailed: boolean, mismatch: string | null): PublishConfirm {
+  return {
+    question: `確定發布「${title}」？會依序發到：`,
+    steps: to,
+    reminder: mismatch ? `提醒：${mismatch}` : null,
+    reviewWarning: reviewFailed ? "注意：規則審核沒通過，發布前請先看過草稿。" : null,
+    closing: "發出去之後不會自動收回。",
+  };
 }
 
 /** What a publish step went out without (publish-steps.ts PublishStep.note), e.g. an article a person had already

@@ -12,8 +12,8 @@ import type { TopicArtifacts } from "@/lib/content/topics/make";
 import { autoPublishes, youtubePrivacy, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
-import { LANE_LABEL, LANE_ORDER, approvedStartText, draftUrl, inLane, laneCounts, nextStep, pendingYoutubePostId, publishConfirmText, publishNote, publishTargets,
-  socialDraftsUrl, topicLane, youtubePrivacyMismatch, type DraftPrivacy, type LaneFilter } from "@/lib/content/topics/lanes";
+import { LANE_LABEL, LANE_ORDER, approvedStartText, draftUrl, inLane, laneCounts, nextStep, pendingYoutubePostId, publishConfirm, publishNote, publishTargets,
+  socialDraftsUrl, topicLane, youtubePrivacyMismatch, type DraftPrivacy, type LaneFilter, type PublishConfirm } from "@/lib/content/topics/lanes";
 import { FlowCells, OverviewTable } from "./AutoContentOverview";
 
 const T = {
@@ -39,8 +39,8 @@ const T = {
   title: "標題",
   keyword: "搜尋關鍵字",
   angle: "切入角度（選填）",
-  formats: "要做的格式",
-  saveFormats: "儲存格式",
+  formats: "要做的格式（點了就存）",
+  atLeastOne: "至少要選一種格式。",
   source: "來源",
   error: "上次失敗原因",
   reload: "有人剛改過，已重新載入。",
@@ -65,7 +65,14 @@ const T = {
   fixDraft: "到社群草稿修改",
   publishNothing: "這個題目沒有可以發布的草稿。",
   publishing: "已開始發布；YouTube 上線後才會發文章，約 5–10 分鐘後重新整理看狀態。",
+  readingDraft: "讀取草稿設定…",
+  readTimeout: "讀不到草稿設定，請再按一次。",
+  draftChanged: "YouTube 草稿的設定剛改過，下面已更新，請再確認一次。",
+  confirmPublish: "確定發布",
+  cancel: "取消",
 };
+/** How long 「發布」 waits for the YouTube draft's setting before giving up (no confirmation, nothing sent). */
+export const PUBLISH_READ_TIMEOUT_MS = 8000;
 /** A search-run folder is named "<keyword> <YYYYMMDDHHmm>" (lib/collect/sinks/kb.ts); the keyword is the topic. */
 const folderKeyword = (name: string) => name.replace(/\s*\d{12}$/, "").trim() || name;
 const STATUS: Record<TopicStatus, [string, string]> = {
@@ -90,6 +97,23 @@ const chip = (on: boolean): React.CSSProperties => ({
   padding: "4px 10px", borderRadius: 999, border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`, cursor: "pointer",
   background: on ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent", color: "var(--text-primary)", fontSize: "var(--font-size-sm)",
 });
+/** The four format toggles (add form and detail panel): selected ones are filled and ticked, with aria-pressed. */
+function FormatButtons({ value, disabled, onToggle }: { value: readonly TopicFormat[]; disabled?: boolean; onToggle: (f: TopicFormat) => void }) {
+  return (
+    <>
+      {TOPIC_FORMATS.map((f) => {
+        const on = value.includes(f);
+        return (
+          <button key={f} type="button" aria-pressed={on} disabled={disabled} onClick={() => onToggle(f)}
+            style={{ ...chip(on), ...(on ? { background: "var(--accent)", color: "var(--bg-card)", fontWeight: 600 } : {}), ...(disabled ? { cursor: "default", opacity: 0.7 } : {}) }}>
+            {on ? "✓ " : ""}{FORMAT[f]}
+          </button>
+        );
+      })}
+    </>
+  );
+}
+const toggle = (list: readonly TopicFormat[], f: TopicFormat) => (list.includes(f) ? list.filter((x) => x !== f) : [...list, f]);
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 const shiftMonth = (m: string, by: number) => {
   const d = new Date(`${m}-01T00:00:00Z`);
@@ -137,6 +161,10 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([]);
   /** Each reviewed topic's YouTube draft privacy, read by the topics API from the draft itself (N6 confirmation). */
   const [ytPrivacy, setYtPrivacy] = useState<Record<string, DraftPrivacy>>({});
+  /** 「發布」 in progress: reading the draft's setting, then the in-page confirmation (one topic at a time). */
+  const [pub, setPub] = useState<{ id: string; confirm: (PublishConfirm & { topic: Topic; privacy: DraftPrivacy }) | null } | null>(null);
+  /** Bumped by cancel / picking another topic, so a read that finishes late opens no confirmation. */
+  const pubReq = useRef(0);
 
   useEffect(() => {
     void (async () => {
@@ -175,7 +203,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
     setFolders(j.folders ?? []);
     setChecked(new Set());
   }, [siteId, month]);
-  useEffect(() => { setSelId(""); setNote(""); void load(); }, [load]);
+  useEffect(() => { setSelId(""); setNote(""); pubReq.current += 1; setPub(null); void load(); }, [load]);
 
   const now = new Date();
   const addDef = addDefaults(month, now);
@@ -212,38 +240,85 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
 
   /** The button on a row: the same actions as the detail panel. */
   async function rowStep(t: Topic, action: "approve" | "reject" | "retry" | "publish") {
-    if (action === "publish") { setSelId(t.id); await publish(t); return; }
+    if (action === "publish") { pick(t.id); await publish(t); return; }
     setBusy(true); setNote("");
     try { await act(t, action); } finally { await load(); setBusy(false); }
   }
 
-  /** The topic's YouTube draft privacy as the topics API reads it now (null = could not be read). */
-  async function readPrivacy(topicId: string): Promise<DraftPrivacy> {
+  /** The topic's YouTube draft privacy as the topics API reads it now (null = could not be read; "timeout" = no answer
+   *  within PUBLISH_READ_TIMEOUT_MS). */
+  async function readPrivacy(topicId: string): Promise<DraftPrivacy | "timeout"> {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), PUBLISH_READ_TIMEOUT_MS);
     try {
-      const j = await (await fetch(`/api/content/topics?siteId=${encodeURIComponent(siteId)}&month=${month}`)).json() as { ok: boolean; youtubePrivacy?: Record<string, DraftPrivacy> };
+      const r = await fetch(`/api/content/topics?siteId=${encodeURIComponent(siteId)}&month=${month}`, { signal: ctl.signal });
+      const j = await r.json() as { ok: boolean; youtubePrivacy?: Record<string, DraftPrivacy> };
       if (!j.ok) return null;
       setYtPrivacy(j.youtubePrivacy ?? {});
       return j.youtubePrivacy?.[topicId] ?? null;
-    } catch { return null; }
+    } catch { return ctl.signal.aborted ? "timeout" : null; } finally { clearTimeout(timer); }
   }
 
-  /** N6 「發布」: names where it goes and asks once; the route records who pressed it. YouTube's privacy is read from the
-   *  draft at this moment (fixed when the draft was made), never taken from the site's current setting. */
+  /** Selecting another topic drops a pending 「發布」 confirmation (its late read included). */
+  function pick(id: string) {
+    if (id !== selId) { pubReq.current += 1; setPub(null); }
+    setSelId(id);
+  }
+
+  /** N6 「發布」 step 1: the button says it is reading at once, then the confirmation opens in the topic's card naming
+   *  where it goes. YouTube's privacy is read from the draft at this moment (fixed when the draft was made), never taken
+   *  from the site's current setting. A read past PUBLISH_READ_TIMEOUT_MS opens nothing and sends nothing. */
   async function publish(t: Topic) {
+    const req = ++pubReq.current;
     const ytId = pendingYoutubePostId(t);
     // busy before the read: a second press while it loads would open a second confirmation and a 409 over the success
-    setBusy(true); setNote("");
-    // read again at the press: the draft may have been changed in the social tool since the list was loaded
-    const privacy = ytId ? await readPrivacy(t.id) : null;
-    const to = publishTargets(t, privacy);
-    if (!to.length) { setNote(T.publishNothing); setBusy(false); return; }
-    const mismatch = ytId ? youtubePrivacyMismatch(privacy, youtubePrivacy(site?.contentDefaults)) : null;
-    if (!window.confirm(publishConfirmText(t.title, to, (t.review as TopicReview | null)?.pass !== true, mismatch))) { setBusy(false); return; }
+    setBusy(true); setNote(""); setPub({ id: t.id, confirm: null });
     try {
-      const r = await fetch(`/api/content/topics/${t.id}/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: t.version }) });
+      // read again at the press: the draft may have been changed in the social tool since the list was loaded
+      const privacy = ytId ? await readPrivacy(t.id) : null;
+      if (req !== pubReq.current) return;
+      if (privacy === "timeout") { setPub(null); setNote(T.readTimeout); return; }
+      const to = publishTargets(t, privacy);
+      if (!to.length) { setPub(null); setNote(T.publishNothing); return; }
+      const mismatch = ytId ? youtubePrivacyMismatch(privacy, youtubePrivacy(site?.contentDefaults)) : null;
+      setPub({ id: t.id, confirm: { ...publishConfirm(t.title, to, (t.review as TopicReview | null)?.pass !== true, mismatch), topic: t, privacy } });
+    } finally { setBusy(false); }
+  }
+
+  function cancelPublish() { pubReq.current += 1; setPub(null); }
+
+  /** N6 「發布」 step 2 (確定發布): the route records who pressed it. */
+  async function sendPublish() {
+    if (!pub?.confirm) return;
+    const { topic: t, privacy: shown } = pub.confirm;
+    const { id, version } = t;
+    setBusy(true); setNote("");
+    // the draft may have been edited (the link in the confirmation) while it was open: send only what was shown
+    if (pendingYoutubePostId(t)) {
+      const privacy = await readPrivacy(id);
+      if (privacy === "timeout") { setNote(T.readTimeout); setBusy(false); return; }
+      if (privacy !== shown) {
+        const mismatch = youtubePrivacyMismatch(privacy, youtubePrivacy(site?.contentDefaults));
+        setPub({ id, confirm: { ...publishConfirm(t.title, publishTargets(t, privacy), (t.review as TopicReview | null)?.pass !== true, mismatch), topic: t, privacy } });
+        setNote(T.draftChanged); setBusy(false); return;
+      }
+    }
+    setPub(null);
+    try {
+      const r = await fetch(`/api/content/topics/${id}/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version }) });
       const j = await r.json().catch(() => ({ ok: false })) as { ok: boolean; error?: string };
       setNote(j.ok ? T.publishing : r.status === 409 && !j.error?.startsWith("只有") && !j.error?.startsWith("要先在排程頁") ? T.reload : (j.error ?? `失敗（${r.status}）`));
     } finally { await load(); setBusy(false); }
+  }
+
+  /** A format button saves at once (same PATCH "formats", raced by version); a failure goes back to the stored formats
+   *  with the reason in the note. The last format cannot be taken off. */
+  async function saveFormat(f: TopicFormat) {
+    if (!sel) return;
+    const n = toggle(draftFormats ?? sel.formats, f);
+    if (!n.length) { setNote(T.atLeastOne); return; }
+    setBusy(true); setNote(""); setDraftFormats(n);
+    try { await act(sel, "formats", n); } finally { await load(); setDraftFormats(null); setBusy(false); }
   }
 
   async function one(action: string, formats?: TopicFormat[]) {
@@ -314,6 +389,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
   // a day past the end of the month just switched to (31 -> November) becomes its last day
   const setWhen = (w: { month: string; day: number; hour: number }) => setDraftWhen({ ...w, day: Math.min(w.day, daysIn(w.month)) });
   const formats = draftFormats ?? sel?.formats ?? [];
+  const selPub = sel && pub?.id === sel.id ? pub : null;
   const site = sites.find((x) => x.id === siteId);
   const siteRow = overview.rows.find((r) => r.siteId === siteId);
   // N3: the median of this brand's recent finished topics once there are enough, else the price list; the page names which
@@ -323,7 +399,6 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
       {busy ? T.planning : `${T.plan}（約 NT$${planCostTwd()}）`}
     </button>
   );
-  const toggle = (list: TopicFormat[], f: TopicFormat) => (list.includes(f) ? list.filter((x) => x !== f) : [...list, f]);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
@@ -355,7 +430,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
             {!topics.length && <p style={{ margin: 0, padding: 14, color: "var(--text-muted)" }}>{T.empty}</p>}
             {!!topics.length && !shown.length && <p style={{ margin: 0, padding: 14, color: "var(--text-muted)" }}>{T.laneEmpty}</p>}
             {shown.map((t) => (
-              <div key={t.id} onClick={() => setSelId(t.id)}
+              <div key={t.id} onClick={() => pick(t.id)}
                 style={{ display: "grid", gridTemplateColumns: "28px minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: "9px 12px",
                   borderTop: "1px solid var(--border)", cursor: "pointer", background: t.id === selId ? "var(--bg-hover)" : undefined }}>
                 <input type="checkbox" aria-label={t.title} disabled={t.status !== "proposed"} checked={checked.has(t.id)}
@@ -371,7 +446,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
                 </span>
                 <span style={{ display: "grid", justifyItems: "end", gap: 4 }}>
                   <span style={{ fontSize: "var(--font-size-xs)", color: STATUS[t.status][1], whiteSpace: "nowrap" }}>{topicLane(t, now) === "overdue" ? "過期" : STATUS[t.status][0]}</span>
-                  {nextStep(t, now) && <button type="button" className="btn btn-secondary" disabled={busy} onClick={(e) => { e.stopPropagation(); void rowStep(t, nextStep(t, now)!.action); }}>{nextStep(t, now)!.label}</button>}
+                  {nextStep(t, now) && <button type="button" className="btn btn-secondary" disabled={busy} onClick={(e) => { e.stopPropagation(); void rowStep(t, nextStep(t, now)!.action); }}>{pub?.id === t.id && !pub.confirm ? T.readingDraft : nextStep(t, now)!.label}</button>}
                 </span>
               </div>
             ))}
@@ -393,8 +468,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
                   <GridPicker value={addHour} options={HOURS} format={hh} label={T.pickHour} disabled={busy} onChange={(h) => setAdd({ ...add, hour: h })} />
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  {TOPIC_FORMATS.map((f) => <button key={f} type="button" style={chip(add.formats.includes(f))}
-                    onClick={() => setAdd({ ...add, formats: toggle(add.formats, f).length ? toggle(add.formats, f) : add.formats })}>{FORMAT[f]}</button>)}
+                  <FormatButtons value={add.formats} onToggle={(f) => setAdd({ ...add, formats: toggle(add.formats, f).length ? toggle(add.formats, f) : add.formats })} />
                   <button type="button" className="btn btn-secondary" disabled={busy || !keywords.length || keywords.length > MAX_BULK_TOPICS} onClick={() => void addMany()}>{T.addMany(keywords.length)}</button>
                 </div>
                 {keywords.length > MAX_BULK_TOPICS && <p style={{ margin: 0, color: "var(--yellow)", fontSize: "var(--font-size-sm)" }}>{T.tooMany}</p>}
@@ -410,8 +484,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
             </div>
             <input id="topic-add-angle" placeholder={T.angle} value={add.angle} onChange={(e) => setAdd({ ...add, angle: e.target.value })} />
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              {TOPIC_FORMATS.map((f) => <button key={f} type="button" style={chip(add.formats.includes(f))}
-                onClick={() => setAdd({ ...add, formats: toggle(add.formats, f).length ? toggle(add.formats, f) : add.formats })}>{FORMAT[f]}</button>)}
+              <FormatButtons value={add.formats} onToggle={(f) => setAdd({ ...add, formats: toggle(add.formats, f).length ? toggle(add.formats, f) : add.formats })} />
               <button type="button" className="btn btn-secondary" disabled={busy || !add.title.trim() || !add.keyword.trim()} onClick={() => void addOne()}>{T.addBtn}</button>
             </div>
             {fromFolder && <p style={{ margin: 0, fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.fromKb}：{fromFolder.name}</p>}
@@ -458,13 +531,9 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <div style={{ fontSize: "var(--font-size-sm)" }}>{T.formats}</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {TOPIC_FORMATS.map((f) => <button key={f} type="button" disabled={!editable} style={chip(formats.includes(f))}
-                    onClick={() => { const n = toggle(formats, f); if (n.length) setDraftFormats(n); }}>{FORMAT[f]}</button>)}
+                <div role="group" aria-label={T.formats} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <FormatButtons value={formats} disabled={!editable || busy} onToggle={(f) => void saveFormat(f)} />
                 </div>
-                {editable && draftFormats && (
-                  <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void one("formats", draftFormats)}>{T.saveFormats}</button>
-                )}
               </div>
               {sel.last_error && <p style={{ margin: 0, fontSize: "var(--font-size-sm)", color: "var(--red)" }}>{T.error}：{sel.last_error}</p>}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: "var(--font-size-sm)" }}>
@@ -480,7 +549,24 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
                       <a href={socialDraftsUrl(sel.organization_id)} target="_blank" rel="noreferrer">{T.fixDraft}</a>
                     </span>
                   )}
-                  <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void publish(sel)}>{T.publish}</button>
+                  {selPub?.confirm ? (
+                    <div role="region" aria-label={T.confirmPublish} style={{ ...card, display: "grid", gap: 6, borderColor: "var(--accent)", fontSize: "var(--font-size-sm)" }}>
+                      <strong style={{ color: "var(--text-primary)" }}>{selPub.confirm.question}</strong>
+                      <ol style={{ margin: 0, paddingLeft: 20 }}>{selPub.confirm.steps.map((s) => <li key={s}>{s}</li>)}</ol>
+                      {selPub.confirm.reminder && (
+                        <span style={{ color: "var(--yellow)" }}>{selPub.confirm.reminder}{" "}
+                          <a href={socialDraftsUrl(sel.organization_id)} target="_blank" rel="noreferrer">{T.fixDraft}</a></span>
+                      )}
+                      {selPub.confirm.reviewWarning && <span style={{ color: "var(--red)" }}>{selPub.confirm.reviewWarning}</span>}
+                      <span style={{ color: "var(--text-muted)" }}>{selPub.confirm.closing}</span>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void sendPublish()}>{T.confirmPublish}</button>
+                        <button type="button" className="btn btn-ghost" disabled={busy} onClick={cancelPublish}>{T.cancel}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void publish(sel)}>{selPub ? T.readingDraft : T.publish}</button>
+                  )}
                   <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.publishHint}</span>
                 </div>
               )}
