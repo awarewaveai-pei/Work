@@ -5,3 +5,9 @@ alter table public.media_assets
   check (asset_domain in ('ai_generated', 'wp_product', 'wp_blog')) not valid;
 reset lock_timeout;
 notify pgrst, 'reload schema';
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0067_media_assets_real_footage.sql';
+  end if;
+end $$;

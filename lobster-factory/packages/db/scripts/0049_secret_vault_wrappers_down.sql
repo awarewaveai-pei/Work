@@ -7,3 +7,9 @@ DROP FUNCTION IF EXISTS public.secret_get(text);
 DROP FUNCTION IF EXISTS public.secret_delete(text);
 
 NOTIFY pgrst, 'reload schema';
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0049_secret_vault_wrappers.sql';
+  end if;
+end $$;

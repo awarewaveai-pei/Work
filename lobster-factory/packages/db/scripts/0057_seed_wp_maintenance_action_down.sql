@@ -8,3 +8,9 @@ update ops_action_catalog
 set enabled = false,
     updated_at = now()
 where action_key = 'ops.maintenance.wp-plugin-update';
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0057_seed_wp_maintenance_action.sql';
+  end if;
+end $$;

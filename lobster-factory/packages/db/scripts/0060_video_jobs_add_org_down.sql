@@ -17,3 +17,9 @@ alter table public.video_jobs drop column if exists organization_id;
 reset lock_timeout;
 
 notify pgrst, 'reload schema';
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0060_video_jobs_add_org.sql';
+  end if;
+end $$;

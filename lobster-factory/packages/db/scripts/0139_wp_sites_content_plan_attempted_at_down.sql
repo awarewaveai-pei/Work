@@ -6,4 +6,9 @@ set local lock_timeout = '5s';
 alter table public.wp_sites drop column if exists content_plan_attempted_at;
 
 notify pgrst, 'reload schema';
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0139_wp_sites_content_plan_attempted_at.sql';
+  end if;
+end $$;
 commit;

@@ -20,4 +20,9 @@ DROP TABLE IF EXISTS public.cs_knowledge_sources;
 
 NOTIFY pgrst, 'reload schema';
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0051_cs_core.sql';
+  end if;
+end $$;
 COMMIT;

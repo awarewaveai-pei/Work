@@ -16,4 +16,9 @@ DROP TABLE IF EXISTS public.collection_sources;
 
 NOTIFY pgrst, 'reload schema';
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0074_collection_sources.sql';
+  end if;
+end $$;
 COMMIT;

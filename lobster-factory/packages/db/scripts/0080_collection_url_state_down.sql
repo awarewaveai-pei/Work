@@ -14,4 +14,9 @@ DROP TABLE IF EXISTS public.collection_url_state;
 
 NOTIFY pgrst, 'reload schema';
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0080_collection_url_state.sql';
+  end if;
+end $$;
 COMMIT;

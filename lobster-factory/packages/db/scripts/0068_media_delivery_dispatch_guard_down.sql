@@ -15,4 +15,9 @@ alter table public.media_delivery_attempts drop column if exists dispatch_claime
 alter table public.media_delivery_attempts drop column if exists dispatch_token;
 reset lock_timeout;
 notify pgrst, 'reload schema';
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0068_media_delivery_dispatch_guard.sql';
+  end if;
+end $$;
 commit;

@@ -45,3 +45,28 @@ test("paired down files are identical and post-0100 migrations have both copies"
   }
   assert.deepEqual(problems, []);
 });
+
+// A down that leaves its public.schema_migrations row makes apply-db-migration.mjs refuse the re-apply
+// (and the deploy migration gate misjudge the state). Exempt: 0092 (its down drops the ledger itself) and a down that
+// executes nothing (comments only, e.g. 0064's deliberately manual rollback): it must NOT delete the row, since the schema
+// change is still in place.
+test("every down file deletes its own up file's ledger row", () => {
+  const LEDGER = "0092_schema_migrations_ledger.sql";
+  const problems = [];
+  let checked = 0;
+  for (const [dir, re, suffix] of [["migrations", DOWN_IN_MIGRATIONS, ".down.sql"], ["scripts", DOWN_IN_SCRIPTS, "_down.sql"]]) {
+    for (const f of fs.readdirSync(path.join(DB, dir)).filter((n) => re.test(n))) {
+      const up = `${f.slice(0, -suffix.length)}.sql`;
+      if (up === LEDGER) continue;
+      if (!fs.existsSync(path.join(DB, "migrations", up))) { problems.push(`${dir}/${f}: no up file ${up}`); continue; }
+      checked++;
+      const sql = fs.readFileSync(path.join(DB, dir, f), "utf8");
+      const executable = sql.replace(/--[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "").trim();
+      const del = new RegExp(`delete\\s+from\\s+public\\.schema_migrations\\s+where\\s+filename\\s*=\\s*'${up.replace(/\./g, "\\.")}'`, "i");
+      if (!executable) { if (del.test(sql)) problems.push(`${dir}/${f}: comment-only down must not delete the ledger row`); continue; }
+      if (!del.test(sql)) problems.push(`${dir}/${f}: no delete of ledger row ${up}`);
+    }
+  }
+  assert.ok(checked > 100, `only ${checked} down files checked -- wrong path?`);
+  assert.deepEqual(problems, []);
+});

@@ -60,4 +60,9 @@ GRANT EXECUTE ON FUNCTION public.cs_match_chunks_keyword(uuid[], uuid[], uuid, t
 
 NOTIFY pgrst, 'reload schema';
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0086_kb_keyword_mode.sql';
+  end if;
+end $$;
 COMMIT;

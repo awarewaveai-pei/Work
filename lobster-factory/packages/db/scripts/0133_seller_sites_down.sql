@@ -351,4 +351,9 @@ drop table public.seller_sites;
 drop function public.seller_root_account_check();
 drop function public.seller_sites_identity_fixed();
 notify pgrst, 'reload schema';
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0133_seller_sites.sql';
+  end if;
+end $$;
 commit;

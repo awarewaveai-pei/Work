@@ -10,4 +10,9 @@ ALTER TABLE public.cs_knowledge_sources
   DROP COLUMN IF EXISTS hci_source_id,
   DROP COLUMN IF EXISTS hci_imported_at;
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0088_kb_hci_link.sql';
+  end if;
+end $$;
 COMMIT;

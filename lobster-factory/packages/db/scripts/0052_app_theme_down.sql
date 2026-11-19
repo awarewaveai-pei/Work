@@ -11,4 +11,9 @@ BEGIN;
 drop policy if exists app_theme_deny_non_service on public.app_theme;
 drop table if exists public.app_theme;
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0052_app_theme.sql';
+  end if;
+end $$;
 COMMIT;

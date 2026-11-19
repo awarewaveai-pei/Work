@@ -43,3 +43,9 @@ begin
 end $$;
 
 notify pgrst, 'reload schema';
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0038_media_assets_reconcile.sql';
+  end if;
+end $$;

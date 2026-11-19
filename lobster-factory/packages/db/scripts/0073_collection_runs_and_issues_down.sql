@@ -23,4 +23,9 @@ ALTER TABLE public.ops_incidents
 
 NOTIFY pgrst, 'reload schema';
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0073_collection_runs_and_issues.sql';
+  end if;
+end $$;
 COMMIT;

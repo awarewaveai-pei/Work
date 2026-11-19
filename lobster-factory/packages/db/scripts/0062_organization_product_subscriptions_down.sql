@@ -20,3 +20,9 @@ drop function if exists public.org_product_subs_touch_updated_at();
 reset lock_timeout;
 
 notify pgrst, 'reload schema';
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0062_organization_product_subscriptions.sql';
+  end if;
+end $$;

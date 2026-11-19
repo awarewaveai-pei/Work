@@ -14,4 +14,9 @@ DROP TABLE IF EXISTS public.cs_knowledge_folders;
 
 NOTIFY pgrst, 'reload schema';
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0085_kb_folders.sql';
+  end if;
+end $$;
 COMMIT;

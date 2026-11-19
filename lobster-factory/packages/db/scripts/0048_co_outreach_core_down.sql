@@ -16,3 +16,9 @@ DROP TABLE IF EXISTS public.co_messages;
 DROP TABLE IF EXISTS public.co_leads;
 DROP TABLE IF EXISTS public.co_lead_inbox;
 DROP TABLE IF EXISTS public.co_service_profiles;
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0048_co_outreach_core.sql';
+  end if;
+end $$;

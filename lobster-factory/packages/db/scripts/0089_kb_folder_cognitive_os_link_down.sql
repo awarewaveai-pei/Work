@@ -8,4 +8,9 @@ BEGIN;
 ALTER TABLE public.cs_knowledge_folders
   DROP COLUMN IF EXISTS cognitive_os_project_id;
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0089_kb_folder_cognitive_os_link.sql';
+  end if;
+end $$;
 COMMIT;

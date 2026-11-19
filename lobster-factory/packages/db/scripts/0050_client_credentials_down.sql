@@ -5,3 +5,9 @@
 -- before running this if you need a clean vault.
 
 DROP TABLE IF EXISTS public.client_credentials;
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0050_client_credentials.sql';
+  end if;
+end $$;

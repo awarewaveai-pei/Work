@@ -43,4 +43,9 @@ ALTER TABLE public.ops_incidents
 
 NOTIFY pgrst, 'reload schema';
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0097_client_schedules.sql';
+  end if;
+end $$;
 COMMIT;

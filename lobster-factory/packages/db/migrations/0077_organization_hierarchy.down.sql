@@ -10,4 +10,9 @@ alter table public.organizations drop constraint if exists organizations_no_self
 alter table public.organizations drop column if exists parent_organization_id;
 alter table public.organizations drop column if exists org_level;
 notify pgrst, 'reload schema';
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0077_organization_hierarchy.sql';
+  end if;
+end $$;
 commit;

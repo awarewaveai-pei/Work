@@ -12,3 +12,9 @@ reset lock_timeout;
 
 -- Reload so the REST layer stops advertising the dropped column immediately.
 notify pgrst, 'reload schema';
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0058_ops_incidents_parent_incident.sql';
+  end if;
+end $$;

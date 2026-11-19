@@ -100,4 +100,9 @@ ALTER TABLE public.cs_knowledge_sources
 
 NOTIFY pgrst, 'reload schema';
 
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0075_kb_provenance_and_citation.sql';
+  end if;
+end $$;
 COMMIT;

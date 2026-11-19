@@ -98,4 +98,9 @@ revoke all on function public.portal_complete_signup(uuid,uuid,text,text,text,te
 grant execute on function public.portal_complete_signup(uuid,uuid,text,text,text,text) to service_role;
 comment on function public.portal_complete_signup is 'Atomic 4-table write for portal customer signup. Caller creates Auth user first and compensates via deleteUser on failure. service_role only (0063).';
 notify pgrst, 'reload schema';
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0110_plans_entitlements.sql';
+  end if;
+end $$;
 commit;

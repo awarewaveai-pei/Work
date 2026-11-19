@@ -5,4 +5,9 @@ BEGIN;
 DROP FUNCTION IF EXISTS public.collection_rate_limit_take(text, double precision, double precision, bigint, bigint);
 DROP TABLE IF EXISTS public.collection_rate_limit_buckets;
 NOTIFY pgrst, 'reload schema';
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0082_collection_rate_limit_buckets.sql';
+  end if;
+end $$;
 COMMIT;

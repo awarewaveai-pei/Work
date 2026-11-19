@@ -13,3 +13,9 @@ drop function if exists public.portal_complete_signup(uuid, uuid, text, text, te
 drop index if exists public.organizations_portal_signup_rl_idx;
 
 notify pgrst, 'reload schema';
+
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0063_portal_complete_signup.sql';
+  end if;
+end $$;

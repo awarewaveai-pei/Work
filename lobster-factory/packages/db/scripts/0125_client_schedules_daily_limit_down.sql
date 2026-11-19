@@ -16,4 +16,9 @@ insert into public.client_schedules_0125_backup (organization_id, job_key, daily
 alter table public.client_schedules drop column if exists daily_limit;
 
 notify pgrst, 'reload schema';
+do $$ begin
+  if to_regclass('public.schema_migrations') is not null then
+    delete from public.schema_migrations where filename = '0125_client_schedules_daily_limit.sql';
+  end if;
+end $$;
 commit;
