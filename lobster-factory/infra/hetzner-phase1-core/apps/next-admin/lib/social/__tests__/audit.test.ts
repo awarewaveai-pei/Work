@@ -36,6 +36,19 @@ const logRows = () => calls.filter((c) => c.table === "social_audit_log" && c.op
 
 beforeEach(() => { calls.length = 0; });
 
+describe("reconnect sends Postiz the platform channel id (2026-11-19 'Channel not found')", () => {
+  it("refresh = postiz_internal_id, never the Postiz row id; not synced yet -> a clear 409, no attempt row", async () => {
+    const { connectUrl } = await import("@/lib/content/postiz");
+    db = fakeDb({ "social_accounts.select": { platform: "youtube", postiz_internal_id: "UCPiDrbv4Nbooue6Y5V-rppw" }, "social_connect_attempts.insert": { id: "att" } });
+    await startConnect("brand", "youtube", "acc", "ops:operator");
+    expect(connectUrl).toHaveBeenLastCalledWith("youtube", "UCPiDrbv4Nbooue6Y5V-rppw");
+    calls.length = 0;
+    db = fakeDb({ "social_accounts.select": { platform: "youtube", postiz_internal_id: null } });
+    await expect(startConnect("brand", "youtube", "acc", "ops:operator")).rejects.toMatchObject({ status: 409 });
+    expect(calls.some((c) => c.table === "social_connect_attempts" && c.op === "insert")).toBe(false);
+  });
+});
+
 describe("one log row per action (C11)", () => {
   it("connect start, cancel, unlink, media upload", async () => {
     db = fakeDb({ "social_connect_attempts.insert": { id: "att" }, "social_connect_attempts.update": [{ id: "att", platform: "bluesky" }],

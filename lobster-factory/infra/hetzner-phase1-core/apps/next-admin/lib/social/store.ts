@@ -377,11 +377,15 @@ export async function startConnect(brandId: string, platform: string, refreshAcc
   }
   let refreshIntegration: string | undefined;
   if (refreshAccountId) {
-    const { data: acc, error } = await sb.from("social_accounts").select("postiz_integration_id, platform").eq("id", refreshAccountId).eq("organization_id", brandId).maybeSingle();
+    const { data: acc, error } = await sb.from("social_accounts").select("postiz_internal_id, platform").eq("id", refreshAccountId).eq("organization_id", brandId).maybeSingle();
     if (error) fail(error, "account");
     if (!acc) throw new SocialStoreError(404, "no such account in this brand");
     if (acc.platform !== platform) throw new SocialStoreError(400, `account is ${acc.platform}, not ${platform}`);
-    refreshIntegration = acc.postiz_integration_id;
+    // Postiz reconnects by the PLATFORM's channel id (its own UI sends integration.internalId; youtube.provider.ts
+    // reConnect requires it among the authorized account's channels), not by its row id -- sending the row id made every
+    // reconnect end in "Channel not found" (2026-11-19). The 5-minute mirror (channel-health.ts) keeps this column filled.
+    if (!acc.postiz_internal_id) throw new SocialStoreError(409, "這個頻道的平台編號還沒同步（每 5 分鐘一次），請 5 分鐘後再按重新連接");
+    refreshIntegration = acc.postiz_internal_id;
   }
   const known = (await listAllIntegrations()).map((i) => i.id);
   const { data: attempt, error } = await sb.from("social_connect_attempts")

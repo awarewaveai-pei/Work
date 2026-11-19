@@ -24,7 +24,7 @@ json="$(psql_q <<'SQL'
 select coalesce(json_agg(json_build_object(
   'id', id, 'provider', "providerIdentifier", 'refreshNeeded', coalesce("refreshNeeded", false),
   'disabled', coalesce(disabled, false), 'inBetweenSteps', coalesce("inBetweenSteps", false),
-  'deleted', "deletedAt" is not null) order by id), '[]'::json)
+  'deleted', "deletedAt" is not null, 'internalId', "internalId") order by id), '[]'::json)
 from "Integration";
 SQL
 )" || fail "Postiz Integration query failed -- not mirrored"

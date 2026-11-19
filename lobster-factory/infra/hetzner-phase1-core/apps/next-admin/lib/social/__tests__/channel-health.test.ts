@@ -1,6 +1,6 @@
 // The channel mirror (SOC-REAUTH): social_accounts.status follows Postiz's own Integration row, both ways.
 import { describe, expect, it } from "vitest";
-import { parseHealth, planMirror, reauthIncident, type ChannelHealth, type MirrorAccount } from "../channel-health";
+import { parseHealth, planInternalIds, planMirror, reauthIncident, type ChannelHealth, type MirrorAccount } from "../channel-health";
 
 const acc = (id: string, status: string): MirrorAccount => ({ id, organization_id: "org", platform: "youtube", label: "Soulful", status, postiz_integration_id: `pz-${id}` });
 const h = (id: string, over: Partial<ChannelHealth> = {}): ChannelHealth =>
@@ -38,5 +38,14 @@ describe("planMirror", () => {
     expect(parseHealth([h("a")])).toEqual([h("a")]);
     expect(parseHealth([h("a"), { id: "x", provider: "y", refreshNeeded: "true" }])).toBeNull();
     expect(parseHealth({})).toBeNull();
+    expect(parseHealth([{ ...h("a"), internalId: 5 }])).toBeNull();
+  });
+
+  it("the platform channel id is carried and stored only when it differs (what 重新連接 must send to Postiz)", () => {
+    expect(parseHealth([{ ...h("a"), internalId: "UCPiDrbv4Nbooue6Y5V-rppw" }])).toEqual([h("a", { internalId: "UCPiDrbv4Nbooue6Y5V-rppw" })]);
+    const known = { ...acc("a", "connected"), postiz_internal_id: "UC-same" };
+    expect(planInternalIds([acc("b", "disabled"), known], [h("b", { internalId: "UC-new" }), h("a", { internalId: "UC-same" })]))
+      .toEqual([{ id: "b", internalId: "UC-new" }]);   // disabled accounts too; an unchanged one is not rewritten
+    expect(planInternalIds([acc("c", "connected")], [h("c")])).toEqual([]);   // an old host script without internalId writes nothing
   });
 });

@@ -9,11 +9,14 @@
 // so the next failure reopens and notifies again. A reconnect is finished only when this mirror says so (store.ts).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { selectAll } from "@/lib/supabase-paging";
 import { ingestIncident } from "@/lib/ops-inbox/ingest";
 import { SETTINGS_CHANNELS } from "./dispatch";
 
-export interface ChannelHealth { id: string; provider: string; refreshNeeded: boolean; disabled: boolean; inBetweenSteps: boolean; deleted: boolean }
-export interface MirrorAccount { id: string; organization_id: string; platform: string; label: string; status: string; postiz_integration_id: string }
+export interface ChannelHealth { id: string; provider: string; refreshNeeded: boolean; disabled: boolean; inBetweenSteps: boolean; deleted: boolean;
+  /** the platform's own channel id (Postiz "internalId"); what Postiz needs as `refresh` to reconnect (store.ts startConnect) */
+  internalId?: string }
+export interface MirrorAccount { id: string; organization_id: string; platform: string; label: string; status: string; postiz_integration_id: string; postiz_internal_id?: string | null }
 export interface MirrorChange { account: MirrorAccount; to: "connected" | "expired"; why: string | null }
 
 /** The Postiz reason a channel cannot post, or null when it can. */
@@ -47,6 +50,17 @@ export function reauthIncident(platform: string, label: string, why: string): { 
   };
 }
 
+/** Accounts whose stored platform channel id differs from Postiz's (new, or Postiz re-created the row). */
+export function planInternalIds(accounts: MirrorAccount[], health: ChannelHealth[]): Array<{ id: string; internalId: string }> {
+  const byId = new Map(health.map((h) => [h.id, h]));
+  const out: Array<{ id: string; internalId: string }> = [];
+  for (const a of accounts) {
+    const want = byId.get(a.postiz_integration_id)?.internalId;
+    if (want && want !== a.postiz_internal_id) out.push({ id: a.id, internalId: want });
+  }
+  return out;
+}
+
 /** Strict parse of the host payload: anything malformed is refused whole (a half-read list would flip channels). */
 export function parseHealth(body: unknown): ChannelHealth[] | null {
   if (!Array.isArray(body)) return null;
@@ -56,8 +70,10 @@ export function parseHealth(body: unknown): ChannelHealth[] | null {
     const o = r as Record<string, unknown>;
     if (typeof o.id !== "string" || !o.id || typeof o.provider !== "string") return null;
     for (const k of ["refreshNeeded", "disabled", "inBetweenSteps", "deleted"]) if (typeof o[k] !== "boolean") return null;
+    if (o.internalId !== undefined && o.internalId !== null && (typeof o.internalId !== "string" || !o.internalId)) return null;
     out.push({ id: o.id, provider: o.provider, refreshNeeded: o.refreshNeeded as boolean, disabled: o.disabled as boolean,
-      inBetweenSteps: o.inBetweenSteps as boolean, deleted: o.deleted as boolean });
+      inBetweenSteps: o.inBetweenSteps as boolean, deleted: o.deleted as boolean,
+      ...(typeof o.internalId === "string" ? { internalId: o.internalId } : {}) });
   }
   return out;
 }
@@ -65,10 +81,17 @@ export function parseHealth(body: unknown): ChannelHealth[] | null {
 export async function applyChannelHealth(health: ChannelHealth[], sb: SupabaseClient | null = getSupabaseWriteClient())
   : Promise<{ expired: number; connected: number; errors: string[] }> {
   if (!sb) throw new Error("Supabase client not configured");
-  const { data, error } = await sb.from("social_accounts").select("id, organization_id, platform, label, status, postiz_integration_id").neq("status", "disabled");
-  if (error) throw new Error(`accounts: ${error.message}`);
+  // every row: PostgREST cuts one select at 1000 and an account past it would never mirror (Codex af10cceb)
+  const data = await selectAll<MirrorAccount>(
+    (from, to) => sb.from("social_accounts").select("id, organization_id, platform, label, status, postiz_integration_id, postiz_internal_id").order("id").range(from, to),
+    (e) => { throw new Error(`accounts: ${e.message}`); });
   const out = { expired: 0, connected: 0, errors: [] as string[] };
-  for (const c of planMirror((data ?? []) as MirrorAccount[], health)) {
+  // every account, disabled ones too: a person may re-enable and reconnect it
+  for (const u of planInternalIds(data, health)) {
+    const { error: idErr } = await sb.from("social_accounts").update({ postiz_internal_id: u.internalId }).eq("id", u.id);
+    if (idErr) out.errors.push(`${u.id}: internal id ${idErr.message}`);
+  }
+  for (const c of planMirror(data, health)) {
     // conditional on the status read: a person reconnecting meanwhile is not overwritten
     const { data: done, error: upErr } = await sb.from("social_accounts").update({ status: c.to })
       .eq("id", c.account.id).eq("status", c.account.status).select("id");
