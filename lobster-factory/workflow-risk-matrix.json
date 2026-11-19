@@ -81,6 +81,22 @@
       "risk_level": "medium",
       "approval_required": false,
       "rollback_required": false
+    },
+    {
+      "task_type": "content_publish",
+      "tool": "trigger",
+      "allowed_envs": ["staging", "production"],
+      "risk_level": "high",
+      "approval_required": true,
+      "rollback_required": true
+    },
+    {
+      "task_type": "member_email",
+      "tool": "trigger",
+      "allowed_envs": ["staging", "production"],
+      "risk_level": "high",
+      "approval_required": true,
+      "rollback_required": true
     }
   ]
 }

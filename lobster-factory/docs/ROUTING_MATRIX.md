@@ -44,6 +44,8 @@ If this matrix and `MCP_TOOL_ROUTING_SPEC.md` disagree, **update the spec first*
 | release_tagging | medium | production | github | yes | gated |
 | runtime_content_ops | medium | staging,production | wordpress | no | manual-assisted |
 | runtime_plugin_change | high | staging | wordpress | yes | manual-gated |
+| content_publish | high | staging,production | trigger | yes | assist-with-approval |
+| member_email | high | staging,production | trigger | yes | assist-with-approval |
 
 ## Fallback Rules
 - If `task_type` is unknown, return `unsupported_task` and block execution.

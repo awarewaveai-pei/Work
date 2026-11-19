@@ -46,13 +46,15 @@ When humans or agents need to route work, use this order. **Lower number wins on
 | release_tagging | github | production | medium | true | false | approval by release owner |
 | runtime_content_ops | wordpress | staging,production | medium | false | false | content/business runtime only |
 | runtime_plugin_change | wordpress | staging | high | true | true | production change blocked by default |
+| content_publish | trigger | staging,production | high | true | true | 內容對外發布（話題佇列把文章／YouTube／社群貼文真的發出去）；發出去就是公開、難收回，故 high 且要人核准；rollback = 撤回／改回草稿 |
+| member_email | trigger | staging,production | high | true | true | 會員信（每週在客戶網站 FluentCRM 備一封信草稿）；寄給客戶的會員、寄出無法收回，故 high 且要人核准；只備草稿不自動寄；rollback = 刪草稿 |
 
 ## Cursor / IDE MCP keys → routing (informative only)
 The following maps **Cursor `mcpServers` names** (see inventory) to **this spec’s `task_type` domain**. **Supabase MCP, LLM wrappers, and filesystem MCPs are not `task_type` owners**—they do not replace Trigger approvals or SoR writes.
 
 | Typical MCP key (inventory) | Related `task_type` values (if any) | Notes |
 |-----------------------------|--------------------------------------|--------|
-| **trigger** | `client_onboarding`, `site_provisioning`, `manifest_apply`, `smoke_test`, `deploy_production`, `incident_repair` | Durable orchestration owner per table above. |
+| **trigger** | `client_onboarding`, `site_provisioning`, `manifest_apply`, `smoke_test`, `deploy_production`, `incident_repair`, `content_publish`, `member_email` | Durable orchestration owner per table above. |
 | **n8n** | `webhook_ingress`, `crm_sync`, `notifications` | Glue only; no critical deploy orchestration. |
 | **github** | `ci_validate`, `release_tagging` | CI/release gate; no runtime secrets in repo. |
 | **wordpress** | `runtime_content_ops`, `runtime_plugin_change` | Delivery runtime; not control plane. |
