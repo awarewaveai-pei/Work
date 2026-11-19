@@ -66,11 +66,16 @@ for g in d.get("granular_scopes") or []:
     if g.get("scope") == need and g.get("target_ids"):
         targets = ",".join(str(t) for t in g["target_ids"])
 print(("valid" if d.get("is_valid") else "invalid"), int(d.get("expires_at") or 0), 1 if need in (d.get("scopes") or []) else 0,
-      d.get("type") or "-", d.get("profile_id") or "-", targets)
+      d.get("type") or "-", d.get("profile_id") or "-", targets, int(d.get("data_access_expires_at") or 0))
 '
 }
 
-failed=0; changed=0
+failed=0; changed=0; warn=()
+# Meta's data_access_expires_at (2027-01-23 for all four channels when measured 2026-11-19) is a second clock: when it
+# passes, the app loses data access until the person logs in again; whether Page publishing stops too is not
+# documented clearly, so the operator is told DATA_ACCESS_WARN_DAYS ahead (Telegram + Slack via notify.sh) to reconnect,
+# which restarts the window. It never changes refreshNeeded.
+DATA_ACCESS_WARN_DAYS="${DATA_ACCESS_WARN_DAYS:-21}"
 rows="$(psql_postiz -tA -F $'\t' -c "select id, \"providerIdentifier\", name, \"internalId\", token, \"refreshNeeded\", coalesce(extract(epoch from \"tokenExpiration\")::bigint, 0) from \"Integration\" where \"deletedAt\" is null and \"providerIdentifier\" in ('facebook','instagram') order by id")" \
   || { log "Postiz Integration read failed -- nothing checked"; exit 1; }
 
@@ -80,9 +85,9 @@ while IFS=$'\t' read -r id prov name internal tok need stored; do
   need_scope="pages_manage_posts"; [[ "$prov" == "instagram" ]] && need_scope="instagram_content_publish"
   tokmd5="$(printf '%s' "$tok" | md5sum | cut -c1-32)"
   parts=("${tok%%___*}"); [[ "$tok" == *___* ]] && parts+=("${tok##*___}")
-  verdict="valid"; why=""; expires=0; first=1
+  verdict="valid"; why=""; expires=0; first=1; posting_dax=0
   for p in "${parts[@]}"; do
-    read -r v e has ty prof targets <<<"$(debug "$p" "$need_scope")"
+    read -r v e has ty prof targets dax <<<"$(debug "$p" "$need_scope")"
     # an unreadable answer is inconclusive -- unless an earlier part already proved the channel cannot post (Codex 4c828135)
     if [[ "$v" == "error" ]]; then [[ "$verdict" == "invalid" ]] || verdict="error:$e"; break; fi
     [[ "$v" == "valid" ]] || { verdict="invalid"; why="token invalid"; }
@@ -94,12 +99,20 @@ while IFS=$'\t' read -r id prov name internal tok need stored; do
       [[ "$has" == "1" ]] || { verdict="invalid"; why="$need_scope missing on the posting token"; }
       [[ "$prov" != "facebook" || "$prof" == "$internal" ]] || { verdict="invalid"; why="token belongs to another Page"; }
       [[ "$prov" != "instagram" || "$targets" == "*" || ",$targets," == *",$internal,"* ]] || { verdict="invalid"; why="token not granted for this Instagram account"; }
+      posting_dax="${dax:-0}"
       first=0
     fi
     # 0 = never; the shorter real life wins
     if [[ "$e" != "0" ]] && { [[ "$expires" == "0" ]] || (( e < expires )); }; then expires="$e"; fi
   done
   if [[ "$verdict" == error:* ]]; then log "$prov $name: Meta answer unusable (${verdict#error:}) -- left as is"; failed=1; continue; fi
+  # Meta's data-access window (separate from expires_at; renewed by reconnecting): warn only for a channel that can
+  # post now (Meta valid and Postiz not flagging it -- a flagged one already has its own alert) and only while the date is still ahead -- once passed, Meta's answer
+  # decides validity and the flag path takes over (Codex c298849d)
+  left=$(( ${posting_dax:-0} - $(date -u +%s) ))
+  if [[ "$verdict" == "valid" && "$need" == "f" && "${posting_dax:-0}" =~ ^[0-9]+$ ]] && (( posting_dax > 0 && left > 0 && left < DATA_ACCESS_WARN_DAYS * 86400 )); then
+    warn+=("$prov「$name」：$(date -u -d "@$posting_dax" +%F)")
+  fi
 
   if [[ "$verdict" == "valid" ]]; then
     target="2126-01-01 00:00:00+00"; label="never"
@@ -119,5 +132,14 @@ while IFS=$'\t' read -r id prov name internal tok need stored; do
   fi
 done <<<"$rows"
 
-echo "done: changed=$changed failed=$failed dry_run=$DRY"
+if (( ${#warn[@]} )); then
+  msg="Meta 資料存取期限快到了（Facebook／Instagram）：
+$(printf '・%s
+' "${warn[@]}")
+到期前請到 app.aware-wave.com/tools/social →「設定」，在上列頻道那一列按「重新連接」，用同一個 Facebook 帳號登入並同意；期限會重新起算。"
+  log "data access ends within $DATA_ACCESS_WARN_DAYS days: ${warn[*]}"
+  if [[ $DRY == 1 ]]; then echo "(dry-run) would notify: $msg"
+  else printf '%s' "$msg" | "${NOTIFY_SH:-$(dirname "$0")/notify.sh}" >/dev/null || { log "notify failed"; failed=1; }; fi
+fi
+echo "done: changed=$changed failed=$failed warn=${#warn[@]} dry_run=$DRY"
 exit "$failed"
