@@ -1,22 +1,27 @@
-# Video unify supervisor — Claude handoff 2026-11-18 23:10
+# Video unify supervisor — Claude handoff (updated 2026-11-19 00:30)
 
-續接語：續做 影片工具融合監工：讀本檔，從「下一步 1」開始；完成＝data.mjs 50 項全 done、每次部署經操作者同意（操作者 2026-11-18：「我全部同意核准，需要決定的事都你決定」）。回報一律繁中。建議模型：Opus 5.5。
+續接語：續做 影片工具融合監工：讀 agency-os/handoffs/2026-11-16-video-unify-supervisor/CLAUDE-HANDOFF-20261118.md，從「下一步 1」開始；完成＝data.mjs 50 項全 done（現 47/50，剩 U11.2、U11.3、U11.5）。操作者 2026-11-18 已全部核准部署與發布（「我全部同意核准，需要決定的事都你決定」）。回報一律繁中。建議模型：Opus 5.5。
 
 ## State (facts, verified)
-- Integrate only in `D:/Worktrees/Work/u-integrate` (detached): fetch → rebase origin/main → cherry-pick → verify → `git push origin HEAD:main`. Supervisor: `data.mjs` here → `node build.mjs && node check.mjs` → commit → Artifact publish `supervisor.html` (URL Gq8RK8udeJR2SGvmjKpQr2). 46/50 done.
-- Live: video-service `0ad5d240b` (cpuset 30,31 + 3 GiB; bookend join bt709 + length check; text fit; QA still-windows), workbench `740618510` (5xx retry), next-admin `1fe9adedd`. DEPLOY_HOLD absent.
-- Deploy recipes: VS = scratchpad `deploy-vs2.sh` pattern (git archive → docker build → unittest → safe-infra-patch compose → health bookends); VW/NA = `sudo /root/lobster-phase1/scripts/sg-deploy.sh <app>` over `ssh -p 58122 ubuntu@145.239.195.47`. First line `# CONFIRMED-HIGH-RISK: …`.
-- Browser: Claude in Chrome does not connect after reboot; use the app's built-in browser (signed in, client switch = Soulful). Workbench pages are iframes: find() can't see inside; click by coordinates; read via javascript_tool on iframe.contentDocument.
+- Integrate only in `D:/Worktrees/Work/u-integrate` (detached): fetch → rebase origin/main → change or cherry-pick → verify → `git push origin HEAD:main`. Never in D:\Work.
+- Supervisor: edit `data.mjs` here → `node build.mjs && node check.mjs` → commit with pathspec → Artifact publish `supervisor.html` to https://claude.ai/artifact/Gq8RK8udeJR2SGvmjKpQr2 (republish same URL).
+- Live versions: next-admin `a67e9bfcb`, video-workbench `754efe007` (code = a67e9bfcb), video-service `0ad5d240b`, wp-bridge 0.22.0 on aware-wave.com + Soulful.
+- Deploy: `ssh -p 58122 ubuntu@145.239.195.47 "sudo /root/lobster-phase1/scripts/sg-deploy.sh <next-admin|video-workbench>"`, first line `# CONFIRMED-HIGH-RISK: …`. video-service: git archive → docker build → unittest → safe-infra-patch compose (recipe in WORKLOG 2026-11-18).
+- Worktree removal: `cmd /c rmdir <app>\node_modules` (junctions into D:\Work) BEFORE `git worktree remove`, else D:\Work node_modules gets emptied.
+- Browser: the app's built-in browser (signed in to video.aware-wave.com and app.aware-wave.com). Claude in Chrome does not connect. Workbench pages are iframes: click by coordinates; read via javascript_tool on `iframe.contentDocument`.
 
-## U11.5 Soulful live run (org 2bf60452-3d4d-47c2-9970-b9046ed1a35a)
-- Project "A 30-Second Creative Pause: Notice, Draw, Reflect". Final renders (22:3x-22:41): workbench cards v10=16:9, v11=9:16, v12=4:5; all 29.67 s, text inside frame, 4 QA passed.
-- Approved for release: 16:9 and 4:5. Social drafts saved (copy edited: no therapy claims / no invented newsletter): YouTube←16:9; Facebook, Instagram, Bluesky←4:5. NOT yet scheduled.
-- WordPress: draft #7753 created on soulfulexpression.org (Kadence) but video NOT embedded: REST credential "Admin" in wp_sites does not authenticate (`/wp-json/wp/v2/users/me` → rest_not_logged_in); create went via wp-bridge. Background subagent fixing "one channel per site" in worktree `D:/Worktrees/Work/vu-wp-embed` (NA node_modules is a JUNCTION: `cmd /c rmdir` it before removing the worktree).
+## Soulful run (org 2bf60452-3d4d-47c2-9970-b9046ed1a35a) — full SOP + 29 issues
+`SOULFUL-LIVE-RUN-SOP-20261118.md` in this folder: §1 SOP, §2 A fixed (11), §2 B open (18), §2 C covers/Remotion, §2 D recommendations in order.
+- Final renders (workbench asset ids): 16:9 `55f52cba-3019-4aa9-8aac-d068b88586a7` (job d9dc4ba2…), 9:16 `3a95c067-8fd6-4cc6-bea2-9802039ea395`, 4:5 `41b1ee7e-9a4a-47a4-a8e6-20f885db2481` (job 6a87d269…). 16:9 and 4:5 approved.
+- WordPress post #7753 (soulfulexpression.org, Kadence): 16:9 video embedded, body + disclaimer + 1925/1995, author 3, status future 2026-11-19 04:00 UTC = 12:00 Taipei. No poster (no cover then).
+- Social drafts (app social tool, brand Soulful, view 貼文清單): YouTube←16:9 `7371fd94…`; Facebook `10983378…`, Instagram `a9cd8360…`, Bluesky `938162eb…` ←4:5. All draft, no cover, NOT scheduled.
 
 ## 下一步
-1. Collect the vu-wp-embed result (commit in that worktree); review; integrate; deploy NA (+ wp-bridge release if it added an endpoint — follow `scripts/release-wp-bridge.sh`); then embed the 16:9 video into draft #7753 and publish the post in WP admin (theme Kadence; set the publish time = social time).
-2. Schedule the 4 social drafts in the main system 社群工具 (Soulful) for a time ≥ now+1h; record time; confirm YouTube gets 16:9.
-3. Record U11.5 numbers (clicks not counted; cost: script ≈NT$1.8 est., renders NT$0, AI copy 2×≈NT$0.1) and close U11.5 in data.mjs only after posts are live/scheduled. U11.1 → done (all 20 §8 rows walked live 2026-11-18).
-4. Then U11.2 (old entry → 開啟影音工作台, script history move) and U11.3 (delete retired pages; video door home → workbench) per plan §13; deploy with go.
-5. Open gaps to log/fix (supervisor 待決 4 has the rest): (a) multi-ratio one-click yields one release panel per ratio — no cross-ratio per-platform pick; (b) v10 card showed 「主系統狀態暫時讀不到」 once; (c) release panel waits ~30 s on `/api/video/assets?includeWorkbench=1`; (d) one-click dialog forgets 全選 (resets to 9:16).
-6. WORKLOG entry for 2026-11-18 not written yet (do via `scripts/git-partial-worktree-commit.py stage`).
+1. Wait for operator on 待決 5 (supervisor): Remotion cover template now, or schedule with current covers. Default if no answer before 10:00 Taipei 11/19: current covers.
+2. Covers for the two approved videos: they were rendered before c02b5fd07, so no candidates. Generate with the workbench's own code (`backend/cover.cjs autoCovers`, frames from the clean copy `media_assets.metadata.cleanUrl`), then set them through the release panel's cover upload (POST multipart `/api/video/cover?organizationId=…`, fields assetId, rightsConfirmed=true, file). Check the image has no caption line.
+3. Delete the 4 social drafts in the social tool, re-save from the 16:9 panel (YouTube only) and the 4:5 panel (Facebook, Instagram, Bluesky) so they carry the cover; reuse the copy above (no therapy claims).
+4. Schedule all 4 at 2026-11-19 12:00 Taipei. The social tool shows 組織時區（UTC）: enter 04:00 UTC or switch the view to 台灣. Confirm YouTube has the 16:9 file.
+5. Post #7753 poster: post is `future`, so the bridge refuses edits; set the poster via wp-cli on host (`docker exec soulful-wp wp --allow-root …`) or move to draft, re-embed, re-schedule.
+6. Mark U11.5 done in data.mjs once the posts are scheduled; republish supervisor.
+7. Then U11.2 (old entry → 開啟影音工作台, script history move) and U11.3 (delete retired pages; video door home → workbench) per plan §13; deploy.
+8. WORKLOG entry for 2026-11-18/19 not written yet (use `scripts/git-partial-worktree-commit.py stage`).
