@@ -10,6 +10,7 @@ import type { OverviewRow } from "@/lib/content/topics/overview";
 import type { TrendCell } from "@/lib/content/topics/overview-load";
 import type { Topic } from "@/lib/content/topics/store";
 import { planCostTwd } from "@/lib/content/topics/cost";
+import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import PublishModeButtons from "../sites/PublishModeButtons";
 import TopicModeButtons from "../sites/TopicModeButtons";
@@ -28,7 +29,8 @@ const T = {
   proposed: "已提案", notProposed: "本月未提案", never: "未嘗試",
   notOpened: "未開通", ok: "—",
 };
-const fmtUsd = (n: number) => `US$${n.toFixed(2)}`;
+// every amount a person reads is NT$ (operator rule); spendUsd stays the stored unit
+const fmtUsd = (n: number) => `NT$${usdToNtd(n).toFixed(0)}`;
 const taipeiText = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : T.never);
 
 export function OverviewTable({ rows, selected, onPick, note }: { rows: OverviewRow[]; selected: string; onPick: (siteId: string) => void; note: string | null }) {
@@ -76,9 +78,11 @@ export function OverviewTable({ rows, selected, onPick, note }: { rows: Overview
   );
 }
 
-function Step({ n, title, children }: { n: string; title: string; children: ReactNode }) {
+// wide = the step holds a table (④'s schedule row, ~900px): it takes a row of its own, and its one column may shrink
+// (minmax(0, 1fr)), so the table scrolls inside the card and never widens the page (S9, seen live 2026-11-19: scrollWidth 1925).
+function Step({ n, title, children, wide }: { n: string; title: string; children: ReactNode; wide?: boolean }) {
   return (
-    <div style={{ ...card, flex: "1 1 220px", minWidth: 0, display: "grid", gap: 6, alignContent: "start" }}>
+    <div style={{ ...card, flex: wide ? "1 1 100%" : "1 1 220px", minWidth: 0, display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 6, alignContent: "start" }}>
       <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{n} {title}</div>
       {children}
     </div>
@@ -117,10 +121,10 @@ export function FlowCells({ site, row, cell, topics, month, schedule, planButton
           <span style={muted}>勾選核准或退回在下面的題目清單。</span>
           <TopicModeButtons site={site} onSaved={onSiteSaved} readOnly={onDoor} />
         </Step>
-        <Step n="④" title="製作">
+        <Step n="④" title="製作" wide={!onDoor && !!schedule}>
           <p style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>總開關{row.enabled ? "開" : "關"}；每天最多開始 {row.dailyLimit ?? DAILY_START_CAP} 題；進行中 {row.inProgress} 題。</p>
           <span style={muted}>這個開關管這個客戶的所有網站。</span>
-          {!onDoor && schedule}
+          {!onDoor && schedule && <div style={{ minWidth: 0, overflowX: "auto" }}>{schedule}</div>}
         </Step>
         <Step n="⑤" title="發布">
           <p style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>{row.publishGate === "auto" ? "AI 審核後自動發布" : "人工審核後發布"}（只管文章）。</p>
