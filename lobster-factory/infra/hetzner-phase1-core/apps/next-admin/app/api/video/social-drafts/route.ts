@@ -7,7 +7,8 @@ import { BadRequest, handle, jsonBody, uuid } from "@/lib/social/http";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { saveVideoSocialDrafts, type DraftItem } from "@/lib/content/video/social-drafts";
 import { DELIVERY_RATIOS } from "@/lib/content/video/platform-ratio";
-import { draftDeps, loadVideoRows } from "@/lib/content/video/social-drafts-deps";
+import { draftDeps } from "@/lib/content/video/social-drafts-deps";
+import { loadVideoRows } from "@/lib/content/video/ratio-rows";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,8 @@ export async function POST(req: Request): Promise<Response> {
     const db = getSupabaseWriteClient();
     if (!db) throw new Error("db unavailable");
     const rows = await loadVideoRows(db, org, candidate);
-    const primary = rows.find((r) => r.id === candidate);
+    // a project video is reached through any of its cuts: the title comes from the cut that was opened, else the newest row
+    const primary = rows.find((r) => r.id === candidate) ?? rows[0];
     if (!primary) throw new BadRequest("video not found");
     const result = await saveVideoSocialDrafts(draftDeps(db, org, rows, actorOf(req)), primary.metadata?.title ?? "video", items);
     if (result.ok === false) throw new BadRequest(result.error);

@@ -21,7 +21,7 @@ export async function GET(req: Request): Promise<Response> {
   // Invariant: workbench renders are listed only to a caller that asks (Release panel); pipeline screens never see them.
   const domains = new URL(req.url).searchParams.get("includeWorkbench") === "1" ? ["ai_generated", "real_footage", "workbench_render"] : ["ai_generated", "real_footage"];
   let q = db.from("media_assets")
-    .select("id, organization_id, asset_domain, object_url, object_key, mime_type, byte_size, checksum_sha256, metadata, created_at")
+    .select("id, organization_id, asset_domain, object_url, object_key, mime_type, byte_size, checksum_sha256, metadata, created_at, media_project_id")
     .eq("organization_id", organizationId)
     .eq("is_current", true)
     .in("asset_domain", domains)

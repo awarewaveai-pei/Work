@@ -4,8 +4,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const PROJECT_COLUMNS = "id, organization_id, title, production_mode, lifecycle_stage, autonomy, source, source_ref, formats, last_error, brief_json, active_story_bible_revision_id, active_candidate_asset_id, active_release_id, created_at, updated_at";
-/** A finished video (成片) in a project: the one mime project-advance rows() and attachVideoAssets accept. */
-export const FINISHED_VIDEO_MIME = "video/mp4";
+import { FINISHED_VIDEO_MIME } from "./ratio-rows";
+export { FINISHED_VIDEO_MIME };
 type Row = Record<string, unknown>;
 type Failure = { ok: false; error: string };
 

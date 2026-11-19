@@ -79,6 +79,24 @@ describe("ReviewRelease", () => {
     expect(saved.items.map((i) => [i.accountId, i.ratio])).toEqual([["acc-yt", "16x9"], ["acc-ig", "9x16"]]);
   });
 
+  it("B1 workbench project: every ratio is its own cut (no variantOf); opened from any one of them the page lists the newest cut of each ratio, with one shared choice", async () => {
+    const P = "f8c27566-9d79-4aa9-87e6-d8e3f84cacac", W45 = "d6a05344-7b57-4e87-a5c4-b6c1d62a8a7a", W916 = "e7b16455-8c68-4f98-b6d5-c7d2e73b9b8b", OLD45 = "a9d49788-bf9b-4cb1-a9f8-fa05b6dd1d1d", ELSE = "b0e5a899-c0ac-4dc2-bab9-0b16c7ee2e2e";
+    const cut = (id: string, ratio: string, at: string, project: string | null = P) => ({ ...ratioRow(id, ratio), created_at: at, media_project_id: project, mime_type: "video/mp4" });
+    const assets = [cut(W916, "9x16", "2026-11-19T03:00:00Z"), cut(W45, "4x5", "2026-11-19T02:00:00Z"), cut(CUT, "16x9", "2026-11-19T01:00:00Z"), cut(OLD45, "4x5", "2026-11-18T02:00:00Z"), cut(ELSE, "1x1", "2026-11-19T04:00:00Z", "other-project")];
+    for (const opened of [CUT, W45, W916]) {
+      cleanup();
+      stubServer(assets, [CUT, W45, W916]);
+      render(<ReviewRelease organizationId={ORG} assetId={opened} section="release" />);
+      const yt = (await screen.findByText("頻道甲（youtube）")).closest("tr")!, ig = screen.getByText("頻道乙（instagram）").closest("tr")!;
+      await waitFor(() => expect(within(yt).getAllByRole("button")).toHaveLength(3));
+      const on = (row: HTMLElement) => within(row).getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent);
+      expect(on(yt)).toEqual(["橫式 16:9"]);   // the same default whichever cut was opened
+      expect(on(ig)).toEqual(["直式 4:5"]);
+      expect(within(yt).queryByText("方形 1:1")).toBeNull();   // another project's cut is not this video's ratio
+      expect(screen.getAllByText("播放")).toHaveLength(3);   // the older 4:5 cut of this project is not listed again
+    }
+  });
+
   it("B1 an older video with only 16:9 approved: every channel can only take 16:9", async () => {
     const four = ["youtube", "instagram", "facebook", "tiktok"].map((p) => ({ id: "acc-" + p, platform: p, label: "頻道-" + p, status: "active" }));
     const calls = stubServer([ratioRow(CUT, "16x9")], [CUT], PASSED, four);

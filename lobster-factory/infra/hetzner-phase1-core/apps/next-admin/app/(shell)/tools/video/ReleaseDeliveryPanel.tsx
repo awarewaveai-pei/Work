@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import OrganizationPicker from "./OrganizationPicker";
 import { buttonStyle, cardStyle, inputStyle, optionStyle } from "@/components/tools/panel-primitives";
 import { QA_LABELS, STATUS_TEXT, BLOCKED_NOTE, explainFinding } from "./qa-labels";
-import { RATIO_LABEL, ratioFor, ratioOfAsset } from "@/lib/content/video/platform-ratio";
+import { RATIO_LABEL, ratioFor } from "@/lib/content/video/platform-ratio";
+import { ratioRowsOf } from "@/lib/content/video/ratio-rows";
 import { textsForAccounts, writerKeysFor } from "@/lib/social/write-posts";
 import { defaultCopy, syndicateCostTwd } from "@/lib/content/video/release-copy";
 
@@ -14,7 +15,7 @@ const btn = (on: boolean): React.CSSProperties => ({ ...buttonStyle({ tone: "pri
 const chip = (on: boolean): React.CSSProperties => ({ ...optionStyle(on), textAlign: "left" });
 
 const KINDS = ["technical", "caption", "editorial", "rights"] as const;
-type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; script?: string; ratio?: string; captionFiles?: { srt?: string; vtt?: string; cues?: number } }; created_at: string; asset_domain: string };
+type Asset = { id: string; object_url: string; checksum_sha256?: string; metadata?: { title?: string; variantOf?: string; script?: string; ratio?: string; captionFiles?: { srt?: string; vtt?: string; cues?: number } }; created_at: string; asset_domain: string; media_project_id?: string | null; mime_type?: string | null };
 type Cover = { id: string; url: string; kind: "auto" | "ai" | "upload"; chosen: boolean };
 const COVER_KIND: Record<Cover["kind"], string> = { auto: "自動", ai: "AI", upload: "上傳" };
 type Qa = { kind: string; status: string; candidateChecksum: string; findings?: Array<{ rule: string; message: string; evidence?: Record<string, number | string | null> }> };
@@ -64,8 +65,8 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
   const changed = () => window.parent.postMessage({ type: "vw:workflow-changed" }, window.location.origin);
   const primaries = useMemo(() => assets.filter((a) => !a.metadata?.variantOf), [assets]);
   const primary = assets.find((a) => a.id === candidateId);
-  const rows = useMemo(() => assets.filter((a) => a.id === candidateId || a.metadata?.variantOf === candidateId)
-    .map((a) => ({ ...a, ratio: ratioOfAsset(a) ?? "" })).filter((a) => a.ratio), [assets, candidateId]);
+  // The ratios of this video: a project's video = the newest cut of each ratio of its project, whichever cut was opened; otherwise the row + its variantOf rows (ratio-rows.ts, the rule the server uses too).
+  const rows = useMemo(() => ratioRowsOf(primary ?? { id: candidateId }, assets), [assets, candidateId, primary]);
   const releasedRows = rows.filter((r) => released[r.id]);
   const releasedRatios = releasedRows.map((r) => r.ratio);
   // B1: the ratio a channel's draft uses = the operator's pick if that ratio is approved, else the platform default (platform-ratio.ts).
@@ -74,10 +75,20 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
   useEffect(() => {
     if (!org) { setAssets([]); setAccounts([]); setSites([]); return; }
     let cancelled = false;
-    void getJson<{ items?: Asset[] }>(`/api/video/assets?organizationId=${encodeURIComponent(org)}&includeWorkbench=1`).then((j) => { if (!cancelled) setAssets(j?.items ?? []); });
+    // The org list is the newest 200 assets; a project's other cuts can lie beyond it, so the opened video's project is read on its own too.
+    void getJson<{ items?: Asset[] }>(`/api/video/assets?organizationId=${encodeURIComponent(org)}&includeWorkbench=1`).then(async (j) => {
+      let items = j?.items ?? [];
+      const project = items.find((a) => a.id === candidateId)?.media_project_id;
+      if (project) {
+        const more = (await getJson<{ items?: Asset[] }>(`/api/video/assets?organizationId=${encodeURIComponent(org)}&includeWorkbench=1&projectId=${encodeURIComponent(project)}`))?.items ?? [];
+        items = [...items, ...more.filter((m) => !items.some((a) => a.id === m.id))];
+      }
+      if (!cancelled) setAssets(items);
+    });
     void getJson<{ accounts?: Account[] }>(`/api/video/social-channels?organizationId=${encodeURIComponent(org)}`).then((j) => { if (!cancelled) setAccounts(j?.accounts ?? []); });
     void getJson<{ sites?: Site[] }>("/api/content/sites").then((j) => { if (!cancelled) setSites((j?.sites ?? []).filter((s) => s.organization_id === org)); });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org]);
 
   // Another video = nothing of the last one's channels, texts or covers carries over (a default text is written only

@@ -10,7 +10,6 @@ import { persistEditorialRightsQa } from "./editorial-rights-persist";
 import { finalizeVideoJob } from "./finalize";
 import { readJob } from "./job-store";
 import { FINISHED_VIDEO_MIME, updateProjectRow } from "./projects";
-import { ratioOfAsset } from "./platform-ratio";
 import type { AdvanceDeps, AdvanceProject } from "./project-advance";
 import { RunChanged, WAIT_LIMIT_MS } from "./project-advance";
 import { embedVideoInNewDraft } from "./embed-in-post";
@@ -24,7 +23,8 @@ import { REQUIRED_RELEASE_QA_KINDS, loadAuthoritativeReleaseEvidence } from "./r
 import { createApprovedRelease } from "./release-create";
 import { summarizeQaFindings } from "./qa-findings-summary";
 import { saveVideoSocialDrafts } from "./social-drafts";
-import { draftDeps, loadVideoRows } from "./social-drafts-deps";
+import { draftDeps } from "./social-drafts-deps";
+import { loadVideoRows, newestPerRatio, projectVideoRows } from "./ratio-rows";
 
 const fail = (what: string, e: { message: string }): never => { throw new Error(`${what}: ${e.message}`); };
 type Row = Record<string, unknown>;
@@ -162,15 +162,7 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
 
     // One row per ratio, the newest: a re-rendered or re-attached video replaces the older one of its ratio (plan U0).
     async rows(projectId) {
-      const { data, error } = await sb.from("media_assets").select("id, object_url, checksum_sha256, metadata").eq("organization_id", org).eq("media_project_id", projectId).eq("is_current", true).eq("mime_type", FINISHED_VIDEO_MIME).order("created_at", { ascending: false });
-      if (error) fail("media_assets", error);
-      const seen = new Set<string>();
-      return (data ?? []).flatMap((a) => {
-        const ratio = a.object_url ? ratioOfAsset({ object_url: String(a.object_url), metadata: a.metadata as { ratio?: unknown } | null }) : undefined;
-        if (!ratio || !a.checksum_sha256 || seen.has(ratio)) return [];
-        seen.add(ratio);
-        return [{ id: String(a.id), ratio, checksum: String(a.checksum_sha256) }];
-      });
+      return newestPerRatio(await projectVideoRows(sb, org, projectId)).map((a) => ({ id: a.id, ratio: a.ratio, checksum: String(a.checksum_sha256) }));
     },
 
     async qaProblems(row) {

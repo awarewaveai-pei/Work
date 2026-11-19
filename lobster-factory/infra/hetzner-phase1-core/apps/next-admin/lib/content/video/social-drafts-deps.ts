@@ -6,15 +6,7 @@ import { addVideo, listAccounts, savePost } from "@/lib/social/store";
 import { ratioOfAsset } from "./platform-ratio";
 import { chosenCovers } from "./cover";
 import type { DraftDeps } from "./social-drafts";
-
-export type VideoRow = { id: string; object_url: string | null; checksum_sha256: string | null; metadata: { title?: string; script?: string; ratio?: unknown } | null };
-
-/** This video's ratio rows: the primary row plus the rows that point back at it. */
-export async function loadVideoRows(db: SupabaseClient, org: string, candidate: string): Promise<VideoRow[]> {
-  const { data } = await db.from("media_assets").select("id, object_url, checksum_sha256, metadata")
-    .eq("organization_id", org).eq("mime_type", "video/mp4").or(`id.eq.${candidate},metadata->>variantOf.eq.${candidate}`);
-  return (data ?? []) as VideoRow[];
-}
+import type { VideoRow } from "./ratio-rows";
 
 export function draftDeps(db: SupabaseClient, org: string, rows: VideoRow[], actor: string): DraftDeps {
   return {

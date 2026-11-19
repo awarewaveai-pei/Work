@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadVideoRows } from "./ratio-rows";
 
 export type ArticleState = "draft" | "published" | "scheduled";
 /** WordPress status -> what a person is told: only publish is live, future is scheduled, everything else is a draft. */
@@ -13,9 +14,9 @@ export async function readDraftOutcome(db: SupabaseClient, org: string, candidat
   const primary = await db.from("media_assets").select("id, object_url, checksum_sha256").eq("organization_id", org).eq("id", candidate).maybeSingle();
   if (primary.error) throw Error(primary.error.message);
   if (!primary.data) return null;
-  const variants = await db.from("media_assets").select("id, object_url, checksum_sha256").eq("organization_id", org).eq("metadata->>variantOf", candidate);
-  if (variants.error) throw Error(variants.error.message);
-  const rows = [primary.data, ...(variants.data || [])], urls = rows.map((r) => r.object_url).filter(Boolean);
+  // the video's ratio rows (the same rule as the release page: lib/content/video/ratio-rows.ts); a cut that was replaced by a newer one of its ratio is no longer this video's
+  const ratioRows = await loadVideoRows(db, org, candidate);
+  const rows = ratioRows.length ? ratioRows : [primary.data], urls = rows.map((r) => r.object_url).filter(Boolean);
   const posts = urls.length ? await db.from("social_posts").select("id, state").eq("organization_id", org).in("source_url", urls) : { data: [], error: null };
   if (posts.error) throw Error(posts.error.message);
   const releases = await db.from("media_releases").select("id, candidate_asset_id, candidate_checksum").eq("organization_id", org).eq("status", "release_approved").in("candidate_asset_id", rows.map((r) => r.id));
