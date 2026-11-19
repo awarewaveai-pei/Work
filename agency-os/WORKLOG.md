@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-19（續1）— 影片工具融合收尾：U11.2／U11.3 上線、U11.5 三級驗收過、兩個「一鍵到草稿從未走通」的根因（Claude 監工＋3 session）
+
+- 範圍：監工台 47→50/50。監工 Fable 5.1 派工：W1 Opus（U11.2＋U11.3＋推進修正）、W2 Opus（Soulful 封面／#7753）、W3 Opus（第 4 級實跑）；監工自跑第 3 級與 Soulful 社群重存排程。
+- 根因 1（B20）：一鍵到草稿每次停在評分。`ScriptForge.tsx:885` 與 `route.ts:160` 檢查 `result.total`，但 `modules.ts:302` 評分提示只要 `{scores, overall}`，任何模型都過不了；測試 fixture 也寫錯形狀。修：共用 `lib/script-forge/auto-run-result.ts autoRunResultValid`，測試直接解析提示裡的 JSON 骨架（4e0c84203，已部署）。
+- 根因 2（B23）：成片後不審片。`video_project_advance` 是 client_schedules 的 opt-in job，正式庫 0 列 → auto_after_render 專案永遠停在成片。修：run-due 每輪對所有有此類專案的組織一律推進，client job 移除（`lib/content/video/advance-auto-projects.ts`，3a749c449，已部署）。沿用行為 B24（每組織取最舊 3 支）。
+- U11.2 ff376bde4：`/tools/video`、`/tools/script-forge` → 「開啟影音工作台」頁（新分頁＋`window.opener` postMessage 搬 `sf_history`，只收 `staffHosts()`；影片網域 SAMEORIGIN 不能 iframe）；側欄三入口合一。U11.3 882f8c69a：刪 §5 清單 31 檔、`(door)/page.tsx` redirect("/")、文件改指工作台。
+- U11.5：第 1 級（Soulful 人工）11-18 過；第 3 級（AwareWave 一鍵到草稿，9:16＋圖庫影片＋網站草稿，上限 NT$1）→ 推進上線後第一輪停在 B25（圖庫影片靜止、Telegram／Slack 有通知）；換素材＋重新出片＋一鍵成片「做到草稿」→ 02:10Z 一輪審片四項過、核准、3 社群草稿＋1 網站草稿嵌入，專案 measure；純路徑約 12 點擊、7 分 45 秒、花費約 NT$0.13／上限 NT$1；B26「從這裡繼續」不重出片；第 4 級（W3，aware-wave.com 自動發布關）話題→WP 草稿 post 55→影片嵌入→reviewed，19.5 分鐘／4 tick，未公開，NT$10.2 vs 預估 NT$7.4（B21 配圖未計；B22 無金額上限）；監工決定 reviewed 為終點。
+- Soulful 收尾：16:9／4:5 各補三張無字幕封面（W2 在容器內用 `cover.cjs` 流程）；四則舊草稿刪、重存帶封面、排程台北 11/19 12:00（社群編輯頁時間選擇器用 UTC、清單切台灣不跟＝B19）；#7753 11-18 23:51 被不明操作丟回收桶 → 救回成草稿補 poster → 操作者「排 12:00」→ 設回 future 04:00Z。
+- 待決 5 定：Soulful 用現有封面；Remotion 封面模板另開卡。待決 6 定：#7753 排 12:00。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin ×2（4e0c84203、3a749c449）smoke all OK; psql media_production_projects e251bc14 lifecycle_stage; curl /tools/video 200 | exit=0 | ms=220000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; vitest lib/script-forge app/api/tools/script-forge app/(shell)/tools/video (45) ; app/__tests__ lib/portal lib/video app/video (159); app/api/internal/schedules lib/schedules lib/content/video (335) | exit=0 | ms=180000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n（codex-oracle 2026-11-19-review-14e58efa：data.mjs `decided` 欄不渲染，已改；W1 三輪 140948b3／08a03f07／529c75d5）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=video_project_advance|Number.isFinite(parsed?.total|result?.total | hits=20（餘為歷史文件：VIDEO_TOOL_REDESIGN_2026-10-26、2026-10-26 監工台、計畫 §12 既有事實段，不回改）
+- 剩餘風險：B19／B21／B22／B24 未修（SOP §2 B）；`/handoff` 搬歷史只有單元測試沒在真瀏覽器跑；W1 worktree `D:\Worktrees\Work\u11-entry-cleanup-c44098` 含 node_modules junction，移除前先 rmdir junction。
+- rollback：next-admin `sg-deploy.sh` 快照 rollback-20261119-013245；程式 `git revert 3a749c449 ff376bde4 882f8c69a 4e0c84203`。
 ## 2026-11-18（續1）— Soulful 代操客戶切換（部署前）
 
 - 根因：工作台未送 org；舊頁／直接上傳／媒體快取未固定 document org。修正沿用 session、HMAC、root billing；不搬舊資料、不改 RLS。VW/shared/adapters.js:115、server.cjs:160、scripts/media-cache-sw.js:93。
