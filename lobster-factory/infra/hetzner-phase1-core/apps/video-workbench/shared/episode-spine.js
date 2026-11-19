@@ -580,16 +580,22 @@
       // A line is voiced again by a newer step for it, so only each line's newest voice-over counts.
       voices = new Map(steps.filter((s) => s.step === "sound" && String(s.target).startsWith("line:")).map((s) => [s.target, s])),
       voiceStale = [...voices.values()].some((s) => s.from?.[0] && isStale(s.from[0].key, current(episode, s.target))),
-      or = (state, stale) => (stale && state === "done" ? "stale" : state);
+      or = (state, stale) => (stale && state === "done" ? "stale" : state),
+      // 快速輸出 (backend/quick-render.cjs) voices and subtitles on the server and never goes through an edit file, so for a
+      // cut made that way, with no edit file, 剪輯/聲音/字幕 are not undone work. Only "todo" turns optional; a step really made stays "done".
+      // Only the newest cut counts (same as outputStale): an older quick render is history once a later cut came from elsewhere.
+      newestCut = outputs.findLast((o) => o.derivedFrom == null),
+      viaQuick = !row && !!newestCut && toolOf(episode, newestCut) === "quick-render",
+      skip = (state) => (viaQuick && state === "todo" ? "optional" : state);
     return [
       "done",
       shots.length ? "done" : "todo",
       shots.length && shots.every((s) => s?.image || s?.video) ? "done" : "todo",
       made("retouch") ? "done" : "optional",
       "optional", // spec §8 C6: a motion piece reaches the episode through 放到剪輯, never as a job of it
-      or(row ? "done" : "todo", staleIn((c) => String(c.slot).startsWith("shot:"))),
-      or(made("sound") ? "done" : "todo", voiceStale || staleIn((c) => c.kind === "audio")),
-      or(made("subtitle") || clips.some((c) => c.kind === "text" && c.slot) ? "done" : "todo", staleIn((c) => c.kind === "text")),
+      skip(or(row ? "done" : "todo", staleIn((c) => String(c.slot).startsWith("shot:")))),
+      skip(or(made("sound") ? "done" : "todo", voiceStale || staleIn((c) => c.kind === "audio"))),
+      skip(or(made("subtitle") || clips.some((c) => c.kind === "text" && c.slot) ? "done" : "todo", staleIn((c) => c.kind === "text"))),
       or(outputs.length ? "done" : "todo", outputs.some((o) => o.derivedFrom == null && outputStale(episode, o, editRows))),
       or(made("finish") ? "done" : "optional", outputs.some((o) => TOOL_STEP[toolOf(episode, o)] === "finish" && outputStale(episode, o, editRows))),
       // 審片 and 發布 are decided on the main system (plan U6); the page reads them (scripts/projects-0.js reviewStates)

@@ -45,6 +45,7 @@ const tests = [
   "u6-next-action",
   "u8-title-form",
   "u8-bookends",
+  "n13-quick-output-steps",
   "u4-scene-image",
   "style-literals",
 ];
