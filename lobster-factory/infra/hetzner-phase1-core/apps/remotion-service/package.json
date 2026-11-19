@@ -6,7 +6,7 @@
     "build": "tsc -p tsconfig.server.json",
     "start": "node dist/server.js",
     "dev": "npm run build && node dist/server.js",
-    "test": "npm run build && node --test test/auth-policy.test.cjs test/render-runner.test.cjs"
+    "test": "npm run build && node --test test/auth-policy.test.cjs test/render-runner.test.cjs test/cover-layout.test.cjs"
   },
   "dependencies": {
     "@remotion/bundler": "4.0.290",

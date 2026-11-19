@@ -19,6 +19,16 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import {
+  BACKDROP_COLOR,
+  OVERLAY_COLOR,
+  TITLE_COLOR,
+  TITLE_FONT_FAMILY,
+  TITLE_FONT_WEIGHT,
+  TITLE_LETTER_SPACING_EM,
+  TITLE_LINE_HEIGHT,
+  TITLE_SHADOW,
+} from "../brand";
 
 export interface ScaleBGTextSlideUpProps {
   /** Background image URL */
@@ -47,7 +57,7 @@ export const ScaleBGTextSlideUpDefaultProps: ScaleBGTextSlideUpProps = {
   text: "This is a sample title",
   logoUrl: "",
   audioUrl: "",
-  overlayColor: "rgba(40, 40, 40, 0.72)",
+  overlayColor: OVERLAY_COLOR,
   durationInFrames: 362,
   fps: 30,
   width: 1920,
@@ -59,7 +69,7 @@ export const ScaleBGTextSlideUp: React.FC<ScaleBGTextSlideUpProps> = ({
   text,
   logoUrl,
   audioUrl,
-  overlayColor = "rgba(40, 40, 40, 0.72)",
+  overlayColor = OVERLAY_COLOR,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -102,7 +112,7 @@ export const ScaleBGTextSlideUp: React.FC<ScaleBGTextSlideUpProps> = ({
   });
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000000" }}>
+    <AbsoluteFill style={{ backgroundColor: BACKDROP_COLOR }}>
       {/* Background image with Ken Burns zoom */}
       <AbsoluteFill style={{ overflow: "hidden" }}>
         <Img
@@ -140,15 +150,15 @@ export const ScaleBGTextSlideUp: React.FC<ScaleBGTextSlideUpProps> = ({
             style={{
               transform: `translateY(${textTranslateY}px)`,
               opacity: textOpacity,
-              fontFamily: "'Oswald', 'Noto Sans CJK TC', sans-serif",
-              fontWeight: 700,
+              fontFamily: TITLE_FONT_FAMILY,
+              fontWeight: TITLE_FONT_WEIGHT,
               fontSize: 72,
               textTransform: "uppercase",
-              color: "#FFFFFF",
-              textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+              color: TITLE_COLOR,
+              textShadow: TITLE_SHADOW,
               maxWidth: "88%",
-              lineHeight: 1.25,
-              letterSpacing: "0.02em",
+              lineHeight: TITLE_LINE_HEIGHT,
+              letterSpacing: `${TITLE_LETTER_SPACING_EM}em`,
             }}
           >
             {text}

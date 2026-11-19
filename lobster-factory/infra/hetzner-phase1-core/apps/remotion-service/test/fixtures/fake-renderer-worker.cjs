@@ -23,6 +23,12 @@ const fake = {
     if (opts.disallowParallelEncoding !== true) throw new Error("parallel encoding not disabled");
     fs.writeFileSync(opts.outputLocation, "mp4");
   },
+  // A still (the cover): one JPEG of frame 0, no ffmpeg involved.
+  renderStill: async (opts) => {
+    if (opts.imageFormat !== "jpeg" || opts.frame !== 0 || opts.composition.durationInFrames !== 1) throw new Error("not a one-frame JPEG still");
+    if (opts.composition.width !== 1080 || opts.composition.height !== 1920) throw new Error("still not at the asked format");
+    fs.writeFileSync(opts.output, "jpg");
+  },
 };
 
 const load = Module._load;

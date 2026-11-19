@@ -94,16 +94,21 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
   // on cancel, and every stop or failure is only result.coverError. The caller decides the job's state (a cancel wins).
   // (the numbers: backend/cover.cjs coverBudget)
   // `file` = the frames' source when it is not the deliverable itself (a quick render's caption-less copy).
+  // Card R1: the title comes from the cover template (remotion-service) within half the budget; when it cannot,
+  // the old ASS title is drawn and result.coverNote says why (a cover never goes missing because that service is down).
   async function addCovers(job, { width, height, duration, title, signal, file }) {
     const budget = require("./cover.cjs").coverBudget(job.deadlineAt, Date.now());
     if (!budget) {
       job.result.coverError = "影片完成時已接近時限，這次沒有自動產生封面；可在送審頁上傳封面。";
       return;
     }
+    delete job.result.coverNote; // every run says afresh whether it fell back
+    const note = (e) => (job.result.coverNote = "封面標題改用舊樣式（字幕樣式）：" + publicError(e.message));
     try {
+      const template = await coverTemplate();
       const made = await require("./cover.cjs").autoCovers(
-        { file: file || localFile(job.result.url), duration, width, height, title, dir: outputs, signal: signal ? AbortSignal.any([AbortSignal.timeout(budget), signal]) : AbortSignal.timeout(budget) },
-        { run: mediaTools.run, fontDir: require("./editor-export.cjs").fontDir },
+        { file: file || localFile(job.result.url), duration, width, height, title, dir: outputs, templateMs: Math.floor(budget / 2), signal: signal ? AbortSignal.any([AbortSignal.timeout(budget), signal]) : AbortSignal.timeout(budget) },
+        { run: mediaTools.run, fontDir: require("./editor-export.cjs").fontDir, template, onFallback: note },
       );
       job.result.covers = made.map((m) => {
         const name = crypto.randomUUID() + ".jpg";
@@ -114,6 +119,12 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     } catch (e) {
       job.result.coverError = publicError(e.message);
     }
+  }
+  // The cover template (backend/cover.cjs titledJpeg) when the service is set up; else undefined.
+  async function coverTemplate() {
+    return (await remotion.configured(env, appDir))
+      ? ({ signal, ...cover }) => remotion.coverStill(cover, { env, appDir, fetchImpl, signal })
+      : undefined;
   }
   // P6 L3: a finished file goes to the main system's asset ledger (sources = every local url in the job input).
   async function register(url, origin, { sources = [], costUsd, jobId, ratio, coverOf, coverKind } = {}) {
@@ -880,17 +891,19 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         }
         job.disclosure = "AI 生成聲音";
       } else if (type === "image" && input.operation === "cover-ai") {
-        // Card VD.4 (backend/cover-ai.cjs): one image-edit row redraws the export's best frame, ffmpeg draws the title, and
+        // Card VD.4 (backend/cover-ai.cjs): one image-edit row redraws the export's best frame, the cover template draws the title, and
         // the result becomes one more cover of THAT export job, registered with it (settle -> VD.2). This job's own file
         // is not registered again (ledger "cover"); it is charged once through settle like any image-edit run.
         const coverAi = require("./cover-ai.cjs"), target = coverAi.exportFor(jobs, input.settings.forJob), m = imageEdit.pick(input.settings.model, env);
+        let coverNote; // card R1: why the title fell back to the ASS look, if it did
         const made = await coverAi.makeAiCover(
-          { exportJob: target, model: m, size: input.settings.quality, env, fetchImpl, signal, dir: outputs, videoFile: localFile(target.result.url),
+          { exportJob: target, model: m, size: input.settings.quality, env, fetchImpl, signal, dir: outputs, videoFile: localFile(target.result.url), deadlineAt: job.deadlineAt,
             onPrediction: (id) => { job.replicateId = id; persist(); },
             // The vendor run is done and billed from here on: a local failure after it still charges it once (settle:
             // a failed job with job.finishing, as 破框 finishing; Codex ccdf770d F1).
             onVendorDone: (costUsd) => { job.finishing = { origin: { kind: "ai_generated", model: m.value, provider: m.vendor, costUsd } }; persist(); } },
-          { imageEdit, run: mediaTools.run, regionMasks: mediaTools.regionMasks, fontDir: require("./editor-export.cjs").fontDir },
+          { imageEdit, run: mediaTools.run, regionMasks: mediaTools.regionMasks, fontDir: require("./editor-export.cjs").fontDir,
+            template: await coverTemplate(), onFallback: (e) => (coverNote = "封面標題改用舊樣式（字幕樣式）：" + publicError(e.message)) },
         );
         if (signal.aborted || job.status === "cancelled") { fs.rmSync(made.file, { force: true }); return; }
         const name = crypto.randomUUID() + ".jpg";
@@ -898,7 +911,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         job.costUsd = made.costUsd;
         job.imageEdit = { model: m.value, provider: m.vendor };
         target.result.covers.push({ url: "/generated/" + name, kind: "ai", costUsd: made.costUsd, model: m.value });
-        job.result = { url: "/generated/" + name, width: target.result.width, height: target.result.height, ledger: "cover", coverOf: target.id };
+        job.result = { url: "/generated/" + name, width: target.result.width, height: target.result.height, ledger: "cover", coverOf: target.id, ...(coverNote ? { coverNote } : {}) };
         job.disclosure = "AI 生成封面";
         // job.finishing stays: until the job is saved succeeded it is the only record that the billed run happened (a
         // restart in between turns the job failed and charges it from finishing; Codex 94927dcb F1).

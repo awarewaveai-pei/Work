@@ -25,6 +25,7 @@ import {
   DynamicSlideshowDefaultProps,
   calculateSceneSeriesDuration,
 } from "./compositions/DynamicSlideshow";
+import { Cover, CoverDefaultProps } from "./compositions/Cover";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -140,6 +141,22 @@ export const RemotionRoot: React.FC = () => {
             height: props.height ?? 1080,
           };
         }}
+      />
+      {/* A still (render-worker.ts renderStill): one frame, sized by the request's outputFormat. */}
+      <Composition
+        id="Cover"
+        component={Cover}
+        durationInFrames={1}
+        fps={CoverDefaultProps.fps ?? 30}
+        width={CoverDefaultProps.width ?? 1920}
+        height={CoverDefaultProps.height ?? 1080}
+        defaultProps={CoverDefaultProps}
+        calculateMetadata={async ({ props }) => ({
+          durationInFrames: 1,
+          fps: props.fps ?? 30,
+          width: props.width ?? 1920,
+          height: props.height ?? 1080,
+        })}
       />
     </>
   );

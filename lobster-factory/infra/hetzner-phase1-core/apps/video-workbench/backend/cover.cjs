@@ -1,8 +1,10 @@
 // Card VD.1 (docs/video-deliverable-pack-spec-20261114.md §2): free cover candidates for a finished video. Frames are
 // sampled once a second from 1 s to min(duration, 120 s); black (YAVG < 24) and white (YAVG > 235) frames are dropped
 // and the rest ranked by contrast (YHIGH - YLOW), at least 2 s apart. None left (a dark or very short video) = the
-// middle frame. The title is drawn by the subtitle burner's own ASS (pinned 思源黑體, missing glyphs refused), never by
-// an AI model. Each JPEG is the video's own size and <= 2 MB (YouTube's mobile thumbnail limit).
+// middle frame. The title is drawn by the cover template (card R1: remotion-service src/compositions/Cover.tsx, the 片頭
+// look, in the ratio's safe area); when that service is not set up, fails or runs out of time, by the subtitle burner's
+// own ASS (pinned 思源黑體, missing glyphs refused) and the caller records why. Never by an AI model. Each JPEG is the
+// video's own size and <= 2 MB (YouTube's mobile thumbnail limit).
 const fs = require("node:fs"),
   path = require("node:path"),
   crypto = require("node:crypto");
@@ -46,11 +48,14 @@ function pickTimes(frames, count, offset = 0) {
 const titleSize = (width, height) => Math.max(20, Math.min(100, Math.round((1000 * Math.min(width, height) * 0.08) / height)));
 
 /**
- * autoCovers({ file, duration, width, height, title, dir, signal }, { run, fontDir }) -> [{ file, t }]
+ * autoCovers({ file, duration, width, height, title, dir, signal, templateMs }, { run, fontDir, template, onFallback }) -> [{ file, t, by }]
  * run = backend/media.cjs run (ffmpeg); fontDir = editor-export.cjs fontDir (throws when the pinned fonts are missing).
+ * template({ frame, title, width, height, signal }) -> JPEG bytes (backend/remotion.cjs coverStill); absent = ASS title.
+ * templateMs = how long the template may take over ALL candidates (the rest of the budget is the ASS fallback's); its
+ * first failure is onFallback(error) and the remaining candidates go straight to the ASS title. by = "template" | "ass".
  * Files are written into `dir`; the caller stores them (media-store ingest) and removes them.
  */
-async function autoCovers({ file, duration, width, height, title = "", dir, signal, count = 3 }, { run, fontDir }) {
+async function autoCovers({ file, duration, width, height, title = "", dir, signal, count = 3, templateMs = 0 }, { run, fontDir, template, onFallback }) {
   if (!(width > 0 && height > 0)) throw Error("封面需要影片尺寸");
   const id = crypto.randomUUID(),
     stats = path.join(dir, `cover-${id}-stats.txt`),
@@ -66,10 +71,17 @@ async function autoCovers({ file, duration, width, height, title = "", dir, sign
       times = pickTimes(parseStats(fs.existsSync(stats) ? fs.readFileSync(stats, "utf8") : ""), count, 1);
     }
     if (!times.length) times = [Math.max(0, (Number(duration) || 0) / 2)];
+    const until = Date.now() + templateMs;
+    let use = template, reported = false; // dropped after its first failure: one slow or broken service costs the budget once, not per frame
+    const fellBack = (e) => {
+      use = null;
+      if (!reported) (reported = true), onFallback?.(e); // the first reason only (later frames would say "未設定")
+    };
     for (const t of times) {
       const out = (writing = path.join(dir, `cover-${id}-${made.length}.jpg`));
-      if (!(await stillJpeg({ input: file, seek: t, width, height, title, out, assFile, signal }, { run, fontDir }))) continue;
-      made.push({ file: out, t });
+      const by = await titledJpeg({ input: file, seek: t, width, height, title, out, assFile, signal, until }, { run, fontDir, template: use, onFallback: fellBack });
+      if (!by) continue;
+      made.push({ file: out, t, by });
       writing = null;
     }
     return made;
@@ -99,6 +111,43 @@ async function stillJpeg({ input, seek, width, height, title = "", out, assFile,
   return false;
 }
 
+// Card R1: one titled cover JPEG. The cover template draws the title when there is one; with no `template` (service not
+// set up) or when it throws, stillJpeg's ASS title does and onFallback(error) says why. A stop of `signal` is never a
+// fallback, it throws. The template step (frame + render + rescale) may run until `until` (ms epoch).
+// -> "template" | "ass" | false (cannot fit 2 MB).
+async function titledJpeg({ input, seek, width, height, title = "", out, assFile, signal, until }, { run, fontDir, template, onFallback }) {
+  const text = String(title || "").trim().slice(0, 200);
+  if (text && !template) onFallback?.(Error("封面模板服務未設定"));
+  if (text && template) {
+    try {
+      if (await templateJpeg({ input, seek, width, height, title: text, out, signal, until, template }, { run })) return "template";
+      throw Error("封面模板產生的圖超過 2 MB");
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      onFallback?.(/^(TimeoutError|AbortError)$/.test(error?.name) ? Error("封面模板在時限內沒有完成") : error);
+    }
+  }
+  return (await stillJpeg({ input, seek, width, height, title: text, out, assFile, signal }, { run, fontDir })) ? "ass" : false;
+}
+
+// The frame at `seek` without a title (the video's size, <= 2 MB) -> template -> scaled back to the video's size, <= 2 MB.
+// The whole step shares one window ending at `until`, so a slow frame extraction cannot eat the ASS fallback's time.
+async function templateJpeg({ input, seek, width, height, title, out, signal, until, template }, { run }) {
+  const left = Number(until) - Date.now();
+  if (!(left > 0)) throw Error("封面模板的時間已用完");
+  const frame = out + ".frame.jpg", drawn = out + ".template.jpg",
+    window = signal ? AbortSignal.any([signal, AbortSignal.timeout(left)]) : AbortSignal.timeout(left);
+  try {
+    if (!(await stillJpeg({ input, seek, width, height, title: "", out: frame, signal: window }, { run }))) throw Error("封面畫格超過 2 MB");
+    const bytes = await template({ frame: fs.readFileSync(frame), title, width, height, signal: window });
+    fs.writeFileSync(drawn, bytes);
+    return await stillJpeg({ input: drawn, width, height, title: "", out, signal: window }, { run });
+  } finally {
+    fs.rmSync(frame, { force: true });
+    fs.rmSync(drawn, { force: true });
+  }
+}
+
 // Card VD.4: the AI cover's input -- the frame at `seek` WITHOUT a title (the model must not see or redraw text), as a PNG
 // of at most 1280 px on the long side (the models bill or cap by megapixels; ~0.9 MP for 16:9).
 async function framePng({ file, seek, width, height, out, signal }, { run }) {
@@ -116,4 +165,4 @@ function coverBudget(deadlineAt, now) {
   return budget >= COVER_MIN_MS ? budget : 0;
 }
 
-module.exports = { autoCovers, stillJpeg, framePng, pickTimes, parseStats, titleSize, coverBudget, MAX_BYTES };
+module.exports = { autoCovers, titledJpeg, stillJpeg, framePng, pickTimes, parseStats, titleSize, coverBudget, MAX_BYTES };

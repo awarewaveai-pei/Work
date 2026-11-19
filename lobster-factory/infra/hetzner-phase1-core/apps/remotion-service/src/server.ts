@@ -11,7 +11,7 @@ import fs from "fs";
 import { evaluateRendererAuthPolicy } from "./auth-policy";
 import { createApp } from "./app";
 import { JobStore } from "./job-store";
-import { RenderRunner } from "./render-runner";
+import { RenderRunner, type OutputKind } from "./render-runner";
 import { allowParallelEncoding, cgroupCpuLimit, cgroupMemoryLimit } from "./resource-limits";
 
 const PORT = parseInt(process.env.REMOTION_PORT ?? "8733", 10);
@@ -66,13 +66,13 @@ function getBundle(): Promise<string> {
 }
 
 // ── R2 upload ─────────────────────────────────────────────────────────────────
-async function uploadToR2(filePath: string, jobId: string): Promise<string> {
-  const r2Key = `remotion/${new Date().toISOString().slice(0, 10)}/${jobId}.mp4`;
+async function uploadToR2(filePath: string, jobId: string, kind: OutputKind): Promise<string> {
+  const r2Key = `remotion/${new Date().toISOString().slice(0, 10)}/${jobId}.${kind}`;
   const buf = await fs.promises.readFile(filePath);
   const url = `${R2_API_BASE_URL}/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_VIDEO_BUCKET}/objects/${r2Key}`;
   const resp = await fetch(url, {
     method: "PUT",
-    headers: { Authorization: `Bearer ${R2_API_TOKEN}`, "Content-Type": "video/mp4" },
+    headers: { Authorization: `Bearer ${R2_API_TOKEN}`, "Content-Type": kind === "jpg" ? "image/jpeg" : "video/mp4" },
     body: buf,
     // Without a limit a hung upload would hold the one-at-a-time queue forever.
     signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
@@ -101,7 +101,7 @@ const runner = new RenderRunner({
   workerPath: path.join(__dirname, "render-worker.js"),
   getServeUrl: getBundle,
   upload: uploadToR2,
-  outFile: (jobId) => path.join(os.tmpdir(), `remotion-${jobId}.mp4`),
+  outFile: (jobId, kind) => path.join(os.tmpdir(), `remotion-${jobId}.${kind}`),
   timeoutMs: RENDER_TIMEOUT_MS,
   cancelGraceMs: 15_000,
   encoderThreads: cpuLimit,

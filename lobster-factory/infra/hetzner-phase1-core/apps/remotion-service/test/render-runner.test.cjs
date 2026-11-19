@@ -20,11 +20,11 @@ async function service(store, timeoutMs = 20000) {
     store,
     workerPath: path.join(__dirname, "fixtures", "fake-renderer-worker.cjs"),
     getServeUrl: async () => "http://bundle.invalid",
-    upload: async (outFile, jobId) => {
-      assert.equal(fs.readFileSync(outFile, "utf8"), "mp4");
-      return `https://r2.invalid/${jobId}.mp4`;
+    upload: async (outFile, jobId, kind) => {
+      assert.equal(fs.readFileSync(outFile, "utf8"), kind); // the fake worker writes its output kind
+      return `https://r2.invalid/${jobId}.${kind}`;
     },
-    outFile: (jobId) => path.join(outDir, `${jobId}.mp4`),
+    outFile: (jobId, kind) => path.join(outDir, `${jobId}.${kind}`),
     timeoutMs,
     cancelGraceMs: 300,
     encoderThreads: 2,
@@ -113,6 +113,27 @@ test("after a restart, a job that was rendering reads as failed, not 404 or pend
     assert.equal(r.status, 200);
     assert.deepEqual([r.body.status, r.body.error], ["error", INTERRUPTED_ERROR]);
     assert.equal((await call("/status/job-2")).body.status, "done");
+  } finally {
+    server.close();
+  }
+});
+
+// R1: the cover is one JPEG frame (renderStill), uploaded as .jpg; bad cover props are refused before a job exists.
+test("a cover renders as one JPEG still; a cover without a picture or title is refused", async () => {
+  const { server, call } = await service(new JobStore(null));
+  try {
+    process.env.FAKE_RENDER_MODE = "ok";
+    const frame = "data:image/jpeg;base64,/9j/4AAQ";
+    const r = await call("/render", { templateId: "cover", props: { backgroundUrl: frame, title: "封面" }, outputFormat: "9x16", fps: 30, durationInFrames: 1 });
+    assert.equal(r.status, 200);
+    const done = await settle(call, r.body.jobId);
+    assert.equal(done.status, "done", JSON.stringify(done));
+    assert.match(done.url, /\.jpg$/);
+    for (const props of [{ title: "封面" }, { backgroundUrl: "https://example.com/a.jpg", title: "封面" }, { backgroundUrl: frame, title: " " }, { backgroundUrl: frame, title: "x".repeat(201) }]) {
+      const bad = await call("/render", { templateId: "cover", props, outputFormat: "16x9" });
+      assert.equal(bad.status, 400, JSON.stringify(props));
+    }
+    assert.equal((await call("/render", { templateId: "cover", props: null, outputFormat: "16x9" })).status, 400, "null props: 400, not 500");
   } finally {
     server.close();
   }

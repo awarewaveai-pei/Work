@@ -25,7 +25,24 @@ export const TEMPLATE_MAP: Record<string, string> = {
   // Director Engine — data-driven, variable N scenes.
   // Duration is computed from scenes[] via calculateMetadata; callers do NOT pass durationInFrames.
   "dynamic-slideshow": "DynamicSlideshow",
+  // A still: one JPEG (render-worker.ts renderStill), not a video. Caller: video-workbench backend/remotion.cjs coverStill.
+  cover: "Cover",
 };
+
+// Templates rendered as one JPEG frame instead of an mp4.
+export const STILL_TEMPLATES = new Set(["cover"]);
+const MAX_TITLE = 200;
+
+/** The cover's props, checked before the job is queued; a reason = refused (400). */
+export function coverPropsProblem(props: unknown): string | null {
+  if (!props || typeof props !== "object" || Array.isArray(props)) return "props must be an object";
+  const { backgroundUrl, title, subtitle } = props as Record<string, unknown>;
+  if (typeof backgroundUrl !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(backgroundUrl))
+    return "backgroundUrl must be a data:image/jpeg|png|webp;base64 URI";
+  if (typeof title !== "string" || !title.trim() || title.length > MAX_TITLE) return `title must be 1-${MAX_TITLE} characters`;
+  if (subtitle !== undefined && (typeof subtitle !== "string" || subtitle.length > MAX_TITLE)) return `subtitle must be at most ${MAX_TITLE} characters`;
+  return null;
+}
 
 // Templates whose duration is derived from calculateMetadata (scenes[] array): the worker trusts
 // the composition's own durationInFrames rather than clamping to the caller's rawFrames.
@@ -111,6 +128,14 @@ export function createApp({ authRequired, authToken, store, runner }: AppDeps): 
     const fps = VALID_FPS.has(rawFps) ? rawFps : 30;
     const totalFrames = Math.min(rawFrames != null ? Math.max(1, Math.round(rawFrames)) : Math.round(fps * 12), MAX_FRAMES);
     const isDataDriven = DATA_DRIVEN_TEMPLATES.has(templateId);
+    const still = STILL_TEMPLATES.has(templateId);
+    if (still) {
+      const problem = coverPropsProblem(props);
+      if (problem) {
+        res.status(400).json({ error: problem });
+        return;
+      }
+    }
 
     // Validate data-driven payloads before touching the renderer: an oversized scenes[] array
     // could drive calculateMetadata to millions of frames, bypassing MAX_FRAMES.
@@ -147,13 +172,14 @@ export function createApp({ authRequired, authToken, store, runner }: AppDeps): 
     store.create(jobId);
     runner.enqueue(jobId, {
       compositionId,
-      inputProps: { ...props, durationInFrames: totalFrames, fps, width, height },
+      inputProps: { ...props, durationInFrames: still ? 1 : totalFrames, fps, width, height },
       fps,
       width,
       height,
-      totalFrames,
+      totalFrames: still ? 1 : totalFrames,
       maxFrames: MAX_FRAMES,
       isDataDriven,
+      still,
     });
     res.json({ jobId });
   });

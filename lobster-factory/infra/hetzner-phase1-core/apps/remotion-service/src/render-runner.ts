@@ -17,7 +17,13 @@ export interface RenderSpec {
   totalFrames: number;
   maxFrames: number;
   isDataDriven: boolean;
+  /** One JPEG frame (renderStill) instead of an mp4 (app.ts STILL_TEMPLATES). */
+  still?: boolean;
 }
+
+/** What a job produces: the file extension (outFile, the R2 key) and its content type follow from it. */
+export type OutputKind = "mp4" | "jpg";
+export const outputKind = (spec: Pick<RenderSpec, "still">): OutputKind => (spec.still ? "jpg" : "mp4");
 
 export interface WorkerRequest extends RenderSpec {
   serveUrl: string;
@@ -36,8 +42,8 @@ export interface RunnerDeps {
   workerPath: string;
   getServeUrl: () => Promise<string>;
   /** Uploads the finished file, returns its public URL. */
-  upload: (outFile: string, jobId: string) => Promise<string>;
-  outFile: (jobId: string) => string;
+  upload: (outFile: string, jobId: string, kind: OutputKind) => Promise<string>;
+  outFile: (jobId: string, kind: OutputKind) => string;
   timeoutMs: number;
   /** After a cancel at the time limit, how long the worker gets to close Chromium before SIGKILL. */
   cancelGraceMs: number;
@@ -109,7 +115,8 @@ export class RenderRunner {
 
   private async runOne(jobId: string, spec: RenderSpec): Promise<void> {
     const { store } = this.deps;
-    const outFile = this.deps.outFile(jobId);
+    const kind = outputKind(spec);
+    const outFile = this.deps.outFile(jobId, kind);
     try {
       store.update(jobId, { status: "rendering", progress: 0 });
       const serveUrl = await this.deps.getServeUrl();
@@ -125,7 +132,7 @@ export class RenderRunner {
         store.update(jobId, { status: "error", error: describeFailure(result, this.deps.timeoutMs) });
         return;
       }
-      const url = await this.deps.upload(outFile, jobId);
+      const url = await this.deps.upload(outFile, jobId, kind);
       store.update(jobId, { status: "done", progress: 100, url });
       console.log(`[remotion] job ${jobId} done → ${url}`);
     } catch (err) {

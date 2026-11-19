@@ -159,10 +159,40 @@ const within = (signal, ms) => AbortSignal.any([signal, AbortSignal.timeout(ms)]
 
 // Submits, polls every 2 s up to 10 min, downloads the finished file. Returns the mp4 bytes.
 async function render(input, { env, appDir, fetchImpl, signal, mediaData, onRemoteJob }) {
+  return transport(request(input, mediaData).body, { env, appDir, fetchImpl, signal, onRemoteJob });
+}
+
+// Card R1: the cover (封面) template, one JPEG still (remotion-service src/compositions/Cover.tsx). Same ratio table as
+// the title templates; the frame goes as a data: URI like every picture this service gets.
+const COVER_MAX_DOWNLOAD = 10 * 1024 * 1024;
+/** The format key for a video of width x height (within 1 %); null = the cover template has no layout for it. */
+function coverRatio(width, height) {
+  for (const [ratio, [, w, h]] of Object.entries(formats)) if (width > 0 && height > 0 && Math.abs(width / height / (w / h) - 1) <= 0.01) return ratio;
+  return null;
+}
+/** The POST /render body of one cover; frame = JPEG bytes of the picture (no title). */
+function coverRequest({ frame, title, subtitle, width, height }) {
+  const ratio = coverRatio(width, height);
+  if (!ratio) throw fail("封面模板不支援這個畫面比例（" + width + "x" + height + "）");
+  const text = String(title || "").replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!text) throw fail("封面模板需要標題");
+  const props = { backgroundUrl: "data:image/jpeg;base64," + Buffer.from(frame).toString("base64"), title: text };
+  const sub = String(subtitle || "").replace(/\s+/g, " ").trim().slice(0, 200);
+  if (sub) props.subtitle = sub;
+  const body = { templateId: "cover", props, outputFormat: formats[ratio][0], fps: 30, durationInFrames: 1 };
+  if (Buffer.byteLength(JSON.stringify(body)) > MAX_BODY) throw fail("封面畫格太大（送出內容超過 3.5 MB）");
+  return body;
+}
+/** One cover still: the JPEG bytes at the ratio's render size (the caller scales it to the video's own size). */
+async function coverStill(cover, { env, appDir, fetchImpl, signal, pollMs }) {
+  return transport(coverRequest(cover), { env, appDir, fetchImpl, signal, pollMs, maxBytes: COVER_MAX_DOWNLOAD, noun: "封面", fileWord: "圖片" });
+}
+
+// POST /render, poll /status, download the result. `noun` names the thing in every error ("片頭" / "封面").
+async function transport(body, { env, appDir, fetchImpl, signal, onRemoteJob = () => {}, pollMs = POLL_MS, maxBytes = MAX_DOWNLOAD, noun = "片頭", fileWord = "影片" }) {
   const auth = await resolveAuth(env, appDir),
     base = baseUrl(env);
-  if (!base || !auth.ok) throw fail("片頭模板服務未設定", 503);
-  const { body } = request(input, mediaData);
+  if (!base || !auth.ok) throw fail(noun + "模板服務未設定", 503);
   let r, reply;
   try {
     r = await fetchImpl(base + "/render", {
@@ -174,28 +204,28 @@ async function render(input, { env, appDir, fetchImpl, signal, mediaData, onRemo
     reply = await r.json().catch(() => ({}));
   } catch (e) {
     if (signal.aborted) throw e;
-    throw fail("無法連線到片頭模板服務");
+    throw fail("無法連線到" + noun + "模板服務");
   }
   if (!r.ok || typeof reply.jobId !== "string" || !reply.jobId)
-    throw fail("片頭模板服務拒絕請求（HTTP " + r.status + "）" + (typeof reply.error === "string" ? "：" + reply.error.slice(0, 200) : ""));
+    throw fail(noun + "模板服務拒絕請求（HTTP " + r.status + "）" + (typeof reply.error === "string" ? "：" + reply.error.slice(0, 200) : ""));
   onRemoteJob(reply.jobId);
   const deadline = Date.now() + POLL_LIMIT_MS;
   let url;
   for (;;) {
-    await sleep(POLL_MS, signal);
-    if (Date.now() > deadline) throw fail("片頭模板渲染逾時（超過 10 分鐘）");
+    await sleep(pollMs, signal);
+    if (Date.now() > deadline) throw fail(noun + "模板渲染逾時（超過 10 分鐘）");
     let status;
     try {
       const s = await fetchImpl(base + "/status/" + encodeURIComponent(reply.jobId), { headers: auth.headers, signal: within(signal, 15000) });
-      if (s.status === 404) throw fail("片頭模板服務找不到此任務（服務可能已重新啟動），請重試");
+      if (s.status === 404) throw fail(noun + "模板服務找不到此任務（服務可能已重新啟動），請重試");
       status = await s.json().catch(() => ({}));
     } catch (e) {
-      if (signal.aborted || String(e.message).startsWith("片頭")) throw e;
+      if (signal.aborted || String(e.message).startsWith(noun)) throw e;
       continue; // transient network error: poll again, as pollRemotion does
     }
-    if (status.status === "error") throw fail("片頭模板渲染失敗：" + String(status.error || "未知原因").slice(0, 200));
+    if (status.status === "error") throw fail(noun + "模板渲染失敗：" + String(status.error || "未知原因").slice(0, 200));
     if (status.status === "done") {
-      if (typeof status.url !== "string" || !/^https:\/\//.test(status.url)) throw fail("片頭模板渲染完成，但沒有可下載的網址");
+      if (typeof status.url !== "string" || !/^https:\/\//.test(status.url)) throw fail(noun + "模板渲染完成，但沒有可下載的網址");
       url = status.url;
       break;
     }
@@ -205,13 +235,13 @@ async function render(input, { env, appDir, fetchImpl, signal, mediaData, onRemo
     file = await fetchImpl(url, { signal: within(signal, 120000) });
   } catch (e) {
     if (signal.aborted) throw e;
-    throw fail("片頭影片下載失敗");
+    throw fail(noun + fileWord + "下載失敗");
   }
-  if (!file.ok) throw fail("片頭影片下載失敗（HTTP " + file.status + "）");
-  if (Number(file.headers?.get?.("content-length")) > MAX_DOWNLOAD) throw fail("片頭影片檔案過大");
+  if (!file.ok) throw fail(noun + fileWord + "下載失敗（HTTP " + file.status + "）");
+  if (Number(file.headers?.get?.("content-length")) > maxBytes) throw fail(noun + fileWord + "檔案過大");
   const buffer = Buffer.from(await file.arrayBuffer());
-  if (!buffer.length || buffer.length > MAX_DOWNLOAD) throw fail("片頭影片檔案大小無效");
+  if (!buffer.length || buffer.length > maxBytes) throw fail(noun + fileWord + "檔案大小無效");
   return buffer;
 }
 
-module.exports = { catalog, configured, request, parentAssetId, render };
+module.exports = { catalog, configured, request, parentAssetId, render, coverRatio, coverRequest, coverStill };
