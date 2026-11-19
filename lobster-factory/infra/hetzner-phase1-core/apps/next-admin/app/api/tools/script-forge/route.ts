@@ -115,7 +115,7 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(org) || !canAccessOrg(req, org)) return new NextResponse("organization not found", { status: 404 });
     if (!budgetDb) return new NextResponse("執行預算暫時無法儲存", { status: 503 });
     try {
-      const key = createHash("sha256").update(JSON.stringify([body.module, body.task, model, system, prompt])).digest("hex"), saved = await reserveScriptRun(budgetDb, org, budget, key, reserved);
+      const key = createHash("sha256").update(JSON.stringify([body.module, body.task, model, system, prompt])).digest("hex"), saved = await reserveScriptRun(budgetDb, org, budget, key, reserved, { runQuote: (body.autoBudget as { runQuote?: unknown }).runQuote, model, sceneCount });
       if (saved.kind === "cached") return new Response(saved.text + "\n[SF_BUDGET]" + JSON.stringify({ spentTwd: saved.spentTwd, estimated: saved.estimated }), { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache", "X-SF-Reserved-Twd": String(saved.spentTwd) } });
       claim = saved;
     } catch (e) { return new NextResponse(e instanceof Error ? e.message : "無法保留執行預算", { status: (e as { status?: number }).status || 503 }); }

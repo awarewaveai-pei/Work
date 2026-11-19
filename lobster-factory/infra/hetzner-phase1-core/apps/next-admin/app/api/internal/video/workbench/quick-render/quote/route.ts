@@ -11,6 +11,10 @@ import { listAccounts } from "@/lib/social/store";
 import { writerKeysFor } from "@/lib/social/write-posts";
 import { renderSiteVoice, siteLanguage, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { draftQuoteUsd } from "@/lib/content/video/auto-run-budget";
+import { MAX_WRITER_CALLS } from "@/lib/social/write-posts";
+import { normalizeAiTextModel } from "@/lib/ai/text-model-options";
+import { oneClickEstimateNtd, oneClickScriptTokens } from "@/lib/script-forge/one-click";
+import { signRunQuote } from "@/lib/script-forge/run-quote";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,7 +125,26 @@ export async function POST(req: Request): Promise<Response> {
     scriptUpperTwd = forgeRunUpperTwd(plan, { lang: plan.lang || "繁體中文", sceneCount: plan.sceneCount!, customScenes: Math.max(0, Math.min(plan.sceneCount!, Number(plan.customScenes) || 0)), brand });
   }
   const scriptUsd = scriptUpperTwd / TWD_RATE;
+  // N12 一鍵到草稿 (scriptPlan given): the only two numbers the page and the dialog show. maxTwd = the whole trip at every
+  // call's upper bound, summed from the same NT$ unit prices the run reserves (workbench projects-0.js: perPictureTwd per
+  // picture, perRatioTwd per render) -- not from the US$ total, whose rounding can land a cent below them (oracle F2) --
+  // rounded up to the cent (the cap must reach it: run-store checkStart, via the signed runQuote).
+  // typicalTwd = the price table at typical sizes: script + score at the cost-model profile, narration as long as that
+  // profile's answer, one writer call instead of MAX_WRITER_CALLS. ai_call_logs cannot tell a one-click script call
+  // from a manual one (logAiCall carries no run marker), so no median of actual spend is used.
+  let oneClick = {};
+  if (b.scriptPlan !== undefined) {
+    const plan = b.scriptPlan as { model?: string; sceneCount: number }, model = normalizeAiTextModel(plan.model);
+    const reservedTwd = scriptUpperTwd + fill.pictures * fill.perPictureTwd + usdToNtd(cost.totalUsd) * ratios.length + draftsUsd * TWD_RATE;
+    const maxTwd = Math.ceil(Math.max(reservedTwd, (fill.usd + cost.totalUsd * ratios.length + draftsUsd + scriptUsd) * TWD_RATE) * 100 - 1e-6) / 100;
+    const typicalRatioUsd = computeVideoCost({ totalScenes: scenes, customScenes: 0, brollScenes: 0, includeScriptCost: false,
+      ttsProvider: voice.provider, ttsVoice: voice.voice, ttsChars: Math.min(ttsChars, oneClickScriptTokens(plan.sceneCount)) }, STEPS).totalUsd;
+    const typicalTwd = Math.min(maxTwd, oneClickEstimateNtd(model, plan.sceneCount) + usdToNtd(fill.usd + typicalRatioUsd * ratios.length + draftsUsd / MAX_WRITER_CALLS));
+    oneClick = { typicalTwd: Math.round(typicalTwd * 100) / 100, maxTwd,
+      ...(b.until === "drafts" ? { runQuote: signRunQuote({ organizationId: b.organizationId, model, sceneCount: plan.sceneCount, maxTwd }) } : {}) };
+  }
   return NextResponse.json({
+    ...oneClick,
     ok: true,
     voices,
     lines: cost.lines.map((l) => ({ label: l.label, tool: l.tool, usd: l.totalUsd })),

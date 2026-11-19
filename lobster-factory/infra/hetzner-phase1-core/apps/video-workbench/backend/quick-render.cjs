@@ -108,8 +108,10 @@ async function quote(settings, main, sizeOf, imageModel) {
     },
   });
   if (!r.ok || r.value.ok !== true) throw refusal("主系統無法估價", r);
-  const { voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, scriptUpperTwd, totalUsd, totalTwd, sites } = r.value;
-  return { problems: problems(scenes, main, sizeOf, !!s.fill), voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, ...(scriptUpperTwd !== undefined ? { scriptUpperTwd } : {}), totalUsd, totalTwd, sites: sites || [] };
+  const { voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, scriptUpperTwd, typicalTwd, maxTwd, runQuote, totalUsd, totalTwd, sites } = r.value;
+  // 一鍵到草稿 (scriptPlan): typicalTwd / maxTwd are the only numbers shown; runQuote = the main system's signed maxTwd,
+  // which its script route checks the cap against before the run starts (passed through untouched).
+  return { problems: problems(scenes, main, sizeOf, !!s.fill), voices, lines, perRatioUsd, perRatioTwd, fill, draftsUsd, ...(scriptUpperTwd !== undefined ? { scriptUpperTwd, typicalTwd, maxTwd, runQuote } : {}), totalUsd, totalTwd, sites: sites || [] };
 }
 
 // Submits, polls until the main system recorded the video, downloads it into the media store. Answers the job result.

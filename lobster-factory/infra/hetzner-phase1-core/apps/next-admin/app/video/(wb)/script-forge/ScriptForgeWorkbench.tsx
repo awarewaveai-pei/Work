@@ -2,9 +2,10 @@
 // 腳本 inside the video workbench (video-unify-plan-20261116 §4 U3): the same ScriptForge, its modules, fields, flow and
 // words unchanged. It works for the organization the workbench is connected to (capabilities.mainSystem), so no
 // organization picker shows. 「送去做影片」 makes a new episode; opened from an episode, it writes the shots back instead.
-import { useEffect, useState } from "react";
-import ScriptForge, { type AutoDraftRequest } from "../../../(shell)/tools/video/ScriptForge";
+import { useCallback, useEffect, useState } from "react";
+import ScriptForge, { type AutoDraftRequest, type QuoteDrafts } from "../../../(shell)/tools/video/ScriptForge";
 import OneClickDraftDialog from "./OneClickDraftDialog";
+import { defaultDraftChoices, requestDraftQuote } from "./draft-quote";
 import { ratioForPlatform, shotsFromScript, type VideoHandoff } from "../../../(shell)/tools/video/video-handoff";
 import { useWorkbench, type Workbench } from "../workbench";
 
@@ -48,6 +49,8 @@ export default function ScriptForgeWorkbench({ episode, socialHref }: { episode:
   // undefined = still asking; null = this workbench is not connected to the main system
   const [organizationId, setOrganizationId] = useState<string | null | undefined>(undefined);
   const [pending, setPending] = useState<{ request: AutoDraftRequest; resolve: () => void } | null>(null);
+  // N12: the page's 一鍵到草稿 price line = the dialog's own quote at the dialog's default choices.
+  const quoteDrafts = useCallback<QuoteDrafts>((request) => requestDraftQuote(workbench!, request, defaultDraftChoices(request)), [workbench]);
   useEffect(() => {
     if (!workbench) return;
     let live = true;
@@ -59,7 +62,7 @@ export default function ScriptForgeWorkbench({ episode, socialHref }: { episode:
   return (
     <><ScriptForge sideMenu videoNeedsClient={false} organizationId={organizationId}
       onSendToVideo={(h) => send(workbench, episode, h)} videoVerb={episode ? "寫回這一集" : undefined}
-      onStartDrafts={(request) => new Promise<void>((resolve) => setPending({ request, resolve }))}
+      onStartDrafts={(request) => new Promise<void>((resolve) => setPending({ request, resolve }))} onQuoteDrafts={quoteDrafts}
       saveSocialDraft={socialHref ? saveSocialDraft : undefined} socialHref={socialHref ?? undefined} />
       {pending && <OneClickDraftDialog request={pending.request} workbench={workbench} close={() => { pending.resolve(); setPending(null); }} />}</>
   );

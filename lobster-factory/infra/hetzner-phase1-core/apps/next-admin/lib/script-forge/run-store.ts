@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureWorkbenchProject, PROJECT_COLUMNS } from "@/lib/content/video/projects";
 import type { AutoBudget } from "@/lib/content/video/auto-run-budget";
+import { verifyRunQuote } from "./run-quote";
 
 type Row = Record<string, any>;
 type Claim = { kind: "claim"; projectId: string; org: string; runId: string; key: string; token: string; reserved: number; spentTwd: number };
@@ -23,8 +24,21 @@ const write = async (db: SupabaseClient, row: Row, org: string, brief: Row) => {
     .eq("organization_id", org).eq("id", row.id).eq("updated_at", row.updated_at).select("id").maybeSingle();
   if (r.error) fail(503, "無法保留執行預算"); return !!r.data;
 };
-export async function reserveScriptRun(db: SupabaseClient, org: string, budget: AutoBudget, key: string, reserved: number): Promise<Claim | Cached> {
+// N12 start check: reservations keep a run under its cap, so a cap below the whole run's maximum can only end in "paid the
+// first calls, stopped midway". Such a run never starts: before any row, reservation or paid call, the cap must cover the
+// maximum the quote route signed (run-quote.ts). A run already on its row (brief_json.autoBudget.runId) is a resume, not a start.
+async function checkStart(db: SupabaseClient, org: string, budget: AutoBudget, start: { runQuote: unknown; model: string; sceneCount: number }) {
+  const found = await db.from("media_production_projects").select(PROJECT_COLUMNS).eq("organization_id", org)
+    .eq("source", "video_workbench").eq("source_ref", "project-" + budget.runId).maybeSingle();
+  if (found.error) return fail(503, "無法讀取執行預算");
+  if ((found.data as Row | null)?.brief_json?.autoBudget?.runId === budget.runId) return;
+  const quote = verifyRunQuote(start.runQuote, org, start.model, start.sceneCount);
+  if (!quote) return fail(409, "沒有開始：缺少有效的整趟報價，請重新開啟一鍵到草稿取得報價；沒有花錢");
+  if (budget.budgetTwd + 1e-9 < quote.maxTwd) return fail(409, `沒有開始：上限至少要 NT$${quote.maxTwd.toFixed(2)}（整趟最多可能花到的錢），低於這個數一定會停在半路；沒有花錢`);
+}
+export async function reserveScriptRun(db: SupabaseClient, org: string, budget: AutoBudget, key: string, reserved: number, start: { runQuote: unknown; model: string; sceneCount: number }): Promise<Claim | Cached> {
   if (!Number.isFinite(reserved) || reserved < 0) return fail(503, "腳本報價無效");
+  await checkStart(db, org, budget, start);
   const ensured = await ensureWorkbenchProject(db, org, "project-" + budget.runId, "一鍵腳本", { production_mode: "quick_video" }, { retitle: false });
   if (!ensured.ok) return fail(503, "無法建立執行預算");
   const projectId = String(ensured.item.id);

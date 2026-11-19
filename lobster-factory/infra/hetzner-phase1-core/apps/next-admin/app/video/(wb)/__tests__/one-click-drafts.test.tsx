@@ -5,52 +5,67 @@ import OneClickDraftDialog from "../script-forge/OneClickDraftDialog";
 import type { AutoDraftRequest } from "../../../(shell)/tools/video/ScriptForge";
 import type { Workbench } from "../workbench";
 const handoff = { title: "完成腳本", script: { scenes: [{ visual: "畫面一", dialogue: "旁白一" }, { visual: "畫面二", dialogue: "旁白二" }] } };
-function setup(generate = vi.fn(async (budget) => { budget.spentTwd = 5; return handoff; })) {
+const QUOTE = { typicalTwd: 12.34, maxTwd: 50, runQuote: "signed-by-main", totalTwd: 50, scriptUpperTwd: 20, perRatioTwd: 1, fill: { twd: 2, perPictureTwd: 1 }, voices: [{ provider: "edge", voice: "tw", label: "繁中配音", available: true }], sites: [{ id: "site", name: "網站" }] };
+function setup(generate = vi.fn(async (budget) => { budget.spentTwd = 5; return handoff; }), customScenes = 2) {
   const create = vi.fn(async (_payload: Parameters<Workbench["spine"]["create"]>[0]) => ({ projectId: "p", episodeId: "e" })), close = vi.fn();
   const workbench = { loadCapabilities: async () => ({ mainSystem: { organizationId: "org" }, remotionTemplates: [] }), spine: { create },
-    request: vi.fn(async () => ({ totalTwd: 50, scriptUpperTwd: 20, perRatioTwd: 1, fill: { twd: 2, perPictureTwd: 1 }, voices: [{ provider: "edge", voice: "tw", label: "繁中配音", available: true }], sites: [{ id: "site", name: "網站" }] })),
+    request: vi.fn(async () => QUOTE),
   } as unknown as Workbench;
-  const request: AutoDraftRequest = { topic: "主題", platform: "reels", sceneCount: 2, plan: { model: "claude-haiku-5-5", fields: { topic: "主題" }, siteId: "", lang: "繁體中文", sceneCount: 2, customScenes: 2 }, generate };
+  const request: AutoDraftRequest = { topic: "主題", platform: "reels", sceneCount: 2, plan: { model: "claude-haiku-5-5", fields: { topic: "主題" }, siteId: "", lang: "繁體中文", sceneCount: 2, customScenes }, generate };
   render(<OneClickDraftDialog request={request} workbench={workbench} close={close} />);
-  return { create, close, generate };
+  return { create, close, generate, workbench };
 }
 afterEach(() => { cleanup(); localStorage.clear(); });
 describe("one click to drafts", () => {
   it("quotes before generation; hands actual script cost and the optional website to the U5 runner", async () => {
     const { create, generate, close } = setup();
-    await screen.findByText(/整趟最多 NT\$50.00/); expect(generate).not.toHaveBeenCalled();
+    await screen.findByText(/最多 NT\$50.00/); expect(generate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText("同時建一篇網站草稿文章並嵌入"));
     fireEvent.click(screen.getByText("16:9"));
     await waitFor(() => expect((screen.getByText("確認，開始到草稿") as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByText("確認，開始到草稿"));
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(generate.mock.calls[0][0]).toMatchObject({ budgetTwd: 50, runQuote: "signed-by-main" });
     const payload = create.mock.calls[0][0];
     expect(payload.shots).toHaveLength(2);
     expect(payload.autoRun).toMatchObject({ until: "drafts", spentTwd: 5, baseSpentTwd: 5, budgetTwd: 50, embedSiteId: "site", ratios: ["9:16", "16:9"] });
     expect(payload.autoRun).not.toHaveProperty("autonomy", "full_auto"); expect(close).toHaveBeenCalled();
   });
+  // N12: the page line and the dialog show only the quote route's typicalTwd / maxTwd; the cap starts at the maximum.
+  it("shows only the quote's two numbers, prefills the cap with the maximum, and cannot start below it", async () => {
+    const { generate, workbench } = setup(undefined, 0);
+    expect((await screen.findByTestId("draft-quote")).textContent).toBe("整趟通常約 NT$12.3，最多 NT$50.00");
+    expect(screen.getByTestId("draft-budget-note").textContent).toContain("通常只花約 NT$12.3");
+    expect(screen.queryByText(/腳本與評分最多/)).toBeNull();
+    const cap = screen.getByLabelText("花費上限 NT$") as HTMLInputElement, startButton = screen.getByText("確認，開始到草稿") as HTMLButtonElement;
+    expect(Number(cap.value)).toBe(QUOTE.maxTwd);
+    expect(vi.mocked(workbench.request).mock.calls[0][1]).toMatchObject({ fill: "stock-video" }); // 0 AI scenes on the page
+    fireEvent.change(cap, { target: { value: "9" } });
+    expect(startButton.disabled).toBe(true); expect(screen.getByTestId("draft-budget-floor").textContent).toContain("上限至少要 NT$50.00");
+    fireEvent.click(startButton); expect(generate).not.toHaveBeenCalled();
+  });
   it("cancel makes no paid call; a failed stage keeps its run id and spending on retry", async () => {
     let attempts = 0, id;
     const generate = vi.fn(async (budget) => { attempts++; if (attempts === 1) { id = budget.runId; budget.spentTwd = 2; throw Error("評分失敗"); } expect(budget.runId).toBe(id); expect(budget.spentTwd).toBe(2); budget.spentTwd = 4; return handoff; });
     const { create } = setup(generate);
-    await screen.findByText(/整趟最多/); fireEvent.click(screen.getByText("確認，開始到草稿"));
+    await screen.findByText(/最多 NT\$/); fireEvent.click(screen.getByText("確認，開始到草稿"));
     await screen.findByText("評分失敗"); expect(create).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("確認，開始到草稿")); await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
   });
   it("a closed dialog's paid run resumes with the same run id (server cache = free), then is forgotten once handed off", async () => {
     let first = "";
     setup(vi.fn(async (budget) => { first = budget.runId; throw Error("評分失敗"); }));
-    await screen.findByText(/整趟最多/); fireEvent.click(screen.getByText("確認，開始到草稿"));
+    await screen.findByText(/最多 NT\$/); fireEvent.click(screen.getByText("確認，開始到草稿"));
     await screen.findByText("評分失敗"); cleanup();
     const resumed = setup(vi.fn(async (budget) => { expect(budget.runId).toBe(first); return handoff; }));
-    await screen.findByText(/整趟最多/); fireEvent.click(await screen.findByText("續接上一趟"));
+    await screen.findByText(/最多 NT\$/); fireEvent.click(await screen.findByText("續接上一趟"));
     await waitFor(() => expect(resumed.create).toHaveBeenCalledTimes(1));
     expect(resumed.create.mock.calls[0][0].autoRun).toMatchObject({ runId: first }); cleanup();
-    setup(); await screen.findByText(/整趟最多/);
+    setup(); await screen.findByText(/最多 NT\$/);
     expect(screen.queryByText("續接上一趟")).toBeNull(); expect(screen.getByText("確認，開始到草稿")).toBeTruthy();
   });
   it("cancels before generating anything", async () => {
-    const { create, close, generate } = setup(); await screen.findByText(/整趟最多/);
+    const { create, close, generate } = setup(); await screen.findByText(/最多 NT\$/);
     fireEvent.click(screen.getByText("取消")); expect(close).toHaveBeenCalled(); expect(generate).not.toHaveBeenCalled(); expect(create).not.toHaveBeenCalled();
   });
 });
