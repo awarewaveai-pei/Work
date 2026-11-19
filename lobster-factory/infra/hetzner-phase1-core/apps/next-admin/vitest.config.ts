@@ -9,6 +9,11 @@ export default defineConfig({
   test: {
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],   // jsdom tests wait 5 s for async UI (see the file)
+    // A test that imports a whole page takes ~1.3 s alone and passes; in the full suite (600+ files in parallel, and on
+    // the 2-core deploy host) the same test can pass vitest's default 5 s and abort a deploy (2026-11-20:
+    // ops/billing page.sidebar; workers saw hosting-gate-contract and tarot batch-store the same way). 20 s is a
+    // ceiling for load, not a budget: a test that hangs still fails.
+    testTimeout: 20_000,
   },
   resolve: {
     alias: {
