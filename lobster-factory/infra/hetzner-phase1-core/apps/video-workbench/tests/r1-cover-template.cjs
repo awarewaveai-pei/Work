@@ -43,7 +43,9 @@ const base = { file: video, duration: 6, width: 640, height: 360, title: "封面
 
   // 2. coverStill against a fake service: POST /render with the token, poll, download the JPEG; a failed render names 封面.
   const SERVICE = "https://remotion.test", env = { REMOTION_SERVICE_URL: SERVICE, MEDIA_RENDER_AUTH_TOKEN: "tok-r1" },
-    appDir = path.join(__dirname, "../../next-admin");
+    // the main system's files as this install has them: ../next-admin in the repo, .awarewave/ in the image (the gate
+    // runs inside the image, where ../../next-admin does not exist and auth then reads as "not configured")
+    appDir = require("../backend/appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env);
   const fake = (status) => {
     const calls = [];
     return { calls, fetchImpl: async (url, init = {}) => {
@@ -137,12 +139,18 @@ const base = { file: video, duration: 6, width: 640, height: 360, title: "封面
 
   // 8. Already chosen covers stay chosen when the template's covers are registered after them (VD.3 rule, unchanged):
   // new rows are later auto covers without chosenAt.
-  const { coversOf } = await import(pathToFileURL(path.join(appDir, "lib/content/video/cover.ts")).href);
-  const row = (id, created, extra = {}) => ({ id, object_url: "https://x/" + id + ".jpg", mime_type: "image/jpeg", created_at: created, metadata: { coverOf: "v1", coverKind: "auto", ...extra } });
-  const old = [row("old-0", "2026-11-18T00:00:00Z"), row("old-1", "2026-11-18T00:00:01Z", { chosenAt: "2026-11-18T01:00:00Z" })],
-    fresh = [row("new-0", "2026-11-19T00:00:00Z"), row("new-1", "2026-11-19T00:00:01Z")];
-  assert.equal(coversOf("v1", [...old, ...fresh]).find((c) => c.chosen).id, "old-1", "a chosen cover is kept");
-  assert.equal(coversOf("v1", [old[0], ...fresh]).find((c) => c.chosen).id, "old-0", "none chosen: the oldest auto cover, not a new one");
+  // The rule is the main system's (cover.ts): the workbench never reads that file at runtime, so the image's .awarewave/
+  // bundle does not carry it. Checked where the repo is present (dev, CI); inside the image only the workbench's own
+  // parts above run.
+  const coverRule = path.join(appDir, "lib/content/video/cover.ts");
+  if (fs.existsSync(coverRule)) {
+    const { coversOf } = await import(pathToFileURL(coverRule).href);
+    const row = (id, created, extra = {}) => ({ id, object_url: "https://x/" + id + ".jpg", mime_type: "image/jpeg", created_at: created, metadata: { coverOf: "v1", coverKind: "auto", ...extra } });
+    const old = [row("old-0", "2026-11-18T00:00:00Z"), row("old-1", "2026-11-18T00:00:01Z", { chosenAt: "2026-11-18T01:00:00Z" })],
+      fresh = [row("new-0", "2026-11-19T00:00:00Z"), row("new-1", "2026-11-19T00:00:01Z")];
+    assert.equal(coversOf("v1", [...old, ...fresh]).find((c) => c.chosen).id, "old-1", "a chosen cover is kept");
+    assert.equal(coversOf("v1", [old[0], ...fresh]).find((c) => c.chosen).id, "old-0", "none chosen: the oldest auto cover, not a new one");
+  } else console.log("r1-cover-template: chosen-cover rule not checked here (no " + coverRule + ")");
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.rmSync(stopDir, { recursive: true, force: true });
