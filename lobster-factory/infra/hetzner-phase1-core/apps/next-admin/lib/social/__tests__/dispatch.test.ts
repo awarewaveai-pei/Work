@@ -5,7 +5,7 @@
 // posts-states.constructed.json: built from the real posts-with-draft.json row (only id/state/error/releaseURL changed).
 import { describe, expect, it, vi } from "vitest";
 import { PostizApiError, type PostizPost, type RawIntegration } from "@/lib/content/postiz";
-import { MAX_POSTIZ_CALLS, runDispatch, type DispatchPorts, type LeaseResult, type QueuedPost } from "../dispatch";
+import { failureText, MAX_POSTIZ_CALLS, runDispatch, type DispatchPorts, type LeaseResult, type QueuedPost } from "../dispatch";
 import states from "@/lib/content/__tests__/fixtures/postiz-v2.25.1/posts-states.constructed.json";
 
 const NOW = new Date("2026-10-15T09:55:00Z");
@@ -113,7 +113,7 @@ describe("runDispatch", () => {
     const refused = fakePorts([post([{}])]);
     vi.mocked(refused.postiz.createPost).mockRejectedValueOnce(new PostizApiError(400, "bad settings"));
     await runDispatch(refused, { mode: "apply", now: NOW });
-    expect(refused.recordSend).toHaveBeenCalledWith(expect.anything(), "t1", null, expect.stringMatching(/refused.*bad settings/));
+    expect(refused.recordSend).toHaveBeenCalledWith(expect.anything(), "t1", null, failureText.refused("bad settings"));
     const flaky = fakePorts([post([{}])]);
     vi.mocked(flaky.postiz.createPost).mockRejectedValueOnce(new Error("The operation was aborted due to timeout"));
     const r = await runDispatch(flaky, { mode: "apply", now: NOW });
@@ -211,8 +211,26 @@ describe("runDispatch", () => {
     await runDispatch(ports, { mode: "apply", now: NOW });
     expect(ports.postiz.createPost).not.toHaveBeenCalled();
     expect(ports.setAccountStatus).toHaveBeenCalledWith("acc", "expired");
-    expect(ports.recordSend).toHaveBeenCalledWith(expect.anything(), "t1", null, expect.stringMatching(/reconnect/));
+    expect(ports.recordSend).toHaveBeenCalledWith(expect.anything(), "t1", null, failureText.channelGone("bluesky", "Postiz 顯示已停用"));
     expect(ports.recordOutcome).toHaveBeenCalledWith(expect.anything(), []);   // nothing open: the post settles to error
+  });
+
+  it("a channel Postiz no longer lists is not sent either: the text says reconnect, never a bare error", async () => {
+    const ports = fakePorts([post([{}])]);
+    vi.mocked(ports.postiz.integrations).mockResolvedValue([]);
+    await runDispatch(ports, { mode: "apply", now: NOW });
+    expect(ports.postiz.createPost).not.toHaveBeenCalled();
+    expect(ports.setAccountStatus).toHaveBeenCalledWith("acc", "expired");
+    expect(ports.recordSend).toHaveBeenCalledWith(expect.anything(), "t1", null, failureText.channelGone("bluesky", "Postiz 已沒有這個頻道"));
+  });
+
+  it("a Postiz ERROR without a reason (v2.25.1 GET /posts gives error null) says where to reconnect, never only 'error'", async () => {
+    const ports = fakePorts([post([{ platform: "youtube", state: "queued", postizPostId: ERR.id }])], { postizPosts: [{ ...ERR, error: null }] });
+    await runDispatch(ports, { mode: "apply", now: NOW });
+    const text = failureText.noReason("youtube");
+    expect(ports.recordOutcome).toHaveBeenCalledWith(expect.anything(), [{ id: "t1", state: "error", error: text }]);
+    expect(text).toMatch(/重新連接 youtube/);
+    expect(ports.raiseIncident).toHaveBeenCalledWith(expect.anything(), expect.stringContaining(text));
   });
 
   it("a brand in a blocking system mode sends nothing; its queued results are still read back", async () => {
@@ -245,7 +263,7 @@ describe("runDispatch", () => {
     const draft = { ...QUE, state: "DRAFT" as const };
     const ports = fakePorts([post([{ state: "queued", postizPostId: draft.id }])], { postizPosts: [draft] });
     await runDispatch(ports, { mode: "apply", now: NOW });
-    expect(ports.recordOutcome).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining({ id: "t1", state: "error", error: expect.stringMatching(/rehearsal/) })]);
+    expect(ports.recordOutcome).toHaveBeenCalledWith(expect.anything(), [expect.objectContaining({ id: "t1", state: "error", error: failureText.rehearsal })]);
     const still = fakePorts([post([{ state: "queued", postizPostId: draft.id }])], { postizPosts: [draft] });
     await runDispatch(still, { mode: "draft", now: NOW });
     expect(still.recordOutcome).not.toHaveBeenCalled();

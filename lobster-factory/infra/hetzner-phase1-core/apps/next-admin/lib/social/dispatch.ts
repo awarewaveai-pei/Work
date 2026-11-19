@@ -97,6 +97,19 @@ const RESULT_WAIT_MS = 7 * 24 * 3600_000;        // how far back the result read
 const ORPHAN_LIMIT = 10;                         // orphans retried per run
 const DEFAULT_BACKOFF_S = 15 * 60;               // a 429 without Retry-After
 
+// Invariant (SOC-REAUTH 2026-11-19): every failure written to social_post_targets.error (and so to the incident) says
+// what a person does next. Postiz v2.25.1's public API returns neither the integration's refreshNeeded nor a failed
+// post's error text (GET /posts projects error as null; the cause stays in Postiz's own Post.error), so "no reason
+// from Postiz" must still point at the channel, never read as a bare "error".
+export const SETTINGS_CHANNELS = "/tools/social 設定 → 頻道";
+export const failureText = {
+  channelGone: (platform: string, why: string) => `${platform} 頻道需要重新授權（${why}）：請到 ${SETTINGS_CHANNELS} → 重新連接，再重新排程此貼文`,
+  refused: (detail: string) => `Postiz 拒收這則貼文：${detail}。修正內容後重新排程`,
+  noReason: (platform: string) => `Postiz 發布失敗（Postiz 未回原因，最常見是 ${platform} 頻道授權失效）：請到 ${SETTINGS_CHANNELS} 重新連接 ${platform}，再重新排程此貼文`,
+  rehearsal: "Postiz 裡是一則預演草稿（draft 模式），不會自己發出：重新排程此貼文才會送出",
+  gone: "Postiz 已沒有這則貼文（在 Postiz 被刪、頻道被移除，或超過 7 天）：重新排程此貼文",
+};
+
 export interface DispatchResult {
   mode: DispatchMode;
   backoffUntil: string | null;
@@ -225,7 +238,7 @@ export async function runDispatch(ports: DispatchPorts, opts: { mode: DispatchMo
     const live = (await liveIntegrations()).find((i) => i.id === t.integrationId);
     if (!live || live.disabled) {
       if (t.accountStatus !== "expired") await ports.setAccountStatus(t.accountId, "expired");
-      return refuse(`the ${t.platform} channel is disconnected in Postiz; reconnect it, then schedule again`);
+      return refuse(failureText.channelGone(t.platform, live ? "Postiz 顯示已停用" : "Postiz 已沒有這個頻道"));
     }
     let composed: Composed;
     try {
@@ -251,7 +264,7 @@ export async function runDispatch(ports: DispatchPorts, opts: { mode: DispatchMo
         await ports.recordSend(post, t.id, null, null);
         throw e;
       }
-      if (e instanceof PostizApiError && e.status >= 400 && e.status < 500) return refuse(`Postiz refused the post: ${e.message}`);
+      if (e instanceof PostizApiError && e.status >= 400 && e.status < 500) return refuse(failureText.refused(e.message));
       r.uncertain++;   // 5xx, timeout, no id: the lease (and its key) stays; the next run looks the key up first
       r.errors.push(`${post.id}/${t.id}: uncertain send: ${String(e).slice(0, 200)}`);
       return;
@@ -306,10 +319,10 @@ export async function runDispatch(ports: DispatchPorts, opts: { mode: DispatchMo
               ...(t.platform === "facebook" || t.platform === "instagram" ? { meta_post_id: p.releaseId } : {}) });
             else if (p?.state === "DRAFT" && opts.mode !== "draft") {
               // a rehearsal draft (SOCIAL_DISPATCH_MODE=draft) never goes out by itself: settle it, the person schedules again
-              changes.push({ id: t.id, state: "error", error: "a rehearsal draft in Postiz (draft mode); schedule the post again to send it" });
+              changes.push({ id: t.id, state: "error", error: failureText.rehearsal });
             }
-            else if (p?.state === "ERROR") changes.push({ id: t.id, state: "error", error: p.error ?? "Postiz reported an error" });
-            else if (!p) changes.push({ id: t.id, state: "error", error: "Postiz has no such post any more (deleted there, its channel removed, or older than 7 days)" });
+            else if (p?.state === "ERROR") changes.push({ id: t.id, state: "error", error: p.error?.trim() || failureText.noReason(t.platform) });
+            else if (!p) changes.push({ id: t.id, state: "error", error: failureText.gone });
           }
         }
         const open = post.targets.some((t) => t.state === "pending" || t.state === "queued");
