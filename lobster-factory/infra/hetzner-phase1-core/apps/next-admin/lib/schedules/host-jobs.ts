@@ -54,6 +54,7 @@ export const HOST_JOBS: Record<string, HostJob> = {
   social_dispatch: { label: "社群貼文發送", description: "每 5 分鐘將到期的社群貼文送到 Postiz 發布，並取回發布結果。", group: "site" },
   social_rotation: { label: "社群輪播排程", description: "每天將輪播清單展開成未來 7 天的排程貼文。", group: "site" },
   social_channel_health: { label: "社群頻道授權檢查", description: "每 5 分鐘讀 Postiz 的頻道狀態（授權失效、停用、已刪除、連接沒走完），同步成社群設定頁的頻道狀態；失效時開事件並推播，恢復時關閉事件；按「重新連接」後也是由它確認完成。", group: "site", fail: "頻道失效時 Telegram 會收到「<平台> 頻道需要重新授權」；本列失敗代表頻道狀態沒同步到、可能過時，「重新連接」也會等不到完成。" },
+  postiz_meta_token_truth: { label: "Meta 權杖期限校正", description: "每天台灣 02:20 問 Meta 每個 Facebook／Instagram 頻道的權杖還能用多久，寫回 Postiz；Meta 的頁面權杖永不過期，但 Postiz 預設當成 59 天，不校正就會在第 59 天把正常頻道標成「需要重新授權」。Meta 說無效或缺發文權限時改標失效，5 分鐘內社群頻道檢查會開事件。", group: "site", fail: "Meta 查不到或回應看不懂；頻道狀態維持原樣，若 Postiz 自己的 59 天到了，頻道可能被誤標失效。" },
   social_metrics: { label: "社群數據快照", description: "每天記錄各社群帳號的數據，供數據分析使用。", group: "site" },
   cs_inbound_sweep: { label: "客服漏接轉人工", description: "每 5 分鐘找出 AI 未完成回覆的客服訊息，轉交員工處理。", group: "site" },
   pod_order_inbox_sweep: { label: "印製訂單重送", description: "每 10 分鐘重送已付款、但尚未送到 Printful 的訂單。", group: "site" },
