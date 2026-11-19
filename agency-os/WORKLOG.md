@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-19（續13）— 監工整合：ORACLE-ENC（續10）與 OUT-GMAIL-REAUTH（續12）上線證據
+
+- 兩張卡由 worker 寫、監工在 `D:/Worktrees/Work/u-integrate` cherry-pick 審讀後推 main：ORACLE-ENC `983d1140a`（只動 D:\Work 腳本，不部署）；OUT-GMAIL-REAUTH `ae8f209d5`（migration 0167 已套 APPLY_OK 1/1；部署 sg-deploy ae8f209d5 smoke all OK 10:29Z，快照 rollback-20261119-102631）。worker 的 WORKLOG 條目隨 commit 進 main，續號唯一已查。
+- 整合後實跑：`outreach_gmail_sync` 手動跑一輪 → HTTP 502 但錯誤文字已是「Gmail 授權已失效…到 /tools/outreach/connectors 按重新連接」，`ops_incidents` 立刻出現兩筆 `outreach:sender:<id>`（awarewaveai@、soulfulexpression01@，open）。操作者待辦（三步）在續12；根治＝Google Console 把 OAuth 用戶端從 Testing 改 In production（Postiz YouTube／Facebook 與 Gmail 同一天同一原因失效）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0167 (APPLY_OK); sg-deploy.sh next-admin ae8f209d5 smoke all OK; cron-run outreach_gmail_sync once; psql ops_incidents fingerprint outreach:sender:% | exit=0 | ms=400000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; vitest lib/outreach app/api/internal/outreach lib/repair-center app/api/outreach lib/ops-inbox lib/portal lib/system-modes (83 files 773); powershell tests/oracle-console-utf8.test.ps1 PASS | exit=0 | ms=300000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（監工讀 diff；worker 各自的 Codex 輪次見續10／續12）
+- BUGHUNT_WAIVED: NA -- 整合與部署，無新 symbol；worker 條目已各自 BUGHUNT
+- rollback：`git revert ae8f209d5 983d1140a`；DB `packages/db/scripts/0167_ops_incidents_outreach_source_down.sql`；next-admin 快照 rollback-20261119-102631。
 ## 2026-11-19（續10）— ORACLE-ENC：oracle 腳本 stdout 回顯一律 UTF-8
 
 - 根因（實測）：`powershell.exe -File x.ps1 | xxd` 在 zh-TW 主控台（`[Console]::OutputEncoding`=950）下，`Write-Host '新增排程'` 輸出 `b7 73 bc 57 b1 c6 b5 7b`（CP950），UTF-8 讀者（Git Bash／監工 session）看到「�s�W�Ƶ{」。**artifact 檔本身是對的**：`agency-os/reports/oracle/2026-11-19-review-7d126eb5.md`、`-28374f69.md` 位元組 UTF-8 可解、0 個 U+FFFD（`Write-RepoTextFile` 以 UTF-8 寫）；掃整個目錄無一份亂碼。亂碼只在 `codex-oracle.ps1:553` `Write-Host $answer`（與 `claude-oracle.ps1:190`）的畫面回顯，此前只有「接 child stdout」的方向有 `Invoke-WithUtf8Console`，「寫出 stdout」方向沒有。「後面 artifact 正常」= 讀者改讀檔案而非回顯，不是 Codex 回答長短。
