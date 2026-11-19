@@ -10,6 +10,7 @@ import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { renderSiteVoice } from "@/lib/content/brand-voice";
 import { FORGE_NAV } from "@/lib/script-forge/nav";
 import { ONE_CLICK_PLATFORM, formatNtd, oneClickEstimateNtd } from "@/lib/script-forge/one-click";
+import { autoRunResultValid } from "@/lib/script-forge/auto-run-result";
 
 // Palette mapped onto the GLOBAL theme CSS vars so ScriptForge matches the rest of the
 // app (was a bespoke coral/violet/jade palette) AND follows /tools/theme automatically.
@@ -879,10 +880,10 @@ function ManualModule({brand}){
     setSt("script");setScript(null);setScore(null);setContinuityCheck(null);setPortraitStatus(null);setLoading(true);setErr("");
     try{
       const s=autoBudget?.script || pj(await forge("manual","script",{...fields,angleName:angle.name,angleHook:angle.hook,characterIdHint,sceneCharacterField},undefined,autoBudget));
-      if(autoBudget&&(!Array.isArray(s?.scenes)||!s.scenes.length))throw Error("腳本回應沒有場景，已停在腳本，尚未送影片");
+      if(autoBudget&&!autoRunResultValid("script",s))throw Error("腳本回應沒有場景，已停在腳本，尚未送影片");
       if(autoBudget)autoBudget.script=s;
       setScript(s);
-      if(!autoBudget?.scored){const sr=await forge("result","score",{hook:s.hook,scenes:s.scenes?.length,cta:s.cta},undefined,autoBudget), result=pj(sr);if(autoBudget&&!Number.isFinite(result?.total))throw Error("評分回應格式不正確，已停在評分，可重試");setScore(result);if(autoBudget)autoBudget.scored=true;}
+      if(!autoBudget?.scored){const sr=await forge("result","score",{hook:s.hook,scenes:s.scenes?.length,cta:s.cta},undefined,autoBudget), result=pj(sr);if(autoBudget&&!autoRunResultValid("score",result))throw Error("評分回應格式不正確，已停在評分，可重試");setScore(result);if(autoBudget)autoBudget.scored=true;}
       if(sbDoc&&!autoBudget){setContinuityCheck({loading:true});checkStoryBibleContinuity(s,sbDoc).then(setContinuityCheck);void autoGeneratePortraits(s.scenes||[],sbOrgId,sbDoc);}
       return s;
     }catch(e){setErr(errText(e));if(from==="brief")setSt("brief");if(autoBudget)throw e;}

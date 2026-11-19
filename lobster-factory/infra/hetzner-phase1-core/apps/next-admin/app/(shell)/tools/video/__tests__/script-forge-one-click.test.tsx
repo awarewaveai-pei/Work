@@ -12,7 +12,8 @@ import ScriptForge, { type AutoDraftRequest } from "../ScriptForge";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const SCRIPT = { title: "新手畫畫三步", hook: "你也能畫", core_idea: "x", scenes: [{ time: "0-5秒", visual: "手拿鉛筆", dialogue: "先畫一條線", subtitle: "第一步" }, { time: "5-10秒", visual: "陰影", dialogue: "再加陰影", subtitle: "第二步" }], cta: "追蹤我" };
-const SCORE = { total: 8, hook: 8, clarity: 8, cta: 8, notes: [] };
+// The shape result.score asks for (lib/script-forge/modules.ts, pinned by modules.test.ts); the page stops on anything else.
+const SCORE = { scores: { hook: 8, rhythm: 8, clarity: 8, emotion: 7, shootability: 8, conversion: 8 }, overall: 8, optimized_hook: "", optimized_cta: "" };
 
 let container: HTMLDivElement;
 let root: Root;

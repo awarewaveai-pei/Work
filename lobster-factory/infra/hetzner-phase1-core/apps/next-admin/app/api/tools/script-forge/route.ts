@@ -13,6 +13,7 @@ import { renderSiteVoice } from "@/lib/content/brand-voice";
 import { forgePrompt, type ForgeCtx } from "@/lib/script-forge/modules";
 import { FORGE_MAX_PROMPT_CHARS, FORGE_MAX_TOKENS, forgeCallUpperTwd } from "@/lib/script-forge/run-budget";
 import { parseAutoBudget } from "@/lib/content/video/auto-run-budget";
+import { autoRunResultValid } from "@/lib/script-forge/auto-run-result";
 import { textCallCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { createHash } from "node:crypto";
 import { reserveScriptRun, finishScriptRun, SCRIPT_STREAM_LIMIT_MS } from "@/lib/script-forge/run-store";
@@ -157,7 +158,7 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
           try {
             const text = Buffer.concat(chunks).toString("utf8");
             let valid = false;
-            try { const parsed = JSON.parse(text.replace(/```json|```/g, "").trim()); valid = body.task === "script" ? Array.isArray(parsed?.scenes) && parsed.scenes.length > 0 : Number.isFinite(parsed?.total); } catch { /* do not cache a malformed result: explicit retry may regenerate it within the same budget */ }
+            try { const parsed = JSON.parse(text.replace(/```json|```/g, "").trim()); valid = autoRunResultValid(body.task === "script" ? "script" : "score", parsed); } catch { /* do not cache a malformed result: explicit retry may regenerate it within the same budget */ }
             const receipt = await finishScriptRun(budgetDb, claim, text, actualUsd === null ? null : usdToNtd(actualUsd), valid && !failed && !ac.signal.aborted && !text.includes("\n[ERROR]"));
             if (talking()) controller.enqueue(encoder.encode("\n[SF_BUDGET]" + JSON.stringify(receipt)));
           } catch { if (talking()) controller.enqueue(encoder.encode("\n[ERROR] 用量回執尚未存妥，已停下並保留額度，請稍後確認")); }
