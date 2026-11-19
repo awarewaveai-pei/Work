@@ -12,7 +12,8 @@ export const VIDEO_STAGE_LABEL: Record<string, string> = { create: "建立", pro
 /** The topic statuses that stop a topic and ask for a person. */
 export const TOPIC_STOP_LABEL: Record<string, string> = { failed: "失敗", proposed: "退回待確認" };
 
-export interface Notice { title: string; message: string; fingerprint: string; jobKey: string; raw: Record<string, unknown> }
+/** signalType: "error" (default) = something stopped; "business" = good news a person acts on (N10 newsletter ready). */
+export interface Notice { title: string; message: string; fingerprint: string; jobKey: string; raw: Record<string, unknown>; signalType?: "error" | "business" }
 
 /** The workbench opens one project only with both project and episode (video-workbench scripts/index-1.js). */
 export function videoProjectUrl(sourceRef: string, episodeId: string): string {
@@ -49,7 +50,7 @@ export async function raiseNotice(sb: SupabaseClient, organizationId: string, n:
     source: "schedule",
     external_id: n.fingerprint,
     fingerprint: n.fingerprint,
-    signal_type: "error",
+    signal_type: n.signalType ?? "error",
     severity: "medium",
     service: "schedules",
     environment: process.env.NODE_ENV === "production" ? "production" : "development",

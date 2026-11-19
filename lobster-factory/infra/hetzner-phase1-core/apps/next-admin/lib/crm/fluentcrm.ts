@@ -23,19 +23,39 @@ export interface BridgeNewsletterSpec {
   body_html: string;
   /** Optional FluentCRM design-template slug; omit to use FluentCRM's default. */
   design_template?: string;
+  /** No caller picks a status or a send time: the draft is the only state this adapter creates. */
+  status?: never;
+  scheduled_at?: never;
 }
+
+/** The one status this adapter ever sends; the plugin (NewsletterCreator.php) sets none and refuses a non-draft row. */
+export const NEWSLETTER_STATUS = "draft" as const;
 
 /**
  * Create a FluentCRM email campaign as a DRAFT through the Bridge `/newsletter` route
  * (NewsletterCreator.php). RED LINE (governance, WP_BRIDGE_CONTROL_PLANE_DESIGN.md §I): this NEVER
- * schedules and NEVER sends — the plugin's NewsletterCreator sets neither status, scheduled_at, nor
- * any send trigger, so the row can only ever be a draft. The operator reviews recipients and presses
- * send manually in FluentCRM. ⚠ ALWAYS a real write (creates a draft campaign row).
+ * schedules and NEVER sends. Only the content fields are copied into the payload (anything else a caller
+ * smuggles in is dropped) and the status is the constant draft; an answer naming any other status is a failure,
+ * never a success. The operator reviews recipients and presses send manually in FluentCRM.
+ * `clientId` picks the bridge site (as upsertContact; "" / absent = default). ⚠ ALWAYS a real write.
  */
-export function createNewsletter(
+export async function createNewsletter(
   spec: BridgeNewsletterSpec,
+  options: { clientId?: string } = {},
 ): Promise<BridgeResult<BridgeNewsletterResponse>> {
-  return bridgePost<BridgeNewsletterResponse>("/newsletter", spec, { timeoutMs: 60_000 });
+  const payload = {
+    title: spec.title,
+    subject: spec.subject,
+    ...(spec.preview !== undefined ? { preview: spec.preview } : {}),
+    body_html: spec.body_html,
+    ...(spec.design_template !== undefined ? { design_template: spec.design_template } : {}),
+    status: NEWSLETTER_STATUS,
+  };
+  const r = await bridgePost<BridgeNewsletterResponse>("/newsletter", payload, { timeoutMs: 60_000, clientId: options.clientId });
+  if (r.ok && r.value.campaign_status !== NEWSLETTER_STATUS) {
+    return { ok: false, error: `unexpected_non_draft_status:${String(r.value.campaign_status)}` };
+  }
+  return r;
 }
 
 export interface BridgeContactSpec {

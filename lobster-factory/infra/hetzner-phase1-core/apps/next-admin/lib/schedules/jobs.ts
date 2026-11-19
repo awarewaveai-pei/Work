@@ -110,6 +110,23 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
   reportJob("yearly", "社群年報自動寄出", `每年 1 月把去年一整年的社群成效報告連結寄${REPORT_TAIL}`,
     { value: "yearly", label: "每年 1 月", usesHour: true, usesDay: false, usesDayOfMonth: true }),
   {
+    // N10 (O3): one draft a week per site, sending is always a person's click in FluentCRM (lib/crm/member-newsletter.ts M1-M5).
+    key: "member_newsletter",
+    label: "每週會員信草稿",
+    description: "每週把各網站上一週（週一到週日）已發布的影片和文章排成一封信，放進那個網站自己的 FluentCRM 當草稿，並通知「會員信草稿已備好」。系統不會自己寄出，要有人到 FluentCRM 看過再按寄出。那一週沒有發布就不建；同一週只建一封；網站沒裝 FluentCRM 就跳過。",
+    cost: "免費（只讀已發布的題目，透過網站外掛建草稿，不用 AI）。",
+    frequencies: [{ value: "weekly", label: "每週", usesHour: true, usesDay: true }],
+    // Monday 01:00 UTC = 09:00 Taipei: last week is complete in every Asian brand zone by then
+    defaults: { frequency: "weekly", hourUtc: 1, dayOfWeekUtc: 1, dayOfMonth: 1 },
+    unavailable: (c) => (c.wpSites ? null : "沒有 WordPress 網站"),
+    async run(organizationId) {
+      const sb = getSupabaseWriteClient();
+      if (!sb) throw new Error("member_newsletter:no_supabase_client");
+      const { runMemberNewsletter, memberNewsletterDeps } = await import("@/lib/crm/member-newsletter");
+      return runMemberNewsletter(memberNewsletterDeps(sb, organizationId), new Date());
+    },
+  },
+  {
     key: "content_pipeline",
     label: "自動內容管線",
     description: "隨時檢查題目：已核准的題目到了排定時間，就依它選的格式做成 WordPress 草稿和社群草稿；選了影片的，影片做好後自動嵌進文章、附到社群貼文，再跑規則審核。網站設成「AI 審核後自動發布」且審核全部通過才會發布，其餘留在草稿。每月自動提題目；網站打開「每日熱題」的，每天另從近兩天熱搜挑最多 3 個相關分數 70 以上的題目。題目和排定時間在「自動內容」頁設定。",

@@ -3,6 +3,7 @@ import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { isBridgeConfigured, createNewsletter } from "@/lib/crm/fluentcrm";
 import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 import { staffOnly } from "@/lib/tenant-guard";
+import { EMAIL_FRAME_OPEN, EMAIL_H1, EMAIL_P, escapeHtml, safeUrl } from "@/lib/crm/newsletter-html";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,25 +17,6 @@ export const dynamic = "force-dynamic";
 // The bridge is our own (WPBRIDGE_*): there is no per-customer FluentCRM, so a customer on a product door gets 403.
 
 const MAX_MARKDOWN_BYTES = 600_000;
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function safeUrl(raw: string): string {
-  if (/^(https?:|mailto:)/i.test(raw)) {
-    try {
-      const u = new URL(raw);
-      return ["http:", "https:", "mailto:"].includes(u.protocol) ? escapeHtml(raw) : "#";
-    } catch { return "#"; }
-  }
-  if (/^[/#]/.test(raw)) return escapeHtml(raw);
-  return "#";
-}
 
 function inline(s: string): string {
   const e = escapeHtml(s);
@@ -146,15 +128,15 @@ function buildTeaserHtml(opts: { title: string; excerpt: string; heroImage?: str
   const url = opts.articleUrl && /^https?:\/\//.test(opts.articleUrl) ? opts.articleUrl : "";
 
   const parts: string[] = [];
-  parts.push('<div style="max-width:600px;margin:0 auto;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">');
+  parts.push(EMAIL_FRAME_OPEN);
   if (hero) {
     parts.push(`<img src="${escapeHtml(hero)}" alt="${escapeHtml(title)}" width="600" style="width:100%;max-width:600px;height:auto;border-radius:12px;margin:0 0 20px;display:block;" />`);
   }
   if (title) {
-    parts.push(`<h1 style="font-size:24px;line-height:1.3;margin:0 0 14px;color:#111827;font-weight:700;">${escapeHtml(title)}</h1>`);
+    parts.push(`<h1 style="${EMAIL_H1}">${escapeHtml(title)}</h1>`);
   }
   excerpt.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).slice(0, 3).forEach(p => {
-    parts.push(`<p style="font-size:16px;line-height:1.6;margin:0 0 14px;color:#374151;">${inline(p)}</p>`);
+    parts.push(`<p style="${EMAIL_P}">${inline(p)}</p>`);
   });
   if (url) {
     parts.push(`<div style="margin:24px 0 8px;"><a href="${safeUrl(url)}" style="display:inline-block;background:#5855d0;color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;padding:13px 30px;border-radius:8px;">閱讀完整文章 →</a></div>`);
