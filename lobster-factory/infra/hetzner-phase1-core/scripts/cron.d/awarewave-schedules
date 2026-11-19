@@ -15,6 +15,7 @@
 # trigger_slots_check: a Trigger.dev concurrency slot held by a run that is not running (C3; the 2026-10-23 outage).
 # auth_profiles_check: an auth.users row without a profiles row, or a 0161 auth.users trigger missing / disabled (count-only).
 # fx_fetch_cbc: 17:00 Taipei, the central bank's NT$/USD closing rates into fx_daily_rates for /ops/costs 月報 (lib/ai/fx-cbc.ts).
+# social_channel_health: every 5 min, Postiz's own Integration rows (refreshNeeded / disabled) mirrored into social_accounts.status (lib/social/channel-health.ts).
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh host_schedules_report 'python3 /root/lobster-phase1/scripts/report-host-schedules.py >> /var/log/host-schedules.log 2>&1'
@@ -24,6 +25,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */5 * * * * root /root/lobster-phase1/scripts/cron-run.sh social_dispatch '/root/lobster-phase1/scripts/poke.sh social_dispatch /api/internal/social/dispatch SOCIAL_DISPATCH_TOKEN'
 */5 * * * * root /root/lobster-phase1/scripts/cron-run.sh cs_inbound_sweep '/root/lobster-phase1/scripts/poke.sh cs_inbound_sweep /api/internal/cs/sweep CS_SWEEP_TOKEN'
 */10 * * * * root /root/lobster-phase1/scripts/cron-run.sh pod_order_inbox_sweep '/root/lobster-phase1/scripts/poke.sh pod_order_inbox_sweep /api/internal/pod-orders/sweep POD_INBOX_SWEEP_TOKEN'
+*/5 * * * * root /root/lobster-phase1/scripts/cron-run.sh social_channel_health '/root/lobster-phase1/scripts/social-channel-health.sh'
 5 0 * * * root /root/lobster-phase1/scripts/cron-run.sh social_rotation '/root/lobster-phase1/scripts/poke.sh social_rotation /api/internal/social/rotation SOCIAL_DISPATCH_TOKEN'
 30 19 * * * root /root/lobster-phase1/scripts/cron-run.sh social_metrics '/root/lobster-phase1/scripts/poke.sh social_metrics /api/internal/social/metrics SOCIAL_DISPATCH_TOKEN'
 0 1 * * * root /root/lobster-phase1/scripts/cron-run.sh entitlements_expire '/root/lobster-phase1/scripts/poke.sh entitlements_expire /api/internal/entitlements/expire SCHEDULE_INGEST_TOKEN'

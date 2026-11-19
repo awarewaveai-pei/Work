@@ -215,6 +215,19 @@ describe("runDispatch", () => {
     expect(ports.recordOutcome).toHaveBeenCalledWith(expect.anything(), []);   // nothing open: the post settles to error
   });
 
+  it("an account the mirror marked expired is not sent: no Postiz call at all, the reconnect text", async () => {
+    const ports = fakePorts([post([{ accountStatus: "expired", platform: "youtube" }])]);
+    await runDispatch(ports, { mode: "apply", now: NOW });
+    expect(ports.postiz.integrations).not.toHaveBeenCalled();
+    expect(ports.postiz.createPost).not.toHaveBeenCalled();
+    expect(ports.recordSend).toHaveBeenCalledWith(expect.anything(), "t1", null, failureText.channelGone("youtube", "Postiz 回報授權失效"));
+    expect(ports.raiseIncident).toHaveBeenCalledWith(expect.anything(), expect.stringContaining("youtube"));
+    const off = fakePorts([post([{ accountStatus: "disabled" }])]);
+    await runDispatch(off, { mode: "apply", now: NOW });
+    expect(off.postiz.createPost).not.toHaveBeenCalled();
+    expect(off.recordSend).toHaveBeenCalledWith(expect.anything(), "t1", null, failureText.disabledHere("bluesky"));
+  });
+
   it("a channel Postiz no longer lists is not sent either: the text says reconnect, never a bare error", async () => {
     const ports = fakePorts([post([{}])]);
     vi.mocked(ports.postiz.integrations).mockResolvedValue([]);

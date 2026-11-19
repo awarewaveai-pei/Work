@@ -326,11 +326,13 @@ export async function resolveConnectAttempt(brandId: string): Promise<{ open: Op
   const live = await listAllIntegrations();
   let accountId: string | null = null;
   if (open.refresh_account_id) {
-    const { data: acc, error: accErr } = await sb.from("social_accounts").select("id, postiz_integration_id").eq("id", open.refresh_account_id).maybeSingle();
+    const { data: acc, error: accErr } = await sb.from("social_accounts").select("id, postiz_integration_id, status").eq("id", open.refresh_account_id).maybeSingle();
     if (accErr) fail(accErr, "account");
     const now = live.find((i) => i.id === acc?.postiz_integration_id);
-    if (acc && now && !now.disabled) {
-      const { error: upErr } = await sb.from("social_accounts").update({ status: "connected", ...profileOf(now) }).eq("id", acc.id);
+    // finished only when the mirror (channel-health.ts, every 5 min from Postiz's own refreshNeeded) says connected: the
+    // public list cannot see refreshNeeded, so "listed and not disabled" is true before the person finished OAuth
+    if (acc && now && !now.disabled && acc.status === "connected") {
+      const { error: upErr } = await sb.from("social_accounts").update(profileOf(now)).eq("id", acc.id);
       if (upErr) fail(upErr, "account status");
       accountId = acc.id;
     }

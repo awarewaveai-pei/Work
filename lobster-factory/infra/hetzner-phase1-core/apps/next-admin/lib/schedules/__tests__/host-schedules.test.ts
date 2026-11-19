@@ -199,3 +199,12 @@ describe("hostScheduleRows file read", () => {
     expect(rows.every((r) => r.state === "ok")).toBe(true);
   });
 });
+
+describe("cron.d/awarewave-schedules vs HOST_JOBS", () => {
+  it("every cron-run.sh key in the repo cron file is registered (social_channel_health included)", () => {
+    const text = readFileSync(join(__dirname, "../../../../../scripts/cron.d/awarewave-schedules"), "utf8");
+    const keys = [...text.matchAll(/^[^#].*cron-run\.sh ([a-z0-9_]+) /gm)].map((m) => m[1]);
+    expect(keys).toContain("social_channel_health");
+    expect(keys.filter((k) => !HOST_JOBS[k])).toEqual([]);
+  });
+});

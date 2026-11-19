@@ -3,8 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const runRotation = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/social/rotation", () => ({ runRotation }));
-const reconcileAccounts = vi.hoisted(() => vi.fn(async () => ({ expired: 0, errors: [] as string[] })));
-vi.mock("@/lib/social/review", () => ({ reconcileAccounts }));
 
 import { POST } from "./route";
 
@@ -24,11 +22,7 @@ describe("social rotation route", () => {
     process.env.SOCIAL_DISPATCH_ENABLED = "true";
     runRotation.mockResolvedValue({ lists: 2, posts: 5, errors: [] });
     expect((await call("tok")).status).toBe(200);
-    expect(reconcileAccounts).toHaveBeenCalled();   // the daily run also reconciles channel status
     runRotation.mockResolvedValue({ lists: 1, posts: 0, errors: ["l2: boom"] });
-    expect((await call("tok")).status).toBe(502);
-    runRotation.mockResolvedValue({ lists: 1, posts: 0, errors: [] });
-    reconcileAccounts.mockRejectedValueOnce(new Error("postiz down"));
     expect((await call("tok")).status).toBe(502);
   });
 });

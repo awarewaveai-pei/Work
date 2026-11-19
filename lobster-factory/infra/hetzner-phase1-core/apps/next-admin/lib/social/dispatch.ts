@@ -106,6 +106,7 @@ export const failureText = {
   channelGone: (platform: string, why: string) => `${platform} 頻道需要重新授權（${why}）：請到 ${SETTINGS_CHANNELS} → 重新連接，再重新排程此貼文`,
   refused: (detail: string) => `Postiz 拒收這則貼文：${detail}。修正內容後重新排程`,
   noReason: (platform: string) => `Postiz 發布失敗（Postiz 未回原因，最常見是 ${platform} 頻道授權失效）：請到 ${SETTINGS_CHANNELS} 重新連接 ${platform}，再重新排程此貼文`,
+  disabledHere: (platform: string) => `${platform} 頻道已在設定中停用，不會送出：要發請先到 ${SETTINGS_CHANNELS} 啟用，再重新排程此貼文`,
   rehearsal: "Postiz 裡是一則預演草稿（draft 模式），不會自己發出：重新排程此貼文才會送出",
   gone: "Postiz 已沒有這則貼文（在 Postiz 被刪、頻道被移除，或超過 7 天）：重新排程此貼文",
 };
@@ -235,9 +236,13 @@ export async function runDispatch(ports: DispatchPorts, opts: { mode: DispatchMo
         return;
       }
     }
+    // the mirror first (lib/social/channel-health.ts, hourly from Postiz's own refreshNeeded): no Postiz call for a
+    // channel Postiz already says cannot post. Only the mirror sets an expired channel back to connected.
+    if (t.accountStatus === "disabled") return refuse(failureText.disabledHere(t.platform));
+    if (t.accountStatus === "expired") return refuse(failureText.channelGone(t.platform, "Postiz 回報授權失效"));
     const live = (await liveIntegrations()).find((i) => i.id === t.integrationId);
     if (!live || live.disabled) {
-      if (t.accountStatus !== "expired") await ports.setAccountStatus(t.accountId, "expired");
+      await ports.setAccountStatus(t.accountId, "expired");
       return refuse(failureText.channelGone(t.platform, live ? "Postiz 顯示已停用" : "Postiz 已沒有這個頻道"));
     }
     let composed: Composed;

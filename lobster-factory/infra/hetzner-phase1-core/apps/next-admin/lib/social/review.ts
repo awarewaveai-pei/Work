@@ -4,12 +4,11 @@
 //   * needs(): the 「通知 N」 list -- failed posts, channels whose authorisation died, and for an approver the posts
 //     waiting for review. One query set, used by the header count and the log's 「需處理」 filter (C11).
 //   * Telegram goes through the ops inbox (ingestIncident -> the operator Telegram notifier): a failed post (raised by
-//     the sender, dispatch.ts), a channel that expired (reconcileAccounts, daily), a post submitted for review.
+//     the sender, dispatch.ts), a channel that expired (channel-health.ts, hourly from Postiz's own table), a post submitted for review.
 // Who is owner / reviewer on a brand: authz.ts roleOn (member rows, managed in the social manager, 0103; else ops_role).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { ingestIncident } from "@/lib/ops-inbox/ingest";
-import { listAllIntegrations } from "@/lib/content/postiz";
 import { SocialStoreError } from "./store";
 import type { BrandRole, PostState } from "./state";
 
@@ -88,24 +87,4 @@ export async function notifyReview(brandId: string, postId: string, body: string
   const err = await incident(db(), brandId, `social:review:${postId}`, "社群貼文等待審核", body.slice(0, 300) || "(沒有文字)", "low")
     .catch((e) => String(e));
   if (err) console.error(`[social/review] notify ${postId}: ${err}`);
-}
-
-/** Daily (social-rotation run): a channel Postiz shows as disabled is expired here, and someone hears it once. */
-export async function reconcileAccounts(): Promise<{ expired: number; errors: string[] }> {
-  const sb = db();
-  const live = new Map((await listAllIntegrations()).map((i) => [i.id, i]));
-  const { data, error } = await sb.from("social_accounts").select("id, organization_id, platform, label, status, postiz_integration_id").eq("status", "connected");
-  if (error) fail(error, "accounts");
-  const out = { expired: 0, errors: [] as string[] };
-  for (const a of data ?? []) {
-    const i = live.get(a.postiz_integration_id as string);
-    if (i && !i.disabled) continue;
-    const { error: upErr } = await sb.from("social_accounts").update({ status: "expired" }).eq("id", a.id).eq("status", "connected");
-    if (upErr) { out.errors.push(`${a.id}: ${upErr.message}`); continue; }
-    out.expired++;
-    const err = await incident(sb, a.organization_id as string, `social:account:${a.id}`, "社群帳號連線失效",
-      `${a.platform} ${a.label}：${i ? "Postiz 顯示已停用" : "Postiz 已沒有這個頻道"}，到社群發文的設定重新連接。`, "medium");
-    if (err) out.errors.push(`${a.id}: incident ${err}`);
-  }
-  return out;
 }
