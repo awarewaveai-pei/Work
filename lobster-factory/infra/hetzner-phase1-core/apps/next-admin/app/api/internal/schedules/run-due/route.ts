@@ -11,6 +11,12 @@
 // 300 s, and the claim is what keeps that retry from running the job twice. A run that throws records
 // last_error and raises one incident per (job, client); the others still run. A store failure is a 500,
 // never a green "nothing due".
+//
+// Every firing also advances the 「做到草稿」 video projects of every organization that has one (lib/content/video/
+// advance-auto-projects.ts): pressing the button is the consent, so it needs no client_schedules row. The organizations
+// are listed in the answer (autoAdvance); the advancing runs after it, after the claimed jobs were handed over. A failure
+// there never stops a claimed job; a video list that cannot be read makes the answer a 500 (the host clock alerts), and a
+// stopped project or a failed organization raises one incident per organization.
 
 import { after, NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
@@ -20,6 +26,7 @@ import { claimScheduleRun, listEnabledSchedules, recordScheduleError, recordSche
 import { NotDueYet, isDueNow, scheduledRunKey } from "@/lib/schedules/schedule";
 import { asRegistered, clientJob } from "@/lib/schedules/jobs";
 import { refreshClaimReviewIfDue } from "@/lib/collect/lookups/answer";
+import { advanceAutoProjects, autoAdvanceDeps, autoAdvanceOrganizations } from "@/lib/content/video/advance-auto-projects";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +39,7 @@ function verifyToken(request: Request): boolean {
   return !!m && timingSafeEqual(m[1], expected);
 }
 
-async function raiseIncident(schedule: StoredSchedule, runKey: string, error: string): Promise<void> {
+async function raiseIncident(schedule: Pick<StoredSchedule, "jobKey" | "organizationId">, runKey: string, error: string): Promise<void> {
   const sb = getSupabaseWriteClient();
   if (!sb) return console.error(`[schedules] incident not raised (no_supabase_client): ${schedule.jobKey} ${runKey} ${error}`);
   const { data: org } = await sb.from("organizations").select("slug").eq("id", schedule.organizationId).maybeSingle();
@@ -75,6 +82,22 @@ async function runClaimed(claimed: Array<{ schedule: StoredSchedule; runKey: str
   }
 }
 
+/** 「做到草稿」 video projects: listed now, advanced after the answer. Never throws; not part of ok/status. */
+async function startAutoAdvance(now: Date): Promise<{ organizations: string[] } | { error: string }> {
+  const sb = getSupabaseWriteClient();
+  try {
+    if (!sb) throw new Error("no_supabase_client");
+    const organizations = await autoAdvanceOrganizations(sb);
+    const runKey = `video_project_advance:${now.toISOString()}`;
+    if (organizations.length) after(() => advanceAutoProjects(autoAdvanceDeps(sb, (organizationId, error) => raiseIncident({ jobKey: "video_project_advance", organizationId }, runKey, error)), organizations));
+    return { organizations };
+  } catch (e) {
+    const error = String(e).slice(0, 200);
+    console.error(`[schedules] video_project_advance not started: ${error}`);
+    return { error };
+  }
+}
+
 export async function POST(request: Request) {
   if (!verifyToken(request)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
@@ -86,7 +109,8 @@ export async function POST(request: Request) {
   try {
     schedules = (await listEnabledSchedules()).map(asRegistered);
   } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e).slice(0, 200) }, { status: 500 });
+    // client_schedules unreadable: the 做到草稿 projects need no row there, so they still move on
+    return NextResponse.json({ ok: false, error: String(e).slice(0, 200), autoAdvance: await startAutoAdvance(now) }, { status: 500 });
   }
   const due = schedules.filter((s) => isDueNow(s, now));
 
@@ -102,8 +126,12 @@ export async function POST(request: Request) {
   }
   if (claimed.length) after(() => runClaimed(claimed));
 
+  const autoAdvance = await startAutoAdvance(now);
+
+  // A video list that could not be read is a failure the host clock must see (500), though the claimed jobs still run.
+  const failed = claimErrors.length > 0 || "error" in autoAdvance;
   return NextResponse.json(
-    { ok: claimErrors.length === 0, checked: schedules.length, due: due.length, started: claimed.map((c) => c.runKey), claimErrors },
-    { status: claimErrors.length ? 500 : 200 },
+    { ok: !failed, checked: schedules.length, due: due.length, started: claimed.map((c) => c.runKey), claimErrors, autoAdvance },
+    { status: failed ? 500 : 200 },
   );
 }
