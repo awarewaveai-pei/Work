@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-19（續16）— 社群權杖「無期限」：Meta 本來就永久，Postiz 寫死 59 天造成假過期；Google 要改發布狀態（Claude 監工）
+
+- 操作者：「權杖到期 我要用無期限的」。查證（不是推測）：Graph `debug_token` 四個 Meta 頻道（兩 Facebook 粉專、兩 Instagram）`is_valid`、`expires_at=0`（永不過期）、`type=PAGE`、Facebook `profile_id`＝Postiz `internalId`；`data_access_expires_at` 2027-01-23（Meta 90 天資料存取期，對粉專發文的影響未實測）。
+- 根因：Postiz v2.25.1 `facebook.provider.ts:386`／`instagram.provider.ts:523` 把 Meta 權杖寫死 `expiresIn = 59 天`，`refreshToken()` 回空字串；`integration.repository.ts needsToBeRefreshed()` 到期前一天選中 → 設 `refreshNeeded`。Aware Wave Facebook 09-11 連接、11-10 被這個假時鐘標記（期間 0 筆發文失敗、11-14 後 Postiz 無錯誤 log），SOC-REAUTH 鏡像（續8）照實把它標成過期並擋發文。
+- 修（整類）：每日 host job `postiz_meta_token_truth`（`scripts/postiz-meta-token-truth.sh`，台北 02:20）：發文那枚權杖本身有效、是 PAGE、有發文權限且屬於這個頻道（Facebook profile_id、Instagram granular target）→ `tokenExpiration` 寫 Meta 真實期限（永久 → 2126-01-01，同 Postiz 存 Bluesky 的做法），假時鐘從此不會走到；Meta 說無效／缺權限／不是這個粉專 → `refreshNeeded=true` 讓鏡像開事件。**永不清 `refreshNeeded`**：它是假時鐘、發文失敗、手動斷開三者共用，值本身分不出來（Codex 連報 3 次後寫的不變量，在腳本開頭）。寫入一律比對後才寫（md5(token)＋旗標）。祕密經 600 權限暫存檔給 curl，不進 argv。commit `4f7d37a86`。
+- 一次性：Aware Wave Facebook 被假時鐘設的旗標依上列證據手動清除（條件式 update，1 列）；鏡像下一輪 → connected，事件自動結案。
+- Google（YouTube、Gmail）：refresh token 只有在 OAuth 同意畫面「發布狀態＝正式版」時才沒有 7 天期限；Postiz 的 YouTube 用戶端與外聯 Gmail 用戶端不同，但在同一個 Google Cloud 專案（client id 專案號前綴比對，未印值）→ 改一處即可。這步只能操作者在 Console 做；改完重新授權 Soulful YouTube、兩個 Gmail 一次。
+- REALTEST_EVIDENCE: tool=SSH | cmd=debug_token ×4（只印 metadata）; postiz-meta-token-truth.sh --dry-run ×6; install-host-schedules.sh（備份 cron-backup-20261119T110806Z）; cron-run postiz_meta_token_truth（changed=4 failed=0）; 條件式清旗標 1 列; cron-run social_channel_health → {"channels":7,"expired":0,"connected":1}; Postiz Meta 四列 tokenExpiration=2126-01-01 refreshNeeded=f | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash -n; npx tsc --noEmit; vitest lib/schedules lib/social (35 files 451) | exit=0 | ms=200000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/9m/0n（Codex 7 輪：7a34245f、0c3089cf、d0266507、883e9144、7ec82e65、4c828135 修；f1e2839b 無 finding；cron 要另裝＝部署步驟、有期限權杖提前一天被標＝要的預警，兩條接受）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=postiz_meta_token_truth|refreshNeeded | hits=14（channel-health.ts 鏡像只讀不寫旗標；無其他寫 Postiz 旗標處）
+- 剩餘風險：Google 未改發布狀態前 Soulful YouTube 與兩個 Gmail 仍會每 7 天失效；Meta 2027-01-23 資料存取期限影響未知（鏡像會在 Meta 說無效時告警）；next-admin `host-jobs.ts` 的中文標籤隨下次部署上線（/ops/schedules 之前顯示鍵名）。
+- rollback：`git revert 4f7d37a86`；`install-host-schedules.sh --rollback /root/lobster-phase1/.state/cron-backup-20261119T110806Z`；Postiz `tokenExpiration` 改回不影響發文（權杖永久）。
 ## 2026-11-19（續15）— 影片下一階段：N7、B19、B25 驗收上線；工人 RISKS 逐條處置；部署改成一批一次
 
 - 驗收：N7 `49854c0ba`、B19 `5022a9f9e`、B25 `70df54136` 讀報告與 diff 後 cherry-pick → `54d429f09`、`edbb8e076`、`5b465fe9c`。監工修正 `861e1e0fe`：N7 的七天過期退回不逐題發通知（正式庫 37 題會一次湧出 37 則；只讀查詢 `content_topics where status='proposed' and scheduled_for < now()-interval '7 days'` = 37），改由每日報告那一行呈現。B19 前提不符（真症狀＝清單用顯示時區、編輯器固定組織時區），定案 A：一次性排程選擇器跟顯示時區。
