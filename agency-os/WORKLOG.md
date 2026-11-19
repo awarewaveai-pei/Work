@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-19（續14）— 影片下一階段：B24、N18、B26 驗收併入 main；第三批部署
+
+- 驗收：三條線交回 B24 `c4fc77faf`、N18 `c675dcb55`、B26 `91fc226d3`＋`d3730f9a4`，監工讀 FILES／TESTS／RISKS 與完整 diff 後 cherry-pick 進 main，rebase 到 origin（另一線剛推 OUT-GMAIL-REAUTH）後為 `d06178e82`（B24）、`c8a97e988`（N18）、`19c12980a`＋`16cea8fb9`（B26）。
+- 監工決定（操作者授權）：B24 由固定 limit(20) 改分頁、等成片的不佔名額，接受工人偏離卡片的理由（Codex 指出固定二十筆仍餓死）；N18 owner 填 `trigger`，接受；B26 兩個要改主系統的空窗（續跑到新出片送出之間幾秒、社群草稿每專案只建一次不重建）記在監工台該項，不另開卡。
+- 部署第三批（第七次）：主機 `setsid nohup sg-deploy.sh next-admin video-workbench`，18:36 完成：npm test 綠、`.deployed-commit = 16cea8fb9`（previous ae8f209d5），rollback 快照 `rollback-20261119-103114`，兩容器 healthy（15s／1s），HTTP smoke 全 OK，主機 log `/root/lobster-phase1/logs/sg-deploy-manual-batch3.log`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit` exit 0；`npx vitest run lib/content/video app/api/internal/schedules` → 51 files / 248 tests passed；video-workbench `node tests/gate.cjs` gate ok（含 b26-resume-rerender）；`node lobster-factory/scripts/validate-workflow-routing-policy.mjs` PASSED；`node build.mjs && node check.mjs` ok（75 items，61 done）；Playwright smoke 34 passed／0 failed／24 skipped | exit=0 | ms=300000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n（B24 Codex 一項已改分頁；B26 Codex 兩項記為已知風險、要改主系統；監工逐 file:line 讀 diff 複核分頁 offset 以 waiting 數計、moved 離開查詢集合的前提成立）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,lobster-factory/docs | grep=AUTO_ADVANCE_CANDIDATES|shotsSwapped|cutOutdated|content_publish|member_email | hits=17
+- ORACLE_WAIVED: 本 commit 只有監工台資料檔與 WORKLOG；程式改動的 oracle artifact 由工人隨 commit 放 `agency-os/reports/oracle/`
+- rollback：`git revert 16cea8fb9 19c12980a c8a97e988 d06178e82`；部署 rollback 由 `sg-deploy.sh` 自動或 `rollback` 子命令。
+- B19 定案（工人回報卡片前提不符）：真症狀是清單用顯示時區、編輯器固定組織時區；走 A：一次性排程選擇器跟顯示時區，重複規則與 slot 維持組織時區並標明，不推翻 2026-11-13 顯示時區功能。
 ## 2026-11-19（續13）— 監工整合：ORACLE-ENC（續10）與 OUT-GMAIL-REAUTH（續12）上線證據
 
 - 兩張卡由 worker 寫、監工在 `D:/Worktrees/Work/u-integrate` cherry-pick 審讀後推 main：ORACLE-ENC `983d1140a`（只動 D:\Work 腳本，不部署）；OUT-GMAIL-REAUTH `ae8f209d5`（migration 0167 已套 APPLY_OK 1/1；部署 sg-deploy ae8f209d5 smoke all OK 10:29Z，快照 rollback-20261119-102631）。worker 的 WORKLOG 條目隨 commit 進 main，續號唯一已查。
