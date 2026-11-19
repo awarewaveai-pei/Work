@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-19（續20）— 影片下一階段：N8、B26 第二段、down 檔整類修正併入 main；批 2 完成；本批 RISKS 一起判；N5a 退回 rebase
+
+- 驗收：N8 `fd83835a0` → `4375809a8`；B26 第二段 `a8bb65e9a` → `7decd94ad`；down 檔修正 `4e3856600` → `3df37a62d`（`migrations/` 9 個＋`scripts/` 35 個舊 down 補刪帳本列，0165／0166／0168 補 `scripts/` 鏡像，檢查器接在 `bootstrap-validate.mjs`）。N5a `9b85f395d` 與已併入的 N1b／N3／N8 在 `make.ts`、`sites/[id]/route.ts` 衝突 → 退回原工人 rebase，未併入。
+- migration：`apply-db-migration.mjs 0170`（`wp_sites.daily_trend_planned_on date null`，純加法，db-expert PASS）APPLY_OK，169 筆 applied（0169 是 N5a 的，待併入時套）。
+- 全套測試第一次在 main 上跑（操作者規則：每批跑全套）抓到三件：
+  - `lib/ai/__tests__/settle-through-ledger.test.ts` 紅：N2 的守衛方法叫 `settle`，撞到「`.settle(` 只能在 log-ai-call」檢查器 → 改名 `exact`（`581e57c0b`）。監工驗收 N2 時只跑目錄漏掉；不修 03:00 部署會被擋。
+  - `scripts/__tests__/down-migration-copies.test.mjs` 紅：N8 的 0170 down 只有 `migrations/` 一份 → 補 `packages/db/scripts/0170_..._down.sql`（`b055c714b`）。已通知 N5a 工人 0169 也要兩處。
+  - `lib/portal/__tests__/products.test.ts`、`staff-tools.test.ts` 本機紅：另一 session 未提交的 `app/(shell)/tools/seedstar/` 目錄（untracked，不在 git，不影響主機部署），非本線。`ContentStudio.site-wiring.test.tsx` 全套時紅、單跑兩次皆綠（本機同時有四個工人在跑），記為觀察。
+- 本批 RISKS 一起判（操作者 20:50 規則，已寫進 DISPATCH.md 與 memory）：
+  - 處理：B26 第二段留「網站草稿文章嵌的影片換片後不更新」→ 屬錯的影片會出貨，併進 N5b（同一個換嵌入機制）；監工台 N5b 已補一句。
+  - 處理：N2 `settle` 命名、N8 down 檔缺副本（見上）。
+  - 接受：N8 AI 挑題的站每日題會在每日上限內立刻開做（設計如此）；每站每天打分約 NT$0.1。N5a 派送器每輪只處理最舊 100 則，塞住時題目會被誤判逾時而停（不會亂發）；YouTube 先發所以影片說明不附文章連結；選了 YouTube 但站沒連頻道時直接發文章與社群（卡片定義）。B26 第二段假設換圖後所有比例都重出；舊路徑多比例相隔逾一小時的既有限制。down 檔 35 個舊 script-only 只做靜態檢查。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin 全套 `npm test` → 592 files passed／3 failed（兩個為他線 untracked 目錄、一個單跑綠）；`settle-through-ledger`＋`lib/content/topics` 17 files／151 tests；`node --test scripts/__tests__/down-migration-copies.test.mjs` 2/2；video-workbench `node tests/gate.cjs` gate ok；`apply-db-migration.mjs 0170` APPLY_OK；`node build.mjs && node check.mjs` ok（75 items，70 done） | exit=0 | ms=600000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/0n（m1 settle 命名撞檢查器、m2 0170 down 缺第二處，皆已修；工人 Codex：N8 四項、B26 第二段五項、down 一項、N5a 三項修二，皆交回前處理）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/packages/db | grep=guard.exact|autoRerender|daily_trend_planned_on|dailyTrendTopics | hits=27
+- ORACLE_WAIVED: 監工兩個修正＝一個方法改名（行為不變）＋一個檔案複製；其餘為工人 commit，各附 oracle artifact
+- rollback：`git revert b055c714b 3df37a62d 4375809a8 7decd94ad 581e57c0b`；0170 down＝`0170_wp_sites_daily_trend_planned_on.down.sql`（先退程式）。
 ## 2026-11-19（續19）— 影片下一階段：N1b、N3、B1 第二段驗收併入 main；批 0 完成（不部署，等 03:00）
 
 - 驗收：B1 第二段 `2189575fd`、N3 `e38c65cd6`、N1b `98d1ad5a9` 讀報告後 cherry-pick → `591b40314`、`27d04b0dd`、`67a7683f5`，三張都動 `make.ts` 無衝突。批 0 六項全完成（N1、N1b、N2、N3、N4、N15）。不手動部署：這三張只動 next-admin，今晚 03:00 自動部署會帶上（migration 0168 已套）。
