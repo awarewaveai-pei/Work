@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-19（續4）— 影片監工台：下一階段待決 7–13 定案（操作者「你決定」）
+
+- 定案（正本 `agency-os/handoffs/2026-11-16-video-unify-supervisor/NEXT-PHASE-PLAN-20261119.md` §11）：O1 加發布鈕｜O2 提案 7 天退回、已審核 72 小時標紅｜O3 會員信每週一封、人按寄出｜O4 在 `E2E-Verify-0704` 測試站實測、YouTube 不公開｜O5 AwareWave 先開、Soulful 維持人工｜O6 每題 NT$15、每天 1 題、門檻 70｜O7 YouTube 預設公開、每站可設。
+- 設計後果：會員信改成既有客戶排程的每週一項（寫法照 `lib/schedules/jobs.ts:43-52,98-99`），不進發布狀態機 → 發布三步（YouTube → 文章 → 社群）；原 N11（名單人數與頻率路由）取消，wp-bridge 不用發版；N5a 多一項「YouTube 公開設定讀網站設定」（現寫死 `lib/social/compose.ts:60`）。
+- 只剩操作者一件事：O4 實測前把 YouTube 頻道連到 `E2E-Verify-0704` 品牌（OAuth）。
+- 監工台：`data.mjs` 待決 7–13 改「已定」、批 3 只剩 N10、批 1 的 N5a 改三步；同一網址重新發布。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs → ok: 12 cards, 5 batches, 75 items (50 done), 13 open, page fresh；psql wp_sites 三列（E2E 測試站網址）；curl 測試站 301 | exit=0 | ms=5000
+- REVIEW_WAIVED: DOC_ONLY -- 計畫檔與監工台資料；計畫 §8 與監工台的批／卡號由 check.mjs 機械比對
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=N11 | hits=1（計畫檔 §11 O3 說明「原 N11 不做」，刻意保留）
+- ORACLE_WAIVED: 只動文件與監工台資料檔，沒有產品 source
+- rollback：`git revert` 本 commit 後 `node build.mjs` 再發布同一網址。
 ## 2026-11-19（續3）— 影片監工台併入下一階段：五批 20 張新卡＋6 個沿用項、待決 7–13（操作者「併進監工台」）
 
 - 範圍：`agency-os/handoffs/2026-11-16-video-unify-supervisor/` 的 `data.mjs`、`build.mjs`、`check.mjs`、`supervisor.html`；同一網址重新發布（https://claude.ai/artifact/44ZLNFx32ZtLhQniaM79S5，Version 23）。

@@ -87,7 +87,7 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 | 發布 YouTube | 半：YouTube 是社群貼文的一個頻道，文章上線後 2 分鐘才排（`make.ts:175-188`、`:50`） | 順序相反；發布網址有回寫（`NA/lib/social/dispatch.ts:305` `release_url`）但沒人讀 | YouTube 配額與審核延遲；Postiz 429 整體退避（`dispatch.ts:7`） | N5a |
 | 發布 WP | 有：`publishDrafts`（`make.ts:190-211`），只在 `ai_review_auto` | 嵌的是 R2 mp4（A3），不是 YouTube 連結；人工審核站沒有發布鈕（S7） | Bridge 只能改草稿（`embed-in-post.ts:259-262`）→ 必須在發布前換連結 | N5b、N6 |
 | 發布其他社群 | 有：帶文章連結後排程或送審（`make.ts:175-188`） | 無 | 品牌要求社群審核時改成送審（既有） | — |
-| 發信 | **無自動通道**：只有建 FluentCRM 草稿、只到我們自己的 bridge 站、寄出要人按（`NA/lib/crm/fluentcrm.ts:35-39`；`NA/app/api/content/newsletter/route.ts:14-16`） | 每站通道、名單人數、退訂、頻率上限、模板全缺；平台沒有任何會員 email 表 | 垃圾信、寄件信譽、個資；`grep -rl -iE 'wc/v3/customers\|get_users\(\|WP_User_Query'` 三處 0 檔 | N10、N11 |
+| 發信 | **無自動通道**：只有建 FluentCRM 草稿、只到我們自己的 bridge 站、寄出要人按（`NA/lib/crm/fluentcrm.ts:35-39`；`NA/app/api/content/newsletter/route.ts:14-16`） | 每站通道、名單人數、退訂、頻率上限、模板全缺；平台沒有任何會員 email 表 | 垃圾信、寄件信譽、個資；`grep -rl -iE 'wc/v3/customers\|get_users\(\|WP_User_Query'` 三處 0 檔 | N10 |
 | 金額上限 | 話題無（B22） | — | 花費失控 | N2 |
 | 提醒與逾時 | 停點有通知（A7）；等人的沒有 | 待核准、待發布不提醒；不逾時 | 題目爛在佇列（現況 53 筆 proposed） | N7、N17 |
 
@@ -96,13 +96,13 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 **審核要人還是 AI**
 - AI／規則就夠：腳本評分（`NA/lib/script-forge/auto-run-result.ts`）、文字規則（`review.ts`）、影片四項 QA（N1 接上後）。
 - 必須人點頭：(a) 把一個站切成自動發布（只有員工能切，`make.ts:8-9`）；(b) 寄出會員信（新 5）；(c) 內容規範有法規風險的品牌（Soulful）每一則的發布——建議維持人工審核站，不開自動。
-- 沒人點頭：永遠不發布，留草稿。每天 09:00 的排程報告多一行「N 題待核准、M 題待發布、最舊幾天」（N7）。提案過了排定日 7 天自動退回並寫原因；已審核 72 小時沒人按就在同一行標紅，不自動發。天數由操作者定（§11 O2）。
+- 沒人點頭：永遠不發布，留草稿。每天 09:00 的排程報告多一行「N 題待核准、M 題待發布、最舊幾天」（N7）。提案過了排定日 7 天自動退回並寫原因；已審核 72 小時沒人按就在同一行標紅，不自動發。天數已定（§11 O2）。
 
 **順序、重試、回退（執行器＝話題佇列，新 1）**
 1. 影片審核過 → 草稿階段文章先嵌 R2 檔（審的人看得到片）。
 2. 發布（自動或人按）→ 只送 YouTube 那則 → 每 5 分鐘讀 `social_post_targets.release_url`。
 3. 拿到網址 → 把文章裡的 R2 影片換成 YouTube 網址（獨立一行，WordPress 自動嵌入）→ 文章上線。
-4. 文章上線 → 其他社群帶文章連結排出 → 建會員信草稿。
+4. 文章上線 → 其他社群帶文章連結排出。會員信不在這一串裡（每週一封，見「發信」）。
 - 每步做完記在 `artifacts`（照 `attachTopicVideo` 的寫法，`make.ts:256-287`），重跑不重做。
 - YouTube 60 分鐘沒網址或回錯 → 題目 failed、文章與其他貼文都還是草稿（沒有東西要收回）。
 - 文章上線後社群失敗 → 既有行為：題目 failed 並保留已上線紀錄，重試只補沒送的（`tick.ts:76-93`）。
@@ -110,9 +110,9 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 
 **發信**
 - 通道：各站自己的 FluentCRM，經 WP Bridge（文件既定：`agency-os/docs/Outbound_OS_Engineering_Spec/cold_email_deliverability_compliance_v3_final.md:53`；不可用開發信信箱，同檔 `:603`）。Resend 只寄單封交易信（`NA/lib/mail/resend.ts:1,12-19`），沒有退訂處理，不用。
-- 名單：在各站 FluentCRM 裡，平台讀不到；N11 加一條只讀人數的 bridge 路由。退訂用 FluentCRM 內建（已退訂者不會被重新訂閱，`ContactUpserter.php:6`）。
-- 頻率預設：每站每天最多 1 封草稿；建議改每週彙整一封（日更影片每天寄會被退訂）——由操作者定（O3）。
-- 模板：文章摘要（`artifacts.article.summary`）＋YouTube 連結＋該站必附段落；沿用 `newsletter/route.ts:167-231` 的轉換。
+- 名單：在各站 FluentCRM 裡，平台不讀；收件人由人在 FluentCRM 按寄出前看（`newsletter/route.ts:14-15`）。退訂用 FluentCRM 內建（已退訂者不會被重新訂閱，`ContactUpserter.php:6`）。
+- 頻率（已定 O3）：每週一封。由既有的客戶排程每週跑一次（寫法照社群週報，`NA/lib/schedules/jobs.ts:43-52,98-99`）；排程就是頻率上限，同一期只會領到一次（`NA/app/api/internal/schedules/run-due/route.ts:9-12`）。不另做人數與頻率的讀取路由。
+- 模板：那一週已發布題目的標題、摘要（`artifacts.article.summary`）、YouTube 連結＋該站必附段落；沿用 `newsletter/route.ts:167-231` 的轉換。那一週沒有發布就不建。
 
 **熱門議題**
 - 來源：`content_trends`（Dcard、Google News、Google Trends、Instagram、Serper、X、YouTube）＋各站自己的 RSS（`plan.ts:52-57`）。
@@ -131,7 +131,7 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 | generating／drafted／waiting_video | 自動 | 無按鈕，顯示做到哪、預計幾分鐘 | 只顯示狀態字 |
 | failed | 停＋通知 | 重試（從失敗那步） | 有 |
 | reviewed | `ai_review_auto` 自動發布 | **發布**（列出會發到哪、開啟各草稿的連結） | **缺**（S7）→ N6 |
-| publishing | 自動逐步 | 無按鈕，顯示 YouTube → 文章 → 社群 → 信 四格 | 缺 → N5a |
+| publishing | 自動逐步 | 無按鈕，顯示 YouTube → 文章 → 社群 三格 | 缺 → N5a |
 | published | — | 完成（各連結） | 有 |
 
 自動節點在手動時變「建議＋確認」的三個：選題（提案＋打分 → 人勾）、發布（N6）、發信（永遠是人按，新 5）。
@@ -162,10 +162,10 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 
 **批 1：發布順序（N5a → N5b → N6；N7、N17 可並行）**
 
-- **N5a 發布分步、YouTube 先發**｜白話：先上 YouTube，拿到連結才動文章與其他貼文。｜完成的樣子：`makeSocial` 把 YouTube 拆成自己一則；題目新增「發布中」狀態（`store.ts:7-8` 現有 11 個狀態沒有它；資料庫的狀態限制要一起改）；每步記 `artifacts.publish`；60 分鐘沒網址 → failed、其餘仍是草稿。｜High｜Opus 5.5＋critic Deep＋db-expert（狀態 check）｜相依：N1｜檔案：`lib/content/topics/tick.ts`、`make.ts`、`store.ts`、`lib/social/store.ts`、migration｜突變：拿掉「等 `release_url`」→ 紅（未上線的連結不得進已發布內容）。
+- **N5a 發布分步、YouTube 先發**｜白話：先上 YouTube，拿到連結才動文章與其他貼文。｜完成的樣子：`makeSocial` 把 YouTube 拆成自己一則；題目新增「發布中」狀態（`store.ts:7-8` 現有 11 個狀態沒有它；資料庫的狀態限制要一起改）；每步記 `artifacts.publish`；60 分鐘沒網址 → failed、其餘仍是草稿；YouTube 公開設定讀網站設定（`public`｜`unlisted`，預設 `public`；現寫死在 `lib/social/compose.ts:60`）。｜High｜Opus 5.5＋critic Deep＋db-expert（狀態 check）｜相依：N1｜檔案：`lib/content/topics/tick.ts`、`make.ts`、`store.ts`、`lib/social/store.ts`、`lib/social/compose.ts`、`lib/content/brand-voice.ts`、migration｜突變：拿掉「等 `release_url`」→ 紅（未上線的連結不得進已發布內容）。
 - **N5b 文章改嵌 YouTube 連結**｜白話：發布時把文章裡的影片檔換成 YouTube 連結。｜完成的樣子：`embed-in-post.ts` 加 `swapEmbeddedVideo`（同一條 bridge 通道、帶 sha256）；發布後文章含 YouTube 網址、不含 `.mp4`；重跑不重複；沒連 YouTube 的站不變。｜Medium｜Opus 5.5｜相依：N5a｜檔案：`lib/content/video/embed-in-post.ts`、`lib/content/topics/make.ts`。
-- **N6 已審核題目的「發布」鈕**｜白話：人工審核的站，在題目上按一顆就照同一串發出去。｜完成的樣子：`TopicsBoard` reviewed 列主按鈕「發布」＋各草稿連結；`publishDrafts` 的門改成「站台自動 或 這次有人按（記誰、何時）」；限員工與品牌編輯。｜High｜Opus 5.5＋critic Deep｜相依：N5a、O1｜檔案：`app/(shell)/tools/content/topics/TopicsBoard.tsx`、`app/api/content/topics/*`、`lib/content/topics/make.ts`｜突變：拿掉「自動或有人按」判斷 → 紅（沒人點頭的站不得發布）。
-- **N7 等人的事會提醒、會過期**｜白話：每天早上一行告訴你幾題等核准、幾題等發布。｜完成的樣子：每日排程報告多一行；提案過期 7 天自動退回並寫原因；已審核 72 小時標紅。｜Low｜fullstack-engineer（Sonnet）｜相依：O2｜檔案：`lib/schedules/alerts.ts`、`lib/content/topics/tick.ts`。
+- **N6 已審核題目的「發布」鈕**｜白話：人工審核的站，在題目上按一顆就照同一串發出去。｜完成的樣子：`TopicsBoard` reviewed 列主按鈕「發布」＋各草稿連結；`publishDrafts` 的門改成「站台自動 或 這次有人按（記誰、何時）」；限員工與品牌編輯。｜High｜Opus 5.5＋critic Deep｜相依：N5a｜檔案：`app/(shell)/tools/content/topics/TopicsBoard.tsx`、`app/api/content/topics/*`、`lib/content/topics/make.ts`｜突變：拿掉「自動或有人按」判斷 → 紅（沒人點頭的站不得發布）。
+- **N7 等人的事會提醒、會過期**｜白話：每天早上一行告訴你幾題等核准、幾題等發布。｜完成的樣子：每日排程報告多一行；提案過期 7 天自動退回並寫原因；已審核 72 小時標紅。｜Low｜fullstack-engineer（Sonnet）｜檔案：`lib/schedules/alerts.ts`、`lib/content/topics/tick.ts`。
 - **N17 停點通知一則就能動手**｜白話：通知寫片名、停在哪、為什麼、點哪裡。｜完成的樣子：`video_project_advance` 與 `content_pipeline` 的事件標題改中文、帶標題與連結；同一停點不重複通知兩則。｜Low｜fullstack-engineer（Sonnet）｜檔案：`app/api/internal/schedules/run-due/route.ts`、`lib/content/video/advance-auto-projects.ts`。
 
 **批 2：每日選題（N9 → N8）**
@@ -173,10 +173,9 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 - **N9 跨月去重**｜白話：三個月內寫過的題目不再提。｜完成的樣子：`proposeTopics` 比對同組織 90 天內正規化標題與關鍵字。｜Low｜fullstack-engineer（Sonnet）｜檔案：`lib/content/topics/store.ts`、`plan.ts`。
 - **N8 每日熱題補位**｜白話：每天從當天熱搜挑最多 3 個跟品牌有關的題目。｜完成的樣子：`content_pipeline` 每天每站一次（先在 DB 佔位再呼叫，照 B2）；便宜模型打分，≥70 才提；`ai_pick` 站自動核准；站台開關預設關。｜Medium｜Opus 5.5＋db-expert｜相依：N2、N9｜檔案：`lib/content/topics/plan-due.ts`、`plan.ts`、`lib/schedules/jobs.ts`、`lib/content/brand-voice.ts`、migration。
 
-**批 3：會員信（N10 → N11）**
+**批 3：會員信（N10）**
 
-- **N10 會員信草稿（各站自己的 FluentCRM）**｜白話：文章上線後，在那個站的 FluentCRM 備好一封信，等人按寄出。｜完成的樣子：`createNewsletter` 收 `clientId`（照 `fluentcrm.ts:66-71`）；發布第 4 步建草稿、記 `artifacts.email`；通知「信已備好」；站沒裝 FluentCRM 就跳過並寫明。｜High（對外信）｜Opus 5.5＋critic Deep｜相依：N5a、O3｜檔案：`lib/crm/fluentcrm.ts`、`app/api/content/newsletter/route.ts`、`lib/content/topics/make.ts`｜突變：讓草稿以外的狀態通過 → 紅（系統不得自行寄信；外掛側 `NewsletterCreator.php:79-86`）。
-- **N11 名單人數與頻率上限**｜白話：畫面看得到這封信會寄給幾個人，一天不會備超過一封。｜完成的樣子：bridge 加只讀路由（人數、上一封日期）；外掛版本升一號並照 `scripts/release-wp-bridge.sh` 發版；超過頻率就不建草稿並寫原因。｜Medium｜Opus 5.5｜相依：N10｜檔案：`lobster-factory/packages/wp-bridge-plugin/includes/Http/RestController.php`、`lib/crm/fluentcrm.ts`。
+- **N10 每週會員信草稿（各站自己的 FluentCRM）**｜白話：每週一次，把這一週發布的影片排成一封信，放進那個站的 FluentCRM，等人按寄出。｜完成的樣子：`CLIENT_JOBS` 加一項每週排程（預設關，寫法照 `reportJob`）；`createNewsletter` 收 `clientId`（照 `fluentcrm.ts:66-71`）；那一週沒有發布就不建；站沒裝 FluentCRM 就跳過並寫明；建好後通知「信已備好」。｜High（對外信）｜Opus 5.5＋critic Deep｜相依：N5a｜檔案：`lib/schedules/jobs.ts`、`lib/crm/fluentcrm.ts`、`app/api/content/newsletter/route.ts`｜突變：讓草稿以外的狀態通過 → 紅（系統不得自行寄信；外掛側 `NewsletterCreator.php:79-86`）。
 
 **批 4：順暢度（互不相依，可並行；動 `VW/scripts/projects-0.js` 的 N13、N14 由監工排先後）**
 
@@ -192,7 +191,7 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 ## 9. 發布安全
 
 - 絕對不能自動：寄出會員信（新 5）；把站切成自動發布（員工手動，逐站）；改已上線文章（Bridge 本來就拒，`embed-in-post.ts:259-262`）；Soulful 的任何對外發布（維持人工審核）。
-- 預設值：每題上限 NT$15；每天最多開始 1 題（現預設 2，`tick.ts:15`）；每天最多提 3 題；相關性門檻 70；會員信每站每天最多 1 封草稿；`topicMode`、`publishMode`、每日熱題三個開關預設關（AGENTS §0 自動化預設 OFF）。
+- 預設值（已定 O6）：每題上限 NT$15；每天最多開始 1 題（現預設 2，`tick.ts:15`）；每天最多提 3 題；相關性門檻 70；會員信每站每週一封草稿；YouTube 預設公開；`topicMode`、`publishMode`、每日熱題三個開關預設關（AGENTS §0 自動化預設 OFF）。
 - 失敗停點：題目 failed＋`last_error`（中文）→ 既有事件 → Slack `#ops-incidents`／Telegram（N17 改文字）；影片專案另有 Telegram 直送（保留一條，N17 去重）。
 - 回滾：每張卡單獨 `git revert`；migration 都附 down（兩處）；部署用 `sg-deploy.sh` 快照回退；已發布內容不自動收回——YouTube 下架、文章改回草稿由人做，步驟寫進 N5a 的驗證檔。
 - 上線前閘：N1、N2 沒上線前，任何站不得切 `ai_review_auto`（在 `sites/[id]` 的 PATCH 加檢查，併 N1）。
@@ -209,20 +208,22 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 | 4 | N5a | `npx vitest run lib/content/topics lib/social`（假 Postiz：YouTube 錯 → 其餘無動作） |
 | 5 | N5b、N6 | `npx vitest run lib/content/video lib/content/topics app/api/content`；部署後 `curl -s -o /dev/null -w "%{http_code}" https://app.aware-wave.com/tools/content/topics` → 200 |
 | 6 | N9、N8、N7 | `npx vitest run lib/content/topics lib/schedules`；psql：`select title, count(*) from content_topics where organization_id='<org>' and created_at>now()-interval '90 days' group by 1 having count(*)>1;` → 0 列 |
-| 7 | N10、N11、部署、第 4 級重跑（測試站，O4） | `npx vitest run lib/crm app/api/content/newsletter`；psql：`select status, artifacts->'publish' from content_topics where id='<題目>';` 四步都有時間；`curl -s https://<測試站>/?p=<id> \| grep -c youtube.com` ≥ 1、`grep -c '\.mp4'` = 0 |
+| 7 | N10、部署、第 4 級重跑（`E2E-Verify-0704` 測試站＋YouTube 不公開，O4） | `npx vitest run lib/crm lib/schedules app/api/content/newsletter`；psql：`select status, artifacts->'publish' from content_topics where id='<題目>';` 三步都有時間；`curl -s https://<測試站>/?p=<id> \| grep -c youtube.com` ≥ 1、`grep -c '\.mp4'` = 0 |
 
 批 4 其餘（N16、B19、B24–B26、B1、R1）排在第 7 天之後，不擋全自動。
 
 ## 11. 沒讀到、無法驗證、要操作者決定
 
-要決定（各附原因）：
-- O1 人工審核的站要不要有「發布」鈕（N6）——它讓人在我們的畫面直接把內容發出去，是新的對外動作。
-- O2 提案幾天過期、已審核幾小時標紅（N7）——影響你每天會被提醒幾次。
-- O3 會員信每天一封還是每週彙整一封；以後要不要開放自動寄（N10）——關係退訂率與寄件信譽，且現行紅線是人按。
-- O4 第 4 級「自動發布開」要在哪個站實測（N5 驗收）——需要一個可以真的公開發文的測試站與 YouTube 頻道。
-- O5 第一個開日更的品牌是誰；Soulful 是否維持人工——法規風險不同。
-- O6 每題上限 NT$15、每天 1 題、相關性 70 這三個預設值——直接決定每月花費與發文量。
-- O7 YouTube 影片預設公開還是不公開（現在寫死 public，`NA/lib/social/compose.ts:60`）——不公開可先嵌文章再手動轉公開。
+已定（2026-11-19，操作者「你決定」；監工定，理由一句）：
+- O1 加「發布」鈕（N6）。沒有它，人工審核的站走到已審核就斷線（S7）；有人按才發，記誰按的。
+- O2 提案過排定日 7 天自動退回；已審核 72 小時標紅、不自動發（N7）。現況 53 筆提案沒人清。
+- O3 會員信每週一封、寄出一律人按（N10）。日更每天寄會被退訂；每週排程本身就是頻率上限，所以原 N11（人數與頻率路由）不做，外掛不用發版。
+- O4 在既有測試站 `E2E-Verify-0704`（`https://aware-wave.com/staging/e2e-verify-0704-6e2b91`，psql `wp_sites` 2026-11-19）實測，YouTube 用不公開。不動 aware-wave.com 正站。
+- O5 AwareWave 先開每日自動；Soulful 維持人工審核，不開自動發布（`CONTENT_STRATEGY.md:19-21`）。
+- O6 每題上限 NT$15、每天 1 題、相關性門檻 70。實測一題 NT$10.2，上限留五成餘裕。
+- O7 YouTube 預設公開，改成每站設定（`public`｜`unlisted`），併 N5a。O4 的實測要用不公開，所以不能寫死。
+
+只剩一件要操作者動手：O4 實測前，到社群工具「加頻道」把 YouTube 頻道連到 `E2E-Verify-0704` 這個品牌（授權只能本人按）。
 
 沒做到或無法驗證：
 - 路線 (a) 一鍵到草稿沒有走完：第一次腳本呼叫後停在上限預留。我在頁面點模型與 AI 生圖時版面位移、沒點中，實際用了 Opus（NT$2.01），加話題 NT$0.014 共 **NT$2.02，超過你給的 NT$2 上限 NT$0.02**；之後沒有再花。點擊數與時間沿用 11-19 10:10 那次（12 點擊、7 分 45 秒）。
@@ -239,5 +240,5 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 
 - 每條結論有證據：§3–§5 每列附 file:line、psql、wp-cli 或實走；§5 發信段的 FluentCRM／Resend 事實來自一個唯讀調查 agent，我抽驗了 `fluentcrm.ts:35-39`、`newsletter/route.ts:14-16`，其餘行號開卡前 grep。
 - 每張卡有完成的樣子；N3、N4、N9、N13、N14、N16、N17、N18 不是隱私／發布守衛，所以沒列突變。
-- 與不變量對照：N6 是人按、走話題佇列，不違反 PLAN §12「不新增第二個自動發布入口」，但屬新對外動作 → O1。N1 讓話題佇列呼叫 `project-advance` 的函式，不改 PLAN §13 C3（`full_auto` 仍只由話題佇列設）。N5b 在發布前換連結，守 Bridge「只改草稿」。沒有提第二套排程、第二套狀態。
+- 與不變量對照：N6 是人按、走話題佇列，不違反 PLAN §12「不新增第二個自動發布入口」（O1 已定：加）。N1 讓話題佇列呼叫 `project-advance` 的函式，不改 PLAN §13 C3（`full_auto` 仍只由話題佇列設）。N5b 在發布前換連結，守 Bridge「只改草稿」。沒有提第二套排程、第二套狀態。
 - 沒重做 50 項；B 系列與 R1 只引用原編號。
