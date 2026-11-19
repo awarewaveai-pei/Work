@@ -34,7 +34,8 @@ describe("one click to drafts", () => {
   // N12: the page line and the dialog show only the quote route's typicalTwd / maxTwd; the cap starts at the maximum.
   it("shows only the quote's two numbers, prefills the cap with the maximum, and cannot start below it", async () => {
     const { generate, workbench } = setup(undefined, 0);
-    expect((await screen.findByTestId("draft-quote")).textContent).toBe("整趟通常約 NT$12.3，最多 NT$50.00");
+    // the element exists while the quote is still loading ("正在取得整趟報價…"): wait for the text, not the node (flaked in the deploy gate under load)
+    await waitFor(() => expect(screen.getByTestId("draft-quote").textContent).toBe("整趟通常約 NT$12.3，最多 NT$50.00"));
     expect(screen.getByTestId("draft-budget-note").textContent).toContain("通常只花約 NT$12.3");
     expect(screen.queryByText(/腳本與評分最多/)).toBeNull();
     const cap = screen.getByLabelText("花費上限 NT$") as HTMLInputElement, startButton = screen.getByText("確認，開始到草稿") as HTMLButtonElement;
