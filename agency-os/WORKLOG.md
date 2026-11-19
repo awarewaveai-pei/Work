@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-19（續19）— 影片下一階段：N1b、N3、B1 第二段驗收併入 main；批 0 完成（不部署，等 03:00）
+
+- 驗收：B1 第二段 `2189575fd`、N3 `e38c65cd6`、N1b `98d1ad5a9` 讀報告後 cherry-pick → `591b40314`、`27d04b0dd`、`67a7683f5`，三張都動 `make.ts` 無衝突。批 0 六項全完成（N1、N1b、N2、N3、N4、N15）。不手動部署：這三張只動 next-admin，今晚 03:00 自動部署會帶上（migration 0168 已套）。
+- RISKS 處置：
+  - B1 工人稱「正式庫 `metadata.ratio` 為 NULL 的舊列算不出比例、要回補」→ 監工查證不成立：正式庫工作台成片 `object_url` 結尾是 `/9x16.mp4`、`/16x9.mp4`（`ratioOfAsset` 的檔名後備會算出），`checksum_sha256` 皆有；不需回補。另查證：工作台每個比例、每次重出片各一列，`variantOf` 列為 0，所以「專案每比例取最新一支」（`ratio-rows.ts`）才是正確規則。
+  - N1b 預設作者沒做（網站設定無此欄位、WP Bridge 外掛不能指定作者，要改外掛發新版）→ 接受，記在監工台 N1b；必附段落在影片上方 → 接受。
+  - N3 中位數只納入 2026-11-20 之後開始的題目、每種格式組合要五題 → 接受；「未用真實資料看過頁面」→ 等有五題完成後實看（寫進下一批部署後的實看清單）。
+  - 沒在瀏覽器看過：B1 發布頁、N1b 設定頁、N3 話題頁 → 下一次手動部署後一次實看（與 N12、B25 真實 Pexels 一起）。
+- 派工：N8 每日熱題（線 D，Opus，migration 0170）、B26 第二段（線 C，補兩個主系統空窗：續跑後自動推進不得拿舊成片、草稿成片換了要重建）、down migration 整類補刪帳本列＋檢查器（線 B）；N5a（線 A）審查中。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit`（僅 `.next/types` 6 個舊產物錯誤，原始碼 0）；`npx vitest run lib/content lib/schedules app/api/content app/api/video app/video "app/(shell)/tools/video" "app/(shell)/tools/content"` → 156 files / 929 tests passed；正式庫只讀 psql 兩次（成片列的 ratio／variantOf／checksum）；`node build.mjs && node check.mjs` ok（75 items，69 done） | exit=0 | ms=300000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（n1 B1 工人的回補建議經正式庫查證不需要；N1b Codex 四項、B1 四項、N3 兩輪皆工人交回前處理）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=requiredBlocks|loadVideoRows|projectVideoRows|actual-cost|no-usd-text | hits=24
+- ORACLE_WAIVED: 本 commit 只有監工台資料檔與 WORKLOG；程式改動的 oracle artifact 隨各工人 commit
+- rollback：`git revert 67a7683f5 27d04b0dd 591b40314`。
 ## 2026-11-19（續18）— Meta 資料存取期限預警（續16 的未確認項）；Google 發布狀態卡在專案擁有者帳號
 
 - 操作者：「還沒確認的兩件事 也去處理好」。①Meta `data_access_expires_at`（四頻道皆 2027-01-23）：Meta 文件未明確說它是否擋粉專發文，改成必定看得到——`postiz_meta_token_truth` 每日檢查，可發文的頻道（Meta 有效、Postiz 未標記）在期限前 21 天內、期限仍在未來時，經既有 `scripts/notify.sh` 發一則 Telegram＋Slack，列頻道與「設定頁該列按重新連接」（`Settings.tsx:139`）；不改旗標，通知失敗 exit 1。commit `24c97046c`，主機已同步（dry-run warn=0；以 70 天視窗模擬 warn=4、訊息文字正確）。②我推 WORKLOG 時一併推上的另一條線 3 個 commit（82d23c5ef N2、4b1ce4067 B1、f28af6832 N9）：該線監工回覆三張已驗收、tsc＋1333 測試綠、0168 已套，今晚 03:00 自動部署照常；B1 第一段單獨上線安全。
