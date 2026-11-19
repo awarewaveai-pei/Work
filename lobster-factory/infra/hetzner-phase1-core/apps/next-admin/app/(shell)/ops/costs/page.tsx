@@ -12,6 +12,7 @@ import { loadCodexImageUsage } from "@/lib/ai/codex-usage";
 import { loadOrgNames, loadSpendRows } from "@/lib/ai/spend-loader";
 import { loadFxDaily, loadFxRates } from "@/lib/ai/fx-loader";
 import { buildFxTable } from "@/lib/ai/fx-rates";
+import { loadVendorInvoices } from "@/lib/ai/vendor-invoices-loader";
 import {
   groupLedger, liveSpend, monthlyReports, rowsSince, summarizeSpend, taipeiDayStartIso, taipeiMonth, taipeiMonthStartIso,
   type SpendRow,
@@ -34,7 +35,7 @@ async function loadCosts(): Promise<CostsData> {
   const historySince = taipeiDayStartIso(now, WINDOW_DAYS - 1 + 14);
   const empty = summarizeSpend([]);
   const base: CostsData = {
-    windowDays: WINDOW_DAYS, window: empty, live: liveSpend([], now), ledger: [], ledgerGroupCount: 0, months: [], orgNames: {}, fxRows: [],
+    windowDays: WINDOW_DAYS, window: empty, live: liveSpend([], now), ledger: [], ledgerGroupCount: 0, months: [], orgNames: {}, fxRows: [], invoiceRows: [],
   };
   const supabase = getSupabaseWriteClient();
   if (!supabase) return { ...base, note: "Supabase service-role 未設定 — 無法讀取真實花費。" };
@@ -45,7 +46,11 @@ async function loadCosts(): Promise<CostsData> {
   const orgNames = await loadOrgNames(supabase, load.rows);
   // 月報 converts each month at its own accounting rate (lib/ai/fx-rates.ts); read once for every month shown.
   const fxSince = `${taipeiMonth(reportSince)}-01`; // reportSince is a UTC instant: 16:00Z on the day before the 1st
-  const [fxManual, fxDaily] = await Promise.all([loadFxRates(supabase, fxSince), loadFxDaily(supabase, fxSince)]);
+  // Vendor bills (FX2 對帳): the last 13 months, same window as the API's GET.
+  const invoiceSince = `${taipeiMonth(taipeiMonthStartIso(now, 12))}-01`;
+  const [fxManual, fxDaily, invoices] = await Promise.all([
+    loadFxRates(supabase, fxSince), loadFxDaily(supabase, fxSince), loadVendorInvoices(supabase, invoiceSince),
+  ]);
 
   const windowRows = rowsSince(load.rows, windowSince);
   const groups = groupLedger(windowRows);
@@ -59,6 +64,7 @@ async function loadCosts(): Promise<CostsData> {
   // A failed read is carried into the table: those months show 不可入帳 instead of a wrong rate (fx-rates.ts rateFor).
   if (fxManual.error) notes.push(`fx_rates 讀取失敗：${fxManual.error}（月報 NT$ 暫以參考價 ${TWD_RATE} 計，不可入帳）`);
   if (fxDaily.error) notes.push(`fx_daily_rates 讀取失敗：${fxDaily.error}（沒有人工匯率的月份不可入帳）`);
+  if (invoices.error) notes.push(`vendor_invoices 讀取失敗：${invoices.error}（對帳表暫不可用，不顯示為尚未登錄）`);
   if (load.truncated) notes.push(`資料超過讀取上限，只讀到前 ${load.rows.length} 筆 — 總額偏低。`);
 
   return {
@@ -71,6 +77,8 @@ async function loadCosts(): Promise<CostsData> {
     months: monthlyReports(rowsSince(load.rows, reportSince), buildFxTable(fxManual.rows, fxDaily.rows, { manual: fxManual.error, daily: fxDaily.error })),
     orgNames,
     fxRows: fxManual.rows,
+    invoiceRows: invoices.rows,
+    invoiceError: invoices.error,
   };
 }
 

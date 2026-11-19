@@ -9,6 +9,10 @@ import {
   type LedgerGroup, type LiveSpend, type MonthReport, type SpendAnomaly, type SpendKind, type SpendSummary,
 } from "@/lib/ai/spend-report";
 import { describeFx, fmtRate, MANUAL_FX_SOURCES, SOURCE_LABEL, type FxRate, type ManualFxSource, type MonthFx } from "@/lib/ai/fx-rates";
+import {
+  CARD_FEE_RATE, PAYMENT_LABEL, PAYMENT_METHODS, reconcileMonth, vendorChoices,
+  type MonthRecon, type PaymentMethod, type VendorInvoice, type VendorRecon,
+} from "@/lib/ai/vendor-invoices";
 import { CostEstimator } from "./CostEstimator";
 import AiModelsClient from "@/app/(shell)/tools/ai-models/AiModelsClient";
 
@@ -30,6 +34,10 @@ export interface CostsData {
   orgNames: Record<string, string>;
   /** Manual accounting-rate rows (fx_rates), newest first: the audit trail shown under each month. */
   fxRows: FxRate[];
+  /** Vendor bills (vendor_invoices), newest first; reconciled per month on 月報 (lib/ai/vendor-invoices.ts). */
+  invoiceRows: VendorInvoice[];
+  /** vendor_invoices read failed: 對帳 shows every vendor as unavailable, never as 尚未登錄. */
+  invoiceError?: string;
 }
 
 interface Props {
@@ -538,7 +546,7 @@ function BreakdownCard({ title, buckets, total, label, rate }: {
 }
 
 /** One CSV per month for the bookkeeper: every breakdown, USD and NT$ at the month's accounting rate, basis stated. */
-function monthCsv(m: MonthReport, orgName: (id: string) => string): string {
+function monthCsv(m: MonthReport, orgName: (id: string) => string, recon: MonthRecon): string {
   const s = m.summary;
   const rate = m.fx.rate;
   const ntd = (usd: number) => (usd * rate).toFixed(2);
@@ -554,6 +562,23 @@ function monthCsv(m: MonthReport, orgName: (id: string) => string): string {
   push("model", s.byModel);
   push("feature", s.byTool, (k) => TOOL_LABEL[k] ?? k);
   push("client", s.byOrg, orgName);
+  const feeMult = String(1 + CARD_FEE_RATE);
+  for (const r of recon.rows) {
+    if (r.status === "registered") {
+      const basis = `實付 NT$${(r.paidTwd ?? 0).toFixed(2)}，隱含匯率 ${r.impliedRate !== undefined ? fmtRate(r.impliedRate) : "—"}，手續費率 ${r.feeRatePct !== undefined ? `${r.feeRatePct.toFixed(2)}%` : "—"}`;
+      lines.push(["invoice", q(`${r.vendor} 發票（${basis}）`), 1, (r.invoiceUsd ?? 0).toFixed(2), (r.paidTwd ?? 0).toFixed(2)].join(","));
+    } else if (r.status === "missing") {
+      lines.push(["invoice_estimate", q(`${r.vendor} 尚未登錄（估算×會計匯率×${feeMult}）`), 1, r.estimateUsd.toFixed(6), r.estimateTwdWithFee.toFixed(2)].join(","));
+    } else {
+      lines.push(["invoice_unavailable", q(`${r.vendor} 帳單表讀取失敗，不可入帳（估算×會計匯率×${feeMult}）`), 1, r.estimateUsd.toFixed(6), r.estimateTwdWithFee.toFixed(2)].join(","));
+    }
+  }
+  if (recon.rows.length > 0) {
+    const t = recon.totals;
+    const usd = t.invoiceUsd + recon.rows.filter((r) => r.status !== "registered").reduce((a, r) => a + r.estimateUsd, 0);
+    lines.push(["invoice_total", q(`對帳合計 USD=已登錄發票+未登錄估算；NT$=已登錄 ${t.registered} 家實付 + 未登錄 ${t.missing} 家估算含手續費${recon.error ? "，帳單表讀取失敗不可入帳" : ""}`),
+      recon.rows.length, usd.toFixed(2), t.bookTwd.toFixed(2)].join(","));
+  }
   for (const i of INFRA_MONTHLY) {
     lines.push(["infra_current", q(`${i.label}${i.estimate ? "（估算）" : "（帳單）"}`), 1, i.usdPerMonth.toFixed(2), ntd(i.usdPerMonth)].join(","));
   }
@@ -592,6 +617,19 @@ function FetchFxButton() {
   );
 }
 
+/** Choice button (visible buttons, no dropdowns) and text field shared by the 月報 forms. */
+const choiceBtn = (active: boolean): React.CSSProperties => ({
+  padding: "5px 10px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+  border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
+  background: active ? "var(--accent)" : "var(--card-bg)",
+  color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
+  fontWeight: active ? 700 : 500,
+});
+const fieldStyle: React.CSSProperties = {
+  padding: "5px 8px", borderRadius: 8, fontSize: 12.5, border: "1px solid var(--border-subtle)",
+  background: "var(--bg-canvas)", color: "var(--text-primary)",
+};
+
 /** The month's accounting rate, the form that appends a new one, and the month's earlier rows (audit trail). */
 function FxPanel({ month, fx, history }: { month: string; fx: MonthFx; history: FxRate[] }) {
   const router = useRouter();
@@ -621,17 +659,8 @@ function FxPanel({ month, fx, history }: { month: string; fx: MonthFx; history: 
     }
   };
 
-  const btn = (active: boolean): React.CSSProperties => ({
-    padding: "5px 10px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-    border: `1px solid ${active ? "var(--accent)" : "var(--border-subtle)"}`,
-    background: active ? "var(--accent)" : "var(--card-bg)",
-    color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
-    fontWeight: active ? 700 : 500,
-  });
-  const input: React.CSSProperties = {
-    padding: "5px 8px", borderRadius: 8, fontSize: 12.5, border: "1px solid var(--border-subtle)",
-    background: "var(--bg-canvas)", color: "var(--text-primary)",
-  };
+  const btn = choiceBtn;
+  const input = fieldStyle;
 
   return (
     <Card>
@@ -669,8 +698,140 @@ function FxPanel({ month, fx, history }: { month: string; fx: MonthFx; history: 
   );
 }
 
-function MonthlyTab({ months, orgNames, monthlyInfraUsd, note, fxRows }: {
+const TWD = (n: number) => `NT$${n.toLocaleString("zh-TW", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+const OTHER_VENDOR = "__other__";
+
+function reconStatus(r: VendorRecon): React.ReactNode {
+  if (r.status === "registered") return "已登錄";
+  if (r.status === "unavailable") return <span style={{ color: "var(--build-risk-medium-text)" }}>讀取失敗，不可入帳</span>;
+  return <span style={{ color: "var(--build-risk-medium-text)" }}>尚未登錄</span>;
+}
+
+/** 廠商帳單對帳: estimate vs invoice vs paid per vendor, the form that appends a bill, and the month's earlier rows. */
+function VendorReconPanel({ month, recon, fx, history }: { month: string; recon: MonthRecon; fx: MonthFx; history: VendorInvoice[] }) {
+  const router = useRouter();
+  const choices = vendorChoices(recon.rows.map((r) => r.vendor));
+  const [vendor, setVendor] = useState(choices[0] ?? OTHER_VENDOR);
+  const [custom, setCustom] = useState("");
+  const [invoiceUsd, setInvoiceUsd] = useState("");
+  const [paidTwd, setPaidTwd] = useState("");
+  const [paidAt, setPaidAt] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("card");
+  const [ref, setRef] = useState("");
+  const [tax, setTax] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const feePct = `${(CARD_FEE_RATE * 100).toFixed(1)}%`;
+
+  const save = async () => {
+    const v = vendor === OTHER_VENDOR ? custom.trim() : vendor;
+    if (!v) { setMsg("請選廠商或自填廠商名稱。"); return; }
+    const inv = Number(invoiceUsd), paid = Number(paidTwd);
+    if (invoiceUsd.trim() === "" || !(inv >= 0)) { setMsg("請填發票美金（0 以上）。"); return; }
+    if (paidTwd.trim() === "" || !(paid >= 0)) { setMsg("請填實付台幣（0 以上）。"); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch("/api/ops/costs/vendor-invoices", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          month, vendor: v, invoice_usd: inv, paid_twd: paid, paid_at: paidAt.trim() || null, payment_method: method,
+          invoice_ref: ref.trim() || null, tax_twd: tax.trim() === "" ? null : Number(tax), note: note.trim() || null,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) { setMsg(`存入失敗：${j.error ?? res.status}`); return; }
+      setInvoiceUsd(""); setPaidTwd(""); setPaidAt(""); setRef(""); setTax(""); setNote(""); setCustom(""); setMsg("已存入。");
+      router.refresh();
+    } catch (e) {
+      setMsg(`存入失敗：${String(e).slice(0, 80)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const t = recon.totals;
+  const rows: React.ReactNode[][] = recon.rows.map((r) => [
+    r.vendor,
+    USD(r.estimateUsd),
+    r.invoiceUsd !== undefined ? USD(r.invoiceUsd) : "—",
+    r.diffUsd !== undefined ? `${r.diffUsd >= 0 ? "+" : "−"}${USD(Math.abs(r.diffUsd))}` : "—",
+    r.status === "registered"
+      ? TWD(r.paidTwd ?? 0)
+      : <span>{TWD(r.estimateTwdWithFee)}<span style={{ fontSize: 11, color: "var(--text-muted)" }}>（估算含手續費）</span></span>,
+    r.impliedRate !== undefined ? fmtRate(r.impliedRate) : "—",
+    r.feeRatePct !== undefined ? `${r.feeRatePct.toFixed(2)}%` : "—",
+    reconStatus(r),
+  ]);
+  if (rows.length > 0) rows.push([
+    <b key="t">合計</b>,
+    USD(t.estimateUsd),
+    t.registered > 0 ? USD(t.invoiceUsd) : "—",
+    "",
+    <b key="b">{TWD(t.bookTwd)}</b>,
+    "",
+    "",
+    `已登錄 ${t.registered}／未登錄 ${t.missing}`,
+  ]);
+
+  return (
+    <Card>
+      <CardHead title="廠商帳單對帳" right={`會計匯率 ${describeFx(fx)}`} />
+      {recon.error && <div style={{ padding: "10px 16px 0" }}><Warn>帳單表讀取失敗（{recon.error}）：下表只能顯示估算，不可入帳。</Warn></div>}
+      {rows.length === 0
+        ? <EmptyState text={`${month} 沒有用量，也沒有登錄帳單。`} />
+        : <Table head={["廠商", "估算 USD", "發票 USD", "差額", "實付 NT$", "隱含匯率", "手續費率", "狀態"]} rows={rows} />}
+      <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--border-subtle)" }}>
+        <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.7 }}>
+          估算 = 用量×公開單價。發票、實付照廠商帳單與刷卡紀錄填（實付含手續費與稅）。隱含匯率 = 實付÷發票；手續費率 = 隱含匯率÷會計匯率−1。
+          尚未登錄的廠商以 估算×會計匯率×(1+{feePct}) 暫列並標「估算含手續費」，不是實付。合計 NT$ = 已登錄的實付 + 未登錄的估算含手續費。
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", fontSize: 12.5, color: "var(--text-secondary)" }}>
+          <span>登錄 {month} 帳單　廠商：</span>
+          {choices.map((k) => (
+            <button key={k} type="button" onClick={() => setVendor(k)} style={choiceBtn(vendor === k)}>{k}</button>
+          ))}
+          <button type="button" onClick={() => setVendor(OTHER_VENDOR)} style={choiceBtn(vendor === OTHER_VENDOR)}>其他（自填）</button>
+          {vendor === OTHER_VENDOR && (
+            <input aria-label="廠商名稱" placeholder="廠商名稱" value={custom} onChange={(e) => setCustom(e.target.value)} style={{ ...fieldStyle, width: 140 }} />
+          )}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", fontSize: 12.5, color: "var(--text-secondary)" }}>
+          <input aria-label="發票 USD" inputMode="decimal" placeholder="發票 USD" value={invoiceUsd} onChange={(e) => setInvoiceUsd(e.target.value)} style={{ ...fieldStyle, width: 110 }} />
+          <input aria-label="實付 NT$" inputMode="decimal" placeholder="實付 NT$" value={paidTwd} onChange={(e) => setPaidTwd(e.target.value)} style={{ ...fieldStyle, width: 110 }} />
+          <input aria-label="付款日" type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} style={fieldStyle} />
+          {PAYMENT_METHODS.map((k) => (
+            <button key={k} type="button" onClick={() => setMethod(k)} style={choiceBtn(method === k)}>{PAYMENT_LABEL[k]}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", fontSize: 12.5, color: "var(--text-secondary)" }}>
+          <input aria-label="發票號" placeholder="發票號（選填）" value={ref} onChange={(e) => setRef(e.target.value)} style={{ ...fieldStyle, width: 150 }} />
+          <input aria-label="稅 NT$" inputMode="decimal" placeholder="稅 NT$（帳單有另列才填）" value={tax} onChange={(e) => setTax(e.target.value)} style={{ ...fieldStyle, width: 190 }} />
+          <input aria-label="備註" placeholder="備註（選填）" value={note} onChange={(e) => setNote(e.target.value)} style={{ ...fieldStyle, flex: "1 1 160px" }} />
+          <button type="button" onClick={save} disabled={busy} style={{ ...choiceBtn(true), cursor: busy ? "wait" : "pointer" }}>{busy ? "存入中…" : "存入"}</button>
+          {msg && <span>{msg}</span>}
+        </div>
+        {history.length > 0 && (
+          <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.7 }}>
+            {month} 登錄過的帳單（新到舊；同廠商最新一筆生效，舊的保留不改）：
+            {history.map((h) => (
+              <div key={h.id}>
+                {new Date(h.created_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false })} · {h.vendor} · 發票 {USD(Number(h.invoice_usd))} · 實付 {TWD(Number(h.paid_twd))}
+                {h.tax_twd != null ? ` · 稅 ${TWD(Number(h.tax_twd))}` : ""}{h.paid_at ? ` · 付款 ${h.paid_at}` : ""}
+                {h.payment_method ? ` · ${PAYMENT_LABEL[h.payment_method] ?? h.payment_method}` : ""}{h.invoice_ref ? ` · #${h.invoice_ref}` : ""}
+                {h.created_by ? ` · ${h.created_by}` : ""}{h.note ? ` · ${h.note}` : ""}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function MonthlyTab({ months, orgNames, monthlyInfraUsd, note, fxRows, invoiceRows, invoiceError }: {
   months: MonthReport[]; orgNames: Record<string, string>; monthlyInfraUsd: number; note?: string; fxRows: FxRate[];
+  invoiceRows: VendorInvoice[]; invoiceError?: string;
 }) {
   const [picked, setPicked] = useState(months[0]?.month ?? "");
   const m = months.find((x) => x.month === picked) ?? months[0];
@@ -682,9 +843,11 @@ function MonthlyTab({ months, orgNames, monthlyInfraUsd, note, fxRows }: {
   }
   const s = m.summary;
   const rate = m.fx.rate;
+  const monthInvoices = invoiceRows.filter((r) => r.month.slice(0, 7) === m.month);
+  const recon = reconcileMonth(s.byVendor, monthInvoices, m.fx, CARD_FEE_RATE, invoiceError);
 
   const download = () => {
-    const blob = new Blob([monthCsv(m, orgName)], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([monthCsv(m, orgName, recon)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `aware-wave-costs-${m.month}.csv`;
@@ -723,6 +886,8 @@ function MonthlyTab({ months, orgNames, monthlyInfraUsd, note, fxRows }: {
       </div>
 
       <FxPanel month={m.month} fx={m.fx} history={fxRows.filter((r) => r.month.slice(0, 7) === m.month)} />
+
+      <VendorReconPanel key={m.month} month={m.month} recon={recon} fx={m.fx} history={monthInvoices} />
 
       <QualityNotes s={s} rate={rate} />
 
@@ -812,7 +977,7 @@ export function CostsTabs({ data, monthlyInfraUsd }: Props) {
       {tab === "estimator" && <CostEstimator />}
       {tab === "models"    && <ModelsTab />}
       {tab === "ledger"    && <LedgerTab groups={data.ledger} groupCount={data.ledgerGroupCount} s={data.window} windowDays={data.windowDays} />}
-      {tab === "monthly"   && <MonthlyTab months={data.months} orgNames={data.orgNames} monthlyInfraUsd={monthlyInfraUsd} note={data.note} fxRows={data.fxRows} />}
+      {tab === "monthly"   && <MonthlyTab months={data.months} orgNames={data.orgNames} monthlyInfraUsd={monthlyInfraUsd} note={data.note} fxRows={data.fxRows} invoiceRows={data.invoiceRows} invoiceError={data.invoiceError} />}
     </div>
   );
 }
