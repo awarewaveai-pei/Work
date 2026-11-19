@@ -2,7 +2,7 @@
 // the start under the per-day cap (0121 content_topics_start).
 import { describe, expect, it } from "vitest";
 import { NEXT, type Topic, type TopicStatus } from "../store";
-import { DAILY_START_CAP, MakeError, STALE_GENERATING_MS, VIDEO_TIMEOUT_MS, tickTopics, type Made, type Published, type TickDeps, type VideoPoll } from "../tick";
+import { DAILY_START_CAP, MakeError, brandDay, STALE_GENERATING_MS, VIDEO_TIMEOUT_MS, tickTopics, type Made, type Published, type TickDeps, type VideoPoll } from "../tick";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const NOW = new Date("2026-11-03T02:00:00Z");
@@ -29,6 +29,8 @@ function queue(rows: Topic[], make: (t: Topic) => Promise<Made> = async () => ({
   const video = { prepared: [] as string[], abandoned: [] as string[], polls: new Map<string, VideoPoll>(), attached: [] as string[],
     attach: undefined as undefined | ((t: Topic, url: string, save: (a: Record<string, unknown>) => Promise<boolean>) => Promise<Published>) };
   let jobs = 0;
+  /** The brand's organizations.default_timezone (null = none: the UTC day). */
+  const zone = { tz: null as string | null };
   const write = (t: Topic, to: TopicStatus, patch: Partial<Topic> = {}) => {
     const cur = db.get(t.id);
     if (!cur || cur.status !== t.status || cur.version !== t.version) return null;
@@ -41,7 +43,8 @@ function queue(rows: Topic[], make: (t: Topic) => Promise<Made> = async () => ({
     due: async (now) => [...db.values()].filter((t) => t.status === "approved" && (!t.scheduled_for || Date.parse(t.scheduled_for) <= now.getTime())).map((t) => ({ ...t })),
     blocker,
     inStatus: async (s) => [...db.values()].filter((t) => s.includes(t.status)).map((t) => ({ ...t })),
-    start: async (t, day, cap) => {
+    start: async (t, cap) => {
+      const day = brandDay(new Date(clock), zone.tz);   // the brand's day at the moment of the start, like make.ts
       if ([...db.values()].filter((r) => r.started_on === day).length >= cap) return null;
       return write(t, "generating", { started_on: day, last_error: null });
     },
@@ -64,7 +67,7 @@ function queue(rows: Topic[], make: (t: Topic) => Promise<Made> = async () => ({
       return { artifacts: { ...t.artifacts, video: { ...(t.artifacts.video as object), url, embedded_at: "now" } } };
     },
   };
-  return { db, deps, made, published, video, advance: (ms: number) => { clock += ms; } };
+  return { db, deps, made, published, video, zone, advance: (ms: number) => { clock += ms; } };
 }
 
 describe("tickTopics", () => {
@@ -81,6 +84,33 @@ describe("tickTopics", () => {
     await tickTopics(q.deps);
     expect(q.made).toHaveLength(DAILY_START_CAP);
     expect(q.db.get("c")?.status).toBe("approved");
+  });
+
+  it("the cap's day is the brand's: a Taipei brand's day turns at Taipei midnight, not UTC midnight (N4)", () => {
+    expect(brandDay(new Date("2026-11-19T23:59:00Z"), "Asia/Taipei")).toBe("2026-11-20");   // Taipei 11/20 07:59
+    expect(brandDay(new Date("2026-11-20T00:01:00Z"), "Asia/Taipei")).toBe("2026-11-20");   // Taipei 11/20 08:01
+  });
+
+  it("at the same instant a UTC brand is still on its own day (N4)", () => {
+    expect(brandDay(new Date("2026-11-19T23:59:00Z"), "UTC")).toBe("2026-11-19");
+    expect(brandDay(new Date("2026-11-19T23:59:00Z"), null)).toBe("2026-11-19");
+  });
+
+  it("rows started on a full UTC day do not block the brand's own next day (old data, N4)", async () => {
+    const q = queue([topic("a", { status: "published", started_on: "2026-11-19" }), topic("b", { status: "published", started_on: "2026-11-19" }), topic("c")]);
+    q.advance(Date.parse("2026-11-19T23:59:00Z") - NOW.getTime());   // UTC 11/19 is full; Taipei is already on 11/20
+    q.zone.tz = "Asia/Taipei";
+    await tickTopics(q.deps);
+    expect(q.db.get("c")).toMatchObject({ status: "reviewed", started_on: "2026-11-20" });
+  });
+
+  it("a firing that crosses the brand's midnight counts a start on the day it happens, not the firing's first day", async () => {
+    const full = { status: "published" as const, started_on: "2026-11-20" };
+    const q = queue([topic("a", full), topic("b", full), topic("c")], undefined, async () => { q.advance(2_000); return null; });
+    q.zone.tz = "Asia/Taipei";
+    q.advance(Date.parse("2026-11-20T15:59:59Z") - NOW.getTime());   // Taipei 11/20 23:59:59, 11/20 already full
+    await tickTopics(q.deps);   // the blocker check takes 2 s: c starts at Taipei 11/21 00:00:01
+    expect(q.db.get("c")).toMatchObject({ status: "reviewed", started_on: "2026-11-21" });
   });
 
   it("leaves a topic whose day has not come", async () => {

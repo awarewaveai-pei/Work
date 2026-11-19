@@ -25,7 +25,7 @@ import { textsForAccounts, writerKeysFor, writeSocialPosts } from "@/lib/social/
 import { inLanguage } from "@/lib/social/post-language";
 import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { articleChecks, reviewOf, socialChecks, type ReviewCheck } from "./review";
-import { claimTopic, dueApproved, inStatus, move, startTopic, type Topic } from "./store";
+import { claimTopic, dueApproved, inStatus, move, orgTimeZone, startTopic, type Topic } from "./store";
 import { startVideoJob } from "@/lib/content/video/start";
 import { ensureTopicProject, updateTopicProject } from "@/lib/content/video/topic-project";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
@@ -33,7 +33,7 @@ import { finalizeVideoJob } from "@/lib/content/video/finalize";
 import { embedVideoInPost } from "@/lib/content/video/embed-in-post";
 import { releaseTopicVideo } from "./video-release";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
-import { MakeError, NOW_FORMATS, waitsForVideo, type Made, type Published, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
+import { MakeError, NOW_FORMATS, brandDay, waitsForVideo, type Made, type Published, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
 
 /** What content_topics.artifacts holds: one entry per made part; `published` / `sent` once auto publish put it out. */
 export interface TopicArtifacts {
@@ -298,6 +298,7 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
   const own = (t: Topic) => {
     if (t.organization_id !== organizationId) throw new Error("topic of another organization");
   };
+  let zone: Promise<string | null> | undefined;   // read once per deps, i.e. once per tick (jobs.ts makes one per firing)
   return {
     now: () => new Date(),
     due: (now) => dueApproved(sb, organizationId, now, NOW_FORMATS),
@@ -312,7 +313,12 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
       }
       return null;
     },
-    start: (t, day, cap) => startTopic(sb, t, day, cap),
+    start: async (t, cap) => {
+      own(t);
+      zone ??= orgTimeZone(sb, organizationId);
+      const tz = await zone;
+      return startTopic(sb, t, brandDay(new Date(), tz), cap);   // the day read now, not at the firing's start (midnight)
+    },
     move: (t, to, patch) => move(sb, t, to, patch),
     claim: (t, patch) => { own(t); return claimTopic(sb, t, patch); },
     make: (t) => { own(t); return runForOrg(organizationId, actor, () => makeDrafts(sb, t, actor)); },

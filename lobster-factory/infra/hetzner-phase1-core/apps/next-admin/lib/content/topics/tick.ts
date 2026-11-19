@@ -10,8 +10,9 @@
 // are never relied on, so a social post never links to an article that is not live yet.
 import type { Topic, TopicFormat, TopicStatus } from "./store";
 import type { TopicReview } from "./review";
+import { zoned } from "@/lib/social/time";
 
-/** Topics a brand may start per UTC day when its content_pipeline row sets no limit (plan D5; 0125 daily_limit, 1-10). */
+/** Topics a brand may start per day (its own day, brandDay) when its content_pipeline row sets no limit (plan D5; 0125 daily_limit, 1-10). */
 export const DAILY_START_CAP = 2;
 /** Far beyond one making (article ~2 min + social), so only a restart mid-way leaves a row this old in 'generating'. */
 export const STALE_GENERATING_MS = 30 * 60 * 1000;
@@ -39,7 +40,9 @@ export interface TickDeps {
   inStatus(statuses: TopicStatus[]): Promise<Topic[]>;
   /** Why the topic cannot be made now (its site is gone, say); null = it can. Asked before a start uses a daily slot. */
   blocker(t: Topic): Promise<string | null>;
-  start(t: Topic, day: string, cap: number): Promise<Topic | null>;
+  /** approved -> generating under the brand's daily cap. The day counted is the brand's (brandDay, its
+   *  organizations.default_timezone) at the moment of this call: no caller passes a day, so none can pass a stale or UTC one. */
+  start(t: Topic, cap: number): Promise<Topic | null>;
   move(t: Topic, to: TopicStatus, patch?: Partial<Pick<Topic, "artifacts" | "review" | "last_error">>): Promise<Topic | null>;
   /** Takes the row (version bump, same status) before an outside write; null = someone else has it (store.ts claimTopic).
    *  With artifacts: also records what an outside write just did, so a restart does not do it again. */
@@ -62,6 +65,10 @@ export interface TickDeps {
 
 /** What content_topics.artifacts.video holds (make.ts writes the attach flags). */
 export interface VideoArtifact { job_id: string; url?: string }
+
+/** The brand's day at `now` (YYYY-MM-DD) in its zone; no zone = the UTC day. started_on holds this day. Rows started
+ *  before N4 hold the UTC day: on the switch-over a brand east of UTC may start up to one cap more, once (not backfilled). */
+export const brandDay = (now: Date, tz: string | null) => (tz ? zoned(now, tz).date : now.toISOString().slice(0, 10));
 
 export const makesNow = (t: Pick<Topic, "formats">) => t.formats.some((f) => NOW_FORMATS.includes(f));
 /** Video is made after the drafts (P6): such a topic stays 'drafted' until then. */
@@ -228,7 +235,6 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
     }
   }
 
-  const day = t0.toISOString().slice(0, 10);
   for (const t of (await deps.due(t0)).filter(makesNow)) {
     if (deps.now().getTime() - t0.getTime() >= budget) break;
     const blocked = await deps.blocker(t);
@@ -236,7 +242,7 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
       if (await deps.move(t, "proposed", { last_error: blocked })) n.returned++;
       continue;
     }
-    const started = await deps.start(t, day, cap);
+    const started = await deps.start(t, cap);
     if (!started) break;   // the day's cap is reached, or another firing took this row: the next firing looks again
     n.started++;
     count(n, await makeStarted(deps, started));

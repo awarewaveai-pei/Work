@@ -50,7 +50,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!approved) return NextResponse.json({ ok: false, error: "changed elsewhere; reload" }, { status: 409 });
       // the brand's limit set on /ops/schedules (content_pipeline), the same one its schedule uses
       const cap = (await storedDailyLimit(t.organization_id, "content_pipeline")) ?? DAILY_START_CAP;
-      const started = await deps.start(approved, new Date().toISOString().slice(0, 10), cap);
+      const started = await deps.start(approved, cap);   // counted on the brand's own day
       if (!started) return NextResponse.json({ ok: false, error: `今天已經開始 ${cap} 題（每天上限，在排程頁 Schedules 的「自動內容管線」改），明天再開始`, topic: approved }, { status: 409 });
       after(() => makeStarted(deps, started).then((r) => console.info(`[content/topics/start] ${started.id} ${r}`),
         (e) => console.error(`[content/topics/start] ${started.id} not recorded:`, e)));

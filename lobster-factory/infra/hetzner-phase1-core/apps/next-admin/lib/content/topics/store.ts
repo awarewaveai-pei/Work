@@ -3,6 +3,7 @@
 // sweeps (or a sweep and a button) never move the same row twice. DB errors throw: for a queue, "no rows" must never
 // stand in for "could not read" (same rule as lib/schedules/store.ts).
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isTimeZone } from "@/lib/social/time";
 
 export const TOPIC_STATUSES = ["proposed", "approved", "rejected", "generating", "drafted", "waiting_video", "embedded",
   "reviewed", "scheduled", "published", "failed"] as const;
@@ -219,12 +220,23 @@ export async function startTopic(sb: SupabaseClient, t: Pick<Topic, "id" | "orga
   return ((data ?? []) as Topic[])[0] ?? null;
 }
 
-/** How many topics of a brand left 'approved' on this UTC day (the daily cap, plan I8). */
+/** How many topics of a brand left 'approved' on this day of the brand (tick.ts brandDay; the daily cap, plan I8). */
 export async function startedOn(sb: SupabaseClient, organizationId: string, day: string): Promise<number> {
   const { count, error } = await sb.from("content_topics").select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId).eq("started_on", day);
   if (error) fail("started_on", error);
   return count ?? 0;
+}
+
+/** The brand's zone its daily cap counts days in (organizations.default_timezone). None, or one this runtime does not
+ *  know = null: the cap counts the UTC day, and the log says so. A read error throws (no start on a guessed day). */
+export async function orgTimeZone(sb: SupabaseClient, organizationId: string): Promise<string | null> {
+  const { data, error } = await sb.from("organizations").select("default_timezone").eq("id", organizationId).maybeSingle();
+  if (error) fail("org_timezone", error);
+  const tz = (data as { default_timezone?: string | null } | null)?.default_timezone ?? "";
+  if (tz && isTimeZone(tz)) return tz;
+  console.warn(`[content/topics] organization ${organizationId} has no usable time zone (${JSON.stringify(tz)}): its daily cap counts the UTC day`);
+  return null;
 }
 
 /** What a sweep may start now: approved, its day reached or none set, making one of `formats`, earliest first. The format

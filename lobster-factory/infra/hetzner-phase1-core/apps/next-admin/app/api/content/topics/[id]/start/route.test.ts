@@ -20,7 +20,7 @@ describe("POST /api/content/topics/[id]/start", () => {
       method: "POST", headers: { "content-type": "application/json", "x-ops-claims-role": "operator", "x-ops-user-kind": "staff" },
       body: JSON.stringify({ version: 2 }),
     }), { params: Promise.resolve({ id: "t1" }) });
-    expect(m.start).toHaveBeenCalledWith(m.topic, expect.any(String), 7);
+    expect(m.start).toHaveBeenCalledWith(m.topic, 7);   // no day passed: start counts the brand's own day itself
     expect(res.status).toBe(409);
     expect((await res.json()).error).toContain("今天已經開始 7 題");
   });
