@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-20（續2）— 影片下一階段：三個風險修正併入；最後一次部署（主系統＋工作台＋Remotion 服務）；正式站實看
+
+- 驗收：線 A 的三個風險修正 `4183f9021`＋`c366850b8`（N6 確認視窗讀草稿實際的 YouTube 設定，經 `GET /api/content/topics` 伺服器端帶回）、`a1b4098fe`（N5b 文章已手動發布時題目上有黃色提示）、`bf0659990`（N10 固定文字照網站語言）→ main `16b126dcd`、`7f2252947`、`3c71e6400`、`be6653e85`。
+- 全套測試不穩的另一半：`ops/billing page.sidebar.test.ts` 單跑 1.3 秒、全套滿載時超過 vitest 預設 5 秒 → `vitest.config.ts testTimeout: 20_000`（`bad9fadae`）；連同 `vitest.setup.ts` 的 `asyncUtilTimeout`，全套連跑兩次 600 檔綠。
+- 部署（一批一次）：主機腳本 `/root/lobster-phase1/logs/deploy-final-20261120.sh`（`setsid nohup`）＝`sg-deploy.sh next-admin video-workbench` 成功後才 `docker tag lobster-remotion-service:local …:rollback-20261120` → `docker build` → `safe-infra-patch.sh compose /root/render-services/docker-compose.yml lobster-remotion-service`（任一步失敗即停並還原舊映像）。
+  - 第一次 00:43：工作台映像內 gate 紅（`tests/r1-cover-template.cjs` 寫死 `../../next-admin`，映像內主系統檔在 `.awarewave/`，`renderer-auth.ts` 找不到 → 「封面模板服務未設定」503）→ 正式站未動。修：改用 `appearance.cjs resolveSource`，主系統 `cover.ts` 那段只在檔案存在時跑（`18cecdd68`）；本機以 `AWAREWAVE_APP_DIR=.awarewave node tests/gate.cjs` 重現映像配置後 gate ok。教訓（已是驗收步驟）：動到 VW 測試的卡，驗收時多跑一次映像配置的 gate。
+  - 第二次 00:57：`.deployed-commit = 18cecdd68`（previous ff6590549），next-admin／video-workbench healthy，HTTP smoke 全 OK；Remotion build rc=0、patch rc=0，`lobster-remotion-service Up (healthy)`；`RESULT ALL OK`。
+- 正式站實看（Chrome，app／video.aware-wave.com，1536 寬）：
+  - 自動內容頁：`scrollWidth` 1521 ≤ 1536（不再溢出）；金額全 NT$、無「US$／美元」；篩選「全部 30／進行中 0／等你處理 12／過期 6」；「發布」鈕 2 顆（N6）；排程列顯示每題上限 NT$15；N7 已把過期提案退回（已退回 12–13）。
+  - 網站設定頁：每日熱題開關、YouTube 公開／不公開按鈕在；「每篇必附段落」在「Content Studio 預設設定」展開後（N1b）。旁觀察：該展開區有 10 個既有的下拉選單（非本階段改動，違反無下拉規則，未處理）。
+  - 腳本頁（工作台內）：約十秒載入，顯示「目前客戶：AwareWave」唯讀（N16）。
+  - R1：在 `lobster-video-workbench` 容器內以容器環境跑真正的 `remotion.coverStill`（真 auth、真 Remotion 服務）出三個比例：16x9 222,830 B／10.8 s、9x16 214,919 B／10.8 s、4x5 191,109 B／8.9 s；圖取回筆電看過（`%TEMP%\r1-live\`）：中文字型正常、標題在安全區、下方漸層。Remotion 容器閒置記憶體 102 MiB／1 GiB。
+  - 還沒實看：B1 發布頁的比例按鈕、N12 對話框的兩個數字、B25 對真實 Pexels 影片的靜止檢查、N6 實際按下發布（會真的發布，等操作者 go）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 `deploy-final-20261120.sh` → RESULT ALL OK deployed 18cecdd68；`docker exec lobster-video-workbench node /tmp/cover-live.cjs` → LIVE_COVER_OK 三張；本機全套 `npm test` ×2 600 files；`AWAREWAVE_APP_DIR=.awarewave node tests/gate.cjs` gate ok；正式站 Chrome 實量 | exit=0 | ms=1800000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n（m1 R1 測試路徑只在 repo 配置成立 → 已修並以映像配置重驗；三個風險修正由工人 critic 一輪、監工讀報告與 diff 範圍）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=resolveSource|testTimeout|asyncUtilTimeout|youtube-draft-privacy | hits=19
+- ORACLE_WAIVED: Codex 額度用完；監工改動＝測試設定與一支測試的路徑解析，各有全套／映像配置重跑為證
+- rollback：部署 rollback＝`rollback-phase1.sh`（next-admin、video-workbench 快照）＋Remotion `docker tag lobster-remotion-service:rollback-20261120 lobster-remotion-service:local` 後 compose up；程式 `git revert` 對應 commit。
 ## 2026-11-20（續1）— 影片下一階段：最後一批 N6、N5b、N10、R1 併入 main（75 項全數完成）；本批 RISKS 一起判；全套測試不穩整類關掉
 
 - 驗收：整批交回後一次併入——N6 `f15648458` → `ffbab1070`、N5b `c248b5345` → `b42f169e5`、N10 `78d9e447a` → `e998eb480`、R1 `d3316823f` → `68da3ef7d`，無衝突（N6／N5b 排同一條線依序做的效果）。批 1、批 3、批 4 完成；`data.mjs` 75 項全 done。未部署。
