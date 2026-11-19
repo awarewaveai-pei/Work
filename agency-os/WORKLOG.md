@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-20（續3）— 影片下一階段：剩餘實看完成；AwareWave 第一則真發布實測（操作者「看完之後你要實測，都用立即發布」）
+
+- 剩餘實看（Chrome，正式站）：B1 發布頁 `video.aware-wave.com/review-release?organizationId=2bf60452…&asset=41b1ee7e…&section=release` → 同頁列出專案三個比例（9:16、16:9、4:5），社群草稿一個頻道一列、比例為按鈕且只列已核准的（Bluesky 預設 16:9、Facebook 預設 4:5），0 個下拉；N12 腳本頁輸入主題後顯示「一鍵到草稿…通常約 NT$38.3，最多 NT$73.49」，無美元字樣。
+- 實測（AwareWave，站 `7aa8ab64…`，題目 `fabee206-0895-4cce-8200-7e629dba9733`「感恩節的心理學：感恩如何讓人更快樂」）：
+  1. 網站設定頁把 YouTube 設「不公開」→ DB `content_defaults->>'youtubePrivacy' = unlisted`。
+  2. 題目加 YouTube 格式：第一次只點格式鈕沒存（DB 仍 `{article,social,video}`，version 1）→ 發現要另按「儲存格式」→ DB `{article,social,video,youtube}`，version 2。花錢前讀回才抓到。
+  3. 01:21「核准並開始」→ 01:25 `waiting_video`（文章、社群草稿 `93ced27f…`、獨立 YouTube 草稿 `54e9adc6…`，`budget.spentTwd 9.49／15`）→ 01:30 `reviewed`（影片過 N1 審片閘並嵌入草稿）。
+  4. 01:33 按「發布」：確認視窗「1. YouTube（這則草稿：不公開）2. 網站文章（WordPress 草稿改成公開）3. 其他社群頻道」；`artifacts.publish.requestedBy = ops:owner:…`、`requestedAt`；題目 `publishing`；YouTube 貼文 scheduled、format=unlisted，FB／IG 仍 draft。
+  5. 01:40 `published`：`publish.youtube.url = https://www.youtube.com/watch?v=q1sKUO8FpdI`，文章 `state: publish`，社群貼文 01:40 才送出（順序正確）。
+  6. 成品：`curl` 文章頁 HTTP 200，含 `youtube.com/embed/q1sKUO8FpdI`、`r2.dev/video/*.mp4` 0 處（N5b）；Facebook `published` `https://www.facebook.com/reel/1181005487930368`；**Instagram `error`**：「Postiz 發布失敗（Postiz 未回原因，最常見是 instagram 頻道授權失效）：請到 /tools/social 設定 → 頻道 重新連接 instagram，再重新排程此貼文」。
+- 發現（未修，下一輪）：F1 Instagram 發送失敗，需操作者重新連接頻道（OAuth 只能本人做）；F2「發布」鈕按下後先讀草稿設定才跳確認視窗，數秒無回饋（監工第一次誤判沒反應，原生 confirm 還卡住自動化分頁）→ 等待時應顯示讀取中；F3 選格式要另按「儲存格式」易漏；F4 文章標題是關鍵字拼接式「感恩節 心理學：7 個 有效 感恩任務 讓你更快樂」（詞間空格，文章生成段的既有問題）；F5 網站設定頁「Content Studio 預設設定」展開區有 10 個既有下拉選單。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql … content_topics／social_posts／social_post_targets`（各步讀回）＋`curl -L` 文章頁 | exit=0 | ms=1800000
+- REVIEW_WAIVED: NA -- 本 entry 是正式站實測紀錄，沒有程式改動
+- BUGHUNT_WAIVED: NA -- 沒有程式改動
+- rollback：YouTube 影片為不公開，可在 YouTube 刪除；文章可在 WordPress 改回草稿；Facebook reel 可刪。皆手動。
 ## 2026-11-20（續2）— 影片下一階段：三個風險修正併入；最後一次部署（主系統＋工作台＋Remotion 服務）；正式站實看
 
 - 驗收：線 A 的三個風險修正 `4183f9021`＋`c366850b8`（N6 確認視窗讀草稿實際的 YouTube 設定，經 `GET /api/content/topics` 伺服器端帶回）、`a1b4098fe`（N5b 文章已手動發布時題目上有黃色提示）、`bf0659990`（N10 固定文字照網站語言）→ main `16b126dcd`、`7f2252947`、`3c71e6400`、`be6653e85`。
