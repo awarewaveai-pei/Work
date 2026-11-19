@@ -66,7 +66,6 @@ const ALLOWLIST: Record<string, string> = {
   "app/api/social/posts/bulk/route.ts": "imports PostizApiError only, to report a per-item refusal.",
   "lib/social/dispatch.ts": "imports PostizApiError and types only; the Postiz calls go through injected ports, gated per brand by sendAllowed (runDispatch).",
   "lib/social/store.ts": "connect URL (a read), channel list (a read) and media upload to Postiz storage; nothing here publishes.",
-  "lib/social/review.ts": "reads Postiz integrations (listAllIntegrations) to mark expired channels; publishes nothing.",
   "lib/social/withdraw.ts": "deletes a post still waiting in Postiz: it can only stop a publication, which a blocking mode must never prevent.",
   "lib/cs/sweep.ts":
     "only posts a private note + hands the conversation to a human -- the exact action a blocking mode itself takes (webhooks/chatwoot/route.ts T27), never AI output.",

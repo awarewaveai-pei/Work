@@ -783,7 +783,7 @@ function VendorReconPanel({ month, recon, fx, history }: { month: string; recon:
         : <Table head={["廠商", "估算 USD", "發票 USD", "差額", "實付 NT$", "隱含匯率", "手續費率", "狀態"]} rows={rows} />}
       <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--border-subtle)" }}>
         <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.7 }}>
-          估算 = 用量×公開單價。發票、實付照廠商帳單與刷卡紀錄填（實付含手續費與稅）。隱含匯率 = 實付÷發票；手續費率 = 隱含匯率÷會計匯率−1。
+          估算 = 用量×公開單價。發票、實付照廠商帳單與刷卡紀錄填（實付含手續費與稅；帳單另列的稅填「稅」欄）。隱含匯率 = （實付−稅）÷發票；手續費率 = 隱含匯率÷會計匯率−1。還沒付款的發票先不登，付款後再填。
           尚未登錄的廠商以 估算×會計匯率×(1+{feePct}) 暫列並標「估算含手續費」，不是實付。合計 NT$ = 已登錄的實付 + 未登錄的估算含手續費。
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", fontSize: 12.5, color: "var(--text-secondary)" }}>

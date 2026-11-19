@@ -84,7 +84,7 @@ export interface VendorRecon {
   status: ReconStatus;
   invoiceUsd?: number;
   paidTwd?: number;
-  /** paid ÷ invoice, 4 dp; absent when the invoice is 0 */
+  /** (paid − tax listed separately) ÷ invoice, 4 dp; absent when the invoice or the net amount is 0 */
   impliedRate?: number;
   /** (implied ÷ accounting rate − 1) × 100, 2 dp */
   feeRatePct?: number;
@@ -120,7 +120,9 @@ export function reconcileMonth(
     est.set(k, (est.get(k) ?? 0) + b.usd);
   }
   const latest = new Map<string, VendorInvoice>();
-  if (!readError) for (const inv of latestInvoiceByVendorMonth(invoices).values()) latest.set(inv.vendor, inv);
+  // a row with nothing paid is a received invoice, not 實付: it registers nothing, the vendor stays 尚未登錄 with its estimate
+  // (the API refuses paid_twd 0 for the same reason; Codex partialreview-27540faf)
+  if (!readError) for (const inv of latestInvoiceByVendorMonth(invoices).values()) if (Number(inv.paid_twd) > 0) latest.set(inv.vendor, inv);
 
   const keys = new Set([...[...est].filter(([, usd]) => usd > 0).map(([k]) => k), ...latest.keys()]);
   const rows: VendorRecon[] = [...keys].map((vendor): VendorRecon => {
@@ -130,7 +132,10 @@ export function reconcileMonth(
     if (!inv) return { vendor, estimateUsd, status: readError ? "unavailable" : "missing", estimateTwdWithFee, bookTwd: estimateTwdWithFee };
     const invoiceUsd = Number(inv.invoice_usd);
     const paidTwd = Number(inv.paid_twd);
-    const impliedRate = invoiceUsd > 0 ? r4(paidTwd / invoiceUsd) : undefined;
+    // tax listed separately on the bill (5% VAT on foreign e-services, withholding) is not exchange or card fee:
+    // the implied rate is paid net of it, else a 5% tax would read as a 6.5% card fee
+    const netTwd = paidTwd - Number(inv.tax_twd ?? 0);
+    const impliedRate = invoiceUsd > 0 && netTwd > 0 ? r4(netTwd / invoiceUsd) : undefined;
     const feeRatePct = impliedRate !== undefined && fx.rate > 0 ? r2((impliedRate / fx.rate - 1) * 100) : undefined;
     return {
       vendor, estimateUsd, status: "registered", invoiceUsd, paidTwd, impliedRate, feeRatePct,

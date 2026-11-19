@@ -5,9 +5,9 @@
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { VENDOR_INVOICE_COLUMNS } from "@/lib/ai/vendor-invoices-loader";
+import { VENDOR_INVOICE_COLUMNS, loadVendorInvoices } from "@/lib/ai/vendor-invoices-loader";
 import { PAYMENT_METHODS, vendorKey, type PaymentMethod } from "@/lib/ai/vendor-invoices";
-import { taipeiMonth, taipeiMonthStartIso } from "@/lib/ai/spend-report";
+import { taipeiDay, taipeiMonth, taipeiMonthStartIso } from "@/lib/ai/spend-report";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,10 +30,10 @@ export async function GET(request: Request) {
   const sb = getSupabaseWriteClient();
   if (!sb) return NextResponse.json({ ok: false, error: "db_unavailable" }, { status: 503 });
   const since = `${taipeiMonth(taipeiMonthStartIso(new Date(), 12))}-01`;
-  const { data, error } = await sb.from("vendor_invoices").select(VENDOR_INVOICE_COLUMNS).gte("month", since)
-    .order("month", { ascending: false }).order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ ok: false, error: error.message.slice(0, 200) }, { status: 500 });
-  return NextResponse.json({ ok: true, rows: data ?? [] });
+  // the same loader as the page: a read that hits the row cap is an error, never a silently shorter list (Codex partialreview-27540faf)
+  const { rows, error } = await loadVendorInvoices(sb, since);
+  if (error) return NextResponse.json({ ok: false, error: error.slice(0, 200) }, { status: 500 });
+  return NextResponse.json({ ok: true, rows });
 }
 
 export async function POST(request: Request) {
@@ -57,15 +57,21 @@ export async function POST(request: Request) {
   if (invoiceUsd === null || Number.isNaN(invoiceUsd)) return bad("invoice_usd_invalid");
   const paidTwd = amount(body.paid_twd);
   if (paidTwd === null || Number.isNaN(paidTwd)) return bad("paid_twd_invalid");
-  // paid ÷ invoice is a USD→TWD rate: outside 1..1000 the two fields were swapped or mistyped (same bound as fx-rates).
-  if (invoiceUsd > 0 && paidTwd > 0) {
-    const implied = paidTwd / invoiceUsd;
+  // this table records 實付; an invoice received but not paid yet is entered after the payment, not as NT$0
+  if (paidTwd <= 0) return bad("paid_twd_must_be_positive：還沒付款的發票先不登，付款後再填實付金額");
+  const taxTwd = amount(body.tax_twd);
+  if (Number.isNaN(taxTwd) || (taxTwd !== null && taxTwd >= paidTwd)) return bad("tax_twd_invalid");
+  // (paid − tax) ÷ invoice is a USD→TWD rate, the same figure reconcileMonth shows: outside 1..1000 the fields were
+  // swapped or mistyped (same bound as fx-rates; Codex review-551b5665 -- checking the gross figure let a mistyped tax through).
+  if (invoiceUsd > 0) {
+    const implied = (paidTwd - (taxTwd ?? 0)) / invoiceUsd;
     if (implied < 1 || implied > 1000) return bad("implied_rate_implausible");
   }
-  const taxTwd = amount(body.tax_twd);
-  if (Number.isNaN(taxTwd)) return bad("tax_twd_invalid");
+  // 實付 needs the day the money left the account: required, a real date, not in the future (review-46f960dc / 15a38b2f)
   const paidAt = text(body.paid_at, 10);
-  if (paidAt && !DAY_RE.test(paidAt)) return bad("paid_at_invalid");
+  if (!paidAt) return bad("paid_at_required：填實際付款日（刷卡日或扣款日）");
+  if (!DAY_RE.test(paidAt)) return bad("paid_at_invalid");
+  if (paidAt > taipeiDay(new Date().toISOString())) return bad("paid_at_in_future：付款日還沒到，付款後再登");
   const method = body.payment_method == null || body.payment_method === "" ? null : String(body.payment_method) as PaymentMethod;
   if (method && !PAYMENT_METHODS.includes(method)) return bad("payment_method_invalid");
 

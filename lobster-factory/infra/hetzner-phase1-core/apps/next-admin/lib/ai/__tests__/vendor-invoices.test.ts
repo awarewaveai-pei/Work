@@ -26,6 +26,21 @@ describe("vendor-invoices", () => {
     expect(r.bookTwd).toBe(3245);
   });
 
+  it("tax listed separately on the bill is taken out before the implied rate, so VAT never reads as card fee", () => {
+    // NT$3,245 paid of which NT$155 is 5% VAT: net 3,090 ÷ 100 = 30.9, fee −3.44% against rate 32 (a cheap card, not a 6.5% fee)
+    const r = reconcileMonth([{ key: "OpenAI", count: 1, usd: 98 }], [{ ...inv("openai", 100, 3245, "2026-11-03T01:00:00Z"), tax_twd: "155" }], fx32).rows[0];
+    expect(r.impliedRate).toBe(30.9);
+    expect(r.feeRatePct).toBe(-3.44);
+    expect(r.bookTwd).toBe(3245); // what left the account is still the booked figure
+  });
+
+  it("a row with nothing paid registers nothing: the vendor stays 尚未登錄 with its estimate", () => {
+    const m = reconcileMonth([{ key: "OpenAI", count: 1, usd: 98 }], [inv("openai", 100, 0, "2026-11-03T01:00:00Z")], fx32);
+    expect(m.rows[0]).toMatchObject({ vendor: "openai", status: "missing" });
+    expect(m.rows[0].paidTwd).toBeUndefined();
+    expect(m.totals).toMatchObject({ registered: 0, missing: 1, paidTwd: 0 });
+  });
+
   it("a vendor with no bill is 尚未登錄 at estimate × rate × 1.015, never shown as paid", () => {
     const m = reconcileMonth([{ key: "Black Forest Labs (Replicate)", count: 2, usd: 6 }, { key: "BFL/Replicate", count: 1, usd: 4 }], [], fx32);
     expect(m.rows).toHaveLength(1);
