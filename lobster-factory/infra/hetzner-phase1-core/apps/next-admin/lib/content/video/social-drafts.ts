@@ -20,7 +20,7 @@ export interface DraftDeps {
   savePost(fields: { body: string; notes: string; source_url?: string }, accountId: string, mediaId: string, altText: string): Promise<{ id: string }>;
 }
 export type DraftResult =
-  | { ok: true; drafts: Array<{ accountId: string; postId: string; ratio: string; platform: string }> }
+  | { ok: true; drafts: Array<{ accountId: string; postId: string; ratio: string; platform: string; mediaId: string }> }
   | { ok: false; status: number; error: string };
 
 export async function saveVideoSocialDrafts(deps: DraftDeps, title: string, items: DraftItem[]): Promise<DraftResult> {
@@ -43,11 +43,11 @@ export async function saveVideoSocialDrafts(deps: DraftDeps, title: string, item
 
   const media = new Map<string, string>();
   const deadline = Date.now() + 240_000;   // one budget for every ratio of this request (300 s proxy timeout)
-  const drafts: Array<{ accountId: string; postId: string; ratio: string; platform: string }> = [];
+  const drafts: Array<{ accountId: string; postId: string; ratio: string; platform: string; mediaId: string }> = [];
   for (const p of plan) {
     if (!media.has(p.ratio)) media.set(p.ratio, (await deps.addVideo(p.videoUrl, `${p.ratio}.mp4`, p.coverUrl, deadline)).id);
     const post = await deps.savePost({ body: p.text, notes: `影片：${title}`.slice(0, 500), source_url: p.videoUrl }, p.accountId, media.get(p.ratio)!, title.trim().slice(0, 1000));
-    drafts.push({ accountId: p.accountId, postId: post.id, ratio: p.ratio, platform: p.platform });
+    drafts.push({ accountId: p.accountId, postId: post.id, ratio: p.ratio, platform: p.platform, mediaId: media.get(p.ratio)! });
   }
   return { ok: true, drafts };
 }

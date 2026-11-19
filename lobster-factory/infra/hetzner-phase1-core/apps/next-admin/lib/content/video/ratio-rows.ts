@@ -12,9 +12,9 @@ import { ratioOfAsset } from "./platform-ratio";
 
 /** A finished video (成片) in a project: the one mime project-advance rows() and attachVideoAssets accept. */
 export const FINISHED_VIDEO_MIME = "video/mp4";
-export const RATIO_ROW_COLUMNS = "id, object_url, checksum_sha256, metadata, media_project_id, mime_type";
+export const RATIO_ROW_COLUMNS = "id, object_url, checksum_sha256, metadata, media_project_id, mime_type, created_at";
 
-export type VideoRow = { id: string; object_url: string | null; checksum_sha256: string | null; metadata: { title?: string; script?: string; ratio?: unknown; variantOf?: string } | null; media_project_id?: string | null; mime_type?: string | null };
+export type VideoRow = { id: string; object_url: string | null; checksum_sha256: string | null; metadata: { title?: string; script?: string; ratio?: unknown; variantOf?: string } | null; media_project_id?: string | null; mime_type?: string | null; created_at?: string | null };
 type Rated = { object_url?: string | null; metadata?: { ratio?: unknown } | null };
 const ratioOf = (a: Rated) => (a.object_url ? ratioOfAsset({ object_url: a.object_url, metadata: a.metadata }) : undefined);
 

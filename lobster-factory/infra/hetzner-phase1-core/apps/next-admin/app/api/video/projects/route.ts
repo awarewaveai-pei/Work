@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { attachVideoAssets, ensureWorkbenchProject, PROJECT_COLUMNS as COLUMNS, updateProjectRow } from "@/lib/content/video/projects";
+import { attachVideoAssets, ensureWorkbenchProject, FINISHED_VIDEO_MIME, PROJECT_COLUMNS as COLUMNS, updateProjectRow } from "@/lib/content/video/projects";
 import { parseAutoBudget } from "@/lib/content/video/auto-run-budget";
+import { rerenderSince } from "@/lib/content/video/rerender-mark";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -129,6 +130,10 @@ export async function POST(req: Request): Promise<Response> {
  * paying). resume: that run's autoStop removed; when the row's autoBudget is that run, budgetTwd = the new limit (never
  * below what was spent) and, once its renders reached the server (renderRatios), autonomy auto_after_render with
  * last_error cleared. armed = the row now runs that run.
+ * resume + rerender:true (B26 part 2: the workbench's cut is outdated, it will render again): the row goes back to stage
+ * produce and brief_json.autoRerender = {runId, at} -- auto-advance then waits for a render sent after `at` instead of
+ * reviewing the earlier cut (rerender-mark.ts). Resumed again while the render it asked for is still on its way (no finished
+ * cut since the mark), the mark keeps its time: moving it later would hide that in-flight render.
  */
 async function autoRunChange(db: NonNullable<ReturnType<typeof getSupabaseWriteClient>>, org: string, id: string, raw: unknown): Promise<Response> {
   const run = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
@@ -136,7 +141,17 @@ async function autoRunChange(db: NonNullable<ReturnType<typeof getSupabaseWriteC
   const budgetTwd = run.budgetTwd === undefined ? undefined : Number(run.budgetTwd);
   if (!runId || (run.action !== "stop" && run.action !== "resume")) return bad("autoRun needs a runId and action stop or resume");
   if (budgetTwd !== undefined && (run.action !== "resume" || !Number.isFinite(budgetTwd) || budgetTwd < 0)) return bad("budgetTwd is a limit >= 0 on resume only");
-  let armed = false, refused = "";
+  if (run.rerender !== undefined && (run.action !== "resume" || typeof run.rerender !== "boolean")) return bad("rerender is true/false on resume only");
+  const rerender = run.rerender === true;
+  let armed = false, refused = "", keepAt: string | null = null;
+  if (rerender) {
+    const cur = await db.from("media_production_projects").select("brief_json").eq("organization_id", org).eq("id", id).maybeSingle();
+    const since = rerenderSince(cur.data?.brief_json, runId);
+    if (since) {
+      const made = await db.from("media_assets").select("id").eq("organization_id", org).eq("media_project_id", id).eq("mime_type", FINISHED_VIDEO_MIME).eq("is_current", true).gte("created_at", since).limit(1);
+      if (!made.error && !made.data?.length) keepAt = since;
+    }
+  }
   const saved = await updateProjectRow(db, org, id, (row) => {
     const brief = { ...((row.brief_json ?? {}) as Record<string, unknown>) }, budget = parseAutoBudget(brief.autoBudget);
     armed = false;
@@ -144,9 +159,11 @@ async function autoRunChange(db: NonNullable<ReturnType<typeof getSupabaseWriteC
     if (brief.autoStop === runId) delete brief.autoStop;
     if (budget?.runId !== runId) return { brief_json: brief };
     if (budgetTwd !== undefined && budgetTwd < budget.spentTwd) { refused = `上限不能低於已用的 NT$${budget.spentTwd}`; return null; }
-    const next = { ...brief, autoBudget: { ...(brief.autoBudget as Record<string, unknown>), ...(budgetTwd !== undefined ? { budgetTwd } : {}) } };
+    const next = { ...brief, autoBudget: { ...(brief.autoBudget as Record<string, unknown>), ...(budgetTwd !== undefined ? { budgetTwd } : {}) },
+      ...(rerender ? { autoRerender: { runId, at: keepAt ?? new Date().toISOString() } } : {}) };
+    const stage = rerender ? { lifecycle_stage: "produce" } : {};
     armed = !!budget.renderRatios?.length; // before its renders reached the server (quick-render route) they arm it themselves
-    return armed ? { brief_json: next, autonomy: "auto_after_render", last_error: null } : { brief_json: next };
+    return armed ? { brief_json: next, autonomy: "auto_after_render", last_error: null, ...stage } : { brief_json: next, ...stage };
   });
   if (saved.ok === false) return NextResponse.json({ ok: false, error: saved.error }, { status: saved.error === "concurrent_update" ? 409 : 500 });
   if (refused) return NextResponse.json({ ok: false, error: refused }, { status: 409 });

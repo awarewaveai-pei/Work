@@ -4,7 +4,7 @@
 type Row = Record<string, unknown>;
 export type FakeLog = { updates: Array<{ table: string; id: unknown; patch: Row }>; inserts: Array<{ table: string; row: Row }>; reads: number };
 
-const col = (r: Row, k: string) => (k.startsWith("metadata->>") ? (r.metadata as Row | undefined)?.[k.slice(11)] ?? null : r[k] ?? null);
+const col = (r: Row, k: string) => { const at = k.indexOf("->>"); return at > 0 ? (r[k.slice(0, at)] as Row | undefined)?.[k.slice(at + 3)] ?? null : r[k] ?? null; };
 const likeRe = (p: string) => new RegExp("^" + p.split("%").map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$", "s");
 
 export function fakeDb(tables: () => Record<string, Row[]>, log: FakeLog = { updates: [], inserts: [], reads: 0 }) {
@@ -40,6 +40,7 @@ export function fakeDb(tables: () => Record<string, Row[]>, log: FakeLog = { upd
         eq: (k: string, v: unknown) => { tests.push((r) => col(r, k) === v); return q; },
         in: (k: string, v: unknown[]) => { tests.push((r) => v.includes(col(r, k))); return q; },
         like: (k: string, p: string) => { tests.push((r) => typeof col(r, k) === "string" && likeRe(p).test(col(r, k) as string)); return q; },
+        gte: (k: string, v: unknown) => { tests.push((r) => col(r, k) !== null && String(col(r, k)) >= String(v)); return q; },
         is: (k: string, v: unknown) => { tests.push((r) => col(r, k) === v); return q; },
         not: (k: string, op: string, v: unknown) => {
           if (op !== "is" || v !== null) throw new Error(`fake-db: not(${op}) unsupported`);

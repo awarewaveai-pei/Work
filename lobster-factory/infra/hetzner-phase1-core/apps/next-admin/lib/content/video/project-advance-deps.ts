@@ -3,14 +3,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { QA_LABELS, explainFinding } from "@/app/(shell)/tools/video/qa-labels";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { renderSiteVoice, siteLanguage, type SiteContentDefaults } from "@/lib/content/brand-voice";
-import { listAccounts } from "@/lib/social/store";
+import { addVideo, getPost, listAccounts, savePost } from "@/lib/social/store";
 import { textsForAccounts, writerKeysFor, writeSocialPosts } from "@/lib/social/write-posts";
 import { claudeWriter } from "@/lib/social/write-posts-claude";
 import { persistEditorialRightsQa } from "./editorial-rights-persist";
 import { finalizeVideoJob } from "./finalize";
 import { readJob } from "./job-store";
 import { FINISHED_VIDEO_MIME, updateProjectRow } from "./projects";
-import type { AdvanceDeps, AdvanceProject } from "./project-advance";
+import type { AdvanceDeps, AdvanceProject, RatioRow } from "./project-advance";
 import { RunChanged, WAIT_LIMIT_MS } from "./project-advance";
 import { embedVideoInNewDraft } from "./embed-in-post";
 import { orgIdentity } from "@/lib/tenant-guard";
@@ -25,6 +25,8 @@ import { summarizeQaFindings } from "./qa-findings-summary";
 import { saveVideoSocialDrafts } from "./social-drafts";
 import { draftDeps } from "./social-drafts-deps";
 import { loadVideoRows, newestPerRatio, projectVideoRows } from "./ratio-rows";
+import { createdSince, rerenderSince } from "./rerender-mark";
+import { keptNote, postsToRefresh, refreshDrafts, type DraftPost } from "./draft-refresh";
 
 const fail = (what: string, e: { message: string }): never => { throw new Error(`${what}: ${e.message}`); };
 type Row = Record<string, unknown>;
@@ -56,15 +58,38 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
     return ((data ?? []) as Array<{ id: string; object_url: string | null; checksum_sha256: string | null; metadata: { variantOf?: string } | null }>).find((a) => !a.metadata?.variantOf && a.object_url);
   }
 
-  // The brand's social drafts, once per project (brief_json.autoDrafts).
-  async function socialDrafts(project: AdvanceProject): Promise<string> {
+  // B26 part 2: the drafts exist but the project's cut of some ratio is not the one a draft was built with (re-rendered
+  // after the drafts were made): swap those drafts' media in place (draft-refresh.ts). Old records without posts: untouched.
+  async function refreshSocialDrafts(project: AdvanceProject, rows: RatioRow[], rec: { at?: string; count?: number; posts?: DraftPost[] }, runId: string | undefined): Promise<string> {
+    const todo = postsToRefresh(rec.posts, rows);
+    if (!todo.length) return "社群草稿先前已建立";
+    assertRun(await freshRow(project.id), runId, true);   // a person's stop ends it before any draft is touched
+    const primaryId = (await primaryVideo(project.id))?.id;
+    if (!primaryId) throw new Error("找不到主成片，沒換社群草稿的影片");
+    const videoRows = await loadVideoRows(sb, org, primaryId);
+    const releases = await draftDeps(sb, org, videoRows, actor).releases();
+    const result = await refreshDrafts({
+      async cut(ratio) { const r = releases.find((x) => x.ratio === ratio), row = rows.find((x) => x.ratio === ratio); return r && row ? { checksum: row.checksum, videoUrl: r.videoUrl, coverUrl: r.coverUrl ?? null } : null; },
+      async post(postId) {
+        try { const p = await getPost(org, postId); return { id: p.id, version: p.version, state: p.state, targetStates: p.targets.map((t) => t.state), media: p.media }; }
+        catch (e) { if ((e as { status?: number }).status === 404) return null; throw e; }
+      },
+      addVideo: (url, fileName, coverUrl, deadline) => addVideo(org, url, fileName, actor, coverUrl, deadline),
+      async swap(post, media, videoUrl) { await savePost(org, post.id, post.version, { source_url: videoUrl }, null, media.map((m) => ({ media_id: m.media_id, position: m.position, alt_text: m.alt_text })), actor); },
+      save: (posts) => patchBrief(project.id, (now, row) => (assertRun(row, runId, false), { ...now, autoDrafts: { ...(now.autoDrafts as Row), posts } })),
+    }, rec.posts ?? [], rows);
+    return [result.swapped ? `已把 ${result.swapped} 個社群草稿換成新版影片` : "", keptNote({ posts: result.posts })].filter(Boolean).join("；") || "社群草稿先前已建立";
+  }
+
+  // The brand's social drafts, once per project (brief_json.autoDrafts); later re-rendered cuts reach them (refreshSocialDrafts).
+  async function socialDrafts(project: AdvanceProject, rows: RatioRow[]): Promise<string> {
     const { data: proj, error } = await sb.from("media_production_projects").select("brief_json").eq("id", project.id).eq("organization_id", org).single();
     if (error) fail("media_production_projects", error);
     const brief = (proj?.brief_json ?? {}) as Record<string, unknown>;
-    if (brief.autoDrafts) return "社群草稿先前已建立";
+    if (brief.autoDrafts) return refreshSocialDrafts(project, rows, brief.autoDrafts as { posts?: DraftPost[] }, parseAutoBudget(brief.autoBudget)?.runId);
     let budget = parseAutoBudget(brief.autoBudget);
     const runId = budget?.runId;
-    const mark = (count: number) => patchBrief(project.id, (now, row) => (assertRun(row, runId, false), { ...now, autoDrafts: { at: new Date().toISOString(), count } }));
+    const mark = (count: number, posts?: DraftPost[]) => patchBrief(project.id, (now, row) => (assertRun(row, runId, false), { ...now, autoDrafts: { at: new Date().toISOString(), count, ...(posts ? { posts } : {}) } }));
     const accounts = (await listAccounts(org, { hydrateProfile: false })).filter((a) => a.status === "connected");
     const keys = writerKeysFor(accounts.map((a) => a.platform));
     if (!keys.length) { await mark(0); return accounts.length ? "已連頻道的平台都還不能自動寫文案，沒建草稿" : "沒有連上的社群頻道，已核准發布但沒建草稿"; }
@@ -101,7 +126,8 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
     const items = accounts.filter((a) => texts[a.id]).map((a) => ({ accountId: a.id, text: texts[a.id] }));
     const result = await saveVideoSocialDrafts(draftDeps(sb, org, videoRows, actor), project.title, items);
     if (result.ok === false) throw new Error(result.error);
-    await mark(result.drafts.length);
+    // Which cut each draft was built with (the project's current cut of its ratio): what a later re-render is compared to.
+    await mark(result.drafts.length, result.drafts.map((d) => ({ postId: d.postId, ratio: d.ratio, mediaId: d.mediaId, ...(rows.find((r) => r.ratio === d.ratio)?.checksum ? { checksum: rows.find((r) => r.ratio === d.ratio)!.checksum } : {}) })));
     return `${result.drafts.length} 個社群草稿`;
   }
 
@@ -132,8 +158,13 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
       if (project.error) fail("media_production_projects", project.error);
       const budget = project.data?.brief_json?.autoBudget;
       if (budget?.runId && Array.isArray(budget.renderRatios) && budget.renderRatios.length) {
-        const { data, error } = await sb.from("video_jobs").select("id").eq("organization_id", org).eq("record_params->>projectId", projectId)
-          .eq("record_params->>autoRunId", budget.runId).order("created_at", { ascending: false }).limit(30);
+        // B26 part 2: a resume that declared a re-render counts only the renders sent after it (rerender-mark.ts); until one
+        // is sent the project waits, so the earlier cut is never taken as this run's result.
+        const since = rerenderSince(project.data?.brief_json, budget.runId);
+        let jobs = sb.from("video_jobs").select("id").eq("organization_id", org).eq("record_params->>projectId", projectId)
+          .eq("record_params->>autoRunId", budget.runId);
+        if (since) jobs = jobs.gte("created_at", since);
+        const { data, error } = await jobs.order("created_at", { ascending: false }).limit(30);
         if (error) fail("video_jobs", error);
         const covered = new Set<string>();
         for (const row of data || []) {
@@ -146,8 +177,10 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
           if (result.status !== "done") return { state: "running" };
           for (const ratio of ratios) covered.add(ratio);
         }
+        // Job rows are deleted after an hour (job-store TTL): a ratio whose job is gone but whose cut was made since the mark is covered.
+        if (since) for (const cut of newestPerRatio(createdSince(await projectVideoRows(sb, org, projectId), since))) covered.add(cut.ratio);
         if (budget.renderRatios.every((r: string) => covered.has(r))) return { state: "done" };
-        return Date.now() - Date.parse(budget.startedAt || "") > WAIT_LIMIT_MS
+        return Date.now() - Math.max(Date.parse(budget.startedAt || ""), since ? Date.parse(since) : 0) > WAIT_LIMIT_MS
           ? { state: "error", error: "超過兩小時仍未收齊這次執行的所有比例" } : { state: "running" };
       }
       const { data, error } = await sb.from("video_jobs").select("id").eq("organization_id", org).eq("record_params->>projectId", projectId).order("created_at", { ascending: false }).limit(1);
@@ -162,7 +195,10 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
 
     // One row per ratio, the newest: a re-rendered or re-attached video replaces the older one of its ratio (plan U0).
     async rows(projectId) {
-      return newestPerRatio(await projectVideoRows(sb, org, projectId)).map((a) => ({ id: a.id, ratio: a.ratio, checksum: String(a.checksum_sha256) }));
+      // After a resume that declared a re-render only the cuts made after it are this run's (rerender-mark.ts).
+      const brief = (await freshRow(projectId)).brief_json as Row | null;
+      const since = rerenderSince(brief, parseAutoBudget(brief?.autoBudget)?.runId);
+      return newestPerRatio(createdSince(await projectVideoRows(sb, org, projectId), since)).map((a) => ({ id: a.id, ratio: a.ratio, checksum: String(a.checksum_sha256) }));
     },
 
     async qaProblems(row) {
@@ -193,8 +229,8 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
       if (created.ok === false) throw new Error(`Release 沒建成：${String(created.body.message ?? created.body.error)}`);
     },
 
-    async drafts(project) {
-      const social = await socialDrafts(project);
+    async drafts(project, rows) {
+      const social = await socialDrafts(project, rows);
       const embedded = await embedDraft(project);
       return embedded ? `${social}；${embedded}` : social;
     },
@@ -211,7 +247,8 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
         if (readError) fail("media_production_projects", readError);
         const brief = (p?.brief_json ?? {}) as Record<string, unknown>, budget = parseAutoBudget(brief.autoBudget);
         if (budget) {
-          const result = patch.lastError ? "停下：" + patch.lastError : "草稿已完成", key = budget.runId + ":" + result;
+          const stale = keptNote(brief.autoDrafts); // B26 part 2: sent posts keep the older cut; say so
+          const result = patch.lastError ? "停下：" + patch.lastError : "草稿已完成" + (stale ? `（${stale}）` : ""), key = budget.runId + ":" + result;
           if ((brief.autoNotification as { key?: string } | undefined)?.key !== key) {
             const notifier = buildOperatorTelegramNotifier(), host = productHost(PRODUCTS.find((p) => p.key === "video")!);
             const url = "https://" + host + "/?" + new URLSearchParams({ open: "projects", project: String(p?.source_ref || ""), episode: budget.episodeId || "" });

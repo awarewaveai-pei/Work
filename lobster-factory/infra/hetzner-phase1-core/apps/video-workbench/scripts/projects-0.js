@@ -959,7 +959,7 @@ const runSubmission = (r, step) => ({ runId: r.runId, runAttempt: r.attempt, ide
 // 停止／關閉／從這裡繼續 of a run that goes to drafts also reach that run's server half (the schedule that writes the drafts,
 // PATCH /api/video/projects autoRun). The row is ensured first (POST, one per project), so a stop made before the first
 // render still refuses that render. Answers whether the row now runs this run.
-async function serverRun(p, run, action, budgetTwd) {
+async function serverRun(p, run, action, budgetTwd, rerender) {
   const call = async (method, body) => {
     const r = await fetch("/api/video/projects", { method, credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await r.json().catch(() => ({}));
@@ -967,7 +967,7 @@ async function serverRun(p, run, action, budgetTwd) {
     return data;
   };
   const { item } = await call("POST", { organizationId: VideoWorkbench.capabilities?.mainSystem?.organizationId, title: p.title, productionMode: "quick_video", source: "video_workbench", sourceRef: p.id });
-  return (await call("PATCH", { id: item.id, autoRun: { runId: run.runId, action, ...(budgetTwd >= 0 ? { budgetTwd } : {}) } })).armed === true;
+  return (await call("PATCH", { id: item.id, autoRun: { runId: run.runId, action, ...(budgetTwd >= 0 ? { budgetTwd } : {}), ...(rerender ? { rerender: true } : {}) } })).armed === true;
 }
 const FAILED = ["failed", "cancelled", "blocked"];
 async function autoRunStep(p, e, next, all) {
@@ -992,7 +992,8 @@ async function autoRunStep(p, e, next, all) {
       // retryOf = that job: the server reuses the render (backend/api.cjs keptQuick), so it costs nothing again.
       const kept = {};
       for (const ratio of next.ratios) {
-        const prior = all.filter((j) => j.input?.runId === run.runId && j.input.operation === "quick-render" && j.input.settings?.ratio === ratio && FAILED.includes(j.status))
+        // (a failed job whose render was made from shot pictures swapped since is never reused: B26)
+        const prior = all.filter((j) => j.input?.runId === run.runId && j.input.operation === "quick-render" && j.input.settings?.ratio === ratio && FAILED.includes(j.status) && !EpisodeSpine.shotsSwapped(e, j.input.link?.from))
           .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))).at(-1);
         if (prior && (await VideoWorkbench.generations.get(prior.id)).quickRenderDone) kept[ratio] = prior.id;
       }
@@ -1489,7 +1490,7 @@ async function action(a, button) {
         // The server half of a drafts run goes on with it (same run, the new limit, the old stop reason cleared) before the
         // runner does, so a render it sends is not refused as stopped; if the runner may not go on, the server half stops again.
         const drafts = run?.until === "drafts";
-        if (drafts && !(await serverRun(p, run, "resume", budget)) && run.stop?.step === "drafts") throw Error("主系統的草稿執行代號不符，請檢查執行紀錄");
+        if (drafts && !(await serverRun(p, run, "resume", budget, EpisodeSpine.cutOutdated(e))) && run.stop?.step === "drafts") throw Error("主系統的草稿執行代號不符，請檢查執行紀錄");
         await runPatch(p, e, (r) => ({ status: "running", stop: null, attempt: (r.attempt || 0) + 1, ...(budget >= 0 ? { budgetTwd: budget } : {}) }))
           .catch(async (err) => { if (drafts) await serverRun(p, run, "stop"); throw err; });
         await driveAutoRuns(true);

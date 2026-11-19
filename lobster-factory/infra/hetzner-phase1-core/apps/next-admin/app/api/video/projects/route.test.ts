@@ -91,6 +91,7 @@ describe("/api/video/projects", () => {
         eq: (k: string, v: unknown) => { tests.push((r) => r[k] === v); return q; },
         is: (k: string, v: unknown) => { tests.push((r) => (r[k] ?? null) === v); return q; },
         in: (k: string, v: unknown[]) => { tests.push((r) => v.includes(r[k])); return q; },
+        gte: (k: string, v: unknown) => { tests.push((r) => String(r[k] ?? "") >= String(v)); return q; },
         insert: (v: Record<string, unknown>) => { op = { kind: "insert", v }; return q; },
         update: (v: Record<string, unknown>) => { op = { kind: "update", v }; return q; },
         maybeSingle: async () => { const r = run(); return { data: r.data?.[0] ?? null, error: r.error }; },
@@ -174,6 +175,30 @@ describe("/api/video/projects", () => {
       expect(tables.media_production_projects[0].brief_json).not.toHaveProperty("autoStop");
       const other = await patch({ runId: "run-old", action: "resume" });
       expect(((await other.json()) as { armed: boolean }).armed).toBe(false);
+    });
+
+    // B26 part 2: resume that declares a re-render records the time after which auto-advance accepts a cut, and goes back to produce.
+    it("resume with rerender marks the run (autoRerender) and returns to produce; only for the row's run, only on resume", async () => {
+      const tables = { media_production_projects: [row({ autonomy: "guided", lifecycle_stage: "review", brief_json: { autoBudget: { runId: "run-new", budgetTwd: 20, spentTwd: 5, renderRatios: ["16x9"] } } })] };
+      getSupabaseWriteClient.mockReturnValue(memoryDb(tables));
+      expect((await patch({ runId: "run-old", action: "resume", rerender: true })).status).toBe(200);
+      expect(tables.media_production_projects[0].brief_json).not.toHaveProperty("autoRerender");
+      expect((await patch({ runId: "run-new", action: "stop", rerender: true })).status).toBe(400);
+      const before = Date.now();
+      expect((await patch({ runId: "run-new", action: "resume", rerender: true })).status).toBe(200);
+      const saved = tables.media_production_projects[0] as unknown as { lifecycle_stage: string; autonomy: string; brief_json: { autoRerender: { runId: string; at: string } } };
+      expect(saved).toMatchObject({ lifecycle_stage: "produce", autonomy: "auto_after_render", brief_json: { autoRerender: { runId: "run-new" } } });
+      expect(Date.parse(saved.brief_json.autoRerender.at)).toBeGreaterThanOrEqual(before);
+      // resumed again while the render is still on its way (no finished cut since the mark): the mark keeps its time
+      const first = saved.brief_json.autoRerender.at;
+      await new Promise((r) => setTimeout(r, 5));
+      expect((await patch({ runId: "run-new", action: "resume", rerender: true })).status).toBe(200);
+      expect((tables.media_production_projects[0] as unknown as typeof saved).brief_json.autoRerender.at).toBe(first);
+      // a cut finished since the mark: the next resume is a new re-render, the mark moves on
+      (tables as Record<string, Array<Record<string, unknown>>>).media_assets = [{ id: "a1", organization_id: org, media_project_id: projectId, mime_type: "video/mp4", is_current: true, created_at: new Date().toISOString() }];
+      await new Promise((r) => setTimeout(r, 5));
+      expect((await patch({ runId: "run-new", action: "resume", rerender: true })).status).toBe(200);
+      expect(Date.parse((tables.media_production_projects[0] as unknown as typeof saved).brief_json.autoRerender.at)).toBeGreaterThan(Date.parse(first));
     });
 
     it("autoRun alone: with another field, or without a runId/action, it is 400", async () => {
