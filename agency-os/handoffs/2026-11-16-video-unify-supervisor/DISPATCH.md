@@ -32,7 +32,7 @@
 
 ## 監工自己的 context
 
-- 每次被工人叫醒：先讀本檔，再 `list_sessions {linked:true}`。一輪驗收做完、沒有進行中的動作時 `clear_session self`（本檔＋`data.mjs`＋git 就是全部狀態）。
+- 每次被工人叫醒：先讀本檔，再 `list_sessions {linked:true}`。**不要 `clear_session self`**（操作者 2026-11-19 13:40 看到對話消失很火：「為什麼對話都沒了」）；context 滿了讓系統自動壓縮，本檔＋`data.mjs`＋git 仍是全部狀態，壓縮後重讀本檔即可。
 - 2026-11-19 實走在正式站留下、未對外：題目 `d67e4a5a…`、社群草稿 `776dc9e4…`、空專案列 `81448cc0…`「一鍵腳本」。操作者說先留著的是 `E2E-Verify-0704` 站；她只用 Soulful 與 AwareWave。
 
 ## 已定且卡片要照做的
