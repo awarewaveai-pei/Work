@@ -5,7 +5,7 @@
 // an earlier failed attempt) is not made again: a retry after the social step failed does not write a second article.
 // Auto publish (gated in tick.ts publishReviewed, always "now") changes those same drafts in steps (publish-steps.ts,
 // N5a): the YouTube draft (its own post since N5a) is scheduled first; once YouTube's public link is back the WordPress
-// draft is published through the calendar's core; then the other channels' draft gets the live article's link and is
+// draft (its video file swapped for that link first, N5b) is published through the calendar's core; then the other channels' draft gets the live article's link and is
 // scheduled a moment ahead as an editor would -- a brand that requires social review gets it submitted instead. Only
 // staff set a site to auto publish (sites/[id] route), so acting as editor here is that staff decision, not the
 // starting person's role. YouTube's privacy is the site's youtubePrivacy, carried on the YouTube target's format.
@@ -32,7 +32,7 @@ import { startVideoJob } from "@/lib/content/video/start";
 import { ensureTopicProject, updateTopicProject } from "@/lib/content/video/topic-project";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { finalizeVideoJob } from "@/lib/content/video/finalize";
-import { embedVideoInPost } from "@/lib/content/video/embed-in-post";
+import { embedVideoInPost, swapEmbeddedVideo } from "@/lib/content/video/embed-in-post";
 import { releaseTopicVideo } from "./video-release";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
 import { TOPIC_ARTICLE_IMAGES } from "./cost";
@@ -283,8 +283,19 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
     now: () => new Date(),
     sendPost: (postId, link, now) => sendSocial(t, postId, link, now, actor),
     lookYoutube: (postId) => lookYoutube(t.organization_id, postId),
-    publishArticle: async (wpPostId) => {
+    publishArticle: async (wpPostId, youtubeUrl) => {
       if (!t.site_id) throw new Error("沒有 WordPress 草稿編號，無法發布");
+      const video = (t.artifacts as TopicArtifacts).video;
+      // N5b: the article goes live with YouTube's player, not the video file (a site without YouTube keeps the file)
+      if (youtubeUrl && video?.url && video.embedded_at) {
+        const s = await swapEmbeddedVideo(orgIdentity(t.organization_id), { siteId: t.site_id, postId: wpPostId, fromUrl: video.url, to: { youtubeUrl } });
+        if ("blockedMode" in s) throw new Error(`系統模式（${s.blockedMode}）不允許改網站，文章沒有發布`);
+        // no video file in the article any more (a person removed it), or a person already published it (live: it is
+        // out as it is, the next steps go on): said in the log; anything else stops before the article goes live
+        const f = s as { ok: boolean; error?: string; notFound?: true; live?: true };   // strict:false
+        if (!f.ok && !f.notFound && !f.live) throw new Error(`文章的影片沒換成 YouTube 連結，沒有發布：${f.error}`);
+        if (!f.ok) console.warn(`[content/topics] ${t.id} article ${wpPostId}: ${f.live ? "文章已經被人發布，影片檔沒換成 YouTube 連結" : f.error}`);
+      }
       const r = await updateWpPost(orgIdentity(t.organization_id), t.site_id, wpPostId, { status: "publish" });
       if (!r.ok) throw new Error(`WordPress 發布失敗：${(r as Extract<typeof r, { ok: false }>).error}`);   // strict:false
       return { status: r.post.status, link: r.post.link };

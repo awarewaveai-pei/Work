@@ -39,8 +39,9 @@ export interface PublishPorts {
   /** Schedules (or submits for review) a social draft; a post a person already moved is left as it is. */
   sendPost(postId: string, link: string | undefined, now: Date): Promise<{ state: string; scheduled_at: string | null; at: string }>;
   lookYoutube(postId: string): Promise<YoutubeLook>;
-  /** WordPress draft -> publish; throws when WordPress refused. */
-  publishArticle(wpPostId: number): Promise<{ status: string; link: string }>;
+  /** WordPress draft -> publish; throws when WordPress refused. youtubeUrl = YouTube's link (N5b): the article's
+   *  embedded video file becomes that link first, while the article is still a draft. */
+  publishArticle(wpPostId: number, youtubeUrl?: string): Promise<{ status: string; link: string }>;
 }
 
 /** The artifacts publish-steps reads and writes (make.ts TopicArtifacts holds the same fields). */
@@ -103,7 +104,7 @@ export async function publishSteps(t: Pick<Topic, "formats" | "artifacts">, port
       if (held(log.article)) return wait;
       log.article = { started_at: at };
       await step();
-      const r = await ports.publishArticle(article.wp_post_id);
+      const r = await ports.publishArticle(article.wp_post_id, log.youtube?.url);
       a.article = { ...article, published: { status: r.status, link: r.link, at } };
       log.article = { ...log.article, sent_at: at, state: r.status, url: r.link };
       await step();

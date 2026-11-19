@@ -12,7 +12,7 @@ import { readJob } from "./job-store";
 import { FINISHED_VIDEO_MIME, updateProjectRow } from "./projects";
 import type { AdvanceDeps, AdvanceProject, RatioRow } from "./project-advance";
 import { RunChanged, WAIT_LIMIT_MS } from "./project-advance";
-import { embedVideoInNewDraft } from "./embed-in-post";
+import { embedVideoInNewDraft, swapEmbeddedVideo } from "./embed-in-post";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { parseAutoBudget, reserveDraftCall } from "./auto-run-budget";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
@@ -30,6 +30,9 @@ import { keptNote, postsToRefresh, refreshDrafts, type DraftPost } from "./draft
 
 const fail = (what: string, e: { message: string }): never => { throw new Error(`${what}: ${e.message}`); };
 type Row = Record<string, unknown>;
+/** brief_json.autoEmbedded: the site draft made once; siteId / videoUrl / checksum = the cut it holds (N5b, absent on
+ *  older records), kept = a newer cut the live article was not changed to. */
+interface EmbeddedRecord { at: string; postId: number; siteId?: string; videoUrl?: string; checksum?: string; kept?: string }
 
 // A firing works for the run in brief_json.autoBudget when it read the row (runId; undefined = a run without a budget).
 // Checked on a fresh row: a newer run ends this firing quietly (RunChanged), and right before anything is paid or sent out
@@ -131,14 +134,42 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
     return `${result.drafts.length} 個社群草稿`;
   }
 
+  // N5b: a re-rendered primary cut reaches the site draft too. autoEmbedded records the cut it embedded (videoUrl +
+  // checksum, as autoDrafts does per post); a newer cut swaps the file in place (swapEmbeddedVideo: draft or pending
+  // only). An article already live keeps the older cut (`kept`, named in the operator notice); a draft whose video a
+  // person removed is settled as is. Old records without the cut are unknown: never touched.
+  async function refreshEmbeddedDraft(project: AdvanceProject, rec: EmbeddedRecord, runId: string | undefined): Promise<string | null> {
+    if (!rec.siteId || !rec.videoUrl || !rec.checksum || !rec.postId) return null;
+    const primary = await primaryVideo(project.id);
+    const checksum = primary?.checksum_sha256;
+    if (!primary || !checksum || checksum === rec.checksum || checksum === rec.kept) return null;
+    const { data: rel, error } = await sb.from("media_releases").select("id").eq("organization_id", org).eq("candidate_asset_id", primary.id).eq("candidate_checksum", checksum).eq("status", "release_approved").limit(1);
+    if (error) fail("media_releases", error);
+    if (!rel?.length) throw new Error("網站草稿文章要換的新影片還沒有核准發布");
+    assertRun(await freshRow(project.id), runId, true);   // a person's stop ends it before the article is touched
+    const r = await swapEmbeddedVideo(orgIdentity(org), { siteId: rec.siteId, postId: rec.postId, fromUrl: rec.videoUrl, to: { videoUrl: String(primary.object_url), releaseId: String(rel[0].id) } });
+    if ("blockedMode" in r) throw new Error(`網站草稿文章沒換影片：系統目前是「${r.blockedMode}」模式`);
+    const settle = (patch: Partial<EmbeddedRecord>) => patchBrief(project.id, (now, row) => (assertRun(row, runId, false), { ...now, autoEmbedded: { ...(now.autoEmbedded as Row), ...patch } }));
+    if (r.ok) {
+      await settle({ videoUrl: String(primary.object_url), checksum, kept: undefined, at: new Date().toISOString() });
+      return `已把網站草稿文章 #${rec.postId} 換成新版影片`;
+    }
+    const failed = r as { status: number; error: string; notFound?: true; live?: true };   // strict:false
+    if (failed.live) { await settle({ kept: checksum }); return `網站文章 #${rec.postId} 已發布，用的是舊版影片（沒有換）`; }
+    if (failed.notFound) { await settle({ checksum }); return `網站草稿文章 #${rec.postId} 裡已經沒有舊影片，沒有換`; }
+    throw new Error(`網站草稿文章沒換影片：${failed.error}`);
+  }
+
   // Plan U5.3 (§13 C2): 「同時建一篇網站草稿文章並嵌入」 -- the quick-render route wrote brief_json.autoEmbed {siteId};
-  // the same function as the release panel's 建新草稿文章並嵌入 (embedVideoInNewDraft: a draft only, never live), once.
+  // the same function as the release panel's 建新草稿文章並嵌入 (embedVideoInNewDraft: a draft only, never live), once;
+  // later re-rendered cuts reach it (refreshEmbeddedDraft).
   async function embedDraft(project: AdvanceProject): Promise<string | null> {
     const { data: proj, error } = await sb.from("media_production_projects").select("brief_json").eq("id", project.id).eq("organization_id", org).single();
     if (error) fail("media_production_projects", error);
     const brief = (proj?.brief_json ?? {}) as Record<string, unknown>, ask = brief.autoEmbed as { siteId?: unknown } | undefined;
-    if (typeof ask?.siteId !== "string" || brief.autoEmbedded) return null;
+    if (typeof ask?.siteId !== "string") return null;
     const runId = parseAutoBudget(brief.autoBudget)?.runId;
+    if (brief.autoEmbedded) return refreshEmbeddedDraft(project, brief.autoEmbedded as EmbeddedRecord, runId);
     const primary = await primaryVideo(project.id);
     if (!primary) throw new Error("找不到主成片，沒建網站草稿文章");
     const { data: rel } = await sb.from("media_releases").select("id").eq("organization_id", org).eq("candidate_asset_id", primary.id).eq("status", "release_approved").limit(1);
@@ -146,7 +177,9 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
     const r = await embedVideoInNewDraft(orgIdentity(org), { siteId: ask.siteId, title: project.title, videoUrl: String(primary.object_url), releaseId: rel?.[0]?.id ? String(rel[0].id) : undefined, variant: "default" });
     if ("blockedMode" in r) throw new Error(`網站草稿文章沒建成：系統目前是「${r.blockedMode}」模式`);
     if (r.ok === false) throw new Error(`網站草稿文章沒建成：${r.error}`);
-    await patchBrief(project.id, (now, row) => (assertRun(row, runId, false), { ...now, autoEmbedded: { at: new Date().toISOString(), postId: r.postId } }));
+    // the cut it was embedded with: what a later re-render is compared to (refreshEmbeddedDraft)
+    const cut = primary.checksum_sha256 ? { siteId: ask.siteId, videoUrl: String(primary.object_url), checksum: primary.checksum_sha256 } : {};
+    await patchBrief(project.id, (now, row) => (assertRun(row, runId, false), { ...now, autoEmbedded: { at: new Date().toISOString(), postId: r.postId, ...cut } }));
     return `已嵌入網站草稿文章 #${r.postId}`;
   }
 
@@ -247,7 +280,8 @@ export function advanceDeps(sb: SupabaseClient, org: string, actor: string): Adv
         if (readError) fail("media_production_projects", readError);
         const brief = (p?.brief_json ?? {}) as Record<string, unknown>, budget = parseAutoBudget(brief.autoBudget);
         if (budget) {
-          const stale = keptNote(brief.autoDrafts); // B26 part 2: sent posts keep the older cut; say so
+          // B26 part 2 / N5b: sent posts and a live article keep the older cut; say so
+          const stale = [keptNote(brief.autoDrafts), (brief.autoEmbedded as EmbeddedRecord | undefined)?.kept ? "已發布的網站文章用的是舊版影片" : ""].filter(Boolean).join("、");
           const result = patch.lastError ? "停下：" + patch.lastError : "草稿已完成" + (stale ? `（${stale}）` : ""), key = budget.runId + ":" + result;
           if ((brief.autoNotification as { key?: string } | undefined)?.key !== key) {
             const notifier = buildOperatorTelegramNotifier(), host = productHost(PRODUCTS.find((p) => p.key === "video")!);

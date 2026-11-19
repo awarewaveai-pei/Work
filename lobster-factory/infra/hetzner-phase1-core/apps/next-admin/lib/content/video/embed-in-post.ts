@@ -316,6 +316,126 @@ export async function embedVideoInPost(
   return { ok: true, postId, videoUrl };
 }
 
+/** A YouTube watch / short / embed link on youtube.com or youtu.be (what Postiz gives back as release_url). */
+export function isYoutubeUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && /^(www\.|m\.)?(youtube\.com|youtu\.be)$/i.test(u.hostname);
+  } catch { return false; }
+}
+
+/** WordPress's own YouTube embed block (core/embed, provider youtube): the player, not a bare link. */
+export function youtubeMarkup(url: string): string {
+  return `<!-- wp:embed ${JSON.stringify({ url, type: "video", providerNameSlug: "youtube", responsive: true })} -->\n`
+    + `<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube"><div class="wp-block-embed__wrapper">\n${url}\n</div></figure>\n<!-- /wp:embed -->`;
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The places a post holds `videoUrl` as its video: a video block whose src is it (with its comment delimiters when
+ *  present), or the bare URL alone on its line (WP autoembed). A link to the same file inside a sentence is not one. */
+function videoSpots(videoUrl: string): RegExp {
+  const src = escapeRe(` src="${attr(videoUrl)}"`);
+  const block = `(?:<!-- wp:video[^>]*-->\\s*)?<figure class="wp-block-video">(?:(?!</figure>)[\\s\\S])*?${src}(?:(?!</figure>)[\\s\\S])*?</figure>(?:\\s*<!-- /wp:video -->)?`;
+  return new RegExp(`${block}|^[ \\t]*${escapeRe(videoUrl)}[ \\t]*$`, "gm");
+}
+
+export type SwapResult =
+  | { ok: true; postId: number; swapped: boolean; delivery?: DeliveryReceipt }
+  | { ok: false; status: number; error: string; notFound?: true; live?: true }
+  | { ok: false; blockedMode: string };
+
+export const SWAP_NOT_FOUND = "文章裡找不到要換的影片，沒有改";
+/** The old file is still in the post but not in a shape this recognises (a person edited the block, wrapped the URL in a
+ *  paragraph, linked it): not swapped, and not "not found" -- a caller must not treat the file as gone. */
+export const SWAP_SHAPE_UNKNOWN = "文章裡還有舊影片，但格式被改過、認不出要換的地方，沒有改；請到 WordPress 草稿手動換掉";
+const SWAP_IN_FLIGHT = "這支影片換進這篇文章的交付已在進行（或上次中斷），沒有換；請到 WordPress 草稿確認";
+const SWAP_LIVE_REFUSAL = "這篇文章已發布或已排程，影片沒有換（只改草稿或待審文章）";
+
+/**
+ * N5b: the video a post already embeds (`fromUrl`) becomes another: a re-rendered cut (`videoUrl`, with its Release for
+ * the poster and the delivery receipt) or the topic's YouTube link (`youtubeUrl`, WordPress's YouTube embed block).
+ * Through the site's one channel (readPost / writePost: the bridge writes only over the content it read, sha256), only
+ * on a draft or pending post (a live one is refused before any write), never twice: a post that already holds the new
+ * video and not the old one is done; a post without the old one is left as it is and said so (notFound).
+ */
+export async function swapEmbeddedVideo(
+  identity: Request | { headers: Headers },
+  input: { siteId: string; postId: number; fromUrl: string; to: { videoUrl: string; releaseId?: string } | { youtubeUrl: string } },
+): Promise<SwapResult> {
+  const siteId = input.siteId.trim();
+  const fromUrl = input.fromUrl.trim();
+  const postId = input.postId;
+  const youtube = "youtubeUrl" in input.to;
+  const toUrl = ("youtubeUrl" in input.to ? input.to.youtubeUrl : input.to.videoUrl).trim();
+  const releaseId = "videoUrl" in input.to ? (input.to.releaseId ?? "").trim() : "";
+  if (!siteId) return { ok: false, status: 400, error: "siteId required" };
+  if (!Number.isInteger(postId) || postId <= 0) return { ok: false, status: 400, error: "postId must be a positive integer" };
+  if (!/^https:\/\//i.test(fromUrl)) return { ok: false, status: 400, error: "fromUrl must start with https://" };
+  if (youtube ? !isYoutubeUrl(toUrl) : !/^https:\/\//i.test(toUrl)) return { ok: false, status: 400, error: youtube ? "youtubeUrl must be a YouTube link" : "videoUrl must start with https://" };
+  if (releaseId && !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(releaseId)) return { ok: false, status: 400, error: "releaseId must be a UUID" };
+
+  const resolved = await resolveWpSite(identity, siteId);
+  if (!resolved) return { ok: false, status: 404, error: "Site not found" };
+  const bridgeClient = bridgeClientForSite(resolved.site.url);
+  if (bridgeClient === null && !resolved.token) return { ok: false, status: 503, error: "No token for site" };
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), resolved.site.organizationId);
+  if (!gate.allowed) return { ok: false, blockedMode: gate.mode };
+
+  const read = await readPost(resolved, bridgeClient, postId);
+  if (!read.ok) { const f = read as Extract<PostRead, { ok: false }>; return { ok: false, status: f.status, error: f.error }; }   // strict:false
+  const content = read.content;
+  const hasFrom = videoSpots(fromUrl).test(content);
+  const hasTo = youtube ? content.includes(toUrl) : alreadyEmbedded(content, toUrl);
+  if (!hasFrom) {
+    if (hasTo && !content.includes(fromUrl) && !content.includes(attr(fromUrl))) return { ok: true, postId, swapped: false };
+    if (content.includes(fromUrl) || content.includes(attr(fromUrl))) return { ok: false, status: 409, error: SWAP_SHAPE_UNKNOWN };
+    return { ok: false, status: 404, error: SWAP_NOT_FOUND, notFound: true };
+  }
+  if (!NOT_LIVE_STATUSES.includes(read.status)) return { ok: false, status: 409, error: SWAP_LIVE_REFUSAL, live: true };
+
+  // N14: the new cut's Release is delivered into this post (drafted / published by the post's status), once
+  let receipt: DeliveryReceipt | null = null;
+  if (releaseId && mediaPersistenceEnabled()) {
+    if (!resolved.site.organizationId) return { ok: false, status: 422, error: "WordPress site is not linked to an organization" };
+    try {
+      receipt = await ensureDeliveryReceipt({ organizationId: resolved.site.organizationId, releaseId, destination: "wordpress", variant: `default:post-${postId}` });
+      if (receipt) {
+        const claim = await claimDeliveryReceipt(receipt);
+        // the old file is still there, so this delivery did not finish: never reported as swapped
+        if (claim && !claim.claimed) return { ok: false, status: 409, error: SWAP_IN_FLIGHT };
+        if (claim) receipt = claim.receipt;
+      }
+    } catch (err) {
+      return { ok: false, status: 503, error: err instanceof Error ? err.message : "failed to reserve delivery receipt" };
+    }
+  }
+  const mark = async (ok: boolean, response: Record<string, unknown>) => {
+    if (!receipt) return;
+    try { await recordDeliveryReceipt(receipt, ok ? { type: deliveryEventForPostStatus(read.status), externalId: String(postId) } : { type: "failed" }, response); }
+    catch (err) { console.error("[video/swap-in-post] receipt persistence failed", err); }
+  };
+
+  let poster: string | null = null;
+  const posterDb = releaseId && resolved.site.organizationId ? getSupabaseWriteClient() : null;
+  if (posterDb) {
+    try { poster = await coverForRelease(posterDb, resolved.site.organizationId as string, releaseId, toUrl); }
+    catch (err) { console.error("[video/swap-in-post] cover lookup failed; swapping without a poster", err); }
+  }
+  const markup = youtube ? youtubeMarkup(toUrl) : videoMarkup(toUrl, poster);
+  const next = content.replace(videoSpots(fromUrl), () => markup);
+  // draftStatus = the not-live status read: REST writes it back, so a post published meanwhile does not go live with this
+  const written = await writePost(resolved, bridgeClient, postId, next, read.sha256 ?? "", read.status, false, toUrl);
+  if (!written.ok) {
+    const failed = written as Exclude<PostWrite, { ok: true }>;   // strict:false
+    await mark(false, { phase: "patch", ...failed.receipt });
+    if ("blockedMode" in failed) return { ok: false, blockedMode: failed.blockedMode };
+    return { ok: false, status: failed.status, error: failed.error, ...(failed.status === 409 && failed.error === BRIDGE_LIVE_REFUSAL ? { live: true as const } : {}) };
+  }
+  await mark(true, { postId, videoUrl: toUrl, fromUrl, postTitle: read.title || "文章 #" + postId, editUrl: resolved.site.url.replace(/\/$/, "") + "/wp-admin/post.php?post=" + postId + "&action=edit", postStatus: read.status });
+  return { ok: true, postId, swapped: true };
+}
+
 export type NewDraftEmbedResult = (Extract<EmbedResult, { ok: true }> & { editUrl?: string }) | Exclude<EmbedResult, { ok: true }>;
 
 /**
