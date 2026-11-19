@@ -41,6 +41,9 @@ import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { MakeError, NOW_FORMATS, brandDay, personAsked, waitsForVideo, type Made, type Published, type PublishRun, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
 import { publishSteps, type PublishLog, type YoutubeLook } from "./publish-steps";
 
+/** N5b: the article was published by a person before 發布 reached it; its video is still the file (artifacts.publish.article.note). */
+export const ARTICLE_LIVE_NOTE = "文章已先被手動發布，影片仍是原檔，沒有換成 YouTube 連結";
+
 /** What content_topics.artifacts holds: one entry per made part; `published` / `sent` once auto publish put it out. */
 export interface TopicArtifacts {
   article?: {
@@ -285,6 +288,7 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
     lookYoutube: (postId) => lookYoutube(t.organization_id, postId),
     publishArticle: async (wpPostId, youtubeUrl) => {
       if (!t.site_id) throw new Error("沒有 WordPress 草稿編號，無法發布");
+      let note: string | undefined;
       const video = (t.artifacts as TopicArtifacts).video;
       // N5b: the article goes live with YouTube's player, not the video file (a site without YouTube keeps the file)
       if (youtubeUrl && video?.url && video.embedded_at) {
@@ -294,11 +298,13 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
         // out as it is, the next steps go on): said in the log; anything else stops before the article goes live
         const f = s as { ok: boolean; error?: string; notFound?: true; live?: true };   // strict:false
         if (!f.ok && !f.notFound && !f.live) throw new Error(`文章的影片沒換成 YouTube 連結，沒有發布：${f.error}`);
-        if (!f.ok) console.warn(`[content/topics] ${t.id} article ${wpPostId}: ${f.live ? "文章已經被人發布，影片檔沒換成 YouTube 連結" : f.error}`);
+        if (!f.ok) console.warn(`[content/topics] ${t.id} article ${wpPostId}: ${f.live ? ARTICLE_LIVE_NOTE : f.error}`);
+        // a live article is left as it is (swapEmbeddedVideo never edits one): the topic says so, or nobody would know
+        if (!f.ok && f.live) note = ARTICLE_LIVE_NOTE;
       }
       const r = await updateWpPost(orgIdentity(t.organization_id), t.site_id, wpPostId, { status: "publish" });
       if (!r.ok) throw new Error(`WordPress 發布失敗：${(r as Extract<typeof r, { ok: false }>).error}`);   // strict:false
-      return { status: r.post.status, link: r.post.link };
+      return { status: r.post.status, link: r.post.link, ...(note ? { note } : {}) };
     },
   }, save, fresh);
 }

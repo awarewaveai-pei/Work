@@ -112,5 +112,12 @@ export function publishConfirmText(title: string, to: string[], reviewFailed: bo
     ...(reviewFailed ? ["", "注意：規則審核沒通過，發布前請先看過草稿。"] : []), "", "發出去之後不會自動收回。"].join("\n");
 }
 
+/** What a publish step went out without (publish-steps.ts PublishStep.note), e.g. an article a person had already
+ *  published keeps its video file (N5b): a yellow line on the topic, not an error. */
+export function publishNote(t: Pick<Topic, "artifacts">): string | null {
+  const note = (t.artifacts as { publish?: { article?: { note?: unknown } } } | null)?.publish?.article?.note;
+  return typeof note === "string" && note ? note : null;
+}
+
 /** The social tool's post list of the topic's brand, where its social drafts are (the tool opens no single post by link). */
 export const socialDraftsUrl = (organizationId: string) => `/tools/social?brand=${encodeURIComponent(organizationId)}&view=list`;

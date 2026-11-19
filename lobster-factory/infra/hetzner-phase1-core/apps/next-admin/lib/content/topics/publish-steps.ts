@@ -20,6 +20,8 @@ export interface PublishStep {
   url?: string;
   /** YouTube: the wait for its link counts from here (sent_at, or the start of this publish run on a retry) */
   since?: string;
+  /** what the step went out without (shown on the topic as a yellow line; not an error, the publish went on) */
+  note?: string;
 }
 /** requestedBy / requestedAt: the person who pressed 發布 (N6) for this run into 'publishing' -- the only way a topic of
  *  a site set to human review goes out (make.ts publishDrafts reads it; tick.ts publishNow clears it on an auto entry). */
@@ -41,7 +43,7 @@ export interface PublishPorts {
   lookYoutube(postId: string): Promise<YoutubeLook>;
   /** WordPress draft -> publish; throws when WordPress refused. youtubeUrl = YouTube's link (N5b): the article's
    *  embedded video file becomes that link first, while the article is still a draft. */
-  publishArticle(wpPostId: number, youtubeUrl?: string): Promise<{ status: string; link: string }>;
+  publishArticle(wpPostId: number, youtubeUrl?: string): Promise<{ status: string; link: string; note?: string }>;
 }
 
 /** The artifacts publish-steps reads and writes (make.ts TopicArtifacts holds the same fields). */
@@ -106,7 +108,7 @@ export async function publishSteps(t: Pick<Topic, "formats" | "artifacts">, port
       await step();
       const r = await ports.publishArticle(article.wp_post_id, log.youtube?.url);
       a.article = { ...article, published: { status: r.status, link: r.link, at } };
-      log.article = { ...log.article, sent_at: at, state: r.status, url: r.link };
+      log.article = { ...log.article, sent_at: at, state: r.status, url: r.link, ...(r.note ? { note: r.note } : {}) };
       await step();
     }
 

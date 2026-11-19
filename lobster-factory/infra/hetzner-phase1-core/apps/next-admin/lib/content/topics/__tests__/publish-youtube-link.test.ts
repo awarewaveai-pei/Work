@@ -14,6 +14,7 @@ vi.mock("@/lib/content/brand-voice-store", () => ({
 
 const { topicDeps } = await import("../make");
 const { continuePublishing } = await import("../tick");
+const { publishNote } = await import("../lanes");
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const FILE = "https://cdn.example/v.mp4";
@@ -66,4 +67,20 @@ describe("N5b (a): the article goes live with YouTube's link", () => {
     expect(wp.updateWpPost).not.toHaveBeenCalled();
     expect(db.row.last_error).toContain("沒換成 YouTube 連結");
   });
+
+  // N5b risk fix: an article a person already published keeps its file; the topic says so instead of only the server log
+  it("an article a person already published: publish goes on and the topic carries a note; a draft article gets none", async () => {
+    embed.swapEmbeddedVideo.mockResolvedValue({ ok: false, live: true, status: 409, error: "live" });
+    const live = deps(row({ social: { post_id: null, youtube_post_id: "y" }, publish: youtubeDone }));
+    expect(await continuePublishing(live.d, live.db.row, false)).toBe("published");
+    const note = (live.db.row.artifacts as { publish: { article: { note?: string } } }).publish.article.note;
+    expect(note).toBe("文章已先被手動發布，影片仍是原檔，沒有換成 YouTube 連結");
+    expect(publishNote(live.db.row)).toBe(note);
+
+    embed.swapEmbeddedVideo.mockResolvedValue({ ok: true, postId: 5, swapped: true });
+    const draft = deps(row({ social: { post_id: null, youtube_post_id: "y" }, publish: youtubeDone }));
+    expect(await continuePublishing(draft.d, draft.db.row, false)).toBe("published");
+    expect(publishNote(draft.db.row)).toBeNull();
+  });
 });
+

@@ -12,7 +12,7 @@ import type { TopicArtifacts } from "@/lib/content/topics/make";
 import { autoPublishes, youtubePrivacy, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
-import { LANE_LABEL, LANE_ORDER, approvedStartText, draftPrivacy, draftUrl, inLane, laneCounts, nextStep, pendingYoutubePostId, publishConfirmText, publishTargets,
+import { LANE_LABEL, LANE_ORDER, approvedStartText, draftPrivacy, draftUrl, inLane, laneCounts, nextStep, pendingYoutubePostId, publishConfirmText, publishNote, publishTargets,
   socialDraftsUrl, topicLane, youtubePrivacyMismatch, type DraftPrivacy, type LaneFilter } from "@/lib/content/topics/lanes";
 import { FlowCells, OverviewTable } from "./AutoContentOverview";
 
@@ -372,6 +372,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
                     {whenText(t)} · {t.formats.map((f) => FORMAT[f]).join("、")} · {SOURCE[t.source]}
                   </span>
                   {approvedStartText(t, now, whenText(t)) && <span style={{ display: "block", fontSize: "var(--font-size-xs)", color: "var(--accent-text)" }}>{approvedStartText(t, now, whenText(t))}</span>}
+                  {publishNote(t) && <span style={{ display: "block", fontSize: "var(--font-size-xs)", color: "var(--yellow)" }}>{publishNote(t)}</span>}
                 </span>
                 <span style={{ display: "grid", justifyItems: "end", gap: 4 }}>
                   <span style={{ fontSize: "var(--font-size-xs)", color: STATUS[t.status][1], whiteSpace: "nowrap" }}>{topicLane(t, now) === "overdue" ? "過期" : STATUS[t.status][0]}</span>
