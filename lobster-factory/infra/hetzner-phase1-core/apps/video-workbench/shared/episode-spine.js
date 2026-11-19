@@ -480,7 +480,12 @@
     // 3. The quick renders not sent yet in this run (a ratio already sent is never sent twice; its newest job failing
     // stops the run there).
     const sent = new Map();
-    for (const j of mine) if (j.input?.operation === "quick-render") sent.set(j.input.settings?.ratio, j);
+    // B26 從這裡繼續: a render finished in an EARLIER attempt (a resume bumps run.attempt) from shot pictures that have since
+    // been swapped is not "sent": the resume renders again, then goes on to drafts. A render of this attempt never is
+    // (its idempotency key is the same, so a repeat would only return the same job).
+    for (const j of mine)
+      if (j.input?.operation === "quick-render" && !(j.status === "succeeded" && (j.input.runAttempt ?? 0) < (run.attempt || 0) && shotsSwapped(episode, j.input.link?.from)))
+        sent.set(j.input.settings?.ratio, j);
     for (const [ratio, j] of sent)
       if (["failed", "cancelled", "blocked"].includes(j.status)) return { do: "stop", ...autoRunFailure("render", { ratio }, j.error || j.status, j.id) };
     const left = run.ratios.filter((r) => !sent.has(r));
@@ -495,6 +500,16 @@
   // Card PJ.4 (spec §4): the one staleness rule of the workbench. A key recorded when something was made against a
   // place's key now; an unknown key now (place gone, engine without revisions) is never stale.
   const isStale = (recordedKey, currentKey) => currentKey != null && recordedKey !== currentKey;
+  // B26: did any shot picture a render was made from (link.from, slot "shot:<id>", key = the picture/clip url) change since?
+  // outputStale does not see this: a quick-render cut has no editRevision.
+  const shotsSwapped = (episode, from) =>
+    (Array.isArray(from) ? from : []).some((f) => typeof f?.slot === "string" && f.slot.startsWith("shot:") && isStale(f.key, current(episode, f.slot)));
+  // The newest cut was made from shot pictures that are not the shots' pictures now (the stop panel says it will be re-rendered).
+  function cutOutdated(episode) {
+    const cut = (episode?.outputs || []).findLast((o) => o.derivedFrom == null),
+      step = cut && (episode.steps || []).find((s) => s.jobId === cut.jobId);
+    return !!step && shotsSwapped(episode, step.from);
+  }
   const editRow = (episode, editRows) =>
     (episode?.edit && (Array.isArray(editRows) ? editRows : []).find((r) => editId(r) === episode.edit.projectId)) || null;
   // The key a place has now (spec §2 PJ.4 table). A line is trimmed: the editor voices and subtitles the trimmed line.
@@ -617,7 +632,7 @@
   }
 
   const api = { editId, editTitle, newProject, newShot, castOf, castShots, setShots, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs,
-    TRANSITIONS, TEMPLATE_RATIOS, normalizeBookend, setBookends, bookendJob, bookendKey, bookendState, AUTO_RUN_STEP, autoRunFailure, readStop, normalizeAutoRun, setAutoRun, autoRunNext, current, isStale, staleClip, outputStale, lineage, stepStates, nextAction };
+    TRANSITIONS, TEMPLATE_RATIOS, normalizeBookend, setBookends, bookendJob, bookendKey, bookendState, AUTO_RUN_STEP, autoRunFailure, readStop, normalizeAutoRun, setAutoRun, autoRunNext, current, isStale, shotsSwapped, cutOutdated, staleClip, outputStale, lineage, stepStates, nextAction };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

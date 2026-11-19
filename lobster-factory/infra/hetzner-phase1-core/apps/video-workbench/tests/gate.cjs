@@ -47,6 +47,7 @@ const tests = [
   "u8-bookends",
   "n13-quick-output-steps",
   "n14-output-card",
+  "b26-resume-rerender",
   "u4-scene-image",
   "style-literals",
 ];
