@@ -27,6 +27,17 @@
   // [] = never released (also when the project has no row yet: the first open of the panel makes it).
   const METRIC = { views: "觀看", impressions: "曝光", reach: "觸及", likes: "讚", comments: "留言", shares: "分享", saves: "收藏", clicks: "點擊", completion_rate: "完成率 %" },
     MATURITY = { "24h": "24 小時", "7d": "7 天", "30d": "30 天" };
+  // N14: a person's words for where a video went. The website article is told by the article as it is now (draft-outcome
+  // `state`), never by the delivery row's status (old receipts recorded drafts as "published"), and never by its code
+  // (wordpress／default:post-57). A title that cannot be read is left out, not made up.
+  const DELIVERY_STATUS = { queued: "排隊中", dispatching: "投遞中", drafted: "草稿", scheduled: "已排程", published: "已發布", failed: "失敗", withdrawn: "已撤回" };
+  // A delivery's platform as a person says it: the platform at the end of a variant code (postiz／default:youtube -> youtube),
+  // else the destination; never the code itself.
+  const platformName = (d) => { const tail = String(d.variant || "").split(":").pop(); return /^[A-Za-z][\w-]*$/.test(tail) && String(d.variant).includes(":") ? tail : d.destination; };
+  const articleLine = (a) => {
+    const title = a?.title && !a.untitled ? "〈" + a.title + "〉" : "";
+    return a?.state === "published" ? "網站文章" + title + "（已發布）" : a?.state === "scheduled" ? "網站文章" + title + "（已排程）" : "網站草稿" + title;
+  };
   async function readPublished(get, organizationId, workbenchProjectId, assetId) {
     const org = encodeURIComponent(organizationId),
       list = await get("/api/video/projects?organizationId=" + org + "&sourceRef=" + encodeURIComponent(workbenchProjectId));
@@ -38,15 +49,30 @@
     const mine = new Set((detail.assets || []).filter((a) => a.id === assetId || a.metadata?.variantOf === assetId).map((a) => a.id)),
       releases = (detail.releases || []).filter((r) => mine.has(r.candidate_asset_id)),
       ids = new Set(releases.map((r) => r.id)),
-      seen = new Set();
+      seen = new Set(),
+      deliveries = (detail.deliveries || []).filter((d) => ids.has(d.release_id)),
+      site = deliveries.filter((d) => d.destination === "wordpress"),
+      made = releases.length ? await get("/api/video/draft-outcome?" + new URLSearchParams({ organizationId, candidateAssetId: assetId })) : null;
     return [
-      ...(detail.deliveries || []).filter((d) => ids.has(d.release_id)).map((d) => d.destination + (d.variant ? "／" + d.variant : "") + "：" + d.status),
+      ...deliveries.filter((d) => d.destination !== "wordpress").map((d) => platformName(d) + "：" + (DELIVERY_STATUS[d.status] || d.status)),
+      // the article's own record when it can be read; else one plain line per delivery (told as a draft: the safe side)
+      ...(made ? (made.articles || []).map(articleLine) : site.map(() => articleLine(null))),
+      ...(made?.drafts?.length ? ["社群草稿 ×" + made.drafts.length] : []),
       // rows arrive newest first: the first one per platform and maturity is the current one
       ...(detail.outcomes || []).filter((o) => ids.has(o.release_id) && !seen.has(o.platform + o.maturity) && seen.add(o.platform + o.maturity))
         .map((o) => o.platform + " 成效（發布後 " + (MATURITY[o.maturity] || o.maturity) + "）：" + (Object.entries(o.metrics || {}).filter(([, n]) => typeof n === "number").map(([k, n]) => (METRIC[k] || k) + " " + n).join("　") || "尚無數字")),
-      ...(releases.length && !(detail.deliveries || []).some((d) => ids.has(d.release_id)) ? ["已核准，還沒投遞"] : []),
+      ...(releases.length && !deliveries.length ? ["已核准，還沒投遞"] : []),
     ];
   }
+  // N14 成片卡: only the newest version is open; an older one is a one-line row (第 N 版・日期・展開) the person opens
+  // on purpose (`opened` = the indexes they opened). 完成：… is said by deliveredText, and only for a version whose own
+  // read shows drafts or articles made from it; none = nothing is written.
+  const expandedOutputs = (count, opened = []) => Array.from({ length: count }, (_, i) => i === count - 1 || opened.includes(i));
+  function outputSummary(o, i, open) {
+    const d = new Date(o?.at || NaN);
+    return ["第 " + (i + 1) + " 版", isNaN(d) ? "" : d.getMonth() + 1 + "/" + d.getDate(), open ? "收合" : "展開"].filter(Boolean).join("・");
+  }
+  const deliveredText = (review) => (review?.drafted ? "完成：已建 " + [[review.drafts?.length, " 個社群草稿"], [review.articles?.length, " 篇文章"]].filter(([n]) => n).map(([n, u]) => n + u).join("、") : "");
   async function readProgress(get, org, asset) {
     const [review, outcome] = await Promise.all([readReview(get, org, asset), get("/api/video/draft-outcome?" + new URLSearchParams({ organizationId: org, candidateAssetId: asset }))]);
     return review && outcome ? { ...review, drafted: !!(outcome.drafts?.length || outcome.articles?.length), drafts: outcome.drafts || [], articles: outcome.articles || [], socialUrl: outcome.socialUrl } : null;
@@ -74,7 +100,10 @@
       const d = new Date(iso || NaN);
       return isNaN(d) ? "" : d.toLocaleString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone });
     };
-  if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio, readReview, readPublished, readProgress, jobStatusLabel, jobTitle, jobTime });
+  if (typeof module === "object" && module.exports) return void (module.exports = { jobRatio, readReview, readPublished, readProgress, expandedOutputs, outputSummary, deliveredText, jobStatusLabel, jobTitle, jobTime });
+  VideoWorkbench.expandedOutputs = expandedOutputs;
+  VideoWorkbench.outputSummary = outputSummary;
+  VideoWorkbench.deliveredText = deliveredText;
   VideoWorkbench.jobStatusLabel = jobStatusLabel;
   VideoWorkbench.jobTitle = jobTitle;
   VideoWorkbench.jobTime = jobTime;
@@ -292,7 +321,7 @@
       };
       if (next.key === "done") {
         button.disabled = true;
-        button.textContent = "完成：已建 " + [[progress.review?.drafts.length, " 個社群草稿"], [progress.review?.articles?.length, " 篇文章"]].filter(([n]) => n).map(([n, u]) => n + u).join("、");
+        button.textContent = deliveredText(progress.review);
         for (const article of progress.review?.articles || []) {
           const a = document.createElement("a"); a.textContent = "已嵌入〈" + article.title + "〉";
           if (article.editUrl && VideoWorkbench.safeUrl(article.editUrl)) { a.href = VideoWorkbench.safeUrl(article.editUrl); a.target = "_blank"; a.rel = "noopener noreferrer"; } box.append(a);

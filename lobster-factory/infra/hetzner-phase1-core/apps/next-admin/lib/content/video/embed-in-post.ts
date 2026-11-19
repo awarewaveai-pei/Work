@@ -3,7 +3,7 @@
  * the pipeline clock embed through the same code (AUTO_CONTENT I4). Kept apart from finalize.ts so the
  * embed route does not reach video-pipeline's product features.
  */
-import { resolveWpSite, type ResolvedWpSite } from "@/lib/content/wp-sites";
+import { listAccessibleWpSites, resolveWpSite, type ResolvedWpSite } from "@/lib/content/wp-sites";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { publishToWordPress } from "@/lib/content/publish/wordpress-core";
@@ -40,6 +40,12 @@ export type EmbedResult =
 
 /** WordPress statuses nobody outside wp-admin sees. Anything else (publish, future, private) is or becomes live on edit. */
 const NOT_LIVE_STATUSES = ["draft", "pending"];
+
+/** The delivery event for an article in WordPress status `status`: publish = published, future = scheduled, anything else
+ *  (draft, pending, private, unknown) = drafted. */
+export function deliveryEventForPostStatus(status: string | undefined): "published" | "scheduled" | "drafted" {
+  return status === "publish" ? "published" : status === "future" ? "scheduled" : "drafted";
+}
 
 const DRAFT_ONLY_REFUSAL = "這篇文章已發布或已排程，嵌入會直接上線；請改用「建新草稿文章並嵌入」";
 const BRIDGE_LIVE_REFUSAL = "這篇文章已發布或已排程；這個網站經 WP Bridge 只能改草稿或待審文章，影片沒有嵌入";
@@ -130,6 +136,22 @@ async function writePost(
     return { ok: true };
   } catch {
     return { ok: false, status: 502, error: "Failed to update post in WordPress", receipt: { error: "network" } };
+  }
+}
+
+/** The article's status in WordPress now ("publish", "draft", ...), found from the edit URL a receipt kept (its site
+ *  origin) and read through the site's one channel; null = cannot tell (site gone, no access, WordPress down). */
+export async function readArticleStatus(identity: Request | { headers: Headers }, editUrl: string, postId: number): Promise<string | null> {
+  try {
+    // the receipt's editUrl is <site url>/wp-admin/post.php...: the site is the one whose url (path included) it starts with
+    const { sites } = await listAccessibleWpSites(identity);
+    const site = sites.filter((s) => editUrl.startsWith(s.url.replace(/\/+$/, "") + "/wp-admin/")).sort((a, b) => b.url.length - a.url.length)[0];
+    const resolved = site ? await resolveWpSite(identity, site.id) : null;
+    if (!resolved || !Number.isInteger(postId) || postId <= 0) return null;
+    const read = await readPost(resolved, bridgeClientForSite(resolved.site.url), postId);
+    return read.ok ? read.status : null;
+  } catch {
+    return null;
   }
 }
 
@@ -224,15 +246,16 @@ export async function embedVideoInPost(
       return { ok: false, status: 503, error: err instanceof Error ? err.message : "failed to reserve delivery receipt" };
     }
   }
-  const markReceipt = async (ok: boolean, externalId?: string, response?: Record<string, unknown>) => {
+  const markReceipt = async (ok: boolean, externalId?: string, response?: Record<string, unknown>, postStatus?: string) => {
     if (!receipt) return;
     try {
       if (!ok) {
         await recordDeliveryReceipt(receipt, { type: "failed" }, response);
         return;
       }
-      const drafted = await recordDeliveryReceipt(receipt, { type: "drafted", externalId: externalId ?? String(postId) }, response);
-      if (drafted) await recordDeliveryReceipt(drafted, { type: "published", externalId: externalId ?? String(postId) }, response);
+      // The receipt says what the article is: only a live post is "published" (a draft recorded as published made the
+      // delivery list and the outcome webhook treat it as public).
+      await recordDeliveryReceipt(receipt, { type: deliveryEventForPostStatus(postStatus), externalId: externalId ?? String(postId) }, { ...response, postStatus });
     } catch (err) {
       console.error("[video/embed-to-wp] receipt persistence failed", err);
     }
@@ -288,7 +311,7 @@ export async function embedVideoInPost(
     return { ok: false, status: failed.status, error: failed.error };
   }
 
-  await markReceipt(true, String(postId), { postId, videoUrl, postTitle, editUrl: resolved.site.url.replace(/\/$/, "") + "/wp-admin/post.php?post=" + postId + "&action=edit" });
+  await markReceipt(true, String(postId), { postId, videoUrl, postTitle, editUrl: resolved.site.url.replace(/\/$/, "") + "/wp-admin/post.php?post=" + postId + "&action=edit" }, read.status);
   return { ok: true, postId, videoUrl };
 }
 

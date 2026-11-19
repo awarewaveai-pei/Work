@@ -285,12 +285,16 @@ function episodeSteps(e) {
 // 審片與發布 (plan U6): the shell opens next-admin's panel at `section` (VideoWorkbench.openReview, shared/jobs-view.js).
 // Offered once wireReviewLinks has checked the video can be placed.
 const reviewButton = (o, section, label) => `<button class="btn small outline" data-review="${esc(o.jobId)}" data-section="${section}" aria-disabled="true">${label}</button>`;
-function bookendCard(e, o, i) {
+// N14: the next step (and its 完成：…) is the episode's, said once on the newest version; an older version says 完成：… only
+// from its own read (data-delivered, wireReviewLinks), and nothing when none was made from it.
+function bookendCard(e, o, i, latest) {
   const end = e.intro, templates = VideoWorkbench.capabilities?.remotionTemplates || [],
     name = !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + (TRANSITION_LABEL[end.transition] || ""),
     preview = end ? `<span data-intro-preview="${esc(o.jobId)}"></span>` : "";
-  return `<div class="row" data-output-next data-vw-next-surface="card"></div><div class="panel"><strong>本集片頭：${esc(name)}</strong>${preview}<div class="row">${[["bookendEdit", "編輯片頭"], ["bookendRender", "重新生成片頭 · 免費"], ["bookendJoin", "加入這支影片 · 免費"], ["copyOutput", "複製連結"]].map(([act, label]) => `<button class="btn small outline" data-action="${act}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
+  return `${latest ? `<div class="row" data-output-next data-vw-next-surface="card"></div>` : `<p class="tiny" data-delivered="${esc(o.jobId)}"></p>`}<div class="panel"><strong>本集片頭：${esc(name)}</strong>${preview}<div class="row">${[["bookendEdit", "編輯片頭"], ["bookendRender", "重新生成片頭 · 免費"], ["bookendJoin", "加入這支影片 · 免費"], ["copyOutput", "複製連結"]].map(([act, label]) => `<button class="btn small outline" data-action="${act}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
 }
+// The older versions the person opened (by job id), kept across redraws.
+const openedOutputs = new Set();
 function outputList(e) {
   const outputs = e.outputs,
     rows = editRows(e),
@@ -306,10 +310,13 @@ function outputList(e) {
           : toolOf(o) === "bookends"
             ? `<p class="tiny">主片換過了，可以用新版重接。</p><button class="btn small outline" data-action="bookendJoin" data-index="${cut}">用最新主片重接 · 免費</button>`
             : `<p class="tiny">成片換過了，這一版要重做。</p><button class="btn small outline" data-action="outputTool" data-tool="${esc(toolOf(o))}" data-index="${cut}">開啟${esc(TOOL_NAME[toolOf(o)] || toolOf(o))}</button>`;
+  const open = VideoWorkbench.expandedOutputs(outputs.length, outputs.map((o, i) => (openedOutputs.has(o.jobId) ? i : -1)).filter((i) => i >= 0));
   return `<section class="panel" style="padding:12px;margin-bottom:16px" aria-label="成片"><strong>成片 ${outputs.length} 支</strong><div class="shot-grid" style="margin-top:10px">${outputs
     .map((o, i) => {
-      const parent = o.derivedFrom ? outputs.findIndex((x) => x.url === o.derivedFrom) : -1;
-      return `<div class="shot" data-output="${i}"><video src="${esc(o.url)}" controls preload="metadata" style="width:100%;max-height:220px"></video><div class="tiny">${parent >= 0 ? `從第 ${parent + 1} 版${esc(TOOL_LABEL[toolOf(o)] || "")}` : `第 ${i + 1} 版`}</div>${redo(o)}${bookendCard(e, o, i)}<div class="row">${reviewButton(o, "qa", "審片與發布")}<button class="btn small outline" data-action="lineage" data-index="${i}">怎麼做的</button>${[...FINISH_TOOLS, ...DERIVE_TOOLS].map(([tool, label]) => `<button class="btn small outline" data-action="outputTool" data-tool="${tool}" data-index="${i}">${label}</button>`).join("")}</div><p class="tiny" data-published="${esc(o.jobId)}"></p></div>`;
+      const parent = o.derivedFrom ? outputs.findIndex((x) => x.url === o.derivedFrom) : -1,
+        latest = i === outputs.length - 1,
+        body = `<video src="${esc(o.url)}" controls preload="metadata" style="width:100%;max-height:220px"></video><div class="tiny">${parent >= 0 ? `從第 ${parent + 1} 版${esc(TOOL_LABEL[toolOf(o)] || "")}` : `第 ${i + 1} 版`}</div>${redo(o)}${bookendCard(e, o, i, latest)}<div class="row">${reviewButton(o, "qa", "審片與發布")}<button class="btn small outline" data-action="lineage" data-index="${i}">怎麼做的</button>${[...FINISH_TOOLS, ...DERIVE_TOOLS].map(([tool, label]) => `<button class="btn small outline" data-action="outputTool" data-tool="${tool}" data-index="${i}">${label}</button>`).join("")}</div><p class="tiny" data-published="${esc(o.jobId)}"></p>`;
+      return latest ? `<div class="shot" data-output="${i}">${body}</div>` : `<details class="shot" data-output="${i}" data-job="${esc(o.jobId)}"${open[i] ? " open" : ""}><summary class="tiny">${esc(VideoWorkbench.outputSummary(o, i, open[i]))}</summary>${body}</details>`;
     })
     .join("")}</div></section>`;
 }
@@ -330,7 +337,9 @@ const read = (key, load) => {
 function wireReviewLinks() {
   const root = $("workbench"),
     buttons = [...root.querySelectorAll("[data-review]")],
-    lines = [...root.querySelectorAll("[data-published]")];
+    shut = (el) => !!el.closest("details[data-output]:not([open])"),   // a collapsed version asks the server nothing until it is opened
+    lines = [...root.querySelectorAll("[data-published]")].filter((el) => !shut(el)),
+    delivered = [...root.querySelectorAll("[data-delivered]")].filter((el) => !shut(el));
   if (!buttons.length && !lines.length) return;
   const jobs = VideoWorkbench.generations.list(),
     videoOf = (id) => read("job:" + id, () => jobs.then((list) => list.find((j) => j.id === id) || VideoWorkbench.generations.get(id)));
@@ -358,6 +367,10 @@ function wireReviewLinks() {
       .then((where) => {
         if (where) line.textContent = "發布到哪：" + (where.join("；") || "還沒發布");
       }, () => {});
+  for (const line of delivered)
+    videoOf(line.dataset.delivered)
+      .then((v) => read("review:" + v.id, () => VideoWorkbench.readProgress(v)))
+      .then((review) => { line.textContent = VideoWorkbench.deliveredText(review); }, () => {});
   // The steps follow the newest cut (the one step 11 and 12 open on).
   const last = buttons.find((b) => b.dataset.section === "qa" && b.closest("[data-step]"));
   if (last)
@@ -371,6 +384,14 @@ function wireReviewLinks() {
         }
       }, () => {});
 }
+document.addEventListener("toggle", (event) => {
+  const box = event.target;
+  if (!box?.matches?.("#workbench details[data-output]")) return;
+  box.open ? openedOutputs.add(box.dataset.job) : openedOutputs.delete(box.dataset.job);
+  const i = Number(box.dataset.output), summary = box.querySelector(":scope > summary");
+  if (summary) summary.textContent = VideoWorkbench.outputSummary(ep()?.outputs?.[i], i, box.open);
+  if (box.open) wireReviewLinks();
+}, true);
 let shown;
 window.addEventListener("resize", () => {
   clearTimeout(shown);

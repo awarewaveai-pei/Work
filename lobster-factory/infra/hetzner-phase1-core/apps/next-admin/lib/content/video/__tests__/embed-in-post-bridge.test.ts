@@ -38,7 +38,7 @@ const plugin = vi.hoisted(() => ({ routes: {} as Record<string, { status: number
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.stubGlobal("fetch", fetchMock);
 
-const { embedVideoInPost, embedVideoInNewDraft, listNotLiveDrafts } = await import("../embed-in-post");
+const { embedVideoInPost, embedVideoInNewDraft, listNotLiveDrafts, deliveryEventForPostStatus } = await import("../embed-in-post");
 
 const SEED_B64 = Buffer.alloc(32, 7).toString("base64");
 const savedEnv = { ...process.env };
@@ -151,18 +151,25 @@ describe("bridge site: every read and write goes through the bridge", () => {
     expect(urls().some((u) => u.includes("/wp-json/"))).toBe(false);
   });
 
-  it("receipts: a claimed delivery is recorded drafted + published; an already-claimed one writes nothing", async () => {
+  it("receipts: a draft is recorded drafted only (never published); an already-claimed one writes nothing", async () => {
     receipts.enabled = true;
     const res = await embedVideoInPost(orgIdentity(ORG), { siteId: "s", postId: 7753, videoUrl: VIDEO, releaseId: RELEASE, draftOnly: true });
     expect(res).toEqual({ ok: true, postId: 7753, videoUrl: VIDEO });
     expect(receipts.ensureDeliveryReceipt).toHaveBeenCalledWith({ organizationId: ORG, releaseId: RELEASE, destination: "wordpress", variant: "default:post-7753" });
-    expect(receipts.recordDeliveryReceipt.mock.calls.map((c) => c[1].type)).toEqual(["drafted", "published"]);
+    expect(receipts.recordDeliveryReceipt.mock.calls.map((c) => c[1].type)).toEqual(["drafted"]);
+    expect((receipts.recordDeliveryReceipt.mock.calls[0] as unknown[])[2]).toMatchObject({ postStatus: "draft", postTitle: expect.any(String) });
 
     fetchMock.mockClear();
     receipts.claimed = false;
     const again = await embedVideoInPost(orgIdentity(ORG), { siteId: "s", postId: 7753, videoUrl: VIDEO, releaseId: RELEASE, draftOnly: true });
     expect(again).toMatchObject({ ok: true, idempotent: true, postId: 7753 });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("deliveryEventForPostStatus (N14)", () => {
+  it("only a live post is published; a scheduled one is scheduled; everything else is a draft", () => {
+    expect(["publish", "future", "draft", "pending", "private", undefined].map(deliveryEventForPostStatus)).toEqual(["published", "scheduled", "drafted", "drafted", "drafted", "drafted"]);
   });
 });
 

@@ -30,6 +30,7 @@ const server = (routes) => async (path) => {
 
   const where = await readPublished(server({
     "/api/video/projects?organizationId": { items: [{ id: "row" }] },
+    "/api/video/draft-outcome": { drafts: [], articles: [] },
     "/api/video/projects?id=": {
       assets: assets.items,
       releases: [{ id: "r-main", candidate_asset_id: "main" }, { id: "r-other", candidate_asset_id: "other" }],
@@ -37,7 +38,7 @@ const server = (routes) => async (path) => {
       outcomes: [{ release_id: "r-main", platform: "youtube", maturity: "7d", metrics: { views: 9 } }, { release_id: "r-main", platform: "youtube", maturity: "7d", metrics: { views: 1 } }, { release_id: "r-other", platform: "tiktok", maturity: "7d", metrics: { views: 5 } }],
     },
   }), "org", "proj-1", "main");
-  assert.deepEqual(where, ["youtube：published", "youtube 成效（發布後 7 天）：觀看 9"], "只列這支影片的發布，成效取最新一筆");
+  assert.deepEqual(where, ["youtube：已發布", "youtube 成效（發布後 7 天）：觀看 9"], "只列這支影片的發布，成效取最新一筆");
   assert.deepEqual(await readPublished(server({ "/api/video/projects?organizationId": { items: [] } }), "org", "proj-1", "main"), [], "專案還沒有列＝沒發布過");
   assert.equal(await readPublished(server({ "/api/video/projects?organizationId": null }), "org", "proj-1", "main"), null);
   console.log("PASS 2 readPublished");
