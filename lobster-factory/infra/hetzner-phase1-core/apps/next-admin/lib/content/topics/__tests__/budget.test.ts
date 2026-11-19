@@ -26,7 +26,7 @@ describe("topic cap guard", () => {
     const guard = capGuard({ id: "t3" }, artifacts, 10, ledger([]));   // the ledger is behind: nothing there yet
     await guard(6, "社群文案");
     await expect(guard(6, "社群文案")).rejects.toThrow("停在〈社群文案〉（已花 NT$6");
-    guard.settle(6, 2);   // the first call's exact cost
+    guard.exact(6, 2);   // the first call's exact cost
     await expect(guard(6, "社群文案")).resolves.toBeUndefined();   // 2 + 6 under 10
     expect(artifacts.budget?.spentTwd).toBe(8);
   });
@@ -35,7 +35,7 @@ describe("topic cap guard", () => {
     const artifacts: TopicArtifacts = {};
     const guard = capGuard({ id: "t4" }, artifacts, 10, ledger([]));
     await guard(6, "文章");
-    guard.settle(6, 0);   // the article call was refused (no key): nothing billed, nothing in the ledger
+    guard.exact(6, 0);   // the article call was refused (no key): nothing billed, nothing in the ledger
     const retry = capGuard({ id: "t4" }, { budget: artifacts.budget }, 10, ledger([]));
     await expect(retry(6, "文章")).resolves.toBeUndefined();
   });

@@ -54,10 +54,10 @@ export interface TopicArtifacts {
   budget?: TopicBudget;
 }
 
-/** Checks the topic's cap before one paid step and reserves the step's most (budget.ts reserveStep); `settle` swaps a
+/** Checks the topic's cap before one paid step and reserves the step's most (budget.ts reserveStep); `exact` (the name "settle" is kept for wallet holds: lib/ai/__tests__/settle-through-ledger.test.ts) swaps a
  *  reservation for the call's exact cost once known (0 = the call failed: whatever it was billed is in the ledger, which
  *  every check reads). A reservation not settled stays counted (its ledger row may lag). */
-type Guard = ((upperTwd: number, step: string) => Promise<void>) & { settle(reservedTwd: number, actualTwd: number): void };
+type Guard = ((upperTwd: number, step: string) => Promise<void>) & { exact(reservedTwd: number, actualTwd: number): void };
 
 /** The social post is due this far ahead (state.ts schedule needs a future time; the sender looks 10 min ahead). */
 export const SOCIAL_NOW_LEAD_MS = 2 * 60_000;
@@ -166,8 +166,8 @@ async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["ar
   const ask = async (prompt: string) => {
     const upper = stepUpperTwd.socialCall(prompt), before = writer.spent.usd;
     await guard(upper, "社群文案");
-    const answer = await writer.ask(prompt).catch((e) => { guard.settle(upper, 0); throw e; });   // a failed call gives it back
-    guard.settle(upper, usdToNtd(writer.spent.usd - before));
+    const answer = await writer.ask(prompt).catch((e) => { guard.exact(upper, 0); throw e; });   // a failed call gives it back
+    guard.exact(upper, usdToNtd(writer.spent.usd - before));
     return answer;
   };
   const source = article?.source || [t.title, t.angle ?? ""].filter(Boolean).join("\n\n");
@@ -193,7 +193,7 @@ export function capGuard(t: Pick<Topic, "id">, artifacts: TopicArtifacts, capTwd
     const b = artifacts.budget!;
     artifacts.budget = await reserveStep(b, upperTwd, step, () => readSpent(b.startedAt));
   };
-  return Object.assign(guard, { settle: (reservedTwd: number, actualTwd: number) => { artifacts.budget = settleStep(artifacts.budget!, reservedTwd, actualTwd); } });
+  return Object.assign(guard, { exact: (reservedTwd: number, actualTwd: number) => { artifacts.budget = settleStep(artifacts.budget!, reservedTwd, actualTwd); } });
 }
 
 async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string, capTwd: number): Promise<Made> {
