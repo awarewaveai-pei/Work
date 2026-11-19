@@ -31,6 +31,7 @@ import { ensureTopicProject, updateTopicProject } from "@/lib/content/video/topi
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { finalizeVideoJob } from "@/lib/content/video/finalize";
 import { embedVideoInPost } from "@/lib/content/video/embed-in-post";
+import { releaseTopicVideo } from "./video-release";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
 import { MakeError, NOW_FORMATS, waitsForVideo, type Made, type Published, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
 
@@ -252,17 +253,21 @@ export async function pollTopicVideo(t: Topic, jobId: string): Promise<VideoPoll
 
 /** The finished video into the article draft and onto the social draft, each once: every step is saved on the row as it
  *  is done, and each write also checks the outside state (the article already has the URL, the post already has media),
- *  so a restart between a write and its save does not do it twice. */
+ *  so a restart between a write and its save does not do it twice. Before either, every time, the video passes the
+ *  workbench's review and is approved (video-release.ts, N1): a topic leaves here only with a released video, also when
+ *  both steps were done by an earlier attempt. One that does not pass fails the topic, nothing attached. */
 export async function attachTopicVideo(t: Topic, url: string, actor: string, save: (a: Record<string, unknown>) => Promise<boolean>): Promise<Published> {
   const prev = t.artifacts as TopicArtifacts;
   const artifacts: TopicArtifacts = { ...prev, video: { ...(prev.video ?? { job_id: "" }), url } };
   const video = artifacts.video!;
   const step = async () => { if (!(await save(artifacts as Record<string, unknown>))) throw new Error("另一次排程接手了這個題目"); };
+  const sb = getSupabaseWriteClient();
   try {
     if (prev.video?.url !== url) await step();   // the URL first: a retry attaches it instead of making another video
+    const releaseId = await releaseTopicVideo(sb, t, url, actor);
     const a = artifacts.article;
     if (a?.wp_post_id && t.site_id && !video.embedded_at) {
-      const r = await embedVideoInPost(orgIdentity(t.organization_id), { siteId: t.site_id, postId: a.wp_post_id, videoUrl: url, once: true });
+      const r = await embedVideoInPost(orgIdentity(t.organization_id), { siteId: t.site_id, postId: a.wp_post_id, videoUrl: url, releaseId, once: true });
       if ("blockedMode" in r) throw new Error(`系統模式（${r.blockedMode}）不允許改網站，影片沒有嵌入`);
       if (!r.ok) throw new Error(`影片嵌入文章失敗：${(r as Extract<typeof r, { ok: false; status: number }>).error}`);   // strict:false
       video.embedded_at = new Date().toISOString();
@@ -280,9 +285,11 @@ export async function attachTopicVideo(t: Topic, url: string, actor: string, sav
       if (video.media_id) await step();
     }
   } catch (e) {
-    throw new MakeError(e instanceof Error ? e.message : String(e), artifacts as Record<string, unknown>);
+    const why = e instanceof Error ? e.message : String(e);
+    await updateTopicProject(sb, t.organization_id, t.id, { last_error: why });   // the project page says why too
+    throw new MakeError(why, artifacts as Record<string, unknown>);
   }
-  await updateTopicProject(getSupabaseWriteClient(), t.organization_id, t.id, { lifecycle_stage: "review", last_error: null });   // V7.1
+  await updateTopicProject(sb, t.organization_id, t.id, { lifecycle_stage: "review", last_error: null });   // V7.1
   return { artifacts: artifacts as Record<string, unknown> };
 }
 

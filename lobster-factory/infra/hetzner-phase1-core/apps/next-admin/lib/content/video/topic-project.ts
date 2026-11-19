@@ -26,11 +26,17 @@ export async function saveTopicVideoScenes(org: string, project: string, scenes:
 
 type TopicRef = { id: string; organization_id: string; title: string };
 
-export async function ensureTopicProject(sb: SupabaseClient, t: TopicRef, formats: readonly string[]): Promise<string> {
-  const found = await sb.from("media_production_projects").select("id").eq("organization_id", t.organization_id)
-    .eq("source", "content_topic").eq("source_ref", t.id).limit(1);
+/** The topic's video project, null = none was made (startVideoJob logs a failed projectFor and goes on). */
+export async function topicProjectId(sb: SupabaseClient, orgId: string, topicId: string): Promise<string | null> {
+  const found = await sb.from("media_production_projects").select("id").eq("organization_id", orgId)
+    .eq("source", "content_topic").eq("source_ref", topicId).limit(1);
   if (found.error) throw new Error(`media_production_projects: ${found.error.message}`);
-  if (found.data?.length) return String(found.data[0].id);
+  return found.data?.length ? String(found.data[0].id) : null;
+}
+
+export async function ensureTopicProject(sb: SupabaseClient, t: TopicRef, formats: readonly string[]): Promise<string> {
+  const existing = await topicProjectId(sb, t.organization_id, t.id);
+  if (existing) return existing;
   const made = await sb.from("media_production_projects").insert({
     organization_id: t.organization_id, title: (t.title.trim() || "影片").slice(0, 180), production_mode: "quick_video",
     lifecycle_stage: "produce", source: "content_topic", source_ref: t.id, autonomy: "full_auto", formats: [...formats],

@@ -36,6 +36,14 @@ export const WAIT_LIMIT_MS = 2 * 60 * 60 * 1000;
  * without writing anything, so it never stops the newer run (the next firing reads the row afresh). */
 export class RunChanged extends Error {}
 
+/** The four-check review of every ratio, one line per reason ("直式 4:5：…"); [] = all passed. Shared with the topic queue
+ *  (lib/content/topics/video-release.ts), so a topic's video passes the same gate as a workbench project. */
+export async function reviewProblems(deps: Pick<AdvanceDeps, "qaProblems">, rows: readonly RatioRow[]): Promise<string[]> {
+  const problems: string[] = [];
+  for (const r of rows) for (const why of await deps.qaProblems(r)) problems.push(`${RATIO_LABEL[r.ratio] ?? r.ratio}：${why}`);
+  return problems;
+}
+
 export async function advanceProject(deps: AdvanceDeps, p: AdvanceProject): Promise<AdvanceOutcome> {
   const stop = async (stage: Stage, why: string): Promise<AdvanceOutcome> => {
     try {
@@ -56,8 +64,7 @@ export async function advanceProject(deps: AdvanceDeps, p: AdvanceProject): Prom
       if (deps.now() - p.updatedAtMs > WAIT_LIMIT_MS) return await stop("produce", "超過 2 小時找不到這個專案的影片");
       return { projectId: p.id, result: "waiting", note: "還沒有成片" };
     }
-    const problems: string[] = [];
-    for (const r of rows) for (const why of await deps.qaProblems(r)) problems.push(`${RATIO_LABEL[r.ratio] ?? r.ratio}：${why}`);
+    const problems = await reviewProblems(deps, rows);
     if (problems.length) return await stop("review", problems.join("；"));
     for (const r of rows) await deps.release(r);
     await deps.update(p.id, { lifecycleStage: "release", lastError: null }, p.runId);
