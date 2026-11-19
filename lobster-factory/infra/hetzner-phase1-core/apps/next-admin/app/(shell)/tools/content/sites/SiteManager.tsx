@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
-import { FUNNEL_STAGES, MAX_REQUIRED_BLOCKS, MAX_TREND_FEEDS, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { FUNNEL_STAGES, MAX_TREND_FEEDS, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import PublishModeButtons from "./PublishModeButtons";
 import TopicModeButtons from "./TopicModeButtons";
 import DailyTrendButtons from "./DailyTrendButtons";
 import YoutubePrivacyButtons from "./YoutubePrivacyButtons";
+import RequiredBlocksField from "./RequiredBlocksField";
+import OptionButtons from "./OptionButtons";
 
 const MKT_PRESETS: Record<string, string[]> = {
   audience: ["台灣 30-45 歲女性", "有焦慮/壓力的上班族", "正在尋找自我療癒的成人", "對心理健康有興趣的父母", "藝術愛好者（非專業）", "身心科/諮商後進階探索者"],
@@ -16,6 +18,7 @@ const MKT_PRESETS: Record<string, string[]> = {
   objections: ["我沒有繪畫天份", "會不會很貴？值得嗎？", "我不確定這對我有效", "我沒有時間", "這跟一般心理諮商有什麼不同？", "我的孩子適合嗎？"],
 };
 const IMAGE_MODELS = [
+  { value: "",                     label: "不指定（用 Studio 預設）" },
   { value: "none",                 label: "None（不生成）" },
   { value: "flux-schnell",         label: "Flux Schnell（預設）" },
   { value: "flux-dev",             label: "Flux Dev（高品質）" },
@@ -23,7 +26,17 @@ const IMAGE_MODELS = [
   { value: "flux-2-max",           label: "Flux.2 Max（旗艦）" },
 ];
 
-const LANGUAGES = ["Traditional Chinese", "Simplified Chinese", "English", "Japanese", "Korean"];
+const LANGUAGES = [{ value: "", label: "不指定" }, ...["Traditional Chinese", "Simplified Chinese", "English", "Japanese", "Korean"].map(l => ({ value: l, label: l }))];
+
+const IMAGE_FONTS = [
+  { value: "sans",  label: "無黑體（Noto Sans CJK）" },
+  { value: "serif", label: "明體（Noto Serif CJK）" },
+  { value: "none",  label: "不疊標題文字" },
+];
+const IMAGE_TITLE_POSITIONS = [
+  { value: "bottom", label: "底部漸層（推薦）" },
+  { value: "center", label: "正中央" },
+];
 
 const ARTICLE_TYPES = [
   { value: "",                label: "不指定" },
@@ -59,8 +72,6 @@ const POVS = [
   { value: "Third person",  label: "第三人稱（他／她）" },
 ];
 
-const NL = String.fromCharCode(10);
-
 const EMPTY_DEFAULTS: SiteContentDefaults = {
   language: "", targetCountry: "", imageModel: "",
   tone: "", articleType: "", readability: "", pointOfView: "none",
@@ -85,16 +96,16 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
     try {
       const res  = await fetch(`/api/content/sites/${site.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentDefaults: d }),
+        // requiredBlocks has its own always-visible field (RequiredBlocksField); send the stored list so this form never overwrites it
+        body: JSON.stringify({ contentDefaults: { ...d, requiredBlocks: site.contentDefaults?.requiredBlocks } }),
       });
       const json = await res.json() as { ok: boolean; site?: ManagedSite; error?: string };
-      if (json.ok && json.site) { onSaved(json.site); setSaved(true); setD(p => ({ ...p, trendFeeds: json.site?.contentDefaults?.trendFeeds ?? p.trendFeeds, requiredBlocks: json.site?.contentDefaults?.requiredBlocks ?? p.requiredBlocks })); }
+      if (json.ok && json.site) { onSaved(json.site); setSaved(true); setD(p => ({ ...p, trendFeeds: json.site?.contentDefaults?.trendFeeds ?? p.trendFeeds })); }
       else setErr(json.error ?? "儲存失敗");
     } finally { setSaving(false); }
   }
 
   const inp: React.CSSProperties = { background: "var(--form-input-bg)", border: "1px solid var(--card-border)", borderRadius: 5, color: "var(--text-primary)", padding: "6px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" };
-  const sel: React.CSSProperties = { ...inp };
   const lbl: React.CSSProperties = { color: "var(--text-muted)", fontSize: 12, display: "block", marginBottom: 3 };
 
   return (
@@ -107,55 +118,18 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
         <div style={{ marginTop: 10, padding: "14px 16px", background: "var(--form-input-bg)", border: "1px solid var(--card-border)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ color: "var(--text-muted)", fontSize: 12 }}>選此站台時自動帶入 Content Studio 表單（只填空白欄位）。</div>
 
-          {/* Row 0: tone / articleType / readability / pointOfView */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
-            <label>
-              <span style={lbl}>語氣風格</span>
-              <select style={sel} value={d.tone ?? ""} onChange={e => { setD(p => ({ ...p, tone: e.target.value })); setSaved(false); }}>
-                {TONES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </label>
-            <label>
-              <span style={lbl}>文章類型</span>
-              <select style={sel} value={d.articleType ?? ""} onChange={e => { setD(p => ({ ...p, articleType: e.target.value })); setSaved(false); }}>
-                {ARTICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </label>
-            <label>
-              <span style={lbl}>可讀性</span>
-              <select style={sel} value={d.readability ?? ""} onChange={e => { setD(p => ({ ...p, readability: e.target.value })); setSaved(false); }}>
-                {READABILITIES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-              </select>
-            </label>
-            <label>
-              <span style={lbl}>人稱視角</span>
-              <select style={sel} value={d.pointOfView ?? ""} onChange={e => { setD(p => ({ ...p, pointOfView: e.target.value })); setSaved(false); }}>
-                {POVS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
-            </label>
-          </div>
-
-          {/* Row 1: language / country / image model */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            <label>
-              <span style={lbl}>語言</span>
-              <select style={sel} value={d.language ?? ""} onChange={e => { setD(p => ({ ...p, language: e.target.value })); setSaved(false); }}>
-                <option value="">不指定</option>
-                {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-            </label>
-            <label>
-              <span style={lbl}>目標國家</span>
-              <input style={inp} value={d.targetCountry ?? ""} placeholder="例：台灣"
-                onChange={e => { setD(p => ({ ...p, targetCountry: e.target.value })); setSaved(false); }} />
-            </label>
-            <label>
-              <span style={lbl}>圖片模型</span>
-              <select style={sel} value={d.imageModel ?? ""} onChange={e => { setD(p => ({ ...p, imageModel: e.target.value })); setSaved(false); }}>
-                {IMAGE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-            </label>
-          </div>
+          {/* Single-choice settings: visible buttons, never a dropdown */}
+          <OptionButtons label="語氣風格" value={d.tone ?? ""} options={TONES} onChange={v => { setD(p => ({ ...p, tone: v })); setSaved(false); }} />
+          <OptionButtons label="文章類型" value={d.articleType ?? ""} options={ARTICLE_TYPES} onChange={v => { setD(p => ({ ...p, articleType: v })); setSaved(false); }} />
+          <OptionButtons label="可讀性" value={d.readability ?? ""} options={READABILITIES} onChange={v => { setD(p => ({ ...p, readability: v })); setSaved(false); }} />
+          <OptionButtons label="人稱視角" value={d.pointOfView ?? ""} options={POVS} onChange={v => { setD(p => ({ ...p, pointOfView: v })); setSaved(false); }} />
+          <OptionButtons label="語言" value={d.language ?? ""} options={LANGUAGES} onChange={v => { setD(p => ({ ...p, language: v })); setSaved(false); }} />
+          <label>
+            <span style={lbl}>目標國家</span>
+            <input style={inp} value={d.targetCountry ?? ""} placeholder="例：台灣"
+              onChange={e => { setD(p => ({ ...p, targetCountry: e.target.value })); setSaved(false); }} />
+          </label>
+          <OptionButtons label="圖片模型" value={d.imageModel ?? ""} options={IMAGE_MODELS} onChange={v => { setD(p => ({ ...p, imageModel: v })); setSaved(false); }} />
 
           {/* Industry feeds (P9.4): read when the month is planned, this brand's prompt only */}
           <div>
@@ -181,24 +155,9 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
             </div>
           </div>
 
-          {/* Row 1b: featured image overlay settings */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <label>
-              <span style={lbl}>精選圖片標題字型</span>
-              <select style={sel} value={d.featuredImageFont ?? "sans"} onChange={e => { setD(p => ({ ...p, featuredImageFont: e.target.value })); setSaved(false); }}>
-                <option value="sans">無黑體（Noto Sans CJK）</option>
-                <option value="serif">明體（Noto Serif CJK）</option>
-                <option value="none">不疊標題文字</option>
-              </select>
-            </label>
-            <label>
-              <span style={lbl}>標題文字位置</span>
-              <select style={sel} value={d.featuredImageTitlePosition ?? "bottom"} onChange={e => { setD(p => ({ ...p, featuredImageTitlePosition: e.target.value })); setSaved(false); }}>
-                <option value="bottom">底部漸層（推薦）</option>
-                <option value="center">正中央</option>
-              </select>
-            </label>
-          </div>
+          {/* Featured image overlay settings */}
+          <OptionButtons label="精選圖片標題字型" value={d.featuredImageFont ?? "sans"} options={IMAGE_FONTS} onChange={v => { setD(p => ({ ...p, featuredImageFont: v })); setSaved(false); }} />
+          <OptionButtons label="標題文字位置" value={d.featuredImageTitlePosition ?? "bottom"} options={IMAGE_TITLE_POSITIONS} onChange={v => { setD(p => ({ ...p, featuredImageTitlePosition: v })); setSaved(false); }} />
 
           {/* Marketing grid — 2-col, matches ContentStudio layout */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -229,11 +188,8 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
                 onChange={e => { setM("usp", e.target.value); }} />
             </div>
             {/* funnel */}
-            <div>
-              <span style={lbl}>漏斗階段預設</span>
-              <select style={sel} value={d.marketing?.funnelStage ?? ""} onChange={e => setM("funnelStage", e.target.value)}>
-                {FUNNEL_STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <OptionButtons label="漏斗階段預設" value={d.marketing?.funnelStage ?? ""} options={FUNNEL_STAGES} onChange={v => setM("funnelStage", v)} />
             </div>
             {/* CTA */}
             <div>
@@ -250,11 +206,8 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
               </div>
             </div>
             {/* price */}
-            <div>
-              <span style={lbl}>價格定位</span>
-              <select style={sel} value={d.marketing?.pricePositioning ?? ""} onChange={e => setM("pricePositioning", e.target.value)}>
-                {PRICE_POSITIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <OptionButtons label="價格定位" value={d.marketing?.pricePositioning ?? ""} options={PRICE_POSITIONS} onChange={v => setM("pricePositioning", v)} />
             </div>
             {/* emotional triggers */}
             <div>
@@ -283,14 +236,6 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
                   </button>
                 ))}
               </div>
-            </div>
-            {/* N1b: must-carry paragraphs — a topic article without any of them fails review; new video drafts get them */}
-            <div style={{ gridColumn: "1 / -1" }}>
-              <span style={lbl}>每篇必附段落（一行一段，最多 {MAX_REQUIRED_BLOCKS} 段）</span>
-              <div style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 6 }}>例如免責聲明、求助專線。AI 寫的文章會逐字附在文末；少了任何一段，審核就不會過。影片建的新草稿也會自動帶上。</div>
-              <textarea style={{ ...inp, minHeight: 72, resize: "vertical" }} value={(d.requiredBlocks ?? []).join(NL)}
-                placeholder={["例：本文僅供參考，不能取代專業醫療或心理治療。", "例：如有立即危險，請撥 1925 安心專線或 1995 生命線。"].join(NL)}
-                onChange={e => { const v = e.target.value; setD(p => ({ ...p, requiredBlocks: v.split(NL) })); setSaved(false); }} />
             </div>
             {/* forbidden claims — full width */}
             <div style={{ gridColumn: "1 / -1" }}>
@@ -846,6 +791,11 @@ export default function SiteManager() {
               site={sites.find(x => x.id === site.id) ?? site}
               onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
               readOnly={onDoor}
+            />
+            <RequiredBlocksField
+              key={site.id}
+              site={sites.find(x => x.id === site.id) ?? site}
+              onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
             />
             <ContentDefaultsPanel
               site={sites.find(x => x.id === site.id) ?? site}
