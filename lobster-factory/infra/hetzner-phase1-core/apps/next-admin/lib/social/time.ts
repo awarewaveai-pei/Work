@@ -69,6 +69,11 @@ export type DisplayZone = (typeof DISPLAY_ZONES)[number];
 export const isDisplayZone = (v: unknown): v is DisplayZone => typeof v === "string" && (DISPLAY_ZONES as readonly string[]).includes(v);
 /** The zone the page shows times in. */
 export const viewZone = (choice: DisplayZone, orgTz: string): string => (choice === "org" ? orgTz : choice);
+/** The zone's name as a person reads it (台灣 for Asia/Taipei, the IANA name otherwise). */
+export const zoneLabel = (z: string): string => (z === "Asia/Taipei" ? "台灣（Asia/Taipei）" : z);
+/** The zone a time INPUT is read and typed in: a one-off post uses the display zone (the number the list and calendar
+ *  draw); a repeat series is a rule, so it keeps the organisation's zone (repeatSlots, B19 2026-11-19). */
+export const inputZone = (isRepeat: boolean, orgTz: string, viewTz: string): string => (isRepeat ? orgTz : viewTz);
 /** A wall-clock time read in one zone, as the same instant's date and time in another (a calendar cell -> the composer). */
 export function rezone(date: string, time: string, from: string, to: string): { date: string; time: string } {
   const z = zoned(instantAt(date, time, from), to);

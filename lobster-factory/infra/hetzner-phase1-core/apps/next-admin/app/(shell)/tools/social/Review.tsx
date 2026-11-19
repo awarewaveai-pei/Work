@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "./api";
 import Icon from "./Icon";
-import { instantAt, zoned, type Brand, type Post } from "./model";
+import { inputZone, instantAt, zoned, zoneLabel, type Brand, type Post } from "./model";
 import type { SlotContext } from "./SocialManager";
 
 export function NeedsButton({ ctx }: { ctx: SlotContext }) {
@@ -44,8 +44,9 @@ export function ReviewSetting({ ctx }: { ctx: SlotContext }) {
 }
 
 /** The approver's bar in the editor: approve at the post's time (or a new one), or reject with a reason. */
-export function ReviewBar({ brand, post, onDone }: { brand: Brand; post: Post; onDone: (id: string, message: string) => void }) {
-  const tz = brand.default_timezone;
+export function ReviewBar({ brand, post, viewTz, onDone }: { brand: Brand; post: Post; viewTz?: string; onDone: (id: string, message: string) => void }) {
+  // a one-off approval time is typed in the zone the list draws; a repeat series keeps the organisation's (B19)
+  const tz = inputZone(!!post.repeat, brand.default_timezone, viewTz ?? brand.default_timezone);
   const at = post.scheduled_at ? zoned(post.scheduled_at, tz) : null;
   const [date, setDate] = useState(at?.date ?? "");
   const [time, setTime] = useState(at?.time ?? "09:00");
@@ -66,6 +67,7 @@ export function ReviewBar({ brand, post, onDone }: { brand: Brand; post: Post; o
   return (
     <div className="sm-row" style={{ border: "1px solid var(--card-border)", borderRadius: 8, padding: 6 }}>
       <span className="sm-lab">審核</span>
+      <span className="sm-muted">{zoneLabel(tz)}</span>
       <input type="date" aria-label="核准後的發文日期" value={date} onChange={(e) => setDate(e.target.value)} />
       <input type="time" aria-label="核准後的發文時間" value={time} onChange={(e) => setTime(e.target.value)} />
       <button type="button" className="btn-primary" onClick={() => act("approve")}>核准並排程</button>

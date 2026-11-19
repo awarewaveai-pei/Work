@@ -11,8 +11,8 @@ import CIcon from "./icons";
 const TIMES = Array.from({ length: 96 }, (_, i) => `${String(Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`);
 const FREQS: Array<[RepeatRule["freq"], string]> = [["day", "每天"], ["week", "每週"], ["month", "每月"]];
 
-export default function DateTimePicker({ date, time, tz, today, repeat, onDone, onClose }: {
-  date: string | null; time: string; tz: string; today: string; repeat?: RepeatRule | null;
+export default function DateTimePicker({ date, time, tz, zoneNote, today, repeat, onDone, onClose }: {
+  date: string | null; time: string; tz: string; zoneNote?: string; today: string; repeat?: RepeatRule | null;
   onDone: (time: string, date: string | null, repeat: RepeatRule | null) => void; onClose: () => void;
 }) {
   const [day, setDay] = useState(date);
@@ -80,7 +80,7 @@ export default function DateTimePicker({ date, time, tz, today, repeat, onDone, 
         <div className="sm-tcol">
           <b className="sm-tcolh"><CIcon name="clock" />幾點發</b>
           <div className="sm-tlist" ref={list}>{times.map((x) => <button type="button" key={x} className={x === t ? "sm-on" : ""} aria-pressed={x === t} onClick={() => setT(x)}>{x}</button>)}</div>
-          <span className="sm-muted">{tz}</span>
+          <span className="sm-muted">{zoneNote ?? tz}</span>
         </div>
       </div>
       <div className="sm-dtft">

@@ -63,6 +63,9 @@ let carried: Note | null = null;
 let carriedComposeSeed: { body: string; mediaIds: string[]; n: number } | null = null;
 
 const param = (k: string) => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get(k));
+// a hand-typed address: a value that is not a date (or a time) is ignored, never fed to the zone arithmetic
+const dateParam = (k: string) => { const v = param(k); return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null; };
+const timeParam = (k: string) => { const v = param(k); return v && /^\d{2}:\d{2}$/.test(v) ? v : null; };
 
 export default function SocialManager({ slots = {}, route = { kind: "plan" }, go = (href, replace) => (replace ? window.location.replace(href) : window.location.assign(href)) }: { slots?: Slots; route?: SocialRoute; go?: Go }) {
   const ArticleSchedule = useContext(ArticleScheduleContext);   // null on a product door (no /api/content there)
@@ -80,7 +83,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const today = useMemo(() => zoned(new Date(), tz).date, [tz]);
   const brandToday = useMemo(() => zoned(new Date(), brandTz).date, [brandTz]);
   const [view, setViewState] = useState<View>(() => { const v = param("view"); return isView(v) ? v : "week"; });
-  const [anchor, setAnchor] = useState<string | null>(() => param("date"));
+  const [anchor, setAnchor] = useState<string | null>(() => dateParam("date"));
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [articles, setArticles] = useState<WpPost[]>([]);
@@ -370,7 +373,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
     const article = param("article") && param("site") ? { siteId: param("site") as string, id: Number(param("article")), title: param("title") ?? "", day: param("day") ?? "" } : null;
     const articleFor = article ? `${article.siteId}:${article.id}` : null;
     // accounts= (the channel menu's 用這個頻道寫) is for C21's channel picker; today's editor starts with every connected channel
-    const defaults = { date: param("date") ?? (article && article.day > brandToday ? article.day : addDays(brandToday, 1)), time: param("time") ?? "12:00" };
+    const defaults = { date: dateParam("date") ?? (article && article.day > brandToday ? article.day : addDays(brandToday, 1)), time: timeParam("time") ?? "12:00" };
     const notice = postId ? null : cannotWriteNotice(brand.role);
     const title = postId ? "編輯貼文" : article ? "文章 → 社群貼文" : notice ? `你的角色：${ROLE_NAMES[brand.role]}` : "建立貼文";
     const library = libraryOpen ? slots.sideView?.("library", ctx) : null;
@@ -394,10 +397,10 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
           )}
           <section className="sm-panel">
             {notice ? <p className="sm-side">{notice}</p> : postId && !editorPost ? <div className="sm-side sm-muted">載入中…</div> : (
-              <Editor key={postId ? `${postId}:${editorPost?.version}` : `new:${newKey}`} brand={brand} accounts={accounts} media={media} post={editorPost} today={brandToday} lists={lists}
+              <Editor key={postId ? `${postId}:${editorPost?.version}` : `new:${newKey}`} brand={brand} accounts={accounts} media={media} post={editorPost} today={brandToday} viewTz={tz} lists={lists}
                   attach={attachRequest} attachMany={attachManyRequest} seed={composeSeed} onOpenLibrary={() => setLibraryOpen(true)} defaults={defaults}
                 prefill={articleFor && prefill?.for === articleFor ? prefill : null}
-                reviewBar={editorPost ? <ReviewBar brand={brand} post={editorPost} onDone={async (_id, msg) => { say(msg); setPostKey((k) => k + 1); }} /> : undefined}
+                reviewBar={editorPost ? <ReviewBar key={tz} brand={brand} viewTz={tz} post={editorPost} onDone={async (_id, msg) => { say(msg); setPostKey((k) => k + 1); }} /> : undefined}
                 source={article && !postId && canWrite ? (
                   <>
                     {/* the article row comes from the calendar just left; a page opened straight on this address has none (no WordPress edit offered without knowing the topic, B12) */}

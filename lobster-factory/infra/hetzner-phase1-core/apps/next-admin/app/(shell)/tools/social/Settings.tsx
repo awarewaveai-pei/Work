@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SENDABLE_PLATFORMS } from "@/lib/social/compose";
 import { api, ApiError, type UnclaimedIntegration } from "./api";
 import { PfMark } from "./Calendar";
-import { platformOf, type Account, type Brand } from "./model";
+import { platformOf, zoneLabel, type Account, type Brand } from "./model";
 
 const POLL_MS = 4000;
 const STATUS: Record<Account["status"], string> = { connected: "已連接", expired: "連線失效", disabled: "已停用" };
@@ -27,7 +27,7 @@ const CONNECTABLE = SENDABLE_PLATFORMS.filter((p) => !["linkedin-page", "instagr
 
 /** The organisation zones offered as buttons; a zone set elsewhere (ops console) is shown as its own button too. */
 const ORG_ZONES = ["Asia/Taipei", "UTC"];
-const zoneName = (z: string) => (z === "Asia/Taipei" ? "台灣（Asia/Taipei）" : z);
+const zoneName = zoneLabel;
 
 export default function Settings({ brand, accounts, onAccounts, team, onTimezone }: {
   brand: Brand; accounts: Account[]; onAccounts: (a: Account[]) => void; team?: React.ReactNode; onTimezone?: (zone: string) => void;

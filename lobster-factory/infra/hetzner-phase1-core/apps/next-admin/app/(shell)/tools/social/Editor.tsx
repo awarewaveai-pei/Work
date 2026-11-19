@@ -12,7 +12,7 @@ import type { PostState } from "@/lib/social/state";
 import { splitKeywords } from "@/lib/social/auto-rules";
 import { api, ApiError, type AutoRule, type ListRow, type MediaItem, type PostInput, type SavedRef, type StateInput } from "./api";
 import { fileDataUrl, uploadTooLarge } from "./media";
-import { instantAt, platformOf, shortDate, targetProblems, zoned, type Account, type AutoMode, type Brand, type Post, type Tag } from "./model";
+import { inputZone, instantAt, platformOf, rezone, shortDate, targetProblems, zoned, zoneLabel, type Account, type AutoMode, type Brand, type Post, type Tag } from "./model";
 import AutoReply, { blankRule, ruleDraftOf, type RuleDraft } from "./compose/AutoReply";
 import ChannelPicker from "./compose/ChannelPicker";
 import Comments from "./compose/Comments";
@@ -35,6 +35,8 @@ export interface EditorProps {
   post: Post | null;
   defaults: { date: string; time: string };
   today: string;
+  /** the zone the list and calendar draw times in (the person's display zone); defaults to the organisation's */
+  viewTz?: string;
   /** unused since C21: a post goes into an autolist from that list's tab (C23 card boundary) */
   lists?: ListRow[];
   /** the reviewer's approve / reject bar (C8) */
@@ -70,7 +72,8 @@ const load = <T,>(read: () => Promise<T>, done: (v: T) => void, fail?: (e: unkno
 
 export default function Editor(props: EditorProps) {
   const { brand, accounts, post } = props;
-  const tz = brand.default_timezone;   // the date and time typed here and a repeat rule are the organisation's wall clock (DateTimePicker names it)
+  const tz = brand.default_timezone;   // date, time and repeat rule are STATE in the organisation's wall clock; a one-off post's picker reads and writes them in viewTz (B19)
+  const viewTz = props.viewTz ?? tz;
   const canWrite = brand.role === "owner" || brand.role === "editor";
   const state: PostState = post?.state ?? "draft";
   const sentIds = useMemo(() => new Set((post?.targets ?? []).filter((t) => t.state === "queued" || t.state === "published").map((t) => t.account_id)), [post]);
@@ -112,6 +115,9 @@ export default function Editor(props: EditorProps) {
   const at = post?.scheduled_at ? zoned(post.scheduled_at, tz) : null;
   const [date, setDate] = useState(at?.date ?? props.defaults.date);
   const [time, setTime] = useState(at?.time ?? props.defaults.time);
+  // a one-off post's exact instant: date and time above are its organisation-zone reading, which cannot tell the two 01:30s
+  // of a DST fall-back apart, so the instant is kept as chosen and the reading is only for a repeat series and drafts
+  const [exact, setExact] = useState<string | null>(post?.scheduled_at ?? null);
   const [repeat, setRepeat] = useState<RepeatRule>(() => post?.repeat ? { ...post.repeat } : newRepeat(at?.date ?? props.defaults.date));
   const [chosen, setChosen] = useState<Act | null>(null);
   const [requireReview, setRequireReview] = useState(false);
@@ -215,6 +221,9 @@ export default function Editor(props: EditorProps) {
   const preferred = ([state === "rotation" ? "keep" : null, post?.repeat ? "repeat" : null, reviewGate && unapproved ? "review" : null, "schedule", "review", "draft"] as Array<Act | null>)
     .find((a): a is Act => !!a && allowed(a)) ?? "draft";
   const act: Act = chosen && allowed(chosen) ? chosen : preferred;
+  // what the person sees and types: the same number the list and calendar draw (a repeat series stays in the organisation's zone)
+  const pickTz = inputZone(act === "repeat", tz, viewTz);
+  const shown = act !== "repeat" && exact ? zoned(exact, pickTz) : rezone(date, time, tz, pickTz);
 
   function validate(kind: Act): string | null {
     const empty = !body.trim() && !mediaList.length && !channels.some((a) => custom[a.id]?.trim());
@@ -301,7 +310,7 @@ export default function Editor(props: EditorProps) {
     if (bad) return say(bad, true);
     let when: string | null = null;
     if (kind === "schedule" || kind === "repeat") {
-      when = instantAt(date, time, tz);
+      when = kind === "schedule" && exact ? exact : instantAt(date, time, tz);
       if (Date.parse(when) <= Date.now()) return say("發佈時間要在未來。要現在發，選「立即發佈」。", true);
     }
     setBusy(true);
@@ -330,7 +339,7 @@ export default function Editor(props: EditorProps) {
         props.onSaved(ref.id, st === "review" ? "已存起來，還在等審核。" : "已送審，審核人核准後才會排程。");
       } else if (kind === "schedule" || kind === "repeat") {
         await step({ action: "schedule", scheduledAt: when as string }, "scheduled");
-        const z = zoned(when as string, tz);
+        const z = zoned(when as string, kind === "repeat" ? tz : viewTz);
         props.onSaved(ref.id, kind === "repeat" ? `已設定週期：${repeatText(repeat, z.date, z.time)}。` : `已排在 ${shortDate(z.date)} ${z.time}。按「回排程日曆」看它在哪。`, { at: when as string });
       } else {
         await step({ action: "publish_now", confirmPublishNow: true }, "scheduled");
@@ -411,7 +420,7 @@ export default function Editor(props: EditorProps) {
       )}
     </>
   );
-  const when = act === "now" ? "現在就發" : act === "repeat" ? repeatText(repeat, date, time) : act === "library" ? "不用時間" : whenText(date, time);
+  const when = act === "now" ? "現在就發" : act === "repeat" ? repeatText(repeat, date, time) : act === "library" ? "不用時間" : whenText(shown.date, shown.time);
 
   return (
     <div className={`sm-cgrid${mobilePane === "preview" ? " sm-mobile-preview" : ""}`}>
@@ -446,13 +455,14 @@ export default function Editor(props: EditorProps) {
         <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f); }} />
       </div>
       <Previews channels={channels} tab={curTab} textFor={textFor} formats={formats} images={images} mediaKinds={mediaKinds}
-        comments={comments} mediaPath={mediaPath} commentImage={commentTakesMedia} when={act === "now" ? "剛剛" : `${shortDate(date)} ${time}`} />
+        comments={comments} mediaPath={mediaPath} commentImage={commentTakesMedia} when={act === "now" ? "剛剛" : `${shortDate(shown.date)} ${shown.time}`} />
       <Footer
         tags={<TagPicker brandId={brand.id} tags={tags} selected={tagIds} disabled={readOnly || queued} canEdit={canWrite} onSelect={setTagIds} onTags={setTags} say={say} />}
         hint={hintNode} when={when} whenDisabled={readOnly || act === "now" || act === "library" || act === "keep"} onWhen={() => setDtOpen(true)}
         picker={dtOpen ? (
-          <DateTimePicker date={date} time={time} tz={tz} today={props.today} repeat={act === "repeat" ? repeat : null} onClose={() => setDtOpen(false)}
-            onDone={(t, d, r) => { setTime(t); if (d) setDate(d); if (r) setRepeat(r); setDtOpen(false); }} />
+          <DateTimePicker date={shown.date} time={shown.time} tz={pickTz} today={zoned(new Date(), pickTz).date} repeat={act === "repeat" ? repeat : null} onClose={() => setDtOpen(false)}
+            zoneNote={act === "repeat" ? `這個週期用 ${zoneLabel(tz)}` : zoneLabel(pickTz)}
+            onDone={(t, d, r) => { const day = d ?? shown.date; const b = rezone(day, t, pickTz, tz); setTime(b.time); if (d) setDate(b.date); if (r) setRepeat(r); setExact(act === "repeat" ? null : instantAt(day, t, pickTz)); setDtOpen(false); }} />
         ) : null}
         act={act} can={can} busy={busy} menuOpen={menuOpen} onMenu={setMenuOpen} onAct={(a) => { setChosen(a); setConfirmNow(false); }}
         onMain={() => (act === "now" ? setConfirmNow(true) : void run(act))}

@@ -74,7 +74,7 @@ export const STATE_TOKEN: Record<PostState, string> = {
 // ---- dates in a time zone (lib/social/time.ts: one copy for the server's rotation slots and this page) -----------
 
 import { addDays, weekday } from "@/lib/social/time";
-export { addDays, DISPLAY_ZONES, instantAt, rezone, viewZone, weekday, zoned, type DisplayZone, type ZonedParts } from "@/lib/social/time";
+export { addDays, DISPLAY_ZONES, inputZone, instantAt, rezone, viewZone, weekday, zoned, zoneLabel, type DisplayZone, type ZonedParts } from "@/lib/social/time";
 
 export const mondayOf = (date: string) => addDays(date, 1 - weekday(date));
 export const monthStart = (date: string) => `${date.slice(0, 7)}-01`;
