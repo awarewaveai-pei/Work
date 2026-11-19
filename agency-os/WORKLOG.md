@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-19（續9）— 影片下一階段：N12 驗收併入 main；第一批（N1、N15、N13、N12）部署
+
+- 驗收：N12 工人交回 `7693224e4`（worktree `recursing-jang-f14f2d`），監工讀 FILES／TESTS／RISKS 與 diff 後 cherry-pick 進 main → `6317f6d8a`。機制：`lib/script-forge/run-quote.ts` 用 `VW_INTERNAL_TOKEN` 派生的 HMAC 簽整趟最多（綁組織、模型、場景數，24h），`run-store.ts checkStart` 在建列／預留／付費前比對上限；`quick-render/quote/route.ts` 回 `typicalTwd`／`maxTwd`／`runQuote`，VW `backend/quick-render.cjs` 原樣帶過。
+- 監工決定（操作者授權）：「通常約」維持價目表（`ai_call_logs` 分不出一鍵與手動呼叫，中位數會混）；報價未綁比例與補圖方式——最壞停在半路、不超上限，接受不另開卡。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit` exit 0；`npx vitest run lib/script-forge app/api/tools/script-forge "app/(shell)/tools/video" app/video app/api/internal/video` → 27 files / 132 tests passed；video-workbench `node tests/gate.cjs` gate ok；`node build.mjs && node check.mjs` ok | exit=0 | ms=180000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（Codex 兩項工人已修：`agency-os/reports/oracle/2026-11-19-review-835513d1.md`；監工複核 run-quote／run-store／quote route 全文）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=signRunQuote|verifyRunQuote|reserveScriptRun|typicalTwd|maxTwd | hits=34
+- ORACLE_WAIVED: 本 commit 只有監工台資料檔與 WORKLOG；程式改動的 oracle artifact 見上
+- 部署（第五次，操作者 2026-11-19 授權監工決定）：14:12 `ssh ks-aw-01 sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin video-workbench` → npm test 綠、VW gate ok、rollback 快照 `rollback-20261119-061202/061203`、`.deployed-commit = 6317f6d8a`（previous a7998f77a，另一條線 14:10 剛部署、含 N1／N15），兩容器 healthy（15s／1s），HTTP smoke 八項 OK，exit 0；log `scratchpad/sg-deploy-batch1.log`。Playwright smoke 見下一行。
+- Playwright smoke（`scripts/playwright-runner.ps1 -Mode smoke -SkipInstall`，路徑要用正斜線）：34 passed／0 failed／24 skipped，49.4s，證據 `agency-os/reports/e2e/2026-11-19/smoke/`。
+- rollback：`git revert 6317f6d8a`；部署 rollback 由 `sg-deploy.sh` 自動（healthcheck 失敗）或 `rollback` 子命令。
 ## 2026-11-19（續8）— 會計匯率（FX1）＋廠商帳單對帳（FX2）上線；社群頻道授權失效提前偵測（SOC-REAUTH）（Claude 監工＋3 session）
 
 - 範圍：操作者要拿 `/ops/costs` 月報做會計帳與財務報表（側欄「AI Models & Costs」）；12:00 Soulful 四則貼文的 YouTube 那則送失敗（Postiz 授權失效）。監工 Fable 5.1 派 Opus 5.5（程度中）三條：fx1-rates、social-yt-reauth、fx2-invoices；監工在 `D:/Worktrees/Work/u-integrate` cherry-pick、Codex 審、補修、推 main、套 migration、部署。

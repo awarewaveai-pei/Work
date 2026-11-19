@@ -32,7 +32,7 @@ export const NOW = [
   { what: '每天自動抓熱搜。', state: 'yes',
     ev: 'NA/lib/content/topics/collect-trends.ts:48-63；自動內容頁顯示近三十天九千多筆。' },
   { what: '話題佇列做的影片有過四項審片。', state: 'yes',
-    ev: 'N1（36cc810e3）：attachTopicVideo 每次先走 lib/content/topics/video-release.ts，與工作台同一套 rows／qaProblems／release；不過 → 題目 failed、原因中文、文章留草稿。還沒部署。' },
+    ev: 'N1（36cc810e3）：attachTopicVideo 每次先走 lib/content/topics/video-release.ts，與工作台同一套 rows／qaProblems／release；不過 → 題目 failed、原因中文、文章留草稿。2026-11-19 14:17 上線（6317f6d8a）。' },
   { what: '每一題有花費上限。', state: 'no',
     ev: 'NA/lib/content/topics/tick.ts:15 只有每天題數。N2 補。' },
   { what: '每天自動選題。', state: 'no',
@@ -43,8 +43,8 @@ export const NOW = [
     ev: 'NA/app/(shell)/tools/content/topics/TopicsBoard.tsx:75：已審核的題目只有「退回重做」。N6 補。' },
   { what: '發信給會員。', state: 'no',
     ev: 'NA/lib/crm/fluentcrm.ts:35-39 只能在自家網站建草稿，寄出要人按；平台沒有會員名單。N10 補。' },
-  { what: '一鍵到草稿的金額看得懂。', state: 'no',
-    ev: '頁面、對話框、拒絕訊息是三個不同的數字（NA/lib/script-forge/run-store.ts:42）。N12 補。' },
+  { what: '一鍵到草稿的金額看得懂。', state: 'yes',
+    ev: 'N12（6317f6d8a）：頁面與對話框只剩「通常約 NT$A」「最多 NT$B」，兩個數字都來自同一個伺服器報價；上限低於整趟最多就在花錢前拒絕並寫「上限至少要 NT$X」。2026-11-19 14:17 上線（6317f6d8a）。' },
 ];
 
 const todo = (id, plain) => ({ id, plain, status: 'todo' });
@@ -201,12 +201,12 @@ export const STEPS = [
     what: 'N1：pollTopicVideo 完成後呼叫 advanceDeps 的 rows／qaProblems／release（不複製），嵌入帶 releaseId。N1b：SiteContentDefaults.requiredBlocks＋articleChecks 多一條＋embedVideoInNewDraft 帶必附段落與預設作者。N2：排程列加每題上限，文章、社群、腳本呼叫都帶 jobId＝題目 id，用 auto-run-budget 預留與實扣。N3：topicCostUsd 算進配圖，改用近三十天實扣中位數。N4：每日上限的日改讀 organizations.default_timezone。N15：作品頁帶工作台目前的組織。',
     files: [`${NA}lib/content/topics/make.ts`, `${NA}lib/content/topics/tick.ts`, `${NA}lib/content/topics/review.ts`, `${NA}lib/content/topics/cost.ts`, `${L}project-advance-deps.ts`, `${L}auto-run-budget.ts`, `${L}embed-in-post.ts`, `${NA}lib/content/brand-voice.ts`, `${NA}lib/schedules/jobs.ts`, `${NA}app/(shell)/tools/designs/DesignsGallery.tsx`, `${NA}app/api/tools/designs/route.ts`, 'lobster-factory/packages/db/migrations/（開卡取號，現最新 0164）'],
     items: [
-      done('N1', '話題做出的影片先過四項審片；不過就停下並寫原因，文章留草稿。2026-11-19：tsc 0、335 支測試綠、突變紅→綠、Codex 一項發現（只有社群且貼文已有媒體時跳過審片）已修。已定：審片沒過的題目重試會拿同一支影片再審、仍 failed，要人到工作台處理那支影片（停點會通知）；沒建成影片專案或成片沒記到專案的題目一律 failed，不放行。還沒部署。', '36cc810e3'),
+      done('N1', '話題做出的影片先過四項審片；不過就停下並寫原因，文章留草稿。2026-11-19：tsc 0、335 支測試綠、突變紅→綠、Codex 一項發現（只有社群且貼文已有媒體時跳過審片）已修。已定：審片沒過的題目重試會拿同一支影片再審、仍 failed，要人到工作台處理那支影片（停點會通知）；沒建成影片專案或成片沒記到專案的題目一律 failed，不放行。2026-11-19 14:17 上線（6317f6d8a）。', '36cc810e3'),
       todo('N1b', '網站可以設「每篇必附」的句子（例：免責聲明、危機專線）；文章沒有就審核不過，一鍵建的網站草稿也自動帶上。'),
       todo('N2', '每題可設花費上限（預設 NT$15），花到就停在那一步；每題實際花多少查得到。'),
       todo('N3', '按鈕上的預估改用最近三十天的實際花費校正；整頁金額都用 NT$。'),
       todo('N4', '「每天最多幾題」照品牌的時區換日（現在是台北早上八點才換日）。'),
-      done('N15', '工作台切到哪個客戶，「作品」就只列那個客戶的片。2026-11-19：帶別人組織的客戶帳號拿到 403、不給任何列；員工本來就看得到所有組織，所以對員工是過濾不是擋；「設計圖」分頁同樣只列該客戶。兩個守衛各做一次突變紅→綠；Codex 無發現。還沒部署。', 'd04251a25'),
+      done('N15', '工作台切到哪個客戶，「作品」就只列那個客戶的片。2026-11-19：帶別人組織的客戶帳號拿到 403、不給任何列；員工本來就看得到所有組織，所以對員工是過濾不是擋；「設計圖」分頁同樣只列該客戶。兩個守衛各做一次突變紅→綠；Codex 無發現。2026-11-19 14:17 上線（6317f6d8a）。', 'd04251a25'),
     ] },
   { n: 14, code: '批1', next: true, title: '發布順序：YouTube 先發', plain: '例：影片先上 YouTube，拿到連結後文章才嵌入並上線，其他社群貼文最後帶著文章連結發出。',
     gate: 'YouTube 發布失敗時，文章和其他貼文都還是草稿（拿掉「等 YouTube 連結」，測試會紅）；沒人按、也沒開自動的網站不會發布（拿掉判斷，測試會紅）；發布後的文章只有 YouTube 連結，沒有影片檔。',
@@ -246,8 +246,8 @@ export const STEPS = [
     what: '各項互不相依。N13、N14 都動 video-workbench 的 projects-0.js，由監工排先後。B 開頭與 R1 是影片工具融合留下、還沒修的項目，照原編號。',
     files: [`${V}ScriptForge.tsx`, `${NA}lib/script-forge/run-store.ts`, `${VW}shared/episode-spine.js`, `${VW}scripts/projects-0.js`, `${WB}schedule/`, `${NA}app/(shell)/tools/content/topics/`, `${NA}app/sidebar-sections.ts`, 'lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md', 'lobster-factory/workflow-risk-matrix.json', 'lobster-factory/docs/ROUTING_MATRIX.md'],
     items: [
-      todo('N12', '一鍵到草稿只顯示一個預估與一個最大金額；上限太低在送出前就擋；腳本頁只留一顆主按鈕。'),
-      done('N13', '用快速輸出做的集，步驟列的剪輯、聲音、字幕顯示「選用」，不再寫「還沒做」。2026-11-19：只看最新一支成片是不是快速輸出、且該集沒有剪輯檔；只有「還沒做」會變「選用」，真的做過配音或字幕仍顯示「做好了」。gate 四十五項全過；Codex 一項發現（舊快速輸出殘留誤判）已修。還沒部署。', '6fd166da8'),
+      done('N12', '一鍵到草稿只顯示一個預估與一個最大金額；上限太低在送出前就擋；腳本頁只留一顆主按鈕。2026-11-19：整趟最多由報價路由簽章後帶到腳本路由，瀏覽器可以丟掉但不能改低；上限低於最多 → 不建列、不預留、不花錢，回「上限至少要 NT$X」；進行中的趟照舊續接。tsc 0、132 支測試綠、突變（拔起跑檢查）紅→綠；Codex 兩項（報價未綁場景數、最多少一分錢）已修。監工決定：「通常約」維持用價目表，不用實際花費中位數（ai_call_logs 分不出一鍵與手動）；報價未綁比例與補圖方式，最壞是停在半路、不會超上限，接受。2026-11-19 14:17 上線（6317f6d8a）。', '6317f6d8a'),
+      done('N13', '用快速輸出做的集，步驟列的剪輯、聲音、字幕顯示「選用」，不再寫「還沒做」。2026-11-19：只看最新一支成片是不是快速輸出、且該集沒有剪輯檔；只有「還沒做」會變「選用」，真的做過配音或字幕仍顯示「做好了」。gate 四十五項全過；Codex 一項發現（舊快速輸出殘留誤判）已修。2026-11-19 14:17 上線（6317f6d8a）。', '6fd166da8'),
       todo('N14', '成片卡只展開最新一版；「發布到哪」寫成「網站草稿〈標題〉」，不再把草稿寫成已發布。'),
       todo('N16', '「自動排程」與「自動內容」兩頁：可以篩選（進行中、等你處理、過期），每列一顆下一步，不用左右捲；員工入口的側欄改繁中。'),
       todo('N18', '在工作路由與風險表登記「內容對外發布」「會員信」兩種工作，都列為要核准。'),
@@ -261,7 +261,7 @@ export const STEPS = [
 ];
 
 export const OPEN = [
-  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；U3、U5 第二段、U6 於 2026-11-16 第二次部署上線，U6.6 第三次部署上線（688d397a5）；2026-11-18 第四次部署：影片服務（片頭接合）、主系統 1fe9adedd、工作台 3078141e4，健康與 smoke 全過，部署暫停檔已移除（efc52f804）；之後的卡上線前一樣要說 go。兩邊都動的卡，工作台那一半還沒上線時，會先放部署暫停檔擋住每晚的自動上線，兩邊一起上線後再拿掉。2026-11-19 13:50：N1、N15、N13 已併入 main（36cc810e3、d04251a25、6fd166da8），都只動一邊、不用暫停檔；監工決定等 N12 併入後一次部署（操作者 2026-11-19 授權監工決定）。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
+  { n: 1, what: '影音工作台部署到正式站。屬 High，每次部署當下都要你說 go，2026-11-16 已部署一次（4b5daf721：U1、U4、U5 第一段、U7、U8、U10 上線，smoke 全過）；U3、U5 第二段、U6 於 2026-11-16 第二次部署上線，U6.6 第三次部署上線（688d397a5）；2026-11-18 第四次部署：影片服務（片頭接合）、主系統 1fe9adedd、工作台 3078141e4，健康與 smoke 全過，部署暫停檔已移除（efc52f804）；之後的卡上線前一樣要說 go。兩邊都動的卡，工作台那一半還沒上線時，會先放部署暫停檔擋住每晚的自動上線，兩邊一起上線後再拿掉。2026-11-19 13:50：N1、N15、N13 已併入 main（36cc810e3、d04251a25、6fd166da8），都只動一邊、不用暫停檔；監工決定等 N12 併入後一次部署（操作者 2026-11-19 授權監工決定）。14:10：N12 已併入（6317f6d8a），第一批四張一起部署 next-admin＋video-workbench（N12 兩邊要一起上）。14:17 第五次部署完成：6317f6d8a，兩個容器 healthy、八個 HTTP smoke 全 OK，N1、N15、N13、N12 上線。', before: 'U1', src: '計畫 §4 共通、§6；AGENTS §3' },
   { n: 2, what: 'Codex 接手做的卡已由 Claude 交叉審查（2026-11-18）。修好：按停止沒停到主系統、續做重付已完成的成片、腳本串流中斷少記費用、一次沒收費的錯誤讓整趟作廢、關頁後重付腳本、生圖先扣錢才擋模型、審片面板英文與亂碼 id。修正再經 Codex 審，找到的問題也已修。仍留的風險：停止前已送出的成片照常完成並計費；回覆在途中遺失時重試會再扣一次（所有付費呼叫皆同）；主系統專案清單會多出「一鍵腳本」空列；工作台「關閉」草稿執行要主系統在線。', before: 'U11', src: 'commit 2d73bc117、70a9bf8ea、eb69c2afa、191aed8a8；agency-os/reports/oracle/2026-11-18-partialreview-3aafd334.md' },
   { n: 3, what: '客戶切換已部署 300396496，正式站已實際按按鈕切至 Soulful，腳本頁品牌正確。部署後瀏覽器檢查 34 pass／24 skip／0 fail。固定每頁客戶、直接上傳與媒體隔離、跨分頁作業鎖；主系統全套 4807 案、工作台總閘、真實 Edge 切換與快取測試通過。操作者已同意本批部署與立即公開發布，Claude 無額度，由 Codex 負責。Soulful 第一支腳本已送出；完整生成、審片及發布仍待完成，U2.3／U11.1／U11.5 保持未完成。', before: 'U11', src: 'NA/app/api/video/workbench/organization/route.ts:23；VW/shared/adapters.js:115；CODEX-TO-CLAUDE-20261118.md §10' },
   { n: 4, what: 'Soulful 實跑修好三個問題並已上線：記憶體（容器只看 2 核心、3GiB）、片頭接合截短（HDR 圖庫片色彩不一致，全部轉 bt709，接合後長度不對就判失敗）、直式字幕與片頭超出畫面（共用自動換行）。4:5 實測 29.67 秒、字都在畫面內。另修主系統回 502 時工作台誤判失敗（改為再問）。WordPress 嵌入原本用另一組已失效的帳密，改為每個網站只走一條通道（有 WP Bridge 的站，建文、讀草稿、嵌影片都走 Bridge；外掛 0.22.0 已裝到 aware-wave.com 與 Soulful）。快速出片原本沒有封面，已補上，封面改從無字幕版截圖。共 11 個問題已修並上線；還沒修的 18 個（不順、不合邏輯、要改畫面）逐條列在 SOULFUL-LIVE-RUN-SOP-20261118.md §2 B，建議先後在 §2 D。', before: 'U11', src: 'commit 476a4c1f5、5e14d9074、549b9d4b0、740618510、6b45fe89f、d77ce908a、0e74a7b53、c02b5fd07、a67e9bfcb；SOULFUL-LIVE-RUN-SOP-20261118.md' },
