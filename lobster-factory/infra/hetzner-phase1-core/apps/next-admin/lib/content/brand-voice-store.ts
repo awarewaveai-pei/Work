@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { canAccessOrg } from "@/lib/tenant-guard";
-import { renderSiteVoice, siteLanguage, type SiteContentDefaults } from "./brand-voice";
+import { renderSiteVoice, requiredBlocks, siteLanguage, type SiteContentDefaults } from "./brand-voice";
 
 export interface SiteBrand {
   siteId: string;
@@ -42,4 +42,13 @@ export async function siteWritingFor(req: Request, siteId: string): Promise<{ vo
   const site = await loadSiteBrand(sb, siteId);
   if (!site || !canAccessOrg(req, site.organizationId)) return null;
   return { voice: renderSiteVoice(site.defaults), language: siteLanguage(site.defaults) };
+}
+
+/** The site's must-carry paragraphs for a server path that writes into that site (N1b). No access check here: the paragraphs only go into a post of that same site, and that write checks access.
+ *  [] without a database (env-only sites) or for an unknown site; a DB error throws, so a draft is never made without them by mistake. */
+export async function requiredBlocksForSite(siteId: string): Promise<string[]> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return [];
+  const site = await loadSiteBrand(sb, siteId);
+  return site ? requiredBlocks(site.defaults) : [];
 }

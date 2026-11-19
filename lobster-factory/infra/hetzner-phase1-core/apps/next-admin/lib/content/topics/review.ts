@@ -6,7 +6,7 @@ import type { RankMathReport } from "@/lib/seo/rankmath-checker";
 /** Below this the article is a broken generation, not a short one (CJK and Latin both: characters of body text). */
 export const MIN_BODY_CHARS = 1000;
 
-export type ReviewCheck = { name: "complete" | "length" | "seo" | "forbidden" | "social" | "social_forbidden"; pass: boolean; detail: string };
+export type ReviewCheck = { name: "complete" | "length" | "seo" | "forbidden" | "social" | "social_forbidden" | "required"; pass: boolean; detail: string };
 /** A type, not an interface: it is stored in content_topics.review (Topic.review is a plain record). */
 export type TopicReview = { pass: boolean; checks: ReviewCheck[]; at: string };
 
@@ -16,16 +16,41 @@ const bodyText = (md: string) => norm(md.replace(/<!--[\s\S]*?-->/g, "").replace
 const hits = (forbidden: string[], text: string) => forbidden.filter((t) => norm(t) && text.includes(norm(t)));
 const forbiddenDetail = (found: string[]) => (found.length ? `出現禁用說法：${found.join("、")}` : "沒有禁用說法");
 
-export function articleChecks(markdown: string, report: RankMathReport | null, forbidden: string[]): ReviewCheck[] {
+/** Width-folded too (NFKC: full-width letters, digits and punctuation = half-width), for the must-carry paragraphs only, so
+ *  "１９２５" in the article matches "1925" in the setting; the other checks keep norm() as it was. */
+const normWide = (s: string) => norm(s.normalize("NFKC"));
+/** A required paragraph's short name for the reason line. */
+const blockLabel = (b: string) => (b.length > 20 ? `${b.slice(0, 20)}…` : b);
+
+/** required = the site's must-carry paragraphs (requiredBlocks()); none set = no check added, the list is as before. */
+export function articleChecks(markdown: string, report: RankMathReport | null, forbidden: string[], required: string[] = []): ReviewCheck[] {
   const marker = /<!-- GENERATION_(ERROR|TRUNCATED):/.test(markdown);
   const text = bodyText(markdown);
   const found = hits(forbidden, text);
-  return [
+  const checks: ReviewCheck[] = [
     { name: "complete", pass: !marker, detail: marker ? "文章沒有寫完" : "文章完整" },
     { name: "length", pass: text.length >= MIN_BODY_CHARS, detail: `內文 ${text.length} 字（至少 ${MIN_BODY_CHARS}）` },
     { name: "seo", pass: report?.grade === "green", detail: report ? `SEO ${report.score} 分（綠燈才算過）` : "沒有 SEO 檢測結果" },
     { name: "forbidden", pass: !found.length, detail: forbiddenDetail(found) },
   ];
+  const wanted = required.filter((b) => normWide(b));
+  if (wanted.length) {
+    // Counts only if a reader sees it whole in the published post: the meta block publishing drops (markdown-to-blocks.ts:87,
+    // wordpress-core.ts:110) and link targets are not shown, and it must sit inside one paragraph (Codex 274b1c6e F2, effcd83c F1/F2).
+    const shown = markdown.replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "");
+    const paragraphs = shown.split(/\n\s*\n/).map((p) => normWide(bodyText(p)));
+    const missing = wanted.filter((b) => !paragraphs.some((p) => p.includes(normWide(b))));
+    checks.push({ name: "required", pass: !missing.length,
+      detail: missing.length ? `缺少必附段落：${missing.map((b) => `「${blockLabel(b)}」`).join("、")}` : `必附段落 ${wanted.length} 段都有` });
+  }
+  return checks;
+}
+
+/** The site's paragraphs now that the article's check did not look for (checked = what it looked for; absent = made
+ *  before N1b, looked for none), short-labelled. A site with none set = [], so auto publish is as before (Codex 274b1c6e F1). */
+export function uncheckedRequired(checked: string[] | undefined, now: string[]): string[] {
+  const had = new Set((checked ?? []).map(normWide));
+  return now.filter((b) => normWide(b) && !had.has(normWide(b))).map((b) => `「${blockLabel(b)}」`);
 }
 
 /** texts = the channels' own posts; problems = what the writer could not do. */

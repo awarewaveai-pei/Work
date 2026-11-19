@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
-import { FUNNEL_STAGES, MAX_TREND_FEEDS, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { FUNNEL_STAGES, MAX_REQUIRED_BLOCKS, MAX_TREND_FEEDS, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import PublishModeButtons from "./PublishModeButtons";
 import TopicModeButtons from "./TopicModeButtons";
 
@@ -57,6 +57,8 @@ const POVS = [
   { value: "Third person",  label: "第三人稱（他／她）" },
 ];
 
+const NL = String.fromCharCode(10);
+
 const EMPTY_DEFAULTS: SiteContentDefaults = {
   language: "", targetCountry: "", imageModel: "",
   tone: "", articleType: "", readability: "", pointOfView: "none",
@@ -84,7 +86,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
         body: JSON.stringify({ contentDefaults: d }),
       });
       const json = await res.json() as { ok: boolean; site?: ManagedSite; error?: string };
-      if (json.ok && json.site) { onSaved(json.site); setSaved(true); setD(p => ({ ...p, trendFeeds: json.site?.contentDefaults?.trendFeeds ?? p.trendFeeds })); }
+      if (json.ok && json.site) { onSaved(json.site); setSaved(true); setD(p => ({ ...p, trendFeeds: json.site?.contentDefaults?.trendFeeds ?? p.trendFeeds, requiredBlocks: json.site?.contentDefaults?.requiredBlocks ?? p.requiredBlocks })); }
       else setErr(json.error ?? "儲存失敗");
     } finally { setSaving(false); }
   }
@@ -279,6 +281,14 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
                   </button>
                 ))}
               </div>
+            </div>
+            {/* N1b: must-carry paragraphs — a topic article without any of them fails review; new video drafts get them */}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <span style={lbl}>每篇必附段落（一行一段，最多 {MAX_REQUIRED_BLOCKS} 段）</span>
+              <div style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 6 }}>例如免責聲明、求助專線。AI 寫的文章會逐字附在文末；少了任何一段，審核就不會過。影片建的新草稿也會自動帶上。</div>
+              <textarea style={{ ...inp, minHeight: 72, resize: "vertical" }} value={(d.requiredBlocks ?? []).join(NL)}
+                placeholder={["例：本文僅供參考，不能取代專業醫療或心理治療。", "例：如有立即危險，請撥 1925 安心專線或 1995 生命線。"].join(NL)}
+                onChange={e => { const v = e.target.value; setD(p => ({ ...p, requiredBlocks: v.split(NL) })); setSaved(false); }} />
             </div>
             {/* forbidden claims — full width */}
             <div style={{ gridColumn: "1 / -1" }}>

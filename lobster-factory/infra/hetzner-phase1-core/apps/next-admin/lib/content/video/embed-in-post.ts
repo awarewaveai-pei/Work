@@ -16,6 +16,7 @@ import {
   type DeliveryReceipt,
 } from "@/lib/content/video/delivery-receipts";
 import { coverForRelease } from "@/lib/content/video/cover";
+import { requiredBlocksForSite } from "@/lib/content/brand-voice-store";
 
 const attr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -335,7 +336,16 @@ export async function embedVideoInNewDraft(
   if (!title) return { ok: false, status: 400, error: "title required" };
   if (!/^https:\/\//i.test(input.videoUrl.trim())) return { ok: false, status: 400, error: "videoUrl must start with https://" };
 
-  const created = await publishToWordPress({ siteId, markdown: `# ${title}\n\n${intro || title}\n`, publishStatus: "draft" }, identity);
+  // N1b / SOP B2: the site's must-carry paragraphs (disclaimer, crisis line) go into the draft from the start. Read before
+  // the draft exists: a failed read makes nothing, rather than a draft that silently lacks them.
+  let required: string[];
+  try { required = await requiredBlocksForSite(siteId); }
+  catch (err) {
+    console.error("[video/embed-new-draft] required blocks read failed; no draft made", err);
+    return { ok: false, status: 500, error: "讀不到網站的必附段落設定，沒有建立草稿；請稍後再試" };
+  }
+  const body = [intro || title, ...required].join("\n\n");
+  const created = await publishToWordPress({ siteId, markdown: `# ${title}\n\n${body}\n`, publishStatus: "draft" }, identity);
   if (!created.ok) {
     const failed = created as { status: number; error: string; mode?: string };   // strict:false: no narrowing on !ok
     return failed.mode !== undefined ? { ok: false, blockedMode: failed.mode } : { ok: false, status: failed.status, error: failed.error };

@@ -16,13 +16,17 @@ vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => null }))
 const publishToWordPress = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/content/publish/wordpress-core", () => ({ publishToWordPress }));
 
+const requiredBlocksForSite = vi.hoisted(() => vi.fn(async (_siteId: string): Promise<string[]> => []));
+vi.mock("@/lib/content/brand-voice-store", () => ({ requiredBlocksForSite }));
+
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.stubGlobal("fetch", fetchMock);
 
 const { embedVideoInPost, embedVideoInNewDraft } = await import("../embed-in-post");
 
 beforeEach(() => {
-  for (const m of [resolveWpSite, checkProductionChangeAllowed, fetchMock, publishToWordPress]) m.mockReset();
+  for (const m of [resolveWpSite, checkProductionChangeAllowed, fetchMock, publishToWordPress, requiredBlocksForSite]) m.mockReset();
+  requiredBlocksForSite.mockResolvedValue([]);
   checkProductionChangeAllowed.mockResolvedValue({ allowed: true, mode: "normal" });
   resolveWpSite.mockResolvedValue({
     site: { id: "1", url: "https://acme.example", organizationId: ORG },
@@ -107,6 +111,19 @@ describe("embedVideoInNewDraft", () => {
     expect(input.markdown).toMatch(/^# 新品介紹\n/);
     expect(who).toBe(identity);
     expect(String(fetchMock.mock.calls[0][0])).toContain("/posts/77?context=edit");
+  });
+  it("the new draft carries the site's required paragraphs (N1b / SOP B2); a failed read makes no draft", async () => {
+    requiredBlocksForSite.mockResolvedValue(["本文僅供參考。", "安心專線 1925"]);
+    publishToWordPress.mockResolvedValue({ ok: true, post_id: 79 });
+    fetchMock.mockImplementation(async (url: string) =>
+      url.includes("context=edit") ? { ok: true, json: async () => ({ status: "draft", content: { raw: "x" } }) } : { ok: true, json: async () => ({}) });
+    await embedVideoInNewDraft(orgIdentity(ORG), { siteId: "1", title: "t", intro: "介紹", videoUrl: "https://cdn.example/v.mp4" });
+    expect(requiredBlocksForSite).toHaveBeenCalledWith("1");
+    expect(publishToWordPress.mock.calls[0][0].markdown).toBe("# t\n\n介紹\n\n本文僅供參考。\n\n安心專線 1925\n");
+    publishToWordPress.mockClear();
+    requiredBlocksForSite.mockRejectedValue(new Error("db down"));
+    expect(await embedVideoInNewDraft(orgIdentity(ORG), { siteId: "1", title: "t", videoUrl: "https://cdn.example/v.mp4" })).toMatchObject({ ok: false, status: 500 });
+    expect(publishToWordPress).not.toHaveBeenCalled();
   });
   it("draft made but the embed failed: the error names the draft, so a retry does not make another", async () => {
     publishToWordPress.mockResolvedValue({ ok: true, post_id: 78 });

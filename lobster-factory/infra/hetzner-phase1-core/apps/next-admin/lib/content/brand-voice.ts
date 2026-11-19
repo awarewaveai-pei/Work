@@ -28,10 +28,16 @@ export type TopicMode = (typeof TOPIC_MODES)[number];
 /** The brand's own industry RSS feeds (AUTO_CONTENT P9.4): https URLs, read at planning time into that brand's prompt only. */
 export const MAX_TREND_FEEDS = 10;
 
+/** Sentences every article of the site must carry word for word (N1b: a disclaimer, a crisis line). Plain text, one
+ *  paragraph each; the route rejects more or longer, requiredBlocks() reads them. */
+export const MAX_REQUIRED_BLOCKS = 10;
+export const MAX_REQUIRED_BLOCK_CHARS = 500;
+
 export interface SiteContentDefaults {
   publishMode?: PublishMode;
   topicMode?: TopicMode;
   trendFeeds?: string[];
+  requiredBlocks?: string[];
   language?: string;
   targetCountry?: string;
   imageModel?: string;
@@ -127,4 +133,12 @@ export function siteLanguage(d: SiteContentDefaults | undefined): string {
 /** Only the exact stored value lets the schedule approve its own proposals: missing, misspelt or any other value = a person picks. */
 export function aiPicksTopics(d: SiteContentDefaults | undefined): boolean {
   return d?.topicMode === "ai_pick";
+}
+
+/** The site's must-carry paragraphs, trimmed, blanks and repeats dropped; [] for a site that never set any (old data). */
+export function requiredBlocks(d: SiteContentDefaults | undefined): string[] {
+  const raw = d?.requiredBlocks;
+  if (!Array.isArray(raw)) return [];
+  const out = [...new Set(raw.map((s) => (typeof s === "string" ? s.trim() : "")).filter(Boolean))];
+  return out.slice(0, MAX_REQUIRED_BLOCKS).map((s) => s.slice(0, MAX_REQUIRED_BLOCK_CHARS));
 }

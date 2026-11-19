@@ -12,7 +12,7 @@ import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
-import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, siteLanguage, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteLanguage, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
 import { parseArticleMeta } from "@/lib/content/article/meta";
@@ -24,7 +24,7 @@ import { requiresReview } from "@/lib/social/review";
 import { textsForAccounts, writerKeysFor, writeSocialPosts } from "@/lib/social/write-posts";
 import { inLanguage } from "@/lib/social/post-language";
 import { claudeWriter } from "@/lib/social/write-posts-claude";
-import { articleChecks, reviewOf, socialChecks, type ReviewCheck } from "./review";
+import { articleChecks, reviewOf, socialChecks, uncheckedRequired, type ReviewCheck } from "./review";
 import { claimTopic, dueApproved, inStatus, move, orgTimeZone, startTopic, type Topic } from "./store";
 import { startVideoJob } from "@/lib/content/video/start";
 import { ensureTopicProject, updateTopicProject } from "@/lib/content/video/topic-project";
@@ -42,6 +42,8 @@ import { MakeError, NOW_FORMATS, brandDay, waitsForVideo, type Made, type Publis
 export interface TopicArtifacts {
   article?: {
     wp_post_id: number | null; wp_edit_url: string | null; seo_score: number | null; summary: string; source: string; checks: ReviewCheck[];
+    /** N1b: the site's must-carry paragraphs this article's checks looked for (absent on articles made before N1b). */
+    required?: string[];
     published?: { status: string; link: string; at: string };
   };
   /** post_id null = no channel the writer can write for (the checks say so). */
@@ -90,7 +92,7 @@ export async function optionalImageGrant(ask: () => Promise<Grant> = () => grant
 /** The article generator's input: the topic, and the site's stored defaults the article tool's form starts from.
  *  images = how many placeholders to ask for (0 when the organization has no content.image). */
 export function articleInput(t: Pick<Topic, "keyword" | "title" | "angle">, d: SiteContentDefaults, images = 0): Record<string, unknown> {
-  const details = [renderBrandVoice(d.marketing, d.brandVoiceInstructions), t.angle ? `切入角度：${t.angle}` : ""].filter(Boolean).join("\n\n");
+  const details = [renderBrandVoice(d.marketing, d.brandVoiceInstructions), t.angle ? `切入角度：${t.angle}` : "", requiredBlocks(d).length ? `文末逐字附上以下段落，一字不改，每段自成一段：\n${requiredBlocks(d).join("\n\n")}` : ""].filter(Boolean).join("\n\n");
   return {
     keyword: t.keyword, title: t.title, language: siteLanguage(d), targetCountry: d.targetCountry, tone: d.tone,
     articleType: d.articleType, readability: d.readability, pointOfView: d.pointOfView, details, generateMeta: true,
@@ -136,7 +138,8 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard): Promise<Non
     summary: meta?.metaDesc || t.title,
     // what the social writer reads (it uses the first 3000 characters), kept so a retry can write posts without the article
     source: markdown.replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "").trim().slice(0, 3000),
-    checks: articleChecks(markdown, report, forbiddenTerms(site.defaults)),
+    checks: articleChecks(markdown, report, forbiddenTerms(site.defaults), requiredBlocks(site.defaults)),
+    required: requiredBlocks(site.defaults),
   };
 }
 
@@ -239,6 +242,9 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string): Promi
     const a = artifacts.article;
     if (t.formats.includes("article") && !a?.published) {
       if (!a?.wp_post_id || !t.site_id) throw new Error("沒有 WordPress 草稿編號，無法發布");
+      // N1b: paragraphs the site asks for now but this article was never checked for (added after it was made) stop it here
+      const unchecked = uncheckedRequired(a.required, requiredBlocks(site.defaults));
+      if (unchecked.length) throw new Error(`網站後來新增了必附段落，這篇沒有檢查過（${unchecked.join("、")}），沒有發布（草稿還在）`);
       const r = await updateWpPost(orgIdentity(t.organization_id), t.site_id, a.wp_post_id, { status: "publish" });
       if (!r.ok) throw new Error(`WordPress 發布失敗：${(r as Extract<typeof r, { ok: false }>).error}`);   // strict:false
       artifacts.article = { ...a, published: { status: r.post.status, link: r.post.link, at: now.toISOString() } };

@@ -4,7 +4,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { siteRowGate, siteUrlWriteGate } from "@/lib/content/wp-sites";
 import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 
 const GATE_MODES = [
@@ -77,6 +77,16 @@ export async function PATCH(
         if (bad) return NextResponse.json({ ok: false, error: `trendFeeds: ${bad} 不是公開 https 網址` }, { status: 400 });
         if (feeds.length > MAX_TREND_FEEDS) return NextResponse.json({ ok: false, error: `trendFeeds: 最多 ${MAX_TREND_FEEDS} 個` }, { status: 400 });
         next.trendFeeds = feeds;
+      }
+    }
+    if (defaultsGiven && "requiredBlocks" in next) {
+      if (!Array.isArray(next.requiredBlocks)) delete next.requiredBlocks;
+      else {
+        const blocks = [...new Set(next.requiredBlocks.map((b) => (typeof b === "string" ? b.trim() : "")).filter(Boolean))];
+        if (blocks.length > MAX_REQUIRED_BLOCKS) return NextResponse.json({ ok: false, error: `每篇必附段落最多 ${MAX_REQUIRED_BLOCKS} 段` }, { status: 400 });
+        const long = blocks.find((b) => b.length > MAX_REQUIRED_BLOCK_CHARS);
+        if (long) return NextResponse.json({ ok: false, error: `每篇必附段落每段最多 ${MAX_REQUIRED_BLOCK_CHARS} 字：「${long.slice(0, 20)}…」太長` }, { status: 400 });
+        next.requiredBlocks = blocks;
       }
     }
     modesRead = [];
