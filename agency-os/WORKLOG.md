@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-19（續6）— 影片下一階段：批 0 三張派工卡（N1、N4、N15）；上線前閘改成流程閘
+
+- 派工：主線 session 提出三張卡（各自 worktree、Opus 5.5），由操作者一次點一張開；brief 含 file:line、既有資料處理、點名測試與突變、FILES／TESTS／RISKS 回報。監工讀 diff 後併入 main，`data.mjs` 只有監工改。
+- 更正：計畫 §9「N1、N2 上線前在 `sites/[id]` PATCH 加檢查」與 `data.mjs` 批0 的同一句自相矛盾——N1 上線後程式已有審片閘，那道檢查上線即成死碼。改成流程閘：批 0 標完成前不切 `ai_review_auto`（切換只有員工能做，`lib/content/topics/make.ts:8-9`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs → ok: 12 cards, 5 batches, 75 items (50 done), 13 open, page fresh；同一網址重新發布 | exit=0 | ms=3000
+- REVIEW_WAIVED: DOC_ONLY -- 計畫檔與監工台各改一句
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=sites PATCH|PATCH 加檢查 | hits=0
+- rollback：`git revert` 本 commit 後 `node build.mjs` 再發布。
 ## 2026-11-19（續5）— 影片監工台：待決 10 更正，不用 E2E 測試站（操作者「只有用 soulful 和 AW」）
 
 - 根因：續4 把驗收地點定在 `E2E-Verify-0704`，依據只有 `wp_sites.active=t`；操作者已不用該站。資料表有列 ≠ 還在用。

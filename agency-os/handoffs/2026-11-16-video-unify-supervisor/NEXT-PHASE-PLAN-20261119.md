@@ -194,7 +194,7 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 - 預設值（已定 O6）：每題上限 NT$15；每天最多開始 1 題（現預設 2，`tick.ts:15`）；每天最多提 3 題；相關性門檻 70；會員信每站每週一封草稿；YouTube 預設公開；`topicMode`、`publishMode`、每日熱題三個開關預設關（AGENTS §0 自動化預設 OFF）。
 - 失敗停點：題目 failed＋`last_error`（中文）→ 既有事件 → Slack `#ops-incidents`／Telegram（N17 改文字）；影片專案另有 Telegram 直送（保留一條，N17 去重）。
 - 回滾：每張卡單獨 `git revert`；migration 都附 down（兩處）；部署用 `sg-deploy.sh` 快照回退；已發布內容不自動收回——YouTube 下架、文章改回草稿由人做，步驟寫進 N5a 的驗證檔。
-- 上線前閘：N1、N2 沒上線前，任何站不得切 `ai_review_auto`（在 `sites/[id]` 的 PATCH 加檢查，併 N1）。
+- 上線前閘（流程，不寫程式）：批 0 在監工台標完成前，不把任何站切成 `ai_review_auto`；切換只有員工能做（`make.ts:8-9`）。N1 上線後程式本身就有審片閘，再加一道檢查只會留下沒用的程式。
 
 ## 10. 七天上線順序與每天的驗收指令
 
