@@ -1,15 +1,8 @@
-import ScriptForgePage from "./ScriptForgePage";
+import WorkbenchEntry from "../video/WorkbenchEntry";
 
-export const metadata = { title: "ScriptForge 腳本工具 · Lobster Factory" };
+export const metadata = { title: "影音工作台 · Lobster Factory" };
 
+// ScriptForge is the video workbench's 腳本 now (video-unify-plan-20261116 §4 U3, U11): this old URL opens it there.
 export default function Page() {
-  return (
-    <>
-      <div className="topbar">
-        <span className="topbar-title">ScriptForge 腳本工具</span>
-        <span className="topbar-env">24 個模組：寫腳本、鉤子、文案、提案；做好可以送社群或送影片</span>
-      </div>
-      <ScriptForgePage />
-    </>
-  );
+  return <WorkbenchEntry open="script-forge" />;
 }

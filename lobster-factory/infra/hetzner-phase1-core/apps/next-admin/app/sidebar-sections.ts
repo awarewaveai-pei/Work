@@ -58,9 +58,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     label: 'Content Tools',
     items: [
       { type: 'link',     href: '/tools/content',       icon: '✍', label: 'SEO Articles',  title: 'SEO/GEO 文章產出' },
-      { type: 'link',     href: '/tools/video',         icon: '🎬', label: 'Video Studio',  title: '影片生成工具' },
-      { type: 'link',     href: '/tools/video/projects', icon: '🎞', label: 'Video Projects', title: '所有影片專案與成片' },
-      { type: 'link',     href: '/tools/script-forge',  icon: '📝', label: 'ScriptForge',   title: '24 個腳本與文案模組' },
+      { type: 'link',     href: '/tools/video',         icon: '🎬', label: 'Video Workbench', title: '影音工作台：腳本、做片、審片、發布（開新分頁）' },
       { type: 'link',     href: '/tools/tarot',         icon: '🔮', label: 'Tarot Studio',  title: '塔羅牌印刷檔生成工具' },
       { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'POD Studio',    title: 'POD 設計生成器' },
       { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',        title: 'AI 擬真商品照' },

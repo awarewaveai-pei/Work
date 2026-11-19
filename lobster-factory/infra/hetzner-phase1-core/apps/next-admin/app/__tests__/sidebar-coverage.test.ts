@@ -17,6 +17,8 @@ const REACHED_ELSEWHERE: Record<string, string> = {
   "/tools/social/inbox": "social app side nav (tools/social/routes.ts)",
   "/tools/social/reporting": "social app side nav (tools/social/routes.ts)",
   "/tools/social/smartlinks": "social app side nav (tools/social/routes.ts)",
+  "/tools/script-forge": "old URL: the same 開啟影音工作台 page as /tools/video, opening the workbench's 腳本",
+  "/tools/video/projects": "old URL, deleted with the old video screens (video-unify-plan-20261116 §4 U11 commit 2)",
 };
 
 const GROUPS = STAFF_ROUTE_GROUPS.map((g) => path.resolve(__dirname, "..", g));
