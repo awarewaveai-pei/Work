@@ -495,8 +495,15 @@ export async function GET(request: Request) {
   // —— 是 designs 這一邊與文件模型衝突。操作者 2026-08-26 明示採「管理員看得到全部客戶」。
   //
   // **寫路徑（POST）不受影響**：insert 必須有明確 org，仍走 defaultOrganizationId() 後備。
+  // An explicit ?organizationId (the video workbench's 作品 page sends the customer it is switched to) is checked like
+  // every (wb) page's API (/api/video/schedule): a customer naming another organization gets 403 and no rows, instead of
+  // effectiveOrgId quietly answering with its own.
+  const requestedOrgId = url.searchParams.get("organizationId")?.trim() || null;
   let organizationId: string | null;
-  try { organizationId = effectiveOrgId(request, url.searchParams.get("organizationId")); }
+  try {
+    if (requestedOrgId) assertOrgAccess(request, requestedOrgId);
+    organizationId = effectiveOrgId(request, requestedOrgId);
+  }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (organizationId && !isUuid(organizationId)) {
     return NextResponse.json({ ok: false, error: "organizationId must be a uuid" }, { status: 400 });

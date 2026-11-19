@@ -262,7 +262,9 @@ function Chips({
   );
 }
 
-export default function DesignsGallery({ initialTab = "designs" }: { initialTab?: ActiveTab }) {
+/** organizationId: list only that organization's pieces (the video workbench's 作品 page passes the customer it is
+ *  switched to; the server checks the caller may see it). Omitted = the server's default scope (staff: every org). */
+export default function DesignsGallery({ initialTab = "designs", organizationId }: { initialTab?: ActiveTab; organizationId?: string }) {
   // Edit opens the design in its editor (canvas-handoff.ts CANVAS_TARGETS): a vector original in VectorCraft, anything
   // else in PhotoCraft. Both hrefs up front: hooks can't be called per row.
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
@@ -355,11 +357,12 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
     if (filterTheme !== "all") p.set("theme", filterTheme);
     if (filterBrand !== "all") p.set("brand", filterBrand);
     if (filterTime !== "all") p.set("time", filterTime);
+    if (organizationId) p.set("organizationId", organizationId);
     if (cursor) p.set("cursor", cursor);
     else p.set("counts", "1");
     const res = await fetch(`/api/tools/designs?${p.toString()}`, { cache: "no-store" });
     return (await res.json()) as DesignListResponse;
-  }, [designGroup, sortOrder, filterModel, filterProduct, filterTheme, filterBrand, filterTime]);
+  }, [designGroup, sortOrder, filterModel, filterProduct, filterTheme, filterBrand, filterTime, organizationId]);
 
   /** "reset": first page for the current filters. "refresh": re-read first page + counts and keep
    *  the pages already loaded (dedupe by id) so a background refresh never collapses the list. */
@@ -419,7 +422,9 @@ export default function DesignsGallery({ initialTab = "designs" }: { initialTab?
   const loadVideos = useCallback(async () => {
     setVideoState("loading");
     try {
-      const res = await fetch("/api/tools/designs?domain=ai_video", { cache: "no-store" });
+      const p = new URLSearchParams({ domain: "ai_video" });
+      if (organizationId) p.set("organizationId", organizationId);
+      const res = await fetch(`/api/tools/designs?${p.toString()}`, { cache: "no-store" });
       const json = (await res.json()) as { ok: boolean; assets?: VideoAsset[]; error?: string };
       if (!json.ok) {
         if (json.error === "pod_designs_disabled") { setVideoState("disabled"); return; }
