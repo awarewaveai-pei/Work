@@ -50,6 +50,7 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [ticked, setTicked] = useState<string[]>([]);
   const [texts, setTexts] = useState<Record<string, string>>({});
+  const [picked, setPicked] = useState<Record<string, string>>({});   // channel id -> the ratio the operator chose (B1); none = platform default
   const [sites, setSites] = useState<Site[]>([]);
   const [siteId, setSiteId] = useState("");
   const [wpPosts, setWpPosts] = useState<WpPost[]>([]);
@@ -67,6 +68,8 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
     .map((a) => ({ ...a, ratio: ratioOfAsset(a) ?? "" })).filter((a) => a.ratio), [assets, candidateId]);
   const releasedRows = rows.filter((r) => released[r.id]);
   const releasedRatios = releasedRows.map((r) => r.ratio);
+  // B1: the ratio a channel's draft uses = the operator's pick if that ratio is approved, else the platform default (platform-ratio.ts).
+  const ratioOfChannel = (a: Account) => (picked[a.id] && releasedRatios.includes(picked[a.id]) ? picked[a.id] : ratioFor(a.platform, releasedRatios));
 
   useEffect(() => {
     if (!org) { setAssets([]); setAccounts([]); setSites([]); return; }
@@ -79,7 +82,7 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
 
   // Another video = nothing of the last one's channels, texts or covers carries over (a default text is written only
   // into an EMPTY box, so a kept text would be posted with the wrong video; Codex 63d19a26 F3).
-  useEffect(() => { setTicked([]); setTexts({}); setCovers({}); setCoverRights(false); }, [candidateId]);
+  useEffect(() => { setTicked([]); setTexts({}); setPicked({}); setCovers({}); setCoverRights(false); }, [candidateId]);
 
   // Every ratio row gets its editorial/rights QA computed (it reads the row's own metadata), then its QA reports and Release are read back.
   async function refresh() {
@@ -148,7 +151,7 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
 
   async function saveDrafts() {
     setBusy(true); setMessage("");
-    const res = await postJson("/api/video/social-drafts", { organizationId: org, candidateAssetId: candidateId, items: ticked.map((id) => ({ accountId: id, text: texts[id] ?? "" })) });
+    const res = await postJson("/api/video/social-drafts", { organizationId: org, candidateAssetId: candidateId, items: ticked.map((id) => { const ratio = ratioOfChannel(accounts.find((a) => a.id === id)!); return { accountId: id, text: texts[id] ?? "", ...(ratio ? { ratio } : {}) }; }) });
     const drafts = (res.json.drafts as unknown[] | undefined)?.length ?? 0;
     setMessage(res.ok ? `✅ 已存成 ${drafts} 個社群草稿，到社群工具查看與發布。` : String(res.json.error ?? "存草稿失敗"));
     if (res.ok) { await loadOutcome(); changed(); }
@@ -239,20 +242,29 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
       {releasedRows.length === 0 ? <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>先核准至少一個比例。</span>
         : accounts.length === 0 ? <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>這個客戶還沒有連上的社群頻道，到社群工具連線。</span>
         : <>
-          <div style={{ display: "grid", gap: 6 }}>
-            {accounts.map((a) => {
-              const ratio = ratioFor(a.platform, releasedRatios);
-              return <label key={a.id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}>
-                <input type="checkbox" checked={ticked.includes(a.id)} onChange={(e) => {
-                  const on = e.target.checked;
-                  setTicked((t) => on ? [...t, a.id] : t.filter((x) => x !== a.id));
-                  // VD.9: free first -- a newly ticked channel starts with the title and the script's first line
-                  if (on) setTexts((t) => (t[a.id] ?? "").trim() ? t : { ...t, [a.id]: defaultCopy(primary?.metadata?.title, primary?.metadata?.script) });
-                }} />
-                {a.label}（{a.platform}）→ {ratio ? RATIO_LABEL[ratio] : "沒有可用比例"}
-              </label>;
-            })}
-          </div>
+          <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>每個頻道預設用最適合它的比例，可改；只列已核准的比例。</span>
+          <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
+            <thead><tr style={{ textAlign: "left", color: "var(--text-secondary)" }}><th style={{ padding: "4px 6px" }}>頻道</th><th style={{ padding: "4px 6px" }}>比例</th></tr></thead>
+            <tbody>
+              {accounts.map((a) => {
+                const ratio = ratioOfChannel(a);
+                return <tr key={a.id} style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                  <td style={{ padding: "6px" }}><label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input type="checkbox" checked={ticked.includes(a.id)} onChange={(e) => {
+                      const on = e.target.checked;
+                      setTicked((t) => on ? [...t, a.id] : t.filter((x) => x !== a.id));
+                      // VD.9: free first -- a newly ticked channel starts with the title and the script's first line
+                      if (on) setTexts((t) => (t[a.id] ?? "").trim() ? t : { ...t, [a.id]: defaultCopy(primary?.metadata?.title, primary?.metadata?.script) });
+                    }} />
+                    {a.label}（{a.platform}）
+                  </label></td>
+                  <td style={{ padding: "6px" }}><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {releasedRows.map((r) => <button key={r.id} type="button" aria-pressed={r.ratio === ratio} onClick={() => setPicked((p) => ({ ...p, [a.id]: r.ratio }))} style={chip(r.ratio === ratio)}>{RATIO_LABEL[r.ratio]}</button>)}
+                  </div></td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
           {ticked.length > 0 && <>
             <button type="button" disabled={busy} onClick={() => void writeCopy()} style={btn(!busy)}>用 AI 改寫各頻道文案（Claude Haiku，約 NT${syndicateCostTwd()}）</button>
             {ticked.map((id) => <label key={id} style={{ fontSize: 11 }}>{accounts.find((a) => a.id === id)?.label} 的文案

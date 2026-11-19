@@ -5,7 +5,8 @@
  */
 import { ratioFor } from "./platform-ratio";
 
-export interface DraftItem { accountId: string; text: string }
+/** ratio = the one the operator picked for this channel (B1); absent = the platform default (platform-ratio.ts). */
+export interface DraftItem { accountId: string; text: string; ratio?: string }
 export interface DraftDeps {
   /** The brand's channels (social accounts). */
   accounts(): Promise<Array<{ id: string; platform: string; status: string; label: string }>>;
@@ -31,7 +32,9 @@ export async function saveVideoSocialDrafts(deps: DraftDeps, title: string, item
     const account = accounts.find((a) => a.id === item.accountId);
     if (!account) return { ok: false, status: 404, error: "頻道不屬於這個客戶" };
     if (account.status !== "connected") return { ok: false, status: 409, error: `${account.label} 的連線已失效，請先到社群工具重新連線` };
-    const ratio = ratioFor(account.platform, releases.map((r) => r.ratio));
+    const approved = releases.map((r) => r.ratio);
+    if (item.ratio && !approved.includes(item.ratio)) return { ok: false, status: 409, error: `${account.label} 選的比例還沒有核准發布的影片` };
+    const ratio = item.ratio ?? ratioFor(account.platform, approved);
     const release = releases.find((r) => r.ratio === ratio);
     if (!ratio || !release) return { ok: false, status: 409, error: `${account.label} 需要的比例還沒有核准發布的影片` };
     plan.push({ ...item, platform: account.platform, ratio, videoUrl: release.videoUrl, coverUrl: release.coverUrl ?? null });

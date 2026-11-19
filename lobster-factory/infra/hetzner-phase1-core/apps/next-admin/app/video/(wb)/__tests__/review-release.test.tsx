@@ -2,17 +2,19 @@
 // video-unify-plan-20261116 §4 U6: 審片與發布 as one workbench page. (1) two channels on different platforms = two own texts,
 // each saved as its own draft; (2) opened from a cut it lists that one video; (3) an older project (made by the old pipeline,
 // source=manual) is opened by its project id: its video plays and can be approved.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ReviewRelease from "../review-release/ReviewRelease";
 
 const ORG = "39ad4149-5044-4077-8d9a-b6b916de0e21", CUT = "a3de2011-1e4a-4624-a1e2-93eacb930757", OTHER = "b4ef3122-2f5b-4735-b2f3-a4fdc0a41868", PROJECT = "c5f04233-3a6c-4846-83a4-b50ed1b52979";
 const video = (id: string, title: string) => ({ id, object_url: `https://r2.example/video/${id}/9x16.mp4`, checksum_sha256: "a".repeat(64), created_at: "2026-11-15T05:17:00Z", asset_domain: "workbench_render", metadata: { title, ratio: "9x16" } });
+// B1: one video made in several ratios = the primary row plus ratio rows that point back at it (variantOf)
+const ratioRow = (id: string, ratio: string, variantOf?: string) => ({ id, object_url: `https://r2.example/video/${CUT}/${ratio}.mp4`, checksum_sha256: "a".repeat(64), created_at: "2026-11-15T05:17:00Z", asset_domain: "workbench_render", metadata: { title: "三比例", ratio, ...(variantOf ? { variantOf } : {}) } });
 const PASSED = ["technical", "caption", "editorial", "rights"].map((kind) => ({ kind, status: "passed", candidateChecksum: "a".repeat(64) }));
 const ACCOUNTS = [{ id: "acc-yt", platform: "youtube", label: "頻道甲", status: "active" }, { id: "acc-ig", platform: "instagram", label: "頻道乙", status: "active" }];
 
 type Call = { url: string; body?: unknown };
-function stubServer(assets: unknown[], released: string[] = [], reports = PASSED) {
+function stubServer(assets: unknown[], released: string[] = [], reports = PASSED, accounts: unknown[] = ACCOUNTS) {
   const calls: Call[] = [];
   let saved = false;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
@@ -20,7 +22,7 @@ function stubServer(assets: unknown[], released: string[] = [], reports = PASSED
     calls.push({ url: u, body: init?.body ? JSON.parse(String(init.body)) : undefined });
     const ok = (value: unknown) => new Response(JSON.stringify(value), { status: 200 });
     if (u.startsWith("/api/video/assets")) return ok({ items: u.includes("projectId=" + PROJECT) ? assets.filter((a) => (a as { id: string }).id === CUT) : assets });
-    if (u.startsWith("/api/video/social-channels")) return ok({ accounts: ACCOUNTS });
+    if (u.startsWith("/api/video/social-channels")) return ok({ accounts });
     if (u.startsWith("/api/content/sites")) return ok({ sites: [] });
     if (u.startsWith("/api/video/qa/")) return ok(init?.method === "POST" ? { ok: true } : { items: reports });
     if (u.startsWith("/api/video/release")) return ok(init?.method === "POST" ? { ok: true, release: { id: "rel-1" } } : { items: released.map((id) => ({ id: "rel-" + id, candidate_asset_id: id, candidate_checksum: "a".repeat(64) })) });
@@ -52,9 +54,44 @@ describe("ReviewRelease", () => {
     fireEvent.click(screen.getByText("存成社群草稿"));
     await waitFor(() => expect(calls.some((c) => c.url.startsWith("/api/video/social-drafts"))).toBe(true));
     const saved = calls.find((c) => c.url.startsWith("/api/video/social-drafts"))!.body as { items: { accountId: string; text: string }[] };
-    expect(saved.items).toEqual([{ accountId: "acc-yt", text: "給 YouTube 的長文案" }, { accountId: "acc-ig", text: "給 IG 的短文案" }]);
+    // only 9:16 is approved here, so both channels carry it (B1: the row's ratio is sent with the text)
+    expect(saved.items).toEqual([{ accountId: "acc-yt", text: "給 YouTube 的長文案", ratio: "9x16" }, { accountId: "acc-ig", text: "給 IG 的短文案", ratio: "9x16" }]);
     expect(await screen.findByText("完成：已建 2 個社群草稿")).toBeTruthy();
     expect(screen.getByText("查看社群草稿").getAttribute("href")).toBe("https://social.example/");
+  });
+
+  it("B1 three ratios approved: each channel starts on its platform's ratio, the ratio can be changed, and the draft carries that row's ratio", async () => {
+    const V45 = "d6a05344-7b57-4e87-a5c4-b6c1d62a8a7a", V916 = "e7b16455-8c68-4f98-b6d5-c7d2e73b9b8b";
+    const calls = stubServer([ratioRow(CUT, "16x9"), ratioRow(V45, "4x5", CUT), ratioRow(V916, "9x16", CUT)], [CUT, V45, V916]);
+    render(<ReviewRelease organizationId={ORG} assetId={CUT} section="release" />);
+    const ytRow = (await screen.findByText("頻道甲（youtube）")).closest("tr")!, igRow = screen.getByText("頻道乙（instagram）").closest("tr")!;
+    await waitFor(() => expect(within(ytRow).getAllByRole("button")).toHaveLength(3));
+    const on = (row: HTMLElement) => within(row).getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent);
+    expect(on(ytRow)).toEqual(["橫式 16:9"]);
+    expect(on(igRow)).toEqual(["直式 4:5"]);
+    fireEvent.click(within(igRow).getByText("直式 9:16"));
+    expect(on(igRow)).toEqual(["直式 9:16"]);
+    expect(on(ytRow)).toEqual(["橫式 16:9"]);   // one channel's pick does not move another's
+    fireEvent.click(within(ytRow).getByRole("checkbox")); fireEvent.click(within(igRow).getByRole("checkbox"));
+    fireEvent.click(await screen.findByText("存成社群草稿"));
+    await waitFor(() => expect(calls.some((c) => c.url.startsWith("/api/video/social-drafts"))).toBe(true));
+    const saved = calls.find((c) => c.url.startsWith("/api/video/social-drafts"))!.body as { items: { accountId: string; ratio?: string }[] };
+    expect(saved.items.map((i) => [i.accountId, i.ratio])).toEqual([["acc-yt", "16x9"], ["acc-ig", "9x16"]]);
+  });
+
+  it("B1 an older video with only 16:9 approved: every channel can only take 16:9", async () => {
+    const four = ["youtube", "instagram", "facebook", "tiktok"].map((p) => ({ id: "acc-" + p, platform: p, label: "頻道-" + p, status: "active" }));
+    const calls = stubServer([ratioRow(CUT, "16x9")], [CUT], PASSED, four);
+    render(<ReviewRelease organizationId={ORG} assetId={CUT} section="release" />);
+    for (const a of four) {
+      const row = (await screen.findByText(`${a.label}（${a.platform}）`)).closest("tr")!;
+      const buttons = within(row).getAllByRole("button");
+      expect(buttons.map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([["橫式 16:9", "true"]]);
+    }
+    fireEvent.click(screen.getByLabelText(/頻道-tiktok/));
+    fireEvent.click(await screen.findByText("存成社群草稿"));
+    await waitFor(() => expect(calls.some((c) => c.url.startsWith("/api/video/social-drafts"))).toBe(true));
+    expect((calls.find((c) => c.url.startsWith("/api/video/social-drafts"))!.body as { items: { ratio?: string }[] }).items[0].ratio).toBe("16x9");
   });
 
   it("opened from a cut it lists that one video, not the client's others", async () => {
