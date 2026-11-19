@@ -179,7 +179,7 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 
 **批 4：順暢度（互不相依，可並行；動 `VW/scripts/projects-0.js` 的 N13、N14 由監工排先後）**
 
-- **N12 一鍵到草稿的金額說清楚**｜一個預估＋一個最大；上限預設＝預估 ×2；低於最小預留在送出前就擋並寫「至少要 NT$X」；腳本頁只留一顆主按鈕。｜Medium｜Opus 5.5｜檔案：`app/(shell)/tools/video/ScriptForge.tsx`、`lib/script-forge/run-store.ts`、`app/api/tools/script-forge/*`。（收 S1–S3）
+- **N12 一鍵到草稿的金額說清楚**｜一個預估＋一個最大（同一個伺服器報價）；上限是硬保證，低於整趟最大值不得起跑，在花錢前就擋並寫「至少要 NT$X」；腳本頁只留一顆主按鈕。｜Medium｜Opus 5.5｜檔案：`app/(shell)/tools/video/ScriptForge.tsx`、`lib/script-forge/run-store.ts`、`app/api/tools/script-forge/*`。（收 S1–S3）
 - **N13 步驟列跟著輸出法**｜快速輸出的集，6–8 顯示「選用」。｜Low｜fullstack-engineer（Sonnet）｜檔案：`VW/shared/episode-spine.js`。（收 S4）
 - **N14 成片卡收斂**｜只展開最新一版；「完成」只標在實際交付那版；「發布到哪」寫「網站草稿〈標題〉」。｜Low｜fullstack-engineer（Sonnet）｜檔案：`VW/scripts/projects-0.js`、`lib/content/video/embed-in-post.ts`。（收 S5、S6）
 - **N16 兩個「自動」頁**｜篩選（進行中／等你處理／過期）、每列一顆下一步、修水平溢出、員工門側欄改繁中、腳本頁舊說明與客戶下拉拿掉。｜Low｜fullstack-engineer（Sonnet）｜檔案：`app/video/(wb)/schedule/*`、`app/(shell)/tools/content/topics/*`、`app/sidebar-sections.ts`、`ScriptForge.tsx`。（收 S8–S11、A9、A10）
