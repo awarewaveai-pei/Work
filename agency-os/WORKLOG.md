@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-19（續2）— 影音平台下一階段評估：融合度、順暢度、離全自動日更的差距與卡片（只產文件，Claude Fable 5.2）
+
+- 產出：`agency-os/handoffs/2026-11-16-video-unify-supervisor/NEXT-PHASE-PLAN-20261119.md`（§1 結論五行、§2 不變量新 1–7、§3 A1–A12、§4 S1–S12、§5 差距表、§8 卡 N1–N18、§10 七天順序、§11 待決 O1–O7）。沒改程式、沒對外發布。
+- C1 融合：人按的做片一條路；自動段兩套。話題佇列的影片不經四項審片（`grep -rnE "persistEditorialRightsQa|media_qa_reports|createApprovedRelease" lib/content/topics` → 0；`make.ts:233-251`）→ 第一優先 N1。
+- C2 發布順序與目標相反：文章先上線、YouTube 後排（`make.ts:175-188`）；`release_url` 有回寫沒人讀（`lib/social/dispatch.ts:305`）→ N5a／N5b。
+- C3 發信：無自動通道；只有 FluentCRM 草稿、只到自家 bridge 站（`lib/crm/fluentcrm.ts:35-39`、`app/api/content/newsletter/route.ts:14-16`）→ N10／N11，寄出維持人按。
+- C4 實走（正式站 AwareWave Ops）：話題（只做社群）核准 02:48:30Z → reviewed 02:50:08Z，NT$0.014 vs 預估 0.4；已審核後畫面只剩「退回重做」（`TopicsBoard.tsx:75`）。一鍵到草稿被上限預留擋（`lib/script-forge/run-store.ts:42`：填 1、9 都 409）。
+- C5 每日上限按 UTC 換日（`tick.ts:231`）；作品頁不跟客戶切換（`DesignsGallery.tsx:422`）；WP 草稿兩種長相（post 55 裸 mp4＋SEO；post 57 video＋poster、無 SEO；兩篇 author 0）。
+- 花費：`ai_call_logs` 02:50:08Z haiku US$0.00043＋02:50:59Z opus US$0.0628 ＝ NT$2.02（上限 NT$2，超 NT$0.02：點模型時版面位移沒點中，用了 Opus；之後停手）。
+- 正式站留下（未對外）：題目 d67e4a5a（reviewed）、社群草稿 776dc9e4（draft）、空專案列 81448cc0「一鍵腳本」。
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql content_topics／ai_call_logs／media_production_projects／wp_sites publishMode；wp-cli post get 55 57 | exit=0 | ms=9000
+- REVIEW_WAIVED: DOC_ONLY -- 只新增一份計畫文件；自審在該檔 §12，引用路徑 16 個以 `[ -e ]` 逐一確認存在
+- BUGHUNT_WAIVED: DOC_ONLY -- 沒有改任何 symbol、字串或 schema
+- 剩餘風險：路線 (a) 沒走完；Slack 通知內文工具讀不到；成本月估是單樣本外推；FluentCRM／Postiz 配額沒量（該檔 §11）。
+- rollback：`git revert` 本 commit（只有文件）。
 ## 2026-11-19（續1）— 影片工具融合收尾：U11.2／U11.3 上線、U11.5 三級驗收過、兩個「一鍵到草稿從未走通」的根因（Claude 監工＋3 session）
 
 - 範圍：監工台 47→50/50。監工 Fable 5.1 派工：W1 Opus（U11.2＋U11.3＋推進修正）、W2 Opus（Soulful 封面／#7753）、W3 Opus（第 4 級實跑）；監工自跑第 3 級與 Soulful 社群重存排程。
