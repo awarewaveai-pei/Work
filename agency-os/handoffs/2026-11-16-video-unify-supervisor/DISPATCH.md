@@ -20,7 +20,7 @@
 3. cherry-pick 進 `main`（pathspec；兩邊都動且工作台未部署 → 放 `DEPLOY_HOLD`）。
 4. `data.mjs` 該項標 done＋commit → `node build.mjs && node check.mjs` → 發布同一網址。
 5. `clear_session` 清掉那條線的 session，再 `send_message` 派下一張（brief 同格式）。
-6. 部署：一批併完部署一次（`sg-deploy.sh`）；next-admin 每晚 03:00 也會自動上 main。
+6. 部署：**不要每輪部署**（操作者 2026-11-19 19:10：「為什麼不多做一點再一起布署？花時間又燒 token」；當天七次部署＋七次 smoke 是浪費）。一天最多手動部署一次：計畫的一整批（批 0／1／2…）做完、或有東西非上線不可驗時才跑；其餘交給每晚 03:00 自動部署。Playwright smoke 只在手動部署後跑一次。有 migration 的卡併入 main 前先套 migration（03:00 的 migration 閘會擋）。長部署一律 `setsid nohup` 脫離 SSH。
 
 ## 派下一張卡的 brief（`send_message` 給同線 session；每節都要有）
 
@@ -34,6 +34,11 @@
 
 - 每次被工人叫醒：先讀本檔，再 `list_sessions {linked:true}`。**不要 `clear_session self`**（操作者 2026-11-19 13:40 看到對話消失很火：「為什麼對話都沒了」）；context 滿了讓系統自動壓縮，本檔＋`data.mjs`＋git 仍是全部狀態，壓縮後重讀本檔即可。
 - 2026-11-19 實走在正式站留下、未對外：題目 `d67e4a5a…`、社群草稿 `776dc9e4…`、空專案列 `81448cc0…`「一鍵腳本」。操作者說先留著的是 `E2E-Verify-0704` 站；她只用 Soulful 與 AwareWave。
+
+## 工人回報的 RISKS（操作者 2026-11-19：「sessions 有 risks 你要看需不需要處理」）
+
+- 每張卡驗收時逐條判：會出錯的貨（錯的影片／錢／可見範圍）、沒在瀏覽器看過的畫面、沒對真實服務跑過 → 監工當輪處理或實看；純理論、機率極低 → 記在監工台該項，不開卡。
+- 工人的 Codex 審查最多兩輪；第三輪起只修「上限被繞過／資料遺失／測試紅」，其餘列 RISKS 後 commit。
 
 ## 已定且卡片要照做的
 

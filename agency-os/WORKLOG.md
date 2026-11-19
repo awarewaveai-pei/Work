@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-19（續15）— 影片下一階段：N7、B19、B25 驗收上線；工人 RISKS 逐條處置；部署改成一批一次
+
+- 驗收：N7 `49854c0ba`、B19 `5022a9f9e`、B25 `70df54136` 讀報告與 diff 後 cherry-pick → `54d429f09`、`edbb8e076`、`5b465fe9c`。監工修正 `861e1e0fe`：N7 的七天過期退回不逐題發通知（正式庫 37 題會一次湧出 37 則；只讀查詢 `content_topics where status='proposed' and scheduled_for < now()-interval '7 days'` = 37），改由每日報告那一行呈現。B19 前提不符（真症狀＝清單用顯示時區、編輯器固定組織時區），定案 A：一次性排程選擇器跟顯示時區。
+- 部署第四批（第八次）：`setsid nohup sg-deploy.sh next-admin video-workbench`，18:56 完成，`.deployed-commit = 861e1e0fe`（previous 16cea8fb9），兩容器 healthy，HTTP smoke 全 OK；Playwright smoke 34 passed／0 failed／24 skipped。
+- 操作者 19:10 兩條指示，已寫進 `DISPATCH.md` 與 memory `feedback_deploy_now_or_batch.md`：(1)「sessions 有 risks 你要看需不需要處理」→ 驗收時逐條判，會出錯的貨／沒在瀏覽器看過／沒對真實服務跑過的當輪處理；(2)「為什麼不多做一點再一起布署」→ 不再每輪部署，一批做完部署一次或交給 03:00；smoke 只在那時跑一次。
+- RISKS 處置（已驗收十四張的回報逐條過）：
+  - 已處理：N16 沒在瀏覽器看過 → 正式站實看（Chrome，app.aware-wave.com/tools/content/topics，1536 寬）：側欄繁中 OK；`scrollWidth` 1925 > 1536 仍水平溢出（步驟④的排程表 902px 撐開 grid）→ 修 `AutoContentOverview.tsx`（④ 自成一列、`minmax(0,1fr)`、表格在卡內捲）；總覽「本月 AI 花費」US$ → NT$。commit 見下，未部署（併下一批）。
+  - 已處理：N15 正式站實看 video.aware-wave.com/?open=works → 只列 AwareWave Ops 的 19 支，OK。
+  - 已處理：B24「等的專案多時每輪多查」→ 正式庫 `auto_after_render` 進行中 0 支，無風險。
+  - 已處理：N2 跑到第六輪 Codex → 叫停，只修上限被繞過／資料遺失／測試紅；N2 migration 0167 與 main 的 `0167_ops_incidents_outreach_source` 撞號 → 退回工人改 0168。
+  - 接受不處理（記在監工台各項）：N4 當天中途改時區／跨午夜瞬間；N12 報價未綁比例與補圖；N14 讀不到狀態的已發布舊文顯示為草稿；N17 無集編號舊專案連結只到列表；N2 單步可超出上限最多一步。
+  - 待處理（下一輪）：B26 兩個主系統空窗（續跑後幾秒拿舊成片、社群草稿不重建）；B25 沒對真實 Pexels 跑過；N12 沒在瀏覽器點過；db-expert 指出 0099／0104／0110／0125／0133／0139 的 down 檔漏刪 schema_migrations 列。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit` exit 0；`npx vitest run lib/schedules lib/content/topics app/api/internal/schedules "app/(shell)/tools/social" lib/social app/api/video/regenerate-image` → 63 files / 653 tests；video-workbench `node tests/gate.cjs` gate ok；overview 修正後 `npx vitest run "app/(shell)/tools/content" lib/content/topics` → 15 files / 155 tests；正式站 Chrome 實量 scrollWidth | exit=0 | ms=600000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/0n（m1 N7 通知洪水 → 已修 861e1e0fe；m2 N16 頁面仍溢出＋US$ → 已修；工人 Codex 發現皆於併入前處理）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=fmtUsd|isExpiredProposal|inputZone|checkFreeze | hits=11
+- ORACLE_WAIVED: 監工兩個修正各兩三行（拿掉一個通知條件；版面一個 flex/grid 值＋金額單位），tsc＋受影響測試＋正式站實量為證；工人卡的 oracle artifact 隨各 commit
+- rollback：`git revert` 對應 commit；部署 rollback 由 `sg-deploy.sh` 快照。
 ## 2026-11-19（續14）— 影片下一階段：B24、N18、B26 驗收併入 main；第三批部署
 
 - 驗收：三條線交回 B24 `c4fc77faf`、N18 `c675dcb55`、B26 `91fc226d3`＋`d3730f9a4`，監工讀 FILES／TESTS／RISKS 與完整 diff 後 cherry-pick 進 main，rebase 到 origin（另一線剛推 OUT-GMAIL-REAUTH）後為 `d06178e82`（B24）、`c8a97e988`（N18）、`19c12980a`＋`16cea8fb9`（B26）。
