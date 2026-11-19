@@ -36,11 +36,12 @@ const T = {
   bulkTime: "套用時間",
   bulkDom: "套用日期",
   bulkLimit: "套用上限",
+  bulkCap: "套用每題上限",
   bulkClear: "取消選取",
   shown: "顯示 {n} / {total} 個 · 失敗的排在最上面",
   serverReadOnly: "伺服器排程只能查看，不能在這裡修改。",
   cost: "每次執行費用",
-  col: { site: "網站", on: "開關", freq: "頻率", day: "星期", dom: "日期", hour: "台北時間", limit: "每天最多開始", last: "上次結果", job: "排程", when: "執行時間", state: "狀態" },
+  col: { site: "網站", on: "開關", freq: "頻率", day: "星期", dom: "日期", hour: "台北時間", limit: "每天最多開始", cap: "每題上限", last: "上次結果", job: "排程", when: "執行時間", state: "狀態" },
   detail: { what: "工作內容", when: "執行時間", where: "結果存放位置", look: "查看位置", fail: "失敗處理" },
   cellBlocked: "已啟用，無法執行：",
   panelOn: "啟用排程",
@@ -94,17 +95,19 @@ const input: CSSProperties = {
 const fixedCadence = (j: JobMeta) => j.frequencies.length === 1 && !j.frequencies[0].usesHour && !j.frequencies[0].usesDay && !j.frequencies[0].usesDayOfMonth;
 /** Client-job rows: select | site | on | frequency | weekday | day of month | hour | daily limit | last result. A column
  *  exists only when some job on screen uses it (a monthly job has no weekday, the content pipeline has no hour). */
-type Cols = { freq: boolean; day: boolean; dom: boolean; hour: boolean; limit: boolean };
+type Cols = { freq: boolean; day: boolean; dom: boolean; hour: boolean; limit: boolean; cap: boolean };
 const colsOf = (jobs: JobMeta[]): Cols => ({
   freq: jobs.some((j) => !fixedCadence(j)),
   day: jobs.some((j) => j.frequencies.some((f) => f.usesDay)),
   dom: jobs.some((j) => j.frequencies.some((f) => f.usesDayOfMonth)),
   hour: jobs.some((j) => j.frequencies.some((f) => f.usesHour)),
   limit: jobs.some((j) => j.dailyLimit),
+  cap: jobs.some((j) => j.perTopicCap),
 });
 const jobGrid = (cols: Cols) =>
-  `28px minmax(140px, 1.2fr) 48px${cols.freq ? " minmax(150px, 1.3fr)" : ""}${cols.day ? " 236px" : ""}${cols.dom ? " 96px" : ""}${cols.hour ? " 118px" : ""}${cols.limit ? " 130px" : ""} minmax(170px, 1.4fr)`;
+  `28px minmax(140px, 1.2fr) 48px${cols.freq ? " minmax(150px, 1.3fr)" : ""}${cols.day ? " 236px" : ""}${cols.dom ? " 96px" : ""}${cols.hour ? " 118px" : ""}${cols.limit ? " 130px" : ""}${cols.cap ? " 110px" : ""} minmax(170px, 1.4fr)`;
 const limitText = (unit: string) => (n: number) => `${n} ${unit}`;
+const capText = (n: number) => `NT$${n}`;
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 /** 1-28: every month has them (0123). */
 const MONTH_DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
@@ -113,7 +116,7 @@ const domText = (d: number) => `${d} 號`;
 const SERVER_GRID = "minmax(220px, 2fr) minmax(130px, 1fr) minmax(150px, 1fr) 96px";
 
 type TabKey = `job:${string}` | `group:${NonNullable<SystemRow["group"]>}`;
-type Patch = Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc" | "dayOfMonth" | "dailyLimit">>;
+type Patch = Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc" | "dayOfMonth" | "dailyLimit" | "perTopicCap">>;
 type JobFilter = "all" | "failed" | "on" | "off";
 
 export function ScheduleTable({ only, jobOnly }: { only?: string; jobOnly?: string }) {
@@ -130,6 +133,7 @@ export function ScheduleTable({ only, jobOnly }: { only?: string; jobOnly?: stri
   const [bulkHour, setBulkHour] = useState(6);
   const [bulkDom, setBulkDom] = useState(1);
   const [bulkLimit, setBulkLimit] = useState(2);
+  const [bulkCap, setBulkCap] = useState(15);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   /** Row keys that just saved, for their 已儲存 mark. */
@@ -170,6 +174,7 @@ export function ScheduleTable({ only, jobOnly }: { only?: string; jobOnly?: stri
           enabled: next.enabled, frequency: next.frequency, hourUtc: next.hourUtc, dayOfWeekUtc: next.dayOfWeekUtc, dayOfMonth: next.dayOfMonth,
           // only when changed: a switch flip must not store today's default as the client's own limit
           ...(patch.dailyLimit !== undefined ? { dailyLimit: patch.dailyLimit } : {}),
+          ...(patch.perTopicCap !== undefined ? { perTopicCap: patch.perTopicCap } : {}),
           ...(cell.version !== null ? { expectedVersion: cell.version } : {}),
         }),
       });
@@ -278,7 +283,7 @@ export function ScheduleTable({ only, jobOnly }: { only?: string; jobOnly?: stri
             job={activeJob} orgs={view.orgs} cells={jobCells(activeJob.key)}
             query={query} setQuery={setQuery} filter={jobFilter} setFilter={setJobFilter}
             selected={selected} setSelected={setSelected} bulkHour={bulkHour} setBulkHour={setBulkHour} bulkDom={bulkDom} setBulkDom={setBulkDom}
-            bulkLimit={bulkLimit} setBulkLimit={setBulkLimit}
+            bulkLimit={bulkLimit} setBulkLimit={setBulkLimit} bulkCap={bulkCap} setBulkCap={setBulkCap}
             saving={saving} savedKeys={savedKeys} save={(items) => void save(items)}
           />
         )}
@@ -300,11 +305,12 @@ function Toolbar({ query, setQuery, placeholder, children }: { query: string; se
 }
 
 /** One job, one row per client: every setting on the row, failures first, bulk edits for many clients. */
-function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, selected, setSelected, bulkHour, setBulkHour, bulkDom, setBulkDom, bulkLimit, setBulkLimit, saving, savedKeys, save }: {
+function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, selected, setSelected, bulkHour, setBulkHour, bulkDom, setBulkDom, bulkLimit, setBulkLimit, bulkCap, setBulkCap, saving, savedKeys, save }: {
   job: JobMeta; orgs: ScheduleOrg[]; cells: ScheduleCell[];
   query: string; setQuery: (q: string) => void; filter: JobFilter; setFilter: (f: JobFilter) => void;
   selected: Set<string>; setSelected: (s: Set<string>) => void; bulkHour: number; setBulkHour: (h: number) => void; bulkDom: number; setBulkDom: (d: number) => void;
   bulkLimit: number; setBulkLimit: (n: number) => void;
+  bulkCap: number; setBulkCap: (n: number) => void;
   saving: boolean; savedKeys: Set<string>; save: (items: Array<{ cell: ScheduleCell; patch: Patch }>) => void;
 }) {
   const name = (id: string) => orgs.find((o) => o.id === id)?.name ?? id;
@@ -356,6 +362,12 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
                 <button type="button" disabled={saving} style={chipStyle(false)} onClick={() => save(picked.map((cell) => ({ cell, patch: { dailyLimit: bulkLimit } })))}>{T.bulkLimit}</button>
               </span>
             )}
+            {job.perTopicCap && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <GridPicker value={bulkCap} options={job.perTopicCap.options} format={capText} label={job.perTopicCap.label} columns={4} disabled={saving} onChange={setBulkCap} />
+                <button type="button" disabled={saving} style={chipStyle(false)} onClick={() => save(picked.map((cell) => ({ cell, patch: { perTopicCap: bulkCap } })))}>{T.bulkCap}</button>
+              </span>
+            )}
             <button type="button" style={chipStyle(false)} onClick={() => setSelected(new Set())}>{T.bulkClear}</button>
           </>
         ) : (
@@ -373,7 +385,7 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
           {cols.day && <span style={headCell}>{T.col.day}</span>}
           {cols.dom && <span style={headCell}>{T.col.dom}</span>}
           {cols.hour && <span style={headCell}>{T.col.hour}</span>}
-          {cols.limit && <span style={headCell}>{T.col.limit}</span>}
+          {cols.limit && <span style={headCell}>{T.col.limit}</span>}{cols.cap && <span style={headCell}>{T.col.cap}</span>}
           <span style={headCell}>{T.col.last}</span>
         </div>
         {rows.map((c) => (
@@ -402,7 +414,7 @@ function ClientJobs({ jobs, cells, saving, savedKeys, save }: {
         {cols.day && <span style={headCell}>{T.col.day}</span>}
         {cols.dom && <span style={headCell}>{T.col.dom}</span>}
         {cols.hour && <span style={headCell}>{T.col.hour}</span>}
-        {cols.limit && <span style={headCell}>{T.col.limit}</span>}
+        {cols.limit && <span style={headCell}>{T.col.limit}</span>}{cols.cap && <span style={headCell}>{T.col.cap}</span>}
         <span style={headCell}>{T.col.last}</span>
       </div>
       {jobs.map((job) => {
@@ -466,6 +478,13 @@ function JobRow({ job, c, name, sub, single, cols, picked, onPick, saving, saved
         <span style={dim}>
           {job.dailyLimit && c.dailyLimit !== null
             ? <GridPicker value={c.dailyLimit} options={job.dailyLimit.options} format={limitText(job.dailyLimit.unit)} label={`${job.dailyLimit.label} · ${name}`} columns={5} disabled={saving} onChange={(n) => onSave({ dailyLimit: n })} />
+            : <span style={muted}>—</span>}
+        </span>
+      )}
+      {cols.cap && (
+        <span style={dim}>
+          {job.perTopicCap && c.perTopicCap !== null
+            ? <GridPicker value={c.perTopicCap} options={job.perTopicCap.options} format={capText} label={`${job.perTopicCap.label} · ${name}`} columns={4} disabled={saving} onChange={(n) => onSave({ perTopicCap: n })} />
             : <span style={muted}>—</span>}
         </span>
       )}

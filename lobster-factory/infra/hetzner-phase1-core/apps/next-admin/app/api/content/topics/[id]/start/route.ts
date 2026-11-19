@@ -11,7 +11,7 @@ import { requestActor } from "@/lib/entitlements/subject";
 import { move, topicById } from "@/lib/content/topics/store";
 import { DAILY_START_CAP, makeStarted, makesNow, waitsForVideo } from "@/lib/content/topics/tick";
 import { topicDeps } from "@/lib/content/topics/make";
-import { listSchedules, storedDailyLimit } from "@/lib/schedules/store";
+import { listSchedules, storedDailyLimit, storedPerTopicCap } from "@/lib/schedules/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +43,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const run = async (): Promise<Response> => {
     try {
-      const deps = topicDeps(sb, t.organization_id, requestActor(req));
+      // the brand's per-topic cap set on /ops/schedules, the same one its schedule uses (null = NT$15)
+      const deps = topicDeps(sb, t.organization_id, requestActor(req), { capTwd: await storedPerTopicCap(t.organization_id, "content_pipeline") });
       const blocked = await deps.blocker(t);   // before a daily slot is used
       if (blocked) return NextResponse.json({ ok: false, error: blocked }, { status: 409 });
       const approved = t.status === "proposed" ? await move(sb, t, "approved", { last_error: null }) : t;

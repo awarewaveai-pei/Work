@@ -32,6 +32,15 @@ describe("automatic article images", () => {
     expect(r.markdown).not.toMatch(/IMAGE_PLACEHOLDER|壞掉/);
   });
 
+  it("never makes more images than were reserved: extra placeholders are removed unpaid (N2)", async () => {
+    const make = vi.fn(async (prompt: string) => `https://cdn/${prompt}.webp`);
+    const md = Array.from({ length: 5 }, (_, i) => `![p${i}](IMAGE_PLACEHOLDER_${i + 1})`).join(" ");
+    const r = await fillArticleImages(md, make, 3);
+    expect(make).toHaveBeenCalledTimes(3);
+    expect(r.images).toHaveLength(3);
+    expect(r.markdown).not.toMatch(/IMAGE_PLACEHOLDER|p3|p4/);
+  });
+
   it("a thrown image error counts as a failed image", async () => {
     const r = await fillArticleImages("![a](IMAGE_PLACEHOLDER_1)", async () => { throw new Error("replicate down"); });
     expect(r).toEqual({ markdown: "", images: [] });

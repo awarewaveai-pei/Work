@@ -2,7 +2,7 @@
 //
 // job = a registry key (lib/schedules/jobs.ts) → client_schedules; job = "site_watch" → site-watch's own
 // locked update (adapters/site-watch.ts). Any other key is 404: the page cannot invent a job.
-// Body: { enabled, frequency, hourUtc, dayOfWeekUtc, dayOfMonth, dailyLimit? } (+ expectedVersion for site_watch; 409 on a
+// Body: { enabled, frequency, hourUtc, dayOfWeekUtc, dayOfMonth, dailyLimit?, perTopicCap? } (+ expectedVersion for site_watch; 409 on a
 // concurrent edit). owner/admin only, every write audited. The table reloads its view after a write.
 
 import type { Frequency } from "@/lib/schedules/schedule";
@@ -48,6 +48,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     // left out = the row keeps its limit; a job without one never stores it
     const dailyLimit = body.dailyLimit === undefined || body.dailyLimit === null ? undefined : Number(body.dailyLimit);
     if (dailyLimit !== undefined && !job.dailyLimit?.options.includes(dailyLimit)) return NextResponse.json({ ok: false, error: "daily_limit_invalid" }, { status: 400 });
+    const perTopicCapTwd = body.perTopicCap === undefined || body.perTopicCap === null ? undefined : Number(body.perTopicCap);
+    if (perTopicCapTwd !== undefined && !job.perTopicCap?.options.includes(perTopicCapTwd)) return NextResponse.json({ ok: false, error: "per_topic_cap_invalid" }, { status: 400 });
     const result = await upsertSchedule({
       organizationId: orgId,
       jobKey: job.key,
@@ -58,6 +60,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       // left out (a page loaded before 0123) = the row keeps its day
       dayOfMonth: Number.isInteger(body.dayOfMonth) ? (body.dayOfMonth as number) : undefined,
       dailyLimit,
+      perTopicCapTwd,
       updatedBy: `${resolved.role}:${resolved.source}`,
     });
     if (!result.ok) return NextResponse.json({ ok: false, error: result.errors.join(",") }, { status: 400 });
@@ -69,6 +72,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       dayOfWeekUtc: result.schedule?.dayOfWeekUtc,
       dayOfMonth: result.schedule?.dayOfMonth,
       dailyLimit: result.schedule?.dailyLimit,
+      perTopicCapTwd: result.schedule?.perTopicCapTwd,
     });
   }
 

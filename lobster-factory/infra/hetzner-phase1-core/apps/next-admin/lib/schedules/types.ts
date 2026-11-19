@@ -21,6 +21,8 @@ export interface JobMeta {
   frequencies: FrequencyOption[];
   /** A per-client "at most N a day" the page lets staff set (content_pipeline); absent = the job has none. */
   dailyLimit?: { label: string; unit: string; options: number[]; default: number };
+  /** A per-client "at most NT$ N a topic" (content_pipeline, 0168); absent = the job has none. */
+  perTopicCap?: { label: string; options: number[]; default: number };
   /** Jobs sharing a group key share one tab on /ops/schedules (label = the tab), switched by a chip per job (item). */
   group?: { key: string; label: string; item: string };
 }
@@ -39,6 +41,8 @@ export interface ScheduleCell {
   dayOfMonth: number;
   /** The limit in force (stored, or the job's default); null = the job has no dailyLimit. */
   dailyLimit: number | null;
+  /** The per-topic cap in force, NT$ (stored, or the job's default); null = the job has no perTopicCap. */
+  perTopicCap: number | null;
   lastRunAt: string | null;
   lastError: string | null;
   lastErrorAt: string | null;

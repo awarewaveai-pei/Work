@@ -16,6 +16,8 @@ export interface StoredSchedule extends Schedule {
   updatedAt: string | null;
   /** 1-10 per day (0125); null = the job's default (jobs.ts dailyLimit). Only jobs with a dailyLimit read it. */
   dailyLimit: number | null;
+  /** 1-1000 NT$ per topic (0168); null = the job's default (jobs.ts perTopicCap). Only jobs with a perTopicCap read it. */
+  perTopicCapTwd: number | null;
 }
 
 interface Row {
@@ -27,6 +29,7 @@ interface Row {
   day_of_week_utc: number;
   day_of_month: number;
   daily_limit?: number | null;
+  per_topic_cap_twd?: number | null;
   last_run_at: string | null;
   last_run_key: string | null;
   last_error: string | null;
@@ -51,6 +54,7 @@ function toSchedule(r: Row): StoredSchedule {
     updatedBy: r.updated_by,
     updatedAt: r.updated_at,
     dailyLimit: r.daily_limit ?? null,
+    perTopicCapTwd: r.per_topic_cap_twd ?? null,
   };
 }
 
@@ -88,6 +92,8 @@ export interface UpsertScheduleInput {
   dayOfMonth?: number;
   /** 1-10 (0125). Left out = an existing row keeps its limit; a new row gets null (the job's default). */
   dailyLimit?: number;
+  /** 1-1000 NT$ (0168). Left out = an existing row keeps its cap; a new row gets null (the job's default). */
+  perTopicCapTwd?: number;
   /** "role:source", same shape as collection_sources.approved_by. */
   updatedBy: string;
 }
@@ -105,6 +111,7 @@ export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteR
   if (input.dayOfWeekUtc < 0 || input.dayOfWeekUtc > 6) return { ok: false, errors: ["day_of_week_utc_out_of_range"] };
   if (input.dayOfMonth !== undefined && (!Number.isInteger(input.dayOfMonth) || input.dayOfMonth < 1 || input.dayOfMonth > 28)) return { ok: false, errors: ["day_of_month_out_of_range"] };
   if (input.dailyLimit !== undefined && (!Number.isInteger(input.dailyLimit) || input.dailyLimit < 1 || input.dailyLimit > 10)) return { ok: false, errors: ["daily_limit_out_of_range"] };
+  if (input.perTopicCapTwd !== undefined && (!Number.isInteger(input.perTopicCapTwd) || input.perTopicCapTwd < 1 || input.perTopicCapTwd > 1000)) return { ok: false, errors: ["per_topic_cap_out_of_range"] };
   const sb = getSupabaseWriteClient();
   if (!sb) return { ok: false, errors: ["no_supabase_client"] };
 
@@ -120,6 +127,7 @@ export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteR
         day_of_week_utc: input.dayOfWeekUtc,
         ...(input.dayOfMonth !== undefined ? { day_of_month: input.dayOfMonth } : {}),
         ...(input.dailyLimit !== undefined ? { daily_limit: input.dailyLimit } : {}),
+        ...(input.perTopicCapTwd !== undefined ? { per_topic_cap_twd: input.perTopicCapTwd } : {}),
         updated_by: input.updatedBy,
         updated_at: new Date().toISOString(),
       },
@@ -155,6 +163,14 @@ export async function storedDailyLimit(organizationId: string, jobKey: string): 
     .eq("organization_id", organizationId).eq("job_key", jobKey).maybeSingle();
   if (error) throw new Error(`schedules_db:daily_limit:${error.message}`);
   return (data as { daily_limit?: number | null } | null)?.daily_limit ?? null;
+}
+
+/** The client's stored per-topic cap for a job, NT$ (0168); null = no row, or the row sets none (the job's default). */
+export async function storedPerTopicCap(organizationId: string, jobKey: string): Promise<number | null> {
+  const { data, error } = await client().from("client_schedules").select("per_topic_cap_twd")
+    .eq("organization_id", organizationId).eq("job_key", jobKey).maybeSingle();
+  if (error) throw new Error(`schedules_db:per_topic_cap:${error.message}`);
+  return (data as { per_topic_cap_twd?: number | null } | null)?.per_topic_cap_twd ?? null;
 }
 
 /**

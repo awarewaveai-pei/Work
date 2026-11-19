@@ -8,7 +8,7 @@ const m = vi.hoisted(() => ({
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: () => {} }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
 vi.mock("@/lib/entitlements/grant", () => ({ thenRun: {}, withFeature: (_k: string, _h: unknown) => (r: Request, run: () => Promise<Response>) => run() }));
-vi.mock("@/lib/schedules/store", () => ({ storedDailyLimit: async () => 7 }));
+vi.mock("@/lib/schedules/store", () => ({ storedDailyLimit: async () => 7, storedPerTopicCap: async () => null }));
 vi.mock("@/lib/content/topics/store", async (orig) => ({ ...(await orig<typeof import("@/lib/content/topics/store")>()), topicById: async () => m.topic }));
 vi.mock("@/lib/content/topics/make", () => ({ topicDeps: () => ({ blocker: async () => null, start: m.start }) }));
 

@@ -586,6 +586,8 @@ export async function prepareScenes(
     sceneCount?: number;
     /** 站別品牌語氣（renderSiteVoice）；只有 Claude 生腳本路徑使用。 */
     brandVoice?: string;
+    /** 腳本呼叫在 ai_call_logs 記的 job_id（題目 id，N2）；省略 = 不記。 */
+    costJobId?: string;
     /** 「自訂 AI 圖」數量（前端滑桿）→ 用 Flux AI 圖的場景數，其餘走 Pexels B-roll。僅 AI 生圖模式 + Claude 生腳本路徑有效。 */
     customScenes?: number;
     /** 要輸出的格式（["16x9","9x16","4x5"] 子集）→ 每格式各生一組原生圖。省略 = 全三格式。 */
@@ -630,6 +632,7 @@ export async function prepareScenes(
         targetMinutes: input.targetMinutes,
         sceneCount: input.sceneCount,
         brandVoice: input.brandVoice,
+        costJobId: input.costJobId,
       },
       anthropicKey,
     );
@@ -727,6 +730,7 @@ register({
         formats: ctx.outputFormats as string[] | undefined,
         videoMotionModel: ctx.videoMotionModel as string | undefined,
         brandVoice: ctx.brandVoice as string | undefined,
+        costJobId: ctx.costJobId as string | undefined,
         onProgress,
       },
       anthropicKey,

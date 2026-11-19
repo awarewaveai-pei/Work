@@ -33,6 +33,8 @@ import { finalizeVideoJob } from "@/lib/content/video/finalize";
 import { embedVideoInPost } from "@/lib/content/video/embed-in-post";
 import { releaseTopicVideo } from "./video-release";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
+import { DEFAULT_TOPIC_CAP_TWD, reserveStep, settleStep, spentSince, stepUpperTwd, topicBudget, type TopicBudget } from "./budget";
+import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { MakeError, NOW_FORMATS, brandDay, waitsForVideo, type Made, type Published, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
 
 /** What content_topics.artifacts holds: one entry per made part; `published` / `sent` once auto publish put it out. */
@@ -45,7 +47,14 @@ export interface TopicArtifacts {
   social?: { post_id: string | null; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string } };
   /** The topic's video job; url once it finished, then when it went into the article and onto the social draft. */
   video?: VideoArtifact & { embedded_at?: string; media_id?: string };
+  /** N2: when this topic's spending cap began, the cap and the spend last read (budget.ts; the ledger is the source). */
+  budget?: TopicBudget;
 }
+
+/** Checks the topic's cap before one paid step and reserves the step's most (budget.ts reserveStep); `settle` swaps a
+ *  reservation for the call's exact cost once known (0 = the call failed: whatever it was billed is in the ledger, which
+ *  every check reads). A reservation not settled stays counted (its ledger row may lag). */
+type Guard = ((upperTwd: number, step: string) => Promise<void>) & { settle(reservedTwd: number, actualTwd: number): void };
 
 /** The social post is due this far ahead (state.ts schedule needs a future time; the sender looks 10 min ahead). */
 export const SOCIAL_NOW_LEAD_MS = 2 * 60_000;
@@ -54,10 +63,14 @@ export const SOCIAL_NOW_LEAD_MS = 2 * 60_000;
 export const TOPIC_ARTICLE_IMAGES = 3;
 const IMAGE_PLACEHOLDER = /!\[([^\]]*)\]\(IMAGE_PLACEHOLDER_\d+\)/g;
 
-/** Each image placeholder becomes a stored image (alt text = its prompt) or is removed; nothing unresolved reaches WordPress. */
-export async function fillArticleImages(markdown: string, make: (prompt: string) => Promise<string | null>): Promise<{ markdown: string; images: string[] }> {
+/** Each image placeholder becomes a stored image (alt text = its prompt) or is removed; nothing unresolved reaches WordPress.
+ *  At most `max` are made (the count the topic's cap reserved, N2): placeholders past it are removed, never paid for. */
+export async function fillArticleImages(markdown: string, make: (prompt: string) => Promise<string | null>, max = TOPIC_ARTICLE_IMAGES): Promise<{ markdown: string; images: string[] }> {
   const urls: Array<string | null> = [];
-  for (const m of markdown.matchAll(IMAGE_PLACEHOLDER)) urls.push(await make(m[1].trim()).catch(() => null));   // one at a time: Replicate's low-balance burst limit is 1
+  for (const m of markdown.matchAll(IMAGE_PLACEHOLDER)) {
+    // one at a time: Replicate's low-balance burst limit is 1
+    urls.push(urls.length < max ? await make(m[1].trim()).catch(() => null) : null);
+  }
   const images: string[] = [];
   let i = 0;
   const filled = markdown.replace(IMAGE_PLACEHOLDER, (_all, alt: string) => {
@@ -94,10 +107,14 @@ async function siteFor(sb: SupabaseClient, t: Topic): Promise<SiteBrand | string
   return site;
 }
 
-async function makeArticle(t: Topic, site: SiteBrand): Promise<NonNullable<TopicArtifacts["article"]>> {
+async function makeArticle(t: Topic, site: SiteBrand, guard: Guard): Promise<NonNullable<TopicArtifacts["article"]>> {
   // no R2 = nowhere to keep an image WordPress can fetch, so none is paid for
   const imageGrant = isR2Configured() ? await optionalImageGrant() : null;
-  const a = await runContentPipeline(articleInput(t, site.defaults, imageGrant ? TOPIC_ARTICLE_IMAGES : 0), { stages: ["article"] });
+  const imageCount = imageGrant ? TOPIC_ARTICLE_IMAGES : 0;
+  // _jobId: the article call's ai_call_logs row carries the topic id (generate-core prepareArticleGeneration)
+  const input = { ...articleInput(t, site.defaults, imageCount), _jobId: t.id };
+  await guard(stepUpperTwd.article(imageCount), "文章");
+  const a = await runContentPipeline(input, { stages: ["article"] });
   if (!a.ok) throw new Error(`文章生成失敗：${(a as PipelineFailure).error}`);   // strict:false: !ok does not narrow
   const { markdown, images } = await fillArticleImages(a.markdown ?? "", async (prompt) => {
     if (!imageGrant) return null;
@@ -105,7 +122,7 @@ async function makeArticle(t: Topic, site: SiteBrand): Promise<NonNullable<Topic
       costLog: { route: "content/topics", tool: "content", jobId: t.id } }, imageGrant);
     // WordPress takes only http(s) images: an unstored (data URL) image would vanish at publish
     return img.ok && (img as { stored: boolean }).stored ? (img as { imageUrl: string }).imageUrl : null;
-  });
+  }, imageCount);
   const meta = parseArticleMeta(markdown);
   const p = await runContentPipeline({
     markdown, focusKeyword: meta?.focusKeyword || t.keyword, seoTitle: meta?.seoTitle, metaDescription: meta?.metaDesc,
@@ -132,7 +149,7 @@ export const topicTargets = (formats: readonly string[], platform: string) =>
 export const socialBody = (summary: string | undefined, title: string, language: string) =>
   summary && inLanguage(summary, language) ? summary : title;
 
-async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["article"], actor: string): Promise<NonNullable<TopicArtifacts["social"]>> {
+async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["article"], actor: string, guard: Guard): Promise<NonNullable<TopicArtifacts["social"]>> {
   const accounts = (await listAccounts(t.organization_id, { hydrateProfile: false }))
     .filter((a) => a.status === "connected" && topicTargets(t.formats, a.platform));
   const keys = writerKeysFor(accounts.map((a) => a.platform));
@@ -142,7 +159,14 @@ async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["ar
   }
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
-  const { ask } = await claudeWriter(await grantFor("content.syndicate"), apiKey, "lib/content/topics/make", null);
+  const writer = await claudeWriter(await grantFor("content.syndicate"), apiKey, "lib/content/topics/make", null, t.id);
+  const ask = async (prompt: string) => {
+    const upper = stepUpperTwd.socialCall(prompt), before = writer.spent.usd;
+    await guard(upper, "社群文案");
+    const answer = await writer.ask(prompt).catch((e) => { guard.settle(upper, 0); throw e; });   // a failed call gives it back
+    guard.settle(upper, usdToNtd(writer.spent.usd - before));
+    return answer;
+  };
   const source = article?.source || [t.title, t.angle ?? ""].filter(Boolean).join("\n\n");
   // No link yet: the article is still a draft. The post gets its link when the article is published.
   // a topic with a video gets posts written for one (the video is attached to this draft once it is rendered)
@@ -158,14 +182,30 @@ async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["ar
   return { post_id: saved.id, checks: socialChecks({ texts, channels: accounts.length, problems }, forbidden) };
 }
 
-async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string): Promise<Made> {
+/** The topic's cap guard: each check reads the ledger (budget.ts) and records the spend on `artifacts.budget`. */
+export function capGuard(t: Pick<Topic, "id">, artifacts: TopicArtifacts, capTwd: number,
+  readSpent: (startedAt: string) => Promise<number>): Guard {
+  artifacts.budget = topicBudget(artifacts.budget, capTwd);
+  const guard = async (upperTwd: number, step: string) => {
+    const b = artifacts.budget!;
+    artifacts.budget = await reserveStep(b, upperTwd, step, () => readSpent(b.startedAt));
+  };
+  return Object.assign(guard, { settle: (reservedTwd: number, actualTwd: number) => { artifacts.budget = settleStep(artifacts.budget!, reservedTwd, actualTwd); } });
+}
+
+async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string, capTwd: number): Promise<Made> {
   const site = await siteFor(sb, t);
   if (typeof site === "string") throw new Error(site);
   const artifacts: TopicArtifacts = { ...(t.artifacts as TopicArtifacts) };
+  const guard = capGuard(t, artifacts, capTwd, (startedAt) => spentSince(sb, t.id, startedAt));
+  const spentAtStart = artifacts.budget!.spentTwd;
   try {
-    if (t.formats.includes("article") && !artifacts.article) artifacts.article = await makeArticle(t, site);
-    if ((t.formats.includes("social") || t.formats.includes("youtube")) && !artifacts.social) artifacts.social = await makeSocial(t, site, artifacts.article, actor);
+    if (t.formats.includes("article") && !artifacts.article) artifacts.article = await makeArticle(t, site, guard);
+    if ((t.formats.includes("social") || t.formats.includes("youtube")) && !artifacts.social) artifacts.social = await makeSocial(t, site, artifacts.article, actor, guard);
   } catch (e) {
+    // a failed attempt keeps none of its own reservations (budget.ts header): what it was billed is in the ledger, which
+    // the retry's first check reads, so a refusal or a WordPress failure does not hold back money never spent
+    artifacts.budget = { ...artifacts.budget!, spentTwd: spentAtStart };
     throw new MakeError(e instanceof Error ? e.message : String(e), artifacts as Record<string, unknown>);
   }
   const checks = [...(artifacts.article?.checks ?? []), ...(artifacts.social?.checks ?? [])];
@@ -215,17 +255,22 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string): Promi
 export const STALE_PREPARE_MS = 15 * 60 * 1000;
 
 /** The topic's video, with the article page's default settings (lib/content/video/defaults.ts) and the site's voice. */
-async function startTopicVideo(sb: SupabaseClient, t: Topic, record: (jobId: string) => Promise<boolean>): Promise<void> {
+async function startTopicVideo(sb: SupabaseClient, t: Topic, record: (jobId: string) => Promise<boolean>, capTwd: number): Promise<void> {
   const site = await siteFor(sb, t);
   if (typeof site === "string") throw new Error(site);
   await grantFor("video.script");   // what /api/video/generate's withFeature asks before its job row
   const a = t.artifacts as TopicArtifacts;
   const d = ARTICLE_VIDEO_DEFAULTS;
+  const script = { topic: t.title, articleTitle: t.title, articleContent: a.article?.source || t.angle || undefined,
+    language: siteLanguage(site.defaults), brandVoice: renderSiteVoice(site.defaults), sceneCount: d.sceneCount };
+  // before the job row: a topic over its cap fails here with nothing started (a pre-N2 topic counts from TOPIC_BUDGET_EPOCH).
+  // Nothing of this check is kept on the row: the script's cost reaches the ledger, which the next check reads.
+  await capGuard(t, { ...a }, capTwd, (startedAt) => spentSince(sb, t.id, startedAt))(stepUpperTwd.video(), "影片");
   const started = await startVideoJob(t.organization_id, {
-    topic: t.title, articleTitle: t.title, articleContent: a.article?.source || t.angle || undefined,
-    language: siteLanguage(site.defaults), brandVoice: renderSiteVoice(site.defaults),
+    ...script,
     sceneCount: d.sceneCount, customScenes: d.customScenes, brollScenes: d.sceneCount - d.customScenes,
     imageModel: d.imageModel, outputFormats: [...d.formats], ...parseVoiceModel(articleVideoVoice(siteLanguage(site.defaults))),
+    costJobId: t.id,
   }, { beforePrepare: record, projectFor: () => ensureTopicProject(sb, t, d.formats) });
   const failure = started.ok ? null : (started as Extract<typeof started, { ok: false }>).error;   // strict:false
   if (failure && failure !== "taken") throw new Error(`影片無法開始：${failure}`);
@@ -294,7 +339,10 @@ export async function attachTopicVideo(t: Topic, url: string, actor: string, sav
 }
 
 /** The real store and makers behind tickTopics, bound to one organization and the actor the work is done as. */
-export function topicDeps(sb: SupabaseClient, organizationId: string, actor: string): TickDeps {
+/** opts.capTwd: the brand's per-topic cap (content_pipeline per_topic_cap_twd, 0168); null = NT$15. Required, so no
+ *  caller (the schedule, the 核准並開始 button) can make a topic under the default by leaving it out. */
+export function topicDeps(sb: SupabaseClient, organizationId: string, actor: string, opts: { capTwd: number | null }): TickDeps {
+  const capTwd = opts.capTwd ?? DEFAULT_TOPIC_CAP_TWD;
   const own = (t: Topic) => {
     if (t.organization_id !== organizationId) throw new Error("topic of another organization");
   };
@@ -321,10 +369,10 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
     },
     move: (t, to, patch) => move(sb, t, to, patch),
     claim: (t, patch) => { own(t); return claimTopic(sb, t, patch); },
-    make: (t) => { own(t); return runForOrg(organizationId, actor, () => makeDrafts(sb, t, actor)); },
+    make: (t) => { own(t); return runForOrg(organizationId, actor, () => makeDrafts(sb, t, actor, capTwd)); },
     autoPublishes: async (t) => { own(t); const s = await siteFor(sb, t); return typeof s !== "string" && autoPublishes(s.defaults); },
     publish: (t) => { own(t); return publishDrafts(sb, t, actor); },
-    startVideo: (t, record) => { own(t); return runForOrg(organizationId, actor, () => startTopicVideo(sb, t, record)); },
+    startVideo: (t, record) => { own(t); return runForOrg(organizationId, actor, () => startTopicVideo(sb, t, record, capTwd)); },
     pollVideo: (t, jobId) => { own(t); return pollTopicVideo(t, jobId); },
     attachVideo: (t, url, save) => { own(t); return attachTopicVideo(t, url, actor, save); },
   };

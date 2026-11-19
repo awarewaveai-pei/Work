@@ -22,6 +22,8 @@ export interface VideoStartInput {
   introDuration?: number;
   outputFormats?: string[];
   brandVoice: string;
+  /** The uuid the script call's ai_call_logs row carries (a topic's id, N2); left out = none. */
+  costJobId?: string;
 }
 
 interface PrepareResult {

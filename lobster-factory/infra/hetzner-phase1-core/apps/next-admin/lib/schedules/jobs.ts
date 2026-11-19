@@ -10,6 +10,7 @@ import { applyChatwootBaseline } from "@/lib/cs/chatwoot-baseline";
 import { REPORT_JOBS, runPeriodReport, type ReportKind } from "@/lib/social/reports";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import { planCostUsd, topicCostUsd } from "@/lib/content/topics/cost";
+import { DEFAULT_TOPIC_CAP_TWD } from "@/lib/content/topics/budget";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 import { raiseNotice, withTopicStopNotices } from "./stop-notice";
 import type { JobMeta } from "./types";
@@ -109,10 +110,12 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     label: "自動內容管線",
     description: "隨時檢查題目：已核准的題目到了排定時間，就依它選的格式做成 WordPress 草稿和社群草稿；選了影片的，影片做好後自動嵌進文章、附到社群貼文，再跑規則審核。網站設成「AI 審核後自動發布」且審核全部通過才會發布，其餘留在草稿。每月自動提題目；題目和排定時間在「自動內容」頁設定。",
     // Prices: lib/ai/cost-model.ts TEXT_FEATURES article + syndicate (lib/content/topics/cost.ts).
-    cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元），選了影片的題目再加約 ${topicCostUsd(["video"]).usual} 美元（腳本；畫面用免費實拍、配音免費）。一天最多花到「每天最多開始」的題數。每個網站每月第一次提案另約 ${planCostUsd()} 美元。沒有到期題目時免費。`,
+    cost: `每題約 ${topicCostUsd().usual} 美元（文章＋社群改寫；社群太長要重寫時最多 ${topicCostUsd().max} 美元），選了影片的題目再加約 ${topicCostUsd(["video"]).usual} 美元（腳本；畫面用免費實拍、配音免費）。一天最多花到「每天最多開始」的題數；每一題花到「每題上限」就停在那一步（預設 NT$${DEFAULT_TOPIC_CAP_TWD}）。每個網站每月第一次提案另約 ${planCostUsd()} 美元。沒有到期題目時免費。`,
     // every_5m is how often it looks, not a choice: the page shows no frequency for a job with one fixed cadence
     frequencies: [{ value: "every_5m", label: "每 5 分鐘", usesHour: false, usesDay: false }],
     dailyLimit: { label: "每天最多開始", unit: "題", options: Array.from({ length: 10 }, (_, i) => i + 1), default: DAILY_START_CAP },
+    // NT$ a topic (0168 per_topic_cap_twd 1-1000); a topic reaching it stops at that step (lib/content/topics/budget.ts)
+    perTopicCap: { label: "每題上限", options: [5, 10, 15, 20, 30, 50, 80, 100], default: DEFAULT_TOPIC_CAP_TWD },
     defaults: { frequency: "every_5m", hourUtc: 0, dayOfWeekUtc: 1, dayOfMonth: 1 },
     unavailable: (c) => (c.wpSites ? null : "沒有 WordPress 網站"),
     async run(organizationId, _runKey, schedule) {
@@ -134,7 +137,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
       // B3: a firing that plans a site's month does not tick (plan ~90 s + tick 200 s would pass run-due's 300 s); the next
       // firing, 5 minutes on, finds the month planned and ticks. A plan failure propagates: no tick, recorded + incident.
       const summary = (await planIfDue(planDueDeps(sb, organizationId, "schedule:content_pipeline"), new Date()))
-        ?? await tickTopics(withTopicStopNotices(topicDeps(sb, organizationId, "schedule:content_pipeline"), (n) => raiseNotice(sb, organizationId, n)), { cap: schedule?.dailyLimit ?? DAILY_START_CAP });
+        ?? await tickTopics(withTopicStopNotices(topicDeps(sb, organizationId, "schedule:content_pipeline", { capTwd: schedule?.perTopicCapTwd ?? DEFAULT_TOPIC_CAP_TWD }), (n) => raiseNotice(sb, organizationId, n)), { cap: schedule?.dailyLimit ?? DAILY_START_CAP });
       if (trendsError) throw new Error(`${summary}; content_pipeline:trends:${trendsError}`);
       return summary;
     },
@@ -146,6 +149,11 @@ export function clientJob(key: string): ClientJob | undefined {
 }
 
 /** The daily limit in force for a client: its stored one, else the job's default; null = the job has no daily limit. */
+/** The per-topic cap in force, NT$: the stored one, else the job's default; null = the job has no per-topic cap. */
+export function perTopicCapOf(job: Pick<JobMeta, "perTopicCap">, stored: number | null | undefined): number | null {
+  return job.perTopicCap ? stored ?? job.perTopicCap.default : null;
+}
+
 export function dailyLimitOf(job: Pick<JobMeta, "dailyLimit">, stored: number | null | undefined): number | null {
   return job.dailyLimit ? stored ?? job.dailyLimit.default : null;
 }

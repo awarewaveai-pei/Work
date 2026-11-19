@@ -171,6 +171,8 @@ export async function generateVideoScript(
     sceneCount?: number;
     /** The site's stored voice (lib/content/brand-voice.ts renderSiteVoice); empty = no brand block. */
     brandVoice?: string;
+    /** The uuid this call's ai_call_logs row carries (a topic's id, N2); left out = none. */
+    costJobId?: string;
   },
   apiKey: string
 ): Promise<VideoScriptResult> {
@@ -215,7 +217,7 @@ export async function generateVideoScript(
       ...claudeFallback(CLAUDE_MODEL),
       messages: [{ role: "user", content: `${systemPrompt}\n\n${userContent}` }],
     });
-    void logAiCall({ route: "video/script", response, grant, tool: "video" });
+    void logAiCall({ route: "video/script", response, grant, tool: "video", jobId: input.costJobId ?? null });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, status: 502, error: `Claude API 呼叫失敗：${msg}` };

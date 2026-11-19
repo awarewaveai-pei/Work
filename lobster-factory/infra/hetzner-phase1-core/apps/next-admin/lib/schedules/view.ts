@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { siteWatchCells, SITE_WATCH_JOB } from "./adapters/site-watch";
 import { hostStatusRows } from "./adapters/host-status";
-import { CLIENT_JOBS, asRegistered, dailyLimitOf } from "./jobs";
+import { CLIENT_JOBS, asRegistered, dailyLimitOf, perTopicCapOf } from "./jobs";
 import { listSchedules } from "./store";
 import type { ScheduleCell, SchedulesView } from "./types";
 
@@ -38,7 +38,7 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
       const unavailable = job.unavailable?.({ siteUrl: org.site_url, chatwoot: org.chatwoot, wpSites: wpSites.get(org.id) ?? 0 }) ?? null;
       cells.push(
         row
-          ? { ...asRegistered(row), dailyLimit: dailyLimitOf(job, row.dailyLimit), stored: true, version: null, unavailable }
+          ? { ...asRegistered(row), dailyLimit: dailyLimitOf(job, row.dailyLimit), perTopicCap: perTopicCapOf(job, row.perTopicCapTwd), stored: true, version: null, unavailable }
           : {
               jobKey: job.key,
               organizationId: org.id,
@@ -46,6 +46,7 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
               enabled: false,
               ...job.defaults,
               dailyLimit: dailyLimitOf(job, null),
+              perTopicCap: perTopicCapOf(job, null),
               lastRunAt: null,
               lastError: null,
               lastErrorAt: null,
@@ -61,7 +62,7 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
 
   const today = now.toISOString().slice(0, 10);
   return {
-    jobs: [...CLIENT_JOBS.map(({ key, label, description, cost, frequencies, dailyLimit, group }) => ({ key, label, description, cost, frequencies, ...(dailyLimit ? { dailyLimit } : {}), ...(group ? { group } : {}) })), SITE_WATCH_JOB],
+    jobs: [...CLIENT_JOBS.map(({ key, label, description, cost, frequencies, dailyLimit, perTopicCap, group }) => ({ key, label, description, cost, frequencies, ...(dailyLimit ? { dailyLimit } : {}), ...(perTopicCap ? { perTopicCap } : {}), ...(group ? { group } : {}) })), SITE_WATCH_JOB],
     orgs: orgs.map((o) => ({ id: o.id, slug: o.slug, name: o.name ?? o.slug })),
     cells,
     system: opts.slug ? [] : await hostStatusRows(now.getTime()),
