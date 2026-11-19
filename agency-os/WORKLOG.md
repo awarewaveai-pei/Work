@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-19（續7）— 影片下一階段：N1、N15、N13 驗收併入 main；監工台三項標完成；派 N4、N16、N14
+
+- 驗收：三條工人線交回（N1 `1d5405e7f`、N15 `695289394`、N13 `1ded406e9`，各自 worktree）；監工讀 FILES／TESTS／RISKS 與完整 diff，cherry-pick 進 main → `36cc810e3`（N1）、`d04251a25`（N15）、`6fd166da8`（N13）。都只動一邊（N1、N15 = next-admin；N13 = video-workbench），不放 `DEPLOY_HOLD`。
+- 監工決定（操作者 2026-11-19 授權「要決定的事監工決定」）：N1 審片沒過的題目重試會拿同一支影片再審、仍 failed，由人到工作台處理（停點通知已有），不另開卡；沒建成影片專案或成片沒記到專案的題目一律 failed 不放行。N15 員工本來就看得到所有組織，對員工是過濾不是擋，「設計圖」分頁同樣只列該客戶，接受。N13 只有「還沒做」變「選用」，做過的仍顯示「做好了」，接受。部署等 N12 併入後一次 `sg-deploy.sh`。
+- 工人各自 oracle：`agency-os/reports/oracle/2026-11-19-review-f1d2fedf.md`（N1，一項已修）、`2026-11-19-review-320ec6bf.md`（N15，無發現）、`2026-11-19-review-6c1f1ef1.md`（N13，一項已修）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit`（.next/types 舊產物移開再放回）exit 0；`npx vitest run lib/content/topics lib/content/video app/api/tools/designs app/video` → 75 files / 393 tests passed；video-workbench `node tests/gate.cjs` → gate ok（含 n13-quick-output-steps）；`node build.mjs && node check.mjs` ok | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n（Codex 兩項皆由工人修於併入前；監工逐 file:line 讀 diff 複核）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench | grep=releaseTopicVideo|reviewProblems|topicProjectId|WorksGallery|viaQuick|n13-quick-output-steps | hits=20
+- ORACLE_WAIVED: 本 commit 只有監工台資料檔與 WORKLOG；程式改動的 oracle artifact 見上列三檔（同日、工人改檔後產生）
+- rollback：`git revert 36cc810e3 d04251a25 6fd166da8`；監工台 `git revert` 本 commit 後 `node build.mjs` 再發布同一網址。
 ## 2026-11-19（續6）— 影片下一階段：批 0 三張派工卡（N1、N4、N15）；上線前閘改成流程閘
 
 - 派工：主線 session 提出三張卡（各自 worktree、Opus 5.5），由操作者一次點一張開；brief 含 file:line、既有資料處理、點名測試與突變、FILES／TESTS／RISKS 回報。監工讀 diff 後併入 main，`data.mjs` 只有監工改。
