@@ -42,7 +42,7 @@ beforeEach(() => {
 describe("GET /api/content/topics", () => {
   it("staff and the owning client read the site's month (+ folders on request)", async () => {
     const r = await GET(req("/api/content/topics?siteId=s1&month=2026-11&folders=1", STAFF));
-    expect(await r.json()).toEqual({ ok: true, topics: [], folders: [{ id: "f1", name: "藝術治療 202610011200" }], dailyCap: 3 });
+    expect(await r.json()).toEqual({ ok: true, topics: [], folders: [{ id: "f1", name: "藝術治療 202610011200" }], dailyCap: 3, youtubePrivacy: {} });
     expect(m.listTopics).toHaveBeenCalledWith({}, "org-a", "2026-11");
     expect((await GET(req("/api/content/topics?siteId=s1&month=2026-11", CLIENT_A))).status).toBe(200);
   });

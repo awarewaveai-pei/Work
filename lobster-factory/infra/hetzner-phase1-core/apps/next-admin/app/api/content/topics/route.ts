@@ -5,7 +5,9 @@
 //        topic; day and hour are Taipei time (hour default 9)
 //   POST { siteId, month, keywords: string[], fromDay?, hour?, formats? }  one manual topic per line (max MAX_BULK_TOPICS),
 //        dates spread from fromDay to month end; answers { added, skipped: keywords already planned that month }
-//   GET also answers dailyCap: how many topics the brand may start a day (its content_pipeline limit on /ops/schedules)
+//   GET also answers dailyCap: how many topics the brand may start a day (its content_pipeline limit on /ops/schedules),
+//       and youtubePrivacy: { topicId: "public"|"unlisted"|"mixed"|null } for reviewed topics with a YouTube draft to send
+//       (the draft's own privacy, which 發布's confirmation names; youtube-draft-privacy.ts)
 // The site decides the organization; the caller must be allowed on it (canAccessOrg), or the answer is 404.
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
@@ -17,6 +19,7 @@ import { listFolders } from "@/lib/kb/folders";
 import { daysIn, fromTaipei, isMonth, listTopics, MAX_BULK_TOPICS, monthKey, proposeTopics, spreadDays, TOPIC_FORMATS, type TopicFormat } from "@/lib/content/topics/store";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import { storedDailyLimit } from "@/lib/schedules/store";
+import { youtubeDraftPrivacies } from "@/lib/content/topics/youtube-draft-privacy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +46,8 @@ export async function GET(req: Request): Promise<Response> {
     if ("res" in s) return s.res;
     const [topics, folders, cap] = await Promise.all([listTopics(s.sb, s.org, month), q.get("folders") === "1" ? listFolders(s.org) : Promise.resolve([]),
       storedDailyLimit(s.org, "content_pipeline")]);
-    return NextResponse.json({ ok: true, topics, folders: folders.map((f) => ({ id: f.id, name: f.name })), dailyCap: cap ?? DAILY_START_CAP });
+    const youtubePrivacy = await youtubeDraftPrivacies(s.org, topics);
+    return NextResponse.json({ ok: true, topics, folders: folders.map((f) => ({ id: f.id, name: f.name })), dailyCap: cap ?? DAILY_START_CAP, youtubePrivacy });
   } catch (e) {
     console.error("[content/topics] list failed:", e);
     return NextResponse.json({ ok: false, error: "topics could not be read" }, { status: 500 });
