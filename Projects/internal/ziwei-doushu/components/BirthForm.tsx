@@ -9,6 +9,39 @@ const CITY_LON: Record<string, number> = {
   香港: 114.2, 北京: 116.4, 上海: 121.5, 廣州: 113.3,
 };
 
+/** 單選按鈕群:選項全部看得到,選中者用 btn-gold,其餘 btn-violet(同塔羅頁寫法)。 */
+function ChoiceGroup<T extends string>({
+  label,
+  value,
+  options,
+  onPick,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; text: string }[];
+  onPick: (v: T) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="label-dark">{label}</span>
+      <div role="group" aria-label={label} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={value === o.value}
+            onClick={() => onPick(o.value)}
+            className={value === o.value ? 'btn-gold' : 'btn-violet'}
+            style={{ width: 'auto' }}
+          >
+            {o.text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * 出生資料表單。單人頁給 onSubmit(顯示送出鈕);多人頁(合婚)給 onChange,
  *   每次欄位變動即回報目前資料,由外層統一送出(此時不顯示送出鈕)。
@@ -83,29 +116,25 @@ export default function BirthForm({
           />
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="label-dark">{t.gender}</span>
-          <select
-            value={gender}
-            onChange={(e) => setGender(e.target.value as Gender)}
-            className="field-dark"
-          >
-            <option value="男">{t.male}</option>
-            <option value="女">{t.female}</option>
-          </select>
-        </label>
+        <ChoiceGroup
+          label={t.gender}
+          value={gender}
+          options={[
+            { value: '男', text: t.male },
+            { value: '女', text: t.female },
+          ]}
+          onPick={setGender}
+        />
 
-        <label className="flex flex-col gap-1.5">
-          <span className="label-dark">{t.calendar}</span>
-          <select
-            value={calendar}
-            onChange={(e) => setCalendar(e.target.value as CalendarType)}
-            className="field-dark"
-          >
-            <option value="solar">{t.solar}</option>
-            <option value="lunar">{t.lunar}</option>
-          </select>
-        </label>
+        <ChoiceGroup
+          label={t.calendar}
+          value={calendar}
+          options={[
+            { value: 'solar', text: t.solar },
+            { value: 'lunar', text: t.lunar },
+          ]}
+          onPick={setCalendar}
+        />
 
         {calendar === 'lunar' ? (
           <label className="flex items-center gap-2 md:mt-6">
@@ -131,21 +160,17 @@ export default function BirthForm({
 
         {useTrueSolar ? (
           <>
-            <label className="flex flex-col gap-1.5">
-              <span className="label-dark">{t.city}</span>
-              <select
+            <div className="col-span-2 md:col-span-3">
+              <ChoiceGroup
+                label={t.city}
                 value={city}
-                onChange={(e) => {
-                  setCity(e.target.value);
-                  setLongitude(CITY_LON[e.target.value]);
+                options={Object.keys(CITY_LON).map((c) => ({ value: c, text: c }))}
+                onPick={(c) => {
+                  setCity(c);
+                  setLongitude(CITY_LON[c]);
                 }}
-                className="field-dark"
-              >
-                {Object.keys(CITY_LON).map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </label>
+              />
+            </div>
             <label className="flex flex-col gap-1.5">
               <span className="label-dark">{t.longitude}</span>
               <input
