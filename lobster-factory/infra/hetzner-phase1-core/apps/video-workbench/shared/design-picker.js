@@ -39,8 +39,8 @@
     const org = V.capabilities?.mainSystem?.organizationId;
     return "/tools/banner?" + new URLSearchParams({ ratio, title: String(title || ""), template: "opener-center", ...(org ? { org } : {}) });
   }
-  // The field: what is picked, 從我的設計挑 / 開橫幅工具做一張, and once loaded the grid (picture cards, aria-pressed,
-  // 會裁切 when the design's shape differs from the project's).
+  // The field: what is picked, 從我的設計挑 / 開橫幅工具做一張, and once loaded the grid (picture cards, aria-pressed, and
+  // when the design's shape differs from the project's: the whole card shows over a blurred copy, never cut).
   function html({ label, list, picked, ratio, esc, attrs }) {
     const head = `<p class="note">${esc(label)}（從我的設計挑；字卡上的字就是片頭的字，不另加標題）</p>${picked ? `<img class="ed-intro-cover" src="${esc(picked.url)}" alt="${esc(picked.name || "設計")}">` : ""}`,
       buttons = `<div class="flow-choices" role="group" aria-label="橫幅字卡來源"><button type="button" class="btn small" ${attrs.load}>${list ? "重新整理我的設計" : "從我的設計挑"}</button><button type="button" class="btn small" ${attrs.banner}>開橫幅工具做一張</button></div>`;
@@ -49,7 +49,7 @@
     if (!list.items.length) return head + buttons + '<p class="note">我的設計還沒有圖片，先用「開橫幅工具做一張」，存到我的設計後回來按「重新整理我的設計」。</p>';
     return head + buttons + `<div class="ed-intro-grid" role="group" aria-label="我的設計">${list.items.map((d) => {
       const on = picked?.id === d.id;
-      return `<button type="button" class="ed-intro-card ${on ? "selected" : ""}" ${attrs.pick(d.id)} aria-pressed="${on}"><img src="${esc(d.url)}" alt="" loading="lazy"><span>${esc(d.name)}</span>${crops(d, ratio) ? "<small>會裁切</small>" : ""}</button>`;
+      return `<button type="button" class="ed-intro-card ${on ? "selected" : ""}" ${attrs.pick(d.id)} aria-pressed="${on}"><img src="${esc(d.url)}" alt="" loading="lazy"><span>${esc(d.name)}</span>${crops(d, ratio) ? "<small>比例不同，會加模糊底</small>" : ""}</button>`;
     }).join("")}</div>`;
   }
   return { crops, load, use, bannerUrl, html };

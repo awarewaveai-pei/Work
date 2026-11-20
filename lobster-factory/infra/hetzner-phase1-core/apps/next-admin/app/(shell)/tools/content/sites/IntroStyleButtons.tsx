@@ -20,7 +20,7 @@ const card = (on: boolean): CSSProperties => ({
   border: `${on ? 2 : 1}px solid ${on ? "var(--accent)" : "var(--card-border)"}`, background: "var(--bg-card)", color: "var(--text-primary)",
 });
 const picture: CSSProperties = { width: "100%", aspectRatio: "16 / 9", objectFit: "cover", borderRadius: 4, background: "var(--card-border)" };
-// card R3: the automatic video's shape (one format); a design of another shape is cut to it (cover), never stretched
+// card R3: the automatic video's shape (one format); a design of another shape shows whole over a blurred copy of itself
 const VIDEO_RATIO = (([w, h]) => w / h)(ARTICLE_VIDEO_DEFAULTS.formats[0].split("x").map(Number) as [number, number]);
 const crops = (w: number, h: number) => Math.abs(w / h / VIDEO_RATIO - 1) > 0.02;
 
@@ -87,7 +87,7 @@ export default function IntroStyleButtons({ site, onSaved }: { site: ManagedSite
                       <img src={d.url} alt="" loading="lazy" style={{ ...picture, objectFit: "contain" }}
                         onLoad={(e) => { const i = e.currentTarget; setShapes((s) => ({ ...s, [d.id]: crops(i.naturalWidth, i.naturalHeight) })); }} />
                       <span>{d.name}</span>
-                      {(d.width && d.height ? crops(d.width, d.height) : shapes[d.id]) && <span style={{ color: "var(--text-muted)", fontSize: 11 }}>會裁切</span>}
+                      {(d.width && d.height ? crops(d.width, d.height) : shapes[d.id]) && <span style={{ color: "var(--text-muted)", fontSize: 11 }}>比例不同，會加模糊底</span>}
                     </button>
                   );
                 })}

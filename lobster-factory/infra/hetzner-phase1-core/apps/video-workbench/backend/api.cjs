@@ -2008,10 +2008,10 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (req.method === "POST" && route === "/bible/public-urls") { json(res, 200, await storyBible.publicUrls(await body(req))); return true; }
       // Card R3: a banner-tool card (我的設計) as the 片頭's picture. Only this server's organization's designs: the main
       // system answers by organization (next-admin lib/content/video/opener-designs.ts), a design of another one is a 404.
-      // Picked = downloaded from our own storage and made a JPEG at the project's render size, cut to fill (cover, as the
-      // automatic path's sharp does): the service gets it as a data: URI like any picked picture, and a 3-5 MB PNG would pass
-      // its 3.5 MB body limit. One file per design and ratio (designs never change). id = the design's main-system asset
-      // (the opener's lineage parent).
+      // Picked = downloaded from our own storage and made a JPEG within the project's render size, whole and in its own
+      // shape (as the automatic path's sharp does; the composition fits it over a blurred copy of itself, never cut): the
+      // service gets it as a data: URI like any picked picture, and a 3-5 MB PNG would pass its 3.5 MB body limit. One file
+      // per design and ratio (designs never change). id = the design's main-system asset (the opener's lineage parent).
       if ((req.method === "GET" && route === "/designs") || (req.method === "POST" && route === "/designs/use")) {
         if (!main) throw Object.assign(Error("沒有連上主系統，讀不到我的設計"), { status: 503 });
         const input = req.method === "POST" ? await body(req) : null, id = input ? String(input.id || "") : null;
@@ -2022,14 +2022,14 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         if (status === 404 && value?.error === "design_not_found") throw Object.assign(Error("找不到這張設計（可能已刪除，或不是這個帳戶的）"), { status: 404 });
         if (!ok || value?.ok !== true) throw Object.assign(Error("讀不到我的設計：" + String(value?.error || "主系統 HTTP " + status)), { status: 502 });
         if (id === null) { json(res, 200, { designs: Array.isArray(value.designs) ? value.designs : [] }); return true; }
-        const name = crypto.createHash("sha256").update(value.design.id + "\n" + input.ratio).digest("hex").slice(0, 32) + ".jpg",
+        const name = crypto.createHash("sha256").update("whole\n" + value.design.id + "\n" + input.ratio).digest("hex").slice(0, 32) + ".jpg",
           file = path.join(outputs, name);
         if (!fs.existsSync(file)) {
           const image = await urlImport.fetchMedia(value.design.url, { kinds: ["image"], bases: await main.storageBases() }),
             tmp = path.join(dataDir, "tmp-design-" + crypto.randomUUID() + "." + image.ext);
           fs.writeFileSync(tmp, image.bytes);
           try {
-            await mediaTools.run(["-y", "-hide_banner", "-i", tmp, "-frames:v", "1", "-an", "-vf", `scale=${size[0]}:${size[1]}:force_original_aspect_ratio=increase,crop=${size[0]}:${size[1]},setsar=1`, "-q:v", "3", file + ".part.jpg"]);
+            await mediaTools.run(["-y", "-hide_banner", "-i", tmp, "-frames:v", "1", "-an", "-vf", `scale=${size[0]}:${size[1]}:force_original_aspect_ratio=decrease,setsar=1`, "-q:v", "3", file + ".part.jpg"]);
             fs.renameSync(file + ".part.jpg", file);
           } finally {
             fs.rmSync(tmp, { force: true });

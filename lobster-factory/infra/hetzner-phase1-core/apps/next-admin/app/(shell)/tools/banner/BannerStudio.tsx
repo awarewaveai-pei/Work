@@ -182,6 +182,7 @@ interface State {
   textScrim:  boolean;   // 局部底襯（文字後方半透明圓角板）— 比整張暗化更高級
   textOutline: boolean;  // 標題描邊 + 陰影（匯出時保留，修舊版 export 掉陰影）
   brandBar:   boolean;   // card R3: a bar in the accent (brand) colour beside a left-aligned stack (影片片頭 版型)
+  balanceTitle: boolean; // card R3: a wrapped title's lines made even (no one-character last line) -- 影片片頭 版型
   // marketing / conversion elements
   ctaText:      string;  // "" = 無按鈕
   ctaBg:        string;
@@ -254,6 +255,7 @@ const INIT: State = {
   textScrim:  false,
   textOutline: true,
   brandBar:   false,
+  balanceTitle: false,
   ctaText:      "",
   ctaBg:        "#ff5a5f",
   ctaTextColor: "#ffffff",
@@ -343,9 +345,10 @@ const TEMPLATES: { key: string; label: string; icon: string; patch: Partial<Stat
   // Card R3: 影片片頭 -- a card a video opens with (the editor's 「開橫幅工具做一張」 preselects one; the video zooms into it).
   // Words only, centred in the frame's safe area (the stack sits between the top and bottom thirds' UI on 9:16); no price,
   // no button, no badge. Colours stay the user's (text / accent = brand colour), so these name none. fit = the title's
-  // size as a share of the card's width (sized when applied: about nine CJK characters to a line in every shape).
+  // size as a share of the card's width -- at least 9% of the width on 9:16 and 4:5 (legible on a phone), at most 15% of the
+  // height on a wide card -- and a wrapped title has even lines.
   {
-    key: "opener-center", label: "片頭：大標題置中", icon: "🎬", group: "opener", fit: 0.086,
+    key: "opener-center", label: "片頭：大標題置中", icon: "🎬", group: "opener", fit: 0.1,
     patch: {
       textPos: "center", textAlignH: "center",
       textScrim: false, textOutline: true, dimOverlay: true, brandBar: false,
@@ -353,7 +356,7 @@ const TEMPLATES: { key: string; label: string; icon: string; patch: Partial<Stat
     },
   },
   {
-    key: "opener-title-sub", label: "片頭：標題＋副標", icon: "🎞", group: "opener", fit: 0.078,
+    key: "opener-title-sub", label: "片頭：標題＋副標", icon: "🎞", group: "opener", fit: 0.1,
     patch: {
       textPos: "center", textAlignH: "center",
       textScrim: true, textOutline: true, dimOverlay: false, brandBar: false,
@@ -361,7 +364,7 @@ const TEMPLATES: { key: string; label: string; icon: string; patch: Partial<Stat
     },
   },
   {
-    key: "opener-left-bar", label: "片頭：左對齊大字＋品牌色條", icon: "▍", group: "opener", fit: 0.08,
+    key: "opener-left-bar", label: "片頭：左對齊大字＋品牌色條", icon: "▍", group: "opener", fit: 0.1,
     patch: {
       textPos: "center", textAlignH: "left",
       textScrim: false, textOutline: true, dimOverlay: true, brandBar: true,
@@ -374,8 +377,8 @@ const RATIO_PRESET: Record<string, PresetKey> = { "16:9": "hero-full", "9:16": "
 /** A template's patch at a size: an opener's title (and subtitle) sized to that card's width; any other unchanged. */
 function templatePatch(t: (typeof TEMPLATES)[number], preset: PresetKey): Partial<State> {
   if (!t.fit) return t.patch;
-  const headlineSize = Math.min(160, Math.round(PRESETS[preset].w * t.fit));
-  return { ...t.patch, headlineSize, subtextSize: Math.round(headlineSize * 0.42) };
+  const { w, h } = PRESETS[preset], headlineSize = Math.round(Math.min(w * t.fit, h * 0.15));
+  return { ...t.patch, balanceTitle: true, headlineSize, subtextSize: Math.round(headlineSize * 0.42) };
 }
 
 // ---------------------------------------------------------------------------
@@ -506,7 +509,14 @@ async function exportToPng(state: State): Promise<string> {
     const hFont = state.headlineFont || font;
     ctx.font = `bold ${state.headlineSize}px ${hFont}`;
     setLetterSpacing(ctx, state.letterSpacing);
-    const lines = layoutAccentLines(ctx, parseAccentRuns(state.headline), maxWidth);
+    const runs = parseAccentRuns(state.headline);
+    let lines = layoutAccentLines(ctx, runs, maxWidth);
+    // card R3: even lines -- the narrowest width that still gives this many lines (off = the wrap as before)
+    if (state.balanceTitle && lines.length > 1) {
+      let lo = maxWidth / lines.length, hi = maxWidth;
+      for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (layoutAccentLines(ctx, runs, mid).length > lines.length) lo = mid; else hi = mid; }
+      lines = layoutAccentLines(ctx, runs, hi);
+    }
     const lineW = (ln: AccentRun[]) => ln.reduce((s, r) => s + ctx.measureText(r.text).width, 0);
     const lineH = state.headlineSize * 1.16;
     const w = Math.min(maxWidth, Math.max(1, ...lines.map(lineW)));
@@ -1103,7 +1113,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
 
   // ── template apply ──
   const applyTemplate = useCallback((patch: Partial<State>) =>
-    setS((prev) => ({ ...prev, brandBar: false, ...patch, saved: false, error: null }))
+    setS((prev) => ({ ...prev, brandBar: false, balanceTitle: false, ...patch, saved: false, error: null }))
   , []);
 
   // Card R3: opened from the video editor or a site's intro setting (/tools/banner?ratio=16:9&title=...&template=opener-center
@@ -1117,7 +1127,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     const preset = RATIO_PRESET[q.get("ratio") ?? ""], title = (q.get("title") ?? "").trim().slice(0, 80);
     const t = TEMPLATES.find((x) => x.group === "opener" && x.key === q.get("template"));
     if (!preset && !title && !t) return;
-    setS((prev) => ({ ...prev, ...(t ? { brandBar: false, ...templatePatch(t, preset ?? prev.preset) } : {}), ...(preset ? { preset } : {}), ...(title ? { headline: title } : {}) }));
+    setS((prev) => ({ ...prev, ...(t ? { brandBar: false, balanceTitle: false, ...templatePatch(t, preset ?? prev.preset) } : {}), ...(preset ? { preset } : {}), ...(title ? { headline: title } : {}) }));
   }, []);
 
   // ── undo / redo (Banner's whole design is ONE serializable State; unchanged image

@@ -57,7 +57,7 @@ const click = async (sel) => { const e = d.querySelector(sel); assert.ok(e, "mis
   await click("[data-design-load]");
   assert.deepEqual(requests.at(-1), ["GET", "/designs", undefined]);
   assert.match(d.innerHTML, /role="group" aria-label="我的設計"/);
-  assert.match(d.innerHTML, /data-id="d2" aria-pressed="false"><img src="https:\/\/r2\/b.png" alt="" loading="lazy"><span>直式<\/span><small>會裁切<\/small>/);
+  assert.match(d.innerHTML, /data-id="d2" aria-pressed="false"><img src="https:\/\/r2\/b.png" alt="" loading="lazy"><span>直式<\/span><small>比例不同，會加模糊底<\/small>/);
   await click('[data-design-pick=backgroundUrl]');
   assert.deepEqual(requests.at(-1), ["POST", "/designs/use", { id: "d1", ratio: "16:9" }]);
   assert.match(d.innerHTML, /data-id="d1" aria-pressed="true"/);

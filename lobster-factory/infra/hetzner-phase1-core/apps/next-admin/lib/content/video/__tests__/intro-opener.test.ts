@@ -109,7 +109,7 @@ describe("makeIntro", () => {
   it("banner card: the design's picture cover-fit, no title; a deleted design is skipped with a note", async () => {
     const card = `${getDesignsPublicBase()}/designs/banner.png`, d = deps();
     const r = await makeIntro(style("still-opener"), { ...video, card }, d);
-    expect(d.picture).toHaveBeenCalledWith(card, 1920, 1080, expect.any(AbortSignal), "橫幅字卡");
+    expect(d.picture).toHaveBeenCalledWith(card, 1920, 1080, expect.any(AbortSignal), { what: "橫幅字卡", whole: true });
     expect(d.submit).toHaveBeenCalledWith("still-opener", { backgroundUrl: "data:image/jpeg;base64,AAAA" }, { outputFormat: "16x9", fps: 30, durationInFrames: 60 });
     expect(r.bookends?.intro).toEqual({ assetUrl: "https://r2.example/rs1.mp4" });
     const gone = deps();

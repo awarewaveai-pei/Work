@@ -28,13 +28,14 @@ const MAX_PICTURE_BYTES = 15 * 1024 * 1024;
 export interface IntroDeps {
   submit: typeof submitRemotion;
   poll: typeof pollRemotion;
-  /** The picture as a JPEG data: URI at w x h (cover-fit); throws when it is not a still picture. what = its name in errors. */
-  picture: (url: string, w: number, h: number, signal: AbortSignal, what?: string) => Promise<string>;
+  /** The picture as a JPEG data: URI at w x h (cover-fit), or with whole within w x h keeping its shape (a banner card:
+   *  the composition fits it whole); throws when it is not a still picture. what = its name in errors. */
+  picture: (url: string, w: number, h: number, signal: AbortSignal, opts?: { what?: string; whole?: boolean }) => Promise<string>;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
 }
 
-async function pictureDataUri(url: string, w: number, h: number, signal: AbortSignal, what = "第一個鏡頭的畫面"): Promise<string> {
+async function pictureDataUri(url: string, w: number, h: number, signal: AbortSignal, { what = "第一個鏡頭的畫面", whole = false }: { what?: string; whole?: boolean } = {}): Promise<string> {
   if (!/^https:\/\//.test(url)) throw new Error(`${what}不是 https 網址`);
   const r = await fetch(url, { signal });
   if (!r.ok) throw new Error(`${what}下載失敗（HTTP ${r.status}）`);
@@ -42,7 +43,7 @@ async function pictureDataUri(url: string, w: number, h: number, signal: AbortSi
   const bytes = Buffer.from(await r.arrayBuffer());
   if (bytes.length > MAX_PICTURE_BYTES) throw new Error(`${what}太大`);
   const sharp = (await import("sharp")).default;
-  const jpeg = await sharp(bytes).resize(w, h, { fit: "cover" }).jpeg({ quality: 82 }).toBuffer();
+  const jpeg = await sharp(bytes).resize(w, h, { fit: whole ? "inside" : "cover" }).jpeg({ quality: 82 }).toBuffer();
   return "data:image/jpeg;base64," + jpeg.toString("base64");
 }
 
@@ -61,7 +62,7 @@ export async function makeIntro(style: IntroStyle | null,
     if (!v.card) return { note: v.cardProblem ?? "選好的橫幅字卡已不在我的設計（可能被刪除），這一輪沒有加片頭" };
     // a design's url is written by the designs route into our own bucket; anything else is not fetched
     if (!isPublicBucketAsset(v.card)) return { note: "橫幅字卡不在我們的儲存空間，這一輪沒有加片頭" };
-    return render(INTRO_TEMPLATES.find((t) => t.id === style.id), v.card, null, v, deps, "橫幅字卡");
+    return render(INTRO_TEMPLATES.find((t) => t.id === style.id), v.card, null, v, deps, { what: "橫幅字卡", whole: true });
   }
   const title = v.title.replace(/\s+/g, " ").trim();
   if (!title) return { note: "影片沒有標題，沒有加片頭" };
@@ -75,16 +76,16 @@ export async function makeIntro(style: IntroStyle | null,
   return render(template, v.firstPicture, { key: fill.textKey, text: title.slice(0, max) }, v, deps);
 }
 
-// The template's video from one picture (cover-fit to the format, so a card of another shape is cropped, never
-// stretched) and, when given, its title; joined with the site's transition. Every failure is a note.
+// The template's video from one picture (cover-fit to the format; a banner card whole, the composition fits it over a
+// blurred copy of itself) and, when given, its title; joined with the site's transition. Every failure is a note.
 async function render(template: (typeof INTRO_TEMPLATES)[number] | undefined, pictureUrl: string, text: { key: string; text: string } | null,
-  v: { format: string; transition?: string }, deps: IntroDeps, what?: string): Promise<IntroResult> {
+  v: { format: string; transition?: string }, deps: IntroDeps, opts?: { what?: string; whole?: boolean }): Promise<IntroResult> {
   const size = SIZES[v.format], image = template?.fields.find((f) => f.type === "image" && f.required);
   if (!template || !image) return { note: "片頭樣式不存在，沒有加片頭" };
   if (!size) return { note: `片頭不支援 ${v.format} 比例，沒有加片頭` };
   const until = deps.now() + INTRO_BUDGET_MS;
   try {
-    const picture = await deps.picture(pictureUrl, size[0], size[1], AbortSignal.timeout(INTRO_BUDGET_MS), ...(what ? [what] : []));
+    const picture = await deps.picture(pictureUrl, size[0], size[1], AbortSignal.timeout(INTRO_BUDGET_MS), ...(opts ? [opts] : []));
     const seconds = template.autoSeconds ?? template.seconds.def;   // the shortest length that still shows the whole title
     const sent = await deps.submit(template.id, { [image.key]: picture, ...(text ? { [text.key]: text.text } : {}) },
       { outputFormat: v.format as "16x9", fps: FPS, durationInFrames: seconds * FPS });
