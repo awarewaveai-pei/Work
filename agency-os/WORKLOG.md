@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-20（續13）— 影片 R2（片首封面＋片頭樣式＋轉場積木）＋R4（58 種轉場）上線；部署中抓到正式機剪輯器轉場出片一直失敗（操作者：「看工人們反應的 RISKS是否需要處理 處理完 部署」）
+
+- 併入：R2 `a024d20b8`、`452697892`、`39b23710d`、補做 `a26662866`（片頭片尾接合收 ffmpeg 轉場名）；R4 `06ece12a5`、`77868f532`（清單以正式出片 ffmpeg-static 7.0.2 為準，58 種）。
+- RISKS 判定：video-service 只接三種 → 補做接通；`/awarewave/editor-shared/` 路徑 → 正式 nginx `default.conf:611` 交工作台，上線後 `curl` 200；cpuset／3 GiB → `docker inspect` 30,31／3221225472；工作台 ffmpeg 版本疑慮 → 出片用 `node_modules/ffmpeg-static`（7.0.2），`/usr/bin/ffmpeg` 5.1 只供 ffprobe，監工誤判、工人更正；ffmpeg-static 下載無 sha256 → 每次部署映像內 gate 逐種出片，接受。
+- 部署事故三則（皆未讓正式站壞掉超過下述）：
+  - C1 監工腳本 `docker compose -f docker-compose.video.yml` 漏 `--env-file .env.video` → 新舊映像都因 `RENDER_AUTH_TOKEN` 空而起不來，video-service 停約 10 分鐘（無進行中出片）；補 `--env-file` 後用舊映像救回 healthy，再部署新版 healthy。避免：主機 compose 指令照檔頭第 6 行註解。
+  - C2 npm test gate 紅：`d065d6025` 把 `middlewareClientMaxBodySize` 提到 50mb，`lib/studio/image-upload-limit.ts` 仍 10MB（`image-upload-limit.test.ts` 守兩者相等）→ `cc177e6e6` 改 50MB，縮圖預設取 `min(12M 圖片欄位上限, 整包−512KiB)`，不讓去背送超過 `image/process` 的 12M 字元而 413。
+  - C3 工作台映像 gate 紅：58 種預覽全失敗。根因 FFmpeg 7：`setpts` 後影格率變未知，`xfade` 拒收（"constant frame rate ... 1/0"）；筆電 6.1.1 不會。順查同類：`editor-export.cjs` 轉場鏈同樣 `setpts` 後接 `xfade` → 正式機舊映像（`rollback-20261120-055830`）用「溶解」出片也失敗＝**正式機剪輯器只要有轉場就出不了片，早於本批**。修 `803b31699`：兩處 `setpts` 後補 `fps=<rate>`。`ed3-legacy-golden` 重錄（參數多 `,fps=30/1`；專案 1 第 19–59 格指紋變、其他專案不變；新舊並排看過，同一效果）。
+- 部署：主機 `deploy-r2r4b-20261120.sh`（video-service build → 新映像內 `python -m unittest discover -s tests` → up → healthy；Remotion build → `safe-infra-patch.sh compose`）＋`deploy-r2r4d-20261120.sh`（`sg-deploy.sh next-admin video-workbench`）→ `RESULT ALL OK deployed 803b31699`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=正式 `lobster-video-workbench` 容器內 exportEditor 兩段片＋vdwind 轉場 → EXPORT OK；映像內 r4-transitions-table 58/58、預覽中位 75 ms；`curl https://video.aware-wave.com/awarewave/editor-shared/transitions.js` 200；`playwright-runner.ps1 -Mode smoke` 34 passed 0 failed；本機 VW gate 兩種模式 ok | exit=0 | ms=2400000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（工人各卡 critic 已修 3M2m、5M8m、1M6m；監工讀 diff 範圍、於正式映像重現與驗證兩處 fps 修正）
+- ORACLE_WAIVED: Codex 額度到 2026-11-24；ffmpeg 修正以正式映像重現→修→重跑為證，上傳上限以測試釘住
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/video-workbench,lobster-factory/infra/hetzner-phase1-core/apps/video-service | grep=setpts=PTS-STARTPTS | hits=7（影像 `xfade` 前只有 editor-export:751 與 transitions 預覽兩處，已修；其餘為音訊 asetpts 或不接 xfade）
+- 剩餘：片頭樣式卡片、網站設定新欄位還沒在瀏覽器實看；R3 在線 C 進行中。
+- rollback：video-service `docker tag lobster-video-service:rollback-r2r4b lobster-video-service:local` 後 `docker compose -f docker-compose.video.yml --env-file .env.video up -d --no-build`；Remotion `rollback-r2r4` 同法；next-admin／video-workbench `rollback-phase1.sh`；程式 `git revert`。
 ## 2026-11-20（續12）— 模特兒印製：第 2 張 invalid_json、儲存沒出現 = 請求被 Next 截在 10MB（操作者：「修!」）
 
 - 根因：`middleware.ts` 存在 → Next 15.5.14 把請求體緩衝給 middleware，只留前 `middlewareClientMaxBodySize`（預設 10485760，`node_modules/next/dist/server/config-shared.js:220`；讀取點 `server/lib/router-utils/resolve-routes.js:111`），超過即靜默截斷 → 路由 `request.json()` 失敗回 `invalid_json`（`app/api/tools/studio/generate/route.ts:55`、`app/api/tools/presets/route.ts:149`）。Nano Banana 2.1 回 2K PNG：真實模特兒圖 7.16MB = base64 9.55M 字元；第 2 張把第 1 張當參考圖送出（`ModelLibraryStudio.tsx:171`）、儲存送整張（`:181`）→ 皆超過。prod `docker logs lobster-next-admin` 有 `Request body exceeded 10MB for /api/tools/studio/generate` 與 `/api/tools/presets`。
