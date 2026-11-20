@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compositeOnFabric, isPrintBox, printCorners, type Point, type RgbaImage } from "../fabric-print";
+import { compositeOnFabric, foldPush, isPrintBox, printCorners, type Point, type RgbaImage } from "../fabric-print";
 
 function solid(w: number, h: number, rgba: [number, number, number, number]): RgbaImage {
   const data = new Uint8ClampedArray(w * h * 4);
@@ -70,6 +70,27 @@ describe("compositeOnFabric", () => {
     expect(px(out, 60, 60)[0]).toBeLessThan(px(out, 30, 60)[0] - 40);
   });
 
+  it("smooth fabric does not move the print: soft uneven lighting leaves the whole outline where it was placed", () => {
+    // +-6 of 255 in slow waves: the shading of an uncreased shirt, not a fold
+    const photo = solid(120, 120, [232, 232, 232, 255]);
+    for (let y = 0; y < 120; y++) for (let x = 0; x < 120; x++) {
+      const v = Math.round(232 + 6 * Math.sin(x / 9) * Math.cos(y / 11));
+      photo.data.set([v, v, v, 255], (y * 120 + x) * 4);
+    }
+    const out = compositeOnFabric(photo, solid(80, 80, [200, 30, 30, 255]), rect(20, 20, 80, 80));
+    let inkOutside = 0;
+    let fabricInside = 0;
+    for (let y = 0; y < 120; y++) for (let x = 0; x < 120; x++) {
+      const isInk = px(out, x, y)[1] < 100;
+      const outside = x < 18 || x >= 102 || y < 18 || y >= 102;   // 2 px beyond the placed outline
+      const inside = x >= 22 && x < 98 && y >= 22 && y < 98;      // 2 px within it
+      if (outside && isInk) inkOutside++;
+      if (inside && !isInk) fabricInside++;
+    }
+    expect(inkOutside).toBe(0);
+    expect(fabricInside).toBe(0);
+  });
+
   it("a tilted outline lands where its corners are: inside is ink, a corner the rectangle would cover stays photo", () => {
     const photo = solid(100, 100, [255, 255, 255, 255]);
     const tilted: [Point, Point, Point, Point] = [{ x: 20, y: 20 }, { x: 80, y: 40 }, { x: 80, y: 80 }, { x: 20, y: 60 }];
@@ -90,5 +111,86 @@ describe("compositeOnFabric", () => {
     const out = compositeOnFabric(photo, solid(20, 20, [0, 0, 0, 255]), rect(20, 20, 20, 20));
     expect(px(out, 25, 25)[0]).toBeLessThan(30);
     expect(px(out, 5, 5)).toEqual([255, 255, 255]);
+  });
+});
+
+// The push field itself (pixels each spot of the print is moved by the fabric's folds), on synthetic luminance maps.
+describe("foldPush", () => {
+  const map = (w: number, h: number, at: (x: number, y: number) => number) => {
+    const m = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) m[y * w + x] = at(x, y);
+    return m;
+  };
+  const dip = (y: number, centre: number, depth: number, width = 18) => 1 - depth * Math.exp(-((y - centre) ** 2) / (2 * width * width));
+  const largest = (f: { x: Float32Array; y: Float32Array }) => f.x.reduce((m, v, i) => Math.max(m, Math.hypot(v, f.y[i])), 0);
+  // How hard the map p -> p + push squeezes the print at its worst spot: 0 = not at all, 1 = flattened to a line,
+  // above 1 = folded over itself. (Largest negative eigenvalue of the field's symmetric gradient.)
+  const squeeze = (f: { x: Float32Array; y: Float32Array }, w: number, h: number) => {
+    let worst = 0;
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const a = (f.x[i + 1] - f.x[i - 1]) / 2;
+      const d = (f.y[i + w] - f.y[i - w]) / 2;
+      const b = ((f.x[i + w] - f.x[i - w]) / 2 + (f.y[i + 1] - f.y[i - 1]) / 2) / 2;
+      worst = Math.max(worst, Math.hypot((a - d) / 2, b) - (a + d) / 2);
+    }
+    return worst;
+  };
+  const W = 240;
+  const H = 400;
+
+  it("follows the fold's depth relative to the fabric: a tenth of the fold, a tenth of the push; dark like light", () => {
+    const fold = (base: number, depth: number) => foldPush(map(W, H, (_x, y) => base * dip(y, 120, depth)), W, H, 1);
+    const deep = largest(fold(0.9, 0.1));
+    expect(deep).toBeGreaterThan(2);
+    expect(largest(fold(0.9, 0.01)) / deep).toBeGreaterThan(0.07);
+    expect(largest(fold(0.9, 0.01)) / deep).toBeLessThan(0.13);
+    // a dark shirt: within a tenth (the noise floor added before the log weighs a little more on it)
+    expect(Math.abs(largest(fold(0.25, 0.1)) / deep - 1)).toBeLessThan(0.1);
+  });
+
+  it("depends on nothing else in the photo: a deeper fold or a bright area elsewhere leaves this fold's push alone", () => {
+    const base = (_x: number, y: number) => 0.25 * dip(y, 80, 0.06);
+    const plain = foldPush(map(W, H, base), W, H, 1);
+    const deeper = foldPush(map(W, H, (x, y) => base(x, y) * dip(y, 320, 0.25)), W, H, 1);
+    const bright = foldPush(map(W, H, (x, y) => (y > 280 ? 0.98 : base(x, y))), W, H, 1);
+    let moved = 0;
+    for (let y = 20; y < 140; y++) {
+      const i = y * W + 120;
+      moved = Math.max(moved, Math.abs(plain.y[i]));
+      expect(deeper.y[i]).toBeCloseTo(plain.y[i], 5);
+      expect(bright.y[i]).toBeCloseTo(plain.y[i], 5);
+    }
+    expect(moved).toBeGreaterThan(1);
+  });
+
+  it("never folds the print over itself, however deep or sharp the folds: squeezed to 0.35 of its size at most", () => {
+    const fields: Array<[string, Float32Array]> = [
+      ["crossing folds", map(W, H, (x, y) => 0.5 * (1 + 0.33 * Math.sin(x / 40) * Math.cos(y / 47)))],
+      ["deep crossing folds", map(W, H, (x, y) => 0.5 * (1 + 0.9 * Math.sin(x / 40) * Math.cos(y / 47)))],
+      ["tight crossing folds", map(W, H, (x, y) => 0.5 * (1 + 0.6 * Math.sin(x / 14) * Math.cos(y / 17)))],
+      ["hard crease", map(W, H, (_x, y) => (y > 190 && y < 210 ? 0.25 : 0.94))],
+      ["hard corner", map(W, H, (x, y) => (x > 120 && y > 200 ? 0.2 : 0.9))],
+    ];
+    for (const [name, lum] of fields) {
+      const f = foldPush(lum, W, H, 1);
+      expect(largest(f), name).toBeGreaterThan(3);              // the folds do move the print
+      expect(squeeze(f, W, H), name).toBeLessThanOrEqual(0.65 + 1e-4);
+    }
+  });
+
+  it("crushed black shows no folds: one-level banding at 2/255 or 4/255 does not move the print", () => {
+    for (const level of [2, 4]) {
+      const banded = map(W, H, (x, y) => (level + (level / 2) * Math.sign(Math.sin(x / 23) * Math.cos(y / 29))) / 255);
+      expect(largest(foldPush(banded, W, H, 1)), `level ${level}`).toBeLessThan(2);
+    }
+  });
+
+  it("is the same push, in print widths, at any resolution", () => {
+    const at = (s: number) => {
+      const f = foldPush(map(W * s, H * s, (_x, y) => 0.9 * dip(y / s, 120, 0.1)), W * s, H * s, s);
+      return largest(f) / s;
+    };
+    expect(Math.abs(at(2) / at(1) - 1)).toBeLessThan(0.08);
   });
 });

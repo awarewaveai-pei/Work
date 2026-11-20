@@ -1,4 +1,28 @@
 # Worklog
+## 2026-11-20（續10）— 程式印花：位移只看該處的相對皺褶，且不翻折（操作者：「好，修方案 A」）
+
+- 起因：操作者否決「程式印」（皺褶不自然）。改走「AI 出素面底圖一次＋程式貼圖案」，同一張平整底圖上 HEAD 版引擎把小字撕爛。
+- 根因（HEAD 版 `lib/studio/fabric-print.ts`，`strength = DISPLACE*unit / p99`）：
+  - R1 位移強度除以「這張照片自己的梯度 p99」→ 平整與皺褶布面都被推到 28 單位上限（p99 相對陡度：平整 AI 底圖 0.0021、調參照片 casual-plain 0.0063）。
+  - R2 撕裂的機制是映射翻折：HEAD 版在 casual-plain 上 6.5% 像素翻折（critic 實測）。只降強度不會關掉這一類。
+- 不變量：I1 位移只由該處的相對皺褶陡度決定；I2 映射 p→p+push 在實際套用的位移場上不把印花壓到 `MIN_STRETCH`(0.35) 以下。
+- 做法（`compositeOnFabric` 簽名不變，唯一呼叫端 `app/api/tools/studio/fabric-print/route.ts:164`；位移場抽成匯出函式 `foldPush`）：
+  - 陡度 = log(模糊亮度 + `FOLD_FLOOR`) 的梯度 × unit ÷ `FOLD_REF`(0.0063 = casual-plain 的 p99)。log → 不看整張照片的亮度統計，深色白色同等。
+  - 區域上限 `(1 − MIN_STRETCH)/鄰近最大曲率`（`nearMax`），先取平滑範圍內最小值（`nearMin`）再平滑 → 平滑後處處 ≤ 上限。
+  - 向量長度截斷後，量實際位移場對稱梯度的最大負特徵值；超過 0.65 則整場等比縮小（I2 的嚴格保證）。
+  - `FOLD_DARK`：亮度低於 4/255 不算皺褶、13/255 起全算（壓暗黑衣的色階斷層曾被推 ~11 單位）。
+- 已知取捨（寫在 `foldPush` 說明）：強的交叉皺褶觸發整場縮放時 I1 被破壞（critic 實測：300 px 外的柔和皺褶位移少三分之一）；單一硬摺不觸發，casual-plain 不觸發。casual-plain 的皺褶被 I2 壓在約 11 單位（HEAD 版 28，其中 6.5% 是翻折），要更強的皺褶感需加寬 fold map，屬操作者取捨。
+- 中途錯誤：第一版只把分母換成常數 0.012；第二版的上限在平滑後失效（交叉皺褶仍翻折）、仍除以全域 ref——皆由 critic 指出後重做。我曾說調參照片不在本機，實際在 `D:\tmp\mockup-2026-11-01\casual-plain.png`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsx run_existing.mts（HEAD 版與現版各跑 casual-plain.png×2 設計、平整 AI 底圖、柔和皺褶底圖；PNG 逐張目視：HEAD 版文字撕裂，現版小字可讀） | exit=0 | ms=329
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx --no-install vitest run lib/studio/__tests__/fabric-print.test.ts → 16 passed；npx tsc --noEmit 於本次兩檔 0 錯（其餘為既有過期 .next/types） | exit=0 | ms=559
+- 突變（暫存區副本，未動 repo）：拿掉整場保險 → never-folds FAIL（squeeze 0.901）；再拿掉 nearMin → 1.033；改回全域 ref → independence FAIL（亮區使位移差 4.7 px）；改回 p99 正規化 → relative depth 與 independence FAIL；拿掉 FOLD_DARK → 暗部位移 11.05（現版 0.00／0.37）。現版全 pass。
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/0m/3n（critic agent 三輪：第一版 0c/3M/4m、第二版 1c/2M/3m、第三版 0c/0M/3m；第三版 m1 說明不實、m2 暗部色階已修，m3 見下）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；改以 critic agent 三輪＋上列突變證據。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=compositeOnFabric|FOLD_REF|SHADE_GAMMA|DISPLACE | hits=30（呼叫端僅 route.ts:164；`MOCKUP_FIXED_MODEL_PLAN.md`、route.ts:17 無強度數值的過時描述）
+- 剩餘風險：`MIN_STRETCH`、`FOLD_REF` 只以一張真實照片校準；深色衣服、深摺痕只有合成測試；沒有測試釘住「一般皺褶不觸發整場縮放」（critic m3，未做）。
+- 同場結論（未進 repo，檔案在 `D:\tmp\blender-poc`）：Blender 3D 模特兒路線對靜態圖不採用——人物渲染達不到真人感、Blender 布料解算做不出平整商品衣；「圖案精準」由本引擎取得。
+- rollback：還原本 commit（單一 commit，兩檔）。
+
 ## 2026-11-20（續9）— 跨模型審查加「推翻根因」一關（參考 OpenAI Performance Factory；操作者「兩步都補」「你決定」）
 
 - 決策（附正式資料，90 天）：事件 36 件、AI 自動診斷 1 件、repair_runs 0 筆、延遲類警報 0 件 → 正式站告警流程不加 Codex 反駁／部署後驗證（會是死碼）。
