@@ -78,6 +78,16 @@ t_renderer_port_follows_docker_port() {
     test "$(resolve_port renderer_port)" = "13190"
 }
 
+t_oracle_port_follows_docker_port() {
+  stub_docker_port "0.0.0.0:13010"
+  check "oracle-web: resolves the port docker port reports" test "$(resolve_port oracle_port)" = "13010"
+}
+
+t_oracle_port_falls_back() {
+  stub_docker_port ""
+  check "oracle-web: falls back to 3010 when docker port finds nothing" test "$(resolve_port oracle_port)" = "3010"
+}
+
 t_next_admin_probe_url_uses_the_resolved_port() {
   stub_docker_port "0.0.0.0:19999"
   local out

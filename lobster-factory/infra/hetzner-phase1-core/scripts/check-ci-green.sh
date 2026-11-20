@@ -32,6 +32,7 @@ app_workflows() {
   case "$1" in
     next-admin)      echo "next-admin-typecheck.yml next-admin-test.yml" ;;
     video-workbench) echo "video-workbench-ci.yml" ;;
+    oracle-web)      echo "oracle-web-ci.yml" ;;
   esac
 }
 

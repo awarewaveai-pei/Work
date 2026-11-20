@@ -959,6 +959,43 @@ services:
           pids: 256
     logging: *lobster-logging
 
+  # oracle.aware-wave.com (Projects/internal/ziwei-doushu -> ./apps/oracle-web, same staged-copy rule as hci-app).
+  # container_name stays "oracle-web": nginx/default.conf proxies to oracle-web:3000 on lobster-net.
+  # OPENAI_* come from the machine-local apps/oracle-web/.env.production (never rsynced, never in the image).
+  # The site URL is not set here: NEXT_PUBLIC_* is inlined at build (lib/site.ts holds the default).
+  oracle-web:
+    init: true
+    build:
+      context: ./apps/oracle-web
+      dockerfile: Dockerfile
+    image: oracle-web:local
+    container_name: oracle-web
+    restart: unless-stopped
+    ports:
+      - "${ORACLE_WEB_HOST_PORT:-127.0.0.1:3010}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    env_file:
+      - ./apps/oracle-web/.env.production
+    healthcheck:
+      test: ["CMD", "timeout", "4", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - lobster-net
+    memswap_limit: 768M
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: '1.00'
+          pids: 512
+    logging: *lobster-logging
+
 networks:
   lobster-net:
     name: lobster-net

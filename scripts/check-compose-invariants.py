@@ -43,7 +43,6 @@ ENFORCED = [
     "lobster-factory/infra/hetzner-phase1-core/apps/video-whisper-worker/docker-compose.whisper.yml",
     "Projects/internal/cognitive-engineering-os/docker-compose.yml",
     "Projects/internal/cognitive-engineering-os/ops/cognitive-db/docker-compose.cognitive-db.yml",
-    "Projects/internal/ziwei-doushu/docker-compose.yml",   # prod: oracle-web at /opt/oracle (was listed as local dev)
 ]
 # Not production. A new compose file must be added to one of the two lists.
 PENDING = {
@@ -57,8 +56,11 @@ PENDING = {
     "Projects/internal/hci30/infra/local/compose.test.yml": "local test",
     "lobster-factory/infra/hetzner-phase1-core/tests/e2e/woo-drill/docker-compose.yml": "local e2e drill (4f2226576)",
 }
-# In the repo hci-app's build context lives outside apps/ (= sg-deploy.sh app_git_source_root); the host has it in apps/.
-REPO_CONTEXT = {"./apps/hci-app": "../../../Projects/internal/hci30"}
+# In the repo these build contexts live outside apps/ (= sg-deploy.sh app_git_source_root); the host has them in apps/.
+REPO_CONTEXT = {
+    "./apps/hci-app": "../../../Projects/internal/hci30",
+    "./apps/oracle-web": "../../../Projects/internal/ziwei-doushu",
+}
 COMPOSE_RE = re.compile(r"(^|/)(docker-)?compose[^/]*\.ya?ml$")
 MPM_DEST = "/etc/apache2/mods-available/mpm_prefork.conf"
 

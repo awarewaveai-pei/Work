@@ -67,7 +67,7 @@
 | Uptime Kuma | `/root/uptime-kuma/`（compose 化 2026-08-28）| `uptime-kuma` |
 | Render 雙服務 | `/root/render-services/`（compose + 兩個 `.env`，600）| 無（無狀態，產出上 R2）|
 | SG 棧(nginx/WP/api/admin/redis/觀測) | `/root/lobster-phase1/`（**exclude `backups/`**；`.env` 是機器設定 SSOT；**`nginx/default.conf` 只能整份直接 rsync 現役機的活檔，絕不可從 repo `lobster-factory/.../nginx/system-sites/*.conf` 這類 2026-06/07 舊架構快照重建**——那批檔案 `X-Forwarded-Proto` 用的是已知有 bug 的 `$scheme` 寫法，2026-08-29 wp-admin 無限重導事故根源，現役檔已修好用 `$http_x_forwarded_proto`，直接 rsync 才會帶到修復） | `lobster-phase1_{wordpress_data,wordpress_db_data,redis_data,loki_data,grafana_obs_data}` |
-| Oracle | `/opt/oracle/Projects/internal/ziwei-doushu/` | 無 |
+| Oracle | `/root/lobster-phase1/apps/oracle-web/`（`sg-deploy.sh oracle-web`；2026-11-20 前在 `/opt/oracle`） | 無 |
 | soulful | `/root/soulful/` | soulful 三容器之 volumes（`docker volume ls | grep soulful` 現查）|
 | 工具/備份腳本 | `/root/scripts/` `/root/Work/`（git clone，deploy key）`/root/backups*`（可不搬，R2 為準）| — |
 

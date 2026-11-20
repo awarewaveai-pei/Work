@@ -14,6 +14,7 @@
 #   sg-deploy.sh                 # deploy default apps (next-admin)
 #   sg-deploy.sh next-admin      # deploy specific apps
 #   sg-deploy.sh next-admin node-api wordpress
+#   sg-deploy.sh oracle-web      # oracle.aware-wave.com (Projects/internal/ziwei-doushu); not in the nightly auto-deploy
 #   sg-deploy.sh --skip-pull     # skip git pull (use whatever is currently in /root/Work)
 #   sg-deploy.sh --dry-run       # rsync -n; do not rebuild
 
@@ -32,6 +33,7 @@ GIT_APPS_ROOT="$REPO_DIR/lobster-factory/infra/hetzner-phase1-core/apps"
 app_git_source_root() {
   case "$1" in
     hci-app) echo "$REPO_DIR/Projects/internal/hci30" ;;
+    oracle-web) echo "$REPO_DIR/Projects/internal/ziwei-doushu" ;;
     *) echo "$GIT_APPS_ROOT/$1" ;;
   esac
 }
@@ -41,7 +43,7 @@ app_git_source_root() {
 # hci-postgres/hci-fetch-runner's own container_name: choices in the same file.
 app_container_name() {
   case "$1" in
-    hci-app) echo "hci-app" ;;
+    hci-app|oracle-web) echo "$1" ;;
     *) echo "lobster-$1" ;;
   esac
 }
@@ -101,7 +103,7 @@ echo $$ > "$LOCK_FILE"
 LOCK_HELD=1
 exec 8>&-
 trap 'if [ $LOCK_HELD -eq 1 ]; then rm -f "$LOCK_FILE"; fi' INT TERM
-# Outcome notification (video-workbench only; auto-deploy-next-admin.sh sends its own and sets SG_DEPLOY_NOTIFY=0).
+# Outcome notification (video-workbench and oracle-web; auto-deploy-next-admin.sh sends its own and sets SG_DEPLOY_NOTIFY=0).
 # DEPLOY_OUTCOME is set by the paths that know it (do_rollback, drill-mode smoke, success); anything else non-zero = FAIL.
 # 75 (refused on purpose), --dry-run and --help send nothing. A failed notify never changes the exit code.
 LAST_ERROR=""
@@ -109,7 +111,7 @@ DEPLOY_OUTCOME=""
 notify_result() {
   local rc="$1" outcome="$DEPLOY_OUTCOME" icon="❌" head
   [[ "${SG_DEPLOY_NOTIFY:-1}" != "0" && $DRY_RUN -eq 0 && "$rc" -ne 75 ]] || return 0
-  [[ " ${APPS[*]} " =~ " video-workbench " ]] || return 0
+  [[ " ${APPS[*]} " =~ " video-workbench " || " ${APPS[*]} " =~ " oracle-web " ]] || return 0
   if [[ "$rc" -eq 0 ]]; then [[ -n "$outcome" ]] || return 0
   elif [[ "$outcome" != "ROLLBACK" ]]; then outcome="FAIL"; fi
   case "$outcome" in SUCCESS) icon="✅" ;; SMOKE_WARN) icon="⚠️" ;; ROLLBACK) icon="🔴" ;; esac
@@ -143,7 +145,7 @@ RESTORABLE_APPS=()
 NON_RESTORABLE_APPS=()
 for _app in "${APPS[@]}"; do
   case "$_app" in
-    wordpress|node-api|next-admin|hci-app|renderer|video-workbench) RESTORABLE_APPS+=("$_app") ;;
+    wordpress|node-api|next-admin|hci-app|renderer|video-workbench|oracle-web) RESTORABLE_APPS+=("$_app") ;;
     *) NON_RESTORABLE_APPS+=("$_app") ;;
   esac
 done
@@ -321,6 +323,17 @@ if [[ " ${APPS[*]} " =~ " renderer " && $DRY_RUN -eq 0 ]]; then
   log "--- node --test gate (renderer) ---"
   node --test "$RENDERER_SRC/test/"*.test.mjs 2>&1 | tee -a "$LOG_FILE"     || fail "renderer unit tests FAILED -- deploy aborted"
   log "renderer gates passed"
+fi
+
+# 1.75. pre-build gate for oracle-web -- same three steps as next-admin's (npm ci = tree == lockfile, tsc, vitest);
+# same commands as .github/workflows/oracle-web-ci.yml.
+if [[ " ${APPS[*]} " =~ " oracle-web " && $DRY_RUN -eq 0 ]]; then
+  ORACLE_SRC="$(app_git_source_root oracle-web)"
+  log "--- npm ci / typecheck / test gate (oracle-web) ---"
+  npm --prefix "$ORACLE_SRC" ci --include=dev 2>&1 | tee -a "$LOG_FILE" || fail "npm ci failed for oracle-web -- deploy aborted"
+  npm --prefix "$ORACLE_SRC" run typecheck 2>&1 | tee -a "$LOG_FILE" || fail "oracle-web typecheck FAILED -- deploy aborted"
+  npm --prefix "$ORACLE_SRC" test 2>&1 | tee -a "$LOG_FILE" || fail "oracle-web tests FAILED -- deploy aborted"
+  log "oracle-web gates passed"
 fi
 
 # Every app must be a service of the staging compose BEFORE anything is rsynced: an app run by its
@@ -641,6 +654,16 @@ if [[ " ${APPS[*]} " =~ " renderer " ]]; then
 ' "$renderer_secret"     | curl -s --max-time 90 --config - -X POST -H "content-type: application/json"       --data '{"url":"https://example.com/"}'       "http://127.0.0.1:${renderer_port}/snapshot" 2>/dev/null | grep -F '"ok":true' | grep -cF '"failureCode":null' || true)
   if [[ "$snap_ok" -ge 1 ]]; then log "  smoke OK: renderer real snapshot (example.com up)"
   else log "  SMOKE_WARN: renderer real snapshot failed or example.com not up"; _smoke_errors=$((_smoke_errors + 1)); fi
+fi
+
+# oracle-web: the app on its published port, one rendered page, and the public vhost through the local nginx
+# (--resolve, never leaves the box; 2026-08-29 this domain answered 200 from the wrong vhost for months).
+if [[ " ${APPS[*]} " =~ " oracle-web " ]]; then
+  oracle_port=$(docker port oracle-web 3000/tcp 2>/dev/null | head -1 | sed 's/.*://')
+  oracle_port="${oracle_port:-3010}"
+  _smoke_check "oracle-web health" "http://127.0.0.1:${oracle_port}/api/health"
+  _smoke_check "oracle-web /zh-TW" "http://127.0.0.1:${oracle_port}/zh-TW"
+  _smoke_check "nginx/oracle"      "https://oracle.aware-wave.com/api/health" "" "oracle.aware-wave.com"
 fi
 
 # video-workbench (P6 L6): public door through the local nginx (--resolve, never leaves the box). /healthz and /login are

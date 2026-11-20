@@ -1,4 +1,4 @@
-# 紫微生態系 — Next.js 16 standalone 多階段映像(供新 EU 機 eu-deploy)。
+# oracle-web (oracle.aware-wave.com) -- Next.js 16 standalone, built by sg-deploy.sh from the staged copy in apps/oracle-web.
 # 三階段:deps(裝依賴)→ builder(build)→ runner(最小 runtime)。
 
 FROM node:22-alpine AS deps

@@ -1,34 +1,30 @@
 # Oracle 部署（oracle.aware-wave.com，ks-aw-01）
 
-主機與 SSH 見 `agency-os/AGENTS.md` §0（登入帳號 `ubuntu`，指令加 `sudo -n`）。部署屬 High，需操作者同意。舊 SG 主機的首次架站步驟在 git 歷史（`deploy/DEPLOY-SG.md`，2026-11-20 前）。
+oracle 是 `sg-deploy.sh` 的一個 app：`oracle-web`。主機與 SSH 見 `agency-os/AGENTS.md` §0（登入 `ubuntu`，指令加 `sudo -n`）。部署屬 High，需操作者同意。
 
-## 主機現況（2026-11-20 實查）
-- 目錄 `/opt/oracle/Projects/internal/ziwei-doushu/`：**不是 git 目錄**，由部署腳本 rsync 寫入。
-- 機器本地檔（不進 git、部署不覆蓋）：`.env.production`（600；`OPENAI_API_KEY`、`OPENAI_MODEL_DEEP`）、`docker-compose.override.yml`（`env_file`）、`docker-compose.yml`。
-- 容器 `oracle-web`，`127.0.0.1:3010` → host nginx vhost `oracle.aware-wave.com`。
-- 不在 `sg-deploy.sh` 的 app 清單，也沒有夜間自動部署：推上 `main` 不會上線。
-
-## 部署（一條指令，脫離 SSH 執行）
+## 部署
 ```bash
-ssh -p 58122 ubuntu@145.239.195.47 'sudo -n bash -c "git -C /root/Work fetch -q origin main && git -C /root/Work show origin/main:Projects/internal/ziwei-doushu/deploy/oracle-deploy.sh > /tmp/oracle-deploy.run.sh && setsid nohup bash /tmp/oracle-deploy.run.sh > /tmp/oracle-deploy.out 2>&1 < /dev/null &"'
+/root/lobster-phase1/scripts/sg-deploy.sh oracle-web
 ```
-- SSH 會掛到逾時才回，屬正常；用 `sudo tail /tmp/oracle-deploy.out` 看進度，結尾 `deployed commit=<sha>` 即成功。
-- 先試跑不改動：把腳本從本機餵進去 `ssh … 'sudo -n bash -s -- --dry-run' < deploy/oracle-deploy.sh`。
-- 流程、不變量與回滾寫在 `deploy/oracle-deploy.sh` 檔頭。失敗會自動還原並經 `notify.sh` 通知；備份在 `/opt/oracle/backups/src-*.tgz`（留 5 份）與映像 `oracle-web:rollback`。
-- 記錄：`/opt/oracle/logs/oracle-deploy-*.log`。
+- 流程（CI 閘 → `npm ci`／tsc／vitest → 快照 → build → up → healthy → smoke → 失敗自動還原）與旗標見 `lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh` 與 `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`。
+- **不在每晚 03:00 自動部署內**：推上 `main` 不會上線，要手動跑上面那行。
+- CI：`.github/workflows/oracle-web-ci.yml`（`check-ci-green.sh` 的 `app_workflows` 對照）。CI 未綠會被拒絕。
+- 回滾：`/root/lobster-phase1/scripts/rollback-phase1.sh restore oracle-web`。
+
+## 主機上的位置
+- 原始碼（rsync 目的地）：`/root/lobster-phase1/apps/oracle-web/`；來源 `Projects/internal/ziwei-doushu/`（`sg-deploy.sh` `app_git_source_root`）。
+- 容器設定：`/root/lobster-phase1/docker-compose.yml` 的 `oracle-web` 服務（機器本地；repo 對照檔 `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`）。改它用 `safe-infra-patch.sh compose`。
+- 金鑰：`/root/lobster-phase1/apps/oracle-web/.env.production`（600；`OPENAI_API_KEY`、`OPENAI_MODEL_DEEP`）。不進 git、rsync 不動、不進映像（`.dockerignore`）。
+- 對外：host nginx vhost → `127.0.0.1:3010`；`lobster-nginx` 以 `oracle-web:3000` 走 `lobster-net`（容器名不可改）。範本 `deploy/nginx/oracle.aware-wave.com.conf`。
 
 ## 上線後驗證（從外部）
 ```bash
-curl -s https://oracle.aware-wave.com/zh-TW | grep -o '<title>[^<]*'          # 東西方命理
+curl -s https://oracle.aware-wave.com/zh-TW | grep -o '<title>[^<]*'            # 東西方命理
 curl -s https://oracle.aware-wave.com/sitemap.xml | grep -c 'oracle.aware-wave' # = 頁數×語言
 ```
 AI 解讀：`POST /api/interpret`，body `{ tier: "light", context: { systemId, locale, headline, facts[] } }`，每個 `SYSTEM_IDS` 各打一次應回 200 與 `text`。
 
-## 改容器設定或 nginx
-- `docker-compose.yml`：repo 與主機不同時部署腳本會停；用 `/root/lobster-phase1/scripts/safe-infra-patch.sh` 改主機那份。
-- nginx vhost 範本：`deploy/nginx/oracle.aware-wave.com.conf`；主機上改用 `safe-infra-patch.sh host-nginx`。
-
 ## 注意
 - `NEXT_PUBLIC_*` 在 build 時內嵌；網域預設值在 `lib/site.ts`。
-- `.dockerignore` 排除 `.env*`：金鑰只在執行期由 compose `env_file` 注入。
 - 付費牆：`/api/interpret` 的 `premium` 回 402；`light`／`deep` 放行；每日次數計量未接。
+- 歷史：2026-11-20 前在 `/opt/oracle` 以獨立 compose 執行（`deploy/DEPLOY-SG.md`、`deploy/oracle-deploy.sh` 見 git 歷史）。
