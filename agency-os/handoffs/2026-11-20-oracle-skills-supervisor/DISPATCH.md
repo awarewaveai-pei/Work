@@ -19,7 +19,7 @@
 | 2 | M1 | 新系統 奇門遁甲（黃金案例對盤） | Opus 5.5 | main `736c8ea7c` |
 | 2 | — | 監工整合＋critic 一條 | — | main `55c8d5c2a` `de4700215` `4eb025456` |
 | 3 | Z1 | 擇日＋八字／風水頁口徑標示 | Opus 5.5 | main `ee1635c6f` `32b1437a9` |
-| — | 部署 | `deploy/oracle-deploy.sh`（`a1750a505`）；ks-aw-01 上線 `043693fa9`（2026-11-20 07:48Z） | — | 線上 |
+| — | 部署 | `sg-deploy.sh oracle-web`（`c5b2091fd`）；ks-aw-01 上線 `4adb301f3`（2026-11-20 12:34Z） | — | 線上 |
 
 整合方式：detached worktree `D:\Worktrees\Work\oracle-int`（cherry-pick → 解衝突 → `npm ci` → tsc＋全套 vitest → `.claude/launch.json` 的 `oracle-int` 預覽實看）→ rebase 到 `main` → `git merge --ff-only`。批 2 併入順序：S1 先，其餘在它之後（Q1、M1 的 `SystemId`／`FRAMING` 行照 S1 的新寫法併）。
 
@@ -91,12 +91,9 @@ brief 在 `briefs/`（`COMMON.md`＋各卡）。
 | Z1 | 節氣名未併入共用簡→繁表（谷／穀一對多） | 正確判斷，維持整詞表 |
 | 全部 | AI 解讀未對真實模型跑 | 已處理：線上七系統 light 各一次皆 200 有文 |
 
-## 待辦：D1 oracle 併進 `sg-deploy.sh`（等部署工具修完；操作者 2026-11-20：「部署工具現在在修理中」）
-`deploy/oracle-deploy.sh` 是暫行路徑，不是最佳解：重做了 `sg-deploy.sh` 已有的鎖／`DEPLOY_HOLD`／回滾／通知，且 `rollback()` 未實際觸發過。前例 hci-app（同為 `Projects/internal/` 產品）已在 `sg-deploy.sh`。
-- 開工條件：操作者說部署工具修好。**在那之前不碰** `lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh`、`rollback-phase1.sh`、主機 `/root/lobster-phase1/docker-compose.yml`。
-- 要做：`sg-deploy.sh:32-37` `app_git_source_root`、`:42-47` `app_container_name`、`:146` RESTORABLE 清單各加 oracle；仿 `:276-287` 加 gate（`npm ci`＋`tsc`＋`vitest`）；`rollback-phase1.sh:36-43` `IMAGE_MAP` 加一列；主機 compose 以 `safe-infra-patch.sh` 加 `oracle-web` 服務（仿 repo `docker-compose.yml:803` hci-app 段）；原始碼與 `.env.production` 由 `/opt/oracle` 搬到 `/root/lobster-phase1/apps/`；`AGENTS_APPENDIX.md:241-253` 七項逐項對。
-- 刪除：`deploy/oracle-deploy.sh`、主機 `/opt/oracle`（含 `backups/`、`logs/`）、oracle 自己的 `docker-compose.yml`／override；`deploy/DEPLOY.md` 改寫。
-- High：動主機容器設定並重建 `oracle-web`，做之前再問操作者一次。
+## D1 oracle 併進 `sg-deploy.sh` — 完成（2026-11-20，`c5b2091fd`；上線 `4adb301f3`）
+oracle 是 `sg-deploy.sh` 的 app `oracle-web`（`Projects/internal/ziwei-doushu/deploy/DEPLOY.md`）。`oracle-deploy.sh`、產品自己的 compose、主機 `/opt/oracle` 已刪。細節與證據：`agency-os/WORKLOG.md` 2026-11-20 同名條目。
+未決：`products.ts` 是否加 oracle 一列（操作者決定）。
 
 ## 現況
 五個外部 skill 的內容全部上線。未排入：紫微夫妻宮／桃花運（yinyuan）、城市五行地圖（fengshui）、每日次數計量與帳號金流（`ORACLE_ROADMAP.md` Phase A）。工人 session 四個皆 idle，可封存。

@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-20（續23）— oracle 併進 `sg-deploy.sh`、刪 `oracle-deploy.sh`；連同主系統／工作台／Remotion R5 一次部署 `4adb301f3`；上線檢查的 nginx 位址窗口修正（操作者：「修好了，開始做」「其他sessions的 你一起部署」）
+
+- 根因：
+  - C1 續17 另寫的 `oracle-deploy.sh` 重做了 `sg-deploy.sh` 已有的鎖／`DEPLOY_HOLD`／閘／回滾／通知，且未先整檔讀既有腳本；前例 hci-app 已示範 `Projects/internal/` 產品如何併入（`sg-deploy.sh` `app_git_source_root`／`app_container_name`）。
+  - C2 第一次三 app 部署被自動回滾：`sg-deploy.sh` smoke 在 `up` 後 16 秒打 `video.aware-wave.com/healthz` → 502 一次（之後每次 200，無任何改動）。`nginx/default.conf:103-109` upstream `resolve`＋`valid=10s`（server 區 30s）仍指向剛被換掉的容器位址；同一次 `up` 多了 oracle-web，位址次序改變。log：主機 `logs/deploy-d1-r5-20261120.log:2948`。
+- 做法：
+  - `c5b2091fd`：`sg-deploy.sh` 加 oracle-web（來源根、容器名、步驟 1.75 `npm ci`／tsc／vitest、RESTORABLE、結果通知、三個 smoke）；`rollback-phase1.sh` `IMAGE_MAP`；`check-ci-green.sh` `app_workflows`＋`.github/workflows/oracle-web-ci.yml`；`docker-compose.yml` `oracle-web` 服務；`check-compose-invariants.py` `REPO_CONTEXT`；刪 `Projects/internal/ziwei-doushu/deploy/oracle-deploy.sh`、`Projects/internal/ziwei-doushu/docker-compose.yml`；`deploy/DEPLOY.md`、`DEPLOY_ROLLBACK_RUNBOOK.md`、`KS-AW-01-HOST-SWITCH-RUNBOOK.md` 改現況。
+  - `4adb301f3`：smoke 兩個 helper 在共用的 30 秒窗口內重問；不變量＝探針判的是 nginx 解析窗口之後的狀態，持續失敗者仍失敗（最多晚 30 秒）。
+  - 主機一次性腳本（已刪）：Remotion `docker build`＋`safe-infra-patch.sh compose /root/render-services/docker-compose.yml lobster-remotion-service`（`rollback-r5` 保留）→ oracle 原始碼與 `.env.production` 複製到 `/root/lobster-phase1/apps/oracle-web/`、先 `compose config` 預檢、`compose rm -sf` 舊容器、`safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml oracle-web`（停機 8 秒，12:17:02–12:17:10Z）→ `sg-deploy.sh next-admin video-workbench oracle-web`。
+  - 主機清理：`/opt/oracle`（原始碼、logs、含金鑰的備份 tgz）刪除（先 `cmp` 兩處 `.env.production` 相同）；映像 `oracle-web:latest`、`:rollback` 移除。
+- REALTEST_EVIDENCE: tool=SSH | cmd=/root/lobster-phase1/scripts/sg-deploy.sh next-admin video-workbench oracle-web（`logs/deploy-d1-r5b-20261120.log`）→ `ci-gate: OK -- 4 workflow(s) green for 4adb301f3`、`oracle-web gates passed`、smoke 11/11 OK、`deployed commit: 4adb301f3`；外部 curl oracle `/zh-TW`、`/zh-TW/zeri`、`/en/qimen` 200 且標題正確、sitemap 24 筆、`video.aware-wave.com/healthz` 200、`app.aware-wave.com/login` 200；`docker exec oracle-web printenv OPENAI_MODEL_DEEP` 有值；oracle-web label project=`lobster-phase1` | exit=0 | ms=285000
+- REVIEW_DONE: critic=Deep | verdict=fail | findings=1c/2m/6n — repo diff 0 條；主機腳本 9 條全修後才執行（C：全域 `umask 077` 會讓工作台 `.awarewave/` 變 0700、容器讀不到；M：還原未驗證卻回報已還原；M：先停站才驗新設定）。smoke 修正另以 stub curl 實跑四情境。
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02；critic agent 審
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/ziwei-doushu,.github,runbooks | grep=oracle-deploy | hits=12（`deploy/DEPLOY.md` 歷史註記 1、`WORKLOG.md` 本日條目 9、本線 `DISPATCH.md` 2；皆記錄文字，無呼叫點）
+- 續20 的待驗項已見：主機部署 log 有 `--- CI gate ---` 與四行 `ci-gate: … green`。
+- 未做／剩餘風險：
+  - R5「放棄等待時取消渲染」在 Linux 的實際效果未在正式機試（影片線的待辦，`agency-os/handoffs/2026-11-16-video-unify-supervisor/data.mjs` R5）。
+  - oracle 無 `products.ts` 登記列（`AGENTS_APPENDIX.md` 新部署路徑清單第 7 項），待操作者決定。
+  - C2 的 502 成因為推定（位址解析窗口）；證據＝僅走 upstream 的探針失敗、容器 healthy、其後連續 200。
+- 避免再發：新增可部署服務先整檔讀 `sg-deploy.sh`，照 hci-app／oracle-web 加 case，不另寫部署腳本。
+- rollback：`rollback-phase1.sh restore oracle-web`（或 next-admin／video-workbench）；Remotion `docker tag lobster-remotion-service:rollback-r5 lobster-remotion-service:local` 後 compose up；主機 compose 備份 `/root/lobster-phase1/docker-compose.yml.bak.safe-patch-20261120-1217*`。
 ## 2026-11-20（續22）— AI 修圖晚到不再蓋掉較新的圖（續21 剩餘風險 m1；操作者：「去處理」）
 
 [根因] `ImageEditPromptPanel` 的結果數秒後才到，呼叫的是按下時那次 render 的 `onEditedImage`；Mockup 平拍與 Studio 工作台都直接寫進畫面（Studio 還按 `activeIdx` 寫），不管那張圖期間已被 PhotoCraft 傳回、再合成或換設計換掉 → 已接受的修圖被無聲蓋掉。Mockup 另有：存 My Designs 途中圖被換，存完仍標「已存」。Tarot 不在此類（AI 修圖與傳回都另存圖庫）。
