@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-20（續6）— Soulful 改成可自動發布（操作者：「Soulful 維持人工審核(不是有設AI會自動審核內容?)>要可自動發布」）
+
+- 決定變更：監工 2026-11-19 的待決 11「Soulful 維持人工審核」作廢，操作者要 Soulful 可自動發布。
+- 改前查證（只讀）：Soulful 站 `401c0f67-f7bc-4731-9147-195096775b15` `content_defaults` 無 `publishMode`（＝人工審核）、`requiredBlocks` 0 段、`marketing.forbiddenClaims` 空；沒有 `content_pipeline` 排程列。也就是「AI 審核」對 Soulful 目前只有通用檢查，沒有任何 Soulful 專屬的把關。
+- 動作（正式站網站設定頁，操作者 session）：(1) 填一段每篇必附段落並儲存——內容取自 `agency-os/tenants/company-soulful-expression/sites/soulfulexpression-org/content/CONTENT_STRATEGY.md:19-21`（不是臨床 art therapy；每篇附 disclaimer＋台灣危機專線 1925／1995）；(2) 發布方式按「AI 審核後自動發布」→「確定自動發布」。
+- 讀回：`publishMode = ai_review_auto`；`requiredBlocks` = 1 段（英文，含 1925 安心專線、1995 生命線）；AwareWave 未變（仍人工審核）。
+- 現況與未做：Soulful 的自動內容管線排程未開，現在不會自己做題也不會自己發；「禁用說法」（cure／heal illness／treat／diagnose／guaranteed results／保證，同檔 :20）尚未填，AI 審核不會擋這些字——等操作者決定；必附段落的用字是監工依文件擬的，操作者可改。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql … select content_defaults->>'publishMode', content_defaults->'requiredBlocks' from wp_sites …` | exit=0 | ms=4000
+- REVIEW_WAIVED: NA -- 正式站設定變更，沒有程式改動
+- BUGHUNT_WAIVED: NA -- 沒有程式改動
+- rollback：網站設定頁把 Soulful 發布方式按回「人工審核」；必附段落清空後儲存。
 ## 2026-11-20（續5）— 影片下一階段：Instagram 那一項重發成功，第一則真發布實測全數完成（操作者「重發」）
 
 - 重發前唯讀查證（線 C 工人，未改程式與資料）：存檔只動文案或格式真的變了的 target（`lobster-factory/packages/db/migrations/0105_social_v16.sql:510-514`）；派送只送 pending 與「失敗時間早於這次重新排程」的 error（`lib/social/dispatch.ts:305-315`），published 不會退回（`0100_social_dispatch.sql:20`、`:195`；測試 `dispatch.test.ts:153-156`）。

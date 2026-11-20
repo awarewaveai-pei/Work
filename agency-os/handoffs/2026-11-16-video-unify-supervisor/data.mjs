@@ -271,7 +271,7 @@ export const OPEN = [
   { n: 8, what: '已定（2026-11-19）：提案過了排定日七天自動退回並寫原因；已審核的題目三天沒人按就在每天早上的排程報告標紅，不會自動發。原題：現在不會過期，清單裡還有上個月沒處理的提案。', before: '批1', src: 'NEXT-PHASE-PLAN-20261119.md §11 O2' },
   { n: 9, what: '已定（2026-11-19）：會員信每週一封，寄出一律由人在 FluentCRM 按，系統不會自己寄。每週的排程本身就是頻率上限，所以原本的「名單人數與頻率上限」那張卡不做，外掛也不用發新版。原題：每天一支影片就每天一封，容易被退訂。', before: '批3', src: 'NEXT-PHASE-PLAN-20261119.md §11 O3；WP_BRIDGE_CONTROL_PLANE_DESIGN.md:95；NA/lib/schedules/jobs.ts:43-52' },
   { n: 10, what: '已定（2026-11-19，你說只用 Soulful 和 AwareWave）：不另設測試網站。驗收就是 AwareWave 第一則真的發布：一個你核准過的真題目，按「發布」發出去，YouTube 先設成不公開；你看過沒問題，再改成公開。你要做的只有一件：那一則要發布的當下說 go。之後何時把 aware-wave.com 切成自動發布，也由你決定。', before: '批1', src: 'NEXT-PHASE-PLAN-20261119.md §11 O4' },
-  { n: 11, what: '已定（2026-11-19）：AwareWave 先開每日自動；Soulful 維持人工審核，不開自動發布。原因：Soulful 的內容不能寫療效，每篇要附免責聲明和危機專線。', before: '批2', src: 'NEXT-PHASE-PLAN-20261119.md §11 O5；CONTENT_STRATEGY.md:19-21' },
+  { n: 11, what: '改定（你 2026-11-20：Soulful 要可自動發布）：Soulful 的發布方式已改成「AI 審核後自動發布」，並填了一段每篇必附段落（非臨床藝術治療、非醫療建議，危機時撥 1925 安心專線或 1995 生命線），文章少了這段審核不會過。Soulful 的「自動內容管線」排程還沒開，所以現在不會自己做題目、也不會自己發；要開始跑，到排程頁打開它。還沒做：Soulful 的「禁用說法」清單是空的，AI 審核目前不會擋 cure、treat、diagnose、guaranteed、保證這類字；要不要照 Soulful 內容規範填進去等你說。原定（2026-11-19）是 Soulful 維持人工審核。', before: '批2', src: 'NEXT-PHASE-PLAN-20261119.md §11 O5；CONTENT_STRATEGY.md:19-21' },
   { n: 12, what: '已定（2026-11-19）：每題花費上限 NT$15、每天一題、熱搜相關性門檻七十分。實測一題含文章約 NT$10.2，上限留五成餘裕；每個品牌每月約 NT$310 以內。', before: '批0', src: 'NEXT-PHASE-PLAN-20261119.md §11 O6、§9' },
   { n: 13, what: '已定（2026-11-19）：YouTube 預設公開，改成每個網站可以設定公開或不公開（現在程式寫死公開）。實測要用不公開，所以一定要能改。', before: '批1', src: 'NEXT-PHASE-PLAN-20261119.md §11 O7；NA/lib/social/compose.ts:60' },
 ];
