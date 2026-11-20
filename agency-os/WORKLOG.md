@@ -8,12 +8,13 @@
   - `modelLibrary.ts` `asJpeg`：生成照轉同尺寸 JPEG q0.92（無 canvas → 原圖）；`readJson` 413 → 「圖太大」。
   - `ModelLibraryStudio.tsx` 生成結果經 `asJpeg`；兩處儲存改用 `readJson`。
   - `TarotStudio.tsx:184` 過時的「10MB」註解改指 `MAX_REF_CHARS`。
-  - `nginx/default.conf` video 門 `location /`（轉 next-admin）加 `client_max_body_size 50M`（原繼承 server 層 500M）；測試改為「所有轉 next-admin 的 location 實際上限最大值 = Next 上限」（critic m1）。repo 改動，prod 需 `safe-infra-patch.sh` 套用（High，待操作者）。
+  - `nginx/default.conf` video 門 `location /`（轉 next-admin）加 `client_max_body_size 50M`（原繼承 server 層 500M）；測試改為「所有轉 next-admin 的 location 實際上限最大值 = Next 上限」（critic m1）。prod 已套用（操作者「好，套用」）：`safe-infra-patch.sh nginx`，prod 檔與 repo 只差此一行，備份 `default.conf.bak.safe-patch-20261120-034237`。
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/__tests__/request-body-limit.test.ts "app/(shell)/tools/mockup/__tests__/model-flow.render.test.tsx" → 11 passed；tsc --noEmit 除既有 .next/types 殘檔外 0 錯；瀏覽器實跑 asJpeg 於真實模特兒圖 2048×2048：9547558 → 1404643 字元、182ms | exit=0 | ms=1820
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（m1 已修：video 門缺口；修前新測試紅、修後綠）
 - ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02（scripts/oracle-quota.ps1 exit 3）；書面自審＋突變：next.config 改 "10mb" → request-body-limit 測試紅（expected 10485760 to be 52428800），還原 → 綠。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=10MB request-body | hits=1（TarotStudio.tsx:184 已改）
-- 剩餘：今晚 03:00 自動部署前，prod 仍是 10MB；操作者畫面上未存的 2 張需等上線後再按儲存（未關分頁才在）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -H 'Host: video.aware-wave.com' --data-binary 60MB/1MB http://127.0.0.1:8083/api/tools/presets → 413 / 404（過 nginx 到 next-admin）；video /healthz 200、app /login 200 | exit=0 | ms=4000
+- 剩餘：今晚 03:00 自動部署前，next-admin 仍是 10MB；操作者畫面上未存的 2 張需等上線後再按儲存（未關分頁才在）。
 - rollback：還原本 commit。
 ## 2026-11-20（續11）— Mockup 主頁「免費預覽」改名「程式免費印」（操作者：「『免費預覽』改成『程式免費印』」）
 
