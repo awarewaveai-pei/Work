@@ -2,8 +2,8 @@
 # 容器僅在 docker 網路內 expose 8732；對外由 EU nginx 終止 TLS 的子網域反代過來，
 # 並要求 X-Render-Token（= RENDER_AUTH_TOKEN）。render 產出上傳 R2 → 回 public URL。
 #
-# 部署（EU）：
-#   docker compose -f docker-compose.video.yml --env-file .env.video up -d --build
+# 部署：主機上 `sg-deploy.sh video-service`（compose 檔／env-file 只寫在 scripts/own-compose-apps.sh；
+#   手打 compose 漏 --env-file .env.video 會起不來，2026-11-20 事故）。主機這份檔不被 rsync，改動走 safe-infra-patch.sh。
 # .env.video 需含：RENDER_AUTH_TOKEN / R2_API_TOKEN / R2_ACCOUNT_ID /
 #   R2_VIDEO_BUCKET / R2_VIDEO_PUBLIC_BASE（皆非提交；見 runbook）。
 

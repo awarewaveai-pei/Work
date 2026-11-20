@@ -17,6 +17,8 @@
 #   sg-deploy.sh oracle-web      # oracle.aware-wave.com (Projects/internal/ziwei-doushu); not in the nightly auto-deploy
 #   sg-deploy.sh --skip-pull     # skip git pull (use whatever is currently in /root/Work)
 #   sg-deploy.sh --dry-run       # rsync -n; do not rebuild
+#   sg-deploy.sh video-service     # an app with its OWN compose file (own-compose-apps.sh lists them) is deployed
+#   sg-deploy.sh remotion-service  # alone, same gates: build, tests inside the new image, healthy, smoke, auto-rollback
 
 set -euo pipefail
 
@@ -103,15 +105,16 @@ echo $$ > "$LOCK_FILE"
 LOCK_HELD=1
 exec 8>&-
 trap 'if [ $LOCK_HELD -eq 1 ]; then rm -f "$LOCK_FILE"; fi' INT TERM
-# Outcome notification (video-workbench and oracle-web; auto-deploy-next-admin.sh sends its own and sets SG_DEPLOY_NOTIFY=0).
+# Outcome notification (video-workbench, oracle-web and own-compose apps; auto-deploy-next-admin.sh sends its own and sets SG_DEPLOY_NOTIFY=0).
 # DEPLOY_OUTCOME is set by the paths that know it (do_rollback, drill-mode smoke, success); anything else non-zero = FAIL.
 # 75 (refused on purpose), --dry-run and --help send nothing. A failed notify never changes the exit code.
 LAST_ERROR=""
 DEPLOY_OUTCOME=""
+OWN_APP=""   # set below when the one app of this run has its own compose file
 notify_result() {
   local rc="$1" outcome="$DEPLOY_OUTCOME" icon="❌" head
   [[ "${SG_DEPLOY_NOTIFY:-1}" != "0" && $DRY_RUN -eq 0 && "$rc" -ne 75 ]] || return 0
-  [[ " ${APPS[*]} " =~ " video-workbench " || " ${APPS[*]} " =~ " oracle-web " ]] || return 0
+  [[ " ${APPS[*]} " =~ " video-workbench " || " ${APPS[*]} " =~ " oracle-web " || -n "$OWN_APP" ]] || return 0
   if [[ "$rc" -eq 0 ]]; then [[ -n "$outcome" ]] || return 0
   elif [[ "$outcome" != "ROLLBACK" ]]; then outcome="FAIL"; fi
   case "$outcome" in SUCCESS) icon="✅" ;; SMOKE_WARN) icon="⚠️" ;; ROLLBACK) icon="🔴" ;; esac
@@ -141,9 +144,17 @@ fi
 # $0-relative path pointed at /root/Work/scripts/ -- the -x check failed and auto-rollback was
 # silently disabled on every such run (WORKLOG 2026-09-19 續81; logs show it since 2026-07-04).
 ROLLBACK_SCRIPT="$(dirname "$SELF_PATH")/rollback-phase1.sh"
+# Apps with their own compose file: the spec (compose file, project, env file, tests) lives only in own-compose-apps.sh,
+# which rollback-phase1.sh reads too. Deployed one per run, never mixed with staging-compose apps.
+# shellcheck source=own-compose-apps.sh
+source "$(dirname "$SELF_PATH")/own-compose-apps.sh"
 RESTORABLE_APPS=()
 NON_RESTORABLE_APPS=()
 for _app in "${APPS[@]}"; do
+  if own_compose_spec "$_app"; then
+    [[ ${#APPS[@]} -eq 1 ]] || fail "$_app has its own compose file -- deploy it alone (sg-deploy.sh $_app), not with: ${APPS[*]}"
+    OWN_APP="$_app"; RESTORABLE_APPS+=("$_app"); continue
+  fi
   case "$_app" in
     wordpress|node-api|next-admin|hci-app|renderer|video-workbench|oracle-web) RESTORABLE_APPS+=("$_app") ;;
     *) NON_RESTORABLE_APPS+=("$_app") ;;
@@ -256,6 +267,160 @@ rm -f "$_ci_out"
 if [[ $_ci_rc -eq 1 && $DRY_RUN -eq 1 ]]; then log "dry-run: the CI gate would refuse this deploy"
 elif [[ $_ci_rc -eq 1 ]]; then log "CI gate: not green, CI_GATE_OVERRIDE=1 set -- continuing"
 elif [[ $_ci_rc -ne 0 ]]; then log "CI gate could not ask GitHub (exit $_ci_rc) -- continuing, the gates below decide"
+fi
+
+# Shared by both deploy paths below. SNAPSHOT_TAG[app] = this run's tag (2.5 has the rules); PREVIOUS_COMMIT = the
+# staging path's .deployed-commit before this run (step 5; stays empty for an own-compose app, which never writes it).
+declare -A SNAPSHOT_TAG=()
+PREVIOUS_COMMIT=""
+snapshot_restorable_apps() {
+  [[ ${#RESTORABLE_APPS[@]} -gt 0 ]] || return 0
+  [[ -x "$ROLLBACK_SCRIPT" ]] \
+    || fail "$ROLLBACK_SCRIPT not executable -- refusing to deploy ${RESTORABLE_APPS[*]} without auto-rollback"
+  log "--- snapshot before build (rollback prep) ---"
+  for APP in "${RESTORABLE_APPS[@]}"; do
+    if ! _save_out=$("$ROLLBACK_SCRIPT" save "$APP" 2>&1); then
+      printf '%s\n' "$_save_out" | tee -a "$LOG_FILE"
+      fail "snapshot save for $APP failed -- refusing to deploy without a rollback point"
+    fi
+    printf '%s\n' "$_save_out" | tee -a "$LOG_FILE"
+    SNAPSHOT_TAG[$APP]=$(printf '%s\n' "$_save_out" | sed -n 's/^Saved: [^:]*:\(rollback-[0-9-]*\)$/\1/p' | tail -1)
+    # Empty tag is accepted ONLY for an explicit first deploy; anything else (e.g. save's
+    # tag format changed) must not quietly become "nothing to restore" at rollback time.
+    if [[ -z "${SNAPSHOT_TAG[$APP]}" ]] && ! grep -qx 'Saved: NONE' <<< "$_save_out"; then
+      fail "cannot parse snapshot tag for $APP from save output -- refusing to deploy without a rollback point"
+    fi
+  done
+}
+
+# Auto-rollback: ONE path for every post-`up` failure (health in step 6, smoke in step 7).
+# Before 2026-09-19 only smoke failure rolled back; an unhealthy/crash-looping new container
+# (the most common failed-deploy shape) was left running with .deployed-commit advanced.
+# Restores each restorable app to SNAPSHOT_TAG from this run, reverts .deployed-commit,
+# always exits non-zero. AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false (drill mode) skips it.
+rollback_enabled() { [[ "${AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL:-true}" == "true" ]]; }
+do_rollback() {
+  local reason="$1" smoke_errors="${2:-0}" failures=0 app tag
+  DEPLOY_OUTCOME="ROLLBACK"
+  log "--- AUTO-ROLLBACK triggered: $reason ---"
+  [[ ${#RESTORABLE_APPS[@]} -gt 0 ]] || fail "$reason; no restorable apps in this deploy, cannot auto-rollback"
+  for app in "${RESTORABLE_APPS[@]}"; do
+    tag="${SNAPSHOT_TAG[$app]:-}"
+    if [[ -z "$tag" ]]; then
+      log "ROLLBACK_FAILED for $app -- no snapshot from this run (first deploy of $app, nothing to restore)"
+      failures=$((failures + 1)); continue
+    fi
+    log "rolling back $app to $tag..."
+    if ! "$ROLLBACK_SCRIPT" restore "$app" "$tag" 2>&1 | tee -a "$LOG_FILE"; then
+      log "ROLLBACK_FAILED for $app -- manual intervention required"
+      failures=$((failures + 1))
+    fi
+  done
+  if [[ -n "$PREVIOUS_COMMIT" ]]; then
+    echo "$PREVIOUS_COMMIT" > "$STAGING_DIR/.deployed-commit"
+    log ".deployed-commit reverted to $PREVIOUS_COMMIT (pre-rollback state)"
+  fi
+  printf 'ROLLBACK|smoke_errors=%d|rollback_failures=%d|%s|reason=%s\n' \
+    "$smoke_errors" "$failures" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$reason" \
+    > "$STAGING_DIR/.rollback-triggered"
+  if [[ "$failures" -gt 0 ]]; then
+    fail "auto-rollback fired ($reason) but $failures app(s) failed to restore; URGENT manual check required"
+  fi
+  fail "auto-rollback fired ($reason); new code reverted to this run's pre-deploy snapshot"
+}
+health_fail() {
+  rollback_enabled && do_rollback "$1"
+  fail "$1"
+}
+
+# 2-own. An app with its own compose file (OWN_APP; spec in own-compose-apps.sh). Same gates as the staging path:
+#   label check -> source -> snapshot -> build -> tests inside the new image -> up with the spec's compose + env file
+#   -> healthy -> HTTP smoke. A failure before `up` leaves the running container untouched; any failure after it
+#   restores this run's snapshot through rollback-phase1.sh, which starts it with the same spec.
+if [[ -n "$OWN_APP" ]]; then
+  own_compose_spec "$OWN_APP"
+  log "--- $OWN_APP: $OC_DIR/$OC_FILE project=$OC_PROJECT service=$OC_SERVICE env-file=${OC_ENV_FILE:-none (env_file: inside the compose file)} ---"
+  # Refusals before anything changes (own-compose-apps.sh has the rules): the container was started by another compose
+  # invocation, or compose as the spec runs it would not start $OC_IMAGE_REPO:local with its required variables set
+  # (the 2026-11-20 outage: no env file -> empty RENDER_AUTH_TOKEN).
+  for _chk in own_compose_check_labels own_compose_preflight; do
+    if ! _oc_out="$("$_chk" 2>&1)"; then
+      printf '%s\n' "$_oc_out" | tee -a "$LOG_FILE"
+      fail "$OWN_APP: $_chk refused (above) -- fix the spec or the host; nothing was changed"
+    fi
+    log "$_oc_out"
+  done
+
+  OC_BUILD_CTX="$REPO_DIR/$OC_SRC"
+  [[ -d "$OC_BUILD_CTX" ]] || fail "source not found: $OC_BUILD_CTX"
+  if [[ -n "$OC_SYNC_DIR" ]]; then
+    [[ -d "$OC_SYNC_DIR" ]] || fail "sync target not found: $OC_SYNC_DIR"
+    log "--- rsync $OWN_APP -> $OC_SYNC_DIR ---"
+    # Machine-local files stay: every .env*, the host's compose file (changed only through safe-infra-patch.sh), its
+    # safe-patch backups, and whatever the app's .gitignore lists (output/, tokens, logs). --delete-after: the delete
+    # phase reads the RECEIVER's .gitignore, so it must run after this transfer put the current one there (without it
+    # a first sync deleted output/ in the e2e test).
+    _rs=(-av --delete-after --include='.env.example' --exclude='.env*' --exclude='docker-compose*.yml'
+         --exclude='*.bak.safe-patch-*' --filter=':- .gitignore')
+    [[ $DRY_RUN -eq 1 ]] && _rs+=(-n)
+    rsync "${_rs[@]}" "$OC_BUILD_CTX/" "$OC_SYNC_DIR/" 2>&1 | tee -a "$LOG_FILE" || fail "rsync $OWN_APP failed"
+    OC_BUILD_CTX="$OC_SYNC_DIR"
+  fi
+  if [[ $DRY_RUN -eq 1 ]]; then
+    log "DRY RUN complete ($OWN_APP): would build $OC_IMAGE_REPO:local from $OC_BUILD_CTX, test it with '$OC_TEST', then up $OC_SERVICE"
+    exit 0
+  fi
+
+  snapshot_restorable_apps
+  export ROLLBACK_HEALTH_TIMEOUT="${ROLLBACK_HEALTH_TIMEOUT:-$OC_HEALTH_TIMEOUT}"   # the restored copy gets the same wait
+  log "--- docker build $OC_IMAGE_REPO:local ($OC_BUILD_CTX) ---"
+  docker build -t "$OC_IMAGE_REPO:local" "$OC_BUILD_CTX" 2>&1 | tee -a "$LOG_FILE" || fail "docker build $OWN_APP failed; the running container is unchanged"
+  OC_NEW_IMAGE="$(docker image inspect -f '{{.Id}}' "$OC_IMAGE_REPO:local")"
+
+  log "--- tests inside the new image: $OC_TEST ---"
+  # Limits like the service's own (video-service: cpus 2, 3 GiB): the tests run real ffmpeg beside production.
+  if ! docker run --rm --network none --cpus 2 --memory 3g --pids-limit 512 --entrypoint sh "$OC_IMAGE_REPO:local" -c "$OC_TEST" 2>&1 | tee -a "$LOG_FILE"; then
+    # :local now names the failed build; point it back so a later `compose up` (or a recreate) cannot start it.
+    if [[ -n "${SNAPSHOT_TAG[$OWN_APP]:-}" ]] && ! docker tag "$OC_IMAGE_REPO:${SNAPSHOT_TAG[$OWN_APP]}" "$OC_IMAGE_REPO:local"; then
+      fail "$OWN_APP tests FAILED and :local could not be re-pointed to ${SNAPSHOT_TAG[$OWN_APP]} -- :local is the failed build; re-tag it by hand"
+    fi
+    fail "$OWN_APP tests FAILED inside the new image -- deploy aborted before up; the running container is unchanged"
+  fi
+  log "$OWN_APP tests passed"
+
+  log "--- up $OC_SERVICE ---"
+  oc_compose up -d --no-build "$OC_SERVICE" 2>&1 | tee -a "$LOG_FILE" || health_fail "compose up $OC_SERVICE failed"
+  log "--- waiting for $OC_CONTAINER healthy (up to ${OC_HEALTH_TIMEOUT}s) ---"
+  for ((i = 1; ; i++)); do
+    STATUS=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$OC_CONTAINER" 2>/dev/null || echo "missing")
+    [[ "$STATUS" == "healthy" ]] && { log "$OC_CONTAINER healthy after ${i}s"; break; }
+    [[ "$STATUS" == "unhealthy" ]] && health_fail "$OC_CONTAINER unhealthy"
+    # No healthcheck = nothing proves the new image works; treated as a failure, never assumed OK.
+    [[ "$STATUS" == "no-healthcheck" ]] && health_fail "$OC_CONTAINER has no healthcheck"
+    (( i >= OC_HEALTH_TIMEOUT )) && health_fail "$OC_CONTAINER not healthy in ${OC_HEALTH_TIMEOUT}s (status=$STATUS)"
+    sleep 1
+  done
+  # Healthy is not enough: an old container that `up` did not replace is healthy too.
+  _running="$(docker inspect -f '{{.Image}}' "$OC_CONTAINER" 2>/dev/null || true)"
+  [[ "$_running" == "$OC_NEW_IMAGE" ]] || health_fail "$OC_CONTAINER runs ${_running:-nothing}, not the image just built ($OC_NEW_IMAGE)"
+
+  log "--- HTTP smoke check ($OWN_APP) ---"
+  http=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" "$OC_SMOKE_URL" 2>/dev/null) || http="000"
+  if [[ "$http" =~ ^2 ]]; then
+    log "  smoke OK: $OC_SMOKE_URL -> $http"
+    rm -f "$STAGING_DIR/.rollback-triggered"
+  elif rollback_enabled; then
+    log "  SMOKE_WARN: $OC_SMOKE_URL -> $http"
+    do_rollback "smoke check: $OC_SMOKE_URL -> $http" 1
+  else
+    log "  SMOKE_WARN: $OC_SMOKE_URL -> $http -- AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false, DRILL MODE; left for inspection"
+    DEPLOY_OUTCOME="SMOKE_WARN"
+  fi
+  # Its own record: .deployed-commit is next-admin's (auto-deploy and the drift checks read it).
+  printf '%s %s\n' "$(git -C "$REPO_DIR" rev-parse HEAD)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAGING_DIR/.deployed-commit.$OWN_APP"
+  [[ -n "$DEPLOY_OUTCOME" ]] || DEPLOY_OUTCOME="SUCCESS"
+  log "=== sg-deploy complete ($OWN_APP: $(cat "$STAGING_DIR/.deployed-commit.$OWN_APP")) ==="
+  exit 0
 fi
 
 # 2. rsync each app
@@ -392,25 +557,7 @@ fi
 #     SNAPSHOT_TAG[app] = this run's tag, so rollback restores exactly it, never "latest
 #     rollback-*" (which a failed save would silently turn into an older deploy's image).
 #     Empty = first deploy of that app (save printed "Saved: NONE"): nothing to roll back to.
-declare -A SNAPSHOT_TAG=()
-if [[ ${#RESTORABLE_APPS[@]} -gt 0 ]]; then
-  [[ -x "$ROLLBACK_SCRIPT" ]] \
-    || fail "$ROLLBACK_SCRIPT not executable -- refusing to deploy ${RESTORABLE_APPS[*]} without auto-rollback"
-  log "--- snapshot before build (rollback prep) ---"
-  for APP in "${RESTORABLE_APPS[@]}"; do
-    if ! _save_out=$("$ROLLBACK_SCRIPT" save "$APP" 2>&1); then
-      printf '%s\n' "$_save_out" | tee -a "$LOG_FILE"
-      fail "snapshot save for $APP failed -- refusing to deploy without a rollback point"
-    fi
-    printf '%s\n' "$_save_out" | tee -a "$LOG_FILE"
-    SNAPSHOT_TAG[$APP]=$(printf '%s\n' "$_save_out" | sed -n 's/^Saved: [^:]*:\(rollback-[0-9-]*\)$/\1/p' | tail -1)
-    # Empty tag is accepted ONLY for an explicit first deploy; anything else (e.g. save's
-    # tag format changed) must not quietly become "nothing to restore" at rollback time.
-    if [[ -z "${SNAPSHOT_TAG[$APP]}" ]] && ! grep -qx 'Saved: NONE' <<< "$_save_out"; then
-      fail "cannot parse snapshot tag for $APP from save output -- refusing to deploy without a rollback point"
-    fi
-  done
-fi
+snapshot_restorable_apps
 if [[ ${#NON_RESTORABLE_APPS[@]} -gt 0 ]]; then
   log "WARN: apps outside rollback-phase1.sh IMAGE_MAP, no auto-rollback for: ${NON_RESTORABLE_APPS[*]}"
 fi
@@ -456,7 +603,6 @@ fi
 #    This way drift detector knows what we shipped even if healthcheck flakes.
 #    C1 fix: also remember the PREVIOUS commit so smoke-fail auto-rollback can revert
 #    the drift marker. EMin-7 also addressed (no more unassigned $DEPLOYED_COMMIT reference).
-PREVIOUS_COMMIT=""
 if [[ -f "$STAGING_DIR/.deployed-commit" ]]; then
   PREVIOUS_COMMIT=$(cat "$STAGING_DIR/.deployed-commit")
 fi
@@ -464,46 +610,6 @@ NEW_COMMIT=$(git -C "$REPO_DIR" rev-parse HEAD)
 echo "$NEW_COMMIT" > "$STAGING_DIR/.deployed-commit"
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAGING_DIR/.deployed-at"
 log "wrote .deployed-commit = $NEW_COMMIT (previous: ${PREVIOUS_COMMIT:-none})"
-
-# Auto-rollback: ONE path for every post-`up` failure (health in step 6, smoke in step 7).
-# Before 2026-09-19 only smoke failure rolled back; an unhealthy/crash-looping new container
-# (the most common failed-deploy shape) was left running with .deployed-commit advanced.
-# Restores each restorable app to SNAPSHOT_TAG from this run, reverts .deployed-commit,
-# always exits non-zero. AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false (drill mode) skips it.
-rollback_enabled() { [[ "${AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL:-true}" == "true" ]]; }
-do_rollback() {
-  local reason="$1" smoke_errors="${2:-0}" failures=0 app tag
-  DEPLOY_OUTCOME="ROLLBACK"
-  log "--- AUTO-ROLLBACK triggered: $reason ---"
-  [[ ${#RESTORABLE_APPS[@]} -gt 0 ]] || fail "$reason; no restorable apps in this deploy, cannot auto-rollback"
-  for app in "${RESTORABLE_APPS[@]}"; do
-    tag="${SNAPSHOT_TAG[$app]:-}"
-    if [[ -z "$tag" ]]; then
-      log "ROLLBACK_FAILED for $app -- no snapshot from this run (first deploy of $app, nothing to restore)"
-      failures=$((failures + 1)); continue
-    fi
-    log "rolling back $app to $tag..."
-    if ! "$ROLLBACK_SCRIPT" restore "$app" "$tag" 2>&1 | tee -a "$LOG_FILE"; then
-      log "ROLLBACK_FAILED for $app -- manual intervention required"
-      failures=$((failures + 1))
-    fi
-  done
-  if [[ -n "$PREVIOUS_COMMIT" ]]; then
-    echo "$PREVIOUS_COMMIT" > "$STAGING_DIR/.deployed-commit"
-    log ".deployed-commit reverted to $PREVIOUS_COMMIT (pre-rollback state)"
-  fi
-  printf 'ROLLBACK|smoke_errors=%d|rollback_failures=%d|%s|reason=%s\n' \
-    "$smoke_errors" "$failures" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$reason" \
-    > "$STAGING_DIR/.rollback-triggered"
-  if [[ "$failures" -gt 0 ]]; then
-    fail "auto-rollback fired ($reason) but $failures app(s) failed to restore; URGENT manual check required"
-  fi
-  fail "auto-rollback fired ($reason); new code reverted to this run's pre-deploy snapshot"
-}
-health_fail() {
-  rollback_enabled && do_rollback "$1"
-  fail "$1"
-}
 
 # 6. wait for healthy. Failure -> auto-rollback (see do_rollback).
 for APP in "${APPS[@]}"; do

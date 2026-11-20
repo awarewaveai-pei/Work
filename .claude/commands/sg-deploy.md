@@ -12,6 +12,7 @@ Default app is `next-admin`. Pass extra args after `/sg-deploy` to override:
 - `/sg-deploy next-admin node-api` — deploy multiple apps
 - `/sg-deploy next-admin --dry-run` — preview rsync without rebuilding
 - `/sg-deploy next-admin --skip-pull` — skip the upstream `git pull` step
+- `/sg-deploy video-service` / `/sg-deploy remotion-service` — an app with its own compose file, deployed alone (spec: `scripts/own-compose-apps.sh`)
 
 Use the `server-ssh` MCP server. Connection details:
 - host: `145.239.195.47`（**現役 ks-aw-01 / OVH KS-6**）

@@ -66,8 +66,8 @@ jobs:
           : "${APPS:=next-admin}"
 
           # 1. Allowlist-validate every app token (also neutralises any injection attempt).
-          #    Keep this list in sync with sg-deploy.sh:60-65 RESTORABLE_APPS case.
-          ALLOWED="next-admin node-api wordpress renderer"
+          #    Keep this list in sync with the report step below (own-compose apps: scripts/own-compose-apps.sh).
+          ALLOWED="next-admin node-api wordpress renderer video-service remotion-service"
           for app in $APPS; do
             case " $ALLOWED " in
               *" $app "*) : ;;
@@ -116,12 +116,14 @@ jobs:
           # deploy step's validation may not have completed, and app names are
           # interpolated into the JSON payload.
           for app in $APPS; do
-            case " next-admin node-api wordpress renderer " in
+            case " next-admin node-api wordpress renderer video-service remotion-service " in
               *" $app "*) : ;;
               *) echo "ops-inbox skipped for '$app': not in allowlist"; continue ;;
             esac
+            # An own-compose app records its own commit (.deployed-commit is next-admin's).
+            D="$DEPLOYED"; [ -f "/root/lobster-phase1/.deployed-commit.$app" ] && D=$(cut -d" " -f1 "/root/lobster-phase1/.deployed-commit.$app")
             payload=$(printf '{"event":"%s","app":"%s","deployed_commit":"%s","origin_commit":"%s","behind":%s,"run_at":"%s"}' \
-              "$EVENT" "$app" "${DEPLOYED:0:12}" "${ORIGIN:0:12}" "$BEHIND" "$RUN_AT")
+              "$EVENT" "$app" "${D:0:12}" "${ORIGIN:0:12}" "$BEHIND" "$RUN_AT")
             http=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
               -X POST -H "Content-Type: application/json" \
               -H "Authorization: Bearer ${TOKEN}" \

@@ -13,6 +13,8 @@
 #   n8n-pin <semver-tag>           update N8N_IMAGE_TAG in .env and restart n8n
 #
 # LOCAL-BUILD services: wordpress | node-api | next-admin | hci-app | renderer | video-workbench | oracle-web
+#   + own-compose apps (video-service | remotion-service): compose file, project and env file come from
+#     own-compose-apps.sh, never typed here.
 # EXTERNAL services (n8n): use n8n-pin.
 # Other external (nginx, redis, mariadb): manual .env image tag edit + docker compose pull.
 #
@@ -42,8 +44,19 @@ declare -A IMAGE_MAP=(
   [video-workbench]="lobster-phase1-video-workbench"
   [oracle-web]="oracle-web"
 )
+# Apps with their own compose file (video-service, remotion-service): spec + oc_compose.
+# shellcheck source=own-compose-apps.sh
+source "$(dirname "${BASH_SOURCE[0]}")/own-compose-apps.sh"
 
 # ---------- helpers ----------
+
+# Image repo / compose service name / compose call for a service: own-compose-apps.sh's spec, else the staging compose.
+svc_image() { if own_compose_spec "$1"; then echo "$OC_IMAGE_REPO"; else echo "${IMAGE_MAP[$1]:-}"; fi; }
+svc_name()  { if own_compose_spec "$1"; then echo "$OC_SERVICE"; else echo "$1"; fi; }
+svc_compose() {  # <service> <compose args...>
+  local svc="$1"; shift
+  if own_compose_spec "$svc"; then oc_compose "$@"; else (cd "$ROOT" && docker compose --env-file "$ENV_FILE" "$@"); fi
+}
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOGFILE"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -57,7 +70,7 @@ image_exists() { docker image inspect "$1" > /dev/null 2>&1; }
 # Wait for a service's Docker healthcheck to pass (uses docker inspect — no curl/wget needed).
 wait_healthy() {
   local svc="$1" elapsed=0 cname hc status
-  cname=$(docker compose --env-file "$ENV_FILE" ps -q "$svc" 2>/dev/null | head -1 || true)
+  cname=$(svc_compose "$svc" ps -q "$(svc_name "$svc")" 2>/dev/null | head -1 || true)
   [[ -z "$cname" ]] && { echo "  (container not found after up — inspect logs)"; return 1; }
   hc=$(docker inspect --format='{{if .Config.Healthcheck}}yes{{end}}' "$cname" 2>/dev/null || true)
   if [[ "$hc" != "yes" ]]; then
@@ -89,7 +102,8 @@ Usage:
   rollback-phase1.sh clean   <service> [days]       prune snapshots older than N days (default: 30)
   rollback-phase1.sh n8n-pin <semver>               update N8N_IMAGE_TAG in .env and restart n8n
 
-Local-build services: wordpress | node-api | next-admin | hci-app
+Local-build services: wordpress | node-api | next-admin | hci-app | renderer | video-workbench | oracle-web
+Own-compose apps: video-service | remotion-service
 Env: ROLLBACK_HEALTH_TIMEOUT=<sec> (default: 90)
 EOF
   exit 1
@@ -104,15 +118,15 @@ case "$cmd" in
 
   save)
     svc="${2:-}"; [[ -z "$svc" ]] && { echo "ERROR: service name required"; usage; }
-    img="${IMAGE_MAP[$svc]:-}"
-    [[ -z "$img" ]] && die "unknown local-build service '$svc'. Valid: ${!IMAGE_MAP[*]}"
+    img="$(svc_image "$svc")"
+    [[ -z "$img" ]] && die "unknown local-build service '$svc'. Valid: ${!IMAGE_MAP[*]} $OWN_COMPOSE_APPS"
     # Snapshot the image the RUNNING container uses, not :local (critic review 2026-09-19):
     # after a deploy that failed post-build, :local IS that failed build, so saving it would
     # make the next rollback re-deploy the broken image. :local is only the fallback when no
     # container runs. Neither one = first deploy: nothing to roll back to, reported as
     # "Saved: NONE" (exit 0) so sg-deploy can tell it apart from a failed save.
     cd "$ROOT"
-    cid=$(docker compose --env-file "$ENV_FILE" ps -q "$svc" 2>/dev/null | head -1 || true)
+    cid=$(svc_compose "$svc" ps -q "$(svc_name "$svc")" 2>/dev/null | head -1 || true)
     src=""
     [[ -n "$cid" ]] && src=$(docker inspect -f '{{.Image}}' "$cid" 2>/dev/null || true)
     [[ -z "$src" ]] && image_exists "$img:local" && src="$img:local"
@@ -129,9 +143,14 @@ case "$cmd" in
 
   restore)
     svc="${2:-}"; [[ -z "$svc" ]] && { echo "ERROR: service name required"; usage; }
-    img="${IMAGE_MAP[$svc]:-}"
-    [[ -z "$img" ]] && die "unknown local-build service '$svc'. Valid: ${!IMAGE_MAP[*]}"
-    require_env
+    img="$(svc_image "$svc")"
+    [[ -z "$img" ]] && die "unknown local-build service '$svc'. Valid: ${!IMAGE_MAP[*]} $OWN_COMPOSE_APPS"
+    if own_compose_spec "$svc"; then
+      # A missing env file is exactly the 2026-11-20 outage: compose interpolates empty secrets and the image can't start.
+      [[ -z "$OC_ENV_FILE" || -f "$OC_DIR/$OC_ENV_FILE" ]] || die "$OC_DIR/$OC_ENV_FILE not found -- $svc cannot start without it"
+    else
+      require_env
+    fi
 
     if [[ -n "${3:-}" ]]; then
       snapshot_tag="$3"
@@ -144,14 +163,13 @@ case "$cmd" in
     image_exists "$img:$snapshot_tag" || die "snapshot $img:$snapshot_tag not found (run 'list' to see available)"
     echo "Restoring $img:$snapshot_tag → $img:local …"
     docker tag "$img:$snapshot_tag" "$img:local"
-    cd "$ROOT"
-    docker compose --env-file .env up -d --no-build "$svc"
+    svc_compose "$svc" up -d --no-build "$(svc_name "$svc")"
     log "restore | service=$svc | from=$img:$snapshot_tag | user=${USER:-unknown}"
     if wait_healthy "$svc"; then
       log "health | service=$svc | status=PASS"
     else
       log "health | service=$svc | status=FAIL"
-      echo "ERROR: restored $svc did not pass its health check — inspect logs: docker compose logs $svc"
+      echo "ERROR: restored $svc did not pass its health check — inspect logs: docker logs \$(docker ps -aqf label=com.docker.compose.service=$(svc_name "$svc"))"
       # Non-zero so sg-deploy counts it as ROLLBACK_FAILED instead of reporting a clean revert.
       exit 1
     fi
@@ -161,12 +179,12 @@ case "$cmd" in
   list)
     svc="${2:-}"
     if [[ -n "$svc" ]]; then
-      img="${IMAGE_MAP[$svc]:-}"; [[ -z "$img" ]] && die "unknown service '$svc'"
+      img="$(svc_image "$svc")"; [[ -z "$img" ]] && die "unknown service '$svc'"
       docker images --format '{{.Repository}}:{{.Tag}}  {{.CreatedAt}}  {{.Size}}' "$img" \
         | grep 'rollback-' || echo "(no snapshots for $svc)"
     else
-      for s in "${!IMAGE_MAP[@]}"; do
-        img="${IMAGE_MAP[$s]}"
+      for s in "${!IMAGE_MAP[@]}" $OWN_COMPOSE_APPS; do
+        img="$(svc_image "$s")"
         echo "=== $s ($img) ==="
         docker images --format '  {{.Repository}}:{{.Tag}}  {{.CreatedAt}}' "$img" \
           | grep 'rollback-' || echo "  (none)"
@@ -176,8 +194,8 @@ case "$cmd" in
 
   clean)
     svc="${2:-}"; [[ -z "$svc" ]] && { echo "ERROR: service name required"; usage; }
-    img="${IMAGE_MAP[$svc]:-}"
-    [[ -z "$img" ]] && die "unknown local-build service '$svc'. Valid: ${!IMAGE_MAP[*]}"
+    img="$(svc_image "$svc")"
+    [[ -z "$img" ]] && die "unknown local-build service '$svc'. Valid: ${!IMAGE_MAP[*]} $OWN_COMPOSE_APPS"
     days="${3:-30}"
     [[ "$days" =~ ^[0-9]+$ ]] || die "days must be a positive integer (got '$days')"
     cutoff=$(date -d "$days days ago" +%Y%m%d 2>/dev/null) \

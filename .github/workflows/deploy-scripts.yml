@@ -1,0 +1,64 @@
+name: Deploy scripts tests
+
+# sg-deploy.sh / rollback-phase1.sh / own-compose-apps.sh guards that need no Docker: every app directory has a deploy
+# path, an own-compose app (video-service, remotion-service) is never started without its env file, and the smoke
+# probes read the real published ports. Bash against stubs only: no network, no containers, no secrets.
+# Job e2e runs sg-deploy.sh's own-compose path for real (build, tests in the image, healthy, smoke, auto-rollback,
+# every refusal) against stand-in services on the runner's Docker. '**/*.md': the stub test also scans the live docs
+# for a manual compose command that drops --env-file.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/own-compose-apps.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/docker-compose.yml'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/*/Dockerfile'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/*/docker-compose*.yml'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/own-compose-apps.test.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/sg-deploy-smoke-ports.test.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/own-compose-deploy.test.sh'
+      - '.github/workflows/deploy-scripts.yml'
+      - '**/*.md'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/own-compose-apps.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/docker-compose.yml'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/*/Dockerfile'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/*/docker-compose*.yml'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/own-compose-apps.test.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/sg-deploy-smoke-ports.test.sh'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/own-compose-deploy.test.sh'
+      - '.github/workflows/deploy-scripts.yml'
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Syntax of the deploy scripts
+        run: for f in sg-deploy.sh rollback-phase1.sh own-compose-apps.sh; do bash -n "lobster-factory/infra/hetzner-phase1-core/scripts/$f"; done
+      - name: Own-compose apps -- deploy path per app dir, env file never dropped
+        run: bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/own-compose-apps.test.sh
+      - name: Smoke probes follow the published ports
+        run: bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/sg-deploy-smoke-ports.test.sh
+
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: sg-deploy.sh own-compose path end to end (stand-in services, real Docker)
+        run: bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/own-compose-deploy.test.sh

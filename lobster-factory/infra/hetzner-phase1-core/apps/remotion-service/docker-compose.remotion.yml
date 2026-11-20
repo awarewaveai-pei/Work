@@ -1,8 +1,8 @@
 # remotion-service — EU 部署單元
 # 依賴同 video-service 的 .env.video（共用 R2/RENDER_AUTH_TOKEN）
 #
-# 部署（EU）：
-#   docker compose -f docker-compose.remotion.yml --env-file .env.video up -d --build
+# 正式機不用這份：ks-aw-01 跑的是 /root/render-services/docker-compose.yml（project render-services，env_file remotion.env），
+#   部署＝主機上 `sg-deploy.sh remotion-service`（設定只寫在 scripts/own-compose-apps.sh）。本檔僅供本機開發對照。
 #
 # 記憶體：Chromium headless ~500MB + Node ~200MB = ~700MB；上限設 1024MB。
 
