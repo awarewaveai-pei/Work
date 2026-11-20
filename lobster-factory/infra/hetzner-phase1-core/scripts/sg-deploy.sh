@@ -549,10 +549,20 @@ done
 #    extra www->apex redirect hop); `curl -H "Host: api.aware-wave.com"
 #    http://127.0.0.1/health` -> 200.
 _smoke_errors=0
+# A probe through lobster-nginx can still reach the address of the container `up` just replaced until nginx's resolver
+# entry expires (nginx/default.conf: valid=10s on upstreams, 30s on servers). 2026-11-20: video-workbench /healthz
+# answered 502 sixteen seconds after `up` and three healthy apps were rolled back. So a probe is judged on the state
+# after that window: while it fails it is asked again, all probes sharing one 30 s window from the first probe.
+_smoke_settle_until=$(( $(date +%s) + 30 ))
+_smoke_settling() { [[ $(date +%s) -lt $_smoke_settle_until ]] && sleep 3; }
 # Negative probe: the status MUST equal $2 (an unauthenticated call that returns 2xx means the identity gate is broken).
 _smoke_expect_status() {
   local label="$1" want="$2" url="$3" resolve_host="$4" http
-  http=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" -k --resolve "${resolve_host}:443:127.0.0.1" "$url" 2>/dev/null) || http="000"
+  while :; do
+    http=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" -k --resolve "${resolve_host}:443:127.0.0.1" "$url" 2>/dev/null) || http="000"
+    [[ "$http" == "$want" ]] && break
+    _smoke_settling || break
+  done
   if [[ "$http" == "$want" ]]; then log "  smoke OK: $label -> $http (expected $want)"
   else log "  SMOKE_WARN: $label -> $http (expected $want)"; _smoke_errors=$((_smoke_errors + 1)); fi
 }
@@ -578,7 +588,11 @@ _smoke_check() {
   # Critic finding (2026-08-29, minor): `$(curl ...) || echo "000"` CONCATENATES -- curl without
   # -f already prints its -w code before exiting non-zero on a transport failure, so the old form
   # could log a misleading "404000"/"000000". Assign first, fall back on failure, never append.
-  http=$(curl "${curl_args[@]}" "$url" 2>/dev/null) || http="000"
+  while :; do
+    http=$(curl "${curl_args[@]}" "$url" 2>/dev/null) || http="000"
+    [[ "$http" =~ ^2 ]] && break
+    _smoke_settling || break
+  done
   if [[ "$http" =~ ^2 ]]; then log "  smoke OK: $label -> $http"
   else log "  SMOKE_WARN: $label -> $http"; _smoke_errors=$((_smoke_errors + 1)); fi
 }
