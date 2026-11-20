@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-20（續5）— 影片下一階段：Instagram 那一項重發成功，第一則真發布實測全數完成（操作者「重發」）
+
+- 重發前唯讀查證（線 C 工人，未改程式與資料）：存檔只動文案或格式真的變了的 target（`lobster-factory/packages/db/migrations/0105_social_v16.sql:510-514`）；派送只送 pending 與「失敗時間早於這次重新排程」的 error（`lib/social/dispatch.ts:305-315`），published 不會退回（`0100_social_dispatch.sql:20`、`:195`；測試 `dispatch.test.ts:153-156`）。
+- 動作（社群工具同一組 API，操作者 session）：GET 貼文 `93ced27f-bfea-4096-9f66-d2b78de10cf5`（state error、version 6；facebook published、instagram error 31 標籤）→ `PUT /api/social/posts/[id]` 只把 Instagram 的 `custom_body` 去掉「#幸福感練習」（30 個；腳本先斷言標籤數=30 才送）→ 讀回 version 7、facebook 仍 published 且 `release_url` 不變 → `PUT …/state {action:"publish_now"}` → scheduled、version 8。
+- 結果：instagram `published` `https://www.instagram.com/reel/Df8Y7gpHCJS/`；facebook 維持 `https://www.facebook.com/reel/1181005487930368`，沒有重發；貼文 state `published`。
+- 第一則真發布實測到此四個出口都有成品：YouTube（不公開）`https://www.youtube.com/watch?v=q1sKUO8FpdI`、文章（公開，嵌 YouTube）、Facebook reel、Instagram reel。YouTube 是否改公開由操作者自己處理（她 2026-11-20 明示）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql … social_posts join social_post_targets`（重發前後讀回） | exit=0 | ms=600000
+- REVIEW_WAIVED: NA -- 正式站操作紀錄，沒有程式改動
+- BUGHUNT_WAIVED: NA -- 沒有程式改動
+- rollback：Instagram reel 可在 Instagram 刪除（手動）。
 ## 2026-11-20（續4）— 影片下一階段：實測找到的四個問題與 Instagram 發送失敗修好並上線（操作者「修」）
 
 - 更正監工自己的誤判：先前回報「Instagram 頻道授權失效、請重新連接」是照系統制式訊息轉述、未查證。操作者質疑後查證：主系統 `social_accounts` instagram `connected`；Postiz `Integration cmvnxspa90001p88sopr0qp60` `refreshNeeded=f`、`disabled=f`、token 到 2126；Postiz `Post cmwnubqju000aqs8hd51utg89` `ERROR`，`error.details` 有 Instagram 原話 code 36004／subcode 2207117「說明文字的主題標籤數量上限為 30 個」，該則實數 31 個。根因＝`lib/social/write-posts.ts:17` 提示詞要 Instagram 寫「20–30 hashtags」且程式不數；「叫人重新連接」＝`lib/social/dispatch.ts:108` 在 Postiz 沒回原因時一律寫重連。監工原先猜的 16:9 比例與中文網址皆非原因。
