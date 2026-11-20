@@ -1,18 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { matchBazi, matchZodiac, yearBranchOf } from './hehun';
-import type { BaziPillar, BaziResult } from './bazi';
+import { matchBazi, matchZodiac, yearBranchOf, type HehunChart } from './hehun';
 import type { WuXing } from './baziAnalysis';
 
-function pillar(ganZhi: string, naYin = '大林木'): BaziPillar {
-  return { gan: ganZhi[0], zhi: ganZhi[1], ganZhi, shiShen: '', hiddenStems: [], naYin };
+function pillar(ganZhi: string, naYin = '大林木') {
+  return { gan: ganZhi[0], zhi: ganZhi[1], naYin };
 }
 
-/** 只填 hehun 會讀的欄位。 */
 function chart(
   year: string,
   day: string,
   opts: { naYin?: string; dayElement?: WuXing; favorable?: WuXing[]; avoid?: WuXing[] } = {},
-): BaziResult {
+): HehunChart {
   return {
     pillars: {
       year: pillar(year, opts.naYin),
@@ -20,14 +18,10 @@ function chart(
       day: pillar(day),
       hour: pillar('戊辰'),
     },
-    dayMaster: day[0],
-    zodiac: '',
     analysis: {
-      strength: '中和',
       dayElement: opts.dayElement ?? '木',
       favorable: opts.favorable ?? ['火'],
       avoid: opts.avoid ?? ['金'],
-      pattern: '',
     },
   };
 }

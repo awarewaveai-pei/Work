@@ -1,5 +1,5 @@
 import { Solar } from 'lunar-javascript';
-import type { BaziResult } from './bazi';
+import type { BaziAnalysisDisplay, BaziPillar } from './bazi';
 import type { WuXing } from './baziAnalysis';
 
 /**
@@ -165,8 +165,14 @@ function elementRelation(a: WuXing, b: WuXing): Relation {
   return KE[a] === b ? 'aKeB' : 'bKeA';
 }
 
+/** 合婚只讀這些欄位;`BaziResult` 結構相容,可直接傳入。 */
+export interface HehunChart {
+  pillars: Record<'year' | 'month' | 'day' | 'hour', Pick<BaziPillar, 'gan' | 'zhi' | 'naYin'>>;
+  analysis: Pick<BaziAnalysisDisplay, 'dayElement' | 'favorable' | 'avoid'>;
+}
+
 /** 四柱八字(4 干＋4 支本氣)五行計數,取最多者(並列全取)。 */
-export function dominantElements(r: BaziResult): WuXing[] {
+export function dominantElements(r: HehunChart): WuXing[] {
   const count: Record<WuXing, number> = { 木: 0, 火: 0, 土: 0, 金: 0, 水: 0 };
   for (const p of [r.pillars.year, r.pillars.month, r.pillars.day, r.pillars.hour]) {
     count[STEM_WUXING[stemIndex(p.gan)]] += 1;
@@ -177,7 +183,7 @@ export function dominantElements(r: BaziResult): WuXing[] {
 }
 
 /** self 的喜用是否由 other 的日主或旺行補上;other 日主落在 self 忌神 → strains。 */
-function complementItem(key: HehunKey, self: BaziResult, other: BaziResult): HehunItem {
+function complementItem(key: HehunKey, self: HehunChart, other: HehunChart): HehunItem {
   const otherDay = other.analysis.dayElement;
   const otherSupply = new Set<WuXing>([otherDay, ...dominantElements(other)]);
   const relations: Relation[] = [];
@@ -199,7 +205,7 @@ function naYinElement(naYin: string): WuXing {
 }
 
 /** 完整八字合婚:a = 甲方、b = 乙方(兩次 computeBazi 的結果)。 */
-export function matchBazi(a: BaziResult, b: BaziResult): HehunMatch {
+export function matchBazi(a: HehunChart, b: HehunChart): HehunMatch {
   const pa = a.pillars;
   const pb = b.pillars;
   const stemA = stemIndex(pa.day.gan);
