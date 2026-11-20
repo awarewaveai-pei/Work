@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-20（續21）— Mockup 生出來的圖可送 PhotoCraft 修圖再「傳回」（操作者：「生出來的圖要能匯入 photo-pro 修改再存回，像 tarot 和其他工具」）
+
+[根因] mockup 四處出圖只有「在畫布編輯」或完全沒入口；`openInCanvas` 沒帶 `ret` 票、頁面沒 `useCanvasReturn`，PhotoCraft 改完只能存 My Designs（tarot 做法：`TarotStudio.tsx:903`、`:2196`）。
+[已修改]（next-admin）
+- `ModelLibraryStudio.tsx`：圖庫每張照片＋剛生成未存的圖加「修圖」；傳回 = 圖庫照片存成同一位模特兒的新照片（`photoRole: "edit"`、原圖保留、比例沒變才沿用印花框；存失敗改存 My Designs），未存的圖原地換掉。
+- `ModelMockupPanel.tsx`：合成結果「在畫布編輯」帶票，傳回換掉該張、可再存；舊批次的票拒收。
+- `MockupStudio.tsx`：平拍合成圖帶票，傳回換掉；換設計／再合成／AI 修圖後舊票拒收。
+- `api/tools/presets/route.ts`：`PHOTO_ROLES` 加 `edit`；`modelLibrary.ts` 加 `imageSize`／`sameShape`；`MOCKUP_FIXED_MODEL_PLAN.md` 角色清單同步。
+- 不變量：存檔進行中一律拒收傳回（拒收 → 編輯器自己存 My Designs，不會遺失）；critic 抓到存進圖庫／存 My Designs 途中傳回會遺失或誤標已存（C1/M1），已依此修。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/mockup" | exit=0 | ms=2300
+- 新檔 `__tests__/photocraft-return.render.test.tsx` 8 條；拔掉兩個「存檔中拒收」守衛 → 正好那 2 條紅，還原 18/18 綠。`npx tsc --noEmit` 原始碼 0 錯（僅舊 `.next/types` 殘檔）。
+- 本機 dev（3901）要登入，端對端（真的開 PhotoCraft 按傳回）未跑；今晚 03:00 自動部署後要實測。
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/2n
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；改由 critic subagent 獨立審查＋上述突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PHOTO_ROLES|photo_role|photoRole | hits=24
+[剩餘風險]
+- m1：平拍合成圖若 AI 修圖（ImageEditPromptPanel）還在跑時 PhotoCraft 傳回被接受，之後 AI 結果到會蓋掉它（原有元件無「開始」回呼可擋；需同時操作兩件事）。
+[rollback] `git revert <本 commit>`。
 ## 2026-11-20（續20）— 部署前先問 CI：今天四次部署失敗的根因與修正（操作者：「部署一直fail 是怎樣? 光今天才下午3點半就已經就4次」）
 
 - 根因（四次失敗各對一個洞，主機 log `/root/lobster-phase1/logs/`）：

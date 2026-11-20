@@ -61,7 +61,7 @@
 - 不開新表：模特兒分組用 `media_assets.metadata`（與 `designs/route.ts:222` 的 `batch_job_id`／`card_index` 同一慣例）。
 
 ### 2.2 `POST/GET/DELETE /api/tools/presets`（`NA/app/api/tools/presets/route.ts`）
-- POST body 加選填：`modelKey`（uuid；沒給 = 新模特兒，伺服器配）、`photoRole`（`face-front|face-left|face-right|face-profile|pose|upload`）、`garmentColor`、`pose`、`scene`。寫進 `metadata.{model_key, photo_role, garment_color, pose, scene}`；`preset_name` 每列都寫（清單用）。
+- POST body 加選填：`modelKey`（uuid；沒給 = 新模特兒，伺服器配）、`photoRole`（`face-front|face-left|face-right|face-profile|pose|upload|edit`；`edit` = 圖庫照片經 PhotoCraft「傳回」存成的新照片，原圖保留，2026-11-20）、`garmentColor`、`pose`、`scene`。寫進 `metadata.{model_key, photo_role, garment_color, pose, scene}`；`preset_name` 每列都寫（清單用）。
 - 一次存多張：body `images: string[]`（≤8，每張同一上限）→ 逐張 R2 PUT → **全部成功才**一次 `insert` 多列；任一 R2 失敗 → 刪已上傳的再回錯（修 §0.1 的孤兒問題，連舊單張路徑一起套同一函式）。
 - GET 回傳不變（`metadata` 已含新欄位）；前端按 `model_key` 分組，舊列沒有 `model_key` → 用自己的 `id` 當 key（舊單張模特兒照常出現）。
 - DELETE 加 `?modelKey=`：刪整位模特兒（同 org 全部列，逐一走 `deleteUnreferencedAsset`）。

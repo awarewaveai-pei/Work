@@ -3,17 +3,20 @@
 // composite one product mockup per photo (POST /api/tools/studio/fabric-print: engine ai = gpt-image-2.5 prints the design
 // onto the photo following its folds, charged like any generated image; engine code = free displacement preview inside a
 // photo's saved print box). The photos themselves are made in 【模特兒印製】 (ModelLibraryStudio).
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { GARMENT_PLACEMENT } from "@/lib/studio/mockup-prompt";
 import { PHOTO_PRINT_MODELS, type StudioModel } from "@/lib/studio/model-options";
 import { buildSemanticBase, buildUniqueFilename, extOfDataUrl } from "@/lib/studio/semantic-filename";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
+import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
 import ImageLightbox from "./ImageLightbox";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 
+/** useCanvasReturn tool id; slot `<batch>:<photo id>` = one composite of one batch. */
+export const COMPOSITE_RETURN_TOOL = "mockup-composite";
 
 export default function ModelMockupPanel({ designRef, designName, photos, onOpenLibrary }: {
   designRef: string | null;
@@ -34,6 +37,18 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
   const [model, setModel] = useState<StudioModel>(PHOTO_PRINT_MODELS[0].value);
   const costNt = PHOTO_PRINT_MODELS.find((m) => m.value === model)?.costNt ?? 2;
   const [zoom, setZoom] = useState<string | null>(null);
+  // Batch number: a 「傳回」 for an older batch's composite is refused (the editor then saves it to My Designs).
+  const batchNo = useRef(0);
+
+  // PhotoCraft 「傳回」: the edited composite replaces the one sent, and can be saved again.
+  useCanvasReturn(COMPOSITE_RETURN_TOOL, (slot, image) => {
+    const cut = slot.indexOf(":");
+    if (Number(slot.slice(0, cut)) !== batchNo.current) return false;
+    const id = slot.slice(cut + 1);
+    if (!results.some((r) => r.photo.id === id && r.shot.status === "done" && r.saved !== "saving")) return false;
+    setResults((prev) => prev.map((r) => (r.photo.id === id ? { ...r, shot: { status: "done", image }, saved: undefined } : r)));
+    return true;
+  });
 
   // A photo deleted in 【模特兒印製】 drops out of the pick on its own.
   const pickedPhotos = photos.filter((p) => picked.has(p.id) && p.object_url);
@@ -48,6 +63,7 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
     const targets = engine === "code" ? boxedPicked : pickedPhotos;
     if (targets.length === 0) { setMsg(engine === "code" ? "程式免費印只能用已框好印花位置的模特兒圖" : "請先勾選模特兒圖"); return; }
     setMsg(null);
+    batchNo.current++;
     setResults(targets.map((photo) => ({ photo, engine, model, designName, shot: { status: "generating" } })));
     await inPairs(targets, async (photo, i) => {
       let shot: Shot;
@@ -187,7 +203,8 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
                       </button>
                       {canvasHref && (
                         <button className="btn-secondary" style={{ fontSize: 11 }}
-                          onClick={() => { if (r.shot.status === "done") void openInCanvas(r.shot.image, buildSemanticBase({ product: "商品圖", subject: r.designName, style: "模特", track: r.photo.metadata?.preset_name ?? undefined }), canvasHref); }}>
+                          onClick={() => { if (r.shot.status === "done") void openInCanvas(r.shot.image, buildSemanticBase({ product: "商品圖", subject: r.designName, style: "模特", track: r.photo.metadata?.preset_name ?? undefined }), canvasHref, undefined,
+                            { tool: COMPOSITE_RETURN_TOOL, slot: `${batchNo.current}:${r.photo.id}`, label: "商品 Mockup" }); }}>
                           在畫布編輯
                         </button>
                       )}

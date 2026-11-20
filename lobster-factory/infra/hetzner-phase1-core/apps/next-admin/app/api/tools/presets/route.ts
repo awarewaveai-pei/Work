@@ -69,7 +69,8 @@ interface SavePresetBody {
   printBox?: unknown;
 }
 
-const PHOTO_ROLES = new Set(["face-front", "face-left", "face-right", "face-profile", "pose", "upload"]);
+// "edit" = a library photo edited in PhotoCraft and sent back (傳回): saved beside its original, which is kept.
+const PHOTO_ROLES = new Set(["face-front", "face-left", "face-right", "face-profile", "pose", "upload", "edit"]);
 const GARMENT_COLORS = new Set(["white", "grey", "black"]);
 
 /** The model-photo fields a request may set, validated; anything else is dropped. */

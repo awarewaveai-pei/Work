@@ -24,9 +24,14 @@ import {
 } from "@/lib/studio/mockup-prompt";
 import { STUDIO_MODEL_OPTIONS, type AspectRatio } from "@/lib/studio/model-options";
 import { isPrintBox, type Point, type PrintBox } from "@/lib/studio/fabric-print";
-import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
+import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, imageSize, inPairs, readJson, sameShape, type LibraryPhoto, type Shot } from "./modelLibrary";
 import ImageLightbox from "./ImageLightbox";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
+import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
+import { useDoorHref } from "@/app/DoorContext";
+import { buildSemanticBase } from "@/lib/studio/semantic-filename";
+import { saveDesign, saveFailureText, urlToBlob } from "@/lib/studio/design-upload";
 
 // nano-banana-2 takes up to 14 reference images (lib/studio/model-options.ts), enough for a model's whole library.
 const GEN_MODEL = "nano-banana-2";
@@ -96,6 +101,9 @@ function Multi({ label, options, values, onToggle }: {
   );
 }
 
+/** useCanvasReturn tool id; slots: `shot:<id>` = a generated photo not saved yet, `lib:<preset id>` = a library photo. */
+export const MODEL_RETURN_TOOL = "mockup-model";
+
 const toggled = (set: Set<string>, v: string) => { const n = new Set(set); if (n.has(v)) n.delete(v); else n.add(v); return n; };
 
 export default function ModelLibraryStudio({ photos, setPhotos }: {
@@ -132,7 +140,11 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
   const [color, setColor] = useState<GarmentColor>("white");
   const [aspect, setAspect] = useState<AspectRatio>("2:3");
 
-  const [shots, setShots] = useState<{ pose: string; shot: Shot; keep: boolean }[]>([]);
+  // id: the 「傳回」 slot of a photo (indexes shift when saved photos leave the list).
+  const [shots, setShots] = useState<{ id: string; pose: string; shot: Shot; keep: boolean }[]>([]);
+  const shotRun = useRef(0);
+  // While 存進圖庫 runs it saves the images it started with: a return accepted then would be dropped with its shot.
+  const savingShots = useRef(false);
   const [newName, setNewName] = useState("");
   // What the batch was generated with, saved with its photos whatever the buttons show by then: a black-shirt photo
   // saved as white would skip the dark-fabric colour lock when a design is printed on it.
@@ -152,7 +164,8 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
       for: subject, color, scene,
       settings: subjectModel ? { mGender: subjectModel.gender } : { mGender: gender, mEthnicity: ethnicity, mAge: age, mBody: body, ageGroup },
     });
-    setShots(list.map((pose) => ({ pose, shot: { status: "generating" }, keep: true })));
+    const run = ++shotRun.current;
+    setShots(list.map((pose, i) => ({ id: `${run}-${i}`, pose, shot: { status: "generating" }, keep: true })));
     const land = (i: number, shot: Shot) => setShots((prev) => prev.map((s, k) => (k === i ? { ...s, shot } : s)));
     if (subjectModel) {
       // Identity-sheet angles (older models) first: the cleanest faces survive the reference limit.
@@ -191,6 +204,7 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
     const name = target ? target.name : newName.trim();
     if (!name) { setMsg("請先幫新模特兒取名字"); return; }
     setBusy(true);
+    savingShots.current = true;
     const modelKey = target ? target.key : crypto.randomUUID();
     const saved: LibraryPhoto[] = [];
     const savedIdx = new Set<number>();
@@ -206,8 +220,49 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
     // Keep what failed to save on screen: those images were paid for.
     setShots((prev) => prev.filter((_, i) => !savedIdx.has(i)));
     if (saved.length) { setSubject(modelKey); setBatch({ ...batch, for: modelKey }); setNewName(""); } // more photos of this person next
+    savingShots.current = false;
     setBusy(false);
   }
+
+  // ── PhotoCraft: 修圖 opens the photo in the pro editor (new tab); its 「傳回」 comes back here ──
+  const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
+  const editIn = (image: string, slot: string, name: string, pose?: string) => {
+    if (!canvasHref) return;
+    void openInCanvas(image, buildSemanticBase({ product: "模特兒圖", subject: name, style: pose }), canvasHref, undefined,
+      { tool: MODEL_RETURN_TOOL, slot, label: "模特兒圖庫" });
+  };
+  // A library photo comes back as a NEW photo of the same model (photo_role "edit"); the original is kept, delete it
+  // yourself if the edit is better. Its print box carries over only while the shape is unchanged (fractions of the photo).
+  async function saveEditedCopy(orig: LibraryPhoto, image: string) {
+    const [a, b] = await Promise.all([imageSize(orig.object_url!), imageSize(image)]);
+    const box = orig.metadata?.print_box;
+    const p = await savePhoto(image, {
+      presetName: orig.metadata?.preset_name ?? "模特兒", modelKey: orig.metadata?.model_key ?? orig.id, photoRole: "edit",
+      ...(orig.metadata?.garment_color ? { garmentColor: orig.metadata.garment_color } : {}),
+      ...(orig.metadata?.preset_settings ? { presetSettings: orig.metadata.preset_settings } : {}),
+      ...(box && sameShape(a, b) ? { printBox: box } : {}),
+    });
+    if (p) { setPhotos((prev) => [p, ...prev]); return; }
+    // Already acked, so the editor saved nothing: the edit goes to My Designs rather than being lost.
+    const r = await urlToBlob(image).then((blob) => saveDesign(blob, { prompt: `[mockup:model-edit] ${orig.metadata?.preset_name ?? ""}`, modelName: "photocraft", source: "mockup" })).catch(() => null);
+    setMsg((m) => `${m ?? "存進模特兒圖庫失敗"}；${r?.ok ? "改過的圖已改存進 My Designs" : r ? saveFailureText(r) : "改過的圖也存不進 My Designs"}`);
+  }
+  useCanvasReturn(MODEL_RETURN_TOOL, (slot, image) => {
+    if (slot.startsWith("shot:")) {
+      const id = slot.slice(5);
+      if (savingShots.current) return false; // the save would keep the original and drop the shot: editor saves to My Designs
+      if (!shots.some((s) => s.id === id && s.shot.status === "done")) return false; // regenerated or saved meanwhile
+      setShots((prev) => prev.map((s) => (s.id === id ? { ...s, shot: { status: "done", image } } : s)));
+      return true;
+    }
+    if (slot.startsWith("lib:")) {
+      const orig = photos.find((p) => p.id === slot.slice(4));
+      if (!orig?.object_url) return false; // deleted meanwhile
+      void saveEditedCopy(orig, image);
+      return true;
+    }
+    return false;
+  });
 
   // ── Library management ──
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -352,6 +407,11 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
                       onChange={() => setShots((prev) => prev.map((x, k) => (k === i ? { ...x, keep: !x.keep } : x)))} />
                   )}
                   <div style={{ fontSize: 10, textAlign: "center" }}>{MODEL_POSES.find((p) => p.value === s.pose)?.label}</div>
+                  {s.shot.status === "done" && canvasHref && (
+                    <button className="btn-secondary" style={{ fontSize: 10, padding: "1px 6px", display: "block", margin: "2px auto 0" }}
+                      title="在 PhotoCraft 修圖，按「傳回」換掉這張"
+                      onClick={() => { if (s.shot.status === "done") editIn(s.shot.image, `shot:${s.id}`, newName.trim() || batchTarget?.name || "新模特兒", s.pose); }}>修圖</button>
+                  )}
                 </div>
               ))}
             </div>
@@ -372,7 +432,7 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
       <section style={section}>
         <div>
           <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>模特兒圖庫</h3>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>勾選照片可一次刪除；點照片可框印花位置（只有主頁的「程式免費印」需要；AI 合成會自己找位置）。</div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>勾選照片可一次刪除；點照片可框印花位置（只有主頁的「程式免費印」需要；AI 合成會自己找位置）；「修圖」在 PhotoCraft 改，按「傳回」存成同一位模特兒的新照片（原圖保留）。</div>
         </div>
         {selected.size > 0 && (
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -417,8 +477,13 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
                   <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }}
                     disabled={deleting} onClick={(e) => { e.stopPropagation(); if (window.confirm("永久刪除這張照片？刪除後無法復原。")) void deletePhotos([p]); }}>✕</button>
                   <div style={{ fontSize: 10, textAlign: "center" }}>
-                    {p.metadata?.garment_color ? `${COLOR_LABEL[p.metadata.garment_color]}衣` : "照片"}{p.metadata?.print_box ? "・已框" : ""}
+                    {p.metadata?.garment_color ? `${COLOR_LABEL[p.metadata.garment_color]}衣` : "照片"}{p.metadata?.photo_role === "edit" ? "・修過" : ""}{p.metadata?.print_box ? "・已框" : ""}
                   </div>
+                  {canvasHref && (
+                    <button className="btn-secondary" style={{ fontSize: 10, padding: "1px 6px", display: "block", margin: "2px auto 0" }}
+                      title="在 PhotoCraft 修圖，按「傳回」存成新照片（原圖保留）"
+                      onClick={(e) => { e.stopPropagation(); editIn(p.object_url!, `lib:${p.id}`, m.name); }}>修圖</button>
+                  )}
                 </div>
               ))}
             </div>

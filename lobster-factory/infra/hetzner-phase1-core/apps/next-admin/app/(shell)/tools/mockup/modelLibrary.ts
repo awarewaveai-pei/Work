@@ -60,3 +60,18 @@ export async function readJson<T extends object>(res: Response): Promise<T & { o
 export function failureText(res: Response, json: { error?: string; code?: string }): string {
   return json.error ?? (res.status === 403 ? `沒有使用權限（${json.code ?? "403"}）` : `HTTP ${res.status}`);
 }
+
+/** Natural size of an image (data: or remote URL; no CORS needed for the size), null when it cannot load. */
+export function imageSize(src: string): Promise<{ w: number; h: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth && img.naturalHeight ? { w: img.naturalWidth, h: img.naturalHeight } : null);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/** A print box is stored as fractions of the photo: it still fits an edited copy whose shape (aspect ratio) is unchanged. */
+export function sameShape(a: { w: number; h: number } | null, b: { w: number; h: number } | null): boolean {
+  return !!a && !!b && Math.abs(a.w / a.h - b.w / b.h) <= 0.005 * (a.w / a.h);
+}

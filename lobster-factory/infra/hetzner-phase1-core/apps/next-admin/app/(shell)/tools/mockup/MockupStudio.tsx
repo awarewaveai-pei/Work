@@ -29,6 +29,7 @@ import {
 import { buildSemanticBase, buildUniqueFilename, extOfDataUrl } from "@/lib/studio/semantic-filename";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
+import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 
@@ -292,8 +293,19 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const inFlight = useRef(false);
   const printfulInFlight = useRef(false);
   const jobIdRef = useRef<string | null>(null);
+  // Which composite is on screen: bumped whenever it is replaced, so a PhotoCraft 「傳回」 for an older one is refused
+  // (the editor then saves it to My Designs) instead of overwriting a newer result.
+  const genNo = useRef(0);
+  useCanvasReturn("mockup", (slot, image) => {
+    // Refused while 存入 My Designs runs: it saves the image it started with, then marks the edit "saved".
+    if (slot !== `gen:${genNo.current}` || gen.status !== "done" || saveState === "saving") return false;
+    setGen((g) => ({ status: "done", image, fileMeta: g.status === "done" ? g.fileMeta : undefined }));
+    setSaveState("idle");
+    return true;
+  });
   // A finished composite belongs to the design it was made from: picking another design drops it from the preview.
   useEffect(() => {
+    genNo.current++;
     setGen((g) => (g.status === "generating" ? g : { status: "idle" }));
     setSaveState("idle");
   }, [designRef]);
@@ -385,6 +397,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     if (!designRef) { setGen({ status: "error", error: "請先選一張設計圖（My Designs 點選或上傳）" }); return; }
     jobIdRef.current = crypto.randomUUID();
     inFlight.current = true;
+    genNo.current++;
     setGen({ status: "generating" });
     setSaveState("idle");
     try {
@@ -836,7 +849,8 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 </button>
                 {canvasHref && (
                   <button className="btn-secondary"
-                    onClick={() => void openInCanvas(gen.image!, buildSemanticBase({ product: "商品圖", subject: gen.fileMeta?.subject, style: "平拍", track: gen.fileMeta?.track }), canvasHref)}>
+                    onClick={() => void openInCanvas(gen.image!, buildSemanticBase({ product: "商品圖", subject: gen.fileMeta?.subject, style: "平拍", track: gen.fileMeta?.track }), canvasHref,
+                      undefined, { tool: "mockup", slot: `gen:${genNo.current}`, label: "商品圖" })}>
                     在畫布編輯
                   </button>
                 )}
@@ -859,6 +873,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                   styleAnchor={{ model, mode: "image", stylePrompt: effectivePrompt, subject: `${mode} ${color}`, refs: designRef ? 1 : 0, target: "mockup" }}
                   onEditedImage={(image, meta) => {
                     setModel(meta.model);
+                    genNo.current++;
                     setGen((g) => ({ status: "done", image, fileMeta: g.fileMeta }));
                     setSaveState("idle");
                   }}
