@@ -120,6 +120,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       job.result.coverError = publicError(e.message);
     }
   }
+  // Card R2: the cover opener's picture = the cover's frame without its title (backend/cover.cjs coverFrame).
+  const coverFrame = (input, signal) => require("./cover.cjs").coverFrame(input, { catalog: remotion.catalog, jobs, dir: outputs, signal },
+    { run: mediaTools.run, localFile, cleanCopy: (url, o) => quickRender.cleanCopy(url, { fetchImpl, ...o }) });
   // The cover template (backend/cover.cjs titledJpeg) when the service is set up; else undefined.
   async function coverTemplate() {
     return (await remotion.configured(env, appDir))
@@ -712,6 +715,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       }
       if (job.input.operation === "remotion-template") {
         job.status = "running";
+        persist();
+        await coverFrame(job.input, signal);
         persist();
         const buffer = await remotion.render(job.input, {
           env, appDir, fetchImpl, signal, mediaData: mediaReference,
@@ -1543,7 +1548,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
       if (req.method === "GET" && route === "/capabilities") {
         await elevenlabs.account(env, fetchImpl); // the plan + credits the ElevenLabs rows price by (cached 10 min)
         const soundOut = await soundPolicy.allowed(); // plan U7: rows that send sound out are off for a client who keeps it here
-        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env, undefined, { soundOut }), audioTools: audioTools.capability(env, { soundOut }), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.catalog, sceneImage: sceneImage.capability(main), visualStyles: require("./visual-styles.cjs").catalog,
+        json(res, 200, { ...generationPolicy.capabilities(env, mediaTools.supported), blender: { ...require("./blender.cjs").capability(env), motions: blender3d().motions }, imageTo3d: imageTo3d.capability(env, { priced: !!main }), prices: costs.displayPrices({ ...providerModels, text: textModel, transcribe: transcribe.defaultEngine(env).model }), editorAgent: { ready: !!env.OPENAI_API_KEY }, transcribe: transcribe.capability(env, undefined, { soundOut }), audioTools: audioTools.capability(env, { soundOut }), imageEdit: imageEdit.capability(env), maxSentReferences: MAX_SENT_REFERENCES, remotion: await remotion.configured(env, appDir), remotionTemplates: remotion.catalog, introStyles: remotion.introStyles, sceneImage: sceneImage.capability(main), visualStyles: require("./visual-styles.cjs").catalog,
           reference: require("./reference.cjs").allowed(env, req) && require("./reference.cjs").present(env),
           // P6 L3: connected = finished videos open next-admin /release (same origin) for review and delivery.
           // Plan X3: storageBases = our own storage (next-admin r2.ts publicBucketBases); [] when it cannot be read now.

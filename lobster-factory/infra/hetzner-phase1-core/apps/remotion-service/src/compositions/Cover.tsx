@@ -3,9 +3,11 @@
  * (video-workbench backend/cover.cjs) full-bleed, a dark layer from the bottom up to the title, and the title in the
  * 片頭 look (brand.ts) placed by cover-layout.ts inside the ratio's safe area. No box behind the text: that is the
  * subtitle look this replaces.
+ * Card R2: the same component is the CoverOpener video (Root.tsx): with more than one frame it animates in
+ * (cover-layout.ts coverMotion) and its last frame is this still exactly.
  */
 import React from "react";
-import { AbsoluteFill, Img, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig } from "remotion";
 import {
   BACKDROP_COLOR,
   OVERLAY_COLOR,
@@ -17,7 +19,7 @@ import {
   TITLE_LINE_HEIGHT,
   TITLE_SHADOW,
 } from "../brand";
-import { layoutCover } from "../cover-layout";
+import { coverMotion, layoutCover } from "../cover-layout";
 
 export interface CoverProps {
   /** The frame, as a data: URI (the service cannot reach the workbench's urls) */
@@ -51,21 +53,40 @@ const lineStyle = (fontSize: number): React.CSSProperties => ({
   whiteSpace: "pre", // cover-layout.ts already broke the lines
 });
 
+const fill: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
+
 export const Cover: React.FC<CoverProps> = ({ backgroundUrl, title, subtitle }) => {
-  const { width, height } = useVideoConfig();
+  const { width, height, durationInFrames } = useVideoConfig();
+  const frame = useCurrentFrame();
   const layout = layoutCover({ width, height, title, subtitle });
+  const motion = coverMotion(frame, durationInFrames, height);
   // Solid to just above the title, then fading out: the text always sits on the dark part.
   const solid = Math.min(100, ((height - layout.blockTop) / height) * 100 + 4);
   const clear = Math.min(100, solid + 22);
   return (
     <AbsoluteFill style={{ backgroundColor: BACKDROP_COLOR }}>
+      {backgroundUrl && motion.backdropVisible && (
+        <AbsoluteFill style={{ filter: `blur(${Math.round(Math.min(width, height) * 0.03)}px)`, transform: "scale(1.1)" }}>
+          <Img src={backgroundUrl} style={fill} />
+        </AbsoluteFill>
+      )}
       {backgroundUrl && (
-        <Img src={backgroundUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <AbsoluteFill style={motion.imageScale === 1 ? undefined : { transform: `scale(${motion.imageScale})` }}>
+          <Img src={backgroundUrl} style={fill} />
+        </AbsoluteFill>
       )}
       <AbsoluteFill
         style={{ background: `linear-gradient(to top, ${OVERLAY_COLOR} 0%, ${OVERLAY_COLOR} ${solid}%, transparent ${clear}%)` }}
       />
-      <div style={{ position: "absolute", left: layout.box.left, top: layout.blockTop, width: layout.box.width }}>
+      <div
+        style={{
+          position: "absolute",
+          left: layout.box.left,
+          top: layout.blockTop + motion.titleOffset,
+          width: layout.box.width,
+          ...(motion.titleOpacity === 1 ? {} : { opacity: motion.titleOpacity }),
+        }}
+      >
         {layout.lines.map((line, i) => (
           <div key={i} style={lineStyle(layout.fontSize)}>
             {line}

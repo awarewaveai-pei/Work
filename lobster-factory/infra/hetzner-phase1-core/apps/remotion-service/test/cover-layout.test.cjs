@@ -2,7 +2,18 @@
 // floor, then cut with "…". The estimate (textEm) is what the composition draws by, so line width = textEm x fontSize.
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { layoutCover, wrapLines, textEm, coverFormatKey, COVER_FORMATS } = require("../dist/cover-layout.js");
+const { layoutCover, wrapLines, textEm, coverFormatKey, COVER_FORMATS, coverMotion } = require("../dist/cover-layout.js");
+
+// R2: the opener ends on the cover itself (the thumbnail's picture), and a 1-frame still is never animated.
+test("the cover opener's last frame and the still are the finished cover; the first frame is not", () => {
+  const done = { progress: 1, imageScale: 1, backdropVisible: false, titleOffset: 0, titleOpacity: 1 };
+  assert.deepEqual(coverMotion(0, 1, 1080), done);
+  for (const frames of [60, 61, 150]) {
+    assert.deepEqual(coverMotion(frames - 1, frames, 1920), done, `${frames} frames`);
+    const first = coverMotion(0, frames, 1920);
+    assert.ok(first.imageScale < 1 && first.backdropVisible && first.titleOpacity === 0 && first.titleOffset > 0, `${frames} frames start`);
+  }
+});
 
 const TITLES = {
   short: "失眠怎麼辦",

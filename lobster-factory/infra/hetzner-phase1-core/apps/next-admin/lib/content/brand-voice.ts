@@ -1,6 +1,7 @@
 // One brand voice for every content generator (AUTO_CONTENT_EXECUTION_PLAN.md I1). The stored copy is
 // wp_sites.content_defaults (read on the server by brand-voice-store.ts); this file is the shape and the one
 // renderer, with no server imports, so the browser tools and the server render the same prompt text.
+import { autoIntroStyles } from "../../public/editor-shared/intro-styles.js";
 
 export interface MarketingBrief {
   audience?: string;
@@ -44,6 +45,9 @@ export interface SiteContentDefaults {
   /** N8: each brand day, up to 3 trend topics scored for the brand (lib/content/topics/daily.ts). Off unless exactly true. */
   dailyTrendTopics?: boolean;
   youtubePrivacy?: YoutubePrivacy;
+  /** Card R2: the intro styles the site's automatic videos take in turn (public/editor-shared/intro-styles.js ids, the
+   *  automatic ones only); missing or [] = no intro. Set by its own PATCH field, like youtubePrivacy. */
+  introStyles?: string[];
   trendFeeds?: string[];
   requiredBlocks?: string[];
   language?: string;
@@ -146,6 +150,11 @@ export function youtubePrivacy(d: SiteContentDefaults | undefined): YoutubePriva
 /** The YouTube target's format, which carries its privacy to the sender (lib/social/compose.ts: "unlisted" -> unlisted,
  *  anything else -> public; "post" is every platform's plain format). */
 export const youtubeFormat = (d: SiteContentDefaults | undefined) => (youtubePrivacy(d) === "unlisted" ? "unlisted" : "post");
+
+/** Card R2: the site's automatic-video intro styles as they are used (known, automatic, each once); old data = [] = none. */
+export function siteIntroStyles(d: SiteContentDefaults | undefined): string[] {
+  return autoIntroStyles(d?.introStyles);
+}
 
 /** Only the exact stored value lets the schedule approve its own proposals: missing, misspelt or any other value = a person picks. */
 export function aiPicksTopics(d: SiteContentDefaults | undefined): boolean {

@@ -105,6 +105,18 @@ class BookendRender(unittest.TestCase):
         cues = pipeline.caption_utils.assemble([[{"startMs": 0, "endMs": 900, "text": "第一句"}]], [2.0], pipeline.bookend_lead_s(b))
         self.assertEqual(cues[0]["startMs"], 2500)
 
+    def test_silent_two_second_cover_opener(self):
+        # card R2: the cover opener is a 2 s remotion-service video without sound, joined by a 0.5 s crossfade
+        opener = f"{self.dir}/opener.mp4"
+        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30", "-t", "2",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", opener], check=True, capture_output=True)
+        b = {"intro": {"asset": opener}, "outro": None, "transition": "crossfade", "transition_s": 0.5}
+        out = self.compose(b)
+        self.assertFalse(b["intro"]["has_audio"])
+        self.assertAlmostEqual(_length(out), 2.0 + 5.0 - 0.5, delta=0.15)
+        cues = pipeline.caption_utils.assemble([[{"startMs": 0, "endMs": 900, "text": "第一句"}]], [2.0], pipeline.bookend_lead_s(b))
+        self.assertEqual(cues[0]["startMs"], 1500)
+
     def test_title_intro_and_outro_fade_black(self):
         b = {"intro": {"title": "片頭", "duration": 2.0}, "outro": {"title": "謝謝收看", "duration": 2.0},
              "transition": "fade-black", "transition_s": 0.5}

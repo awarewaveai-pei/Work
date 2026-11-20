@@ -8,6 +8,7 @@ import PublishModeButtons from "./PublishModeButtons";
 import TopicModeButtons from "./TopicModeButtons";
 import DailyTrendButtons from "./DailyTrendButtons";
 import YoutubePrivacyButtons from "./YoutubePrivacyButtons";
+import IntroStyleButtons from "./IntroStyleButtons";
 import RequiredBlocksField from "./RequiredBlocksField";
 import OptionButtons from "./OptionButtons";
 
@@ -791,6 +792,10 @@ export default function SiteManager() {
               site={sites.find(x => x.id === site.id) ?? site}
               onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
               readOnly={onDoor}
+            />
+            <IntroStyleButtons
+              site={sites.find(x => x.id === site.id) ?? site}
+              onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
             />
             <RequiredBlocksField
               key={site.id}

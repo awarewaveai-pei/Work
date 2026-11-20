@@ -27,10 +27,15 @@ export const TEMPLATE_MAP: Record<string, string> = {
   "dynamic-slideshow": "DynamicSlideshow",
   // A still: one JPEG (render-worker.ts renderStill), not a video. Caller: video-workbench backend/remotion.cjs coverStill.
   cover: "Cover",
+  // Card R2: the cover as a 2-5 s opener video (same component, animated in; last frame = the still).
+  "cover-opener": "CoverOpener",
 };
 
 // Templates rendered as one JPEG frame instead of an mp4.
 export const STILL_TEMPLATES = new Set(["cover"]);
+// Templates whose props are a cover's (coverPropsProblem); the opener is a short video, at most COVER_OPENER_MAX_S.
+export const COVER_TEMPLATES = new Set(["cover", "cover-opener"]);
+export const COVER_OPENER_MAX_S = 10;
 const MAX_TITLE = 200;
 
 /** The cover's props, checked before the job is queued; a reason = refused (400). */
@@ -129,8 +134,8 @@ export function createApp({ authRequired, authToken, store, runner }: AppDeps): 
     const totalFrames = Math.min(rawFrames != null ? Math.max(1, Math.round(rawFrames)) : Math.round(fps * 12), MAX_FRAMES);
     const isDataDriven = DATA_DRIVEN_TEMPLATES.has(templateId);
     const still = STILL_TEMPLATES.has(templateId);
-    if (still) {
-      const problem = coverPropsProblem(props);
+    if (COVER_TEMPLATES.has(templateId)) {
+      const problem = coverPropsProblem(props) ?? (!still && totalFrames > COVER_OPENER_MAX_S * fps ? `cover-opener is at most ${COVER_OPENER_MAX_S} seconds` : null);
       if (problem) {
         res.status(400).json({ error: problem });
         return;

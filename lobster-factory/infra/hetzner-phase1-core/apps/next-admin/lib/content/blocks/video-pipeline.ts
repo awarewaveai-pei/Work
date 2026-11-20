@@ -19,7 +19,8 @@ import {
   deleteDesignObject,
   isR2Configured,
 } from "../../storage/r2";
-import { submitRender, type RenderOutputMeta, type RenderOutputs, type VideoServiceCapability } from "../video/render-client";
+import { submitRender, type RenderOutputMeta, type RenderOutputs, type RenderOpts, type VideoServiceCapability } from "../video/render-client";
+import { makeIntro, type IntroStyle } from "../video/intro-opener";
 import { generateTarotImage, isTarotModel, TAROT_MODELS } from "../../tarot/image-gen";
 import { generateVideoMotionBatch, isVideoMotionModel } from "../../tarot/video-motion-gen";
 import { grantFor } from "@/lib/entitlements/grant";
@@ -347,6 +348,8 @@ export interface VideoPipelinePending {
   visualBreakdown: { custom: number; broll: number };
   imageModel?: string;
   serviceCapability?: VideoServiceCapability;
+  /** Card R2: the automatic intro asked for (ctx.introStyle) and, when the video went out without it, why. */
+  intro?: { style: string; note?: string };
 }
 type VideoPipelineResult = VideoPipelinePending | { ok: false; status: number; error: string };
 
@@ -738,14 +741,28 @@ register({
     if (!prep.ok) return prep as { ok: false; status: number; error: string };
     const { scenes, formatAssets, formats, r2Keys, title, origins } = prep;
 
+    // Card R2: the site's automatic intro (lib/content/video/intro-opener.ts). An asset intro is one file video-service
+    // crops into every ratio, so it is made only for a one-ratio video (the topic videos); any failure = no intro, a note.
+    const introStyle = ctx.introStyle as IntroStyle | null | undefined;
+    let intro: { style: string; note?: string } | undefined, bookends: RenderOpts["bookends"];
+    if (introStyle && introStyle.kind !== "none") {
+      onProgress?.(`片頭（${introStyle.label}）製作中…`);
+      const made = introStyle.kind !== "title" && formats.length > 1
+        ? { note: "封面開場與模板片頭只加在單一比例的影片，這支沒有加片頭" }
+        : await makeIntro(introStyle, { title, firstPicture: formatAssets[formats[0]]?.[0], format: formats[0] });
+      bookends = made.bookends;
+      intro = { style: introStyle.id, ...(made.note ? { note: made.note } : {}) };
+    }
+
     // 3) 提交 EU（短請求，不等渲染）→ 回 euJobId。渲染在 EU thread 跑，由 /status 輪詢收尾。
     onProgress?.("提交合成任務（EU 伺服器）…");
-    const sub = await submitRender(
+    // out_name 決定 R2 目錄 → object_key → 這列資產的身分。帶租戶前綴+隨機碼，
+    // 不再直接送標題（見 buildVideoOutName 註解的跨租戶覆寫案例）。
+    const outName = buildVideoOutName((ctx.organizationId as string | undefined) ?? null, title);
+    const send = (ends: RenderOpts["bookends"]) => submitRender(
       scenes.map((s) => ({ id: s.id, narration: s.narration })),
       [], // 多格式走 formatAssets（下方 opts）；位置參數 assets 忽略
-      // out_name 決定 R2 目錄 → object_key → 這列資產的身分。帶租戶前綴+隨機碼，
-      // 不再直接送標題（見 buildVideoOutName 註解的跨租戶覆寫案例）。
-      buildVideoOutName((ctx.organizationId as string | undefined) ?? null, title),
+      outName,
       undefined,
       {
         ttsProvider: ctx.ttsProvider as string | undefined,
@@ -754,8 +771,19 @@ register({
         introDuration: ctx.introDuration as number | undefined,
         formats,
         formatAssets,
+        ...(ends ? { bookends: ends } : {}),
       },
     );
+    let sub = await send(bookends);
+    // an intro never stops the video: refused because of it -- the service validated and refused (4xx) or is too old to
+    // join intros (submitRender's own check, nothing sent) -- = sent again without. A 5xx / network error may have started
+    // a render, so it is not sent twice.
+    const refused = sub.ok ? null : (sub as { ok: false; status: number; error: string });   // strict:false: !ok does not narrow
+    if (refused && bookends && (refused.status < 500 || /片頭接合/.test(refused.error))) {
+      intro = { style: intro!.style, note: `影片服務不收這個片頭（${refused.error}），影片照樣出，沒有片頭` };
+      sub = await send(undefined);
+    }
+    if (intro?.note) console.warn(`[video-pipeline] intro ${intro.style}: ${intro.note}`);
     if (!sub.ok) {
       await cleanupVideoInputKeys(r2Keys);
       return {
@@ -786,6 +814,7 @@ register({
       visualBreakdown,
       imageModel: ctx.imageModel as string | undefined,
       serviceCapability: sub.serviceCapability,
+      ...(intro ? { intro } : {}),
     };
   },
 });

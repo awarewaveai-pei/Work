@@ -184,6 +184,16 @@ function createServer({
         res.end(content);
         return;
       }
+      // Card R2: the intro styles' previews live beside their one definition in the main system
+      // (public/editor-shared/intro-styles/, shipped by awarewave-files.txt); a fixed name pattern, nothing else there.
+      if (/^\/editor-shared\/intro-styles\/[a-z0-9-]{1,60}\.jpg$/.test(pathname)) {
+        const preview = path.join(awareWaveDir, "public", pathname.slice(1));
+        if (!fs.existsSync(preview)) throw Error();
+        const body = fs.readFileSync(preview);
+        res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff", "Content-Length": body.length });
+        res.end(req.method === "HEAD" ? undefined : body);
+        return;
+      }
       if (
         /^\/generated\/[a-f0-9-]+\.(png|jpg|webp|gif|mp3|wav|m4a|mp4|webm|mov|cube)$/.test(
           pathname,

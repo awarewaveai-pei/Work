@@ -94,6 +94,29 @@ export function ellipsize(s: string, limit: number): string {
   return chars.join("").trimEnd() + "…";
 }
 
+/**
+ * Card R2: the cover as a 2-5 s opener (composition CoverOpener = the same Cover component). The picture grows from
+ * IMAGE_START to full bleed over a blurred copy of itself and the title slides up into place, both done by MOTION_SHARE
+ * of the length; the rest holds the finished cover, so the crossfade into the video starts from the thumbnail's picture.
+ * Invariant: the last frame, and a 1-frame still, is the cover exactly (progress 1: scale 1, offset 0, opacity 1).
+ */
+const IMAGE_START = 0.86, MOTION_SHARE = 0.6, TITLE_DELAY = 0.15, TITLE_RISE = 0.06;
+export interface CoverMotion { progress: number; imageScale: number; backdropVisible: boolean; titleOffset: number; titleOpacity: number }
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+const easeOut = (n: number) => 1 - Math.pow(1 - n, 3);
+export function coverMotion(frame: number, durationInFrames: number, height: number): CoverMotion {
+  const span = Math.max(1, Math.round(durationInFrames * MOTION_SHARE));
+  const p = durationInFrames <= 1 ? 1 : clamp01(frame / span);
+  const t = durationInFrames <= 1 ? 1 : clamp01((frame - span * TITLE_DELAY) / (span * (1 - TITLE_DELAY)));
+  return {
+    progress: p,
+    imageScale: IMAGE_START + (1 - IMAGE_START) * easeOut(p),
+    backdropVisible: p < 1,
+    titleOffset: Math.round((1 - easeOut(t)) * height * TITLE_RISE),
+    titleOpacity: easeOut(t),
+  };
+}
+
 export interface CoverLayout {
   format: string;
   box: { left: number; top: number; width: number; height: number };

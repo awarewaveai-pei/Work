@@ -6,6 +6,7 @@ import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, YOUTUBE_PRIVACIES, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { isSafePublicHttps } from "@/lib/content/public-https";
+import { autoIntroStyles } from "@/public/editor-shared/intro-styles.js";
 
 // youtubePrivacy (N5a): who sees the auto-made videos -- outward like the two modes, so set the same way
 const GATE_MODES = [
@@ -66,8 +67,13 @@ export async function PATCH(
     if (!(g.allowed as readonly unknown[]).includes(body[g.field]))
       return NextResponse.json({ ok: false, error: `${g.field} must be one of ${g.allowed.join(", ")}` }, { status: 400 });
   }
+  // Card R2: the automatic videos' intro styles -- its own field (a whole-defaults save keeps the stored list, as with the
+  // modes); automatic style ids only, each once; [] = no intro. Not a gate: it neither spends nor sends anything.
+  const introGiven = body.introStyles !== undefined;
+  if (introGiven && (!Array.isArray(body.introStyles) || autoIntroStyles(body.introStyles).length !== body.introStyles.length))
+    return NextResponse.json({ ok: false, error: "introStyles: 只能是可自動加的片頭樣式，每個一次" }, { status: 400 });
   let modesRead: Array<[string, string | null]> | undefined;   // undefined = content_defaults not written
-  if (defaultsGiven || GATE_MODES.some((g) => body[g.field] !== undefined)) {
+  if (defaultsGiven || introGiven || GATE_MODES.some((g) => body[g.field] !== undefined)) {
     const { data: current, error: readError } = await supabase.from("wp_sites").select("content_defaults").eq("id", id).maybeSingle();
     if (readError) return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
     const stored = ((current as { content_defaults: SiteContentDefaults | null } | null)?.content_defaults) ?? {};
@@ -92,6 +98,9 @@ export async function PATCH(
         next.requiredBlocks = blocks;
       }
     }
+    const intro = autoIntroStyles(introGiven ? body.introStyles : (stored as SiteContentDefaults).introStyles);
+    delete next.introStyles;
+    if (intro.length) next.introStyles = intro;
     modesRead = [];
     for (const g of GATE_MODES) {
       delete next[g.field];
@@ -101,6 +110,13 @@ export async function PATCH(
       const raw = (stored as Record<string, unknown>)[g.field];
       modesRead.push([g.field, raw === undefined || raw === null ? null : typeof raw === "string" ? raw : JSON.stringify(raw)]);
     }
+    // R2 (Codex daa15da9): the write is also conditional on the intro list read here, so a whole-defaults save racing an
+    // intro save gets 409 instead of writing the old list back. Compared as `content_defaults->>introStyles` renders a
+    // jsonb array of strings (", " between items); a hand-made non-list value is not compared (it reads as no intro).
+    const rawIntro = (stored as Record<string, unknown>).introStyles;
+    if (rawIntro === undefined || rawIntro === null) modesRead.push(["introStyles", null]);
+    else if (Array.isArray(rawIntro) && rawIntro.every((x) => typeof x === "string"))
+      modesRead.push(["introStyles", "[" + rawIntro.map((x) => JSON.stringify(x)).join(", ") + "]"]);
     patch.content_defaults = next;
   }
 

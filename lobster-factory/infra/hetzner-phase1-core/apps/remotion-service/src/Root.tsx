@@ -158,6 +158,22 @@ export const RemotionRoot: React.FC = () => {
           height: props.height ?? 1080,
         })}
       />
+      {/* Card R2: the same cover as a short opener video; its last frame is the still above. */}
+      <Composition
+        id="CoverOpener"
+        component={Cover}
+        durationInFrames={60}
+        fps={CoverDefaultProps.fps ?? 30}
+        width={CoverDefaultProps.width ?? 1920}
+        height={CoverDefaultProps.height ?? 1080}
+        defaultProps={{ ...CoverDefaultProps, durationInFrames: 60 }}
+        calculateMetadata={async ({ props }) => ({
+          durationInFrames: props.durationInFrames ?? 60,
+          fps: props.fps ?? 30,
+          width: props.width ?? 1920,
+          height: props.height ?? 1080,
+        })}
+      />
     </>
   );
 };

@@ -139,6 +139,24 @@ test("a cover renders as one JPEG still; a cover without a picture or title is r
   }
 });
 
+// R2: the cover opener is a short mp4 with the cover's props; the same picture/title rules, and at most 10 seconds.
+test("a cover opener renders as an mp4; bad cover props or more than 10 s are refused", async () => {
+  const { server, call } = await service(new JobStore(null));
+  try {
+    process.env.FAKE_RENDER_MODE = "ok";
+    const frame = "data:image/jpeg;base64,/9j/4AAQ";
+    const r = await call("/render", { templateId: "cover-opener", props: { backgroundUrl: frame, title: "開場" }, outputFormat: "16x9", fps: 30, durationInFrames: 60 });
+    assert.equal(r.status, 200);
+    const done = await settle(call, r.body.jobId);
+    assert.equal(done.status, "done", JSON.stringify(done));
+    assert.match(done.url, /\.mp4$/);
+    assert.equal((await call("/render", { templateId: "cover-opener", props: { backgroundUrl: "https://example.com/a.jpg", title: "開場" }, outputFormat: "16x9", fps: 30, durationInFrames: 60 })).status, 400);
+    assert.equal((await call("/render", { templateId: "cover-opener", props: { backgroundUrl: frame, title: "開場" }, outputFormat: "16x9", fps: 30, durationInFrames: 301 })).status, 400);
+  } finally {
+    server.close();
+  }
+});
+
 test("container limits come from the cgroup, and 1 GiB rules out parallel encoding at 1080p", () => {
   const v2 = tmp();
   fs.writeFileSync(path.join(v2, "cpu.max"), "200000 100000\n");

@@ -3,12 +3,29 @@
 // and fps follow the project, so nothing here is a second source of template ids or sizes.
 const edTitleFormats = ["16:9", "9:16", "4:5", "1:1"],
   edTitleFps = [24, 25, 30, 60];
+// Card R2: the style picker's choice. "title-card" (the render service's own title card) has no template here; nothing
+// chosen = the first template that is not the cover opener (the old default).
 function edTitleTemplate() {
   const list = VideoWorkbench.capabilities?.remotionTemplates || [];
-  return list.find((t) => t.id === ed.title.templateId) || list[0] || null;
+  if (ed.title.templateId === "title-card") return null;
+  return list.find((t) => t.id === ed.title.templateId) || list.find((t) => !t.cover) || list[0] || null;
+}
+// Card R2: the cover the 封面開場 starts from = the first (default) cover of this cut's newest finished output in the
+// project's ratio (backend/cover.cjs, best first). Outputs are this episode's, this editor project's, or a file on its
+// timeline. null = none yet (the card says to make one on the release panel first). url = the titled cover (shown here);
+// cover = its job and time, from which the server cuts the same frame without the title (backend/api.cjs coverFrame).
+function edCoverOf(p, jobs, hit) {
+  const urls = new Set(p.clips.map((c) => c.asset?.url).filter(Boolean));
+  return (jobs || [])
+    .filter((j) => j.status === "succeeded" && j.result?.covers?.[0]?.url && [j.input?.settings?.ratio, j.input?.settings?.project?.ratio].includes(p.ratio))
+    .filter((j) => (hit && j.input?.link?.projectId === hit.project.id && j.input.link.episodeId === hit.episode.id) || j.input?.link?.projectId === p.id || urls.has(j.result.url))
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map((j) => ({ url: j.result.covers[0].url, name: "封面", cover: { jobId: j.id, at: Number(j.result.covers[0].at) || 0 } }))[0] || null;
 }
 function edTitleBlocked(p) {
+  if (ed.title.templateId === "title-card") return "標題字卡在快速輸出、一鍵成片時由影片服務接上，剪輯器不另做片頭檔；要放進時間軸請改選其他樣式";
   if (!VideoWorkbench.capabilities?.remotion) return "片頭模板服務未設定";
+  if (edTitleTemplate()?.cover && !ed.title.cover) return "先到發布面板產生封面";
   if (!edTitleFormats.includes(p.ratio))
     return "片頭模板不支援 " + p.ratio + " 比例";
   if (!edTitleFps.includes(Timebase.fps(p.timebase)))
@@ -20,7 +37,12 @@ function edTitleBlocked(p) {
 const edTitleGeneratable = (f) => !/logo|profile/i.test(f.key),
   edTitleMedia = (f) => f.type === "image" || f.type === "audio",
   edTitleSeconds = (t) => ed.title.seconds ?? t.seconds.def;
-async function edTitleRefresh() {
+// p = the project whose pane is open (its cover is looked up again); left out = the cover stays as it was.
+// Redrawn only when something it shows changed: a re-check that finds nothing new must not stop playback or take the
+// focus from a field (critic, card R2).
+async function edTitleRefresh(p) {
+  const seen = () => JSON.stringify([(ed.title.images || []).map((a) => a.id), (ed.title.audios || []).map((a) => a.id), ed.title.done?.id, ed.title.cover?.url]),
+    before = seen();
   const rows = await VideoWorkbench.assets.list();
   ed.title.images = rows.filter(
     (a) =>
@@ -35,14 +57,19 @@ async function edTitleRefresh() {
   ed.title.done = ed.title.jobId
     ? rows.find((a) => a.id === "job-" + ed.title.jobId) || null
     : null;
-  if (tool === "edit" && ed.pane === "文字") edRender();
+  if (p && ed.title.projectId === p.id) {
+    ed.title.coverAt = Date.now();
+    ed.title.cover = edCoverOf(p, await VideoWorkbench.generations.list(), edSpineHit(p));
+  }
+  if (tool === "edit" && ed.pane === "文字" && seen() !== before) edRender();
 }
 function edTitlePane(p) {
   // The pane's state belongs to one project: another project's finished title must not be offered here.
   if (ed.title.projectId !== p.id) {
     const intro = edSpineHit(p)?.episode?.intro;
     ed.title = {
-      templateId: intro?.templateId || null,
+      // a saved title card shows as chosen (card R2 old data); a saved template by its id
+      templateId: intro?.kind === "title" ? "title-card" : intro?.templateId || null,
       fields: structuredClone(intro?.fields || {}),
       picks: structuredClone(intro?.references || {}),
       seconds: intro?.seconds || null,
@@ -50,12 +77,20 @@ function edTitlePane(p) {
       images: null,
       audios: null,
       done: null,
+      cover: null,
       projectId: p.id,
     };
   }
   const t = edTitleTemplate(),
-    blocked = edTitleBlocked(p),
     list = VideoWorkbench.capabilities?.remotionTemplates || [];
+  // The cover opener's picture is the cut's cover, never a library pick: it is set here, so every later step (the
+  // blocked check, the job's references, the episode's saved intro) reads it like any picked picture.
+  if (t?.cover) {
+    const key = t.fields.find((f) => f.type === "image").key;
+    if (ed.title.cover) ed.title.picks[key] = ed.title.cover;
+    else delete ed.title.picks[key];
+  }
+  const blocked = edTitleBlocked(p);
   // Card U8.3: an untouched text field starts from this episode (title; the first shot's line for the tagline).
   const hit = edSpineHit(p);
   if (t)
@@ -63,14 +98,20 @@ function edTitlePane(p) {
       title: hit?.episode?.name?.trim() || hit?.project?.title || p.title,
       line: edLines(hit?.episode)[0]?.line,
     });
-  if (!ed.title.images) {
-    ed.title.images = [];
-    ed.title.audios = [];
-    edTitleRefresh().catch(VideoWorkbench.reportError);
+  // No cover yet: looked up again (at most every 5 s), so one made on the release panel meanwhile enables the opener (Codex daa15da9).
+  if (!ed.title.images || (!ed.title.cover && Date.now() - (ed.title.coverAt || 0) > 5000)) {
+    ed.title.images ||= [];
+    ed.title.audios ||= [];
+    ed.title.coverAt = Date.now();
+    edTitleRefresh(p).catch(VideoWorkbench.reportError);
   }
   // One control per field of the template's table (backend/remotion.cjs): text, number, colour, or a library picker.
   const control = (f) => {
     const label = esc(f.label) + (f.required ? "" : '<span class="note">（選填）</span>');
+    if (t.cover && f.type === "image")
+      return ed.title.cover
+        ? `<p class="note">${label}（本集成片的封面）</p><img class="ed-intro-cover" src="${esc(ed.title.cover.url)}" alt="封面">`
+        : `<p class="note" data-ed-cover-missing>${label}：先到發布面板產生封面</p>`;
     if (f.type === "image" || f.type === "audio") {
       const rows = f.type === "image" ? ed.title.images : ed.title.audios,
         picked = ed.title.picks[f.key];
@@ -95,13 +136,18 @@ function edTitlePane(p) {
           : `<input ${attrs} maxlength="${f.type === "color" ? 7 : f.max}" value="${value}">`
     }</label>`;
   };
-  const intro = hit?.episode?.intro;
-  return `<h3>片頭</h3>${intro ? `<p class="note" data-ed-current-intro>本集：${esc(intro.kind === "title" ? "標題卡「" + intro.fields.title + "」" : list.find((x) => x.id === intro.templateId)?.label || "模板")} · ${intro.seconds} 秒 · ${esc({ none: "無轉場", crossfade: "交叉淡化", "fade-black": "淡黑" }[intro.transition])}</p>` : '<p class="note">本集尚未設定片頭。</p>'}<p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}）。</p><div class="flow-choices">${list
-    .map(
-      (x) =>
-        `<button type="button" class="btn small ${x.id === t?.id ? "selected" : ""}" data-ed-action="title-template:${esc(x.id)}" aria-pressed="${x.id === t?.id}">${esc(x.label)}</button>`,
-    )
-    .join("")}</div>${
+  const intro = hit?.episode?.intro,
+    chosen = ed.title.templateId === "title-card" ? "title-card" : t?.id;
+  // Card R2: one picture card per style (capabilities introStyles = next-admin public/editor-shared/intro-styles.js);
+  // single choice. 不加片頭 is not offered: removing an intro is removing its clip from the timeline.
+  const styles = (VideoWorkbench.capabilities?.introStyles || []).filter((s) => s.kind === "title" || list.some((x) => x.id === s.id));
+  const card = (s) => {
+    // the title card is made by the render service at output time: shown chosen when the episode has one saved, never
+    // pickable here (nothing in the editor could apply it -- Codex daa15da9)
+    const why = s.kind === "cover" && !ed.title.cover ? "先到發布面板產生封面" : s.kind === "title" && intro?.kind !== "title" ? "在快速輸出、一鍵成片設定" : "";
+    return `<button type="button" class="ed-intro-card ${s.id === chosen ? "selected" : ""}" data-ed-action="title-template:${esc(s.id)}" aria-pressed="${s.id === chosen}" ${why ? "disabled" : ""}>${s.preview ? `<img src="${esc(s.preview)}" alt="" loading="lazy">` : ""}<span>${esc(s.label)}</span>${why ? `<small>${why}</small>` : ""}</button>`;
+  };
+  return `<h3>片頭</h3>${intro ? `<p class="note" data-ed-current-intro>本集：${esc(intro.kind === "title" ? "標題卡「" + intro.fields.title + "」" : list.find((x) => x.id === intro.templateId)?.label || "模板")} · ${intro.seconds} 秒 · ${esc({ none: "無轉場", crossfade: "交叉淡化", "fade-black": "淡黑" }[intro.transition])}</p>` : '<p class="note">本集尚未設定片頭。</p>'}<p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}）。</p><div class="ed-intro-grid" role="group" aria-label="片頭樣式">${styles.map(card).join("")}</div>${
     t
       ? `<label>長度（秒，${t.seconds.min}–${t.seconds.max}）<input class="text-input" type="number" aria-label="片頭長度（秒）" data-ed-title-seconds min="${t.seconds.min}" max="${t.seconds.max}" step="1" value="${edTitleSeconds(t)}"></label>${t.fields.map(control).join("")}`
       : ""
@@ -158,8 +204,10 @@ async function edTitleInsert(p, asset, bookend = ed.title.renderedBookend) {
 }
 function edTitleBookend(p) {
   const t = edTitleTemplate(), old = edSpineHit(p)?.episode?.intro;
+  // The cover opener's picture is not saved with the episode: a later 一鍵成片 takes the first shot picture (the saved
+  // cover would be the titled one) -- card R2.
   return EpisodeSpine.normalizeBookend({ kind: "template", templateId: t.id, fields: structuredClone(ed.title.fields),
-    references: Object.fromEntries(Object.entries(ed.title.picks).map(([k, a]) => [k, { url: a.url, ...(a.id ? { id: a.id } : {}) }])),
+    references: Object.fromEntries(Object.entries(ed.title.picks).filter(([, a]) => !a.cover).map(([k, a]) => [k, { url: a.url, ...(a.id ? { id: a.id } : {}) }])),
     seconds: edTitleSeconds(t), transition: old?.transition || "crossfade", transitionSeconds: old?.transitionSeconds ?? 0.5 });
 }
 // ---- ED.5: 樣板／純文字／品牌字型 ----
@@ -394,7 +442,7 @@ edRegisterPane("text", {
           fps: Timebase.fps(p.timebase),
         },
         references: Object.fromEntries(
-          t.fields.filter((f) => ed.title.picks[f.key]).map((f) => [f.key, { url: ed.title.picks[f.key].url, id: ed.title.picks[f.key].id }]),
+          t.fields.filter((f) => ed.title.picks[f.key]).map((f) => [f.key, { url: ed.title.picks[f.key].url, id: ed.title.picks[f.key].id, ...(ed.title.picks[f.key].cover ? { cover: ed.title.picks[f.key].cover } : {}) }]),
         ),
       }, key = EpisodeSpine.bookendKey(input),
         previous = (await VideoWorkbench.generations.list()).filter((j) => j.input?.operation === "remotion-template" && EpisodeSpine.bookendKey(j.input) === key).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))).at(-1);

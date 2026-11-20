@@ -156,6 +156,27 @@ async function framePng({ file, seek, width, height, out, signal }, { run }) {
   return { width: w, height: h };
 }
 
+// Card R2: the cover opener's picture is the cover's own frame WITHOUT its title (the opener draws the title; the stored
+// cover JPEG already has it). The editor names the cover (references.<image>.cover = { jobId, at }); the frame is cut here
+// from that job's video -- its caption-less copy when the main system kept one, as the cover was -- and replaces the
+// titled picture on the input (so a retry does not cut it again). Not a cover opener, or no named cover: nothing to do.
+async function coverFrame(input, { catalog, jobs, dir, signal }, { run, localFile, cleanCopy }) {
+  const t = catalog.find((x) => x.id === input.settings?.templateId);
+  const key = t?.cover && t.fields.find((f) => f.type === "image").key, ref = key && input.references?.[key];
+  if (!ref?.cover) return;
+  const r = jobs.find((j) => j.id === ref.cover.jobId)?.result, at = Number(ref.cover.at);
+  if (!r?.url || !(r.width > 0 && r.height > 0) || !(at >= 0)) throw Object.assign(Error("找不到封面所在的影片，請到發布面板重新產生封面"), { status: 400 });
+  const clean = r.cleanUrl ? await cleanCopy(r.cleanUrl, { signal, dir }).catch(() => null) : null;
+  try {
+    const name = crypto.randomUUID() + ".jpg";
+    if (!(await stillJpeg({ input: clean || localFile(r.url), seek: at, width: r.width, height: r.height, out: path.join(dir, name), signal }, { run })))
+      throw Error("封面畫格超過 2 MB");
+    input.references[key] = { url: "/generated/" + name };
+  } finally {
+    if (clean) fs.rmSync(clean, { force: true });
+  }
+}
+
 // Time the covers may take (ms), 0 = none: at most COVER_MS, ending COVER_SLACK_MS before the job's deadline (the
 // browser stops watching a job then, shared/runtime.js); under COVER_MIN_MS left = not worth starting. No deadline = COVER_MS.
 const COVER_MS = 120000, COVER_SLACK_MS = 5000, COVER_MIN_MS = 3000;
@@ -165,4 +186,4 @@ function coverBudget(deadlineAt, now) {
   return budget >= COVER_MIN_MS ? budget : 0;
 }
 
-module.exports = { autoCovers, titledJpeg, stillJpeg, framePng, pickTimes, parseStats, titleSize, coverBudget, MAX_BYTES };
+module.exports = { autoCovers, titledJpeg, stillJpeg, framePng, coverFrame, pickTimes, parseStats, titleSize, coverBudget, MAX_BYTES };

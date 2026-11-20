@@ -24,6 +24,8 @@ export interface VideoStartInput {
   brandVoice: string;
   /** The uuid the script call's ai_call_logs row carries (a topic's id, N2); left out = none. */
   costJobId?: string;
+  /** Card R2: the automatic intro (lib/content/video/intro-opener.ts); null / left out = none. */
+  introStyle?: import("./intro-opener").IntroStyle | null;
 }
 
 interface PrepareResult {
@@ -38,6 +40,7 @@ interface PrepareResult {
   formats?: string[];
   visualBreakdown?: { custom: number; broll: number };
   serviceCapability?: VideoServiceCapability;
+  intro?: { style: string; note?: string };
   error?: string;
   status?: number;
 }
@@ -111,6 +114,7 @@ export async function startVideoJob(orgId: string | null, input: VideoStartInput
             imageModel: input.imageModel,
             source: "generate",
             serviceCapability: prep.serviceCapability,
+            ...(prep.intro ? { intro: prep.intro } : {}),
             ...(projectId ? { projectId } : {}),
           }
         : undefined,

@@ -17,4 +17,12 @@ public/editor-shared/image-models.js
 public/editor-shared/video-styles.js
 public/editor-shared/art-styles.js
 public/editor-shared/video-organization.cjs
+public/editor-shared/intro-styles.js
+public/editor-shared/intro-styles/title-card.jpg
+public/editor-shared/intro-styles/cover-opener.jpg
+public/editor-shared/intro-styles/scale-bg-text-slideup.jpg
+public/editor-shared/intro-styles/circle-mask-text-slideup-reveal.jpg
+public/editor-shared/intro-styles/pan-slide-text-left-3scenes.jpg
+public/editor-shared/intro-styles/product-review-typewriter.jpg
+public/editor-shared/intro-styles/photo-highlights-slides-zoom.jpg
 lib/ai/video-motion-models.ts

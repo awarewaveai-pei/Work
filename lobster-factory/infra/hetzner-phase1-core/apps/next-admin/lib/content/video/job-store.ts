@@ -60,6 +60,8 @@ export interface VideoJob {
     /** media_production_projects.id the render belongs to; checked against organizationId before it is stored. */
     projectId?: string;
     autoRunId?: string;
+    /** Card R2: the automatic intro asked for; note = why the video went out without it (the job's own record). */
+    intro?: { style: string; note?: string };
   };
   recorded?: boolean;           // media_assets 已記錄（只記一次）
 }

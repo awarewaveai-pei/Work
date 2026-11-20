@@ -14,7 +14,8 @@ import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
-import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteLanguage, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteIntroStyles, siteLanguage, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { introStyleFor } from "@/public/editor-shared/intro-styles.js";
 import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
 import { parseArticleMeta } from "@/lib/content/article/meta";
@@ -316,6 +317,16 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
 /** A video job row older than this with nothing submitted is a prepare that died (a prepare takes under ~100s). */
 export const STALE_PREPARE_MS = 15 * 60 * 1000;
 
+/** Card R2: how many videos the site's topics started before this one (its intro style is that count's turn,
+ *  introStyleFor); a failed count = 0 (the intro is decoration, never a reason to stop the video). */
+export async function siteVideosMade(sb: SupabaseClient, t: Pick<Topic, "id" | "site_id">): Promise<number> {
+  if (!t.site_id) return 0;
+  const { count, error } = await sb.from("content_topics").select("id", { count: "exact", head: true })
+    .eq("site_id", t.site_id).not("artifacts->video", "is", null).neq("id", t.id);
+  if (error) console.warn(`[content/topics] ${t.id} video count for the intro failed: ${error.message}`);
+  return error ? 0 : count ?? 0;
+}
+
 /** The topic's video, with the article page's default settings (lib/content/video/defaults.ts) and the site's voice. */
 async function startTopicVideo(sb: SupabaseClient, t: Topic, record: (jobId: string) => Promise<boolean>, capTwd: number): Promise<void> {
   const site = await siteFor(sb, t);
@@ -328,11 +339,13 @@ async function startTopicVideo(sb: SupabaseClient, t: Topic, record: (jobId: str
   // before the job row: a topic over its cap fails here with nothing started (a pre-N2 topic counts from TOPIC_BUDGET_EPOCH).
   // Nothing of this check is kept on the row: the script's cost reaches the ledger, which the next check reads.
   await capGuard(t, { ...a }, capTwd, (startedAt) => spentSince(sb, t.id, startedAt))(stepUpperTwd.video(), "影片");
+  const styles = siteIntroStyles(site.defaults);
+  const introStyle = styles.length ? introStyleFor(styles, await siteVideosMade(sb, t)) : null;
   const started = await startVideoJob(t.organization_id, {
     ...script,
     sceneCount: d.sceneCount, customScenes: d.customScenes, brollScenes: d.sceneCount - d.customScenes,
     imageModel: d.imageModel, outputFormats: [...d.formats], ...parseVoiceModel(articleVideoVoice(siteLanguage(site.defaults))),
-    costJobId: t.id,
+    costJobId: t.id, introStyle,
   }, { beforePrepare: record, projectFor: () => ensureTopicProject(sb, t, d.formats) });
   const failure = started.ok ? null : (started as Extract<typeof started, { ok: false }>).error;   // strict:false
   if (failure && failure !== "taken") throw new Error(`影片無法開始：${failure}`);

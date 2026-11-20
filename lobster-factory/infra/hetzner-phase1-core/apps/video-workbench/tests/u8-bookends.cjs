@@ -8,7 +8,7 @@ const intro = { kind: 'template', templateId: template.id, fields: { headline: '
 let saved;
 const ctx = vm.createContext({ console, structuredClone, crypto, EpisodeSpine, Timebase, document: { addEventListener() {} },
   ed: { title: {}, projects: [p], picks: new Set() }, edRegisterPane() {}, tool: 'other',
-  VideoWorkbench: { assets: { list: async () => [] }, capabilities: { remotion: true, remotionTemplates: [template] },
+  VideoWorkbench: { assets: { list: async () => [] }, generations: { list: async () => [] }, capabilities: { remotion: true, remotionTemplates: [template] },
     spine: { setBookends: async (v) => { saved = v; } } },
   edSpineHit: () => ({ project: { id: 'project' }, episode: { id: 'ep', intro } }),
   edLines: () => [], EditorModel: require('../shared/editor-model.js'), esc: (x) => String(x ?? ''),

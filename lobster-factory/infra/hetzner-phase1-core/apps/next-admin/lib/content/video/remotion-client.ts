@@ -9,6 +9,8 @@ const svcBase = () => process.env.REMOTION_SERVICE_URL ?? "http://127.0.0.1:8733
 export interface RemotionRenderOptions {
   readonly outputFormat?: "9x16" | "4x5" | "16x9" | "1x1";
   readonly fps?: 24 | 25 | 30 | 60;
+  /** The video's length in frames (remotion-service app.ts clamps it; default 12 s). */
+  readonly durationInFrames?: number;
 }
 
 /** POST /render → remotion service job ID (not the job-store UUID). */
