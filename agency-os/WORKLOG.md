@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-20（續29）— oracle 六類 GitHub 候選核對（研究，未改程式）
+
+- 結論與逐案表：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/GITHUB_RESEARCH.md`（唯一細節處）。
+- 重點：紫微／八字／每日的「首選」本站已在用；占星已用 Apache-2.0 的 `@xalen/wasm`，不需要 AGPL 的 Kerykeion。實際缺口三個——`iztro` 停在 2.5.8（2.6.1 修酉宮三主星亮度等，本站亮度直取 iztro：`Projects/internal/ziwei-doushu/lib/ziwei/brightness.ts:46`）；易經給 AI 的 facts 無卦辭爻辭（`lib/divination/systems/iching.ts:12-24`）；占星無相位。
+- 未做：未下載執行任何候選程式；分數為判斷。
+- REALTEST_EVIDENCE: tool=Bash | cmd=gh api repos/<17 個候選> --jq license/stars/pushed_at；gh api .../contents 讀 LICENSE、`scripts/gen-data.mjs`、`scripts/download-cards.js`、`assets/ASSET_LICENSE.md`；npm view iztro／lunar-javascript／@xalen/wasm version | exit=0 | ms=40000
+- REVIEW_WAIVED: DOC_ONLY -- 研究文件，無程式改動
+- BUGHUNT_WAIVED: DOC_ONLY -- 無 symbol 改動
 ## 2026-11-20（續28）— 模特兒圖庫加「上傳照片成新模特兒」（續27 剩餘風險；操作者：「要，加上」）
 
 [根因] 「上傳照片」只在各模特兒列（`ModelLibraryStudio.tsx` `uploadPhoto` 只認既有 `uploadFor`）：別人的照片只能歸進某位模特兒，混進他的長相參考與「刪除整位」範圍（續27 多刪 4 張中 2 張即此）。
