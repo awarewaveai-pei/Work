@@ -91,5 +91,12 @@ brief 在 `briefs/`（`COMMON.md`＋各卡）。
 | Z1 | 節氣名未併入共用簡→繁表（谷／穀一對多） | 正確判斷，維持整詞表 |
 | 全部 | AI 解讀未對真實模型跑 | 已處理：線上七系統 light 各一次皆 200 有文 |
 
+## 待辦：D1 oracle 併進 `sg-deploy.sh`（等部署工具修完；操作者 2026-11-20：「部署工具現在在修理中」）
+`deploy/oracle-deploy.sh` 是暫行路徑，不是最佳解：重做了 `sg-deploy.sh` 已有的鎖／`DEPLOY_HOLD`／回滾／通知，且 `rollback()` 未實際觸發過。前例 hci-app（同為 `Projects/internal/` 產品）已在 `sg-deploy.sh`。
+- 開工條件：操作者說部署工具修好。**在那之前不碰** `lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh`、`rollback-phase1.sh`、主機 `/root/lobster-phase1/docker-compose.yml`。
+- 要做：`sg-deploy.sh:32-37` `app_git_source_root`、`:42-47` `app_container_name`、`:146` RESTORABLE 清單各加 oracle；仿 `:276-287` 加 gate（`npm ci`＋`tsc`＋`vitest`）；`rollback-phase1.sh:36-43` `IMAGE_MAP` 加一列；主機 compose 以 `safe-infra-patch.sh` 加 `oracle-web` 服務（仿 repo `docker-compose.yml:803` hci-app 段）；原始碼與 `.env.production` 由 `/opt/oracle` 搬到 `/root/lobster-phase1/apps/`；`AGENTS_APPENDIX.md:241-253` 七項逐項對。
+- 刪除：`deploy/oracle-deploy.sh`、主機 `/opt/oracle`（含 `backups/`、`logs/`）、oracle 自己的 `docker-compose.yml`／override；`deploy/DEPLOY.md` 改寫。
+- High：動主機容器設定並重建 `oracle-web`，做之前再問操作者一次。
+
 ## 現況
 五個外部 skill 的內容全部上線。未排入：紫微夫妻宮／桃花運（yinyuan）、城市五行地圖（fengshui）、每日次數計量與帳號金流（`ORACLE_ROADMAP.md` Phase A）。工人 session 四個皆 idle，可封存。
