@@ -26,7 +26,7 @@ const nextPlan = readFileSync(path.join(repo, META.next), 'utf8');
 const sec8 = nextPlan.split(/^## 8\. 卡片/m)[1]?.split(/^## 9\./m)[0] || '';
 const planBatches = sec8.split(/^(?=\*\*批 \d+：)/m).slice(1).map((b) => ({
   code: `批${/^\*\*批 (\d+)：/.exec(b)[1]}`,
-  ids: [...[...b.matchAll(/^- \*\*(N\d+[a-z]?) /gm)].map((m) => m[1]), ...[...b.matchAll(/\*\*([BR]\d+)\*\*/g)].map((m) => m[1])],
+  ids: [...[...b.matchAll(/^- \*\*(N\d+[a-z]?) /gm)].map((m) => m[1]), ...[...b.matchAll(/\*\*([BRT]\d+)\*\*/g)].map((m) => m[1])],
 }));
 const pageBatches = STEPS.filter((s) => s.next).map((s) => ({ code: s.code, ids: s.items.map((it) => it.id) }));
 if (!planBatches.length) fail('下一階段計畫 §8 找不到任何批（標題或格式變了）');

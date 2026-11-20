@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-20（續8）— 影片下一階段：線 D 補修併入（舊文章不自動發）、實測四修正正式站實看、本批 RISKS 收尾
+
+- 併入：線 D `1a7a15284` cherry-pick 進 main。Codex 對 `48d6700ca`（已上線為 `369afb5c8`）補跑審查 3 點（artifact `agency-os/reports/oracle/2026-11-20-partialreview-17ea90d3.md`）：F3 屬實——標題空格檢查上線前做好的文章，存的 checks 沒有 `title_spacing`，自動發布站上仍會自己發；修在 `lib/content/topics/make.ts` 發布關卡（與必附段落關卡同處），沒人按發布就停、寫原因，有人按照常發。F1／F2（WordPress 端 Rank Math 外掛照字面比對焦點關鍵字、強力詞以 ASCII 空格切標題，`RankMathPowerWords.php:14`）＝brief 已接受的取捨：標題自然優先，WordPress 後台的 Rank Math 分數可能比主系統算的低，不影響發布。
+- 正式站實看（操作者 session，唯讀＋按取消）：`/tools/content/sites` 展開前後 `<select>` 0 個、`aria-pressed` 按鈕 183 顆（選中 42）、「每篇必附段落」可見並標「已設 1 段」；`/tools/content/topics` 無「儲存格式」鈕、格式鈕有 `aria-pressed`；按「發布」出現頁內確認區塊（題目「小坪數居家收納…」、列出「網站文章（WordPress 草稿改成公開）」），按「取消」後區塊消失、未發任何東西。
+- 沒看到的：「讀取草稿設定…」讀取狀態——只在帶 YouTube 草稿的題目出現，本次題目只有文章；有單元測試。文章標題自然——要等下一篇新文章。
+- 本批 RISKS 收尾：四項中「Instagram 重發」已完成（前一則 entry）、「正式站實看」本則完成；兩項接受不動（標籤上限只放 Instagram；平台拒收原話只在 Postiz）。
+- 未部署：`1a7a15284` 與禁用字比對 `caada1cfd` 隨今晚 03:00 自動部署（不為兩個小修另跑一次部署）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content`（98 files／605 tests passed）＋`npx tsc --noEmit` 無新錯；Chrome 正式站 DOM 讀取如上 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/2n（Codex 3 點：F3 已修，F1／F2 接受；監工讀 `make.ts` diff 4 行與新測試）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=title_spacing | hits=9
+- rollback：`git revert 1a7a15284`。
 ## 2026-11-20（續7）— Soulful 禁用說法已填；禁用字比對改成英文按整個字（操作者：「填」）
 
 - 動作（正式站網站設定頁，操作者 session）：Soulful 站 `401c0f67-f7bc-4731-9147-195096775b15` 的「禁用說法」填 `cure, heal illness, treat, diagnose, guaranteed results, 保證`，來源 `agency-os/tenants/company-soulful-expression/sites/soulfulexpression-org/content/CONTENT_STRATEGY.md:20`；按「儲存預設」。
