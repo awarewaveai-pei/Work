@@ -1,5 +1,6 @@
 import { Solar } from 'lunar-javascript';
-import { GAN, ganZhiIndex, ZHI, type Dun } from './plate';
+import { BRANCHES, ganZhiIndex, STEMS } from '../ganzhi';
+import { type Dun } from './plate';
 
 /**
  * 奇門遁甲・拆補法定局 — 起局時刻 → 四柱、節氣、三元、陰陽遁、局數。
@@ -63,7 +64,7 @@ export function yuanOf(dayGanZhi: string): { futou: string; yuan: Yuan } {
   const zhi = f % 12;
   // 子午卯酉(0,6,3,9)上、寅申巳亥(2,8,5,11)中、辰戌丑未(4,10,1,7)下
   const yuan: Yuan = zhi % 3 === 0 ? 'upper' : zhi % 3 === 2 ? 'middle' : 'lower';
-  return { futou: GAN[f % 10] + ZHI[zhi], yuan };
+  return { futou: STEMS[f % 10] + BRANCHES[zhi], yuan };
 }
 
 export function juOf(jieqi: string, yuan: Yuan): { dun: Dun; ju: number } {

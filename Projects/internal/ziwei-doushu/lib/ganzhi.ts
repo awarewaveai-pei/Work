@@ -63,6 +63,14 @@ export function ganZhiAt(i: number): string {
   return STEMS[n % 10] + BRANCHES[n % 12];
 }
 
+/** 六十甲子序 0..59(甲子 = 0);陰陽不配的干支拋錯。 */
+export function ganZhiIndex(gz: string): number {
+  const g = stemIndex(gz[0]);
+  const z = branchIndex(gz[1]);
+  if (g % 2 !== z % 2) throw new Error(`非法干支: ${gz}`);
+  return (((6 * g - 5 * z) % 60) + 60) % 60;
+}
+
 // ---- 干支關係規則表(字序即傳統口訣字序) ----
 
 /** 天干五合與所化五行 */

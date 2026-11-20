@@ -12,15 +12,14 @@
  * 外環順時針(上南下北的畫法):坎1 → 艮8 → 震3 → 巽4 → 離9 → 坤2 → 兌7 → 乾6。
  */
 
+import { BRANCHES, ganZhiAt, ganZhiIndex } from '../ganzhi';
+
 export type Palace = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 export type Dun = 'yang' | 'yin';
 
 export type Star = '天蓬' | '天任' | '天沖' | '天輔' | '天英' | '天芮' | '天柱' | '天心' | '天禽';
 export type Door = '休門' | '生門' | '傷門' | '杜門' | '景門' | '死門' | '驚門' | '開門';
 export type Deity = '值符' | '螣蛇' | '太陰' | '六合' | '白虎' | '玄武' | '九地' | '九天';
-
-export const GAN = '甲乙丙丁戊己庚辛壬癸';
-export const ZHI = '子丑寅卯辰巳午未申酉戌亥';
 
 /** 地盤布干次序(三奇六儀) */
 const YI_QI = ['戊', '己', '庚', '辛', '壬', '癸', '丁', '丙', '乙'] as const;
@@ -84,18 +83,6 @@ export interface QimenPlate {
   ma: { zhi: string; palace: Palace };
   /** 依宮號 1..9 排列 */
   palaces: QimenPalace[];
-}
-
-/** 六十甲子序 0..59 */
-export function ganZhiIndex(gz: string): number {
-  const g = GAN.indexOf(gz[0]);
-  const z = ZHI.indexOf(gz[1]);
-  if (g < 0 || z < 0 || g % 2 !== z % 2) throw new Error(`非法干支: ${gz}`);
-  return (((6 * g - 5 * z) % 60) + 60) % 60;
-}
-
-function ganZhiAt(i: number): string {
-  return GAN[i % 10] + ZHI[i % 12];
 }
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
@@ -168,7 +155,7 @@ export function layPlate(dun: Dun, ju: number, hour: string): QimenPlate {
     at(RING[mod(ringIdx(starTarget) + step * k, 8)]).deity = d;
   });
 
-  const kongZhi = ZHI[mod(hourIdx % 12 - sinceXun - 2, 12)] + ZHI[mod(hourIdx % 12 - sinceXun - 1, 12)];
+  const kongZhi = BRANCHES[mod(hourIdx % 12 - sinceXun - 2, 12)] + BRANCHES[mod(hourIdx % 12 - sinceXun - 1, 12)];
   const kongPalaces = [...new Set([...kongZhi].map((z) => ZHI_PALACE[z]))];
   for (const p of kongPalaces) at(p).kong = true;
   const maZhi = MA[hour[1]];
