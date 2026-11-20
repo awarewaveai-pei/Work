@@ -93,7 +93,7 @@ brief 在 `briefs/`（`COMMON.md`＋各卡）。
 
 ## D1 oracle 併進 `sg-deploy.sh` — 完成（2026-11-20，`c5b2091fd`；上線 `4adb301f3`）
 oracle 是 `sg-deploy.sh` 的 app `oracle-web`（`Projects/internal/ziwei-doushu/deploy/DEPLOY.md`）。`oracle-deploy.sh`、產品自己的 compose、主機 `/opt/oracle` 已刪。細節與證據：`agency-os/WORKLOG.md` 2026-11-20 同名條目。
-`products.ts` 已有 oracle 一列（外部門、`coming_soon`、`features: []`；`e0f9cdee6`）。
+`products.ts` 不登記 oracle（`e0f9cdee6` 加過、`f41ca1bbe` 撤回）：登記的產品必須是 `0110_plans_entitlements.sql` 三個 `product_key` CHECK 接受的值，否則每日補發權益會失敗；要登記須連同一支改這三個 CHECK 的 migration，與 oracle 的帳號／計量同一張卡做。
 
 ## 現況
 五個外部 skill 的內容全部上線。未排入：紫微夫妻宮／桃花運（yinyuan）、城市五行地圖（fengshui）、每日次數計量與帳號金流（`ORACLE_ROADMAP.md` Phase A）。工人 session 四個皆 idle，可封存。

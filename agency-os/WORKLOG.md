@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-20（續26）— 撤回 oracle 產品登記列：main 的主系統完整測試被我弄紅（`e0f9cdee6` → `f41ca1bbe`）
+
+- 根因：續25 加列前只跑 `npx vitest run lib/portal`，沒跑全套。`lib/entitlements/__tests__/expiry.test.ts:171` 要求每個 `PRODUCTS` key 都在 `lobster-factory/packages/db/migrations/0110_plans_entitlements.sql:9`、`:22` 等三處 `product_key in (…)` 清單內——每日補發權益會對每個產品寫列，未知 key 在正式資料庫會失敗。CI run on `77126c9ce`：`next-admin — full test suite` failure（`expected [ 'oracle' ] to deeply equal []`）。CI 閘擋住，未部署、正式站未受影響。
+- 決定：不加（撤回）。登記 oracle 必須連帶一支 migration 改 `plans`／`organization_entitlements`／`organization_product_subscriptions` 三個 CHECK；為一個沒有帳號、沒有收費功能、未販售的產品動帳務表，不值得。等 oracle 做帳號與計量時，與該 migration 同一張卡處理。
+- 做法：移除 `products.ts` 該列與 `lib/oracle/MODULE_MANIFEST.json`；`node scripts/sync-foundry-catalog.mjs` 重產（保留續25 順帶補上的 `tools/photo-pro` 匯出）。`products.ts` 與 `e0f9cdee6~1` 逐字相同（`git diff` 空）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit && npx vitest run → 5085 passed／3 failed（`tools/seedstar` ×2＝別的 session 未追蹤資料夾；mockup `model-flow.render`＝別的 session 未提交的 `ModelMockupPanel.tsx`／`model-options.ts`；皆不在 main）；`expiry.test.ts` 通過；`sync-foundry-catalog.mjs --check` PASS | exit=0 | ms=95000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（撤回；以全套測試與 `git diff` 空驗）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PRODUCT_HOST_ORACLE | hits=2（本日 WORKLOG 兩條目的記錄文字；程式與匯出 0）
+- 避免再發：動 `lib/portal/products.ts` 一律跑 next-admin **全套** `npx vitest run`（登記表被 entitlements、doors、staff-tools、Foundry 匯出多處測試交叉檢查）；本 session 稍早自己定的「每批併入跑全套」這次沒照做。
+- rollback：不需要（已回到 `e0f9cdee6` 之前）。
 ## 2026-11-20（續25）— oracle 登記為產品（`products.ts` 外部門一列＋`lib/oracle/MODULE_MANIFEST.json`）（操作者：「你決定」）
 
 - 決定與理由：加。`lib/portal/products.ts` 是產品與門的唯一清單（ADR 017/018；`AGENTS_APPENDIX.md` 新部署路徑清單第 7 項）；oracle.aware-wave.com 是對客戶的門卻不在其中＝清單與實況不符。前例：`hci`、`cognitive` 同為獨立容器、未販售即已登記。
