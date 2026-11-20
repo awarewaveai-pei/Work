@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-20（續4）— 影片下一階段：實測找到的四個問題與 Instagram 發送失敗修好並上線（操作者「修」）
+
+- 更正監工自己的誤判：先前回報「Instagram 頻道授權失效、請重新連接」是照系統制式訊息轉述、未查證。操作者質疑後查證：主系統 `social_accounts` instagram `connected`；Postiz `Integration cmvnxspa90001p88sopr0qp60` `refreshNeeded=f`、`disabled=f`、token 到 2126；Postiz `Post cmwnubqju000aqs8hd51utg89` `ERROR`，`error.details` 有 Instagram 原話 code 36004／subcode 2207117「說明文字的主題標籤數量上限為 30 個」，該則實數 31 個。根因＝`lib/social/write-posts.ts:17` 提示詞要 Instagram 寫「20–30 hashtags」且程式不數；「叫人重新連接」＝`lib/social/dispatch.ts:108` 在 Postiz 沒回原因時一律寫重連。監工原先猜的 16:9 比例與中文網址皆非原因。
+- 驗收併入（四條線，brief `briefs/live-test-fixes.md`、`briefs/instagram-send-failure.md`）：A `3350c93a0` → `72ab39403`（發布鈕按下即顯示讀取中、頁內確認區塊取代原生 confirm、格式點了就存且有 `aria-pressed`）；B `0925395cc` → `c1ed20bc6`（網站設定頁 10 個 `<select>` 改按鈕組、必附段落常駐可見、禁用 select 的檢查器）；C `48d6700ca` → `369afb5c8`（空格來源＝`lib/content/article/generate-core.ts:287-291` 提示詞要求強力詞與情緒詞前後加半形空格、數字範例「7 個」，加上 `lib/seo/rankmath-checker.ts:107` 起逐字比對關鍵字「感恩節 心理學」；改成中日韓文字比對忽略空白、提示詞要求自然標題）；Instagram `de10ab4a5` → `afb02abfb`（`lib/social/limits.ts` 主題標籤上限表，寫文案、存檔、送出三處把關；頻道 connected 時的未知失敗訊息不再含「重新連接」）。
+- 本批 RISKS 一起判：接受——標籤上限只放 Instagram（其他平台無實證）；平台拒收的原話只在 Postiz 資料庫，主系統目前只能列常見原因（要顯示原話得另做回傳）。待做——`93ced27f-bfea-4096-9f66-d2b78de10cf5` 的 Instagram 那一項尚未重發（步驟：文案刪到 30 個標籤以內 → 只重排 Instagram；Facebook 已成功不重發）；四處修改尚未在正式站瀏覽器實看。
+- 部署（這一批一次）：主機 `setsid nohup sg-deploy.sh next-admin`；`.deployed-commit = afb02abfb`（previous 18cecdd68），`lobster-next-admin healthy after 15s`，HTTP smoke all OK（2026-11-20T00:31Z）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql -U supabase_admin -d postiz`（Post.error、Integration）＋主系統 `social_accounts`；本機 next-admin 全套 `npm test` 603 files passed（2 failed＝他線 untracked `tools/seedstar/`）；主機 sg-deploy smoke OK | exit=0 | ms=900000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/4n（Instagram 卡 Codex 一輪四項工人已修；A／C critic 一輪；B 全套綠；監工讀各報告與根因證據）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=hashtag|重新連接|asyncUtilTimeout|OptionButtons | hits=30
+- ORACLE_WAIVED: 本 commit 只有 WORKLOG；程式改動的審查紀錄隨各工人 commit（Codex 有額度的走 Codex，無額度的 critic）
+- rollback：`git revert afb02abfb 369afb5c8 c1ed20bc6 72ab39403`；部署 rollback＝`rollback-phase1.sh`（next-admin 快照）。
 ## 2026-11-20（續3）— 影片下一階段：剩餘實看完成；AwareWave 第一則真發布實測（操作者「看完之後你要實測，都用立即發布」）
 
 - 剩餘實看（Chrome，正式站）：B1 發布頁 `video.aware-wave.com/review-release?organizationId=2bf60452…&asset=41b1ee7e…&section=release` → 同頁列出專案三個比例（9:16、16:9、4:5），社群草稿一個頻道一列、比例為按鈕且只列已核准的（Bluesky 預設 16:9、Facebook 預設 4:5），0 個下拉；N12 腳本頁輸入主題後顯示「一鍵到草稿…通常約 NT$38.3，最多 NT$73.49」，無美元字樣。
