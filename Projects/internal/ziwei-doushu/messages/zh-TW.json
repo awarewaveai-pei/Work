@@ -12,7 +12,8 @@
     "tarot": "塔羅",
     "daily": "每日運勢",
     "astrology": "西洋占星",
-    "fengshui": "風水飛星"
+    "fengshui": "風水飛星",
+    "qimen": "奇門遁甲"
   },
   "hub": {
     "title": "東西方命理",
@@ -313,6 +314,44 @@
       "liuSha": "六煞",
       "huoHai": "禍害"
     }
+  },
+  "qimen": {
+    "title": "奇門遁甲",
+    "subtitle": "時家轉盤九宮 · 值符值使 · AI 時機與方位解讀",
+    "method": "口徑:時家奇門、轉盤、拆補法定局,陰陽遁依節氣(冬至後陽遁、夏至後陰遁),中五宮寄坤二;23:00 起換日;時間以台灣/北京時間(UTC+8)計。",
+    "timeLabel": "起局時間",
+    "now": "現在",
+    "topicLabel": "想問的主題",
+    "topics": {
+      "general": "整體運勢",
+      "career": "事業工作",
+      "wealth": "財務收入",
+      "relationship": "感情人際",
+      "study": "考試學習"
+    },
+    "compute": "起局",
+    "yang": "陽遁",
+    "yin": "陰遁",
+    "ju": "{dun}{n}局",
+    "jieqi": "{name}{yuan}",
+    "yuan": {
+      "upper": "上元",
+      "middle": "中元",
+      "lower": "下元"
+    },
+    "pillars": "四柱",
+    "zhiFu": "值符",
+    "zhiShi": "值使",
+    "kong": "旬空",
+    "ma": "馬星",
+    "yongShen": "用神",
+    "chartTitle": "奇門九宮盤",
+    "chartLegend": "上南下北 · 每宮:八神 / 九星 / 八門 / 天盤干 · 地盤干",
+    "heaven": "天",
+    "earth": "地",
+    "kongMark": "空",
+    "maMark": "馬",
+    "center": "中五寄坤二"
   },
   "errors": {
     "computeFailed": "排盤失敗,請檢查輸入"

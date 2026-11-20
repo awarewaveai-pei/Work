@@ -19,6 +19,7 @@ export const SYSTEM_IDS = [
   'astrology',
   'hehun',
   'fengshui',
+  'qimen',
 ] as const;
 export type SystemId = (typeof SYSTEM_IDS)[number];
 

@@ -12,7 +12,8 @@
     "tarot": "Tarot",
     "daily": "Daily Fortune",
     "astrology": "Astrology",
-    "fengshui": "Feng Shui"
+    "fengshui": "Feng Shui",
+    "qimen": "Qi Men Dun Jia"
   },
   "hub": {
     "title": "East & West Divination",
@@ -313,6 +314,44 @@
       "liuSha": "Liu Sha",
       "huoHai": "Huo Hai"
     }
+  },
+  "qimen": {
+    "title": "Qi Men Dun Jia",
+    "subtitle": "Hour chart on the rotating plate · chief star and door · AI reading on timing and direction",
+    "method": "Method: hour-based Qi Men, rotating plate, Chai Bu cycle rule; Yang Dun from the Winter Solstice and Yin Dun from the Summer Solstice; the center palace lodges in Kun 2; the day changes at 23:00; times are UTC+8 (Taiwan / Beijing).",
+    "timeLabel": "Chart time",
+    "now": "Now",
+    "topicLabel": "What would you like to ask about?",
+    "topics": {
+      "general": "General outlook",
+      "career": "Career and work",
+      "wealth": "Money and income",
+      "relationship": "Love and relationships",
+      "study": "Exams and study"
+    },
+    "compute": "Cast chart",
+    "yang": "Yang Dun",
+    "yin": "Yin Dun",
+    "ju": "{dun}, chart {n}",
+    "jieqi": "{name}, {yuan}",
+    "yuan": {
+      "upper": "upper cycle",
+      "middle": "middle cycle",
+      "lower": "lower cycle"
+    },
+    "pillars": "Four pillars",
+    "zhiFu": "Chief star",
+    "zhiShi": "Chief door",
+    "kong": "Void",
+    "ma": "Horse star",
+    "yongShen": "Focus element",
+    "chartTitle": "Qi Men nine-palace chart",
+    "chartLegend": "South at top · each palace: deity / star / door / heaven stem · earth stem",
+    "heaven": "H",
+    "earth": "E",
+    "kongMark": "Void",
+    "maMark": "Horse",
+    "center": "Center lodges in Kun 2"
   },
   "errors": {
     "computeFailed": "Charting failed, please check your input"

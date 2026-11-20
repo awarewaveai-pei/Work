@@ -74,6 +74,19 @@ declare module 'lunar-javascript' {
     getYearInGanZhiByLiChun(): string;
     getDayYi(): string[];
     getDayJi(): string[];
+    /** 以節氣精確時刻換年/月;日以 23:00 換日 */
+    getYearInGanZhiExact(): string;
+    getMonthInGanZhiExact(): string;
+    getDayInGanZhiExact(): string;
+    getTimeInGanZhi(): string;
+    /** wholeDay=false:精確到秒的上一個節氣(含當下時刻) */
+    getPrevJieQi(wholeDay?: boolean): JieQi;
+  }
+
+  export class JieQi {
+    /** 簡體節氣名 */
+    getName(): string;
+    getSolar(): Solar;
   }
 
   export class Solar {
@@ -90,5 +103,7 @@ declare module 'lunar-javascript' {
     getYear(): number;
     getMonth(): number;
     getDay(): number;
+    getHour(): number;
+    getMinute(): number;
   }
 }
