@@ -16,6 +16,7 @@ const GLYPHS: Record<PageSlug, string> = {
   hehun: "☯",
   iching: "☲",
   tarot: "✦",
+  qian: "☸",
   astrology: "♆",
   fengshui: "☷",
   qimen: "☰",
