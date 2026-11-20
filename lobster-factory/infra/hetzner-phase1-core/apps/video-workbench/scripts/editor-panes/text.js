@@ -147,9 +147,9 @@ function edTitlePane(p) {
     const why = s.kind === "cover" && !ed.title.cover ? "先到發布面板產生封面" : s.kind === "title" && intro?.kind !== "title" ? "在快速輸出、一鍵成片設定" : "";
     return `<button type="button" class="ed-intro-card ${s.id === chosen ? "selected" : ""}" data-ed-action="title-template:${esc(s.id)}" aria-pressed="${s.id === chosen}" ${why ? "disabled" : ""}>${s.preview ? `<img src="${esc(s.preview)}" alt="" loading="lazy">` : ""}<span>${esc(s.label)}</span>${why ? `<small>${why}</small>` : ""}</button>`;
   };
-  return `<h3>片頭</h3>${intro ? `<p class="note" data-ed-current-intro>本集：${esc(intro.kind === "title" ? "標題卡「" + intro.fields.title + "」" : list.find((x) => x.id === intro.templateId)?.label || "模板")} · ${intro.seconds} 秒 · ${esc({ none: "無轉場", crossfade: "交叉淡化", "fade-black": "淡黑" }[intro.transition])}</p>` : '<p class="note">本集尚未設定片頭。</p>'}<p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}）。</p><div class="ed-intro-grid" role="group" aria-label="片頭樣式">${styles.map(card).join("")}</div>${
+  return `<h3>片頭</h3>${intro ? `<p class="note" data-ed-current-intro>本集：${esc(intro.kind === "title" ? "標題卡「" + intro.fields.title + "」" : list.find((x) => x.id === intro.templateId)?.label || "模板")} · ${intro.seconds} 秒 · ${esc(Transitions.name(intro.transition))}轉場</p>` : '<p class="note">本集尚未設定片頭。</p>'}<p class="note">比例與影格率跟隨專案（${esc(p.ratio)} · ${esc(Timebase.label(p.timebase))}）。</p><div class="ed-intro-grid" role="group" aria-label="片頭樣式">${styles.map(card).join("")}</div>${
     t
-      ? `<label>長度（秒，${t.seconds.min}–${t.seconds.max}）<input class="text-input" type="number" aria-label="片頭長度（秒）" data-ed-title-seconds min="${t.seconds.min}" max="${t.seconds.max}" step="1" value="${edTitleSeconds(t)}"></label>${t.fields.map(control).join("")}`
+      ? `<label>長度（秒，${t.seconds.min}–${t.seconds.max}）<input class="text-input" type="number" aria-label="片頭長度（秒）" data-ed-title-seconds min="${t.seconds.min}" max="${t.seconds.max}" step="1" value="${edTitleSeconds(t)}"></label>${t.fields.map(control).join("")}<p class="note">片頭轉場（接到第一個片段）</p>${Transitions.buttons({ label: "片頭轉場", value: ed.title.transition ?? intro?.transition ?? Transitions.AUTO.id, esc, attrs: (id) => `data-ed-action="${esc("title-transition:" + id)}"` })}`
       : ""
   }<button type="button" class="btn primary small" data-ed-action="title-generate" ${blocked ? "disabled" : ""}>產生片頭（免費）</button>${blocked ? `<p class="note" data-ed-title-blocked>${esc(blocked)}</p>` : ""}${ed.title.done ? edButton("放到時間軸開頭", "title-insert") : ""}`;
 }
@@ -159,7 +159,8 @@ async function edTitleInsert(p, asset, bookend = ed.title.renderedBookend) {
   const a = await edProbe(asset);
   if (!ed.projects.includes(p)) return;
   const hit = edSpineHit(p),
-    end = EpisodeSpine.normalizeBookend(bookend || hit?.episode?.intro || edTitleBookend(p));
+    end = EpisodeSpine.normalizeBookend(bookend || hit?.episode?.intro || edTitleBookend(p)),
+    transition = Transitions.name(end.transition);
   if (p.clips.some((row) => row.bookend === "intro")) throw Error("時間軸已有片頭，請先移除舊片頭再加入，避免重複");
   const first = p.clips.filter((row) => row.track === edMain(p)).sort((a, b) => a.startFrame - b.startFrame)[0];
   if (first && first.startFrame !== 0) throw Error("請先把主影片軌開頭對齊，再加入片頭轉場");
@@ -193,8 +194,8 @@ async function edTitleInsert(p, asset, bookend = ed.title.renderedBookend) {
   );
   for (const row of p.clips)
     edTime(p, row, { startFrame: row.startFrame + c.durationFrames });
-  if (first && end.transition !== "none") {
-    first.transition = end.transition === "fade-black" ? "黑場" : "溶解";
+  if (first && transition !== "無") {
+    first.transition = transition;
     first.transitionFrames = Timebase.toFrames(end.transitionSeconds, p.timebase);
   }
   p.clips.push(c);
@@ -208,7 +209,7 @@ function edTitleBookend(p) {
   // cover would be the titled one) -- card R2.
   return EpisodeSpine.normalizeBookend({ kind: "template", templateId: t.id, fields: structuredClone(ed.title.fields),
     references: Object.fromEntries(Object.entries(ed.title.picks).filter(([, a]) => !a.cover).map(([k, a]) => [k, { url: a.url, ...(a.id ? { id: a.id } : {}) }])),
-    seconds: edTitleSeconds(t), transition: old?.transition || "crossfade", transitionSeconds: old?.transitionSeconds ?? 0.5 });
+    seconds: edTitleSeconds(t), transition: ed.title.transition ?? old?.transition ?? Transitions.AUTO.id, transitionSeconds: old?.transitionSeconds ?? 0.5 });
 }
 // ---- ED.5: 樣板／純文字／品牌字型 ----
 // Template looks are made of theme tokens only: the preview card paints them with var(--token), and a clip gets the
@@ -381,6 +382,13 @@ edRegisterPane("text", {
       c.font = font;
       edRender();
       await edSave();
+    },
+    // card R2: the intro's transition, from the transitions module's list (any of them: the editor's export makes all)
+    "title-transition:": async (action) => {
+      const name = Transitions.name(action.slice(17));
+      if (name === null) throw Error("轉場不存在");
+      ed.title.transition = name;
+      edRender();
     },
     "title-template:": async (action, p, c) => {
       ed.title.templateId = action.slice(15);

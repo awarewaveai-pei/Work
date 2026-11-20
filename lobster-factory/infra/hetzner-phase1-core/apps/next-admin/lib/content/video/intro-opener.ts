@@ -8,12 +8,14 @@
 import { autoFill, INTRO_TEMPLATES } from "../../../public/editor-shared/intro-styles.js";
 import { pollRemotion, submitRemotion } from "./remotion-client";
 import type { RenderBookends } from "./render-client";
+import Transitions from "../../../public/editor-shared/transitions.js";
 
 export interface IntroStyle { id: string; label: string; kind: string }
 export interface IntroResult { bookends?: RenderBookends; note?: string }
 
-/** Automatic intros: crossfade 0.5 s (card R2 item 11); a title card is 3 s (video-service's own default). */
-export const AUTO_TRANSITION = { transition: "crossfade", transitionSeconds: 0.5 } as const;
+/** The join: the site's transition (brand-voice.ts siteIntroTransition, default 溶解) as video-service names it, 0.5 s
+ *  (card R2 item 11); a title card is 3 s (video-service's own default). */
+const joinOf = (transition: string | undefined) => ({ transition: Transitions.bookend(transition ?? Transitions.AUTO.id) ?? Transitions.bookend(Transitions.AUTO.id), transitionSeconds: Transitions.AUTO.seconds });
 export const TITLE_CARD_SECONDS = 3;
 /** The whole intro step (picture + render + polls) gets this long; the render's own prepare stays under ~100 s + this. */
 export const INTRO_BUDGET_MS = 45_000;
@@ -49,12 +51,12 @@ const realDeps: IntroDeps = {
 };
 
 /** The intro for one automatic video (single format: an asset intro is shared by every ratio in video-service). */
-export async function makeIntro(style: IntroStyle | null, v: { title: string; firstPicture?: string; format: string },
+export async function makeIntro(style: IntroStyle | null, v: { title: string; firstPicture?: string; format: string; transition?: string },
   deps: IntroDeps = realDeps): Promise<IntroResult> {
   if (!style || style.kind === "none") return {};
   const title = v.title.replace(/\s+/g, " ").trim();
   if (!title) return { note: "影片沒有標題，沒有加片頭" };
-  if (style.kind === "title") return { bookends: { intro: { title: title.slice(0, 80), duration: TITLE_CARD_SECONDS }, ...AUTO_TRANSITION } };
+  if (style.kind === "title") return { bookends: { intro: { title: title.slice(0, 80), duration: TITLE_CARD_SECONDS }, ...joinOf(v.transition) } };
   const template = INTRO_TEMPLATES.find((t) => t.id === style.id), fill = template && autoFill(template);
   const size = SIZES[v.format];
   if (!template || !fill) return { note: `片頭樣式「${style.label}」不能自動做，沒有加片頭` };
@@ -73,7 +75,7 @@ export async function makeIntro(style: IntroStyle | null, v: { title: string; fi
       const p = await deps.poll(sent.jobId);
       if (p.status === "done") {
         if (!/^https:\/\//.test(p.url)) return { note: "片頭做好了但沒有可用的網址，影片照樣出，沒有片頭" };
-        return { bookends: { intro: { assetUrl: p.url }, ...AUTO_TRANSITION } };
+        return { bookends: { intro: { assetUrl: p.url }, ...joinOf(v.transition) } };
       }
       if (p.status === "error") return { note: `片頭沒有做成（${p.error}），影片照樣出，沒有片頭` };
     }

@@ -94,8 +94,11 @@ export function autoFill(template) {
   return image.length === 1 && text.length === 1 && required.length === 2 ? { imageKey: image[0].key, textKey: text[0].key } : null;
 }
 
-// kind: "none" = no intro | "cover" = the cover opener | "title" = the render service's title card (video-service, plain
-// text on black; no template render) | "template" = a remotion-service template. auto = an automatic video can make it
+// kind = the source kind (card R2 item 8): "none" = no intro | "cover" = the cover opener | "title" = the render service's
+// title card (video-service, plain text on black; no template render) | "template" = a remotion-service template. Card R3
+// adds "still" (a ready picture, e.g. a banner-tool card): it would take the cover opener's road -- the picture made into
+// a short video by remotion-service, then joined as an intro file with a transition -- and every caller already treats a
+// kind it does not know as "cannot make it" (lib/content/video/intro-opener.ts). auto = an automatic video can make it
 // from the video's title and one picture alone. preview = the file beside this one.
 const styleOf = (t) => ({ id: t.id, label: t.label, kind: t.cover ? "cover" : "template", auto: !!autoFill(t), preview: "intro-styles/" + t.id + ".jpg" });
 export const INTRO_STYLES = [

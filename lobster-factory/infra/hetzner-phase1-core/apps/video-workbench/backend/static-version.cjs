@@ -8,9 +8,13 @@
 const crypto = require("node:crypto"), fs = require("node:fs"), path = require("node:path");
 
 const DIRS = ["pages", "shared", "styles", "scripts", "vendor", "assets", "examples"];
-const CACHEABLE = /^\/(shared|styles|scripts|vendor|assets|examples|pages)\/[^?#]*$/;
+const CACHEABLE = /^\/(shared|styles|scripts|vendor|assets|examples|pages)\/[^?#]*$|^\/awarewave\/editor-shared\/transitions\.js$/;
+// Main-system files the pages load as scripts (served by server.cjs from the shipped copy, card R2): part of the build
+// id, so a change to one of them is a new build and never an old immutable copy.
+const SHARED_SCRIPTS = ["public/editor-shared/transitions.js"];
 
-function buildId(root) {
+// appDir = the main-system copy the server serves (server.cjs awareWaveDir), so the hash is of the file it sends.
+function buildId(root, appDir) {
   const hash = crypto.createHash("sha256");
   const walk = (dir) => {
     let entries;
@@ -22,6 +26,12 @@ function buildId(root) {
     }
   };
   for (const d of DIRS) walk(path.join(root, d));
+  for (const f of SHARED_SCRIPTS) {
+    try {
+      const file = path.join(appDir ?? require("./appearance.cjs").resolveSource(root, process.env), f);
+      hash.update(f + "\0").update(fs.readFileSync(file)).update("\0");
+    } catch { /* no main-system copy here (a bare static root): nothing to version */ }
+  }
   return hash.digest("hex").slice(0, 16);
 }
 

@@ -162,7 +162,7 @@ function validateProject(raw, quality = "1080p") {
       throw Error("LUT 必須是素材庫的 .cube 檔");
     if (
       c.transitionCurve &&
-      !["線性", "平滑", "加速"].includes(c.transitionCurve)
+      !Object.hasOwn(EditorModel.TRANSITION_CURVES, c.transitionCurve)
     )
       throw Error("轉場曲線不存在");
     const clip = {

@@ -7,6 +7,7 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, YOUTUBE_PRIVACIES, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { autoIntroStyles } from "@/public/editor-shared/intro-styles.js";
+import Transitions from "@/public/editor-shared/transitions.js";
 
 // youtubePrivacy (N5a): who sees the auto-made videos -- outward like the two modes, so set the same way
 const GATE_MODES = [
@@ -72,8 +73,12 @@ export async function PATCH(
   const introGiven = body.introStyles !== undefined;
   if (introGiven && (!Array.isArray(body.introStyles) || autoIntroStyles(body.introStyles).length !== body.introStyles.length))
     return NextResponse.json({ ok: false, error: "introStyles: 只能是可自動加的片頭樣式，每個一次" }, { status: 400 });
+  // The intro's transition: its own field too; a name video-service can join (the transitions module), stored as that name.
+  const transitionGiven = body.introTransition !== undefined;
+  if (transitionGiven && (typeof body.introTransition !== "string" || Transitions.name(body.introTransition) !== body.introTransition || Transitions.bookend(body.introTransition) === null))
+    return NextResponse.json({ ok: false, error: `introTransition: ${Transitions.BOOKEND_UNSUPPORTED}` }, { status: 400 });
   let modesRead: Array<[string, string | null]> | undefined;   // undefined = content_defaults not written
-  if (defaultsGiven || introGiven || GATE_MODES.some((g) => body[g.field] !== undefined)) {
+  if (defaultsGiven || introGiven || transitionGiven || GATE_MODES.some((g) => body[g.field] !== undefined)) {
     const { data: current, error: readError } = await supabase.from("wp_sites").select("content_defaults").eq("id", id).maybeSingle();
     if (readError) return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
     const stored = ((current as { content_defaults: SiteContentDefaults | null } | null)?.content_defaults) ?? {};
@@ -101,6 +106,10 @@ export async function PATCH(
     const intro = autoIntroStyles(introGiven ? body.introStyles : (stored as SiteContentDefaults).introStyles);
     delete next.introStyles;
     if (intro.length) next.introStyles = intro;
+    const rawTransition = (stored as Record<string, unknown>).introTransition;
+    delete next.introTransition;
+    const transition = transitionGiven ? body.introTransition : rawTransition;
+    if (typeof transition === "string") next.introTransition = transition;
     modesRead = [];
     for (const g of GATE_MODES) {
       delete next[g.field];
@@ -117,6 +126,9 @@ export async function PATCH(
     if (rawIntro === undefined || rawIntro === null) modesRead.push(["introStyles", null]);
     else if (Array.isArray(rawIntro) && rawIntro.every((x) => typeof x === "string"))
       modesRead.push(["introStyles", "[" + rawIntro.map((x) => JSON.stringify(x)).join(", ") + "]"]);
+    // the same for the transition (a string renders as itself)
+    if (rawTransition === undefined || rawTransition === null) modesRead.push(["introTransition", null]);
+    else if (typeof rawTransition === "string") modesRead.push(["introTransition", rawTransition]);
     patch.content_defaults = next;
   }
 

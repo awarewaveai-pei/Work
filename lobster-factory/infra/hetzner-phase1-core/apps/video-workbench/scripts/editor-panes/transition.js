@@ -9,7 +9,7 @@ const edTrEffects = Transitions.PICKER,
   // The cut the user clicked (the later clip's id) and the values 套用全部剪點 uses.
   edTr = {
     cut: null,
-    draft: { name: "溶解", curve: "線性", seconds: 0.5 },
+    draft: { name: Transitions.AUTO.id, curve: "線性", seconds: Transitions.AUTO.seconds },
     timer: null,
   };
 document.addEventListener(
@@ -118,18 +118,11 @@ function edTransitionPane(p, c) {
       ...edTrEffects.map(([, stored]) => stored),
       ...(edTrNoCurve.includes(look.name) ? [look.name] : []),
     ],
-    label = (stored) =>
-      edTrEffects.find(([, s]) => s === stored)?.[0] || stored;
+    label = null;
   return (
     `<h3>轉場</h3><p class="note" data-ed-transition-hint>${active ? `已選剪點：${c.start.toFixed(2)} 秒。轉場以剪點為中心，前段與後段各占一半，總長度不變。預覽以透明度近似，輸出為準。` : "請先點選 V1 相鄰片段之間的剪點"}</p>` +
-    edTrButtons(
-      "轉場",
-      "transition",
-      has ? look.name : "",
-      names,
-      label,
-      !active,
-    ) +
+    Transitions.buttons({ label: "轉場", value: has ? look.name : "", ids: names, esc, disabled: !active,
+      attrs: (id) => `data-ed-action="${esc("transition:" + id)}"` }) +
     `<label class="editor-transition-length">長度（秒）<input class="text-input" type="number" aria-label="轉場秒數" data-ed-tr-seconds min="0.1" max="${(range.max / range.fps).toFixed(3)}" step="0.1" value="${shown}" ${active ? "" : "disabled"}></label>` +
     `<p class="note">0.1–2 秒，不超過左右片段各半${active ? `（此處最長 ${(range.max / range.fps).toFixed(2)} 秒）` : ""}</p>` +
     edTrButtons(

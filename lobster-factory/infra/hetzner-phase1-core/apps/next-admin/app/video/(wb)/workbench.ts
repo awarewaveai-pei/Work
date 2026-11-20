@@ -8,7 +8,7 @@ import type { WorkbenchCharacter, WorkbenchShot } from "../../(shell)/tools/vide
 
 // pages/projects.html's order: config.js first (runtime.js reads VW_CONFIG when it loads), purify.js before security.js.
 export const RUNTIME_SCRIPTS: readonly string[] = ["/config.js", "/shared/models.js", "/shared/adapters.js", "/shared/purify.js",
-  "/shared/episode-spine.js", "/shared/runtime.js", "/shared/security.js", "/shared/theme.js"];
+  "/awarewave/editor-shared/transitions.js", "/shared/episode-spine.js", "/shared/runtime.js", "/shared/security.js", "/shared/theme.js"];
 
 /** The part of shared/runtime.js's window.VideoWorkbench these pages use. */
 export interface Workbench {

@@ -6,7 +6,7 @@
 const TOOL_SCRIPTS_SUBTITLE = ["../shared/subtitle-parse.js", "tools-subtitles.js"];
 const TOOL_SCRIPTS_EDIT = [
   ...TOOL_SCRIPTS_SUBTITLE,
-  "../shared/timebase.js", "../shared/project-envelope.js", "../editor-shared/transitions.js", "../shared/editor-model.js", "tools-editor.js", "../shared/transcript-words.js",
+  "../shared/timebase.js", "../shared/project-envelope.js", "../shared/editor-model.js", "tools-editor.js", "../shared/transcript-words.js",
   "editor-panes/assets.js", "editor-panes/text.js", "editor-panes/audio.js", "editor-panes/transition.js", "editor-panes/effects.js",
   "editor-panes/stickers.js", "editor-panes/subtitles.js", "editor-panes/fillers.js", "editor-export-dialog.js", "editor-project-list.js",
   "../shared/editor-agent-plan.js", "editor-agent.js",

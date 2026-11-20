@@ -46,6 +46,16 @@ describe("site introStyles", () => {
     expect(db.filters).toContainEqual(["is", "content_defaults->>introStyles", null]);
   });
 
+  it("introTransition: a name video-service can join, stored as given; others refused; kept by a whole-defaults save", async () => {
+    expect((await patch({ introTransition: "黑場" })).status).toBe(200);
+    expect((db.updated.at(-1)?.content_defaults as { introTransition?: string }).introTransition).toBe("黑場");
+    for (const bad of ["向左擦除", "fade-black", "nope", 3]) expect((await patch({ introTransition: bad })).status).toBe(400);
+    db.stored = { introTransition: "無" };
+    await patch({ contentDefaults: { tone: "Calm" } });
+    expect(db.updated.at(-1)?.content_defaults).toEqual({ tone: "Calm", introTransition: "無" });
+    expect(db.filters).toContainEqual(["eq", "content_defaults->>introTransition", "無"]);
+  });
+
   it("refuses manual-only, unknown, repeated or non-list values and writes nothing", async () => {
     for (const bad of [["product-review-typewriter"], ["nope"], ["cover-opener", "cover-opener"], "cover-opener", ["none"]]) {
       expect((await patch({ introStyles: bad })).status).toBe(400);

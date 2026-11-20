@@ -6,7 +6,7 @@ const p = { id: 'edit', ratio: '16:9', timebase: { num: 30, den: 1 }, assets: []
 ] };
 const intro = { kind: 'template', templateId: template.id, fields: { headline: '已儲存的片頭' }, references: {}, seconds: 4, transition: 'crossfade', transitionSeconds: 0.5 };
 let saved;
-const ctx = vm.createContext({ console, structuredClone, crypto, EpisodeSpine, Timebase, document: { addEventListener() {} },
+const ctx = vm.createContext({ Transitions: require("../backend/transitions.cjs").Transitions, console, structuredClone, crypto, EpisodeSpine, Timebase, document: { addEventListener() {} },
   ed: { title: {}, projects: [p], picks: new Set() }, edRegisterPane() {}, tool: 'other',
   VideoWorkbench: { assets: { list: async () => [] }, generations: { list: async () => [] }, capabilities: { remotion: true, remotionTemplates: [template] },
     spine: { setBookends: async (v) => { saved = v; } } },

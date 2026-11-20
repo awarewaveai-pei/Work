@@ -108,7 +108,7 @@
   VideoWorkbench.jobTitle = jobTitle;
   VideoWorkbench.jobTime = jobTime;
   VideoWorkbench.bookendAction = async (v, action) => {
-    if (!VideoWorkbench.bookends) await VideoWorkbench.loadScripts(["bookends.js"], sharedBase);
+    if (!VideoWorkbench.bookends) await VideoWorkbench.loadScripts(["../awarewave/editor-shared/transitions.js", "bookends.js"], sharedBase);
     const api = VideoWorkbench.bookends;
     if (action === "edit") return api.edit(v);
     if (action === "join") return api.join(v);
@@ -117,7 +117,7 @@
     return api.render(hit.p, hit.e, "intro", jobRatio(v) || hit.p.ratio, true);
   };
   VideoWorkbench.bookendPreview = async (v) => {
-    if (!VideoWorkbench.bookends) await VideoWorkbench.loadScripts(["bookends.js"], sharedBase);
+    if (!VideoWorkbench.bookends) await VideoWorkbench.loadScripts(["../awarewave/editor-shared/transitions.js", "bookends.js"], sharedBase);
     const hit = await VideoWorkbench.bookends.current(v);
     return hit?.e.intro ? VideoWorkbench.bookends.peek(hit.p, hit.e, "intro", jobRatio(v) || hit.p.ratio) : null;
   };
@@ -125,7 +125,7 @@
   function bookendButtons(v, actions, notes) {
     const box = document.createElement("div"), about = document.createElement("div"), note = document.createElement("p");
     box.className = "job-bookend-actions"; note.textContent = "片頭：讀取中…"; about.append(note); notes.append(about);
-    const refresh = () => VideoWorkbench.loadScripts(["bookends.js"], sharedBase).then(async () => {
+    const refresh = () => VideoWorkbench.loadScripts(["../awarewave/editor-shared/transitions.js", "bookends.js"], sharedBase).then(async () => {
       const hit = await VideoWorkbench.bookends.current(v);
       note.textContent = "本集片頭：" + VideoWorkbench.bookends.label(hit?.e.intro, VideoWorkbench.capabilities?.remotionTemplates || []);
       about.querySelectorAll('[data-bookend-preview]').forEach((el) => el.remove());

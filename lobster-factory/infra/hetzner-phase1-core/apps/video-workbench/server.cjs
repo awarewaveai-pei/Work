@@ -89,7 +89,7 @@ function createServer({
   // Edge-cacheable static files (backend/static-version.cjs). Only where the files cannot change while the server runs (the
   // container image); local start.cmd keeps no-store so an edited file is never pinned under an old ?v=.
   const staticVersion = require("./backend/static-version.cjs");
-  const build = staticBuild !== undefined ? staticBuild : trustProxy ? staticVersion.buildId(root) : null;
+  const build = staticBuild !== undefined ? staticBuild : trustProxy ? staticVersion.buildId(root, awareWaveDir) : null;
   const server = http.createServer(async (req, res) => {
     let file;
     try {
@@ -185,12 +185,17 @@ function createServer({
         return;
       }
       // Card R2: shared definitions the pages need from the main system (public/editor-shared/, shipped by
-      // awarewave-files.txt): the intro styles' previews and the transitions module. Fixed names only, nothing else there.
-      if (/^\/editor-shared\/(intro-styles\/[a-z0-9-]{1,60}\.jpg|transitions\.js)$/.test(pathname)) {
-        const shared = path.join(awareWaveDir, "public", pathname.slice(1));
+      // awarewave-files.txt): the intro styles' previews and the transitions module. Under /awarewave/ because the public
+      // proxy sends that prefix to this server (nginx/default.conf), so they come from this image, versioned with it.
+      // Fixed names only, nothing else there.
+      if (/^\/awarewave\/editor-shared\/(intro-styles\/[a-z0-9-]{1,60}\.jpg|transitions\.js)$/.test(pathname)) {
+        const shared = path.join(awareWaveDir, "public", pathname.slice("/awarewave/".length));
         if (!fs.existsSync(shared)) throw Error();
-        const body = fs.readFileSync(shared);
-        res.writeHead(200, { "Content-Type": pathname.endsWith(".js") ? "text/javascript; charset=utf-8" : "image/jpeg", "Cache-Control": pathname.endsWith(".js") ? "no-cache" : "public, max-age=3600", "X-Content-Type-Options": "nosniff", "Content-Length": body.length });
+        const body = fs.readFileSync(shared), script = pathname.endsWith(".js"),
+          // a script is versioned like every page script (static-version.cjs hashes it into the build id)
+          policy = script ? staticVersion.cachePolicy(pathname, new URL(req.url, "http://localhost").search, build, shared) : "preview";
+        if (policy === "stale") throw Error();
+        res.writeHead(200, { "Content-Type": script ? "text/javascript; charset=utf-8" : "image/jpeg", "Cache-Control": policy === "immutable" ? "public, max-age=31536000, immutable" : script ? "no-store" : "public, max-age=3600", "X-Content-Type-Options": "nosniff", "Content-Length": body.length });
         res.end(req.method === "HEAD" ? undefined : body);
         return;
       }

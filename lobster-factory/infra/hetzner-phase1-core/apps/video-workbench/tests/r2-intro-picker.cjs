@@ -8,8 +8,8 @@ const remotion = require("../backend/remotion.cjs");
 // The list as /capabilities sends it: previews served from the shared folder (server.cjs), automatic flags derived.
 assert.deepEqual(remotion.introStyles.map((s) => s.id), ["none", "cover-opener", "title-card", "scale-bg-text-slideup", "circle-mask-text-slideup-reveal", "pan-slide-text-left-3scenes", "product-review-typewriter", "photo-highlights-slides-zoom"]);
 for (const s of remotion.introStyles.filter((x) => x.kind !== "none")) {
-  assert.equal(s.preview, "/editor-shared/intro-styles/" + s.id + ".jpg");
-  assert.ok(fs.existsSync(require("node:path").join(require("../backend/appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "public", s.preview.slice(1))), s.id + " preview file");
+  assert.equal(s.preview, "/awarewave/editor-shared/intro-styles/" + s.id + ".jpg");
+  assert.ok(fs.existsSync(require("node:path").join(require("../backend/appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "public", s.preview.slice("/awarewave/".length))), s.id + " preview file");
 }
 const opener = remotion.catalog.find((t) => t.id === "cover-opener");
 assert.deepEqual(opener.seconds, { min: 2, def: 2, max: 5 });
@@ -19,7 +19,7 @@ assert.deepEqual(req.body, { templateId: "cover-opener", props: { backgroundUrl:
 
 function pane({ intro, jobs }) {
   const p = { id: "edit", ratio: "16:9", timebase: { num: 30, den: 1 }, assets: [], clips: [{ id: "main", track: "V1", startFrame: 0, durationFrames: 60, asset: { url: "/media/x/original.mp4" } }] };
-  const ctx = vm.createContext({ console, structuredClone, crypto, EpisodeSpine, Timebase, document: { addEventListener() {} },
+  const ctx = vm.createContext({ Transitions: require("../backend/transitions.cjs").Transitions, console, structuredClone, crypto, EpisodeSpine, Timebase, document: { addEventListener() {} },
     ed: { title: {}, projects: [p], picks: new Set() }, edRegisterPane() {}, tool: "other",
     VideoWorkbench: { assets: { list: async () => [] }, generations: { list: async () => jobs },
       capabilities: { remotion: true, remotionTemplates: remotion.catalog, introStyles: remotion.introStyles } },

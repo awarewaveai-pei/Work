@@ -34,6 +34,7 @@ const tests = [
   "cover-ai-api",
   "r1-cover-template",
   "r2-intro-picker",
+  "r2-transitions-one-list",
   "auth-redirect",
   "r26-generated-thumb",
   "u4-url-import",

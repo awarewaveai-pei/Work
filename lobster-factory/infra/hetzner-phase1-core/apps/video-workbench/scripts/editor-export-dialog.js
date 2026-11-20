@@ -55,13 +55,13 @@ function edAddBookends(native, ends, assets) {
       startFrame, durationFrames: Timebase.toFrames(assets[which].duration, native.timebase), sourceStartFrame: 0,
       speed: 1, volume: 1, opacity: 1, scale: 1, x: 0, y: 0, rotation: 0, width: 25, fadeIn: 0, fadeOut: 0, transition: "無" }),
     transition = (incoming, end) => {
-      if (!end || end.transition === "none") return;
-      incoming.transition = end.transition === "fade-black" ? "黑場" : "溶解";
+      if (!end || Transitions.name(end.transition) === "無") return;
+      incoming.transition = Transitions.name(end.transition);
       incoming.transitionFrames = Timebase.toFrames(end.transitionSeconds, native.timebase);
     };
   if (assets.intro && !native.clips.some((c) => c.bookend === "intro")) {
     const intro = clip("intro", 0), first = native.clips.filter((c) => c.track === main).sort((a, b) => a.startFrame - b.startFrame)[0];
-    if (!first || (ends.intro.transition !== "none" && first.startFrame !== 0)) throw Error("主影片軌開頭有空隙，請先對齊，才能接片頭轉場");
+    if (!first || (Transitions.name(ends.intro.transition) !== "無" && first.startFrame !== 0)) throw Error("主影片軌開頭有空隙，請先對齊，才能接片頭轉場");
     for (const c of native.clips) c.startFrame += intro.durationFrames;
     transition(first, ends.intro);
     native.clips.push(intro);
@@ -69,7 +69,7 @@ function edAddBookends(native, ends, assets) {
   if (assets.outro && !native.clips.some((c) => c.bookend === "outro")) {
     const end = Math.max(...native.clips.map((c) => c.startFrame + c.durationFrames)),
       previous = native.clips.filter((c) => c.track === main).sort((a, b) => a.startFrame - b.startFrame).at(-1), outro = clip("outro", end);
-    if (ends.outro.transition !== "none" && previous.startFrame + previous.durationFrames !== end) throw Error("主影片軌結尾有空隙，請先對齊，才能接片尾轉場");
+    if (Transitions.name(ends.outro.transition) !== "無" && previous.startFrame + previous.durationFrames !== end) throw Error("主影片軌結尾有空隙，請先對齊，才能接片尾轉場");
     transition(outro, ends.outro);
     native.clips.push(outro);
   }

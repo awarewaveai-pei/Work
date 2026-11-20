@@ -43,7 +43,8 @@ export type BookendSegment = { title: string; duration: number } | { assetUrl: s
 export interface RenderBookends {
   intro?: BookendSegment;
   outro?: BookendSegment;
-  transition: "none" | "crossfade" | "fade-black";
+  /** video-service's name for it (public/editor-shared/transitions.js Transitions.bookend). */
+  transition: string;
   transitionSeconds: number;
 }
 const segmentBody = (s: BookendSegment) => ("assetUrl" in s ? { asset_url: s.assetUrl } : { title: s.title, duration: s.duration });

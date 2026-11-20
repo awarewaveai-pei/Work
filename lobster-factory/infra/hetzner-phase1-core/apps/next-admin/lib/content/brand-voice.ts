@@ -2,6 +2,7 @@
 // wp_sites.content_defaults (read on the server by brand-voice-store.ts); this file is the shape and the one
 // renderer, with no server imports, so the browser tools and the server render the same prompt text.
 import { autoIntroStyles } from "../../public/editor-shared/intro-styles.js";
+import Transitions from "../../public/editor-shared/transitions.js";
 
 export interface MarketingBrief {
   audience?: string;
@@ -48,6 +49,9 @@ export interface SiteContentDefaults {
   /** Card R2: the intro styles the site's automatic videos take in turn (public/editor-shared/intro-styles.js ids, the
    *  automatic ones only); missing or [] = no intro. Set by its own PATCH field, like youtubePrivacy. */
   introStyles?: string[];
+  /** Card R2: the transition from that intro into the video (public/editor-shared/transitions.js name, one video-service
+   *  can join); missing = 溶解 0.5 s. Its own PATCH field. */
+  introTransition?: string;
   trendFeeds?: string[];
   requiredBlocks?: string[];
   language?: string;
@@ -154,6 +158,12 @@ export const youtubeFormat = (d: SiteContentDefaults | undefined) => (youtubePri
 /** Card R2: the site's automatic-video intro styles as they are used (known, automatic, each once); old data = [] = none. */
 export function siteIntroStyles(d: SiteContentDefaults | undefined): string[] {
   return autoIntroStyles(d?.introStyles);
+}
+
+/** Card R2: the site's intro transition as used: a stored name video-service can join (old names read), else 溶解. */
+export function siteIntroTransition(d: SiteContentDefaults | undefined): string {
+  const name = Transitions.name(d?.introTransition);
+  return d?.introTransition !== undefined && name !== null && Transitions.bookend(name) !== null ? name : Transitions.AUTO.id;
 }
 
 /** Only the exact stored value lets the schedule approve its own proposals: missing, misspelt or any other value = a person picks. */

@@ -12,8 +12,8 @@ let contract = null;
 const loadContract = () => (contract ||= import(pathToFileURL(contractFile).href));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const profiles = { "16:9": "landscape_16_9", "9:16": "vertical_9_16", "1:1": "square_1_1", "4:5": "square_4_5" };
-// Card P2 transition names (pre-P2 names are mapped by EditorModel.transitionName first).
-const transitions = { 溶解: "fade", 黑場: "fade", 向左擦除: "slide_left", 向右擦除: "slide_right", 向左推移: "slide_left", 向右推移: "slide_right" };
+// Transition name -> Timeline v1 kind: the transitions module's (pre-P2 names are mapped by EditorModel.transitionName first).
+const transitions = require("./transitions.cjs").Transitions.TIMELINE;
 // Clip fields with no V1 equivalent: [field, default, applies to].
 const unsupported = [
   ["speed", 1, ["video", "image", "audio"]],

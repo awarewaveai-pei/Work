@@ -4,6 +4,8 @@
 // Invariant (spec §0): the spine fields of an episode are changed only by the top page's runtime; a child page's
 // whole-list write keeps the top page's copy of them (keepSpine), so a stale copy can never overwrite them.
 (function (root) {
+  // Card R2: the one transitions module (next-admin public/editor-shared/transitions.js; the page loads it first).
+  const Transitions = typeof module === "object" && module.exports ? require(require("node:path").join(require("../backend/appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "public/editor-shared/transitions.js")) : root.Transitions;
   // Plan U5.3: intro / outro / autoRun are spine fields too (written only by the top page: spine-set-bookends,
   // spine-set-auto-run), so a child's stale whole-list write can never undo a choice or a run's progress.
   const SPINE = ["edit", "steps", "outputs", "intro", "outro", "autoRun"],
@@ -266,16 +268,16 @@
   }
 
   // ── Plan U5.3 / U5.4: the episode's intro and outro (§9: one setting, read by 快速輸出, 一鍵成片 and the editor) ──
-  // EpisodeBookend = { kind: "none"|"title"|"template", templateId?, fields?, references?, seconds, transition:
-  // "none"|"crossfade"|"fade-black", transitionSeconds }. Absent = kind "none". templates = capabilities.remotionTemplates.
-  const TRANSITIONS = ["none", "crossfade", "fade-black"],
-    TEMPLATE_RATIOS = ["16:9", "9:16", "4:5", "1:1"]; // backend/remotion.cjs formats; a template may list fewer (t.ratios)
+  // EpisodeBookend = { kind: "none"|"title"|"template", templateId?, fields?, references?, seconds, transition: a
+  // Transitions name (old crossfade / fade-black / none read as 溶解 / 黑場 / 無), transitionSeconds }. Absent = kind
+  // "none". templates = capabilities.remotionTemplates.
+  const TEMPLATE_RATIOS = ["16:9", "9:16", "4:5", "1:1"]; // backend/remotion.cjs formats; a template may list fewer (t.ratios)
   const bookendOn = (b) => b?.kind === "title" || b?.kind === "template";
   // A valid bookend or null (= refused). templates may be omitted (top page without capabilities): then the id is only
   // checked for shape, and the template's own checks run when its job is sent.
   function normalizeBookend(v, templates) {
     if (v == null || v.kind === "none") return null;
-    const transition = TRANSITIONS.includes(v.transition) ? v.transition : "crossfade",
+    const transition = (v.transition === undefined ? null : Transitions.name(v.transition)) ?? Transitions.AUTO.id,
       ts = v.transitionSeconds === undefined ? 0.5 : Number(v.transitionSeconds),
       base = { transition, transitionSeconds: ts };
     if (!(ts >= 0.2 && ts <= 2)) return null;
@@ -445,6 +447,10 @@
     if (!shots.length) return { do: "stop", step: "fill", reason: "這一集還沒有鏡頭" };
     const unlined = shots.findIndex((s) => !String(s?.line ?? "").trim());
     if (unlined >= 0) return { do: "stop", step: "render", reason: "第 " + (unlined + 1) + " 個鏡頭沒有旁白" };
+    // card R2: the 片頭／片尾 transition must be one video-service joins -- refused before step 1 pays for pictures
+    const end = bookendOn(episode.intro) ? episode.intro : bookendOn(episode.outro) ? episode.outro : null;
+    if (end && Transitions.bookend(end.transition) === null)
+      return { do: "stop", step: "render", reason: "「" + Transitions.name(end.transition) + "」：" + Transitions.BOOKEND_UNSUPPORTED + "，請改選後再從這裡繼續" };
     // 1. Missing pictures. A shot that has one is never made again; a job already sent for a shot is waited for.
     const missing = shots.filter((s) => !s?.image && !s?.video), wait = [], todo = [];
     for (const s of missing) {
@@ -462,7 +468,7 @@
     // 2. Template bookends, one per ratio, each rendered once (reused when one with the same key exists).
     const bookends = {};
     for (const ratio of run.ratios) {
-      const b = { transition: (episode.intro || episode.outro)?.transition || "none", transitionSeconds: (episode.intro || episode.outro)?.transitionSeconds || 0.5 };
+      const b = { transition: Transitions.name((episode.intro || episode.outro)?.transition), transitionSeconds: (episode.intro || episode.outro)?.transitionSeconds || 0.5 };
       for (const which of ["intro", "outro"]) {
         const end = episode[which];
         if (!bookendOn(end)) continue;
@@ -632,7 +638,7 @@
   }
 
   const api = { editId, editTitle, newProject, newShot, castOf, castShots, setShots, adopt, keepSpine, findByEdit, TOOL_STEP, settle, setShot, QUICK_RATIOS, quickScenes, quickRenderJobs,
-    TRANSITIONS, TEMPLATE_RATIOS, normalizeBookend, setBookends, bookendJob, bookendKey, bookendState, AUTO_RUN_STEP, autoRunFailure, readStop, normalizeAutoRun, setAutoRun, autoRunNext, current, isStale, shotsSwapped, cutOutdated, staleClip, outputStale, lineage, stepStates, nextAction };
+    TEMPLATE_RATIOS, normalizeBookend, setBookends, bookendJob, bookendKey, bookendState, AUTO_RUN_STEP, autoRunFailure, readStop, normalizeAutoRun, setAutoRun, autoRunNext, current, isStale, shotsSwapped, cutOutdated, staleClip, outputStale, lineage, stepStates, nextAction };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.EpisodeSpine = api;
 })(typeof globalThis === "object" ? globalThis : this);

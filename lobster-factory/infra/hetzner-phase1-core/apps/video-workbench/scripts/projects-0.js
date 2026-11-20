@@ -289,7 +289,7 @@ const reviewButton = (o, section, label) => `<button class="btn small outline" d
 // from its own read (data-delivered, wireReviewLinks), and nothing when none was made from it.
 function bookendCard(e, o, i, latest) {
   const end = e.intro, templates = VideoWorkbench.capabilities?.remotionTemplates || [],
-    name = !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + (TRANSITION_LABEL[end.transition] || ""),
+    name = !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + Transitions.name(end.transition) + "轉場",
     preview = end ? `<span data-intro-preview="${esc(o.jobId)}"></span>` : "";
   return `${latest ? `<div class="row" data-output-next data-vw-next-surface="card"></div>` : `<p class="tiny" data-delivered="${esc(o.jobId)}"></p>`}<div class="panel"><strong>本集片頭：${esc(name)}</strong>${preview}<div class="row">${[["bookendEdit", "編輯片頭"], ["bookendRender", "重新生成片頭 · 免費"], ["bookendJoin", "加入這支影片 · 免費"], ["copyOutput", "複製連結"]].map(([act, label]) => `<button class="btn small outline" data-action="${act}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
 }
@@ -837,7 +837,6 @@ async function motionShot(index, modelId) {
 // Plan U5.3: the dialog's button groups (no dropdowns). off = a reason the button cannot be pressed.
 const chip = (act, value, label, on, off = "", extra = "") => `<button class="btn small ${on ? "primary" : "outline"}" data-action="${act}" data-value="${esc(value)}" aria-pressed="${on}"${off ? ` disabled title="${esc(off)}"` : ""}${extra}>${esc(label)}</button>`;
 const FILL_MODES = [["ai", "AI 生圖"], ["stock-video", "圖庫影片"], ["stock-photo", "圖庫照片"]],
-  TRANSITION_LABEL = { none: "無", crossfade: "交叉淡化 0.5 秒", "fade-black": "淡黑 0.5 秒" },
   END_LABEL = { intro: "片頭", outro: "片尾" };
 // 片頭／片尾／轉場: the episode's one setting (EpisodeSpine.normalizeBookend), edited here as a draft and written on send.
 function bookendControls(d) {
@@ -856,7 +855,9 @@ function bookendControls(d) {
             : ""
       }`;
     };
-  return part("intro") + part("outro") + `<label>轉場</label><div class="row" role="group" aria-label="轉場">${EpisodeSpine.TRANSITIONS.map((t) => chip("bookendTransition", t, TRANSITION_LABEL[t], d.transition === t)).join("")}</div>`;
+  // card R2: the transitions module's picker; the ones video-service cannot join are shown and refused by name
+  return part("intro") + part("outro") + `<label>轉場（0.5 秒）</label>` + Transitions.buttons({ label: "轉場", value: d.transition, esc, why: Transitions.bookendWhy,
+    attrs: (id) => `data-action="bookendTransition" data-value="${esc(id)}"`, look: (on) => "btn small " + (on ? "primary" : "outline") });
 }
 function embedControls(d) {
   const sites = d.quote?.sites || [];
@@ -873,6 +874,9 @@ function bookendProblems(d) {
     e = ep(),
     out = [],
     shots = (e?.shots || []).map((s) => (d.oneClick && !s.image && !s.video ? { ...s, image: "/generated/pending.png" } : s));
+  // card R2: a transition video-service cannot join is refused here, before any picture is paid for
+  if ((d.intro.kind !== "none" || d.outro.kind !== "none") && Transitions.bookend(d.transition) === null)
+    out.push("「" + Transitions.name(d.transition) + "」：" + Transitions.BOOKEND_UNSUPPORTED);
   for (const which of ["intro", "outro"]) {
     const b = d[which];
     if (b.kind === "title" && !String(b.fields?.title || "").trim()) out.push(END_LABEL[which] + "標題卡要有文字");
@@ -897,7 +901,7 @@ function openQuickRender(oneClick) {
     until: "video",
     intro: draft(e.intro),
     outro: draft(e.outro),
-    transition: (e.intro || e.outro)?.transition || "crossfade",
+    transition: Transitions.name((e.intro || e.outro)?.transition ?? Transitions.AUTO.id),
     embed: false,
     siteId: null,
     budgetTwd: null,

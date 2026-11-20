@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict"), fs = require("node:fs"), os = require("node:os"), path = require("node:path");
 global.EditorModel = require("../shared/editor-model.js");
 global.Timebase = require("../shared/timebase.js");
+global.Transitions = require("../backend/transitions.cjs").Transitions; // the page loads it before the editor scripts
 const { edAddBookends } = require("../scripts/editor-export-dialog.js");
 const { validateProject, exportEditor } = require("../backend/editor-export.cjs");
 const { run } = require("../backend/media.cjs");

@@ -1,7 +1,9 @@
 // The transitions module's export side (card R2 item 11): how a stored transition becomes an FFmpeg instruction. The list
 // itself is next-admin public/editor-shared/transitions.js (read through shared/editor-model.js); nothing here names a
 // transition by its stored name.
-const EditorModel = require("../shared/editor-model.js");
+const path = require("node:path"),
+  EditorModel = require("../shared/editor-model.js"),
+  Transitions = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "public/editor-shared/transitions.js"));
 
 // Card ED.7 轉場曲線 (formula in EditorModel.TRANSITION_CURVES, shared with the preview): xfade progress P runs 1 -> 0,
 // so T = 1 - P is the linear 0 -> 1 progress the formula reads.
@@ -18,4 +20,13 @@ const CURVED_TRANSITIONS = {
 };
 const curvedTransition = (type, curve) => CURVED_TRANSITIONS[type](`(${EditorModel.TRANSITION_CURVES[curve]})`).replaceAll("T", "(1-P)");
 
-module.exports = { CURVED_TRANSITIONS, curvedTransition };
+// A 片頭／片尾 transition as video-service joins it (backend/quick-render.cjs; the main system's automatic videos use the
+// same Transitions.bookend): any stored name, old ones included -> video-service's name (Transitions LIST bookend). A transition it
+// cannot make is refused by name, never turned into 溶解.
+function bookendTransition(v) {
+  const name = Transitions.name(v), wire = name === null ? null : Transitions.bookend(name);
+  if (wire === null) throw Object.assign(Error(name ? "「" + name + "」：" + Transitions.BOOKEND_UNSUPPORTED : "轉場設定無效"), { status: 400 });
+  return wire;
+}
+
+module.exports = { Transitions, CURVED_TRANSITIONS, curvedTransition, bookendTransition };

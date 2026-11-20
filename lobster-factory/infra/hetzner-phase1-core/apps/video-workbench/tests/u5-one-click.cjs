@@ -26,7 +26,7 @@ const job = (id, input, status = "running", result) => ({ id, status, input, cre
 // ── shapes: one shape for intro/outro, one for autoRun ──
 const projects = [{ id: "p1", episodes: [episode()] }];
 assert.equal(spine.setBookends(projects, { projectId: "p1", episodeId: "e1", intro: { kind: "template", templateId: "scale-bg-text-slideup", transition: "crossfade" } }, TEMPLATES), true);
-assert.deepEqual(projects[0].episodes[0].intro, { kind: "template", templateId: "scale-bg-text-slideup", fields: {}, references: {}, seconds: 5, transition: "crossfade", transitionSeconds: 0.5 });
+assert.deepEqual(projects[0].episodes[0].intro, { kind: "template", templateId: "scale-bg-text-slideup", fields: {}, references: {}, seconds: 5, transition: "溶解", transitionSeconds: 0.5 });
 assert.equal(spine.setBookends(projects, { projectId: "p1", episodeId: "e1", outro: { kind: "title", fields: { title: "" } } }, TEMPLATES), false, "an empty title card is refused");
 assert.equal(spine.setBookends(projects, { projectId: "p1", episodeId: "e1", intro: { kind: "none" } }, TEMPLATES), true);
 assert.equal("intro" in projects[0].episodes[0], false, "kind none removes it");
@@ -68,7 +68,7 @@ const introUrl = "/generated/11111111-1111-4111-8111-111111111111.mp4";
 const earlier = job("old-intro", next.input, "succeeded", { url: introUrl, assetId: "a-intro" }); // made in an earlier run
 next = spine.autoRunNext(project, e, [...fills, earlier], TEMPLATES);
 assert.equal(next.do, "render", "the same intro already exists: no second template job");
-assert.deepEqual(next.bookends, { "16:9": { transition: "crossfade", transitionSeconds: 0.5, intro: { kind: "template", url: introUrl } } });
+assert.deepEqual(next.bookends, { "16:9": { transition: "溶解", transitionSeconds: 0.5, intro: { kind: "template", url: introUrl } } });
 const renderBookends = next.bookends;
 // failed intro: stop there, nothing rendered
 const failedIntro = job("bad-intro", { ...earlier.input }, "failed");

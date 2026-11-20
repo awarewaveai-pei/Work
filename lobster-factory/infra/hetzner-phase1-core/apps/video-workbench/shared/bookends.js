@@ -1,7 +1,7 @@
 // U5.5: edit, render and rejoin the episode's one bookend setting. All rendering here is local (免費).
 (function () {
   const V = VideoWorkbench, S = EpisodeSpine, clone = (v) => structuredClone(v);
-  const label = (end, templates) => !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + ({ none: "無轉場", crossfade: "交叉淡化", "fade-black": "淡黑" }[end.transition]);
+  const label = (end, templates) => !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + (Transitions.name(end.transition) ?? "") + "轉場";
   const current = async (v, create = false) => {
     const links = await V.preferences.get("bookends.jobLinks", {});
     let link = v.input?.link || links[v.id], list = await V.projects.list(), p = list.find((p) => p.id === link?.projectId), e = p?.episodes?.find((e) => e.id === link.episodeId);
@@ -94,12 +94,12 @@
         project.clips.forEach((c) => c.startFrame += length);
         leadFrames = length;
       }
-      if (which === "outro" && end.transition !== "none") {
+      if (which === "outro" && Transitions.name(end.transition) !== "無") {
         const previous = project.clips.filter((c) => c.track === main).sort((a, b) => a.startFrame - b.startFrame).at(-1);
         if (previous.startFrame + previous.durationFrames !== clip.startFrame) throw Error("主影片軌結尾有空隙，請先在剪輯器對齊");
       }
       const incoming = which === "intro" ? first : clip;
-      incoming.transition = end.transition === "none" ? "無" : end.transition === "fade-black" ? "黑場" : "溶解";
+      incoming.transition = Transitions.name(end.transition);
       incoming.transitionFrames = Math.round(end.transitionSeconds * fps); project.clips.push(clip);
     }
     // paid: none (only re-encodes the existing pictures and voice with local editor-export).
@@ -112,14 +112,14 @@
   async function edit(v) {
     const hit = await current(v, true), caps = V.capabilities || await V.loadCapabilities(), templates = caps.remotionTemplates || [],
       assets = await V.assets.list(), d = document.createElement("dialog");
-    let draft = clone(hit.e.intro || { kind: "title", fields: { title: hit.p.title }, seconds: 3, transition: "crossfade", transitionSeconds: 0.5 });
+    let draft = clone(hit.e.intro || { kind: "title", fields: { title: hit.p.title }, seconds: 3, transition: Transitions.AUTO.id, transitionSeconds: 0.5 });
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const draw = () => {
       const t = templates.find((t) => t.id === draft.templateId), field = (f) => {
         if (["image", "audio"].includes(f.type)) return `<fieldset><legend>${esc(f.label)}</legend>${assets.filter((a) => V.mediaKind(a) === f.type).map((a) => `<button type="button" class="btn small" data-pick="${esc(f.key)}" data-id="${esc(a.id)}" aria-pressed="${draft.references?.[f.key]?.url === a.url}">${esc(a.name || a.id)}</button>`).join("")}<button type="button" class="btn small" data-pick="${esc(f.key)}" data-id="">不使用</button></fieldset>`;
         return `<label>${esc(f.label)}<input class="text-input" data-field="${esc(f.key)}" value="${esc(draft.fields?.[f.key] ?? "")}" maxlength="${f.max || 200}"></label>`;
       };
-      d.innerHTML = V.sanitize(`<form><h3>編輯片頭</h3><p>渲染與重接 免費，原鏡頭與配音不重生。</p><div class="row">${[["none", "不要"], ["title", "標題卡"], ...templates.map((t) => [t.id, t.label])].map(([id, name]) => `<button type="button" class="btn small" data-kind="${esc(id)}" aria-pressed="${id === (draft.templateId || draft.kind)}">${esc(name)}</button>`).join("")}</div>${draft.kind === "title" ? field({ key: "title", label: "標題", max: 80 }) : draft.kind === "template" ? (t?.fields || []).map(field).join("") : ""}<label>長度（秒）<input type="number" class="text-input" name="seconds" min="${t?.seconds.min || 1}" max="${t?.seconds.max || 15}" value="${draft.seconds}"></label><div class="row">${[["none", "無"], ["crossfade", "交叉淡化"], ["fade-black", "淡黑"]].map(([id, name]) => `<button type="button" class="btn small" data-transition="${id}" aria-pressed="${draft.transition === id}">${name}</button>`).join("")}</div><p data-error role="alert"></p><button type="button" class="btn" data-cancel>取消</button><button class="btn primary" type="submit">儲存並渲染片頭 · 免費</button></form>`);
+      d.innerHTML = V.sanitize(`<form><h3>編輯片頭</h3><p>渲染與重接 免費，原鏡頭與配音不重生。</p><div class="row">${[["none", "不要"], ["title", "標題卡"], ...templates.map((t) => [t.id, t.label])].map(([id, name]) => `<button type="button" class="btn small" data-kind="${esc(id)}" aria-pressed="${id === (draft.templateId || draft.kind)}">${esc(name)}</button>`).join("")}</div>${draft.kind === "title" ? field({ key: "title", label: "標題", max: 80 }) : draft.kind === "template" ? (t?.fields || []).map(field).join("") : ""}<label>長度（秒）<input type="number" class="text-input" name="seconds" min="${t?.seconds.min || 1}" max="${t?.seconds.max || 15}" value="${draft.seconds}"></label>${Transitions.buttons({ label: "轉場", value: draft.transition, esc, why: Transitions.bookendWhy })}<p data-error role="alert"></p><button type="button" class="btn" data-cancel>取消</button><button class="btn primary" type="submit">儲存並渲染片頭 · 免費</button></form>`);
       d.querySelectorAll('[data-kind]').forEach((b) => b.onclick = () => { const id = b.dataset.kind, t = templates.find((t) => t.id === id); draft = { ...draft, kind: t ? "template" : id, templateId: t?.id, fields: id === "title" ? { title: hit.p.title } : {}, references: {}, seconds: t?.seconds.def || 3 }; draw(); });
       d.querySelectorAll('[data-field]').forEach((i) => i.oninput = () => { draft.fields ||= {}; draft.fields[i.dataset.field] = i.value; });
       d.querySelector('[name=seconds]').oninput = (ev) => draft.seconds = Number(ev.target.value);

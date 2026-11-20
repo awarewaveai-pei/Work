@@ -22,7 +22,7 @@ const VOICE = /^[A-Za-z0-9:._-]{0,64}$/, REF = /^[A-Za-z0-9._:-]{1,200}$/, UUID 
 // The stop point (plan §12): a quick render a person sends ends at the cut ("video") or at drafts. Nothing else maps:
 // full_auto (outward publishing) is the topic queue's alone, so no setting here can reach it (§13 C3).
 const AUTONOMY = Object.freeze({ video: "guided", drafts: "auto_after_render" });
-const TRANSITIONS = ["none", "crossfade", "fade-black"];
+const { bookendTransition } = require("./transitions.cjs");
 
 // What keeps an episode's shots from rendering, one line each ([] = it can be sent): the dialog lists them before
 // sending (quote) and request() refuses the job on the first. scenes = [{ narration, url }]; sizeOf(url) = bytes | null.
@@ -75,8 +75,9 @@ function request(input, main, sizeOf) {
   if (!Object.hasOwn(AUTONOMY, until)) throw fail("做到哪裡停只能是成片或草稿", 400);
   let ends = {};
   if (s.bookends != null) {
-    const b = s.bookends, transition = b.transition ?? "none", transitionSeconds = b.transitionSeconds === undefined ? 0.5 : Number(b.transitionSeconds);
-    if (!TRANSITIONS.includes(transition) || (transition !== "none" && !(transitionSeconds >= 0.2 && transitionSeconds <= 2))) throw fail("轉場設定無效", 400);
+    // card R2: any stored name (old ones too) -> what video-service joins with; one it cannot make is refused by name
+    const b = s.bookends, transition = bookendTransition(b.transition), transitionSeconds = b.transitionSeconds === undefined ? 0.5 : Number(b.transitionSeconds);
+    if (transition !== "none" && !(transitionSeconds >= 0.2 && transitionSeconds <= 2)) throw fail("轉場設定無效", 400);
     const intro = bookendPart(b.intro, main, "片頭"), outro = bookendPart(b.outro, main, "片尾");
     if (intro || outro) ends = { ...(intro ? { intro } : {}), ...(outro ? { outro } : {}), transition, transitionSeconds };
   }

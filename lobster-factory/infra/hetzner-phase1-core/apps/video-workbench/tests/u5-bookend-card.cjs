@@ -12,7 +12,7 @@ const jobs = [], preferences = {}, V = {
   } },
 };
 const document = { createElement: () => ({ set src(u) { this.duration = u.includes('intro') ? 2 : 5; queueMicrotask(() => this.onloadedmetadata()); }, removeAttribute() {}, load() {} }) };
-vm.runInNewContext(fs.readFileSync(require.resolve('../shared/bookends.js'), 'utf8'), { VideoWorkbench: V, EpisodeSpine: S, structuredClone, document, crypto, setTimeout, clearTimeout });
+vm.runInNewContext(fs.readFileSync(require.resolve('../shared/bookends.js'), 'utf8'), { Transitions: require("../backend/transitions.cjs").Transitions, VideoWorkbench: V, EpisodeSpine: S, structuredClone, document, crypto, setTimeout, clearTimeout });
 (async () => {
   const old = { id: 'old', input: { link: { projectId: 'p', episodeId: 'e' }, settings: { ratio: '16:9' } }, result: { url: '/old.mp4', script: '原旁白', mainCaptionCues: [{ startMs: 0, endMs: 900, text: '原旁白' }] } };
   const first = await V.bookends.join(old);

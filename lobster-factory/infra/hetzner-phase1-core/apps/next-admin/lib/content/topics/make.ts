@@ -14,7 +14,7 @@ import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
-import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteIntroStyles, siteLanguage, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteIntroStyles, siteIntroTransition, siteLanguage, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { introStyleFor } from "@/public/editor-shared/intro-styles.js";
 import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
@@ -345,7 +345,7 @@ async function startTopicVideo(sb: SupabaseClient, t: Topic, record: (jobId: str
     ...script,
     sceneCount: d.sceneCount, customScenes: d.customScenes, brollScenes: d.sceneCount - d.customScenes,
     imageModel: d.imageModel, outputFormats: [...d.formats], ...parseVoiceModel(articleVideoVoice(siteLanguage(site.defaults))),
-    costJobId: t.id, introStyle,
+    costJobId: t.id, introStyle, introTransition: siteIntroTransition(site.defaults),
   }, { beforePrepare: record, projectFor: () => ensureTopicProject(sb, t, d.formats) });
   const failure = started.ok ? null : (started as Extract<typeof started, { ok: false }>).error;   // strict:false
   if (failure && failure !== "taken") throw new Error(`影片無法開始：${failure}`);

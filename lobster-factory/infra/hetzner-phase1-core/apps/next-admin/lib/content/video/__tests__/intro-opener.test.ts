@@ -2,7 +2,7 @@
 // never stops a video (every failure is a note and no bookends).
 import { describe, expect, it, vi } from "vitest";
 import { INTRO_STYLES, INTRO_TEMPLATES, autoIntroStyles, introStyleFor } from "@/public/editor-shared/intro-styles.js";
-import { siteIntroStyles } from "@/lib/content/brand-voice";
+import { siteIntroStyles, siteIntroTransition } from "@/lib/content/brand-voice";
 import { INTRO_BUDGET_MS, makeIntro, type IntroDeps } from "../intro-opener";
 
 const style = (id: string) => INTRO_STYLES.find((s) => s.id === id)!;
@@ -60,6 +60,14 @@ describe("makeIntro", () => {
     const t = deps();
     expect(await makeIntro(style("title-card"), video, t)).toEqual({ bookends: { intro: { title: "感恩節的心理學", duration: 3 }, transition: "crossfade", transitionSeconds: 0.5 } });
     expect(t.submit).not.toHaveBeenCalled();
+  });
+
+  it("the site's transition as video-service names it (the transitions module); old or unjoinable values = 溶解", async () => {
+    const at = async (transition?: string) => (await makeIntro(style("title-card"), { ...video, transition }, deps())).bookends?.transition;
+    expect([await at(), await at("溶解"), await at("黑場"), await at("無")]).toEqual(["crossfade", "crossfade", "fade-black", "none"]);
+    expect(siteIntroTransition(undefined)).toBe("溶解");
+    expect(siteIntroTransition({ introTransition: "fade-black" })).toBe("黑場");      // an old name reads as the new one
+    expect(siteIntroTransition({ introTransition: "向左擦除" })).toBe("溶解");        // video-service cannot join it
   });
 
   it("never stops the video: refused, failed, too slow, a clip instead of a picture, no service -- a note and no intro", async () => {

@@ -23,7 +23,7 @@
   // async = false keeps the list order while the downloads overlap. ?v=<build> as in loadScripts (edge-cacheable).
   const build = document.documentElement.getAttribute("data-vw-build");
   try {
-    await Promise.all(["config.js", "shared/models.js", "shared/adapters.js", "shared/purify.js", "shared/episode-spine.js", "shared/runtime.js", "shared/security.js", "shared/theme.js", "shared/jobs-view.js", "shared/workflows.js", "shared/assets-ui.js", "scripts/index-boot.js"].map((file) => new Promise((resolve, reject) => {
+    await Promise.all(["config.js", "shared/models.js", "shared/adapters.js", "shared/purify.js", "awarewave/editor-shared/transitions.js", "shared/episode-spine.js", "shared/runtime.js", "shared/security.js", "shared/theme.js", "shared/jobs-view.js", "shared/workflows.js", "shared/assets-ui.js", "scripts/index-boot.js"].map((file) => new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.async = false;
       script.src = new URL(file + (build ? "?v=" + encodeURIComponent(build) : ""), document.baseURI).href;

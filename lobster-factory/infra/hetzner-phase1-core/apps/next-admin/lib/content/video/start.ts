@@ -26,6 +26,8 @@ export interface VideoStartInput {
   costJobId?: string;
   /** Card R2: the automatic intro (lib/content/video/intro-opener.ts); null / left out = none. */
   introStyle?: import("./intro-opener").IntroStyle | null;
+  /** The transition into the video (brand-voice.ts siteIntroTransition). */
+  introTransition?: string;
 }
 
 interface PrepareResult {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import Transitions from "@/public/editor-shared/transitions.js";
 import { workbenchAuthorized } from "@/lib/content/video/workbench-internal";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { runForOrg } from "@/lib/entitlements/grant";
@@ -35,7 +36,8 @@ const VOICE = /^[A-Za-z0-9:._-]{0,64}$/;
 const RATIOS = new Set(["16x9", "9x16", "4x5"]);   // finalize.ts EXPECTED_VIDEO_DIMENSIONS
 const MAX_SCENES = 30;                             // video-service RENDER_MAX_SCENES default
 const AUTONOMY = new Set(["guided", "auto_after_render"]);
-const TRANSITIONS = new Set(["none", "crossfade", "fade-black"]);
+// What video-service joins bookends with: the transitions module's output values (card R2), never a list here.
+const TRANSITIONS = new Set<string>(Transitions.LIST.map((t: { bookend: string | null }) => t.bookend).filter(Boolean));
 type Body = Record<string, unknown>;
 const obj = (v: unknown): Body | null => (v && typeof v === "object" && !Array.isArray(v) ? v as Body : null);
 
@@ -46,7 +48,7 @@ type Bookend = { kind: "title"; title: string; seconds: number } | { kind: "temp
 type Parsed = {
   organizationId: string; sourceRef: string; title: string; ratio: string; scenes: { narration: string; assetId: string }[];
   tts: { provider: "edge" | "openai"; voice: string }; intro: { title: string; seconds: number } | null; autonomy: string | null; actor: string;
-  bookends: { intro: Bookend | null; outro: Bookend | null; transition: "none" | "crossfade" | "fade-black"; transitionSeconds: number } | null;
+  bookends: { intro: Bookend | null; outro: Bookend | null; transition: string; transitionSeconds: number } | null;
   embedSiteId: string | null;
   autoBudget: AutoBudget | null;
 };
@@ -86,7 +88,7 @@ function parse(b: Body | null): Parsed | string {
     const transition = b.transition ?? "none", ts = b.transitionSeconds === undefined ? 0.5 : Number(b.transitionSeconds);
     if (typeof transition !== "string" || !TRANSITIONS.has(transition)) return "invalid transition";
     if (transition !== "none" && !(ts >= 0.2 && ts <= 2)) return "transitionSeconds must be 0.2-2";
-    bookends = { intro: i, outro: o, transition: transition as "none" | "crossfade" | "fade-black", transitionSeconds: ts };
+    bookends = { intro: i, outro: o, transition, transitionSeconds: ts };
   } else if (b.intro !== undefined) {
     const i = obj(b.intro), it = typeof i?.title === "string" ? i.title.trim() : "", sec = Number(i?.seconds);
     if (!it || it.length > 80 || !Number.isFinite(sec) || sec <= 0 || sec > 15) return "intro needs a title (1-80) and 0-15 seconds";

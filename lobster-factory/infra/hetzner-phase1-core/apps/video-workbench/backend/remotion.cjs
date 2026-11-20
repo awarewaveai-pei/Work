@@ -12,8 +12,8 @@ const path = require("node:path"),
 // TEMPLATE_MAP (tests/remotion-template.cjs reads it).
 const shared = require(path.join(require("./appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "public/editor-shared/intro-styles.js"));
 const catalog = shared.INTRO_TEMPLATES;
-// /capabilities introStyles: the preview is served by server.cjs from the same folder (/editor-shared/intro-styles/<id>.jpg).
-const introStyles = shared.INTRO_STYLES.map((s) => ({ ...s, preview: s.preview && "/editor-shared/" + s.preview }));
+// /capabilities introStyles: the preview is served by server.cjs from the same folder (/awarewave/editor-shared/intro-styles/<id>.jpg).
+const introStyles = shared.INTRO_STYLES.map((s) => ({ ...s, preview: s.preview && "/awarewave/editor-shared/" + s.preview }));
 const POLL_MS = 2000,
   POLL_LIMIT_MS = 10 * 60 * 1000,
   MAX_BODY = 3.5 * 1024 * 1024,

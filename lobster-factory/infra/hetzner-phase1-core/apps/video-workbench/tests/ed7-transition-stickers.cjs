@@ -76,7 +76,7 @@ function run(args, binary = false) {
     await page.locator('[data-ed-pane="轉場"]').click();
     assert.equal(await page.locator("[data-ed-transition-hint]").innerText(), "請先點選 V1 相鄰片段之間的剪點");
     assert.equal(await group("轉場").getByRole("button").count(), 5);
-    assert.deepEqual(await group("轉場").getByRole("button").allInnerTexts(), ["融接", "淡入淡出", "向左擦除", "向右擦除", "圓形裁切"]);
+    assert.deepEqual(await group("轉場").getByRole("button").allInnerTexts(), ["溶解 ＝交叉淡化", "黑場 ＝淡黑", "向左擦除", "向右擦除", "圓形展開"]); // card R2: the transitions module's names
     assert.equal(await group("轉場").locator("button:not([disabled])").count(), 0);
     assert.equal(await page.getByRole("button", { name: "套用全部剪點 (2)", exact: true }).isDisabled(), false);
     // a clip click is not a cut click
@@ -123,7 +123,7 @@ function run(args, binary = false) {
     assert.equal((await v1())[1].t, "無");
     await page.getByRole("button", { name: "復原", exact: true }).click();
     assert.equal((await v1())[1].t, "向左擦除");
-    await group("轉場").getByRole("button", { name: "圓形裁切", exact: true }).click();
+    await group("轉場").getByRole("button", { name: "圓形展開", exact: true }).click();
     assert.equal((await v1())[1].t, "圓形展開");
     await page.getByRole("button", { name: "套用全部剪點 (2)", exact: true }).click();
     [a, b, c] = await v1();
