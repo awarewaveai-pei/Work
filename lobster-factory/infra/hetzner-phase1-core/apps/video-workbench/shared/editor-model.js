@@ -1,6 +1,12 @@
 // Card P2: the editor's track, transition, colour, quality and loudness rules in one place, shared by the page
 // (browser global `EditorModel`) and the export (require() in Node), so the two cannot disagree.
 (function (root) {
+  // Card R2: transitions are one module shared with the main system (next-admin public/editor-shared/transitions.js):
+  // the page loads it before this file (global Transitions); Node reads the main system's copy (awarewave-files.txt).
+  const Transitions =
+    typeof module === "object" && module.exports
+      ? require(require("node:path").join(require("../backend/appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "public/editor-shared/transitions.js"))
+      : root.Transitions;
   const LIMITS = { video: 8, audio: 8, text: 4 };
   // All tracks together: = MEDIA_TIMELINE_V1_MAX_TRACKS (next-admin timeline-v1.ts:3), so every project exports to V1.
   // tests/p2-review-fixes.cjs checks the two stay equal.
@@ -86,34 +92,11 @@
     }
     throw Error("軌道數已達上限");
   }
-  // UI label -> ffmpeg xfade transition. Pre-P2 names map onto these on load and at export.
-  const TRANSITIONS = {
-    溶解: "fade",
-    黑場: "fadeblack",
-    向左擦除: "wipeleft",
-    向右擦除: "wiperight",
-    向左推移: "slideleft",
-    向右推移: "slideright",
-    圓形展開: "circleopen",
-  };
-  const LEGACY_TRANSITIONS = {
-    融接: "溶解",
-    淡入淡出: "黑場",
-    圓形裁切: "圓形展開",
-  };
-  // null = unknown name (export refuses it); "無" = no transition.
-  function transitionName(name) {
-    if (name === undefined || name === null || name === "" || name === "無")
-      return "無";
-    if (Object.hasOwn(TRANSITIONS, name)) return name;
-    return Object.hasOwn(LEGACY_TRANSITIONS, name)
-      ? LEGACY_TRANSITIONS[name]
-      : null;
-  }
-  const transitionLimits = (tb) => ({
-    min: 2,
-    max: Math.floor((2 * tb.num) / tb.den),
-  });
+  // Transitions (the module above): stored name -> ffmpeg xfade, pre-P2 names, the reader, the length limits.
+  const TRANSITIONS = Transitions.XFADE,
+    LEGACY_TRANSITIONS = Transitions.LEGACY,
+    transitionName = Transitions.name,
+    transitionLimits = Transitions.limits;
   // Stored as integer frames; pre-P2 clips carry transitionDuration in seconds (default 0.5 s).
   function transitionFrames(clip, tb) {
     const { min, max } = transitionLimits(tb);
@@ -367,7 +350,7 @@
   }
   // Card ED.7.3: 轉場曲線 as one formula of the linear progress T (0 -> 1). The export writes it into FFmpeg's xfade
   // expression; the preview evaluates the same text with T replaced by its progress.
-  const TRANSITION_CURVES = { 線性: "T", 平滑: "T*T*(3-2*T)", 加速: "T*T" };
+  const TRANSITION_CURVES = Transitions.CURVES;
   const transitionProgress = (curve, t) =>
     evalNumber((TRANSITION_CURVES[curve] || "T").replaceAll("T", Math.max(0, Math.min(1, t)).toFixed(9)));
   // Card ED.5.3: 文字動畫 timings, burnt by the export as ASS tags and drawn by the preview. 淡入淡出 = \fad(ms, ms);

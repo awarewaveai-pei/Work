@@ -45,7 +45,13 @@ const loadScripts = new Function("document", m[0] + "\nreturn loadScripts;")(doc
   const boot = JSON.parse(read("scripts/tools-boot.js").match(/loadScripts\((\[[^\]]*\])/)[1]);
   assert.deepEqual(boot, ["../shared/subtitles.js", "tool-processing.js", "tools-workflows.js", "tools-engine-host.js", "tools-0.js"], "tools.html boots the list and frame only");
   const wired = new Set([...boot, ...TOOLS.flatMap((t) => t.scripts || [])]);
-  for (const f of wired) assert(fs.existsSync(path.join(root, "scripts", f)), "tool script exists: " + f);
+  // ../editor-shared/<name> = a main-system shared file (card R2 transitions), served by server.cjs from its shipped copy.
+  const { resolveSource, runtimeFiles } = require("../backend/appearance.cjs"), shipped = new Set(runtimeFiles(root));
+  for (const f of wired)
+    if (f.startsWith("../editor-shared/")) {
+      const file = "public/editor-shared/" + f.slice(17);
+      assert(shipped.has(file) && fs.existsSync(path.join(resolveSource(root, process.env), file)), "shared tool script shipped and exists: " + f);
+    } else assert(fs.existsSync(path.join(root, "scripts", f)), "tool script exists: " + f);
   const toolFiles = [...fs.readdirSync(path.join(root, "scripts")).filter((f) => /^(tools?-|editor-).*\.js$/.test(f) && f !== "tools-boot.js"),
     ...fs.readdirSync(path.join(root, "scripts", "editor-panes")).map((f) => "editor-panes/" + f)];
   for (const f of toolFiles) assert(wired.has(f), f + " is loaded by tools-boot.js or a TOOLS[].scripts group");

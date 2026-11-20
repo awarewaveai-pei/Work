@@ -184,13 +184,13 @@ function createServer({
         res.end(content);
         return;
       }
-      // Card R2: the intro styles' previews live beside their one definition in the main system
-      // (public/editor-shared/intro-styles/, shipped by awarewave-files.txt); a fixed name pattern, nothing else there.
-      if (/^\/editor-shared\/intro-styles\/[a-z0-9-]{1,60}\.jpg$/.test(pathname)) {
-        const preview = path.join(awareWaveDir, "public", pathname.slice(1));
-        if (!fs.existsSync(preview)) throw Error();
-        const body = fs.readFileSync(preview);
-        res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff", "Content-Length": body.length });
+      // Card R2: shared definitions the pages need from the main system (public/editor-shared/, shipped by
+      // awarewave-files.txt): the intro styles' previews and the transitions module. Fixed names only, nothing else there.
+      if (/^\/editor-shared\/(intro-styles\/[a-z0-9-]{1,60}\.jpg|transitions\.js)$/.test(pathname)) {
+        const shared = path.join(awareWaveDir, "public", pathname.slice(1));
+        if (!fs.existsSync(shared)) throw Error();
+        const body = fs.readFileSync(shared);
+        res.writeHead(200, { "Content-Type": pathname.endsWith(".js") ? "text/javascript; charset=utf-8" : "image/jpeg", "Cache-Control": pathname.endsWith(".js") ? "no-cache" : "public, max-age=3600", "X-Content-Type-Options": "nosniff", "Content-Length": body.length });
         res.end(req.method === "HEAD" ? undefined : body);
         return;
       }

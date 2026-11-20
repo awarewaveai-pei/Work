@@ -18,6 +18,7 @@ public/editor-shared/video-styles.js
 public/editor-shared/art-styles.js
 public/editor-shared/video-organization.cjs
 public/editor-shared/intro-styles.js
+public/editor-shared/transitions.js
 public/editor-shared/intro-styles/title-card.jpg
 public/editor-shared/intro-styles/cover-opener.jpg
 public/editor-shared/intro-styles/scale-bg-text-slideup.jpg

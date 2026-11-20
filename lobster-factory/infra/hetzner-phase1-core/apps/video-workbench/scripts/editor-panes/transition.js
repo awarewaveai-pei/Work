@@ -1,16 +1,11 @@
 // Card ED.0/ED.7: the 「轉場」 left pane (spec §1.3 轉場). Registered with edRegisterPane in tools-editor.js.
 // A transition belongs to the later clip of a cut between two touching V1 clips; only a clicked cut (the ⧉ button on
 // the timeline) can take one. The export repeats the edge frame for any missing handle frames.
-const edTrEffects = [
-    ["融接", "溶解"],
-    ["淡入淡出", "黑場"],
-    ["向左擦除", "向左擦除"],
-    ["向右擦除", "向右擦除"],
-    ["圓形裁切", "圓形展開"],
-  ],
-  edTrCurves = ["線性", "平滑", "加速"],
-  // Slides keep working on old projects but have no curved form in the export (backend/editor-export.cjs).
-  edTrNoCurve = ["向左推移", "向右推移"],
+// The names, curves and curve-less slides come from the transitions module (Transitions, card R2), never a list here.
+const edTrEffects = Transitions.PICKER,
+  edTrCurves = Object.keys(Transitions.CURVES),
+  // Slides keep working on old projects but have no curved form in the export (backend/transitions.cjs).
+  edTrNoCurve = Transitions.NO_CURVE,
   // The cut the user clicked (the later clip's id) and the values 套用全部剪點 uses.
   edTr = {
     cut: null,

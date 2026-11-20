@@ -94,7 +94,13 @@ const ORG = "11111111-1111-4111-8111-111111111111", USER = "44444444-4444-4444-8
     // The route got asset ids only, from this workbench's own index, for the episode's project.
     assert.deepEqual(submitted, [{ organizationId: ORG, sourceRef: "proj-1", title: "第一集", ratio: "9x16", scenes: [{ narration: "第一句旁白", assetId: IMAGE }], tts: { provider: "edge", voice: "zh-TW-HsiaoChenNeural" }, autonomy: "guided", userId: USER }]);
     // One main-system row: the one the main system made; the downloaded copy maps to it and is never registered again.
+    // The covers register after the video (settle, api.cjs): a read can come back while they are still in flight (the
+    // gate saw it ~1 run in 10), so read until they are -- a cover that never registers still fails below.
     job = await (await fetch(at + "/generations/" + job.id)).json();
+    for (let i = 0; i < 50 && (job.ledgerPending || !(job.result.covers || []).every((c) => c.assetId)); i++) {
+      await new Promise((res) => setTimeout(res, 100));
+      job = await (await fetch(at + "/generations/" + job.id)).json();
+    }
     assert.equal(job.result.assetId, VIDEO);
     assert.equal(job.result.checksumSha256, sha);
     assert.deepEqual(registered, []);
