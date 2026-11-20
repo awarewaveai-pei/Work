@@ -93,7 +93,7 @@ brief 在 `briefs/`（`COMMON.md`＋各卡）。
 
 ## D1 oracle 併進 `sg-deploy.sh` — 完成（2026-11-20，`c5b2091fd`；上線 `4adb301f3`）
 oracle 是 `sg-deploy.sh` 的 app `oracle-web`（`Projects/internal/ziwei-doushu/deploy/DEPLOY.md`）。`oracle-deploy.sh`、產品自己的 compose、主機 `/opt/oracle` 已刪。細節與證據：`agency-os/WORKLOG.md` 2026-11-20 同名條目。
-未決：`products.ts` 是否加 oracle 一列（操作者決定）。
+`products.ts` 已有 oracle 一列（外部門、`coming_soon`、`features: []`；`e0f9cdee6`）。
 
 ## 現況
 五個外部 skill 的內容全部上線。未排入：紫微夫妻宮／桃花運（yinyuan）、城市五行地圖（fengshui）、每日次數計量與帳號金流（`ORACLE_ROADMAP.md` Phase A）。工人 session 四個皆 idle，可封存。

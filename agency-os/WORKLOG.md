@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-20（續25）— oracle 登記為產品（`products.ts` 外部門一列＋`lib/oracle/MODULE_MANIFEST.json`）（操作者：「你決定」）
+
+- 決定與理由：加。`lib/portal/products.ts` 是產品與門的唯一清單（ADR 017/018；`AGENTS_APPENDIX.md` 新部署路徑清單第 7 項）；oracle.aware-wave.com 是對客戶的門卻不在其中＝清單與實況不符。前例：`hci`、`cognitive` 同為獨立容器、未販售即已登記。
+- 內容（`e0f9cdee6`）：`key: "oracle"`、`door: { app: "external" }`、`status: "coming_soon"`、`features: []`（無帳號與計量前不發明 feature key；開賣時許可改走 `can()` 再補）、`loginSources: ["local","awarewave-wp"]`；manifest 十項宣告附檔案位置，`services`＝核心 compose 的 `oracle-web`；`node scripts/sync-foundry-catalog.mjs` 重產 6 檔（順帶補上既有 `tools/photo-pro` 的匯出落差）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit；node --test scripts/__tests__/product-manifests.test.mjs scripts/__tests__/new-product.test.mjs → 8 passed；node scripts/sync-foundry-catalog.mjs --check → PASS；npx vitest run lib/portal → 66 passed／2 failed（`tools/seedstar`：別的 session 未追蹤的資料夾，不在本 commit） | exit=0 | ms=9000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（一列登記＋說明檔；由登記表自己的測試與 manifest 檢查器驗）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=PRODUCT_HOST_ORACLE | hits=3（manifest 1、Foundry 匯出 1、本條目 1；無程式讀取，與 `PRODUCT_HOST_HCI` 同為安裝設定說明）
+- 影響：隨每晚 03:00 自動部署進主系統；`/ops/products` 多一列「獨立服務／即將推出」。無收費功能、無權限格。
+- rollback：`git revert e0f9cdee6`。
 ## 2026-11-20（續23）— oracle 併進 `sg-deploy.sh`、刪 `oracle-deploy.sh`；連同主系統／工作台／Remotion R5 一次部署 `4adb301f3`；上線檢查的 nginx 位址窗口修正（操作者：「修好了，開始做」「其他sessions的 你一起部署」）
 
 - 根因：
