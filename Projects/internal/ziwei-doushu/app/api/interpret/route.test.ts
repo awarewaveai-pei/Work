@@ -33,6 +33,12 @@ describe('/api/interpret 輸入驗證(信任邊界)', () => {
     expect(r.status).toBe(400);
   });
 
+  it('求籤 qian 的 context 通過 systemId 驗證(曾漏登 → AI 解籤一律 400)', async () => {
+    // context 驗證先於 tier:非法 tier 讓請求停在 'bad tier',不打真實 AI。
+    const r = await POST(post({ context: { ...goodCtx, systemId: 'qian' }, tier: 'ultra' }));
+    expect(((await r.json()) as { detail: string }).detail).toBe('bad tier');
+  });
+
   it('未知 locale → 400', async () => {
     const r = await POST(post({ context: { ...goodCtx, locale: 'fr' } }));
     expect(r.status).toBe(400);

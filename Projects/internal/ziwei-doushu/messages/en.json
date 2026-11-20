@@ -13,7 +13,8 @@
     "daily": "Daily Fortune",
     "astrology": "Astrology",
     "fengshui": "Feng Shui",
-    "qimen": "Qi Men Dun Jia"
+    "qimen": "Qi Men Dun Jia",
+    "qian": "Guanyin Lots"
   },
   "hub": {
     "title": "East & West Divination",
@@ -27,6 +28,7 @@
     "dailyDesc": "Daily fortune, lucky color, lucky number, almanac",
     "astrologyDesc": "Planets · Signs · Houses · Ascendant (Swiss-grade, self-hosted)",
     "fengshuiDesc": "Flying Star chart, Eight Mansions, placement tips",
+    "qianDesc": "The hundred Guanyin lots: hold a question in mind and draw one",
     "qimenDesc": "Qi Men Dun Jia hour chart: stems, eight doors, nine stars, eight deities"
   },
   "home": {
@@ -353,6 +355,16 @@
     "kongMark": "Void",
     "maMark": "Horse",
     "center": "Center lodges in Kun 2"
+  },
+  "qian": {
+    "title": "Guanyin Lots",
+    "subtitle": "The hundred Guanyin temple lots · hold your question, draw one lot",
+    "topic": "What you are asking about",
+    "hint": "Pick the area of life, hold your question in mind, then press Draw a lot.",
+    "draw": "Draw a lot",
+    "lotNo": "Lot {n}",
+    "lotTitle": "Story",
+    "poemNote": "The lot poem is shown in its original classical Chinese; the reading below explains it in English."
   },
   "errors": {
     "computeFailed": "Charting failed, please check your input"

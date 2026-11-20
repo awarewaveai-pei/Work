@@ -13,7 +13,8 @@
     "daily": "每日運勢",
     "astrology": "西洋占星",
     "fengshui": "風水飛星",
-    "qimen": "奇門遁甲"
+    "qimen": "奇門遁甲",
+    "qian": "觀音靈籤"
   },
   "hub": {
     "title": "東西方命理",
@@ -27,6 +28,7 @@
     "dailyDesc": "今日運勢、幸運色、幸運數字、宜忌",
     "astrologyDesc": "行星·星座·宮位·上升(Swiss 級精度,自架)",
     "fengshuiDesc": "玄空飛星九宮盤、八宅命卦,方位擺放建議",
+    "qianDesc": "觀音靈籤一百首,默念所問求一支籤",
     "qimenDesc": "時家奇門九宮盤:三奇六儀、八門、九星、八神"
   },
   "home": {
@@ -353,6 +355,16 @@
     "kongMark": "空",
     "maMark": "馬",
     "center": "中五寄坤二"
+  },
+  "qian": {
+    "title": "觀音靈籤",
+    "subtitle": "觀音靈籤一百首 · 默念所問,求一支籤",
+    "topic": "所問之事",
+    "hint": "先選所問之事,心裡默念想問的問題,再按「求籤」。",
+    "draw": "求籤",
+    "lotNo": "第 {n} 籤",
+    "lotTitle": "籤題",
+    "poemNote": ""
   },
   "errors": {
     "computeFailed": "排盤失敗,請檢查輸入"

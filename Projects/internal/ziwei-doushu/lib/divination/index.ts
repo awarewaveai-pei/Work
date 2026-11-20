@@ -11,6 +11,7 @@ import { tarotSystem } from './systems/tarot';
 import { hehunSystem } from './systems/hehun';
 import { fengshuiSystem } from './systems/fengshui';
 import { qimenSystem } from './systems/qimen';
+import { qianSystem } from './systems/qian';
 
 registerSystem(ziweiSystem);
 registerSystem(baziSystem);
@@ -19,6 +20,7 @@ registerSystem(tarotSystem);
 registerSystem(hehunSystem);
 registerSystem(fengshuiSystem);
 registerSystem(qimenSystem);
+registerSystem(qianSystem);
 // 後續系統(按 PLAN §18 路線圖,需 API key):
 // registerSystem(astrologySystem);
 
