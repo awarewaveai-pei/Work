@@ -12,10 +12,32 @@ export type ReviewCheck = { name: "complete" | "length" | "seo" | "forbidden" | 
 /** A type, not an interface: it is stored in content_topics.review (Topic.review is a plain record). */
 export type TopicReview = { pass: boolean; checks: ReviewCheck[]; at: string };
 
-/** Text as a reader sees it, without spaces and markdown marks: what length counts and what a forbidden term is matched in. */
+/** Text as a reader sees it, without spaces and markdown marks: what length counts and what a forbidden term in a script
+ *  written without spaces (Chinese, Japanese) is matched in. */
 const norm = (s: string) => s.toLowerCase().replace(/[\s#>*_`|~-]/g, "");
-const bodyText = (md: string) => norm(md.replace(/<!--[\s\S]*?-->/g, "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1"));
-const hits = (forbidden: string[], text: string) => forbidden.filter((t) => norm(t) && text.includes(norm(t)));
+/** Markdown without what a reader never sees: comments and link targets. */
+const shownText = (md: string) => md.replace(/<!--[\s\S]*?-->/g, "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1");
+const bodyText = (md: string) => norm(shownText(md));
+/** A term of Latin letters only ("treat", "guaranteed results") is matched as whole words, the last one with its common
+ *  endings (treats, treated, treating, curing): the space-blind match would also stop "treatment", "retreat" and "secure"
+ *  (for "cure"), and a site on auto publish would never publish. Any other term keeps the space-blind match. */
+const LATIN_TERM = /^[a-z0-9]+(?:[\s'-]+[a-z0-9]+)*$/;
+function wordPattern(term: string): RegExp {
+  const words = term.split(/[\s'-]+/);
+  const last = words.pop() as string;
+  const tail = last.endsWith("e") ? `(?:${last}(?:s|d)?|${last.slice(0, -1)}ing)` : `${last}(?:s|es|d|ed|ing)?`;
+  return new RegExp(`(?<![a-z0-9])${[...words, tail].join("[\\s'-]+")}(?![a-z0-9])`);
+}
+/** shown = text with its spaces; emphasis marks are dropped so "**treat**" is still the word. */
+function hits(forbidden: string[], shown: string): string[] {
+  const words = shown.toLowerCase().replace(/[*_`~]/g, "");
+  const packed = norm(shown);
+  return forbidden.filter((t) => {
+    const term = t.trim().toLowerCase();
+    if (!norm(term)) return false;
+    return LATIN_TERM.test(term) ? wordPattern(term).test(words) : packed.includes(norm(term));
+  });
+}
 const forbiddenDetail = (found: string[]) => (found.length ? `出現禁用說法：${found.join("、")}` : "沒有禁用說法");
 
 /** Width-folded too (NFKC: full-width letters, digits and punctuation = half-width), for the must-carry paragraphs only, so
@@ -37,7 +59,7 @@ function titleSpacingCheck(markdown: string): ReviewCheck {
 export function articleChecks(markdown: string, report: RankMathReport | null, forbidden: string[], required: string[] = []): ReviewCheck[] {
   const marker = /<!-- GENERATION_(ERROR|TRUNCATED):/.test(markdown);
   const text = bodyText(markdown);
-  const found = hits(forbidden, text);
+  const found = hits(forbidden, shownText(markdown));
   const checks: ReviewCheck[] = [
     { name: "complete", pass: !marker, detail: marker ? "文章沒有寫完" : "文章完整" },
     { name: "length", pass: text.length >= MIN_BODY_CHARS, detail: `內文 ${text.length} 字（至少 ${MIN_BODY_CHARS}）` },
@@ -67,7 +89,7 @@ export function uncheckedRequired(checked: string[] | undefined, now: string[]):
 
 /** texts = the channels' own posts; problems = what the writer could not do. */
 export function socialChecks(s: { texts: string[]; channels: number; problems: string[] }, forbidden: string[]): ReviewCheck[] {
-  const found = hits(forbidden, s.texts.map(norm).join("\n"));
+  const found = hits(forbidden, s.texts.join("\n"));
   return [
     { name: "social", pass: s.channels > 0 && !s.problems.length,
       detail: s.channels ? (s.problems.length ? s.problems.join("；") : `${s.channels} 個頻道都有貼文`) : "沒有已連接的社群頻道" },

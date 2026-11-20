@@ -30,6 +30,15 @@ describe("topic review", () => {
     expect(failed(socialChecks({ ...clean, texts: ["真的 100%有效！"] }, ["100% 有效"]))).toEqual(["social_forbidden"]);
   });
 
+  it("a Latin forbidden word is matched as a word with its endings, not inside another word", () => {
+    const terms = ["cure", "heal illness", "treat", "diagnose", "guaranteed results"];
+    const found = (text: string) => articleChecks(`${body}\n\n${text}`, green, terms).find((c) => c.name === "forbidden")?.detail;
+    expect(found("A secure retreat is not a treatment, and a diagnosis is for a doctor.")).toBe("沒有禁用說法");
+    expect(found("Art **Treats** anxiety; curing is Guaranteed  Results. It can heal-illness.")).toBe("出現禁用說法：cure、heal illness、treat、guaranteed results");
+    expect(failed(socialChecks({ ...clean, texts: ["We diagnosed it"] }, terms))).toEqual(["social_forbidden"]);
+    expect(failed(socialChecks({ ...clean, texts: ["Join our retreat"] }, terms))).toEqual([]);
+  });
+
   it("no checks is not a pass", () => {
     expect(reviewOf([], NOW).pass).toBe(false);
   });

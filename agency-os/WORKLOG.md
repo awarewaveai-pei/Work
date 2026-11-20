@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-20（續7）— Soulful 禁用說法已填；禁用字比對改成英文按整個字（操作者：「填」）
+
+- 動作（正式站網站設定頁，操作者 session）：Soulful 站 `401c0f67-f7bc-4731-9147-195096775b15` 的「禁用說法」填 `cure, heal illness, treat, diagnose, guaranteed results, 保證`，來源 `agency-os/tenants/company-soulful-expression/sites/soulfulexpression-org/content/CONTENT_STRATEGY.md:20`；按「儲存預設」。
+- 讀回：`marketing.forbiddenClaims` = 上列六項；`publishMode` 仍 `ai_review_auto`；`requiredBlocks` 仍 1 段（整份存檔沒有蓋掉另兩項）。
+- 填完才看得到的問題（根因）：`lib/content/topics/review.ts` 的 `hits()` 把文章去掉空白後做「包含」比對——為中文而寫。英文禁用字 `treat` 會命中 treatment／retreat，`cure` 會命中 secure。Soulful 是英文站且已設自動發布，不修＝幾乎每篇都被擋下、自動發布形同沒開（方向是安全的，但功能失效）。
+- 不變量：禁用字比對的單位＝該文字的「詞」。以空白分詞的文字（純拉丁字母的禁用字）按整個字比對，末字允許常見字尾（s／es／d／ed／ing，e 結尾含 -ing 變化）；其他（中日文、含符號）維持去空白包含。文章與社群貼文共用同一個 `hits()`，一處改兩處生效。
+- 既有資料：AwareWave 的禁用說法是中文，行為不變（既有測試 `保證治癒`、`100% 有效` 原樣通過）。已存的檢查結果不回改。
+- 必附段落本身不含任何禁用字（讀回原文核對），不會自己擋自己。
+- 未上線：程式改動隨今晚 03:00 自動部署；Soulful 的內容管線排程本來就沒開，上線前不會有文章被誤擋。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/content/topics`（19 files／174 tests passed，含新案：secure retreat／treatment／diagnosis 不擋；Treats／curing／Guaranteed  Results／heal-illness／diagnosed 擋）＋`npx tsc --noEmit` 無新錯；SSH psql 讀回設定 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回改後 `review.ts` 全檔；新測試在舊比對下會紅＝突變證據）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=forbiddenTerms | hits=5
+- BUGHUNT_SCOPE_NARROW: 另一處同名 `forbiddenTerms`（`lib/content/video/editorial-rights-qa.ts:85`）是影片腳本 QA，資料來源不同（影片 metadata，不是站台設定），同樣是小寫包含比對；本次不動，英文站開始做影片時再併同一個比對。
+- ORACLE_WAIVED: 單一純函式、26 行，新測試即突變證據；不值得一輪外部審查
+- rollback：`git revert` 本 commit；設定頁把「禁用說法」清空後儲存。
 ## 2026-11-20（續6）— Soulful 改成可自動發布（操作者：「Soulful 維持人工審核(不是有設AI會自動審核內容?)>要可自動發布」）
 
 - 決定變更：監工 2026-11-19 的待決 11「Soulful 維持人工審核」作廢，操作者要 Soulful 可自動發布。
