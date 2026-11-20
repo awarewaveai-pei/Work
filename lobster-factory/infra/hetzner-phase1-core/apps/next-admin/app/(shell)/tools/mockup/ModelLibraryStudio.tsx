@@ -372,7 +372,7 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
       <section style={section}>
         <div>
           <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>模特兒圖庫</h3>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>勾選照片可一次刪除；點照片可框印花位置（只有主頁的「免費預覽」需要；AI 合成會自己找位置）。</div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>勾選照片可一次刪除；點照片可框印花位置（只有主頁的「程式免費印」需要；AI 合成會自己找位置）。</div>
         </div>
         {selected.size > 0 && (
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

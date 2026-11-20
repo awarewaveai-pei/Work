@@ -35,10 +35,10 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
     expect(screen.getByText("Mia")).toBeTruthy();
     fireEvent.click(screen.getAllByRole("button", { name: "全選" })[0]);
     expect(screen.getByRole("button", { name: /合成（2 張/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /免費預覽（1 張）/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /程式免費印（1 張）/ })).toBeTruthy();
   });
 
-  it("合成 sends every picked photo across models to the AI print; 免費預覽 sends only outlined ones with their box", async () => {
+  it("合成 sends every picked photo across models to the AI print; 程式免費印 sends only outlined ones with their box", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, image: "data:image/jpeg;base64,AA==" })));
     vi.stubGlobal("fetch", fetchMock);
     render(<ModelMockupPanel designRef={DESIGN} designName="" photos={library} onOpenLibrary={() => {}} />);
@@ -51,7 +51,7 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
     expect(ai.map((b) => b.photo).sort()).toEqual(library.map((p) => p.object_url).sort());
     await waitFor(() => expect(screen.getAllByAltText("商品 Mockup")).toHaveLength(3));
     fetchMock.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: /免費預覽（2 張）/ }));
+    fireEvent.click(screen.getByRole("button", { name: /程式免費印（2 張）/ }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(bodies(fetchMock).map((b) => [b.engine, b.box])).toEqual([["code", boxed], ["code", boxed]]);
   });

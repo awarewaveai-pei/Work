@@ -1,6 +1,7 @@
 # Mockup Studio 固定模特兒（多張姿勢照 ＋ 一張設計圖）建置計畫
 
 > 讀者：執行這份計畫的 agent。狀態：2026-11-01 已實作（WORKLOG 2026-11-01 續16）。原系統全部保留，只加新功能。
+> **2026-11-20 定案（以此為準，覆蓋以下所有段落中對程式印的定位）**：正式出圖走「AI 生成素面模特兒圖一次＋程式印每個設計」。AI 印會改動圖案（實測多出連字號、小字變亂碼），程式印圖案原樣。程式印引擎已修正（`lib/studio/fabric-print.ts` `foldPush`：位移只看該處相對皺褶、不翻折；commit cabd21e03，WORKLOG 2026-11-20 續10）。主頁按鈕「免費預覽」改名「程式免費印」。Blender 3D 模特兒路線試過，不用於靜態圖。
 > **2026-11-02 定案（以此為準，覆蓋以下所有段落）**：流程拆兩頁。【模特兒印製】（`ModelLibraryStudio.tsx`）用全部模特設定（按鈕）生成**含背景、素色衣服的模特兒圖**存圖庫（新的人：首張靠描述、其餘以首張為長相參考；既有模特兒：其照片為參考；`buildModelPhotoPrompt`）。主頁「模特」（`ModelMockupPanel.tsx`）勾多張模特兒圖＋設計圖 → 每張合成一張商品 Mockup（fabric-print engine ai）。主頁舊的一次生成、固定模特兒、4 角度建模特兒（`buildModelSheetPrompt`）、`withIdentityReference` 已刪。WORKLOG 2026-11-02。
 > **2026-11-01 晚間再改**：第 3 步預設改為 **AI 印（gpt-image-2.5-sunburst，`openai-25-edit`）**——程式印在平順的 AI 照片上跟不到皺褶（操作者：「圖案都沒有隨衣服的皺褶」）。研究五條路（nano-banana-2／pro、程式置換、FASHN v1.6、FLUX VTO、gpt-image-2.5），只有 gpt-image-2.5 同時做到：印花隨皺褶與身體弧度、人／姿勢／背景不動、設計圖不變；FASHN／FLUX 會重畫衣服版型與身材。`POST /api/tools/studio/fabric-print` 收 `engine: "ai" | "code"`，AI 走 `generateImage` 扣 `studio.image`（約 US$0.06／張），程式印保留為免費預覽（需印花框）。對照圖 `D:/tmp/mockup-2026-11-01/cmp-cafe-3-zoom.jpg`。
 > **與下文不同處（以此為準）**：第 3 步改為**程式印**（`lib/studio/fabric-print.ts` 置換＋明暗，`POST /api/tools/studio/fabric-print`），不呼叫 AI、不扣點——AI 兩個模型（nano-banana-2／pro）試印都是平的方塊、不隨皺褶（試驗圖 `D:/tmp/mockup-2026-11-01/fold-3way.jpg`）。每張照片要先框印花位置（`metadata.print_box`，`PATCH /api/tools/presets?id=`）。presets 不做多張原子寫入：前端逐張 POST、同一 `modelKey`；整位刪除＝逐張 DELETE。畫面為新模式「模特兒印製」（`app/(shell)/tools/mockup/ModelLibraryStudio.tsx`）。

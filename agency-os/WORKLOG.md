@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-20（續11）— Mockup 主頁「免費預覽」改名「程式免費印」（操作者：「『免費預覽』改成『程式免費印』」）
+
+- 原因：續10 定案程式印為正式出圖方式（AI 印會改圖案），按鈕仍叫「預覽」。
+- 改動：`ModelMockupPanel.tsx`（按鈕字、提示 title 加「圖案原樣不被改」、無框照片的錯誤訊息、圖案位置說明）；`ModelLibraryStudio.tsx:375` 說明文字一處；`__tests__/model-flow.render.test.tsx` 三處按鈕名；`MOCKUP_FIXED_MODEL_PLAN.md` 頂部加 11-20 定案一段。
+- 同檔另一 session（32c9f471）的 `asJpeg`／`readJson` 改動未納入本 commit（只選 :375 那一段）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx --no-install vitest run "app/(shell)/tools/mockup/__tests__/model-flow.render.test.tsx" → 10 passed（按新名稱找到按鈕並送出 engine code 請求）；tsc --noEmit 於 mockup 檔 0 錯 | exit=0 | ms=929
+- REVIEW_WAIVED: NA -- 只改畫面文字，無邏輯改動；diff 已逐行讀回
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=免費預覽 | hits=10（現行 6 處已改；WORKLOG 舊紀錄 4810/4817/4818/4926/4946/4952 為歷史不改）
+- rollback：還原本 commit。
 ## 2026-11-20（續10）— 程式印花：位移只看該處的相對皺褶，且不翻折（操作者：「好，修方案 A」）
 
 - 起因：操作者否決「程式印」（皺褶不自然）。改走「AI 出素面底圖一次＋程式貼圖案」，同一張平整底圖上 HEAD 版引擎把小字撕爛。

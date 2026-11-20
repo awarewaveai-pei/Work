@@ -46,7 +46,7 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
   async function composite(engine: "ai" | "code") {
     if (!designRef) { setMsg("請先在右邊選一張設計圖"); return; }
     const targets = engine === "code" ? boxedPicked : pickedPhotos;
-    if (targets.length === 0) { setMsg(engine === "code" ? "免費預覽只能用已框好印花位置的模特兒圖" : "請先勾選模特兒圖"); return; }
+    if (targets.length === 0) { setMsg(engine === "code" ? "程式免費印只能用已框好印花位置的模特兒圖" : "請先勾選模特兒圖"); return; }
     setMsg(null);
     setResults(targets.map((photo) => ({ photo, engine, model, designName, shot: { status: "generating" } })));
     await inPairs(targets, async (photo, i) => {
@@ -131,7 +131,7 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
 
       {models.length > 0 && (
         <div style={{ fontSize: 13 }}>
-          圖案位置（AI 合成用；免費預覽照框的位置）
+          圖案位置（AI 合成用；程式免費印照框的位置）
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
             {GARMENT_PLACEMENT.filter((o) => o.value !== "all-over").map((o) => (
               <button key={o.value} className={chip(placement === o.value)} style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => setPlacement(o.value)}>{o.label}</button>
@@ -156,8 +156,8 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
               合成（{pickedPhotos.length} 張，約 NT${Math.round(pickedPhotos.length * costNt)}）
             </button>
             <button className="btn-secondary" disabled={boxedPicked.length === 0 || !designRef || running} onClick={() => void composite("code")}
-              title="不用 AI、不扣點；只用已在【模特兒印製】框好印花位置的圖">
-              免費預覽（{boxedPicked.length} 張）
+              title="不用 AI、不扣點、圖案原樣不被改；只用已在【模特兒印製】框好印花位置的圖">
+              程式免費印（{boxedPicked.length} 張）
             </button>
           </div>
         </div>
