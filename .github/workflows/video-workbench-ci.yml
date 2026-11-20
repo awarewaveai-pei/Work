@@ -108,11 +108,16 @@ jobs:
 
       # The image has no ../next-admin: it reads the bundled .awarewave/, whose imports resolve from this app's node_modules.
       # Same here, so a next-admin file needing a package this app does not install fails in CI as it would on the host.
+      # Run from a copy outside the checkout: with the repo around it, a test that reaches for ../../next-admin by path
+      # passes here and fails in the image (r1-cover-template, deploy of 2026-11-20 00:43; this job was green).
       - name: Gate
         env:
           FFPROBE_PATH: /usr/bin/ffprobe
           AWAREWAVE_APP_DIR: .awarewave
-        run: node tests/gate.cjs
+        run: |
+          cp -a . "$RUNNER_TEMP/video-workbench"
+          cd "$RUNNER_TEMP/video-workbench"
+          node tests/gate.cjs
 
       # CI-only extra: the next-admin route/page contracts p6-main-system checks when the full next-admin source is present.
       - name: next-admin contracts (full checkout)

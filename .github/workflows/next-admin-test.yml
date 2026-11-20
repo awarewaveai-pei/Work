@@ -1,0 +1,57 @@
+name: next-admin — full test suite
+
+# Runs `npm test` (the whole vitest suite) on every push to main (and PR to main) that touches next-admin:
+# the same command as sg-deploy.sh's npm test gate, on the host's Node major (20).
+# Until 2026-11-20 the whole suite ran only inside a deploy, so a rule test that scans the source tree
+# (accent-not-text, image-upload-limit) first went red on the host, minutes into a deploy.
+# Second job of the same defence as next-admin-typecheck.yml; sg-deploy.sh's own gate stays the hard stop.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/**'
+      - '.github/workflows/next-admin-test.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/**'
+      - '.github/workflows/next-admin-test.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: next-admin-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  test:
+    name: vitest run
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: lobster-factory/infra/hetzner-phase1-core/apps/next-admin
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: lobster-factory/infra/hetzner-phase1-core/apps/next-admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full test suite
+        run: npm test
