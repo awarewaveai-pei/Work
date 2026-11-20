@@ -3,7 +3,7 @@ name: codex-review
 description: Cross-model oracle review for a change WRITTEN BY CLAUDE -- the primary R0 verification Review action. Produces an ORACLE gate artifact.
 ---
 
-Run the standard cross-model oracle review for R0 [驗證計畫] Review 動作 (AGENTS.md §跨模型 oracle, primary entry point since 2026-08-30). This command exists so two things are never left to memory: the two mandatory focus-text additions in Step 2, and the capture-before-review sequencing in Step 1.5 (2026-08-30 rewrite, closing a critic Critical finding — see Step 1.5's own note).
+Run the standard cross-model oracle review for R0 [驗證計畫] Review 動作 (AGENTS.md §跨模型 oracle, primary entry point since 2026-08-30). This command exists so two things are never left to memory: the mandatory focus-text additions in Step 2, and the capture-before-review sequencing in Step 1.5 (2026-08-30 rewrite, closing a critic Critical finding — see Step 1.5's own note).
 
 ## Step 0 — Quota circuit breaker (2026-09-04, operator: 撞到額度就停)
 
@@ -25,7 +25,7 @@ Treat untracked files as reviewable work even when the diff shortstat is empty. 
 
 **Route by file count (2026-10-01).** Count the changed files above (staged + unstaged + untracked).
 - **≤ 2 files** → Steps 1.5–3 below (companion `adversarial-review`, foreground `--wait`).
-- **> 2 files** → skip Steps 1.5–3 and run `scripts/codex-oracle.ps1 -Mode review -Context "<one line>"` (background; it captures, inlines the diff, and writes its own artifact). Why: the companion inlines the diff only up to 2 files (`plugins/codex/scripts/lib/git.mjs:8` `DEFAULT_INLINE_DIFF_MAX_FILES = 2`); above that Codex must read the tree itself, and its managed shell rejects `git diff`/`Get-Content` outside `D:\Work` — on 2026-10-01 two of six rounds reviewed nothing, one of them returning a vacuous `approve`. `codex-oracle.ps1` always inlines (`:408`), so the reviewer never has to read files to see the change.
+- **> 2 files** → skip Steps 1.5–3 and run `scripts/codex-oracle.ps1 -Mode review -Context "<one line; for a fix, its root cause>"` (background; it captures, inlines the diff, and writes its own artifact). Why: the companion inlines the diff only up to 2 files (`plugins/codex/scripts/lib/git.mjs:8` `DEFAULT_INLINE_DIFF_MAX_FILES = 2`); above that Codex must read the tree itself, and its managed shell rejects `git diff`/`Get-Content` outside `D:\Work` — on 2026-10-01 two of six rounds reviewed nothing, one of them returning a vacuous `approve`. `codex-oracle.ps1` always inlines (`:408`), so the reviewer never has to read files to see the change.
 
 A review whose output says it could not read the diff/files is **not a review**: never land it as an artifact, never count it toward `REVIEW_DONE`.
 
@@ -39,14 +39,14 @@ powershell -ExecutionPolicy Bypass -File ./scripts/write-oracle-artifact.ps1 -Mo
 
 Real exit code 2 if there is nothing to review, or if HEAD looks like it just absorbed an auto-checkpoint commit (report that to the user rather than proceeding). Keep the `-Out` path — Step 3 needs it.
 
-## Step 2 — Run the review with both mandatory focus-text additions
+## Step 2 — Run the review with the mandatory focus-text additions
 
-Neither addition below exists in the official `/codex:adversarial-review` prompt (verified 2026-08-30 by reading `~/.claude/plugins/marketplaces/openai-codex/plugins/codex/prompts/adversarial-review.md` in full) — do not drop either one, and do not paraphrase them.
+Fill `<one line, or 'not a fix'>` with the root cause the fix claims (same text as the commit message); for `codex-oracle.ps1` put it in `-Context`. None of the additions below exists in the official `/codex:adversarial-review` prompt (verified 2026-08-30 by reading `~/.claude/plugins/marketplaces/openai-codex/plugins/codex/prompts/adversarial-review.md` in full) — do not drop any of them, and do not paraphrase them.
 
 `${CLAUDE_PLUGIN_ROOT}` is only set when Claude Code is executing the plugin's OWN command file — it is empty when this project command runs it instead (verified 2026-08-30: `echo $CLAUDE_PLUGIN_ROOT` prints nothing here). Use the resolved plugin path directly. `--model gpt-6-sol` is pinned for the same reason as `scripts/codex-oracle.ps1` `$Model` (config keeps changing; gpt-6.1-sol 400s on this ChatGPT account; gpt-6-astra too costly, operator 2026-10-28):
 
 ```bash
-node "$HOME/.claude/plugins/marketplaces/openai-codex/plugins/codex/scripts/codex-companion.mjs" adversarial-review --wait --model gpt-6-sol "Also verify: does this change depend on something NOT visible in this diff — a config value, retention/timeout setting, schema assumption, cron schedule, or upstream default defined elsewhere in the repo? If it contradicts the change (e.g. makes it silently unreachable / dead code), report that as a finding even if it wasn't otherwise in scope. Reminder: if you cannot support a real finding after checking the above, say so directly and return no findings. Do not invent a weak or speculative finding just to appear useful -- that is worse than reporting nothing."
+node "$HOME/.claude/plugins/marketplaces/openai-codex/plugins/codex/scripts/codex-companion.mjs" adversarial-review --wait --model gpt-6-sol "Also verify: does this change depend on something NOT visible in this diff — a config value, retention/timeout setting, schema assumption, cron schedule, or upstream default defined elsewhere in the repo? If it contradicts the change (e.g. makes it silently unreachable / dead code), report that as a finding even if it wasn't otherwise in scope. Stated root cause: <one line, or 'not a fix'>. If this change fixes a bug, the stated root cause is a hypothesis, not a fact. Try to refute it: does evidence in the repository show this is the real cause, and does the change remove that cause rather than hide the symptom (editing data, adding an exemption, loosening a threshold, swallowing an error)? A root cause the evidence does not support is a finding. Reminder: if you cannot support a real finding after checking the above, say so directly and return no findings. Do not invent a weak or speculative finding just to appear useful -- that is worse than reporting nothing."
 ```
 
 If that path doesn't exist (plugin reinstalled under a different marketplace/version), fall back to running the literal `/codex:adversarial-review` slash command with the same focus text as its argument instead of the `node` call above.
@@ -75,4 +75,4 @@ Always use `-AnswerFile` (write Step 2's output to a temp file first), not `-Ans
 
 ## Fallback
 
-If `/codex:adversarial-review` fails twice in a row (timeout, no output), drop to `.\scripts\codex-oracle.ps1 -Mode review -Context "<what changed>"` instead — it captures and reviews in one step with its own artifact, skip Steps 1.5 and 3 in that case. See AGENTS.md §跨模型 oracle for the full three-layer fallback chain (critic → `/codex-review` → `codex-oracle.ps1`).
+If `/codex:adversarial-review` fails twice in a row (timeout, no output), drop to `.\scripts\codex-oracle.ps1 -Mode review -Context "<what changed; for a fix, its root cause>"` instead — it captures and reviews in one step with its own artifact, skip Steps 1.5 and 3 in that case. See AGENTS.md §跨模型 oracle for the full three-layer fallback chain (critic → `/codex-review` → `codex-oracle.ps1`).

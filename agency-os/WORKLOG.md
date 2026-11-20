@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-20（續9）— 跨模型審查加「推翻根因」一關（參考 OpenAI Performance Factory；操作者「兩步都補」「你決定」）
+
+- 決策（附正式資料，90 天）：事件 36 件、AI 自動診斷 1 件、repair_runs 0 筆、延遲類警報 0 件 → 正式站告警流程不加 Codex 反駁／部署後驗證（會是死碼）。
+  - 部署後驗證已有：同 fingerprint 再出現 → `computeTransition` 重開事件（`lib/ops-inbox/transition.ts:18`）；下次診斷的蒐證含上次修復紀錄（`lib/repair-center/evidence.ts:151`）。
+  - 量在開發端：每個修 bug 的 commit 都寫根因，但審查者只查 diff 缺陷，沒被要求檢驗根因是否成立（實例 b575c36db：Instagram 失敗原以為斷線，實為 31 個 hashtag）。
+- 做法：三條審查路徑加同一段「根因是假說，試著推翻；檢查是否只是蓋掉症狀」。
+  - `scripts/codex-oracle.ps1`（BEFORE YOU ANSWER 後）、`scripts/claude-oracle.ps1`（prompt）、`.claude/commands/codex-review.md`（focus text 加 `Stated root cause: <…>`）。
+  - 根因（第二個）：`claude-oracle.ps1` 的 `-Context` 只寫進 artifact，從沒給審查者看（舊 `:184` 才用到）→ 現在一併放進 stdin。
+  - `claude-review.md`：`-Context` 寫明根因。
+- 不做：p95 等效能指標（無延遲警報）；自審（critic）不另加，`/review` 走同一套 oracle。
+- REALTEST_EVIDENCE: tool=Bash | cmd=codex-oracle.ps1 -Mode review -Context <根因> -Path 4 檔（新 prompt 段實際送出並審查本變更） | exit=0 | ms=82466
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（Codex gpt-6-sol，`agency-os/reports/oracle/2026-11-20-partialreview-a3276715.md`，files-reviewed 四檔；1m＝備援範例沒要求寫根因，已修 codex-review.md:28,:78）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude/commands | grep=two mandatory focus|both mandatory focus|Review it adversarially|BEFORE YOU ANSWER | hits=95（兩支 oracle script 本身＋agency-os/Backups 舊備份＋reports/oracle 舊審查封包；無現行過時主張）
 ## 2026-11-20（續8）— 影片下一階段：線 D 補修併入（舊文章不自動發）、實測四修正正式站實看、本批 RISKS 收尾
 
 - 併入：線 D `1a7a15284` cherry-pick 進 main。Codex 對 `48d6700ca`（已上線為 `369afb5c8`）補跑審查 3 點（artifact `agency-os/reports/oracle/2026-11-20-partialreview-17ea90d3.md`）：F3 屬實——標題空格檢查上線前做好的文章，存的 checks 沒有 `title_spacing`，自動發布站上仍會自己發；修在 `lib/content/topics/make.ts` 發布關卡（與必附段落關卡同處），沒人按發布就停、寫原因，有人按照常發。F1／F2（WordPress 端 Rank Math 外掛照字面比對焦點關鍵字、強力詞以 ASCII 空格切標題，`RankMathPowerWords.php:14`）＝brief 已接受的取捨：標題自然優先，WordPress 後台的 Rank Math 分數可能比主系統算的低，不影響發布。

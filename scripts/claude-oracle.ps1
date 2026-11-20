@@ -87,6 +87,7 @@ $prompt = @'
 You are the cross-model oracle for a change written by OpenAI Codex in this repository. The complete change (unified diff plus untracked files) follows these instructions.
 Review it adversarially for real defects only: correctness, security, data loss, broken invariants, cross-file contract breaks, governance rules in CLAUDE.md / agency-os/AGENTS.md that the change violates.
 Also verify: does this change depend on something NOT visible in the diff (a config value, retention/timeout setting, schema assumption, cron schedule, or upstream default defined elsewhere in the repo)? If that makes the change wrong or silently unreachable, report it.
+If this change fixes a bug, the stated root cause is a hypothesis, not a fact. Try to refute it: does evidence in the repository show this is the real cause, and does the change remove that cause rather than hide the symptom (editing data, adding an exemption, loosening a threshold, swallowing an error)? A root cause the evidence does not support is a finding.
 Confirm every claim with Read/Grep/Glob against the repository and cite file:line. If you cannot support a real finding, return no findings; never invent a weak or speculative finding.
 Reply with ONLY this JSON, no prose, no code fence:
 {"verdict":"approve|needs-attention","findings":[{"severity":"critical|high|medium|low","file":"path","line":1,"title":"...","detail":"...","fix":"..."}]}
@@ -95,7 +96,7 @@ Reply with ONLY this JSON, no prose, no code fence:
 # Instructions travel on stdin with the diff: Windows PowerShell 5.1 does not
 # escape embedded double quotes when passing an argument to a native exe, so the
 # JSON example above would split the command line.
-$stdinText = $prompt + "`n`n===== CHANGE UNDER REVIEW (unified diff + untracked files) =====`n" + (Get-Content -Raw -Encoding UTF8 -LiteralPath $diffFile)
+$stdinText = $prompt + "`n`n===== WHAT THIS CHANGE IS FOR =====`n" + $Context + "`n`n===== CHANGE UNDER REVIEW (unified diff + untracked files) =====`n" + (Get-Content -Raw -Encoding UTF8 -LiteralPath $diffFile)
 
 $prevOut = $OutputEncoding
 $prevConsole = [Console]::OutputEncoding
