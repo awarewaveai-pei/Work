@@ -296,6 +296,10 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   // Which composite is on screen: bumped whenever it is replaced, so a PhotoCraft 「傳回」 for an older one is refused
   // (the editor then saves it to My Designs) instead of overwriting a newer result.
   const genNo = useRef(0);
+  // The composite on screen now: a late AI edit compares it with the one it was made from.
+  const genImage = useRef<string | undefined>(undefined);
+  genImage.current = gen.status === "done" ? gen.image : undefined;
+  const [editNote, setEditNote] = useState<string | null>(null);
   useCanvasReturn("mockup", (slot, image) => {
     // Refused while 存入 My Designs runs: it saves the image it started with, then marks the edit "saved".
     if (slot !== `gen:${genNo.current}` || gen.status !== "done" || saveState === "saving") return false;
@@ -520,10 +524,13 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const saveMockup = useCallback(async () => {
     if (gen.status !== "done" || !gen.image) return;
     setSaveState("saving");
+    // The answer belongs to the image it saved: if that image was replaced meanwhile, the new one is not "saved".
+    const no = genNo.current;
+    const land = (st: "saved" | "error") => { if (genNo.current === no) setSaveState(st); };
     try {
       const json = await saveDesign(await urlToBlob(gen.image), { prompt: `[mockup:${mode}:${color}] ${effectivePrompt}`, modelName: model, source: "mockup" });
-      setSaveState(json.ok ? "saved" : "error");
-    } catch { setSaveState("error"); }
+      land(json.ok ? "saved" : "error");
+    } catch { land("error"); }
   }, [gen, mode, color, effectivePrompt, model]);
 
   const saveProductPreset = useCallback(async () => {
@@ -861,6 +868,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
               </div>
             )}
+            {editNote && <p style={{ fontSize: 12, opacity: 0.8 }}>{editNote}</p>}
             {/* Restored 2026-11-01: checkpoint ab72acb06 (2026-06-23) dropped this panel together with the result image. */}
             {gen.status === "done" && gen.image && (
               <div style={{ marginTop: 14 }}>
@@ -872,6 +880,17 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                   aspectRatio={aspect}
                   styleAnchor={{ model, mode: "image", stylePrompt: effectivePrompt, subject: `${mode} ${color}`, refs: designRef ? 1 : 0, target: "mockup" }}
                   onEditedImage={(image, meta) => {
+                    // This closure is the render the edit was started from: gen.image here = the image it edited. If the
+                    // composite changed since (PhotoCraft 傳回, 再合成, another design), the paid edit is kept in My Designs
+                    // instead of overwriting what is on screen now.
+                    if (genImage.current !== gen.image) {
+                      void urlToBlob(image)
+                        .then((blob) => saveDesign(blob, { prompt: `[mockup:ai-edit] ${meta.prompt}`, modelName: meta.model, source: "mockup" }))
+                        .then((r) => setEditNote(r.ok ? "AI 修圖完成時合成圖已換過，修改版已存進 My Designs" : `AI 修圖完成時合成圖已換過；存進 My Designs 失敗：${r.ok ? "" : (r as { error: string }).error}`))
+                        .catch((e) => setEditNote(`AI 修圖完成時合成圖已換過；存進 My Designs 失敗：${e instanceof Error ? e.message : String(e)}`));
+                      return;
+                    }
+                    setEditNote(null);
                     setModel(meta.model);
                     genNo.current++;
                     setGen((g) => ({ status: "done", image, fileMeta: g.fileMeta }));

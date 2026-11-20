@@ -1,6 +1,6 @@
 // 傳回 C8.3：Studio 的格子判斷——還在就換那一格，不在回 null（→ dock 存 My Designs），不落到別格。
 import { describe, expect, it } from "vitest";
-import { newRefImage, parseStudioSlot, refSlot, replaceRefImage, replaceResultImage, resultSlot } from "./studio-canvas-return";
+import { applyAiEdit, newRefImage, parseStudioSlot, refSlot, replaceRefImage, replaceResultImage, resultSlot } from "./studio-canvas-return";
 
 const NEW = "data:image/png;base64,NEW";
 
@@ -36,5 +36,16 @@ describe("Studio 傳回格子", () => {
     expect(parseStudioSlot(resultSlot("flux-dev"))).toEqual({ kind: "result", model: "flux-dev" });
     expect(parseStudioSlot(refSlot("ref3-x"))).toEqual({ kind: "ref", id: "ref3-x" });
     expect(parseStudioSlot("preview")).toBeNull();
+  });
+});
+
+describe("Studio AI 修圖晚到", () => {
+  const results = [{ model: "a", image: "A", seed: 1 }, { model: "b", image: "B", seed: 2 }];
+  it("那格還是原圖 → 換上修改版與新 seed（看模型，不看 activeIdx）", () => {
+    expect(applyAiEdit(results, "b", "B", NEW, 9)).toEqual([results[0], { model: "b", image: NEW, seed: 9 }]);
+  });
+  it("那格已被傳回／重生換掉，或模型不在 → null（改存 My Designs，不蓋掉新圖）", () => {
+    expect(applyAiEdit(results, "b", "OLD", NEW, 9)).toBeNull();
+    expect(applyAiEdit(results, "c", "C", NEW, 9)).toBeNull();
   });
 });

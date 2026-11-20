@@ -22,6 +22,16 @@ export function replaceResultImage<R extends { model: string; image: string | nu
   return results.map((r, j) => (j === i ? { ...r, image } : r));
 }
 
+/** A late AI edit (修圖 prompt) of `from`: that model's result takes it only while it still shows `from`; null = the
+ *  image was replaced meanwhile (傳回, regenerate) or is gone -- the caller keeps the edit in My Designs instead. */
+export function applyAiEdit<R extends { model: string; image: string | null; seed?: number | null }>(
+  results: R[], model: string, from: string | null, image: string, seed: number | null,
+): R[] | null {
+  const i = results.findIndex((r) => r.model === model);
+  if (i < 0 || !from || results[i].image !== from) return null;
+  return results.map((r, j) => (j === i ? { ...r, image, seed } : r));
+}
+
 /** That reference image gets the new url; null = it was removed meanwhile. */
 export function replaceRefImage(refs: StudioRefImage[], id: string, url: string): StudioRefImage[] | null {
   if (!refs.some((r) => r.id === id)) return null;

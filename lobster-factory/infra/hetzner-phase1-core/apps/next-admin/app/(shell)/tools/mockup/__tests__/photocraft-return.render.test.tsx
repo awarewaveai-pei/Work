@@ -16,7 +16,9 @@ vi.mock("../modelLibrary", async (orig) => ({ ...(await orig<object>()), imageSi
 const saveDesign = vi.fn(async () => ({ ok: true }));
 vi.mock("@/lib/studio/design-upload", async (orig) => ({ ...(await orig<object>()), saveDesign: (...a: unknown[]) => saveDesign(...(a as [])), urlToBlob: async () => new Blob(["x"]) }));
 
-vi.mock("@/components/tools/ImageEditPromptPanel", () => ({ default: () => null }));
+// Each render's onEditedImage, newest last: the panel calls the one from the render its 生成 was clicked in.
+const aiEditCallbacks: ((image: string, meta: { prompt: string; model: string; seed: null }) => void)[] = [];
+vi.mock("@/components/tools/ImageEditPromptPanel", () => ({ default: (p: { onEditedImage: (typeof aiEditCallbacks)[number] }) => { aiEditCallbacks.push(p.onEditedImage); return null; } }));
 
 import ModelLibraryStudio from "../ModelLibraryStudio";
 import MockupStudio from "../MockupStudio";
@@ -36,7 +38,7 @@ function Library() {
   return <ModelLibraryStudio photos={photos} setPhotos={setPhotos} />;
 }
 
-beforeEach(() => { openInCanvas.mockClear(); saveDesign.mockClear(); for (const k of Object.keys(sizes)) delete sizes[k]; });
+beforeEach(() => { aiEditCallbacks.length = 0; openInCanvas.mockClear(); saveDesign.mockClear(); for (const k of Object.keys(sizes)) delete sizes[k]; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("模特兒圖庫 修圖 → PhotoCraft → 傳回", () => {
@@ -161,6 +163,50 @@ describe("主頁 平拍 合成圖 在畫布編輯 → 傳回", () => {
     release({ ok: true });
     await waitFor(() => expect(screen.getByRole("button", { name: "已存入 My Designs ✓" })).toBeTruthy());
     expect(screen.getByAltText("合成結果").getAttribute("src")).toBe("data:image/png;base64,QQ==");
+  });
+});
+
+describe("主頁 平拍: an AI edit (修圖 prompt) that lands late never overwrites a newer image", () => {
+  const DESIGN = "https://pub-test.r2.dev/designs/2026-11/d.png";
+  const AI = "data:image/png;base64,QUk=";
+  beforeEach(() => vi.stubGlobal("fetch", vi.fn(async (u: string) => {
+    if (u.startsWith("/api/tools/designs?group=print")) return new Response(JSON.stringify({ ok: true, assets: [{ id: "d1", object_url: DESIGN, metadata: { prompt: "art" } }] }));
+    if (u === "/api/tools/presets") return new Response(JSON.stringify({ ok: true, presets: [] }));
+    return new Response(JSON.stringify({ ok: true, image: "data:image/png;base64,QQ==" }));
+  })));
+  async function composite() {
+    render(<MockupStudio />);
+    fireEvent.click(await screen.findByAltText("art"));
+    fireEvent.click(screen.getByRole("button", { name: "平拍" }));
+    fireEvent.click(screen.getByRole("button", { name: "合成 Mockup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "在畫布編輯" }));
+    return ret();
+  }
+
+  it("PhotoCraft 傳回 accepted first: the late AI edit goes to My Designs and the PhotoCraft edit stays on screen", async () => {
+    const t = await composite();
+    const startedFrom = aiEditCallbacks[aiEditCallbacks.length - 1]; // render showing the original composite
+    expect(await handlers["mockup"](t.slot, EDITED)).toBe(true);
+    await waitFor(() => expect(screen.getByAltText("合成結果").getAttribute("src")).toBe(EDITED));
+    startedFrom(AI, { prompt: "brighter", model: "nano-banana-2", seed: null });
+    await waitFor(() => expect(saveDesign).toHaveBeenCalledTimes(1));
+    expect((saveDesign.mock.calls[0] as unknown as [Blob, { prompt: string }])[1].prompt).toBe("[mockup:ai-edit] brighter");
+    expect(await screen.findByText("AI 修圖完成時合成圖已換過，修改版已存進 My Designs")).toBeTruthy();
+    expect(screen.getByAltText("合成結果").getAttribute("src")).toBe(EDITED);
+  });
+
+  it("an AI edit that lands while 存入 My Designs runs replaces the image, and the save's answer no longer marks it 已存", async () => {
+    let release: (v: { ok: true }) => void = () => {};
+    saveDesign.mockImplementationOnce(() => new Promise((r) => { release = r as typeof release; }));
+    await composite();
+    fireEvent.click(screen.getByRole("button", { name: "存入 My Designs" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "儲存中…" })).toBeTruthy());
+    aiEditCallbacks[aiEditCallbacks.length - 1](AI, { prompt: "p", model: "nano-banana-2", seed: null });
+    await waitFor(() => expect(screen.getByAltText("合成結果").getAttribute("src")).toBe(AI));
+    release({ ok: true });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByRole("button", { name: "存入 My Designs" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "已存入 My Designs ✓" })).toBeNull();
   });
 });
 

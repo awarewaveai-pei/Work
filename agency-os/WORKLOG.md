@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-20（續22）— AI 修圖晚到不再蓋掉較新的圖（續21 剩餘風險 m1；操作者：「去處理」）
+
+[根因] `ImageEditPromptPanel` 的結果數秒後才到，呼叫的是按下時那次 render 的 `onEditedImage`；Mockup 平拍與 Studio 工作台都直接寫進畫面（Studio 還按 `activeIdx` 寫），不管那張圖期間已被 PhotoCraft 傳回、再合成或換設計換掉 → 已接受的修圖被無聲蓋掉。Mockup 另有：存 My Designs 途中圖被換，存完仍標「已存」。Tarot 不在此類（AI 修圖與傳回都另存圖庫）。
+[不變量] 晚到的結果只套用到「它當初處理的那張圖」；圖已換 → AI 修改版存進 My Designs 並提示。存檔結果只標記它存的那張。
+[已修改]
+- `MockupStudio.tsx`：`genImage` ref 比對 closure 的 `gen.image`；`saveMockup` 依 `genNo` 判斷存檔結果是否還屬於畫面上的圖；`editNote` 提示。
+- `studio/studio-canvas-return.ts` `applyAiEdit`（依模型、比對原圖）；`StudioWorkbench.tsx` 兩處 `onEditedImage` 改走 `onAiEdit`，圖已換 → 存 My Designs＋`aiEditNote`。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/studio" "app/(shell)/tools/mockup" | exit=0 | ms=3000
+- 新測：mockup 2 條（PhotoCraft 傳回後 AI 晚到 → 存 My Designs、畫面保留傳回圖；存檔途中 AI 修圖到 → 不標已存）、studio `applyAiEdit` 2 條。拔掉 mockup 兩個守衛 → 正好那 2 條紅，還原綠。`npx tsc --noEmit` 原始碼 0 錯。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；書面自審＋上述突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ImageEditPromptPanel | hits=35
+[rollback] `git revert <本 commit>`。
 ## 2026-11-20（續21）— Mockup 生出來的圖可送 PhotoCraft 修圖再「傳回」（操作者：「生出來的圖要能匯入 photo-pro 修改再存回，像 tarot 和其他工具」）
 
 [根因] mockup 四處出圖只有「在畫布編輯」或完全沒入口；`openInCanvas` 沒帶 `ret` 票、頁面沒 `useCanvasReturn`，PhotoCraft 改完只能存 My Designs（tarot 做法：`TarotStudio.tsx:903`、`:2196`）。

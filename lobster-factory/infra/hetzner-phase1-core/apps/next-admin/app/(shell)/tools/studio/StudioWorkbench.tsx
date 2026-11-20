@@ -25,7 +25,7 @@ import { tabStyle, chipStyle, actionPill, ghostBtn } from "@/components/tools/pa
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
-import { STUDIO_RETURN_TOOL, newRefImage, parseStudioSlot, refSlot, replaceRefImage, replaceResultImage, resultSlot, type StudioRefImage } from "./studio-canvas-return";
+import { STUDIO_RETURN_TOOL, applyAiEdit, newRefImage, parseStudioSlot, refSlot, replaceRefImage, replaceResultImage, resultSlot, type StudioRefImage } from "./studio-canvas-return";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref } from "@/app/DoorContext";
 import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
@@ -412,6 +412,7 @@ export default function StudioWorkbench() {
   const [mapMode, setMapMode] = useState(false); // 🗺️ 做地圖（true）vs 🎨 做圖案（false）— 只決定輸出格式
   const [fusionPickMode, setFusionPickMode] = useState(false); // ✋ 手選混搭 — next country click sets fusionRegion
   const [zoomImage, setZoomImage] = useState<string | null>(null); // 🔍 click-to-enlarge lightbox
+  const [aiEditNote, setAiEditNote] = useState<string | null>(null);
   const [playMods, setPlayMods] = useState<string[]>([]); // 🎭 玩法 — selected treatment fragments (multi)
   const [showAdvanced, setShowAdvanced] = useState(false); // ▸ 進階：文化混搭 (collapsed by default to declutter)
 
@@ -617,6 +618,19 @@ export default function StudioWorkbench() {
     }
     return false;
   });
+  // AI 修圖 lands seconds later: it replaces only the image it was made from (this closure's), else goes to My Designs.
+  const onAiEdit = (model: StudioModel, from: string | null, image: string, meta: { seed: number | null; prompt: string }) => {
+    if (applyAiEdit(resultsRef.current, model, from, image, meta.seed)) {
+      setAiEditNote(null);
+      setResults((prev) => applyAiEdit(prev, model, from, image, meta.seed) ?? prev);
+      clearDerivedFor(model);
+      return;
+    }
+    void urlToBlob(image)
+      .then((blob) => saveDesign(blob, { prompt: meta.prompt, modelName: model, source: "pod-studio" }))
+      .then((r) => setAiEditNote(r.ok ? "AI 修圖完成時這張圖已換過，修改版已存進 My Designs" : "AI 修圖完成時這張圖已換過；存進 My Designs 失敗"))
+      .catch(() => setAiEditNote("AI 修圖完成時這張圖已換過；存進 My Designs 失敗"));
+  };
   const selectedSearchDataModel = AI_TEXT_MODELS.find((model) => model.value === searchDataModel) ?? AI_TEXT_MODELS[0];
 
   const onPickProduct = useCallback((value: string) => {
@@ -1761,11 +1775,9 @@ export default function StudioWorkbench() {
                     aspectRatio={aspect}
                     title=""
                     styleAnchor={{ model: activeResult.model, mode: refImages.length > 0 ? "image" : "text", stylePrompt: resolvedStylePrompt || effectivePrompt, subject: subject.trim(), refs: refImages.length, target: "pod-design" }}
-                    onEditedImage={(image, meta) => {
-                      setResults((prev) => prev.map((r, i) => i === activeIdx ? { ...r, image, seed: meta.seed } : r));
-                      clearDerivedFor(activeResult.model);
-                    }}
+                    onEditedImage={(image, meta) => onAiEdit(activeResult.model, activeResult.image, image, meta)}
                   />
+                  {aiEditNote && <p style={{ fontSize: 12, opacity: 0.8 }}>{aiEditNote}</p>}
                 </AccordionSection>
               </div>
             </div>
@@ -1976,11 +1988,9 @@ export default function StudioWorkbench() {
                     aspectRatio={aspect}
                     title=""
                     styleAnchor={{ model: activeResult.model, mode: refImages.length > 0 ? "image" : "text", stylePrompt: resolvedStylePrompt || effectivePrompt, subject: subject.trim(), refs: refImages.length, target: "pod-design" }}
-                    onEditedImage={(image, meta) => {
-                      setResults((prev) => prev.map((r, i) => i === activeIdx ? { ...r, image, seed: meta.seed } : r));
-                      clearDerivedFor(activeResult.model);
-                    }}
+                    onEditedImage={(image, meta) => onAiEdit(activeResult.model, activeResult.image, image, meta)}
                   />
+                  {aiEditNote && <p style={{ fontSize: 12, opacity: 0.8 }}>{aiEditNote}</p>}
                 </AccordionSection>
               </div>
               </div>
