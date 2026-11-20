@@ -23,7 +23,7 @@ const youtubeDone = { youtube: { post_id: "y", started_at: "2026-11-19T00:00:00Z
 const row = (artifacts: Record<string, unknown>): Topic => ({
   id: "a", organization_id: ORG, site_id: "s1", title: "題目", keyword: "k", angle: null, source: "manual", source_ref: {},
   month: "2026-11-01", scheduled_for: null, formats: ["article", "youtube"], status: "publishing", review: null,
-  artifacts: { article: { wp_post_id: 5, required: [] }, video: { job_id: "j", url: FILE, embedded_at: "2026-11-19T00:00:00Z" }, ...artifacts },
+  artifacts: { article: { wp_post_id: 5, required: [], checks: [{ name: "title_spacing", pass: true, detail: "" }] }, video: { job_id: "j", url: FILE, embedded_at: "2026-11-19T00:00:00Z" }, ...artifacts },
   version: 3, last_error: null, started_on: "2026-11-19", created_by: "staff:x", created_at: "2026-11-19T00:00:00Z", updated_at: "2026-11-19T00:00:00Z",
 });
 function deps(start: Topic) {

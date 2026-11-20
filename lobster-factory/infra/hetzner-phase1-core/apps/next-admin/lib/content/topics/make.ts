@@ -281,6 +281,10 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
   if (t.formats.includes("article") && a && !a.published) {
     const unchecked = uncheckedRequired(a.required, requiredBlocks(site.defaults));
     if (unchecked.length) throw new MakeError(`網站後來新增了必附段落，這篇沒有檢查過（${unchecked.join("、")}），沒有發布（草稿還在）`, t.artifacts);
+    // C: made before the title-spacing check (its stored checks have none) = never checked, so not out by itself; a
+    // person's press is the check (they saw the title)
+    if (!personAsked(t.artifacts) && !(a.checks ?? []).some((c) => c.name === "title_spacing"))
+      throw new MakeError("這篇文章做好時還沒有「標題空格」檢查，沒有自動發布；看過標題後按「發布」（草稿還在）", t.artifacts);
   }
   return publishSteps(t, {
     now: () => new Date(),
