@@ -18,6 +18,7 @@ const GLYPHS: Record<PageSlug, string> = {
   tarot: "✦",
   astrology: "♆",
   fengshui: "☷",
+  qimen: "☰",
   daily: "☀",
 };
 const descKey = (id: PageSlug) => `${id}Desc` as const;

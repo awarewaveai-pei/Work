@@ -26,7 +26,8 @@
     "tarotDesc": "78-card deck, single / three-card / Celtic Cross",
     "dailyDesc": "Daily fortune, lucky color, lucky number, almanac",
     "astrologyDesc": "Planets · Signs · Houses · Ascendant (Swiss-grade, self-hosted)",
-    "fengshuiDesc": "Flying Star chart, Eight Mansions, placement tips"
+    "fengshuiDesc": "Flying Star chart, Eight Mansions, placement tips",
+    "qimenDesc": "Qi Men Dun Jia hour chart: stems, eight doors, nine stars, eight deities"
   },
   "home": {
     "title": "Zi Wei Dou Shu Chart",

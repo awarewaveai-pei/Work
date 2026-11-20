@@ -26,7 +26,8 @@
     "tarotDesc": "78 張牌庫,單張/三張/凱爾特十字",
     "dailyDesc": "今日運勢、幸運色、幸運數字、宜忌",
     "astrologyDesc": "行星·星座·宮位·上升(Swiss 級精度,自架)",
-    "fengshuiDesc": "玄空飛星九宮盤、八宅命卦,方位擺放建議"
+    "fengshuiDesc": "玄空飛星九宮盤、八宅命卦,方位擺放建議",
+    "qimenDesc": "時家奇門九宮盤:三奇六儀、八門、九星、八神"
   },
   "home": {
     "title": "紫微斗數命盤",
