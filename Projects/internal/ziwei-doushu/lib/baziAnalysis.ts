@@ -1,3 +1,5 @@
+import { isStem, KE, SHENG, STEM_WUXING, type WuXing } from './ganzhi';
+
 /**
  * 八字喜用神 / 格局分析(扶抑取用法)。
  *
@@ -11,24 +13,10 @@
  *
  * 十神由 lunar-javascript 算出(本模組只分類,不自行推十神),故與排盤同源。
  */
-export type WuXing = '木' | '火' | '土' | '金' | '水';
 export type Strength = '身強' | '身弱' | '中和';
 
-const GAN_WUXING: Record<string, WuXing> = {
-  甲: '木', 乙: '木', 丙: '火', 丁: '火', 戊: '土',
-  己: '土', 庚: '金', 辛: '金', 壬: '水', 癸: '水',
-};
-
-/** 五行相生:X 生 SHENG[X]。 */
-const SHENG: Record<WuXing, WuXing> = {
-  木: '火', 火: '土', 土: '金', 金: '水', 水: '木',
-};
-/** 五行相剋:X 剋 KE[X]。 */
-const KE: Record<WuXing, WuXing> = {
-  木: '土', 火: '金', 土: '水', 金: '木', 水: '火',
-};
 /** 反查:回傳 map[?] === target 的 key(生我=印用 SHENG 反查、剋我=官殺用 KE 反查)。 */
-function inverse(map: Record<WuXing, WuXing>, target: WuXing): WuXing {
+function inverse(map: Readonly<Record<WuXing, WuXing>>, target: WuXing): WuXing {
   return (Object.keys(map) as WuXing[]).find((k) => map[k] === target) as WuXing;
 }
 
@@ -73,9 +61,9 @@ function uniq(a: WuXing[]): WuXing[] {
 }
 
 export function analyzeBazi(input: BaziAnalysisInput): BaziAnalysis {
-  const dayElement = GAN_WUXING[input.dayGan];
   // export + 單元測試直呼:未知日干即大聲拋錯,不靜默回 undefined 欄位(critic 2026-06-26)。
-  if (!dayElement) throw new Error(`analyzeBazi: 未知日干 ${input.dayGan}`);
+  if (!isStem(input.dayGan)) throw new Error(`analyzeBazi: 未知日干 ${input.dayGan}`);
+  const dayElement = STEM_WUXING[input.dayGan];
 
   let support = 0;
   let drain = 0;

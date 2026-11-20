@@ -3,19 +3,24 @@ import type { Locale } from '@/lib/i18n/config';
 /**
  * 命理系統統一合約 (F3 接縫)。
  *
- * 設計目標(30 年可擴可刪):新增一個系統 = 實作 DivinationSystem 並 register;
- *   移除 = 刪模組 + 不再 register。其餘程式(AI 解讀、付費牆、UI 路由)透過
- *   InterpretationContext 這個「系統無關」結構運作,不需認識各系統內部。
+ * 新增一個系統 = SYSTEM_IDS 加一項 + lib/ai/prompts/systems.ts FRAMING 加一項
+ *   + 實作 DivinationSystem 並在 lib/divination/index.ts register;前兩項漏了 tsc 會紅。
+ *   有獨立頁面的另在 lib/site.ts PAGE_SLUGS 加一項(導覽、首頁、sitemap 由它產生)。
+ *   移除 = 反向刪除。其餘程式(AI 解讀、付費牆)透過 InterpretationContext 這個
+ *   「系統無關」結構運作,不需認識各系統內部。
  */
 
-export type SystemId =
-  | 'ziwei'
-  | 'bazi'
-  | 'iching'
-  | 'tarot'
-  | 'astrology'
-  | 'hehun'
-  | 'fengshui';
+/** 系統清單唯一來源(API 白名單 /api/interpret 亦由此驗證)。 */
+export const SYSTEM_IDS = [
+  'ziwei',
+  'bazi',
+  'iching',
+  'tarot',
+  'astrology',
+  'hehun',
+  'fengshui',
+] as const;
+export type SystemId = (typeof SYSTEM_IDS)[number];
 
 /**
  * 給 AI 解讀層的「系統無關」結構化輸入。

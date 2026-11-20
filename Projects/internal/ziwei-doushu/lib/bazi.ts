@@ -4,11 +4,8 @@ import {
   type TrueSolarResult,
 } from './trueSolarTime';
 import { defaultLocale, type Locale } from './i18n/config';
-import {
-  analyzeBazi,
-  type Strength,
-  type WuXing,
-} from './baziAnalysis';
+import { analyzeBazi, type Strength } from './baziAnalysis';
+import type { WuXing } from './ganzhi';
 import type { Gender, CalendarType } from './ziwei';
 import { findBaziRelations, type BaziRelation, type PillarChars } from './baziRelations';
 import { liChunYear, yearGanZhi } from './liChun';

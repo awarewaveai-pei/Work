@@ -1,8 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { locales } from '@/lib/i18n/config';
-import { SITE_URL } from '@/lib/site';
+import { PAGE_SLUGS, SITE_URL } from '@/lib/site';
 
-const PAGES = ['', 'ziwei', 'bazi', 'hehun', 'iching', 'tarot', 'astrology', 'fengshui', 'daily'] as const;
+const PAGES = ['', ...PAGE_SLUGS] as const;
 
 /** 多語 sitemap + hreflang alternates → 各語言頁分別被各國搜尋引擎收錄。 */
 export default function sitemap(): MetadataRoute.Sitemap {

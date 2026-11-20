@@ -2,22 +2,25 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import { PAGE_SLUGS, type PageSlug } from "@/lib/site";
 
 /**
  * 首頁 hub — 深色星空主題，5 個命理系統卡片。
  * Server Component：SEO + dict 解析在伺服器端。
  */
 
-const SYSTEMS = [
-  { id: "ziwei",  descKey: "ziweiDesc", glyph: "☽" },
-  { id: "bazi",   descKey: "baziDesc",  glyph: "⊕" },
-  { id: "hehun",  descKey: "hehunDesc", glyph: "☯" },
-  { id: "iching", descKey: "ichingDesc",glyph: "☲" },
-  { id: "tarot",  descKey: "tarotDesc", glyph: "✦" },
-  { id: "astrology", descKey: "astrologyDesc", glyph: "♆" },
-  { id: "fengshui", descKey: "fengshuiDesc", glyph: "☷" },
-  { id: "daily",  descKey: "dailyDesc", glyph: "☀" },
-] as const;
+/** 每頁卡片圖示;順序由 PAGE_SLUGS 決定。漏一頁、或 messages 缺 hub.<slug>Desc,tsc 紅。 */
+const GLYPHS: Record<PageSlug, string> = {
+  ziwei: "☽",
+  bazi: "⊕",
+  hehun: "☯",
+  iching: "☲",
+  tarot: "✦",
+  astrology: "♆",
+  fengshui: "☷",
+  daily: "☀",
+};
+const descKey = (id: PageSlug) => `${id}Desc` as const;
 
 export default async function Hub({
   params,
@@ -64,13 +67,13 @@ export default async function Hub({
 
         {/* System cards */}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {SYSTEMS.map((s) => (
+          {PAGE_SLUGS.map((id) => (
             <Link
-              key={s.id}
-              href={`/${lang}/${s.id}`}
+              key={id}
+              href={`/${lang}/${id}`}
               className="glass-card block p-6 no-underline group"
             >
-              <span className="system-glyph">{s.glyph}</span>
+              <span className="system-glyph">{GLYPHS[id]}</span>
               <h2
                 style={{
                   fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
@@ -81,10 +84,10 @@ export default async function Hub({
                   transition: "color var(--dur-normal) var(--ease-out)",
                 }}
               >
-                {dict.nav[s.id]}
+                {dict.nav[id]}
               </h2>
               <p style={{ color: "var(--text-caption)", fontSize: "0.8125rem", lineHeight: 1.6 }}>
-                {dict.hub[s.descKey]}
+                {dict.hub[descKey(id)]}
               </p>
               <span
                 className="mt-4 inline-block text-sm font-semibold"

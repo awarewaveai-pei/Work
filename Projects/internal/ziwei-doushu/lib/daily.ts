@@ -2,6 +2,7 @@ import { Solar } from 'lunar-javascript';
 import { computeBazi, type BaziRequest } from './bazi';
 import { defaultLocale, type Locale } from './i18n/config';
 import type { InterpretationContext } from './divination/types';
+import { KE, SHENG, stemWuXing, type WuXing } from './ganzhi';
 
 /**
  * 每日運勢工廠(PLAN §9)— 免費病毒漏斗,確定性、零邊際成本。
@@ -12,8 +13,6 @@ import type { InterpretationContext } from './divination/types';
  * 宜忌:lunar-javascript 黃曆(getDayYi/getDayJi)。
  * 運勢「文案」由 AI 層另行產生(本模組給結構化結果 + dailyContext 餵 AI,供快取 chart+date+locale)。
  */
-
-export type WuXing = '木' | '火' | '土' | '金' | '水';
 
 interface WuXingAttr {
   colors: Record<Locale, string[]>;
@@ -29,22 +28,12 @@ const WUXING: Record<WuXing, WuXingAttr> = {
   水: { colors: { 'zh-TW': ['黑', '藍'], en: ['Black', 'Blue'] }, numbers: [1, 6], direction: { 'zh-TW': '北', en: 'North' } },
 };
 
-const GAN_WUXING: Record<string, WuXing> = {
-  甲: '木', 乙: '木', 丙: '火', 丁: '火', 戊: '土',
-  己: '土', 庚: '金', 辛: '金', 壬: '水', 癸: '水',
-};
-
-/** 我生(相生):木→火→土→金→水→木 */
-const GENERATES: Record<WuXing, WuXing> = { 木: '火', 火: '土', 土: '金', 金: '水', 水: '木' };
-/** 我剋(相剋):木→土→水→火→金→木 */
-const CONTROLS: Record<WuXing, WuXing> = { 木: '土', 土: '水', 水: '火', 火: '金', 金: '木' };
-
 type Relation = '比和' | '生我' | '我生' | '剋我' | '我剋';
 function relation(today: WuXing, me: WuXing): Relation {
   if (today === me) return '比和';
-  if (GENERATES[today] === me) return '生我';
-  if (GENERATES[me] === today) return '我生';
-  if (CONTROLS[today] === me) return '剋我';
+  if (SHENG[today] === me) return '生我';
+  if (SHENG[me] === today) return '我生';
+  if (KE[today] === me) return '剋我';
   return '我剋';
 }
 const REL_SCORE: Record<Relation, number> = { 比和: 5, 生我: 4, 我生: 3, 我剋: 3, 剋我: 2 };
@@ -79,7 +68,7 @@ export function computeDailyFortune(
   locale: Locale = defaultLocale,
 ): DailyFortune {
   const bazi = computeBazi({ ...birth, locale });
-  const meEl = GAN_WUXING[bazi.dayMaster];
+  const meEl = stemWuXing(bazi.dayMaster);
   // 真喜用神(扶抑法):身強者忌印、身弱者喜印;取 favorable 之首為主喜神。
   //   analyzeBazi 保證 favorable 非空(各 strength 分支皆 uniq ≥1);不設靜默 fallback,
   //   以免日後若 favorable 變空而靜默回日主五行(身強者得比劫=命理錯,critic 2026-06-26)。
@@ -87,7 +76,7 @@ export function computeDailyFortune(
   const attr = WUXING[luckyEl];
 
   const lunar = Solar.fromYmd(target.year, target.month, target.day).getLunar();
-  const todayEl = GAN_WUXING[lunar.getDayGan()];
+  const todayEl = stemWuXing(lunar.getDayGan());
   const ganZhi = lunar.getDayInGanZhi();
   const overall = REL_SCORE[relation(todayEl, meEl)];
 

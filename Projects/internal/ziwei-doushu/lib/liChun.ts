@@ -1,12 +1,9 @@
 import { Solar } from 'lunar-javascript';
-
-const GAN = '甲乙丙丁戊己庚辛壬癸';
-const ZHI = '子丑寅卯辰巳午未申酉戌亥';
+import { ganZhiAt } from './ganzhi';
 
 /** 干支年(立春年)的年柱,如 2026 → 丙午。 */
 export function yearGanZhi(liChunYear: number): string {
-  const i = (((liChunYear - 4) % 60) + 60) % 60;
-  return GAN[i % 10] + ZHI[i % 12];
+  return ganZhiAt(liChunYear - 4);
 }
 
 /**

@@ -1,9 +1,23 @@
-import type { WuXing } from './baziAnalysis';
+import {
+  ganHe,
+  GAN_HE,
+  HAI,
+  isHai,
+  isLiuChong,
+  isLiuHe,
+  LIU_CHONG,
+  LIU_HE,
+  SAN_HE,
+  SAN_XING,
+  SELF_XING,
+  ZI_MAO_XING,
+  type WuXing,
+} from './ganzhi';
 
 /**
  * 八字原局干支關係(純函式):天干五合、地支六合／三合／六沖／三刑／相害。
  *
- * 口徑:傳統公開規則(《三命通會》干支關係;表同 bazi-skill references/wuxing-tables.md,MIT)。
+ * 規則表與兩兩判定在 lib/ganzhi.ts(全站唯一來源)。
  * 只回「原局命中」的結構化清單,不判吉凶、不論合化成否 —— 敘事交 AI。
  * 三合只認三字全見(半合不列);三刑兩字以上同組即列,三字全見標 complete。
  */
@@ -27,28 +41,6 @@ export interface PillarChars {
   gan: Record<PillarPosition, string>;
   zhi: Record<PillarPosition, string>;
 }
-
-const GAN_HE: ReadonlyArray<[string, string, WuXing]> = [
-  ['甲', '己', '土'], ['乙', '庚', '金'], ['丙', '辛', '水'], ['丁', '壬', '木'], ['戊', '癸', '火'],
-];
-const LIU_HE: ReadonlyArray<[string, string]> = [
-  ['子', '丑'], ['寅', '亥'], ['卯', '戌'], ['辰', '酉'], ['巳', '申'], ['午', '未'],
-];
-const CHONG: ReadonlyArray<[string, string]> = [
-  ['子', '午'], ['丑', '未'], ['寅', '申'], ['卯', '酉'], ['辰', '戌'], ['巳', '亥'],
-];
-const HAI: ReadonlyArray<[string, string]> = [
-  ['子', '未'], ['丑', '午'], ['寅', '巳'], ['卯', '辰'], ['申', '亥'], ['酉', '戌'],
-];
-const SAN_HE: ReadonlyArray<[string[], WuXing]> = [
-  [['申', '子', '辰'], '水'], [['亥', '卯', '未'], '木'], [['寅', '午', '戌'], '火'], [['巳', '酉', '丑'], '金'],
-];
-/** 無恩之刑、持勢之刑(兩字以上即刑) */
-const XING_GROUPS: ReadonlyArray<string[]> = [['寅', '巳', '申'], ['丑', '戌', '未']];
-const SELF_XING = ['辰', '午', '酉', '亥'];
-
-const isPair = (a: string, b: string, x: string, y: string) =>
-  (a === x && b === y) || (a === y && b === x);
 
 /** 兩兩柱位組合(year-month, year-day, …),順序固定。 */
 function positionPairs(): Array<[PillarPosition, PillarPosition]> {
@@ -76,11 +68,11 @@ export function findBaziRelations({ gan, zhi }: PillarChars): BaziRelation[] {
 
   for (const [a, b] of positionPairs()) {
     const ga = gan[a], gb = gan[b], za = zhi[a], zb = zhi[b];
-    const he = GAN_HE.find(([x, y]) => isPair(ga, gb, x, y));
-    if (he) out.push({ kind: 'ganHe', chars: [ga, gb], positions: [a, b], element: he[2] });
-    if (LIU_HE.some(([x, y]) => isPair(za, zb, x, y))) out.push({ kind: 'liuHe', chars: [za, zb], positions: [a, b] });
-    if (CHONG.some(([x, y]) => isPair(za, zb, x, y))) out.push({ kind: 'chong', chars: [za, zb], positions: [a, b] });
-    if (HAI.some(([x, y]) => isPair(za, zb, x, y))) out.push({ kind: 'hai', chars: [za, zb], positions: [a, b] });
+    const he = ganHe(ga, gb);
+    if (he) out.push({ kind: 'ganHe', chars: [ga, gb], positions: [a, b], element: he });
+    if (isLiuHe(za, zb)) out.push({ kind: 'liuHe', chars: [za, zb], positions: [a, b] });
+    if (isLiuChong(za, zb)) out.push({ kind: 'chong', chars: [za, zb], positions: [a, b] });
+    if (isHai(za, zb)) out.push({ kind: 'hai', chars: [za, zb], positions: [a, b] });
   }
 
   for (const [group, element] of SAN_HE) {
@@ -88,12 +80,12 @@ export function findBaziRelations({ gan, zhi }: PillarChars): BaziRelation[] {
     if (h.distinct === 3) out.push({ kind: 'sanHe', chars: h.chars, positions: h.positions, element });
   }
 
-  for (const group of XING_GROUPS) {
+  for (const group of SAN_XING) {
     const h = groupHits(zhi, group);
     if (h.distinct >= 2) out.push({ kind: 'xing', chars: h.chars, positions: h.positions, complete: h.distinct === 3 });
   }
   // 子卯相刑(無禮之刑)
-  const ziMao = groupHits(zhi, ['子', '卯']);
+  const ziMao = groupHits(zhi, ZI_MAO_XING);
   if (ziMao.distinct === 2) out.push({ kind: 'xing', chars: ziMao.chars, positions: ziMao.positions });
   // 自刑:同支重見
   for (const z of SELF_XING) {
@@ -108,10 +100,10 @@ export function findBaziRelations({ gan, zhi }: PillarChars): BaziRelation[] {
 const CANONICAL_ORDER: Record<RelationKind, ReadonlyArray<readonly string[]>> = {
   ganHe: GAN_HE.map(([x, y]) => [x, y]),
   liuHe: LIU_HE,
-  chong: CHONG,
+  chong: LIU_CHONG,
   hai: HAI,
   sanHe: SAN_HE.map(([g]) => g),
-  xing: [...XING_GROUPS, ['子', '卯']],
+  xing: [...SAN_XING, ZI_MAO_XING],
 };
 
 function canonical(r: BaziRelation): string {

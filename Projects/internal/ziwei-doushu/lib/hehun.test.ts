@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { matchBazi, matchZodiac, yearBranchOf, type HehunChart } from './hehun';
-import type { WuXing } from './baziAnalysis';
+import type { WuXing } from './ganzhi';
 
 function pillar(ganZhi: string, naYin = '大林木') {
   return { gan: ganZhi[0], zhi: ganZhi[1], naYin };

@@ -4,8 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { locales, type Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
-
-const SYSTEMS = ['ziwei', 'bazi', 'hehun', 'iching', 'tarot', 'astrology', 'fengshui', 'daily'] as const;
+import { PAGE_SLUGS } from '@/lib/site';
 
 export default function SystemNav({
   dict,
@@ -29,7 +28,7 @@ export default function SystemNav({
         <span className="mx-2 text-[var(--text-dim)] hidden sm:inline select-none">·</span>
 
         <div className="flex flex-wrap gap-x-1 gap-y-1">
-          {SYSTEMS.map((s) => {
+          {PAGE_SLUGS.map((s) => {
             const href = `${base}/${s}`;
             const active = pathname === href;
             return (

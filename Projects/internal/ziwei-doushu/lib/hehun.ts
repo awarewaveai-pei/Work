@@ -1,6 +1,20 @@
 import { liChunYear, yearGanZhi } from './liChun';
 import type { BaziAnalysisDisplay, BaziPillar } from './bazi';
-import type { WuXing } from './baziAnalysis';
+import {
+  branchIndex,
+  branchWuXing,
+  ganHe,
+  isHai,
+  isLiuChong,
+  isLiuHe,
+  isSanHePair,
+  isXing,
+  KE,
+  SHENG,
+  stemIndex,
+  stemWuXing,
+  type WuXing,
+} from './ganzhi';
 
 /**
  * 合婚(八字合婚＋生肖配對)— 純函式,依傳統公開規則逐項比對兩人命盤。
@@ -69,29 +83,8 @@ export const RELATION_ZH: Record<Relation, string> = {
   strains: '對方為忌神',
 };
 
-const STEMS = '甲乙丙丁戊己庚辛壬癸';
-const BRANCHES = '子丑寅卯辰巳午未申酉戌亥';
-
-// baziAnalysis.ts 的 GAN_WUXING 未匯出且由別張卡維護,此處只用到兩張小表,就地定義。
-const STEM_WUXING: WuXing[] = ['木', '木', '火', '火', '土', '土', '金', '金', '水', '水'];
-/** 地支本氣五行 */
-const BRANCH_WUXING: WuXing[] = ['水', '土', '木', '木', '土', '火', '火', '土', '金', '金', '土', '水'];
-const SHENG: Record<WuXing, WuXing> = { 木: '火', 火: '土', 土: '金', 金: '水', 水: '木' };
-const KE: Record<WuXing, WuXing> = { 木: '土', 火: '金', 土: '水', 金: '木', 水: '火' };
-
+/** 生肖,依地支序(子=鼠)。 */
 const ANIMALS = '鼠牛虎兔龍蛇馬羊猴雞狗豬';
-
-function branchIndex(zhi: string): number {
-  const i = BRANCHES.indexOf(zhi);
-  if (i < 0) throw new Error(`未知地支: ${zhi}`);
-  return i;
-}
-
-function stemIndex(gan: string): number {
-  const i = STEMS.indexOf(gan);
-  if (i < 0) throw new Error(`未知天干: ${gan}`);
-  return i;
-}
 
 /** 地支 → 生肖(繁中)。 */
 export function animalOf(zhi: string): string {
@@ -106,27 +99,15 @@ export function yearBranchOf(year: number, month: number, day: number): string {
   return yearGanZhi(liChunYear(year, month, day))[1];
 }
 
-// ---- 地支關係(索引算術:子=0 … 亥=11) ----
-const isLiuHe = (a: number, b: number) => (a + b) % 12 === 1; // 子丑 寅亥 卯戌 辰酉 巳申 午未
-const isLiuChong = (a: number, b: number) => Math.abs(a - b) === 6;
-const isSanHe = (a: number, b: number) => a !== b && a % 4 === b % 4; // 申子辰 亥卯未 寅午戌 巳酉丑
-const isHai = (a: number, b: number) => (a + b) % 12 === 7; // 子未 丑午 寅巳 卯辰 申亥 酉戌
-const XING_PAIRS = new Set(['子卯', '寅巳', '巳申', '申寅', '丑戌', '戌未', '未丑']);
-const SELF_XING = new Set(['辰', '午', '酉', '亥']);
-function isXing(a: string, b: string): boolean {
-  if (a === b) return SELF_XING.has(a);
-  return XING_PAIRS.has(a + b) || XING_PAIRS.has(b + a);
-}
-
-/** 兩地支間的所有傳統關係(可同時多項,如巳申 = 六合＋相刑)。 */
+/** 兩地支間的所有傳統關係(可同時多項,如巳申 = 六合＋相刑);規則表在 lib/ganzhi.ts。 */
 export function branchRelations(zhiA: string, zhiB: string): Relation[] {
-  const a = branchIndex(zhiA);
-  const b = branchIndex(zhiB);
+  branchIndex(zhiA); // 未知地支拋錯
+  branchIndex(zhiB);
   const out: Relation[] = [];
-  if (isLiuHe(a, b)) out.push('liuHe');
-  if (isSanHe(a, b)) out.push('sanHe');
-  if (isLiuChong(a, b)) out.push('liuChong');
-  if (isHai(a, b)) out.push('hai');
+  if (isLiuHe(zhiA, zhiB)) out.push('liuHe');
+  if (isSanHePair(zhiA, zhiB)) out.push('sanHe');
+  if (isLiuChong(zhiA, zhiB)) out.push('liuChong');
+  if (isHai(zhiA, zhiB)) out.push('hai');
   if (isXing(zhiA, zhiB)) out.push('xing');
   return out;
 }
@@ -175,8 +156,8 @@ export interface HehunChart {
 export function dominantElements(r: HehunChart): WuXing[] {
   const count: Record<WuXing, number> = { 木: 0, 火: 0, 土: 0, 金: 0, 水: 0 };
   for (const p of [r.pillars.year, r.pillars.month, r.pillars.day, r.pillars.hour]) {
-    count[STEM_WUXING[stemIndex(p.gan)]] += 1;
-    count[BRANCH_WUXING[branchIndex(p.zhi)]] += 1;
+    count[stemWuXing(p.gan)] += 1;
+    count[branchWuXing(p.zhi)] += 1;
   }
   const max = Math.max(...Object.values(count));
   return (Object.keys(count) as WuXing[]).filter((k) => count[k] === max);
@@ -208,8 +189,8 @@ function naYinElement(naYin: string): WuXing {
 export function matchBazi(a: HehunChart, b: HehunChart): HehunMatch {
   const pa = a.pillars;
   const pb = b.pillars;
-  const stemA = stemIndex(pa.day.gan);
-  const stemB = stemIndex(pb.day.gan);
+  stemIndex(pa.day.gan); // 未知天干拋錯
+  stemIndex(pb.day.gan);
   const naA = naYinElement(pa.year.naYin);
   const naB = naYinElement(pb.year.naYin);
   const dayBranchRel = branchRelations(pa.day.zhi, pb.day.zhi).filter(
@@ -218,7 +199,7 @@ export function matchBazi(a: HehunChart, b: HehunChart): HehunMatch {
 
   const items: HehunItem[] = [
     yearBranchItem(pa.year.zhi, pb.year.zhi),
-    item('dayStem', pa.day.gan, pb.day.gan, Math.abs(stemA - stemB) === 5 ? ['wuHe'] : []),
+    item('dayStem', pa.day.gan, pb.day.gan, ganHe(pa.day.gan, pb.day.gan) ? ['wuHe'] : []),
     item('dayBranch', pa.day.zhi, pb.day.zhi, dayBranchRel),
     complementItem('elementsAB', a, b),
     complementItem('elementsBA', b, a),

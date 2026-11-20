@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { interpret, defaultProvider } from '@/lib/ai/interpret';
 import { AiNotConfiguredError } from '@/lib/ai/errors';
 import type { AiProviderId, AiTier, InterpretRequest } from '@/lib/ai/types';
-import type { InterpretationContext, SystemId } from '@/lib/divination/types';
+import { SYSTEM_IDS, type InterpretationContext, type SystemId } from '@/lib/divination/types';
 import { isLocale } from '@/lib/i18n/config';
 import { evaluateEntitlement } from '@/lib/entitlements';
 
@@ -20,15 +20,6 @@ import { evaluateEntitlement } from '@/lib/entitlements';
  */
 export const dynamic = 'force-dynamic';
 
-const SYSTEM_IDS: readonly SystemId[] = [
-  'ziwei',
-  'bazi',
-  'iching',
-  'tarot',
-  'astrology',
-  'hehun',
-  'fengshui',
-];
 const PROVIDERS: readonly AiProviderId[] = ['openai', 'anthropic'];
 /** tier 合法性(政策由 lib/entitlements 判定,非在此寫死)。 */
 const VALID_TIERS: readonly AiTier[] = ['light', 'deep', 'premium'];
@@ -66,7 +57,7 @@ function validateContext(c: unknown): Validated {
 
   if (
     typeof ctx.systemId !== 'string' ||
-    !SYSTEM_IDS.includes(ctx.systemId as SystemId)
+    !(SYSTEM_IDS as readonly string[]).includes(ctx.systemId)
   )
     return { ok: false, detail: 'bad systemId' };
   if (typeof ctx.locale !== 'string' || !isLocale(ctx.locale))
