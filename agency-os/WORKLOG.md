@@ -7,6 +7,31 @@
 - REVIEW_WAIVED: NA -- 只有唯讀演練，沒有程式改動
 - BUGHUNT_WAIVED: NA -- 沒有程式改動
 - rollback：無（未改正式機；暫存資料夾已刪）
+## 2026-11-20（續30）— sg-deploy 收進兩個自己有 compose 的服務：`sg-deploy.sh video-service`／`sg-deploy.sh remotion-service`
+
+[根因] `sg-deploy.sh` 只認 `/root/lobster-phase1/docker-compose.yml` 的服務，video-service（`apps/video-service/docker-compose.video.yml`＋`--env-file .env.video`）與 remotion-service（`/root/render-services/docker-compose.yml`，project `render-services`）一律被拒 → 每次手寫部署腳本 → 11-20 漏 `--env-file`，新舊映像都起不來，停約 10 分鐘（本日 C1）。
+[不變量] compose 檔／project／env-file／映像內測試只寫一處（`scripts/own-compose-apps.sh`）；部署與回滾都經 `oc_compose`；開動前比對容器 compose 標籤與「compose 實際會起什麼」（映像＝剛 build 的 `:local`、container_name、必填變數非空），不符就拒絕、什麼都不動。
+[已修改]
+- `scripts/own-compose-apps.sh`（新）：spec、`oc_compose`（清掉 `COMPOSE_FILE` 與呼叫端同名變數）、`own_compose_check_labels`（docker 回不了話≠首次部署）、`own_compose_preflight`。
+- `scripts/sg-deploy.sh`：own-compose app 只能單獨部署；路徑＝標籤＋preflight → 同步（video-service rsync `--delete-after`，保留 `.env*`、主機 compose、`.gitignore` 列的檔）→ 快照 → build → 新映像內跑測試（無網路、cpus 2／3 GiB）→ `up` → healthy → 容器 image ID＝剛 build 的 → smoke；`up` 後任何失敗走同一個 `do_rollback`。rollback／snapshot 函式移到兩條路徑共用處，staging 路徑行為不變。記錄寫 `.deployed-commit.<app>`（`.deployed-commit` 仍只給 next-admin）。
+- `scripts/rollback-phase1.sh`：save／restore／list／clean 對兩個 app 走同一份 spec；restore 前 env file 不在就拒絕。
+- 測試：`tests/host-scripts/own-compose-apps.test.sh`（stub，59 條：每個 app 目錄都有部署路徑、spec、標籤、preflight、restore、live docs 無漏 `--env-file` 的手打指令）；`own-compose-deploy.test.sh`（Docker e2e，29 條：替身服務、真 sg-deploy）。CI `.github/workflows/deploy-scripts.yml` 兩個 job。
+- 文件：`DEPLOY_ROLLBACK_RUNBOOK.md` §2.6、兩份 compose 檔頭、`.claude/commands/sg-deploy.md`、`sg-deploy.yml`（允許清單＋ops-inbox 回報讀 `.deployed-commit.<app>`）。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash tests/host-scripts/own-compose-deploy.test.sh（docker:cli 容器內重建主機目錄，跑真 sg-deploy.sh：首次部署、dry-run、映像內測試紅→不 up 且 :local 指回舊版、起不來→自動回滾、compose 指向別的映像→拒絕、缺 .env.video→拒絕、token 空→拒絕、手動漏 --env-file 起的容器→拒絕、rollback-phase1.sh restore 帶 env-file）→ 29 passed | exit=0 | ms=126000
+- REALTEST_EVIDENCE: tool=Bash | cmd=真映像：docker build apps/video-service、apps/remotion-service 後 `docker run --rm --network none … sh -c "$OC_TEST"` → video-service 77 tests OK（3 skipped）、remotion 20/20 | exit=0 | ms=330000
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash tests/host-scripts/own-compose-apps.test.sh → 59 passed；sg-deploy-smoke-ports.test.sh → 8 passed（rebase 後 10 passed） | exit=0 | ms=4000
+- 突變：拔 `oc_compose` 的 `--env-file` → stub 測試 2 條紅；sg-deploy 拔 `own_compose_preflight` → e2e 3 條紅（錯映像那條仍被 healthy 後的 image ID 檢查擋下＝第二層有效）；還原全綠。
+- e2e 抓到的真 bug（已修）：rsync `--delete` 刪掉 `.gitignore` 列的 `output/`（刪除階段讀的是接收端 `.gitignore`）→ 改 `--delete-after`。
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/8n（M1 compose 指向別的映像會「宣告成功但沒換碼」→ preflight＋healthy 後 image ID 檢查；M2 拒絕路徑 CI 沒跑 → e2e 進 CI＋token 空情境；m1 inspect 錯誤當首次部署、m2 pipefail＋grep -q、m3 空值、m4 re-tag 失敗無訊息、m5 測試無資源限制、m7 ops-inbox 回報、m8 docs 掃描觸發 → 皆修；m6 rsync 刪除清單 → 主機 dry-run 看 log 的 `deleting`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,.github | grep=docker-compose\.video\.yml|render-services|deployed-commit|RESTORABLE_APPS|IMAGE_MAP | hits=276（多數為 WORKLOG 歷史；手打 compose 指令只剩 WORKLOG／handoffs 歷史；`.deployed-commit` 讀者 auto-deploy／check-drift／check-deploy-drift.ps1 不受影響）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；以獨立 critic＋突變證據代替
+[剩餘風險]
+- 主機唯讀 dry-run：見下一則（sg-deploy own-compose dry-run）。
+- ADR 017:125-126、`next-admin/lib/video/MODULE_MANIFEST.json:19-20` 仍把 repo 的 `docker-compose.remotion.yml` 寫成部署來源（正式機用 `/root/render-services`），未改。
+- video-whisper-worker、r2-egress-proxy 仍不在 sg-deploy（`OWN_COMPOSE_NOT_IN_SG_DEPLOY` 明列）。
+- rebase 到 origin/main（`8f07a86b0`）：衝突只在兩處，兩邊都保留——`sg-deploy.sh` 通知條件（main 的 oracle-web ＋本卡 own-compose app）、`rollback-phase1.sh` 檔頭服務清單（加 oracle-web）。搬移的 rollback／snapshot 區塊與 main 版逐字相同（diff 0）。另改 `own-compose-apps.sh` 檔頭一句註解（docs 掃描把它當成手打指令）。rebase 後重跑：stub 59/59、e2e 29/29、smoke-ports 10/10、verify-build-gates 320/321（唯一失敗＝worktree 內 sync-check 依設計拒跑）。檢查邏輯沒改，主機 dry-run 不需重跑。
+[rollback] `git revert <本 commit>`；主機腳本由 `sync-host-scripts.sh` 隨 origin/main 還原。
 ## 2026-11-20（續29）— oracle 六類 GitHub 候選核對（研究，未改程式）
 
 - 結論與逐案表：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/GITHUB_RESEARCH.md`（唯一細節處）。
