@@ -1470,28 +1470,6 @@
         "Define and verify module migration, rollback and replacement before release."
       ]
     },
-    "aw-oracle": {
-      "purpose": "紫微、八字、塔羅、風水等排盤與 AI 解讀。",
-      "invariants": [
-        "Product registry key: oracle.",
-        "Source module contract: lib/oracle/MODULE_MANIFEST.json.",
-        "Keep authoritative state and public contracts within the declared module boundary.",
-        "Product access uses the shared entitlement contract; no private billing ledger."
-      ],
-      "security": [
-        "Keep provider secrets in deployment configuration.",
-        "Authorize each paid feature through the shared entitlement boundary."
-      ],
-      "tests": [
-        "Verify the product module contract and its declared dependencies before release."
-      ],
-      "operations": [
-        "Record module logs, metrics, alert ownership and the operational runbook."
-      ],
-      "recovery": [
-        "Define and verify module migration, rollback and replacement before release."
-      ]
-    },
     "aw-outreach": {
       "purpose": "產生開發信並管理寄送名單。",
       "invariants": [

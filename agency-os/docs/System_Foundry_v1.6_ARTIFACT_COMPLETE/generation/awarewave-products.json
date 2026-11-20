@@ -2482,30 +2482,6 @@
       "staffPaths": []
     },
     {
-      "key": "oracle",
-      "name": "東西方命理",
-      "description": "紫微、八字、塔羅、風水等排盤與 AI 解讀。",
-      "subdomain": "oracle",
-      "door": {
-        "app": "external"
-      },
-      "loginSources": [
-        "local",
-        "awarewave-wp"
-      ],
-      "standalone": true,
-      "status": "coming_soon",
-      "features": [],
-      "accessChannels": [
-        "ui"
-      ],
-      "modules": {
-        "dependsOn": [],
-        "manifest": "lib/oracle/MODULE_MANIFEST.json"
-      },
-      "staffPaths": []
-    },
-    {
       "key": "outreach",
       "name": "行銷開發信",
       "description": "產生開發信並管理寄送名單。",
