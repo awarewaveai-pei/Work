@@ -74,7 +74,7 @@ export default function IntroStyleButtons({ site, onSaved }: { site: ManagedSite
       {stillOn && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
-            橫幅字卡用哪幾張設計（可複選，每張輪一次）。在 <a href={`/tools/banner?${new URLSearchParams({ ratio: ARTICLE_VIDEO_DEFAULTS.formats[0].replace("x", ":"), template: "opener-center", ...(site.organization_id ? { org: site.organization_id } : {}) })}`} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>橫幅工具</a> 存到我的設計後回來重新整理。
+            橫幅字卡用哪幾張設計（可複選，每張輪一次）。在 <a href={`/tools/banner?${new URLSearchParams({ ratio: ARTICLE_VIDEO_DEFAULTS.formats[0].replace("x", ":"), template: "opener-center", ...(site.organization_id ? { org: site.organization_id } : {}) })}`} target="_blank" rel="noreferrer" style={{ color: "var(--accent-text)" }}>橫幅工具</a> 存到我的設計後回來重新整理。
           </span>
           {designs === null ? <span style={{ color: "var(--text-muted)", fontSize: 12 }}>讀取我的設計…</span>
             : designs.length === 0 ? <span style={{ color: "var(--text-muted)", fontSize: 12 }}>我的設計還沒有圖片，先到橫幅工具做一張。</span>
