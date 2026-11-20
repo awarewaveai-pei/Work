@@ -1,12 +1,13 @@
 /**
  * Render job table, mirrored to one JSON file so a job outlives the process that ran it.
- * Invariant: a job a caller was given always ends "done" or "error" with a reason. A job found
- * pending/rendering at load time was cut off by a restart and is closed with INTERRUPTED_ERROR.
+ * Invariant: a job a caller was given always ends "done", "error" with a reason, or "cancelled" (the caller gave up:
+ * DELETE /render/:jobId). A job found pending/rendering at load time was cut off by a restart and is closed with
+ * INTERRUPTED_ERROR.
  */
 import fs from "fs";
 import path from "path";
 
-export type JobStatus = "pending" | "rendering" | "done" | "error";
+export type JobStatus = "pending" | "rendering" | "done" | "error" | "cancelled";
 
 export interface RenderJob {
   status: JobStatus;
@@ -82,7 +83,7 @@ export class JobStore {
     const cutoff = Date.now() - maxAgeMs;
     let changed = false;
     for (const [id, job] of this.jobs.entries()) {
-      if (job.createdAt < cutoff && (job.status === "done" || job.status === "error")) {
+      if (job.createdAt < cutoff && (job.status === "done" || job.status === "error" || job.status === "cancelled")) {
         this.jobs.delete(id);
         changed = true;
       }

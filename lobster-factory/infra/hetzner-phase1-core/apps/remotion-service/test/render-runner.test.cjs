@@ -33,9 +33,9 @@ async function service(store, timeoutMs = 20000) {
   const server = createApp({ authRequired: true, authToken: TOKEN, store, runner }).listen(0, "127.0.0.1");
   await new Promise((res) => server.once("listening", res));
   const base = () => `http://127.0.0.1:${server.address().port}`;
-  const call = async (p, body) => {
+  const call = async (p, body, method = body ? "POST" : "GET") => {
     const r = await fetch(base() + p, {
-      method: body ? "POST" : "GET",
+      method,
       headers: { "Content-Type": "application/json", "X-Render-Token": TOKEN },
       body: body && JSON.stringify(body),
     });
@@ -92,6 +92,27 @@ test("a render that never finishes is stopped at the time limit", async () => {
     const hung = await settle(call, await submit(call, "hang"));
     assert.equal(hung.status, "error");
     assert.match(hung.error, /仍未完成，已中止/);
+  } finally {
+    server.close();
+  }
+});
+
+// R5: a caller that gives up cancels; the one-at-a-time queue moves on instead of waiting for a render nobody collects.
+test("cancelling the running job (DELETE /render/:id) frees the queue: the next job starts and finishes", async () => {
+  const { server, call } = await service(new JobStore(null), 60000);   // the time limit is far off: only the cancel stops it
+  try {
+    const stuck = await submit(call, "hang");
+    for (let i = 0; i < 100 && (await call("/status/" + stuck)).body.status !== "rendering"; i++) await new Promise((res) => setTimeout(res, 50));
+    const next = await submit(call, "ok");
+    assert.equal((await call("/status/" + next)).body.status, "pending", "waits behind the stuck one");
+    const t0 = Date.now();
+    assert.deepEqual(await call("/render/" + stuck, undefined, "DELETE"), { status: 200, body: { status: "cancelled" } });
+    const done = await settle(call, next);
+    assert.equal(done.status, "done", JSON.stringify(done));
+    assert.ok(Date.now() - t0 < 10000, "the next job started on the cancel, not at the time limit");
+    assert.equal((await call("/status/" + stuck)).body.status, "cancelled", "a cancelled job is never closed as an error");
+    assert.deepEqual((await call("/render/" + stuck, undefined, "DELETE")).body, { status: "cancelled" }, "a repeat is harmless");
+    assert.equal((await call("/render/no-such-job", undefined, "DELETE")).status, 404);
   } finally {
     server.close();
   }

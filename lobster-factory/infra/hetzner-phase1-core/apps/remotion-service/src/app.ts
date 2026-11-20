@@ -1,6 +1,7 @@
 /**
  * HTTP routes. POST /render → { jobId }; GET /status/:jobId → { status, progress, url?, error? };
- * GET /health. Rendering happens in RenderRunner; the job table is JobStore.
+ * DELETE /render/:jobId → { status } (R5: the caller gave up); GET /health. Rendering happens in RenderRunner; the job
+ * table is JobStore.
  */
 import express from "express";
 import crypto from "crypto";
@@ -192,6 +193,23 @@ export function createApp({ authRequired, authToken, store, runner }: AppDeps): 
       still,
     });
     res.json({ jobId });
+  });
+
+  // Card R5: a caller that gives up (its time limit, its user) cancels, so the one-at-a-time queue is not held by a render
+  // nobody will collect. Waiting or rendering -> 200 { status: "cancelled" }. Already ended (done / error / cancelled) ->
+  // 200 with that status, nothing changed: a repeat is harmless, and a caller that lost the race learns it finished.
+  // Unknown id (never given, or pruned) -> 404.
+  app.delete("/render/:jobId", requireAuth, (req: express.Request, res: express.Response) => {
+    const job = store.get(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+    if ((job.status === "pending" || job.status === "rendering") && runner.cancel(req.params.jobId)) {
+      res.json({ status: "cancelled" });
+      return;
+    }
+    res.json({ status: store.get(req.params.jobId)?.status ?? job.status });
   });
 
   app.get("/status/:jobId", requireAuth, (req: express.Request, res: express.Response) => {

@@ -88,8 +88,31 @@ export function describeFailure(r: WorkerResult, timeoutMs: number): string {
 export class RenderRunner {
   private readonly queue: Array<{ jobId: string; spec: RenderSpec }> = [];
   private running = false;
+  // R5: the job rendering now and how to stop it (null between forks); jobs a caller cancelled, never closed as error/done
+  private current: { jobId: string; stop: (() => void) | null } | null = null;
+  private readonly cancelled = new Set<string>();
 
   constructor(private readonly deps: RunnerDeps) {}
+
+  /**
+   * Card R5: the caller gave up (DELETE /render/:jobId). A waiting job leaves the queue; the running one gets the cancel
+   * the time limit sends (render-job.ts aborts Remotion and closes its Chromium), then SIGKILL after cancelGraceMs if it
+   * does not exit -- and the next job starts. Either way the job ends "cancelled", never "error"/"done", nothing uploaded.
+   * false = not waiting or running here (unknown, already finished).
+   */
+  cancel(jobId: string): boolean {
+    const at = this.queue.findIndex((q) => q.jobId === jobId);
+    if (at >= 0) {
+      this.queue.splice(at, 1);
+      this.deps.store.update(jobId, { status: "cancelled" });
+      return true;
+    }
+    if (this.current?.jobId !== jobId) return false;
+    this.cancelled.add(jobId);
+    this.deps.store.update(jobId, { status: "cancelled" });
+    this.current.stop?.();
+    return true;
+  }
 
   enqueue(jobId: string, spec: RenderSpec): void {
     this.queue.push({ jobId, spec });
@@ -117,9 +140,11 @@ export class RenderRunner {
     const { store } = this.deps;
     const kind = outputKind(spec);
     const outFile = this.deps.outFile(jobId, kind);
+    this.current = { jobId, stop: null };
     try {
       store.update(jobId, { status: "rendering", progress: 0 });
       const serveUrl = await this.deps.getServeUrl();
+      if (this.cancelled.has(jobId)) return;   // cancelled while the bundle was being made: no worker at all
       const result = await this.runWorker(jobId, {
         ...spec,
         serveUrl,
@@ -127,6 +152,10 @@ export class RenderRunner {
         encoderThreads: this.deps.encoderThreads,
         allowParallelEncoding: this.deps.allowParallelEncoding(spec.width, spec.height),
       });
+      if (this.cancelled.has(jobId)) {
+        console.log(`[remotion] job ${jobId} cancelled by the caller`);
+        return;
+      }
       if (!result.ok) {
         console.error(`[remotion] job ${jobId} failed:`, result);
         store.update(jobId, { status: "error", error: describeFailure(result, this.deps.timeoutMs) });
@@ -138,8 +167,10 @@ export class RenderRunner {
     } catch (err) {
       console.error(`[remotion] job ${jobId} error:`, err);
       const message = err instanceof Error ? err.message : String(err);
-      store.update(jobId, { status: "error", error: `渲染失敗：${sanitize(message) || "未知錯誤"}` });
+      if (!this.cancelled.has(jobId)) store.update(jobId, { status: "error", error: `渲染失敗：${sanitize(message) || "未知錯誤"}` });
     } finally {
+      this.cancelled.delete(jobId);
+      this.current = null;
       try { fs.unlinkSync(outFile); } catch { /* not created */ }
     }
   }
@@ -160,10 +191,16 @@ export class RenderRunner {
         } catch { /* already gone */ }
       };
       let graceTimer: NodeJS.Timeout | undefined;
-      const timer = setTimeout(() => {
-        timedOut = true;
+      // the time limit's stop, also the caller's (cancel): ask the worker to cancel, kill the tree if it does not exit
+      const stop = () => {
+        if (graceTimer) return;
         try { child.send({ type: "cancel" }); } catch { /* channel closed */ }
         graceTimer = setTimeout(killTree, this.deps.cancelGraceMs);
+      };
+      if (this.current?.jobId === jobId) this.current.stop = stop;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        stop();
       }, this.deps.timeoutMs);
       const finish = (code: number | null, signal: NodeJS.Signals | null) => {
         if (settled) return;
