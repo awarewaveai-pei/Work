@@ -56,24 +56,6 @@ export async function readJson<T extends object>(res: Response): Promise<T & { o
   }
 }
 
-/** A generated 模特兒圖 (2K PNG, ~10 MB as base64) → a same-size JPEG (~1–2 MB). It is sent again as the identity
- *  reference and on save. Undecodable here (no canvas, e.g. jsdom) → the original, unchanged. */
-export async function asJpeg(dataUrl: string, quality = 0.92): Promise<string> {
-  try {
-    const img = new Image();
-    img.src = dataUrl;
-    await img.decode();
-    const c = document.createElement("canvas");
-    c.width = img.naturalWidth; c.height = img.naturalHeight;
-    const g = c.getContext("2d");
-    if (!g) return dataUrl;
-    g.drawImage(img, 0, 0);
-    return c.toDataURL("image/jpeg", quality);
-  } catch {
-    return dataUrl;
-  }
-}
-
 /** The message a refused or failed JSON call shows: withFeature answers 403 { ok:false, code } with no text. */
 export function failureText(res: Response, json: { error?: string; code?: string }): string {
   return json.error ?? (res.status === 403 ? `沒有使用權限（${json.code ?? "403"}）` : `HTTP ${res.status}`);

@@ -24,7 +24,7 @@ import {
 } from "@/lib/studio/mockup-prompt";
 import { STUDIO_MODEL_OPTIONS, type AspectRatio } from "@/lib/studio/model-options";
 import { isPrintBox, type Point, type PrintBox } from "@/lib/studio/fabric-print";
-import { COLOR_LABEL, GENDER_LABEL, asJpeg, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
+import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 import ImageLightbox from "./ImageLightbox";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 
@@ -56,7 +56,7 @@ async function generatePhoto(prompt: string, referenceImages: string[], aspectRa
       body: JSON.stringify({ model: GEN_MODEL, prompt, referenceImages, aspectRatio }),
     });
     const json = await readJson<{ ok: boolean; image?: string; error?: string; code?: string }>(res);
-    return json.ok && json.image ? { status: "done", image: await asJpeg(json.image) } : { status: "error", error: failureText(res, json) };
+    return json.ok && json.image ? { status: "done", image: json.image } : { status: "error", error: failureText(res, json) };
   } catch (err) {
     return { status: "error", error: err instanceof Error ? err.message : String(err) };
   }

@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-20（續14）— 模特兒印製：生成圖不轉 JPEG，維持原 PNG（操作者：「不轉JPG」）
+
+- 改動：移除 `modelLibrary.ts` `asJpeg`；`ModelLibraryStudio.tsx:59` 生成結果原樣保存。續12 的 Next 50MB 上限（`next.config.ts`）不變，PNG 已能通過。
+- 容量：真實 2K PNG 7.16MB = 9.55M 字元，低於 generate `MAX_REF_CHARS`（`app/api/tools/studio/generate/route.ts:33`，12M）與 presets `MAX_IMAGE_CHARS`（`app/api/tools/presets/route.ts:19`，12M）；超過者回清楚的 413 文字。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/__tests__/request-body-limit.test.ts "app/(shell)/tools/mockup/__tests__/model-flow.render.test.tsx" → 11 passed；tsc --noEmit 除 .next 殘檔 0 錯 | exit=0 | ms=1800
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（純刪除，diff 讀回）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02；純刪除一個函式與其唯一呼叫點
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=asJpeg | hits=0
+- rollback：還原本 commit。
 ## 2026-11-20（續13）— 影片 R2（片首封面＋片頭樣式＋轉場積木）＋R4（58 種轉場）上線；部署中抓到正式機剪輯器轉場出片一直失敗（操作者：「看工人們反應的 RISKS是否需要處理 處理完 部署」）
 
 - 併入：R2 `a024d20b8`、`452697892`、`39b23710d`、補做 `a26662866`（片頭片尾接合收 ffmpeg 轉場名）；R4 `06ece12a5`、`77868f532`（清單以正式出片 ffmpeg-static 7.0.2 為準，58 種）。
