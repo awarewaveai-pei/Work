@@ -33,7 +33,7 @@ brief 在 `briefs/`（`COMMON.md`＋各卡）。
 3. 整批併完在專案目錄跑一次 `npx tsc --noEmit`＋全套 `npm test`，再開頁面實看繁中／英文。
 4. `clear_session` 清工人；同線下一張用 `send_message` 派。
 5. **整批交回後獨立一步「一起看 RISKS」**：並排判，短表回報，再派下一批。
-6. 部署是 High：整批完成後問操作者一次，照 `Projects/internal/ziwei-doushu/deploy/DEPLOY-SG.md`。
+6. 部署是 High：整批完成後問操作者一次，照 `Projects/internal/ziwei-doushu/deploy/DEPLOY.md`。
 
 ## RISKS 紀錄
 ### 批 1（2026-11-20）
