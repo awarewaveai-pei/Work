@@ -748,7 +748,9 @@ async function exportEditor(
         // what it would show anyway), then xfade the chain and lay it on the timeline once.
         graph.push(`${inputLabel}${steps.length ? steps.join(",") : "null"}[clip${layer}]`);
         graph.push(`color=c=black:s=${width}x${height}:r=${rate}[canvas${layer}]`);
-        graph.push(`[canvas${layer}][clip${layer}]overlay=x='${x}':y='${y}':shortest=1,trim=end_frame=${frameCount},setpts=PTS-STARTPTS[flat${layer}]`);
+        // fps after setpts: FFmpeg 7 (the image's ffmpeg-static 7.0.2) leaves the rate unknown after setpts and xfade
+        // refuses it ("constant frame rate ... 1/0"); every export with a transition failed in production until 2026-11-20
+        graph.push(`[canvas${layer}][clip${layer}]overlay=x='${x}':y='${y}':shortest=1,trim=end_frame=${frameCount},setpts=PTS-STARTPTS,fps=${rate}[flat${layer}]`);
         chain.push({ clip, label: `[flat${layer}]` });
         layer++;
         if (leave) continue;

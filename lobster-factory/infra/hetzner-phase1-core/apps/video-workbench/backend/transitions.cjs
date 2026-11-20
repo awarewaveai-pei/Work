@@ -119,7 +119,8 @@ async function preview({ transition, curve = "線性", seconds = 0.5, ratio = "1
   try { return await made; } finally { inFlight.delete(file); }
 }
 async function render({ type, curve, t, w, h, length, a, b, file, dir, signal, run }) {
-  const fit = `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},fps=${PREVIEW.fps},setsar=1,format=yuv420p,trim=duration=${length},setpts=PTS-STARTPTS`;
+  // fps last: on FFmpeg 7 setpts leaves the frame rate unknown and xfade refuses ("constant frame rate ... 1/0"); 6.1 kept it
+  const fit = `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1,format=yuv420p,trim=duration=${length},setpts=PTS-STARTPTS,fps=${PREVIEW.fps}`;
   const graph = [`[0:v]${fit}[pa]`, `[1:v]${fit}[pb]`,
     ...xfadeSteps({ type, curve, timing: `duration=${t}:offset=${PREVIEW.side}`, a: "[pa]", b: "[pb]", out: "[pv]", tag: "p" })];
   const tmp = path.join(dir, crypto.randomUUID() + ".part.mp4");
