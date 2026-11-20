@@ -80,9 +80,11 @@
     t("vuwind", "vuwind", "向上風吹", "特效"),
     t("vdwind", "vdwind", "向下風吹", "特效"),
   ];
-  // The entries whose table test passed (an export renders with the right length, its preview within PREVIEW_MS):
-  // written by video-workbench tests/r4-transitions-table.cjs --write, never by hand; the gate fails when it no longer
-  // matches what passes. A kind that fails is not offered anywhere (operator 2026-11-20: 做不到的不放).
+  // The entries whose table test passed (an export renders with the right length, its preview within PREVIEW_MS) on
+  // the ffmpeg production exports with: the workbench image's ffmpeg-static (release b6.1.1, whose Linux binary is
+  // VERIFIED_ON; the image's /usr/bin/ffmpeg 5.1 is only its ffprobe and makes no video). Written by
+  // video-workbench tests/r4-transitions-table.cjs --print run in the image, pasted here; the image's gate fails when
+  // an offered kind does not pass there. A kind that fails is not offered anywhere (operator 2026-11-20: 做不到的不放).
   // @verified-begin
   const VERIFIED = [
     "溶解",
@@ -122,6 +124,7 @@
     "revealup",
     "revealdown",
     "squeezeh",
+    "squeezev",
     "圓形展開",
     "circleclose",
     "circlecrop",
@@ -144,6 +147,11 @@
     "vdwind",
   ];
   // @verified-end
+  const VERIFIED_ON = "7.0.2";
+  // Offered kinds another ffmpeg build cannot always make, by "platform:version": the laptop's Windows ffmpeg-static
+  // (same release, 6.1.1) crashes on squeezev at some lengths (0.3 s; 0.5 s and up work -- critic 2026-11-20); it passes
+  // on VERIFIED_ON. There its preview says so plainly. The image's gate runs on Linux, where no exception applies.
+  const NOT_ON = { "win32:6.1.1": ["squeezev"] };
   // Card R4 item 3: a preview of one transition (rendered by the export's own ffmpeg) may take this long on the laptop.
   const PREVIEW_MS = 2000;
   const NONE = { id: "無", xfade: null, label: "無", group: null, note: "直接切", curved: false, timeline: null };
@@ -199,5 +207,5 @@
       .map(([g, row]) => `${g ? `<p class="note">${esc(g)}</p>` : ""}<div class="flow-choices row"${g ? ` role="group" aria-label="${esc(g)}"` : ""}>${row.map(button).join("")}</div>`)
       .join("")}</div>`;
   }
-  return { GROUPS, CATALOG, VERIFIED, PREVIEW_MS, LIST, XFADE, TIMELINE, PICKER, LEGACY, NO_CURVE, NO_CURVE_WHY, CURVES, name, offered, label, limits, wire, AUTO, buttons };
+  return { GROUPS, CATALOG, VERIFIED, VERIFIED_ON, NOT_ON, PREVIEW_MS, LIST, XFADE, TIMELINE, PICKER, LEGACY, NO_CURVE, NO_CURVE_WHY, CURVES, name, offered, label, limits, wire, AUTO, buttons };
 });

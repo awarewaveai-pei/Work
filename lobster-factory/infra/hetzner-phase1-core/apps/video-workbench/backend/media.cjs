@@ -56,9 +56,10 @@ function run(args, signal) {
       log = (log + c).slice(-16000);
     });
     process.on("error", reject);
-    process.on("close", (code) => {
+    process.on("close", (code, signal) => {
       scan(line);
-      if (code !== 0) reject(Error("媒體處理失敗：" + log.slice(-600)));
+      // exitCode / signal on the error: a caller can tell a crash (Windows 0xC0000005, SIGSEGV) from a refusal
+      if (code !== 0) reject(Object.assign(Error("媒體處理失敗：" + log.slice(-600)), { exitCode: code, signal }));
       else if (missing.size) reject(missingGlyphError(missing));
       else resolve(log);
     });

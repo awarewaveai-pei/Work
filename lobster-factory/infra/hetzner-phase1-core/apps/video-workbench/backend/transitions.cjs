@@ -53,6 +53,19 @@ const VERSION = (() => {
   return crypto.createHash("sha1").update(fs.readFileSync(__filename)).update(String(st.size) + ":" + st.mtimeMs).digest("hex").slice(0, 12);
 })();
 const RATIOS = ["16:9", "9:16", "4:5", "1:1", "4:3"];
+// The running ffmpeg's version ("7.0.2", "6.1.1"): which of Transitions.NOT_ON applies here.
+let version;
+function ffmpegVersion() {
+  if (version === undefined) {
+    const out = require("node:child_process").spawnSync(require("ffmpeg-static"), ["-version"], { encoding: "utf8", windowsHide: true }).stdout || "";
+    version = (/ffmpeg version n?(\d+\.\d+(?:\.\d+)?)/.exec(out) || [])[1] || "";
+  }
+  return version;
+}
+const hereKey = () => process.platform + ":" + ffmpegVersion();
+const missingHere = (id) => (Transitions.NOT_ON[hereKey()] || []).includes(id);
+// A crash, not a refusal: Windows access violation (0xC0000005 = 3221225477) or a signal on Linux.
+const crashed = (e) => e?.exitCode === 3221225477 || e?.exitCode === -1073741819 || !!e?.signal;
 const inFlight = new Map();
 let running = 0;
 const waiting = [];
@@ -94,7 +107,14 @@ async function preview({ transition, curve = "線性", seconds = 0.5, ratio = "1
   const file = path.join(dir, key + ".mp4");
   if (fs.existsSync(file)) return { file, name: key + ".mp4", cached: true };
   if (inFlight.has(file)) return inFlight.get(file);
-  const made = slot(() => render({ type, curve, t, w, h, length, a, b, file, dir, signal, run })).then(() => ({ file, name: key + ".mp4", cached: false }));
+  const made = slot(() => render({ type, curve, t, w, h, length, a, b, file, dir, signal, run })).then(() => ({ file, name: key + ".mp4", cached: false }),
+    (e) => {
+      // ffmpeg crashed on a kind this machine's build cannot always make (Transitions.NOT_ON): said plainly, the
+      // original reason kept; any other failure (timeout, a missing source) is left as it is
+      if (missingHere(name) && crashed(e))
+        throw Object.assign(Error(`這台電腦的 ffmpeg ${ffmpegVersion()} 在這個長度做不出「${Transitions.label(name)}」（正式機出片可以；換個長度再試）。原因：${String(e.message).slice(-160)}`), { status: 400 });
+      throw e;
+    });
   inFlight.set(file, made);
   try { return await made; } finally { inFlight.delete(file); }
 }
@@ -114,4 +134,4 @@ async function render({ type, curve, t, w, h, length, a, b, file, dir, signal, r
   prune(dir);
 }
 
-module.exports = { Transitions, CURVED_TRANSITIONS, curvedTransition, xfadeSteps, bookendTransition, preview, previewSize, PREVIEW };
+module.exports = { Transitions, CURVED_TRANSITIONS, curvedTransition, xfadeSteps, bookendTransition, preview, previewSize, PREVIEW, ffmpegVersion, hereKey, missingHere };

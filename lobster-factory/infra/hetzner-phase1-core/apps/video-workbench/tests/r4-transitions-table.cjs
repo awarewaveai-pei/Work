@@ -4,9 +4,11 @@
 //      the function backend/editor-export.cjs builds its transitions with), on the export's ffmpeg; the file exists and
 //      lasts a + b - t;
 //   2. its preview (backend/transitions.cjs preview, the same step on the same ffmpeg) is made within PREVIEW_MS.
-// The ones that pass are VERIFIED. `node tests/r4-transitions-table.cjs --write` writes that list into the module; the
-// gate run fails when an offered kind no longer passes (it then leaves the list on the next --write; nobody keeps an
-// exclusion list). Also: curves exist only where the export has a curved form, and are refused elsewhere.
+// The ones that pass on the production export ffmpeg (the image's ffmpeg-static, Transitions.VERIFIED_ON) are VERIFIED:
+// `node tests/r4-transitions-table.cjs --print` in the gate image (Dockerfile.gate: the built image plus tests/) prints
+// the list to paste into the module (--write writes it in place, only on that ffmpeg). The gate run fails when an
+// offered kind does not pass on the ffmpeg it runs on, except the kinds Transitions.NOT_ON names for this platform and
+// version (the laptop's Windows 6.1.1 build), which are only reported; on Linux no exception may apply. Also: curves exist only where the export has a curved form, and are refused elsewhere.
 // One real editor export with a card R4 kind runs too. video-service's join of a card R4 kind: video-service
 // tests/test_bookends.py (it checks names against FFmpeg's own list, the same 58 here).
 const assert = require("node:assert/strict"), fs = require("node:fs"), os = require("node:os"), path = require("node:path");
@@ -40,8 +42,9 @@ const seconds = (file) => {
     try {
       await tr.preview({ transition: x.id, seconds: 0.5 }, { run, dir: fs.mkdtempSync(path.join(dir, "p-")), signal: AbortSignal.timeout(20000) });
       const ms = Date.now() - started;
-      // the time standard decides the list when it is written (on the laptop); a loaded build machine only logs it
-      if (ms > Transitions.PREVIEW_MS && process.argv.includes("--write")) why.push(`預覽 ${ms} ms，超過 ${Transitions.PREVIEW_MS} ms`);
+      // the time standard decides the list when it is printed or written; a plain gate run on a loaded build machine
+      // only logs it (a slow build host must not drop a kind)
+      if (ms > Transitions.PREVIEW_MS && (process.argv.includes("--print") || process.argv.includes("--write"))) why.push(`預覽 ${ms} ms，超過 ${Transitions.PREVIEW_MS} ms`);
       results.push({ id: x.id, ms, why });
     } catch (e) {
       results.push({ id: x.id, ms: Date.now() - started, why: [...why, "預覽失敗：" + String(e.message).slice(-160)] });
@@ -52,20 +55,30 @@ const seconds = (file) => {
   console.log(`R4 table: ${passed.length}/${results.length} pass; preview ms median ${ms[ms.length >> 1]}, max ${ms.at(-1)}`);
   for (const f of failed) console.log("  not offered:", f.id, "--", f.why.join("；"));
 
+  const here = tr.ffmpegVersion(), gaps = Transitions.NOT_ON[tr.hereKey()] || [];
+  console.log(`ffmpeg ${here} on ${process.platform} (the list is decided on ${Transitions.VERIFIED_ON}); not always made by this build, by design: ${gaps.join(", ") || "none"}`);
+  if (process.platform === "linux") assert.deepEqual(gaps, [], "no exception applies where production runs");
+  const block = "  const VERIFIED = [\n" + passed.map((id) => `    ${JSON.stringify(id)},`).join("\n") + "\n  ];";
+  if (process.argv.includes("--print")) console.log("  // @verified-begin\n" + block + "\n  // @verified-end");
   if (process.argv.includes("--write")) {
+    assert.equal(here, Transitions.VERIFIED_ON, "the list is written on the production export ffmpeg only; run --print in the image");
     const file = path.join(require("../backend/appearance.cjs").resolveSource(path.join(__dirname, ".."), process.env), "public/editor-shared/transitions.js");
     const text = fs.readFileSync(file, "utf8").replace(/(\/\/ @verified-begin\n)[\s\S]*?(\n\s*\/\/ @verified-end)/,
-      (_, a, b) => a + "  const VERIFIED = [\n" + passed.map((id) => `    ${JSON.stringify(id)},`).join("\n") + "\n  ];" + b);
+      (_, a, b) => a + block + b);
     fs.writeFileSync(file, text);
     console.log("wrote VERIFIED:", passed.length);
   } else {
     // every offered kind must pass here (the gate runs this in the workbench image too); one that passes here but is not
     // offered was left out on the machine that wrote the list -- said, not added by hand
-    const broken = Transitions.VERIFIED.filter((id) => !passed.includes(id));
+    const broken = Transitions.VERIFIED.filter((id) => !passed.includes(id) && !gaps.includes(id));
     assert.deepEqual(broken, [], "offered but failing now: " + broken.join(", ") + " -- run node tests/r4-transitions-table.cjs --write");
     const extra = passed.filter((id) => !Transitions.VERIFIED.includes(id));
     if (extra.length) console.log("  passes here but not offered (list written elsewhere):", extra.join(", "));
-    assert.ok(Transitions.LIST.slice(1).every((x) => passed.includes(x.id)), "only what passes is offered");
+    assert.ok(Transitions.LIST.slice(1).every((x) => passed.includes(x.id) || gaps.includes(x.id)), "only what passes is offered");
+    // a kind this build cannot always make: at a length it crashes on (0.3 s) its preview says so plainly, never a raw crash
+    for (const id of gaps.filter((g) => !passed.includes(g)))
+      await assert.rejects(tr.preview({ transition: id, seconds: 0.3 }, { run, dir: fs.mkdtempSync(path.join(dir, "g-")), signal: AbortSignal.timeout(20000) }),
+        (e) => e.status === 400 && /這台電腦的 ffmpeg .*做不出.*原因：/s.test(e.message), id);
   }
 
   // Curves: the module's flag = the export's curved forms; a curve on any other kind is refused, never ignored.
