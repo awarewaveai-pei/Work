@@ -447,10 +447,6 @@
     if (!shots.length) return { do: "stop", step: "fill", reason: "這一集還沒有鏡頭" };
     const unlined = shots.findIndex((s) => !String(s?.line ?? "").trim());
     if (unlined >= 0) return { do: "stop", step: "render", reason: "第 " + (unlined + 1) + " 個鏡頭沒有旁白" };
-    // card R2: the 片頭／片尾 transition must be one video-service joins -- refused before step 1 pays for pictures
-    const end = bookendOn(episode.intro) ? episode.intro : bookendOn(episode.outro) ? episode.outro : null;
-    if (end && Transitions.bookend(end.transition) === null)
-      return { do: "stop", step: "render", reason: "「" + Transitions.name(end.transition) + "」：" + Transitions.BOOKEND_UNSUPPORTED + "，請改選後再從這裡繼續" };
     // 1. Missing pictures. A shot that has one is never made again; a job already sent for a shot is waited for.
     const missing = shots.filter((s) => !s?.image && !s?.video), wait = [], todo = [];
     for (const s of missing) {

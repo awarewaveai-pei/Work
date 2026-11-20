@@ -75,7 +75,7 @@ function request(input, main, sizeOf) {
   if (!Object.hasOwn(AUTONOMY, until)) throw fail("做到哪裡停只能是成片或草稿", 400);
   let ends = {};
   if (s.bookends != null) {
-    // card R2: any stored name (old ones too) -> what video-service joins with; one it cannot make is refused by name
+    // card R2: any stored name (old ones too) -> what video-service joins with (the FFmpeg name); an unknown one is refused
     const b = s.bookends, transition = bookendTransition(b.transition), transitionSeconds = b.transitionSeconds === undefined ? 0.5 : Number(b.transitionSeconds);
     if (transition !== "none" && !(transitionSeconds >= 0.2 && transitionSeconds <= 2)) throw fail("轉場設定無效", 400);
     const intro = bookendPart(b.intro, main, "片頭"), outro = bookendPart(b.outro, main, "片尾");

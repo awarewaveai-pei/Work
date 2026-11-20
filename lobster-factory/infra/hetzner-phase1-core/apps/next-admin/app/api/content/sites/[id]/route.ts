@@ -73,10 +73,10 @@ export async function PATCH(
   const introGiven = body.introStyles !== undefined;
   if (introGiven && (!Array.isArray(body.introStyles) || autoIntroStyles(body.introStyles).length !== body.introStyles.length))
     return NextResponse.json({ ok: false, error: "introStyles: 只能是可自動加的片頭樣式，每個一次" }, { status: 400 });
-  // The intro's transition: its own field too; a name video-service can join (the transitions module), stored as that name.
+  // The intro's transition: its own field too; one of the transitions module's choices, stored by its name.
   const transitionGiven = body.introTransition !== undefined;
-  if (transitionGiven && (typeof body.introTransition !== "string" || Transitions.name(body.introTransition) !== body.introTransition || Transitions.bookend(body.introTransition) === null))
-    return NextResponse.json({ ok: false, error: `introTransition: ${Transitions.BOOKEND_UNSUPPORTED}` }, { status: 400 });
+  if (transitionGiven && (typeof body.introTransition !== "string" || !Transitions.LIST.some((t: { id: string }) => t.id === body.introTransition)))
+    return NextResponse.json({ ok: false, error: "introTransition: 不是轉場清單裡的名字" }, { status: 400 });
   let modesRead: Array<[string, string | null]> | undefined;   // undefined = content_defaults not written
   if (defaultsGiven || introGiven || transitionGiven || GATE_MODES.some((g) => body[g.field] !== undefined)) {
     const { data: current, error: readError } = await supabase.from("wp_sites").select("content_defaults").eq("id", id).maybeSingle();

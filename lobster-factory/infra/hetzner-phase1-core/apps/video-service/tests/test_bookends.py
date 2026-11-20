@@ -42,6 +42,13 @@ class BookendValidation(unittest.TestCase):
                 _validate_bookends(payload)
 
 
+    def test_old_names_still_read(self):
+        # card R2: the transition is now an FFmpeg xfade name; a job queued before (or an older main system) sends the old ones
+        for old, kind in [("crossfade", "fade"), ("fade-black", "fadeblack"), ("none", None), ("wipeleft", "wipeleft")]:
+            b = _validate_bookends({"format_assets": FA, "intro": {"title": "a", "duration": 3}, "transition": old})
+            self.assertEqual(pipeline.xfade_kind(b["transition"]), kind, old)
+
+
 class OldPathUnchanged(unittest.TestCase):
     def test_without_bookends_the_scenes_are_only_concatenated(self):
         calls = []
@@ -104,6 +111,22 @@ class BookendRender(unittest.TestCase):
         self.assertAlmostEqual(pipeline.bookend_lead_s(b), 2.5)
         cues = pipeline.caption_utils.assemble([[{"startMs": 0, "endMs": 900, "text": "第一句"}]], [2.0], pipeline.bookend_lead_s(b))
         self.assertEqual(cues[0]["startMs"], 2500)
+
+    def test_wipes_and_circle_join_with_captions_moved(self):
+        # card R2: every transition the editor offers joins bookends too -- the three that are not a fade, each once
+        real, used = pipeline._run_ffmpeg, []
+        def spy(cmd, *a, **k):
+            used.append(" ".join(cmd))
+            return real(cmd, *a, **k)
+        for t in ("wipeleft", "wiperight", "circleopen"):
+            self.assertIn(t, pipeline.xfade_names())
+            b = {"intro": {"asset": self.intro}, "outro": None, "transition": t, "transition_s": 0.5}
+            with mock.patch.object(pipeline, "_run_ffmpeg", spy):
+                out = self.compose(b)
+            self.assertTrue(any(f"xfade=transition={t}:" in c for c in used), t)
+            self.assertAlmostEqual(_length(out), 3.0 + 5.0 - 0.5, delta=0.15)
+            cues = pipeline.caption_utils.assemble([[{"startMs": 0, "endMs": 900, "text": "第一句"}]], [2.0], pipeline.bookend_lead_s(b))
+            self.assertEqual(cues[0]["startMs"], 2500, t)
 
     def test_silent_two_second_cover_opener(self):
         # card R2: the cover opener is a 2 s remotion-service video without sound, joined by a 0.5 s crossfade

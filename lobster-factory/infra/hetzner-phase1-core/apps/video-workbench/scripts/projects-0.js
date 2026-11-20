@@ -855,8 +855,8 @@ function bookendControls(d) {
             : ""
       }`;
     };
-  // card R2: the transitions module's picker; the ones video-service cannot join are shown and refused by name
-  return part("intro") + part("outro") + `<label>轉場（0.5 秒）</label>` + Transitions.buttons({ label: "轉場", value: d.transition, esc, why: Transitions.bookendWhy,
+  // card R2: the transitions module's picker (video-service joins every one of them)
+  return part("intro") + part("outro") + `<label>轉場（0.5 秒）</label>` + Transitions.buttons({ label: "轉場", value: d.transition, esc,
     attrs: (id) => `data-action="bookendTransition" data-value="${esc(id)}"`, look: (on) => "btn small " + (on ? "primary" : "outline") });
 }
 function embedControls(d) {
@@ -874,9 +874,6 @@ function bookendProblems(d) {
     e = ep(),
     out = [],
     shots = (e?.shots || []).map((s) => (d.oneClick && !s.image && !s.video ? { ...s, image: "/generated/pending.png" } : s));
-  // card R2: a transition video-service cannot join is refused here, before any picture is paid for
-  if ((d.intro.kind !== "none" || d.outro.kind !== "none") && Transitions.bookend(d.transition) === null)
-    out.push("「" + Transitions.name(d.transition) + "」：" + Transitions.BOOKEND_UNSUPPORTED);
   for (const which of ["intro", "outro"]) {
     const b = d[which];
     if (b.kind === "title" && !String(b.fields?.title || "").trim()) out.push(END_LABEL[which] + "標題卡要有文字");

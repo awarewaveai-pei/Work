@@ -657,10 +657,43 @@ def compose_base_video(scenes: list, visual_files: list, audio_files: list, out_
 
 
 # ── Plan U5.4 片頭／片尾接成一支 ──
-# bookends = {"intro": seg | None, "outro": seg | None, "transition": "none" | "crossfade" | "fade-black",
+# bookends = {"intro": seg | None, "outro": seg | None, "transition": "none" | an FFmpeg xfade transition name,
 # "transition_s": float}; seg = {"title": str, "duration": float} (a title card) or {"asset": local path} (a rendered
 # template video; "duration" is filled by resolve_bookends). bookends None = the old path, untouched (concat only).
-_XFADE = {"crossfade": "fade", "fade-black": "fadeblack"}
+# Card R2: the name is the one the transitions module gives every transition (next-admin
+# public/editor-shared/transitions.js xfade), checked against FFmpeg's own list (xfade_names), so every choice the
+# editor offers joins here too. Names sent before card R2 (a job already queued, an older main system) still read.
+_LEGACY_TRANSITIONS = {"crossfade": "fade", "fade-black": "fadeblack"}
+_xfade_list: "list | None" = None
+
+
+def xfade_kind(transition) -> "str | None":
+    """The xfade transition a bookends transition joins with; None = no transition (a plain cut)."""
+    if transition in (None, "", "none"):
+        return None
+    return _LEGACY_TRANSITIONS.get(transition, transition)
+
+
+def xfade_names() -> list:
+    """The transitions this FFmpeg's xfade filter has (its own help, read once): the renderer decides, not a list here."""
+    global _xfade_list
+    if _xfade_list is None:
+        res = subprocess.run(["ffmpeg", "-hide_banner", "-h", "filter=xfade"], capture_output=True, timeout=60)
+        text = res.stdout.decode("utf-8", "ignore") + res.stderr.decode("utf-8", "ignore")
+        block = text.split(" transition ", 1)[1] if " transition " in text else ""
+        names = []
+        for line in block.splitlines()[1:]:
+            m = re.match(r"^ {5}([a-z0-9]+)\s+-?\d+\s", line)
+            if not m:
+                if names:
+                    break
+                continue
+            names.append(m.group(1))
+        names = [n for n in names if n != "custom"]
+        if not names:
+            return []  # could not read FFmpeg's help: not kept, asked again next time (/health reports it false meanwhile)
+        _xfade_list = names
+    return _xfade_list
 
 # ── Intended stills: spans a render made still on purpose (title cards, template intro / outro) ──
 # Written into the video's own `comment` tag by the step that makes them, and ONLY there: every step that reads an
@@ -711,7 +744,7 @@ def bookend_lead_s(bookends: "dict | None") -> float:
     seg = (bookends or {}).get("intro")
     if not seg:
         return 0.0
-    t = float(bookends.get("transition_s", 0)) if bookends.get("transition") in _XFADE else 0.0
+    t = float(bookends.get("transition_s", 0)) if xfade_kind(bookends.get("transition")) else 0.0
     return max(0.0, float(seg["duration"]) - t)
 
 
@@ -745,7 +778,7 @@ def _join_bookends(scene_paths: list, scene_s: list, bookends: dict, out_path: s
     intro, outro = bookends.get("intro"), bookends.get("outro")
     parts = ([_bookend_segment(intro, "intro", w, h, fps)] if intro else []) + scene_paths + \
             ([_bookend_segment(outro, "outro", w, h, fps)] if outro else [])
-    kind = _XFADE.get(bookends.get("transition", "none"))
+    kind = xfade_kind(bookends.get("transition"))
     main_s = sum(scene_s)
     planned = (float(intro["duration"]) if intro else 0.0) + main_s + (float(outro["duration"]) if outro else 0.0)
     stills = lambda length: ([(0.0, float(intro["duration"]))] if intro else []) + \

@@ -160,10 +160,10 @@ export function siteIntroStyles(d: SiteContentDefaults | undefined): string[] {
   return autoIntroStyles(d?.introStyles);
 }
 
-/** Card R2: the site's intro transition as used: a stored name video-service can join (old names read), else 溶解. */
+/** Card R2: the site's intro transition as used: one of the transitions module's choices (old names read), else 溶解. */
 export function siteIntroTransition(d: SiteContentDefaults | undefined): string {
   const name = Transitions.name(d?.introTransition);
-  return d?.introTransition !== undefined && name !== null && Transitions.bookend(name) !== null ? name : Transitions.AUTO.id;
+  return d?.introTransition !== undefined && name !== null ? name : Transitions.AUTO.id;
 }
 
 /** Only the exact stored value lets the schedule approve its own proposals: missing, misspelt or any other value = a person picks. */

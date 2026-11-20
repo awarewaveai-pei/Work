@@ -334,7 +334,6 @@ def _build_output_meta(outputs: dict) -> dict:
     return meta
 
 
-_TRANSITIONS = ("none", "crossfade", "fade-black")
 
 
 def _validate_bookends(payload: dict):
@@ -371,8 +370,10 @@ def _validate_bookends(payload: dict):
         return {"title": title.strip(), "duration": duration}
 
     transition = payload.get("transition", "none")
-    if transition not in _TRANSITIONS:
-        raise ValueError(f"transition 必須是 {_TRANSITIONS}")
+    # card R2: "none", an FFmpeg xfade name (the transitions module's), or a name sent before it (crossfade / fade-black)
+    kind = pipeline.xfade_kind(transition) if isinstance(transition, str) else ""
+    if kind is not None and kind not in pipeline.xfade_names():
+        raise ValueError("transition 必須是 none 或 FFmpeg xfade 的轉場名稱")
     try:
         transition_s = float(payload.get("transition_duration", 0.5))
     except (TypeError, ValueError):
@@ -876,6 +877,9 @@ class _Handler(BaseHTTPRequestHandler):
                     "caption_reburn": True,
                     "bookends": True,  # plan U5.4: intro/outro/transition; next-admin refuses to send them without this
                     "bookend_main": True,  # U5.5: retained main and original caption times for rejoining
+                    # card R2: bookend transitions are FFmpeg xfade names (every editor transition) -- true only once
+                    # FFmpeg's own list was read, so a main system never sends a name this service cannot check
+                    "bookend_xfade": bool(pipeline.xfade_names()),
                     "tts": True,
                 },
                 "formats": list(config.FORMATS.keys()),

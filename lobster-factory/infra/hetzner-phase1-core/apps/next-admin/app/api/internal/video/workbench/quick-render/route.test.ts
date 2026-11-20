@@ -68,7 +68,7 @@ describe("POST /api/internal/video/workbench/quick-render", () => {
   it("template intro + title outro + crossfade: joined by the service from the rows' urls", async () => {
     expect((await call(mine, { intro: { kind: "template", assetId: myIntro }, outro: { kind: "title", title: "謝謝收看", seconds: 3 }, transition: "crossfade", transitionSeconds: 0.5 })).status).toBe(202);
     expect(submitDraftRender).toHaveBeenCalledWith(expect.objectContaining({
-      bookends: { intro: { assetUrl: "https://v.example.com/video/workbench/intro.mp4" }, outro: { title: "謝謝收看", duration: 3 }, transition: "crossfade", transitionSeconds: 0.5 },
+      bookends: { intro: { assetUrl: "https://v.example.com/video/workbench/intro.mp4" }, outro: { title: "謝謝收看", duration: 3 }, transition: "fade", transitionSeconds: 0.5 },   // an old name, sent as FFmpeg's
     }));
     expect(submitDraftRender.mock.calls[0][0]).not.toHaveProperty("introTitle");
   });

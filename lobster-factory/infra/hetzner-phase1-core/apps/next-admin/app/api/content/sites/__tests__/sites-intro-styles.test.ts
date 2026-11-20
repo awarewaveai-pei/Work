@@ -49,7 +49,7 @@ describe("site introStyles", () => {
   it("introTransition: a name video-service can join, stored as given; others refused; kept by a whole-defaults save", async () => {
     expect((await patch({ introTransition: "黑場" })).status).toBe(200);
     expect((db.updated.at(-1)?.content_defaults as { introTransition?: string }).introTransition).toBe("黑場");
-    for (const bad of ["向左擦除", "fade-black", "nope", 3]) expect((await patch({ introTransition: bad })).status).toBe(400);
+    for (const bad of ["fade-black", "nope", 3]) expect((await patch({ introTransition: bad })).status).toBe(400);
     db.stored = { introTransition: "無" };
     await patch({ contentDefaults: { tone: "Calm" } });
     expect(db.updated.at(-1)?.content_defaults).toEqual({ tone: "Calm", introTransition: "無" });

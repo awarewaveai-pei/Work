@@ -47,7 +47,7 @@ describe("makeIntro", () => {
     const r = await makeIntro(style("cover-opener"), video, d);
     expect(d.picture).toHaveBeenCalledWith(video.firstPicture, 1920, 1080, expect.any(AbortSignal));
     expect(d.submit).toHaveBeenCalledWith("cover-opener", { backgroundUrl: "data:image/jpeg;base64,AAAA", title: "感恩節的心理學" }, { outputFormat: "16x9", fps: 30, durationInFrames: 60 });
-    expect(r).toEqual({ bookends: { intro: { assetUrl: "https://r2.example/rs1.mp4" }, transition: "crossfade", transitionSeconds: 0.5 } });
+    expect(r).toEqual({ bookends: { intro: { assetUrl: "https://r2.example/rs1.mp4" }, transition: "fade", transitionSeconds: 0.5 } });
   });
 
   it("a template takes its own picture and title keys at its shortest length; the title card needs no render", async () => {
@@ -58,16 +58,17 @@ describe("makeIntro", () => {
     await makeIntro(style("scale-bg-text-slideup"), video, s);   // its title only slides in from 3.8 s: 5 s, never its 3 s minimum
     expect(s.submit).toHaveBeenCalledWith("scale-bg-text-slideup", { imageUrl: "data:image/jpeg;base64,AAAA", text: "感恩節的心理學" }, { outputFormat: "16x9", fps: 30, durationInFrames: 150 });
     const t = deps();
-    expect(await makeIntro(style("title-card"), video, t)).toEqual({ bookends: { intro: { title: "感恩節的心理學", duration: 3 }, transition: "crossfade", transitionSeconds: 0.5 } });
+    expect(await makeIntro(style("title-card"), video, t)).toEqual({ bookends: { intro: { title: "感恩節的心理學", duration: 3 }, transition: "fade", transitionSeconds: 0.5 } });
     expect(t.submit).not.toHaveBeenCalled();
   });
 
-  it("the site's transition as video-service names it (the transitions module); old or unjoinable values = 溶解", async () => {
+  it("the site's transition as video-service names it (the transitions module); unknown values = 溶解", async () => {
     const at = async (transition?: string) => (await makeIntro(style("title-card"), { ...video, transition }, deps())).bookends?.transition;
-    expect([await at(), await at("溶解"), await at("黑場"), await at("無")]).toEqual(["crossfade", "crossfade", "fade-black", "none"]);
+    expect([await at(), await at("溶解"), await at("黑場"), await at("無")]).toEqual(["fade", "fade", "fadeblack", "none"]);
     expect(siteIntroTransition(undefined)).toBe("溶解");
     expect(siteIntroTransition({ introTransition: "fade-black" })).toBe("黑場");      // an old name reads as the new one
-    expect(siteIntroTransition({ introTransition: "向左擦除" })).toBe("溶解");        // video-service cannot join it
+    expect(siteIntroTransition({ introTransition: "向左擦除" })).toBe("向左擦除");
+    expect(siteIntroTransition({ introTransition: "nope" })).toBe("溶解");
   });
 
   it("never stops the video: refused, failed, too slow, a clip instead of a picture, no service -- a note and no intro", async () => {

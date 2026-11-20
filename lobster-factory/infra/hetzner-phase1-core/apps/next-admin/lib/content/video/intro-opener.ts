@@ -2,7 +2,7 @@
 // The style comes from the site's setting in turn (public/editor-shared/intro-styles.js introStyleFor); the title is the
 // video's title and the picture is the video's first shot in its first format -- an automatic video has no cover yet when
 // it is sent (covers are cut from the finished file), so the first shot stands in for it. The template's video is made by
-// remotion-service (NT$0) and joined by video-service like any template intro, with a 0.5 s crossfade.
+// remotion-service (NT$0) and joined by video-service like any template intro, with the site's transition (0.5 s).
 // Invariant: an intro never stops a video -- every failure (no service, timeout, a picture that is not a still) is
 // { note } and the video is sent without one.
 import { autoFill, INTRO_TEMPLATES } from "../../../public/editor-shared/intro-styles.js";
@@ -15,7 +15,7 @@ export interface IntroResult { bookends?: RenderBookends; note?: string }
 
 /** The join: the site's transition (brand-voice.ts siteIntroTransition, default 溶解) as video-service names it, 0.5 s
  *  (card R2 item 11); a title card is 3 s (video-service's own default). */
-const joinOf = (transition: string | undefined) => ({ transition: Transitions.bookend(transition ?? Transitions.AUTO.id) ?? Transitions.bookend(Transitions.AUTO.id), transitionSeconds: Transitions.AUTO.seconds });
+const joinOf = (transition: string | undefined) => ({ transition: Transitions.wire(transition ?? Transitions.AUTO.id) ?? Transitions.wire(Transitions.AUTO.id), transitionSeconds: Transitions.AUTO.seconds });
 export const TITLE_CARD_SECONDS = 3;
 /** The whole intro step (picture + render + polls) gets this long; the render's own prepare stays under ~100 s + this. */
 export const INTRO_BUDGET_MS = 45_000;

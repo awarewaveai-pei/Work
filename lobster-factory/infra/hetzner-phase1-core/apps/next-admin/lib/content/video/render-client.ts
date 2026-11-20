@@ -4,6 +4,7 @@
  * 本模組只做 HTTP 包裝，不做任何渲染邏輯。
  * video-service 負責 TTS + ffmpeg 合成；本模組只傳資料、接結果。
  */
+import Transitions from "../../../public/editor-shared/transitions.js";
 import { optionalRendererAuthHeaders, resolveRendererAuth } from "./renderer-auth";
 import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
 import { grantFor } from "@/lib/entitlements/grant";
@@ -35,6 +36,8 @@ export interface VideoServiceCapability {
   footage_timeline?: boolean;
   /** Plan U5.4: joins intro / outro / transition (video-service server.py _validate_bookends). */
   bookends?: boolean;
+  /** Card R2: joins bookends with any FFmpeg xfade transition name (transitions.js wire), not only crossfade / fade-black. */
+  bookend_xfade?: boolean;
   formats: string[];
 }
 
@@ -43,7 +46,7 @@ export type BookendSegment = { title: string; duration: number } | { assetUrl: s
 export interface RenderBookends {
   intro?: BookendSegment;
   outro?: BookendSegment;
-  /** video-service's name for it (public/editor-shared/transitions.js Transitions.bookend). */
+  /** video-service's name for it (public/editor-shared/transitions.js Transitions.wire: "none" or the FFmpeg xfade name). */
   transition: string;
   transitionSeconds: number;
 }
@@ -77,7 +80,7 @@ async function assertNativeMultiformat(base: string, formats: string[]): Promise
     });
     const body = (await r.json().catch(() => ({}))) as {
       ok?: boolean;
-      capabilities?: { native_multiformat?: boolean; format_assets?: boolean; output_dimensions?: boolean; openai_tts?: boolean; bookends?: boolean };
+      capabilities?: { native_multiformat?: boolean; format_assets?: boolean; output_dimensions?: boolean; openai_tts?: boolean; bookends?: boolean; bookend_xfade?: boolean };
       formats?: string[];
     };
     const serviceFormats = new Set(body.formats ?? []);
@@ -97,6 +100,7 @@ async function assertNativeMultiformat(base: string, formats: string[]): Promise
           format_assets: true,
           output_dimensions: true,
           bookends: body.capabilities?.bookends === true,
+          bookend_xfade: body.capabilities?.bookend_xfade === true,
           formats: body.formats ?? [],
         },
       };
@@ -156,6 +160,15 @@ export async function submitRender(
   if (opts?.bookends && !(useMulti && serviceCapability?.bookends)) {
     return { ok: false, status: 503, error: "video-service 尚未部署片頭接合版本（/health 需回報 bookends）；請先更新 video-service，或不加片頭先出片。" };
   }
+  // Card R2: the transition is now an FFmpeg xfade name. A video-service from before (this app deploys every night, it
+  // does not) knows only its old names: the ones it has get them (the transitions module's old names, read back), the
+  // others are refused -- so 無／溶解／黑場 keep working whichever deploys first.
+  let bookends = opts?.bookends;
+  if (bookends && !serviceCapability?.bookend_xfade) {
+    const old = Object.keys(Transitions.LEGACY).find((k) => /^[a-z-]+$/.test(k) && Transitions.wire(k) === bookends!.transition);
+    if (!old) return { ok: false, status: 503, error: "video-service 尚未部署全部轉場的片頭接合版本（/health 需回報 bookend_xfade）；請先更新 video-service，或改用無、溶解、黑場。" };
+    bookends = { ...bookends, transition: old };
+  }
   // OpenAI narration is the paid voice (video-cost.ts "openai"); video-service calls it out of process, behind no
   // in-process seam, so the render asks here and meters when it submits (like a seam: reaching the paid work counts).
   let ttsGrant: Grant | null = null;
@@ -183,11 +196,11 @@ export async function submitRender(
         ...(opts?.ttsVoice && { tts_voice: opts.ttsVoice }),
         ...(opts?.introTitle && { intro_title: opts.introTitle }),
         ...(opts?.introDuration && { intro_duration: opts.introDuration }),
-        ...(opts?.bookends && {
-          ...(opts.bookends.intro && { intro: segmentBody(opts.bookends.intro) }),
-          ...(opts.bookends.outro && { outro: segmentBody(opts.bookends.outro) }),
-          transition: opts.bookends.transition,
-          transition_duration: opts.bookends.transitionSeconds,
+        ...(bookends && {
+          ...(bookends.intro && { intro: segmentBody(bookends.intro) }),
+          ...(bookends.outro && { outro: segmentBody(bookends.outro) }),
+          transition: bookends.transition,
+          transition_duration: bookends.transitionSeconds,
         }),
       }),
       signal: AbortSignal.timeout(30_000),

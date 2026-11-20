@@ -54,14 +54,13 @@ export default function IntroStyleButtons({ site, onSaved }: { site: ManagedSite
           );
         })}
       </div>
-      {/* card R2: the transitions module's list; video-service joins only some of them, the rest are shown, not pressable */}
+      {/* card R2: the transitions module's list */}
       <span style={{ color: "var(--text-muted)", fontSize: 12 }}>片頭接正片的轉場（0.5 秒）</span>
       <div role="group" aria-label="片頭轉場" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {Transitions.LIST.map((t: { id: string; note: string; bookend: string | null }) => (
-          <button key={t.id} type="button" style={{ ...card(transition === t.id), flexDirection: "row" }} disabled={saving || !t.bookend}
-            title={t.bookend ? undefined : Transitions.BOOKEND_UNSUPPORTED} aria-pressed={transition === t.id}
-            onClick={() => { if (t.id !== transition) void save({ introTransition: t.id }); }}>
-            {t.id}{t.bookend ? (t.note ? ` ${t.note}` : "") : "（影片服務還不支援）"}
+        {Transitions.LIST.map((t: { id: string; note: string }) => (
+          <button key={t.id} type="button" style={{ ...card(transition === t.id), flexDirection: "row" }} disabled={saving}
+            aria-pressed={transition === t.id} onClick={() => { if (t.id !== transition) void save({ introTransition: t.id }); }}>
+            {t.id}{t.note ? ` ${t.note}` : ""}
           </button>
         ))}
       </div>

@@ -21,11 +21,10 @@ const CURVED_TRANSITIONS = {
 const curvedTransition = (type, curve) => CURVED_TRANSITIONS[type](`(${EditorModel.TRANSITION_CURVES[curve]})`).replaceAll("T", "(1-P)");
 
 // A 片頭／片尾 transition as video-service joins it (backend/quick-render.cjs; the main system's automatic videos use the
-// same Transitions.bookend): any stored name, old ones included -> video-service's name (Transitions LIST bookend). A transition it
-// cannot make is refused by name, never turned into 溶解.
+// same Transitions.wire): any stored name, old ones included -> "none" or the FFmpeg xfade name. Unknown = refused.
 function bookendTransition(v) {
-  const name = Transitions.name(v), wire = name === null ? null : Transitions.bookend(name);
-  if (wire === null) throw Object.assign(Error(name ? "「" + name + "」：" + Transitions.BOOKEND_UNSUPPORTED : "轉場設定無效"), { status: 400 });
+  const wire = Transitions.wire(v);
+  if (wire === null) throw Object.assign(Error("轉場設定無效"), { status: 400 });
   return wire;
 }
 

@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
  * GET ?organizationId=&jobId= -> {status: running|error|done}; done = the finished video's main-system row
  * (assetId, checksumSha256, url, ratio, rightsSources). The render's input assets are library assets: nothing is deleted.
  * Plan U5.4: intro?/outro? = {kind:"title", title, seconds} | {kind:"template", assetId} (a rendered template video of
- * THIS org, checked like the scenes), transition? none|crossfade|fade-black, transitionSeconds? 0.2-2 -> joined into the
+ * THIS org, checked like the scenes), transition? any transitions.js name (old ones too; sent as Transitions.wire), transitionSeconds? 0.2-2 -> joined into the
  * one video by the service. An intro without kind = the old title card (intro_title), unchanged.
  * Plan U5.3: embedSiteId? (with autonomy auto_after_render only) = after the schedule's social drafts, a new WordPress
  * draft on this org's site with the video embedded (project-advance-deps drafts). autonomy never takes full_auto: a
@@ -36,8 +36,6 @@ const VOICE = /^[A-Za-z0-9:._-]{0,64}$/;
 const RATIOS = new Set(["16x9", "9x16", "4x5"]);   // finalize.ts EXPECTED_VIDEO_DIMENSIONS
 const MAX_SCENES = 30;                             // video-service RENDER_MAX_SCENES default
 const AUTONOMY = new Set(["guided", "auto_after_render"]);
-// What video-service joins bookends with: the transitions module's output values (card R2), never a list here.
-const TRANSITIONS = new Set<string>(Transitions.LIST.map((t: { bookend: string | null }) => t.bookend).filter(Boolean));
 type Body = Record<string, unknown>;
 const obj = (v: unknown): Body | null => (v && typeof v === "object" && !Array.isArray(v) ? v as Body : null);
 
@@ -85,8 +83,9 @@ function parse(b: Body | null): Parsed | string {
     const i = b.intro === undefined ? null : bookend(b.intro), o = b.outro === undefined ? null : bookend(b.outro);
     if (typeof i === "string") return i;
     if (typeof o === "string") return o;
-    const transition = b.transition ?? "none", ts = b.transitionSeconds === undefined ? 0.5 : Number(b.transitionSeconds);
-    if (typeof transition !== "string" || !TRANSITIONS.has(transition)) return "invalid transition";
+    // card R2: any transition name (old ones too) -> what video-service joins with (the transitions module)
+    const transition: string | null = Transitions.wire(b.transition ?? "none"), ts = b.transitionSeconds === undefined ? 0.5 : Number(b.transitionSeconds);
+    if (transition === null) return "invalid transition";
     if (transition !== "none" && !(ts >= 0.2 && ts <= 2)) return "transitionSeconds must be 0.2-2";
     bookends = { intro: i, outro: o, transition, transitionSeconds: ts };
   } else if (b.intro !== undefined) {

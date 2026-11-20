@@ -86,7 +86,7 @@ assert.equal(jobs[0].settings.until, "video");
 const main = { assetOf: (u) => ({ [pic(1)]: "a1", [pic(2)]: "a2", [pic(3)]: "a3", [introUrl]: "a-intro" })[u] || null, organizationId: () => "org" };
 const sent = quick.request({ ...jobs[0], link: { projectId: "p1" } }, main, () => 1);
 assert.equal(sent.autonomy, "guided");
-assert.deepEqual([sent.intro, sent.transition, sent.transitionSeconds], [{ kind: "template", assetId: "a-intro" }, "crossfade", 0.5]);
+assert.deepEqual([sent.intro, sent.transition, sent.transitionSeconds], [{ kind: "template", assetId: "a-intro" }, "fade", 0.5]);
 e.autoRun.jobIds.push("r1");
 assert.deepEqual(spine.autoRunNext(project, e, [...fills, earlier, job("r1", jobs[0])], TEMPLATES), { do: "wait" }, "送出還不是完成，也不能重送");
 assert.deepEqual(spine.autoRunNext(project, e, [...fills, earlier, job("r1", jobs[0], "succeeded")], TEMPLATES), { do: "done" });
