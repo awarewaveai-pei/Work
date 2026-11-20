@@ -10,3 +10,5 @@ HANDOFF.md
 PLAN.md
 **/*.test.ts
 **/*.test.tsx
+# secrets are injected at run time by compose env_file, never part of the build context
+.env*

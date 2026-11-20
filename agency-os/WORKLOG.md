@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-20（續17）— oracle 部署腳本 `oracle-deploy.sh`（ks-aw-01）；既有手冊仍寫退租的 SG 主機（操作者：「當然要部署在新機啊」）
+
+- 現況（SSH 唯讀實查）：`/opt/oracle/Projects/internal/ziwei-doushu/` 非 git 目錄；`oracle-web:latest` 4 個月前建、容器 healthy；不在 `sg-deploy.sh` 的 app 清單；`deploy/DEPLOY-SG.md` §7 的 `git fetch && reset` 在此不可用。
+- 做法：`Projects/internal/ziwei-doushu/deploy/oracle-deploy.sh` — `git archive <ref>`（不動 `/root/Work` worktree）→ gate（`node:22-alpine` 內 `npm ci`＋`tsc`＋`vitest`）→ compose 差異即停 → 原始碼 tar＋`:rollback`（取執行中容器的映像）→ rsync（保留 `.env*`、`docker-compose*`）→ build → up → healthy → 兩語言逐頁 200 → 任何非零結束經 EXIT trap 進 `rollback()`，還原後再驗 healthy 並通知兩種結果之一。`.dockerignore` 加 `.env*`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh -p 58122 ubuntu@145.239.195.47 'sudo -n bash -s -- --dry-run' < deploy/oracle-deploy.sh（兩次，修正前後）→ gate 186 passed、compose 無差異、rsync 無 deleting、`/opt/oracle/backups` 700 | exit=0 | ms=26000
+- REVIEW_DONE: critic=Deep | verdict=fail | findings=0c/4m/3n — 全修：M1 rollback 內 `set -e` 會半途結束且未驗還原結果；M2 rsync 失敗／訊號不進 rollback；M3 `curl | grep -q` 在 pipefail 下因 EPIPE 假失敗；M4 備份 tar 含 `.env.production` 卻 644；m1 build context 含 `.env*`；m2 `:rollback` 標 `:latest` 非執行中映像；m3 smoke 把 3xx 當通過。
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02；critic agent 審
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=oracle-deploy | hits=5（皆 `deploy/oracle-deploy.sh` 自身的用法與 lock／log 檔名；無其他呼叫點。`DEPLOY-SG.md` 未提及，待實際部署後改寫為現況）
+- 剩餘風險：`rollback()` 路徑未實際觸發過（只有語法與審查）；第一次實跑有 tar＋映像雙備份可手動還原。
+- rollback：`git revert` 本 commit；主機無常駐副本（腳本由 `git show <ref>:… | bash -s` 讀取）。
 ## 2026-11-20（續16）— oracle 補強批 2：清單與干支規則單一來源、表單下拉改按鈕、奇門遁甲、求籤（觀音靈籤百首）併入 main
 
 - 派工表與 RISKS：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/DISPATCH.md`。
