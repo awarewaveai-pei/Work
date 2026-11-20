@@ -26,6 +26,7 @@ const SYSTEM_IDS: readonly SystemId[] = [
   'iching',
   'tarot',
   'astrology',
+  'hehun',
 ];
 const PROVIDERS: readonly AiProviderId[] = ['openai', 'anthropic'];
 /** tier 合法性(政策由 lib/entitlements 判定,非在此寫死)。 */

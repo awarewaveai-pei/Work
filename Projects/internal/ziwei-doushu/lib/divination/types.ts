@@ -8,7 +8,7 @@ import type { Locale } from '@/lib/i18n/config';
  *   InterpretationContext 這個「系統無關」結構運作,不需認識各系統內部。
  */
 
-export type SystemId = 'ziwei' | 'bazi' | 'iching' | 'tarot' | 'astrology';
+export type SystemId = 'ziwei' | 'bazi' | 'iching' | 'tarot' | 'astrology' | 'hehun';
 
 /**
  * 給 AI 解讀層的「系統無關」結構化輸入。

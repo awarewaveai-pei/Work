@@ -7,6 +7,7 @@
     "home": "Home",
     "ziwei": "Zi Wei Dou Shu",
     "bazi": "BaZi",
+    "hehun": "Compatibility",
     "iching": "I Ching",
     "tarot": "Tarot",
     "daily": "Daily Fortune",
@@ -18,6 +19,7 @@
     "enter": "Enter",
     "ziweiDesc": "Zi Wei Dou Shu chart with true solar time correction",
     "baziDesc": "BaZi Four Pillars, Ten Gods, hidden stems, NaYin",
+    "hehunDesc": "BaZi compatibility and zodiac match for two, with the reason for each item",
     "ichingDesc": "I Ching coin casting, primary & changed hexagrams",
     "tarotDesc": "78-card deck, single / three-card / Celtic Cross",
     "dailyDesc": "Daily fortune, lucky color, lucky number, almanac",
@@ -120,6 +122,82 @@
       "jiangXing": "General Star",
       "luShen": "Prosperity Star",
       "yangRen": "Goat Blade"
+    }
+  },
+  "hehun": {
+    "title": "BaZi Compatibility",
+    "subtitle": "Zodiac match · Day pillar · Element support · NaYin cycle (each item explained)",
+    "modeFull": "Full BaZi",
+    "modeZodiac": "Birth year only (zodiac)",
+    "personA": "Person A",
+    "personB": "Person B",
+    "birthDate": "Birth date",
+    "zodiacHint": "The zodiac year turns at Lichun (around February 4), so anyone born before it belongs to the previous animal. If the birthday falls on Lichun itself, use Full BaZi instead.",
+    "submit": "Compare",
+    "summary": "Summary",
+    "basisFavorable": "Favorable",
+    "basisSupply": "Partner's day master / strongest",
+    "noRelation": "No particular relation",
+    "note": "\"Needs work\" marks a theme to talk through together; it never means the two of you cannot be together. Compatibility is a reference — the relationship is yours to build.",
+    "verdict": {
+      "合": "Harmonious",
+      "平": "Neutral",
+      "沖": "Needs work"
+    },
+    "items": {
+      "yearBranch": {
+        "name": "Zodiac (year branch)",
+        "desc": "Whether your backgrounds and overall pace of life fit together."
+      },
+      "dayStem": {
+        "name": "Day stem",
+        "desc": "The day stem stands for the self; a stem combination means a natural pull toward each other."
+      },
+      "dayBranch": {
+        "name": "Day branch (partner seat)",
+        "desc": "The day branch is read as the partner seat: everyday closeness and points of friction."
+      },
+      "elementsAB": {
+        "name": "Element support (B → A)",
+        "desc": "Whether B's day-master or strongest element supplies the elements A needs."
+      },
+      "elementsBA": {
+        "name": "Element support (A → B)",
+        "desc": "Whether A's day-master or strongest element supplies the elements B needs."
+      },
+      "yearNaYin": {
+        "name": "Year NaYin",
+        "desc": "Traditional matching compares the NaYin elements of the two year pillars to see whether temperaments support each other."
+      }
+    },
+    "rel": {
+      "liuHe": "Six Harmony",
+      "sanHe": "Three Harmony",
+      "liuChong": "Clash",
+      "hai": "Harm",
+      "xing": "Punishment",
+      "wuHe": "Stem combination",
+      "aShengB": "A nourishes B",
+      "bShengA": "B nourishes A",
+      "aKeB": "A restrains B",
+      "bKeA": "B restrains A",
+      "biHe": "Same element",
+      "feeds": "Partner supplies a favorable element",
+      "strains": "Partner's day master is an element to avoid"
+    },
+    "animals": {
+      "子": "Rat",
+      "丑": "Ox",
+      "寅": "Tiger",
+      "卯": "Rabbit",
+      "辰": "Dragon",
+      "巳": "Snake",
+      "午": "Horse",
+      "未": "Goat",
+      "申": "Monkey",
+      "酉": "Rooster",
+      "戌": "Dog",
+      "亥": "Pig"
     }
   },
   "iching": {

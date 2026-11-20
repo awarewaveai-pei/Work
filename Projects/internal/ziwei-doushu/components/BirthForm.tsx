@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChartRequest, Gender, CalendarType } from '@/lib/ziwei';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -9,12 +9,18 @@ const CITY_LON: Record<string, number> = {
   香港: 114.2, 北京: 116.4, 上海: 121.5, 廣州: 113.3,
 };
 
+/**
+ * 出生資料表單。單人頁給 onSubmit(顯示送出鈕);多人頁(合婚)給 onChange,
+ *   每次欄位變動即回報目前資料,由外層統一送出(此時不顯示送出鈕)。
+ */
 export default function BirthForm({
   dict,
   onSubmit,
+  onChange,
 }: {
   dict: Dictionary;
-  onSubmit: (req: ChartRequest) => void;
+  onSubmit?: (req: ChartRequest) => void;
+  onChange?: (req: ChartRequest) => void;
 }) {
   const t = dict.form;
   const [date, setDate] = useState('2000-08-16');
@@ -26,15 +32,26 @@ export default function BirthForm({
   const [city, setCity] = useState('台北');
   const [longitude, setLongitude] = useState(121.5);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  function buildRequest(): ChartRequest {
     const [y, m, d] = date.split('-').map(Number);
     const [hh, mm] = time.split(':').map(Number);
-    onSubmit({
+    return {
       year: y, month: m, day: d, hour: hh, minute: mm,
       gender, calendar, isLeapMonth,
       trueSolar: useTrueSolar ? { longitude, tzOffsetHours: 8 } : undefined,
-    });
+    };
+  }
+
+  // 只依欄位值觸發;onChange 存 ref,外層傳 inline 函式也拿得到最新版本。
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  useEffect(() => {
+    onChangeRef.current?.(buildRequest());
+  }, [date, time, gender, calendar, isLeapMonth, useTrueSolar, longitude]);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    onSubmit?.(buildRequest());
   }
 
   return (
@@ -142,11 +159,13 @@ export default function BirthForm({
           </>
         ) : null}
 
-        <div className="col-span-2 md:col-span-3 mt-2">
-          <button type="submit" className="btn-gold">
-            {t.submit}
-          </button>
-        </div>
+        {onSubmit ? (
+          <div className="col-span-2 md:col-span-3 mt-2">
+            <button type="submit" className="btn-gold">
+              {t.submit}
+            </button>
+          </div>
+        ) : null}
       </div>
     </form>
   );

@@ -11,6 +11,7 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 const SYSTEMS = [
   { id: "ziwei",  descKey: "ziweiDesc", glyph: "☽" },
   { id: "bazi",   descKey: "baziDesc",  glyph: "⊕" },
+  { id: "hehun",  descKey: "hehunDesc", glyph: "☯" },
   { id: "iching", descKey: "ichingDesc",glyph: "☲" },
   { id: "tarot",  descKey: "tarotDesc", glyph: "✦" },
   { id: "astrology", descKey: "astrologyDesc", glyph: "♆" },
