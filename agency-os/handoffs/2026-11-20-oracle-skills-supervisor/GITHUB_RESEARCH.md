@@ -36,6 +36,11 @@
 | 占星 | flatangle/flatlib | MIT | 395 | 2026-10-09 | 1.6 | 已 archived；依賴 Swiss Ephemeris |
 | 每日 | （無獨立引擎） | — | — | — | — | 文件 §3.6 結論成立；本站已是確定性算法 |
 
+**查核深度（三級）**：
+- 讀過內容檔：iching-kit（README、`package.json`、`scripts/gen-data.mjs`）、TarotWhisper（LICENSE、`scripts/download-cards.js`、檔案樹）、tarot-mcp（`assets/ASSET_LICENSE.md`、檔案樹）、iztro（releases 說明）、x-iztro（`tests/golden` 檔案樹）、ichingshifa（`src/` 檔案樹）。
+- 只讀 LICENSE：anois/tarot、openephem、iChing-JS（確認無 LICENSE）。
+- **只查 API 中繼資料（授權、星數、push 日、語言、archived），沒開任何檔案**：react-iztro、ziwei-chart、lunar-javascript、lunar-python、bazi-mcp、ichingpy、kerykeion、flatlib。這八個在「結論」欄的功能描述（如 ichingpy 解釋未完成、flatlib 依賴 Swiss Ephemeris、anois 3D 互動）沿用輸入文件，未親驗。
+
 文件勘誤：TarotWhisper、anois/tarot、openephem 的 GitHub 授權欄顯示 NOASSERTION，LICENSE 檔實為 MIT；kerykeion 不是本站需要的選項（文件不知道本站已用 XALEN）。
 
 ## Backlog（收益高、成本低在前）
