@@ -56,8 +56,9 @@ const lineStyle = (fontSize: number): React.CSSProperties => ({
 const fill: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
 
 // Card R5: the blurred backdrop is made ONCE per render, not on every frame. A CSS blur on a full-frame layer is redrawn
-// for each frame with software GL (swangle): on a laptop pinned to 2 cores it was ~45% of a frame (140 -> 81 ms); the
-// production share is to be measured (scripts/profile-opener.mjs). Here the picture is drawn once into a small canvas
+// for each frame: on a laptop pinned to 2 cores (swangle) it was ~45% of a frame (140 -> 81 ms); on ks-aw-01 this and
+// one browser per job took a 2 s opener from 160 s to 54 s, the GL renderer the rest (render-job.ts RENDER_GL). Here the
+// picture is drawn once into a small canvas
 // (1/8 size, so the blur is 1/8 the radius and 1/64 the pixels) with the blur and darkening baked in, and every frame
 // only scales that finished image up. null = not needed (a 1-frame cover) or not ready; a picture that does not load
 // gives no backdrop (the dark colour shows), never a stuck render.

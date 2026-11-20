@@ -18,8 +18,15 @@ export interface IntroResult { bookends?: RenderBookends; note?: string }
  *  (card R2 item 11); a title card is 3 s (video-service's own default). */
 const joinOf = (transition: string | undefined) => ({ transition: Transitions.wire(transition ?? Transitions.AUTO.id) ?? Transitions.wire(Transitions.AUTO.id), transitionSeconds: Transitions.AUTO.seconds });
 export const TITLE_CARD_SECONDS = 3;
-/** The whole intro step (picture + render + polls) gets this long; the render's own prepare stays under ~100 s + this. */
-export const INTRO_BUDGET_MS = 45_000;
+/** The whole intro step (picture + render + polls) gets about twice the measured render, by the intro's length: a 2 s
+ *  (60-frame) 1080p still-opener / cover-opener took 17-18 s on ks-aw-01 with remotion-service's ANGLE renderer (R5,
+ *  2026-11-20; it was 160 s before, so every automatic intro timed out at the old 45 s) -> 40 s per 60 frames. Longer
+ *  automatic templates (5 s, 10 s) are NOT measured: scaled by frames from that, within 40-120 s (the cap: the step runs
+ *  in the topic's start, which should not stall for minutes). Slower = the video goes out without one, with the note.
+ *  Keep in step with remotion-service src/render-job.ts RENDER_GL's measurements. */
+export const introBudgetMs = (frames: number) => Math.min(120_000, Math.max(40_000, Math.round((frames * 40_000) / 60)));
+/** The budget of a 2 s opener (the measured case). */
+export const INTRO_BUDGET_MS = introBudgetMs(60);
 const POLL_MS = 2_000;
 const FPS = 30;
 const SIZES: Record<string, [number, number]> = { "16x9": [1920, 1080], "9x16": [1080, 1920], "4x5": [1080, 1350] };
@@ -83,10 +90,10 @@ async function render(template: (typeof INTRO_TEMPLATES)[number] | undefined, pi
   const size = SIZES[v.format], image = template?.fields.find((f) => f.type === "image" && f.required);
   if (!template || !image) return { note: "片頭樣式不存在，沒有加片頭" };
   if (!size) return { note: `片頭不支援 ${v.format} 比例，沒有加片頭` };
-  const until = deps.now() + INTRO_BUDGET_MS;
+  const seconds = template.autoSeconds ?? template.seconds.def;   // the shortest length that still shows the whole title
+  const budget = introBudgetMs(seconds * FPS), until = deps.now() + budget;
   try {
-    const picture = await deps.picture(pictureUrl, size[0], size[1], AbortSignal.timeout(INTRO_BUDGET_MS), ...(opts ? [opts] : []));
-    const seconds = template.autoSeconds ?? template.seconds.def;   // the shortest length that still shows the whole title
+    const picture = await deps.picture(pictureUrl, size[0], size[1], AbortSignal.timeout(budget), ...(opts ? [opts] : []));
     const sent = await deps.submit(template.id, { [image.key]: picture, ...(text ? { [text.key]: text.text } : {}) },
       { outputFormat: v.format as "16x9", fps: FPS, durationInFrames: seconds * FPS });
     if (!sent.ok) return { note: `片頭沒有做成（${(sent as { error: string }).error}），影片照樣出，沒有片頭` };
@@ -99,7 +106,7 @@ async function render(template: (typeof INTRO_TEMPLATES)[number] | undefined, pi
       }
       if (p.status === "error") return { note: `片頭沒有做成（${p.error}），影片照樣出，沒有片頭` };
     }
-    return { note: `片頭 ${Math.round(INTRO_BUDGET_MS / 1000)} 秒內沒有做好，影片照樣出，沒有片頭` };
+    return { note: `片頭 ${Math.round(budget / 1000)} 秒內沒有做好，影片照樣出，沒有片頭` };
   } catch (e) {
     return { note: `片頭沒有做成（${e instanceof Error ? e.message : String(e)}），影片照樣出，沒有片頭` };
   }

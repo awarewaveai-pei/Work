@@ -13,7 +13,11 @@ const browser = { close: async () => {} };
 const sameBrowser = (opts, step) => { if (opts.puppeteerInstance !== browser) throw new Error(step + " did not reuse the job's browser"); };
 const fake = {
   makeCancelSignal: () => ({ cancelSignal: () => {}, cancel: () => {} }), // "hang" ignores cancel -> grace SIGKILL
-  openBrowser: async () => { if (++opened > 1) throw new Error("a second browser in one job"); return browser; },
+  openBrowser: async (kind, opts) => {
+    if (++opened > 1) throw new Error("a second browser in one job");
+    if (opts?.chromiumOptions?.gl !== "angle") throw new Error("browser opened with gl " + opts?.chromiumOptions?.gl + ", not angle");
+    return browser;
+  },
   selectComposition: async (opts) => (sameBrowser(opts, "selectComposition"), { id: "X", durationInFrames: 30, fps: 30, width: 1920, height: 1080 }),
   renderMedia: async (opts) => {
     sameBrowser(opts, "renderMedia");

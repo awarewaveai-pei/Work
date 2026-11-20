@@ -1,13 +1,16 @@
 // Card R2: the intro style previews (next-admin public/editor-shared/intro-styles/<id>.jpg), made once on a laptop and
 // shipped as files -- never rendered on a page. One frame per template at 16:9 with a fixed demo title and demo pictures.
 //   node scripts/render-intro-previews.mjs <out dir> <browser exe> <picture.jpg> [<picture 2> <picture 3>]
-// (browser = a local Chrome/Edge; gl swangle like the service). The title card (video-service's own black card) is not a
+// (browser = a local Chrome/Edge; the service's GL renderer, dist/render-job.js RENDER_GL -- npm run build first). The title card (video-service's own black card) is not a
 // remotion template: its preview is a frame of pipeline._render_intro_scene, made with the service's code.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { bundle } from "@remotion/bundler";
 import { renderStill, selectComposition } from "@remotion/renderer";
+import renderJob from "../dist/render-job.js";
+const { RENDER_GL } = renderJob;
+if (!RENDER_GL) throw new Error("dist/render-job.js has no RENDER_GL: npm run build first");
 
 const [outDir, browserExecutable, ...pictureFiles] = process.argv.slice(2);
 if (!outDir || !browserExecutable || !pictureFiles.length) throw new Error("usage: <out dir> <browser exe> <picture.jpg> [more]");
@@ -34,9 +37,9 @@ for (const t of INTRO_TEMPLATES) {
   }
   const fps = 30, durationInFrames = t.seconds.def * fps;
   const inputProps = { ...props, durationInFrames, fps, width: 1920, height: 1080 };
-  const composition = await selectComposition({ serveUrl, id: TEMPLATE_MAP[t.id], inputProps, browserExecutable, chromiumOptions: { gl: "swangle" } });
+  const composition = await selectComposition({ serveUrl, id: TEMPLATE_MAP[t.id], inputProps, browserExecutable, chromiumOptions: { gl: RENDER_GL } });
   const started = Date.now();
   await renderStill({ composition, serveUrl, inputProps, frame: Math.min(durationInFrames - 1, Math.round((durationInFrames - 1) * AT[t.id])),
-    output: path.join(outDir, t.id + ".jpg"), imageFormat: "jpeg", jpegQuality: 80, scale: 1 / 3, overwrite: true, browserExecutable, chromiumOptions: { gl: "swangle" } });
+    output: path.join(outDir, t.id + ".jpg"), imageFormat: "jpeg", jpegQuality: 80, scale: 1 / 3, overwrite: true, browserExecutable, chromiumOptions: { gl: RENDER_GL } });
   console.log(`${t.id}.jpg ${Date.now() - started} ms`);
 }

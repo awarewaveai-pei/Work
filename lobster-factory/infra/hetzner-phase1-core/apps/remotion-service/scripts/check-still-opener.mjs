@@ -11,6 +11,9 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { bundle } from "@remotion/bundler";
 import { renderStill, selectComposition } from "@remotion/renderer";
+import renderJob from "../dist/render-job.js";   // RENDER_GL: the renderer production uses (npm run build first)
+const { RENDER_GL } = renderJob;
+if (!RENDER_GL) throw new Error("dist/render-job.js has no RENDER_GL: npm run build first");
 
 const [browserExecutable, ...cards] = process.argv.slice(2);
 if (!browserExecutable || !cards.length) throw new Error("usage: <browser exe> <card.png> [more]");
@@ -27,9 +30,9 @@ for (const card of cards) {
     const picture = await sharp(fs.readFileSync(card)).resize(W, H, { fit: "inside" }).jpeg({ quality: 82 }).toBuffer();
     const { width: pw, height: ph } = await sharp(picture).metadata();
     const inputProps = { backgroundUrl: "data:image/jpeg;base64," + picture.toString("base64"), durationInFrames: 60, fps: 30, width: W, height: H };
-    const composition = await selectComposition({ serveUrl, id: "StillOpener", inputProps, browserExecutable, chromiumOptions: { gl: "swangle" } });
+    const composition = await selectComposition({ serveUrl, id: "StillOpener", inputProps, browserExecutable, chromiumOptions: { gl: RENDER_GL } });
     const out = path.join(os.tmpdir(), `still-opener-check-${format}.png`);
-    await renderStill({ composition, serveUrl, inputProps, frame: 59, output: out, imageFormat: "png", overwrite: true, browserExecutable, chromiumOptions: { gl: "swangle" } });
+    await renderStill({ composition, serveUrl, inputProps, frame: 59, output: out, imageFormat: "png", overwrite: true, browserExecutable, chromiumOptions: { gl: RENDER_GL } });
     const s = Math.min(W / pw, H / ph), w = Math.round(pw * s), h = Math.round(ph * s), left = Math.round((W - w) / 2), top = Math.round((H - h) / 2);   // a half-pixel margin: the browser rounds up
     const a = await raw(await sharp(out).extract({ left, top, width: w, height: h }).toBuffer(), w, h), b = await raw(picture, w, h);
     let se = 0;
@@ -46,9 +49,9 @@ for (const [format, [W, H]] of Object.entries(FORMATS)) {
   const frames = {};
   for (const [id, n] of [["Cover", 1], ["CoverOpener", 60]]) {
     const inputProps = { backgroundUrl: "data:image/jpeg;base64," + picture.toString("base64"), title: "為什麼你總是睡不好", durationInFrames: n, fps: 30, width: W, height: H };
-    const composition = await selectComposition({ serveUrl, id, inputProps, browserExecutable, chromiumOptions: { gl: "swangle" } });
+    const composition = await selectComposition({ serveUrl, id, inputProps, browserExecutable, chromiumOptions: { gl: RENDER_GL } });
     frames[id] = path.join(os.tmpdir(), `cover-check-${id}-${format}.png`);
-    await renderStill({ composition, serveUrl, inputProps, frame: n - 1, output: frames[id], imageFormat: "png", overwrite: true, browserExecutable, chromiumOptions: { gl: "swangle" } });
+    await renderStill({ composition, serveUrl, inputProps, frame: n - 1, output: frames[id], imageFormat: "png", overwrite: true, browserExecutable, chromiumOptions: { gl: RENDER_GL } });
   }
   const a = await raw(fs.readFileSync(frames.CoverOpener), W, H), b = await raw(fs.readFileSync(frames.Cover), W, H);
   let se = 0;
