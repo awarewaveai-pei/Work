@@ -6,7 +6,7 @@
 // Invariant: an intro never stops a video -- every failure (no service, timeout, a picture that is not a still) is
 // { note } and the video is sent without one.
 import { autoFill, INTRO_TEMPLATES } from "../../../public/editor-shared/intro-styles.js";
-import { pollRemotion, submitRemotion } from "./remotion-client";
+import { cancelRemotion, pollRemotion, submitRemotion } from "./remotion-client";
 import { isPublicBucketAsset } from "@/lib/storage/r2";
 import type { RenderBookends } from "./render-client";
 import Transitions from "../../../public/editor-shared/transitions.js";
@@ -18,14 +18,17 @@ export interface IntroResult { bookends?: RenderBookends; note?: string }
  *  (card R2 item 11); a title card is 3 s (video-service's own default). */
 const joinOf = (transition: string | undefined) => ({ transition: Transitions.wire(transition ?? Transitions.AUTO.id) ?? Transitions.wire(Transitions.AUTO.id), transitionSeconds: Transitions.AUTO.seconds });
 export const TITLE_CARD_SECONDS = 3;
-/** The whole intro step (picture + render + polls) gets about twice the measured render, by the intro's length: a 2 s
- *  (60-frame) 1080p still-opener / cover-opener took 17-18 s on ks-aw-01 with remotion-service's ANGLE renderer (R5,
- *  2026-11-20; it was 160 s before, so every automatic intro timed out at the old 45 s) -> 40 s per 60 frames. Longer
- *  automatic templates (5 s, 10 s) are NOT measured: scaled by frames from that, within 40-120 s (the cap: the step runs
- *  in the topic's start, which should not stall for minutes). Slower = the video goes out without one, with the note.
- *  Keep in step with remotion-service src/render-job.ts RENDER_GL's measurements. */
-export const introBudgetMs = (frames: number) => Math.min(120_000, Math.max(40_000, Math.round((frames * 40_000) / 60)));
-/** The budget of a 2 s opener (the measured case). */
+const FPS_FOR_BUDGET = 30;
+/** The whole intro step (picture + render + polls) gets about twice the measured render: 20 s + 10 s per second of
+ *  intro, at least 40 s, at most 10 min (video-workbench backend/remotion.cjs transport's limit). Measured on ks-aw-01
+ *  (R5 image, 2026-11-20, --cpus=2 --memory=1g, ANGLE, 1080p30), render time by intro length: still-opener 2 s -> 16 s,
+ *  5 s -> 36 s; cover-opener 2 s -> 18 s, 5 s -> 39 s; scale-bg-text-slideup 5 s -> 35 s, 30 s -> 155 s;
+ *  circle-mask-text-slideup-reveal 20 s -> 108 s, 30 s -> 153 s; pan-slide 20 s -> 126 s, 30 s -> 183 s;
+ *  product-review-typewriter 10 s -> 101 s, 30 s -> 289 s; photo-highlights 22 s -> 120 s, 30 s -> 157 s. So a 2 s intro
+ *  gets 40 s (2.2x), 5 s 70 s (1.8-2x), 10 s 120 s, 20 s 220 s (2x the 108 s). Slower = the render is cancelled (DELETE)
+ *  and the video goes out without one, with the note. (A 2 s opener took 160 s before R5.) */
+export const introBudgetMs = (frames: number) => Math.min(600_000, Math.max(40_000, Math.round(20_000 + (frames / FPS_FOR_BUDGET) * 10_000)));
+/** The budget of a 2 s opener. */
 export const INTRO_BUDGET_MS = introBudgetMs(60);
 const POLL_MS = 2_000;
 const FPS = 30;
@@ -35,6 +38,8 @@ const MAX_PICTURE_BYTES = 15 * 1024 * 1024;
 export interface IntroDeps {
   submit: typeof submitRemotion;
   poll: typeof pollRemotion;
+  /** Card R5: the render given up on (budget passed, or this step failed after submitting) -- never throws. */
+  cancel: typeof cancelRemotion;
   /** The picture as a JPEG data: URI at w x h (cover-fit), or with whole within w x h keeping its shape (a banner card:
    *  the composition fits it whole); throws when it is not a still picture. what = its name in errors. */
   picture: (url: string, w: number, h: number, signal: AbortSignal, opts?: { what?: string; whole?: boolean }) => Promise<string>;
@@ -55,7 +60,7 @@ async function pictureDataUri(url: string, w: number, h: number, signal: AbortSi
 }
 
 const realDeps: IntroDeps = {
-  submit: submitRemotion, poll: pollRemotion, picture: pictureDataUri,
+  submit: submitRemotion, poll: pollRemotion, cancel: cancelRemotion, picture: pictureDataUri,
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)), now: () => Date.now(),
 };
 
@@ -92,22 +97,37 @@ async function render(template: (typeof INTRO_TEMPLATES)[number] | undefined, pi
   if (!size) return { note: `片頭不支援 ${v.format} 比例，沒有加片頭` };
   const seconds = template.autoSeconds ?? template.seconds.def;   // the shortest length that still shows the whole title
   const budget = introBudgetMs(seconds * FPS), until = deps.now() + budget;
+  let jobId: string | null = null;   // submitted and not yet collected: cancelled if this step gives up
   try {
     const picture = await deps.picture(pictureUrl, size[0], size[1], AbortSignal.timeout(budget), ...(opts ? [opts] : []));
     const sent = await deps.submit(template.id, { [image.key]: picture, ...(text ? { [text.key]: text.text } : {}) },
       { outputFormat: v.format as "16x9", fps: FPS, durationInFrames: seconds * FPS });
     if (!sent.ok) return { note: `片頭沒有做成（${(sent as { error: string }).error}），影片照樣出，沒有片頭` };
+    jobId = sent.jobId;
     while (deps.now() < until) {
       await deps.sleep(POLL_MS);
       const p = await deps.poll(sent.jobId);
       if (p.status === "done") {
+        jobId = null;
         if (!/^https:\/\//.test(p.url)) return { note: "片頭做好了但沒有可用的網址，影片照樣出，沒有片頭" };
         return { bookends: { intro: { assetUrl: p.url }, ...joinOf(v.transition) } };
       }
-      if (p.status === "error") return { note: `片頭沒有做成（${p.error}），影片照樣出，沒有片頭` };
+      if (p.status === "error") {
+        jobId = null;
+        return { note: `片頭沒有做成（${p.error}），影片照樣出，沒有片頭` };
+      }
     }
-    return { note: `片頭 ${Math.round(budget / 1000)} 秒內沒有做好，影片照樣出，沒有片頭` };
+    // the budget passed: cancel now and say what happened; a render that finished meanwhile is used after all
+    const ended = await deps.cancel(sent.jobId);
+    jobId = null;
+    if (ended === "done") {
+      const p = await deps.poll(sent.jobId);
+      if (p.status === "done" && /^https:\/\//.test(p.url)) return { bookends: { intro: { assetUrl: p.url }, ...joinOf(v.transition) } };
+    }
+    return { note: `片頭 ${Math.round(budget / 1000)} 秒內沒有做好，${ended === "cancelled" ? "已取消渲染" : "取消渲染沒有確認"}，影片照樣出，沒有片頭` };
   } catch (e) {
     return { note: `片頭沒有做成（${e instanceof Error ? e.message : String(e)}），影片照樣出，沒有片頭` };
+  } finally {
+    if (jobId) await deps.cancel(jobId);
   }
 }

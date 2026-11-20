@@ -71,9 +71,12 @@ export class JobStore {
     if (job && job.status === "rendering") job.progress = progress;
   }
 
+  /** R5: an ended job (done / error / cancelled) never changes again -- a late writer (an upload that finished after the
+   *  caller cancelled) is ignored, so a cancelled job stays cancelled and a repeat DELETE answers the same. */
   update(id: string, patch: Partial<Omit<RenderJob, "createdAt">>): void {
     const job = this.jobs.get(id);
     if (!job) return;
+    if (job.status === "done" || job.status === "error" || job.status === "cancelled") return;
     Object.assign(job, patch);
     this.persist();
   }

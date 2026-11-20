@@ -60,8 +60,32 @@ export async function pollRemotion(jobId: string): Promise<RemotionPoll> {
       return { status: "done", url: body.url };
     }
     if (body.status === "error") return { status: "error", error: body.error ?? "渲染失敗" };
+    if (body.status === "cancelled") return { status: "error", error: "渲染已取消" };   // R5: never polled forever
     return { status: "rendering" };
   } catch {
     return { status: "rendering" }; // transient network error — caller retries
+  }
+}
+
+/**
+ * Card R5: DELETE /render/:jobId -- a caller that gives up (its time limit) cancels, so remotion-service's one-at-a-time
+ * queue is not held by a render nobody collects. Never throws: a failed cancel is logged and answered null, the caller's
+ * own outcome stands (the service ends the job anyway at its own limit). -> the job's status after the call ("cancelled",
+ * or "done" / "error" when it had already ended), null = not known.
+ */
+export async function cancelRemotion(jobId: string): Promise<string | null> {
+  const auth = resolveRendererAuth("remotion");
+  if (auth.ok === false) return null;
+  try {
+    const r = await fetch(`${svcBase()}/render/${encodeURIComponent(jobId)}`, { method: "DELETE", headers: auth.headers, signal: AbortSignal.timeout(10_000) });
+    if (!r.ok) {
+      if (r.status !== 404) console.warn(`[remotion] cancel ${jobId}: HTTP ${r.status}`);
+      return null;
+    }
+    const body = (await r.json().catch(() => ({}))) as { status?: unknown };
+    return typeof body.status === "string" ? body.status : null;
+  } catch (e) {
+    console.warn(`[remotion] cancel ${jobId} failed: ${e instanceof Error ? e.message : String(e)}`);
+    return null;
   }
 }

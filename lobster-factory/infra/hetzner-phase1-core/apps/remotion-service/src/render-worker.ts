@@ -30,14 +30,23 @@ process.on("unhandledRejection", (err) => void fail(err));
 // Parent gone: nobody will read the result.
 process.on("disconnect", () => process.exit(1));
 
+// R5: a cancel (the time limit, or the caller's DELETE) can arrive before Remotion is even loaded: it is noted from the
+// first moment and applied as soon as the job's cancel signal exists -- a lost one left a Chromium the parent cannot kill.
+let cancelRequested = false;
+let cancelNow: (() => void) | null = null;
+process.on("message", (m: { type?: string }) => {
+  if (!m || m.type !== "cancel") return;
+  cancelRequested = true;
+  cancelNow?.();
+});
+
 async function render(req: WorkerRequest): Promise<void> {
   const { makeCancelSignal } = await import("@remotion/renderer");
-  // The parent asks for a cancel at its time limit; the job then closes its Chromium (render-job.ts owns the browser,
-  // which puppeteer starts in a separate process group the parent cannot kill as a tree).
+  // The parent asks for a cancel at its time limit or on the caller's DELETE; the job then closes its Chromium
+  // (render-job.ts owns the browser, which puppeteer starts in a separate process group the parent cannot kill as a tree).
   const { cancelSignal, cancel } = makeCancelSignal();
-  process.on("message", (m: { type?: string }) => {
-    if (m && m.type === "cancel") cancel();
-  });
+  cancelNow = cancel;
+  if (cancelRequested) throw new Error("cancelled before the render started");
   // render-job.ts: one browser for the whole job, the steps profile-opener.mjs times
   const timings = await runRenderJob(req, { cancelSignal, onProgress: (progress) => void send({ type: "progress", progress }) });
   console.log("[remotion-worker] timings", JSON.stringify(timings));

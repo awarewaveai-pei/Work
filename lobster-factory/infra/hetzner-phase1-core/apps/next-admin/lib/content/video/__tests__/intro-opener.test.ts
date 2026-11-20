@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { INTRO_STYLES, INTRO_TEMPLATES, autoIntroStyles, introPlanFor, introStyleFor } from "@/public/editor-shared/intro-styles.js";
 import { siteIntroCards, siteIntroStyles, siteIntroTransition } from "@/lib/content/brand-voice";
-import { INTRO_BUDGET_MS, makeIntro, type IntroDeps } from "../intro-opener";
+import { INTRO_BUDGET_MS, introBudgetMs, makeIntro, type IntroDeps } from "../intro-opener";
 import { getDesignsPublicBase } from "@/lib/storage/r2";
 
 const style = (id: string) => INTRO_STYLES.find((s) => s.id === id)!;
@@ -12,6 +12,7 @@ const deps = (over: Partial<IntroDeps> = {}): IntroDeps => {
   return {
     submit: vi.fn(async () => ({ ok: true as const, jobId: "rs1" })),
     poll: vi.fn(async () => ({ status: "done" as const, url: "https://r2.example/rs1.mp4" })),
+    cancel: vi.fn(async () => "cancelled"),
     picture: vi.fn(async () => "data:image/jpeg;base64,AAAA"),
     sleep: async (ms) => { t += ms; },
     now: () => t,
@@ -103,6 +104,20 @@ describe("makeIntro", () => {
     }
     expect((await makeIntro(style("cover-opener"), { ...video, firstPicture: undefined }, deps())).note).toMatch(/沒有第一個鏡頭/);
     expect(await makeIntro(null, video, deps())).toEqual({});
+  });
+
+  // card R5 named test: a render given up on is cancelled, so remotion-service's one-at-a-time queue moves on
+  it("past its budget the intro cancels the render it submitted (DELETE), and a finished or failed one is not cancelled", async () => {
+    const slow = deps({ poll: vi.fn(async () => ({ status: "rendering" as const })) });
+    const r = await makeIntro(style("cover-opener"), video, slow);
+    expect(r.note).toMatch(/已取消渲染/);
+    expect(slow.cancel).toHaveBeenCalledWith("rs1");
+    for (const over of [{}, { poll: vi.fn(async () => ({ status: "error" as const, error: "x" })) }]) {
+      const d = deps(over);
+      await makeIntro(style("cover-opener"), video, d);
+      expect(d.cancel).not.toHaveBeenCalled();
+    }
+    expect([60, 150, 300, 600].map((f) => introBudgetMs(f) / 1000)).toEqual([40, 70, 120, 220]);
   });
 
   // card R3 named test: a design deleted since the site chose it skips that turn with the reason; the video goes on

@@ -127,6 +127,16 @@ async function coverStill(cover, { env, appDir, fetchImpl, signal, pollMs }) {
   return transport(coverRequest(cover), { env, appDir, fetchImpl, signal, pollMs, maxBytes: COVER_MAX_DOWNLOAD, noun: "封面", fileWord: "圖片" });
 }
 
+// Card R5: DELETE /render/:jobId with its own short limit (the job's signal may already be aborted). Never throws.
+async function cancelRemote(base, headers, jobId, fetchImpl) {
+  try {
+    const r = await fetchImpl(base + "/render/" + encodeURIComponent(jobId), { method: "DELETE", headers, signal: AbortSignal.timeout(10000) });
+    if (!r.ok && r.status !== 404) console.warn("[remotion] cancel " + jobId + ": HTTP " + r.status);
+  } catch (e) {
+    console.warn("[remotion] cancel " + jobId + " failed: " + (e && e.message));
+  }
+}
+
 // POST /render, poll /status, download the result. `noun` names the thing in every error ("片頭" / "封面").
 async function transport(body, { env, appDir, fetchImpl, signal, onRemoteJob = () => {}, pollMs = POLL_MS, maxBytes = MAX_DOWNLOAD, noun = "片頭", fileWord = "影片" }) {
   const auth = await resolveAuth(env, appDir),
@@ -150,6 +160,7 @@ async function transport(body, { env, appDir, fetchImpl, signal, onRemoteJob = (
   onRemoteJob(reply.jobId);
   const deadline = Date.now() + POLL_LIMIT_MS;
   let url;
+  try {
   for (;;) {
     await sleep(pollMs, signal);
     if (Date.now() > deadline) throw fail(noun + "模板渲染逾時（超過 10 分鐘）");
@@ -163,11 +174,18 @@ async function transport(body, { env, appDir, fetchImpl, signal, onRemoteJob = (
       continue; // transient network error: poll again, as pollRemotion does
     }
     if (status.status === "error") throw fail(noun + "模板渲染失敗：" + String(status.error || "未知原因").slice(0, 200));
+    if (status.status === "cancelled") throw fail(noun + "模板渲染已取消");
     if (status.status === "done") {
       if (typeof status.url !== "string" || !/^https:\/\//.test(status.url)) throw fail(noun + "模板渲染完成，但沒有可下載的網址");
       url = status.url;
       break;
     }
+  }
+  } catch (e) {
+    // Card R5: given up while it still renders (the 10-minute limit, or the job was stopped): cancel it so the service's
+    // one-at-a-time queue moves on. A failed cancel is only logged; this error stands.
+    if (signal.aborted || Date.now() > deadline) await cancelRemote(base, auth.headers, reply.jobId, fetchImpl);
+    throw e;
   }
   let file;
   try {

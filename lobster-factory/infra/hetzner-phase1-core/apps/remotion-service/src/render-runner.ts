@@ -1,6 +1,6 @@
 /**
  * Runs render jobs one at a time, each in a forked render-worker process.
- * Invariant: every job taken in ends "done" or "error" with a reason; nothing a render does
+ * Invariant: every job taken in ends "done", "error" with a reason, or "cancelled"; nothing a render does
  * can end this (the HTTP) process. One at a time because the container (1 GiB) holds one
  * Chromium + ffmpeg at most.
  */
@@ -162,7 +162,7 @@ export class RenderRunner {
         return;
       }
       const url = await this.deps.upload(outFile, jobId, kind);
-      store.update(jobId, { status: "done", progress: 100, url });
+      store.update(jobId, { status: "done", progress: 100, url });   // a cancel during the upload wins (JobStore.update)
       console.log(`[remotion] job ${jobId} done → ${url}`);
     } catch (err) {
       console.error(`[remotion] job ${jobId} error:`, err);
@@ -205,6 +205,7 @@ export class RenderRunner {
       const finish = (code: number | null, signal: NodeJS.Signals | null) => {
         if (settled) return;
         settled = true;
+        if (this.current?.jobId === jobId) this.current.stop = null;   // nothing left to stop (no stale kill timer)
         clearTimeout(timer);
         if (graceTimer) clearTimeout(graceTimer);
         killTree(); // reap any orphaned Chromium/ffmpeg left in the group
