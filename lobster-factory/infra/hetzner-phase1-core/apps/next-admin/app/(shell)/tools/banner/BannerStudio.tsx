@@ -1044,6 +1044,8 @@ export interface BannerStaffApi {
   scriptForge(task: "design" | "copy", fields: Record<string, unknown>): Promise<Response>;
   /** The brand picker (a client search over GET /api/ops/clients): onPick gets the picked client's brand colours. */
   BrandPicker: ComponentType<{ onPick(colors: string[]): void }>;
+  /** Card R3: which client's 我的設計 存到圖庫 saves into (staff work for a customer); null = 自用 (the default org). */
+  SaveOrgPicker: ComponentType<{ selected: string | null; onPick(orgId: string | null): void }>;
 }
 
 export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
@@ -1107,11 +1109,11 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   // Card R3: opened from the video editor or a site's intro setting (/tools/banner?ratio=16:9&title=...&template=opener-center
   // &org=<uuid>): that video's shape, its title as the headline, the opener layout, and the organization 存到我的設計 saves
   // into (staff work for a customer; the designs route checks access). Read once; unknown values are ignored.
-  const saveOrgRef = useRef<string | undefined>(undefined);
+  const [saveOrg, setSaveOrg] = useState<string | null>(null);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const org = q.get("org") ?? "";
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(org)) saveOrgRef.current = org;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(org)) setSaveOrg(org);
     const preset = RATIO_PRESET[q.get("ratio") ?? ""], title = (q.get("title") ?? "").trim().slice(0, 80);
     const t = TEMPLATES.find((x) => x.group === "opener" && x.key === q.get("template"));
     if (!preset && !title && !t) return;
@@ -1354,7 +1356,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
         prompt:    s.headline || (s.bgMode === "ai" ? effectiveBgPrompt : undefined) || undefined,
         modelName: s.bgMode === "ai" ? s.aiBgModel : undefined,
         subject:   s.preset,
-      }, { organizationId: saveOrgRef.current });
+      }, { organizationId: saveOrg ?? undefined });
       if (!res.ok) throw new Error((res as { ok: false; error: string }).error);
       setS((prev) => ({ ...prev, saving: false, saved: true }));
     } catch (err) {
@@ -2153,6 +2155,13 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
           {/* Export */}
           <div className="card" style={{ order: 9 }}>
             <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 5 · 匯出</h2>
+            {/* card R3: staff choose whose 我的設計 it goes to (opened from a customer's video or site = that customer) */}
+            {staff && (
+              <div className="form-row" style={{ marginBottom: 12 }}>
+                <label className="form-label">存到哪個客戶的我的設計</label>
+                <staff.SaveOrgPicker selected={saveOrg} onPick={(id) => { setSaveOrg(id); setS((prev) => ({ ...prev, saved: false })); }} />
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="btn btn-primary" onClick={handleSave}
                 disabled={s.saving || s.generating || s.productRemoving}>

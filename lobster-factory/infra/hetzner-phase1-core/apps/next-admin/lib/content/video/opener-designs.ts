@@ -3,7 +3,7 @@
 // never found by id (the ownership guard; app/api/internal/video/workbench/designs and the site setting use these).
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export interface OpenerDesign { id: string; url: string; name: string; source: string; createdAt: string }
+export interface OpenerDesign { id: string; url: string; name: string; source: string; createdAt: string; width?: number; height?: number }
 const COLUMNS = "id, object_url, mime_type, created_at, metadata";
 export const DESIGNS_LIMIT = 60;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -11,7 +11,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type Row = { id: string; object_url: string | null; mime_type: string | null; created_at: string | null; metadata: Record<string, unknown> | null };
 const toDesign = (r: Row): OpenerDesign | null =>
   r.object_url && String(r.mime_type ?? "").startsWith("image/") && r.metadata?.source
-    ? { id: r.id, url: r.object_url, name: String(r.metadata.prompt || r.metadata.card_name || r.metadata.subject || r.metadata.source).slice(0, 60), source: String(r.metadata.source), createdAt: String(r.created_at ?? "") }
+    ? { id: r.id, url: r.object_url, name: String(r.metadata.prompt || r.metadata.card_name || r.metadata.subject || r.metadata.source).slice(0, 60), source: String(r.metadata.source), createdAt: String(r.created_at ?? ""),
+        ...(Number(r.metadata.width) > 0 && Number(r.metadata.height) > 0 ? { width: Number(r.metadata.width), height: Number(r.metadata.height) } : {}) }
     : null;
 
 // The rows 我的設計 shows (lib/studio/designs-list.ts applyFilters: our storage, made in the tools, the current version, not

@@ -217,47 +217,11 @@ function edTitleBookend(p) {
     references: Object.fromEntries(Object.entries(ed.title.picks).filter(([, a]) => !a.cover).map(([k, a]) => [k, { url: a.url, ...(a.id ? { id: a.id } : {}) }])),
     seconds: edTitleSeconds(t), transition: ed.title.transition ?? old?.transition ?? Transitions.AUTO.id, transitionSeconds: old?.transitionSeconds ?? 0.5 });
 }
-// Card R3: the 橫幅字卡 opener's picture -- a card from 我的設計 (backend GET /designs = this organization's only). A design
-// of another shape than the project is cut to it (cover, never stretched): its card says 會裁切. 開橫幅工具做一張 opens
-// the banner tool in a new tab in the project's ratio with the episode's title and an opener layout; after 存到我的設計
-// a 重新整理 here lists it (no live return between the windows).
+// Card R3: the 橫幅字卡 opener's picture -- a card from 我的設計, drawn and picked through shared/design-picker.js (the
+// 編輯片頭 dialog uses the same). After 存到我的設計 in the banner tool, 重新整理 here lists it (no live return).
 function edTitleDesigns(p, f) {
-  const picked = ed.title.picks[f.key],
-    list = ed.title.designs;
-  return `<p class="note">${esc(f.label)}（從我的設計挑；字卡上的字就是片頭的字，不另加標題）</p>${picked ? `<img class="ed-intro-cover" src="${esc(picked.url)}" alt="${esc(picked.name || "設計")}">` : ""}<div class="flow-choices" role="group" aria-label="橫幅字卡來源"><button type="button" class="btn small" data-ed-action="title-designs">${list ? "重新整理我的設計" : "從我的設計挑"}</button><button type="button" class="btn small" data-ed-action="title-banner">開橫幅工具做一張</button></div>${
-    !list ? "" : list.error ? `<p class="note">${esc(list.error)}</p>` : !list.items.length ? '<p class="note">我的設計還沒有圖片，先用「開橫幅工具做一張」，存到我的設計後回來按「重新整理我的設計」。</p>'
-      : `<div class="ed-intro-grid" role="group" aria-label="我的設計">${list.items.map((d) => {
-          const on = picked?.id === d.id, crop = edDesignCrops(d, p.ratio);
-          return `<button type="button" class="ed-intro-card ${on ? "selected" : ""}" data-ed-action="title-design:${esc(d.id)}" aria-pressed="${on}"><img src="${esc(d.url)}" alt="" loading="lazy"><span>${esc(d.name)}</span>${crop ? "<small>會裁切</small>" : ""}</button>`;
-        }).join("")}</div>`
-  }`;
-}
-// The banner tool for this project: its ratio, the episode's title, the centred opener layout (BannerStudio.tsx reads them).
-function edBannerUrl(p) {
-  const hit = edSpineHit(p), title = hit?.episode?.name?.trim() || hit?.project?.title || p.title || "";
-  const org = VideoWorkbench.capabilities?.mainSystem?.organizationId;
-  return "/tools/banner?" + new URLSearchParams({ ratio: p.ratio, title, template: "opener-center", ...(org ? { org } : {}) });
-}
-// A design's shape against the project's ratio ("16:9"); unknown size = not marked.
-function edDesignCrops(d, ratio) {
-  const [w, h] = String(ratio).split(":").map(Number);
-  return d.width > 0 && d.height > 0 && w > 0 && h > 0 && Math.abs(d.width / d.height / (w / h) - 1) > 0.02;
-}
-// The designs with their picture sizes (read from the pictures themselves; one that does not load keeps no size).
-async function edLoadDesigns() {
-  try {
-    const { designs } = await VideoWorkbench.request("/designs", undefined, "GET");
-    const items = await Promise.all((designs || []).map((d) => new Promise((done) => {
-      const img = new Image();
-      img.onload = () => done({ ...d, width: img.naturalWidth, height: img.naturalHeight });
-      img.onerror = () => done(d);
-      img.src = d.url;
-    })));
-    ed.title.designs = { items };
-  } catch (e) {
-    ed.title.designs = { items: [], error: e.message || "讀不到我的設計" };
-  }
-  if (tool === "edit" && ed.pane === "文字") edRender();
+  return DesignPicker.html({ label: f.label, list: ed.title.designs, picked: ed.title.picks[f.key], ratio: p.ratio, esc,
+    attrs: { load: 'data-ed-action="title-designs"', banner: 'data-ed-action="title-banner"', pick: (id) => `data-ed-action="title-design:${esc(id)}"` } });
 }
 // ---- ED.5: 樣板／純文字／品牌字型 ----
 // Template looks are made of theme tokens only: the preview card paints them with var(--token), and a clip gets the
@@ -446,18 +410,20 @@ edRegisterPane("text", {
     },
     // Card R3: 從我的設計挑 / 重新整理我的設計, and picking one (downloaded here by the backend: POST /designs/use).
     "title-banner": async (action, p) => {
-      window.open(edBannerUrl(p), "_blank", "noopener");
+      const hit = edSpineHit(p);
+      window.open(DesignPicker.bannerUrl(VideoWorkbench, p.ratio, hit?.episode?.name?.trim() || hit?.project?.title || p.title), "_blank", "noopener");
     },
     "title-designs": async () => {
       ed.title.designs = null;
-      await edLoadDesigns();
+      ed.title.designs = await DesignPicker.load(VideoWorkbench);
+      if (tool === "edit" && ed.pane === "文字") edRender();
     },
     "title-design:": async (action, p) => {
       const id = action.slice(13), t = edTitleTemplate(), field = t?.still && t.fields.find((f) => f.type === "image");
       if (!field || !(ed.title.designs?.items || []).some((d) => d.id === id)) return;
-      const got = await VideoWorkbench.request("/designs/use", { id, ratio: p.ratio });
+      const got = await DesignPicker.use(VideoWorkbench, id, p.ratio);
       if (ed.title.projectId !== p.id) return;
-      ed.title.picks[field.key] = { id: got.id, url: got.url, name: got.name };
+      ed.title.picks[field.key] = got;
       edRender();
     },
     // title-pick:<field key>:<asset id>; an empty id clears an optional field.

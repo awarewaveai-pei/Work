@@ -34,6 +34,7 @@ const tests = [
   "cover-ai-api",
   "r1-cover-template",
   "r2-intro-picker",
+  "r3-design-picker",
   "r2-transitions-one-list",
   "r4-transitions-table",
   "auth-redirect",

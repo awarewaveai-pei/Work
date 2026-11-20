@@ -87,7 +87,7 @@ export default function IntroStyleButtons({ site, onSaved }: { site: ManagedSite
                       <img src={d.url} alt="" loading="lazy" style={{ ...picture, objectFit: "contain" }}
                         onLoad={(e) => { const i = e.currentTarget; setShapes((s) => ({ ...s, [d.id]: crops(i.naturalWidth, i.naturalHeight) })); }} />
                       <span>{d.name}</span>
-                      {shapes[d.id] && <span style={{ color: "var(--text-muted)", fontSize: 11 }}>會裁切</span>}
+                      {(d.width && d.height ? crops(d.width, d.height) : shapes[d.id]) && <span style={{ color: "var(--text-muted)", fontSize: 11 }}>會裁切</span>}
                     </button>
                   );
                 })}

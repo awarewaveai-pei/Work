@@ -327,9 +327,10 @@
     let text = 0, image = 0;
     for (const f of t.fields) {
       if (f.type === "image" || f.type === "audio") {
-        const r = b.references?.[f.key] || (f.type === "image" && f.required ? (pictures[image++] ? { url: pictures[image - 1] } : null) : null);
+        // card R3: a 橫幅字卡 (t.still) is its picked design or nothing -- a shot picture would be a card without its words
+        const r = b.references?.[f.key] || (f.type === "image" && f.required && !t.still ? (pictures[image++] ? { url: pictures[image - 1] } : null) : null);
         if (r) references[f.key] = r;
-        else if (f.required) return { problem: (which === "intro" ? "片頭" : "片尾") + "模板「" + t.label + "」需要更多鏡頭畫面" };
+        else if (f.required) return { problem: t.still ? "橫幅字卡還沒從我的設計挑一張" : (which === "intro" ? "片頭" : "片尾") + "模板「" + t.label + "」需要更多鏡頭畫面" };
         continue;
       }
       const given = String(b.fields?.[f.key] ?? "").trim(),

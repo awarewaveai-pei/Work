@@ -292,17 +292,20 @@ export async function POST(request: Request) {
   };
 
   let uploaded: { objectKey: string; publicUrl: string; byteSize: number; checksumSha256: string };
+  // card R3: the picture's size, kept in metadata so a picker can mark a design of another shape without loading it
+  let pixelSize: { width?: number; height?: number } = {};
   if (pendingImage) {
     written.push(objectKey);
     const got = await claimPendingUpload(pendingImage, objectKey);
     if (!got.ok) { const f = got as { ok: false; status: number; error: string }; return fail(f.status, f.error); }
     // Checked on the formal copy (the bytes kept); the decoded format must be the type the key and Content-Type claim.
     let format: string | undefined;
-    try { format = (await sharp(got.buffer).metadata()).format; } catch { format = undefined; }
+    try { const m = await sharp(got.buffer).metadata(); format = m.format; pixelSize = { width: m.width, height: m.height }; } catch { format = undefined; }
     if (!format || SNIFFED_MIME[format] !== pendingImage.mime) return fail(400, "upload is not the png/jpeg/webp image its key names");
     uploaded = { objectKey, publicUrl: `${getDesignsPublicBase()}/${objectKey}`, byteSize: got.buffer.byteLength, checksumSha256: sha256Hex(got.buffer) };
   } else {
     written.push(objectKey);
+    try { const m = await sharp(parsed!.buffer).metadata(); pixelSize = { width: m.width, height: m.height }; } catch { pixelSize = {}; }
     const put = await putDesignObject(objectKey, parsed!.buffer, parsed!.mime);
     // Same cast convention as tarot/generate route — tsconfig here does not narrow `!x.ok`.
     if (!put.ok) return fail(502, (put as { ok: false; error: string }).error);
@@ -343,6 +346,7 @@ export async function POST(request: Request) {
         brand: body.brand ?? null,
         style_tags: sanitizeStyleTags(body.styleTags),
         subject: body.subject?.trim() || null,
+        ...(pixelSize.width && pixelSize.height ? { width: pixelSize.width, height: pixelSize.height } : {}),
         ...sourceMeta,
         ...(batchKey ? { batch_job_id: batchKey.job, card_index: batchKey.card } : {}),
         ...(pendingImage ? { upload_key: pendingImage.key } : {}),

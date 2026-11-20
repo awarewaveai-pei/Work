@@ -113,9 +113,14 @@
     const hit = await current(v, true), caps = V.capabilities || await V.loadCapabilities(), templates = caps.remotionTemplates || [],
       assets = await V.assets.list(), d = document.createElement("dialog");
     let draft = clone(hit.e.intro || { kind: "title", fields: { title: hit.p.title }, seconds: 3, transition: Transitions.AUTO.id, transitionSeconds: 0.5 });
+    // card R3: a 橫幅字卡's picture is picked from 我的設計 through shared/design-picker.js, as in the editor's 片頭 pane
+    const ratio = v.result?.ratio || v.input?.settings?.ratio || v.input?.settings?.project?.ratio || hit.p.ratio;
+    let designs = null;
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const draw = () => {
       const t = templates.find((t) => t.id === draft.templateId), field = (f) => {
+        if (t?.still && f.type === "image") return DesignPicker.html({ label: f.label, list: designs, picked: draft.references?.[f.key], ratio, esc,
+          attrs: { load: "data-design-load", banner: "data-design-banner", pick: (id) => `data-design-pick="${esc(f.key)}" data-id="${esc(id)}"` } });
         if (["image", "audio"].includes(f.type)) return `<fieldset><legend>${esc(f.label)}</legend>${assets.filter((a) => V.mediaKind(a) === f.type).map((a) => `<button type="button" class="btn small" data-pick="${esc(f.key)}" data-id="${esc(a.id)}" aria-pressed="${draft.references?.[f.key]?.url === a.url}">${esc(a.name || a.id)}</button>`).join("")}<button type="button" class="btn small" data-pick="${esc(f.key)}" data-id="">不使用</button></fieldset>`;
         return `<label>${esc(f.label)}<input class="text-input" data-field="${esc(f.key)}" value="${esc(draft.fields?.[f.key] ?? "")}" maxlength="${f.max || 200}"></label>`;
       };
@@ -125,12 +130,18 @@
       d.querySelector('[name=seconds]').oninput = (ev) => draft.seconds = Number(ev.target.value);
       d.querySelectorAll('[data-transition]').forEach((b) => b.onclick = () => { draft.transition = b.dataset.transition; draw(); });
       d.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => { draft.references ||= {}; const a = assets.find((a) => a.id === b.dataset.id); if (a) draft.references[b.dataset.pick] = { url: a.url, id: a.id }; else delete draft.references[b.dataset.pick]; draw(); });
+      d.querySelectorAll('[data-design-load]').forEach((b) => b.onclick = async () => { designs = await DesignPicker.load(V); draw(); });
+      d.querySelectorAll('[data-design-banner]').forEach((b) => b.onclick = () => window.open(DesignPicker.bannerUrl(V, ratio, hit.e.name || hit.p.title), "_blank", "noopener"));
+      d.querySelectorAll('[data-design-pick]').forEach((b) => b.onclick = async () => {
+        try { draft.references ||= {}; draft.references[b.dataset.designPick] = await DesignPicker.use(V, b.dataset.id, ratio); draw(); }
+        catch (error) { d.querySelector('[data-error]').textContent = error.message; }
+      });
       d.querySelector('[data-cancel]').onclick = () => d.close();
       d.querySelector('form').onsubmit = async (ev) => {
         ev.preventDefault(); const submit = d.querySelector('[type=submit]'); submit.disabled = true;
         try {
           const end = S.normalizeBookend(draft, templates); if (draft.kind !== 'none' && !end) throw Error('請確認標題、長度與轉場設定');
-          const e = { ...hit.e, intro: end }, ratio = v.result?.ratio || v.input?.settings?.ratio || v.input?.settings?.project?.ratio || hit.p.ratio;
+          const e = { ...hit.e, intro: end };
           if (end?.kind === 'template') { const made = S.bookendJob(hit.p, e, 'intro', ratio, templates); if (made.problem) throw Error(made.problem); }
           await V.spine.setBookends({ projectId: hit.p.id, episodeId: hit.e.id, intro: end });
           if (end) await render(hit.p, e, 'intro', ratio); d.close(); V.notify('片頭已更新；按「加入這支影片」產生新版本');
