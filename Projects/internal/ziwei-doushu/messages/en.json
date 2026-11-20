@@ -11,7 +11,8 @@
     "iching": "I Ching",
     "tarot": "Tarot",
     "daily": "Daily Fortune",
-    "astrology": "Astrology"
+    "astrology": "Astrology",
+    "fengshui": "Feng Shui"
   },
   "hub": {
     "title": "East & West Divination",
@@ -23,7 +24,8 @@
     "ichingDesc": "I Ching coin casting, primary & changed hexagrams",
     "tarotDesc": "78-card deck, single / three-card / Celtic Cross",
     "dailyDesc": "Daily fortune, lucky color, lucky number, almanac",
-    "astrologyDesc": "Planets · Signs · Houses · Ascendant (Swiss-grade, self-hosted)"
+    "astrologyDesc": "Planets · Signs · Houses · Ascendant (Swiss-grade, self-hosted)",
+    "fengshuiDesc": "Flying Star chart, Eight Mansions, placement tips"
   },
   "home": {
     "title": "Zi Wei Dou Shu Chart",
@@ -253,6 +255,64 @@
     "ascendant": "Ascendant",
     "mc": "Midheaven (MC)",
     "house": "House"
+  },
+  "fengshui": {
+    "title": "Feng Shui Flying Stars",
+    "subtitle": "Xuan Kong nine-palace chart · Eight Mansions directions · AI placement tips",
+    "facingLabel": "Facing direction (degrees)",
+    "facingHint": "Stand at the main door or main window looking out and read the compass in degrees (0–359)",
+    "quick": "Quick directions",
+    "moveInLabel": "Move-in or completion date",
+    "occupantLabel": "Occupant (optional, for Eight Mansions)",
+    "birthLabel": "Date of birth",
+    "gender": "Gender",
+    "male": "Male",
+    "female": "Female",
+    "skip": "Skip",
+    "compute": "Cast chart",
+    "chartTitle": "Flying Star Chart",
+    "chartLegend": "Top-left mountain star · top-right facing star · center period star · bottom annual star (south at top)",
+    "facing": "Facing",
+    "sitting": "Sitting",
+    "period": "Period {n}",
+    "pattern": "Formation",
+    "jian": "Leaning toward {m}; replacement stars used",
+    "annual": "{y}: annual star {n} at center",
+    "bazhaiTitle": "Eight Mansions",
+    "mingGua": "Personal trigram",
+    "east": "East group",
+    "west": "West group",
+    "supportive": "Supportive",
+    "lessSupportive": "Less supportive",
+    "bazhaiHint": "Point the bed headboard, desk and main door toward supportive directions when you can; less supportive sectors suit storage, bathrooms and other short-stay spaces.",
+    "directions": {
+      "N": "N",
+      "NE": "NE",
+      "E": "E",
+      "SE": "SE",
+      "S": "S",
+      "SW": "SW",
+      "W": "W",
+      "NW": "NW",
+      "C": "Center"
+    },
+    "patterns": {
+      "wangShanWangXiang": "Prosperous sitting & facing",
+      "shangShanXiaShui": "Reversed stars",
+      "shuangXingDaoXiang": "Double stars at facing",
+      "shuangXingDaoZuo": "Double stars at sitting",
+      "none": "Prosperous stars elsewhere"
+    },
+    "stars": {
+      "shengQi": "Sheng Qi · vitality",
+      "tianYi": "Tian Yi · restoration",
+      "yanNian": "Yan Nian · relationships",
+      "fuWei": "Fu Wei · stability",
+      "jueMing": "Jue Ming",
+      "wuGui": "Wu Gui",
+      "liuSha": "Liu Sha",
+      "huoHai": "Huo Hai"
+    }
   },
   "errors": {
     "computeFailed": "Charting failed, please check your input"

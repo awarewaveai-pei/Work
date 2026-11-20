@@ -11,7 +11,8 @@
     "iching": "易經卜卦",
     "tarot": "塔羅",
     "daily": "每日運勢",
-    "astrology": "西洋占星"
+    "astrology": "西洋占星",
+    "fengshui": "風水飛星"
   },
   "hub": {
     "title": "東西方命理",
@@ -23,7 +24,8 @@
     "ichingDesc": "六爻銅錢起卦,本卦變卦動爻",
     "tarotDesc": "78 張牌庫,單張/三張/凱爾特十字",
     "dailyDesc": "今日運勢、幸運色、幸運數字、宜忌",
-    "astrologyDesc": "行星·星座·宮位·上升(Swiss 級精度,自架)"
+    "astrologyDesc": "行星·星座·宮位·上升(Swiss 級精度,自架)",
+    "fengshuiDesc": "玄空飛星九宮盤、八宅命卦,方位擺放建議"
   },
   "home": {
     "title": "紫微斗數命盤",
@@ -253,6 +255,64 @@
     "ascendant": "上升",
     "mc": "天頂 MC",
     "house": "宮"
+  },
+  "fengshui": {
+    "title": "風水飛星",
+    "subtitle": "玄空飛星九宮盤 · 八宅命卦八方 · AI 方位建議",
+    "facingLabel": "房屋朝向(度數)",
+    "facingHint": "站在大門或主要採光面往外看,用手機指南針讀出的度數(0–359)",
+    "quick": "快捷方位",
+    "moveInLabel": "入伙或建成日期",
+    "occupantLabel": "居住者(選填,算八宅命卦)",
+    "birthLabel": "出生日期",
+    "gender": "性別",
+    "male": "男",
+    "female": "女",
+    "skip": "不填",
+    "compute": "排盤",
+    "chartTitle": "九宮飛星盤",
+    "chartLegend": "左上山星 · 右上向星 · 中間運星 · 下方年星(上南下北)",
+    "facing": "向",
+    "sitting": "坐",
+    "period": "{n} 運",
+    "pattern": "格局",
+    "jian": "兼{m},以替卦起星",
+    "annual": "{y} 年流年 {n} 入中",
+    "bazhaiTitle": "八宅八方",
+    "mingGua": "命卦",
+    "east": "東四命",
+    "west": "西四命",
+    "supportive": "較宜",
+    "lessSupportive": "較不宜",
+    "bazhaiHint": "床頭、書桌、大門可優先朝向「較宜」的方位;「較不宜」的方位適合放儲物、浴廁等停留時間短的空間。",
+    "directions": {
+      "N": "北",
+      "NE": "東北",
+      "E": "東",
+      "SE": "東南",
+      "S": "南",
+      "SW": "西南",
+      "W": "西",
+      "NW": "西北",
+      "C": "中"
+    },
+    "patterns": {
+      "wangShanWangXiang": "旺山旺向",
+      "shangShanXiaShui": "上山下水",
+      "shuangXingDaoXiang": "雙星到向",
+      "shuangXingDaoZuo": "雙星到坐",
+      "none": "當運星未到坐向"
+    },
+    "stars": {
+      "shengQi": "生氣",
+      "tianYi": "天醫",
+      "yanNian": "延年",
+      "fuWei": "伏位",
+      "jueMing": "絕命",
+      "wuGui": "五鬼",
+      "liuSha": "六煞",
+      "huoHai": "禍害"
+    }
   },
   "errors": {
     "computeFailed": "排盤失敗,請檢查輸入"

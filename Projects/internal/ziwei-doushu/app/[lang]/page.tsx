@@ -15,6 +15,7 @@ const SYSTEMS = [
   { id: "iching", descKey: "ichingDesc",glyph: "☲" },
   { id: "tarot",  descKey: "tarotDesc", glyph: "✦" },
   { id: "astrology", descKey: "astrologyDesc", glyph: "♆" },
+  { id: "fengshui", descKey: "fengshuiDesc", glyph: "☷" },
   { id: "daily",  descKey: "dailyDesc", glyph: "☀" },
 ] as const;
 

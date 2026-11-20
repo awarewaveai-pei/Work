@@ -9,12 +9,14 @@ import { baziSystem } from './systems/bazi';
 import { ichingSystem } from './systems/iching';
 import { tarotSystem } from './systems/tarot';
 import { hehunSystem } from './systems/hehun';
+import { fengshuiSystem } from './systems/fengshui';
 
 registerSystem(ziweiSystem);
 registerSystem(baziSystem);
 registerSystem(ichingSystem);
 registerSystem(tarotSystem);
 registerSystem(hehunSystem);
+registerSystem(fengshuiSystem);
 // 後續系統(按 PLAN §18 路線圖,需 API key):
 // registerSystem(astrologySystem);
 
