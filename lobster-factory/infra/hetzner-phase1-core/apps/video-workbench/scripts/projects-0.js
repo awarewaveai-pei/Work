@@ -289,7 +289,7 @@ const reviewButton = (o, section, label) => `<button class="btn small outline" d
 // from its own read (data-delivered, wireReviewLinks), and nothing when none was made from it.
 function bookendCard(e, o, i, latest) {
   const end = e.intro, templates = VideoWorkbench.capabilities?.remotionTemplates || [],
-    name = !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + Transitions.name(end.transition) + "轉場",
+    name = !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + (Transitions.label(end.transition) ?? "") + "轉場",
     preview = end ? `<span data-intro-preview="${esc(o.jobId)}"></span>` : "";
   return `${latest ? `<div class="row" data-output-next data-vw-next-surface="card"></div>` : `<p class="tiny" data-delivered="${esc(o.jobId)}"></p>`}<div class="panel"><strong>本集片頭：${esc(name)}</strong>${preview}<div class="row">${[["bookendEdit", "編輯片頭"], ["bookendRender", "重新生成片頭 · 免費"], ["bookendJoin", "加入這支影片 · 免費"], ["copyOutput", "複製連結"]].map(([act, label]) => `<button class="btn small outline" data-action="${act}" data-index="${i}">${label}</button>`).join("")}</div></div>`;
 }

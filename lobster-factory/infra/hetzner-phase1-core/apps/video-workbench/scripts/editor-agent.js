@@ -103,6 +103,7 @@ const edAgentTools = {
       name = EditorModel.transitionName(a.name);
     if (c.track !== edMain(p) || !edPrevious(p, c)) throw Error("轉場只能放在主視訊軌兩段相接的剪點");
     if (name === null) throw Error("轉場不存在");
+    if (!EditorModel.transitionOffered(name) && name !== EditorModel.transitionName(c.transition)) throw Error("這種轉場沒有在可用清單裡");
     if (name === "無") {
       c.transition = "無";
       delete c.transitionCurve;

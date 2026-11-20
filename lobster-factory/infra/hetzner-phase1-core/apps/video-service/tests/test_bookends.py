@@ -113,12 +113,13 @@ class BookendRender(unittest.TestCase):
         self.assertEqual(cues[0]["startMs"], 2500)
 
     def test_wipes_and_circle_join_with_captions_moved(self):
-        # card R2: every transition the editor offers joins bookends too -- the three that are not a fade, each once
+        # card R2: every transition the editor offers joins bookends too -- the three that are not a fade, each once;
+        # card R4: plus one of FFmpeg's other built-ins (pixelize), the same path for every name on FFmpeg's list
         real, used = pipeline._run_ffmpeg, []
         def spy(cmd, *a, **k):
             used.append(" ".join(cmd))
             return real(cmd, *a, **k)
-        for t in ("wipeleft", "wiperight", "circleopen"):
+        for t in ("wipeleft", "wiperight", "circleopen", "pixelize"):
             self.assertIn(t, pipeline.xfade_names())
             b = {"intro": {"asset": self.intro}, "outro": None, "transition": t, "transition_s": 0.5}
             with mock.patch.object(pipeline, "_run_ffmpeg", spy):

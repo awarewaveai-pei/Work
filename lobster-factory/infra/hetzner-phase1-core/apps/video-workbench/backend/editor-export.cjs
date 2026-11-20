@@ -450,7 +450,7 @@ function duckExpression(ranges) {
 }
 const even = (n) => Math.ceil(n / 2) * 2;
 // The transitions' export (curved xfade expressions): backend/transitions.cjs, card R2.
-const { CURVED_TRANSITIONS, curvedTransition } = require("./transitions.cjs");
+const { CURVED_TRANSITIONS, xfadeSteps } = require("./transitions.cjs");
 const TRUE_PEAK_CEILING = -2; // dBTP for loudnorm and the limiter; the export must measure <= -1 dBTP after AAC.
 async function exportEditor(
   raw,
@@ -759,12 +759,8 @@ async function exportEditor(
           const t = incoming.get(next.id),
             out = `[xfade${layer}_${i}]`;
           const timing = `duration=${Timebase.ffTime(t.frames, tb)}:offset=${Timebase.ffTime(t.cut - t.before - groupStart, tb)}`;
-          if (t.curve === "線性") graph.push(`${joined}${label}xfade=transition=${t.type}:${timing}${out}`);
-          else {
-            // Card ED.7: xfade's own transitions are linear, so a curve re-states the effect with the remapped progress.
-            graph.push(`${joined}format=yuv420p[xa${layer}_${i}]`, `${label}format=yuv420p[xb${layer}_${i}]`);
-            graph.push(`[xa${layer}_${i}][xb${layer}_${i}]xfade=transition=custom:${timing}:expr='${curvedTransition(t.type, t.curve)}'${out}`);
-          }
+          // card R4: the same xfade step the transition preview builds (backend/transitions.cjs xfadeSteps)
+          graph.push(...xfadeSteps({ type: t.type, curve: t.curve, timing, a: joined, b: label, out, tag: `${layer}_${i}` }));
           joined = out;
         });
         graph.push(`${joined}setpts=PTS+${groupStart}[group${layer}]`);

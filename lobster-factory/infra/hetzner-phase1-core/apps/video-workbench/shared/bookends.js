@@ -1,7 +1,7 @@
 // U5.5: edit, render and rejoin the episode's one bookend setting. All rendering here is local (免費).
 (function () {
   const V = VideoWorkbench, S = EpisodeSpine, clone = (v) => structuredClone(v);
-  const label = (end, templates) => !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + (Transitions.name(end.transition) ?? "") + "轉場";
+  const label = (end, templates) => !end ? "尚未設定" : (end.kind === "title" ? "標題卡" : templates.find((t) => t.id === end.templateId)?.label || "模板") + " · " + end.seconds + " 秒 · " + (Transitions.label(end.transition) ?? "") + "轉場";
   const current = async (v, create = false) => {
     const links = await V.preferences.get("bookends.jobLinks", {});
     let link = v.input?.link || links[v.id], list = await V.projects.list(), p = list.find((p) => p.id === link?.projectId), e = p?.episodes?.find((e) => e.id === link.episodeId);

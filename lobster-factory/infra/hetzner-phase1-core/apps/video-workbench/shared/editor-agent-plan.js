@@ -30,7 +30,7 @@
     set_volume_db: { args: { clipId: ID, db: { type: "number", min: EM.DB.min, max: 12 } }, doc: `片段音量 dB（${EM.DB.min}～12）` },
     set_fades: { args: { clipId: ID, inSec: opt({ type: "number", min: 0, max: 10 }), outSec: opt({ type: "number", min: 0, max: 10 }) }, doc: "淡入、淡出秒數（不超過片段長度一半）" },
     set_duck: { args: { clipId: ID, on: { type: "boolean" } }, doc: `旁白出現時自動降低這段音量 12 dB（需有旁白軌 ${EM.NARRATION}）` },
-    set_transition: { args: { clipId: ID, name: NAME, sec: { type: "number", min: 0.05, max: 2 } }, doc: `片段開頭的轉場：${Object.keys(EM.TRANSITIONS).join("、")} 或 無` },
+    set_transition: { args: { clipId: ID, name: NAME, sec: { type: "number", min: 0.05, max: 2 } }, doc: `片段開頭的轉場：${EM.OFFERED_TRANSITIONS.join("、")} 或 無` },
     add_text: { args: { text: { type: "string", min: 1, max: 200 }, startSec: SEC, durSec: { type: "number", min: 0.1, max: 600 }, trackId: opt(TRACK) }, doc: "新增文字片段" },
     import_cues: { args: { language: NAME, cues: { type: "array", min: 1, max: 2000, items: { type: "object", props: { start: SEC, end: SEC, text: { type: "string", min: 1, max: 500 } } } } }, doc: "把字幕句子放進該語言的字幕軌（取代同語言軌；片尾之後的句子不放）" },
     transform_key: { args: { clipId: ID, op: { type: "string", enum: ["add", "delete", "clear"] }, frame: opt({ type: "integer", min: 0, max: 10000000 }), values: opt({ type: "object", props: { scale: opt({ type: "number", min: EM.TRANSFORM.scale[0], max: EM.TRANSFORM.scale[1] }), x: opt({ type: "number", min: EM.TRANSFORM.main[0], max: EM.TRANSFORM.main[1] }), y: opt({ type: "number", min: EM.TRANSFORM.main[0], max: EM.TRANSFORM.main[1] }), rotation: opt({ type: "number", min: EM.TRANSFORM.rotation[0], max: EM.TRANSFORM.rotation[1] }) } }) }, doc: "變形關鍵影格（frame＝從片段起點算的影格）" },

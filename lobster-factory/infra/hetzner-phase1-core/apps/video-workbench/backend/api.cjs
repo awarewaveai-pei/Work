@@ -1604,6 +1604,23 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         json(res, 200, mediaStore.preview(String(input.url || "")));
         return true;
       }
+      // Card R4 item 3: a transition's preview rendered by the export's own ffmpeg (backend/transitions.cjs preview):
+      // { transition, curve?, seconds?, ratio?, a?, b? } (a / b = { url, at } of the clips around a cut; none = the
+      // picker's two test patterns) -> { url }. Kept by its inputs, so asking again is free.
+      if (req.method === "POST" && route === "/transitions/preview") {
+        const input = await body(req), side = (s) => {
+          if (s == null) return null;
+          const url = String(s.url || ""), file = localFile(url);
+          if (!file) throw Object.assign(Error("找不到剪點兩側的素材"), { status: 400 });
+          return { file, key: url, at: Number(s.at) || 0, image: /\.(png|jpe?g|webp|gif)$/i.test(url) };
+        };
+        const made = await require("./transitions.cjs").preview(
+          { transition: input.transition, curve: input.curve || "線性", seconds: input.seconds, ratio: input.ratio, a: side(input.a), b: side(input.b) },
+          { run: mediaTools.run, dir: outputs, signal: AbortSignal.timeout(30000) },
+        );
+        json(res, 200, { url: "/generated/" + made.name, cached: made.cached });
+        return true;
+      }
       if (req.method === "POST" && route === "/generations/quote") {
         const input = await body(req);
         // Card ED.12.3: an AI 畫質增強 job is priced from its own source length (the estimate the charge never exceeds

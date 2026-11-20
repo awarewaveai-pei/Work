@@ -92,19 +92,12 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-"));
     await page.getByRole("button", { name: "匯出", exact: true }).click();
     await page.locator('[data-ed-action="quality:720p"]').click();
     await page.locator("[data-ed-export]").click();
-    await page.waitForFunction(
-      () =>
-        document
-          .querySelector(".job-view")
-          ?.textContent.match(/succeeded|failed/),
-      null,
-      { timeout: 60000 },
-    );
+    // card R4: the job's own status value, not the words the job view shows (they are 已完成／失敗 since an earlier card)
+    const exportStatus = () => page.evaluate(async () => (await VideoWorkbench.generations.list()).filter((j) => j.input?.operation === "editor-export").at(-1)?.status);
+    for (let i = 0; i < 120 && !["succeeded", "failed", "cancelled", "blocked"].includes(await exportStatus()); i++) await page.waitForTimeout(500);
     const panel = page.locator(".job-view");
-    assert(
-      !(await panel.innerText()).includes("failed"),
-      await panel.innerText(),
-    );
+    assert.equal(await exportStatus(), "succeeded", await panel.innerText());
+    await panel.locator("video").waitFor({ timeout: 15000 });
     const url = await panel.locator("video").getAttribute("src"),
       probe = spawnSync(ffmpeg, ["-i", path.join(dataDir, url.slice(1))], {
         encoding: "utf8",
@@ -113,7 +106,7 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-editor-"));
     assert.match(probe.stderr, /720x900/);
     assert.match(probe.stderr, /Audio: aac/);
     assert.match(probe.stderr, /00:00:02/);
-    await panel.locator("[data-job-close]").click();
+    await panel.getByRole("button", { name: "關閉", exact: true }).click(); // the job view has no data-job-close since an earlier card
     await page.evaluate(() => edSave());
     await page.reload();
     await page.waitForFunction(() => typeof ed !== "undefined" && ed.ready);

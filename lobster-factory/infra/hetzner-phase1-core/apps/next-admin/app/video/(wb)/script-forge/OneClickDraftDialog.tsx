@@ -1,5 +1,6 @@
 "use client";
 import Transitions from "@/public/editor-shared/transitions.js";
+import TransitionButtons from "@/components/tools/TransitionButtons";
 import { useEffect, useRef, useState } from "react";
 import { buttonStyle, inputStyle, optionStyle } from "@/components/tools/panel-primitives";
 import { shotsFromScript } from "../../../(shell)/tools/video/video-handoff";
@@ -78,7 +79,7 @@ export default function OneClickDraftDialog({ request, workbench, close }: { req
     <p>配音</p><div role="group" aria-label="配音">{quote?.voices.map((v) => <button type="button" key={v.provider + v.voice} disabled={busy || v.available === false} style={optionStyle(tts ? tts.provider === v.provider && tts.voice === v.voice : v === quote.voices.find((x) => x.available !== false))} onClick={() => setTts({ provider: v.provider, voice: v.voice })}>{v.label}</button>)}</div>
     <p>片頭</p><div role="group" aria-label="片頭">{[["none", "不要"], ["title", "標題卡"], ...(caps?.remotionTemplates || []).map((t) => [t.id, t.label])].map(([id, label]) => <button type="button" key={id} disabled={busy} style={optionStyle(intro === id)} onClick={() => setIntro(id)}>{label}</button>)}</div>
     {/* card R2: the transitions module's list */}
-    <div role="group" aria-label="轉場">{Transitions.LIST.map((t: { id: string; note: string }) => <button type="button" key={t.id} disabled={busy} aria-pressed={transition === t.id} style={optionStyle(transition === t.id)} onClick={() => setTransition(t.id)}>{t.id}{t.note ? ` ${t.note}` : ""}</button>)}</div>
+    <TransitionButtons label="轉場" value={transition} disabled={busy} onPick={setTransition} look={optionStyle} />
     {unsupported && <p role="alert">片頭模板不支援所選比例，請改比例或選標題卡。</p>}
     {!!template && !caps?.remotion && <p role="alert">片頭模板服務尚未設定，請選標題卡或不要。</p>}
     <p><label><input type="checkbox" checked={embed} disabled={busy || !quote?.sites.length} onChange={(e) => { setEmbed(e.target.checked); if (e.target.checked && !siteId) setSiteId(quote?.sites[0]?.id || ""); }} />同時建一篇網站草稿文章並嵌入</label></p>

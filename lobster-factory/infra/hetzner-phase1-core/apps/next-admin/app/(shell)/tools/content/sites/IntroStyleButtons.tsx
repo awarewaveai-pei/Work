@@ -8,6 +8,7 @@ import type { CSSProperties } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { siteIntroStyles, siteIntroTransition } from "@/lib/content/brand-voice";
 import { INTRO_STYLES } from "@/public/editor-shared/intro-styles.js";
+import TransitionButtons from "@/components/tools/TransitionButtons";
 import Transitions from "@/public/editor-shared/transitions.js";
 
 const CHOICES = INTRO_STYLES.filter((s) => s.auto);
@@ -56,18 +57,12 @@ export default function IntroStyleButtons({ site, onSaved }: { site: ManagedSite
       </div>
       {/* card R2: the transitions module's list */}
       <span style={{ color: "var(--text-muted)", fontSize: 12 }}>片頭接正片的轉場（0.5 秒）</span>
-      <div role="group" aria-label="片頭轉場" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {Transitions.LIST.map((t: { id: string; note: string }) => (
-          <button key={t.id} type="button" style={{ ...card(transition === t.id), flexDirection: "row" }} disabled={saving}
-            aria-pressed={transition === t.id} onClick={() => { if (t.id !== transition) void save({ introTransition: t.id }); }}>
-            {t.id}{t.note ? ` ${t.note}` : ""}
-          </button>
-        ))}
-      </div>
+      <TransitionButtons label="片頭轉場" value={transition} disabled={saving} onPick={(id) => void save({ introTransition: id })}
+        look={(on) => ({ ...card(on), flexDirection: "row" })} />
       <div style={{ color: "var(--text-muted)", fontSize: 12 }}>
         {current.length === 0 ? "自動做的影片不加片頭。" : current.length === 1
-          ? `每支自動影片開頭加「${names[0]}」，${transition === "無" ? "直接切" : `${transition} 0.5 秒`}接正片。`
-          : `自動影片依序輪流用：${names.join(" → ")}，${transition === "無" ? "直接切" : `${transition} 0.5 秒`}接正片。`}
+          ? `每支自動影片開頭加「${names[0]}」，${transition === "無" ? "直接切" : `${Transitions.label(transition)} 0.5 秒`}接正片。`
+          : `自動影片依序輪流用：${names.join(" → ")}，${transition === "無" ? "直接切" : `${Transitions.label(transition)} 0.5 秒`}接正片。`}
         標題用影片標題，背景用影片第一個鏡頭的畫面；片頭做不出來時照樣出沒有片頭的影片。
       </div>
       {error && <div style={{ color: "var(--red)", fontSize: 12 }}>{error}</div>}

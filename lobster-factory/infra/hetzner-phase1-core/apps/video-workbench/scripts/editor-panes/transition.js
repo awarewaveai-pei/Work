@@ -116,7 +116,8 @@ function edTransitionPane(p, c) {
     issue = has ? edTransitionIssue(p, c) : "",
     names = [
       ...edTrEffects.map(([, stored]) => stored),
-      ...(edTrNoCurve.includes(look.name) ? [look.name] : []),
+      // a saved transition that is not offered (an old slide) still shows, pressed
+      ...(look.name && look.name !== "無" && !edTrEffects.some(([, id]) => id === look.name) ? [look.name] : []),
     ],
     label = null;
   return (
@@ -128,14 +129,63 @@ function edTransitionPane(p, c) {
     edTrButtons(
       "轉場曲線",
       "transition-curve",
-      look.curve,
+      edTrNoCurve.includes(look.name) ? "線性" : look.curve,
       edTrCurves,
       (o) => o,
       !active || edTrNoCurve.includes(look.name),
     ) +
+    // card R4 item 4: a built-in has no curve -- said, not silently ignored
+    (edTrNoCurve.includes(look.name) ? `<p class="note" data-ed-tr-no-curve>${esc(Transitions.NO_CURVE_WHY)}</p>` : "") +
     `<div class="editor-transition-actions">${edButton(`套用全部剪點 (${cuts.length})`, "transition-all", !cuts.length)}${edButton("預覽剪點", "transition-preview", !has)}${edButton("移除轉場", "transition-remove", !has)}</div>` +
+    // card R4 item 3: the transition exactly as the export makes it (same ffmpeg, backend/transitions.cjs preview);
+    // pointing at a button shows that one, 預覽剪點 shows the cut's own clips. The timeline's live playback only
+    // approximates a transition with opacity (it has to run in real time); this box is the true look.
+    `<div class="editor-transition-preview" data-ed-tr-preview-box><p class="note" data-ed-tr-preview-note>${esc(edTr.previewNote || "指向任一種轉場，這裡播放它出片的樣子")}</p>${edTr.previewUrl ? `<video data-ed-tr-preview src="${esc(edTr.previewUrl)}" muted autoplay loop playsinline></video>` : ""}</div>` +
     (issue ? `<p class="note" data-ed-transition-issue>${esc(issue)}</p>` : "")
   );
+}
+// Card R4 item 3: one transition's preview from the workbench (the export's ffmpeg), for the clips around cut c when
+// one is chosen, else the two test patterns; the newest request wins.
+// Where each side's picture starts so the transition sits where the export puts it -- centred on the cut: the outgoing
+// clip runs `after` past its out point, the incoming one starts `before` ahead of its in point (editor-export.cjs).
+const edTrSide = (p, clip, end, seconds) => {
+  if (!clip || !["video", "image"].includes(clip.kind) || !clip.asset?.url) return null;
+  const fps = Timebase.fps(p.timebase), start = Number(clip.sourceStart ?? clip.sourceStartFrame / fps) || 0,
+    speed = clip.speed || 1, before = Math.floor((seconds * fps) / 2) / fps, side = 0.6;
+  return { url: clip.asset.url, at: Number(Math.max(0, end ? start + (clip.durationFrames / fps) * speed - (side + before) * speed : start - before * speed).toFixed(2)) };
+};
+// The preview box alone is repainted (a whole-pane render would stop playback and drop the keyboard focus).
+function edTrPaintPreview() {
+  const box = document.querySelector("[data-ed-tr-preview-box]");
+  if (!box) return;
+  box.querySelector("[data-ed-tr-preview-note]").textContent = edTr.previewNote || "";
+  let v = box.querySelector("[data-ed-tr-preview]");
+  if (!edTr.previewUrl) return v?.remove();
+  if (!v) {
+    v = document.createElement("video");
+    Object.assign(v, { muted: true, autoplay: true, loop: true, playsInline: true });
+    v.setAttribute("data-ed-tr-preview", "");
+    box.append(v);
+  }
+  if (v.getAttribute("src") !== edTr.previewUrl) v.src = edTr.previewUrl;
+}
+async function edTrShowPreview(p, c, name, curve, seconds) {
+  const ask = (edTr.ask = (edTr.ask || 0) + 1),
+    cut = c && edTrActive(p, c) ? { a: edTrSide(p, edPrevious(p, c), true, seconds), b: edTrSide(p, c, false, seconds) } : {};
+  edTr.previewNote = (Transitions.label(name) || name) + "：產生預覽中…";
+  edTrPaintPreview();
+  try {
+    const r = await VideoWorkbench.request("/transitions/preview", { transition: name, curve: edTrNoCurve.includes(name) ? "線性" : curve, seconds, ratio: p.ratio,
+      ...(cut.a && cut.b ? cut : {}) }, "POST");
+    if (ask !== edTr.ask) return;
+    edTr.previewUrl = r.url;
+    edTr.previewNote = (Transitions.label(name) || name) + (cut.a && cut.b ? "（這個剪點的素材）" : "（示範畫面）") + "：轉場的樣子與出片相同（片段的縮放、濾鏡與速度只在出片套用）";
+  } catch (e) {
+    if (ask !== edTr.ask) return;
+    edTr.previewUrl = null;
+    edTr.previewNote = "預覽沒有做成：" + (e?.message || e);
+  }
+  edTrPaintPreview();
 }
 function edTrStopPreview() {
   clearInterval(edTr.timer);
@@ -150,6 +200,7 @@ edRegisterPane("transition", {
       if (!edTrActive(p, c)) return;
       const name = EditorModel.transitionName(action.slice(11));
       if (name === null || name === "無") throw Error("轉場不存在");
+      if (!EditorModel.transitionOffered(name)) throw Error("這種轉場沒有在可用清單裡");
       if (!edTrRange(p, c).ok) throw Error("片段太短，放不下轉場");
       edCheckpoint();
       const had = edTrHas(c);
@@ -192,6 +243,8 @@ edRegisterPane("transition", {
     },
     "transition-preview": async (action, p, c) => {
       if (!edTrActive(p, c)) return;
+      edTrShowPreview(p, c, EditorModel.transitionName(c.transition), c.transitionCurve || "線性",
+        EditorModel.transitionFrames(c, p.timebase) / Timebase.fps(p.timebase)).catch(VideoWorkbench.reportError);
       const end =
         c.start +
         EditorModel.transitionFrames(c, p.timebase) / Timebase.fps(p.timebase) +
@@ -230,3 +283,20 @@ document.addEventListener("change", async (e) => {
     );
   await edCommit(p);
 });
+
+// Card R4 item 3: pointing at (or tabbing to) a transition button shows its preview, after a short pause.
+for (const type of ["pointerover", "focusin"])
+  document.addEventListener(type, (e) => {
+    const b = e.target.closest?.('[data-ed-action^="transition:"]'), p = edProject();
+    if (!b || !p || ed.pane !== "轉場") return;
+    const name = EditorModel.transitionName(b.dataset.edAction.slice(11));
+    const c = edClip(), key = (c && edTrActive(p, c) ? c.id : "") + "|" + name;
+    if (!name || name === "無" || key === edTr.pointed) return;
+    edTr.pointed = key;
+    clearTimeout(edTr.pointTimer);
+    // the cut's own length and curve when one is chosen, else the values the next choice will use
+    const has = c && edTrActive(p, c) && edTrHas(c),
+      seconds = has ? EditorModel.transitionFrames(c, p.timebase) / Timebase.fps(p.timebase) : edTr.draft.seconds,
+      curve = has ? c.transitionCurve || "線性" : edTr.draft.curve;
+    edTr.pointTimer = setTimeout(() => edTrShowPreview(p, c, name, curve, seconds).catch(VideoWorkbench.reportError), 200);
+  });

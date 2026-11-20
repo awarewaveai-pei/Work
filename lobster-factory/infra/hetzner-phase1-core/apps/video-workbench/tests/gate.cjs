@@ -35,6 +35,7 @@ const tests = [
   "r1-cover-template",
   "r2-intro-picker",
   "r2-transitions-one-list",
+  "r4-transitions-table",
   "auth-redirect",
   "r26-generated-thumb",
   "u4-url-import",

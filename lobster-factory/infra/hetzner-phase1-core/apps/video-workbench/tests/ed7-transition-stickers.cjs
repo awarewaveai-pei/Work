@@ -75,8 +75,10 @@ function run(args, binary = false) {
 
     await page.locator('[data-ed-pane="轉場"]').click();
     assert.equal(await page.locator("[data-ed-transition-hint]").innerText(), "請先點選 V1 相鄰片段之間的剪點");
-    assert.equal(await group("轉場").getByRole("button").count(), 5);
-    assert.deepEqual(await group("轉場").getByRole("button").allInnerTexts(), ["溶解 ＝交叉淡化", "黑場 ＝淡黑", "向左擦除", "向右擦除", "圓形展開"]); // card R2: the transitions module's names
+    // card R4: every offered transition of the module, in its button rows (淡化 first)
+    const offered = require(require("node:path").join(require("../backend/appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "public/editor-shared/transitions.js")).PICKER;
+    assert.equal(await group("轉場").getByRole("button").count(), offered.length);
+    assert.deepEqual((await group("轉場").getByRole("button").allInnerTexts()).slice(0, 2), ["溶解 ＝交叉淡化", "黑場 ＝淡黑"]);
     assert.equal(await group("轉場").locator("button:not([disabled])").count(), 0);
     assert.equal(await page.getByRole("button", { name: "套用全部剪點 (2)", exact: true }).isDisabled(), false);
     // a clip click is not a cut click
@@ -131,6 +133,16 @@ function run(args, binary = false) {
     assert.equal(b.f, 24, "每個剪點各自夾在自己的上限");
     assert.equal(c.f, 24, "套用全部：長度取目前設定，再夾進各剪點的上限");
     pass("移除轉場、復原、換效果、套用全部剪點 (2)");
+    // card R4: a built-in without a curved form -- curve buttons off with the reason, and its exact preview from the export's ffmpeg
+    await group("轉場").getByRole("button", { name: "像素化", exact: true }).click();
+    assert.equal((await v1())[1].t, "pixelize");
+    assert.equal(await group("轉場曲線").locator("button:not([disabled])").count(), 0);
+    assert.match(await page.locator("[data-ed-tr-no-curve]").innerText(), /沒有曲線可調/);
+    await page.getByRole("button", { name: "預覽剪點", exact: true }).click();
+    await page.waitForFunction(() => /與出片相同|沒有做成/.test(document.querySelector("[data-ed-tr-preview-note]")?.textContent || ""), null, { timeout: 15000 });
+    assert.ok(await page.locator("[data-ed-tr-preview]").count());
+    assert.match(await page.locator("[data-ed-tr-preview-note]").innerText(), /像素化（這個剪點的素材）：轉場的樣子與出片相同/);
+    pass("內建轉場（像素化）：曲線停用並寫原因；預覽剪點由出片的 ffmpeg 算出");
 
     // Codex ED.7 F2: a neighbour under 0.1 s caps the length at its own size, never past it (the export refuses that).
     await page.evaluate(() => {

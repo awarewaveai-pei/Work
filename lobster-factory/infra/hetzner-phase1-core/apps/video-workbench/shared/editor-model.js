@@ -96,7 +96,10 @@
   const TRANSITIONS = Transitions.XFADE,
     LEGACY_TRANSITIONS = Transitions.LEGACY,
     transitionName = Transitions.name,
-    transitionLimits = Transitions.limits;
+    transitionLimits = Transitions.limits,
+    // card R4: what may be newly set (the transitions that passed the table test); saved others still read and export
+    transitionOffered = Transitions.offered,
+    OFFERED_TRANSITIONS = Transitions.PICKER.map(([, id]) => id);
   // Stored as integer frames; pre-P2 clips carry transitionDuration in seconds (default 0.5 s).
   function transitionFrames(clip, tb) {
     const { min, max } = transitionLimits(tb);
@@ -506,6 +509,8 @@
     TRANSITIONS,
     LEGACY_TRANSITIONS,
     transitionName,
+    transitionOffered,
+    OFFERED_TRANSITIONS,
     transitionLimits,
     transitionFrames,
     COLOR,

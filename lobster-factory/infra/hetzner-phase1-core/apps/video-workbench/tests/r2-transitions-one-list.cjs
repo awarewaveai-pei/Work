@@ -8,8 +8,14 @@ const { Transitions, bookendTransition } = require("../backend/transitions.cjs")
 const EpisodeSpine = require("../shared/episode-spine.js");
 
 // (1) one list
-const NAMES = /["'`](crossfade|fade-black|溶解|黑場|向左擦除|向右擦除|圓形展開|融接|圓形裁切|向左推移|向右推移)["'`]/,
-  KEYS = /(^|[{,\s])(溶解|黑場|向左擦除|向右擦除|圓形展開|融接|圓形裁切|向左推移|向右推移)\s*:/; // an object key is a list too
+// every name the module knows -- its ids and labels (card R4: built from the catalogue, so a new kind is guarded too), the
+// old names and video-service's old names
+const known = [...new Set([...Transitions.CATALOG.flatMap((t) => [t.id, t.label]), ...Object.keys(Transitions.LEGACY), "fade-black"])]
+  // words that also mean something else here: 無／none (nothing), 淡入淡出 (a text animation), distance (a compositor field)
+  .filter((n) => !["無", "none", "淡入淡出", "distance"].includes(n))
+  .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+const NAMES = new RegExp("[\"'`](" + known + ")[\"'`]"),
+  KEYS = new RegExp("(^|[{,\\s])(" + known + ")\\s*:"); // an object key is a list too
 const walk = (dir, exts) => !fs.existsSync(dir) ? [] : fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
   const f = path.join(dir, e.name);
   if (e.isDirectory()) return /^(node_modules|__tests__|tests|\.next)$/.test(e.name) ? [] : walk(f, exts);
@@ -19,7 +25,9 @@ const na = path.join(root, "../next-admin");
 const files = [
   path.join(root, "server.cjs"),
   ...["scripts", "shared", "backend", "pages"].flatMap((d) => walk(path.join(root, d), /\.(c?js|html)$/)),
-  ...["app", "lib", "components"].flatMap((d) => walk(path.join(na, d), /\.(ts|tsx|js)$/)),
+  // the main system's video and content code (its design tools use words like "radial" for their own things)
+  ...["lib/content", "lib/social", "app/video", "app/api/internal/video", "app/api/content", "app/api/video", "app/(shell)/tools/content", "app/(shell)/tools/video", "components/tools"]
+    .flatMap((d) => walk(path.join(na, d), /\.(ts|tsx|js)$/)),
 ];
 assert.ok(files.length > 50, "scanned " + files.length);
 const found = [];
@@ -30,12 +38,13 @@ for (const f of files)
 assert.deepEqual(found, [], "transition names written outside public/editor-shared/transitions.js:\n" + found.join("\n"));
 
 // (2) the module
-assert.deepEqual(Transitions.LIST.map((t) => t.id), ["無", "溶解", "黑場", "向左擦除", "向右擦除", "圓形展開"]);
+assert.deepEqual(Transitions.LIST.map((t) => t.id).slice(0, 3), ["無", "溶解", "黑場"]);
+assert.ok(["向左擦除", "向右擦除", "圓形展開"].every((id) => Transitions.LIST.some((t) => t.id === id)), "the six before card R4 are still offered");
 assert.deepEqual(Transitions.LIST.map((t) => t.note).slice(1, 3), ["＝交叉淡化", "＝淡黑"]);
 for (const [old, now] of [["crossfade", "溶解"], ["fade-black", "黑場"], ["none", "無"], ["融接", "溶解"], ["淡入淡出", "黑場"], ["圓形裁切", "圓形展開"], [undefined, "無"], ["向左推移", "向左推移"], ["nope", null]])
   assert.equal(Transitions.name(old), now, String(old));
-assert.deepEqual(Transitions.LIST.map((t) => Transitions.wire(t.id)), ["none", "fade", "fadeblack", "wipeleft", "wiperight", "circleopen"]);
-assert.deepEqual(Transitions.PICKER.map(([, id]) => id), ["溶解", "黑場", "向左擦除", "向右擦除", "圓形展開"]);
+assert.deepEqual(["無", "溶解", "黑場", "向左擦除", "向右擦除", "圓形展開", "pixelize"].map((id) => Transitions.wire(id)), ["none", "fade", "fadeblack", "wipeleft", "wiperight", "circleopen", "pixelize"]);
+assert.deepEqual(Transitions.PICKER.map(([, id]) => id), Transitions.LIST.slice(1).map((t) => t.id));
 const esc = (s) => String(s);
 const html = Transitions.buttons({ label: "轉場", value: "crossfade", esc });
 assert.match(html, /aria-pressed="true"[^>]*>溶解<small> ＝交叉淡化/);

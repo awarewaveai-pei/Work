@@ -2,4 +2,7 @@
 .editor-transition-length { display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 2px; }
 .editor-transition-length input { width:84px; }
 .editor-transition-actions { display:flex;flex-wrap:wrap;gap:4px;margin-top:10px; }
-.editor-library .flow-choices[aria-label="轉場"] .btn,.editor-library .flow-choices[aria-label="轉場曲線"] .btn { margin:2px; }
+.editor-library [role="group"][aria-label="轉場"] .flow-choices .btn,.editor-library .flow-choices[aria-label="轉場曲線"] .btn { margin:2px; }
+/* card R4: the exact preview of a transition (backend/transitions.cjs preview) */
+.editor-transition-preview { margin-top:10px; }
+.editor-transition-preview video { display:block;max-width:100%;border-radius:var(--radius-sm);background:var(--code-bg); }
