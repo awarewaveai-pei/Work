@@ -1,4 +1,28 @@
 # Worklog
+## 2026-11-20（續20）— 部署前先問 CI：今天四次部署失敗的根因與修正（操作者：「部署一直fail 是怎樣? 光今天才下午3點半就已經就4次」）
+
+- 根因（四次失敗各對一個洞，主機 log `/root/lobster-phase1/logs/`）：
+  - C1 00:50 `sg-deploy-20261119-164339.log`：工作台 `tests/r1-cover-template.cjs` 寫死 `../../next-admin`。CI 在 checkout 裡跑（旁邊有 next-admin）是綠的，映像檔只有 app 自己 → 主機紅（修正 `18cecdd68`）。
+  - C2 13:54、15:30 `sg-deploy-20261120-055241.log`／`-072833.log`：主系統完整測試只在 `sg-deploy.sh` 跑（`.github/workflows/next-admin-typecheck.yml` 只有 tsc），掃全庫的規則測試 `image-upload-limit`、`accent-not-text` 到主機才紅。
+  - C3 14:05 `sg-deploy-20261120-055709.log`：`video-workbench-ci.yml` 在 12:59（run 44677967394）、13:40（run 44682601059）已紅在同一個 `r4-transitions-table`，部署照送。
+- 不變量：部署只從「CI 已對這版的檔案給出綠燈」的 commit 開始；CI 跑的閘與部署閘同一份、同一種擺法。
+- 已修改：
+  - `79a6422d0` `.github/workflows/next-admin-test.yml`（新，`npm test`，Node 20）；`video-workbench-ci.yml` Gate 步驟改在 `$RUNNER_TEMP` 的副本裡跑（旁邊沒有 repo）。
+  - `lobster-factory/infra/hetzner-phase1-core/scripts/check-ci-green.sh`（新）：app → workflow 對照只在 `app_workflows`；取 main 上「commit 是部署版本或其祖先」的最新 run；workflow 自己的 `on.push.paths` 檔案在那次 run 之後有變 → 視為新 run 尚未列出、等；exit 0 綠／1 不綠／2 問不到。
+  - `sg-deploy.sh` 步驟 1.87：exit 1 → `refuse`（75）＋寫 `.ci-gate-refused`；exit 2 → 照常往下（後面的閘仍擋）；`CI_GATE_OVERRIDE=1`；`--dry-run` 只報告不等。
+  - `auto-deploy-next-admin.sh`：75 且有 `.ci-gate-refused` → 發「今晚沒有自動部署」（紅的 main 不靜默跳過）；呼叫 sg-deploy 前先清旗標。
+  - `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §1.5 CI 閘列＋步驟表 1.87；`next-admin-typecheck.yml` 過時註解；`sg-deploy.yml` `timeout-minutes` 20→35（等 CI 最多 15 分）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=gh run view 44698388379（next-admin-test，79a6422d0，success，3 分 9 秒）＋ 44698388287（video-workbench 副本擺法，success）；`bash check-ci-green.sh /d/Work <commit> <app>` 對真實 GitHub：綠→0、failure→1、cancelled→1、還在跑 wait=0→1、等到跑完→0、無 run 涵蓋→1、問不到→2、無 workflow 的 app→0；主機 origin 形狀 `git@github.com-work:owner/repo.git` 的 clone→1（紅）、不存在的 repo→2；`sg-deploy.sh` 1.87 區塊原文 source 進測試殼跑六條路（綠續行／紅 75＋旗標／override／dry-run／問不到續行／無閘 app） | exit=0 | ms=600000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/0m/3n（三條皆已修：m1 紅燈後剛推修正、新 run 未列出會誤擋 → 改比對 `on.push.paths` 檔案，以存下的真實 run 清單模擬驗證「等、不判紅」；m2 警報截到頭 800 字會漏原因 → `tail -c 800`；m3 `sg-deploy.yml` 20 分鐘上限不含等 CI → 35）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02（scripts/oracle-quota.ps1）；改由 critic agent 獨立審＋書面自審。自審抓到 C：主機 origin 是 ssh 別名，原 sed 只認 `github.com` → slug 空 → 閘永遠 exit 2 等於啞掉；已改成取 origin 最後兩段並實測。突變：1.87 區塊副本拔掉 `refuse` 行 → 紅 CI 案例變成續行（測試紅），原文 → 75。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github,.claude | grep=check-ci-green|ci-gate-refused|CI_GATE_ | hits=22（全在本次七個檔；`.claude/commands`、`.claude/agents` 0；讀 sg-deploy exit 75 的只有 `auto-deploy-next-admin.sh:208`；`.github/workflows/sg-deploy.yml` 任何非零皆失敗，行為不變）
+- 未做／未驗證：
+  - 新腳本尚未在主機實跑：主機 `scripts/` 由 `sync-host-scripts.sh` 在下一次部署或 03:00 tick 同步；第一次部署 log 要看到 `--- CI gate ---` 與三行 `ci-gate: … green`。若出現 `could not ask GitHub`＝閘沒在作用，要查。
+  - 未登入查 GitHub 每 IP 每小時 60 次（本機測試用完過一次，走的就是 exit 2 續行）。主機一次部署 3 次＋等待時每分鐘每個未完成 workflow 1 次；一小時內密集部署會退回「問不到 → 照常往下」。
+  - 只有真映像檔測得出的（Blender、apt 的 ffmpeg）仍只在主機 3.5 閘擋。
+  - `video-workbench-ci.yml` 的 paths 是手列 20 條；工作台新增打包的 next-admin 檔而沒補 paths 時，CI 不會為它跑、舊綠燈仍被採信。
+- 避免再發：新增可部署 app 的 CI workflow 時，在 `check-ci-green.sh` `app_workflows` 加一行（唯一對照處）。
+- rollback：`git revert <本 commit>`（還原 1.87 與旗標邏輯；主機下次同步即回舊版）；CI 兩檔 `git revert 79a6422d0`。
 ## 2026-11-20（續19）— 影片 R3（橫幅字卡當片頭）上線；RISKS 處理（217 張舊設計補尺寸）；上線實測抓到片頭渲染 160 秒 → 開 R5（操作者：「RISKS 去處理」「go」）
 
 - 併入：`e9514260a`、`1cb25cdc4`（編輯片頭對話框同一個挑選器；員工存檔選客戶；設計帶尺寸）、`3927a21fe`（比例不同整張放＋模糊底；直式標題 ≥ 寬 9%）、`7ae5d060b`（部署 npm test 擋：`IntroStyleButtons.tsx:77` 連結用 `var(--accent)` 當字色 → `var(--accent-text)`，`lib/theme/__tests__/accent-not-text.test.ts`）。

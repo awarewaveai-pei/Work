@@ -56,6 +56,7 @@
 | 強制 | `sg-deploy.sh` 步驟 1.85（讀 `origin/main:DEPLOY_HOLD`，refuse 並印 `reason=`） |
 | 自動路徑 | `auto-deploy-next-admin.sh`（cron `0 19` UTC＝台灣 03:00，每天一次，操作者 2026-10-15）有 hold 就跳過，**不發 Slack／Telegram**；`check-drift-and-alert.sh`（cron `0 20` UTC＝台灣 04:00，部署後一小時；還有落差＝當晚沒部署成）同樣靜音 — 否則兩支都在叫人部署 hold 正要擋的東西 |
 | migration 閘 | `sg-deploy.sh` 步驟 1.86 跑 `check-migrations-applied.sh`：repo 有、正式庫帳本（`schema_migrations`）沒有的 migration 存在 → 拒絕部署並發警報（exit 1，不是 75）。先 `node scripts/apply-db-migration.mjs <號碼>`；程式確定不需要那些 migration 才用 `MIGRATION_GATE_OVERRIDE=1`。讀不到帳本（exit 2）一律擋、不可 override。只檢查 next-admin／node-api 的部署；`--dry-run` 只報告。**套完 migration 立刻手動部署**，別等當晚：會取代或改簽名的函式（如 0101）一套上，線上舊程式就可能壞——這種改動先「擴充」（新舊並存）、程式上線後再「收斂」（刪舊）。auto-deploy 失敗警報會寫出是 migration 閘擋下（`.migration-gate-failed` 第一行＝exit code） |
+| CI 閘 | `sg-deploy.sh` 步驟 1.87 跑 `check-ci-green.sh`（2026-11-20）：部署 app 對應的 workflow（對照表只在該腳本 `app_workflows`：next-admin → `next-admin-typecheck.yml`＋`next-admin-test.yml`；video-workbench → `video-workbench-ci.yml`），取 main 上「commit 是部署版本或其祖先」的最新一次 run，必須 completed＋success；還在跑、或該 workflow `on.push.paths` 的檔案在那次 run 之後又變了（新 run 還沒列出）就等（預設最多 900 秒）。CI 自己壞（非程式問題）→ 在 GitHub 重跑該 run。不綠 → 拒絕（exit 75，手動部署不發失敗通知；auto-deploy 讀 `.ci-gate-refused` 發「今晚沒有自動部署」）。問不到 GitHub（exit 2）→ 照常往下，後面的閘仍會擋。單次繞過 `CI_GATE_OVERRIDE=1`。`--dry-run` 只報告、不等 |
 | 腳本新鮮度 | 上面兩支 cron 腳本決策前先跑 `sync-host-scripts.sh`（主機 `scripts/` = `origin/main`），自身被換掉就 re-exec 新版 → 改它們的邏輯下一個 tick 就生效。2026-09-23 07:00Z 的「auto-deploy FAILED」誤報就是舊版 caller（無 hold 檢查）先決策造成 |
 | 浮出 | `check-smoke-tests.ps1` 的 `deploy_hold` → AO-RESUME §1 每次開工都看得到；> 14 天升 `warn:hold_stale_<N>d` |
 | 也會提醒 | `check-deploy-drift.ps1`／`/check-drift`／AO-CLOSE 的 deploy hint：有 hold 時改印「不要跑 sg-deploy」 |
@@ -93,6 +94,7 @@
 | 1 | `cd /root/Work && git fetch + git pull --ff-only origin main` | 非 fast-forward → 立即 fail（保留現狀，需要人介入） |
 | 1.8 | `sync-host-scripts.sh`：`origin/main` 的 `scripts/` 裝進 `/root/lobster-phase1/scripts`（全部 `.sh` 過 `bash -n` 才裝、rename 替換、部署進行中不換）；`sg-deploy.sh` 自己變了就 re-exec 新版 | 任一 `.sh` 語法錯 → 一個都不裝、deploy fail（急用：手動 `git pull` 後 `--skip-pull`） |
 | 1.85 | `DEPLOY_HOLD` 在 `origin/main` → 拒絕（§1.5） | fail；auto-deploy 在呼叫前就先靜默跳過 |
+| 1.87 | CI 閘：該版的 CI 要全綠（§1.5） | 拒絕（exit 75），什麼都沒動；修好或等 CI 跑完再部署 |
 | 1.5 | `npm test`（next-admin 專屬 test gate，35 vitest tests） | test 失敗 → 立即 fail abort deploy，舊版繼續跑 |
 | 2 | `rsync -av --delete --exclude='.env*' --exclude='node_modules' --exclude='.next' /root/Work/.../apps/<APP>/ /root/lobster-phase1/apps/<APP>/` | rsync 錯誤 → fail，staging 保持原狀 |
 | 2.5 | 對每個 RESTORABLE app 執行 `rollback-phase1.sh save`：快照**正在跑的 container 的 image**（沒有 container 才用 `:local`；兩者都沒有＝首次部署，印 `Saved: NONE`），並記下本次 tag（2026-09-19 起） | 腳本不可執行或 save 失敗 → 在 build 前 fail，**不在沒有回滾點的情況下部署** |

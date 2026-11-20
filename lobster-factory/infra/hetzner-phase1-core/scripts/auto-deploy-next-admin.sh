@@ -185,6 +185,8 @@ SMOKE_WARN_SUFFIX=""
 ROLLBACK_SUFFIX=""
 NEW_COMMIT="${DEPLOYED}"
 # This script sends its own outcome message below; sg-deploy.sh must not send a second one.
+# A flag left by an earlier manual deploy must not explain this run (sg-deploy can exit 75 on its lock before clearing it).
+rm -f "$DEPLOY_DIR/.ci-gate-refused"
 if SG_DEPLOY_NOTIFY=0 bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FILE" 2>&1; then
     NEW_COMMIT=$(cat "$DEPLOY_DIR/.deployed-commit" | tr -d '[:space:]')
     log "SUCCESS: $APP deployed to ${NEW_COMMIT:0:12}"
@@ -201,9 +203,17 @@ if SG_DEPLOY_NOTIFY=0 bash "$DEPLOY_DIR/scripts/sg-deploy.sh" "$APP" >> "$LOG_FI
     probe_models_after_deploy || true
 else
     _deploy_rc=$?
-    # 75 = sg-deploy refused on purpose (DEPLOY_HOLD pushed after the check above, or another deploy
-    # holds its lock): not a failure, the next tick re-evaluates. Alerting on it is the 07:00Z shape.
+    # 75 = sg-deploy refused on purpose (DEPLOY_HOLD pushed after the check above, another deploy holds
+    # its lock, or its CI gate): not a failure, the next tick re-evaluates. Alerting on hold/lock is the 07:00Z shape.
     if [[ "$_deploy_rc" -eq 75 ]]; then
+        # sg-deploy step 1.87 refused: main's CI is red or unfinished. Not silent -- a red main would otherwise skip every night unseen.
+        if [[ -f "$DEPLOY_DIR/.ci-gate-refused" ]]; then
+            log "REFUSED by sg-deploy: CI not green (see above)"
+            printf '🟠 今晚沒有自動部署 — SG next-admin\nmain 上的自動檢查（CI）不是全綠，所以沒有部署；正式站維持原版，沒有壞。\n%s\n處理：修好讓 CI 變綠；明天 03:00 會自動帶上，或修好後手動部署。\n（技術資訊：auto-deploy refused by CI gate, deployed=%s, origin=%s）' \
+                "$(tail -c 800 "$DEPLOY_DIR/.ci-gate-refused")" "${DEPLOYED:0:12}" "${REMOTE_HEAD:0:12}" \
+                | "$(dirname "$SELF_PATH")/notify.sh" --slack SLACK_WEBHOOK_URL >/dev/null 2>&1 || log "CI gate alert: notify incomplete"
+            exit 0
+        fi
         log "REFUSED by sg-deploy (hold or deploy in progress, see above) -- no alert, next tick re-evaluates"
         exit 0
     fi

@@ -4,6 +4,7 @@ name: next-admin — full test suite
 # the same command as sg-deploy.sh's npm test gate, on the host's Node major (20).
 # Until 2026-11-20 the whole suite ran only inside a deploy, so a rule test that scans the source tree
 # (accent-not-text, image-upload-limit) first went red on the host, minutes into a deploy.
+# sg-deploy.sh step 1.87 (check-ci-green.sh) refuses to start a deploy while this workflow's run is not green.
 # Second job of the same defence as next-admin-typecheck.yml; sg-deploy.sh's own gate stays the hard stop.
 
 on:

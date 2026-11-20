@@ -53,8 +53,8 @@ SELF_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOG_FILE"; }
 fail() { LAST_ERROR="$*"; log "ERROR: $*"; exit 1; }
-# 75 = EX_TEMPFAIL: refused on purpose (DEPLOY_HOLD, or another deploy holds the lock), not broken.
-# auto-deploy-next-admin.sh skips the tick without an alert on 75; every other non-zero alerts.
+# 75 = EX_TEMPFAIL: refused on purpose (DEPLOY_HOLD, another deploy holds the lock, or step 1.87's CI gate), not broken.
+# auto-deploy-next-admin.sh skips the tick without an alert on 75, except a CI-gate refusal; every other non-zero alerts.
 refuse() { log "REFUSED: $*"; exit 75; }
 
 SKIP_PULL=0
@@ -230,6 +230,30 @@ if [[ $_mig_needed -eq 1 ]]; then
     fi
     fail "migration gate could not check the ledger (exit $_mig_rc) -- refusing to deploy unverified"
   fi
+fi
+
+# 1.87. CI gate. GitHub Actions runs the gates below (1.5, and 3.5's tests/gate.cjs) on every push; asking for that
+# verdict first turns a failure minutes into a deploy into a refusal in seconds (four failed deploys, 2026-11-20).
+# check-ci-green.sh has the rule and waits for a run still going. Exit 1 = not green: refused (75, so no failure
+# alert from here; the flag file lets auto-deploy-next-admin.sh say why the night was skipped). Exit 2 = could not
+# ask GitHub: go on, the gates below still decide. CI_GATE_OVERRIDE=1 goes on past a red or unfinished run.
+CI_FLAG="$STAGING_DIR/.ci-gate-refused"
+rm -f "$CI_FLAG"
+log "--- CI gate ---"
+_ci_out="$(mktemp)"
+set +e
+CI_GATE_WAIT_SECONDS="$([[ $DRY_RUN -eq 1 ]] && echo 0 || echo "${CI_GATE_WAIT_SECONDS:-900}")" \
+  bash "$(dirname "$SELF_PATH")/check-ci-green.sh" "$REPO_DIR" "$(git -C "$REPO_DIR" rev-parse HEAD)" "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" "$_ci_out"
+_ci_rc=${PIPESTATUS[0]}
+set -e
+if [[ $_ci_rc -eq 1 && $DRY_RUN -eq 0 && "${CI_GATE_OVERRIDE:-0}" != "1" ]]; then
+  mv -f "$_ci_out" "$CI_FLAG"
+  refuse "CI is not green for this commit (see above) -- fix main or wait for the run, then deploy again; CI_GATE_OVERRIDE=1 skips this"
+fi
+rm -f "$_ci_out"
+if [[ $_ci_rc -eq 1 && $DRY_RUN -eq 1 ]]; then log "dry-run: the CI gate would refuse this deploy"
+elif [[ $_ci_rc -eq 1 ]]; then log "CI gate: not green, CI_GATE_OVERRIDE=1 set -- continuing"
+elif [[ $_ci_rc -ne 0 ]]; then log "CI gate could not ask GitHub (exit $_ci_rc) -- continuing, the gates below decide"
 fi
 
 # 2. rsync each app

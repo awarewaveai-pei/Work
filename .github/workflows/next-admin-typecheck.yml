@@ -8,8 +8,8 @@ name: next-admin — TypeScript typecheck
 #   someone deploys. This CI surfaces it within ~90s of the push.
 #
 # Why not rely only on this CI?
-#   CI is non-blocking (no branch protection enforced); sg-deploy.sh tsc gate is
-#   the hard stop that prevents a broken build from reaching production.
+#   CI does not block a push (no branch protection enforced). sg-deploy.sh step 1.87 refuses to
+#   start a deploy while this workflow is red; its own tsc gate is the hard stop.
 #
 # Together they form two independent layers of the same defence.
 
