@@ -11,6 +11,7 @@ import {
 } from './baziAnalysis';
 import type { Gender, CalendarType } from './ziwei';
 import { findBaziRelations, type BaziRelation, type PillarChars } from './baziRelations';
+import { liChunYear, yearGanZhi } from './liChun';
 import { findShensha, type ShenshaHit } from './baziShensha';
 
 /**
@@ -122,10 +123,8 @@ const LUCK_STEPS = 8;
 
 /** 基準日的流年:立春前仍屬前一年。 */
 function liuNianOf(d: { year: number; month: number; day: number }): BaziLuck['liuNian'] {
-  const ganZhi = Solar.fromYmd(d.year, d.month, d.day).getLunar().getYearInGanZhiByLiChun();
-  // 年中(6/1)必在立春與春節之後,其年干支即該國曆年的干支
-  const sameYear = Solar.fromYmd(d.year, 6, 1).getLunar().getYearInGanZhi() === ganZhi;
-  return { year: sameYear ? d.year : d.year - 1, ganZhi };
+  const year = liChunYear(d.year, d.month, d.day);
+  return { year, ganZhi: yearGanZhi(year) };
 }
 
 function todayYmd(): { year: number; month: number; day: number } {

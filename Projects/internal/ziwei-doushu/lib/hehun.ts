@@ -1,4 +1,4 @@
-import { Solar } from 'lunar-javascript';
+import { liChunYear, yearGanZhi } from './liChun';
 import type { BaziAnalysisDisplay, BaziPillar } from './bazi';
 import type { WuXing } from './baziAnalysis';
 
@@ -99,11 +99,11 @@ export function animalOf(zhi: string): string {
 }
 
 /**
- * 出生日 → 年支(生肖以立春換年,取 lunar-javascript 八字年柱,與 lib/bazi.ts 同源)。
- * 只給日期時以當日正午計;恰好立春當天、交節時刻前出生者可能差一年,需改用完整八字模式。
+ * 出生日 → 年支(生肖以立春換年)。只給日期時立春當日即算新年(lib/liChun.ts);
+ * 立春當天、交節時刻前出生者可能差一年,需改用完整八字模式。
  */
 export function yearBranchOf(year: number, month: number, day: number): string {
-  return Solar.fromYmdHms(year, month, day, 12, 0, 0).getLunar().getEightChar().getYearZhi();
+  return yearGanZhi(liChunYear(year, month, day))[1];
 }
 
 // ---- 地支關係(索引算術:子=0 … 亥=11) ----

@@ -25,6 +25,9 @@ describe('findShensha — 每個神煞一例', () => {
   it('華蓋:年支辰(申子辰)見辰 → 年支', () => expect(at(A, 'huaGai')).toEqual(['year']));
   it('驛馬:日支午(寅午戌)見申 → 月支', () => expect(at(A, 'yiMa')).toEqual(['month']));
   it('羊刃:丙見午 → 日支', () => expect(at(A, 'yangRen')).toEqual(['day']));
+  it('羊刃:陰干辛見申(祿前一位),不取子', () => {
+    expect(at(chart('甲甲辛甲', '子申丑丑'), 'yangRen')).toEqual(['month']);
+  });
   it('祿神:甲見寅 → 月支', () => expect(at(B, 'luShen')).toEqual(['month']));
   it('桃花:年支子(申子辰)見酉 → 時支', () => {
     expect(at(chart('甲甲甲甲', '子丑丑酉'), 'taoHua')).toEqual(['hour']);

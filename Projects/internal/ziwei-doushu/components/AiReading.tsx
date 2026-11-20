@@ -23,14 +23,15 @@ export default function AiReading({
   // 解讀綁定產生它的那份事實:換人／重抽後 context 變了,舊解讀就不再顯示。
   const [reading, setReading] = useState<{ sig: string; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [errorSig, setErrorSig] = useState<string | null>(null);
 
   const sig = JSON.stringify(context);
   const text = reading?.sig === sig ? reading.text : null;
+  const error = errorSig === sig;
 
   async function run() {
     setLoading(true);
-    setError(false);
+    setErrorSig(null);
     setReading(null);
     try {
       const res = await fetch('/api/interpret', {
@@ -42,7 +43,7 @@ export default function AiReading({
       const data = (await res.json()) as { text?: unknown };
       setReading({ sig, text: typeof data.text === 'string' ? data.text : '' });
     } catch {
-      setError(true);
+      setErrorSig(sig);
     } finally {
       setLoading(false);
     }

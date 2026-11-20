@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import AiReading from '@/components/AiReading';
 import { computeFengshui, toContext, type FengshuiResult } from '@/lib/divination/systems/fengshui';
-import { liChunYear, type Palace } from '@/lib/fengshui/feixing';
+import { type Palace } from '@/lib/fengshui/feixing';
+import { liChunYear } from '@/lib/liChun';
 import { AUSPICIOUS, INAUSPICIOUS } from '@/lib/fengshui/bazhai';
 import type { Gender } from '@/lib/ziwei';
 import type { Locale } from '@/lib/i18n/config';

@@ -56,8 +56,9 @@ const WEN_CHANG: Record<string, string> = {
 const LU: Record<string, string> = {
   甲: '寅', 乙: '卯', 丙: '巳', 丁: '午', 戊: '巳', 己: '午', 庚: '申', 辛: '酉', 壬: '亥', 癸: '子',
 };
+// 陽干取帝旺(祿後一位)、陰干取祿前一位。辛祿在酉 → 申;bazi-skill 原表寫「辛子」為誤植(子是辛的長生)。
 const YANG_REN: Record<string, string> = {
-  甲: '卯', 乙: '寅', 丙: '午', 丁: '巳', 戊: '午', 己: '巳', 庚: '酉', 辛: '子', 壬: '子', 癸: '亥',
+  甲: '卯', 乙: '寅', 丙: '午', 丁: '巳', 戊: '午', 己: '巳', 庚: '酉', 辛: '申', 壬: '子', 癸: '亥',
 };
 
 const RULES: readonly ShenshaRule[] = [

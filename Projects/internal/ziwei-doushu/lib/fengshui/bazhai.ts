@@ -1,5 +1,6 @@
 import type { Gender } from '@/lib/ziwei';
-import { annualStar, liChunYear, PALACE_DIRECTION, type Direction, type Palace } from './feixing';
+import { liChunYear } from '../liChun';
+import { annualStar, PALACE_DIRECTION, type Direction, type Palace } from './feixing';
 
 /**
  * 八宅(八宅明鏡)命卦與遊年八方 — 純函式。

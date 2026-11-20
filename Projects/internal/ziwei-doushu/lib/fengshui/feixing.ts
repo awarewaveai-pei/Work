@@ -1,4 +1,4 @@
-import { Solar } from 'lunar-javascript';
+import { liChunYear } from '../liChun';
 
 /**
  * 玄空飛星(沈氏玄空學)— 純函式,只算事實,解讀交給 AI 層。
@@ -73,16 +73,6 @@ export function degreeToMountain(degree: number): MountainReading {
       ? MOUNTAINS[mod(index + Math.sign(deviation), 24)]
       : null;
   return { index, mountain: MOUNTAINS[index], palace: palaceOfMountain(index), deviation, jian };
-}
-
-const GAN = '甲乙丙丁戊己庚辛壬癸';
-const ZHI = '子丑寅卯辰巳午未申酉戌亥';
-
-/** 以立春換年;借八字年柱(立春精確時刻換柱),只給日期時立春當日即算新年。 */
-export function liChunYear(year: number, month: number, day: number): number {
-  const pillar = Solar.fromYmdHms(year, month, day, 23, 59, 59).getLunar().getEightChar().getYear();
-  const i = mod(year - 4, 60);
-  return pillar === GAN[i % 10] + ZHI[i % 12] ? year : year - 1;
 }
 
 /** 三元九運:1864 起一運,每運 20 年。 */
