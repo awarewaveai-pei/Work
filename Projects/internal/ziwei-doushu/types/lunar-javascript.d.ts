@@ -55,6 +55,16 @@ declare module 'lunar-javascript' {
   }
 
   export class Lunar {
+    /** month 為負數 = 閏月 */
+    static fromYmdHms(
+      year: number,
+      month: number,
+      day: number,
+      hour: number,
+      minute: number,
+      second: number,
+    ): Lunar;
+    getSolar(): Solar;
     getEightChar(): EightChar;
     getYearShengXiao(): string;
     getDayGan(): string;
@@ -77,5 +87,8 @@ declare module 'lunar-javascript' {
     ): Solar;
     static fromYmd(year: number, month: number, day: number): Solar;
     getLunar(): Lunar;
+    getYear(): number;
+    getMonth(): number;
+    getDay(): number;
   }
 }

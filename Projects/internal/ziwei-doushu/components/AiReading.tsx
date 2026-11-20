@@ -20,14 +20,18 @@ export default function AiReading({
   ai: Dictionary['ai'];
   tier?: 'light' | 'deep';
 }) {
-  const [text, setText] = useState<string | null>(null);
+  // 解讀綁定產生它的那份事實:換人／重抽後 context 變了,舊解讀就不再顯示。
+  const [reading, setReading] = useState<{ sig: string; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+
+  const sig = JSON.stringify(context);
+  const text = reading?.sig === sig ? reading.text : null;
 
   async function run() {
     setLoading(true);
     setError(false);
-    setText(null);
+    setReading(null);
     try {
       const res = await fetch('/api/interpret', {
         method: 'POST',
@@ -36,7 +40,7 @@ export default function AiReading({
       });
       if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as { text?: unknown };
-      setText(typeof data.text === 'string' ? data.text : '');
+      setReading({ sig, text: typeof data.text === 'string' ? data.text : '' });
     } catch {
       setError(true);
     } finally {

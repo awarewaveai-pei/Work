@@ -90,3 +90,45 @@ describe('八字系統 adapter', () => {
     expect(context.facts.find((f) => f.label === 'dayMaster')?.value).toBe('丙');
   });
 });
+
+describe('computeBazi — 農曆輸入與繁中用字', () => {
+  const base = { hour: 12, minute: 0, gender: '女', calendar: 'solar' } as const;
+
+  it('農曆 2000 正月初一 = 國曆 2000-02-05,四柱相同', () => {
+    const lunar = computeBazi({ ...base, year: 2000, month: 1, day: 1, calendar: 'lunar' });
+    const solar = computeBazi({ ...base, year: 2000, month: 2, day: 5 });
+    expect(lunar.pillars).toEqual(solar.pillars);
+  });
+
+  it('閏月:農曆 2001 閏四月初一 = 國曆 2001-05-23', () => {
+    const lunar = computeBazi({
+      ...base, year: 2001, month: 4, day: 1, calendar: 'lunar', isLeapMonth: true,
+    });
+    const solar = computeBazi({ ...base, year: 2001, month: 5, day: 23 });
+    expect(lunar.pillars).toEqual(solar.pillars);
+  });
+
+  it('六十甲子的納音、十二長生、十神、生肖都是繁體', () => {
+    const NAYIN = '海中金 爐中火 大林木 路旁土 劍鋒金 山頭火 澗下水 城頭土 白蠟金 楊柳木 泉中水 屋上土 霹靂火 松柏木 長流水 沙中金 山下火 平地木 壁上土 金箔金 覆燈火 天河水 大驛土 釵釧金 桑柘木 大溪水 沙中土 天上火 石榴木 大海水'.split(' ');
+    const DISHI = '長生 沐浴 冠帶 臨官 帝旺 衰 病 死 墓 絕 胎 養'.split(' ');
+    const SHISHEN = '比肩 劫財 食神 傷官 偏財 正財 七殺 正官 偏印 正印 日主'.split(' ');
+    const ZODIAC = [...'鼠牛虎兔龍蛇馬羊猴雞狗豬'];
+    const seenNaYin = new Set<string>();
+    for (let i = 0; i < 60; i++) {
+      // 每 61 天取一日、時辰輪轉 → 涵蓋六十日柱與十二生肖年
+      const d = new Date(Date.UTC(1990, 0, 1 + i * 61));
+      const r = computeBazi({
+        ...base, hour: (i * 2) % 24,
+        year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(),
+      });
+      expect(ZODIAC).toContain(r.zodiac);
+      for (const p of Object.values(r.pillars)) {
+        expect(NAYIN).toContain(p.naYin);
+        expect(DISHI).toContain(p.diShi);
+        expect(SHISHEN).toContain(p.shiShen);
+        seenNaYin.add(p.naYin);
+      }
+    }
+    expect(seenNaYin.size).toBe(30);
+  });
+});

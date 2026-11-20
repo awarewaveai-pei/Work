@@ -1,4 +1,4 @@
-import { Solar } from 'lunar-javascript';
+import { Lunar, Solar } from 'lunar-javascript';
 import {
   toTrueSolarTime,
   type TrueSolarResult,
@@ -17,7 +17,7 @@ import { findShensha, type ShenshaHit } from './baziShensha';
  * 八字四柱排盤 (lunar-javascript)。
  *
  * 注意:lunar-javascript 僅輸出簡體中文且無 i18n。本模組將高頻可見詞(十神/生肖)
- *   正規化到顯示 locale;干支/藏干/五行為繁簡共形,納音 passthrough。英文使用者
+ *   正規化到顯示 locale(十神/生肖/十二長生/納音逐字轉繁);干支/藏干/五行為繁簡共形。英文使用者
  *   的「解讀」由 AI 層依 locale 產生(命盤資料本身為命理通用記法)。
  * 時柱採真太陽時校正(與紫微同一套 trueSolarTime,準度核心)。
  */
@@ -98,22 +98,14 @@ export interface BaziResult {
   correction?: TrueSolarResult;
 }
 
-// 簡 → 繁 正規化(僅列繁簡相異者;其餘 passthrough)
-const SHISHEN_TW: Record<string, string> = {
-  劫财: '劫財', 伤官: '傷官', 偏财: '偏財', 正财: '正財', 七杀: '七殺',
+// 簡 → 繁 逐字正規化:lunar-javascript 的十神/生肖/十二長生/納音全部輸出字集中,
+//   繁簡相異者只有下列字(bazi.test.ts 以完整納音／長生／生肖／十神名單守住)。
+const S2T: Record<string, string> = {
+  财: '財', 伤: '傷', 杀: '殺', 龙: '龍', 马: '馬', 鸡: '雞', 猪: '豬',
+  长: '長', 带: '帶', 临: '臨', 养: '養', 绝: '絕',
+  涧: '澗', 炉: '爐', 杨: '楊', 剑: '劍', 锋: '鋒', 头: '頭', 蜡: '蠟', 雳: '靂',
+  灯: '燈', 驿: '驛', 钗: '釵', 钏: '釧',
 };
-const ZODIAC_TW: Record<string, string> = {
-  龙: '龍', 马: '馬', 鸡: '雞', 猪: '豬',
-};
-
-// lunar-javascript 十二長生為簡體
-const DISHI_TW: Record<string, string> = {
-  长生: '長生', 冠带: '冠帶', 临官: '臨官', 养: '養', 绝: '絕',
-};
-
-function toTW(value: string, map: Record<string, string>): string {
-  return map[value] ?? value;
-}
 
 // zh-CN(尚未上線,未來加入時)passthrough 簡體;其餘正規化為繁中。
 // cast 以容納未來新增的 locale,避免目前 union 不含 zh-CN 的型別誤判。
@@ -121,11 +113,9 @@ function isSimplified(locale: Locale): boolean {
   return (locale as string).startsWith('zh-CN');
 }
 
-function localizeShiShen(value: string, locale: Locale): string {
-  return isSimplified(locale) ? value : toTW(value, SHISHEN_TW);
-}
-function localizeZodiac(value: string, locale: Locale): string {
-  return isSimplified(locale) ? value : toTW(value, ZODIAC_TW);
+function localize(value: string, locale: Locale): string {
+  if (isSimplified(locale)) return value;
+  return [...value].map((ch) => S2T[ch] ?? ch).join('');
 }
 
 const LUCK_STEPS = 8;
@@ -145,7 +135,7 @@ function todayYmd(): { year: number; month: number; day: number } {
 
 /** 月令本氣十神 → 格局名(比肩/劫財 為特殊格)。 */
 function patternName(rawShiShen: string, locale: Locale): string {
-  const tw = localizeShiShen(rawShiShen, locale);
+  const tw = localize(rawShiShen, locale);
   if (tw === '比肩') return '建祿格';
   if (tw === '劫財') return '陽刃格';
   return `${tw}格`;
@@ -156,6 +146,14 @@ export function computeBazi(req: BaziRequest): BaziResult {
   let { year, month, day, hour, minute } = req;
   let correction: TrueSolarResult | undefined;
 
+  // 農曆輸入先轉國曆(閏月以負月份表示);該年無此閏月時 lunar-javascript 會拋錯。
+  if (req.calendar === 'lunar') {
+    const s = Lunar.fromYmdHms(year, req.isLeapMonth ? -month : month, day, hour, minute, 0).getSolar();
+    year = s.getYear();
+    month = s.getMonth();
+    day = s.getDay();
+  }
+
   if (req.trueSolar) {
     correction = toTrueSolarTime({
       year, month, day, hour, minute,
@@ -165,7 +163,7 @@ export function computeBazi(req: BaziRequest): BaziResult {
     ({ year, month, day, hour, minute } = correction);
   }
 
-  // 八字以節氣立年/月,農曆輸入先轉國曆再排(lunar-javascript 由國曆推八字)
+  // 八字以節氣立年/月(lunar-javascript 由國曆推八字)
   const solar = Solar.fromYmdHms(year, month, day, hour, minute, 0);
   const lunar = solar.getLunar();
   const ec = lunar.getEightChar();
@@ -182,10 +180,10 @@ export function computeBazi(req: BaziRequest): BaziResult {
     gan,
     zhi,
     ganZhi,
-    shiShen: localizeShiShen(shiShen, locale),
-    hiddenStems: hidden.map((h) => localizeShiShen(h, locale)),
-    naYin,
-    diShi: isSimplified(locale) ? diShi : toTW(diShi, DISHI_TW),
+    shiShen: localize(shiShen, locale),
+    hiddenStems: hidden.map((h) => localize(h, locale)),
+    naYin: localize(naYin, locale),
+    diShi: localize(diShi, locale),
   });
 
   // 大運:lunar-javascript 依節氣精算起運(3 日折 1 年);索引 0 為起運前小運,不列。
@@ -231,7 +229,7 @@ export function computeBazi(req: BaziRequest): BaziResult {
       hour: pillar(ec.getTime(), ec.getTimeGan(), ec.getTimeZhi(), ec.getTimeShiShenGan(), ec.getTimeShiShenZhi(), ec.getTimeNaYin(), ec.getTimeDiShi()),
     },
     dayMaster: ec.getDayGan(),
-    zodiac: localizeZodiac(lunar.getYearShengXiao(), locale),
+    zodiac: localize(lunar.getYearShengXiao(), locale),
     analysis: {
       strength: analysisRaw.strength,
       dayElement: analysisRaw.dayElement,
