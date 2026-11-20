@@ -27,6 +27,31 @@ declare module 'lunar-javascript' {
     getMonthNaYin(): string;
     getDayNaYin(): string;
     getTimeNaYin(): string;
+    getYearDiShi(): string;
+    getMonthDiShi(): string;
+    getDayDiShi(): string;
+    getTimeDiShi(): string;
+    getDayXunKong(): string;
+    /** gender: 1 男、0 女 */
+    getYun(gender: number): Yun;
+  }
+
+  export class Yun {
+    isForward(): boolean;
+    getStartYear(): number;
+    getStartMonth(): number;
+    getStartDay(): number;
+    /** n 步(含索引 0 的起運前小運) */
+    getDaYun(n?: number): DaYun[];
+  }
+
+  export class DaYun {
+    getIndex(): number;
+    getGanZhi(): string;
+    getStartAge(): number;
+    getEndAge(): number;
+    getStartYear(): number;
+    getEndYear(): number;
   }
 
   export class Lunar {
@@ -35,6 +60,8 @@ declare module 'lunar-javascript' {
     getDayGan(): string;
     getDayZhi(): string;
     getDayInGanZhi(): string;
+    getYearInGanZhi(): string;
+    getYearInGanZhiByLiChun(): string;
     getDayYi(): string[];
     getDayJi(): string[];
   }

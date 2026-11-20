@@ -87,7 +87,40 @@
     "pattern": "Pattern",
     "strength": "Strength",
     "favorable": "Favorable",
-    "avoid": "Unfavorable"
+    "avoid": "Unfavorable",
+    "diShi": "Life stage",
+    "xunKong": "Day void branches",
+    "luckTitle": "Luck pillars",
+    "luckForward": "Forward",
+    "luckBackward": "Backward",
+    "luckStart": "Begins {y}y {m}m {d}d after birth",
+    "luckAges": "Nominal age {a}–{b}",
+    "luckCurrent": "Current luck pillar",
+    "luckOutside": "Not within the eight luck pillars now",
+    "liuNian": "This year's pillar",
+    "relationsTitle": "Combinations & clashes",
+    "relationsNone": "No combinations, clashes, punishments or harms in the natal chart",
+    "relationKinds": {
+      "ganHe": "Stem combination",
+      "liuHe": "Six harmony",
+      "sanHe": "Three harmony",
+      "chong": "Clash",
+      "xing": "Punishment",
+      "hai": "Harm"
+    },
+    "shenshaTitle": "Auxiliary stars",
+    "shenshaNote": "Auxiliary stars are supporting evidence only, never a verdict on their own.",
+    "shenshaNone": "None of the common auxiliary stars appear in the natal chart",
+    "shenshaNames": {
+      "tianYi": "Heavenly Noble",
+      "wenChang": "Literary Star",
+      "taoHua": "Peach Blossom",
+      "yiMa": "Travelling Horse",
+      "huaGai": "Canopy Star",
+      "jiangXing": "General Star",
+      "luShen": "Prosperity Star",
+      "yangRen": "Goat Blade"
+    }
   },
   "iching": {
     "title": "I Ching",

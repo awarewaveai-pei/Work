@@ -87,7 +87,40 @@
     "pattern": "格局",
     "strength": "身強弱",
     "favorable": "喜用神",
-    "avoid": "忌神"
+    "avoid": "忌神",
+    "diShi": "長生",
+    "xunKong": "日柱空亡",
+    "luckTitle": "大運",
+    "luckForward": "順排",
+    "luckBackward": "逆排",
+    "luckStart": "出生後 {y} 年 {m} 月 {d} 日起運",
+    "luckAges": "虛歲 {a}–{b}",
+    "luckCurrent": "目前大運",
+    "luckOutside": "目前不在八步大運內",
+    "liuNian": "今年流年",
+    "relationsTitle": "合沖刑害",
+    "relationsNone": "原局無合沖刑害",
+    "relationKinds": {
+      "ganHe": "天干五合",
+      "liuHe": "地支六合",
+      "sanHe": "地支三合",
+      "chong": "六沖",
+      "xing": "三刑",
+      "hai": "相害"
+    },
+    "shenshaTitle": "神煞",
+    "shenshaNote": "神煞只作旁證，不單獨論命。",
+    "shenshaNone": "原局未見常用神煞",
+    "shenshaNames": {
+      "tianYi": "天乙貴人",
+      "wenChang": "文昌",
+      "taoHua": "桃花（咸池）",
+      "yiMa": "驛馬",
+      "huaGai": "華蓋",
+      "jiangXing": "將星",
+      "luShen": "祿神",
+      "yangRen": "羊刃"
+    }
   },
   "iching": {
     "title": "易經卜卦",
