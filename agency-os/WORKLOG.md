@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-20（續19）— 影片 R3（橫幅字卡當片頭）上線；RISKS 處理（217 張舊設計補尺寸）；上線實測抓到片頭渲染 160 秒 → 開 R5（操作者：「RISKS 去處理」「go」）
+
+- 併入：`e9514260a`、`1cb25cdc4`（編輯片頭對話框同一個挑選器；員工存檔選客戶；設計帶尺寸）、`3927a21fe`（比例不同整張放＋模糊底；直式標題 ≥ 寬 9%）、`7ae5d060b`（部署 npm test 擋：`IntroStyleButtons.tsx:77` 連結用 `var(--accent)` 當字色 → `var(--accent-text)`，`lib/theme/__tests__/accent-not-text.test.ts`）。
+- 監工看實跑截圖退回兩次：16:9 字卡放 9:16 被切成「你總是睡不」（派工單寫 cover 裁切＝監工錯）、9:16 標題過小。
+- 合併時另一 session 同時動 main → cherry-pick 衝突；`--abort`（sequencer head＝當前 HEAD，安全）後逐一重套乾淨，先前跑的 gate 作廢重跑。
+- RISKS：存錯客戶 → 已修（OrgPicker）；舊設計無尺寸 → 正式庫 `media_assets` 217 列以 HTTP range 讀檔頭補 `metadata.width/height`，改前備份 `/root/lobster-phase1/logs/media_assets-designs-metadata-backup-20261120.tsv`，結果 217/217；ffmpeg 7 → 上線後實跑。
+- 部署：`deploy-r3-20261120.sh`（Remotion build＋safe-infra-patch rc=0；sg-deploy 被 accent 測試擋）→ `deploy-r3b-20261120.sh` `RESULT ALL OK deployed 7ae5d060b`。
+- 實測新發現（開 R5）：正式 VW 容器內 `remotion.render` still-opener 16:9 2 秒 → 160305 / 162483 ms（筆電 9–12 s）；RS 容器 2 CPU／1 GiB／shm 64 MB。自動片頭上限 45 s → 正式機必逾時、退回無片頭原片（不擋）；cover-opener 推定同。
+- REALTEST_EVIDENCE: tool=SSH | cmd=正式 VW 容器 r3live（still-opener render → exportEditor 接 溶解）→ STILL-OPENER rendered 109849 bytes / EXPORT OK 713778 bytes；`playwright-runner.ps1 -Mode smoke` 34 passed 0 failed；本機 VW gate 兩模式 ok、NA tsc＋124 檔 759 測試、RS 16/16 | exit=0 | ms=1500000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/4m/0n（工人 critic 4 M 已修；監工看截圖退回 2 項已修）
+- ORACLE_WAIVED: Codex 額度到 2026-11-24
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=var(--accent) | hits=0（accent-not-text 測試全庫掃描綠）
+- rollback：Remotion `docker tag lobster-remotion-service:rollback-r3 lobster-remotion-service:local` 後 compose up；NA／VW `rollback-phase1.sh`；設計尺寸以備份 tsv 還原 metadata。
 ## 2026-11-20（續18）— oracle 批 3（擇日＋口徑標示）併入並部署 ks-aw-01；三批全部上線；sitemap 網域錯誤修正（操作者：「當然要部署在新機啊」）
 
 - 併入：Z1 `ee1635c6f`（`lib/zeri.ts`、`lib/s2t.ts` 共用簡→繁、八字／風水頁口徑一行）、監工修 `32b1437a9`（宜避開日只列觸犯項）、`043693fa9`（`lib/site.ts` 預設網域＋`deploy/DEPLOY.md` 取代 `DEPLOY-SG.md`）。

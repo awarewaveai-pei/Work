@@ -185,7 +185,7 @@ PLAN §8 的 20 列：2026-11-18 Soulful 實走全部能用（`data.mjs:184`）�
 - **N16 兩個「自動」頁**｜篩選（進行中／等你處理／過期）、每列一顆下一步、修水平溢出、員工門側欄改繁中、腳本頁舊說明與客戶下拉拿掉。｜Low｜fullstack-engineer（Sonnet）｜檔案：`app/video/(wb)/schedule/*`、`app/(shell)/tools/content/topics/*`、`app/sidebar-sections.ts`、`ScriptForge.tsx`。（收 S8–S11、A9、A10）
 - **N18 路由三件套登記**｜加 `content_publish`（high、要核准）、`member_email`（high、要核准）。｜Low｜fullstack-engineer（Sonnet）｜檔案：`lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`、`lobster-factory/workflow-risk-matrix.json`、`lobster-factory/docs/ROUTING_MATRIX.md`（同一 commit）。
 - 既有未修、照原編號併入本批：**B19**（社群編輯時區）、**B24**（每組織只推 3 支）、**B25**（靜止片預篩）、**B26**（續接先重出片）、**B1**（發布頁合併多比例）、**R1**（Remotion 封面模板，待決 5）。
-- 2026-11-20 第一則真發布實測後加入：**T1**（實測找到的四個介面問題）、**T2**（Instagram 主題標籤上限 30）、**T3**（標題空格檢查之前做好的文章不自動發）。同日操作者加開：**R2**（片首封面：封面做成開場並轉場進正片，自動與手動都能加；派工單 `briefs/R2-cover-opener.md`）。**R3**（橫幅工具當積木：橫幅字卡當片頭，接在 R2 之後）。**R4**（轉場加多：出片工具內建的轉場全部接進 R2 的轉場模組，分組按鈕）。
+- 2026-11-20 第一則真發布實測後加入：**T1**（實測找到的四個介面問題）、**T2**（Instagram 主題標籤上限 30）、**T3**（標題空格檢查之前做好的文章不自動發）。同日操作者加開：**R2**（片首封面：封面做成開場並轉場進正片，自動與手動都能加；派工單 `briefs/R2-cover-opener.md`）。**R3**（橫幅工具當積木：橫幅字卡當片頭，接在 R2 之後）。**R4**（轉場加多：出片工具內建的轉場全部接進 R2 的轉場模組，分組按鈕）。**R5**（片頭在正式機渲染太慢：約 160 秒，目標 30 秒內；監工上線實測發現）。
 
 拆不下去的：N5 原本一張，估 1.5–2 天（狀態機＋貼文拆分＋文章換連結）→ 已拆 N5a／N5b。
 
