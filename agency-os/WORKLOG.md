@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-20（續16）— oracle 補強批 2：清單與干支規則單一來源、表單下拉改按鈕、奇門遁甲、求籤（觀音靈籤百首）併入 main
+
+- 派工表與 RISKS：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/DISPATCH.md`。
+- 併入（`Projects/internal/ziwei-doushu/`）：S1 `bb30d9803`、U1 `8725f92f1`、M1 `736c8ea7c`、Q1 `0749084cc`＋`b98c8d003`＋`8d4751087`；整合 `55c8d5c2a`、`de4700215`、`4eb025456`。
+- 做了什麼：
+  - S1 `lib/divination/types.ts` `SYSTEM_IDS`（API 白名單同源）、`lib/site.ts` `PAGE_SLUGS`（導覽／首頁／sitemap 同源，`lib/site.test.ts` 檢查頁檔與 `nav` 字串）、`lib/ganzhi.ts`（干支五行與合沖刑害唯一來源）。
+  - M1 `lib/qimen/`：時家・轉盤・拆補・中五寄坤・23:00 換日；四個公開黃金盤。
+  - Q1 `lib/qian/data.ts`：四個見證者校勘（北海觀音＋解籤閣共用錯字視為一個）；整首多數 64 首、逐句 36 首、規則 3b（另一首詩不混拼）套用第 32、64 籤；`SINGLE_WITNESS_LINES` 23 句、`SINGLE_SOURCE_TITLES` 5 題由測試鎖定。
+- 根因（整合時處理）：M1、Q1 與 S1 同批並行，各自寫了清單項與干支表 → 併入時改走 `SYSTEM_IDS`／`PAGE_SLUGS`／`lib/ganzhi.ts`，Q1 在 `route.ts` 另寫的窮舉表捨棄。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd D:/Worktrees/Work/oracle-int/Projects/internal/ziwei-doushu && npx tsc --noEmit && npx vitest run → 186 passed／3 skipped；瀏覽器實開 /zh-TW/qimen（2026-11-20 15:20 起局＝立冬上元陰遁六局、值符天蓬→巽四、值使休門→巽四，手算一致）、/zh-TW/hehun（按鈕表單→開始合婚出結果）、/zh-TW/qian（抽得第 91 籤） | exit=0 | ms=1500
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（奇門自帶干支表，已修 `4eb025456`；critic 手推並實跑三盤含兩個旬首落中五）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02；改由 critic agent 獨立審整批 diff
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=GAN_WUXING|SYSTEM_ID_SET|SINGLE_SOURCE_POEMS | hits=0
+- 未做：未部署（High）；AI 解讀未對真實模型實跑（部署後 smoke 做）；批 3 Z1 擇日＋各頁口徑標示未開。
+- 避免再發：同批有「收斂清單」的卡時，其餘卡的 brief 寫明不碰清單、由監工併入時接（本批已照做，衝突皆機械可解）。
+- rollback：`git revert bb30d9803^..8d4751087`（九個 commit 僅動 `Projects/internal/ziwei-doushu/`）。
 ## 2026-11-20（續15）— oracle 補強批 1：塔羅牌間關係、八字大運神煞、合婚、風水併入 main；整合時修三個既有錯誤＋審查三條（操作者：「你是監工派工者」）
 
 - 來源：五個外部 skill（tarot-skill／bazi-skill 為 MIT，其餘三個無授權只參考做法）。派工表與 brief：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/DISPATCH.md`。
