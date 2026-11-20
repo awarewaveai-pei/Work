@@ -181,8 +181,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 // Downscale an uploaded reference image to a small JPEG data URL. A style reference does not
-// need full resolution, and keeping it small avoids the route's 10MB request-body limit
-// (a few full-res photos would blow past it → truncated body → "invalid_json").
+// need full resolution, and keeping it small keeps a few photos under the route's MAX_REF_CHARS cap.
 async function downscaleImageFile(file: File, maxDim = 1024, quality = 0.85): Promise<string> {
   const dataUrl = await readFileAsDataUrl(file);
   return new Promise((resolve, reject) => {

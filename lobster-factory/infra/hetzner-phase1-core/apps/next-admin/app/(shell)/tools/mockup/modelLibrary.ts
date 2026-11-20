@@ -51,7 +51,26 @@ export async function readJson<T extends object>(res: Response): Promise<T & { o
     const busy = res.status === 502 || res.status === 503 || res.status === 504;
     return { ok: false, error: busy
       ? `伺服器暫時沒有回應（HTTP ${res.status}），可能正在部署，請稍等一分鐘再試`
+      : res.status === 413 ? "圖太大，超過上傳上限（HTTP 413）"
       : `伺服器回傳了非預期的內容（HTTP ${res.status}）` } as T & { ok: boolean; error: string };
+  }
+}
+
+/** A generated 模特兒圖 (2K PNG, ~10 MB as base64) → a same-size JPEG (~1–2 MB). It is sent again as the identity
+ *  reference and on save. Undecodable here (no canvas, e.g. jsdom) → the original, unchanged. */
+export async function asJpeg(dataUrl: string, quality = 0.92): Promise<string> {
+  try {
+    const img = new Image();
+    img.src = dataUrl;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext("2d");
+    if (!g) return dataUrl;
+    g.drawImage(img, 0, 0);
+    return c.toDataURL("image/jpeg", quality);
+  } catch {
+    return dataUrl;
   }
 }
 

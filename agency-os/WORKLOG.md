@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-20（續12）— 模特兒印製：第 2 張 invalid_json、儲存沒出現 = 請求被 Next 截在 10MB（操作者：「修!」）
+
+- 根因：`middleware.ts` 存在 → Next 15.5.14 把請求體緩衝給 middleware，只留前 `middlewareClientMaxBodySize`（預設 10485760，`node_modules/next/dist/server/config-shared.js:220`；讀取點 `server/lib/router-utils/resolve-routes.js:111`），超過即靜默截斷 → 路由 `request.json()` 失敗回 `invalid_json`（`app/api/tools/studio/generate/route.ts:55`、`app/api/tools/presets/route.ts:149`）。Nano Banana 2.1 回 2K PNG：真實模特兒圖 7.16MB = base64 9.55M 字元；第 2 張把第 1 張當參考圖送出（`ModelLibraryStudio.tsx:171`）、儲存送整張（`:181`）→ 皆超過。prod `docker logs lobster-next-admin` 有 `Request body exceeded 10MB for /api/tools/studio/generate` 與 `/api/tools/presets`。
+- 不變量：Next 緩衝上限 = 邊緣 nginx 上限（app.aware-wave.com `client_max_body_size 50M`，`nginx/default.conf:266`）→ nginx 放行的請求不會被靜默截斷；各路由自己的 cap（如 generate 24M 字元）才是清楚的 413。
+- 改動：
+  - `next.config.ts` `experimental.middlewareClientMaxBodySize: "50mb"`；`lib/__tests__/request-body-limit.test.ts` 守兩邊相等。
+  - `modelLibrary.ts` `asJpeg`：生成照轉同尺寸 JPEG q0.92（無 canvas → 原圖）；`readJson` 413 → 「圖太大」。
+  - `ModelLibraryStudio.tsx` 生成結果經 `asJpeg`；兩處儲存改用 `readJson`。
+  - `TarotStudio.tsx:184` 過時的「10MB」註解改指 `MAX_REF_CHARS`。
+  - `nginx/default.conf` video 門 `location /`（轉 next-admin）加 `client_max_body_size 50M`（原繼承 server 層 500M）；測試改為「所有轉 next-admin 的 location 實際上限最大值 = Next 上限」（critic m1）。repo 改動，prod 需 `safe-infra-patch.sh` 套用（High，待操作者）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/__tests__/request-body-limit.test.ts "app/(shell)/tools/mockup/__tests__/model-flow.render.test.tsx" → 11 passed；tsc --noEmit 除既有 .next/types 殘檔外 0 錯；瀏覽器實跑 asJpeg 於真實模特兒圖 2048×2048：9547558 → 1404643 字元、182ms | exit=0 | ms=1820
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（m1 已修：video 門缺口；修前新測試紅、修後綠）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02（scripts/oracle-quota.ps1 exit 3）；書面自審＋突變：next.config 改 "10mb" → request-body-limit 測試紅（expected 10485760 to be 52428800），還原 → 綠。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=10MB request-body | hits=1（TarotStudio.tsx:184 已改）
+- 剩餘：今晚 03:00 自動部署前，prod 仍是 10MB；操作者畫面上未存的 2 張需等上線後再按儲存（未關分頁才在）。
+- rollback：還原本 commit。
 ## 2026-11-20（續11）— Mockup 主頁「免費預覽」改名「程式免費印」（操作者：「『免費預覽』改成『程式免費印』」）
 
 - 原因：續10 定案程式印為正式出圖方式（AI 印會改圖案），按鈕仍叫「預覽」。

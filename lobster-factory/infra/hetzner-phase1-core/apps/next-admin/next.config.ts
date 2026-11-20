@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
   // sg-deploy runs `npm run typecheck` (next typegen + tsc, the same route-type validation next build does) as a gate
   // before the image build and then passes NEXT_TYPECHECK_DONE=1, so the build skips its second, ~60s copy. Any
   // other build (local, CI) still checks.
+  // middleware.ts exists, so Next buffers every request body for it and silently keeps only the first N bytes (default
+  // 10 MB): a 2K PNG sent as base64 was cut and the route answered "invalid_json" (2026-11-20). Kept equal to the
+  // app.aware-wave.com client_max_body_size in nginx/default.conf (lib/__tests__/request-body-limit.test.ts), so nginx is
+  // the one size gate in front of each route's own cap.
+  experimental: { middlewareClientMaxBodySize: "50mb" },
   typescript: { ignoreBuildErrors: process.env.NEXT_TYPECHECK_DONE === "1" },
   eslint: { ignoreDuringBuilds: process.env.NEXT_TYPECHECK_DONE === "1" },
   // /vector-pro/*: VectorCraft's web build. On the host nginx serves it before a request reaches this app, so production
