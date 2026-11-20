@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-21（續1）— oracle 17 個候選專案原始碼全讀報告（研究，未改程式）
+
+- 報告：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/GITHUB_RESEARCH.md`（結論、查核深度表、backlog）；逐專案事實與行號在同資料夾 `research-detail/*.md`（13 份）。取代 2026-11-20 續29 的簡版。
+- 做法：17 個 repo shallow clone 到 `D:\tmp\oracle-repos`，只讀不執行；分領域派讀者，共四批；主線抽驗 12 個論點。
+- 結論：不換任何引擎。本站自己要做五件事——(E1) `Projects/internal/ziwei-doushu/lib/ziwei.ts:117-132` 農曆輸入被當國曆做真太陽時校正；(E2) `components/ZiweiTool.tsx:20-22` 今日運限取 UTC 日期；iztro 2.5.8→2.6.5（晚子時整盤換日 #314＋酉宮三主星亮度，須先定日界口徑且與八字 `sect` 一致）；易經 facts 補卦爻辭（取 iching-kit，修 2 字）；占星自算相位。
+- 未做完：Kerykeion `tests/core` 66,951 行只整檔讀完 17 檔，其餘讀檔頭、基準、容差、skip 並 grep；15 支大型 scripts 只讀檔頭。Kerykeion 為 AGPL、已決定不採用。
+- REALTEST_EVIDENCE: tool=Bash | cmd=sed/grep 對 D:\tmp\oracle-repos 各 repo 與本站 lib/ziwei.ts、components/ZiweiTool.tsx 抽驗 12 處行號；Read anois 牌圖邊緣裁切圖 | exit=0 | ms=8000
+- REVIEW_WAIVED: DOC_ONLY -- 研究文件，無程式改動
+- BUGHUNT_WAIVED: DOC_ONLY -- 無 symbol 改動
+- 避免再發：研究類任務開工先量行數再報「讀到哪一級」；2026-11-20 簡版只查 API 中繼資料卻寫「已確認」，被操作者指出。
 ## 2026-11-20（續31）— sg-deploy own-compose：ks-aw-01 唯讀 dry-run（video-service、remotion-service 皆通過）
 
 - 主機 dry-run（操作者「Run the dry-run」，21:06 台北）：本 commit 的 scripts 複製到 `/tmp/oc-dryrun-210630` 以 `--skip-pull --dry-run` 跑（主機 `/root/Work` 在 `4adb301f3`，不 pull、不同步主機腳本），跑完已刪。video-service：標籤與 spec 相符（含 `.env.video`）、preflight ok（四個必填變數有值、映像 `lobster-video-service:local`）、`rsync -n` 只會更新 `.env.example`，0 個刪除，EXIT=0。remotion-service：標籤相符（project render-services、無 env-file 標籤）、preflight ok（`RENDER_AUTH_TOKEN` 有值），EXIT=0；容器映像＝`:local`（`sha256:aeb761ee…`）。
