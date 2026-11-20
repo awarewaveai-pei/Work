@@ -1,0 +1,60 @@
+/**
+ * One render, as the worker runs it (render-worker.ts) and as scripts/profile-opener.mjs times it -- one code path, so a
+ * measurement is of production's own calls.
+ * Card R5: one browser per job. selectComposition and renderMedia/renderStill each opened (and closed) their own
+ * Chromium; on the production host a cold Chromium start is seconds, so the second one is gone. The browser is the
+ * image's (REMOTION_CHROME_EXECUTABLE_PATH; unset = Remotion's own headless shell). Chromium options are Remotion's
+ * defaults (multi-process on Linux) plus swangle, as before. The job owns the browser: a cancel closes it too.
+ */
+import type { WorkerRequest } from "./render-runner";
+import { withEncoderThreads } from "./resource-limits";
+
+export interface RenderTimings { openBrowserMs: number; selectMs: number; firstFrameMs: number | null; framesMs: number | null; renderMs: number }
+
+export async function runRenderJob(
+  req: WorkerRequest,
+  { onProgress = () => {}, cancelSignal, env = process.env }: { onProgress?: (percent: number) => void; cancelSignal?: import("@remotion/renderer").CancelSignal; env?: NodeJS.ProcessEnv } = {},
+): Promise<RenderTimings> {
+  const { openBrowser, selectComposition, renderMedia, renderStill } = await import("@remotion/renderer");
+  const browserExecutable = env.REMOTION_CHROME_EXECUTABLE_PATH || null;
+  const chromiumOptions = { headless: true, gl: "swangle" as const };
+  let t = Date.now();
+  const browser = await openBrowser("chrome", { browserExecutable, chromiumOptions });
+  const openBrowserMs = Date.now() - t;
+  cancelSignal?.(() => void browser.close({ silent: true }).catch(() => {}));
+  try {
+    t = Date.now();
+    const composition = await selectComposition({ serveUrl: req.serveUrl, id: req.compositionId, inputProps: req.inputProps, browserExecutable, puppeteerInstance: browser, chromiumOptions });
+    const selectMs = Date.now() - t;
+    t = Date.now();
+    // A still (the cover): one frame as JPEG, no ffmpeg encode (U8.4: the 1 GiB container), so no thread limits to pass.
+    if (req.still) {
+      await renderStill({
+        composition: { ...composition, durationInFrames: 1, fps: req.fps, width: req.width, height: req.height },
+        serveUrl: req.serveUrl, output: req.outFile, inputProps: req.inputProps, frame: 0, imageFormat: "jpeg", jpegQuality: 92,
+        overwrite: true, browserExecutable, puppeteerInstance: browser, cancelSignal, chromiumOptions,
+      });
+      onProgress(100);
+      return { openBrowserMs, selectMs, firstFrameMs: null, framesMs: null, renderMs: Date.now() - t };
+    }
+    // Data-driven templates take their length from calculateMetadata (scenes[] sum); MAX_FRAMES stays the backstop.
+    const renderFrames = Math.min(req.isDataDriven ? composition.durationInFrames : req.totalFrames, req.maxFrames);
+    let firstFrameMs: number | null = null, framesMs: number | null = null;
+    await renderMedia({
+      composition: { ...composition, durationInFrames: renderFrames, fps: req.fps, width: req.width, height: req.height },
+      serveUrl: req.serveUrl, codec: "h264", outputLocation: req.outFile, inputProps: req.inputProps, browserExecutable,
+      puppeteerInstance: browser, concurrency: 1, cancelSignal,
+      disallowParallelEncoding: req.allowParallelEncoding === false ? true : undefined,
+      ffmpegOverride: ({ args }) => withEncoderThreads(args, req.encoderThreads),
+      chromiumOptions,
+      onProgress: ({ progress, renderedFrames }) => {
+        if (renderedFrames >= 1 && firstFrameMs === null) firstFrameMs = Date.now() - t;
+        if (renderedFrames >= renderFrames && framesMs === null) framesMs = Date.now() - t;
+        onProgress(Math.round(progress * 100));
+      },
+    });
+    return { openBrowserMs, selectMs, firstFrameMs, framesMs, renderMs: Date.now() - t };
+  } finally {
+    await browser.close({ silent: true }).catch(() => {});
+  }
+}

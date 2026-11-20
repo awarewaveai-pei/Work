@@ -6,8 +6,8 @@
  * Card R2: the same component is the CoverOpener video (Root.tsx): with more than one frame it animates in
  * (cover-layout.ts coverMotion) and its last frame is this still exactly.
  */
-import React from "react";
-import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig } from "remotion";
+import React, { useEffect, useState } from "react";
+import { AbsoluteFill, Img, continueRender, delayRender, useCurrentFrame, useVideoConfig } from "remotion";
 import {
   BACKDROP_COLOR,
   OVERLAY_COLOR,
@@ -54,6 +54,46 @@ const lineStyle = (fontSize: number): React.CSSProperties => ({
 });
 
 const fill: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
+
+// Card R5: the blurred backdrop is made ONCE per render, not on every frame. A CSS blur on a full-frame layer is redrawn
+// for each frame with software GL (swangle): on a laptop pinned to 2 cores it was ~45% of a frame (140 -> 81 ms); the
+// production share is to be measured (scripts/profile-opener.mjs). Here the picture is drawn once into a small canvas
+// (1/8 size, so the blur is 1/8 the radius and 1/64 the pixels) with the blur and darkening baked in, and every frame
+// only scales that finished image up. null = not needed (a 1-frame cover) or not ready; a picture that does not load
+// gives no backdrop (the dark colour shows), never a stuck render.
+const BACKDROP_STEP = 8;
+function useBackdrop(src: string, width: number, height: number, darken: number, needed: boolean): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  const [handle] = useState(() => (needed && src ? delayRender("blurred backdrop") : null));
+  useEffect(() => {
+    if (handle === null) return;
+    const img = new Image();
+    const done = () => continueRender(handle);
+    img.onload = () => {
+      try {
+        const w = Math.max(2, Math.round(width / BACKDROP_STEP)), h = Math.max(2, Math.round(height / BACKDROP_STEP));
+        const c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext("2d");
+        if (ctx) {
+          // cover-fit, 1.1x (the blur's soft edge falls outside the frame), blurred by 3% of the short side like before
+          const s = Math.max(w / img.width, h / img.height) * 1.1, dw = img.width * s, dh = img.height * s;
+          ctx.fillStyle = BACKDROP_COLOR;
+          ctx.fillRect(0, 0, w, h);
+          ctx.filter = `blur(${(Math.min(width, height) * 0.03) / BACKDROP_STEP}px) brightness(${darken})`;
+          ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+          setUrl(c.toDataURL("image/png"));   // lossless: JPEG blocks would show 8x enlarged in the dark gradient
+        }
+      } finally {
+        done();
+      }
+    };
+    img.onerror = done;
+    img.src = src;
+  }, [handle, src, width, height, darken]);
+  return url;
+}
 const whole: React.CSSProperties = { width: "100%", height: "100%", objectFit: "contain" };
 
 export const Cover: React.FC<CoverProps> = ({ backgroundUrl, title, subtitle }) => {
@@ -65,14 +105,12 @@ export const Cover: React.FC<CoverProps> = ({ backgroundUrl, title, subtitle }) 
   const titled = !!String(title ?? "").trim();
   const layout = titled ? layoutCover({ width, height, title, subtitle }) : null;
   const motion = coverMotion(frame, durationInFrames, height);
+  // the still opener shows its backdrop to the end (darkened); an animated cover only while it zooms in
+  const backdrop = useBackdrop(backgroundUrl, width, height, layout ? 1 : 0.55, !layout || durationInFrames > 1);
   if (!layout) {
     return (
       <AbsoluteFill style={{ backgroundColor: BACKDROP_COLOR }}>
-        {backgroundUrl && (
-          <AbsoluteFill style={{ filter: `blur(${Math.round(Math.min(width, height) * 0.03)}px) brightness(0.55)`, transform: "scale(1.1)" }}>
-            <Img src={backgroundUrl} style={fill} />
-          </AbsoluteFill>
-        )}
+        {backdrop && <Img src={backdrop} style={fill} />}
         {backgroundUrl && (
           <AbsoluteFill style={motion.imageScale === 1 ? undefined : { transform: `scale(${motion.imageScale})` }}>
             <Img src={backgroundUrl} style={whole} />
@@ -86,11 +124,7 @@ export const Cover: React.FC<CoverProps> = ({ backgroundUrl, title, subtitle }) 
   const clear = Math.min(100, solid + 22);
   return (
     <AbsoluteFill style={{ backgroundColor: BACKDROP_COLOR }}>
-      {backgroundUrl && motion.backdropVisible && (
-        <AbsoluteFill style={{ filter: `blur(${Math.round(Math.min(width, height) * 0.03)}px)`, transform: "scale(1.1)" }}>
-          <Img src={backgroundUrl} style={fill} />
-        </AbsoluteFill>
-      )}
+      {backdrop && motion.backdropVisible && <Img src={backdrop} style={fill} />}
       {backgroundUrl && (
         <AbsoluteFill style={motion.imageScale === 1 ? undefined : { transform: `scale(${motion.imageScale})` }}>
           <Img src={backgroundUrl} style={fill} />
