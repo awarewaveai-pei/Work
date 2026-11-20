@@ -14,6 +14,7 @@
     "astrology": "西洋占星",
     "fengshui": "風水飛星",
     "qimen": "奇門遁甲",
+    "zeri": "擇日",
     "qian": "觀音靈籤"
   },
   "hub": {
@@ -29,7 +30,8 @@
     "astrologyDesc": "行星·星座·宮位·上升(Swiss 級精度,自架)",
     "fengshuiDesc": "玄空飛星九宮盤、八宅命卦,方位擺放建議",
     "qianDesc": "觀音靈籤一百首,默念所問求一支籤",
-    "qimenDesc": "時家奇門九宮盤:三奇六儀、八門、九星、八神"
+    "qimenDesc": "時家奇門九宮盤:三奇六儀、八門、九星、八神",
+    "zeriDesc": "依事項挑吉日:通書宜忌、建除、黃道與沖煞逐日判定"
   },
   "home": {
     "title": "紫微斗數命盤",
@@ -128,7 +130,8 @@
       "jiangXing": "將星",
       "luShen": "祿神",
       "yangRen": "羊刃"
-    }
+    },
+    "method": "口徑:晚子時(23:00–24:00)出生,日柱算當日;大運歲數為虛歲;喜用神採扶抑法。"
   },
   "hehun": {
     "title": "八字合婚",
@@ -316,7 +319,8 @@
       "wuGui": "五鬼",
       "liuSha": "六煞",
       "huoHai": "禍害"
-    }
+    },
+    "method": "口徑:沈氏玄空;朝向離本山中線超過 4.5° 為兼向,兼向改用替卦起星;只有日期時,立春當日即算新年。"
   },
   "qimen": {
     "title": "奇門遁甲",
@@ -365,6 +369,41 @@
     "lotNo": "第 {n} 籤",
     "lotTitle": "籤題",
     "poemNote": ""
+  },
+  "zeri": {
+    "title": "擇日",
+    "subtitle": "通書宜忌 · 建除十二值 · 黃道黑道 · 沖煞",
+    "method": "口徑:宜忌與神煞取自 lunar-javascript 的通書資料;吉日=宜此事且黃道日,忌此事或沖居住者生肖的日子列為宜避開;只擇日,不擇時辰。",
+    "activityLabel": "要辦的事",
+    "fromLabel": "開始日期",
+    "toLabel": "結束日期",
+    "rangeHint": "區間最長 92 天",
+    "birthYearLabel": "居住者出生年(選填,用來避開沖生肖的日子)",
+    "birthYearHint": "以立春換年:1 月到 2 月初出生者,生肖可能屬前一年,請確認下方顯示的生肖",
+    "residentZodiac": "居住者生肖:{a}",
+    "compute": "查吉日",
+    "rangeError": "日期區間無效:結束日不可早於開始日,且最長 92 天",
+    "goodTitle": "吉日",
+    "goodNone": "這段期間沒有符合條件的吉日,可放寬區間,或從下方「可用」日子挑選。",
+    "showAll": "展開全部日子(可用/宜避開與原因)",
+    "hideAll": "收起",
+    "lunar": "農曆",
+    "zhiXing": "建除",
+    "tianShen": "值日",
+    "chong": "沖{a}",
+    "verdict": {
+      "good": "吉",
+      "ok": "可用",
+      "avoid": "宜避開"
+    },
+    "reasons": {
+      "jiHit": "通書忌此事",
+      "chongResident": "日沖居住者生肖",
+      "yiHit": "通書宜此事",
+      "yiMissing": "宜中未列此事",
+      "huangDao": "黃道日",
+      "heiDao": "黑道日"
+    }
   },
   "errors": {
     "computeFailed": "排盤失敗,請檢查輸入"

@@ -10,12 +10,13 @@ import type { Gender, CalendarType } from './ziwei';
 import { findBaziRelations, type BaziRelation, type PillarChars } from './baziRelations';
 import { liChunYear, yearGanZhi } from './liChun';
 import { findShensha, type ShenshaHit } from './baziShensha';
+import { localize } from './s2t';
 
 /**
  * 八字四柱排盤 (lunar-javascript)。
  *
  * 注意:lunar-javascript 僅輸出簡體中文且無 i18n。本模組將高頻可見詞(十神/生肖)
- *   正規化到顯示 locale(十神/生肖/十二長生/納音逐字轉繁);干支/藏干/五行為繁簡共形。英文使用者
+ *   正規化到顯示 locale(十神/生肖/十二長生/納音逐字轉繁,表在 lib/s2t.ts);干支/藏干/五行為繁簡共形。英文使用者
  *   的「解讀」由 AI 層依 locale 產生(命盤資料本身為命理通用記法)。
  * 時柱採真太陽時校正(與紫微同一套 trueSolarTime,準度核心)。
  */
@@ -94,26 +95,6 @@ export interface BaziResult {
   /** 原局神煞 */
   shensha: ShenshaHit[];
   correction?: TrueSolarResult;
-}
-
-// 簡 → 繁 逐字正規化:lunar-javascript 的十神/生肖/十二長生/納音全部輸出字集中,
-//   繁簡相異者只有下列字(bazi.test.ts 以完整納音／長生／生肖／十神名單守住)。
-const S2T: Record<string, string> = {
-  财: '財', 伤: '傷', 杀: '殺', 龙: '龍', 马: '馬', 鸡: '雞', 猪: '豬',
-  长: '長', 带: '帶', 临: '臨', 养: '養', 绝: '絕',
-  涧: '澗', 炉: '爐', 杨: '楊', 剑: '劍', 锋: '鋒', 头: '頭', 蜡: '蠟', 雳: '靂',
-  灯: '燈', 驿: '驛', 钗: '釵', 钏: '釧',
-};
-
-// zh-CN(尚未上線,未來加入時)passthrough 簡體;其餘正規化為繁中。
-// cast 以容納未來新增的 locale,避免目前 union 不含 zh-CN 的型別誤判。
-function isSimplified(locale: Locale): boolean {
-  return (locale as string).startsWith('zh-CN');
-}
-
-function localize(value: string, locale: Locale): string {
-  if (isSimplified(locale)) return value;
-  return [...value].map((ch) => S2T[ch] ?? ch).join('');
 }
 
 const LUCK_STEPS = 8;

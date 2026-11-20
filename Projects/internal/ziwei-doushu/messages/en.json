@@ -14,6 +14,7 @@
     "astrology": "Astrology",
     "fengshui": "Feng Shui",
     "qimen": "Qi Men Dun Jia",
+    "zeri": "Date Selection",
     "qian": "Guanyin Lots"
   },
   "hub": {
@@ -29,7 +30,8 @@
     "astrologyDesc": "Planets · Signs · Houses · Ascendant (Swiss-grade, self-hosted)",
     "fengshuiDesc": "Flying Star chart, Eight Mansions, placement tips",
     "qianDesc": "The hundred Guanyin lots: hold a question in mind and draw one",
-    "qimenDesc": "Qi Men Dun Jia hour chart: stems, eight doors, nine stars, eight deities"
+    "qimenDesc": "Qi Men Dun Jia hour chart: stems, eight doors, nine stars, eight deities",
+    "zeriDesc": "Pick good days for an event: almanac do/don't lists, day officers, yellow-path days and clashes, day by day"
   },
   "home": {
     "title": "Zi Wei Dou Shu Chart",
@@ -128,7 +130,8 @@
       "jiangXing": "General Star",
       "luShen": "Prosperity Star",
       "yangRen": "Goat Blade"
-    }
+    },
+    "method": "Method: a birth between 23:00 and 24:00 keeps that calendar day's day pillar; luck-pillar ages count from 1 at birth (East Asian reckoning); the favorable element follows the support-and-restrain method."
   },
   "hehun": {
     "title": "BaZi Compatibility",
@@ -316,7 +319,8 @@
       "wuGui": "Wu Gui",
       "liuSha": "Liu Sha",
       "huoHai": "Huo Hai"
-    }
+    },
+    "method": "Method: Shen-school Xuan Kong; a facing more than 4.5° off the mountain's center line counts as a leaning facing and uses replacement stars; when only a date is given, the Start of Spring day itself begins the new year."
   },
   "qimen": {
     "title": "Qi Men Dun Jia",
@@ -365,6 +369,41 @@
     "lotNo": "Lot {n}",
     "lotTitle": "Story",
     "poemNote": "The lot poem is shown in its original classical Chinese; the reading below explains it in English."
+  },
+  "zeri": {
+    "title": "Date Selection",
+    "subtitle": "Almanac do/don't lists · Twelve day officers · Yellow and black path days · Clashes",
+    "method": "Method: favourable and unfavourable activities and day deities come from the lunar-javascript almanac data. A good day lists the activity as favourable and is a yellow-path day; a day that lists it as unfavourable or clashes with the resident's zodiac is marked best avoided. Days only, no hour selection.",
+    "activityLabel": "What are you planning?",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "rangeHint": "Up to 92 days",
+    "birthYearLabel": "Resident's birth year (optional, to skip days that clash with their zodiac)",
+    "birthYearHint": "The zodiac year starts at the Start of Spring: if born in January or early February, the sign may belong to the previous year — check the sign shown below",
+    "residentZodiac": "Resident's zodiac: {a}",
+    "compute": "Find good days",
+    "rangeError": "Invalid range: the end date cannot be before the start date, and the range is at most 92 days",
+    "goodTitle": "Good days",
+    "goodNone": "No day in this range meets the criteria. Try a wider range, or pick one of the usable days below.",
+    "showAll": "Show every day (usable / best avoided, with reasons)",
+    "hideAll": "Hide",
+    "lunar": "Lunar",
+    "zhiXing": "Officer",
+    "tianShen": "Deity",
+    "chong": "clashes {a}",
+    "verdict": {
+      "good": "Good",
+      "ok": "Usable",
+      "avoid": "Best avoided"
+    },
+    "reasons": {
+      "jiHit": "almanac lists it as unfavourable",
+      "chongResident": "clashes with the resident's zodiac",
+      "yiHit": "almanac lists it as favourable",
+      "yiMissing": "not on the favourable list",
+      "huangDao": "yellow-path day",
+      "heiDao": "black-path day"
+    }
   },
   "errors": {
     "computeFailed": "Charting failed, please check your input"

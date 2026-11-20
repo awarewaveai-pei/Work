@@ -74,6 +74,18 @@ declare module 'lunar-javascript' {
     getYearInGanZhiByLiChun(): string;
     getDayYi(): string[];
     getDayJi(): string[];
+    /** 建除十二值(簡體,如 闭) */
+    getZhiXing(): string;
+    /** 值日天神(簡體,如 金匮) */
+    getDayTianShen(): string;
+    /** '黄道' | '黑道'(簡體) */
+    getDayTianShenType(): string;
+    /** 日沖的地支,如 辰 */
+    getDayChong(): string;
+    /** 農曆月名(正…冬腊,閏月前綴 闰) */
+    getMonthInChinese(): string;
+    /** 農曆日名(初一…三十) */
+    getDayInChinese(): string;
     /** 以節氣精確時刻換年/月;日以 23:00 換日 */
     getYearInGanZhiExact(): string;
     getMonthInGanZhiExact(): string;

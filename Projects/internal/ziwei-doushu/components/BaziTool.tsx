@@ -44,6 +44,9 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
   return (
     <>
       <BirthForm dict={dict} onSubmit={handleSubmit} />
+      <p className="mt-3 text-center" style={{ fontSize: '0.75rem', color: 'var(--text-caption)' }}>
+        {t.method}
+      </p>
 
       {error ? (
         <div className="error-banner mt-6">{error}</div>

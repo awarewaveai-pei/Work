@@ -142,6 +142,9 @@ export default function FengshuiTool({ dict, locale }: { dict: Dictionary; local
         <button type="submit" className="btn-gold mt-5">
           {t.compute}
         </button>
+        <p className="mt-3" style={{ fontSize: '0.75rem', color: 'var(--text-caption)' }}>
+          {t.method}
+        </p>
       </form>
 
       {error ? <div className="error-banner mt-6">{error}</div> : null}
