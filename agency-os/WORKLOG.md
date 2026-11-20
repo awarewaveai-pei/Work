@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-20（續28）— 模特兒圖庫加「上傳照片成新模特兒」（續27 剩餘風險；操作者：「要，加上」）
+
+[根因] 「上傳照片」只在各模特兒列（`ModelLibraryStudio.tsx` `uploadPhoto` 只認既有 `uploadFor`）：別人的照片只能歸進某位模特兒，混進他的長相參考與「刪除整位」範圍（續27 多刪 4 張中 2 張即此）。
+[不變量] 一位模特兒＝一個人：列上的「上傳照片」只加同一人；別人的照片走圖庫頂端「上傳照片成新模特兒」（填名字才可按），存成新 `model_key`（`crypto.randomUUID()`）。
+[已修改] `ModelLibraryStudio.tsx`：`NEW_MODEL` 上傳目標＋名字欄（提示「照片裡的人叫什麼」，與生成區的「新模特兒名字」區分）；說明文字補一句。伺服器不動（`presets` POST 已接受新 uuid）。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx vitest run "app/(shell)/tools/mockup" → 23 passed；npx tsc --noEmit 原始碼 0 錯 | exit=0 | ms=6000
+- 新測 1 條（沒名字不能按；新上傳不是 k-leo／k-mia、多出第三位；列上上傳仍進 Leo）。突變：新上傳改用既有模特兒 key → 該條紅，還原 13/13 綠。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff；一個新上傳目標＋一個輸入欄）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；自審＋突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=上傳照片成新模特兒|NEW_MODEL | hits=8（`ModelLibraryStudio.tsx` 與其測試；docs 0）
+[rollback] `git revert <本 commit>`。
 ## 2026-11-20（續27）— 模特兒圖庫多刪 4 張（查證＋刪除前看縮圖）；PhotoCraft 傳回不閃、成功自動關分頁、訊息框不全高；修圖鍵移到模特兒那列；合成模型只留 3 個（操作者截圖四張）
 
 [查證：多刪] 正式庫 `ops_audit_events`＋主機 nginx access log：12:59:25–39Z 同一次操作連發 4 個 `DELETE /api/tools/presets?id=`（805221ef、d185bbc7、b6175704、aff0c717，順序＝圖庫列表順序），伺服器每次只刪該 id（`app/api/tools/presets/route.ts:380-383`）。d185／8052 是 12:57 的 `.jpg`＝「上傳照片」（只能上傳進按下那列的模特兒，`ModelLibraryStudio.tsx` `uploadPhoto`）→ 4 張同屬一位模特兒；刪的是整位或全選。舊確認框只寫張數（`window.confirm`），看不到要刪哪幾張。R2 4 個物件 HEAD 404，救不回。剩 THEO 1 張。

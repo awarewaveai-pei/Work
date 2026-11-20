@@ -194,6 +194,33 @@ describe("【模特兒印製】: settings → 模特兒圖 → library", () => {
     await waitFor(() => expect(urls(fetchMock)).toEqual(["/api/tools/presets?id=mia1"]));
   });
 
+  // 2026-11-20: someone else's photo uploaded through a model's row joined that model (its faces, its 刪除整位).
+  it("上傳照片成新模特兒 starts a model of its own; a row's 上傳照片 adds to that model", async () => {
+    const fetchMock = vi.fn(async (_u: string, init?: RequestInit) => {
+      const b = JSON.parse(String(init!.body));
+      return new Response(JSON.stringify({ ok: true, preset: { ...photo(`up${fetchMock.mock.calls.length}`, b.presetName, b.modelKey), metadata: {
+        preset_name: b.presetName, model_key: b.modelKey, photo_role: b.photoRole, preset_settings: b.presetSettings } } }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<Library initial={library} />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const pick = () => fireEvent.change(input, { target: { files: [new File(["x"], "a.jpg", { type: "image/jpeg" })] } });
+    const newBtn = screen.getByRole("button", { name: "上傳照片成新模特兒" });
+    expect((newBtn as HTMLButtonElement).disabled).toBe(true); // a new model needs a name
+    fireEvent.change(screen.getByPlaceholderText(/照片裡的人叫什麼/), { target: { value: "Ava" } });
+    fireEvent.click(newBtn);
+    pick();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [b] = bodies(fetchMock);
+    expect(b).toMatchObject({ presetName: "Ava", photoRole: "upload" });
+    expect(["k-leo", "k-mia"]).not.toContain(b.modelKey);
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "刪除整位" })).toHaveLength(3)); // Ava is her own model
+    fireEvent.click(screen.getAllByRole("button", { name: "上傳照片" })[1]); // Leo's row (Ava is listed first)
+    pick();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(bodies(fetchMock)[1]).toMatchObject({ presetName: "Leo", modelKey: "k-leo" });
+  });
+
   it("修圖 sits in the model's row: it edits the one checked photo (or the only photo), then unchecks it", () => {
     const open = vi.spyOn(window, "open").mockReturnValue({ location: {} } as Window);
     render(<Library initial={library} />);

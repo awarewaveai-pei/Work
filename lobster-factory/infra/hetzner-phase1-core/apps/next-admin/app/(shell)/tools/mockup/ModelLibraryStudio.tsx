@@ -103,6 +103,8 @@ function Multi({ label, options, values, onToggle }: {
 
 /** useCanvasReturn tool id; slots: `shot:<id>` = a generated photo not saved yet, `lib:<preset id>` = a library photo. */
 export const MODEL_RETURN_TOOL = "mockup-model";
+/** uploadFor value of 「上傳照片成新模特兒」 (model keys are uuids). */
+const NEW_MODEL = "new";
 
 const toggled = (set: Set<string>, v: string) => { const n = new Set(set); if (n.has(v)) n.delete(v); else n.add(v); return n; };
 
@@ -265,10 +267,16 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
   });
 
   // ── Library management ──
+  // A model's 上傳照片 adds the same person (its photos are that model's face references); someone else's photo starts
+  // a new model (uploadFor NEW_MODEL, named by newModelName) -- filed under an existing model it joined that model's
+  // faces and its 刪除整位 (2026-11-20).
   const uploadRef = useRef<HTMLInputElement>(null);
   const [uploadFor, setUploadFor] = useState<string | null>(null);
+  const [newModelName, setNewModelName] = useState("");
   async function uploadPhoto(file: File | undefined) {
-    const target = models.find((m) => m.key === uploadFor);
+    const existing = models.find((m) => m.key === uploadFor);
+    const target = existing ?? (uploadFor === NEW_MODEL && newModelName.trim()
+      ? { key: crypto.randomUUID(), name: newModelName.trim(), gender: "" } : null);
     if (!target || !file) return;
     const image = await new Promise<string>((resolve, reject) => {
       const r = new FileReader();
@@ -278,7 +286,9 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
     }).catch(() => null);
     if (!image) { setMsg("讀不到這張照片"); return; }
     const p = await savePhoto(image, { presetName: target.name, modelKey: target.key, photoRole: "upload", presetSettings: { mGender: target.gender } });
-    if (p) setPhotos((prev) => [p, ...prev]);
+    if (!p) return;
+    setPhotos((prev) => [p, ...prev]);
+    if (!existing) setNewModelName("");
   }
 
   // Deletes are permanent (the R2 file and its row). Each goes through the server's WordPress reference check; its
@@ -436,7 +446,14 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
       <section style={section}>
         <div>
           <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>模特兒圖庫</h3>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>勾選照片可一次刪除；點照片可框印花位置（只有主頁的「程式免費印」需要；AI 合成會自己找位置）；「修圖」改勾選的那一張（只有一張就不用勾），在 PhotoCraft 改完按「傳回」存成同一位模特兒的新照片（原圖保留）。</div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>勾選照片可一次刪除；點照片可框印花位置（只有主頁的「程式免費印」需要；AI 合成會自己找位置）；「修圖」改勾選的那一張（只有一張就不用勾），在 PhotoCraft 改完按「傳回」存成同一位模特兒的新照片（原圖保留）。各列的「上傳照片」只放同一個人的照片；別人的照片請用下面「上傳照片成新模特兒」。</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input value={newModelName} onChange={(e) => setNewModelName(e.target.value)} placeholder="照片裡的人叫什麼，例如 Mia" maxLength={40}
+            style={{ padding: "4px 8px", fontSize: 12, background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }} />
+          <button className="btn-secondary" style={{ fontSize: 11, padding: "2px 8px" }} disabled={!newModelName.trim()}
+            title={newModelName.trim() ? "選一張照片，存成一位新模特兒" : "先填新模特兒名字"}
+            onClick={() => { setUploadFor(NEW_MODEL); uploadRef.current?.click(); }}>上傳照片成新模特兒</button>
         </div>
         {selected.size > 0 && (
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
