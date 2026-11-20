@@ -65,17 +65,18 @@ describe("主頁 模特: 模特兒圖 + design → product mockups", () => {
     expect(screen.queryByText(/Unexpected token/)).toBeNull();
   });
 
-  it("the model buttons list only models that take two references, and the picked one is sent; results enlarge on click", async () => {
+  it("the model buttons are the operator's three, in her order (2026-11-20), and the picked one is sent; results enlarge on click", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, image: "data:image/jpeg;base64,AA==" })));
     vi.stubGlobal("fetch", fetchMock);
     render(<ModelMockupPanel designRef={DESIGN} designName="" photos={library} onOpenLibrary={() => {}} />);
-    expect(screen.queryByRole("button", { name: /FLUX/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Imagen/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /^Nano Banana 2\.1（/ }));
+    const models = screen.getAllByRole("button", { name: /（~NT\$/ }).map((b) => b.textContent!.replace(/（.*/, ""));
+    expect(models).toEqual(["GPT-Image-2.5 修圖", "GPT-Image-2.6 修圖", "Codex 免費生圖"]);
+    expect(screen.queryByText(/只列能同時看/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^GPT-Image-2\.6 修圖（/ }));
     fireEvent.click(screen.getAllByRole("checkbox")[0]);
-    fireEvent.click(screen.getByRole("button", { name: /合成（1 張，約 NT\$2）/ /* nano-banana-2 = Nano Banana 2.1 on Google at 2K: US$0.057 x 32 */ }));
+    fireEvent.click(screen.getByRole("button", { name: /^合成（1 張/ }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(bodies(fetchMock)[0].model).toBe("nano-banana-2");
+    expect(bodies(fetchMock)[0].model).toBe("openai-26-edit");
     fireEvent.click(await screen.findByAltText("商品 Mockup"));
     expect(screen.getByRole("dialog", { name: "放大檢視" })).toBeTruthy();
     fireEvent.click(screen.getByRole("dialog"));
@@ -162,15 +163,50 @@ describe("【模特兒印製】: settings → 模特兒圖 → library", () => {
       ? new Response(JSON.stringify({ ok: false, error: "無法確認檔案是否仍被文章使用，未刪除（reference_scan_http_400:Soulful Expression）" }), { status: 502 })
       : new Response(JSON.stringify({ ok: true })));
     vi.stubGlobal("fetch", fetchMock);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<Library initial={library} />);
     for (const c of screen.getAllByRole("checkbox", { name: "勾選刪除" })) fireEvent.click(c);
     fireEvent.click(screen.getByRole("button", { name: "永久刪除勾選的 3 張" }));
+    fireEvent.click(screen.getByRole("button", { name: "永久刪除這 3 張" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(urls(fetchMock).every((u) => u.startsWith("/api/tools/presets?id=") && true)).toBe(true);
     expect(fetchMock.mock.calls.every((c) => (c as unknown as [string, RequestInit])[1].method === "DELETE")).toBe(true);
     await waitFor(() => expect(screen.getByText(/有 1 張沒有刪除：.*Soulful Expression/)).toBeTruthy());
     expect(screen.getAllByRole("checkbox", { name: "勾選刪除" })).toHaveLength(1); // leo2 stays
+  });
+
+  // 2026-11-20: a whole model went when one photo was meant; the confirm showed only a count.
+  it("every delete first shows the very photos it will remove; 取消 removes nothing", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true })));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<Library initial={library} />);
+    const dialog = () => screen.getByRole("dialog", { name: "確認刪除" });
+    const shown = () => [...dialog().querySelectorAll("img")].map((i) => i.getAttribute("src"));
+    fireEvent.click(screen.getAllByRole("button", { name: "刪除整位" })[0]); // Leo
+    expect(shown()).toEqual([library[0].object_url, library[1].object_url]);
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "刪除整位" })[0]);
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" }); // focus starts on 取消
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "✕" })[2]); // Mia's one photo
+    expect(shown()).toEqual([library[2].object_url]);
+    fireEvent.click(screen.getByRole("button", { name: "永久刪除這 1 張" }));
+    await waitFor(() => expect(urls(fetchMock)).toEqual(["/api/tools/presets?id=mia1"]));
+  });
+
+  it("修圖 sits in the model's row: it edits the one checked photo (or the only photo), then unchecks it", () => {
+    const open = vi.spyOn(window, "open").mockReturnValue({ location: {} } as Window);
+    render(<Library initial={library} />);
+    const [leoEdit, miaEdit] = screen.getAllByRole("button", { name: "修圖" });
+    expect((leoEdit as HTMLButtonElement).disabled).toBe(true); // Leo has 2 photos, none checked
+    expect((miaEdit as HTMLButtonElement).disabled).toBe(false); // Mia has one
+    const boxes = screen.getAllByRole("checkbox", { name: "勾選刪除" });
+    fireEvent.click(boxes[1]); // leo2
+    expect((leoEdit as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(leoEdit);
+    expect(open).toHaveBeenCalledOnce();
+    expect((boxes[1] as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByRole("button", { name: /永久刪除勾選/ })).toBeNull();
   });
 
   it("dragging a corner of a photo's outline saves a tilted quad with its bounding rectangle", async () => {

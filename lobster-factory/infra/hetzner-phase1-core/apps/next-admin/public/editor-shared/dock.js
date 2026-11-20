@@ -146,6 +146,7 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
       noticeShown = false;
       noticeTitle = null;
       flyout.hidden = true;
+      flyout.classList.remove("vp-notice");
     }
     if (!open) return;
     open.button.classList.remove("tab--active");
@@ -180,12 +181,14 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
   document.addEventListener("pointerdown", (e) => {
     if ((open || noticeShown) && !flyout.contains(e.target) && !icons.contains(e.target)) close();
   });
-  /** 沒開面板時也看得到的訊息：浮出層只放標題與狀態列。同一標題再叫只換文字（每秒更新的等待訊息不閃）。 */
+  /** 沒開面板時也看得到的訊息：浮出層只放標題與狀態列，高度只到訊息（vp-notice；全高會蓋住編輯器右側控制項）。
+   *  同一標題再叫只換文字（每秒更新的等待訊息不閃）。 */
   const notice = (title, msg) => {
     if (!(noticeShown && noticeTitle === title)) {
       close();
       for (const b of bodies.children) b.hidden = true;
       tab.textContent = title;
+      flyout.classList.add("vp-notice");
       flyout.hidden = false;
       place();
       noticeShown = true;
@@ -205,7 +208,9 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
     (err) => notice(STARTUP_TITLE, startupFailureMessage(err)),
   );
 
-  // C8.1：交接帶「傳回」票、且開成功 → 圖示欄頂端多一顆「傳回 <label>」（可重複按：改了再傳）
+  // C8.1：交接帶「傳回」票、且開成功 → 圖示欄頂端多一顆「傳回 <label>」。原分頁收下（returned）→ 關掉這個分頁
+  // （openInCanvas 以 window.open 開的，可由程式關；2026-11-20 操作者：開著會再按，每按一次原工具多存一份）。
+  // 關不掉（瀏覽器拒絕）就留著「✅ 已傳回」；沒收下（存 My Designs／下載）不關，訊息要讓人看到。
   openHandoff(ctx, (msg) => notice("帶入設計", msg), tag, { ready }).then((h) => {
     if (!h?.ret) return;
     const title = `傳回 ${h.ret.label}`;
@@ -217,12 +222,14 @@ export async function mountDock(root, { makeCtx, panelIds, storeKey, sizes }) {
     b.addEventListener("click", async () => {
       b.disabled = true;
       ctx.busy?.(true);
+      let result;
       try {
-        await sendBack(ctx, h.ret, (msg) => notice(title, msg));
+        result = await sendBack(ctx, h.ret, (msg) => notice(title, msg));
       } finally {
         ctx.busy?.(false);
         b.disabled = false;
       }
+      if (result === "returned") window.close();
     });
     icons.prepend(b);
   });

@@ -154,7 +154,7 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
             ))}
           </div>
           <div style={{ marginTop: 8 }}>
-            合成用的 AI 模型（只列能同時看照片和設計圖的）
+            合成用的 AI 模型
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
               {PHOTO_PRINT_MODELS.map((m) => (
                 <button key={m.value} className={chip(model === m.value)} style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => setModel(m.value)}>

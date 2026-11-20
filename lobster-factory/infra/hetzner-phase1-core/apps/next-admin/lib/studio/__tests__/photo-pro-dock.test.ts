@@ -315,6 +315,18 @@ describe("ctx-photocraft.js 契約（mock photocraft）", () => {
     await expect(ctx.exportArtboard({ format: "gif" })).rejects.toThrow(/不支援/);
   });
 
+  it("exportArtboard：原尺寸透明 PNG（傳回、mockup 取設計）→ 快速轉存 PNG，不開 Export As 對話框（會閃）", async () => {
+    const { ctx, calls } = mockPc();
+    for (const o of [{ format: "png" }, { format: "png", background: "transparent" }, { format: "png", ppi: 300 }]) {
+      calls.length = 0;
+      expect(await (await ctx.exportArtboard(o)).text()).toBe("PNG");
+      expect(calls.filter((c) => c[1] === "ui.menu.invoke").map((c) => c[2].id)).toEqual(["file.export.quickExportAsPng"]);
+    }
+    calls.length = 0;
+    await ctx.exportArtboard({ format: "png", ppi: 36 }).catch(() => {}); // 縮小 → 仍要對話框設縮放（mock 的對話框只交 webp）
+    expect(calls.find((c) => c[1] === "ui.menu.invoke")![2]).toEqual({ id: "file.export.exportAs" });
+  });
+
   it("setArtboardSize：mm 以 dpi 換像素 → image.canvasSize；沒文件 → file.new", async () => {
     const { ctx, calls, state } = mockPc();
     expect(await ctx.setArtboardSize({ width: 210, height: 297, unit: "mm", dpi: 300 })).toEqual({ width: 2480, height: 3508, created: false });

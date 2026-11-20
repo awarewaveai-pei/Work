@@ -1,4 +1,26 @@
 # Worklog
+## 2026-11-20（續27）— 模特兒圖庫多刪 4 張（查證＋刪除前看縮圖）；PhotoCraft 傳回不閃、成功自動關分頁、訊息框不全高；修圖鍵移到模特兒那列；合成模型只留 3 個（操作者截圖四張）
+
+[查證：多刪] 正式庫 `ops_audit_events`＋主機 nginx access log：12:59:25–39Z 同一次操作連發 4 個 `DELETE /api/tools/presets?id=`（805221ef、d185bbc7、b6175704、aff0c717，順序＝圖庫列表順序），伺服器每次只刪該 id（`app/api/tools/presets/route.ts:380-383`）。d185／8052 是 12:57 的 `.jpg`＝「上傳照片」（只能上傳進按下那列的模特兒，`ModelLibraryStudio.tsx` `uploadPhoto`）→ 4 張同屬一位模特兒；刪的是整位或全選。舊確認框只寫張數（`window.confirm`），看不到要刪哪幾張。R2 4 個物件 HEAD 404，救不回。剩 THEO 1 張。
+[查證：連按] 12:52:09Z 同秒 3 個 `POST /api/tools/presets`＝傳回被按 3 次（票可重複用，`components/tools/useCanvasReturn.ts:12`）；編輯器傳回後不關，按一次多存一份。
+[不變量]
+- 永久刪除前，畫面顯示的就是要刪的那幾張（縮圖），三個入口（勾選列、刪除整位、✕）同一個對話框。
+- 傳回被原分頁收下 → 編輯器分頁關閉（不能再按出重複）；沒收下（改存 My Designs／下載）不關，訊息要看得到。
+[已修改]（next-admin）
+- `ModelLibraryStudio.tsx`：`toDelete` 對話框（縮圖＋「永久刪除這 N 張」／取消；`aria-modal`、Esc、焦點在取消）取代 `window.confirm`；「修圖」從每張照片下方移到模特兒那列（上傳照片／全選／修圖／刪除整位）：改勾選的那一張，或只有一張的那位；開了就取消勾選（不留給之後的刪除）。
+- `public/editor-shared/dock.js`：`sendBack` 回 `"returned"` → `window.close()`；訊息浮出層加 `vp-notice`（`dock.css` `bottom:auto`，只到訊息高度，不蓋編輯器右側控制項）。向量版共用。
+- `public/editor-shared/ctx-photocraft.js` `exportArtboard`：原尺寸透明 PNG 改走「快速轉存 PNG」（`file.export.quickExportAsPng`，不開對話框＝不閃）；其他格式／尺寸照舊 Export As。`ctx-contract.md` 傳回與 `exportArtboard` 兩列改現況。
+- `lib/studio/model-options.ts` `PHOTO_PRINT_MODELS`：明列 GPT-Image-2.5 修圖、GPT-Image-2.6 修圖、Codex 免費生圖（操作者指定順序；也是 `fabric-print` 允許清單，Nano Banana 等改 400）；`ModelMockupPanel.tsx` 刪「（只列能同時看照片和設計圖的）」。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx vitest run "app/(shell)/tools/mockup" "app/(shell)/tools/studio" components/tools lib/studio/__tests__/photo-pro-dock.test.ts lib/studio/__tests__/vector-pro-dock.test.ts lib/studio/__tests__/editor-ai-panels.test.ts app/api/tools/studio/fabric-print → 188 passed；npx tsc --noEmit 原始碼 0 錯 | exit=0 | ms=12000
+- 新測：dock 傳回鈕 2 條（收下→關＋vp-notice、沒收下→不關）、`exportArtboard` 快速轉存 1 條、圖庫刪除對話框 1 條（含 Esc）、列上修圖 1 條；合成模型與 fabric-print 允許清單改寫。突變：拔「只有 returned 才關」→ 不關那條紅；✕ 直接刪 → 縮圖那條紅；還原 21/21 綠。
+- 正式站端對端（PhotoCraft 真按傳回、實際關分頁）未跑：本機要登入；今晚 03:00 自動部署後實測。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/4n（m1 契約文件兩列過時→已改；m3 刪除框 Esc／焦點→已加；m2 存入 My Designs 縮放時仍開對話框＝縮放需要對話框；m4 關分頁不留圖層文件＝操作者要的，已記契約）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；critic subagent 獨立審查＋上述突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=只列能同時|PHOTO_PRINT_MODELS|刪除整位 | hits=1（`ModelLibraryStudio.tsx` 刪除整位按鈕本身；docs 0）
+[剩餘風險]
+- 「上傳照片」只能進某位模特兒；上傳別人的照片會混進那位的長相參考與「刪除整位」範圍。沒有「上傳成新模特兒」入口（未做，待操作者決定）。
+[rollback] `git revert <本 commit>`。
 ## 2026-11-20（續26）— 撤回 oracle 產品登記列：main 的主系統完整測試被我弄紅（`e0f9cdee6` → `f41ca1bbe`）
 
 - 根因：續25 加列前只跑 `npx vitest run lib/portal`，沒跑全套。`lib/entitlements/__tests__/expiry.test.ts:171` 要求每個 `PRODUCTS` key 都在 `lobster-factory/packages/db/migrations/0110_plans_entitlements.sql:9`、`:22` 等三處 `product_key in (…)` 清單內——每日補發權益會對每個產品寫列，未知 key 在正式資料庫會失敗。CI run on `77126c9ce`：`next-admin — full test suite` failure（`expected [ 'oracle' ] to deeply equal []`）。CI 閘擋住，未部署、正式站未受影響。

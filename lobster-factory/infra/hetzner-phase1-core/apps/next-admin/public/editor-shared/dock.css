@@ -55,6 +55,8 @@
   user-select: none;
 }
 .vp-root .vp-flyout[hidden] { display: none; }
+/* 只有一則訊息（沒開面板）：高度只到標題＋狀態列，不蓋住編輯器右側控制項 */
+.vp-root .vp-flyout.vp-notice { bottom: auto; }
 .vp-root .vp-tabs { flex: 0 0 var(--vp-tab); height: var(--vp-tab); flex-wrap: nowrap; background: var(--bg-subtle); }
 .vp-root .vp-tab { display: flex; align-items: center; gap: 6px; padding-block: 0; }
 .vp-bodies { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; }

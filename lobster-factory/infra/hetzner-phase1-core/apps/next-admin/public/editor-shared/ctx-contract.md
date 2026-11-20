@@ -45,7 +45,7 @@ My Designs 清單過濾：列出 `metadata.source ∈ listSources`（沒有 meta
 ## 傳回（dock 外殼，C8.1；面板不用）
 
 - 交接（`components/tools/canvas-handoff.ts` `openInCanvas(..., ret)`）帶票 `ret={id,label}` 且開成功 → `dock.js` 在圖示欄頂端加「傳回 <label>」。
-- 按下：`ctx.exportArtboard({format:'png'})` → `BroadcastChannel('canvas-return')` 送 `{type:'return', id, image:<PNG data URL>}` → 2 秒內收到 `{type:'ack', id}` 顯示「已傳回 <label>」；否則 `blocks/my-designs.js` `saveToMyDesigns(ctx, png, {previewOnlyIfTooBig:true})`（同面板的存入：預覽＋`ctx.saveAs()` 原檔；原檔超過 64MB 只存預覽）並顯示「原分頁已關，已存進我的設計」；存也失敗 → PNG 下載到電腦。可重複按。
+- 按下：`ctx.exportArtboard({format:'png'})` → `BroadcastChannel('canvas-return')` 送 `{type:'return', id, image:<PNG data URL>}` → 2 秒內收到 `{type:'ack', id}` 顯示「已傳回 <label>」；否則 `blocks/my-designs.js` `saveToMyDesigns(ctx, png, {previewOnlyIfTooBig:true})`（同面板的存入：預覽＋`ctx.saveAs()` 原檔；原檔超過 64MB 只存預覽）並顯示「原分頁已關，已存進我的設計」；存也失敗 → PNG 下載到電腦。原分頁收下（ack）→ `window.close()` 關掉編輯器分頁（2026-11-20 操作者；只有攤平的 PNG 回去，圖層文件不留）；沒收下不關、按鈕可再按。訊息浮出層 `vp-notice` 只到訊息高度。
 - 原分頁：`components/tools/useCanvasReturn.ts`，只收自己發出的票、`onReturn(slot, image)` 回 `true` 才 ack。
 
 ## replaceImage（spike 2026-11-05 通過，未降級）
@@ -68,7 +68,7 @@ My Designs 清單過濾：列出 `metadata.source ∈ listSources`（沒有 meta
 | `placeImage` 帶 `at` | 同上到 copy 前：暫用文件讀 `document.inspect` 尺寸、`layer.list` 修剪範圍 tb → `ex('layer.copyToDocument',{document:原, at:[x+tb 中心x, y+tb 中心y], name})`（`at` 對齊修剪範圍中心）→ 回傳 `offset`≠(x,y)：`ex('layer.translate',{layer, dx, dy})`。記下完整框（同 `replaceImage` 的圖片框），之後 `selectedImage` 讀回整張含透明邊 | 1（平移 2） |
 | `selectedImage` | 作用中圖層（`ex('layer.list',{flat:true})` 的 `active`，`kind` 須為 `Pixel`，否則 `null`）→ `inv('layer.quickExportAsPng')`（圖層 › 快速轉存為 PNG：只出這個圖層的修剪範圍，不開文件）→ 等 save → 瀏覽器貼進圖片框（框＝修剪範圍時原樣）。轉存尺寸≠修剪範圍（圖層樣式外擴等）→ 退回 `ex('layer.duplicate',{layer, document:'new'})` → `ex('image.crop', 框)` → `inv('file.export.quickExportAsPng')` → 關副本。`id`＝圖層 id；`transform`＝`[1,0,0,1,x,y]`；`blob`＝圖片框 PNG | 0 |
 | `replaceImage` | 框 F＝舊圖層的圖片框（見下）→ `ex('layer.select',{layer:id})` → 開新圖（暫用文件讀 `document.inspect` 尺寸、`layer.list` 修剪範圍 tb）→ `ex('layer.copyToDocument',{document:原, at:F 左上＋tb 中心, name:舊名})` → 關暫用 → 新圖尺寸≠F：`ex('edit.transform',{layer:新, quad:tb 依「整張→F」比例})`；同尺寸但回傳 `offset`≠F 左上：`ex('layer.translate',{layer:新, dx, dy})` → `ex('layer.delete',{layer:id})`；回新 id | 2（縮放或平移 3） |
-| `exportArtboard` | `inv('file.export.exportAs')` → `{dialog}` → `request('ui.dialog.set',{dialog, field, value})`：`format` png／jpg／webp、`sizing` scale（`scale`％）或 pixels（`width`／`height`）、`transparency`、WebP `lossless`、`quality` 1–100 → `request('ui.dialog.confirm')` → 等 save | 0 |
+| `exportArtboard` | 原尺寸透明 PNG（無 width／height、縮放 100%）→ `inv('file.export.quickExportAsPng')`（不開對話框，不閃）→ 等 save。其餘 → `inv('file.export.exportAs')` → `{dialog}` → `request('ui.dialog.set',{dialog, field, value})`：`format` png／jpg／webp、`sizing` scale（`scale`％）或 pixels（`width`／`height`）、`transparency`、WebP `lossless`、`quality` 1–100 → `request('ui.dialog.confirm')` → 等 save | 0 |
 | `setArtboardSize` | 有文件：`ex('image.canvasSize',{width, height, units:'px', anchor:'center'})`；沒有：`ex('file.new',{width, height, mode:'rgb', depth:8, background:'white'})`；mm／cm／in／pt 以 dpi 換成像素 | 1 |
 | `openFile` | `photocraft:open {name, bytes}` → 輪詢 `session.documents` 多一份 | 0（新分頁） |
 | `saveAs` | `inv('file.saveACopy')` → 等 save → **PSD**（網頁版存不出 `.pcraft`：PC `crates/ui-egui/src/app/files.rs:236-245`，無路徑一律 `.psd`；主 session 2026-11-06 定案原始檔＝`.psd`） | 0 |

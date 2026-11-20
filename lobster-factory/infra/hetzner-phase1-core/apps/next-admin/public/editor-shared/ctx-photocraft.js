@@ -508,7 +508,8 @@ export function createPhotocraftCtx(opts) {
       return true;
     }),
 
-    /** 整張 → Blob：Export As 對話框（format、縮放、品質、透明）。ppi 相對文件解析度、不放大；width/height = 指定像素。
+    /** 整張 → Blob。原尺寸透明 PNG = 檔案 › 快速轉存 PNG（不開對話框；Export As 對話框會在畫面閃一下，2026-11-20 操作者回報）；
+     *  其餘走 Export As 對話框（format、縮放、品質、透明）。ppi 相對文件解析度、不放大；width/height = 指定像素。
      *  background 不透明時先出透明 PNG，再由瀏覽器疊底色、編碼。artboard 忽略（點陣文件只有一張畫布）。0 個 undo 步。 */
     exportArtboard: op(async (api, o = {}) => {
       const format = FORMAT[String(o.format || "png").toLowerCase()];
@@ -517,6 +518,9 @@ export function createPhotocraftCtx(opts) {
       const fileFormat = opaque ? "png" : format;
       const q = toQuality(o.quality);
       const d = await doc(api);
+      if (format === "png" && !opaque && o.width === undefined && o.height === undefined && scaleFor(o.ppi, d.resolution) === 100) {
+        return (await savedBy(["png"], () => invoke(api, "file.export.quickExportAsPng"))).blob;
+      }
       const { dialog } = await invoke(api, "file.export.exportAs");
       const set = (field, value) => api.request("ui.dialog.set", { dialog, field, value });
       const cancel = () => api.request("ui.dialog.cancel", { dialog }).catch(() => {});

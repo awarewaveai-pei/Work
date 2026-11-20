@@ -283,9 +283,13 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
 
   // Deletes are permanent (the R2 file and its row). Each goes through the server's WordPress reference check; its
   // refusal reason is shown as is -- "刪除失敗，請重試" hid that a site could not be checked (2026-11-02).
+  // Every delete is confirmed on the photos themselves (toDelete): a count alone let a whole model go when one photo
+  // was meant (2026-11-20, 4 photos lost, two of them uploads filed under that model).
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [toDelete, setToDelete] = useState<LibraryPhoto[] | null>(null);
   async function deletePhotos(list: LibraryPhoto[]): Promise<boolean> {
+    setToDelete(null);
     setDeleting(true); setMsg(null);
     let failed = 0;
     let reason = "";
@@ -432,19 +436,41 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
       <section style={section}>
         <div>
           <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>模特兒圖庫</h3>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>勾選照片可一次刪除；點照片可框印花位置（只有主頁的「程式免費印」需要；AI 合成會自己找位置）；「修圖」在 PhotoCraft 改，按「傳回」存成同一位模特兒的新照片（原圖保留）。</div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>勾選照片可一次刪除；點照片可框印花位置（只有主頁的「程式免費印」需要；AI 合成會自己找位置）；「修圖」改勾選的那一張（只有一張就不用勾），在 PhotoCraft 改完按「傳回」存成同一位模特兒的新照片（原圖保留）。</div>
         </div>
         {selected.size > 0 && (
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button className="btn-secondary" style={{ color: "var(--red)" }} disabled={deleting}
-              onClick={() => { if (window.confirm(`永久刪除勾選的 ${selectedPhotos.length} 張照片？刪除後無法復原。`)) void deletePhotos(selectedPhotos); }}>
+            <button className="btn-secondary" style={{ color: "var(--red)" }} disabled={deleting} onClick={() => setToDelete(selectedPhotos)}>
               {deleting ? "刪除中…" : `永久刪除勾選的 ${selectedPhotos.length} 張`}
             </button>
             <button className="btn-secondary" disabled={deleting} onClick={() => setSelected(new Set())}>取消勾選</button>
           </div>
         )}
+        {toDelete && (
+          <div role="dialog" aria-modal="true" aria-label="確認刪除" style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}
+            onClick={() => setToDelete(null)} onKeyDown={(e) => { if (e.key === "Escape") setToDelete(null); }}>
+            <div className="card" style={{ maxWidth: "min(720px, 92vw)", maxHeight: "86vh", overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}
+              onClick={(e) => e.stopPropagation()}>
+              <b style={{ fontSize: 14 }}>永久刪除下面這 {toDelete.length} 張照片？刪除後無法復原。</b>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {toDelete.map((p) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={p.id} src={p.object_url!} alt={p.metadata?.preset_name ?? "模特兒"} style={thumb} />
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn-secondary" style={{ color: "var(--red)" }} onClick={() => void deletePhotos(toDelete)}>永久刪除這 {toDelete.length} 張</button>
+                <button className="btn-secondary" autoFocus onClick={() => setToDelete(null)}>取消</button>
+              </div>
+            </div>
+          </div>
+        )}
         {models.length === 0 && <p style={{ fontSize: 13, opacity: 0.6 }}>還沒有模特兒圖，先在上面生成。</p>}
-        {models.map((m) => (
+        {models.map((m) => {
+          // 修圖 opens one photo (a click may open only one tab): the one checked, or the model's only photo.
+          const checked = m.photos.filter((p) => selected.has(p.id));
+          const editTarget = checked.length === 1 ? checked[0] : m.photos.length === 1 ? m.photos[0] : null;
+          return (
           <div key={m.key}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 4 }}>
               <b>{m.name}</b>
@@ -460,8 +486,17 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
                 })}>
                 {m.photos.every((p) => selected.has(p.id)) ? "取消全選" : "全選"}
               </button>
+              {canvasHref && (
+                <button className="btn-secondary" style={{ fontSize: 11, padding: "1px 8px" }} disabled={!editTarget}
+                  title={editTarget ? "在 PhotoCraft 修圖，按「傳回」存成新照片（原圖保留）" : "先勾選一張要修的照片"}
+                  onClick={() => {
+                    if (!editTarget) return;
+                    editIn(editTarget.object_url!, `lib:${editTarget.id}`, m.name);
+                    setSelected((prev) => { const n = new Set(prev); n.delete(editTarget.id); return n; }); // not left checked for a later delete
+                  }}>修圖</button>
+              )}
               <button className="btn-secondary" style={{ fontSize: 11, padding: "1px 8px", color: "var(--red)" }} disabled={deleting}
-                onClick={() => { if (window.confirm(`永久刪除模特兒「${m.name}」和他的 ${m.photos.length} 張照片？刪除後無法復原。`)) void deletePhotos(m.photos); }}>
+                onClick={() => setToDelete(m.photos)}>
                 刪除整位
               </button>
             </div>
@@ -475,20 +510,16 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
                     onClick={(e) => e.stopPropagation()}
                     onChange={() => setSelected((prev) => { const n = new Set(prev); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })} />
                   <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }}
-                    disabled={deleting} onClick={(e) => { e.stopPropagation(); if (window.confirm("永久刪除這張照片？刪除後無法復原。")) void deletePhotos([p]); }}>✕</button>
+                    disabled={deleting} onClick={(e) => { e.stopPropagation(); setToDelete([p]); }}>✕</button>
                   <div style={{ fontSize: 10, textAlign: "center" }}>
                     {p.metadata?.garment_color ? `${COLOR_LABEL[p.metadata.garment_color]}衣` : "照片"}{p.metadata?.photo_role === "edit" ? "・修過" : ""}{p.metadata?.print_box ? "・已框" : ""}
                   </div>
-                  {canvasHref && (
-                    <button className="btn-secondary" style={{ fontSize: 10, padding: "1px 6px", display: "block", margin: "2px auto 0" }}
-                      title="在 PhotoCraft 修圖，按「傳回」存成新照片（原圖保留）"
-                      onClick={(e) => { e.stopPropagation(); editIn(p.object_url!, `lib:${p.id}`, m.name); }}>修圖</button>
-                  )}
                 </div>
               ))}
             </div>
           </div>
-        ))}
+          );
+        })}
         <input ref={uploadRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: "none" }}
           onChange={(e) => { void uploadPhoto(e.target.files?.[0]); e.target.value = ""; }} />
 

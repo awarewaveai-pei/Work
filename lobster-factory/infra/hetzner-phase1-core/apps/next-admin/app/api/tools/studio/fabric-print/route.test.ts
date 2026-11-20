@@ -10,7 +10,7 @@ vi.mock("@/lib/entitlements/grant", () => ({
 }));
 
 import { POST } from "./route";
-import { nearestAspectRatio as nearestAspect } from "@/lib/studio/model-options";
+import { PHOTO_PRINT_MODELS, nearestAspectRatio as nearestAspect } from "@/lib/studio/model-options";
 
 const post = (body: unknown) => POST(new Request("http://localhost/api/tools/studio/fabric-print", {
   method: "POST",
@@ -56,12 +56,14 @@ describe("POST /api/tools/studio/fabric-print", () => {
     expect(gate.asked).toBe(1);
   });
 
-  it("ai: the caller picks the model among those that take two reference images; a one-reference model is refused unspent", async () => {
+  it("ai: the caller picks one of PHOTO_PRINT_MODELS (each takes the photo and the design); any other is refused unspent", async () => {
     m.get.mockResolvedValue({ ok: true, body: await png(80, 120, { r: 250, g: 250, b: 250 }), contentType: "image/png" });
-    await post({ photo: PHOTO, design: DESIGN, model: "nano-banana-2" });
-    expect(m.gen.mock.calls[0][0]).toMatchObject({ model: "nano-banana-2", referenceImages: [PHOTO, DESIGN] });
+    expect(PHOTO_PRINT_MODELS.map((x) => x.value)).toEqual(["openai-25-edit", "openai-26-edit", "codex-image"]);
+    expect(PHOTO_PRINT_MODELS.every((x) => x.maxRefs >= 2)).toBe(true);
+    await post({ photo: PHOTO, design: DESIGN, model: "openai-26-edit" });
+    expect(m.gen.mock.calls[0][0]).toMatchObject({ model: "openai-26-edit", referenceImages: [PHOTO, DESIGN] });
     m.gen.mockClear();
-    for (const model of ["flux-kontext-pro", "flux-schnell", "not-a-model"]) {
+    for (const model of ["nano-banana-2", "flux-kontext-pro", "flux-schnell", "not-a-model"]) {
       expect((await post({ photo: PHOTO, design: DESIGN, model })).status, model).toBe(400);
     }
     expect(m.gen).not.toHaveBeenCalled();

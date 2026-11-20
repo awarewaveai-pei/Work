@@ -6,7 +6,7 @@ import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { issuedReturnTickets } from "./canvas-handoff";
 import { useCanvasReturn } from "./useCanvasReturn";
-import { postReturn, sendBack } from "../../public/editor-shared/dock.js";
+import { mountDock, postReturn, sendBack } from "../../public/editor-shared/dock.js";
 
 const IMG = "data:image/png;base64,AAAA";
 let unmount: (() => void) | null = null;
@@ -99,4 +99,34 @@ describe("編輯器 sendBack", () => {
     expect(save).not.toHaveBeenCalled();
     expect(report).toHaveBeenLastCalledWith("✅ 已傳回 商品圖");
   });
+});
+
+describe("dock 的傳回鈕（2026-11-20 操作者：傳回成功就關掉編輯器；訊息框不要全高蓋住控制項）", () => {
+  const SIZES = { rail: 40, button: 32, panel: 300, panelMin: 200, panelMax: 600, tab: 32, pad: 8 };
+  async function clickReturn(ticket: string) {
+    vi.stubGlobal("fetch", async () => ({ ok: true, blob: async () => new Blob(["x"]) }));
+    vi.stubGlobal("__proEditor", { handoff: Promise.resolve({ url: "blob:x", name: "a.png", ret: { id: ticket, label: "模特兒圖庫" }, done() {} }) });
+    const close = vi.spyOn(window, "close").mockImplementation(() => {});
+    const root = document.createElement("div");
+    document.body.append(root);
+    const c = { ready: () => Promise.resolve(), openFile: async () => true, exportArtboard: async () => new Blob(["png"], { type: "image/png" }), busy() {} };
+    await mountDock(root, { makeCtx: () => c, panelIds: [], storeKey: "t", sizes: SIZES });
+    await vi.waitFor(() => expect(root.querySelector("[data-return]")).not.toBeNull());
+    (root.querySelector("[data-return]") as HTMLButtonElement).click();
+    await vi.waitFor(() => expect((root.querySelector("[data-return]") as HTMLButtonElement).disabled).toBe(false), { timeout: 4000 });
+    return { close, flyout: root.querySelector(".vp-flyout")! };
+  }
+
+  it("原分頁收下 → 關掉這個分頁；訊息浮出層是 vp-notice（只到訊息高度）", async () => {
+    issuedReturnTickets.set("t5", { tool: "mockup-model", slot: "lib:x", label: "模特兒圖庫" });
+    senderTab("mockup-model", () => true);
+    const { close, flyout } = await clickReturn("t5");
+    expect(close).toHaveBeenCalledOnce();
+    expect(flyout.classList.contains("vp-notice")).toBe(true);
+  });
+
+  it("原分頁沒收下 → 不關（改存／下載的訊息要讓人看到）", async () => {
+    const { close } = await clickReturn("nobody");
+    expect(close).not.toHaveBeenCalled();
+  }, 8000);
 });

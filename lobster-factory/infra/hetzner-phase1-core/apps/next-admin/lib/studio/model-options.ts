@@ -82,12 +82,11 @@ export function modelsFor(use: ModelUse): readonly (ImageModelRow & { costNt: nu
   return (shared.modelsFor(use) as readonly ImageModelRow[]).map((m) => ({ ...m, costNt: nt(m.usd) }));
 }
 
-/** Models that can print a design onto a photo: the call carries TWO reference images (the photo, then the design),
- *  so a model that takes 0 or 1 cannot see both. GPT-Image-2.5 first: it bent the print with the folds best (2026-11-01). */
-export const PHOTO_PRINT_MODELS: readonly StudioModelOption[] = [
-  ...STUDIO_MODEL_OPTIONS.filter((m) => m.value === "openai-25-edit"),
-  ...STUDIO_MODEL_OPTIONS.filter((m) => m.value !== "openai-25-edit" && m.maxRefs >= 2),
-];
+/** Models that print a design onto a photo (the call carries TWO reference images: the photo, then the design), also the
+ *  fabric-print route's allowlist. Operator's pick and order 2026-11-20; GPT-Image-2.5 first: it bent the print with the
+ *  folds best (2026-11-01). Every one must take >= 2 references (model-options test). */
+export const PHOTO_PRINT_MODELS: readonly StudioModelOption[] = (["openai-25-edit", "openai-26-edit", "codex-image"] as const)
+  .map((v) => STUDIO_MODEL_OPTIONS.find((m) => m.value === v)!);
 
 export function isStudioModel(v: unknown): v is StudioModel {
   return typeof v === "string" && STUDIO_MODEL_OPTIONS.some((m) => m.value === v);
