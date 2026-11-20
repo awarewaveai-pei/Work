@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-20（續15）— oracle 補強批 1：塔羅牌間關係、八字大運神煞、合婚、風水併入 main；整合時修三個既有錯誤＋審查三條（操作者：「你是監工派工者」）
+
+- 來源：五個外部 skill（tarot-skill／bazi-skill 為 MIT，其餘三個無授權只參考做法）。派工表與 brief：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/DISPATCH.md`。
+- 併入（`Projects/internal/ziwei-doushu/`）：T1 `fd8be5e07`→main `d77cf7cda`、B1 `4737bddfc`、H1 `28ac8fb90`、F1 `e77943e36`；整合修正 `17f71c422`、`3380e3973`、`ee5bacf58`。
+- 根因（整合時修的既有錯誤）：
+  - C1 `lib/bazi.ts` `computeBazi` 從未讀 `req.calendar`，農曆輸入被當國曆排盤 → 先 `Lunar→Solar`（閏月負月份）。
+  - C2 納音未轉繁（`涧下水`）；三張詞表改成一張逐字表 `S2T`，涵蓋十神／生肖／十二長生／納音。
+  - C3 `components/AiReading.tsx` 解讀與錯誤橫幅不隨 context 更新 → 以 `JSON.stringify(context)` 綁定。
+  - C4（critic）`lib/baziShensha.ts` 羊刃辛取子為來源誤植 → 申。
+  - M1（critic）只有日期時的立春換年有三種寫法（00:00／12:00／23:59）→ 全站一個 `lib/liChun.ts`。
+  - m1 H1 手寫測試盤在 B1 加必填欄後不過型別 → `HehunChart` 只宣告合婚實際讀的欄位。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd D:/Worktrees/Work/oracle-int/Projects/internal/ziwei-doushu && npx tsc --noEmit && npx vitest run → 163 passed／3 skipped；瀏覽器實開 /zh-TW、/zh-TW/fengshui、/zh-TW/hehun、/zh-TW/bazi（排盤後納音為繁體）、/en/tarot，console 無錯 | exit=0 | ms=1400
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=1c/1m/1n（三條皆已修於 `ee5bacf58`；領域表格逐表核對其餘無誤）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02；改由 critic agent 獨立審整批 diff
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=SPREAD_SIZE|localizeShiShen|localizeZodiac | hits=4（皆 `WORKLOG-archive/2026-06.md` 歷史紀錄，程式無殘留）
+- 未做：未部署（High，整批完成後問操作者）；批 2（S1 清單與規則表單一來源、U1 表單下拉改按鈕、Q1 求籤、M1 奇門）待派。
+- 避免再發：工人 brief 共用規則加「禁止依程式名全殺 node」；審查不可用時批次整合後固定派一個 critic 核對領域表格。
+- rollback：`git revert d77cf7cda^..ee5bacf58`（七個 commit 僅動 `Projects/internal/ziwei-doushu/`）。
 ## 2026-11-20（續14）— 模特兒印製：生成圖不轉 JPEG，維持原 PNG（操作者：「不轉JPG」）
 
 - 改動：移除 `modelLibrary.ts` `asJpeg`；`ModelLibraryStudio.tsx:59` 生成結果原樣保存。續12 的 Next 50MB 上限（`next.config.ts`）不變，PNG 已能通過。
