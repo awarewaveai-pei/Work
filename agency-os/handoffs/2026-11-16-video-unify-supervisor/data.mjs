@@ -242,7 +242,7 @@ export const STEPS = [
     ] },
   { n: 17, code: '批4', next: true, title: '順暢度', plain: '例：腳本頁只剩一顆主按鈕；一鍵到草稿只顯示一個預估和一個最大金額，上限填太低會在送出前說至少要多少。',
     gate: '腳本頁只有一顆主按鈕；快速輸出的集不再顯示「剪輯還沒做」；成片卡的「完成」只標在實際交付的那一版；自動內容頁不用左右捲。',
-    risk: 'Medium', model: 'fullstack-engineer（Sonnet）；N12 用 Opus 5.5', status: 'done', commit: '68da3ef7d', depends: [],
+    risk: 'Medium', model: 'fullstack-engineer（Sonnet）；N12 用 Opus 5.5', status: 'in_progress', commit: '68da3ef7d', depends: [],
     what: '各項互不相依。N13、N14 都動 video-workbench 的 projects-0.js，由監工排先後。B 開頭與 R1 是影片工具融合留下、還沒修的項目，照原編號。',
     files: [`${V}ScriptForge.tsx`, `${NA}lib/script-forge/run-store.ts`, `${VW}shared/episode-spine.js`, `${VW}scripts/projects-0.js`, `${WB}schedule/`, `${NA}app/(shell)/tools/content/topics/`, `${NA}app/sidebar-sections.ts`, 'lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md', 'lobster-factory/workflow-risk-matrix.json', 'lobster-factory/docs/ROUTING_MATRIX.md'],
     items: [
@@ -260,6 +260,7 @@ export const STEPS = [
       done('T1', '第一則真發布實測找到的四個問題。2026-11-20 上線並在正式站看過：按「發布」後在頁面內展開確認區塊，按取消什麼都不發；格式點了就存，沒有「儲存格式」鈕；網站設定頁沒有下拉選單，選項都是按鈕，「每篇必附段落」常駐可見並標「已設幾段」。文章標題不再硬塞空格，要等下一篇新文章才看得到。「讀取草稿設定…」那一下只有帶 YouTube 草稿的題目才會出現，這次看的題目只有文章，沒看到。', 'c1ed20bc6'),
       done('T2', 'Instagram 發不出去不是斷線，是那則貼文有 31 個主題標籤，Instagram 上限 30。2026-11-20 上線：寫文案、存檔、送出三處都會擋超過 30 個；頻道連線正常時，失敗訊息不再叫人重新連接。那一則已重發成功。', 'afb02abfb'),
       done('T3', '標題空格檢查上線前就做好的文章，不會自己發出去，要有人看過標題按「發布」。2026-11-20：Codex 審查找到的漏洞，已修；今晚 03:00 自動上線。', '1a7a15284'),
+      todo('R2', '片首封面：把封面做成 2 秒開場接在影片最前面，半秒淡入淡出轉進正片。自動做的影片在網站設定開了才加（預設關）；剪輯器手動做的也能按「用封面當片頭」加入。開場做失敗就出原片，不擋發布。費用 NT$0。2026-11-20 你說要做、手動的也要能加；已派線 C，做完監工驗收，再跟你要一次部署的 go。'),
     ] },
 ];
 
