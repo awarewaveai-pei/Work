@@ -2,11 +2,13 @@
 // when it is made and its checks are stored with it (content_topics.artifacts), so a retry that keeps a made part keeps
 // its checks too; the topic's review (content_topics.review) is all parts' checks together.
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
+import { parseArticleMeta } from "@/lib/content/article/meta";
+import { unspacedWordGaps } from "@/lib/seo/keyword-match";
 
 /** Below this the article is a broken generation, not a short one (CJK and Latin both: characters of body text). */
 export const MIN_BODY_CHARS = 1000;
 
-export type ReviewCheck = { name: "complete" | "length" | "seo" | "forbidden" | "social" | "social_forbidden" | "required"; pass: boolean; detail: string };
+export type ReviewCheck = { name: "complete" | "length" | "seo" | "forbidden" | "social" | "social_forbidden" | "required" | "title_spacing"; pass: boolean; detail: string };
 /** A type, not an interface: it is stored in content_topics.review (Topic.review is a plain record). */
 export type TopicReview = { pass: boolean; checks: ReviewCheck[]; at: string };
 
@@ -22,6 +24,15 @@ const normWide = (s: string) => norm(s.normalize("NFKC"));
 /** A required paragraph's short name for the reason line. */
 const blockLabel = (b: string) => (b.length > 20 ? `${b.slice(0, 20)}…` : b);
 
+/** The titles a reader sees: the SEO title and every heading (H1–H4). Stray spaces between Chinese/Japanese words in any
+ *  of them = the keyword was pasted in instead of written into the sentence (keyword-match.ts UNSPACED_TITLE_RULE). */
+function titleSpacingCheck(markdown: string): ReviewCheck {
+  const titles = [parseArticleMeta(markdown)?.seoTitle ?? "", ...markdown.split("\n").filter((l) => /^#{1,4}\s/.test(l)).map((l) => l.replace(/^#+\s+/, ""))];
+  const gaps = titles.flatMap(unspacedWordGaps);
+  return { name: "title_spacing", pass: !gaps.length,
+    detail: gaps.length ? `標題的中文詞之間有空格（像硬塞關鍵字）：${gaps.slice(0, 3).map((g) => `「${g}」`).join("、")}` : "標題是自然的句子" };
+}
+
 /** required = the site's must-carry paragraphs (requiredBlocks()); none set = no check added, the list is as before. */
 export function articleChecks(markdown: string, report: RankMathReport | null, forbidden: string[], required: string[] = []): ReviewCheck[] {
   const marker = /<!-- GENERATION_(ERROR|TRUNCATED):/.test(markdown);
@@ -32,6 +43,7 @@ export function articleChecks(markdown: string, report: RankMathReport | null, f
     { name: "length", pass: text.length >= MIN_BODY_CHARS, detail: `內文 ${text.length} 字（至少 ${MIN_BODY_CHARS}）` },
     { name: "seo", pass: report?.grade === "green", detail: report ? `SEO ${report.score} 分（綠燈才算過）` : "沒有 SEO 檢測結果" },
     { name: "forbidden", pass: !found.length, detail: forbiddenDetail(found) },
+    titleSpacingCheck(markdown),
   ];
   const wanted = required.filter((b) => normWide(b));
   if (wanted.length) {

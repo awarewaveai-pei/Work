@@ -34,6 +34,15 @@ describe("topic review", () => {
     expect(reviewOf([], NOW).pass).toBe(false);
   });
 
+  it("a title with spaces between Chinese words fails and names them; a natural one passes (live 2026-11-20)", () => {
+    const meta = (t: string) => `<!-- CONTENT_META_START -->\nSEO_TITLE: ${t}\nMETA_DESC: d\n<!-- CONTENT_META_END -->\n`;
+    const spaced = articleChecks(`${meta("感恩節 心理學：7 個 有效 感恩任務")}# 感恩節的心理學\n\n${body}`, green, []);
+    expect(failed(spaced)).toEqual(["title_spacing"]);
+    expect(spaced.find((c) => c.name === "title_spacing")?.detail).toContain("「感恩節 心理學");
+    expect(failed(articleChecks(`${meta("Gratitude Psychology: 7 Effective Tasks")}# 感恩節的心理學：7個有效的感恩練習\n\n## 為什麼 感恩有用\n\n${body}`, green, []))).toEqual(["title_spacing"]);
+    expect(failed(articleChecks(`${meta("感恩節的心理學：7個有效的感恩練習")}# 感恩節的心理學\n\n${body}`, green, []))).toEqual([]);
+  });
+
   describe("required paragraphs (N1b)", () => {
     const DISCLAIMER = "本文僅供參考，不能取代專業治療。";
     const HOTLINE = "安心專線 1925";
@@ -62,7 +71,7 @@ describe("topic review", () => {
       for (const md of [body, "短", `${body}<!-- GENERATION_TRUNCATED: x -->`]) {
         const before = articleChecks(md, green, ["保證治癒"]);
         expect(articleChecks(md, green, ["保證治癒"], [])).toEqual(before);
-        expect(before.map((c) => c.name)).toEqual(["complete", "length", "seo", "forbidden"]);
+        expect(before.map((c) => c.name)).toEqual(["complete", "length", "seo", "forbidden", "title_spacing"]);
       }
     });
   });

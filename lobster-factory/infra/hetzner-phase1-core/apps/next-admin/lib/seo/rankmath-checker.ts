@@ -1,3 +1,5 @@
+import { containsKeyword, countKeyword, keywordPosition } from "./keyword-match";
+
 export interface RankMathInput {
   markdown: string;
   focusKeyword: string;
@@ -107,8 +109,8 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
   checks.push({
     id: "kw-in-title",
     label: "Focus keyword in SEO title",
-    pass: seoTitle.toLowerCase().includes(kw),
-    detail: seoTitle.toLowerCase().includes(kw)
+    pass: containsKeyword(seoTitle, kw),
+    detail: containsKeyword(seoTitle, kw)
       ? `"${kw}" found in title`
       : `"${kw}" not found in title: "${seoTitle}"`,
   });
@@ -117,8 +119,8 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
   checks.push({
     id: "kw-in-meta",
     label: "Focus keyword in meta description",
-    pass: metaDescription.toLowerCase().includes(kw),
-    detail: metaDescription.toLowerCase().includes(kw)
+    pass: containsKeyword(metaDescription, kw),
+    detail: containsKeyword(metaDescription, kw)
       ? `"${kw}" found in meta description`
       : `"${kw}" not found in meta description`,
   });
@@ -140,7 +142,7 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
 
   // 4. kw-in-intro
   const intro = getIntroWords(markdown, 150);
-  const introPass = intro.includes(kw);
+  const introPass = containsKeyword(intro, kw);
   checks.push({
     id: "kw-in-intro",
     label: "Focus keyword in first 150 words",
@@ -150,7 +152,7 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
 
   // 5. kw-in-h2h3
   const headings = getHeadingLines(markdown, "both");
-  const headingPass = headings.some(h => h.toLowerCase().includes(kw));
+  const headingPass = headings.some(h => containsKeyword(h, kw));
   checks.push({
     id: "kw-in-h2h3",
     label: "Focus keyword in H2 or H3 heading",
@@ -186,8 +188,8 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
       // ASCII single-word: word-boundary match
       kwOccurrences = (plain.match(new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g")) ?? []).length;
     } else {
-      // Multi-word OR CJK: plain substring (\b doesn't work for non-ASCII)
-      kwOccurrences = (plain.match(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
+      // Multi-word OR CJK: substring (\b doesn't work for non-ASCII); Chinese/Japanese ignore spaces (keyword-match.ts)
+      kwOccurrences = countKeyword(plain, kw);
     }
   }
   const density = wordCount > 0 ? kwOccurrences / wordCount : 0;
@@ -269,9 +271,8 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
   });
 
   // 11b. title-kw-position — keyword must appear in the FIRST HALF of the title (RankMath requirement)
-  const titleLower = seoTitle.toLowerCase();
-  const kwPosInTitle = titleLower.indexOf(kw);
-  const titleKwPosPass = kwPosInTitle >= 0 && kwPosInTitle <= Math.floor(titleLower.length / 2);
+  const { index: kwPosInTitle, length: titleCmpLen } = keywordPosition(seoTitle, kw);
+  const titleKwPosPass = kwPosInTitle >= 0 && kwPosInTitle <= Math.floor(titleCmpLen / 2);
   checks.push({
     id: "title-kw-position",
     label: "Focus keyword in first half of title",
@@ -354,7 +355,7 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
   while ((imgM = imgAltPattern.exec(markdown)) !== null) {
     imgAlts.push(imgM[1].toLowerCase());
   }
-  const kwInAlt = imgAlts.some(a => a.includes(kw));
+  const kwInAlt = imgAlts.some(a => containsKeyword(a, kw));
   checks.push({
     id: "kw-in-image-alt",
     label: "Focus keyword in at least one image alt text",
