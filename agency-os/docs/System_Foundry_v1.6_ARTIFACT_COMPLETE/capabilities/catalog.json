@@ -5662,6 +5662,23 @@
       ]
     },
     {
+      "id": "CAP-AW-ORACLE",
+      "name": "東西方命理",
+      "description": "紫微、八字、塔羅、風水等排盤與 AI 解讀。",
+      "module": "aw-oracle",
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "POST /api/interpret with tier premium (Projects/internal/ziwei-doushu/app/api/interpret/route.test.ts)",
+          "expect": "回 402；免費訪客拿不到頂規解讀"
+        },
+        {
+          "test": "every page slug has its page file and nav label in both languages (Projects/internal/ziwei-doushu/lib/site.test.ts)",
+          "expect": "導覽列、首頁、sitemap 上的每一頁都打得開，繁中與英文都有名稱"
+        }
+      ]
+    },
+    {
       "id": "CAP-AW-OUTREACH",
       "name": "行銷開發信",
       "description": "產生開發信並管理寄送名單。",

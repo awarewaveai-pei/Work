@@ -3230,6 +3230,14 @@
       "required_when_active": true
     },
     {
+      "id": "Q-AW-ORACLE",
+      "category": "AW",
+      "label": "東西方命理",
+      "description": "紫微、八字、塔羅、風水等排盤與 AI 解讀。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
       "id": "Q-AW-OUTREACH",
       "category": "AW",
       "label": "行銷開發信",

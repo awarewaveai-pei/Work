@@ -2403,7 +2403,7 @@
           {
             "path": "canvas",
             "name": "畫布",
-            "staff": "tools/canvas"
+            "staff": "tools/photo-pro"
           },
           {
             "path": "banner",
@@ -2453,7 +2453,8 @@
         "tools/designs",
         "tools/mockup",
         "tools/banner",
-        "tools/vector-pro"
+        "tools/vector-pro",
+        "tools/photo-pro"
       ]
     },
     {
@@ -2477,6 +2478,30 @@
       "modules": {
         "dependsOn": [],
         "manifest": "lib/hci/MODULE_MANIFEST.json"
+      },
+      "staffPaths": []
+    },
+    {
+      "key": "oracle",
+      "name": "東西方命理",
+      "description": "紫微、八字、塔羅、風水等排盤與 AI 解讀。",
+      "subdomain": "oracle",
+      "door": {
+        "app": "external"
+      },
+      "loginSources": [
+        "local",
+        "awarewave-wp"
+      ],
+      "standalone": true,
+      "status": "coming_soon",
+      "features": [],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/oracle/MODULE_MANIFEST.json"
       },
       "staffPaths": []
     },
@@ -2840,7 +2865,8 @@
             "name": "我的作品",
             "staff": "tools/designs"
           }
-        ]
+        ],
+        "uiService": "video-workbench"
       },
       "loginSources": [
         "local"
@@ -2893,6 +2919,20 @@
         {
           "feature_key": "video.3d",
           "name": "圖片轉 3D",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "video.enhance",
+          "name": "AI 畫質增強",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "video.music",
+          "name": "音樂生成",
           "limitKind": "QUOTA",
           "buyout": true,
           "billing": "credits"

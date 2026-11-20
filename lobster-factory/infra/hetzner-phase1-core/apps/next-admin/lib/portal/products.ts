@@ -93,6 +93,10 @@ const PRODUCT_DEFINITIONS = [
         { path: "profiles", name: "服務設定", staff: "tools/outreach/settings/service-profiles" }, { path: "suppression", name: "拒收名單", staff: "tools/outreach/settings/suppression" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
     features: [quota("outreach.draft", "AI 開發信"), quota("outreach.qa", "事實核對"), quota("outreach.research", "客戶研究"), quota("outreach.discover", "找名單"), quota("outreach.classify", "回信分類"), quota("outreach.verify", "信箱驗證")], accessChannels: ["ui"], modules: { dependsOn: ["collect"], manifest: "lib/outreach/MODULE_MANIFEST.json" }, staffPaths: ["tools/outreach"] },
+  // Its own container and door (oracle.aware-wave.com, Projects/internal/ziwei-doushu); public and anonymous, nothing sold yet.
+  { key: "oracle", name: "東西方命理", description: "紫微、八字、塔羅、風水等排盤與 AI 解讀。", subdomain: "oracle", door: { app: "external" },
+    loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon",
+    features: [], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/oracle/MODULE_MANIFEST.json" }, staffPaths: [] },
   // NEW_PRODUCT_ROWS: scripts/new-product.mjs inserts before this marker.
 ] as const satisfies readonly ProductDefinition[];
 export type ProductKey = (typeof PRODUCT_DEFINITIONS)[number]["key"];

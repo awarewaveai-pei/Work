@@ -2704,6 +2704,16 @@
       ]
     },
     {
+      "id": "RULE-Q-AW-ORACLE",
+      "when": {
+        "question": "Q-AW-ORACLE",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-ORACLE"
+      ]
+    },
+    {
       "id": "RULE-Q-AW-OUTREACH",
       "when": {
         "question": "Q-AW-OUTREACH",

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "module_id": "oracle",
+  "declarations": {
+    "state_ownership": "None persisted. Every chart, draw and reading is computed per request from the visitor's input and returned; nothing is written to a database, a file or a cookie (Projects/internal/ziwei-doushu/lib/db/client.ts:3-8 is an env-detection seam with no client; lib/db/schema.ts is an unapplied draft). No next-admin table, no shared Supabase row.",
+    "behavior_ownership": "Eleven public pages under /[lang]/ (list: Projects/internal/ziwei-doushu/lib/site.ts PAGE_SLUGS) for Zi Wei, BaZi, BaZi compatibility, I Ching, tarot, Guanyin lots, Western astrology, feng shui, Qi Men Dun Jia, date selection and the daily reading. Deterministic engines in lib/ compute every fact (lib/ziwei.ts, lib/bazi.ts, lib/hehun.ts, lib/iching.ts, lib/tarot.ts, lib/qian.ts, lib/fengshui/, lib/qimen/, lib/zeri.ts, lib/daily.ts; shared stem/branch rules lib/ganzhi.ts, Li Chun rule lib/liChun.ts); the AI layer only narrates those facts (lib/ai/prompts/index.ts:36 NO CALCULATIONS).",
+    "public_api_event_contract": "HTTP, Next.js route handlers: GET /api/health -> {ok:true,service:\"ziwei\"} (app/api/health/route.ts:9-11); POST /api/interpret {tier, context{systemId, locale, headline, facts[]}} -> {text, provider, model}, 400 on a malformed context, 402 on tier premium (app/api/interpret/route.ts:121-129); POST /api/astrology; GET /api/og (share card image). systemId must be one of SYSTEM_IDS (lib/divination/types.ts). No events, no webhooks.",
+    "invariants": "The model never computes: facts come from the engines and the prompt forbids calculation (lib/ai/prompts/index.ts:36-56). /api/interpret accepts at most 60 facts, labels up to 60 and values up to 300 characters, and strips control and line-separator characters before they reach the prompt (app/api/interpret/route.ts:27-30, :46-48, :74-87). One list each for systems, pages and stem/branch rules (lib/divination/types.ts SYSTEM_IDS, lib/site.ts PAGE_SLUGS, lib/ganzhi.ts); lib/site.test.ts fails a page without its file or nav label. Secrets are never in the image (.dockerignore .env*).",
+    "dependencies": "One container, oracle-web. Outbound: the AI provider chosen by AI_PROVIDER, OpenAI by default (lib/ai/providers/openai.ts, lib/ai/providers/anthropic.ts). No Supabase, no Trigger, no next-admin call, no shared database. products.ts dependsOn is empty. Payment and database modules are stubs that read env only (lib/payments/providers/*.ts, lib/db/client.ts).",
+    "failure_isolation_boundary": "Its own container on lobster-net with a 768M memory limit and 512 pids (hetzner-phase1-core/docker-compose.yml service oracle-web); it shares no volume and no database with any other service, so its failure touches nothing else. Without an AI key every chart and draw still works and only the reading button fails (lib/ai/errors.ts AiNotConfiguredError). /api/health is liveness only.",
+    "data_lifecycle": "No personal data is stored: birth data lives in the browser page state and in the single request that computes or interprets it. Nothing to export, erase or retain. Container logs rotate (docker-compose.yml x-logging lobster-logging).",
+    "observability_contract": "GET /api/health; the compose healthcheck calls it every 10 s (docker-compose.yml service oracle-web); sg-deploy.sh probes it on the published port, one rendered page and the public vhost after every deploy (scripts/sg-deploy.sh, oracle-web smoke block). Deploy outcome goes through notify.sh.",
+    "migration_rollback_contract": "No schema, so no migration. A deploy snapshots the running image first and restores it on any health or smoke failure (scripts/sg-deploy.sh step 2.5 and do_rollback; scripts/rollback-phase1.sh IMAGE_MAP oracle-web). Gates before build: npm ci, tsc, vitest (sg-deploy.sh step 1.75; .github/workflows/oracle-web-ci.yml).",
+    "replacement_strategy": "A stateless Next.js standalone image (Projects/internal/ziwei-doushu/Dockerfile) behind one vhost; replacing it means another service on oracle-web:3000 answering the same pages and /api/interpret. A system is added or removed in one place each: SYSTEM_IDS, FRAMING, the register line and PAGE_SLUGS (lib/divination/types.ts header)."
+  },
+  "services": [
+    { "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml", "service": "oracle-web" }
+  ],
+  "env": ["OPENAI_API_KEY"],
+  "acceptance": [
+    {"test": "POST /api/interpret with tier premium (Projects/internal/ziwei-doushu/app/api/interpret/route.test.ts)", "expect": "回 402；免費訪客拿不到頂規解讀"},
+    {"test": "every page slug has its page file and nav label in both languages (Projects/internal/ziwei-doushu/lib/site.test.ts)", "expect": "導覽列、首頁、sitemap 上的每一頁都打得開，繁中與英文都有名稱"}
+  ],
+  "configuration": {
+    "PUBLIC_BASE_DOMAIN": "installation base domain",
+    "PRODUCT_HOST_ORACLE": "optional product host; the site URL is inlined at build (NEXT_PUBLIC_SITE_URL, default in Projects/internal/ziwei-doushu/lib/site.ts)",
+    "loginSources": ["local", "awarewave-wp"],
+    "apiKeys": "OPENAI_API_KEY (required for readings); OPENAI_MODEL_DEEP optional; ANTHROPIC_API_KEY with AI_PROVIDER=anthropic as the alternative. Read from apps/oracle-web/.env.production at run time (docker-compose.yml oracle-web env_file).",
+    "generatedByInstall": "None.",
+    "readiness": "Public and anonymous today: no login, no account, no payment. /api/interpret gates only the premium tier (402); the free daily limit is defined but not metered (Projects/internal/ziwei-doushu/lib/entitlements.ts:19, app/api/interpret/route.ts:121-125). Not sold until accounts and metering exist; at that point permission moves to can(subject, feature_key, actor) and this row gets its features.",
+    "installUnit": "The one service oracle-web from the core compose file plus its .env.production; nothing else is needed (ADR 017 section 5)."
+  }
+}
