@@ -118,11 +118,12 @@ export function computeZeri(req: ZeriRequest): ZeriResult {
     const chongZhi = lunar.getDayChong();
     const chongResident = residentZhi !== null && chongZhi === residentZhi;
 
+    const verdict: ZeriVerdict = ji || chongResident ? 'avoid' : yi && huangDao ? 'good' : 'ok';
+    // 原因只列決定該判定的那幾項:avoid 列觸犯的,其餘列宜／黃黑道(avoid 日不再附「黃道日」這類無關項)。
     const reasons: ZeriReason[] = [];
     if (ji) reasons.push('jiHit');
     if (chongResident) reasons.push('chongResident');
-    reasons.push(yi ? 'yiHit' : 'yiMissing', huangDao ? 'huangDao' : 'heiDao');
-    const verdict: ZeriVerdict = ji || chongResident ? 'avoid' : yi && huangDao ? 'good' : 'ok';
+    if (verdict !== 'avoid') reasons.push(yi ? 'yiHit' : 'yiMissing', huangDao ? 'huangDao' : 'heiDao');
 
     days.push({
       date: ymdString(ymd),
