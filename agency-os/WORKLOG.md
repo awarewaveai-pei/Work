@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-20（續18）— oracle 批 3（擇日＋口徑標示）併入並部署 ks-aw-01；三批全部上線；sitemap 網域錯誤修正（操作者：「當然要部署在新機啊」）
+
+- 併入：Z1 `ee1635c6f`（`lib/zeri.ts`、`lib/s2t.ts` 共用簡→繁、八字／風水頁口徑一行）、監工修 `32b1437a9`（宜避開日只列觸犯項）、`043693fa9`（`lib/site.ts` 預設網域＋`deploy/DEPLOY.md` 取代 `DEPLOY-SG.md`）。
+- 部署：`oracle-deploy.sh` 兩次，皆 `deployed`、無 ROLLBACK — `32b1437a9`（07:45Z）、`043693fa9`（07:48Z）。備份 `/opt/oracle/backups/src-*.tgz`＋`oracle-web:rollback`。
+- 根因（部署後外部檢查發現）：`NEXT_PUBLIC_SITE_URL` 於 `next build` 內嵌，compose `environment` 只在執行期 → 線上 sitemap 24 筆全指向不存在的 `ziwei.aware-wave.com`（既有，4 個月）。修：`lib/site.ts` 預設值＝正式網域。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl https://oracle.aware-wave.com/{zh-TW,zh-TW/tarot,bazi,hehun,fengshui,qimen,qian,zeri,en/zeri,en/qian} → 10/10 200 且 `<title>` 正確；sitemap `oracle.aware-wave.com` 24 筆、`ziwei.aware-wave` 0 筆；`POST /api/interpret` light 對 qian／bazi(readingType)／qimen／zeri／hehun／fengshui／tarot 各一次皆 200 有文（model=gpt-5.4-mini）；`docker exec oracle-web printenv OPENAI_MODEL_DEEP`＝有值；映像 `/app` 無 `.env*`；主機 gate 193 passed | exit=0 | ms=35000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（Z1 由 Opus 工人寫、監工讀 diff；宜避開日原因清單含無關項，已修）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/ziwei-doushu | grep=DEPLOY-SG | hits=4（`deploy/DEPLOY.md` 1 筆歷史註記、`WORKLOG.md` 本日條目 3 筆；無仍指向舊檔的引用，`DISPATCH.md` 已改指 `DEPLOY.md`）
+- 剩餘風險：`rollback()` 仍未實際觸發；`/opt/oracle/backups` 首份備份建於 umask 修正後（700／600 已實查）；Z1 RISKS（出生年只收年份、英文頁農曆日期顯示中文、「簽約」對應立券／交易）記於 `DISPATCH.md`，未處理。
+- rollback：主機 `docker tag oracle-web:rollback oracle-web:latest && docker compose up -d --no-build --force-recreate`（回到 `32b1437a9`）；更早版本用 `/opt/oracle/backups/src-20261120-074329.tgz` 還原原始碼後重 build。
 ## 2026-11-20（續17）— oracle 部署腳本 `oracle-deploy.sh`（ks-aw-01）；既有手冊仍寫退租的 SG 主機（操作者：「當然要部署在新機啊」）
 
 - 現況（SSH 唯讀實查）：`/opt/oracle/Projects/internal/ziwei-doushu/` 非 git 目錄；`oracle-web:latest` 4 個月前建、容器 healthy；不在 `sg-deploy.sh` 的 app 清單；`deploy/DEPLOY-SG.md` §7 的 `git fetch && reset` 在此不可用。

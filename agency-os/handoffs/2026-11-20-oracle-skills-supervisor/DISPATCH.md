@@ -18,7 +18,8 @@
 | 2 | Q1 | 新系統 求籤（觀音靈籤，四見證者校勘） | Opus 5.5 | main `0749084cc` `b98c8d003` `8d4751087` |
 | 2 | M1 | 新系統 奇門遁甲（黃金案例對盤） | Opus 5.5 | main `736c8ea7c` |
 | 2 | — | 監工整合＋critic 一條 | — | main `55c8d5c2a` `de4700215` `4eb025456` |
-| 3 | Z1 | 擇日（接風水；`lunar-javascript` 已有宜忌）＋風水頁標示流派口徑 | 待定 | 未開 |
+| 3 | Z1 | 擇日＋八字／風水頁口徑標示 | Opus 5.5 | main `ee1635c6f` `32b1437a9` |
+| — | 部署 | `deploy/oracle-deploy.sh`（`a1750a505`）；ks-aw-01 上線 `043693fa9`（2026-11-20 07:48Z） | — | 線上 |
 
 整合方式：detached worktree `D:\Worktrees\Work\oracle-int`（cherry-pick → 解衝突 → `npm ci` → tsc＋全套 vitest → `.claude/launch.json` 的 `oracle-int` 預覽實看）→ rebase 到 `main` → `git merge --ff-only`。批 2 併入順序：S1 先，其餘在它之後（Q1、M1 的 `SystemId`／`FRAMING` 行照 S1 的新寫法併）。
 
@@ -74,3 +75,21 @@ brief 在 `briefs/`（`COMMON.md`＋各卡）。
 | U1 | 合婚頁未實際操作 | 監工已實按「開始合婚」，正常 |
 | 全部 | AI 解讀（籤、奇門、合婚、風水、八字新框架）未對真實模型跑 | 部署後 smoke 每系統實跑一次 |
 | 全部 | Codex 無額度 | critic 審整批（pass 0c/0m/1n） |
+
+### 批 3＋部署（2026-11-20）
+
+| 來源 | 風險 | 處置 |
+|---|---|---|
+| 監工 | 主機無部署路徑、手冊指向退租主機 | 已處理：`oracle-deploy.sh`＋`DEPLOY.md` |
+| critic | 部署腳本 4M/3m（rollback 半途結束、訊號不還原、smoke 假失敗、備份含金鑰 644…） | 全修於 `a1750a505` |
+| 部署後檢查 | sitemap 24 筆指向 `ziwei.aware-wave.com` | 已修 `043693fa9`，線上 24/0 |
+| 監工 | `rollback()` 未實際觸發過 | 未處理；有 tar＋映像雙備份可手動還原 |
+| Z1 | 宜避開日原因清單附無關項 | 已修 `32b1437a9` |
+| Z1 | 出生年只收年份（1 月–2 月初出生者生肖可能差一年） | 頁面顯示算出的生肖供核對；接受 |
+| Z1 | 「簽約」對應立券／交易；忌含「諸事不宜」一律宜避開 | 規則寫在 `lib/zeri.ts` 檔頭；接受 |
+| Z1 | 英文頁農曆日期顯示中文 | 接受（農曆日無通行英文寫法） |
+| Z1 | 節氣名未併入共用簡→繁表（谷／穀一對多） | 正確判斷，維持整詞表 |
+| 全部 | AI 解讀未對真實模型跑 | 已處理：線上七系統 light 各一次皆 200 有文 |
+
+## 現況
+五個外部 skill 的內容全部上線。未排入：紫微夫妻宮／桃花運（yinyuan）、城市五行地圖（fengshui）、每日次數計量與帳號金流（`ORACLE_ROADMAP.md` Phase A）。工人 session 四個皆 idle，可封存。
