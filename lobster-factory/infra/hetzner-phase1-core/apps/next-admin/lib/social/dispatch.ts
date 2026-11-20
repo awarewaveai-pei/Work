@@ -99,13 +99,17 @@ const DEFAULT_BACKOFF_S = 15 * 60;               // a 429 without Retry-After
 
 // Invariant (SOC-REAUTH 2026-11-19): every failure written to social_post_targets.error (and so to the incident) says
 // what a person does next. Postiz v2.25.1's public API returns neither the integration's refreshNeeded nor a failed
-// post's error text (GET /posts projects error as null; the cause stays in Postiz's own Post.error), so "no reason
-// from Postiz" must still point at the channel, never read as a bare "error".
+// post's error text (GET /posts projects error as null; the cause stays in Postiz's own Post.error). "No reason from
+// Postiz" points at reconnecting ONLY when our mirror of Postiz's channel state (channel-health.ts, every 5 min) says the
+// channel is not connected; a connected channel's failure is the platform refusing the post, and saying "reconnect"
+// there sent the operator the wrong way (Instagram 2026-11-20: 31 hashtags, channel healthy).
 export const SETTINGS_CHANNELS = "/tools/social 設定 → 頻道";
 export const failureText = {
   channelGone: (platform: string, why: string) => `${platform} 頻道需要重新授權（${why}）：請到 ${SETTINGS_CHANNELS} → 重新連接，再重新排程此貼文`,
   refused: (detail: string) => `Postiz 拒收這則貼文：${detail}。修正內容後重新排程`,
-  noReason: (platform: string) => `Postiz 發布失敗（Postiz 未回原因，最常見是 ${platform} 頻道授權失效）：請到 ${SETTINGS_CHANNELS} 重新連接 ${platform}，再重新排程此貼文`,
+  noReason: (platform: string, accountStatus: string) => accountStatus === "connected"
+    ? `${platform} 拒收這則貼文（頻道連線正常，問題不在授權）：Postiz 沒有轉交 ${platform} 給的原因。常見是內容不符平台規定（例如 Instagram 主題標籤超過 30 個、說明文字太長、影片規格不符）；修正內容後重新排程此貼文`
+    : `Postiz 發布失敗（Postiz 未回原因，${platform} 頻道目前不是「已連接」）：請到 ${SETTINGS_CHANNELS} 重新連接 ${platform}，再重新排程此貼文`,
   disabledHere: (platform: string) => `${platform} 頻道已在設定中停用，不會送出：要發請先到 ${SETTINGS_CHANNELS} 啟用，再重新排程此貼文`,
   rehearsal: "Postiz 裡是一則預演草稿（draft 模式），不會自己發出：重新排程此貼文才會送出",
   gone: "Postiz 已沒有這則貼文（在 Postiz 被刪、頻道被移除，或超過 7 天）：重新排程此貼文",
@@ -329,7 +333,7 @@ export async function runDispatch(ports: DispatchPorts, opts: { mode: DispatchMo
               // a rehearsal draft (SOCIAL_DISPATCH_MODE=draft) never goes out by itself: settle it, the person schedules again
               changes.push({ id: t.id, state: "error", error: failureText.rehearsal });
             }
-            else if (p?.state === "ERROR") changes.push({ id: t.id, state: "error", error: p.error?.trim() || failureText.noReason(t.platform) });
+            else if (p?.state === "ERROR") changes.push({ id: t.id, state: "error", error: p.error?.trim() || failureText.noReason(t.platform, t.accountStatus) });
             else if (!p) changes.push({ id: t.id, state: "error", error: failureText.gone });
           }
         }

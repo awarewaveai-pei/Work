@@ -61,6 +61,30 @@ describe("writeSocialPosts", () => {
     expect(r).toEqual({ posts: { threads: "字".repeat(100), facebook: "好" }, tooLong: [], missing: [], wrongLanguage: [], language: "繁體中文" });
   });
 
+  // Instagram 2026-11-20 refused 31 hashtags (limit 30): the cap is cut in code, the model is only asked for fewer.
+  it("Instagram: the prompt states the hashtag cap, and an answer over it keeps only the first 30 hashtags", async () => {
+    const p = buildPrompt({ article: "a", siteLanguage: "繁體中文", keys: ["instagram"] }, ["instagram"]);
+    expect(p).toContain("At most 30 hashtags");
+    expect(p).not.toContain("20-30 hashtags");
+    const caption = "感恩的一天\n\n" + Array.from({ length: 31 }, (_, i) => `#感恩${i}`).join(" ");
+    const ask = vi.fn().mockResolvedValue(answer({ instagram: caption }));
+    const r = await writeSocialPosts({ article: "文章", siteLanguage: "繁體中文", keys: ["instagram"] }, ask);
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(r.posts.instagram).toBe(caption.replace(/ #感恩30$/, ""));
+  });
+
+  // Codex a0bd51a8: the length is measured after the cut, so cutting the extra hashtag can make a post fit.
+  it("Instagram: a caption over 2200 only because of its 31st hashtag fits after the cut and is not reported too long", async () => {
+    const tags = Array.from({ length: 31 }, (_, i) => `#t${String(i).padStart(4, "0")}`);
+    const caption = "a".repeat(BODY_LIMITS.instagram - 30 * 7) + "\n" + tags.join(" ");   // 30 tags of 6 chars fit; the 31st does not
+    expect(caption.length).toBeGreaterThan(BODY_LIMITS.instagram);
+    const ask = vi.fn().mockResolvedValue(answer({ instagram: caption }));
+    const r = await writeSocialPosts({ article: "an article", siteLanguage: "English", keys: ["instagram"] }, ask);
+    expect(r.tooLong).toEqual([]);
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(r.posts.instagram!.length).toBeLessThanOrEqual(BODY_LIMITS.instagram);
+  });
+
   it("still too long after the rewrite: reported, never silently cut", async () => {
     const ask = vi.fn().mockResolvedValue(answer({ twitter_single: "a".repeat(400) }));
     const r = await writeSocialPosts({ article: "a", siteLanguage: "English", keys: ["twitter_single"] }, ask);

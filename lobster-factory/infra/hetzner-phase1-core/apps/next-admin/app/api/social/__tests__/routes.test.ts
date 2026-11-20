@@ -107,6 +107,18 @@ describe("/api/social routes", () => {
     expect((await POST(req("POST", "/api/social/posts", { role: "owner" }, { brand: A, fields: { body: "ok" }, targets: [{ account_id: ACC }] }))).status).toBe(200);
   });
 
+  // Instagram 2026-11-20 refused a caption with 31 hashtags at send time; saving now refuses it first.
+  it("posts POST: more hashtags than Instagram takes is a 400 naming the count; 30 is saved", async () => {
+    const { POST } = await import("../posts/route");
+    store.accountPlatforms.mockResolvedValue(new Map([[ACC, "instagram"]]));
+    const tags = (n: number) => "感恩的一天\n\n" + Array.from({ length: n }, (_, i) => `#感恩${i}`).join(" ");
+    const over = await POST(req("POST", "/api/social/posts", { role: "owner" }, { brand: A, fields: { body: tags(31) }, targets: [{ account_id: ACC }] }));
+    expect(over.status).toBe(400);
+    expect((await over.json()).detail.hashtagOverLimit[0]).toMatchObject({ platform: "instagram", count: 31, limit: 30 });
+    expect(store.savePost).not.toHaveBeenCalled();
+    expect((await POST(req("POST", "/api/social/posts", { role: "owner" }, { brand: A, fields: { body: tags(30) }, targets: [{ account_id: ACC }] }))).status).toBe(200);
+  });
+
   it("posts/[id] PUT: needs the version; a client may not edit; DELETE goes through the state rules", async () => {
     const { PUT, DELETE } = await import("../posts/[id]/route");
     store.getPost.mockResolvedValue(draft());

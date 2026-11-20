@@ -3,7 +3,7 @@
 // read the same function, so what is previewed is what is sent.
 // Postiz content is HTML (sanitizePostContent keeps p/br/a/...; each provider turns it back into text): plain text is
 // escaped and every line becomes a <p>, or a "<" in a post would be eaten and line breaks lost.
-import { youtubeParts } from "./limits";
+import { hashtagCount, HASHTAG_LIMITS, youtubeParts } from "./limits";
 
 /** A comment posted under the post by the same account (0105 social_post_comments, in position order). */
 export interface ComposeComment {
@@ -129,6 +129,14 @@ export function compose(input: ComposeInput): Composed {
     const cover = coverOf(input.media[0]);
     return { values: [{ content: toPostizHtml(description), image }], settings: { __type: "youtube", ...settingsOf(input.format), title, ...(cover ? { thumbnail: cover } : {}) }, text };
   }
+  // the platform's hashtag cap, checked here because every send passes here: a draft saved by the pipeline (savePost),
+  // a post rescheduled without an edit, a first_comment -- none goes through the save check (Codex a0bd51a8)
+  const tagLimit = HASHTAG_LIMITS[input.platform];
+  const tagsOver = (s: string, where: string) => {
+    const n = hashtagCount(s);
+    if (tagLimit && n > tagLimit) throw new ComposeError(`${where}有 ${n} 個主題標籤，${input.platform} 上限 ${tagLimit} 個`);
+  };
+  tagsOver(text, "內文");
   const values: Composed["values"] = [{ content: toPostizHtml(text), image }];
   // a story shows no comments (the preview says the same)
   if (input.format !== "story") input.comments.forEach((c, i) => {
@@ -136,6 +144,7 @@ export function compose(input: ComposeInput): Composed {
     const media = c.media && commentTakesMedia(input.platform) ? c.media : null;
     if (!c.body.trim() && !media) throw new ComposeError(`comment ${i + 1} is an image only, and ${input.platform} comments carry no image`);
     if (media && (!media.postizMediaId || !media.postizPath)) throw new ComposeError(`comment ${i + 1}'s image is not in Postiz storage yet`);
+    tagsOver(c.body, `第 ${i + 1} 則留言`);
     values.push({
       content: toPostizHtml(c.body),
       image: media ? [{ id: media.postizMediaId as string, path: media.postizPath as string }] : [],

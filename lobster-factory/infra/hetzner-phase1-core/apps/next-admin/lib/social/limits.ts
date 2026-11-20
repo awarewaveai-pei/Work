@@ -22,6 +22,54 @@ export const BODY_LIMITS: Record<string, number> = {
   facebook: 63206,
 };
 
+/** Hashtags a post may carry, per Postiz providerIdentifier. Instagram refuses a caption with more than 30 at send time
+ *  (Graph API code 36004 / subcode 2207117 「說明文字的主題標籤數量上限為 30 個」, AwareWave post 2026-11-20 with 31),
+ *  and Postiz does not check it. Save (posts.ts), the editor and the AI writer (write-posts.ts) read this one table. */
+export const HASHTAG_LIMITS: Record<string, number> = {
+  instagram: 30,
+  "instagram-standalone": 30,
+};
+
+// A hashtag = "#" + letters/digits/underscore, not inside a word or a URL ("a#b", "/#top", "&#123;" are not hashtags).
+const HASHTAG = /(?<![\p{L}\p{N}_/&#])#[\p{L}\p{M}\p{N}_]+/gu;
+
+export function hashtagCount(text: string): number {
+  return (text.match(HASHTAG) ?? []).length;
+}
+
+/** `text` with only its first `max` hashtags: each later one goes with the spaces before it, and a line that held only
+ *  such hashtags goes too. Unchanged when it has at most `max`. */
+export function keepHashtags(text: string, max: number): string {
+  if (hashtagCount(text) <= max) return text;
+  let n = 0;
+  const tag = new RegExp(`[ \\t]*${HASHTAG.source}`, "gu");
+  return text.split("\n").flatMap((line) => {
+    const kept = line.replace(tag, (t) => (++n <= max ? t : ""));
+    return kept === line ? [line] : kept.trim() ? [kept.trimEnd()] : [];
+  }).join("\n").trimEnd();
+}
+
+export interface HashtagProblem {
+  accountId: string;
+  platform: string;
+  count: number;
+  limit: number;
+  /** 1-based comment number; absent = the post's own text */
+  comment?: number;
+}
+
+/** Each target's text and each comment against its platform's hashtag limit (Instagram checks the caption and every
+ *  comment Postiz posts for it alike). */
+export function hashtagsOverLimit(targets: Array<{ accountId: string; platform: string; text: string }>, comments: string[] = []): HashtagProblem[] {
+  return targets.flatMap((t) => {
+    const limit = HASHTAG_LIMITS[t.platform];
+    if (!limit) return [];
+    return [{ text: t.text, comment: undefined as number | undefined }, ...comments.map((text, i) => ({ text, comment: i + 1 }))]
+      .map((v) => ({ accountId: t.accountId, platform: t.platform, count: hashtagCount(v.text), limit, ...(v.comment ? { comment: v.comment } : {}) }))
+      .filter((p) => p.count > limit);
+  });
+}
+
 /** YouTube's video title: the first line of a YouTube post (youtube.settings.dto.ts 2-100, counted as code points). */
 export const YOUTUBE_TITLE_MAX = 100;
 export const YOUTUBE_TITLE_MIN = 2;

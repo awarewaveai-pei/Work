@@ -1,7 +1,7 @@
 // Post payloads for POST /api/social/posts and PUT /api/social/posts/[id]: what may be sent, and the body limits.
 import { WRITE_ROLES, actorOf, requireBrandRole } from "./authz";
 import { BadRequest, uuid } from "./http";
-import { commentsOverLimit, overLimit, youtubeParts } from "./limits";
+import { commentsOverLimit, hashtagsOverLimit, overLimit, youtubeParts } from "./limits";
 import { accountPlatforms, savePost, type AutoMode, type CommentInput, type MediaInput, type PostChildren, type PostFields, type SavedPost, type TargetInput } from "./store";
 import { commentTakesMedia, composeText, ComposeError } from "./compose";
 import { parseRepeat, RepeatError } from "./repeat-rule";
@@ -100,7 +100,7 @@ export function parsePostPayload(body: Record<string, unknown>): PostPayload {
 }
 
 /** 400 when a target's text -- as the sender composes it, link and UTM included -- or one of the comments is longer than
- *  its platform takes, or the account is not this brand's. */
+ *  its platform takes or carries more hashtags than it takes (HASHTAG_LIMITS), or the account is not this brand's. */
 export async function assertWithinLimits(brandId: string, body: string, targets: TargetInput[], link: { url: string | null; utm: boolean } = { url: null, utm: false },
   comments: Array<{ body: string; media_id?: string | null }> = []): Promise<void> {
   const platforms = await accountPlatforms(brandId, targets.map((t) => t.account_id));
@@ -116,6 +116,9 @@ export async function assertWithinLimits(brandId: string, body: string, targets:
   };
   const problems = overLimit(body, targets.map((t) => { const platform = platforms.get(t.account_id) as string; return { accountId: t.account_id, platform, customBody: textOf(t, platform) }; }));
   if (problems.length) throw new BadRequest("text longer than the platform allows", { overLimit: problems });
+  const tags = hashtagsOverLimit(targets.map((t) => { const platform = platforms.get(t.account_id) as string; return { accountId: t.account_id, platform, text: textOf(t, platform) }; }),
+    comments.map((c) => c.body));
+  if (tags.length) throw new BadRequest("more hashtags than the platform allows", { hashtagOverLimit: tags });
   for (const t of targets) {   // YouTube's title rule, checked where it is written, not first at send (compose.ts)
     if (platforms.get(t.account_id) !== "youtube" || !(t.custom_body ?? body).trim()) continue;
     const yt = youtubeParts(textOf(t, "youtube")).problem;

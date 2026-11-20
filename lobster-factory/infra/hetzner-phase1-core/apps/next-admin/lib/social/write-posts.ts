@@ -3,7 +3,7 @@
 // A platform's hard length lives only in BODY_LIMITS (limits.ts, what Postiz enforces); the prompt states it from
 // there, and every answer is measured with the same bodyLength before anyone may send it. The style lines below carry
 // tone and shape only, never a second length number.
-import { BODY_LIMITS, bodyLength, YOUTUBE_TITLE_MAX } from "./limits";
+import { BODY_LIMITS, bodyLength, HASHTAG_LIMITS, keepHashtags, YOUTUBE_TITLE_MAX } from "./limits";
 import { inLanguage, postLanguage } from "./post-language";
 
 /** How each writer platform is written; `limit` = its BODY_LIMITS key, `perLine` = the limit applies to each line,
@@ -14,7 +14,7 @@ const PLATFORMS = {
   twitter_single: { limit: "x", style: "Twitter/X (single post): punchy, hook first. 2-3 relevant hashtags at the end.",
     video: "Copy for an X video post: hook first, let the video explain." },
   twitter_thread: { limit: "x", perLine: true, style: "Twitter/X thread: 5-7 posts, each on its own line and numbered '2/7', '3/7' etc. Post 1 = hook + main insight; the middle posts = one key point each; the last = CTA with the article link placeholder [LINK]." },
-  instagram: { limit: "instagram", style: "Instagram caption: hook in the first 3 lines, storytelling style, clear CTA at the end. Then a line break and 20-30 hashtags starting with #. Include [LINK] where appropriate.",
+  instagram: { limit: "instagram", style: "Instagram caption: hook in the first 3 lines, storytelling style, clear CTA at the end. Then a line break and 10-20 hashtags starting with #. Include [LINK] where appropriate.",
     video: "Copy for an Instagram Reel (9:16): first line = hook emoji + punchy statement; the video tells the story, the caption adds emotional pull." },
   threads: { limit: "threads", style: "Threads post: conversational, authentic, community-first, warm and direct. At most 3 hashtags. End with a question that invites replies.",
     video: "Copy for a Threads video post: conversational, adds context the video does not say out loud." },
@@ -67,7 +67,8 @@ function limitPhrase(p: WriterPlatform): string {
   const n = BODY_LIMITS[p.limit];
   if (p.limit === "threads") return ` Hard limit: ${n} bytes in UTF-8 (about ${Math.floor(n / 3)} Chinese characters).`;
   if (p.titleLine) return ` Hard limit: title line ${p.titleLine} characters; ${n} bytes in UTF-8 in all (about ${Math.floor(n / 3)} Chinese characters); no < or > anywhere.`;
-  return p.perLine ? ` Hard limit: ${n} characters per post.` : ` Hard limit: ${n} characters including hashtags and links.`;
+  const tags = HASHTAG_LIMITS[p.limit] ? ` At most ${HASHTAG_LIMITS[p.limit]} hashtags (the platform refuses more).` : "";
+  return (p.perLine ? ` Hard limit: ${n} characters per post.` : ` Hard limit: ${n} characters including hashtags and links.`) + tags;
 }
 
 /** Measured length of a post against its platform's hard limit (per line for a thread); null = within limit or no limit. */
@@ -151,7 +152,11 @@ function parsePosts(text: string, keys: WriterKey[], articleUrl?: string): Parti
     const v = raw[k];
     if (typeof v !== "string" || !v.trim()) continue;
     // no URL: a placeholder the model wrote anyway is removed, never published
-    out[k] = articleUrl ? v.replace(/\[LINK\]/g, articleUrl) : v.replace(/[ \t]*\[LINK\]/g, "").trim();
+    const text = articleUrl ? v.replace(/\[LINK\]/g, articleUrl) : v.replace(/[ \t]*\[LINK\]/g, "").trim();
+    // the platform's hashtag cap is code, not a request to the model: the extra ones are cut here, before the length is
+    // measured (Instagram refused 31 > 30, 2026-11-20)
+    const cap = HASHTAG_LIMITS[(PLATFORMS[k] as WriterPlatform).limit ?? ""];
+    out[k] = cap ? keepHashtags(text, cap) : text;
   }
   return out;
 }

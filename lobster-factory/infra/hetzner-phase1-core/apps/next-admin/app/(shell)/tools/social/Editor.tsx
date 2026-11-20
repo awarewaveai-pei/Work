@@ -6,7 +6,7 @@
 // who may do what is lib/social/state.ts RULES (the buttons only mirror it; the server decides).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { commentTakesMedia, isVideo } from "@/lib/social/compose";
-import { commentsOverLimit, overLimit, youtubeParts } from "@/lib/social/limits";
+import { commentsOverLimit, hashtagsOverLimit, overLimit, youtubeParts, type HashtagProblem } from "@/lib/social/limits";
 import type { RepeatRule } from "@/lib/social/repeat-rule";
 import type { PostState } from "@/lib/social/state";
 import { splitKeywords } from "@/lib/social/auto-rules";
@@ -55,10 +55,16 @@ export interface EditorProps {
   onOpenLibrary?: () => void;
 }
 
+/** One hashtag-limit problem in words (save's 400 and the button check say the same). */
+function hashtagText(p: HashtagProblem): string {
+  return `${p.comment ? `第 ${p.comment} 則留言在 ` : ""}${platformOf(p.platform).name} 有 ${p.count} 個主題標籤，上限 ${p.limit} 個，請刪到 ${p.limit} 個以內`;
+}
+
 function message(e: unknown): string {
   if (e instanceof ApiError) {
-    const d = e.detail as { overLimit?: Array<{ platform: string; length: number; limit: number }>; commentOverLimit?: Array<{ platform: string; length: number; limit: number; comment: number }> } | undefined;
+    const d = e.detail as { overLimit?: Array<{ platform: string; length: number; limit: number }>; commentOverLimit?: Array<{ platform: string; length: number; limit: number; comment: number }>; hashtagOverLimit?: HashtagProblem[] } | undefined;
     if (d?.overLimit?.length) return d.overLimit.map((o) => `${platformOf(o.platform).name} ${o.length}／${o.limit} 字，太長了`).join("；");
+    if (d?.hashtagOverLimit?.length) return d.hashtagOverLimit.map(hashtagText).join("；");
     if (d?.commentOverLimit?.length) return d.commentOverLimit.map((o) => `第 ${o.comment} 則留言在 ${platformOf(o.platform).name} ${o.length}／${o.limit} 字，太長了`).join("；");
     if (e.status === 409) return `${e.message}（重新整理後再試）`;
     return e.message;
@@ -203,6 +209,7 @@ export default function Editor(props: EditorProps) {
   // numbered over every box on the page (an empty box keeps its number)
   const commentProblems = commentsOverLimit(comments.map((c) => c.body), channels.map((a) => ({ accountId: a.id, platform: a.platform })));
   const noCommentImage = channels.filter((a) => !commentTakesMedia(a.platform));
+  const tagProblems = hashtagsOverLimit(channels.map((a) => ({ accountId: a.id, platform: a.platform, text: textFor(a) })), comments.map((c) => c.body));
 
   // ---- what the main button may do (lib/social/state.ts RULES; with review on an editor submits, 0102) ----
   const reviewGate = requireReview && brand.role === "editor";
@@ -230,6 +237,7 @@ export default function Editor(props: EditorProps) {
     if (empty && !contentLocked) return "貼文還是空的。";
     if (kind !== "draft" && kind !== "keep" && !channels.length) return "還沒選要發到哪裡：在左邊勾頻道。";
     if (problems.length) return `${problems.map((p) => `${accounts.find((a) => a.id === p.accountId)?.label ?? ""}（${platformOf(p.platform).name}）`).join("、")} 超過字數上限，點上面它的名字另外寫一份短的。`;
+    if (tagProblems.length) return `${accounts.find((a) => a.id === tagProblems[0].accountId)?.label ?? ""}：${hashtagText(tagProblems[0])}。`;
     if (commentProblems.length) return `第 ${commentProblems[0].comment} 則留言超過 ${platformOf(commentProblems[0].platform).name} 的字數上限（${commentProblems[0].length}／${commentProblems[0].limit}）。`;
     const imageOnly = comments.findIndex((c) => c.media_id && !c.body.trim());
     if (imageOnly >= 0 && noCommentImage.length) return `第 ${imageOnly + 1} 則留言只有圖，${[...new Set(noCommentImage.map((a) => platformOf(a.platform).name))].join("、")} 的留言不能帶圖，請加上文字。`;

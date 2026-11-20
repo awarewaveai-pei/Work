@@ -237,13 +237,33 @@ describe("runDispatch", () => {
     expect(ports.recordSend).toHaveBeenCalledWith(expect.anything(), "t1", null, failureText.channelGone("bluesky", "Postiz 已沒有這個頻道"));
   });
 
-  it("a Postiz ERROR without a reason (v2.25.1 GET /posts gives error null) says where to reconnect, never only 'error'", async () => {
-    const ports = fakePorts([post([{ platform: "youtube", state: "queued", postizPostId: ERR.id }])], { postizPosts: [{ ...ERR, error: null }] });
+  it("a Postiz ERROR without a reason (v2.25.1 GET /posts gives error null) on a channel that is not connected says where to reconnect, never only 'error'", async () => {
+    const ports = fakePorts([post([{ platform: "youtube", state: "queued", postizPostId: ERR.id, accountStatus: "expired" }])], { postizPosts: [{ ...ERR, error: null }] });
     await runDispatch(ports, { mode: "apply", now: NOW });
-    const text = failureText.noReason("youtube");
+    const text = failureText.noReason("youtube", "expired");
     expect(ports.recordOutcome).toHaveBeenCalledWith(expect.anything(), [{ id: "t1", state: "error", error: text }]);
     expect(text).toMatch(/重新連接 youtube/);
     expect(ports.raiseIncident).toHaveBeenCalledWith(expect.anything(), expect.stringContaining(text));
+  });
+
+  // Instagram 2026-11-20: the channel was connected (Postiz refreshNeeded=false) and Instagram refused 31 hashtags;
+  // the text told the operator to reconnect.
+  it("the same ERROR on a connected channel says the platform refused the post and never asks to reconnect", async () => {
+    const ports = fakePorts([post([{ platform: "instagram", state: "queued", postizPostId: ERR.id, accountStatus: "connected" }])], { postizPosts: [{ ...ERR, error: null }] });
+    await runDispatch(ports, { mode: "apply", now: NOW });
+    const text = failureText.noReason("instagram", "connected");
+    expect(ports.recordOutcome).toHaveBeenCalledWith(expect.anything(), [{ id: "t1", state: "error", error: text }]);
+    expect(text).not.toMatch(/重新連接/);
+    expect(text).toMatch(/頻道連線正常/);
+  });
+
+  // Codex a0bd51a8: the failed 2026-11-20 post (31 hashtags) rescheduled without an edit must not go out again.
+  it("an Instagram post over the hashtag cap is refused before Postiz with the count, whatever saved it", async () => {
+    const tags = Array.from({ length: 31 }, (_, i) => `#感恩${i}`).join(" ");
+    const ports = fakePorts([post([{ platform: "instagram" }], { body: tags })]);
+    await runDispatch(ports, { mode: "apply", now: NOW });
+    expect(ports.postiz.createPost).not.toHaveBeenCalled();
+    expect(ports.recordSend).toHaveBeenCalledWith(expect.anything(), "t1", null, expect.stringContaining("內文有 31 個主題標籤，instagram 上限 30 個"));
   });
 
   it("a brand in a blocking system mode sends nothing; its queued results are still read back", async () => {

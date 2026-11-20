@@ -22,6 +22,17 @@ describe("compose", () => {
     expect(withUtm("https://s.example/?utm_source=keep", "x")).toBe("https://s.example/?utm_source=keep&utm_medium=social");
   });
 
+  // Instagram 2026-11-20 refused a caption with 31 hashtags; every send passes compose, so the cap is checked here
+  // whatever path made the post (pipeline draft, a reschedule without an edit, a first_comment).
+  it("Instagram: more than 30 hashtags in the text or in a comment is refused before Postiz; 30 goes", () => {
+    const tags = (n: number) => Array.from({ length: n }, (_, i) => `#感恩${i}`).join(" ");
+    expect(() => compose({ ...base, body: tags(31), platform: "instagram" })).toThrow(new ComposeError("內文有 31 個主題標籤，instagram 上限 30 個"));
+    expect(() => compose({ ...base, body: "ok", platform: "instagram", comments: [{ body: tags(31), delayMinutes: 0, media: null }] }))
+      .toThrow(/第 1 則留言有 31 個主題標籤/);
+    expect(compose({ ...base, body: tags(30), platform: "instagram" }).values).toHaveLength(1);
+    expect(compose({ ...base, body: tags(40), platform: "facebook" }).values).toHaveLength(1);   // no hashtag cap known for Facebook
+  });
+
   it("a comment is the second value; media keep order and alt text", () => {
     const c = compose({ ...base, comments: [{ body: "link in bio", delayMinutes: 0, media: null }], platform: "instagram", format: "post",
       media: [{ postizMediaId: "m1", postizPath: "https://p/1.jpg", altText: " a cat " }, { postizMediaId: "m2", postizPath: "https://p/2.jpg", altText: null }] });
