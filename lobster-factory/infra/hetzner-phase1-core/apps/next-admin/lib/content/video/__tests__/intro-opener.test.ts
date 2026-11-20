@@ -1,9 +1,10 @@
 // Card R2: the automatic intro -- which styles an automatic video can take, the site's styles in turn, and an intro that
 // never stops a video (every failure is a note and no bookends).
 import { describe, expect, it, vi } from "vitest";
-import { INTRO_STYLES, INTRO_TEMPLATES, autoIntroStyles, introStyleFor } from "@/public/editor-shared/intro-styles.js";
-import { siteIntroStyles, siteIntroTransition } from "@/lib/content/brand-voice";
+import { INTRO_STYLES, INTRO_TEMPLATES, autoIntroStyles, introPlanFor, introStyleFor } from "@/public/editor-shared/intro-styles.js";
+import { siteIntroCards, siteIntroStyles, siteIntroTransition } from "@/lib/content/brand-voice";
 import { INTRO_BUDGET_MS, makeIntro, type IntroDeps } from "../intro-opener";
+import { getDesignsPublicBase } from "@/lib/storage/r2";
 
 const style = (id: string) => INTRO_STYLES.find((s) => s.id === id)!;
 const deps = (over: Partial<IntroDeps> = {}): IntroDeps => {
@@ -21,8 +22,8 @@ const video = { title: "  感恩節的心理學  ", firstPicture: "https://image
 
 describe("intro styles (one list for the editor and the site setting)", () => {
   it("lists none, the cover opener, the title card and every template; automatic = a title and one picture fill it", () => {
-    expect(INTRO_STYLES.map((s) => s.id)).toEqual(["none", "cover-opener", "title-card", ...INTRO_TEMPLATES.filter((t) => !t.cover).map((t) => t.id)]);
-    expect(INTRO_STYLES.filter((s) => s.auto).map((s) => s.id)).toEqual(["none", "cover-opener", "title-card", "scale-bg-text-slideup", "circle-mask-text-slideup-reveal"]);
+    expect(INTRO_STYLES.map((s) => s.id)).toEqual(["none", "cover-opener", "still-opener", "title-card", ...INTRO_TEMPLATES.filter((t) => !t.cover && !t.still).map((t) => t.id)]);
+    expect(INTRO_STYLES.filter((s) => s.auto).map((s) => s.id)).toEqual(["none", "cover-opener", "still-opener", "title-card", "scale-bg-text-slideup", "circle-mask-text-slideup-reveal"]);
     for (const s of INTRO_STYLES) if (s.kind !== "none") expect(s.preview).toBe(`intro-styles/${s.id}.jpg`);
   });
 
@@ -38,6 +39,22 @@ describe("intro styles (one list for the editor and the site setting)", () => {
     const ids = ["cover-opener", "title-card", "scale-bg-text-slideup"];
     expect([0, 1, 2, 3, 4].map((n) => introStyleFor(ids, n)?.id)).toEqual(["cover-opener", "title-card", "scale-bg-text-slideup", "cover-opener", "title-card"]);
     expect(introStyleFor(ids, 7)?.id).toBe(introStyleFor(ids, 7)?.id);
+  });
+
+  // card R3 named test: the site's rotation with banner cards -- each chosen design takes its own turn
+  it("a banner card takes one turn per chosen design, in turn with the other ticked styles", () => {
+    const plan = (n: number) => { const p = introPlanFor(["cover-opener", "still-opener", "title-card"], ["d1", "d2"], n); return p && (p.card ?? p.style?.id); };
+    expect([0, 1, 2, 3, 4, 5].map(plan)).toEqual(["cover-opener", "d1", "d2", "title-card", "cover-opener", "d1"]);
+    expect(introPlanFor(["still-opener"], ["d1", "d1", ""], 1)).toEqual({ style: style("still-opener"), card: "d1" });
+  });
+
+  // card R3 named test: old data -- a site saved before banner cards (no introCards) never gets one
+  it("old data: no introCards field = no banner card; its other styles rotate as before", () => {
+    expect(siteIntroCards(undefined)).toEqual([]);
+    expect(siteIntroCards({ introStyles: ["cover-opener"] })).toEqual([]);
+    expect(introPlanFor(["still-opener"], siteIntroCards({}), 4)).toBeNull();
+    expect([0, 1, 2].map((n) => introPlanFor(["cover-opener", "still-opener", "title-card"], siteIntroCards({}), n)?.style?.id))
+      .toEqual([0, 1, 2].map((n) => introStyleFor(["cover-opener", "title-card"], n)?.id));
   });
 });
 
@@ -86,5 +103,19 @@ describe("makeIntro", () => {
     }
     expect((await makeIntro(style("cover-opener"), { ...video, firstPicture: undefined }, deps())).note).toMatch(/沒有第一個鏡頭/);
     expect(await makeIntro(null, video, deps())).toEqual({});
+  });
+
+  // card R3 named test: a design deleted since the site chose it skips that turn with the reason; the video goes on
+  it("banner card: the design's picture cover-fit, no title; a deleted design is skipped with a note", async () => {
+    const card = `${getDesignsPublicBase()}/designs/banner.png`, d = deps();
+    const r = await makeIntro(style("still-opener"), { ...video, card }, d);
+    expect(d.picture).toHaveBeenCalledWith(card, 1920, 1080, expect.any(AbortSignal), "橫幅字卡");
+    expect(d.submit).toHaveBeenCalledWith("still-opener", { backgroundUrl: "data:image/jpeg;base64,AAAA" }, { outputFormat: "16x9", fps: 30, durationInFrames: 60 });
+    expect(r.bookends?.intro).toEqual({ assetUrl: "https://r2.example/rs1.mp4" });
+    const gone = deps();
+    const skipped = await makeIntro(style("still-opener"), { ...video, card: null }, gone);
+    expect(skipped).toEqual({ note: expect.stringMatching(/已不在我的設計/) });
+    expect(gone.submit).not.toHaveBeenCalled();
+    expect((await makeIntro(style("still-opener"), { ...video, card: null, cardProblem: "橫幅字卡讀取失敗（x）" }, deps())).note).toBe("橫幅字卡讀取失敗（x）");
   });
 });

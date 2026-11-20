@@ -58,8 +58,26 @@ const fill: React.CSSProperties = { width: "100%", height: "100%", objectFit: "c
 export const Cover: React.FC<CoverProps> = ({ backgroundUrl, title, subtitle }) => {
   const { width, height, durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
-  const layout = layoutCover({ width, height, title, subtitle });
+  // Card R3: no title = a ready picture (still-opener): no dark layer, no words -- the last frame is the picture itself.
+  const titled = !!String(title ?? "").trim();
+  const layout = titled ? layoutCover({ width, height, title, subtitle }) : null;
   const motion = coverMotion(frame, durationInFrames, height);
+  if (!layout) {
+    return (
+      <AbsoluteFill style={{ backgroundColor: BACKDROP_COLOR }}>
+        {backgroundUrl && motion.backdropVisible && (
+          <AbsoluteFill style={{ filter: `blur(${Math.round(Math.min(width, height) * 0.03)}px)`, transform: "scale(1.1)" }}>
+            <Img src={backgroundUrl} style={fill} />
+          </AbsoluteFill>
+        )}
+        {backgroundUrl && (
+          <AbsoluteFill style={motion.imageScale === 1 ? undefined : { transform: `scale(${motion.imageScale})` }}>
+            <Img src={backgroundUrl} style={fill} />
+          </AbsoluteFill>
+        )}
+      </AbsoluteFill>
+    );
+  }
   // Solid to just above the title, then fading out: the text always sits on the dark part.
   const solid = Math.min(100, ((height - layout.blockTop) / height) * 100 + 4);
   const clear = Math.min(100, solid + 22);

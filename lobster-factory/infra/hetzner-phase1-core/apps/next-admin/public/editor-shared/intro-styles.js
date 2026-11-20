@@ -83,7 +83,19 @@ export const INTRO_TEMPLATES = [
     autoSeconds: 2,
     fields: [{ key: "backgroundUrl", label: "封面畫格", type: "image", required: true }, { key: "title", label: "標題", max: 80, required: true }],
   },
+  {
+    // Card R3: a ready picture -- a banner-tool card from 我的設計 -- as the same opener with no title drawn (the card
+    // carries its words): remotion-service still-opener. The picture is chosen by the person (editor) or the site.
+    id: "still-opener",
+    label: "橫幅字卡",
+    still: true,
+    seconds: { min: 2, def: 2, max: 5 },
+    autoSeconds: 2,
+    fields: [{ key: "backgroundUrl", label: "橫幅字卡", type: "image", required: true }],
+  },
 ];
+/** Card R3: the banner-card style's id (its picture is a saved design, not the video's). */
+export const STILL_STYLE = "still-opener";
 
 const isMedia = (f) => f.type === "image" || f.type === "audio";
 /** What an automatic video fills a template with: its one required picture and its one required text; null = the template
@@ -99,13 +111,14 @@ export function autoFill(template) {
 // adds "still" (a ready picture, e.g. a banner-tool card): it would take the cover opener's road -- the picture made into
 // a short video by remotion-service, then joined as an intro file with a transition -- and every caller already treats a
 // kind it does not know as "cannot make it" (lib/content/video/intro-opener.ts). auto = an automatic video can make it
-// from the video's title and one picture alone. preview = the file beside this one.
-const styleOf = (t) => ({ id: t.id, label: t.label, kind: t.cover ? "cover" : "template", auto: !!autoFill(t), preview: "intro-styles/" + t.id + ".jpg" });
+// from the video's title and one picture alone -- a still from the site's chosen designs (introPlanFor). preview = the
+// file beside this one.
+const styleOf = (t) => ({ id: t.id, label: t.label, kind: t.cover ? "cover" : t.still ? "still" : "template", auto: !!t.still || !!autoFill(t), preview: "intro-styles/" + t.id + ".jpg" });
 export const INTRO_STYLES = [
   { id: "none", label: "不加片頭", kind: "none", auto: true, preview: null },
-  ...INTRO_TEMPLATES.filter((t) => t.cover).map(styleOf),
+  ...INTRO_TEMPLATES.filter((t) => t.cover || t.still).map(styleOf),
   { id: "title-card", label: "標題字卡", kind: "title", auto: true, preview: "intro-styles/title-card.jpg" },
-  ...INTRO_TEMPLATES.filter((t) => !t.cover).map(styleOf),
+  ...INTRO_TEMPLATES.filter((t) => !t.cover && !t.still).map(styleOf),
 ];
 
 /** A site's stored intro styles as they are used: known, automatic, not "none", each once, in the stored order. Old data
@@ -123,4 +136,15 @@ export function introStyleFor(ids, made) {
   if (!list.length) return null;
   const n = Number.isSafeInteger(made) && made > 0 ? made : 0;
   return INTRO_STYLES.find((s) => s.id === list[n % list.length]) || null;
+}
+
+/** Card R3: the site's next intro. The stored styles in turn by the site's video count (made % n, no randomness); the
+ *  banner card takes one turn per chosen design (cards = saved design ids, each once). -> { style, card } | null. A
+ *  banner card with no design chosen takes no turn. */
+export function introPlanFor(ids, cards, made) {
+  const designs = Array.isArray(cards) ? [...new Set(cards.filter((c) => typeof c === "string" && c))] : [];
+  const slots = autoIntroStyles(ids).flatMap((id) => (id === STILL_STYLE ? designs.map((card) => ({ id, card })) : [{ id, card: null }]));
+  if (!slots.length) return null;
+  const n = Number.isSafeInteger(made) && made > 0 ? made : 0, slot = slots[n % slots.length];
+  return { style: INTRO_STYLES.find((s) => s.id === slot.id) || null, card: slot.card };
 }

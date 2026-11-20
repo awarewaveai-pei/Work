@@ -181,6 +181,7 @@ interface State {
   dimOverlay: boolean;
   textScrim:  boolean;   // 局部底襯（文字後方半透明圓角板）— 比整張暗化更高級
   textOutline: boolean;  // 標題描邊 + 陰影（匯出時保留，修舊版 export 掉陰影）
+  brandBar:   boolean;   // card R3: a bar in the accent (brand) colour beside a left-aligned stack (影片片頭 版型)
   // marketing / conversion elements
   ctaText:      string;  // "" = 無按鈕
   ctaBg:        string;
@@ -252,6 +253,7 @@ const INIT: State = {
   dimOverlay: true,
   textScrim:  false,
   textOutline: true,
+  brandBar:   false,
   ctaText:      "",
   ctaBg:        "#ff5a5f",
   ctaTextColor: "#ffffff",
@@ -279,7 +281,7 @@ const INIT: State = {
 // user's content (headline/subtext/product/bg). Applied via merge into State.
 // ---------------------------------------------------------------------------
 
-const TEMPLATES: { key: string; label: string; icon: string; patch: Partial<State> }[] = [
+const TEMPLATES: { key: string; label: string; icon: string; patch: Partial<State>; group?: "opener"; fit?: number }[] = [
   {
     key: "sale-blast", label: "促銷爆款", icon: "🔥",
     patch: {
@@ -338,7 +340,43 @@ const TEMPLATES: { key: string; label: string; icon: string; patch: Partial<Stat
       showPrice: true, trustType: "stars", trustStars: 5,
     },
   },
+  // Card R3: 影片片頭 -- a card a video opens with (the editor's 「開橫幅工具做一張」 preselects one; the video zooms into it).
+  // Words only, centred in the frame's safe area (the stack sits between the top and bottom thirds' UI on 9:16); no price,
+  // no button, no badge. Colours stay the user's (text / accent = brand colour), so these name none. fit = the title's
+  // size as a share of the card's width (sized when applied: about nine CJK characters to a line in every shape).
+  {
+    key: "opener-center", label: "片頭：大標題置中", icon: "🎬", group: "opener", fit: 0.086,
+    patch: {
+      textPos: "center", textAlignH: "center",
+      textScrim: false, textOutline: true, dimOverlay: true, brandBar: false,
+      ctaText: "", badgeText: "", showPrice: false, trustType: "none",
+    },
+  },
+  {
+    key: "opener-title-sub", label: "片頭：標題＋副標", icon: "🎞", group: "opener", fit: 0.078,
+    patch: {
+      textPos: "center", textAlignH: "center",
+      textScrim: true, textOutline: true, dimOverlay: false, brandBar: false,
+      ctaText: "", badgeText: "", showPrice: false, trustType: "none",
+    },
+  },
+  {
+    key: "opener-left-bar", label: "片頭：左對齊大字＋品牌色條", icon: "▍", group: "opener", fit: 0.08,
+    patch: {
+      textPos: "center", textAlignH: "left",
+      textScrim: false, textOutline: true, dimOverlay: true, brandBar: true,
+      ctaText: "", badgeText: "", showPrice: false, trustType: "none",
+    },
+  },
 ];
+/** Card R3: the video ratios the editor opens this tool with (?ratio=) -> the size of that shape. */
+const RATIO_PRESET: Record<string, PresetKey> = { "16:9": "hero-full", "9:16": "ig-story", "4:5": "ig-portrait", "1:1": "ig-square" };
+/** A template's patch at a size: an opener's title (and subtitle) sized to that card's width; any other unchanged. */
+function templatePatch(t: (typeof TEMPLATES)[number], preset: PresetKey): Partial<State> {
+  if (!t.fit) return t.patch;
+  const headlineSize = Math.min(160, Math.round(PRESETS[preset].w * t.fit));
+  return { ...t.patch, headlineSize, subtextSize: Math.round(headlineSize * 0.42) };
+}
 
 // ---------------------------------------------------------------------------
 // Canvas export — single source of truth (preview renders this too).
@@ -659,6 +697,14 @@ async function exportToPng(state: State): Promise<string> {
     const sh = Math.min(p.h - sy, stackH + sPadY * 2);
     ctx.fillStyle = `rgba(0,0,0,${state.textScrimOpacity})`;
     roundRectPath(ctx, sx, sy, sw, sh, Math.round(state.subtextSize * 0.6));
+    ctx.fill();
+  }
+
+  // card R3: the brand colour bar beside a left-aligned stack, the stack's height, in the left margin
+  if (state.brandBar && blocks.length && align === "left") {
+    const barW = Math.max(6, Math.round(state.headlineSize * 0.12));
+    ctx.fillStyle = state.accentColor;
+    roundRectPath(ctx, Math.round(padding * 0.55), stackTop, barW, stackH, barW / 2);
     ctx.fill();
   }
 
@@ -1055,8 +1101,22 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
 
   // ── template apply ──
   const applyTemplate = useCallback((patch: Partial<State>) =>
-    setS((prev) => ({ ...prev, ...patch, saved: false, error: null }))
+    setS((prev) => ({ ...prev, brandBar: false, ...patch, saved: false, error: null }))
   , []);
+
+  // Card R3: opened from the video editor or a site's intro setting (/tools/banner?ratio=16:9&title=...&template=opener-center
+  // &org=<uuid>): that video's shape, its title as the headline, the opener layout, and the organization 存到我的設計 saves
+  // into (staff work for a customer; the designs route checks access). Read once; unknown values are ignored.
+  const saveOrgRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const org = q.get("org") ?? "";
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(org)) saveOrgRef.current = org;
+    const preset = RATIO_PRESET[q.get("ratio") ?? ""], title = (q.get("title") ?? "").trim().slice(0, 80);
+    const t = TEMPLATES.find((x) => x.group === "opener" && x.key === q.get("template"));
+    if (!preset && !title && !t) return;
+    setS((prev) => ({ ...prev, ...(t ? { brandBar: false, ...templatePatch(t, preset ?? prev.preset) } : {}), ...(preset ? { preset } : {}), ...(title ? { headline: title } : {}) }));
+  }, []);
 
   // ── undo / redo (Banner's whole design is ONE serializable State; unchanged image
   //    strings are shared by reference across snapshots, so history is memory-cheap) ──
@@ -1294,7 +1354,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
         prompt:    s.headline || (s.bgMode === "ai" ? effectiveBgPrompt : undefined) || undefined,
         modelName: s.bgMode === "ai" ? s.aiBgModel : undefined,
         subject:   s.preset,
-      });
+      }, { organizationId: saveOrgRef.current });
       if (!res.ok) throw new Error((res as { ok: false; error: string }).error);
       setS((prev) => ({ ...prev, saving: false, saved: true }));
     } catch (err) {
@@ -1396,10 +1456,21 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
           <StepCard title="版型模板" icon="✨" hint="一鍵套用" order={5}>
             <p className="form-hint" style={{ marginBottom: 8, marginTop: 4 }}>套用後再填內容；只改版面/元素，不動你的文字與圖。</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              {TEMPLATES.map((t) => (
+              {TEMPLATES.filter((t) => !t.group).map((t) => (
                 <button key={t.key} className="btn btn-ghost"
                   style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
                   onClick={() => applyTemplate(t.patch)}>
+                  <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
+                </button>
+              ))}
+            </div>
+            {/* card R3: cards a video opens with (存到我的設計 -> the editor's 片頭 「從我的設計挑」) */}
+            <p className="form-hint" style={{ margin: "10px 0 6px" }}>影片片頭（存到我的設計後，可在影片剪輯的片頭選「橫幅字卡」使用）</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {TEMPLATES.filter((t) => t.group === "opener").map((t) => (
+                <button key={t.key} className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
+                  onClick={() => applyTemplate(templatePatch(t, s.preset))}>
                   <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
                 </button>
               ))}

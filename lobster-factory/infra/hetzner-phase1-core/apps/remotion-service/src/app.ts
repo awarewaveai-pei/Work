@@ -29,21 +29,26 @@ export const TEMPLATE_MAP: Record<string, string> = {
   cover: "Cover",
   // Card R2: the cover as a 2-5 s opener video (same component, animated in; last frame = the still).
   "cover-opener": "CoverOpener",
+  // Card R3: a ready picture (a banner-tool card) as the same opener, with no title drawn: the picture is the card.
+  "still-opener": "StillOpener",
 };
 
 // Templates rendered as one JPEG frame instead of an mp4.
 export const STILL_TEMPLATES = new Set(["cover"]);
 // Templates whose props are a cover's (coverPropsProblem); the opener is a short video, at most COVER_OPENER_MAX_S.
-export const COVER_TEMPLATES = new Set(["cover", "cover-opener"]);
+export const COVER_TEMPLATES = new Set(["cover", "cover-opener", "still-opener"]);
+// The cover templates that draw no title (the picture carries its own words).
+export const UNTITLED_TEMPLATES = new Set(["still-opener"]);
 export const COVER_OPENER_MAX_S = 10;
 const MAX_TITLE = 200;
 
 /** The cover's props, checked before the job is queued; a reason = refused (400). */
-export function coverPropsProblem(props: unknown): string | null {
+export function coverPropsProblem(props: unknown, untitled = false): string | null {
   if (!props || typeof props !== "object" || Array.isArray(props)) return "props must be an object";
   const { backgroundUrl, title, subtitle } = props as Record<string, unknown>;
   if (typeof backgroundUrl !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(backgroundUrl))
     return "backgroundUrl must be a data:image/jpeg|png|webp;base64 URI";
+  if (untitled) return title === undefined || title === "" ? (subtitle === undefined ? null : "still-opener takes no subtitle") : "still-opener takes no title";
   if (typeof title !== "string" || !title.trim() || title.length > MAX_TITLE) return `title must be 1-${MAX_TITLE} characters`;
   if (subtitle !== undefined && (typeof subtitle !== "string" || subtitle.length > MAX_TITLE)) return `subtitle must be at most ${MAX_TITLE} characters`;
   return null;
@@ -135,7 +140,7 @@ export function createApp({ authRequired, authToken, store, runner }: AppDeps): 
     const isDataDriven = DATA_DRIVEN_TEMPLATES.has(templateId);
     const still = STILL_TEMPLATES.has(templateId);
     if (COVER_TEMPLATES.has(templateId)) {
-      const problem = coverPropsProblem(props) ?? (!still && totalFrames > COVER_OPENER_MAX_S * fps ? `cover-opener is at most ${COVER_OPENER_MAX_S} seconds` : null);
+      const problem = coverPropsProblem(props, UNTITLED_TEMPLATES.has(templateId)) ?? (!still && totalFrames > COVER_OPENER_MAX_S * fps ? `cover-opener is at most ${COVER_OPENER_MAX_S} seconds` : null);
       if (problem) {
         res.status(400).json({ error: problem });
         return;

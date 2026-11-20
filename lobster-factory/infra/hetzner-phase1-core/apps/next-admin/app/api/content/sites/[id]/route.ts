@@ -4,9 +4,10 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { siteRowGate, siteUrlWriteGate } from "@/lib/content/wp-sites";
 import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, YOUTUBE_PRIVACIES, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, YOUTUBE_PRIVACIES, siteIntroCards, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { autoIntroStyles } from "@/public/editor-shared/intro-styles.js";
+import { orgDesignIds } from "@/lib/content/video/opener-designs";
 import Transitions from "@/public/editor-shared/transitions.js";
 
 // youtubePrivacy (N5a): who sees the auto-made videos -- outward like the two modes, so set the same way
@@ -77,8 +78,26 @@ export async function PATCH(
   const transitionGiven = body.introTransition !== undefined;
   if (transitionGiven && (typeof body.introTransition !== "string" || !Transitions.LIST.some((t: { id: string }) => t.id === body.introTransition)))
     return NextResponse.json({ ok: false, error: "introTransition: 不是轉場清單裡的名字" }, { status: 400 });
+  // Card R3: the banner-card intro's designs: its own field; each once. An id added now must be a saved design of THIS
+  // site's organization (the ownership guard: another organization's design is refused, never stored); an id already
+  // stored was checked when it was added and may stay or go even if its design was deleted since (the topic run skips a
+  // deleted one with a note), so a deleted design never locks the list.
+  const cardsGiven = body.introCards !== undefined;
+  if (cardsGiven) {
+    const cards = body.introCards;
+    if (!Array.isArray(cards) || cards.length > 20 || new Set(cards).size !== cards.length || cards.some((c) => typeof c !== "string"))
+      return NextResponse.json({ ok: false, error: "introCards: 最多 20 個設計，每個一次" }, { status: 400 });
+    const { data: site, error: siteErr } = await supabase.from("wp_sites").select("organization_id, content_defaults").eq("id", id).maybeSingle();
+    if (siteErr) return NextResponse.json({ ok: false, error: siteErr.message }, { status: 500 });
+    const row = site as { organization_id: string | null; content_defaults: SiteContentDefaults | null } | null;
+    const stored = new Set(siteIntroCards(row?.content_defaults ?? undefined)), added = (cards as string[]).filter((c) => !stored.has(c));
+    if (added.length) {
+      const found = row?.organization_id ? await orgDesignIds(supabase, row.organization_id, added) : new Set<string>();
+      if (added.some((c) => !found.has(c))) return NextResponse.json({ ok: false, error: "introCards: 只能選這個網站所屬客戶的設計" }, { status: 400 });
+    }
+  }
   let modesRead: Array<[string, string | null]> | undefined;   // undefined = content_defaults not written
-  if (defaultsGiven || introGiven || transitionGiven || GATE_MODES.some((g) => body[g.field] !== undefined)) {
+  if (defaultsGiven || introGiven || transitionGiven || cardsGiven || GATE_MODES.some((g) => body[g.field] !== undefined)) {
     const { data: current, error: readError } = await supabase.from("wp_sites").select("content_defaults").eq("id", id).maybeSingle();
     if (readError) return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
     const stored = ((current as { content_defaults: SiteContentDefaults | null } | null)?.content_defaults) ?? {};
@@ -106,6 +125,10 @@ export async function PATCH(
     const intro = autoIntroStyles(introGiven ? body.introStyles : (stored as SiteContentDefaults).introStyles);
     delete next.introStyles;
     if (intro.length) next.introStyles = intro;
+    const rawCards = (stored as Record<string, unknown>).introCards;
+    delete next.introCards;
+    const cards = cardsGiven ? body.introCards : rawCards;
+    if (Array.isArray(cards) && cards.length) next.introCards = cards;
     const rawTransition = (stored as Record<string, unknown>).introTransition;
     delete next.introTransition;
     const transition = transitionGiven ? body.introTransition : rawTransition;
@@ -126,6 +149,10 @@ export async function PATCH(
     if (rawIntro === undefined || rawIntro === null) modesRead.push(["introStyles", null]);
     else if (Array.isArray(rawIntro) && rawIntro.every((x) => typeof x === "string"))
       modesRead.push(["introStyles", "[" + rawIntro.map((x) => JSON.stringify(x)).join(", ") + "]"]);
+    // card R3: the same for the banner-card designs
+    if (rawCards === undefined || rawCards === null) modesRead.push(["introCards", null]);
+    else if (Array.isArray(rawCards) && rawCards.every((x) => typeof x === "string"))
+      modesRead.push(["introCards", "[" + rawCards.map((x) => JSON.stringify(x)).join(", ") + "]"]);
     // the same for the transition (a string renders as itself)
     if (rawTransition === undefined || rawTransition === null) modesRead.push(["introTransition", null]);
     else if (typeof rawTransition === "string") modesRead.push(["introTransition", rawTransition]);
@@ -137,7 +164,7 @@ export async function PATCH(
     update = read === null ? update.is(`content_defaults->>${field}`, null) : update.eq(`content_defaults->>${field}`, read);
   }
   const { data, error } = await update
-    .select("id, name, url, color, active, note, created_at, token, username, content_defaults")
+    .select("id, name, url, color, active, note, created_at, token, username, content_defaults, organization_id")
     .single();
 
   if (error) {
@@ -148,7 +175,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: error.message }, { status });
   }
 
-  const row = data as { id: string; name: string; url: string; color: string; active: boolean; note: string | null; created_at: string; token: string; username: string; content_defaults: SiteContentDefaults | null };
+  const row = data as { id: string; name: string; url: string; color: string; active: boolean; note: string | null; created_at: string; token: string; username: string; content_defaults: SiteContentDefaults | null; organization_id: string | null };
   const site: ManagedSite = {
     id: row.id,
     name: row.name,
@@ -161,6 +188,7 @@ export async function PATCH(
     source: "db",
     createdAt: row.created_at,
     contentDefaults: row.content_defaults ?? {},
+    organization_id: row.organization_id,
   };
   return NextResponse.json({ ok: true, site });
 }

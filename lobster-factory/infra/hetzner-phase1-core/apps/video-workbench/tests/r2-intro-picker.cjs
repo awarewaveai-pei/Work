@@ -6,7 +6,7 @@ const EpisodeSpine = require("../shared/episode-spine.js"), Timebase = require("
 const remotion = require("../backend/remotion.cjs");
 
 // The list as /capabilities sends it: previews served from the shared folder (server.cjs), automatic flags derived.
-assert.deepEqual(remotion.introStyles.map((s) => s.id), ["none", "cover-opener", "title-card", "scale-bg-text-slideup", "circle-mask-text-slideup-reveal", "pan-slide-text-left-3scenes", "product-review-typewriter", "photo-highlights-slides-zoom"]);
+assert.deepEqual(remotion.introStyles.map((s) => s.id), ["none", "cover-opener", "still-opener", "title-card", "scale-bg-text-slideup", "circle-mask-text-slideup-reveal", "pan-slide-text-left-3scenes", "product-review-typewriter", "photo-highlights-slides-zoom"]);
 for (const s of remotion.introStyles.filter((x) => x.kind !== "none")) {
   assert.equal(s.preview, "/awarewave/editor-shared/intro-styles/" + s.id + ".jpg");
   assert.ok(fs.existsSync(require("node:path").join(require("../backend/appearance.cjs").resolveSource(require("node:path").join(__dirname, ".."), process.env), "public", s.preview.slice("/awarewave/".length))), s.id + " preview file");

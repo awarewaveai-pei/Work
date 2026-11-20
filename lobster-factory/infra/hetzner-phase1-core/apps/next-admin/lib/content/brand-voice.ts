@@ -52,6 +52,9 @@ export interface SiteContentDefaults {
   /** Card R2: the transition from that intro into the video (public/editor-shared/transitions.js name, one video-service
    *  can join); missing = 溶解 0.5 s. Its own PATCH field. */
   introTransition?: string;
+  /** Card R3: the saved designs (media_assets ids of this site's organization) the banner-card intro takes in turn. Its
+   *  own PATCH field; missing = none. */
+  introCards?: string[];
   trendFeeds?: string[];
   requiredBlocks?: string[];
   language?: string;
@@ -158,6 +161,11 @@ export const youtubeFormat = (d: SiteContentDefaults | undefined) => (youtubePri
 /** Card R2: the site's automatic-video intro styles as they are used (known, automatic, each once); old data = [] = none. */
 export function siteIntroStyles(d: SiteContentDefaults | undefined): string[] {
   return autoIntroStyles(d?.introStyles);
+}
+
+/** Card R3: the site's chosen banner-card designs as stored (ids, each once); old data = []. */
+export function siteIntroCards(d: SiteContentDefaults | undefined): string[] {
+  return Array.isArray(d?.introCards) ? [...new Set(d.introCards.filter((x): x is string => typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x)))].slice(0, 20) : [];
 }
 
 /** Card R2: the site's intro transition as used: one of the transitions module's choices (old names read), else 溶解. */

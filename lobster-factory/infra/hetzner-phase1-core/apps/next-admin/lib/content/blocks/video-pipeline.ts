@@ -749,7 +749,7 @@ register({
       onProgress?.(`片頭（${introStyle.label}）製作中…`);
       const made = introStyle.kind !== "title" && formats.length > 1
         ? { note: "封面開場與模板片頭只加在單一比例的影片，這支沒有加片頭" }
-        : await makeIntro(introStyle, { title, firstPicture: formatAssets[formats[0]]?.[0], format: formats[0], transition: ctx.introTransition as string | undefined });
+        : await makeIntro(introStyle, { title, firstPicture: formatAssets[formats[0]]?.[0], format: formats[0], transition: ctx.introTransition as string | undefined, card: ctx.introCard as string | null | undefined, cardProblem: ctx.introCardProblem as string | undefined });
       bookends = made.bookends;
       intro = { style: introStyle.id, ...(made.note ? { note: made.note } : {}) };
     }

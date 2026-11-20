@@ -13,13 +13,13 @@ const [outDir, browserExecutable, ...pictureFiles] = process.argv.slice(2);
 if (!outDir || !browserExecutable || !pictureFiles.length) throw new Error("usage: <out dir> <browser exe> <picture.jpg> [more]");
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { INTRO_TEMPLATES } = await import(new URL("../../next-admin/public/editor-shared/intro-styles.js", import.meta.url));
-const TEMPLATE_MAP = { "cover-opener": "CoverOpener", "scale-bg-text-slideup": "ScaleBGTextSlideUp", "circle-mask-text-slideup-reveal": "CircleMaskTextSlideUpReveal",
+const TEMPLATE_MAP = { "cover-opener": "CoverOpener", "still-opener": "StillOpener", "scale-bg-text-slideup": "ScaleBGTextSlideUp", "circle-mask-text-slideup-reveal": "CircleMaskTextSlideUpReveal",
   "pan-slide-text-left-3scenes": "PanSlideTextLeft3Scenes", "product-review-typewriter": "ProductReviewTypewriter", "photo-highlights-slides-zoom": "PhotoHighlightsSlidesZoom" };
 const pictures = pictureFiles.map((f) => "data:image/jpeg;base64," + fs.readFileSync(f).toString("base64"));
 const DEMO = { title: "示範標題 Demo Title", text: "示範標題 Demo Title", headline: "示範標題 Demo Title", brand: "AwareWave", tagline: "一句品牌標語",
   reviewerName: "王小明", reviewDate: "2026.11.20", reviewText: "很好用，推薦給大家。", text1: "第一幕", text2: "第二幕", text3: "第三幕", starCount: 5 };
 // where each template shows its title: the opener's last frame (= the cover), the others at this share of their length
-const AT = { "cover-opener": 1, "scale-bg-text-slideup": 0.95, "circle-mask-text-slideup-reveal": 0.35, "pan-slide-text-left-3scenes": 0.2,
+const AT = { "cover-opener": 1, "still-opener": 1, "scale-bg-text-slideup": 0.95, "circle-mask-text-slideup-reveal": 0.35, "pan-slide-text-left-3scenes": 0.2,
   "product-review-typewriter": 0.8, "photo-highlights-slides-zoom": 0.2 };
 
 fs.mkdirSync(outDir, { recursive: true });

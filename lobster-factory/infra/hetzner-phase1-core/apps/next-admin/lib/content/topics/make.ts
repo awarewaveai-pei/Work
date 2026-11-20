@@ -14,8 +14,9 @@ import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
-import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteIntroStyles, siteIntroTransition, siteLanguage, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
-import { introStyleFor } from "@/public/editor-shared/intro-styles.js";
+import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteIntroCards, siteIntroStyles, siteIntroTransition, siteLanguage, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { introPlanFor } from "@/public/editor-shared/intro-styles.js";
+import { orgDesign } from "@/lib/content/video/opener-designs";
 import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
 import { parseArticleMeta } from "@/lib/content/article/meta";
@@ -340,12 +341,19 @@ async function startTopicVideo(sb: SupabaseClient, t: Topic, record: (jobId: str
   // Nothing of this check is kept on the row: the script's cost reaches the ledger, which the next check reads.
   await capGuard(t, { ...a }, capTwd, (startedAt) => spentSince(sb, t.id, startedAt))(stepUpperTwd.video(), "影片");
   const styles = siteIntroStyles(site.defaults);
-  const introStyle = styles.length ? introStyleFor(styles, await siteVideosMade(sb, t)) : null;
+  const plan = styles.length ? introPlanFor(styles, siteIntroCards(site.defaults), await siteVideosMade(sb, t)) : null;
+  const introStyle = plan?.style ?? null;
+  // card R3: a banner card's picture, of this topic's organization only; gone (deleted) = null -> no intro, a note
+  let introCard: string | null | undefined, introCardProblem: string | undefined;
+  if (plan?.card) {
+    try { introCard = (await orgDesign(sb, t.organization_id, plan.card))?.url ?? null; }
+    catch (e) { introCard = null; introCardProblem = `橫幅字卡讀取失敗（${e instanceof Error ? e.message : String(e)}），這一輪沒有加片頭`; }
+  }
   const started = await startVideoJob(t.organization_id, {
     ...script,
     sceneCount: d.sceneCount, customScenes: d.customScenes, brollScenes: d.sceneCount - d.customScenes,
     imageModel: d.imageModel, outputFormats: [...d.formats], ...parseVoiceModel(articleVideoVoice(siteLanguage(site.defaults))),
-    costJobId: t.id, introStyle, introTransition: siteIntroTransition(site.defaults),
+    costJobId: t.id, introStyle, introTransition: siteIntroTransition(site.defaults), ...(introCard !== undefined ? { introCard, introCardProblem } : {}),
   }, { beforePrepare: record, projectFor: () => ensureTopicProject(sb, t, d.formats) });
   const failure = started.ok ? null : (started as Extract<typeof started, { ok: false }>).error;   // strict:false
   if (failure && failure !== "taken") throw new Error(`影片無法開始：${failure}`);

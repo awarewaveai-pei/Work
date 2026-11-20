@@ -183,4 +183,6 @@ async function transport(body, { env, appDir, fetchImpl, signal, onRemoteJob = (
   return buffer;
 }
 
-module.exports = { catalog, introStyles, configured, request, parentAssetId, render, coverRatio, coverRequest, coverStill };
+/** Card R3: the render size of a project ratio ("16:9" -> [1920, 1080]); null = no template renders it. */
+const renderSize = (ratio) => (Object.hasOwn(formats, String(ratio)) ? formats[ratio].slice(1) : null);
+module.exports = { catalog, introStyles, configured, request, parentAssetId, render, coverRatio, coverRequest, coverStill, renderSize };

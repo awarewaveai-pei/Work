@@ -139,6 +139,22 @@ test("a cover renders as one JPEG still; a cover without a picture or title is r
   }
 });
 
+// R3: a ready picture as the opener (still-opener): the cover's picture rules, and no title or subtitle at all.
+test("a still opener renders as an mp4 with the picture only; a title or a non-data picture is refused", async () => {
+  const { server, call } = await service(new JobStore(null));
+  try {
+    process.env.FAKE_RENDER_MODE = "ok";
+    const frame = "data:image/png;base64,iVBORw0KGgo=";
+    const r = await call("/render", { templateId: "still-opener", props: { backgroundUrl: frame }, outputFormat: "4x5", fps: 30, durationInFrames: 60 });
+    assert.equal(r.status, 200);
+    assert.match((await settle(call, r.body.jobId)).url, /\.mp4$/);
+    for (const props of [{ backgroundUrl: frame, title: "字" }, { backgroundUrl: frame, subtitle: "副" }, { backgroundUrl: "https://example.com/a.png" }])
+      assert.equal((await call("/render", { templateId: "still-opener", props, outputFormat: "16x9", fps: 30, durationInFrames: 60 })).status, 400, JSON.stringify(props));
+  } finally {
+    server.close();
+  }
+});
+
 // R2: the cover opener is a short mp4 with the cover's props; the same picture/title rules, and at most 10 seconds.
 test("a cover opener renders as an mp4; bad cover props or more than 10 s are refused", async () => {
   const { server, call } = await service(new JobStore(null));

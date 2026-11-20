@@ -174,6 +174,23 @@ export const RemotionRoot: React.FC = () => {
           height: props.height ?? 1080,
         })}
       />
+      {/* Card R3: a ready picture (a banner card) as the same opener. Its own defaults carry no words: Remotion fills a
+          prop the request leaves out from defaultProps, so with the cover's defaults it drew the sample title. */}
+      <Composition
+        id="StillOpener"
+        component={Cover}
+        durationInFrames={60}
+        fps={CoverDefaultProps.fps ?? 30}
+        width={CoverDefaultProps.width ?? 1920}
+        height={CoverDefaultProps.height ?? 1080}
+        defaultProps={{ ...CoverDefaultProps, title: "", subtitle: "", durationInFrames: 60 }}
+        calculateMetadata={async ({ props }) => ({
+          durationInFrames: props.durationInFrames ?? 60,
+          fps: props.fps ?? 30,
+          width: props.width ?? 1920,
+          height: props.height ?? 1080,
+        })}
+      />
     </>
   );
 };

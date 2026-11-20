@@ -28,6 +28,10 @@ export interface VideoStartInput {
   introStyle?: import("./intro-opener").IntroStyle | null;
   /** The transition into the video (brand-voice.ts siteIntroTransition). */
   introTransition?: string;
+  /** Card R3: a banner-card intro's picture url (the site's saved design); null = it was deleted (no intro, a note). */
+  introCard?: string | null;
+  /** Why introCard is null when it is not a deletion (the design could not be read). */
+  introCardProblem?: string;
 }
 
 interface PrepareResult {
