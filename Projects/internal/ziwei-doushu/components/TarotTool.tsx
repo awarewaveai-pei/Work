@@ -11,6 +11,7 @@ import {
   type TarotTopic,
 } from '@/lib/tarot';
 import { toContext } from '@/lib/divination/systems/tarot';
+import { computeTarotRelations, describeRelations } from '@/lib/tarotRelations';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -22,46 +23,53 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
   const [topic, setTopic] = useState<TarotTopic>('general');
   const [result, setResult] = useState<TarotResult | null>(null);
   const t = dict.tarot;
+  const relationLines = result
+    ? describeRelations(computeTarotRelations(result.cards), result.cards, locale)
+    : [];
   const positions = result ? SPREADS[result.spread].positions[locale] : [];
 
   return (
     <>
       <div className="glass-card p-6" style={{ display: 'grid', gap: '1rem' }}>
-        <label style={{ display: 'block' }}>
+        <div>
           <span className="label-dark" style={{ display: 'block', marginBottom: '0.5rem' }}>
             {t.spread}
           </span>
-          <select
-            value={spread}
-            onChange={(e) => setSpread(e.target.value as SpreadId)}
-            className="field-dark"
-            style={{ maxWidth: '320px' }}
-          >
+          <div role="group" aria-label={t.spread} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
             {SPREAD_IDS.map((id) => (
-              <option key={id} value={id}>
+              <button
+                key={id}
+                type="button"
+                aria-pressed={spread === id}
+                onClick={() => setSpread(id)}
+                className={spread === id ? 'btn-gold' : 'btn-violet'}
+                style={{ width: 'auto' }}
+              >
                 {SPREADS[id].name[locale]}
-              </option>
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
 
-        <label style={{ display: 'block' }}>
+        <div>
           <span className="label-dark" style={{ display: 'block', marginBottom: '0.5rem' }}>
             {t.topic}
           </span>
-          <select
-            value={topic}
-            onChange={(e) => setTopic(e.target.value as TarotTopic)}
-            className="field-dark"
-            style={{ maxWidth: '320px' }}
-          >
+          <div role="group" aria-label={t.topic} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
             {TOPIC_IDS.map((id) => (
-              <option key={id} value={id}>
+              <button
+                key={id}
+                type="button"
+                aria-pressed={topic === id}
+                onClick={() => setTopic(id)}
+                className={topic === id ? 'btn-gold' : 'btn-violet'}
+                style={{ width: 'auto' }}
+              >
                 {TOPICS[id][locale]}
-              </option>
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
 
         <button onClick={() => setResult(drawSpread(spread))} className="btn-gold" style={{ justifySelf: 'start' }}>
           {t.draw}
@@ -106,6 +114,19 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
               </div>
             ))}
           </div>
+
+          {relationLines.length ? (
+            <div className="glass-card p-6 mt-8">
+              <h3 className="label-dark" style={{ marginBottom: '0.5rem' }}>
+                {t.relations}
+              </h3>
+              <ul style={{ display: 'grid', gap: '0.4rem', fontSize: '0.875rem', color: 'var(--text-heading)' }}>
+                {relationLines.map((l) => (
+                  <li key={l.key}>{l.text}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <AiReading context={toContext(result, locale, topic)} ai={dict.ai} />
         </section>

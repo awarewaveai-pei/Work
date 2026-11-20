@@ -95,6 +95,9 @@ export type SpreadId =
   | 'relationship'
   | 'decision'
   | 'yesno'
+  | 'diamond'
+  | 'moon'
+  | 'horseshoe'
   | 'celtic';
 
 export interface TarotSpread {
@@ -145,6 +148,33 @@ export const SPREADS: Record<SpreadId, TarotSpread> = {
     name: { 'zh-TW': '是非題', en: 'Yes / No' },
     positions: { 'zh-TW': ['是非傾向與提醒'], en: ['Yes/No leaning & caution'] },
   },
+  diamond: {
+    id: 'diamond',
+    size: 5,
+    name: { 'zh-TW': '鑽石(卡關決策)', en: 'Diamond (stuck decision)' },
+    positions: {
+      'zh-TW': ['核心議題', '根源', '阻力', '潛力', '建議'],
+      en: ['Core issue', 'Root', 'Resistance', 'Potential', 'Advice'],
+    },
+  },
+  moon: {
+    id: 'moon',
+    size: 4,
+    name: { 'zh-TW': '月相(月度)', en: 'Moon phases (monthly)' },
+    positions: {
+      'zh-TW': ['新月・設定意圖', '上弦月・採取行動', '滿月・看見與覺察', '下弦月・放下與釋放'],
+      en: ['New moon: intention', 'First quarter: action', 'Full moon: awareness', 'Last quarter: release'],
+    },
+  },
+  horseshoe: {
+    id: 'horseshoe',
+    size: 7,
+    name: { 'zh-TW': '馬蹄(時間線)', en: 'Horseshoe (timeline)' },
+    positions: {
+      'zh-TW': ['遠期過去', '近期過去', '當前', '近期未來', '外部影響', '建議', '結果'],
+      en: ['Distant past', 'Recent past', 'Present', 'Near future', 'External influences', 'Advice', 'Outcome'],
+    },
+  },
   celtic: {
     id: 'celtic',
     size: 10,
@@ -193,11 +223,6 @@ export const TOPICS: Record<TarotTopic, Record<Locale, string>> = {
   wealth: { 'zh-TW': '財運', en: 'Wealth' },
   spiritual: { 'zh-TW': '靈性成長', en: 'Spiritual' },
 };
-
-/** @deprecated 改用 SPREADS[id].size;保留以免外部引用即斷。 */
-export const SPREAD_SIZE: Record<SpreadId, number> = Object.fromEntries(
-  (Object.keys(SPREADS) as SpreadId[]).map((id) => [id, SPREADS[id].size]),
-) as Record<SpreadId, number>;
 
 export interface DrawnCard {
   card: TarotCard;

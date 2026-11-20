@@ -56,6 +56,12 @@ describe('牌陣定義 SPREADS', () => {
     }
   });
 
+  it('新增三牌陣:鑽石 5 / 月相 4 / 馬蹄 7', () => {
+    expect(SPREADS.diamond.size).toBe(5);
+    expect(SPREADS.moon.size).toBe(4);
+    expect(SPREADS.horseshoe.size).toBe(7);
+  });
+
   it('新增牌陣存在(關係/抉擇/是非)', () => {
     expect(SPREADS.relationship.size).toBe(3);
     expect(SPREADS.decision.size).toBe(3);

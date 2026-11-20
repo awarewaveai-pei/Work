@@ -6,6 +6,7 @@ import {
   type SpreadId,
   type TarotTopic,
 } from '@/lib/tarot';
+import { computeTarotRelations, describeRelations } from '@/lib/tarotRelations';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
 
@@ -44,6 +45,10 @@ export function toContext(
       value: `${d.card.name[locale]}(${orient(d.reversed, locale)})`,
     });
   });
+  // 牌間關係由確定性程式算好,AI 只負責敘事(單張牌無關係)
+  for (const line of describeRelations(computeTarotRelations(r.cards), r.cards, locale)) {
+    facts.push({ label: line.key, value: line.text });
+  }
 
   return {
     systemId: 'tarot',
