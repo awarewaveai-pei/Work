@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-20（續31）— sg-deploy own-compose：ks-aw-01 唯讀 dry-run（video-service、remotion-service 皆通過）
+
+- 主機 dry-run（操作者「Run the dry-run」，21:06 台北）：本 commit 的 scripts 複製到 `/tmp/oc-dryrun-210630` 以 `--skip-pull --dry-run` 跑（主機 `/root/Work` 在 `4adb301f3`，不 pull、不同步主機腳本），跑完已刪。video-service：標籤與 spec 相符（含 `.env.video`）、preflight ok（四個必填變數有值、映像 `lobster-video-service:local`）、`rsync -n` 只會更新 `.env.example`，0 個刪除，EXIT=0。remotion-service：標籤相符（project render-services、無 env-file 標籤）、preflight ok（`RENDER_AUTH_TOKEN` 有值），EXIT=0；容器映像＝`:local`（`sha256:aeb761ee…`）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo bash /tmp/oc-dryrun-210630/sg-deploy.sh --skip-pull --dry-run video-service；同 remotion-service | exit=0 | ms=12000
+- 真正部署要等本 commit 上 main（主機腳本由 `sync-host-scripts.sh` 從 origin/main 安裝）；部署本身仍是 High，要操作者 go。
+- REVIEW_WAIVED: NA -- 只有唯讀演練，沒有程式改動
+- BUGHUNT_WAIVED: NA -- 沒有程式改動
+- rollback：無（未改正式機；暫存資料夾已刪）
 ## 2026-11-20（續29）— oracle 六類 GitHub 候選核對（研究，未改程式）
 
 - 結論與逐案表：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/GITHUB_RESEARCH.md`（唯一細節處）。
