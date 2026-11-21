@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-21（續17）— 系統總控中心手動提前部署 next-admin `246a449a4`＋首次匯入（操作者：「都好了嗎? 如果好了就部署」）
+
+- 前置：`check-deploy-drift.ps1` composeVarDrift 空（`SYSTEMS_INGEST_TOKEN` repo 與 prod 一致），落後 15 commit＝本次內容；無 `DEPLOY_HOLD`。
+- 部署：`sg-deploy.sh next-admin`（12:40–12:46Z）：ci-gate 2 workflow 綠 → npm ci → 測試 → migration 閘（0174 已套）→ healthy 15s → smoke `/login`、`/api/ops/summary`、wordpress、node-api、nginx/api 全 200。
+- 首次匯入：經 `cron-run.sh systems_import` 手動跑 → imported 136 events／1 batch，state＝`246a449a4128`。正式庫：systems 1、phases 1、features 4、activity 134、revert 1、import_run 1。next-admin 10 分鐘內無錯誤 log。
+- 觀察：從主機打公開網址 `https://app.aware-wave.com/api/internal/systems/ingest` 回 401（非 404），未帶 token 一律拒（timingSafeEqual、64 hex token）；與 critic 所述 nginx 擋 `/api/internal` 不一致，待查是否只因主機自身解析繞過 Cloudflare。
+- 延後：Outbound 監工頁切換（凍結 data.mjs）——外聯監工台仍在進行，現在凍結會擋住它；第三批一起切。
+- 待確認：操作者登入後實看 /ops/systems（瀏覽器面板未登入，agent 不代輸密碼）；2026-11-22 04:30 排程自動跑一次。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo sg-deploy.sh next-admin → healthy 15s, smoke all endpoints OK | exit=0 | ms=360000
+- REALTEST_EVIDENCE: tool=SSH | cmd=cron-run.sh systems_import python3 systems-import.py → imported 136 event(s); psql counts systems 1／features 4／activity 134 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -X POST http://127.0.0.1:3002/api/internal/systems/ingest（無 token）→ 401 | exit=0 | ms=200
+- REVIEW_WAIVED: NA -- 部署與匯入操作，無新程式；程式審查見 續16
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-21（續16）— 系統總控中心 /ops/systems 批 1 上線：registry＋主機匯入器＋0174＋頁面（操作者：「三件都同意」）
 
 - 根因：15+ 系統散在約 15 個按階段開的監工頁＋2000 行 TASKS.md，操作者看不到各系統用途／進度／下一步，且很少跑 AO-CLOSE（人填或靠收工的寫入點都會失效）。
