@@ -142,3 +142,4 @@ RISKS 處置：`agency-os/WORKLOG.md` 2026-11-21「oracle 批 6 併入六張」�
 - 之後待派：W2、W3、P2–P4、S1–S6、G-ADR、G-GAP（計畫 §3）；L1 英文補齊、G1 全球實測、B8 完整度各卡；Kerykeion tests/core 未逐行讀（操作者未要求補）。
 - 2026-11-21 補：合盤改為**私人合盤**（不需對方是會員、不通知對方），見 `briefs/WP-front-door-plan.md` 檔頭修訂；計畫 §4 第 4 題已答。X2 `d512d1ab5`、P1 `6bed458fe` 工人已 commit 待審併；W1 等 critic。
 - 2026-11-21 補：操作者決定「先補系統功能，再由她自己直接在系統裡手動操作」。規劃 agent 進行中，產出 `briefs/SITE-FLOW-COMPLETION-PLAN.md`（讀完後整理 §4 給她決定，再派卡；next-admin 每日 03:00 自動部署，未完成的要用開關或 `DEPLOY_HOLD`）。E6c `54c78e564` 工人已 commit 待審併。
+- 2026-11-21 晚：E6c、X2、W1、P1 已併入 main（合併後 tsc 綠、vitest 482 passed；`app/api/places/route.ts` 手動合併）。**未補的閉環**：這四張的工人 RISKS 尚未逐項處置、WORKLOG 尚未寫（工人回報在各 session 最後一則訊息：`local_f1c77b0b…` E6c、`local_53c300dd…` X2、`local_51906081…` W1、`local_2b695d16…` P1）；P1 外掛沒跑 critic、沒在真的 WordPress 裝過；X2 未做八字反推日期。全部未部署。
