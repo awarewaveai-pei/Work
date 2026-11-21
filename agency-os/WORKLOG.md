@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-22（續8）— oracle WP 卡 A1：ADR 015／017／018 修訂；SF-A 移到第五批
+
+- 根因：ADR 018「不採用 iframe」與 ADR 015 §2 沒分跨網域／同網域，理由（第三方 cookie 被擋）只對跨網域成立；也沒有任何 ADR 寫客戶網站的會員歸屬。
+- 015 §2：禁止的是跨網域且帶登入狀態的 iframe；加範圍句（客戶網站會員屬該站 WordPress，不進共用錢包）。018 不採用段：同上，被嵌頁送 `frame-ancestors 'self'`。017 §0b 末：客戶網站掛後端服務時主體＝站所屬組織，終端會員不進 Supabase；檔頭修訂日加 2026-11-22。`ADR_INDEX.md` 摘要不變，未改。
+- SF-A（平台文件更正）從第一批移到第五批與 SF-O 一起：它要把文件指到 `lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md` 與「頁面建站」流程，兩者在 SF-L 跑完前都不存在，先改會讓文件宣稱與實況不符。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/verify-governance-pointers.mjs | exit=0 | ms=4000
+- REVIEW_WAIVED: DOC_ONLY -- 三份 ADR 各加一至兩句，讀回 diff
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=frame-ancestors | hits=74
+- ORACLE_WAIVED: 純文件
 ## 2026-11-22（續7）— oracle WP 第一批：E1 併入 `d11320883`；E4 的 Major 判「現在修」回派
 
 - E1（線1 `d6affccfa` → main `d11320883`，已 push，未部署）：`app/embed/[lang]/[slug]/page.tsx`（根元素 `#aw-oracle-root`）、`app/embed/[lang]/layout.tsx`（第二個 root layout，無工具列、高度跟內容）、`components/toolRegistry.tsx`（鍵型別 `PageSlug`，漏登記 tsc 紅）、`next.config.ts`（`/embed/*` 加 `X-Robots-Tag: noindex, indexifembedded`、`frame-ancestors 'self'`）、`proxy.ts` matcher 排除 `embed/`。

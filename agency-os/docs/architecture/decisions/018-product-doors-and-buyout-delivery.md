@@ -67,7 +67,7 @@
 
 ## 不採用
 
-- **把產品嵌進 WordPress 頁面（iframe）**：第三方 cookie 會被瀏覽器擋、手機難用，也容易被誘導點擊（ADR 015 §2 同理）。
+- **把產品嵌進 WordPress 頁面（iframe）**：第三方 cookie 會被瀏覽器擋、手機難用，也容易被誘導點擊（ADR 015 §2 同理）。不採用的是跨網域且帶登入狀態的 iframe；同網域 iframe 不在此限，被嵌頁要送 `frame-ancestors 'self'`（2026-11-22 修訂，決策記錄 `reports/decisions/2026-11-21-oracle-wp-front-door-architecture.md`）。
 - **登入 cookie 設成整個 .aware-wave.com 共用**：aware-wave.com 底下也有客戶的 staging WordPress（`middleware.ts:225`），共用 cookie 讓那些網站也帶得到登入。
 - **每個網址在 nginx 寫路徑改寫（portal 的做法）**：每加一個產品就要改 nginx，買斷安裝又要再改一次。改成 middleware 讀登記表；portal 現有的 nginx 改寫保留，middleware 的改寫遇到已有前綴的路徑不再動它。
 - **每個產品一個獨立 app**：多出好幾套登入和主題（ADR 016、017 同理）。

@@ -12,11 +12,11 @@
 
 | 批 | 線 1（引擎） | 線 2（引擎→外掛） | 線 3（主機腳本） | 線 4（next-admin） | 監工自己 |
 |---|---|---|---|---|---|
-| 1 | E1 → E3 | E4 | SF-C → SF-D | SF-B | A1、SF-A |
+| 1 | E1 → E3 | E4 | SF-C → SF-D | SF-B | A1 |
 | 2 | E2 | P1 | SF-E → SF-F | SF-G | 套 migration（SF-B，需同意） |
 | 3 | — | P2 ∥ P3（P3 用線 1 的 session） | SF-H | SF-I ∥ SF-J（SF-J 用新的設計 session） | SF-I0（需同意） |
 | 4 | — | P4 | SF-K | SF-P | 一次部署 next-admin＋smoke；SF-L（需同意） |
-| 5 | — | — | — | — | GO-1 → GO-2 → GO-3（每步需同意）；SF-O |
+| 5 | — | — | — | — | GO-1 → GO-2 → GO-3（每步需同意）；SF-O、SF-A（文件要指到 SF-L 跑完才存在的手冊與流程） |
 
 - 關鍵路徑：E1 → P1 → P3 → GO-3；平台 SF-C → SF-D → SF-E → SF-H → SF-L → GO-2。
 - 批 1 派出時 E3、SF-D 不另開 session：同一條線的工人交回前一張、監工併入後，用 `SendMessage` 派下一張（context 過長先 `clear_session`）。

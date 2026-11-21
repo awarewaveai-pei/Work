@@ -1,7 +1,7 @@
 # ADR 017: 客戶怎麼買 — 線上用「權利」（合約、贈送＋點數），買斷＝一鍵架站到客戶主機、用客戶自己的 API、模組選購
 
 - **狀態**：已接受（操作者 2026-10-14「你決定」：8 題照建議定案，第 3 題是上線前要查的事）
-- **日期**：2026-10-14；修訂 2026-10-16（§0 三軸、§3 actor／on_behalf_of、順序 6–7）、2026-10-17（§0b 積木契約、順序 3↔4 對調、Q9–Q10）、2026-10-18（全鏈自審：金鑰託管、會員離開 WordPress、退款、備份）
+- **日期**：2026-10-14；修訂 2026-10-16（§0 三軸、§3 actor／on_behalf_of、順序 6–7）、2026-10-17（§0b 積木契約、順序 3↔4 對調、Q9–Q10）、2026-10-18（全鏈自審：金鑰託管、會員離開 WordPress、退款、備份）、2026-11-22（§0b 客戶網站掛後端服務的主體）
 - **承接**：[ADR 012](012-shared-platform-layer.md)（產品登記表、共用帳本、簽章許可 `entitlement_ref`）、[ADR 015](015-awarewave-account-and-shared-wallet.md)（一個帳號、一個錢包、WordPress 收費）、[ADR 016](016-social-manager-third-product.md)（社群管理）。
 - **部分取代**（2026-10-14 接受起生效）：
   - HCI [ADR-0031](../../HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0031-ai-lego-usage-metering-attribution.md)：`:33` 不授權「Product/Plan/Feature/Entitlement/Limit engine」→ 由本 ADR 授權。gate 1／2／4（`:39-42`）的許可欄位與簽發條件改照 §3（簽發依據改為 `organization_entitlements`；`subscription_ref` 改為 `entitlement_id`＋`source_ref`）。驗章方式、不得直讀對方資料表不變。HCI `governance/ADR_INDEX.md` 已註記。
@@ -53,6 +53,8 @@
 6. **離開 WordPress 測試**（可替換性的具體形式）：整套測試以 `payments=local`、`loginSources=[local]`、`crm=none` 跑一遍必須全綠；任何核心邏輯 import WordPress／Woo／Fluent 的符號即紅燈（第 2 步 import-boundary 閘加這一組）。WordPress 是今天的門口與收銀台（ADR 015），不是房子；哪天自建會員與金流，換接頭的值，產品程式不動。會員主檔在 Supabase（ADR 005），WordPress 只是登入來源之一：離開時把 `awarewave-wp` 來源的使用者改為 `local`（寄設定密碼信），資料不搬；合約與權利列本來就在控制面，不受影響。
 7. **選配＝在 System Foundry 勾積木**（操作者 2026-10-18「應該要可以選擇項目（行銷、客服、社群…）然後組裝上去」）：登記表就是積木目錄。順序 1 的 `scripts/sync-foundry-catalog.mjs` 把 `products.ts` 匯出成 `System_Foundry_v1.6_ARTIFACT_COMPLETE/generation/awarewave-products.json`（每產品：key、名稱、一句用途、`dependsOn`、`standalone`、`features`、manifest 路徑），System Foundry 問卷多一節「AwareWave 積木」，每個產品一題要／不要；勾了就把該產品的 `MODULE_MANIFEST.json` 當一個模組放進藍圖，`dependsOn` 走 SF 既有的能力依賴閉包（產品映成 `CAP-AW-<KEY>`），`foundry-plan.json` 的 `modules[]` 列出選到的產品。`new-product.mjs --from-foundry` 讀 `modules[]`：客戶自己的系統＝買斷安裝的模組清單（順序 5）；線上帳戶＝方案要開的功能（順序 4）。閘：目錄檔必須等於登記表重新匯出的結果（測試 diff），`status: available` 的產品都要在目錄裡；SF 的 `make verify` 加同一檢查。`features[]` 與 `plans` 決定一個客戶能用哪些功能；`standalone`＋`dependsOn` 決定買斷能單獨裝哪些積木。
 8. **只有一個入口，兩條路進來**：新系統只從 `scripts/new-product.mjs` 長出來（順序 1）；手寫一列＝閘紅。整套新系統先走 System Foundry（`python scripts/serve_configurator.py` → 答要／不要 → Submit → `generated/<名稱>/`），再 `new-product.mjs --from-foundry generated/<名稱>`：讀 `.foundry/resolution/foundry-plan.json` 與藍圖末節「交付登記」，十項宣告直接填進 `MODULE_MANIFEST.json`（欄位名與 `kernel/06` 相同），只補問子網域與逐項收費功能；小工具直接 `new-product.mjs` 答五題。兩條路同一份登記表、同一個 `can()`、同一個 manifest。
+
+客戶網站掛我們後端服務的情形（第一例：oracle.aware-wave.com 的 WordPress 掛算命引擎）：主體＝該站所屬的組織，站用自己的站台鑰匙簽章呼叫；站的終端會員屬於該站，不進 Supabase、不是 `can()` 的主體；每位會員的用量上限由該站簽的短效票帶假名給服務自己計（2026-11-22 修訂，決策記錄 `reports/decisions/2026-11-21-oracle-wp-front-door-architecture.md`）。
 
 ### 1. 兩條路，同一份商品目錄、同一個判斷
 
