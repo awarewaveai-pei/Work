@@ -13,9 +13,11 @@ describe('紫微頂規分析引擎', () => {
   const r = computeChart({ ...birth, locale: 'zh-TW' });
   const a = analyzeZiwei(r.astrolabe);
 
-  it('格局判定:回傳已知格局(府相朝垣/坐貴向貴)', () => {
+  it('格局判定:回傳已知格局(金輿扶駕/坐貴向貴)', () => {
+    // 此盤天府在命、天相在官祿,不合府相朝垣「府居官祿、相居財帛」口徑(Z2 收窄),不報
     const names = a.patterns.map((p) => p.name);
-    expect(names).toContain('府相朝垣格');
+    expect(names).toContain('金輿扶駕格');
+    expect(names).not.toContain('府相朝垣格');
     expect(names).toContain('坐貴向貴格');
     for (const p of a.patterns) {
       expect(p.desc.length).toBeGreaterThan(10);
@@ -74,7 +76,7 @@ describe('紫微頂規分析引擎', () => {
     expect(ctx.facts.some((f) => f.label.startsWith('宮:'))).toBe(true); // 逐宮逐星
     expect(ctx.facts.length).toBeLessThanOrEqual(60); // route MAX_FACTS
     expect(ctx.facts.every((f) => f.value.length <= 300)).toBe(true); // route 上限
-    expect(ctx.headline).toContain('府相朝垣格');
+    expect(ctx.headline).toContain('金輿扶駕格');
   });
 
   it('toContext 不帶 analysis 時無頂規 facts(compute 預設不帶,維持確定性)', () => {
