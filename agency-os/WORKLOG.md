@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-21（續5）— oracle 批 6 併入六張（T2、A1、I2、T3、A2、D1）；對外介面與批 7 卡片（操作者：「17 個裡可用的全加 派工」「那就去做對外的資料介面」）
+
+- 併入 main（皆 `Projects/internal/ziwei-doushu/`，**未部署**）：T2 `8f92f89dc`（塔羅 45 牌陣分 5 組按鈕、`crypto` 拒絕取樣、每日一牌）；A1 `b0ddcc0c8`（本命五相位、容許度 6／5、日月 +1.5、入出相用 XALEN 速度）；I2 `e3a90e932`（六爻納甲：八宮、世應、納甲、六親、六神、旬空）；T3 `6778e9c43`（78 張牌圖＋牌背，`public/tarot/`，6.8MB）；A2 `9e3310a66`（廟旺陷失勢、日夜盤、福點精神點、年小限）；D1 `fa3c31791`（當日黃曆：九星、二十八宿、彭祖百忌、三神方位、胎神、沖煞、建除、吉神凶煞）。監工 commit：`5f1776dd3`（`localToday`／`Ymd` 移到無依賴的 `lib/today.ts`）、`80a028230`（I2 改 import）。
+- RISKS 處置：
+  - T2「`lib/tarot.ts` import `lib/dates.ts` 把 lunar-javascript 帶進塔羅頁」→ 已修 `5f1776dd3`。
+  - T2「牌陣文案未人工校稿」「每日一牌依本機日期」「Node 18 未驗 `globalThis.crypto`」→ 接受（部署映像為 Node 20；文案待操作者看頁面）。
+  - A1「上升、天頂不列入相位」→ 接受（XALEN 不回傳其速度，檔頭已寫）。「說明文字的 6／5／1.5 與常數各寫一份」→ 接受，常數旁有註解。
+  - I2「伺服器端 compute 用伺服器時區的今天」→ 目前只有測試呼叫；寫進 X1 卡（對外介面必須由呼叫端給起卦日期）。
+  - T3「AI 生成牌圖、授權僅在著作權存在範圍內」→ 原聲明寫入 `THIRD_PARTY_NOTICES.md` 與 `public/tarot/ASSET_LICENSE.txt`；操作者已指示採用；獨立 commit 可單獨撤。「流程改為先蓋牌再翻」→ 接受，facts 不受影響。「`next/image` 用 `unoptimized`」→ 接受（來源已是 512×768 webp）。
+  - A2「facts 最多 59／60」→ 批 7 的 A3、A4 不得再往本命 context 加 facts，行運與合盤各用獨立 context；寫進 `briefs/B7-remaining.md`。「三分主、界、面未做」→ 接受（來源表無出處）。「2/29 出生平年 3/1 才加歲，無測試」→ 接受。
+  - D1「`lib/s2t.ts` 加整套黃曆用字與整詞表」→ 工人掃 2020–2025 每日字串無殘留簡體，critic 查八字、擇日輸入不受影響；接受。順帶修掉既有 bug：每日頁宜忌原本直接顯示簡體。「福神方位只有一派」→ 接受。
+  - 各卡 Codex 未跑 → 各工人自帶 critic（I2 pass 0c/0m/1n、A1 pass、A2 pass、D1 pass）；T3 由監工讀元件與測試並親看牌圖。
+- 尚在進行：Z2（紫微格局 64 條，工人 `local_2b695d16…` 等 critic）。
+- 新卡：`briefs/X1-public-api.md`（輸入規格單一來源 → 驗證＋REST v1＋限流）、`briefs/X2-mcp-endpoint.md`（MCP 工具由登錄表產生）、`briefs/B7-remaining.md`（A3 行運合盤、A4 時間主星、V1 吠陀、Z3 星曜知識、T4 追問補抽；末節列不做及原因）。先前回報「只有 bazi-mcp 一項沒排」不正確，重新核對後補上這九張。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd D:/Worktrees/Work/oracle-int/Projects/internal/ziwei-doushu && npx tsc --noEmit && npx vitest run → 36 檔 270 passed／3 skipped（六張卡與 main 合併後）；messages 兩檔 JSON.parse 通過；Read `public/tarot/cups-10.webp` 親看牌圖 | exit=0 | ms=6000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（各工人自帶 critic；監工讀 `components/TarotCardView.tsx`、`lib/tarotArt.test.ts` 與合併衝突處）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/ziwei-doushu | grep=localToday | hits=30
+- rollback：各卡一個 commit，`git revert <sha>` 可個別撤（T3 撤掉即回純文字牌）。
 ## 2026-11-21（續4）— oracle 紫微晚子時改「仍屬當日」；批 6 卡片（操作者：「你去看正確的傳統算命應該怎麼做」「17 個裡可用的全加 派工」）
 
 - 決定：`Projects/internal/ziwei-doushu/lib/ziwei.ts` `ZIWEI_DAY_DIVIDE` `'forward'` → `'current'`（23:00–24:00 整張盤歸當日、時辰為子時）。八字不動（`lib/bazi.ts` 走 lunar-javascript `sect=2`：夜子時日柱當日、時干用次日日干推）——兩系統口徑一致。

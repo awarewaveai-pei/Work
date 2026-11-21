@@ -1,5 +1,7 @@
 # 批 7：其餘可取用項目（批 6 併入後依序派；每節一張卡，先讀 `COMMON.md`＋`COMMON-B6.md`）
 
+共同限制：占星本命 context 的 facts 已到 59／60（`lib/astrologyView.ts`）。新功能不得再往本命 context 加 facts；行運、合盤、時間主星、吠陀各自用獨立的 context（獨立的解讀按鈕），各自不超過 60 條。更新 worktree 用 `git fetch origin && git checkout --detach origin/main`，不要用 `reset --hard`。「今天」用 `lib/today.ts` `localToday`。
+
 ## A3 占星：行運與合盤（等 A1、A2）
 來源（只取規則數值，Kerykeion 為 AGPL 不抄程式）：`research-detail/kerykeion-techniques.md` §2-3、`kerykeion-core.md`；openephem `src\openephem\aspects.py:87-159`（跨盤相位）、`returns.py:58-85`。
 做：(1) 行運：今天（`lib/today.ts`）的行星對本命行星的相位，容許度一律 3°、日月不加寬、標入相／出相；(2) 合盤：兩人本命盤之間的相位，不判入出相；(3) 太陽回歸盤的時刻（回到本命太陽黃經，牛頓法或二分法，誤差 <1 角秒）。計算在伺服器端（`@xalen/wasm`）。合盤計分表（Discepolo）出處只有網址、兩版互相矛盾，**不採用**。

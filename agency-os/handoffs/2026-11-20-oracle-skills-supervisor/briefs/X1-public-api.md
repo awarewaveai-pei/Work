@@ -10,6 +10,7 @@
 2. 占星與每日運勢註冊為系統（`SYSTEM_IDS` 已有 `astrology`；每日運勢與 D1 的當日黃曆照同一合約）。`app/api/astrology/route.ts` 的手寫驗證刪掉，改走同一套規格；`AstrologyTool` 改呼叫新端點或該路由變成薄轉接——二擇一，不留兩份驗證。
 3. 端點（`app/api/v1/`）：`GET /api/v1/systems`（系統清單＋各自輸入規格＋`apiVersion`）；`POST /api/v1/systems/{id}`，body `{ input, locale? }` → `{ apiVersion, system, data, context }`。`data` 必須是純 JSON（紫微的 astrolabe 用它自己的 `toJSON()`）。錯誤格式統一 `{ error, detail }`，400／404／429／500 分清楚，例外不外洩堆疊。
 4. 不對外開 AI 解讀；v1 只給確定性結果。
+   伺服器沒有「使用者的今天」：凡是用到今天的系統（易經六爻的起卦日、每日運勢與黃曆、塔羅每日一牌、占星小限與行運、風水流年、八字流年）對外介面一律由呼叫端傳日期，規格標必填；不可在伺服器端用 `localToday()` 當預設。
 5. 限流：一個共用小模組（每來源位址固定視窗，記憶體計數，回 429＋`Retry-After`），套在 v1、`/api/astrology`（若保留）與 `/api/interpret`。來源位址取法先讀 `lobster-factory/infra/hetzner-phase1-core/` 的 nginx 設定確認轉送的是哪個標頭，只信那一個；寫明多副本時計數不共享的限制。
 6. CORS：只對 `/api/v1/*` 開放任意來源的 GET／POST／OPTIONS，不帶憑證。
 7. 部署煙霧測試加一條 `/api/v1/systems`（`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh` oracle-web 那段，照既有寫法加一行）與對應的 `tests/host-scripts` 測試。
