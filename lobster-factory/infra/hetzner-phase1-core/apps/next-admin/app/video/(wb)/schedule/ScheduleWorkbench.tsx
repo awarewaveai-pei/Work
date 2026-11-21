@@ -39,9 +39,20 @@ export async function adoptTopic(workbench: Workbench, id: string, org: string) 
   return workbench.spine.create({ title: item.title, ratio: String(item.formats?.[0] || "16x9").replace("x", ":"), shots, characters: [], sourceProjectId: id });
 }
 
+/** The workbench client's name from the same list its 「客戶：…」 switch reads (GET /api/video/workbench/bootstrap); null
+ *  when it cannot be read -- the empty-queue line then says 這個客戶. */
+async function orgNameOf(organizationId: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/video/workbench/bootstrap", { credentials: "same-origin" });
+    const orgs = res.ok ? ((await res.json()).organizations as Array<{ id: string; name?: string }> | undefined) : undefined;
+    return orgs?.find((o) => o.id === organizationId)?.name || null;
+  } catch { return null; }
+}
+
 export default function ScheduleWorkbench({ settingsHref }: { settingsHref: string | null }) {
   const workbench = useWorkbench();
   const [org, setOrg] = useState("");
+  const [orgName, setOrgName] = useState<string | null>(null);
   const [items, setItems] = useState<Topic[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
@@ -57,7 +68,10 @@ export default function ScheduleWorkbench({ settingsHref }: { settingsHref: stri
       setOrg(organizationId);
       const res = await fetch(`/api/video/schedule?organizationId=${encodeURIComponent(organizationId)}`, { credentials: "same-origin" });
       if (!res.ok) throw Error("排程讀取失敗，請重試");
-      setItems((await res.json()).items);
+      const list: Topic[] = (await res.json()).items;
+      setItems(list);
+      // an empty queue reads like a broken page unless it names the client (operator 2026-11-21: Soulful had 0 topics)
+      if (!list.length) setOrgName(await orgNameOf(organizationId));
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   }
@@ -89,7 +103,7 @@ export default function ScheduleWorkbench({ settingsHref }: { settingsHref: stri
     </div>
     <p>接手編輯會建立工作台的一集；原排程仍依原設定運作。如需停止自動發布，先到內容排程設定調整。</p>
     {busy && <p>讀取中…</p>}{error && <p role="alert">{error}</p>}
-    {!busy && !error && !items.length && <p>目前沒有話題排程。</p>}
+    {!busy && !error && !items.length && <p>{orgName ? `${orgName} 目前沒有題目。` : "這個客戶目前沒有題目。"}要看別的客戶，從左上角「客戶：…」換。</p>}
     {items.length > 0 && <div role="group" aria-label="篩選" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
       {LANE_ORDER.map((l) => <button key={l} type="button" aria-pressed={lane === l} style={optionStyle(lane === l)} onClick={() => setLane(l)}>{LANE_LABEL[l]} {counts[l]}</button>)}
     </div>}

@@ -45,6 +45,13 @@ it("filters by lane (an old October proposal is 過期), and a row's one button 
   expect(JSON.parse(String(patch.body))).toEqual({ action: "approve", version: 4 });
 });
 
+it("an empty queue names the client it is empty for", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => Response.json(url.includes("bootstrap")
+    ? { ok: true, organizations: [{ id: "other", name: "別家" }, { id: "org", name: "Soulful Expression Art Therapy" }] } : { items: [] })));
+  render(<ScheduleWorkbench settingsHref={null} />);
+  expect(await screen.findByText("Soulful Expression Art Therapy 目前沒有題目。要看別的客戶，從左上角「客戶：…」換。")).toBeTruthy();
+});
+
 it("發布 opens the content tool on that topic's site, month and topic (the confirmation is there)", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ items: [{ id: "v", title: "待看", status: "reviewed", site_id: "s1", scheduled_for: "2026-11-25T01:00:00Z", version: 2 }] })));
   render(<ScheduleWorkbench settingsHref="https://content.example/topics" />);
