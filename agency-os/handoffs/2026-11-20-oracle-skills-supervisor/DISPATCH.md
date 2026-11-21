@@ -127,3 +127,5 @@ RISKS 處置：`agency-os/WORKLOG.md` 2026-11-21「oracle 批 5 併入」。
 不做（原因見 `B7-remaining.md` 末節）；react-iztro、lunar-python、ziwei-chart、ichingshifa、iChing-JS（無可取）。
 RISKS 處置：`agency-os/WORKLOG.md` 2026-11-21「oracle 批 6 併入六張」。批 7 派工：A3→`local_617452cb…`、V1→`local_f1c77b0b…`、T4→`local_1e8cf0f6…`；A4 等 A3、Z3 等 Z2。
 批 7 進度：T4 main `440f9889f`；A3、V1 工人等 critic；Z3 派 `local_2b695d16…`；A4 等 A3。之後 X1 → X2。
+批 7 進度：A3 main `b624e6496`、V1 main `c17bc67c6`（＋`6abe3a6a9` 手動合併 `next.config.ts`、`lib/astrology.ts`）；A4 派 `local_617452cb…`；Z3 進行中。
+批 8（`briefs/B8-accuracy-completeness.md`，操作者：「最完整完善、最準確」）：E5 時區／夏令時間／晚子時派別 → `local_51906081…`；E7 獨立基準驗證 → `local_53c300dd…`；其餘完整度卡在 X1、X2 之後。需操作者決定的（帳號、金流、推播、好友）不派。

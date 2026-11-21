@@ -12,6 +12,7 @@
 4. 不對外開 AI 解讀；v1 只給確定性結果。
    伺服器沒有「使用者的今天」：凡是用到今天的系統（易經六爻的起卦日、每日運勢與黃曆、塔羅每日一牌、占星小限與行運、風水流年、八字流年）對外介面一律由呼叫端傳日期，規格標必填；不可在伺服器端用 `localToday()` 當預設。
 5. 限流：一個共用小模組（每來源位址固定視窗，記憶體計數，回 429＋`Retry-After`），套在 v1、`/api/astrology`（若保留）與 `/api/interpret`。來源位址取法先讀 `lobster-factory/infra/hetzner-phase1-core/` 的 nginx 設定確認轉送的是哪個標頭，只信那一個；寫明多副本時計數不共享的限制。
+   wasm 追蹤：`next.config.ts` `outputFileTracingIncludes` 目前每條用到 `@xalen/wasm` 的路由各列一行（漏列＝正式環境 500）。新路由一併改成一個涵蓋所有會載入 wasm 的路由的寫法，並用 `next build` 後檢查 `.nft.json` 驗證。
 6. CORS：只對 `/api/v1/*` 開放任意來源的 GET／POST／OPTIONS，不帶憑證。
 7. 部署煙霧測試加一條 `/api/v1/systems`（`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh` oracle-web 那段，照既有寫法加一行）與對應的 `tests/host-scripts` 測試。
 8. 測試：`parseInput` 的必填、範圍、列舉、多餘欄位；每個系統用規格裡的範例輸入呼叫一次 handler 得 200 且 `data` 可 `JSON.stringify`；限流第 N+1 次回 429；未知系統 404。
