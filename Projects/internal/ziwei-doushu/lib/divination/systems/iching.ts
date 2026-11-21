@@ -2,7 +2,7 @@ import { castHexagram, type IChingResult } from '@/lib/iching';
 import { HEXAGRAM_TEXTS } from '@/lib/iching/text';
 import { READING_RULE_TEXT, selectReading } from '@/lib/iching/reading';
 import { dayGanZhiOf, lineFact, najiaChart, type NajiaChart } from '@/lib/iching/najia';
-import { localToday, type Ymd } from '@/lib/dates';
+import { localToday, type Ymd } from '@/lib/today';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
 

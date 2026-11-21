@@ -13,7 +13,7 @@
  * 參考 ichingpy(MIT)six_lines.py 的規則,TypeScript 自行重寫。
  */
 import { Solar } from 'lunar-javascript';
-import type { Ymd } from '@/lib/dates';
+import type { Ymd } from '@/lib/today';
 import {
   BRANCHES,
   KE,
