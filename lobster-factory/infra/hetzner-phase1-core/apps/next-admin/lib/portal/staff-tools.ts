@@ -8,7 +8,7 @@
 // one: /api/ops/clients/[slug]/cs-knowledge is AI 客服's, not 客戶's. A product's API never gets a non-product owner
 // here: a page calling another product's API needs that product ticked (staff-tools.test.ts NEEDS_OTHER_TOOL).
 import { BACK_OFFICE, STAFF_UTILITIES, type StaffPage } from "./products";
-import { PLATFORM_APIS, doorApis, nextAdminProducts } from "./doors";
+import { PLATFORM_APIS, STATIC_PAGES, doorApis, nextAdminProducts } from "./doors";
 
 export type StaffToolGroup = "product" | "utility" | "back_office";
 // apis: a product cell's door APIs (its own and its dependsOn closure); staff-only APIs live in STAFF_API_OWNERS.
@@ -56,12 +56,10 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
 
 /** Pages and APIs every signed-in staff member may use, whatever is ticked. */
 export const STAFF_PLATFORM: { pages: readonly string[]; apis: readonly string[] } = {
-  // /no-access: where the gate sends a page it refuses (a loop otherwise). /editor-shared: static editor math (public/editor-shared/*.js,
-  // no data) that /tools/canvas and the /tools/vector-pro dock blocks both load -- a restricted staff member must not lose 調色.
-  // /vector-pro, /vector-pro-dock: static files /tools/vector-pro loads (the VectorCraft build nginx serves publicly, and
-  // locally next.config.ts rewrites; our dock in public/vector-pro-dock/). No data, like /editor-shared. /photo-pro, /photo-pro-dock:
-  // the same for /tools/photo-pro (PhotoCraft build; our dock in public/photo-pro-dock/).
-  pages: ["/$", "/no-access$", "/editor-shared", "/vector-pro", "/vector-pro-dock", "/photo-pro", "/photo-pro-dock"],
+  // /no-access: where the gate sends a page it refuses (a loop otherwise). STATIC_PAGES (lib/portal/doors.ts, the one list):
+  // data-free public files pages load by fixed URL -- /editor-shared (the editor math /tools/canvas and the vector-pro dock
+  // load, so a restricted staff member keeps 調色), the VectorCraft / PhotoCraft builds and our docks for them.
+  pages: ["/$", "/no-access$", ...STATIC_PAGES],
   // /api/tools/codex-laptop: the sidebar's 「啟動筆電」 status on every page; the route itself answers the owner only (codexAllowed).
   apis: [...PLATFORM_APIS, "/api/ops/build-id", "/api/ops/analytics-context", "/api/tools/codex-laptop"],
 };

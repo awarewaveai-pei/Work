@@ -42,6 +42,16 @@ export function doorForHost(host: string, env: Env = process.env): Door {
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
+/** The data-free static files pages load by a fixed URL -- the one list (lib/portal/staff-tools.ts STAFF_PLATFORM.pages
+ *  takes it too). /editor-shared: editor scripts and the intro style previews (content/sites IntroStyleButtons);
+ *  /vector-pro-dock, /photo-pro-dock: our docks (design door /design/pro, /design/canvas). These three are public/ folders
+ *  next-admin serves to a signed-in identity on a product door (otherwise rewritten under the product's page prefix,
+ *  /content/editor-shared/... -> 404: card R9) and to staff on the staff door. /vector-pro, /photo-pro: the VectorCraft /
+ *  PhotoCraft builds nginx serves itself, without login (nginx/default.conf); next-admin sees them only in dev
+ *  (next.config.ts rewrites). Never a route: lib/portal/__tests__/door-static-files.test.ts fails if one of these names
+ *  becomes an app/ route or is neither a public/ folder nor an nginx location. */
+export const STATIC_PAGES: readonly string[] = ["/editor-shared", "/vector-pro", "/vector-pro-dock", "/photo-pro", "/photo-pro-dock"];
+
 /** A path the product serves with no login (registry `door.anonymous`, e.g. /smartlink). */
 export function isAnonymousPath(pathname: string, product: NextAdminProduct): boolean {
   return (product.door.anonymous ?? []).some((a) => under(pathname, a));
@@ -81,7 +91,8 @@ export function doorApis(product: NextAdminProduct): string[] {
 
 /** The product's own page, the APIs its door serves, and its no-login paths. */
 export function isProductPath(pathname: string, product: NextAdminProduct): boolean {
-  return under(pathname, product.door.page) || doorApis(product).some((a) => under(pathname, a)) || isAnonymousPath(pathname, product);
+  return under(pathname, product.door.page) || doorApis(product).some((a) => under(pathname, a)) || isAnonymousPath(pathname, product)
+    || STATIC_PAGES.some((s) => under(pathname, s));
 }
 
 /** A page path some product serves only on its own door (e.g. /social or /smartlink on the staff host). */
