@@ -2,6 +2,7 @@
 // One registration path for a small tool or a Foundry delivery package (ADR 017 step 1).
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -108,6 +109,16 @@ export async function createProduct(options) {
     let exists = true; try { fs.lstatSync(path.join(app, dir)); } catch (e) { if (e.code === 'ENOENT') exists = false; else throw e; }
     assert(!exists, `refusing existing path: ${dir}`);
   }
+  // Systems registry (SSOT agency-os/systems/registry.json): a new product starts as a planning system. An explicit --app without --registry skips it so fixtures never touch the real file.
+  const systemsPath = options.registry ?? (options.app ? null : path.join(repo, 'agency-os/systems/registry.json'));
+  let systemsOriginal = null, nextSystems = null;
+  if (systemsPath) {
+    systemsOriginal = fs.readFileSync(systemsPath, 'utf8');
+    const systems = JSON.parse(systemsOriginal);
+    assert(!systems.systems.some((s) => s.slug === key || s.product_key === key), `registry already has system: ${key}`);
+    systems.systems.push({ id: randomUUID(), slug: key, name, aliases: [], type: 'product', purpose: delivery?.description ?? name, product_key: key, source_paths: [], phases: [], features: [] });
+    nextSystems = JSON.stringify(systems, null, 2) + '\n';
+  }
   const row = JSON.stringify(product, null, 4).split('\n').map((line) => '  ' + line).join('\n') + ',\n';
   const nextRegistry = original.replace(marker, row + marker);
   const lock = registry + '.new-product.lock';
@@ -115,6 +126,7 @@ export async function createProduct(options) {
   const staging = registry + '.new-product.tmp';
   let stagingFd;
   let stagingCreated = false;
+  let systemsStaging;
   const created = [];
   const createdDirs = [];
   try {
@@ -129,7 +141,15 @@ export async function createProduct(options) {
     stagingFd = fs.openSync(staging, 'wx'); stagingCreated = true;
     fs.writeFileSync(stagingFd, nextRegistry); fs.closeSync(stagingFd); stagingFd = undefined;
     assert(fs.readFileSync(registry, 'utf8') === original, 'registry changed during generation; retry');
-    fs.renameSync(staging, registry); stagingCreated = false;
+    if (systemsPath) {
+      // Registry first (stage + rename); if the products.ts rename then fails, put the old registry content back.
+      assert(fs.readFileSync(systemsPath, 'utf8') === systemsOriginal, 'systems registry changed during generation; retry');
+      systemsStaging = systemsPath + '.new-product.tmp';
+      fs.writeFileSync(systemsStaging, nextSystems, { flag: 'wx' });
+      fs.renameSync(systemsStaging, systemsPath); systemsStaging = undefined;
+      try { fs.renameSync(staging, registry); } catch (error) { fs.writeFileSync(systemsPath, systemsOriginal); throw error; }
+    } else fs.renameSync(staging, registry);
+    stagingCreated = false;
   } catch (error) {
     for (const file of created.reverse()) fs.unlinkSync(file);
     for (const dir of createdDirs.reverse()) fs.rmdirSync(dir);
@@ -137,13 +157,14 @@ export async function createProduct(options) {
   } finally {
     if (stagingFd !== undefined) fs.closeSync(stagingFd);
     if (stagingCreated) fs.unlinkSync(staging);
+    if (systemsStaging) fs.rmSync(systemsStaging, { force: true });
     fs.closeSync(fd); fs.unlinkSync(lock);
   }
   return [registry, ...[...files.keys()].map((relative) => path.join(app, relative))];
 }
 
 async function main() {
-  const { values } = parseArgs({ options: Object.fromEntries(['key', 'name', 'subdomain', 'page', 'login', 'standalone', 'features', 'config', 'app', 'from-foundry'].map((k) => [k, { type: 'string' }])) });
+  const { values } = parseArgs({ options: Object.fromEntries(['key', 'name', 'subdomain', 'page', 'login', 'standalone', 'features', 'config', 'app', 'registry', 'from-foundry'].map((k) => [k, { type: 'string' }])) });
   // A noninteractive invocation never hangs asking for missing inputs.
   if (process.stdin.isTTY) {
     const foundry = values['from-foundry'] ? readFoundry(path.resolve(values['from-foundry'])) : null;

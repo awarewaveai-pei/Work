@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { checkCommon, report } from '../../../scripts/supervisor-kit/check.mjs';
 import { META, NOW, STEPS, OPEN, COPY } from './data.mjs';
 import { render } from './build.mjs';
@@ -11,6 +12,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../../..');
 const errors = checkCommon({ here, STEPS, OPEN, NOW, COPY, render, fields: ['code', 'group', 'items'] });
 const fail = (m) => errors.push(m);
+
+// Switch to true in the commit that moves this page's state to /ops/systems (systems-migrate-supervisor.mjs). Then data.mjs is read-only.
+const FROZEN = false;
+if (FROZEN && spawnSync('git', ['diff', 'HEAD', '--quiet', '--', path.join(here, 'data.mjs')], { cwd: repo }).status !== 0) fail('已移到 /ops/systems：data.mjs 的狀態不能再改，請在 /ops/systems 更新');
 
 // 計畫 §6 每節（### Cn）＝一個步驟；表格第一欄的卡號＝該步驟 items；計畫不寫狀態。
 const plan = readFileSync(path.join(repo, META.plan), 'utf8');

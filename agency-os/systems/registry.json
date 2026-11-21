@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "shared_paths": [
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/package.json",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/package-lock.json",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/globals.css",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/supabase-server.ts",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts",
+    "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+    "lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/"
+  ],
+  "ignore_paths": ["agency-os/WORKLOG.md", "agency-os/TASKS.md", "agency-os/memory/", "agency-os/reports/"],
+  "systems": [
+    {
+      "id": "8089ea31-fb72-4e1f-ad05-80035f3731e2",
+      "slug": "outbound-os",
+      "name": "外聯系統（Outbound OS）",
+      "aliases": ["outreach", "冷信", "行銷開發信", "outbound-v2"],
+      "type": "product",
+      "purpose": "替你找到客戶：AI 查對方並留證據、產信、信箱輪流自動寄、回信自動進系統並停後續。",
+      "product_key": "outreach",
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/outreach/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/outreach/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/outreach/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/outreach/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/outreach/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/outreach/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/sinks/outreach-research.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/clients/[slug]/OutreachTab.tsx",
+        "lobster-factory/packages/db/migrations/0048_co_outreach_core",
+        "lobster-factory/packages/db/migrations/0149_outbound_v2_expand",
+        "lobster-factory/packages/db/migrations/0152_sender_pool",
+        "lobster-factory/packages/db/migrations/0154_co_leads_meta_source",
+        "lobster-factory/packages/db/migrations/0155_sender_auto_draft",
+        "lobster-factory/packages/db/migrations/0157_sender_test_send",
+        "lobster-factory/packages/db/migrations/0167_ops_incidents_outreach_source",
+        "lobster-factory/packages/db/scripts/0048_co_outreach_core_down.sql",
+        "lobster-factory/packages/db/scripts/0149_outbound_v2_expand_down.sql",
+        "lobster-factory/packages/db/scripts/0152_sender_pool_down.sql",
+        "lobster-factory/packages/db/scripts/0154_co_leads_meta_source_down.sql",
+        "lobster-factory/packages/db/scripts/0167_ops_incidents_outreach_source_down.sql",
+        "lobster-factory/packages/db/tests/test_0152_sender_pool.py",
+        "lobster-factory/packages/db/tests/test_0154_co_leads_meta_source.py",
+        "scripts/outreach-verifier-keys.ps1",
+        "agency-os/handoffs/2026-10-31-outbound-os/",
+        "agency-os/handoffs/2026-11-02-1424-outbound-v2-handoff.md",
+        "agency-os/handoffs/2026-11-03-outbound-v2-handoff.md",
+        "agency-os/handoffs/2026-11-05-outbound-c16-2-handoff.md",
+        "agency-os/docs/Outbound_OS_Engineering_Spec/"
+      ],
+      "phases": [
+        {
+          "id": "37f6c9f3-400d-4ac5-9d8c-c3b3c167779e",
+          "slug": "outbound-v2",
+          "name": "外聯系統 v2（17 張卡）",
+          "legacy_source_path": "agency-os/handoffs/2026-10-31-outbound-os/"
+        }
+      ],
+      "features": [
+        { "id": "b2014070-a4b2-4ab1-a260-75a2fd7cfb41", "slug": "c3-research-evidence", "name": "AI 研究對方並留下有來源的證據", "phase": "outbound-v2" },
+        { "id": "afd4d72f-4a55-44bf-aa7c-bd489ee5a64d", "slug": "c4-reply-sync", "name": "回覆同步與回信頁", "phase": "outbound-v2" },
+        { "id": "6c018ecf-77fb-4b6c-bbb7-b22b77f31ebc", "slug": "c8-auto-send-rotation", "name": "自動寄與信箱輪流寄（量產）", "phase": "outbound-v2" },
+        { "id": "f553b371-7595-4d88-b7cc-45b8271847f1", "slug": "c16-tuning", "name": "自動化調校：抽得準、核得穩、越寫越好", "phase": "outbound-v2" }
+      ]
+    }
+  ]
+}

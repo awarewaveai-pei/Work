@@ -28,8 +28,13 @@ function fixture(t) {
 const demo = ['--key', 'demo', '--name', '示範', '--subdomain', 'demo', '--page', '/demo', '--login', 'local', '--standalone', 'no', '--features', 'demo.run:QUOTA'];
 
 test('direct CLI creates five paths, a fail-closed can point and ten TODO declarations; refuses overwrite', (t) => {
-  const { app, run } = fixture(t);
-  const result = run(demo);
+  const { app, root, run } = fixture(t);
+  const systems = path.join(root, 'registry.json');
+  fs.writeFileSync(systems, JSON.stringify({ version: 1, shared_paths: [], ignore_paths: [], systems: [] }));
+  const result = run([...demo, '--registry', systems]);
+  const planned = JSON.parse(fs.readFileSync(systems, 'utf8')).systems;
+  assert.deepEqual(planned.map((x) => [x.slug, x.product_key, x.type, x.source_paths]), [['demo', 'demo', 'product', []]]);
+  assert.match(planned[0].id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.trim().split(/\r?\n/).length, 5);
   for (const f of result.stdout.trim().split(/\r?\n/)) assert(fs.existsSync(f));
