@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-21（續19）— 合成頁設計圖清單改成跟螢幕一樣高（操作者截圖：只看得到兩排）
+
+[根因] 設計圖清單固定 `maxHeight: 132`（`MockupStudio.tsx` 設計圖區），四個模式共用，一次只看得到兩排。
+[已修改] `maxHeight: max(132px, calc(100vh - 320px))`：填滿螢幕高度，留約 320px 給面板頂、上傳、已選設計與模式鍵，模式鍵仍在第一屏。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/mockup" → 25 passed；npx tsc --noEmit 0 錯 | exit=0 | ms=7000
+- 未實看：本機需登入；03:00 上線後看（產品預設庫展開時模式鍵會被推到第一屏下方，可捲動）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n1 同上：預設庫展開時模式鍵下移）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02；單行樣式改動
+- BUGHUNT_WAIVED: NA -- 單一樣式值，無其他呼叫處（grep maxHeight: 132 hits=0 其他檔）
+[rollback] `git revert <本 commit>`。
 ## 2026-11-21（續18）— 系統總控中心批 3：29 系統盤點、頁面照參考面板改版、6 個已結束監工頁搬入並凍結（操作者：「要,然後有一個面板讓你參考」「可以」）
 
 - 派工：W5 盤點（Opus，`ae2f28a73` `97ddaa9dc`）、W6 頁面改版（Sonnet，`cd2b52d07` `dd22ec024`）；參考面板存 `agency-os/handoffs/2026-11-21-systems-control-center/reference/ops-systems-prototype.html`。原型的下拉、立即更新、新增系統、自帶配色不採用（UI 規則與設計決定）。

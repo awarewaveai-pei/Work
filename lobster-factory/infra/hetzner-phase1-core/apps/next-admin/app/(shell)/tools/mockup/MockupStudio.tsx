@@ -618,7 +618,8 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 onClick={() => setDesignGroup(g)}>{label}</button>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap", maxHeight: 132, overflowY: "auto" }}>
+          {/* As tall as the screen allows; ~320px is left for the panel header, upload, selected design and the mode tabs. */}
+          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap", maxHeight: "max(132px, calc(100vh - 320px))", overflowY: "auto" }}>
             {designs.map((d) => (
               // eslint-disable-next-line @next/next/no-img-element
               <img key={d.id} src={d.object_url!} alt={d.metadata?.prompt ?? d.id}
