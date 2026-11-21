@@ -11,7 +11,7 @@ import { importSummary, PRIORITIES, projectSystem, SYSTEM_STATUSES, type Feature
 import {
   EVENT_LABEL, FEATURE_BADGE, FEATURE_LABEL, formatTime, PRIORITY_LABEL, RESULT_MESSAGES, SOURCE_LABEL, STATUS_BADGE, STATUS_LABEL, TYPE_LABEL,
 } from "@/lib/systems/labels";
-import { buildResumeMarkdown, legacyDone } from "@/lib/systems/overview";
+import { buildResumeMarkdown, legacyDone, progressKind } from "@/lib/systems/overview";
 import { readDefinitions, readImportRuns, readProjectionInput, readRecentEvents } from "@/lib/systems/store";
 import { reviewFeature, setSystemStatus } from "../actions";
 import { CopyBrief } from "../CopyBrief";
@@ -28,6 +28,7 @@ const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px" };
 const row: React.CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--card-border)", fontSize: 13, color: "var(--text-primary)" };
 
 function Overview({ system, p, hist, brief }: { system: SystemRow; p: SystemProjection; hist: ReturnType<typeof legacyDone>; brief: string }) {
+  const kind = progressKind(p);
   const hidden = (
     <>
       <input type="hidden" name="system_id" value={system.id} />
@@ -50,8 +51,8 @@ function Overview({ system, p, hist, brief }: { system: SystemRow; p: SystemProj
         </div>
         <div className="card" style={{ padding: "14px 16px" }}>
           <div className="card-label">有證據驗收</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "var(--accent)" }}>{p.completion === null ? "尚未盤點" : `${Math.round(p.completion * 100)}%`}</div>
-          <div style={muted}>{p.completion === null ? "registry 還沒有功能" : `已驗收 ${p.verified}／${p.counted}，已實作待驗證 ${p.implemented}`}</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "var(--accent-text)" }}>{kind === "number" ? `${Math.round((p.completion ?? 0) * 100)}%` : kind === "legacy" ? "進度在舊監工頁" : "尚未盤點"}</div>
+          <div style={muted}>{kind !== "number" ? (kind === "legacy" ? "功能還在舊監工頁，切換後才在這裡計算" : "registry 還沒有功能") : `已驗收 ${p.verified}／${p.counted}，已實作待驗證 ${p.implemented}`}</div>
         </div>
       </div>
       <h3 style={{ marginBottom: 8 }}>系統狀態</h3>
@@ -201,7 +202,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
         events: state.events,
         history: state.history,
       });
-      hist = legacyDone(state.events);
+      hist = legacyDone(state.events, state.history, new Set(p.features.map((f) => f.feature.id)));
     }
   } catch (e) {
     failure = String(e instanceof Error ? e.message : e);

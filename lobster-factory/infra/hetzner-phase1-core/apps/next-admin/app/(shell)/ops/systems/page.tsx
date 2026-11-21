@@ -9,7 +9,7 @@ import { SYSTEM_TYPES, type SystemType } from "@/lib/systems/contract";
 import { systemsAccess } from "@/lib/systems/access";
 import { projectSystem, SYSTEM_STATUSES, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
 import { formatTime, STATUS_BADGE, STATUS_LABEL, TYPE_LABEL } from "@/lib/systems/labels";
-import { gapBreakdown, overviewCounts, recentHandoffs } from "@/lib/systems/overview";
+import { gapBreakdown, overviewCounts, progressKind, recentHandoffs } from "@/lib/systems/overview";
 import { importSummary } from "@/lib/systems/projection";
 import { readDefinitions, readImportRuns, readProjectionInput } from "@/lib/systems/store";
 import { Refused, errorBox, muted, page } from "./parts";
@@ -45,8 +45,10 @@ function Stat({ title, value, hint }: { title: string; value: number; hint: stri
 }
 
 function Progress({ p }: { p: SystemProjection }) {
-  if (p.completion === null) return <span style={muted}>尚未盤點</span>;
-  const pct = Math.round(p.completion * 100);
+  const kind = progressKind(p);
+  if (kind === "empty") return <span style={muted}>尚未盤點</span>;
+  if (kind === "legacy") return <span style={muted}>進度在舊監工頁</span>;
+  const pct = Math.round((p.completion ?? 0) * 100);
   return (
     <div>
       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>{pct}%・{p.verified}／{p.counted}</div>
@@ -198,7 +200,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
   const shown = rows.filter(({ system, p }) =>
     (!typeFilter || system.type === typeFilter) && (!statusFilter || (statusFilter === "unset" ? p.status === null : p.status === statusFilter))
     && (!needle || [system.name, system.purpose, system.slug, ...(system.aliases ?? [])].some((s) => (s ?? "").toLowerCase().includes(needle))));
-  const counts = overviewCounts(rows.map(({ p }) => ({ status: p.status, counted: p.counted, blocker: p.handoff.blocker, lastActivityAt: p.lastActivityAt })), Date.now());
+  const counts = overviewCounts(rows.map(({ p }) => ({ status: p.status, featureCount: p.features.length, blocker: p.handoff.blocker, lastActivityAt: p.lastActivityAt })), Date.now());
   const keep = (...omit: Array<"type" | "status" | "q">) => ({
     ...(typeFilter && !omit.includes("type") ? { type: typeFilter } : {}),
     ...(statusFilter && !omit.includes("status") ? { status: statusFilter } : {}),

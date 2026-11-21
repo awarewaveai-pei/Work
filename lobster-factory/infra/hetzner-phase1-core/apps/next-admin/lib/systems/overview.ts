@@ -1,19 +1,19 @@
 // Pure helpers for the /ops/systems overview and detail pages (no I/O, no clock reads: `now` is passed in).
-import { chronological, type SystemProjection, type UpdateRow } from "./projection";
+import { chronological, liveEvents, type SystemProjection, type UpdateRow } from "./projection";
 
 export const STALL_DAYS = 30;
 
-export interface CountInput { status: SystemProjection["status"]; counted: number; blocker: string | null; lastActivityAt: string | null }
+export interface CountInput { status: SystemProjection["status"]; featureCount: number; blocker: string | null; lastActivityAt: string | null }
 export interface OverviewCounts { total: number; active: number; needsAttention: number; wrapped: number }
 
 /** Four stat cards. 待確認 = still moving (not done / archived / paused) and either blocked, not inventoried yet
- *  (no countable features) or silent for STALL_DAYS. 維護與已完成 = done + archived. */
+ *  (registry lists no features at all; features still on an old supervisor page count as inventoried) or silent for STALL_DAYS. 維護與已完成 = done + archived. */
 export function overviewCounts(rows: readonly CountInput[], now: number): OverviewCounts {
   const stallMs = STALL_DAYS * 86400000;
   const attention = (r: CountInput) => {
     if (r.status === "done" || r.status === "archived" || r.status === "paused") return false;
     if (r.blocker) return true;
-    if (r.counted === 0) return true;
+    if (r.featureCount === 0) return true;
     const at = r.lastActivityAt ? Date.parse(r.lastActivityAt) : NaN;
     return !Number.isFinite(at) || now - at > stallMs;
   };
@@ -45,10 +45,18 @@ export function gapBreakdown(runs: readonly UpdateRow[]): Array<{ key: string; l
   return Object.entries(GAP_LABEL).map(([key, label]) => ({ key, label, count: Array.isArray(gaps[key]) ? (gaps[key] as unknown[]).length : 0 }));
 }
 
-/** 歷史標示完成 = migrated features whose old supervisor page said done, ÷ migrated features. null = nothing migrated. */
-export function legacyDone(events: readonly UpdateRow[]): { done: number; total: number; ratio: number | null } {
+/** What the 進度 cell says: a number, 尚未盤點 (registry lists no features) or 進度在舊監工頁 (every feature still lives there). */
+export function progressKind(p: { features: ReadonlyArray<{ legacy: boolean }>; counted: number }): "number" | "empty" | "legacy" {
+  if (p.features.length === 0) return "empty";
+  if (p.counted > 0) return "number";
+  return p.features.some((f) => f.legacy) ? "legacy" : "empty";
+}
+
+/** 歷史標示完成 = migrated features whose old supervisor page said done, ÷ migrated features. null = nothing migrated.
+ *  Reverted / orphaned commits do not count (liveEvents) and only features still in the registry (`featureIds`) do. */
+export function legacyDone(events: readonly UpdateRow[], history: readonly UpdateRow[], featureIds: ReadonlySet<string>): { done: number; total: number; ratio: number | null } {
   const latest = new Map<string, UpdateRow>();
-  for (const e of chronological(events)) if (e.event_type === "migration" && e.feature_id) latest.set(e.feature_id, e);
+  for (const e of chronological(liveEvents(events, history))) if (e.event_type === "migration" && e.feature_id && featureIds.has(e.feature_id)) latest.set(e.feature_id, e);
   const total = latest.size;
   const done = [...latest.values()].filter((e) => e.payload.legacy_status === "done").length;
   return { done, total, ratio: total ? done / total : null };
@@ -57,7 +65,7 @@ export function legacyDone(events: readonly UpdateRow[]): { done: number; total:
 /** One line of user-controlled text made safe to drop into Markdown: one line, no markup-active characters. */
 export function mdInline(v: unknown): string {
   const s = String(v ?? "").replace(/\s+/g, " ").trim();
-  return s.replace(/[\\`*_[\]<>|]/g, (c) => `\\${c}`).replace(/^([#+\-]|\d+\.)/, "\\$1");
+  return s.replace(/[\\`*_~[\]<>|]/g, (c) => `\\${c}`).replace(/^([#+\-]|\d+\.)/, "\\$1");
 }
 
 export interface BriefInput {

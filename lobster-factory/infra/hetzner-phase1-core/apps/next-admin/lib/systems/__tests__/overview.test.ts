@@ -1,21 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { buildResumeMarkdown, mdInline, overviewCounts, recentHandoffs, type BriefInput } from "../overview";
+import type { UpdateRow } from "../projection";
+import { buildResumeMarkdown, legacyDone, mdInline, overviewCounts, progressKind, recentHandoffs, type BriefInput } from "../overview";
 
 const NOW = Date.parse("2026-11-21T00:00:00Z");
-const row = (o: Partial<Parameters<typeof overviewCounts>[0][number]> = {}) => ({ status: "active" as const, counted: 3, blocker: null, lastActivityAt: "2026-11-20T00:00:00Z", ...o });
+const row = (o: Partial<Parameters<typeof overviewCounts>[0][number]> = {}) => ({ status: "active" as const, featureCount: 3, blocker: null, lastActivityAt: "2026-11-20T00:00:00Z", ...o });
 
 describe("overviewCounts", () => {
   it("counts total / active / needs attention / wrapped; paused, done and archived never need attention", () => {
     const c = overviewCounts([
       row(),
       row({ blocker: "waiting" }),
-      row({ counted: 0 }),
+      row({ featureCount: 0 }),
       row({ status: null, lastActivityAt: "2026-09-01T00:00:00Z" }),
       row({ status: "paused", blocker: "x" }),
-      row({ status: "done", counted: 0 }),
+      row({ status: "done", featureCount: 0 }),
       row({ status: "archived" }),
     ], NOW);
     expect(c).toEqual({ total: 7, active: 3, needsAttention: 3, wrapped: 2 });
+  });
+});
+
+describe("progressKind", () => {
+  it("empty without features, legacy when every feature is still on the old page, number otherwise", () => {
+    expect(progressKind({ features: [], counted: 0 })).toBe("empty");
+    expect(progressKind({ features: [{ legacy: true }, { legacy: true }], counted: 0 })).toBe("legacy");
+    expect(progressKind({ features: [{ legacy: true }, { legacy: false }], counted: 1 })).toBe("number");
+    expect(progressKind({ features: [{ legacy: false }], counted: 0 })).toBe("empty");
+  });
+  it("a system whose features are all on the old page is not flagged as uninventoried", () => {
+    expect(overviewCounts([row({ featureCount: 2 })], NOW).needsAttention).toBe(0);
+  });
+});
+
+describe("legacyDone", () => {
+  let n = 0;
+  const mig = (fid: string, legacy: string, sha: string | null): UpdateRow => ({ id: `m${++n}`, event_key: `mk${n}`, system_id: "s", phase_id: null, feature_id: fid, event_type: "migration", source: "migration", commit_sha: sha, occurred_at: "2026-11-01T00:00:00Z", payload: { legacy_status: legacy, mapped_status: "implemented" } });
+  const revert = (sha: string, of: string): UpdateRow => ({ id: `r${++n}`, event_key: `rk${n}`, system_id: null, phase_id: null, feature_id: null, event_type: "revert", source: "importer", commit_sha: sha, occurred_at: "2026-11-02T00:00:00Z", payload: { reverted_sha: of } });
+  it("counts done / migrated, but not a reverted commit's migration nor a feature gone from the registry", () => {
+    const events = [mig("a", "done", "c1"), mig("b", "todo", "c2"), mig("c", "done", "c3"), mig("gone", "done", "c4")];
+    const r = legacyDone(events, [revert("c9", "c3")], new Set(["a", "b", "c"]));
+    expect(r).toEqual({ done: 1, total: 2, ratio: 0.5 });
+    expect(legacyDone([], [], new Set()).ratio).toBeNull();
   });
 });
 
@@ -60,6 +85,7 @@ describe("buildResumeMarkdown", () => {
   });
   it("neutralises markup and newlines in user-controlled text", () => {
     expect(mdInline("# head\n- item `x` <b>")).toBe("\\# head - item \\`x\\` \\<b\\>");
+    expect(mdInline("~~~js")).toBe("\\~\\~\\~js");
     const md = buildResumeMarkdown({ ...base, next: "line1\n## 注入\n```", features: [{ name: "a\n## b", status: "verified", legacy: false }] });
     expect(md).not.toMatch(/^## 注入/m);
     expect(md).not.toMatch(/^## b/m);
