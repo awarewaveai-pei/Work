@@ -233,6 +233,8 @@
     "three": "三張(過去/現在/未來)",
     "celtic": "凱爾特十字",
     "relations": "牌間關係",
+    "daily": "每日一牌",
+    "dailyHint": "同一天固定同一張牌",
     "draw": "抽牌",
     "topic": "主題",
     "upright": "正位",

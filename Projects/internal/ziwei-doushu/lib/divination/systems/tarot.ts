@@ -1,4 +1,5 @@
 import {
+  drawDaily,
   drawSpread,
   SPREADS,
   TOPICS,
@@ -7,6 +8,7 @@ import {
   type TarotTopic,
 } from '@/lib/tarot';
 import { computeTarotRelations, describeRelations } from '@/lib/tarotRelations';
+import type { Ymd } from '@/lib/dates';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
 
@@ -14,7 +16,9 @@ export interface TarotInput {
   spread: SpreadId;
   /** 情境化卡義主題(感情/事業/…);不給為綜合 */
   topic?: TarotTopic;
-  /** 可注入亂數源以利測試;預設 Math.random */
+  /** 每日一牌:帶當天本地日期,同日同牌(忽略 spread / rng) */
+  daily?: Ymd;
+  /** 可注入亂數源以利測試;預設密碼學亂數 */
   rng?: () => number;
 }
 
@@ -38,6 +42,10 @@ export function toContext(
   const facts: { label: string; value: string }[] = [
     { label: 'spread', value: spread.name[locale] },
   ];
+  if (r.daily) {
+    const { year, month, day } = r.daily;
+    facts.push({ label: 'mode', value: `${locale === 'en' ? 'Card of the day' : '每日一牌'} ${year}-${month}-${day}` });
+  }
   if (topic) facts.push({ label: 'topic', value: TOPICS[topic][locale] });
   r.cards.forEach((d, i) => {
     facts.push({
@@ -53,7 +61,7 @@ export function toContext(
   return {
     systemId: 'tarot',
     locale,
-    headline: `${spread.name[locale]}${topic ? ` · ${TOPICS[topic][locale]}` : ''}`,
+    headline: `${r.daily ? (locale === 'en' ? 'Card of the day' : '每日一牌') : spread.name[locale]}${topic ? ` · ${TOPICS[topic][locale]}` : ''}`,
     facts,
   };
 }
@@ -61,7 +69,7 @@ export function toContext(
 export const tarotSystem: DivinationSystem<TarotInput, TarotResult> = {
   meta: { id: 'tarot', kind: 'draw', requiresApiKey: false },
   async compute(input, locale) {
-    const data = drawSpread(input.spread, input.rng);
+    const data = input.daily ? drawDaily(input.daily) : drawSpread(input.spread, input.rng);
     return { data, context: toContext(data, locale, input.topic) };
   },
 };

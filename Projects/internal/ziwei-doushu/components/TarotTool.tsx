@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import AiReading from '@/components/AiReading';
 import {
+  drawDaily,
   drawSpread,
   SPREADS,
+  SPREAD_GROUPS,
   TOPICS,
   type TarotResult,
   type SpreadId,
@@ -15,7 +17,6 @@ import { computeTarotRelations, describeRelations } from '@/lib/tarotRelations';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
-const SPREAD_IDS = Object.keys(SPREADS) as SpreadId[];
 const TOPIC_IDS = Object.keys(TOPICS) as TarotTopic[];
 
 export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: Locale }) {
@@ -35,18 +36,27 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
           <span className="label-dark" style={{ display: 'block', marginBottom: '0.5rem' }}>
             {t.spread}
           </span>
-          <div role="group" aria-label={t.spread} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-            {SPREAD_IDS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={spread === id}
-                onClick={() => setSpread(id)}
-                className={spread === id ? 'btn-gold' : 'btn-violet'}
-                style={{ width: 'auto' }}
-              >
-                {SPREADS[id].name[locale]}
-              </button>
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            {SPREAD_GROUPS.map((g) => (
+              <div key={g.id}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--gold-400)', marginBottom: '0.35rem' }}>
+                  {g.name[locale]}
+                </div>
+                <div role="group" aria-label={g.name[locale]} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {g.spreads.map((sp) => (
+                    <button
+                      key={sp.id}
+                      type="button"
+                      aria-pressed={spread === sp.id}
+                      onClick={() => setSpread(sp.id)}
+                      className={spread === sp.id ? 'btn-gold' : 'btn-violet'}
+                      style={{ width: 'auto' }}
+                    >
+                      {sp.name[locale]}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -71,9 +81,15 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
           </div>
         </div>
 
-        <button onClick={() => setResult(drawSpread(spread))} className="btn-gold" style={{ justifySelf: 'start' }}>
-          {t.draw}
-        </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
+          <button onClick={() => setResult(drawSpread(spread))} className="btn-gold" style={{ width: 'auto' }}>
+            {t.draw}
+          </button>
+          <button onClick={() => setResult(drawDaily())} className="btn-violet" style={{ width: 'auto' }}>
+            {t.daily}
+          </button>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-caption)' }}>{t.dailyHint}</span>
+        </div>
       </div>
 
       {result ? (

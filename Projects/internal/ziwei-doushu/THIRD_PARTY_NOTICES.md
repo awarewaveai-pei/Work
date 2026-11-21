@@ -20,6 +20,18 @@
 - 授權：MIT License，Copyright (c) 2026 I Ching Oracle；所含《周易》卦爻辭為古文，屬公有領域
 - 採用範圍：`src/data/classic.ts` 的 64 卦卦辭、384 爻辭與用九用六中文原文，轉為繁體並與 ichingpy、ichingshifa 逐條校對改正後收於 `lib/iching/text.ts`；未採用其英文關鍵詞。變爻讀法（`lib/iching/reading.ts`）為本專案依朱熹《易學啟蒙》自行實作，未複製原始碼。
 
+## tarot-mcp
+
+- 來源：https://github.com/fzlzjerry/tarot-mcp
+- 授權：MIT License，Copyright (c) 2024 Morax
+- 採用範圍：`src/tarot/readings/spreads.ts` 的牌陣種類與牌位構想（愛情、事業、靈性、脈輪、曼陀羅、生命之樹、年度、十二宮位等），牌陣名稱與牌位文字為本站自寫繁中／英文，收於 `lib/tarot.ts`；亂數的拒絕取樣做法參考 `src/tarot/shared/utils.ts`，程式為本專案以 TypeScript 重寫，未複製原始碼。
+
+## anois_tarot
+
+- 來源：https://github.com/anois/tarot
+- 授權：MIT License，Copyright (c) 2026 anois
+- 採用範圍：`src/spreads/builtins.ts` 的牌陣種類與牌位構想（二選一、是非澄清、桃花、正緣、復合、曖昧、事業與財運全景等），牌位文字為本站自寫；未採用其英文牌義與牌圖座標；亂數取樣做法參考 `src/mechanics/rng.ts`，程式為本專案重寫。
+
 ## MIT License 全文（上列專案共用）
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:

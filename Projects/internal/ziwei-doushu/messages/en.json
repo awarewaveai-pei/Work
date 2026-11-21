@@ -233,6 +233,8 @@
     "three": "Three cards (past/present/future)",
     "celtic": "Celtic Cross",
     "relations": "Card relationships",
+    "daily": "Card of the day",
+    "dailyHint": "Same card all day, every time",
     "draw": "Draw",
     "topic": "Topic",
     "upright": "Upright",

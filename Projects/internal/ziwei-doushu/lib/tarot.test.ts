@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TAROT_DECK, drawCards, drawSpread, SPREADS } from './tarot';
+import { TAROT_DECK, drawCards, drawSpread, dailyCard, secureInt, SPREADS, SPREAD_GROUPS } from './tarot';
 import type { SpreadId } from './tarot';
 import { tarotSystem, toContext } from './divination/systems/tarot';
 
@@ -56,6 +56,14 @@ describe('牌陣定義 SPREADS', () => {
     }
   });
 
+  it('id 不重複,且每個牌陣都在某個分組裡恰好一次', () => {
+    const ids = Object.keys(SPREADS);
+    expect(ids.length).toBeGreaterThanOrEqual(40);
+    const grouped = SPREAD_GROUPS.flatMap((g) => g.spreads.map((s) => s.id));
+    expect(grouped).toHaveLength(ids.length);
+    expect(new Set(grouped).size).toBe(ids.length);
+  });
+
   it('新增三牌陣:鑽石 5 / 月相 4 / 馬蹄 7', () => {
     expect(SPREADS.diamond.size).toBe(5);
     expect(SPREADS.moon.size).toBe(4);
@@ -92,5 +100,42 @@ describe('塔羅系統 adapter — 牌位 + 情境', () => {
     const r = drawSpread('single', () => 0.9);
     const ctx = toContext(r, 'zh-TW');
     expect(ctx.facts.some((f) => f.label === 'topic')).toBe(false);
+  });
+});
+
+describe('密碼學亂數', () => {
+  it('secureInt 落在 [0,n),n=1 恆為 0,越界丟錯', () => {
+    for (let i = 0; i < 200; i++) expect(secureInt(78)).toBeLessThan(78);
+    expect(secureInt(1)).toBe(0);
+    expect(() => secureInt(0)).toThrow();
+  });
+
+  it('預設抽牌(不注入 rng)不放回、張數正確', () => {
+    const r = drawCards(10);
+    expect(new Set(r.map((d) => d.card.id)).size).toBe(10);
+  });
+});
+
+describe('每日一牌', () => {
+  it('同一本地日期固定同一張牌與正逆位', () => {
+    const d = { year: 2026, month: 11, day: 21 };
+    expect(dailyCard(d)).toEqual(dailyCard({ ...d }));
+  });
+
+  it('連續 30 天不全相同', () => {
+    const keys = new Set<string>();
+    for (let day = 1; day <= 30; day++) {
+      const c = dailyCard({ year: 2026, month: 11, day });
+      keys.add(`${c.card.id}:${c.reversed}`);
+    }
+    expect(keys.size).toBeGreaterThan(1);
+  });
+
+  it('adapter:facts 標明每日一牌與日期', async () => {
+    const { context } = await tarotSystem.compute(
+      { spread: 'single', daily: { year: 2026, month: 11, day: 21 } },
+      'zh-TW',
+    );
+    expect(context.facts.find((f) => f.label === 'mode')?.value).toBe('每日一牌 2026-11-21');
   });
 });
