@@ -13,7 +13,7 @@ const row = (siteId: string, orgName: string, failed = 0) => ({
 });
 const overview = { rows: [row("s1", "甲", 2), row("s2", "乙")], cells: {}, actual: {}, spendNote: null } as unknown as OverviewData;
 /** Stands in for OrgPicker: one button per client, named as the page hands it over. */
-const picker: ClientPickerSlot = ({ orgs, onPick }) => <div>{orgs.map((o) => <button key={o.id} type="button" onClick={() => onPick(o)}>{o.name}</button>)}</div>;
+const picker: ClientPickerSlot = ({ orgs, onPick, badge }) => <div>{orgs.map((o) => <button key={o.id} type="button" onClick={() => onPick(o)}>{o.name}{badge(o)}</button>)}</div>;
 
 function stubFetch() {
   const site = (id: string) => ({ id, name: id, url: "https://x.example", organization_id: `o-${id}`, org_slug: id, contentDefaults: {} });
@@ -42,7 +42,7 @@ describe("TopicsBoard views", () => {
     expect(clients()).toBeTruthy();
     expect(steps()).toBeNull();
     expect(topicList()).toBeNull();
-    expect(screen.getByRole("button", { name: "甲（失敗 2）" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^甲.*失敗 2$/ })).toBeTruthy();   // the problem is the picker badge
     expect(screen.queryByText("乙 網站")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "乙" }));
     expect(screen.getByRole("link", { name: "看這個網站的題目" }).getAttribute("href")).toBe("/tools/content/topics?site=s2");

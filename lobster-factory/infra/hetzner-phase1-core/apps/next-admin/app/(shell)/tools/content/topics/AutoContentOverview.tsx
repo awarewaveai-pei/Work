@@ -43,7 +43,7 @@ export const topicsSiteHref = (base: string, siteId: string) => `${base}?site=${
 
 /** Staff only: the shared client picker (search + one row per client, OrgPicker.tsx), handed in by StaffTopicsBoard so a
  *  door page never imports an /api/ops caller. A door holds one client and gets none. */
-export type ClientPickerSlot = (p: { orgs: PickOrg[]; total: number; selected: string | null; onPick: (org: PickOrg | null) => void }) => ReactNode;
+export type ClientPickerSlot = (p: { orgs: PickOrg[]; total: number; selected: string | null; onPick: (org: PickOrg | null) => void; badge: (org: PickOrg) => ReactNode; hint: ReactNode }) => ReactNode;
 
 /** What is wrong with a client's sites, as its picker name says it (the old table's problems-first job); null = nothing. */
 function problemTag(rows: OverviewRow[]): string | null {
@@ -67,15 +67,20 @@ export function ClientOverview({ rows, note, siteId, picker }: { rows: OverviewR
   const [orgId, setOrgId] = useState(rows.find((r) => r.siteId === siteId)?.organizationId ?? rows[0]?.organizationId ?? null);
   const byOrg = new Map<string, OverviewRow[]>();
   for (const r of rows) byOrg.set(r.organizationId, [...(byOrg.get(r.organizationId) ?? []), r]);
-  const orgs: PickOrg[] = [...byOrg.entries()].map(([id, rs]) => {
+  const orgs: PickOrg[] = [...byOrg.entries()].map(([id, rs]) => ({ id, slug: id, name: rs[0].orgName, color: "var(--text-muted)", brandColors: [] }));
+  // the problem mark, on the first page and on search results alike (OrgPicker badge); a client with no site here says so
+  const badge = (o: PickOrg) => {
+    const rs = byOrg.get(o.id);
+    if (!rs) return <span style={muted}>沒有網站</span>;
     const tag = problemTag(rs);
-    return { id, slug: id, name: tag ? `${rs[0].orgName}（${tag}）` : rs[0].orgName, color: tag ? "var(--red)" : "var(--text-muted)", brandColors: [] };
-  });
+    return tag ? <span style={{ color: "var(--red)" }}>● {tag}</span> : null;
+  };
+  const hint = `共 ${orgs.length} 個客戶，有問題的排前面；其他請用上面的搜尋。`;
   const shown = picker ? (orgId ? byOrg.get(orgId) ?? [] : []) : rows;
   return (
     <section style={{ display: "grid", gap: 12 }} aria-label={T.heading}>
       {note && <div style={{ ...muted, color: "var(--yellow)" }}>{note}</div>}
-      {picker?.({ orgs: firstPage(orgs, orgId), total: orgs.length, selected: orgId, onPick: (o) => setOrgId(o?.id ?? null) })}
+      {picker?.({ orgs: firstPage(orgs, orgId), total: orgs.length, selected: orgId, onPick: (o) => setOrgId(o?.id ?? null), badge, hint })}
       {picker && orgId && !shown.length && <p style={{ margin: 0, color: "var(--text-muted)" }}>{T.noSite}</p>}
       {shown.map((r) => {
         const cell = (i: number, v: ReactNode, color?: string) => (

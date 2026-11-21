@@ -47,7 +47,7 @@ it("filters by lane (an old October proposal is 過期), and a row's one button 
 
 it("an empty queue names the client it is empty for", async () => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => Response.json(url.includes("bootstrap")
-    ? { ok: true, organizations: [{ id: "other", name: "別家" }, { id: "org", name: "Soulful Expression Art Therapy" }] } : { items: [] })));
+    ? { ok: true, orgs: [{ id: "other", name: "別家" }, { id: "org", name: "Soulful Expression Art Therapy" }] } : { items: [] })));
   render(<ScheduleWorkbench settingsHref={null} />);
   expect(await screen.findByText("Soulful Expression Art Therapy 目前沒有題目。要看別的客戶，從左上角「客戶：…」換。")).toBeTruthy();
 });

@@ -19,7 +19,9 @@ const CLIENT_LISTS: readonly RegExp[] = [
 
 /** Files that get a client list without being a picker, one reason each. Empty today: shrink, never grow it to quiet
  *  the test -- a new entry needs a reason a reviewer can check. */
-const NOT_A_PICKER: Readonly<Record<string, string>> = {};
+const NOT_A_PICKER: Readonly<Record<string, string>> = {
+  "app/video/(wb)/schedule/ScheduleWorkbench.tsx": "reads the current client's name for the empty-queue line (?first=1&include=); draws no menu",
+};
 
 /** The source's tokens without comments (a comment may name a route): the parsed tree's leaves, so a "/*" inside a
  *  string or regex stays what it is; JSDoc nodes are skipped. Joined with a space; the patterns allow it. */

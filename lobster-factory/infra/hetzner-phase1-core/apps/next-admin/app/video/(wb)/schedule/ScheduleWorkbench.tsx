@@ -39,12 +39,12 @@ export async function adoptTopic(workbench: Workbench, id: string, org: string) 
   return workbench.spine.create({ title: item.title, ratio: String(item.formats?.[0] || "16x9").replace("x", ":"), shots, characters: [], sourceProjectId: id });
 }
 
-/** The workbench client's name from the same list its 「客戶：…」 switch reads (GET /api/video/workbench/bootstrap); null
- *  when it cannot be read -- the empty-queue line then says 這個客戶. */
+/** The workbench client's name: bootstrap's first page with that client included (?first=1&include=, never the whole
+ *  list); null when it cannot be read -- the empty-queue line then says 這個客戶. */
 async function orgNameOf(organizationId: string): Promise<string | null> {
   try {
-    const res = await fetch("/api/video/workbench/bootstrap", { credentials: "same-origin" });
-    const orgs = res.ok ? ((await res.json()).organizations as Array<{ id: string; name?: string }> | undefined) : undefined;
+    const res = await fetch(`/api/video/workbench/bootstrap?first=1&include=${encodeURIComponent(organizationId)}`, { credentials: "same-origin" });
+    const orgs = res.ok ? ((await res.json()).orgs as Array<{ id: string; name?: string }> | undefined) : undefined;
     return orgs?.find((o) => o.id === organizationId)?.name || null;
   } catch { return null; }
 }

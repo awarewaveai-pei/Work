@@ -8,6 +8,6 @@ import type { OverviewData } from "@/lib/content/topics/overview-load";
 import { TopicsBoard, type TopicsView } from "./TopicsBoard";
 
 export function StaffTopicsBoard({ overview, canSchedule, view }: { overview: OverviewData; canSchedule: boolean; view: TopicsView }) {
-  return <TopicsBoard overview={overview} view={view} pickClient={(p) => <OrgPicker {...p} by="id" />}
+  return <TopicsBoard overview={overview} view={view} pickClient={(p) => <OrgPicker {...p} by="id" searchPath="/api/ops/org-search" />}
     scheduleFor={canSchedule ? (slug) => <ScheduleTable only={slug} jobOnly="content_pipeline" /> : undefined} />;
 }

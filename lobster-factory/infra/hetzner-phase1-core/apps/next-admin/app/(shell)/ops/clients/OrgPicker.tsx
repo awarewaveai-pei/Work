@@ -58,11 +58,12 @@ function rowStyle(on: boolean, disabled = false): React.CSSProperties {
   };
 }
 
-function RowBody({ org }: { org: PickOrg }) {
+function RowBody({ org, badge }: { org: PickOrg; badge?: ReactNode }) {
   return (
     <>
       <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: org.color, flexShrink: 0 }} />
       <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{org.name}</span>
+      {badge != null && badge !== false && <span style={{ flexShrink: 0, fontSize: 11 }}>{badge}</span>}
     </>
   );
 }
@@ -90,9 +91,14 @@ export interface OrgPickerProps {
   fill?: boolean;
   /** Every row and the search box disabled (a caller mid-work that must not switch client). */
   disabled?: boolean;
+  /** A mark after a client's name, on first-page rows and search results alike (e.g. the 客戶 page's problems). */
+  badge?(org: PickOrg): ReactNode;
+  /** The line under a first page shorter than `total`, when the caller orders the page itself (e.g. problems first);
+   *  default: the first NAV_FIRST by age, the rest by search. */
+  hint?: ReactNode;
 }
 
-export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor, none, filter, searchPath, searchable = true, fill = false, disabled = false }: OrgPickerProps) {
+export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor, none, filter, searchPath, searchable = true, fill = false, disabled = false, badge, hint }: OrgPickerProps) {
   const [search, setSearch] = useState("");
   const { found, failed } = useOrgSearch(searchable ? search : "", searchPath, filter);
   // a client picked from search results stays on screen once the search box is cleared
@@ -135,11 +141,11 @@ export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor,
           const on = org[by] === selected;
           return hrefFor ? (
             <Link key={org.id || org.slug} href={hrefFor(org)} aria-current={on ? "page" : undefined} style={rowStyle(on)}>
-              <RowBody org={org} />
+              <RowBody org={org} badge={badge?.(org)} />
             </Link>
           ) : (
             <button key={org.id} type="button" aria-pressed={on} disabled={disabled} onClick={() => pick(org)} style={rowStyle(on, disabled)}>
-              <RowBody org={org} />
+              <RowBody org={org} badge={badge?.(org)} />
             </button>
           );
         })}
@@ -147,7 +153,7 @@ export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor,
           <div style={note}>{failed ? "搜尋失敗，請再試一次" : search.trim() ? "無符合的客戶" : "尚無客戶"}</div>
         )}
         {found === null && total > orgs.length && (
-          <div style={note}>共 {total.toLocaleString("zh-TW")} 個客戶，這裡列最早的 {NAV_FIRST} 個；其他請用上面的搜尋。</div>
+          <div style={note}>{hint ?? <>共 {total.toLocaleString("zh-TW")} 個客戶，這裡列最早的 {NAV_FIRST} 個；其他請用上面的搜尋。</>}</div>
         )}
         {found !== null && found.length >= NAV_SEARCH_LIMIT && (
           <div style={note}>只列前 {NAV_SEARCH_LIMIT} 個符合的，請打得更完整。</div>
