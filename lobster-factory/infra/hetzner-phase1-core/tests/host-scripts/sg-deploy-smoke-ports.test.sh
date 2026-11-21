@@ -117,6 +117,9 @@ t_oracle_smoke_probes_the_public_api() {
   local block
   block="$(awk '/^if \[\[ " \$\{APPS\[\*\]\} " =~ " oracle-web " \]\]; then$/,/^fi$/' "$SG_DEPLOY")"
   check "oracle-web: smoke block probes /api/v1/systems on the resolved port"     grep -qF '_smoke_check "oracle-web api v1" "http://127.0.0.1:${oracle_port}/api/v1/systems"' <<< "$block"
+  # X2 (2026-11-21): MCP initialize is POSTed, so a deploy that breaks /api/mcp fails the smoke.
+  check "oracle-web: smoke block POSTs an MCP initialize on the resolved port"     grep -qF '_smoke_check "oracle-web mcp" "http://127.0.0.1:${oracle_port}/api/mcp" "" "" '"'"'{"jsonrpc":"2.0","id":1,"method":"initialize"' <<< "$block"
+  check "_smoke_check: optional 5th arg turns the probe into a JSON POST"     grep -qF 'curl_args+=(-X POST -H "Content-Type: application/json"' "$SG_DEPLOY"
 }
 
 main() {

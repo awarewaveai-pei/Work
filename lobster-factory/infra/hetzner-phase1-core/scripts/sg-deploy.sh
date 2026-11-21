@@ -673,9 +673,13 @@ _smoke_expect_status() {
   else log "  SMOKE_WARN: $label -> $http (expected $want)"; _smoke_errors=$((_smoke_errors + 1)); fi
 }
 _smoke_check() {
-  local label="$1" url="$2" host_header="${3:-}" resolve_host="${4:-}"
+  local label="$1" url="$2" host_header="${3:-}" resolve_host="${4:-}" post_json="${5:-}"
   local http
   local -a curl_args=(-s --max-time 5 -o /dev/null -w "%{http_code}")
+  # Optional 5th arg: POST this JSON body instead of a GET (oracle MCP initialize, X2 2026-11-21).
+  if [[ -n "$post_json" ]]; then
+    curl_args+=(-X POST -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" --data "$post_json")
+  fi
   if [[ -n "$resolve_host" ]]; then
     # Critic finding (2026-08-29, Major): an earlier version of this probe used `-L` to follow
     # WordPress's forced http->https redirect. Following it means curl re-resolves the hostname
@@ -784,6 +788,7 @@ if [[ " ${APPS[*]} " =~ " oracle-web " ]]; then
   _smoke_check "oracle-web health" "http://127.0.0.1:${oracle_port}/api/health"
   _smoke_check "oracle-web /zh-TW" "http://127.0.0.1:${oracle_port}/zh-TW"
   _smoke_check "oracle-web api v1" "http://127.0.0.1:${oracle_port}/api/v1/systems"
+  _smoke_check "oracle-web mcp" "http://127.0.0.1:${oracle_port}/api/mcp" "" "" '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"sg-deploy-smoke","version":"1"}}}'
   _smoke_check "nginx/oracle"      "https://oracle.aware-wave.com/api/health" "" "oracle.aware-wave.com"
 fi
 

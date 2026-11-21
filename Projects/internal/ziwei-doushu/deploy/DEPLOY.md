@@ -35,6 +35,18 @@ AI 解讀：`POST /api/interpret`，body `{ tier: "light", context: { systemId, 
 - 新增系統：實作 `DivinationSystem`（含 `input` 規格）並在 `lib/divination/index.ts` 註冊，REST 與文件自動出現。
 - 部署煙霧測試含 `/api/v1/systems`（`sg-deploy.sh` oracle-web 段）。
 
+## MCP 端點（AI 助理工具）
+- 網址：`https://oracle.aware-wave.com/api/mcp`，MCP Streamable HTTP、無狀態、無需金鑰。在 Claude／ChatGPT 等加「自訂連接器／遠端 MCP 伺服器」填此網址即可。
+- 工具：每個已註冊系統一個（名稱＝系統 id，參數＝ v1 的 `input` 欄位攤平＋選填 `locale`），外加 `list_systems`（各系統範例輸入）。工具與 JSON Schema 由 `lib/divination/input.ts` 的規格轉出（`lib/mcp/schema.ts`），新增系統自動出現。
+- 回傳：`content` 一段事實純文字（`lib/mcp/text.ts`）＋ `structuredContent: { data, context }`；只給確定性結果，不含 AI 解讀。輸入錯誤回 `isError: true` 並逐項列出。
+- 協定：手寫最小集合（`initialize`、`ping`、`tools/list`、`tools/call`），版本 2025-11-25／2025-06-18／2025-03-26；不開 SSE（GET／DELETE 回 405）；帶 `Origin` 必須同源，否則 403。
+- 限流沿用 v1 額度（每來源每分鐘 60 次，另計 `mcp`）；body 上限同 v1。
+- 部署煙霧測試 POST 一次 `initialize`（`sg-deploy.sh` oracle-web 段）。手動驗：
+```bash
+curl -s https://oracle.aware-wave.com/api/mcp -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | head -c 300
+```
+
 ## 注意
 - `NEXT_PUBLIC_*` 在 build 時內嵌；網域預設值在 `lib/site.ts`。
 - 付費牆：`/api/interpret` 的 `premium` 回 402；`light`／`deep` 放行；每日次數計量未接。
