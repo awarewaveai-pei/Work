@@ -17,8 +17,8 @@ Settings (environment first, else a plain read of SYSTEMS_ENV_FILE -- never sour
   SYSTEMS_INGEST_TOKEN    bearer token for the route (sent in a header, never on a command line)
   SYSTEMS_INGEST_URL      default http://127.0.0.1:3002/api/internal/systems/ingest
 Exit 0 = imported / up to date / disabled; 1 = history diverged or a POST failed; 2 = could not run.
-History diverged (previous_head is not an ancestor of HEAD, e.g. a force push): only the import_run event is sent,
-the state is kept, and every run reports it until someone deletes the state file (= re-import the last 90 days;
+History diverged (previous_head is not an ancestor of HEAD, e.g. a force push): one orphaned event per commit that
+left main plus the import_run event are sent, nothing new is imported, the state is kept, and every run reports it until someone deletes the state file (= re-import the last 90 days;
 the route skips events it already has).
 Trailers come from %(trailers:only,unfold) in the one `git log` call: the same parser as `git interpret-trailers
 --parse`, without one process per commit (a first run walks ~4000 commits within the 300 s limit).
@@ -44,6 +44,9 @@ PRODUCTS_PATH = "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/p
 SUPERVISOR_RE = re.compile(r"^(agency-os/handoffs/[^/]+)/data\.mjs$")
 REVERT_RE = re.compile(r"^This reverts commit ([0-9a-f]{40})\b", re.M)  # git revert's own line, not a quote in prose
 LOOSE_TRAILER_RE = re.compile(r"^(System|Phase|Feature|Next|Blocker|Blocker-Cleared|Test):", re.I | re.M)
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)  # = contract.ts UUID
+SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")  # = contract.ts SLUG
+SYSTEM_TYPES = ("product", "internal", "infrastructure", "governance", "client")
 FEATURE_RE = re.compile(r"^([a-z0-9][a-z0-9-]*)\s*=\s*([a-z_]+)$")
 # importer statuses (PLAN §9: a commit never claims verified -- an agent claim is at most implemented)
 STATUSES = {"todo", "in_progress", "implemented", "blocked", "cancelled"}
@@ -78,33 +81,87 @@ def setting(name, default=""):
 
 
 def load_registry(text):
+    """The route's rule set (apps/next-admin/lib/systems/contract.ts parseRegistry; COMMON 契約 1): the first broken rule
+    is Fatal, named as registry.systems[i].field -- the same place the route would name in its 400. Lengths count UTF-16
+    units and "empty" ignores a BOM, as JS does. Stricter than the route on purpose (COMMON): feature slugs are global,
+    feature.phase is required, purpose / shared_paths / ignore_paths may not be null."""
     try:
         reg = json.loads(text)
     except ValueError as e:
         raise Fatal(f"{REGISTRY_PATH} is not JSON: {e}")
-    if not isinstance(reg, dict) or reg.get("version") != 1 or not isinstance(reg.get("systems"), list):
-        raise Fatal(f"{REGISTRY_PATH}: need version 1 and a systems list")
-    ids, slugs, features = set(), set(), set()
 
-    def once(seen, v, what):
-        if not isinstance(v, str) or not v:
-            raise Fatal(f"{REGISTRY_PATH}: {what} must be a non-empty string")
+    def bad(where, what):
+        raise Fatal(f"{REGISTRY_PATH}: {where}: {what}")
+
+    def obj(v, where):
+        return v if isinstance(v, dict) else bad(where, "not an object")
+
+    def arr(v, where):
+        return v if isinstance(v, list) else bad(where, "not an array")
+
+    def text_(v, where, mx=2000, empty_ok=True, null_ok=False):
+        if v is None and null_ok:
+            return
+        if not isinstance(v, str) or len(v.encode("utf-16-le")) // 2 > mx:
+            bad(where, f"not a string of at most {mx} characters")
+        if not empty_ok and not v.replace("﻿", "").strip():
+            bad(where, "empty")
+
+    def strs(v, where):
+        for i, x in enumerate(arr(v, where)):
+            text_(x, f"{where}[{i}]", 500)
+
+    def uuid(v, where, ids):
+        if not isinstance(v, str) or not UUID_RE.fullmatch(v):  # fullmatch: Python's $ also matches before a final \n
+            bad(where, "not a uuid")
+        if v.lower() in ids:
+            bad(where, f"duplicate id {v}")
+        ids.add(v.lower())
+
+    def slug(v, where, seen, what):
+        if not isinstance(v, str) or len(v) > 100 or not SLUG_RE.fullmatch(v):
+            bad(where, "not a kebab slug")
         if v in seen:
-            raise Fatal(f"{REGISTRY_PATH}: duplicate {what} {v!r}")
+            bad(where, f"duplicate {what} slug {v}")
         seen.add(v)
 
-    for s in reg["systems"]:
-        if not isinstance(s, dict):
-            raise Fatal(f"{REGISTRY_PATH}: every system must be an object")
-        once(ids, s.get("id"), "id")
-        once(slugs, s.get("slug"), "system slug")
-        for x in s.get("phases", []) + s.get("features", []):
-            once(ids, x.get("id"), "id")
-        phases = {p.get("slug") for p in s.get("phases", [])}
-        for f in s.get("features", []):  # Feature: <slug>=<status> names no system, so feature slugs are global
-            once(features, f.get("slug"), "feature slug")
-            if f.get("phase") not in phases:
-                raise Fatal(f"{REGISTRY_PATH}: feature {f.get('slug')!r} names phase {f.get('phase')!r}, not a phase of {s['slug']!r}")
+    obj(reg, "registry")
+    if type(reg.get("version")) is not int or reg["version"] != 1:  # not True: JSON true is not 1 to the route
+        bad("registry.version", "must be 1")
+    strs(reg.get("shared_paths", []), "registry.shared_paths")
+    strs(reg.get("ignore_paths", []), "registry.ignore_paths")
+    ids, systems, features = set(), set(), set()
+    for i, s in enumerate(arr(reg.get("systems"), "registry.systems")):
+        w = f"registry.systems[{i}]"
+        obj(s, w)
+        uuid(s.get("id"), f"{w}.id", ids)
+        slug(s.get("slug"), f"{w}.slug", systems, "system")
+        text_(s.get("name"), f"{w}.name", 200, empty_ok=False)
+        if s.get("type") not in SYSTEM_TYPES:
+            bad(f"{w}.type", f"not one of {'|'.join(SYSTEM_TYPES)}")
+        text_(s.get("purpose", ""), f"{w}.purpose")
+        text_(s.get("product_key"), f"{w}.product_key", 100, null_ok=True)
+        strs(s.get("aliases", []), f"{w}.aliases")
+        strs(s.get("source_paths"), f"{w}.source_paths")
+        phases = set()
+        for j, p in enumerate(arr(s.get("phases"), f"{w}.phases")):
+            pw = f"{w}.phases[{j}]"
+            obj(p, pw)
+            uuid(p.get("id"), f"{pw}.id", ids)
+            slug(p.get("slug"), f"{pw}.slug", phases, "phase")
+            text_(p.get("name"), f"{pw}.name", 200, empty_ok=False)
+            text_(p.get("legacy_source_path"), f"{pw}.legacy_source_path", 500, null_ok=True)
+        for j, f in enumerate(arr(s.get("features"), f"{w}.features")):
+            fw = f"{w}.features[{j}]"
+            obj(f, fw)
+            uuid(f.get("id"), f"{fw}.id", ids)
+            # global, not per system: a Feature: <slug>=<status> trailer names no system
+            slug(f.get("slug"), f"{fw}.slug", features, "feature")
+            text_(f.get("name"), f"{fw}.name", 200, empty_ok=False)
+            if f.get("phase") is None:
+                bad(f"{fw}.phase", "required")
+            if not isinstance(f.get("phase"), str) or f.get("phase") not in phases:
+                bad(f"{fw}.phase", f"no phase {f.get('phase')} in {s['slug']}")
     return reg
 
 
@@ -171,7 +228,8 @@ def events_for(c, idx, gaps):
     def emit(event_type, system, payload, phase=None, feature=None):
         # <idx> comes from what the event is about, not its position: a registry change between two runs over the
         # same commit (a failed batch retried, or a deleted state file) must not shift keys onto other events.
-        ident = "|".join([event_type, system or "", feature or "", payload.get("unclassified", "")])
+        ident = "|".join([event_type, system or "", feature or "", payload.get("unclassified", ""),
+                          payload.get("reverted_sha", "")])
         n = int(hashlib.sha1(ident.encode("utf-8")).hexdigest()[:12], 16)
         while n in used:
             n += 1
@@ -215,14 +273,16 @@ def events_for(c, idx, gaps):
     if any(k == "blocker-cleared" for k, _ in tr):
         handoff["blocker_cleared"] = True
 
-    m = REVERT_RE.search(c["body"])
-    if m:
+    # one event per reverted sha (`git revert -n A B` + one commit has two lines); a revert of a revert is just another
+    # revert event -- the projection toggles them in time order (COMMON 契約 2)
+    reverted = list(dict.fromkeys(m.group(1) for m in REVERT_RE.finditer(c["body"])))
+    for r in reverted:
         for s in targets or [None]:
-            payload = {"reverted_sha": m.group(1)}
+            payload = {"reverted_sha": r}
             if s is None:
                 payload["unclassified"] = "revert touches no registered system"
             emit("revert", s, payload)
-    elif not tr:
+    if not reverted and not tr:
         for s in sorted(per_system):
             emit("activity", s, {"subject": c["subject"], "files": per_system[s]})
 
@@ -259,7 +319,12 @@ def events_for(c, idx, gaps):
 
 
 def head_gaps(mirror, head, reg):
-    """products.ts keys with no registry product_key; supervisor data.mjs folders no phase claims."""
+    """products.ts keys with no registry product_key; supervisor data.mjs folders no phase claims; registry file paths
+    (no trailing /) that are not a file at HEAD -- such an entry owns nothing, so its commits fall through silently."""
+    tree = set(git(mirror, "ls-tree", "-r", "--name-only", head).stdout.splitlines())
+    listed = reg.get("shared_paths", []) + reg.get("ignore_paths", []) + [
+        p for s in reg["systems"] for p in s.get("source_paths", [])]
+    dead = sorted({p for p in listed if not p.endswith("/") and p not in tree})
     unregistered = []
     p = git(mirror, "show", f"{head}:{PRODUCTS_PATH}", check=False)
     if p.returncode == 0:
@@ -268,11 +333,11 @@ def head_gaps(mirror, head, reg):
         unregistered = sorted(k for k in re.findall(r'\{\s*key:\s*"([a-z0-9-]+)"', body) if k not in have)
     claimed = {(ph.get("legacy_source_path") or "").rstrip("/") for s in reg["systems"] for ph in s.get("phases", [])}
     unclaimed = []
-    for path in git(mirror, "ls-tree", "-r", "--name-only", head, "agency-os/handoffs/").stdout.splitlines():
+    for path in tree:
         m = SUPERVISOR_RE.match(path)
         if m and m.group(1) not in claimed:
             unclaimed.append(m.group(1) + "/")
-    return unregistered, sorted(unclaimed)
+    return unregistered, sorted(unclaimed), dead
 
 
 def post(url, token, body):
@@ -313,14 +378,20 @@ def build(mirror, state_path, ref, first_days):
     idx = Index(reg)
     gaps = {"unowned_paths": set(), "unclassified_trailers": set()}
     events, status, error = [], "ok", None
+    at = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     if prev and git(mirror, "merge-base", "--is-ancestor", prev, head, check=False).returncode != 0:
-        # PLAN §7: stop the increment, delete nothing; the commits that left main are listed, not imported
+        # PLAN §7: stop the increment, delete nothing; each commit that left main gets an orphaned event (the projection
+        # drops its events), nothing new is imported, and the state stays put
         status = "history_diverged"
         if git(mirror, "cat-file", "-e", f"{prev}^{{commit}}", check=False).returncode == 0:
             gone = git(mirror, "rev-list", f"{head}..{prev}").stdout.split()
             error = (f"previous_head {prev[:12]} is not an ancestor of HEAD; {len(gone)} orphaned commit(s): "
                      + " ".join(g[:12] for g in gone[:50]))
+            for g in gone:
+                events.append({"event_key": f"orphan:{g}", "system_slug": None, "phase_slug": None, "feature_slug": None,
+                               "event_type": "orphaned", "source": "importer", "commit_sha": g, "occurred_at": at,
+                               "payload": {"sha": g}, "evidence": None})
         else:
             error = f"previous_head {prev[:12]} is not in the mirror (history rewritten)"
     else:
@@ -328,14 +399,13 @@ def build(mirror, state_path, ref, first_days):
         for c in commits(mirror, rng):
             events.extend(events_for(c, idx, gaps))
 
-    unregistered, unclaimed = head_gaps(mirror, head, reg)
+    unregistered, unclaimed, dead = head_gaps(mirror, head, reg)
     import_run = {"head": head, "previous_head": prev, "status": status, "error": error, "gaps": {
         "unowned_paths": sorted(gaps["unowned_paths"])[:GAP_CAP],
         "unclassified_trailers": sorted(gaps["unclassified_trailers"])[:GAP_CAP],
-        "unregistered_products": unregistered, "unclaimed_supervisors": unclaimed}}
+        "unregistered_products": unregistered, "unclaimed_supervisors": unclaimed, "dead_source_paths": dead}}
     # last of all, so the route has a run record only once every earlier batch landed; the time in the key gives every
     # run its own record (a rerun at the same HEAD must still update status and gaps)
-    at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     events.append({"event_key": f"run:{head}:{at}", "system_slug": None, "phase_slug": None, "feature_slug": None,
                    "event_type": "import_run", "source": "importer", "commit_sha": head,
                    "occurred_at": at, "payload": import_run, "evidence": None})

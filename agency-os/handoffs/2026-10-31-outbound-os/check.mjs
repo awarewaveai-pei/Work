@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { checkCommon, report } from '../../../scripts/supervisor-kit/check.mjs';
 import { META, NOW, STEPS, OPEN, COPY } from './data.mjs';
 import { render } from './build.mjs';
@@ -13,9 +13,16 @@ const repo = path.resolve(here, '../../..');
 const errors = checkCommon({ here, STEPS, OPEN, NOW, COPY, render, fields: ['code', 'group', 'items'] });
 const fail = (m) => errors.push(m);
 
-// Switch to true in the commit that moves this page's state to /ops/systems (systems-migrate-supervisor.mjs). Then data.mjs is read-only.
+// Switch to true in the commit that moves this page's state to /ops/systems (systems-migrate-supervisor.mjs), with
+// FROZEN_SHA256 = sha256 of data.mjs as migrated. Then data.mjs is read-only: a hash, not `git diff HEAD`, so an edit that
+// was already committed still fails. CRLF is folded to LF first (a Windows checkout must hash the same).
 const FROZEN = false;
-if (FROZEN && spawnSync('git', ['diff', 'HEAD', '--quiet', '--', path.join(here, 'data.mjs')], { cwd: repo }).status !== 0) fail('已移到 /ops/systems：data.mjs 的狀態不能再改，請在 /ops/systems 更新');
+const FROZEN_SHA256 = '';
+if (FROZEN) {
+  const got = createHash('sha256').update(readFileSync(path.join(here, 'data.mjs'), 'utf8').replace(/\r\n/g, '\n')).digest('hex');
+  if (!/^[0-9a-f]{64}$/.test(FROZEN_SHA256)) fail('FROZEN=true 但 FROZEN_SHA256 沒填：切換的 commit 要填入 data.mjs 的 sha256');
+  else if (got !== FROZEN_SHA256) fail('已移到 /ops/systems：data.mjs 的狀態不能再改，請在 /ops/systems 更新');
+}
 
 // 計畫 §6 每節（### Cn）＝一個步驟；表格第一欄的卡號＝該步驟 items；計畫不寫狀態。
 const plan = readFileSync(path.join(repo, META.plan), 'utf8');

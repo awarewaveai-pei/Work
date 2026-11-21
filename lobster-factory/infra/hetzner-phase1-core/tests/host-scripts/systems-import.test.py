@@ -136,11 +136,50 @@ class SystemsImportTest(unittest.TestCase):
         self.assertEqual(evs[3]["payload"], {"status": "implemented", "test": "t1"})  # a commit cannot claim verified
         self.assertEqual(evs[4]["payload"]["unclassified"], "unknown feature: ghost")
 
-    def test_revert(self):
+    def test_revert_and_revert_of_revert(self):
         bad = self.r.commit({"apps/x.ts": "1"}, "bad change")
         self.r.git("revert", "--no-edit", "HEAD")
+        undo = self.r.git("rev-parse", "HEAD")
+        self.r.git("revert", "--no-edit", "HEAD")  # re-applies bad: the projection toggles by time, it needs both
         rev = [e for e in events(self.build()[0]) if e["event_type"] == "revert"]
-        self.assertEqual([(e["system_slug"], e["payload"]) for e in rev], [("alpha", {"reverted_sha": bad})])
+        self.assertEqual([(e["system_slug"], e["payload"]) for e in rev],
+                         [("alpha", {"reverted_sha": bad}), ("alpha", {"reverted_sha": undo})])
+
+    def test_one_commit_reverting_two(self):
+        a = self.r.commit({"apps/x.ts": "1"}, "A")
+        b = self.r.commit({"apps/b/y.ts": "1"}, "B")
+        self.r.git("revert", "-n", b, a)
+        self.r.git("commit", "-q", "-m", f"Revert A and B\n\nThis reverts commit {b}.\nThis reverts commit {a}.")
+        rev = [e for e in events(self.build()[0]) if e["event_type"] == "revert"]
+        self.assertEqual(sorted((e["system_slug"], e["payload"]["reverted_sha"]) for e in rev),
+                         sorted([("alpha", a), ("beta", a), ("alpha", b), ("beta", b)]))
+        self.assertEqual(len({e["event_key"] for e in rev}), 4)
+
+    def test_registry_rules_are_fatal_and_named(self):
+        s0 = REGISTRY["systems"][0]
+        cases = [
+            (dict(s0, id="not-a-uuid"), "systems[0].id: not a uuid"),
+            (dict(s0, slug="Alpha_1"), "systems[0].slug: not a kebab slug"),
+            (dict(s0, name="x" * 201), "systems[0].name: not a string of at most 200"),
+            (dict(s0, type="toy"), "systems[0].type: not one of"),
+            (dict(s0, features=[dict(s0["features"][0], phase=None)]), "systems[0].features[0].phase: required"),
+            (dict(s0, features=[dict(s0["features"][0], phase="p9")]), "systems[0].features[0].phase: no phase p9"),
+            (dict(s0, slug="beta"), "systems[1].slug: duplicate system slug beta"),
+        ]
+        for system, msg in cases:
+            with self.subTest(msg):
+                reg = dict(REGISTRY, systems=[system] + REGISTRY["systems"][1:])
+                with self.assertRaises(si.Fatal) as cm:
+                    si.load_registry(json.dumps(reg))
+                self.assertIn(msg, str(cm.exception))
+
+    def test_real_registry_passes_with_no_dead_paths(self):
+        root = os.path.abspath(os.path.join(os.path.dirname(SRC), "..", "..", "..", ".."))
+        git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], cwd=root, check=True,
+                                 capture_output=True, text=True).stdout.strip()
+        with open(os.path.join(root, si.REGISTRY_PATH), encoding="utf-8") as f:
+            reg = si.load_registry(f.read())  # the working-tree copy, checked against the files at HEAD
+        self.assertEqual(si.head_gaps(git_dir, "HEAD", reg)[2], [])
 
     def test_rerun_same_range_same_event_keys(self):
         self.r.commit({"apps/x.ts": "1"}, "one\n\nNext: two")
@@ -156,12 +195,12 @@ class SystemsImportTest(unittest.TestCase):
         again = keyed()
         self.assertEqual({k: again[k] for k in first if k in again}, {k: first[k] for k in first if k in again})
 
-    def test_history_diverged_sends_no_events_and_keeps_state(self):
+    def test_history_diverged_sends_only_orphans_and_keeps_state(self):
         os.environ.update(SYSTEMS_IMPORT_ENABLED="true", SYSTEMS_INGEST_TOKEN="tok")
         srv = Server()
         os.environ["SYSTEMS_INGEST_URL"] = srv.url
         try:
-            self.r.commit({"apps/x.ts": "1"}, "first")
+            dropped = self.r.commit({"apps/x.ts": "1"}, "first")
             self.assertEqual(self.run_main()[0], 0)
             with open(self.r.state) as f:
                 kept = f.read().strip()
@@ -173,7 +212,9 @@ class SystemsImportTest(unittest.TestCase):
             run = last["events"][-1]["payload"]
             self.assertEqual(run["status"], "history_diverged")
             self.assertIn("1 orphaned", run["error"])
-            self.assertEqual([e["event_type"] for e in last["events"]], ["import_run"])
+            self.assertEqual([(e["event_type"], e["event_key"], e["system_slug"], e["payload"]) for e in last["events"][:-1]],
+                             [("orphaned", f"orphan:{dropped}", None, {"sha": dropped})])  # and no activity for "rewritten"
+            self.assertEqual(last["events"][-1]["event_type"], "import_run")
             with open(self.r.state) as f:
                 self.assertEqual(f.read().strip(), kept)
         finally:
