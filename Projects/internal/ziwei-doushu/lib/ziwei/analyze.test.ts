@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { computeChart } from '@/lib/ziwei';
 import { analyzeZiwei, detectPatterns } from './analyze';
 import { toContext } from '@/lib/divination/systems/ziwei';
+import { STAR_NOTES, MUTAGEN_BRIEF, starBrief, flowCounterpart } from './stars';
+import { toTraditional } from '@/lib/s2t';
 
 const birth = {
   year: 2000, month: 8, day: 16, hour: 14, minute: 30,
@@ -94,4 +96,44 @@ describe('酉宮主星亮度(iztro 2.6.1 修正)', () => {
   it('太陽在酉 = 平(舊版陷)', () => expect(youStar(2023, 12, 31, 10, '太陽')).toBe('平'));
   it('太陰在酉 = 旺(舊版不)', () => expect(youStar(2023, 4, 5, 10, '太陰')).toBe('旺'));
   it('七殺在酉 = 旺(舊版廟)', () => expect(youStar(1990, 3, 21, 4, '七殺')).toBe('旺'));
+});
+
+describe('星曜一句要點(Z3)', () => {
+  it('盤上出現的每顆星與每個十二神都查得到要點(8 張盤)', () => {
+    const missing = new Set<string>();
+    for (const [y, hour, gender] of [[1950, 0, '男'], [1963, 5, '女'], [1977, 9, '男'], [1984, 13, '女'], [1991, 17, '男'], [2000, 21, '女'], [2008, 3, '男'], [2016, 11, '女']] as const) {
+      const a = computeChart({ year: y, month: 5, day: 9, hour, minute: 0, gender, calendar: 'solar', locale: 'zh-TW' }).astrolabe;
+      for (const p of a.palaces) {
+        const names = [
+          ...[...p.majorStars, ...p.minorStars, ...p.adjectiveStars].map((s) => String(s.name)),
+          ...[p.changsheng12, p.boshi12, p.jiangqian12, p.suiqian12].map(String),
+        ];
+        for (const n of names) if (!starBrief(n)) missing.add(n);
+      }
+    }
+    expect([...missing]).toEqual([]);
+  });
+
+  it('要點全為繁體', () => {
+    for (const t of [...Object.values(STAR_NOTES).map((x) => x.note + x.group), ...Object.values(MUTAGEN_BRIEF)]) {
+      expect(toTraditional(t)).toBe(t);
+    }
+  });
+
+  it('流耀指向運限層與本命星', () => {
+    expect(flowCounterpart('運祿')).toEqual({ scope: '大限', base: '祿存' });
+    expect(flowCounterpart('流羊')).toEqual({ scope: '流年', base: '擎羊' });
+    expect(flowCounterpart('天馬')).toBeNull();
+    expect(starBrief('流鉞')).toContain('流年天鉞');
+  });
+
+  it('toContext 附命宮三方四正的星要 facts,整條收不切半句', () => {
+    const r = computeChart({ ...birth, locale: 'zh-TW' });
+    const ctx = toContext(r, 'zh-TW', undefined, analyzeZiwei(r.astrolabe));
+    const notes = ctx.facts.filter((f) => f.label.startsWith('星要:'));
+    expect(notes.map((f) => f.label)).toEqual(['星要:命宮', '星要:財帛', '星要:官祿', '星要:遷移']);
+    const soul = analyzeZiwei(r.astrolabe).palaceReadings.find((p) => p.palace === '命宮')!;
+    for (const part of notes[0].value.split('；')) expect(soul.starNotes).toContain(part);
+    expect(notes[0].value).toContain('天魁：'); // 此盤命宮坐天魁
+  });
 });

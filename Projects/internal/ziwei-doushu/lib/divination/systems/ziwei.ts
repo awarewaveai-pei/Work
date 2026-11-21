@@ -9,6 +9,9 @@ import type { ZiweiAnalysis } from '@/lib/ziwei/analyze';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
 
+/** 命宮三方四正:星曜要點 facts 只取這四宮(控制 fact 數)。 */
+const STAR_NOTE_PALACES = ['命宮', '財帛', '官祿', '遷移'] as const;
+
 /**
  * 紫微斗數系統 adapter — 把既有 computeChart 接上統一 DivinationSystem 合約。
  * 這是 F3 的「垂直證明」:現有引擎不重寫,只用 adapter 接縫。
@@ -112,6 +115,18 @@ export function toContext(
         label: `宮:${pr.palace}`,
         value: (prefix + pr.readings.join('；')).slice(0, 300),
       });
+    }
+    // 命宮三方四正(命、財、官、遷)的輔星雜曜與四化一句要點;整條收、超長就停,不切半句
+    for (const name of STAR_NOTE_PALACES) {
+      const pr = analysis.palaceReadings.find((x) => x.palace === name);
+      if (!pr?.starNotes.length) continue;
+      let value = '';
+      for (const note of pr.starNotes) {
+        const next = value ? `${value}；${note}` : note;
+        if (next.length > 300) break;
+        value = next;
+      }
+      if (value) facts.push({ label: `星要:${name}`, value });
     }
   }
 

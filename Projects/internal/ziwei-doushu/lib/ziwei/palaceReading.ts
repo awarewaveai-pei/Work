@@ -1,6 +1,6 @@
 import type { IFunctionalAstrolabe } from 'iztro/lib/astro/FunctionalAstrolabe';
 import type { PalaceName } from 'iztro/lib/i18n';
-import { STAR_PROFILES, PALACE_ORDER, type PalaceKey } from './stars';
+import { STAR_PROFILES, PALACE_ORDER, MUTAGEN_BRIEF, starBrief, type PalaceKey } from './stars';
 
 /**
  * 十二宮逐星解讀 (頂規)。
@@ -32,6 +32,8 @@ export interface PalaceReading {
   borrowedFrom: string[];
   /** 逐星斷語(已含廟旺/四化修飾) */
   readings: string[];
+  /** 本宮輔星、雜曜的一句要點與宮內生年四化要點(「星名：要點」;不含主星,主星見 readings) */
+  starNotes: string[];
 }
 
 const BRIGHT_GOOD = ['廟', '旺'];
@@ -69,6 +71,30 @@ function composeStar(star: PalaceStar, palace: PalaceKey, borrowed: boolean): st
   return `${prefix}${head}：${base}${bnote}${mnote}`.trim();
 }
 
+/** 本宮輔星、雜曜要點 + 宮內(含主星)生年四化要點;借星宮只論本宮自己的星。 */
+function composeStarNotes(p: {
+  majorStars?: { name: unknown; mutagen?: unknown; type?: unknown }[];
+  minorStars?: { name: unknown; mutagen?: unknown }[];
+  adjectiveStars?: { name: unknown }[];
+}): string[] {
+  const notes: string[] = [];
+  // majorStars 內也放祿存、天馬(type !== 'major'),它們不在 STAR_PROFILES,要點走 starBrief
+  const lesser = [
+    ...(p.majorStars ?? []).filter((s) => s.type !== 'major'),
+    ...(p.minorStars ?? []),
+    ...(p.adjectiveStars ?? []),
+  ];
+  for (const s of lesser) {
+    const brief = starBrief(String(s.name));
+    if (brief) notes.push(`${String(s.name)}：${brief}`);
+  }
+  for (const s of [...(p.majorStars ?? []), ...(p.minorStars ?? [])]) {
+    const m = String(s.mutagen ?? '');
+    if (m && MUTAGEN_BRIEF[m]) notes.push(`${String(s.name)}化${m}：${MUTAGEN_BRIEF[m]}`);
+  }
+  return notes;
+}
+
 function toPalaceStars(
   stars: { name: unknown; brightness?: unknown; mutagen?: unknown }[],
 ): PalaceStar[] {
@@ -104,6 +130,7 @@ export function analyzePalaceReadings(astro: IFunctionalAstrolabe): PalaceReadin
         readings: majors
           .filter((s) => STAR_PROFILES[s.name])
           .map((s) => composeStar(s, palace, false)),
+        starNotes: composeStarNotes(p),
       });
       continue;
     }
@@ -125,6 +152,7 @@ export function analyzePalaceReadings(astro: IFunctionalAstrolabe): PalaceReadin
       readings: borrowedStars
         .filter((s) => STAR_PROFILES[s.name])
         .map((s) => composeStar(s, palace, true)),
+      starNotes: composeStarNotes(p),
     });
   }
 
