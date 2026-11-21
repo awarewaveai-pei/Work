@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-21（續10）— 我的設計影片批次刪除 17 部全失敗：QA 報告外鍵擋刪，且刪除先動 R2 檔再刪列（操作者截圖「17 部刪除失敗（0 部成功）」；「你決定」）
+
+- 根因：`media_qa_reports.candidate_asset_id`（0065:9，RESTRICT）擋 `media_assets` 列刪除；prod log `[designs] media_assets delete failed: ... media_qa_reports_candidate_asset_id_fkey`。所有刪除路徑先 `deleteUnreferencedAsset` 刪 R2、後刪列 → 列被擋時檔案已沒（抽查有 QA 報告的影片 10 部 R2 404，卡片仍在）。另：designs DELETE 只刪主列，影片其他比例列（`metadata.variantOf`，`video-pipeline.ts:284-302`）不檢查也不刪，R2 卻整個資料夾刪（`r2-delete-guard.ts:61`）。
+- 決定：QA 報告、轉錄 job 跟影片一起刪（0173 CASCADE；supersedes 改 SET NULL）；`media_releases`（表註明不可改的發布證據，下掛 5 筆 delivery）與專案 active candidate 維持 RESTRICT，刪除前先擋並說明。prod 現況：30 部列表影片全有 QA 報告、6 部有 release → 這 6 部刪不掉（409）。
+- 改法：`lib/content/media-asset-delete.ts` `deleteMediaAsset` = 唯一刪 media_assets 列的程式：含比例列 → 擋 RESTRICT 引用 → R2（含 extraKeys）→ 一次刪所有列。designs／presets／video/[id]／internal/video/cleanup 四路由改呼叫它。前端批次刪除 alert 列出伺服器原因；非 JSON 回應顯示 HTTP 狀態。
+- 檢查 `lib/content/__tests__/media-asset-delete.test.ts`：migration 解析出的 RESTRICT FK = `RESTRICTING_REFERENCES`；CASCADE 下游表無 RESTRICT；全 app 只有該檔刪 media_assets 列（舊版本檢查曾抓出 presets 漏接）；行為 4 條。
+- 0173 已套 prod：先在 prod 回滾交易預演上下兩向＋實刪一列 OK；`apply-db-migration.mjs 0173` APPLY_OK；pg_constraint 確認 c／n／c。程式待今晚 03:00 自動部署。
+- 未處理（理由）：critic M「擋路檢查與刪列之間（WP 掃描期間）有人建 release」→ 需同時對同一部影片刪除與建 release，機率極低，治本要 tombstone 欄位，不做；critic L「cleanup 每次取 50 部無排序，永遠被擋的會佔名額」→ 既有，被擋的只有 6 部；cleanup 在 repo 無呼叫者。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run lib/content app/api/tools app/api/video app/api/internal/video → 159 檔 907 passed | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 預演 0173 up/down（rollback）＋apply-db-migration.mjs 0173＋pg_constraint 查核 | exit=0 | ms=5000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1h/3m/4l（H 變體列已修；M 解析器／路由偵測已強化；M race 與 L cleanup 記錄不修；L 前端錯誤訊息已修；L 部署順序已先套 migration）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=from("media_assets") .delete( | hits=1
+- rollback：`git revert` 本 commit；DB 跑 `0173_media_asset_delete_takes_qa_and_transcripts.down.sql`（先撤程式）。已 cascade 掉的 QA 報告不會回來。
 ## 2026-11-21（續9）— oracle 併入 A3、V1、A4、E7、Z3、E5、E6a；門面改 WordPress 的方向待操作者確認
 
 - 併入 main（`Projects/internal/ziwei-doushu/`，**未部署**；commit 主旨前綴可 `git log --grep` 找）：A3 行運／合盤／太陽回歸；V1 吠陀占星（新系統與頁面 `/vedic`）；A4 法達、黃道釋放、十年期、19 個阿拉伯點、與太陽距離（行星時未做：`@xalen/wasm` 無日出日落 API）；E7 外部基準測試；Z3 輔星雜曜十二神要點（含 critic 修正）；E5 出生地時區／歷史夏令時間／晚子時選項；E6a 全球城市資料與 `/api/places`。監工 commit：`6abe3a6a9`（A3、V1 在 `next.config.ts`、`lib/astrology.ts` 的手動合併——「兩邊都留」的自動解衝突對程式碼會產生無效 TS）、`e7bca2155`（渙九二「機」→「机」）。

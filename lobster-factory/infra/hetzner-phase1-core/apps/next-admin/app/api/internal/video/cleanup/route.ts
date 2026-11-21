@@ -6,8 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { deleteUnreferencedAsset } from "@/lib/content/r2-delete-guard";
-import { videoObjectKey } from "@/lib/content/blocks/video-pipeline";
+import { deleteMediaAsset } from "@/lib/content/media-asset-delete";
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const { data: old, error } = await supabase
     .from("media_assets")
-    .select("id, object_url, metadata")
+    .select("id, object_key, organization_id, metadata")
     .eq("mime_type", "video/mp4")
     .lt("created_at", cutoff)
     .limit(50);
@@ -40,17 +39,17 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   if (!old || old.length === 0) return NextResponse.json({ ok: true, deleted: 0 });
 
-  // Age alone never deletes: a video still embedded in a WordPress page is kept (r2-delete-guard.ts), and the row is
-  // only removed after the R2 objects are gone, so a refusal or failure leaves the video in the gallery.
+  // Age alone never deletes: a video a release or a WordPress page still needs is kept, and rows go only after their R2
+  // objects (media-asset-delete.ts). A video's other-ratio rows go with it, so they are skipped when met later.
   let deleted = 0;
+  const gone = new Set<string>();
   const kept: { id: string; reason: string }[] = [];
   for (const asset of old) {
-    // R2DEL: only this row is going; a content-addressed object another row still uses stays in R2.
-    const r = await deleteUnreferencedAsset(videoObjectKey(asset.object_url), { exceptAssetIds: [String(asset.id)] });
-    if ("error" in r) { kept.push({ id: asset.id, reason: r.error }); continue; }
-    const { error: delErr } = await supabase.from("media_assets").delete().eq("id", asset.id);
-    if (delErr) { kept.push({ id: asset.id, reason: `db_delete_failed:${delErr.message}` }); continue; }
-    deleted++;
+    if (gone.has(asset.id)) continue;
+    const r = await deleteMediaAsset(supabase, asset);
+    if ("code" in r) { kept.push({ id: asset.id, reason: r.code }); continue; }
+    for (const id of r.deletedIds) gone.add(id);
+    deleted += r.deletedIds.length;
   }
 
   return NextResponse.json({ ok: true, deleted, kept, cutoff });

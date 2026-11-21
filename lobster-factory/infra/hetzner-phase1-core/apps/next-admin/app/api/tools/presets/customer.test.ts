@@ -14,6 +14,7 @@ vi.mock("../../../../lib/storage/r2", async (orig) => ({
   putDesignObject: async () => { db.uploads++; return { ok: true, objectKey: "designs/p.png", publicUrl: "https://r2.example/p.png", byteSize: 10, checksumSha256: "c" }; },
 }));
 vi.mock("../../../../lib/content/r2-delete-guard", () => ({ deleteUnreferencedAsset: async () => ({ ok: true }) }));
+vi.mock("../../../../lib/content/media-asset-delete", () => ({ deleteMediaAsset: async () => { db.deleted = true; return { ok: true, deletedIds: [] }; } }));
 vi.mock("../../../../lib/supabase-server", () => {
   const client = {
     from: (table: string) => {

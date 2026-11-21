@@ -7,7 +7,7 @@ import { buildDesignKey, getDesignsPublicBase, isR2Configured, putDesignObject, 
 import { isR2S3Configured } from "../../../../lib/storage/r2-s3";
 import { claimPendingUpload, discardPendingUpload, discardUnregisteredDesignObjects, parsePendingKey, type PendingKey } from "../../../../lib/studio/design-pending";
 import { cleanSourceName, sourceBytesMatch, sourceKeyFor, sourceKeyFromMetadata } from "../../../../lib/studio/design-source";
-import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
+import { deleteMediaAsset } from "../../../../lib/content/media-asset-delete";
 import { decodeCursor, listDesigns, type SortOrder, type TimeRange } from "../../../../lib/studio/designs-list";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 
@@ -428,39 +428,10 @@ export async function DELETE(request: Request) {
     if (!own || (asset as Record<string, unknown>).created_by !== own) return NextResponse.json({ ok: false, error: "not_your_asset" }, { status: 403 });
   }
 
-  // A file still shown by a WordPress post/page is refused and the row stays (r2-delete-guard.ts picks the bucket
-  // from the key: video/ and remotion/ -> R2_VIDEO_BUCKET, designs/ captions/ web/ -> R2_DESIGNS_BUCKET).
-  // R2DEL: this row is the one going; a content-addressed object (e.g. a workbench file, ai_generated too) that another
-  // row still uses stays in R2.
-  const r2Result = await deleteUnreferencedAsset(asset.object_key, { exceptAssetIds: [String(asset.id)] });
-  if ("error" in r2Result) {
-    console.error("[designs] delete refused:", r2Result.error);
-    const references = "references" in r2Result ? r2Result.references : undefined;
-    return NextResponse.json({ ok: false, error: r2Result.message, code: r2Result.error, references },
-      { status: r2Result.error === "asset_in_use" ? 409 : 502 });
-  }
-
-  // The original file saved with the preview (sourceUpload): same guarded delete. A failure keeps the row so a retry finishes the job
-  // (the preview delete above treats an already-gone object as ok).
+  // The original file saved with the preview (sourceUpload) goes with it; a video takes its other-ratio rows.
   const sourceKey = sourceKeyFromMetadata((asset as Record<string, unknown>).metadata);
-  if (sourceKey) {
-    const sr = await deleteUnreferencedAsset(sourceKey);
-    if ("error" in sr) {
-      console.error("[designs] source delete refused:", sr.error);
-      return NextResponse.json({ ok: false, error: sr.message, code: sr.error }, { status: sr.error === "asset_in_use" ? 409 : 502 });
-    }
-  }
-
-  // Remove row from media_assets.
-  const { error: deleteErr } = await supabase
-    .from("media_assets")
-    .delete()
-    .eq("id", assetId);
-
-  if (deleteErr) {
-    console.error("[designs] media_assets delete failed:", deleteErr.message);
-    return NextResponse.json({ ok: false, error: "delete_failed" }, { status: 500 });
-  }
+  const del = await deleteMediaAsset(supabase, asset, { extraKeys: sourceKey ? [sourceKey] : [] });
+  if ("code" in del) return NextResponse.json({ ok: false, error: del.message, code: del.code, references: del.references }, { status: del.status });
 
   // Audit trail.
   const traceId = randomUUID();

@@ -491,7 +491,7 @@ export default function DesignsGallery({ initialTab = "designs", organizationId 
     setDeletingId(asset.id);
     try {
       const res = await fetch(`/api/tools/designs?id=${asset.id}`, { method: "DELETE" });
-      const json = (await res.json()) as { ok: boolean; error?: string };
+      const json = (await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))) as { ok: boolean; error?: string };
       if (json.ok) {
         setAssets((prev) => prev.filter((a) => a.id !== asset.id));
         setSelectedIds((prev) => { const n = new Set(prev); n.delete(asset.id); return n; });
@@ -682,24 +682,27 @@ export default function DesignsGallery({ initialTab = "designs", organizationId 
     setBulkDeleting(true);
     let failed = 0;
     let done = 0;
+    const reasons = new Set<string>();
     for (const id of ids) {
       try {
         const res = await fetch(`/api/tools/designs?id=${id}`, { method: "DELETE" });
-        const json = (await res.json()) as { ok: boolean };
+        const json = (await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))) as { ok: boolean; error?: string };
         if (json.ok) {
           done++;
           setAssets((prev) => prev.filter((a) => a.id !== id));
           setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
         } else {
           failed++;
+          reasons.add(json.error ?? "unknown");
         }
       } catch {
         failed++;
+        reasons.add("網路錯誤");
       }
     }
     setBulkDeleting(false);
     if (done > 0) void load("refresh");
-    if (failed > 0) alert(`${failed} 張刪除失敗（${done} 張成功）`);
+    if (failed > 0) alert(`${failed} 張刪除失敗（${done} 張成功）\n${[...reasons].join("\n")}`);
   }, [visible, selectedIds, load]);
 
   /* bulk download — scoped to visible set so filtered-out assets are never downloaded */
@@ -779,7 +782,7 @@ export default function DesignsGallery({ initialTab = "designs", organizationId 
     setVideoDeletingId(video.id);
     try {
       const res = await fetch(`/api/tools/designs?id=${video.id}`, { method: "DELETE" });
-      const json = (await res.json()) as { ok: boolean; error?: string };
+      const json = (await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))) as { ok: boolean; error?: string };
       if (json.ok) {
         setVideoAssets((prev) => prev.filter((v) => v.id !== video.id));
         setVideoSelectedIds((prev) => { const n = new Set(prev); n.delete(video.id); return n; });
@@ -817,19 +820,20 @@ export default function DesignsGallery({ initialTab = "designs", organizationId 
     if (!confirm(`確定刪除選取的 ${ids.length} 部影片？此操作無法復原。`)) return;
     setVideoBulkDeleting(true);
     let failed = 0, done = 0;
+    const reasons = new Set<string>();
     for (const id of ids) {
       try {
         const res = await fetch(`/api/tools/designs?id=${id}`, { method: "DELETE" });
-        const json = (await res.json()) as { ok: boolean };
+        const json = (await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))) as { ok: boolean; error?: string };
         if (json.ok) {
           done++;
           setVideoAssets((prev) => prev.filter((v) => v.id !== id));
           setVideoSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
-        } else { failed++; }
-      } catch { failed++; }
+        } else { failed++; reasons.add(json.error ?? "unknown"); }
+      } catch { failed++; reasons.add("網路錯誤"); }
     }
     setVideoBulkDeleting(false);
-    if (failed > 0) alert(`${failed} 部刪除失敗（${done} 部成功）`);
+    if (failed > 0) alert(`${failed} 部刪除失敗（${done} 部成功）\n${[...reasons].join("\n")}`);
   }, [visibleVideos, videoSelectedIds]);
 
   const videoBulkDownload = useCallback(async () => {

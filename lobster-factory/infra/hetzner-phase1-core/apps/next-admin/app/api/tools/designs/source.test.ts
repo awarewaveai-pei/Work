@@ -19,10 +19,10 @@ vi.mock("../../../../lib/tenant-guard", () => ({
   OrgAccessError: class extends Error {},
   toOrgAccessResponse: () => new Response(null, { status: 403 }),
 }));
-vi.mock("../../../../lib/content/r2-delete-guard", () => ({
-  deleteUnreferencedAsset: async (k: string) => { st.guardDeleted.push(k); return { ok: true, deleted: 1 }; },
+vi.mock("../../../../lib/content/media-asset-delete", () => ({
+  deleteMediaAsset: async (_db: unknown, a: { object_key: string }, o?: { extraKeys?: string[] }) => { st.guardDeleted.push(a.object_key, ...(o?.extraKeys ?? [])); return { ok: true, deletedIds: [] }; },
 }));
-vi.mock("../../../../lib/studio/designs-list", () => ({ decodeCursor: vi.fn(), listDesigns: vi.fn() }));
+vi.mock("../../../../lib/studio/designs-list",() => ({ decodeCursor: vi.fn(), listDesigns: vi.fn() }));
 vi.mock("../../../../lib/storage/r2", () => ({
   isR2Configured: () => true,
   buildDesignKey: () => KEY,
@@ -109,7 +109,7 @@ describe("POST sourceUpload", () => {
 });
 
 describe("DELETE removes the original file too", () => {
-  it("deletes the preview and metadata.source_key through the reference guard; ignores a source_key it would not mint", async () => {
+  it("hands the preview and metadata.source_key to deleteMediaAsset; ignores a source_key it would not mint", async () => {
     st.rows = [{ metadata: { source_key: SRC_KEY } }];
     const url = `http://localhost/api/tools/designs?id=${ASSET}`;
     expect((await DELETE(new Request(url, { method: "DELETE" }))).status).toBe(200);

@@ -10,6 +10,7 @@ import {
   putDesignObject,
 } from "../../../../lib/storage/r2";
 import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
+import { deleteMediaAsset } from "../../../../lib/content/media-asset-delete";
 import { isPrintBox } from "../../../../lib/studio/fabric-print";
 import { effectiveOrgId, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 
@@ -370,23 +371,9 @@ async function handleDelete(request: Request): Promise<Response> {
     if (!own || asset.created_by !== own) return NextResponse.json({ ok: false, error: "not_your_asset" }, { status: 403 });
   }
 
-  // Same rule as every saved asset: refused while a WordPress post/page still shows it (r2-delete-guard.ts).
-  const r2Result = await deleteUnreferencedAsset(asset.object_key);
-  if ("error" in r2Result) {
-    console.error("[presets] delete refused:", r2Result.error);
-    return NextResponse.json({ ok: false, error: r2Result.message, code: r2Result.error },
-      { status: r2Result.error === "asset_in_use" ? 409 : 502 });
-  }
-
-  const { error: deleteErr } = await supabase
-    .from("media_assets")
-    .delete()
-    .eq("id", assetId);
-
-  if (deleteErr) {
-    console.error("[presets] media_assets delete failed:", deleteErr.message);
-    return NextResponse.json({ ok: false, error: "delete_failed" }, { status: 500 });
-  }
+  // Same rule as every saved asset (media-asset-delete.ts): refused while a WordPress post/page still shows it.
+  const del = await deleteMediaAsset(supabase, asset);
+  if ("code" in del) return NextResponse.json({ ok: false, error: del.message, code: del.code }, { status: del.status });
 
   const traceId = randomUUID();
   await supabase.from("ops_audit_events").insert({

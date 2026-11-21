@@ -10,7 +10,7 @@ vi.mock("../../../../lib/storage/r2", async (orig) => ({
   buildDesignKey: () => "designs/x.png",
   putDesignObject: async () => ({ ok: true, objectKey: "designs/x.png", publicUrl: "https://r2.example/x.png", byteSize: 10, checksumSha256: "c" }),
 }));
-vi.mock("../../../../lib/content/r2-delete-guard", () => ({ deleteUnreferencedAsset: async () => ({ ok: true }) }));
+vi.mock("../../../../lib/content/media-asset-delete", () => ({ deleteMediaAsset: async () => { db.deleted = true; return { ok: true, deletedIds: [] }; } }));
 vi.mock("../../../../lib/storage/r2-s3", () => ({ isR2S3Configured: () => true }));
 // What the browser PUT to uploads/pending/ (the copy-then-read itself is covered by upload.test.ts).
 const pending = vi.hoisted(() => ({ bytes: Buffer.alloc(0) as Buffer }));

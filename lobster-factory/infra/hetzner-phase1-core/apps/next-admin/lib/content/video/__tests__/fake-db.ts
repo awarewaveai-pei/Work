@@ -1,4 +1,4 @@
-// In-memory stand-in for the PostgREST calls the cover code makes (lib/content/video/cover.ts, app/api/video/cover):
+// In-memory stand-in (incl. delete) for the PostgREST calls the cover code makes (lib/content/video/cover.ts, app/api/video/cover):
 // eq / in / like / not(k, "is", null) / is filters, order (asc/desc, nulls last) and limit applied for real, so a test of
 // the bounded cover queries fails when they would pick the wrong row. "metadata->>k" = the JSON text path.
 type Row = Record<string, unknown>;
@@ -13,7 +13,7 @@ export function fakeDb(tables: () => Record<string, Row[]>, log: FakeLog = { upd
     from: (table: string) => {
       const tests: Array<(r: Row) => boolean> = [];
       const orders: Array<[string, boolean]> = [];
-      let limit = Infinity, patch: Row | null = null, insertRow: Row | null = null;
+      let limit = Infinity, patch: Row | null = null, insertRow: Row | null = null, remove = false;
       const rows = () => {
         const list = (tables()[table] ?? []).filter((r) => tests.every((t) => t(r)));
         list.sort((a, b) => {
@@ -50,6 +50,7 @@ export function fakeDb(tables: () => Record<string, Row[]>, log: FakeLog = { upd
         order: (k: string, o?: { ascending?: boolean }) => { orders.push([k, o?.ascending !== false]); return q; },
         limit: (n: number) => { limit = n; return q; },
         update: (p: Row) => { patch = p; return q; },
+        delete: () => { remove = true; return q; },
         insert: (r: Row) => { insertRow = r; return q; },
         maybeSingle: one,
         single: async () => {
@@ -61,6 +62,12 @@ export function fakeDb(tables: () => Record<string, Row[]>, log: FakeLog = { upd
         },
         then: (resolve: (v: unknown) => void) => {
           log.reads++;
+          if (remove) {
+            const hit = new Set(rows());
+            tables()[table] = (tables()[table] ?? []).filter((r) => !hit.has(r));
+            resolve({ error: null });
+            return;
+          }
           if (patch) {
             for (const row of rows()) { log.updates.push({ table, id: row.id, patch }); Object.assign(row, patch); }
             resolve({ error: null });
