@@ -170,7 +170,7 @@ NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`；VW = `lobste
 
 | 卡 | 一句話 | 檔案（獨佔） | 刪除 | 相容 | 驗收 | 風險 | 依賴 |
 |---|---|---|---|---|---|---|---|
-| C1 | ADR 019「目前客戶」契約登記 | 新 `agency-os/docs/architecture/decisions/019-client-context.md`；`ADR_INDEX.md` | — | — | 3a 表全文；`verify-governance-pointers.mjs` 綠 | Low | — |
+| C1 | ADR 020「目前客戶」契約登記 | 新 `agency-os/docs/architecture/decisions/020-client-context.md`；`ADR_INDEX.md` | — | — | 3a 表全文；`verify-governance-pointers.mjs` 綠 | Low | — |
 | C2 | 契約純函式＋單元測試 | 新 NA `lib/client-context/contract.ts`、`lib/client-context/__tests__/contract.test.ts` | — | `normalizeQuery`：`siteId`→`site`；兩者並存以 `site` 為準並標 legacy | 測試：site 推 org、mismatch 不選、客戶帳號忽略網址、1 站自動／多站不選、`withContext` 對 none／org／site／跨主機 | Low | — |
 | C3 | `/api/client-context`＋抽出 bootstrap 邏輯＋掛 PLATFORM_APIS | 新 NA `app/api/client-context/route.ts` 與其 test、新 `lib/client-context/orgs.ts`；改 `app/api/video/workbench/bootstrap/route.ts`、`lib/portal/doors.ts:66` | bootstrap 內重複的 first/q/include 實作 | bootstrap 回應形狀不變（VW `organization-picker.js:7-13` 依賴） | route.test：客戶帶他人 org → 回自己；site 不屬 org → site_mismatch；無權 → forbidden；`registry-code.test.ts`、`products.test.ts`、bootstrap 既有測試綠 | **High**（每個入口門新開一條客戶可呼叫的 API） | C2 |
 | C4 | hook＋頂部列積木 | 新 NA `lib/client-context/use-client-context.ts`、`app/ClientContextBar.tsx`、各自 test | — | legacy 參數 → `router.replace` 換名 | render test：org 層用 OrgPicker、site 層按鈕、錯誤三態文字、客戶帳號無搜尋框；URL 變更不 remount 也重算 | Medium | C2（C3 回應形狀依 3b，可並行） |
