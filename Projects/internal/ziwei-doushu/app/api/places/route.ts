@@ -5,7 +5,7 @@ import { searchPlaces } from '@/lib/places/server';
 
 /**
  * 出生地搜尋:GET /api/places?q=台北&locale=zh-TW&limit=10 → { places: BirthPlace[], attribution }。
- * 資料是靜態檔、不含使用者資料,結果可公開快取。
+ * 資料是靜態檔、不含使用者資料,結果可公開快取(短時間)。
  */
 export const runtime = 'nodejs';
 
@@ -23,6 +23,7 @@ export function GET(request: Request) {
   }
   return NextResponse.json(
     { places: searchPlaces(q, locale, limit), attribution: ATTRIBUTION },
-    { headers: { 'Cache-Control': 'public, max-age=86400' } },
+    // 快取只 5 分鐘:重產 data.json(如補譯名)後,使用者不會整天拿到舊結果;每次查詢約 10ms,不必長快取
+    { headers: { 'Cache-Control': 'public, max-age=300' } },
   );
 }

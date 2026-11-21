@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FIXED_UTC8, dstHoursAt, isDstAt, utcOffsetAt } from './timezone';
+import { FIXED_UTC8, ZONE_RENAMES, dstHoursAt, isDstAt, resolveZone, utcOffsetAt } from './timezone';
 import { resolveBirth } from './dates';
 
 describe('utcOffsetAt — 出生當下的 UTC 偏移(含歷史夏令時間)', () => {
@@ -54,5 +54,22 @@ describe('utcOffsetAt — 出生當下的 UTC 偏移(含歷史夏令時間)', ()
 
   it('不存在的時區名拋錯', () => {
     expect(() => utcOffsetAt('Mars/Olympus', 2000, 1, 1, 0, 0)).toThrow();
+  });
+});
+
+describe('resolveZone — 瀏覽器不認得 IANA 新名時改用舊名', () => {
+  /** 模擬時區資料停在 2021 年的瀏覽器:不認得 Europe/Kyiv,認得 Europe/Kiev */
+  const old = (z: string) => z !== 'Europe/Kyiv' && z !== 'America/Ciudad_Juarez';
+  it('認得本名就用本名;只認得舊名就用舊名;都不認得回 null', () => {
+    expect(resolveZone('Europe/Kyiv')).toBe('Europe/Kyiv');
+    expect(resolveZone('Europe/Kyiv', old)).toBe('Europe/Kiev');
+    expect(resolveZone('America/Ciudad_Juarez', old)).toBeNull(); // 拆分出來的新時區沒有舊名
+    expect(resolveZone('Mars/Olympus')).toBeNull();
+  });
+  it('每個改名的舊名在目前的 Intl 都有效,且兩者在 2000 年與 2025 年的偏移相同', () => {
+    for (const [now, before] of Object.entries(ZONE_RENAMES)) {
+      expect(resolveZone(before)).toBe(before);
+      for (const y of [2000, 2025]) expect([now, y, utcOffsetAt(before, y, 7, 1, 12, 0)]).toEqual([now, y, utcOffsetAt(now, y, 7, 1, 12, 0)]);
+    }
   });
 });

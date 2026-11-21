@@ -19,12 +19,51 @@ export interface BirthPlace {
 /** 舊行為的固定 UTC+8、無夏令時間(IANA 的 Etc 時區符號與一般相反:Etc/GMT-8 = UTC+8)。 */
 export const FIXED_UTC8 = 'Etc/GMT-8';
 
+/**
+ * IANA 改名:新名 → 舊名。舊名在 IANA 資料庫裡仍是指向新名的連結,規則完全相同;
+ * 瀏覽器內建的時區資料比改名早時只認得舊名(如 2022 年改名的 Europe/Kyiv)。
+ * 只收純改名;拆分出來的新時區(如 America/Ciudad_Juarez、Asia/Qostanay)沒有等價舊名,不收。
+ */
+export const ZONE_RENAMES: Readonly<Record<string, string>> = {
+  'Europe/Kyiv': 'Europe/Kiev', // 2022
+  'Pacific/Kanton': 'Pacific/Enderbury', // 2021
+  'America/Nuuk': 'America/Godthab', // 2020
+  'Asia/Yangon': 'Asia/Rangoon', // 2016
+  'Asia/Kolkata': 'Asia/Calcutta',
+  'Asia/Ho_Chi_Minh': 'Asia/Saigon',
+  'Asia/Kathmandu': 'Asia/Katmandu',
+  'Asia/Ulaanbaatar': 'Asia/Ulan_Bator',
+  'Africa/Asmara': 'Africa/Asmera',
+  'Atlantic/Faroe': 'Atlantic/Faeroe',
+  'Pacific/Chuuk': 'Pacific/Truk',
+  'Pacific/Pohnpei': 'Pacific/Ponape',
+};
+
+function intlSupports(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 這個環境能用的時區名:本名能用就用本名,否則試改名前的舊名;都不能用回 null。
+ * isSupported 可注入以利測試(模擬只認得舊名的瀏覽器)。
+ */
+export function resolveZone(zone: string, isSupported: (z: string) => boolean = intlSupports): string | null {
+  if (isSupported(zone)) return zone;
+  const old = ZONE_RENAMES[zone];
+  return old && isSupported(old) ? old : null;
+}
+
 const formatters = new Map<string, Intl.DateTimeFormat>();
 function formatterFor(zone: string): Intl.DateTimeFormat {
   let f = formatters.get(zone);
   if (!f) {
-    // 時區名不存在時這裡拋 RangeError,呼叫端的「計算失敗」會接住。
-    f = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' });
+    // 本名與舊名都不認得時,這裡以本名建立而拋 RangeError,呼叫端的「計算失敗」會接住。
+    f = new Intl.DateTimeFormat('en-US', { timeZone: resolveZone(zone) ?? zone, timeZoneName: 'longOffset' });
     formatters.set(zone, f);
   }
   return f;

@@ -72,7 +72,13 @@
 
 - 來源：GeoNames（https://www.geonames.org/），GeoNames 為 Unxos GmbH 的專案；資料檔 `cities15000`、`alternateNamesV2`、`admin1CodesASCII`、`countryInfo`，取自 https://download.geonames.org/export/dump/ （2026-11-21 版）
 - 授權：Creative Commons Attribution 4.0（CC BY 4.0），https://creativecommons.org/licenses/by/4.0/ 。依 GeoNames 原文：資料以 "as is" 提供，不保證準確、即時或完整。
-- 本站的修改：只取城市名、當地名、中文名、國家、一級行政區、經緯度（四捨五入到小數 4 位）、IANA 時區與人口；中文顯示名只取 zh-TW／zh-Hant／zh-HK 標籤，其他中文名只當搜尋鍵；不取歷史名與俗名。產生方式見 `scripts/build-places.mjs`，產出為 `lib/places/data.json`，由 `lib/places/search.ts` 搜尋。原始檔未收進本 repo。
+- 本站的修改：只取城市名、當地名、含漢字的中文名、國家、一級行政區、經緯度（四捨五入到小數 4 位）、IANA 時區與人口；不取歷史名與俗名。繁中顯示名依語言標籤選一個中文名，一律照 OpenCC s2tw 流程（詞表→字表→臺灣字形）轉為臺灣繁體；另以本站人工整理的臺灣慣用譯名（`lib/places/twNames.json`，城市如雪梨、杜拜、基隆，國名如寮國、北馬其頓）取代對應的顯示名。原中文名、轉換後名稱與臺灣譯名都可搜尋。產生方式見 `scripts/build-places.mjs`，產出為 `lib/places/data.json`，由 `lib/places/search.ts` 搜尋。原始檔未收進本 repo。
+
+## OpenCC（簡→繁字表，只在建檔時使用）
+
+- 來源：https://github.com/BYVoid/OpenCC 的 `data/dictionary/STPhrases.txt`、`STCharacters.txt`、`TWVariants.txt`（2026-11-21 取得）
+- 授權：Apache License 2.0，https://www.apache.org/licenses/LICENSE-2.0 ；作者 Carbo Kuo（BYVoid）及 OpenCC contributors（見該專案 AUTHORS）
+- 採用範圍：`scripts/build-places.mjs` 讀這三份字典，把 GeoNames 的中文地名轉成臺灣繁體；字表一字多繁時另依本站規則取字，並補一條「祕→秘」（見腳本檔頭）。字典本身未收進本 repo，執行期也不使用；`lib/places/data.json` 只含轉換後的地名。
 
 ## MIT License 全文（上列專案共用）
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { BirthPlace } from '@/lib/timezone';
+import { resolveZone, type BirthPlace } from '@/lib/timezone';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -19,14 +19,8 @@ export function defaultPlace(locale: Locale): BirthPlace | null {
 const SEARCH_LIMIT = 8;
 const DEBOUNCE_MS = 250;
 
-function isZone(zone: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
-}
+/** 這個瀏覽器能換算的時區(含 IANA 改名前的舊名),單一來源在 lib/timezone.ts */
+const isZone = (zone: string): boolean => resolveZone(zone) !== null;
 
 function manualPlace(z: string, la: string, lo: string): BirthPlace | null {
   const latN = Number(la);
@@ -76,7 +70,7 @@ export default function PlaceField({
         const params = new URLSearchParams({ q, locale, limit: String(SEARCH_LIMIT) });
         const res = await fetch(`/api/places?${params}`, { signal: ctrl.signal });
         if (!res.ok) throw new Error();
-        // 瀏覽器內建時區資料較舊時(如不認得 Europe/Kyiv),該城市無法換算偏移,不列出
+        // 本名與改名前舊名都不認得的時區(拆分出來的新時區,瀏覽器資料又太舊)無法換算偏移,不列出
         setResults((((await res.json()) as { places?: BirthPlace[] }).places ?? []).filter((p) => isZone(p.zone)));
       } catch {
         if (ctrl.signal.aborted) return;
