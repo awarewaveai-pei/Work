@@ -141,3 +141,4 @@ RISKS 處置：`agency-os/WORKLOG.md` 2026-11-21「oracle 批 6 併入六張」�
 - 待操作者回答（計畫 §4）：每日信要不要附 AI 段落（建議不要）；寄信服務（建議 Amazon SES）；寄送時間（建議當地 7 點）；好友合盤是否限本站會員（建議是）；以客戶「AwareWave 算命站」、自用 0 元、代操登記（建議是）。另：要不要先補系統的建站缺口再練習，或先由工程師手動開站（未問）。
 - 之後待派：W2、W3、P2–P4、S1–S6、G-ADR、G-GAP（計畫 §3）；L1 英文補齊、G1 全球實測、B8 完整度各卡；Kerykeion tests/core 未逐行讀（操作者未要求補）。
 - 2026-11-21 補：合盤改為**私人合盤**（不需對方是會員、不通知對方），見 `briefs/WP-front-door-plan.md` 檔頭修訂；計畫 §4 第 4 題已答。X2 `d512d1ab5`、P1 `6bed458fe` 工人已 commit 待審併；W1 等 critic。
+- 2026-11-21 補：操作者決定「先補系統功能，再由她自己直接在系統裡手動操作」。規劃 agent 進行中，產出 `briefs/SITE-FLOW-COMPLETION-PLAN.md`（讀完後整理 §4 給她決定，再派卡；next-admin 每日 03:00 自動部署，未完成的要用開關或 `DEPLOY_HOLD`）。E6c `54c78e564` 工人已 commit 待審併。
