@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-21（續16）— 系統總控中心 /ops/systems 批 1 上線：registry＋主機匯入器＋0174＋頁面（操作者：「三件都同意」）
+
+- 根因：15+ 系統散在約 15 個按階段開的監工頁＋2000 行 TASKS.md，操作者看不到各系統用途／進度／下一步，且很少跑 AO-CLOSE（人填或靠收工的寫入點都會失效）。
+- 設計：`agency-os/handoffs/2026-11-21-systems-control-center/PLAN.md`（GPT 三輪＋自審＋critic 12 條）。定義＝git `agency-os/systems/registry.json`；狀態＝`system_updates` append-only 事件；寫入點＝commit（路徑歸屬＋選填 trailer）；主機 04:30 匯入，經 `/api/internal/systems/ingest`；隔離不變量：追蹤工具故障只會讓資料過時。
+- 派工：W1 匯入器、W2 0174＋route＋頁面（Opus）；W3 registry（Outbound）＋遷移腳本、W4 監工台（Sonnet）。整合 `08816df48`；審查（critic warn 0c/4M/5m、db-expert 修後可套）→ 修正 `2706f2aa8` `99782e3d8` → db-expert 複審抓 C1：`store.ts:34` 註解吃掉 slug/name/position，每次 ingest 會回滾，tsc 與測試皆未抓 → `7a639eb5a` 修＋測試假 rpc 模擬 NOT NULL（突變紅→綠）＋id 不得跨系統搬移預檢。
+- 上線：正式庫 to_regclass 四表皆 null → `apply-db-migration.mjs 0174` APPLY_OK；main ff `73fab1033` 推送；GitHub main 開保護（禁強推、禁刪，不要求 PR／check）；主機 `.env` 加 `SYSTEMS_INGEST_TOKEN`（主機產生）＋`SYSTEMS_IMPORT_ENABLED=true`；compose 經 `safe-infra-patch.sh compose … next-admin`（healthy 15s，backup `docker-compose.yml.bak.safe-patch-20261121-123242`）；`/root/systems-mirror.git`；`sync-host-scripts.sh` 裝 2 檔；`install-host-schedules.sh` 裝 `/etc/cron.d/systems-import`（`30 20 * * *` UTC）。頁面隨今晚 03:00 自動部署上線，首次匯入 04:30。
+- 避免再發生：rpc 參數無型別 → route 測試的假 rpc 一律依 migration 的 NOT NULL 欄位拒收；`data.mjs` 監工頁 RISKS 正本，DISPATCH 不重複。
+- 待確認：2026-11-22 04:30 首次匯入結果（/ops/schedules `systems_import`、/ops/systems 最後成功時間）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（next-admin 全套，systems-int） → 622 files／5134 passed | exit=0 | ms=900000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo python3 systems-import.py --dry-run（主機 mirror，90 天）→ 134 activity＋1 revert＋import_run ok，dead_source_paths 0 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 驗 0174：四表 RLS on、anon/authenticated 權限 0、service_role 最小授權、TRUNCATE 42501、ledger 有列 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/5n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=SYSTEMS_INGEST_TOKEN | hits=14
+- ORACLE_WAIVED: Codex 額度到 11/24；改以 critic（整批）＋db-expert 兩輪＋突變證據代替
 ## 2026-11-21（續15）— 部署待上線項目：next-admin 與 oracle-web 上線 `acf182549`（修 main 上 CI 紅燈後）
 
 - 操作者：「部署已完成待上線的所有項目」。盤點：next-admin 主機在 `c9e911c7f`，main 多 22 commit；oracle-web 主機在 `4adb301f3`，main 多 31 commit（批 5–8、E6b、X1、E6c、X2、W1）。video-workbench／video-service／remotion 已是最新。oracle-wp-plugin（P1）不是可部署服務，未動。無 `DEPLOY_HOLD`。
