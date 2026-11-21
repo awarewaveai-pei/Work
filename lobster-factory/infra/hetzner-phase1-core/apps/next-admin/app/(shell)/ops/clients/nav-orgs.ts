@@ -41,7 +41,7 @@ const ORG_COLORS = [
 ];
 
 /** metadata.color, else a palette color from the slug: the same client gets the same dot in the list and in search. */
-export function orgColor(slug: string, color: unknown): string {
+function orgColor(slug: string, color: unknown): string {
   if (typeof color === "string" && color) return color;
   let h = 0;
   for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;

@@ -13,7 +13,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Human-facing bootstrap: names/IDs are resolved once, then projects carry tenant context.
  *  ?first=1 (the client block, OrgPicker.tsx): the first NAV_FIRST clients as PickOrg plus `total` and `scoped`
  *  (true = a customer, who sees only its own organization and gets no search); &include=<uuid> adds that client when it
- *  is outside the first page. ?q= = the block's search. Without ?first / ?q the answer is as before (the video workbench's switch dialog reads it). */
+ *  is outside the first page. ?q= = the block's search. Active organizations only on every path, as the legacy answer
+ *  (a suspended client is not offered). Without ?first / ?q the answer is as before (the workbench's switch dialog). */
 export async function GET(req: Request): Promise<Response> {
   if (!canCreateAiImageJob(resolveOpsRole(req).role)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   const db = getSupabaseWriteClient(); if (!db) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
@@ -27,21 +28,21 @@ export async function GET(req: Request): Promise<Response> {
     // the block's search (?q=), the same match as GET /api/ops/org-search; a customer searches only its own organization
     const q = orgSearchTerm(params.get("q"));
     if (!q) return NextResponse.json({ ok: true, orgs: [] });
-    let hits = db.from("organizations").select(cols).neq("status", "inactive").or(orgNameFilter(q)).order("created_at", { ascending: true }).limit(NAV_SEARCH_LIMIT);
+    let hits = db.from("organizations").select(cols).eq("status", "active").or(orgNameFilter(q)).order("created_at", { ascending: true }).limit(NAV_SEARCH_LIMIT);
     if (own) hits = hits.eq("id", own);
     const { data, error } = await hits;
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, orgs: (data ?? []).map(toPickOrg) });
   }
   if (params.get("first") === "1") {
-    let page = db.from("organizations").select(cols, { count: "exact" }).neq("status", "inactive").order("created_at", { ascending: true }).limit(NAV_FIRST);
+    let page = db.from("organizations").select(cols, { count: "exact" }).eq("status", "active").order("created_at", { ascending: true }).limit(NAV_FIRST);
     if (own) page = page.eq("id", own);
     const { data, error, count } = await page;
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     const orgs = (data ?? []).map(toPickOrg);
     const include = params.get("include");
     if (!own && include && UUID.test(include) && !orgs.some((o) => o.id === include)) {
-      const one = await db.from("organizations").select(cols).neq("status", "inactive").eq("id", include).maybeSingle();
+      const one = await db.from("organizations").select(cols).eq("status", "active").eq("id", include).maybeSingle();
       if (one.data) orgs.unshift(toPickOrg(one.data));
     }
     return NextResponse.json({ ok: true, orgs, total: count ?? orgs.length, scoped: Boolean(own) });

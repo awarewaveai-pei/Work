@@ -21,7 +21,8 @@ const NAV_STYLE: React.CSSProperties = {
 /** The client slug the current path is under (/ops/clients/<slug>[/...]), or null. */
 function slugIn(pathname: string): string | null {
   const m = /^\/ops\/clients\/([^/]+)/.exec(pathname);
-  return m ? decodeURIComponent(m[1]) : null;
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]); } catch { return m[1]; }   // a malformed %-escape must not crash the sidebar
 }
 
 export function ClientPanelNav({ orgs, total }: { orgs: PickOrg[]; total: number }) {

@@ -117,9 +117,11 @@ describe("organizations reads are bounded", () => {
 // client picker: every first-page / search read of organizations filters it out (2026-11-06, the second Soulful).
 describe("client pickers hide inactive organizations", () => {
   it("every organizations read limited to NAV_FIRST or NAV_SEARCH_LIMIT filters status inactive", () => {
+    // neq inactive, or eq active (stricter: active only -- the video tools' bootstrap, which also hides suspended)
     const missing = ["app", "lib", "components"].flatMap((d) => sources(path.join(ROOT, d))).filter((f) => {
       const text = readFileSync(f, "utf8");
-      return /from\("organizations"\)/.test(text) && /limit\(NAV_(FIRST|SEARCH_LIMIT)\)/.test(text) && !text.includes('neq("status", "inactive")');
+      return /from\("organizations"\)/.test(text) && /limit\(NAV_(FIRST|SEARCH_LIMIT)\)/.test(text)
+        && !text.includes('neq("status", "inactive")') && !text.includes('eq("status", "active")');
     }).map(posix);
     expect(missing).toEqual([]);
   });

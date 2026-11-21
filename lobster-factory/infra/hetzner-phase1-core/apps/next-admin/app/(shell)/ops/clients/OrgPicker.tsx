@@ -16,7 +16,7 @@ export type OrgFilter = "brandColors";
 
 /** Server search for `search` at `path` (?q=, debounced). found = null while no search runs; failed = the last search did
  *  not answer. The route answers { ok, orgs: PickOrg[] }. */
-export function useOrgSearch(search: string, path: string, filter?: OrgFilter): { found: PickOrg[] | null; failed: boolean } {
+function useOrgSearch(search: string, path: string, filter?: OrgFilter): { found: PickOrg[] | null; failed: boolean } {
   const [found, setFound] = useState<PickOrg[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -46,11 +46,11 @@ export function useOrgSearch(search: string, path: string, filter?: OrgFilter): 
 const note: React.CSSProperties = { fontSize: 11, color: "var(--text-muted)", padding: "8px" };
 
 /** One client row: colour dot + name, the picked one on the accent tint (theme tokens only). */
-function rowStyle(on: boolean): React.CSSProperties {
+function rowStyle(on: boolean, disabled = false): React.CSSProperties {
   return {
     font: "inherit",   // first: the longhands below override it (a <button> does not inherit the page font)
     display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left",
-    padding: "7px 8px", marginBottom: 1, borderRadius: 6, border: "none", cursor: "pointer",
+    padding: "7px 8px", marginBottom: 1, borderRadius: 6, border: "none", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1,
     fontSize: 12, textDecoration: "none",
     background: on ? "var(--accent-light)" : "transparent",
     color: on ? "var(--accent-text)" : "var(--text-primary)",
@@ -88,9 +88,11 @@ export interface OrgPickerProps {
   searchable?: boolean;
   /** Fill the parent's height (a sidebar); otherwise a box of at most 320px wide, 280px of rows. */
   fill?: boolean;
+  /** Every row and the search box disabled (a caller mid-work that must not switch client). */
+  disabled?: boolean;
 }
 
-export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor, none, filter, searchPath, searchable = true, fill = false }: OrgPickerProps) {
+export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor, none, filter, searchPath, searchable = true, fill = false, disabled = false }: OrgPickerProps) {
   const [search, setSearch] = useState("");
   const { found, failed } = useOrgSearch(searchable ? search : "", searchPath, filter);
   // a client picked from search results stays on screen once the search box is cleared
@@ -112,6 +114,7 @@ export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor,
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            disabled={disabled}
             placeholder="搜尋客戶..."
             aria-label="搜尋客戶"
             style={{
@@ -124,7 +127,7 @@ export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor,
       )}
       <div role="group" aria-label="客戶" style={{ padding: 6, overflowY: "auto", ...(fill ? { flex: 1 } : { maxHeight: 280 }) }}>
         {none !== undefined && found === null && !hrefFor && (
-          <button type="button" aria-pressed={selected === null} onClick={() => pick(null)} style={rowStyle(selected === null)}>
+          <button type="button" aria-pressed={selected === null} disabled={disabled} onClick={() => pick(null)} style={rowStyle(selected === null, disabled)}>
             <span style={{ flex: 1 }}>{none}</span>
           </button>
         )}
@@ -135,7 +138,7 @@ export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor,
               <RowBody org={org} />
             </Link>
           ) : (
-            <button key={org.id} type="button" aria-pressed={on} onClick={() => pick(org)} style={rowStyle(on)}>
+            <button key={org.id} type="button" aria-pressed={on} disabled={disabled} onClick={() => pick(org)} style={rowStyle(on, disabled)}>
               <RowBody org={org} />
             </button>
           );
