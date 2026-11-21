@@ -223,7 +223,22 @@
     "readingTitle": "依此卦該讀的經文",
     "readingMethod": "依朱熹《易學啟蒙》的變爻讀法",
     "readingMain": "主讀",
-    "readingNote": ""
+    "readingNote": "",
+    "najiaTitle": "六爻納甲",
+    "najiaSummary": "{palace}宮・五行屬{wuxing}・{generation}卦・起卦日 {day}・旬空 {void}",
+    "colSpirit": "六神",
+    "colRelative": "六親",
+    "colGanZhi": "納甲",
+    "colLine": "本卦",
+    "colMark": "世應",
+    "colChanged": "變爻",
+    "shi": "世",
+    "ying": "應",
+    "voidMark": "空",
+    "lineNames": ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"],
+    "relatives": { "父母": "父母", "兄弟": "兄弟", "子孫": "子孫", "妻財": "妻財", "官鬼": "官鬼" },
+    "spirits": { "青龍": "青龍", "朱雀": "朱雀", "勾陳": "勾陳", "螣蛇": "螣蛇", "白虎": "白虎", "玄武": "玄武" },
+    "najiaNote": ""
   },
   "tarot": {
     "title": "塔羅占卜",

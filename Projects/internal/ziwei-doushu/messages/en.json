@@ -223,7 +223,22 @@
     "readingTitle": "The classic text to read for this cast",
     "readingMethod": "Changing-line rules after Zhu Xi’s Yixue Qimeng",
     "readingMain": "Leading",
-    "readingNote": "The text is shown in its original classical Chinese; the reading below explains it in English."
+    "readingNote": "The text is shown in its original classical Chinese; the reading below explains it in English.",
+    "najiaTitle": "Six-line Na Jia chart",
+    "najiaSummary": "Palace {palace} · element {wuxing} · {generation} · cast on day {day} · void branches {void}",
+    "colSpirit": "Spirit",
+    "colRelative": "Relation",
+    "colGanZhi": "Stem & branch",
+    "colLine": "Line",
+    "colMark": "Self / Response",
+    "colChanged": "Changes to",
+    "shi": "Self",
+    "ying": "Response",
+    "voidMark": "void",
+    "lineNames": ["Line 1", "Line 2", "Line 3", "Line 4", "Line 5", "Line 6"],
+    "relatives": { "父母": "Parents", "兄弟": "Siblings", "子孫": "Offspring", "妻財": "Wealth", "官鬼": "Officer" },
+    "spirits": { "青龍": "Azure Dragon", "朱雀": "Vermilion Bird", "勾陳": "Gou Chen", "螣蛇": "Teng Snake", "白虎": "White Tiger", "玄武": "Black Tortoise" },
+    "najiaNote": "The palace, its generation, the stems, branches and elements are shown in their Chinese names."
   },
   "tarot": {
     "title": "Tarot Reading",

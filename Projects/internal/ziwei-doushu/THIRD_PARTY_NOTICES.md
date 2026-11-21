@@ -46,6 +46,12 @@
 
 另：`lib/astrologyAspects.ts` 的容許度數值（合／沖／拱／刑 6°、六合 5°、日月 +1.5°）與 Kerykeion（AGPL-3.0）預設值一致；這是主流本命盤的公開慣例數值，僅取數值，未取用 Kerykeion 的任何程式或文字。
 
+## ichingpy
+
+- 來源：https://github.com/JinyangWang27/ichingpy
+- 授權：MIT License，Copyright (c) 2024 Jinyang Wang
+- 採用範圍：六爻納甲規則（`src/ichingpy/divination/six_lines.py` 的納干、納支、世應、六親、六神；`model/sexagenary_cycle.py` 的旬空算法），依京房通行口徑以 TypeScript 自行重寫於 `lib/iching/najia.ts`；八宮歸屬以 64 卦逐宮對照傳統表測試，未複製原始碼。
+
 ## MIT License 全文（上列專案共用）
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
