@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-21（續9）— oracle 併入 A3、V1、A4、E7、Z3、E5、E6a；門面改 WordPress 的方向待操作者確認
+
+- 併入 main（`Projects/internal/ziwei-doushu/`，**未部署**；commit 主旨前綴可 `git log --grep` 找）：A3 行運／合盤／太陽回歸；V1 吠陀占星（新系統與頁面 `/vedic`）；A4 法達、黃道釋放、十年期、19 個阿拉伯點、與太陽距離（行星時未做：`@xalen/wasm` 無日出日落 API）；E7 外部基準測試；Z3 輔星雜曜十二神要點（含 critic 修正）；E5 出生地時區／歷史夏令時間／晚子時選項；E6a 全球城市資料與 `/api/places`。監工 commit：`6abe3a6a9`（A3、V1 在 `next.config.ts`、`lib/astrology.ts` 的手動合併——「兩邊都留」的自動解衝突對程式碼會產生無效 TS）、`e7bca2155`（渙九二「機」→「机」）。
+- E7 結果（引擎未改）：占星對 JPL Horizons 10 時刻 × 10 星，最大差月亮 11.3″、其餘 ≤2.9″（`lib/fixtures/jpl-horizons-geocentric.json`）；節氣對香港天文台 2020／2024／2028 共 72 個，最大差 0.52 分鐘（`lib/fixtures/hko-solar-terms.json`）；易經 450 條對維基文庫，20 處差異逐條裁定寫在 `lib/iching/text.reference.test.ts` `RULINGS`；紫微找不到有出處的出版命盤，未做。
+- E5 行為變化：表單預設台北＋真太陽時 → 1945–1979 夏令時間期間出生者時辰改正；八字起運小幅變動；節氣或春節前後出生者年柱、月柱、生肖可能改變（年月柱改以北京時間的出生瞬間判定節氣）。工人比對 2835 組 UTC+8 輸入：未啟用真太陽時 0 差異、紫微 0 差異。`DEFAULT_DAY_DIVIDE` 由 `lib/ziwei.ts` 移到 `lib/dates.ts`（八字也要讀，避免把 iztro 拉進八字頁）——監工同意。
+- RISKS 處置：
+  - Z3 critic M1（十二神要點與流耀換算只有測試在用）→ 工人已改：十二神依組別顯示在逐宮解讀、流耀換算刪除、頁面列出星曜要點；m2–m5 已修。
+  - E7「革卦巳日與維基『已日』不合」→ 保留「巳日」（維基該頁自標完成度 50%、未註明底本）；列為待人工對照阮刻本。「萃卦辭『亨』」「大畜九三」「困九二享祀」「井九五洌／冽」→ 保留，同列待核。
+  - E5「24 小時內兩次時區切換」「英國 1941–45 雙重夏令時間只扣 1 小時」→ 接受並記錄（極少見；後者列入 G1 全球檢查）。「每日運勢、合婚結果頁未顯示時區提示」「占星、吠陀表單未改用 `BirthPlace`」→ 併入 E6b。
+  - E6a 資料 2.2MB → 走伺服器端 `/api/places`，不進前端 bundle；頁面上的 GeoNames 署名留給 E6b。
+  - A4「高緯度時 4 個用宮頭的阿拉伯點隨替代宮制變動但說明仍寫 Placidus」→ 既有缺口，列入 G1。
+  - A3 動到卡片外三檔（共用相位比對、facts 組裝、`next.config.ts` wasm 追蹤）→ 合理，接受；wasm 追蹤逐路由列舉的脆弱性已寫進 X1 卡。
+- 方向變更（待確認，未動工）：操作者 2026-11-21 要求 oracle.aware-wave.com 改用 WordPress 架設、設單獨的網站帳號、訂閱後自動寄信。監工建議：WordPress 當門面（帳號、訂閱寄信、內容），現有引擎留作後端，以一支 WP 外掛嵌入工具並串身分與每日內容；X1 對外介面為其地基。原「沿用 next-admin Supabase 登入」的規劃 agent 已停止，無產出檔。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd D:/Worktrees/Work/oracle-int/Projects/internal/ziwei-doushu && npx tsc --noEmit && npx vitest run → 46 檔 416 passed／3 skipped；messages 兩檔 JSON.parse 通過 | exit=0 | ms=6000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/5n（Z3 由監工派 critic，1 Major 5 Minor 皆已由工人修正；A3、V1、A4、E5、E6a 各工人自帶 critic 無 Critical／Major）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/ziwei-doushu | grep=DEFAULT_DAY_DIVIDE | hits=8
+- rollback：各卡一個 commit，可個別 `git revert`；E5 撤回即回到固定 UTC+8。
 ## 2026-11-21（續8）— 影片監工：正式站瀏覽器驗收四個畫面；R6–R10 併入 main（操作者：「派工」「R6、R7 去處理好」「做成一個積木 lego，並強制規定」）
 
 - 瀏覽器驗收（app／video.aware-wave.com，內建瀏覽器）：U3.5 一鍵腳本鈕與標價、U7.1 下載 SRT／VTT 與改字幕、N16 兩頁篩選、R2／R3 片頭卡片皆可用；付費鈕與重燒未按。監工誤存 AwareWave 片頭「橫幅字卡」一次，已改回並重新整理確認。
