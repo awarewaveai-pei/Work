@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-21（續18）— 系統總控中心批 3：29 系統盤點、頁面照參考面板改版、6 個已結束監工頁搬入並凍結（操作者：「要,然後有一個面板讓你參考」「可以」）
+
+- 派工：W5 盤點（Opus，`ae2f28a73` `97ddaa9dc`）、W6 頁面改版（Sonnet，`cd2b52d07` `dd22ec024`）；參考面板存 `agency-os/handoffs/2026-11-21-systems-control-center/reference/ops-systems-prototype.html`。原型的下拉、立即更新、新增系統、自帶配色不採用（UI 規則與設計決定）。
+- 根因 C1（critic）：`[slug]/page.tsx:53` 文字用 `var(--accent)`，全套 `accent-not-text.test.ts` 紅會擋部署 → `var(--accent-text)`。M：`legacyDone` 未經 `liveEvents`；「尚未盤點」以 counted 判斷，功能全在舊頁時誤標 → `progressKind`。
+- 卡號對照：監工頁卡號（`ED.1`、`批0`）無法靠 slug 慣例對上 → registry feature 加選填 `legacy_code`，遷移精確比對（無 code 的頁用卡片編號）；14 頁 unmapped 全 0。凍結從 outbound 自寫常數改進 `scripts/supervisor-kit/check.mjs`：頁旁 `FROZEN.json {sha256}` 即唯讀（`1ee682419`）。
+- 上線：main `fea1d62d7`，`sg-deploy.sh next-admin` healthy、smoke 全 200；主機 state 改名 `.before-full-reimport` 後重匯 90 天 → 4540 events／10 批；正式庫 systems 29、features 145、29 系統皆有 activity。6 頁搬入（51 migration events，6 phases）＋凍結 `f11c4ceaa`。未搬 7 頁原因見該 commit。
+- 避免再發生：新監工頁的卡要能被 `legacy_code` 對上（盤點 dry-run `unclaimed_supervisors` 會列出）；凍結只用共用檢查，不再每頁自寫。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（next-admin 全套，systems-int3）→ 623 files／5142 passed | exit=0 | ms=900000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → smoke all endpoints OK；systems-import 重匯 → imported 4540 event(s)；psql 29|145|29|4545 | exit=0 | ms=420000
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl POST /api/internal/systems/ingest（6 頁遷移）→ {"ok":true,"inserted":51,"skipped":0} | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=凍結突變：凍結頁 data.mjs 追加一行 → node check.mjs 擋「已移到 /ops/systems」；還原 → ok | exit=0 | ms=1000
+- REVIEW_DONE: critic=Standard | verdict=fail→pass | findings=1c/2m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=legacy_code | hits=164
+- ORACLE_WAIVED: Codex 額度到 11/24；critic 審 W6、W5 契約差異自審＋測試＋突變證據
 ## 2026-11-21（續17）— 系統總控中心手動提前部署 next-admin `246a449a4`＋首次匯入（操作者：「都好了嗎? 如果好了就部署」）
 
 - 前置：`check-deploy-drift.ps1` composeVarDrift 空（`SYSTEMS_INGEST_TOKEN` repo 與 prod 一致），落後 15 commit＝本次內容；無 `DEPLOY_HOLD`。
