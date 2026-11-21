@@ -267,7 +267,10 @@
     "computing": "Casting…",
     "ascendant": "Ascendant",
     "mc": "Midheaven (MC)",
-    "house": "House"
+    "house": "House",
+    "aspects": "Major aspects (tightest first)",
+    "noAspects": "No major aspects fall within orb in this chart.",
+    "aspectsNote": "Orbs: conjunction, square, trine and opposition 6°, sextile 5°; 1.5° wider when the Sun or Moon is involved. Applying = the two bodies are moving toward the exact angle; separating = moving away. Ascendant and MC are not included."
   },
   "fengshui": {
     "title": "Feng Shui Flying Stars",

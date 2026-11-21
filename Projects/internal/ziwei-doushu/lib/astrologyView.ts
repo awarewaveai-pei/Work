@@ -1,6 +1,7 @@
 import type { Locale } from './i18n/config';
 import type { BodyKey, WesternChart } from './astrology';
 import type { InterpretationContext } from './divination/types';
+import type { Aspect, AspectKey } from './astrologyAspects';
 
 /**
  * 西洋占星「顯示層」— 純函式、client/server 共用(type-only import,不拉 wasm)。
@@ -31,6 +32,40 @@ export const BODY_NAMES: Record<BodyKey, Record<Locale, string>> = {
   northNode: { 'zh-TW': '北交點', en: 'North Node' },
   chiron: { 'zh-TW': '凱龍星', en: 'Chiron' },
 };
+
+export const ASPECT_NAMES: Record<AspectKey, Record<Locale, string>> = {
+  conjunction: { 'zh-TW': '合相', en: 'Conjunction' },
+  sextile: { 'zh-TW': '六合', en: 'Sextile' },
+  square: { 'zh-TW': '刑相', en: 'Square' },
+  trine: { 'zh-TW': '拱相', en: 'Trine' },
+  opposition: { 'zh-TW': '沖相', en: 'Opposition' },
+};
+
+/**
+ * 給 AI 的相位 facts 上限:interpret route 最多 60 條,上升/天頂 2 + 星體 12 = 14,
+ * 相位最多取偏離最小的 40 條(chart.aspects 已依偏離排序),總數 ≤ 54。
+ */
+export const MAX_ASPECT_FACTS = 40;
+
+export function aspectName(aspect: AspectKey, locale: Locale): string {
+  return ASPECT_NAMES[aspect][locale];
+}
+
+/** 「太陽 合相 月亮」 */
+export function aspectLabel(a: Aspect<BodyKey>, locale: Locale): string {
+  return `${bodyName(a.a, locale)} ${aspectName(a.aspect, locale)} ${bodyName(a.b, locale)}`;
+}
+
+/** 偏離度數(一位小數)+ 入相/出相 */
+export function aspectDetail(a: Aspect<BodyKey>, locale: Locale): string {
+  const orb = a.orb.toFixed(1);
+  if (locale === 'en') {
+    const motion = a.applying === null ? '' : a.applying ? ', applying' : ', separating';
+    return `orb ${orb}°${motion}`;
+  }
+  const motion = a.applying === null ? '' : a.applying ? '・入相' : '・出相';
+  return `偏離 ${orb}°${motion}`;
+}
 
 export function signName(signIndex: number, locale: Locale): string {
   return SIGN_NAMES[locale][signIndex] ?? '?';
@@ -77,6 +112,9 @@ export function astrologyContext(
       label: bodyName(p.body, locale),
       value: planetLine(p.signIndex, p.house, p.retrograde, locale),
     });
+  }
+  for (const a of chart.aspects.slice(0, MAX_ASPECT_FACTS)) {
+    facts.push({ label: aspectLabel(a, locale), value: aspectDetail(a, locale) });
   }
 
   const sun = chart.planets.find((p) => p.body === 'sun');

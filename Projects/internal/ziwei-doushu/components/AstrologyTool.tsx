@@ -4,6 +4,8 @@ import { useState } from 'react';
 import AiReading from '@/components/AiReading';
 import {
   astrologyContext,
+  aspectDetail,
+  aspectName,
   bodyName,
   signName,
   degInSign,
@@ -122,6 +124,25 @@ export default function AstrologyTool({
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="glass-card p-4 mt-5">
+            <h2 className="label-dark" style={{ marginBottom: '0.5rem' }}>{t.aspects}</h2>
+            {chart.aspects.length === 0 ? (
+              <p style={{ color: 'var(--text-caption)', fontSize: '0.8125rem' }}>{t.noAspects}</p>
+            ) : (
+              <ul style={{ display: 'grid', gap: '0.3rem', fontSize: '0.8125rem' }}>
+                {chart.aspects.map((a) => (
+                  <li key={`${a.a}-${a.b}`} className="flex flex-wrap gap-x-2">
+                    <span style={{ color: 'var(--text-heading)' }}>{bodyName(a.a, locale)}</span>
+                    <span style={{ color: 'var(--gold-400)', fontWeight: 600 }}>{aspectName(a.aspect, locale)}</span>
+                    <span style={{ color: 'var(--text-heading)' }}>{bodyName(a.b, locale)}</span>
+                    <span style={{ color: 'var(--text-caption)' }}>{aspectDetail(a, locale)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p style={{ color: 'var(--text-caption)', fontSize: '0.7rem', marginTop: '0.5rem' }}>{t.aspectsNote}</p>
           </div>
 
           <AiReading context={astrologyContext(chart, locale)} ai={dict.ai} />

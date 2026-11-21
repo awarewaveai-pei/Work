@@ -1,6 +1,7 @@
 import { initSync, XalenWasm } from '@xalen/wasm';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { computeAspects, type Aspect } from './astrologyAspects';
 
 /**
  * 西洋占星本命盤引擎 — 自架 XALEN(@xalen/wasm,Apache-2.0,**無需 API key**)。
@@ -44,6 +45,8 @@ export interface WesternPlanet {
   /** 落入宮位 1–12 */
   house: number;
   retrograde: boolean;
+  /** 黃經速度(度/日,XALEN lon_speed;負 = 逆行) */
+  speed: number;
 }
 
 export interface WesternChart {
@@ -53,6 +56,8 @@ export interface WesternChart {
   /** 12 宮頭黃道度 */
   houseCusps: number[];
   planets: WesternPlanet[];
+  /** 本命主要相位,依偏離由小到大(lib/astrologyAspects.ts) */
+  aspects: Aspect<BodyKey>[];
   /** 高緯(|lat|≳66.5°)Placidus 退化,XALEN 改用替代宮位制 */
   fallbackHouses: boolean;
 }
@@ -153,13 +158,14 @@ export function computeWesternChart(req: WesternRequest): WesternChart {
   const planets: WesternPlanet[] = WESTERN_BODIES.map((b) => {
     const p = JSON.parse(
       w.planetPositionJson(jd, b.id, false, 0),
-    ) as { longitude: number; is_retrograde: boolean };
+    ) as { longitude: number; lon_speed: number; is_retrograde: boolean };
     return {
       body: b.key,
       longitude: p.longitude,
       signIndex: signIndexOf(p.longitude),
       house: houseOf(p.longitude, cusps),
       retrograde: Boolean(p.is_retrograde),
+      speed: p.lon_speed,
     };
   });
 
@@ -169,6 +175,7 @@ export function computeWesternChart(req: WesternRequest): WesternChart {
     mc: { longitude: mcDeg, signIndex: signIndexOf(mcDeg) },
     houseCusps: cusps,
     planets,
+    aspects: computeAspects(planets),
     fallbackHouses: Boolean(houses.fallback_used),
   };
 }
