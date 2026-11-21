@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-21（續20）— 合成頁右欄：設計圖＋模式鍵剛好填滿第一屏；右欄加寬（操作者：按鍵字變兩行）
+
+[根因] 續19 用 `calc(100vh - 320px)` 猜剩餘高度，模式鍵不一定剛好在螢幕底；右欄 360px，「模特兒印製」等鍵換行。
+[不變量] 產品預設庫＋設計圖＋模式鍵包成一塊，`minHeight` = 視窗高 − 該塊頁面座標 top − 32（面板 padding 14＋邊框 2＋頁 padding 16），resize 重算；設計圖清單 `flex: 1 1 0px`、最少 132px 吃剩餘空間；預設庫展開時整塊變高、不疊到下方控制。右欄 440px，模式鍵 `nowrap`。
+[已修改] `MockupStudio.tsx`（`firstScreen` ref＋高度、右欄 440px、續19 的 calc 刪除）。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Browser | cmd=preview next-admin-ui-3903 /tools/mockup，JS 讀 getBoundingClientRect | exit=0 | ms=20000 | result=innerHeight 768：模式鍵 bottom 736、高 38（單行）、scrollHeight 768（無溢出）
+- vitest mockup 25 passed；tsc 0；eslint 0。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02；版面改動，實測截圖為證
+- BUGHUNT_WAIVED: NA -- 單檔版面；續19 的 calc 已刪（grep "100vh - 320px" hits=0）
+[rollback] `git revert <本 commit>`。
 ## 2026-11-21（續19）— 合成頁設計圖清單改成跟螢幕一樣高（操作者截圖：只看得到兩排）
 
 [根因] 設計圖清單固定 `maxHeight: 132`（`MockupStudio.tsx` 設計圖區），四個模式共用，一次只看得到兩排。

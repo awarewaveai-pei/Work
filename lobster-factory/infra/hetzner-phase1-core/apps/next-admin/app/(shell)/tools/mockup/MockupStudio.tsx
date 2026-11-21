@@ -573,76 +573,93 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     cursor: "pointer",
   });
 
+  // The first screen of the right column ends at the bottom of the window: its height = window height minus its top
+  // (page coordinates) minus the panel's bottom padding and border and the page's bottom padding (14 + 2 + 16).
+  const firstScreen = useRef<HTMLDivElement>(null);
+  const [firstScreenH, setFirstScreenH] = useState<number | null>(null);
+  useEffect(() => {
+    const fit = () => {
+      const el = firstScreen.current;
+      if (el) setFirstScreenH(Math.max(360, window.innerHeight - (el.getBoundingClientRect().top + window.scrollY) - 32));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16, padding: 16, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 440px", gap: 16, padding: 16, alignItems: "start" }}>
       {/* ── Controls (right column) ──────────────────────────── */}
       <div className="build-panel" style={{ gridColumn: 2, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
 
-        {/* ── Preset Library ── */}
-        <div style={{ border: "1px solid #333", borderRadius: 6 }}>
-          <button
-            className="btn-secondary"
-            style={{ width: "100%", textAlign: "left", padding: "6px 10px", borderRadius: 6 }}
-            onClick={() => setPresetsOpen((v) => !v)}
-          >
-            {presetsOpen ? "[-]" : "[+]"} 產品預設庫
-          </button>
-          {presetsOpen && (
-            <div style={{ padding: "8px 10px" }}>
-                <div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                    {productPresets.length === 0 && <p style={{ fontSize: 12, opacity: 0.5 }}>尚無產品預設</p>}
-                    {productPresets.map((p) => (
-                      <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => { if (p.object_url) { setDesignRef(p.object_url); setDesignThumb(p.object_url); setDesignName(p.metadata?.preset_name ?? ""); } }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111" }} />
-                        <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.metadata?.preset_name ?? "預設"}</div>
-                        <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); void deleteProductPreset(p.id); }}>✕</button>
-                      </div>
-                    ))}
+        {/* Preset library + design picker + mode tabs fill the first screen: the picker takes what is left (at least 132px;
+            an open preset library makes the block taller instead of overlapping the controls below). */}
+        <div ref={firstScreen} style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: firstScreenH ?? undefined }}>
+          {/* ── Preset Library ── */}
+          <div style={{ border: "1px solid #333", borderRadius: 6 }}>
+            <button
+              className="btn-secondary"
+              style={{ width: "100%", textAlign: "left", padding: "6px 10px", borderRadius: 6 }}
+              onClick={() => setPresetsOpen((v) => !v)}
+            >
+              {presetsOpen ? "[-]" : "[+]"} 產品預設庫
+            </button>
+            {presetsOpen && (
+              <div style={{ padding: "8px 10px" }}>
+                  <div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                      {productPresets.length === 0 && <p style={{ fontSize: 12, opacity: 0.5 }}>尚無產品預設</p>}
+                      {productPresets.map((p) => (
+                        <div key={p.id} style={{ position: "relative", cursor: "pointer" }} onClick={() => { if (p.object_url) { setDesignRef(p.object_url); setDesignThumb(p.object_url); setDesignName(p.metadata?.preset_name ?? ""); } }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={p.object_url!} alt={p.metadata?.preset_name ?? p.id} style={{ width: 64, height: 80, objectFit: "cover", borderRadius: 4, background: "#111" }} />
+                          <div style={{ fontSize: 10, textAlign: "center", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.metadata?.preset_name ?? "預設"}</div>
+                          <button style={{ position: "absolute", top: 0, right: 0, fontSize: 9, background: "var(--red)", color: "var(--btn-primary-text)", border: "none", borderRadius: 2, cursor: "pointer", padding: "1px 3px" }} onClick={(e) => { e.stopPropagation(); void deleteProductPreset(p.id); }}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>上傳產品圖</div>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" style={{ fontSize: 11, marginBottom: 4 }} onChange={(e) => setProductUploadFile(e.target.files?.[0] ?? null)} />
+                    {productUploadFile && <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => void saveProductPreset()}>存為產品預設</button>}
                   </div>
-                  <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>上傳產品圖</div>
-                  <input type="file" accept="image/png,image/jpeg,image/webp" style={{ fontSize: 11, marginBottom: 4 }} onChange={(e) => setProductUploadFile(e.target.files?.[0] ?? null)} />
-                  {productUploadFile && <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => void saveProductPreset()}>存為產品預設</button>}
-                </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── My Designs ── */}
-        <div style={{ fontSize: 13 }}>
-          設計圖（My Designs 點選，或上傳）
-          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-            {([["print", "設計圖"], ["tarot", "塔羅牌"]] as const).map(([g, label]) => (
-              <button key={g} type="button" className={designGroup === g ? "btn-primary" : "btn-secondary"} style={{ fontSize: 11, padding: "2px 10px" }}
-                onClick={() => setDesignGroup(g)}>{label}</button>
-            ))}
+              </div>
+            )}
           </div>
-          {/* As tall as the screen allows; ~320px is left for the panel header, upload, selected design and the mode tabs. */}
-          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap", maxHeight: "max(132px, calc(100vh - 320px))", overflowY: "auto" }}>
-            {designs.map((d) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={d.id} src={d.object_url!} alt={d.metadata?.prompt ?? d.id}
-                style={{ width: 56, height: 56, objectFit: "contain", background: "#111", ...selectStyle(designRef === d.object_url) }}
-                onClick={() => { setDesignRef(d.object_url); setDesignThumb(d.object_url); setDesignName(designLabel(d)); }}
-              />
-            ))}
-          </div>
-          <input type="file" accept="image/png,image/jpeg,image/webp" style={{ width: "100%", marginTop: 6 }} onChange={(e) => void onUploadDesign(e.target.files)} />
-          {designThumb && (
-            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.7 }}>
-              已選設計：{/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={designThumb} alt="selected design" style={{ width: 40, height: 40, objectFit: "contain", background: "#111", verticalAlign: "middle", marginLeft: 6, borderRadius: 4 }} />
-            </div>
-          )}
-        </div>
 
-        {/* ── Mode tabs ── */}
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className={mode === "model" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("model")}>模特</button>
-          <button className={mode === "flat" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("flat")}>平拍</button>
-          <button className={mode === "printful" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("printful")}>Printful</button>
-          <button className={mode === "library" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("library")}>模特兒印製</button>
+          {/* ── My Designs ── */}
+          <div style={{ fontSize: 13, flex: "1 1 0px", display: "flex", flexDirection: "column" }}>
+            設計圖（My Designs 點選，或上傳）
+            <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+              {([["print", "設計圖"], ["tarot", "塔羅牌"]] as const).map(([g, label]) => (
+                <button key={g} type="button" className={designGroup === g ? "btn-primary" : "btn-secondary"} style={{ fontSize: 11, padding: "2px 10px" }}
+                  onClick={() => setDesignGroup(g)}>{label}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap", alignContent: "flex-start", flex: "1 1 0px", minHeight: 132, overflowY: "auto" }}>
+              {designs.map((d) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={d.id} src={d.object_url!} alt={d.metadata?.prompt ?? d.id}
+                  style={{ width: 56, height: 56, objectFit: "contain", background: "#111", ...selectStyle(designRef === d.object_url) }}
+                  onClick={() => { setDesignRef(d.object_url); setDesignThumb(d.object_url); setDesignName(designLabel(d)); }}
+                />
+              ))}
+            </div>
+            <input type="file" accept="image/png,image/jpeg,image/webp" style={{ width: "100%", marginTop: 6 }} onChange={(e) => void onUploadDesign(e.target.files)} />
+            {designThumb && (
+              <div style={{ marginTop: 6, fontSize: 12, opacity: 0.7 }}>
+                已選設計：{/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={designThumb} alt="selected design" style={{ width: 40, height: 40, objectFit: "contain", background: "#111", verticalAlign: "middle", marginLeft: 6, borderRadius: 4 }} />
+              </div>
+            )}
+          </div>
+
+          {/* ── Mode tabs ── */}
+          <div style={{ display: "flex", gap: 8, whiteSpace: "nowrap" }}>
+            <button className={mode === "model" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("model")}>模特</button>
+            <button className={mode === "flat" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("flat")}>平拍</button>
+            <button className={mode === "printful" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("printful")}>Printful</button>
+            <button className={mode === "library" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("library")}>模特兒印製</button>
+          </div>
         </div>
 
         {/* ── Shared shirt colour (all tabs). On Printful it picks the real White/Grey/Black
