@@ -15,7 +15,7 @@
 | 寫入點 | git commit；不是 AO-CLOSE、不是人填 |
 | 匯入時間 | 每天 04:30 台灣＝cron `30 20 * * *`（主機 UTC，`auto-reboot/ks-aw-01-auto-reboot.conf:9`；避 04:00 auto-reboot）。v1 無「立即更新」（容器無法觸發主機，現有方向只有主機→app，`scripts/cron.d/awarewave-schedules:25`）；要更即時就改 cron 一行 |
 | 寫庫通道 | 照既有 poke 模式：主機匯入器解析 git → POST 事件 JSON 到 `/api/internal/systems/ingest`（`SYSTEMS_INGEST_TOKEN`）→ route 驗 schema、只寫 4 張表。主機腳本不持 DB 憑證；筆電零 DB 憑證 |
-| 權限 | 頁面預設僅擁有者；server 用 service_role（`lib/supabase-server.ts:8`），授權寫在 server code |
+| 權限 | 頁面僅 owner／admin（與既有 /ops 頁同一判定，`app/(shell)/ops/system-modes/page.tsx`）；server 用 service_role（`lib/supabase-server.ts:8`），授權寫在 server code |
 
 ## 3. 資料表（migration 0174）
 - `systems`、`system_phases`、`system_features`：registry 投影（欄位同 §2）
@@ -38,12 +38,12 @@
 | 匯入排程 | 吃資源、卡住 | 走 `cron-run.sh`（`:3`，進 /ops/schedules、紅燈由 schedule_alerts 通知一次）；`flock -n`＋`timeout 300`＋`nice -n 19 ionice -c3`；獨立 bare mirror（不碰 `/root/Work` 部署工作樹）；`SYSTEMS_IMPORT_ENABLED` 預設 OFF；重試＝下一輪補跑，不在單輪內迴圈 |
 | 寫庫 | bug 寫壞其他表 | 匯入器只能打 ingest route；route 只寫 4 表 |
 | migration | 推上 main 未套 prod → 每晚部署被 migration 閘擋（`sg-deploy.sh:220-244`） | **先套後推**：經操作者同意後從筆電 ssh psql 套 0174，確認 `check-migrations-applied.sh` 綠，才推含 0174 的 commit；只新增表，不動既有表 |
-| next-admin 測試 | 頁面／route 的 test、tsc、build 紅 → 擋每晚部署（前例 `acf182549`） | 解析／歸屬／投影邏輯放匯入器，用自己的測試（不進 next-admin npm test）；next-admin 只留 route schema＋授權＋頁面讀取，量最小；推前本機 `npm test`＋`npx tsc --noEmit` 綠 |
+| next-admin 測試 | 頁面／route 的 test、tsc、build 紅 → 擋每晚部署（前例 `acf182549`） | git 解析／歸屬放匯入器（自己的測試，不進 next-admin npm test）；投影必須讀 user 事件，只能在 app 端，其測試限純函式（不讀檔、不依賴現在時間）；推前本機 `npm test`＋`npx tsc --noEmit` 綠 |
 | 頁面 | 錯誤拖垮後台 | 路由 error boundary；查詢有上限＋索引；寫入只限 status_change／review 事件 |
 
 ## 7. 匯入器規則
-- 記 `last_imported_head`（import_run 事件）；`git merge-base --is-ancestor` 不成立 → 停增量、標「Git 歷史異常」，不刪事件，消失的 commit 標 orphaned（Claude 已 deny force push `.claude/settings.json:658-659`，GitHub main 無分支保護 → 必做）
-- revert commit → revert 事件，投影重算
+- 記 `last_imported_head`（import_run 事件）；`git merge-base --is-ancestor` 不成立 → 停增量、標「Git 歷史異常」，不刪事件，消失的 commit 各送一筆 `orphaned` 事件，投影排除（Claude 已 deny force push `.claude/settings.json:658-659`，GitHub main 無分支保護 → 必做）
+- revert commit → 每個被撤的 sha 一筆 revert 事件；revert 被 revert 依時間順序還原，投影重算
 - trailer 格式錯 → 保留原文＋解析錯誤；重跑不重複（唯一鍵）
 - 頁面顯示最後成功匯入時間、HEAD
 

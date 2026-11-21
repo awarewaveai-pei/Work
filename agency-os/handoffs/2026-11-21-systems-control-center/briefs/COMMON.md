@@ -29,7 +29,7 @@
   }]
 }
 ```
-規則：slug／id 全域唯一；監工頁卡對 feature：slug 以小寫卡號加 `-` 開頭（`c3-…`）；路徑以 `/` 結尾＝資料夾前綴；歸屬＝最長前綴，命中 shared／ignore 不歸任何系統。
+規則（匯入器與 route 同一套，任一不符＝整份拒收）：id 為 uuid；slug kebab-case 且全域唯一；name 1–200 字；type 屬列舉；feature.phase 必填且存在；非 `/` 結尾的路徑必須是 HEAD 中存在的檔案（否則列入 `dead_source_paths` 缺口）；監工頁卡對 feature：slug 以小寫卡號加 `-` 開頭（`c3-…`）；路徑以 `/` 結尾＝資料夾前綴；歸屬＝最長前綴，命中 shared／ignore 不歸任何系統。
 
 ## 契約 2：ingest（`POST /api/internal/systems/ingest`，`Authorization: Bearer $SYSTEMS_INGEST_TOKEN`）
 ```json
@@ -38,7 +38,7 @@
   "events": [{
     "event_key": "git:<sha>:<內容雜湊> | mig:<feature_id> | run:<head>:<occurred_at>",
     "system_slug": "<slug|null>", "phase_slug": null, "feature_slug": null,
-    "event_type": "activity|handoff|feature_update|revert|migration|import_run",
+    "event_type": "activity|handoff|feature_update|revert|orphaned|migration|import_run",
     "source": "agent|migration|importer",
     "commit_sha": null, "occurred_at": "<ISO8601>", "payload": {}, "evidence": null
   }]
@@ -48,8 +48,9 @@ payload 依 event_type：
 - `activity` `{ "subject": "<commit 主旨>", "files": <數量> }`（有歸屬、無 trailer 的 commit）
 - `handoff` `{ "subject", "next"?: str, "blocker"?: str, "blocker_cleared"?: true }`
 - `feature_update` `{ "status": "todo|in_progress|implemented|verified|blocked|cancelled", "test"?: str }`（importer 只送 ≤ implemented；verified 只能來自 review／CI）
-- `revert` `{ "reverted_sha": "<sha>" }`
+- `revert` `{ "reverted_sha": "<sha>" }`（一個 commit 撤多個 → 多筆；revert 被 revert → 依時間順序來回切換）
+- `orphaned` `{ "sha": "<sha>" }`（歷史分叉後不再可達的 commit；投影排除其事件，事件不刪）
 - `migration` `{ "legacy_status": str, "mapped_status": str, "evidence_level": "none|commit|test", "source_path": str, "source_sha": str }`
-- `import_run` `{ "head", "previous_head", "status": "ok|history_diverged|error", "error", "gaps": { "unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors" } }`；importer 只在**最後一批**送，route 不自建（一輪只在全部批次落地後才算成功）
+- `import_run` `{ "head", "previous_head", "status": "ok|history_diverged|error", "error", "gaps": { "unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths" } }`；importer 只在**最後一批**送，route 不自建（一輪只在全部批次落地後才算成功）
 未分類：`system_slug=null`，payload 加 `"unclassified": "<原因>"`。
 route 行為：registry 投影 upsert 三張定義表（以 id）；events `insert … on conflict (event_key) do nothing`；回 `{ inserted, skipped }`。頁面另寫 `status_change`／`review` 事件（source=user），不經此 route。
