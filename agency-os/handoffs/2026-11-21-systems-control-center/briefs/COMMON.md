@@ -29,7 +29,7 @@
   }]
 }
 ```
-規則（匯入器與 route 同一套，任一不符＝整份拒收）：id 為 uuid；slug kebab-case 且全域唯一；name 1–200 字；type 屬列舉；feature.phase 必填且存在；phase／feature 的 id 永遠屬於建立時的系統（要搬就給新 id，否則 DB 拒收）；source_paths／shared_paths 裡非 `/` 結尾的路徑必須是 HEAD 中存在的檔案（否則列入 `dead_source_paths` 缺口；ignore_paths 不檢查，可列會出現又消失的營運檔如 `DEPLOY_HOLD`）；監工頁卡對 feature：feature 可帶選填 `legacy_code`＝監工頁卡號原文（如 `ED.1`、`批0`），遷移只用它精確比對，不靠 slug 慣例；路徑以 `/` 結尾＝資料夾前綴；歸屬＝最長前綴，命中 shared／ignore 不歸任何系統。
+規則（匯入器與 route 同一套，任一不符＝整份拒收）：id 為 uuid；slug kebab-case 且全域唯一；name 1–200 字；type 屬列舉；feature.phase 必填且存在；phase／feature 的 id 永遠屬於建立時的系統（要搬就給新 id，否則 DB 拒收）；source_paths／shared_paths 裡非 `/` 結尾的路徑必須是 HEAD 中存在的檔案（否則列入 `dead_source_paths` 缺口；ignore_paths 不檢查，可列會出現又消失的營運檔如 `DEPLOY_HOLD`）；監工頁卡對 feature：feature 可帶選填 `legacy_code`＝監工頁卡號原文（如 `ED.1`、`批0`；該頁的卡沒有 code 時填卡片編號 `n` 的文字），遷移只用它精確比對，不靠 slug 慣例；路徑以 `/` 結尾＝資料夾前綴；歸屬＝最長前綴，命中 shared／ignore 不歸任何系統。
 
 ## 契約 2：ingest（`POST /api/internal/systems/ingest`，`Authorization: Bearer $SYSTEMS_INGEST_TOKEN`）
 ```json
