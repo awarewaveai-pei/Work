@@ -82,3 +82,14 @@ describe('紫微頂規分析引擎', () => {
     expect(ctx.facts.some((f) => f.label.startsWith('格局:'))).toBe(false);
   });
 });
+
+describe('酉宮主星亮度(iztro 2.6.1 修正)', () => {
+  const youStar = (y: number, m: number, d: number, hour: number, star: string) =>
+    computeChart({ year: y, month: m, day: d, hour, minute: 30, gender: '女', calendar: 'solar', locale: 'zh-TW' })
+      .astrolabe.palaces.find((p) => p.earthlyBranch === '酉')
+      ?.majorStars.find((s) => s.name === star)?.brightness;
+
+  it('太陽在酉 = 平(舊版陷)', () => expect(youStar(2023, 12, 31, 10, '太陽')).toBe('平'));
+  it('太陰在酉 = 旺(舊版不)', () => expect(youStar(2023, 4, 5, 10, '太陰')).toBe('旺'));
+  it('七殺在酉 = 旺(舊版廟)', () => expect(youStar(1990, 3, 21, 4, '七殺')).toBe('旺'));
+});

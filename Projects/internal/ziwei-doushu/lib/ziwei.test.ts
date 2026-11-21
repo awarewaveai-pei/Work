@@ -127,3 +127,46 @@ describe('紫微 toContext 強化(廟旺 + 四化 + 過運)', () => {
     expect(ctx.facts.some((f) => f.label === 'yearly')).toBe(false);
   });
 });
+
+describe('晚子時日界(iztro 2.6.5,ZIWEI_DAY_DIVIDE=forward)', () => {
+  const chartOf = (y: number, m: number, d: number, hour: number) =>
+    computeChart({ year: y, month: m, day: d, hour, minute: 30, gender: '女', calendar: 'solar' }).astrolabe;
+  const view = (a: ReturnType<typeof chartOf>) => ({
+    lunarDate: a.lunarDate, chineseDate: a.chineseDate, soul: a.soul, body: a.body,
+    five: a.fiveElementsClass, zodiac: a.zodiac, palaces: JSON.stringify(a.palaces),
+  });
+  // iztro late-rat-hour.test.ts 矩陣節選:[23 點那天, 次日]
+  const rows = [
+    ['月中', [2000, 8, 16], [2000, 8, 17]],
+    ['農曆小月末', [1996, 8, 13], [1996, 8, 14]],
+    ['除夕', [2020, 1, 24], [2020, 1, 25]],
+    ['閏月十五', [2023, 4, 5], [2023, 4, 6]],
+  ] as const;
+
+  it.each(rows)('%s:23 點的盤 = 次日 0 點的盤', (_n, [y, m, d], [ny, nm, nd]) => {
+    expect(view(chartOf(y, m, d, 23))).toEqual(view(chartOf(ny, nm, nd, 0)));
+  });
+});
+
+describe('iztro 2.6.5 輸入驗證與英文盤', () => {
+  it('不存在的國曆日期拋錯,不靜默回捲', () => {
+    expect(() =>
+      computeChart({ year: 2023, month: 2, day: 30, hour: 10, minute: 0, gender: '女', calendar: 'solar' }),
+    ).toThrow();
+  });
+
+  it('en 盤:頁面用到的欄位皆有值,農曆日期為英文格式', () => {
+    const a = computeChart({
+      year: 2023, month: 12, day: 31, hour: 14, minute: 30, gender: '女', calendar: 'solar', locale: 'en',
+    }).astrolabe;
+    for (const v of [a.solarDate, a.lunarDate, a.chineseDate, a.time, a.zodiac, a.sign, a.soul, a.body, a.fiveElementsClass]) {
+      expect(String(v ?? '')).not.toBe('');
+    }
+    expect(a.lunarDate).toBe('Lunar 2023-11-19');
+    expect(a.soul).toBe('warrior'); // 武曲,2.6.1 起不再與將軍同譯 general
+    for (const p of a.palaces) {
+      expect(p.name).not.toBe('');
+      for (const s of [...p.majorStars, ...p.minorStars, ...p.adjectiveStars]) expect(s.name).not.toBe('');
+    }
+  });
+});

@@ -22,8 +22,8 @@ export function isLocale(value: string): value is Locale {
 
 /**
  * locale → iztro 語言碼。
- * ⚠️ iztro 的英文碼是 'en-US';傳 'en' 會回傳 i18n key(如 'pojunMaj')而非英文,
- *    故此對應表為必要(已實測 2026-06-24)。
+ * ⚠️ iztro 的英文碼是 'en-US';iztro ≥2.6.2 傳 'en' 直接拋 `invalid language.`,
+ *    故此對應表為必要(2.6.5 實測 2026-11-21)。
  */
 const LOCALE_TO_IZTRO: Record<Locale, string> = {
   'zh-TW': 'zh-TW',

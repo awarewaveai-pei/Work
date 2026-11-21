@@ -7,6 +7,14 @@ import {
 } from './trueSolarTime';
 import { localeToIztroLang, defaultLocale, type Locale } from './i18n/config';
 import { toSolarYmd } from './dates';
+import type { Config, Option } from 'iztro/lib/data/types';
+
+/**
+ * 晚子時(23 時,timeIndex 12)日界口徑:全站唯一設定處。
+ * 'forward' = 整張盤(日、月、年、閏月)換到次日;'current' = 整張盤歸當日。
+ * 上游預設 forward。要改口徑只改這一行。
+ */
+export const ZIWEI_DAY_DIVIDE: NonNullable<Config['dayDivide']> = 'forward';
 
 export type Gender = '男' | '女';
 export type CalendarType = 'solar' | 'lunar';
@@ -135,13 +143,17 @@ export function computeChart(req: ChartRequest): ChartResult {
   const dateStr = `${year}-${month}-${day}`;
   const iztroLang = localeToIztroLang(req.locale ?? defaultLocale);
 
-  const astrolabe = astro.bySolar(
+  // withOptions 的 config 只作用於這張盤(iztro ≥2.6.2 綁在盤上,含之後的 horoscope),
+  // 不改全域設定,伺服器端多請求互不影響。不可改用 astro.config():那會改整個行程的預設。
+  const astrolabe = astro.withOptions({
+    type: 'solar',
     dateStr,
     timeIndex,
-    req.gender,
-    true,
-    iztroLang as Parameters<typeof astro.bySolar>[4],
-  );
+    gender: req.gender,
+    fixLeap: true,
+    language: iztroLang as Option['language'],
+    config: { dayDivide: ZIWEI_DAY_DIVIDE },
+  });
 
   return { astrolabe, timeIndex, correction };
 }
