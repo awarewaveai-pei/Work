@@ -34,6 +34,8 @@ export default function ImageLightbox({ src, alt, onClose }: { src: string | nul
     setZ(n);
   };
   const button = { fontSize: 13, padding: "4px 10px" };
+  // The scrim is black in every theme, so its text is white in every theme (no theme token fits a fixed scrim).
+  const ON_SCRIM = "rgb(255 255 255)";
 
   return (
     <div role="dialog" aria-label="放大檢視" aria-modal="true"
@@ -50,14 +52,14 @@ export default function ImageLightbox({ src, alt, onClose }: { src: string | nul
         style={{ maxWidth: "92vw", maxHeight: "88vh", objectFit: "contain", borderRadius: 6, boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
           transform: `translate(${t.x}px, ${t.y}px) scale(${z})`, cursor: z > MIN ? "grab" : "zoom-in", userSelect: "none" }} />
       <div style={{ position: "fixed", top: 12, right: 16, display: "flex", gap: 6, alignItems: "center" }}>
-        <span aria-label="放大倍率" style={{ color: "#fff", fontSize: 13, minWidth: 52, textAlign: "right" }}>{Math.round((z / actual) * 100)}%</span>
+        <span aria-label="放大倍率" style={{ color: ON_SCRIM, fontSize: 13, minWidth: 52, textAlign: "right" }}>{Math.round((z / actual) * 100)}%</span>
         <button type="button" className="btn-secondary" style={button} aria-label="縮小" onClick={() => zoomTo(z / STEP)}>－</button>
         <button type="button" className="btn-secondary" style={button} aria-label="放大" onClick={() => zoomTo(z * STEP)}>＋</button>
         <button type="button" className="btn-secondary" style={button} onClick={() => zoomTo(actual)}>1:1</button>
         <button type="button" className="btn-secondary" style={button} onClick={() => zoomTo(MIN)}>符合畫面</button>
         <button type="button" className="btn-secondary" style={button} aria-label="關閉" onClick={onClose}>✕</button>
       </div>
-      <div style={{ position: "fixed", bottom: 12, left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: 12, opacity: 0.7, pointerEvents: "none" }}>
+      <div style={{ position: "fixed", bottom: 12, left: 0, right: 0, textAlign: "center", color: ON_SCRIM, fontSize: 12, opacity: 0.7, pointerEvents: "none" }}>
         滾輪縮放・雙擊放大・放大後拖曳移動・Esc 或點黑色背景關閉
       </div>
     </div>
