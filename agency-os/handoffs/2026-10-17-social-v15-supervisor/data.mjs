@@ -15,7 +15,7 @@ export const META = {
 
 // 頁面上所有固定文字（不含資料列）。{x} 由 build.mjs 代入算出來的值。
 export const COPY = {
-  sub: '把定案的新畫面做進 social.aware-wave.com。共 {total} 張卡，一張一個工作階段。',
+  sub: '【已移到 app.aware-wave.com/ops/systems，本頁凍結（2026-11-21）；之後的進度由 commit 自動進總控頁。】把定案的新畫面做進 social.aware-wave.com。共 {total} 張卡，一張一個工作階段。',
   updated: '更新於 {date}',
   nav: { now: '現況', steps: '待建項目', open: '待你決定', paths: '檔案' },
   now: { h: '現況', lead: '目前的版本可以發文。新畫面已定案，還沒做進產品。' },

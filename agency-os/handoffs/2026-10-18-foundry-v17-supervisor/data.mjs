@@ -13,7 +13,7 @@ export const META = {
 
 // 頁面上所有固定文字（不含資料列）。{x} 由 build.mjs 代入算出來的值。
 export const COPY = {
-  sub: '讓 System Foundry 答完問卷後，產出 Claude 能直接開工的專案資料夾，並自帶監工台。共 {total} 張卡。',
+  sub: '【已移到 app.aware-wave.com/ops/systems，本頁凍結（2026-11-21）；之後的進度由 commit 自動進總控頁。】讓 System Foundry 答完問卷後，產出 Claude 能直接開工的專案資料夾，並自帶監工台。共 {total} 張卡。',
   updated: '更新於 {date}',
   nav: { now: '現況', measure: '進度數字', steps: '待建項目', open: '待你決定', paths: '檔案' },
   measure: { h: '進度數字', lead: '每次產生頁面時從檔案現算；數字沒到，對應的卡不能標完成。', gap: '沒有驗收的能力：{n}／{total} 個', manifests: 'manifest 完整的產品：{ok}／{total} 個', missing: '還缺：{keys}' },

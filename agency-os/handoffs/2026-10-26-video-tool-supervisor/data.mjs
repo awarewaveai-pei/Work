@@ -12,7 +12,7 @@ export const META = {
 };
 
 export const COPY = {
-  sub: '一支影片＝一個專案：客戶只選一次、關頁不丟、做完有結果頁，可選每步參與、④後自動或題目頁全自動。共 {total} 個階段、{items} 張卡，已完成 {itemsDone} 張。',
+  sub: '【已移到 app.aware-wave.com/ops/systems，本頁凍結（2026-11-21）；之後的進度由 commit 自動進總控頁。】一支影片＝一個專案：客戶只選一次、關頁不丟、做完有結果頁，可選每步參與、④後自動或題目頁全自動。共 {total} 個階段、{items} 張卡，已完成 {itemsDone} 張。',
   updated: '更新於 {date}',
   nav: { now: '現況', steps: '階段與卡片', open: '待你決定', paths: '檔案' },
   now: { h: '現況', lead: '已上線的修正，和還不能用的。' },

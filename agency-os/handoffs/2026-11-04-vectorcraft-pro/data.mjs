@@ -13,7 +13,7 @@ export const META = {
 };
 
 export const COPY = {
-  sub: '把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的九項（尺寸範本、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成右側圖示欄＋浮出面板（圖示欄跟 app 主題；VectorCraft 本體用自己的深色／淺色）；字型灌進它自己的字型庫；舊設計轉檔後舊編輯器退場，只留一套。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
+  sub: '【已移到 app.aware-wave.com/ops/systems，本頁凍結（2026-11-21）；之後的進度由 commit 自動進總控頁。】把開源的 VectorCraft（Illustrator 的完整重製，工具、面板、快捷鍵都一樣）放進 app.aware-wave.com 當「向量（專業版）」；AwareWave 獨有的九項（尺寸範本、調色、去背、WebP、My Designs、QR、條碼、Mockup、批次匯出）做成右側圖示欄＋浮出面板（圖示欄跟 app 主題；VectorCraft 本體用自己的深色／淺色）；字型灌進它自己的字型庫；舊設計轉檔後舊編輯器退場，只留一套。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
   updated: '更新於 {date}',
   nav: { now: '現況', steps: '卡片與工作', open: '待你決定', paths: '檔案' },
   now: { h: '現況', lead: '目前已做到與還沒做到的事（2026-11-05 查）。' },

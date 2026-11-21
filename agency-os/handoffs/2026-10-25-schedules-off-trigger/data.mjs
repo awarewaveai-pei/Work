@@ -14,7 +14,7 @@ export const META = {
 
 // 頁面上所有固定文字（不含資料列）。{x} 由 build.mjs 代入算出來的值。
 export const COPY = {
-  sub: '定時工作改由主機排程啟動。Trigger 只執行按鈕啟動的長流程。所有排程集中在 /ops/schedules。排程太久未成功會通知手機。每天另發一行「全部正常」。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
+  sub: '【已移到 app.aware-wave.com/ops/systems，本頁凍結（2026-11-21）；之後的進度由 commit 自動進總控頁。】定時工作改由主機排程啟動。Trigger 只執行按鈕啟動的長流程。所有排程集中在 /ops/schedules。排程太久未成功會通知手機。每天另發一行「全部正常」。共 {total} 張卡、{items} 項工作，已完成 {itemsDone} 項。',
   updated: '更新於 {date}',
   nav: { now: '現況', steps: '卡片與工作', open: '待你決定', paths: '檔案' },
   now: { h: '現況', lead: '目前已做到與還沒做到的事。' },
