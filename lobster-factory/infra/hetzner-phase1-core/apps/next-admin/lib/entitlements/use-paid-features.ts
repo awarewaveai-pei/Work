@@ -3,6 +3,7 @@
 // mount; the server caches it 5 minutes). Loading, an error or a feature missing from the list = usable: the API still asks can().
 
 import { useEffect, useState } from "react";
+import { rightLabel } from "./right-label";
 
 type Entry = { allowed: boolean; reason: string | null };
 
@@ -14,8 +15,6 @@ function load(): Promise<Record<string, Entry> | null> {
     .then((body) => (body?.list?.features as Record<string, Entry> | undefined) ?? null)
     .catch(() => null);
 }
-
-const WHY: Record<string, string> = { no_entitlement: "尚未開通此功能", no_credits: "點數不足" };
 
 export function usePaidFeatures() {
   const [features, setFeatures] = useState<Record<string, Entry> | null>(null);
@@ -31,7 +30,10 @@ export function usePaidFeatures() {
   /** Tooltip for a greyed button; undefined while it is usable. */
   const why = (featureKey: string) => {
     const entry = features?.[featureKey];
-    return entry && !entry.allowed ? WHY[entry.reason ?? ""] ?? "目前無法使用" : undefined;
+    if (!entry || entry.allowed) return undefined;
+    // Tooltip keeps today's wording ("點數不足" without the full stop); the full sentence is for screens that have numbers.
+    const text = rightLabel({ entry, source: null, door: "open", viewer: "member", mode: "enforce" }).text;
+    return text ? text.replace(/。$/, "") : "目前無法使用";
   };
   return { canUse, holds, why };
 }
