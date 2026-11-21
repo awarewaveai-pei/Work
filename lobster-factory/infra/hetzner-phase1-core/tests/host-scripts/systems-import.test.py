@@ -165,6 +165,10 @@ class SystemsImportTest(unittest.TestCase):
             (dict(s0, features=[dict(s0["features"][0], phase=None)]), "systems[0].features[0].phase: required"),
             (dict(s0, features=[dict(s0["features"][0], phase="p9")]), "systems[0].features[0].phase: no phase p9"),
             (dict(s0, slug="beta"), "systems[1].slug: duplicate system slug beta"),
+            (dict(s0, features=[dict(s0["features"][0], legacy_code="")]), "systems[0].features[0].legacy_code: empty"),
+            (dict(s0, features=[dict(s0["features"][0], legacy_code="x" * 41)]),
+             "systems[0].features[0].legacy_code: not a string of at most 40"),
+            (dict(s0, features=[dict(s0["features"][0], legacy_code=3)]), "systems[0].features[0].legacy_code: not a string"),
         ]
         for system, msg in cases:
             with self.subTest(msg):
@@ -172,6 +176,17 @@ class SystemsImportTest(unittest.TestCase):
                 with self.assertRaises(si.Fatal) as cm:
                     si.load_registry(json.dumps(reg))
                 self.assertIn(msg, str(cm.exception))
+
+    def test_legacy_code_optional_and_ignore_paths_not_dead_checked(self):
+        s0 = REGISTRY["systems"][0]
+        reg = dict(REGISTRY, ignore_paths=REGISTRY["ignore_paths"] + ["ops/DEPLOY_HOLD"],
+                   shared_paths=REGISTRY["shared_paths"] + ["gone.txt"],
+                   systems=[dict(s0, features=[dict(s0["features"][0], legacy_code="批0")])] + REGISTRY["systems"][1:])
+        loaded = si.load_registry(json.dumps(reg))  # legacy_code present: fine; absent (beta, REGISTRY): fine
+        head = self.r.git("rev-parse", "HEAD")
+        dead = si.head_gaps(self.r.origin + "/.git", head, loaded)[2]
+        self.assertIn("gone.txt", dead)  # shared_paths still checked
+        self.assertNotIn("ops/DEPLOY_HOLD", dead)
 
     def test_real_registry_passes_with_no_dead_paths(self):
         root = os.path.abspath(os.path.join(os.path.dirname(SRC), "..", "..", "..", ".."))

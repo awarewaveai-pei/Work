@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // One-off per supervisor page: data.mjs cards -> contract-2 `migration` events on stdout. Never POSTs (the supervisor does).
-// Card -> feature link: feature slug starts with the lowercased card code + "-" (c3-research-evidence <- code C3).
+// Card -> feature link: feature.legacy_code === the card's code as written (ED.1, 批0); a page whose cards carry no code
+// (customer-model) uses the card number n as text. Slugs play no part.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -11,6 +12,8 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATUS = { done: 'implemented', in_progress: 'in_progress', todo: 'todo' };
 const norm = (p) => p.replaceAll(String.fromCharCode(92), '/').replace(/^\.\//, '').replace(/\/?$/, '/');
 
+export const cardCode = (step) => (step.code !== undefined && step.code !== null ? String(step.code) : String(step.n));
+
 // No evidence never lowers a done card: done -> implemented regardless. Unknown legacy status -> todo + flagged by caller.
 export function buildMigrationEvents({ registry, steps, folder, sourceSha, occurredAt, resolveSha }) {
   const want = norm(folder);
@@ -19,8 +22,9 @@ export function buildMigrationEvents({ registry, steps, folder, sourceSha, occur
   if (!system) throw new Error(`no registry phase claims legacy_source_path ${folder}`);
   const events = [], unmapped = [];
   for (const step of steps) {
-    const feature = system.features.find((f) => f.phase === phase.slug && f.slug.startsWith(String(step.code).toLowerCase() + '-'));
-    if (!feature) { unmapped.push(step.code); continue; }
+    const code = cardCode(step);
+    const feature = system.features.find((f) => f.phase === phase.slug && f.legacy_code === code);
+    if (!feature) { unmapped.push(code); continue; }
     // Step-level commit, else the last done item's commit (cards in progress only carry item commits).
     const commit = step.commit || [...(step.items || [])].reverse().find((i) => i.status === 'done' && i.commit)?.commit || null;
     const fullSha = commit ? resolveSha(commit) : null; // data.mjs keeps short shas; events carry the full one

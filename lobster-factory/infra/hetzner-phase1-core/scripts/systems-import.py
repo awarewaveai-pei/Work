@@ -158,6 +158,8 @@ def load_registry(text):
             # global, not per system: a Feature: <slug>=<status> trailer names no system
             slug(f.get("slug"), f"{fw}.slug", features, "feature")
             text_(f.get("name"), f"{fw}.name", 200, empty_ok=False)
+            if "legacy_code" in f:  # supervisor card code as written (ED.1, 批0); only the cutover script reads it
+                text_(f["legacy_code"], f"{fw}.legacy_code", 40, empty_ok=False)
             if f.get("phase") is None:
                 bad(f"{fw}.phase", "required")
             if not isinstance(f.get("phase"), str) or f.get("phase") not in phases:
@@ -320,9 +322,10 @@ def events_for(c, idx, gaps):
 
 def head_gaps(mirror, head, reg):
     """products.ts keys with no registry product_key; supervisor data.mjs folders no phase claims; registry file paths
-    (no trailing /) that are not a file at HEAD -- such an entry owns nothing, so its commits fall through silently."""
+    (no trailing /) that are not a file at HEAD -- such an entry owns nothing, so its commits fall through silently.
+    ignore_paths are not checked: they may name operational files that come and go (DEPLOY_HOLD)."""
     tree = set(git(mirror, "ls-tree", "-r", "--name-only", head).stdout.splitlines())
-    listed = reg.get("shared_paths", []) + reg.get("ignore_paths", []) + [
+    listed = reg.get("shared_paths", []) + [
         p for s in reg["systems"] for p in s.get("source_paths", [])]
     dead = sorted({p for p in listed if not p.endswith("/") and p not in tree})
     unregistered = []

@@ -16,7 +16,7 @@ export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
 export type ImporterEventType = (typeof IMPORTER_EVENT_TYPES)[number];
 
 export interface RegistryPhase { id: string; slug: string; name: string; legacy_source_path: string | null }
-export interface RegistryFeature { id: string; slug: string; name: string; phase: string }
+export interface RegistryFeature { id: string; slug: string; name: string; phase: string; legacy_code?: string }
 export interface RegistrySystem {
   id: string; slug: string; name: string; aliases: string[]; type: SystemType; purpose: string; product_key: string | null;
   source_paths: string[]; phases: RegistryPhase[]; features: RegistryFeature[];
@@ -85,7 +85,10 @@ function parseRegistry(raw: unknown): Registry {
       featureSlugs.add(fs);
       const phase = slug(f.phase, `${fw}.phase`);
       if (!phaseSlugs.has(phase)) fail(`${fw}.phase`, `no phase ${phase} in ${systemSlug}`);
-      return { id: claim(uuid(f.id, `${fw}.id`), `${fw}.id`), slug: fs, name: nonEmpty(f.name, `${fw}.name`, 200), phase };
+      const out: RegistryFeature = { id: claim(uuid(f.id, `${fw}.id`), `${fw}.id`), slug: fs, name: nonEmpty(f.name, `${fw}.name`, 200), phase };
+      // supervisor card code as written (ED.1, 批0): cutover lookup only, never stored
+      if (f.legacy_code !== undefined) out.legacy_code = nonEmpty(f.legacy_code, `${fw}.legacy_code`, 40);
+      return out;
     });
     return {
       id: claim(uuid(s.id, `${w}.id`), `${w}.id`), slug: systemSlug, name: nonEmpty(s.name, `${w}.name`, 200),

@@ -14,7 +14,9 @@
     "agency-os/WORKLOG.md",
     "agency-os/TASKS.md",
     "agency-os/memory/",
-    "agency-os/reports/"
+    "agency-os/reports/",
+    "lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD",
+    "agency-os/ALERT_REQUIRED.txt"
   ],
   "systems": [
     {
@@ -98,103 +100,120 @@
           "id": "b2014070-a4b2-4ab1-a260-75a2fd7cfb41",
           "slug": "c3-research-evidence",
           "name": "AI 研究對方並留下有來源的證據",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C3"
         },
         {
           "id": "afd4d72f-4a55-44bf-aa7c-bd489ee5a64d",
           "slug": "c4-reply-sync",
           "name": "回覆同步與回信頁",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C4"
         },
         {
           "id": "6c018ecf-77fb-4b6c-bbb7-b22b77f31ebc",
           "slug": "c8-auto-send-rotation",
           "name": "自動寄與信箱輪流寄（量產）",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C8"
         },
         {
           "id": "f553b371-7595-4d88-b7cc-45b8271847f1",
           "slug": "c16-tuning",
           "name": "自動化調校：抽得準、核得穩、越寫越好",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C16"
         },
         {
           "id": "938f41a9-2ab2-465a-babd-ec1b9bf51e31",
           "slug": "c1-outbound-v2",
           "name": "守衛與事實訂正",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C1"
         },
         {
           "id": "05108a1d-cbbc-47bf-afc6-ccb2b8292ab0",
           "slug": "c2-outbound-v2",
           "name": "署名、定位、主旨、多版本、追蹤信內容",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C2"
         },
         {
           "id": "8464570b-68c6-4f5f-a3c3-70b8a183bb78",
           "slug": "c10-outbound-v2",
           "name": "名單來源：店家",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C10"
         },
         {
           "id": "11596a0c-8e62-4c9a-935b-02ea701fc4e6",
           "slug": "c17-outbound-v2",
           "name": "名單研究：讀店家的 IG／FB 頁",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C17"
         },
         {
           "id": "16234f68-e86d-4a8e-9c03-9dc3887e4570",
           "slug": "c11-outbound-v2",
           "name": "寄件信箱池：次網域、DNS、暖機",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C11"
         },
         {
           "id": "b65b0c70-a8e2-4483-9635-7e0e10e8c1b2",
           "slug": "c5-outbound-v2",
           "name": "追蹤信與人工步驟",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C5"
         },
         {
           "id": "670cfb56-458e-4ef8-98ff-36b00d2122c8",
           "slug": "c15-outbound-v2",
           "name": "量產管線：照政策自動前進",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C15"
         },
         {
           "id": "c9f86cea-6e18-4460-bcff-bfdeda20b07d",
           "slug": "c7-outbound-v2",
           "name": "成效頁",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C7"
         },
         {
           "id": "d3c61811-3b19-423e-95d8-713e42580838",
           "slug": "c12-outbound-v2",
           "name": "名單來源：公司行號",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C12"
         },
         {
           "id": "3d8f231d-ad7a-4f9d-bd50-d788448581cf",
           "slug": "c13-outbound-v2",
           "name": "名單來源：人員搜尋、email 推斷、付費驗證",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C13"
         },
         {
           "id": "5e0a48fa-d2c0-4309-90c9-266b0ede8c75",
           "slug": "c6-outbound-v2",
           "name": "暖名單進 FluentCRM",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C6"
         },
         {
           "id": "93499441-069c-492e-b955-6b361164982f",
           "slug": "c14-outbound-v2",
           "name": "個人消費者：Meta 名單型廣告 → FluentCRM",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C14"
         },
         {
           "id": "d7c1f06d-060f-4575-8945-14dea85042ba",
           "slug": "c9-outbound-v2",
           "name": "舊欄位退場",
-          "phase": "outbound-v2"
+          "phase": "outbound-v2",
+          "legacy_code": "C9"
         }
       ]
     },
@@ -370,79 +389,92 @@
           "id": "70134fe7-5bb5-4c20-b8d6-ddb3301ae1f8",
           "slug": "c20-social-v15",
           "name": "資料表 0105",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C20"
         },
         {
           "id": "71c1bbe0-a213-41e8-a53b-936624fd2426",
           "slug": "c19-social-v15",
           "name": "骨架與路由",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C19"
         },
         {
           "id": "e37bb2a2-4cd1-4c65-a995-5a1f42781c0a",
           "slug": "c21-social-v15",
           "name": "撰寫頁",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C21"
         },
         {
           "id": "5a1158b3-978f-42cd-88dc-7906a663156b",
           "slug": "c22-social-v15",
           "name": "日曆、卡片、清單、已刪除、篩選",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C22"
         },
         {
           "id": "137dbc9a-9bce-466d-959d-4f5f3c051873",
           "slug": "c26-social-v15",
           "name": "智慧連結",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C26"
         },
         {
           "id": "6357659a-240f-4273-b689-b2a40f6828c8",
           "slug": "c29-social-v15",
           "name": "訊息收件匣",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C29"
         },
         {
           "id": "f7716e8e-5a53-438d-a1a1-66eda79b5ee6",
           "slug": "c23-social-v15",
           "name": "自動發布清單方格",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C23"
         },
         {
           "id": "d91f5293-cc1a-4cb3-9a20-e4f48973aad0",
           "slug": "c24-social-v15",
           "name": "數據分析",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C24"
         },
         {
           "id": "2f2af7a1-4b8a-464a-8d6b-f73fb25531e8",
           "slug": "c27-social-v15",
           "name": "自動化流程",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C27"
         },
         {
           "id": "7fe31cbb-ded4-468b-906e-d80b594cb270",
           "slug": "c31-social-v15",
           "name": "媒體與影片",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C31"
         },
         {
           "id": "c7a9cac7-3761-48e8-b555-94919e433eff",
           "slug": "c30-social-v15",
           "name": "手機",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C30"
         },
         {
           "id": "034274bf-41db-4f6f-b1f2-619fcc467ea1",
           "slug": "c25-social-v15",
           "name": "報表管理",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C25"
         },
         {
           "id": "63a4e251-9724-4639-b747-c500f3200f20",
           "slug": "c28-social-v15",
           "name": "廣告管理",
-          "phase": "social-v15"
+          "phase": "social-v15",
+          "legacy_code": "C28"
         }
       ]
     },
@@ -554,331 +586,386 @@
           "id": "24218860-d956-43f3-b824-27aff213c0ff",
           "slug": "v1-video-tool-redesign",
           "name": "專案骨架",
-          "phase": "video-tool-redesign"
+          "phase": "video-tool-redesign",
+          "legacy_code": "V1"
         },
         {
           "id": "046de952-49d0-49f6-90c3-9fd452cfc0ef",
           "slug": "v2-video-tool-redesign",
           "name": "結果頁",
-          "phase": "video-tool-redesign"
+          "phase": "video-tool-redesign",
+          "legacy_code": "V2"
         },
         {
           "id": "a35a76a8-10f7-4b63-afb8-e8d1a73644ca",
           "slug": "v3-video-tool-redesign",
           "name": "腳本頁整理",
-          "phase": "video-tool-redesign"
+          "phase": "video-tool-redesign",
+          "legacy_code": "V3"
         },
         {
           "id": "e670ec18-d4d3-43ee-85aa-eccc842711bd",
           "slug": "v4-video-tool-redesign",
           "name": "QA 真能通過",
-          "phase": "video-tool-redesign"
+          "phase": "video-tool-redesign",
+          "legacy_code": "V4"
         },
         {
           "id": "be2e259b-2b48-43e3-8b16-f5cabbdb22e8",
           "slug": "v5-video-tool-redesign",
           "name": "發布不填 JSON",
-          "phase": "video-tool-redesign"
+          "phase": "video-tool-redesign",
+          "legacy_code": "V5"
         },
         {
           "id": "76e4553a-1241-4938-acf2-adadc7515cea",
           "slug": "v6-video-tool-redesign",
           "name": "④ 後自動",
-          "phase": "video-tool-redesign"
+          "phase": "video-tool-redesign",
+          "legacy_code": "V6"
         },
         {
           "id": "1c364dc2-b9b7-44e2-a0f9-10b1b9b526d7",
           "slug": "v7-video-tool-redesign",
           "name": "全自動接專案",
-          "phase": "video-tool-redesign"
+          "phase": "video-tool-redesign",
+          "legacy_code": "V7"
         },
         {
           "id": "1a7881f3-27db-4f13-8932-01af2824a75d",
           "slug": "0-video-workbench",
           "name": "切 4178 到 repo",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "0"
         },
         {
           "id": "37a6078a-24c0-4ab1-91e1-347d539bacf1",
           "slug": "m1-video-workbench",
           "name": "媒體存放、探測、代理檔",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "M1"
         },
         {
           "id": "c7c7e952-d7e8-4d73-a58a-33a5337a558b",
           "slug": "p0-video-workbench",
           "name": "EffectCraft 試驗",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "P0"
         },
         {
           "id": "952fc240-94d1-4658-941b-0f83b804f4a1",
           "slug": "m2-video-workbench",
           "name": "素材與專案存到伺服器",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "M2"
         },
         {
           "id": "3daa9d6f-253a-4074-8968-0750c3376fa0",
           "slug": "m3-video-workbench",
           "name": "影格時間、輸出檢查、專案格式",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "M3"
         },
         {
           "id": "6f3d60e2-a662-4ab8-a3ad-69ef1a6dbdb5",
           "slug": "s3as2-video-workbench",
           "name": "去背、同場景多鏡",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "S3a＋S2"
         },
         {
           "id": "77cf4394-0748-411c-9721-1efc33ddb34e",
           "slug": "p1-video-workbench",
           "name": "引擎接入與存檔閉環",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "P1"
         },
         {
           "id": "d866d448-ff22-4228-84fa-51205c1d4320",
           "slug": "p2-video-workbench",
           "name": "完整剪輯",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "P2"
         },
         {
           "id": "7ea9d422-ce34-4df9-a40a-fca8b9635187",
           "slug": "p3-video-workbench",
           "name": "2D 動畫合成",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "P3"
         },
         {
           "id": "de7694d4-50c7-4acf-adf9-8d3556c14c6d",
           "slug": "p4-video-workbench",
           "name": "2D 角色骨架",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "P4"
         },
         {
           "id": "a6c930e5-6837-495d-8144-468dbbb6eed6",
           "slug": "p5-video-workbench",
           "name": "3D",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "P5"
         },
         {
           "id": "e1b4e2a7-1602-4395-bc78-47bbb070668f",
           "slug": "p6-video-workbench",
           "name": "上線 video.aware-wave.com",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "P6"
         },
         {
           "id": "dcd87d36-3a22-4162-ae15-9604067ad4e6",
           "slug": "s4b-video-workbench",
           "name": "圖片轉 3D 換供應商＋自動骨架",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "S4b"
         },
         {
           "id": "24aff3b5-2095-4dd6-b30d-b78177213d67",
           "slug": "rv-video-workbench",
           "name": "影片模型接 Replicate",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "RV"
         },
         {
           "id": "e666217e-5e22-4f2a-b605-ffed018b4dde",
           "slug": "re-video-workbench",
           "name": "引擎路線重評",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "RE"
         },
         {
           "id": "f326d25a-9332-4cf6-ba4f-1b82dd24e8fd",
           "slug": "pj-video-workbench",
           "name": "一支影片一條線",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "PJ"
         },
         {
           "id": "c4f04571-f23f-466e-9907-9e1cc6fbc289",
           "slug": "fc-video-workbench",
           "name": "專業剪輯（FilmCraft）",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "FC"
         },
         {
           "id": "14dbe4cb-6766-4c5b-a609-63730ba77cc6",
           "slug": "ec-video-workbench",
           "name": "專業特效（EffectCraft）",
-          "phase": "video-workbench"
+          "phase": "video-workbench",
+          "legacy_code": "EC"
         },
         {
           "id": "a6d3799c-c135-48fa-be2e-8050219bf80a",
           "slug": "ed1-video-editor-parity",
           "name": "版面骨架",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.1"
         },
         {
           "id": "7337370b-84e4-479a-8c37-c90e99dbe471",
           "slug": "ed2-video-editor-parity",
           "name": "時間軸操作",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.2"
         },
         {
           "id": "0d99244c-ff41-4a8d-ba62-6b4f46b4061d",
           "slug": "ed3-video-editor-parity",
           "name": "屬性面板",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.3"
         },
         {
           "id": "3c720e93-3552-43d3-95af-ad792d7829c8",
           "slug": "ed4-video-editor-parity",
           "name": "素材分頁",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.4"
         },
         {
           "id": "1dcf78b9-0a2c-4494-adbc-e2773a119048",
           "slug": "ed5-video-editor-parity",
           "name": "文字分頁",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.5"
         },
         {
           "id": "f1b78aa5-a85a-42dd-8779-2073a5ce4013",
           "slug": "ed6-video-editor-parity",
           "name": "音訊分頁",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.6"
         },
         {
           "id": "4e6b05bb-f249-4a97-8964-41b5d05019f0",
           "slug": "ed7-video-editor-parity",
           "name": "轉場與貼圖",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.7"
         },
         {
           "id": "8a9fb353-4e55-49f4-8009-555cd2273371",
           "slug": "ed8-video-editor-parity",
           "name": "匯出視窗",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.8"
         },
         {
           "id": "98a42ce0-d589-4787-b5c4-2dcb1ce4d12f",
           "slug": "ed9-video-editor-parity",
           "name": "專案列表頁",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.9"
         },
         {
           "id": "b1b71519-eb05-423f-8559-85f2a2c3a5a5",
           "slug": "ed10-video-editor-parity",
           "name": "字幕",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.10"
         },
         {
           "id": "cdf60177-d08e-468d-84be-20183c4e3b58",
           "slug": "ed11-video-editor-parity",
           "name": "剪贅字",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.11"
         },
         {
           "id": "05d02861-75c8-45f1-8a0e-4ae982873b95",
           "slug": "ed12-video-editor-parity",
           "name": "特效裡的 AI 功能",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.12"
         },
         {
           "id": "3e37a8c5-08f8-4be9-9194-911055eef27d",
           "slug": "ed13-video-editor-parity",
           "name": "剪輯 Agent",
-          "phase": "video-editor-parity"
+          "phase": "video-editor-parity",
+          "legacy_code": "ED.13"
         },
         {
           "id": "705d2ecb-087b-4a67-8732-dd6eab0f8a91",
           "slug": "u0-video-unify",
           "name": "專案列「建或取回」",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U0"
         },
         {
           "id": "8f9c6f12-3840-4303-80d0-d51ae26633db",
           "slug": "u1-video-unify",
           "name": "門頁機制＋側欄「作品」",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U1"
         },
         {
           "id": "e8cb28b1-5e7d-4833-bbe0-922c504f5411",
           "slug": "u2-video-unify",
           "name": "一套樣式",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U2"
         },
         {
           "id": "33ae6d34-8fa6-4368-8e43-1c861d6e40a0",
           "slug": "u3-video-unify",
           "name": "腳本＝新系統的腳本功能",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U3"
         },
         {
           "id": "e570dae4-924f-4d8b-ba03-6ae66441d8ba",
           "slug": "u4-video-unify",
           "name": "鏡頭卡補齊",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U4"
         },
         {
           "id": "53c32131-8d1a-4581-b43b-a4265156b14c",
           "slug": "u5-video-unify",
           "name": "快速輸出、多比例、一鍵成片",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U5"
         },
         {
           "id": "a31f32be-dff7-490d-a30f-edf444117e7d",
           "slug": "u6-video-unify",
           "name": "審片與發布併進成片",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U6"
         },
         {
           "id": "e131580f-827e-4dd5-8821-8b6a67892721",
           "slug": "u7-video-unify",
           "name": "字幕與音檔",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U7"
         },
         {
           "id": "afcbc318-a11b-4508-a66d-da175c146bab",
           "slug": "u8-video-unify",
           "name": "片頭模板與時間軸 v1",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U8"
         },
         {
           "id": "60d9328b-f89e-4cfb-bc41-10b6e469e110",
           "slug": "u9-video-unify",
           "name": "一本聖經",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U9"
         },
         {
           "id": "a0948c0a-e826-4786-b4ed-eae2b297b8e9",
           "slug": "u10-video-unify",
           "name": "用量與方案",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U10"
         },
         {
           "id": "a7c8e34e-d191-4281-9410-2b3ac5d1b754",
           "slug": "u11-video-unify",
           "name": "收尾",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "U11"
         },
         {
           "id": "1cfe2983-13b9-4b49-8cff-187af4daf78d",
           "slug": "batch0-video-unify",
           "name": "開自動發布前的守衛",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "批0"
         },
         {
           "id": "769e3f28-3d19-4c3c-a016-c3992240254a",
           "slug": "batch1-video-unify",
           "name": "發布順序：YouTube 先發",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "批1"
         },
         {
           "id": "d3f13852-6339-43e5-9421-9f75b1fe0ec4",
           "slug": "batch2-video-unify",
           "name": "每日選題",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "批2"
         },
         {
           "id": "12a87adc-cbe7-443d-ae06-60d2c28cbcd1",
           "slug": "batch3-video-unify",
           "name": "每週會員信草稿",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "批3"
         },
         {
           "id": "93b924b7-bfcc-43ea-8d8f-7c8229ffec6d",
           "slug": "batch4-video-unify",
           "name": "順暢度",
-          "phase": "video-unify"
+          "phase": "video-unify",
+          "legacy_code": "批4"
         }
       ]
     },
@@ -1013,91 +1100,106 @@
           "id": "f804acb0-62a9-407e-94e2-8573078318a3",
           "slug": "c1-vectorcraft-pro",
           "name": "建置鏈（本機）",
-          "phase": "vectorcraft-pro"
+          "phase": "vectorcraft-pro",
+          "legacy_code": "C1"
         },
         {
           "id": "6ecc1e64-abbc-4453-9751-6d7ef902e7f6",
           "slug": "c2-vectorcraft-pro",
           "name": "承載（正式站靜態檔）",
-          "phase": "vectorcraft-pro"
+          "phase": "vectorcraft-pro",
+          "legacy_code": "C2"
         },
         {
           "id": "e7e12481-dea7-4656-9313-b75745c86363",
           "slug": "c3-vectorcraft-pro",
           "name": "app 門",
-          "phase": "vectorcraft-pro"
+          "phase": "vectorcraft-pro",
+          "legacy_code": "C3"
         },
         {
           "id": "e646e783-2eb0-4235-a67c-ad7d1c6de3aa",
           "slug": "c4-vectorcraft-pro",
           "name": "第二 dock 欄：AwareWave 獨有的十個面板",
-          "phase": "vectorcraft-pro"
+          "phase": "vectorcraft-pro",
+          "legacy_code": "C4"
         },
         {
           "id": "6fb06aa5-8d1b-4627-9ae9-120a488c36b8",
           "slug": "c5-vectorcraft-pro",
           "name": "繁中與存檔",
-          "phase": "vectorcraft-pro"
+          "phase": "vectorcraft-pro",
+          "legacy_code": "C5"
         },
         {
           "id": "49f9bf2b-1ad5-419c-8025-9e2ec6adc092",
           "slug": "c6-vectorcraft-pro",
           "name": "驗收、升級流程、文件",
-          "phase": "vectorcraft-pro"
+          "phase": "vectorcraft-pro",
+          "legacy_code": "C6"
         },
         {
           "id": "3b353b08-569c-4251-a506-4421d973dd41",
           "slug": "c7-vectorcraft-pro",
           "name": "舊設計轉檔、舊編輯器退場",
-          "phase": "vectorcraft-pro"
+          "phase": "vectorcraft-pro",
+          "legacy_code": "C7"
         },
         {
           "id": "5bf7b1eb-8d52-450e-be69-73339564cbad",
           "slug": "c1-photocraft-pro",
           "name": "建置鏈、介面、本機試做",
-          "phase": "photocraft-pro"
+          "phase": "photocraft-pro",
+          "legacy_code": "C1"
         },
         {
           "id": "84821708-c29d-42e2-9357-aeba5c4733ca",
           "slug": "c2-photocraft-pro",
           "name": "承載（正式站靜態檔）",
-          "phase": "photocraft-pro"
+          "phase": "photocraft-pro",
+          "legacy_code": "C2"
         },
         {
           "id": "b6454f80-f4ef-4d32-8349-0c4482df5e69",
           "slug": "c3-photocraft-pro",
           "name": "app 門",
-          "phase": "photocraft-pro"
+          "phase": "photocraft-pro",
+          "legacy_code": "C3"
         },
         {
           "id": "0cf7ae17-d2fb-4b49-a538-3613a231d3a4",
           "slug": "c4-photocraft-pro",
           "name": "右側圖示欄與面板",
-          "phase": "photocraft-pro"
+          "phase": "photocraft-pro",
+          "legacy_code": "C4"
         },
         {
           "id": "a2a3a7df-9fc8-491c-92c7-81e8f5e8b4a7",
           "slug": "c5-photocraft-pro",
           "name": "My Designs 存原始檔",
-          "phase": "photocraft-pro"
+          "phase": "photocraft-pro",
+          "legacy_code": "C5"
         },
         {
           "id": "d140c08d-1824-4e82-8457-8e60941fb065",
           "slug": "c6-photocraft-pro",
           "name": "驗收、升級流程、文件",
-          "phase": "photocraft-pro"
+          "phase": "photocraft-pro",
+          "legacy_code": "C6"
         },
         {
           "id": "5c91167f-8128-4d2d-8a83-2ea6842056ee",
           "slug": "c7-photocraft-pro",
           "name": "入口改接、舊編輯器退場",
-          "phase": "photocraft-pro"
+          "phase": "photocraft-pro",
+          "legacy_code": "C7"
         },
         {
           "id": "b9af061f-f2e7-4fc4-ba00-0dd0e33cd911",
           "slug": "c8-photocraft-pro",
           "name": "傳回原工具",
-          "phase": "photocraft-pro"
+          "phase": "photocraft-pro",
+          "legacy_code": "C8"
         }
       ]
     },
@@ -1169,55 +1271,64 @@
           "id": "8e94339b-298a-4043-b52d-ca643ccd3630",
           "slug": "p1-auto-content",
           "name": "品牌聲音只存一份",
-          "phase": "auto-content"
+          "phase": "auto-content",
+          "legacy_code": "P1"
         },
         {
           "id": "f9234920-5a2f-4577-b0dc-be5ff161317b",
           "slug": "p2-auto-content",
           "name": "寫社群貼文共用核心",
-          "phase": "auto-content"
+          "phase": "auto-content",
+          "legacy_code": "P2"
         },
         {
           "id": "fb046e8f-a23e-4440-b269-3a9a4e556fdc",
           "slug": "p3-auto-content",
           "name": "熱搜落地＋題目佇列",
-          "phase": "auto-content"
+          "phase": "auto-content",
+          "legacy_code": "P3"
         },
         {
           "id": "d5b34420-91fe-4a0b-85ef-3310f06093f1",
           "slug": "p4-auto-content",
           "name": "排程管線＋AI 審核",
-          "phase": "auto-content"
+          "phase": "auto-content",
+          "legacy_code": "P4"
         },
         {
           "id": "43c07179-c3e8-4824-9c67-2d30049b6efc",
           "slug": "p5-auto-content",
           "name": "ScriptForge 獨立頁＋伺服器模組登記",
-          "phase": "auto-content"
+          "phase": "auto-content",
+          "legacy_code": "P5"
         },
         {
           "id": "9152d14f-ae11-47cb-a3d4-b51da42d7465",
           "slug": "p6-auto-content",
           "name": "影片接管線",
-          "phase": "auto-content"
+          "phase": "auto-content",
+          "legacy_code": "P6"
         },
         {
           "id": "ac671fa8-9f98-4e2c-842a-8f49ce1174e0",
           "slug": "p7-auto-content",
           "name": "YouTube",
-          "phase": "auto-content"
+          "phase": "auto-content",
+          "legacy_code": "P7"
         },
         {
           "id": "215943be-bcd4-46d4-855a-aec2e8a9af15",
           "slug": "p8-auto-content",
           "name": "治理收尾",
-          "phase": "auto-content"
+          "phase": "auto-content",
+          "legacy_code": "P8"
         },
         {
           "id": "22b58369-aadc-4e70-a6ce-3515b84ae8c2",
           "slug": "p9-auto-content",
           "name": "熱搜與提案自動＋題目閘",
-          "phase": "auto-content"
+          "phase": "auto-content",
+          "legacy_code": "P9"
         }
       ]
     },
@@ -1491,55 +1602,64 @@
           "id": "9cc9260f-9e81-479b-b324-db4ef8c5b355",
           "slug": "s1-customer-model",
           "name": "登記表加 features[] 與 accessChannels；產生器 new-product.mjs；機械閘",
-          "phase": "customer-model"
+          "phase": "customer-model",
+          "legacy_code": "1"
         },
         {
           "id": "e4d65338-1101-4ed6-8c94-e6833e9ad1cc",
           "slug": "s2-customer-model",
           "name": "Migration：plans、organization_entitlements、organizations.kind；許可帶 actor",
-          "phase": "customer-model"
+          "phase": "customer-model",
+          "legacy_code": "2"
         },
         {
           "id": "ff05a13d-959a-4c6a-80f1-e4f5dfe4dad1",
           "slug": "s3-customer-model",
           "name": "每個收費點只問 can(主體, feature_key, actor)",
-          "phase": "customer-model"
+          "phase": "customer-model",
+          "legacy_code": "3"
         },
         {
           "id": "7a0062ee-5769-4805-92fa-88dc235453c6",
           "slug": "s4-customer-model",
           "name": "Woo 付款通知 → 合約與權利；帳本泛化",
-          "phase": "customer-model"
+          "phase": "customer-model",
+          "legacy_code": "4"
         },
         {
           "id": "41e65599-9991-44fb-9158-004332b07ecf",
           "slug": "s5-customer-model",
           "name": "買斷安裝階段",
-          "phase": "customer-model"
+          "phase": "customer-model",
+          "legacy_code": "5"
         },
         {
           "id": "56870154-9e9b-457a-b711-b893109f4c27",
           "slug": "s6-customer-model",
           "name": "API 通道",
-          "phase": "customer-model"
+          "phase": "customer-model",
+          "legacy_code": "6"
         },
         {
           "id": "666c0f1a-f767-49df-a2b3-72c9edddf012",
           "slug": "s7-customer-model",
           "name": "轉售（代理商版）",
-          "phase": "customer-model"
+          "phase": "customer-model",
+          "legacy_code": "7"
         },
         {
           "id": "5828f640-42a5-4d8b-a998-6ac36fa07978",
           "slug": "s8-customer-model",
           "name": "每個產品長成單一產品的樣子",
-          "phase": "customer-model"
+          "phase": "customer-model",
+          "legacy_code": "8"
         },
         {
           "id": "10e3d1f1-8b65-4e02-ab1e-15ad38a39017",
           "slug": "s9-customer-model",
           "name": "客戶自己的網址指到 hosted 產品門（白牌）",
-          "phase": "customer-model"
+          "phase": "customer-model",
+          "legacy_code": "9"
         }
       ]
     },
@@ -1577,37 +1697,43 @@
           "id": "e00ae372-44c6-4fe9-87e2-b087a3ea3980",
           "slug": "c1-staff-tool-grants",
           "name": "員工工具登記表",
-          "phase": "staff-tool-grants"
+          "phase": "staff-tool-grants",
+          "legacy_code": "C1"
         },
         {
           "id": "b9a45cbb-6d87-4b44-9d47-28b419b9c479",
           "slug": "c2-staff-tool-grants",
           "name": "身分帶工具、擋網址與 API",
-          "phase": "staff-tool-grants"
+          "phase": "staff-tool-grants",
+          "legacy_code": "C2"
         },
         {
           "id": "ae082408-9398-4162-bf67-af7a9cc29d6e",
           "slug": "c3-staff-tool-grants",
           "name": "側欄與首頁只顯示有權限的",
-          "phase": "staff-tool-grants"
+          "phase": "staff-tool-grants",
+          "legacy_code": "C3"
         },
         {
           "id": "578657ac-3048-48ed-bc86-0fe2108a2165",
           "slug": "c4-staff-tool-grants",
           "name": "員工權限頁 /ops/staff",
-          "phase": "staff-tool-grants"
+          "phase": "staff-tool-grants",
+          "legacy_code": "C4"
         },
         {
           "id": "c29537bb-634f-4ad3-893e-961fb35732ed",
           "slug": "c5-staff-tool-grants",
           "name": "沒權限頁與文件",
-          "phase": "staff-tool-grants"
+          "phase": "staff-tool-grants",
+          "legacy_code": "C5"
         },
         {
           "id": "38c2aa7e-b637-4018-a14e-a74d0782243d",
           "slug": "c6-staff-tool-grants",
           "name": "上線",
-          "phase": "staff-tool-grants"
+          "phase": "staff-tool-grants",
+          "legacy_code": "C6"
         }
       ]
     },
@@ -1670,43 +1796,50 @@
           "id": "b43cd569-eae5-4615-9a31-b692e7491610",
           "slug": "c1-schedules-off-trigger",
           "name": "定時工作改由主機啟動",
-          "phase": "schedules-off-trigger"
+          "phase": "schedules-off-trigger",
+          "legacy_code": "C1"
         },
         {
           "id": "be294c42-4394-466f-a156-9e001794aa66",
           "slug": "c2-schedules-off-trigger",
           "name": "定時工作上線",
-          "phase": "schedules-off-trigger"
+          "phase": "schedules-off-trigger",
+          "legacy_code": "C2"
         },
         {
           "id": "280dabbc-8dba-42ed-80bd-57210e376940",
           "slug": "c3-schedules-off-trigger",
           "name": "自動偵測 Trigger 停滯",
-          "phase": "schedules-off-trigger"
+          "phase": "schedules-off-trigger",
+          "legacy_code": "C3"
         },
         {
           "id": "32a727ce-0a4b-4e8b-ae88-e24681a45009",
           "slug": "c4-schedules-off-trigger",
           "name": "統一發送排程通知",
-          "phase": "schedules-off-trigger"
+          "phase": "schedules-off-trigger",
+          "legacy_code": "C4"
         },
         {
           "id": "315a89b4-8aea-460c-b231-eb2955e70c31",
           "slug": "c5-schedules-off-trigger",
           "name": "補齊排程頁的工作清單",
-          "phase": "schedules-off-trigger"
+          "phase": "schedules-off-trigger",
+          "legacy_code": "C5"
         },
         {
           "id": "7103256a-fc7f-487b-b24e-0f1aeed2f0c2",
           "slug": "c6-schedules-off-trigger",
           "name": "狀態報告改由主機產生",
-          "phase": "schedules-off-trigger"
+          "phase": "schedules-off-trigger",
+          "legacy_code": "C6"
         },
         {
           "id": "ec77e5a2-4aaa-4b77-9361-60aeb26c8b15",
           "slug": "c8-schedules-off-trigger",
           "name": "從主機外監控網站",
-          "phase": "schedules-off-trigger"
+          "phase": "schedules-off-trigger",
+          "legacy_code": "C8"
         }
       ]
     },
@@ -1747,37 +1880,43 @@
           "id": "9922d9fe-26f8-4498-a9e4-d1f62a22e2d3",
           "slug": "w1-control-center-v1",
           "name": "主機匯入器",
-          "phase": "control-center-v1"
+          "phase": "control-center-v1",
+          "legacy_code": "W1"
         },
         {
           "id": "ec22117f-1f2a-4c83-8c28-214bffa13dae",
           "slug": "w2-control-center-v1",
           "name": "資料表、接收端與頁面",
-          "phase": "control-center-v1"
+          "phase": "control-center-v1",
+          "legacy_code": "W2"
         },
         {
           "id": "98929e04-6a93-4a00-8e9c-0dae2f6b183a",
           "slug": "w3-control-center-v1",
           "name": "系統清單與搬遷腳本",
-          "phase": "control-center-v1"
+          "phase": "control-center-v1",
+          "legacy_code": "W3"
         },
         {
           "id": "6f61b5af-bb7e-46fa-a765-d4b9bf2c99cb",
           "slug": "w4-control-center-v1",
           "name": "監工台頁",
-          "phase": "control-center-v1"
+          "phase": "control-center-v1",
+          "legacy_code": "W4"
         },
         {
           "id": "762859d0-27ad-4f49-a2b1-27331ba8ff72",
           "slug": "b2-control-center-v1",
           "name": "整合與上線",
-          "phase": "control-center-v1"
+          "phase": "control-center-v1",
+          "legacy_code": "B2"
         },
         {
           "id": "446f3eb1-9124-4d1d-855b-92e8052a43f0",
           "slug": "b3-control-center-v1",
           "name": "系統盤點與其餘監工頁切換",
-          "phase": "control-center-v1"
+          "phase": "control-center-v1",
+          "legacy_code": "B3"
         }
       ]
     },
@@ -1816,49 +1955,57 @@
           "id": "a4e54afc-f0b1-4ec0-a06a-82d7d10174a1",
           "slug": "v171-foundry-v17",
           "name": "樣板瘦身",
-          "phase": "foundry-v17"
+          "phase": "foundry-v17",
+          "legacy_code": "V17-1"
         },
         {
           "id": "5d920e88-c8ab-4cf5-ad19-7eaaa1d39223",
           "slug": "v172-foundry-v17",
           "name": "每模組一張可執行卡",
-          "phase": "foundry-v17"
+          "phase": "foundry-v17",
+          "legacy_code": "V17-2"
         },
         {
           "id": "bd48fea7-ff42-438d-a87b-cc9fb4afd780",
           "slug": "v173-foundry-v17",
           "name": "監工台套件共用",
-          "phase": "foundry-v17"
+          "phase": "foundry-v17",
+          "legacy_code": "V17-3"
         },
         {
           "id": "1367a4ed-79f2-48ba-9f65-818482da7e84",
           "slug": "v174-foundry-v17",
           "name": "接軌 AwareWave",
-          "phase": "foundry-v17"
+          "phase": "foundry-v17",
+          "legacy_code": "V17-4"
         },
         {
           "id": "a6f6f602-35d2-4c86-b05d-ab36d8d31b4a",
           "slug": "v175-foundry-v17",
           "name": "範例 intake 自動重生",
-          "phase": "foundry-v17"
+          "phase": "foundry-v17",
+          "legacy_code": "V17-5"
         },
         {
           "id": "1b413c5e-409d-44e0-a67b-f1532c032ef1",
           "slug": "v176-foundry-v17",
           "name": "新題",
-          "phase": "foundry-v17"
+          "phase": "foundry-v17",
+          "legacy_code": "V17-6"
         },
         {
           "id": "a844fea2-d501-47c8-8155-6b450c6df45b",
           "slug": "v177-foundry-v17",
           "name": "能力驗收補齊",
-          "phase": "foundry-v17"
+          "phase": "foundry-v17",
+          "legacy_code": "V17-7"
         },
         {
           "id": "69eaaaed-7715-49bb-b4f3-df2f9bc0025f",
           "slug": "v178-foundry-v17",
           "name": "產品 manifest 補齊",
-          "phase": "foundry-v17"
+          "phase": "foundry-v17",
+          "legacy_code": "V17-8"
         }
       ]
     },
