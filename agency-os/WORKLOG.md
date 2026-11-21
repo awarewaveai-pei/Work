@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-21（續6）— oracle 併入 Z2（紫微格局 22→66）與 T4（塔羅追問補抽）
+
+- 併入 main（`Projects/internal/ziwei-doushu/`，**未部署**）：Z2 `19fc4a09b`（`lib/ziwei/patterns.ts`：x-iztro 全部 62 條本命格局以 TS 重寫＋本站原有 4 條；新 `lib/ziwei/patterns.test.ts`）；T4 `440f9889f`（`lib/tarot.ts` 補抽 1–3 張、不重複、同一亂數來源、累計上限 9；facts 標 `followup:#n`）。
+- Z2 行為變化（已上線使用者會看到格局清單不同）：依引文收窄 6 條（府相朝垣、君臣慶會、左右同宮、坐貴向貴、貪武同行、丹墀桂墀）、放寬 4 條（機月同梁加寅申、日照雷門加官祿宮、石中隱玉與殺破狼加身宮）、文星拱命改名文星朝命；新增 44 條；x-iztro 兩條行運格（祿衰馬困、風雲際會）本命盤不判，未收。卡片寫現有 25 條，實際 22 條。
+- RISKS 處置：
+  - Z2「成立例是用新偵測函式搜盤得來，有自證成分」→ 接受：critic 逐條對照 Rust 原碼 62 條無條件錯誤，工人另抽 6 張核原始星位；無外部命例可用（x-iztro `pattern_examples.rs` 只有盤型無生辰）。
+  - Z2「口徑標記與破格標記未輸出」「英文頁格局名與解說仍為中文」→ 不處理（前者卡片未要求，後者既有現況）。
+  - Z2 解說含投資建議字眼與保證語 → 工人已改並全檔掃過。
+  - T4「累計上限 9 為工人所定」→ 接受（守住 60 條 facts）。「AI 是否把補牌當追問敘事未實測」→ 部署後煙霧測試補一次。「補牌不計入牌間關係」→ 接受。
+- 進行中：A3（行運合盤）、V1（吠陀）兩工人各自等 critic。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd D:/Worktrees/Work/oracle-int/Projects/internal/ziwei-doushu && npx tsc --noEmit && npx vitest run → 37 檔 321 passed／3 skipped | exit=0 | ms=5000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n（Z2 工人自帶 critic，3 Minor 皆處理；T4 監工讀回報與測試清單）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/ziwei-doushu | grep=府相朝垣 | hits=6
+- rollback：`git revert 19fc4a09b`／`440f9889f` 可個別撤。
 ## 2026-11-21（續5）— oracle 批 6 併入六張（T2、A1、I2、T3、A2、D1）；對外介面與批 7 卡片（操作者：「17 個裡可用的全加 派工」「那就去做對外的資料介面」）
 
 - 併入 main（皆 `Projects/internal/ziwei-doushu/`，**未部署**）：T2 `8f92f89dc`（塔羅 45 牌陣分 5 組按鈕、`crypto` 拒絕取樣、每日一牌）；A1 `b0ddcc0c8`（本命五相位、容許度 6／5、日月 +1.5、入出相用 XALEN 速度）；I2 `e3a90e932`（六爻納甲：八宮、世應、納甲、六親、六神、旬空）；T3 `6778e9c43`（78 張牌圖＋牌背，`public/tarot/`，6.8MB）；A2 `9e3310a66`（廟旺陷失勢、日夜盤、福點精神點、年小限）；D1 `fa3c31791`（當日黃曆：九星、二十八宿、彭祖百忌、三神方位、胎神、沖煞、建除、吉神凶煞）。監工 commit：`5f1776dd3`（`localToday`／`Ymd` 移到無依賴的 `lib/today.ts`）、`80a028230`（I2 改 import）。
