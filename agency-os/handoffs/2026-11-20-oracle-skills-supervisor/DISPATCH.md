@@ -116,12 +116,13 @@ RISKS 處置：`agency-os/WORKLOG.md` 2026-11-21「oracle 批 5 併入」。
 | 卡 | 內容 | 工人 session（沿用） | 狀態 |
 |---|---|---|---|
 | Z2 | 紫微格局 25→64 條 | `local_2b695d16-feff-4153-b410-a8dca0915081` | 6a 進行中 |
-| T2 | 塔羅牌陣、密碼學亂數、每日一牌 | `local_1e8cf0f6-0159-4627-ae35-a4845b8667dd` | 6a 進行中 |
-| A1 | 占星本命相位 | `local_617452cb-7ed2-4a4e-8591-0e9160c5b5ac` | 6a 進行中 |
+| T2 | 塔羅牌陣（45 種）、密碼學亂數、每日一牌 | `local_1e8cf0f6-0159-4627-ae35-a4845b8667dd` | main `8f92f89dc`＋`5f1776dd3` |
+| A1 | 占星本命相位 | `local_617452cb-7ed2-4a4e-8591-0e9160c5b5ac` | main `b0ddcc0c8` |
 | I2 | 六爻納甲排盤 | `local_f1c77b0b-cc9f-44ba-a7d1-316911378bd0` | 6a 進行中 |
-| D1 | 每日黃曆加料 | — | 6b 待派 |
-| T3 | 塔羅牌圖（等 T2） | — | 6b 待派 |
-| A2 | 尊貴、阿拉伯點、小限（等 A1） | — | 6b 待派 |
+| D1 | 每日黃曆加料 | `local_51906081-7b64-41ec-928f-7f2f9e1f019a` | 6b 進行中 |
+| T3 | 塔羅牌圖 | `local_1e8cf0f6-0159-4627-ae35-a4845b8667dd` | 6b 進行中 |
+| A2 | 尊貴、阿拉伯點、小限 | `local_617452cb-7ed2-4a4e-8591-0e9160c5b5ac` | 6b 進行中 |
 
-不做：bazi-mcp 的輸出欄位（本站無對外 API）；react-iztro、lunar-python、ziwei-chart、ichingshifa、iChing-JS（無可取）。
+之後：批 7（`briefs/B7-remaining.md`：A3 行運合盤、A4 時間主星、V1 吠陀、Z3 星曜知識、T4 追問補抽）→ X1 對外 REST（`briefs/X1-public-api.md`）→ X2 MCP（`briefs/X2-mcp-endpoint.md`）。X1 要等所有動到 `lib/divination/systems/*` 的卡併入。操作者 2026-11-21：「那就去做對外的資料介面」「缺介面而沒加的全面補上」。
+不做（原因見 `B7-remaining.md` 末節）；react-iztro、lunar-python、ziwei-chart、ichingshifa、iChing-JS（無可取）。
 
