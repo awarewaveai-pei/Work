@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-22（續4）— oracle 每日信寄信服務改為 Resend（操作者指示）
+
+- 操作者：「不是有人留 email 就可以用 resend 寄?」→ 是。上一條（Brevo）改掉：`ORACLE-WP-SPEC.md` §2-10 改 FluentSMTP＋Resend。
+- 實查 Resend 帳號（MCP `get-usage`、`list-domains`）：免費方案每日 100／每月 3,000 封，已用 1；`aware-wave.com` verified、sending enabled；網域 1／3。
+- 我先前排除 Resend 的理由只有一個：FluentCRM 內建退信回報不含 Resend。處置：P3′ 加收 Resend webhook，把退信／投訴寫回 FluentCRM 聯絡人狀態。
+- 每日信用獨立寄件網域 `oracle.aware-wave.com`（未建，屬寄信卡的 DNS 步驟，High）。
+- REALTEST_WAIVED: DOC_ONLY -- 只改規格文件
+- REVIEW_WAIVED: DOC_ONLY -- 只改規格文件
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式或識別符改動
 ## 2026-11-22（續3）— oracle 每日信寄信服務定案：FluentSMTP＋Brevo
 
 - 操作者指示參照外聯系統。`https://outreach.aware-wave.com/` 是登入頁（未登入，無內容）；資訊取自該系統的程式與規格：寄信路由 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/outreach/connectors/router.ts:42-47`（冷信＝Gmail 信箱池；暖信＝站自己的 FluentSMTP，備援 Brevo 免費每日 300 封；交易信＝Resend）、`agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md:24`（主網域不寄冷信）、`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` §8.2。

@@ -51,7 +51,7 @@ WordPress 頁面（Kadence，可排版）
 | 7 | AI 額度依會員 | 外掛 REST 發一張站台金鑰簽的短效票（假名、到期時間、key_id，60 秒）；框內頁帶票呼叫 `/api/interpret`；引擎用 `ENG/lib/sites/verify.ts` 驗，依 key_id＋假名限額。無票＝匿名，照現行依來源位址限流。登記表加每站每日 AI 上限欄位 | REV M11、m9 |
 | 8 | 每日信 | 外掛自帶訂閱區塊 → 建 FluentCRM 聯絡人（pending）→ FluentCRM 雙重確認。出生資料存外掛表 `{prefix}aworacle_daily_profiles`（不存 FluentCRM 自訂欄位）。每小時排程：挑「所在時區當地時間 ≥ 07:00 且今天還沒寄」的人 → 批次算 → 寫 `{prefix}aworacle_daily_sent`（唯一鍵 訂閱者＋當地日期）→ 站內呼叫 FluentCRM `POST /fluent-crm/v2/subscribers/{id}/emails/send`。引擎回錯就不寄。排程停擺超過一天的不補寄。每月清 30 天前的 `custom_email_campaign` 列 | D3；試驗 V4；REV m3 |
 | 9 | 寄信層接頭 | 外掛設定 `mailer: fluentcrm \| none`；`none` 或未裝 FluentCRM 時不顯示訂閱區塊。FluentCRM 免費版即可 | ADR 017 `:52`；試驗 V4 |
-| 10 | 寄信服務 | **FluentSMTP＋Brevo**（已定，2026-11-22）。沿用外聯系統既有的寄信路由：暖信＝站自己的 FluentSMTP，備援 Brevo 免費方案每日 300 封；交易信＝Resend；冷信的 Gmail 信箱池不得用於此（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/outreach/connectors/router.ts:42-47`；`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` §8.2）。Brevo 在 FluentCRM 內建退信回報名單內。訂閱者每日超過 300 人時升 Brevo 付費或改 Amazon SES（同樣有退信回報），外掛不用改。寄件網域用 `oracle.aware-wave.com` 自己的 DKIM／SPF，不動主網域 `aware-wave.com` 的寄信設定 | 操作者 2026-11-22 指示參照外聯系統；決策紀錄 §5 |
+| 10 | 寄信服務 | **FluentSMTP＋Resend**（操作者 2026-11-22：「有人留 email 就可以用 Resend 寄」）。平台已有 Resend 帳號，`aware-wave.com` 已驗證可寄（2026-11-22 查：免費方案每日 100 封、每月 3,000 封，已用 1；網域 1／3）。每日信用獨立寄件網域 `oracle.aware-wave.com`（在 Resend 加第二個網域，自己的 DKIM／SPF），不與主網域的系統通知信混在一起。Resend 不在 FluentCRM 內建退信回報名單內 → 外掛收 Resend webhook（`email.bounced`、`email.complained`），把該聯絡人在 FluentCRM 標成 bounced／complained（P3′ 內）。訂閱者每日超過 100 人時升 Resend 付費方案；外掛不用改 | 操作者指示；Resend 帳號實查 |
 | 11 | 站台金鑰登記 | 本輪沿用已併入的 `ORACLE_SITES` 環境變數（一個站）。第二個站要接入時，搬進控制面並沿用 `seller_sites` 的形狀（`lobster-factory/packages/db/migrations/0133_seller_sites.sql:18-29`）；屆時引擎改讀簽章清單端點 | REV C2；本輪只有一個站 |
 | 12 | 搜尋 | 工具頁＝WordPress 頁，介紹文與 FAQ 寫在頁面本體可收錄；框內內容靠 `indexifembedded` 歸到父頁。sitemap 與 robots 由 WordPress（Rank Math）出；引擎的 `sitemap.ts`、`robots.ts` 在 `ORACLE_FRONT_PAGES` 有設定時不輸出 | REV M4 |
 | 13 | 多語 | TranslatePress（站台既有選擇）。WordPress 的語言網址代稱不得用 `en`、`zh-TW`（引擎佔用）；外掛以 `determine_locale()` 對應引擎語言，對不到用 `en` | §1 分路限制 |
@@ -77,7 +77,7 @@ WordPress 頁面（Kadence，可排版）
 |---|---|---|---|---|
 | P1′ | 修 critic 1M/6n（清單：`agency-os/WORKLOG.md` 2026-11-21 續21「未修，裝到任何 WordPress 前必修」）；嵌入輸出改同網域（`<iframe src="/embed/…">`＋同源量高度腳本），跨網域寫法留在原檔但由設定 `embed: same-origin \| cross-origin` 切換，預設 same-origin | 乾淨 WordPress（docker，產物放 `$env:TEMP`）裝外掛 → 第一次儲存設定後對照表仍在 → 區塊嵌入可用；PHPUnit 綠 | E1 | Medium |
 | P2′ | 命盤與「我存的對象」：兩張表（dbDelta）、REST、短碼 `[aw_oracle_my_charts]`、`[aw_oracle_persons]`、出生欄位加密（§2-6）、隱私匯出與刪除、刪會員連動 | 未登入 401；無 nonce 401；甲會員讀不到乙會員的列；`wp db export` 的檔裡查不到明文出生日期；匯出含兩類資料；刪除後兩表無該人資料 | P1′ | High（個資） |
-| P3′ | 每日信（§2-8、§2-9）；會員票 REST（§2-7） | 四個時區（Asia/Taipei、Europe/London 跨夏令時間當日、America/Los_Angeles、Asia/Kolkata）各在當地 07:00 後第一次排程被挑中且只一次；同日重跑不重寄；退訂者不被挑；引擎回錯不寄；`mailer=none` 時無訂閱區塊 | P1′、E4 | High（寄信、個資） |
+| P3′ | 每日信（§2-8、§2-9）；會員票 REST（§2-7） | 四個時區（Asia/Taipei、Europe/London 跨夏令時間當日、America/Los_Angeles、Asia/Kolkata）各在當地 07:00 後第一次排程被挑中且只一次；同日重跑不重寄；退訂者不被挑；引擎回錯不寄；`mailer=none` 時無訂閱區塊；收到 Resend 的退信或投訴 webhook（驗簽章）後該聯絡人不再被挑 | P1′、E4 | High（寄信、個資） |
 | P4 | 發佈：`scripts/release-wp-bridge.sh`、`scripts/rollout-wp-bridge.ps1` 加 `oracle`；發佈 repo；`WP_CLIENT_PLUGIN_STACK.md` 加「產品外掛」類別 | 兩支腳本 dry-run 正確 | P1′ | Medium（新公開 repo） |
 
 ### 治理
