@@ -97,3 +97,13 @@ oracle 是 `sg-deploy.sh` 的 app `oracle-web`（`Projects/internal/ziwei-doushu
 
 ## 現況
 五個外部 skill 的內容全部上線。未排入：紫微夫妻宮／桃花運（yinyuan）、城市五行地圖（fengshui）、每日次數計量與帳號金流（`ORACLE_ROADMAP.md` Phase A）。工人 session 四個皆 idle，可封存。
+
+## 批 5（2026-11-21，來源 `GITHUB_RESEARCH.md` §5）
+
+| 卡 | 內容 | 工人 session | 狀態 |
+|---|---|---|---|
+| 監工 | 農曆先轉國曆再校正；「今天」取本地日期（`lib/dates.ts`） | — | main `d86262763`，未部署 |
+| U2 | iztro 2.5.8→2.6.5；日界單一常數 `'forward'`；回歸測試 | `local_51906081-7b64-41ec-928f-7f2f9e1f019a` | 進行中 |
+| I1 | 易經卦爻辭（iching-kit 三方校對、繁體）＋七種變爻讀法進 facts 與頁面 | `local_53c300dd-192c-479c-a081-f667eb10780e` | 進行中 |
+
+卡片全文在各 session 的開場訊息。併入方式同前（`oracle-int` worktree → tsc＋全套 vitest → ff main）。待操作者決定：23 點出生的日界（紫微 `'forward'` 與八字 `sect=2` 現在相反）；塔羅牌圖。未排：`GITHUB_RESEARCH.md` §0.1 標「未排」各列。

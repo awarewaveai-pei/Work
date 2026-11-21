@@ -11,6 +11,26 @@
 3. **可取用的外部資產只有三樣**：iching-kit 的卦爻辭資料與朱熹規則（MIT，要修 2 字）；Kerykeion／openephem／flatlib 的相位規則數值（只抄數字當規格）；tarot-mcp 的牌圖（MIT，但有條件，§4）。
 4. **不可用**：anois 牌圖（78 張全印「© 1971 U.S. Games」）、anois 英文牌義（檔頭自標出自 Mark McElroy 的書）、Kerykeion（AGPL）、ziwei-chart（GPL-3.0）、flatlib 附帶的 Swiss 星曆檔。
 
+### 0.1 每個專案能取用什麼（2026-11-21 補；操作者質疑「17 個都不能用」）
+
+「不換引擎」不等於「沒有可用的」。能用的是零件與內容，不是整包：
+
+| 專案 | 可取用 | 授權 | 用在哪 | 狀態 |
+|---|---|---|---|---|
+| iztro | 2.6.5 的修正（晚子時、酉宮亮度、非法日期丟錯） | MIT | 紫微排盤 | 派工 U2 |
+| iching-kit | 64 卦辭＋384 爻辭＋用九用六；七種變爻讀法 | MIT | 易經 facts 與頁面 | 派工 I1 |
+| ichingpy | 納甲、八宮、世應、六親、六神、旬空的規則（`divination/six_lines.py`）；大象、小象原文 | MIT | 新功能：六爻排盤 | 未排 |
+| x-iztro | 64 條格局規則與出處（`src/pattern/rules/*`，本站 `lib/ziwei/patterns.ts` 現有條數遠少於此）；知識包 162 星曜／64 格局／49 術語（`src/data/knowledge/iztro_docs.zh-CN.json`，簡體） | MIT | 紫微格局判定與解讀素材 | 未排 |
+| tarot-mcp | 78 張牌圖＋牌背；25 種牌陣的位置定義（`src/tarot/readings/spreads.ts`）；先洗牌再給編號的防作弊流程 | MIT（牌圖有 §4 的條件） | 塔羅牌圖、牌陣擴充 | 牌圖待操作者決定 |
+| anois/tarot | 25 種牌陣定義（含事業、財運、桃花、復合等主題牌陣，`src/spreads/builtins.ts:655-681`）；黃金黎明占星對應表 | MIT（程式；牌圖與英文牌義除外） | 塔羅牌陣擴充 | 未排 |
+| TarotWhisper | 每日一牌的日期雜湊做法（`lib/tarot/daily.ts`）；追問時補抽 1–3 張的互動 | MIT（程式） | 塔羅每日牌、追問 | 未排 |
+| openephem | 相位規則；時間主星技法的常數與算法：小限、法達、黃道釋放、十年期（`profections.py`、`firdaria.py`、`zodiacal_releasing.py`、`decennials.py`） | MIT | 占星相位與流年類功能 | 未排 |
+| flatlib | 本質尊貴計分、21 個阿拉伯點公式、行星時、與太陽距離分級（`dignities/*`、`tools/arabicparts.py`、`tools/planetarytime.py`） | MIT（星曆檔除外） | 占星進階解讀 | 未排 |
+| Kerykeion | 只取規則數值：各情境 orb 表、行運逆行多次命中的切法、極區改 Porphyry | AGPL（數值與規則不受限，程式不可抄） | 占星相位、行運規格 | 未排 |
+| lunar-javascript | 本站尚未用到的現成功能：九星、二十八宿、彭祖百忌、吉神方位、胎神、佛曆道曆節日 | MIT | 每日運勢與擇日加料 | 未排 |
+| bazi-mcp | 八字 JSON 輸出欄位設計 | ISC | 若日後做對外 API | 未排 |
+| react-iztro、lunar-python、ziwei-chart、ichingshifa、iChing-JS | 無（重複、語言不符、授權不可用或品質有錯） | — | — | — |
+
 ## 1. 查核深度（照實）
 
 | 專案 | 授權 | 逐行讀完 | 沒逐行讀 |
