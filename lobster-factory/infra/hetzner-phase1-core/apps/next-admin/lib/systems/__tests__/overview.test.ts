@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UpdateRow } from "../projection";
-import { buildResumeMarkdown, legacyDone, mdInline, overviewCounts, progressKind, recentHandoffs, type BriefInput } from "../overview";
+import { buildResumeMarkdown, effectiveStatus, implementedRatio, legacyDone, mdInline, overviewCounts, progressKind, recentHandoffs, type BriefInput } from "../overview";
 
 const NOW = Date.parse("2026-11-21T00:00:00Z");
 const row = (o: Partial<Parameters<typeof overviewCounts>[0][number]> = {}) => ({ status: "active" as const, featureCount: 3, blocker: null, lastActivityAt: "2026-11-20T00:00:00Z", ...o });
@@ -90,5 +90,27 @@ describe("buildResumeMarkdown", () => {
     expect(md).not.toMatch(/^## 注入/m);
     expect(md).not.toMatch(/^## b/m);
     expect(md).not.toContain("```");
+  });
+});
+
+describe("effectiveStatus", () => {
+  const ago = (d: number) => new Date(NOW - d * 86400000).toISOString();
+  it("infers from the last commit: <=14 days active, 15-60 maintenance, older paused, no activity unset", () => {
+    expect(effectiveStatus(null, ago(14), NOW)).toEqual({ status: "active", inferred: true });
+    expect(effectiveStatus(null, ago(15), NOW)).toEqual({ status: "maintenance", inferred: true });
+    expect(effectiveStatus(null, ago(60), NOW)).toEqual({ status: "maintenance", inferred: true });
+    expect(effectiveStatus(null, ago(61), NOW)).toEqual({ status: "paused", inferred: true });
+    expect(effectiveStatus(null, null, NOW)).toEqual({ status: null, inferred: false });
+  });
+  it("a recorded status_change wins over any activity", () => {
+    expect(effectiveStatus("done", ago(1), NOW)).toEqual({ status: "done", inferred: false });
+    expect(effectiveStatus("paused", ago(1), NOW)).toEqual({ status: "paused", inferred: false });
+  });
+});
+
+describe("implementedRatio", () => {
+  it("counts implemented and verified over counted features; null when nothing counted", () => {
+    expect(implementedRatio({ counted: 4, verified: 1, implemented: 2 })).toBe(0.75);
+    expect(implementedRatio({ counted: 0, verified: 0, implemented: 0 })).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 // 繁中 labels and badge classes (globals.css .badge-*) for /ops/systems.
 import type { FeatureStatus, SystemType } from "./contract";
+import type { EffectiveStatus } from "./overview";
 import type { Priority, SystemStatus } from "./projection";
 
 export const TYPE_LABEL: Record<SystemType, string> = {
@@ -7,6 +8,8 @@ export const TYPE_LABEL: Record<SystemType, string> = {
 };
 export const STATUS_LABEL: Record<SystemStatus, string> = { active: "進行中", paused: "暫停", done: "完成", archived: "封存" };
 export const STATUS_BADGE: Record<SystemStatus, string> = { active: "badge-green", paused: "badge-yellow", done: "badge-gray", archived: "badge-gray" };
+export const EFFECTIVE_LABEL: Record<EffectiveStatus, string> = { ...STATUS_LABEL, active: "開發中", maintenance: "維護中" };
+export const EFFECTIVE_BADGE: Record<EffectiveStatus, string> = { ...STATUS_BADGE, maintenance: "badge-green" };
 export const PRIORITY_LABEL: Record<Priority, string> = { high: "高", normal: "中", low: "低" };
 export const FEATURE_LABEL: Record<FeatureStatus, string> = {
   todo: "未開始", in_progress: "進行中", implemented: "已實作", verified: "已驗收", blocked: "卡住", cancelled: "取消",

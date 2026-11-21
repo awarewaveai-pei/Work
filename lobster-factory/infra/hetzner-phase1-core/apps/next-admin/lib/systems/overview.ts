@@ -2,16 +2,36 @@
 import { chronological, liveEvents, type SystemProjection, type UpdateRow } from "./projection";
 
 export const STALL_DAYS = 30;
+export const ACTIVE_DAYS = 14;
+export const MAINTENANCE_DAYS = 60;
 
-export interface CountInput { status: SystemProjection["status"]; featureCount: number; blocker: string | null; lastActivityAt: string | null }
+export type EffectiveStatus = NonNullable<SystemProjection["status"]> | "maintenance";
+export interface EffectiveState { status: EffectiveStatus | null; inferred: boolean }
+
+/** A recorded status_change always wins. Without one, infer from the last commit: <= 14 days 開發中 (active), <= 60 days
+ *  維護中, older 暫停; no activity at all stays null (未設定). `inferred` drives the 「（推定）」 suffix. */
+export function effectiveStatus(status: SystemProjection["status"], lastActivityAt: string | null, now: number): EffectiveState {
+  if (status) return { status, inferred: false };
+  const at = lastActivityAt ? Date.parse(lastActivityAt) : NaN;
+  if (!Number.isFinite(at)) return { status: null, inferred: false };
+  const days = (now - at) / 86400000;
+  return { status: days <= ACTIVE_DAYS ? "active" : days <= MAINTENANCE_DAYS ? "maintenance" : "paused", inferred: true };
+}
+
+/** 已實作 = (implemented + verified) / counted features; null when nothing is counted. */
+export function implementedRatio(p: { counted: number; verified: number; implemented: number }): number | null {
+  return p.counted ? (p.implemented + p.verified) / p.counted : null;
+}
+
+export interface CountInput { status: EffectiveStatus | null; featureCount: number; blocker: string | null; lastActivityAt: string | null }
 export interface OverviewCounts { total: number; active: number; needsAttention: number; wrapped: number }
 
-/** Four stat cards. 待確認 = still moving (not done / archived / paused) and either blocked, not inventoried yet
- *  (registry lists no features at all; features still on an old supervisor page count as inventoried) or silent for STALL_DAYS. 維護與已完成 = done + archived. */
+/** Four stat cards. 待確認 = still moving (not done / archived / paused / maintenance) and either blocked, not inventoried yet
+ *  (registry lists no features at all; features still on an old supervisor page count as inventoried) or silent for STALL_DAYS. 維護與已完成 = maintenance + done + archived. */
 export function overviewCounts(rows: readonly CountInput[], now: number): OverviewCounts {
   const stallMs = STALL_DAYS * 86400000;
   const attention = (r: CountInput) => {
-    if (r.status === "done" || r.status === "archived" || r.status === "paused") return false;
+    if (r.status === "done" || r.status === "archived" || r.status === "paused" || r.status === "maintenance") return false;
     if (r.blocker) return true;
     if (r.featureCount === 0) return true;
     const at = r.lastActivityAt ? Date.parse(r.lastActivityAt) : NaN;
@@ -21,7 +41,7 @@ export function overviewCounts(rows: readonly CountInput[], now: number): Overvi
     total: rows.length,
     active: rows.filter((r) => r.status === "active").length,
     needsAttention: rows.filter(attention).length,
-    wrapped: rows.filter((r) => r.status === "done" || r.status === "archived").length,
+    wrapped: rows.filter((r) => r.status === "done" || r.status === "archived" || r.status === "maintenance").length,
   };
 }
 

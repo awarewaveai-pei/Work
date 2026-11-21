@@ -9,9 +9,9 @@ import type { SystemType } from "@/lib/systems/contract";
 import { systemsAccess } from "@/lib/systems/access";
 import { importSummary, PRIORITIES, projectSystem, SYSTEM_STATUSES, type FeatureView, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
 import {
-  EVENT_LABEL, FEATURE_BADGE, FEATURE_LABEL, formatTime, PRIORITY_LABEL, RESULT_MESSAGES, SOURCE_LABEL, STATUS_BADGE, STATUS_LABEL, TYPE_LABEL,
+  EFFECTIVE_BADGE, EFFECTIVE_LABEL, EVENT_LABEL, FEATURE_BADGE, FEATURE_LABEL, formatTime, PRIORITY_LABEL, RESULT_MESSAGES, SOURCE_LABEL, STATUS_LABEL, TYPE_LABEL,
 } from "@/lib/systems/labels";
-import { buildResumeMarkdown, legacyDone, progressKind } from "@/lib/systems/overview";
+import { buildResumeMarkdown, effectiveStatus, implementedRatio, legacyDone, progressKind, type EffectiveState } from "@/lib/systems/overview";
 import { readDefinitions, readImportRuns, readProjectionInput, readRecentEvents } from "@/lib/systems/store";
 import { reviewFeature, setSystemStatus } from "../actions";
 import { CopyBrief } from "../CopyBrief";
@@ -27,7 +27,7 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px" };
 const row: React.CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--card-border)", fontSize: 13, color: "var(--text-primary)" };
 
-function Overview({ system, p, hist, brief }: { system: SystemRow; p: SystemProjection; hist: ReturnType<typeof legacyDone>; brief: string }) {
+function Overview({ system, p, eff, hist, brief }: { system: SystemRow; p: SystemProjection; eff: EffectiveState; hist: ReturnType<typeof legacyDone>; brief: string }) {
   const kind = progressKind(p);
   const hidden = (
     <>
@@ -54,8 +54,14 @@ function Overview({ system, p, hist, brief }: { system: SystemRow; p: SystemProj
           <div style={{ fontSize: 26, fontWeight: 800, color: "var(--accent-text)" }}>{kind === "number" ? `${Math.round((p.completion ?? 0) * 100)}%` : kind === "legacy" ? "進度在舊監工頁" : "尚未盤點"}</div>
           <div style={muted}>{kind !== "number" ? (kind === "legacy" ? "功能還在舊監工頁，切換後才在這裡計算" : "registry 還沒有功能") : `已驗收 ${p.verified}／${p.counted}，已實作待驗證 ${p.implemented}`}</div>
         </div>
+        <div className="card" style={{ padding: "14px 16px" }}>
+          <div className="card-label">已實作</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "var(--accent-text)" }}>{implementedRatio(p) === null ? "—" : `${Math.round((implementedRatio(p) ?? 0) * 100)}%`}</div>
+          <div style={muted}>{implementedRatio(p) === null ? "沒有可計算的功能" : `已實作與已驗收 ${p.implemented + p.verified}／${p.counted}`}</div>
+        </div>
       </div>
       <h3 style={{ marginBottom: 8 }}>系統狀態</h3>
+      {eff.inferred && eff.status && <div style={{ ...muted, marginBottom: 8 }}>目前顯示「{EFFECTIVE_LABEL[eff.status]}（推定）」：還沒有人設定狀態，依最近一次 commit 推定；按下面任一鈕就改成實際狀態。</div>}
       <form action={setSystemStatus} style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
         {hidden}
         {SYSTEM_STATUSES.map((s) => (
@@ -217,6 +223,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
     );
   }
 
+  const eff = effectiveStatus(p.status, p.lastActivityAt, Date.now());
   const imp = importSummary(runs);
   const brief = buildResumeMarkdown({
     name: system.name, purpose: system.purpose, type: TYPE_LABEL[system.type as SystemType] ?? system.type, sourcePaths: system.source_paths ?? [],
@@ -230,7 +237,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
       <Link href="/ops/systems" style={{ ...muted, textDecoration: "none" }}>← 系統總控中心</Link>
       <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0 16px" }}>
         <h1 style={{ margin: 0 }}>{system.name}</h1>
-        <span className={`card-badge ${p.status ? STATUS_BADGE[p.status] : "badge-gray"}`}>{p.status ? STATUS_LABEL[p.status] : "未設定"}</span>
+        <span className={`card-badge ${eff.status ? EFFECTIVE_BADGE[eff.status] : "badge-gray"}`}>{eff.status ? `${EFFECTIVE_LABEL[eff.status]}${eff.inferred ? "（推定）" : ""}` : "未設定"}</span>
       </div>
       <ImportLine runs={runs} />
       {notice && <div style={notice.ok ? box : errorBox}>{notice.text}</div>}
@@ -240,7 +247,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
           <Link key={t} href={`/ops/systems/${system!.slug}?tab=${t}`} className={tab === t ? "btn-primary" : "btn-secondary"} style={{ ...smallBtn, textDecoration: "none" }}>{label}</Link>
         ))}
       </div>
-      {tab === "overview" && <Overview system={system} p={p} hist={hist} brief={brief} />}
+      {tab === "overview" && <Overview system={system} p={p} eff={eff} hist={hist} brief={brief} />}
       {tab === "log" && <Log events={recent} />}
     </div>
   );
