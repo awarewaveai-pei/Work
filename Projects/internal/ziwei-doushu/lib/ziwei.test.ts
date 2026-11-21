@@ -41,7 +41,7 @@ describe('computeChart — 紫微排盤回歸', () => {
 describe('computeChart — 農曆輸入', () => {
   const palaces = (r: ReturnType<typeof computeChart>) => JSON.stringify(r.astrolabe.palaces);
   const birth = { hour: 10, minute: 20, gender: '女' as const };
-  const trueSolar = { longitude: 121.5, tzOffsetHours: 8 };
+  const place = { label: '台北', lat: 25.03, lon: 121.5, zone: 'Etc/GMT-8' };
   // [農曆年, 月, 日, 閏月?, 對應國曆年, 月, 日]
   const cases = [
     [1990, 2, 30, false, 1990, 3, 26], // 國曆沒有 2/30
@@ -50,9 +50,9 @@ describe('computeChart — 農曆輸入', () => {
   ] as const;
 
   it.each(cases)('農曆 %i-%i-%i 與同一天的國曆排出同一張盤(含真太陽時)', (ly, lm, ld, leap, sy, sm, sd) => {
-    for (const ts of [undefined, trueSolar]) {
-      const lunar = computeChart({ ...birth, year: ly, month: lm, day: ld, calendar: 'lunar', isLeapMonth: leap, trueSolar: ts });
-      const solar = computeChart({ ...birth, year: sy, month: sm, day: sd, calendar: 'solar', trueSolar: ts });
+    for (const ts of [false, true]) {
+      const lunar = computeChart({ ...birth, year: ly, month: lm, day: ld, calendar: 'lunar', isLeapMonth: leap, place, trueSolar: ts });
+      const solar = computeChart({ ...birth, year: sy, month: sm, day: sd, calendar: 'solar', place, trueSolar: ts });
       expect(palaces(lunar)).toBe(palaces(solar));
       expect(lunar.correction).toEqual(solar.correction);
     }
@@ -60,7 +60,7 @@ describe('computeChart — 農曆輸入', () => {
 
   it('不存在的農曆日期拋錯,不靜默改排別天', () => {
     expect(() =>
-      computeChart({ ...birth, year: 1990, month: 5, day: 15, calendar: 'lunar', isLeapMonth: false, trueSolar })
+      computeChart({ ...birth, year: 1990, month: 5, day: 15, calendar: 'lunar', isLeapMonth: false, place, trueSolar: true })
         && computeChart({ ...birth, year: 1991, month: 5, day: 15, calendar: 'lunar', isLeapMonth: true }),
     ).toThrow();
   });
@@ -171,5 +171,24 @@ describe('iztro 2.6.5 輸入驗證與英文盤', () => {
       expect(p.name).not.toBe('');
       for (const s of [...p.majorStars, ...p.minorStars, ...p.adjectiveStars]) expect(s.name).not.toBe('');
     }
+  });
+});
+
+describe('computeChart — 出生地時區與晚子時選項(E5)', () => {
+  it('台北 1975-07-01 13:30 夏令時間扣回一小時 → 午時(timeIndex 6)', () => {
+    const r = computeChart({
+      year: 1975, month: 7, day: 1, hour: 13, minute: 30, gender: '男', calendar: 'solar',
+      place: { label: '台北', lat: 25.03, lon: 121.5, zone: 'Asia/Taipei' },
+    });
+    expect(r.zone.dst).toBe(true);
+    expect(r.timeIndex).toBe(6);
+  });
+
+  it('晚子時選「23 點算隔天」:23 點的盤 = 隔天 0 點的盤', () => {
+    const at = (day: number, hour: number) =>
+      JSON.stringify(computeChart({
+        year: 2000, month: 8, day, hour, minute: 30, gender: '女', calendar: 'solar', dayDivide: 'forward',
+      }).astrolabe.palaces);
+    expect(at(16, 23)).toBe(at(17, 0));
   });
 });

@@ -50,9 +50,18 @@
     "lunar": "Lunar (Chinese)",
     "leapMonth": "Leap month",
     "trueSolarToggle": "Enable true solar time correction (professional accuracy, recommended)",
-    "city": "Birth city",
-    "longitude": "Longitude (East)",
-    "submit": "Generate chart"
+    "longitude": "Longitude (East +)",
+    "submit": "Generate chart",
+    "place": "Birthplace",
+    "placeOther": "Other (enter manually)",
+    "timeZone": "Time zone (IANA name)",
+    "latitude": "Latitude (North +)",
+    "timeZoneHint": "Use an IANA time zone name such as Europe/Paris, America/Chicago or Australia/Perth; coordinates in decimal degrees, South and West negative.",
+    "timeZoneInvalid": "Unknown time zone name. Check the spelling (e.g. Europe/Paris).",
+    "placeRequired": "Choose your birthplace first (or enter a time zone and coordinates under \"Other\").",
+    "lateRatHour": "Late Rat hour (born 23:00–23:59)",
+    "lateRatCurrent": "23:00 still counts as the same day (default)",
+    "lateRatForward": "23:00 counts as the next day"
   },
   "chart": {
     "soulInfo": "Chart info",
@@ -82,7 +91,9 @@
     "patternsTitle": "Chart patterns",
     "flyingTitle": "Flying transformations",
     "palaceReadingTitle": "Twelve palaces, star by star",
-    "palaceBorrowed": "No major star (read via opposite palace)"
+    "palaceBorrowed": "No major star (read via opposite palace)",
+    "dstApplied": "Daylight saving time was in effect at birth; the extra hour has been removed automatically",
+    "utcOffset": "Birthplace time zone"
   },
   "bazi": {
     "title": "BaZi Four Pillars",
@@ -237,9 +248,29 @@
     "shi": "Self",
     "ying": "Response",
     "voidMark": "void",
-    "lineNames": ["Line 1", "Line 2", "Line 3", "Line 4", "Line 5", "Line 6"],
-    "relatives": { "父母": "Parents", "兄弟": "Siblings", "子孫": "Offspring", "妻財": "Wealth", "官鬼": "Officer" },
-    "spirits": { "青龍": "Azure Dragon", "朱雀": "Vermilion Bird", "勾陳": "Gou Chen", "螣蛇": "Teng Snake", "白虎": "White Tiger", "玄武": "Black Tortoise" },
+    "lineNames": [
+      "Line 1",
+      "Line 2",
+      "Line 3",
+      "Line 4",
+      "Line 5",
+      "Line 6"
+    ],
+    "relatives": {
+      "父母": "Parents",
+      "兄弟": "Siblings",
+      "子孫": "Offspring",
+      "妻財": "Wealth",
+      "官鬼": "Officer"
+    },
+    "spirits": {
+      "青龍": "Azure Dragon",
+      "朱雀": "Vermilion Bird",
+      "勾陳": "Gou Chen",
+      "螣蛇": "Teng Snake",
+      "白虎": "White Tiger",
+      "玄武": "Black Tortoise"
+    },
     "najiaNote": "The palace, its generation, the stems, branches and elements are shown in their Chinese names."
   },
   "tarot": {

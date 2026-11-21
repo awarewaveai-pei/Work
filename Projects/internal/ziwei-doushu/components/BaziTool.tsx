@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import BirthForm from '@/components/BirthForm';
 import AiReading from '@/components/AiReading';
+import BirthZoneNote from '@/components/BirthZoneNote';
 import { computeBazi, type BaziResult } from '@/lib/bazi';
 import { toContext } from '@/lib/divination/systems/bazi';
 import { relationTerm, type PillarPosition } from '@/lib/baziRelations';
@@ -43,7 +44,7 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
 
   return (
     <>
-      <BirthForm dict={dict} onSubmit={handleSubmit} />
+      <BirthForm dict={dict} locale={locale} onSubmit={handleSubmit} />
       <p className="mt-3 text-center" style={{ fontSize: '0.75rem', color: 'var(--text-caption)' }}>
         {t.method}
       </p>
@@ -255,6 +256,9 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
               {result.correction.correctionMinutes} {dict.chart.minutesUnit}
             </p>
           ) : null}
+          <div className="text-center">
+            <BirthZoneNote zone={result.zone} dict={dict} />
+          </div>
 
           <AiReading context={toContext(result, locale)} ai={dict.ai} />
         </section>

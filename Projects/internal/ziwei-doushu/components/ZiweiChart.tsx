@@ -1,6 +1,7 @@
 'use client';
 
 import type { ChartResult } from '@/lib/ziwei';
+import BirthZoneNote from '@/components/BirthZoneNote';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 /** 地支 -> 4x4 命盤格座標 (傳統紫微盤固定方位)
@@ -160,6 +161,7 @@ export default function ZiweiChart({
           ) : (
             <p className="no-correction-text">{t.trueSolarOff}</p>
           )}
+          <BirthZoneNote zone={result.zone} dict={dict} />
         </div>
       </div>
     </div>

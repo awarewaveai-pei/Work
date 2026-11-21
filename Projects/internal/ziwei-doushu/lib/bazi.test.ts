@@ -32,7 +32,7 @@ describe('computeBazi — 八字回歸', () => {
   it('真太陽時校正會帶 correction 並可能改時柱', () => {
     const c = computeBazi({
       year: 2000, month: 8, day: 16, hour: 14, minute: 30, gender: '女',
-      calendar: 'solar', trueSolar: { longitude: 121.5, tzOffsetHours: 8 },
+      calendar: 'solar', place: { label: '台北', lat: 25.03, lon: 121.5, zone: 'Etc/GMT-8' }, trueSolar: true,
     });
     expect(c.correction).toBeDefined();
   });
@@ -130,5 +130,35 @@ describe('computeBazi — 農曆輸入與繁中用字', () => {
       }
     }
     expect(seenNaYin.size).toBe(30);
+  });
+});
+
+describe('computeBazi — 出生地時區(E5)', () => {
+  const newYork = { label: 'New York', lat: 40.71, lon: -74.01, zone: 'America/New_York' };
+  const taipei = { label: '台北', lat: 25.03, lon: 121.5, zone: 'Asia/Taipei' };
+
+  it('紐約 2000-02-04 08:00(北京 21:00,已過 20:40 立春):年月柱依北京時間的節氣、日時柱依當地真太陽時', () => {
+    const r = computeBazi({
+      year: 2000, month: 2, day: 4, hour: 8, minute: 0, gender: '男', calendar: 'solar',
+      place: newYork, trueSolar: true,
+    });
+    expect(r.zone).toEqual({ timeZone: 'America/New_York', utcOffsetHours: -5, dst: false });
+    expect([r.pillars.year.ganZhi, r.pillars.month.ganZhi]).toEqual(['庚辰', '戊寅']);
+    // 當地真太陽時約 07:50 → 辰時
+    expect([r.pillars.day.ganZhi, r.pillars.hour.ganZhi]).toEqual(['壬辰', '甲辰']);
+  });
+
+  it('台北 1975-07-01 13:30 實施夏令時間 = 標準時 12:30 → 午時(不是未時)', () => {
+    const r = computeBazi({
+      year: 1975, month: 7, day: 1, hour: 13, minute: 30, gender: '男', calendar: 'solar', place: taipei,
+    });
+    expect(r.zone).toEqual({ timeZone: 'Asia/Taipei', utcOffsetHours: 9, dst: true });
+    expect(r.pillars.hour.ganZhi).toBe('戊午');
+  });
+
+  it('晚子時選「23 點算隔天」:日柱換成隔天', () => {
+    const base = { year: 2000, month: 8, day: 16, hour: 23, minute: 30, gender: '女' as const, calendar: 'solar' as const };
+    expect(computeBazi(base).pillars.day.ganZhi).toBe('丙午');
+    expect(computeBazi({ ...base, dayDivide: 'forward' }).pillars.day.ganZhi).toBe('丁未');
   });
 });

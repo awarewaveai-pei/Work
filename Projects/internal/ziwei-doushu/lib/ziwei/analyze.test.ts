@@ -8,7 +8,7 @@ import { toTraditional } from '@/lib/s2t';
 const birth = {
   year: 2000, month: 8, day: 16, hour: 14, minute: 30,
   gender: '女' as const, calendar: 'solar' as const, isLeapMonth: false,
-  trueSolar: { longitude: 121.5, tzOffsetHours: 8 },
+  place: { label: '台北', lat: 25.03, lon: 121.5, zone: 'Etc/GMT-8' }, trueSolar: true,
 };
 
 describe('紫微頂規分析引擎', () => {

@@ -74,7 +74,7 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
 
   return (
     <>
-      <BirthForm dict={dict} onSubmit={handleSubmit} />
+      <BirthForm dict={dict} locale={locale} onSubmit={handleSubmit} />
 
       {error ? (
         <div className="error-banner mt-6">{error}</div>

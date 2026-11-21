@@ -50,9 +50,18 @@
     "lunar": "農曆 (陰曆)",
     "leapMonth": "閏月",
     "trueSolarToggle": "啟用真太陽時校正(專業級準度,建議開啟)",
-    "city": "出生城市",
-    "longitude": "經度 (東經)",
-    "submit": "排盤"
+    "longitude": "經度(東經為正)",
+    "submit": "排盤",
+    "place": "出生地",
+    "placeOther": "其他(手動輸入)",
+    "timeZone": "時區(IANA 名稱)",
+    "latitude": "緯度(北緯為正)",
+    "timeZoneHint": "時區請填 IANA 名稱,如 Europe/Paris、America/Chicago、Australia/Perth;經緯度用十進位,南緯、西經為負。",
+    "timeZoneInvalid": "找不到這個時區名稱,請確認拼寫(如 Europe/Paris)。",
+    "placeRequired": "請先選擇出生地(或在「其他」輸入時區與經緯度)。",
+    "lateRatHour": "晚子時(23:00–23:59 出生)",
+    "lateRatCurrent": "23 點仍算當天(預設)",
+    "lateRatForward": "23 點算隔天"
   },
   "chart": {
     "soulInfo": "命主資訊",
@@ -82,7 +91,9 @@
     "patternsTitle": "格局分析",
     "flyingTitle": "飛宮四化",
     "palaceReadingTitle": "十二宮逐星詳解",
-    "palaceBorrowed": "無主星（借對宮論）"
+    "palaceBorrowed": "無主星（借對宮論）",
+    "dstApplied": "出生時當地實施夏令時間,已自動扣回一小時",
+    "utcOffset": "出生地時區"
   },
   "bazi": {
     "title": "八字四柱排盤",
@@ -237,9 +248,29 @@
     "shi": "世",
     "ying": "應",
     "voidMark": "空",
-    "lineNames": ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"],
-    "relatives": { "父母": "父母", "兄弟": "兄弟", "子孫": "子孫", "妻財": "妻財", "官鬼": "官鬼" },
-    "spirits": { "青龍": "青龍", "朱雀": "朱雀", "勾陳": "勾陳", "螣蛇": "螣蛇", "白虎": "白虎", "玄武": "玄武" },
+    "lineNames": [
+      "初爻",
+      "二爻",
+      "三爻",
+      "四爻",
+      "五爻",
+      "上爻"
+    ],
+    "relatives": {
+      "父母": "父母",
+      "兄弟": "兄弟",
+      "子孫": "子孫",
+      "妻財": "妻財",
+      "官鬼": "官鬼"
+    },
+    "spirits": {
+      "青龍": "青龍",
+      "朱雀": "朱雀",
+      "勾陳": "勾陳",
+      "螣蛇": "螣蛇",
+      "白虎": "白虎",
+      "玄武": "玄武"
+    },
     "najiaNote": ""
   },
   "tarot": {

@@ -34,7 +34,24 @@ declare module 'lunar-javascript' {
     getDayXunKong(): string;
     /** gender: 1 男、0 女 */
     getYun(gender: number): Yun;
+    /** 1 = 晚子時日柱算明天;2(預設)= 晚子時日柱算當天 */
+    setSect(sect: number): void;
+    getSect(): number;
+    /** 日干序 0–9(甲=0) */
+    getDayGanIndex(): number;
   }
+
+  /** 查表用常數(簡體;鍵為干支字) */
+  export const LunarUtil: {
+    /** 鍵 = 日干 + 他干,如「丙庚」→ 偏财 */
+    SHI_SHEN: Record<string, string>;
+    ZHI_HIDE_GAN: Record<string, string[]>;
+    NAYIN: Record<string, string>;
+    CHANG_SHENG_OFFSET: Record<string, number>;
+    CHANG_SHENG: string[];
+    /** 索引 0 為空字串,子 = 1 */
+    ZHI: string[];
+  };
 
   export class Yun {
     isForward(): boolean;

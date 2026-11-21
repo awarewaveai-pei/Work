@@ -1,42 +1,19 @@
 import { astro } from 'iztro';
 import type { IFunctionalAstrolabe } from 'iztro/lib/astro/FunctionalAstrolabe';
-import {
-  toTrueSolarTime,
-  hourToTimeIndex,
-  type TrueSolarResult,
-} from './trueSolarTime';
+import { hourToTimeIndex, type TrueSolarResult } from './trueSolarTime';
 import { localeToIztroLang, defaultLocale, type Locale } from './i18n/config';
-import { toSolarYmd } from './dates';
-import type { Config, Option } from 'iztro/lib/data/types';
+import { DEFAULT_DAY_DIVIDE, resolveBirth, type BirthInput } from './dates';
+import type { Option } from 'iztro/lib/data/types';
 
-/**
- * 晚子時(23 時,timeIndex 12)日界口徑:全站唯一設定處。
- * 'current' = 整張盤歸當日(時辰仍為子時);'forward' = 整張盤(日、月、年、閏月)換到次日。
- * 取 current:《三命通會·論時刻》「若子時,則上半時在夜半前,屬昨日;下半時在夜半後,屬今日」,
- *   日以子正(0 時)為界;八字(lib/bazi.ts,lunar-javascript sect 2)同此口徑。上游預設是 forward。
- * 要改口徑只改這一行,並把 ziwei.test.ts「晚子時日界」那組測試反過來。
- */
-export const ZIWEI_DAY_DIVIDE: NonNullable<Config['dayDivide']> = 'current';
+export type { CalendarType } from './dates';
+
+// 晚子時日界的預設口徑與依據在 lib/dates.ts DEFAULT_DAY_DIVIDE(八字共用,故不放本檔)。
 
 export type Gender = '男' | '女';
-export type CalendarType = 'solar' | 'lunar';
 
-export interface ChartRequest {
-  /** YYYY-MM-DD (solar) 或 lunar 年月日字串 */
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
+/** 出生時間、時區、真太陽時、晚子時口徑見 BirthInput(lib/dates.ts)。 */
+export interface ChartRequest extends BirthInput {
   gender: Gender;
-  calendar: CalendarType;
-  /** 農曆閏月 (僅 calendar=lunar 時有效) */
-  isLeapMonth?: boolean;
-  /** 真太陽時校正設定；不給則用鐘錶時間直接排盤 */
-  trueSolar?: {
-    longitude: number;
-    tzOffsetHours: number;
-  };
   /** 命盤資料語言（對應 iztro 語言碼）；不給預設繁中 */
   locale?: Locale;
 }
@@ -47,6 +24,8 @@ export interface ChartResult {
   timeIndex: number;
   /** 真太陽時校正明細 (若啟用) */
   correction?: TrueSolarResult;
+  /** 出生地時區與出生當下的 UTC 偏移(dst = 當時實施夏令時間,已校正) */
+  zone: { timeZone: string; utcOffsetHours: number; dst: boolean };
 }
 
 /** 四化順序固定:祿 / 權 / 科 / 忌(對應 iztro horoscope mutagen 陣列順序)。 */
@@ -121,25 +100,8 @@ export function computeHoroscope(
  * 是本站的準度核心 (見 trueSolarTime.ts)。
  */
 export function computeChart(req: ChartRequest): ChartResult {
-  let { year, month, day } = toSolarYmd(req);
-  let hour = req.hour;
-  let correction: TrueSolarResult | undefined;
-
-  if (req.trueSolar) {
-    correction = toTrueSolarTime({
-      year,
-      month,
-      day,
-      hour: req.hour,
-      minute: req.minute,
-      longitude: req.trueSolar.longitude,
-      tzOffsetHours: req.trueSolar.tzOffsetHours,
-    });
-    year = correction.year;
-    month = correction.month;
-    day = correction.day;
-    hour = correction.hour;
-  }
+  const birth = resolveBirth(req);
+  const { year, month, day, hour } = birth.chart;
 
   const timeIndex = hourToTimeIndex(hour);
   const dateStr = `${year}-${month}-${day}`;
@@ -154,8 +116,13 @@ export function computeChart(req: ChartRequest): ChartResult {
     gender: req.gender,
     fixLeap: true,
     language: iztroLang as Option['language'],
-    config: { dayDivide: ZIWEI_DAY_DIVIDE },
+    config: { dayDivide: req.dayDivide ?? DEFAULT_DAY_DIVIDE },
   });
 
-  return { astrolabe, timeIndex, correction };
+  return {
+    astrolabe,
+    timeIndex,
+    correction: birth.correction,
+    zone: { timeZone: birth.timeZone, utcOffsetHours: birth.utcOffsetHours, dst: birth.dst },
+  };
 }
