@@ -86,13 +86,13 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 </div></aside>
 <main>
 <p class="sub">系統總控中心（app 後台的 /ops/systems）讓操作者在一個頁面看到每個系統的用途、做到哪、下一步是什麼。進度不靠人填，而是每天由主機讀 git 的提交紀錄自動整理。本頁只看這個專案自己的派工進度。共 <span data-computed>6</span> 張卡。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>設計已定案，四張卡已派給工人。<small>PLAN.md 定案、DISPATCH.md 派工表（2026-11-21）。</small></span></li><li class="no"><b>還不行</b><span>主機匯入器、資料表、頁面。<small>第一批四張卡進行中，還沒有任何一張併入主線。</small></span></li><li class="no"><b>還不行</b><span>每天自動更新進度。<small>要等整合完成、你同意裝排程之後才會開始。</small></span></li></ul></section>
+<section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>設計已定案，第一批四張卡已交回並整合在同一個工作區。<small>整合工作區 D:WorktreesWorksystems-int（2026-11-21）：型別檢查、後台相關測試、匯入器測試全綠，對真實 repo 預演成功。</small></span></li><li class="no"><b>還不行</b><span>主機匯入器、資料表、頁面。<small>兩位審查員共找到 6 個中度、10 個輕度問題，已交回 W1、W2 修正中；尚未推上主線。</small></span></li><li class="no"><b>還不行</b><span>每天自動更新進度。<small>要等整合完成、你同意裝排程之後才會開始。</small></span></li></ul></section>
 
 <section id="steps"><h2>批次與卡</h2><p class="lead">第一批的四張卡同時進行，各自改不同的檔案；整批交回後才做整合。</p><ol class="steps"><li class="grp">可同時進行：<a href="#W1">W1</a>、<a href="#W2">W2</a>、<a href="#W3">W3</a>、<a href="#W4">W4</a></li><li class="step doing" id="W1">
     <div class="n">1</div>
     <div class="b">
       <p class="plain">主機上的小程式，每天讀 git 提交紀錄，整理成事件送給後台。解析、歸屬、重跑不重複都在這裡，並有自己的測試。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Opus 5.5</span><span class="who wait">審查後修正中</span></p>
       <p class="donewhen"><b>完成的樣子：</b>對真實 repo 預演一次，輸出的事件格式符合契約，重跑不重複；測試全綠。</p>
       <details><summary>細節：W1 主機匯入器</summary>
         <p>python 匯入器＋cron.d 檔＋測試；不進 next-admin 的測試。</p>
@@ -103,7 +103,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
     <div class="n">2</div>
     <div class="b">
       <p class="plain">後台新增四張表、一個只收匯入器資料的接收端，以及 /ops/systems 頁面。資料表先寫好檔，不套正式庫。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（套正式庫是 High，不在本卡）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（套正式庫是 High，不在本卡）</span><span class="who">模型：Opus 5.5</span><span class="who wait">審查後修正中</span></p>
       <p class="donewhen"><b>完成的樣子：</b>未登入、一般員工、非授權帳號直打頁面與接收端都被拒；相關測試與型別檢查綠。</p>
       <details><summary>細節：W2 資料表、接收端與頁面</summary>
         <p>migration 0174、ingest route、投影、頁面；只寫四張表。</p>
@@ -114,7 +114,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
     <div class="n">3</div>
     <div class="b">
       <p class="plain">寫出第一個系統（外聯系統）的清單，加上把舊監工頁資料搬進來的腳本，並讓新增產品的腳本同時登記系統清單。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span><span class="who wait">已整合，待上線</span></p>
       <p class="donewhen"><b>完成的樣子：</b>清單通過檢查；搬遷腳本對外聯系統預演成功；新增產品腳本會同時寫兩邊。</p>
       <details><summary>細節：W3 系統清單與搬遷腳本</summary>
         <p>agency-os/systems/registry.json、遷移腳本、new-product 接線。</p>
@@ -125,7 +125,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
     <div class="n">4</div>
     <div class="b">
       <p class="plain">本頁。讓操作者看這個專案的派工進度、風險與待決的事。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span><span class="who wait">待驗收</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span><span class="who wait">已整合，待上線</span></p>
       <p class="donewhen"><b>完成的樣子：</b>node build.mjs 與 node check.mjs 皆綠；頁面不含色碼、不用下拉。</p>
       <details><summary>細節：W4 監工台頁</summary>
         <p>data.mjs、build.mjs、check.mjs、supervisor.html；不發布，由監工發布。</p>
@@ -158,9 +158,9 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 
 <section id="safe"><h2>不會拖垮別的東西</h2><p class="lead">追蹤工具壞了，只會讓資料變舊，不會擋提交、部署或其他服務。六道隔離如下。</p><ul class="yn rules"><li><b>匯入器本體</b><span>寫成 python 檔，語法錯誤也不會讓主機的腳本同步整批失敗、部署被拒。</span></li><li><b>匯入排程</b><span>走既有的排程包裝，會出現在排程頁、紅燈會通知一次；同時只跑一個、五分鐘到就停、用最低優先權；用獨立的 git 副本，不碰部署用的工作樹；開關預設關閉。</span></li><li><b>寫入資料庫</b><span>匯入器只能打接收端，接收端只能寫這四張表，主機腳本不持有資料庫憑證。</span></li><li><b>資料表上線</b><span>先套正式庫、確認檢查綠，才推上主線；只新增表，不改既有表。</span></li><li><b>後台測試</b><span>解析與歸屬邏輯放在匯入器，用自己的測試；後台只留接收端驗證、授權與頁面讀取，推前本機測試與型別檢查必須綠。</span></li><li><b>頁面</b><span>有錯誤邊界，錯誤不拖垮後台；查詢有上限與索引；頁面只能寫狀態變更與審核兩種事件。</span></li></ul></section>
 
-<section id="open"><h2>待你決定</h2><p class="lead">兩件都會動到正式環境，所以由你點頭才做。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">套用資料表（正式庫新增四張表，不動既有表）。先套、確認遷移檢查綠，才推上主線；否則每晚部署會被擋。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>由監工從筆電連線套用，套完驗證再推。</span></li><li class=""><b>先不要</b><span>整合停在本機，頁面不上線。</span></li></ul><p class="meta"><a href="#B2" class="who">需在第 <span data-computed>5</span> 張卡開始前決定</a><span class="who">出處：PLAN.md 第 6 節</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">安裝每天一次的匯入排程（台灣 04:30）。裝好時匯入開關預設關閉，要另外打開才會開始跑。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>裝好但保持關閉，確認資料沒問題後再開。</span></li><li class=""><b>先不要</b><span>只在本機手動跑。</span></li></ul><p class="meta"><a href="#B2" class="who">需在第 <span data-computed>5</span> 張卡開始前決定</a><span class="who">出處：PLAN.md 第 6 節</span></p></div></li></ol></section>
+<section id="open"><h2>待你決定</h2><p class="lead">兩件都會動到正式環境，所以由你點頭才做。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">套用資料表（正式庫新增四張表，不動既有表）。先套、確認遷移檢查綠，才推上主線；否則每晚部署會被擋。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>由監工從筆電連線套用，套完驗證再推。</span></li><li class=""><b>先不要</b><span>整合停在本機，頁面不上線。</span></li></ul><p class="meta"><a href="#B2" class="who">需在第 <span data-computed>5</span> 張卡開始前決定</a><span class="who">出處：PLAN.md 第 6 節</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">安裝每天一次的匯入排程（台灣 04:30），連同主機準備：建立獨立 git 副本、.env 加接收端密碼、後台容器加入同一個密碼變數（容器設定走既有的安全修補腳本）。裝好時匯入開關預設關閉，要另外打開才會開始跑。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>裝好但保持關閉，確認資料沒問題後再開。</span></li><li class=""><b>先不要</b><span>只在本機手動跑。</span></li></ul><p class="meta"><a href="#B2" class="who">需在第 <span data-computed>5</span> 張卡開始前決定</a><span class="who">出處：PLAN.md 第 6 節</span></p></div></li></ol></section>
 
-<section id="risks"><h2>風險與處置</h2><p class="lead">每批一張表。工人交回的每條風險，都要有處置：現在處理、實測驗證，或記下不處理的理由。</p><h3 class="sub-h">第一批</h3><p class="lead">工人尚未交回，交回後由監工逐條填入。</p><h3 class="sub-h">第二批</h3><ul class="yn rules"><li><b>B2</b><span>資料表推上主線但正式庫未套，每晚部署被遷移檢查擋住。<small><b>處置：</b>先套後推；套之前問你，套完確認遷移檢查綠才推。</small></span></li><li><b>B2</b><span>後台測試或型別檢查紅，擋住每晚自動部署。<small><b>處置：</b>推前本機跑測試與型別檢查，綠才推。</small></span></li><li><b>B2</b><span>排程吃資源或卡住。<small><b>處置：</b>同時只跑一個、五分鐘上限、最低優先權、預設關閉；紅燈走排程頁通知。</small></span></li></ul></section>
+<section id="risks"><h2>風險與處置</h2><p class="lead">每批一張表。工人交回的每條風險，都要有處置：現在處理、實測驗證，或記下不處理的理由。</p><h3 class="sub-h">第一批</h3><ul class="yn rules"><li><b>W2</b><span>接收端在第一批就記「匯入成功」，後面批次失敗時頁面仍顯示成功，而且匯入器真正的成功紀錄被當重複丟掉。<small><b>處置：</b>已修（監工整合）：接收端不再自建紀錄，匯入器在最後一批才送；重跑同一版本也會留下新紀錄。</small></span></li><li><b>W1</b><span>排程那一行以 flock 開頭，安裝腳本無法檢查程式是否存在；排程頁不認得這個排程。<small><b>處置：</b>已修（監工整合）：鎖、五分鐘上限、低優先權搬進程式內；排程清單加上這一項；測試加進 CI。</small></span></li><li><b>W3</b><span>搬遷事件用短的提交編號；卡號對功能沒有寫進契約。<small><b>處置：</b>已修：改用完整編號；對應規則寫進契約。</small></span></li><li><b>W2</b><span>撤銷再被撤銷時，功能仍被藏起來；一次撤多個只認第一個。<small><b>處置：</b>修正中（W1 送完整事件、W2 依時間順序計算）。</small></span></li><li><b>W1</b><span>強推後不再存在的提交，其狀態仍算進完成度。<small><b>處置：</b>修正中：新增「失效」事件，計算時排除，事件不刪。</small></span></li><li><b>W3</b><span>外聯系統的 7 個資料表檔路徑少了副檔名，全部對不到。<small><b>處置：</b>修正中：補完整檔名，並新增「指向不存在檔案」的缺口與測試。</small></span></li><li><b>W2</b><span>後台容器沒有接收端密碼變數，上線後每晚都會被拒。<small><b>處置：</b>修正中（repo 設定）；正式環境併入待決 2，由你同意後走安全修補腳本。</small></span></li><li><b>W1</b><span>匯入器與接收端檢查系統清單的規則不一致，清單寫錯會每晚失敗。<small><b>處置：</b>修正中：兩邊同一套規則，並用真實清單跑測試。</small></span></li><li><b>W3</b><span>舊頁凍結只擋還沒提交的改動。<small><b>處置：</b>修正中：改成比對檔案指紋。</small></span></li><li><b>W2</b><span>總覽頁事件上限 5000 筆，搬遷事件最舊、最先被截掉，完成度會算錯。<small><b>處置：</b>修正中：搬遷事件另外讀，不受上限影響。</small></span></li><li><b>W2</b><span>頁面放行 owner 和 admin，與設計寫的「僅擁有者」不一致。<small><b>處置：</b>維持 owner／admin（與其他 /ops 頁同一判定，避免把你鎖在門外）；設計正本已改。</small></span></li><li><b>W2</b><span>完成度計算放在後台，它的測試紅會擋每晚部署。<small><b>處置：</b>接受：計算必須讀你在頁面按的審核，只能在後台；測試限純函式，降低誤紅。設計正本已改。</small></span></li><li><b>W2</b><span>兩次匯入同時跑，該退役的定義可能殘留；索引對不上實際查詢。<small><b>處置：</b>修正中：加交易鎖；索引照實際查詢重建。</small></span></li><li><b>W2</b><span>事件表擋不住整表清空；權限依賴預設值；同名表已存在時退版會誤刪。<small><b>處置：</b>修正中：權限明寫最小授權（含擋清空）；已存在同名表就拒絕套用。</small></span></li><li><b>W1</b><span>第一次跑會有約 8000 個未歸屬路徑。<small><b>處置：</b>預期內：目前只登記外聯系統；第三批盤點全部系統後歸零。</small></span></li><li><b>W2</b><span>後台資料夾的套件目錄是連到主工作區的捷徑，刪工作區前沒先移除會清空主工作區的套件。<small><b>處置：</b>記錄：移除任何工作區前先拆捷徑（既有教訓）。</small></span></li></ul><h3 class="sub-h">第二批</h3><ul class="yn rules"><li><b>B2</b><span>資料表推上主線但正式庫未套，每晚部署被遷移檢查擋住。<small><b>處置：</b>先套後推；套之前問你，套完確認遷移檢查綠才推。</small></span></li><li><b>B2</b><span>後台測試或型別檢查紅，擋住每晚自動部署。<small><b>處置：</b>推前本機跑測試與型別檢查，綠才推。</small></span></li><li><b>B2</b><span>排程吃資源或卡住。<small><b>處置：</b>同時只跑一個、五分鐘上限、最低優先權、預設關閉；紅燈走排程頁通知。</small></span></li></ul></section>
 
 <section id="paths"><h2>檔案</h2><div class="paths"><div><b>設計正本</b><code>agency-os/handoffs/2026-11-21-systems-control-center/PLAN.md</code></div><div><b>派工與驗收</b><code>agency-os/handoffs/2026-11-21-systems-control-center/DISPATCH.md</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-21-systems-control-center/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。</span></div></div></section>
 </main>
