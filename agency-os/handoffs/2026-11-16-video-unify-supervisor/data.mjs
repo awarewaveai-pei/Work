@@ -242,7 +242,7 @@ export const STEPS = [
     ] },
   { n: 17, code: '批4', next: true, title: '順暢度', plain: '例：腳本頁只剩一顆主按鈕；一鍵到草稿只顯示一個預估和一個最大金額，上限填太低會在送出前說至少要多少。',
     gate: '腳本頁只有一顆主按鈕；快速輸出的集不再顯示「剪輯還沒做」；成片卡的「完成」只標在實際交付的那一版；自動內容頁不用左右捲。',
-    risk: 'Medium', model: 'fullstack-engineer（Sonnet）；N12 用 Opus 5.5', status: 'done', commit: '4638411ea', depends: [],
+    risk: 'Medium', model: 'fullstack-engineer（Sonnet）；N12 用 Opus 5.5', status: 'in_progress', depends: [],
     what: '各項互不相依。N13、N14 都動 video-workbench 的 projects-0.js，由監工排先後。B 開頭與 R1 是影片工具融合留下、還沒修的項目，照原編號。',
     files: [`${V}ScriptForge.tsx`, `${NA}lib/script-forge/run-store.ts`, `${VW}shared/episode-spine.js`, `${VW}scripts/projects-0.js`, `${WB}schedule/`, `${NA}app/(shell)/tools/content/topics/`, `${NA}app/sidebar-sections.ts`, 'lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md', 'lobster-factory/workflow-risk-matrix.json', 'lobster-factory/docs/ROUTING_MATRIX.md'],
     items: [
@@ -266,6 +266,7 @@ export const STEPS = [
       done('R5', '片頭變快了：正式機做一支 2 秒片頭從約 160 秒降到 16–18 秒，5 秒片頭約 36–39 秒；所有片頭模板都一起變快，畫面和原本一樣，長到 30 秒也沒有記憶體不足。主因是畫每一格用軟體模擬顯示卡（swangle），換成 angle。放棄等待時會取消渲染服務上的工作，不佔住佇列；自動片頭的等待上限照實測約兩倍（2 秒 40 秒、5 秒 70 秒、20 秒 220 秒）。2026-11-20 由另一個工作視窗部署上線；監工在正式機實測取消：6 秒後放棄，渲染服務記「已被呼叫端取消」，沒有殘留瀏覽器。已知：送出後回應若中途遺失、或工作台剛好重啟，那一支取消不了，只能等服務自己的時間上限。', 'aca23d7eb'),
       done('R6', '影片腳本的禁用字比對不再誤擋：英文禁用詞只在獨立出現時才擋（禁「cure」不再擋到「secure」），必要詞同一條規則；中文詞照舊。2026-11-21：Soulful 現有六個禁用詞（cure、heal illness、treat、diagnose、guaranteed results、保證）各有測試證明照樣擋得住，常見字尾變化（cures、treated、treatment）也擋；AwareWave 沒有禁用詞。已知：前面多接字母的字不再擋（例 untreated），「treatable」這類字尾也不擋。影片測試全綠、突變驗過。隨當晚自動部署上線。', 'fb3f58035'),
       done('R7', '網站設定的片頭樣式「可複選」驗過：連點兩張不會互蓋（按下那一刻按鈕就鎖住，存完才用新的清單算下一步），所以程式沒改，只加一條測試擋回歸。2026-11-21：瀏覽器實點勾兩種、取消、清空都正常；本機沒有資料庫，存檔那一段是在頁面裡模擬的。正式站只驗過單選會存。', '4638411ea'),
+      todo('R8', '題目頁拆開：側欄「題目」底下多兩個子項「客戶」「五步驟」，各自一頁；題目頁只留題目清單，不用再捲過客戶表和五步驟卡。客戶入口和員工入口都改。2026-11-21 操作者看截圖指示，派給線 A。'),
     ] },
 ];
 
