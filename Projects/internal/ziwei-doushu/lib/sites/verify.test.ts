@@ -32,6 +32,18 @@ describe('站台登記表 ORACLE_SITES', () => {
   });
 
   it('沒設定 = 沒有站台', () => expect(parseSites(undefined).sites.size).toBe(0));
+
+  it('ai_per_day:預設 20;1..100000 的整數才收,其餘那筆略過', () => {
+    const { sites, errors } = parseSites(JSON.stringify([
+      { key_id: 'site-a', public_key: PEM },
+      { key_id: 'site-b', public_key: PEM, ai_per_day: 100000 },
+      ...[0, 100001, 1.5, '20'].map((ai_per_day, i) => ({ key_id: `bad-${i}`, public_key: PEM, ai_per_day })),
+    ]));
+    expect(sites.get('site-a')!.aiPerDay).toBe(20);
+    expect(sites.get('site-b')!.aiPerDay).toBe(100000);
+    expect(sites.size).toBe(2);
+    expect(errors).toHaveLength(4);
+  });
 });
 
 describe('站台請求驗證', () => {

@@ -5,7 +5,9 @@ import type { AiProviderId, AiTier, InterpretRequest } from '@/lib/ai/types';
 import { SYSTEM_IDS, type InterpretationContext, type SystemId } from '@/lib/divination/types';
 import { isLocale } from '@/lib/i18n/config';
 import { evaluateEntitlement } from '@/lib/entitlements';
-import { INTERPRET_RULE, rateLimited } from '@/lib/http/rateLimit';
+import { INTERPRET_RULE, hit, rateLimited } from '@/lib/http/rateLimit';
+import { SITE_SIGNATURE_HEADER } from '@/lib/sites/verify';
+import { SITE_TICKET_HEADER, verifyTicket } from '@/lib/sites/ticket';
 
 /**
  * AI 解讀端點 (Phase A — AI 問答入口)。
@@ -18,6 +20,8 @@ import { INTERPRET_RULE, rateLimited } from '@/lib/http/rateLimit';
  * 付費牆(lib/entitlements):政策判定已接(premium 需訂閱 → 擋下)。
  *   ⚠️ 每日次數計量(checkAndConsume + Supabase store)+ auth + rate-limit /
  *   Turnstile 待帳號階段接上;匿名期間僅做 premium gate(見 POST 內註解)。
+ * 會員票(lib/sites/ticket.ts):WordPress 站台替登入會員簽的一次性票;帶票的請求另以
+ *   <key_id>:<假名> 計每 24 小時 AI 次數(登記表 ai_per_day)。沒帶票 = 匿名,只有來源限流。
  */
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +33,7 @@ const MAX_FACTS = 60;
 const MAX_HEADLINE = 200;
 const MAX_LABEL = 60;
 const MAX_VALUE = 300;
+const DAY_MS = 86_400_000;
 
 function bad(detail: string) {
   return NextResponse.json({ error: 'invalid_request', detail }, { status: 400 });
@@ -104,6 +109,14 @@ export async function POST(request: Request) {
   // AI 呼叫花錢:每來源每分鐘 INTERPRET_RULE 次(lib/http/rateLimit.ts)
   const limited = rateLimited(request, 'interpret', INTERPRET_RULE);
   if (limited) return limited;
+  // 帶了票標頭就必須驗過:任何驗票失敗都回錯,不退回匿名
+  const ticketHeader = request.headers.get(SITE_TICKET_HEADER);
+  let quota: { key: string; perDay: number } | null = null;
+  if (ticketHeader !== null) {
+    const t = verifyTicket(ticketHeader, request.headers.get(SITE_SIGNATURE_HEADER));
+    if (!t.ok) return NextResponse.json({ error: t.error }, { status: t.status });
+    quota = { key: `${t.site.keyId}:${t.member}`, perDay: t.site.aiPerDay };
+  }
   let body: unknown;
   try {
     body = await request.json();
@@ -146,6 +159,17 @@ export async function POST(request: Request) {
     tier,
     locale: v.context.locale,
   };
+
+  // 會員每日 AI 次數:輸入全部驗過、真的要呼叫 AI 才計(記憶體計數,lib/http/rateLimit.ts 的限制同樣適用)
+  if (quota) {
+    const r = hit('ai-day', quota.key, { limit: quota.perDay, windowMs: DAY_MS });
+    if (!r.ok) {
+      return NextResponse.json(
+        { error: 'daily_limit_reached', detail: `daily AI limit reached; retry in ${r.retryAfterSec}s` },
+        { status: 429, headers: { 'Retry-After': String(r.retryAfterSec) } },
+      );
+    }
+  }
 
   try {
     const reading = await interpret(req, provider);

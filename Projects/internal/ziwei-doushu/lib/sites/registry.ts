@@ -5,7 +5,7 @@ import { createPublicKey, type KeyObject } from 'node:crypto';
  * 不寫死任何網域,也不存任何個資:站台只以 key_id 識別。格式見 deploy/DEPLOY.md。
  *
  *   [{ "key_id": "oracle-main", "public_key": "-----BEGIN PUBLIC KEY-----\n…", "embed_origins": ["https://oracle.example"],
- *      "requests_per_minute": 600 }]
+ *      "requests_per_minute": 600, "ai_per_day": 20 }]
  *
  * public_key = 該站 Ed25519 公鑰(SPKI PEM,外掛 Signature::publicKeyPem 的輸出);私鑰只在該站。
  * 一筆設定錯誤只略過那一筆並記錄 key_id 與原因(不記金鑰內容),不讓整張表失效。
@@ -15,6 +15,9 @@ import { createPublicKey, type KeyObject } from 'node:crypto';
 export const SITE_KEY_ID = /^[a-z0-9][a-z0-9-]{1,23}$/;
 export const DEFAULT_REQUESTS_PER_MINUTE = 600;
 const MAX_REQUESTS_PER_MINUTE = 100_000;
+/** 每個會員假名每天可用的 AI 解讀次數(會員票,lib/sites/ticket.ts)。 */
+export const DEFAULT_AI_PER_DAY = 20;
+const MAX_AI_PER_DAY = 100_000;
 
 export interface Site {
   keyId: string;
@@ -23,6 +26,8 @@ export interface Site {
   embedOrigins: readonly string[];
   /** 已簽章請求的每分鐘額度(批次按筆數計) */
   requestsPerMinute: number;
+  /** 每個會員假名每 24 小時可用的 AI 解讀次數 */
+  aiPerDay: number;
 }
 
 function publicKeyOf(pem: unknown): KeyObject | null {
@@ -73,7 +78,17 @@ export function parseSites(raw: string | undefined): { sites: Map<string, Site>;
     if (!Number.isInteger(rpm) || (rpm as number) < 1 || (rpm as number) > MAX_REQUESTS_PER_MINUTE) {
       return fail(`requests_per_minute must be an integer 1..${MAX_REQUESTS_PER_MINUTE}`);
     }
-    sites.set(e.key_id, { keyId: e.key_id, publicKey, embedOrigins: embedOrigins as string[], requestsPerMinute: rpm as number });
+    const aiPerDay = e.ai_per_day ?? DEFAULT_AI_PER_DAY;
+    if (!Number.isInteger(aiPerDay) || (aiPerDay as number) < 1 || (aiPerDay as number) > MAX_AI_PER_DAY) {
+      return fail(`ai_per_day must be an integer 1..${MAX_AI_PER_DAY}`);
+    }
+    sites.set(e.key_id, {
+      keyId: e.key_id,
+      publicKey,
+      embedOrigins: embedOrigins as string[],
+      requestsPerMinute: rpm as number,
+      aiPerDay: aiPerDay as number,
+    });
   });
   return { sites, errors };
 }
