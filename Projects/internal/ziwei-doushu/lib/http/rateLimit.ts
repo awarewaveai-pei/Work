@@ -5,6 +5,7 @@
  *   oracle.aware-wave.com 段)設 `X-Real-IP $remote_addr`,而 $remote_addr 已由 aware-wave-security.conf 的
  *   real_ip(CF-Connecting-IP,只信 Cloudflare 網段)還原成真實訪客。X-Forwarded-For 可被訪客偽造,不讀。
  *   沒有這個標頭(本機開發、直連容器埠)時全部算同一個來源 'unknown'。
+ * 已簽章的站台(lib/sites)不走來源位址,改以 key_id 另計額度(siteRateLimited)。
  * 限制:計數在單一行程的記憶體裡;多副本或多行程時各算各的,總量最多放大成副本數倍。重啟歸零。
  */
 
@@ -16,6 +17,8 @@ export interface RateRule {
 
 /** 對外資料介面 v1 與占星計算:每分鐘 60 次。 */
 export const API_RULE: RateRule = { limit: 60, windowMs: 60_000 };
+/** 帶站台簽章的請求在驗簽前依來源位址先計一次:擋住亂帶簽章標頭白耗驗簽與解析;一台 WP 主機每分鐘 600 次綽綽有餘。 */
+export const SITE_PREAUTH_RULE: RateRule = { limit: 600, windowMs: 60_000 };
 /** AI 解讀(花錢):每分鐘 10 次。 */
 export const INTERPRET_RULE: RateRule = { limit: 10, windowMs: 60_000 };
 
@@ -30,8 +33,8 @@ const MAX_BUCKETS = 50_000;
 
 export type RateResult = { ok: true } | { ok: false; retryAfterSec: number };
 
-/** scope 區分各組端點的額度(v1、interpret…),同一來源各自計數。 */
-export function hit(scope: string, source: string, rule: RateRule, now = Date.now()): RateResult {
+/** scope 區分各組端點的額度(v1、interpret、site…),同一來源各自計數;weight = 這次算幾次(批次按筆數)。 */
+export function hit(scope: string, source: string, rule: RateRule, now = Date.now(), weight = 1): RateResult {
   const key = `${scope}|${source}`;
   let b = buckets.get(key);
   if (!b || now - b.start >= rule.windowMs) {
@@ -40,7 +43,7 @@ export function hit(scope: string, source: string, rule: RateRule, now = Date.no
     b = { start: now, count: 0 };
     buckets.set(key, b);
   }
-  b.count += 1;
+  b.count += weight;
   if (b.count <= rule.limit) return { ok: true };
   return { ok: false, retryAfterSec: Math.max(1, Math.ceil((b.start + rule.windowMs - now) / 1000)) };
 }
@@ -74,6 +77,16 @@ export function rateLimited(request: Request, scope: string, rule: RateRule, hea
   if (r.ok) return null;
   return Response.json(
     { error: 'rate_limited', detail: `too many requests; retry in ${r.retryAfterSec}s` },
+    { status: 429, headers: { ...Object.fromEntries(new Headers(headers)), 'Retry-After': String(r.retryAfterSec) } },
+  );
+}
+
+/** 已簽章站台的額度:以 key_id 計數(一個站的伺服器 IP 代表全站訪客,不能用 IP 計),每分鐘依登記表。 */
+export function siteRateLimited(keyId: string, requestsPerMinute: number, weight: number, headers: HeadersInit = {}): Response | null {
+  const r = hit('site', keyId, { limit: requestsPerMinute, windowMs: 60_000 }, Date.now(), weight);
+  if (r.ok) return null;
+  return Response.json(
+    { error: 'rate_limited', detail: `site quota exceeded; retry in ${r.retryAfterSec}s` },
     { status: 429, headers: { ...Object.fromEntries(new Headers(headers)), 'Retry-After': String(r.retryAfterSec) } },
   );
 }

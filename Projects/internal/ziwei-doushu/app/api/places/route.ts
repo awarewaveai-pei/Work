@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server';
-import { isLocale } from '@/lib/i18n/config';
-import { MAX_LIMIT } from '@/lib/places/search';
-import { searchPlaces } from '@/lib/places/server';
+import { answerPlaces } from '@/lib/places/http';
 
 /**
  * 出生地搜尋:GET /api/places?q=台北&locale=zh-TW&limit=10 → { places: BirthPlace[], attribution }。
  * 資料是靜態檔、不含使用者資料,結果可公開快取(短時間)。
+ * 資料是靜態檔、不含使用者資料,結果可公開快取。跨網域用的是 /api/v1/places(同一份邏輯,lib/places/http.ts)。
  */
 export const runtime = 'nodejs';
-
-const MAX_QUERY = 64;
-/** CC BY 4.0 要求分享時附署名;頁面上的署名在接表單的卡(E6b)加。 */
-const ATTRIBUTION = 'Place data: GeoNames (https://www.geonames.org/), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), modified';
 
 export function GET(request: Request) {
   const url = new URL(request.url);
@@ -26,4 +21,7 @@ export function GET(request: Request) {
     // 快取只 5 分鐘:重產 data.json(如補譯名)後,使用者不會整天拿到舊結果;每次查詢約 10ms,不必長快取
     { headers: { 'Cache-Control': 'public, max-age=300' } },
   );
+  const a = answerPlaces(new URL(request.url));
+  if (!a.ok) return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  return NextResponse.json(a.body, { headers: { 'Cache-Control': 'public, max-age=86400' } });
 }
