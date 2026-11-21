@@ -72,6 +72,26 @@ function terms(value: unknown): string[] {
     .slice(0, 100);
 }
 
+const LATIN_EDGE = /[\p{Script=Latin}\p{N}]/u;
+const NOT_LATIN_BEFORE = "(?<![\\p{Script=Latin}\\p{N}])";
+const NOT_LATIN_AFTER = "(?![\\p{Script=Latin}\\p{N}])";
+/** English inflections a Latin term still matches through: a site's 「cure」/「treat」 keeps stopping 「cures」/「treated」/
+ *  「treatment」 as the old substring match did, while 「secure」 no longer counts as 「cure」. */
+const INFLECTION = "(?:s|es|d|ed|ing|ment|ments)?";
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The one test of "term is in this text" for forbidden and required terms. A Latin/digit end of the term needs a word
+ *  edge there (no Latin letter or digit beside it; a CJK character beside it is an edge, so 「這個cure」 still counts);
+ *  a CJK end has no word edges, so it stays a plain substring. Case-insensitive. */
+export function termAppears(text: string, term: string): boolean {
+  const t = term.trim().toLocaleLowerCase();
+  if (!t) return false;
+  const chars = [...t];
+  const head = LATIN_EDGE.test(chars[0]) ? NOT_LATIN_BEFORE : "";
+  const tail = LATIN_EDGE.test(chars[chars.length - 1]) ? `${INFLECTION}${NOT_LATIN_AFTER}` : "";
+  return new RegExp(`${head}${esc(t)}${tail}`, "u").test(text.toLocaleLowerCase());
+}
+
 /** Check script completeness and deterministic brand/safety terms. */
 export function runEditorialQa(input: EditorialQaInput): AutomatedQaReport {
   const findings: QaFinding[] = [];
@@ -81,12 +101,11 @@ export function runEditorialQa(input: EditorialQaInput): AutomatedQaReport {
   if (!script) findings.push({ code: "missing_script", path: "$.script", severity: "error", message: "旁白或腳本不可為空" });
   if (script.length > MAX_TEXT) findings.push({ code: "script_too_long", path: "$.script", severity: "error", message: `腳本不可超過 ${MAX_TEXT} 字元` });
 
-  const lowerScript = script.toLocaleLowerCase();
   for (const [index, term] of terms(input.forbiddenTerms).entries()) {
-    if (lowerScript.includes(term)) findings.push({ code: "forbidden_term", path: `$.forbiddenTerms[${index}]`, severity: "error", message: `腳本含禁止詞：${term}` });
+    if (termAppears(script, term)) findings.push({ code: "forbidden_term", path: `$.forbiddenTerms[${index}]`, severity: "error", message: `腳本含禁止詞：${term}` });
   }
   for (const [index, term] of terms(input.requiredTerms).entries()) {
-    if (!lowerScript.includes(term) && !title.toLocaleLowerCase().includes(term)) findings.push({ code: "required_term_missing", path: `$.requiredTerms[${index}]`, severity: "warning", message: `腳本未包含必要詞：${term}` });
+    if (!termAppears(script, term) && !termAppears(title, term)) findings.push({ code: "required_term_missing", path: `$.requiredTerms[${index}]`, severity: "warning", message: `腳本未包含必要詞：${term}` });
   }
   return report("editorial", "media.qa.editorial", findings);
 }
