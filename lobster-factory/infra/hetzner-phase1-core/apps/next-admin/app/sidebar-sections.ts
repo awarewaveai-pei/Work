@@ -157,6 +157,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     id: 'system',
     label: '系統',
     items: [
+      { type: 'link', href: '/ops/systems',  icon: '▦', label: '系統總控', title: '每個系統的用途、進度與下一步（擁有者／管理員）' },
       { type: 'link', href: '/ops/products', icon: '▤', label: '產品',     title: '產品登記表：門、販售狀態、收費功能' },
       { type: 'link', href: '/ops/staff',    icon: '👤', label: '員工權限', title: '員工權限：每位員工的角色與可用工具（只有擁有者能改）' },
       { type: 'link', href: '/ops-console',  icon: '▣', label: '營運主控台',  title: '架構邊界 · Tenant 設定 · M3 · AI Job' },

@@ -120,6 +120,7 @@ export const BACK_OFFICE: Readonly<Record<string, StaffPage>> = {
   "ops/onboarding": { name: "客戶啟用", why: "員工處理客戶啟用。" },
   "ops/tools": { name: "工具清單", why: "員工維護工具清單。" }, "ops/products": { name: "產品表", why: "員工查看產品登記表：門、販售狀態、收費功能。" },
   "ops/plans": { name: "方案", why: "擁有者與管理員建立、修改、刪除 AwareWave 自己的方案（每個方案開通哪些功能、哪些用點數付）；員工可查看。" },
+  "ops/systems": { name: "系統總控", why: "擁有者與管理員查看每個系統的用途、進度與下一步，並標記系統狀態與驗收功能。" },
   "ops/staff": { name: "員工權限", why: "擁有者設定每位員工的角色與可用工具；其他人只能查看。" },
   "build": { name: "建站", why: "員工執行建站作業。" },
   "ops-console": { name: "營運總台", why: "員工檢視營運總台。" }, "onboard": { name: "佈建", why: "員工操作佈建流程。" },
