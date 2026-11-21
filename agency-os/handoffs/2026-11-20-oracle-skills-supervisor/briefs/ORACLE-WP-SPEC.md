@@ -51,7 +51,7 @@ WordPress 頁面（Kadence，可排版）
 | 7 | AI 額度依會員 | 外掛 REST 發一張站台金鑰簽的短效票（假名、到期時間、key_id，60 秒）；框內頁帶票呼叫 `/api/interpret`；引擎用 `ENG/lib/sites/verify.ts` 驗，依 key_id＋假名限額。無票＝匿名，照現行依來源位址限流。登記表加每站每日 AI 上限欄位 | REV M11、m9 |
 | 8 | 每日信 | 外掛自帶訂閱區塊 → 建 FluentCRM 聯絡人（pending）→ FluentCRM 雙重確認。出生資料存外掛表 `{prefix}aworacle_daily_profiles`（不存 FluentCRM 自訂欄位）。每小時排程：挑「所在時區當地時間 ≥ 07:00 且今天還沒寄」的人 → 批次算 → 寫 `{prefix}aworacle_daily_sent`（唯一鍵 訂閱者＋當地日期）→ 站內呼叫 FluentCRM `POST /fluent-crm/v2/subscribers/{id}/emails/send`。引擎回錯就不寄。排程停擺超過一天的不補寄。每月清 30 天前的 `custom_email_campaign` 列 | D3；試驗 V4；REV m3 |
 | 9 | 寄信層接頭 | 外掛設定 `mailer: fluentcrm \| none`；`none` 或未裝 FluentCRM 時不顯示訂閱區塊。FluentCRM 免費版即可 | ADR 017 `:52`；試驗 V4 |
-| 10 | 寄信服務 | 經 FluentSMTP。要自動處理退信就選 FluentCRM 有回報支援的（Amazon SES、Brevo 等）；平台現用的 Resend 不在其列。**待操作者選**（§7） | 決策紀錄 §5 |
+| 10 | 寄信服務 | **FluentSMTP＋Brevo**（已定，2026-11-22）。沿用外聯系統既有的寄信路由：暖信＝站自己的 FluentSMTP，備援 Brevo 免費方案每日 300 封；交易信＝Resend；冷信的 Gmail 信箱池不得用於此（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/outreach/connectors/router.ts:42-47`；`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` §8.2）。Brevo 在 FluentCRM 內建退信回報名單內。訂閱者每日超過 300 人時升 Brevo 付費或改 Amazon SES（同樣有退信回報），外掛不用改。寄件網域用 `oracle.aware-wave.com` 自己的 DKIM／SPF，不動主網域 `aware-wave.com` 的寄信設定 | 操作者 2026-11-22 指示參照外聯系統；決策紀錄 §5 |
 | 11 | 站台金鑰登記 | 本輪沿用已併入的 `ORACLE_SITES` 環境變數（一個站）。第二個站要接入時，搬進控制面並沿用 `seller_sites` 的形狀（`lobster-factory/packages/db/migrations/0133_seller_sites.sql:18-29`）；屆時引擎改讀簽章清單端點 | REV C2；本輪只有一個站 |
 | 12 | 搜尋 | 工具頁＝WordPress 頁，介紹文與 FAQ 寫在頁面本體可收錄；框內內容靠 `indexifembedded` 歸到父頁。sitemap 與 robots 由 WordPress（Rank Math）出；引擎的 `sitemap.ts`、`robots.ts` 在 `ORACLE_FRONT_PAGES` 有設定時不輸出 | REV M4 |
 | 13 | 多語 | TranslatePress（站台既有選擇）。WordPress 的語言網址代稱不得用 `en`、`zh-TW`（引擎佔用）；外掛以 `determine_locale()` 對應引擎語言，對不到用 `en` | §1 分路限制 |
@@ -122,9 +122,8 @@ WordPress 頁面（Kadence，可排版）
 - 引擎收到的訪客位址：`INFRA/nginx/default.conf:424` 的 `X-Real-IP $remote_addr` 是主機 nginx 的位址，不是訪客（X1、MCP、匿名 AI 限流的前提）。GO-1 前在主機確認。
 - 真手機瀏覽器；實際寄出與退信回報。
 
-## §7 要請操作者決定
+## §7 照建議做（操作者不同意再改）
 
-1. 寄信服務用哪一家（Amazon SES 或 Brevo 才有自動退信處理）。
-2. 每日信固定在訂閱者當地早上 7 點，不讓訂閱者自己選（建議：是）。
-3. 每日信不附 AI 寫的段落，只寄引擎算好的內容（建議：是，不花錢）。
-4. 這個站在系統裡登記成一個客戶「AwareWave 算命站」，自用 0 元，由我們代操（建議：是）。
+1. 每日信固定在訂閱者當地早上 7 點，不讓訂閱者自己選（建議：是）。
+2. 每日信不附 AI 寫的段落，只寄引擎算好的內容（建議：是，不花錢）。
+3. 這個站在系統裡登記成一個客戶「AwareWave 算命站」，自用 0 元，由我們代操（建議：是）。

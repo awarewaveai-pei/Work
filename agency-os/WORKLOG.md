@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-22（續3）— oracle 每日信寄信服務定案：FluentSMTP＋Brevo
+
+- 操作者指示參照外聯系統。`https://outreach.aware-wave.com/` 是登入頁（未登入，無內容）；資訊取自該系統的程式與規格：寄信路由 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/outreach/connectors/router.ts:42-47`（冷信＝Gmail 信箱池；暖信＝站自己的 FluentSMTP，備援 Brevo 免費每日 300 封；交易信＝Resend）、`agency-os/docs/Outbound_OS_Engineering_Spec/Outbound_OS_Engineering_Spec.md:24`（主網域不寄冷信）、`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` §8.2。
+- 決定寫進 `agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md` §2-10：每日信屬暖信 → FluentSMTP＋Brevo；超過每日 300 人升付費或 SES；寄件網域用 `oracle.aware-wave.com` 自己的 DKIM／SPF。§7 其餘三題改為照建議做。
+- 未驗證：Brevo 免費額度數字取自我們自己的文件，未上 Brevo 官網核對。
+- REALTEST_WAIVED: DOC_ONLY -- 只改規格文件
+- REVIEW_WAIVED: DOC_ONLY -- 只改規格文件
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式或識別符改動
 ## 2026-11-22（續2）— oracle：兩份計畫照「同網域內嵌框」改寫；舊門面計畫作廢
 
 - 新 `agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md`：產品規格（決定 15 項；引擎 E1–E4、外掛 P1′–P4、ADR A1、上線 GO-1–GO-3；現站全程不中斷：WordPress 先接非引擎路徑且設建置中，最後才換首頁）。
