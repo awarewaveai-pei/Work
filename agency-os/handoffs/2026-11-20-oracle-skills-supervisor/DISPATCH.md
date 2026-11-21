@@ -131,3 +131,13 @@ RISKS 處置：`agency-os/WORKLOG.md` 2026-11-21「oracle 批 6 併入六張」�
 批 8（`briefs/B8-accuracy-completeness.md`，操作者：「最完整完善、最準確」）：E5 時區／夏令時間／晚子時派別 → `local_51906081…`；E7 獨立基準驗證 → `local_53c300dd…`；其餘完整度卡在 X1、X2 之後。需操作者決定的（帳號、金流、推播、好友）不派。
 併入（2026-11-21）：A4、E7、Z3（含 critic 修正）、E5、E6a 皆在 main，未部署；RISKS 處置見 WORKLOG 同日「oracle 併入 A3、V1、A4、E7、Z3、E5、E6a」。待派：E6b（接表單）、L1、G1、X1、X2、B8 完整度各卡。
 **方向待確認**：操作者要求門面改 WordPress（單獨的網站帳號、訂閱後自動寄信）。確認前不派帳號／寄信／好友合盤；X1 優先度提高（WP 外掛的地基）。
+
+## 現況快照（2026-11-21 晚；接手先讀這段）
+- 操作者定案：oracle.aware-wave.com 放 WordPress；帳號用該 WP 站自己的會員；每日寄信 FluentCRM；好友合盤要做；付費訂閱先不做；給全世界用；**站是她的但要照客戶網站的方式管理**；她要「用我們的系統實際操作」把站接到 WP 當練習。
+- 設計：`briefs/WP-front-door-plan.md`（9 決定、15 卡、G1–G8）。系統可操作性盤點：`briefs/SYSTEM-OPERABILITY-AUDIT.md`（結論：頁面只能建 `aware-wave.com/staging/<slug>/` 測試站，其餘做不到）。
+- main 已有、**全部未部署**：批 5–8 各卡（見上）＋ E6b `fde90441c`、X1 `1ba36f1e1`。合併後 `npx vitest run` 445 passed。部署 oracle-web 屬 High，需操作者明示；部署時要 `sync-host-scripts.sh`（`sg-deploy.sh` 煙霧測試多一行）並在主機確認 nginx 轉送 `X-Real-IP`（X1 限流的前提）。
+- 進行中工人：W1 引擎站台簽章與批次 → `local_51906081…`；X2 MCP → `local_53c300dd…`；P1 外掛骨架 → `local_2b695d16…`；E6c 臺灣譯名與時區別名 → `local_f1c77b0b…`（等 critic）。閒置：`local_1e8cf0f6…`、`local_617452cb…`。
+- 併入做法：`scratchpad/pick.sh <sha…>`（在 `D:/Worktrees/Work/oracle-int` 從 origin/main cherry-pick，`.md` 衝突兩邊都留；**程式檔衝突要手動合**）→ `npx tsc --noEmit`＋全套 vitest → `git rebase main` → D:\Work `git merge --ff-only` → push → WORKLOG（`worklog-insert-entry.py`＋私有 index）。
+- 待操作者回答（計畫 §4）：每日信要不要附 AI 段落（建議不要）；寄信服務（建議 Amazon SES）；寄送時間（建議當地 7 點）；好友合盤是否限本站會員（建議是）；以客戶「AwareWave 算命站」、自用 0 元、代操登記（建議是）。另：要不要先補系統的建站缺口再練習，或先由工程師手動開站（未問）。
+- 之後待派：W2、W3、P2–P4、S1–S6、G-ADR、G-GAP（計畫 §3）；L1 英文補齊、G1 全球實測、B8 完整度各卡；Kerykeion tests/core 未逐行讀（操作者未要求補）。
+
