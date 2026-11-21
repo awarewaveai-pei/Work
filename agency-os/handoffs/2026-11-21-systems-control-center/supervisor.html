@@ -1,0 +1,167 @@
+<title>系統總控中心 監工台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* 左側欄＋右側單欄內容；手機時側欄在上。顏色只載意義：有／沒有、狀態、風險。 */
+:root{
+  --bg:#f4f5f7; --paper:#ffffff; --ink:#1b2230; --muted:#5d6878; --line:#d8dde5; --accent:#2b4ea2; --rail:#e9ecf1;
+  --todo:#8b95a5; --doing:#c2410c; --done:#1f7a3a; --no:#b42318; --high:#b42318; --med:#9a6700; --low:#1f7a3a; --onDot:#ffffff;
+  --display:"Noto Serif TC","Songti TC",serif; --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;--onDot:#121722;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;--onDot:#121722;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.6;font-size:16px}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100%}
+@media (max-width:820px){.shell{grid-template-columns:1fr}}
+aside{background:var(--rail);border-right:1px solid var(--line);padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px}
+@media (max-width:820px){aside{border-right:0;border-bottom:1px solid var(--line);padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}}
+aside .in{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}
+@media (max-width:820px){aside .in{position:static}}
+aside h1{font-family:var(--display);font-size:20px;margin:0 0 4px;text-wrap:balance}
+aside .upd{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+.bar{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--line);margin:0 0 16px}
+.bar i{display:block;height:100%}.bar .d{background:var(--done)}.bar .g{background:var(--doing)}
+nav{display:grid;gap:2px}
+@media (max-width:820px){nav{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}}
+nav a{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:15px}
+nav a:hover,nav a:focus-visible{background:var(--paper);outline:none}
+nav a small{color:var(--muted);font-size:12.5px;white-space:nowrap}
+main{min-width:0;max-width:820px;padding-block:24px 56px;padding-left:24px;padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:820px){main{padding-left:max(16px,env(safe-area-inset-left,0px))}}
+.sub{color:var(--muted);margin:0 0 24px;font-size:15px}
+section{margin-bottom:36px;scroll-margin-top:16px}
+section>h2{font-family:var(--display);font-size:21px;margin:0 0 4px}
+section>.lead{color:var(--muted);margin:0 0 14px;font-size:15px}
+.sub-h{font-size:15px;margin:14px 0 8px;color:var(--muted);font-weight:500}
+code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border-radius:4px;padding:1px 5px;color:var(--muted)}
+small{display:block;color:var(--muted);font-size:13px;font-weight:400}
+ul.yn{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+ul.yn li{display:grid;grid-template-columns:64px 1fr;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+ul.yn li.yes b{color:var(--done)}ul.yn li.no b{color:var(--no)}
+ul.yn li span{min-width:0}
+ul.yn.rules li{grid-template-columns:130px 1fr}ul.yn.rules li b{color:var(--accent)}
+ul.yn.rules small a{color:var(--accent)}
+ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ol.steps li.grp{color:var(--muted);font-size:13.5px;padding:4px 2px 0}
+ol.steps li.grp a{color:var(--accent)}
+ol.open{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ol.steps li.step,ol.open li{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0;scroll-margin-top:16px}
+ol.steps .n,ol.open .n{width:30px;height:30px;border-radius:50%;background:var(--todo);color:var(--onDot);text-align:center;line-height:30px;font-weight:700;font-size:14px}
+.step.doing .n{background:var(--doing)}.step.done .n{background:var(--done)}
+ol.open .n{background:var(--accent)}
+.b{min-width:0}
+.plain{margin:0 0 6px;font-size:16px;font-weight:500}
+.meta{margin:0 0 6px;display:flex;flex-wrap:wrap;gap:6px 10px;font-size:13px;align-items:center}
+.pill{border-radius:999px;padding:1px 9px;border:1px solid currentColor;white-space:nowrap}
+.st-todo{color:var(--todo)}.st-doing{color:var(--doing)}.st-done{color:var(--done)}
+.risk-high{color:var(--high)}.risk-med{color:var(--med)}.risk-low{color:var(--low)}
+.who{color:var(--muted)} a.who{color:var(--accent)} .wait{color:var(--med)}
+.donewhen{margin:0 0 6px;font-size:14px}
+details{font-size:13.5px;color:var(--muted)}
+details summary{cursor:pointer;color:var(--accent)}
+details p{margin:6px 0 0}
+details a{color:var(--accent)}
+details code{font-size:12px;word-break:break-all}
+.paths{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.paths div{display:grid;grid-template-columns:130px 1fr;gap:8px;padding:5px 0;border-top:1px solid var(--line);min-width:0}
+.paths div:first-child{border-top:0}
+.paths code{word-break:break-all}
+@media (max-width:560px){.paths div{grid-template-columns:1fr}}
+:target{box-shadow:0 0 0 2px var(--accent)}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+ul.items{list-style:none;margin:2px 0 8px;padding:0;display:grid;gap:4px;font-size:14px}
+ul.items li{display:grid;grid-template-columns:18px 1fr;gap:6px;min-width:0}
+ul.items li b{color:var(--todo)} ul.items li.done b{color:var(--done)} ul.items li.done span{color:var(--muted)}
+ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
+ul.opts{list-style:none;margin:4px 0 6px;padding:0;display:grid;gap:4px;font-size:14px}
+ul.opts li{display:grid;grid-template-columns:auto 1fr;gap:8px;min-width:0;color:var(--muted)} ul.opts li b{color:var(--todo);white-space:nowrap}
+ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
+</style>
+<div class="shell">
+<aside><div class="in">
+  <h1>系統總控中心 監工台</h1>
+  <p class="upd">更新於 <span data-computed>2026-11-21</span></p>
+  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:66.66666666666666%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>0</span>／<span data-computed>6</span> 已併入</small></a><a href="#safe"><span>不會拖垮別的東西</span><small></small></a><a href="#open"><span>待你決定</span><small><span data-computed>2</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+</div></aside>
+<main>
+<p class="sub">系統總控中心（app 後台的 /ops/systems）讓操作者在一個頁面看到每個系統的用途、做到哪、下一步是什麼。進度不靠人填，而是每天由主機讀 git 的提交紀錄自動整理。本頁只看這個專案自己的派工進度。共 <span data-computed>6</span> 張卡。</p>
+<section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>設計已定案，四張卡已派給工人。<small>PLAN.md 定案、DISPATCH.md 派工表（2026-11-21）。</small></span></li><li class="no"><b>還不行</b><span>主機匯入器、資料表、頁面。<small>第一批四張卡進行中，還沒有任何一張併入主線。</small></span></li><li class="no"><b>還不行</b><span>每天自動更新進度。<small>要等整合完成、你同意裝排程之後才會開始。</small></span></li></ul></section>
+
+<section id="steps"><h2>批次與卡</h2><p class="lead">第一批的四張卡同時進行，各自改不同的檔案；整批交回後才做整合。</p><ol class="steps"><li class="grp">可同時進行：<a href="#W1">W1</a>、<a href="#W2">W2</a>、<a href="#W3">W3</a>、<a href="#W4">W4</a></li><li class="step doing" id="W1">
+    <div class="n">1</div>
+    <div class="b">
+      <p class="plain">主機上的小程式，每天讀 git 提交紀錄，整理成事件送給後台。解析、歸屬、重跑不重複都在這裡，並有自己的測試。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>對真實 repo 預演一次，輸出的事件格式符合契約，重跑不重複；測試全綠。</p>
+      <details><summary>細節：W1 主機匯入器</summary>
+        <p>python 匯入器＋cron.d 檔＋測試；不進 next-admin 的測試。</p>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/W1-importer.md</code></p>
+      </details>
+    </div></li><li class="step doing" id="W2">
+    <div class="n">2</div>
+    <div class="b">
+      <p class="plain">後台新增四張表、一個只收匯入器資料的接收端，以及 /ops/systems 頁面。資料表先寫好檔，不套正式庫。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（套正式庫是 High，不在本卡）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>未登入、一般員工、非授權帳號直打頁面與接收端都被拒；相關測試與型別檢查綠。</p>
+      <details><summary>細節：W2 資料表、接收端與頁面</summary>
+        <p>migration 0174、ingest route、投影、頁面；只寫四張表。</p>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/W2-app.md</code></p>
+      </details>
+    </div></li><li class="step doing" id="W3">
+    <div class="n">3</div>
+    <div class="b">
+      <p class="plain">寫出第一個系統（外聯系統）的清單，加上把舊監工頁資料搬進來的腳本，並讓新增產品的腳本同時登記系統清單。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>清單通過檢查；搬遷腳本對外聯系統預演成功；新增產品腳本會同時寫兩邊。</p>
+      <details><summary>細節：W3 系統清單與搬遷腳本</summary>
+        <p>agency-os/systems/registry.json、遷移腳本、new-product 接線。</p>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/W3-registry.md</code></p>
+      </details>
+    </div></li><li class="step doing" id="W4">
+    <div class="n">4</div>
+    <div class="b">
+      <p class="plain">本頁。讓操作者看這個專案的派工進度、風險與待決的事。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span><span class="who wait">待驗收</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>node build.mjs 與 node check.mjs 皆綠；頁面不含色碼、不用下拉。</p>
+      <details><summary>細節：W4 監工台頁</summary>
+        <p>data.mjs、build.mjs、check.mjs、supervisor.html；不發布，由監工發布。</p>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/W4-supervisor-page.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="B2">
+    <div class="n">5</div>
+    <div class="b">
+      <p class="plain">把四張卡合起來：預演匯入器、對本機接收端實打、看頁面。然後經你同意套資料表、推上主線、裝排程、切換外聯系統。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（套資料表、裝排程）</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>本機完整跑通一輪；資料表套用後遷移檢查綠，才推含該資料表的提交；排程裝好且預設關閉。</p>
+      <details><summary>細節：B2 整合與上線</summary>
+        <p>先套後推：資料表先套正式庫並確認遷移檢查綠，才推含它的提交。</p>
+        <p><b>需先完成：</b><a href="#W1">W1</a>、<a href="#W2">W2</a>、<a href="#W3">W3</a>、<a href="#W4">W4</a>；待決 1、待決 2</p>
+        <p><b>卡片：</b><code>DISPATCH.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="B3">
+    <div class="n">6</div>
+    <div class="b">
+      <p class="plain">把所有系統寫進清單，讓程式路徑都有歸屬；其餘舊監工頁一次一個階段切換過來。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：待定</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>近 90 天非共用程式路徑全部有歸屬；切換的舊頁改成指向新頁。</p>
+      <details><summary>細節：B3 系統盤點與其餘監工頁切換</summary>
+        <p>PLAN.md 第 10 節步驟 3、4。</p>
+        <p><b>需先完成：</b><a href="#B2">B2</a></p>
+        <p><b>卡片：</b><code>PLAN.md</code></p>
+      </details>
+    </div></li></ol></section>
+
+<section id="safe"><h2>不會拖垮別的東西</h2><p class="lead">追蹤工具壞了，只會讓資料變舊，不會擋提交、部署或其他服務。六道隔離如下。</p><ul class="yn rules"><li><b>匯入器本體</b><span>寫成 python 檔，語法錯誤也不會讓主機的腳本同步整批失敗、部署被拒。</span></li><li><b>匯入排程</b><span>走既有的排程包裝，會出現在排程頁、紅燈會通知一次；同時只跑一個、五分鐘到就停、用最低優先權；用獨立的 git 副本，不碰部署用的工作樹；開關預設關閉。</span></li><li><b>寫入資料庫</b><span>匯入器只能打接收端，接收端只能寫這四張表，主機腳本不持有資料庫憑證。</span></li><li><b>資料表上線</b><span>先套正式庫、確認檢查綠，才推上主線；只新增表，不改既有表。</span></li><li><b>後台測試</b><span>解析與歸屬邏輯放在匯入器，用自己的測試；後台只留接收端驗證、授權與頁面讀取，推前本機測試與型別檢查必須綠。</span></li><li><b>頁面</b><span>有錯誤邊界，錯誤不拖垮後台；查詢有上限與索引；頁面只能寫狀態變更與審核兩種事件。</span></li></ul></section>
+
+<section id="open"><h2>待你決定</h2><p class="lead">兩件都會動到正式環境，所以由你點頭才做。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">套用資料表（正式庫新增四張表，不動既有表）。先套、確認遷移檢查綠，才推上主線；否則每晚部署會被擋。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>由監工從筆電連線套用，套完驗證再推。</span></li><li class=""><b>先不要</b><span>整合停在本機，頁面不上線。</span></li></ul><p class="meta"><a href="#B2" class="who">需在第 <span data-computed>5</span> 張卡開始前決定</a><span class="who">出處：PLAN.md 第 6 節</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">安裝每天一次的匯入排程（台灣 04:30）。裝好時匯入開關預設關閉，要另外打開才會開始跑。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>裝好但保持關閉，確認資料沒問題後再開。</span></li><li class=""><b>先不要</b><span>只在本機手動跑。</span></li></ul><p class="meta"><a href="#B2" class="who">需在第 <span data-computed>5</span> 張卡開始前決定</a><span class="who">出處：PLAN.md 第 6 節</span></p></div></li></ol></section>
+
+<section id="risks"><h2>風險與處置</h2><p class="lead">每批一張表。工人交回的每條風險，都要有處置：現在處理、實測驗證，或記下不處理的理由。</p><h3 class="sub-h">第一批</h3><p class="lead">工人尚未交回，交回後由監工逐條填入。</p><h3 class="sub-h">第二批</h3><ul class="yn rules"><li><b>B2</b><span>資料表推上主線但正式庫未套，每晚部署被遷移檢查擋住。<small><b>處置：</b>先套後推；套之前問你，套完確認遷移檢查綠才推。</small></span></li><li><b>B2</b><span>後台測試或型別檢查紅，擋住每晚自動部署。<small><b>處置：</b>推前本機跑測試與型別檢查，綠才推。</small></span></li><li><b>B2</b><span>排程吃資源或卡住。<small><b>處置：</b>同時只跑一個、五分鐘上限、最低優先權、預設關閉；紅燈走排程頁通知。</small></span></li></ul></section>
+
+<section id="paths"><h2>檔案</h2><div class="paths"><div><b>設計正本</b><code>agency-os/handoffs/2026-11-21-systems-control-center/PLAN.md</code></div><div><b>派工與驗收</b><code>agency-os/handoffs/2026-11-21-systems-control-center/DISPATCH.md</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-21-systems-control-center/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。</span></div></div></section>
+</main>
+</div>
