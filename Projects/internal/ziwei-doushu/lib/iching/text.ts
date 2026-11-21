@@ -3,13 +3,14 @@
  *
  * 底本:iching-kit `src/data/classic.ts`(MIT,古文屬公有領域,只取中文原文)。
  *   簡→繁後與 ichingpy `iching_zh.json`、ichingshifa `d.py` 逐條三方校對,裁定記錄在
- *   卡片 I1 的回報。周易用字:「无」不作「無」,「于」不作「於」,「凶」「征」不作「兇」「徵」。
+ *   卡片 I1 的回報。監工裁定(從王弼、朱熹本,三方來源之外):革卦辭與六二作「巳日」;
+ *   无妄六三作「繫」;履、艮、否、同人卦辭本以卦名起句,不另加卦名。周易用字:「无」不作「無」,「于」不作「於」,「凶」「征」不作「兇」「徵」。
  * 順序 = 文王序,與 lib/iching.ts 的 HEXAGRAMS 同一索引(第 n 卦在 [n-1])。
  * lines 由初爻到上爻,每條帶爻題(例「初九：」)。
  */
 
 export interface HexagramText {
-  /** 卦辭(帶卦名開頭,例「乾，元亨利貞。」) */
+  /** 卦辭(帶卦名開頭,例「乾，元亨利貞。」;經文本以卦名起句者不重複) */
   judgment: string;
   /** 爻辭,初爻 → 上爻 */
   lines: readonly [string, string, string, string, string, string];
@@ -116,7 +117,7 @@ export const HEXAGRAM_TEXTS: ReadonlyArray<HexagramText> = [
     ],
   },
   {
-    judgment: "履，履虎尾，不咥人，亨。",
+    judgment: "履虎尾，不咥人，亨。",
     lines: [
       "初九：素履，往无咎。",
       "九二：履道坦坦，幽人貞吉。",
@@ -285,7 +286,7 @@ export const HEXAGRAM_TEXTS: ReadonlyArray<HexagramText> = [
     lines: [
       "初九：无妄往，吉。",
       "六二：不耕穫，不菑畬，則利有攸往。",
-      "六三：无妄之災，或係之牛，行人之得，邑人之災。",
+      "六三：无妄之災，或繫之牛，行人之得，邑人之災。",
       "九四：可貞，无咎。",
       "九五：无妄之疾，勿藥有喜。",
       "上九：无妄行，有眚，无攸利。",
@@ -545,10 +546,10 @@ export const HEXAGRAM_TEXTS: ReadonlyArray<HexagramText> = [
     ],
   },
   {
-    judgment: "革，己日乃孚，元亨利貞，悔亡。",
+    judgment: "革，巳日乃孚，元亨利貞，悔亡。",
     lines: [
       "初九：鞏用黃牛之革。",
-      "六二：己日乃革之，征吉，无咎。",
+      "六二：巳日乃革之，征吉，无咎。",
       "九三：征凶，貞厲；革言三就，有孚。",
       "九四：悔亡，有孚改命，吉。",
       "九五：大人虎變，未占有孚。",
@@ -578,7 +579,7 @@ export const HEXAGRAM_TEXTS: ReadonlyArray<HexagramText> = [
     ],
   },
   {
-    judgment: "艮，艮其背，不獲其身；行其庭，不見其人，无咎。",
+    judgment: "艮其背，不獲其身；行其庭，不見其人，无咎。",
     lines: [
       "初六：艮其趾，无咎，利永貞。",
       "六二：艮其腓，不拯其隨，其心不快。",

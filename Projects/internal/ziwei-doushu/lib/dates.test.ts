@@ -11,6 +11,11 @@ describe('toSolarYmd', () => {
     expect(toSolarYmd({ year: 1990, month: 5, day: 15, calendar: 'lunar', isLeapMonth: true })).toEqual({ year: 1990, month: 7, day: 7 });
   });
 
+  it('不存在的國曆日期拋錯', () => {
+    expect(() => toSolarYmd({ year: 2023, month: 2, day: 30, calendar: 'solar' })).toThrow();
+    expect(toSolarYmd({ year: 2024, month: 2, day: 29, calendar: 'solar' })).toEqual({ year: 2024, month: 2, day: 29 });
+  });
+
   it('該年沒有的閏月拋錯', () => {
     expect(() => toSolarYmd({ year: 1991, month: 5, day: 15, calendar: 'lunar', isLeapMonth: true })).toThrow();
   });

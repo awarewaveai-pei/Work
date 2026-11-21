@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { HEXAGRAM_TEXTS, USE_NINE, USE_SIX } from './text';
+import { hexagramFromSums } from '../iching';
 
 describe('周易經文資料', () => {
   it('64 卦辭 + 384 爻辭 + 用九用六', () => {
@@ -7,6 +8,24 @@ describe('周易經文資料', () => {
     expect(HEXAGRAM_TEXTS.flatMap((h) => h.lines)).toHaveLength(384);
     expect(USE_NINE).toBe('用九：見群龍无首，吉。');
     expect(USE_SIX).toBe('用六：利永貞。');
+  });
+
+  it('每條爻辭的爻題與該卦的陰陽爻相符(384 條)', () => {
+    const POS = ['初', '二', '三', '四', '五', '上'];
+    const byNumber = new Map<number, number[]>();
+    for (let b = 0; b < 64; b++) {
+      const sums = Array.from({ length: 6 }, (_, i) => ((b >> i) & 1 ? 7 : 8));
+      const h = hexagramFromSums('', sums).primary;
+      byNumber.set(h.number, h.lines);
+    }
+    HEXAGRAM_TEXTS.forEach((t, idx) => {
+      const lines = byNumber.get(idx + 1)!;
+      t.lines.forEach((text, i) => {
+        const yy = lines[i] ? '九' : '六';
+        const title = i === 0 || i === 5 ? `${POS[i]}${yy}` : `${yy}${POS[i]}`;
+        expect(text.startsWith(`${title}：`), `第 ${idx + 1} 卦第 ${i + 1} 爻`).toBe(true);
+      });
+    });
   });
 
   it('卦序對齊文王序:乾、坤、坎、既濟、未濟的卦辭與初爻', () => {
