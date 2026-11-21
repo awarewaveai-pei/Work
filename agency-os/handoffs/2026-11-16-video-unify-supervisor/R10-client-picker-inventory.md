@@ -10,10 +10,10 @@ NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`；積木 = NA 
 | 4 | NA `app/(shell)/tools/outreach/OrgSwitcher.tsx:15` | 積木（膠囊） | 首頁 | 同上 |
 | 5 | NA `app/(shell)/tools/banner/BannerStudioStaff.tsx:34,66` | 積木（膠囊） | 首頁 | 同上 |
 | 6 | NA `app/(shell)/tools/video/OrganizationPicker.tsx`（StoryBible／ReleaseDelivery／ScriptForge） | 自畫按鈕 | 整表 bootstrap ≤200 | 換：積木＋bootstrap `?first=1`/`&include`/`?q`；自畫按鈕刪 |
-| 7 | `../video-workbench/scripts/organization-picker.js:3` | 對話框全部按鈕 | 整表 bootstrap | 未換：另一服務、需多檔 |
-| 8 | NA `app/(shell)/tools/content/topics/*`、`app/content/topics/*` | 每客戶一大列 | 題目資料 | 未換：線 A R8 |
+| 7 | `../video-workbench/scripts/organization-picker.js:3` | 對話框全部按鈕 | 整表 bootstrap | 換：前 50（含目前客戶）＋搜尋 bootstrap `?q=`；只動此檔 |
+| 8 | NA `app/(shell)/tools/content/topics/AutoContentOverview.tsx:64`（客戶頁） | 每客戶一大列 | 題目資料 | 換（R8）＋積木 `badge`／`hint`：問題標記在搜尋結果也有 |
 | 9 | NA `app/(shell)/tools/video/ScriptForge.tsx:1256`、`tools/content/ContentStudio.tsx:748`、`tools/content/sites/SiteManager.tsx:619`、`tools/video/ReleaseDeliveryPanel.tsx:89` | 網站按鈕 | 整表 `/api/content/sites`（wp_sites） | 未換：挑網站非組織，無網站搜尋 API |
 
-非挑客戶：NA `ops/integrations/page.tsx:211`（只畫已選一個）、`ops/schedules/ScheduleTable.tsx:166`（列名查詢）、`ops/knowledge/page.tsx:60`／`ops/sellers/page.tsx:26`（依 id 查名）、`ops/billing/page.tsx:4`（挑帳務帳戶）、`ops/repairs/page.tsx:126`／`ops/inbox/page.tsx:119`（?client_slug 篩選連結）。
+非挑客戶：NA `app/video/(wb)/schedule/ScheduleWorkbench.tsx:46`（只讀目前客戶名稱，`?first=1&include=`）、NA `ops/integrations/page.tsx:211`（只畫已選一個）、`ops/schedules/ScheduleTable.tsx:166`（列名查詢）、`ops/knowledge/page.tsx:60`／`ops/sellers/page.tsx:26`（依 id 查名）、`ops/billing/page.tsx:4`（挑帳務帳戶）、`ops/repairs/page.tsx:126`／`ops/inbox/page.tsx:119`（?client_slug 篩選連結）。
 
-規則：NA `OrgPicker.tsx` 檔頭；檢查器：NA `app/(shell)/ops/clients/__tests__/client-picker-rule.test.ts`。
+規則：NA `OrgPicker.tsx` 檔頭；檢查器：NA `app/(shell)/ops/clients/__tests__/client-picker-rule.test.ts`（拿客戶清單的檔要交給積木；交給積木的 `orgs={x}` 同檔不得再 `.map`）。
