@@ -3,6 +3,7 @@
 // Card -> feature link: feature slug starts with the lowercased card code + "-" (c3-research-evidence <- code C3).
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -48,6 +49,8 @@ async function main() {
   if (log.length !== 2) throw new Error(`data.mjs has no git history under ${rel}`);
   const { events, unmapped } = buildMigrationEvents({ registry, steps: STEPS, folder: rel, sourceSha: log[0], occurredAt: log[1], resolveSha: (sha) => { const r = git(['rev-parse', '--verify', '--quiet', sha + '^{commit}']); return r.status === 0 ? String(r.stdout).trim() : null; } });
   console.error(`migrated ${events.length}, unmapped cards (not in registry): ${unmapped.length}${unmapped.length ? ' ' + unmapped.join(',') : ''}`);
+  // the value the page's check.mjs FROZEN_SHA256 needs at cutover -- same LF normalisation, so a CRLF checkout matches
+  console.error(`FROZEN_SHA256=${createHash('sha256').update(fs.readFileSync(path.join(repo, rel, 'data.mjs'), 'utf8').replace(/\r\n/g, '\n')).digest('hex')}`);
   console.log(JSON.stringify(events, null, 2));
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

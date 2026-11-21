@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const tables = vi.hoisted(() => new Map<string, Map<string, Record<string, unknown>>>());
 const sb = vi.hoisted(() => ({
   // systems_apply_registry (migration 0174): one transaction; here, record the systems by id
-  rpc(_fn: string, args: { p_systems: Array<Record<string, unknown>> }) {
+  rpc(_fn: string, args: Record<"p_systems" | "p_phases" | "p_features", Array<Record<string, unknown>>>) {
+    // the NOT NULL columns of 0174: a row missing one would make the real function roll back the whole ingest
+    const required = { p_systems: ["id", "slug", "name", "type", "position"], p_phases: ["id", "system_id", "slug", "name", "position"], p_features: ["id", "system_id", "phase_id", "slug", "name", "position"] } as const;
+    for (const [arg, cols] of Object.entries(required)) for (const row of args[arg as keyof typeof required]) for (const c of cols) if (row[c] == null) return Promise.resolve({ data: null, error: { message: `${arg}.${c} is null` } });
     const t = tables.get("systems") ?? new Map<string, Record<string, unknown>>();
     tables.set("systems", t);
     for (const s of args.p_systems) t.set(String(s.id), { ...s, in_registry: true });
@@ -37,7 +40,8 @@ const SYS = "11111111-1111-4111-8111-111111111111";
 const body = (events: unknown[] = []) => ({
   registry: { version: 1, shared_paths: [], ignore_paths: [], systems: [{
     id: SYS, slug: "outbound-os", name: "外送系統", aliases: [], type: "product", purpose: "x", product_key: null,
-    source_paths: ["lobster-factory/"], phases: [], features: [],
+    source_paths: ["lobster-factory/"], phases: [{ id: "22222222-2222-4222-8222-222222222222", slug: "p1", name: "階段", legacy_source_path: null }],
+    features: [{ id: "33333333-3333-4333-8333-333333333333", slug: "c1-send", name: "寄信", phase: "p1" }],
   }] },
   events,
 });

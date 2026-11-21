@@ -31,7 +31,7 @@ async function writeRegistry(sb: SupabaseClient, registry: Registry): Promise<vo
   const p_features = registry.systems.flatMap((s) => {
     const phaseId = new Map(s.phases.map((p) => [p.slug, p.id]));
     return s.features.map((f, position) => ({
-      id: f.id, system_id: s.id, phase_id: phaseId.get(f.phase), // contract.ts checked the phase exists slug: f.slug, name: f.name, position,
+      id: f.id, system_id: s.id, phase_id: phaseId.get(f.phase), slug: f.slug, name: f.name, position, // contract.ts checked the phase exists
     }));
   });
   const r = await sb.rpc("systems_apply_registry", { p_systems, p_phases, p_features });

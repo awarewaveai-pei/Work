@@ -90,12 +90,12 @@ function parseRegistry(raw: unknown): Registry {
     return {
       id: claim(uuid(s.id, `${w}.id`), `${w}.id`), slug: systemSlug, name: nonEmpty(s.name, `${w}.name`, 200),
       aliases: s.aliases === undefined ? [] : strArr(s.aliases, `${w}.aliases`),
-      type: oneOf(s.type, SYSTEM_TYPES, `${w}.type`), purpose: str(s.purpose ?? "", `${w}.purpose`),
+      type: oneOf(s.type, SYSTEM_TYPES, `${w}.type`), purpose: str(s.purpose, `${w}.purpose`),
       product_key: strOrNull(s.product_key, `${w}.product_key`, 100), source_paths: strArr(s.source_paths, `${w}.source_paths`),
       phases, features,
     };
   });
-  return { version: 1, shared_paths: strArr(r.shared_paths ?? [], "registry.shared_paths"), ignore_paths: strArr(r.ignore_paths ?? [], "registry.ignore_paths"), systems };
+  return { version: 1, shared_paths: strArr(r.shared_paths, "registry.shared_paths"), ignore_paths: strArr(r.ignore_paths, "registry.ignore_paths"), systems };
 }
 
 function parseImportRun(raw: unknown, where: string): ImportRun {

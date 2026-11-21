@@ -128,6 +128,14 @@ begin
     raise exception 'systems_apply_registry: phases and features must be arrays';
   end if;
 
+  -- An id belongs to one system forever (composite FKs, append-only events): moving one would fail on a FK name.
+  if exists (select 1 from jsonb_to_recordset(p_phases) as x(id uuid, system_id uuid)
+             join public.system_phases p on p.id = x.id where p.system_id <> x.system_id)
+  or exists (select 1 from jsonb_to_recordset(p_features) as x(id uuid, system_id uuid)
+             join public.system_features f on f.id = x.id where f.system_id <> x.system_id) then
+    raise exception 'systems_apply_registry: a phase or feature id moved to another system; ids never move -- give it a new id';
+  end if;
+
   select coalesce(array_agg(id), '{}') into live_systems from public.systems where in_registry;
   select coalesce(array_agg(id), '{}') into live_phases from public.system_phases where in_registry;
   select coalesce(array_agg(id), '{}') into live_features from public.system_features where in_registry;
@@ -149,7 +157,7 @@ begin
   insert into public.system_phases as t (id, system_id, slug, name, legacy_source_path, position, in_registry, updated_at)
   select x.id, x.system_id, x.slug, x.name, x.legacy_source_path, x.position, true, now()
   from jsonb_to_recordset(p_phases) as x(id uuid, system_id uuid, slug text, name text, legacy_source_path text, position int)
-  on conflict (id) do update set system_id = excluded.system_id, slug = excluded.slug, name = excluded.name,
+  on conflict (id) do update set slug = excluded.slug, name = excluded.name,
     legacy_source_path = excluded.legacy_source_path, position = excluded.position, in_registry = true,
     updated_at = case when t.id <> all(live_phases)
       or (t.system_id, t.slug, t.name, t.legacy_source_path, t.position)
@@ -159,7 +167,7 @@ begin
   insert into public.system_features as t (id, system_id, phase_id, slug, name, position, in_registry, updated_at)
   select x.id, x.system_id, x.phase_id, x.slug, x.name, x.position, true, now()
   from jsonb_to_recordset(p_features) as x(id uuid, system_id uuid, phase_id uuid, slug text, name text, position int)
-  on conflict (id) do update set system_id = excluded.system_id, phase_id = excluded.phase_id, slug = excluded.slug,
+  on conflict (id) do update set phase_id = excluded.phase_id, slug = excluded.slug,
     name = excluded.name, position = excluded.position, in_registry = true,
     updated_at = case when t.id <> all(live_features)
       or (t.system_id, t.phase_id, t.slug, t.name, t.position)
