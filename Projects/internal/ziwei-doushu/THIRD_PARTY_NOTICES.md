@@ -36,7 +36,7 @@
 
 - 來源：https://github.com/NoahChristian/openephem
 - 授權：MIT License，Copyright (c) 2026 Elizabeth Huston, Ph.D. and Noah Christian, Ph.D.
-- 採用範圍：`src/openephem/aspects.py` 的相位判定做法（最短弧角距、日月加寬容許度、以速度判斷入相／出相），以 TypeScript 自行重寫於 `lib/astrologyAspects.ts`；`src/openephem/profections.py` 的年小限規則（整宮制、古典守護星）重寫於 `lib/astrologyTraditional.ts`。未複製原始碼。
+- 採用範圍：`src/openephem/aspects.py` 的相位判定做法（最短弧角距、日月加寬容許度、以速度判斷入相／出相），以 TypeScript 自行重寫於 `lib/astrologyAspects.ts`；`src/openephem/profections.py` 的年小限規則（整宮制、古典守護星）重寫於 `lib/astrologyTraditional.ts`。跨盤相位（`aspects.py` between：兩盤逐點配對、行運把本命速度設 0 判入出相）與回歸求根（`returns.py` find_return：牛頓法）重寫於 `lib/astrologyAspects.ts`、`lib/astrologyTransits.ts`。未複製原始碼。
 
 ## flatlib
 

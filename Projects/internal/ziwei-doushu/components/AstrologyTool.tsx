@@ -13,10 +13,16 @@ import {
   sectName,
   signName,
   degInSign,
+  solarReturnLine,
+  synastryAspectLabel,
+  synastryContext,
+  transitAspectLabel,
+  transitContext,
 } from '@/lib/astrologyView';
-import type { WesternChart } from '@/lib/astrology';
+import type { BodyKey, SynastryResult, TransitResult, WesternChart, WesternRequest } from '@/lib/astrology';
+import type { Aspect } from '@/lib/astrologyAspects';
 import { traditionalReading } from '@/lib/astrologyTraditional';
-import { localToday, type Ymd } from '@/lib/today';
+import { localToday } from '@/lib/today';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -28,14 +34,10 @@ export default function AstrologyTool({
   locale: Locale;
 }) {
   const t = dict.astrology;
-  const [date, setDate] = useState('2000-01-01');
-  const [time, setTime] = useState('12:00');
-  const [tz, setTz] = useState(8);
-  const [lat, setLat] = useState(25.03);
-  const [lon, setLon] = useState(121.56);
+  const [form, setForm] = useState<BirthForm>(DEFAULT_BIRTH);
   const [chart, setChart] = useState<WesternChart | null>(null);
-  /** 排盤當下的出生日(小限算足歲用;表單日期之後被改不影響已排的盤) */
-  const [birth, setBirth] = useState<Ymd | null>(null);
+  /** 排盤當下的生辰(小限、行運、合盤都用它;表單之後被改不影響已排的盤) */
+  const [natalReq, setNatalReq] = useState<WesternRequest | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
@@ -45,19 +47,9 @@ export default function AstrologyTool({
     setError(false);
     setChart(null);
     try {
-      const [y, m, d] = date.split('-').map(Number);
-      const [hh, mm] = time.split(':').map(Number);
-      const res = await fetch('/api/astrology', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          year: y, month: m, day: d, hour: hh, minute: mm,
-          tzOffsetHours: tz, lat, lon,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      setChart((await res.json()) as WesternChart);
-      setBirth({ year: y, month: m, day: d });
+      const req = toRequest(form);
+      setChart(await postJson<WesternChart>('/api/astrology', req));
+      setNatalReq(req);
     } catch {
       setError(true);
     } finally {
@@ -68,28 +60,7 @@ export default function AstrologyTool({
   return (
     <>
       <form onSubmit={submit} className="glass-card p-6" style={{ display: 'grid', gap: '1rem' }}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label>
-            <span className="label-dark" style={{ display: 'block', marginBottom: '0.4rem' }}>{t.birthDate}</span>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="field-dark" required />
-          </label>
-          <label>
-            <span className="label-dark" style={{ display: 'block', marginBottom: '0.4rem' }}>{t.birthTime}</span>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="field-dark" required />
-          </label>
-          <label>
-            <span className="label-dark" style={{ display: 'block', marginBottom: '0.4rem' }}>{t.timezone}</span>
-            <input type="number" step="0.5" value={tz} onChange={(e) => setTz(Number(e.target.value))} className="field-dark" />
-          </label>
-          <label>
-            <span className="label-dark" style={{ display: 'block', marginBottom: '0.4rem' }}>{t.latitude}</span>
-            <input type="number" step="0.01" value={lat} onChange={(e) => setLat(Number(e.target.value))} className="field-dark" />
-          </label>
-          <label>
-            <span className="label-dark" style={{ display: 'block', marginBottom: '0.4rem' }}>{t.longitude}</span>
-            <input type="number" step="0.01" value={lon} onChange={(e) => setLon(Number(e.target.value))} className="field-dark" />
-          </label>
-        </div>
+        <BirthFields value={form} onChange={setForm} t={t} />
         <button type="submit" disabled={loading} className="btn-gold" style={{ justifySelf: 'start' }}>
           {loading ? t.computing : t.submit}
         </button>
@@ -98,7 +69,7 @@ export default function AstrologyTool({
       {error ? <div className="error-banner mt-6">{dict.errors.computeFailed}</div> : null}
 
       {chart ? (() => {
-        const trad = birth ? traditionalReading(chart, birth, localToday()) : null;
+        const trad = natalReq ? traditionalReading(chart, natalReq, localToday()) : null;
         return (
         <section className="mt-8">
           <hr className="star-divider" />
@@ -197,9 +168,190 @@ export default function AstrologyTool({
           ) : null}
 
           <AiReading context={astrologyContext(chart, locale, trad)} ai={dict.ai} />
+
+          {natalReq ? (
+            <>
+              <TransitPanel natalReq={natalReq} dict={dict} locale={locale} />
+              <SynastryPanel natalReq={natalReq} dict={dict} locale={locale} />
+            </>
+          ) : null}
         </section>
         );
       })() : null}
     </>
+  );
+}
+
+interface BirthForm {
+  date: string;
+  time: string;
+  tz: number;
+  lat: number;
+  lon: number;
+}
+
+const DEFAULT_BIRTH: BirthForm = { date: '2000-01-01', time: '12:00', tz: 8, lat: 25.03, lon: 121.56 };
+
+function toRequest(f: BirthForm): WesternRequest {
+  const [year, month, day] = f.date.split('-').map(Number);
+  const [hour, minute] = f.time.split(':').map(Number);
+  return { year, month, day, hour, minute, tzOffsetHours: f.tz, lat: f.lat, lon: f.lon };
+}
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(String(res.status));
+  return (await res.json()) as T;
+}
+
+type AstroDict = Dictionary['astrology'];
+
+function BirthFields({ value, onChange, t }: { value: BirthForm; onChange: (v: BirthForm) => void; t: AstroDict }) {
+  const set = <K extends keyof BirthForm>(k: K, v: BirthForm[K]) => onChange({ ...value, [k]: v });
+  const label = (text: string) => (
+    <span className="label-dark" style={{ display: 'block', marginBottom: '0.4rem' }}>{text}</span>
+  );
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label>
+        {label(t.birthDate)}
+        <input type="date" value={value.date} onChange={(e) => set('date', e.target.value)} className="field-dark" required />
+      </label>
+      <label>
+        {label(t.birthTime)}
+        <input type="time" value={value.time} onChange={(e) => set('time', e.target.value)} className="field-dark" required />
+      </label>
+      <label>
+        {label(t.timezone)}
+        <input type="number" step="0.5" value={value.tz} onChange={(e) => set('tz', Number(e.target.value))} className="field-dark" />
+      </label>
+      <label>
+        {label(t.latitude)}
+        <input type="number" step="0.01" value={value.lat} onChange={(e) => set('lat', Number(e.target.value))} className="field-dark" />
+      </label>
+      <label>
+        {label(t.longitude)}
+        <input type="number" step="0.01" value={value.lon} onChange={(e) => set('lon', Number(e.target.value))} className="field-dark" />
+      </label>
+    </div>
+  );
+}
+
+function AspectList({
+  aspects,
+  label,
+  locale,
+  empty,
+}: {
+  aspects: readonly Aspect<BodyKey>[];
+  label: (a: Aspect<BodyKey>) => string;
+  locale: Locale;
+  empty: string;
+}) {
+  if (aspects.length === 0) return <p style={{ color: 'var(--text-caption)' }}>{empty}</p>;
+  return (
+    <ul style={{ display: 'grid', gap: '0.3rem' }}>
+      {aspects.map((a) => (
+        <li key={`${a.a}-${a.b}`} className="flex flex-wrap gap-x-2">
+          <span style={{ color: 'var(--text-heading)' }}>{label(a)}</span>
+          <span style={{ color: 'var(--text-caption)' }}>{aspectDetail(a, locale)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function TransitPanel({ natalReq, dict, locale }: { natalReq: WesternRequest; dict: Dictionary; locale: Locale }) {
+  const t = dict.astrology;
+  const [result, setResult] = useState<TransitResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    setError(false);
+    try {
+      setResult(
+        await postJson<TransitResult>('/api/astrology/transits', {
+          birth: natalReq,
+          today: localToday(),
+          viewerTzOffsetHours: -new Date().getTimezoneOffset() / 60,
+        }),
+      );
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="glass-card p-4 mt-8" style={{ fontSize: '0.8125rem' }}>
+      <h2 className="label-dark" style={{ marginBottom: '0.5rem' }}>{t.transits}</h2>
+      {result ? null : (
+        <button type="button" onClick={load} disabled={loading} className="btn-gold">
+          {loading ? t.computing : t.transitsButton}
+        </button>
+      )}
+      {error ? <div className="error-banner mt-4">{dict.errors.computeFailed}</div> : null}
+      {result ? (
+        <>
+          <p style={{ marginBottom: '0.5rem' }}>
+            <span style={{ color: 'var(--text-caption)' }}>{t.solarReturn}　</span>
+            <span style={{ color: 'var(--gold-400)', fontWeight: 600 }}>{solarReturnLine(result.solarReturn)}</span>
+          </p>
+          <AspectList aspects={result.aspects} label={(a) => transitAspectLabel(a, locale)} locale={locale} empty={t.noTransitAspects} />
+          <p style={{ color: 'var(--text-caption)', fontSize: '0.7rem', marginTop: '0.5rem' }}>{t.transitsNote}</p>
+          <AiReading context={transitContext(result, locale)} ai={dict.ai} />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function SynastryPanel({ natalReq, dict, locale }: { natalReq: WesternRequest; dict: Dictionary; locale: Locale }) {
+  const t = dict.astrology;
+  const [partner, setPartner] = useState<BirthForm>(DEFAULT_BIRTH);
+  const [result, setResult] = useState<SynastryResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(false);
+    setResult(null);
+    try {
+      setResult(await postJson<SynastryResult>('/api/astrology/synastry', { a: natalReq, b: toRequest(partner) }));
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="glass-card p-4 mt-5" style={{ fontSize: '0.8125rem' }}>
+      <h2 className="label-dark" style={{ marginBottom: '0.25rem' }}>{t.synastry}</h2>
+      <p style={{ color: 'var(--text-caption)', marginBottom: '0.75rem' }}>{t.synastryHint}</p>
+      <form onSubmit={submit} style={{ display: 'grid', gap: '1rem' }}>
+        <BirthFields value={partner} onChange={setPartner} t={t} />
+        <button type="submit" disabled={loading} className="btn-gold" style={{ justifySelf: 'start' }}>
+          {loading ? t.computing : t.synastryButton}
+        </button>
+      </form>
+      {error ? <div className="error-banner mt-4">{dict.errors.computeFailed}</div> : null}
+      {result ? (
+        <div className="mt-4">
+          <AspectList aspects={result.aspects} label={(a) => synastryAspectLabel(a, locale)} locale={locale} empty={t.noSynastryAspects} />
+          <p style={{ color: 'var(--text-caption)', fontSize: '0.7rem', marginTop: '0.5rem' }}>{t.synastryNote}</p>
+          <AiReading context={synastryContext(result, locale)} ai={dict.ai} />
+        </div>
+      ) : null}
+    </div>
   );
 }

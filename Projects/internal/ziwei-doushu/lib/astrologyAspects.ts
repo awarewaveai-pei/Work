@@ -72,6 +72,26 @@ function applyingOf(a: AspectPoint, b: AspectPoint, angle: number): boolean | nu
   return rate < 0;
 }
 
+/** 角距 sep 對應的最近相位（容許度 = 該相位 orb + bonus，邊界含）；不成立回 null */
+function matchAspect(
+  sep: number,
+  bonus: number,
+  types: readonly AspectType[],
+): { key: AspectKey; angle: number; orb: number } | null {
+  let best: { key: AspectKey; angle: number; orb: number } | null = null;
+  for (const t of types) {
+    const dev = Math.abs(sep - t.angle);
+    if (dev <= t.orb + bonus && (best === null || dev < best.orb)) {
+      best = { key: t.key, angle: t.angle, orb: dev };
+    }
+  }
+  return best;
+}
+
+function luminaryBonus(a: string, b: string, bonus: number): number {
+  return LUMINARIES.has(a) || LUMINARIES.has(b) ? bonus : 0;
+}
+
 /**
  * 回傳所有成立的主要相位，依偏離度數由小到大排序。
  * `types` 預設 ASPECT_TYPES（容許度互不重疊）；自訂較寬容許度時重疊者取偏離最小。
@@ -85,23 +105,37 @@ export function computeAspects<B extends string>(
     for (let j = i + 1; j < points.length; j++) {
       const p = points[i];
       const q = points[j];
-      const sep = separation(p.longitude, q.longitude);
-      const bonus = LUMINARIES.has(p.body) || LUMINARIES.has(q.body) ? LUMINARY_ORB_BONUS : 0;
-      let best: { key: AspectKey; angle: number; orb: number } | null = null;
-      for (const t of types) {
-        const dev = Math.abs(sep - t.angle);
-        if (dev <= t.orb + bonus && (best === null || dev < best.orb)) {
-          best = { key: t.key, angle: t.angle, orb: dev };
-        }
-      }
+      const best = matchAspect(
+        separation(p.longitude, q.longitude),
+        luminaryBonus(p.body, q.body, LUMINARY_ORB_BONUS),
+        types,
+      );
       if (best) {
-        out.push({
-          a: p.body,
-          b: q.body,
-          aspect: best.key,
-          orb: best.orb,
-          applying: applyingOf(p, q, best.angle),
-        });
+        out.push({ a: p.body, b: q.body, aspect: best.key, orb: best.orb, applying: applyingOf(p, q, best.angle) });
+      }
+    }
+  }
+  return out.sort((x, y) => x.orb - y.orb);
+}
+
+/**
+ * 兩張盤之間的相位（行運對本命、合盤）：a 盤每點對 b 盤每點，不含盤內配對；依偏離由小到大。
+ * `a`／`b` 分別是 a 盤、b 盤的星體（兩盤同名星體各自獨立）。
+ * 入相／出相：兩邊都給速度才判（行運把本命速度設 0）；任一邊缺速度 = null。
+ */
+export function computeCrossAspects<A extends string, B extends string>(
+  as: readonly AspectPoint<A>[],
+  bs: readonly AspectPoint<B>[],
+  opts: { types?: readonly AspectType[]; luminaryBonus?: number } = {},
+): Aspect<A | B>[] {
+  const types = opts.types ?? ASPECT_TYPES;
+  const bonus = opts.luminaryBonus ?? LUMINARY_ORB_BONUS;
+  const out: Aspect<A | B>[] = [];
+  for (const p of as) {
+    for (const q of bs) {
+      const best = matchAspect(separation(p.longitude, q.longitude), luminaryBonus(p.body, q.body, bonus), types);
+      if (best) {
+        out.push({ a: p.body, b: q.body, aspect: best.key, orb: best.orb, applying: applyingOf(p, q, best.angle) });
       }
     }
   }

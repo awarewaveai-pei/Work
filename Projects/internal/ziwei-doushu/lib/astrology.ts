@@ -2,6 +2,9 @@ import { initSync, XalenWasm } from '@xalen/wasm';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { computeAspects, type Aspect } from './astrologyAspects';
+import { findReturnJd, jdToDateTime, transitAspects, type DateTimeParts } from './astrologyTransits';
+import { synastryAspects } from './astrologySynastry';
+import type { Ymd } from './today';
 
 /**
  * 西洋占星本命盤引擎 — 自架 XALEN(@xalen/wasm,Apache-2.0,**無需 API key**)。
@@ -137,6 +140,23 @@ function getXalen(): XalenWasm {
 const RAD2DEG = 180 / Math.PI;
 const norm360 = (x: number): number => (((x % 360) + 360) % 360);
 
+/** 某時刻十二星體位置;宮位依給定宮頭(行運用本命宮頭)。 */
+function bodyPositions(w: XalenWasm, jd: number, cusps: number[]): WesternPlanet[] {
+  return WESTERN_BODIES.map((b) => {
+    const p = JSON.parse(
+      w.planetPositionJson(jd, b.id, false, 0),
+    ) as { longitude: number; lon_speed: number; is_retrograde: boolean };
+    return {
+      body: b.key,
+      longitude: p.longitude,
+      signIndex: signIndexOf(p.longitude),
+      house: houseOf(p.longitude, cusps),
+      retrograde: Boolean(p.is_retrograde),
+      speed: p.lon_speed,
+    };
+  });
+}
+
 export function computeWesternChart(req: WesternRequest): WesternChart {
   const w = getXalen();
   const hourUT = req.hour + req.minute / 60 - req.tzOffsetHours;
@@ -155,19 +175,7 @@ export function computeWesternChart(req: WesternRequest): WesternChart {
   const ascDeg = norm360(houses.ascendant * RAD2DEG);
   const mcDeg = norm360(houses.mc * RAD2DEG);
 
-  const planets: WesternPlanet[] = WESTERN_BODIES.map((b) => {
-    const p = JSON.parse(
-      w.planetPositionJson(jd, b.id, false, 0),
-    ) as { longitude: number; lon_speed: number; is_retrograde: boolean };
-    return {
-      body: b.key,
-      longitude: p.longitude,
-      signIndex: signIndexOf(p.longitude),
-      house: houseOf(p.longitude, cusps),
-      retrograde: Boolean(p.is_retrograde),
-      speed: p.lon_speed,
-    };
-  });
+  const planets = bodyPositions(w, jd, cusps);
 
   return {
     jd,
@@ -178,4 +186,92 @@ export function computeWesternChart(req: WesternRequest): WesternChart {
     aspects: computeAspects(planets),
     fallbackHouses: Boolean(houses.fallback_used),
   };
+}
+
+/**
+ * 生辰欄位驗證(各 /api/astrology* 路由共用)。成功回 WesternRequest,失敗回錯誤說明字串。
+ * 拒絕不存在的日期(2/31 等):native date picker 已擋,但 API 可直打。
+ */
+export function parseWesternRequest(v: unknown): WesternRequest | string {
+  if (!v || typeof v !== 'object') return 'birth object required';
+  const b = v as Record<string, unknown>;
+  const num = (x: unknown, lo: number, hi: number): number | null =>
+    typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi ? x : null;
+  const year = num(b.year, 1800, 2200);
+  const month = num(b.month, 1, 12);
+  const day = num(b.day, 1, 31);
+  const hour = num(b.hour, 0, 23);
+  const minute = num(b.minute, 0, 59);
+  const tzOffsetHours = num(b.tzOffsetHours, -12, 14);
+  const lat = num(b.lat, -90, 90);
+  const lon = num(b.lon, -180, 180);
+  if (
+    year === null || month === null || day === null || hour === null ||
+    minute === null || tzOffsetHours === null || lat === null || lon === null
+  ) {
+    return 'bad birth/location fields';
+  }
+  if (!isRealDate(year, month, day)) return 'impossible calendar date';
+  return { year, month, day, hour, minute, tzOffsetHours, lat, lon };
+}
+
+export function isRealDate(year: number, month: number, day: number): boolean {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === day;
+}
+
+export interface TransitResult {
+  /** 行運時刻(today 當地正午)JD UT */
+  jd: number;
+  today: Ymd;
+  /** 行運星體;house = 落在本命盤的哪一宮 */
+  planets: WesternPlanet[];
+  /** 行運對本命,依偏離由小到大(lib/astrologyTransits.ts) */
+  aspects: Aspect<BodyKey>[];
+  /** 最近一次(不晚於行運時刻)太陽回歸:太陽回到本命太陽黃經,即目前這一年的太陽回歸盤時刻 */
+  solarReturn: { jd: number; local: DateTimeParts; tzOffsetHours: number };
+}
+
+/**
+ * 行運 + 太陽回歸。today / viewerTzOffsetHours 由 client 給(lib/today.ts localToday 與瀏覽器時區),
+ * 伺服器不自己取「今天」(伺服器時區不是使用者時區)。
+ */
+export function computeTransits(birth: WesternRequest, today: Ymd, viewerTzOffsetHours: number): TransitResult {
+  const w = getXalen();
+  const natal = computeWesternChart(birth);
+  const jd = julianDay(today.year, today.month, today.day, 12 - viewerTzOffsetHours);
+  const planets = bodyPositions(w, jd, natal.houseCusps);
+  const natalSun = natal.planets.find((p) => p.body === 'sun')!;
+  const birthHourUT = birth.hour + birth.minute / 60 - birth.tzOffsetHours;
+  const sunAt = (t: number) => w.tropicalLongitude(t, 0);
+  const returnIn = (year: number) =>
+    findReturnJd(sunAt, natalSun.longitude, julianDay(year, birth.month, birth.day, birthHourUT));
+  // 今年生日附近的回歸若還沒到,目前生效的是去年那一次
+  let srJd = returnIn(today.year);
+  if (srJd > jd) srJd = returnIn(today.year - 1);
+  return {
+    jd,
+    today,
+    planets,
+    aspects: transitAspects(planets, natal.planets),
+    solarReturn: {
+      jd: srJd,
+      local: jdToDateTime(srJd, viewerTzOffsetHours),
+      tzOffsetHours: viewerTzOffsetHours,
+    },
+  };
+}
+
+export interface SynastryResult {
+  a: WesternChart;
+  b: WesternChart;
+  /** a 盤星體(Aspect.a)對 b 盤星體(Aspect.b),依偏離由小到大 */
+  aspects: Aspect<BodyKey>[];
+}
+
+export function computeSynastry(a: WesternRequest, b: WesternRequest): SynastryResult {
+  const ca = computeWesternChart(a);
+  const cb = computeWesternChart(b);
+  return { a: ca, b: cb, aspects: synastryAspects(ca.planets, cb.planets) };
 }

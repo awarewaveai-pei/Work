@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { computeWesternChart, type WesternRequest } from '@/lib/astrology';
+import { computeWesternChart, parseWesternRequest } from '@/lib/astrology';
 
 /**
  * 西洋占星本命盤端點 — 伺服器端跑 XALEN wasm(1.75MB,不進 client bundle)。
@@ -15,12 +15,6 @@ function bad(detail: string) {
   return NextResponse.json({ error: 'invalid_request', detail }, { status: 400 });
 }
 
-function intIn(v: unknown, lo: number, hi: number): number | null {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
-  if (v < lo || v > hi) return null;
-  return v;
-}
-
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -28,38 +22,8 @@ export async function POST(request: Request) {
   } catch {
     return bad('invalid json');
   }
-  if (!body || typeof body !== 'object') return bad('body required');
-  const b = body as Record<string, unknown>;
-
-  const year = intIn(b.year, 1800, 2200);
-  const month = intIn(b.month, 1, 12);
-  const day = intIn(b.day, 1, 31);
-  const hour = intIn(b.hour, 0, 23);
-  const minute = intIn(b.minute, 0, 59);
-  const tzOffsetHours = intIn(b.tzOffsetHours, -12, 14);
-  const lat = intIn(b.lat, -90, 90);
-  const lon = intIn(b.lon, -180, 180);
-
-  if (
-    year === null || month === null || day === null || hour === null ||
-    minute === null || tzOffsetHours === null || lat === null || lon === null
-  ) {
-    return bad('bad birth/location fields');
-  }
-
-  // 拒絕不存在的日期(2/31、4/31 等)。native date picker 已擋,但 API 可直打。
-  const dt = new Date(Date.UTC(year, month - 1, day));
-  if (
-    dt.getUTCFullYear() !== year ||
-    dt.getUTCMonth() !== month - 1 ||
-    dt.getUTCDate() !== day
-  ) {
-    return bad('impossible calendar date');
-  }
-
-  const req: WesternRequest = {
-    year, month, day, hour, minute, tzOffsetHours, lat, lon,
-  };
+  const req = parseWesternRequest(body);
+  if (typeof req === 'string') return bad(req);
 
   try {
     const chart = computeWesternChart(req);
