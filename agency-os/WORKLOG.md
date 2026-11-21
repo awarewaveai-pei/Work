@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-21（續8）— 影片監工：正式站瀏覽器驗收四個畫面；R6–R10 併入 main（操作者：「派工」「R6、R7 去處理好」「做成一個積木 lego，並強制規定」）
+
+- 瀏覽器驗收（app／video.aware-wave.com，內建瀏覽器）：U3.5 一鍵腳本鈕與標價、U7.1 下載 SRT／VTT 與改字幕、N16 兩頁篩選、R2／R3 片頭卡片皆可用；付費鈕與重燒未按。監工誤存 AwareWave 片頭「橫幅字卡」一次，已改回並重新整理確認。
+- R6 `fb3f58035`：`lib/content/video/editorial-rights-qa.ts` `termAppears`——拉丁詞要詞界（含 s/es/d/ed/ing/ment 字尾），CJK 照舊子字串；forbidden／required 同一條。正式庫 Soulful 六個禁用詞各一條測試仍命中。
+- R7 `4638411ea`：`IntroStyleButtons` 複選不互蓋（saving 期間 disabled），程式不改，只加測試。
+- R8 `0d309d5e7`、`469ab3bd9`：`TopicsBoard` 加 view（topics／clients／steps），兩邊側欄加 `under` 子項；`OverviewTable` 刪除；`ScheduleWorkbench.tsx:92` 空清單寫客戶名。
+- R9 `77495a697`：根因＝`lib/portal/doors.ts` `routeOnProductDoor` 把 `/editor-shared/...` 改寫成 `/content/editor-shared/...`（404）。`STATIC_PAGES` 單一清單，`staff-tools.ts` 改引用。
+- R10 `cd30675df`…`6101bb235`：`OrgPicker` 收斂成搜尋＋清單並加 `badge`／`hint`；`ClientPanelNav`、`tools/video/OrganizationPicker`、video-workbench `scripts/organization-picker.js` 的自做清單刪除；`bootstrap/route.ts` 加 `?first=1`／`?q=`；檢查 `ops/clients/__tests__/client-picker-rule.test.ts`；盤點 `agency-os/handoffs/2026-11-16-video-unify-supervisor/R10-client-picker-inventory.md`。
+- 「自動排程沒內容」查證：nginx access log 該瀏覽器送 organizationId=Soulful，`content_topics` Soulful 0 筆、AwareWave Ops 58 筆（唯讀 psql）＝非故障。
+- 合併：主 checkout 有他 session 未提交的 `globals.css` → 整合在線 D worktree 做，`git push origin 6101bb235:main`；本機 ff 時該檔以 patch 帶過（`git apply --3way` 乾淨）。
+- 未做：video-workbench 需 sg-deploy 才上線（High，等 go）；next-admin 隨 03:00 自動部署；截圖皆假資料，上線後正式站再看；四處網站選單未換（無網站搜尋 API）；`public/editor-shared` 內 `ctx-contract.md`、`video-organization.cjs` 入口已登入客戶可讀（無密鑰，接受）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=線 D worktree @6101bb235 `npx tsc --noEmit`＋`npx vitest run`（617 檔 5108 passed）；工人 `node tests/gate.cjs` gate ok | exit=0 | ms=47150
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/8m/0n（各卡工人 critic 一輪，Minor 皆修；監工讀 doors.ts／staff-tools.ts／bootstrap route diff）
+- ORACLE_WAIVED: Codex 額度到 2026-11-24
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps | grep=OverviewTable | hits=0
+- rollback：`git revert cd30675df^..6101bb235`（R8–R10）、`git revert fb3f58035 4638411ea`；無資料庫改動。
 ## 2026-11-21（續7）— 模特兒圖庫加「取消印花框」（操作者：想做全幅）
 
 [根因] 照片框過一次就拿不掉：PATCH `printBox` 只能換框，`null` 被 `modelPhotoMeta` 略過（`presets/route.ts` `!== null`）。
