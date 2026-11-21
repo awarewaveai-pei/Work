@@ -250,6 +250,8 @@
     "relations": "Card relationships",
     "daily": "Card of the day",
     "dailyHint": "Same card all day, every time",
+    "flipHint": "Tap to flip",
+    "flipAll": "Flip all",
     "draw": "Draw",
     "topic": "Topic",
     "upright": "Upright",

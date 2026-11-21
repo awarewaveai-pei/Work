@@ -52,6 +52,13 @@
 - 授權：MIT License，Copyright (c) 2024 Jinyang Wang
 - 採用範圍：六爻納甲規則（`src/ichingpy/divination/six_lines.py` 的納干、納支、世應、六親、六神；`model/sexagenary_cycle.py` 的旬空算法），依京房通行口徑以 TypeScript 自行重寫於 `lib/iching/najia.ts`；八宮歸屬以 64 卦逐宮對照傳統表測試，未複製原始碼。
 
+## tarot-mcp 牌圖（Midnight Art Nouveau Tarot）
+
+- 來源：https://github.com/fzlzjerry/tarot-mcp 的 `assets/cards/`（79 張 512×768 webp：78 張牌面＋牌背）
+- 授權：MIT License，Copyright (c) 2026 Morax；原授權檔收於 `public/tarot/LICENSE.txt`，來源聲明全文收於 `public/tarot/ASSET_LICENSE.txt`
+- 來源聲明摘要：牌圖為該專案以 OpenAI 內建 `image_gen` 工具依專案自寫提示詞生成，再由其腳本正規化加框；未下載或複製任何第三方牌組。授權僅「在著作權存在的範圍內」，以 "AS IS" 提供，不保證無侵權（AI 生成內容的著作權歸屬依各法域而異）。
+- 採用範圍：原檔複製為 `public/tarot/<本站牌 id>.webp`（檔名改為本站 id，內容與來源逐位元相同，雜湊記於 `public/tarot/SHA256.json`），由 `components/TarotCardView.tsx` 顯示。
+
 ## MIT License 全文（上列專案共用）
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:

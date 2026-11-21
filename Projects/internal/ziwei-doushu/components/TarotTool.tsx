@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import AiReading from '@/components/AiReading';
+import TarotCardView from '@/components/TarotCardView';
 import {
   drawDaily,
   drawSpread,
@@ -23,6 +24,14 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
   const [spread, setSpread] = useState<SpreadId>('three');
   const [topic, setTopic] = useState<TarotTopic>('general');
   const [result, setResult] = useState<TarotResult | null>(null);
+  const [revealed, setRevealed] = useState<boolean[]>([]);
+  const [drawId, setDrawId] = useState(0);
+  // 每次抽牌:新牌一律先蓋著,並換 key 讓每張牌的圖檔載入狀態重置
+  const show = (r: TarotResult) => {
+    setResult(r);
+    setRevealed(r.cards.map(() => false));
+    setDrawId((n) => n + 1);
+  };
   const t = dict.tarot;
   const relationLines = result
     ? describeRelations(computeTarotRelations(result.cards), result.cards, locale)
@@ -82,10 +91,10 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
-          <button onClick={() => setResult(drawSpread(spread))} className="btn-gold" style={{ width: 'auto' }}>
+          <button onClick={() => show(drawSpread(spread))} className="btn-gold" style={{ width: 'auto' }}>
             {t.draw}
           </button>
-          <button onClick={() => setResult(drawDaily())} className="btn-violet" style={{ width: 'auto' }}>
+          <button onClick={() => show(drawDaily())} className="btn-violet" style={{ width: 'auto' }}>
             {t.daily}
           </button>
           <span style={{ fontSize: '0.75rem', color: 'var(--text-caption)' }}>{t.dailyHint}</span>
@@ -95,6 +104,15 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
       {result ? (
         <section className="mt-8">
           <hr className="star-divider" />
+          <button
+            type="button"
+            className="btn-violet"
+            style={{ width: 'auto', marginBottom: '0.75rem' }}
+            onClick={() => setRevealed(result.cards.map(() => true))}
+            disabled={revealed.every(Boolean)}
+          >
+            {t.flipAll}
+          </button>
           <div
             style={{
               display: 'grid',
@@ -103,31 +121,15 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
             }}
           >
             {result.cards.map((d, i) => (
-              <div key={i} className={`tarot-card ${d.reversed ? 'reversed' : 'upright'}`}>
-                <div style={{ fontSize: '0.65rem', color: 'var(--gold-400)', marginBottom: '0.4rem', minHeight: '1.6em' }}>
-                  {positions[i] ?? `#${i + 1}`}
-                </div>
-                <div
-                  style={{
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: 'var(--text-heading)',
-                    marginBottom: '0.5rem',
-                    fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
-                  }}
-                >
-                  {d.card.name[locale]}
-                </div>
-                <div
-                  style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    color: d.reversed ? 'var(--rose-400)' : 'var(--jade-400)',
-                  }}
-                >
-                  {d.reversed ? t.reversed : t.upright}
-                </div>
-              </div>
+              <TarotCardView
+                key={`${drawId}-${i}`}
+                drawn={d}
+                position={positions[i] ?? `#${i + 1}`}
+                revealed={revealed[i] ?? false}
+                onToggle={() => setRevealed((r) => r.map((v, j) => (j === i ? !v : v)))}
+                locale={locale}
+                labels={t}
+              />
             ))}
           </div>
 

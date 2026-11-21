@@ -250,6 +250,8 @@
     "relations": "牌間關係",
     "daily": "每日一牌",
     "dailyHint": "同一天固定同一張牌",
+    "flipHint": "點擊翻牌",
+    "flipAll": "全部翻開",
     "draw": "抽牌",
     "topic": "主題",
     "upright": "正位",
