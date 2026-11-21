@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeDailyFortune, dailyCacheKey, dailyContext } from './daily';
+import { computeDailyAlmanac, computeDailyFortune, dailyCacheKey, dailyContext } from './daily';
 
 const birth = {
   year: 2000, month: 8, day: 16, hour: 14, minute: 30,
@@ -57,5 +57,103 @@ describe('每日運勢工廠', () => {
 
   it('快取鍵含 chart+date+locale', () => {
     expect(dailyCacheKey('abc', '2026-06-24', 'en')).toBe('abc|2026-06-24|en');
+  });
+});
+
+describe('當日黃曆(computeDailyAlmanac)', () => {
+  it('2026-06-24 全部新欄位(繁中)', () => {
+    expect(computeDailyAlmanac({ year: 2026, month: 6, day: 24 }, 'zh-TW')).toMatchInlineSnapshot(`
+      {
+        "clash": {
+          "animal": "豬",
+          "ganZhi": "癸亥",
+          "sha": "東",
+        },
+        "fetusGod": "占門床 外正南",
+        "gods": {
+          "fortune": "正北",
+          "joy": "東北",
+          "wealth": "正北",
+        },
+        "ji": [
+          "安床",
+          "祈福",
+          "出行",
+          "安葬",
+          "行喪",
+          "開光",
+        ],
+        "luckyGods": [
+          "四相",
+          "王日",
+          "玉宇",
+        ],
+        "mansion": {
+          "auspicious": true,
+          "name": "軫水蚓",
+        },
+        "nineStar": "四綠木",
+        "officer": "閉",
+        "pengZu": [
+          "己不破券二比並亡",
+          "巳不遠行財物伏藏",
+        ],
+        "unluckyGods": [
+          "游禍",
+          "血支",
+          "重日",
+          "元武",
+        ],
+        "yi": [
+          "嫁娶",
+          "合帳",
+          "裁衣",
+          "冠笄",
+          "伐木",
+          "上梁",
+          "出火",
+          "拆卸",
+          "移徙",
+          "修造",
+          "動土",
+          "安門",
+          "納財",
+          "築堤",
+          "栽種",
+          "塞穴",
+        ],
+      }
+    `);
+  });
+
+  it('2026-06-24 英文:有通行英譯的譯出,其餘保留繁中', () => {
+    const a = computeDailyAlmanac({ year: 2026, month: 6, day: 24 }, 'en');
+    expect([a.nineStar, a.mansion.name, a.officer, a.clash.animal, a.clash.sha, a.gods.joy]).toMatchInlineSnapshot(`
+      [
+        "Four Green (Wood)",
+        "Chariot (軫)",
+        "Close",
+        "Pig",
+        "East",
+        "Northeast",
+      ]
+    `);
+  });
+
+  it('改正字:胃宿動物作雉(庫作彘)', () => {
+    expect(computeDailyAlmanac({ year: 2026, month: 1, day: 24 }, 'zh-TW').mansion.name).toBe('胃土雉');
+  });
+  it('改正字:壁宿動物作貐(庫作獝)', () => {
+    expect(computeDailyAlmanac({ year: 2026, month: 1, day: 21 }, 'zh-TW').mansion.name).toBe('壁水貐');
+  });
+  it('改正字:彭祖百忌「壬不汲水」(庫作泱)', () => {
+    expect(computeDailyAlmanac({ year: 2026, month: 1, day: 8 }, 'zh-TW').pengZu[0]).toBe('壬不汲水更難提防');
+  });
+
+  it('dailyContext 加黃曆後仍在 60 條、每條 300 字以內', () => {
+    const ctx = dailyContext(computeDailyFortune(birth, { year: 2026, month: 6, day: 24 }, 'zh-TW'), 'zh-TW');
+    expect(ctx.facts.length).toBeLessThanOrEqual(60);
+    expect(ctx.facts.every((x) => x.label.length <= 60 && x.value.length <= 300)).toBe(true);
+    expect(ctx.facts.some((x) => x.label === 'almanacOfficer')).toBe(true);
   });
 });

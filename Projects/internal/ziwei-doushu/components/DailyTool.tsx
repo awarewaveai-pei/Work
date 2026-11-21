@@ -28,6 +28,19 @@ function GoldStars({ n }: { n: number }) {
   );
 }
 
+/** 黃曆一列:標籤、值、一句說明(英文介面對無通行英譯的術語尤其需要)。 */
+function AlmanacRow({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--glass-border)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.875rem' }}>
+        <span style={{ color: 'var(--text-caption)', flexShrink: 0 }}>{label}</span>
+        <span style={{ color: 'var(--text-heading)', textAlign: 'right' }}>{value}</span>
+      </div>
+      <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginTop: '0.125rem' }}>{hint}</div>
+    </div>
+  );
+}
+
 export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   const [result, setResult] = useState<DailyFortune | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +83,8 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
       {result ? (
         <section className="mt-8 space-y-4">
           <hr className="star-divider" />
+
+          <div className="label-dark">{t.personalTitle}</div>
 
           {/* Score panel */}
           <div className="glass-card p-5">
@@ -159,6 +174,32 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
                 {result.ji.join('、')}
               </div>
             </div>
+          </div>
+
+          {/* 當日黃曆:只看日期,與出生資料無關 */}
+          <div className="label-dark" style={{ marginTop: '1.5rem' }}>{t.almanacTitle}</div>
+          <div className="glass-card p-4">
+            <AlmanacRow label={t.officer} value={result.almanac.officer} hint={t.officerHint} />
+            <AlmanacRow
+              label={t.mansion}
+              value={`${result.almanac.mansion.name} · ${result.almanac.mansion.auspicious ? t.auspicious : t.inauspicious}`}
+              hint={t.mansionHint}
+            />
+            <AlmanacRow label={t.nineStar} value={result.almanac.nineStar} hint={t.nineStarHint} />
+            <AlmanacRow
+              label={t.clash}
+              value={`${result.almanac.clash.animal} (${result.almanac.clash.ganZhi}) · ${t.sha} ${result.almanac.clash.sha}`}
+              hint={t.clashHint}
+            />
+            <AlmanacRow
+              label={`${t.joyGod} / ${t.wealthGod} / ${t.fortuneGod}`}
+              value={`${result.almanac.gods.joy} / ${result.almanac.gods.wealth} / ${result.almanac.gods.fortune}`}
+              hint={t.godsHint}
+            />
+            <AlmanacRow label={t.fetusGod} value={result.almanac.fetusGod} hint={t.fetusGodHint} />
+            <AlmanacRow label={t.pengZu} value={result.almanac.pengZu.join(' ')} hint={t.pengZuHint} />
+            <AlmanacRow label={t.luckyGods} value={result.almanac.luckyGods.join('、') || '—'} hint={t.spiritsHint} />
+            <AlmanacRow label={t.unluckyGods} value={result.almanac.unluckyGods.join('、') || '—'} hint={t.spiritsHint} />
           </div>
 
           <AiReading context={dailyContext(result, locale)} ai={dict.ai} tier="light" />
