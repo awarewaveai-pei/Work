@@ -1,10 +1,12 @@
 import type { Locale } from '@/lib/i18n/config';
+import type { InputSpec } from './input';
 
 /**
  * 命理系統統一合約 (F3 接縫)。
  *
  * 新增一個系統 = SYSTEM_IDS 加一項 + lib/ai/prompts/systems.ts FRAMING 加一項
- *   + 實作 DivinationSystem 並在 lib/divination/index.ts register;前兩項漏了 tsc 會紅。
+ *   + 實作 DivinationSystem(含 input 規格)並在 lib/divination/index.ts register;前兩項漏了 tsc 會紅。
+ *   註冊後自動有輸入驗證、REST v1(app/api/v1)與對外文件。
  *   有獨立頁面的另在 lib/site.ts PAGE_SLUGS 加一項(導覽、首頁、sitemap 由它產生)。
  *   移除 = 反向刪除。其餘程式(AI 解讀、付費牆)透過 InterpretationContext 這個
  *   「系統無關」結構運作,不需認識各系統內部。
@@ -23,6 +25,7 @@ export const SYSTEM_IDS = [
   'qian',
   'zeri',
   'vedic',
+  'daily',
 ] as const;
 export type SystemId = (typeof SYSTEM_IDS)[number];
 
@@ -56,6 +59,8 @@ export interface SystemMeta {
  */
 export interface DivinationSystem<TInput = unknown, TData = unknown> {
   readonly meta: SystemMeta;
+  /** 對外輸入規格(驗證、REST v1、文件的唯一來源;見 ./input.ts) */
+  readonly input: InputSpec<TInput>;
   /** 排盤/起卦/抽牌 → 可渲染資料 + 給 AI 的系統無關 context */
   compute(
     input: TInput,

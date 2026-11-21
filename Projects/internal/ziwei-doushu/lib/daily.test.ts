@@ -24,9 +24,9 @@ describe('每日運勢工廠', () => {
     expect(f.favorable.length).toBeGreaterThan(0);
   });
 
-  it('dailyContext → systemId=bazi、headline 今日 + 含評分/宜忌 facts', () => {
+  it('dailyContext → systemId=daily(已註冊為系統)、headline 今日 + 含評分/宜忌 facts', () => {
     const ctx = dailyContext(f, 'zh-TW');
-    expect(ctx.systemId).toBe('bazi');
+    expect(ctx.systemId).toBe('daily');
     expect(ctx.headline).toContain(f.date);
     expect(ctx.facts.find((x) => x.label === 'favorable')?.value).toBeTruthy();
     expect(ctx.facts.some((x) => x.label === 'scoreOverall')).toBe(true);

@@ -11,6 +11,8 @@ import {
 } from '@/lib/hehun';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
+import { BIRTH_FIELDS, DATE, EXAMPLE_BIRTH, birthDateErrors, toBirth, toYmd } from '../fields';
+import { isRealDate, type FieldSpec, type Fields, type InputSpec } from '../input';
 
 /** 只用出生年模式:需要月日才能判斷立春前後。 */
 export interface BirthDay {
@@ -91,8 +93,54 @@ export function toContext(d: HehunData, locale: Locale): InterpretationContext {
   };
 }
 
+/** 兩種模式共用一組欄位:年月日必填,其餘在 full 模式由 check 要求。 */
+const PERSON_FIELDS: Fields = Object.fromEntries(
+  Object.entries(BIRTH_FIELDS).map(([k, f]) => [k, ['year', 'month', 'day'].includes(k) ? f : { ...f, required: false }]),
+);
+const person = (zh: string, en: string): FieldSpec => ({
+  type: 'object',
+  fields: PERSON_FIELDS,
+  doc: { 'zh-TW': `${zh}(zodiac 模式只看年月日;full 模式出生資料全填)`, en: `${en} (zodiac mode reads only the date; full mode needs the whole birth record)` },
+});
+const FULL_REQUIRED = ['calendar', 'hour', 'minute', 'gender', 'place'];
+
+const HEHUN_INPUT: InputSpec<HehunInput> = {
+  fields: {
+    mode: { type: 'enum', values: ['full', 'zodiac'], doc: { 'zh-TW': 'full 八字合婚 / zodiac 只用出生日期', en: 'full = BaZi match, zodiac = birth date only' } },
+    a: person('甲方', 'Person A'),
+    b: person('乙方', 'Person B'),
+    asOf: DATE('流年基準日(呼叫端的今天;full 模式必填)', 'Reference date for the current year (the caller\'s today; required in full mode)', false),
+  },
+  check: (v) => [
+    ...(v.mode === 'full' && v.asOf === undefined ? ['asOf: required in full mode'] : []),
+    ...(['a', 'b'] as const).flatMap((k) => {
+      const p = v[k] as Record<string, unknown>;
+      if (v.mode === 'zodiac') {
+        if (p.calendar === 'lunar') return [`${k}.calendar: zodiac mode takes solar (Gregorian) dates`];
+        return isRealDate(p.year as number, p.month as number, p.day as number) ? [] : [`${k}.day: no such date`];
+      }
+      const missing = FULL_REQUIRED.filter((f) => p[f] === undefined).map((f) => `${k}.${f}: required in full mode`);
+      return missing.length ? missing : birthDateErrors(p, k);
+    }),
+  ],
+  build: (v) => {
+    const a = v.a as Record<string, unknown>;
+    const b = v.b as Record<string, unknown>;
+    if (v.mode === 'zodiac') return { mode: 'zodiac', a: toYmd(a), b: toYmd(b) };
+    const asOf = toYmd(v.asOf);
+    return { mode: 'full', a: { ...toBirth(a), asOf }, b: { ...toBirth(b), asOf } };
+  },
+  example: {
+    mode: 'full',
+    a: EXAMPLE_BIRTH,
+    b: { ...EXAMPLE_BIRTH, year: 1998, month: 3, day: 2, hour: 9, minute: 15, gender: '男' },
+    asOf: { year: 2026, month: 11, day: 21 },
+  },
+};
+
 export const hehunSystem: DivinationSystem<HehunInput, HehunData> = {
   meta: { id: 'hehun', kind: 'chart', requiresApiKey: false },
+  input: HEHUN_INPUT,
   async compute(input, locale) {
     const data = computeHehun(input, locale);
     return { data, context: toContext(data, locale) };

@@ -111,6 +111,14 @@ t_every_other_hardcoded_127_port_is_only_in_comments() {
   check "no other hardcoded 127.0.0.1:<port> in live code (comments are fine)" test -z "$offenders"
 }
 
+t_oracle_smoke_probes_the_public_api() {
+  # X1 (2026-11-21): the oracle block probes /api/v1/systems on the resolved port, so a deploy that
+  # breaks the public data API (system registry, input specs) fails the smoke instead of shipping.
+  local block
+  block="$(awk '/^if \[\[ " \$\{APPS\[\*\]\} " =~ " oracle-web " \]\]; then$/,/^fi$/' "$SG_DEPLOY")"
+  check "oracle-web: smoke block probes /api/v1/systems on the resolved port"     grep -qF '_smoke_check "oracle-web api v1" "http://127.0.0.1:${oracle_port}/api/v1/systems"' <<< "$block"
+}
+
 main() {
   local t
   for t in $(declare -F | awk '{print $3}' | grep '^t_'); do "$t"; done

@@ -11,6 +11,8 @@ import { computeTarotRelations, describeRelations } from '@/lib/tarotRelations';
 import type { Ymd } from '@/lib/today';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
+import { DATE, toYmd } from '../fields';
+import type { InputSpec } from '../input';
 
 export interface TarotInput {
   spread: SpreadId;
@@ -73,8 +75,34 @@ export function toContext(
   };
 }
 
+const TAROT_INPUT: InputSpec<TarotInput> = {
+  fields: {
+    spread: {
+      type: 'enum',
+      values: Object.keys(SPREADS),
+      required: false,
+      doc: { 'zh-TW': '牌陣(與 daily 二擇一);由伺服器以密碼學亂數洗牌', en: 'Spread (either this or daily); shuffled with a cryptographic random source' },
+    },
+    daily: DATE('每日一牌的日期(呼叫端的今天;同日同牌)', 'Card of the day for this date (the caller\'s today; same date, same card)', false),
+    topic: {
+      type: 'enum',
+      values: Object.keys(TOPICS),
+      required: false,
+      doc: { 'zh-TW': '情境主題(預設綜合)', en: 'Topic (default general)' },
+    },
+  },
+  check: (v) => ((v.spread === undefined) === (v.daily === undefined) ? ['spread: give exactly one of spread or daily'] : []),
+  build: (v) => ({
+    spread: (v.spread as SpreadId | undefined) ?? 'single',
+    daily: v.daily === undefined ? undefined : toYmd(v.daily),
+    topic: v.topic as TarotTopic | undefined,
+  }),
+  example: { spread: 'three', topic: 'career' },
+};
+
 export const tarotSystem: DivinationSystem<TarotInput, TarotResult> = {
   meta: { id: 'tarot', kind: 'draw', requiresApiKey: false },
+  input: TAROT_INPUT,
   async compute(input, locale) {
     const data = input.daily ? drawDaily(input.daily) : drawSpread(input.spread, input.rng);
     return { data, context: toContext(data, locale, input.topic) };

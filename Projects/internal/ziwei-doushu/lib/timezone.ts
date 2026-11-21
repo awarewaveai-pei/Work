@@ -30,6 +30,16 @@ function formatterFor(zone: string): Intl.DateTimeFormat {
   return f;
 }
 
+/** 是否為執行環境認得的 IANA 時區名。 */
+export function isTimeZone(zone: string): boolean {
+  try {
+    formatterFor(zone);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 某個 UTC 瞬間在該時區的偏移(小時)。 */
 export function offsetAtInstant(zone: string, utcMs: number): number {
   const name = formatterFor(zone)

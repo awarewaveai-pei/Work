@@ -783,6 +783,7 @@ if [[ " ${APPS[*]} " =~ " oracle-web " ]]; then
   oracle_port="${oracle_port:-3010}"
   _smoke_check "oracle-web health" "http://127.0.0.1:${oracle_port}/api/health"
   _smoke_check "oracle-web /zh-TW" "http://127.0.0.1:${oracle_port}/zh-TW"
+  _smoke_check "oracle-web api v1" "http://127.0.0.1:${oracle_port}/api/v1/systems"
   _smoke_check "nginx/oracle"      "https://oracle.aware-wave.com/api/health" "" "oracle.aware-wave.com"
 fi
 

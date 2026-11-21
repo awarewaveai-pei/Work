@@ -1,7 +1,9 @@
-import { computeZeri, type ZeriActivity, type ZeriDay, type ZeriRequest, type ZeriResult } from '@/lib/zeri';
+import { computeZeri, MAX_RANGE_DAYS, ZERI_ACTIVITIES, type ZeriActivity, type ZeriDay, type ZeriRequest, type ZeriResult } from '@/lib/zeri';
 import { branchIndex } from '@/lib/ganzhi';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
+import { DATE, toYmd } from '../fields';
+import { YEAR_MAX, YEAR_MIN, type InputSpec } from '../input';
 
 /** 擇日:程式依 lib/zeri.ts 規則逐日判定,AI 只依吉日清單敘事。 */
 
@@ -93,8 +95,41 @@ export function toContext(r: ZeriResult, locale: Locale): InterpretationContext 
   return { systemId: 'zeri', locale, headline, facts };
 }
 
+const dayNumber = (d: unknown) => {
+  const x = d as Record<string, number>;
+  return Date.UTC(x.year, x.month - 1, x.day) / 86_400_000;
+};
+
+const ZERI_INPUT: InputSpec<ZeriRequest> = {
+  fields: {
+    activity: { type: 'enum', values: ZERI_ACTIVITIES, doc: { 'zh-TW': '事項', en: 'Event' } },
+    from: DATE('起始日', 'First day'),
+    to: DATE(`結束日(區間最長 ${MAX_RANGE_DAYS} 天)`, `Last day (at most ${MAX_RANGE_DAYS} days in all)`),
+    birthYear: {
+      type: 'integer',
+      min: YEAR_MIN,
+      max: YEAR_MAX,
+      required: false,
+      doc: { 'zh-TW': '選填:居住者出生的立春年(避開沖本命的日子)', en: 'Optional: occupant birth year by Lichun (skips days that clash with it)' },
+    },
+  },
+  check: (v) => {
+    const n = dayNumber(v.to) - dayNumber(v.from) + 1;
+    if (n < 1) return ['to: before from'];
+    return n > MAX_RANGE_DAYS ? [`to: at most ${MAX_RANGE_DAYS} days in all`] : [];
+  },
+  build: (v) => ({
+    activity: v.activity as ZeriActivity,
+    from: toYmd(v.from),
+    to: toYmd(v.to),
+    birthYear: v.birthYear as number | undefined,
+  }),
+  example: { activity: 'ruZhai', from: { year: 2026, month: 12, day: 1 }, to: { year: 2026, month: 12, day: 31 }, birthYear: 1985 },
+};
+
 export const zeriSystem: DivinationSystem<ZeriRequest, ZeriResult> = {
   meta: { id: 'zeri', kind: 'chart', requiresApiKey: false },
+  input: ZERI_INPUT,
   async compute(input, locale) {
     const data = computeZeri(input);
     return { data, context: toContext(data, locale) };

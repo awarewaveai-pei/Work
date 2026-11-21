@@ -2,6 +2,8 @@ import { computeBazi, type BaziRequest, type BaziResult } from '@/lib/bazi';
 import { relationTerm, type PillarPosition, type RelationKind } from '@/lib/baziRelations';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
+import { BIRTH_FIELDS, DATE, EXAMPLE_BIRTH, birthDateErrors, toBirth, toYmd } from '../fields';
+import type { InputSpec } from '../input';
 
 const POS: Record<Locale, Record<PillarPosition, string>> = {
   'zh-TW': { year: '年', month: '月', day: '日', hour: '時' },
@@ -90,8 +92,16 @@ export function toContext(r: BaziResult, locale: Locale): InterpretationContext 
   };
 }
 
+const BAZI_INPUT: InputSpec<BaziRequest> = {
+  fields: { ...BIRTH_FIELDS, asOf: DATE('流年、目前大運的基準日(呼叫端的今天)', 'Reference date for the current year and luck pillar (the caller\'s today)') },
+  check: (v) => birthDateErrors(v),
+  build: (v) => ({ ...toBirth(v), asOf: toYmd(v.asOf) }),
+  example: { ...EXAMPLE_BIRTH, asOf: { year: 2026, month: 11, day: 21 } },
+};
+
 export const baziSystem: DivinationSystem<BaziRequest, BaziResult> = {
   meta: { id: 'bazi', kind: 'chart', requiresApiKey: false },
+  input: BAZI_INPUT,
   async compute(input, locale) {
     const data = computeBazi({ ...input, locale });
     return { data, context: toContext(data, locale) };

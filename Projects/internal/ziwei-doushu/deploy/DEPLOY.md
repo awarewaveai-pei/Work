@@ -24,6 +24,17 @@ curl -s https://oracle.aware-wave.com/sitemap.xml | grep -c 'oracle.aware-wave' 
 ```
 AI 解讀：`POST /api/interpret`，body `{ tier: "light", context: { systemId, locale, headline, facts[] } }`，每個 `SYSTEM_IDS` 各打一次應回 200 與 `text`。
 
+## 對外資料介面 v1
+- `GET /api/v1/systems`：全部系統與輸入規格（欄位、範圍、繁中英文說明、範例）；`GET /api/v1/systems/{id}` 單一系統。
+- `POST /api/v1/systems/{id}`，body `{ input, locale? }` → `{ apiVersion, system, data, context }`；只給確定性結果，不含 AI 解讀。
+- 錯誤 `{ error, detail }`：400 輸入錯（逐項列出）、404 未知系統、429 限流（附 `Retry-After`）、500 計算失敗（不含內部細節）。
+- 用到「今天」的系統（八字、每日運勢、合婚、易經、塔羅每日一牌、占星、吠陀）日期必填，伺服器不代填。
+- 限流（`lib/http/rateLimit.ts`）：每來源位址每分鐘 v1 60 次、`/api/astrology*`與`/api/vedic` 合計 60 次、`/api/interpret` 10 次。來源位址只信 nginx 設的 `X-Real-IP`。計數在單一行程記憶體：多副本各算各的，重啟歸零。
+- CORS：`/api/v1/*` 對任意來源開放 GET／POST／OPTIONS，不帶憑證。
+- 沒有帳號、沒有計量；日後要收費時走 `can()`，與 oracle 的帳號卡一起做。
+- 新增系統：實作 `DivinationSystem`（含 `input` 規格）並在 `lib/divination/index.ts` 註冊，REST 與文件自動出現。
+- 部署煙霧測試含 `/api/v1/systems`（`sg-deploy.sh` oracle-web 段）。
+
 ## 注意
 - `NEXT_PUBLIC_*` 在 build 時內嵌；網域預設值在 `lib/site.ts`。
 - 付費牆：`/api/interpret` 的 `premium` 回 402；`light`／`deep` 放行；每日次數計量未接。

@@ -2,6 +2,9 @@ import { computeFeixing, type Direction, type FeixingInput, type FeixingPattern,
 import { computeBazhai, type BazhaiInput, type BazhaiResult, type Star } from '@/lib/fengshui/bazhai';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
+import { DATE, GENDER_FIELD, toYmd } from '../fields';
+import { YEAR_MAX, YEAR_MIN, type InputSpec } from '../input';
+import type { Gender } from '@/lib/ziwei';
 
 export interface FengshuiInput extends FeixingInput {
   /** 選填:居住者生日＋性別 → 八宅命卦 */
@@ -103,8 +106,33 @@ export function toContext(r: FengshuiResult, locale: Locale): InterpretationCont
   return { systemId: 'fengshui', locale, headline, facts };
 }
 
+const FENGSHUI_INPUT: InputSpec<FengshuiInput> = {
+  fields: {
+    facingDegree: { type: 'number', min: 0, max: 360, doc: { 'zh-TW': '向的羅盤度數(大門或主要採光面朝向)', en: 'Facing direction in compass degrees (main door or main light side)' } },
+    moveIn: DATE('入伙或建成日期(立春換年)', 'Move-in or completion date (year changes at Lichun)'),
+    flowYear: { type: 'integer', min: YEAR_MIN, max: YEAR_MAX, doc: { 'zh-TW': '要看的流年(節氣年;呼叫端給)', en: 'Year to read (solar-term year; given by the caller)' } },
+    occupant: {
+      type: 'object',
+      required: false,
+      doc: { 'zh-TW': '選填:居住者生日與性別 → 八宅命卦', en: 'Optional: occupant birth date and gender for the Eight Mansions life gua' },
+      fields: { birth: DATE('居住者生日', 'Occupant birth date'), gender: GENDER_FIELD },
+    },
+  },
+  build: (v) => {
+    const o = v.occupant as Record<string, unknown> | undefined;
+    return {
+      facingDegree: v.facingDegree as number,
+      moveIn: toYmd(v.moveIn),
+      flowYear: v.flowYear as number,
+      occupant: o ? { birth: toYmd(o.birth), gender: o.gender as Gender } : undefined,
+    };
+  },
+  example: { facingDegree: 180, moveIn: { year: 2015, month: 6, day: 1 }, flowYear: 2026, occupant: { birth: { year: 1985, month: 4, day: 10 }, gender: '女' } },
+};
+
 export const fengshuiSystem: DivinationSystem<FengshuiInput, FengshuiResult> = {
   meta: { id: 'fengshui', kind: 'chart', requiresApiKey: false },
+  input: FENGSHUI_INPUT,
   async compute(input, locale) {
     const data = computeFengshui(input);
     return { data, context: toContext(data, locale) };

@@ -229,7 +229,7 @@ export function computeDailyFortune(
  */
 export function dailyContext(f: DailyFortune, locale: Locale): InterpretationContext {
   return {
-    systemId: 'bazi',
+    systemId: 'daily',
     locale,
     headline: `今日運勢 ${f.date}`,
     facts: [

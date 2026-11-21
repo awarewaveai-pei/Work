@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
-import { computeTransits, isRealDate, parseWesternRequest } from '@/lib/astrology';
+import { computeTransits } from '@/lib/astrology';
+import { parseInput } from '@/lib/divination/input';
+import { LEGACY_TRANSITS_INPUT } from '@/lib/divination/fields';
+import { API_RULE, rateLimited } from '@/lib/http/rateLimit';
 
 /**
- * 行運 + 太陽回歸端點。POST { birth: 生辰欄位, today: {year,month,day}, viewerTzOffsetHours }。
+ * 行運 + 太陽回歸端點。POST { birth, today, viewerTzOffsetHours }。
  * today 由 client 用 lib/today.ts localToday 給:伺服器時區不是使用者時區。
- * 無 auth/quota 的理由同 /api/astrology(純計算、無外部 fetch、無金鑰)。
+ * 驗證走共用規格(lib/divination/fields.ts LEGACY_TRANSITS_INPUT);不外洩內部錯誤細節(wasm/檔案路徑等)。
  */
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,35 +17,20 @@ function bad(detail: string) {
 }
 
 export async function POST(request: Request) {
+  const limited = rateLimited(request, 'astrology', API_RULE);
+  if (limited) return limited;
   let body: unknown;
   try {
     body = await request.json();
   } catch {
     return bad('invalid json');
   }
-  if (!body || typeof body !== 'object') return bad('body required');
-  const b = body as Record<string, unknown>;
-  const birth = parseWesternRequest(b.birth);
-  if (typeof birth === 'string') return bad(birth);
-  const t = (b.today ?? {}) as Record<string, unknown>;
-  const today = { year: t.year, month: t.month, day: t.day };
-  if (
-    typeof today.year !== 'number' || typeof today.month !== 'number' || typeof today.day !== 'number' ||
-    today.year < 1800 || today.year > 2200 || !isRealDate(today.year, today.month, today.day)
-  ) {
-    return bad('bad today');
-  }
-  const ymd = (y: number, m: number, d: number) => y * 10000 + m * 100 + d;
-  if (ymd(today.year, today.month, today.day) < ymd(birth.year, birth.month, birth.day)) {
-    return bad('today before birth');
-  }
-  const tz = b.viewerTzOffsetHours;
-  if (typeof tz !== 'number' || !Number.isFinite(tz) || tz < -12 || tz > 14) return bad('bad viewerTzOffsetHours');
+  const parsed = parseInput(LEGACY_TRANSITS_INPUT, body);
+  if (!parsed.ok) return bad(parsed.errors.join('; '));
+  const input = parsed.value;
 
   try {
-    return NextResponse.json(
-      computeTransits(birth, { year: today.year, month: today.month, day: today.day }, tz),
-    );
+    return NextResponse.json(computeTransits(input.birth, input.today, input.viewerTzOffsetHours));
   } catch {
     return NextResponse.json({ error: 'compute_failed' }, { status: 500 });
   }

@@ -1,6 +1,7 @@
 import { computeQimen, type Deity, type Door, type Palace, type QimenResult, type QimenTime, type Star, type Yuan } from '@/lib/qimen';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
+import { isRealDate, YEAR_MAX, YEAR_MIN, type InputSpec } from '../input';
 
 /**
  * 奇門遁甲(時家・轉盤・拆補法・中五寄坤)。程式排盤,AI 只依 facts 敘事。
@@ -188,8 +189,32 @@ export function toContext(r: QimenData, locale: Locale): InterpretationContext {
   return { systemId: 'qimen', locale, headline, facts };
 }
 
+const QIMEN_INPUT: InputSpec<QimenInput> = {
+  fields: {
+    time: {
+      type: 'object',
+      doc: { 'zh-TW': '起局時刻(北京時間 UTC+8;節氣以北京時間判定)', en: 'Chart moment in Beijing time (UTC+8; solar terms are judged in Beijing time)' },
+      fields: {
+        year: { type: 'integer', min: YEAR_MIN, max: YEAR_MAX, doc: { 'zh-TW': '年', en: 'Year' } },
+        month: { type: 'integer', min: 1, max: 12, doc: { 'zh-TW': '月', en: 'Month' } },
+        day: { type: 'integer', min: 1, max: 31, doc: { 'zh-TW': '日', en: 'Day' } },
+        hour: { type: 'integer', min: 0, max: 23, doc: { 'zh-TW': '時', en: 'Hour' } },
+        minute: { type: 'integer', min: 0, max: 59, doc: { 'zh-TW': '分', en: 'Minute' } },
+      },
+    },
+    topic: { type: 'enum', values: QIMEN_TOPICS, doc: { 'zh-TW': '所問主題', en: 'Topic' } },
+  },
+  check: (v) => {
+    const t = v.time as Record<string, number>;
+    return isRealDate(t.year, t.month, t.day) ? [] : ['time.day: no such date'];
+  },
+  build: (v) => ({ time: v.time as QimenTime, topic: v.topic as QimenTopic }),
+  example: { time: { year: 2026, month: 11, day: 21, hour: 10, minute: 0 }, topic: 'career' },
+};
+
 export const qimenSystem: DivinationSystem<QimenInput, QimenData> = {
   meta: { id: 'qimen', kind: 'chart', requiresApiKey: false },
+  input: QIMEN_INPUT,
   async compute(input, locale) {
     const data = computeQimenReading(input);
     return { data, context: toContext(data, locale) };

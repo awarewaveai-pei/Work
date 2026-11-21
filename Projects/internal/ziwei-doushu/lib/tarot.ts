@@ -1,5 +1,8 @@
 import type { Locale } from './i18n/config';
 import { localToday, type Ymd } from './today';
+import { secureInt } from './random';
+
+export { secureInt };
 
 /**
  * 塔羅 — 78 張牌庫(中英雙語)+ Fisher-Yates 抽牌(預設密碼學亂數,可注入 rng 測試)+ 每日一牌(確定性)。
@@ -514,20 +517,6 @@ export interface TarotResult {
 
 /** 可注入的亂數源:回傳 [0,1)。測試注入固定值;預設改用密碼學亂數(見 secureInt)。 */
 export type Rng = () => number;
-
-/**
- * 密碼學亂數的無偏整數 [0, n)。拒絕取樣:丟掉 2^32 尾端不足一整輪的區段,避免 % n 偏向小值。
- * globalThis.crypto 在瀏覽器與 Node ≥ 19 皆有。
- */
-export function secureInt(n: number): number {
-  if (!Number.isInteger(n) || n < 1 || n > 2 ** 32) throw new Error(`secureInt 範圍錯誤: ${n}`);
-  const limit = 2 ** 32 - (2 ** 32 % n);
-  const buf = new Uint32Array(1);
-  do {
-    globalThis.crypto.getRandomValues(buf);
-  } while (buf[0] >= limit);
-  return buf[0] % n;
-}
 
 /** 洗牌與正逆位共用同一個整數來源:有注入 rng 就以它換算,沒有就用 secureInt。 */
 function intSource(rng?: Rng): (n: number) => number {

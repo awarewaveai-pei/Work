@@ -5,6 +5,7 @@ import type { AiProviderId, AiTier, InterpretRequest } from '@/lib/ai/types';
 import { SYSTEM_IDS, type InterpretationContext, type SystemId } from '@/lib/divination/types';
 import { isLocale } from '@/lib/i18n/config';
 import { evaluateEntitlement } from '@/lib/entitlements';
+import { INTERPRET_RULE, rateLimited } from '@/lib/http/rateLimit';
 
 /**
  * AI 解讀端點 (Phase A — AI 問答入口)。
@@ -100,6 +101,9 @@ function validateContext(c: unknown): Validated {
 }
 
 export async function POST(request: Request) {
+  // AI 呼叫花錢:每來源每分鐘 INTERPRET_RULE 次(lib/http/rateLimit.ts)
+  const limited = rateLimited(request, 'interpret', INTERPRET_RULE);
+  if (limited) return limited;
   let body: unknown;
   try {
     body = await request.json();

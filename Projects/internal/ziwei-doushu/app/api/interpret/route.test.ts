@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import { POST, sanitizeFact } from './route';
+import { __resetRateLimit } from '@/lib/http/rateLimit';
+
+// 限流計數跨測試共用;每個測試從零開始,本檔驗的是輸入驗證不是限流
+beforeEach(() => __resetRateLimit());
 
 function post(body: unknown): Request {
   return new Request('http://localhost/api/interpret', {

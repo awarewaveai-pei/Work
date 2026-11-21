@@ -188,38 +188,6 @@ export function computeWesternChart(req: WesternRequest): WesternChart {
   };
 }
 
-/**
- * 生辰欄位驗證(各 /api/astrology* 路由共用)。成功回 WesternRequest,失敗回錯誤說明字串。
- * 拒絕不存在的日期(2/31 等):native date picker 已擋,但 API 可直打。
- */
-export function parseWesternRequest(v: unknown): WesternRequest | string {
-  if (!v || typeof v !== 'object') return 'birth object required';
-  const b = v as Record<string, unknown>;
-  const num = (x: unknown, lo: number, hi: number): number | null =>
-    typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi ? x : null;
-  const year = num(b.year, 1800, 2200);
-  const month = num(b.month, 1, 12);
-  const day = num(b.day, 1, 31);
-  const hour = num(b.hour, 0, 23);
-  const minute = num(b.minute, 0, 59);
-  const tzOffsetHours = num(b.tzOffsetHours, -12, 14);
-  const lat = num(b.lat, -90, 90);
-  const lon = num(b.lon, -180, 180);
-  if (
-    year === null || month === null || day === null || hour === null ||
-    minute === null || tzOffsetHours === null || lat === null || lon === null
-  ) {
-    return 'bad birth/location fields';
-  }
-  if (!isRealDate(year, month, day)) return 'impossible calendar date';
-  return { year, month, day, hour, minute, tzOffsetHours, lat, lon };
-}
-
-export function isRealDate(year: number, month: number, day: number): boolean {
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
-  const dt = new Date(Date.UTC(year, month - 1, day));
-  return dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === day;
-}
 
 export interface TransitResult {
   /** 行運時刻(today 當地正午)JD UT */

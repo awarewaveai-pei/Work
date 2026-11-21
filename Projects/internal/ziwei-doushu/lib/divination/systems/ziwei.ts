@@ -8,6 +8,8 @@ import {
 import type { ZiweiAnalysis } from '@/lib/ziwei/analyze';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
+import { BIRTH_FIELDS, EXAMPLE_BIRTH, birthDateErrors, toBirth } from '../fields';
+import type { InputSpec } from '../input';
 
 /** 命宮三方四正:星曜要點 facts 只取這四宮(控制 fact 數)。 */
 const STAR_NOTE_PALACES = ['命宮', '財帛', '官祿', '遷移'] as const;
@@ -139,8 +141,16 @@ export function toContext(
   };
 }
 
+const ZIWEI_INPUT: InputSpec<ChartRequest> = {
+  fields: BIRTH_FIELDS,
+  check: (v) => birthDateErrors(v),
+  build: toBirth,
+  example: EXAMPLE_BIRTH,
+};
+
 export const ziweiSystem: DivinationSystem<ChartRequest, ChartResult> = {
   meta: { id: 'ziwei', kind: 'chart', requiresApiKey: false },
+  input: ZIWEI_INPUT,
   async compute(input, locale) {
     const data = computeChart({ ...input, locale });
     return { data, context: toContext(data, locale) };
