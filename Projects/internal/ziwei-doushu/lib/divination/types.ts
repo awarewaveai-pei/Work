@@ -22,6 +22,7 @@ export const SYSTEM_IDS = [
   'qimen',
   'qian',
   'zeri',
+  'vedic',
 ] as const;
 export type SystemId = (typeof SYSTEM_IDS)[number];
 

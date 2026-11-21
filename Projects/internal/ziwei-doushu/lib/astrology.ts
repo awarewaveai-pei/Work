@@ -274,4 +274,51 @@ export function computeSynastry(a: WesternRequest, b: WesternRequest): SynastryR
   const ca = computeWesternChart(a);
   const cb = computeWesternChart(b);
   return { a: ca, b: cb, aspects: synastryAspects(ca.planets, cb.planets) };
+// ---- 吠陀(恆星黃道)原始星曆:只取 XALEN 的位置,其餘(宮位、月宿、分盤、大運、五支)在 lib/vedic.ts ----
+
+/** XALEN ayanamsa id:0 = Lahiri(Chitrapaksha,印度官方曆法採用)。 */
+export const LAHIRI = 0;
+
+/** 九曜與 XALEN body id;羅睺取平均交點(9),計都(13)= 羅睺 + 180°。 */
+export const VEDIC_BODIES = [
+  { key: 'sun', id: 0 },
+  { key: 'moon', id: 1 },
+  { key: 'mars', id: 4 },
+  { key: 'mercury', id: 2 },
+  { key: 'jupiter', id: 5 },
+  { key: 'venus', id: 3 },
+  { key: 'saturn', id: 6 },
+  { key: 'rahu', id: 9 },
+  { key: 'ketu', id: 13 },
+] as const;
+
+export type GrahaKey = (typeof VEDIC_BODIES)[number]['key'];
+
+export interface SiderealPositions {
+  jd: number;
+  ayanamsa: number;
+  /** 恆星黃道上升點(度) */
+  ascendant: number;
+  grahas: { key: GrahaKey; longitude: number; speed: number; retrograde: boolean }[];
+}
+
+/**
+ * 恆星黃道九曜與上升點。
+ * ⚠️ XALEN fullChartJson 的 ascendant_deg 是回歸黃道值(與 housesJson 相同,實測 2026-11-21),
+ *   不可直接當恆星上升;此處一律以回歸上升減同一時刻的 ayanamsa。
+ */
+export function computeSiderealPositions(req: WesternRequest, ayanamsaId: number = LAHIRI): SiderealPositions {
+  const w = getXalen();
+  const jd = julianDay(req.year, req.month, req.day, req.hour + req.minute / 60 - req.tzOffsetHours);
+  const ayanamsa = XalenWasm.ayanamsaDeg(jd, ayanamsaId);
+  const houses = JSON.parse(w.housesJson(jd, req.lat, req.lon, 0)) as { ascendant: number };
+  const grahas = VEDIC_BODIES.map((b) => {
+    const p = JSON.parse(w.planetPositionJson(jd, b.id, true, ayanamsaId)) as {
+      longitude: number;
+      lon_speed: number;
+      is_retrograde: boolean;
+    };
+    return { key: b.key, longitude: norm360(p.longitude), speed: p.lon_speed, retrograde: Boolean(p.is_retrograde) };
+  });
+  return { jd, ayanamsa, ascendant: norm360(houses.ascendant * RAD2DEG - ayanamsa), grahas };
 }

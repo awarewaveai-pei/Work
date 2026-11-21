@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
     '/api/astrology': ['./node_modules/@xalen/wasm/xalen_wasm_bg.wasm'],
     '/api/astrology/transits': ['./node_modules/@xalen/wasm/xalen_wasm_bg.wasm'],
     '/api/astrology/synastry': ['./node_modules/@xalen/wasm/xalen_wasm_bg.wasm'],
+  // /api/astrology、/api/vedic 以 fs.readFileSync 載入 XALEN wasm(runtime 字串路徑,tracer 偵測不到)
+  //   → 每個用到的 route 都要顯式納入 standalone 輸出,否則部署時 wasm 缺檔(task#7)。
+  outputFileTracingIncludes: {
+    '/api/astrology': ['./node_modules/@xalen/wasm/xalen_wasm_bg.wasm'],
+    '/api/vedic': ['./node_modules/@xalen/wasm/xalen_wasm_bg.wasm'],
   },
 };
 

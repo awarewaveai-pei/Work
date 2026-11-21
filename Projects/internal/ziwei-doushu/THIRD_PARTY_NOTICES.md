@@ -38,6 +38,8 @@
 - 授權：MIT License，Copyright (c) 2026 Elizabeth Huston, Ph.D. and Noah Christian, Ph.D.
 - 採用範圍：`src/openephem/aspects.py` 的相位判定做法（最短弧角距、日月加寬容許度、以速度判斷入相／出相），以 TypeScript 自行重寫於 `lib/astrologyAspects.ts`；`src/openephem/profections.py` 的年小限規則（整宮制、古典守護星）重寫於 `lib/astrologyTraditional.ts`。跨盤相位（`aspects.py` between：兩盤逐點配對、行運把本命速度設 0 判入出相）與回歸求根（`returns.py` find_return：牛頓法）重寫於 `lib/astrologyAspects.ts`、`lib/astrologyTransits.ts`。未複製原始碼。
 
+- 採用範圍：`src/openephem/aspects.py` 的相位判定做法（最短弧角距、日月加寬容許度、以速度判斷入相／出相），以 TypeScript 自行重寫於 `lib/astrologyAspects.ts`；`src/openephem/profections.py` 的年小限規則（整宮制、古典守護星）重寫於 `lib/astrologyTraditional.ts`；`src/openephem/vedic.py`、`varga.py`、`vimshottari.py` 的月宿、九分盤、Vimśottarī 大運與五支規則重寫於 `lib/vedic.ts`（恆星黃道位置用 XALEN 自己的 Lahiri，未取 openephem 的 ayanamsa 擬合係數；大運年長本站取恆星年）。未複製原始碼。
+
 ## flatlib
 
 - 來源：https://github.com/flatangle/flatlib

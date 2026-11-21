@@ -13,5 +13,5 @@ export const SITE_URL =
  * 加一頁:此處一項 + app/[lang]/<slug>/page.tsx + messages 的 nav.<slug>(lib/site.test.ts 檢查)
  *   + 首頁的 glyph/desc(漏了 tsc 紅)。
  */
-export const PAGE_SLUGS = ['ziwei', 'bazi', 'hehun', 'iching', 'tarot', 'qian', 'astrology', 'fengshui', 'qimen', 'zeri', 'daily'] as const;
+export const PAGE_SLUGS = ['ziwei', 'bazi', 'hehun', 'iching', 'tarot', 'qian', 'astrology', 'vedic', 'fengshui', 'qimen', 'zeri', 'daily'] as const;
 export type PageSlug = (typeof PAGE_SLUGS)[number];
