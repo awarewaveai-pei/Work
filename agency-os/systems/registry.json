@@ -7,15 +7,26 @@
     "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/supabase-server.ts",
     "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts",
     "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
-    "lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/"
+    "lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/components/"
   ],
-  "ignore_paths": ["agency-os/WORKLOG.md", "agency-os/TASKS.md", "agency-os/memory/", "agency-os/reports/"],
+  "ignore_paths": [
+    "agency-os/WORKLOG.md",
+    "agency-os/TASKS.md",
+    "agency-os/memory/",
+    "agency-os/reports/"
+  ],
   "systems": [
     {
       "id": "8089ea31-fb72-4e1f-ad05-80035f3731e2",
       "slug": "outbound-os",
       "name": "外聯系統（Outbound OS）",
-      "aliases": ["outreach", "冷信", "行銷開發信", "outbound-v2"],
+      "aliases": [
+        "outreach",
+        "冷信",
+        "行銷開發信",
+        "outbound-v2"
+      ],
       "type": "product",
       "purpose": "替你找到客戶：AI 查對方並留證據、產信、信箱輪流自動寄、回信自動進系統並停後續。",
       "product_key": "outreach",
@@ -55,7 +66,24 @@
         "agency-os/handoffs/2026-11-02-1424-outbound-v2-handoff.md",
         "agency-os/handoffs/2026-11-03-outbound-v2-handoff.md",
         "agency-os/handoffs/2026-11-05-outbound-c16-2-handoff.md",
-        "agency-os/docs/Outbound_OS_Engineering_Spec/"
+        "agency-os/docs/Outbound_OS_Engineering_Spec/",
+        "agency-os/docs/cold_email/",
+        "lobster-factory/packages/db/migrations/0150_co_evidence.down.sql",
+        "lobster-factory/packages/db/migrations/0150_co_evidence.sql",
+        "lobster-factory/packages/db/migrations/0153_co_replies.down.sql",
+        "lobster-factory/packages/db/migrations/0153_co_replies.sql",
+        "lobster-factory/packages/db/migrations/0156_co_evidence_backfill_observation.down.sql",
+        "lobster-factory/packages/db/migrations/0156_co_evidence_backfill_observation.sql",
+        "lobster-factory/packages/db/migrations/0158_begin_send_test_window.down.sql",
+        "lobster-factory/packages/db/migrations/0158_begin_send_test_window.sql",
+        "lobster-factory/packages/db/migrations/0160_co_search_cursors.down.sql",
+        "lobster-factory/packages/db/migrations/0160_co_search_cursors.sql",
+        "lobster-factory/packages/db/scripts/0150_co_evidence_down.sql",
+        "lobster-factory/packages/db/scripts/0153_co_replies_down.sql",
+        "lobster-factory/packages/db/scripts/0156_co_evidence_backfill_observation_down.sql",
+        "lobster-factory/packages/db/scripts/0158_begin_send_test_window_down.sql",
+        "lobster-factory/packages/db/scripts/0160_co_search_cursors_down.sql",
+        "lobster-factory/packages/db/tests/test_0153_co_replies.py"
       ],
       "phases": [
         {
@@ -66,11 +94,2287 @@
         }
       ],
       "features": [
-        { "id": "b2014070-a4b2-4ab1-a260-75a2fd7cfb41", "slug": "c3-research-evidence", "name": "AI 研究對方並留下有來源的證據", "phase": "outbound-v2" },
-        { "id": "afd4d72f-4a55-44bf-aa7c-bd489ee5a64d", "slug": "c4-reply-sync", "name": "回覆同步與回信頁", "phase": "outbound-v2" },
-        { "id": "6c018ecf-77fb-4b6c-bbb7-b22b77f31ebc", "slug": "c8-auto-send-rotation", "name": "自動寄與信箱輪流寄（量產）", "phase": "outbound-v2" },
-        { "id": "f553b371-7595-4d88-b7cc-45b8271847f1", "slug": "c16-tuning", "name": "自動化調校：抽得準、核得穩、越寫越好", "phase": "outbound-v2" }
+        {
+          "id": "b2014070-a4b2-4ab1-a260-75a2fd7cfb41",
+          "slug": "c3-research-evidence",
+          "name": "AI 研究對方並留下有來源的證據",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "afd4d72f-4a55-44bf-aa7c-bd489ee5a64d",
+          "slug": "c4-reply-sync",
+          "name": "回覆同步與回信頁",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "6c018ecf-77fb-4b6c-bbb7-b22b77f31ebc",
+          "slug": "c8-auto-send-rotation",
+          "name": "自動寄與信箱輪流寄（量產）",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "f553b371-7595-4d88-b7cc-45b8271847f1",
+          "slug": "c16-tuning",
+          "name": "自動化調校：抽得準、核得穩、越寫越好",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "938f41a9-2ab2-465a-babd-ec1b9bf51e31",
+          "slug": "c1-outbound-v2",
+          "name": "守衛與事實訂正",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "05108a1d-cbbc-47bf-afc6-ccb2b8292ab0",
+          "slug": "c2-outbound-v2",
+          "name": "署名、定位、主旨、多版本、追蹤信內容",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "8464570b-68c6-4f5f-a3c3-70b8a183bb78",
+          "slug": "c10-outbound-v2",
+          "name": "名單來源：店家",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "11596a0c-8e62-4c9a-935b-02ea701fc4e6",
+          "slug": "c17-outbound-v2",
+          "name": "名單研究：讀店家的 IG／FB 頁",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "16234f68-e86d-4a8e-9c03-9dc3887e4570",
+          "slug": "c11-outbound-v2",
+          "name": "寄件信箱池：次網域、DNS、暖機",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "b65b0c70-a8e2-4483-9635-7e0e10e8c1b2",
+          "slug": "c5-outbound-v2",
+          "name": "追蹤信與人工步驟",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "670cfb56-458e-4ef8-98ff-36b00d2122c8",
+          "slug": "c15-outbound-v2",
+          "name": "量產管線：照政策自動前進",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "c9f86cea-6e18-4460-bcff-bfdeda20b07d",
+          "slug": "c7-outbound-v2",
+          "name": "成效頁",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "d3c61811-3b19-423e-95d8-713e42580838",
+          "slug": "c12-outbound-v2",
+          "name": "名單來源：公司行號",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "3d8f231d-ad7a-4f9d-bd50-d788448581cf",
+          "slug": "c13-outbound-v2",
+          "name": "名單來源：人員搜尋、email 推斷、付費驗證",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "5e0a48fa-d2c0-4309-90c9-266b0ede8c75",
+          "slug": "c6-outbound-v2",
+          "name": "暖名單進 FluentCRM",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "93499441-069c-492e-b955-6b361164982f",
+          "slug": "c14-outbound-v2",
+          "name": "個人消費者：Meta 名單型廣告 → FluentCRM",
+          "phase": "outbound-v2"
+        },
+        {
+          "id": "d7c1f06d-060f-4575-8945-14dea85042ba",
+          "slug": "c9-outbound-v2",
+          "name": "舊欄位退場",
+          "phase": "outbound-v2"
+        }
       ]
+    },
+    {
+      "id": "ea821d77-bb52-47f1-a1c5-c92d90e7da6f",
+      "slug": "cognitive-os",
+      "name": "AI LEGO 認知工程 OS",
+      "aliases": [
+        "cos",
+        "cognitive",
+        "認知主權平台"
+      ],
+      "type": "product",
+      "purpose": "把認知方法、研究資料與專案組合起來用的平台（含藝術反思等方法庫）。",
+      "product_key": "cognitive",
+      "source_paths": [
+        "Projects/internal/cognitive-engineering-os/",
+        "agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/cognitive-os/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/cognitive/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/cognitive-os/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/cognitive-os/",
+        "lobster-factory/infra/hetzner-phase1-core/tests/e2e/cognitive/",
+        "agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/",
+        "agency-os/handoffs/cos-codex-queue/",
+        "agency-os/handoffs/2026-10-02-1105-cognitive-sovereignty-platform.md",
+        "agency-os/handoffs/2026-10-04-1400-cos-step2-merged-storage-next.md",
+        "agency-os/handoffs/2026-10-08-cos-codex-to-claude.md",
+        "agency-os/handoffs/2026-10-11-cognitive-fix-batch-resume.md",
+        "agency-os/handoffs/2026-10-11-cognitive-platform-walk-issues.md",
+        "agency-os/handoffs/2026-10-12-cognitive-fix-batch2-resume.md",
+        "agency-os/handoffs/2026-10-14-cos-tool-lessons.md",
+        "agency-os/handoffs/2026-10-15-cos-tool-template-apply.md",
+        "agency-os/handoffs/2026-10-15-lesson-v2-wip.patch",
+        "scripts/verify-art-therapy-dry-run.mjs",
+        "scripts/art-therapy-transform.mjs",
+        "scripts/art-therapy-transform.test.mjs",
+        "scripts/load-art-therapy-source-archive.mjs",
+        "scripts/sync-cognitive-product-features.py"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "b58f758a-d287-41ff-97ca-6d62d0042132",
+      "slug": "hci30",
+      "name": "HCI-30 人機互動監測",
+      "aliases": [
+        "hci",
+        "hci-30"
+      ],
+      "type": "product",
+      "purpose": "人機互動研究與持續監測工具。",
+      "product_key": "hci",
+      "source_paths": [
+        "Projects/internal/hci30/",
+        "agency-os/docs/HCI/",
+        "agency-os/docs/HCI30_RESEARCH_REVIEW/",
+        "agency-os/docs/HCI_AI_LEGO_Blueprint_v1/",
+        "agency-os/docs/HCI_AI_LEGO_Blueprint_v2/",
+        "agency-os/systems/hci30/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/hci/",
+        "agency-os/docs/CODEX_HANDOFF_HCI_SOP_GAP_CHECK_2026-08-31.md",
+        "scripts/apply-hci-postgres-migration.mjs"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "de418890-d3e4-450c-a05a-db5fbec6202d",
+      "slug": "social",
+      "name": "社群發文",
+      "aliases": [
+        "social-manager",
+        "postiz",
+        "社群"
+      ],
+      "type": "product",
+      "purpose": "改寫、排程並派送品牌社群貼文，含日曆、收件匣、數據與智慧連結。",
+      "product_key": "social",
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/social/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/social/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/social/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/social/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/social/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(public)/smartlink/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/meta/",
+        "lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/",
+        "lobster-factory/docs/social/",
+        "lobster-factory/infra/postiz/",
+        "runbooks/POSTIZ-OPS-RUNBOOK.md",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/social-channel-health.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/postiz-meta-token-truth.sh",
+        "agency-os/handoffs/2026-10-24-social-report-schedules-CODEX.md",
+        "agency-os/handoffs/2026-10-17-social-v15-supervisor/",
+        "lobster-factory/packages/db/migrations/0011_social_postiz_connections.sql",
+        "lobster-factory/packages/db/migrations/0096_social_manager.sql",
+        "lobster-factory/packages/db/migrations/0098_social_writes.sql",
+        "lobster-factory/packages/db/migrations/0100_social_dispatch.down.sql",
+        "lobster-factory/packages/db/migrations/0100_social_dispatch.sql",
+        "lobster-factory/packages/db/migrations/0101_social_rotation.down.sql",
+        "lobster-factory/packages/db/migrations/0101_social_rotation.sql",
+        "lobster-factory/packages/db/migrations/0102_social_review.down.sql",
+        "lobster-factory/packages/db/migrations/0102_social_review.sql",
+        "lobster-factory/packages/db/migrations/0103_social_brand_members.down.sql",
+        "lobster-factory/packages/db/migrations/0103_social_brand_members.sql",
+        "lobster-factory/packages/db/migrations/0105_social_v16.down.sql",
+        "lobster-factory/packages/db/migrations/0105_social_v16.sql",
+        "lobster-factory/packages/db/migrations/0109_social_repeat_version.down.sql",
+        "lobster-factory/packages/db/migrations/0109_social_repeat_version.sql",
+        "lobster-factory/packages/db/migrations/0111_social_rule_post_guard.down.sql",
+        "lobster-factory/packages/db/migrations/0111_social_rule_post_guard.sql",
+        "lobster-factory/packages/db/migrations/0112_social_saved_text_media.down.sql",
+        "lobster-factory/packages/db/migrations/0112_social_saved_text_media.sql",
+        "lobster-factory/packages/db/migrations/0113_social_smart_link_visitor_dedupe.down.sql",
+        "lobster-factory/packages/db/migrations/0113_social_smart_link_visitor_dedupe.sql",
+        "lobster-factory/packages/db/migrations/0114_social_meta_webhook_idempotency.down.sql",
+        "lobster-factory/packages/db/migrations/0114_social_meta_webhook_idempotency.sql",
+        "lobster-factory/packages/db/migrations/0116_social_meta_assets.down.sql",
+        "lobster-factory/packages/db/migrations/0116_social_meta_assets.sql",
+        "lobster-factory/packages/db/migrations/0163_social_media_cover.down.sql",
+        "lobster-factory/packages/db/migrations/0163_social_media_cover.sql",
+        "lobster-factory/packages/db/migrations/0171_social_accounts_postiz_internal_id.down.sql",
+        "lobster-factory/packages/db/migrations/0171_social_accounts_postiz_internal_id.sql",
+        "lobster-factory/packages/db/scripts/0096_social_manager-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0096_social_manager-local-verify.sql",
+        "lobster-factory/packages/db/scripts/0096_social_manager_down.sql",
+        "lobster-factory/packages/db/scripts/0098_social_writes-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0098_social_writes-local-verify.sql",
+        "lobster-factory/packages/db/scripts/0098_social_writes_down.sql",
+        "lobster-factory/packages/db/scripts/0100_social_dispatch-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0100_social_dispatch-local-verify.sql",
+        "lobster-factory/packages/db/scripts/0100_social_dispatch_down.sql",
+        "lobster-factory/packages/db/scripts/0101_social_rotation-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0101_social_rotation-local-verify.sql",
+        "lobster-factory/packages/db/scripts/0101_social_rotation_down.sql",
+        "lobster-factory/packages/db/scripts/0102_social_review-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0102_social_review_down.sql",
+        "lobster-factory/packages/db/scripts/0103_social_brand_members-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0103_social_brand_members-local-verify.sql",
+        "lobster-factory/packages/db/scripts/0103_social_brand_members_down.sql",
+        "lobster-factory/packages/db/scripts/0105_social_v16-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0105_social_v16-local-verify.sql",
+        "lobster-factory/packages/db/scripts/0105_social_v16_down.sql",
+        "lobster-factory/packages/db/scripts/0109_social_repeat_version-local-verify.sql",
+        "lobster-factory/packages/db/scripts/0109_social_repeat_version_down.sql",
+        "lobster-factory/packages/db/scripts/0111_social_rule_post_guard-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0111_social_rule_post_guard-local-verify.sql",
+        "lobster-factory/packages/db/scripts/0111_social_rule_post_guard_down.sql",
+        "lobster-factory/packages/db/scripts/0112_social_saved_text_media-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0112_social_saved_text_media_down.sql",
+        "lobster-factory/packages/db/scripts/0113_social_smart_link_visitor_dedupe-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0113_social_smart_link_visitor_dedupe_down.sql",
+        "lobster-factory/packages/db/scripts/0114_social_meta_webhook_idempotency-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0114_social_meta_webhook_idempotency_down.sql",
+        "lobster-factory/packages/db/scripts/0116_social_meta_assets-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0116_social_meta_assets_down.sql",
+        "lobster-factory/packages/db/scripts/0163_social_media_cover_down.sql",
+        "lobster-factory/packages/db/scripts/0171_social_accounts_postiz_internal_id_down.sql",
+        "lobster-factory/packages/db/tests/test_0163_social_media_cover.py"
+      ],
+      "phases": [
+        {
+          "id": "8ad9517d-3b33-4ffb-8063-efa8b5fbfa2e",
+          "slug": "social-v15",
+          "name": "社群發文 v1.5",
+          "legacy_source_path": "agency-os/handoffs/2026-10-17-social-v15-supervisor/"
+        }
+      ],
+      "features": [
+        {
+          "id": "70134fe7-5bb5-4c20-b8d6-ddb3301ae1f8",
+          "slug": "c20-social-v15",
+          "name": "資料表 0105",
+          "phase": "social-v15"
+        },
+        {
+          "id": "71c1bbe0-a213-41e8-a53b-936624fd2426",
+          "slug": "c19-social-v15",
+          "name": "骨架與路由",
+          "phase": "social-v15"
+        },
+        {
+          "id": "e37bb2a2-4cd1-4c65-a995-5a1f42781c0a",
+          "slug": "c21-social-v15",
+          "name": "撰寫頁",
+          "phase": "social-v15"
+        },
+        {
+          "id": "5a1158b3-978f-42cd-88dc-7906a663156b",
+          "slug": "c22-social-v15",
+          "name": "日曆、卡片、清單、已刪除、篩選",
+          "phase": "social-v15"
+        },
+        {
+          "id": "137dbc9a-9bce-466d-959d-4f5f3c051873",
+          "slug": "c26-social-v15",
+          "name": "智慧連結",
+          "phase": "social-v15"
+        },
+        {
+          "id": "6357659a-240f-4273-b689-b2a40f6828c8",
+          "slug": "c29-social-v15",
+          "name": "訊息收件匣",
+          "phase": "social-v15"
+        },
+        {
+          "id": "f7716e8e-5a53-438d-a1a1-66eda79b5ee6",
+          "slug": "c23-social-v15",
+          "name": "自動發布清單方格",
+          "phase": "social-v15"
+        },
+        {
+          "id": "d91f5293-cc1a-4cb3-9a20-e4f48973aad0",
+          "slug": "c24-social-v15",
+          "name": "數據分析",
+          "phase": "social-v15"
+        },
+        {
+          "id": "2f2af7a1-4b8a-464a-8d6b-f73fb25531e8",
+          "slug": "c27-social-v15",
+          "name": "自動化流程",
+          "phase": "social-v15"
+        },
+        {
+          "id": "7fe31cbb-ded4-468b-906e-d80b594cb270",
+          "slug": "c31-social-v15",
+          "name": "媒體與影片",
+          "phase": "social-v15"
+        },
+        {
+          "id": "c7a9cac7-3761-48e8-b555-94919e433eff",
+          "slug": "c30-social-v15",
+          "name": "手機",
+          "phase": "social-v15"
+        },
+        {
+          "id": "034274bf-41db-4f6f-b1f2-619fcc467ea1",
+          "slug": "c25-social-v15",
+          "name": "報表管理",
+          "phase": "social-v15"
+        },
+        {
+          "id": "63a4e251-9724-4639-b747-c500f3200f20",
+          "slug": "c28-social-v15",
+          "name": "廣告管理",
+          "phase": "social-v15"
+        }
+      ]
+    },
+    {
+      "id": "e180c063-e093-438a-b412-c987c9bc7555",
+      "slug": "video",
+      "name": "影片製作",
+      "aliases": [
+        "video-workbench",
+        "影音工作台",
+        "seedstar",
+        "filmcraft",
+        "effectcraft",
+        "script-forge"
+      ],
+      "type": "product",
+      "purpose": "從腳本、鏡頭到剪輯、特效、旁白與發布，一支影片在同一條線上做完。",
+      "product_key": "video",
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/seedstar/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/video-service/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/video-whisper-worker/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/video/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/script-forge/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/video/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/video/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/video/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/video-billing/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/video-outcome/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/video/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/script-forge/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/script-forge/",
+        "scripts/filmcraft-pro/",
+        "scripts/effectcraft-pro/",
+        "agency-os/docs/video_generator/",
+        "lobster-factory/scripts/script_forge_video.jsx",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/reconcile-videos.sh",
+        "lobster-factory/infra/hetzner-phase1-core/tests/e2e/tutorial/",
+        "agency-os/handoffs/2026-11-05-effectcraft-filmcraft-reeval.md",
+        "agency-os/handoffs/2026-11-16-1400-video-unify-supervisor.md",
+        "agency-os/handoffs/2026-10-26-video-tool-supervisor/",
+        "agency-os/handoffs/2026-11-02-video-workbench-supervisor/",
+        "agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/",
+        "agency-os/handoffs/2026-11-16-video-unify-supervisor/",
+        "lobster-factory/packages/db/migrations/0038_media_assets_reconcile.sql",
+        "lobster-factory/packages/db/migrations/0047_video_jobs.sql",
+        "lobster-factory/packages/db/migrations/0060_video_jobs_add_org.sql",
+        "lobster-factory/packages/db/migrations/0065_media_production_persistence.sql",
+        "lobster-factory/packages/db/migrations/0066_media_billing_and_provider_profiles.sql",
+        "lobster-factory/packages/db/migrations/0067_media_assets_real_footage.sql",
+        "lobster-factory/packages/db/migrations/0068_media_delivery_dispatch_guard.sql",
+        "lobster-factory/packages/db/migrations/0069_media_transcription_jobs.down.sql",
+        "lobster-factory/packages/db/migrations/0069_media_transcription_jobs.sql",
+        "lobster-factory/packages/db/migrations/0070_media_story_bible_revisions.sql",
+        "lobster-factory/packages/db/migrations/0071_media_production_projects.sql",
+        "lobster-factory/packages/db/migrations/0138_media_projects_v2.down.sql",
+        "lobster-factory/packages/db/migrations/0138_media_projects_v2.sql",
+        "lobster-factory/packages/db/migrations/0151_media_assets_presets_restore.down.sql",
+        "lobster-factory/packages/db/migrations/0151_media_assets_presets_restore.sql",
+        "lobster-factory/packages/db/migrations/0159_video_workbench_jobs.down.sql",
+        "lobster-factory/packages/db/migrations/0159_video_workbench_jobs.sql",
+        "lobster-factory/packages/db/migrations/0164_media_projects_workbench_source.down.sql",
+        "lobster-factory/packages/db/migrations/0164_media_projects_workbench_source.sql",
+        "lobster-factory/packages/db/migrations/0173_media_asset_delete_takes_qa_and_transcripts.down.sql",
+        "lobster-factory/packages/db/migrations/0173_media_asset_delete_takes_qa_and_transcripts.sql",
+        "lobster-factory/packages/db/scripts/0038_media_assets_reconcile_down.sql",
+        "lobster-factory/packages/db/scripts/0047_video_jobs_down.sql",
+        "lobster-factory/packages/db/scripts/0060_video_jobs_add_org_down.sql",
+        "lobster-factory/packages/db/scripts/0065_media_production_persistence_down.sql",
+        "lobster-factory/packages/db/scripts/0066_media_billing_and_provider_profiles_down.sql",
+        "lobster-factory/packages/db/scripts/0067_media_assets_real_footage_down.sql",
+        "lobster-factory/packages/db/scripts/0068_media_delivery_dispatch_guard_down.sql",
+        "lobster-factory/packages/db/scripts/0138_media_projects_v2_down.sql",
+        "lobster-factory/packages/db/scripts/0151_media_assets_presets_restore_down.sql",
+        "lobster-factory/packages/db/scripts/0159_video_workbench_jobs_down.sql",
+        "lobster-factory/packages/db/scripts/0164_media_projects_workbench_source_down.sql",
+        "lobster-factory/packages/db/tests/test_0138_media_projects_v2.py"
+      ],
+      "phases": [
+        {
+          "id": "3a428403-487f-4ff1-bc53-892ed1b51853",
+          "slug": "video-tool-redesign",
+          "name": "影片工具重新設計",
+          "legacy_source_path": "agency-os/handoffs/2026-10-26-video-tool-supervisor/"
+        },
+        {
+          "id": "cb759a0a-fef1-44bf-bab8-eb57bf097c25",
+          "slug": "video-workbench",
+          "name": "影音工作台",
+          "legacy_source_path": "agency-os/handoffs/2026-11-02-video-workbench-supervisor/"
+        },
+        {
+          "id": "942f51e4-fb6a-429a-8481-4bd76b751ded",
+          "slug": "video-editor-parity",
+          "name": "影片剪輯補齊",
+          "legacy_source_path": "agency-os/handoffs/2026-11-06-video-editor-parity-supervisor/"
+        },
+        {
+          "id": "2e5f965a-178c-411b-ae44-bebc1309738f",
+          "slug": "video-unify",
+          "name": "影片工具融合",
+          "legacy_source_path": "agency-os/handoffs/2026-11-16-video-unify-supervisor/"
+        }
+      ],
+      "features": [
+        {
+          "id": "24218860-d956-43f3-b824-27aff213c0ff",
+          "slug": "v1-video-tool-redesign",
+          "name": "專案骨架",
+          "phase": "video-tool-redesign"
+        },
+        {
+          "id": "046de952-49d0-49f6-90c3-9fd452cfc0ef",
+          "slug": "v2-video-tool-redesign",
+          "name": "結果頁",
+          "phase": "video-tool-redesign"
+        },
+        {
+          "id": "a35a76a8-10f7-4b63-afb8-e8d1a73644ca",
+          "slug": "v3-video-tool-redesign",
+          "name": "腳本頁整理",
+          "phase": "video-tool-redesign"
+        },
+        {
+          "id": "e670ec18-d4d3-43ee-85aa-eccc842711bd",
+          "slug": "v4-video-tool-redesign",
+          "name": "QA 真能通過",
+          "phase": "video-tool-redesign"
+        },
+        {
+          "id": "be2e259b-2b48-43e3-8b16-f5cabbdb22e8",
+          "slug": "v5-video-tool-redesign",
+          "name": "發布不填 JSON",
+          "phase": "video-tool-redesign"
+        },
+        {
+          "id": "76e4553a-1241-4938-acf2-adadc7515cea",
+          "slug": "v6-video-tool-redesign",
+          "name": "④ 後自動",
+          "phase": "video-tool-redesign"
+        },
+        {
+          "id": "1c364dc2-b9b7-44e2-a0f9-10b1b9b526d7",
+          "slug": "v7-video-tool-redesign",
+          "name": "全自動接專案",
+          "phase": "video-tool-redesign"
+        },
+        {
+          "id": "1a7881f3-27db-4f13-8932-01af2824a75d",
+          "slug": "0-video-workbench",
+          "name": "切 4178 到 repo",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "37a6078a-24c0-4ab1-91e1-347d539bacf1",
+          "slug": "m1-video-workbench",
+          "name": "媒體存放、探測、代理檔",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "c7c7e952-d7e8-4d73-a58a-33a5337a558b",
+          "slug": "p0-video-workbench",
+          "name": "EffectCraft 試驗",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "952fc240-94d1-4658-941b-0f83b804f4a1",
+          "slug": "m2-video-workbench",
+          "name": "素材與專案存到伺服器",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "3daa9d6f-253a-4074-8968-0750c3376fa0",
+          "slug": "m3-video-workbench",
+          "name": "影格時間、輸出檢查、專案格式",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "6f3d60e2-a662-4ab8-a3ad-69ef1a6dbdb5",
+          "slug": "s3as2-video-workbench",
+          "name": "去背、同場景多鏡",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "77cf4394-0748-411c-9721-1efc33ddb34e",
+          "slug": "p1-video-workbench",
+          "name": "引擎接入與存檔閉環",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "d866d448-ff22-4228-84fa-51205c1d4320",
+          "slug": "p2-video-workbench",
+          "name": "完整剪輯",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "7ea9d422-ce34-4df9-a40a-fca8b9635187",
+          "slug": "p3-video-workbench",
+          "name": "2D 動畫合成",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "de7694d4-50c7-4acf-adf9-8d3556c14c6d",
+          "slug": "p4-video-workbench",
+          "name": "2D 角色骨架",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "a6c930e5-6837-495d-8144-468dbbb6eed6",
+          "slug": "p5-video-workbench",
+          "name": "3D",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "e1b4e2a7-1602-4395-bc78-47bbb070668f",
+          "slug": "p6-video-workbench",
+          "name": "上線 video.aware-wave.com",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "dcd87d36-3a22-4162-ae15-9604067ad4e6",
+          "slug": "s4b-video-workbench",
+          "name": "圖片轉 3D 換供應商＋自動骨架",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "24aff3b5-2095-4dd6-b30d-b78177213d67",
+          "slug": "rv-video-workbench",
+          "name": "影片模型接 Replicate",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "e666217e-5e22-4f2a-b605-ffed018b4dde",
+          "slug": "re-video-workbench",
+          "name": "引擎路線重評",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "f326d25a-9332-4cf6-ba4f-1b82dd24e8fd",
+          "slug": "pj-video-workbench",
+          "name": "一支影片一條線",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "c4f04571-f23f-466e-9907-9e1cc6fbc289",
+          "slug": "fc-video-workbench",
+          "name": "專業剪輯（FilmCraft）",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "14dbe4cb-6766-4c5b-a609-63730ba77cc6",
+          "slug": "ec-video-workbench",
+          "name": "專業特效（EffectCraft）",
+          "phase": "video-workbench"
+        },
+        {
+          "id": "a6d3799c-c135-48fa-be2e-8050219bf80a",
+          "slug": "ed1-video-editor-parity",
+          "name": "版面骨架",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "7337370b-84e4-479a-8c37-c90e99dbe471",
+          "slug": "ed2-video-editor-parity",
+          "name": "時間軸操作",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "0d99244c-ff41-4a8d-ba62-6b4f46b4061d",
+          "slug": "ed3-video-editor-parity",
+          "name": "屬性面板",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "3c720e93-3552-43d3-95af-ad792d7829c8",
+          "slug": "ed4-video-editor-parity",
+          "name": "素材分頁",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "1dcf78b9-0a2c-4494-adbc-e2773a119048",
+          "slug": "ed5-video-editor-parity",
+          "name": "文字分頁",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "f1b78aa5-a85a-42dd-8779-2073a5ce4013",
+          "slug": "ed6-video-editor-parity",
+          "name": "音訊分頁",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "4e6b05bb-f249-4a97-8964-41b5d05019f0",
+          "slug": "ed7-video-editor-parity",
+          "name": "轉場與貼圖",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "8a9fb353-4e55-49f4-8009-555cd2273371",
+          "slug": "ed8-video-editor-parity",
+          "name": "匯出視窗",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "98a42ce0-d589-4787-b5c4-2dcb1ce4d12f",
+          "slug": "ed9-video-editor-parity",
+          "name": "專案列表頁",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "b1b71519-eb05-423f-8559-85f2a2c3a5a5",
+          "slug": "ed10-video-editor-parity",
+          "name": "字幕",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "cdf60177-d08e-468d-84be-20183c4e3b58",
+          "slug": "ed11-video-editor-parity",
+          "name": "剪贅字",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "05d02861-75c8-45f1-8a0e-4ae982873b95",
+          "slug": "ed12-video-editor-parity",
+          "name": "特效裡的 AI 功能",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "3e37a8c5-08f8-4be9-9194-911055eef27d",
+          "slug": "ed13-video-editor-parity",
+          "name": "剪輯 Agent",
+          "phase": "video-editor-parity"
+        },
+        {
+          "id": "705d2ecb-087b-4a67-8732-dd6eab0f8a91",
+          "slug": "u0-video-unify",
+          "name": "專案列「建或取回」",
+          "phase": "video-unify"
+        },
+        {
+          "id": "8f9c6f12-3840-4303-80d0-d51ae26633db",
+          "slug": "u1-video-unify",
+          "name": "門頁機制＋側欄「作品」",
+          "phase": "video-unify"
+        },
+        {
+          "id": "e8cb28b1-5e7d-4833-bbe0-922c504f5411",
+          "slug": "u2-video-unify",
+          "name": "一套樣式",
+          "phase": "video-unify"
+        },
+        {
+          "id": "33ae6d34-8fa6-4368-8e43-1c861d6e40a0",
+          "slug": "u3-video-unify",
+          "name": "腳本＝新系統的腳本功能",
+          "phase": "video-unify"
+        },
+        {
+          "id": "e570dae4-924f-4d8b-ba03-6ae66441d8ba",
+          "slug": "u4-video-unify",
+          "name": "鏡頭卡補齊",
+          "phase": "video-unify"
+        },
+        {
+          "id": "53c32131-8d1a-4581-b43b-a4265156b14c",
+          "slug": "u5-video-unify",
+          "name": "快速輸出、多比例、一鍵成片",
+          "phase": "video-unify"
+        },
+        {
+          "id": "a31f32be-dff7-490d-a30f-edf444117e7d",
+          "slug": "u6-video-unify",
+          "name": "審片與發布併進成片",
+          "phase": "video-unify"
+        },
+        {
+          "id": "e131580f-827e-4dd5-8821-8b6a67892721",
+          "slug": "u7-video-unify",
+          "name": "字幕與音檔",
+          "phase": "video-unify"
+        },
+        {
+          "id": "afcbc318-a11b-4508-a66d-da175c146bab",
+          "slug": "u8-video-unify",
+          "name": "片頭模板與時間軸 v1",
+          "phase": "video-unify"
+        },
+        {
+          "id": "60d9328b-f89e-4cfb-bc41-10b6e469e110",
+          "slug": "u9-video-unify",
+          "name": "一本聖經",
+          "phase": "video-unify"
+        },
+        {
+          "id": "a0948c0a-e826-4786-b4ed-eae2b297b8e9",
+          "slug": "u10-video-unify",
+          "name": "用量與方案",
+          "phase": "video-unify"
+        },
+        {
+          "id": "a7c8e34e-d191-4281-9410-2b3ac5d1b754",
+          "slug": "u11-video-unify",
+          "name": "收尾",
+          "phase": "video-unify"
+        },
+        {
+          "id": "1cfe2983-13b9-4b49-8cff-187af4daf78d",
+          "slug": "batch0-video-unify",
+          "name": "開自動發布前的守衛",
+          "phase": "video-unify"
+        },
+        {
+          "id": "769e3f28-3d19-4c3c-a016-c3992240254a",
+          "slug": "batch1-video-unify",
+          "name": "發布順序：YouTube 先發",
+          "phase": "video-unify"
+        },
+        {
+          "id": "d3f13852-6339-43e5-9421-9f75b1fe0ec4",
+          "slug": "batch2-video-unify",
+          "name": "每日選題",
+          "phase": "video-unify"
+        },
+        {
+          "id": "12a87adc-cbe7-443d-ae06-60d2c28cbcd1",
+          "slug": "batch3-video-unify",
+          "name": "每週會員信草稿",
+          "phase": "video-unify"
+        },
+        {
+          "id": "93b924b7-bfcc-43ea-8d8f-7c8229ffec6d",
+          "slug": "batch4-video-unify",
+          "name": "順暢度",
+          "phase": "video-unify"
+        }
+      ]
+    },
+    {
+      "id": "5fea9a1b-bd8d-42d3-a0a6-a54e678075a7",
+      "slug": "tarot",
+      "name": "塔羅製圖",
+      "aliases": [
+        "tarot-cards"
+      ],
+      "type": "product",
+      "purpose": "生成塔羅牌圖片、提示詞與動態。",
+      "product_key": "tarot",
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/tarot/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/tarot/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tarot/",
+        "agency-os/docs/tarot_cards/",
+        "lobster-factory/docs/PLAN-tarot-pod-image-colorgrade-webp-cmykpdf-canvas.md",
+        "lobster-factory/docs/PLAN-tarot-pod-image-output-pipeline-plus.md",
+        "lobster-factory/packages/db/migrations/0115_tarot_batch_jobs.down.sql",
+        "lobster-factory/packages/db/migrations/0115_tarot_batch_jobs.sql",
+        "lobster-factory/packages/db/migrations/0119_tarot_batch_actor.down.sql",
+        "lobster-factory/packages/db/migrations/0119_tarot_batch_actor.sql",
+        "lobster-factory/packages/db/migrations/0162_tarot_batch_deck_key.down.sql",
+        "lobster-factory/packages/db/migrations/0162_tarot_batch_deck_key.sql",
+        "lobster-factory/packages/db/scripts/0115_tarot_batch_jobs-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0115_tarot_batch_jobs_down.sql",
+        "lobster-factory/packages/db/scripts/0119_tarot_batch_actor-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0119_tarot_batch_actor_down.sql",
+        "lobster-factory/packages/db/scripts/0162_tarot_batch_deck_key_down.sql"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "1a18adb8-4837-4187-8461-88eda6dc139b",
+      "slug": "studio",
+      "name": "商品設計工作室",
+      "aliases": [
+        "pod",
+        "studio-culture"
+      ],
+      "type": "product",
+      "purpose": "生成商品圖片、文案與修圖素材，含 POD 商品圖與訂單收件。",
+      "product_key": "studio",
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/studio/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/studio/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/studio/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/studio/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/image/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/codex-images/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/pod-orders/",
+        "scripts/lib/pod-order-inbox-probe.ps1",
+        "tests/pod-order-inbox-probe.test.ps1",
+        "lobster-factory/docs/IMAGE_GEN_TOOLKIT.md",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/edit-guide/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/guides/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/convert-curated-traditional.py",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/generate-culture-curated.mjs",
+        "agency-os/docs/生圖風格 PROMPT/",
+        "lobster-factory/docs/POD_STUDIO_ROADMAP.md",
+        "lobster-factory/docs/POD-Fast-Correct-Flow-Plan.md",
+        "lobster-factory/docs/PLAN-pod-one-click-auto-publish-design-to-woo-printful.md",
+        "lobster-factory/docs/PLAN-pod-printful-per-colour-mockup-variation-swatch.md",
+        "lobster-factory/docs/feature-image-output-pipeline.md",
+        "lobster-factory/packages/db/migrations/0045_mockup_presets.sql",
+        "lobster-factory/packages/db/migrations/0093_pod_order_inbox.sql",
+        "lobster-factory/packages/db/scripts/0093_pod_order_inbox_down.sql"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "ed74d881-d8f6-4b77-8451-9d24169bdb46",
+      "slug": "design",
+      "name": "設計編輯器",
+      "aliases": [
+        "vectorcraft",
+        "photocraft",
+        "canvas",
+        "banner",
+        "mockup"
+      ],
+      "type": "product",
+      "purpose": "編輯畫布、橫幅、模型圖與向量設計（含向量專業版與畫布專業版）。",
+      "product_key": "design",
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/canvas/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/banner/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/mockup/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/vector-editor/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/designs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(full)/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/designs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/presets/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/printful/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/design/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/design/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/editor-shared/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/vector-pro-dock/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/photo-pro-dock/",
+        "scripts/vectorcraft-pro/",
+        "scripts/photocraft-pro/",
+        "scripts/craft-web-build/",
+        "agency-os/handoffs/2026-11-04-editor-merge/",
+        "lobster-factory/infra/hetzner-phase1-core/tests/e2e/editor-merge/",
+        "lobster-factory/docs/PLAN-designs-direct-upload.md",
+        "agency-os/handoffs/2026-11-04-vectorcraft-pro/",
+        "agency-os/handoffs/2026-11-05-photocraft-pro/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/docs/DESIGN_EDITOR_TOOLKIT_PLAN.md"
+      ],
+      "phases": [
+        {
+          "id": "ab13e5fd-e305-41e6-9b4e-f9db60a65ad2",
+          "slug": "vectorcraft-pro",
+          "name": "向量專業版",
+          "legacy_source_path": "agency-os/handoffs/2026-11-04-vectorcraft-pro/"
+        },
+        {
+          "id": "8e317e47-158a-4499-b87b-508c79afd8f9",
+          "slug": "photocraft-pro",
+          "name": "畫布專業版",
+          "legacy_source_path": "agency-os/handoffs/2026-11-05-photocraft-pro/"
+        }
+      ],
+      "features": [
+        {
+          "id": "f804acb0-62a9-407e-94e2-8573078318a3",
+          "slug": "c1-vectorcraft-pro",
+          "name": "建置鏈（本機）",
+          "phase": "vectorcraft-pro"
+        },
+        {
+          "id": "6ecc1e64-abbc-4453-9751-6d7ef902e7f6",
+          "slug": "c2-vectorcraft-pro",
+          "name": "承載（正式站靜態檔）",
+          "phase": "vectorcraft-pro"
+        },
+        {
+          "id": "e7e12481-dea7-4656-9313-b75745c86363",
+          "slug": "c3-vectorcraft-pro",
+          "name": "app 門",
+          "phase": "vectorcraft-pro"
+        },
+        {
+          "id": "e646e783-2eb0-4235-a67c-ad7d1c6de3aa",
+          "slug": "c4-vectorcraft-pro",
+          "name": "第二 dock 欄：AwareWave 獨有的十個面板",
+          "phase": "vectorcraft-pro"
+        },
+        {
+          "id": "6fb06aa5-8d1b-4627-9ae9-120a488c36b8",
+          "slug": "c5-vectorcraft-pro",
+          "name": "繁中與存檔",
+          "phase": "vectorcraft-pro"
+        },
+        {
+          "id": "49f9bf2b-1ad5-419c-8025-9e2ec6adc092",
+          "slug": "c6-vectorcraft-pro",
+          "name": "驗收、升級流程、文件",
+          "phase": "vectorcraft-pro"
+        },
+        {
+          "id": "3b353b08-569c-4251-a506-4421d973dd41",
+          "slug": "c7-vectorcraft-pro",
+          "name": "舊設計轉檔、舊編輯器退場",
+          "phase": "vectorcraft-pro"
+        },
+        {
+          "id": "5bf7b1eb-8d52-450e-be69-73339564cbad",
+          "slug": "c1-photocraft-pro",
+          "name": "建置鏈、介面、本機試做",
+          "phase": "photocraft-pro"
+        },
+        {
+          "id": "84821708-c29d-42e2-9357-aeba5c4733ca",
+          "slug": "c2-photocraft-pro",
+          "name": "承載（正式站靜態檔）",
+          "phase": "photocraft-pro"
+        },
+        {
+          "id": "b6454f80-f4ef-4d32-8349-0c4482df5e69",
+          "slug": "c3-photocraft-pro",
+          "name": "app 門",
+          "phase": "photocraft-pro"
+        },
+        {
+          "id": "0cf7ae17-d2fb-4b49-a538-3613a231d3a4",
+          "slug": "c4-photocraft-pro",
+          "name": "右側圖示欄與面板",
+          "phase": "photocraft-pro"
+        },
+        {
+          "id": "a2a3a7df-9fc8-491c-92c7-81e8f5e8b4a7",
+          "slug": "c5-photocraft-pro",
+          "name": "My Designs 存原始檔",
+          "phase": "photocraft-pro"
+        },
+        {
+          "id": "d140c08d-1824-4e82-8457-8e60941fb065",
+          "slug": "c6-photocraft-pro",
+          "name": "驗收、升級流程、文件",
+          "phase": "photocraft-pro"
+        },
+        {
+          "id": "5c91167f-8128-4d2d-8a83-2ea6842056ee",
+          "slug": "c7-photocraft-pro",
+          "name": "入口改接、舊編輯器退場",
+          "phase": "photocraft-pro"
+        },
+        {
+          "id": "b9af061f-f2e7-4fc4-ba00-0dd0e33cd911",
+          "slug": "c8-photocraft-pro",
+          "name": "傳回原工具",
+          "phase": "photocraft-pro"
+        }
+      ]
+    },
+    {
+      "id": "3c67b57e-0174-4d44-9c73-ddd194c357cf",
+      "slug": "content",
+      "name": "內容行銷",
+      "aliases": [
+        "auto-content",
+        "全自動內容"
+      ],
+      "type": "product",
+      "purpose": "抓熱門話題、產文章與貼文、排程並發布到客戶網站與各平台。",
+      "product_key": "content",
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/content/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/content/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/content/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/content/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/publish/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/publish/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/seo/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/events/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/events/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/events/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/events/",
+        "agency-os/docs/AUTO_CONTENT/",
+        "agency-os/handoffs/2026-10-26-autocontent-gap.md",
+        "agency-os/handoffs/2026-10-24-auto-content-supervisor/",
+        "agency-os/docs/RankMath/",
+        "agency-os/docs/seo/",
+        "agency-os/docs/GEO/",
+        "lobster-factory/docs/seowriting-basic-guide.md",
+        "lobster-factory/packages/db/migrations/0041_content_drafts.sql",
+        "lobster-factory/packages/db/migrations/0042_content_sources.sql",
+        "lobster-factory/packages/db/migrations/0044_wp_sites_content_defaults.sql",
+        "lobster-factory/packages/db/migrations/0053_global_events.sql",
+        "lobster-factory/packages/db/migrations/0121_content_topics.down.sql",
+        "lobster-factory/packages/db/migrations/0121_content_topics.sql",
+        "lobster-factory/packages/db/migrations/0122_content_topics_site_org.down.sql",
+        "lobster-factory/packages/db/migrations/0122_content_topics_site_org.sql",
+        "lobster-factory/packages/db/migrations/0139_wp_sites_content_plan_attempted_at.down.sql",
+        "lobster-factory/packages/db/migrations/0139_wp_sites_content_plan_attempted_at.sql",
+        "lobster-factory/packages/db/migrations/0169_content_topics_publishing.down.sql",
+        "lobster-factory/packages/db/migrations/0169_content_topics_publishing.sql",
+        "lobster-factory/packages/db/migrations/0170_wp_sites_daily_trend_planned_on.down.sql",
+        "lobster-factory/packages/db/migrations/0170_wp_sites_daily_trend_planned_on.sql",
+        "lobster-factory/packages/db/migrations/0172_wp_sites_member_newsletter_week.down.sql",
+        "lobster-factory/packages/db/migrations/0172_wp_sites_member_newsletter_week.sql",
+        "lobster-factory/packages/db/scripts/0121_content_topics-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0121_content_topics_down.sql",
+        "lobster-factory/packages/db/scripts/0122_content_topics_site_org-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0122_content_topics_site_org_down.sql",
+        "lobster-factory/packages/db/scripts/0139_wp_sites_content_plan_attempted_at_down.sql",
+        "lobster-factory/packages/db/scripts/0169_content_topics_publishing_down.sql",
+        "lobster-factory/packages/db/scripts/0170_wp_sites_daily_trend_planned_on_down.sql",
+        "lobster-factory/packages/db/scripts/0172_wp_sites_member_newsletter_week_down.sql"
+      ],
+      "phases": [
+        {
+          "id": "87be0a05-3b49-4a0a-ae4f-1292d2c951e0",
+          "slug": "auto-content",
+          "name": "全自動內容",
+          "legacy_source_path": "agency-os/handoffs/2026-10-24-auto-content-supervisor/"
+        }
+      ],
+      "features": [
+        {
+          "id": "8e94339b-298a-4043-b52d-ca643ccd3630",
+          "slug": "p1-auto-content",
+          "name": "品牌聲音只存一份",
+          "phase": "auto-content"
+        },
+        {
+          "id": "f9234920-5a2f-4577-b0dc-be5ff161317b",
+          "slug": "p2-auto-content",
+          "name": "寫社群貼文共用核心",
+          "phase": "auto-content"
+        },
+        {
+          "id": "fb046e8f-a23e-4440-b269-3a9a4e556fdc",
+          "slug": "p3-auto-content",
+          "name": "熱搜落地＋題目佇列",
+          "phase": "auto-content"
+        },
+        {
+          "id": "d5b34420-91fe-4a0b-85ef-3310f06093f1",
+          "slug": "p4-auto-content",
+          "name": "排程管線＋AI 審核",
+          "phase": "auto-content"
+        },
+        {
+          "id": "43c07179-c3e8-4824-9c67-2d30049b6efc",
+          "slug": "p5-auto-content",
+          "name": "ScriptForge 獨立頁＋伺服器模組登記",
+          "phase": "auto-content"
+        },
+        {
+          "id": "9152d14f-ae11-47cb-a3d4-b51da42d7465",
+          "slug": "p6-auto-content",
+          "name": "影片接管線",
+          "phase": "auto-content"
+        },
+        {
+          "id": "ac671fa8-9f98-4e2c-842a-8f49ce1174e0",
+          "slug": "p7-auto-content",
+          "name": "YouTube",
+          "phase": "auto-content"
+        },
+        {
+          "id": "215943be-bcd4-46d4-855a-aec2e8a9af15",
+          "slug": "p8-auto-content",
+          "name": "治理收尾",
+          "phase": "auto-content"
+        },
+        {
+          "id": "22b58369-aadc-4e70-a6ce-3515b84ae8c2",
+          "slug": "p9-auto-content",
+          "name": "熱搜與提案自動＋題目閘",
+          "phase": "auto-content"
+        }
+      ]
+    },
+    {
+      "id": "43b71a4d-208b-4ee3-9251-e2154636254b",
+      "slug": "cs",
+      "name": "AI 客服",
+      "aliases": [
+        "customer-service",
+        "kb",
+        "知識庫"
+      ],
+      "type": "product",
+      "purpose": "根據知識庫回答客人問題，必要時交接給真人。",
+      "product_key": "cs",
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/cs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/kb/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/cs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/cs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/cs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/knowledge/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/chatwoot/",
+        "agency-os/docs/Customer_service/",
+        "agency-os/docs/knowledge-base/",
+        "lobster-factory/infra/chatwoot/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/cs-widget/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/cs-widget/",
+        "lobster-factory/packages/db/migrations/0051_cs_core.sql",
+        "lobster-factory/packages/db/migrations/0072_kb_versioning_and_retrieval_predicates.sql",
+        "lobster-factory/packages/db/migrations/0075_kb_provenance_and_citation.sql",
+        "lobster-factory/packages/db/migrations/0076_kb_ranked_keyword_retrieval.sql",
+        "lobster-factory/packages/db/migrations/0079_organizations_chatwoot_account_id_unique.down.sql",
+        "lobster-factory/packages/db/migrations/0079_organizations_chatwoot_account_id_unique.sql",
+        "lobster-factory/packages/db/migrations/0083_kb_sensitive_audience_gate.sql",
+        "lobster-factory/packages/db/migrations/0084_kb_source_body.sql",
+        "lobster-factory/packages/db/migrations/0085_kb_folders.sql",
+        "lobster-factory/packages/db/migrations/0086_kb_keyword_mode.sql",
+        "lobster-factory/packages/db/migrations/0087_kb_cognitive_os_link.sql",
+        "lobster-factory/packages/db/migrations/0088_kb_hci_link.sql",
+        "lobster-factory/packages/db/migrations/0089_kb_folder_cognitive_os_link.sql",
+        "lobster-factory/packages/db/migrations/0099_cs_ai_replies_completed_at.down.sql",
+        "lobster-factory/packages/db/migrations/0099_cs_ai_replies_completed_at.sql",
+        "lobster-factory/packages/db/migrations/0104_cs_crisis_holding_replies.down.sql",
+        "lobster-factory/packages/db/migrations/0104_cs_crisis_holding_replies.sql",
+        "lobster-factory/packages/db/migrations/0107_cs_holding_reply_kinds.down.sql",
+        "lobster-factory/packages/db/migrations/0107_cs_holding_reply_kinds.sql",
+        "lobster-factory/packages/db/migrations/0108_cs_conversation_staff_replies.down.sql",
+        "lobster-factory/packages/db/migrations/0108_cs_conversation_staff_replies.sql",
+        "lobster-factory/packages/db/scripts/0051_cs_core_down.sql",
+        "lobster-factory/packages/db/scripts/0072_kb_versioning_and_retrieval_predicates_down.sql",
+        "lobster-factory/packages/db/scripts/0075_kb_provenance_and_citation_down.sql",
+        "lobster-factory/packages/db/scripts/0076_kb_ranked_keyword_retrieval_down.sql",
+        "lobster-factory/packages/db/scripts/0083_kb_sensitive_audience_gate_down.sql",
+        "lobster-factory/packages/db/scripts/0084_kb_source_body_down.sql",
+        "lobster-factory/packages/db/scripts/0085_kb_folders_down.sql",
+        "lobster-factory/packages/db/scripts/0086_kb_keyword_mode_down.sql",
+        "lobster-factory/packages/db/scripts/0087_kb_cognitive_os_link_down.sql",
+        "lobster-factory/packages/db/scripts/0088_kb_hci_link_down.sql",
+        "lobster-factory/packages/db/scripts/0089_kb_folder_cognitive_os_link_down.sql",
+        "lobster-factory/packages/db/scripts/0104_cs_crisis_holding_replies_down.sql",
+        "lobster-factory/packages/db/scripts/0107_cs_holding_reply_kinds_down.sql",
+        "lobster-factory/packages/db/scripts/0108_cs_conversation_staff_replies_down.sql"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "6ee8a514-ea66-4319-a59f-2c3bb1403866",
+      "slug": "collect",
+      "name": "資料蒐集器",
+      "aliases": [
+        "collector",
+        "renderer"
+      ],
+      "type": "product",
+      "purpose": "搜尋並蒐集外部網站與研究資料，存成可引用的來源。",
+      "product_key": "collect",
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/collect/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/collect/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/collect-rate-limit-verify.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/research-bridges.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/research-bridges.test.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/renderer/",
+        "agency-os/docs/data-collection/",
+        "lobster-factory/packages/db/migrations/0073_collection_runs_and_issues.sql",
+        "lobster-factory/packages/db/migrations/0074_collection_sources.sql",
+        "lobster-factory/packages/db/migrations/0080_collection_url_state.sql",
+        "lobster-factory/packages/db/migrations/0081_collection_schedules.sql",
+        "lobster-factory/packages/db/migrations/0082_collection_rate_limit_buckets.sql",
+        "lobster-factory/packages/db/migrations/0090_collection_off_entity.sql",
+        "lobster-factory/packages/db/migrations/0095_collect_claimreview_mirror.sql",
+        "lobster-factory/packages/db/scripts/0073_collection_runs_and_issues_down.sql",
+        "lobster-factory/packages/db/scripts/0074_collection_sources_down.sql",
+        "lobster-factory/packages/db/scripts/0080_collection_url_state_down.sql",
+        "lobster-factory/packages/db/scripts/0081_collection_schedules_down.sql",
+        "lobster-factory/packages/db/scripts/0082_collection_rate_limit_buckets_down.sql",
+        "lobster-factory/packages/db/scripts/0090_collection_off_entity_down.sql",
+        "lobster-factory/packages/db/scripts/0095_collect_claimreview_mirror-local-verify.sh",
+        "lobster-factory/packages/db/scripts/0095_collect_claimreview_mirror-local-verify.sql",
+        "lobster-factory/packages/db/scripts/0095_collect_claimreview_mirror_down.sql"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "b18eed87-8ec8-4bac-9b19-0050f55cae17",
+      "slug": "oracle",
+      "name": "算命站",
+      "aliases": [
+        "oracle-web",
+        "ziwei",
+        "紫微斗數"
+      ],
+      "type": "product",
+      "purpose": "紫微斗數等命理網站與 WordPress 外掛（oracle-web）。",
+      "product_key": null,
+      "source_paths": [
+        "Projects/internal/ziwei-doushu/",
+        "lobster-factory/packages/oracle-wp-plugin/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/oracle/",
+        "agency-os/handoffs/2026-11-20-oracle-skills-supervisor/"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "9bfd95c6-a318-4cdc-a8f3-46a695c300ab",
+      "slug": "commerce",
+      "name": "客戶與收費",
+      "aliases": [
+        "customer-model",
+        "entitlements",
+        "billing",
+        "客戶怎麼來",
+        "aware-wave-store"
+      ],
+      "type": "internal",
+      "purpose": "客戶怎麼買、能用什麼：方案、權利、共用錢包、帳單、賣家與付款通知。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/payments/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/accounts/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/reconcile/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/portal/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/entitlements/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/entitlements/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/billing/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/sellers/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/reconcile/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/fx/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/payments/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/woo-order/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/plans/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/sellers/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/billing/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/products/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/record-payment.mjs",
+        "lobster-factory/packages/aware-wave-store-plugin/",
+        "scripts/new-product.mjs",
+        "lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/",
+        "lobster-factory/infra/hetzner-phase1-core/tests/e2e/woo-drill/",
+        "agency-os/docs/Composable AI Commerce OS/",
+        "agency-os/docs/sales/",
+        "agency-os/docs/product/",
+        "agency-os/handoffs/2026-10-19-adr017-step3-resume.md",
+        "agency-os/handoffs/2026-09-29-wc-p2-09b-part2.md",
+        "lobster-factory/packages/contracts/",
+        "agency-os/handoffs/2026-10-16-customer-model-supervisor/",
+        "lobster-factory/packages/db/migrations/0018_rls_initplan_and_workflow_runs_index_dedupe.sql",
+        "lobster-factory/packages/db/migrations/0062_organization_product_subscriptions.sql",
+        "lobster-factory/packages/db/migrations/0063_portal_complete_signup.sql",
+        "lobster-factory/packages/db/migrations/0110_plans_entitlements.down.sql",
+        "lobster-factory/packages/db/migrations/0110_plans_entitlements.sql",
+        "lobster-factory/packages/db/migrations/0117_entitlement_internal_comp.down.sql",
+        "lobster-factory/packages/db/migrations/0117_entitlement_internal_comp.sql",
+        "lobster-factory/packages/db/migrations/0118_entitlement_all_features.down.sql",
+        "lobster-factory/packages/db/migrations/0118_entitlement_all_features.sql",
+        "lobster-factory/packages/db/migrations/0120_payment_events.down.sql",
+        "lobster-factory/packages/db/migrations/0120_payment_events.sql",
+        "lobster-factory/packages/db/migrations/0124_customer_identities.down.sql",
+        "lobster-factory/packages/db/migrations/0124_customer_identities.sql",
+        "lobster-factory/packages/db/migrations/0126_ops_incidents_payments_source.down.sql",
+        "lobster-factory/packages/db/migrations/0126_ops_incidents_payments_source.sql",
+        "lobster-factory/packages/db/migrations/0127_billing_account_views.down.sql",
+        "lobster-factory/packages/db/migrations/0127_billing_account_views.sql",
+        "lobster-factory/packages/db/migrations/0128_pack_usage_rights_open_ended.down.sql",
+        "lobster-factory/packages/db/migrations/0128_pack_usage_rights_open_ended.sql",
+        "lobster-factory/packages/db/migrations/0129_drop_billing_overview.down.sql",
+        "lobster-factory/packages/db/migrations/0129_drop_billing_overview.sql",
+        "lobster-factory/packages/db/migrations/0130_billing_ledger.down.sql",
+        "lobster-factory/packages/db/migrations/0130_billing_ledger.sql",
+        "lobster-factory/packages/db/migrations/0131_billing_ledger_order_search.down.sql",
+        "lobster-factory/packages/db/migrations/0131_billing_ledger_order_search.sql",
+        "lobster-factory/packages/db/migrations/0132_drop_billing_attention.down.sql",
+        "lobster-factory/packages/db/migrations/0132_drop_billing_attention.sql",
+        "lobster-factory/packages/db/migrations/0133_seller_sites.down.sql",
+        "lobster-factory/packages/db/migrations/0133_seller_sites.sql",
+        "lobster-factory/packages/db/migrations/0137_partner_referrals_writes_only.down.sql",
+        "lobster-factory/packages/db/migrations/0137_partner_referrals_writes_only.sql",
+        "lobster-factory/packages/db/migrations/0140_seller_sites_app_writes_site.down.sql",
+        "lobster-factory/packages/db/migrations/0140_seller_sites_app_writes_site.sql",
+        "lobster-factory/packages/db/migrations/0141_billing_ledger_seller.down.sql",
+        "lobster-factory/packages/db/migrations/0141_billing_ledger_seller.sql",
+        "lobster-factory/packages/db/migrations/0142_billing_seller_month_paid_at.down.sql",
+        "lobster-factory/packages/db/migrations/0142_billing_seller_month_paid_at.sql",
+        "lobster-factory/packages/db/migrations/0143_entitlement_staff_grants.down.sql",
+        "lobster-factory/packages/db/migrations/0143_entitlement_staff_grants.sql",
+        "lobster-factory/packages/db/migrations/0144_plan_studio_basic.down.sql",
+        "lobster-factory/packages/db/migrations/0144_plan_studio_basic.sql",
+        "lobster-factory/packages/db/migrations/0145_credit_plans.down.sql",
+        "lobster-factory/packages/db/migrations/0145_credit_plans.sql",
+        "lobster-factory/packages/db/migrations/0146_pack_plan_keys.down.sql",
+        "lobster-factory/packages/db/migrations/0146_pack_plan_keys.sql",
+        "lobster-factory/packages/db/migrations/0147_plan_admin.down.sql",
+        "lobster-factory/packages/db/migrations/0147_plan_admin.sql",
+        "lobster-factory/packages/db/migrations/0148_credit_call_holds.down.sql",
+        "lobster-factory/packages/db/migrations/0148_credit_call_holds.sql",
+        "lobster-factory/packages/db/migrations/0165_fx_rates.down.sql",
+        "lobster-factory/packages/db/migrations/0165_fx_rates.sql",
+        "lobster-factory/packages/db/migrations/0166_vendor_invoices.down.sql",
+        "lobster-factory/packages/db/migrations/0166_vendor_invoices.sql",
+        "lobster-factory/packages/db/scripts/0062_organization_product_subscriptions_down.sql",
+        "lobster-factory/packages/db/scripts/0063_portal_complete_signup_down.sql",
+        "lobster-factory/packages/db/scripts/0110_plans_entitlements-local-verify.py",
+        "lobster-factory/packages/db/scripts/0110_plans_entitlements_down.sql",
+        "lobster-factory/packages/db/scripts/0117_entitlement_internal_comp-local-verify.py",
+        "lobster-factory/packages/db/scripts/0117_entitlement_internal_comp_down.sql",
+        "lobster-factory/packages/db/scripts/0118_entitlement_all_features-local-verify.py",
+        "lobster-factory/packages/db/scripts/0118_entitlement_all_features_down.sql",
+        "lobster-factory/packages/db/scripts/0120_payment_events-local-verify.py",
+        "lobster-factory/packages/db/scripts/0120_payment_events_down.sql",
+        "lobster-factory/packages/db/scripts/0124_customer_identities_down.sql",
+        "lobster-factory/packages/db/scripts/0126_ops_incidents_payments_source_down.sql",
+        "lobster-factory/packages/db/scripts/0127_billing_account_views-local-verify.py",
+        "lobster-factory/packages/db/scripts/0127_billing_account_views_down.sql",
+        "lobster-factory/packages/db/scripts/0128_pack_usage_rights_open_ended_down.sql",
+        "lobster-factory/packages/db/scripts/0129_drop_billing_overview_down.sql",
+        "lobster-factory/packages/db/scripts/0130_billing_ledger_down.sql",
+        "lobster-factory/packages/db/scripts/0131_billing_ledger_order_search_down.sql",
+        "lobster-factory/packages/db/scripts/0132_drop_billing_attention_down.sql",
+        "lobster-factory/packages/db/scripts/0133_seller_sites_down.sql",
+        "lobster-factory/packages/db/scripts/0137_partner_referrals_writes_only_down.sql",
+        "lobster-factory/packages/db/scripts/0140_seller_sites_app_writes_site_down.sql",
+        "lobster-factory/packages/db/scripts/0141_billing_ledger_seller_down.sql",
+        "lobster-factory/packages/db/scripts/0142_billing_seller_month_paid_at_down.sql",
+        "lobster-factory/packages/db/scripts/0143_entitlement_staff_grants_down.sql",
+        "lobster-factory/packages/db/scripts/0144_plan_studio_basic_down.sql",
+        "lobster-factory/packages/db/scripts/0145_credit_plans_down.sql",
+        "lobster-factory/packages/db/scripts/0146_pack_plan_keys_down.sql",
+        "lobster-factory/packages/db/scripts/0147_plan_admin_down.sql",
+        "lobster-factory/packages/db/scripts/0148_credit_call_holds_down.sql",
+        "lobster-factory/packages/db/scripts/0165_fx_rates_down.sql",
+        "lobster-factory/packages/db/scripts/0166_vendor_invoices_down.sql",
+        "lobster-factory/packages/db/tests/test_0137_partner_referrals_writes.py"
+      ],
+      "phases": [
+        {
+          "id": "89d569cd-9534-4661-94ba-0b1430c357e8",
+          "slug": "customer-model",
+          "name": "客戶怎麼來",
+          "legacy_source_path": "agency-os/handoffs/2026-10-16-customer-model-supervisor/"
+        }
+      ],
+      "features": [
+        {
+          "id": "9cc9260f-9e81-479b-b324-db4ef8c5b355",
+          "slug": "s1-customer-model",
+          "name": "登記表加 features[] 與 accessChannels；產生器 new-product.mjs；機械閘",
+          "phase": "customer-model"
+        },
+        {
+          "id": "e4d65338-1101-4ed6-8c94-e6833e9ad1cc",
+          "slug": "s2-customer-model",
+          "name": "Migration：plans、organization_entitlements、organizations.kind；許可帶 actor",
+          "phase": "customer-model"
+        },
+        {
+          "id": "ff05a13d-959a-4c6a-80f1-e4f5dfe4dad1",
+          "slug": "s3-customer-model",
+          "name": "每個收費點只問 can(主體, feature_key, actor)",
+          "phase": "customer-model"
+        },
+        {
+          "id": "7a0062ee-5769-4805-92fa-88dc235453c6",
+          "slug": "s4-customer-model",
+          "name": "Woo 付款通知 → 合約與權利；帳本泛化",
+          "phase": "customer-model"
+        },
+        {
+          "id": "41e65599-9991-44fb-9158-004332b07ecf",
+          "slug": "s5-customer-model",
+          "name": "買斷安裝階段",
+          "phase": "customer-model"
+        },
+        {
+          "id": "56870154-9e9b-457a-b711-b893109f4c27",
+          "slug": "s6-customer-model",
+          "name": "API 通道",
+          "phase": "customer-model"
+        },
+        {
+          "id": "666c0f1a-f767-49df-a2b3-72c9edddf012",
+          "slug": "s7-customer-model",
+          "name": "轉售（代理商版）",
+          "phase": "customer-model"
+        },
+        {
+          "id": "5828f640-42a5-4d8b-a998-6ac36fa07978",
+          "slug": "s8-customer-model",
+          "name": "每個產品長成單一產品的樣子",
+          "phase": "customer-model"
+        },
+        {
+          "id": "10e3d1f1-8b65-4e02-ab1e-15ad38a39017",
+          "slug": "s9-customer-model",
+          "name": "客戶自己的網址指到 hosted 產品門（白牌）",
+          "phase": "customer-model"
+        }
+      ]
+    },
+    {
+      "id": "dd5c5758-6cb3-4013-9ade-ea4fc5aed091",
+      "slug": "staff-access",
+      "name": "員工權限",
+      "aliases": [
+        "staff-tool-grants",
+        "staff"
+      ],
+      "type": "internal",
+      "purpose": "每位員工能用哪些工具：勾選、擋網址與 API、側欄只顯示有權限的。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/staff-access.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-role.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/__tests__/middleware-staff-tools.test.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/__tests__/ops-role-client.test.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/staff/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/staff/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/no-access/",
+        "agency-os/handoffs/2026-10-24-staff-tool-grants/"
+      ],
+      "phases": [
+        {
+          "id": "543240f7-7651-4abf-ac3b-631367e1f5e8",
+          "slug": "staff-tool-grants",
+          "name": "員工權限",
+          "legacy_source_path": "agency-os/handoffs/2026-10-24-staff-tool-grants/"
+        }
+      ],
+      "features": [
+        {
+          "id": "e00ae372-44c6-4fe9-87e2-b087a3ea3980",
+          "slug": "c1-staff-tool-grants",
+          "name": "員工工具登記表",
+          "phase": "staff-tool-grants"
+        },
+        {
+          "id": "b9a45cbb-6d87-4b44-9d47-28b419b9c479",
+          "slug": "c2-staff-tool-grants",
+          "name": "身分帶工具、擋網址與 API",
+          "phase": "staff-tool-grants"
+        },
+        {
+          "id": "ae082408-9398-4162-bf67-af7a9cc29d6e",
+          "slug": "c3-staff-tool-grants",
+          "name": "側欄與首頁只顯示有權限的",
+          "phase": "staff-tool-grants"
+        },
+        {
+          "id": "578657ac-3048-48ed-bc86-0fe2108a2165",
+          "slug": "c4-staff-tool-grants",
+          "name": "員工權限頁 /ops/staff",
+          "phase": "staff-tool-grants"
+        },
+        {
+          "id": "c29537bb-634f-4ad3-893e-961fb35732ed",
+          "slug": "c5-staff-tool-grants",
+          "name": "沒權限頁與文件",
+          "phase": "staff-tool-grants"
+        },
+        {
+          "id": "38c2aa7e-b637-4018-a14e-a74d0782243d",
+          "slug": "c6-staff-tool-grants",
+          "name": "上線",
+          "phase": "staff-tool-grants"
+        }
+      ]
+    },
+    {
+      "id": "0b9d7e41-3429-426a-aad9-4bf99b23850d",
+      "slug": "schedules",
+      "name": "排程與背景工作",
+      "aliases": [
+        "cron",
+        "trigger",
+        "schedules-off-trigger"
+      ],
+      "type": "infrastructure",
+      "purpose": "主機 cron 準時啟動所有定時工作，Trigger 只當工人；排程頁看紅綠燈。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/schedules/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/schedules/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/schedules/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/schedules/",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/cron-run.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/install-host-schedules.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/report-host-schedules.py",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/trigger-task.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/check-trigger-slots.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/poke.sh",
+        "lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py",
+        "lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/check-trigger-slots.test.sh",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/__tests__/trigger-callbacks-server-to-server.test.ts",
+        "lobster-factory/infra/trigger/",
+        "lobster-factory/packages/workflows/",
+        "agency-os/automation/claude-routines/",
+        "runbooks/TRIGGER-DEPLOY-CLOUDFLARE-BFM.md",
+        "runbooks/TRIGGER-RUNS-STUCK-QUEUED.md",
+        "runbooks/CLAUDE-ROUTINE-WATCHDOG-RUNBOOK.md",
+        "runbooks/自動排程監控與手機Telegram警報-維護手冊.md",
+        "agency-os/handoffs/2026-10-25-schedules-off-trigger/",
+        "lobster-factory/packages/db/migrations/0097_client_schedules.sql",
+        "lobster-factory/packages/db/migrations/0123_client_schedules_day_of_month.down.sql",
+        "lobster-factory/packages/db/migrations/0123_client_schedules_day_of_month.sql",
+        "lobster-factory/packages/db/migrations/0125_client_schedules_daily_limit.down.sql",
+        "lobster-factory/packages/db/migrations/0125_client_schedules_daily_limit.sql",
+        "lobster-factory/packages/db/migrations/0168_client_schedules_per_topic_cap.down.sql",
+        "lobster-factory/packages/db/migrations/0168_client_schedules_per_topic_cap.sql",
+        "lobster-factory/packages/db/scripts/0097_client_schedules_down.sql",
+        "lobster-factory/packages/db/scripts/0123_client_schedules_day_of_month_down.sql",
+        "lobster-factory/packages/db/scripts/0125_client_schedules_daily_limit_down.sql",
+        "lobster-factory/packages/db/scripts/0168_client_schedules_per_topic_cap_down.sql"
+      ],
+      "phases": [
+        {
+          "id": "37c929cb-434a-4ff3-8c4d-10a28059f465",
+          "slug": "schedules-off-trigger",
+          "name": "排程離開 Trigger",
+          "legacy_source_path": "agency-os/handoffs/2026-10-25-schedules-off-trigger/"
+        }
+      ],
+      "features": [
+        {
+          "id": "b43cd569-eae5-4615-9a31-b692e7491610",
+          "slug": "c1-schedules-off-trigger",
+          "name": "定時工作改由主機啟動",
+          "phase": "schedules-off-trigger"
+        },
+        {
+          "id": "be294c42-4394-466f-a156-9e001794aa66",
+          "slug": "c2-schedules-off-trigger",
+          "name": "定時工作上線",
+          "phase": "schedules-off-trigger"
+        },
+        {
+          "id": "280dabbc-8dba-42ed-80bd-57210e376940",
+          "slug": "c3-schedules-off-trigger",
+          "name": "自動偵測 Trigger 停滯",
+          "phase": "schedules-off-trigger"
+        },
+        {
+          "id": "32a727ce-0a4b-4e8b-ae88-e24681a45009",
+          "slug": "c4-schedules-off-trigger",
+          "name": "統一發送排程通知",
+          "phase": "schedules-off-trigger"
+        },
+        {
+          "id": "315a89b4-8aea-460c-b231-eb2955e70c31",
+          "slug": "c5-schedules-off-trigger",
+          "name": "補齊排程頁的工作清單",
+          "phase": "schedules-off-trigger"
+        },
+        {
+          "id": "7103256a-fc7f-487b-b24e-0f1aeed2f0c2",
+          "slug": "c6-schedules-off-trigger",
+          "name": "狀態報告改由主機產生",
+          "phase": "schedules-off-trigger"
+        },
+        {
+          "id": "ec77e5a2-4aaa-4b77-9361-60aeb26c8b15",
+          "slug": "c8-schedules-off-trigger",
+          "name": "從主機外監控網站",
+          "phase": "schedules-off-trigger"
+        }
+      ]
+    },
+    {
+      "id": "e97a497b-2252-4315-bbb6-e4228828f6dc",
+      "slug": "systems-control-center",
+      "name": "系統總控中心",
+      "aliases": [
+        "ops-systems",
+        "registry",
+        "多系統進度追蹤"
+      ],
+      "type": "internal",
+      "purpose": "一頁看所有系統的用途、進度、下一步；資料從 git 提交自動匯入。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/systems/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/systems/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/systems/",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/systems-import.py",
+        "lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/systems-import.test.py",
+        "scripts/systems-migrate-supervisor.mjs",
+        "agency-os/systems/registry.json",
+        "agency-os/handoffs/2026-11-21-systems-control-center/",
+        "lobster-factory/packages/db/migrations/0174_systems_control_center.down.sql",
+        "lobster-factory/packages/db/migrations/0174_systems_control_center.sql"
+      ],
+      "phases": [
+        {
+          "id": "b2561c0c-7e18-422d-ae1c-c2cff0f3afb6",
+          "slug": "control-center-v1",
+          "name": "系統總控中心 v1",
+          "legacy_source_path": "agency-os/handoffs/2026-11-21-systems-control-center/"
+        }
+      ],
+      "features": [
+        {
+          "id": "9922d9fe-26f8-4498-a9e4-d1f62a22e2d3",
+          "slug": "w1-control-center-v1",
+          "name": "主機匯入器",
+          "phase": "control-center-v1"
+        },
+        {
+          "id": "ec22117f-1f2a-4c83-8c28-214bffa13dae",
+          "slug": "w2-control-center-v1",
+          "name": "資料表、接收端與頁面",
+          "phase": "control-center-v1"
+        },
+        {
+          "id": "98929e04-6a93-4a00-8e9c-0dae2f6b183a",
+          "slug": "w3-control-center-v1",
+          "name": "系統清單與搬遷腳本",
+          "phase": "control-center-v1"
+        },
+        {
+          "id": "6f61b5af-bb7e-46fa-a765-d4b9bf2c99cb",
+          "slug": "w4-control-center-v1",
+          "name": "監工台頁",
+          "phase": "control-center-v1"
+        },
+        {
+          "id": "762859d0-27ad-4f49-a2b1-27331ba8ff72",
+          "slug": "b2-control-center-v1",
+          "name": "整合與上線",
+          "phase": "control-center-v1"
+        },
+        {
+          "id": "446f3eb1-9124-4d1d-855b-92e8052a43f0",
+          "slug": "b3-control-center-v1",
+          "name": "系統盤點與其餘監工頁切換",
+          "phase": "control-center-v1"
+        }
+      ]
+    },
+    {
+      "id": "9dae08d1-4883-4176-a986-fb9dc4cb1773",
+      "slug": "system-foundry",
+      "name": "System Foundry 系統藍圖",
+      "aliases": [
+        "foundry",
+        "project-kit",
+        "supervisor-kit"
+      ],
+      "type": "internal",
+      "purpose": "替新專案產生系統藍圖、執行卡與監工台的樣板工具，含產業包（水電 MEP）。",
+      "product_key": null,
+      "source_paths": [
+        "agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/",
+        "agency-os/docs/Water_Electrical_MEP_ALL_LATEST_2026-09-03/",
+        "agency-os/project-kit/",
+        "scripts/supervisor-kit/",
+        "agency-os/docs/CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md",
+        "agency-os/docs/CODEX_HANDOFF_SOP_ADDENDUM_2026-08-31.md",
+        "agency-os/docs/CODEX_HANDOFF_MVP_PLAN_RECONCILE_2026-08-31.md",
+        "agency-os/handoffs/2026-10-18-foundry-v17-supervisor/"
+      ],
+      "phases": [
+        {
+          "id": "716fc967-c9a3-43cf-9fe8-586f4167909c",
+          "slug": "foundry-v17",
+          "name": "System Foundry v1.7",
+          "legacy_source_path": "agency-os/handoffs/2026-10-18-foundry-v17-supervisor/"
+        }
+      ],
+      "features": [
+        {
+          "id": "a4e54afc-f0b1-4ec0-a06a-82d7d10174a1",
+          "slug": "v171-foundry-v17",
+          "name": "樣板瘦身",
+          "phase": "foundry-v17"
+        },
+        {
+          "id": "5d920e88-c8ab-4cf5-ad19-7eaaa1d39223",
+          "slug": "v172-foundry-v17",
+          "name": "每模組一張可執行卡",
+          "phase": "foundry-v17"
+        },
+        {
+          "id": "bd48fea7-ff42-438d-a87b-cc9fb4afd780",
+          "slug": "v173-foundry-v17",
+          "name": "監工台套件共用",
+          "phase": "foundry-v17"
+        },
+        {
+          "id": "1367a4ed-79f2-48ba-9f65-818482da7e84",
+          "slug": "v174-foundry-v17",
+          "name": "接軌 AwareWave",
+          "phase": "foundry-v17"
+        },
+        {
+          "id": "a6f6f602-35d2-4c86-b05d-ab36d8d31b4a",
+          "slug": "v175-foundry-v17",
+          "name": "範例 intake 自動重生",
+          "phase": "foundry-v17"
+        },
+        {
+          "id": "1b413c5e-409d-44e0-a67b-f1532c032ef1",
+          "slug": "v176-foundry-v17",
+          "name": "新題",
+          "phase": "foundry-v17"
+        },
+        {
+          "id": "a844fea2-d501-47c8-8155-6b450c6df45b",
+          "slug": "v177-foundry-v17",
+          "name": "能力驗收補齊",
+          "phase": "foundry-v17"
+        },
+        {
+          "id": "69eaaaed-7715-49bb-b4f3-df2f9bc0025f",
+          "slug": "v178-foundry-v17",
+          "name": "產品 manifest 補齊",
+          "phase": "foundry-v17"
+        }
+      ]
+    },
+    {
+      "id": "6059a24d-1bb6-4b3e-835d-7fc2ac45f67b",
+      "slug": "app-platform",
+      "name": "員工後台骨架",
+      "aliases": [
+        "app-aware-wave",
+        "next-admin",
+        "theme",
+        "外觀"
+      ],
+      "type": "internal",
+      "purpose": "app.aware-wave 的共用底座：登入、側欄、外觀主題、產品門、AI 呼叫與成本、中介層。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/layout.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/providers.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/global-error.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/sidebar-sections.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/SidebarNav.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/DoorNav.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/DoorContext.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ProductDoorShell.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/LogoutButton.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/UpdateNotice.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/CodexLaptopButton.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/layout.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/page.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/login/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/__tests__/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/auth/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/theme/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/theme/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/theme/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/build/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/build/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/build-id/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/auth/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/theme/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/supabase/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/db/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/storage/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/security/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/mail/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/build-console/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/__tests__/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tenant-guard.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/turnstile.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/sentry-scrub.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/public-asset-cache.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/supabase-paging.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/build-id.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/middleware.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/instrumentation.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/next.config.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/sentry.client.config.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/sentry.edge.config.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/sentry.server.config.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/vitest.config.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/vitest.setup.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/Dockerfile",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/ai-models/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/probe-models.mjs",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/codex-laptop/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(public)/layout.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/sentry-test/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/posthog-analytics.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/analytics.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/secret-vault.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/tsconfig.json",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/next-env.d.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/.dockerignore",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/.gitignore",
+        "lobster-factory/packages/db/migrations/0052_app_theme.sql",
+        "lobster-factory/packages/db/scripts/0052_app_theme_down.sql"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "f2e67464-3091-468e-9b50-4c0d8e528faf",
+      "slug": "ops-console",
+      "name": "營運後台",
+      "aliases": [
+        "ops",
+        "/ops"
+      ],
+      "type": "internal",
+      "purpose": "員工管理客戶、收件匣、成本、整合、組織與系統模式的 /ops 頁。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/clients/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/clients/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/inbox/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/inbox/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-inbox/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/costs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/costs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/integrations/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/integrations/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/organizations/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/org-search/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/org-search.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/tenants/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/tenant-integration/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/ai-models/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/system-modes/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/system-modes/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/system-modes/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/tools/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-audit.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/crm/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/dossier/",
+        "lobster-factory/infra/hetzner-phase1-core/tests/e2e/client/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops-console/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/approvals/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/approvals/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/audit-events/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/summary/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/workflow-runs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/probe/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/analytics-context/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/ai-image-jobs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ai/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/api-check/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/api-check-client/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-actions/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ops-contracts.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/org-client.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/department-catalog.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/kick-dispatcher.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/AutoRefresh.tsx",
+        "lobster-factory/packages/db/migrations/0011_ops_console_control_plane.sql",
+        "lobster-factory/packages/db/migrations/0012_seed_ops_console_minimal.sql",
+        "lobster-factory/packages/db/migrations/0013_ops_inbox.sql",
+        "lobster-factory/packages/db/migrations/0015_fix_function_search_path_ops_inbox.sql",
+        "lobster-factory/packages/db/migrations/0016_ops_console_and_permission_catalog_rls_policies.sql",
+        "lobster-factory/packages/db/migrations/0021_seed_build_console_actions.sql",
+        "lobster-factory/packages/db/migrations/0022_build_console_execution_tables.sql",
+        "lobster-factory/packages/db/migrations/0024_tenant_integration_registry.sql",
+        "lobster-factory/packages/db/migrations/0034_intake_forms.sql",
+        "lobster-factory/packages/db/migrations/0037_ops_action_runs_pending_dispatch_index.sql",
+        "lobster-factory/packages/db/migrations/0055_intake_quote.sql",
+        "lobster-factory/packages/db/migrations/0077_organization_hierarchy.down.sql",
+        "lobster-factory/packages/db/migrations/0077_organization_hierarchy.sql",
+        "lobster-factory/packages/db/migrations/0078_validate_organization_hierarchy_checks.sql"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "fd587109-7d12-4981-a91f-f3a58d0b135a",
+      "slug": "repair-center",
+      "name": "自動修復與監控",
+      "aliases": [
+        "repair-os",
+        "site-watch",
+        "command-plane",
+        "telegram"
+      ],
+      "type": "infrastructure",
+      "purpose": "偵測事故、健康探針、網站巡檢、Telegram 指令台，能修的自動修、修不好就通知。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-center/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/repair-os/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/repairs/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/site-watch/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/site-watch/",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/site-watch-tick.sh",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/command-plane/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/commands/",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/aw-autorepair-gate.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/awarewave-endpoint-alert.service",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/ops-probe-heartbeat.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/notify.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/slack-alert-drill.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/check-drift-and-alert.sh",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/grafana/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/netdata/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/posthog/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/sentry/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/uptime-kuma/",
+        "tests/repair-health-probes.test.ps1",
+        "scripts/apply-repair-center-migration-eu.mjs",
+        "scripts/repair-center-smoke.mjs",
+        "scripts/check-site-watch-health.ps1",
+        "lobster-factory/packages/db/migrations/0025_always_on_command_plane.sql",
+        "lobster-factory/packages/db/migrations/0026_ops_incidents_client_slug.sql",
+        "lobster-factory/packages/db/migrations/0027_repair_runs.sql",
+        "lobster-factory/packages/db/migrations/0028_repair_os_client_asset_scope.sql",
+        "lobster-factory/packages/db/migrations/0029_repair_os_integration_slots.sql",
+        "lobster-factory/packages/db/migrations/0030_repair_runs_archive.sql",
+        "lobster-factory/packages/db/migrations/0031_ops_incidents_deploy_source.sql",
+        "lobster-factory/packages/db/migrations/0032_archive_triage_needed.sql",
+        "lobster-factory/packages/db/migrations/0033_repair_runs_rls_deny_anon.sql",
+        "lobster-factory/packages/db/migrations/0035_upsert_incident_atomic.sql",
+        "lobster-factory/packages/db/migrations/0036_fingerprint_v2.sql",
+        "lobster-factory/packages/db/migrations/0054_repair_runs_add_org.sql",
+        "lobster-factory/packages/db/migrations/0056_upsert_incident_atomic_add_client_slug.sql",
+        "lobster-factory/packages/db/migrations/0058_ops_incidents_parent_incident.sql",
+        "lobster-factory/packages/db/migrations/0059_repair_runs_add_deploy_source.sql",
+        "lobster-factory/packages/db/migrations/0091_site_watch.sql",
+        "lobster-factory/packages/db/scripts/0058_ops_incidents_parent_incident_down.sql",
+        "lobster-factory/packages/db/scripts/0091_site_watch_down.sql"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "3b1a4748-9ff6-4180-b1bb-0b04292c1215",
+      "slug": "provisioning",
+      "name": "一鍵架站與佈建",
+      "aliases": [
+        "hosting",
+        "onboarding",
+        "provision",
+        "tenants"
+      ],
+      "type": "internal",
+      "purpose": "開主機、建站、新客戶租戶上線與買斷交付的佈建流程。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/hosting/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/provision/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/hosting/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/onboarding/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/onboarding/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/onboard/",
+        "lobster-factory/docs/hosting/",
+        "lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/aw-hosting-gate.sh",
+        "lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/hosting-gate.test.sh",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/deprovision-staging.sh",
+        "agency-os/tenants/",
+        "agency-os/automation/",
+        "automation/",
+        "agency-os/handoffs/2026-09-30-master-plan-remaining.md",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/onboarding/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(public)/intake/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/wp-plugin-stack-catalog.ts",
+        "agency-os/platform-templates/",
+        "lobster-factory/templates/",
+        "lobster-factory/docs/ONE_CLICK_BUILD_SOP.md",
+        "lobster-factory/docs/WORDPRESS_FACTORY_EXECUTION_SPEC.md"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "e4f31e66-d044-4161-8b71-7060f2cc11c0",
+      "slug": "wordpress-ops",
+      "name": "WordPress 客戶站維運",
+      "aliases": [
+        "wp-bridge",
+        "mainwp",
+        "wp-maintenance"
+      ],
+      "type": "infrastructure",
+      "purpose": "所有客戶 WordPress 站的橋接外掛、MainWP、備份與安全更新、WP 排程。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/packages/wp-bridge-plugin/",
+        "lobster-factory/infra/mainwp/",
+        "runbooks/WP-BRIDGE-RELEASE-RUNBOOK.md",
+        "runbooks/WORDPRESS-LOGIN-SECURITY.md",
+        "lobster-factory/infra/hetzner-phase1-core/scripts/wp-cron-runner.sh",
+        "lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/wp-cron-runner.test.sh",
+        "lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/wp-login-audit.test.php",
+        "scripts/update-client-wp-plugins.ps1",
+        "docs/wordpress_mainwp_plan.md",
+        "includes/",
+        "tests/Auth/",
+        "tests/Http/",
+        "tests/Transaction/",
+        "tests/Validation/",
+        "tests/bootstrap.php",
+        "aware-wave-wp-bridge.php",
+        "composer.json",
+        "phpunit.xml",
+        ".wp-env.json",
+        "agency-os/docs/wp-bridge-product-template.md",
+        "WP_BRIDGE_CONTROL_PLANE_DESIGN.md",
+        "scripts/release-wp-bridge.sh",
+        "scripts/rollout-wp-bridge.ps1",
+        "scripts/bootstrap-local-wordpress-windows.ps1",
+        "lobster-factory/docs/BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md",
+        "lobster-factory/docs/PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md",
+        "lobster-factory/packages/db/migrations/0039_wp_sites.sql",
+        "lobster-factory/packages/db/migrations/0040_wp_sites_add_username.sql",
+        "lobster-factory/packages/db/migrations/0057_seed_wp_maintenance_action.sql",
+        "lobster-factory/packages/db/migrations/0061_wp_sites_add_org.sql",
+        "lobster-factory/packages/db/scripts/0057_seed_wp_maintenance_action_down.sql",
+        "lobster-factory/packages/db/scripts/0061_wp_sites_add_org_down.sql"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "5ec95120-9df2-4923-b156-d03b836a60fe",
+      "slug": "host-infra",
+      "name": "主機與部署",
+      "aliases": [
+        "ks-aw-01",
+        "sg-deploy",
+        "infra",
+        "backup"
+      ],
+      "type": "infrastructure",
+      "purpose": "唯一主機 ks-aw-01 的容器、nginx、部署閘、備份還原與安全加固。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/scripts/",
+        "lobster-factory/infra/hetzner-phase1-core/tests/",
+        "lobster-factory/infra/hetzner-phase1-core/nginx/",
+        "lobster-factory/infra/hetzner-phase1-core/apache/",
+        "lobster-factory/infra/hetzner-phase1-core/auto-reboot/",
+        "lobster-factory/infra/hetzner-phase1-core/observability/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/node-api/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/r2-egress-proxy/",
+        "lobster-factory/infra/hetzner-phase1-core/.env.example",
+        "lobster-factory/infra/hetzner-phase1-core/.env.renderer-staging.example",
+        "lobster-factory/infra/hetzner-phase1-core/BACKUP_RESTORE_PROOF.md",
+        "lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md",
+        "lobster-factory/infra/hetzner-phase1-core/MAINTENANCE_CALENDAR.md",
+        "lobster-factory/infra/hetzner-phase1-core/README.md",
+        "lobster-factory/infra/hetzner-phase1-core/SAME_VPS_STAGING_RUNBOOK.md",
+        "lobster-factory/infra/hetzner-phase1-core/docker-compose.observability.yml",
+        "lobster-factory/infra/hetzner-phase1-core/docker-compose.renderer-staging.yml",
+        "lobster-factory/infra/eu-backup/",
+        "lobster-factory/infra/ks-aw-01-backup/",
+        "lobster-factory/infra/ks-aw-01/",
+        "lobster-factory/infra/hetzner-eu/",
+        "lobster-factory/infra/supabase/",
+        "lobster-factory/infra/n8n/",
+        "lobster-factory/infra/netdata/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/backup/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/backup/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/deploy/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/github/",
+        "runbooks/",
+        "agency-os/docs/infrastructure/",
+        "agency-os/docs/edge-and-domains/",
+        "lobster-factory/infra/hetzner-phase1-core/fail2ban/",
+        "lobster-factory/infra/hetzner-phase1-core/netdata/",
+        "lobster-factory/infra/hetzner-phase1-core/docs/",
+        "lobster-factory/infra/hetzner-phase1-core/.gitignore",
+        "lobster-factory/infra/hetzner-phase1-core/.env.staging.example",
+        "lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml",
+        "lobster-factory/infra/hetzner-phase1-core/docker-compose.recommended-ai-native.yml"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "0900b9f7-f09f-496b-be87-0518ea59f259",
+      "slug": "database",
+      "name": "資料庫結構",
+      "aliases": [
+        "db",
+        "migrations",
+        "supabase"
+      ],
+      "type": "infrastructure",
+      "purpose": "Supabase 資料表、migration 與回滾腳本、上線前的 migration 閘。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/packages/db/",
+        "agency-os/supabase/"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "5b677cb7-3c30-40d2-8992-c14ea3632ba2",
+      "slug": "governance",
+      "name": "治理規則與機械閘",
+      "aliases": [
+        "agents-md",
+        "hooks",
+        "gates",
+        "codex-parity"
+      ],
+      "type": "governance",
+      "purpose": "AI 工作規則（AGENTS／CLAUDE）、Claude 與 Codex 的 hooks、skills、指令與 CI 閘，以及治理文件。",
+      "product_key": null,
+      "source_paths": [
+        ".claude/",
+        ".codex/",
+        ".agents/",
+        ".cursor/",
+        "agency-os/.cursor/",
+        "mcp/",
+        "mcp-local-wrappers/",
+        "mcp.json.template",
+        "tests/hooks/",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "agency-os/AGENTS.md",
+        "agency-os/handoffs/codex-queue/",
+        ".github/",
+        "agency-os/docs/",
+        "docs/",
+        "lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md",
+        "lobster-factory/docs/ROUTING_MATRIX.md",
+        "lobster-factory/workflow-risk-matrix.json",
+        "lobster-factory/docs/V3_GOVERNANCE_GATES.md",
+        "lobster-factory/docs/operations/",
+        "lobster-factory/scripts/",
+        "bin/",
+        "agency-os/handoffs/SCHEMA.md",
+        "tests/oracle-capture-policy.test.ps1",
+        "tests/oracle-console-utf8.test.ps1",
+        "scripts/bughunt-oracle.ps1",
+        "scripts/claude-oracle.ps1",
+        "scripts/codex-oracle.ps1",
+        "scripts/oracle-capture-policy.ps1",
+        "scripts/oracle-quota.ps1",
+        "scripts/write-oracle-artifact.ps1"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "0a0673a5-68b7-459b-ac1d-914d37dc121b",
+      "slug": "ao-operations",
+      "name": "開工收工與日常營運",
+      "aliases": [
+        "ao-resume",
+        "ao-close",
+        "health",
+        "smoke"
+      ],
+      "type": "governance",
+      "purpose": "AO-RESUME／AO-CLOSE、健康檢查、smoke、WORKLOG 工具與筆電端全域腳本。",
+      "product_key": null,
+      "source_paths": [
+        "scripts/",
+        "agency-os/scripts/",
+        "tests/",
+        "agency-os/config/",
+        ".agency-state/",
+        "agency-os/README.md",
+        "agency-os/LAST_SYSTEM_STATUS.md",
+        "agency-os/RESUME_AFTER_REBOOT.md",
+        "agency-os/WORKLOG-archive/",
+        "agency-os/handoffs/",
+        "README.md",
+        "ONBOARDING.md",
+        "WORKLOG.md",
+        ".gitignore",
+        ".gitattributes",
+        ".dockerignore",
+        "agency-os/handoffs/2026-09-10-1737-f08-strategy-closeout.md",
+        "agency-os/handoffs/2026-09-30-codex-work-review.md"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "6f716d82-7d1d-4063-b9bf-6d1c7b2f5ece",
+      "slug": "meeting-ppt",
+      "name": "會議轉簡報",
+      "aliases": [
+        "meeting-service"
+      ],
+      "type": "internal",
+      "purpose": "會議錄音轉逐字稿、摘要與簡報。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "3d3cb5b4-74b6-4a43-923a-8dde251faaa5",
+      "slug": "client-soulful",
+      "name": "客戶：Soulful Expression",
+      "aliases": [
+        "soulful",
+        "soulfulexpression"
+      ],
+      "type": "client",
+      "purpose": "Soulful Expression 網站代管：主機、nginx、備份、外掛維護。",
+      "product_key": null,
+      "source_paths": [
+        "agency-os/tenants/company-soulful-expression/",
+        "lobster-factory/infra/soulful/",
+        "scripts/verify-soulful-cutover.ps1"
+      ],
+      "phases": [],
+      "features": []
+    },
+    {
+      "id": "af947890-3086-421b-86a9-161a7ccff458",
+      "slug": "client-aware-wave",
+      "name": "客戶：Aware Wave 官網",
+      "aliases": [
+        "aware-wave.com",
+        "awarewave-wp"
+      ],
+      "type": "client",
+      "purpose": "自家 aware-wave.com WordPress 官網（收錢的門）的容器與維護。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/wordpress/"
+      ],
+      "phases": [],
+      "features": []
     }
   ]
 }
