@@ -29,7 +29,6 @@ const RULINGS: Record<string, string> = {
   '49-2': '同 49-0。',
   '55-6': '維基「窺」「觌」(後者簡體漏轉);ichingpy、ichingshifa 作「闚」,保留。',
   '59-1': '維基多「悔亡」;三個 I1 來源皆無,保留。',
-  '59-2': '維基「机」;本站「機」是簡體「机」經 OpenCC 轉出,疑本站錯,建議改「机」,見 RISKS。',
 };
 
 const PUNCT = /[，。：；、！？「」\s,.;:]/g;
