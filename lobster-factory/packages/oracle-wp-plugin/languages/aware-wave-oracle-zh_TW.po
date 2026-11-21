@@ -1,0 +1,141 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: aware-wave-oracle\n"
+"Language: zh_TW\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Domain: aware-wave-oracle\n"
+
+msgid "AwareWave Oracle"
+msgstr "AwareWave 命理"
+
+msgid "Engine URL (browser) must be an https:// address without query or fragment."
+msgstr "引擎網址（瀏覽器用）必須是 https:// 開頭，且不可帶查詢字串或 #。"
+
+msgid "Engine URL (server) must be an http(s):// address without query or fragment."
+msgstr "引擎網址（伺服器用）必須是 http:// 或 https:// 開頭，且不可帶查詢字串或 #。"
+
+msgid "Key ID: 3–64 characters, lowercase letters, digits, - and _."
+msgstr "金鑰名稱：3–64 個字元，只能用小寫英文字母、數字、- 和 _。"
+
+#, php-format
+msgid "These lines were not saved (wrong format): %s"
+msgstr "以下幾行格式不對，沒有儲存：%s"
+
+msgid "Insufficient permissions."
+msgstr "權限不足。"
+
+msgid "Engine URL (browser)"
+msgstr "引擎網址（瀏覽器用）"
+
+msgid "Address visitors’ browsers load the embedded tools from, e.g. https://engine.example.com"
+msgstr "訪客的瀏覽器從這個網址載入嵌入的工具，例如 https://engine.example.com"
+
+msgid "Engine URL (server)"
+msgstr "引擎網址（伺服器用）"
+
+msgid "Address this WordPress server calls the engine at. Leave empty to use the browser URL; may be an internal http:// address."
+msgstr "本站 WordPress 伺服器呼叫引擎用的網址。留空就用瀏覽器用網址；可填內部的 http:// 網址。"
+
+msgid "Key ID"
+msgstr "金鑰名稱"
+
+msgid "The name this site is registered under at the engine."
+msgstr "本站在引擎登記時使用的名稱。"
+
+msgid "Default engine language"
+msgstr "預設引擎語言"
+
+msgid "Used when the page language has no entry below, e.g. en or zh-TW."
+msgstr "頁面語言在下方對照表找不到時使用，例如 en 或 zh-TW。"
+
+msgid "Language map"
+msgstr "語言對照"
+
+msgid "One per line: WordPress locale=engine language, e.g. zh_TW=zh-TW"
+msgstr "每行一筆：WordPress 語系=引擎語言，例如 zh_TW=zh-TW"
+
+msgid "Tool pages"
+msgstr "工具頁面"
+
+msgid "One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page."
+msgstr "每行一筆：工具=頁面 ID。嵌入的工具連到另一個工具時，訪客會被帶到這個頁面。"
+
+msgid "Site key"
+msgstr "站台金鑰"
+
+msgid "This site signs its requests to the engine with an Ed25519 key. The private half never leaves this site; register the public key below with the engine under the key ID above."
+msgstr "本站以 Ed25519 金鑰為送往引擎的請求簽章。私鑰只留在本站；請把下方的公鑰以上面的金鑰名稱登記到引擎。"
+
+msgid "No key yet."
+msgstr "尚未建立金鑰。"
+
+msgid "I understand the old key stops working until the new public key is registered at the engine."
+msgstr "我了解：新公鑰登記到引擎之前，舊金鑰就會失效。"
+
+msgid "Rotate key"
+msgstr "更換金鑰"
+
+msgid "Generate key"
+msgstr "建立金鑰"
+
+msgid "Member pseudonyms"
+msgstr "會員代號"
+
+msgid "The engine never sees member IDs or e-mails, only HMAC(salt, user ID). Rotating the salt makes every member look new to the engine (usage limits restart)."
+msgstr "引擎看不到會員 ID 或電子郵件，只看到 HMAC(鹽, 使用者 ID)。更換鹽之後，每位會員在引擎看來都是新的（用量限制重新計算）。"
+
+msgid "Yes, rotate the salt."
+msgstr "是，更換鹽。"
+
+msgid "Rotate salt"
+msgstr "更換鹽"
+
+msgid "Tools available from the engine"
+msgstr "引擎提供的工具"
+
+msgid "None — check the engine URL."
+msgstr "沒有工具，請檢查引擎網址。"
+
+msgid "Shortcode:"
+msgstr "短碼："
+
+msgid "Refresh tool list"
+msgstr "重新取得工具清單"
+
+msgid "Tick the confirmation box to rotate the key."
+msgstr "要更換金鑰，請先勾選確認。"
+
+msgid "New key created. Register the public key below at the engine."
+msgstr "已建立新金鑰。請把下方公鑰登記到引擎。"
+
+msgid "Tick the confirmation box to rotate the salt."
+msgstr "要更換鹽，請先勾選確認。"
+
+msgid "Salt rotated."
+msgstr "已更換鹽。"
+
+msgid "Tool list refreshed."
+msgstr "已重新取得工具清單。"
+
+msgid "Choose a tool to embed:"
+msgstr "選擇要嵌入的工具："
+
+msgid "Embedded tool:"
+msgstr "已嵌入的工具："
+
+msgid "No tools available — check Settings → AwareWave Oracle."
+msgstr "沒有可用的工具，請到「設定 → AwareWave 命理」檢查。"
+
+msgid "The tool appears here on the published page."
+msgstr "頁面發佈後，工具會顯示在這裡。"
+
+msgid "AwareWave Oracle: set the engine URL in Settings → AwareWave Oracle and use a valid tool name."
+msgstr "AwareWave 命理：請到「設定 → AwareWave 命理」填入引擎網址，並使用正確的工具名稱。"
+
+#, php-format
+msgid "AwareWave Oracle: %s"
+msgstr "AwareWave 命理：%s"
+

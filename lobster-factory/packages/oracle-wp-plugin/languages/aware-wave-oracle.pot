@@ -1,0 +1,137 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: aware-wave-oracle\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"X-Domain: aware-wave-oracle\n"
+
+msgid "AwareWave Oracle"
+msgstr ""
+
+msgid "Engine URL (browser) must be an https:// address without query or fragment."
+msgstr ""
+
+msgid "Engine URL (server) must be an http(s):// address without query or fragment."
+msgstr ""
+
+msgid "Key ID: 3–64 characters, lowercase letters, digits, - and _."
+msgstr ""
+
+#, php-format
+msgid "These lines were not saved (wrong format): %s"
+msgstr ""
+
+msgid "Insufficient permissions."
+msgstr ""
+
+msgid "Engine URL (browser)"
+msgstr ""
+
+msgid "Address visitors’ browsers load the embedded tools from, e.g. https://engine.example.com"
+msgstr ""
+
+msgid "Engine URL (server)"
+msgstr ""
+
+msgid "Address this WordPress server calls the engine at. Leave empty to use the browser URL; may be an internal http:// address."
+msgstr ""
+
+msgid "Key ID"
+msgstr ""
+
+msgid "The name this site is registered under at the engine."
+msgstr ""
+
+msgid "Default engine language"
+msgstr ""
+
+msgid "Used when the page language has no entry below, e.g. en or zh-TW."
+msgstr ""
+
+msgid "Language map"
+msgstr ""
+
+msgid "One per line: WordPress locale=engine language, e.g. zh_TW=zh-TW"
+msgstr ""
+
+msgid "Tool pages"
+msgstr ""
+
+msgid "One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page."
+msgstr ""
+
+msgid "Site key"
+msgstr ""
+
+msgid "This site signs its requests to the engine with an Ed25519 key. The private half never leaves this site; register the public key below with the engine under the key ID above."
+msgstr ""
+
+msgid "No key yet."
+msgstr ""
+
+msgid "I understand the old key stops working until the new public key is registered at the engine."
+msgstr ""
+
+msgid "Rotate key"
+msgstr ""
+
+msgid "Generate key"
+msgstr ""
+
+msgid "Member pseudonyms"
+msgstr ""
+
+msgid "The engine never sees member IDs or e-mails, only HMAC(salt, user ID). Rotating the salt makes every member look new to the engine (usage limits restart)."
+msgstr ""
+
+msgid "Yes, rotate the salt."
+msgstr ""
+
+msgid "Rotate salt"
+msgstr ""
+
+msgid "Tools available from the engine"
+msgstr ""
+
+msgid "None — check the engine URL."
+msgstr ""
+
+msgid "Shortcode:"
+msgstr ""
+
+msgid "Refresh tool list"
+msgstr ""
+
+msgid "Tick the confirmation box to rotate the key."
+msgstr ""
+
+msgid "New key created. Register the public key below at the engine."
+msgstr ""
+
+msgid "Tick the confirmation box to rotate the salt."
+msgstr ""
+
+msgid "Salt rotated."
+msgstr ""
+
+msgid "Tool list refreshed."
+msgstr ""
+
+msgid "Choose a tool to embed:"
+msgstr ""
+
+msgid "Embedded tool:"
+msgstr ""
+
+msgid "No tools available — check Settings → AwareWave Oracle."
+msgstr ""
+
+msgid "The tool appears here on the published page."
+msgstr ""
+
+msgid "AwareWave Oracle: set the engine URL in Settings → AwareWave Oracle and use a valid tool name."
+msgstr ""
+
+#, php-format
+msgid "AwareWave Oracle: %s"
+msgstr ""
+
