@@ -14,9 +14,24 @@
  *   福點 日盤＝上升＋月−日、夜盤＝上升＋日−月；精神點日夜相反。宮位用整宮制（自上升星座起算）。
  * - 年小限（openephem `profections.py`）：0 歲＝上升星座為第 1 宮，每滿一歲前進一個星座；
  *   年主星＝該星座的古典守護星。年齡依出生日與今天（使用者時區）算足歲。
+ * - 其餘 19 個阿拉伯點（flatlib `tools/arabicparts.py` FORMULAS）：點 = C + B − A（A 到 B 的距離從 C 投出），
+ *   夜盤用夜間公式；宮頭用本命盤 Placidus 宮頭，「宮主」＝宮頭星座的古典守護星。
+ * - 與太陽距離（flatlib `dignities/accidental.py` sunRelation）：月亮與五星距太陽 < 17′（0.2833°）＝日核（cazimi）、
+ *   < 8° ＝燃燒（combust）、< 16° ＝在太陽光束下（under the beams），以黃經最短弧計。
+ * - 時間主星（法達、黃道釋放、十年期）規則見 lib/astrologyTimeLords.ts。
  */
 import type { BodyKey } from './astrology';
 import type { Ymd } from './today';
+import {
+  decennialAt,
+  elapsedDays,
+  firdariaAt,
+  releasingAt,
+  type BirthMoment,
+  type DecennialNow,
+  type FirdariaNow,
+  type ReleasingNow,
+} from './astrologyTimeLords';
 
 export const CLASSICAL_PLANETS = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn'] as const;
 export type ClassicalPlanet = (typeof CLASSICAL_PLANETS)[number];
@@ -151,5 +166,137 @@ export function traditionalReading(
     fortune: place(fortune),
     spirit: place(spirit),
     profection: annualProfection(asc.signIndex, birth, today),
+  };
+}
+
+// ---------------------------------------------------------------- 其餘阿拉伯點
+
+/** 公式的一項：行星、福點／精神點、第 n 宮頭（cusp n）、第 n 宮宮主（ruler n） */
+type PartTerm = ClassicalPlanet | 'asc' | 'fortune' | 'spirit' | `cusp${2 | 8 | 9 | 12}` | `ruler${2 | 9 | 12}`;
+
+/** [日盤 A, B, C]、[夜盤 A, B, C]：點 = C + B − A */
+export const ARABIC_PARTS = {
+  faith: [['moon', 'mercury', 'asc'], ['mercury', 'moon', 'asc']],
+  substance: [['ruler2', 'cusp2', 'asc'], ['ruler2', 'cusp2', 'asc']],
+  weddingMale: [['saturn', 'venus', 'asc'], ['saturn', 'venus', 'asc']],
+  weddingFemale: [['venus', 'saturn', 'asc'], ['venus', 'saturn', 'asc']],
+  sons: [['jupiter', 'saturn', 'asc'], ['saturn', 'jupiter', 'asc']],
+  father: [['sun', 'saturn', 'asc'], ['saturn', 'sun', 'asc']],
+  mother: [['venus', 'moon', 'asc'], ['moon', 'venus', 'asc']],
+  brothers: [['saturn', 'jupiter', 'asc'], ['saturn', 'jupiter', 'asc']],
+  diseases: [['saturn', 'mars', 'asc'], ['mars', 'saturn', 'asc']],
+  death: [['moon', 'cusp8', 'saturn'], ['moon', 'cusp8', 'saturn']],
+  travel: [['ruler9', 'cusp9', 'asc'], ['ruler9', 'cusp9', 'asc']],
+  friends: [['moon', 'mercury', 'asc'], ['moon', 'mercury', 'asc']],
+  enemies: [['ruler12', 'cusp12', 'asc'], ['ruler12', 'cusp12', 'asc']],
+  saturn: [['saturn', 'fortune', 'asc'], ['fortune', 'saturn', 'asc']],
+  jupiter: [['spirit', 'jupiter', 'asc'], ['jupiter', 'spirit', 'asc']],
+  mars: [['mars', 'fortune', 'asc'], ['fortune', 'mars', 'asc']],
+  venus: [['spirit', 'venus', 'asc'], ['venus', 'spirit', 'asc']],
+  mercury: [['mercury', 'fortune', 'asc'], ['fortune', 'mercury', 'asc']],
+  horsemanship: [['saturn', 'moon', 'asc'], ['moon', 'saturn', 'asc']],
+} as const satisfies Record<string, readonly [readonly [PartTerm, PartTerm, PartTerm], readonly [PartTerm, PartTerm, PartTerm]]>;
+
+export type ArabicPartKey = keyof typeof ARABIC_PARTS;
+
+export interface PartsInput {
+  diurnal: boolean;
+  asc: number;
+  /** 12 宮頭黃經（度），index 0 = 第 1 宮 */
+  cusps: readonly number[];
+  planets: Record<ClassicalPlanet, number>;
+  fortune: number;
+  spirit: number;
+}
+
+function termLon(term: PartTerm, x: PartsInput): number {
+  if (term === 'asc') return x.asc;
+  if (term === 'fortune') return x.fortune;
+  if (term === 'spirit') return x.spirit;
+  if (term.startsWith('cusp')) return x.cusps[Number(term.slice(4)) - 1];
+  if (term.startsWith('ruler')) {
+    const cusp = x.cusps[Number(term.slice(5)) - 1];
+    return x.planets[DOMICILE_RULER[Math.floor(norm360(cusp) / 30)]];
+  }
+  return x.planets[term as ClassicalPlanet];
+}
+
+export function arabicPart(key: ArabicPartKey, x: PartsInput): number {
+  const [a, b, c] = ARABIC_PARTS[key][x.diurnal ? 0 : 1];
+  return norm360(termLon(c, x) + termLon(b, x) - termLon(a, x));
+}
+
+// ---------------------------------------------------------------- 與太陽距離
+
+export type SunRelation = 'cazimi' | 'combust' | 'underBeams';
+
+export const CAZIMI_DEG = 0.2833;
+export const COMBUST_DEG = 8;
+export const UNDER_BEAMS_DEG = 16;
+
+/** 行星與太陽的黃經最短弧距離分級；16° 以外回傳 null。 */
+export function sunRelation(planetLon: number, sunLon: number): SunRelation | null {
+  const d = Math.abs(norm360(planetLon - sunLon + 180) - 180);
+  if (d < CAZIMI_DEG) return 'cazimi';
+  if (d < COMBUST_DEG) return 'combust';
+  if (d < UNDER_BEAMS_DEG) return 'underBeams';
+  return null;
+}
+
+// ---------------------------------------------------------------- 彙整
+
+export interface TechniquesReading {
+  diurnal: boolean;
+  /** 出生到今天正午的天數 */
+  days: number;
+  firdaria: FirdariaNow | null;
+  releasingFortune: ReleasingNow | null;
+  releasingSpirit: ReleasingNow | null;
+  decennialStart: ClassicalPlanet;
+  decennial: DecennialNow | null;
+  parts: { key: ArabicPartKey; longitude: number; signIndex: number; house: number }[];
+  sunRelations: { planet: Exclude<ClassicalPlanet, 'sun'>; relation: SunRelation; distance: number }[];
+}
+
+/** 法達、黃道釋放、十年期、其餘阿拉伯點、與太陽距離。缺古典行星時回傳 null。 */
+export function techniquesReading(
+  chart: {
+    ascendant: { longitude: number; signIndex: number };
+    houseCusps: readonly number[];
+    planets: readonly { body: BodyKey; longitude: number }[];
+  },
+  birth: BirthMoment,
+  today: Ymd,
+): TechniquesReading | null {
+  const lon = {} as Record<ClassicalPlanet, number>;
+  for (const p of chart.planets) if (isClassical(p.body)) lon[p.body] = p.longitude;
+  if (CLASSICAL_PLANETS.some((k) => lon[k] === undefined)) return null;
+  const asc = chart.ascendant;
+  const diurnal = isDiurnal(lon.sun, asc.longitude);
+  const { fortune, spirit } = lots(asc.longitude, lon.sun, lon.moon, diurnal);
+  const signOf = (l: number) => Math.floor(norm360(l) / 30) % 12;
+  const fortuneSign = signOf(fortune);
+  const days = elapsedDays(birth, today);
+  const decennialStart = DOMICILE_RULER[fortuneSign];
+  const input: PartsInput = { diurnal, asc: asc.longitude, cusps: chart.houseCusps, planets: lon, fortune, spirit };
+  const parts = (Object.keys(ARABIC_PARTS) as ArabicPartKey[]).map((key) => {
+    const l = arabicPart(key, input);
+    return { key, longitude: l, signIndex: signOf(l), house: wholeSignHouse(signOf(l), asc.signIndex) };
+  });
+  const sunRelations: TechniquesReading['sunRelations'] = [];
+  for (const planet of ['moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn'] as const) {
+    const relation = sunRelation(lon[planet], lon.sun);
+    if (relation) sunRelations.push({ planet, relation, distance: Math.abs(norm360(lon[planet] - lon.sun + 180) - 180) });
+  }
+  return {
+    diurnal,
+    days,
+    firdaria: firdariaAt(diurnal, days),
+    releasingFortune: releasingAt(fortuneSign, fortuneSign, days),
+    releasingSpirit: releasingAt(signOf(spirit), fortuneSign, days),
+    decennialStart,
+    decennial: decennialAt(decennialStart, days),
+    parts,
+    sunRelations,
   };
 }

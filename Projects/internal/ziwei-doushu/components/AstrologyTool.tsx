@@ -18,10 +18,17 @@ import {
   synastryContext,
   transitAspectLabel,
   transitContext,
+  decennialLine,
+  firdariaLine,
+  PART_NAMES,
+  partLine,
+  releasingLine,
+  sunRelationsLine,
+  techniquesContext,
 } from '@/lib/astrologyView';
 import type { BodyKey, SynastryResult, TransitResult, WesternChart, WesternRequest } from '@/lib/astrology';
 import type { Aspect } from '@/lib/astrologyAspects';
-import { traditionalReading } from '@/lib/astrologyTraditional';
+import { techniquesReading, traditionalReading } from '@/lib/astrologyTraditional';
 import { localToday } from '@/lib/today';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
@@ -171,6 +178,7 @@ export default function AstrologyTool({
 
           {natalReq ? (
             <>
+              <TechniquesPanel chart={chart} natalReq={natalReq} dict={dict} locale={locale} />
               <TransitPanel natalReq={natalReq} dict={dict} locale={locale} />
               <SynastryPanel natalReq={natalReq} dict={dict} locale={locale} />
             </>
@@ -352,6 +360,51 @@ function SynastryPanel({ natalReq, dict, locale }: { natalReq: WesternRequest; d
           <AiReading context={synastryContext(result, locale)} ai={dict.ai} />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function TechniquesPanel({
+  chart,
+  natalReq,
+  dict,
+  locale,
+}: {
+  chart: WesternChart;
+  natalReq: WesternRequest;
+  dict: Dictionary;
+  locale: Locale;
+}) {
+  const t = dict.astrology;
+  const r = techniquesReading(chart, natalReq, localToday());
+  if (!r) return null;
+  const row = (label: string, value: string) => (
+    <li>
+      <span style={{ color: 'var(--text-caption)' }}>{label}　</span>
+      <span style={{ color: 'var(--text-heading)' }}>{value}</span>
+    </li>
+  );
+  return (
+    <div className="glass-card p-4 mt-8" style={{ fontSize: '0.8125rem' }}>
+      <h2 className="label-dark" style={{ marginBottom: '0.5rem' }}>{t.techniques}</h2>
+      <ul style={{ display: 'grid', gap: '0.3rem' }}>
+        {r.firdaria ? row(t.firdaria, firdariaLine(r, natalReq, locale)) : null}
+        {r.releasingFortune ? row(t.releasingFortune, releasingLine(r.releasingFortune, natalReq, locale)) : null}
+        {r.releasingSpirit ? row(t.releasingSpirit, releasingLine(r.releasingSpirit, natalReq, locale)) : null}
+        {r.decennial ? row(t.decennials, decennialLine(r, natalReq, locale)) : null}
+        {row(t.sunRelations, sunRelationsLine(r, locale))}
+      </ul>
+      <h3 className="label-dark" style={{ margin: '0.75rem 0 0.4rem' }}>{t.otherLots}</h3>
+      <ul style={{ display: 'grid', gap: '0.25rem', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+        {r.parts.map((p) => (
+          <li key={p.key}>
+            <span style={{ color: 'var(--text-caption)' }}>{PART_NAMES[p.key][locale]}　</span>
+            <span style={{ color: 'var(--text-heading)' }}>{partLine(p, locale)}</span>
+          </li>
+        ))}
+      </ul>
+      <p style={{ color: 'var(--text-caption)', fontSize: '0.7rem', marginTop: '0.5rem' }}>{t.techniquesNote}</p>
+      <AiReading context={techniquesContext(r, natalReq, locale)} ai={dict.ai} />
     </div>
   );
 }

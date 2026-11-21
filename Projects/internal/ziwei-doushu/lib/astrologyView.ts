@@ -2,7 +2,16 @@ import type { Locale } from './i18n/config';
 import type { BodyKey, SynastryResult, TransitResult, WesternChart } from './astrology';
 import type { InterpretationContext } from './divination/types';
 import type { Aspect, AspectKey } from './astrologyAspects';
-import type { DignityKey, Profection, TraditionalReading } from './astrologyTraditional';
+import type {
+  ArabicPartKey,
+  DignityKey,
+  Profection,
+  SunRelation,
+  TechniquesReading,
+  TraditionalReading,
+} from './astrologyTraditional';
+import type { Angularity, BirthMoment, FirdariaLord, Period, ReleasePeriod } from './astrologyTimeLords';
+import { YEAR_DAYS, dateAfterBirth } from './astrologyTimeLords';
 
 /**
  * 西洋占星「顯示層」— 純函式、client/server 共用(type-only import,不拉 wasm)。
@@ -280,5 +289,123 @@ export function synastryContext(s: SynastryResult, locale: Locale): Interpretati
     locale,
     headline: en ? 'Synastry' : '合盤',
     facts,
+  };
+}
+
+// ---------------------------------------------------------------- 時間主星與其餘技法(獨立 context)
+
+export const PART_NAMES: Record<ArabicPartKey, Record<Locale, string>> = {
+  faith: { 'zh-TW': '信仰點', en: 'Lot of Faith' },
+  substance: { 'zh-TW': '財物點', en: 'Lot of Substance' },
+  weddingMale: { 'zh-TW': '婚姻點(男命)', en: 'Lot of Marriage (men)' },
+  weddingFemale: { 'zh-TW': '婚姻點(女命)', en: 'Lot of Marriage (women)' },
+  sons: { 'zh-TW': '子女點', en: 'Lot of Children' },
+  father: { 'zh-TW': '父親點', en: 'Lot of the Father' },
+  mother: { 'zh-TW': '母親點', en: 'Lot of the Mother' },
+  brothers: { 'zh-TW': '手足點', en: 'Lot of Siblings' },
+  diseases: { 'zh-TW': '疾病點', en: 'Lot of Illness' },
+  death: { 'zh-TW': '死亡點', en: 'Lot of Death' },
+  travel: { 'zh-TW': '旅行點', en: 'Lot of Travel' },
+  friends: { 'zh-TW': '朋友點', en: 'Lot of Friends' },
+  enemies: { 'zh-TW': '敵人點', en: 'Lot of Enemies' },
+  saturn: { 'zh-TW': '土星點(宿命)', en: 'Lot of Saturn (Nemesis)' },
+  jupiter: { 'zh-TW': '木星點(勝利)', en: 'Lot of Jupiter (Victory)' },
+  mars: { 'zh-TW': '火星點(勇氣)', en: 'Lot of Mars (Courage)' },
+  venus: { 'zh-TW': '金星點(愛欲)', en: 'Lot of Venus (Eros)' },
+  mercury: { 'zh-TW': '水星點(必然)', en: 'Lot of Mercury (Necessity)' },
+  horsemanship: { 'zh-TW': '騎術點', en: 'Lot of Horsemanship' },
+};
+
+export const SUN_RELATION_NAMES: Record<SunRelation, Record<Locale, string>> = {
+  cazimi: { 'zh-TW': '日核', en: 'cazimi' },
+  combust: { 'zh-TW': '燃燒', en: 'combust' },
+  underBeams: { 'zh-TW': '在太陽光束下', en: 'under the beams' },
+};
+
+const ANGULARITY_NAMES: Record<Angularity, Record<Locale, string>> = {
+  angular: { 'zh-TW': '角宮・巔峰期', en: 'angular (peak)' },
+  succedent: { 'zh-TW': '續宮', en: 'succedent' },
+  cadent: { 'zh-TW': '果宮', en: 'cadent' },
+};
+
+export function lordName(lord: FirdariaLord, locale: Locale): string {
+  if (lord === 'southNode') return locale === 'en' ? 'South Node' : '南交點';
+  return bodyName(lord, locale);
+}
+
+function ymdText(d: { year: number; month: number; day: number }): string {
+  return `${d.year}-${pad2(d.month)}-${pad2(d.day)}`;
+}
+
+/** 「2016-01-01 ～ 2025-01-01(16.0–25.0 歲)」 */
+export function periodRange(p: { start: number; end: number }, birth: BirthMoment, locale: Locale): string {
+  const a = (p.start / YEAR_DAYS).toFixed(1);
+  const b = (p.end / YEAR_DAYS).toFixed(1);
+  const dates = `${ymdText(dateAfterBirth(birth, p.start))} ～ ${ymdText(dateAfterBirth(birth, p.end))}`;
+  return locale === 'en' ? `${dates} (age ${a}–${b})` : `${dates}(${a}–${b} 歲)`;
+}
+
+export function firdariaLine(r: TechniquesReading, birth: BirthMoment, locale: Locale): string {
+  const f = r.firdaria!;
+  const major = `${lordName(f.major.ruler, locale)} ${periodRange(f.major, birth, locale)}`;
+  if (!f.sub) return major;
+  const sub = `${lordName(f.sub.ruler, locale)} ${periodRange(f.sub, birth, locale)}`;
+  return locale === 'en' ? `major ${major}; sub ${sub}` : `大運 ${major}・小運 ${sub}`;
+}
+
+function releaseLevel(p: ReleasePeriod, birth: BirthMoment, locale: Locale): string {
+  const lb = p.loosing ? (locale === 'en' ? ', loosing of the bond' : '・解除束縛') : '';
+  const ang = ANGULARITY_NAMES[p.angularity][locale];
+  return locale === 'en'
+    ? `${signName(p.signIndex, locale)} (${ang}${lb}) ${periodRange(p, birth, locale)}`
+    : `${signName(p.signIndex, locale)}(${ang}${lb})${periodRange(p, birth, locale)}`;
+}
+
+export function releasingLine(z: NonNullable<TechniquesReading['releasingFortune']>, birth: BirthMoment, locale: Locale): string {
+  return locale === 'en'
+    ? `L1 ${releaseLevel(z.l1, birth, locale)}; L2 ${releaseLevel(z.l2, birth, locale)}`
+    : `第一層 ${releaseLevel(z.l1, birth, locale)}・第二層 ${releaseLevel(z.l2, birth, locale)}`;
+}
+
+export function decennialLine(r: TechniquesReading, birth: BirthMoment, locale: Locale): string {
+  const d = r.decennial!;
+  const span = (p: Period<typeof d.major.ruler>) => `${bodyName(p.ruler, locale)} ${periodRange(p, birth, locale)}`;
+  return locale === 'en' ? `general ${span(d.major)}; sub ${span(d.sub)}` : `主段 ${span(d.major)}・分段 ${span(d.sub)}`;
+}
+
+export function sunRelationsLine(r: TechniquesReading, locale: Locale): string {
+  if (r.sunRelations.length === 0) {
+    return locale === 'en' ? 'no planet within 16° of the Sun' : '沒有行星在太陽 16° 以內';
+  }
+  return r.sunRelations
+    .map((x) => `${bodyName(x.planet, locale)} ${SUN_RELATION_NAMES[x.relation][locale]} ${x.distance.toFixed(1)}°`)
+    .join(locale === 'en' ? '; ' : '、');
+}
+
+export function partLine(p: TechniquesReading['parts'][number], locale: Locale): string {
+  return lotLine(p, locale);
+}
+
+/** 時間主星與其餘傳統技法的解讀 context(獨立於本命,≤ 6 + 19 = 25 條)。 */
+export function techniquesContext(r: TechniquesReading, birth: BirthMoment, locale: Locale): InterpretationContext {
+  const en = locale === 'en';
+  const facts: { label: string; value: string }[] = [
+    { label: en ? 'Sect' : '日夜盤', value: sectName(r.diurnal, locale) },
+  ];
+  if (r.firdaria) facts.push({ label: en ? 'Firdaria now' : '目前法達', value: firdariaLine(r, birth, locale) });
+  if (r.releasingFortune) {
+    facts.push({ label: en ? 'Zodiacal releasing from Fortune' : '黃道釋放(福點)', value: releasingLine(r.releasingFortune, birth, locale) });
+  }
+  if (r.releasingSpirit) {
+    facts.push({ label: en ? 'Zodiacal releasing from Spirit' : '黃道釋放(精神點)', value: releasingLine(r.releasingSpirit, birth, locale) });
+  }
+  if (r.decennial) facts.push({ label: en ? 'Decennials now' : '目前十年期', value: decennialLine(r, birth, locale) });
+  facts.push({ label: en ? 'Planets near the Sun' : '與太陽距離', value: sunRelationsLine(r, locale) });
+  for (const p of r.parts) facts.push({ label: PART_NAMES[p.key][locale], value: partLine(p, locale) });
+  return {
+    systemId: 'astrology',
+    locale,
+    headline: en ? 'Time lords and traditional techniques' : '時間主星與傳統技法',
+    facts: facts.slice(0, MAX_CONTEXT_FACTS),
   };
 }

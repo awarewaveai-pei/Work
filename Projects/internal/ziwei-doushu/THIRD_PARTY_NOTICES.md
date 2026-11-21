@@ -36,7 +36,7 @@
 
 - 來源：https://github.com/NoahChristian/openephem
 - 授權：MIT License，Copyright (c) 2026 Elizabeth Huston, Ph.D. and Noah Christian, Ph.D.
-- 採用範圍：`src/openephem/aspects.py` 的相位判定做法（最短弧角距、日月加寬容許度、以速度判斷入相／出相），以 TypeScript 自行重寫於 `lib/astrologyAspects.ts`；`src/openephem/profections.py` 的年小限規則（整宮制、古典守護星）重寫於 `lib/astrologyTraditional.ts`。跨盤相位（`aspects.py` between：兩盤逐點配對、行運把本命速度設 0 判入出相）與回歸求根（`returns.py` find_return：牛頓法）重寫於 `lib/astrologyAspects.ts`、`lib/astrologyTransits.ts`。未複製原始碼。
+- 採用範圍：`src/openephem/aspects.py` 的相位判定做法（最短弧角距、日月加寬容許度、以速度判斷入相／出相），以 TypeScript 自行重寫於 `lib/astrologyAspects.ts`；`src/openephem/profections.py` 的年小限規則（整宮制、古典守護星）重寫於 `lib/astrologyTraditional.ts`。跨盤相位（`aspects.py` between：兩盤逐點配對、行運把本命速度設 0 判入出相）與回歸求根（`returns.py` find_return：牛頓法）重寫於 `lib/astrologyAspects.ts`、`lib/astrologyTransits.ts`。法達（`firdaria.py`）、黃道釋放（`zodiacal_releasing.py`）、十年期（`decennials.py`）的期間數值與輪替規則重寫於 `lib/astrologyTimeLords.ts`。未複製原始碼。
 
 - 採用範圍：`src/openephem/aspects.py` 的相位判定做法（最短弧角距、日月加寬容許度、以速度判斷入相／出相），以 TypeScript 自行重寫於 `lib/astrologyAspects.ts`；`src/openephem/profections.py` 的年小限規則（整宮制、古典守護星）重寫於 `lib/astrologyTraditional.ts`；`src/openephem/vedic.py`、`varga.py`、`vimshottari.py` 的月宿、九分盤、Vimśottarī 大運與五支規則重寫於 `lib/vedic.ts`（恆星黃道位置用 XALEN 自己的 Lahiri，未取 openephem 的 ayanamsa 擬合係數；大運年長本站取恆星年）。未複製原始碼。
 
@@ -44,7 +44,7 @@
 
 - 來源：https://github.com/flatangle/flatlib
 - 授權：MIT License，Copyright (c) 2015 FlatAngle
-- 採用範圍：`flatlib/aspects.py` 的主要相位角度與入相／出相分類方式，作為 `lib/astrologyAspects.ts` 的對照；程式為本專案自行重寫，未複製原始碼。另取 `dignities/tables.py` 的旺位度數、`dignities/essential.py` 的廟旺陷失勢計分、`tools/arabicparts.py` 的福點與精神點日夜公式，以 TypeScript 自行重寫於 `lib/astrologyTraditional.ts`；三分主、界、面表未採用。
+- 採用範圍：`flatlib/aspects.py` 的主要相位角度與入相／出相分類方式，作為 `lib/astrologyAspects.ts` 的對照；程式為本專案自行重寫，未複製原始碼。另取 `dignities/tables.py` 的旺位度數、`dignities/essential.py` 的廟旺陷失勢計分、`tools/arabicparts.py` 的福點與精神點日夜公式，以 TypeScript 自行重寫於 `lib/astrologyTraditional.ts`；三分主、界、面表未採用。其餘 19 個阿拉伯點公式（`tools/arabicparts.py` FORMULAS）與日核／燃燒／光束下的距離門檻（`dignities/accidental.py` sunRelation）重寫於 `lib/astrologyTraditional.ts`；行星時（`tools/planetarytime.py`）因星曆庫無日出日落而未採用。
 
 另：`lib/astrologyAspects.ts` 的容許度數值（合／沖／拱／刑 6°、六合 5°、日月 +1.5°）與 Kerykeion（AGPL-3.0）預設值一致；這是主流本命盤的公開慣例數值，僅取數值，未取用 Kerykeion 的任何程式或文字。
 
