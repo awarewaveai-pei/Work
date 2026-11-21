@@ -16,7 +16,7 @@ export const FEATURE_BADGE: Record<FeatureStatus, string> = {
 };
 export const EVENT_LABEL: Record<string, string> = {
   activity: "改動", handoff: "接續", feature_update: "功能狀態", status_change: "系統狀態", review: "驗收",
-  revert: "撤銷", migration: "舊頁搬入", import_run: "匯入",
+  revert: "撤銷", orphaned: "歷史分叉", migration: "舊頁搬入", import_run: "匯入",
 };
 export const SOURCE_LABEL: Record<string, string> = { agent: "AI", user: "操作者", migration: "搬移", importer: "匯入器" };
 export const RESULT_MESSAGES: Record<string, { ok: boolean; text: string }> = {

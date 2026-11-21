@@ -10,7 +10,7 @@ import { requestActor } from "@/lib/entitlements/subject";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { systemsAccess } from "@/lib/systems/access";
 import { PRIORITIES, projectSystem, SYSTEM_STATUSES } from "@/lib/systems/projection";
-import { readDefinitions, readRevertedShas, readStateEvents, writeUserEvent } from "@/lib/systems/store";
+import { readDefinitions, readProjectionInput, writeUserEvent } from "@/lib/systems/store";
 
 const text = (form: FormData, name: string) => {
   const v = form.get(name);
@@ -36,8 +36,8 @@ async function systemsWrite(systemId: string, write: (ctx: { sb: SupabaseClient;
       featureSlug: (id) => defs.features.find((f) => f.id === id)?.slug ?? null,
       // A feature of a phase still on its old supervisor page has its status there (PLAN §8: one source per phase).
       isLegacy: async (id) => {
-        const [state, revertedShas] = await Promise.all([readStateEvents(sb, systemId), readRevertedShas(sb)]);
-        const p = projectSystem({ phases: defs.phases, features: defs.features, events: state.events, revertedShas });
+        const input = await readProjectionInput(sb, systemId);
+        const p = projectSystem({ phases: defs.phases, features: defs.features, events: input.events, history: input.history });
         return p.features.some((f) => f.feature.id === id && f.legacy);
       },
     });

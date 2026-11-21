@@ -6,17 +6,17 @@
 
 export const SYSTEM_TYPES = ["product", "internal", "infrastructure", "governance", "client"] as const;
 export const FEATURE_STATUSES = ["todo", "in_progress", "implemented", "verified", "blocked", "cancelled"] as const;
-export const IMPORTER_EVENT_TYPES = ["activity", "handoff", "feature_update", "revert", "migration", "import_run"] as const;
+export const IMPORTER_EVENT_TYPES = ["activity", "handoff", "feature_update", "revert", "orphaned", "migration", "import_run"] as const;
 export const IMPORTER_SOURCES = ["agent", "migration", "importer"] as const;
 export const IMPORT_RUN_STATUSES = ["ok", "history_diverged", "error"] as const;
-export const GAP_KEYS = ["unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors"] as const;
+export const GAP_KEYS = ["unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths"] as const;
 
 export type SystemType = (typeof SYSTEM_TYPES)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
 export type ImporterEventType = (typeof IMPORTER_EVENT_TYPES)[number];
 
 export interface RegistryPhase { id: string; slug: string; name: string; legacy_source_path: string | null }
-export interface RegistryFeature { id: string; slug: string; name: string; phase: string | null }
+export interface RegistryFeature { id: string; slug: string; name: string; phase: string }
 export interface RegistrySystem {
   id: string; slug: string; name: string; aliases: string[]; type: SystemType; purpose: string; product_key: string | null;
   source_paths: string[]; phases: RegistryPhase[]; features: RegistryFeature[];
@@ -52,13 +52,14 @@ const oneOf = <T extends string>(v: unknown, list: readonly T[], where: string):
   (list as readonly unknown[]).includes(v) ? (v as T) : fail(where, `not one of ${list.join("|")}`);
 const uuid = (v: unknown, where: string) => (typeof v === "string" && UUID.test(v) ? v.toLowerCase() : fail(where, "not a uuid"));
 const slug = (v: unknown, where: string) => (typeof v === "string" && SLUG.test(v) && v.length <= 100 ? v : fail(where, "not a kebab slug"));
-const slugOrNull = (v: unknown, where: string) => (v === null || v === undefined ? null : slug(v, where));
 
 function parseRegistry(raw: unknown): Registry {
   const r = obj(raw, "registry");
   if (r.version !== 1) fail("registry.version", "must be 1");
   const ids = new Set<string>();
   const slugs = new Set<string>();
+  // Feature slugs are global, as the importer has them (a `Feature: <slug>=<status>` trailer names no system).
+  const featureSlugs = new Set<string>();
   const claim = (id: string, where: string) => (ids.has(id) ? fail(where, `duplicate id ${id}`) : (ids.add(id), id));
   if (!Array.isArray(r.systems)) fail("registry.systems", "not an array");
   const systems = (r.systems as unknown[]).map((rawSystem, i): RegistrySystem => {
@@ -76,15 +77,14 @@ function parseRegistry(raw: unknown): Registry {
       phaseSlugs.add(ps);
       return { id: claim(uuid(p.id, `${pw}.id`), `${pw}.id`), slug: ps, name: nonEmpty(p.name, `${pw}.name`, 200), legacy_source_path: strOrNull(p.legacy_source_path, `${pw}.legacy_source_path`, 500) };
     });
-    const featureSlugs = new Set<string>();
     const features = (Array.isArray(s.features) ? s.features : fail(`${w}.features`, "not an array")).map((rawFeature, j): RegistryFeature => {
       const fw = `${w}.features[${j}]`;
       const f = obj(rawFeature, fw);
       const fs = slug(f.slug, `${fw}.slug`);
       if (featureSlugs.has(fs)) fail(`${fw}.slug`, `duplicate feature slug ${fs}`);
       featureSlugs.add(fs);
-      const phase = slugOrNull(f.phase, `${fw}.phase`);
-      if (phase !== null && !phaseSlugs.has(phase)) fail(`${fw}.phase`, `no phase ${phase} in ${systemSlug}`);
+      const phase = slug(f.phase, `${fw}.phase`);
+      if (!phaseSlugs.has(phase)) fail(`${fw}.phase`, `no phase ${phase} in ${systemSlug}`);
       return { id: claim(uuid(f.id, `${fw}.id`), `${fw}.id`), slug: fs, name: nonEmpty(f.name, `${fw}.name`, 200), phase };
     });
     return {
@@ -119,6 +119,8 @@ function parseEvent(raw: unknown, i: number): IngestEvent {
   // review verifies): refusing it here would let one stray trailer block every later run, since the importer resends.
   if (eventType === "feature_update") oneOf(payload.status, FEATURE_STATUSES, `${w}.payload.status`);
   if (eventType === "import_run") parseImportRun(payload, `${w}.payload`);
+  if (eventType === "revert") nonEmpty(payload.reverted_sha, `${w}.payload.reverted_sha`, 64);
+  if (eventType === "orphaned") nonEmpty(payload.sha, `${w}.payload.sha`, 64);
   return {
     event_key: nonEmpty(e.event_key, `${w}.event_key`, 200), system_slug: strOrNull(e.system_slug, `${w}.system_slug`, 100),
     phase_slug: strOrNull(e.phase_slug, `${w}.phase_slug`, 100), feature_slug: strOrNull(e.feature_slug, `${w}.feature_slug`, 100),

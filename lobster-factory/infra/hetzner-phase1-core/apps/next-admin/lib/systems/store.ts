@@ -7,7 +7,8 @@ import type { IngestBody, Registry } from "./contract";
 import type { FeatureRow, PhaseRow, SystemRow, UpdateRow } from "./projection";
 
 const CHUNK = 500;
-export const REVERT_READ_CAP = 5000;
+export const HISTORY_READ_CAP = 20000;
+export const MIGRATION_READ_CAP = 20000;
 export const EVENT_READ_CAP = 5000;
 export const ACTIVITY_READ_CAP = 100;
 const UPDATE_COLUMNS = "id,event_key,system_id,phase_id,feature_id,event_type,source,commit_sha,occurred_at,payload,created_at";
@@ -30,7 +31,7 @@ async function writeRegistry(sb: SupabaseClient, registry: Registry): Promise<vo
   const p_features = registry.systems.flatMap((s) => {
     const phaseId = new Map(s.phases.map((p) => [p.slug, p.id]));
     return s.features.map((f, position) => ({
-      id: f.id, system_id: s.id, phase_id: f.phase ? phaseId.get(f.phase) ?? null : null, slug: f.slug, name: f.name, position,
+      id: f.id, system_id: s.id, phase_id: phaseId.get(f.phase), // contract.ts checked the phase exists slug: f.slug, name: f.name, position,
     }));
   });
   const r = await sb.rpc("systems_apply_registry", { p_systems, p_phases, p_features });
@@ -80,24 +81,41 @@ export async function readDefinitions(sb: SupabaseClient, systemId?: string): Pr
   return { systems, phases, features };
 }
 
-/** State-bearing events (not activity / import_run), newest EVENT_READ_CAP; capped = there were more. */
+// Read separately from the capped state events, so neither a long history nor a busy week can push them out:
+// a migration is the only record of a switched phase (one per feature), a revert / orphaned event changes what every
+// system's other events mean.
+const SEPARATE_TYPES = ["migration", "revert", "orphaned"];
+
+/** State-bearing events (not activity / import_run / the SEPARATE_TYPES), newest EVENT_READ_CAP; capped = there were
+ *  more. The filter matches the partial index system_updates_state_idx (migration 0174). */
 export async function readStateEvents(sb: SupabaseClient, systemId?: string): Promise<{ events: UpdateRow[]; capped: boolean }> {
   let q = sb.from("system_updates").select(UPDATE_COLUMNS).not("system_id", "is", null)
-    .in("event_type", ["handoff", "feature_update", "status_change", "review", "revert", "migration"])
+    .not("event_type", "in", `(activity,import_run,${SEPARATE_TYPES.join(",")})`)
     .order("occurred_at", { ascending: false }).order("created_at", { ascending: false }).limit(EVENT_READ_CAP + 1);
   if (systemId) q = q.eq("system_id", systemId);
   const rows = check(await q, "system_updates read") as unknown as UpdateRow[];
   return { events: rows.slice(0, EVENT_READ_CAP).reverse(), capped: rows.length > EVENT_READ_CAP };
 }
 
-/** Every reverted commit, whatever system the revert event landed on (or none): a commit touching two systems is
- *  undone in both. */
-export async function readRevertedShas(sb: SupabaseClient): Promise<Set<string>> {
-  const rows = check(
-    await sb.from("system_updates").select("payload").eq("event_type", "revert").order("occurred_at", { ascending: false }).limit(REVERT_READ_CAP),
-    "revert read",
-  ) as unknown as Array<{ payload: Record<string, unknown> }>;
-  return new Set(rows.map((r) => r.payload?.reverted_sha).filter((x): x is string => typeof x === "string" && !!x));
+async function readByType(sb: SupabaseClient, types: string[], cap: number, systemId?: string): Promise<{ events: UpdateRow[]; capped: boolean }> {
+  let q = sb.from("system_updates").select(UPDATE_COLUMNS).in("event_type", types)
+    .order("occurred_at", { ascending: false }).order("created_at", { ascending: false }).limit(cap + 1);
+  if (systemId) q = q.eq("system_id", systemId);
+  const rows = check(await q, `${types.join("/")} read`) as unknown as UpdateRow[];
+  return { events: rows.slice(0, cap).reverse(), capped: rows.length > cap };
+}
+
+/** Migration events (at most one per feature), outside the state cap. */
+export const readMigrationEvents = (sb: SupabaseClient, systemId?: string) => readByType(sb, ["migration"], MIGRATION_READ_CAP, systemId);
+
+/** Every revert and orphaned event, whatever system it landed on (or none): a commit touching two systems is undone in
+ *  both, and a revert of a revert needs the whole chain. */
+export const readCommitHistory = (sb: SupabaseClient) => readByType(sb, ["revert", "orphaned"], HISTORY_READ_CAP);
+
+/** Everything projectSystem needs: state events + migrations (per system or all), and the global commit history. */
+export async function readProjectionInput(sb: SupabaseClient, systemId?: string): Promise<{ events: UpdateRow[]; history: UpdateRow[]; capped: boolean }> {
+  const [state, migrations, history] = await Promise.all([readStateEvents(sb, systemId), readMigrationEvents(sb, systemId), readCommitHistory(sb)]);
+  return { events: [...migrations.events, ...state.events], history: history.events, capped: state.capped || migrations.capped || history.capped };
 }
 
 /** Newest events of one system, any type, for the 紀錄 tab. */

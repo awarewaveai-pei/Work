@@ -9,10 +9,9 @@ vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }))
 const SYS = "11111111-1111-4111-8111-111111111111";
 const store = vi.hoisted(() => ({
   readDefinitions: vi.fn(),
-  readStateEvents: vi.fn(),
   readImportRuns: vi.fn(),
   readRecentEvents: vi.fn(),
-  readRevertedShas: vi.fn(),
+  readProjectionInput: vi.fn(),
   writeUserEvent: vi.fn(),
 }));
 vi.mock("@/lib/systems/store", () => store);
@@ -29,9 +28,8 @@ const form = (fields: Record<string, string>) => {
 beforeEach(() => {
   vi.clearAllMocks();
   store.readDefinitions.mockResolvedValue({ systems: [{ id: SYS, slug: "outbound-os" }], phases: [], features: [] });
-  store.readStateEvents.mockResolvedValue({ events: [], capped: false });
   store.readImportRuns.mockResolvedValue([]);
-  store.readRevertedShas.mockResolvedValue(new Set());
+  store.readProjectionInput.mockResolvedValue({ events: [], history: [], capped: false });
   store.writeUserEvent.mockResolvedValue(undefined);
 });
 

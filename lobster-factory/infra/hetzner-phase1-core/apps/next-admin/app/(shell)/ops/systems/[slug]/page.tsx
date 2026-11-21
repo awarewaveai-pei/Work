@@ -10,7 +10,7 @@ import { PRIORITIES, projectSystem, SYSTEM_STATUSES, type FeatureView, type Syst
 import {
   EVENT_LABEL, FEATURE_BADGE, FEATURE_LABEL, formatTime, PRIORITY_LABEL, RESULT_MESSAGES, SOURCE_LABEL, STATUS_BADGE, STATUS_LABEL, TYPE_LABEL,
 } from "@/lib/systems/labels";
-import { readDefinitions, readImportRuns, readRecentEvents, readRevertedShas, readStateEvents } from "@/lib/systems/store";
+import { readDefinitions, readImportRuns, readProjectionInput, readRecentEvents } from "@/lib/systems/store";
 import { reviewFeature, setSystemStatus } from "../actions";
 import { ImportLine, Refused, box, errorBox, muted, page } from "../parts";
 
@@ -115,6 +115,7 @@ function summary(e: UpdateRow): string {
     case "review": case "feature_update": return `${s("status")}${s("note") ? `：${s("note")}` : ""}`;
     case "migration": return `${s("legacy_status")} → ${s("mapped_status")}（${s("evidence_level")}）`;
     case "revert": return `撤銷 ${s("reverted_sha").slice(0, 9)}`;
+    case "orphaned": return `${s("sha").slice(0, 9)} 已不在 Git 歷史中，不再計入`;
     default: return s("subject");
   }
 }
@@ -172,7 +173,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
     const all = await readDefinitions(sb);
     system = all.systems.find((s) => s.slug === slug);
     if (system) {
-      const [state, rec, importRuns, revertedShas] = await Promise.all([readStateEvents(sb, system.id), tab === "log" ? readRecentEvents(sb, system.id) : Promise.resolve([]), readImportRuns(sb), readRevertedShas(sb)]);
+      const [state, rec, importRuns] = await Promise.all([readProjectionInput(sb, system.id), tab === "log" ? readRecentEvents(sb, system.id) : Promise.resolve([]), readImportRuns(sb)]);
       capped = state.capped;
       recent = rec;
       runs = importRuns;
@@ -180,7 +181,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
         phases: all.phases.filter((x) => x.system_id === system!.id),
         features: all.features.filter((x) => x.system_id === system!.id),
         events: state.events,
-        revertedShas,
+        history: state.history,
       });
     }
   } catch (e) {

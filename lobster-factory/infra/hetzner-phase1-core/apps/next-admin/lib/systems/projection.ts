@@ -5,7 +5,9 @@
 //   and cleared only by one with blocker_cleared, never by a handoff that just leaves it out.
 // - feature status: newest feature_update / migration (mapped_status) / review for that feature. Only a review may say
 //   verified: a feature_update or migration that claims it counts as implemented.
-// - a revert event hides every event of the reverted commit, in every system (revertedShas is read across all).
+// - a commit's events are hidden while the commit is reverted by a commit still in force; a revert that is itself
+//   reverted lifts it again (back and forth, in commit order), and an orphaned commit (history diverged) is out with
+//   its own reverts. Revert / orphaned events are read across every system (store.readCommitHistory).
 // - completion = verified / features not cancelled; no features = null (尚未盤點). Features of a phase that still
 //   lives on its old supervisor page (legacy_source_path, no migration event yet) are left out: that page is the source.
 import type { FeatureStatus } from "./contract";
@@ -15,7 +17,7 @@ export interface SystemRow {
   source_paths: string[]; position: number;
 }
 export interface PhaseRow { id: string; system_id: string; slug: string; name: string; legacy_source_path: string | null; position: number }
-export interface FeatureRow { id: string; system_id: string; phase_id: string | null; slug: string; name: string; position: number }
+export interface FeatureRow { id: string; system_id: string; phase_id: string; slug: string; name: string; position: number }
 export interface UpdateRow {
   id: string; event_key: string; system_id: string | null; phase_id: string | null; feature_id: string | null;
   event_type: string; source: string; commit_sha: string | null; occurred_at: string; payload: Record<string, unknown>;
@@ -46,11 +48,39 @@ export function chronological(events: readonly UpdateRow[]): UpdateRow[] {
   return [...events].sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
 }
 
-/** Events still in force: a revert hides the reverted commit's events (the revert itself stays). */
-export function liveEvents(events: readonly UpdateRow[], alsoReverted: ReadonlySet<string> = new Set()): UpdateRow[] {
-  const reverted = new Set(alsoReverted);
-  for (const sha of events.filter((e) => e.event_type === "revert").map((e) => asStr(e.payload.reverted_sha)).filter((s): s is string => !!s)) reverted.add(sha);
-  return events.filter((e) => e.event_type === "revert" || !e.commit_sha || !reverted.has(e.commit_sha));
+/** Commits not in force, from revert and orphaned events. A commit is out when orphaned, or when some revert of it
+ *  comes from a commit that is itself in force -- so reverting a revert brings the original back, and so on. A revert
+ *  always comes after what it reverts, so the recursion follows commit order; a cycle (impossible in git) counts as in force. */
+export function inactiveCommits(history: readonly UpdateRow[]): Set<string> {
+  const orphaned = new Set(history.filter((e) => e.event_type === "orphaned").map((e) => asStr(e.payload.sha)).filter((x): x is string => !!x));
+  const revertersOf = new Map<string, Array<string | null>>();
+  for (const e of history) {
+    if (e.event_type !== "revert") continue;
+    const target = asStr(e.payload.reverted_sha);
+    if (!target) continue;
+    revertersOf.set(target, [...(revertersOf.get(target) ?? []), e.commit_sha]);
+  }
+  const memo = new Map<string, boolean>();
+  const inactive = (sha: string, visiting: Set<string>): boolean => {
+    if (orphaned.has(sha)) return true;
+    const known = memo.get(sha);
+    if (known !== undefined) return known;
+    if (visiting.has(sha)) return false;
+    visiting.add(sha);
+    const out = (revertersOf.get(sha) ?? []).some((by) => by === null || !inactive(by, visiting));
+    visiting.delete(sha);
+    memo.set(sha, out);
+    return out;
+  };
+  const shas = new Set<string>([...orphaned, ...revertersOf.keys()]);
+  return new Set([...shas].filter((sha) => inactive(sha, new Set())));
+}
+
+/** Events still in force: every event of a commit that is out is hidden (its revert events too). */
+export function liveEvents(events: readonly UpdateRow[], history: readonly UpdateRow[] = []): UpdateRow[] {
+  const keys = new Set(history.map((e) => e.event_key));
+  const out = inactiveCommits([...history, ...events.filter((e) => (e.event_type === "revert" || e.event_type === "orphaned") && !keys.has(e.event_key))]);
+  return events.filter((e) => !e.commit_sha || !out.has(e.commit_sha));
 }
 
 /** The status one event says a feature has, or null when it says nothing about it. */
@@ -63,10 +93,10 @@ function featureStatusOf(e: UpdateRow): FeatureStatus | null {
 
 export function projectSystem(input: {
   phases: readonly PhaseRow[]; features: readonly FeatureRow[]; events: readonly UpdateRow[];
-  /** reverted SHAs from every revert event, not only this system's (store.readRevertedShas) */
-  revertedShas?: ReadonlySet<string>;
+  /** revert and orphaned events of every system, not only this one's (store.readCommitHistory) */
+  history?: readonly UpdateRow[];
 }): SystemProjection {
-  const events = chronological(liveEvents(input.events, input.revertedShas));
+  const events = chronological(liveEvents(input.events, input.history));
   let status: SystemStatus | null = null;
   let priority: Priority | null = null;
   const handoff: HandoffCard = { next: null, nextAt: null, blocker: null, blockerAt: null, lastSubject: null, lastAt: null };

@@ -8,7 +8,7 @@ import { SYSTEM_TYPES, type SystemType } from "@/lib/systems/contract";
 import { systemsAccess } from "@/lib/systems/access";
 import { projectSystem, SYSTEM_STATUSES, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
 import { formatTime, PRIORITY_LABEL, STATUS_BADGE, STATUS_LABEL, TYPE_LABEL } from "@/lib/systems/labels";
-import { readDefinitions, readImportRuns, readRevertedShas, readStateEvents } from "@/lib/systems/store";
+import { readDefinitions, readImportRuns, readProjectionInput } from "@/lib/systems/store";
 import { ImportLine, Refused, errorBox, muted, page } from "./parts";
 
 export const dynamic = "force-dynamic";
@@ -71,7 +71,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
   let capped = false;
   if (sb) {
     try {
-      const [defs, state, importRuns, revertedShas] = await Promise.all([readDefinitions(sb), readStateEvents(sb), readImportRuns(sb), readRevertedShas(sb)]);
+      const [defs, state, importRuns] = await Promise.all([readDefinitions(sb), readProjectionInput(sb), readImportRuns(sb)]);
       runs = importRuns;
       capped = state.capped;
       rows = defs.systems.map((system) => ({
@@ -80,7 +80,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
           phases: defs.phases.filter((x) => x.system_id === system.id),
           features: defs.features.filter((x) => x.system_id === system.id),
           events: state.events.filter((e) => e.system_id === system.id),
-          revertedShas,
+          history: state.history,
         }),
       }));
     } catch (e) {

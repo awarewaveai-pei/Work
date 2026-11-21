@@ -1,15 +1,27 @@
 -- 0174: /ops/systems 系統總控中心 (agency-os/handoffs/2026-11-21-systems-control-center/PLAN.md §2, §3).
 -- systems / system_phases / system_features = projection of git agency-os/systems/registry.json, written only by
 -- next-admin POST /api/internal/systems/ingest via systems_apply_registry (one transaction; a definition gone from the
--- registry gets in_registry=false, never deleted, because events point at it). system_updates = the state: append-only events, unique event_key
--- (git:<sha>:<idx> | mig:<feature_id> | run:<head> | user:<uuid>); status, handoff card and completion are computed
--- from them (next-admin lib/systems/projection.ts). A correction is a new event (corrects_event_id), never an UPDATE.
--- RLS deny-by-default (same as 0166_vendor_invoices): RLS on, no policy, anon/authenticated revoked; only the service role.
--- Additive only: no existing table is touched. Rollback: 0174_systems_control_center.down.sql.
+-- registry gets in_registry=false, never deleted, because events point at it). system_updates = the state:
+-- append-only events, unique event_key (git:<sha>:<hash> | mig:<feature_id> | run:<head>:<at> | user:<uuid>); status,
+-- handoff card and completion are computed from them (next-admin lib/systems/projection.ts). A correction is a new
+-- event, never an UPDATE. RLS deny-by-default (as 0166): RLS on, no policy, anon/authenticated revoked; service_role
+-- gets only what the app does (no delete, no truncate).
+-- New tables only; refuses to run if any of the four already exists, so the down file can never drop a table this
+-- migration did not create. Rollback: 0174_systems_control_center.down.sql.
 begin;
 set local lock_timeout = '5s';
 
-create table if not exists public.systems (
+do $$
+declare t text;
+begin
+  foreach t in array array['systems', 'system_phases', 'system_features', 'system_updates'] loop
+    if to_regclass('public.' || t) is not null then
+      raise exception '0174: public.% already exists; this migration only creates new tables', t;
+    end if;
+  end loop;
+end $$;
+
+create table public.systems (
   id            uuid primary key,                       -- registry id, fixed at creation
   slug          text not null check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   name          text not null check (length(btrim(name)) between 1 and 200),
@@ -20,10 +32,10 @@ create table if not exists public.systems (
   source_paths  text[] not null default '{}',
   position      integer not null default 0,             -- order in registry.json
   in_registry   boolean not null default true,
-  updated_at    timestamptz not null default now()
+  updated_at    timestamptz not null default now()      -- last time a definition field changed
 );
 
-create table if not exists public.system_phases (
+create table public.system_phases (
   id                  uuid primary key,
   system_id           uuid not null references public.systems(id),
   slug                text not null check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
@@ -31,91 +43,128 @@ create table if not exists public.system_phases (
   legacy_source_path  text,                             -- old supervisor-page folder; null = never had one
   position            integer not null default 0,
   in_registry         boolean not null default true,
-  updated_at          timestamptz not null default now()
+  updated_at          timestamptz not null default now(),
+  unique (id, system_id)                                -- target of the composite FKs below
 );
 
-create table if not exists public.system_features (
+create table public.system_features (
   id           uuid primary key,
   system_id    uuid not null references public.systems(id),
-  phase_id     uuid references public.system_phases(id),
+  phase_id     uuid not null,
   slug         text not null check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   name         text not null,
   position     integer not null default 0,
   in_registry  boolean not null default true,
-  updated_at   timestamptz not null default now()
+  updated_at   timestamptz not null default now(),
+  unique (id, system_id),
+  -- a feature's phase belongs to the same system
+  foreign key (phase_id, system_id) references public.system_phases (id, system_id)
 );
 
-create table if not exists public.system_updates (
+create table public.system_updates (
   id                 uuid primary key default gen_random_uuid(),
   event_key          text not null unique check (length(event_key) between 1 and 200),
   system_id          uuid references public.systems(id),          -- null = unclassified
-  phase_id           uuid references public.system_phases(id),
-  feature_id         uuid references public.system_features(id),
+  phase_id           uuid,
+  feature_id         uuid,
   system_slug        text,                                         -- as sent, kept when it resolved to nothing
   phase_slug         text,
   feature_slug       text,
   event_type         text not null check (event_type in
-                       ('activity', 'handoff', 'feature_update', 'status_change', 'review', 'revert', 'migration', 'import_run')),
+                       ('activity', 'handoff', 'feature_update', 'status_change', 'review', 'revert', 'orphaned', 'migration', 'import_run')),
   source             text not null check (source in ('agent', 'user', 'migration', 'importer')),
   commit_sha         text,
   occurred_at        timestamptz not null,
   payload            jsonb not null default '{}'::jsonb,
   evidence           jsonb,
   corrects_event_id  uuid references public.system_updates(id),
-  created_at         timestamptz not null default now()
+  created_at         timestamptz not null default now(),
+  -- an event's phase / feature belongs to the event's system (MATCH SIMPLE: a null id skips the check)
+  foreign key (phase_id, system_id) references public.system_phases (id, system_id),
+  foreign key (feature_id, system_id) references public.system_features (id, system_id)
 );
 
 -- Slugs are unique among live rows only: a retired row keeps its slug (events point at it) without blocking a new
 -- definition from reusing it, and a swap of two slugs inside one registry version passes (see systems_apply_registry).
-create unique index if not exists systems_slug_live_idx on public.systems (slug) where in_registry;
-create unique index if not exists system_phases_slug_live_idx on public.system_phases (system_id, slug) where in_registry;
-create unique index if not exists system_features_slug_live_idx on public.system_features (system_id, slug) where in_registry;
+create unique index systems_slug_live_idx on public.systems (slug) where in_registry;
+create unique index system_phases_slug_live_idx on public.system_phases (system_id, slug) where in_registry;
+create unique index system_features_slug_live_idx on public.system_features (system_id, slug) where in_registry;
 
-create index if not exists system_updates_system_occurred_idx on public.system_updates (system_id, occurred_at desc);
-create index if not exists system_updates_event_type_idx on public.system_updates (event_type);
+-- One index per read in next-admin lib/systems/store.ts:
+create index system_updates_type_occurred_idx on public.system_updates (event_type, occurred_at desc);          -- import runs, reverts/orphans, migrations
+create index system_updates_system_occurred_idx on public.system_updates (system_id, occurred_at desc, created_at desc); -- one system
+create index system_updates_state_idx on public.system_updates (occurred_at desc, created_at desc)
+  where system_id is not null and event_type not in ('activity', 'import_run');                                   -- overview state events
 
 alter table public.systems         enable row level security;
 alter table public.system_phases   enable row level security;
 alter table public.system_features enable row level security;
 alter table public.system_updates  enable row level security;
-revoke all on public.systems, public.system_phases, public.system_features, public.system_updates from anon, authenticated;
+revoke all on public.systems, public.system_phases, public.system_features, public.system_updates from public, anon, authenticated, service_role;
+grant select, insert, update on public.systems, public.system_phases, public.system_features to service_role;
+grant select, insert on public.system_updates to service_role;
 
--- Append-only in the database, not just in the app: any UPDATE / DELETE (service role included) is refused.
+-- Append-only in the database, not just in the app: any UPDATE / DELETE is refused (TRUNCATE is not granted at all).
 create or replace function public.system_updates_append_only() returns trigger language plpgsql as $$
 begin
   raise exception 'system_updates is append-only: add a new event instead of changing %', old.id;
 end $$;
-drop trigger if exists system_updates_append_only on public.system_updates;
 create trigger system_updates_append_only before update or delete on public.system_updates
   for each row execute function public.system_updates_append_only();
 
 -- The registry projection in one transaction: retire every live row, then upsert the registry (a row in it comes back
--- live). A failure leaves the previous projection whole. Called only by the ingest route (service role).
+-- live). A failure leaves the previous projection whole; two runs at once wait on the advisory lock. updated_at moves
+-- only when a definition field changed or the row came back from retirement. Called only by the ingest route.
 create or replace function public.systems_apply_registry(p_systems jsonb, p_phases jsonb, p_features jsonb)
-returns void language plpgsql security invoker set search_path = public as $$
+returns void language plpgsql security invoker set search_path = public, pg_temp as $$
+declare
+  live_systems uuid[]; live_phases uuid[]; live_features uuid[];
 begin
+  perform pg_advisory_xact_lock(hashtextextended('systems_apply_registry', 0));
+  if p_systems is null or jsonb_typeof(p_systems) <> 'array' or jsonb_array_length(p_systems) = 0 then
+    raise exception 'systems_apply_registry: empty registry refused (it would retire every system)';
+  end if;
+  if jsonb_typeof(coalesce(p_phases, 'null')) <> 'array' or jsonb_typeof(coalesce(p_features, 'null')) <> 'array' then
+    raise exception 'systems_apply_registry: phases and features must be arrays';
+  end if;
+
+  select coalesce(array_agg(id), '{}') into live_systems from public.systems where in_registry;
+  select coalesce(array_agg(id), '{}') into live_phases from public.system_phases where in_registry;
+  select coalesce(array_agg(id), '{}') into live_features from public.system_features where in_registry;
   update public.systems         set in_registry = false where in_registry;
   update public.system_phases   set in_registry = false where in_registry;
   update public.system_features set in_registry = false where in_registry;
 
-  insert into public.systems (id, slug, name, aliases, type, purpose, product_key, source_paths, position, in_registry, updated_at)
+  insert into public.systems as t (id, slug, name, aliases, type, purpose, product_key, source_paths, position, in_registry, updated_at)
   select x.id, x.slug, x.name, coalesce(x.aliases, '{}'), x.type, coalesce(x.purpose, ''), x.product_key, coalesce(x.source_paths, '{}'), x.position, true, now()
   from jsonb_to_recordset(p_systems) as x(id uuid, slug text, name text, aliases text[], type text, purpose text, product_key text, source_paths text[], position int)
   on conflict (id) do update set slug = excluded.slug, name = excluded.name, aliases = excluded.aliases, type = excluded.type,
     purpose = excluded.purpose, product_key = excluded.product_key, source_paths = excluded.source_paths,
-    position = excluded.position, in_registry = true, updated_at = excluded.updated_at;
+    position = excluded.position, in_registry = true,
+    updated_at = case when t.id <> all(live_systems)
+      or (t.slug, t.name, t.aliases, t.type, t.purpose, t.product_key, t.source_paths, t.position)
+         is distinct from (excluded.slug, excluded.name, excluded.aliases, excluded.type, excluded.purpose, excluded.product_key, excluded.source_paths, excluded.position)
+      then now() else t.updated_at end;
 
-  insert into public.system_phases (id, system_id, slug, name, legacy_source_path, position, in_registry, updated_at)
+  insert into public.system_phases as t (id, system_id, slug, name, legacy_source_path, position, in_registry, updated_at)
   select x.id, x.system_id, x.slug, x.name, x.legacy_source_path, x.position, true, now()
   from jsonb_to_recordset(p_phases) as x(id uuid, system_id uuid, slug text, name text, legacy_source_path text, position int)
   on conflict (id) do update set system_id = excluded.system_id, slug = excluded.slug, name = excluded.name,
-    legacy_source_path = excluded.legacy_source_path, position = excluded.position, in_registry = true, updated_at = excluded.updated_at;
+    legacy_source_path = excluded.legacy_source_path, position = excluded.position, in_registry = true,
+    updated_at = case when t.id <> all(live_phases)
+      or (t.system_id, t.slug, t.name, t.legacy_source_path, t.position)
+         is distinct from (excluded.system_id, excluded.slug, excluded.name, excluded.legacy_source_path, excluded.position)
+      then now() else t.updated_at end;
 
-  insert into public.system_features (id, system_id, phase_id, slug, name, position, in_registry, updated_at)
+  insert into public.system_features as t (id, system_id, phase_id, slug, name, position, in_registry, updated_at)
   select x.id, x.system_id, x.phase_id, x.slug, x.name, x.position, true, now()
   from jsonb_to_recordset(p_features) as x(id uuid, system_id uuid, phase_id uuid, slug text, name text, position int)
   on conflict (id) do update set system_id = excluded.system_id, phase_id = excluded.phase_id, slug = excluded.slug,
-    name = excluded.name, position = excluded.position, in_registry = true, updated_at = excluded.updated_at;
+    name = excluded.name, position = excluded.position, in_registry = true,
+    updated_at = case when t.id <> all(live_features)
+      or (t.system_id, t.phase_id, t.slug, t.name, t.position)
+         is distinct from (excluded.system_id, excluded.phase_id, excluded.slug, excluded.name, excluded.position)
+      then now() else t.updated_at end;
 end $$;
 revoke all on function public.systems_apply_registry(jsonb, jsonb, jsonb) from public, anon, authenticated;
 grant execute on function public.systems_apply_registry(jsonb, jsonb, jsonb) to service_role;
