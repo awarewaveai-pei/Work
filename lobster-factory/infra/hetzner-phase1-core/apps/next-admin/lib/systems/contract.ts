@@ -31,7 +31,7 @@ export interface IngestEvent {
   event_type: ImporterEventType; source: (typeof IMPORTER_SOURCES)[number]; commit_sha: string | null;
   occurred_at: string; payload: Record<string, unknown>; evidence: unknown;
 }
-export interface IngestBody { registry: Registry; import_run: ImportRun; events: IngestEvent[] }
+export interface IngestBody { registry: Registry; events: IngestEvent[] }
 
 export const MAX_BODY_BYTES = 5 * 1024 * 1024;
 
@@ -133,14 +133,11 @@ export function parseIngest(raw: unknown): ParseResult {
   try {
     const b = obj(raw, "body");
     const registry = parseRegistry(b.registry);
-    const importRun = parseImportRun(b.import_run, "import_run");
     if (!Array.isArray(b.events)) fail("events", "not an array");
+    // No run record is made here: the importer sends its import_run event in the last batch, so a run only counts
+    // once every batch landed.
     const events = (b.events as unknown[]).map(parseEvent);
-    // The run itself is always recorded, even when the importer left its event out (the page reads it).
-    if (!events.some((e) => e.event_type === "import_run")) {
-      events.push({ event_key: `run:${importRun.head}`, system_slug: null, phase_slug: null, feature_slug: null, event_type: "import_run", source: "importer", commit_sha: importRun.head, occurred_at: new Date().toISOString(), payload: importRun as unknown as Record<string, unknown>, evidence: null });
-    }
-    return { ok: true, body: { registry, import_run: importRun, events } };
+    return { ok: true, body: { registry, events } };
   } catch (e) {
     if (e instanceof Bad) return { ok: false, error: e.message };
     throw e;

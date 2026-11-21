@@ -1,8 +1,8 @@
 # /etc/cron.d/systems-import -- git commits -> /ops/systems (scripts/systems-import.py; handoffs/2026-11-21-systems-control-center).
 # Installed by install-host-schedules.sh. Times UTC: 20:30 = 04:30 Taipei, after the 04:00 auto-reboot.
-# Does nothing until SYSTEMS_IMPORT_ENABLED=true in /root/lobster-phase1/.env. flock: a slow run is skipped, not
-# stacked; timeout/nice/ionice: a stuck or heavy run cannot starve the host. Called through python3: sync-host-scripts.sh
-# marks only *.sh executable.
+# Does nothing until SYSTEMS_IMPORT_ENABLED=true in /root/lobster-phase1/.env. Lock, 300 s limit and nice 19 are inside
+# the script, so the line keeps the `python3 /path` form install-host-schedules.sh checks. python3, not ./: sync marks
+# only *.sh executable.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-30 20 * * * root /root/lobster-phase1/scripts/cron-run.sh systems_import 'flock -n /tmp/systems-import.lock timeout 300 nice -n 19 ionice -c3 python3 /root/lobster-phase1/scripts/systems-import.py >> /var/log/systems-import.log 2>&1'
+30 20 * * * root /root/lobster-phase1/scripts/cron-run.sh systems_import 'python3 /root/lobster-phase1/scripts/systems-import.py >> /var/log/systems-import.log 2>&1'

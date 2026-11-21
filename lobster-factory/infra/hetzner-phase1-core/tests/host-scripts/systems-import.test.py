@@ -121,7 +121,7 @@ class SystemsImportTest(unittest.TestCase):
         act = {e["system_slug"]: e["payload"] for e in events(bodies) if e["event_type"] == "activity"}
         self.assertEqual(act, {"alpha": {"subject": "touch everything", "files": 1},
                                "beta": {"subject": "touch everything", "files": 1}})
-        self.assertEqual(bodies[-1]["import_run"]["gaps"]["unowned_paths"], ["other/z.ts"])
+        self.assertEqual(bodies[-1]["events"][-1]["payload"]["gaps"]["unowned_paths"], ["other/z.ts"])
 
     def test_trailers_several_systems_and_unknown_slugs(self):
         sha = self.r.commit({"docs/n.md": "1"}, "plan\n\nSystem: alpha\nSystem: Bee\nSystem: nope\nPhase: p1\n"
@@ -170,8 +170,9 @@ class SystemsImportTest(unittest.TestCase):
             rc, out = self.run_main()
             self.assertEqual(rc, 1, out)
             last = srv.bodies[-1]
-            self.assertEqual(last["import_run"]["status"], "history_diverged")
-            self.assertIn("1 orphaned", last["import_run"]["error"])
+            run = last["events"][-1]["payload"]
+            self.assertEqual(run["status"], "history_diverged")
+            self.assertIn("1 orphaned", run["error"])
             self.assertEqual([e["event_type"] for e in last["events"]], ["import_run"])
             with open(self.r.state) as f:
                 self.assertEqual(f.read().strip(), kept)

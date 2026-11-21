@@ -35,6 +35,7 @@ export const HOST_JOBS: Record<string, HostJob> = {
   ops_probe_heartbeat: { label: "主機存活回報", description: "每 30 分鐘回報主機仍在運作，讓健康檢查確認主機排程正常執行。", group: "deploy" },
   auto_deploy_next_admin: { label: "管理後台自動部署", description: "每天凌晨部署最新管理後台版本，部署前測試，失敗時自動退回上一版。", group: "deploy", fail: "部署失敗時，Slack 與 Telegram 會收到通知。" },
   deploy_drift_check: { label: "部署版本檢查", description: "每天檢查主機版本是否落後程式庫，及早發現運作中的版本有落差。", group: "deploy", fail: "發現版本落差時，Slack 會收到通知。" },
+  systems_import: { label: "系統總控匯入", description: "每天 04:30 讀取新的 git commit，更新系統總控頁的進度與缺口清單；只讀 git，不產生 commit。", group: "deploy", fail: "匯入失敗時資料只會停在上一次，系統總控頁會顯示最後成功時間。" },
   routine_watchdog: { label: "雲端排程報告檢查", description: "每天檢查 Claude routine 是否按時產生報告，確保雲端自動排程正常。", group: "deploy", fail: "檢查失敗時，Telegram 會收到通知。" },
   schedules_run_due: { label: "客戶排程時鐘", description: "每 5 分鐘找出到期的客戶排程（自動爬取、內容管線、月報等）並啟動，並推進所有按了「做到草稿」的影片專案。", group: "site", fail: "某個排程本身失敗時，會記在該格並送到營運收件匣。" },
   reconcile_videos: { label: "影片畫廊補登", description: "每天兩次找出 R2 中未出現在畫廊的影片並補登，避免關閉頁面後遺漏。", group: "site", fail: "同一輪重試 3 次仍失敗時，Telegram 會收到通知。" },

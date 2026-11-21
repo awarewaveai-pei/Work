@@ -39,7 +39,6 @@ const body = (events: unknown[] = []) => ({
     id: SYS, slug: "outbound-os", name: "外送系統", aliases: [], type: "product", purpose: "x", product_key: null,
     source_paths: ["lobster-factory/"], phases: [], features: [],
   }] },
-  import_run: { head: "abc123", previous_head: null, status: "ok", error: null, gaps: {} },
   events,
 });
 const event = (key: string) => ({
@@ -70,10 +69,10 @@ describe("POST /api/internal/systems/ingest", () => {
   it("resending the same event_key does not add it twice", async () => {
     const first = await POST(req(body([event("git:abc123:0"), event("git:abc123:1")])));
     expect(first.status).toBe(200);
-    expect(await first.json()).toMatchObject({ ok: true, inserted: 3, skipped: 0 }); // 2 events + the run itself
+    expect(await first.json()).toMatchObject({ ok: true, inserted: 2, skipped: 0 }); // no run record of its own: the importer sends it last
     const again = await POST(req(body([event("git:abc123:0"), event("git:abc123:1")])));
-    expect(await again.json()).toMatchObject({ ok: true, inserted: 0, skipped: 3 });
-    expect(tables.get("system_updates")!.size).toBe(3);
+    expect(await again.json()).toMatchObject({ ok: true, inserted: 0, skipped: 2 });
+    expect(tables.get("system_updates")!.size).toBe(2);
     expect(tables.get("system_updates")!.get("git:abc123:0")!.system_id).toBe(SYS);
   });
 

@@ -21,10 +21,14 @@ History diverged (previous_head is not an ancestor of HEAD, e.g. a force push): 
 the state is kept, and every run reports it until someone deletes the state file (= re-import the last 90 days;
 the route skips events it already has).
 Trailers come from %(trailers:only,unfold) in the one `git log` call: the same parser as `git interpret-trailers
---parse`, without one process per commit (a first run walks ~4000 commits under timeout 300).
+--parse`, without one process per commit (a first run walks ~4000 commits within the 300 s limit).
+Guards live in here, not as flock/timeout/nice wrappers on the cron line, so install-host-schedules.sh can still check
+the `python3 /path` form: one run at a time (non-blocking lock; a second run exits 0), 300 s alarm, nice 19 (which
+also puts git's I/O at the lowest best-effort priority).
 """
 import argparse
 import hashlib
+import signal
 import json
 import os
 import re
@@ -329,13 +333,13 @@ def build(mirror, state_path, ref, first_days):
         "unowned_paths": sorted(gaps["unowned_paths"])[:GAP_CAP],
         "unclassified_trailers": sorted(gaps["unclassified_trailers"])[:GAP_CAP],
         "unregistered_products": unregistered, "unclaimed_supervisors": unclaimed}}
-    # last of all, so the route has a run record only once every earlier batch landed
-    events.append({"event_key": f"run:{head}", "system_slug": None, "phase_slug": None, "feature_slug": None,
+    # last of all, so the route has a run record only once every earlier batch landed; the time in the key gives every
+    # run its own record (a rerun at the same HEAD must still update status and gaps)
+    at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    events.append({"event_key": f"run:{head}:{at}", "system_slug": None, "phase_slug": None, "feature_slug": None,
                    "event_type": "import_run", "source": "importer", "commit_sha": head,
-                   "occurred_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                   "payload": import_run, "evidence": None})
-    bodies = [{"registry": reg, "import_run": import_run, "events": events[i:i + BATCH]}
-              for i in range(0, len(events), BATCH)]
+                   "occurred_at": at, "payload": import_run, "evidence": None})
+    bodies = [{"registry": reg, "events": events[i:i + BATCH]} for i in range(0, len(events), BATCH)]
     return bodies, head, status
 
 
@@ -346,11 +350,23 @@ def main(argv=None):
     ap.add_argument("--ref", default="refs/heads/main")
     ap.add_argument("--first-days", type=int, default=90)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--lock", default="/tmp/systems-import.lock")
+    ap.add_argument("--max-seconds", type=int, default=300)
     a = ap.parse_args(argv)
 
     if not a.dry_run and setting("SYSTEMS_IMPORT_ENABLED") != "true":
         print("[systems-import] SYSTEMS_IMPORT_ENABLED is not true -- nothing done")
         return 0
+    if not a.dry_run and os.name == "posix":  # the host; tests also run on the Windows laptop, which has none of these
+        import fcntl
+        lock = open(a.lock, "w")
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("[systems-import] another run holds the lock -- skipped")
+            return 0
+        signal.alarm(a.max_seconds)  # SIGALRM ends the process; state is only written at the very end
+        os.nice(19)
     try:
         bodies, head, status = build(a.mirror, a.state, a.ref, a.first_days)
     except Fatal as e:
@@ -376,7 +392,7 @@ def main(argv=None):
                   file=sys.stderr)
             return 1
     if status != "ok":
-        print(f"[systems-import] {status}: {bodies[-1]['import_run']['error']} -- state kept", file=sys.stderr)
+        print(f"[systems-import] {status}: {bodies[-1]['events'][-1]['payload']['error']} -- state kept", file=sys.stderr)
         return 1
     write_state(a.state, head)
     total = sum(len(b["events"]) for b in bodies)

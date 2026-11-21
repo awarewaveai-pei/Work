@@ -18,6 +18,8 @@ on:
       - 'lobster-factory/infra/hetzner-phase1-core/scripts/install-host-schedules.sh'
       - 'lobster-factory/infra/hetzner-phase1-core/scripts/report-host-schedules.py'
       - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/systems-import.py'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/systems-import.test.py'
       - '.github/workflows/backup-scripts.yml'
   pull_request:
     branches:
@@ -31,6 +33,8 @@ on:
       - 'lobster-factory/infra/hetzner-phase1-core/scripts/install-host-schedules.sh'
       - 'lobster-factory/infra/hetzner-phase1-core/scripts/report-host-schedules.py'
       - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/systems-import.py'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/systems-import.test.py'
       - '.github/workflows/backup-scripts.yml'
   workflow_dispatch:
 
@@ -52,3 +56,5 @@ jobs:
         run: python3 lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-restore-drill.test.py
       - name: Host cron files, cron-run.sh, the installer and the schedules inventory
         run: python3 lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/host-schedules.test.py
+      - name: Systems control center importer (git commits -> /ops/systems events)
+        run: python3 lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/systems-import.test.py
