@@ -68,6 +68,12 @@
 - 採用範圍：`src/pattern/rules/*.rs` 的 62 條本命格局成立條件（口徑來自 iztro-docs《格局》頁與《紫微斗數全書》），以 TypeScript 改寫於 `lib/ziwei/patterns.ts`；行運格（祿衰馬困、風雲際會）未採用。格局解說為本專案自寫繁體文字，未複製其知識包；程式未複製原始碼。
 - 另採用 `src/data/knowledge/iztro_docs.zh-CN.json` 的星曜釋義（底本 iztro-docs，https://github.com/SylarLong/iztro-docs ，MIT，作者 Sylar Long）：52 顆輔星與雜曜、四組十二神共 48 條的要點、四化意象，轉繁後改寫成一句要點，收於 `lib/ziwei/stars.ts` 的 `STAR_NOTES`、`GOD12_NOTES`、`MUTAGEN_BRIEF`；只收 iztro 預設派實際安放的星，未整段照抄，流耀、術語（concepts）與格局釋義未採用。
 
+## GeoNames（出生地城市資料）
+
+- 來源：GeoNames（https://www.geonames.org/），GeoNames 為 Unxos GmbH 的專案；資料檔 `cities15000`、`alternateNamesV2`、`admin1CodesASCII`、`countryInfo`，取自 https://download.geonames.org/export/dump/ （2026-11-21 版）
+- 授權：Creative Commons Attribution 4.0（CC BY 4.0），https://creativecommons.org/licenses/by/4.0/ 。依 GeoNames 原文：資料以 "as is" 提供，不保證準確、即時或完整。
+- 本站的修改：只取城市名、當地名、中文名、國家、一級行政區、經緯度（四捨五入到小數 4 位）、IANA 時區與人口；中文顯示名只取 zh-TW／zh-Hant／zh-HK 標籤，其他中文名只當搜尋鍵；不取歷史名與俗名。產生方式見 `scripts/build-places.mjs`，產出為 `lib/places/data.json`，由 `lib/places/search.ts` 搜尋。原始檔未收進本 repo。
+
 ## MIT License 全文（上列專案共用）
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
