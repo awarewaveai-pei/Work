@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import AiReading from '@/components/AiReading';
+import PlaceField, { defaultPlace } from '@/components/PlaceField';
 import {
   astrologyContext,
   aspectDetail,
@@ -30,6 +31,7 @@ import type { BodyKey, SynastryResult, TransitResult, WesternChart, WesternReque
 import type { Aspect } from '@/lib/astrologyAspects';
 import { techniquesReading, traditionalReading } from '@/lib/astrologyTraditional';
 import { localToday } from '@/lib/today';
+import { utcOffsetAt, type BirthPlace } from '@/lib/timezone';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -41,7 +43,8 @@ export default function AstrologyTool({
   locale: Locale;
 }) {
   const t = dict.astrology;
-  const [form, setForm] = useState<BirthForm>(DEFAULT_BIRTH);
+  const [form, setForm] = useState<BirthForm>(() => defaultBirth(locale));
+  const [placeMissing, setPlaceMissing] = useState(false);
   const [chart, setChart] = useState<WesternChart | null>(null);
   /** 排盤當下的生辰(小限、行運、合盤都用它;表單之後被改不影響已排的盤) */
   const [natalReq, setNatalReq] = useState<WesternRequest | null>(null);
@@ -50,11 +53,13 @@ export default function AstrologyTool({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setPlaceMissing(!form.place);
+    if (!form.place) return;
     setLoading(true);
     setError(false);
     setChart(null);
     try {
-      const req = toRequest(form);
+      const req = toRequest(form)!;
       setChart(await postJson<WesternChart>('/api/astrology', req));
       setNatalReq(req);
     } catch {
@@ -67,7 +72,8 @@ export default function AstrologyTool({
   return (
     <>
       <form onSubmit={submit} className="glass-card p-6" style={{ display: 'grid', gap: '1rem' }}>
-        <BirthFields value={form} onChange={setForm} t={t} />
+        <BirthFields value={form} onChange={(v) => { setForm(v); if (v.place) setPlaceMissing(false); }} dict={dict} locale={locale} />
+        {placeMissing ? <div className="error-banner">{dict.form.placeRequired}</div> : null}
         <button type="submit" disabled={loading} className="btn-gold" style={{ justifySelf: 'start' }}>
           {loading ? t.computing : t.submit}
         </button>
@@ -193,17 +199,18 @@ export default function AstrologyTool({
 interface BirthForm {
   date: string;
   time: string;
-  tz: number;
-  lat: number;
-  lon: number;
+  place: BirthPlace | null;
 }
 
-const DEFAULT_BIRTH: BirthForm = { date: '2000-01-01', time: '12:00', tz: 8, lat: 25.03, lon: 121.56 };
+const defaultBirth = (locale: Locale): BirthForm => ({ date: '2000-01-01', time: '12:00', place: defaultPlace(locale) });
 
-function toRequest(f: BirthForm): WesternRequest {
+/** UTC 偏移由出生地時區與出生時刻算出(含歷史夏令時間),不讓使用者手填。未選出生地回 null。 */
+function toRequest(f: BirthForm): WesternRequest | null {
+  if (!f.place) return null;
   const [year, month, day] = f.date.split('-').map(Number);
   const [hour, minute] = f.time.split(':').map(Number);
-  return { year, month, day, hour, minute, tzOffsetHours: f.tz, lat: f.lat, lon: f.lon };
+  const tzOffsetHours = utcOffsetAt(f.place.zone, year, month, day, hour, minute);
+  return { year, month, day, hour, minute, tzOffsetHours, lat: f.place.lat, lon: f.place.lon };
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -218,7 +225,18 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 
 type AstroDict = Dictionary['astrology'];
 
-function BirthFields({ value, onChange, t }: { value: BirthForm; onChange: (v: BirthForm) => void; t: AstroDict }) {
+function BirthFields({
+  value,
+  onChange,
+  dict,
+  locale,
+}: {
+  value: BirthForm;
+  onChange: (v: BirthForm) => void;
+  dict: Dictionary;
+  locale: Locale;
+}) {
+  const t: AstroDict = dict.astrology;
   const set = <K extends keyof BirthForm>(k: K, v: BirthForm[K]) => onChange({ ...value, [k]: v });
   const label = (text: string) => (
     <span className="label-dark" style={{ display: 'block', marginBottom: '0.4rem' }}>{text}</span>
@@ -233,18 +251,9 @@ function BirthFields({ value, onChange, t }: { value: BirthForm; onChange: (v: B
         {label(t.birthTime)}
         <input type="time" value={value.time} onChange={(e) => set('time', e.target.value)} className="field-dark" required />
       </label>
-      <label>
-        {label(t.timezone)}
-        <input type="number" step="0.5" value={value.tz} onChange={(e) => set('tz', Number(e.target.value))} className="field-dark" />
-      </label>
-      <label>
-        {label(t.latitude)}
-        <input type="number" step="0.01" value={value.lat} onChange={(e) => set('lat', Number(e.target.value))} className="field-dark" />
-      </label>
-      <label>
-        {label(t.longitude)}
-        <input type="number" step="0.01" value={value.lon} onChange={(e) => set('lon', Number(e.target.value))} className="field-dark" />
-      </label>
+      <div className="sm:col-span-2">
+        <PlaceField dict={dict} locale={locale} onChange={(p) => set('place', p)} />
+      </div>
     </div>
   );
 }
@@ -323,18 +332,22 @@ function TransitPanel({ natalReq, dict, locale }: { natalReq: WesternRequest; di
 
 function SynastryPanel({ natalReq, dict, locale }: { natalReq: WesternRequest; dict: Dictionary; locale: Locale }) {
   const t = dict.astrology;
-  const [partner, setPartner] = useState<BirthForm>(DEFAULT_BIRTH);
+  const [partner, setPartner] = useState<BirthForm>(() => defaultBirth(locale));
+  const [placeMissing, setPlaceMissing] = useState(false);
   const [result, setResult] = useState<SynastryResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setPlaceMissing(!partner.place);
+    if (!partner.place) return;
     setLoading(true);
     setError(false);
     setResult(null);
     try {
-      setResult(await postJson<SynastryResult>('/api/astrology/synastry', { a: natalReq, b: toRequest(partner) }));
+      const b = toRequest(partner)!;
+      setResult(await postJson<SynastryResult>('/api/astrology/synastry', { a: natalReq, b }));
     } catch {
       setError(true);
     } finally {
@@ -347,7 +360,8 @@ function SynastryPanel({ natalReq, dict, locale }: { natalReq: WesternRequest; d
       <h2 className="label-dark" style={{ marginBottom: '0.25rem' }}>{t.synastry}</h2>
       <p style={{ color: 'var(--text-caption)', marginBottom: '0.75rem' }}>{t.synastryHint}</p>
       <form onSubmit={submit} style={{ display: 'grid', gap: '1rem' }}>
-        <BirthFields value={partner} onChange={setPartner} t={t} />
+        <BirthFields value={partner} onChange={(v) => { setPartner(v); if (v.place) setPlaceMissing(false); }} dict={dict} locale={locale} />
+        {placeMissing ? <div className="error-banner">{dict.form.placeRequired}</div> : null}
         <button type="submit" disabled={loading} className="btn-gold" style={{ justifySelf: 'start' }}>
           {loading ? t.computing : t.synastryButton}
         </button>

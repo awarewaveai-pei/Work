@@ -4,7 +4,7 @@ import { MAX_LIMIT } from '@/lib/places/search';
 import { searchPlaces } from '@/lib/places/server';
 
 /**
- * 出生地搜尋:GET /api/places?q=台北&locale=zh-TW&limit=10 → { places: PlaceResult[] }。
+ * 出生地搜尋:GET /api/places?q=台北&locale=zh-TW&limit=10 → { places: BirthPlace[], attribution }。
  * 資料是靜態檔、不含使用者資料,結果可公開快取。
  */
 export const runtime = 'nodejs';

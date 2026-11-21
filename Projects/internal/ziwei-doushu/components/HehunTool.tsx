@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import BirthForm from '@/components/BirthForm';
+import BirthZoneNote from '@/components/BirthZoneNote';
 import AiReading from '@/components/AiReading';
 import { computeHehun, toContext, type BirthDay, type HehunData } from '@/lib/divination/systems/hehun';
 import type { HehunItem, Verdict } from '@/lib/hehun';
@@ -153,6 +154,7 @@ export default function HehunTool({ dict, locale }: { dict: Dictionary; locale: 
                     {dict.bazi.dayMaster} {r.dayMaster}({r.analysis.dayElement}) · {dict.bazi.favorable}{' '}
                     {r.analysis.favorable.join('、')}
                   </div>
+                  <BirthZoneNote zone={r.zone} dict={dict} />
                 </div>
               ))}
             </div>

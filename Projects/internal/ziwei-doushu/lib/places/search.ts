@@ -1,5 +1,6 @@
 import type { Locale } from '@/lib/i18n/config';
-import type { PlaceResult, PlacesData } from './types';
+import type { BirthPlace } from '@/lib/timezone';
+import type { PlacesData } from './types';
 
 /**
  * 出生地搜尋 —— 純函式,資料由呼叫端注入(伺服器端見 lib/places/server.ts;資料約 2.3MB,不進前端)。
@@ -74,7 +75,7 @@ export function createSearchPlaces(data: PlacesData) {
   }
 
   /** 依名稱搜尋城市;查無或空字串回空陣列。limit 夾在 1–MAX_LIMIT。 */
-  return function searchPlaces(query: string, locale: Locale, limit = 10): PlaceResult[] {
+  return function searchPlaces(query: string, locale: Locale, limit = 10): BirthPlace[] {
     const q = normalizePlaceText(query);
     if (!q) return [];
     const n = Math.min(MAX_LIMIT, Math.max(1, Math.floor(limit)));

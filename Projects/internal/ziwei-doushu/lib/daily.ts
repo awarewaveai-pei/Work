@@ -1,5 +1,5 @@
 import { Solar } from 'lunar-javascript';
-import { computeBazi, type BaziRequest } from './bazi';
+import { computeBazi, type BaziRequest, type BaziResult } from './bazi';
 import { defaultLocale, type Locale } from './i18n/config';
 import type { InterpretationContext } from './divination/types';
 import { KE, SHENG, stemWuXing, type WuXing } from './ganzhi';
@@ -169,6 +169,8 @@ export interface DailyFortune {
   favorable: string[];
   /** 當日黃曆(與出生資料無關) */
   almanac: DailyAlmanac;
+  /** 出生地時區與出生當下的 UTC 偏移、夏令時間(取自八字,結果頁顯示) */
+  zone: BaziResult['zone'];
 }
 
 export function computeDailyFortune(
@@ -212,6 +214,7 @@ export function computeDailyFortune(
     },
     yi: almanac.yi.slice(0, 5),
     ji: almanac.ji.slice(0, 5),
+    zone: bazi.zone,
     dayMaster: bazi.dayMaster,
     strength: bazi.analysis.strength,
     pattern: bazi.analysis.pattern,

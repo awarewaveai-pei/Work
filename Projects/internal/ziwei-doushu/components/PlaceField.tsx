@@ -1,55 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { BirthPlace } from '@/lib/timezone';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 /**
- * 出生地選擇。過渡版:常用地點按鈕 + 「其他」手動輸入 IANA 時區與經緯度。
- * 對外只交出 BirthPlace(lib/timezone.ts);E6 會把內部換成全球城市搜尋,外部介面不變。
+ * 出生地選擇:全球城市搜尋(/api/places,GeoNames)+「其他」手動輸入 IANA 時區與經緯度。
+ * 結果是看得到的按鈕,不是下拉選單。對外只交出 BirthPlace(lib/timezone.ts)。
  */
 
-interface Preset {
-  id: string;
-  zh: string;
-  en: string;
-  lat: number;
-  lon: number;
-  zone: string;
-}
-
-/** 台灣與中國城市的經度沿用舊表(既有排盤結果不變)。 */
-const PRESETS: readonly Preset[] = [
-  { id: 'taipei', zh: '台北', en: 'Taipei', lat: 25.03, lon: 121.5, zone: 'Asia/Taipei' },
-  { id: 'taichung', zh: '台中', en: 'Taichung', lat: 24.15, lon: 120.7, zone: 'Asia/Taipei' },
-  { id: 'kaohsiung', zh: '高雄', en: 'Kaohsiung', lat: 22.63, lon: 120.3, zone: 'Asia/Taipei' },
-  { id: 'tainan', zh: '台南', en: 'Tainan', lat: 22.99, lon: 120.2, zone: 'Asia/Taipei' },
-  { id: 'hongkong', zh: '香港', en: 'Hong Kong', lat: 22.32, lon: 114.2, zone: 'Asia/Hong_Kong' },
-  { id: 'macau', zh: '澳門', en: 'Macau', lat: 22.2, lon: 113.55, zone: 'Asia/Macau' },
-  { id: 'beijing', zh: '北京', en: 'Beijing', lat: 39.9, lon: 116.4, zone: 'Asia/Shanghai' },
-  { id: 'shanghai', zh: '上海', en: 'Shanghai', lat: 31.23, lon: 121.5, zone: 'Asia/Shanghai' },
-  { id: 'guangzhou', zh: '廣州', en: 'Guangzhou', lat: 23.13, lon: 113.3, zone: 'Asia/Shanghai' },
-  { id: 'singapore', zh: '新加坡', en: 'Singapore', lat: 1.35, lon: 103.82, zone: 'Asia/Singapore' },
-  { id: 'kualalumpur', zh: '吉隆坡', en: 'Kuala Lumpur', lat: 3.14, lon: 101.69, zone: 'Asia/Kuala_Lumpur' },
-  { id: 'tokyo', zh: '東京', en: 'Tokyo', lat: 35.68, lon: 139.69, zone: 'Asia/Tokyo' },
-  { id: 'seoul', zh: '首爾', en: 'Seoul', lat: 37.57, lon: 126.98, zone: 'Asia/Seoul' },
-  { id: 'sydney', zh: '雪梨', en: 'Sydney', lat: -33.87, lon: 151.21, zone: 'Australia/Sydney' },
-  { id: 'london', zh: '倫敦', en: 'London', lat: 51.51, lon: -0.13, zone: 'Europe/London' },
-  { id: 'newyork', zh: '紐約', en: 'New York', lat: 40.71, lon: -74.01, zone: 'America/New_York' },
-  { id: 'losangeles', zh: '洛杉磯', en: 'Los Angeles', lat: 34.05, lon: -118.24, zone: 'America/Los_Angeles' },
-];
-
-const OTHER = 'other';
-
-function toPlace(p: Preset, locale: Locale): BirthPlace {
-  return { label: locale === 'en' ? p.en : p.zh, lat: p.lat, lon: p.lon, zone: p.zone };
-}
-
-/** 繁中介面預設台北;英文介面不預設,要使用者自己選。 */
+/** 繁中介面預設台北(沿用舊表經度 121.5,既有排盤結果不變);英文介面不預設,要使用者自己選。 */
+const TAIPEI: BirthPlace = { label: '台北', lat: 25.03, lon: 121.5, zone: 'Asia/Taipei' };
 export function defaultPlace(locale: Locale): BirthPlace | null {
-  return locale === 'zh-TW' ? toPlace(PRESETS[0], locale) : null;
+  return locale === 'zh-TW' ? TAIPEI : null;
 }
+
+const SEARCH_LIMIT = 8;
+const DEBOUNCE_MS = 250;
 
 function isZone(zone: string): boolean {
   try {
@@ -59,6 +27,16 @@ function isZone(zone: string): boolean {
     return false;
   }
 }
+
+function manualPlace(z: string, la: string, lo: string): BirthPlace | null {
+  const latN = Number(la);
+  const lonN = Number(lo);
+  if (!isZone(z.trim()) || la.trim() === '' || lo.trim() === '') return null;
+  if (!(Math.abs(latN) <= 90 && Math.abs(lonN) <= 180)) return null;
+  return { label: z.trim(), lat: latN, lon: lonN, zone: z.trim() };
+}
+
+const fmt = (v: number, pos: string, neg: string) => `${Math.abs(v).toFixed(2)}°${v >= 0 ? pos : neg}`;
 
 export default function PlaceField({
   dict,
@@ -71,52 +49,120 @@ export default function PlaceField({
   onChange: (place: BirthPlace | null) => void;
 }) {
   const t = dict.form;
-  const [picked, setPicked] = useState<string | null>(locale === 'zh-TW' ? PRESETS[0].id : null);
+  const [picked, setPicked] = useState<BirthPlace | null>(() => defaultPlace(locale));
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<BirthPlace[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
   const [zone, setZone] = useState('');
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
 
-  function pick(id: string) {
-    setPicked(id);
-    const p = PRESETS.find((x) => x.id === id);
-    onChange(p ? toPlace(p, locale) : manual(zone, lat, lon));
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setResults(null);
+      setSearching(false);
+      return;
+    }
+    const ctrl = new AbortController();
+    // 改字就清掉上一輪的結果與錯誤,避免等待期間點到舊結果
+    setResults(null);
+    setSearchFailed(false);
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ q, locale, limit: String(SEARCH_LIMIT) });
+        const res = await fetch(`/api/places?${params}`, { signal: ctrl.signal });
+        if (!res.ok) throw new Error();
+        // 瀏覽器內建時區資料較舊時(如不認得 Europe/Kyiv),該城市無法換算偏移,不列出
+        setResults((((await res.json()) as { places?: BirthPlace[] }).places ?? []).filter((p) => isZone(p.zone)));
+      } catch {
+        if (ctrl.signal.aborted) return;
+        setResults(null);
+        setSearchFailed(true);
+      } finally {
+        if (!ctrl.signal.aborted) setSearching(false);
+      }
+    }, DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [query, locale]);
+
+  function pick(p: BirthPlace) {
+    setPicked(p);
+    setManualOpen(false);
+    setQuery('');
+    setResults(null);
+    onChange(p);
   }
 
-  function manual(z: string, la: string, lo: string): BirthPlace | null {
-    const latN = Number(la);
-    const lonN = Number(lo);
-    if (!isZone(z.trim()) || la.trim() === '' || lo.trim() === '') return null;
-    if (!(Math.abs(latN) <= 90 && Math.abs(lonN) <= 180)) return null;
-    return { label: z.trim(), lat: latN, lon: lonN, zone: z.trim() };
+  function openManual() {
+    setManualOpen(true);
+    setPicked(null);
+    onChange(manualPlace(zone, lat, lon));
   }
 
   function edit(z: string, la: string, lo: string) {
     setZone(z);
     setLat(la);
     setLon(lo);
-    onChange(manual(z, la, lo));
+    onChange(manualPlace(z, la, lo));
   }
 
-  const zoneBad = picked === OTHER && zone.trim() !== '' && !isZone(zone.trim());
+  const zoneBad = manualOpen && zone.trim() !== '' && !isZone(zone.trim());
 
   return (
     <div className="flex flex-col gap-1.5">
       <span className="label-dark">{t.place}</span>
-      <div role="group" aria-label={t.place} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-        {[...PRESETS.map((p) => ({ id: p.id, text: locale === 'en' ? p.en : p.zh })), { id: OTHER, text: t.placeOther }].map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            aria-pressed={picked === o.id}
-            onClick={() => pick(o.id)}
-            className={picked === o.id ? 'btn-gold' : 'btn-violet'}
-            style={{ width: 'auto' }}
-          >
-            {o.text}
-          </button>
-        ))}
+      {picked ? (
+        <p className="correction-text" aria-live="polite">
+          {t.placeSelected} {picked.label} · {picked.zone} · {fmt(picked.lat, 'N', 'S')} {fmt(picked.lon, 'E', 'W')}
+        </p>
+      ) : null}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t.placeSearchPlaceholder}
+          aria-label={t.placeSearch}
+          className="field-dark"
+          style={{ flex: '1 1 14rem' }}
+          maxLength={64}
+        />
+        <button
+          type="button"
+          aria-pressed={manualOpen}
+          onClick={openManual}
+          className={manualOpen ? 'btn-gold' : 'btn-violet'}
+          style={{ width: 'auto' }}
+        >
+          {t.placeOther}
+        </button>
       </div>
-      {picked === OTHER ? (
+      {query.trim() ? (
+        <div role="group" aria-label={t.placeSearch} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.25rem' }}>
+          {searching && !results ? <span className="no-correction-text">{t.placeSearching}</span> : null}
+          {searchFailed ? <span className="no-correction-text">{t.placeSearchFailed}</span> : null}
+          {results && results.length === 0 ? <span className="no-correction-text">{t.placeNoResult}</span> : null}
+          {results?.map((p) => (
+            <button
+              key={`${p.lat},${p.lon},${p.label}`}
+              type="button"
+              onClick={() => pick(p)}
+              className="btn-violet"
+              style={{ width: 'auto', textAlign: 'left' }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {manualOpen ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3" style={{ marginTop: '0.5rem' }}>
           <label className="flex flex-col gap-1.5">
             <span className="label-dark">{t.timeZone}</span>
@@ -140,6 +186,16 @@ export default function PlaceField({
           <p className="no-correction-text md:col-span-3">{zoneBad ? t.timeZoneInvalid : t.timeZoneHint}</p>
         </div>
       ) : null}
+      <p className="no-correction-text" style={{ fontSize: '0.7rem' }}>
+        {t.placeCredit}{' '}
+        <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer" className="text-gold-dim">
+          GeoNames
+        </a>
+        {' · '}
+        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer" className="text-gold-dim">
+          CC BY 4.0
+        </a>
+      </p>
     </div>
   );
 }

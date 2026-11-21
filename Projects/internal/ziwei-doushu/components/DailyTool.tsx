@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import BirthForm from '@/components/BirthForm';
+import BirthZoneNote from '@/components/BirthZoneNote';
 import AiReading from '@/components/AiReading';
 import { computeDailyFortune, dailyContext, type DailyFortune } from '@/lib/daily';
 import type { ChartRequest } from '@/lib/ziwei';
@@ -99,6 +100,7 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
             >
               {result.date}
             </div>
+            <BirthZoneNote zone={result.zone} dict={dict} />
             {rows.map(([k, label]) => (
               <div key={k} className="fortune-row">
                 <span style={{ color: 'var(--text-body)', fontSize: '0.875rem' }}>{label}</span>

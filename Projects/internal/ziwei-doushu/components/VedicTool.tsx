@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import AiReading from '@/components/AiReading';
+import PlaceField, { defaultPlace } from '@/components/PlaceField';
 import { degInSign } from '@/lib/astrologyView';
 import {
   currentDasha,
@@ -13,6 +14,7 @@ import {
 } from '@/lib/divination/systems/vedic';
 import { karanaName, nakshatraName, tithiName, varaName, yogaName, type VedicChart } from '@/lib/vedic';
 import { localToday, type Ymd } from '@/lib/today';
+import { utcOffsetAt, type BirthPlace } from '@/lib/timezone';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -23,9 +25,8 @@ export default function VedicTool({ dict, locale }: { dict: Dictionary; locale: 
   const t = dict.vedic;
   const [date, setDate] = useState('2000-01-01');
   const [time, setTime] = useState('12:00');
-  const [tz, setTz] = useState(8);
-  const [lat, setLat] = useState(25.03);
-  const [lon, setLon] = useState(121.56);
+  const [place, setPlace] = useState<BirthPlace | null>(() => defaultPlace(locale));
+  const [placeMissing, setPlaceMissing] = useState(false);
   const [chart, setChart] = useState<VedicChart | null>(null);
   /** 排盤當下的「今天」:目前大運與 AI 事實用同一天 */
   const [today, setToday] = useState<Ymd | null>(null);
@@ -34,16 +35,20 @@ export default function VedicTool({ dict, locale }: { dict: Dictionary; locale: 
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setPlaceMissing(!place);
+    if (!place) return;
     setLoading(true);
     setError(false);
     setChart(null);
     try {
       const [y, m, d] = date.split('-').map(Number);
       const [hh, mm] = time.split(':').map(Number);
+      // UTC 偏移由出生地時區與出生時刻算出(含歷史夏令時間)
+      const tzOffsetHours = utcOffsetAt(place.zone, y, m, d, hh, mm);
       const res = await fetch('/api/vedic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year: y, month: m, day: d, hour: hh, minute: mm, tzOffsetHours: tz, lat, lon }),
+        body: JSON.stringify({ year: y, month: m, day: d, hour: hh, minute: mm, tzOffsetHours, lat: place.lat, lon: place.lon }),
       });
       if (!res.ok) throw new Error();
       setChart((await res.json()) as VedicChart);
@@ -71,10 +76,18 @@ export default function VedicTool({ dict, locale }: { dict: Dictionary; locale: 
         <div className="grid gap-3 sm:grid-cols-2">
           {field(t.birthDate, <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="field-dark" required />)}
           {field(t.birthTime, <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="field-dark" required />)}
-          {field(t.timezone, <input type="number" step="0.5" value={tz} onChange={(e) => setTz(Number(e.target.value))} className="field-dark" />)}
-          {field(t.latitude, <input type="number" step="0.01" value={lat} onChange={(e) => setLat(Number(e.target.value))} className="field-dark" />)}
-          {field(t.longitude, <input type="number" step="0.01" value={lon} onChange={(e) => setLon(Number(e.target.value))} className="field-dark" />)}
+          <div className="sm:col-span-2">
+            <PlaceField
+              dict={dict}
+              locale={locale}
+              onChange={(p) => {
+                setPlace(p);
+                if (p) setPlaceMissing(false);
+              }}
+            />
+          </div>
         </div>
+        {placeMissing ? <div className="error-banner">{dict.form.placeRequired}</div> : null}
         <button type="submit" disabled={loading} className="btn-gold" style={{ justifySelf: 'start' }}>
           {loading ? t.computing : t.submit}
         </button>
