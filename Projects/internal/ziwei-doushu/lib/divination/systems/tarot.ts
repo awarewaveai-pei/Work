@@ -53,6 +53,13 @@ export function toContext(
       value: `${d.card.name[locale]}(${orient(d.reversed, locale)})`,
     });
   });
+  // 追問補抽的牌:標明是補牌,不佔牌陣牌位,也不算進牌間關係
+  (r.extra ?? []).forEach((d, i) => {
+    facts.push({
+      label: `followup:#${i + 1}`,
+      value: `${d.card.name[locale]}(${orient(d.reversed, locale)})`,
+    });
+  });
   // 牌間關係由確定性程式算好,AI 只負責敘事(單張牌無關係)
   for (const line of describeRelations(computeTarotRelations(r.cards), r.cards, locale)) {
     facts.push({ label: line.key, value: line.text });

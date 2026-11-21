@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TAROT_DECK, drawCards, drawSpread, dailyCard, secureInt, SPREADS, SPREAD_GROUPS } from './tarot';
+import { TAROT_DECK, drawCards, drawSpread, dailyCard, drawFollowUp, MAX_EXTRA_CARDS, secureInt, SPREADS, SPREAD_GROUPS } from './tarot';
 import type { SpreadId } from './tarot';
 import { tarotSystem, toContext } from './divination/systems/tarot';
 
@@ -137,5 +137,39 @@ describe('每日一牌', () => {
       'zh-TW',
     );
     expect(context.facts.find((f) => f.label === 'mode')?.value).toBe('每日一牌 2026-11-21');
+  });
+});
+
+describe('追問補抽', () => {
+  it('只從剩餘牌堆抽:不與牌陣、先前補抽重複(凱爾特十字 + 三次 3 張)', () => {
+    let r = drawSpread('celtic');
+    for (let i = 0; i < 3; i++) r = drawFollowUp(r, 3);
+    const all = [...r.cards, ...(r.extra ?? [])].map((d) => d.card.id);
+    expect(r.extra).toHaveLength(9);
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  it('注入 rng 恆回 0(最易撞牌)時,補牌仍不與主牌重複', () => {
+    const r = drawFollowUp(drawSpread('single', () => 0), 3, () => 0);
+    const ids = [...r.cards, ...(r.extra ?? [])].map((d) => d.card.id);
+    expect(new Set(ids).size).toBe(4);
+  });
+
+  it('張數須 1–3、累計不超過上限;不改原物件', () => {
+    const r = drawSpread('three');
+    expect(() => drawFollowUp(r, 0)).toThrow();
+    expect(() => drawFollowUp(r, 4)).toThrow();
+    expect(() => drawFollowUp(r, 1.5)).toThrow();
+    const r9 = drawFollowUp(drawFollowUp(drawFollowUp(r, 3), 3), 3);
+    expect(r9.extra).toHaveLength(MAX_EXTRA_CARDS);
+    expect(() => drawFollowUp(r9, 1)).toThrow();
+    expect(r.extra).toBeUndefined();
+  });
+
+  it('adapter:補牌進 facts 以 followup 標示,不佔牌位', async () => {
+    const r = drawFollowUp(drawSpread('single', () => 0), 2, () => 0);
+    const ctx = toContext(r, 'zh-TW');
+    expect(ctx.facts.filter((f) => f.label.startsWith('followup:'))).toHaveLength(2);
+    expect(ctx.facts.filter((f) => f.label.startsWith('position:'))).toHaveLength(1);
   });
 });

@@ -508,6 +508,8 @@ export interface TarotResult {
   cards: DrawnCard[];
   /** 每日一牌時為抽牌當天(本地日期);一般抽牌不帶 */
   daily?: Ymd;
+  /** 追問時補抽的牌(依序累計),抽自這次牌陣剩下的牌;一般抽牌不帶 */
+  extra?: DrawnCard[];
 }
 
 /** 可注入的亂數源:回傳 [0,1)。測試注入固定值;預設改用密碼學亂數(見 secureInt)。 */
@@ -555,6 +557,32 @@ export function drawCards(count: number, rng?: Rng): DrawnCard[] {
 
 export function drawSpread(spread: SpreadId, rng?: Rng): TarotResult {
   return { spread, cards: drawCards(SPREADS[spread].size, rng) };
+}
+
+/** 一次解讀最多補抽幾張(累計;facts 另有 60 條上限)。 */
+export const MAX_EXTRA_CARDS = 9;
+
+/**
+ * 追問補抽:張數 1–3 由使用者按鈕決定。只從「這次牌陣與先前補抽都沒出現過」的牌裡抽,
+ * 與主牌同一個亂數來源(密碼學亂數,或測試注入的 rng)。回傳新結果,不改原物件。
+ */
+export function drawFollowUp(r: TarotResult, count: number, rng?: Rng): TarotResult {
+  if (!Number.isInteger(count) || count < 1 || count > 3) {
+    throw new Error(`補抽張數須為 1–3: ${count}`);
+  }
+  const prior = r.extra ?? [];
+  if (prior.length + count > MAX_EXTRA_CARDS) {
+    throw new Error(`補抽累計不可超過 ${MAX_EXTRA_CARDS} 張`);
+  }
+  const used = new Set([...r.cards, ...prior].map((d) => d.card.id));
+  const int = intSource(rng);
+  const drawn = shuffle(
+    TAROT_DECK.filter((c) => !used.has(c.id)),
+    int,
+  )
+    .slice(0, count)
+    .map((card) => ({ card, reversed: int(2) === 0 }));
+  return { ...r, extra: [...prior, ...drawn] };
 }
 
 /** FNV-1a 32 位元雜湊。 */

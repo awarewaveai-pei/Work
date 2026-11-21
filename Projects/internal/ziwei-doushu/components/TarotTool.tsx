@@ -5,6 +5,8 @@ import AiReading from '@/components/AiReading';
 import TarotCardView from '@/components/TarotCardView';
 import {
   drawDaily,
+  drawFollowUp,
+  MAX_EXTRA_CARDS,
   drawSpread,
   SPREADS,
   SPREAD_GROUPS,
@@ -37,6 +39,15 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
     ? describeRelations(computeTarotRelations(result.cards), result.cards, locale)
     : [];
   const positions = result ? SPREADS[result.spread].positions[locale] : [];
+  const extra = result?.extra ?? [];
+  const mainCount = result?.cards.length ?? 0;
+  const flip = (i: number) => setRevealed((r) => r.map((v, j) => (j === i ? !v : v)));
+  const followUp = (count: number) => {
+    if (!result) return;
+    const next = drawFollowUp(result, count);
+    setResult(next);
+    setRevealed((r) => [...r, ...Array.from({ length: count }, () => false)]);
+  };
 
   return (
     <>
@@ -108,7 +119,7 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
             type="button"
             className="btn-violet"
             style={{ width: 'auto', marginBottom: '0.75rem' }}
-            onClick={() => setRevealed(result.cards.map(() => true))}
+            onClick={() => setRevealed(revealed.map(() => true))}
             disabled={revealed.every(Boolean)}
           >
             {t.flipAll}
@@ -126,11 +137,51 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
                 drawn={d}
                 position={positions[i] ?? `#${i + 1}`}
                 revealed={revealed[i] ?? false}
-                onToggle={() => setRevealed((r) => r.map((v, j) => (j === i ? !v : v)))}
+                onToggle={() => flip(i)}
                 locale={locale}
                 labels={t}
               />
             ))}
+          </div>
+
+          <div className="glass-card p-6 mt-8" style={{ display: 'grid', gap: '0.75rem' }}>
+            <span className="label-dark">{t.followUp}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-caption)' }}>{t.followUpHint}</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {[1, 2, 3].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className="btn-violet"
+                  style={{ width: 'auto' }}
+                  disabled={extra.length + n > MAX_EXTRA_CARDS}
+                  onClick={() => followUp(n)}
+                >
+                  {t.followUpDraw.replace('{n}', String(n))}
+                </button>
+              ))}
+            </div>
+            {extra.length ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                  gap: '0.75rem',
+                }}
+              >
+                {extra.map((d, i) => (
+                  <TarotCardView
+                    key={`${drawId}-x${i}`}
+                    drawn={d}
+                    position={t.followUpCard.replace('{n}', String(i + 1))}
+                    revealed={revealed[mainCount + i] ?? false}
+                    onToggle={() => flip(mainCount + i)}
+                    locale={locale}
+                    labels={t}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {relationLines.length ? (
