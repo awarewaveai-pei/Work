@@ -7,10 +7,16 @@ import {
   aspectDetail,
   aspectName,
   bodyName,
+  dignityLine,
+  lotLine,
+  profectionLine,
+  sectName,
   signName,
   degInSign,
 } from '@/lib/astrologyView';
 import type { WesternChart } from '@/lib/astrology';
+import { traditionalReading } from '@/lib/astrologyTraditional';
+import { localToday, type Ymd } from '@/lib/today';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -28,6 +34,8 @@ export default function AstrologyTool({
   const [lat, setLat] = useState(25.03);
   const [lon, setLon] = useState(121.56);
   const [chart, setChart] = useState<WesternChart | null>(null);
+  /** 排盤當下的出生日(小限算足歲用;表單日期之後被改不影響已排的盤) */
+  const [birth, setBirth] = useState<Ymd | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
@@ -49,6 +57,7 @@ export default function AstrologyTool({
       });
       if (!res.ok) throw new Error();
       setChart((await res.json()) as WesternChart);
+      setBirth({ year: y, month: m, day: d });
     } catch {
       setError(true);
     } finally {
@@ -88,7 +97,9 @@ export default function AstrologyTool({
 
       {error ? <div className="error-banner mt-6">{dict.errors.computeFailed}</div> : null}
 
-      {chart ? (
+      {chart ? (() => {
+        const trad = birth ? traditionalReading(chart, birth, localToday()) : null;
+        return (
         <section className="mt-8">
           <hr className="star-divider" />
 
@@ -145,9 +156,50 @@ export default function AstrologyTool({
             <p style={{ color: 'var(--text-caption)', fontSize: '0.7rem', marginTop: '0.5rem' }}>{t.aspectsNote}</p>
           </div>
 
-          <AiReading context={astrologyContext(chart, locale)} ai={dict.ai} />
+          {trad ? (
+            <div className="glass-card p-4 mt-5" style={{ fontSize: '0.8125rem' }}>
+              <h2 className="label-dark" style={{ marginBottom: '0.5rem' }}>{t.traditional}</h2>
+              <ul style={{ display: 'grid', gap: '0.3rem' }}>
+                <li>
+                  <span style={{ color: 'var(--text-caption)' }}>{t.sect}　</span>
+                  <span style={{ color: 'var(--gold-400)', fontWeight: 600 }}>{sectName(trad.diurnal, locale)}</span>
+                </li>
+                <li>
+                  <span style={{ color: 'var(--text-caption)' }}>{t.dignities}　</span>
+                  {trad.dignities.some((d) => d.dignities.length > 0)
+                    ? trad.dignities
+                        .filter((d) => d.dignities.length > 0)
+                        .map((d) => (
+                          <span key={d.planet} style={{ marginRight: '0.75rem' }}>
+                            <span style={{ color: 'var(--text-heading)' }}>{bodyName(d.planet, locale)}</span>{' '}
+                            <span style={{ color: 'var(--gold-400)' }}>{dignityLine(d, locale)}</span>
+                          </span>
+                        ))
+                    : <span style={{ color: 'var(--text-caption)' }}>{t.noDignities}</span>}
+                </li>
+                <li>
+                  <span style={{ color: 'var(--text-caption)' }}>{t.fortune}　</span>
+                  <span style={{ color: 'var(--text-heading)' }}>{lotLine(trad.fortune, locale)}</span>
+                </li>
+                <li>
+                  <span style={{ color: 'var(--text-caption)' }}>{t.spirit}　</span>
+                  <span style={{ color: 'var(--text-heading)' }}>{lotLine(trad.spirit, locale)}</span>
+                </li>
+                {trad.profection ? (
+                  <li>
+                    <span style={{ color: 'var(--text-caption)' }}>{t.profection}　</span>
+                    <span style={{ color: 'var(--text-heading)' }}>{profectionLine(trad.profection, locale)}</span>
+                  </li>
+                ) : null}
+              </ul>
+              <p style={{ color: 'var(--text-caption)', fontSize: '0.7rem', marginTop: '0.5rem' }}>{t.traditionalNote}</p>
+            </div>
+          ) : null}
+
+          <AiReading context={astrologyContext(chart, locale, trad)} ai={dict.ai} />
         </section>
-      ) : null}
+        );
+      })() : null}
     </>
   );
 }

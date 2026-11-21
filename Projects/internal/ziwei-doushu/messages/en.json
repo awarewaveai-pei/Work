@@ -287,6 +287,14 @@
     "house": "House",
     "aspects": "Major aspects (tightest first)",
     "noAspects": "No major aspects fall within orb in this chart.",
+    "traditional": "Traditional astrology",
+    "sect": "Sect",
+    "dignities": "Essential dignities",
+    "noDignities": "None of the seven classical planets is in domicile, exaltation, detriment or fall.",
+    "fortune": "Lot of Fortune",
+    "spirit": "Lot of Spirit",
+    "profection": "Profection this year",
+    "traditionalNote": "Seven classical planets only, with traditional rulers (Mars rules Scorpio, Saturn Aquarius, Jupiter Pisces). Domicile +5, exaltation +4, detriment −5, fall −4. The Lots of Fortune and Spirit swap formulas between day and night births and use whole-sign houses. Profections start at the rising sign and move one sign per completed year; that sign's ruler is the lord of the year.",
     "aspectsNote": "Orbs: conjunction, square, trine and opposition 6°, sextile 5°; 1.5° wider when the Sun or Moon is involved. Applying = the two bodies are moving toward the exact angle; separating = moving away. Ascendant and MC are not included."
   },
   "fengshui": {

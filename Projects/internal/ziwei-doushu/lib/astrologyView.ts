@@ -2,6 +2,7 @@ import type { Locale } from './i18n/config';
 import type { BodyKey, WesternChart } from './astrology';
 import type { InterpretationContext } from './divination/types';
 import type { Aspect, AspectKey } from './astrologyAspects';
+import type { DignityKey, Profection, TraditionalReading } from './astrologyTraditional';
 
 /**
  * 西洋占星「顯示層」— 純函式、client/server 共用(type-only import,不拉 wasm)。
@@ -43,7 +44,7 @@ export const ASPECT_NAMES: Record<AspectKey, Record<Locale, string>> = {
 
 /**
  * 給 AI 的相位 facts 上限:interpret route 最多 60 條,上升/天頂 2 + 星體 12 = 14,
- * 相位最多取偏離最小的 40 條(chart.aspects 已依偏離排序),總數 ≤ 54。
+ * 傳統占星 ≤5(traditionalFacts),相位最多取偏離最小的 40 條(chart.aspects 已依偏離排序),總數 ≤ 59。
  */
 export const MAX_ASPECT_FACTS = 40;
 
@@ -65,6 +66,58 @@ export function aspectDetail(a: Aspect<BodyKey>, locale: Locale): string {
   }
   const motion = a.applying === null ? '' : a.applying ? '・入相' : '・出相';
   return `偏離 ${orb}°${motion}`;
+}
+
+export const DIGNITY_NAMES: Record<DignityKey, Record<Locale, string>> = {
+  domicile: { 'zh-TW': '廟', en: 'Domicile' },
+  exaltation: { 'zh-TW': '旺', en: 'Exaltation' },
+  detriment: { 'zh-TW': '陷', en: 'Detriment' },
+  fall: { 'zh-TW': '失勢', en: 'Fall' },
+};
+
+export function sectName(diurnal: boolean, locale: Locale): string {
+  if (locale === 'en') return diurnal ? 'Day chart' : 'Night chart';
+  return diurnal ? '日盤' : '夜盤';
+}
+
+/** 「廟+旺 (+9)」；無尊貴回傳空字串 */
+export function dignityLine(d: TraditionalReading['dignities'][number], locale: Locale): string {
+  if (d.dignities.length === 0) return '';
+  const names = d.dignities.map((k) => DIGNITY_NAMES[k][locale]).join(locale === 'en' ? ' + ' : '・');
+  return `${names} (${d.score > 0 ? '+' : ''}${d.score})`;
+}
+
+/** 福點、精神點：「金牛 12.3°・第 5 宮」 */
+export function lotLine(l: TraditionalReading['fortune'], locale: Locale): string {
+  const sign = signName(l.signIndex, locale);
+  if (locale === 'en') return `${sign} ${degInSign(l.longitude)}°, whole-sign house ${l.house}`;
+  return `${sign} ${degInSign(l.longitude)}°・整宮第 ${l.house} 宮`;
+}
+
+export function profectionLine(p: Profection, locale: Locale): string {
+  const sign = signName(p.signIndex, locale);
+  const lord = bodyName(p.lord, locale);
+  if (locale === 'en') return `age ${p.age}: whole-sign house ${p.house} (${sign}), lord of the year ${lord}`;
+  return `${p.age} 歲:整宮第 ${p.house} 宮(${sign}座)・年主星 ${lord}`;
+}
+
+/** 傳統占星 facts,固定 ≤5 條(日夜盤、尊貴、福點、精神點、小限)。 */
+export function traditionalFacts(r: TraditionalReading, locale: Locale): { label: string; value: string }[] {
+  const en = locale === 'en';
+  const dign = r.dignities
+    .filter((d) => d.dignities.length > 0)
+    .map((d) => `${bodyName(d.planet, locale)} ${dignityLine(d, locale)}`)
+    .join(en ? '; ' : '、');
+  const facts = [
+    { label: en ? 'Sect' : '日夜盤', value: sectName(r.diurnal, locale) },
+    { label: en ? 'Essential dignities' : '本質尊貴', value: dign || (en ? 'none of the seven classical planets' : '七顆古典行星皆無廟旺陷失勢') },
+    { label: en ? 'Lot of Fortune' : '福點', value: lotLine(r.fortune, locale) },
+    { label: en ? 'Lot of Spirit' : '精神點', value: lotLine(r.spirit, locale) },
+  ];
+  if (r.profection) {
+    facts.push({ label: en ? 'Annual profection' : '年小限', value: profectionLine(r.profection, locale) });
+  }
+  return facts;
 }
 
 export function signName(signIndex: number, locale: Locale): string {
@@ -96,6 +149,7 @@ function planetLine(
 export function astrologyContext(
   chart: WesternChart,
   locale: Locale,
+  traditional: TraditionalReading | null = null,
 ): InterpretationContext {
   const facts: { label: string; value: string }[] = [
     {
@@ -113,6 +167,7 @@ export function astrologyContext(
       value: planetLine(p.signIndex, p.house, p.retrograde, locale),
     });
   }
+  if (traditional) facts.push(...traditionalFacts(traditional, locale));
   for (const a of chart.aspects.slice(0, MAX_ASPECT_FACTS)) {
     facts.push({ label: aspectLabel(a, locale), value: aspectDetail(a, locale) });
   }

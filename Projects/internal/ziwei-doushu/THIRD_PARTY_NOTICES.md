@@ -36,13 +36,13 @@
 
 - 來源：https://github.com/NoahChristian/openephem
 - 授權：MIT License，Copyright (c) 2026 Elizabeth Huston, Ph.D. and Noah Christian, Ph.D.
-- 採用範圍：`src/openephem/aspects.py` 的相位判定做法（最短弧角距、日月加寬容許度、以速度判斷入相／出相），以 TypeScript 自行重寫於 `lib/astrologyAspects.ts`；未複製原始碼。
+- 採用範圍：`src/openephem/aspects.py` 的相位判定做法（最短弧角距、日月加寬容許度、以速度判斷入相／出相），以 TypeScript 自行重寫於 `lib/astrologyAspects.ts`；`src/openephem/profections.py` 的年小限規則（整宮制、古典守護星）重寫於 `lib/astrologyTraditional.ts`。未複製原始碼。
 
 ## flatlib
 
 - 來源：https://github.com/flatangle/flatlib
 - 授權：MIT License，Copyright (c) 2015 FlatAngle
-- 採用範圍：`flatlib/aspects.py` 的主要相位角度與入相／出相分類方式，作為 `lib/astrologyAspects.ts` 的對照；程式為本專案自行重寫，未複製原始碼。
+- 採用範圍：`flatlib/aspects.py` 的主要相位角度與入相／出相分類方式，作為 `lib/astrologyAspects.ts` 的對照；程式為本專案自行重寫，未複製原始碼。另取 `dignities/tables.py` 的旺位度數、`dignities/essential.py` 的廟旺陷失勢計分、`tools/arabicparts.py` 的福點與精神點日夜公式，以 TypeScript 自行重寫於 `lib/astrologyTraditional.ts`；三分主、界、面表未採用。
 
 另：`lib/astrologyAspects.ts` 的容許度數值（合／沖／拱／刑 6°、六合 5°、日月 +1.5°）與 Kerykeion（AGPL-3.0）預設值一致；這是主流本命盤的公開慣例數值，僅取數值，未取用 Kerykeion 的任何程式或文字。
 
