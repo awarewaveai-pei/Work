@@ -1,12 +1,21 @@
 // 監工台共用的閘；各監工台的 check.mjs 加自己的跨檔綁定後呼叫 report()。
 import { readFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { key } from './build.mjs';
+
+// sha256 of data.mjs with CRLF folded to LF (a Windows checkout hashes the same); scripts/systems-migrate-supervisor.mjs prints it.
+export const dataSha256 = (here) => createHash('sha256').update(readFileSync(path.join(here, 'data.mjs'), 'utf8').replace(/\r\n/g, '\n')).digest('hex');
 
 // fields：該頁每步另外必填的欄位。回傳錯誤字串陣列。
 export function checkCommon({ here, STEPS, OPEN, NOW = [], COPY, render, fields = [] }) {
   const errors = [];
   const fail = (m) => errors.push(m);
+  // 0. 已切到 /ops/systems 的頁：FROZEN.json {sha256} 存在 → data.mjs 唯讀（比內容指紋，已 commit 的改動也擋）
+  const frozen = path.join(here, 'FROZEN.json');
+  if (existsSync(frozen) && JSON.parse(readFileSync(frozen, 'utf8')).sha256 !== dataSha256(here)) {
+    fail('已移到 /ops/systems：data.mjs 不能再改，進度改由 commit 自動進總控頁');
+  }
   const byKey = new Map(STEPS.map((s) => [key(s), s]));
   if (byKey.size !== STEPS.length) fail('步驟鍵重複');
 
