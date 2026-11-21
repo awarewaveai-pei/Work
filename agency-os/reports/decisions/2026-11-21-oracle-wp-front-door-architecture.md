@@ -5,6 +5,19 @@
 - 路徑縮寫：FD = `agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/WP-front-door-plan.md`；REV = 同目錄 `PLAN-REVIEW.md`；ENG = `Projects/internal/ziwei-doushu/`；ADR = `agency-os/docs/architecture/decisions/`；STATUS = `agency-os/handoffs/2026-11-16-video-unify-supervisor/WP-MEMBERSHIP-STATUS-20261121.md`。
 - 未做：沒連主機、沒建任何測試站。§5 的驗證都還沒跑。
 
+## 0. 操作者回答與定案方向（2026-11-22，優先於下文 §6 的建議）
+
+- §6 第 1 題操作者答：「要能排版」→ 新增 R7：工具頁是 WordPress 頁面，工具上下可放區塊。乙出局（工具頁不在 WordPress）。
+- 方向：**甲′ 同網域內嵌框**＝甲的頁面形式＋乙的網域安排。
+  - WordPress 佔 `oracle.aware-wave.com` 的頁面；引擎不改名，同一網域下由 nginx 依路徑轉到引擎（同乙）；WordPress 頁面用 iframe 載入同網域的引擎頁。
+  - 對 ADR 018 三個理由：cookie 與儲存是第一方（同源）；誘導點擊以 `frame-ancestors 'self'` 關閉（現有 `default.conf:415` 已送 `X-Frame-Options SAMEORIGIN`）；手機問題仍在，但同源時父頁可直接量框內高度、接手捲動，不需要跨網域訊息協定。
+  - 相對甲省掉：引擎改名、新憑證、DNS、嵌入票、跨網域 origin 登記；會員存檔由框內頁直接呼叫同網域的外掛 REST。
+  - 相對乙多出：搜尋收錄要處理（引擎工具頁與 WordPress 頁內容重複，canonical 指向 WordPress 頁）；手機浮層與捲動。
+  - 保留乙的代價 2（引擎與 WordPress 同源）與代價 3（語言路徑不可相撞）。
+  - 客戶自己主機上的 WordPress：跨網域內嵌框（P1 現有寫法），有第一個這種客戶時才做。
+- 丙不選：18 個元件重做並永久維護兩份。
+- §7 試驗照甲′ 調整，結果寫在 §8。
+
 ## 1. 操作者要的（需求，不是做法）
 
 來源 `DISPATCH.md:133,136,141,143` 與 FD `:3-8`。
@@ -126,4 +139,21 @@ ADR 018 `:70`：「第三方 cookie 會被瀏覽器擋、手機難用，也容�
 | V4 | FluentCRM 免費版：對同一聯絡人連兩次「寄自訂信」 | 兩封都進佇列並寄出（MailHog）、有退訂連結與 `List-Unsubscribe` 標頭 | 寄法二 |
 | V5 | V4 失敗時：標籤每日重複觸發、smartcode 計算時點 | — | 寄法一 |
 
-V1–V4 過關後，才把 FD 與 SITE-FLOW 兩份計畫照乙改寫合併（REV §3 的分工仍適用），再給操作者確認後派卡。
+V1–V4 過關後，才把 FD 與 SITE-FLOW 兩份計畫改寫合併（REV §3 的分工仍適用），再給操作者確認後派卡。
+
+## 8. 試驗結果（2026-11-22，照 §0 的甲′；本機拋棄式環境，已拆除）
+
+環境：`%TEMP%/oracle-spike`（compose：`mariadb:11.4`、`wordpress:php8.3-apache`、`wordpress:cli-php8.3`、`nginx:alpine`，對外 `127.0.0.1:8188`）；引擎＝`oracle-int` 工作樹 `next dev -p 3911`；WordPress 6.x 預設佈景（不是 Kadence）；一支拋棄式 mu-plugin 提供同網域 iframe 短碼、`aworacle/v1/charts` REST、`pre_wp_mail` 記錄。
+
+| # | 結果 | 證據 |
+|---|---|---|
+| V1 分路 | **過** | nginx `location ~ ^/(zh-TW\|en)(/\|$)`、`/api/`、`/_next/` → 引擎，其餘 → WordPress。`curl`：`/` 200（WordPress）、`/ziwei/` 200（WordPress 頁，含上方段落＋iframe＋下方段落）、`/zh-TW/ziwei` 200（引擎）、`/api/health` 200、`/wp-login.php` 200、`/nonexistent-page` 404（WordPress，沒被引擎的語言轉址接走） |
+| V1b 同網域內嵌框 | **過，附兩項要做的事** | 瀏覽器：父頁可直接讀 `iframe.contentDocument`（同源），不用訊息協定就能量高度；段落在工具上下正常顯示；375px 寬無橫向捲動。要做：(a) 引擎 `body` 是 `min-height:100%` 的 flex，量 `documentElement.scrollHeight` 會只增不減（桌面量到 4157px，實際內容到 902px）→ 嵌入時要量內容本身，或給嵌入版不撐滿視窗的版面；(b) 引擎自己的工具列與語言鈕會出現在框內 → 嵌入版要隱藏 |
+| V2 會員存檔 | **過** | 從框內頁（引擎頁的 window）呼叫：未登入 GET 401；登入測試會員後取 `admin-ajax.php?action=rest-nonce` → POST 存一筆 200 `{"saved":1}` → GET 讀回同一筆 200；有 cookie 沒 nonce 的 POST 401 |
+| V3 內容安全政策 | **未跑** | 要先在引擎加回應標頭才能測；列為引擎嵌入版那張卡的驗收 |
+| V4 每日信寄法二 | **過（FluentCRM 免費版 3.3.5，不需 Pro）** | 站內 `rest_do_request('POST /fluent-crm/v2/subscribers/{id}/emails/send')` 對同一聯絡人連叫兩次，皆 200；`wp_fc_campaign_emails` 兩筆 `sent`；交給 `wp_mail` 的兩封信內文都有退訂連結，標頭有 `List-Unsubscribe` 與 `List-Unsubscribe-Post: List-Unsubscribe=One-Click`；聯絡人改 `unsubscribed` 後第三次回 422「status needs to be Subscribed」且沒有寄出。代價確認：每封信在 `wp_fc_campaigns` 多一列 `custom_email_campaign`，要定期清 |
+| V5 | 不需要 | V4 過 |
+
+未涵蓋：Kadence 佈景與 Kadence 區塊；真手機瀏覽器（只做 375px 模擬；`loading="lazy"` 的 iframe 在模擬視窗第一次沒載入，改 eager 後正常，原因未查）；實際寄出與退信回報（只攔在 `wp_mail`）；TranslatePress 語言路徑；正式 nginx（兩層）上的分路。
+
+下一步：照甲′ 把兩份計畫改寫合併成一份（產品：引擎嵌入版＋外掛；平台：建站流程；上線：GO-1–GO-3），再給操作者確認後派卡。

@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-22（續1）— oracle WordPress 門面：操作者定「要能排版」→ 同網域內嵌框；本機試驗 V1、V2、V4 過
+
+- 操作者 2026-11-22：「要能排版」（工具頁要能在 WordPress 編輯器裡排版）。「同網域分路」因工具頁不在 WordPress 而出局；改為**同網域內嵌框**：WordPress 頁面內嵌同網域的引擎頁，nginx 依路徑分。理由與比較：`agency-os/reports/decisions/2026-11-21-oracle-wp-front-door-architecture.md` §0。
+- 試驗（本機拋棄式 compose `%TEMP%/oracle-spike`，已 `down -v`；repo 無產物）結果與證據：同檔 §8。
+  - V1 分路：過。V1b 同源內嵌：過；嵌入版要量內容高度（`documentElement.scrollHeight` 只增不減，4157px 對實際 902px）並隱藏引擎工具列。
+  - V2 會員存檔（框內頁以 WordPress cookie＋nonce 呼叫外掛 REST）：過。
+  - V4 FluentCRM 免費版 3.3.5「寄自訂信給聯絡人」：同一人連寄兩封、內文與標頭皆有退訂（含 One-Click）、已退訂者 422 不寄。每封信多一列 `custom_email_campaign`，要定期清。
+  - V3 內容安全政策：未跑（需先改引擎）。
+- 未涵蓋：Kadence、真手機、實際寄出與退信回報、TranslatePress 語言路徑、正式兩層 nginx。
+- 未做：兩份計畫尚未改寫合併；在那之前不派卡（`DISPATCH.md` 現況快照已改）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=curl http://localhost:8188{/,/ziwei/,/zh-TW/ziwei,/api/health,/wp-login.php,/nonexistent-page}（200/200/200/200/200/404）；瀏覽器 javascript 於 iframe.contentWindow 呼叫 /wp-json/aworacle/v1/charts（401→200 saved→200 read→無 nonce 401）；`wp spike-send A|B`（200×2）、退訂後 422；`wp db query` fc_campaign_emails 兩筆 sent | exit=0 | ms=600000
+- REVIEW_WAIVED: DOC_ONLY -- 本條只改決策紀錄、索引與派工表；試驗程式是拋棄式、未進 repo
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式或識別符改動
+- rollback：`git revert` 本 commit（僅文件）。
 ## 2026-11-21（續21）— oracle E6c、X2、W1、P1 風險處置；X2 critic 四項修正；WordPress 門面架構比較（待操作者確認）
 
 - 併入：E6c 後續 `459ae5bea` → main `60d923eac`（臺灣譯名 67→110、後灣／後海、舊瀏覽器時區提示）。E6c `787012ef5`、X2 `6eae15f2d`、W1 `8d60735c2`、P1 `e082fbd04` 先前已在 main。**全部未部署**。
