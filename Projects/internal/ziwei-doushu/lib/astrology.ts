@@ -274,6 +274,8 @@ export function computeSynastry(a: WesternRequest, b: WesternRequest): SynastryR
   const ca = computeWesternChart(a);
   const cb = computeWesternChart(b);
   return { a: ca, b: cb, aspects: synastryAspects(ca.planets, cb.planets) };
+}
+
 // ---- 吠陀(恆星黃道)原始星曆:只取 XALEN 的位置,其餘(宮位、月宿、分盤、大運、五支)在 lib/vedic.ts ----
 
 /** XALEN ayanamsa id:0 = Lahiri(Chitrapaksha,印度官方曆法採用)。 */
