@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-21（續15）— 部署待上線項目：next-admin 與 oracle-web 上線 `acf182549`（修 main 上 CI 紅燈後）
+
+- 操作者：「部署已完成待上線的所有項目」。盤點：next-admin 主機在 `c9e911c7f`，main 多 22 commit；oracle-web 主機在 `4adb301f3`，main 多 31 commit（批 5–8、E6b、X1、E6c、X2、W1）。video-workbench／video-service／remotion 已是最新。oracle-wp-plugin（P1）不是可部署服務，未動。無 `DEPLOY_HOLD`。
+- 根因（擋部署）：next-admin full test suite 自 `4a142d10c` 起紅 2 項——C1 `registry-code.test.ts` UNSCOPED_ROUTES 仍列 `video/[id]`、`internal/video/cleanup`（`4a142d10c` 改走 `media-asset-delete.ts` 後不再碰付費功能，條目過時，刪除）；C2 `ImageLightbox.tsx:53,60` `#fff` 違反影片工具樣式契約（遮罩固定黑，改常數 `ON_SCRIM`）。修正 `acf182549`。此紅燈也會擋今晚 03:00 自動部署。
+- 前置：oracle X1 限流依 `X-Real-IP`——主機 nginx `X-Real-IP $remote_addr` → lobster-nginx `real_ip_header CF-Connecting-IP`（`/root/lobster-phase1/nginx/default.conf:40`）→ oracle，鏈路正確。
+- 部署：`sg-deploy.sh next-admin`（09:30Z，healthy 15s，smoke 全 OK）→ `sg-deploy.sh oracle-web`（09:32Z，healthy 7s，smoke 含 oracle health／zh-TW／api v1／mcp 全 OK）。
+- 避免再發生：改動路由走共用模組時同 commit 跑 `lib/portal/__tests__/registry-code.test.ts`；部署前看 `gh run list` 的 full test suite，不只 tsc。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal/__tests__/registry-code.test.ts "app/video/(wb)/__tests__/style-contract.test.ts" | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=curl | cmd=curl https://oracle.aware-wave.com/api/v1/systems ; /api/mcp tools/list ; /api/v1/places ; playwright-runner -Mode smoke (34 passed 0 failed) | exit=0 | ms=200000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=videoObjectKey only | hits=0
+- ORACLE_WAIVED: 兩處為測試清單過時條目刪除與一個顏色常數，無行為改動；CI full suite 綠為驗證
 ## 2026-11-21（續14）— 編輯器存入照文件分類：從 My Designs 修合成圖再存，不會變成設計圖（續13 m1；操作者：「要補上」）
 
 [根因] PhotoCraft「存入 My Designs」一律 `host.saveTag.source`＝`canvas`（`blocks/my-designs.js`），從 My Designs 把合成圖／塔羅牌開進畫布再存，就成了設計圖、進合成頁清單。續13 只把分類放在傳回票上，沒票的交接（`DesignsGallery.tsx` 畫布編輯）沒有。
