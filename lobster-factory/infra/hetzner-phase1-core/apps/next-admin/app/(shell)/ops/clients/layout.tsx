@@ -1,23 +1,22 @@
 import type { ReactNode } from "react";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { ClientPanelNav } from "./ClientPanelNav";
-import type { OrgStub } from "./ClientPanelNav";
-import { NAV_FIRST, orgColor } from "./nav-orgs";
+import { NAV_FIRST, toPickOrg, type PickOrg } from "./nav-orgs";
 
 // The first NAV_FIRST clients only; the rest are found with the nav's search (GET /api/ops/org-search?q=).
 export default async function ClientsLayout({ children }: { children: ReactNode }) {
   const supabase = getSupabaseServerClient();
 
-  let orgs: OrgStub[] = [];
+  let orgs: PickOrg[] = [];
   let total = 0;
   if (supabase) {
     const { data, count } = await supabase
       .from("organizations")
-      .select("slug, name, color:metadata->>color", { count: "exact" })
+      .select("id, slug, name, color:metadata->>color", { count: "exact" })
       .neq("status", "inactive")
       .order("created_at", { ascending: true })
       .limit(NAV_FIRST);
-    orgs = (data ?? []).map((row) => ({ slug: row.slug, name: row.name, color: orgColor(row.slug, row.color) }));
+    orgs = (data ?? []).map(toPickOrg);
     total = count ?? orgs.length;
   }
 

@@ -192,7 +192,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
       {!orgFilter && (
         <section style={{ ...panelStyle, marginBottom: 16 }}>
           <h2 style={{ ...sectionTitleStyle, marginBottom: 10 }}>Client</h2>
-          <OrgUrlPicker orgs={pickOrgs} total={firstPage.count ?? pickOrgs.length} param="org" by="id" selected={selected?.id ?? null} />
+          <OrgUrlPicker searchPath="/api/ops/org-search" orgs={pickOrgs} total={firstPage.count ?? pickOrgs.length} param="org" by="id" selected={selected?.id ?? null} />
         </section>
       )}
 

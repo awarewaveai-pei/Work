@@ -12,7 +12,7 @@ export function OrgSwitcher({ orgs, total }: { orgs: PickOrg[]; total: number })
     <div className="topbar" style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap" }}>
       <span className="topbar-title">操作客戶</span>
       <div style={{ flex: 1, minWidth: 260 }}>
-        <OrgUrlPicker orgs={orgs} total={total} param="org" by="id" none="自用 / 未指定" />
+        <OrgUrlPicker searchPath="/api/ops/org-search" orgs={orgs} total={total} param="org" by="id" none="自用 / 未指定" />
       </div>
       {cur ? (
         <span className="card-badge badge-green">代操中：{curName ?? cur.slice(0, 8)}</span>

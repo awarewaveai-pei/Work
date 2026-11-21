@@ -55,7 +55,7 @@ export default async function CollectPage({ searchParams }: { searchParams: Prom
       ) : (
         <>
           <nav aria-label="選客戶" style={{ marginBottom: 20 }}>
-            <OrgUrlPicker orgs={clients} total={total} param="slug" by="slug" selected={selected ?? null} />
+            <OrgUrlPicker searchPath="/api/ops/org-search" orgs={clients} total={total} param="slug" by="slug" selected={selected ?? null} />
           </nav>
           {lookupFailed ? <p style={{ color: "var(--red)" }}>讀不到客戶「{slug}」，請重新整理或從上面重選。</p> : null}
           {selected ? <CollectionSourcesPanel slug={selected} researchBridgesEnabled={isResearchBridgesEnabled()} /> : null}

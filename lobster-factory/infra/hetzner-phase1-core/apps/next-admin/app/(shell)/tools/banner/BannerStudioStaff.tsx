@@ -32,6 +32,7 @@ function BrandPicker({ onPick }: { onPick(colors: string[]): void }) {
     <div className="form-row" style={{ marginTop: 12 }}>
       <label className="form-label">選擇品牌帶入配色</label>
       <OrgPicker
+        searchPath="/api/ops/org-search"
         orgs={first.orgs}
         total={first.total}
         selected={selected}
@@ -63,7 +64,7 @@ function SaveOrgPicker({ selected, onPick }: { selected: string | null; onPick(o
   if (!first) return null;
   return (
     <>
-      <OrgPicker orgs={first.orgs} total={first.total} selected={selected} by="id" none="自用" onPick={(org) => onPick(org?.id ?? null)} />
+      <OrgPicker searchPath="/api/ops/org-search" orgs={first.orgs} total={first.total} selected={selected} by="id" none="自用" onPick={(org) => onPick(org?.id ?? null)} />
       {selected && !first.orgs.some((o) => o.id === selected) && <p className="form-hint" style={{ marginTop: 6 }}>存到開啟時指定的客戶。</p>}
     </>
   );
