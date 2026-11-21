@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-22（續2）— oracle：兩份計畫照「同網域內嵌框」改寫；舊門面計畫作廢
+
+- 新 `agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md`：產品規格（決定 15 項；引擎 E1–E4、外掛 P1′–P4、ADR A1、上線 GO-1–GO-3；現站全程不中斷：WordPress 先接非引擎路徑且設建置中，最後才換首頁）。
+- `briefs/SITE-FLOW-COMPLETION-PLAN.md` 就地修訂（不是檔頭附註）：SF-M／SF-N 作廢改指 GO；加 SF-P 舊頁本輪退場；Uptime 監控改手動（無建監控 REST API）；`site-wp` 改固定子動詞、不收腳本；管理員密碼不存 Vault；主機 cron；bridge 步驟寫 `wp_sites`；`site.*` 無 catalog 列或紀錄寫入失敗就不執行；`metadata.ingress`（`host-vhost`｜`product-gateway`）。
+- `briefs/WP-front-door-plan.md` 檔頭標作廢；`DISPATCH.md` 現況快照更新。
+- `PLAN-REVIEW.md` 各條去向：C1（合併、私人合盤）、C3（不中斷）、M1、M2、M3、M4、M5、M6、M8、M9、M10、M11、m3、m4、m7、m9、m11 已寫進兩檔；C2 本輪只寫 `wp_sites`、站台金鑰沿用 `ORACLE_SITES`（第二個站接入時搬控制面）；M7 寄信商留給操作者選；M12、m10 因引擎不改名而不再需要；m5、m6、m8、m12、m13 未處理（m6 列為 §4 第 3 題的替代案）。
+- 未做：未派任何卡；兩檔的待決定題（SPEC §7、SITE-FLOW §4）未問完。
+- 流程更正：操作者已答「要能排版」，下一輪我又丟出新問題被指正；之後已定的事不再問，可自行決定的直接做。
+- REALTEST_WAIVED: DOC_ONLY -- 只改計畫文件
+- REVIEW_WAIVED: DOC_ONLY -- 計畫文件；派卡前由操作者確認
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=WP-front-door-plan | hits=21
+- rollback：`git revert` 本 commit。
 ## 2026-11-22（續1）— oracle WordPress 門面：操作者定「要能排版」→ 同網域內嵌框；本機試驗 V1、V2、V4 過
 
 - 操作者 2026-11-22：「要能排版」（工具頁要能在 WordPress 編輯器裡排版）。「同網域分路」因工具頁不在 WordPress 而出局；改為**同網域內嵌框**：WordPress 頁面內嵌同網域的引擎頁，nginx 依路徑分。理由與比較：`agency-os/reports/decisions/2026-11-21-oracle-wp-front-door-architecture.md` §0。
