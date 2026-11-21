@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { localToday, toSolarYmd } from './dates';
+import { toSolarYmd } from './dates';
+import { localToday } from './today';
 
 describe('toSolarYmd', () => {
   it('國曆原樣回傳', () => {

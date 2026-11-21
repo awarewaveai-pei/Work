@@ -13,7 +13,7 @@ import {
 } from '@/lib/ziwei';
 import { analyzeZiwei, type PatternKind } from '@/lib/ziwei/analyze';
 import { toContext } from '@/lib/divination/systems/ziwei';
-import { localToday } from '@/lib/dates';
+import { localToday } from '@/lib/today';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 

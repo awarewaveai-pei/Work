@@ -5,7 +5,7 @@ import BirthForm from '@/components/BirthForm';
 import AiReading from '@/components/AiReading';
 import { computeDailyFortune, dailyContext, type DailyFortune } from '@/lib/daily';
 import type { ChartRequest } from '@/lib/ziwei';
-import { localToday } from '@/lib/dates';
+import { localToday } from '@/lib/today';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 

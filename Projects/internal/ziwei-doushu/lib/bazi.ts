@@ -11,7 +11,8 @@ import { findBaziRelations, type BaziRelation, type PillarChars } from './baziRe
 import { liChunYear, yearGanZhi } from './liChun';
 import { findShensha, type ShenshaHit } from './baziShensha';
 import { localize } from './s2t';
-import { localToday, toSolarYmd } from './dates';
+import { toSolarYmd } from './dates';
+import { localToday } from './today';
 
 /**
  * 八字四柱排盤 (lunar-javascript)。

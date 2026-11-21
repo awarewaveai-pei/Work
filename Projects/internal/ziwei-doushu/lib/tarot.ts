@@ -1,5 +1,5 @@
 import type { Locale } from './i18n/config';
-import { localToday, type Ymd } from './dates';
+import { localToday, type Ymd } from './today';
 
 /**
  * 塔羅 — 78 張牌庫(中英雙語)+ Fisher-Yates 抽牌(預設密碼學亂數,可注入 rng 測試)+ 每日一牌(確定性)。

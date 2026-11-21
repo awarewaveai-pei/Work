@@ -8,7 +8,7 @@ import {
   type TarotTopic,
 } from '@/lib/tarot';
 import { computeTarotRelations, describeRelations } from '@/lib/tarotRelations';
-import type { Ymd } from '@/lib/dates';
+import type { Ymd } from '@/lib/today';
 import type { Locale } from '@/lib/i18n/config';
 import type { DivinationSystem, InterpretationContext } from '../types';
 
