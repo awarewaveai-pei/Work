@@ -69,7 +69,7 @@ WordPress 頁面（Kadence，可排版）
 | E1 | 嵌入版頁面 | 新 `app/embed/[lang]/[slug]/page.tsx`、嵌入用版面（無工具列、不撐滿視窗、有固定 id 的工具根元素）；`proxy.ts:38-40` matcher 排除 `/embed`；嵌入頁標頭（§2-2）；浮層就地展開（`components/PlaceField.tsx`、`TarotCardView.tsx`） | 12 個工具各一頁可用；375px 無橫向捲動；工具根元素高度＝內容高度（不隨框高變大）；`curl -I` 見兩個標頭 | — | Medium |
 | E2 | 全站 CSP | `next.config.ts` 或 `proxy.ts` 送 CSP；12 頁＋嵌入頁無違規 | 瀏覽器主控台 0 筆 CSP 違規（決策紀錄 §7 V3） | E1 | Medium（安全） |
 | E3 | 轉向與搜尋 | `ORACLE_FRONT_PAGES`（§2-3）；有設定時 `sitemap.ts`、`robots.ts` 不輸出 | 設定時 `/zh-TW/ziwei` 308 到樣式網址、`/sitemap.xml` 404；未設定時與現在逐頁相同（既有測試不變） | — | Low |
-| E4 | 會員票與 AI 限額 | `lib/sites/registry.ts` 加 `ai_per_day`；`app/api/interpret/route.ts` 收票（§2-7） | 偽造或過期的票拿不到會員額度（回匿名限流）；同一假名超過上限 429；日誌不含假名以外的身分資料 | — | Medium（auth） |
+| E4 | 會員票與 AI 限額 | `lib/sites/registry.ts` 加 `ai_per_day`；`app/api/interpret/route.ts` 收票（§2-7） | 偽造或過期的票直接回錯，不退回匿名；簽過的原文帶 `aud`（`v1`｜`ticket`），票不能拿去打 `/api/v1`；同一假名超過上限 429；日誌不含假名以外的身分資料 | — | Medium（auth） |
 
 ### 外掛（`PLG/`）
 

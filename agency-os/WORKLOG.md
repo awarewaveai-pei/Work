@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-22（續7）— oracle WP 第一批：E1 併入 `d11320883`；E4 的 Major 判「現在修」回派
+
+- E1（線1 `d6affccfa` → main `d11320883`，已 push，未部署）：`app/embed/[lang]/[slug]/page.tsx`（根元素 `#aw-oracle-root`）、`app/embed/[lang]/layout.tsx`（第二個 root layout，無工具列、高度跟內容）、`components/toolRegistry.tsx`（鍵型別 `PageSlug`，漏登記 tsc 紅）、`next.config.ts`（`/embed/*` 加 `X-Robots-Tag: noindex, indexifembedded`、`frame-ancestors 'self'`）、`proxy.ts` matcher 排除 `embed/`。
+- 監工驗收：讀完整 diff；整合 worktree `npx tsc --noEmit` exit 0、全套 vitest 489 passed／3 skipped；預覽實看 `/embed/zh-TW/ziwei`、`/embed/en/tarot`、375px `/embed/zh-TW/hehun`（`scrollWidth=clientWidth=375`、根元素高 1565＝文件高 1565、無 `nav`）。
+- E4（線2 `777753c7e`，未併入）critic Major：會員票原文可原樣送 `/api/v1`，`lib/http/v1.ts:73-76` 驗簽通過後先扣站台額度。判定現在修，不採「v1 拒掉帶 `member`」的單點修法：簽過的原文加必填 `aud`（`v1`｜`ticket`），`verifySiteRequest` 在消耗 nonce 前比對。已回派線2（E4b）；外掛簽章加 `aud` 併入 P1 卡。`ORACLE-WP-SPEC.md` E4 列同步（原寫「回匿名限流」與卡片矛盾，改為直接回錯）。
+- 線3（SF-C）、線4（SF-B）用量重設後已叫回續做；線1 清空後派 E3。SF-B 卡片外多改兩個假 DB 測試檔，同意。
+- `WP-PLAN.md` §3：session id 改由 `list_sessions {linked:true}` 依 name 查（原寫在 `data.mjs`，實際沒有該欄）；`data.mjs` E1＝done、E3＝in_progress；監工台重新發布。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (oracle-int, ziwei-doushu) | exit=0 | ms=5950
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n
+- BUGHUNT_DONE: scope=Projects/internal/ziwei-doushu,agency-os,scripts | grep=aw-oracle-root | hits=3
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic 一輪＋監工讀 diff 與預覽實看代替
 ## 2026-11-22（續6）— oracle WordPress 階段：派工計畫、監工台、第一批卡片
 
 - 操作者：「派工者寫最完整的plan和監工台」。新 `agency-os/handoffs/2026-11-20-oracle-skills-supervisor/WP-PLAN.md`（27 張卡、五批、四條工人線、驗收與併入、一起看 RISKS、六個要操作者點頭的時刻）；`briefs/COMMON-WP.md`；第一批 brief 六張（`briefs/WP-E1`、`WP-E3`、`WP-E4`、`WP-SF-B`、`WP-SF-C`、`WP-SF-D`）；後續批次的 brief 在該批開始前寫（要引用前一批定下的名稱）。

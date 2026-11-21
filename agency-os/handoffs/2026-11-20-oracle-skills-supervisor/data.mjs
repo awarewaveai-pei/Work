@@ -38,9 +38,9 @@ const SF = 'briefs/SITE-FLOW-COMPLETION-PLAN.md';
 export const STEPS = [
   // 第一批
   { n: 1, code: 'E1', group: 'B1', title: '引擎嵌入版頁面', plain: '做一個只有工具本身的頁面，給 WordPress 頁面嵌進去用：沒有引擎自己的工具列，高度剛好等於內容。',
-    gate: '12 個工具各有嵌入版且可用；手機寬度不會橫向捲動；原本的 12 頁不變。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: [], card: 'briefs/WP-E1-embed-page.md' },
+    gate: '12 個工具各有嵌入版且可用；手機寬度不會橫向捲動；原本的 12 頁不變。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'd11320883', depends: [], card: 'briefs/WP-E1-embed-page.md' },
   { n: 2, code: 'E3', group: 'B1b', title: '舊工具網址轉到 WordPress 頁', plain: '站前面有 WordPress 時，舊的工具網址自動轉到對應的 WordPress 頁，網站地圖改由 WordPress 提供；沒有 WordPress 時一切照舊。',
-    gate: '打開開關後舊網址會轉向；關掉開關與現在完全相同。', risk: 'Low', model: 'Opus 5.5', status: 'not_started', depends: ['E1'], card: 'briefs/WP-E3-front-redirect.md' },
+    gate: '打開開關後舊網址會轉向；關掉開關與現在完全相同。', risk: 'Low', model: 'Opus 5.5', status: 'in_progress', depends: ['E1'], card: 'briefs/WP-E3-front-redirect.md' },
   { n: 3, code: 'E4', group: 'B1', title: '會員票與 AI 每日上限', plain: '登入的會員用 AI 解讀時，額度記在這位會員身上，每人每天有上限；沒登入的人照現在的方式限制。',
     gate: '假的或過期的票被拒；同一會員超過上限被擋；沒登入時行為不變。', risk: 'Medium（身分驗證）', model: 'Opus 5.5', status: 'in_progress', depends: [], card: 'briefs/WP-E4-member-ticket.md' },
   { n: 4, code: 'SF-B', group: 'B1', title: '網站與環境的紀錄', plain: '讓一個客戶可以有多個網站、每個網站有自己的紀錄；建立客戶時不再把既有設定整包蓋掉。資料表異動先寫好檔，不套用到正式資料庫。',

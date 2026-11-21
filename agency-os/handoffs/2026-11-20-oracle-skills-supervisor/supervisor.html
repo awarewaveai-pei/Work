@@ -81,22 +81,23 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>算命站 WordPress 階段 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
-  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:14.814814814814813%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>0</span>／<span data-computed>27</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:3.7037037037037033%"></i><i class="g" style="width:14.814814814814813%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>1</span>／<span data-computed>27</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">把 oracle.aware-wave.com 改成 WordPress 網站：算命工具嵌在可以排版的頁面裡，會員能存命盤，訂閱後每天收到運勢信；同時把「從後台開一個客戶網站」做成能一步一步按完的流程。共 <span data-computed>27</span> 張卡。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>現有算命站正常服務。<small>線上是 2026-11-20 部署的版本；之後併入的卡都還沒部署。</small></span></li><li class="yes"><b>可以</b><span>做法已定，本機試過可行。<small>2026-11-22：分流、工具嵌在 WordPress 頁面、會員存檔、FluentCRM 對同一人連寄，四項試驗過了三項；內容安全政策未試。</small></span></li><li class="no"><b>還不行</b><span>每日信的寄件網域 oracle.aware-wave.com 可以寄信。<small>2026-11-22 已在 Resend 建立並加好 DNS，驗證中。</small></span></li><li class="no"><b>還不行</b><span>工具嵌在 WordPress 頁面裡。<small>第一批進行中。</small></span></li><li class="no"><b>還不行</b><span>會員能存命盤、訂閱每日信。<small>第三批。</small></span></li><li class="no"><b>還不行</b><span>從後台一步一步開一個客戶網站。<small>平台線第一批進行中。</small></span></li></ul></section>
 
-<section id="steps"><h2>批次與卡</h2><p class="lead">同一批的卡同時進行，各自改不同的檔案；整批交回後一起看風險，再開下一批。</p><ol class="steps"><li class="grp">可同時進行：<a href="#E1">E1</a>、<a href="#E4">E4</a>、<a href="#SF-B">SF-B</a>、<a href="#SF-C">SF-C</a>、<a href="#SF-A">SF-A</a>、<a href="#A1">A1</a></li><li class="step doing" id="E1">
+<section id="steps"><h2>批次與卡</h2><p class="lead">同一批的卡同時進行，各自改不同的檔案；整批交回後一起看風險，再開下一批。</p><ol class="steps"><li class="grp">可同時進行：<a href="#E1">E1</a>、<a href="#E4">E4</a>、<a href="#SF-B">SF-B</a>、<a href="#SF-C">SF-C</a>、<a href="#SF-A">SF-A</a>、<a href="#A1">A1</a></li><li class="step done" id="E1">
     <div class="n">1</div>
     <div class="b">
       <p class="plain">做一個只有工具本身的頁面，給 WordPress 頁面嵌進去用：沒有引擎自己的工具列，高度剛好等於內容。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>12 個工具各有嵌入版且可用；手機寬度不會橫向捲動；原本的 12 頁不變。</p>
       <details><summary>細節：E1 引擎嵌入版頁面</summary>
         <p><b>需先完成：</b>無</p>
         <p><b>卡片：</b><code>briefs/WP-E1-embed-page.md</code></p>
+        <p><b>併入於：</b><code>d11320883</code></p>
       </details>
     </div></li><li class="step doing" id="E4">
     <div class="n">3</div>
@@ -148,11 +149,11 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>需先完成：</b>無</p>
         <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#E3">E3</a>、<a href="#SF-D">SF-D</a></li><li class="step todo" id="E3">
+    </div></li><li class="grp">可同時進行：<a href="#E3">E3</a>、<a href="#SF-D">SF-D</a></li><li class="step doing" id="E3">
     <div class="n">2</div>
     <div class="b">
       <p class="plain">站前面有 WordPress 時，舊的工具網址自動轉到對應的 WordPress 頁，網站地圖改由 WordPress 提供；沒有 WordPress 時一切照舊。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>打開開關後舊網址會轉向；關掉開關與現在完全相同。</p>
       <details><summary>細節：E3 舊工具網址轉到 WordPress 頁</summary>
         <p><b>需先完成：</b><a href="#E1">E1</a></p>

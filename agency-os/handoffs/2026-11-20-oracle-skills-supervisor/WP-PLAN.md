@@ -64,7 +64,7 @@
 | 3 | `wp-host` | Opus 5.5 | 同上 | 同上 |
 | 4 | `wp-admin` | Opus 5.5 | 同上 | 同上 |
 
-- 同時最多 4 個工人。session id 寫在 `data.mjs` 各卡的 `session`。
+- 同時最多 4 個工人。session id 用 `mcp__ccd_session_mgmt__list_sessions {linked:true}` 依 name 查，不另外抄寫。
 - 沿用同一條線的 session 派下一張（`SendMessage`）；上一張 context 已長就先 `mcp__ccd_session_mgmt__clear_session` 再派。工人自己接近上限時照 `COMMON-WP.md` 的 Context 條。
 - 工人不 push、不部署、不連主機、不套 migration；這些全在監工。
 
