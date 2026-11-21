@@ -7,7 +7,8 @@ export const LOGIN_SOURCES: readonly LoginSource[] = ["local", "awarewave-wp", "
 // nav: a multi-page door's menu (ADR 018 §2 rule 3), rendered by app/ProductDoorShell.tsx. path: the page below the door
 // ("" = its home), served from app<page>/<path>/page.tsx (route groups such as app/video/(wb) add no segment); staff: the staff page showing the same component, so
 // useDoorHref (app/DoorContext.tsx) can turn a shared component's staff link into the door link.
-export interface DoorNavItem { path: string; name: string; staff: string }
+// under: the path of the item this one is a sub-page of; the door menu draws it indented right below it.
+export interface DoorNavItem { path: string; name: string; staff: string; under?: string }
 // uiService: a separate UI container that owns this door's host except next-admin's login, /_next and API paths (P6 D1,
 // video-workbench). nginx/default.conf must give that host its own server block (lib/portal/__tests__/products.test.ts).
 export type ProductDoor = { app: "next-admin"; page: string; api: readonly string[]; anonymous?: readonly string[]; enabled?: boolean; nav?: readonly DoorNavItem[]; uiService?: "video-workbench" } | { app: "external" };
@@ -74,7 +75,9 @@ const PRODUCT_DEFINITIONS = [
     modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-pro", "tools/photo-pro"] },
   { key: "content", name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", api: ["/api/content"],
       nav: [{ path: "", name: "內容編輯", staff: "tools/content" },
-        { path: "topics", name: "題目", staff: "tools/content/topics" }, { path: "sites", name: "網站", staff: "tools/content/sites" }, { path: "events", name: "節日", staff: "tools/events" }] },
+        { path: "topics", name: "題目", staff: "tools/content/topics" },
+        { path: "topics/clients", name: "客戶", staff: "tools/content/topics/clients", under: "topics" }, { path: "topics/steps", name: "五步驟", staff: "tools/content/topics/steps", under: "topics" },
+        { path: "sites", name: "網站", staff: "tools/content/sites" }, { path: "events", name: "節日", staff: "tools/events" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
     features: [quota("content.article", "文章生成"), quota("content.humanize", "文章人性化"), quota("content.seo-fix", "SEO 修正"), quota("content.brand-voice", "品牌語氣擷取"), quota("content.outline", "大綱生成"), quota("content.title", "標題建議"), quota("content.keywords", "關鍵字建議"), quota("content.hook-brief", "Hook 草稿"), quota("content.syndicate", "多平台內容改寫"), quota("content.market-analysis", "市場分析"), quota("content.plan", "每月題目規劃"), quota("content.trending", "趨勢分析"), quota("content.image", "內容配圖")],
     accessChannels: ["ui"], modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/content/MODULE_MANIFEST.json" }, staffPaths: ["tools/content", "tools/events"] },

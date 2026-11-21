@@ -82,7 +82,7 @@ export function SidebarNav({ initialLayout, visible = null }: { initialLayout?: 
             }
             return (
               <Link key={item.href} href={item.href} title={item.title}
-                className={item.href === current?.href ? 'sidebar-link active' : 'sidebar-link'}
+                className={`sidebar-link${item.under ? ' sub' : ''}${item.href === current?.href ? ' active' : ''}`}
                 aria-current={item.href === current?.href ? 'page' : undefined}>
                 <span className="sidebar-icon">{item.icon}</span> {item.label}
                 {item.badge === 'ops-inbox' && <OpsInboxBadge />}

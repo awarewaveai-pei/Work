@@ -374,6 +374,9 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-family-heading); }
 }
 
 /* A <button> nav item (e.g. ScriptForge's side menu) wears the same look as a <Link>. */
+/* A sub-page drawn under its parent link (NavItem `under`). */
+.sidebar-link.sub { padding-left: 34px; font-size: 12.5px; }
+
 button.sidebar-link {
   width: 100%;
   border: none;
@@ -532,6 +535,8 @@ button.sidebar-link {
   text-decoration: none;
 }
 .door-nav-link:hover { color: var(--sidebar-text-hover); background: var(--sidebar-hover); }
+/* A sub-page drawn under its parent (door.nav `under`, sidebar link `under`). */
+.door-nav-link.sub { padding-left: 28px; font-size: 13px; }
 .door-nav-link.active {
   color: var(--sidebar-text-active);
   background: var(--sidebar-active-bg);

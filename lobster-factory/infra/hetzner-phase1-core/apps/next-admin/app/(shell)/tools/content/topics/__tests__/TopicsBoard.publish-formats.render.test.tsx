@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
 import { PUBLISH_READ_TIMEOUT_MS, TopicsBoard } from "../TopicsBoard";
 
-vi.mock("../AutoContentOverview", () => ({ OverviewTable: () => null, FlowCells: () => null }));
+vi.mock("../AutoContentOverview", () => ({ ClientOverview: () => null, FlowCells: () => null }));
 
 const overview = { rows: [{ siteId: "s1", organizationId: "o1" }], cells: {}, actual: {}, spendNote: null } as unknown as OverviewData;
 const topic = (over: Record<string, unknown>) => ({

@@ -1,12 +1,14 @@
 "use client";
-// The two layers above the topic list (AUTO_CONTENT P9.3). OverviewTable = every site, one row each, problems first;
+// The auto-content views besides the topic list (AUTO_CONTENT P9.3; R8: each on its own page under 題目 in the side
+// menu). ClientOverview = pick a client, then its sites' numbers, each with a link to that site's topics;
 // FlowCells = the picked site's five steps, each with its status, its control and its cost. All numbers arrive from the
 // server page in one piece (overview-load.ts); the controls reuse the existing components and APIs, so the old pages
 // (/ops/schedules, /tools/content/sites) show the same values. Buttons only, no dropdowns; colors are theme tokens.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { useOnDoor } from "@/app/DoorContext";
+import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import type { OverviewRow } from "@/lib/content/topics/overview";
+import { NAV_FIRST, type PickOrg } from "@/app/(shell)/ops/clients/nav-orgs";
 import type { TrendCell } from "@/lib/content/topics/overview-load";
 import type { Topic } from "@/lib/content/topics/store";
 import { planCostTwd } from "@/lib/content/topics/cost";
@@ -22,8 +24,9 @@ const muted: React.CSSProperties = { color: "var(--text-muted)", fontSize: "var(
 const CELLS = "repeat(auto-fit, minmax(104px, 1fr))";
 
 const T = {
-  heading: "全部客戶一覽",
-  hint: "有問題的排在最上面。點一列看那個網站的五個步驟。",
+  heading: "客戶",
+  noSite: "這個客戶還沒有可用的網站。",
+  openTopics: "看這個網站的題目",
   cols: ["客戶・網站", "總開關", "每天上限", "題目", "發布", "本月提案／上次嘗試", "待核准", "進行中", "失敗", "未開通", "本月 AI 花費（所有工具）"],
   costLink: "到成本頁看明細",
   on: "開", off: "關", ai: "AI 挑", human: "人挑", auto: "自動發", review: "人審",
@@ -34,47 +37,76 @@ const T = {
 const fmtUsd = (n: number) => `NT$${usdToNtd(n).toFixed(0)}`;
 const taipeiText = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : T.never);
 
-export function OverviewTable({ rows, selected, onPick, note }: { rows: OverviewRow[]; selected: string; onPick: (siteId: string) => void; note: string | null }) {
+/** The topics page of one site: the staff page, or the door's own page on a product door. */
+export const TOPICS_PAGE = "/tools/content/topics";
+export const topicsSiteHref = (base: string, siteId: string) => `${base}?site=${encodeURIComponent(siteId)}`;
+
+/** Staff only: the shared client picker (search + one row per client, OrgPicker.tsx), handed in by StaffTopicsBoard so a
+ *  door page never imports an /api/ops caller. A door holds one client and gets none. */
+export type ClientPickerSlot = (p: { orgs: PickOrg[]; total: number; selected: string | null; onPick: (org: PickOrg | null) => void }) => ReactNode;
+
+/** What is wrong with a client's sites, as its picker name says it (the old table's problems-first job); null = nothing. */
+function problemTag(rows: OverviewRow[]): string | null {
+  if (!rows.some((r) => r.problem)) return null;
+  const failed = rows.reduce((n, r) => n + r.failed, 0);
+  return [failed && `失敗 ${failed}`, rows.some((r) => r.notOpened) && T.notOpened, rows.some((r) => r.lastError) && "出錯"].filter(Boolean).join("、");
+}
+
+/** The picker's first page; a picked client past it goes first, so its button shows as picked (OrgPicker contract). */
+const firstPage = (orgs: PickOrg[], picked: string | null) => {
+  const i = orgs.findIndex((o) => o.id === picked);
+  return i < NAV_FIRST ? orgs.slice(0, NAV_FIRST) : [orgs[i], ...orgs.slice(0, NAV_FIRST - 1)];
+};
+
+/** The 客戶 page: pick a client (staff), then that client's sites, one block of numbers each, with a link to its topics.
+ *  The picker lists clients problems first (overview order) with a red dot and what is wrong; a client found by search
+ *  with no site here says so. A door (no picker) shows its own sites. */
+export function ClientOverview({ rows, note, siteId, picker }: { rows: OverviewRow[]; note: string | null; siteId: string; picker?: ClientPickerSlot }) {
+  const base = useDoorHref(TOPICS_PAGE) ?? TOPICS_PAGE;
+  const costsHref = useDoorHref("/ops/costs");   // a staff page: a door has none, so the link is hidden there
+  const [orgId, setOrgId] = useState(rows.find((r) => r.siteId === siteId)?.organizationId ?? rows[0]?.organizationId ?? null);
+  const byOrg = new Map<string, OverviewRow[]>();
+  for (const r of rows) byOrg.set(r.organizationId, [...(byOrg.get(r.organizationId) ?? []), r]);
+  const orgs: PickOrg[] = [...byOrg.entries()].map(([id, rs]) => {
+    const tag = problemTag(rs);
+    return { id, slug: id, name: tag ? `${rs[0].orgName}（${tag}）` : rs[0].orgName, color: tag ? "var(--red)" : "var(--text-muted)", brandColors: [] };
+  });
+  const shown = picker ? (orgId ? byOrg.get(orgId) ?? [] : []) : rows;
   return (
-    <section style={{ ...card, padding: 0 }} aria-label={T.heading}>
-      <div style={{ padding: "10px 12px 6px" }}>
-        <div className="section-title" style={{ margin: 0 }}>{T.heading}</div>
-        <div style={muted}>{T.hint}</div>
-        {note && <div style={{ ...muted, color: "var(--yellow)" }}>{note}</div>}
-      </div>
-      <div>
-        {rows.map((r) => {
-          const cell = (i: number, v: ReactNode, color?: string) => (
-            <span key={i} style={{ display: "grid", gap: 2, minWidth: 0 }}>
-              <span style={muted}>{T.cols[i]}</span>
-              <span style={{ color, fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}>{v}</span>
+    <section style={{ display: "grid", gap: 12 }} aria-label={T.heading}>
+      {note && <div style={{ ...muted, color: "var(--yellow)" }}>{note}</div>}
+      {picker?.({ orgs: firstPage(orgs, orgId), total: orgs.length, selected: orgId, onPick: (o) => setOrgId(o?.id ?? null) })}
+      {picker && orgId && !shown.length && <p style={{ margin: 0, color: "var(--text-muted)" }}>{T.noSite}</p>}
+      {shown.map((r) => {
+        const cell = (i: number, v: ReactNode, color?: string) => (
+          <span key={i} style={{ display: "grid", gap: 2, minWidth: 0 }}>
+            <span style={muted}>{T.cols[i]}</span>
+            <span style={{ color, fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}>{v}</span>
+          </span>
+        );
+        return (
+          <div key={r.siteId} style={{ ...card, display: "grid", gridTemplateColumns: CELLS, gap: 8, alignItems: "start", fontSize: "var(--font-size-sm)",
+            background: r.problem ? "color-mix(in srgb, var(--red) 6%, var(--card-bg))" : "var(--card-bg)" }}>
+            <span style={{ gridColumn: "1 / -1", minWidth: 0 }}>
+              <span style={{ display: "block", fontWeight: 600 }}>{r.orgName}</span>
+              <span style={muted}>{r.siteName}</span>
+              {r.lastError && <span style={{ display: "block", ...muted, color: "var(--red)" }}>{r.lastError}</span>}
             </span>
-          );
-          return (
-            <button key={r.siteId} type="button" onClick={() => onPick(r.siteId)} aria-pressed={r.siteId === selected}
-              style={{ display: "grid", gridTemplateColumns: CELLS, gap: 8, alignItems: "start", width: "100%", textAlign: "left", padding: "8px 12px", cursor: "pointer",
-                border: 0, borderTop: "1px solid var(--border)", color: "var(--text-primary)", fontSize: "var(--font-size-sm)",
-                background: r.siteId === selected ? "var(--bg-hover)" : r.problem ? "color-mix(in srgb, var(--red) 6%, transparent)" : "transparent" }}>
-              <span style={{ gridColumn: "1 / -1", minWidth: 0 }}>
-                <span style={{ display: "block", fontWeight: 600 }}>{r.orgName}</span>
-                <span style={muted}>{r.siteName}</span>
-                {r.lastError && <span style={{ display: "block", ...muted, color: "var(--red)" }}>{r.lastError}</span>}
-              </span>
-              {cell(1, r.enabled ? T.on : T.off, r.enabled ? "var(--green)" : "var(--text-muted)")}
-              {cell(2, r.dailyLimit ?? DAILY_START_CAP)}
-              {cell(3, r.topicGate === "ai" ? T.ai : T.human)}
-              {cell(4, r.publishGate === "auto" ? T.auto : T.review)}
-              {cell(5, <>{r.proposedThisMonth ? T.proposed : T.notProposed}<br />{taipeiText(r.attemptedAt)}</>, r.proposedThisMonth ? "var(--text-primary)" : "var(--text-muted)")}
-              {cell(6, r.pending, r.pending ? "var(--accent-text)" : "var(--text-muted)")}
-              {cell(7, r.inProgress)}
-              {cell(8, r.failed, r.failed ? "var(--red)" : "var(--text-muted)")}
-              {cell(9, r.notOpened ? T.notOpened : T.ok, r.notOpened ? "var(--red)" : "var(--text-muted)")}
-              {cell(10, fmtUsd(r.spendUsd))}
-            </button>
-          );
-        })}
-      </div>
-      <div style={{ padding: "6px 12px 10px" }}><a href="/ops/costs" style={{ fontSize: "var(--font-size-xs)" }}>{T.costLink}</a></div>
+            {cell(1, r.enabled ? T.on : T.off, r.enabled ? "var(--green)" : "var(--text-muted)")}
+            {cell(2, r.dailyLimit ?? DAILY_START_CAP)}
+            {cell(3, r.topicGate === "ai" ? T.ai : T.human)}
+            {cell(4, r.publishGate === "auto" ? T.auto : T.review)}
+            {cell(5, <>{r.proposedThisMonth ? T.proposed : T.notProposed}<br />{taipeiText(r.attemptedAt)}</>, r.proposedThisMonth ? "var(--text-primary)" : "var(--text-muted)")}
+            {cell(6, r.pending, r.pending ? "var(--accent-text)" : "var(--text-muted)")}
+            {cell(7, r.inProgress)}
+            {cell(8, r.failed, r.failed ? "var(--red)" : "var(--text-muted)")}
+            {cell(9, r.notOpened ? T.notOpened : T.ok, r.notOpened ? "var(--red)" : "var(--text-muted)")}
+            {cell(10, fmtUsd(r.spendUsd))}
+            <a className="btn btn-secondary" href={topicsSiteHref(base, r.siteId)} style={{ gridColumn: "1 / -1", justifySelf: "start" }}>{T.openTopics}</a>
+          </div>
+        );
+      })}
+      {costsHref && <a href={costsHref} style={{ fontSize: "var(--font-size-xs)" }}>{T.costLink}</a>}
     </section>
   );
 }
@@ -96,6 +128,7 @@ export function FlowCells({ site, row, cell, topics, month, schedule, planButton
   schedule?: ReactNode; planButton: ReactNode; onSiteSaved: (s: ManagedSite) => void;
 }) {
   const onDoor = useOnDoor();
+  const topicsHref = topicsSiteHref(useDoorHref(TOPICS_PAGE) ?? TOPICS_PAGE, site.id);
   const proposedN = topics.filter((t) => t.source !== "manual").length;
   const pending = topics.filter((t) => t.status === "proposed").length;
   return (
@@ -119,7 +152,7 @@ export function FlowCells({ site, row, cell, topics, month, schedule, planButton
         </Step>
         <Step n="③" title="挑題">
           <p style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>待核准 {pending} 題；目前由{row.topicGate === "ai" ? " AI 挑" : "人挑"}。</p>
-          <span style={muted}>勾選核准或退回在下面的題目清單。</span>
+          <span style={muted}>勾選核准或退回在<a href={topicsHref}>題目頁</a>。</span>
           <TopicModeButtons site={site} onSaved={onSiteSaved} readOnly={onDoor} />
           <DailyTrendButtons site={site} onSaved={onSiteSaved} readOnly={onDoor} />
         </Step>

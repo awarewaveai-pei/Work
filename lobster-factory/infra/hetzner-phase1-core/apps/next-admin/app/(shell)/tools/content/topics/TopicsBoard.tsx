@@ -1,5 +1,8 @@
 "use client";
-// Control page body: all-sites table, the picked site's five steps, then one month's topic list on the left, the clicked topic on the right (same layout as /ops/schedules).
+// Auto-content pages' body, one view per page (R8, operator 2026-11-21: 客戶 and 五步驟 are sub-pages of 題目 in the side
+// menu): topics = one site's month of topics, the list on the left and the clicked topic on the right (same layout as
+// /ops/schedules); clients = pick a client, see its sites' numbers, each linking to its topics; steps = one site's five steps.
+// All three read the site from ?site= (first site when absent) and share this one component's loading.
 // Buttons and checkboxes only, no dropdowns (memory feedback_no_dropdowns_multiselect). Every change goes through
 // /api/content/topics*, which checks the site's organization; a stale page gets 409 and reloads.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -14,10 +17,15 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
 import { LANE_LABEL, LANE_ORDER, approvedStartText, draftUrl, inLane, laneCounts, nextStep, pendingYoutubePostId, publishConfirm, publishNote, publishTargets,
   socialDraftsUrl, topicLane, youtubePrivacyMismatch, type DraftPrivacy, type LaneFilter, type PublishConfirm } from "@/lib/content/topics/lanes";
-import { FlowCells, OverviewTable } from "./AutoContentOverview";
+import { ClientOverview, FlowCells, type ClientPickerSlot } from "./AutoContentOverview";
+import { useDoorHref } from "@/app/DoorContext";
 
 const T = {
   noSites: "還沒有可用的客戶網站，先到「客戶網站」加一個。",
+  current: "目前：",
+  otherSite: "換客戶或網站",
+  pickSite: "選網站",
+  noSiteSettings: "讀不到這個網站的設定（網站沒有連到客戶，或沒有權限），五個步驟無法顯示。",
   plan: "AI 提案本月題目",
   planning: "AI 規劃中…",
   approveSel: "核准所選",
@@ -139,7 +147,13 @@ const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 const dayText = (d: number) => `${d} 日`;
 const daysOf = (month: string) => Array.from({ length: daysIn(month) }, (_, i) => i + 1);
 
-export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData; scheduleFor?: (orgSlug: string) => ReactNode }) {
+export type TopicsView = "topics" | "clients" | "steps";
+const CLIENTS_PAGE = "/tools/content/topics/clients";
+
+export function TopicsBoard({ overview, scheduleFor, pickClient, view = "topics" }: {
+  overview: OverviewData; scheduleFor?: (orgSlug: string) => ReactNode; pickClient?: ClientPickerSlot; view?: TopicsView;
+}) {
+  const clientsHref = useDoorHref(CLIENTS_PAGE);
   const [sites, setSites] = useState<Site[] | null>(null);
   // the table is sorted problems first, so the first row is the site that most needs a look
   const [siteId, setSiteId] = useState(overview.rows[0]?.siteId ?? "");
@@ -189,7 +203,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
   }, [overview.rows]);
 
   const load = useCallback(async () => {
-    if (!siteId) return;
+    if (!siteId || view === "clients") return;
     const key = `${siteId}|${month}`;
     looking.current = key;
     const r = await fetch(`/api/content/topics?siteId=${encodeURIComponent(siteId)}&month=${month}&folders=1`);
@@ -202,7 +216,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
     if (typeof j.dailyCap === "number") setDailyCap(j.dailyCap);
     setFolders(j.folders ?? []);
     setChecked(new Set());
-  }, [siteId, month]);
+  }, [siteId, month, view]);
   useEffect(() => { setSelId(""); setNote(""); pubReq.current += 1; setPub(null); void load(); }, [load]);
 
   const now = new Date();
@@ -382,6 +396,8 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
   }
 
   if (!overview.rows.length) return <p style={{ color: "var(--text-muted)" }}>{T.noSites}</p>;
+  // keyed by the site: ?site= lands after the first render (the effect above), and the picked client starts from it
+  if (view === "clients") return <ClientOverview key={siteId} rows={overview.rows} note={overview.spendNote} siteId={siteId} picker={pickClient} />;
   if (!sites) return <p style={{ color: "var(--text-muted)" }}>…</p>;
   const editable = sel && ["proposed", "approved"].includes(sel.status);
   const selWhen = sel?.scheduled_for ? taipeiParts(sel.scheduled_for) : { month, day: 1, hour: 9 };
@@ -400,13 +416,32 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
     </button>
   );
 
+  const noteLine = note && <p style={{ margin: 0, color: "var(--yellow)", fontSize: "var(--font-size-sm)" }}>{note}</p>;
+
+  if (view === "steps") {
+    // the site switch keeps ?site= in the address, so the page reloads and links to the same site
+    const pickSite = (id: string) => { setSiteId(id); history.replaceState(null, "", `${location.pathname}?site=${encodeURIComponent(id)}`); };
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
+        <div role="group" aria-label={T.pickSite} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {overview.rows.map((r) => <button key={r.siteId} type="button" aria-pressed={r.siteId === siteId} style={chip(r.siteId === siteId)} onClick={() => pickSite(r.siteId)}>{r.orgName}・{r.siteName}</button>)}
+        </div>
+        {noteLine}
+        {!site && <p style={{ margin: 0, color: "var(--text-muted)" }}>{T.noSiteSettings}</p>}
+        {siteRow && site && (
+          <FlowCells site={site} row={siteRow} cell={overview.cells[siteId]} topics={topics} month={month} schedule={site.org_slug && scheduleFor ? scheduleFor(site.org_slug) : null}
+            planButton={planButton} onSiteSaved={(u) => setSites((l) => (l ?? []).map((x) => (x.id === u.id ? u : x)))} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
-      <OverviewTable rows={overview.rows} selected={siteId} onPick={setSiteId} note={overview.spendNote} />
-      {siteRow && site && (
-        <FlowCells site={site} row={siteRow} cell={overview.cells[siteId]} topics={topics} month={month} schedule={site.org_slug && scheduleFor ? scheduleFor(site.org_slug) : null}
-          planButton={planButton} onSiteSaved={(u) => setSites((l) => (l ?? []).map((x) => (x.id === u.id ? u : x)))} />
-      )}
+      <p style={{ margin: 0, fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
+        {T.current}<strong style={{ color: "var(--text-primary)" }}>{siteRow ? `${siteRow.orgName}・${siteRow.siteName}` : "—"}</strong>
+        {clientsHref && <>{"　"}<a href={`${clientsHref}?site=${encodeURIComponent(siteId)}`}>{T.otherSite}</a></>}
+      </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
         <button type="button" className="btn btn-secondary" onClick={() => setMonth(shiftMonth(month, -1))}>‹ 上個月</button>
         <strong style={{ fontVariantNumeric: "tabular-nums" }}>{month}</strong>
@@ -415,7 +450,7 @@ export function TopicsBoard({ overview, scheduleFor }: { overview: OverviewData;
       <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "var(--font-size-sm)" }}>
         {(Object.keys(STATUS) as TopicStatus[]).filter((s) => counts[s]).map((s) => `${STATUS[s][0]} ${counts[s]}`).join(" · ") || "—"}
       </p>
-      {note && <p style={{ margin: 0, color: "var(--yellow)", fontSize: "var(--font-size-sm)" }}>{note}</p>}
+      {noteLine}
 
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "999 1 480px", minWidth: 0, display: "grid", gap: 10 }}>

@@ -19,7 +19,7 @@ export function DoorNav({ page, name, features }: { page: string; name: string; 
           {nav.map((n) => {
             const href = `/${n.path}`;
             const active = pathname === href || pathname === (n.path ? `${page}/${n.path}` : page);
-            return <a key={n.path} href={href} className={active ? "door-nav-link active" : "door-nav-link"}>{n.name}</a>;
+            return <a key={n.path} href={href} className={`door-nav-link${n.under !== undefined ? " sub" : ""}${active ? " active" : ""}`}>{n.name}</a>;
           })}
         </nav>
       ) : null}

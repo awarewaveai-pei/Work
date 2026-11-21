@@ -29,7 +29,7 @@ import path from "path";
 describe("SidebarNav marks the current link", () => {
   it("the link whose href is activeLink's gets .active and aria-current", () => {
     const src = fs.readFileSync(path.resolve(__dirname, "../SidebarNav.tsx"), "utf8");
-    expect(src).toMatch(/item\.href === current\?\.href \? 'sidebar-link active' : 'sidebar-link'/);
+    expect(src).toMatch(/className=\{`sidebar-link\$\{item\.under \? ' sub' : ''\}\$\{item\.href === current\?\.href \? ' active' : ''\}`\}/);
     expect(src).toMatch(/aria-current=\{item\.href === current\?\.href \? 'page' : undefined\}/);
   });
 });
