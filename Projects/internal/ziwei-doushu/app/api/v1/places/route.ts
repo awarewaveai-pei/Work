@@ -13,7 +13,7 @@ export function GET(request: Request) {
   if (limited) return limited;
   const a = answerPlaces(new URL(request.url));
   if (!a.ok) return v1Error(400, 'invalid_request', a.detail);
-  return Response.json(a.body, { headers: { ...CORS_HEADERS, 'Cache-Control': 'public, max-age=86400' } });
+  return Response.json(a.body, { headers: { ...CORS_HEADERS, 'Cache-Control': 'public, max-age=300' } });
 }
 
 export function OPTIONS() {
