@@ -5,11 +5,11 @@
 ## 批次
 | 批 | 卡 | 內容 | 模型 | 狀態 |
 |---|---|---|---|---|
-| 1 | W1 | 主機匯入器（python）＋cron.d＋測試 | Opus 5.5 | 整合 `08816df48`；審查修正中 |
-| 1 | W2 | 0174＋ingest route＋投影＋/ops/systems 頁 | Opus 5.5 | 整合 `08816df48`；審查修正中 |
-| 1 | W3 | registry（Outbound）＋遷移腳本＋new-product 接線 | Sonnet 5.5 | 整合；工人已 clear |
-| 1 | W4 | 監工台頁 | Sonnet 5.5 | 整合；工人已 clear；頁面 https://claude.ai/artifact/2QN1ygisHD9xRprX1B2xZF |
-| 2 | — | 整合：dry-run 匯入器對真 repo → 本機 ingest 實打 → 頁面實看；套 0174（High，問操作者）→ 推 → 裝排程 → 切換 Outbound | 監工 | 待批 1 |
+| 1 | W1 | 主機匯入器（python）＋cron.d＋測試 | Opus 5.5 | main `73fab1033` |
+| 1 | W2 | 0174＋ingest route＋投影＋/ops/systems 頁 | Opus 5.5 | main `73fab1033`；0174 已套 |
+| 1 | W3 | registry（Outbound）＋遷移腳本＋new-product 接線 | Sonnet 5.5 | main `73fab1033` |
+| 1 | W4 | 監工台頁 | Sonnet 5.5 | main `73fab1033`；頁面 https://claude.ai/artifact/2QN1ygisHD9xRprX1B2xZF |
+| 2 | — | 已做：套 0174、推 main、GitHub 禁強推、主機 token／compose／mirror、排程裝且打開（WORKLOG 2026-11-21 續16）。剩：11-22 04:30 首次匯入驗收 → 頁面實看 → 切換 Outbound（`systems-migrate-supervisor.mjs` POST＋FROZEN） | 監工 | 進行中 |
 | 3 | — | 系統盤點全部 registry（覆蓋率 100%）、其餘監工頁逐一切換 | 待定 | — |
 
 brief：`briefs/`（`COMMON.md`＋各卡）。整合工作區：`D:\Worktrees\Work\systems-int`（detached；next-admin `node_modules` 是 junction，移除前先 rmdir）。工人在各自 worktree；契約在 COMMON。

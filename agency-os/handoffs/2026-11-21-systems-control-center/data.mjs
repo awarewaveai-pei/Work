@@ -24,26 +24,26 @@ export const COPY = {
 };
 
 export const NOW = [
-  { what: '設計已定案，第一批四張卡已交回並整合在同一個工作區。', state: 'yes', ev: '整合工作區 D:\Worktrees\Work\systems-int（2026-11-21）：型別檢查、後台相關測試、匯入器測試全綠，對真實 repo 預演成功。' },
-  { what: '主機匯入器、資料表、頁面。', state: 'no', ev: '審查問題已全部修完並複核；程式在整合工作區，等你同意套資料表後才推上主線。' },
-  { what: '每天自動更新進度。', state: 'no', ev: '要等整合完成、你同意裝排程之後才會開始。' },
+  { what: '程式已推上主線，資料表已套正式庫，匯入排程已裝且已打開。', state: 'yes', ev: '主線 73fab1033；0174 套用並驗過權限；/etc/cron.d/systems-import（2026-11-21）。' },
+  { what: '總控頁可以打開。', state: 'no', ev: '頁面隨今晚 03:00 自動部署上線。' },
+  { what: '每天自動更新進度。', state: 'no', ev: '第一次匯入在 2026-11-22 04:30（部署之後）；之後確認排程頁與總控頁的最後成功時間。' },
 ];
 
 export const STEPS = [
   { n: 1, code: 'W1', group: 'B1', title: '主機匯入器', plain: '主機上的小程式，每天讀 git 提交紀錄，整理成事件送給後台。解析、歸屬、重跑不重複都在這裡，並有自己的測試。',
-    gate: '對真實 repo 預演一次，輸出的事件格式符合契約，重跑不重複；測試全綠。', risk: 'Low', model: 'Opus 5.5', status: 'in_progress', waitFor: '已整合，待上線', depends: [],
+    gate: '對真實 repo 預演一次，輸出的事件格式符合契約，重跑不重複；測試全綠。', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '73fab1033', doneAt: '2026-11-21', depends: [],
     what: 'python 匯入器＋cron.d 檔＋測試；不進 next-admin 的測試。', card: 'briefs/W1-importer.md' },
   { n: 2, code: 'W2', group: 'B1', title: '資料表、接收端與頁面', plain: '後台新增四張表、一個只收匯入器資料的接收端，以及 /ops/systems 頁面。資料表先寫好檔，不套正式庫。',
-    gate: '未登入、一般員工、非授權帳號直打頁面與接收端都被拒；相關測試與型別檢查綠。', risk: 'Medium（套正式庫是 High，不在本卡）', model: 'Opus 5.5', status: 'in_progress', waitFor: '已整合，待上線', depends: [],
+    gate: '未登入、一般員工、非授權帳號直打頁面與接收端都被拒；相關測試與型別檢查綠。', risk: 'Medium（套正式庫是 High，不在本卡）', model: 'Opus 5.5', status: 'done', commit: '73fab1033', doneAt: '2026-11-21', depends: [],
     what: 'migration 0174、ingest route、投影、頁面；只寫四張表。', card: 'briefs/W2-app.md' },
   { n: 3, code: 'W3', group: 'B1', title: '系統清單與搬遷腳本', plain: '寫出第一個系統（外聯系統）的清單，加上把舊監工頁資料搬進來的腳本，並讓新增產品的腳本同時登記系統清單。',
-    gate: '清單通過檢查；搬遷腳本對外聯系統預演成功；新增產品腳本會同時寫兩邊。', risk: 'Low', model: 'Sonnet 5.5', status: 'in_progress', waitFor: '已整合，待上線', depends: [],
+    gate: '清單通過檢查；搬遷腳本對外聯系統預演成功；新增產品腳本會同時寫兩邊。', risk: 'Low', model: 'Sonnet 5.5', status: 'done', commit: '73fab1033', doneAt: '2026-11-21', depends: [],
     what: 'agency-os/systems/registry.json、遷移腳本、new-product 接線。', card: 'briefs/W3-registry.md' },
   { n: 4, code: 'W4', group: 'B1', title: '監工台頁', plain: '本頁。讓操作者看這個專案的派工進度、風險與待決的事。',
-    gate: 'node build.mjs 與 node check.mjs 皆綠；頁面不含色碼、不用下拉。', risk: 'Low', model: 'Sonnet 5.5', status: 'in_progress', waitFor: '已整合，待上線', depends: [],
+    gate: 'node build.mjs 與 node check.mjs 皆綠；頁面不含色碼、不用下拉。', risk: 'Low', model: 'Sonnet 5.5', status: 'done', commit: '73fab1033', doneAt: '2026-11-21', depends: [],
     what: 'data.mjs、build.mjs、check.mjs、supervisor.html；不發布，由監工發布。', card: 'briefs/W4-supervisor-page.md' },
   { n: 5, code: 'B2', group: 'B2', title: '整合與上線', plain: '把四張卡合起來：預演匯入器、對本機接收端實打、看頁面。然後經你同意套資料表、推上主線、裝排程、切換外聯系統。',
-    gate: '本機完整跑通一輪；資料表套用後遷移檢查綠，才推含該資料表的提交；排程裝好且預設關閉。', risk: 'High（套資料表、裝排程）', model: '監工', status: 'not_started', before: '待決 1、待決 2、待決 3', depends: ['W1', 'W2', 'W3', 'W4'],
+    gate: '本機完整跑通一輪；資料表套用後遷移檢查綠，才推含該資料表的提交；排程裝好且預設關閉。', risk: 'High（套資料表、裝排程）', model: '監工', status: 'in_progress', waitFor: '等首次匯入（2026-11-22 04:30）', decided: '你 2026-11-21 三件都同意：資料表已套、排程已裝並打開、GitHub 主線已禁止強推。', depends: ['W1', 'W2', 'W3', 'W4'],
     what: '先套後推：資料表先套正式庫並確認遷移檢查綠，才推含它的提交。', card: 'DISPATCH.md' },
   { n: 6, code: 'B3', group: 'B3', title: '系統盤點與其餘監工頁切換', plain: '把所有系統寫進清單，讓程式路徑都有歸屬；其餘舊監工頁一次一個階段切換過來。',
     gate: '近 90 天非共用程式路徑全部有歸屬；切換的舊頁改成指向新頁。', risk: 'Medium', model: '待定', status: 'not_started', depends: ['B2'],
@@ -51,18 +51,6 @@ export const STEPS = [
 ];
 
 export const OPEN = [
-  { n: 1, what: '套用資料表（正式庫新增四張表，不動既有表）。先套、確認遷移檢查綠，才推上主線；否則每晚部署會被擋。', before: 'B2', src: 'PLAN.md 第 6 節', options: [
-    { k: '同意', t: '由監工從筆電連線套用，套完驗證再推。', pick: true },
-    { k: '先不要', t: '整合停在本機，頁面不上線。' },
-  ] },
-  { n: 2, what: '安裝每天一次的匯入排程（台灣 04:30），連同主機準備：建立獨立 git 副本、.env 加接收端密碼、後台容器加入同一個密碼變數（容器設定走既有的安全修補腳本）。裝好時匯入開關預設關閉，要另外打開才會開始跑。', before: 'B2', src: 'PLAN.md 第 6 節', options: [
-    { k: '同意', t: '裝好但保持關閉，確認資料沒問題後再開。', pick: true },
-    { k: '先不要', t: '只在本機手動跑。' },
-  ] },
-  { n: 3, what: 'GitHub 主線禁止強推（帳號設定）。強推會讓已記錄的進度對不上；目前只有 Claude 這邊擋住，Codex 或手動仍推得動。', before: 'B2', src: 'DISPATCH.md 批 1 風險', options: [
-    { k: '同意', t: '在 GitHub 主線開啟保護、只禁止強推，直接推送照舊。', pick: true },
-    { k: '先不要', t: '維持現狀；遇到時手動處理。' },
-  ] },
 ];
 
 // 六道隔離（白話）。正本：PLAN.md 第 6 節。
