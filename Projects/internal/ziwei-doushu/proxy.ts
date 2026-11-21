@@ -36,6 +36,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // 略過 _next、api、與帶副檔名的靜態檔(favicon 等)
-  matcher: ['/((?!_next|api|.*\\..*).*)'],
+  // 略過 _next、api、embed(嵌入版自帶語言段 /embed/<語言>/…)、與帶副檔名的靜態檔(favicon 等)
+  matcher: ['/((?!_next|api|embed/|.*\\..*).*)'],
 };

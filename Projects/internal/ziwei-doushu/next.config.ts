@@ -12,6 +12,18 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/**/*': ['./node_modules/@xalen/wasm/xalen_wasm_bg.wasm'],
   },
+  // 嵌入版(WordPress 同網域 iframe):不單獨收錄、內容歸父頁;只允許同源框住。只加在 /embed/*。
+  async headers() {
+    return [
+      {
+        source: '/embed/:path*',
+        headers: [
+          { key: 'X-Robots-Tag', value: 'noindex, indexifembedded' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
