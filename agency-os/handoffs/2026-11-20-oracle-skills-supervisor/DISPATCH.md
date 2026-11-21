@@ -144,6 +144,7 @@ RISKS 處置：`agency-os/WORKLOG.md` 2026-11-21「oracle 批 6 併入六張」�
 - 2026-11-21 補：操作者決定「先補系統功能，再由她自己直接在系統裡手動操作」。規劃 agent 進行中，產出 `briefs/SITE-FLOW-COMPLETION-PLAN.md`（讀完後整理 §4 給她決定，再派卡；next-admin 每日 03:00 自動部署，未完成的要用開關或 `DEPLOY_HOLD`）。E6c `54c78e564` 工人已 commit 待審併。
 - 2026-11-21 晚：E6c、X2、W1、P1 已併入 main（合併後 tsc 綠、vitest 482 passed；`app/api/places/route.ts` 手動合併）。**未補的閉環**：這四張的工人 RISKS 尚未逐項處置、WORKLOG 尚未寫（工人回報在各 session 最後一則訊息：`local_f1c77b0b…` E6c、`local_53c300dd…` X2、`local_51906081…` W1、`local_2b695d16…` P1）；P1 外掛沒跑 critic、沒在真的 WordPress 裝過；X2 未做八字反推日期。全部未部署。
 - 2026-11-21 晚：`briefs/SITE-FLOW-COMPLETION-PLAN.md` 完成（16 卡 5 批；新頁 `/ops/sites/new`、`/ops/sites/[siteId]`；主機動作只經 `aw-hosting-gate.sh` 新增 5 個指令；兩把開關預設關）。**待操作者同意其 §4 四題後才派卡**（已向她列出，尚未回覆）：WP 直接建在正式主機先顯示建置中；引擎先改名 `oracle-engine` 讓出網域（一次性前置）；MainWP 金鑰放進主系統設定（High）；新網域憑證本輪不做成按鈕。
+- **2026-11-22：WordPress 階段的派工改由 `WP-PLAN.md` 管**（27 張卡、五批、四條工人線；狀態只在 `data.mjs`；監工台 https://claude.ai/artifact/9PGQAU9kFciKoTJT3UxZGi）。本檔以下各列是歷史。
 - **2026-11-21 深夜（最新，優先於本節上文）**：
   - E6c 後續 `459ae5bea` 已併入 main（`60d923eac`；tsc 綠、vitest 483 passed）。E6c、X2、W1、P1 的 RISKS 處置與 critic 結果：`agency-os/WORKLOG.md` 2026-11-21「oracle E6c、X2、W1、P1 風險處置」。全部仍未部署。
   - 部署 oracle-web 時多做三件：主機 `.env.production` 加 `ORACLE_SITES`；`sync-host-scripts.sh`；確認引擎收到的是訪客位址（`default.conf:424` 的 `X-Real-IP $remote_addr` 是主機 nginx 的位址，X1／MCP 限流的前提）。部署後用真的 Claude 連接器連一次 `/api/mcp`。

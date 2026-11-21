@@ -1,0 +1,371 @@
+<title>算命站 WordPress 階段 監工台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* 左側欄＋右側單欄內容；手機時側欄在上。顏色只載意義：有／沒有、狀態、風險。 */
+:root{
+  --bg:#f4f5f7; --paper:#ffffff; --ink:#1b2230; --muted:#5d6878; --line:#d8dde5; --accent:#2b4ea2; --rail:#e9ecf1;
+  --todo:#8b95a5; --doing:#c2410c; --done:#1f7a3a; --no:#b42318; --high:#b42318; --med:#9a6700; --low:#1f7a3a; --onDot:#ffffff;
+  --display:"Noto Serif TC","Songti TC",serif; --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;--onDot:#121722;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;--onDot:#121722;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.6;font-size:16px}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100%}
+@media (max-width:820px){.shell{grid-template-columns:1fr}}
+aside{background:var(--rail);border-right:1px solid var(--line);padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px}
+@media (max-width:820px){aside{border-right:0;border-bottom:1px solid var(--line);padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}}
+aside .in{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}
+@media (max-width:820px){aside .in{position:static}}
+aside h1{font-family:var(--display);font-size:20px;margin:0 0 4px;text-wrap:balance}
+aside .upd{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+.bar{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--line);margin:0 0 16px}
+.bar i{display:block;height:100%}.bar .d{background:var(--done)}.bar .g{background:var(--doing)}
+nav{display:grid;gap:2px}
+@media (max-width:820px){nav{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}}
+nav a{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:15px}
+nav a:hover,nav a:focus-visible{background:var(--paper);outline:none}
+nav a small{color:var(--muted);font-size:12.5px;white-space:nowrap}
+main{min-width:0;max-width:820px;padding-block:24px 56px;padding-left:24px;padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:820px){main{padding-left:max(16px,env(safe-area-inset-left,0px))}}
+.sub{color:var(--muted);margin:0 0 24px;font-size:15px}
+section{margin-bottom:36px;scroll-margin-top:16px}
+section>h2{font-family:var(--display);font-size:21px;margin:0 0 4px}
+section>.lead{color:var(--muted);margin:0 0 14px;font-size:15px}
+.sub-h{font-size:15px;margin:14px 0 8px;color:var(--muted);font-weight:500}
+code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border-radius:4px;padding:1px 5px;color:var(--muted)}
+small{display:block;color:var(--muted);font-size:13px;font-weight:400}
+ul.yn{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+ul.yn li{display:grid;grid-template-columns:64px 1fr;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+ul.yn li.yes b{color:var(--done)}ul.yn li.no b{color:var(--no)}
+ul.yn li span{min-width:0}
+ul.yn.rules li{grid-template-columns:130px 1fr}ul.yn.rules li b{color:var(--accent)}
+ul.yn.rules small a{color:var(--accent)}
+ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ol.steps li.grp{color:var(--muted);font-size:13.5px;padding:4px 2px 0}
+ol.steps li.grp a{color:var(--accent)}
+ol.open{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ol.steps li.step,ol.open li{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0;scroll-margin-top:16px}
+ol.steps .n,ol.open .n{width:30px;height:30px;border-radius:50%;background:var(--todo);color:var(--onDot);text-align:center;line-height:30px;font-weight:700;font-size:14px}
+.step.doing .n{background:var(--doing)}.step.done .n{background:var(--done)}
+ol.open .n{background:var(--accent)}
+.b{min-width:0}
+.plain{margin:0 0 6px;font-size:16px;font-weight:500}
+.meta{margin:0 0 6px;display:flex;flex-wrap:wrap;gap:6px 10px;font-size:13px;align-items:center}
+.pill{border-radius:999px;padding:1px 9px;border:1px solid currentColor;white-space:nowrap}
+.st-todo{color:var(--todo)}.st-doing{color:var(--doing)}.st-done{color:var(--done)}
+.risk-high{color:var(--high)}.risk-med{color:var(--med)}.risk-low{color:var(--low)}
+.who{color:var(--muted)} a.who{color:var(--accent)} .wait{color:var(--med)}
+.donewhen{margin:0 0 6px;font-size:14px}
+details{font-size:13.5px;color:var(--muted)}
+details summary{cursor:pointer;color:var(--accent)}
+details p{margin:6px 0 0}
+details a{color:var(--accent)}
+details code{font-size:12px;word-break:break-all}
+.paths{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.paths div{display:grid;grid-template-columns:130px 1fr;gap:8px;padding:5px 0;border-top:1px solid var(--line);min-width:0}
+.paths div:first-child{border-top:0}
+.paths code{word-break:break-all}
+@media (max-width:560px){.paths div{grid-template-columns:1fr}}
+:target{box-shadow:0 0 0 2px var(--accent)}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+ul.items{list-style:none;margin:2px 0 8px;padding:0;display:grid;gap:4px;font-size:14px}
+ul.items li{display:grid;grid-template-columns:18px 1fr;gap:6px;min-width:0}
+ul.items li b{color:var(--todo)} ul.items li.done b{color:var(--done)} ul.items li.done span{color:var(--muted)}
+ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
+ul.opts{list-style:none;margin:4px 0 6px;padding:0;display:grid;gap:4px;font-size:14px}
+ul.opts li{display:grid;grid-template-columns:auto 1fr;gap:8px;min-width:0;color:var(--muted)} ul.opts li b{color:var(--todo);white-space:nowrap}
+ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
+</style>
+<div class="shell">
+<aside><div class="in">
+  <h1>算命站 WordPress 階段 監工台</h1>
+  <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
+  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:14.814814814814813%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>0</span>／<span data-computed>27</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+</div></aside>
+<main>
+<p class="sub">把 oracle.aware-wave.com 改成 WordPress 網站：算命工具嵌在可以排版的頁面裡，會員能存命盤，訂閱後每天收到運勢信；同時把「從後台開一個客戶網站」做成能一步一步按完的流程。共 <span data-computed>27</span> 張卡。</p>
+<section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>現有算命站正常服務。<small>線上是 2026-11-20 部署的版本；之後併入的卡都還沒部署。</small></span></li><li class="yes"><b>可以</b><span>做法已定，本機試過可行。<small>2026-11-22：分流、工具嵌在 WordPress 頁面、會員存檔、FluentCRM 對同一人連寄，四項試驗過了三項；內容安全政策未試。</small></span></li><li class="no"><b>還不行</b><span>每日信的寄件網域 oracle.aware-wave.com 可以寄信。<small>2026-11-22 已在 Resend 建立並加好 DNS，驗證中。</small></span></li><li class="no"><b>還不行</b><span>工具嵌在 WordPress 頁面裡。<small>第一批進行中。</small></span></li><li class="no"><b>還不行</b><span>會員能存命盤、訂閱每日信。<small>第三批。</small></span></li><li class="no"><b>還不行</b><span>從後台一步一步開一個客戶網站。<small>平台線第一批進行中。</small></span></li></ul></section>
+
+<section id="steps"><h2>批次與卡</h2><p class="lead">同一批的卡同時進行，各自改不同的檔案；整批交回後一起看風險，再開下一批。</p><ol class="steps"><li class="grp">可同時進行：<a href="#E1">E1</a>、<a href="#E4">E4</a>、<a href="#SF-B">SF-B</a>、<a href="#SF-C">SF-C</a>、<a href="#SF-A">SF-A</a>、<a href="#A1">A1</a></li><li class="step doing" id="E1">
+    <div class="n">1</div>
+    <div class="b">
+      <p class="plain">做一個只有工具本身的頁面，給 WordPress 頁面嵌進去用：沒有引擎自己的工具列，高度剛好等於內容。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>12 個工具各有嵌入版且可用；手機寬度不會橫向捲動；原本的 12 頁不變。</p>
+      <details><summary>細節：E1 引擎嵌入版頁面</summary>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/WP-E1-embed-page.md</code></p>
+      </details>
+    </div></li><li class="step doing" id="E4">
+    <div class="n">3</div>
+    <div class="b">
+      <p class="plain">登入的會員用 AI 解讀時，額度記在這位會員身上，每人每天有上限；沒登入的人照現在的方式限制。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（身分驗證）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>假的或過期的票被拒；同一會員超過上限被擋；沒登入時行為不變。</p>
+      <details><summary>細節：E4 會員票與 AI 每日上限</summary>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/WP-E4-member-ticket.md</code></p>
+      </details>
+    </div></li><li class="step doing" id="SF-B">
+    <div class="n">4</div>
+    <div class="b">
+      <p class="plain">讓一個客戶可以有多個網站、每個網站有自己的紀錄；建立客戶時不再把既有設定整包蓋掉。資料表異動先寫好檔，不套用到正式資料庫。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（套用到正式資料庫是 High，不在本卡）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>既有客戶的設定在重新建立後原樣保留；資料表異動可套用也可退回。</p>
+      <details><summary>細節：SF-B 網站與環境的紀錄</summary>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/WP-SF-B-records.md</code></p>
+      </details>
+    </div></li><li class="step doing" id="SF-C">
+    <div class="n">5</div>
+    <div class="b">
+      <p class="plain">主機上改設定檔只能走一支會自動還原的工具，但它只會改已存在的檔。加上「新建檔案」的能力，新網站才有合法的建立方式。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-high">風險 High（所有主機改動共用）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>新建成功；檢查失敗時檔案消失、容器停下、資料保留；原本的功能完全不變。</p>
+      <details><summary>細節：SF-C 主機改檔工具支援「新建」</summary>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/WP-SF-C-patch-create.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-A">
+    <div class="n">7</div>
+    <div class="b">
+      <p class="plain">把說法過時或互相矛盾的建站文件改成指向新流程。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>文件連結檢查通過。</p>
+      <details><summary>細節：SF-A 文件更正</summary>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="A1">
+    <div class="n">8</div>
+    <div class="b">
+      <p class="plain">三份架構決策補上：同網域的內嵌框可以用；客戶網站的會員屬於該網站。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>治理文件檢查通過。</p>
+      <details><summary>細節：A1 架構決策文件修訂</summary>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+      </details>
+    </div></li><li class="grp">可同時進行：<a href="#E3">E3</a>、<a href="#SF-D">SF-D</a></li><li class="step todo" id="E3">
+    <div class="n">2</div>
+    <div class="b">
+      <p class="plain">站前面有 WordPress 時，舊的工具網址自動轉到對應的 WordPress 頁，網站地圖改由 WordPress 提供；沒有 WordPress 時一切照舊。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>打開開關後舊網址會轉向；關掉開關與現在完全相同。</p>
+      <details><summary>細節：E3 舊工具網址轉到 WordPress 頁</summary>
+        <p><b>需先完成：</b><a href="#E1">E1</a></p>
+        <p><b>卡片：</b><code>briefs/WP-E3-front-redirect.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-D">
+    <div class="n">6</div>
+    <div class="b">
+      <p class="plain">新網站的容器與網址設定範本、主機上「有哪些網站」的登記格式，以及把一個網站完整拆掉的腳本。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>範本能渲染出可用的設定；拆除預設只列出不動手，資料要另外確認才刪。</p>
+      <details><summary>細節：SF-D 網站範本與拆除腳本</summary>
+        <p><b>需先完成：</b><a href="#SF-C">SF-C</a></p>
+        <p><b>卡片：</b><code>briefs/WP-SF-D-site-template.md</code></p>
+      </details>
+    </div></li><li class="grp">可同時進行：<a href="#E2">E2</a>、<a href="#P1">P1</a>、<a href="#SF-E">SF-E</a>、<a href="#SF-F">SF-F</a>、<a href="#SF-G">SF-G</a></li><li class="step todo" id="E2">
+    <div class="n">9</div>
+    <div class="b">
+      <p class="plain">引擎和 WordPress 同一個網域後，引擎頁若被植入惡意程式會波及 WordPress 後台。加上瀏覽器層的限制來擋。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（安全）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>12 頁與嵌入頁都沒有被政策擋下的東西。</p>
+      <details><summary>細節：E2 引擎的內容安全政策</summary>
+        <p><b>需先完成：</b><a href="#E1">E1</a></p>
+        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="P1">
+    <div class="n">10</div>
+    <div class="b">
+      <p class="plain">修掉審查找到的 7 個問題（第一次儲存設定會清空對照表等），並把嵌入方式改成同網域。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>在乾淨的 WordPress 裝起來，第一次儲存後設定還在，頁面上的工具可用。</p>
+      <details><summary>細節：P1 外掛修正與同網域嵌入</summary>
+        <p><b>需先完成：</b><a href="#E1">E1</a></p>
+        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-E">
+    <div class="n">11</div>
+    <div class="b">
+      <p class="plain">後台只能請主機做幾個固定動作（檢查網址、建站、裝 WordPress、掛網址），不能執行任意指令，所以讀不到網站的會員資料。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>每個動作只收固定格式；格式不對或開關沒開一律拒絕。</p>
+      <details><summary>細節：SF-E 後台對主機的固定動作</summary>
+        <p><b>需先完成：</b><a href="#SF-C">SF-C</a>、<a href="#SF-D">SF-D</a></p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-F">
+    <div class="n">12</div>
+    <div class="b">
+      <p class="plain">備份腳本改成讀「有哪些網站」的登記，新網站建好當晚就被備份。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>新網站出現在備份清單；Soulful 的備份輸出與改前逐行相同。</p>
+      <details><summary>細節：SF-F 每日備份自動涵蓋新網站</summary>
+        <p><b>需先完成：</b><a href="#SF-D">SF-D</a></p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-G">
+    <div class="n">13</div>
+    <div class="b">
+      <p class="plain">每個會動主機的步驟都走同一套：先給你看要做什麼、你確認才做、做完檢查、失敗還原、留紀錄。紀錄寫不進去就不做。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>過期的確認被拒；開關沒開被拒；紀錄寫入失敗時不會動主機。</p>
+      <details><summary>細節：SF-G 建站步驟的共用骨架</summary>
+        <p><b>需先完成：</b><a href="#SF-B">SF-B</a>；套用資料表（待決 1）之後才併入</p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="grp">可同時進行：<a href="#P2">P2</a>、<a href="#P3">P3</a>、<a href="#SF-H">SF-H</a>、<a href="#SF-I0">SF-I0</a>、<a href="#SF-I">SF-I</a>、<a href="#SF-J">SF-J</a></li><li class="step todo" id="P2">
+    <div class="n">14</div>
+    <div class="b">
+      <p class="plain">會員能存自己的命盤，也能存別人的出生資料做私人合盤；只有自己看得到，資料加密保存，可匯出、可刪除。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（個資）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>別的會員讀不到；資料庫備份裡查不到明文生日；刪除帳號後資料清空。</p>
+      <details><summary>細節：P2 會員命盤與「我存的對象」</summary>
+        <p><b>需先完成：</b><a href="#P1">P1</a></p>
+        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="P3">
+    <div class="n">15</div>
+    <div class="b">
+      <p class="plain">訂閱並確認後，每天在訂閱者當地早上 7 點寄運勢信；同一天不重寄；退訂、退信、投訴的人不再寄。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（寄信、個資）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>四個時區都在當地 7 點後寄一次；算不出內容就不寄；退信的人被停寄。</p>
+      <details><summary>細節：P3 每日運勢信</summary>
+        <p><b>需先完成：</b><a href="#P1">P1</a>、<a href="#E4">E4</a></p>
+        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-H">
+    <div class="n">16</div>
+    <div class="b">
+      <p class="plain">網址檢查、建立網站主機、安裝 WordPress 與外掛、掛上網址、正式開放，五個步驟接上骨架。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>在測試站實際跑過；管理員密碼不出現在任何紀錄裡。</p>
+      <details><summary>細節：SF-H 建站的主機步驟</summary>
+        <p><b>需先完成：</b><a href="#SF-E">SF-E</a>、<a href="#SF-G">SF-G</a></p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-I0">
+    <div class="n">17</div>
+    <div class="b">
+      <p class="plain">讓後台能把新網站加進 MainWP（一次性的主機設定）。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>後台容器讀得到這三個設定值。</p>
+      <details><summary>細節：SF-I0 MainWP 連線金鑰</summary>
+        <p><b>需先完成：</b>無；待決 2</p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-I">
+    <div class="n">18</div>
+    <div class="b">
+      <p class="plain">新網站自動加進 MainWP、建立與後台之間的簽章通道，並登記這個網站屬於哪個客戶。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（憑證）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>測試站出現在 MainWP 且連線正常；通道簽章請求成功；私鑰不出現在任何紀錄。</p>
+      <details><summary>細節：SF-I 接上 MainWP 與 AI 控制通道</summary>
+        <p><b>需先完成：</b><a href="#SF-G">SF-G</a>、<a href="#SF-I0">SF-I0</a></p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-J">
+    <div class="n">19</div>
+    <div class="b">
+      <p class="plain">「新增客戶網站」與「建站流程」兩個頁面：一欄由上到下九步，每步顯示狀態，會動主機的步驟都要按兩下。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>九步都顯示；開關沒開時按鈕顯示「尚未開放」；密碼只顯示一次。</p>
+      <details><summary>細節：SF-J 建站流程頁面</summary>
+        <p><b>需先完成：</b><a href="#SF-G">SF-G</a></p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="grp">可同時進行：<a href="#P4">P4</a>、<a href="#SF-K">SF-K</a>、<a href="#SF-P">SF-P</a>、<a href="#SF-L">SF-L</a></li><li class="step todo" id="P4">
+    <div class="n">20</div>
+    <div class="b">
+      <p class="plain">讓這支外掛能像其他自有外掛一樣打包、發佈、安裝到網站。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>發佈與安裝腳本預演正確。</p>
+      <details><summary>細節：P4 外掛發佈管道</summary>
+        <p><b>需先完成：</b><a href="#P1">P1</a></p>
+        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-K">
+    <div class="n">21</div>
+    <div class="b">
+      <p class="plain">後台幾處寫死的「已完成」打勾與過時說明，改成顯示真實狀態。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>清單上每一處都改掉。</p>
+      <details><summary>細節：SF-K 清掉假的狀態顯示</summary>
+        <p><b>需先完成：</b><a href="#SF-J">SF-J</a></p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-P">
+    <div class="n">22</div>
+    <div class="b">
+      <p class="plain">舊的兩個建站頁刪除並轉到新流程；它們還有用的兩塊設定搬到客戶頁。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>既有客戶的設定在新位置看得到；全站沒有連到舊頁的連結。</p>
+      <details><summary>細節：SF-P 舊的建站頁退場</summary>
+        <p><b>需先完成：</b><a href="#SF-J">SF-J</a></p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="SF-L">
+    <div class="n">23</div>
+    <div class="b">
+      <p class="plain">後台部署後，用一個拋棄式網域從頭到尾建一個站，當晚確認有被備份，再整個拆掉，確認沒留下任何東西。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>每一步都有成功紀錄；拆掉後容器、設定、登記都不存在。</p>
+      <details><summary>細節：SF-L 用測試網域完整跑一次</summary>
+        <p><b>需先完成：</b><a href="#SF-F">SF-F</a>、<a href="#SF-H">SF-H</a>、<a href="#SF-I">SF-I</a>、<a href="#SF-J">SF-J</a>；待決 3</p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="grp">可同時進行：<a href="#SF-O">SF-O</a>、<a href="#GO-1">GO-1</a>、<a href="#GO-2">GO-2</a>、<a href="#GO-3">GO-3</a></li><li class="step todo" id="SF-O">
+    <div class="n">24</div>
+    <div class="b">
+      <p class="plain">寫一份照著做就能開站的手冊，並登記一條你自己能跑的示範。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>只讀手冊就能完成測試網域的流程。</p>
+      <details><summary>細節：SF-O 操作手冊</summary>
+        <p><b>需先完成：</b><a href="#SF-L">SF-L</a></p>
+        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="GO-1">
+    <div class="n">25</div>
+    <div class="b">
+      <p class="plain">把引擎的新版本（含嵌入版頁面）部署上去。這一步之後訪客看到的網站沒有任何變化。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>原有網址逐頁與部署前相同；嵌入版頁面打得開。</p>
+      <details><summary>細節：GO-1 上線一：部署引擎</summary>
+        <p><b>需先完成：</b><a href="#E1">E1</a>、<a href="#E3">E3</a>、<a href="#E4">E4</a>、<a href="#E2">E2</a>；待決 4</p>
+        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="GO-2">
+    <div class="n">26</div>
+    <div class="b">
+      <p class="plain">建好 oracle 的 WordPress，讓它接手引擎沒用到的網址，並設成建置中。訪客原本的網址都不變；你登入後開始建頁面、設定外掛與寄信。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>原有網址不變；你能登入 WordPress 後台。</p>
+      <details><summary>細節：GO-2 上線二：接上 WordPress（建置中）</summary>
+        <p><b>需先完成：</b><a href="#GO-1">GO-1</a>、<a href="#SF-L">SF-L</a>、<a href="#P1">P1</a>、<a href="#P4">P4</a>；待決 5</p>
+        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="GO-3">
+    <div class="n">27</div>
+    <div class="b">
+      <p class="plain">你確認頁面與每日信都沒問題後，首頁換成 WordPress，舊工具網址轉到新頁面，關掉建置中。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>首頁是 WordPress；頁面裡的工具可用；訂閱測試信收得到。</p>
+      <details><summary>細節：GO-3 上線三：正式開放</summary>
+        <p><b>需先完成：</b><a href="#GO-2">GO-2</a>、<a href="#P2">P2</a>、<a href="#P3">P3</a>；待決 6</p>
+        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+      </details>
+    </div></li></ol></section>
+
+<section id="safe"><h2>不會弄壞現有的東西</h2><p class="lead">現有算命站從頭到尾不中斷；每個會動到正式環境的步驟都由你點頭。</p><ul class="yn rules"><li><b>現有算命站</b><span>WordPress 先只接手引擎沒用到的網址，而且是建置中；首頁最後才換。中間任何一步都可以退回上一步。</span></li><li><b>引擎</b><span>不改名、不換網域；沒有設定 WordPress 的開關時，行為與現在逐頁相同。</span></li><li><b>主機</b><span>後台只能請主機做固定的幾個動作；改檔一律走失敗會自動還原的工具；刪資料要另外確認。</span></li><li><b>開關</b><span>新的主機動作有兩道開關，預設都關；紀錄寫不進去就不執行。</span></li><li><b>個資</b><span>引擎不存任何個人資料；出生資料只存在該網站的 WordPress，並且加密。</span></li><li><b>工人</b><span>工人只在自己的工作區改檔，不推送、不部署、不連主機、不套用資料表；這些都由監工在你點頭後做。</span></li></ul></section>
+
+<section id="open"><h2>到時要你點頭</h2><p class="lead">這些步驟會動到正式環境。做到那一步時才問，一次問一件。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">把「網站與環境的紀錄」的資料表異動套用到正式資料庫（只新增索引與幾列預設關閉的開關，不改既有資料）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>監工套用並驗證後才推上主線。</span></li><li class=""><b>先不要</b><span>平台線停在第一批。</span></li></ul><p class="meta"><a href="#SF-G" class="who">在 <span data-computed>SF-G</span> 之前</a><span class="who">出處：WP-PLAN.md 第 6 節</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">把 MainWP 的連線金鑰放進後台容器（主機設定變更，走會自動還原的工具）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>之後新網站能自動加進 MainWP。</span></li><li class=""><b>先不要</b><span>這一步改成你手動在 MainWP 加站。</span></li></ul><p class="meta"><a href="#SF-I0" class="who">在 <span data-computed>SF-I0</span> 之前</a><span class="who">出處：SITE-FLOW 第 4 節第 3 題</span></p></div></li><li><div class="n">3</div><div class="b"><p class="plain">打開主機與後台的建站開關，建一筆測試網域的 DNS，跑一次完整的拋棄式建站再拆掉。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>跑完確認沒留下東西再關回開關。</span></li><li class=""><b>先不要</b><span>流程只在本機驗證。</span></li></ul><p class="meta"><a href="#SF-L" class="who">在 <span data-computed>SF-L</span> 之前</a><span class="who">出處：WP-PLAN.md 第 6 節</span></p></div></li><li><div class="n">4</div><div class="b"><p class="plain">部署引擎新版本（含目前所有尚未部署的引擎改動）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>失敗會自動還原到現在的版本。</span></li><li class=""><b>先不要</b><span>引擎維持 2026-11-20 的版本。</span></li></ul><p class="meta"><a href="#GO-1" class="who">在 <span data-computed>GO-1</span> 之前</a><span class="who">出處：ORACLE-WP-SPEC.md 上線</span></p></div></li><li><div class="n">5</div><div class="b"><p class="plain">改 oracle 網域的分流設定，讓 WordPress 接手引擎沒用到的網址（建置中）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>訪客原本的網址不變；失敗自動還原。</span></li><li class=""><b>先不要</b><span>WordPress 只能在主機內部看。</span></li></ul><p class="meta"><a href="#GO-2" class="who">在 <span data-computed>GO-2</span> 之前</a><span class="who">出處：ORACLE-WP-SPEC.md 上線</span></p></div></li><li><div class="n">6</div><div class="b"><p class="plain">首頁換成 WordPress 並正式開放。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>可以一步退回建置中的狀態。</span></li><li class=""><b>先不要</b><span>維持建置中。</span></li></ul><p class="meta"><a href="#GO-3" class="who">在 <span data-computed>GO-3</span> 之前</a><span class="who">出處：ORACLE-WP-SPEC.md 上線</span></p></div></li></ol></section>
+
+<section id="risks"><h2>風險與處置</h2><p class="lead">每批一張表。工人交回的每條風險都要有處置：現在處理、實測驗證，或記下不處理的理由。</p><h3 class="sub-h">動工前（計畫審查與試驗）</h3><ul class="yn rules"><li><b>E1</b><span>工具放進內嵌框後，量整頁高度會只增不減（試驗量到 4157，實際內容 902）；引擎的工具列也會出現在框裡。<small><b>處置：</b>已寫進 E1：嵌入版不撐滿視窗、不放工具列，高度量工具本身。</small></span></li><li><b>E2</b><span>引擎與 WordPress 同網域後，引擎頁的漏洞可波及 WordPress 後台。<small><b>處置：</b>由 E2 的內容安全政策擋；GO-2 之前必須完成。</small></span></li><li><b>P1</b><span>外掛有 1 個主要問題、6 個小問題未修（第一次儲存清空對照表等）。<small><b>處置：</b>列為 P1 的必修內容；外掛尚未安裝在任何網站。</small></span></li><li><b>P3</b><span>Resend 不在 FluentCRM 內建的退信處理名單內。<small><b>處置：</b>已寫進 P3：外掛接 Resend 的退信與投訴通知，把該聯絡人標記為停寄。</small></span></li><li><b>SF-E</b><span>後台若能對正式站執行任意指令，等於能讀所有網站的會員資料。<small><b>處置：</b>已改設計：只有固定動作，不收指令內容。</small></span></li><li><b>SF-G</b><span>既有的紀錄工具在開關不存在時會自動補成「開」，寫入失敗時仍照做。<small><b>處置：</b>已改設計：建站動作不走那條路；沒有開關或寫不進紀錄就不執行。</small></span></li><li><b>GO-1</b><span>引擎拿到的訪客位址可能是主機自己的位址，限流會把所有人算成同一個來源。<small><b>處置：</b>部署前在主機實測確認，不對就先修分流設定。</small></span></li><li><b>GO-2</b><span>Kadence 佈景、真手機、英文頁網址代稱、正式主機兩層分流都還沒試。<small><b>處置：</b>在建置中階段逐項實測，有問題不進 GO-3。</small></span></li></ul><h3 class="sub-h">第一批</h3><p class="lead">這一批的工人尚未交回。</p></section>
+
+<section id="paths"><h2>檔案</h2><div class="paths"><div><b>派工與驗收</b><code>agency-os/handoffs/2026-11-20-oracle-skills-supervisor/WP-PLAN.md</code></div><div><b>產品規格</b><code>agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-20-oracle-skills-supervisor/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。</span></div></div></section>
+</main>
+</div>

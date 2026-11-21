@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-22（續6）— oracle WordPress 階段：派工計畫、監工台、第一批卡片
+
+- 操作者：「派工者寫最完整的plan和監工台」。新 `agency-os/handoffs/2026-11-20-oracle-skills-supervisor/WP-PLAN.md`（27 張卡、五批、四條工人線、驗收與併入、一起看 RISKS、六個要操作者點頭的時刻）；`briefs/COMMON-WP.md`；第一批 brief 六張（`briefs/WP-E1`、`WP-E3`、`WP-E4`、`WP-SF-B`、`WP-SF-C`、`WP-SF-D`）；後續批次的 brief 在該批開始前寫（要引用前一批定下的名稱）。
+- 監工台：`data.mjs`／`build.mjs`／`check.mjs`／`supervisor.html`（沿用 `scripts/supervisor-kit`）；發布 https://claude.ai/artifact/9PGQAU9kFciKoTJT3UxZGi 。
+- 計畫更正：`SITE-FLOW-COMPLETION-PLAN.md` 的「主機 cron 產生器」刪除——既有 `lobster-factory/infra/hetzner-phase1-core/scripts/wp-cron-runner.sh:2-6` 已自動發現所有設 `DISABLE_WP_CRON` 的 WordPress 容器；測試路徑改為 `tests/host-scripts/`。`ORACLE-WP-SPEC.md` §2-3 的 `ORACLE_FRONT_PAGES` 格式對齊 E3 卡。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs（ok: 27 cards, 8 risk rows with actions, 6 open, page fresh） | exit=0 | ms=1500
+- REVIEW_WAIVED: DOC_ONLY -- 計畫與監工台資料；build.mjs／check.mjs 逐字複製自 2026-11-21-systems-control-center
+- BUGHUNT_WAIVED: DOC_ONLY -- 無產品程式改動
 ## 2026-11-22（續5）— oracle 每日信寄件網域：Resend 加 `oracle.aware-wave.com`＋Cloudflare 4 筆 DNS
 
 - 操作者：「在 Resend 多加一個寄件網域 oracle.aware-wave.com 可以」。

@@ -44,7 +44,7 @@ WordPress 頁面（Kadence，可排版）
 |---|---|---|---|
 | 1 | 分路 | 上表路徑。nginx 規則只列引擎的前綴；WordPress 不得使用 `/embed`、`/api`、`/_next`、`/tarot`、`/zh-TW`、`/en` 當頁面網址 | 試驗 V1 |
 | 2 | 嵌入版頁面 | 引擎新路由 `/embed/[lang]/[slug]`：重用現有工具元件；不顯示引擎的工具列與語言鈕；版面不撐滿視窗；回應標頭 `X-Robots-Tag: noindex, indexifembedded`；`Content-Security-Policy: frame-ancestors 'self'` | 試驗 V1b 兩項；REV M4 |
-| 3 | 既有 `/zh-TW/<工具>`、`/en/<工具>` | 引擎加環境變數 `ORACLE_FRONT_PAGES`（JSON：每語言一個網址樣式，例 `{"zh-TW":"/{slug}/","en":"/english/{slug}/"}`）。有設定時這些網址 308 轉到樣式算出的 WordPress 頁；沒設定時照現在顯示（買斷或無 WordPress 時不變） | 避免同內容兩個網址；不寫死網域 |
+| 3 | 既有 `/zh-TW/<工具>`、`/en/<工具>` | 引擎加環境變數 `ORACLE_FRONT_PAGES`（JSON：`{"pages":{"zh-TW":"/{slug}/","en":"/english/{slug}/"},"home":{"zh-TW":"/","en":"/english/"}}`；`home` 選填；格式正本 `briefs/WP-E3-front-redirect.md`）。有設定時這些網址 308 轉到樣式算出的 WordPress 頁；沒設定時照現在顯示（買斷或無 WordPress 時不變） | 避免同內容兩個網址；不寫死網域 |
 | 4 | 高度與捲動 | 父頁腳本量框內「工具根元素」的高度（不是整份文件，試驗量到 4157px 對實際 902px）；結果出現時父頁捲到結果；框內浮層（城市搜尋、放大牌圖）改為框內就地展開，不用固定定位 | 試驗 V1b；REV m7 |
 | 5 | 會員與存檔 | 外掛 REST `aworacle/v1`（登入＋nonce）。兩張表：`{prefix}aworacle_charts`（自己的命盤）、`{prefix}aworacle_persons`（我存的對象：暱稱、出生資料）。對象只屬於該會員，不與任何帳號關聯。未登入照常使用，不存，顯示「登入以儲存」 | D2、D4；試驗 V2 |
 | 6 | 出生資料保護 | 出生欄位以 libsodium secretbox 加密後存；金鑰放 `wp-config.php` 常數，不進資料庫與備份的資料庫部分。WordPress 隱私工具的匯出與刪除要涵蓋兩張表與訂閱資料；刪會員連動刪除 | REV M6 |
