@@ -1,6 +1,7 @@
 import '@/lib/divination';
 import { listSystems } from '@/lib/divination/registry';
-import { describeSpec, parseInput } from '@/lib/divination/input';
+import { describeSpec } from '@/lib/divination/input';
+import { runOne } from '@/lib/http/runSystem';
 import type { DivinationSystem } from '@/lib/divination/types';
 import { defaultLocale, isLocale, type Locale } from '@/lib/i18n/config';
 import en from '@/messages/en.json';
@@ -107,21 +108,15 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<Ou
 
   const { [LOCALE_ARG]: locale = defaultLocale, ...input } = args;
   if (typeof locale !== 'string' || !isLocale(locale)) return { result: toolError('locale: must be zh-TW or en') };
-  const parsed = parseInput(system.input, input);
+  // 與 REST v1 同一條路徑(驗證、計算、例外都在 runOne 內),MCP 只換回應的形狀
+  const run = await runOne(system, input, locale as Locale);
+  if (run.ok) return { result: { content: text(factsToText(run.context)), structuredContent: { data: run.data, context: run.context } } };
   // 輸入錯誤回 isError 結果(不是協定錯誤),讓模型看得到逐項原因自行修正
-  if (!parsed.ok) return { result: toolError(`Invalid input:\n${parsed.errors.map((e) => `- ${e}`).join('\n')}`) };
-  try {
-    const { data, context } = await system.compute(parsed.value, locale as Locale);
-    return {
-      result: {
-        content: text(factsToText(context)),
-        // 紫微 astrolabe 等功能物件經自己的 toJSON() 變成純 JSON(同 REST v1)
-        structuredContent: { data: JSON.parse(JSON.stringify(data)), context },
-      },
-    };
-  } catch {
-    return { result: toolError('The engine could not compute this input.') };
+  // REST 的欄位路徑以 input. 開頭(欄位在 body.input 底下);MCP 的參數在最上層,所以拿掉前綴
+  if (run.error === 'invalid_input') {
+    return { result: toolError(`Invalid input:\n${run.detail.map((e) => `- ${e.replace(/^input\./, '')}`).join('\n')}`) };
   }
+  return { result: toolError('The engine could not compute this input.') };
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);

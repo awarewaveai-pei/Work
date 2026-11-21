@@ -12,10 +12,11 @@ namespace AwareWave\Oracle\Crypto;
 
 final class SiteKey {
 
-	/** Header naming the signing site; the engine looks the key id up in its registry. */
-	const SITE_HEADER = 'X-AwareWave-Site';
-	/** Header carrying base64(Ed25519(raw body)). */
-	const SIGNATURE_HEADER = 'X-AwareWave-Site-Signature';
+	/**
+	 * Header carrying base64(Ed25519(raw body)). The engine's contract (ziwei-doushu lib/sites/verify.ts):
+	 * the site is named by `key_id` inside the JSON body, next to `ts` (unix seconds) and `nonce`.
+	 */
+	const SIGNATURE_HEADER = 'X-AwareWave-Oracle-Signature';
 
 	/** DER SubjectPublicKeyInfo prefix of an Ed25519 public key; the 32 raw bytes follow. */
 	const SPKI_PREFIX_HEX = '302a300506032b6570032100';

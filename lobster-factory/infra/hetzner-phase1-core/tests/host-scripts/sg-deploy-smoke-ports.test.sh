@@ -120,6 +120,33 @@ t_oracle_smoke_probes_the_public_api() {
   # X2 (2026-11-21): MCP initialize is POSTed, so a deploy that breaks /api/mcp fails the smoke.
   check "oracle-web: smoke block POSTs an MCP initialize on the resolved port"     grep -qF '_smoke_check "oracle-web mcp" "http://127.0.0.1:${oracle_port}/api/mcp" "" "" '"'"'{"jsonrpc":"2.0","id":1,"method":"initialize"' <<< "$block"
   check "_smoke_check: optional 5th arg turns the probe into a JSON POST"     grep -qF 'curl_args+=(-X POST -H "Content-Type: application/json"' "$SG_DEPLOY"
+  # A broken initialize still answers HTTP 200 with a JSON-RPC error, so the probe names a body string.
+  check "oracle-web: the MCP probe requires protocolVersion in the body"     grep -qF "\"version\":\"1\"}}}' '\"protocolVersion\"'" <<< "$block"
+}
+
+t_smoke_check_body_match_fails_a_2xx_with_the_wrong_body() {
+  # Run the real _smoke_check against a stub curl: 200 + JSON-RPC error must count as a smoke error,
+  # 200 + the expected string must not. `log`, `_smoke_settling` and curl are stubbed.
+  local fn out
+  fn="$(awk '/^_smoke_check\(\) \{$/,/^\}$/' "$SG_DEPLOY")"
+  out="$(bash -c '
+    set -euo pipefail
+    log() { :; }
+    _smoke_settling() { return 1; }
+    _smoke_errors=0
+    curl() { local o=""; while [[ $# -gt 0 ]]; do if [[ "$1" == "-o" ]]; then o="$2"; fi; shift; done; printf "%s" "$STUB_BODY" > "$o"; printf 200; }
+    '"$fn"'
+    STUB_BODY="{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601}}"
+    _smoke_check bad http://x "" "" "{}" "\"protocolVersion\""
+    bad=$_smoke_errors
+    STUB_BODY="{\"result\":{\"protocolVersion\":\"2025-06-18\"}}"
+    _smoke_check good http://x "" "" "{}" "\"protocolVersion\""
+    _smoke_check plain http://x
+    mktemp() { return 1; }
+    _smoke_check nomktemp http://x "" "" "{}" "\"protocolVersion\""
+    echo "$bad $_smoke_errors"
+  ')"
+  check "_smoke_check (set -euo pipefail): 200 + JSON-RPC error body and a failing mktemp are smoke errors; matching body and plain GET are not" test "$out" = "1 2"
 }
 
 main() {

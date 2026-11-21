@@ -21,7 +21,7 @@
   - 引擎→父頁：`{type:'oracle:ready', v}`、`{type:'oracle:resize', height}`、`{type:'oracle:need-login'}`、`{type:'oracle:navigate', slug}`、`{type:'oracle:save-chart', system, input}`（P1 只轉發成 DOM 事件 `aworacle:save-chart`，儲存屬 P2）。
   - 父頁→引擎：`{type:'oracle:init', v, locale, theme, member}`；`theme` 是 Kadence 色票 `--global-palette1..9`，沒有就送 `{}`。
   - 父頁只收 `event.origin` 等於瀏覽器用引擎網址的 origin、且 `event.source` 是本頁嵌入框的訊息；回覆只送到該 origin。
-- 站台簽章（P1 只建金鑰，尚未送請求）：標頭 `X-AwareWave-Site: <金鑰名稱>`、`X-AwareWave-Site-Signature: base64(Ed25519(原始內容))`；時間戳與 nonce 欄位依 W1 定案。
+- 站台簽章（P1 只建金鑰，尚未送請求）：照引擎 `Projects/internal/ziwei-doushu/lib/sites/verify.ts`：標頭 `X-AwareWave-Oracle-Signature: base64(Ed25519(原始內容))`；JSON 內容帶 `key_id`（金鑰名稱）、`ts`（unix 秒，±60 秒）、`nonce`（16–100 個 `[A-Za-z0-9_-]`，每站只能用一次）。
 - 會員代號：`HMAC-SHA256(鹽, 使用者 ID)`（`Options::memberPseudonym`），P2 起送給引擎。
 
 ## 驗證

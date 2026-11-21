@@ -673,9 +673,16 @@ _smoke_expect_status() {
   else log "  SMOKE_WARN: $label -> $http (expected $want)"; _smoke_errors=$((_smoke_errors + 1)); fi
 }
 _smoke_check() {
-  local label="$1" url="$2" host_header="${3:-}" resolve_host="${4:-}" post_json="${5:-}"
-  local http
-  local -a curl_args=(-s --max-time 5 -o /dev/null -w "%{http_code}")
+  local label="$1" url="$2" host_header="${3:-}" resolve_host="${4:-}" post_json="${5:-}" body_has="${6:-}"
+  local http body_file=/dev/null
+  # Optional 6th arg: the response body must contain this literal string. A JSON-RPC endpoint answers
+  # HTTP 200 with {"error":...} when the method is broken, so the status alone cannot fail the gate.
+  # mktemp failing (disk full after the build) must count as a smoke error so the rollback below runs;
+  # under `set -e` a bare assignment would abort the script with the new containers left up.
+  if [[ -n "$body_has" ]]; then
+    body_file="$(mktemp)" || { log "  SMOKE_WARN: $label -> mktemp-failed"; _smoke_errors=$((_smoke_errors + 1)); return 0; }
+  fi
+  local -a curl_args=(-s --max-time 5 -o "$body_file" -w "%{http_code}")
   # Optional 5th arg: POST this JSON body instead of a GET (oracle MCP initialize, X2 2026-11-21).
   if [[ -n "$post_json" ]]; then
     curl_args+=(-X POST -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" --data "$post_json")
@@ -700,10 +707,12 @@ _smoke_check() {
   # could log a misleading "404000"/"000000". Assign first, fall back on failure, never append.
   while :; do
     http=$(curl "${curl_args[@]}" "$url" 2>/dev/null) || http="000"
-    [[ "$http" =~ ^2 ]] && break
+    if [[ "$http" =~ ^2 ]] && [[ -n "$body_has" ]] && ! grep -qF -- "$body_has" "$body_file"; then http="${http}-body-mismatch"; fi
+    [[ "$http" =~ ^2[0-9][0-9]$ ]] && break
     _smoke_settling || break
   done
-  if [[ "$http" =~ ^2 ]]; then log "  smoke OK: $label -> $http"
+  if [[ -n "$body_has" ]]; then rm -f "$body_file"; fi
+  if [[ "$http" =~ ^2[0-9][0-9]$ ]]; then log "  smoke OK: $label -> $http"
   else log "  SMOKE_WARN: $label -> $http"; _smoke_errors=$((_smoke_errors + 1)); fi
 }
 log "--- HTTP smoke check ---"
@@ -788,7 +797,7 @@ if [[ " ${APPS[*]} " =~ " oracle-web " ]]; then
   _smoke_check "oracle-web health" "http://127.0.0.1:${oracle_port}/api/health"
   _smoke_check "oracle-web /zh-TW" "http://127.0.0.1:${oracle_port}/zh-TW"
   _smoke_check "oracle-web api v1" "http://127.0.0.1:${oracle_port}/api/v1/systems"
-  _smoke_check "oracle-web mcp" "http://127.0.0.1:${oracle_port}/api/mcp" "" "" '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"sg-deploy-smoke","version":"1"}}}'
+  _smoke_check "oracle-web mcp" "http://127.0.0.1:${oracle_port}/api/mcp" "" "" '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"sg-deploy-smoke","version":"1"}}}' '"protocolVersion"'
   _smoke_check "nginx/oracle"      "https://oracle.aware-wave.com/api/health" "" "oracle.aware-wave.com"
 fi
 
@@ -801,12 +810,12 @@ if [[ " ${APPS[*]} " =~ " video-workbench " ]]; then
 fi
 
 if [[ "$_smoke_errors" -gt 0 ]]; then
-  log "SMOKE_WARN: $_smoke_errors endpoint(s) returned non-2xx -- service may be partially degraded"
+  log "SMOKE_WARN: $_smoke_errors endpoint(s) failed (non-2xx or body mismatch) -- service may be partially degraded"
   printf '%s|%s\n' "$_smoke_errors" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAGING_DIR/.smoke-warn"
 
   # C1: Plan §五 third-layer auto-rollback (default ON).
   if rollback_enabled; then
-    do_rollback "smoke check: $_smoke_errors endpoint(s) non-2xx" "$_smoke_errors"
+    do_rollback "smoke check: $_smoke_errors endpoint(s) failed (non-2xx or body mismatch)" "$_smoke_errors"
   else
     log "AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false -- DRILL MODE; leaving degraded state for inspection"
     DEPLOY_OUTCOME="SMOKE_WARN"

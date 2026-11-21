@@ -1,4 +1,38 @@
 # Worklog
+## 2026-11-21（續21）— oracle E6c、X2、W1、P1 風險處置；X2 critic 四項修正；WordPress 門面架構比較（待操作者確認）
+
+- 併入：E6c 後續 `459ae5bea` → main `60d923eac`（臺灣譯名 67→110、後灣／後海、舊瀏覽器時區提示）。E6c `787012ef5`、X2 `6eae15f2d`、W1 `8d60735c2`、P1 `e082fbd04` 先前已在 main。**全部未部署**。
+- 根因（本次修的）：X2 與 P1 併入時沒過 critic；P1 的簽章標頭是工人在 W1 定案前假設的，與引擎不同。
+- critic（Standard，X2＋P1 一次）：X2 warn 0c/0m/5n；P1 warn 0c/1m/6n。
+- X2 處置（`Projects/internal/ziwei-doushu/`）：
+  - m1 `lib/mcp/server.ts` 自己重寫一份驗證＋計算，`parseInput` 在 try 外 → 改呼叫 `lib/http/runSystem.ts` `runOne`，與 REST v1 同一條路徑。
+  - m2 Origin 與 `Host` 標頭比對（rebinding 時兩者同為攻擊網域）→ `app/api/mcp/route.ts` 改比對 `SITE_URL`；非正式環境另收迴路位址。
+  - m3 部署煙霧測試只看 2xx，JSON-RPC 錯誤也是 200 → `sg-deploy.sh` `_smoke_check` 第 6 參數「內容必含字串」，MCP 探針要求 `"protocolVersion"`；`sg-deploy-smoke-ports.test.sh` 以替身 curl 實跑該函式。
+  - m4 有 `id` 但 `method` 非字串回 202 → 改回 -32600 並帶回 `id`；帶 `result`／`error` 的才當回應。
+  - m5 無 Content-Length 的 chunked 內容先整個讀進記憶體（v1 同寫法，`lib/http/v1.ts:66-68`）→ 不修：正式路徑經 nginx 緩衝並補長度，只有主機本機直連 `127.0.0.1:3010` 才會發生。
+  - 工人 RISKS：手寫協定、無 SSE／resources／prompts、Accept 不檢查、v1 與 MCP 各計 60 次／分 → 接受。未用真的連接器連過 → 部署後做一次（已寫進 DISPATCH）。八字反推出生日期 → 未做，要新註冊一個系統，列入可派清單。`locale` 欄位撞名會讓 `tools/list` 拋錯 → `mcp.test.ts` 的 `tools/list` 測試會先紅，接受。
+- 修正本身的 critic（/verify-recent，warn 0c/0m/6n）：`mktemp` 失敗在 `set -e` 下會中止而不回滾 → 改計為煙霧錯誤；MCP 錯誤訊息帶 REST 的 `input.` 前綴 → MCP 層拿掉，測試改比對整行；`RunResult` 拆成兩種、刪轉型；彙總與回滾原因改「non-2xx or body mismatch」；替身測試改在 `set -euo pipefail` 下跑並加 `mktemp` 失敗案例。不修：允許的 Origin 取自 build 時的 `SITE_URL`，而 `Dockerfile` 沒有 `ARG NEXT_PUBLIC_SITE_URL`（`deploy/DEPLOY.md` 說買斷用它換網域，實際傳不進去）→ 既有缺口，目前無買斷安裝；做買斷時補 ARG。
+- W1 處置：工人 critic（Deep）1M/3m 已修，不重審。nonce 與額度在單一行程記憶體 → 接受（compose 單一容器；重啟後 ±60 秒時窗仍擋重送）。允許 `http:` 嵌入網域、`ORACLE_SITES` 放環境變數（`PLAN-REVIEW.md` C2）→ 併入門面架構決定，未動。部署時主機 `.env.production` 要加 `ORACLE_SITES` → 寫進 DISPATCH。
+- P1 處置（`lobster-factory/packages/oracle-wp-plugin/`）：
+  - 已修：`includes/Crypto/SiteKey.php` 標頭改 `X-AwareWave-Oracle-Signature`、刪未使用的 `SITE_HEADER`；`README.md` 同步（引擎合約 `lib/sites/verify.ts:8-13`）。
+  - **未修，裝到任何 WordPress 前必修**（外掛尚未安裝在任何站；iframe 與對照表那一半是否保留取決於門面架構決定，定案後連同真 WordPress 安裝測試一起修）：
+    - M1 `includes/Admin/SettingsPage.php:80-81` 第一次儲存時 sanitize 連跑兩次，語言對照與頁面對照被清空。
+    - m1 `:88` 被拒的行未跳脫就進 `add_settings_error`。
+    - m2 `:102,175-181` 動作無 Post/Redirect/Get，重新整理會再輪替一次金鑰。
+    - m3 `includes/Settings/Normalize.php:42` 保留 `:443`，`assets/embed.js:43` origin 比對不符。
+    - m4 `includes/Settings/Options.php:47-51,60-61` salt 只在啟用時建，缺少時 `memberPseudonym()` 回空字串。
+    - m5 `uninstall.php:13-16` multisite 只清目前站。
+    - m6 `includes/Engine/EngineClient.php:28` 無回應大小上限、會跟隨轉址。
+    - 建議：iframe 加 `sandbox`；私鑰允許 `wp-config.php` 常數覆寫。
+  - 工人 RISKS：沒在真 WordPress 裝過、沒跑 PHPUnit → 同上，定案後做。PHP 7.4 語法 → critic 逐檔讀過，無 7.4 不支援的語法。
+- E6c 處置：「后」、譯名、舊瀏覽器時區三項由 `459ae5bea` 關閉。OpenCC 只在建檔時用、搜尋快取 5 分鐘 → 非缺陷。
+- WordPress 門面：`agency-os/reports/decisions/2026-11-21-oracle-wp-front-door-architecture.md`。四種做法（內嵌框／同網域分路／原生繪製／只當後台）；建議同網域分路＋每日信用 FluentCRM「寄自訂信給聯絡人」；§6 兩題待操作者；§7 V1–V4 試驗未跑。兩份計畫在此之前不派卡（DISPATCH 已改）。FluentCRM 查證＝官方文件，未實測。
+- 未驗證：X2 修正未對 production build 以 curl 實打（只跑路由處理函式的測試）；Origin 守衛未做突變；Codex 審查無額度。
+- REALTEST_EVIDENCE: tool=Bash | cmd=oracle-int@60d923eac `npx tsc --noEmit`＋`npx vitest run`（52 檔 483 passed）；修正後 D:/Work `npx tsc --noEmit`＋`npx vitest run app/api/mcp app/api/v1 lib/http lib/mcp`（46 passed）；`bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/sg-deploy-smoke-ports.test.sh`（15 passed）；`php -l includes/Crypto/SiteKey.php` | exit=0 | ms=9000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/17n（X2 5n：4 修 1 接受；P1 1m/6n：記錄為安裝前必修；修正 diff 6n：5 修 1 記錄）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/ziwei-doushu | grep=X-AwareWave-Oracle-Signature | hits=8（引擎 `lib/sites/verify.ts`、`deploy/DEPLOY.md`、外掛 `SiteKey.php`、`README.md` 一致；舊名 `X-AwareWave-Site` 在外掛內 0 筆，其餘命中是付款用的同名標頭，無關）
+- rollback：`git revert` 本 commit（X2 修正、煙霧測試參數、外掛標頭各自獨立）；`60d923eac` 可單獨 revert。
 ## 2026-11-21（續20）— 合成頁右欄：設計圖＋模式鍵剛好填滿第一屏；右欄加寬（操作者：按鍵字變兩行）
 
 [根因] 續19 用 `calc(100vh - 320px)` 猜剩餘高度，模式鍵不一定剛好在螢幕底；右欄 360px，「模特兒印製」等鍵換行。

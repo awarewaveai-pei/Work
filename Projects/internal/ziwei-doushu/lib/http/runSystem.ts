@@ -4,7 +4,8 @@ import type { Locale } from '@/lib/i18n/config';
 
 export type RunResult =
   | { ok: true; data: unknown; context: InterpretationContext }
-  | { ok: false; error: 'invalid_input' | 'compute_failed'; detail: string[] | string };
+  | { ok: false; error: 'invalid_input'; detail: string[] }
+  | { ok: false; error: 'compute_failed'; detail: string };
 
 /**
  * 單次與批次共用:驗證一筆輸入並計算。錯誤只回欄位路徑與訊息,不回輸入值(出生資料不進回應以外的任何地方)。

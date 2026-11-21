@@ -1,6 +1,7 @@
 import { handleRequest, ERR, PROTOCOL_VERSIONS, type JsonRpcError } from '@/lib/mcp/server';
 import { API_RULE, clientSource, hit } from '@/lib/http/rateLimit';
 import { MAX_BODY_BYTES } from '@/lib/http/v1';
+import { SITE_URL } from '@/lib/site';
 
 /**
  * MCP 端點 /api/mcp — Streamable HTTP 傳輸,無狀態(無 Mcp-Session-Id)。
@@ -10,7 +11,7 @@ import { MAX_BODY_BYTES } from '@/lib/http/v1';
  * - POST 單一 JSON-RPC 訊息:initialize、ping、tools/list、tools/call → 200 application/json;
  *   通知(notifications/initialized 等)與回應 → 202 無內容。不支援批次(2025-06-18 起規格已移除)。
  * - 不開 SSE 串流:GET、DELETE → 405。伺服器不主動發訊息,也沒有 resources/prompts。
- * - Origin(規格要求防 DNS rebinding):沒帶 Origin(伺服器端客戶端)放行;帶了就必須與本站同源,否則 403。
+ * - Origin(規格要求防 DNS rebinding):沒帶 Origin(伺服器端客戶端)放行;帶了就必須是設定的本站網址(SITE_URL),否則 403。
  * - MCP-Protocol-Version 標頭帶了不支援的版本 → 400。
  * 安全:沿用 REST v1 的限流額度(另計 scope 'mcp')與 body 上限;不呼叫 AI、不存輸入、不回堆疊。
  */
@@ -24,12 +25,19 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
 const rpcError = (id: Id, error: JsonRpcError, status = 200, headers: Record<string, string> = {}) =>
   json({ jsonrpc: '2.0', id, error }, status, headers);
 
+const SITE_ORIGIN = new URL(SITE_URL).origin;
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+/**
+ * 允許的 Origin 來自設定,不從請求推導:Host 標頭由請求方決定,DNS rebinding 時 Origin 與 Host 會一起變成攻擊網域。
+ * 正式環境只收本站(SITE_URL);非正式環境另收本機迴路位址。
+ */
 function originAllowed(request: Request): boolean {
   const origin = request.headers.get('origin');
   if (!origin) return true;
   try {
-    const host = request.headers.get('host');
-    return new URL(origin).host === host;
+    const url = new URL(origin);
+    if (url.origin === SITE_ORIGIN) return true;
+    return process.env.NODE_ENV !== 'production' && LOOPBACK.has(url.hostname);
   } catch {
     return false;
   }
@@ -69,11 +77,13 @@ export async function POST(request: Request) {
   }
   const m = msg as { id?: unknown; method?: unknown; params?: unknown };
 
-  // 通知(無 id)與客戶端送來的回應(無 method):照規格回 202,不處理
-  if (m.id === undefined || typeof m.method !== 'string') return new Response(null, { status: 202 });
+  // 通知(無 id)與客戶端送來的回應(帶 result 或 error):照規格回 202,不處理
+  if (m.id === undefined || 'result' in m || 'error' in m) return new Response(null, { status: 202 });
   if (typeof m.id !== 'string' && typeof m.id !== 'number') {
     return rpcError(null, ERR.invalidRequest('id must be a string or number'), 400);
   }
+  // 有 id 卻沒有字串 method:不是合法請求,要回錯誤(回 202 的話客戶端會一直等)
+  if (typeof m.method !== 'string') return rpcError(m.id, ERR.invalidRequest('method must be a string'), 400);
 
   const outcome = await handleRequest(m.method, m.params);
   return 'error' in outcome

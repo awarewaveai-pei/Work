@@ -4,6 +4,7 @@ import { listSystems } from '@/lib/divination/registry';
 import { describeSpec } from '@/lib/divination/input';
 import { __resetRateLimit } from '@/lib/http/rateLimit';
 import { factsToText } from '@/lib/mcp/text';
+import { SITE_URL } from '@/lib/site';
 
 let nextId = 1;
 const rpc = (method: string, params?: unknown, headers: Record<string, string> = {}) =>
@@ -53,8 +54,8 @@ describe('MCP /api/mcp', () => {
   it('輸入錯誤 → isError 結果逐項列出;未知工具與未知方法 → JSON-RPC 錯誤', async () => {
     const bad = await (await rpc('tools/call', { name: 'qian', arguments: { lot: 101, extra: 1 } })).json();
     expect(bad.result.isError).toBe(true);
-    expect(bad.result.content[0].text).toContain('lot: must be 1..100');
-    expect(bad.result.content[0].text).toContain('extra: unknown field');
+    // 欄位名與工具參數同層(不帶 REST 的 input. 前綴)
+    expect(bad.result.content[0].text.split('\n')).toEqual(expect.arrayContaining(['- lot: must be 1..100', '- extra: unknown field']));
     expect((await (await rpc('tools/call', { name: 'nope', arguments: {} })).json()).error.code).toBe(-32602);
     expect((await (await rpc('resources/list')).json()).error.code).toBe(-32601);
   });
@@ -69,6 +70,14 @@ describe('MCP /api/mcp', () => {
     expect((await post('[]')).status).toBe(400);
     expect((await rpc('ping', undefined, { origin: 'https://evil.example' })).status).toBe(403);
     expect((await rpc('ping', undefined, { origin: 'http://localhost' })).status).toBe(200);
+    // DNS rebinding:Origin 與 Host 同為攻擊網域也要拒絕(允許清單來自設定,不看 Host)
+    expect((await rpc('ping', undefined, { origin: 'https://evil.example', host: 'evil.example' })).status).toBe(403);
+    expect((await rpc('ping', undefined, { origin: new URL(SITE_URL).origin })).status).toBe(200);
+    // 有 id 但 method 不是字串:回 -32600 並帶回 id;客戶端送來的回應仍回 202
+    const noMethod = await post(JSON.stringify({ jsonrpc: '2.0', id: 7, method: 5 }));
+    expect(noMethod.status).toBe(400);
+    expect(await noMethod.json()).toMatchObject({ id: 7, error: { code: -32600 } });
+    expect((await post(JSON.stringify({ jsonrpc: '2.0', id: 7, result: {} }))).status).toBe(202);
     expect((await rpc('ping', undefined, { 'mcp-protocol-version': '1999-01-01' })).status).toBe(400);
     expect(GET().status).toBe(405);
   });
