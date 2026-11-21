@@ -228,4 +228,13 @@ describe("GET /api/tools/designs list", () => {
     expect(json.ok).toBe(true);
     expect(json.assets.map((a) => a.id).sort()).toEqual([design.id, noSource.id].sort());
   });
+
+  it("?group=tarot (the picker's 塔羅牌 tab) keeps tarot card art only", async () => {
+    const tarotArt = asset(304, ORG_A, "tarot-art", null);
+    db.rows.push(asset(300, ORG_A, "pod-studio", "flux-dev"), asset(302, ORG_A, "mockup", null), tarotArt);
+    const res = await GET(new Request("http://localhost/api/tools/designs?group=tarot"));
+    const json = (await res.json()) as { ok: boolean; assets: { id: string; metadata: { source: string } }[] };
+    expect(json.assets.map((a) => a.id)).toContain(tarotArt.id);
+    expect(json.assets.every((a) => a.metadata.source.startsWith("tarot"))).toBe(true);
+  });
 });

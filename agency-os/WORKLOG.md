@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-21（續12）— 放大檢視統一成一個可縮放元件；合成頁設計圖加「塔羅牌」分頁
+
+[根因]
+- C1 放大檢視有 4 份手寫（mockup `ImageLightbox`、`DesignsGallery`、`StudioWorkbench`、`TarotStudio`×2），都只「符合畫面」，看不到細節。
+- C2 塔羅牌圖不能當印花：合成頁只抓 `?group=print`（=設計圖減塔羅，32c9396c0 為了不讓 78 張牌洗版）。
+- 查證：模特兒修圖 5 天內 0 筆進 My Designs（prod `media_assets` source canvas/mockup 只 1 筆＝合成圖存檔）；修圖傳回存回模特兒圖庫，只有原分頁關了才落 My Designs。
+[不變量] 全站一個 `components/tools/ImageLightbox.tsx`（滾輪／＋－／1:1 實際像素／雙擊／拖曳；Esc、✕、點背景關）。設計圖清單的群組只在 `designs-list.ts` 定義：`tarot` = 只塔羅；預設仍 `print`，塔羅要按分頁才出現。
+[已修改] 新 `components/tools/ImageLightbox.tsx`（刪 mockup 舊檔）；4 工具改用它；`globals.css` 刪無用 `.designs-lightbox-img`；`designs-list.ts`＋`designs/route.ts` 加 `group=tarot`；`MockupStudio.tsx` 設計圖／塔羅牌兩鍵。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run components/tools/ImageLightbox.render.test.tsx "app/(shell)/tools/mockup" app/api/tools/designs "app/(shell)/tools/designs" "app/(shell)/tools/studio" "app/(shell)/tools/tarot" lib/studio/designs-list → 14 files 87 passed；tsc 0；eslint 0 | exit=0 | ms=9000
+- 新測 3 條（縮放／關閉、`group=tarot`、合成頁塔羅牌分頁選牌）。突變：route 不認 tarot → 紅；點圖也關 → 紅；還原綠。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n1 滾輪縮放時背景頁可能跟著捲，overlay fixed 未鎖 body，接受）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；自審＋突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ImageLightbox|designs-lightbox-img|group=print|group=tarot | hits=19（全在 next-admin 原始碼與測試；docs 0）
+- 未做：正式站實看（本機需登入），今晚 03:00 上線後看。
+[rollback] `git revert <本 commit>`。
 ## 2026-11-21（續11）— 影片監工：R6–R10 部署上線（操作者：「go，現在部署」）
 
 - 部署：`/tmp/deploy-r10.sh` → `sg-deploy.sh next-admin video-workbench`，`RESULT ALL OK deployed c9e911c7f`（含 `41fe01a27`）。兩個一起上的原因：video-workbench `scripts/organization-picker.js` 新視窗呼叫 next-admin `bootstrap?first=1`／`?q=`，單上工作台會壞。log `/root/lobster-phase1/logs/deploy-r10-20261121.log`。

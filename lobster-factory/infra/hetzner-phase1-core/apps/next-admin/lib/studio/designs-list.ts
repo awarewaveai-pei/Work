@@ -29,8 +29,9 @@ export interface DesignListFilters {
   /** null = staff without ?organizationId → all orgs (see route GET comment). */
   organizationId: string | null;
   mimePrefix: "image/%" | "video/%";
-  /** "print" = 設計圖 minus tarot card art: what can go on a product (the mockup picker). */
-  group: "design" | "print" | "mockup" | null;
+  /** "print" = 設計圖 minus tarot card art: what can go on a product (the mockup picker); "tarot" = tarot card art only
+   *  (the picker's 塔羅牌 tab: a card can go on a shirt too). */
+  group: "design" | "print" | "tarot" | "mockup" | null;
   model: string | null;
   product: string | null;
   theme: string | null;
@@ -125,8 +126,9 @@ function applyFilters(q: Query, f: DesignListFilters, now: Date, omit?: FacetDim
   const ors: string[] = [];
   // Group filter (洗版 fix): applied in the DB so each group pages on its own — tarot art can not
   // starve mockups out of the publish picker. Unknown ?group values are ignored by the route.
-  if (f.group === "mockup") {
-    ors.push(MOCKUP_SOURCES.map((s) => `metadata->>source.eq.${s}`).join(","));
+  if (f.group === "mockup" || f.group === "tarot") {
+    const only = f.group === "mockup" ? MOCKUP_SOURCES : TAROT_SOURCES;
+    ors.push(only.map((s) => `metadata->>source.eq.${s}`).join(","));
   } else if (f.group === "design" || f.group === "print") {
     // NOT any excluded source, INCLUDING null source: jsonb ->> yields NULL for an absent key, which a
     // bare neq would drop (three-valued logic), so is.null is OR-ed in explicitly.

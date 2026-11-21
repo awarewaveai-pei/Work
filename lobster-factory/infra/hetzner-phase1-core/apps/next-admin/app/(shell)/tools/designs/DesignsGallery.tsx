@@ -15,6 +15,7 @@ import { useDoorHref } from "@/app/DoorContext";
 import { bucketDownloadHref } from "@/lib/storage/download-href";
 import { createOriginalImageCache, type OriginalImageCache } from "@/lib/studio/original-image-cache";
 import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
+import ImageLightbox from "@/components/tools/ImageLightbox";
 
 interface AssetMetadata {
   prompt?: string | null;
@@ -1638,20 +1639,7 @@ export default function DesignsGallery({ initialTab = "designs", organizationId 
       ) : null}
 
       {/* ── Zoom lightbox ─────────────────────────────────────────── */}
-      {zoom ? (
-        <div
-          className="designs-lightbox"
-          onClick={() => setZoom(null)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={zoom}
-            alt="zoom"
-            className="designs-lightbox-img"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      ) : null}
+      <ImageLightbox src={zoom} onClose={() => setZoom(null)} />
     </div>
   );
 }

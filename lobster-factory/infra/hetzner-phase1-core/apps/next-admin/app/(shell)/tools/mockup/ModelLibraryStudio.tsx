@@ -25,7 +25,7 @@ import {
 import { STUDIO_MODEL_OPTIONS, type AspectRatio } from "@/lib/studio/model-options";
 import { isPrintBox, type Point, type PrintBox } from "@/lib/studio/fabric-print";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, imageSize, inPairs, readJson, sameShape, type LibraryPhoto, type Shot } from "./modelLibrary";
-import ImageLightbox from "./ImageLightbox";
+import ImageLightbox from "@/components/tools/ImageLightbox";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useCanvasReturn } from "@/components/tools/useCanvasReturn";

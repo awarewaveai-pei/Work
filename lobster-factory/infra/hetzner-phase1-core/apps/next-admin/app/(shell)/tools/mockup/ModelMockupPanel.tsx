@@ -10,7 +10,7 @@ import { buildSemanticBase, buildUniqueFilename, extOfDataUrl } from "@/lib/stud
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
 import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
-import ImageLightbox from "./ImageLightbox";
+import ImageLightbox from "@/components/tools/ImageLightbox";
 import { COLOR_LABEL, GENDER_LABEL, failureText, groupModels, inPairs, readJson, type LibraryPhoto, type Shot } from "./modelLibrary";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";

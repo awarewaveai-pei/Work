@@ -40,6 +40,7 @@ import { STUDIO_MODEL_OPTIONS } from "@/lib/studio/model-options";
 const orderOf = (m: TarotModel) => MODEL_SPECS[m].promptOrder;
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
+import ImageLightbox from "@/components/tools/ImageLightbox";
 
 type Mode = "text" | "image";
 
@@ -2361,43 +2362,9 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
         </div>
       )}
 
-      {compareZoom && (
-        <div
-          onClick={() => setCompareZoom(null)}
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 1000, padding: 24, cursor: "zoom-out",
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={compareZoom}
-            alt="compare large"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxHeight: "90vh", maxWidth: "92vw", borderRadius: 10, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
-          />
-        </div>
-      )}
+      <ImageLightbox src={compareZoom} onClose={() => setCompareZoom(null)} />
 
-      {previewZoom && previewImage && (
-        <div
-          onClick={() => setPreviewZoom(false)}
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 1000, padding: 24, cursor: "zoom-out",
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewImage}
-            alt="preview large"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxHeight: "90vh", maxWidth: "92vw", borderRadius: 10, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
-          />
-        </div>
-      )}
+      <ImageLightbox src={previewZoom ? previewImage : null} onClose={() => setPreviewZoom(false)} />
 
       {/* Style-chip hover tooltip — position:FIXED at the viewport coords captured on
           chip hover. Rendered here at the component root (a sibling of the sticky

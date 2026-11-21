@@ -2863,15 +2863,6 @@ pre {
   to   { opacity: 1; }
 }
 
-.designs-lightbox-img {
-  max-width: 90vw;
-  max-height: 90vh;
-  object-fit: contain;
-  border-radius: var(--radius);
-  box-shadow: 0 24px 80px rgba(0,0,0,0.5);
-  cursor: default;
-}
-
 /* ── Empty / loading / error states ── */
 .designs-state {
   padding: 48px 24px;

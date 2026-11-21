@@ -41,6 +41,7 @@ import { EVENT_ALL_COUNTRIES_FILTER, EVENT_COUNTRY_FILTER_GROUPS } from "@/lib/e
 import { textModelCostLabel, textModelCostSummary } from "@/lib/ai/text-model-pricing";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
+import ImageLightbox from "@/components/tools/ImageLightbox";
 
 // suffix describes the FLAT print-ready ARTWORK (not the physical product) so literal models
 // (Nano Banana / Ideogram) don't render a t-shirt/mug. The aspect ratio still tailors the
@@ -787,14 +788,6 @@ export default function StudioWorkbench() {
     autoLoadedRef.current.add(key);
     void fetchCulture(region.en, facetKey, { curatedOnly: true });
   }, [region, topic, fetchCulture]);
-
-  // 🔍 Lightbox: close on Escape while an image is zoomed.
-  useEffect(() => {
-    if (!zoomImage) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setZoomImage(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [zoomImage]);
 
   const onUploadRefs = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -2151,22 +2144,7 @@ export default function StudioWorkbench() {
       )}
 
       {/* 🔍 Lightbox — click the generated image to view it full-screen. Click anywhere to close. */}
-      {zoomImage && (
-        <div
-          onClick={() => setZoomImage(null)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 2147483646,
-            background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center",
-            justifyContent: "center", padding: 24, cursor: "zoom-out",
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={zoomImage} alt="放大檢視"
-            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8, boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }} />
-          <button type="button" onClick={() => setZoomImage(null)}
-            style={{ position: "fixed", top: 16, right: 20, fontSize: 22, lineHeight: 1, color: "#fff", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 8, width: 40, height: 40, cursor: "pointer" }}>✕</button>
-        </div>
-      )}
+      <ImageLightbox src={zoomImage} onClose={() => setZoomImage(null)} />
     </div>
   );
 }

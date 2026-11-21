@@ -223,3 +223,22 @@ describe("主頁 模特 合成結果 在畫布編輯 → 傳回", () => {
     expect(await handlers["mockup-composite"]("0:leo1", EDITED)).toBe(false);
   });
 });
+
+describe("主頁 design picker: 設計圖 / 塔羅牌", () => {
+  it("塔羅牌 lists tarot card art (group=tarot) and a card can be picked as the design", async () => {
+    const CARD = "https://pub-test.r2.dev/designs/2026-11/card.png";
+    const fetchMock = vi.fn(async (u: string) => {
+      if (u === "/api/tools/designs?group=tarot") return new Response(JSON.stringify({ ok: true, assets: [{ id: "t1", object_url: CARD, metadata: { prompt: "The Star" } }] }));
+      if (u === "/api/tools/designs?group=print") return new Response(JSON.stringify({ ok: true, assets: [{ id: "d1", object_url: "https://pub-test.r2.dev/d.png", metadata: { prompt: "art" } }] }));
+      return new Response(JSON.stringify({ ok: true, presets: [] }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<MockupStudio />);
+    expect(await screen.findByAltText("art")).toBeTruthy();
+    expect(screen.queryByAltText("The Star")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "塔羅牌" }));
+    fireEvent.click(await screen.findByAltText("The Star"));
+    expect(screen.queryByAltText("art")).toBeNull();
+    expect(screen.getByAltText("selected design").getAttribute("src")).toBe(CARD);
+  });
+});

@@ -313,6 +313,21 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
     setGen((g) => (g.status === "generating" ? g : { status: "idle" }));
     setSaveState("idle");
   }, [designRef]);
+  // The picker lists design art (print: no mockups, no tarot) or, on its 塔羅牌 tab, tarot card art -- the deck's 78 cards
+  // stay out of the default list. DB-side filter, lib/studio/designs-list.ts.
+  const [designGroup, setDesignGroup] = useState<"print" | "tarot">("print");
+  useEffect(() => {
+    let live = true;
+    setDesigns([]);
+    void (async () => {
+      try {
+        const res = await fetch(`/api/tools/designs?group=${designGroup}`, { cache: "no-store" });
+        const json = (await res.json()) as { ok: boolean; assets?: DesignAsset[] };
+        if (live && json.ok) setDesigns((json.assets ?? []).filter((a) => a.object_url));
+      } catch { /* unavailable */ }
+    })();
+    return () => { live = false; };
+  }, [designGroup]);
   // presets
   const [modelPresets, setModelPresets] = useState<PresetAsset[]>([]);
   const [productPresets, setProductPresets] = useState<PresetAsset[]>([]);
@@ -320,14 +335,6 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
   const [productUploadFile, setProductUploadFile] = useState<File | null>(null);
 
   useEffect(() => {
-    void (async () => {
-      try {
-        // print = design art only: no mockups, no tarot cards (DB-side filter, lib/studio/designs-list.ts).
-        const res = await fetch("/api/tools/designs?group=print", { cache: "no-store" });
-        const json = (await res.json()) as { ok: boolean; assets?: DesignAsset[] };
-        if (json.ok) setDesigns((json.assets ?? []).filter((a) => a.object_url));
-      } catch { /* unavailable */ }
-    })();
     if (loadCatalog) void (async () => {
       setCatalogLoading(true);
       try {
@@ -605,6 +612,12 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
         {/* ── My Designs ── */}
         <div style={{ fontSize: 13 }}>
           設計圖（My Designs 點選，或上傳）
+          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+            {([["print", "設計圖"], ["tarot", "塔羅牌"]] as const).map(([g, label]) => (
+              <button key={g} type="button" className={designGroup === g ? "btn-primary" : "btn-secondary"} style={{ fontSize: 11, padding: "2px 10px" }}
+                onClick={() => setDesignGroup(g)}>{label}</button>
+            ))}
+          </div>
           <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap", maxHeight: 132, overflowY: "auto" }}>
             {designs.map((d) => (
               // eslint-disable-next-line @next/next/no-img-element
