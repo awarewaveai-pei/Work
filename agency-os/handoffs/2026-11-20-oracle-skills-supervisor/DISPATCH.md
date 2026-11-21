@@ -140,4 +140,4 @@ RISKS 處置：`agency-os/WORKLOG.md` 2026-11-21「oracle 批 6 併入六張」�
 - 併入做法：`bash agency-os/handoffs/2026-11-20-oracle-skills-supervisor/pick.sh <sha…>`（在 `D:/Worktrees/Work/oracle-int` 從 origin/main cherry-pick，`.md` 衝突兩邊都留；**程式檔衝突要手動合**）→ `npx tsc --noEmit`＋全套 vitest → `git rebase main` → D:\Work `git merge --ff-only` → push → WORKLOG（`worklog-insert-entry.py`＋私有 index）。
 - 待操作者回答（計畫 §4）：每日信要不要附 AI 段落（建議不要）；寄信服務（建議 Amazon SES）；寄送時間（建議當地 7 點）；好友合盤是否限本站會員（建議是）；以客戶「AwareWave 算命站」、自用 0 元、代操登記（建議是）。另：要不要先補系統的建站缺口再練習，或先由工程師手動開站（未問）。
 - 之後待派：W2、W3、P2–P4、S1–S6、G-ADR、G-GAP（計畫 §3）；L1 英文補齊、G1 全球實測、B8 完整度各卡；Kerykeion tests/core 未逐行讀（操作者未要求補）。
-
+- 2026-11-21 補：合盤改為**私人合盤**（不需對方是會員、不通知對方），見 `briefs/WP-front-door-plan.md` 檔頭修訂；計畫 §4 第 4 題已答。X2 `d512d1ab5`、P1 `6bed458fe` 工人已 commit 待審併；W1 等 critic。
