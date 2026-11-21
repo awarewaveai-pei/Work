@@ -1,9 +1,9 @@
 # ADR 021: 會員模型 — 每個客戶單位連到一個收銀台網站會員；單位底下的人是被授權的 app 帳號；分類由合約算出
 
-- **狀態**：已接受（操作者 2026-11-21：D1–D3 原話見 §1；Q1–Q4「都照建議」）。2026-11-21 依獨立審查 B1–B6、m4、m5、m10 改文（`agency-os/handoffs/2026-11-16-video-unify-supervisor/PLAN-REVIEW-20261121.md`）；2026-11-22 操作者改定 D1 範圍。三層身分已定。**尚未實作**：缺口見 §3。
+- **狀態**：已接受（操作者 2026-11-21：D1–D3 原話見 §1；Q1–Q4「都照建議」）。2026-11-21 依獨立審查 B1–B6、m4、m5、m10 改文（`agency-os/handoffs/2026-11-22-platform-membership-ux/PLAN-REVIEW-20261121.md`）；2026-11-22 操作者改定 D1 範圍。三層身分已定。**尚未實作**：缺口見 §3。
 - **日期**：2026-11-21
 - **承接**：[ADR 015](015-awarewave-account-and-shared-wallet.md) §2、[ADR 017](017-entitlements-and-self-hosted-modules.md) §0（三軸）／§0b 第 5、6 條、[ADR 018](018-product-doors-and-buyout-delivery.md) §3。本 ADR 只補「單位／人／分類／代辦」。
-- **現況證據**：`agency-os/handoffs/2026-11-16-video-unify-supervisor/WP-MEMBERSHIP-STATUS-20261121.md`（下稱「現況報告」）。
+- **現況證據**：`agency-os/handoffs/2026-11-22-platform-membership-ux/WP-MEMBERSHIP-STATUS-20261121.md`（下稱「現況報告」）。
 - NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`
 
 ## 1. 決定
@@ -50,8 +50,9 @@
 | G10 | 收銀台端刪除會員／改 email → app 沒有對應事件 | 現況報告 `:188` |
 | G11 | aware-wave.com 進門不看產品 `loginSources` | `NA/lib/auth/sources/awarewave-wp.ts:75-80` |
 | G12 | 測試單位沒有標記：`e2e-verify-0704-5c1356`、`test-wp-webhook-co-c705c6` 都是 `kind=customer`；`kind` 需加值 `test` | 正式庫 `organizations` SELECT 2026-11-22（`kind` 只有 `customer`／`internal`） |
+| G13 | WordPress「我的帳號」的「進入」清單來自該會員的 WooCommerce 訂單，不是 app 權益：贈送、員工建立的合約、代操客戶持有的產品不會出現 | `lobster-factory/packages/aware-wave-store-plugin/includes/MyAccountDoors.php:109-121` |
 
-開放註冊的前置條件：G1、G5、G6、G7、G10 完成，且以一個測試會員走完「註冊 → 付款 → 進產品 → 扣點」。畫面位置由 ADR 020（目前客戶）的客戶頁決定；缺口卡排在該計畫 C10 之後。
+開放註冊的前置條件：G1、G5、G6、G7、G10 完成，且以一個測試會員走完「註冊 → 付款 → 進產品 → 扣點」。畫面位置由 ADR 020（目前客戶）的客戶頁決定；缺口卡排在該計畫 K10 之後。
 
 ## 4. 沒選的做法
 

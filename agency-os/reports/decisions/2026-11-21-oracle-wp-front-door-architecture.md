@@ -2,7 +2,7 @@
 
 - Mode: 直接決策，非 /decide 面板。**狀態：待操作者確認**（§6 兩題）。確認前 `briefs/WP-front-door-plan.md`、`briefs/SITE-FLOW-COMPLETION-PLAN.md` 一律不派卡。
 - 日期：2026-11-21
-- 路徑縮寫：FD = `agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/WP-front-door-plan.md`；REV = 同目錄 `PLAN-REVIEW.md`；ENG = `Projects/internal/ziwei-doushu/`；ADR = `agency-os/docs/architecture/decisions/`；STATUS = `agency-os/handoffs/2026-11-16-video-unify-supervisor/WP-MEMBERSHIP-STATUS-20261121.md`。
+- 路徑縮寫：FD = `agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/WP-front-door-plan.md`；REV = 同目錄 `PLAN-REVIEW.md`；ENG = `Projects/internal/ziwei-doushu/`；ADR = `agency-os/docs/architecture/decisions/`；STATUS = `agency-os/handoffs/2026-11-22-platform-membership-ux/WP-MEMBERSHIP-STATUS-20261121.md`。
 - 未做：沒連主機、沒建任何測試站。§5 的驗證都還沒跑。
 
 ## 0. 操作者回答與定案方向（2026-11-22，優先於下文 §6 的建議）
