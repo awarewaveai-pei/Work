@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-22（續5）— oracle 每日信寄件網域：Resend 加 `oracle.aware-wave.com`＋Cloudflare 4 筆 DNS
+
+- 操作者：「在 Resend 多加一個寄件網域 oracle.aware-wave.com 可以」。
+- Resend：`create-domain oracle.aware-wave.com`（us-east-1，開信／點擊追蹤關）→ id `86fd3992-5c20-4266-9155-74a2f9ff4e93`；已觸發 `verify-domain`，狀態 pending。帳號網域 2／3。
+- Cloudflare zone `aware-wave.com` 新增 4 筆（皆 DNS only，只加不改；新增前查過這四個名稱無既有紀錄）：
+  - TXT `resend._domainkey.oracle` ＝ Resend 給的 DKIM 公鑰（id `07f57ab2a720c4bdcab414c0bae43cc8`）
+  - MX `send.oracle` ＝ `feedback-smtp.us-east-1.amazonses.com` 優先 10（id `74f214708e0f6f893ed1ecc04a844fb0`）
+  - TXT `send.oracle` ＝ `v=spf1 include:amazonses.com ~all`（id `5c682bec7216d50a4b25657b9dcc873b`）
+  - CNAME `rsend.oracle` ＝ `send.forge.rmta.net`（id `97c932dbbd45603d3e6d9f792bfecb79`）
+- 未動：主網域 `aware-wave.com` 的 DKIM／SPF／DMARC；`oracle.aware-wave.com` 的 A 紀錄。子網域沒有自己的 `_dmarc`，沿用主網域的 `p=quarantine`。
+- 未完成：Resend 驗證結果尚未回來（下次接手先 `get-domain` 看 status）；尚未寄過任何信。
+- REALTEST_EVIDENCE: tool=Bash | cmd=nslookup -type=TXT resend._domainkey.oracle.aware-wave.com 1.1.1.1（回 DKIM 公鑰）；Resend get-domain → status pending | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 無程式改動；DNS 值逐字取自 Resend 回傳
+- BUGHUNT_WAIVED: NA -- 無程式或識別符改動
+- rollback：Cloudflare 刪上列 4 筆（id 如上）；Resend `remove-domain 86fd3992-5c20-4266-9155-74a2f9ff4e93`。
 ## 2026-11-22（續4）— oracle 每日信寄信服務改為 Resend（操作者指示）
 
 - 操作者：「不是有人留 email 就可以用 resend 寄?」→ 是。上一條（Brevo）改掉：`ORACLE-WP-SPEC.md` §2-10 改 FluentSMTP＋Resend。
