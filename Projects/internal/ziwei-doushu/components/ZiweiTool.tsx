@@ -13,12 +13,14 @@ import {
 } from '@/lib/ziwei';
 import { analyzeZiwei, type PatternKind } from '@/lib/ziwei/analyze';
 import { toContext } from '@/lib/divination/systems/ziwei';
+import { localToday } from '@/lib/dates';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 /** 今日 YYYY-MM-DD(client island,Date 僅在瀏覽器執行)。 */
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  const { year, month, day } = localToday();
+  return `${year}-${month}-${day}`;
 }
 
 const KIND_COLOR: Record<PatternKind, string> = {

@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-21（續2）— oracle 紫微：農曆輸入先轉國曆再校正；「今天」取本地日期（操作者：「好，修這兩個」）
+
+- 根因 1：`Projects/internal/ziwei-doushu/lib/ziwei.ts` `computeChart` 把農曆年月日直接交給 `toTrueSolarTime`（國曆運算），均時差算錯，農曆二月三十被 `Date.UTC` 推成三月二日；八字 `lib/bazi.ts` 早已先轉國曆，兩處各寫一份才漏。
+- 根因 2：`components/ZiweiTool.tsx` `todayStr()` 用 `toISOString()`（UTC），台灣 08:00 前是昨天；同一件事另有三處各自手寫本地取法。
+- 不變量：出生日期進入校正與排盤前一律是國曆；使用者看到的「今天」一律是本地日期。兩者各只有一個實作：新檔 `lib/dates.ts` 的 `toSolarYmd`、`localToday`；`ziwei.ts`、`bazi.ts`、`ZiweiTool`、`DailyTool`、`FengshuiTool` 全改用，刪掉 `bazi.ts` 的 `todayYmd` 與內嵌轉換、`ziwei.ts` 的 `byLunar` 分支。
+- 順帶：修正 `ziwei.ts` 兩處寫「不傳 timeIndex 取呼叫當下時辰」的註解（iztro 實際取 0）。
+- 行為變化：農曆＋真太陽時的盤改為正確；不存在的農曆日期由靜默改排改為拋錯（畫面顯示計算失敗）；舊路徑 `astro.byLunar` 對閏月三十日拋錯（1952 閏五、1955 閏三、2017 閏六），新路徑可排。
+- 未動：`lib/entitlements.ts:78` 記憶體用量 stub 以 UTC 日為界（伺服器端計量鍵，非顯示日期）。未部署。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd Projects/internal/ziwei-doushu && npx tsc --noEmit && npx vitest run → 201 passed／3 skipped；一次性掃描 1950–2030 每個農曆月初一／十五／月末共 3003 例，新路徑對 `astro.byLunar` 宮位 JSON 差異 0、新路徑拋錯 0、舊路徑拋錯 3 | exit=0 | ms=130000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff；突變：`toSolarYmd` 改成原樣回傳 → `dates.test.ts` 兩例變紅 → 還原 30 passed）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02；以突變與 3003 例對照代替
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/ziwei-doushu | grep=todayYmd | hits=0
+- rollback：`git revert` 本 commit。
 ## 2026-11-21（續1）— oracle 17 個候選專案原始碼全讀報告（研究，未改程式）
 
 - 報告：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/GITHUB_RESEARCH.md`（結論、查核深度表、backlog）；逐專案事實與行號在同資料夾 `research-detail/*.md`（13 份）。取代 2026-11-20 續29 的簡版。

@@ -5,6 +5,7 @@ import AiReading from '@/components/AiReading';
 import { computeFengshui, toContext, type FengshuiResult } from '@/lib/divination/systems/fengshui';
 import { type Palace } from '@/lib/fengshui/feixing';
 import { liChunYear } from '@/lib/liChun';
+import { localToday } from '@/lib/dates';
 import { AUSPICIOUS, INAUSPICIOUS } from '@/lib/fengshui/bazhai';
 import type { Gender } from '@/lib/ziwei';
 import type { Locale } from '@/lib/i18n/config';
@@ -50,12 +51,12 @@ export default function FengshuiTool({ dict, locale }: { dict: Dictionary; local
       return;
     }
     try {
-      const now = new Date();
+      const today = localToday();
       setResult(
         computeFengshui({
           facingDegree: deg,
           moveIn: parseDate(moveIn),
-          flowYear: liChunYear(now.getFullYear(), now.getMonth() + 1, now.getDate()),
+          flowYear: liChunYear(today.year, today.month, today.day),
           occupant: gender && birth ? { birth: parseDate(birth), gender } : undefined,
         }),
       );

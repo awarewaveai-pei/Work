@@ -6,6 +6,7 @@ import {
   type TrueSolarResult,
 } from './trueSolarTime';
 import { localeToIztroLang, defaultLocale, type Locale } from './i18n/config';
+import { toSolarYmd } from './dates';
 
 export type Gender = '男' | '女';
 export type CalendarType = 'solar' | 'lunar';
@@ -57,8 +58,7 @@ export interface ZiweiHoroscope {
   yearly: ZiweiScope; // 流年
   monthly: ZiweiScope; // 流月
   daily: ZiweiScope; // 流日
-  /** 流時。⚠️ 需 timeIndex 才確定;computeHoroscope 未傳 timeIndex 時 iztro 取
-   *  「呼叫當下時辰」→ 同 date 跨次呼叫可能不同。批次/持久化請務必傳入 timeIndex。 */
+  /** 流時。未傳 timeIndex 且 date 不帶時間時,iztro 取 0(早子時),不是呼叫當下的時辰。 */
   hourly: ZiweiScope;
 }
 
@@ -75,9 +75,8 @@ export function formatMutagen(stars: string[]): string {
  *
  * 由排好的本命盤 + 目標日期推算(iztro horoscope)。本函式不碰 Date,呼叫端決定
  *   date(UI 傳今日 / 每日運勢工廠傳當日),保持可測。
- * 決定論:大限/流年/流月/流日 只取決於 date → 同 (astrolabe,date) 必同。流時另需
- *   timeIndex;不傳則 iztro 取「呼叫當下時辰」→ hourly 非確定(見 ZiweiHoroscope.hourly)。
- *   要 hourly 確定/可重現,務必傳入 timeIndex(0–11,子時起)。
+ * 決定論:同 (astrolabe,date,timeIndex) 必同。流時需 timeIndex(0–11,子時起);
+ *   不傳且 date 不帶時間時 iztro 取 0(早子時)。
  */
 export function computeHoroscope(
   astrolabe: IFunctionalAstrolabe,
@@ -112,15 +111,15 @@ export function computeHoroscope(
  * 是本站的準度核心 (見 trueSolarTime.ts)。
  */
 export function computeChart(req: ChartRequest): ChartResult {
-  let { year, month, day, hour } = req;
+  let { year, month, day } = toSolarYmd(req);
+  let hour = req.hour;
   let correction: TrueSolarResult | undefined;
 
-  // 真太陽時校正只在國曆有意義 (農曆已是日期層級，時辰仍可校正)
   if (req.trueSolar) {
     correction = toTrueSolarTime({
-      year: req.year,
-      month: req.month,
-      day: req.day,
+      year,
+      month,
+      day,
       hour: req.hour,
       minute: req.minute,
       longitude: req.trueSolar.longitude,
@@ -136,23 +135,13 @@ export function computeChart(req: ChartRequest): ChartResult {
   const dateStr = `${year}-${month}-${day}`;
   const iztroLang = localeToIztroLang(req.locale ?? defaultLocale);
 
-  const astrolabe =
-    req.calendar === 'lunar'
-      ? astro.byLunar(
-          dateStr,
-          timeIndex,
-          req.gender,
-          req.isLeapMonth ?? false,
-          true,
-          iztroLang as Parameters<typeof astro.byLunar>[5],
-        )
-      : astro.bySolar(
-          dateStr,
-          timeIndex,
-          req.gender,
-          true,
-          iztroLang as Parameters<typeof astro.bySolar>[4],
-        );
+  const astrolabe = astro.bySolar(
+    dateStr,
+    timeIndex,
+    req.gender,
+    true,
+    iztroLang as Parameters<typeof astro.bySolar>[4],
+  );
 
   return { astrolabe, timeIndex, correction };
 }

@@ -5,6 +5,7 @@ import BirthForm from '@/components/BirthForm';
 import AiReading from '@/components/AiReading';
 import { computeDailyFortune, dailyContext, type DailyFortune } from '@/lib/daily';
 import type { ChartRequest } from '@/lib/ziwei';
+import { localToday } from '@/lib/dates';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -35,11 +36,10 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
   function handleSubmit(req: ChartRequest) {
     try {
       setError(null);
-      const now = new Date();
       setResult(
         computeDailyFortune(
           { ...req },
-          { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() },
+          localToday(),
           locale,
         ),
       );

@@ -1,4 +1,4 @@
-import { Lunar, Solar } from 'lunar-javascript';
+import { Solar } from 'lunar-javascript';
 import {
   toTrueSolarTime,
   type TrueSolarResult,
@@ -11,6 +11,7 @@ import { findBaziRelations, type BaziRelation, type PillarChars } from './baziRe
 import { liChunYear, yearGanZhi } from './liChun';
 import { findShensha, type ShenshaHit } from './baziShensha';
 import { localize } from './s2t';
+import { localToday, toSolarYmd } from './dates';
 
 /**
  * 八字四柱排盤 (lunar-javascript)。
@@ -105,11 +106,6 @@ function liuNianOf(d: { year: number; month: number; day: number }): BaziLuck['l
   return { year, ganZhi: yearGanZhi(year) };
 }
 
-function todayYmd(): { year: number; month: number; day: number } {
-  const now = new Date();
-  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
-}
-
 /** 月令本氣十神 → 格局名(比肩/劫財 為特殊格)。 */
 function patternName(rawShiShen: string, locale: Locale): string {
   const tw = localize(rawShiShen, locale);
@@ -120,16 +116,9 @@ function patternName(rawShiShen: string, locale: Locale): string {
 
 export function computeBazi(req: BaziRequest): BaziResult {
   const locale = req.locale ?? defaultLocale;
-  let { year, month, day, hour, minute } = req;
+  let { year, month, day } = toSolarYmd(req);
+  let { hour, minute } = req;
   let correction: TrueSolarResult | undefined;
-
-  // 農曆輸入先轉國曆(閏月以負月份表示);該年無此閏月時 lunar-javascript 會拋錯。
-  if (req.calendar === 'lunar') {
-    const s = Lunar.fromYmdHms(year, req.isLeapMonth ? -month : month, day, hour, minute, 0).getSolar();
-    year = s.getYear();
-    month = s.getMonth();
-    day = s.getDay();
-  }
 
   if (req.trueSolar) {
     correction = toTrueSolarTime({
@@ -172,7 +161,7 @@ export function computeBazi(req: BaziRequest): BaziResult {
     startYear: d.getStartYear(),
     endYear: d.getEndYear(),
   }));
-  const liuNian = liuNianOf(req.asOf ?? todayYmd());
+  const liuNian = liuNianOf(req.asOf ?? localToday());
   const current = steps.findIndex((s) => s.startYear <= liuNian.year && liuNian.year <= s.endYear);
 
   const chars: PillarChars = {

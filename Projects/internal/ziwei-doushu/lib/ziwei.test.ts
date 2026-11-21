@@ -38,6 +38,34 @@ describe('computeChart — 紫微排盤回歸', () => {
   });
 });
 
+describe('computeChart — 農曆輸入', () => {
+  const palaces = (r: ReturnType<typeof computeChart>) => JSON.stringify(r.astrolabe.palaces);
+  const birth = { hour: 10, minute: 20, gender: '女' as const };
+  const trueSolar = { longitude: 121.5, tzOffsetHours: 8 };
+  // [農曆年, 月, 日, 閏月?, 對應國曆年, 月, 日]
+  const cases = [
+    [1990, 2, 30, false, 1990, 3, 26], // 國曆沒有 2/30
+    [1990, 5, 15, true, 1990, 7, 7], // 閏五月
+    [1996, 1, 1, false, 1996, 2, 19],
+  ] as const;
+
+  it.each(cases)('農曆 %i-%i-%i 與同一天的國曆排出同一張盤(含真太陽時)', (ly, lm, ld, leap, sy, sm, sd) => {
+    for (const ts of [undefined, trueSolar]) {
+      const lunar = computeChart({ ...birth, year: ly, month: lm, day: ld, calendar: 'lunar', isLeapMonth: leap, trueSolar: ts });
+      const solar = computeChart({ ...birth, year: sy, month: sm, day: sd, calendar: 'solar', trueSolar: ts });
+      expect(palaces(lunar)).toBe(palaces(solar));
+      expect(lunar.correction).toEqual(solar.correction);
+    }
+  });
+
+  it('不存在的農曆日期拋錯,不靜默改排別天', () => {
+    expect(() =>
+      computeChart({ ...birth, year: 1990, month: 5, day: 15, calendar: 'lunar', isLeapMonth: false, trueSolar })
+        && computeChart({ ...birth, year: 1991, month: 5, day: 15, calendar: 'lunar', isLeapMonth: true }),
+    ).toThrow();
+  });
+});
+
 describe('computeHoroscope — 過運四化', () => {
   const result = computeChart({
     year: 2000, month: 8, day: 16, hour: 4, minute: 0,
