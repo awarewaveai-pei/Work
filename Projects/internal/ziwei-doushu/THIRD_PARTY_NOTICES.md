@@ -66,7 +66,7 @@
 - 來源：https://github.com/x-haose/x-iztro
 - 授權：MIT License，Copyright (c) 2026 昊色居士 (x-haose)
 - 採用範圍：`src/pattern/rules/*.rs` 的 62 條本命格局成立條件（口徑來自 iztro-docs《格局》頁與《紫微斗數全書》），以 TypeScript 改寫於 `lib/ziwei/patterns.ts`；行運格（祿衰馬困、風雲際會）未採用。格局解說為本專案自寫繁體文字，未複製其知識包；程式未複製原始碼。
-- 另採用 `src/data/knowledge/iztro_docs.zh-CN.json` 的星曜釋義（底本 iztro-docs，https://github.com/SylarLong/iztro-docs ，MIT，作者 Sylar Long）：98 顆輔星、雜曜與十二神的要點、四化意象、流耀對應本命星的關係，轉繁後改寫成一句要點，收於 `lib/ziwei/stars.ts` 的 `STAR_NOTES`、`MUTAGEN_BRIEF`、`flowCounterpart`；未整段照抄，術語（concepts）與格局釋義未採用。
+- 另採用 `src/data/knowledge/iztro_docs.zh-CN.json` 的星曜釋義（底本 iztro-docs，https://github.com/SylarLong/iztro-docs ，MIT，作者 Sylar Long）：52 顆輔星與雜曜、四組十二神共 48 條的要點、四化意象，轉繁後改寫成一句要點，收於 `lib/ziwei/stars.ts` 的 `STAR_NOTES`、`GOD12_NOTES`、`MUTAGEN_BRIEF`；只收 iztro 預設派實際安放的星，未整段照抄，流耀、術語（concepts）與格局釋義未採用。
 
 ## MIT License 全文（上列專案共用）
 

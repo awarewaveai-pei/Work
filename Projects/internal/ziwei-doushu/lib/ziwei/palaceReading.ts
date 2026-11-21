@@ -1,6 +1,14 @@
 import type { IFunctionalAstrolabe } from 'iztro/lib/astro/FunctionalAstrolabe';
 import type { PalaceName } from 'iztro/lib/i18n';
-import { STAR_PROFILES, PALACE_ORDER, MUTAGEN_BRIEF, starBrief, type PalaceKey } from './stars';
+import {
+  STAR_PROFILES,
+  PALACE_ORDER,
+  MUTAGEN_BRIEF,
+  GOD12_SETS,
+  GOD12_NOTES,
+  starBrief,
+  type PalaceKey,
+} from './stars';
 
 /**
  * 十二宮逐星解讀 (頂規)。
@@ -34,6 +42,8 @@ export interface PalaceReading {
   readings: string[];
   /** 本宮輔星、雜曜的一句要點與宮內生年四化要點(「星名：要點」;不含主星,主星見 readings) */
   starNotes: string[];
+  /** 本宮十二神(長生/博士/將前/歲前)要點(「組別 星名：要點」);只供頁面顯示,不進 AI facts */
+  godNotes: string[];
 }
 
 const BRIGHT_GOOD = ['廟', '旺'];
@@ -73,24 +83,30 @@ function composeStar(star: PalaceStar, palace: PalaceKey, borrowed: boolean): st
 
 /** 本宮輔星、雜曜要點 + 宮內(含主星)生年四化要點;借星宮只論本宮自己的星。 */
 function composeStarNotes(p: {
-  majorStars?: { name: unknown; mutagen?: unknown; type?: unknown }[];
+  majorStars?: { name: unknown; mutagen?: unknown }[];
   minorStars?: { name: unknown; mutagen?: unknown }[];
   adjectiveStars?: { name: unknown }[];
 }): string[] {
   const notes: string[] = [];
-  // majorStars 內也放祿存、天馬(type !== 'major'),它們不在 STAR_PROFILES,要點走 starBrief
-  const lesser = [
-    ...(p.majorStars ?? []).filter((s) => s.type !== 'major'),
-    ...(p.minorStars ?? []),
-    ...(p.adjectiveStars ?? []),
-  ];
-  for (const s of lesser) {
+  // 祿存、天馬在 minorStars(iztro 2.6.5 實測);主星的要點已在 readings,這裡不重複
+  for (const s of [...(p.minorStars ?? []), ...(p.adjectiveStars ?? [])]) {
     const brief = starBrief(String(s.name));
     if (brief) notes.push(`${String(s.name)}：${brief}`);
   }
   for (const s of [...(p.majorStars ?? []), ...(p.minorStars ?? [])]) {
     const m = String(s.mutagen ?? '');
     if (m && MUTAGEN_BRIEF[m]) notes.push(`${String(s.name)}化${m}：${MUTAGEN_BRIEF[m]}`);
+  }
+  return notes;
+}
+
+/** 本宮十二神要點:同名星依所屬組別各查各的(大耗、病符、天德在不同組意思不同)。 */
+function composeGodNotes(p: Partial<Record<(typeof GOD12_SETS)[number][0], unknown>>): string[] {
+  const notes: string[] = [];
+  for (const [field, label] of GOD12_SETS) {
+    const name = String(p[field] ?? '');
+    const note = GOD12_NOTES[field][name];
+    if (note) notes.push(`${label} ${name}：${note}`);
   }
   return notes;
 }
@@ -131,6 +147,7 @@ export function analyzePalaceReadings(astro: IFunctionalAstrolabe): PalaceReadin
           .filter((s) => STAR_PROFILES[s.name])
           .map((s) => composeStar(s, palace, false)),
         starNotes: composeStarNotes(p),
+        godNotes: composeGodNotes(p),
       });
       continue;
     }
@@ -153,6 +170,7 @@ export function analyzePalaceReadings(astro: IFunctionalAstrolabe): PalaceReadin
         .filter((s) => STAR_PROFILES[s.name])
         .map((s) => composeStar(s, palace, true)),
       starNotes: composeStarNotes(p),
+      godNotes: composeGodNotes(p),
     });
   }
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeChart } from '@/lib/ziwei';
 import { analyzeZiwei, detectPatterns } from './analyze';
 import { toContext } from '@/lib/divination/systems/ziwei';
-import { STAR_NOTES, MUTAGEN_BRIEF, starBrief, flowCounterpart } from './stars';
+import { STAR_NOTES, MUTAGEN_BRIEF, GOD12_SETS, GOD12_NOTES, starBrief } from './stars';
 import { toTraditional } from '@/lib/s2t';
 
 const birth = {
@@ -99,32 +99,34 @@ describe('酉宮主星亮度(iztro 2.6.1 修正)', () => {
 });
 
 describe('星曜一句要點(Z3)', () => {
-  it('盤上出現的每顆星與每個十二神都查得到要點(8 張盤)', () => {
+  it('盤上出現的每顆星、每組十二神都查得到要點(8 張盤);同名十二神依組別各有其義', () => {
     const missing = new Set<string>();
     for (const [y, hour, gender] of [[1950, 0, '男'], [1963, 5, '女'], [1977, 9, '男'], [1984, 13, '女'], [1991, 17, '男'], [2000, 21, '女'], [2008, 3, '男'], [2016, 11, '女']] as const) {
       const a = computeChart({ year: y, month: 5, day: 9, hour, minute: 0, gender, calendar: 'solar', locale: 'zh-TW' }).astrolabe;
       for (const p of a.palaces) {
-        const names = [
-          ...[...p.majorStars, ...p.minorStars, ...p.adjectiveStars].map((s) => String(s.name)),
-          ...[p.changsheng12, p.boshi12, p.jiangqian12, p.suiqian12].map(String),
-        ];
-        for (const n of names) if (!starBrief(n)) missing.add(n);
+        for (const s of [...p.majorStars, ...p.minorStars, ...p.adjectiveStars]) {
+          if (!starBrief(String(s.name))) missing.add(String(s.name));
+        }
+        for (const [field] of GOD12_SETS) {
+          if (!GOD12_NOTES[field][String(p[field])]) missing.add(`${field}:${String(p[field])}`);
+        }
       }
     }
     expect([...missing]).toEqual([]);
+    expect(GOD12_NOTES.boshi12['大耗']).not.toBe(GOD12_NOTES.suiqian12['大耗']);
+    expect(GOD12_NOTES.boshi12['病符']).not.toBe(GOD12_NOTES.suiqian12['病符']);
   });
 
-  it('要點全為繁體', () => {
-    for (const t of [...Object.values(STAR_NOTES).map((x) => x.note + x.group), ...Object.values(MUTAGEN_BRIEF)]) {
+  it('要點全為繁體、標點全形', () => {
+    const all = [
+      ...Object.values(STAR_NOTES).map((x) => x.note + x.group),
+      ...Object.values(GOD12_NOTES).flatMap((g) => Object.values(g)),
+      ...Object.values(MUTAGEN_BRIEF),
+    ];
+    for (const t of all) {
       expect(toTraditional(t)).toBe(t);
+      expect(t).not.toMatch(/[,:;]/); // 標點一律全形
     }
-  });
-
-  it('流耀指向運限層與本命星', () => {
-    expect(flowCounterpart('運祿')).toEqual({ scope: '大限', base: '祿存' });
-    expect(flowCounterpart('流羊')).toEqual({ scope: '流年', base: '擎羊' });
-    expect(flowCounterpart('天馬')).toBeNull();
-    expect(starBrief('流鉞')).toContain('流年天鉞');
   });
 
   it('toContext 附命宮三方四正的星要 facts,整條收不切半句', () => {

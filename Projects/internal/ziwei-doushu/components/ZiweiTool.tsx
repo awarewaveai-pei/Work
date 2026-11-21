@@ -212,7 +212,7 @@ export default function ZiweiTool({
                   </div>
                   <div style={{ display: 'grid', gap: '0.7rem' }}>
                     {analysis.palaceReadings.map((pr) =>
-                      pr.readings.length ? (
+                      pr.readings.length || pr.starNotes.length || pr.godNotes.length ? (
                         <div
                           key={pr.palace}
                           style={{
@@ -245,6 +245,18 @@ export default function ZiweiTool({
                                 color: 'var(--text-body)',
                                 fontSize: '0.78rem',
                                 lineHeight: 1.6,
+                              }}
+                            >
+                              {r}
+                            </div>
+                          ))}
+                          {[...pr.starNotes, ...pr.godNotes].map((r, i) => (
+                            <div
+                              key={`n${i}`}
+                              style={{
+                                color: 'var(--text-caption)',
+                                fontSize: '0.72rem',
+                                lineHeight: 1.55,
                               }}
                             >
                               {r}
