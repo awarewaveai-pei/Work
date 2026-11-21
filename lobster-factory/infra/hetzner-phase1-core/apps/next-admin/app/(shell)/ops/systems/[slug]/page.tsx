@@ -1,4 +1,5 @@
-// /ops/systems/[slug] -- one system: 概覽 / 功能 / 紀錄 / 接續卡 (tabs are links, ?tab=). Owner / admin only.
+// /ops/systems/[slug] -- one system: 概覽 (purpose, two completion numbers, status, phases, features, handoff card,
+// copy-brief button) and 紀錄 (tabs are links, ?tab=). Owner / admin only.
 // The only writes are ../actions.ts (status_change, review). A phase still on its old supervisor page shows a pointer
 // to it and no status (PLAN §8: one source of truth per phase).
 import Link from "next/link";
@@ -6,25 +7,27 @@ import { headers } from "next/headers";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { SystemType } from "@/lib/systems/contract";
 import { systemsAccess } from "@/lib/systems/access";
-import { PRIORITIES, projectSystem, SYSTEM_STATUSES, type FeatureView, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
+import { importSummary, PRIORITIES, projectSystem, SYSTEM_STATUSES, type FeatureView, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
 import {
   EVENT_LABEL, FEATURE_BADGE, FEATURE_LABEL, formatTime, PRIORITY_LABEL, RESULT_MESSAGES, SOURCE_LABEL, STATUS_BADGE, STATUS_LABEL, TYPE_LABEL,
 } from "@/lib/systems/labels";
+import { buildResumeMarkdown, legacyDone } from "@/lib/systems/overview";
 import { readDefinitions, readImportRuns, readProjectionInput, readRecentEvents } from "@/lib/systems/store";
 import { reviewFeature, setSystemStatus } from "../actions";
+import { CopyBrief } from "../CopyBrief";
 import { ImportLine, Refused, box, errorBox, muted, page } from "../parts";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "系統 · Ops" };
 
-const TABS = [["overview", "概覽"], ["features", "功能"], ["log", "紀錄"], ["handoff", "接續卡"]] as const;
+const TABS = [["overview", "概覽"], ["log", "紀錄"]] as const;
 type Tab = (typeof TABS)[number][0];
 type Sp = { tab?: string | string[]; r?: string | string[] };
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px" };
 const row: React.CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--card-border)", fontSize: 13, color: "var(--text-primary)" };
 
-function Overview({ system, p }: { system: SystemRow; p: SystemProjection }) {
+function Overview({ system, p, hist, brief }: { system: SystemRow; p: SystemProjection; hist: ReturnType<typeof legacyDone>; brief: string }) {
   const hidden = (
     <>
       <input type="hidden" name="system_id" value={system.id} />
@@ -38,8 +41,17 @@ function Overview({ system, p }: { system: SystemRow; p: SystemProjection }) {
         <div style={muted}>類型：{TYPE_LABEL[system.type as SystemType] ?? system.type}{system.product_key ? `・產品鍵 ${system.product_key}` : ""}</div>
         {system.aliases.length > 0 && <div style={muted}>別名：{system.aliases.join("、")}</div>}
         <div style={muted}>程式位置：{system.source_paths.length ? system.source_paths.map((s) => <code key={s} style={{ marginRight: 8 }}>{s}</code>) : "—"}</div>
-        <div style={{ fontSize: 13, marginTop: 10, color: "var(--text-primary)" }}>
-          {p.completion === null ? "尚未盤點（registry 還沒有功能）" : `完成度 ${Math.round(p.completion * 100)}%：已驗收 ${p.verified}／${p.counted}，已實作 ${p.implemented}`}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 20 }}>
+        <div className="card" style={{ padding: "14px 16px" }}>
+          <div className="card-label">歷史標示完成</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "var(--text-primary)" }}>{hist.ratio === null ? "—" : `${Math.round(hist.ratio * 100)}%`}</div>
+          <div style={muted}>{hist.ratio === null ? "沒有舊監工頁搬入的功能" : `舊監工頁寫「完成」的 ${hist.done}／${hist.total}，不算驗收`}</div>
+        </div>
+        <div className="card" style={{ padding: "14px 16px" }}>
+          <div className="card-label">有證據驗收</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "var(--accent)" }}>{p.completion === null ? "尚未盤點" : `${Math.round(p.completion * 100)}%`}</div>
+          <div style={muted}>{p.completion === null ? "registry 還沒有功能" : `已驗收 ${p.verified}／${p.counted}，已實作待驗證 ${p.implemented}`}</div>
         </div>
       </div>
       <h3 style={{ marginBottom: 8 }}>系統狀態</h3>
@@ -63,6 +75,11 @@ function Overview({ system, p }: { system: SystemRow; p: SystemProjection }) {
           {legacy && phase.legacy_source_path ? <span style={muted}>舊監工頁（未切換）：<code>{phase.legacy_source_path}</code></span> : <span style={muted}>在這裡追蹤</span>}
         </div>
       ))}
+      <h3 style={{ margin: "20px 0 8px" }}>功能清單</h3>
+      <Features system={system} p={p} />
+      <h3 style={{ margin: "20px 0 8px" }}>下次從這裡繼續</h3>
+      <Handoff p={p} />
+      <div style={{ marginTop: 16 }}><CopyBrief text={brief} /></div>
     </div>
   );
 }
@@ -167,6 +184,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
   let p: SystemProjection | null = null;
   let recent: UpdateRow[] = [];
   let runs: UpdateRow[] = [];
+  let hist: ReturnType<typeof legacyDone> = { done: 0, total: 0, ratio: null };
   let capped = false;
   let failure: string | null = null;
   try {
@@ -183,6 +201,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
         events: state.events,
         history: state.history,
       });
+      hist = legacyDone(state.events);
     }
   } catch (e) {
     failure = String(e instanceof Error ? e.message : e);
@@ -196,6 +215,14 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
       </div>
     );
   }
+
+  const imp = importSummary(runs);
+  const brief = buildResumeMarkdown({
+    name: system.name, purpose: system.purpose, type: TYPE_LABEL[system.type as SystemType] ?? system.type, sourcePaths: system.source_paths ?? [],
+    features: p.features.map((f) => ({ name: f.feature.name, status: f.status, legacy: f.legacy })),
+    next: p.handoff.next, blocker: p.handoff.blocker, lastSubject: p.handoff.lastSubject, lastAt: p.handoff.lastAt,
+    importHead: imp.lastOk?.head ?? null, importAt: imp.lastOk?.at ?? null,
+  }, formatTime);
 
   return (
     <div style={page}>
@@ -212,10 +239,8 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
           <Link key={t} href={`/ops/systems/${system!.slug}?tab=${t}`} className={tab === t ? "btn-primary" : "btn-secondary"} style={{ ...smallBtn, textDecoration: "none" }}>{label}</Link>
         ))}
       </div>
-      {tab === "overview" && <Overview system={system} p={p} />}
-      {tab === "features" && <Features system={system} p={p} />}
+      {tab === "overview" && <Overview system={system} p={p} hist={hist} brief={brief} />}
       {tab === "log" && <Log events={recent} />}
-      {tab === "handoff" && <Handoff p={p} />}
     </div>
   );
 }
