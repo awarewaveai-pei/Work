@@ -10,7 +10,9 @@
 | 1 | W3 | registry（Outbound）＋遷移腳本＋new-product 接線 | Sonnet 5.5 | main `73fab1033` |
 | 1 | W4 | 監工台頁 | Sonnet 5.5 | main `73fab1033`；頁面 https://claude.ai/artifact/2QN1ygisHD9xRprX1B2xZF |
 | 2 | — | 已做：套 0174、推 main、GitHub 禁強推、主機 token／compose／mirror、排程裝且打開（WORKLOG 2026-11-21 續16）。剩：11-22 04:30 首次匯入驗收 → 頁面實看 → 切換 Outbound（`systems-migrate-supervisor.mjs` POST＋FROZEN） | 監工 | 進行中 |
-| 3 | — | 系統盤點全部 registry（覆蓋率 100%）、其餘監工頁逐一切換 | 待定 | — |
+| 3 | W5 | 系統盤點：registry 寫全部系統（非共用路徑 100% 歸屬） | Opus 5.5 | 派出 |
+| 3 | W6 | /ops/systems 照參考面板改版（`reference/ops-systems-prototype.html`）＋複製接續摘要 | Sonnet 5.5 | 派出 |
+| 3 | — | 已結束的監工頁逐一切換（遷移事件 POST＋FROZEN）；進行中的監工頁等它收尾 | 監工 | 待 W5 |
 
 brief：`briefs/`（`COMMON.md`＋各卡）。整合工作區：`D:\Worktrees\Work\systems-int`（detached；next-admin `node_modules` 是 junction，移除前先 rmdir）。工人在各自 worktree；契約在 COMMON。
 
