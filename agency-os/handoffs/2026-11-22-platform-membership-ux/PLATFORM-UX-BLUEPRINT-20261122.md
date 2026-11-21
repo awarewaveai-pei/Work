@@ -71,6 +71,8 @@ NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`。需求來源
 | Q4 | 員工在產品子網域（content／video…）也能挑客戶，同意「同一支客戶搜尋 API、同樣的逐工具授權，只多開一個網域入口」嗎？ | 同意（§9.4）。這不擴大誰能讀客戶名單，只擴大從哪個網址呼叫 |
 | Q5 | 員工客戶欄的「類別」要畫成哪一種？（wireframe 第 15 頁並排） | **A 類別篩選鈕**（建議）：清單長度穩定、一個客戶多類別不重複、客戶上百也不亂；上方固定「需處理（N）」。B 依類別分組的標題：好掃、有計數，但同一客戶會出現在多個分組、客戶多了很長。現在只有 6 個客戶兩種都行 |
 
+2026-11-22：Q2–Q5 已由操作者定（`README.md` §2、§5，照建議答案）；Q1 未答，只擋 U3（`DISPATCH.md`）。
+
 ---
 
 ## 0. 現況事實（藍圖建立在這上面）
@@ -619,19 +621,19 @@ launcher 現況問題與改法：
 | 訂閱／贈送／只有點數 | 是 | 合約與權利列（`BillingAccount.contracts/grants`，`tables.ts:126-127`） |
 | 代操、經銷、買斷、TEST | **否** | 等 G3（標籤函式；合約沒有這幾種方式的記法）、G12（`kind=test`） |
 
-一個客戶可同時屬於多個類別（像郵件標籤），清單每列用小字標籤顯示。類別筛選在伺服器做（`org-search` 加參數，併入 K3）。【假設 A2：操作者說的「類別」＝方式；Q1 確認】
+一個客戶可同時屬於多個類別（像郵件標籤），清單每列用小字標籤顯示。類別篩選在伺服器做（`org-search` 加參數，卡 U3，定義在 CLIENT-CONTEXT-PLAN §4）。【假設 A2：操作者說的「類別」＝方式；Q1 確認】
 
 ### 9.4 員工在產品子網域直接用並切換客戶（推翻計畫 §6 第 3 題）
 同時滿足 ADR 019 逐工具授權的做法（**不新增 API、不新增授權格**）：
 
 1. 資料來源仍是 `GET /api/ops/org-search`，授權格不變（`staff-tools.ts:20`：ops/clients、design、collect、outreach、ops/integrations、content）。
-2. 在 `doors.ts` 新增 `STAFF_DOOR_APIS`（只含這支）。`routeOnProductDoor`（`doors.ts:107-111`）對**員工身分**放行、對客戶身分仍 404。**不放進** `PLATFORM_APIS`（`doors.ts:66`），所以不會進 `STAFF_PLATFORM.apis`（`staff-tools.ts:64`）＝沒擴權。
+2. 在 `doors.ts` 新增 `STAFF_DOOR_APIS`（只含這支），`routeOnProductDoor`（`doors.ts:107-111`）對它回 `pass`。該函式在身分解析前執行（`middleware.ts:347-351` vs `:407-430`），不能依身分放行；客戶由後面的 `isClientOutsideDoor` 擋成 403（`middleware.ts:231-234,246-249`，因為不加進 `isProductPath`），路由內再加 `staffOnly`（`tenant-guard.ts:129-131`；客戶角色解析為 `operator`，`ops-role.ts:11,50`，只靠角色擋不住）。**不放進** `PLATFORM_APIS`（`doors.ts:66`），所以不會進 `STAFF_PLATFORM.apis`（`staff-tools.ts:64`）＝沒擴權。完整機制：CLIENT-CONTEXT-PLAN §3b。
 3. 逐工具授權已在產品門生效（`middleware.ts:147-150` 對 staff／product 兩種門都跑 `staffDenial`），沒勾對應格的員工在門上照樣被擋。
 4. 頁面開始登記「需要客戶」時，把該產品 key 併進 `org-search` 的授權格清單，同一張卡內完成（`staff-tools.test.ts` 的 NEEDS_OTHER_TOOL 規則會逼這件事）。
-5. 目前客戶的功能狀態：`/api/entitlements/features` 加 `?org=`，員工以 `AuthorizedOrg`（`subject.ts`、`social/authz`）驗證後才用該客戶為主體；現況員工拿到的是內部帳戶（`subject.ts:67`）。
+5. 目前客戶的功能狀態：`/api/entitlements/features` 加 `?org=`，員工以 `actorFor`（`social/authz.ts:94-101`，付費路由同一規則 `grant.ts:91-99`）驗證後才用該客戶為主體；現況員工拿到的是內部帳戶（`subject.ts:63-67`）；快取鍵本來就含主體 org（`features.ts:35`）。
 6. 登入 cookie 每個主機各一份：員工在子網域用同一個帳密表單登入，或從 app 帶 `?org=` 的連結過去（CLIENT-CONTEXT-PLAN K5／K11）。
 
-結果：員工能讀到的客戶名單範圍與今天完全相同；只增加「從哪個網址呼叫」。**限制**：影片產品由獨立容器 `video-workbench` 供畫面（`products.ts:14,53`），客戶欄放不進去，沿用計畫 3d 的 VW 切換對話框（K12）。【假設 A8：技術可行，開卡前先以測試確認 `isClientOutsideDoor` 與 `doorApiDenial` 對這支路由的行為】
+結果：員工能讀到的客戶名單範圍與今天完全相同；只增加「從哪個網址呼叫」。**限制**：影片產品由獨立容器 `video-workbench` 供畫面（`products.ts:14,53`），客戶欄放不進去，沿用計畫 3d 的 VW 切換對話框（K12）。（A8 已於 2026-11-22 讀程式驗證可行，見第 2 點；U4 以測試固定）
 
 ### 9.5 介紹頁與操作頁
 介紹頁（WordPress）與操作頁（外框）版型不同：介紹頁有行銷版面，操作頁最小化外框、內容最大。不迷路靠：麵包屑、左欄目前頁高亮、頁面 `h1` 與左欄名稱**同一個字**（§15A 命名表）、頂列永遠有「← 我的工作台」。
@@ -895,7 +897,7 @@ launcher 現況問題與改法：
 |---|---|---|---|
 | `PlatformFrame` | 取代 `(shell)/layout.tsx`、`ProductDoorShell.tsx` | 一般／未開通（沿用現有頁）／暫時無法確認 | 外框只讀登記表與主機設定，不寫死網域 |
 | `NavRail` | 合併 `SidebarNav`、`DoorNav` | 目前頁（`aria-current`）／子頁縮排（`under`）／徽章 | 項目＝`{label, href, under?, badge?}` |
-| `ClientRail` | 計畫的 `ClientContextBar`（頂部列）改為側欄；以 `OrgPicker` 為核心 | 載入／無結果「無符合的客戶」／搜尋失敗「搜尋失敗，請再試一次」（沿用 `OrgPicker.tsx:153`）／只列前 20 筆提示 | 類別為單選按鈕組；選客戶寫入網址 `org` |
+| `ClientRail` | CLIENT-CONTEXT-PLAN K4（類別列 U3）；以 `OrgPicker` 為核心 | 載入／無結果「無符合的客戶」／搜尋失敗「搜尋失敗，請再試一次」（沿用 `OrgPicker.tsx:153`）／只列前 20 筆提示 | 類別為單選按鈕組；選客戶寫入網址 `org` |
 | `ToolCard`（三密度）＋`ToolGrid` | 取代 launcher 卡片（原 `ProductCard`）；公開站同型 | §5.2 全部觀看者與狀態 | 標籤與按鈕只由 `RightBadge` 決定；量級大時只換容器為 `FacetedList`（§4.7） |
 | `SearchBox` | 【新增】頂列與探索頁共用 | 空／輸入中／結果／無結果（§3.6）／載入 | 瀏覽器端索引（§4.5）；`/` 聚焦 |
 | `WpSummary`（外掛端） | 【新增】`MyAccountDoors::render()` | 載入／清單／尚未連結／讀不到（退場） | 文案全由 app JSON 帶入（§2A.4） |
@@ -909,20 +911,19 @@ launcher 現況問題與改法：
 ## 17. 路線圖與工程卡
 
 ### 17.1 與既有工作的先後
-- CLIENT-CONTEXT-PLAN 先做：K1、K2、K3（擴充）、K4（改為 ClientRail）、K5。U 卡接在 K5 後或併入。
+- **唯一的開工順序與派工單：同資料夾 `DISPATCH.md`**（K、U、W、M 卡全部）。CLIENT-CONTEXT-PLAN 已於 2026-11-22 依本藍圖改寫（客戶欄、產品門員工換客戶）。
 - 內容入口重排（U11）必須在 K7（ContentStudio 網站挑選）、K8（刪「題目›客戶」）之後，否則同檔衝突（`ContentStudio.tsx`、`products.ts:77-80`、`sidebar-sections.ts:82`）。
 - ADR 021 缺口：**G7、G8**（WordPress 登入與進入）由 W 卡（§2A.6）關閉；G1、G5、G6、G7、G10 擋「開放註冊」（ADR 021 §3 末段）；G3、G12 決定客戶欄能不能有代操／經銷／買斷／TEST 類別；G4＝U19；新增 **G13**（「進入」清單來自訂單而非權益）由 W3 關閉。
-- 注意：ADR 021 `:54` 寫「ADR 020 … C10」，計畫實際卡號是 K10（改文時一併更正）。
 
 ### 17.2 卡片
 
 | 卡 | 階段 | 內容 | 檔案（獨佔） | 依賴 | 風險 | 驗收（可檢查） |
 |---|---|---|---|---|---|---|
-| U1 | 1 | `PlatformFrame`＋`NavRail` 合併（併入 K5） | `ProductDoorShell.tsx`、`DoorNav.tsx`、`SidebarNav.tsx`、`(shell)/layout.tsx`、`globals.css` | K2、K4 | Medium | 既有 `DoorNav`／`SidebarNav` 測試綠 |
-| U2 | 1 | `ClientRail`＋類別（畫法由操作者從 wireframe 第 15 頁選，Q5） | 新 `app/ClientRail.tsx`、test | K2、K3 | Medium | 100 個客戶 mock：開頁到看見指定客戶 ≤ 3 次點擊 |
-| U3 | 1 | `org-search` 加 `category`、`problem`（併入 K3） | `api/ops/org-search/route.ts` | K3 | Medium | 不帶新參數回應不變；授權格不變 |
-| U4 | 1 | 員工在產品門：`STAFF_DOOR_APIS`＋授權格併入 | `lib/portal/doors.ts`、`staff-tools.ts`、middleware 測試 | U3 | **High** | 客戶身分打該路由＝404；沒勾格的員工被擋 |
-| U5 | 1 | `/api/entitlements/features?org=`（員工、`AuthorizedOrg`） | `app/api/entitlements/features/route.ts` | U4 | **High** | 員工無該客戶角色＝403；快取鍵含 org |
+| U1 | 1 | **已併入 K5**（CLIENT-CONTEXT-PLAN §4；不改 `globals.css`） | — | — | — | — |
+| U2 | 1 | **已併入 K4**（客戶欄本體）與 U3（類別列） | — | — | — | — |
+| U3 | 1 | 客戶欄類別（定義在 CLIENT-CONTEXT-PLAN §4 第 2 波） | `api/ops/org-search/route.ts`、`app/ClientRail.tsx` | K4、U4 | Medium | 見計畫 |
+| U4 | 1 | 員工在產品門搜尋客戶（定義在 CLIENT-CONTEXT-PLAN §4 第 1 波） | `lib/portal/doors.ts`、`staff-tools.ts`、`api/ops/org-search/route.ts`、測試 | K3 | **High** | 客戶身分打該路由＝403（不是 404，見 §9.4 第 2 點）；enforce 下沒勾格的員工 403 |
+| U5 | 1 | `/api/entitlements/features?org=`（定義在 CLIENT-CONTEXT-PLAN §4 第 1 波） | `app/api/entitlements/features/route.ts`、`use-paid-features.ts` | K4、U6 | **High** | 員工無該客戶角色＝403 `not_authorized_for_org` |
 | U6 | 1 | `RightBadge` 純函式＋§8 表格驅動測試（含 S16、S18、R1–R3 預留分支） | 新 `lib/entitlements/right-label.ts`；`use-paid-features.ts` | — | Low | §8 每列一個測試；刪 `WHY` |
 | U7 | 1 | 客戶版帳戶唯讀 API | 新 `app/api/portal/account/route.ts` | — | Medium | 只回 §15.4 子集 |
 | U8 | 1 | 工作台改版（用 `ToolCard`） | `app/portal/launcher/page.tsx` | U6、U7、U21 | Medium | 已開通在上；失敗有重新整理；空狀態文案 |
@@ -936,8 +937,9 @@ launcher 現況問題與改法：
 | **U22** | 1 | 登記表 `catalog` 欄位（**產品層**必填欄、詞表、測試、`new-product.mjs` 多問題）；11 產品填值 | `products.ts`、新 `lib/portal/catalog-vocab.ts`、`scripts/new-product.mjs` | — | Medium | §4.3 測試；11 列都有 `catalog` |
 | **U23** | 1 | 埋點基礎：`Events` 擴充、客戶群組、`client_picked`、`blocked_shown`、`login_succeeded` | `lib/analytics.ts`、`app/posthog-analytics.tsx`、`api/ops/analytics-context` | — | Low | 事件先登記才可用；不含 email |
 | **W1** | 1 | app：`/api/auth/wp-summary` | `lib/auth/sources/awarewave-wp.ts`、新路由 | U6、U7 | **High** | §2A.4 |
-| **W2–W5** | 1 | 外掛：`Summary` 用戶端、`render()`／`handle()` 改摘要、退場畫面、手機樣式；關著上線 | `aware-wave-store-plugin/includes/MyAccountDoors.php` 等 | W1 | Medium | §2A.6 |
-| U15 | 2 | 客戶欄 `?org` 帶入工具頁連結（含跨網域） | 併入 K5／K11 | — | — | — |
+| **W2**（併 W3、W4） | 1 | 外掛：`Summary` 用戶端、`render()`／`handle()` 改摘要、退場畫面、手機樣式；關著上線 | `aware-wave-store-plugin/includes/MyAccountDoors.php`、新 `includes/Summary.php`、外掛測試 | W1 | Medium | §2A.6 |
+| **W5** | 1 | 本機 WordPress＋app 走一遍，寫成可重跑腳本（＝ADR 021 G9） | 新腳本 | W1、W2 | Low | §2A.6 |
+| U15 | 2 | **已併入 K5**（同主機）與 K11（跨網域） | — | — | — | — |
 | U16 | 2 | 內容概覽首頁 | `app/content/page.tsx` | U11 | Medium | 待核准題目、草稿、已排程三個數字 |
 | U17 | 2 | 工作台「繼續上次」（作品＋草稿） | `launcher/page.tsx` | U8 | Medium | 讀 `/api/tools/designs` 最近 3 件 |
 | U18 | 2 | 頂列搜尋（瀏覽器端索引） | `PlatformFrame` | U1、U22 | Low | 輸入「文章」能到「寫文章」 |
@@ -969,7 +971,6 @@ launcher 現況問題與改法：
 | `DoorNav` 的「功能」清單（`DoorNav.tsx:26-35`） | 刪；移到 `ToolCard` 與按鈕標籤 |
 | `DoorNav`＋`SidebarNav` | 合併為 `NavRail` |
 | `(shell)/layout.tsx`＋`ProductDoorShell.tsx` 的外框骨架 | 合併為 `PlatformFrame` |
-| CLIENT-CONTEXT-PLAN 的 `ClientContextBar` | 改為 `ClientRail` |
 | `use-paid-features.ts` 的 `WHY` 字典 | 併入 `RightBadge` |
 | launcher 的「你的產品」混排卡片 | 改為工作台＋`ToolCard` |
 | 內容頁 3 個頁內頁籤 | 升為左欄頁面 |
@@ -980,25 +981,7 @@ launcher 現況問題與改法：
 | 行內表格樣式（`BillingTab.tsx:14-15`） | 抽成 `.data-table` |
 
 ### 17.5 CLIENT-CONTEXT-PLAN 需修改處
-（行號為 `CLIENT-CONTEXT-PLAN-20261121.md`）
-
-| 處 | 改什麼 |
-|---|---|
-| §1d `:81-82` | 「頂部列」→ 客戶欄（側欄） |
-| §3a `:125,126,130` | 「頂部列」→ 客戶欄 |
-| §3b `:145` | 「產品門上不需要客戶清單…員工在產品門上不挑客戶」→ 推翻，改引本藍圖 §9.4 |
-| §3c `:152-154` | `ClientContextBar` → `ClientRail`；site 層網站按鈕放客戶欄下方 |
-| §3e `:174` | 「頂部列旁『客戶頁 →』」→ 客戶欄頂端 |
-| §4 K3 `:189` | `org-search` 加 `category`、`problem`（U3） |
-| §4 K4 `:190` | 元件改名 `ClientRail`；驗收改為「產品門上員工可搜尋客戶」 |
-| §4 K5 `:191` | 外框由 `PlatformFrame` 組出（U1 併入） |
-| §4 K7 `:199`、K9 `:202`、K11 `:211` | 驗收「頂部列」→ 客戶欄 |
-| §4 上線後看得到 `:193,205,214` | 同上 |
-| §4b T3 `:243` | 「`DoorNav` 與頂部列」→ `NavRail` 與 `ClientRail` |
-| §6 Q1 `:287`、Q3 `:289` | Q1 改「客戶欄請先挑」；Q3 結論由「不能」改為「能」（§9.4） |
-| §7 未採納 `:311` | 該段作廢；不採 `bootstrap` 搬家的結論仍成立 |
-| 新增卡 | U4、U5；排在 K5 之後、K7 之前 |
-| K13 `:220` | 加規則：頁面不得自畫客戶挑選 |
+2026-11-22 已全部改入該檔（客戶欄、產品門員工換客戶、U1／U2／U15 併卡、U3–U5 定義、K13 加「頁面不得自畫客戶挑選」、§6 與 §7 改寫），本節不再列。
 
 ### 17.6 驗收檢查與指標
 每張卡驗收含一條可檢查項（§17.2「驗收」欄）。員工視角總檢查：開任一功能頁到看見指定客戶資料 ≤ 3 次點擊（事件 `client_picked`）。指標定義、事件、埋點、A/B 見 §13。
@@ -1084,7 +1067,7 @@ launcher 現況問題與改法：
 | A4c | 個人最近使用只給本人，管理者只看單位彙總 | 操作者回答 |
 | A5 | 預估點數與實際相近；≥ 50 點才跳確認 | 對 `entitlement.usage` 比對預估與實扣 |
 | A6 | 手機底列 4 項夠用；5 人可用性測試足以發現主要問題 | 實機走一遍；每次 5 人任務測試 |
-| A8 | 員工在產品門呼叫 `org-search` 技術上可行 | U4 開卡前以測試跑：客戶身分 404、員工被授權格擋 |
+| A8 | 員工在產品門呼叫 `org-search` 技術上可行 | **已驗證**（2026-11-22，§9.4 第 2 點）：客戶 403、未登入 401、員工照授權格；U4 以測試固定 |
 | A9 | S11 文案客戶可接受 | 操作者審 |
 | A10 | 自助註冊者不連網站也能先寫稿 | 讀 `ContentStudio` 無網站時的行為 |
 | A11 | 「註冊送 50 點」可作為免費開始 | 操作者決定是否重開（現況報告 O6） |
