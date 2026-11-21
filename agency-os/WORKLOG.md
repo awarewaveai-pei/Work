@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-21（續3）— oracle 批 5 併入：iztro 2.6.5＋易經經文進 facts（操作者：「升級紫微套件>派工」「易經補原文>派工」）
+
+- 併入：`f0113fead`（U2，工人 `local_51906081…`）、`01f599b7c`（I1，工人 `local_53c300dd…`）、`6ebc79425`（監工處理審查發現）；main ff 至 `6ebc79425`。**未部署**（`oracle-web` 不在夜間自動部署）。
+- U2：`Projects/internal/ziwei-doushu/lib/ziwei.ts` 新增 `ZIWEI_DAY_DIVIDE='forward'`（晚子時日界唯一設定處），`computeChart` 改 `astro.withOptions({config})`，設定只綁當張盤、不寫全域。升級前後差異（工人量測 20 日期 × 6 時辰 × 兩語言）：一般時辰只有酉宮太陽／太陰／七殺亮度；23 點出生 `lunarDate` 顯示次日；23 點＋農曆月底／閏月月底／閏月十五／除夕整張盤改變（例 2020-01-24 生肖豬→鼠、水二局→土五局）；大月三十 23 點且次日進閏月（例 2023-03-21）三台八座恩光天貴換宮；en 盤 `lunarDate` 與武曲譯名改變。
+- I1：`lib/iching/text.ts`（64 卦辭＋384 爻辭＋用九用六，繁體；底本 iching-kit MIT，對 ichingpy、ichingshifa 三方校對）、`lib/iching/reading.ts`（朱熹七種變爻讀法，自行實作）、facts 加卦辭與該讀段落（最多 9 條、最長 38 字）、prompt 限定經文只可逐字引用 facts、頁面顯示經文。
+- RISKS 處置：
+  - critic m1 革卦「己日」（虞翻讀法，與頁面宣稱的朱熹讀法不一致）→ 改「巳日」（`text.ts` 革卦辭、六二）。
+  - critic m2 无妄六三「係」→ 改「繫」。依據為監工與 critic 的版本知識，三方來源唯一的繁體見證（ichingshifa `d.py:155`）作「係」；ctext 擋自動讀取，未線上核對阮刻本。
+  - critic 版式：履、艮卦辭重複加卦名 → 移除，與否、同人一致。
+  - critic m4 開真太陽時時 `Date.UTC` 把 2/30 靜默推成 3/2 → `lib/dates.ts` `toSolarYmd` 入口擋不存在的國曆日期（補上續2 的同一不變量）。
+  - critic 建議：384 條爻題對陰陽爻的檢查 → 已成永久測試（`lib/iching/text.test.ts`）。
+  - critic m3 晚子時測試鎖不住「config 沒傳進去」（值等於上游預設）→ 不處理：改口徑時既有四列測試會紅，屆時連同 `'current'` 對照一起改。
+  - I1 其餘字形裁定（比初六「它」、坎上六「係」、大過「棟橈」、井九五「洌」、9 處係／繫與干／幹）→ critic 抽 29 卦對照，除上兩處外皆同通行本；接受。
+  - U2 範圍外：英文頁運限行夾中文（`formatMutagen` 寫死中文）→ 未處理，既有問題。
+  - 三爻動未分貞悔前十後十 → 依卡片不做。
+  - 紫微 `'forward'` 與八字 `sect=2` 日界相反 → 待操作者決定。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd D:/Worktrees/Work/oracle-int/Projects/internal/ziwei-doushu && npm ci && npx tsc --noEmit && npx vitest run → 32 檔 222 passed／3 skipped；工人各自 `npm run dev` 實開紫微頁（23:30 與一般時辰，繁中英文）與易經頁（繁中英文各一卦，AI 引用經文逐字等於 facts） | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/0m/4n（四項處置如上；critic 實測 `withOptions` 不寫全域、horoscope 沿用盤設定、384 爻題全對、facts 不超限）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/ziwei-doushu | grep=astro.bySolar | hits=3（研究細節檔 2、本條目 1；程式呼叫端 0，只剩 `astro.withOptions`）
+- rollback：`git revert 6ebc79425 01f599b7c f0113fead`（三者互不依賴，可個別撤）。
 ## 2026-11-21（續2）— oracle 紫微：農曆輸入先轉國曆再校正；「今天」取本地日期（操作者：「好，修這兩個」）
 
 - 根因 1：`Projects/internal/ziwei-doushu/lib/ziwei.ts` `computeChart` 把農曆年月日直接交給 `toTrueSolarTime`（國曆運算），均時差算錯，農曆二月三十被 `Date.UTC` 推成三月二日；八字 `lib/bazi.ts` 早已先轉國曆，兩處各寫一份才漏。
