@@ -268,7 +268,7 @@ async function handlePost(request: Request): Promise<Response> {
   return NextResponse.json({ ok: true, preset: data });
 }
 
-/** PATCH ?id= — change a model photo's print box / garment colour (the image itself never changes). */
+/** PATCH ?id= — change a model photo's print box / garment colour (the image itself never changes); printBox null removes the box. */
 export const PATCH = withFeature("design.edit", handlePatch);
 async function handlePatch(request: Request): Promise<Response> {
   if (!featureEnabled()) {
@@ -310,7 +310,8 @@ async function handlePatch(request: Request): Promise<Response> {
     if (!own || asset.created_by !== own) return NextResponse.json({ ok: false, error: "not_your_asset" }, { status: 403 });
   }
 
-  const metadata = { ...((asset.metadata as Record<string, unknown> | null) ?? {}), ...patch };
+  const metadata: Record<string, unknown> = { ...((asset.metadata as Record<string, unknown> | null) ?? {}), ...patch };
+  if (body.printBox === null) delete metadata.print_box; // 取消印花框: the photo is unboxed again
   const { data, error } = await supabase
     .from("media_assets")
     .update({ metadata })

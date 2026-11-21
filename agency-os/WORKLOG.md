@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-21（續7）— 模特兒圖庫加「取消印花框」（操作者：想做全幅）
+
+[根因] 照片框過一次就拿不掉：PATCH `printBox` 只能換框，`null` 被 `modelPhotoMeta` 略過（`presets/route.ts` `!== null`）。
+[不變量] 印花框可設、可改、可移除；`printBox: null` = 刪 `metadata.print_box`，其餘欄位不動。框只給「程式免費印」；AI 全幅走合成頁「滿版前幅」（`ModelMockupPanel.tsx` 只對 code 引擎送 box）。
+[已修改] `presets/route.ts` PATCH null 刪框；`ModelLibraryStudio.tsx` `saveBox(remove)`＋已框照片才顯示「取消印花框」＋說明一句。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/mockup" app/api/tools/presets → 32 passed；npx tsc --noEmit 0 錯 | exit=0 | ms=6600
+- 新測 2 條（伺服器 null 刪框留其他欄位；未框照片無此鍵、已框送 `{printBox:null}`）。突變：拿掉 delete → 伺服器那條紅，還原 8/8 綠。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（讀回 diff，4 檔 +31/-6）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；自審＋突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=取消印花框|print_box | hits=12（mockup 元件、presets route 與測試；docs 0）
+[rollback] `git revert <本 commit>`。
 ## 2026-11-21（續6）— oracle 併入 Z2（紫微格局 22→66）與 T4（塔羅追問補抽）
 
 - 併入 main（`Projects/internal/ziwei-doushu/`，**未部署**）：Z2 `19fc4a09b`（`lib/ziwei/patterns.ts`：x-iztro 全部 62 條本命格局以 TS 重寫＋本站原有 4 條；新 `lib/ziwei/patterns.test.ts`）；T4 `440f9889f`（`lib/tarot.ts` 補抽 1–3 張、不重複、同一亂數來源、累計上限 9；facts 標 `followup:#n`）。

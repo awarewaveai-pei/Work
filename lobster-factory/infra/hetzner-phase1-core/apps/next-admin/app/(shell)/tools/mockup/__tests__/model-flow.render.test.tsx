@@ -256,4 +256,18 @@ describe("【模特兒印製】: settings → 模特兒圖 → library", () => {
     expect(sent).toMatchObject({ x: 0.3, y: 0.3 });
     expect(sent.w).toBeCloseTo(0.42);
   });
+
+  it("取消印花框 shows only on a boxed photo and sends printBox null", async () => {
+    const { print_box: _gone, ...unboxed } = library[0].metadata!;
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, preset: { ...library[0], metadata: unboxed } })));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<Library initial={library} />);
+    fireEvent.click(screen.getAllByAltText("Leo")[1]); // leo2 has no box
+    expect(screen.queryByRole("button", { name: "取消印花框" })).toBeNull();
+    fireEvent.click(screen.getAllByAltText("Leo")[0]); // leo1 is boxed
+    fireEvent.click(screen.getByRole("button", { name: "取消印花框" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as unknown[] as [string, RequestInit])[1].body))).toEqual({ printBox: null });
+    await waitFor(() => expect(screen.queryByRole("button", { name: "儲存印花框" })).toBeNull());
+  });
 });

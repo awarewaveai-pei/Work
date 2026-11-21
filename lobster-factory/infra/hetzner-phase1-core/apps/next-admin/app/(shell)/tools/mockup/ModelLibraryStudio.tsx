@@ -329,10 +329,11 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
     const r = frame.current!.getBoundingClientRect();
     return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
   };
-  async function saveBox() {
+  // null = 取消印花框: the photo goes back to unboxed.
+  async function saveBox(remove = false) {
     if (!boxPhoto || !draft) return;
-    const printBox = boxOf(draft);
-    if (!isPrintBox(printBox)) { setMsg("四個角拉成交叉或太小了，請重拉"); return; }
+    const printBox = remove ? null : boxOf(draft);
+    if (printBox && !isPrintBox(printBox)) { setMsg("四個角拉成交叉或太小了，請重拉"); return; }
     const res = await fetch(`/api/tools/presets?id=${boxPhoto.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ printBox }),
     }).catch(() => null);
@@ -577,9 +578,10 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
                   style={{ position: "absolute", left: `${p.x * 100}%`, top: `${p.y * 100}%`, width: 16, height: 16, marginLeft: -8, marginTop: -8, borderRadius: "50%", background: "var(--accent)", border: "2px solid #fff", cursor: "move" }} />
               ))}
             </div>
-            <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>在照片上拖曳 = 畫新框；拖四個圓點 = 調整角度（身體斜的、轉身的，讓框貼著胸口的斜度）。</div>
+            <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>在照片上拖曳 = 畫新框；拖四個圓點 = 調整角度（身體斜的、轉身的，讓框貼著胸口的斜度）。框只給「程式免費印」用；AI 合成要全幅，在合成頁選「滿版前幅」。</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
               <button className="btn-primary" onClick={() => void saveBox()}>儲存印花框</button>
+              {boxPhoto.metadata?.print_box && <button className="btn-secondary" onClick={() => void saveBox(true)}>取消印花框</button>}
               <button className="btn-secondary" onClick={() => setBoxPhoto(null)}>取消</button>
             </div>
           </div>

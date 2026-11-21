@@ -104,4 +104,12 @@ describe("mockup presets for a customer", () => {
     expect(orgFilter().every((o) => o === ORG)).toBe(true);
     expect(db.updated).toEqual({ metadata: { model_key: "k", preset_name: "Leo", print_box: { x: 0.2, y: 0.3, w: 0.5, h: 0.4 } } });
   });
+
+  it("printBox null removes the box and keeps the rest", async () => {
+    db.asset = { id: ASSET, metadata: { model_key: "k", preset_name: "Leo", print_box: { x: 0.2, y: 0.3, w: 0.5, h: 0.4 } }, created_by: ME };
+    const res = await PATCH(new Request(at(`?id=${ASSET}`), { method: "PATCH",
+      headers: { "content-type": "application/json", ...client }, body: JSON.stringify({ printBox: null }) }));
+    expect(res.status).toBe(200);
+    expect(db.updated).toEqual({ metadata: { model_key: "k", preset_name: "Leo" } });
+  });
 });
