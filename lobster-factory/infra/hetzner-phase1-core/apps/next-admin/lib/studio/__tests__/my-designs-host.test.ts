@@ -2,7 +2,7 @@
 // My Designs panel (C5.2) reads every editor-specific value from ctx.host: one save and one list per host (vector, canvas),
 // and a vector host never lists a .psd original. The canvas host literal below is the C4.2 shape (ctx-contract.md "host").
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import myDesigns from "../../../public/editor-shared/blocks/my-designs.js";
+import myDesigns, { saveToMyDesigns } from "../../../public/editor-shared/blocks/my-designs.js";
 import { createVectorcraftCtx } from "../../../public/editor-shared/ctx-vectorcraft.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
@@ -80,6 +80,15 @@ describe.each([
     rows = [asset(3, "tarot")];
     const { body } = mountPanel(host);
     await vi.waitFor(() => expect(body.querySelector("#mdList")!.textContent).toBe(emptyText));
+  });
+});
+
+describe("saveToMyDesigns: a 傳回 fallback is filed under the ticket's source", () => {
+  it("opts.source replaces the host's source tag; without it the host's stays", async () => {
+    const ctx = mountPanel(CANVAS).ctx;
+    await saveToMyDesigns(ctx, new Blob(["png"], { type: "image/png" }), { previewOnlyIfTooBig: true, source: "mockup" });
+    await saveToMyDesigns(ctx, new Blob(["png"], { type: "image/png" }), { previewOnlyIfTooBig: true });
+    expect(posts.map((p) => p.source)).toEqual(["mockup", "canvas"]);
   });
 });
 

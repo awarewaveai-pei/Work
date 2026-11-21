@@ -26,8 +26,10 @@ export const CANVAS_TARGET_KEY = "canvas:target";
 
 /** BroadcastChannel name of the return path: editor -> `{type:"return", id, image}`, sender -> `{type:"ack", id}`. */
 export const CANVAS_RETURN_CHANNEL = "canvas-return";
-/** Where the edited image goes back to: the sending tool, its slot (tool-defined, e.g. "preview"), the button's label. */
-export type CanvasReturnTicket = { tool: string; slot: string; label: string };
+/** Where the edited image goes back to: the sending tool, its slot (tool-defined, e.g. "preview"), the button's label.
+ *  saveAs: the My Designs source a return nobody takes is saved under (default the editor's own, "canvas" = design art),
+ *  so a model photo or a composite never lands among the prints (lib/studio/asset-group.ts). */
+export type CanvasReturnTicket = { tool: string; slot: string; label: string; saveAs?: string };
 /** Tickets this tab issued (handoff id -> ticket). Memory only: a reload forgets them and a "傳回" then lands in My Designs. */
 export const issuedReturnTickets = new Map<string, CanvasReturnTicket>();
 
@@ -228,7 +230,7 @@ export type ProEditorHandoff = {
   /** Delete the handoff record: call once the editor has opened it. */
   done: () => void;
   /** Present when the sender asked for the edited image back: the dock shows "傳回 <label>" and posts `{type:"return", id}`. */
-  ret?: { id: string; label: string };
+  ret?: { id: string; label: string; saveAs?: string };
 };
 
 const IMAGE_EXT: Record<string, string> = { png: "png", jpg: "jpg", jpeg: "jpg", webp: "webp", gif: "gif" };
@@ -269,7 +271,8 @@ export async function takeCanvasHandoff(editor: CanvasEditorId): Promise<ProEdit
   }
   if (rec.editor !== editor) return null;
   const done = () => void idbDel(key);
-  const ret = rec.ret && rec.ret.id === id && typeof rec.ret.label === "string" ? { ret: { id, label: rec.ret.label } } : {};
+  const saveAs = typeof rec.ret?.saveAs === "string" && /^[a-z][a-z-]{0,39}$/.test(rec.ret.saveAs) ? { saveAs: rec.ret.saveAs } : {};
+  const ret = rec.ret && rec.ret.id === id && typeof rec.ret.label === "string" ? { ret: { id, label: rec.ret.label, ...saveAs } } : {};
   const src = rec.source;
   if (src && typeof src.url === "string" && src.url && typeof src.name === "string" && src.name) {
     return { url: toCanvasSrc(src.url), name: src.name, done, ...ret };

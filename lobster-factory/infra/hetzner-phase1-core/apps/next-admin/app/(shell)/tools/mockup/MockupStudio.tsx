@@ -870,7 +870,7 @@ export default function MockupStudio({ loadCatalog }: { loadCatalog?: () => Prom
                 {canvasHref && (
                   <button className="btn-secondary"
                     onClick={() => void openInCanvas(gen.image!, buildSemanticBase({ product: "商品圖", subject: gen.fileMeta?.subject, style: "平拍", track: gen.fileMeta?.track }), canvasHref,
-                      undefined, { tool: "mockup", slot: `gen:${genNo.current}`, label: "商品圖" })}>
+                      undefined, { tool: "mockup", slot: `gen:${genNo.current}`, label: "商品圖", saveAs: "mockup" })}>
                     在畫布編輯
                   </button>
                 )}

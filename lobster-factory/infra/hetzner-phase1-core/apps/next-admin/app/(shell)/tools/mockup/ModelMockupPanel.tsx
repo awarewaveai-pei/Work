@@ -204,7 +204,7 @@ export default function ModelMockupPanel({ designRef, designName, photos, onOpen
                       {canvasHref && (
                         <button className="btn-secondary" style={{ fontSize: 11 }}
                           onClick={() => { if (r.shot.status === "done") void openInCanvas(r.shot.image, buildSemanticBase({ product: "商品圖", subject: r.designName, style: "模特", track: r.photo.metadata?.preset_name ?? undefined }), canvasHref, undefined,
-                            { tool: COMPOSITE_RETURN_TOOL, slot: `${batchNo.current}:${r.photo.id}`, label: "商品 Mockup" }); }}>
+                            { tool: COMPOSITE_RETURN_TOOL, slot: `${batchNo.current}:${r.photo.id}`, label: "商品 Mockup", saveAs: "mockup" }); }}>
                           在畫布編輯
                         </button>
                       )}

@@ -231,7 +231,7 @@ export default function ModelLibraryStudio({ photos, setPhotos }: {
   const editIn = (image: string, slot: string, name: string, pose?: string) => {
     if (!canvasHref) return;
     void openInCanvas(image, buildSemanticBase({ product: "模特兒圖", subject: name, style: pose }), canvasHref, undefined,
-      { tool: MODEL_RETURN_TOOL, slot, label: "模特兒圖庫" });
+      { tool: MODEL_RETURN_TOOL, slot, label: "模特兒圖庫", saveAs: "mockup" });
   };
   // A library photo comes back as a NEW photo of the same model (photo_role "edit"); the original is kept, delete it
   // yourself if the edit is better. Its print box carries over only while the shape is unchanged (fractions of the photo).

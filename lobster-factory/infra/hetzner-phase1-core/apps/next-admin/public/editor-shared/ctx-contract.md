@@ -44,8 +44,8 @@ My Designs 清單過濾：列出 `metadata.source ∈ listSources`（沒有 meta
 
 ## 傳回（dock 外殼，C8.1；面板不用）
 
-- 交接（`components/tools/canvas-handoff.ts` `openInCanvas(..., ret)`）帶票 `ret={id,label}` 且開成功 → `dock.js` 在圖示欄頂端加「傳回 <label>」。
-- 按下：`ctx.exportArtboard({format:'png'})` → `BroadcastChannel('canvas-return')` 送 `{type:'return', id, image:<PNG data URL>}` → 2 秒內收到 `{type:'ack', id}` 顯示「已傳回 <label>」；否則 `blocks/my-designs.js` `saveToMyDesigns(ctx, png, {previewOnlyIfTooBig:true})`（同面板的存入：預覽＋`ctx.saveAs()` 原檔；原檔超過 64MB 只存預覽）並顯示「原分頁已關，已存進我的設計」；存也失敗 → PNG 下載到電腦。原分頁收下（ack）→ `window.close()` 關掉編輯器分頁（2026-11-20 操作者；只有攤平的 PNG 回去，圖層文件不留）；沒收下不關、按鈕可再按。訊息浮出層 `vp-notice` 只到訊息高度。
+- 交接（`components/tools/canvas-handoff.ts` `openInCanvas(..., ret)`）帶票 `ret={id,label,saveAs?}` 且開成功 → `dock.js` 在圖示欄頂端加「傳回 <label>」。
+- 按下：`ctx.exportArtboard({format:'png'})` → `BroadcastChannel('canvas-return')` 送 `{type:'return', id, image:<PNG data URL>}` → 2 秒內收到 `{type:'ack', id}` 顯示「已傳回 <label>」；否則 `blocks/my-designs.js` `saveToMyDesigns(ctx, png, {previewOnlyIfTooBig:true, source:ret.saveAs})`（saveAs＝該圖在 My Designs 的分類，沒給＝編輯器自己的）（同面板的存入：預覽＋`ctx.saveAs()` 原檔；原檔超過 64MB 只存預覽）並顯示「原分頁已關，已存進我的設計」；存也失敗 → PNG 下載到電腦。原分頁收下（ack）→ `window.close()` 關掉編輯器分頁（2026-11-20 操作者；只有攤平的 PNG 回去，圖層文件不留）；沒收下不關、按鈕可再按。訊息浮出層 `vp-notice` 只到訊息高度。
 - 原分頁：`components/tools/useCanvasReturn.ts`，只收自己發出的票、`onReturn(slot, image)` 回 `true` 才 ack。
 
 ## replaceImage（spike 2026-11-05 通過，未降級）

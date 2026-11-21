@@ -61,6 +61,12 @@ describe("編輯器 sendBack", () => {
     expect(report).toHaveBeenLastCalledWith("原分頁已關，已存進我的設計");
   });
 
+  it("票的 saveAs = 存進 My Designs 的分類（模特兒圖／合成圖不落在設計圖）", async () => {
+    const save = vi.fn(async () => ({ ok: true }));
+    expect(await sendBack(ctx, { id: "gone", label: "模特兒圖庫", saveAs: "mockup" }, vi.fn(), { ackMs: 50, save })).toBe("saved");
+    expect(save).toHaveBeenCalledWith(ctx, expect.any(Blob), { previewOnlyIfTooBig: true, source: "mockup" });
+  });
+
   it("沒 ack 且存檔失敗（網路／伺服器）→ PNG 下載到電腦，不會兩處都沒有", async () => {
     const save = vi.fn(async () => ({ ok: false, message: "HTTP 500" }));
     const download = vi.fn();

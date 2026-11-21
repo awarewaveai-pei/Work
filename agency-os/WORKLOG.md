@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-21（續13）— 傳回退路存 My Designs 時照原工具分類（操作者：商品／模特兒合成圖不能再拿去合成）
+
+[根因] 原分頁已關時 `dock.js` `sendBack` 退路存 My Designs，source 固定編輯器的 `canvas`（=設計圖）：模特兒圖、合成圖、塔羅卡會落進合成頁設計圖清單（`designs-list.ts` print 只排除 mockup／tarot source）。
+[不變量] 傳回票帶 `saveAs`（該圖在 My Designs 的 source）：模特兒圖庫／模特合成／平拍 → `mockup`，塔羅預覽 → `tarot-preview-edit`，塔羅牌組 → `tarot`；Studio／Banner 不帶＝`canvas` 設計圖。`takeCanvasHandoff` 只收 `^[a-z][a-z-]{0,39}$`。
+[已修改] `canvas-handoff.ts`（票型＋讀取驗格式）、`dock.js`（退路傳 `source`）、`blocks/my-designs.js`（`opts.source` 優先）、`ctx-contract.md`；5 個發票處加 `saveAs`。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run components/tools lib/studio/__tests__/my-designs-host.test.ts lib/studio/__tests__/photo-pro-dock.test.ts "app/(shell)/tools/mockup" "app/(shell)/tools/tarot" "app/(shell)/tools/studio" "app/(shell)/tools/banner" → 11 files 143 passed；tsc 0 | exit=0 | ms=12000
+- 新測 3 條（票帶 saveAs／壞格式丟掉、sendBack 傳 source、saveToMyDesigns 以 opts.source 為準）。突變：dock 不傳 source → 紅，還原綠。
+- prod 查證：My Designs `canvas` 只 3 筆（2026-11-06 建 PhotoCraft 時），無模特兒／合成圖混入。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n（m1 未關：從 My Designs 把合成圖開進 PhotoCraft 再按「存入」仍存成 canvas；無票，需交接層帶分類，另問操作者）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；自審＋突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=openInCanvas\(|saveAs|saveTag.source | hits=31（發票處全列：banner/studio 刻意不帶）
+[rollback] `git revert <本 commit>`。
 ## 2026-11-21（續12）— 放大檢視統一成一個可縮放元件；合成頁設計圖加「塔羅牌」分頁
 
 [根因]
