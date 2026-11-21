@@ -24,9 +24,9 @@ export const COPY = {
 };
 
 export const NOW = [
-  { what: '程式已推上主線，資料表已套正式庫，匯入排程已裝且已打開。', state: 'yes', ev: '主線 73fab1033；0174 套用並驗過權限；/etc/cron.d/systems-import（2026-11-21）。' },
-  { what: '總控頁可以打開。', state: 'no', ev: '頁面隨今晚 03:00 自動部署上線。' },
-  { what: '每天自動更新進度。', state: 'no', ev: '第一次匯入在 2026-11-22 04:30（部署之後）；之後確認排程頁與總控頁的最後成功時間。' },
+  { what: '程式、資料表、匯入排程都已上線。', state: 'yes', ev: '2026-11-21 手動提前部署 246a449a4（健康檢查 15 秒、smoke 全 200）；排程每天 04:30。' },
+  { what: '總控頁可以打開，已有外聯系統的資料。', state: 'yes', ev: '首次匯入 2026-11-21 手動跑：1 個系統、4 個功能、134 筆提交紀錄寫入正式庫。' },
+  { what: '外聯系統的舊監工頁切換過來。', state: 'no', ev: '刻意延後：外聯監工台仍在進行中，現在凍結舊頁會擋住它；改在第三批與其他監工頁一起逐一切換。' },
 ];
 
 export const STEPS = [
@@ -43,7 +43,7 @@ export const STEPS = [
     gate: 'node build.mjs 與 node check.mjs 皆綠；頁面不含色碼、不用下拉。', risk: 'Low', model: 'Sonnet 5.5', status: 'done', commit: '73fab1033', doneAt: '2026-11-21', depends: [],
     what: 'data.mjs、build.mjs、check.mjs、supervisor.html；不發布，由監工發布。', card: 'briefs/W4-supervisor-page.md' },
   { n: 5, code: 'B2', group: 'B2', title: '整合與上線', plain: '把四張卡合起來：預演匯入器、對本機接收端實打、看頁面。然後經你同意套資料表、推上主線、裝排程、切換外聯系統。',
-    gate: '本機完整跑通一輪；資料表套用後遷移檢查綠，才推含該資料表的提交；排程裝好且預設關閉。', risk: 'High（套資料表、裝排程）', model: '監工', status: 'in_progress', waitFor: '等首次匯入（2026-11-22 04:30）', decided: '你 2026-11-21 三件都同意：資料表已套、排程已裝並打開、GitHub 主線已禁止強推。', depends: ['W1', 'W2', 'W3', 'W4'],
+    gate: '本機完整跑通一輪；資料表套用後遷移檢查綠，才推含該資料表的提交；排程裝好且預設關閉。', risk: 'High（套資料表、裝排程）', model: '監工', status: 'done', commit: '246a449a4', doneAt: '2026-11-21', decided: '你 2026-11-21 三件都同意：資料表已套、排程已裝並打開、GitHub 主線已禁止強推。', depends: ['W1', 'W2', 'W3', 'W4'],
     what: '先套後推：資料表先套正式庫並確認遷移檢查綠，才推含它的提交。', card: 'DISPATCH.md' },
   { n: 6, code: 'B3', group: 'B3', title: '系統盤點與其餘監工頁切換', plain: '把所有系統寫進清單，讓程式路徑都有歸屬；其餘舊監工頁一次一個階段切換過來。',
     gate: '近 90 天非共用程式路徑全部有歸屬；切換的舊頁改成指向新頁。', risk: 'Medium', model: '待定', status: 'not_started', depends: ['B2'],

@@ -81,12 +81,12 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>系統總控中心 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-21</span></p>
-  <div class="bar" data-computed><i class="d" style="width:66.66666666666666%"></i><i class="g" style="width:16.666666666666664%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>4</span>／<span data-computed>6</span> 已併入</small></a><a href="#safe"><span>不會拖垮別的東西</span><small></small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:83.33333333333334%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>5</span>／<span data-computed>6</span> 已併入</small></a><a href="#safe"><span>不會拖垮別的東西</span><small></small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">系統總控中心（app 後台的 /ops/systems）讓操作者在一個頁面看到每個系統的用途、做到哪、下一步是什麼。進度不靠人填，而是每天由主機讀 git 的提交紀錄自動整理。本頁只看這個專案自己的派工進度。共 <span data-computed>6</span> 張卡。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>程式已推上主線，資料表已套正式庫，匯入排程已裝且已打開。<small>主線 73fab1033；0174 套用並驗過權限；/etc/cron.d/systems-import（2026-11-21）。</small></span></li><li class="no"><b>還不行</b><span>總控頁可以打開。<small>頁面隨今晚 03:00 自動部署上線。</small></span></li><li class="no"><b>還不行</b><span>每天自動更新進度。<small>第一次匯入在 2026-11-22 04:30（部署之後）；之後確認排程頁與總控頁的最後成功時間。</small></span></li></ul></section>
+<section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>程式、資料表、匯入排程都已上線。<small>2026-11-21 手動提前部署 246a449a4（健康檢查 15 秒、smoke 全 200）；排程每天 04:30。</small></span></li><li class="yes"><b>可以</b><span>總控頁可以打開，已有外聯系統的資料。<small>首次匯入 2026-11-21 手動跑：1 個系統、4 個功能、134 筆提交紀錄寫入正式庫。</small></span></li><li class="no"><b>還不行</b><span>外聯系統的舊監工頁切換過來。<small>刻意延後：外聯監工台仍在進行中，現在凍結舊頁會擋住它；改在第三批與其他監工頁一起逐一切換。</small></span></li></ul></section>
 
 <section id="steps"><h2>批次與卡</h2><p class="lead">第一批的四張卡同時進行，各自改不同的檔案；整批交回後才做整合。</p><ol class="steps"><li class="grp">可同時進行：<a href="#W1">W1</a>、<a href="#W2">W2</a>、<a href="#W3">W3</a>、<a href="#W4">W4</a></li><li class="step done" id="W1">
     <div class="n">1</div>
@@ -136,17 +136,18 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>卡片：</b><code>briefs/W4-supervisor-page.md</code></p>
         <p><b>併入於：</b><code>73fab1033</code></p>
       </details>
-    </div></li><li class="step doing" id="B2">
+    </div></li><li class="step done" id="B2">
     <div class="n">5</div>
     <div class="b">
       <p class="plain">把四張卡合起來：預演匯入器、對本機接收端實打、看頁面。然後經你同意套資料表、推上主線、裝排程、切換外聯系統。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-high">風險 High（套資料表、裝排程）</span><span class="who">模型：監工</span><span class="who wait">等首次匯入（2026-11-22 04:30）</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-high">風險 High（套資料表、裝排程）</span><span class="who">模型：監工</span></p>
       <p class="donewhen"><b>完成的樣子：</b>本機完整跑通一輪；資料表套用後遷移檢查綠，才推含該資料表的提交；排程裝好且預設關閉。</p>
       <details><summary>細節：B2 整合與上線</summary>
         <p>先套後推：資料表先套正式庫並確認遷移檢查綠，才推含它的提交。</p>
         <p><b>需先完成：</b><a href="#W1">W1</a>、<a href="#W2">W2</a>、<a href="#W3">W3</a>、<a href="#W4">W4</a></p>
         <p><b>決定：</b>你 2026-11-21 三件都同意：資料表已套、排程已裝並打開、GitHub 主線已禁止強推。</p>
         <p><b>卡片：</b><code>DISPATCH.md</code></p>
+        <p><b>併入於：</b><code>246a449a4</code></p>
       </details>
     </div></li><li class="step todo" id="B3">
     <div class="n">6</div>
