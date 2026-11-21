@@ -53,15 +53,15 @@ curl -s https://oracle.aware-wave.com/api/mcp -H 'content-type: application/json
   - `key_id`：`[a-z0-9][a-z0-9-]{1,23}`；`public_key`：該站 Ed25519 公鑰 SPKI PEM（外掛產生，私鑰只在站上；放進 JSON 時換行寫成 `\n`，寫成真的換行整串 JSON 會解析失敗、全部站台一起失效）；`embed_origins`：允許嵌入的來源（W2 用）；`requests_per_minute`：選填，預設 600；`ai_per_day`：選填，預設 20（1–100000），每個會員假名每 24 小時可用的 AI 解讀次數（見下方會員票）。
   - 不寫死任何網域；引擎不存任何個資，站台只以 key_id 識別。格式錯的那筆略過並在啟動後首次請求記錄原因（不記金鑰內容）。
   - 輪替金鑰＝改該筆 `public_key` 後重啟容器；停用站台＝刪掉該筆。
-- 簽章（沿用 WordPress 換手的構造，next-admin `lib/auth/sources/awarewave-wp.ts`）：body 為 JSON 並含 `key_id`、`ts`（unix 秒）、`nonce`（16–100 個 `[A-Za-z0-9_-]`）；標頭 `X-AwareWave-Oracle-Signature: base64(Ed25519(原始 body))`；ts 須在 ±60 秒內、nonce 每站只能用一次。
-- 回應：錯簽、過期、重送 401；未知 key 404；超過站台額度 429（`Retry-After`）。帶簽章的請求在驗簽前先以來源位址計一次（每分鐘 600 次），亂帶簽章標頭不能免費消耗驗簽與解析。
-- `POST /api/v1/batch`（只限站台）：`{key_id, ts, nonce, system, items:[input…]（1–200 筆）, locale?}` → `{apiVersion, system, results:[{ok,data,context}|{ok:false,error,detail}]}`，與 items 同序，額度按筆數計。
-- `POST /api/v1/systems/{id}` 帶簽章時改用站台額度（body 另含 key_id、ts、nonce）。
+- 簽章（沿用 WordPress 換手的構造，next-admin `lib/auth/sources/awarewave-wp.ts`）：body 為 JSON 並含 `key_id`、`ts`（unix 秒）、`nonce`（16–100 個 `[A-Za-z0-9_-]`）、`aud`（用途：`/api/v1` 請求寫 `"v1"`，會員票寫 `"ticket"`；同一把鑰匙兩種用途，一份原文只對一個用途有效）；標頭 `X-AwareWave-Oracle-Signature: base64(Ed25519(原始 body))`；ts 須在 ±60 秒內、nonce 每站只能用一次。
+- 回應：錯簽、`aud` 不符（`wrong_audience`，不消耗 nonce、不扣額度）、過期、重送 401；未知 key 404；超過站台額度 429（`Retry-After`）。帶簽章的請求在驗簽前先以來源位址計一次（每分鐘 600 次），亂帶簽章標頭不能免費消耗驗簽與解析。
+- `POST /api/v1/batch`（只限站台）：`{key_id, ts, nonce, aud:"v1", system, items:[input…]（1–200 筆）, locale?}` → `{apiVersion, system, results:[{ok,data,context}|{ok:false,error,detail}]}`，與 items 同序，額度按筆數計。
+- `POST /api/v1/systems/{id}` 帶簽章時改用站台額度（body 另含 key_id、ts、nonce、aud:"v1"）。
 - `GET /api/v1/places?q=&locale=&limit=`：出生地搜尋的跨網域版（CORS 任意來源），依來源位址限流。
 - 會員票（`POST /api/interpret`，框內頁從瀏覽器帶上；`lib/sites/ticket.ts`）：外掛替登入會員簽一次性短效票。
-  - 原文 JSON 只含 `{"key_id","ts","nonce","member"}`（多一個欄位就不算票）；`member` = 站台給的假名，16–64 個 `[A-Za-z0-9_-]`，不放 email、user id 等可辨識資料。簽法同上（ts ±60 秒、nonce 一次＝一張票只能用一次）。
+  - 原文 JSON 只含 `{"key_id","ts","nonce","aud":"ticket","member"}`（多一個欄位就不算票）；`member` = 站台給的假名，16–64 個 `[A-Za-z0-9_-]`，不放 email、user id 等可辨識資料。簽法同上（ts ±60 秒、nonce 一次＝一張票只能用一次）。
   - 標頭：`X-AwareWave-Oracle-Ticket: base64url(原文)`、`X-AwareWave-Oracle-Signature: base64(Ed25519(原文))`；body 照舊是解讀請求。
-  - 先照匿名請求依來源位址限流（每分鐘 10 次）；帶了票標頭就必須驗過，失敗不退回匿名：400 `invalid_ticket`（標頭不是 base64url、`member` 格式錯或多欄位）／`invalid_json`／`invalid_key_id`／`invalid_nonce`；401 `invalid_signature`／`stale_request`／`replayed_request`；404 `unknown_site`。
+  - 先照匿名請求依來源位址限流（每分鐘 10 次）；帶了票標頭就必須驗過，失敗不退回匿名：400 `invalid_ticket`（標頭不是 base64url、`member` 格式錯或多欄位）／`invalid_json`／`invalid_key_id`／`invalid_nonce`；401 `invalid_signature`／`wrong_audience`／`stale_request`／`replayed_request`；404 `unknown_site`。
   - 驗過後以 `<key_id>:<member>` 計每 24 小時 AI 次數（輸入驗過、要呼叫 AI 才計；AI 端回 502／503 也算一次），超過 `ai_per_day` 回 429 `daily_limit_reached`（`Retry-After`）。計數在單一行程記憶體，重啟歸零。
   - 沒帶票 = 匿名，行為不變。
 

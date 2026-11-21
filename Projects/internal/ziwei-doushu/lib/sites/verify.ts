@@ -4,16 +4,20 @@ import { getSites, SITE_KEY_ID, type Site } from './registry';
 /**
  * 站台對引擎的伺服器對伺服器請求驗證。構造沿用既有的 WordPress 換手(next-admin
  *   lib/auth/sources/awarewave-wp.ts、aware-wave-store Signature.php):
- * - body 是 JSON,含 key_id、ts(unix 秒)、nonce(16–100 個 [A-Za-z0-9_-]),其餘是請求內容;
+ * - body 是 JSON,含 key_id、ts(unix 秒)、nonce(16–100 個 [A-Za-z0-9_-])、aud(用途),其餘是請求內容;
  * - 標頭 X-AwareWave-Oracle-Signature = base64(Ed25519(原始 body 位元組)),以站台私鑰簽;
  * - ts 在 ±60 秒內、同一站的 nonce 只能用一次;nonce 只在簽章與時鐘都通過後才消耗(攻擊者燒不掉別人的 nonce)。
  * 標頭名稱依用途分開(付款、換手、算命各一個),漏出的一把鑰匙不能拿去做另一件事。
+ * 算命站內同一把鑰匙、同一個標頭有兩種用途(/api/v1 伺服器請求、會員票),所以簽過的原文自帶 aud:
+ *   一份原文只對一個用途有效;aud 不符在消耗 nonce 之前就拒絕(拿錯地方的票之後仍可正常使用)。
  * nonce 記在本行程記憶體;重啟最多忘掉最後 60 秒,而那些請求的 ts 也已過期。
  */
 export const SITE_SIGNATURE_HEADER = 'x-awarewave-oracle-signature';
 const WINDOW_SECONDS = 60;
 const NONCE = /^[A-Za-z0-9_-]{16,100}$/;
-const AUTH_FIELDS = ['key_id', 'ts', 'nonce'] as const;
+const AUTH_FIELDS = ['key_id', 'ts', 'nonce', 'aud'] as const;
+/** 簽過的原文的用途:/api/v1(含 batch)= v1;會員票(lib/sites/ticket.ts)= ticket。 */
+export type SiteAudience = 'v1' | 'ticket';
 
 const seen = new Map<string, number>(); // <key_id>:<nonce> -> 到期(unix 秒)
 let lastSweep = 0;
@@ -41,6 +45,7 @@ export type SiteAuth =
 export function verifySiteRequest(
   rawBody: string,
   signature: string | null,
+  aud: SiteAudience,
   now: number = Math.floor(Date.now() / 1000),
   env: Record<string, string | undefined> = process.env,
 ): SiteAuth {
@@ -64,6 +69,7 @@ export function verifySiteRequest(
     valid = false;
   }
   if (!valid) return { ok: false, status: 401, error: 'invalid_signature' };
+  if (body.aud !== aud) return { ok: false, status: 401, error: 'wrong_audience' };
   if (typeof nonce !== 'string' || !NONCE.test(nonce)) return { ok: false, status: 400, error: 'invalid_nonce' };
   if (!Number.isSafeInteger(ts) || Math.abs(now - (ts as number)) > WINDOW_SECONDS) return { ok: false, status: 401, error: 'stale_request' };
   if (!takeNonce(`${keyId}:${nonce}`, now)) return { ok: false, status: 401, error: 'replayed_request' };

@@ -46,7 +46,7 @@ export type V1Request =
 /**
  * 讀 body 並決定這次請求算誰的額度:
  * - 帶 X-AwareWave-Oracle-Signature = 站台伺服器呼叫:驗簽(lib/sites/verify.ts),以 key_id 另計額度,
- *   body 去掉 key_id／ts／nonce 後回傳;
+ *   body 去掉 key_id／ts／nonce／aud 後回傳;
  * - 沒帶 = 匿名呼叫:依來源位址限流。
  * weight(body) = 這次要算幾次額度(批次按筆數);不合法的 body 算 1 次。
  * requireSite:只給站台用的端點(批次),沒簽章直接 401。
@@ -70,7 +70,7 @@ export async function readV1Request(
     return { ok: false, response: v1Error(400, 'invalid_request', `body larger than ${maxBytes} bytes`) };
   }
   if (signature !== null) {
-    const auth = verifySiteRequest(text, signature);
+    const auth = verifySiteRequest(text, signature, 'v1');
     if (!auth.ok) return { ok: false, response: v1Error(auth.status, auth.error, 'site request rejected') };
     const weight = Math.max(1, opts.weight?.(auth.payload) ?? 1);
     const limited = siteRateLimited(auth.site.keyId, auth.site.requestsPerMinute, weight, CORS_HEADERS);

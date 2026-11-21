@@ -8,7 +8,7 @@ import { runOne } from '@/lib/http/runSystem';
 
 /**
  * POST /api/v1/systems/{id}  body { input, locale? } → { apiVersion, system, data, context }
- *   匿名呼叫依來源位址限流;已登記站台帶簽章(body 另含 key_id、ts、nonce)時改以 key_id 計額度。
+ *   匿名呼叫依來源位址限流;已登記站台帶簽章(body 另含 key_id、ts、nonce、aud:"v1")時改以 key_id 計額度。
  * GET  /api/v1/systems/{id}  → 該系統的輸入規格
  * 只給確定性結果;AI 解讀不在 v1。
  */

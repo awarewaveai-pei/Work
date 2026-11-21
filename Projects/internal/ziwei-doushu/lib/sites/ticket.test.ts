@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { __resetSiteNonces } from './verify';
+import { __resetSiteNonces, verifySiteRequest } from './verify';
 import { verifyTicket } from './ticket';
 
 const { publicKey, privateKey } = generateKeyPairSync('ed25519');
@@ -10,7 +10,7 @@ const NOW = 1_800_000_000;
 const MEMBER = 'member-abcdef-0001';
 let n = 0;
 const ticket = (over: Record<string, unknown> = {}) => {
-  const raw = JSON.stringify({ key_id: 'site-a', ts: NOW, nonce: `nonce-abcdefghij-${++n}`, member: MEMBER, ...over });
+  const raw = JSON.stringify({ key_id: 'site-a', ts: NOW, nonce: `nonce-abcdefghij-${++n}`, aud: 'ticket', member: MEMBER, ...over });
   return { t: Buffer.from(raw).toString('base64url'), sig: sign(null, Buffer.from(raw), privateKey).toString('base64') };
 };
 
@@ -56,6 +56,13 @@ describe('會員票 verifyTicket', () => {
   it('多帶欄位(例如站台對 /api/v1 的請求原文)不算票 → 400', () => {
     const { t, sig } = ticket({ system: 'ziwei' });
     expect(verifyTicket(t, sig, NOW, env)).toMatchObject({ ok: false, status: 400, error: 'invalid_ticket' });
+  });
+
+  it('/api/v1 的原文(aud=v1)當票 → 401 wrong_audience', () => {
+    const { t, sig } = ticket({ aud: 'v1' });
+    expect(verifyTicket(t, sig, NOW, env)).toMatchObject({ ok: false, status: 401, error: 'wrong_audience' });
+    // nonce 沒被消耗:同一份原文在 v1 仍有效
+    expect(verifySiteRequest(Buffer.from(t, 'base64url').toString('utf8'), sig, 'v1', NOW, env).ok).toBe(true);
   });
 
   it('不是 base64url → 400', () => {

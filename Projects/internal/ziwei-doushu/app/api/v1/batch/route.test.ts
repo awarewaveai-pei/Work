@@ -5,6 +5,7 @@ import { POST as single } from '../systems/[id]/route';
 import { GET as places, OPTIONS as placesOptions } from '../places/route';
 import { __resetRateLimit } from '@/lib/http/rateLimit';
 import { __resetSiteNonces } from '@/lib/sites/verify';
+import { verifyTicket } from '@/lib/sites/ticket';
 
 // lib/places/server.ts 的 server-only 由 Next 提供,vitest 沒有;只在這裡換成空模組
 vi.mock('server-only', () => ({}));
@@ -15,7 +16,7 @@ let n = 0;
 const nonce = () => `nonce-abcdefghij-${++n}`;
 
 function signedRequest(url: string, body: Record<string, unknown>, keyId = 'site-a') {
-  const raw = JSON.stringify({ key_id: keyId, ts: Math.floor(Date.now() / 1000), nonce: nonce(), ...body });
+  const raw = JSON.stringify({ key_id: keyId, ts: Math.floor(Date.now() / 1000), nonce: nonce(), aud: 'v1', ...body });
   return new Request(url, {
     method: 'POST',
     headers: {
@@ -119,6 +120,20 @@ describe('已簽章的單次呼叫', () => {
     );
     expect(r.status).toBe(200);
     expect((await r.json()).data.no).toBe(7);
+  });
+  it('會員票原文拿來打 v1 → 401 wrong_audience;不扣站台額度、不消耗 nonce', async () => {
+    process.env.ORACLE_SITES = JSON.stringify([{ key_id: 'site-a', public_key: PEM, requests_per_minute: 1 }]);
+    const stolen = signedRequest('http://x/api/v1/systems/qian', { aud: 'ticket', member: 'member-aaaaaaaa-0001' });
+    const raw = await stolen.clone().text();
+    const sig = stolen.headers.get('x-awarewave-oracle-signature');
+    const r = await single(stolen, { params: Promise.resolve({ id: 'qian' }) });
+    expect(r.status).toBe(401);
+    expect((await r.json()).error).toBe('wrong_audience');
+    // 站台每分鐘只剩 1 次:沒被扣掉,正常請求仍過
+    const ok = await single(signedRequest('http://x/api/v1/systems/qian', { input: { lot: 7 } }), { params: Promise.resolve({ id: 'qian' }) });
+    expect(ok.status).toBe(200);
+    // nonce 沒被消耗:同一張票在正確用途仍有效
+    expect(verifyTicket(Buffer.from(raw).toString('base64url'), sig).ok).toBe(true);
   });
 });
 

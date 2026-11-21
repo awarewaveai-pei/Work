@@ -20,8 +20,8 @@ afterAll(() => {
 
 const goodCtx = { systemId: 'ziwei', locale: 'zh-TW', headline: '破軍 · 木三局', facts: [{ label: 'soul', value: '破軍' }] };
 let n = 0;
-function post(member: string, opts: { badSig?: boolean; ip?: string } = {}): Request {
-  const raw = JSON.stringify({ key_id: 'site-a', ts: Math.floor(Date.now() / 1000), nonce: `nonce-abcdefghij-${++n}`, member });
+function post(member: string, opts: { badSig?: boolean; ip?: string; aud?: string } = {}): Request {
+  const raw = JSON.stringify({ key_id: 'site-a', ts: Math.floor(Date.now() / 1000), nonce: `nonce-abcdefghij-${++n}`, aud: opts.aud ?? 'ticket', member });
   const signed = opts.badSig ? `${raw} ` : raw;
   return new Request('http://localhost/api/interpret', {
     method: 'POST',
@@ -55,6 +55,15 @@ describe('/api/interpret 會員票', () => {
     expect(r.status).toBe(401);
     expect(await r.json()).toEqual({ error: 'invalid_signature' });
     expect(interpretMock).not.toHaveBeenCalled();
+  });
+
+  it('aud 不是 ticket(v1 原文當票)→ 401 wrong_audience,不扣每日次數', async () => {
+    const r = await POST(post(A, { aud: 'v1' }));
+    expect(r.status).toBe(401);
+    expect(await r.json()).toEqual({ error: 'wrong_audience' });
+    expect((await POST(post(A))).status).toBe(200);
+    expect((await POST(post(A))).status).toBe(200); // ai_per_day = 2:被拒的那次沒算
+    expect(interpretMock).toHaveBeenCalledTimes(2);
   });
 
   it('空的票標頭 → 400,不退回匿名', async () => {

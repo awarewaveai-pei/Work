@@ -6,7 +6,7 @@ import { API_VERSION, MAX_BATCH_BODY_BYTES, MAX_BATCH_ITEMS, readV1Request, v1Er
 import { runOne } from '@/lib/http/runSystem';
 
 /**
- * POST /api/v1/batch — 只給已登記站台(帶簽章)。body { key_id, ts, nonce, system, items: [input…], locale? }
+ * POST /api/v1/batch — 只給已登記站台(帶簽章)。body { key_id, ts, nonce, aud: "v1", system, items: [input…], locale? }
  *   → { apiVersion, system, results: [{ ok: true, data, context } | { ok: false, error, detail }] },results 與 items 同序。
  * 每筆用同一份輸入規格(X1 parseInput)逐筆驗證與計算,一筆失敗不影響其他筆。額度以 key_id 按筆數計。
  * 用途:外掛每日排程一次預算多位訂閱者的每日運勢。
