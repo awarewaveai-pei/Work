@@ -6,7 +6,7 @@
  *
  * Auth: Authorization: Bearer {LOBSTER_HOSTING_API_TOKEN}
  * Input: { organizationId, siteId, siteName }
- * Output: { environmentId, wpRootPath, stagingSiteUrl, wpAdminUrl, wpAdminUser }
+ * Output: { environmentId (a real environments row, staging), wpRootPath, stagingSiteUrl, wpAdminUrl, wpAdminUser }
  *
  * Host access: HOSTING_BRIDGE_SSH_* key, whose only power is the forced command
  * scripts/aw-hosting-gate.sh (verbs `staging-prepare <slug> <db>`, `staging-wp <slug>`). The command line
@@ -26,6 +26,7 @@ import { isR2Configured, buildWebImageKey, parseImageDataUrl, putDesignObject } 
 import { generateStagingAdminPassword, vaultStagingAdminPassword } from "../../../../../lib/hosting/staging-admin-credential";
 import { checkProductionChangeAllowed } from "../../../../../lib/system-modes/production-change-gate";
 import { blockedChangeResponse } from "../../../../../lib/system-modes/blocked-change";
+import { ensureEnvironment, setEnvironmentStatus } from "../../../../../lib/site-flow/records";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -434,7 +435,32 @@ export async function POST(request: Request) {
   const stagingSiteUrl = `${STAGING_BASE_URL}/${slug}/`;
   const wpAdminUrl = `${stagingSiteUrl}wp-admin/`;
   const adminPass = generateStagingAdminPassword();
-  const environmentId = crypto.randomUUID();
+
+  // The staging environment row is written before any host work, so the environmentId returned below is a
+  // real environments.id (lib/site-flow/records.ts). No row (unknown site, another org's site, DB down)
+  // = no host work. resolveTargetOrg made organizationId a required uuid for this (non-seed) path.
+  const envOrgId = scope.organizationId;
+  if (!envOrgId) return NextResponse.json({ error: "organizationId required" }, { status: 422 });
+  const db = getSupabaseWriteClient();
+  if (!db) {
+    return NextResponse.json({ error: "environment_record_failed", detail: "no DB write client" }, { status: 503 });
+  }
+  const env = await ensureEnvironment(db, {
+    organizationId: envOrgId,
+    siteId,
+    environmentType: "staging",
+    name: `${siteName} Staging`,
+    hostingProvider: "ks-aw-01-staging-subdir",
+    serverRef: "ks-aw-01",
+    baseUrl: stagingSiteUrl,
+    wpRootPath: wpPath,
+    status: "provisioning",
+  });
+  if ("error" in env) {
+    const status = env.error === "site_not_found" || env.error === "site_scope_mismatch" ? 422 : 500;
+    return NextResponse.json({ error: "environment_record_failed", detail: env.error }, { status });
+  }
+  const environmentId = env.value.id;
 
   let conn: SshClient | null = null;
   try {
@@ -534,6 +560,7 @@ export async function POST(request: Request) {
     // WORKLOG 2026-06-17). So seeding runs as a SEPARATE short call (mode:"seed", handled at the
     // top of POST) that the persistent Trigger.dev `create-wp-site` task makes AFTER this provision
     // call returns. Each call stays under the CF ceiling; the orchestrator surfaces seed status.
+    const ready = await setEnvironmentStatus(db, environmentId, "ready");
     return NextResponse.json({
       environmentId,
       wpRootPath: wpPath,
@@ -550,12 +577,21 @@ export async function POST(request: Request) {
         // Never the password: these notes land in Trigger.dev run output + ops_action_runs.
         adminCredNote,
         ...(mainwpNote ? [mainwpNote] : []),
+        ...("error" in ready ? [`WARN: environment ${environmentId} not marked ready (${ready.detail ?? ready.error})`] : []),
         `Org: ${organizationId ?? "n/a"} Site: ${siteId}`,
       ],
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: "provisioning_failed", detail: msg }, { status: 500 });
+    const failed = await setEnvironmentStatus(db, environmentId, "failed");
+    if ("error" in failed) {
+      // The row stays `provisioning`: say so, a re-run of this call rewrites it.
+      console.error(`[provision-staging] environment ${environmentId} not marked failed: ${failed.detail ?? failed.error}`);
+    }
+    return NextResponse.json(
+      { error: "provisioning_failed", detail: msg, ...("error" in failed ? { environment_status: "write_failed" } : {}) },
+      { status: 500 },
+    );
   } finally {
     conn?.end();
   }

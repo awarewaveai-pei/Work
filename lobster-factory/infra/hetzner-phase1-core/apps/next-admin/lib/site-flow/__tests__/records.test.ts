@@ -1,0 +1,144 @@
+// lib/site-flow/records.ts against an in-memory table fake (the PostgREST chain shapes records.ts uses).
+// Card SF-B acceptance: an existing organization's metadata survives a repeat create (old-data test);
+// a repeated environment does not duplicate; invalid hosting_provider / ingress are refused.
+import { describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { ensureEnvironment, ensureOrganization, mergeMetadataAddOnly } from "../records";
+
+type Row = Record<string, unknown>;
+
+function fakeDb(seed: Record<string, Row[]> = {}) {
+  const tables: Record<string, Row[]> = { ...seed };
+  let n = 0;
+  const from = (table: string) => {
+    const rows = (tables[table] ??= []);
+    const filters: ((r: Row) => boolean)[] = [];
+    let patch: Row | null = null;
+    let inserted: Row | null = null;
+    const matching = () => rows.filter((r) => filters.every((f) => f(r)));
+    const q = {
+      select: () => q,
+      eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
+      neq: (c: string, v: unknown) => (filters.push((r) => r[c] !== v), q),
+      order: () => q,
+      limit: () => q,
+      maybeSingle: async () => ({ data: matching()[0] ?? null, error: null }),
+      single: async () => (inserted ? { data: inserted, error: null } : { data: matching()[0] ?? null, error: null }),
+      insert: (row: Row) => {
+        inserted = { id: `id-${++n}`, status: "active", created_at: "2026-11-22T00:00:00Z", metadata: {}, ...row };
+        rows.push(inserted);
+        return q;
+      },
+      update: (p: Row) => ((patch = p), q),
+      then: (resolve: (v: { error: null }) => void) => {
+        if (patch) for (const r of matching()) Object.assign(r, patch);
+        resolve({ error: null });
+      },
+    };
+    return q;
+  };
+  return { db: { from } as unknown as SupabaseClient, tables };
+}
+
+const ORG = "0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a";
+const OTHER_ORG = "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b";
+const SITE = "6f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b";
+
+describe("ensureOrganization", () => {
+  it("an existing client's wp_update_latest, brand_colors and client_config survive a create with the same slug", async () => {
+    const original = {
+      wp_update_latest: { at: "2026-11-01T03:00:00Z", ok: true, plugins: ["fluentform"] },
+      brand_colors: { primary: "#112233" },
+      client_config: { platform: "wordpress", site_url: "https://soulful.example", ssh_host: "h", ssh_user: "u" },
+    };
+    const { db, tables } = fakeDb({
+      organizations: [{ id: ORG, slug: "soulful", name: "Soulful", type: "client", status: "active", created_at: "x", metadata: structuredClone(original) }],
+    });
+
+    const r = await ensureOrganization(db, {
+      slug: "soulful",
+      name: "Soulful renamed",
+      type: "client",
+      metadata: { client_config: { platform: "wordpress", site_url: "https://typo.example", hosting_type: "hostinger" } },
+    });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.id).toBe(ORG);
+    expect(r.value.created).toBe(false);
+    const meta = tables.organizations[0].metadata as typeof original & { client_config: Record<string, unknown> };
+    expect(meta.wp_update_latest).toEqual(original.wp_update_latest);
+    expect(meta.brand_colors).toEqual(original.brand_colors);
+    expect(meta.client_config).toEqual({ ...original.client_config, hosting_type: "hostinger" });
+    expect(r.value.keptKeys).toEqual(["client_config.site_url"]);
+    expect(tables.organizations).toHaveLength(1);
+    expect(tables.organizations[0].name).toBe("Soulful");
+  });
+
+  it("an existing slug under another id is refused", async () => {
+    const { db } = fakeDb({ organizations: [{ id: ORG, slug: "acme", name: "Acme", metadata: {} }] });
+    const r = await ensureOrganization(db, { slug: "acme", name: "Acme", id: OTHER_ORG });
+    expect(r).toMatchObject({ ok: false, error: "slug_id_mismatch" });
+  });
+
+  it("createOnly: an existing slug is refused and left untouched (a new client never adopts another's org)", async () => {
+    const { db, tables } = fakeDb({ organizations: [{ id: ORG, slug: "acme-1a2b3c", name: "Acme", metadata: { a: 1 } }] });
+    const r = await ensureOrganization(db, { slug: "acme-1a2b3c", name: "Other", metadata: { b: 2 }, createOnly: true });
+    expect(r).toMatchObject({ ok: false, error: "slug_taken" });
+    expect(tables.organizations).toEqual([{ id: ORG, slug: "acme-1a2b3c", name: "Acme", metadata: { a: 1 } }]);
+  });
+
+  it("mergeMetadataAddOnly never replaces a value, even a falsy one", () => {
+    const { merged, kept } = mergeMetadataAddOnly({ a: 0, b: { c: false } }, { a: 1, b: { c: true, d: 2 }, e: 3 });
+    expect(merged).toEqual({ a: 0, b: { c: false, d: 2 }, e: 3 });
+    expect(kept).toEqual(["a", "b.c"]);
+  });
+});
+
+describe("ensureEnvironment", () => {
+  const site = { id: SITE, organization_id: ORG, workspace_id: "ws-1" };
+  const base = {
+    organizationId: ORG,
+    siteId: SITE,
+    environmentType: "staging" as const,
+    name: "Acme Staging",
+    hostingProvider: "ks-aw-01-staging-subdir",
+    baseUrl: "https://aware-wave.com/staging/acme-6f1e2d/",
+  };
+
+  it("a repeated call returns the same row instead of a second one; ingress defaults to host-vhost", async () => {
+    const { db, tables } = fakeDb({ sites: [site] });
+    const a = await ensureEnvironment(db, base);
+    const b = await ensureEnvironment(db, { ...base, status: "ready" });
+    expect(a).toMatchObject({ ok: true, value: { created: true } });
+    expect(b).toMatchObject({ ok: true, value: { created: false } });
+    if (!a.ok || !b.ok) return;
+    expect(b.value.id).toBe(a.value.id);
+    expect(tables.environments).toHaveLength(1);
+    expect(tables.environments[0]).toMatchObject({ organization_id: ORG, workspace_id: "ws-1", status: "ready", metadata: { ingress: "host-vhost" } });
+  });
+
+  it("an existing row keeps its ingress when the caller passes none", async () => {
+    const { db, tables } = fakeDb({ sites: [site] });
+    await ensureEnvironment(db, { ...base, metadata: { ingress: "product-gateway" } });
+    await ensureEnvironment(db, base);
+    expect((tables.environments[0].metadata as Row).ingress).toBe("product-gateway");
+  });
+
+  it.each([
+    ["hosting_provider", { hostingProvider: "hostinger" }, "invalid_hosting_provider"],
+    ["ingress", { metadata: { ingress: "public" } }, "invalid_ingress"],
+  ])("an invalid %s is refused and nothing is written", async (_l, override, error) => {
+    const { db, tables } = fakeDb({ sites: [site] });
+    const r = await ensureEnvironment(db, { ...base, ...override });
+    expect(r).toMatchObject({ ok: false, error });
+    expect(tables.environments ?? []).toHaveLength(0);
+  });
+
+  it("another organization's site is refused", async () => {
+    const { db, tables } = fakeDb({ sites: [site] });
+    const r = await ensureEnvironment(db, { ...base, organizationId: OTHER_ORG });
+    expect(r).toMatchObject({ ok: false, error: "site_scope_mismatch" });
+    expect(tables.environments ?? []).toHaveLength(0);
+  });
+});

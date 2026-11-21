@@ -22,6 +22,7 @@ import {
   resolveInstallableSlugsForPacks,
   resolvePaidPluginsForPacks,
 } from "../../../../lib/wp-plugin-stack-catalog";
+import { ensureOrganization, ensureProject, ensureSite, ensureWorkspace } from "../../../../lib/site-flow/records";
 
 // Auth: Supabase session (owner/admin/operator) OR server-to-server x-ops-sync-key.
 // Mirrors the dual-path pattern established in wp-update/route.ts.
@@ -146,7 +147,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, run_id: existingRun?.id ?? null, idempotent: true });
   }
 
-  // Resolve org — reuse bound org or create new
+  // Resolve org → workspace → project → site through the shared records (lib/site-flow/records.ts):
+  // reuse the bound org or create a new one, then the org's default workspace, its wordpress project
+  // and the project's draft site.
   let organizationId: string | null = (intakeRow.organization_id as string | null) ?? null;
   let organizationSlug: string | null = null;
 
@@ -163,23 +166,21 @@ export async function POST(request: Request) {
 
   if (!organizationId) {
     const suffix = crypto.randomUUID().slice(0, 6);
-    organizationSlug = toOrgSlug(companyName, suffix);
-    const { data: org, error: orgErr } = await supabase
-      .from("organizations")
-      .insert({
-        type: "client",
-        name: companyName,
-        slug: organizationSlug,
-        status: "active",
-        default_locale: locale,
-        metadata: { intake_form_id, website_spec_id, source: "onboarding_portal", ...clientConfigSeed },
-      })
-      .select("id")
-      .single();
-    if (orgErr || !org) {
+    const org = await ensureOrganization(supabase, {
+      type: "client",
+      name: companyName,
+      slug: toOrgSlug(companyName, suffix),
+      status: "active",
+      defaultLocale: locale,
+      metadata: { intake_form_id, website_spec_id, source: "onboarding_portal", ...clientConfigSeed },
+      createOnly: true, // a slug collision must fail, never bind this intake to an existing client
+    });
+    if ("error" in org) {
+      console.error(`[trigger-build] organization create failed: ${org.error} ${org.detail ?? ""}`);
       return NextResponse.json({ ok: false, error: "org_create_failed" }, { status: 500 });
     }
-    organizationId = org.id;
+    organizationId = org.value.id;
+    organizationSlug = org.value.slug;
 
     // Bind org to intake form
     const { error: bindErr } = await supabase
@@ -201,98 +202,32 @@ export async function POST(request: Request) {
     organizationSlug = (orgRow?.slug as string | undefined) ?? null;
   }
 
-  // Resolve workspace — reuse existing default or create
-  let workspaceId: string;
-  const { data: existingWs } = await supabase
-    .from("workspaces")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("slug", "default")
-    .maybeSingle();
-
-  if (existingWs) {
-    workspaceId = existingWs.id;
-  } else {
-    const { data: ws, error: wsErr } = await supabase
-      .from("workspaces")
-      .insert({
-        organization_id: organizationId,
-        name: `${companyName} - Default`,
-        slug: "default",
-        workspace_type: "default",
-        status: "active",
-      })
-      .select("id")
-      .single();
-    if (wsErr || !ws) {
-      return NextResponse.json({ ok: false, error: "workspace_create_failed" }, { status: 500 });
-    }
-    workspaceId = ws.id;
+  const ws = await ensureWorkspace(supabase, { organizationId, name: `${companyName} - Default` });
+  if (!ws.ok) {
+    return NextResponse.json({ ok: false, error: "workspace_create_failed" }, { status: 500 });
   }
+  const workspaceId = ws.value.id;
 
-  // Resolve project — reuse existing or create
-  let projectId: string;
-  const { data: existingProj } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("workspace_id", workspaceId)
-    .eq("project_type", "wordpress")
-    .maybeSingle();
-
-  if (existingProj) {
-    projectId = existingProj.id;
-  } else {
-    const { data: proj, error: projErr } = await supabase
-      .from("projects")
-      .insert({
-        organization_id: organizationId,
-        workspace_id: workspaceId,
-        name: `${spec.site_name ?? companyName} Website`,
-        project_type: "wordpress",
-        status: "active",
-      })
-      .select("id")
-      .single();
-    if (projErr || !proj) {
-      return NextResponse.json({ ok: false, error: "project_create_failed" }, { status: 500 });
-    }
-    projectId = proj.id;
+  const proj = await ensureProject(supabase, { organizationId, workspaceId, name: `${spec.site_name ?? companyName} Website` });
+  if (!proj.ok) {
+    return NextResponse.json({ ok: false, error: "project_create_failed" }, { status: 500 });
   }
+  const projectId = proj.value.id;
 
-  // Resolve site — reuse existing staging draft or create
-  let siteId: string;
-  const { data: existingSite } = await supabase
-    .from("sites")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("project_id", projectId)
-    .eq("status", "draft")
-    .maybeSingle();
-
-  if (existingSite) {
-    siteId = existingSite.id;
-  } else {
-    const { data: site, error: siteErr } = await supabase
-      .from("sites")
-      .insert({
-        organization_id: organizationId,
-        workspace_id: workspaceId,
-        project_id: projectId,
-        name: spec.site_name ?? companyName,
-        primary_domain: domain,
-        locale: locale === "zh-TW" ? "zh_TW" : "en",
-        status: "draft",
-        theme_family: manifestSlug === "wp-tourism" ? "elementor" : "kadence",
-        stack_profile: manifestSlug,
-      })
-      .select("id")
-      .single();
-    if (siteErr || !site) {
-      return NextResponse.json({ ok: false, error: "site_create_failed" }, { status: 500 });
-    }
-    siteId = site.id;
+  const site = await ensureSite(supabase, {
+    organizationId,
+    workspaceId,
+    projectId,
+    name: spec.site_name ?? companyName,
+    primaryDomain: domain,
+    locale: locale === "zh-TW" ? "zh_TW" : "en",
+    themeFamily: manifestSlug === "wp-tourism" ? "elementor" : "kadence",
+    stackProfile: manifestSlug,
+  });
+  if (!site.ok) {
+    return NextResponse.json({ ok: false, error: "site_create_failed" }, { status: 500 });
   }
+  const siteId = site.value.id;
 
   // Build pipeline request
   const stagingDomain = domain ?? `staging-${organizationId}.aware-wave.com`;

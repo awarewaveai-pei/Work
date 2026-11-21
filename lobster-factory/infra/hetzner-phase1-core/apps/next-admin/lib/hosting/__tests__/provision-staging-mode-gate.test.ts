@@ -49,11 +49,16 @@ function fakeDb() {
     from: (table: string) => {
       const q: Record<string, unknown> = {};
       Object.assign(q, {
-        select: () => q, eq: () => q, update: () => q, delete: () => q,
+        select: () => q, eq: () => q, neq: () => q, order: () => q, limit: () => q, update: () => q, delete: () => q,
         single: async () => ({ data: { spec_data: {}, metadata: {} }, error: null }),
+        // sites: the provisioned site, owned by ORG_A (provision-staging writes its staging environments row first).
         maybeSingle: async () =>
-          table === "website_specs" ? db.spec : table === "intake_forms" ? db.intake : { data: null, error: null },
-        insert: async () => ({ error: null }),
+          table === "website_specs" ? db.spec : table === "intake_forms" ? db.intake
+            : table === "sites" ? { data: { id: SITE_ID, organization_id: ORG_A, workspace_id: "ws-1" }, error: null }
+            : { data: null, error: null },
+        insert: () => Object.assign(Promise.resolve({ error: null }), {
+          select: () => ({ single: async () => ({ data: { id: "env-1" }, error: null }) }),
+        }),
       });
       return q;
     },

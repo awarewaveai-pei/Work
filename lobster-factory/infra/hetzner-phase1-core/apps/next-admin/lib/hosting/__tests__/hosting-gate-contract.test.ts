@@ -45,7 +45,8 @@ vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => fakeDb()
 vi.mock("../../supabase-server", () => ({ getSupabaseWriteClient: () => fakeDb() }));
 function fakeDb() {
   return { from: (table: string) => {
-    const q = { select: () => q, eq: () => q,
+    // neq/order/limit: provision-staging's environments row (lib/site-flow/records.ts ensureEnvironment).
+    const q = { select: () => q, eq: () => q, neq: () => q, order: () => q, limit: () => q,
       single: async () => ({ data: table === "organizations" ? { metadata: dbState.orgMetadata } : { spec_data: spec }, error: null }),
       // website_specs row for the seed org lookup (provision-staging resolveTargetOrg)
       maybeSingle: async () => ({ data: { organization_id: ORG_ID, intake_form_id: null }, error: null }),

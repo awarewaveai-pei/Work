@@ -1,10 +1,13 @@
-// POST /api/ops/organizations — upsert an organization record (by slug)
+// POST /api/ops/organizations — ensure an organization record (by slug)
 // Called from /onboard Step 3→4 to auto-register new clients in Supabase.
 // GET is handled by /api/ops/clients/route.ts (reads organizations table).
+// An existing organization is never overwritten: its metadata is only added to (lib/site-flow/records.ts
+// ensureOrganization); `kept_keys` lists the submitted values that were not applied.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { resolveOpsRole, canWriteTenantConfig } from "../../../../lib/ops-role";
+import { ensureOrganization } from "../../../../lib/site-flow/records";
 
 export const dynamic = "force-dynamic";
 
@@ -38,28 +41,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "slug_and_name_required" }, { status: 400 });
   }
 
-  const now = new Date().toISOString();
-  const record: Record<string, unknown> = {
-    slug: body.slug.trim(),
-    name: body.name.trim(),
-    type: body.type ?? "client",
-    metadata: body.metadata ?? {},
-    updated_at: now,
-  };
-  if (body.id) record.id = body.id;
+  const result = await ensureOrganization(supabase, {
+    slug: body.slug,
+    name: body.name,
+    type: body.type,
+    metadata: body.metadata,
+    id: body.id,
+  });
 
-  const { data, error } = await supabase
-    .from("organizations")
-    .upsert(record, { onConflict: "slug" })
-    .select("id,slug,name,type,status,created_at")
-    .single();
-
-  if (error) {
+  if ("error" in result) {
+    const status = result.error === "slug_id_mismatch" ? 409 : result.error === "invalid_input" ? 400 : 500;
     return NextResponse.json(
-      { ok: false, error: "upsert_failed", details: error.message },
-      { status: 500 },
+      { ok: false, error: result.error === "slug_id_mismatch" ? result.error : "upsert_failed", details: result.detail ?? result.error },
+      { status },
     );
   }
 
-  return NextResponse.json({ ok: true, organization: data });
+  const { id, slug, name, type, status, created_at, created, keptKeys } = result.value;
+  return NextResponse.json({
+    ok: true,
+    organization: { id, slug, name, type, status, created_at },
+    created,
+    kept_keys: keptKeys,
+  });
 }
