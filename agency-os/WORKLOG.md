@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-21（續11）— 影片監工：R6–R10 部署上線（操作者：「go，現在部署」）
+
+- 部署：`/tmp/deploy-r10.sh` → `sg-deploy.sh next-admin video-workbench`，`RESULT ALL OK deployed c9e911c7f`（含 `41fe01a27`）。兩個一起上的原因：video-workbench `scripts/organization-picker.js` 新視窗呼叫 next-admin `bootstrap?first=1`／`?q=`，單上工作台會壞。log `/root/lobster-phase1/logs/deploy-r10-20261121.log`。
+- 未驗：部署後內建瀏覽器的登入失效，正式站題目三頁／客戶頁／content 入口預覽圖／工作台換客戶視窗尚未用瀏覽器看過。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke` → 34 passed 0 failed 24 skipped（`agency-os/reports/e2e/2026-11-21/smoke`） | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 部署，無新程式；程式審查見同日前一則
+- BUGHUNT_WAIVED: NA -- 部署，無新程式
+- rollback：`rollback-phase1.sh`（snapshot `lobster-phase1-next-admin:rollback-20261121-071906`、`lobster-phase1-video-workbench:rollback-20261121-071906`）。
 ## 2026-11-21（續10）— 我的設計影片批次刪除 17 部全失敗：QA 報告外鍵擋刪，且刪除先動 R2 檔再刪列（操作者截圖「17 部刪除失敗（0 部成功）」；「你決定」）
 
 - 根因：`media_qa_reports.candidate_asset_id`（0065:9，RESTRICT）擋 `media_assets` 列刪除；prod log `[designs] media_assets delete failed: ... media_qa_reports_candidate_asset_id_fkey`。所有刪除路徑先 `deleteUnreferencedAsset` 刪 R2、後刪列 → 列被擋時檔案已沒（抽查有 QA 報告的影片 10 部 R2 404，卡片仍在）。另：designs DELETE 只刪主列，影片其他比例列（`metadata.variantOf`，`video-pipeline.ts:284-302`）不檢查也不刪，R2 卻整個資料夾刪（`r2-delete-guard.ts:61`）。
