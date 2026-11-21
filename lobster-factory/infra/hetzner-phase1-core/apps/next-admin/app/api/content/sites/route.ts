@@ -5,6 +5,8 @@ import { getWpSites, siteUrlWriteGate } from "@/lib/content/wp-sites";
 import { canAccessOrg, effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -41,7 +43,19 @@ export async function GET(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
-  const includeInactive = new URL(req.url).searchParams.get("includeInactive") === "1";
+  const params = new URL(req.url).searchParams;
+  const includeInactive = params.get("includeInactive") === "1";
+  // ?organizationId= (through effectiveOrgId: a customer always gets its own) and ?siteId= narrow the list; none = as before.
+  const rawOrg = params.get("organizationId")?.trim() || null;
+  const siteId = params.get("siteId")?.trim() || null;
+  if ((rawOrg && !UUID_RE.test(rawOrg)) || (siteId && !UUID_RE.test(siteId))) {
+    return NextResponse.json({ ok: false, error: "invalid_id" }, { status: 400 });
+  }
+  let orgFilter: string | null = null;
+  if (rawOrg) {
+    try { orgFilter = effectiveOrgId(req, rawOrg); }
+    catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  }
 
   const supabase = getSupabaseWriteClient();
   if (supabase) {
@@ -49,6 +63,8 @@ export async function GET(req: Request): Promise<Response> {
       .from("wp_sites")
       .select("id, name, url, color, active, note, created_at, token, username, content_defaults, organization_id, organizations(slug)");
     if (!includeInactive) sitesQuery = sitesQuery.eq("active", true);
+    if (orgFilter) sitesQuery = sitesQuery.eq("organization_id", orgFilter);
+    if (siteId) sitesQuery = sitesQuery.eq("id", siteId);
 
     const sitesResult = await sitesQuery.order("created_at");
 
@@ -97,7 +113,10 @@ export async function GET(req: Request): Promise<Response> {
 
   // Fallback: env vars (read-only, shown as "env" source). Env sites belong to no organization: a customer sees none.
   const { sites: envSites } = await getWpSites();
-  const sites: ManagedSite[] = envSites.filter(s => canAccessOrg(req, s.organizationId)).map(s => ({
+  const sites: ManagedSite[] = envSites
+    .filter(s => canAccessOrg(req, s.organizationId))
+    .filter(s => (!orgFilter || s.organizationId === orgFilter) && (!siteId || s.id === siteId))
+    .map(s => ({
     ...s,
     active: true,
     tokenSet: true,

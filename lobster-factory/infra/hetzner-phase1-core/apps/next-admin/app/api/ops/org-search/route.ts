@@ -3,7 +3,7 @@
 // GET /api/ops/clients returns (client_config holds SSH host / user / key name and the WordPress path).
 // Never the whole table (every WordPress buyer is an organization): no q = the first NAV_FIRST by created_at plus
 // `total`; ?q= = name or slug contains q, at most NAV_SEARCH_LIMIT rows; ?brandColors=1 = only clients with at least
-// one valid hex brand colour.
+// one valid hex brand colour; ?include=<uuid> = that client is put first when the page would not have it.
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { resolveOpsRole, canModifyIncidentStatus } from "@/lib/ops-role";
@@ -17,6 +17,7 @@ const ORG_SEARCH_COLUMNS = "id,slug,name,color:metadata->>color,brandColors:meta
 
 const BRAND = "metadata->client_config->brandColors";
 const HEX = `"^#[0-9a-fA-F]{6}$"`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HAS_BRAND = ["primary", "secondary", "accent"].map((k) => `${BRAND}->>${k}.match.${HEX}`).join(",");
 
 export async function GET(request: Request) {
@@ -50,6 +51,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "org_search_failed", details: error.message }, { status: 500 });
   }
   const orgs = (data ?? []).map(toPickOrg);
+  // ?include=<uuid>: the client named in the URL shows even when it is not in this page (same columns, first row).
+  const include = params.get("include");
+  if (include && UUID.test(include) && !orgs.some((o) => o.id === include)) {
+    const one = await supabase.from("organizations").select(ORG_SEARCH_COLUMNS).neq("status", "inactive").eq("id", include).maybeSingle();
+    if (one.data) orgs.unshift(toPickOrg(one.data));
+  }
   // total: every matching client (no q only; a search reports what it returned)
   return NextResponse.json({ ok: true, orgs, total: count ?? orgs.length });
 }
