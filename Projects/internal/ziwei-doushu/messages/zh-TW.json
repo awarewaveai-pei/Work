@@ -219,7 +219,11 @@
     "changed": "變卦",
     "movingLines": "動爻",
     "noMoving": "無動爻",
-    "hexagramNo": "第 {n} 卦"
+    "hexagramNo": "第 {n} 卦",
+    "readingTitle": "依此卦該讀的經文",
+    "readingMethod": "依朱熹《易學啟蒙》的變爻讀法",
+    "readingMain": "主讀",
+    "readingNote": ""
   },
   "tarot": {
     "title": "塔羅占卜",

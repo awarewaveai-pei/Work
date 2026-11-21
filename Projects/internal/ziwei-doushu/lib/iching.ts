@@ -4,7 +4,8 @@
  * 起卦法(銅錢):每爻擲 3 枚銅錢,陰面=2、陽面=3,三枚和:
  *   6 老陰(動,變陽) / 7 少陽(靜) / 8 少陰(靜) / 9 老陽(動,變陰)
  * 六爻由下(初爻)而上(上爻)。動爻翻面 → 本卦 + 變卦。
- * 解卦文字由 AI 層產生(本模組提供卦象結構:卦名/卦序/上下卦/動爻)。
+ * 本模組提供卦象結構(卦名/卦序/上下卦/動爻);經文在 lib/iching/text.ts,
+ * 依動爻該讀哪幾段在 lib/iching/reading.ts。AI 只依這些事實敘事。
  */
 
 /** 八卦三爻二進位(由下而上,1=陽 0=陰) */
@@ -70,15 +71,22 @@ export function castHexagram(
   question: string,
   rng: () => number = Math.random,
 ): IChingResult {
-  const lines: number[] = [];
-  const moving: number[] = [];
-  for (let i = 0; i < 6; i++) {
-    // 三枚銅錢:陰面=2、陽面=3
-    const sum = [0, 0, 0].reduce((acc) => acc + (rng() < 0.5 ? 2 : 3), 0);
-    const yang = sum === 7 || sum === 9 ? 1 : 0; // 7少陽/9老陽=陽
-    lines.push(yang);
-    if (sum === 6 || sum === 9) moving.push(i); // 老陰/老陽=動爻
+  // 每爻三枚銅錢:陰面=2、陽面=3
+  const sums = Array.from({ length: 6 }, () =>
+    [0, 0, 0].reduce((acc) => acc + (rng() < 0.5 ? 2 : 3), 0),
+  );
+  return hexagramFromSums(question, sums);
+}
+
+/**
+ * 六個爻值(由下而上,各為 6/7/8/9)→ 本卦、變卦、動爻。
+ */
+export function hexagramFromSums(question: string, sums: readonly number[]): IChingResult {
+  if (sums.length !== 6 || sums.some((s) => s < 6 || s > 9)) {
+    throw new Error(`爻值須為六個 6–9: ${sums.join(',')}`);
   }
+  const lines = sums.map((s) => (s === 7 || s === 9 ? 1 : 0)); // 7少陽/9老陽=陽
+  const moving = sums.flatMap((s, i) => (s === 6 || s === 9 ? [i] : [])); // 老陰/老陽=動爻
 
   const primaryMeta = lookup(lines);
   const primary: Hexagram = { ...primaryMeta, lines: [...lines] };

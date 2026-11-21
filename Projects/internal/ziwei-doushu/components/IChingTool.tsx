@@ -4,6 +4,7 @@ import { useState } from 'react';
 import AiReading from '@/components/AiReading';
 import { castHexagram, type IChingResult, type Hexagram } from '@/lib/iching';
 import { toContext } from '@/lib/divination/systems/iching';
+import { READING_RULE_TEXT, selectReading } from '@/lib/iching/reading';
 import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -42,6 +43,58 @@ function HexView({ h, label, hexagramNo }: { h: Hexagram; label: string; hexagra
       <div style={{ fontSize: '0.75rem', color: 'var(--text-caption)', marginTop: '0.2rem' }}>
         {hexagramNo}
       </div>
+    </div>
+  );
+}
+
+const SERIF = "var(--font-noto-serif-tc), 'PingFang TC', serif";
+
+/** 依變爻讀法該讀的經文(中文原文;英文頁只換標籤與說明)。 */
+function ReadingView({
+  result,
+  locale,
+  t,
+}: {
+  result: IChingResult;
+  locale: Locale;
+  t: Dictionary['iching'];
+}) {
+  const plan = selectReading(result);
+  const sourceLabel = (source: 'primary' | 'changed') =>
+    source === 'primary'
+      ? `${t.primary} · ${result.primary.name}`
+      : `${t.changed} · ${result.changed?.name ?? ''}`;
+  return (
+    <div className="glass-card p-6 mt-4" style={{ display: 'grid', gap: '0.75rem' }}>
+      <div>
+        <div style={{ fontWeight: 700, color: 'var(--gold-400)' }}>{t.readingTitle}</div>
+        <div style={{ fontSize: '0.8125rem', color: 'var(--text-caption)', marginTop: '0.25rem' }}>
+          {t.readingMethod} — {READING_RULE_TEXT[plan.rule][locale]}
+        </div>
+      </div>
+      {plan.passages.map((p, i) => (
+        <div key={i}>
+          <div className="label-dark" style={{ fontSize: '0.75rem' }}>
+            {sourceLabel(p.source)}
+            {p.main ? ` · ${t.readingMain}` : ''}
+          </div>
+          <p
+            lang="zh-Hant"
+            style={{
+              fontFamily: SERIF,
+              fontSize: '1.0625rem',
+              lineHeight: 1.9,
+              color: 'var(--text-heading)',
+              fontWeight: p.main ? 700 : 400,
+            }}
+          >
+            {p.text}
+          </p>
+        </div>
+      ))}
+      {t.readingNote ? (
+        <p style={{ color: 'var(--text-caption)', fontSize: '0.75rem' }}>{t.readingNote}</p>
+      ) : null}
     </div>
   );
 }
@@ -103,6 +156,7 @@ export default function IChingTool({ dict, locale }: { dict: Dictionary; locale:
               ? result.movingLines.map((i) => i + 1).join('、')
               : t.noMoving}
           </p>
+          <ReadingView result={result} locale={locale} t={t} />
           <AiReading context={toContext(result, locale)} ai={dict.ai} />
         </section>
       ) : null}

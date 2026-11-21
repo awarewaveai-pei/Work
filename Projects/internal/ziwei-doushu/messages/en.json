@@ -219,7 +219,11 @@
     "changed": "Changed",
     "movingLines": "Moving lines",
     "noMoving": "No moving lines",
-    "hexagramNo": "Hexagram {n}"
+    "hexagramNo": "Hexagram {n}",
+    "readingTitle": "The classic text to read for this cast",
+    "readingMethod": "Changing-line rules after Zhu Xi’s Yixue Qimeng",
+    "readingMain": "Leading",
+    "readingNote": "The text is shown in its original classical Chinese; the reading below explains it in English."
   },
   "tarot": {
     "title": "Tarot Reading",
