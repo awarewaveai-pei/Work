@@ -108,3 +108,20 @@ oracle 是 `sg-deploy.sh` 的 app `oracle-web`（`Projects/internal/ziwei-doushu
 
 卡片全文在各 session 的開場訊息。併入方式同前（`oracle-int` worktree → tsc＋全套 vitest → ff main）。待操作者決定：23 點出生的日界（紫微 `'forward'` 與八字 `sect=2` 現在相反）；塔羅牌圖。未排：`GITHUB_RESEARCH.md` §0.1 標「未排」各列。
 RISKS 處置：`agency-os/WORKLOG.md` 2026-11-21「oracle 批 5 併入」。
+
+## 批 6（2026-11-21，操作者：「17 個裡可用的全加 派工」；來源 `GITHUB_RESEARCH.md` §0.1）
+
+卡片在 `briefs/`（先讀 `COMMON.md`＋`COMMON-B6.md`）。日界已定：紫微 `ZIWEI_DAY_DIVIDE='current'`（23 點仍屬當日），與八字一致；依據見 WORKLOG 2026-11-21。
+
+| 卡 | 內容 | 工人 session（沿用） | 狀態 |
+|---|---|---|---|
+| Z2 | 紫微格局 25→64 條 | `local_2b695d16-feff-4153-b410-a8dca0915081` | 6a 進行中 |
+| T2 | 塔羅牌陣、密碼學亂數、每日一牌 | `local_1e8cf0f6-0159-4627-ae35-a4845b8667dd` | 6a 進行中 |
+| A1 | 占星本命相位 | `local_617452cb-7ed2-4a4e-8591-0e9160c5b5ac` | 6a 進行中 |
+| I2 | 六爻納甲排盤 | `local_f1c77b0b-cc9f-44ba-a7d1-316911378bd0` | 6a 進行中 |
+| D1 | 每日黃曆加料 | — | 6b 待派 |
+| T3 | 塔羅牌圖（等 T2） | — | 6b 待派 |
+| A2 | 尊貴、阿拉伯點、小限（等 A1） | — | 6b 待派 |
+
+不做：bazi-mcp 的輸出欄位（本站無對外 API）；react-iztro、lunar-python、ziwei-chart、ichingshifa、iChing-JS（無可取）。
+

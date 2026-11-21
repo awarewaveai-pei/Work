@@ -11,10 +11,12 @@ import type { Config, Option } from 'iztro/lib/data/types';
 
 /**
  * 晚子時(23 時,timeIndex 12)日界口徑:全站唯一設定處。
- * 'forward' = 整張盤(日、月、年、閏月)換到次日;'current' = 整張盤歸當日。
- * 上游預設 forward。要改口徑只改這一行。
+ * 'current' = 整張盤歸當日(時辰仍為子時);'forward' = 整張盤(日、月、年、閏月)換到次日。
+ * 取 current:《三命通會·論時刻》「若子時,則上半時在夜半前,屬昨日;下半時在夜半後,屬今日」,
+ *   日以子正(0 時)為界;八字(lib/bazi.ts,lunar-javascript sect 2)同此口徑。上游預設是 forward。
+ * 要改口徑只改這一行,並把 ziwei.test.ts「晚子時日界」那組測試反過來。
  */
-export const ZIWEI_DAY_DIVIDE: NonNullable<Config['dayDivide']> = 'forward';
+export const ZIWEI_DAY_DIVIDE: NonNullable<Config['dayDivide']> = 'current';
 
 export type Gender = '男' | '女';
 export type CalendarType = 'solar' | 'lunar';

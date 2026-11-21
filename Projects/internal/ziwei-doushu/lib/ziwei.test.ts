@@ -128,7 +128,7 @@ describe('紫微 toContext 強化(廟旺 + 四化 + 過運)', () => {
   });
 });
 
-describe('晚子時日界(iztro 2.6.5,ZIWEI_DAY_DIVIDE=forward)', () => {
+describe('晚子時日界(ZIWEI_DAY_DIVIDE=current:23 點仍屬當日)', () => {
   const chartOf = (y: number, m: number, d: number, hour: number) =>
     computeChart({ year: y, month: m, day: d, hour, minute: 30, gender: '女', calendar: 'solar' }).astrolabe;
   const view = (a: ReturnType<typeof chartOf>) => ({
@@ -143,8 +143,11 @@ describe('晚子時日界(iztro 2.6.5,ZIWEI_DAY_DIVIDE=forward)', () => {
     ['閏月十五', [2023, 4, 5], [2023, 4, 6]],
   ] as const;
 
-  it.each(rows)('%s:23 點的盤 = 次日 0 點的盤', (_n, [y, m, d], [ny, nm, nd]) => {
-    expect(view(chartOf(y, m, d, 23))).toEqual(view(chartOf(ny, nm, nd, 0)));
+  // 上游預設是換到次日;兩個方向都鎖,設定沒接上這組就會紅。
+  it.each(rows)('%s:23 點的盤 = 當日 0 點的盤,≠ 次日 0 點的盤', (_n, [y, m, d], [ny, nm, nd]) => {
+    const late = view(chartOf(y, m, d, 23));
+    expect(late).toEqual(view(chartOf(y, m, d, 0)));
+    expect(late).not.toEqual(view(chartOf(ny, nm, nd, 0)));
   });
 });
 

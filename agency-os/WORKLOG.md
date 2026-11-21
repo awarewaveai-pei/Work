@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-21（續4）— oracle 紫微晚子時改「仍屬當日」；批 6 卡片（操作者：「你去看正確的傳統算命應該怎麼做」「17 個裡可用的全加 派工」）
+
+- 決定：`Projects/internal/ziwei-doushu/lib/ziwei.ts` `ZIWEI_DAY_DIVIDE` `'forward'` → `'current'`（23:00–24:00 整張盤歸當日、時辰為子時）。八字不動（`lib/bazi.ts` 走 lunar-javascript `sect=2`：夜子時日柱當日、時干用次日日干推）——兩系統口徑一致。
+- 依據（查得到原文者）：
+  - 《三命通會》卷二〈論時刻〉：「若子時，則上半時在夜半前，屬昨日；下半時在夜半後，屬今日。」（識典古籍 https://www.shidianguji.com/zh/book/SK1610/chapter/1kf5v6o9bz7lf ；維基文庫四庫本卷02 同文，僅字形異）
+  - 袁樹珊《命理探原》卷五〈論時刻及夜子時與子時正不同〉引《星平大成》：「子正者，今日之早，非作日之晚也。」「夜子者，今日之夜，非今日之早也。」例：甲寅年正月初十夜子時作辛酉日庚子時、子正作壬戌日庚子時（https://www.suanzhun.net/book/986.html ）——與 lunar-javascript `sect=2` 的排法相同。
+- 未能證實：「23 點即換日」一派的古籍原文（二手文章稱引《尚書大傳》《革象新書》等，未讀到原文）；王亭之／中州派對紫微晚子時的規定（搜尋無原文）；紫微古籍（《紫微斗數全書》）無此條。知乎頁 403 未讀。網路文章對「何者為多數」說法互相矛盾，不採信任一方的「多數」宣稱。
+- 測試：`lib/ziwei.test.ts`「晚子時日界」四列改為「23 點的盤＝當日 0 點的盤，且≠次日 0 點的盤」——值已不同於上游預設，設定沒接上會紅（關掉 批 5 critic m3）。
+- 批 6 卡片（`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/`）：`COMMON-B6.md`、`Z2`（紫微格局 64 條）、`T2`（塔羅牌陣／亂數／每日一牌）、`A1`（占星相位）、`I2`（六爻納甲）、`D1`（黃曆加料）、`T3`（牌圖）、`A2`（尊貴／阿拉伯點／小限）。6a＝Z2、T2、A1、I2 同時；6b＝D1、T3、A2。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd Projects/internal/ziwei-doushu && npx tsc --noEmit && npx vitest run → 32 檔 222 passed／3 skipped | exit=0 | ms=4000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（一個常數＋四列測試反向；批 5 critic 已實測 `withOptions` 的 `dayDivide` 生效且 horoscope 沿用）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/ziwei-doushu | grep=ZIWEI_DAY_DIVIDE | hits=8
+- rollback：把常數改回 `'forward'` 並還原該組測試（`git revert` 本 commit）。未部署。
 ## 2026-11-21（續3）— oracle 批 5 併入：iztro 2.6.5＋易經經文進 facts（操作者：「升級紫微套件>派工」「易經補原文>派工」）
 
 - 併入：`f0113fead`（U2，工人 `local_51906081…`）、`01f599b7c`（I1，工人 `local_53c300dd…`）、`6ebc79425`（監工處理審查發現）；main ff 至 `6ebc79425`。**未部署**（`oracle-web` 不在夜間自動部署）。
