@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-21（續14）— 編輯器存入照文件分類：從 My Designs 修合成圖再存，不會變成設計圖（續13 m1；操作者：「要補上」）
+
+[根因] PhotoCraft「存入 My Designs」一律 `host.saveTag.source`＝`canvas`（`blocks/my-designs.js`），從 My Designs 把合成圖／塔羅牌開進畫布再存，就成了設計圖、進合成頁清單。續13 只把分類放在傳回票上，沒票的交接（`DesignsGallery.tsx` 畫布編輯）沒有。
+[不變量] 分類跟著文件走，一個來源：交接帶 `saveAs`（`openInCanvas` 第 6 參數，有無票皆可；票不再帶）→ dock 開檔後 `doc-source.js` `tagDocument(檔名, saveAs)` → 每次存入（面板存入＋傳回退路）以 `ctx.documentName()` 查標記，沒有＝宿主預設。對照表 `asset-group.ts` `editSaveSource`：mockup 類 → `mockup`、塔羅 → 原 source、設計圖 → 不標。
+[已修改] 新 `public/editor-shared/doc-source.js`；`canvas-handoff.ts`（saveAs 移到交接層）；`dock.js`（開檔標記、退路不再自帶 source）；`blocks/my-designs.js`（查標記）；`ctx-photocraft.js` `documentName`；`ctx-contract.md`「My Designs 分類」；`asset-group.ts` `editSaveSource`；`DesignsGallery.tsx` 帶分類；5 個發票處 saveAs 改第 6 參數。
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run components/tools lib/studio/__tests__/my-designs-host.test.ts lib/studio/__tests__/photo-pro-dock.test.ts lib/studio/__tests__/vector-pro-dock.test.ts "app/(shell)/tools/mockup" "app/(shell)/tools/tarot" "app/(shell)/tools/designs" → 10 files 182 passed；tsc 0；eslint 0 | exit=0 | ms=14000
+- 新測：交接→開檔→存入＝mockup、換文件＝canvas、宿主無 documentName＝canvas；saveAs 有票／無票／壞格式；`editSaveSource` 對照。突變：dock 不標記 → 紅，還原綠。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n（n1 標記以文件名為鍵：使用者把文件改名後再存＝走預設 canvas；PhotoCraft 無其他文件 id，契約已寫明）
+- ORACLE_WAIVED: codex quota blocked until 2026-11-24 11:02 (scripts/oracle-quota.ps1)；自審＋突變證據
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=openInCanvas\(|saveAs|saveTag.source|editSaveSource|tagDocument | hits=34（發票處、編輯器共用檔與測試；VectorCraft 無 documentName＝不分類，向量檔不會是合成圖）
+[rollback] `git revert <本 commit>`。
 ## 2026-11-21（續13）— 傳回退路存 My Designs 時照原工具分類（操作者：商品／模特兒合成圖不能再拿去合成）
 
 [根因] 原分頁已關時 `dock.js` `sendBack` 退路存 My Designs，source 固定編輯器的 `canvas`（=設計圖）：模特兒圖、合成圖、塔羅卡會落進合成頁設計圖清單（`designs-list.ts` print 只排除 mockup／tarot source）。

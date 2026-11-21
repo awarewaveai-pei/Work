@@ -4,6 +4,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import myDesigns, { saveToMyDesigns } from "../../../public/editor-shared/blocks/my-designs.js";
 import { createVectorcraftCtx } from "../../../public/editor-shared/ctx-vectorcraft.js";
+import { openHandoff } from "../../../public/editor-shared/dock.js";
+import { editSaveSource } from "../asset-group";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const VECTOR = createVectorcraftCtx({ frame: () => undefined }).host;
@@ -83,12 +85,25 @@ describe.each([
   });
 });
 
-describe("saveToMyDesigns: a 傳回 fallback is filed under the ticket's source", () => {
-  it("opts.source replaces the host's source tag; without it the host's stays", async () => {
-    const ctx = mountPanel(CANVAS).ctx;
-    await saveToMyDesigns(ctx, new Blob(["png"], { type: "image/png" }), { previewOnlyIfTooBig: true, source: "mockup" });
-    await saveToMyDesigns(ctx, new Blob(["png"], { type: "image/png" }), { previewOnlyIfTooBig: true });
-    expect(posts.map((p) => p.source)).toEqual(["mockup", "canvas"]);
+describe("My Designs 分類: a document opened from a composite saves as mockup, never as design art", () => {
+  afterEach(() => { delete (globalThis as { __proEditor?: unknown }).__proEditor; });
+  it("handoff saveAs tags the opened document; saves of it take the tag, other documents the host's", async () => {
+    let active = "合成.png";
+    const { ctx } = mountPanel(CANVAS, { ready: async () => {}, documentName: async () => active });
+    (globalThis as { __proEditor?: unknown }).__proEditor = { handoff: Promise.resolve({ url: "/h", name: "合成.png", saveAs: "mockup", done() {} }) };
+    expect(await openHandoff(ctx as never, () => {})).toBeTruthy();
+    expect(ctx.openFile).toHaveBeenCalledWith(expect.any(Blob), "合成.png");
+    const png = new Blob(["png"], { type: "image/png" });
+    await saveToMyDesigns(ctx, png);
+    active = "別的設計.psd";
+    await saveToMyDesigns(ctx, png);
+    await saveToMyDesigns({ ...ctx, documentName: undefined }, png); // a host without documentName: never classified
+    expect(posts.map((p) => p.source)).toEqual(["mockup", "canvas", "canvas"]);
+  });
+
+  it("editSaveSource (the gallery's 畫布編輯): mockups stay mockup, tarot keeps its source, design art is untagged", () => {
+    expect(["printful-mockup", "mockup", "tarot-art", "tarot", "pod-studio", "canvas", null].map(editSaveSource))
+      .toEqual(["mockup", "mockup", "tarot-art", "tarot", undefined, undefined, undefined]);
   });
 });
 

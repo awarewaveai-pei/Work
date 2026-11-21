@@ -6,6 +6,8 @@
 // cannot import it). GET rows carry source_url + metadata.source_name.
 // 開啟: row with source_url -> ctx.openFile(blob,name); row without -> ctx.placeImage(preview). 匯入舊專案: only when ctx.importLegacy exists (the host owns that conversion).
 
+import { documentSource } from "../doc-source.js";
+
 const MAX_UPLOAD_BYTES = 64 * 1024 * 1024; // lib/studio/design-pending.ts MAX_UPLOAD_BYTES
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const MB = (n) => Math.round(n / 1048576);
@@ -27,7 +29,7 @@ const headers = { "Content-Type": "application/json", "x-ops-simulated-role": "o
  * 存入 My Designs＝預覽 PNG＋可編輯原檔（ctx.saveAs）。面板的「存入」與 dock 的「傳回」退路（editor-shared/dock.js，C8.1）共用這一個。
  * png：已匯出的預覽（傳回時已有，不再匯出一次）；沒給就以 150 ppi 匯出。回 { ok: true, previewOnly? } 或 { ok: false, message }（給人看的原因）。
  * opts.previewOnlyIfTooBig：原檔超過 64MB 時不拒絕，改只存預覽圖（傳回的退路用：圖一定要落地一處）→ previewOnly: true。
- * opts.source：傳回票的 saveAs（模特兒圖／合成圖 → "mockup"、塔羅 → 塔羅 source），沒給用 host.saveTag.source。
+ * source：作用中文件的分類（doc-source.js；交接帶的 saveAs：合成圖 → "mockup"、塔羅 → 塔羅 source），沒有用 host.saveTag.source。
  */
 export async function saveToMyDesigns(ctx, png, opts = {}) {
   const host = ctx.host;
@@ -39,7 +41,7 @@ export async function saveToMyDesigns(ctx, png, opts = {}) {
     const [key, sourceKey] = await Promise.all([uploadToPending(preview, "image"), tooBig ? Promise.resolve(null) : uploadToPending(file, "source", host.sourceExt)]);
     const res = await fetch("/api/tools/designs", { method: "POST", credentials: "same-origin", headers,
       body: JSON.stringify({ upload: { key }, sourceUpload: sourceKey ? { key: sourceKey, name: host.sourceName } : undefined,
-        prompt: host.saveTag.prompt, modelName: host.saveTag.modelName, source: opts.source || host.saveTag.source }) });
+        prompt: host.saveTag.prompt, modelName: host.saveTag.modelName, source: (await documentSource(ctx)) || host.saveTag.source }) });
     const out = await res.json().catch(() => ({ ok: false, error: "HTTP " + res.status }));
     return out.ok ? (tooBig ? { ok: true, previewOnly: true } : { ok: true }) : { ok: false, message: "⚠️ 儲存失敗：" + (out.error || ("HTTP " + res.status)) };
   } catch (err) {

@@ -6,6 +6,8 @@
 // 面板 = /editor-shared/blocks/<id>.js，介面 export default { id, title, icon, mount(ctx, body) }，單一面板載入或掛載失敗只影響它自己。
 // 尺寸只存在各編輯器 dock.js 的 sizes：這裡寫成 root 上的 --vp-*，dock.css 只用 var()。
 
+import { tagDocument } from "./doc-source.js";
+
 /** 面板模組所在（搬路徑只改這一處）。 */
 export const BLOCKS_BASE = "/editor-shared/blocks/";
 
@@ -291,9 +293,9 @@ export function postReturn(id, image, ackMs = RETURN_ACK_MS) {
  * 原檔超過 64MB 改只存預覽）→ 存也失敗（網路／伺服器）→ PNG 下載到電腦（最後一道落地）。
  * report(msg) 顯示結果；回 "returned" | "saved" | "downloaded" | "failed"（"failed" = 連匯出都失敗，沒有圖可落地）。
  * @param {{ exportArtboard: (o: object) => Promise<Blob> }} ctx
- * @param {{ id: string, label: string, saveAs?: string }} ret
+ * @param {{ id: string, label: string }} ret
  * @param {(msg: string) => void} [report]
- * @param {{ ackMs?: number, save?: (ctx: object, png: Blob, o: { previewOnlyIfTooBig: boolean, source?: string }) => Promise<{ ok: boolean, previewOnly?: boolean, message?: string }>, download?: (png: Blob, name: string) => void }} [opts]
+ * @param {{ ackMs?: number, save?: (ctx: object, png: Blob, o: { previewOnlyIfTooBig: boolean }) => Promise<{ ok: boolean, previewOnly?: boolean, message?: string }>, download?: (png: Blob, name: string) => void }} [opts]
  */
 export async function sendBack(ctx, ret, report, { ackMs = RETURN_ACK_MS, save, download = downloadBlob } = {}) {
   let png;
@@ -308,7 +310,7 @@ export async function sendBack(ctx, ret, report, { ackMs = RETURN_ACK_MS, save, 
     let r;
     try {
       const saveFn = save ?? (await import(`${BLOCKS_BASE}my-designs.js`)).saveToMyDesigns;
-      r = await saveFn(ctx, png, { previewOnlyIfTooBig: true, source: ret.saveAs });
+      r = await saveFn(ctx, png, { previewOnlyIfTooBig: true });
     } catch (err) {
       r = { ok: false, message: err?.message || String(err) };
     }
@@ -344,6 +346,7 @@ export async function openHandoff(ctx, report, tag = "[pro dock]", { ready } = {
     stage = "open";
     report?.("開啟中…");
     await ctx.openFile(blob, h.name);
+    tagDocument(h.name, h.saveAs);
     h.done?.();
     return h;
   } catch (err) {

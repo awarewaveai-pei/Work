@@ -42,10 +42,12 @@ host = {
 
 My Designs 清單過濾：列出 `metadata.source ∈ listSources`（沒有 metadata 的舊資料也列）的設計；有原始檔的，原始檔副檔名必須等於 `sourceExt`，否則別的編輯器的原始檔會列出卻開不了。
 
+**My Designs 分類**（2026-11-21 操作者：商品／模特兒合成圖不能再拿去合成）：存入的 source = 作用中文件的標記，沒有才用 `saveTag.source`。交接帶 `saveAs`（`openInCanvas(..., ret?, saveAs?)`；合成圖 → `mockup`、塔羅 → 原塔羅 source，`lib/studio/asset-group.ts` `editSaveSource`）→ dock 開檔後 `doc-source.js` `tagDocument(檔名, saveAs)`；`saveToMyDesigns` 以 `ctx.documentName()`（選用；PhotoCraft 有，沒有＝不分類）查標記。標記以文件名為鍵，改名或另開的文件走宿主預設。
+
 ## 傳回（dock 外殼，C8.1；面板不用）
 
-- 交接（`components/tools/canvas-handoff.ts` `openInCanvas(..., ret)`）帶票 `ret={id,label,saveAs?}` 且開成功 → `dock.js` 在圖示欄頂端加「傳回 <label>」。
-- 按下：`ctx.exportArtboard({format:'png'})` → `BroadcastChannel('canvas-return')` 送 `{type:'return', id, image:<PNG data URL>}` → 2 秒內收到 `{type:'ack', id}` 顯示「已傳回 <label>」；否則 `blocks/my-designs.js` `saveToMyDesigns(ctx, png, {previewOnlyIfTooBig:true, source:ret.saveAs})`（saveAs＝該圖在 My Designs 的分類，沒給＝編輯器自己的）（同面板的存入：預覽＋`ctx.saveAs()` 原檔；原檔超過 64MB 只存預覽）並顯示「原分頁已關，已存進我的設計」；存也失敗 → PNG 下載到電腦。原分頁收下（ack）→ `window.close()` 關掉編輯器分頁（2026-11-20 操作者；只有攤平的 PNG 回去，圖層文件不留）；沒收下不關、按鈕可再按。訊息浮出層 `vp-notice` 只到訊息高度。
+- 交接（`components/tools/canvas-handoff.ts` `openInCanvas(..., ret)`）帶票 `ret={id,label}` 且開成功 → `dock.js` 在圖示欄頂端加「傳回 <label>」。
+- 按下：`ctx.exportArtboard({format:'png'})` → `BroadcastChannel('canvas-return')` 送 `{type:'return', id, image:<PNG data URL>}` → 2 秒內收到 `{type:'ack', id}` 顯示「已傳回 <label>」；否則 `blocks/my-designs.js` `saveToMyDesigns(ctx, png, {previewOnlyIfTooBig:true})`（分類同上「My Designs 分類」）（同面板的存入：預覽＋`ctx.saveAs()` 原檔；原檔超過 64MB 只存預覽）並顯示「原分頁已關，已存進我的設計」；存也失敗 → PNG 下載到電腦。原分頁收下（ack）→ `window.close()` 關掉編輯器分頁（2026-11-20 操作者；只有攤平的 PNG 回去，圖層文件不留）；沒收下不關、按鈕可再按。訊息浮出層 `vp-notice` 只到訊息高度。
 - 原分頁：`components/tools/useCanvasReturn.ts`，只收自己發出的票、`onReturn(slot, image)` 回 `true` 才 ack。
 
 ## replaceImage（spike 2026-11-05 通過，未降級）

@@ -34,6 +34,13 @@ export function assetToolGroup(source: string | null | undefined): string {
   return source;
 }
 
+/** The source an editor save keeps (openInCanvas saveAs): a mockup or tarot original stays in its group, so its edit never
+ *  joins the prints of the mockup picker; design art -> undefined (the editor's own tag, also design art). */
+export function editSaveSource(source: string | null | undefined): string | undefined {
+  const group = assetToolGroup(source);
+  return group === "mockup" ? "mockup" : group === "tarot" ? source! : undefined;
+}
+
 /** Raw `metadata.source` values that mean tarot card art (assetToolGroup "tarot", product "tarot-card"). */
 // Every tarot save-source (TarotStudio saveToGallery / postDesign). The gallery, its counts and assetToolGroup all
 // read this list: "tarot-preview-edit" was missing from three hand-written copies, so it counted under 全部 only.

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STYLE_PRESETS } from "../tarot/cards";
 // SSOT for source→group classification — shared with the publish picker + /api/tools/designs filter.
-import { assetToolGroup as toolGroup, GALLERY_MODEL_LABELS, GALLERY_PRODUCT_LABELS, TAROT_SOURCES } from "@/lib/studio/asset-group";
+import { assetToolGroup as toolGroup, editSaveSource, GALLERY_MODEL_LABELS, GALLERY_PRODUCT_LABELS, TAROT_SOURCES } from "@/lib/studio/asset-group";
 import {
   EDGE_MASK_STYLES,
   applyEdgeMask,
@@ -1332,7 +1332,7 @@ export default function DesignsGallery({ initialTab = "designs", organizationId 
                         return asset.object_url && t.href ? (
                           <button
                             className="designs-kebab-item"
-                            onClick={() => { setOpenMenuId(null); openInCanvas(asset.object_url!, designBaseName(asset), t.href!, t.source); }}
+                            onClick={() => { setOpenMenuId(null); openInCanvas(asset.object_url!, designBaseName(asset), t.href!, t.source, undefined, editSaveSource(asset.metadata?.source)); }}
                           >
                             {t.vector ? "✒ 向量編輯" : "🎨 畫布編輯"}
                           </button>

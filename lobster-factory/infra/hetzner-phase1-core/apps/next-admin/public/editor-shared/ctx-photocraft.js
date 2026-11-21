@@ -565,6 +565,9 @@ export function createPhotocraftCtx(opts) {
       return { width: w, height: h, created: false };
     }),
 
+    /** 選用：作用中文件的名字（doc-source.js 以名字找它的 My Designs 分類）。 */
+    documentName: op(async (api) => (await targetRef(api)).name),
+
     /** 目前文件存成分層原始檔 → PSD Blob（File › Save a Copy；不改文件自己的名字）。0 個 undo 步。 */
     saveAs: op(async (api) => (await savedBy(["psd"], () => invoke(api, "file.saveACopy"))).blob),
 

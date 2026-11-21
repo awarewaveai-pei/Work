@@ -113,13 +113,16 @@ describe("openInCanvas → takeCanvasHandoff", () => {
     expect((await takeCanvasHandoff("photocraft"))!.ret).toEqual({ id, label: "塔羅預覽" });
   });
 
-  it("票帶 saveAs → 編輯器拿到；不合格式的 saveAs 丟掉", async () => {
-    await openInCanvas("data:image/png;base64,AAAA", "x", "/tools/photo-pro", undefined, { tool: "mockup-model", slot: "lib:1", label: "模特兒圖庫", saveAs: "mockup" });
+  it("saveAs（My Designs 分類）帶到編輯器，有沒有票都一樣；不合格式的丟掉", async () => {
+    await openInCanvas("data:image/png;base64,AAAA", "x", "/tools/photo-pro", undefined, { tool: "mockup-model", slot: "lib:1", label: "模特兒圖庫" }, "mockup");
     editorSees(tab!.location.href);
-    expect((await takeCanvasHandoff("photocraft"))!.ret).toMatchObject({ label: "模特兒圖庫", saveAs: "mockup" });
-    await openInCanvas("data:image/png;base64,AAAA", "x", "/tools/photo-pro", undefined, { tool: "t", slot: "s", label: "L", saveAs: "Bad Source!" });
+    expect(await takeCanvasHandoff("photocraft")).toMatchObject({ ret: { label: "模特兒圖庫" }, saveAs: "mockup" });
+    await openInCanvas("data:image/png;base64,AAAA", "x", "/tools/photo-pro", undefined, undefined, "tarot-art");
     editorSees(tab!.location.href);
-    expect((await takeCanvasHandoff("photocraft"))!.ret).not.toHaveProperty("saveAs");
+    expect(await takeCanvasHandoff("photocraft")).toMatchObject({ saveAs: "tarot-art" });
+    await openInCanvas("data:image/png;base64,AAAA", "x", "/tools/photo-pro", undefined, undefined, "Bad Source!");
+    editorSees(tab!.location.href);
+    expect(await takeCanvasHandoff("photocraft")).not.toHaveProperty("saveAs");
   });
 
   it("有原始檔：開原始檔（走同源下載路由），不開預覽圖", async () => {

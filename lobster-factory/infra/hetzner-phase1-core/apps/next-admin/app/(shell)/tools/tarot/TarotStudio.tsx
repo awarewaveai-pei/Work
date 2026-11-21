@@ -2204,7 +2204,8 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                         }),
                         canvasHref,
                         undefined,
-                        { tool: "tarot", slot: PREVIEW_SLOT, label: "塔羅預覽", saveAs: "tarot-preview-edit" },
+                        { tool: "tarot", slot: PREVIEW_SLOT, label: "塔羅預覽" },
+                        "tarot-preview-edit",
                       );
                     }}
                   >
@@ -2347,7 +2348,8 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
                       buildSemanticBase({ product: "塔羅卡", subject: subjectText.trim() || undefined, style: stylePrompt.trim() || undefined, track: item.card.name }),
                       canvasHref,
                       undefined,
-                      { tool: "tarot", slot: deckSlot(deckGenRef.current, idx), label: `塔羅第 ${idx + 1} 張`, saveAs: "tarot" },
+                      { tool: "tarot", slot: deckSlot(deckGenRef.current, idx), label: `塔羅第 ${idx + 1} 張` },
+                      "tarot",
                     );
                   }}
                 >

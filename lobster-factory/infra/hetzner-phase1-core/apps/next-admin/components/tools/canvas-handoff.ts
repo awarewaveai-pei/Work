@@ -26,10 +26,8 @@ export const CANVAS_TARGET_KEY = "canvas:target";
 
 /** BroadcastChannel name of the return path: editor -> `{type:"return", id, image}`, sender -> `{type:"ack", id}`. */
 export const CANVAS_RETURN_CHANNEL = "canvas-return";
-/** Where the edited image goes back to: the sending tool, its slot (tool-defined, e.g. "preview"), the button's label.
- *  saveAs: the My Designs source a return nobody takes is saved under (default the editor's own, "canvas" = design art),
- *  so a model photo or a composite never lands among the prints (lib/studio/asset-group.ts). */
-export type CanvasReturnTicket = { tool: string; slot: string; label: string; saveAs?: string };
+/** Where the edited image goes back to: the sending tool, its slot (tool-defined, e.g. "preview"), the button's label. */
+export type CanvasReturnTicket = { tool: string; slot: string; label: string };
 /** Tickets this tab issued (handoff id -> ticket). Memory only: a reload forgets them and a "傳回" then lands in My Designs. */
 export const issuedReturnTickets = new Map<string, CanvasReturnTicket>();
 
@@ -149,14 +147,16 @@ async function idbDel(key: string): Promise<void> {
 export const CANVAS_STAFF_HREF = canvasTarget().staffHref;
 
 /** The IndexedDB record of one handoff. */
-type HandoffRecord = { editor: CanvasEditorId; image?: string; source?: CanvasSourceFile; name?: string; ret?: CanvasReturnTicket & { id: string } };
+type HandoffRecord = { editor: CanvasEditorId; image?: string; source?: CanvasSourceFile; name?: string; ret?: CanvasReturnTicket & { id: string }; saveAs?: string };
 
 /**
  * Send `image` to the pro editor at `href` in a new tab: `useDoorHref(canvasTarget(source?.name).staffHref)` --
  * CANVAS_STAFF_HREF for an image, /tools/vector-pro for a vector source; null (hide the button) on a door without one.
  * `baseName`: 產品-主圖名稱-風格, the opened file's name. `source`: the design's editable original, opened instead of the
  * image. `ret`: give the editor a "傳回 <label>" button; the edited PNG comes back to this tab's useCanvasReturn(ret.tool)
- * as onReturn(ret.slot, dataUrl). Call it straight from the click handler: the tab is opened before the first await
+ * as onReturn(ret.slot, dataUrl). `saveAs`: the My Designs source every save of this document takes in the editor (存入 and
+ * a 傳回 nobody takes), so a composite or a tarot card stays in its group and never joins the prints (asset-group.ts
+ * editSaveSource); omitted = the editor's own tag (design art). Call it straight from the click handler: the tab is opened before the first await
  * (popup blockers allow window.open only inside the click), then pointed at the editor once the record is written.
  */
 export async function openInCanvas(
@@ -165,6 +165,7 @@ export async function openInCanvas(
   href: string,
   source?: CanvasSourceFile,
   ret?: CanvasReturnTicket,
+  saveAs?: string,
 ): Promise<void> {
   // id: base-36 time first (idbPrune reads it), random after: each handoff is distinct.
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -186,6 +187,7 @@ export async function openInCanvas(
     ...(source ? { source } : { image }),
     ...(baseName ? { name: baseName } : {}),
     ...(ret ? { ret: { ...ret, id } } : {}),
+    ...(saveAs ? { saveAs } : {}),
   };
   let url = href;
   try {
@@ -230,7 +232,9 @@ export type ProEditorHandoff = {
   /** Delete the handoff record: call once the editor has opened it. */
   done: () => void;
   /** Present when the sender asked for the edited image back: the dock shows "傳回 <label>" and posts `{type:"return", id}`. */
-  ret?: { id: string; label: string; saveAs?: string };
+  ret?: { id: string; label: string };
+  /** The My Designs source saves of the opened document take (openInCanvas saveAs); absent = the editor's own. */
+  saveAs?: string;
 };
 
 const IMAGE_EXT: Record<string, string> = { png: "png", jpg: "jpg", jpeg: "jpg", webp: "webp", gif: "gif" };
@@ -271,8 +275,10 @@ export async function takeCanvasHandoff(editor: CanvasEditorId): Promise<ProEdit
   }
   if (rec.editor !== editor) return null;
   const done = () => void idbDel(key);
-  const saveAs = typeof rec.ret?.saveAs === "string" && /^[a-z][a-z-]{0,39}$/.test(rec.ret.saveAs) ? { saveAs: rec.ret.saveAs } : {};
-  const ret = rec.ret && rec.ret.id === id && typeof rec.ret.label === "string" ? { ret: { id, label: rec.ret.label, ...saveAs } } : {};
+  const ret = {
+    ...(rec.ret && rec.ret.id === id && typeof rec.ret.label === "string" ? { ret: { id, label: rec.ret.label } } : {}),
+    ...(typeof rec.saveAs === "string" && /^[a-z][a-z-]{0,39}$/.test(rec.saveAs) ? { saveAs: rec.saveAs } : {}),
+  };
   const src = rec.source;
   if (src && typeof src.url === "string" && src.url && typeof src.name === "string" && src.name) {
     return { url: toCanvasSrc(src.url), name: src.name, done, ...ret };

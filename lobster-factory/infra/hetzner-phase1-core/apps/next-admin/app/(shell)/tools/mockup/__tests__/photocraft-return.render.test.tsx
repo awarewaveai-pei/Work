@@ -54,7 +54,7 @@ describe("模特兒圖庫 修圖 → PhotoCraft → 傳回", () => {
     render(<Library />);
     fireEvent.click(screen.getByRole("button", { name: "修圖" }));
     expect((openInCanvas.mock.calls[0] as unknown as unknown[])[0]).toBe(leo.object_url);
-    expect(ret()).toEqual({ tool: "mockup-model", slot: "lib:leo1", label: "模特兒圖庫", saveAs: "mockup" });
+    expect(ret()).toEqual({ tool: "mockup-model", slot: "lib:leo1", label: "模特兒圖庫" });
     expect(await handlers["mockup-model"]("lib:leo1", EDITED)).toBe(true);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const [url, init] = fetchMock.mock.calls[0];
@@ -217,7 +217,7 @@ describe("主頁 模特 合成結果 在畫布編輯 → 傳回", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: /合成（1 張/ }));
     fireEvent.click(await screen.findByRole("button", { name: "在畫布編輯" }));
-    expect(ret()).toEqual({ tool: "mockup-composite", slot: "1:leo1", label: "商品 Mockup", saveAs: "mockup" });
+    expect(ret()).toEqual({ tool: "mockup-composite", slot: "1:leo1", label: "商品 Mockup" });
     expect(await handlers["mockup-composite"]("1:leo1", EDITED)).toBe(true);
     await waitFor(() => expect(screen.getByAltText("商品 Mockup").getAttribute("src")).toBe(EDITED));
     expect(await handlers["mockup-composite"]("0:leo1", EDITED)).toBe(false);
