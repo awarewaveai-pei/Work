@@ -48,6 +48,8 @@ export default function PlaceField({
   const [results, setResults] = useState<BirthPlace[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchFailed, setSearchFailed] = useState(false);
+  /** 這輪結果裡,因瀏覽器時區資料太舊而無法換算、被略過的城市數 */
+  const [dropped, setDropped] = useState(0);
   const [manualOpen, setManualOpen] = useState(false);
   const [zone, setZone] = useState('');
   const [lat, setLat] = useState('');
@@ -64,14 +66,18 @@ export default function PlaceField({
     // 改字就清掉上一輪的結果與錯誤,避免等待期間點到舊結果
     setResults(null);
     setSearchFailed(false);
+    setDropped(0);
     setSearching(true);
     const timer = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ q, locale, limit: String(SEARCH_LIMIT) });
         const res = await fetch(`/api/places?${params}`, { signal: ctrl.signal });
         if (!res.ok) throw new Error();
-        // 本名與改名前舊名都不認得的時區(拆分出來的新時區,瀏覽器資料又太舊)無法換算偏移,不列出
-        setResults((((await res.json()) as { places?: BirthPlace[] }).places ?? []).filter((p) => isZone(p.zone)));
+        // 本名與改名前舊名都不認得的時區(拆分出來的新時區,瀏覽器資料又太舊)無法換算偏移:不列出,但告訴使用者
+        const all = ((await res.json()) as { places?: BirthPlace[] }).places ?? [];
+        const usable = all.filter((p) => isZone(p.zone));
+        setResults(usable);
+        setDropped(all.length - usable.length);
       } catch {
         if (ctrl.signal.aborted) return;
         setResults(null);
@@ -142,7 +148,8 @@ export default function PlaceField({
         <div role="group" aria-label={t.placeSearch} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.25rem' }}>
           {searching && !results ? <span className="no-correction-text">{t.placeSearching}</span> : null}
           {searchFailed ? <span className="no-correction-text">{t.placeSearchFailed}</span> : null}
-          {results && results.length === 0 ? <span className="no-correction-text">{t.placeNoResult}</span> : null}
+          {results && results.length === 0 && dropped === 0 ? <span className="no-correction-text">{t.placeNoResult}</span> : null}
+          {dropped > 0 ? <span className="no-correction-text">{t.placeZoneUnsupported.replace('{n}', String(dropped))}</span> : null}
           {results?.map((p) => (
             <button
               key={`${p.lat},${p.lon},${p.label}`}

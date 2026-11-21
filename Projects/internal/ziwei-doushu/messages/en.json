@@ -57,6 +57,7 @@
     "placeCredit": "City data:",
     "placeSelected": "Selected:",
     "placeNoResult": "No city found. Try another spelling, or choose \"Other\" to enter a time zone and coordinates.",
+    "placeZoneUnsupported": "Some matching cities ({n}) can't be used because this browser's time-zone data is out of date. Update the browser, or choose \"Other\" and enter a nearby city's time zone and coordinates.",
     "placeSearchFailed": "City search is unavailable right now. Try again shortly, or choose \"Other\" to enter a time zone and coordinates.",
     "placeSearching": "Searching…",
     "placeSearchPlaceholder": "Type a city name, e.g. London, São Paulo, 台北",

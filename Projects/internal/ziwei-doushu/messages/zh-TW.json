@@ -57,6 +57,7 @@
     "placeCredit": "城市資料:",
     "placeSelected": "已選:",
     "placeNoResult": "找不到這個城市;可換個寫法,或按「其他」手動輸入時區與經緯度。",
+    "placeZoneUnsupported": "有 {n} 個符合的城市因這個瀏覽器的時區資料太舊而無法換算;請更新瀏覽器,或按「其他」手動輸入鄰近城市的時區與經緯度。",
     "placeSearchFailed": "城市搜尋暫時失敗,請稍後再試,或按「其他」手動輸入時區與經緯度。",
     "placeSearching": "搜尋中…",
     "placeSearchPlaceholder": "輸入城市名,中英文皆可,如 台中、London、São Paulo",

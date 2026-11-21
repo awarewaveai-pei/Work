@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import data from './data.json';
+import twNames from './twNames.json';
 import { createSearchPlaces, normalizePlaceText } from './search';
 import type { PlacesData } from './types';
 
@@ -85,5 +86,11 @@ describe('searchPlaces', () => {
   it('正規化:去重音、小寫、連字號當空白、臺→台', () => {
     expect(normalizePlaceText('Saint-Étienne')).toBe('saint etienne');
     expect(normalizePlaceText(' 臺中 ')).toBe('台中');
+  });
+  it('臺灣譯名表每一筆都搜得到,且繁中顯示名就是表上的寫法', () => {
+    for (const n of twNames.names) {
+      const hit = searchPlaces(n.zh, 'zh-TW', 20).find((p) => p.label.startsWith(n.zh));
+      expect([n.en, hit?.label.split('，')[0]]).toEqual([n.en, n.zh]);
+    }
   });
 });
