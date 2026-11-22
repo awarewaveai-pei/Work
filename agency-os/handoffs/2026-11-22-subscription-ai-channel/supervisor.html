@@ -1,0 +1,211 @@
+<title>AI 訂閱通道 監工台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* 左側欄＋右側單欄內容；手機時側欄在上。顏色只載意義：有／沒有、狀態、風險。 */
+:root{
+  --bg:#f4f5f7; --paper:#ffffff; --ink:#1b2230; --muted:#5d6878; --line:#d8dde5; --accent:#2b4ea2; --rail:#e9ecf1;
+  --todo:#8b95a5; --doing:#c2410c; --done:#1f7a3a; --no:#b42318; --high:#b42318; --med:#9a6700; --low:#1f7a3a; --onDot:#ffffff;
+  --display:"Noto Serif TC","Songti TC",serif; --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;--onDot:#121722;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;--onDot:#121722;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.6;font-size:16px}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100%}
+@media (max-width:820px){.shell{grid-template-columns:1fr}}
+aside{background:var(--rail);border-right:1px solid var(--line);padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px}
+@media (max-width:820px){aside{border-right:0;border-bottom:1px solid var(--line);padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}}
+aside .in{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}
+@media (max-width:820px){aside .in{position:static}}
+aside h1{font-family:var(--display);font-size:20px;margin:0 0 4px;text-wrap:balance}
+aside .upd{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+.bar{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--line);margin:0 0 16px}
+.bar i{display:block;height:100%}.bar .d{background:var(--done)}.bar .g{background:var(--doing)}
+nav{display:grid;gap:2px}
+@media (max-width:820px){nav{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}}
+nav a{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:15px}
+nav a:hover,nav a:focus-visible{background:var(--paper);outline:none}
+nav a small{color:var(--muted);font-size:12.5px;white-space:nowrap}
+main{min-width:0;max-width:820px;padding-block:24px 56px;padding-left:24px;padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:820px){main{padding-left:max(16px,env(safe-area-inset-left,0px))}}
+.sub{color:var(--muted);margin:0 0 24px;font-size:15px}
+section{margin-bottom:36px;scroll-margin-top:16px}
+section>h2{font-family:var(--display);font-size:21px;margin:0 0 4px}
+section>.lead{color:var(--muted);margin:0 0 14px;font-size:15px}
+.sub-h{font-size:15px;margin:14px 0 8px;color:var(--muted);font-weight:500}
+code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border-radius:4px;padding:1px 5px;color:var(--muted)}
+small{display:block;color:var(--muted);font-size:13px;font-weight:400}
+ul.yn{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+ul.yn li{display:grid;grid-template-columns:64px 1fr;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+ul.yn li.yes b{color:var(--done)}ul.yn li.no b{color:var(--no)}
+ul.yn li span{min-width:0}
+ul.yn.rules li{grid-template-columns:130px 1fr}ul.yn.rules li b{color:var(--accent)}
+ul.yn.rules small a{color:var(--accent)}
+ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ol.steps li.grp{color:var(--muted);font-size:13.5px;padding:4px 2px 0}
+ol.steps li.grp a{color:var(--accent)}
+ol.open{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ol.steps li.step,ol.open li{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0;scroll-margin-top:16px}
+ol.steps .n,ol.open .n{width:30px;height:30px;border-radius:50%;background:var(--todo);color:var(--onDot);text-align:center;line-height:30px;font-weight:700;font-size:14px}
+.step.doing .n{background:var(--doing)}.step.done .n{background:var(--done)}
+ol.open .n{background:var(--accent)}
+.b{min-width:0}
+.plain{margin:0 0 6px;font-size:16px;font-weight:500}
+.meta{margin:0 0 6px;display:flex;flex-wrap:wrap;gap:6px 10px;font-size:13px;align-items:center}
+.pill{border-radius:999px;padding:1px 9px;border:1px solid currentColor;white-space:nowrap}
+.st-todo{color:var(--todo)}.st-doing{color:var(--doing)}.st-done{color:var(--done)}
+.risk-high{color:var(--high)}.risk-med{color:var(--med)}.risk-low{color:var(--low)}
+.who{color:var(--muted)} a.who{color:var(--accent)} .wait{color:var(--med)}
+.donewhen{margin:0 0 6px;font-size:14px}
+details{font-size:13.5px;color:var(--muted)}
+details summary{cursor:pointer;color:var(--accent)}
+details p{margin:6px 0 0}
+details a{color:var(--accent)}
+details code{font-size:12px;word-break:break-all}
+.paths{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.paths div{display:grid;grid-template-columns:130px 1fr;gap:8px;padding:5px 0;border-top:1px solid var(--line);min-width:0}
+.paths div:first-child{border-top:0}
+.paths code{word-break:break-all}
+@media (max-width:560px){.paths div{grid-template-columns:1fr}}
+:target{box-shadow:0 0 0 2px var(--accent)}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+ul.items{list-style:none;margin:2px 0 8px;padding:0;display:grid;gap:4px;font-size:14px}
+ul.items li{display:grid;grid-template-columns:18px 1fr;gap:6px;min-width:0}
+ul.items li b{color:var(--todo)} ul.items li.done b{color:var(--done)} ul.items li.done span{color:var(--muted)}
+ul.items code{font-size:11.5px} ul.items small{display:inline;font-size:12px}
+ul.opts{list-style:none;margin:4px 0 6px;padding:0;display:grid;gap:4px;font-size:14px}
+ul.opts li{display:grid;grid-template-columns:auto 1fr;gap:8px;min-width:0;color:var(--muted)} ul.opts li b{color:var(--todo);white-space:nowrap}
+ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
+</style>
+<div class="shell">
+<aside><div class="in">
+  <h1>AI 訂閱通道 監工台</h1>
+  <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
+  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:27.27272727272727%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>0</span>／<span data-computed>11</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你做的事</span><small><span data-computed>2</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+</div></aside>
+<main>
+<p class="sub">讓寫字和畫圖都能選「走 API 付費」或「走訂閱額度」。本人按的功能由筆電執行；自動排程由主機上的常駐程式執行。每個網站各自選。共 <span data-computed>11</span> 張卡。</p>
+<section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>畫圖可以走訂閱（Codex 免費生圖）。<small>已上線；只限本人、筆電要開著。近 30 天只用過兩次。</small></span></li><li class="no"><b>還不行</b><span>ChatGPT 訂閱現在有額度。<small>2026-11-22 實測：本週額度用完，11-24 上午 11:02 恢復。主因是程式審查共用同一份額度。</small></span></li><li class="yes"><b>可以</b><span>Claude 訂閱可以用命令列寫字。<small>2026-11-22 筆電實測成功，一次約 12 秒；執行時不給它任何工具。</small></span></li><li class="no"><b>還不行</b><span>寫字可以選訂閱。<small>第一批進行中。目前文字全部走 API。</small></span></li><li class="no"><b>還不行</b><span>每個網站可以各自選 API／訂閱／訂閱優先。<small>第三批。</small></span></li><li class="no"><b>還不行</b><span>排程不開筆電也能走訂閱。<small>第四批；需要你在主機上登入一次 ChatGPT。</small></span></li><li class="no"><b>還不行</b><span>知道一篇文章吃掉多少訂閱額度。<small>11-24 額度恢復後實測三篇才有數字；在那之前不估。</small></span></li></ul></section>
+
+<section id="steps"><h2>批次與卡</h2><p class="lead">同一批的卡同時進行，各自改不同的檔案；整批交回後一起看風險，再開下一批。</p><ol class="steps"><li class="grp">可同時進行：<a href="#K1">K1</a>、<a href="#K2">K2</a>、<a href="#K3">K3</a></li><li class="step doing" id="K1">
+    <div class="n">1</div>
+    <div class="b">
+      <p class="plain">現在的佇列只會排「畫圖」。加上「寫字」，並分成兩條線：本人按的給筆電、排程的給主機。Claude 訂閱只准走本人那條線，由程式擋住，不是靠約定。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>主機的密鑰領不到本人線的工作；Claude 的工作排進排程線會被拒絕；畫圖的既有測試一行不改全過。</p>
+      <details><summary>細節：K1 任務佇列支援寫字與兩條線</summary>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/K1-bridge.md</code></p>
+      </details>
+    </div></li><li class="step doing" id="K2">
+    <div class="n">2</div>
+    <div class="b">
+      <p class="plain">筆電上那支程式除了畫圖，也能叫 Codex 或 Claude 寫字。寫字時關掉 AI 的所有工具，交回前檢查內容裡有沒有混進本機的登入憑證，有就整篇丟掉。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（安全）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>筆電實跑：Claude 訂閱寫出一段字並回報用量；把檢查拿掉測試會變紅；不帶新參數時與今天的畫圖程式完全相同。</p>
+      <details><summary>細節：K2 執行程式會寫字，而且不給 AI 任何工具</summary>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/K2-worker.md</code></p>
+      </details>
+    </div></li><li class="step doing" id="K3">
+    <div class="n">3</div>
+    <div class="b">
+      <p class="plain">模型清單多一組「訂閱」（Codex、Claude 三種），價格是 NT$0；帳本記一筆 NT$0 和實際用掉的額度。這張卡只加資料，還不能按。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>訂閱模型算出來的費用是 0；每個訂閱模型都指定了額度用完時改走的 API 模型；現有按鈕列不變。</p>
+      <details><summary>細節：K3 訂閱模型進入模型清單與成本帳本</summary>
+        <p><b>需先完成：</b>無</p>
+        <p><b>卡片：</b><code>briefs/K3-catalog-ledger.md</code></p>
+      </details>
+    </div></li><li class="grp">可同時進行：<a href="#K4">K4</a>、<a href="#K6">K6</a></li><li class="step todo" id="K4">
+    <div class="n">4</div>
+    <div class="b">
+      <p class="plain">寫文章、劇本工坊選了訂閱模型，就交給筆電寫；網頁先顯示「筆電寫作中」，寫完整篇出現。額度用完或筆電沒開時，依你選的「改走 API」或「停下來」。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>筆電實寫一篇文章並看內容；帳本一筆 NT$0；筆電離線且選了改走 API 時文章照樣產出；沒選訂閱時與今天逐字相同。</p>
+      <details><summary>細節：K4 文章與劇本工坊可以走訂閱</summary>
+        <p><b>需先完成：</b><a href="#K1">K1</a>、<a href="#K3">K3</a></p>
+        <p><b>卡片：</b><code>briefs/K4-sub-text-article-forge.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="K6">
+    <div class="n">5</div>
+    <div class="b">
+      <p class="plain">文章和劇本工坊選模型的地方多一組訂閱按鈕，標 NT$0。筆電離線或額度用完時按鈕反灰並寫原因，旁邊有「啟動筆電」。只有你本人看得到這一組。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>其他帳號登入看不到訂閱按鈕；筆電沒開時按鈕不能按並顯示原因。</p>
+      <details><summary>細節：K6 選模型那一排多出「訂閱」按鈕</summary>
+        <p><b>需先完成：</b><a href="#K3">K3</a></p>
+        <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
+      </details>
+    </div></li><li class="grp">可同時進行：<a href="#K5">K5</a>、<a href="#K7">K7</a>、<a href="#K8">K8</a>、<a href="#DA">DA</a></li><li class="step todo" id="K5">
+    <div class="n">6</div>
+    <div class="b">
+      <p class="plain">影片腳本用同一個入口接上訂閱。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>訂閱寫出的腳本能被解析成場景；沒選訂閱時不變。</p>
+      <details><summary>細節：K5 影片腳本可以走訂閱</summary>
+        <p><b>需先完成：</b><a href="#K4">K4</a></p>
+        <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="K7">
+    <div class="n">7</div>
+    <div class="b">
+      <p class="plain">網站設定多三顆按鈕。自動排程寫那個站的文章時照它的設定走；選「訂閱優先」的站，額度用完自動改走 API，不會停擺。排程只能用 Codex 訂閱。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>沒設定過的舊網站與今天完全相同；訂閱失敗又不改走 API 時，題目停在文章那一步並寫明原因，不扣預算。</p>
+      <details><summary>細節：K7 每個網站各自選 API／訂閱／訂閱優先</summary>
+        <p><b>需先完成：</b><a href="#K4">K4</a></p>
+        <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="K8">
+    <div class="n">8</div>
+    <div class="b">
+      <p class="plain">成本頁顯示：訂閱畫了幾張圖、寫了幾篇、額度用到百分之幾；每個網站本月幾篇走訂閱、幾篇走 API、API 花多少。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>有改走 API 的月份兩欄都有數字；讀不到資料時顯示「讀不到」，不是 0。</p>
+      <details><summary>細節：K8 成本頁看得到訂閱用了多少</summary>
+        <p><b>需先完成：</b><a href="#K3">K3</a></p>
+        <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="DA">
+    <div class="n">9</div>
+    <div class="b">
+      <p class="plain">前三批一起部署一次，然後用筆電的 Claude 訂閱真的寫一篇文章，看內容。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（部署；失敗自動還原）</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>線上文章頁選訂閱模型寫出一篇；成本頁出現一筆 NT$0。</p>
+      <details><summary>細節：DA 部署並在筆電實測</summary>
+        <p><b>需先完成：</b><a href="#K4">K4</a>、<a href="#K6">K6</a>、<a href="#K5">K5</a>、<a href="#K7">K7</a>、<a href="#K8">K8</a></p>
+        <p><b>卡片：</b><code>DISPATCH.md</code></p>
+      </details>
+    </div></li><li class="grp">可同時進行：<a href="#K9">K9</a>、<a href="#M1">M1</a></li><li class="step todo" id="K9">
+    <div class="n">10</div>
+    <div class="b">
+      <p class="plain">在主機開一個權限最小的帳號，只跑這支程式和 Codex。它讀不到網站、資料庫和其他金鑰。登入過期或額度用完會發 Telegram。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（主機、憑證）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>程式常駐；用那個帳號去讀主機其他地方全部被拒；後台顯示排程線在線。</p>
+      <details><summary>細節：K9 主機上的常駐執行程式</summary>
+        <p><b>需先完成：</b><a href="#DA">DA</a>；待決 1、待決 2 之後</p>
+        <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="M1">
+    <div class="n">11</div>
+    <div class="b">
+      <p class="plain">11-24 之後：Codex 畫一張圖、寫一篇字、試著騙它讀本機檔案（必須讀不到）；量三篇文章各花多久、吃多少額度。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>三項實測結果寫進「現況」；一篇超過兩分半就另開卡把排程改成分兩輪。</p>
+      <details><summary>細節：M1 額度恢復後的實測</summary>
+        <p><b>需先完成：</b><a href="#K9">K9</a></p>
+        <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
+      </details>
+    </div></li></ol></section>
+
+<section id="safe"><h2>不會弄壞現有的東西</h2><p class="lead">現有的 API 路徑原樣保留；訂閱是多出來的選項，拿掉就回到今天的樣子。</p><ul class="yn rules"><li><b>現有的 API 路徑</b><span>一行不刪。沒選訂閱模型時，文章、劇本、排程的行為與今天逐字相同。</span></li><li><b>現有的 Codex 生圖</b><span>網址、檔名、畫圖流程都不改；舊版執行程式照樣能畫。</span></li><li><b>Claude 訂閱</b><span>只在你本人按、筆電執行時使用。程式會拒絕把它排進排程，主機上也不安裝。</span></li><li><b>AI 讀不到本機檔案</b><span>寫字時關掉 AI 的所有工具；交回的文字若含本機登入憑證，整篇丟掉。</span></li><li><b>額度用完</b><span>不會停擺也不會偷偷付費：照每個網站的設定，改走 API 或停下來，並發通知。</span></li><li><b>退路</b><span>前三批沒有資料庫異動、沒有主機改動，退回一個版本即可。第四批停掉服務即可。</span></li><li><b>工人</b><span>工人只在自己的工作區改檔，不推送、不部署、不連主機；這些都由監工做。</span></li></ul></section>
+
+<section id="open"><h2>到時要你做的事</h2><p class="lead">只有這幾步需要你。做到那一步時才問，一次問一件。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">把主機執行程式專用的一把密鑰放進後台容器（主機設定變更，走失敗會自動還原的工具）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>排程線可以開始接工作。</span></li><li class=""><b>先不要</b><span>排程維持全部走 API。</span></li></ul><p class="meta"><a href="#K9" class="who">在 <span data-computed>K9</span> 之前</a><span class="who">出處：PLAN.md 第 3 節</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">你本人在主機上登入一次 ChatGPT 帳號。指令由監工備好，你照著貼上並在手機確認。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>主機可以用你的訂閱額度寫字。</span></li><li class=""><b>先不要</b><span>只有筆電能用訂閱。</span></li></ul><p class="meta"><a href="#K9" class="who">在 <span data-computed>K9</span> 之前</a><span class="who">出處：PLAN.md 第 3 節</span></p></div></li></ol></section>
+
+<section id="risks"><h2>風險與處置</h2><p class="lead">每批一張表。工人交回的每條風險都要有處置：現在處理、實測驗證，或記下不處理的理由。</p><h3 class="sub-h">動工前（查證與實測）</h3><ul class="yn rules"><li><b>K1</b><span>Claude 的條款不允許無人排程、也不允許產品代別人使用訂閱。<small><b>處置：</b>已寫進設計：Claude 訂閱只走本人線，程式強制；主機不裝 Claude。</small></span></li><li><b>K2</b><span>文章的提示詞裡有從網路抓來的內容，可能夾帶指令，騙 AI 把本機檔案內容寫進文章。<small><b>處置：</b>已寫進 K2：寫字時不給任何工具，交回前掃描憑證；M1 實際試騙一次。</small></span></li><li><b>K9</b><span>筆電和主機共用同一份登入檔會互相讓對方失效。<small><b>處置：</b>已寫進設計：主機由你另外登入一次，不複製筆電的登入檔。</small></span></li><li><b>K7</b><span>排程一輪只有 200 秒；Codex 寫一篇長文的耗時還沒量過。<small><b>處置：</b>實測驗證：M1 量三篇；超過兩分半才另開卡改成分兩輪，現在不先做。</small></span></li><li><b>M1</b><span>ChatGPT 訂閱到 11-24 才有額度，Codex 寫字這條路在那之前無法實跑。<small><b>處置：</b>記錄：前三批以 Claude 訂閱實測；Codex 寫字與畫圖回歸留到 M1。</small></span></li><li><b>K4</b><span>Codex 沒有額度，這段期間沒有另一家模型的審查。<small><b>處置：</b>每批由審查代理人看整批差異一次，並在工作日誌註明。</small></span></li><li><b>K1</b><span>檔名和網址仍叫 codex-image，但之後也載文字與 Claude。<small><b>處置：</b>不處理：改名牽動約三十個檔、沒有行為收益，還會製造部署空窗；只更正檔頭說明。</small></span></li></ul><h3 class="sub-h">第一批</h3><p class="lead">這一批的工人尚未交回。</p></section>
+
+<section id="paths"><h2>檔案</h2><div class="paths"><div><b>完整計畫</b><code>agency-os/handoffs/2026-11-22-subscription-ai-channel/PLAN.md</code></div><div><b>派工與驗收</b><code>agency-os/handoffs/2026-11-22-subscription-ai-channel/DISPATCH.md</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-22-subscription-ai-channel/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。</span></div></div></section>
+</main>
+</div>
