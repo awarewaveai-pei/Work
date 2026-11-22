@@ -6,12 +6,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { refreshState } from "./refresh-state";
 import { requestActor } from "@/lib/entitlements/subject";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { systemsAccess } from "@/lib/systems/access";
 import { PRIORITIES, projectSystem, SYSTEM_STATUSES } from "@/lib/systems/projection";
 import { SYSTEM_TYPES, type SystemType } from "@/lib/systems/contract";
-import { closeProposal, proposeSystem, readDefinitions, readPending, readProjectionInput, requestRefresh, writeUserEvent } from "@/lib/systems/store";
+import { BadInput, ProposalNotFound, closeProposal, proposeSystem, readDefinitions, readPending, readProjectionInput, requestRefresh, writeUserEvent } from "@/lib/systems/store";
 
 const text = (form: FormData, name: string) => {
   const v = form.get(name);
@@ -110,7 +111,7 @@ async function overviewWrite(write: (ctx: { sb: SupabaseClient; actor: string })
 
 export async function requestSystemsRefresh() {
   await overviewWrite(async ({ sb, actor }) => {
-    if ((await readPending(sb)).refresh) return "refresh_pending";
+    if (refreshState(await readPending(sb), Date.now()).kind === "waiting") return "refresh_pending";
     await requestRefresh(sb, actor);
     return "refresh_queued";
   });
@@ -123,7 +124,13 @@ export async function withdrawProposal(form: FormData) {
   const reason = text(form, "reason");
   await overviewWrite(async ({ sb, actor }) => {
     if (!key || key.length > 100 || !(CLOSE_REASONS as readonly string[]).includes(reason)) return "bad_proposal";
-    await closeProposal(sb, actor, key, reason);
+    try {
+      await closeProposal(sb, actor, key, reason);
+    } catch (e) {
+      if (e instanceof ProposalNotFound) return "proposal_not_found";
+      if (e instanceof BadInput) return "bad_withdraw";
+      throw e;
+    }
     return "withdrawn";
   });
 }

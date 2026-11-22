@@ -12,6 +12,7 @@ import { EFFECTIVE_BADGE, EFFECTIVE_LABEL, formatTime, STATUS_LABEL, TYPE_LABEL 
 import { effectiveStatus, gapBreakdown, implementedRatio, overviewCounts, progressKind, recentHandoffs, type EffectiveState } from "@/lib/systems/overview";
 import { importSummary } from "@/lib/systems/projection";
 import { readDefinitions, readImportRuns, readPending, readProjectionInput, type Pending } from "@/lib/systems/store";
+import { refreshState, type RefreshState } from "./refresh-state";
 import { proposeNewSystem, requestSystemsRefresh, withdrawProposal } from "./actions";
 import { Refused, box, errorBox, muted, page } from "./parts";
 
@@ -22,6 +23,8 @@ type Sp = { type?: string | string[]; status?: string | string[]; q?: string | s
 const NOTICES: Record<string, { ok: boolean; text: string }> = {
   refresh_queued: { ok: true, text: "已排入，約 5 分鐘內更新。" },
   refresh_pending: { ok: true, text: "更新已在排隊中。" },
+  proposal_not_found: { ok: false, text: "找不到這筆提案，可能已被撤回。" },
+  bad_withdraw: { ok: false, text: "撤回原因不正確，沒有記下。" },
   withdrawn: { ok: true, text: "已撤回。" },
   proposed: { ok: true, text: "已記下，下一次 agent 開工時會寫進系統清單。" },
   bad_proposal: { ok: false, text: "名稱與用途各要 1–200 字，類型要選一個。" },
@@ -42,7 +45,7 @@ const RESPONSIVE = `
 .sys-right{display:flex;flex-direction:column;gap:16px}
 .sys-cards{display:none}
 .sys-row{position:relative}.sys-row:hover{background:var(--bg-subtle)}.sys-row a::after{content:"";position:absolute;inset:0}
-.sys-add{position:relative}.sys-add summary::-webkit-details-marker{display:none}.sys-type input{position:absolute;opacity:0;pointer-events:none}.sys-type{position:relative}.sys-type input:checked+span{background:var(--accent);color:var(--bg-card)}.sys-type input:focus-visible+span{outline:2px solid var(--accent)}
+.sys-add{position:relative}.sys-add summary::-webkit-details-marker{display:none}.sys-type input{position:absolute;opacity:0;pointer-events:none}.sys-type{position:relative}.sys-type input:checked+span{background:var(--accent);color:var(--btn-primary-text)}.sys-type input:focus-visible+span{outline:2px solid var(--accent)}
 .sys-icon{height:30px;width:30px;border-radius:10px;display:grid;place-items:center;background:var(--accent-light);color:var(--accent-text);font-size:14px}
 @media (max-width:1100px){.sys-board{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){.sys-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.sys-table{display:none}.sys-cards{display:block}.sys-page{padding:20px 16px!important}}
@@ -205,7 +208,7 @@ function PendingPanel({ pending }: { pending: Pending }) {
 function HelpCard({ rows }: { rows: Row[] }) {
   const target = recentHandoffs(rows.map((r) => ({ ...r, slug: r.system.slug, name: r.system.name, handoff: r.p.handoff })), 1)[0]?.system ?? rows[0]?.system;
   return (
-    <div style={{ ...panel, padding: 20, background: "var(--accent)", color: "var(--bg-card, var(--card-bg))" }}>
+    <div style={{ ...panel, padding: 20, background: "var(--accent)", color: "var(--btn-primary-text)" }}>
       <h3 style={{ margin: "0 0 6px", fontSize: 16 }}>不記得上次做到哪裡？</h3>
       <p style={{ margin: "0 0 14px", fontSize: 12, lineHeight: 1.7 }}>點選系統，展開完整接續卡。可複製摘要給 Claude 或 Codex，重新開始工作。</p>
       {target ? <Link href={`/ops/systems/${target.slug}`} className="btn-secondary" style={smallBtn}>看看接續摘要</Link> : <span style={{ fontSize: 12 }}>還沒有系統可看。</span>}
@@ -213,7 +216,7 @@ function HelpCard({ rows }: { rows: Row[] }) {
   );
 }
 
-function SyncPanel({ runs, refreshAt }: { runs: UpdateRow[]; refreshAt: string | null }) {
+function SyncPanel({ runs, refresh, pendingFailed }: { runs: UpdateRow[]; refresh: RefreshState; pendingFailed: boolean }) {
   const { lastOk, latest } = importSummary(runs);
   const gaps = gapBreakdown(runs);
   const bad = latest && latest.status !== "ok";
@@ -221,7 +224,9 @@ function SyncPanel({ runs, refreshAt }: { runs: UpdateRow[]; refreshAt: string |
     <section style={panel}>
       <div style={panelHead}><h2 style={{ margin: 0, fontSize: 16 }}>資料同步狀態</h2><div style={muted}>每天 04:30 從 Git 匯入</div></div>
       <div style={panelBody}>
-        {refreshAt && <div style={{ fontSize: 13, color: "var(--accent-text)", marginBottom: 8 }}>已排入更新（約 5 分鐘內處理）</div>}
+        {refresh.kind === "waiting" && <div style={{ fontSize: 13, color: "var(--accent-text)", marginBottom: 8 }}>已排入更新（約 5 分鐘內處理）</div>}
+        {refresh.kind === "stale" && <div style={{ ...errorBox, padding: "8px 12px", marginBottom: 10 }}>匯入器沒有回應（已等 {refresh.minutes} 分鐘），可以再按一次「立即更新」。</div>}
+        {pendingFailed && <div style={{ ...muted, marginBottom: 8 }}>待登記暫時讀不到。</div>}
         {!latest ? <div style={muted}>還沒有任何匯入紀錄：主機匯入器尚未跑過（或尚未開啟）。</div> : (
           <>
             <div style={{ fontSize: 13, color: "var(--text-primary)" }}>最後成功匯入：<strong>{formatTime(lastOk?.at)}</strong></div>
@@ -255,14 +260,12 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
   let runs: UpdateRow[] = [];
   let capped = false;
   let pending: Pending = NO_PENDING;
-  let refreshAt: string | null = null;
+  let pendingFailed = false;
   if (sb) {
     try {
       const [defs, state, importRuns] = await Promise.all([readDefinitions(sb), readProjectionInput(sb), readImportRuns(sb)]);
       runs = importRuns;
       capped = state.capped;
-      pending = await readPending(sb);
-      refreshAt = pending.refresh ? new Date().toISOString() : null;
       const now = Date.now();
       rows = defs.systems.map((system) => {
         const p = projectSystem({
@@ -277,6 +280,15 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
       failure = String(e instanceof Error ? e.message : e);
     }
   }
+  if (sb && !failure) {
+    try {
+      pending = await readPending(sb);
+    } catch (e) {
+      console.error(`[systems/page] pending: ${e instanceof Error ? e.message : String(e)}`);
+      pendingFailed = true;
+    }
+  }
+  const refresh = refreshState(pending, Date.now());
   const needle = q.toLowerCase();
   const shown = rows.filter(({ system, eff }) =>
     (!typeFilter || system.type === typeFilter) && (!statusFilter || (statusFilter === "unset" ? eff.status === null : eff.status === statusFilter))
@@ -298,7 +310,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
         </div>
         <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
           <form action={requestSystemsRefresh}>
-            <button type="submit" className="btn-secondary" style={{ fontSize: 13, padding: "8px 14px" }} disabled={pending.refresh}>{pending.refresh ? "更新排隊中" : "◷ 立即更新"}</button>
+            <button type="submit" className="btn-secondary" style={{ fontSize: 13, padding: "8px 14px" }} disabled={refresh.kind === "waiting"}>{refresh.kind === "waiting" ? "更新排隊中" : "◷ 立即更新"}</button>
           </form>
           <AddSystemForm />
         </div>
@@ -337,7 +349,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
         <div className="sys-right">
           <PendingPanel pending={pending} />
           <ResumePanel rows={rows} />
-          <SyncPanel runs={runs} refreshAt={refreshAt} />
+          <SyncPanel runs={runs} refresh={refresh} pendingFailed={pendingFailed} />
           <HelpCard rows={rows} />
         </div>
       </div>

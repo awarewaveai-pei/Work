@@ -47,4 +47,23 @@ describe("accent color is not used for text", () => {
       });
     expect(hits).toEqual([]);
   });
+
+  // Tighter: inside a solid accent block ANY color other than --btn-primary-text is a violation.
+  // Debt found when this rule was tightened (2026-11-22): fix the file, then delete its entry. New files may not join.
+  const KNOWN_DEBT = ["ops/clients/[slug]/CsIntentsCard.tsx", "ops/clients/[slug]/CustomerServiceTab.tsx", "tools/content/ContentStudio.tsx", "tools/content/topics/TopicsBoard.tsx", "app/globals.css"];
+  it("a solid accent fill carries only --btn-primary-text as ink", () => {
+    const SOLID_ACCENT_BG = /background\s*:[^;{}\n]*?(?<!srgb, )var\(--accent\)(?![-\w])/;
+    const COLORS = /(?<![-\w])color\s*:\s*([^;,{}\n]*)/g;
+    const hits = ["app", "components", "lib"]
+      .flatMap((d) => walk(path.join(ROOT, d)))
+      .flatMap((f) => {
+        const src = fs.readFileSync(f, "utf8");
+        return [...src.matchAll(/\{[^{}]*\}/g)].flatMap((m) => {
+          if (!SOLID_ACCENT_BG.test(m[0])) return [];
+          const bad = [...m[0].matchAll(COLORS)].filter((c) => !/var\(--btn-primary-text\)/.test(c[1]));
+          return bad.length ? [`${path.relative(ROOT, f)}:${src.slice(0, m.index).split("\n").length} ${bad[0][0].trim()}`] : [];
+        });
+      });
+    expect(hits.filter((h) => !KNOWN_DEBT.some((k) => h.split(path.sep).join("/").includes(k)))).toEqual([]);
+  });
 });

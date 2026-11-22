@@ -16,6 +16,8 @@ const store = vi.hoisted(() => ({
   requestRefresh: vi.fn(),
   proposeSystem: vi.fn(),
   closeProposal: vi.fn(),
+  BadInput: class BadInput extends Error {},
+  ProposalNotFound: class ProposalNotFound extends Error {},
   writeUserEvent: vi.fn(),
 }));
 vi.mock("@/lib/systems/store", () => store);
@@ -35,7 +37,7 @@ beforeEach(() => {
   store.readImportRuns.mockResolvedValue([]);
   store.readProjectionInput.mockResolvedValue({ events: [], history: [], capped: false });
   store.writeUserEvent.mockResolvedValue(undefined);
-  store.readPending.mockResolvedValue({ refresh: false, proposals: [] });
+  store.readPending.mockResolvedValue({ refresh: false, requestedAt: null, proposals: [] });
   store.requestRefresh.mockResolvedValue(undefined);
   store.proposeSystem.mockResolvedValue(undefined);
   store.closeProposal.mockResolvedValue(undefined);
@@ -82,7 +84,7 @@ describe("overview writes (立即更新 / 新增系統) are owner / admin only",
     role.value = "owner";
     expect(await redirectedTo(() => requestSystemsRefresh())).toBe("REDIRECT /ops/systems?r=refresh_queued");
     expect(store.requestRefresh).toHaveBeenCalledTimes(1);
-    store.readPending.mockResolvedValue({ refresh: true, proposals: [] });
+    store.readPending.mockResolvedValue({ refresh: true, requestedAt: new Date().toISOString(), proposals: [] });
     expect(await redirectedTo(() => requestSystemsRefresh())).toBe("REDIRECT /ops/systems?r=refresh_pending");
     expect(store.requestRefresh).toHaveBeenCalledTimes(1);
     expect(await redirectedTo(() => proposeNewSystem(form({ name: "新系統", type: "product", purpose: "做事" })))).toBe("REDIRECT /ops/systems?r=proposed");
@@ -99,5 +101,22 @@ describe("撤回待登記 is owner / admin only", () => {
     role.value = "owner";
     expect(await run()).toBe("REDIRECT /ops/systems?r=withdrawn");
     expect(store.closeProposal).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("撤回 error codes and the stale refresh lock", () => {
+  it("named store errors map to their own codes", async () => {
+    role.value = "owner";
+    const run = async () => { try { await withdrawProposal(form({ event_key: "user:abc", reason: "重複" })); } catch (e) { return String((e as Error).message); } return ""; };
+    store.closeProposal.mockRejectedValueOnce(new store.ProposalNotFound("x"));
+    expect(await run()).toBe("REDIRECT /ops/systems?r=proposal_not_found");
+    store.closeProposal.mockRejectedValueOnce(new store.BadInput("x"));
+    expect(await run()).toBe("REDIRECT /ops/systems?r=bad_withdraw");
+  });
+  it("a request unanswered for 15 minutes no longer blocks 立即更新", async () => {
+    role.value = "owner";
+    store.readPending.mockResolvedValue({ refresh: true, requestedAt: new Date(Date.now() - 16 * 60000).toISOString(), proposals: [] });
+    try { await requestSystemsRefresh(); } catch (e) { expect(String((e as Error).message)).toBe("REDIRECT /ops/systems?r=refresh_queued"); }
+    expect(store.requestRefresh).toHaveBeenCalledTimes(1);
   });
 });

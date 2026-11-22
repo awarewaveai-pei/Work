@@ -61,7 +61,7 @@ function Overview({ system, p, eff, hist, brief }: { system: SystemRow; p: Syste
         </div>
       </div>
       <h3 style={{ marginBottom: 8 }}>系統狀態</h3>
-      {eff.inferred && eff.status && <div style={{ ...muted, marginBottom: 8 }}>目前顯示「{EFFECTIVE_LABEL[eff.status]}（推定）」：還沒有人設定狀態，依最近一次 commit 推定；按下面任一鈕就改成實際狀態。</div>}
+      {eff.inferred && eff.status && <div style={{ ...muted, marginBottom: 8 }}>目前顯示「{EFFECTIVE_LABEL[eff.status]}（推定）」：還沒有人設定狀態，依最近一次 git commit 推定；按下面任一鈕就改成實際狀態。</div>}
       <form action={setSystemStatus} style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
         {hidden}
         {SYSTEM_STATUSES.map((s) => (
