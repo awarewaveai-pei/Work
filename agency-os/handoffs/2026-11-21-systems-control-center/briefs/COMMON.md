@@ -54,3 +54,10 @@ payload 依 event_type：
 - `import_run` `{ "head", "previous_head", "status": "ok|history_diverged|error", "error", "gaps": { "unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths" } }`；importer 只在**最後一批**送，route 不自建（一輪只在全部批次落地後才算成功）
 未分類：`system_slug=null`，payload 加 `"unclassified": "<原因>"`。
 route 行為：registry 投影 upsert 三張定義表（以 id）；events `insert … on conflict (event_key) do nothing`；回 `{ inserted, skipped }`。頁面另寫 `status_change`／`review` 事件（source=user），不經此 route。
+
+## 契約 3：頁面寫入的事件（source=user，不經 ingest route）
+- `status_change` `{ "status", "priority"? }`、`review` `{ "target_event_key", "decision" }`（既有）
+- `refresh_request` `{}`：按「立即更新」；system_id null。待處理＝有一筆 refresh_request 比最新 import_run 新。
+- `system_proposed` `{ "name": 1–200 字, "type": 五類之一, "purpose": 1–200 字 }`：按「新增系統」；system_id null。待登記＝名稱（去空白、不分大小寫）不等於任何 registry 系統的 name／slug／aliases。agent 寫進 registry 後自然消失，不另寫完成事件。
+- 主機查詢：`GET /api/internal/systems/pending`（Bearer `SYSTEMS_INGEST_TOKEN`）→ `{ "refresh": bool, "proposals": [{ "name", "type", "purpose", "at" }] }`。
+- store.ts 對外函式名（W9 實作、W10 呼叫）：`requestRefresh(sb, actor)`、`proposeSystem(sb, actor, { name, type, purpose })`、`readPending(sb)`（回同上 JSON 結構）。
