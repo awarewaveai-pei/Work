@@ -18,6 +18,8 @@ export const TEXT_CHAIN_LABELS: Array<{ value: TextChain; label: string }> = [
   { value: "api", label: "只用 API" },
 ];
 
+const POLL_MS = 15_000;
+
 const COPY = {
   label: "文字 AI 走法",
   levelLabel: "Claude 等級",
@@ -59,32 +61,51 @@ export default function TextChainButtons({ chain, claudeModel, onChange, lane, d
   disabled?: boolean;
 }) {
   // Safe default = the fixed 只用 API screen. Only a 200 with ok swaps in the full buttons; 403 = not the owner (no
-  // subscription wording at all); any other failure (401, 5xx, network) keeps API only and says the state is unreadable.
-  const [state, setState] = useState<WorkerState | "denied" | "error" | null>(null);
+  // subscription wording at all, no more polling). Any other failure (401, 5xx, network) keeps the last good state and
+  // says it is unreadable; with no good state yet that is the API-only screen.
+  const [state, setState] = useState<WorkerState | "denied" | null>(null);
+  const [unreadable, setUnreadable] = useState(false);
 
+  // The laptop worker can start after the page opened: re-read every POLL_MS while visible, at once when it turns visible.
   useEffect(() => {
     let live = true;
-    void (async () => {
+    let denied = false;
+    let ctl: AbortController | null = null;
+    async function load() {
+      if (!live || denied || ctl) return;
+      const mine = (ctl = new AbortController());
       try {
-        const r = await fetch(`/api/tools/sub-worker?lane=${lane}`, { cache: "no-store" });
+        const r = await fetch(`/api/tools/sub-worker?lane=${lane}`, { cache: "no-store", signal: mine.signal });
         const j = (await r.json().catch(() => null)) as ({ ok?: boolean } & Partial<WorkerState>) | null;
         if (!live) return;
-        if (r.status === 403) setState("denied");
-        else if (r.ok && j?.ok) setState({ tools: j.tools ?? [], online: !!j.online, quotaBlockedUntil: j.quotaBlockedUntil ?? {} });
-        else setState("error");
-      } catch { if (live) setState("error"); }
-    })();
-    return () => { live = false; };
+        if (r.status === 403) { denied = true; setState("denied"); setUnreadable(false); }
+        else if (r.ok && j?.ok) { setState({ tools: j.tools ?? [], online: !!j.online, quotaBlockedUntil: j.quotaBlockedUntil ?? {} }); setUnreadable(false); }
+        else setUnreadable(true);
+      } catch { if (live) setUnreadable(true); }
+      finally { if (ctl === mine) ctl = null; }
+    }
+    const visible = () => document.visibilityState === "visible";
+    const tick = () => { if (visible()) void load(); };
+    const onVisible = () => { if (visible()) void load(); };
+    void load();
+    const timer = setInterval(tick, POLL_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      live = false;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      ctl?.abort();
+    };
   }, [lane]);
 
-  if (state === null || state === "denied" || state === "error") {
+  if (state === null || state === "denied") {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={row}>
           <span style={note}>{COPY.label}</span>
           <button type="button" style={btn(true)} aria-pressed disabled>{COPY.chains[3].label}</button>
         </div>
-        {state === "error" && <div style={note}>{COPY.unreadable}</div>}
+        {unreadable && <div style={note}>{COPY.unreadable}</div>}
       </div>
     );
   }
@@ -121,6 +142,7 @@ export default function TextChainButtons({ chain, claudeModel, onChange, lane, d
           ))}
         </div>
       )}
+      {unreadable && <div style={note}>{COPY.unreadable}</div>}
       {segments.map((tool) => {
         const text = status(tool);
         const name = tool === "claude" ? (isSubTextModel(claudeModel) ? SUB_TEXT_MODELS[claudeModel].label : COPY.claude) : COPY.codex;
