@@ -88,7 +88,7 @@ NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`。需求來源
 | 功能額度（本月可用幾次）沒有數字：`limits` 只放 `pay` 標記 | grep `limits.`：只有 `plans-admin.ts:34`、`ops/plans/page.tsx:35,98` |
 | 員工在產品門直接通過（不查持有），但仍受逐工具授權 | `door-access.ts:25`；`middleware.ts:147-150` |
 | 員工在產品門呼叫客戶搜尋：僅客戶 403；員工照授權格（U4 已做，`doors.ts` `STAFF_DOOR_APIS`） | `doors.ts:107-111`；`staff-tools.ts:20` |
-| 員工的功能清單用的是「內部帳戶」，不是目前客戶 | `subject.ts:67`；`api/entitlements/features/route.ts:11` |
+| 員工的功能清單：帶 `?org=` 時用目前客戶（U5 已做），不帶仍是內部帳戶 | `subject.ts:67`；`api/entitlements/features/route.ts:11` |
 
 ---
 
@@ -210,8 +210,8 @@ B 的代價：①「我的帳號」多一個對 app 的依賴（讀不到就用�
 
 - 請求：`{wp_user_id, ts, nonce, key_id?}`。
 - 回應：`{ok:true, unit:{name}, wallet:{balance, frozen}, products:[{key, name, right:{kind:"contract|comp|credits|trial|none", label, until?, counts:{covered,gift,credits,locked}}, can_enter}], fetched_at}`。
-- 錯誤：`not_a_member`（404，WordPress 顯示「尚未連結，請聯絡我們」）、`email_unverified`、`source_disabled`、`unavailable`。
-- 計算：持有判斷用 `heldDoors`（`lib/portal/held-doors.ts`），權益標籤用 §8 的 `RightBadge` 純函式，餘額用 `createEntitlementStore().getCreditBalance`。不新增判斷。
+- 錯誤：完整代碼表（17 列：代碼、HTTP 狀態、外掛該顯示什麼）只在 `NA/app/api/auth/wp-summary/route.ts` 檔頭一處（W1 已做）；常見：`not_a_member` 404、`email_unverified` 403、`source_disabled` 404（鑰匙未設，正式站現況）、`unavailable` 503。
+- 計算：持有判斷用 `heldDoors`（`lib/portal/held-doors.ts`），權益標籤用 `rightLabel()`（U6），`counts` 用 `createEntitlementStore().listActiveEntitlements`（一次讀完，與 `findActiveEntitlement` 同一個有效條件），餘額用 `getCreditBalance`。不新增判斷。回應另含 `url`（僅 `can_enter` 時）。
 
 **外掛**：
 1. `Summary` 用戶端：簽章 POST、逾時 2 秒、成功後存 transient 60 秒（鍵＝WordPress 使用者 id；與門的持有快取 60 秒一致，`lib/portal/door-access.ts:13`）；外掛自己送出付款事件時（`PaymentSender`）立刻清掉該會員的快取。
@@ -857,7 +857,7 @@ launcher 現況問題與改法：
 | P6 | 主要動作「生成文章」在 15 個摺疊區之後，約第 3661 行；選填的「熱門搜尋」卻排在最上面 | `ContentStudio.tsx:1977`、`:3661` |
 | P7 | 「題目›客戶」「題目›五步驟」同一份資料三種看法；對客戶單位而言「客戶」不知所指 | `products.ts:78-79` |
 | P8 | 手機上 6 個連結＋13 個功能疊在內容上面 | `globals.css:528-531` |
-| P9 | 發布網站選擇出現兩處、都是下拉 | `ContentStudio.tsx:1953`、`:2203`（K7 已列） |
+| P9 | 發布網站選擇出現兩處、都是下拉 | `ContentStudio.tsx:1953`、`:2203`（**K7 已刪**） |
 | P10 | 沒有「現況」：看不到待核准題目、草稿、已排程 | 資料已有：`/api/content/topics/overview`（`DoorTopicsBoard.tsx:11`）、草稿頁籤（`:2168`） |
 | P11 | 硬寫色碼 | `ContentStudio.tsx:2031-2033`（`#ff4500`、`#006e2e`）、`:3934`（`#5855d0`） |
 

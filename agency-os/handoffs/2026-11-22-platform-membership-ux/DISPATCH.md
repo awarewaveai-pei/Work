@@ -38,11 +38,11 @@
 | K5 | app 與各產品子網域換成同一個外框與左欄 | NA `app/ProductDoorShell.tsx`、`app/(shell)/layout.tsx`、`app/DoorNav.tsx`、`app/SidebarNav.tsx`、新 `app/PlatformFrame.tsx`、`app/NavRail.tsx`＋test | Medium | Opus | K4 | 3 | 已併 |
 | U4 | 員工在產品子網域也能搜尋客戶 | NA `lib/portal/doors.ts`、`lib/portal/staff-tools.ts`、`app/api/ops/org-search/route.ts`、`lib/portal/__tests__/doors.test.ts`、`staff-tools.test.ts`、`registry-code.test.ts`、新 `lib/__tests__/middleware-staff-door-api.test.ts` | **High** | Opus | K3 | 3 | 已併 |
 | U21 | 工具卡片元件（三種密度） | 新 NA `components/portal/ToolCard.tsx`、`ToolGrid.tsx`＋test | Low | Sonnet | U6 | 3 | 已併 |
-| W1 | app 提供 WordPress「我的帳號」要畫的產品摘要 | 新 NA `app/api/auth/wp-summary/route.ts`＋test；`lib/auth/sources/awarewave-wp.ts`＋其 test | **High** | Opus | U6、U7 | 3 | |
-| U5 | 員工替客戶操作時，按鈕顯示的是該客戶的開通狀態 | NA `app/api/entitlements/features/route.ts`、新 `app/api/entitlements/features/__tests__/route-org.test.ts`、`lib/entitlements/use-paid-features.ts`、`lib/entitlements/can.ts`（`verdictOf` 多回 `source`）、`lib/entitlements/features.ts` | **High** | Opus | K4、U6 | 4 | |
-| K7 | 寫文章頁改用客戶欄挑網站，拿掉兩個下拉；補：查單一網站網路失敗要顯示「載入失敗」（`ClientContextProvider.tsx` 單站查詢） | NA `app/(shell)/tools/content/ContentStudio.tsx`、`__tests__/ContentStudio.site-wiring.test.tsx`；刪 `lib/content/pick-initial-site.ts`＋test | Medium | Opus | K3、K5 | 4 | |
-| K8 | 題目、五步驟改用客戶欄；刪「題目›客戶」頁 | NA `app/(shell)/tools/content/topics/*`、`app/content/topics/DoorTopicsBoard.tsx`、刪兩個 `topics/clients/page.tsx`、`lib/portal/products.ts`、`app/sidebar-sections.ts` | Medium | Opus | K3、K5 | 4 | |
-| K9 | 網站頁只列目前客戶的網站 | NA `app/(shell)/tools/content/sites/SiteManager.tsx`、`sites/page.tsx`、`app/content/sites/page.tsx`、`sites/__tests__/SiteManager*` | Medium | Sonnet | K3、K5 | 4 | |
+| W1 | app 提供 WordPress「我的帳號」要畫的產品摘要 | 新 NA `app/api/auth/wp-summary/route.ts`＋test；`lib/auth/sources/awarewave-wp.ts`＋其 test | **High** | Opus | U6、U7 | 3 | 已併 |
+| U5 | 員工替客戶操作時，按鈕顯示的是該客戶的開通狀態 | NA `app/api/entitlements/features/route.ts`、新 `app/api/entitlements/features/__tests__/route-org.test.ts`、`lib/entitlements/use-paid-features.ts`、`lib/entitlements/can.ts`（`verdictOf` 多回 `source`）、`lib/entitlements/features.ts` | **High** | Opus | K4、U6 | 4 | 已併 |
+| K7 | 寫文章頁改用客戶欄挑網站，拿掉兩個下拉；補：查單一網站網路失敗要顯示「載入失敗」（`ClientContextProvider.tsx` 單站查詢） | NA `app/(shell)/tools/content/ContentStudio.tsx`、`__tests__/ContentStudio.site-wiring.test.tsx`；刪 `lib/content/pick-initial-site.ts`＋test | Medium | Opus | K3、K5 | 4 | 已併 |
+| K8 | 題目、五步驟改用客戶欄；刪「題目›客戶」頁 | NA `app/(shell)/tools/content/topics/*`、`app/content/topics/DoorTopicsBoard.tsx`、刪兩個 `topics/clients/page.tsx`、`lib/portal/products.ts`、`app/sidebar-sections.ts` | Medium | Opus | K3、K5 | 4 | 已併 |
+| K9 | 網站頁只列目前客戶的網站 | NA `app/(shell)/tools/content/sites/SiteManager.tsx`、`sites/page.tsx`、`app/content/sites/page.tsx`、`sites/__tests__/SiteManager*` | Medium | Sonnet | K3、K5 | 4 | 已併 |
 | K6 | 伺服器不再「沒指定網站就拿第一個」 | NA `lib/content/wp-sites.ts`＋其 tests | **High** | Opus | K7 | 5 | |
 | K10 | 客戶頁每個網站都能改；客戶首頁列出有問題的客戶 | NA `app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx`、`app/(shell)/ops/clients/page.tsx` | Medium | Sonnet | K2、K7 | 5 | |
 | K11 | 從 app 開影片工作台會帶著目前客戶 | NA `app/(shell)/tools/video/{OpenWorkbench,WorkbenchEntry,ScriptForge,ReleaseDeliveryPanel}.tsx`、`app/video/(door)/handoff/*`、`app/video/(wb)/review-release/*`＋tests | Medium | Opus | K3、K5、U4 | 5 | |
@@ -56,10 +56,10 @@
 | M2 | 合約能記「我們代操」 | MIG 新 migration（`organization_product_subscriptions.operated_by`）＋down；NA `lib/entitlements/contracts.ts`、`app/(shell)/ops/clients/[slug]/BillingTab.tsx`＋test | **High** | Opus | M1 | 7 | |
 | M11 | aware-wave.com 進門照產品的登入來源清單 | NA `lib/auth/sources/awarewave-wp.ts`＋test、`lib/portal/products.ts`（`loginSources`） | **High** | Opus | W1、K8、U22 | 7 | |
 | U11 | 內容入口重排：拆頁、改名、刪功能清單、下拉改按鈕 | NA `lib/portal/products.ts`（content 列）、`app/content/*`、`ContentStudio.tsx`、`app/sidebar-sections.ts`、`app/NavRail.tsx`（刪「功能」清單） | Medium | Opus | K5、K7、K8、U12、M11 | 8 | |
-| W2 | 外掛「我的帳號」改畫 app 給的摘要（併 W3、W4） | PL `includes/MyAccountDoors.php`、新 `includes/Summary.php`、`tests/*` | Medium | Sonnet | W1 | 8 | |
+| W2 | 外掛「我的帳號」改畫 app 給的摘要（併 W3、W4）；補：啟用外掛前先在 Cloudflare 對 `/api/auth/wp-summary`、`/api/auth/wp-handoff` 加限流（NA 無既有入站限流；改正式站安全設定，先問操作者） | PL `includes/MyAccountDoors.php`、新 `includes/Summary.php`、`tests/*` | Medium | Sonnet | W1 | 8 | |
 | M3 | 由合約自動算出「產品／方式」標籤與 TEST | 新 NA `lib/entitlements/member-tags.ts`＋test；`app/api/ops/org-search/route.ts`＋`route.test.ts`（類別改用它） | Medium | Sonnet | M1、M2、U3 | 8 | |
 | U13 | 5 組對比不足的顏色修正；補：兩個主題檔的 import 改指 `app/sidebar-sections` 後刪 `app/SidebarNav.tsx`（K5 暫留的 re-export）；加 `.badge-blue` 後換掉 `ToolCard.tsx` 行內 token | NA `app/globals.css`、`lib/theme/tokens.ts`＋檢查器 | Low | Sonnet | 先與主題 session 協調 | 8 | |
-| U14 | 手機底列 | NA `app/PlatformFrame.tsx`、`app/globals.css` | Low | Sonnet | U9、U13；先與主題 session 協調 | 9 | |
+| U14 | 手機底列；補：員工後台手機寬 375 客戶欄把內容擠到 0 寬（`.sidebar` 固定 248＋客戶欄 220）；內容門手機直排時客戶欄不撐滿、內容在一屏以下 | NA `app/PlatformFrame.tsx`、`app/globals.css` | Low | Sonnet | U9、U13；先與主題 session 協調 | 9 | |
 | W5 | 本機 WordPress＋app 走一遍，寫成可重跑腳本（G9） | 新 `scripts/local-member-flow.ps1`（路徑展開時確認） | Low | Sonnet | W1、W2 | 9 | |
 | K13 | 檢查器：頁面不得私藏客戶來源 | 新 NA `lib/client-context/__tests__/no-private-context.test.ts` | Low | Sonnet | K7–K11 | 9 | |
 | M5 | 員工替既有客戶代辦會員（app 端） | MIG 新 migration（待驗證的會員邀請）；NA `lib/entitlements/wp-customers.ts`、`lib/entitlements/identities.ts`、`app/api/ops/clients/[slug]/accounts/route.ts`、`app/(shell)/ops/clients/[slug]/AccountsCard.tsx`＋tests | **High** | Opus | M1、K10 | 9 | |
@@ -225,7 +225,7 @@ P2、P3：P1 全部併入後，監工依 §1 依賴排批（同樣每批 ≤ 4�
 | K6 | A §2 F6 標「已關」 |
 | K7、K8 | A §2 F7、F8、F14 標「已關」；B §15A P9 標「K7 已刪」 |
 | K13 | A §2 F12 標「已關」 |
-| W2 | C §3 G13 列標「已關（W2）」；B §2A.2「缺口」列與 §17.4 `heldProducts()` 列改為已完成 |
+| W2 | C §3 G13 列標「已關（W2）」；B §2A.2「缺口」列與 §17.4 `heldProducts()` 列改為已完成；補：啟用外掛前先在 Cloudflare 對 `/api/auth/wp-summary`、`/api/auth/wp-handoff` 加限流（NA 無既有入站限流；改正式站安全設定，先問操作者） |
 | W5 | C §3 G9 標「已關（W5）」 |
 | W6 | C §3 G8、G7 標「已關（W2＋W6）」；C `:3` 狀態改「部分實作」 |
 | M1 | C §2 三層表「`test` 值未存在，G12」改為「已加（M1）」；C §3 G12 標「已關」；B §9.3 類別表 TEST 列改「是」 |

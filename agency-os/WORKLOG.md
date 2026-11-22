@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-22（續16）— 平台第 4 批＋W1 上線：K7、K8、K9、U5（High）、W1（High）
+
+- 操作者 2026-11-22：「看看工人們反應的 RISKS 是否需要處理，先處理完風險再全部一起部署」＝ W1、U5 的 go，條件是風險先處理。流程改為：RISKS 與處置先寫 `data.mjs`、發布監工台，再 push／部署。
+- K8 `dcc2b5224`：題目、五步驟讀客戶欄；刪兩個 `topics/clients/page.tsx` 與兩個選單項；`overview-load.ts` 沒選客戶不讀。K7 `7a023729a`＋`75aed77b2`：`ContentStudio` 兩個網站下拉刪除、刪 `pick-initial-site.ts`；沒選網站一律擋發布（原本落到伺服器「取第一個網站」）；`PlatformFrame` 把客戶欄移進 `.main`（`.sidebar` 是 `position: fixed` 248px，客戶欄原本整條被蓋住——工人看 dev server 才發現，jsdom 測不到）。K9 `c7d6ee595`：`SiteManager` 只抓目前客戶。W1 `58cc7d670`＋`343fe7f9c`：`POST /api/auth/wp-summary`，驗簽與 `wp-handoff` 共用 `verifySignedMember`；`tables.ts` `activeRows()` 為唯一有效條件，`listActiveEntitlements` 一次讀完；鑰匙未設且無 `key_id` → 不讀資料庫回 404。U5 `3fc7eb92b`＋`79a587310`：`/api/entitlements/features?org=` 經 `actorFor`；不存在的 uuid 與無權限同為 403，查詢失敗才 503；`can.ts` 回 `source`。`9f33296bf`：分類顯示名移到 `catalog-vocab.ts`。
+- 整合修正 `86dc9d09f`：K7 把 `ContextSite` 改成 `ManagedSite`，K8 平行開發仍在轉型並用三欄假資料 → 兩者同樹才 tsc 紅；`registry-code.test.ts` 過時的 `ORG_FREE_ROUTES` 一列刪除。
+- 規格更正：W1 派工訊息比藍圖 §2A.4 鬆 → 退回照藍圖改；藍圖錯誤碼列改指路由檔頭唯一一張表。
+- 未在上線前關掉、已記卡：手機寬 375 員工後台客戶欄把內容擠到 0 寬（加客戶欄前內容亦僅 127px；修需改 `globals.css`，主題 session 佔用）→ U14；`wp-*` 入站限流（NA 無既有工具，Cloudflare 規則＝改正式站安全設定）→ W2 前問操作者。正式站未設 `PRODUCT_HOST_*`／`PUBLIC_BASE_DOMAIN`（`docker exec lobster-next-admin printenv` 無此名），工人回報的 dev 環境變數不生效不影響正式站。
+- 未驗：客戶身分的版面、選了客戶後的真資料（本機無資料庫）；部署後在正式站看。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin，rebase 到 origin/main 33775b69b 後全套 5378 passed) | exit=0 | ms=700000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=pick-initial-site | hits=13
+- ORACLE_WAIVED: Codex 額度 2026-11-24 才恢復；W1、U5 各有書面對抗自審＋突變證據（W1 拔驗簽 3 紅、拔單位限制 1 紅；U5 拔 actorFor 2 紅），W1 另有工人的 Standard critic，監工讀過 U5 路由、W1 路由與 `tables.ts`／`can.ts` diff
 ## 2026-11-22（續15）— oracle WP：SF-D 併入；第一批整批 RISKS 總檢完成；SF-E、SF-F brief
 
 - SF-D 併入 `380b3cec1`（已 push）：`scripts/templates/client-wp/{docker-compose.yml.tmpl,vhost.conf.tmpl,render.sh,Dockerfile,site-health.php,php-limits.ini,apache-mpm-prefork.conf}`、`scripts/deprovision-site.sh`、`tests/host-scripts/client-wp-template.test.sh`。監工：整份讀 `deprovision-site.sh`（預設 dry-run；`--apply --confirm <slug>`；刪 volume 另需 `--purge-volumes --confirm-purge <slug>`；登記檔值必須等於 `render.sh` 由 slug 推出的值；vhost 必須帶本站的檔頭與 `proxy_pass`）與 `render.sh:20-52` caller contract；重跑測試 60 passed／0 failed；`bash -n` 過。主機腳本隨 push 同步到主機，但沒有任何呼叫端（閘門動詞在 SF-E，開關檔未開）。
