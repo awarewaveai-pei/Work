@@ -73,6 +73,19 @@ curl -s https://oracle.aware-wave.com/api/mcp -H 'content-type: application/json
 - 驗證：`curl -sI https://<站>/zh-TW/ziwei` → 308、`location: /tools/ziwei/`；`curl -sI https://<站>/embed/zh-TW/ziwei` → 200。
 - 規格：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md` §2-3、§2-12；程式 `lib/frontPages.ts`、`proxy.ts`。
 
+## 內容安全政策（CSP）
+- 引擎與 WordPress 同網域（ORACLE-WP-SPEC §2-14）：引擎頁一個 XSS 就能帶管理員登入狀態操作 WP 後台，所以頁面只執行帶本次 nonce 的腳本。
+- 唯一定義：`lib/http/csp.ts`。頁面（`/<語言>/…`、`/embed/…`、404）由 `proxy.ts` 逐請求產生 nonce 送出；API（`/api/*`）由 `next.config.ts` 送 `API_CSP`。同一回應只能有一個 CSP 標頭（兩個都會生效），不要在 nginx 或別處再加。
+- 頁面政策（production）：`default-src 'self'; script-src 'self' 'nonce-<每請求>' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'`。dev 另加 `'unsafe-eval'`。
+  - `'strict-dynamic'` 使 `'self'` 對腳本失效：同網域的 WordPress 上傳區檔案不能當腳本跑。
+  - `style-src 'unsafe-inline'`：工具元件用 React `style` 屬性排版（數百處），伺服端輸出成 `style="…"`；行內樣式不能執行腳本。
+- `frame-src 'none'`：引擎頁不框任何東西，防注入的 HTML 框住同網域 WP 後台做點擊誘騙。`frame-ancestors 'self'`：只准同網域（WordPress 頁）框引擎；客戶自己主機的跨網域內嵌（ORACLE-WP-SPEC §1 末段）開卡時要改這一條。
+- proxy 刻意不排除 prefetch 與 `/tarot/*` 等靜態檔請求（官方範例會排除）：所有經過的回應都帶 CSP，matcher 與 `next.config.ts` 的 `/api/:path*` 互補，不留沒有 CSP 的 HTML。
+- API 政策：`default-src 'none'; frame-ancestors 'none'`。`/embed/*` 另有 `X-Robots-Tag: noindex, indexifembedded`。
+- 代價：nonce 需逐請求渲染（兩個 root layout `await connection()`），頁面不再預生成；本機量首頁中位數 3.7ms → 20.6ms（2026-11-22，操作者選此做法）。`/_not-found` 仍是靜態頁，其腳本被擋、內容照顯示。
+- 加外部來源（例：新的分析腳本、外部圖片或 API）：只改 `lib/http/csp.ts` 對應指令＋`lib/http/csp.test.ts`；外部腳本用 Next `<Script nonce={(await headers()).get('x-nonce')}>` 或確保由帶 nonce 的腳本載入（`'strict-dynamic'`）。不要加 `'unsafe-inline'`／`'unsafe-eval'` 到 `script-src`。
+- 驗證：`curl -sI https://<站>/zh-TW/ziwei | grep -ic content-security-policy` → `1`；`/embed/zh-TW/ziwei` 另有 `x-robots-tag`；`/api/v1/systems` 的 CSP 是 `default-src 'none'…`。
+
 ## 注意
 - `NEXT_PUBLIC_*` 在 build 時內嵌；網域預設值在 `lib/site.ts`。
 - 付費牆：`/api/interpret` 的 `premium` 回 402；`light`／`deep` 放行；每日次數計量未接。

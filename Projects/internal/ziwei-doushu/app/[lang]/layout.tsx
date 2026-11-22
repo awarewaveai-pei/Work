@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Serif_TC } from "next/font/google";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import "../globals.css";
 import { locales, isLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -57,6 +58,8 @@ export default async function LocaleLayout({
   children: React.ReactNode;
   params: Promise<{ lang: string }>;
 }) {
+  // CSP nonce 逐請求產生(proxy.ts),頁面須逐請求渲染才拿得到;不可改回靜態預生成。
+  await connection();
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
   const dict = await getDictionary(lang);

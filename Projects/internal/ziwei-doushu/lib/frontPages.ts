@@ -5,7 +5,7 @@ import { PAGE_SLUGS } from '@/lib/site';
  * 站前面有 WordPress 時,舊的 /<語言>/<工具> 與 /<語言> 改由 WordPress 頁接手(ORACLE-WP-SPEC §2-3、§2-12)。
  * 來源只有執行期環境變數 ORACLE_FRONT_PAGES(JSON),未設定＝沒有 WordPress,引擎行為不變。格式見 deploy/DEPLOY.md:
  *
- *   {"pages":{"zh-TW":"/{slug}/","en":"/english/{slug}/"},"home":{"zh-TW":"/","en":"/english/"}}   (home 選填)
+ *   {"pages":{"zh-TW":"/tools/{slug}/","en":"/english/{slug}/"},"home":{"zh-TW":"/","en":"/english/"}}   (home 選填)
  *
  * 只產生同網域相對路徑:不收網域、協定、`//`。任何一處不合法＝整個視為未設定,記一行原因(不印值)。
  */

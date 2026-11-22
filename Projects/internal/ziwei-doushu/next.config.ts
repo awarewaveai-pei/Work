@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { API_CSP } from "./lib/http/csp";
 
 const nextConfig: NextConfig = {
   // standalone:產出自帶最小 runtime 的 server.js → Docker 映像精簡,供 eu-deploy。
@@ -12,15 +13,18 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/**/*': ['./node_modules/@xalen/wasm/xalen_wasm_bg.wasm'],
   },
-  // 嵌入版(WordPress 同網域 iframe):不單獨收錄、內容歸父頁;只允許同源框住。只加在 /embed/*。
+  // CSP 唯一定義在 lib/http/csp.ts:頁面(含 /embed/*,frame-ancestors 'self')由 proxy.ts 逐請求帶 nonce 送;
+  //   這裡只送 API 的。同一回應不可再加第二個 CSP 標頭(兩個都會生效)。
   async headers() {
     return [
       {
+        source: '/api/:path*',
+        headers: [{ key: 'Content-Security-Policy', value: API_CSP }],
+      },
+      // 嵌入版(WordPress 同網域 iframe):不單獨收錄、內容歸父頁。
+      {
         source: '/embed/:path*',
-        headers: [
-          { key: 'X-Robots-Tag', value: 'noindex, indexifembedded' },
-          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
-        ],
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, indexifembedded' }],
       },
     ];
   },
