@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-22（續20）— 系統總控中心批 4：照參考面板補齊、「立即更新」「新增系統」上線、30 系統接續卡（操作者：「為什麼你做出來的少很多東西」「好，兩顆都做」）
+
+- 根因：W6 改版漏原型元素；正式庫 0 handoff、3 status_change → 頁面多為「未設定」、接續空、已驗收 0%；且無規則要求 agent 寫 Next:。
+- 修正：W7 補齊原型＋狀態推定；W9 0177（event_type 加 refresh_request／system_proposed／system_proposal_closed＋view `system_last_commit`）＋pending route＋匯入器 `--if-requested`／`--wait-lock`＋`*/5` cron＋`scripts/check-systems-proposals.ps1`（AO-RESUME，經主機 curl 打 pending route）；W10 兩顆按鈕＋撤回＋實看缺陷（24:00、最近動態、待確認）；W8 30 系統 seed handoffs（出處 file:line）；W11 registry 補 client-context／site-flow／sub-worker 與 3 個新監工頁。AGENTS.md §8 規定 commit 結尾 `Next:`、與 Co-Authored-By 同段（`d01791657` `065aac2e3`）。
+- 審查：critic W9（1c/4m/3n：PS 5.1 `ConvertFrom-Json` 陣列不攤平→0 筆崩潰等）→ 全修；critic 整合版（0c/2m/8n：推定吃掉待確認、ingest 持續拒收每 5 分鐘重跑等）→ 全修；監工整合補 `lastCommitAt` 三處傳入（`a81fe31d2`）。
+- 上線：0177 先套（to_regclass null → APPLY_OK；view 29 列、anon 無權）→ main `a81fe31d2` 部署 → seed 30 handoffs 經 ingest inserted 30 → install-host-schedules 裝 `*/5` → 待登記檢查主機實跑 PASS → 操作者登入實看：版面齊，發現 3 缺陷 → `ee7da26f6` 部署。
+- 實測「立即更新」：按下 → `?r=refresh_queued`、按鈕「更新排隊中」→ 約 3 分鐘後 import_run 回應，imported 143 events HEAD ee7da26f6。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（next-admin 全套）→ 661 files／5503 passed | exit=0 | ms=900000
+- REALTEST_EVIDENCE: tool=SSH | cmd=apply-db-migration 0177 → APPLY_OK；psql system_last_commit 29 列、has_table_privilege(anon)=f | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl POST ingest（seed handoffs）→ {"ok":true,"inserted":30,"skipped":0} | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=check-systems-proposals.ps1（真主機）→ overall PASS, measured 1, none pending | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=SSH | cmd=頁面按「立即更新」後輪詢 refresh_request < import_run → t（第 6 次）；log imported 143 event(s) | exit=0 | ms=180000
+- REVIEW_DONE: critic=Standard | verdict=warn→pass | findings=1c/6m/11n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=system_last_commit | hits=14
+- ORACLE_WAIVED: Codex 額度到 11/24；兩輪 critic＋各卡突變證據＋正式頁實看
 ## 2026-11-22（續18）— oracle WP：SF-E 併入；第二批整批 RISKS 總檢完成；新增卡 E5、SF-E2
 
 - SF-E 併入 `2f9c53fc8`（已 push）：`aw-hosting-gate.sh` 新增 `site-preflight／site-create／site-job／site-vhost／site-wp`；開關檔 `/etc/default/aw-hosting-gate.local` 無 `AW_SITE_VERBS=on` → 126（`switch_trusted`：root 擁有、非他人可寫、只讀不 source）；site 動詞帶 stdin → 126；`render.sh` 加 `client_wp_write_registry／read_registry`；`vhost.conf.tmpl` 自帶 `real_ip_header`。監工讀開關與分派段、確認既有行只刪註解與 `--list` 一行；`hosting-gate-site.test.sh` 96 passed；next-admin 對 main `npx tsc --noEmit` exit 0、全套 vitest 第一次 5430 passed／1 failed、重跑 0 failed（不穩定測試，未定位，與本卡無關）。主機腳本已隨 push 同步，開關未開。
