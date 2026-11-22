@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
+import { codexAllowed, deferCodexWork } from "@/lib/tarot/codex-bridge";
+import { subErrorText } from "@/lib/ai/sub-text";
 import {
   prepareArticleGeneration,
   streamArticleGeneration,
@@ -19,7 +22,9 @@ export const maxDuration = 120;
 // check, json parse — and wraps the core async generator in a ReadableStream for
 // text/plain streaming. The streamed output (incl. GENERATION_TRUNCATED / GENERATION_ERROR
 // markers) is byte-identical to the previous inline implementation.
-async function handlePost(req: Request): Promise<Response> {
+// A chain with subscription segments, asked by the operator herself, never holds the request open for a worker (PLAN
+// I5): the same stream runs detached and the 202 job's result is { ok: true, markdown } (the whole stream as one string).
+async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return new NextResponse("forbidden", { status: 403 });
@@ -44,6 +49,21 @@ async function handlePost(req: Request): Promise<Response> {
   }
   const { config } = prepared as ArticlePrepareSuccess;
 
+  if (config.chain && codexAllowed(grant.actor)) {
+    // Detached from the request: its signal ends with the 202 answer. The bridge's queue and lease timers bound the wait.
+    // Collected here, not through streamResponse: that stream closes on a throw, so a failure would read as an empty
+    // article. A throw answers as an article error, not with deferCodexWork's picture fallback.
+    return deferCodexWork(grant.actor, async () => {
+      try {
+        let markdown = "";
+        for await (const chunk of streamArticleGeneration(config, apiKey, new AbortController().signal)) markdown += chunk;
+        return Response.json({ ok: true, markdown });
+      } catch {
+        return Response.json({ ok: false, error: subErrorText("article_failed"), code: "article_failed" });
+      }
+    });
+  }
+
   // Abort plumbing — restore the original route's belt-and-suspenders (the pre-refactor route had
   // BOTH a req.signal listener AND cancel(){ anthropicStream.abort() }). In App Router the request
   // abort event is not reliably fired on client disconnect, so the ReadableStream cancel() hook is
@@ -52,7 +72,10 @@ async function handlePost(req: Request): Promise<Response> {
   const ac = new AbortController();
   if (req.signal.aborted) ac.abort();
   else req.signal.addEventListener("abort", () => ac.abort());
+  return streamResponse(config, apiKey, ac);
+}
 
+function streamResponse(config: ArticlePrepareSuccess["config"], apiKey: string, ac: AbortController): Response {
   const readable = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();

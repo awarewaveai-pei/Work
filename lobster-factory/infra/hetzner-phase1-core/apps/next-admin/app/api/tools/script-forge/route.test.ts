@@ -7,7 +7,12 @@ const sent = vi.hoisted(() => ({ calls: [] as Array<{ system: string; messages: 
 // Set = the real SDK stream accumulates this provider response (usage and stop_reason exactly as the SDK snapshots them).
 const provider = vi.hoisted(() => ({ fetch: null as null | (() => Promise<Response>) }));
 const limit = vi.hoisted(() => ({ ms: 110_000 }));
-vi.mock("@/lib/entitlements/grant", () => ({ withFeature: (_k: string, h: (r: Request, g: unknown) => Promise<Response>) => (r: Request) => h(r, {}) }));
+const who = vi.hoisted(() => ({ actor: "ops:owner:u-owner", subJobs: 0, subAnswer: null as unknown }));
+vi.mock("@/lib/entitlements/grant", () => ({ withFeature: (_k: string, h: (r: Request, g: unknown) => Promise<Response>) => (r: Request) => h(r, { actor: who.actor }) }));
+vi.mock("@/lib/tarot/codex-bridge", async (orig) => ({
+  ...(await orig<typeof import("@/lib/tarot/codex-bridge")>()),
+  runSubJob: async () => { who.subJobs++; return who.subAnswer ?? { ok: false, error: "sub_worker_offline" }; },
+}));
 vi.mock("@/lib/ai/gateway", () => ({
   claudeParams: () => ({ model: "claude-haiku-5-5", max_tokens: 10 }), claudeFallback: () => ({}), providerUrl: () => "http://x",
   loadAnthropic: async () => provider.fetch ? class extends (await import("@anthropic-ai/sdk")).default {
@@ -42,13 +47,14 @@ vi.mock("@/lib/content/brand-voice-store", () => ({
     : id === "other" ? { siteId: id, organizationId: "22222222-2222-4222-8222-222222222222", name: "X", defaults: {} } : null),
 }));
 const { POST } = await import("./route");
+const { CODEX_JOB_HEADER, takeCodexResult } = await import("@/lib/tarot/codex-bridge");
 
 const client = { "x-ops-user-kind": "client", "x-ops-org-id": ORG };
 const post = (b: object) => POST(new Request("https://video.aware-wave.com/api/tools/script-forge", {
   method: "POST", headers: { "content-type": "application/json", ...client }, body: JSON.stringify(b),
 }));
 
-beforeEach(() => { vi.stubEnv("ANTHROPIC_API_KEY", "k"); sent.calls = []; sent.options = []; logged.calls = []; provider.fetch = null; limit.ms = 110_000; });
+beforeEach(() => { who.actor = "ops:owner:u-owner"; who.subJobs = 0; who.subAnswer = null; vi.stubEnv("ANTHROPIC_API_KEY", "k"); sent.calls = []; sent.options = []; logged.calls = []; provider.fetch = null; limit.ms = 110_000; });
 const budgeted = (extra: object = {}) => post({ module: "manual", task: "script", fields: { topic: "主題" }, model: "claude-haiku-5-5", autoBudget: { organizationId: ORG, runId: "run-one", budgetTwd: 10000, spentTwd: 1 }, ...extra });
 const receiptOf = async (res: Response) => { const reserved = Number(res.headers.get("X-SF-Reserved-Twd")), parts = (await res.text()).split("\n[SF_BUDGET]"); return { reserved, text: parts[0], receipt: JSON.parse(parts[1]) }; };
 const sse = (events: object[]) => events.map((e) => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`).join("");
@@ -137,6 +143,44 @@ describe("POST /api/tools/script-forge", () => {
     const res = await post({ module: "hook", task: "hooks", fields: { topic: "x" }, siteId: "own" });
     await res.text();
     expect(logged.calls).toEqual([expect.objectContaining({ route: "/api/tools/script-forge", response: { model: "claude-x", stop_reason: "end_turn", usage: { input_tokens: 7, output_tokens: 3 } } })]);
+  });
+
+  // K4a (PLAN 2026-11-22 I1, I5): the operator's chain runs detached (202 + job header); anyone else's is API only.
+  describe("text chain", () => {
+    const settled = async (res: Response) => {
+      expect(res.status).toBe(202);
+      const id = res.headers.get(CODEX_JOB_HEADER)!;
+      let r = takeCodexResult(id, who.actor);
+      for (let i = 0; r.state === "running" && i < 50; i++) { await new Promise((ok) => setTimeout(ok, 5)); r = takeCodexResult(id, who.actor); }
+      expect(r.state).toBe("done");
+      return (r as { body: Record<string, unknown> }).body;
+    };
+    const hooks = { module: "hook", task: "hooks", fields: { topic: "x" }, siteId: "own" };
+    beforeEach(() => { vi.stubEnv("CODEX_IMAGE_OWNER_USER_ID", "u-owner"); });
+
+    it("the subscription answers: the poll gets its text, no API call", async () => {
+      who.subAnswer = { ok: true, text: '{"hooks":["訂閱"]}' };
+      expect(await settled(await post({ ...hooks, chain: "claude+api", claudeModel: "sub-claude-haiku" }))).toEqual({ ok: true, text: '{"hooks":["訂閱"]}' });
+      expect(who.subJobs).toBe(1); expect(sent.calls).toEqual([]);
+    });
+    it("every subscription segment down: the API's text and the skips, each with its sentence", async () => {
+      expect(await settled(await post({ ...hooks, chain: "claude+codex+api" }))).toEqual({ ok: true, text: '{"hooks":[]}', skipped: [
+        { model: "sub-claude-opus", error: "sub_worker_offline", reason: "Claude 訂閱 Opus：筆電離線" },
+        { model: "sub-codex", error: "sub_worker_offline", reason: "Codex 訂閱：筆電離線" }] });
+      expect(sent.calls).toHaveLength(1);
+    });
+    it("a budgeted run answered by the subscription costs NT$0 (reservation released to actual 0)", async () => {
+      who.subAnswer = { ok: true, text: '{"hooks":["訂閱"]}' };
+      const body = await settled(await budgeted({ chain: "claude+api" }));
+      expect(body.reservedTwd).toBeGreaterThan(1);
+      expect(JSON.parse(String(body.text).split("\n[SF_BUDGET]")[1])).toEqual({ spentTwd: 1, estimated: false });
+    });
+    it("a chain sent by someone who is not the operator streams the API answer in the request", async () => {
+      who.actor = "ops:staff:u-staff";
+      const res = await post({ ...hooks, chain: "claude+codex+api" });
+      expect(res.status).toBe(200); expect(await res.text()).toBe('{"hooks":[]}');
+      expect(who.subJobs).toBe(0);
+    });
   });
 
   it("OpenAI: usage from the final frame is logged even when the connection breaks after it (Codex F5)", async () => {

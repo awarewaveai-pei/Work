@@ -4,7 +4,9 @@ import { withFeature } from "@/lib/entitlements/grant";
 import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
 import type { Grant } from "@/lib/entitlements/can";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { normalizeAiTextModel, isOpenAiTextModel, type AiTextModel } from "@/lib/ai/text-model-options";
+import { normalizeAiTextModel, isOpenAiTextModel, isTextChain, resolveTextChain, type AiTextModel, type ChannelModel } from "@/lib/ai/text-model-options";
+import { runSubText, runTextChain, skipNote, type ChainSkip } from "@/lib/ai/sub-text";
+import { codexAllowed, deferCodexWork } from "@/lib/tarot/codex-bridge";
 import { claudeFallback, claudeParams } from "@/lib/ai/gateway";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { canAccessOrg } from "@/lib/tenant-guard";
@@ -46,6 +48,9 @@ interface ScriptForgeBody {
   sceneCount?: number;
   customScenes?: number;
   model?: string;
+  /** 訂閱通道 (PLAN 2026-11-22 §3): the chain to try, `model` being its API segment; absent = API only. */
+  chain?: unknown;
+  claudeModel?: unknown;
   autoBudget?: unknown;
 }
 
@@ -121,11 +126,19 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
     } catch (e) { return new NextResponse(e instanceof Error ? e.message : "無法保留執行預算", { status: (e as { status?: number }).status || 503 }); }
   }
 
+  // 訂閱段只給擁有者本人（PLAN I1）；其他人送來的 chain 當成只用 API。有訂閱段 = 不讓瀏覽器等 worker（I5）：同一條串流
+  // 脫離請求跑，回 202，輪詢拿 { ok:true, text, skipped?, reservedTwd? }（text = 原本會串出的全文）。
+  const chain = isTextChain(body.chain) && body.chain !== "api" && codexAllowed(grant.actor) ? body.chain : null;
+  const models: ChannelModel[] = chain ? resolveTextChain({ chain, apiModel: model, claudeModel: body.claudeModel }) : [model];
+  let skipped: ChainSkip[] = [];
+
   // Abort plumbing — 與 content/generate 同樣的 belt-and-suspenders：req.signal 監聽 + ReadableStream
-  // cancel() 雙保險，client 斷線時中止 in-flight 串流（不浪費 token）。
+  // cancel() 雙保險，client 斷線時中止 in-flight 串流（不浪費 token）。脫離請求跑的那條不聽 req.signal（202 後它就結束）。
   const ac = new AbortController();
-  if (req.signal.aborted) ac.abort();
-  else req.signal.addEventListener("abort", () => ac.abort());
+  if (!chain) {
+    if (req.signal.aborted) ac.abort();
+    else req.signal.addEventListener("abort", () => ac.abort());
+  }
   // A budgeted call never outlives its reservation (run-store STALE_RESERVATION_MS): cut here, the reserved cost stays.
   let timedOut = false;
   const deadline = claim ? setTimeout(() => { timedOut = true; ac.abort(); }, SCRIPT_STREAM_LIMIT_MS) : undefined;
@@ -139,11 +152,15 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
       const chunks: Uint8Array[] = [], capture = { enqueue: (chunk: Uint8Array) => { if (claim) chunks.push(chunk); controller.enqueue(chunk); } } as ReadableStreamDefaultController<Uint8Array>;
       const used = budget ? (usd: number) => { actualUsd = usd; } : undefined;
       try {
-        if (useOpenAi) {
-          await streamOpenAi(capture, encoder, model, system, prompt, apiKey, ac.signal, grant, used);
-        } else {
-          await streamAnthropic(capture, encoder, model, system, prompt, apiKey, ac.signal, grant, used);
-        }
+        const out = await runTextChain(models, {
+          runSub: (sub) => runSubText({ grant, model: sub, system, prompt, lane: "owner", signal: ac.signal, route: "/api/tools/script-forge", tool: "video" }),
+          // The API segment is always `model` (resolveTextChain's last segment = apiModel), whose key was checked above.
+          runApi: () => useOpenAi
+            ? streamOpenAi(capture, encoder, model, system, prompt, apiKey, ac.signal, grant, used)
+            : streamAnthropic(capture, encoder, model, system, prompt, apiKey, ac.signal, grant, used),
+        });
+        skipped = out.skipped;
+        if (out.via === "sub") { capture.enqueue(encoder.encode(out.text)); used?.(0); }
         if (timedOut) throw new Error("timeout"); // a cut stream may end quietly; it is still a failed call
       } catch (err) {
         failed = true;
@@ -171,13 +188,19 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
     },
   });
 
-  return new Response(readable, {
+  const response = new Response(readable, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-cache",
       "X-Accel-Buffering": "no",
       ...(claim ? { "X-SF-Reserved-Twd": String(claim.spentTwd) } : {}),
     },
+  });
+  if (!chain) return response;
+  return deferCodexWork(grant.actor, async () => {
+    const text = await response.text();
+    return Response.json({ ok: true, text, ...(skipped.length ? { skipped: skipped.map((s) => skipNote(s)) } : {}),
+      ...(claim ? { reservedTwd: claim.spentTwd } : {}) });
   });
 }
 

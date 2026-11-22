@@ -1,6 +1,8 @@
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
-import { DEFAULT_AI_TEXT_MODEL, isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "../../ai/text-model-options";
+import { DEFAULT_AI_TEXT_MODEL, isOpenAiTextModel, isTextChain, normalizeAiTextModel, resolveTextChain, type AiTextModel, type TextChain } from "../../ai/text-model-options";
+import { runSubText, runTextChain, skipNote } from "../../ai/sub-text";
+import { codexAllowed, type SubLane } from "@/lib/tarot/codex-bridge";
 import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "../../ai/log-ai-call";
 import { claudeFallback, claudeParams } from "../../ai/gateway";
 import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
@@ -539,6 +541,13 @@ export interface ArticlePreparedConfig {
   userPrompt: string;
   sourcesCostUsd?: number;
   jobId?: string | null;
+  /** 訂閱通道 (PLAN 2026-11-22 §3): the chain to try; `model` is its last (API) segment. Absent = API only. */
+  chain?: TextChain;
+  /** The claude segment's subscription model (sub-claude-*); resolveTextChain defaults it. */
+  claudeModel?: string;
+  /** Whose worker runs the subscription segments: "owner" (default, the operator's laptop) or "schedule" (set by the
+   *  scheduled caller, never by a request body: PLAN I2). */
+  lane?: SubLane;
 }
 
 export interface ArticleGenerateFailure {
@@ -673,7 +682,10 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
   });
 
   const jobId = typeof body._jobId === "string" ? body._jobId : null;
-  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, sourcesCostUsd: sourcesCostUsd > 0 ? sourcesCostUsd : undefined, jobId } };
+  // A saved request without `chain` (or "api") = API only, as before.
+  const chain = isTextChain(body.chain) && body.chain !== "api"
+    ? { chain: body.chain, ...(typeof body.claudeModel === "string" ? { claudeModel: body.claudeModel } : {}) } : {};
+  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, sourcesCostUsd: sourcesCostUsd > 0 ? sourcesCostUsd : undefined, jobId, ...chain } };
 }
 
 /**
@@ -688,11 +700,49 @@ export async function* streamArticleGeneration(
   apiKey: string,
   signal?: AbortSignal,
 ): AsyncGenerator<string, void, unknown> {
+  const lane = config.lane ?? "owner";
+  const grant = config.chain && config.chain !== "api" ? await grantFor("content.article") : null;
+  // No chain, or the owner lane for someone who is not the operator (the subscription segments do not exist for them):
+  // the API path exactly as before.
+  if (!grant || (lane === "owner" && !codexAllowed(grant.actor))) {
+    yield* streamApiArticle(config, apiKey, signal, []);
+    return;
+  }
+  const models = resolveTextChain({ chain: config.chain!, apiModel: config.model, claudeModel: config.claudeModel });
+  const out = await runTextChain(models, {
+    runSub: (model) => runSubText({ grant, model, system: config.system, prompt: config.userPrompt, lane,
+      signal: signal ?? new AbortController().signal, route: "content/article-generate", tool: "content", jobId: config.jobId }),
+    runApi: async (model) => model,
+  });
+  const skipped = out.skipped.map((s) => skipNote(s, lane));
+  if (out.via === "api") {
+    yield* streamApiArticle({ ...config, model: out.model }, apiKey, signal, skipped);
+    return;
+  }
+  if (signal?.aborted) return;
+  // The whole article at once, then the cost tail exactly as the API paths write it (usd 0, vendor 訂閱: PLAN I6).
+  yield out.text;
+  if (config.sourcesCostUsd) {
+    yield `\n[COST_JSON]${JSON.stringify({ usd: config.sourcesCostUsd, model: "search", vendor: "Serper", route: "content/fetchRealSources" })}`;
+  }
+  yield `\n[COST_JSON]${JSON.stringify({ usd: 0, model: out.model, vendor: "訂閱", route: "content/article-generate", ...(skipped.length ? { skipped } : {}) })}`;
+}
+
+type SkipNote = ReturnType<typeof skipNote>;
+
+/** The API segment (Anthropic or OpenAI streaming). `skipped` = subscription segments that failed first; it rides on
+ *  the model's [COST_JSON] line only when non-empty, so an API-only call is byte-identical to before. */
+async function* streamApiArticle(
+  config: ArticlePreparedConfig,
+  apiKey: string,
+  signal: AbortSignal | undefined,
+  skipped: SkipNote[],
+): AsyncGenerator<string, void, unknown> {
   // Provider routing (P2 積木化 — multi-provider). GPT models stream through the OpenAI Chat
   // Completions SSE path; everything else stays on the byte-identical Anthropic path below. The
   // system + user prompt are provider-agnostic, so only the transport differs.
   if (isOpenAiTextModel(config.model as AiTextModel)) {
-    yield* streamOpenAiGeneration(config, signal);
+    yield* streamOpenAiGeneration(config, signal, skipped);
     return;
   }
   const articleGrant = await grantFor("content.article");
@@ -733,7 +783,7 @@ export async function* streamArticleGeneration(
         if (config.sourcesCostUsd) {
           yield `\n[COST_JSON]${JSON.stringify({ usd: config.sourcesCostUsd, model: "search", vendor: "Serper", route: "content/fetchRealSources" })}`;
         }
-        yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: finalMsg.model, vendor: rate.vendor, route: "content/article-generate" })}`;
+        yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: finalMsg.model, vendor: rate.vendor, route: "content/article-generate", ...(skipped.length ? { skipped } : {}) })}`;
       }
       if (finalMsg?.stop_reason === "refusal") {
         yield "\n\n<!-- GENERATION_ERROR: the model declined this request -->";
@@ -784,7 +834,8 @@ export async function generateArticleMarkdown(
  */
 async function* streamOpenAiGeneration(
   config: ArticlePreparedConfig,
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  skipped: SkipNote[],
 ): AsyncGenerator<string, void, unknown> {
   const grant = await grantFor("content.article");
   const apiKey = process.env.OPENAI_API_KEY;
@@ -877,7 +928,7 @@ async function* streamOpenAiGeneration(
       if (config.sourcesCostUsd) {
         yield `\n[COST_JSON]${JSON.stringify({ usd: config.sourcesCostUsd, model: "search", vendor: "Serper", route: "content/fetchRealSources" })}`;
       }
-      yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate" })}`;
+      yield `\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: config.model, vendor: rate.vendor, route: "content/article-generate", ...(skipped.length ? { skipped } : {}) })}`;
     }
 
     // Truncation guard — parallel to the Anthropic stop_reason==="max_tokens" check.
