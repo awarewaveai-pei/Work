@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """systems-import.py -- git commits -> /ops/systems events (agency-os/handoffs/2026-11-21-systems-control-center,
-PLAN §5-§7, briefs/COMMON.md contracts 1 and 2). Cron: cron.d/systems-import, 04:30 Taipei.
+PLAN §5-§7, briefs/COMMON.md contracts 1-3). Cron: cron.d/systems-import, 04:30 Taipei, and every 5 minutes with
+--if-requested (the page's 「立即更新」).
 
 Reads a bare mirror of the repo (never /root/Work, the deploy tree), takes agency-os/systems/registry.json at HEAD,
 walks previous_head..HEAD (first run: the last 90 days) and POSTs events to next-admin's ingest route in batches of
@@ -11,11 +12,15 @@ a commit or a deploy.
   --mirror <dir>   bare mirror (one-time: git clone --mirror <origin url> /root/systems-mirror.git)
   --state <file>   last imported HEAD
   --dry-run        print the request bodies, POST nothing, write no state (runs even when the import is disabled)
+  --if-requested   first GET the pending route (契約 3): refresh false -> one line, exit 0, git untouched; true -> import
+                   as usual, and send an import_run even when already up to date (that run is what answers the
+                   request). A failed GET = exit 1, nothing fetched, state untouched.
 
 Settings (environment first, else a plain read of SYSTEMS_ENV_FILE -- never sourced, like poke.sh):
   SYSTEMS_IMPORT_ENABLED  anything but "true" -> one line, exit 0 (default OFF)
   SYSTEMS_INGEST_TOKEN    bearer token for the route (sent in a header, never on a command line)
   SYSTEMS_INGEST_URL      default http://127.0.0.1:3002/api/internal/systems/ingest
+  SYSTEMS_PENDING_URL     default: SYSTEMS_INGEST_URL with /ingest -> /pending
 Exit 0 = imported / up to date / disabled; 1 = history diverged or a POST failed; 2 = could not run.
 History diverged (previous_head is not an ancestor of HEAD, e.g. a force push): one orphaned event per commit that
 left main plus the import_run event are sent, nothing new is imported, the state is kept, and every run reports it until someone deletes the state file (= re-import the last 90 days;
@@ -355,6 +360,20 @@ def post(url, token, body):
         return 0, str(e)
 
 
+def get_pending(url, token):
+    """-> True / False (契約 3 refresh), or an error string."""
+    req = urllib.request.Request(url, method="GET", headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            body = json.loads(r.read(1_000_000).decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        return f"HTTP {e.code} {e.read(300).decode('utf-8', 'replace')}"
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        return str(e)
+    refresh = body.get("refresh") if isinstance(body, dict) else None
+    return refresh if isinstance(refresh, bool) else f"no boolean refresh in {str(body)[:200]}"
+
+
 def write_state(path, head):
     d = os.path.dirname(os.path.abspath(path))
     os.makedirs(d, exist_ok=True)
@@ -364,15 +383,16 @@ def write_state(path, head):
     os.replace(tmp, path)
 
 
-def build(mirror, state_path, ref, first_days):
-    """-> (bodies, head, status); bodies == [] when already up to date."""
+def build(mirror, state_path, ref, first_days, run_when_current=False):
+    """-> (bodies, head, status); bodies == [] when already up to date, unless run_when_current (then the one body
+    carries just the import_run: a refresh request is answered by a run record newer than it)."""
     git(mirror, "fetch", "--prune", "--quiet", "origin")
     head = git(mirror, "rev-parse", "--verify", f"{ref}^{{commit}}").stdout.strip()
     prev = None
     if os.path.exists(state_path):
         with open(state_path, encoding="utf-8") as f:
             prev = f.read().strip() or None
-    if prev == head:
+    if prev == head and not run_when_current:
         return [], head, "ok"
     reg_text = git(mirror, "show", f"{head}:{REGISTRY_PATH}", check=False)
     if reg_text.returncode != 0:
@@ -423,6 +443,7 @@ def main(argv=None):
     ap.add_argument("--ref", default="refs/heads/main")
     ap.add_argument("--first-days", type=int, default=90)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--if-requested", action="store_true")
     ap.add_argument("--lock", default="/tmp/systems-import.lock")
     ap.add_argument("--max-seconds", type=int, default=300)
     a = ap.parse_args(argv)
@@ -440,8 +461,22 @@ def main(argv=None):
             return 0
         signal.alarm(a.max_seconds)  # SIGALRM ends the process; state is only written at the very end
         os.nice(19)
+    token = setting("SYSTEMS_INGEST_TOKEN")
+    url = setting("SYSTEMS_INGEST_URL", "http://127.0.0.1:3002/api/internal/systems/ingest")
+    if a.if_requested:
+        if not token:
+            print("[systems-import] ERROR: SYSTEMS_INGEST_TOKEN not set -- cannot ask for requests", file=sys.stderr)
+            return 2
+        pending_url = setting("SYSTEMS_PENDING_URL", re.sub(r"/ingest/?$", "/pending", url))
+        refresh = get_pending(pending_url, token)
+        if not isinstance(refresh, bool):
+            print(f"[systems-import] ERROR: pending check failed: {refresh} -- nothing done", file=sys.stderr)
+            return 1
+        if not refresh:
+            print("[systems-import] no refresh requested -- nothing done")
+            return 0
     try:
-        bodies, head, status = build(a.mirror, a.state, a.ref, a.first_days)
+        bodies, head, status = build(a.mirror, a.state, a.ref, a.first_days, run_when_current=a.if_requested)
     except Fatal as e:
         print(f"[systems-import] ERROR: {e}", file=sys.stderr)
         return 2
@@ -453,11 +488,9 @@ def main(argv=None):
         print()
         return 0
 
-    token = setting("SYSTEMS_INGEST_TOKEN")
     if not token:
         print("[systems-import] ERROR: SYSTEMS_INGEST_TOKEN not set -- nothing sent", file=sys.stderr)
         return 2
-    url = setting("SYSTEMS_INGEST_URL", "http://127.0.0.1:3002/api/internal/systems/ingest")
     for n, body in enumerate(bodies, 1):
         code, text = post(url, token, body)
         if not 200 <= code < 300:

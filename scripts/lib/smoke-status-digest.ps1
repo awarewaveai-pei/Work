@@ -545,6 +545,42 @@ function Get-DocIntegrityCommitEntry {
     return New-DigestEntry -Verdict "WARN" -Label "Doc integrity (script commits)" -RawLines $lines
 }
 
+# --- 12. /ops/systems requests waiting for registry.json (check-systems-proposals.ps1, run by ao-resume.ps1) ---
+# The one source whose BLIND is a blind spot, not a blocker (handoffs/2026-11-21-systems-control-center W9): a failed
+# query says nothing about the requests, so it must not read as work to do. Such an entry carries no blocker lines
+# (the M2 guarantee does not apply to it) and lists its reasons in `blind`; check-smoke-tests.ps1 adds it to the smoke
+# report's blind_spots. A non-empty list is one WARN blocker line naming the systems.
+function New-BlindSpotEntry {
+    param([Parameter(Mandatory = $true)][string]$Label, [string[]]$Lines = @())
+    $clean = @($Lines | Where-Object { $_ -and "$_".Trim() })
+    if ($clean.Count -eq 0) { $clean = @("no detail") }
+    return [ordered]@{ verdict = "BLIND"; blockers = [string[]]@(); blind = [string[]]@($clean | ForEach-Object { "{0}: {1}" -f $Label, $_ }) }
+}
+
+function Get-SystemsProposalsEntry {
+    param([string]$StatusDir, [double]$MaxAgeHours = 2)
+    $label = "Systems proposals"
+    $file = "systems-proposals-LATEST.json"
+    $j = Get-JsonReportSafe -Path (Join-Path $StatusDir $file)
+    if ($null -eq $j) { return New-BlindSpotEntry -Label $label -Lines @("$file missing or unreadable") }
+    $missing = @(@('generated_utc', 'overall', 'measured', 'proposals', 'blind_spots') | Where-Object { -not $j.PSObject.Properties[$_] })
+    if ($missing.Count -gt 0) { return New-BlindSpotEntry -Label $label -Lines @(("{0} lacks producer key(s) {1}" -f $file, ($missing -join ', '))) }
+    $ts = ConvertFrom-IsoUtcSafe -Text ([string]$j.generated_utc)
+    if (-not (Test-TimestampFresh -UtcTimestamp $ts -MaxAgeHours $MaxAgeHours)) {
+        return New-BlindSpotEntry -Label $label -Lines @(("{0} is stale (max {1}h)" -f $file, $MaxAgeHours))
+    }
+    if ([int]$j.measured -le 0 -or @($j.blind_spots).Count -gt 0) {
+        return New-BlindSpotEntry -Label $label -Lines @(@($j.blind_spots) | ForEach-Object { [string]$_ })
+    }
+    $overall = [string]$j.overall
+    if ($overall -ne 'PASS' -and $overall -ne 'WARN') { return New-BlindSpotEntry -Label $label -Lines @(("{0} has overall='{1}' (expects PASS|WARN)" -f $file, $overall)) }
+    $names = @(@($j.proposals) | Where-Object { $_ } | ForEach-Object { [string]$_.name } | Where-Object { $_ })
+    if ($names.Count -eq 0) { return New-DigestEntry -Verdict "PASS" -Label $label -RawLines @() }
+    # ASCII-only source (PS 5.1 reads a BOM-less .ps1 as the console code page): the line is decoded at run time.
+    $line = [regex]::Unescape('/ops/systems \u6709 {0} \u500b\u5f85\u767b\u8a18\u7cfb\u7d71\uff1a{1}\uff0c\u8acb\u5beb\u9032 agency-os/systems/registry.json') -f $names.Count, ($names -join [regex]::Unescape('\u3001'))
+    return New-DigestEntry -Verdict "WARN" -Label $label -RawLines @($line)
+}
+
 # critic M3: isolate each source so one parser's exception cannot blind the other nine.
 # Set-StrictMode makes an absent property or a bad [double]/[DateTime] cast throw, and
 # every Get-*Entry above touches producer-controlled JSON/MD it does not own the shape of.
@@ -573,6 +609,7 @@ function Get-StatusDigest {
         routine_freshness  = Invoke-EntrySafe -SourceLabel "Routine freshness" { Get-RoutineFreshnessEntry -StatusDir $statusDir }
         cf_security_health = Invoke-EntrySafe -SourceLabel "Cloudflare"        { Get-CfSecurityEntry -StatusDir $statusDir }
         doc_integrity_commits = Invoke-EntrySafe -SourceLabel "Doc integrity (script commits)" { Get-DocIntegrityCommitEntry -StatusDir $statusDir }
+        systems_proposals  = Invoke-EntrySafe -SourceLabel "Systems proposals" { Get-SystemsProposalsEntry -StatusDir $statusDir }
     }
 
     $blockers = New-Object System.Collections.Generic.List[string]

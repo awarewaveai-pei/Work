@@ -132,6 +132,38 @@ function parseEvent(raw: unknown, i: number): IngestEvent {
   };
 }
 
+// 契約 3: the page's 「立即更新」 and 「新增系統」 buttons. User events with system_id null (migration 0177); the importer
+// reads them through GET /api/internal/systems/pending, the projection ignores them, the ingest route refuses them.
+export const USER_REQUEST_TYPES = ["refresh_request", "system_proposed"] as const;
+export type UserRequestType = (typeof USER_REQUEST_TYPES)[number];
+export interface SystemProposal { name: string; type: SystemType; purpose: string }
+
+/** A page request's payload, normalized (trimmed). `by` (the actor, as on every user event) is the only extra key. */
+export function parseUserRequest(
+  type: UserRequestType, raw: unknown,
+): { ok: true; payload: Record<string, unknown> } | { ok: false; error: string } {
+  try {
+    const p = obj(raw, "payload");
+    const allowed = type === "refresh_request" ? ["by"] : ["by", "name", "type", "purpose"];
+    const extra = Object.keys(p).find((k) => !allowed.includes(k));
+    if (extra) fail(`payload.${extra}`, "not allowed");
+    const out: Record<string, unknown> = {};
+    if (p.by !== undefined) out.by = str(p.by, "payload.by", 200);
+    if (type === "system_proposed") {
+      out.name = nonEmpty(p.name, "payload.name", 200).trim();
+      out.type = oneOf(p.type, SYSTEM_TYPES, "payload.type");
+      out.purpose = nonEmpty(p.purpose, "payload.purpose", 200).trim();
+    }
+    return { ok: true, payload: out };
+  } catch (e) {
+    if (e instanceof Bad) return { ok: false, error: e.message };
+    throw e;
+  }
+}
+
+/** The name match of 契約 3: whitespace removed, case ignored. */
+export const proposalKey = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+
 export type ParseResult = { ok: true; body: IngestBody } | { ok: false; error: string };
 
 export function parseIngest(raw: unknown): ParseResult {

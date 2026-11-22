@@ -52,6 +52,8 @@ try {
     Write-Utf8 (Join-Path $statusDir "staging-orphans-LATEST.json") (@{ generated_utc = $nowIso; overall = "OK"; blind_spots = @(); orphan_total = 0; counts = @{} } | ConvertTo-Json -Depth 5)
     Write-Utf8 (Join-Path $statusDir "routine-freshness-LATEST.md") "# freshness`n- generated: $nowLocalMin (local)`n- OK    Phase 4 weekly: 1d old (max 8d)`n- overall: all fresh`n"
     Write-Utf8 (Join-Path $statusDir "cf-security-LATEST.md") "# cf`n- Generated: $nowLocalSec`n- **Overall: PASS**`n"
+    $nowZ = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    Write-Utf8 (Join-Path $statusDir "systems-proposals-LATEST.json") (@{ overall = "PASS"; measured = 1; generated_utc = $nowZ; proposals = @(); blind_spots = @() } | ConvertTo-Json -Depth 5)
 
     $d2 = Get-StatusDigest -WorkRoot $root
     foreach ($k in $d2.entries.Keys) {
@@ -182,8 +184,22 @@ try {
     $d19b = Get-StatusDigest -WorkRoot $root
     Assert-Eq "PASS" $d19b.entries.ci_health.verdict "Case19: a real boolean true still passes"
 
+    # ---------- Case 20: /ops/systems proposals -- pending = one WARN blocker naming them; failed query = blind spot only ----------
+    $p20 = @(@{ name = "Ledger"; type = "internal"; purpose = "p"; at = $nowZ }, @{ name = "Oracle"; type = "product"; purpose = "q"; at = $nowZ })
+    Write-Utf8 (Join-Path $statusDir "systems-proposals-LATEST.json") (@{ overall = "WARN"; measured = 1; generated_utc = $nowZ; proposals = $p20; blind_spots = @() } | ConvertTo-Json -Depth 5)
+    $d20 = Get-StatusDigest -WorkRoot $root
+    Assert-Eq "WARN" $d20.entries.systems_proposals.verdict "Case20: pending proposals are WARN"
+    $line20 = @($d20.blockers | Where-Object { $_ -like "*Systems proposals*" })
+    Assert-Eq 1 $line20.Count "Case20: one blocker line for all pending proposals"
+    Assert-True (($line20 -join "") -match "^\[WARN\] Systems proposals: /ops/systems .* 2 .*Ledger.*Oracle.*agency-os/systems/registry\.json$") "Case20: the line names the count, each system and registry.json"
+    Write-Utf8 (Join-Path $statusDir "systems-proposals-LATEST.json") (@{ overall = "UNKNOWN"; measured = 0; generated_utc = $nowZ; proposals = @(); blind_spots = @("query failed (exit 255): ssh") } | ConvertTo-Json -Depth 5)
+    $d20b = Get-StatusDigest -WorkRoot $root
+    Assert-Eq "BLIND" $d20b.entries.systems_proposals.verdict "Case20b: a failed query is BLIND"
+    Assert-Eq 0 @($d20b.blockers | Where-Object { $_ -like "*Systems proposals*" }).Count "Case20b: a failed query adds no blocker line"
+    Assert-True ((@($d20b.entries.systems_proposals.blind) -join "") -match "exit 255") "Case20b: the reason is kept for blind_spots"
+
     if ($failures.Count -eq 0) {
-        Write-Host "ALL PASS (19 cases, 1 mutation proof)" -ForegroundColor Green
+        Write-Host "ALL PASS (20 cases, 1 mutation proof)" -ForegroundColor Green
         exit 0
     } else {
         Write-Host ("FAILED: {0} assertion(s)" -f $failures.Count) -ForegroundColor Red

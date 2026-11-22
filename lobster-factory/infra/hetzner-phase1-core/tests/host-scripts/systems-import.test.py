@@ -68,10 +68,12 @@ def events(bodies):
 
 
 class Server:
-    """Stands in for the ingest route: records each body, answers 200."""
+    """Stands in for the ingest route (records each body, answers 200) and the pending route (answers self.pending)."""
 
     def __init__(self):
         self.bodies = []
+        self.gets = []
+        self.pending = {"refresh": False, "proposals": []}
         outer = self
 
         class H(BaseHTTPRequestHandler):
@@ -80,6 +82,12 @@ class Server:
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b'{"inserted":1,"skipped":0}')
+
+            def do_GET(self):
+                outer.gets.append((self.path, self.headers.get("Authorization")))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(json.dumps(outer.pending).encode("utf-8"))
 
             def log_message(self, *a):
                 pass
@@ -247,6 +255,35 @@ class SystemsImportTest(unittest.TestCase):
             self.assertIn("not true", out)
             self.assertFalse(os.path.exists(self.r.state))
             self.assertEqual(self.r.git("rev-parse", "refs/heads/main", cwd=self.r.mirror), before)  # not fetched
+        finally:
+            srv.close()
+
+    def test_if_requested(self):
+        os.environ.update(SYSTEMS_IMPORT_ENABLED="true", SYSTEMS_INGEST_TOKEN="tok")
+        srv = Server()
+        os.environ["SYSTEMS_INGEST_URL"] = srv.url
+        try:
+            before = self.r.git("rev-parse", "refs/heads/main", cwd=self.r.mirror)
+            self.r.commit({"apps/x.ts": "1"}, "new")
+            # refresh false: one GET to /pending with the token, no fetch, no POST, no state
+            rc, out = self.run_main("--if-requested")
+            self.assertEqual((rc, srv.bodies), (0, []), out)
+            self.assertIn("no refresh requested", out)
+            self.assertEqual(srv.gets, [("/api/internal/systems/pending", "Bearer tok")])
+            self.assertEqual(self.r.git("rev-parse", "refs/heads/main", cwd=self.r.mirror), before)
+            self.assertFalse(os.path.exists(self.r.state))
+            # refresh true: imports as usual, the import_run (last) is what answers the request
+            srv.pending = {"refresh": True, "proposals": []}
+            rc, out = self.run_main("--if-requested")
+            self.assertEqual(rc, 0, out)
+            self.assertEqual([e["event_type"] for e in srv.bodies[-1]["events"]], ["activity", "import_run"])
+            head = self.r.git("rev-parse", "HEAD")
+            with open(self.r.state) as f:
+                self.assertEqual(f.read().strip(), head)
+            # still requested with nothing new: a run record alone is sent (else the request would stay pending)
+            rc, out = self.run_main("--if-requested")
+            self.assertEqual(rc, 0, out)
+            self.assertEqual([(e["event_type"], e["payload"]["head"]) for e in srv.bodies[-1]["events"]], [("import_run", head)])
         finally:
             srv.close()
 

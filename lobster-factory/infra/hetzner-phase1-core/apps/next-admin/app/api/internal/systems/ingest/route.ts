@@ -8,24 +8,17 @@
 // run sends the same events again. Status_change / review never come through here (the page writes them, source=user).
 
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { MAX_BODY_BYTES, parseIngest } from "@/lib/systems/contract";
+import { verifySystemsToken } from "@/lib/systems/ingest-token";
 import { ingest } from "@/lib/systems/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-function verifyToken(request: Request): boolean {
-  const expected = process.env.SYSTEMS_INGEST_TOKEN;
-  if (!expected) return false; // fail closed: unset means nobody is authorized, not everybody
-  const m = (request.headers.get("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
-  return !!m && timingSafeEqual(m[1], expected);
-}
-
 export async function POST(request: Request) {
-  if (!verifyToken(request)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  if (!verifySystemsToken(request)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (declared > MAX_BODY_BYTES) return NextResponse.json({ ok: false, error: "body_too_large" }, { status: 413 });

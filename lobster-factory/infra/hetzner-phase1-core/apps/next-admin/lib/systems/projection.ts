@@ -10,7 +10,8 @@
 //   its own reverts. Revert / orphaned events are read across every system (store.readCommitHistory).
 // - completion = verified / features not cancelled; no features = null (尚未盤點). Features of a phase that still
 //   lives on its old supervisor page (legacy_source_path, no migration event yet) are left out: that page is the source.
-import type { FeatureStatus } from "./contract";
+// - refresh_request / system_proposed (契約 3) are requests to the host, not state: ignored.
+import { USER_REQUEST_TYPES, type FeatureStatus } from "./contract";
 
 export interface SystemRow {
   id: string; slug: string; name: string; aliases: string[]; type: string; purpose: string; product_key: string | null;
@@ -106,6 +107,7 @@ export function projectSystem(input: {
   let lastActivityAt: string | null = null;
 
   for (const e of events) {
+    if ((USER_REQUEST_TYPES as readonly string[]).includes(e.event_type)) continue;
     if (e.event_type !== "import_run") lastActivityAt = e.occurred_at;
     if (e.event_type === "status_change") {
       if ((SYSTEM_STATUSES as readonly unknown[]).includes(e.payload.status)) status = e.payload.status as SystemStatus;

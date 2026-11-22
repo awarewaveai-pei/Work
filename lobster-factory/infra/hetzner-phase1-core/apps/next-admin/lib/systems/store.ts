@@ -1,9 +1,10 @@
 // The four tables of migration 0174, service role only. Writes: the registry projection and importer events (ingest
-// route), and the page's own status_change / review events. Reads are capped (PLAN §6: a page that cannot hurt the
+// route), and the page's own status_change / review events and its refresh / new-system requests (契約 3). Reads are capped (PLAN §6: a page that cannot hurt the
 // back office); a capped read says so, so the page never shows a partial history as the whole one.
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { IngestBody, Registry } from "./contract";
+import { parseUserRequest, proposalKey } from "./contract";
+import type { IngestBody, Registry, SystemProposal, UserRequestType } from "./contract";
 import type { FeatureRow, PhaseRow, SystemRow, UpdateRow } from "./projection";
 
 const CHUNK = 500;
@@ -146,4 +147,76 @@ export async function writeUserEvent(
     }),
     "system_updates insert",
   );
+}
+
+// --- 契約 3: 「立即更新」 and 「新增系統」 (migration 0177). system_id null; the projection ignores both. ---------------
+
+export const PROPOSAL_READ_CAP = 200;
+
+async function writeRequest(sb: SupabaseClient, type: UserRequestType, payload: Record<string, unknown>): Promise<void> {
+  const parsed = parseUserRequest(type, payload);
+  if ("error" in parsed) throw new Error(`${type}: ${parsed.error}`);
+  check(
+    await sb.from("system_updates").insert({
+      event_key: `user:${randomUUID()}`, system_id: null, event_type: type, source: "user",
+      occurred_at: new Date().toISOString(), payload: parsed.payload,
+    }),
+    "system_updates insert",
+  );
+}
+
+/** 「立即更新」: the host asks GET /api/internal/systems/pending every 5 minutes and imports when this is newer than
+ *  the newest import_run. */
+export const requestRefresh = (sb: SupabaseClient, actor: string) => writeRequest(sb, "refresh_request", { by: actor });
+
+/** 「新增系統」: waits on /api/internal/systems/pending until an agent writes it into registry.json. Throws on a payload
+ *  that breaks 契約 3 (name / purpose 1-200 characters, type one of the five). */
+export const proposeSystem = (sb: SupabaseClient, actor: string, p: SystemProposal) =>
+  writeRequest(sb, "system_proposed", { by: actor, name: p.name, type: p.type, purpose: p.purpose });
+
+export interface PendingProposal { name: string; type: string; purpose: string; at: string }
+export interface Pending { refresh: boolean; proposals: PendingProposal[] }
+
+/** Pure part of readPending. refresh = a refresh_request newer than the newest import_run (any status: a run that
+ *  failed still answered it -- the next request asks again). A proposal is pending while its name matches no live
+ *  system's name / slug / alias (proposalKey); the same name asked twice is listed once, newest wins; oldest first. */
+export function pendingFrom(input: {
+  lastRequestAt: string | null; lastRunAt: string | null;
+  proposals: ReadonlyArray<{ payload: Record<string, unknown>; occurred_at: string }>;
+  systems: ReadonlyArray<{ name: string; slug: string; aliases: string[] | null }>;
+}): Pending {
+  const refresh = !!input.lastRequestAt && (!input.lastRunAt || Date.parse(input.lastRequestAt) > Date.parse(input.lastRunAt));
+  const taken = new Set(input.systems.flatMap((s) => [s.name, s.slug, ...(s.aliases ?? [])]).map(proposalKey));
+  const byName = new Map<string, PendingProposal>();
+  for (const e of [...input.proposals].sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at))) {
+    const p = e.payload;
+    if (typeof p.name !== "string" || !p.name.trim()) continue;
+    const key = proposalKey(p.name);
+    if (taken.has(key)) continue;
+    byName.delete(key);
+    byName.set(key, { name: p.name, type: String(p.type ?? ""), purpose: String(p.purpose ?? ""), at: e.occurred_at });
+  }
+  return { refresh, proposals: [...byName.values()] };
+}
+
+/** 契約 3 JSON for the host (GET /api/internal/systems/pending). Four capped reads on the (event_type, occurred_at)
+ *  index of 0174 and the live systems. */
+export async function readPending(sb: SupabaseClient): Promise<Pending> {
+  const newest = async (type: string) => {
+    const rows = check(
+      await sb.from("system_updates").select("occurred_at").eq("event_type", type).order("occurred_at", { ascending: false }).limit(1),
+      `${type} read`,
+    ) as Array<{ occurred_at: string }>;
+    return rows[0]?.occurred_at ?? null;
+  };
+  const [lastRequestAt, lastRunAt, proposals, systems] = await Promise.all([
+    newest("refresh_request"),
+    newest("import_run"),
+    sb.from("system_updates").select("payload,occurred_at").eq("event_type", "system_proposed")
+      .order("occurred_at", { ascending: false }).limit(PROPOSAL_READ_CAP)
+      .then((r) => check(r as { data: unknown; error: { message: string } | null }, "system_proposed read") as Array<{ payload: Record<string, unknown>; occurred_at: string }>),
+    sb.from("systems").select("name,slug,aliases").eq("in_registry", true).limit(EVENT_READ_CAP)
+      .then((r) => check(r as { data: unknown; error: { message: string } | null }, "systems read") as Array<{ name: string; slug: string; aliases: string[] | null }>),
+  ]);
+  return pendingFrom({ lastRequestAt, lastRunAt, proposals, systems });
 }

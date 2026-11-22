@@ -633,6 +633,8 @@ $hasWarn    = @($checks | Where-Object { $results[$_] -like "warn:*" -or $result
 # skip:no_ssh_key are equally blind, and matching "skip:*" alone would report an empty
 # blind_spots list while the detector had in fact learned nothing.
 $blindSpots = @($criticalChecks | Where-Object { $noEvidence.ContainsKey($_) -and $noEvidence[$_] })
+# systems_proposals (smoke-status-digest.ps1 source 12): a failed query is a blind spot, never a blocker line.
+if ($statusDigest -and $statusDigest.entries.Contains('systems_proposals') -and $statusDigest.entries['systems_proposals'].verdict -eq 'BLIND') { $blindSpots += 'systems_proposals' }
 $allSkip    = @($checks | Where-Object { $results[$_] -notlike "skip:*" }).Count -eq 0
 
 # blockers[]: the flat, ready-to-print list ao-resume.md §6 reads verbatim. Sourced from ALL
