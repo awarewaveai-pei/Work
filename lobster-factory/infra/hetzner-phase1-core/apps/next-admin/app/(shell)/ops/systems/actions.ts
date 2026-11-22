@@ -11,7 +11,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { systemsAccess } from "@/lib/systems/access";
 import { PRIORITIES, projectSystem, SYSTEM_STATUSES } from "@/lib/systems/projection";
 import { SYSTEM_TYPES, type SystemType } from "@/lib/systems/contract";
-import { proposeSystem, readDefinitions, readPending, readProjectionInput, requestRefresh, writeUserEvent } from "@/lib/systems/store";
+import { closeProposal, proposeSystem, readDefinitions, readPending, readProjectionInput, requestRefresh, writeUserEvent } from "@/lib/systems/store";
 
 const text = (form: FormData, name: string) => {
   const v = form.get(name);
@@ -113,6 +113,18 @@ export async function requestSystemsRefresh() {
     if ((await readPending(sb)).refresh) return "refresh_pending";
     await requestRefresh(sb, actor);
     return "refresh_queued";
+  });
+}
+
+const CLOSE_REASONS = ["打錯", "重複", "不做了"] as const;
+
+export async function withdrawProposal(form: FormData) {
+  const key = text(form, "event_key");
+  const reason = text(form, "reason");
+  await overviewWrite(async ({ sb, actor }) => {
+    if (!key || key.length > 100 || !(CLOSE_REASONS as readonly string[]).includes(reason)) return "bad_proposal";
+    await closeProposal(sb, actor, key, reason);
+    return "withdrawn";
   });
 }
 

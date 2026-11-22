@@ -15,12 +15,13 @@ const store = vi.hoisted(() => ({
   readPending: vi.fn(),
   requestRefresh: vi.fn(),
   proposeSystem: vi.fn(),
+  closeProposal: vi.fn(),
   writeUserEvent: vi.fn(),
 }));
 vi.mock("@/lib/systems/store", () => store);
 
 const { default: SystemsPage } = await import("../page");
-const { setSystemStatus, requestSystemsRefresh, proposeNewSystem } = await import("../actions");
+const { setSystemStatus, requestSystemsRefresh, proposeNewSystem, withdrawProposal } = await import("../actions");
 
 const form = (fields: Record<string, string>) => {
   const f = new FormData();
@@ -37,6 +38,7 @@ beforeEach(() => {
   store.readPending.mockResolvedValue({ refresh: false, proposals: [] });
   store.requestRefresh.mockResolvedValue(undefined);
   store.proposeSystem.mockResolvedValue(undefined);
+  store.closeProposal.mockResolvedValue(undefined);
 });
 
 describe("/ops/systems is owner / admin only", () => {
@@ -85,5 +87,17 @@ describe("overview writes (立即更新 / 新增系統) are owner / admin only",
     expect(store.requestRefresh).toHaveBeenCalledTimes(1);
     expect(await redirectedTo(() => proposeNewSystem(form({ name: "新系統", type: "product", purpose: "做事" })))).toBe("REDIRECT /ops/systems?r=proposed");
     expect(store.proposeSystem).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("撤回待登記 is owner / admin only", () => {
+  it("refused for a non-owner, written for an owner", async () => {
+    const run = async () => { try { await withdrawProposal(form({ event_key: "user:abc", reason: "重複" })); } catch (e) { return String((e as Error).message); } return ""; };
+    role.value = "operator";
+    expect(await run()).toBe("REDIRECT /ops/systems?r=forbidden");
+    expect(store.closeProposal).not.toHaveBeenCalled();
+    role.value = "owner";
+    expect(await run()).toBe("REDIRECT /ops/systems?r=withdrawn");
+    expect(store.closeProposal).toHaveBeenCalledTimes(1);
   });
 });

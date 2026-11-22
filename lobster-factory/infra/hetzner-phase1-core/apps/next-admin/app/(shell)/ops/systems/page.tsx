@@ -12,7 +12,7 @@ import { EFFECTIVE_BADGE, EFFECTIVE_LABEL, formatTime, STATUS_LABEL, TYPE_LABEL 
 import { effectiveStatus, gapBreakdown, implementedRatio, overviewCounts, progressKind, recentHandoffs, type EffectiveState } from "@/lib/systems/overview";
 import { importSummary } from "@/lib/systems/projection";
 import { readDefinitions, readImportRuns, readPending, readProjectionInput, type Pending } from "@/lib/systems/store";
-import { proposeNewSystem, requestSystemsRefresh } from "./actions";
+import { proposeNewSystem, requestSystemsRefresh, withdrawProposal } from "./actions";
 import { Refused, box, errorBox, muted, page } from "./parts";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,7 @@ type Sp = { type?: string | string[]; status?: string | string[]; q?: string | s
 const NOTICES: Record<string, { ok: boolean; text: string }> = {
   refresh_queued: { ok: true, text: "已排入，約 5 分鐘內更新。" },
   refresh_pending: { ok: true, text: "更新已在排隊中。" },
+  withdrawn: { ok: true, text: "已撤回。" },
   proposed: { ok: true, text: "已記下，下一次 agent 開工時會寫進系統清單。" },
   bad_proposal: { ok: false, text: "名稱與用途各要 1–200 字，類型要選一個。" },
   forbidden: { ok: false, text: "只有擁有者或管理員能這樣做。" },
@@ -183,9 +184,17 @@ function PendingPanel({ pending }: { pending: Pending }) {
       <div style={panelHead}><h2 style={{ margin: 0, fontSize: 16 }}>待登記</h2><div style={muted}>下一次 agent 開工時會寫進系統清單</div></div>
       <div style={panelBody}>
         {pending.proposals.map((x) => (
-          <div key={`${x.name}-${x.at}`} style={{ padding: "10px 0", borderBottom: "1px solid var(--card-border)" }}>
+          <div key={x.event_key} style={{ padding: "10px 0", borderBottom: "1px solid var(--card-border)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><strong style={{ fontSize: 14 }}>{x.name}</strong><span style={muted}>{formatTime(x.at)}</span></div>
             <div style={muted}>{TYPE_LABEL[x.type as SystemType] ?? x.type}・{x.purpose}</div>
+            <details style={{ marginTop: 6 }}>
+              <summary className="btn-secondary" style={{ ...smallBtn, listStyle: "none", cursor: "pointer", display: "inline-block" }}>撤回</summary>
+              <form action={withdrawProposal} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 6 }}>
+                <input type="hidden" name="event_key" value={x.event_key} />
+                <span style={muted}>原因</span>
+                {["打錯", "重複", "不做了"].map((r) => <button key={r} type="submit" name="reason" value={r} className="btn-secondary" style={{ fontSize: 12, padding: "4px 10px" }}>{r}</button>)}
+              </form>
+            </details>
           </div>
         ))}
       </div>
