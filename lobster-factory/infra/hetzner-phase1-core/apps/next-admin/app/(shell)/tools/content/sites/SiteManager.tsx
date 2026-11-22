@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
+import { useClientContext } from "@/lib/client-context/use-client-context";
 import { FUNNEL_STAGES, MAX_TREND_FEEDS, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import PublishModeButtons from "./PublishModeButtons";
 import TopicModeButtons from "./TopicModeButtons";
@@ -589,6 +590,8 @@ export default function SiteManager() {
   const studioHref = useDoorHref("/tools/content");
   const scheduleHref = useDoorHref("/tools/social");
   const [sites, setSites] = useState<ManagedSite[]>([]);
+  // 目前客戶（ADR 020）：本頁只列這個客戶的網站；客戶由側欄客戶欄挑，客戶帳號固定是自己。
+  const { org, status } = useClientContext("org");
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingSite, setEditingSite] = useState<ManagedSite | null>(null);
@@ -598,17 +601,20 @@ export default function SiteManager() {
   const [testingIds, setTestingIds] = useState<Set<string>>(new Set());
 
   const loadSites = useCallback(async () => {
+    // 沒有目前客戶就不抓：舊做法抓整表，員工會看到所有客戶的站。
+    if (!org) { setSites([]); setLoading(false); return; }
     setLoading(true);
+    setSites([]);
     try {
       // 站別管理頁是唯一真的需要看見「已停用」站的畫面（要能重新啟用／刪除它們），
       // 所以明示 opt-in。其他消費端不帶這個參數 → 只拿得到 active（route.ts GET 的預設）。
-      const res = await fetch("/api/content/sites?includeInactive=1");
+      const res = await fetch(`/api/content/sites?includeInactive=1&organizationId=${encodeURIComponent(org)}`);
       const data = await res.json() as { ok: boolean; sites?: ManagedSite[] };
       if (data.ok && data.sites) setSites(data.sites);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [org]);
 
   useEffect(() => { void loadSites(); }, [loadSites]);
 
@@ -619,7 +625,7 @@ export default function SiteManager() {
       const res = await fetch("/api/content/sites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, organizationId: org }),
       });
       const data = await res.json() as { ok: boolean; error?: string; site?: ManagedSite };
       if (!data.ok) { setFormError(data.error ?? "新增失敗"); return; }
@@ -700,13 +706,13 @@ export default function SiteManager() {
         <div>
           <h2 style={{ color: "var(--text-primary)", margin: 0, fontSize: 22 }}>WordPress 網站連線</h2>
           <p style={{ color: "var(--text-muted)", margin: "4px 0 0", fontSize: 13 }}>
-            {onDoor ? "你的 WordPress 網站。" : "管理所有客戶的 WP 站點。"}Token 加密儲存，不會顯示明文。
+            {onDoor ? "你的 WordPress 網站。" : "目前客戶的 WP 站點。"}Token 加密儲存，不會顯示明文。
           </p>
         </div>
         {!onDoor && <button
           className="btn btn-primary"
           onClick={() => { setShowForm(true); setEditingSite(null); setFormError(null); }}
-          disabled={showForm || Boolean(editingSite)}
+          disabled={!org || showForm || Boolean(editingSite)}
         >
           + 新增網站
         </button>}
@@ -723,11 +729,18 @@ export default function SiteManager() {
         />
       )}
 
+      {/* 未選客戶：客戶欄也會寫同一句；員工進來預設在這裡 */}
+      {!org && status !== "loading" && (
+        <div style={{ border: "1px dashed var(--card-border)", borderRadius: 8, padding: 32, textAlign: "center", color: "var(--text-muted)" }}>
+          請先選客戶
+        </div>
+      )}
+
       {/* Loading */}
-      {loading && <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 32 }}>載入中…</div>}
+      {org && loading && <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 32 }}>載入中…</div>}
 
       {/* DB sites */}
-      {!loading && dbSites.length === 0 && !showForm && (
+      {org && !loading && dbSites.length === 0 && !showForm && (
         <div
           style={{
             border: "1px dashed var(--card-border)",

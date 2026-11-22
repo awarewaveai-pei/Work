@@ -9,6 +9,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import SiteManager from "../SiteManager";
 
+// 目前客戶由外框的 ClientContextProvider 決定（ADR 020）；這裡只要一個固定的客戶。
+const ORG = "11111111-1111-4111-8111-111111111111";
+vi.mock("@/lib/client-context/use-client-context", () => ({
+  useClientContext: () => ({ org: ORG, status: "ok" }),
+}));
+
 const site = (contentDefaults: ManagedSite["contentDefaults"] = {}): ManagedSite => ({
   id: "s1", name: "Shop", url: "https://shop.example.com", color: "#5855d0", active: true, tokenSet: true, usernameSet: true,
   note: null, source: "db", createdAt: "t", contentDefaults,
