@@ -48,17 +48,23 @@ export const STEPS = [
   { n: 4, code: 'K4', group: 'B2', title: '文章與劇本工坊可以走訂閱', plain: '分兩段做：先接好後端，再把按鈕裝進頁面。寫文章、劇本工坊照你選的走法：先交給筆電用訂閱寫，網頁顯示「筆電寫作中」，寫完整篇出現。額度用完或筆電沒開，就自動換下一段，最後一定有 API 接手。',
     gate: '筆電實寫一篇文章並看內容；帳本一筆 NT$0；筆電離線時文章照樣由 API 產出，畫面寫明哪一段被跳過與原因；選「只用 API」時與今天逐字相同。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K1', 'K3'], card: 'briefs/K4-sub-text-article-forge.md' },
   { n: 5, code: 'K6', group: 'B2', title: '四種走法的按鈕', plain: '文章和劇本工坊多一排四顆按鈕選走法；含 Claude 的走法可再選等級。每個訂閱段下面寫現在的狀態：在線、筆電離線（旁邊有「啟動筆電」）、額度用完到幾點。只有你本人看得到訂閱的走法。',
-    gate: '其他帳號登入只看得到「只用 API」；筆電沒開時仍可選，並顯示會被跳過的原因。', risk: 'Low', model: 'Sonnet 5.5', status: 'in_progress', depends: ['K3'], card: 'briefs/K6-chain-buttons.md' },
+    gate: '其他帳號登入只看得到「只用 API」；筆電沒開時仍可選，並顯示會被跳過的原因。', risk: 'Low', model: 'Sonnet 5.5', status: 'done', commit: '81b5e30eb', depends: ['K3'], card: 'briefs/K6-chain-buttons.md' },
   // 第三批
   { n: 6, code: 'K5', group: 'B3', title: '影片腳本可以走訂閱', plain: '影片腳本用同一個入口接上訂閱。', gate: '訂閱寫出的腳本能被解析成場景；沒選訂閱時不變。', risk: 'Low', model: 'Sonnet 5.5', status: 'not_started', depends: ['K4'], card: K },
-  { n: 7, code: 'K7', group: 'B3', title: '每個網站各自選走法', plain: '網站設定多同一排四顆按鈕。自動排程寫那個站的文章時照它的走法；訂閱不能用就換下一段，不會停擺。主機上有登入哪一家訂閱，那一段才會真的被用到。',
+  { n: 7, code: 'K7', group: 'B3', title: '每個網站各自選走法', plain: '網站設定多同一排四顆按鈕，另有一顆「套用到所有網站」把這個站的走法複製到同一個客戶的其他站。自動排程寫那個站的文章時照它的走法；訂閱不能用就換下一段，不會停擺。主機上有登入哪一家訂閱，那一段才會真的被用到。',
     gate: '沒設定過的舊網站與今天完全相同；訂閱段不能用時文章照出，預算只記 API 實際花費。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['K4'], card: K },
-  { n: 8, code: 'K8', group: 'B2', title: '成本頁看得到訂閱用了多少', plain: '成本頁顯示：訂閱畫了幾張圖、寫了幾篇、額度用到百分之幾；每個網站本月幾篇走訂閱、幾篇走 API、API 花多少。', gate: '有改走 API 的月份兩欄都有數字；讀不到資料時顯示「讀不到」，不是 0。', risk: 'Low', model: 'Sonnet 5.5', status: 'in_progress', depends: ['K3'], card: K },
-  { n: 9, code: 'DA', group: 'B3', title: '部署並在筆電實測', plain: '前三批一起部署一次，然後用筆電的 Claude 訂閱真的寫一篇文章，看內容。', gate: '線上文章頁選訂閱模型寫出一篇；成本頁出現一筆 NT$0。', risk: 'High（部署；失敗自動還原）', model: '監工', status: 'not_started', depends: ['K4', 'K6', 'K5', 'K7', 'K8'], card: 'DISPATCH.md' },
+  { n: 8, code: 'K10', group: 'B3b', title: '文章配圖不再亂畫', plain: '現在的配圖把中文替代文字直接丟給最便宜的模型，畫出穿西裝的人和亂碼字。改成：寫文章的 AI 另外寫一句英文的畫面描述，固定加上「圖上不要有字」，生圖模型改讀網站設定。',
+    gate: '部署後真的產一篇，圖和文章內容有關、圖上沒有字；替代文字照舊；舊文章不受影響。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['K7'], card: 'briefs/K10-K12.md' },
+  { n: 9, code: 'K11', group: 'B3', title: '模型清單補上五個', plain: '把 GPT-6 luna、GPT-6.1 terra、GPT-6.2 sol、GPT-6.2 astra、Claude Sonnet 5.5 加進文字模型的選單，價格照官網。每個都實際呼叫一次，打得通才加。',
+    gate: '五個模型各有一次成功呼叫的紀錄；打不通的不進選單並寫明原因。', risk: 'Low', model: 'Sonnet 5.5', status: 'in_progress', depends: ['K3'], card: 'briefs/K10-K12.md' },
+  { n: 10, code: 'K8', group: 'B2', title: '成本頁看得到訂閱用了多少', plain: '成本頁顯示：訂閱畫了幾張圖、寫了幾篇、額度用到百分之幾；每個網站本月幾篇走訂閱、幾篇走 API、API 花多少。', gate: '有改走 API 的月份兩欄都有數字；讀不到資料時顯示「讀不到」，不是 0。', risk: 'Low', model: 'Sonnet 5.5', status: 'done', commit: 'dc9e37167', depends: ['K3'], card: K },
+  { n: 11, code: 'K12', group: 'B3c', title: '十二個模型寫同一篇文章給你比', plain: '同一個題目、同一組網站設定，選單上每個模型各寫一篇。全文並排給你看，模型名稱先遮住；你排名後，連同實際花費、耗時、SEO 分數記到「AI 模型與成本」的實測紀錄。約花 NT$60–70。',
+    gate: '你拿到並排比較頁；實測紀錄多一組「文章生成」，每個模型一列。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K11'], card: 'briefs/K10-K12.md' },
+  { n: 12, code: 'DA', group: 'B3', title: '部署並在筆電實測', plain: '前三批一起部署一次，然後用筆電的 Claude 訂閱真的寫一篇文章，看內容。', gate: '線上文章頁選訂閱模型寫出一篇；成本頁出現一筆 NT$0。', risk: 'High（部署；失敗自動還原）', model: '監工', status: 'not_started', depends: ['K4', 'K6', 'K5', 'K7', 'K10', 'K11', 'K8'], card: 'DISPATCH.md' },
   // 第四批
-  { n: 10, code: 'K9', group: 'B4', title: '主機上的常駐執行程式', plain: '在主機開一個權限最小的帳號，只跑這支程式和 Codex。它讀不到網站、資料庫和其他金鑰。登入過期或額度用完會發 Telegram。',
+  { n: 13, code: 'K9', group: 'B4', title: '主機上的常駐執行程式', plain: '在主機開一個權限最小的帳號，只跑這支程式和 Codex。它讀不到網站、資料庫和其他金鑰。登入過期或額度用完會發 Telegram。',
     gate: '程式常駐；用那個帳號去讀主機其他地方全部被拒；後台顯示排程線在線。', risk: 'High（主機、憑證）', model: 'Opus 5.5', status: 'not_started', depends: ['DA'], card: K, before: '待決 1、待決 2、待決 3 之後' },
-  { n: 11, code: 'M1', group: 'B4', title: '額度恢復後的實測', plain: '11-24 之後：Codex 畫一張圖、寫一篇字、試著騙它讀本機檔案（必須讀不到）；量三篇文章各花多久、吃多少額度。', gate: '三項實測結果寫進「現況」；一篇超過兩分半就另開卡把排程改成分兩輪。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K9'], card: K, before: '待決 4 之後' },
+  { n: 14, code: 'M1', group: 'B4', title: '額度恢復後的實測', plain: '11-24 之後：Codex 畫一張圖、寫一篇字、試著騙它讀本機檔案（必須讀不到）；量三篇文章各花多久、吃多少額度。', gate: '三項實測結果寫進「現況」；一篇超過兩分半就另開卡把排程改成分兩輪。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K9'], card: K, before: '待決 4 之後' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
@@ -100,5 +106,17 @@ export const RISKS = [
     { card: 'K2', risk: 'Claude 寫字是否也會載入筆電上的個人設定，還沒有證據。', act: '實測驗證：工人實跑探針並回報；監工先前實測它回答「沒有工具」、讀不到憑證檔。' },
     { card: 'K2', risk: 'Codex 寫字在 11-24 前無法實跑。', act: '記錄：留到 M1。' },
     { card: 'K1', risk: '主線當時有兩個測試是紅的。', act: '已查：是開站流程那條線造成，該線已自行修掉；接上最新主線後全過。' },
+  ] },
+  { batch: '第二批（文章後端、走法按鈕、成本頁）', rows: [
+    { card: 'K4', risk: '劇本工坊的一鍵流程選了訂閱模型時，花費上限被估成 0；實際最後一段是付費 API，可能付到一半被上限擋下。', act: '已處理：上限一律用 API 的價格估，訂閱成功時實際花費再歸零；加了測試。' },
+    { card: 'K4', risk: '訂閱那一段如果程式出錯，後面的 API 不會接手。', act: '已處理：出錯當成那一段不能用，繼續往下走；加了測試。' },
+    { card: 'K4', risk: '文章在背景寫的時候出錯，畫面拿到的是生圖工具的錯誤訊息；空白文章會被當成成功。', act: '已處理：回文章自己的錯誤訊息，空白視為失敗。' },
+    { card: 'K6', risk: '走法按鈕在狀態還沒讀到時，會先讓所有人看到訂閱選項。', act: '已處理：預設只顯示「只用 API」，確認是本人才顯示四顆。' },
+    { card: 'K6', risk: '新的狀態 API 沒有登記到「哪些工具可以用它」的清單，結構檢查會紅。', act: '已處理：監工整合時登記，全套測試通過。' },
+    { card: 'K4', risk: '劇本工坊的一鍵流程有 110 秒上限；訂閱那一段太慢時，後面的 API 也會一起被停。', act: '下一張卡處理：把按鈕裝進頁面的那一步（K4 第二段），一鍵流程不提供訂閱走法。' },
+    { card: 'K8', risk: '成本頁的每站表格一個月最多讀五千筆，超過會少算且沒有提示。', act: '記錄：目前一個月約一百筆。到三千筆前由 K8 的後續補上提示，不另開卡。' },
+    { card: 'K8', risk: '成本頁有資料時的畫面沒看過（本機沒有資料庫）。', act: '實測驗證：部署後監工打開成本頁看一次。' },
+    { card: 'K8', risk: '文章重試時每次都記一筆，篇數會多算。', act: '記錄：只影響顯示的篇數，不影響金額。' },
+    { card: 'K4', risk: '整批審查確認乾淨的三件事：別的帳號用不到訂閱；改走 API 只扣一次；沒選走法時與現在相同。', act: '已驗證：審查代理人逐項查過，監工全套測試通過。' },
   ] },
 ];

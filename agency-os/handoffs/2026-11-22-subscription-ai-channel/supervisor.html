@@ -81,11 +81,11 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>AI 訂閱通道 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
-  <div class="bar" data-computed><i class="d" style="width:27.27272727272727%"></i><i class="g" style="width:27.27272727272727%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>3</span>／<span data-computed>11</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你做的事</span><small><span data-computed>4</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:35.714285714285715%"></i><i class="g" style="width:14.285714285714285%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>5</span>／<span data-computed>14</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你做的事</span><small><span data-computed>4</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">讓寫字和畫圖都能選「走 API 付費」或「走訂閱額度」。本人按的功能由筆電執行；自動排程由主機上的常駐程式執行。每個網站各自選四種走法之一：Claude 訂閱→Codex 訂閱→API、Claude 訂閱→API、Codex 訂閱→API、只用 API。前一段不能用就自動換下一段。共 <span data-computed>11</span> 張卡。</p>
+<p class="sub">讓寫字和畫圖都能選「走 API 付費」或「走訂閱額度」。本人按的功能由筆電執行；自動排程由主機上的常駐程式執行。每個網站各自選四種走法之一：Claude 訂閱→Codex 訂閱→API、Claude 訂閱→API、Codex 訂閱→API、只用 API。前一段不能用就自動換下一段。共 <span data-computed>14</span> 張卡。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>畫圖可以走訂閱（Codex 免費生圖）。<small>已上線；只限本人、筆電要開著。近 30 天只用過兩次。</small></span></li><li class="no"><b>還不行</b><span>ChatGPT 訂閱現在有額度。<small>2026-11-22 實測：本週額度用完，11-24 上午 11:02 恢復。主因是程式審查共用同一份額度。</small></span></li><li class="yes"><b>可以</b><span>Claude 訂閱可以用命令列寫字。<small>2026-11-22 筆電實測成功，一次約 12 秒；執行時不給它任何工具。</small></span></li><li class="no"><b>還不行</b><span>寫字可以選訂閱。<small>第一批（底層）已併入主線，筆電實跑 Claude 訂閱寫字成功；頁面上的按鈕在第二、三批。目前文字仍全部走 API。</small></span></li><li class="no"><b>還不行</b><span>本人按的功能可以選四種走法。<small>第二批。</small></span></li><li class="no"><b>還不行</b><span>每個網站的排程可以各自選四種走法。<small>第三批。</small></span></li><li class="no"><b>還不行</b><span>排程不開筆電也能走訂閱。<small>第四批；需要你在主機上登入一次 ChatGPT。</small></span></li><li class="no"><b>還不行</b><span>知道一篇文章吃掉多少訂閱額度。<small>11-24 額度恢復後實測三篇才有數字；在那之前不估。</small></span></li></ul></section>
 
 <section id="steps"><h2>批次與卡</h2><p class="lead">同一批的卡同時進行，各自改不同的檔案；整批交回後一起看風險，再開下一批。</p><ol class="steps"><li class="grp">可同時進行：<a href="#K1">K1</a>、<a href="#K2">K2</a>、<a href="#K3">K3</a></li><li class="step done" id="K1">
@@ -131,27 +131,29 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>需先完成：</b><a href="#K1">K1</a>、<a href="#K3">K3</a></p>
         <p><b>卡片：</b><code>briefs/K4-sub-text-article-forge.md</code></p>
       </details>
-    </div></li><li class="step doing" id="K6">
+    </div></li><li class="step done" id="K6">
     <div class="n">5</div>
     <div class="b">
       <p class="plain">文章和劇本工坊多一排四顆按鈕選走法；含 Claude 的走法可再選等級。每個訂閱段下面寫現在的狀態：在線、筆電離線（旁邊有「啟動筆電」）、額度用完到幾點。只有你本人看得到訂閱的走法。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>其他帳號登入只看得到「只用 API」；筆電沒開時仍可選，並顯示會被跳過的原因。</p>
       <details><summary>細節：K6 四種走法的按鈕</summary>
         <p><b>需先完成：</b><a href="#K3">K3</a></p>
         <p><b>卡片：</b><code>briefs/K6-chain-buttons.md</code></p>
+        <p><b>併入於：</b><code>81b5e30eb</code></p>
       </details>
-    </div></li><li class="step doing" id="K8">
-    <div class="n">8</div>
+    </div></li><li class="step done" id="K8">
+    <div class="n">10</div>
     <div class="b">
       <p class="plain">成本頁顯示：訂閱畫了幾張圖、寫了幾篇、額度用到百分之幾；每個網站本月幾篇走訂閱、幾篇走 API、API 花多少。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>有改走 API 的月份兩欄都有數字；讀不到資料時顯示「讀不到」，不是 0。</p>
       <details><summary>細節：K8 成本頁看得到訂閱用了多少</summary>
         <p><b>需先完成：</b><a href="#K3">K3</a></p>
         <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
+        <p><b>併入於：</b><code>dc9e37167</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#K5">K5</a>、<a href="#K7">K7</a>、<a href="#DA">DA</a></li><li class="step todo" id="K5">
+    </div></li><li class="grp">可同時進行：<a href="#K5">K5</a>、<a href="#K7">K7</a>、<a href="#K11">K11</a>、<a href="#DA">DA</a></li><li class="step todo" id="K5">
     <div class="n">6</div>
     <div class="b">
       <p class="plain">影片腳本用同一個入口接上訂閱。</p>
@@ -164,25 +166,55 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
     </div></li><li class="step todo" id="K7">
     <div class="n">7</div>
     <div class="b">
-      <p class="plain">網站設定多同一排四顆按鈕。自動排程寫那個站的文章時照它的走法；訂閱不能用就換下一段，不會停擺。主機上有登入哪一家訂閱，那一段才會真的被用到。</p>
+      <p class="plain">網站設定多同一排四顆按鈕，另有一顆「套用到所有網站」把這個站的走法複製到同一個客戶的其他站。自動排程寫那個站的文章時照它的走法；訂閱不能用就換下一段，不會停擺。主機上有登入哪一家訂閱，那一段才會真的被用到。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>沒設定過的舊網站與今天完全相同；訂閱段不能用時文章照出，預算只記 API 實際花費。</p>
       <details><summary>細節：K7 每個網站各自選走法</summary>
         <p><b>需先完成：</b><a href="#K4">K4</a></p>
         <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
       </details>
-    </div></li><li class="step todo" id="DA">
+    </div></li><li class="step doing" id="K11">
     <div class="n">9</div>
+    <div class="b">
+      <p class="plain">把 GPT-6 luna、GPT-6.1 terra、GPT-6.2 sol、GPT-6.2 astra、Claude Sonnet 5.5 加進文字模型的選單，價格照官網。每個都實際呼叫一次，打得通才加。</p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>五個模型各有一次成功呼叫的紀錄；打不通的不進選單並寫明原因。</p>
+      <details><summary>細節：K11 模型清單補上五個</summary>
+        <p><b>需先完成：</b><a href="#K3">K3</a></p>
+        <p><b>卡片：</b><code>briefs/K10-K12.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="DA">
+    <div class="n">12</div>
     <div class="b">
       <p class="plain">前三批一起部署一次，然後用筆電的 Claude 訂閱真的寫一篇文章，看內容。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（部署；失敗自動還原）</span><span class="who">模型：監工</span></p>
       <p class="donewhen"><b>完成的樣子：</b>線上文章頁選訂閱模型寫出一篇；成本頁出現一筆 NT$0。</p>
       <details><summary>細節：DA 部署並在筆電實測</summary>
-        <p><b>需先完成：</b><a href="#K4">K4</a>、<a href="#K6">K6</a>、<a href="#K5">K5</a>、<a href="#K7">K7</a>、<a href="#K8">K8</a></p>
+        <p><b>需先完成：</b><a href="#K4">K4</a>、<a href="#K6">K6</a>、<a href="#K5">K5</a>、<a href="#K7">K7</a>、<a href="#K10">K10</a>、<a href="#K11">K11</a>、<a href="#K8">K8</a></p>
         <p><b>卡片：</b><code>DISPATCH.md</code></p>
       </details>
+    </div></li><li class="step todo" id="K10">
+    <div class="n">8</div>
+    <div class="b">
+      <p class="plain">現在的配圖把中文替代文字直接丟給最便宜的模型，畫出穿西裝的人和亂碼字。改成：寫文章的 AI 另外寫一句英文的畫面描述，固定加上「圖上不要有字」，生圖模型改讀網站設定。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>部署後真的產一篇，圖和文章內容有關、圖上沒有字；替代文字照舊；舊文章不受影響。</p>
+      <details><summary>細節：K10 文章配圖不再亂畫</summary>
+        <p><b>需先完成：</b><a href="#K7">K7</a></p>
+        <p><b>卡片：</b><code>briefs/K10-K12.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="K12">
+    <div class="n">11</div>
+    <div class="b">
+      <p class="plain">同一個題目、同一組網站設定，選單上每個模型各寫一篇。全文並排給你看，模型名稱先遮住；你排名後，連同實際花費、耗時、SEO 分數記到「AI 模型與成本」的實測紀錄。約花 NT$60–70。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>你拿到並排比較頁；實測紀錄多一組「文章生成」，每個模型一列。</p>
+      <details><summary>細節：K12 十二個模型寫同一篇文章給你比</summary>
+        <p><b>需先完成：</b><a href="#K11">K11</a></p>
+        <p><b>卡片：</b><code>briefs/K10-K12.md</code></p>
+      </details>
     </div></li><li class="grp">可同時進行：<a href="#K9">K9</a>、<a href="#M1">M1</a></li><li class="step todo" id="K9">
-    <div class="n">10</div>
+    <div class="n">13</div>
     <div class="b">
       <p class="plain">在主機開一個權限最小的帳號，只跑這支程式和 Codex。它讀不到網站、資料庫和其他金鑰。登入過期或額度用完會發 Telegram。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（主機、憑證）</span><span class="who">模型：Opus 5.5</span></p>
@@ -192,7 +224,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
       </details>
     </div></li><li class="step todo" id="M1">
-    <div class="n">11</div>
+    <div class="n">14</div>
     <div class="b">
       <p class="plain">11-24 之後：Codex 畫一張圖、寫一篇字、試著騙它讀本機檔案（必須讀不到）；量三篇文章各花多久、吃多少額度。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：監工</span></p>
@@ -207,7 +239,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 
 <section id="open"><h2>到時要你做的事</h2><p class="lead">只有這幾步需要你。做到那一步時才問，一次問一件。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">把主機執行程式專用的一把密鑰放進後台容器（主機設定變更，走失敗會自動還原的工具）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>排程線可以開始接工作。</span></li><li class=""><b>先不要</b><span>排程維持全部走 API。</span></li></ul><p class="meta"><a href="#K9" class="who">在 <span data-computed>K9</span> 之前</a><span class="who">出處：PLAN.md 第 3 節</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">你本人在主機上登入一次 ChatGPT 帳號。指令由監工備好，你照著貼上並在手機確認。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>主機可以用你的訂閱額度寫字。</span></li><li class=""><b>先不要</b><span>只有筆電能用訂閱。</span></li></ul><p class="meta"><a href="#K9" class="who">在 <span data-computed>K9</span> 之前</a><span class="who">出處：PLAN.md 第 3 節</span></p></div></li><li><div class="n">3</div><div class="b"><p class="plain">要不要也在主機上登入 Claude 帳號，讓排程能用 Claude 訂閱。Claude 的條款沒有明確允許無人排程，這是三段裡風險最高的一段。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>排程的走法裡 Claude 那一段會真的被用到。</span></li><li class=""><b>先不要</b><span>排程選了含 Claude 的走法時，那一段自動跳過。</span></li></ul><p class="meta"><a href="#K9" class="who">在 <span data-computed>K9</span> 之前</a><span class="who">出處：PLAN.md 第 2 節</span></p></div></li><li><div class="n">4</div><div class="b"><p class="plain">在筆電上為「Codex 寫字」另外登入一次 ChatGPT（寫字用乾淨的專用資料夾，和你平常寫程式的 Codex 分開）。指令由監工備好。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>你本人按的功能可以用 Codex 訂閱寫字。</span></li><li class=""><b>先不要</b><span>筆電只用 Claude 訂閱寫字；Codex 那一段自動跳過。</span></li></ul><p class="meta"><a href="#M1" class="who">在 <span data-computed>M1</span> 之前</a><span class="who">出處：PLAN.md 第 2 節 I3</span></p></div></li></ol></section>
 
-<section id="risks"><h2>風險與處置</h2><p class="lead">每批一張表。工人交回的每條風險都要有處置：現在處理、實測驗證，或記下不處理的理由。</p><h3 class="sub-h">動工前（查證與實測）</h3><ul class="yn rules"><li><b>K9</b><span>Claude 的條款沒有明確允許無人排程；也不允許產品代別人使用訂閱。<small><b>處置：</b>你已決定排程可選 Claude。處置：訂閱只服務你本人；主機要不要登入 Claude 列為待決，不登入就等於關閉；每個網站可改選不含 Claude 的走法。</small></span></li><li><b>K2</b><span>文章的提示詞裡有從網路抓來的內容，可能夾帶指令，騙 AI 把本機檔案內容寫進文章。<small><b>處置：</b>已寫進 K2：寫字時不給任何工具，交回前掃描憑證；M1 實際試騙一次。</small></span></li><li><b>K9</b><span>筆電和主機共用同一份登入檔會互相讓對方失效。<small><b>處置：</b>已寫進設計：主機由你另外登入一次，不複製筆電的登入檔。</small></span></li><li><b>K7</b><span>排程一輪只有 200 秒；Codex 寫一篇長文的耗時還沒量過。<small><b>處置：</b>實測驗證：M1 量三篇；超過兩分半才另開卡改成分兩輪，現在不先做。</small></span></li><li><b>M1</b><span>ChatGPT 訂閱到 11-24 才有額度，Codex 寫字這條路在那之前無法實跑。<small><b>處置：</b>記錄：前三批以 Claude 訂閱實測；Codex 寫字與畫圖回歸留到 M1。</small></span></li><li><b>K4</b><span>Codex 沒有額度，這段期間沒有另一家模型的審查。<small><b>處置：</b>每批由審查代理人看整批差異一次，並在工作日誌註明。</small></span></li><li><b>K1</b><span>檔名和網址仍叫 codex-image，但之後也載文字與 Claude。<small><b>處置：</b>不處理：改名牽動約三十個檔、沒有行為收益，還會製造部署空窗；只更正檔頭說明。</small></span></li></ul><h3 class="sub-h">第一批（三張卡交回後，整批審查找到的問題）</h3><ul class="yn rules"><li><b>K3</b><span>訂閱模型放進一般模型清單後，原本只走 API 的功能可能拿訂閱模型的名字去打 API 而失敗；每晚的模型檢查也會把它們報成壞掉。<small><b>處置：</b>現在處理：訂閱模型改成獨立清單，一般清單與價目表還原。退回工人重做。</small></span></li><li><b>K1</b><span>筆電上若還是舊版執行程式，領到寫字工作會當掉，連帶畫圖也卡住。<small><b>處置：</b>現在處理：舊版程式一律只會被派畫圖。退回工人修。</small></span></li><li><b>K1</b><span>寫字把額度用完後，畫圖不知道，會白等四分鐘才失敗。<small><b>處置：</b>現在處理：額度用完是同一份方案的狀態，畫圖和寫字都立刻得知。退回工人修。</small></span></li><li><b>K2</b><span>Codex 寫字時仍會載入筆電上的個人設定與自動程式，文章的提示詞會流進去，也不算真的「沒有工具」。<small><b>處置：</b>現在處理：Codex 寫字改用一個乾淨的專用資料夾，裡面只有登入檔。筆電要用 Codex 寫字，需要你另外登入一次（列入待辦 4）。</small></span></li><li><b>K2</b><span>文章內容若提到「額度」「信用卡點數」這類字又剛好逾時，會被誤判成訂閱額度用完，停用五小時。<small><b>處置：</b>現在處理：只看程式回報的錯誤，不看 AI 寫出來的內容。退回工人修。</small></span></li><li><b>K2</b><span>Codex 寫字失敗時，提示詞會留在本機紀錄檔裡。<small><b>處置：</b>現在處理：失敗也刪掉該次紀錄。</small></span></li><li><b>K2</b><span>Claude 寫字是否也會載入筆電上的個人設定，還沒有證據。<small><b>處置：</b>實測驗證：工人實跑探針並回報；監工先前實測它回答「沒有工具」、讀不到憑證檔。</small></span></li><li><b>K2</b><span>Codex 寫字在 11-24 前無法實跑。<small><b>處置：</b>記錄：留到 M1。</small></span></li><li><b>K1</b><span>主線當時有兩個測試是紅的。<small><b>處置：</b>已查：是開站流程那條線造成，該線已自行修掉；接上最新主線後全過。</small></span></li></ul></section>
+<section id="risks"><h2>風險與處置</h2><p class="lead">每批一張表。工人交回的每條風險都要有處置：現在處理、實測驗證，或記下不處理的理由。</p><h3 class="sub-h">動工前（查證與實測）</h3><ul class="yn rules"><li><b>K9</b><span>Claude 的條款沒有明確允許無人排程；也不允許產品代別人使用訂閱。<small><b>處置：</b>你已決定排程可選 Claude。處置：訂閱只服務你本人；主機要不要登入 Claude 列為待決，不登入就等於關閉；每個網站可改選不含 Claude 的走法。</small></span></li><li><b>K2</b><span>文章的提示詞裡有從網路抓來的內容，可能夾帶指令，騙 AI 把本機檔案內容寫進文章。<small><b>處置：</b>已寫進 K2：寫字時不給任何工具，交回前掃描憑證；M1 實際試騙一次。</small></span></li><li><b>K9</b><span>筆電和主機共用同一份登入檔會互相讓對方失效。<small><b>處置：</b>已寫進設計：主機由你另外登入一次，不複製筆電的登入檔。</small></span></li><li><b>K7</b><span>排程一輪只有 200 秒；Codex 寫一篇長文的耗時還沒量過。<small><b>處置：</b>實測驗證：M1 量三篇；超過兩分半才另開卡改成分兩輪，現在不先做。</small></span></li><li><b>M1</b><span>ChatGPT 訂閱到 11-24 才有額度，Codex 寫字這條路在那之前無法實跑。<small><b>處置：</b>記錄：前三批以 Claude 訂閱實測；Codex 寫字與畫圖回歸留到 M1。</small></span></li><li><b>K4</b><span>Codex 沒有額度，這段期間沒有另一家模型的審查。<small><b>處置：</b>每批由審查代理人看整批差異一次，並在工作日誌註明。</small></span></li><li><b>K1</b><span>檔名和網址仍叫 codex-image，但之後也載文字與 Claude。<small><b>處置：</b>不處理：改名牽動約三十個檔、沒有行為收益，還會製造部署空窗；只更正檔頭說明。</small></span></li></ul><h3 class="sub-h">第一批（三張卡交回後，整批審查找到的問題）</h3><ul class="yn rules"><li><b>K3</b><span>訂閱模型放進一般模型清單後，原本只走 API 的功能可能拿訂閱模型的名字去打 API 而失敗；每晚的模型檢查也會把它們報成壞掉。<small><b>處置：</b>現在處理：訂閱模型改成獨立清單，一般清單與價目表還原。退回工人重做。</small></span></li><li><b>K1</b><span>筆電上若還是舊版執行程式，領到寫字工作會當掉，連帶畫圖也卡住。<small><b>處置：</b>現在處理：舊版程式一律只會被派畫圖。退回工人修。</small></span></li><li><b>K1</b><span>寫字把額度用完後，畫圖不知道，會白等四分鐘才失敗。<small><b>處置：</b>現在處理：額度用完是同一份方案的狀態，畫圖和寫字都立刻得知。退回工人修。</small></span></li><li><b>K2</b><span>Codex 寫字時仍會載入筆電上的個人設定與自動程式，文章的提示詞會流進去，也不算真的「沒有工具」。<small><b>處置：</b>現在處理：Codex 寫字改用一個乾淨的專用資料夾，裡面只有登入檔。筆電要用 Codex 寫字，需要你另外登入一次（列入待辦 4）。</small></span></li><li><b>K2</b><span>文章內容若提到「額度」「信用卡點數」這類字又剛好逾時，會被誤判成訂閱額度用完，停用五小時。<small><b>處置：</b>現在處理：只看程式回報的錯誤，不看 AI 寫出來的內容。退回工人修。</small></span></li><li><b>K2</b><span>Codex 寫字失敗時，提示詞會留在本機紀錄檔裡。<small><b>處置：</b>現在處理：失敗也刪掉該次紀錄。</small></span></li><li><b>K2</b><span>Claude 寫字是否也會載入筆電上的個人設定，還沒有證據。<small><b>處置：</b>實測驗證：工人實跑探針並回報；監工先前實測它回答「沒有工具」、讀不到憑證檔。</small></span></li><li><b>K2</b><span>Codex 寫字在 11-24 前無法實跑。<small><b>處置：</b>記錄：留到 M1。</small></span></li><li><b>K1</b><span>主線當時有兩個測試是紅的。<small><b>處置：</b>已查：是開站流程那條線造成，該線已自行修掉；接上最新主線後全過。</small></span></li></ul><h3 class="sub-h">第二批（文章後端、走法按鈕、成本頁）</h3><ul class="yn rules"><li><b>K4</b><span>劇本工坊的一鍵流程選了訂閱模型時，花費上限被估成 0；實際最後一段是付費 API，可能付到一半被上限擋下。<small><b>處置：</b>已處理：上限一律用 API 的價格估，訂閱成功時實際花費再歸零；加了測試。</small></span></li><li><b>K4</b><span>訂閱那一段如果程式出錯，後面的 API 不會接手。<small><b>處置：</b>已處理：出錯當成那一段不能用，繼續往下走；加了測試。</small></span></li><li><b>K4</b><span>文章在背景寫的時候出錯，畫面拿到的是生圖工具的錯誤訊息；空白文章會被當成成功。<small><b>處置：</b>已處理：回文章自己的錯誤訊息，空白視為失敗。</small></span></li><li><b>K6</b><span>走法按鈕在狀態還沒讀到時，會先讓所有人看到訂閱選項。<small><b>處置：</b>已處理：預設只顯示「只用 API」，確認是本人才顯示四顆。</small></span></li><li><b>K6</b><span>新的狀態 API 沒有登記到「哪些工具可以用它」的清單，結構檢查會紅。<small><b>處置：</b>已處理：監工整合時登記，全套測試通過。</small></span></li><li><b>K4</b><span>劇本工坊的一鍵流程有 110 秒上限；訂閱那一段太慢時，後面的 API 也會一起被停。<small><b>處置：</b>下一張卡處理：把按鈕裝進頁面的那一步（K4 第二段），一鍵流程不提供訂閱走法。</small></span></li><li><b>K8</b><span>成本頁的每站表格一個月最多讀五千筆，超過會少算且沒有提示。<small><b>處置：</b>記錄：目前一個月約一百筆。到三千筆前由 K8 的後續補上提示，不另開卡。</small></span></li><li><b>K8</b><span>成本頁有資料時的畫面沒看過（本機沒有資料庫）。<small><b>處置：</b>實測驗證：部署後監工打開成本頁看一次。</small></span></li><li><b>K8</b><span>文章重試時每次都記一筆，篇數會多算。<small><b>處置：</b>記錄：只影響顯示的篇數，不影響金額。</small></span></li><li><b>K4</b><span>整批審查確認乾淨的三件事：別的帳號用不到訂閱；改走 API 只扣一次；沒選走法時與現在相同。<small><b>處置：</b>已驗證：審查代理人逐項查過，監工全套測試通過。</small></span></li></ul></section>
 
 <section id="paths"><h2>檔案</h2><div class="paths"><div><b>完整計畫</b><code>agency-os/handoffs/2026-11-22-subscription-ai-channel/PLAN.md</code></div><div><b>派工與驗收</b><code>agency-os/handoffs/2026-11-22-subscription-ai-channel/DISPATCH.md</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-22-subscription-ai-channel/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。</span></div></div></section>
 </main>

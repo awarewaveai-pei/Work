@@ -9,12 +9,15 @@
 | 1 | K1 | bridge kind／tool／lane／額度 | Opus 5.5 | main `a7d814353` |
 | 1 | K2 | worker 文字 job、無工具、憑證掃描 | Opus 5.5 | main `b53be9244` |
 | 1 | K3 | 訂閱模型獨立清單＋鏈＋帳本 | Sonnet 5.5 | main `47d60570c` |
-| 2 | K4a | sub-text＋文章／劇本工坊後端（不動 .tsx） | Opus 5.5 | 派出（sub-k1） |
-| 2 | K6 | 走法按鈕元件＋狀態 API（只新增檔） | Sonnet 5.5 | 派出（sub-k3） |
-| 2 | K8 | 成本頁訂閱用量 | Sonnet 5.5 | 派出（sub-k2） |
-| 3 | K4b | 頁面掛按鈕＋202 輪詢＋實寫一篇 | Opus 5.5 | 等批 2 |
-| 3 | K5 | 影片腳本 | Sonnet 5.5 | 等 K4a |
-| 3 | K7 | 每站走法＋排程帶入 | Opus 5.5 | 等 K4a、K6 |
+| 2 | K4a | sub-text＋文章／劇本工坊後端（不動 .tsx） | Opus 5.5 | main `d31151b5a` |
+| 2 | K6 | 走法按鈕元件＋狀態 API（只新增檔） | Sonnet 5.5 | main `81b5e30eb` |
+| 2 | K8 | 成本頁訂閱用量 | Sonnet 5.5 | main `dc9e37167` |
+| 3 | K4b | 頁面掛按鈕＋202 輪詢＋實寫一篇；一鍵流程不給訂閱走法 | Opus 5.5 | 派出（sub-k1） |
+| 3 | K5 | 影片腳本後端收 chain（不動 .tsx） | Sonnet 5.5 | 派出（sub-k2） |
+| 3 | K7 | 每站走法＋套用到所有網站＋排程帶入 | Opus 5.5 | 派出（sub-k4） |
+| 3 | K11 | 模型清單補五個（實際探針） | Sonnet 5.5 | 派出（sub-k3） |
+| 3b | K10 | 文章配圖：英文畫面描述＋網站的生圖模型 | Opus 5.5 | 等 K7（同工人） |
+| 3c | K12 | 十二個模型文章實測 | 監工 | 等 K11＋部署 |
 | — | DA | `sg-deploy.sh next-admin`＋smoke＋筆電實寫一篇 | 監工 | 等批 3 |
 | 4 | K9 | 主機常駐 worker（High；待決 1、2） | Opus 5.5 | 等 DA |
 | 4 | M1 | 11-24 後實測 | 監工 | 等 K9 |
@@ -40,5 +43,9 @@
 critic Standard 整批：fail 6 major／6 minor → 全部處理（規格更正＋三張卡退回修）→ 重新整合：tsc 0、全套 vitest 5312 passed、worker node --test 綠、筆電實跑 Claude haiku 6.2 s＋憑證探針「沒有工具」。逐條處置見 `data.mjs` RISKS 第二張表。每卡 squash 成一個 commit。Codex 無額度至 11-24：`ORACLE_WAIVED`（critic 代）。
 未關：Codex 文字與圖回歸實跑 → M1；`vendor-invoices`／`probe-models` 不受影響（`TEXT_RATES` 未動，`git diff` 驗）。
 
-### 批 2
+### 批 2（2026-11-22）
+critic Standard 整批：warn 1 major／3 minor → 全修（K4a run-budget 上限、runTextChain 例外、deferred 錯誤 body；K6 預設 API-only）。結構測試紅一項（`/api/tools/sub-worker` 未登記）→ 監工在 `lib/portal/staff-tools.ts` 登記。重新整合：tsc 0、全套 vitest 5350 passed。逐條處置見 `data.mjs` RISKS 第三張表。`ORACLE_WAIVED`（Codex 無額度，critic 代）。
+給批 3：K4b 輪詢回傳格式＝文章 `{ ok, markdown }`（跳過段在 `[COST_JSON].skipped[]`，每筆 `{ model, error, reason }`，`reason` 為可直接顯示的繁中）；劇本工坊 `{ ok, text, skipped?, reservedTwd? }`。lane 只能由程式設定（`config.lane`），K7 在排程傳 `schedule`。
+
+### 批 3
 （待交回）

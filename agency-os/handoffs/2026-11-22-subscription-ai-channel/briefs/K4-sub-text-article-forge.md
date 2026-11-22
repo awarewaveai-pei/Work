@@ -4,7 +4,7 @@
 
 **分兩段派工（避免兩個工人改同一個頁面檔）**
 - **K4a（批 2，後端）**：下列「要做」第 1、2、3、5 點，以及第 4 點的伺服器端（route 回 202）。**不動任何 `.tsx`。** route 的 202 回應本段就做好並測試；頁面還不會送 `chain`，所以線上行為不變。
-- **K4b（批 3，頁面）**：`ContentStudio.tsx`、`ScriptForge.tsx` 掛上 `components/tools/TextChainButtons.tsx`（K6 產出，props 見 `K6-chain-buttons.md`）、送出 `chain`＋`claudeModel`、收到 202 後輪詢、第 6 點的等待畫面，以及驗收節的實寫一篇。
+- **K4b（批 3，頁面）**：`ContentStudio.tsx`、`ScriptForge.tsx` 掛上 `components/tools/TextChainButtons.tsx`（K6 產出，props 見 `K6-chain-buttons.md`）、送出 `chain`＋`claudeModel`、收到 202 後輪詢、第 6 點的等待畫面，以及驗收節的實寫一篇。已在 main 的回傳格式：文章輪詢結果 `{ ok, markdown }`，跳過的段落在 `[COST_JSON]` 的 `skipped[]`（每筆 `{ model, error, reason }`，`reason` 直接顯示）；劇本工坊 `{ ok, text, skipped?, reservedTwd? }`。**劇本工坊的「一鍵到草稿」（有預算、受 `SCRIPT_STREAM_LIMIT_MS` 約 110 秒限制）不提供訂閱走法**：那個流程固定送 `api`，按鈕列只出現在手動的文章與劇本工坊。影片腳本頁（K5 後端已收 `chain`）若與 ScriptForge 是同一個元件就一併掛上，不是就不動、回報。
 
 ## 檔案
 - 新 `lib/ai/sub-text.ts`＋`lib/ai/__tests__/sub-text.test.ts`
