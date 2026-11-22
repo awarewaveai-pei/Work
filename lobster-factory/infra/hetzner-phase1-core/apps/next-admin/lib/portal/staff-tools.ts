@@ -61,8 +61,9 @@ export const STAFF_PLATFORM: { pages: readonly string[]; apis: readonly string[]
   // data-free public files pages load by fixed URL -- /editor-shared (the editor math /tools/canvas and the vector-pro dock
   // load, so a restricted staff member keeps 調色), the VectorCraft / PhotoCraft builds and our docks for them.
   pages: ["/$", "/no-access$", ...STATIC_PAGES],
-  // /api/tools/codex-laptop: the sidebar's 「啟動筆電」 status on every page; the route itself answers the owner only (codexAllowed).
-  apis: [...PLATFORM_APIS, "/api/ops/build-id", "/api/ops/analytics-context", "/api/tools/codex-laptop"],
+  // /api/tools/codex-laptop, /api/tools/sub-worker: the laptop / subscription worker status shown beside the tools; each
+  // route itself answers the owner only (codexAllowed).
+  apis: [...PLATFORM_APIS, "/api/ops/build-id", "/api/ops/analytics-context", "/api/tools/codex-laptop", "/api/tools/sub-worker"],
 };
 
 /** The STAFF_API_OWNERS patterns that name `key`, as listed (toolsFor applies specificity). */
