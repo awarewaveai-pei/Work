@@ -146,7 +146,7 @@ export default function ZeriTool({ dict, locale }: { dict: Dictionary; locale: L
       {error ? <div className="error-banner mt-6">{error}</div> : null}
 
       {result ? (
-        <section className="mt-8">
+        <section data-aw-result className="mt-8">
           <hr className="star-divider" />
           <h2 className="label-dark text-center" style={{ marginBottom: '0.75rem' }}>
             {t.goodTitle} · {ACTIVITY[result.activity][locale]} · {result.from} ~ {result.to}

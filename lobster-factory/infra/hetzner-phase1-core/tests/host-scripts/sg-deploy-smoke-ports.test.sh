@@ -122,6 +122,9 @@ t_oracle_smoke_probes_the_public_api() {
   check "_smoke_check: optional 5th arg turns the probe into a JSON POST"     grep -qF 'curl_args+=(-X POST -H "Content-Type: application/json"' "$SG_DEPLOY"
   # A broken initialize still answers HTTP 200 with a JSON-RPC error, so the probe names a body string.
   check "oracle-web: the MCP probe requires protocolVersion in the body"     grep -qF "\"version\":\"1\"}}}' '\"protocolVersion\"'" <<< "$block"
+  # E5: the page probe is the embed page (a redirect on /zh-TW must not fail the deploy) and requires the root marker.
+  check "oracle-web: page probe is /embed/zh-TW/ziwei and requires aw-oracle-root"     grep -qF '_smoke_check "oracle-web embed page" "http://127.0.0.1:${oracle_port}/embed/zh-TW/ziwei" "" "" "" "aw-oracle-root"' <<< "$block"
+  check "oracle-web: no probe of /zh-TW left (it 308s once the front page is set)"     bash -c '! grep -qF "oracle_port}/zh-TW\"" <<< "$1"' _ "$block"
 }
 
 t_smoke_check_body_match_fails_a_2xx_with_the_wrong_body() {

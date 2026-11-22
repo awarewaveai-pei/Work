@@ -795,7 +795,10 @@ if [[ " ${APPS[*]} " =~ " oracle-web " ]]; then
   oracle_port=$(docker port oracle-web 3000/tcp 2>/dev/null | head -1 | sed 's/.*://')
   oracle_port="${oracle_port:-3010}"
   _smoke_check "oracle-web health" "http://127.0.0.1:${oracle_port}/api/health"
-  _smoke_check "oracle-web /zh-TW" "http://127.0.0.1:${oracle_port}/zh-TW"
+  # The page probe is the embed page, not /zh-TW: once ORACLE_FRONT_PAGES.home is set /zh-TW answers 308 and
+  # _smoke_check does not follow redirects, so a healthy deploy would be rolled back. aw-oracle-root is the
+  # element the WordPress parent script measures (app/embed/[lang]/[slug]/page.tsx).
+  _smoke_check "oracle-web embed page" "http://127.0.0.1:${oracle_port}/embed/zh-TW/ziwei" "" "" "" "aw-oracle-root"
   _smoke_check "oracle-web api v1" "http://127.0.0.1:${oracle_port}/api/v1/systems"
   _smoke_check "oracle-web mcp" "http://127.0.0.1:${oracle_port}/api/mcp" "" "" '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"sg-deploy-smoke","version":"1"}}}' '"protocolVersion"'
   _smoke_check "nginx/oracle"      "https://oracle.aware-wave.com/api/health" "" "oracle.aware-wave.com"

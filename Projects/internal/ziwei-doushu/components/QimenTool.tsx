@@ -122,7 +122,7 @@ export default function QimenTool({ dict, locale }: { dict: Dictionary; locale: 
       {error ? <div className="error-banner mt-6">{error}</div> : null}
 
       {result && p ? (
-        <section className="mt-8">
+        <section data-aw-result className="mt-8">
           <hr className="star-divider" />
 
           <div className="glass-card p-4 mb-5 flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm">

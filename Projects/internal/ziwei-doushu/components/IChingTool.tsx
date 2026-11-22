@@ -197,7 +197,7 @@ export default function IChingTool({ dict, locale }: { dict: Dictionary; locale:
       </form>
 
       {result ? (
-        <section className="mt-8">
+        <section data-aw-result className="mt-8">
           <hr className="star-divider" />
           <div
             className="glass-card p-8"

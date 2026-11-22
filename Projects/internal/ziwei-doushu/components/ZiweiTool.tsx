@@ -83,7 +83,7 @@ export default function ZiweiTool({
       {error ? <div className="error-banner mt-6">{error}</div> : null}
 
       {result ? (
-        <section className="mt-8">
+        <section data-aw-result className="mt-8">
           <hr className="star-divider" />
           <ZiweiChart result={result} dict={dict} />
 

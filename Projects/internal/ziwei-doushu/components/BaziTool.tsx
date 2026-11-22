@@ -54,7 +54,7 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
       ) : null}
 
       {result ? (
-        <section className="mt-8">
+        <section data-aw-result className="mt-8">
           <hr className="star-divider" />
 
           {/* Day master summary */}

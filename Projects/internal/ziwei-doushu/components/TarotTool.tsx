@@ -113,7 +113,7 @@ export default function TarotTool({ dict, locale }: { dict: Dictionary; locale: 
       </div>
 
       {result ? (
-        <section className="mt-8">
+        <section data-aw-result className="mt-8">
           <hr className="star-divider" />
           <button
             type="button"

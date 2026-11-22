@@ -134,7 +134,7 @@ export default function HehunTool({ dict, locale }: { dict: Dictionary; locale: 
       {error ? <div className="error-banner mt-6">{error}</div> : null}
 
       {result ? (
-        <section className="mt-8">
+        <section data-aw-result className="mt-8">
           <hr className="star-divider" />
 
           {result.mode === 'full' ? (

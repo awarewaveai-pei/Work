@@ -46,7 +46,7 @@ export default function QianTool({ dict, locale }: { dict: Dictionary; locale: L
       </div>
 
       {lot ? (
-        <section className="mt-8">
+        <section data-aw-result className="mt-8">
           <hr className="star-divider" />
           <div className="glass-card p-6" style={{ display: 'grid', gap: '1rem', justifyItems: 'center' }}>
             <div style={{ fontSize: '0.875rem', color: 'var(--gold-400)', letterSpacing: '0.08em' }}>

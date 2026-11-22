@@ -84,7 +84,7 @@ export default function AstrologyTool({
       {chart ? (() => {
         const trad = natalReq ? traditionalReading(chart, natalReq, localToday()) : null;
         return (
-        <section className="mt-8">
+        <section data-aw-result className="mt-8">
           <hr className="star-divider" />
 
           <div className="glass-card p-4 mb-5 flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm">

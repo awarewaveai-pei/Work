@@ -82,7 +82,7 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
       ) : null}
 
       {result ? (
-        <section className="mt-8 space-y-4">
+        <section data-aw-result className="mt-8 space-y-4">
           <hr className="star-divider" />
 
           <div className="label-dark">{t.personalTitle}</div>
