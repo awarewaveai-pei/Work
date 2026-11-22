@@ -1020,7 +1020,6 @@
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/studio/",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/studio/",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/image/",
-        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/codex-images/",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/pod-orders/",
         "scripts/lib/pod-order-inbox-probe.ps1",
         "tests/pod-order-inbox-probe.test.ps1",
@@ -1454,8 +1453,219 @@
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/oracle/",
         "agency-os/handoffs/2026-11-20-oracle-skills-supervisor/"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "9f2a8d11-18ee-4778-ad80-6c287ec04c78",
+          "slug": "oracle-wp-front-door",
+          "name": "WordPress 門面與建站流程",
+          "legacy_source_path": "agency-os/handoffs/2026-11-20-oracle-skills-supervisor/"
+        }
+      ],
+      "features": [
+        {
+          "id": "be5136b0-9aa6-450a-98fd-c9fcd911c269",
+          "slug": "e1-oracle-wp-front-door",
+          "name": "引擎嵌入版頁面",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "E1"
+        },
+        {
+          "id": "e4fb2b68-9302-4874-9df7-b07f6dd3b621",
+          "slug": "e3-oracle-wp-front-door",
+          "name": "舊工具網址轉到 WordPress 頁",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "E3"
+        },
+        {
+          "id": "7cbbf3de-e640-49cb-833c-2359542ff4b8",
+          "slug": "e4-oracle-wp-front-door",
+          "name": "會員票與 AI 每日上限",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "E4"
+        },
+        {
+          "id": "db8e64af-2578-428c-a1e6-e5ccd30c15b4",
+          "slug": "sf-b-oracle-wp-front-door",
+          "name": "網站與環境的紀錄",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-B"
+        },
+        {
+          "id": "e0f091b8-113e-4407-b607-6935e11c8fce",
+          "slug": "sf-c-oracle-wp-front-door",
+          "name": "主機改檔工具支援「新建」",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-C"
+        },
+        {
+          "id": "1bdff30f-334e-4ace-9365-28441ef45932",
+          "slug": "sf-d-oracle-wp-front-door",
+          "name": "網站範本與拆除腳本",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-D"
+        },
+        {
+          "id": "4b7063ec-087a-4c21-b3a6-1b3cf011d949",
+          "slug": "a1-oracle-wp-front-door",
+          "name": "架構決策文件修訂",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "A1"
+        },
+        {
+          "id": "d8f7661f-0308-440a-8325-1fe10f5a28eb",
+          "slug": "e2-oracle-wp-front-door",
+          "name": "引擎的內容安全政策",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "E2"
+        },
+        {
+          "id": "852c8925-8799-4ea8-9e5d-67d43a824925",
+          "slug": "p1-oracle-wp-front-door",
+          "name": "外掛修正與同網域嵌入",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "P1"
+        },
+        {
+          "id": "da7de930-9374-489f-8a5a-af591b24c126",
+          "slug": "sf-e-oracle-wp-front-door",
+          "name": "後台對主機的固定動作",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-E"
+        },
+        {
+          "id": "0c4cb1a0-426a-4929-96ef-b12810ea9db0",
+          "slug": "sf-f-oracle-wp-front-door",
+          "name": "每日備份自動涵蓋新網站",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-F"
+        },
+        {
+          "id": "be6201f8-efbb-449b-8e49-7461dfc29c47",
+          "slug": "sf-g-oracle-wp-front-door",
+          "name": "建站步驟的共用骨架",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-G"
+        },
+        {
+          "id": "2bf7cc1a-6517-4d0f-9fe7-f46e2fb258eb",
+          "slug": "e5-oracle-wp-front-door",
+          "name": "引擎收尾",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "E5"
+        },
+        {
+          "id": "b1020e52-071b-4091-ba24-4a413adc8741",
+          "slug": "sf-e2-oracle-wp-front-door",
+          "name": "主機腳本加固",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-E2"
+        },
+        {
+          "id": "6d136158-a2df-49cb-8afc-408fe0b5752d",
+          "slug": "p2-oracle-wp-front-door",
+          "name": "會員命盤與「我存的對象」",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "P2"
+        },
+        {
+          "id": "93483469-f9a3-417e-b8f6-55a1ad085e43",
+          "slug": "p3-oracle-wp-front-door",
+          "name": "每日運勢信",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "P3"
+        },
+        {
+          "id": "17dac4c9-538e-414e-870c-e9f348a5ca7b",
+          "slug": "sf-h-oracle-wp-front-door",
+          "name": "建站的主機步驟",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-H"
+        },
+        {
+          "id": "5bfa58ba-22d1-489f-a1e9-9979dda9ae28",
+          "slug": "sf-i0-oracle-wp-front-door",
+          "name": "MainWP 連線金鑰",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-I0"
+        },
+        {
+          "id": "dfd1e44a-fae8-4014-b29f-f1f5571fe7f2",
+          "slug": "sf-i-oracle-wp-front-door",
+          "name": "接上 MainWP 與 AI 控制通道",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-I"
+        },
+        {
+          "id": "688c6f66-c103-4a5f-9bb5-4a1d87c21a20",
+          "slug": "sf-j-oracle-wp-front-door",
+          "name": "建站流程頁面",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-J"
+        },
+        {
+          "id": "000000a7-0e0b-4297-a860-808450246a12",
+          "slug": "p4-oracle-wp-front-door",
+          "name": "外掛發佈管道",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "P4"
+        },
+        {
+          "id": "fb907c83-4178-41e8-a987-c92f6e0ecfaf",
+          "slug": "sf-k-oracle-wp-front-door",
+          "name": "清掉假的狀態顯示",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-K"
+        },
+        {
+          "id": "615ad0b8-a347-4bbd-8cdd-fb5a64e3f644",
+          "slug": "sf-p-oracle-wp-front-door",
+          "name": "舊的建站頁退場",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-P"
+        },
+        {
+          "id": "2f52b0c2-8239-4936-8e20-ba411228d365",
+          "slug": "sf-l-oracle-wp-front-door",
+          "name": "用測試網域完整跑一次",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-L"
+        },
+        {
+          "id": "74f8542b-8a68-4702-b125-cce877d42c84",
+          "slug": "sf-a-oracle-wp-front-door",
+          "name": "文件更正",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-A"
+        },
+        {
+          "id": "b2b6f94b-b942-41e9-bdcb-4edc0c6b7057",
+          "slug": "sf-o-oracle-wp-front-door",
+          "name": "操作手冊",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-O"
+        },
+        {
+          "id": "a0d8778e-31cc-4c05-be12-247ff2663e4d",
+          "slug": "go-1-oracle-wp-front-door",
+          "name": "上線一：部署引擎",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "GO-1"
+        },
+        {
+          "id": "61bfb61b-18fc-45a4-84a3-9634906828a7",
+          "slug": "go-2-oracle-wp-front-door",
+          "name": "上線二：接上 WordPress（建置中）",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "GO-2"
+        },
+        {
+          "id": "56f63712-9e9c-4190-ba35-de2fbbf1c41c",
+          "slug": "go-3-oracle-wp-front-door",
+          "name": "上線三：正式開放",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "GO-3"
+        }
+      ]
     },
     {
       "id": "9bfd95c6-a318-4cdc-a8f3-46a695c300ab",
@@ -2028,12 +2238,10 @@
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/global-error.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/sidebar-sections.ts",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/SidebarNav.tsx",
-        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/DoorNav.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/DoorContext.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ProductDoorShell.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/LogoutButton.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/UpdateNotice.tsx",
-        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/CodexLaptopButton.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/layout.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/page.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/login/",
@@ -2073,7 +2281,6 @@
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/public/",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/ai-models/",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/probe-models.mjs",
-        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/codex-laptop/",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(public)/layout.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/sentry-test/",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/posthog-analytics.tsx",
@@ -2084,10 +2291,458 @@
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/.dockerignore",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/.gitignore",
         "lobster-factory/packages/db/migrations/0052_app_theme.sql",
-        "lobster-factory/packages/db/scripts/0052_app_theme_down.sql"
+        "lobster-factory/packages/db/scripts/0052_app_theme_down.sql",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ClientContextProvider.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/ClientRail.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/NavRail.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/PlatformFrame.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/client-context/",
+        "agency-os/handoffs/2026-11-22-platform-membership-ux/"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "e76e753d-c8e9-48d5-a494-4361d281ca4e",
+          "slug": "platform-membership-ux",
+          "name": "平台會員、目前客戶與登入後介面",
+          "legacy_source_path": "agency-os/handoffs/2026-11-22-platform-membership-ux/"
+        }
+      ],
+      "features": [
+        {
+          "id": "64294f08-db98-4f16-b1c2-e4902bd23385",
+          "slug": "k1-platform-membership-ux",
+          "name": "把「目前客戶」的規則寫成正式決策文件（編號 020）",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K1"
+        },
+        {
+          "id": "20836fc4-7f9b-4696-832c-ec7ddb423e10",
+          "slug": "k2-platform-membership-ux",
+          "name": "做一個小函式，決定「現在是哪個客戶、哪個網站」",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K2"
+        },
+        {
+          "id": "4e7ffd83-9d53-43c6-a6df-b33eb3126c73",
+          "slug": "k3-platform-membership-ux",
+          "name": "客戶搜尋和網站清單兩個功能，可以指定要看哪個客戶",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K3"
+        },
+        {
+          "id": "600bd3ac-51da-4e7f-ac4b-326f4c548d29",
+          "slug": "u6-platform-membership-ux",
+          "name": "「方案內／贈送／扣點／未開通」這些標籤，只由一個函式決定",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U6"
+        },
+        {
+          "id": "1f63a782-24a8-4cba-ae8a-6a3803c2f4d0",
+          "slug": "k4-platform-membership-ux",
+          "name": "做好左邊的客戶欄（搜尋加清單），先不放到任何頁面",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K4"
+        },
+        {
+          "id": "4e56432b-e35e-43c8-a72a-5ec27d36b43a",
+          "slug": "u7-platform-membership-ux",
+          "name": "做出會員查看自己點數與合約的功能（只讀）",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U7"
+        },
+        {
+          "id": "0c6fbb0d-c9c1-487d-9295-2b7fe98f449c",
+          "slug": "u22-platform-membership-ux",
+          "name": "產品登記表多加分類、任務、一句話介紹等欄位",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U22"
+        },
+        {
+          "id": "39556844-7408-4016-a004-06390a31f068",
+          "slug": "m1-platform-membership-ux",
+          "name": "把測試用的客戶在資料庫標成「測試」",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M1"
+        },
+        {
+          "id": "299fcb75-bf8f-4297-9b25-5bfd7cd0651b",
+          "slug": "k5-platform-membership-ux",
+          "name": "app 與各產品網站換成同一個外框與左欄",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K5"
+        },
+        {
+          "id": "154bb676-9586-4c33-b258-8e3eddd49f40",
+          "slug": "u4-platform-membership-ux",
+          "name": "員工在產品子網域也能搜尋客戶",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U4"
+        },
+        {
+          "id": "459d442a-fd72-4f41-b9f0-c9430930bb4c",
+          "slug": "u21-platform-membership-ux",
+          "name": "做工具卡片元件（三種大小）",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U21"
+        },
+        {
+          "id": "3ca97883-7726-4ef7-b72f-3edde5494e06",
+          "slug": "w1-platform-membership-ux",
+          "name": "app 提供 WordPress「我的帳號」要畫的產品摘要",
+          "phase": "platform-membership-ux",
+          "legacy_code": "W1"
+        },
+        {
+          "id": "84ef34bb-1b97-4281-b3ef-d49fe2c7af68",
+          "slug": "u5-platform-membership-ux",
+          "name": "員工替客戶操作時，按鈕顯示的是那個客戶的開通狀態",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U5"
+        },
+        {
+          "id": "0b815810-6251-4860-a649-41e6874d2275",
+          "slug": "k7-platform-membership-ux",
+          "name": "寫文章頁改用客戶欄挑網站，拿掉兩個下拉選單",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K7"
+        },
+        {
+          "id": "1d6181da-5bb1-4a43-9767-c8cf6b5e55de",
+          "slug": "k8-platform-membership-ux",
+          "name": "題目與五步驟頁改用客戶欄，刪掉「題目›客戶」頁",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K8"
+        },
+        {
+          "id": "e3a56303-a821-4ef7-8d20-2ef94ed1ca5f",
+          "slug": "k9-platform-membership-ux",
+          "name": "網站頁只列目前客戶的網站",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K9"
+        },
+        {
+          "id": "8c527cd8-0cd5-4f4c-9e8b-c977cedec454",
+          "slug": "k6-platform-membership-ux",
+          "name": "伺服器不再「沒指定網站就拿第一個」",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K6"
+        },
+        {
+          "id": "df0b8b2a-1db3-42e4-96e7-6b3e5c04e055",
+          "slug": "k10-platform-membership-ux",
+          "name": "客戶頁每個網站都能改；客戶首頁列出有問題的客戶",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K10"
+        },
+        {
+          "id": "3913cd80-3c48-4d76-b426-2530217370ce",
+          "slug": "k11-platform-membership-ux",
+          "name": "從 app 開影片工作台時帶著目前客戶",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K11"
+        },
+        {
+          "id": "828faea3-2899-4b4a-b7f9-31f686af0a81",
+          "slug": "u3-platform-membership-ux",
+          "name": "客戶欄上方加類別按鈕",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U3"
+        },
+        {
+          "id": "3aa42097-06f5-490a-8ae4-b8c31207601c",
+          "slug": "k12-platform-membership-ux",
+          "name": "影片工作台收到別的客戶時，先跳確認窗再切換",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K12"
+        },
+        {
+          "id": "41ee4d3d-2b32-4741-ad5f-5e3dde5c30e0",
+          "slug": "u8-platform-membership-ux",
+          "name": "會員登入後的第一頁改成「我的工作台」",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U8"
+        },
+        {
+          "id": "a64a3aa4-6d9b-4624-af8f-1d2b59356ec7",
+          "slug": "u9-platform-membership-ux",
+          "name": "「尚未開通」頁多一顆「了解這個產品」",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U9"
+        },
+        {
+          "id": "d8d4c639-8f74-44e9-92a4-7da7d5d30c2a",
+          "slug": "u10-platform-membership-ux",
+          "name": "做會員的「點數與合約」頁",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U10"
+        },
+        {
+          "id": "ca5f24c6-5740-443d-90f8-dde800eb15d9",
+          "slug": "u12-platform-membership-ux",
+          "name": "做檢查器：頁面名稱、左欄名稱、標題三者要一樣",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U12"
+        },
+        {
+          "id": "b3952d9f-b55c-48e7-86b9-fdf7722d0f09",
+          "slug": "u23-platform-membership-ux",
+          "name": "補上基本的使用紀錄（挑客戶、被擋、登入成功）",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U23"
+        },
+        {
+          "id": "1e2301c0-6503-4a92-a899-3e8a573f7a6d",
+          "slug": "m2-platform-membership-ux",
+          "name": "合約可以記「AwareWave 代操」",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M2"
+        },
+        {
+          "id": "e842a05b-ac7e-440e-ad5b-a9865a359a3b",
+          "slug": "m11-platform-membership-ux",
+          "name": "aware-wave.com 進門時，照各產品登記的登入來源清單",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M11"
+        },
+        {
+          "id": "d53b0097-ed36-458b-b122-47dd8b876ac3",
+          "slug": "u11-platform-membership-ux",
+          "name": "內容入口重排：拆頁、改名、刪功能清單、下拉改按鈕",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U11"
+        },
+        {
+          "id": "087ac725-ed07-4ee9-82a4-d9f358a54e71",
+          "slug": "w2-platform-membership-ux",
+          "name": "WordPress 外掛的「我的帳號」改畫 app 給的摘要",
+          "phase": "platform-membership-ux",
+          "legacy_code": "W2"
+        },
+        {
+          "id": "ae19c6a3-a05b-48d5-a616-4fb6d2c155d7",
+          "slug": "m3-platform-membership-ux",
+          "name": "由合約自動算出「產品／方式」標籤與測試標記",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M3"
+        },
+        {
+          "id": "072b62cd-a082-4699-a3e2-8e8bad2038e8",
+          "slug": "u13-platform-membership-ux",
+          "name": "修正五組對比不足的顏色",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U13"
+        },
+        {
+          "id": "663b1e91-8932-47f0-9162-dfefd9529c0d",
+          "slug": "u14-platform-membership-ux",
+          "name": "做手機底列",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U14"
+        },
+        {
+          "id": "90185de5-ecbf-40bd-8bd1-423e67393bad",
+          "slug": "w5-platform-membership-ux",
+          "name": "把「本機 WordPress＋app 走一遍」寫成可重跑的腳本",
+          "phase": "platform-membership-ux",
+          "legacy_code": "W5"
+        },
+        {
+          "id": "bf3049e6-9890-466d-a08c-9fe76febd413",
+          "slug": "k13-platform-membership-ux",
+          "name": "做檢查器：頁面不得自己藏一份客戶來源",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K13"
+        },
+        {
+          "id": "bfc03fd7-da28-4f42-8ba8-8faa999cd98b",
+          "slug": "m5-platform-membership-ux",
+          "name": "員工替既有客戶代辦會員（app 端）",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M5"
+        },
+        {
+          "id": "bd184e4e-d5c9-494e-b226-2026ba5abb1a",
+          "slug": "k14-platform-membership-ux",
+          "name": "做驗收測試：新增產品入口不用手改就接上",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K14"
+        },
+        {
+          "id": "84c5ebff-1760-4e79-b59e-d9219f1b636f",
+          "slug": "m6-platform-membership-ux",
+          "name": "代辦的外掛端：會員驗證 email 後才連上",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M6"
+        },
+        {
+          "id": "e0ea64cf-0b41-45e9-95b5-de70da58046b",
+          "slug": "m8-platform-membership-ux",
+          "name": "員工可以轉移會員（換單位管理者）",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M8"
+        },
+        {
+          "id": "14a2a9db-8032-4256-bfaa-b0369cc1540c",
+          "slug": "k15-platform-membership-ux",
+          "name": "目前客戶功能的期末檢查與第一階段驗收",
+          "phase": "platform-membership-ux",
+          "legacy_code": "K15"
+        },
+        {
+          "id": "85afd70e-d9d2-46e2-9e2d-8d4bbe6b2054",
+          "slug": "m10-platform-membership-ux",
+          "name": "WordPress 刪會員或改 email 時，app 跟著知道",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M10"
+        },
+        {
+          "id": "c82dfe7f-80fe-4aee-a2fa-1d3a77c443a4",
+          "slug": "w6-platform-membership-ux",
+          "name": "正式站重新開啟店面外掛與兩把密鑰",
+          "phase": "platform-membership-ux",
+          "legacy_code": "W6"
+        },
+        {
+          "id": "13308acb-2a92-4afd-ac50-a4bf4a5d650f",
+          "slug": "m9-platform-membership-ux",
+          "name": "aware-wave.com 關掉訪客結帳",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M9"
+        },
+        {
+          "id": "e2534a31-16d0-43a0-9cdd-51f54c93c904",
+          "slug": "m4-platform-membership-ux",
+          "name": "標籤寫進 FluentCRM，WordPress 加測試角色",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M4"
+        },
+        {
+          "id": "c79b4650-7af6-4a41-9986-4ce8194a7496",
+          "slug": "m7-platform-membership-ux",
+          "name": "既有客戶逐一代辦成會員",
+          "phase": "platform-membership-ux",
+          "legacy_code": "M7"
+        },
+        {
+          "id": "0bb45353-d786-4e41-be94-74e0ef6a3790",
+          "slug": "w7-platform-membership-ux",
+          "name": "真人走一遍：註冊、付款、進入、扣點",
+          "phase": "platform-membership-ux",
+          "legacy_code": "W7"
+        },
+        {
+          "id": "af49b776-565a-4d5a-805b-3ca153adada5",
+          "slug": "u16-platform-membership-ux",
+          "name": "內容概覽首頁",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U16"
+        },
+        {
+          "id": "20a40385-5f21-4379-89fe-366ccff8cb7a",
+          "slug": "u17-platform-membership-ux",
+          "name": "工作台「繼續上次」",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U17"
+        },
+        {
+          "id": "7b6d9b9a-a54f-4b30-aa08-83b43da130c3",
+          "slug": "u18-platform-membership-ux",
+          "name": "頂列搜尋",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U18"
+        },
+        {
+          "id": "e5bb387b-61d7-466f-8f24-e598bbea48e2",
+          "slug": "u19-platform-membership-ux",
+          "name": "客戶自己授權他人",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U19"
+        },
+        {
+          "id": "a004c69a-9ce8-4dac-9e56-6696ab85964a",
+          "slug": "u24-platform-membership-ux",
+          "name": "最近使用與常用",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U24"
+        },
+        {
+          "id": "2537ef1d-7745-4b04-b5b0-b4312366840d",
+          "slug": "u25-platform-membership-ux",
+          "name": "功能層分類欄位，並填入資料",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U25"
+        },
+        {
+          "id": "4129eb8f-51d2-4436-a6fe-d1d093c1e7dd",
+          "slug": "u26-platform-membership-ux",
+          "name": "登記表匯出成 catalog.json",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U26"
+        },
+        {
+          "id": "743ff993-0c54-4d18-a427-a2fa75d5a4da",
+          "slug": "u28-platform-membership-ux",
+          "name": "付款後立刻讓功能清單的快取失效",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U28"
+        },
+        {
+          "id": "8bed4932-b937-4e03-82b4-bb43052b5843",
+          "slug": "u20-platform-membership-ux",
+          "name": "收藏",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U20"
+        },
+        {
+          "id": "35634334-6202-4781-b240-bf411c168888",
+          "slug": "u29-platform-membership-ux",
+          "name": "公開面：首頁、全部工具、分類、介紹頁",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U29"
+        },
+        {
+          "id": "22f1e0e9-b640-48e1-bed2-5a545d9dd412",
+          "slug": "u30-platform-membership-ux",
+          "name": "搜尋沒結果時的表單與彙整",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U30"
+        },
+        {
+          "id": "58a909dd-cc5c-4948-b734-9b80297dd493",
+          "slug": "u31-platform-membership-ux",
+          "name": "一百個以上工具的清單容器",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U31"
+        },
+        {
+          "id": "8a144f70-e5bd-4101-8069-57fc71835a13",
+          "slug": "u32-platform-membership-ux",
+          "name": "AI 智慧搜尋（有門檻）",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U32"
+        },
+        {
+          "id": "b29929a7-11b5-4fea-8a86-7e6ead33bc08",
+          "slug": "u33-platform-membership-ux",
+          "name": "啟用免費或免登入",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U33"
+        },
+        {
+          "id": "0e10da76-963c-4ef2-8ef2-4c548b8355a3",
+          "slug": "u34-platform-membership-ux",
+          "name": "啟用方案分級與功能額度",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U34"
+        },
+        {
+          "id": "018d2da1-cc95-4e82-9442-a6cca7abe0cd",
+          "slug": "u35-platform-membership-ux",
+          "name": "買斷安裝卡片",
+          "phase": "platform-membership-ux",
+          "legacy_code": "U35"
+        }
+      ]
     },
     {
       "id": "f2e67464-3091-468e-9b50-4c0d8e528faf",
@@ -2256,7 +2911,9 @@
         "agency-os/platform-templates/",
         "lobster-factory/templates/",
         "lobster-factory/docs/ONE_CLICK_BUILD_SOP.md",
-        "lobster-factory/docs/WORDPRESS_FACTORY_EXECUTION_SPEC.md"
+        "lobster-factory/docs/WORDPRESS_FACTORY_EXECUTION_SPEC.md",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/site-flow/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/site-flow/"
       ],
       "phases": [],
       "features": []
@@ -2434,6 +3091,152 @@
       ],
       "phases": [],
       "features": []
+    },
+    {
+      "id": "34358804-4fb9-4cb0-8f45-cf616b258f47",
+      "slug": "ai-subscription-channel",
+      "name": "AI 訂閱通道",
+      "aliases": [
+        "sub-channel",
+        "codex-laptop",
+        "codex 免費生圖",
+        "訂閱通道"
+      ],
+      "type": "internal",
+      "purpose": "讓文字與生圖改用 Claude／Codex 訂閱額度在筆電或主機上跑，不花 API 費用，並記用量。",
+      "product_key": null,
+      "source_paths": [
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/CodexLaptopButton.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/codex-laptop/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/codex-images/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/sub-worker/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/sub-text.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/__tests__/sub-text.test.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/__tests__/sub-text-catalog.test.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/codex-usage.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/ai/__tests__/codex-usage.test.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/codex-bridge.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/__tests__/codex-bridge.test.ts",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/__tests__/sub-lanes.test.ts",
+        "scripts/codex-image-worker.mjs",
+        "scripts/__tests__/codex-image-worker.test.mjs",
+        "agency-os/handoffs/2026-11-22-subscription-ai-channel/"
+      ],
+      "phases": [
+        {
+          "id": "84a8173b-b7c3-4f63-9b6a-5ac4393163fe",
+          "slug": "subscription-ai-channel",
+          "name": "文字與生圖走訂閱",
+          "legacy_source_path": "agency-os/handoffs/2026-11-22-subscription-ai-channel/"
+        }
+      ],
+      "features": [
+        {
+          "id": "62754696-9c8f-4f10-a14a-75a7894485be",
+          "slug": "k1-subscription-ai-channel",
+          "name": "任務佇列支援寫字與兩條線",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K1"
+        },
+        {
+          "id": "bf9ccab4-1f0e-4c0c-8a56-71cb43c95c1d",
+          "slug": "k2-subscription-ai-channel",
+          "name": "執行程式會寫字，而且不給 AI 任何工具",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K2"
+        },
+        {
+          "id": "7fa2a27f-f848-4fd6-9dda-0bd77bf8ab3c",
+          "slug": "k3-subscription-ai-channel",
+          "name": "訂閱模型進入模型清單與成本帳本",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K3"
+        },
+        {
+          "id": "919e1ad3-ab57-4b25-a1f7-3adaa06fe8fb",
+          "slug": "k4-subscription-ai-channel",
+          "name": "文章與劇本工坊可以走訂閱",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K4"
+        },
+        {
+          "id": "0baef2a4-0b72-4e8c-8944-374a1fea0c81",
+          "slug": "k6-subscription-ai-channel",
+          "name": "四種走法的按鈕",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K6"
+        },
+        {
+          "id": "697e1022-f606-4ac7-81b8-b6a5ddc6c8f8",
+          "slug": "k5-subscription-ai-channel",
+          "name": "影片腳本可以走訂閱",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K5"
+        },
+        {
+          "id": "80a08df9-54f2-4647-8865-651f8dc79863",
+          "slug": "k7-subscription-ai-channel",
+          "name": "每個網站各自選走法",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K7"
+        },
+        {
+          "id": "f6c7e139-052c-47ae-bcc3-a0c8980ae1ae",
+          "slug": "k11-subscription-ai-channel",
+          "name": "模型清單補上五個",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K11"
+        },
+        {
+          "id": "d97161b2-06a1-49cf-92b5-a6bb8fc8a4ed",
+          "slug": "k8-subscription-ai-channel",
+          "name": "成本頁看得到訂閱用了多少",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K8"
+        },
+        {
+          "id": "d3149642-7b30-4941-9d39-cbea4b20314e",
+          "slug": "k12-subscription-ai-channel",
+          "name": "十二個模型寫同一篇文章給你比",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K12"
+        },
+        {
+          "id": "c602d4c5-9898-43ad-b91a-bde05988f3d8",
+          "slug": "k13-subscription-ai-channel",
+          "name": "幾個生圖模型畫同一張配圖給你比",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K13"
+        },
+        {
+          "id": "3a520084-d1ad-41c2-960f-95d786d122de",
+          "slug": "da-subscription-ai-channel",
+          "name": "部署並在筆電實測",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "DA"
+        },
+        {
+          "id": "87ac8889-773f-4423-8d2c-72cb4f020b6b",
+          "slug": "k10-subscription-ai-channel",
+          "name": "文章配圖不再亂畫",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K10"
+        },
+        {
+          "id": "26f2f74d-dfbe-4544-8fea-baea23f4f1b6",
+          "slug": "k9-subscription-ai-channel",
+          "name": "主機上的常駐執行程式",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K9"
+        },
+        {
+          "id": "bd406ce5-a8e9-4e41-bb1c-b51201d01bca",
+          "slug": "m1-subscription-ai-channel",
+          "name": "額度恢復後的實測",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "M1"
+        }
+      ]
     },
     {
       "id": "0a0673a5-68b7-459b-ac1d-914d37dc121b",
