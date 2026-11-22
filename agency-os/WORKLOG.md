@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-22（續15）— oracle WP：SF-D 併入；第一批整批 RISKS 總檢完成；SF-E、SF-F brief
+
+- SF-D 併入 `380b3cec1`（已 push）：`scripts/templates/client-wp/{docker-compose.yml.tmpl,vhost.conf.tmpl,render.sh,Dockerfile,site-health.php,php-limits.ini,apache-mpm-prefork.conf}`、`scripts/deprovision-site.sh`、`tests/host-scripts/client-wp-template.test.sh`。監工：整份讀 `deprovision-site.sh`（預設 dry-run；`--apply --confirm <slug>`；刪 volume 另需 `--purge-volumes --confirm-purge <slug>`；登記檔值必須等於 `render.sh` 由 slug 推出的值；vhost 必須帶本站的檔頭與 `proxy_pass`）與 `render.sh:20-52` caller contract；重跑測試 60 passed／0 failed；`bash -n` 過。主機腳本隨 push 同步到主機，但沒有任何呼叫端（閘門動詞在 SF-E，開關檔未開）。
+- 第一批全部交回（E1、E3、E4、A1、SF-B、SF-C、SF-D；SF-A 已移第五批）。整批 RISKS 總檢：`data.mjs` 第一批表共 30 列，每列有處置。SF-D 的 7 列：volume 四情形規則（已定，SF-E 照 `render.sh` contract 4）；wp-cron-runner 暫停旗標（SF-E，contract 3b）；critic 修完 C1 未審第二輪（監工讀全文＋SF-E 的 critic Deep 納入這兩支）；拆站 reload 未驗 worker PID（不處理，理由見表）；`real_ip_header` 只在 `lobster-factory/infra/soulful/nginx/soulful-security.conf:28`（SF-E 搬成平台自有設定）；wp-login 限速與 `www.`（本階段不處理）；卡片外四檔（接受）。
+- 新 brief：`briefs/WP-SF-E-gate-verbs.md`、`briefs/WP-SF-F-backup-registry.md`（引用 SF-C、SF-D、SF-G 實際定下的名稱與契約）。SF-E 派線3；SF-F 同線接續。
+- 第二批狀態：E2、P1、SF-G 已併入；SF-E 進行中；SF-F 未開始。第二批的 RISKS（E2 5 條、P1 7 條、SF-G 6 條，見續14 與上一則）等 SF-E、SF-F 交回後一起看，之前不派第三批。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash tests/host-scripts/client-wp-template.test.sh（oracle-int） | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/3m/6n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=client_wp_lock_file | hits=3
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic Deep（1C/3M 已修或轉成 SF-E 契約）＋突變＋監工讀全文代替
 ## 2026-11-22（續14）— oracle WP 第二批：E2、P1 併入；RISKS 留待整批總檢
 
 - 併入（已 push，引擎與外掛皆未部署／未安裝）：E2 `1e3c839f2`（`lib/http/csp.ts` 唯一定義；`proxy.ts` 逐請求 nonce＋`'strict-dynamic'`，matcher 擴到所有 HTML；`/api/*` 由 `next.config.ts` 送 `default-src 'none'; frame-ancestors 'none'`；兩個 layout `await connection()` 改動態渲染；操作者在工人 session 選 (a) nonce）、P1 `93f38797e`（外掛 15 檔：1M/6n 全修、`embed: same-origin|cross-origin` 預設同網域、`assets/embed-same-origin.js` 量 `#aw-oracle-root`、`SiteKey::signedRequest()` 必帶 `aud`、存檔時警告頁面網址落在引擎前綴）。

@@ -28,9 +28,9 @@ export const NOW = [
   { what: '現有算命站正常服務。', state: 'yes', ev: '線上是 2026-11-20 部署的版本；之後併入的卡都還沒部署。' },
   { what: '做法已定，本機試過可行。', state: 'yes', ev: '2026-11-22：分流、工具嵌在 WordPress 頁面、會員存檔、FluentCRM 對同一人連寄，四項試驗過了三項；內容安全政策未試。' },
   { what: '每日信的寄件網域 oracle.aware-wave.com 可以寄信。', state: 'no', ev: '2026-11-22 已在 Resend 建立並加好 DNS，驗證中。' },
-  { what: '工具嵌在 WordPress 頁面裡。', state: 'no', ev: '第一批進行中。' },
+  { what: '工具嵌在 WordPress 頁面裡。', state: 'no', ev: '引擎的嵌入版與外掛都做好並併入，還沒部署、還沒裝到網站；要等上線三步。' },
   { what: '會員能存命盤、訂閱每日信。', state: 'no', ev: '第三批。' },
-  { what: '從後台一步一步開一個客戶網站。', state: 'no', ev: '平台線第一批進行中。' },
+  { what: '從後台一步一步開一個客戶網站。', state: 'no', ev: '資料紀錄、主機工具、網站範本、步驟骨架已併入；主機固定動作與頁面還沒做。' },
 ];
 
 const SPEC = 'briefs/ORACLE-WP-SPEC.md';
@@ -48,7 +48,7 @@ export const STEPS = [
   { n: 5, code: 'SF-C', group: 'B1', title: '主機改檔工具支援「新建」', plain: '主機上改設定檔只能走一支會自動還原的工具，但它只會改已存在的檔。加上「新建檔案」的能力，新網站才有合法的建立方式。',
     gate: '新建成功；檢查失敗時檔案消失、容器停下、資料保留；原本的功能完全不變。', risk: 'High（所有主機改動共用）', model: 'Opus 5.5', status: 'done', commit: '5a1dae31d', depends: [], card: 'briefs/WP-SF-C-patch-create.md' },
   { n: 6, code: 'SF-D', group: 'B1b', title: '網站範本與拆除腳本', plain: '新網站的容器與網址設定範本、主機上「有哪些網站」的登記格式，以及把一個網站完整拆掉的腳本。',
-    gate: '範本能渲染出可用的設定；拆除預設只列出不動手，資料要另外確認才刪。', risk: 'High', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-C'], card: 'briefs/WP-SF-D-site-template.md' },
+    gate: '範本能渲染出可用的設定；拆除預設只列出不動手，資料要另外確認才刪。', risk: 'High', model: 'Opus 5.5', status: 'done', commit: '380b3cec1', depends: ['SF-C'], card: 'briefs/WP-SF-D-site-template.md' },
   { n: 7, code: 'A1', group: 'B1', title: '架構決策文件修訂', plain: '三份架構決策補上：同網域的內嵌框可以用；客戶網站的會員屬於該網站。',
     gate: '治理文件檢查通過。', risk: 'Medium', model: '監工', status: 'done', commit: 'da53adac6', depends: [], card: SPEC },
   // 第二批
@@ -57,9 +57,9 @@ export const STEPS = [
   { n: 9, code: 'P1', group: 'B2', title: '外掛修正與同網域嵌入', plain: '修掉審查找到的 7 個問題（第一次儲存設定會清空對照表等），並把嵌入方式改成同網域。',
     gate: '在乾淨的 WordPress 裝起來，第一次儲存後設定還在，頁面上的工具可用。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '93f38797e', depends: ['E1'], card: 'briefs/WP-P1-plugin-embed.md' },
   { n: 10, code: 'SF-E', group: 'B2', title: '後台對主機的固定動作', plain: '後台只能請主機做幾個固定動作（檢查網址、建站、裝 WordPress、掛網址），不能執行任意指令，所以讀不到網站的會員資料。',
-    gate: '每個動作只收固定格式；格式不對或開關沒開一律拒絕。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-C', 'SF-D'], card: SF },
+    gate: '每個動作只收固定格式；格式不對或開關沒開一律拒絕。', risk: 'High', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-C', 'SF-D'], card: 'briefs/WP-SF-E-gate-verbs.md' },
   { n: 11, code: 'SF-F', group: 'B2', title: '每日備份自動涵蓋新網站', plain: '備份腳本改成讀「有哪些網站」的登記，新網站建好當晚就被備份。',
-    gate: '新網站出現在備份清單；Soulful 的備份輸出與改前逐行相同。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-D'], card: SF },
+    gate: '新網站出現在備份清單；Soulful 的備份輸出與改前逐行相同。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-D'], card: 'briefs/WP-SF-F-backup-registry.md' },
   { n: 12, code: 'SF-G', group: 'B2', title: '建站步驟的共用骨架', plain: '每個會動主機的步驟都走同一套：先給你看要做什麼、你確認才做、做完檢查、失敗還原、留紀錄。紀錄寫不進去就不做。',
     gate: '過期的確認被拒；開關沒開被拒；紀錄寫入失敗時不會動主機。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'e681e8e15', depends: ['SF-B'], card: 'briefs/WP-SF-G-step-engine.md', before: '套用資料表（待決 1）之後才併入' },
   // 第三批
@@ -128,7 +128,7 @@ export const RISKS = [
     { card: 'GO-1', risk: '引擎拿到的訪客位址可能是主機自己的位址，限流會把所有人算成同一個來源。', act: '部署前在主機實測確認，不對就先修分流設定。' },
     { card: 'GO-2', risk: 'Kadence 佈景、真手機、英文頁網址代稱、正式主機兩層分流都還沒試。', act: '在建置中階段逐項實測，有問題不進 GO-3。' },
   ] },
-  { batch: '第一批（SF-D 交回後補上它的風險，再做整批總檢）', rows: [
+  { batch: '第一批（全部交回，2026-11-22 整批總檢完成）', rows: [
     { card: 'E1', risk: '字型設定在兩個版面檔各寫一份。', act: '不處理：嵌入版必須是獨立的版面，框架不允許共用；兩處註解已互相指到對方。' },
     { card: 'E1', risk: '合婚的嵌入版只驗了版面，沒有驗送出後的結果。', act: '實測：監工看過繁中、英文、手機寬度的版面；送出結果在 P1 驗收時於 WordPress 頁面裡實測 12 個工具。' },
     { card: 'E3', risk: '規格的網址範例會讓塔羅頁無限轉向（WordPress 頁網址撞到引擎自己的路徑）。', act: '已處理：引擎會拒收這種設定；規格範例改成工具頁放在 /tools/ 底下。' },
@@ -148,6 +148,13 @@ export const RISKS = [
     { card: 'SF-C', risk: '新建時只等指定的那個容器變健康，同一組的資料庫掛掉不會被發現。', act: '現在處理：寫進 SF-D，範本讓 WordPress 的健康檢查反映資料庫可用。' },
     { card: 'SF-C', risk: '還原進行中若再收到第二次中斷訊號，還原會被打斷（既有四種用法本來就有）。', act: '不處理：需要連續兩次中斷才會發生，且既有用法行為不在本階段改動範圍；記入 SF-O 手冊的注意事項。' },
     { card: 'SF-C', risk: '紀錄檔路徑寫死在本機路徑，換到客戶自己的主機會直接失敗還原。', act: '不處理：本階段只在自家主機建站；買斷交付到客戶主機時再處理。' },
+    { card: 'SF-D', risk: '建站失敗後重試、拆站後重建，資料該沿用還是拒絕，要有明確規則。', act: '已處理：SF-D 定出四種情形（全新、失敗殘留可重試、已拆除要拒絕、其他一律拒絕）；刪資料要另外確認兩次。SF-E 照做。' },
+    { card: 'SF-D', risk: 'WordPress 還沒裝好之前，排程巡檢會在這個新容器上失敗，連帶讓整台主機的排程心跳中斷。', act: '現在處理：寫進 SF-E，建容器前先暫停這個站的巡檢，裝好才恢復。' },
+    { card: 'SF-D', risk: '審查找到 1 個重大問題（拆站可能移走別的站的網址設定），修掉之後沒有再審第二輪。', act: '現在處理：監工整份讀過拆站腳本並重跑它的全部測試；SF-E 的深度審查把這兩支腳本一併納入。' },
+    { card: 'SF-D', risk: '拆站時重新載入網址設定，沒有確認新設定真的生效。', act: '不處理：最壞情況是已拆的站多被服務一會兒，再執行一次即可；要確認就得改動所有主機改動共用的工具，本階段不動。記入 SF-O 手冊。' },
+    { card: 'SF-D', risk: '新網站要拿到訪客真實位址，目前靠 Soulful 的設定檔；Soulful 下架後會失效。', act: '現在處理：寫進 SF-E，搬成平台自己的一份設定。' },
+    { card: 'SF-D', risk: '新網站的登入頁沒有限速，也沒有處理 www 開頭的網址。', act: '不處理（本階段）：登入頁由 Cloudflare 的規則擋；本階段的網站都用子網域，不會有 www。之後接客戶自有網域時再開卡。' },
+    { card: 'SF-D', risk: '卡片外多做了四個檔（容器映像定義、健康檢查等）。', act: '接受：卡片要求容器內要有 WordPress 指令工具，照 Soulful 現行做法就需要這些檔；映像基底與 Soulful 相同。' },
     { card: 'SF-B', risk: '另一支接口還有一份重複的「建立客戶」邏輯沒收進來。', act: '現在處理：寫進第四批 SF-P，舊頁退場時一起刪。' },
     { card: 'SF-B', risk: '重複送出建立客戶時，沒被套用的欄位只在回應裡列出，舊頁面沒顯示。', act: '現在處理：寫進第三批 SF-J，新頁面要顯示「這些值沒有套用」。' },
     { card: 'SF-B', risk: '兩個端點同時改同一個客戶的設定時，後寫的會蓋掉先寫的。', act: '不處理：後台只有操作者一人使用，同時改同一個客戶的機率極低；SF-G 的步驟不寫這個欄位。' },
