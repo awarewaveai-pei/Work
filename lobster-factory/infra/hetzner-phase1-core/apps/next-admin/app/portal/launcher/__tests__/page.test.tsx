@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({ held: new Set<string>(), fail: false }));
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-ops-user-kind": "client", "x-ops-org-id": "org-1" }),
 }));
+vi.mock("../CreditsLine", () => ({ CreditsLine: () => <p data-credits>點數</p> }));
 vi.mock("@/app/LogoutButton", () => ({ LogoutButton: () => <button>登出</button> }));
 vi.mock("@/lib/entitlements/door-holds", () => ({
   holdsProduct: async ({ productKey }: { productKey: string }) => {
@@ -19,7 +20,7 @@ import PortalLauncherPage from "../page";
 import { PRODUCTS } from "@/lib/portal/products";
 import { shopUrl } from "@/lib/portal/hosts";
 
-const card = (html: string, name: string) => html.split('<div class="card"').find((c) => c.includes(`>${name}</h2>`)) ?? "";
+const card = (html: string, name: string) => html.split("<li ").find((c) => c.includes(`>${name}</strong>`)) ?? "";
 const name = (key: string) => PRODUCTS.find((p) => p.key === key)!.name;
 const page = (door?: string) => PortalLauncherPage({ searchParams: Promise.resolve(door ? { door } : {}) });
 // a door button is a POST form to /portal/api/door, never a link to the door (the door has no session for this person)
@@ -31,13 +32,13 @@ describe("portal launcher", () => {
   it("a held, served door opens; a served door not held says 尚未開通; a closed door says 即將推出", async () => {
     state.held = new Set(["tarot", "cs"]);
     const html = renderToStaticMarkup(await page());
-    expect(card(html, name("tarot"))).toContain("已開通");
-    expect(card(html, name("tarot"))).toContain(`${FORM}tarot"/><button class="btn-primary">開啟</button></form>`);
+        expect(card(html, name("tarot"))).toContain(`${FORM}tarot"/><button class="btn-primary">開啟</button></form>`);
     expect(card(html, name("tarot"))).not.toContain("https://tarot.");
-    expect(card(html, name("content"))).toContain("尚未開通");
+    expect(card(html, name("content"))).toContain("未開通");
     expect(card(html, name("content"))).not.toContain("開啟");
     // cs is held but its door is not served yet (products.ts enabled:false): never offered
     expect(card(html, name("cs"))).toContain("即將推出");
+    expect(card(html, name("tarot"))).not.toContain("未開通");
     expect(card(html, name("cs"))).not.toContain("開啟");
   });
 
@@ -45,7 +46,7 @@ describe("portal launcher", () => {
     state.held = new Set(["tarot", "content", "design"]);
     const html = renderToStaticMarkup(await page());
     expect(card(html, name("tarot"))).toContain(`${FORM}tarot"/><input type="hidden" name="next" value="/works"/><button class="btn-primary">我的作品</button></form>`);
-    expect(card(html, name("content"))).toContain("已開通");
+    expect(card(html, name("content"))).toContain('name="product_key" value="content"');
     expect(card(html, name("content"))).not.toContain("我的作品");
     // the design door's home is the works library: one 開啟 button, no second link to the same page
     expect(card(html, name("design"))).toContain(`${FORM}design"/><button class="btn-primary">開啟</button></form>`);
@@ -61,8 +62,23 @@ describe("portal launcher", () => {
     state.fail = true;
     const html = renderToStaticMarkup(await page());
     expect(html).toContain("讀取產品清單時發生錯誤");
-    expect(html).not.toContain("href=");
+    expect(html).not.toContain(shopUrl());
     expect(html).not.toContain("<form");
+  });
+
+  it("held products sit above the not-held group; none held shows the empty state; a failed read shows 重新整理", async () => {
+    state.held = new Set(["tarot"]);
+    const html = renderToStaticMarkup(await page());
+    expect(html.indexOf(`>${name("tarot")}</strong>`)).toBeLessThan(html.indexOf("還沒開通（"));
+    expect(html.indexOf("還沒開通（")).toBeLessThan(html.indexOf(`>${name("content")}</strong>`));
+    state.held = new Set();
+    const none = renderToStaticMarkup(await page());
+    expect(none).toContain("還沒有開通的產品");
+    expect(none).toContain(">了解產品<");
+    state.fail = true;
+    const bad = renderToStaticMarkup(await page());
+    expect(bad).toContain('href="/portal/launcher" class="btn-primary">重新整理<');
+    expect(bad).toContain("暫時無法確認");
   });
 
   it("?door=<code> shows one line saying why the door did not open; no code shows none", async () => {

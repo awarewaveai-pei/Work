@@ -6,6 +6,9 @@ import { shopUrl } from "@/lib/portal/hosts";
 import { doorHref } from "@/lib/portal/door-href";
 import { heldDoors } from "@/lib/portal/held-doors";
 import { LogoutButton } from "@/app/LogoutButton";
+import { rightLabel, type RightLabel } from "@/lib/entitlements/right-label";
+import { ToolCard } from "@/components/portal/ToolCard";
+import { CreditsLine } from "./CreditsLine";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +59,12 @@ function AccessDenied() {
   );
 }
 
+// every badge and sentence is rightLabel()'s; the caller only drops a caption that would lead nowhere on this very page
+// (S1's 「回到我的工作台」 / S12's 「重新整理」, which the page-level button already is)
+const quiet = (r: RightLabel): RightLabel => ({ ...r, action: null });
+const GRID = { display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", listStyle: "none", padding: 0, margin: "0 0 28px" } as const;
+const H2 = { fontSize: 15, fontWeight: 700, margin: "0 0 12px" } as const;
+
 export default async function PortalLauncherPage({ searchParams }: { searchParams: Promise<{ door?: string }> }) {
   let orgId: string;
   try {
@@ -68,51 +77,70 @@ export default async function PortalLauncherPage({ searchParams }: { searchParam
   const { door } = await searchParams;
   const { held, failed } = await getHeld(orgId);
   const served = new Set(servedNextAdminProducts().map((p) => p.key));
+  const now = new Date();
+
+  const label = ({ key, name }: (typeof PRODUCTS)[number]): RightLabel => {
+    const door = failed ? "unavailable" : held.has(key) ? "open" : "not_held";
+    return quiet(rightLabel({ entry: null, source: null, door, comingSoon: !served.has(key), viewer: "member", mode: "enforce", productName: name }));
+  };
+  const open = failed ? [] : PRODUCTS.filter((p) => held.has(p.key));
+  const rest = PRODUCTS.filter((p) => !open.includes(p));   // heldDoors returns served doors only, so a held product is always served
 
   return (
-    <div style={{ maxWidth: 720, margin: "60px auto", padding: 24 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>你的產品</h1>
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: "40px 16px" }}>
+      <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>我的工作台</h1>
       {door && (
         <p style={{ fontSize: 13.5, color: "var(--badge-red-text)", marginBottom: 8 }}>
           {Object.prototype.hasOwnProperty.call(DOOR_NOTICE, door) ? DOOR_NOTICE[door] : DOOR_NOTICE_DEFAULT}
         </p>
       )}
-      {failed ? (
-        <p style={{ fontSize: 13.5, color: "var(--badge-red-text)", marginBottom: 24 }}>
-          讀取產品清單時發生錯誤，請重新整理頁面再試一次。
-        </p>
-      ) : (
-        <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginBottom: 24 }}>
-          選擇要開啟的產品。還沒買的產品可按「去了解」，還在準備的標示「即將推出」。
-        </p>
+      <CreditsLine />
+      {failed && (
+        <div style={{ margin: "0 0 24px" }}>
+          <p style={{ fontSize: 13.5, color: "var(--badge-red-text)", margin: "0 0 8px" }}>讀取產品清單時發生錯誤，請重新整理頁面再試一次。</p>
+          <a href="/portal/launcher" className="btn-primary">重新整理</a>
+        </div>
       )}
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
-        {PRODUCTS.map((product) => {
-          const isOpen = held.has(product.key); // heldDoors returns served doors only
-          const label = isOpen ? "已開通" : served.has(product.key) ? "尚未開通" : "即將推出";
-          // the door page showing the shared works library; the design door IS that page, so 開啟 already goes there
-          const works = isOpen && product.door.app === "next-admin" ? doorHref(product.door.nav ?? [], "/tools/designs") : null;
-          const worksPath = works && works !== "/" ? works : null;
-          return (
-            <div key={product.key} className="card" style={{ padding: 20 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{product.name}</h2>
-              <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>{failed ? "—" : label}</p>
-              {isOpen ? (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <DoorForm productKey={product.key} label="開啟" />
-                  {worksPath && <DoorForm productKey={product.key} next={worksPath} label="我的作品" />}
-                </div>
-              ) : served.has(product.key) && !failed ? (
-                <a href={shopUrl()} className="btn-primary">去了解</a>
-              ) : (
-                <button className="btn-primary" disabled style={{ opacity: 0.5, cursor: "not-allowed" }}>
-                  {failed ? "無法確認" : label}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {!failed && open.length === 0 && (
+        <div className="card" style={{ margin: "0 0 28px" }}>
+          <p style={{ fontWeight: 600, margin: "0 0 8px" }}>還沒有開通的產品</p>
+          <a href={shopUrl()} className="btn-primary">了解產品</a>
+        </div>
+      )}
+      {open.length > 0 && (
+        <section aria-label="我的產品">
+          <h2 style={H2}>我的產品（{open.length}）</h2>
+          <ul style={GRID}>
+            {open.map((product) => {
+              // the door page showing the shared works library; the design door IS that page, so 開啟 already goes there
+              const works = product.door.app === "next-admin" ? doorHref(product.door.nav ?? [], "/tools/designs") : null;
+              const worksPath = works && works !== "/" ? works : null;
+              return (
+                <li key={product.key} data-product={product.key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <ToolCard name={product.name} catalog={product.catalog} right={label(product)} href={null} now={now} />
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <DoorForm productKey={product.key} label="開啟" />
+                    {worksPath && <DoorForm productKey={product.key} next={worksPath} label="我的作品" />}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      {rest.length > 0 && (
+        <section aria-label="還沒開通">
+          <h2 style={H2}>還沒開通（{rest.length}）</h2>
+          <ul style={GRID}>
+            {rest.map((product) => (
+              <li key={product.key} data-product={product.key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <ToolCard name={product.name} catalog={product.catalog} right={label(product)} href={null} now={now} />
+                {served.has(product.key) && !failed && <div><a href={shopUrl()} className="btn-primary">去了解</a></div>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {/* the portal has no other sign-out: a shared computer must be able to change account (critic 2026-10-30) */}
       <div className="door-foot"><LogoutButton variant="page" /></div>
     </div>
