@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { effectiveStatus } from "../overview";
 import { projectSystem, type FeatureRow, type PhaseRow, type UpdateRow } from "../projection";
 
 const SYS = "00000000-0000-4000-8000-000000000001";
@@ -11,6 +12,18 @@ const ev = (event_type: string, payload: Record<string, unknown>, at: string, ex
 });
 
 describe("projectSystem", () => {
+  it("lastCommitAt counts only the importer's git events: a review today leaves a 90-day-silent system 暫停（推定）", () => {
+    const NOW = Date.parse("2026-11-22T00:00:00Z");
+    const old = "2026-08-20T00:00:00Z"; // 94 days before NOW
+    const p = projectSystem({ phases: [], features: [feature("f1")], events: [
+      ev("handoff", { subject: "last work" }, old, { event_key: "git:abc:1", commit_sha: "abc" }),
+      ev("review", { status: "verified", by: "u" }, "2026-11-21T00:00:00Z", { source: "user", feature_id: "f1", event_key: "user:r1" }),
+    ] });
+    expect(p.lastCommitAt).toBe(old);
+    expect(p.lastActivityAt).toBe("2026-11-21T00:00:00Z");
+    expect(effectiveStatus(p.status, p.lastCommitAt, NOW)).toEqual({ status: "paused", inferred: true });
+  });
+
   it("handoff card: next is kept when a later handoff leaves it out; blocker clears only on blocker_cleared", () => {
     const p = projectSystem({ phases: [], features: [], events: [
       ev("handoff", { subject: "a", next: "write the route", blocker: "waiting on token" }, "2026-11-01T00:00:00Z"),

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const reads = vi.hoisted(() => ({ n: 0 }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
-vi.mock("@/lib/systems/store", () => ({ readPending: async () => { reads.n++; return { refresh: false, proposals: [] }; } }));
+vi.mock("@/lib/systems/store", () => ({ readPending: async () => { reads.n++; return { refresh: true, requestedAt: "2026-11-22T01:00:00.000Z", proposals: [] }; } }));
 
 const { GET } = await import("./route");
 const TOKEN = "systems-ingest-token-long-enough";
@@ -26,6 +26,6 @@ describe("GET /api/internal/systems/pending", () => {
   it("the right token gets the 契約 3 JSON", async () => {
     const r = await GET(req(`Bearer ${TOKEN}`));
     expect(r.status).toBe(200);
-    expect(await r.json()).toEqual({ refresh: false, proposals: [] });
+    expect(await r.json()).toEqual({ refresh: true, requested_at: "2026-11-22T01:00:00.000Z", proposals: [] });
   });
 });

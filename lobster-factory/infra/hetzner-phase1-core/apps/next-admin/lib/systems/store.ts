@@ -154,9 +154,14 @@ export async function writeUserEvent(
 
 export const PROPOSAL_READ_CAP = 200;
 
+/** A request payload that breaks 契約 3 (parseUserRequest's message). The caller maps it to its own code. */
+export class BadInput extends Error { override name = "BadInput"; }
+/** closeProposal: the key is not a system_proposed event. */
+export class ProposalNotFound extends Error { override name = "ProposalNotFound"; }
+
 async function writeRequest(sb: SupabaseClient, type: UserRequestType, payload: Record<string, unknown>): Promise<void> {
   const parsed = parseUserRequest(type, payload);
-  if ("error" in parsed) throw new Error(`${type}: ${parsed.error}`);
+  if ("error" in parsed) throw new BadInput(`${type}: ${parsed.error}`);
   check(
     await sb.from("system_updates").insert({
       event_key: `user:${randomUUID()}`, system_id: null, event_type: type, source: "user",
@@ -175,19 +180,22 @@ export const requestRefresh = (sb: SupabaseClient, actor: string) => writeReques
 export const proposeSystem = (sb: SupabaseClient, actor: string, p: SystemProposal) =>
   writeRequest(sb, "system_proposed", { by: actor, name: p.name, type: p.type, purpose: p.purpose });
 
-/** Withdraws a proposal that will not become a registry entry (duplicate, mistake). Throws when `proposalEventKey` is
- *  not a system_proposed event, or on an empty reason. */
+/** Withdraws a proposal that will not become a registry entry (duplicate, mistake). Throws ProposalNotFound when
+ *  `proposalEventKey` is not a system_proposed event, BadInput on an empty or too long reason; other errors = the
+ *  database. */
 export async function closeProposal(sb: SupabaseClient, actor: string, proposalEventKey: string, reason: string): Promise<void> {
   const found = check(
     await sb.from("system_updates").select("event_key").eq("event_key", proposalEventKey).eq("event_type", "system_proposed").limit(1),
     "system_proposed read",
   ) as unknown[];
-  if (found.length === 0) throw new Error(`system_proposal_closed: no proposal ${proposalEventKey}`);
+  if (found.length === 0) throw new ProposalNotFound(`system_proposal_closed: no proposal ${proposalEventKey}`);
   await writeRequest(sb, "system_proposal_closed", { by: actor, proposal_event_key: proposalEventKey, reason });
 }
 
 export interface PendingProposal { event_key: string; name: string; type: string; purpose: string; at: string }
-export interface Pending { refresh: boolean; proposals: PendingProposal[] }
+/** requestedAt = the newest refresh_request (null: never), whether or not still pending; the host remembers the last
+ *  one it answered, so a request is worked on once even when every run fails. */
+export interface Pending { refresh: boolean; requestedAt: string | null; proposals: PendingProposal[] }
 
 type EventIn = { event_key: string; payload: Record<string, unknown>; occurred_at: string };
 
@@ -219,7 +227,7 @@ export function pendingFrom(input: {
     byName.delete(n);
     byName.set(n, { event_key: e.event_key, name: String(e.payload.name), type: String(e.payload.type ?? ""), purpose: String(e.payload.purpose ?? ""), at: e.occurred_at });
   }
-  return { refresh, proposals: [...byName.values()] };
+  return { refresh, requestedAt: input.lastRequestAt, proposals: [...byName.values()] };
 }
 
 type Res = { data: unknown; error: { message: string } | null };

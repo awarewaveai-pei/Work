@@ -223,7 +223,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
     );
   }
 
-  const eff = effectiveStatus(p.status, p.lastActivityAt, Date.now());
+  const eff = effectiveStatus(p.status, p.lastCommitAt, Date.now());
   const imp = importSummary(runs);
   const brief = buildResumeMarkdown({
     name: system.name, purpose: system.purpose, type: TYPE_LABEL[system.type as SystemType] ?? system.type, sourcePaths: system.source_paths ?? [],

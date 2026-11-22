@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseUserRequest } from "../contract";
-import { pendingFrom, readPending } from "../store";
+import { BadInput, closeProposal, pendingFrom, ProposalNotFound, readPending } from "../store";
 
 describe("契約 3 payloads", () => {
   it("refresh_request: empty or by only", () => {
@@ -99,7 +99,27 @@ describe("readPending", () => {
       },
     };
     expect(await readPending(sb as never)).toEqual({
-      refresh: true, proposals: [{ event_key: open.event_key, name: "記帳本", type: "product", purpose: "p", at: "2026-11-22T01:30:00Z" }],
+      refresh: true, requestedAt: "2026-11-22T02:00:00Z", proposals: [{ event_key: open.event_key, name: "記帳本", type: "product", purpose: "p", at: "2026-11-22T01:30:00Z" }],
     });
+  });
+});
+
+describe("closeProposal errors are named", () => {
+  const sbWith = (found: unknown[]) => {
+    const inserts: unknown[] = [];
+    const q = {
+      select: () => q, eq: () => q, limit: () => q,
+      then: (ok: (r: unknown) => unknown) => Promise.resolve({ data: found, error: null }).then(ok),
+    };
+    return { inserts, sb: { from: () => ({ ...q, insert: (row: unknown) => { inserts.push(row); return Promise.resolve({ data: null, error: null }); } }) } };
+  };
+  it("ProposalNotFound for a key that is no proposal, BadInput for an empty reason; nothing written", async () => {
+    const none = sbWith([]);
+    await expect(closeProposal(none.sb as never, "u", "user:nope", "重複")).rejects.toBeInstanceOf(ProposalNotFound);
+    const one = sbWith([{ event_key: "user:p1" }]);
+    await expect(closeProposal(one.sb as never, "u", "user:p1", "  ")).rejects.toBeInstanceOf(BadInput);
+    expect([...none.inserts, ...one.inserts]).toEqual([]);
+    await closeProposal(one.sb as never, "u", "user:p1", "重複");
+    expect(one.inserts).toHaveLength(1);
   });
 });

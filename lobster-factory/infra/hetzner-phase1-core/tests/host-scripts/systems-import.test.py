@@ -282,7 +282,7 @@ class SystemsImportTest(unittest.TestCase):
             self.assertEqual(self.r.git("rev-parse", "refs/heads/main", cwd=self.r.mirror), before)
             self.assertFalse(os.path.exists(self.r.state))
             # refresh true: imports as usual, the import_run (last) is what answers the request
-            srv.pending = {"refresh": True, "proposals": []}
+            srv.pending = {"refresh": True, "requested_at": "r1", "proposals": []}
             rc, out = self.run_main("--if-requested")
             self.assertEqual(rc, 0, out)
             self.assertEqual([e["event_type"] for e in srv.bodies[-1]["events"]], ["activity", "import_run"])
@@ -290,7 +290,7 @@ class SystemsImportTest(unittest.TestCase):
             with open(self.r.state) as f:
                 self.assertEqual(f.read().strip(), head)
             # still requested with nothing new: a run record alone is sent (else the request would stay pending)
-            srv.pending = {"refresh": True, "proposals": []}
+            srv.pending = {"refresh": True, "requested_at": "r2", "proposals": []}
             rc, out = self.run_main("--if-requested")
             self.assertEqual(rc, 0, out)
             self.assertEqual([(e["event_type"], e["payload"]["head"]) for e in srv.bodies[-1]["events"]], [("import_run", head)])
@@ -303,7 +303,7 @@ class SystemsImportTest(unittest.TestCase):
         os.environ["SYSTEMS_INGEST_URL"] = srv.url
         try:
             self.r.commit({"apps/x.ts": "1"}, "new")
-            srv.pending = {"refresh": True, "proposals": []}
+            srv.pending = {"refresh": True, "requested_at": "r1", "proposals": []}
             srv.refuse = lambda body: any(e["event_type"] != "import_run" for e in body["events"])  # the import batch fails
             rc, out = self.run_main("--if-requested")
             self.assertEqual(rc, 1, out)
@@ -320,6 +320,33 @@ class SystemsImportTest(unittest.TestCase):
         finally:
             srv.close()
 
+
+    def test_if_requested_works_on_one_request_once(self):
+        os.environ.update(SYSTEMS_IMPORT_ENABLED="true", SYSTEMS_INGEST_TOKEN="tok")
+        srv = Server()
+        os.environ["SYSTEMS_INGEST_URL"] = srv.url
+        try:
+            self.r.commit({"apps/x.ts": "1"}, "new")
+            srv.pending = {"refresh": True, "requested_at": "2026-11-22T01:00:00.000Z", "proposals": []}
+            srv.refuse = lambda body: True  # the route refuses every body, the error run record too
+            rc, out = self.run_main("--if-requested")
+            self.assertEqual(rc, 1, out)
+            self.assertEqual(out.count("HTTP 500"), 2, out)  # the batch, then the error record
+            # the same request stays pending on the app side, but this host already worked on it: no git work
+            before = self.r.git("rev-parse", "refs/heads/main", cwd=self.r.mirror)
+            self.r.commit({"apps/x.ts": "2"}, "newer")
+            sent = len(srv.bodies)
+            rc, out = self.run_main("--if-requested")
+            self.assertEqual((rc, len(srv.bodies), out), (0, sent, ""))
+            self.assertEqual(self.r.git("rev-parse", "refs/heads/main", cwd=self.r.mirror), before)  # not fetched
+            # a new press is a new request: worked on again; the same error line is not printed a second time
+            srv.pending = dict(srv.pending, requested_at="2026-11-22T01:10:00.000Z")
+            rc, out = self.run_main("--if-requested")
+            self.assertEqual(rc, 1, out)
+            self.assertGreater(len(srv.bodies), sent)
+            self.assertEqual(out, "")  # both error lines are the same as last time: not printed again
+        finally:
+            srv.close()
 
 if __name__ == "__main__":
     unittest.main()

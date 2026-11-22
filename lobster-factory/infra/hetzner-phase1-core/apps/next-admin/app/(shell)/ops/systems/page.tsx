@@ -28,7 +28,7 @@ const NOTICES: Record<string, { ok: boolean; text: string }> = {
   forbidden: { ok: false, text: "只有擁有者或管理員能這樣做。" },
   db_unavailable: { ok: false, text: "資料庫暫時讀寫不了，沒有記下。" },
 };
-const NO_PENDING: Pending = { refresh: false, proposals: [] };
+const NO_PENDING: Pending = { refresh: false, requestedAt: null, proposals: [] };
 type Row = { system: SystemRow; p: SystemProjection; eff: EffectiveState };
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px", textDecoration: "none" };
@@ -271,7 +271,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
           events: state.events.filter((e) => e.system_id === system.id),
           history: state.history,
         });
-        return { system, p, eff: effectiveStatus(p.status, p.lastActivityAt, now) };
+        return { system, p, eff: effectiveStatus(p.status, p.lastCommitAt, now) };
       });
     } catch (e) {
       failure = String(e instanceof Error ? e.message : e);
@@ -281,7 +281,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
   const shown = rows.filter(({ system, eff }) =>
     (!typeFilter || system.type === typeFilter) && (!statusFilter || (statusFilter === "unset" ? eff.status === null : eff.status === statusFilter))
     && (!needle || [system.name, system.purpose, system.slug, ...(system.aliases ?? [])].some((s) => (s ?? "").toLowerCase().includes(needle))));
-  const counts = overviewCounts(rows.map(({ p, eff }) => ({ status: eff.status, featureCount: p.features.length, blocker: p.handoff.blocker, lastActivityAt: p.lastActivityAt })), Date.now());
+  const counts = overviewCounts(rows.map(({ p, eff }) => ({ status: eff.status, inferred: eff.inferred, featureCount: p.features.length, blocker: p.handoff.blocker, lastActivityAt: p.lastActivityAt })), Date.now());
   const keep = (...omit: Array<"type" | "status" | "q">) => ({
     ...(typeFilter && !omit.includes("type") ? { type: typeFilter } : {}),
     ...(statusFilter && !omit.includes("status") ? { status: statusFilter } : {}),

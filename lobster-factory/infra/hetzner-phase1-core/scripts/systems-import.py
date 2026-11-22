@@ -16,10 +16,12 @@ a commit or a deploy.
                    line), git untouched; true -> import as usual, and send an import_run even when already up to date
                    (that run is what answers the request). Any failure after that (Fatal, a failed POST, the time
                    limit) still sends a run record alone with status=error, best effort, so one request is answered
-                   once and not redone every 5 minutes. A failed GET = exit 1, nothing fetched, state untouched.
+                   once and not redone every 5 minutes. Its requested_at is written to systems-import.answered
+                   next to the state file after every attempt, whatever came of it: the same request is never worked
+                   on twice. A failed GET = exit 1, nothing fetched, state untouched.
                    Never waits for the lock.
-  --wait-lock N    wait up to N s for the lock instead of skipping (the 04:30 line: a requested run may hold it), then
-                   exit 1
+  --wait-lock N    wait up to N s for the lock, then exit 1 (default: --max-seconds + 120, the longest a requested run
+                   holds it); --if-requested never waits
 
 Settings (environment first, else a plain read of SYSTEMS_ENV_FILE -- never sourced, like poke.sh):
   SYSTEMS_IMPORT_ENABLED  anything but "true" -> one line, exit 0 (default OFF)
@@ -27,13 +29,15 @@ Settings (environment first, else a plain read of SYSTEMS_ENV_FILE -- never sour
   SYSTEMS_INGEST_URL      default http://127.0.0.1:3002/api/internal/systems/ingest
   SYSTEMS_PENDING_URL     default: SYSTEMS_INGEST_URL with /ingest -> /pending
 Exit 0 = imported / up to date / disabled; 1 = history diverged or a POST failed; 2 = could not run.
+An error line is printed only when it differs from the previous one (systems-import.last-error next to the state file;
+cleared by a run that gets through), so a dead app does not write the same line every 5 minutes.
 History diverged (previous_head is not an ancestor of HEAD, e.g. a force push): one orphaned event per commit that
 left main plus the import_run event are sent, nothing new is imported, the state is kept, and every run reports it until someone deletes the state file (= re-import the last 90 days;
 the route skips events it already has).
 Trailers come from %(trailers:only,unfold) in the one `git log` call: the same parser as `git interpret-trailers
 --parse`, without one process per commit (a first run walks ~4000 commits within the 300 s limit).
 Guards live in here, not as flock/timeout/nice wrappers on the cron line, so install-host-schedules.sh can still check
-the `python3 /path` form: one run at a time (non-blocking lock, a second run exits 0; --wait-lock waits), 300 s
+the `python3 /path` form: one run at a time (a run waits for the lock, --wait-lock; --if-requested skips), 300 s
 alarm, nice 19 (which
 also puts git's I/O at the lowest best-effort priority).
 """
@@ -368,7 +372,7 @@ def post(url, token, body):
 
 
 def get_pending(url, token):
-    """-> True / False (契約 3 refresh), or an error string."""
+    """-> (refresh, requested_at) from 契約 3, or an error string."""
     req = urllib.request.Request(url, method="GET", headers={"Authorization": f"Bearer {token}"})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
@@ -378,7 +382,10 @@ def get_pending(url, token):
     except (urllib.error.URLError, OSError, ValueError) as e:
         return str(e)
     refresh = body.get("refresh") if isinstance(body, dict) else None
-    return refresh if isinstance(refresh, bool) else f"no boolean refresh in {str(body)[:200]}"
+    if not isinstance(refresh, bool):
+        return f"no boolean refresh in {str(body)[:200]}"
+    at = body.get("requested_at")
+    return refresh, (at if isinstance(at, str) and at else None)
 
 
 def write_state(path, head):
@@ -497,6 +504,51 @@ def take_lock(path, wait_seconds):
             time.sleep(1)
 
 
+PENDING_FAILED = "[systems-import] ERROR: pending check failed:"
+
+
+class StateFiles:
+    """Small files next to the state file: the last answered refresh request (requested_at) and the last error line."""
+
+    def __init__(self, state_path):
+        self.dir = os.path.dirname(os.path.abspath(state_path))
+        self.answered = os.path.join(self.dir, "systems-import.answered")
+        self.last_error = os.path.join(self.dir, "systems-import.last-error")
+
+    def read(self, path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return f.read().strip()
+        except OSError:
+            return ""
+
+    def write(self, path, text):
+        os.makedirs(self.dir, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=self.dir, prefix=".systems-import.")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+        os.replace(tmp, path)
+
+    def error(self, line):
+        """Print an error line only when this failure has not printed it yet (the 5-minute line would repeat it all
+        day). The lines of the current failure are kept in last-error until it is over (ok)."""
+        line = line.strip()
+        seen = [l for l in self.read(self.last_error).splitlines() if l]
+        if line not in seen:
+            print(line, file=sys.stderr)
+            self.write(self.last_error, "\n".join((seen + [line])[-20:]))
+
+    def ok(self, only=None):
+        """The failure is over: its lines are news again. only = forget just the lines starting with it."""
+        if not os.path.exists(self.last_error):
+            return
+        keep = [l for l in self.read(self.last_error).splitlines() if l and only is not None and not l.startswith(only)]
+        if keep:
+            self.write(self.last_error, "\n".join(keep))
+        else:
+            os.remove(self.last_error)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="git commits -> /ops/systems events")
     ap.add_argument("--mirror", default="/root/systems-mirror.git")
@@ -505,21 +557,24 @@ def main(argv=None):
     ap.add_argument("--first-days", type=int, default=90)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--if-requested", action="store_true")
-    ap.add_argument("--wait-lock", type=int, default=0)
+    ap.add_argument("--wait-lock", type=int, default=None)
     ap.add_argument("--lock", default="/tmp/systems-import.lock")
     ap.add_argument("--max-seconds", type=int, default=300)
     a = ap.parse_args(argv)
+    # Default: long enough for a requested run to finish (its limit, its 60 s error POST) plus a minute of slack.
+    wait_lock = a.max_seconds + 60 + 60 if a.wait_lock is None else a.wait_lock
     quiet = a.if_requested  # every 5 minutes: only a run that does something writes to the log
+    files = StateFiles(a.state)
 
     if not a.dry_run and setting("SYSTEMS_IMPORT_ENABLED") != "true":
         if not quiet:
             print("[systems-import] SYSTEMS_IMPORT_ENABLED is not true -- nothing done")
         return 0
     if not a.dry_run and os.name == "posix":  # the host; tests also run on the Windows laptop, which has none of these
-        lock = take_lock(a.lock, 0 if a.if_requested else a.wait_lock)
+        lock = take_lock(a.lock, 0 if a.if_requested else wait_lock)
         if lock is None:
-            if a.wait_lock > 0 and not a.if_requested:
-                print(f"[systems-import] ERROR: lock still held after {a.wait_lock} s -- nothing done", file=sys.stderr)
+            if wait_lock > 0 and not a.if_requested:
+                files.error(f"[systems-import] ERROR: lock still held after {wait_lock} s -- nothing done")
                 return 1
             if not quiet:
                 print("[systems-import] another run holds the lock -- skipped")
@@ -532,18 +587,33 @@ def main(argv=None):
         os.nice(19)
     token = setting("SYSTEMS_INGEST_TOKEN")
     url = setting("SYSTEMS_INGEST_URL", "http://127.0.0.1:3002/api/internal/systems/ingest")
+    requested_at = None
     if a.if_requested:
         if not token:
-            print("[systems-import] ERROR: SYSTEMS_INGEST_TOKEN not set -- cannot ask for requests", file=sys.stderr)
+            files.error("[systems-import] ERROR: SYSTEMS_INGEST_TOKEN not set -- cannot ask for requests")
             return 2
         pending_url = setting("SYSTEMS_PENDING_URL", re.sub(r"/ingest/?$", "/pending", url))
-        refresh = get_pending(pending_url, token)
-        if not isinstance(refresh, bool):
-            print(f"[systems-import] ERROR: pending check failed: {refresh} -- nothing done", file=sys.stderr)
+        pending = get_pending(pending_url, token)
+        if isinstance(pending, str):
+            files.error(f"{PENDING_FAILED} {pending} -- nothing done")
             return 1
-        if not refresh:
+        refresh, requested_at = pending
+        # One attempt per request: a request this host already worked on (whatever came of it) is not redone, so an
+        # ingest route that refuses every body does not cost a full run every 5 minutes.
+        if not refresh or (requested_at and requested_at == files.read(files.answered)):
+            files.ok(only=PENDING_FAILED)  # the GET works again; a failed import stays "last error" until one succeeds
             return 0
+    try:
+        rc = run(a, files, token, url)
+    finally:
+        if requested_at:
+            files.write(files.answered, requested_at)
+    if rc == 0:
+        files.ok()
+    return rc
 
+
+def run(a, files, token, url):
     ctx = {}
 
     def answer_failure(error):
@@ -555,19 +625,17 @@ def main(argv=None):
             signal.alarm(60)  # the error POST gets its own short limit; past it the process just ends
         body = error_body(a.mirror, ctx, error)
         if body is None:
-            print("[systems-import] no valid registry at hand -- the request stays pending", file=sys.stderr)
+            files.error("[systems-import] no valid registry at hand -- no error run record sent")
             return
         code, text = post(url, token, body)
-        if 200 <= code < 300:
-            print("[systems-import] answered the request with an error run record", file=sys.stderr)
-        else:
-            print(f"[systems-import] error run record not sent: HTTP {code} {text}", file=sys.stderr)
+        if not 200 <= code < 300:
+            files.error(f"[systems-import] error run record not sent: HTTP {code} {text}")
 
     try:
         try:
             bodies, head, status = build(a.mirror, a.state, a.ref, a.first_days, run_when_current=a.if_requested, ctx=ctx)
         except Fatal as e:
-            print(f"[systems-import] ERROR: {e}", file=sys.stderr)
+            files.error(f"[systems-import] ERROR: {e}")
             answer_failure(e)
             return 2
         if not bodies:
@@ -579,26 +647,26 @@ def main(argv=None):
             return 0
 
         if not token:
-            print("[systems-import] ERROR: SYSTEMS_INGEST_TOKEN not set -- nothing sent", file=sys.stderr)
+            files.error("[systems-import] ERROR: SYSTEMS_INGEST_TOKEN not set -- nothing sent")
             return 2
         for n, body in enumerate(bodies, 1):
             code, text = post(url, token, body)
             if not 200 <= code < 300:
-                print(f"[systems-import] batch {n}/{len(bodies)} HTTP {code} {text} -- state kept, next run retries",
-                      file=sys.stderr)
+                files.error(f"[systems-import] batch {n}/{len(bodies)} HTTP {code} {text} -- state kept, next run retries")
                 answer_failure(f"batch {n}/{len(bodies)} HTTP {code} {text}")
                 return 1
     except Timeout as e:
-        print(f"[systems-import] ERROR: {e} -- state kept", file=sys.stderr)
+        files.error(f"[systems-import] ERROR: {e} -- state kept")
         answer_failure(e)
         return 1
     if status != "ok":
-        print(f"[systems-import] {status}: {bodies[-1]['events'][-1]['payload']['error']} -- state kept", file=sys.stderr)
+        files.error(f"[systems-import] {status}: {bodies[-1]['events'][-1]['payload']['error']} -- state kept")
         return 1
     write_state(a.state, head)
     total = sum(len(b["events"]) for b in bodies)
     print(f"[systems-import] imported {total} event(s) in {len(bodies)} batch(es), HEAD {head[:12]}")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

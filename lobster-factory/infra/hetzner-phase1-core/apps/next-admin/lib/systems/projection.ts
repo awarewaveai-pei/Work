@@ -38,6 +38,8 @@ export interface SystemProjection {
   features: FeatureView[]; phases: PhaseView[];
   counted: number; verified: number; implemented: number; completion: number | null;
   lastActivityAt: string | null;
+  /** newest git commit event (activity / handoff / feature_update sent by the importer); the inferred status uses it */
+  lastCommitAt: string | null;
 }
 
 const asStr = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
@@ -84,6 +86,11 @@ export function liveEvents(events: readonly UpdateRow[], history: readonly Updat
   return events.filter((e) => !e.commit_sha || !out.has(e.commit_sha));
 }
 
+// The importer's git events carry source "agent" (the commit's author speaks) and a git:<sha>:<n> key; its own records
+// (import_run, orphaned) are source "importer". Commit events = the former, of the three commit-borne types.
+const COMMIT_TYPES = new Set(["activity", "handoff", "feature_update"]);
+const isCommitEvent = (e: UpdateRow) => COMMIT_TYPES.has(e.event_type) && !!e.commit_sha && e.event_key.startsWith("git:");
+
 /** The status one event says a feature has, or null when it says nothing about it. */
 function featureStatusOf(e: UpdateRow): FeatureStatus | null {
   const raw = e.event_type === "migration" ? e.payload.mapped_status : e.event_type === "feature_update" || e.event_type === "review" ? e.payload.status : undefined;
@@ -105,10 +112,12 @@ export function projectSystem(input: {
   const migratedPhases = new Set<string>();
   const phaseOfFeature = new Map(input.features.map((f) => [f.id, f.phase_id]));
   let lastActivityAt: string | null = null;
+  let lastCommitAt: string | null = null;
 
   for (const e of events) {
     if ((USER_REQUEST_TYPES as readonly string[]).includes(e.event_type)) continue;
     if (e.event_type !== "import_run") lastActivityAt = e.occurred_at;
+    if (isCommitEvent(e)) lastCommitAt = e.occurred_at;
     if (e.event_type === "status_change") {
       if ((SYSTEM_STATUSES as readonly unknown[]).includes(e.payload.status)) status = e.payload.status as SystemStatus;
       if ((PRIORITIES as readonly unknown[]).includes(e.payload.priority)) priority = e.payload.priority as Priority;
@@ -146,6 +155,7 @@ export function projectSystem(input: {
     counted: counted.length, verified, implemented,
     completion: counted.length ? verified / counted.length : null,
     lastActivityAt,
+    lastCommitAt,
   };
 }
 
