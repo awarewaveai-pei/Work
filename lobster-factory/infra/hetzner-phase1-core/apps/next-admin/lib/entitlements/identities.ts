@@ -91,3 +91,15 @@ export async function linkIdentity(
   }
   return { ...account(existing), created: false };
 }
+
+/** The unit's manager = the app account holding the unit's member link (ADR 021 D5). Fails closed: a failed or empty
+ *  lookup reads as "not the manager" (a screen shows less, never more). */
+export async function isAccountManager(db: SupabaseClient, organizationId: string, userId: string): Promise<boolean> {
+  const { data, error } = await db
+    .from("customer_identities")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .limit(1);
+  return !error && Array.isArray(data) && data.length > 0;
+}
