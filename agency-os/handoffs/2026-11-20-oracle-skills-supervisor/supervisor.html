@@ -81,12 +81,12 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>算命站 WordPress 階段 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
-  <div class="bar" data-computed><i class="d" style="width:37.03703703703704%"></i><i class="g" style="width:3.7037037037037033%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>10</span>／<span data-computed>27</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:40.74074074074074%"></i><i class="g" style="width:3.7037037037037033%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>11</span>／<span data-computed>27</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">把 oracle.aware-wave.com 改成 WordPress 網站：算命工具嵌在可以排版的頁面裡，會員能存命盤，訂閱後每天收到運勢信；同時把「從後台開一個客戶網站」做成能一步一步按完的流程。共 <span data-computed>27</span> 張卡。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>現有算命站正常服務。<small>線上是 2026-11-20 部署的版本；之後併入的卡都還沒部署。</small></span></li><li class="yes"><b>可以</b><span>做法已定，本機試過可行。<small>2026-11-22：分流、工具嵌在 WordPress 頁面、會員存檔、FluentCRM 對同一人連寄，四項試驗過了三項；內容安全政策未試。</small></span></li><li class="no"><b>還不行</b><span>每日信的寄件網域 oracle.aware-wave.com 可以寄信。<small>2026-11-22 已在 Resend 建立並加好 DNS，驗證中。</small></span></li><li class="no"><b>還不行</b><span>工具嵌在 WordPress 頁面裡。<small>引擎的嵌入版與外掛都做好並併入，還沒部署、還沒裝到網站；要等上線三步。</small></span></li><li class="no"><b>還不行</b><span>會員能存命盤、訂閱每日信。<small>第三批。</small></span></li><li class="no"><b>還不行</b><span>從後台一步一步開一個客戶網站。<small>資料紀錄、主機工具、網站範本、步驟骨架已併入；主機固定動作與頁面還沒做。</small></span></li></ul></section>
+<section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>現有算命站正常服務。<small>線上是 2026-11-20 部署的版本；之後併入的卡都還沒部署。</small></span></li><li class="yes"><b>可以</b><span>做法已定，本機試過可行。<small>2026-11-22：分流、工具嵌在 WordPress 頁面、會員存檔、FluentCRM 對同一人連寄，四項試驗過了三項；內容安全政策未試。</small></span></li><li class="no"><b>還不行</b><span>每日信的寄件網域 oracle.aware-wave.com 可以寄信。<small>2026-11-22 已在 Resend 建立並加好 DNS，驗證中。</small></span></li><li class="no"><b>還不行</b><span>工具嵌在 WordPress 頁面裡。<small>引擎的嵌入版與外掛都做好並併入，還沒部署、還沒裝到網站；要等上線三步。</small></span></li><li class="no"><b>還不行</b><span>會員能存命盤、訂閱每日信。<small>第三批。</small></span></li><li class="no"><b>還不行</b><span>AI 解讀分成免費簡批與付費深度報告。<small>2026-11-22 已定：用 OpenAI、單次購買、簡批下方列出這張命盤還有哪些深度內容可付費得知；紫微補上十二宮互動與流年流月。排在 WordPress 階段之後，共三張卡，尚未派工。</small></span></li><li class="no"><b>還不行</b><span>從後台一步一步開一個客戶網站。<small>資料紀錄、主機工具、網站範本、步驟骨架已併入；主機固定動作與頁面還沒做。</small></span></li></ul></section>
 
 <section id="steps"><h2>批次與卡</h2><p class="lead">同一批的卡同時進行，各自改不同的檔案；整批交回後一起看風險，再開下一批。</p><ol class="steps"><li class="grp">可同時進行：<a href="#E1">E1</a>、<a href="#E4">E4</a>、<a href="#SF-B">SF-B</a>、<a href="#SF-C">SF-C</a>、<a href="#A1">A1</a></li><li class="step done" id="E1">
     <div class="n">1</div>
@@ -197,15 +197,16 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>需先完成：</b><a href="#SF-C">SF-C</a>、<a href="#SF-D">SF-D</a></p>
         <p><b>卡片：</b><code>briefs/WP-SF-E-gate-verbs.md</code></p>
       </details>
-    </div></li><li class="step todo" id="SF-F">
+    </div></li><li class="step done" id="SF-F">
     <div class="n">11</div>
     <div class="b">
       <p class="plain">備份腳本改成讀「有哪些網站」的登記，新網站建好當晚就被備份。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-high">風險 High</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>新網站出現在備份清單；Soulful 的備份輸出與改前逐行相同。</p>
       <details><summary>細節：SF-F 每日備份自動涵蓋新網站</summary>
         <p><b>需先完成：</b><a href="#SF-D">SF-D</a></p>
         <p><b>卡片：</b><code>briefs/WP-SF-F-backup-registry.md</code></p>
+        <p><b>併入於：</b><code>c780599df</code></p>
       </details>
     </div></li><li class="step done" id="SF-G">
     <div class="n">12</div>

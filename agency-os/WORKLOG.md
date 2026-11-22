@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-22（續17）— oracle：深度報告方向定案（D8、D9）；SF-F 併入
+
+- 操作者決定（原話在 `ORACLE-WP-SPEC.md` §0 D8、D9）：AI 解讀分免費簡批與付費深度；單次購買；供應商 OpenAI；簡批下方列出還有哪些深度內容可付費得知；紫微補十二宮的對宮、三方四正、三合六合互動與流年流月。規格新增 §8（現況查核、模型與價格、卡 Z1–Z3、待定事項）；排在 WordPress 階段之後，未派工。
+- 現況查核：正式容器 `printenv` 只有 `OPENAI_API_KEY` 與 `OPENAI_MODEL_DEEP=gpt-4o-2024-11-20`（蓋掉 `lib/ai/models.ts:20-22` 預設）；`gpt-4o` 2027-01-14 關閉。移除該 env 併入 GO-1（需同意）。紫微缺口的 file:line 見 §8。
+- OpenAI 模型與價格由 web-researcher 查官方頁（developers.openai.com/api/docs/{models,pricing,deprecations}，2026-11-22）：`gpt-6-luna`、`gpt-6.1-terra`、`gpt-6.2-sol`、`gpt-6.2-astra`；未驗證項（sol／astra 的 effort 值清單等）列在該回報，Z2 動工時補查。
+- 外部資源評估：`muyen/meihua-yishu`（梅花易數技能包）授權 CC BY-NC-SA 4.0 → 不取程式與文字；引擎現無梅花易數（`lib/najia.ts` 是六爻納甲），功能值得做，未排。
+- SF-F 併入 `c780599df`（已 push）：`backup-ks-aw-01.sh` 4b 段、`verify-backup-ks-aw-01.sh`、`backup-coverage-check.py` 讀 `sites.d`。監工讀備份腳本 diff；`backup-coverage-check.test.py` 34 OK；`backup-ks-aw-01-sites.test.sh` 30 passed（不可加 `MSYS_NO_PATHCONV=1`，加了 19 failed）。這三支不隨 push 同步主機（README：手動放 `/root/scripts/`），主機現行備份未變。
+- 線3、線4 曾回報撞每週用量上限（重設 2026-11-26 04:00），之後恢復執行；SF-E 仍在等 critic。第二批 RISKS 等 SF-E 交回後一起看。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python backup-coverage-check.test.py；bash backup-ks-aw-01-sites.test.sh（oracle-int）；ssh docker exec oracle-web printenv | exit=0 | ms=60000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/7n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,Projects/internal/ziwei-doushu | grep=OPENAI_MODEL_DEEP | hits=3
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic＋突變＋監工讀 diff 與重跑測試代替
 ## 2026-11-22（續16）— 平台第 4 批＋W1 上線：K7、K8、K9、U5（High）、W1（High）
 
 - 操作者 2026-11-22：「看看工人們反應的 RISKS 是否需要處理，先處理完風險再全部一起部署」＝ W1、U5 的 go，條件是風險先處理。流程改為：RISKS 與處置先寫 `data.mjs`、發布監工台，再 push／部署。

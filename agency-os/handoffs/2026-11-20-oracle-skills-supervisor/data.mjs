@@ -30,6 +30,7 @@ export const NOW = [
   { what: '每日信的寄件網域 oracle.aware-wave.com 可以寄信。', state: 'no', ev: '2026-11-22 已在 Resend 建立並加好 DNS，驗證中。' },
   { what: '工具嵌在 WordPress 頁面裡。', state: 'no', ev: '引擎的嵌入版與外掛都做好並併入，還沒部署、還沒裝到網站；要等上線三步。' },
   { what: '會員能存命盤、訂閱每日信。', state: 'no', ev: '第三批。' },
+  { what: 'AI 解讀分成免費簡批與付費深度報告。', state: 'no', ev: '2026-11-22 已定：用 OpenAI、單次購買、簡批下方列出這張命盤還有哪些深度內容可付費得知；紫微補上十二宮互動與流年流月。排在 WordPress 階段之後，共三張卡，尚未派工。' },
   { what: '從後台一步一步開一個客戶網站。', state: 'no', ev: '資料紀錄、主機工具、網站範本、步驟骨架已併入；主機固定動作與頁面還沒做。' },
 ];
 
@@ -59,7 +60,7 @@ export const STEPS = [
   { n: 10, code: 'SF-E', group: 'B2', title: '後台對主機的固定動作', plain: '後台只能請主機做幾個固定動作（檢查網址、建站、裝 WordPress、掛網址），不能執行任意指令，所以讀不到網站的會員資料。',
     gate: '每個動作只收固定格式；格式不對或開關沒開一律拒絕。', risk: 'High', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-C', 'SF-D'], card: 'briefs/WP-SF-E-gate-verbs.md' },
   { n: 11, code: 'SF-F', group: 'B2', title: '每日備份自動涵蓋新網站', plain: '備份腳本改成讀「有哪些網站」的登記，新網站建好當晚就被備份。',
-    gate: '新網站出現在備份清單；Soulful 的備份輸出與改前逐行相同。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-D'], card: 'briefs/WP-SF-F-backup-registry.md' },
+    gate: '新網站出現在備份清單；Soulful 的備份輸出與改前逐行相同。', risk: 'High', model: 'Opus 5.5', status: 'done', commit: 'c780599df', depends: ['SF-D'], card: 'briefs/WP-SF-F-backup-registry.md' },
   { n: 12, code: 'SF-G', group: 'B2', title: '建站步驟的共用骨架', plain: '每個會動主機的步驟都走同一套：先給你看要做什麼、你確認才做、做完檢查、失敗還原、留紀錄。紀錄寫不進去就不做。',
     gate: '過期的確認被拒；開關沒開被拒；紀錄寫入失敗時不會動主機。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'e681e8e15', depends: ['SF-B'], card: 'briefs/WP-SF-G-step-engine.md', before: '套用資料表（待決 1）之後才併入' },
   // 第三批
