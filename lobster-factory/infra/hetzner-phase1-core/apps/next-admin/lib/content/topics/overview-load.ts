@@ -130,41 +130,49 @@ export async function loadOverview(sb: SupabaseClient, organizationId: string | 
   return { organizationId: org, month, rows, cells, spendNote, actual };
 }
 
-/** One client of the staff landing list. `notOpened` (the per-client entitlement check) is not read here: that check is one
- *  call per client, which a list of many clients must not pay; the client's own overview page still shows it. */
-export interface ClientProblem { organizationId: string; problem: boolean; lastError: string | null; failedTopics: number }
+/** One client of the staff landing list: a client with a content problem, found from the problem rows. */
+export interface ClientProblem { organizationId: string; slug: string; name: string; lastError: string | null; failedTopics: number }
+export const PROBLEM_LIST_MAX = 50;
 
-/** Which of these clients have a problem, in a constant number of queries (`in (...)`, never one per client). `organizationIds` =
- *  the clients the landing page shows (the caller caps them); empty = nothing is read. `mayRead` = the caller's canAccessOrg.
- *  Only clients with an active site are answered: no site, nothing to be wrong with. A failed query throws. */
-export async function loadClientProblems(sb: SupabaseClient, organizationIds: string[], mayRead: (organizationId: string) => boolean, now = new Date()): Promise<ClientProblem[]> {
-  const orgs = [...new Set(organizationIds.map((o) => o.trim().toLowerCase()).filter(Boolean))].filter(mayRead);
-  if (!orgs.length) return [];
+/** The clients that have a content problem (a schedule error, or a failed topic this month), in a constant number of queries:
+ *  it starts from the problem rows (few), not from the client list. `notOpened` (a per-client entitlement call) is not read
+ *  here; the client's own overview page shows it. `mayRead` = the caller's canAccessOrg; only clients with an active site
+ *  count. At most PROBLEM_LIST_MAX are returned, by name, with `more` set when there were others. A failed query throws. */
+export async function loadClientProblems(sb: SupabaseClient, mayRead: (organizationId: string) => boolean, now = new Date()): Promise<{ clients: ClientProblem[]; more: boolean }> {
   const month = monthKey(taipeiParts(now.toISOString()).month);
 
-  const siteRes = await sb.from("wp_sites").select("id, organization_id").eq("active", true).in("organization_id", orgs);
-  if (siteRes.error) fail("problem_sites", siteRes.error);
-  const sites = (siteRes.data ?? []) as Array<{ id: string; organization_id: string }>;
-  if (!sites.length) return [];
-  const orgOfSite = new Map(sites.map((s) => [s.id, s.organization_id]));
-
-  const schedRes = await sb.from("client_schedules").select("organization_id, last_error").eq("job_key", JOB).in("organization_id", orgs);
+  const schedRes = await sb.from("client_schedules").select("organization_id, last_error").eq("job_key", JOB).not("last_error", "is", null);
   if (schedRes.error) fail("problem_schedules", schedRes.error);
-  const lastError = new Map(((schedRes.data ?? []) as Array<{ organization_id: string; last_error: string | null }>).map((r) => [r.organization_id, r.last_error]));
+  const lastError = new Map(((schedRes.data ?? []) as Array<{ organization_id: string; last_error: string | null }>)
+    .filter((r) => r.last_error).map((r) => [r.organization_id.toLowerCase(), r.last_error]));
 
-  const failed = new Map<string, number>();
+  const failedSites = new Map<string, number>();
   for (let from = 0; ; ) {
-    const t = await sb.from("content_topics").select("site_id").eq("month", month).eq("status", "failed").in("site_id", [...orgOfSite.keys()]).order("id").range(from, from + 999);
+    const t = await sb.from("content_topics").select("site_id").eq("month", month).eq("status", "failed").order("id").range(from, from + 999);
     if (t.error) fail("problem_topics", t.error);
     const page = (t.data ?? []) as Array<{ site_id: string }>;
     if (!page.length) break;
-    for (const r of page) { const o = orgOfSite.get(r.site_id); if (o) failed.set(o, (failed.get(o) ?? 0) + 1); }
+    for (const r of page) failedSites.set(r.site_id, (failedSites.get(r.site_id) ?? 0) + 1);
     from += page.length;
   }
+  if (!lastError.size && !failedSites.size) return { clients: [], more: false };
 
-  return [...new Set(sites.map((s) => s.organization_id))].map((o) => {
-    const err = lastError.get(o) ?? null;
-    const failedTopics = failed.get(o) ?? 0;
-    return { organizationId: o, lastError: err, failedTopics, problem: hasProblem({ lastError: err, failed: failedTopics, notOpened: false }) };
-  });
+  // an active site per problem: wp_sites narrows both kinds to clients that still have something running
+  const siteRes = await sb.from("wp_sites").select("id, organization_id").eq("active", true)
+    .or([lastError.size ? `organization_id.in.(${[...lastError.keys()].join(",")})` : "", failedSites.size ? `id.in.(${[...failedSites.keys()].join(",")})` : ""].filter(Boolean).join(","));
+  if (siteRes.error) fail("problem_sites", siteRes.error);
+  const sites = (siteRes.data ?? []) as Array<{ id: string; organization_id: string }>;
+  const failed = new Map<string, number>();
+  for (const s of sites) { const n = failedSites.get(s.id); if (n) failed.set(s.organization_id.toLowerCase(), (failed.get(s.organization_id.toLowerCase()) ?? 0) + n); }
+
+  const ids = [...new Set(sites.map((s) => s.organization_id.toLowerCase()))]
+    .filter((o) => hasProblem({ lastError: lastError.get(o) ?? null, failed: failed.get(o) ?? 0, notOpened: false }))
+    .filter(mayRead);
+  if (!ids.length) return { clients: [], more: false };
+  const orgRes = await sb.from("organizations").select("id, slug, name").in("id", ids);
+  if (orgRes.error) fail("problem_orgs", orgRes.error);
+  const clients = ((orgRes.data ?? []) as Array<{ id: string; slug: string; name: string | null }>)
+    .map((o): ClientProblem => ({ organizationId: o.id.toLowerCase(), slug: o.slug, name: o.name || o.slug, lastError: lastError.get(o.id.toLowerCase()) ?? null, failedTopics: failed.get(o.id.toLowerCase()) ?? 0 }))
+    .sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
+  return { clients: clients.slice(0, PROBLEM_LIST_MAX), more: clients.length > PROBLEM_LIST_MAX };
 }
