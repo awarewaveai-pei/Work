@@ -9,6 +9,7 @@ import { STAFF_ROUTE_GROUPS } from "../../lib/portal/doors";
 const REACHED_ELSEWHERE: Record<string, string> = {
   "/no-access": "middleware sends a page refused by staff tool grants here (lib/staff-access.ts)",
   "/ops/ai-models": "redirects to /tools/ai-models?tab=image-specs",
+  "/ops/sites/new": "新增客戶網站 link in the client panel nav (ops/clients/ClientPanelNav.tsx)",
   "/tools/outreach/settings/service-profiles": "tab of /tools/outreach/settings",
   "/tools/outreach/settings/suppression": "tab of /tools/outreach/settings",
   "/tools/social/ads": "social app side nav (tools/social/routes.ts)",
