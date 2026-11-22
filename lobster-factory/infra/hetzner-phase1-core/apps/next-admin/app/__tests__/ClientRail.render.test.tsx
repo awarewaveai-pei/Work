@@ -212,4 +212,14 @@ describe("ClientRail", () => {
     fireEvent.click(screen.getByRole("button", { name: "需處理" }));
     expect(await screen.findByRole("button", { name: /Late Payer/ })).toBeTruthy();
   });
+
+  it("says when AwareWave 自己 could not be read, and when tags do not cover every client", async () => {
+    fetchMock.mockImplementation(async () => json({
+      ok: true, orgs: ORGS.slice(0, 2), total: 2, categories: CATEGORIES, internalOrgId: null, internalOrgFailed: true, tagsPartial: true,
+    }));
+    mount({ layer: "org", onDoor: true, internalOrgId: null });
+    expect((await screen.findByRole("alert")).textContent).toBe("AwareWave 自己 載入失敗");
+    expect(screen.getByText(/超過的客戶沒有標籤/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "AwareWave 自己" })).toBeNull();
+  });
 });

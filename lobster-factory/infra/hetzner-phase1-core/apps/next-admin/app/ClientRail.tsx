@@ -53,6 +53,8 @@ interface RailPage {
   category: OrgCategory | null;
   first: TaggedOrg[];
   tagsFailed: boolean;
+  tagsPartial: boolean;
+  internalOrgFailed: boolean;
   total: number;
   failed: boolean;
   categories: Array<{ key: OrgCategory; label: string }>;
@@ -61,7 +63,7 @@ interface RailPage {
 
 /** 員工的客戶第一頁（這個類別；+ 網址指定的那一個），交給 OrgPicker 畫。 */
 function useFirstPage(enabled: boolean, category: OrgCategory, include: string | null): RailPage {
-  const [state, setState] = useState<RailPage>({ category: null, first: [], total: 0, failed: false, tagsFailed: false, categories: [], internalOrgId: null });
+  const [state, setState] = useState<RailPage>({ category: null, first: [], total: 0, failed: false, tagsFailed: false, tagsPartial: false, internalOrgFailed: false, categories: [], internalOrgId: null });
   useEffect(() => {
     if (!enabled) return;
     let live = true;
@@ -75,6 +77,7 @@ function useFirstPage(enabled: boolean, category: OrgCategory, include: string |
         if (!res.ok || json.ok !== true) throw new Error(String(json.error ?? res.status));
         if (live) setState({
           category, first: json.orgs as TaggedOrg[], total: Number(json.total ?? 0), failed: false, tagsFailed: json.tagsFailed === true,
+          tagsPartial: json.tagsPartial === true, internalOrgFailed: json.internalOrgFailed === true,
           categories: Array.isArray(json.categories) ? json.categories : [],
           internalOrgId: typeof json.internalOrgId === "string" ? json.internalOrgId : null,
         });
@@ -145,6 +148,8 @@ export function ClientRail() {
           {page.failed && <div style={note}>客戶清單載入失敗，請重新整理。</div>}
           {!page.failed && page.category !== category && <div style={note}>載入中…</div>}
           {page.tagsFailed && <div style={note}>類別標籤暫時讀不到，清單照常可選。</div>}
+          {page.tagsPartial && <div style={note}>客戶太多，超過的客戶沒有標籤，也不在需處理／訂閱／點數裡；請用搜尋。</div>}
+          {page.internalOrgFailed && !internalOrgId && <div role="alert" style={note}>AwareWave 自己 載入失敗</div>}
           <OrgPicker
             orgs={rows}
             total={page.total + (self ? 1 : 0)}

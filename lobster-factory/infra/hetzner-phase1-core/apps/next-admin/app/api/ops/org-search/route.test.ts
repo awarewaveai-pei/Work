@@ -6,6 +6,7 @@ const calls = vi.hoisted(() => ({
   select: [] as string[], or: [] as string[], limit: [] as number[], from: 0, eq: [] as Array<[string, unknown]>, extra: null as unknown,
   neq: [] as Array<[string, unknown]>, in: [] as Array<[string, unknown]>, rpc: [] as Array<[string, Record<string, unknown>]>,
   rows: null as unknown[] | null, ledger: null as unknown, ledgerError: null as { message: string } | null, internal: null as unknown,
+  testRows: [] as unknown[], internalError: null as { message: string } | null,
 }));
 // a row as the database could return it if the select ever named metadata whole
 const ROW = vi.hoisted(() => ({
@@ -21,32 +22,46 @@ vi.mock("@/lib/supabase-server", () => {
     is: () => q,
     in: (c: string, v: unknown) => { calls.in.push([c, v]); return q; },
     // the internal-org read is the one select("id"); the ?include= read is the other maybeSingle
-    maybeSingle: async () => ({ data: calls.select.at(-1) === "id" ? calls.internal : calls.extra, error: null }),
+    maybeSingle: async () => (calls.select.at(-1) === "id"
+      ? { data: calls.internal, error: calls.internalError }
+      : { data: calls.extra, error: null }),
     or: (f: string) => { calls.or.push(f); return q; },
     limit: (n: number) => { calls.limit.push(n); return q; },
-    then: (ok: (v: unknown) => unknown) => ok({ data: calls.rows ?? [ROW], error: null, count: (calls.rows ?? [ROW]).length }),
+    // the TEST-organizations read is the select("id") that ends in a list
+    then: (ok: (v: unknown) => unknown) => {
+      const data = calls.select.at(-1) === "id" ? calls.testRows : calls.rows ?? [ROW];
+      return ok({ data, error: null, count: data.length });
+    },
   };
   const rpc = async (name: string, args: Record<string, unknown>) => {
     calls.rpc.push([name, args]);
-    return calls.ledgerError ? { data: null, error: calls.ledgerError } : { data: calls.ledger, error: null };
+    if (calls.ledgerError) return { data: null, error: calls.ledgerError };
+    // calls.ledger = every row; the mock pages it like billing_ledger (limit / offset)
+    const all = calls.ledger as { rows: unknown[]; matching: number } | null;
+    if (!all) return { data: null, error: null };
+    const from = Number(args.p_offset), n = Number(args.p_limit);
+    return { data: { ...all, rows: all.rows.slice(from, from + n) }, error: null };
   };
   const client = { from: () => { calls.from++; return q; }, rpc };
   return { getSupabaseServerClient: () => client, getSupabaseWriteClient: () => client };
 });
-import { GET } from "./route";
+let GET: typeof import("./route").GET;
 import { NAV_FIRST, NAV_SEARCH_LIMIT } from "@/app/(shell)/ops/clients/nav-orgs";
 
 const staff = { "x-ops-user-kind": "staff", "x-ops-claims-role": "operator" };
 const get = async (qs: string) => (await GET(new Request(`https://app.aware-wave.com/api/ops/org-search${qs}`, { headers: staff }))).json();
 
-beforeEach(() => {
-  Object.assign(calls, { select: [], or: [], limit: [], from: 0, eq: [], extra: null, neq: [], in: [], rpc: [], rows: null, ledger: null, ledgerError: null, internal: null });
+beforeEach(async () => {
+  Object.assign(calls, { select: [], or: [], limit: [], from: 0, eq: [], extra: null, neq: [], in: [], rpc: [], rows: null, ledger: null, ledgerError: null, internal: null, testRows: [], internalError: null });
+  // a fresh route module: its ledger memory starts empty in every test
+  vi.resetModules();
+  ({ GET } = await import("./route"));
 });
 
 describe("GET /api/ops/org-search", () => {
   it("selects no whole metadata column and returns only the picker's fields", async () => {
     const body = await get("?q=ac");
-    for (const col of calls.select[0].split(",")) expect(col.includes("metadata") ? col.includes("->") : true, col).toBe(true);
+    for (const col of calls.select.find((c) => c.includes("slug"))!.split(",")) expect(col.includes("metadata") ? col.includes("->") : true, col).toBe(true);
     expect(body.orgs.map((o: object) => Object.keys(o).sort())).toEqual([["brandColors", "color", "id", "name", "slug"]]);
     expect(body.orgs[0].brandColors).toEqual(["#112233"]);   // a non-hex value is not a colour
   });
@@ -54,9 +69,9 @@ describe("GET /api/ops/org-search", () => {
   it("is bounded: NAV_FIRST without q, NAV_SEARCH_LIMIT with q, nothing for a q of only stripped characters", async () => {
     await get("");
     await get("?q=ac");
-    expect(calls.limit).toEqual([NAV_FIRST, NAV_SEARCH_LIMIT]);
+    expect(calls.limit).toEqual([NAV_FIRST, 500, NAV_SEARCH_LIMIT]);   // 500 = the TEST organizations read
     expect(await get("?q=%22%2A%28%29")).toEqual({ ok: true, orgs: [], total: 0 });
-    expect(calls.from).toBe(2);
+    expect(calls.from).toBe(3);
   });
 
   const INC = "22222222-2222-4222-8222-222222222222";
@@ -158,16 +173,18 @@ describe("GET /api/ops/org-search?category=", () => {
 
   it("attention / contract / credits: billing_ledger's own filter, TEST and internal rows dropped, ledger order kept", async () => {
     const C2 = "55555555-5555-4555-8555-555555555555";
-    for (const [cat, filter] of [["attention", "attention"], ["contract", "contract"], ["credits", "balance"]] as const) {
-      calls.rpc = []; calls.in = [];
-      calls.ledger = ledger([lrow(C2, "customer", { balance: 3 }), lrow(T1, "test", { balance: 9 }), lrow(INTERNAL, "internal"), lrow(C1, "customer", { balance: 1 })]);
+    for (const cat of ["attention", "contract", "credits"] as const) {
+      calls.in = [];
+      calls.ledger = ledger([lrow(C2, "customer", { balance: 3, reasons: ["frozen"], contracts: [{}] }), lrow(T1, "test", { balance: 9, reasons: ["frozen"], contracts: [{}] }),
+        lrow(INTERNAL, "internal", { balance: 1, reasons: ["frozen"], contracts: [{}] }), lrow(C1, "customer", { balance: 1, reasons: ["past_due"], contracts: [{}] })]);
       calls.rows = [org(C1, "acme"), org(C2, "zeta")];   // the database's order; the answer keeps the ledger's
       const body = await get(`?category=${cat}`);
-      expect(calls.rpc, cat).toEqual([["billing_ledger", { p_filter: filter, p_query: "", p_limit: NAV_FIRST, p_offset: 0 }]]);
       expect(calls.in, cat).toEqual([["id", [C2, C1]]]);
       expect(body.orgs.map((o: { id: string }) => o.id), cat).toEqual([C2, C1]);
       expect(body.total, cat).toBe(2);
     }
+    // one ledger read (mode 'all') answered all three
+    expect(calls.rpc).toEqual([["billing_ledger", { p_filter: "all", p_query: "", p_limit: 200, p_offset: 0 }]]);
   });
 
   it("a failed ledger read: 全部 still lists clients (tags marked unavailable); a billing category fails", async () => {
@@ -178,5 +195,94 @@ describe("GET /api/ops/org-search?category=", () => {
     expect(all.tagsFailed).toBe(true);
     const res = await GET(new Request("https://app.aware-wave.com/api/ops/org-search?category=attention", { headers: staff }));
     expect(res.status).toBe(500);
+  });
+
+  it("the ledger read is reused for 60 seconds; a failed read is not kept", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      calls.rows = [org(C1, "acme")];
+      calls.ledgerError = { message: "boom" };
+      await get("?category=all");
+      calls.ledgerError = null;
+      calls.ledger = ledger([lrow(C1, "customer", { balance: 2 })]);
+      const ok = await get("?category=all");
+      expect(ok.orgs[0].tags).toEqual(["credits"]);   // the failure was not cached
+      expect(calls.rpc).toHaveLength(2);
+      vi.advanceTimersByTime(59_000);
+      await get("?category=attention");
+      await get("?category=all");
+      expect(calls.rpc).toHaveLength(2);   // within 60 s: no new read
+      vi.advanceTimersByTime(2_000);
+      await get("?category=all");
+      expect(calls.rpc).toHaveLength(3);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("reads every ledger page, so tags cover every billing account; past the page limit the answer says tagsPartial", async () => {
+    const many = Array.from({ length: 450 }, (_, i) => lrow(`acc-${i}`, "customer"));
+    many[449] = lrow(C1, "customer", { balance: 4 });
+    calls.ledger = ledger(many);
+    calls.rows = [org(C1, "acme")];
+    const body = await get("?category=all");
+    expect(calls.rpc.map(([, a]) => a.p_offset)).toEqual([0, 200, 400]);
+    expect(body.orgs[0].tags).toEqual(["credits"]);
+    expect(body.tagsPartial).toBe(false);
+
+    vi.resetModules();
+    ({ GET } = await import("./route"));
+    calls.rpc = [];
+    // every page full and more matching: stop at 50 pages and say so
+    const big = Array.from({ length: 50 * 200 + 1 }, (_, i) => lrow(`acc-${i}`, "customer"));
+    calls.ledger = ledger(big);
+    const partial = await get("?category=all");
+    expect(calls.rpc).toHaveLength(50);
+    expect(partial.tagsPartial).toBe(true);
+  });
+
+  it("a billing category's total counts the same rows its list is cut from (inactive / TEST left out)", async () => {
+    const C2 = "55555555-5555-4555-8555-555555555555";
+    const C3 = "66666666-6666-4666-8666-666666666666";
+    calls.ledger = ledger([lrow(C1, "customer", { reasons: ["frozen"] }), lrow(C2, "customer", { reasons: ["frozen"] }), lrow(C3, "customer", { reasons: ["frozen"] })]);
+    calls.rows = [org(C1, "acme"), org(C2, "beta")];   // C3 is inactive: the database leaves it out
+    const body = await get("?category=attention");
+    expect(body.orgs).toHaveLength(2);
+    expect(body.total).toBe(2);
+  });
+
+  it("a TEST organization's brands are hidden like it: one read of the TEST ids, then own kind and parent in the same query", async () => {
+    calls.testRows = [{ id: T1 }];
+    calls.rows = [org(C1, "acme")];
+    calls.ledger = ledger([]);
+    await get("?category=all");
+    expect(calls.neq).toContainEqual(["kind", "test"]);
+    expect(calls.or).toContain(`parent_organization_id.is.null,parent_organization_id.not.in.(${T1})`);
+    calls.or = [];
+    const BRAND = "77777777-7777-4777-8777-777777777777";
+    calls.rows = [org(T1, "e2e", "test"), org(BRAND, "e2e-brand", "customer", T1)];
+    const test = await get("?category=test");
+    expect(calls.or).toEqual([`kind.eq.test,parent_organization_id.in.(${T1})`]);
+    expect(test.orgs.map((o: { tags: string[] }) => o.tags)).toEqual([["test"], ["test"]]);
+  });
+
+  it("a search hides TEST too, and finds it only with ?category=test", async () => {
+    calls.testRows = [{ id: T1 }];
+    await get("?q=e2e");
+    expect(calls.neq).toContainEqual(["kind", "test"]);
+    expect(calls.or).toContain(`parent_organization_id.is.null,parent_organization_id.not.in.(${T1})`);
+    calls.neq = []; calls.or = [];
+    await get("?q=e2e&category=test");
+    expect(calls.neq).not.toContainEqual(["kind", "test"]);
+    expect(calls.or).toContain(`kind.eq.test,parent_organization_id.in.(${T1})`);
+  });
+
+  it("a failed internal-org read says so (internalOrgFailed) instead of dropping the row silently", async () => {
+    calls.ledger = ledger([]);
+    calls.internalError = { message: "boom" };
+    const body = await get("?category=all");
+    expect(body.internalOrgId).toBeNull();
+    expect(body.internalOrgFailed).toBe(true);
+    calls.internalError = null;
+    calls.internal = { id: INTERNAL };
+    expect((await get("?category=all")).internalOrgFailed).toBe(false);
   });
 });

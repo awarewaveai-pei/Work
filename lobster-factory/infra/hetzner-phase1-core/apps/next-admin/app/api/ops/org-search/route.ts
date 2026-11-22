@@ -6,7 +6,8 @@
 // one valid hex brand colour; ?include=<uuid> = that client is put first when the page would not have it.
 // ?category=<ORG_CATEGORIES> (the client rail, U3): the first page of that category, each row with `tags`, plus
 // `categories` (the buttons) and `internalOrgId` (「AwareWave 自己」, so a door's rail can draw it without reading the
-// database itself). Without ?category= the answer is as before. Not combined with ?q=: a search covers every client.
+// database itself). Without ?category= the first page is as before. A search (?q=) never returns TEST organizations
+// (own or parent kind test) unless ?category=test.
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -15,7 +16,7 @@ import { NAV_FIRST, NAV_SEARCH_LIMIT, toPickOrg, type PickOrg } from "@/app/(she
 import { orgNameFilter, orgSearchTerm } from "@/lib/org-search";
 import { staffOnly } from "@/lib/tenant-guard";
 // billingLedger reads with the service-role client itself (billing_ledger is granted to service_role only, 0148)
-import { billingLedger, type BillingLedger, type LedgerFilter } from "@/lib/entitlements/tables";
+import { billingLedger, type BillingLedger } from "@/lib/entitlements/tables";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HAS_BRAND = ["primary", "secondary", "accent"].map((k) => `${BRAND}->>${k}.match.${HEX}`).join(",");
 
 /** The client rail's category buttons, in order: the one vocabulary (route.test.ts refuses any other value). Only what
- *  today's data can tell (blueprint §9.3): 需處理 / 訂閱 / 點數 are billing_ledger's own filters (the /ops/billing tabs,
+ *  today's data can tell (blueprint §9.3): 需處理 / 訂閱 / 點數 follow billing_ledger's own filters (the /ops/billing tabs,
  *  0148), TEST is organizations.kind (0175). 代操、經銷、買斷 wait for member tags (M3). TEST shows only under 測試.
  *  Not exported (a route file exports only handlers): the rail reads the list from the answer. */
 const ORG_CATEGORIES = [
@@ -44,88 +45,135 @@ export type OrgCategory = (typeof ORG_CATEGORIES)[number]["key"];
 export type OrgTag = Exclude<OrgCategory, "all">;
 export type TaggedOrg = PickOrg & { tags: OrgTag[] };
 
-const LEDGER_FILTER: Readonly<Record<"attention" | "contract" | "credits", LedgerFilter>> = {
-  attention: "attention", contract: "contract", credits: "balance",
+/** A billing category = billing_ledger 'all' rows that pass the same rule as that RPC filter (0148: attention =
+ *  reasons, contract = has_contract, balance = balance > 0), so one cached read answers all three and the tags. */
+const IN_CATEGORY: Readonly<Record<"attention" | "contract" | "credits", (r: LedgerRow) => boolean>> = {
+  attention: (r) => r.reasons.length > 0, contract: (r) => r.contracts.length > 0, credits: (r) => r.balance > 0,
 };
-/** billing_ledger's row limit (0148: least(p_limit, 200)): the billing accounts whose tags one answer can carry. */
-const LEDGER_TAG_ROWS = 200;
+/** billing_ledger's page size (0148: least(p_limit, 200)). */
+const LEDGER_PAGE = 200;
+/** Pages read before giving up on the rest (10 000 accounts); past it the answer says tagsPartial. */
+const LEDGER_MAX_PAGES = 50;
+/** How long one full ledger read is reused: it aggregates the whole credit ledger per page (0148). */
+const LEDGER_TTL_MS = 60_000;
+/** Most TEST organizations whose brands the TEST rule can hide (0175 marked two). */
+const TEST_ORGS_MAX = 500;
 
 type OrgRow = { id: string; slug: string; name?: string | null; kind?: string | null; parent_organization_id?: string | null; color?: unknown; brandColors?: unknown };
 type LedgerRow = BillingLedger["rows"][number];
+type Ledger = { rows: LedgerRow[]; partial: boolean };
 
 const isCategory = (v: string): v is OrgCategory => ORG_CATEGORIES.some((c) => c.key === v);
 
-/** One billing account's tags, by the same rules as its /ops/billing row (reasons / contracts / balance). */
+// Module memory, per server process. Only a complete read is kept (a failure throws before the set); tests start a
+// fresh module (vi.resetModules) -- a route file may export nothing but its handlers.
+const ledgerCache = new Map<string, { at: number; ledger: Ledger }>();
+
+/** Every billing account billing_ledger lists (mode 'all'), paged, reused for LEDGER_TTL_MS. */
+async function allLedger(): Promise<Ledger> {
+  const key = "all";
+  const hit = ledgerCache.get(key);
+  if (hit && Date.now() - hit.at < LEDGER_TTL_MS) return hit.ledger;
+  const rows: LedgerRow[] = [];
+  let partial = false;
+  for (let page = 0; ; page++) {
+    if (page === LEDGER_MAX_PAGES) { partial = true; break; }
+    const got = await billingLedger({ filter: "all", query: "", limit: LEDGER_PAGE, offset: page * LEDGER_PAGE });
+    rows.push(...got.rows);
+    if (got.rows.length < LEDGER_PAGE || rows.length >= got.matching) break;
+  }
+  const ledger = { rows, partial };
+  ledgerCache.set(key, { at: Date.now(), ledger });
+  return ledger;
+}
+
+/** One billing account's tags, by the same rules as its /ops/billing row. */
 function ledgerTags(r: LedgerRow): OrgTag[] {
-  const tags: OrgTag[] = [];
-  if (r.reasons.length > 0) tags.push("attention");
-  if (r.contracts.length > 0) tags.push("contract");
-  if (r.balance > 0) tags.push("credits");
-  return tags;
+  return (["attention", "contract", "credits"] as const).filter((c) => IN_CATEGORY[c](r));
 }
 
-/** A row's tags: its billing account's (a brand bills to its root) plus TEST from its own kind. */
-function tagsOf(row: OrgRow, byAccount: ReadonlyMap<string, OrgTag[]>): OrgTag[] {
-  const tags = [...(byAccount.get(row.parent_organization_id ?? row.id) ?? [])];
-  if (row.kind === "test") tags.push("test");
-  return tags;
+/** TEST = an organization whose own kind is test or whose parent's is (a test unit's brands). One bounded read. */
+async function testOrgIds(supabase: SupabaseClient): Promise<string[]> {
+  const { data, error } = await supabase.from("organizations").select("id").eq("kind", "test").limit(TEST_ORGS_MAX);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Array<{ id: string }>).map((r) => r.id);
 }
 
-/** 全部 (every kind but TEST) or 測試 (TEST only): the first NAV_FIRST by age, with the count. */
-function kindPage(supabase: SupabaseClient, test: boolean) {
+type Scoped<B> = { neq(column: string, value: string): B; eq(column: string, value: string): B; or(filters: string): B };
+/** The one TEST rule, on any organizations query: "hide" = neither it nor its parent is test; "only" = one of them is.
+ *  The list, its count and a search all go through it. */
+function testScope<B extends Scoped<B>>(query: B, mode: "hide" | "only", testIds: readonly string[]): B {
+  const ids = `(${testIds.join(",")})`;
+  if (mode === "only") return testIds.length ? query.or(`kind.eq.test,parent_organization_id.in.${ids}`) : query.eq("kind", "test");
+  const own = query.neq("kind", "test");
+  // `not in` alone would drop every root: NULL NOT IN (...) is null, not true
+  return testIds.length ? own.or(`parent_organization_id.is.null,parent_organization_id.not.in.${ids}`) : own;
+}
+
+const isTest = (r: OrgRow, testIds: readonly string[]) => r.kind === "test" || (r.parent_organization_id != null && testIds.includes(r.parent_organization_id));
+
+/** 全部 or 測試: the first NAV_FIRST by age, and the count of the same query. */
+function kindPage(supabase: SupabaseClient, test: boolean, testIds: readonly string[]) {
   const query = supabase.from("organizations").select(ORG_SEARCH_COLUMNS, { count: "exact" })
     .neq("status", "inactive").order("created_at", { ascending: true }).limit(NAV_FIRST);
-  return test ? query.eq("kind", "test") : query.neq("kind", "test");
+  return testScope(query, test ? "only" : "hide", testIds);
+}
+
+/** The organizations rows of these billing accounts that the list shows (active, not TEST), in the given order. */
+async function ledgerOrgs(supabase: SupabaseClient, ids: string[], testIds: readonly string[]): Promise<OrgRow[]> {
+  const byId = new Map<string, OrgRow>();
+  for (let i = 0; i < ids.length; i += LEDGER_PAGE) {
+    const chunk = supabase.from("organizations").select(ORG_SEARCH_COLUMNS).neq("status", "inactive").in("id", ids.slice(i, i + LEDGER_PAGE));
+    const { data, error } = await testScope(chunk, "hide", testIds);
+    if (error) throw new Error(error.message);
+    for (const r of (data ?? []) as unknown as OrgRow[]) byId.set(r.id, r);
+  }
+  return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
 async function categoryPage(supabase: SupabaseClient, category: OrgCategory, include: string | null) {
   // 「AwareWave 自己」: one bounded read, here rather than on a door's page (a door never reads with the service role).
   const internal = await supabase.from("organizations").select("id").eq("kind", "internal").is("parent_organization_id", null).limit(1).maybeSingle();
   const internalOrgId = (internal.data as { id: string } | null)?.id ?? null;
+  const internalOrgFailed = Boolean(internal.error);
+
+  let testIds: string[];
+  try { testIds = await testOrgIds(supabase); } catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
 
   let rows: OrgRow[];
   let total: number;
-  let ledgerRows: LedgerRow[];
+  let ledger: Ledger;
   let tagsFailed = false;
   if (category === "all" || category === "test") {
-    const { data, error, count } = await kindPage(supabase, category === "test");
+    const { data, error, count } = await kindPage(supabase, category === "test", testIds);
     if (error) return { error: error.message };
     rows = (data ?? []) as unknown as OrgRow[];
     total = count ?? rows.length;
-    // Tags for this page from one ledger read: the first LEDGER_TAG_ROWS billing accounts by name (route.test.ts).
-    try {
-      ledgerRows = (await billingLedger({ filter: "all", query: "", limit: LEDGER_TAG_ROWS, offset: 0 })).rows;
-    } catch {
-      ledgerRows = [];
-      tagsFailed = true;
-    }
+    try { ledger = await allLedger(); } catch { ledger = { rows: [], partial: false }; tagsFailed = true; }
   } else {
-    let ledger: BillingLedger;
     try {
-      ledger = await billingLedger({ filter: LEDGER_FILTER[category], query: "", limit: NAV_FIRST, offset: 0 });
+      ledger = await allLedger();
+      // the internal account is the rail's own row; TEST shows only under 測試 (ledger rows are root accounts)
+      const ids = ledger.rows.filter((r) => r.kind === "customer" && IN_CATEGORY[category](r)).map((r) => r.organization_id);
+      const all = await ledgerOrgs(supabase, ids, testIds);
+      rows = all.slice(0, NAV_FIRST);
+      total = all.length;   // the same rows the list is cut from
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) };
     }
-    // TEST shows only under 測試; the internal account is the rail's own row.
-    ledgerRows = ledger.rows.filter((r) => r.kind === "customer");
-    const ids = ledgerRows.map((r) => r.organization_id);
-    const found = ids.length
-      ? await supabase.from("organizations").select(ORG_SEARCH_COLUMNS).neq("status", "inactive").in("id", ids)
-      : { data: [], error: null };
-    if (found.error) return { error: found.error.message };
-    const byId = new Map(((found.data ?? []) as unknown as OrgRow[]).map((r) => [r.id, r]));
-    rows = ids.flatMap((id) => byId.get(id) ?? []);   // the ledger's order (by name)
-    // exact when the whole category fits one page; otherwise the ledger's count less what this page dropped
-    total = Math.max(rows.length, ledger.matching - (ledger.rows.length - rows.length));
   }
 
   if (include && UUID.test(include) && !rows.some((r) => r.id === include)) {
     const one = await supabase.from("organizations").select(ORG_SEARCH_COLUMNS).neq("status", "inactive").eq("id", include).maybeSingle();
     if (one.data) rows.unshift(one.data as unknown as OrgRow);
   }
-  const byAccount = new Map(ledgerRows.map((r) => [r.organization_id, ledgerTags(r)]));
-  const orgs: TaggedOrg[] = rows.map((r) => ({ ...toPickOrg(r), tags: tagsOf(r, byAccount) }));
-  return { orgs, total, internalOrgId, tagsFailed };
+  const byAccount = new Map(ledger.rows.map((r) => [r.organization_id, ledgerTags(r)]));
+  const orgs: TaggedOrg[] = rows.map((r) => ({
+    ...toPickOrg(r),
+    tags: [...(byAccount.get(r.parent_organization_id ?? r.id) ?? []), ...(isTest(r, testIds) ? ["test" as const] : [])],
+  }));
+  // tagsPartial: accounts past LEDGER_MAX_PAGES have no billing tags and are missing from 需處理／訂閱／點數
+  return { orgs, total, internalOrgId, internalOrgFailed, tagsFailed, tagsPartial: ledger.partial };
 }
 
 export async function GET(request: Request) {
@@ -163,6 +211,14 @@ export async function GET(request: Request) {
   // A search never returns the whole table: a q of only stripped characters matches nothing.
   if (rawQ !== null && !q) return NextResponse.json({ ok: true, orgs: [], total: 0 });
 
+  // A search hides TEST like the rail's list does; it finds TEST only with ?category=test.
+  let testIds: string[] = [];
+  if (q) {
+    try { testIds = await testOrgIds(supabase); } catch (e) {
+      return NextResponse.json({ ok: false, error: "org_search_failed", details: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    }
+  }
+
   let query = supabase
     .from("organizations")
     .select(ORG_SEARCH_COLUMNS, q ? undefined : { count: "exact" })
@@ -171,6 +227,7 @@ export async function GET(request: Request) {
   if (params.get("brandColors") === "1") query = query.or(HAS_BRAND);
   // a second or() is ANDed with the first (postgrest-js appends the param)
   query = q ? query.or(orgNameFilter(q)).limit(NAV_SEARCH_LIMIT) : query.limit(NAV_FIRST);
+  if (q) query = testScope(query, category === "test" ? "only" : "hide", testIds);
   const { data, error, count } = await query;
 
   if (error) {
