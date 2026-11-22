@@ -10,7 +10,8 @@ import { requestActor } from "@/lib/entitlements/subject";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { systemsAccess } from "@/lib/systems/access";
 import { PRIORITIES, projectSystem, SYSTEM_STATUSES } from "@/lib/systems/projection";
-import { readDefinitions, readProjectionInput, writeUserEvent } from "@/lib/systems/store";
+import { SYSTEM_TYPES, type SystemType } from "@/lib/systems/contract";
+import { proposeSystem, readDefinitions, readPending, readProjectionInput, requestRefresh, writeUserEvent } from "@/lib/systems/store";
 
 const text = (form: FormData, name: string) => {
   const v = form.get(name);
@@ -84,4 +85,44 @@ export async function reviewFeature(form: FormData) {
     return "saved";
   });
   await done(code, text(form, "slug"), "features");
+}
+
+/** Overview-page writes (no system id): 立即更新 and 新增系統. Same owner / admin check, answers ?r=<code> on /ops/systems. */
+async function overviewWrite(write: (ctx: { sb: SupabaseClient; actor: string }) => Promise<string>): Promise<never> {
+  let code: string;
+  const access = systemsAccess(await headers());
+  if (!access.allowed) code = "forbidden";
+  else {
+    const sb = getSupabaseWriteClient();
+    if (!sb) code = "db_unavailable";
+    else {
+      try {
+        code = await write({ sb, actor: requestActor(access.req) });
+      } catch (e) {
+        console.error(`[systems/actions] ${e instanceof Error ? e.message : String(e)}`);
+        code = "db_unavailable";
+      }
+    }
+  }
+  revalidatePath("/ops/systems");
+  redirect(`/ops/systems?r=${encodeURIComponent(code)}`);
+}
+
+export async function requestSystemsRefresh() {
+  await overviewWrite(async ({ sb, actor }) => {
+    if ((await readPending(sb)).refresh) return "refresh_pending";
+    await requestRefresh(sb, actor);
+    return "refresh_queued";
+  });
+}
+
+export async function proposeNewSystem(form: FormData) {
+  const name = text(form, "name");
+  const type = text(form, "type");
+  const purpose = text(form, "purpose");
+  await overviewWrite(async ({ sb, actor }) => {
+    if (!name || !purpose || !(SYSTEM_TYPES as readonly string[]).includes(type) || name.length > 200 || purpose.length > 200) return "bad_proposal";
+    await proposeSystem(sb, actor, { name, type: type as SystemType, purpose });
+    return "proposed";
+  });
 }

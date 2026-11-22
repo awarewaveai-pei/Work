@@ -11,13 +11,23 @@ import { projectSystem, SYSTEM_STATUSES, type SystemProjection, type SystemRow, 
 import { EFFECTIVE_BADGE, EFFECTIVE_LABEL, formatTime, STATUS_LABEL, TYPE_LABEL } from "@/lib/systems/labels";
 import { effectiveStatus, gapBreakdown, implementedRatio, overviewCounts, progressKind, recentHandoffs, type EffectiveState } from "@/lib/systems/overview";
 import { importSummary } from "@/lib/systems/projection";
-import { readDefinitions, readImportRuns, readProjectionInput } from "@/lib/systems/store";
-import { Refused, errorBox, muted, page } from "./parts";
+import { readDefinitions, readImportRuns, readPending, readProjectionInput, type Pending } from "@/lib/systems/store";
+import { proposeNewSystem, requestSystemsRefresh } from "./actions";
+import { Refused, box, errorBox, muted, page } from "./parts";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "系統總控中心 · Ops" };
 
-type Sp = { type?: string | string[]; status?: string | string[]; q?: string | string[] };
+type Sp = { type?: string | string[]; status?: string | string[]; q?: string | string[]; r?: string | string[] };
+const NOTICES: Record<string, { ok: boolean; text: string }> = {
+  refresh_queued: { ok: true, text: "已排入，約 5 分鐘內更新。" },
+  refresh_pending: { ok: true, text: "更新已在排隊中。" },
+  proposed: { ok: true, text: "已記下，下一次 agent 開工時會寫進系統清單。" },
+  bad_proposal: { ok: false, text: "名稱與用途各要 1–200 字，類型要選一個。" },
+  forbidden: { ok: false, text: "只有擁有者或管理員能這樣做。" },
+  db_unavailable: { ok: false, text: "資料庫暫時讀寫不了，沒有記下。" },
+};
+const NO_PENDING: Pending = { refresh: false, proposals: [] };
 type Row = { system: SystemRow; p: SystemProjection; eff: EffectiveState };
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px", textDecoration: "none" };
@@ -31,6 +41,7 @@ const RESPONSIVE = `
 .sys-right{display:flex;flex-direction:column;gap:16px}
 .sys-cards{display:none}
 .sys-row{position:relative}.sys-row:hover{background:var(--bg-subtle)}.sys-row a::after{content:"";position:absolute;inset:0}
+.sys-add{position:relative}.sys-add summary::-webkit-details-marker{display:none}.sys-type input{position:absolute;opacity:0;pointer-events:none}.sys-type{position:relative}.sys-type input:checked+span{background:var(--accent);color:var(--bg-card)}.sys-type input:focus-visible+span{outline:2px solid var(--accent)}
 .sys-icon{height:30px;width:30px;border-radius:10px;display:grid;place-items:center;background:var(--accent-light);color:var(--accent-text);font-size:14px}
 @media (max-width:1100px){.sys-board{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){.sys-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.sys-table{display:none}.sys-cards{display:block}.sys-page{padding:20px 16px!important}}
@@ -145,6 +156,43 @@ function ResumePanel({ rows }: { rows: Row[] }) {
   );
 }
 
+function AddSystemForm() {
+  const field: React.CSSProperties = { fontSize: 13, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-subtle)", color: "var(--text-primary)", minWidth: 0 };
+  return (
+    <details className="sys-add">
+      <summary className="btn-primary" style={{ listStyle: "none", cursor: "pointer", display: "inline-block", fontSize: 13, padding: "8px 14px" }}>＋ 新增系統</summary>
+      <form action={proposeNewSystem} style={{ ...panel, position: "absolute", right: 0, zIndex: 5, width: 340, maxWidth: "calc(100vw - 32px)", marginTop: 8, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+        <input name="name" required maxLength={200} placeholder="系統名稱" aria-label="系統名稱" style={field} />
+        <div role="radiogroup" aria-label="類型" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {SYSTEM_TYPES.map((t, i) => (
+            <label key={t} className="sys-type"><input type="radio" name="type" value={t} required defaultChecked={i === 0} /><span className="btn-secondary" style={smallBtn}>{TYPE_LABEL[t]}</span></label>
+          ))}
+        </div>
+        <input name="purpose" required maxLength={200} placeholder="一句話：這個系統做什麼" aria-label="用途" style={field} />
+        <button type="submit" className="btn-primary" style={{ fontSize: 13, padding: "8px 14px" }}>送出</button>
+        <div style={muted}>送出後會列在「待登記」，下一次 agent 開工時寫進系統清單。</div>
+      </form>
+    </details>
+  );
+}
+
+function PendingPanel({ pending }: { pending: Pending }) {
+  if (pending.proposals.length === 0) return null;
+  return (
+    <section style={panel}>
+      <div style={panelHead}><h2 style={{ margin: 0, fontSize: 16 }}>待登記</h2><div style={muted}>下一次 agent 開工時會寫進系統清單</div></div>
+      <div style={panelBody}>
+        {pending.proposals.map((x) => (
+          <div key={`${x.name}-${x.at}`} style={{ padding: "10px 0", borderBottom: "1px solid var(--card-border)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><strong style={{ fontSize: 14 }}>{x.name}</strong><span style={muted}>{formatTime(x.at)}</span></div>
+            <div style={muted}>{TYPE_LABEL[x.type as SystemType] ?? x.type}・{x.purpose}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function HelpCard({ rows }: { rows: Row[] }) {
   const target = recentHandoffs(rows.map((r) => ({ ...r, slug: r.system.slug, name: r.system.name, handoff: r.p.handoff })), 1)[0]?.system ?? rows[0]?.system;
   return (
@@ -156,7 +204,7 @@ function HelpCard({ rows }: { rows: Row[] }) {
   );
 }
 
-function SyncPanel({ runs }: { runs: UpdateRow[] }) {
+function SyncPanel({ runs, refreshAt }: { runs: UpdateRow[]; refreshAt: string | null }) {
   const { lastOk, latest } = importSummary(runs);
   const gaps = gapBreakdown(runs);
   const bad = latest && latest.status !== "ok";
@@ -164,6 +212,7 @@ function SyncPanel({ runs }: { runs: UpdateRow[] }) {
     <section style={panel}>
       <div style={panelHead}><h2 style={{ margin: 0, fontSize: 16 }}>資料同步狀態</h2><div style={muted}>每天 04:30 從 Git 匯入</div></div>
       <div style={panelBody}>
+        {refreshAt && <div style={{ fontSize: 13, color: "var(--accent-text)", marginBottom: 8 }}>已排入更新（約 5 分鐘內處理）</div>}
         {!latest ? <div style={muted}>還沒有任何匯入紀錄：主機匯入器尚未跑過（或尚未開啟）。</div> : (
           <>
             <div style={{ fontSize: 13, color: "var(--text-primary)" }}>最後成功匯入：<strong>{formatTime(lastOk?.at)}</strong></div>
@@ -189,17 +238,22 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
   const statusRaw = first(sp.status) ?? "";
   const statusFilter = (SYSTEM_STATUSES as readonly string[]).includes(statusRaw) || statusRaw === "unset" || statusRaw === "maintenance" ? statusRaw : "";
   const q = (first(sp.q) ?? "").trim().slice(0, 100);
+  const notice = NOTICES[first(sp.r) ?? ""];
 
   const sb = getSupabaseWriteClient();
   let failure: string | null = sb ? null : "Supabase 未設定。";
   let rows: Row[] = [];
   let runs: UpdateRow[] = [];
   let capped = false;
+  let pending: Pending = NO_PENDING;
+  let refreshAt: string | null = null;
   if (sb) {
     try {
       const [defs, state, importRuns] = await Promise.all([readDefinitions(sb), readProjectionInput(sb), readImportRuns(sb)]);
       runs = importRuns;
       capped = state.capped;
+      pending = await readPending(sb);
+      refreshAt = pending.refresh ? new Date().toISOString() : null;
       const now = Date.now();
       rows = defs.systems.map((system) => {
         const p = projectSystem({
@@ -228,8 +282,19 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
   return (
     <div style={page} className="sys-page">
       <style>{RESPONSIVE}</style>
-      <div style={{ fontSize: 11, letterSpacing: 2.2, fontWeight: 800, color: "var(--accent-text)" }}>DEVELOPMENT COMMAND CENTER</div>
-      <h1 style={{ margin: "8px 0 6px" }}>系統總控中心</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: 2.2, fontWeight: 800, color: "var(--accent-text)" }}>DEVELOPMENT COMMAND CENTER</div>
+          <h1 style={{ margin: "8px 0 6px" }}>系統總控中心</h1>
+        </div>
+        <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
+          <form action={requestSystemsRefresh}>
+            <button type="submit" className="btn-secondary" style={{ fontSize: 13, padding: "8px 14px" }} disabled={pending.refresh}>{pending.refresh ? "更新排隊中" : "◷ 立即更新"}</button>
+          </form>
+          <AddSystemForm />
+        </div>
+      </div>
+      {notice && <div style={notice.ok ? box : errorBox}>{notice.text}</div>}
       <p style={{ ...muted, fontSize: 14, marginBottom: 20 }}>不必記住每一個專案：這裡看每個系統的用途、進度、卡點與下一步。這裡只能改系統狀態與驗收功能，其餘從 Git 匯入。</p>
       {failure && <div style={errorBox}>讀不到資料：{failure}</div>}
       {capped && <div style={errorBox}>事件超過讀取上限，最舊的一段沒有算進來。</div>}
@@ -261,8 +326,9 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
           </div>
         </section>
         <div className="sys-right">
+          <PendingPanel pending={pending} />
           <ResumePanel rows={rows} />
-          <SyncPanel runs={runs} />
+          <SyncPanel runs={runs} refreshAt={refreshAt} />
           <HelpCard rows={rows} />
         </div>
       </div>

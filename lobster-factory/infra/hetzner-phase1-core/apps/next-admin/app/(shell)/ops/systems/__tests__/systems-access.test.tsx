@@ -12,12 +12,15 @@ const store = vi.hoisted(() => ({
   readImportRuns: vi.fn(),
   readRecentEvents: vi.fn(),
   readProjectionInput: vi.fn(),
+  readPending: vi.fn(),
+  requestRefresh: vi.fn(),
+  proposeSystem: vi.fn(),
   writeUserEvent: vi.fn(),
 }));
 vi.mock("@/lib/systems/store", () => store);
 
 const { default: SystemsPage } = await import("../page");
-const { setSystemStatus } = await import("../actions");
+const { setSystemStatus, requestSystemsRefresh, proposeNewSystem } = await import("../actions");
 
 const form = (fields: Record<string, string>) => {
   const f = new FormData();
@@ -31,6 +34,9 @@ beforeEach(() => {
   store.readImportRuns.mockResolvedValue([]);
   store.readProjectionInput.mockResolvedValue({ events: [], history: [], capped: false });
   store.writeUserEvent.mockResolvedValue(undefined);
+  store.readPending.mockResolvedValue({ refresh: false, proposals: [] });
+  store.requestRefresh.mockResolvedValue(undefined);
+  store.proposeSystem.mockResolvedValue(undefined);
 });
 
 describe("/ops/systems is owner / admin only", () => {
@@ -53,5 +59,31 @@ describe("/ops/systems is owner / admin only", () => {
     role.value = "owner";
     await expect(setSystemStatus(form({ system_id: SYS, slug: "outbound-os", status: "paused" }))).rejects.toThrow(/r=saved/);
     expect(store.writeUserEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: "status_change", payload: expect.objectContaining({ status: "paused" }) }));
+  });
+});
+
+describe("overview writes (立即更新 / 新增系統) are owner / admin only", () => {
+  const redirectedTo = async (run: () => Promise<void>) => {
+    try { await run(); } catch (e) { return String((e as Error).message); }
+    return "";
+  };
+  it("a non-owner is refused and nothing is written", async () => {
+    for (const r of ["viewer", "operator"]) {
+      role.value = r;
+      expect(await redirectedTo(() => requestSystemsRefresh())).toBe("REDIRECT /ops/systems?r=forbidden");
+      expect(await redirectedTo(() => proposeNewSystem(form({ name: "新系統", type: "product", purpose: "做事" })))).toBe("REDIRECT /ops/systems?r=forbidden");
+    }
+    expect(store.requestRefresh).not.toHaveBeenCalled();
+    expect(store.proposeSystem).not.toHaveBeenCalled();
+  });
+  it("an owner queues a refresh once and a proposal is written", async () => {
+    role.value = "owner";
+    expect(await redirectedTo(() => requestSystemsRefresh())).toBe("REDIRECT /ops/systems?r=refresh_queued");
+    expect(store.requestRefresh).toHaveBeenCalledTimes(1);
+    store.readPending.mockResolvedValue({ refresh: true, proposals: [] });
+    expect(await redirectedTo(() => requestSystemsRefresh())).toBe("REDIRECT /ops/systems?r=refresh_pending");
+    expect(store.requestRefresh).toHaveBeenCalledTimes(1);
+    expect(await redirectedTo(() => proposeNewSystem(form({ name: "新系統", type: "product", purpose: "做事" })))).toBe("REDIRECT /ops/systems?r=proposed");
+    expect(store.proposeSystem).toHaveBeenCalledTimes(1);
   });
 });
