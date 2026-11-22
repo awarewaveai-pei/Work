@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-22（續10）— oracle WP 第一批：E3、E4＋E4b、SF-B 程式併入；RISKS 處置（引擎線、後台線）
+
+- 併入（main，皆已 push，引擎未部署；next-admin 今晚 03:00 自動部署會帶上 SF-B 程式）：E4 `1caa8a285`、E4b `1cf4bf55b`（簽過的原文必填 `aud`＝`v1`｜`ticket`，`lib/sites/verify.ts` 在消耗 nonce 前比對，不符 401 `wrong_audience`）、SF-B 程式 `4d504c0aa`（`lib/site-flow/records.ts`：`ensureOrganization` 只補缺鍵、`ensureEnvironment` 驗站台歸屬、`provision-staging` 先寫環境列）、E3 `16d756bdd`（`lib/frontPages.ts`、`proxy.ts` 308、sitemap／robots 讓位）、`c3291e4f5`（`Projects/internal/ziwei-doushu/.next` 23 檔移出版本控制；checkpoint `5a641d872` 誤提交，使開過 dev 的機器 tsc 紅）。
+- SF-B migration `441f1ea86`（`0175_site_flow.sql`＋down）留在線4 分支，未併入、未套用：等操作者同意（WP-PLAN §6 第 1 件）。唯讀查正式庫：`sites`=3、`environments`=0、無重複 → 0175 的前置檢查會過。
+- 監工驗收：引擎 `npx tsc --noEmit` exit 0、全套 vitest 517 passed／3 skipped；next-admin `npx tsc --noEmit` exit 0、全套 vitest 5217 passed／2 failed，兩個紅燈都是本機未追蹤目錄 `app/(shell)/tools/seedstar`（別的 session 的未提交工作，不在 main）觸發的登記檢查（`lib/portal/__tests__/products.test.ts:152`、`staff-tools.test.ts:83`），與本批無關。
+- E3 回報的規格衝突：`ORACLE-WP-SPEC.md` §2-3 範例 `/{slug}/` 代入 tarot＝`/tarot/`（§2-1 歸引擎）→ 無限轉向。引擎已拒收；規格範例改 `/tools/{slug}/`，格式正本改指 `lib/frontPages.ts`。
+- RISKS 處置 18 列寫入 `data.mjs`（第一批）。要帶進後續卡的：sg-deploy smoke 打 `/zh-TW`（`sg-deploy.sh:798`）在 GO-3 設 `home` 後會 308 → 第二批監工改打 `/embed/zh-TW/ziwei`；`frontPages.ts` 註解範例 → E2 卡；外掛簽章加 `aud` → P1；環境列卡在 `provisioning` 的回收 → SF-G；部分失敗不得標 ready → SF-H；`kept_keys` 顯示 → SF-J；`app/api/build/runs/route.ts:100-230` 重複邏輯 → SF-P。
+- 共享工作區：`agency-os/WORKLOG.md` 在共用 index 有一份過期的整檔暫存（會刪掉 184 行已提交內容），擋住 ff；已 `git reset -q HEAD -- agency-os/WORKLOG.md`（只動 index，不動檔案），再跑 `ao-resume.ps1 -FullMainlineParity` 對齊。
+- 主機線 SF-C 仍在做（critic Deep 後修），SF-D 待派；該線 RISKS 交回後補進同一張表。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (ziwei-doushu 與 next-admin) | exit=0 | ms=48000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n
+- BUGHUNT_DONE: scope=Projects/internal/ziwei-doushu,agency-os,scripts,lobster-factory | grep=verifySiteRequest | hits=6
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；各卡工人 critic（E4 Deep、SF-B critic＋db-expert）＋突變測試＋監工讀 diff 代替
 ## 2026-11-22（續9）— 平台（會員／目前客戶／登入後介面）第 1 批併入：K1、K2、K3、U6＋監工台
 
 - 根因：「目前客戶」在各頁各傳各的（`siteId`／`org`／退回第一個網站），權益文字散在 `use-paid-features.ts` 的對照表；規劃見 `agency-os/handoffs/2026-11-22-platform-membership-ux/DISPATCH.md`。

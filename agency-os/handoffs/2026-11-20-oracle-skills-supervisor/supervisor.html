@@ -81,8 +81,8 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>算命站 WordPress 階段 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
-  <div class="bar" data-computed><i class="d" style="width:3.7037037037037033%"></i><i class="g" style="width:14.814814814814813%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>1</span>／<span data-computed>27</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:14.814814814814813%"></i><i class="g" style="width:7.4074074074074066%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>4</span>／<span data-computed>27</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">把 oracle.aware-wave.com 改成 WordPress 網站：算命工具嵌在可以排版的頁面裡，會員能存命盤，訂閱後每天收到運勢信；同時把「從後台開一個客戶網站」做成能一步一步按完的流程。共 <span data-computed>27</span> 張卡。</p>
@@ -99,15 +99,16 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>卡片：</b><code>briefs/WP-E1-embed-page.md</code></p>
         <p><b>併入於：</b><code>d11320883</code></p>
       </details>
-    </div></li><li class="step doing" id="E4">
+    </div></li><li class="step done" id="E4">
     <div class="n">3</div>
     <div class="b">
       <p class="plain">登入的會員用 AI 解讀時，額度記在這位會員身上，每人每天有上限；沒登入的人照現在的方式限制。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（身分驗證）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-med">風險 Medium（身分驗證）</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>假的或過期的票被拒；同一會員超過上限被擋；沒登入時行為不變。</p>
       <details><summary>細節：E4 會員票與 AI 每日上限</summary>
         <p><b>需先完成：</b>無</p>
         <p><b>卡片：</b><code>briefs/WP-E4-member-ticket.md</code></p>
+        <p><b>併入於：</b><code>1cf4bf55b</code></p>
       </details>
     </div></li><li class="step doing" id="SF-B">
     <div class="n">4</div>
@@ -129,25 +130,27 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>需先完成：</b>無</p>
         <p><b>卡片：</b><code>briefs/WP-SF-C-patch-create.md</code></p>
       </details>
-    </div></li><li class="step todo" id="A1">
+    </div></li><li class="step done" id="A1">
     <div class="n">7</div>
     <div class="b">
       <p class="plain">三份架構決策補上：同網域的內嵌框可以用；客戶網站的會員屬於該網站。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：監工</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：監工</span></p>
       <p class="donewhen"><b>完成的樣子：</b>治理文件檢查通過。</p>
       <details><summary>細節：A1 架構決策文件修訂</summary>
         <p><b>需先完成：</b>無</p>
         <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+        <p><b>併入於：</b><code>da53adac6</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#E3">E3</a>、<a href="#SF-D">SF-D</a></li><li class="step doing" id="E3">
+    </div></li><li class="grp">可同時進行：<a href="#E3">E3</a>、<a href="#SF-D">SF-D</a></li><li class="step done" id="E3">
     <div class="n">2</div>
     <div class="b">
       <p class="plain">站前面有 WordPress 時，舊的工具網址自動轉到對應的 WordPress 頁，網站地圖改由 WordPress 提供；沒有 WordPress 時一切照舊。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>打開開關後舊網址會轉向；關掉開關與現在完全相同。</p>
       <details><summary>細節：E3 舊工具網址轉到 WordPress 頁</summary>
         <p><b>需先完成：</b><a href="#E1">E1</a></p>
         <p><b>卡片：</b><code>briefs/WP-E3-front-redirect.md</code></p>
+        <p><b>併入於：</b><code>16d756bdd</code></p>
       </details>
     </div></li><li class="step todo" id="SF-D">
     <div class="n">6</div>
@@ -365,7 +368,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 
 <section id="open"><h2>到時要你點頭</h2><p class="lead">這些步驟會動到正式環境。做到那一步時才問，一次問一件。</p><ol class="open"><li><div class="n">1</div><div class="b"><p class="plain">把「網站與環境的紀錄」的資料表異動套用到正式資料庫（只新增索引與幾列預設關閉的開關，不改既有資料）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>監工套用並驗證後才推上主線。</span></li><li class=""><b>先不要</b><span>平台線停在第一批。</span></li></ul><p class="meta"><a href="#SF-G" class="who">在 <span data-computed>SF-G</span> 之前</a><span class="who">出處：WP-PLAN.md 第 6 節</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">把 MainWP 的連線金鑰放進後台容器（主機設定變更，走會自動還原的工具）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>之後新網站能自動加進 MainWP。</span></li><li class=""><b>先不要</b><span>這一步改成你手動在 MainWP 加站。</span></li></ul><p class="meta"><a href="#SF-I0" class="who">在 <span data-computed>SF-I0</span> 之前</a><span class="who">出處：SITE-FLOW 第 4 節第 3 題</span></p></div></li><li><div class="n">3</div><div class="b"><p class="plain">打開主機與後台的建站開關，建一筆測試網域的 DNS，跑一次完整的拋棄式建站再拆掉。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>跑完確認沒留下東西再關回開關。</span></li><li class=""><b>先不要</b><span>流程只在本機驗證。</span></li></ul><p class="meta"><a href="#SF-L" class="who">在 <span data-computed>SF-L</span> 之前</a><span class="who">出處：WP-PLAN.md 第 6 節</span></p></div></li><li><div class="n">4</div><div class="b"><p class="plain">部署引擎新版本（含目前所有尚未部署的引擎改動）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>失敗會自動還原到現在的版本。</span></li><li class=""><b>先不要</b><span>引擎維持 2026-11-20 的版本。</span></li></ul><p class="meta"><a href="#GO-1" class="who">在 <span data-computed>GO-1</span> 之前</a><span class="who">出處：ORACLE-WP-SPEC.md 上線</span></p></div></li><li><div class="n">5</div><div class="b"><p class="plain">改 oracle 網域的分流設定，讓 WordPress 接手引擎沒用到的網址（建置中）。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>訪客原本的網址不變；失敗自動還原。</span></li><li class=""><b>先不要</b><span>WordPress 只能在主機內部看。</span></li></ul><p class="meta"><a href="#GO-2" class="who">在 <span data-computed>GO-2</span> 之前</a><span class="who">出處：ORACLE-WP-SPEC.md 上線</span></p></div></li><li><div class="n">6</div><div class="b"><p class="plain">首頁換成 WordPress 並正式開放。</p><ul class="opts"><li class="pick"><b>同意 ★</b><span>可以一步退回建置中的狀態。</span></li><li class=""><b>先不要</b><span>維持建置中。</span></li></ul><p class="meta"><a href="#GO-3" class="who">在 <span data-computed>GO-3</span> 之前</a><span class="who">出處：ORACLE-WP-SPEC.md 上線</span></p></div></li></ol></section>
 
-<section id="risks"><h2>風險與處置</h2><p class="lead">每批一張表。工人交回的每條風險都要有處置：現在處理、實測驗證，或記下不處理的理由。</p><h3 class="sub-h">動工前（計畫審查與試驗）</h3><ul class="yn rules"><li><b>E1</b><span>工具放進內嵌框後，量整頁高度會只增不減（試驗量到 4157，實際內容 902）；引擎的工具列也會出現在框裡。<small><b>處置：</b>已寫進 E1：嵌入版不撐滿視窗、不放工具列，高度量工具本身。</small></span></li><li><b>E2</b><span>引擎與 WordPress 同網域後，引擎頁的漏洞可波及 WordPress 後台。<small><b>處置：</b>由 E2 的內容安全政策擋；GO-2 之前必須完成。</small></span></li><li><b>P1</b><span>外掛有 1 個主要問題、6 個小問題未修（第一次儲存清空對照表等）。<small><b>處置：</b>列為 P1 的必修內容；外掛尚未安裝在任何網站。</small></span></li><li><b>P3</b><span>Resend 不在 FluentCRM 內建的退信處理名單內。<small><b>處置：</b>已寫進 P3：外掛接 Resend 的退信與投訴通知，把該聯絡人標記為停寄。</small></span></li><li><b>SF-E</b><span>後台若能對正式站執行任意指令，等於能讀所有網站的會員資料。<small><b>處置：</b>已改設計：只有固定動作，不收指令內容。</small></span></li><li><b>SF-G</b><span>既有的紀錄工具在開關不存在時會自動補成「開」，寫入失敗時仍照做。<small><b>處置：</b>已改設計：建站動作不走那條路；沒有開關或寫不進紀錄就不執行。</small></span></li><li><b>GO-1</b><span>引擎拿到的訪客位址可能是主機自己的位址，限流會把所有人算成同一個來源。<small><b>處置：</b>部署前在主機實測確認，不對就先修分流設定。</small></span></li><li><b>GO-2</b><span>Kadence 佈景、真手機、英文頁網址代稱、正式主機兩層分流都還沒試。<small><b>處置：</b>在建置中階段逐項實測，有問題不進 GO-3。</small></span></li></ul><h3 class="sub-h">第一批</h3><p class="lead">這一批的工人尚未交回。</p></section>
+<section id="risks"><h2>風險與處置</h2><p class="lead">每批一張表。工人交回的每條風險都要有處置：現在處理、實測驗證，或記下不處理的理由。</p><h3 class="sub-h">動工前（計畫審查與試驗）</h3><ul class="yn rules"><li><b>E1</b><span>工具放進內嵌框後，量整頁高度會只增不減（試驗量到 4157，實際內容 902）；引擎的工具列也會出現在框裡。<small><b>處置：</b>已寫進 E1：嵌入版不撐滿視窗、不放工具列，高度量工具本身。</small></span></li><li><b>E2</b><span>引擎與 WordPress 同網域後，引擎頁的漏洞可波及 WordPress 後台。<small><b>處置：</b>由 E2 的內容安全政策擋；GO-2 之前必須完成。</small></span></li><li><b>P1</b><span>外掛有 1 個主要問題、6 個小問題未修（第一次儲存清空對照表等）。<small><b>處置：</b>列為 P1 的必修內容；外掛尚未安裝在任何網站。</small></span></li><li><b>P3</b><span>Resend 不在 FluentCRM 內建的退信處理名單內。<small><b>處置：</b>已寫進 P3：外掛接 Resend 的退信與投訴通知，把該聯絡人標記為停寄。</small></span></li><li><b>SF-E</b><span>後台若能對正式站執行任意指令，等於能讀所有網站的會員資料。<small><b>處置：</b>已改設計：只有固定動作，不收指令內容。</small></span></li><li><b>SF-G</b><span>既有的紀錄工具在開關不存在時會自動補成「開」，寫入失敗時仍照做。<small><b>處置：</b>已改設計：建站動作不走那條路；沒有開關或寫不進紀錄就不執行。</small></span></li><li><b>GO-1</b><span>引擎拿到的訪客位址可能是主機自己的位址，限流會把所有人算成同一個來源。<small><b>處置：</b>部署前在主機實測確認，不對就先修分流設定。</small></span></li><li><b>GO-2</b><span>Kadence 佈景、真手機、英文頁網址代稱、正式主機兩層分流都還沒試。<small><b>處置：</b>在建置中階段逐項實測，有問題不進 GO-3。</small></span></li></ul><h3 class="sub-h">第一批（引擎線與後台線；主機線 SF-C、SF-D 交回後補）</h3><ul class="yn rules"><li><b>E1</b><span>字型設定在兩個版面檔各寫一份。<small><b>處置：</b>不處理：嵌入版必須是獨立的版面，框架不允許共用；兩處註解已互相指到對方。</small></span></li><li><b>E1</b><span>合婚的嵌入版只驗了版面，沒有驗送出後的結果。<small><b>處置：</b>實測：監工看過繁中、英文、手機寬度的版面；送出結果在 P1 驗收時於 WordPress 頁面裡實測 12 個工具。</small></span></li><li><b>E3</b><span>規格的網址範例會讓塔羅頁無限轉向（WordPress 頁網址撞到引擎自己的路徑）。<small><b>處置：</b>已處理：引擎會拒收這種設定；規格範例改成工具頁放在 /tools/ 底下。</small></span></li><li><b>E3</b><span>部署後的自動檢查會打引擎首頁；首頁換成 WordPress 後它會被判失敗並自動退回。<small><b>處置：</b>現在處理：第二批由監工把檢查改打嵌入版頁面，GO-1 之前完成。</small></span></li><li><b>E3</b><span>網站地圖改成每次請求才產生，快取標頭可能與現在不同。<small><b>處置：</b>GO-1 部署後實測比對標頭，不同就修。</small></span></li><li><b>E3</b><span>建置產物被誤放進版本控制，開過本機預覽後型別檢查會變紅。<small><b>處置：</b>已處理：移出版本控制（c3291e4f5）。</small></span></li><li><b>E3</b><span>程式註解裡的設定範例還是會被拒收的那一種。<small><b>處置：</b>現在處理：併入第二批 E2 卡順手改。</small></span></li><li><b>E4</b><span>會員拿到的票可以原樣拿去打站台專用接口，白扣站台額度。<small><b>處置：</b>已處理：每份簽過的內容都註明用途，用途不對在扣額度前就拒絕（1cf4bf55b）。外掛端在 P1 配合。</small></span></li><li><b>E4</b><span>不登入就不受每日上限限制，只受每個來源每分鐘 10 次限制。<small><b>處置：</b>不處理：每日上限是登入會員之間的公平額度，不是成本上限；成本由來源限流與 AI 供應商帳戶上限把關。</small></span></li><li><b>E4</b><span>每日計數放在記憶體，引擎重啟會歸零。<small><b>處置：</b>不處理：引擎只有一個行程，重啟只在部署時發生；最壞情況是當天多給幾次。</small></span></li><li><b>E4</b><span>簽章格式直接改、不留舊格式。<small><b>處置：</b>GO-1 前實測確認正式環境沒有已登記的站台（目前引擎未部署新版）。</small></span></li><li><b>SF-B</b><span>建站做到一半程序中斷時，環境紀錄會停在「建立中」。<small><b>處置：</b>現在處理：寫進第二批 SF-G，骨架要能把逾時的步驟標成失敗並可重跑。</small></span></li><li><b>SF-B</b><span>舊的建站接口在部分失敗時仍把環境標成「就緒」。<small><b>處置：</b>現在處理：寫進第三批 SF-H，檢查通過才標就緒；舊接口在 SF-P 退場。</small></span></li><li><b>SF-B</b><span>舊的建站接口現在要求網站紀錄先存在；正式資料庫的既有資料沒查過。<small><b>處置：</b>已實測（唯讀查正式庫）：3 筆網站、0 筆環境、沒有重複，資料表異動可以直接套用。</small></span></li><li><b>SF-B</b><span>另一支接口還有一份重複的「建立客戶」邏輯沒收進來。<small><b>處置：</b>現在處理：寫進第四批 SF-P，舊頁退場時一起刪。</small></span></li><li><b>SF-B</b><span>重複送出建立客戶時，沒被套用的欄位只在回應裡列出，舊頁面沒顯示。<small><b>處置：</b>現在處理：寫進第三批 SF-J，新頁面要顯示「這些值沒有套用」。</small></span></li><li><b>SF-B</b><span>兩個端點同時改同一個客戶的設定時，後寫的會蓋掉先寫的。<small><b>處置：</b>不處理：後台只有操作者一人使用，同時改同一個客戶的機率極低；SF-G 的步驟不寫這個欄位。</small></span></li><li><b>E4</b><span>（第一批各卡共通）Codex 額度到 2026-11-24 才恢復，沒有做跨模型審查。<small><b>處置：</b>已用替代：每張卡工人各跑一輪獨立審查，身分驗證與資料模型加跑第二種審查並做突變測試；監工讀完整 diff。</small></span></li></ul></section>
 
 <section id="paths"><h2>檔案</h2><div class="paths"><div><b>派工與驗收</b><code>agency-os/handoffs/2026-11-20-oracle-skills-supervisor/WP-PLAN.md</code></div><div><b>產品規格</b><code>agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md</code></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-11-20-oracle-skills-supervisor/</code><br>修改 data.mjs 後，執行 node build.mjs 和 node check.mjs，再重新發布到同一個網址。</span></div></div></section>
 </main>
