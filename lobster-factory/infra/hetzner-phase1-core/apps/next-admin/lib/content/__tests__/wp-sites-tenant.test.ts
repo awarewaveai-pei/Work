@@ -60,15 +60,22 @@ describe("resolveWpSite — 租戶邊界", () => {
     await expect(resolveWpSite(clientA, "site-x")).rejects.toBeInstanceOf(OrgAccessError);
   });
 
-  it("未指定 siteId：staff 取第一個（維持舊行為，前端有不帶 siteId 的呼叫）", async () => {
-    const r = await resolveWpSite(staff, "");
-    expect(r?.site.id).toBe("site-a");
+  it("K6 未指定 siteId：staff → null，不再取第一個（員工的「第一個」＝某個別人的客戶）", async () => {
+    expect(await resolveWpSite(staff, "")).toBeNull();
+    expect(await resolveWpSite(staff, undefined)).toBeNull();
+    expect(await resolveWpSite(staff, "   ")).toBeNull();
   });
 
-  it("未指定 siteId：client 取到的是**自己的**站，不是清單第一個", async () => {
+  it("K6 未指定 siteId：單站客戶自動選自己的站（ADR 020），不是清單第一個", async () => {
     const clientB = req({ "x-ops-user-kind": "client", "x-ops-org-id": ORG_B });
-    const r = await resolveWpSite(clientB, "");
-    expect(r?.site.id).toBe("site-b"); // 不是 site-a
+    expect((await resolveWpSite(clientB, ""))?.site.id).toBe("site-b"); // 不是 site-a
+    expect((await resolveWpSite(orgIdentity(ORG_A), null))?.site.id).toBe("site-a"); // 排程身分同規則
+  });
+
+  it("K6 未指定 siteId：多站客戶 → null（不猜哪一站）", async () => {
+    mockSites([...ROWS, { id: "site-a2", name: "A 第二站", url: "https://a2.example", token: "ta2", color: "#444", username: "ua2", organization_id: ORG_A }]);
+    expect(await resolveWpSite(clientA, "")).toBeNull();
+    expect((await resolveWpSite(clientA, "site-a2"))?.site.id).toBe("site-a2"); // 指定仍照常
   });
 
   it("client 無 org 綁定 + 未指定 siteId → null（拿不到任何站）", async () => {

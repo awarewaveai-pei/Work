@@ -1,5 +1,5 @@
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { assertOrgAccess, canAccessOrg, staffOnly } from "@/lib/tenant-guard";
+import { assertOrgAccess, canAccessOrg, staffOnly, userKindOf } from "@/lib/tenant-guard";
 
 export interface WpSite {
   id: string;
@@ -100,11 +100,12 @@ export interface ResolvedWpSite {
  * 呼叫者都能對**任一客戶的 WordPress** 發文或改文。修法不是在 7 個地方各補一次
  * assertOrgAccess —— 那等於把同一條規則抄七遍，遲早分叉。收斂成一個函式，改一次全部生效。
  *
- * `siteId` 省略時**保留** 「取第一個」的既有行為，但範圍縮成「呼叫者有權存取的第一個」。
- * 不直接砍掉這個後備：前端確實有不帶 siteId 的呼叫（ContentStudio.tsx:1087、:1260 等
- * `selectedSiteId ? ... : ""`），砍掉會讓「還沒選站」的畫面直接壞掉。
+ * `siteId` 省略時不猜（K6，ADR 020：目前客戶只由網址 org／site 決定）。唯一例外：**客戶身分**
+ * 且有權存取的站恰好 1 個 → 那一站（ADR 020 單站自動選；排程的 orgIdentity 也是客戶身分）。
+ * 其餘（員工、多站客戶、零站客戶）→ null。員工沒有「自己的站」，舊的「取第一個」對員工＝某個
+ * 別人的客戶，發文或讀分類會落到錯的網站。
  *
- * @returns null = 找不到該站（呼叫端回 404）
+ * @returns null = 找不到該站，或未指定且不屬單站客戶（呼叫端回 404／空結果）
  * @throws OrgAccessError = 找得到但不屬於呼叫者（呼叫端回 403）。兩者刻意分開：
  *   404 與 403 對 staff 是不同的事實，混成一種會讓除錯時分不出「打錯 id」與「沒權限」。
  */
@@ -121,9 +122,11 @@ export async function resolveWpSite(
     if (!site) return null;
     assertOrgAccess(req, site.organizationId); // 明確指定 → 不符即 403
   } else {
-    // 未指定 → 呼叫者有權存取的第一個（staff 等同舊的 sites[0]）
-    site = sites.find((s) => canAccessOrg(req, s.organizationId));
-    if (!site) return null;
+    // 未指定 → 只有客戶身分且可存取恰 1 站才自動選；員工永遠 null（canAccessOrg 對員工全真，不可拿來挑站）
+    if (userKindOf(req.headers) !== "client") return null;
+    const own = sites.filter((s) => canAccessOrg(req, s.organizationId));
+    if (own.length !== 1) return null;
+    site = own[0];
   }
 
   const token = tokens[site.id] ?? "";
