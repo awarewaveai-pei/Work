@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resetHandoffNonces, signHandoff, wpHandoff, type HandoffDeps } from "../sources/awarewave-wp";
+import { productRight, resetHandoffNonces, signHandoff, wpHandoff, wpSummary, type HandoffDeps, type SummaryDeps } from "../sources/awarewave-wp";
+import { pickEntitlementRow, type BillingAccount } from "@/lib/entitlements/tables";
+import type { EntitlementRecord } from "@/lib/entitlements/can";
+import { servedNextAdminProducts } from "@/lib/portal/doors";
 import { readWpToken } from "@/app/login/wp/WpSignIn";
 import { createPrivateKey, sign } from "node:crypto";
 import fixture from "@/lib/payments/__tests__/fixtures/ed25519-v1.json";
@@ -154,5 +157,157 @@ describe("WordPress one-time sign-in into a product door (ADR 015 order 1, 4b-4)
     expect(readWpToken("#token_hash=abc&type=recovery")).toBe("abc");
     expect(readWpToken("#token_hash=abc&type=magiclink")).toBeNull();
     expect(readWpToken("")).toBeNull();
+  });
+});
+
+// ---------- POST /api/auth/wp-summary (blueprint §2A.4, ADR 021 G13) ----------
+const BILLING: BillingAccount = {
+  organization_id: "org-1", name: "Soulful Expression", slug: "soulful", kind: "customer", all_features: null,
+  balance: 1240, hold: null,
+  contracts: [{ id: "c1", product_key: "content", plan_key: "p", status: "active", started_at: "2026-10-01", current_period_end: "2026-12-31T00:00:00Z", source_ref: "woo-9" }],
+  grants: [{ product_key: "content", source: "contract", source_ref: "woo-9", state: "active", features: 13, ends_at: null },
+    { product_key: "social", source: "comp", source_ref: "staff", state: "active", features: 4, ends_at: "2026-12-01T00:00:00Z" }],
+  expired_grants: 0,
+  ledger: [{ at: "2026-11-20", units: -5, entry_type: "debit", reference_type: "x", reference_id: "r1" }],
+  payments: [{ at: "t", provider: "woocommerce", event_id: "evt_secret", kind: "k", result: null }],
+};
+const sreq = (o: object = {}) => JSON.stringify({ wp_user_id: 57, ts: NOW, nonce: "s-0123456789abcdef", ...o });
+const door = (k: string) => servedNextAdminProducts().find((p) => p.key === k)!;
+type Row = { feature_key: string; source: string; limits: Record<string, unknown> | null };
+// content: a subscription, the last two features charged to the wallet; social: a gift of every feature
+const ROWS: Record<string, Row[]> = {
+  content: door("content").features.map((f, i, all) => ({ feature_key: f.feature_key, source: "contract", limits: i >= all.length - 2 ? { pay: "credits" } : {} })),
+  social: door("social").features.map((f) => ({ feature_key: f.feature_key, source: "comp", limits: {} })),
+};
+function sdeps(over: { billing?: BillingAccount | null; account?: typeof ACCOUNT | null; confirmed?: string | null; held?: string[]; rows?: Record<string, Row[]> } = {}) {
+  const { d } = deps({ account: over.account, confirmed: over.confirmed });
+  const s: SummaryDeps = { db: d.db, site: d.site, find: d.find, now: d.now,
+    held: vi.fn(async () => (over.held ?? ["content", "social"]).map(door)),
+    account: vi.fn(async () => (over.billing === undefined ? BILLING : over.billing)),
+    // the store's answer: the row pickEntitlementRow picks among the product's rows of that feature
+    entitlement: vi.fn(async ({ productKey, featureKey }: { productKey: string; featureKey: string }) => {
+      const row = pickEntitlementRow(((over.rows ?? ROWS)[productKey] ?? []).filter((r) => r.feature_key === featureKey));
+      return row ? ({ ...row, limits: row.limits ?? {} } as unknown as EntitlementRecord) : null;
+    }) };
+  return s;
+}
+const scall = (body: string, d: SummaryDeps, sig: string | null = signHandoff(body, SECRET), env: Record<string, string | undefined> = ENV) => wpSummary(body, sig, env, d);
+const ok = async (d: SummaryDeps, nonce = "s-0123456789abcdef") => {
+  const out = await scall(sreq({ nonce }), d);
+  if (out.ok === false) throw new Error(out.error);
+  return out;
+};
+
+describe("WordPress My Account summary (POST /api/auth/wp-summary)", () => {
+  beforeEach(() => resetHandoffNonces());
+
+  it("a member gets the unit, wallet and every member door: held ones with kind, rightLabel's badge, counts and URL", async () => {
+    const d = sdeps();
+    const out = await ok(d);
+    const n = (k: string) => door(k).features.length;
+    expect(out.unit).toEqual({ name: "Soulful Expression" });
+    expect(out.wallet).toEqual({ balance: 1240, frozen: false });
+    expect(out.fetched_at).toBe(new Date(NOW * 1000).toISOString());
+    expect(out.products.map((p) => p.key)).toEqual(servedNextAdminProducts().map((p) => p.key));
+    const by = (k: string) => out.products.find((p) => p.key === k);
+    expect(by("content")).toEqual({ key: "content", name: "內容行銷", can_enter: true, url: "https://content.aware-wave.com/",
+      right: { kind: "contract", label: "方案內", until: "2026-12-31T00:00:00Z", counts: { covered: n("content") - 2, gift: 0, credits: 2, locked: 0 } } });
+    expect(by("social")).toEqual({ key: "social", name: "社群發文", can_enter: true, url: "https://social.aware-wave.com/",
+      right: { kind: "comp", label: "贈送", until: "2026-12-01T00:00:00Z", counts: { covered: 0, gift: n("social"), credits: 0, locked: 0 } } });
+    // not held: 未開通, no URL, nothing read for it
+    expect(by("video")).toEqual({ key: "video", name: "影片製作", can_enter: false,
+      right: { kind: "none", label: "未開通", counts: { covered: 0, gift: 0, credits: 0, locked: n("video") } } });
+    expect(d.entitlement).toHaveBeenCalledTimes(door("content").features.length + door("social").features.length);
+    // the held list is the app's entitlements of the member's own unit, never WooCommerce orders
+    expect(d.held).toHaveBeenCalledWith("org-1", undefined, NOW);
+  });
+
+  it("kind from the real source: trial, a credit pack alone, a contract row without a subscription (no badge), missing rows locked", async () => {
+    const trial = await ok(sdeps({ held: ["content"], billing: { ...BILLING, contracts: [{ ...BILLING.contracts[0], status: "trial" }] } }), "s-t-0123456789abcdef");
+    expect(trial.products.find((p) => p.key === "content")!.right).toMatchObject({ kind: "trial", label: "試用中" });
+    const noSub = { ...BILLING, contracts: [], grants: [] };
+    const pack = await ok(sdeps({ held: ["tarot"], billing: noSub, rows: { tarot: [{ feature_key: door("tarot").features[0].feature_key, source: "contract", limits: { pay: "credits" } }] } }), "s-k-0123456789abcdef");
+    const tarot = pack.products.find((p) => p.key === "tarot")!;
+    expect(tarot.right).toEqual({ kind: "credits", label: "扣點", counts: { covered: 0, gift: 0, credits: 1, locked: door("tarot").features.length - 1 } });
+    const staff = await ok(sdeps({ held: ["social"], billing: noSub, rows: { social: [{ feature_key: door("social").features[0].feature_key, source: "contract", limits: {} }] } }), "s-c-0123456789abcdef");
+    expect(staff.products.find((p) => p.key === "social")!.right).toMatchObject({ kind: "contract", label: null, counts: { covered: 1 } });
+  });
+
+  it("answers only for the member's own unit: no other unit, no parent, no payment events or provider", async () => {
+    const d = sdeps();
+    const text = JSON.stringify(await scall(sreq(), d));
+    expect(d.account).toHaveBeenCalledTimes(1);
+    expect(d.account).toHaveBeenCalledWith("org-1", d.db);
+    expect(d.held).toHaveBeenCalledTimes(1);
+    for (const leak of ["org-1", "woocommerce", "evt_secret", "woo-9", "provider", "payments", "ledger", "soulful"]) expect(text).not.toContain(leak);
+    // a brand (child org): billing_account answers with its root -- the root's name and wallet are not this member's to see
+    const brand = sdeps({ billing: { ...BILLING, organization_id: "org-root", name: "Parent Co" } });
+    await expect(scall(sreq({ nonce: "s-b-0123456789abcdef" }), brand)).resolves.toEqual({ ok: false, status: 403, error: "brand_unit_unsupported" });
+    expect(brand.held).not.toHaveBeenCalled();
+  });
+
+  it("not_a_member: no billing identity for this WordPress user", async () => {
+    const d = sdeps({ account: null });
+    await expect(scall(sreq(), d)).resolves.toEqual({ ok: false, status: 404, error: "not_a_member" });
+    expect(d.account).not.toHaveBeenCalled();
+  });
+
+  it("email_unverified: an email never proven gets nothing", async () => {
+    const d = sdeps({ confirmed: null });
+    await expect(scall(sreq(), d)).resolves.toEqual({ ok: false, status: 403, error: "email_unverified" });
+    expect(d.account).not.toHaveBeenCalled();
+  });
+
+  it("source_disabled while the key is unset, empty, blank or short -- production today; never 'no key, no check'", async () => {
+    for (const env of [{}, { AUTH_WP_HANDOFF_SECRET: "" }, { AUTH_WP_HANDOFF_SECRET: " ".repeat(40) }, { AUTH_WP_HANDOFF_SECRET: "short" }]) {
+      const d = sdeps();
+      for (const sig of [null, "", signHandoff(sreq(), "")]) {
+        await expect(scall(sreq(), d, sig, env)).resolves.toEqual({ ok: false, status: 404, error: "source_disabled" });
+      }
+      expect(d.find).not.toHaveBeenCalled();
+    }
+  });
+
+  it("invalid_signature: forged, edited, another key, or another seller site's key", async () => {
+    const d = sdeps();
+    for (const sig of [null, "", signHandoff(sreq(), SECRET + "x"), signHandoff(sreq({ wp_user_id: 58 }), SECRET), signShop(sreq())]) {
+      await expect(scall(sreq(), d, sig)).resolves.toEqual({ ok: false, status: 401, error: "invalid_signature" });
+    }
+    expect(d.find).not.toHaveBeenCalled();
+    // a seller site signing with its own key is refused: the summary is aware-wave.com's only
+    const shop = sreq({ key_id: "shop-b", nonce: "s-s-0123456789abcdef" });
+    await expect(scall(shop, d, signShop(shop))).resolves.toEqual({ ok: false, status: 403, error: "login_source_not_allowed" });
+    expect(d.find).not.toHaveBeenCalled();
+  });
+
+  it("stale_request: ts more than 60 s either way, or not a number", async () => {
+    const d = sdeps();
+    for (const ts of [NOW - 61, NOW + 61, String(NOW), undefined]) {
+      await expect(scall(sreq({ ts }), d)).resolves.toEqual({ ok: false, status: 401, error: "stale_request" });
+    }
+    await expect(scall(sreq({ ts: NOW - 60 }), d)).resolves.toMatchObject({ ok: true });
+  });
+
+  it("replayed_request: a nonce once, shared with wp-handoff; a hand-off body is not a summary request", async () => {
+    const d = sdeps();
+    await expect(scall(sreq(), d)).resolves.toMatchObject({ ok: true });
+    await expect(scall(sreq(), d)).resolves.toEqual({ ok: false, status: 401, error: "replayed_request" });
+    // a nonce spent on a hand-off cannot be spent again here
+    const { d: hd } = deps();
+    await expect(call(req({ nonce: "s-h-0123456789abcdef" }), hd)).resolves.toMatchObject({ ok: true });
+    await expect(scall(sreq({ nonce: "s-h-0123456789abcdef" }), d)).resolves.toEqual({ ok: false, status: 401, error: "replayed_request" });
+    // a signed hand-off body replayed at the summary is refused
+    await expect(scall(req({ nonce: "s-p-0123456789abcdef" }), d)).resolves.toEqual({ ok: false, status: 400, error: "unexpected_product_key" });
+  });
+
+  it("productRight: trial, lapsing and unknown sources come from the account, nothing guessed", () => {
+    const acc = (o: Partial<BillingAccount>): BillingAccount => ({ ...BILLING, contracts: [], grants: [], ...o });
+    const c = (status: string) => ({ id: "c", product_key: "video", plan_key: "p", status, started_at: null, current_period_end: "2026-12-05", source_ref: null });
+    const g = (source: string) => ({ product_key: "video", source, source_ref: null, state: "active", features: 1, ends_at: null });
+    expect(productRight(acc({ contracts: [c("trial")] }), "video")).toEqual({ source: "contract", contractStatus: "trial", endsAt: "2026-12-05" });
+    expect(productRight(acc({ contracts: [c("canceled")], grants: [g("comp")] }), "video")).toEqual({ source: "comp", contractStatus: null, endsAt: null });
+    expect(productRight(acc({ contracts: [c("past_due")] }), "video")).toMatchObject({ source: "contract", contractStatus: "past_due" });
+    expect(productRight(acc({ grants: [g("contract")] }), "video")).toEqual({ source: null, contractStatus: null, endsAt: null });
+    expect(productRight(acc({ contracts: [c("active")] }), "tarot")).toEqual({ source: null, contractStatus: null, endsAt: null });
   });
 });

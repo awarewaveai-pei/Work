@@ -8,8 +8,13 @@ export type DoorLinkOutcome =
   | { ok: true; url: string }
   | { ok: false; status: 403 | 503; error: "auth_lookup_failed" | "not_this_account" | "email_unverified" | "link_failed" };
 
-/** `next`: where the door's /login/wp page sends the person after the exchange; the caller has already restricted it. */
-export async function mintDoorLink(db: SupabaseClient, account: { userId: string; organizationId: string }, host: string, next?: string): Promise<DoorLinkOutcome> {
+export type DoorAccountCheck =
+  | { ok: true; email: string }
+  | { ok: false; status: 403 | 503; error: "auth_lookup_failed" | "not_this_account" | "email_unverified" };
+
+/** Whether this account may be shown or signed in from a cash-register site: still this organization's client, with an
+ *  email the person proved. wp-handoff (through mintDoorLink) and wp-summary ask this one copy. */
+export async function checkDoorAccount(db: SupabaseClient, account: { userId: string; organizationId: string }): Promise<DoorAccountCheck> {
   const { data: got, error: getErr } = await db.auth.admin.getUserById(account.userId);
   if (getErr || !got?.user?.email) return { ok: false, status: 503, error: "auth_lookup_failed" };
   // Still this organization's client (as client-invite.ts belongsTo): a later app_metadata change must not open a door.
@@ -22,7 +27,14 @@ export async function mintDoorLink(db: SupabaseClient, account: { userId: string
   // check, registering on aware-wave.com with someone else's address would hand that address's account to the payer
   // and fake the 0103 proof. The first entry is always the mailed link. (critic 2026-10-25 High)
   if (!got.user.email_confirmed_at) return { ok: false, status: 403, error: "email_unverified" };
-  const { data: link, error: linkErr } = await db.auth.admin.generateLink({ type: "recovery", email: got.user.email });
+  return { ok: true, email: got.user.email };
+}
+
+/** `next`: where the door's /login/wp page sends the person after the exchange; the caller has already restricted it. */
+export async function mintDoorLink(db: SupabaseClient, account: { userId: string; organizationId: string }, host: string, next?: string): Promise<DoorLinkOutcome> {
+  const checked = await checkDoorAccount(db, account);
+  if (checked.ok === false) return checked;
+  const { data: link, error: linkErr } = await db.auth.admin.generateLink({ type: "recovery", email: checked.email });
   const hashed = link?.properties?.hashed_token;
   // generateLink goes by email; it must have resolved the same account (an email changed in between is not this member).
   if (linkErr || !hashed || link.user?.id !== account.userId) return { ok: false, status: 503, error: "link_failed" };
