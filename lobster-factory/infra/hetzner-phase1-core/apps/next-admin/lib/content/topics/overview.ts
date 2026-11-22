@@ -37,6 +37,11 @@ export interface OverviewRow {
   problem: boolean;
 }
 
+/** The one rule for "this client has a problem" (the overview rows and the clients landing list both call it). */
+export function hasProblem(p: { lastError: string | null; failed: number; notOpened: boolean }): boolean {
+  return Boolean(p.lastError) || p.failed > 0 || p.notOpened;
+}
+
 const IN_PROGRESS: ReadonlySet<TopicStatus> = new Set(["generating", "drafted", "waiting_video", "embedded", "publishing"]);
 
 export function buildOverview(input: OverviewInput): OverviewRow[] {
@@ -57,7 +62,7 @@ export function buildOverview(input: OverviewInput): OverviewRow[] {
       pending: mine.filter((t) => t.status === "proposed").length,
       inProgress: mine.filter((t) => IN_PROGRESS.has(t.status)).length,
       failed, notOpened, spendUsd: input.spendUsd[s.organizationId] ?? 0,
-      problem: Boolean(lastError) || failed > 0 || notOpened,
+      problem: hasProblem({ lastError, failed, notOpened }),
     };
   });
   const rank = (r: OverviewRow) => (r.problem ? 0 : r.pending > 0 ? 1 : 2);

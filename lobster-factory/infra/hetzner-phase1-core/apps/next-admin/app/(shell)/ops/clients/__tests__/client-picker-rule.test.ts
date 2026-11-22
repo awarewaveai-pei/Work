@@ -21,6 +21,7 @@ const CLIENT_LISTS: readonly RegExp[] = [
  *  the test -- a new entry needs a reason a reviewer can check. */
 const NOT_A_PICKER: Readonly<Record<string, string>> = {
   "app/video/(wb)/schedule/ScheduleWorkbench.tsx": "reads the current client's name for the empty-queue line (?first=1&include=); draws no menu",
+  "app/(shell)/ops/clients/page.tsx": "reads the nav's first page of clients only to answer which of them have a content problem (loadClientProblems); lists the problem ones as links, no client menu (the layout's nav is the picker)",
 };
 
 /** The source's tokens without comments (a comment may name a route): the parsed tree's leaves, so a "/*" inside a

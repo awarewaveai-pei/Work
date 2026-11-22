@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
+import { withContext } from "@/lib/client-context/contract";
 import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
@@ -207,12 +208,13 @@ function IntegrationTile({ name, status }: { name: string; status: "active" | "f
 
 // ── Tab content ───────────────────────────────────────────────────────────────
 
-function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg" | "wpSites">) {
-  const site = wpSites[0];
-  const siteId = site?.id;
+/** One site's brand voice + Content Studio links; the tab draws one of these per site (state is per block, so several
+ *  sites of one client are each edited and saved on their own). */
+function SiteContentBlock({ org, site }: { org: ClientHubTabsProps["org"]; site: WpSiteStub }) {
+  const siteId = site.id;
 
   const [defaults, setDefaults] = useState<SiteContentDefaults>(
-    () => (site?.content_defaults ?? {}) as SiteContentDefaults,
+    () => (site.content_defaults ?? {}) as SiteContentDefaults,
   );
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -251,10 +253,6 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
   }
 
   async function save() {
-    // 這個客戶沒有 wp_sites 列時，按鈕原本按了完全沒反應。siteId 現在來自 page.tsx 的
-    // organization_id 查詢（不再用 hostname 猜），所以「查不到列」正是那個查詢出錯時會有的
-    // 樣子 —— 靜默 return 會讓它隱形。
-    if (!siteId) { setSaveMsg("此客戶尚未連接 WP 網站（wp_sites 無對應列），無法儲存"); return; }
     setSaving(true);
     setSaveMsg(null);
     try {
@@ -287,36 +285,8 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
 
   return (
     <>
-      {/* ── WP 連線 ──────────────────────────────────────────────────────── */}
-      <Card title="WP 連線" action={
-        <Link href="/tools/content/sites" style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none" }}>
-          管理連線 →
-        </Link>
-      }>
-        {wpSites.length === 0 ? (
-          <NoData>
-            未找到對應此客戶的 WP 連線。<br />
-            <Link href="/tools/content/sites" style={{ color: "var(--accent-text)", textDecoration: "none" }}>
-              + 新增 WP 連線
-            </Link>
-          </NoData>
-        ) : (
-          wpSites.map((s) => (
-            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color ?? "var(--text-muted)", flexShrink: 0 }} />
-              <span style={{ flex: 1, fontWeight: 500 }}>{s.name}</span>
-              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{s.url.replace(/^https?:\/\//, "")}</span>
-              <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: s.active ? "var(--badge-green-bg)" : "var(--badge-red-bg)", color: s.active ? "var(--badge-green-text)" : "var(--badge-red-text)" }}>
-                {s.active ? "已連線" : "停用"}
-              </span>
-            </div>
-          ))
-        )}
-      </Card>
-
       {/* ── 品牌 & 文章設定（可編輯）───────────────────────────────────── */}
-      {wpSites.length > 0 && (
-        <Card title="品牌聲音（Brand Voice）" action={
+        <Card title={`品牌聲音（Brand Voice）· ${site.name}`} action={
           saveMsg ? (
             <span style={{ fontSize: 11, color: saveMsg.startsWith("已") ? "var(--green)" : "var(--red)" }}>{saveMsg}</span>
           ) : (
@@ -538,28 +508,62 @@ function ContentTab({ org, cfg, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg
             </button>
           </div>
         </Card>
-      )}
 
       {/* ── Content Studio 快速入口 ──────────────────────────────────────── */}
-      <Card title="Content Studio">
+      <Card title={`Content Studio · ${site.name}`}>
         <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10, lineHeight: 1.7 }}>
           在 Content Studio 中為此客戶生成 SEO 文章，品牌設定自動套用。
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link
-            href={siteId ? `/tools/content?siteId=${siteId}` : "/tools/content"}
+            href={withContext("/tools/content", { org: org.id, site: siteId })}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6, background: "var(--accent)", color: "var(--btn-primary-text)", fontSize: 12, fontWeight: 500, textDecoration: "none" }}
           >
             ✍ 開啟 Content Studio
           </Link>
           <Link
-            href={siteId ? `/tools/content?siteId=${siteId}` : "/tools/content"}
+            href={withContext("/tools/content", { org: org.id, site: siteId })}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 6, border: "1px solid var(--card-border)", background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 12, textDecoration: "none" }}
           >
             📝 內容編輯
           </Link>
         </div>
       </Card>
+    </>
+  );
+}
+
+function ContentTab({ org, wpSites }: Pick<ClientHubTabsProps, "org" | "cfg" | "wpSites">) {
+  return (
+    <>
+      {/* ── WP 連線 ──────────────────────────────────────────────────────── */}
+      <Card title="WP 連線" action={
+        <Link href="/tools/content/sites" style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none" }}>
+          管理連線 →
+        </Link>
+      }>
+        {wpSites.length === 0 ? (
+          <NoData>
+            未找到對應此客戶的 WP 連線。<br />
+            <Link href="/tools/content/sites" style={{ color: "var(--accent-text)", textDecoration: "none" }}>
+              + 新增 WP 連線
+            </Link>
+          </NoData>
+        ) : (
+          wpSites.map((s) => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.color ?? "var(--text-muted)", flexShrink: 0 }} />
+              <span style={{ flex: 1, fontWeight: 500 }}>{s.name}</span>
+              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{s.url.replace(/^https?:\/\//, "")}</span>
+              <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: s.active ? "var(--badge-green-bg)" : "var(--badge-red-bg)", color: s.active ? "var(--badge-green-text)" : "var(--badge-red-text)" }}>
+                {s.active ? "已連線" : "停用"}
+              </span>
+            </div>
+          ))
+        )}
+      </Card>
+
+      {wpSites.map((site) => <SiteContentBlock key={site.id} org={org} site={site} />)}
     </>
   );
 }

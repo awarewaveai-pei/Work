@@ -11,7 +11,7 @@ import { planDueDeps } from "./plan-due";
 import { recentTopicActual } from "./actual-cost";
 import type { TopicActual } from "./cost";
 import { trendGeosFor } from "./plan";
-import { buildOverview, type OverviewRow } from "./overview";
+import { buildOverview, hasProblem, type OverviewRow } from "./overview";
 import { monthKey, taipeiParts, type TopicSource, type TopicStatus } from "./store";
 
 /** Step ① of a site: what the daily trend collection left for its market, and the events in this month's marketing window. */
@@ -128,4 +128,43 @@ export async function loadOverview(sb: SupabaseClient, organizationId: string | 
     };
   }
   return { organizationId: org, month, rows, cells, spendNote, actual };
+}
+
+/** One client of the staff landing list. `notOpened` (the per-client entitlement check) is not read here: that check is one
+ *  call per client, which a list of many clients must not pay; the client's own overview page still shows it. */
+export interface ClientProblem { organizationId: string; problem: boolean; lastError: string | null; failedTopics: number }
+
+/** Which of these clients have a problem, in a constant number of queries (`in (...)`, never one per client). `organizationIds` =
+ *  the clients the landing page shows (the caller caps them); empty = nothing is read. `mayRead` = the caller's canAccessOrg.
+ *  Only clients with an active site are answered: no site, nothing to be wrong with. A failed query throws. */
+export async function loadClientProblems(sb: SupabaseClient, organizationIds: string[], mayRead: (organizationId: string) => boolean, now = new Date()): Promise<ClientProblem[]> {
+  const orgs = [...new Set(organizationIds.map((o) => o.trim().toLowerCase()).filter(Boolean))].filter(mayRead);
+  if (!orgs.length) return [];
+  const month = monthKey(taipeiParts(now.toISOString()).month);
+
+  const siteRes = await sb.from("wp_sites").select("id, organization_id").eq("active", true).in("organization_id", orgs);
+  if (siteRes.error) fail("problem_sites", siteRes.error);
+  const sites = (siteRes.data ?? []) as Array<{ id: string; organization_id: string }>;
+  if (!sites.length) return [];
+  const orgOfSite = new Map(sites.map((s) => [s.id, s.organization_id]));
+
+  const schedRes = await sb.from("client_schedules").select("organization_id, last_error").eq("job_key", JOB).in("organization_id", orgs);
+  if (schedRes.error) fail("problem_schedules", schedRes.error);
+  const lastError = new Map(((schedRes.data ?? []) as Array<{ organization_id: string; last_error: string | null }>).map((r) => [r.organization_id, r.last_error]));
+
+  const failed = new Map<string, number>();
+  for (let from = 0; ; ) {
+    const t = await sb.from("content_topics").select("site_id").eq("month", month).eq("status", "failed").in("site_id", [...orgOfSite.keys()]).order("id").range(from, from + 999);
+    if (t.error) fail("problem_topics", t.error);
+    const page = (t.data ?? []) as Array<{ site_id: string }>;
+    if (!page.length) break;
+    for (const r of page) { const o = orgOfSite.get(r.site_id); if (o) failed.set(o, (failed.get(o) ?? 0) + 1); }
+    from += page.length;
+  }
+
+  return [...new Set(sites.map((s) => s.organization_id))].map((o) => {
+    const err = lastError.get(o) ?? null;
+    const failedTopics = failed.get(o) ?? 0;
+    return { organizationId: o, lastError: err, failedTopics, problem: hasProblem({ lastError: err, failed: failedTopics, notOpened: false }) };
+  });
 }
