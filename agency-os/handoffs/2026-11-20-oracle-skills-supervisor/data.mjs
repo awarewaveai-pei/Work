@@ -79,7 +79,7 @@ export const STEPS = [
   { n: 19, code: 'SF-I', group: 'B3', title: '接上 MainWP 與 AI 控制通道', plain: '新網站自動加進 MainWP、建立與後台之間的簽章通道，並登記這個網站屬於哪個客戶。',
     gate: '測試站出現在 MainWP 且連線正常；通道簽章請求成功；私鑰不出現在任何紀錄。', risk: 'High（憑證）', model: 'Opus 5.5', status: 'not_started', depends: ['SF-G', 'SF-I0'], card: SF },
   { n: 20, code: 'SF-J', group: 'B3', title: '建站流程頁面', plain: '「新增客戶網站」與「建站流程」兩個頁面：一欄由上到下九步，每步顯示狀態，會動主機的步驟都要按兩下。',
-    gate: '九步都顯示；開關沒開時按鈕顯示「尚未開放」；密碼只顯示一次。', risk: 'Medium', model: 'Sonnet 5.5', status: 'in_progress', depends: ['SF-G'], card: 'briefs/WP-SF-J-pages.md' },
+    gate: '九步都顯示；開關沒開時按鈕顯示「尚未開放」；密碼只顯示一次。', risk: 'Medium', model: 'Sonnet 5.5', status: 'done', commit: 'dcc3c8922', depends: ['SF-G'], card: 'briefs/WP-SF-J-pages.md' },
   // 第四批
   { n: 21, code: 'P4', group: 'B4', title: '外掛發佈管道', plain: '讓這支外掛能像其他自有外掛一樣打包、發佈、安裝到網站。',
     gate: '發佈與安裝腳本預演正確。', risk: 'Medium', model: 'Sonnet 5.5', status: 'not_started', depends: ['P1'], card: SPEC },

@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-22（續22）— oracle WP 第三批：SF-J 併入；側欄涵蓋紅燈修掉；工人規則改成 next-admin 卡跑全套
+
+- SF-J 併入 `85e41f82b`＋修正 `dcc3c8922`（已 push；今晚 03:00 自動部署會帶上）：`app/(shell)/ops/sites/new`、`ops/sites/[siteId]`、`app/api/ops/site-flow/route.ts`（POST 建立客戶＋站＋正式環境，寫 `environments.metadata.host_slug`）、`lib/site-flow/{create-site,page-model}.ts`、`ops/clients/[slug]/SiteFlowSummary.tsx` 取代寫死的五個綠勾、`ClientPanelNav.tsx:38` 改指新頁、`lib/portal/products.ts` 加 `ops/sites`（後台清單，非產品鍵）。步驟登記表仍空、catalog 全關：頁面上線後九步顯示「尚未提供／尚未開放」。
+- 監工驗收：看工人截圖 `flow-preview.png`（桌機九步、預覽後才出現確認鈕）、`new-375.png`；整合後 next-admin `npx tsc --noEmit` exit 0、全套 vitest 第一次 1 failed：`app/__tests__/sidebar-coverage.test.ts:41`（`/ops/sites/new` 不在側欄也不在 `REACHED_ELSEWHERE`）→ 補登記「從客戶面板導覽進入」→ 5526 passed／0 failed 後才 push。
+- 同一類第三次（SF-G 兩支、SF-J 一支：工人只跑指定路徑，全站結構測試紅）。關掉整類：`COMMON-WP.md` 驗收條改為 next-admin 卡一律跑全套 `npx vitest run`（約一分鐘），不再列舉個別結構測試。
+- 第三批待總檢（SF-J 回報，未處置；等 P2、SF-E2 及後續卡一起）：`host_slug` 無唯一索引，同網域不同建立代碼並發可建出兩個環境（`create-site.ts:78-87`，需 migration）；「費用方式」欄位被拿掉（SITE-FLOW §2 有列；ADR 017 商業軸只有四值，頁面不得自訂五種標籤）；新網址不併入既有客戶 → 目前無法替既有客戶加新網站；第 4 步（每日備份）、第 8 步（手動項目）無引擎步驟；375px 外殼側欄不收合（既有問題）；「需先完成：create」顯示原始鍵名；讀取中也顯示「尚未提供」；步驟執行中其他按鈕仍可按；輪詢可能重疊；`ensureSite`／`ensureProject` 並發回 500；截圖中 dev 模式有「1 Issue」未查；未跑 `/verify-recent`。
+- P2（線2）程式與驗收做完、等 critic Deep（第一次輸出 0 位元組，重派中）；SF-E2（線3）等 Docker 測試與 critic Deep。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run（next-admin，quizzical worktree @ 整合結果） | exit=0 | ms=57000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/3m/7n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=ops/sites/new | hits=9
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic Standard（3 Major 已修）＋Playwright 5 條＋監工看截圖與全套測試代替
 ## 2026-11-22（續21）— oracle WP：SF-I0（MainWP 金鑰進 next-admin）完成；第三批派工；E5 併入
 
 - SF-I0（操作者同意，WP-PLAN §6 第 2 件）：主機 `/root/lobster-phase1/.env` 已有 `MAINWP_DASHBOARD_URL／CONSUMER_KEY／CONSUMER_SECRET`，compose 沒有引用。經 `safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin` 在 `HOSTING_BRIDGE_SSH_HOST_KEY_SHA256` 後加三行 `${VAR:-}`。第一次 09:55:58Z 重建時 docker 回 `No such container`，工具自動還原（09:56:13Z，容器 49 秒內 healthy，`app.aware-wave.com` 回 307）；第二次 09:57:19Z 成功，15 秒 healthy，備份 `docker-compose.yml.bak.safe-patch-20261122-095719`。驗證：`docker exec lobster-next-admin printenv <三個名稱>` 皆 exit 0（只看存在，不印值）。repo 對照檔同步 `1341b5dde`。第一次失敗的原因未定位（重建瞬間的容器 id 消失，重試即過）。
