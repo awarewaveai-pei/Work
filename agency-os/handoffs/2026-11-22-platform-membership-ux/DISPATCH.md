@@ -43,11 +43,11 @@
 | K7 | 寫文章頁改用客戶欄挑網站，拿掉兩個下拉；補：查單一網站網路失敗要顯示「載入失敗」（`ClientContextProvider.tsx` 單站查詢） | NA `app/(shell)/tools/content/ContentStudio.tsx`、`__tests__/ContentStudio.site-wiring.test.tsx`；刪 `lib/content/pick-initial-site.ts`＋test | Medium | Opus | K3、K5 | 4 | 已併 |
 | K8 | 題目、五步驟改用客戶欄；刪「題目›客戶」頁 | NA `app/(shell)/tools/content/topics/*`、`app/content/topics/DoorTopicsBoard.tsx`、刪兩個 `topics/clients/page.tsx`、`lib/portal/products.ts`、`app/sidebar-sections.ts` | Medium | Opus | K3、K5 | 4 | 已併 |
 | K9 | 網站頁只列目前客戶的網站 | NA `app/(shell)/tools/content/sites/SiteManager.tsx`、`sites/page.tsx`、`app/content/sites/page.tsx`、`sites/__tests__/SiteManager*` | Medium | Sonnet | K3、K5 | 4 | 已併 |
-| K6 | 伺服器不再「沒指定網站就拿第一個」 | NA `lib/content/wp-sites.ts`＋其 tests | **High** | Opus | K7 | 5 | |
-| K10 | 客戶頁每個網站都能改；客戶首頁列出有問題的客戶 | NA `app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx`、`app/(shell)/ops/clients/page.tsx` | Medium | Sonnet | K2、K7 | 5 | |
-| K11 | 從 app 開影片工作台會帶著目前客戶 | NA `app/(shell)/tools/video/{OpenWorkbench,WorkbenchEntry,ScriptForge,ReleaseDeliveryPanel}.tsx`、`app/video/(door)/handoff/*`、`app/video/(wb)/review-release/*`＋tests | Medium | Opus | K3、K5、U4 | 5 | |
-| U3 | 客戶欄上方的類別按鈕；補：產品門上的「AwareWave 自己」列（由 org-search 回傳內部組織標記，門上不讀 service-role；K5 `PlatformFrame.tsx` 門上傳 `internalOrgId: null`） | NA `app/api/ops/org-search/route.ts`、`route.test.ts`、`app/ClientRail.tsx`＋test | Medium | Opus | K4、U4；操作者答 Q1 | 5 | |
-| K12 | 影片工作台收到別的客戶時跳確認窗再切 | VW `scripts/index-1.js`、`scripts/organization-picker.js`、`tests/` 新 cjs | **High** | Opus | K11 | 6 | |
+| K6 | 伺服器不再「沒指定網站就拿第一個」 | NA `lib/content/wp-sites.ts`＋其 tests | **High** | Opus | K7 | 5 | 已併 |
+| K10 | 客戶頁每個網站都能改；客戶首頁列出有問題的客戶 | NA `app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx`、`app/(shell)/ops/clients/page.tsx` | Medium | Sonnet | K2、K7 | 5 | 已併 |
+| K11 | 從 app 開影片工作台會帶著目前客戶 | NA `app/(shell)/tools/video/{OpenWorkbench,WorkbenchEntry,ScriptForge,ReleaseDeliveryPanel}.tsx`、`app/video/(door)/handoff/*`、`app/video/(wb)/review-release/*`＋tests | Medium | Opus | K3、K5、U4 | 5 | 已併 |
+| U3 | 客戶欄上方的類別按鈕；補：產品門上的「AwareWave 自己」列（由 org-search 回傳內部組織標記，門上不讀 service-role；K5 `PlatformFrame.tsx` 門上傳 `internalOrgId: null`） | NA `app/api/ops/org-search/route.ts`、`route.test.ts`、`app/ClientRail.tsx`＋test | Medium | Opus | K4、U4；操作者答 Q1 | 5 | 已併 |
+| K12 | 影片工作台收到別的客戶時跳確認窗再切；補：做完後刪 `OpenWorkbench.tsx` 的 `VW_IGNORES_ORG_UNTIL_K12` 與那行提示 | VW `scripts/index-1.js`、`scripts/organization-picker.js`、`tests/` 新 cjs | **High** | Opus | K11 | 6 | |
 | U8 | 會員登入後第一頁改成「我的工作台」；補：分類顯示名從 `ToolCard.tsx:24-26` 移到 `catalog-vocab.ts` | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U6、U7、U21 | 6 | |
 | U9 | 「尚未開通」頁多一顆「了解這個產品」 | NA `app/PlatformFrame.tsx`（K5 後未開通分支所在檔） | Low | Sonnet | K5 | 6 | |
 | U10 | 會員的「點數與合約」頁 | 新 NA `app/portal/wallet/page.tsx`＋test | Medium | Sonnet | U7 | 6 | |
@@ -63,7 +63,7 @@
 | W5 | 本機 WordPress＋app 走一遍，寫成可重跑腳本（G9） | 新 `scripts/local-member-flow.ps1`（路徑展開時確認） | Low | Sonnet | W1、W2 | 9 | |
 | K13 | 檢查器：頁面不得私藏客戶來源 | 新 NA `lib/client-context/__tests__/no-private-context.test.ts` | Low | Sonnet | K7–K11 | 9 | |
 | M5 | 員工替既有客戶代辦會員（app 端） | MIG 新 migration（待驗證的會員邀請）；NA `lib/entitlements/wp-customers.ts`、`lib/entitlements/identities.ts`、`app/api/ops/clients/[slug]/accounts/route.ts`、`app/(shell)/ops/clients/[slug]/AccountsCard.tsx`＋tests | **High** | Opus | M1、K10 | 9 | |
-| K14 | 新增產品入口零手改的驗收測試 | 新 NA `lib/client-context/__tests__/new-door.test.ts` | Low | Sonnet | K5、K13 | 10 | |
+| K14 | 新增產品入口零手改的驗收測試；補：collect／outreach／design 自己的挑客戶清單（org-search 不帶 category）仍列出 TEST 單位，換成客戶欄後消失 | 新 NA `lib/client-context/__tests__/new-door.test.ts` | Low | Sonnet | K5、K13 | 10 | |
 | M6 | 代辦（外掛端）：會員驗證 email 後才連上 | PL 新 `includes/MemberInvite.php`、主檔註冊、`tests/*` | **High** | Opus | W2、M5 | 10 | |
 | M8 | 轉移會員（換單位管理者） | MIG 新 migration（轉移函式）；NA 新 `app/api/ops/clients/[slug]/member-transfer/route.ts`、`AccountsCard.tsx` | **High** | Opus | M5 | 10 | |
 | K15 | 目前客戶期末閘＋P1 驗收 | 無程式；WORKLOG、本檔狀態欄 | — | Opus | 全部 K | 11 | |

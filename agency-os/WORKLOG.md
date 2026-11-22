@@ -14,6 +14,16 @@
 - REVIEW_DONE: critic=Standard | verdict=warn→pass | findings=1c/6m/11n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=system_last_commit | hits=14
 - ORACLE_WAIVED: Codex 額度到 11/24；兩輪 critic＋各卡突變證據＋正式頁實看
+## 2026-11-22（續19）— 平台第 5 批上線：K6（High）、K10、K11、U3
+
+- 操作者 2026-11-22：「看工人們反應的 RISKS 是否需要處理，先處理完風險再部署」＝ K6 的 go。原列「記到 M3」的 U3 六條風險重看後可在卡內處理，退回補做後才併。
+- K6 `c633da65d`＋`cce6ceb39`：`lib/content/wp-sites.ts` `resolveWpSite` 未指定 siteId 不再取第一站；只有客戶身分且恰一站才自動選。13 個呼叫端都不靠舊行為；正式庫 `content_topics` 58 列 `site_id` 無空值（唯讀查）→ 排程不受影響。K10 `9d1ba0000`＋`0f4890aa0`：客戶頁每站一塊；`/ops/clients` 列排程出錯／題目失敗的客戶，`loadClientProblems` 從問題列找客戶（第一版從前 50 個客戶找問題並在 `client-picker-rule.test.ts` 加例外 → 退回重做，例外已拿掉）。K11 `27ef1da60`＋`e57b6af9c`：影片頁登記 org 層，開 VW 的網址帶 `org`；VW 在 K12 前不處理 `org`，所以選了客戶也顯示「工作台目前不會自動切到這個客戶」（`VW_IGNORES_ORG_UNTIL_K12`，K12 刪）。U3 `58cf63122`＋`01d44fd01`：org-search `?category=`（全部／需處理／訂閱／點數／測試），TEST（自己或上層是 test）預設隱藏、搜尋亦然；帳本彙總快取 60 秒並分頁讀完；回應帶內部組織 id 讓產品門畫「AwareWave 自己」；客戶欄 `position: sticky`。
+- 未在上線前關掉：U3 補做的 PostgREST `.or(parent_organization_id…not.in…)` 只有 mock 測試 → 部署後立刻在正式站開客戶欄；代操／經銷／買斷類別算不出來（無資料，M2／M3）；手機寬客戶欄（`globals.css` 仍被主題 session 佔用，`git status` 仍 dirty）→ U14。
+- 全套測試 1 紅：`app/video/(wb)/__tests__/one-click-drafts.test.tsx`「cancel makes no paid call…」在全套負載下逾時，單獨重跑 3 次皆 5/5 綠；本批未動該檔（`git diff origin/main -- "app/video/(wb)"` 只有 `review-release/*`），先前 `9d7548f89` 已為同一測試修過一次等待。非本批造成，未修；若部署的 test gate 因它變紅則重跑。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin，rebase 後全套 5477 passed / 1 flaky failed，重跑該檔 3 次綠) | exit=1 | ms=700000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/4n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=VW_IGNORES_ORG_UNTIL_K12 | hits=5
+- ORACLE_WAIVED: Codex 額度 2026-11-24 才恢復；K6 有書面對抗自審＋突變（恢復取第一站 → 2 紅），監工讀過 `wp-sites.ts` diff 與全部 `resolveWpSite(` 呼叫端並查正式庫；U3 有工人的 critic（0 Critical／High）與 TEST 隱藏突變（3 紅）
 ## 2026-11-22（續18）— oracle WP：SF-E 併入；第二批整批 RISKS 總檢完成；新增卡 E5、SF-E2
 
 - SF-E 併入 `2f9c53fc8`（已 push）：`aw-hosting-gate.sh` 新增 `site-preflight／site-create／site-job／site-vhost／site-wp`；開關檔 `/etc/default/aw-hosting-gate.local` 無 `AW_SITE_VERBS=on` → 126（`switch_trusted`：root 擁有、非他人可寫、只讀不 source）；site 動詞帶 stdin → 126；`render.sh` 加 `client_wp_write_registry／read_registry`；`vhost.conf.tmpl` 自帶 `real_ip_header`。監工讀開關與分派段、確認既有行只刪註解與 `--list` 一行；`hosting-gate-site.test.sh` 96 passed；next-admin 對 main `npx tsc --noEmit` exit 0、全套 vitest 第一次 5430 passed／1 failed、重跑 0 failed（不穩定測試，未定位，與本卡無關）。主機腳本已隨 push 同步，開關未開。

@@ -105,10 +105,10 @@ NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`；VW = `lobste
 | F3 | 「網站」層讀整表：`/api/content/sites` 無 org 篩選、無上限；`loadOverview` 也整表 | `api/content/sites/route.ts:48-53`；`lib/content/topics/overview-load.ts:54`；R10 盤點第 9 列 |
 | F4 | 挑選介面由各頁自畫，位置與規則不一；兩份選單沒有「此頁要哪一層」的資訊 | 1a #2、#6、#13、#18、#19；`products.ts:11`、`sidebar-sections.ts:9` |
 | F5 | **已關（U4）** 客戶登入時畫面若用網址 uuid 查名顯示＝誤導；產品門上 `/api/ops/org-search` 一律 404，員工在產品門無法換客戶 | `tenant-guard.ts:198-205`；`doors.ts:107-111`（`:109` not_found） |
-| F6 | 「沒指定就拿第一個」三處，staff 情境＝某個別人的客戶 | `TopicsBoard.tsx:159`；`pick-initial-site.test.ts:14`；`wp-sites.ts:103-105,123-126` |
+| F6 | **已關（K6）** 「沒指定就拿第一個」三處，staff 情境＝某個別人的客戶 | `TopicsBoard.tsx:159`；`pick-initial-site.test.ts:14`；`wp-sites.ts:103-105,123-126` |
 | F7 | **已關（K7、K8）** 客戶頁內容分頁只編 `wpSites[0]`；外連用舊名 `?siteId=` | `ClientHubTabs.tsx:211-212,550,556` |
 | F8 | **已關（K7、K8）** 內容編輯兩個 select 挑網站（違反無下拉），選擇不寫回網址 | `ContentStudio.tsx:1953,2203` |
-| F9 | R8「題目›客戶」刪除後：員工問題清單無處放（`/ops/clients` 落地頁空白）；入口客戶的各站數字五步驟已有 | `ops/clients/page.tsx:6-18`；`AutoContentOverview.tsx:64-117,130-176` |
+| F9 | **已關（K10）** R8「題目›客戶」刪除後：員工問題清單無處放（`/ops/clients` 落地頁空白）；入口客戶的各站數字五步驟已有 | `ops/clients/page.tsx:6-18`；`AutoContentOverview.tsx:64-117,130-176` |
 | F10 | 跨網域只能靠網址（1c）；主機只能在伺服器推導 | `hosts.ts:26-28`；`door-link.ts:12,30` |
 | F11 | 兩條客戶清單 API、權限門檻不同 | `org-search/route.ts:24`；`bootstrap/route.ts:19` |
 | F12 | R10 檢查器只管客戶清單，不管網站清單與私藏來源 | `client-picker-rule.test.ts:13-18` |
