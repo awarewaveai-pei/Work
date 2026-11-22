@@ -114,9 +114,22 @@ export const readMigrationEvents = (sb: SupabaseClient, systemId?: string) => re
 export const readCommitHistory = (sb: SupabaseClient) => readByType(sb, ["revert", "orphaned"], HISTORY_READ_CAP);
 
 /** Everything projectSystem needs: state events + migrations (per system or all), and the global commit history. */
-export async function readProjectionInput(sb: SupabaseClient, systemId?: string): Promise<{ events: UpdateRow[]; history: UpdateRow[]; capped: boolean }> {
-  const [state, migrations, history] = await Promise.all([readStateEvents(sb, systemId), readMigrationEvents(sb, systemId), readCommitHistory(sb)]);
-  return { events: [...migrations.events, ...state.events], history: history.events, capped: state.capped || migrations.capped || history.capped };
+export async function readProjectionInput(sb: SupabaseClient, systemId?: string): Promise<{
+  events: UpdateRow[]; history: UpdateRow[]; capped: boolean;
+  /** system id -> newest git commit (view system_last_commit, migration 0177): pass as projectSystem's lastCommitAt */
+  lastCommitAt: Record<string, string>;
+}> {
+  const [state, migrations, history, lastCommitAt] = await Promise.all([readStateEvents(sb, systemId), readMigrationEvents(sb, systemId), readCommitHistory(sb), readLastCommits(sb, systemId)]);
+  return { events: [...migrations.events, ...state.events], history: history.events, capped: state.capped || migrations.capped || history.capped, lastCommitAt };
+}
+
+/** View system_last_commit (migration 0177): one row per system that has a git commit event, any type -- the inferred
+ *  status's clock. */
+export async function readLastCommits(sb: SupabaseClient, systemId?: string): Promise<Record<string, string>> {
+  let q = sb.from("system_last_commit").select("system_id,last_commit_at").limit(EVENT_READ_CAP);
+  if (systemId) q = q.eq("system_id", systemId);
+  const rows = check(await q, "system_last_commit read") as unknown as Array<{ system_id: string; last_commit_at: string }>;
+  return Object.fromEntries(rows.map((r) => [r.system_id, r.last_commit_at]));
 }
 
 /** Newest events of one system, any type, for the 紀錄 tab. */

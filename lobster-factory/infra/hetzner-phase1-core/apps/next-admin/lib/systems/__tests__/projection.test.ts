@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { effectiveStatus } from "../overview";
 import { projectSystem, type FeatureRow, type PhaseRow, type UpdateRow } from "../projection";
+import { readProjectionInput } from "../store";
 
 const SYS = "00000000-0000-4000-8000-000000000001";
 const phase = (id: string, legacy: string | null = null): PhaseRow => ({ id, system_id: SYS, slug: id, name: id, legacy_source_path: legacy, position: 0 });
@@ -12,16 +13,39 @@ const ev = (event_type: string, payload: Record<string, unknown>, at: string, ex
 });
 
 describe("projectSystem", () => {
-  it("lastCommitAt counts only the importer's git events: a review today leaves a 90-day-silent system 暫停（推定）", () => {
+  it("the inferred status reads lastCommitAt as given: a review today leaves a 94-day-silent system 暫停（推定）", () => {
     const NOW = Date.parse("2026-11-22T00:00:00Z");
     const old = "2026-08-20T00:00:00Z"; // 94 days before NOW
-    const p = projectSystem({ phases: [], features: [feature("f1")], events: [
-      ev("handoff", { subject: "last work" }, old, { event_key: "git:abc:1", commit_sha: "abc" }),
+    const p = projectSystem({ phases: [], features: [feature("f1")], lastCommitAt: old, events: [
       ev("review", { status: "verified", by: "u" }, "2026-11-21T00:00:00Z", { source: "user", feature_id: "f1", event_key: "user:r1" }),
     ] });
     expect(p.lastCommitAt).toBe(old);
     expect(p.lastActivityAt).toBe("2026-11-21T00:00:00Z");
     expect(effectiveStatus(p.status, p.lastCommitAt, NOW)).toEqual({ status: "paused", inferred: true });
+    // not derived from events: a git handoff in the input does not move it
+    const q = projectSystem({ phases: [], features: [], events: [ev("handoff", { subject: "x" }, "2026-11-20T00:00:00Z", { event_key: "git:abc:1", commit_sha: "abc" })] });
+    expect(q.lastCommitAt).toBeNull();
+  });
+
+  it("a system with only trailer-less commits (activity, left out of the state read) is 開發中 when its last commit is 5 days old", async () => {
+    const NOW = Date.parse("2026-11-22T00:00:00Z");
+    const fiveDays = "2026-11-17T00:00:00Z";
+    // the state reads return nothing (activity is not read), the view has the commit
+    const reads: string[] = [];
+    const sb = {
+      from(table: string) {
+        reads.push(table);
+        const data = table === "system_last_commit" ? [{ system_id: SYS, last_commit_at: fiveDays }] : [];
+        const q: Record<string, unknown> = {};
+        for (const m of ["select", "not", "order", "limit", "eq", "in"]) q[m] = () => q;
+        q.then = (ok: (r: unknown) => unknown) => Promise.resolve({ data, error: null }).then(ok);
+        return q;
+      },
+    };
+    const input = await readProjectionInput(sb as never, SYS);
+    expect(reads).toContain("system_last_commit");
+    const p = projectSystem({ phases: [], features: [], events: input.events, history: input.history, lastCommitAt: input.lastCommitAt[SYS] ?? null });
+    expect(effectiveStatus(p.status, p.lastCommitAt, NOW)).toEqual({ status: "active", inferred: true });
   });
 
   it("handoff card: next is kept when a later handoff leaves it out; blocker clears only on blocker_cleared", () => {

@@ -16,6 +16,7 @@ begin
   end if;
 end $$;
 
+drop view if exists public.system_last_commit;
 alter table public.system_updates drop constraint system_updates_event_type_check;
 alter table public.system_updates add constraint system_updates_event_type_check check (event_type in
   ('activity', 'handoff', 'feature_update', 'status_change', 'review', 'revert', 'orphaned', 'migration', 'import_run'));
