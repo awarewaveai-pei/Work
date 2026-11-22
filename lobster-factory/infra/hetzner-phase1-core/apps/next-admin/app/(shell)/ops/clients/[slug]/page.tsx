@@ -70,7 +70,7 @@ export default async function ClientDetailPage({
   const wp = ((org.metadata as Record<string, unknown>)?.wp_update_latest as WpUpdateLatest) ?? null;
 
   // ── Parallel fetches ────────────────────────────────────────────────────────
-  const [health, runsResult, installRunsResult, integrationsResult, wpSitesResult] = await Promise.all([
+  const [health, runsResult, installRunsResult, integrationsResult, wpSitesResult, flowSitesResult] = await Promise.all([
     probeHealth(cfg.site_url),
     supabase
       .from("ops_action_runs")
@@ -98,6 +98,12 @@ export default async function ClientDetailPage({
     supabase
       .from("wp_sites")
       .select("id,name,url,color,active,content_defaults")
+      .eq("organization_id", org.id)
+      .order("created_at"),
+    // The sites made through the site flow (/ops/sites): the 佈建 tab shows each one's live step state.
+    supabase
+      .from("sites")
+      .select("id,name,primary_domain")
       .eq("organization_id", org.id)
       .order("created_at"),
   ]);
@@ -192,6 +198,7 @@ export default async function ClientDetailPage({
       deptSummary={deptSummary}
       integrations={(integrationsResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["integrations"]}
       wpSites={(wpSitesResult.data ?? []) as Parameters<typeof ClientHubTabs>[0]["wpSites"]}
+      sites={((flowSitesResult.data ?? []) as Array<{ id: string; name: string; primary_domain: string | null }>).map((s) => ({ id: s.id, name: s.name, domain: s.primary_domain }))}
       researchBridgesEnabled={isResearchBridgesEnabled()}
       hiddenTabs={hiddenTabs}
       billing={billing}

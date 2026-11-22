@@ -133,6 +133,7 @@ export const BACK_OFFICE: Readonly<Record<string, StaffPage>> = {
   "ops/sellers": { name: "賣家", why: "擁有者與管理員登記、停用收銀台網站（每個網站一把鑰匙，由鑰匙查出賣家）；員工可查看。" },
   "ops/ai-models": { name: "模型資料", why: "舊網址，轉到 /tools/ai-models 的圖片模型規格分頁。", tool: "tools/ai-models" },
   "ops/onboarding": { name: "客戶啟用", why: "員工處理客戶啟用。" },
+  "ops/sites": { name: "建站流程", why: "員工替客戶一步一步建網站（建立、主機、WordPress、網址、整合、開放）；與客戶共用同一個權限格。", tool: "ops/clients" },
   "ops/tools": { name: "工具清單", why: "員工維護工具清單。" }, "ops/products": { name: "產品表", why: "員工查看產品登記表：門、販售狀態、收費功能。" },
   "ops/plans": { name: "方案", why: "擁有者與管理員建立、修改、刪除 AwareWave 自己的方案（每個方案開通哪些功能、哪些用點數付）；員工可查看。" },
   "ops/systems": { name: "系統總控", why: "擁有者與管理員查看每個系統的用途、進度與下一步，並標記系統狀態與驗收功能。" },

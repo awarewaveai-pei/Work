@@ -35,7 +35,7 @@ export function ClientPanelNav({ orgs, total }: { orgs: PickOrg[]; total: number
       <OrgPicker searchPath="/api/ops/org-search" orgs={orgs} total={total} selected={slugIn(pathname)} by="slug" fill hrefFor={(org) => `/ops/clients/${org.slug}`} />
       <div style={{ padding: "8px 10px", borderTop: "1px solid var(--card-border)" }}>
         <Link
-          href="/ops/onboarding"
+          href="/ops/sites/new"
           style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: "7px 8px", borderRadius: 6,

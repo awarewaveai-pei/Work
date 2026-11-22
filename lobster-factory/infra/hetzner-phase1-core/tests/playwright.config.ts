@@ -112,6 +112,15 @@ export default defineConfig({
         baseURL: SOCIAL_URL,
       },
     },
+    {
+      name: 'sites',   // /ops/sites flows: a dev server with no Supabase (.claude/launch.json "next-admin-ui-3903")
+      testMatch: '**/sites/**/*.spec.ts',
+      timeout: 120_000,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: process.env.PLAYWRIGHT_SITES_URL || 'http://localhost:3903',
+      },
+    },
     // ── Mobile smoke: same smoke suite on a Pixel 5 viewport ─────────────
     {
       name: 'mobile-smoke',

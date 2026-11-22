@@ -7,6 +7,7 @@ import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
 import { SiteWatchCard } from "./SiteWatchCard";
+import { SiteFlowSummary, type FlowSite } from "./SiteFlowSummary";
 import { AccountsCard } from "./AccountsCard";
 import { CustomerServiceTab } from "./CustomerServiceTab";
 import { OutreachTab } from "./OutreachTab";
@@ -115,6 +116,8 @@ export interface ClientHubTabsProps {
   deptSummary: DepartmentSummaryPayload;
   integrations: IntegrationBinding[];
   wpSites: WpSiteStub[];
+  /** The client's sites made through the site flow (sites table), for the 佈建 tab summary. */
+  sites: FlowSite[];
   /** lib/research-bridges.ts: false (default since 2026-09-23) hides the per-folder 送去 Cognitive OS button. */
   researchBridgesEnabled: boolean;
   /** Tabs of products not ticked for this staff member (hub-tab-tools.ts); the page computes it from their grant. */
@@ -611,7 +614,7 @@ function IntegrationsTab({ integrations }: Pick<ClientHubTabsProps, "integration
   );
 }
 
-function ProvisioningTab({ deptSummary, runs, cfg }: Pick<ClientHubTabsProps, "deptSummary" | "runs" | "cfg">) {
+function ProvisioningTab({ deptSummary, runs, sites }: Pick<ClientHubTabsProps, "deptSummary" | "runs" | "sites">) {
   // action_key resolved from the catalog by page.tsx; the legacy action_id
   // check never matched (action_id is a uuid) — kept only as a harmless fallback.
   const buildRuns = runs.filter((r) => {
@@ -643,33 +646,7 @@ function ProvisioningTab({ deptSummary, runs, cfg }: Pick<ClientHubTabsProps, "d
         </Link>
       </Card>
 
-      <Card title="佈建步驟">
-        {[
-          "客戶探索問卷 (Intake)",
-          "AI 網站規格生成",
-          "Build Console 部署觸發",
-          "初始外掛堆疊安裝",
-          "整合串接確認",
-        ].map((step, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 12 }}>
-            <span style={{
-              width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 10, flexShrink: 0, fontWeight: 600,
-              background: "var(--badge-green-bg)", color: "var(--badge-green-text)",
-            }}>✓</span>
-            {step}
-          </div>
-        ))}
-        <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-          <Link href="/ops/onboarding" style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none" }}>
-            重新 Onboarding →
-          </Link>
-          <span style={{ color: "var(--text-muted)", fontSize: 11 }}>·</span>
-          <Link href="/build" style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none" }}>
-            Build Console →
-          </Link>
-        </div>
-      </Card>
+      <SiteFlowSummary sites={sites} />
 
       {buildRuns.length > 0 && (
         <Card title="佈建執行紀錄" badge={`${buildRuns.length} 筆`}>
@@ -2477,7 +2454,7 @@ const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
-  const { org, cfg, health, wp, runs, installRuns, deptSummary, integrations, wpSites, hiddenTabs = [] } = props;
+  const { org, cfg, health, wp, runs, installRuns, deptSummary, integrations, wpSites, sites, hiddenTabs = [] } = props;
   const tabs = TABS.filter((t) => !hiddenTabs.includes(t));
   const [activeTab, setActiveTab] = useState<Tab>(() => tabs.find((t) => t === props.initialTab) ?? "維護");
 
@@ -2550,7 +2527,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
       <div style={{ flex: 1, overflowY: "auto", padding: "18px 24px", background: "var(--bg-canvas)" }}>
         {activeTab === "內容工具" && <ContentTab org={org} cfg={cfg} wpSites={wpSites} />}
         {activeTab === "整合" && <IntegrationsTab integrations={integrations} />}
-        {activeTab === "佈建" && <ProvisioningTab deptSummary={deptSummary} runs={runs} cfg={cfg} />}
+        {activeTab === "佈建" && <ProvisioningTab deptSummary={deptSummary} runs={runs} sites={sites} />}
         {activeTab === "維護" && <MaintenanceTab org={org} cfg={cfg} wp={wp} runs={runs} installRuns={installRuns} />}
         {activeTab === "設定" && <SettingsTab org={org} cfg={cfg} wpSites={wpSites} />}
         {activeTab === "品牌識別" && <BrandIdentityTab org={org} cfg={cfg} />}
