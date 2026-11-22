@@ -24,6 +24,8 @@
 # Environment (from shell or /etc/default/ks-aw-01-backup):
 #   EXPECT_SERVICES      — space-separated list of deployed services to back up.
 #                          Valid tokens: soulful chatwoot. Empty = pre-P5/P7 state.
+#   CLIENT_WP_REGISTRY_DIR — client site registry (default /etc/awarewave/sites.d; section 4b). Every
+#                          <slug>.json there is backed up as <slug>-db.sql.gz + <slug>-wordpress.tgz.
 #   BACKUP_DIR           — output root (default: /root/backups)
 #   BACKUP_RETAIN_DAYS   — delete local backups older than N days (default: 7)
 #   BACKUP_ENC_KEY       — AES key for .env encryption (required once any .env exists)
@@ -149,6 +151,84 @@ if expects chatwoot; then
   fi
 fi
 
+# --- 4b. Client WordPress sites registered in sites.d (SITE-FLOW SF-F) ---
+# The registry IS the declaration for these sites (same rule as EXPECT_SERVICES: registered + missing = ERROR).
+# Format and names: hetzner-phase1-core/scripts/templates/client-wp/render.sh (<slug>-db, <slug>_wordpress_data);
+# a file whose values differ from those names is refused, never guessed. Same dump/archive commands as Soulful.
+# A site's failure counts in SITE_ERRORS: it fails the run and verify, but does not cost every other store its
+# offsite copy (the abort gate below reads ERRORS only). No registry files = no output here at all.
+SITES_DIR="${CLIENT_WP_REGISTRY_DIR:-/etc/awarewave/sites.d}"
+SITE_ERRORS=0
+site_error() { log "  ERROR: $1"; SITE_ERRORS=$((SITE_ERRORS + 1)); }
+if compgen -G "${SITES_DIR}/*.json" >/dev/null; then
+  # One line per file: ok<TAB>slug<TAB>db container<TAB>files volume | bad<TAB>file<TAB>reason (no file content).
+  if ! SITE_LIST="$(python3 - "$SITES_DIR" <<'PY'
+import json, os, re, sys
+sys.stdout.reconfigure(newline="\n")  # LF even where Python would write CRLF: bash splits on LF only
+d = sys.argv[1]
+keys = {"slug", "domain", "ingress", "container", "db_container", "volumes", "port", "compose_file", "vhost_file", "created_at"}
+for name in sorted(os.listdir(d)):
+    if name.startswith(".") or not name.endswith(".json"):  # bash globs skip dotfiles too
+        continue
+    slug = name[:-5]
+    try:
+        with open(os.path.join(d, name), encoding="utf-8") as fh:
+            r = json.load(fh)
+    except (OSError, ValueError) as e:
+        print(f"bad\t{name}\tunreadable ({type(e).__name__})")
+        continue
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,39}", slug):
+        why = "file name is not a site slug"
+    elif not isinstance(r, dict) or set(r) != keys:
+        why = "keys differ from the template"
+    elif (r["slug"], r["container"], r["db_container"], r["volumes"]) != (
+            slug, f"{slug}-wp", f"{slug}-db", [f"{slug}_wordpress_data", f"{slug}_db_data"]):
+        why = "slug/container/db_container/volumes differ from what render.sh derives"
+    else:
+        print(f"ok\t{slug}\t{r['db_container']}\t{r['volumes'][0]}")
+        continue
+    print(f"bad\t{name}\t{why}")
+PY
+  )"; then
+    site_error "cannot read the site registry ${SITES_DIR} (python3 failed) -- registered sites NOT backed up"
+    SITE_LIST=""
+  fi
+  # Not under set -e: a docker hiccup here must fail the sites, not abort before the other stores' upload.
+  RUNNING="$(docker ps --format '{{.Names}}')" || { site_error "docker ps failed -- registered sites NOT backed up"; RUNNING=""; }
+  while IFS=$'\t' read -r kind slug db vol; do
+    [[ -n "$kind" ]] || continue
+    if [[ "$kind" != ok ]]; then site_error "registry ${SITES_DIR}/${slug} refused: ${db} -- that site is NOT backed up"; continue; fi
+    for f in "${slug}-db.sql.gz" "${slug}-wordpress.tgz"; do
+      [[ ! -e "${OUT}/${f}" ]] || { site_error "site ${slug}: ${f} already written by another section -- slug clashes"; continue 2; }
+    done
+    if grep -qx "$db" <<<"$RUNNING"; then
+      log "Dumping site ${slug} WordPress DB..."
+      if docker exec "$db" sh -c 'mariadb-dump -u root -p"$MARIADB_ROOT_PASSWORD" --single-transaction wordpress' 2>/dev/null | gzip > "${OUT}/${slug}-db.sql.gz"; then
+        if gzip -t "${OUT}/${slug}-db.sql.gz" 2>/dev/null && [[ -s "${OUT}/${slug}-db.sql.gz" ]]; then
+          SIZE=$(du -h "${OUT}/${slug}-db.sql.gz" | cut -f1); log "  ${slug}-db.sql.gz OK (${SIZE})"
+        else
+          site_error "${slug}-db.sql.gz integrity failed or empty"
+        fi
+      else
+        site_error "site ${slug} MariaDB dump failed"
+      fi
+    else
+      site_error "site ${slug} DB container '${db}' registered in ${SITES_DIR} but NOT running"
+    fi
+    if docker volume inspect "$vol" >/dev/null 2>&1; then
+      log "Archiving site ${slug} WordPress volume..."
+      if docker run --rm -v "$vol":/data:ro -v "$(realpath "${OUT}")":/backup \
+           alpine tar czf "/backup/${slug}-wordpress.tgz" -C /data . 2>/dev/null && [[ -s "${OUT}/${slug}-wordpress.tgz" ]]; then
+        SIZE=$(du -h "${OUT}/${slug}-wordpress.tgz" | cut -f1); log "  ${slug}-wordpress.tgz OK (${SIZE})"
+      else
+        site_error "${slug}-wordpress.tgz failed"
+      fi
+    else
+      site_error "site ${slug} volume '${vol}' registered in ${SITES_DIR} but NOT found"
+    fi
+  done <<<"$SITE_LIST"
+fi
+
 # --- 5. Secrets: any .env files present, ENCRYPTED before leaving host ---
 ENV_FILES=()
 for f in /root/soulful/.env /root/chatwoot/.env; do
@@ -178,9 +258,9 @@ fi
 # --- 6. Manifest, written BEFORE the abort gate so a failed run still leaves a
 #        readable record of what went wrong (errors>0 is the useful case). ---
 cat > "${OUT}/manifest.json" <<EOF
-{"host":"ks-aw-01","stamp":"${STAMP}","date":"${DATE}","expect_services":"${EXPECT_SERVICES}","errors":${ERRORS},"files":$(ls -1 "${OUT}" | grep -v manifest.json | wc -l)}
+{"host":"ks-aw-01","stamp":"${STAMP}","date":"${DATE}","expect_services":"${EXPECT_SERVICES}","errors":$((ERRORS + SITE_ERRORS)),"files":$(ls -1 "${OUT}" | grep -v manifest.json | wc -l)}
 EOF
-log "manifest.json written (errors=${ERRORS})"
+log "manifest.json written (errors=$((ERRORS + SITE_ERRORS)))"
 
 # --- 7. Abort if critical errors ---
 if [[ $ERRORS -gt 0 ]]; then
@@ -225,15 +305,22 @@ if [[ -z "${R2_API_TOKEN:-}" ]]; then
   log "FATAL: R2_API_TOKEN not set — no offsite copy"
   exit 2
 fi
-if [[ ! -x "/root/scripts/upload-to-r2.sh" ]]; then
-  log "FATAL: /root/scripts/upload-to-r2.sh not found or not executable"
+UPLOAD_TO_R2="${UPLOAD_TO_R2:-/root/scripts/upload-to-r2.sh}"   # override for throwaway tests only
+if [[ ! -x "${UPLOAD_TO_R2}" ]]; then
+  log "FATAL: ${UPLOAD_TO_R2} not found or not executable"
   exit 2
 fi
 log "Uploading to Cloudflare R2..."
-if /root/scripts/upload-to-r2.sh "${OUT}" "${STAMP}" 2>&1; then
+if "${UPLOAD_TO_R2}" "${OUT}" "${STAMP}" 2>&1; then
   log "  R2 upload OK"
   echo "${STAMP}" > "${OUT}/.verify"
 else
   log "FATAL: R2 upload failed"
   exit 2
+fi
+
+# --- 11. Registered-site errors (4b) fail the run only after the other stores reached R2 ---
+if [[ $SITE_ERRORS -gt 0 ]]; then
+  log "FATAL: ${SITE_ERRORS} registered-site error(s) -- see ERROR lines above; other stores uploaded"
+  exit 1
 fi

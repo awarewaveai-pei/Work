@@ -3,6 +3,7 @@
 SRC=<file> tests a mutated copy."""
 import importlib.util
 import os
+import time
 import unittest
 
 SRC = os.environ.get("SRC") or os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "backup-coverage-check.py")
@@ -174,6 +175,87 @@ class RealInventory(unittest.TestCase):
         # backup-cognitive-db.sh:6 -- erased data lives at most 7 days in a dump; R2 may delete up to a day late
         self.assertLessEqual(self.inv["r2"]["lifecycle_max_age_seconds"]["cognitive/"], 6 * 86400)
         self.assertIn("cognitive/", self.inv["r2"]["unlocked_prefixes"])
+
+
+class RegisteredSites(unittest.TestCase):
+    """SF-F: every site in sites.d is a store of the ks-aw-01 pipeline (backup-ks-aw-01.sh section 4b)."""
+    INV = {**INV, "pipelines": {**INV["pipelines"], "ks-aw-01": {"local_root": "/w", "r2_prefix": "ksw", "r2_dir": "stamp"}}}
+    MOUNTS = {**MOUNTS, "a-wp:/var/www/html": "a_wordpress_data", "a-db:/var/lib/mysql": "a_db_data",
+              "b-wp:/var/www/html": "b_wordpress_data", "b-db:/var/lib/mysql": "b_db_data"}
+    SITES = [{"slug": "a", "created": FRESH - 86400 * 30}, {"slug": "b", "created": None}]
+
+    def run_eval(self, sites=None, mounts=None, drop=(), retained=()):
+        snaps, keys, life, locks = state()
+        files = {"manifest.json": (100, FRESH)}
+        stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(FRESH - 600))  # the run started 10 min before writing
+        for slug in ("a", "b"):
+            for art in (f"{slug}-db.sql.gz", f"{slug}-wordpress.tgz"):
+                if art not in drop:
+                    files[art] = (10, FRESH)
+                keys.setdefault("ks-aw-01", {})[f"ksw/{stamp}/{art}"] = (10, UP)
+        snaps["ks-aw-01"] = {"stamp": stamp, "members": {}, "files": files}
+        return cov.evaluate(self.INV, self.MOUNTS if mounts is None else mounts, snaps, keys, life, locks, NOW,
+                            sites=self.SITES if sites is None else sites, retained=retained)
+
+    def test_registered_sites_covered_pass(self):
+        rows = self.run_eval()
+        self.assertEqual(fails(rows), {})
+        self.assertEqual({r["id"] for r in rows} >= {"site:a", "site:b", "site-registry"}, True)
+
+    def test_missing_site_artifact_fails_that_site(self):
+        self.assertIn("a-wordpress.tgz missing", fails(self.run_eval(drop=("a-wordpress.tgz",)))["site:a"])
+
+    def test_site_taken_out_of_the_registry_is_reported(self):
+        # its containers still run: their mounts are no longer listed anywhere
+        f = fails(self.run_eval(sites=[self.SITES[1]]))
+        self.assertIn("a-wp:/var/www/html", f["inventory"])
+        self.assertIn("a-db:/var/lib/mysql", f["inventory"])
+
+    def test_unreadable_registry_fails(self):
+        f = fails(self.run_eval(sites=self.SITES + [{"file": "c.json", "error": "unreadable (JSONDecodeError)"}]))
+        self.assertIn("c.json", f["site-registry"])
+
+    def test_site_registered_after_the_snapshot_is_not_due_yet(self):
+        rows = self.run_eval(sites=[{"slug": "a", "created": FRESH + 60}], drop=("a-db.sql.gz", "a-wordpress.tgz"),
+                             mounts={k: v for k, v in self.MOUNTS.items() if not k.startswith("b-")})
+        self.assertEqual(fails(rows), {})
+        self.assertIn("first due", next(r for r in rows if r["id"] == "site:a")["detail"])
+
+    def test_site_registered_while_the_run_went_on_is_not_due_yet(self):
+        # read by 4b or not: after the STAMP it is never required (manifest mtime would be too late a cutoff)
+        rows = self.run_eval(sites=[{"slug": "a", "created": FRESH - 300}], drop=("a-db.sql.gz", "a-wordpress.tgz"),
+                             mounts={k: v for k, v in self.MOUNTS.items() if not k.startswith("b-")})
+        self.assertEqual(fails(rows), {})
+
+    def test_future_created_at_fails_instead_of_exempting_forever(self):
+        self.assertIn("future", fails(self.run_eval(sites=[{"slug": "a", "created": NOW + 3600}, self.SITES[1]]))["site:a"])
+
+    def test_retained_volumes_are_a_reminder_not_a_failure(self):
+        rows = self.run_eval(retained=[("old", ["old_wordpress_data", "old_db_data"])])
+        self.assertEqual(fails(rows), {})
+        self.assertIn("old (old_wordpress_data, old_db_data)", next(r for r in rows if r["id"] == "retained-volumes")["detail"])
+
+    def test_no_sites_adds_no_rows(self):
+        self.assertFalse({"site-registry", "retained-volumes"} & {r["id"] for r in cov.evaluate(
+            INV, MOUNTS, *state(), NOW)})
+
+    def test_read_sites_refuses_names_render_sh_would_not_derive(self):
+        import json
+        import tempfile
+        good = {"slug": "a", "domain": "a.example.org", "ingress": "host-vhost", "container": "a-wp", "db_container": "a-db",
+                "volumes": ["a_wordpress_data", "a_db_data"], "port": 8100, "compose_file": "/root/sites/a/docker-compose.yml",
+                "vhost_file": None, "created_at": "2026-11-22T10:00:00Z"}
+        with tempfile.TemporaryDirectory() as d:
+            for name, body in (("a.json", good), ("b.json", {**good, "slug": "b", "container": "b-wp", "db_container": "x",
+                                                            "volumes": ["b_wordpress_data", "b_db_data"]}),
+                               ("Bad.json", good), ("c.json", "{not json")):
+                with open(os.path.join(d, name), "w", encoding="utf-8") as fh:
+                    fh.write(body if isinstance(body, str) else json.dumps(body))
+            got = {s.get("slug") or s["file"]: s for s in cov.read_sites(d)}
+        self.assertEqual(got["a"]["created"], 1795341600.0)
+        self.assertIn("differ", got["b.json"]["error"])
+        self.assertIn("not a site slug", got["Bad.json"]["error"])
+        self.assertIn("unreadable", got["c.json"]["error"])
 
 
 if __name__ == "__main__":

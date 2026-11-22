@@ -5,7 +5,8 @@
 #
 # ---------------------------------------------------------------------------
 # Expectations come from EXPECT_SERVICES in /etc/default/ks-aw-01-backup — the
-# SAME declaration backup-ks-aw-01.sh uses. This script deliberately does NOT
+# SAME declaration backup-ks-aw-01.sh uses — plus the client site registry
+# CLIENT_WP_REGISTRY_DIR (default /etc/awarewave/sites.d), also read by both. This script deliberately does NOT
 # call `docker ps` / `docker volume inspect`: if the verifier re-derived its
 # expectations from the same live state the producer used, then a renamed or
 # crashed container would make both of them agree that nothing was expected,
@@ -131,6 +132,36 @@ if expects chatwoot; then
   # caught by backup-coverage-check.py's sources check (hetzner-phase1-core/scripts/backup-inventory.json).
   require_tgz  "chatwoot-storage.tgz" "chatwoot" 0 1
 fi
+
+# Client sites registered in sites.d (backup-ks-aw-01.sh section 4b): the registry is their declaration, read here
+# directly, not from the producer's output. Names come from the file name (the producer refuses a registry whose
+# names differ from it, and that refusal is in manifest errors above). A site registered after this backup's
+# manifest was written is first due tomorrow. Floors: a fresh WordPress has 12 core tables and ~3000 core files.
+SITES_DIR="${CLIENT_WP_REGISTRY_DIR:-/etc/awarewave/sites.d}"
+for reg in "${SITES_DIR}"/*.json; do
+  [[ -e "$reg" ]] || continue
+  slug="$(basename "$reg" .json)"
+  if [[ ! "$slug" =~ ^[a-z0-9][a-z0-9-]{0,39}$ ]]; then fail "${reg}: file name is not a site slug"; continue; fi
+  created="$(grep -o '"created_at": *"[^"]*"' "$reg" | cut -d'"' -f4 || true)"
+  created_s=0
+  [[ -z "$created" ]] || created_s="$(date -u -d "$created" +%s 2>/dev/null || echo 0)"
+  # Cutoff = the snapshot's own STAMP (host clock, taken before section 4b read sites.d): conservative, never late.
+  stamp="$(basename "$TODAY_DIR")"
+  started_s="$(date -d "${stamp:0:8} ${stamp:9:2}:${stamp:11:2}:${stamp:13:2}" +%s)"
+  if [[ "$created_s" -gt $(( $(date +%s) + 300 )) ]]; then
+    fail "site ${slug}: created_at '${created}' is in the future -- registry wrong, the site would never be due"
+    continue
+  fi
+  if [[ "$created_s" -gt "$started_s" ]]; then
+    ok "site ${slug} registered ${created}, after this backup started -- first due in the next one"
+    continue
+  fi
+  for f in "${slug}-db.sql.gz" "${slug}-wordpress.tgz"; do
+    [[ -f "${TODAY_DIR}/${f}" ]] || fail "${f} missing (site ${slug} registered in ${SITES_DIR})"
+  done
+  if [[ -f "${TODAY_DIR}/${slug}-db.sql.gz" ]]; then require_gzip "${slug}-db.sql.gz" "site ${slug}" 2000 12; fi
+  if [[ -f "${TODAY_DIR}/${slug}-wordpress.tgz" ]]; then require_tgz "${slug}-wordpress.tgz" "site ${slug}" 1000000 1000; fi
+done
 
 # Encrypted .env bundle — required whenever any target .env exists on the host
 if [[ -f /root/soulful/.env || -f /root/chatwoot/.env ]]; then

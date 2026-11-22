@@ -15,7 +15,13 @@ Reads backup-inventory.json next to this file and fails when:
     restore_drill.max_age_days, not PASS, did not cover every store with a "drill" entry, or left labelled
     containers/volumes or files behind;
   - an id this platform stores for another product's object is gone from that product (B8: next-admin's
-    /api/internal/reconcile, one row per inventory reconcile check), or the check could not run.
+    /api/internal/reconcile, one row per inventory reconcile check), or the check could not run;
+  - a client site in the registry SITES_DIR (templates/client-wp/render.sh) is unreadable, or lacks its
+    <slug>-db.sql.gz / <slug>-wordpress.tgz in the ks-aw-01 pipeline (backup-ks-aw-01.sh section 4b). Each registered
+    site is a store "site:<slug>" built here, so its running containers' mounts count as listed.
+Volumes kept by deprovision-site.sh (<site dir>/DEPROVISIONED) are no longer backed up daily; they are reported in a
+"retained-volumes" PASS row as a reminder, not a failure: teardown chose to keep them, and the last snapshots
+holding them stay in R2 until the ks-aw-01/ lifecycle expires them.
 Writes STATUS_FILE (read by scripts/check-backup-health.ps1 and /ops/backup) and one verdict line. On PASS it touches
 OK_STAMP, otherwise sets its mtime to 0, so endpoint-alert.sh (fresh.d registration below) alerts within minutes.
 Exit 0 = all PASS, 1 = a FAIL, 2 = the check itself could not run. Cron: cron.d/backup-coverage.
@@ -38,6 +44,13 @@ OK_STAMP = os.environ.get("BACKUP_COVERAGE_OK_STAMP", "/var/lib/awarewave/backup
 FRESH_REGISTRATION = os.environ.get("BACKUP_COVERAGE_FRESH", "/etc/awarewave-alert/fresh.d/backup-coverage")
 STAMP = re.compile(r"^\d{8}-\d{6}$")
 CLOCK_SKEW = 300  # R2 last_modified vs. this host's clock
+# Client site registry and site dirs: same defaults and override names as templates/client-wp/render.sh.
+SITES_DIR = os.environ.get("CLIENT_WP_REGISTRY_DIR", "/etc/awarewave/sites.d")
+SITES_ROOT = os.environ.get("CLIENT_WP_SITES_ROOT", "/root/sites")
+SITE_PIPELINE = "ks-aw-01"  # backup-ks-aw-01.sh backs registered sites up (section 4b)
+SITE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+SITE_KEYS = {"slug", "domain", "ingress", "container", "db_container", "volumes", "port", "compose_file", "vhost_file",
+             "created_at"}
 
 
 def mount_matches(key, pattern):
@@ -66,7 +79,17 @@ def r2_problems(keys, base, size, mtime, threshold):
     return [f"R2 {k} predates the local file" for k in old]
 
 
-def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now, drill=None, leftovers=(), reconcile=None):
+def site_store(site):
+    """A registered client site as an inventory store (names = render.sh's, already checked by read_sites)."""
+    slug = site["slug"]
+    return {"id": f"site:{slug}", "pipeline": SITE_PIPELINE, "created": site.get("created"),
+            "mounts": [f"{slug}-wp:/var/www/html", f"{slug}-db:/var/lib/mysql"],
+            "artifacts": [f"{slug}-db.sql.gz", f"{slug}-wordpress.tgz"],
+            "sources": {f"{slug}-wp:/var/www/html": f"{slug}_wordpress_data"}}
+
+
+def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now, drill=None, leftovers=(), reconcile=None,
+             sites=(), retained=()):
     """Pure: inventory + observed state -> result rows.
 
     mounts: {"container:destination": source} for running containers' writable mounts (volume name or bind path).
@@ -76,8 +99,20 @@ def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now, drill=None,
     drill: None (no status file) | {"unreadable": why} | backup-restore-drill.py's status JSON.
     leftovers: what the drill left (labelled containers/volumes, files under its work root).
     reconcile: None | {"error": why} | /api/internal/reconcile's answer (B8, one row per inventory check).
+    sites: read_sites() -- [{"slug", "created": epoch | None} | {"file", "error"}].
+    retained: [(slug, [volume, ...])] -- volumes deprovision-site.sh kept that still exist.
     """
     rows = []
+    stores = list(inv["stores"])
+    if sites:
+        bad = [f"{s['file']}: {s['error']}" for s in sites if "error" in s]
+        if SITE_PIPELINE not in inv["pipelines"]:
+            bad.append(f"pipeline {SITE_PIPELINE} missing from the inventory: registered sites cannot be checked")
+        else:
+            stores += [site_store(s) for s in sites if "error" not in s]
+        good = sum("error" not in s for s in sites)
+        rows.append({"id": "site-registry", "status": "FAIL" if bad else "PASS",
+                     "detail": "; ".join(bad) + " -- not backed up" if bad else f"{good} registered site(s) read"})
 
     def row(rid, problems, ok_detail, plan=None):
         r = {"id": rid, "status": "FAIL" if problems else "PASS", "detail": "; ".join(problems) or ok_detail}
@@ -85,19 +120,28 @@ def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now, drill=None,
             r["plan"] = plan
         rows.append(r)
 
-    listed = [p for s in inv["stores"] for p in s["mounts"]] + [p for n in inv["not_backed_up"] for p in n["mounts"]]
+    listed = [p for s in stores for p in s["mounts"]] + [p for n in inv["not_backed_up"] for p in n["mounts"]]
     problems = [] if mounts else ["no writable mounts seen: docker returned nothing"]
     problems += [f"not in backup-inventory.json: {m}" for m in sorted(mounts) if not any(mount_matches(m, p) for p in listed)]
-    for s in inv["stores"]:
+    for s in stores:
         for key, want in s.get("sources", {}).items():
             if key in mounts and mounts[key] != want:
                 problems.append(f"{key} now mounts {mounts[key]}, inventory and its backup script say {want}")
     row("inventory", problems, f"{len(mounts)} writable mounts, all listed")
 
-    for s in inv["stores"]:
+    for s in stores:
         pipe = inv["pipelines"][s["pipeline"]]
         snap = snapshots.get(s["pipeline"])
         problems = []
+        if s.get("created") and s["created"] > now + CLOCK_SKEW:
+            row(s["id"], ["created_at is in the future: registry wrong, the site would never be due"], "")
+            continue
+        # Cutoff = the snapshot's STAMP (host local time, set before backup-ks-aw-01.sh 4b reads sites.d).
+        started = snap and time.mktime(time.strptime(snap["stamp"], "%Y%m%d-%H%M%S"))
+        if s.get("created") and (snap is None or s["created"] > started):
+            rows.append({"id": s["id"], "status": "PASS",
+                         "detail": "registered after the newest snapshot: first due in the next one"})
+            continue
         if snap is None:
             problems.append(f"no snapshot directory under {pipe['local_root']}")
         elif pipe.get("complete_marker") and pipe["complete_marker"] not in snap["files"]:
@@ -178,6 +222,11 @@ def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now, drill=None,
             problems = [f"{len(got['dangling'])} id(s) {owner} does not have: "
                         + ", ".join(f"{p['where']} -> {p['id']}" for p in got["dangling"][:3])] if got["dangling"] else []
         row(f"ids:{cid}", problems, f"{got and got.get('checked')} stored ids all exist in {owner}", "B8")
+
+    if retained:
+        rows.append({"id": "retained-volumes", "status": "PASS",
+                     "detail": "kept after teardown, NOT in the daily backup: "
+                               + "; ".join(f"{slug} ({', '.join(v)})" for slug, v in retained)})
     return rows
 
 
@@ -210,6 +259,59 @@ def newest_snapshot(root):
                 with open(path, encoding="utf-8") as fh:
                     members[name] = [line.strip().lstrip("./") for line in fh if line.strip()]
     return {"stamp": stamps[-1], "files": files, "members": members}
+
+
+def read_sites(d=None):
+    """sites.d -> [{"slug", "created": epoch | None} | {"file", "error"}]. Same refusal rule as backup-ks-aw-01.sh 4b."""
+    d = d or SITES_DIR
+    try:
+        names = sorted(n for n in os.listdir(d) if n.endswith(".json") and not n.startswith("."))
+    except FileNotFoundError:
+        return []
+    out = []
+    for name in names:
+        slug = name[:-5]
+        try:
+            with open(os.path.join(d, name), encoding="utf-8") as fh:
+                r = json.load(fh)
+        except (OSError, ValueError) as e:
+            out.append({"file": name, "error": f"unreadable ({type(e).__name__})"})
+            continue
+        if not SITE_SLUG.match(slug):
+            out.append({"file": name, "error": "file name is not a site slug"})
+        elif not isinstance(r, dict) or set(r) != SITE_KEYS:
+            out.append({"file": name, "error": "keys differ from the template"})
+        elif (r["slug"], r["container"], r["db_container"], r["volumes"]) != (
+                slug, f"{slug}-wp", f"{slug}-db", [f"{slug}_wordpress_data", f"{slug}_db_data"]):
+            out.append({"file": name, "error": "slug/container/db_container/volumes differ from what render.sh derives"})
+        else:
+            try:
+                created = datetime.strptime(r["created_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+            except (TypeError, ValueError):
+                created = None  # unknown age: due now
+            out.append({"slug": slug, "created": created})
+    return out
+
+
+def retained_volumes(root=None):
+    """[(slug, [volume, ...])] for <site dir>/DEPROVISIONED markers whose volumes still exist (a purge removes both)."""
+    root = root or SITES_ROOT
+    try:
+        dirs = sorted(os.listdir(root))
+    except FileNotFoundError:
+        return []
+    marked = []
+    for slug in dirs:
+        try:
+            with open(os.path.join(root, slug, "DEPROVISIONED"), encoding="utf-8") as fh:
+                vols = next((ln.split("=", 1)[1].split() for ln in fh if ln.startswith("volumes=")), [])
+        except OSError:
+            continue
+        marked.append((slug, vols))
+    if not marked:
+        return []
+    have = set(subprocess.run(["docker", "volume", "ls", "-q"], check=True, capture_output=True, text=True).stdout.split())
+    return [(slug, [v for v in vols if v in have]) for slug, vols in marked if any(v in have for v in vols)]
 
 
 def parse_env(text):
@@ -364,7 +466,7 @@ def main():
     except Exception:  # noqa: BLE001 -- reported in the r2-retention row
         pass
     rows = evaluate(inv, running_mounts(), snapshots, r2_keys, lifecycle, locks, time.time(), read_drill(inv),
-                    drill_leftovers(inv), read_reconcile(inv))
+                    drill_leftovers(inv), read_reconcile(inv), read_sites(), retained_volumes())
     fails = [r for r in rows if r["status"] == "FAIL"]
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     write_atomic(STATUS_FILE, json.dumps({"generated_at": stamp, "overall": "FAIL" if fails else "PASS", "rows": rows},
