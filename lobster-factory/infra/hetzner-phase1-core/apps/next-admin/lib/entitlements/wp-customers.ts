@@ -13,6 +13,7 @@ import { findAuthUserByEmail, inviteClientAccount, verifiedClientAccount } from 
 import { servedNextAdminProducts } from "@/lib/portal/doors";
 import { AWARE_WAVE_KEY_ID, siteIdentityProvider, type SellerSite } from "@/lib/payments/sites";
 import { findBillingAccount, linkIdentity, type Identity } from "./identities";
+import { isCustomerRoot } from "./subject";
 
 /** emailVerified: WordPress (the wp-bridge plugin) proved this member owns the address. WooCommerce does not, so the
  *  plugin must; an account is never made for an unproven address (critic 2026-10-25 second pass, M). */
@@ -42,7 +43,7 @@ export async function findWpOrganization(db: SupabaseClient, site: MemberSite, w
   if (got.error) throw new Error(got.error.message);
   const row = got.data as { id: string; name: string; kind: string; parent_organization_id: string | null; metadata: Record<string, unknown> | null } | null;
   if (!row) return null;
-  if (row.kind !== "customer" || row.parent_organization_id !== null || row.metadata?.wp_user_id !== wpUserId || !orgSiteMatches(row.metadata, site)) {
+  if (!isCustomerRoot(row) || row.metadata?.wp_user_id !== wpUserId || !orgSiteMatches(row.metadata, site)) {
     throw new WpCustomerRefused("organization_slug_taken");
   }
   return { id: row.id, name: row.name };
@@ -92,7 +93,7 @@ export async function emailOwner(db: SupabaseClient, email: string): Promise<Ema
     if (org.error) throw new Error(org.error.message);
     const row = org.data as { metadata: Record<string, unknown> | null; kind: string; parent_organization_id: string | null } | null;
     owner.orgMetadata = row?.metadata ?? null;
-    owner.orgRootCustomer = row?.kind === "customer" && row.parent_organization_id === null;
+    owner.orgRootCustomer = isCustomerRoot(row);
   }
   return owner;
 }

@@ -7,6 +7,7 @@ import { createPublicKey, verify as verifySignature } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sellerMaySell, type CanStore } from "@/lib/entitlements/can";
 import { createEntitlementStore } from "@/lib/entitlements/tables";
+import { isCustomerKind } from "@/lib/entitlements/subject";
 import { verifyPayment } from "./hmac";
 
 /** aware-wave.com's row (0133): hmac-env until its plugin moves to ed25519; a request with no site header is this one. */
@@ -35,10 +36,11 @@ type Row = {
 };
 function toSite(r: Row): SellerSite {
   const seller = Array.isArray(r.seller) ? r.seller[0] : r.seller;
-  // 0133 seller_root_account_check: a seller is a root internal or customer account; anything else is not a seller.
-  if (seller?.kind !== "internal" && seller?.kind !== "customer") throw new Error(`seller_sites ${r.key_id}: seller is not a billing account`);
+  // 0133/0175 seller_root_account_check: a seller is a root internal or customer (or test) account; anything else is not a
+  // seller. A test seller is a customer seller here, as subject.ts reads it (0175).
+  if (seller?.kind !== "internal" && !isCustomerKind(seller?.kind)) throw new Error(`seller_sites ${r.key_id}: seller is not a billing account`);
   return {
-    id: r.id, host: r.host, keyId: r.key_id, sellerOrganizationId: r.seller_organization_id, sellerKind: seller.kind,
+    id: r.id, host: r.host, keyId: r.key_id, sellerOrganizationId: r.seller_organization_id, sellerKind: seller.kind === "internal" ? "internal" : "customer",
     verifyAlg: r.verify_alg, publicKey: r.public_key, envVar: r.env_var, handoffPublicKey: r.handoff_public_key,
     handoffEnvVar: r.handoff_env_var, status: r.status,
   };

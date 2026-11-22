@@ -3,7 +3,7 @@
 // passes the real ones).
 import { canWriteTenantConfig, readOpsRole } from "@/lib/ops-role";
 import { staffGrantOf, staffMayUseTool, staffUnrestricted } from "@/lib/staff-access";
-import { requestActor, resolveSubject } from "@/lib/entitlements/subject";
+import { isCustomerKind, requestActor, resolveSubject } from "@/lib/entitlements/subject";
 import { giveProduct, takeProduct, STAFF_GRANT_KINDS, type StaffGrantChange } from "@/lib/entitlements/staff-grants";
 import { PRODUCTS } from "@/lib/portal/products";
 import { HUB_TAB_TOOL } from "./hub-tab-tools";
@@ -52,7 +52,7 @@ export async function staffGrantOutcome(form: FormData, h: Headers): Promise<URL
     q.set("r", "account_not_found");
     return q;
   }
-  if (account.kind !== "customer") {
+  if (!isCustomerKind(account.kind)) {
     q.set("r", "internal_account");
     return q;
   }

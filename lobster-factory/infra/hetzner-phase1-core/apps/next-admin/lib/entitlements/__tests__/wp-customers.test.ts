@@ -47,6 +47,11 @@ describe("a WordPress member's organization", () => {
     await expect(ensureWpOrganization(db, MEMBER)).resolves.toEqual({ id: "o1", name: "A B" });
   });
 
+  it("a member organization marked test (0175) is found like a customer one", async () => {
+    const row = { id: "o1", name: "A B", slug: wpOrgSlug(AWC, 57), kind: "test", parent_organization_id: null, metadata: { source: "awarewave-wp", wp_user_id: 57 } };
+    await expect(findWpOrganization(fakeDb({ data: null, error: null }, row).db, AWC, 57)).resolves.toEqual({ id: "o1", name: "A B" });
+  });
+
   it("a slug taken by an organization that is not this member's is refused, never billed", async () => {
     for (const other of [
       { slug: wpOrgSlug(AWC, 57), id: "x", name: "X", kind: "customer", parent_organization_id: null, metadata: {} },

@@ -119,7 +119,7 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
 
 /** One billing account, the 帳務 tab on /ops/clients/<slug> (0127 billing_account; grants grouped, so 300+ feature rows stay one line). */
 export interface BillingAccount {
-  organization_id: string; name: string; slug: string; kind: "internal" | "customer";
+  organization_id: string; name: string; slug: string; kind: "internal" | "customer" | "test";
   all_features: { source: string; source_ref: string; note: string | null } | null;
   balance: number;
   hold: { reason: string; since: string } | null;
@@ -149,7 +149,7 @@ export interface BillingLedger {
     & Record<AttentionReason, number>;
   matching: number;
   rows: Array<{
-    organization_id: string; name: string; slug: string; kind: "internal" | "customer";
+    organization_id: string; name: string; slug: string; kind: "internal" | "customer" | "test";
     balance: number; granted_30d: number; spent_30d: number; frozen_since: string | null; reasons: AttentionReason[];
     contracts: Array<{ product_key: string; plan_key: string; status: string; current_period_end: string | null }>;
     next_period_end: string | null;

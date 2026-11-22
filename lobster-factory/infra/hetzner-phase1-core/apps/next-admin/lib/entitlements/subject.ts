@@ -4,7 +4,14 @@ import { resolveOpsRole } from "@/lib/ops-role";
 import { resolveTenant } from "@/lib/tenant-guard";
 import type { Subject } from "./can";
 
-export interface OrgRow { id: string; parent_organization_id: string | null; kind: "internal" | "customer" }
+export interface OrgRow { id: string; parent_organization_id: string | null; kind: "internal" | "customer" | "test" }
+
+/** 0175 (ADR 021 D3): a `test` unit bills, buys, sells and is granted exactly like a customer; only reports and tags tell
+ *  them apart. Every "is this a customer" check in the app goes through these two, the same rule as 0175's DB functions. */
+export const isCustomerKind = (kind: unknown): kind is "customer" | "test" => kind === "customer" || kind === "test";
+/** A root billing account that is not the internal one. */
+export const isCustomerRoot = (row: { kind: unknown; parent_organization_id: string | null } | null | undefined): boolean =>
+  !!row && row.parent_organization_id === null && isCustomerKind(row.kind);
 export interface SubjectStore {
   byId(id: string): Promise<OrgRow | null>;
   bySlug(slug: string): Promise<OrgRow | null>;

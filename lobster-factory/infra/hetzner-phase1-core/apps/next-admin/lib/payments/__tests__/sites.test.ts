@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import { sellerLicenceKey } from "@/lib/entitlements/can";
 import { generateKeyPairSync } from "node:crypto";
-import { ed25519PublicKeyPem, siteMaySellPlan, type SellerSite } from "../sites";
+import { ed25519PublicKeyPem, findSiteByKeyId, siteMaySellPlan, type SellerSite } from "../sites";
 
 const SHOP: SellerSite = { id: "site-shop", host: "shop.example", keyId: "shop-b", sellerOrganizationId: "org-reseller", sellerKind: "customer",
   verifyAlg: "ed25519", publicKey: "-----BEGIN PUBLIC KEY-----", envVar: null, handoffPublicKey: null, handoffEnvVar: null, status: "active" };
@@ -46,5 +46,17 @@ describe("which plans a cash-register site may sell (ADR 017 #12, 4c-2)", () => 
     // a pack with no plan names no product: only aware-wave.com sells one
     expect(await siteMaySellPlan(none.db, SHOP, undefined, none.store)).toBe("seller_pack_needs_plan");
     expect(await siteMaySellPlan(awc.db, AWC, undefined, awc.store)).toBeNull();
+  });
+});
+
+describe("a site's seller kind (0133, 0175)", () => {
+  const row = (kind: string) => ({ id: "s1", host: "shop.example", key_id: "shop-b", seller_organization_id: "org-x", verify_alg: "ed25519",
+    public_key: "k", env_var: null, handoff_public_key: null, handoff_env_var: null, status: "active", seller: { kind } });
+  const db = (kind: string) => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: row(kind), error: null }) }) }) }) }) as unknown as SupabaseClient;
+  it("a test seller sells as a customer seller; any other kind is not a seller", async () => {
+    expect((await findSiteByKeyId(db("test"), "shop-b"))?.sellerKind).toBe("customer");
+    expect((await findSiteByKeyId(db("customer"), "shop-b"))?.sellerKind).toBe("customer");
+    expect((await findSiteByKeyId(db("internal"), "shop-b"))?.sellerKind).toBe("internal");
+    await expect(findSiteByKeyId(db("bogus"), "shop-b")).rejects.toThrow("seller is not a billing account");
   });
 });
