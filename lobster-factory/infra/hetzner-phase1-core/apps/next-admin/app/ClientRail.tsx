@@ -12,6 +12,7 @@ import { useClientContextState, type ClientContextValue } from "@/lib/client-con
 
 export const ORG_SEARCH_PATH = "/api/ops/org-search";
 const SELF_NAME = "AwareWave 自己";
+const SELF_DOT = "var(--accent)";   // the row's dot (a background in OrgPicker), not text
 
 const STATUS_TEXT: Partial<Record<ClientContextValue["status"], string>> = {
   rejected: "此網址與登入的客戶不一致，無法顯示。",
@@ -62,7 +63,7 @@ export function ClientRail() {
 
   const { org, site, sites, status, layer, internalOrgId } = ctx;
   const self: PickOrg | null = internalOrgId
-    ? { id: internalOrgId, slug: "", name: SELF_NAME, color: "var(--accent)", brandColors: [] }
+    ? { id: internalOrgId, slug: "", name: SELF_NAME, color: SELF_DOT, brandColors: [] }
     : null;
   const others = page.first.filter((o) => o.id !== internalOrgId);
   const rows: PickOrg[] = self ? [self, ...others] : others;

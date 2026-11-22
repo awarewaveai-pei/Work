@@ -897,7 +897,7 @@ launcher 現況問題與改法：
 |---|---|---|---|
 | `PlatformFrame` | 取代 `(shell)/layout.tsx`、`ProductDoorShell.tsx` | 一般／未開通（沿用現有頁）／暫時無法確認 | 外框只讀登記表與主機設定，不寫死網域 |
 | `NavRail` | 合併 `SidebarNav`、`DoorNav` | 目前頁（`aria-current`）／子頁縮排（`under`）／徽章 | 項目＝`{label, href, under?, badge?}` |
-| `ClientRail` | CLIENT-CONTEXT-PLAN K4（類別列 U3）；以 `OrgPicker` 為核心 | 載入／無結果「無符合的客戶」／搜尋失敗「搜尋失敗，請再試一次」（沿用 `OrgPicker.tsx:153`）／只列前 20 筆提示 | 類別為單選按鈕組；選客戶寫入網址 `org` |
+| `ClientRail` | `app/ClientRail.tsx`（K4 已做；類別列 U3）；以 `OrgPicker` 為核心 | 載入／無結果「無符合的客戶」／搜尋失敗「搜尋失敗，請再試一次」（沿用 `OrgPicker.tsx:153`）／只列前 20 筆提示 | 類別為單選按鈕組；選客戶寫入網址 `org` |
 | `ToolCard`（三密度）＋`ToolGrid` | 取代 launcher 卡片（原 `ProductCard`）；公開站同型 | §5.2 全部觀看者與狀態 | 標籤與按鈕只由 `RightBadge` 決定；量級大時只換容器為 `FacetedList`（§4.7） |
 | `SearchBox` | 【新增】頂列與探索頁共用 | 空／輸入中／結果／無結果（§3.6）／載入 | 瀏覽器端索引（§4.5）；`/` 聚焦 |
 | `WpSummary`（外掛端） | 【新增】`MyAccountDoors::render()` | 載入／清單／尚未連結／讀不到（退場） | 文案全由 app JSON 帶入（§2A.4） |
@@ -925,7 +925,7 @@ launcher 現況問題與改法：
 | U4 | 1 | 員工在產品門搜尋客戶（定義在 CLIENT-CONTEXT-PLAN §4 第 1 波） | `lib/portal/doors.ts`、`staff-tools.ts`、`api/ops/org-search/route.ts`、測試 | K3 | **High** | 客戶身分打該路由＝403（不是 404，見 §9.4 第 2 點）；enforce 下沒勾格的員工 403 |
 | U5 | 1 | `/api/entitlements/features?org=`（定義在 CLIENT-CONTEXT-PLAN §4 第 1 波） | `app/api/entitlements/features/route.ts`、`use-paid-features.ts` | K4、U6 | **High** | 員工無該客戶角色＝403 `not_authorized_for_org` |
 | U6 | 1 | `RightBadge` 純函式＋§8 表格驅動測試（含 S16、S18、R1–R3 預留分支） | 新 `lib/entitlements/right-label.ts`；`use-paid-features.ts` | — | Low | §8 每列一個測試；刪 `WHY` |
-| U7 | 1 | 客戶版帳戶唯讀 API | 新 `app/api/portal/account/route.ts` | — | Medium | 只回 §15.4 子集 |
+| U7 | 1 | 客戶版帳戶唯讀 API | 新 `app/portal/api/account/route.ts`（客戶只進得了 `/portal/*`） | — | Medium | 只回 §15.4 子集 |
 | U8 | 1 | 工作台改版（用 `ToolCard`） | `app/portal/launcher/page.tsx` | U6、U7、U21 | Medium | 已開通在上；失敗有重新整理；空狀態文案 |
 | U9 | 1 | 「尚未開通」頁加「了解這個產品」 | `ProductDoorShell.tsx` | — | Low | 兩顆按鈕都不是死路 |
 | U10 | 1 | 點數與合約頁 | 新 `app/portal/wallet/page.tsx` | U7 | Medium | 三分頁；被授權的人無購買鈕 |

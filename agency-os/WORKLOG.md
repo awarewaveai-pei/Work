@@ -12,6 +12,17 @@
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n
 - BUGHUNT_DONE: scope=Projects/internal/ziwei-doushu,agency-os,scripts,lobster-factory | grep=verifySiteRequest | hits=6
 - ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；各卡工人 critic（E4 Deep、SF-B critic＋db-expert）＋突變測試＋監工讀 diff 代替
+## 2026-11-22（續11）— 平台第 2 批併入：K4、U7、U22（M1 高風險，另待操作者同意）
+
+- K4 `1ad43b327`：`NA/app/ClientContextProvider.tsx`、`app/ClientRail.tsx`、`lib/client-context/use-client-context.ts`，尚無頁面掛載（K5 接）。U7 `22dedf837`：`GET /portal/api/account`，單位只由 `requireClientOrg` 取；`lib/entitlements/identities.ts` 加 `isAccountManager`（查不到＝被授權的人）。U22 `7e21ab49c`：`products.ts` 每產品 `catalog`＋`lib/portal/catalog-vocab.ts`，`scripts/new-product.mjs` 多四個必填旗標。
+- 規格更正（根因：規劃時沒對照 `middleware.ts` 的 `isClientOutsideDoor`）：U7 路徑 `app/api/portal/account` 客戶會被擋成 403 → 改 `app/portal/api/account`；`DISPATCH.md:35`、藍圖 U7 列已改。
+- 整合後全套測試 1 紅：`lib/theme/__tests__/accent-not-text.test.ts` 命中 `ClientRail.tsx:65`（「AwareWave 自己」那列色點的資料欄位寫成 `color: "var(--accent)"`，正則當成文字色）。改成具名常數 `SELF_DOT`（色點是 OrgPicker 的背景，不是文字），沒有動檢查器。
+- RISKS 處置八條寫在同資料夾 `data.mjs` 的 `RISKS`（K4 產品門無客戶頁連結／固定寬／網站清單失敗顯示成沒有網站 → K5；U7 管理者判斷未對真庫驗 → U10；U22 `addedAt` 統一 2026-01-01、圖示與任務名為工人所擬 → 保留）。
+- M1（`kind=test`，migration＋金流函式）未併：工人仍在收尾，驗收後先問操作者。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin 整合後全套；修後重跑 accent-not-text＋ClientRail) && node --test scripts/__tests__/new-product.test.mjs | exit=0 | ms=700000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/2n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api/portal/account | hits=2
+- ORACLE_WAIVED: Codex 額度 2026-11-24 才恢復；U7 可見範圍守衛有工人的突變證據（改用 query 的單位 → 測試轉紅 → 還原），監工逐行讀過 route 與 `isAccountManager`
 ## 2026-11-22（續9）— 平台（會員／目前客戶／登入後介面）第 1 批併入：K1、K2、K3、U6＋監工台
 
 - 根因：「目前客戶」在各頁各傳各的（`siteId`／`org`／退回第一個網站），權益文字散在 `use-paid-features.ts` 的對照表；規劃見 `agency-os/handoffs/2026-11-22-platform-membership-ux/DISPATCH.md`。
