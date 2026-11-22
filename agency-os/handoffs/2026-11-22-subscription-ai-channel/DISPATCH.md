@@ -57,3 +57,10 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 `sg-deploy.sh next-admin` → `a12137def`（前一版 `343fe7f9c`），healthy 15 s，HTTP smoke 全 OK；Playwright smoke 34 passed／0 failed（`agency-os/reports/e2e/2026-11-22/smoke`）。
 正式站實測：筆電 worker（owner lane，tools codex＋claude）→ 文章頁 `claude+api`＋Haiku → worker 109 s 交回、`ai_call_logs` 一列 `sub-claude-haiku`／vendor 訂閱／usd 0／answered `claude-haiku-5-5`。網站設定頁（選 Soulful）：按鈕「這個客戶的網站也是我的，允許用訂閱」、12 個模型、套用到所有網站皆在。
 發現：`TextChainButtons` 狀態只在掛載時讀一次（worker 後啟動仍顯示離線）→ 小卡。未看：成本頁、劇本工坊頁、apply-text-road 對真 PostgREST（Chrome MCP 中途 unhealthy）。
+
+### K14＋K12（2026-11-22 晚）
+- K14 `TextChainButtons` 狀態每 15 s 重讀：main `ad07ec5ef`（tsc 0；vitest components/tools＋lib/portal＋content 頁 166 passed）。未部署。
+- 09:57Z 容器重建＝他線 `safe-infra-patch.sh compose`（`/root/lobster-phase1/safe-patch.log` 09:57:19 apply → 09:57:48 success），非 K12 造成。
+- K12 重跑（正式站、擁有者 session、逐一）：12/12 完成，每篇存 `content_drafts` 後取出再刪（36 列測試草稿已刪）。資料 `agency-os/reports/model-bakeoff/2026-11-article/`（`drafts.jsonl`、`ledger.jsonl`、`metrics.json`、`key.json`＝字母↔模型）。總實扣約 NT$52。盲測頁 `https://claude.ai/artifact/JyYNnD8Txmmiwv53S4wMsU`。
+- 結果（字母／模型／NT$／秒／字數／SEO／未查證標記）：A opus-5-5 8.03/119/5221/86/7；B haiku-5-5 0.08/24/2621/59/0；C gpt-5.4 2.88/84/4978/73/3；D gpt-6.2-astra 6.68/105/4117/82/3；E gpt-6.2-sol 1.96/80/4338/86/0；F gpt-5.4-mini 0.71/23/3801/68/5；G gpt-5.5 8.72/164/4850/77/3（截斷）；H fable-5-1 19.56/167/5437/82/13；I gpt-5.4-nano 0.25/33/5298/64/1；J sonnet-5-5 2.16/46/3576/68/0；K gpt-6-luna 0.13/55/4297/82/0；L gpt-6.1-terra 1.02/82/4328/77/6。
+- 待操作者：回覆她選的字母 → 寫進 `app/(shell)/tools/ai-models/MeasuredRuns.tsx`「文章生成」組 → K13 開測前先問她。
