@@ -46,7 +46,7 @@ const { chromium } = require("playwright");
     fail = true;
     await p.locator("#send").click();
     await p.locator("#service-error").waitFor();
-    assert.match(await p.locator("#service-error").innerText(), /422/);
+    assert.match(await p.locator("#service-error").innerText(), /host rejected input/); // the server's own refusal, not a bare status code (9fa2320f8)
     assert.equal(await p.evaluate(() => localStorage.getItem("vw.app.v1")), null);
     const retryStart = calls.length;
     fail = false;

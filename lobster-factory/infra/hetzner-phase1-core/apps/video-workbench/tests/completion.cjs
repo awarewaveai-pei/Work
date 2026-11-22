@@ -97,7 +97,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   await p.locator("#service-error button").click();
   await p.locator("#historyNav").click();
   await p.locator("[data-job-open]").first().click();
-  assert.match(await p.locator(".job-view").innerText(), /blocked/);
+  assert.match(await p.locator(".job-view").innerText(), /已停止/); // job states read Chinese (shared/jobs-view.js JOB_STATUS, a07784024)
   await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
   await p.locator("[data-job-draft]").first().click();
   assert.equal(await p.locator("#prompt").inputValue(), "第二步調色");

@@ -4,9 +4,12 @@ const evidence = fs.mkdtempSync(path.join(os.tmpdir(), "vw-generate-parity-"));
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=", "base64");
 (async () => {
   const providerCalls = [];
-  const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: { OPENAI_API_KEY: "test-only", VW_VIDEO_MODEL: "configured-video" }, fetchImpl: async (url, options) => {
+  const server = require("../server.cjs").createServer({ dataDir: path.join(evidence, "data"), env: { OPENAI_API_KEY: "test-only", REPLICATE_API_TOKEN: "test-only", VW_VIDEO_MODEL: "veo-3-1-fast" }, fetchImpl: async (url, options) => {
+    // Video models are a fixed list since card RV (backend/generation-policy.cjs videoModels; Sora retired): VW_VIDEO_MODEL
+    // picks the default among them, so the env default is a listed model that is not the list's own first (Gemini).
     providerCalls.push({ url, body: options.body });
-    if (url.endsWith("/videos")) return Response.json({ id: "fixture-video", status: "queued" });
+    if (url.endsWith("/models/google/veo-3.1-fast/predictions")) return Response.json({ id: "fixture-video", status: "starting" });
+    if (url.includes("api.replicate.com/v1/predictions/")) return Response.json({ id: "fixture-video", status: "starting" });
     if (url.endsWith("/images/generations")) return Response.json({ data: [{ b64_json: png.toString("base64") }] });
     throw Error("Unexpected provider call: " + url);
   } });
@@ -22,12 +25,12 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.goto(base);
     await p.waitForFunction(() => window.VideoWorkbench?.generator?.controlsReady);
     await p.locator("[data-mode=reference]").click();
-    assert.match(await p.locator("#modelBtn").innerText(), /configured-video/);
+    assert.match(await p.locator("#modelBtn").innerText(), /Veo 3\.1 Fast/);
     await p.locator("#prompt").fill("測試海邊影片");
     await p.locator("[data-panel=settings]").first().click();
     assert(await p.locator('[data-ratio="1:1"]').isDisabled());
     await p.locator('[data-ratio="9:16"]').click();
-    await p.locator("[data-gen-duration='12']").click();
+    await p.locator("[data-gen-duration='4']").click(); // a non-default length the model offers (Veo 3.1 Fast: 4/6/8)
     await p.locator("[data-panel=presets]").click();
     await p.locator("#generatorPresetName").fill("直橫雙比例");
     await p.locator("[data-gen-preset-save]").click();
@@ -36,7 +39,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.reload();
     await p.waitForFunction(() => VideoWorkbench.generator.controlsReady);
     await p.locator("[data-mode=reference]").click();
-    assert.match(await p.locator("#outputBtn").innerText(), /16:9、9:16.*12s/);
+    assert.match(await p.locator("#outputBtn").innerText(), /16:9、9:16.*4s/);
     console.log("PASS 儲存設定與預設跨重新整理生效；多比例、支援時長、服務端模型");
 
     {
@@ -109,7 +112,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     await p.locator("#send").click();
     await p.getByRole("heading", { name: "多比例生成任務" }).waitFor();
     assert.equal(submissions.at(-1).type, "cartoon");
-    assert.match(submissions.at(-1).settings.model, /configured-video/);
+    assert.match(submissions.at(-1).settings.model, /veo-3-1-fast/);
     await p.locator("#closeModal").click();
     console.log("PASS 卡通風格必選，送出影片設定");
 
@@ -173,7 +176,8 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     assert.deepEqual(errors, []);
 
     const before = providerCalls.length;
-    for (const settings of [{ subtitle: "開" }, { audio: "靜音" }, { quality: "480p" }, { ratio: "1:1" }]) {
+    // 靜音 is a real choice now (a model without sound, backend/generation-policy.cjs:21), so it is not refused here
+    for (const settings of [{ subtitle: "開" }, { quality: "480p" }, { ratio: "1:1" }]) {
       const response = await fetch(base + "/api/vw/generations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "video", prompt: "guard", settings }) });
       assert.equal(response.status, 400);
     }
@@ -182,8 +186,9 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     assert.equal(response.status, 202);
     assert.equal((await response.json()).type, "video");
     await new Promise((r) => setTimeout(r, 100));
-    assert(providerCalls.at(-1).url.endsWith("/videos"));
-    assert.match(JSON.parse(providerCalls.at(-1).body).prompt, /水彩/);
+    const create = providerCalls.find((c) => c.url.endsWith("/predictions") && c.body);
+    assert(create, "the cartoon job went to the video adapter");
+    assert.match(JSON.parse(create.body).input.prompt, /水彩/);
     console.log("PASS 後端拒絕不支援設定且不呼叫供應商；卡通實際使用影片 adapter");
     console.log("EVIDENCE " + evidence);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise((r) => server.close(r)); }

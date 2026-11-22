@@ -130,7 +130,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
       await p.locator("#historyNav").click();
       await p.locator(`[data-job-check="${stale.id}"]`).click();
       await p.locator(".job-view").waitFor();
-      assert.match(await p.locator(".job-view").innerText(), /queued|running/);
+      assert.match(await p.locator(".job-view").innerText(), /排隊中|處理中/); // job states read Chinese (shared/jobs-view.js JOB_STATUS, a07784024)
       assert.equal(provider.length, count);
       await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
       release();
@@ -155,10 +155,14 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     const beforeRefresh = provider.length;
     const jobCount = (await p.evaluate(() => VideoWorkbench.generations.list())).length;
     await p.getByRole("button", { name: "重新整理", exact: true }).click();
-    await p.locator(`[data-job-check="${fresh.id}"]`).click();
+    // 重新整理 itself brings the finished state (1340eeff4: one reconcile runner woken by refresh), so the card turns
+    // into 以相同設定再次執行 and the result is opened with 檢視任務
+    await p.locator(`[data-job-retry="${fresh.id}"]`).waitFor();
+    await p.locator(`[data-job-open="${fresh.id}"]`).click();
     await p.getByRole("link", { name: "下載成果", exact: true }).waitFor();
     assert.equal(provider.length, beforeRefresh);
-    assert.match(await p.locator(".job-view").innerText(), new RegExp(fresh.id));
+    // the view no longer prints the job id (a07784024: the id stays in data attributes); it was opened by fresh.id above
+    assert.match(await p.locator(".job-view").innerText(), /已完成/);
     assert.equal((await p.evaluate(() => VideoWorkbench.generations.list())).length, jobCount);
     await p.locator(".job-view button").filter({ hasText: "關閉" }).click();
     await p.locator("#generatorNav").click();

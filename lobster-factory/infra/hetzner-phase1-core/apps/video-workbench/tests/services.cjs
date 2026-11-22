@@ -26,6 +26,10 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
       body: `window.VW_CONFIG={mode:'http',apiBaseUrl:'/api/vw',timeoutMs:1000}`,
     }),
   );
+  // the client picker (scripts/organization-picker.js) reads its list from the main system in http mode
+  await p.route("**/api/video/workbench/bootstrap**", (r) =>
+    r.fulfill({ json: { ok: true, orgs: [{ id: "11111111-1111-4111-8111-111111111111", name: "內部帳戶" }], total: 1, scoped: false } }),
+  );
   await p.route("**/api/vw/**", async (r) => {
     const req = r.request(),
       url = new URL(req.url()).pathname;
@@ -34,6 +38,8 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
       url,
       body: req.postData() ? req.postDataJSON() : null,
     });
+    // every http-mode page first asks who it works for (shared/adapters.js, since 300396496)
+    if (url.endsWith("/identity")) return r.fulfill({ json: { organizationId: "11111111-1111-4111-8111-111111111111" } });
     if (url.endsWith("/state")) {
       if (req.method() === "PUT") db = req.postDataJSON();
       return r.fulfill({ json: db });
@@ -83,10 +89,10 @@ process.env.EVIDENCE_DIR ||= fs.mkdtempSync(
       .body.references.images[0].url,
     "/assets/test-image-1.png",
   );
-  assert.match(await p.locator(".job-view").innerText(), /queued/);
+  assert.match(await p.locator(".job-view").innerText(), /排隊中/); // job states read Chinese (shared/jobs-view.js JOB_STATUS, a07784024)
   await p.locator(".job-view button").filter({ hasText: "取消任務" }).click();
   await p.waitForFunction(() =>
-    document.querySelector(".job-view").textContent.includes("cancelled"),
+    document.querySelector(".job-view").textContent.includes("已取消"),
   );
   assert(requests.some((r) => r.url.endsWith("/cancel")));
   await p.locator(".job-view button").filter({ hasText: "關閉" }).click();

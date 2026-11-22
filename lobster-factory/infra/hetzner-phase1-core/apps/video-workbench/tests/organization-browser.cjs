@@ -8,9 +8,12 @@ const A = "11111111-1111-4111-8111-111111111111", B = "22222222-2222-4222-8222-2
   await new Promise((r) => app.listen(0, "127.0.0.1", r));
   const proxy = http.createServer(async (req, res) => {
     const json = (value) => { res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify(value)); };
-    if (req.url === "/api/vw/identity") return json({ scope: org, organizationId: org });
-    if (req.url === "/api/video/workbench/bootstrap") return json({ organizations: [{ id: A, name: "內部帳戶" }, { id: B, name: "Soulful" }] });
-    if (req.url === "/api/video/workbench/organization") {
+    const url = new URL(req.url, "http://x"), orgs = [{ id: A, name: "內部帳戶" }, { id: B, name: "Soulful" }];
+    if (url.pathname === "/api/vw/identity") return json({ scope: org, organizationId: org });
+    // the picker's modes since R10 (6101bb235): ?first=1&include=<current> and ?q= (next-admin bootstrap/route.ts)
+    if (url.pathname === "/api/video/workbench/bootstrap")
+      return json(url.searchParams.has("q") ? { ok: true, orgs: orgs.filter((o) => o.name.includes(url.searchParams.get("q"))) } : { ok: true, orgs, total: orgs.length, scoped: false });
+    if (url.pathname === "/api/video/workbench/organization") {
       let body = ""; for await (const chunk of req) body += chunk;
       org = JSON.parse(body).organizationId; switches++; return json({ ok: true, organizationId: org });
     }
