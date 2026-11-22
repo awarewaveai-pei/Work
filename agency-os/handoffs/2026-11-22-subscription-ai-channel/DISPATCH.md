@@ -53,5 +53,7 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 正式站資料修正（操作者逐次同意）：aware-wave.com `wp_posts` 36,38,48,55,62,69 移除 `[COST_JSON]` 段；62,69 移除 `NEEDS_FACT_CHECK` 標記（21＋6 處）；備份 `~/backups/wp-costjson-20261122/`、`~/backups/wp-factcheck-20261122/`；線上頁面 curl 驗 0 命中。Soulful 0 篇。
 未關：劇本工坊無員工頁可用訂閱（部署後決定）；`SiteManager` 預覽未以真資料看；`probe-models.mjs --write-verified` 寫出重複屬性（`cost-model.ts:156`，既有工具 bug）。
 
-### 部署 A
-（待做）
+### 部署 A（2026-11-22 09:37Z）
+`sg-deploy.sh next-admin` → `a12137def`（前一版 `343fe7f9c`），healthy 15 s，HTTP smoke 全 OK；Playwright smoke 34 passed／0 failed（`agency-os/reports/e2e/2026-11-22/smoke`）。
+正式站實測：筆電 worker（owner lane，tools codex＋claude）→ 文章頁 `claude+api`＋Haiku → worker 109 s 交回、`ai_call_logs` 一列 `sub-claude-haiku`／vendor 訂閱／usd 0／answered `claude-haiku-5-5`。網站設定頁（選 Soulful）：按鈕「這個客戶的網站也是我的，允許用訂閱」、12 個模型、套用到所有網站皆在。
+發現：`TextChainButtons` 狀態只在掛載時讀一次（worker 後啟動仍顯示離線）→ 小卡。未看：成本頁、劇本工坊頁、apply-text-road 對真 PostgREST（Chrome MCP 中途 unhealthy）。
