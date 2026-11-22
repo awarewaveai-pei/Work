@@ -7,7 +7,7 @@
 
 ## 已知事實（第一批定下的）
 - SF-B 已併入 main `4d504c0aa`：`NA/lib/site-flow/records.ts`（`ensureOrganization`、`ensureEnvironment`、`setEnvironmentStatus`）。環境列先以 `provisioning` 寫入，再標 `ready`／`failed`。
-- migration `0175_site_flow.sql`（線4 分支 commit `441f1ea86`，尚未套用、尚未併入）：`environments` 的 `(site_id, environment_type)` 活列唯一索引；`ops_action_catalog` 七列 `site.preflight`、`site.create`、`site.wp_install`、`site.vhost`、`site.mainwp`、`site.bridge`、`site.open`，全部 `enabled=false`。你的程式以這七個 `action_key` 為準；測試用假 DB，不依賴它已套用。
+- migration `0176_site_flow.sql（原編號 0175，已改號）`（線4 分支 commit `441f1ea86`，尚未套用、尚未併入）：`environments` 的 `(site_id, environment_type)` 活列唯一索引；`ops_action_catalog` 七列 `site.preflight`、`site.create`、`site.wp_install`、`site.vhost`、`site.mainwp`、`site.bridge`、`site.open`，全部 `enabled=false`。你的程式以這七個 `action_key` 為準；測試用假 DB，不依賴它已套用。
 - I6：`site.*` 不走 `NA/lib/ops-actions/record.ts` 的自動補列與「寫入失敗照做」。沒有 catalog 列就拒絕；`ops_action_runs` 寫不進去就不呼叫閘門。
 - 主機端閘門動詞由 SF-E 做（線3，尚未完成）。本卡的 `gate-client.ts` 只定介面與轉接層，測試用假閘門；動詞名稱以 SITE-FLOW §1-3 為準。
 

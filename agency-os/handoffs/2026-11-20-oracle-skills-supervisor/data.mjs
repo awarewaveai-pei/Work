@@ -44,11 +44,11 @@ export const STEPS = [
   { n: 3, code: 'E4', group: 'B1', title: '會員票與 AI 每日上限', plain: '登入的會員用 AI 解讀時，額度記在這位會員身上，每人每天有上限；沒登入的人照現在的方式限制。',
     gate: '假的或過期的票被拒；同一會員超過上限被擋；沒登入時行為不變。', risk: 'Medium（身分驗證）', model: 'Opus 5.5', status: 'done', commit: '1cf4bf55b', depends: [], card: 'briefs/WP-E4-member-ticket.md' },
   { n: 4, code: 'SF-B', group: 'B1', title: '網站與環境的紀錄', plain: '讓一個客戶可以有多個網站、每個網站有自己的紀錄；建立客戶時不再把既有設定整包蓋掉。資料表異動先寫好檔，不套用到正式資料庫。',
-    gate: '既有客戶的設定在重新建立後原樣保留；資料表異動可套用也可退回。', risk: 'Medium（套用到正式資料庫是 High，不在本卡）', model: 'Opus 5.5', status: 'in_progress', depends: [], card: 'briefs/WP-SF-B-records.md' },
+    gate: '既有客戶的設定在重新建立後原樣保留；資料表異動可套用也可退回。', risk: 'Medium（套用到正式資料庫是 High，不在本卡）', model: 'Opus 5.5', status: 'done', commit: '676014cd5', depends: [], card: 'briefs/WP-SF-B-records.md' },
   { n: 5, code: 'SF-C', group: 'B1', title: '主機改檔工具支援「新建」', plain: '主機上改設定檔只能走一支會自動還原的工具，但它只會改已存在的檔。加上「新建檔案」的能力，新網站才有合法的建立方式。',
-    gate: '新建成功；檢查失敗時檔案消失、容器停下、資料保留；原本的功能完全不變。', risk: 'High（所有主機改動共用）', model: 'Opus 5.5', status: 'in_progress', depends: [], card: 'briefs/WP-SF-C-patch-create.md' },
+    gate: '新建成功；檢查失敗時檔案消失、容器停下、資料保留；原本的功能完全不變。', risk: 'High（所有主機改動共用）', model: 'Opus 5.5', status: 'done', commit: '5a1dae31d', depends: [], card: 'briefs/WP-SF-C-patch-create.md' },
   { n: 6, code: 'SF-D', group: 'B1b', title: '網站範本與拆除腳本', plain: '新網站的容器與網址設定範本、主機上「有哪些網站」的登記格式，以及把一個網站完整拆掉的腳本。',
-    gate: '範本能渲染出可用的設定；拆除預設只列出不動手，資料要另外確認才刪。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-C'], card: 'briefs/WP-SF-D-site-template.md' },
+    gate: '範本能渲染出可用的設定；拆除預設只列出不動手，資料要另外確認才刪。', risk: 'High', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-C'], card: 'briefs/WP-SF-D-site-template.md' },
   { n: 7, code: 'A1', group: 'B1', title: '架構決策文件修訂', plain: '三份架構決策補上：同網域的內嵌框可以用；客戶網站的會員屬於該網站。',
     gate: '治理文件檢查通過。', risk: 'Medium', model: '監工', status: 'done', commit: 'da53adac6', depends: [], card: SPEC },
   // 第二批
@@ -61,7 +61,7 @@ export const STEPS = [
   { n: 11, code: 'SF-F', group: 'B2', title: '每日備份自動涵蓋新網站', plain: '備份腳本改成讀「有哪些網站」的登記，新網站建好當晚就被備份。',
     gate: '新網站出現在備份清單；Soulful 的備份輸出與改前逐行相同。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-D'], card: SF },
   { n: 12, code: 'SF-G', group: 'B2', title: '建站步驟的共用骨架', plain: '每個會動主機的步驟都走同一套：先給你看要做什麼、你確認才做、做完檢查、失敗還原、留紀錄。紀錄寫不進去就不做。',
-    gate: '過期的確認被拒；開關沒開被拒；紀錄寫入失敗時不會動主機。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-B'], card: 'briefs/WP-SF-G-step-engine.md', before: '套用資料表（待決 1）之後才併入' },
+    gate: '過期的確認被拒；開關沒開被拒；紀錄寫入失敗時不會動主機。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'e681e8e15', depends: ['SF-B'], card: 'briefs/WP-SF-G-step-engine.md', before: '套用資料表（待決 1）之後才併入' },
   // 第三批
   { n: 13, code: 'P2', group: 'B3', title: '會員命盤與「我存的對象」', plain: '會員能存自己的命盤，也能存別人的出生資料做私人合盤；只有自己看得到，資料加密保存，可匯出、可刪除。',
     gate: '別的會員讀不到；資料庫備份裡查不到明文生日；刪除帳號後資料清空。', risk: 'High（個資）', model: 'Opus 5.5', status: 'not_started', depends: ['P1'], card: SPEC },
@@ -99,7 +99,7 @@ export const STEPS = [
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
 export const OPEN = [
-  { n: 1, what: '把「網站與環境的紀錄」的資料表異動套用到正式資料庫（只新增索引與幾列預設關閉的開關，不改既有資料）。', before: 'SF-G', src: 'WP-PLAN.md 第 6 節', options: ASK('監工套用並驗證後才推上主線。', '平台線停在第一批。') },
+  { n: 1, what: '把「網站與環境的紀錄」的資料表異動套用到正式資料庫（只新增索引與幾列預設關閉的開關，不改既有資料）。', before: 'SF-G', decided: '2026-11-22 同意。已套用（編號 0176）並驗證：索引存在、七個開關全關。', src: 'WP-PLAN.md 第 6 節', options: ASK('監工套用並驗證後才推上主線。', '平台線停在第一批。') },
   { n: 2, what: '把 MainWP 的連線金鑰放進後台容器（主機設定變更，走會自動還原的工具）。', before: 'SF-I0', src: 'SITE-FLOW 第 4 節第 3 題', options: ASK('之後新網站能自動加進 MainWP。', '這一步改成你手動在 MainWP 加站。') },
   { n: 3, what: '打開主機與後台的建站開關，建一筆測試網域的 DNS，跑一次完整的拋棄式建站再拆掉。', before: 'SF-L', src: 'WP-PLAN.md 第 6 節', options: ASK('跑完確認沒留下東西再關回開關。', '流程只在本機驗證。') },
   { n: 4, what: '部署引擎新版本（含目前所有尚未部署的引擎改動）。', before: 'GO-1', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('失敗會自動還原到現在的版本。', '引擎維持 2026-11-20 的版本。') },
@@ -128,7 +128,7 @@ export const RISKS = [
     { card: 'GO-1', risk: '引擎拿到的訪客位址可能是主機自己的位址，限流會把所有人算成同一個來源。', act: '部署前在主機實測確認，不對就先修分流設定。' },
     { card: 'GO-2', risk: 'Kadence 佈景、真手機、英文頁網址代稱、正式主機兩層分流都還沒試。', act: '在建置中階段逐項實測，有問題不進 GO-3。' },
   ] },
-  { batch: '第一批（引擎線與後台線；主機線 SF-C、SF-D 交回後補）', rows: [
+  { batch: '第一批（SF-D 交回後補上它的風險，再做整批總檢）', rows: [
     { card: 'E1', risk: '字型設定在兩個版面檔各寫一份。', act: '不處理：嵌入版必須是獨立的版面，框架不允許共用；兩處註解已互相指到對方。' },
     { card: 'E1', risk: '合婚的嵌入版只驗了版面，沒有驗送出後的結果。', act: '實測：監工看過繁中、英文、手機寬度的版面；送出結果在 P1 驗收時於 WordPress 頁面裡實測 12 個工具。' },
     { card: 'E3', risk: '規格的網址範例會讓塔羅頁無限轉向（WordPress 頁網址撞到引擎自己的路徑）。', act: '已處理：引擎會拒收這種設定；規格範例改成工具頁放在 /tools/ 底下。' },
@@ -143,6 +143,11 @@ export const RISKS = [
     { card: 'SF-B', risk: '建站做到一半程序中斷時，環境紀錄會停在「建立中」。', act: '現在處理：寫進第二批 SF-G，骨架要能把逾時的步驟標成失敗並可重跑。' },
     { card: 'SF-B', risk: '舊的建站接口在部分失敗時仍把環境標成「就緒」。', act: '現在處理：寫進第三批 SF-H，檢查通過才標就緒；舊接口在 SF-P 退場。' },
     { card: 'SF-B', risk: '舊的建站接口現在要求網站紀錄先存在；正式資料庫的既有資料沒查過。', act: '已實測（唯讀查正式庫）：3 筆網站、0 筆環境、沒有重複，資料表異動可以直接套用。' },
+    { card: 'SF-C', risk: '同一個網站名稱留有舊資料時，新建會被拒絕（避免新站接到舊站的資料）；建站失敗後重試會撞到這條。', act: '現在處理：寫進 SF-D，由它定出重試與拆除各自怎麼對待資料。' },
+    { card: 'SF-C', risk: '主機改檔工具沒有互斥鎖，同時對同一個網站跑兩次會互相干擾。', act: '現在處理：寫進 SF-D 與第二批 SF-E，在閘門那一層上鎖；不改既有四種用法。' },
+    { card: 'SF-C', risk: '新建時只等指定的那個容器變健康，同一組的資料庫掛掉不會被發現。', act: '現在處理：寫進 SF-D，範本讓 WordPress 的健康檢查反映資料庫可用。' },
+    { card: 'SF-C', risk: '還原進行中若再收到第二次中斷訊號，還原會被打斷（既有四種用法本來就有）。', act: '不處理：需要連續兩次中斷才會發生，且既有用法行為不在本階段改動範圍；記入 SF-O 手冊的注意事項。' },
+    { card: 'SF-C', risk: '紀錄檔路徑寫死在本機路徑，換到客戶自己的主機會直接失敗還原。', act: '不處理：本階段只在自家主機建站；買斷交付到客戶主機時再處理。' },
     { card: 'SF-B', risk: '另一支接口還有一份重複的「建立客戶」邏輯沒收進來。', act: '現在處理：寫進第四批 SF-P，舊頁退場時一起刪。' },
     { card: 'SF-B', risk: '重複送出建立客戶時，沒被套用的欄位只在回應裡列出，舊頁面沒顯示。', act: '現在處理：寫進第三批 SF-J，新頁面要顯示「這些值沒有套用」。' },
     { card: 'SF-B', risk: '兩個端點同時改同一個客戶的設定時，後寫的會蓋掉先寫的。', act: '不處理：後台只有操作者一人使用，同時改同一個客戶的機率極低；SF-G 的步驟不寫這個欄位。' },

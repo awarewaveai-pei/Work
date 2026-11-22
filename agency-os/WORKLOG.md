@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-22（續13）— oracle WP：0176 套用正式庫；SF-C、SF-G 併入；SF-G 造成的兩個結構紅燈修掉
+
+- 操作者同意（WP-PLAN §6 第 1 件，「同意套用」）。工人寫的 `0175_site_flow`（`441f1ea86`，參照 `refs/keep/sf-b-0175`）撞號：main 已有 `0175_organizations_kind_test.sql` → 改號 `0176_site_flow.sql`＋down，檔內 `source` 字串與 `lib/site-flow` 三處註解同步。`node scripts/apply-db-migration.mjs 0176` → `APPLY_OK 1/1`。正式庫查核：`uq_environments_site_type_live` 存在；`site.preflight／create／wp_install／vhost／mainwp／bridge／open` 七列 `enabled=f`；`schema_migrations` 有 `0176_site_flow.sql`。套用後才推 `676014cd5`。
+- 併入（已 push）：SF-C `5a1dae31d`（`safe-infra-patch.sh` 新增 `compose-new`、`host-nginx-new`；監工讀完整 diff，既有四型路徑不變；三支測試 32/32、21/21、19/19）；SF-G `8fba2dcb7`（`lib/site-flow/{types,engine,gate-client}.ts`、`app/api/ops/site-flow/**`；步驟登記表為空、catalog 全關，上線不動主機）。
+- SF-G 併入後 next-admin 全套 2 紅（工人只跑指定路徑）：`lib/portal/__tests__/staff-tools.test.ts:88`（`/api/ops/site-flow` 沒有所屬工具）、`lib/system-modes/__tests__/blocked-change.test.ts:44`（`engine.ts` 手寫 `system_mode_blocks_change`）。修 `e681e8e15`：`staff-tools.ts` 登記到 `ops/clients`；`engine.ts` 改用 `BLOCKED_CHANGE_CODE`。全套 5297 passed／0 failed。避免再發生：`COMMON-WP.md` 驗收條加「next-admin 動到 route／頁面／系統模式字串時另跑 `npx vitest run lib/portal lib/system-modes`」。
+- 先前回報的「2 紅是本機 seedstar 目錄」只對當時成立；這次的 2 紅是真的，已修。
+- E2：工人量到 nonce 做法首頁 3.7ms → 20.6ms，停在卡片的停點；操作者直接在該 session 回「用 (a) nonce」，工人續做中。
+- 操作者重申：一批全部交回後才一起看 RISKS，看完才開下一批。第二批的 E2、P1、SF-G 已在第一批主機線交回前派出（提早了）；之後不再提前派。SF-D（第一批最後一張）已派線3；SF-C 的 5 條 RISKS 已入表並帶進 SF-D。
+- 第二批待總檢（SF-G 回報，尚未處置，等 E2、P1、SF-E、SF-F 一起）：輪詢改 `POST {action:"poll"}`（非卡片的 GET，理由 CSRF）；引擎不寫 `environments.status`，failed 後重跑成功回不到 ready（留 SF-H）；docker 站 slug 定在 `environments.metadata.host_slug`（SF-H／SF-J 要寫入）；staging 轉接層只有 `set-mainwp-id`、`plugins`；逾時回收後新舊程序的主機動作可能短暫重疊；狀態 GET 一次最多 7 條 SSH、無節流。
+- 主工作區 `D:\Work` 有別的 session 未推送的本機 commit（`e568031db`），與 origin 分岔；本條目與監工台改動改在整合 worktree `D:/Worktrees/Work/oracle-int` 提交。
+- REALTEST_EVIDENCE: tool=SSH | cmd=apply-db-migration.mjs 0176 ＋ psql 查 pg_indexes／ops_action_catalog／schema_migrations；next-admin npx vitest run | exit=0 | ms=98000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/8n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=0176_site_flow | hits=4
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；SF-C、SF-G 各一輪 critic Deep（各 4 Major 已修）＋突變＋監工讀 diff 與全套測試代替
 ## 2026-11-22（續12）— 平台第 3 批併入並上線：K5、U21、U4（High）、M1（High，0175 已套用）
 
 - 操作者 2026-11-22「兩張都上」＝ M1、U4 的 go。M1 工人的 session 權限拒絕 `git commit`，由監工在其 worktree 代為 commit（`f9c8f21a7` → main `66b7d681c`）。

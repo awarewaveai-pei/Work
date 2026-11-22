@@ -7,7 +7,7 @@
 - 套件：引擎在專案目錄 `npm ci`；next-admin 在 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin` `npm ci`。不建 junction 連到別處的 `node_modules`。
 - Git：commit 帶 pathspec、留在 detached HEAD；不 push、不動 `main`、不改 `agency-os/WORKLOG.md`／`TASKS.md`／本資料夾的 `data.mjs`；不部署、不連主機、不套 migration、不改任何 `.env*`。
 - 測試：不做無效益測試：只寫卡片／finding 點名的測試；突變只做在隱私／可見範圍／擦除／同意／擁有權的守衛，一個守衛一次。產物放 `$env:TEMP` 或 session scratchpad，不進 repo。
-- 驗收必跑：改 `.ts/.tsx` → 該專案 `npx tsc --noEmit`＋`npx vitest run <受影響路徑>`（不跑全套）；改 `.sh` → `bash -n`＋卡片指定的測試腳本；改 `.php` → `php -l`。跑完把 `tsconfig.tsbuildinfo`、`next-env.d.ts` 還原（`git show HEAD:<檔> > <檔>`）。
+- 驗收必跑：改 `.ts/.tsx` → 該專案 `npx tsc --noEmit`＋`npx vitest run <受影響路徑>`（不跑全套）；next-admin 新增或搬動 API route、頁面、或寫到系統模式／權限相關字串時，另跑結構檢查 `npx vitest run lib/portal lib/system-modes`（SF-G 併入後這兩處紅過）；改 `.sh` → `bash -n`＋卡片指定的測試腳本；改 `.php` → `php -l`。跑完把 `tsconfig.tsbuildinfo`、`next-env.d.ts` 還原（`git show HEAD:<檔> > <檔>`）。
 - 審查：完成後派一個 `critic`（卡片寫 Deep 的用 Deep），Critical／Major 修完才回報。Codex 額度到 2026-11-24 前不可用，RISKS 寫明。
 - 本機服務：只關自己開的 PID／port；禁止 `taskkill /IM node.exe`；dev server 用 `.claude/launch.json` 的預覽，不用 Bash 起。
 - Context：要改的檔整檔讀，其餘 grep；大輸出導檔。接近上限時先把進度寫進自己 worktree 的 `HANDOFF-<卡號>.md`（不 commit）再讓系統壓縮；壓縮後重讀本檔、自己的卡與該檔續做。一張卡做完就停，不自己接下一張；監工會用訊息派下一張或清空 session。
