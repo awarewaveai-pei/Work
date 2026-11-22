@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
 import { PRODUCTS, type ProductKey } from "@/lib/portal/products";
-import { portalHost, productHost, staffHosts } from "@/lib/portal/hosts";
+import { baseDomain, portalHost, productHost, staffHosts } from "@/lib/portal/hosts";
 import { doorAccess } from "@/lib/portal/door-access";
 import { resolveTenant } from "@/lib/tenant-guard";
 import type { SavedLayout } from "@/lib/theme/tokens";
@@ -26,6 +26,13 @@ export function frameHosts(env: Record<string, string | undefined> = process.env
   const staff = staffHosts(env)[0];
   if (staff) hosts[STAFF_HOST_KEY] = `https://${staff}`;
   return hosts;
+}
+
+/** The product's intro page on the WordPress site (catalog.intro is its slug); null when the registry has none, so the
+ *  not-enabled page draws no button rather than one that ends on a 404 (blueprint S1, U9). */
+export function introUrl(intro: string | undefined, env: Record<string, string | undefined> = process.env): string | null {
+  const slug = (intro ?? "").trim().replace(/^\/+|\/+$/g, "");
+  return slug ? `https://${baseDomain(env)}/${slug}/` : null;
 }
 
 /** The sites list API (ADR 020 §2.1). Not called here: a door is handed it only when its registered door.api covers it
@@ -124,6 +131,7 @@ async function DoorFrame({ productKey, bare = false, children }: { productKey: P
   if (door?.app !== "next-admin") throw new Error(`${productKey}: no next-admin door`);
   const h = await headers();
   const access = await doorAccess(h, productKey);
+  const intro = introUrl(product!.catalog.intro);
   if (access !== "open") {
     return (
       <div className="shell">
@@ -132,7 +140,10 @@ async function DoorFrame({ productKey, bare = false, children }: { productKey: P
             <>
               <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>「{product!.name}」尚未開通</h1>
               <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginBottom: 20 }}>這是加購的產品，每個功能要分開購買，或由我們贈送後才能使用。</p>
-              <a href={`https://${portalHost()}/launcher`} className="btn-primary">回到我的產品</a>
+              <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                {intro && <a href={intro} className="btn-primary">了解這個產品</a>}
+                <a href={`https://${portalHost()}/launcher`} className={intro ? "btn-secondary" : "btn-primary"}>回到我的產品</a>
+              </div>
             </>
           ) : (
             <p style={{ fontSize: 13.5, color: "var(--badge-red-text)" }}>暫時無法確認開通狀態，請重新整理頁面再試一次。</p>
