@@ -273,6 +273,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
           features: defs.features.filter((x) => x.system_id === system.id),
           events: state.events.filter((e) => e.system_id === system.id),
           history: state.history,
+          lastCommitAt: state.lastCommitAt[system.id] ?? null,
         });
         return { system, p, eff: effectiveStatus(p.status, p.lastCommitAt, now) };
       });
