@@ -32,6 +32,8 @@ const TARGET_MODULES = [
 const ALLOWLIST: Record<string, string> = {
   "lib/repair-center/ssh.ts":
     "primitive SSH transport -- not a call site; every real caller in this repo is itself gated or allowlisted below.",
+  "lib/site-flow/gate-client.ts":
+    "site-flow host gate transport -- not a call site; lib/site-flow/engine.ts executeStep gates before any execute, pollRun's rollback gates again, and observe/plan get a read-only reader (preflight, job).",
   "lib/repair-center/evidence.ts":
     "read-only evidence collection (own header: \"Read-only. Evidence collection NEVER mutates any system.\").",
   "lib/repair-center/backup.ts":
