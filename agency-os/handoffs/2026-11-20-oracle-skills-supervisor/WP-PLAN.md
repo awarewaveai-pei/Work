@@ -14,7 +14,7 @@
 |---|---|---|---|---|---|
 | 1 | E1 → E3 | E4 | SF-C → SF-D | SF-B | A1 |
 | 2 | E2 | P1 | SF-E → SF-F | SF-G | 套 migration（SF-B，需同意） |
-| 3 | — | P2 ∥ P3（P3 用線 1 的 session） | SF-H | SF-I ∥ SF-J（SF-J 用新的設計 session） | SF-I0（需同意） |
+| 3 | E5（Sonnet 5.5）→ P3 | P2 | SF-E2 → SF-H | SF-J（Sonnet 5.5）；SF-I 等 SF-I0 | SF-I0（需同意） |
 | 4 | — | P4 | SF-K | SF-P | 一次部署 next-admin＋smoke；SF-L（需同意） |
 | 5 | — | — | — | — | GO-1 → GO-2 → GO-3（每步需同意）；SF-O、SF-A（文件要指到 SF-L 跑完才存在的手冊與流程） |
 
@@ -42,6 +42,8 @@
 | SF-F | 備份讀登記 | SITE-FLOW §3 | 批 2 前寫 | Opus 5.5 | High |
 | SF-G | 步驟引擎＋API（失敗就不做） | SITE-FLOW §0 I6、§3 | 批 2 前寫 | Opus 5.5 | Medium |
 | SF-H | 主機步驟實作 | SITE-FLOW §3 | 批 3 前寫 | Opus 5.5 | High |
+| E5 | 引擎收尾：CSP 範圍互補測試、工具結果區標記、sg-deploy smoke 改打嵌入頁 | 第二批 RISKS | 批 3 前寫 | Sonnet 5.5 | Low（smoke 屬部署腳本，Medium） |
+| SF-E2 | 主機腳本加固（第二批 RISKS 的主機項） | 第二批 RISKS | 批 3 前寫 | Opus 5.5＋`critic` Deep | High |
 | SF-I0 | MainWP 金鑰進 next-admin | SITE-FLOW §3 | 監工 | 監工 | High |
 | SF-I | MainWP、wp-bridge、寫 `wp_sites` | SITE-FLOW §3 | 批 3 前寫 | Opus 5.5＋`critic` ×2（憑證） | High |
 | SF-J | 兩個頁面 | SITE-FLOW §2、§3 | 批 3 前寫 | Sonnet 5.5（`frontend-designer`） | Medium |

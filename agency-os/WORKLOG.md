@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-22（續18）— oracle WP：SF-E 併入；第二批整批 RISKS 總檢完成；新增卡 E5、SF-E2
+
+- SF-E 併入 `2f9c53fc8`（已 push）：`aw-hosting-gate.sh` 新增 `site-preflight／site-create／site-job／site-vhost／site-wp`；開關檔 `/etc/default/aw-hosting-gate.local` 無 `AW_SITE_VERBS=on` → 126（`switch_trusted`：root 擁有、非他人可寫、只讀不 source）；site 動詞帶 stdin → 126；`render.sh` 加 `client_wp_write_registry／read_registry`；`vhost.conf.tmpl` 自帶 `real_ip_header`。監工讀開關與分派段、確認既有行只刪註解與 `--list` 一行；`hosting-gate-site.test.sh` 96 passed；next-admin 對 main `npx tsc --noEmit` exit 0、全套 vitest 第一次 5430 passed／1 failed、重跑 0 failed（不穩定測試，未定位，與本卡無關）。主機腳本已隨 push 同步，開關未開。
+- 第二批全部交回（E2、P1、SF-G、SF-F、SF-E）。整批 RISKS 總檢 34 列入 `data.mjs`（第二批表），分類：
+  - 現在處理 → 引擎收尾卡 E5：CSP 的 proxy matcher 與 `/api` 標頭互補測試；各工具結果區固定標記（P1 捲動推測的根因）；`sg-deploy.sh:798` smoke 改打 `/embed/zh-TW/ziwei`（第一批留下）。
+  - 現在處理 → 主機加固卡 SF-E2：鎖目錄 `/run/lock/awarewave-sites` 全體可寫（critic m4）；`product-gateway` 接 `lobster-net` 改由開關檔核准清單；網址占用改查 `nginx -T`；自有外掛不 `--force` 降版；`site-wp plugins` 前 `wp db export`；客戶站 `.env` 進加密備份（`backup-ks-aw-01.sh` §5）；未安裝站（`paused.<slug>-wp` 存在）備份驗證不算失敗；`deprovision-site.sh` m5（測試用覆蓋）、m6（網域易主後無法清 volume）；`site-wp` 各子動詞持 slug 鎖。
+  - 現在處理 → SF-H：`gate-client.ts:173`（docker 站 `wp()` 不得送 stdin）、`:158`（`create()` 送 ingress）、install 送 email；install 改背景 job（`gate-client.ts:26` 90 秒）；環境狀態由觀測決定並明訂轉換；`environments.metadata.host_slug` 寫入；狀態 GET 改一次 `site-preflight`；安裝外掛時自動填「引擎網址（伺服器用）」。
+  - 現在處理 → P2：外掛 cross-origin 選項標「尚未支援」；改認結果區標記。P4：補 `languages/*.po`。SF-J：輪詢用 `POST {action:"poll"}`、顯示 `kept_keys`、寫 `host_slug`。SF-L：拋棄式站實際還原一次、放備份腳本上主機並確認 python ≥3.7、確認記憶體守衛的 log。
+  - 實測驗證：登記檔暫存檔名 `render.sh:154` 為 `.<slug>.json.XXXXXX`（隱藏檔，三個讀取端皆略過）→ SF-F 第 4 條成立不需修。GO-1：動態渲染後的回應時間與負載。GO-2：Kadence 固定頁首、真手機。
+  - 不處理（理由在表）：`style-src 'unsafe-inline'`；`/_not-found` 腳本被擋；`frame-ancestors 'self'` 全站；multisite；備份與拆站同時發生的單次誤報；名稱推導規則兩處各寫一份（測試綁住）。
+- `WP-PLAN.md` 第三批改為：線1 E5 → P3；線2 P2；線3 SF-E2 → SF-H；線4 SF-J，SF-I 等 SF-I0（需操作者同意，§6 第 2 件）。`data.mjs` 加 E5、SF-E2（共 29 張）。第三批 brief 尚未寫、尚未派工。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash tests/host-scripts/hosting-gate-site.test.sh；next-admin npx tsc --noEmit && npx vitest run（quizzical worktree @ origin/main） | exit=0 | ms=104000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/11n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=AW_SITE_VERBS | hits=5
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic Deep（3 Major 已修）＋三次突變＋監工讀閘門開關段與重跑測試代替
 ## 2026-11-22（續17）— oracle：深度報告方向定案（D8、D9）；SF-F 併入
 
 - 操作者決定（原話在 `ORACLE-WP-SPEC.md` §0 D8、D9）：AI 解讀分免費簡批與付費深度；單次購買；供應商 OpenAI；簡批下方列出還有哪些深度內容可付費得知；紫微補十二宮的對宮、三方四正、三合六合互動與流年流月。規格新增 §8（現況查核、模型與價格、卡 Z1–Z3、待定事項）；排在 WordPress 階段之後，未派工。
