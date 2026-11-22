@@ -65,11 +65,11 @@ export const STEPS = [
     gate: '過期的確認被拒；開關沒開被拒；紀錄寫入失敗時不會動主機。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'e681e8e15', depends: ['SF-B'], card: 'briefs/WP-SF-G-step-engine.md', before: '套用資料表（待決 1）之後才併入' },
   // 第三批
   { n: 13, code: 'E5', group: 'B3', title: '引擎收尾', plain: '第二批總檢留下的三件小事：補一個自動測試守住「每個網址都有送出安全政策」；每個工具的結果區加上固定標記，讓外掛知道結果出來了；部署後的自動檢查改打嵌入版頁面。',
-    gate: '測試會在漏送政策時變紅；12 個工具的結果區都有標記；部署檢查不再依賴引擎首頁。', risk: 'Low', model: 'Sonnet 5.5', status: 'not_started', depends: ['E2'], card: SPEC },
+    gate: '測試會在漏送政策時變紅；12 個工具的結果區都有標記；部署檢查不再依賴引擎首頁。', risk: 'Low', model: 'Sonnet 5.5', status: 'in_progress', depends: ['E2'], card: 'briefs/WP-E5-engine-wrapup.md' },
   { n: 14, code: 'SF-E2', group: 'B3', title: '主機腳本加固', plain: '第二批總檢留下的主機端問題一次修完：鎖檔換到安全的位置、接內部網路要主機核准、網址占用查完整設定、外掛不被裝回舊版、裝外掛前先備份資料庫、新網站的密碼檔進加密備份、還沒裝好的站不誤報、拆站腳本的兩個小洞。',
-    gate: '每一項都有測試；既有測試全部原樣通過。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-E', 'SF-F'], card: SF },
+    gate: '每一項都有測試；既有測試全部原樣通過。', risk: 'High', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-E', 'SF-F'], card: 'briefs/WP-SF-E2-host-hardening.md' },
   { n: 15, code: 'P2', group: 'B3', title: '會員命盤與「我存的對象」', plain: '會員能存自己的命盤，也能存別人的出生資料做私人合盤；只有自己看得到，資料加密保存，可匯出、可刪除。',
-    gate: '別的會員讀不到；資料庫備份裡查不到明文生日；刪除帳號後資料清空。', risk: 'High（個資）', model: 'Opus 5.5', status: 'not_started', depends: ['P1'], card: SPEC },
+    gate: '別的會員讀不到；資料庫備份裡查不到明文生日；刪除帳號後資料清空。', risk: 'High（個資）', model: 'Opus 5.5', status: 'in_progress', depends: ['P1'], card: 'briefs/WP-P2-member-charts.md' },
   { n: 16, code: 'P3', group: 'B3', title: '每日運勢信', plain: '訂閱並確認後，每天在訂閱者當地早上 7 點寄運勢信；同一天不重寄；退訂、退信、投訴的人不再寄。',
     gate: '四個時區都在當地 7 點後寄一次；算不出內容就不寄；退信的人被停寄。', risk: 'High（寄信、個資）', model: 'Opus 5.5', status: 'not_started', depends: ['P1', 'E4'], card: SPEC },
   { n: 17, code: 'SF-H', group: 'B3', title: '建站的主機步驟', plain: '網址檢查、建立網站主機、安裝 WordPress 與外掛、掛上網址、正式開放，五個步驟接上骨架。',
@@ -79,7 +79,7 @@ export const STEPS = [
   { n: 19, code: 'SF-I', group: 'B3', title: '接上 MainWP 與 AI 控制通道', plain: '新網站自動加進 MainWP、建立與後台之間的簽章通道，並登記這個網站屬於哪個客戶。',
     gate: '測試站出現在 MainWP 且連線正常；通道簽章請求成功；私鑰不出現在任何紀錄。', risk: 'High（憑證）', model: 'Opus 5.5', status: 'not_started', depends: ['SF-G', 'SF-I0'], card: SF },
   { n: 20, code: 'SF-J', group: 'B3', title: '建站流程頁面', plain: '「新增客戶網站」與「建站流程」兩個頁面：一欄由上到下九步，每步顯示狀態，會動主機的步驟都要按兩下。',
-    gate: '九步都顯示；開關沒開時按鈕顯示「尚未開放」；密碼只顯示一次。', risk: 'Medium', model: 'Sonnet 5.5', status: 'not_started', depends: ['SF-G'], card: SF },
+    gate: '九步都顯示；開關沒開時按鈕顯示「尚未開放」；密碼只顯示一次。', risk: 'Medium', model: 'Sonnet 5.5', status: 'in_progress', depends: ['SF-G'], card: 'briefs/WP-SF-J-pages.md' },
   // 第四批
   { n: 21, code: 'P4', group: 'B4', title: '外掛發佈管道', plain: '讓這支外掛能像其他自有外掛一樣打包、發佈、安裝到網站。',
     gate: '發佈與安裝腳本預演正確。', risk: 'Medium', model: 'Sonnet 5.5', status: 'not_started', depends: ['P1'], card: SPEC },
@@ -105,7 +105,7 @@ export const STEPS = [
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
 export const OPEN = [
   { n: 1, what: '把「網站與環境的紀錄」的資料表異動套用到正式資料庫（只新增索引與幾列預設關閉的開關，不改既有資料）。', before: 'SF-G', decided: '2026-11-22 同意。已套用（編號 0176）並驗證：索引存在、七個開關全關。', src: 'WP-PLAN.md 第 6 節', options: ASK('監工套用並驗證後才推上主線。', '平台線停在第一批。') },
-  { n: 2, what: '把 MainWP 的連線金鑰放進後台容器（主機設定變更，走會自動還原的工具）。', before: 'SF-I0', src: 'SITE-FLOW 第 4 節第 3 題', options: ASK('之後新網站能自動加進 MainWP。', '這一步改成你手動在 MainWP 加站。') },
+  { n: 2, what: '把 MainWP 的連線金鑰放進後台容器（主機設定變更，走會自動還原的工具）。', before: 'SF-I0', decided: '2026-11-22 同意。', src: 'SITE-FLOW 第 4 節第 3 題', options: ASK('之後新網站能自動加進 MainWP。', '這一步改成你手動在 MainWP 加站。') },
   { n: 3, what: '打開主機與後台的建站開關，建一筆測試網域的 DNS，跑一次完整的拋棄式建站再拆掉。', before: 'SF-L', src: 'WP-PLAN.md 第 6 節', options: ASK('跑完確認沒留下東西再關回開關。', '流程只在本機驗證。') },
   { n: 4, what: '部署引擎新版本（含目前所有尚未部署的引擎改動）。', before: 'GO-1', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('失敗會自動還原到現在的版本。', '引擎維持 2026-11-20 的版本。') },
   { n: 5, what: '改 oracle 網域的分流設定，讓 WordPress 接手引擎沒用到的網址（建置中）。', before: 'GO-2', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('訪客原本的網址不變；失敗自動還原。', 'WordPress 只能在主機內部看。') },
