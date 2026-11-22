@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-22（續23）— oracle WP 第三批：SF-E2 併入；SF-H brief 派線3
+
+- SF-E2 併入 `8c2468adc`（已 push；主機腳本隨 push 同步，開關檔未開；備份三支不自動同步）：10 項見 `briefs/WP-SF-E2-host-hardening.md` 對照表，工人回報逐項 file:line。監工：`bash -n` 五支過；`hosting-gate-site.test.sh` 131 passed、`client-wp-template.test.sh` 67 passed、`backup-ks-aw-01-sites.test.sh` 40 passed、`backup-coverage-check.test.py` OK；next-admin `npx tsc --noEmit` exit 0、全套 vitest 5526 passed／0 failed 後才 push。
+- 鎖目錄由 `/run/lock/awarewave-sites` 換到 `/run/awarewave/site-locks`：主機開關檔未開、無 site job，新舊鎖並存的情形不存在。
+- 第三批待總檢（SF-E2 回報，未處置）：主機開關檔未設 `AW_SITE_GATEWAY_SLUGS`（oracle 走 `product-gateway` 前要加，GO-2）；備份三支要手動同步主機（SF-L 前）；外掛步驟失敗只還原資料庫，已升級的外掛檔案留在新版；客戶站 `.env` 在備份中途被刪會讓當晚其他服務不上傳 R2（critic Minor 未修）；每次 `plugins` 整庫匯出，大庫可能超過 90 秒；既有測試只改了 setup 與 shim、斷言未改；next-admin contract 測試仍用無版本的外掛檔名。
+- 新 brief `briefs/WP-SF-H-host-steps.md`（引用 SF-E、SF-E2、SF-G、SF-J 實際定下的介面，帶入前三批 RISKS 八項）；派線3。SF-I（線4）排在 SF-H 之後：兩張都改步驟登記表與 `gate-client.ts`。P3（線1）等 P2：同一個外掛。
+- REALTEST_EVIDENCE: tool=Bash | cmd=四支 host-scripts 測試＋next-admin npx tsc --noEmit && npx vitest run（quizzical worktree @ 整合結果） | exit=0 | ms=43000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/6n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=AW_SITE_GATEWAY_SLUGS | hits=4
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic Deep 兩輪（2 Major 已修）＋監工重跑全部測試代替
 ## 2026-11-22（續22）— oracle WP 第三批：SF-J 併入；側欄涵蓋紅燈修掉；工人規則改成 next-admin 卡跑全套
 
 - SF-J 併入 `85e41f82b`＋修正 `dcc3c8922`（已 push；今晚 03:00 自動部署會帶上）：`app/(shell)/ops/sites/new`、`ops/sites/[siteId]`、`app/api/ops/site-flow/route.ts`（POST 建立客戶＋站＋正式環境，寫 `environments.metadata.host_slug`）、`lib/site-flow/{create-site,page-model}.ts`、`ops/clients/[slug]/SiteFlowSummary.tsx` 取代寫死的五個綠勾、`ClientPanelNav.tsx:38` 改指新頁、`lib/portal/products.ts` 加 `ops/sites`（後台清單，非產品鍵）。步驟登記表仍空、catalog 全關：頁面上線後九步顯示「尚未提供／尚未開放」。
