@@ -75,7 +75,7 @@ export const STEPS = [
   { n: 17, code: 'SF-H', group: 'B3', title: '建站的主機步驟', plain: '網址檢查、建立網站主機、安裝 WordPress 與外掛、掛上網址、正式開放，五個步驟接上骨架。',
     gate: '在測試站實際跑過；管理員密碼不出現在任何紀錄裡。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-E', 'SF-G', 'SF-E2'], card: SF },
   { n: 18, code: 'SF-I0', group: 'B3', title: 'MainWP 連線金鑰', plain: '讓後台能把新網站加進 MainWP（一次性的主機設定）。',
-    gate: '後台容器讀得到這三個設定值。', risk: 'High', model: '監工', status: 'not_started', depends: [], card: SF, before: '待決 2' },
+    gate: '後台容器讀得到這三個設定值。', risk: 'High', model: '監工', status: 'done', commit: '1341b5dde', depends: [], card: SF, before: '待決 2' },
   { n: 19, code: 'SF-I', group: 'B3', title: '接上 MainWP 與 AI 控制通道', plain: '新網站自動加進 MainWP、建立與後台之間的簽章通道，並登記這個網站屬於哪個客戶。',
     gate: '測試站出現在 MainWP 且連線正常；通道簽章請求成功；私鑰不出現在任何紀錄。', risk: 'High（憑證）', model: 'Opus 5.5', status: 'not_started', depends: ['SF-G', 'SF-I0'], card: SF },
   { n: 20, code: 'SF-J', group: 'B3', title: '建站流程頁面', plain: '「新增客戶網站」與「建站流程」兩個頁面：一欄由上到下九步，每步顯示狀態，會動主機的步驟都要按兩下。',
@@ -105,7 +105,7 @@ export const STEPS = [
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
 export const OPEN = [
   { n: 1, what: '把「網站與環境的紀錄」的資料表異動套用到正式資料庫（只新增索引與幾列預設關閉的開關，不改既有資料）。', before: 'SF-G', decided: '2026-11-22 同意。已套用（編號 0176）並驗證：索引存在、七個開關全關。', src: 'WP-PLAN.md 第 6 節', options: ASK('監工套用並驗證後才推上主線。', '平台線停在第一批。') },
-  { n: 2, what: '把 MainWP 的連線金鑰放進後台容器（主機設定變更，走會自動還原的工具）。', before: 'SF-I0', decided: '2026-11-22 同意。', src: 'SITE-FLOW 第 4 節第 3 題', options: ASK('之後新網站能自動加進 MainWP。', '這一步改成你手動在 MainWP 加站。') },
+  { n: 2, what: '把 MainWP 的連線金鑰放進後台容器（主機設定變更，走會自動還原的工具）。', before: 'SF-I0', decided: '2026-11-22 同意。已完成：後台容器讀得到三個設定值，後台正常。', src: 'SITE-FLOW 第 4 節第 3 題', options: ASK('之後新網站能自動加進 MainWP。', '這一步改成你手動在 MainWP 加站。') },
   { n: 3, what: '打開主機與後台的建站開關，建一筆測試網域的 DNS，跑一次完整的拋棄式建站再拆掉。', before: 'SF-L', src: 'WP-PLAN.md 第 6 節', options: ASK('跑完確認沒留下東西再關回開關。', '流程只在本機驗證。') },
   { n: 4, what: '部署引擎新版本（含目前所有尚未部署的引擎改動）。', before: 'GO-1', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('失敗會自動還原到現在的版本。', '引擎維持 2026-11-20 的版本。') },
   { n: 5, what: '改 oracle 網域的分流設定，讓 WordPress 接手引擎沒用到的網址（建置中）。', before: 'GO-2', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('訪客原本的網址不變；失敗自動還原。', 'WordPress 只能在主機內部看。') },
