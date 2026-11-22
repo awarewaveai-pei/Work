@@ -22,7 +22,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
-import { blockedChangeBody } from "@/lib/system-modes/blocked-change";
+import { BLOCKED_CHANGE_CODE, blockedChangeBody } from "@/lib/system-modes/blocked-change";
 import type { SiteGateClient } from "./gate-client";
 import {
   actionKeyOf,
@@ -367,7 +367,7 @@ export async function executeStep(
 
   const mode = await checkProductionChangeAllowed(db, args.site.organization_id);
   if (!mode.allowed) {
-    const runId = await insertRun(db, { ...base, status: "blocked", inputPayload: input, errorSummary: `system_mode_blocks_change: ${mode.mode}` });
+    const runId = await insertRun(db, { ...base, status: "blocked", inputPayload: input, errorSummary: `${BLOCKED_CHANGE_CODE}: ${mode.mode}` });
     return out(423, { ...blockedChangeBody(mode.mode), runId });
   }
 

@@ -42,6 +42,7 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
   "/api/ops/workflow-runs": ["ops-console"],
   "/api/ops/audit-events": ["ops-console"],
   "/api/ops/organizations": ["onboard"],
+  "/api/ops/site-flow": ["ops/clients"],
   "/api/build/provision-services": ["onboard"],
   "/api/build/runs": ["build"],
   "/api/provision": ["build"],
