@@ -2,6 +2,10 @@
 
 前置：K1、K3 已在 main。合約＝PLAN §3「一個入口」、I5 I6。
 
+**分兩段派工（避免兩個工人改同一個頁面檔）**
+- **K4a（批 2，後端）**：下列「要做」第 1、2、3、5 點，以及第 4 點的伺服器端（route 回 202）。**不動任何 `.tsx`。** route 的 202 回應本段就做好並測試；頁面還不會送 `chain`，所以線上行為不變。
+- **K4b（批 3，頁面）**：`ContentStudio.tsx`、`ScriptForge.tsx` 掛上 `components/tools/TextChainButtons.tsx`（K6 產出，props 見 `K6-chain-buttons.md`）、送出 `chain`＋`claudeModel`、收到 202 後輪詢、第 6 點的等待畫面，以及驗收節的實寫一篇。
+
 ## 檔案
 - 新 `lib/ai/sub-text.ts`＋`lib/ai/__tests__/sub-text.test.ts`
 - `lib/content/article/generate-core.ts`（`streamArticleGeneration` 分流 `:694`；`generateArticleMarkdown` `:762`；`prepareArticleGeneration` 的 model 正規化 `:624`）
