@@ -1,0 +1,43 @@
+# @@DOMAIN@@ -- client WordPress site @@SLUG@@. Rendered by templates/client-wp/render.sh, created with
+# `safe-infra-patch.sh host-nginx-new /etc/nginx/sites-available/@@DOMAIN@@.conf @@DOMAIN@@`; removed by deprovision-site.sh.
+# Path: visitor -> Cloudflare (proxied) -> this vhost :443 -> @@SLUG@@-wp on 127.0.0.1:@@PORT@@ (loopback only).
+server {
+    listen 80;
+    listen [::]:80;
+    server_name @@DOMAIN@@;
+    include /etc/nginx/snippets/cf-only.conf;
+    location / { return 301 https://$host$request_uri; }
+}
+
+server {
+    # nginx 1.24 on the host takes http2 only as a listen parameter (`http2 on;` is an error there).
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name @@DOMAIN@@;
+    include /etc/nginx/snippets/cf-only.conf;
+
+    ssl_certificate     @@CERT_DIR@@/fullchain.pem;
+    ssl_certificate_key @@CERT_DIR@@/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+
+    # = upload_max_filesize/post_max_size in php-limits.ini; nginx's 1M default would 413 media uploads first.
+    client_max_body_size 256M;
+    proxy_read_timeout    300s;
+    proxy_send_timeout    300s;
+    proxy_connect_timeout 30s;
+
+    # DISABLE_WP_CRON is set; the host's wp-cron-runner.sh is the only scheduler. A web hit would start a second run.
+    location = /wp-cron.php { return 403; }
+    location = /xmlrpc.php { return 444; }
+
+    location / {
+        proxy_pass http://127.0.0.1:@@PORT@@;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # Load-bearing: wp-config maps it to HTTPS=on (docker-compose.yml.tmpl); without it WordPress redirect-loops.
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host  $host;
+    }
+}

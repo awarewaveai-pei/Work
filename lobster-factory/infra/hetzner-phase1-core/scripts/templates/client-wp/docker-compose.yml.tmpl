@@ -1,0 +1,107 @@
+# Client WordPress site @@SLUG@@ (@@DOMAIN@@). Rendered by templates/client-wp/render.sh, created with
+# `safe-infra-patch.sh compose-new <this file> @@SLUG@@-wp`; later changes go through `safe-infra-patch.sh compose`.
+#
+# Names are a contract: container @@SLUG@@-wp / @@SLUG@@-db and volumes @@SLUG@@_wordpress_data / @@SLUG@@_db_data are
+# what /etc/awarewave/sites.d/@@SLUG@@.json records, and backup (SF-F) and deprovision-site.sh read them from there.
+# Project name = slug: compose-new's "project already has containers / volumes" refusals then cover these names.
+# Secrets: only from the .env next to this file (0600, generated on the host); this file holds no value.
+name: "@@SLUG@@"   # quoted: a slug such as 123 or true would otherwise not be a YAML string
+
+x-site-logging: &site-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  @@SLUG@@-db:
+    init: true
+    image: mariadb:11.8.8
+    container_name: @@SLUG@@-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: ${SITE_DB_PASSWORD:?SITE_DB_PASSWORD missing from .env}
+      MARIADB_ROOT_PASSWORD: ${SITE_DB_ROOT_PASSWORD:?SITE_DB_ROOT_PASSWORD missing from .env}
+      MARIADB_AUTO_UPGRADE: "1"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-allowed-packet=64M
+      - --innodb-buffer-pool-size=256M
+    volumes:
+      - db_data:/var/lib/mysql
+    # No ports: the database is reachable only on this site's own network.
+    healthcheck:
+      test: ["CMD", "timeout", "4", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - site
+    memswap_limit: 1G
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          pids: 256
+    logging: *site-logging
+
+  @@SLUG@@-wp:
+    init: true
+    build:
+      context: @@BUILD_CONTEXT@@
+    image: @@IMAGE@@
+    pull_policy: never
+    container_name: @@SLUG@@-wp
+    restart: unless-stopped
+    depends_on:
+      @@SLUG@@-db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: @@SLUG@@-db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${SITE_DB_PASSWORD:?SITE_DB_PASSWORD missing from .env}
+      WORDPRESS_TABLE_PREFIX: wp_
+      # Evaluated by the image's wp-config.php on every load (web and wp-cli), so it holds after the first boot too.
+      # DISABLE_WP_CRON: the host's wp-cron-runner.sh discovers this container by it and runs due events each minute.
+      # Proxy block: nginx terminates TLS and sends X-Forwarded-Proto; without HTTPS=on WordPress redirect-loops.
+      WORDPRESS_CONFIG_EXTRA: |
+        define('DISABLE_WP_CRON', true);
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { $$_SERVER['HTTPS'] = 'on'; }
+    volumes:
+      - wordpress_data:/var/www/html
+    ports:
+      - "127.0.0.1:@@PORT@@:80"
+    # Healthy = Apache serves a static file AND the database accepts this site's credentials (site-health.php).
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null -m 4 http://127.0.0.1/wp-includes/images/blank.gif && timeout 8 php /usr/local/lib/aw-site-health.php"]
+      interval: 20s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+    networks:
+      - site
+      - lobster-net  # @@same_host_products@@
+    memswap_limit: 2G
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          pids: 256
+    logging: *site-logging
+
+volumes:
+  wordpress_data:
+    name: @@SLUG@@_wordpress_data
+  db_data:
+    name: @@SLUG@@_db_data
+
+networks:
+  site: {}
+  lobster-net:  # @@same_host_products@@
+    name: lobster-net  # @@same_host_products@@
+    external: true  # @@same_host_products@@
