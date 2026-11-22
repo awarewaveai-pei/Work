@@ -1,4 +1,5 @@
-import type { CodexImageUsage } from "@/lib/ai/codex-usage";
+import type { SubscriptionUsage, SiteMonthRow } from "@/lib/ai/codex-usage";
+import type { subWorkerStatus } from "@/lib/tarot/codex-bridge";
 import { CodexLaptopButton } from "../../../CodexLaptopButton";
 
 const twTime = (unixS: number) =>
@@ -22,33 +23,84 @@ function Bar({ label, pct, resets }: { label: string; pct: number | null; resets
   );
 }
 
-/** Codex 免費生圖 — pictures drawn on the operator's laptop with her ChatGPT plan, and how much of the plan is used. */
-export function CodexQuotaCard({ usage }: { usage: CodexImageUsage }) {
-  const n = (v: number | null) => (v === null ? "讀取失敗" : `${v} 張`);
+type Workers = ReturnType<typeof subWorkerStatus>;
+const LANES: { id: keyof Workers; label: string }[] = [{ id: "owner", label: "本人按（筆電）" }, { id: "schedule", label: "排程（主機）" }];
+const TOOL_LABEL = { codex: "Codex", claude: "Claude" } as const;
+const card = { background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, marginBottom: 20, padding: "12px 16px" } as const;
+const cell = { padding: "6px 8px", fontSize: 12.5, color: "var(--text-primary)", textAlign: "right" } as const;
+
+/** 訂閱用量 — pictures and text made on the ChatGPT / Claude plans (NT$0), how much of the plan is used, whether each lane is online,
+ *  and per site this month: articles on 訂閱 vs API (API 花費 in NT$). A null count = the read failed. */
+export function CodexQuotaCard({ usage, workers, siteMonth }: { usage: SubscriptionUsage; workers: Workers; siteMonth: SiteMonthRow[] | null }) {
+  const n = (v: number | null, unit: string) => (v === null ? "讀不到" : `${v} ${unit}`);
+  const line = (label: string, c: { last24h: number | null; last7d: number | null }, unit: string) => (
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-primary)", marginTop: 6 }}>
+      <span style={{ fontWeight: 700 }}>{label}</span>
+      <span style={{ fontWeight: 700 }}>近 24 小時 {n(c.last24h, unit)} · 近 7 天 {n(c.last7d, unit)}</span>
+    </div>
+  );
   return (
-    <div style={{ background: "var(--card-bg)", border: "1px solid var(--border-subtle)", borderRadius: 12, marginBottom: 20, padding: "12px 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
-          Codex 免費生圖
-          <span style={{ fontWeight: 500, color: "var(--text-muted)", marginLeft: 8 }}>用 ChatGPT Plus 的 Codex 額度畫，不另外付錢</span>
-        </span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>近 24 小時 {n(usage.last24h)} · 近 7 天 {n(usage.last7d)}</span>
+    <div style={card}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>
+        訂閱用量
+        <span style={{ fontWeight: 500, color: "var(--text-muted)", marginLeft: 8 }}>用 ChatGPT／Claude 訂閱的額度做，每次 NT$0</span>
+      </span>
+      {line("Codex 畫圖", usage.images, "張")}
+      {line("Codex 寫文字", usage.textCodex, "篇")}
+      {line("Claude 寫文字", usage.textClaude, "篇")}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 10, fontSize: 12.5, color: "var(--text-primary)" }}>
+        {LANES.map(({ id, label }) => {
+          const w = workers[id];
+          return (
+            <div key={id}>
+              <span style={{ fontWeight: 700 }}>{label}：</span>{w.online ? "在線" : "離線"}
+              {w.online && <span style={{ color: "var(--text-muted)" }}>（{w.tools.length ? w.tools.map((t) => TOOL_LABEL[t]).join("、") : "沒有可用的工具"}）</span>}
+              {(Object.entries(w.quotaBlockedUntil) as [keyof typeof TOOL_LABEL, number][]).map(([t, until]) => (
+                <span key={t} style={{ color: "var(--red)", marginLeft: 8 }}>{TOOL_LABEL[t]} 額度用完，{twTime(until / 1000)} 恢復</span>
+              ))}
+            </div>
+          );
+        })}
       </div>
       <CodexLaptopButton variant="page" />
       {usage.latest ? (
         <>
-          <Bar label="5 小時額度" pct={usage.latest.pct5h} resets={usage.latest.resets5h} />
-          <Bar label="每週額度" pct={usage.latest.pctWeek} resets={usage.latest.resetsWeek} />
+          <Bar label="Codex 5 小時額度" pct={usage.latest.pct5h} resets={usage.latest.resets5h} />
+          <Bar label="Codex 每週額度" pct={usage.latest.pctWeek} resets={usage.latest.resetsWeek} />
           <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6, marginTop: 8 }}>
-            讀數來自最近一張圖（{new Date(usage.latest.at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false })}），額度也算到你自己用 Codex 寫程式的部分。
+            讀數來自最近一次 Codex 工作（{new Date(usage.latest.at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false })}），額度也算到你自己用 Codex 寫程式的部分。Claude 不回報額度百分比。
           </div>
         </>
       ) : (
-        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 8 }}>還沒有用 Codex 畫過圖。</div>
+        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 8 }}>還沒有 Codex 額度讀數（沒做過 Codex 的工作，或讀取失敗）。</div>
       )}
-      <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6, marginTop: 6 }}>
-        實測（2026-11-15，Plus）：1 張用掉 5 小時額度的 5–12%、每週額度約 1%，所以 5 小時內約 8–20 張。額度用完時筆電上的程式會停下，不會改扣儲值點數。
-      </div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginTop: 14 }}>每站本月文章：訂閱／API</div>
+      {siteMonth === null ? (
+        <div style={{ fontSize: 12, color: "var(--red)", marginTop: 6 }}>讀不到</div>
+      ) : siteMonth.length === 0 ? (
+        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>本月還沒有文章。</div>
+      ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 6 }}>
+          <thead>
+            <tr style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              <th style={{ ...cell, textAlign: "left", fontWeight: 600 }}>網站</th>
+              <th style={{ ...cell, fontWeight: 600 }}>訂閱（篇）</th>
+              <th style={{ ...cell, fontWeight: 600 }}>API（篇）</th>
+              <th style={{ ...cell, fontWeight: 600 }}>API 花費</th>
+            </tr>
+          </thead>
+          <tbody>
+            {siteMonth.map((r) => (
+              <tr key={r.siteId ?? "none"} style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                <td style={{ ...cell, textAlign: "left", fontWeight: 600 }}>{r.name}</td>
+                <td style={cell}>{r.sub}</td>
+                <td style={cell}>{r.api}</td>
+                <td style={cell}>NT${Math.round(r.apiTwd).toLocaleString("zh-TW")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
