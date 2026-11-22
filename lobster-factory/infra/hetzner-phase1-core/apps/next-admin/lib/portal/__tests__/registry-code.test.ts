@@ -10,7 +10,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { BACK_OFFICE_FEATURES } from "../../entitlements/can";
 import { ROUTE_FEATURES } from "../../entitlements/route-features";
-import { PLATFORM_APIS, PLATFORM_PAGES, STAFF_ROUTE_GROUPS, doorApis, nextAdminProducts, type NextAdminProduct } from "../doors";
+import { PLATFORM_APIS, PLATFORM_PAGES, STAFF_DOOR_APIS, STAFF_ROUTE_GROUPS, doorApis, nextAdminProducts, type NextAdminProduct } from "../doors";
 import { PRODUCTS, type PortalProduct } from "../products";
 import { ROOT, under, sources, scan, FILES, resolve, isRoute, importClosure } from "./code-scan";
 import { doorPageUrls } from "./app-pages";
@@ -313,6 +313,22 @@ describe("registry claims match the code", () => {
       const routes = routesUnder(prefix);
       expect(routes.length, prefix).toBeGreaterThan(0);
       for (const r of routes) expect(authorizes(r), r).toBe(true);
+    }
+  });
+
+  // doors.ts STAFF_DOOR_APIS: a staff-only route every product door serves refuses a customer itself (staffOnly), not
+  // only through middleware -- a customer's identity resolves to the operator role (ops-role.ts), so a role check is not enough.
+  it("a staff door API is one existing route that calls staffOnly before anything else", () => {
+    for (const a of STAFF_DOOR_APIS) {
+      const file = `app${a}/route.ts`;
+      expect(FILES.has(file), file).toBe(true);
+      expect(routesUnder(a), a).toEqual([file]);
+      const text = readFileSync(path.join(ROOT, file), "utf8");
+      expect(/import \{[^}]*\bstaffOnly\b[^}]*\} from "@\/lib\/tenant-guard"/.test(text), file).toBe(true);
+      const body = text.slice(text.indexOf("export async function GET"));
+      const guard = body.indexOf("staffOnly(");
+      expect(guard, file).toBeGreaterThan(0);
+      for (const later of ["resolveOpsRole(", "getSupabase"]) expect(body.indexOf(later), `${file}: ${later} before staffOnly`).toBeGreaterThan(guard);
     }
   });
 

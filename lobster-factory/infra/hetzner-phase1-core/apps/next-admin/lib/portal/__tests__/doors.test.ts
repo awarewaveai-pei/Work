@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PLATFORM_APIS, doorApis, doorForHost, portalHost, productHost, routeOnProductDoor, type NextAdminProduct } from "../doors";
+import { PLATFORM_APIS, STAFF_DOOR_APIS, doorApis, doorForHost, isProductPath, nextAdminProducts, portalHost, productHost, routeOnProductDoor, type NextAdminProduct } from "../doors";
 import { PRODUCTS } from "../products";
 
 // ADR 018 §2: hosts come from config, so a buyout install on a customer's domain changes env only.
@@ -52,8 +52,21 @@ describe("routeOnProductDoor", () => {
     ["/portal/api/anything", { action: "not_found" }],
     ["/api/tools/designs", { action: "pass" }],
     ["/api/tools/designsx", { action: "not_found" }],
+    // STAFF_DOOR_APIS: the exact path only (U4)
+    ["/api/ops/org-search", { action: "pass" }],
+    ["/api/ops/org-search/x", { action: "not_found" }],
+    ["/api/ops/org-searchx", { action: "not_found" }],
+    ["/api/ops/org-search/", { action: "not_found" }],
   ])("%s -> %j", (path, expected) => {
     expect(routeOnProductDoor(path, p)).toEqual(expected);
+  });
+
+  it("a staff door API is served on every product door but is no product path and no platform API", () => {
+    for (const d of nextAdminProducts()) for (const a of STAFF_DOOR_APIS) {
+      expect(routeOnProductDoor(a, d), `${d.key} ${a}`).toEqual({ action: "pass" });
+      expect(isProductPath(a, d), `${d.key} ${a}`).toBe(false);
+    }
+    for (const a of STAFF_DOOR_APIS) expect(PLATFORM_APIS.some((x) => a === x || a.startsWith(`${x}/`) || x.startsWith(`${a}/`)), a).toBe(false);
   });
 });
 

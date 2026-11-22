@@ -64,6 +64,11 @@ export function isAnonymousPath(pathname: string, product: NextAdminProduct): bo
 // image/process: the export bar (components/tools/OutputTrackBar) every image studio shows -- WebP / print file from the
 // request image, no database, no paid model.
 export const PLATFORM_APIS: readonly string[] = ["/api/tools/designs", "/api/entitlements/features", "/api/tools/events/upcoming", "/api/tools/image/process"];
+/** Staff-only APIs every product door also serves, so staff on a product subdomain get the same client rail as on the
+ *  staff host (ADR 020; card U4). Exact paths, never a prefix: nothing below them passes. Kept out of PLATFORM_APIS and
+ *  isProductPath on purpose: a customer on the door is still refused by middleware (isClientOutsideDoor -> 403) and by
+ *  the route's own staffOnly (registry-code.test.ts); staff still pass their tool gate (staffToolDenial). */
+export const STAFF_DOOR_APIS: readonly string[] = ["/api/ops/org-search"];
 /** Shared staff pages any door may list in door.nav (ADR 018 §2 rule 3); each reads only PLATFORM_APIS. tools/designs:
  *  the saved-works library every image and video studio writes to (media_assets), so a door's "我的作品" is this page. */
 export const PLATFORM_PAGES: readonly string[] = ["tools/designs"];
@@ -105,7 +110,7 @@ export type ProductRoute = { action: "pass" } | { action: "rewrite"; pathname: s
 /** On a product door: its own paths pass; any other API is 404; every other page path is served under the product's
  *  page prefix ("/" -> "/social"), so a staff page such as /ops becomes /social/ops and 404s on its own. */
 export function routeOnProductDoor(pathname: string, product: NextAdminProduct): ProductRoute {
-  if (isProductPath(pathname, product)) return { action: "pass" };
+  if (isProductPath(pathname, product) || STAFF_DOOR_APIS.includes(pathname)) return { action: "pass" };
   if (pathname.startsWith("/api/") || pathname === "/api" || pathname.startsWith("/portal/api/")) return { action: "not_found" };
   return { action: "rewrite", pathname: pathname === "/" ? product.door.page : `${product.door.page}${pathname}` };
 }

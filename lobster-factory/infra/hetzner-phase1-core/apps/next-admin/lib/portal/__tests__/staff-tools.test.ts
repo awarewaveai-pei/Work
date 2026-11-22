@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { PUBLIC_API_PATHS } from "../../../middleware";
 import { BACK_OFFICE, PRODUCTS, STAFF_UTILITIES } from "../products";
-import { PLATFORM_APIS, STAFF_ROUTE_GROUPS, doorApis, nextAdminProducts } from "../doors";
+import { PLATFORM_APIS, STAFF_DOOR_APIS, STAFF_ROUTE_GROUPS, doorApis, nextAdminProducts } from "../doors";
 import { STAFF_API_OWNERS, STAFF_PLATFORM, STAFF_TOOLS, covers, staffApisOf, toolsFor } from "../staff-tools";
 import ts from "typescript";
 import { ROOT, codeIndex, isRoute, scan } from "./code-scan";
@@ -207,7 +207,12 @@ describe("staff tools", () => {
     expect(toolsFor("/api/ops/build-id")).toBe("platform");
     // client_config (SSH, WordPress paths) is 客戶's alone; every picker's tool gets the names-only search
     expect(toolsFor("/api/ops/clients")).toEqual(["ops/clients"]);
-    expect(toolsFor("/api/ops/org-search")).toEqual(expect.arrayContaining(["ops/clients", "design", "collect", "outreach"]));
+    expect(toolsFor("/api/ops/org-search")).toEqual(expect.arrayContaining(["ops/clients", "design", "collect", "outreach", "content", "video"]));
+    // served on product doors (doors.ts STAFF_DOOR_APIS) but still a ticked tool's, never every staff member's (U4)
+    for (const a of STAFF_DOOR_APIS) {
+      expect(toolsFor(a), a).not.toBe("platform");
+      expect(STAFF_PLATFORM.apis.some((p) => covers(p, a)), a).toBe(false);
+    }
     expect(toolsFor("/api/ops/clients/acme/credentials")).toEqual(["ops/clients"]);
     // the narrow row replaces the broad one: 客戶 alone does not reach AI 客服's knowledge base
     expect(toolsFor("/api/ops/clients/acme/cs-knowledge")).toEqual(["cs"]);

@@ -9,6 +9,7 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { resolveOpsRole, canModifyIncidentStatus } from "@/lib/ops-role";
 import { NAV_FIRST, NAV_SEARCH_LIMIT, toPickOrg } from "@/app/(shell)/ops/clients/nav-orgs";
 import { orgNameFilter, orgSearchTerm } from "@/lib/org-search";
+import { staffOnly } from "@/lib/tenant-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HAS_BRAND = ["primary", "secondary", "accent"].map((k) => `${BRAND}->>${k}.match.${HEX}`).join(",");
 
 export async function GET(request: Request) {
+  // Every product door serves this route (doors.ts STAFF_DOOR_APIS); a customer's identity resolves to operator
+  // (ops-role.ts), so the role check below alone would let one list every client: staff only, here as well as in middleware.
+  const notStaff = staffOnly(request);
+  if (notStaff) return notStaff;
   const resolved = resolveOpsRole(request);
   if (!canModifyIncidentStatus(resolved.role) || resolved.source === "default_viewer") {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
