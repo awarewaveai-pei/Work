@@ -1,4 +1,8 @@
 (async () => {
+  // K12 (ADR 020 §2.4): /?open=X&org=Y from the main system's handoff. org leaves the address at once (a reload or a
+  // bookmark never asks again; index-1.js never hands it to a frame); the cookie stays the only client in here.
+  const query = new URLSearchParams(location.search), wanted = (query.get("org") || "").trim().toLowerCase(), opening = query.get("open");
+  if (query.has("org")) { query.delete("org"); history.replaceState(history.state, "", location.pathname + (query.toString() ? "?" + query : "") + location.hash); }
   if (VW_CONFIG.mode !== "http" || VW_CONFIG.apiBaseUrl !== "/api/vw") return;
   const context = VideoWorkbenchAdapters.context, button = document.getElementById("organizationPicker");
   const identity = await context.ready;
@@ -44,7 +48,8 @@
     }
     throw Error("媒體服務已更新，請重新整理後再切換客戶");
   }
-  button.onclick = () => {
+  // returnTo: where a confirmed switch lands -- "/" from the top button (unchanged), /?open=X for a handoff (A10).
+  function openDialog(preselect = null, returnTo = "/") {
     const panel = document.createElement("dialog"), title = document.createElement("h2"), note = document.createElement("p"), close = document.createElement("button");
     panel.className = "vw-organization-dialog";
     title.textContent = "切換客戶";
@@ -53,17 +58,24 @@
     const search = document.createElement("input"), list = document.createElement("div"), hint = document.createElement("p");
     search.type = "search"; search.placeholder = "搜尋客戶..."; search.setAttribute("aria-label", "搜尋客戶"); search.hidden = first.scoped;
     list.setAttribute("role", "group"); list.setAttribute("aria-label", "客戶");
+    if (preselect) {
+      // never the focused control: a stray Enter cancels, only a click on the client's own button switches
+      note.textContent = "主系統要以「" + preselect.name + "」開啟。按下它切換客戶；按「返回」留在目前的客戶。" + note.textContent;
+      close.autofocus = true;
+    }
     panel.append(title, note, search, list, hint, close);
     let switching = false, timer = 0, asked = 0;
     const show = (orgs, more) => {
       list.replaceChildren(...orgs.map(choiceFor));
       hint.textContent = orgs.length ? more : "無符合的客戶";
     };
+    // the asked-for client is offered even when it is outside the first page
+    const offered = preselect && !first.orgs.some((o) => o.id === preselect.id) ? [preselect, ...first.orgs] : first.orgs;
     const firstHint = first.total > first.orgs.length ? "共 " + first.total + " 個客戶，其他請用上面的搜尋。" : "";
     search.oninput = () => {
       clearTimeout(timer);
       const q = search.value.trim(), mine = ++asked;
-      if (!q) return show(first.orgs, firstHint);
+      if (!q) return show(offered, firstHint);
       timer = setTimeout(async () => {
         try { const j = await bootstrap("q=" + encodeURIComponent(q)); if (mine === asked) show(j.orgs, ""); }
         catch (error) { if (mine === asked) { list.replaceChildren(); hint.textContent = error.message; } }
@@ -71,7 +83,7 @@
     };
     function choiceFor(org) {
       const choice = document.createElement("button");
-      choice.type = "button"; choice.className = "minor"; choice.textContent = org.name; // dialog surface: the sidebar "nav" class is white text
+      choice.type = "button"; choice.className = org.id === preselect?.id ? "" : "minor"; choice.textContent = org.name; // dialog surface: the sidebar "nav" class is white text
       choice.disabled = org.id === identity.organizationId;
       choice.setAttribute("aria-pressed", String(choice.disabled));
       choice.onclick = async () => {
@@ -92,7 +104,7 @@
             const result = await r.json();
             if (!r.ok) throw Error(result.error?.message || result.error || "切換客戶失敗");
             channel?.postMessage({ organizationId: org.id });
-            location.assign("/");
+            location.assign(returnTo);
           });
         } catch (error) {
           if (locked) context.unlock();
@@ -105,8 +117,17 @@
       };
       return choice;
     }
-    show(first.orgs, firstHint);
+    show(offered, firstHint);
     panel.addEventListener("close", () => panel.remove(), { once: true });
     document.body.append(panel); panel.showModal();
-  };
+  }
+  button.onclick = () => openDialog();
+  if (!wanted || wanted === identity.organizationId) return;
+  // Another client asked for: only a client this account may pick (the dialog's own list -- a customer's is itself alone,
+  // staff see active clients) opens the dialog; anything else changes nothing and says so.
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  const target = UUID.test(wanted) ? first.orgs.find((o) => o.id === wanted)
+    || (await bootstrap("first=1&include=" + encodeURIComponent(wanted))).orgs.find((o) => o.id === wanted) : null;
+  if (!target) throw Error("主系統帶來的客戶無法在這裡開啟（客戶代碼不正確，或你沒有這個客戶的權限）；工作台仍是目前的客戶。");
+  openDialog(target, opening ? "/?open=" + encodeURIComponent(opening) : "/");
 })().catch(VideoWorkbench.reportError);

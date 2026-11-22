@@ -139,6 +139,7 @@
   const params = new URLSearchParams(location.search),
     opening = params.get("open");
   params.delete("open");
+  params.delete("org"); // K12: the client is organization-picker.js's alone (it confirms a switch); a frame never gets it
   VideoWorkbench.loadCapabilities()
     .then(async (caps) => {
       $("worksNav").hidden = $("script-forgeNav").hidden = !caps?.mainSystem;
