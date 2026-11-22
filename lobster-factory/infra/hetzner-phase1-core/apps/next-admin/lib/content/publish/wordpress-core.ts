@@ -323,7 +323,7 @@ export async function publishToWordPress(
 
   const { sites } = await getWpSites();
   if (siteId || sites.length > 0) {
-    // 指定站 → 驗租戶；未指定 → 取「呼叫者有權存取的第一個」（staff 等同舊的 sites[0]）
+    // 指定站 → 驗租戶；未指定 → 只有單站客戶自動選該站，員工與多站客戶得 null → 400（K6，wp-sites.ts resolveWpSite）
     let resolved;
     try {
       resolved = await resolveWpSite(req, siteId);

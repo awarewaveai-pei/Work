@@ -194,15 +194,15 @@ export async function embedVideoInPost(
   // WP REST has no draft revision of a published post, so editing one is a live edit.
   input: { siteId: string; postId: number; videoUrl: string; releaseId?: string; variant?: string; once?: boolean; draftOnly?: boolean },
 ): Promise<EmbedResult> {
-  // Normalized here, not only in the route: a blank siteId reaching resolveWpSite means "first accessible site".
+  // Normalized here, not only in the route: a blank siteId reaching resolveWpSite picks a single-site customer's one site.
   const siteId = input.siteId.trim();
   const videoUrl = input.videoUrl.trim();
   const postId = input.postId;
   const releaseId = (input.releaseId ?? "").trim();
   const variant = (input.variant ?? "").trim() || "default";
 
-  // Required: this rewrites an existing post by id, so resolveWpSite's "first accessible site" fallback
-  // would edit post N on whichever site happens to be first.
+  // Required: this rewrites an existing post by id; resolveWpSite's single-site-customer pick must never decide
+  // which site's post N gets edited.
   if (!siteId) return { ok: false, status: 400, error: "siteId required" };
   if (!videoUrl) return { ok: false, status: 400, error: "videoUrl required" };
   if (!/^https:\/\//i.test(videoUrl)) return { ok: false, status: 400, error: "videoUrl must start with https://" };
@@ -450,7 +450,7 @@ export async function embedVideoInNewDraft(
   const siteId = input.siteId.trim();
   const title = input.title.replace(/[\r\n#]+/g, " ").trim().slice(0, 200);
   const intro = (input.intro ?? "").trim().slice(0, 2000);
-  // Checked before the draft exists: publishToWordPress treats a blank siteId as "first accessible site",
+  // Checked before the draft exists: publishToWordPress lets a blank siteId pick a single-site customer's one site,
   // and a bad video URL would leave an empty draft behind.
   if (!siteId) return { ok: false, status: 400, error: "siteId required" };
   if (!title) return { ok: false, status: 400, error: "title required" };
