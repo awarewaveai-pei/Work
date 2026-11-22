@@ -318,7 +318,7 @@ describe("seller licences (ADR 017 decision #12, D3)", () => {
   it("can() never answers a seller licence, in shadow or enforce", async () => {
     for (const mode of ["shadow", "enforce"] as const) {
       const { deps } = gateFixture({ mode, entitlement: { featureKey: sellerLicenceKey("social") } });
-      expect(await verdictOf(CUSTOMER, sellerLicenceKey("social"), ACTOR, deps)).toEqual({ allowed: false, reason: "unknown_feature" });
+      expect(await verdictOf(CUSTOMER, sellerLicenceKey("social"), ACTOR, deps)).toEqual({ allowed: false, reason: "unknown_feature", source: null });
       expect(await can(CUSTOMER, sellerLicenceKey("social"), ACTOR, deps)).toMatchObject({ allowed: false, reason: "seller_licence_not_a_feature" });
     }
   });

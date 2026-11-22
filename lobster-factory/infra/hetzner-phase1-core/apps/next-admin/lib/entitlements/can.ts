@@ -271,13 +271,14 @@ async function decide(subject: Subject, featureKey: string, actor: string, d: Ga
   return { ok: true, limits: payload.limits, maxSpend: payload.max_spend, source: payload.source, entitlementId: payload.entitlement_id };
 }
 
-/** The verdict alone: no audit row, no grant (the usable-features list asks it for many features at once). */
-export async function verdictOf(subject: Subject, featureKey: string, actor: string, d: GateDependencies): Promise<{ allowed: boolean; reason: string | null }> {
+/** The verdict alone: no audit row, no grant (the usable-features list asks it for many features at once). `source` =
+ *  who pays, from the verified permit (contract / comp / credits); null on a refusal. */
+export async function verdictOf(subject: Subject, featureKey: string, actor: string, d: GateDependencies): Promise<{ allowed: boolean; reason: string | null; source: PermitPayload["source"] | null }> {
   try {
     const v = await decide(subject, featureKey, actor, d);
-    return v.ok === true ? { allowed: true, reason: null } : { allowed: false, reason: v.reason };
+    return v.ok === true ? { allowed: true, reason: null, source: v.source } : { allowed: false, reason: v.reason, source: null };
   } catch {
-    return { allowed: false, reason: "infrastructure_error" };
+    return { allowed: false, reason: "infrastructure_error", source: null };
   }
 }
 

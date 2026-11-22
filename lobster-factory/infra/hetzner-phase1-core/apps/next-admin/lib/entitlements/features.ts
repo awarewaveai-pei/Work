@@ -1,5 +1,6 @@
 import { sign } from "node:crypto";
 import { modeFor, verdictOf, type EntitlementMode, type GateDependencies, type Subject } from "./can";
+import type { PermitPayload } from "./permit";
 import { canonicalize } from "./permit";
 import { PRODUCTS } from "@/lib/portal/products";
 import { routeFeatureKeys } from "./route-features";
@@ -13,8 +14,9 @@ export interface FeatureList {
   format_version: 1;
   subject: string;
   mode: EntitlementMode;
-  /** allowed = what the button should do now (shadow: always true); verdict = what enforce would answer. */
-  features: Record<string, { allowed: boolean; verdict: boolean; reason: string | null }>;
+  /** allowed = what the button should do now (shadow: always true); verdict = what enforce would answer; source = who
+   *  pays when verdict is true (contract / comp / credits, rightLabel's `source`), else null. */
+  features: Record<string, { allowed: boolean; verdict: boolean; reason: string | null; source: PermitPayload["source"] | null }>;
   issued_at: number;
   expires_at: number;
   kid: string | null;
@@ -38,7 +40,7 @@ export async function featureList(subject: Subject, actor: string, d: GateDepend
   const features: FeatureList["features"] = {};
   for (const key of keys) {
     const v = await verdictOf(subject, key, actor, d);
-    features[key] = { allowed: mode === "shadow" || v.allowed, verdict: v.allowed, reason: v.reason };
+    features[key] = { allowed: mode === "shadow" || v.allowed, verdict: v.allowed, reason: v.reason, source: v.source };
   }
   let kid: string | null = null;
   let signature: string | null = null;

@@ -12,19 +12,19 @@ describe("the usable-features list that greys paid buttons (ADR 017 §4)", () =>
   it("enforce greys what is not bought, with the reason; nothing is audited", async () => {
     const { deps, audit } = gateFixture({ credits: true, balance: 0 });
     const { list } = await featureList(CUSTOMER, "client:x:u", deps, KEYS);
-    expect(list.features["social.dispatch"]).toEqual({ allowed: true, verdict: true, reason: null });
-    expect(list.features["content.title"]).toEqual({ allowed: false, verdict: false, reason: "no_credits" });
+    expect(list.features["social.dispatch"]).toEqual({ allowed: true, verdict: true, reason: null, source: "contract" });
+    expect(list.features["content.title"]).toEqual({ allowed: false, verdict: false, reason: "no_credits", source: null });
     expect(audit).not.toHaveBeenCalled();
   });
 
   it("shadow greys nothing for staff but still carries the real verdict; a customer sees the real state", async () => {
     resetFeatureListCache();
     const staff = await featureList(CUSTOMER, "ops:operator:u", gateFixture({ mode: "shadow", entitlement: null }).deps, KEYS);
-    expect(staff.list.features["social.dispatch"]).toEqual({ allowed: true, verdict: false, reason: "no_entitlement" });
+    expect(staff.list.features["social.dispatch"]).toEqual({ allowed: true, verdict: false, reason: "no_entitlement", source: null });
     resetFeatureListCache();
     const customer = await featureList(CUSTOMER, "client:x:u", gateFixture({ mode: "shadow", entitlement: null }).deps, KEYS);
     expect(customer.list).toMatchObject({ mode: "enforce" });
-    expect(customer.list.features["social.dispatch"]).toEqual({ allowed: false, verdict: false, reason: "no_entitlement" });
+    expect(customer.list.features["social.dispatch"]).toEqual({ allowed: false, verdict: false, reason: "no_entitlement", source: null });
   });
 
   it("by default lists every feature a door shows, including ones asked outside a route; cognitive's methods stay out", async () => {

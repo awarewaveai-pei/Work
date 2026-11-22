@@ -48,7 +48,7 @@ describe.skipIf(!REST)("entitlements against a real database (enforce)", () => {
     const list = await (await GET(staff())).json();
     expect(list.list.mode).toBe("enforce");
     expect(list.list.subject).toBe(INTERNAL);
-    expect(list.list.features["content.title"]).toEqual({ allowed: false, verdict: false, reason: "no_credits" });
+    expect(list.list.features["content.title"]).toEqual({ allowed: false, verdict: false, reason: "no_credits", source: null });
     expect(typeof list.signature).toBe("string");
     const refused = await POST(staff());
     expect(refused.status).toBe(403);
@@ -57,7 +57,7 @@ describe.skipIf(!REST)("entitlements against a real database (enforce)", () => {
     const { error } = await db.from("media_credit_ledger").insert({ organization_id: INTERNAL, units: 10, entry_type: "grant", idempotency_key: "e2e-grant-1" });
     if (error) throw new Error(error.message);
     resetFeatureListCache();
-    expect((await (await GET(staff())).json()).list.features["content.title"]).toEqual({ allowed: true, verdict: true, reason: null });
+    expect((await (await GET(staff())).json()).list.features["content.title"]).toEqual({ allowed: true, verdict: true, reason: null, source: "credits" });
     const passed = await POST(staff());
     expect([passed.status, await passed.text()]).toEqual([503, "ANTHROPIC_API_KEY not configured"]);   // past the gate
   });
