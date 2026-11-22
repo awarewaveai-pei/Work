@@ -14,6 +14,7 @@ import { featureUnitCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { DEFAULT_IMAGE_MODEL, IMAGE_RATES, TEXT_FEATURES } from "@/lib/ai/cost-model";
 import { draftCallUpperTwd } from "@/lib/content/video/auto-run-budget";
 import { articleVideoCostUsd } from "@/lib/content/video/defaults";
+import { articleModelUsd, type TopicTextRoad } from "./cost";
 
 /** The cap when the content_pipeline row sets none (0168 per_topic_cap_twd null). */
 export const DEFAULT_TOPIC_CAP_TWD = 15;
@@ -89,7 +90,9 @@ function feature(key: string): number {
  *  its ceiling minus its estimate; the next step then stops. A social writer call is reserved at its ceiling
  *  (auto-run-budget draftCallUpperTwd, ~NT$0.07) and settled to its exact cost. */
 export const stepUpperTwd = {
-  article: (images: number) => twd(feature("article") + images * (IMAGE_RATES[DEFAULT_IMAGE_MODEL]?.usd ?? 0)),
+  // K7: on the site's API model (a subscription road reserves its API fallback, the most it can cost); no road = as before
+  article: (images: number, road?: TopicTextRoad) => twd(feature("article") + (road ? articleModelUsd(road) - articleModelUsd() : 0)
+    + images * (IMAGE_RATES[DEFAULT_IMAGE_MODEL]?.usd ?? 0)),
   video: () => twd(articleVideoCostUsd()),
   socialCall: (prompt: string) => draftCallUpperTwd(prompt),
 };

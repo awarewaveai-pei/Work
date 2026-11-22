@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { getWpSites, siteUrlWriteGate } from "@/lib/content/wp-sites";
-import { canAccessOrg, effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { canAccessOrg, effectiveOrgId, OrgAccessError, staffOnly, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { subscriptionOrgStatus } from "@/lib/content/text-road-guard";
+import { requestActor } from "@/lib/entitlements/subject";
+import { codexAllowed } from "@/lib/tarot/codex-bridge";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,6 +29,12 @@ export interface ManagedSite {
   org_slug?: string | null;
   /** The owning organization (0061); the social manager's brand id. Env sites have none. */
   organization_id?: string | null;
+  /** K7: the site's organization is the operator's own, so a subscription road may be set (staff lists only). */
+  subscriptionsAllowed?: boolean;
+  /** K7: the owner marked this client organization as hers (client_config.ownerSubscription). */
+  ownerSubscription?: boolean;
+  /** K7: the viewer is the owner, so the page offers the mark. */
+  ownerViewing?: boolean;
 }
 
 // GET /api/content/sites — list sites (no tokens in response)
@@ -107,6 +116,18 @@ export async function GET(req: Request): Promise<Response> {
           organization_id: r.organization_id,
         };
       });
+      // K7: whether a subscription road may be set and run on each site (its organization is the operator's own); staff
+      // only, the only ones who see that panel. One lookup per organization.
+      if (!staffOnly(req)) {
+        const own = new Map<string, ReturnType<typeof subscriptionOrgStatus>>();
+        const ownerViewing = codexAllowed(requestActor(req));
+        for (const s of sites) {
+          const org = s.organization_id ?? "";
+          if (!own.has(org)) own.set(org, subscriptionOrgStatus(org || null));
+          const st = await own.get(org)!;
+          Object.assign(s, { subscriptionsAllowed: st.allowed, ownerSubscription: st.marked, ownerViewing });
+        }
+      }
       return NextResponse.json({ ok: true, sites });
     }
   }

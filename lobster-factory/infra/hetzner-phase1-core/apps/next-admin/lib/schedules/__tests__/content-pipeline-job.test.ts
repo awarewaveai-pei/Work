@@ -15,7 +15,8 @@ vi.mock("@/lib/content/topics/daily", () => ({ dailyIfDue, dailyDeps: () => ({})
 vi.mock("@/lib/collect/run", () => ({ runCollection: vi.fn() }));
 vi.mock("@/lib/collect/blocks", () => ({}));
 vi.mock("@/lib/content/topics/tick", async (orig) => ({ ...(await orig<typeof import("@/lib/content/topics/tick")>()), tickTopics }));
-vi.mock("@/lib/content/topics/make", () => ({ topicDeps: () => ({}) }));
+const topicDeps = vi.hoisted(() => vi.fn((..._a: unknown[]) => ({})));
+vi.mock("@/lib/content/topics/make", () => ({ topicDeps }));
 
 const { clientJob } = await import("@/lib/schedules/jobs");
 const { DAILY_START_CAP } = await import("@/lib/content/topics/tick");
@@ -24,6 +25,11 @@ const job = clientJob("content_pipeline")!;
 beforeEach(() => { tickTopics.mockClear(); collectTrendsIfDue.mockClear(); planIfDue.mockClear(); planIfDue.mockResolvedValue(null); dailyIfDue.mockClear(); dailyIfDue.mockResolvedValue(null); sites.rows = []; });
 
 describe("content_pipeline job", () => {
+  it("makes topics as the schedule (K7): its subscription segments run on the host's lane, a person's start does not", async () => {
+    await job.run("o", "rk", { dailyLimit: 2, perTopicCapTwd: 20 } as never);
+    expect(topicDeps).toHaveBeenLastCalledWith(sb, "o", "schedule:content_pipeline", { capTwd: 20, maker: "schedule" });
+  });
+
   it("passes the client's stored limit to the tick, and the default when the row sets none", async () => {
     await job.run("o", "rk", { dailyLimit: 5 } as never);
     expect(tickTopics).toHaveBeenLastCalledWith(expect.objectContaining({ move: expect.any(Function) }), { cap: 5 });

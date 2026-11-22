@@ -19,6 +19,7 @@ import { isDesignsAsset } from "@/lib/storage/r2";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { BLOCKED_CHANGE_CODE } from "@/lib/system-modes/blocked-change";
+import { scrubInternalMarkers } from "@/lib/content/internal-markers";
 
 /** 發佈輸入。欄位型別刻意保持 unknown（與原 route body 同形），coercion 在 core 內統一做 → route 與積木共用同一套寬鬆解析。 */
 export interface WordPressPublishInput {
@@ -104,19 +105,10 @@ function isYouTubeUrl(url: string): boolean {
   return /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtube-nocookie\.com\/embed\/|youtu\.be\/)[\w-]{11}/i.test(url);
 }
 
-function markdownToHtml(md: string): string {
-  // Strip meta block before converting
-  const clean = md
-    .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
-    // Drop any UNRESOLVED YouTube placeholder, even if emitted inline (defense-in-depth so a stray
-    // "[YOUTUBE_PLACEHOLDER_N: ...]" cue never reaches a live post). Resolved ones are already bare
-    // watch URLs by now and don't match. (critic 2026-06-15 Major)
-    .replace(/\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]/g, "")
-    // #6 — strip only INLINE Kadence-pattern leftovers; a standalone-line placeholder is converted
-    // to a wp:block reference in the main loop below.
-    .replace(/(?<=\S)[ \t]*\[KADENCE_PATTERN:\s*\d+\s*\]/gi, "")
-    .replace(/\[KADENCE_PATTERN:\s*\d+\s*\][ \t]*(?=\S)/gi, "")
-    .trim();
+export function markdownToHtml(md: string): string {
+  // every internal marker out first (lib/content/internal-markers.ts, the same list markdownToBlocks uses); a standalone
+  // [KADENCE_PATTERN: id] line stays for the loop below, which turns it into a wp:block reference
+  const clean = scrubInternalMarkers(md);
 
   const lines = clean.split("\n");
   const out: string[] = [];

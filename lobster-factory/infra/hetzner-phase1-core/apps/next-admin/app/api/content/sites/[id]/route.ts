@@ -4,7 +4,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { siteRowGate, siteUrlWriteGate } from "@/lib/content/wp-sites";
 import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TOPIC_MODES, YOUTUBE_PRIVACIES, siteIntroCards, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TEXT_ROAD_API_MODELS, TEXT_ROAD_CHAINS, TEXT_ROAD_CLAUDE_MODELS, TOPIC_MODES, YOUTUBE_PRIVACIES, siteIntroCards, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { subscriptionRoadDenied } from "@/lib/content/text-road-guard";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { autoIntroStyles } from "@/public/editor-shared/intro-styles.js";
 import { orgDesignIds } from "@/lib/content/video/opener-designs";
@@ -16,6 +17,10 @@ const GATE_MODES = [
   { field: "topicMode", allowed: TOPIC_MODES },
   { field: "dailyTrendTopics", allowed: [true, false] },   // N8: the schedule scores and proposes trend topics each day
   { field: "youtubePrivacy", allowed: YOUTUBE_PRIVACIES },
+  // K7: the schedule's text road -- the API model spends money; a subscription segment is the owner's alone (text-road-guard.ts)
+  { field: "textChain", allowed: TEXT_ROAD_CHAINS },
+  { field: "textApiModel", allowed: TEXT_ROAD_API_MODELS },
+  { field: "textClaudeModel", allowed: TEXT_ROAD_CLAUDE_MODELS },
 ] as const;
 
 export const runtime = "nodejs";
@@ -69,6 +74,12 @@ export async function PATCH(
     if (!(g.allowed as readonly unknown[]).includes(body[g.field]))
       return NextResponse.json({ ok: false, error: `${g.field} must be one of ${g.allowed.join(", ")}` }, { status: 400 });
   }
+  const subDenied = await subscriptionRoadDenied(req, body, async () => {
+    const { data, error } = await supabase.from("wp_sites").select("organization_id").eq("id", id).maybeSingle();
+    if (error) throw new Error(`wp_sites:organization:${error.message}`);
+    return (data as { organization_id: string | null } | null)?.organization_id;
+  });
+  if (subDenied) return subDenied;
   // Card R2: the automatic videos' intro styles -- its own field (a whole-defaults save keeps the stored list, as with the
   // modes); automatic style ids only, each once; [] = no intro. Not a gate: it neither spends nor sends anything.
   const introGiven = body.introStyles !== undefined;

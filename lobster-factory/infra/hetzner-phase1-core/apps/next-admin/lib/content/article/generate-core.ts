@@ -534,6 +534,13 @@ function buildUserPrompt(params: {
 
 export type ArticleGenerateInput = Record<string, unknown>;
 
+/** Card K7: the key under which a program (never a request: a JSON body cannot carry a symbol key, PLAN I2) says how its
+ *  subscription segments run: `lane` "schedule" = the host's worker (only the schedule sets it, lib/content/topics/make.ts;
+ *  absent = the owner lane), `subBudgetMs` = how long all of them together may take before the chain moves on to the API
+ *  (PLAN I5: the schedule waits only within its tick budget). */
+export const ARTICLE_CALLER: unique symbol = Symbol("article.caller");
+export interface ArticleCaller { lane?: "schedule"; subBudgetMs?: number }
+
 export interface ArticlePreparedConfig {
   model: string;
   maxTokens: number;
@@ -548,6 +555,8 @@ export interface ArticlePreparedConfig {
   /** Whose worker runs the subscription segments: "owner" (default, the operator's laptop) or "schedule" (set by the
    *  scheduled caller, never by a request body: PLAN I2). */
   lane?: SubLane;
+  /** All subscription segments together end after this long (a program caller's ARTICLE_CALLER); absent = no limit. */
+  subBudgetMs?: number;
 }
 
 export interface ArticleGenerateFailure {
@@ -685,7 +694,12 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
   // A saved request without `chain` (or "api") = API only, as before.
   const chain = isTextChain(body.chain) && body.chain !== "api"
     ? { chain: body.chain, ...(typeof body.claudeModel === "string" ? { claudeModel: body.claudeModel } : {}) } : {};
-  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, sourcesCostUsd: sourcesCostUsd > 0 ? sourcesCostUsd : undefined, jobId, ...chain } };
+  const caller = ((body as Record<symbol, unknown>)[ARTICLE_CALLER] ?? {}) as ArticleCaller;
+  const lane = {
+    ...(caller.lane === "schedule" ? { lane: "schedule" as const } : {}),
+    ...(typeof caller.subBudgetMs === "number" && caller.subBudgetMs > 0 ? { subBudgetMs: caller.subBudgetMs } : {}),
+  };
+  return { ok: true, config: { model, maxTokens, system: SYSTEM_PROMPT, userPrompt, sourcesCostUsd: sourcesCostUsd > 0 ? sourcesCostUsd : undefined, jobId, ...chain, ...lane } };
 }
 
 /**
@@ -709,9 +723,12 @@ export async function* streamArticleGeneration(
     return;
   }
   const models = resolveTextChain({ chain: config.chain!, apiModel: config.model, claudeModel: config.claudeModel });
+  // one deadline for every subscription segment together (a waiting or running job is dropped as sub_worker_timeout)
+  const limits = [signal, config.subBudgetMs ? AbortSignal.timeout(config.subBudgetMs) : undefined].filter((s): s is AbortSignal => !!s);
+  const subSignal = limits.length > 1 ? AbortSignal.any(limits) : limits[0] ?? new AbortController().signal;
   const out = await runTextChain(models, {
     runSub: (model) => runSubText({ grant, model, system: config.system, prompt: config.userPrompt, lane,
-      signal: signal ?? new AbortController().signal, route: "content/article-generate", tool: "content", jobId: config.jobId }),
+      signal: subSignal, route: "content/article-generate", tool: "content", jobId: config.jobId }),
     runApi: async (model) => model,
     signal,
   });

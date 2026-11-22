@@ -8,7 +8,7 @@
 // /api/content/topics*, which checks the site's organization; a stale page gets 409 and reloads.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MAX_BULK_TOPICS, NEXT, TOPIC_FORMATS, canReschedule, daysIn, taipeiParts, type Topic, type TopicFormat, type TopicStatus } from "@/lib/content/topics/store";
-import { costBasisNote, planCostTwd, topicShownTwd } from "@/lib/content/topics/cost";
+import { costBasisNote, planCostTwd, subRoadNote, topicShownTwd } from "@/lib/content/topics/cost";
 import { DAILY_START_CAP, makesNow } from "@/lib/content/topics/tick";
 import { GridPicker } from "@/components/tools/GridPicker";
 import type { TopicReview } from "@/lib/content/topics/review";
@@ -400,7 +400,9 @@ export function TopicsBoard({ overview, scheduleFor, view = "topics" }: {
   const site = saved[siteId] ?? ctx.sites?.find((x) => x.id === siteId);
   const siteRow = overview.rows.find((r) => r.siteId === siteId);
   // N3: the median of this brand's recent finished topics once there are enough, else the price list; the page names which
-  const priceOf = (f?: readonly string[]) => topicShownTwd(f, siteRow ? overview.actual?.[siteRow.organizationId] : null);
+  const priceOf = (f?: readonly string[]) => topicShownTwd(f, siteRow ? overview.actual?.[siteRow.organizationId] : null, site?.contentDefaults);
+  // K7: a site whose article starts on a subscription says what that costs and what the API fallback can cost
+  const subNote = (f: readonly string[]) => (f.includes("article") ? subRoadNote(site?.contentDefaults) : null);
   const planButton = (
     <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void plan()} style={{ whiteSpace: "normal" }}>
       {busy ? T.planning : `${T.plan}（約 NT$${planCostTwd()}）`}
@@ -492,7 +494,7 @@ export function TopicsBoard({ overview, scheduleFor, view = "topics" }: {
                   <button type="button" className="btn btn-secondary" disabled={busy || !keywords.length || keywords.length > MAX_BULK_TOPICS} onClick={() => void addMany()}>{T.addMany(keywords.length)}</button>
                 </div>
                 {keywords.length > MAX_BULK_TOPICS && <p style={{ margin: 0, color: "var(--yellow)", fontSize: "var(--font-size-sm)" }}>{T.tooMany}</p>}
-                <p style={{ margin: 0, fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.manyCost(priceOf(add.formats).usual, costBasisNote(priceOf(add.formats).basis, priceOf(add.formats).n))}</p>
+                <p style={{ margin: 0, fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>{T.manyCost(priceOf(add.formats).usual, costBasisNote(priceOf(add.formats).basis, priceOf(add.formats).n))}{subNote(add.formats) && `。${subNote(add.formats)}`}</p>
               </>
             )}
             {!many && <>
@@ -603,7 +605,7 @@ export function TopicsBoard({ overview, scheduleFor, view = "topics" }: {
                   <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void start()} style={{ whiteSpace: "normal" }}>
                     {T.start}（約 NT${priceOf(sel.formats).usual}{priceOf(sel.formats).max > priceOf(sel.formats).usual ? `，最多 NT$${priceOf(sel.formats).max}` : ""}）
                   </button>
-                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>價格：{costBasisNote(priceOf(sel.formats).basis, priceOf(sel.formats).n)}。{T.startHint(sel.formats, autoPublishes(site?.contentDefaults), dailyCap)}</span>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)" }}>價格：{costBasisNote(priceOf(sel.formats).basis, priceOf(sel.formats).n)}。{subNote(sel.formats) && `${subNote(sel.formats)}。`}{T.startHint(sel.formats, autoPublishes(site?.contentDefaults), dailyCap)}</span>
                 </div>
               )}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

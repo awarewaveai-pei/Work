@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { useClientContext } from "@/lib/client-context/use-client-context";
@@ -583,7 +583,16 @@ function SiteForm({
   );
 }
 
-export default function SiteManager() {
+/** The schedule's text-road block for one site. The staff page passes it in (SiteManagerStaff.tsx); a product door page
+ *  passes none, so its import closure carries no subscription UI and none of the staff-only APIs it calls. */
+export type TextRoadControl = (p: {
+  site: ManagedSite;
+  sites: readonly ManagedSite[];
+  onSaved: (updated: ManagedSite) => void;
+  onApplied: () => void;
+}) => ReactNode;
+
+export default function SiteManager({ textRoad }: { textRoad?: TextRoadControl } = {}) {
   // On the content door a customer edits its own sites, but adding one or changing a URL is staff-only
   // (siteUrlWriteGate, lib/content/wp-sites.ts): those controls do not show there.
   const onDoor = useOnDoor();
@@ -806,6 +815,13 @@ export default function SiteManager() {
               onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
               readOnly={onDoor}
             />
+            {/* K7: the schedule's text road -- passed in by the staff page (SiteManagerStaff.tsx); a door page passes none */}
+            {textRoad?.({
+              site: sites.find(x => x.id === site.id) ?? site,
+              sites,
+              onSaved: updated => setSites(s => s.map(x => x.id === updated.id ? updated : x)),
+              onApplied: () => void loadSites(),
+            })}
             <IntroStyleButtons
               site={sites.find(x => x.id === site.id) ?? site}
               onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}

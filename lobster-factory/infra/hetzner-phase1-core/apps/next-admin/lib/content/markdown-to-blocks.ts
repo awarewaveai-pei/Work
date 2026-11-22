@@ -16,6 +16,7 @@
  * passes a block's text straight into the markup without escaping; the same escaping idiom as
  * lib/content/publish/wordpress-core.ts is reused locally to keep this module self-contained.
  */
+import { scrubInternalMarkers } from "@/lib/content/internal-markers";
 
 export type Block =
   | { type: "heading"; text: string; level: number }
@@ -83,19 +84,9 @@ function inline(s: string): string {
  * paragraph so no content is silently dropped.
  */
 export function markdownToBlocks(md: string): Block[] {
-  const clean = md
-    .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
-    .replace(/<!--\s*SLUG_HINT:[^>]*-->/g, "")
-    // Drop any UNRESOLVED YouTube placeholder, even if the model emitted it inline rather than on its
-    // own line. By publish time a resolved placeholder is already a bare watch URL (no longer matches),
-    // so this scrubs only the leftover authoring cue and never a real embed. (critic 2026-06-15 Major)
-    .replace(/\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]/g, "")
-    // A KADENCE_PATTERN placeholder alone on its line is handled in the main loop below; this scrubs
-    // only INLINE leftovers (model glued one inside a sentence) so the raw cue never reaches the post.
-    // (?<=\S) / (?=\S) require a non-space neighbour, so a standalone line is left intact for the loop.
-    .replace(/(?<=\S)[ \t]*\[KADENCE_PATTERN:\s*\d+\s*\]/gi, "")
-    .replace(/\[KADENCE_PATTERN:\s*\d+\s*\][ \t]*(?=\S)/gi, "")
-    .trim();
+  // every internal marker out first (lib/content/internal-markers.ts, the same list markdownToHtml uses); a standalone
+  // [KADENCE_PATTERN: id] line stays for the main loop below, which turns it into a pattern block
+  const clean = scrubInternalMarkers(md);
 
   const lines = clean.split("\n");
   const blocks: Block[] = [];

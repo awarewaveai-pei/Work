@@ -10,15 +10,18 @@ import { SUB_TEXT_COST_LABEL, SUB_TEXT_MODELS, isSubTextModel, type SubTextModel
 type Tool = "claude" | "codex";
 type WorkerState = { tools: Tool[]; online: boolean; quotaBlockedUntil: Partial<Record<Tool, number>> };
 
+/** The four roads as the buttons name them (also read by pages that show a stored road as text). */
+export const TEXT_CHAIN_LABELS: Array<{ value: TextChain; label: string }> = [
+  { value: "claude+codex+api", label: "Claude 訂閱 → Codex 訂閱 → API" },
+  { value: "claude+api", label: "Claude 訂閱 → API" },
+  { value: "codex+api", label: "Codex 訂閱 → API" },
+  { value: "api", label: "只用 API" },
+];
+
 const COPY = {
   label: "文字 AI 走法",
   levelLabel: "Claude 等級",
-  chains: [
-    { value: "claude+codex+api", label: "Claude 訂閱 → Codex 訂閱 → API" },
-    { value: "claude+api", label: "Claude 訂閱 → API" },
-    { value: "codex+api", label: "Codex 訂閱 → API" },
-    { value: "api", label: "只用 API" },
-  ] as Array<{ value: TextChain; label: string }>,
+  chains: TEXT_CHAIN_LABELS,
   levels: [
     { value: "sub-claude-haiku", label: "Haiku" },
     { value: "sub-claude-sonnet", label: "Sonnet" },

@@ -22,7 +22,9 @@ import { expiredReason, isExpiredProposal } from "./waiting";
 export const DAILY_START_CAP = 2;
 /** Far beyond one making (article ~2 min + social), so only a restart mid-way leaves a row this old in 'generating'. */
 export const STALE_GENERATING_MS = 30 * 60 * 1000;
-/** run-due runs jobs one after another; this leaves room under the host cron's 5 minutes. */
+/** run-due runs jobs one after another; this leaves room under the host cron's 5 minutes. Checked before each topic is
+ *  started; a started topic's subscription wait (K7) is sized to what is left of it after the API article's reserve
+ *  (make.ts subBudgetMs), so a subscription road adds no time past it beyond what an API-only article already takes. */
 export const TICK_BUDGET_MS = 200_000;
 /** A video still not done this long after it was started has failed (renders take minutes; video_jobs rows live 1h). */
 /** Expired proposals returned per firing (the October backlog is ~37 topics, one notice each). */
@@ -57,8 +59,9 @@ export interface TickDeps {
   /** Takes the row (version bump, same status) before an outside write; null = someone else has it (store.ts claimTopic).
    *  With artifacts: also records what an outside write just did, so a restart does not do it again. */
   claim(t: Topic, patch?: { artifacts: Record<string, unknown> }): Promise<Topic | null>;
-  /** The article draft and social drafts of one started topic, and their review. Throws when anything failed. */
-  make(t: Topic): Promise<Made>;
+  /** The article draft and social drafts of one started topic, and their review. Throws when anything failed.
+   *  deadline (K7): when the firing's budget ends (epoch ms) -- only the subscription wait reads it; none = a person's start. */
+  make(t: Topic, deadline?: number): Promise<Made>;
   /** The topic's site is set to publish without a person (brand-voice.ts autoPublishes, read now). */
   autoPublishes(t: Topic): Promise<boolean>;
   /** Moves a 'publishing' topic's drafts out as far as it can (publish-steps.ts: YouTube, then the article, then the
@@ -239,10 +242,10 @@ async function checkVideo(deps: TickDeps, waiting: Topic, now: Date): Promise<Ou
 }
 
 /** Makes one started topic and moves it on. Never throws for the topic's own failure: that is the row's last_error. */
-export async function makeStarted(deps: TickDeps, started: Topic): Promise<Outcome> {
+export async function makeStarted(deps: TickDeps, started: Topic, deadline?: number): Promise<Outcome> {
   let made: Made;
   try {
-    made = await deps.make(started);
+    made = await deps.make(started, deadline);
   } catch (e) {
     return (await deps.move(started, "failed", failedPatch(e))) ? "failed" : "moved_elsewhere";
   }
@@ -305,7 +308,7 @@ export async function tickTopics(deps: TickDeps, opts: { cap?: number; budgetMs?
     const started = await deps.start(t, cap);
     if (!started) break;   // the day's cap is reached, or another firing took this row: the next firing looks again
     n.started++;
-    count(n, await makeStarted(deps, started));
+    count(n, await makeStarted(deps, started, t0.getTime() + budget));   // the article sizes its subscription wait to what is left
   }
   return Object.entries(n).map(([k, v]) => `${k}=${v}`).join(" ");
 }

@@ -3,6 +3,7 @@
 // renderer, with no server imports, so the browser tools and the server render the same prompt text.
 import { autoIntroStyles } from "../../public/editor-shared/intro-styles.js";
 import Transitions from "../../public/editor-shared/transitions.js";
+import { ALLOWED_TEXT_MODELS, DEFAULT_TEXT_CHAIN, SUB_TEXT_MODELS, TEXT_CHAINS, isTextChain, type TextChain } from "../ai/text-model-options";
 
 export interface MarketingBrief {
   audience?: string;
@@ -40,8 +41,21 @@ export const MAX_TREND_FEEDS = 10;
 export const MAX_REQUIRED_BLOCKS = 10;
 export const MAX_REQUIRED_BLOCK_CHARS = 500;
 
+/** Card K7 (訂閱通道 PLAN §3): the site's text road for the schedule's articles -- each its own PATCH field like the modes
+ *  above. textApiModel = the chain's last (API) segment, an API catalogue id only; textClaudeModel = the claude segment's
+ *  subscription level. All three missing (every site before K7) = API only on the default model, as before. */
+export const TEXT_ROAD_CHAINS = TEXT_CHAINS;
+export const TEXT_ROAD_API_MODELS = ALLOWED_TEXT_MODELS;
+export const TEXT_ROAD_CLAUDE_MODELS = (Object.keys(SUB_TEXT_MODELS) as Array<keyof typeof SUB_TEXT_MODELS>)
+  .filter((m) => SUB_TEXT_MODELS[m].tool === "claude");
+/** The three fields "套用到所有網站" copies, and nothing else. */
+export const TEXT_ROAD_FIELDS = ["textChain", "textApiModel", "textClaudeModel"] as const;
+
 export interface SiteContentDefaults {
   publishMode?: PublishMode;
+  textChain?: TextChain;
+  textApiModel?: string;
+  textClaudeModel?: string;
   topicMode?: TopicMode;
   /** N8: each brand day, up to 3 trend topics scored for the brand (lib/content/topics/daily.ts). Off unless exactly true. */
   dailyTrendTopics?: boolean;
@@ -172,6 +186,11 @@ export function siteIntroCards(d: SiteContentDefaults | undefined): string[] {
 export function siteIntroTransition(d: SiteContentDefaults | undefined): string {
   const name = Transitions.name(d?.introTransition);
   return d?.introTransition !== undefined && name !== null ? name : Transitions.AUTO.id;
+}
+
+/** The site's text road as the schedule reads it: a stored chain that is not one of the four (or none) = API only. */
+export function siteTextChain(d: SiteContentDefaults | undefined): TextChain {
+  return isTextChain(d?.textChain) ? d.textChain : DEFAULT_TEXT_CHAIN;
 }
 
 /** Only the exact stored value lets the schedule approve its own proposals: missing, misspelt or any other value = a person picks. */

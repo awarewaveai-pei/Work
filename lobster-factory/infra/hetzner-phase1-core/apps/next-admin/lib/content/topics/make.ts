@@ -14,7 +14,10 @@ import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
-import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteIntroCards, siteIntroStyles, siteIntroTransition, siteLanguage, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteIntroCards, siteIntroStyles, siteIntroTransition, siteLanguage, siteTextChain, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { ARTICLE_CALLER, type ArticleCaller } from "@/lib/content/article/generate-core";
+import { subscriptionOrgAllowed } from "@/lib/content/text-road-guard";
+import { isAiTextModel } from "@/lib/ai/text-model-options";
 import { introPlanFor } from "@/public/editor-shared/intro-styles.js";
 import { orgDesign } from "@/lib/content/video/opener-designs";
 import { updateWpPost } from "@/lib/content/publish/wp-post-core";
@@ -102,14 +105,57 @@ export async function optionalImageGrant(ask: () => Promise<Grant> = () => grant
 }
 
 /** The article generator's input: the topic, and the site's stored defaults the article tool's form starts from.
- *  images = how many placeholders to ask for (0 when the organization has no content.image). */
+ *  images = how many placeholders to ask for (0 when the organization has no content.image). The site's text road (K7)
+ *  rides along only when set: a site without one gets exactly the input it got before (API only, default model). */
 export function articleInput(t: Pick<Topic, "keyword" | "title" | "angle">, d: SiteContentDefaults, images = 0): Record<string, unknown> {
   const details = [renderBrandVoice(d.marketing, d.brandVoiceInstructions), t.angle ? `切入角度：${t.angle}` : "", requiredBlocks(d).length ? `文末逐字附上以下段落，一字不改，每段自成一段：\n${requiredBlocks(d).join("\n\n")}` : ""].filter(Boolean).join("\n\n");
+  const chain = siteTextChain(d);
   return {
     keyword: t.keyword, title: t.title, language: siteLanguage(d), targetCountry: d.targetCountry, tone: d.tone,
     articleType: d.articleType, readability: d.readability, pointOfView: d.pointOfView, details, generateMeta: true,
     media: images > 0 ? { aiImages: "flux-schnell", imageCount: images, imageSize: "16:9" } : { aiImages: "none" },
+    ...(isAiTextModel(d.textApiModel) ? { model: d.textApiModel } : {}),
+    ...(chain !== "api" ? { chain, ...(typeof d.textClaudeModel === "string" ? { claudeModel: d.textClaudeModel } : {}) } : {}),
   };
+}
+
+const COST_ROUTES = ["content/article-generate", "content/fetchRealSources"];
+
+/** The article generator's text and what its call was billed. generate-core appends [COST_JSON] lines after the text
+ *  (the search's, then the model's: content/fetchRealSources, content/article-generate; a subscription answer is usd 0)
+ *  -- they are for the browser's cost display and must never reach WordPress (before K7 they did: they became the
+ *  draft's last paragraph). The trailing run of such lines is cut off; only the last model line and the last search
+ *  line in it are counted, so a cost line the model wrote into its own text is never billed.
+ *  billedTwd null = no model cost line (the call wrote none): the reservation then stands. */
+export function splitArticleCost(raw: string): { markdown: string; billedTwd: number | null } {
+  const lines = raw.trimEnd().split("\n");
+  let model: number | null = null, search: number | null = null;
+  while (lines.length) {
+    const line = lines[lines.length - 1].trim();
+    if (!line.startsWith("[COST_JSON]")) break;
+    let c: { usd?: unknown; route?: unknown };
+    try { c = JSON.parse(line.slice("[COST_JSON]".length)); } catch { break; }
+    if (!COST_ROUTES.includes(String(c.route))) break;
+    const n = Number(c.usd);
+    if (Number.isFinite(n) && n >= 0) {
+      if (c.route === "content/article-generate") model ??= n; else search ??= n;
+    }
+    lines.pop();
+  }
+  return { markdown: lines.join("\n").trimEnd(), billedTwd: model === null ? null : usdToNtd(model + (search ?? 0)) };
+}
+
+/** K7: all of a scheduled article's subscription segments together get at most this long, then the API writes it. */
+export const SCHEDULE_SUB_BUDGET_MS = 120_000;
+/** What the API article needs after the subscriptions gave up, kept out of a tick's remaining time (PLAN I5): a tick
+ *  with less left than this tries no subscription at all. */
+export const API_ARTICLE_RESERVE_MS = 90_000;
+
+/** How long the subscription segments may take: the cap, or what the tick has left beyond the API's reserve, whichever is
+ *  less (`deadline` = when the tick's budget ends; none = a person's start, run after the response). 0 = try none. */
+export function subBudgetMs(deadline: number | undefined, now: number): number {
+  if (deadline === undefined) return SCHEDULE_SUB_BUDGET_MS;
+  return Math.max(0, Math.min(SCHEDULE_SUB_BUDGET_MS, deadline - now - API_ARTICLE_RESERVE_MS));
 }
 
 /** Why this topic cannot be made now (no site, an inactive one, another organization's); null = it can. */
@@ -121,16 +167,34 @@ async function siteFor(sb: SupabaseClient, t: Topic): Promise<SiteBrand | string
   return site;
 }
 
-async function makeArticle(t: Topic, site: SiteBrand, guard: Guard): Promise<NonNullable<TopicArtifacts["article"]>> {
+/** Who makes the topic (K7, PLAN I1/I2): "schedule" = the content_pipeline job, whose subscription segments run on the
+ *  host's worker; "person" = someone pressed start, so they run on the owner lane, which generate-core gives only the
+ *  owner herself (anyone else gets the API alone). */
+export type TopicMaker = "schedule" | "person";
+
+async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: TopicMaker, deadline?: number): Promise<NonNullable<TopicArtifacts["article"]>> {
   // no R2 = nowhere to keep an image WordPress can fetch, so none is paid for
   const imageGrant = isR2Configured() ? await optionalImageGrant() : null;
   const imageCount = imageGrant ? TOPIC_ARTICLE_IMAGES : 0;
+  // The subscriptions run only for the operator's own organization (I1: never for a customer's site, whoever made the
+  // road), and only with time left for the API after them (I5); otherwise the site's road is read as API only.
+  const budgetMs = subBudgetMs(deadline, Date.now());
+  const subs = siteTextChain(site.defaults) !== "api" && budgetMs > 0 && await subscriptionOrgAllowed(t.organization_id);
+  const defaults: SiteContentDefaults = subs ? site.defaults : { ...site.defaults, textChain: undefined, textClaudeModel: undefined };
   // _jobId: the article call's ai_call_logs row carries the topic id (generate-core prepareArticleGeneration)
-  const input = { ...articleInput(t, site.defaults, imageCount), _jobId: t.id };
-  await guard(stepUpperTwd.article(imageCount), "文章");
+  const caller: ArticleCaller = { ...(maker === "schedule" ? { lane: "schedule" as const } : {}), subBudgetMs: budgetMs };
+  const input = { ...articleInput(t, defaults, imageCount), _jobId: t.id, ...(subs ? { [ARTICLE_CALLER]: caller } : {}) };
+  const road = { textChain: defaults.textChain, textApiModel: defaults.textApiModel };
+  const upper = stepUpperTwd.article(imageCount, road);
+  await guard(upper, "文章");
   const a = await runContentPipeline(input, { stages: ["article"] });
   if (!a.ok) throw new Error(`文章生成失敗：${(a as PipelineFailure).error}`);   // strict:false: !ok does not narrow
-  const { markdown, images } = await fillArticleImages(a.markdown ?? "", async (prompt) => {
+  // the cost lines are cut off here: every step after this one gets the article text alone
+  const { markdown: article, billedTwd } = splitArticleCost(a.markdown ?? "");
+  // a road with subscriptions: the article call's own cost replaces its reservation (a subscription answer = 0, the API
+  // fallback = what it was billed); the images part stays until they are made. An API-only site keeps the estimate, as before.
+  if (subs && billedTwd !== null) guard.exact(upper, billedTwd + (upper - stepUpperTwd.article(0, road)));
+  const { markdown, images } = await fillArticleImages(article, async (prompt) => {
     if (!imageGrant) return null;
     const img = await makeContentImage({ model: "flux-schnell", prompt: prompt || t.title, aspectRatio: "16:9", seed: null,
       costLog: { route: "content/topics", tool: "content", jobId: t.id } }, imageGrant);
@@ -222,14 +286,14 @@ export function capGuard(t: Pick<Topic, "id">, artifacts: TopicArtifacts, capTwd
   return Object.assign(guard, { exact: (reservedTwd: number, actualTwd: number) => { artifacts.budget = settleStep(artifacts.budget!, reservedTwd, actualTwd); } });
 }
 
-async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string, capTwd: number): Promise<Made> {
+async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string, capTwd: number, maker: TopicMaker, deadline?: number): Promise<Made> {
   const site = await siteFor(sb, t);
   if (typeof site === "string") throw new Error(site);
   const artifacts: TopicArtifacts = { ...(t.artifacts as TopicArtifacts) };
   const guard = capGuard(t, artifacts, capTwd, (startedAt) => spentSince(sb, t.id, startedAt));
   const spentAtStart = artifacts.budget!.spentTwd;
   try {
-    if (t.formats.includes("article") && !artifacts.article) artifacts.article = await makeArticle(t, site, guard);
+    if (t.formats.includes("article") && !artifacts.article) artifacts.article = await makeArticle(t, site, guard, maker, deadline);
     if ((t.formats.includes("social") || t.formats.includes("youtube")) && !artifacts.social) artifacts.social = await makeSocial(t, site, artifacts.article, actor, guard);
   } catch (e) {
     // a failed attempt keeps none of its own reservations (budget.ts header): what it was billed is in the ledger, which
@@ -426,7 +490,8 @@ export async function attachTopicVideo(t: Topic, url: string, actor: string, sav
 /** The real store and makers behind tickTopics, bound to one organization and the actor the work is done as. */
 /** opts.capTwd: the brand's per-topic cap (content_pipeline per_topic_cap_twd, 0168); null = NT$15. Required, so no
  *  caller (the schedule, the 核准並開始 button) can make a topic under the default by leaving it out. */
-export function topicDeps(sb: SupabaseClient, organizationId: string, actor: string, opts: { capTwd: number | null }): TickDeps {
+/** opts.maker (K7): "schedule" only from the content_pipeline job (lib/schedules/jobs.ts); absent = a person pressed start. */
+export function topicDeps(sb: SupabaseClient, organizationId: string, actor: string, opts: { capTwd: number | null; maker?: TopicMaker }): TickDeps {
   const capTwd = opts.capTwd ?? DEFAULT_TOPIC_CAP_TWD;
   const own = (t: Topic) => {
     if (t.organization_id !== organizationId) throw new Error("topic of another organization");
@@ -454,7 +519,7 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
     },
     move: (t, to, patch) => move(sb, t, to, patch),
     claim: (t, patch) => { own(t); return claimTopic(sb, t, patch); },
-    make: (t) => { own(t); return runForOrg(organizationId, actor, () => makeDrafts(sb, t, actor, capTwd)); },
+    make: (t, deadline) => { own(t); return runForOrg(organizationId, actor, () => makeDrafts(sb, t, actor, capTwd, opts.maker ?? "person", deadline)); },
     autoPublishes: async (t) => { own(t); const s = await siteFor(sb, t); return typeof s !== "string" && autoPublishes(s.defaults); },
     publish: (t, save, fresh) => { own(t); return publishDrafts(sb, t, actor, save, fresh); },
     startVideo: (t, record) => { own(t); return runForOrg(organizationId, actor, () => startTopicVideo(sb, t, record, capTwd)); },
