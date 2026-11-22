@@ -29,6 +29,10 @@ describe("OpenWorkbench (K11)", () => {
   it("staff with a client picked: the handoff link carries org on the server-given host", () => {
     expect(openWith(ctx({ org: ORG, status: "ok" }))).toBe(`https://video.example.test/handoff?open=script-forge&org=${ORG}`);
   });
+  it("until K12: with a client picked the page says the workbench will not switch to it by itself", () => {
+    openWith(ctx({ org: ORG, status: "ok" }));
+    expect(screen.getByText("工作台目前不會自動切到這個客戶，請在工作台頂部確認客戶。")).toBeTruthy();
+  });
   it("staff with no client: no org, and the page says the workbench keeps its own", () => {
     expect(openWith(ctx({}))).toBe("https://video.example.test/handoff?open=script-forge");
     expect(screen.getByText(/工作台會用它目前的客戶/)).toBeTruthy();

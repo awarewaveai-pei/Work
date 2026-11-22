@@ -8,6 +8,11 @@ import { HANDOFF_CHANNEL, fromHandoff, readScriptHistory } from "@/lib/video/scr
 import { withContext } from "@/lib/client-context/contract";
 import { useClientContext } from "@/lib/client-context/use-client-context";
 
+/** TEMPORARY until card K12 (agency-os/handoffs/2026-11-22-platform-membership-ux/DISPATCH.md, row K12): the workbench
+ *  ignores ?org= until its shell reads it, so a picked client is NOT applied there yet and the page must say so.
+ *  Remove this constant and the note it gates when K12 ships (VW scripts/index-1.js + organization-picker.js). */
+export const VW_IGNORES_ORG_UNTIL_K12 = true;
+
 export default function OpenWorkbench({ videoHost, open }: { videoHost: string; open: string | null }) {
   const ctx = useClientContext("org");
   // A client account's workbench is always its own (session/route.ts ignores the cookie for clients): nothing to carry.
@@ -38,6 +43,11 @@ export default function OpenWorkbench({ videoHost, open }: { videoHost: string; 
       {ctx.viewer === "staff" && !org && (
         <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.7, marginBottom: 16 }}>
           還沒在左邊客戶欄選客戶：工作台會用它目前的客戶，可在工作台頂部切換。
+        </p>
+      )}
+      {VW_IGNORES_ORG_UNTIL_K12 && org && (
+        <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.7, marginBottom: 16 }}>
+          工作台目前不會自動切到這個客戶，請在工作台頂部確認客戶。
         </p>
       )}
       <button type="button" className="btn-primary" onClick={start}>開啟影音工作台</button>
