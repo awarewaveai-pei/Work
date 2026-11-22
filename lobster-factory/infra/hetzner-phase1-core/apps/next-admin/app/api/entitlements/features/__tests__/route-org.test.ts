@@ -12,6 +12,8 @@ import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 const A = CUSTOMER.orgId;                                   // holds social.dispatch (gate fixture row)
 const A_CHILD = "33333333-3333-4333-8333-333333333333";     // A's sub-unit
 const B = "44444444-4444-4444-8444-444444444444";           // another customer
+const MISSING = "55555555-5555-4555-8555-555555555555";     // no such org
+const BROKEN = "66666666-6666-4666-8666-666666666666";      // the organizations query fails for this id
 const ORGS = [
   { id: INTERNAL.orgId, parent_organization_id: null, kind: "internal" },
   { id: A, parent_organization_id: null, kind: "customer" },
@@ -31,6 +33,7 @@ vi.mock("@/lib/supabase-server", () => ({
           eq(column: string, value: unknown) { filters.push([column, value]); return q; },
           limit() { return q; },
           async maybeSingle() {
+            if (filters.some(([, v]) => v === BROKEN)) return { data: null, error: { message: "connection reset" } };
             return { data: ORGS.find((o) => filters.every(([c, v]) => (o as Record<string, unknown>)[c] === v)) ?? null, error: null };
           },
         };
@@ -84,7 +87,7 @@ describe("feature list for the current client (?org=)", () => {
   });
 
   it("a client naming another org, its own sub-unit or a made-up uuid gets the same 403; its own org = no parameter", async () => {
-    for (const org of [B, A_CHILD, "55555555-5555-4555-8555-555555555555"]) {
+    for (const org of [B, A_CHILD, MISSING]) {
       expect(await call(client(A), org), org).toEqual({ status: 403, body: { ok: false, code: "not_authorized_for_org" } });
     }
     const own = await call(client(A), A);
@@ -92,6 +95,15 @@ describe("feature list for the current client (?org=)", () => {
     const none = await call(client(A));
     expect(own.status).toBe(200);
     expect({ ...own.body.list, issued_at: 0, expires_at: 0 }).toEqual({ ...none.body.list, issued_at: 0, expires_at: 0 });
+  });
+
+  it("staff naming an org that does not exist get the same 403 as one they have no role on; a failed query is 503", async () => {
+    const noRole = await call(staff("operator"), B);
+    expect(noRole).toEqual({ status: 403, body: { ok: false, code: "not_authorized_for_org" } });
+    for (const role of ["owner", "admin", "operator"]) expect(await call(staff(role), MISSING), role).toEqual(noRole);
+    for (const role of ["owner", "operator"]) {
+      expect(await call(staff(role), BROKEN), role).toEqual({ status: 503, body: { ok: false, code: "infrastructure_error" } });
+    }
   });
 
   it("a non-uuid org is 400", async () => {
@@ -111,6 +123,19 @@ describe("usePaidFeatures asks for the client chosen in the client rail", () => 
   const withOrg = (org: string | null) => ({ children }: { children: ReactNode }) =>
     createElement(ClientContext.Provider, { value: { org } as unknown as ClientContextValue }, children);
   beforeEach(() => { fetchSpy.mockClear(); vi.stubGlobal("fetch", fetchSpy); });
+
+  it("a source the list does not give (null: shadow, refused) never turns into a label", async () => {
+    fetchSpy.mockImplementationOnce(async () => new Response(JSON.stringify({ list: { features: {
+      shadowed: { allowed: true, verdict: false, reason: "no_entitlement", source: null },
+      unknown: { allowed: true, verdict: true, reason: null, source: null },
+      refused: { allowed: false, verdict: false, reason: "no_entitlement", source: null },
+    } } })));
+    const { result } = renderHook(() => usePaidFeatures());
+    await waitFor(() => expect(result.current.holds("unknown")).toBe(true));
+    expect(result.current.why("shadowed")).toBeUndefined();
+    expect(result.current.why("unknown")).toBeUndefined();
+    expect(result.current.why("refused")).toBe("尚未開通此功能");
+  });
 
   it("a chosen client adds ?org=; no provider or no client keeps the plain request", async () => {
     renderHook(() => usePaidFeatures(), { wrapper: withOrg(B) });
