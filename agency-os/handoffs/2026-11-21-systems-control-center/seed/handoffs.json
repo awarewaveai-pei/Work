@@ -1,0 +1,184 @@
+{
+  "generated_at": "2026-11-22T00:00:00+08:00",
+  "items": [
+    {
+      "system_slug": "outbound-os",
+      "subject": "外聯 Gmail 授權失效改成看得到：連接器標紅並開事件，已上線。",
+      "next": "完成 C16.2 事實核對一致率量測（主機每天量 80 封，達 95% 才算完成）。",
+      "blocker": "一天寄 100 封要等操作者買次網域、開 2 個池信箱並連上（C11.1）。",
+      "source": "agency-os/WORKLOG.md:809; agency-os/handoffs/2026-10-31-outbound-os/data.mjs:266; agency-os/handoffs/2026-10-31-outbound-os/data.mjs:33"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "subject": "分析與背景 AI 動作的 run lock 檔改成會自動清理。",
+      "next": "替結果頁以外的各頁補渲染閘，並做示意稿裡還沒做的動作。",
+      "blocker": "報告核准要不要限角色、來源搜尋規模，待操作者決定。",
+      "source": "agency-os/TASKS.md:341; agency-os/TASKS.md:346; agency-os/TASKS.md:154"
+    },
+    {
+      "system_slug": "hci30",
+      "subject": "C6 真實登入串接計畫已產出（12 個任務），尚未授權執行。",
+      "blocker": "C6 含多個高風險步驟，需操作者授權才開工。",
+      "source": "agency-os/TASKS.md:217"
+    },
+    {
+      "system_slug": "social",
+      "subject": "Meta 權杖假過期修正：主機每天核對真實期限，改寫 Postiz 的到期日。",
+      "next": "各平台 OAuth app 送審（Meta、Reddit、LinkedIn）。",
+      "blocker": "留言自動回覆要等 Meta 審核通過。",
+      "source": "agency-os/WORKLOG.md:768; agency-os/TASKS.md:165; agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs:33"
+    },
+    {
+      "system_slug": "video",
+      "subject": "影片 R6–R10 部署上線（禁用字按整個字比對、挑客戶統一成一個積木等）。",
+      "next": "派「目前客戶統一」計畫第一批卡（內容入口、客戶頁、工作台進入點）。",
+      "blocker": "該計畫 §6 三題待操作者決定。",
+      "source": "agency-os/WORKLOG.md:96; agency-os/handoffs/2026-11-16-video-unify-supervisor/CLIENT-CONTEXT-PLAN-20261121.md:167; agency-os/handoffs/2026-11-16-video-unify-supervisor/CLIENT-CONTEXT-PLAN-20261121.md:248"
+    },
+    {
+      "system_slug": "tarot",
+      "subject": "塔羅存檔改成原始檔直傳 R2。",
+      "next": "生圖額度改由共用 can() 與花費煞車決定，刪掉 tarot 自己的每日 300 張上限。",
+      "source": "agency-os/WORKLOG.md:1124; agency-os/TASKS.md:252"
+    },
+    {
+      "system_slug": "studio",
+      "subject": "模特兒圖庫加「取消印花框」，可改做全幅。",
+      "next": "POD 一鍵建品跑一次真實端到端開賣驗證。",
+      "blocker": "自動扣款並送印（A2）屬金流，需操作者明示批准才做。",
+      "source": "agency-os/WORKLOG.md:152; agency-os/TASKS.md:191; agency-os/TASKS.md:195"
+    },
+    {
+      "system_slug": "design",
+      "subject": "編輯器存入照文件分類：從 My Designs 修合成圖再存，不會變成設計圖。",
+      "next": "PhotoCraft 專業版上線後登入實測截圖，並在正式站存入、開回、在 Mockup 選一次。",
+      "source": "agency-os/WORKLOG.md:55; agency-os/handoffs/2026-11-05-photocraft-pro/data.mjs:74; agency-os/handoffs/2026-11-05-photocraft-pro/data.mjs:95"
+    },
+    {
+      "system_slug": "content",
+      "subject": "Soulful 禁用說法已填，英文禁用字改成按整個字比對。",
+      "next": "在排程頁打開 Soulful 的自動內容管線（目前不會自己做題與發布）。",
+      "source": "agency-os/WORKLOG.md:596; agency-os/WORKLOG.md:617"
+    },
+    {
+      "system_slug": "cs",
+      "subject": "客服 Gemini 備援改用 3.5-flash-lite，並開始記花費。",
+      "next": "Soulful 課程類匯入 30 題考試，考過才開 AI 自動回覆。",
+      "blocker": "Soulful 常見問答 8 條正式資料待操作者確認。",
+      "source": "agency-os/WORKLOG.md:9040; agency-os/TASKS.md:207; agency-os/TASKS.md:213"
+    },
+    {
+      "system_slug": "collect",
+      "subject": "蒐集失敗事件改走標準事件入口，已結案的同類失敗會重開。",
+      "next": "讓蒐集來的 provenance 與作者傳進知識庫，不在 sink 丟掉。",
+      "source": "agency-os/TASKS.md:250; agency-os/TASKS.md:251"
+    },
+    {
+      "system_slug": "oracle",
+      "subject": "E6c、X2、W1、P1 四張已併入 main，尚未部署。",
+      "next": "依 PLAN-REVIEW §4 查證 8 項，再把 WordPress 門面與建站兩份計畫改寫合併。",
+      "blocker": "兩份計畫審查未通過，改寫並經操作者確認前不可派卡。",
+      "source": "agency-os/handoffs/2026-11-20-oracle-skills-supervisor/DISPATCH.md:145; agency-os/handoffs/2026-11-20-oracle-skills-supervisor/DISPATCH.md:147"
+    },
+    {
+      "system_slug": "commerce",
+      "subject": "aware-wave.com 與 app 切斷，目前只有自用與代操、只收人工登記付款。",
+      "blocker": "收錢通道依操作者 2026-10-30 決定停用，自助付款與真實付款演練暫停。",
+      "source": "agency-os/handoffs/2026-10-16-customer-model-supervisor/data.mjs:117; agency-os/handoffs/2026-10-16-customer-model-supervisor/data.mjs:116"
+    },
+    {
+      "system_slug": "staff-access",
+      "subject": "逐工具權限已上線，目前只記錄「本來會擋」、不擋。",
+      "next": "操作者在 /ops/staff 替每位員工勾選工具。",
+      "blocker": "正式開始擋屬高風險，需操作者同意。",
+      "source": "agency-os/handoffs/2026-10-24-staff-tool-grants/data.mjs:103; agency-os/handoffs/2026-10-24-staff-tool-grants/data.mjs:104; agency-os/handoffs/2026-10-24-staff-tool-grants/data.mjs:106"
+    },
+    {
+      "system_slug": "schedules",
+      "subject": "最後一張 C8「從主機外監控網站」完成，排程全部離開 Trigger。",
+      "source": "agency-os/handoffs/2026-10-25-schedules-off-trigger/data.mjs:117"
+    },
+    {
+      "system_slug": "systems-control-center",
+      "subject": "批 3 完成：29 個系統盤點、頁面照參考面板改版、6 個已結束監工頁搬入並凍結。",
+      "next": "W7 頁面補齊參考面板、資料空時不顯得壞掉。",
+      "source": "agency-os/WORKLOG.md:2; agency-os/handoffs/2026-11-21-systems-control-center/briefs/W7-page-parity.md:1"
+    },
+    {
+      "system_slug": "system-foundry",
+      "subject": "v1.7 最後一張 V17-8 產品 manifest 補齊完成。",
+      "source": "agency-os/handoffs/2026-10-18-foundry-v17-supervisor/data.mjs:45"
+    },
+    {
+      "system_slug": "app-platform",
+      "subject": "側欄加子項：題目、客戶、五步驟成為題目下的三頁。",
+      "source": "agency-os/WORKLOG.md:141"
+    },
+    {
+      "system_slug": "ops-console",
+      "subject": "/ops/costs 月報加會計匯率與廠商帳單對帳，已上線。",
+      "source": "agency-os/WORKLOG.md:860"
+    },
+    {
+      "system_slug": "repair-center",
+      "subject": "事件「開始處理」的來源清單補齊，外聯 Gmail 授權失效會進事件收件匣。",
+      "next": "M2/M4 指紋與來源簽章做 Phase 2 rollout 與 Phase 3 限制切換。",
+      "source": "agency-os/WORKLOG.md:839; agency-os/TASKS.md:463"
+    },
+    {
+      "system_slug": "provisioning",
+      "subject": "建站引擎閉環已驗過（Stage 0）。",
+      "next": "把一鍵租機 provisionClient() 接進 app 的一鍵架站按鈕（Phase 5）。",
+      "source": "agency-os/TASKS.md:454; agency-os/TASKS.md:469"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "subject": "wp-bridge 0.21.0 發版並推上 aware-wave.com 與 Soulful。",
+      "next": "建站自動接上 MainWP，用真建站跑一次端到端。",
+      "source": "agency-os/WORKLOG.md:4586; agency-os/TASKS.md:441"
+    },
+    {
+      "system_slug": "host-infra",
+      "subject": "sg-deploy 收進 video-service、remotion-service，主機唯讀演練通過。",
+      "next": "這兩個服務照新流程真正部署一次（高風險，需操作者同意）。",
+      "source": "agency-os/WORKLOG.md:256; agency-os/WORKLOG.md:260"
+    },
+    {
+      "system_slug": "database",
+      "subject": "0174 系統總控四張表已套上正式庫。",
+      "next": "用 EXPLAIN 證實客服知識庫的 partial HNSW 索引有被用到。",
+      "source": "agency-os/WORKLOG.md:34; agency-os/TASKS.md:448"
+    },
+    {
+      "system_slug": "governance",
+      "subject": "跨模型審查加「推翻根因」一關。",
+      "blocker": "Codex 驗收檢查剩換帳號與收緊 Codex 權限，屬安全設定，待操作者。",
+      "source": "agency-os/WORKLOG.md:572; agency-os/TASKS.md:244"
+    },
+    {
+      "system_slug": "ao-operations",
+      "subject": "共享 worktree 衛生：WORKLOG 跨 worktree 配號、過期私有 index 自動清理。",
+      "source": "agency-os/WORKLOG.md:1301"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "subject": "會議錄音到會議記錄、PPT 的全鏈以 60 分鐘真實錄音在本機跑通。",
+      "blocker": "網路版安裝等操作者明確下指令。",
+      "source": "C:/Users/user1115/.claude/projects/D--Work/memory/project_meeting_to_ppt_pipeline.md:11; agency-os/TASKS.md:200"
+    },
+    {
+      "system_slug": "client-soulful",
+      "subject": "Soulful 改成 AI 審核後自動發布，並填了每篇必附段落。",
+      "next": "網域轉 Cloudflare Registrar（無死線，勿動 DKIM 設定）。",
+      "blocker": "常見問答正式資料待操作者確認。",
+      "source": "agency-os/WORKLOG.md:611; agency-os/TASKS.md:139; agency-os/TASKS.md:213"
+    },
+    {
+      "system_slug": "client-aware-wave",
+      "subject": "aware-wave.com 只留 WordPress，與 app 的連結全部切斷。",
+      "next": "看 DMARC 報表零未解釋失敗後，把 aware-wave.com 升到 p=reject。",
+      "source": "C:/Users/user1115/.claude/projects/D--Work/memory/project_awarewave_com_wordpress_only.md:11; agency-os/TASKS.md:125"
+    }
+  ],
+  "missing": []
+}
