@@ -31,5 +31,20 @@ export const RESULT_MESSAGES: Record<string, { ok: boolean; text: string }> = {
   db_unavailable: { ok: false, text: "資料庫暫時讀寫不了，沒有記下。" },
 };
 
+/** Full Taipei time. hourCycle h23: hour12:false alone prints midnight as 24:00. */
 export const formatTime = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false }) : "—";
+  iso ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hourCycle: "h23" }) : "—";
+
+const taipeiDay = (ms: number) => Math.floor((ms + 8 * 3600000) / 86400000);
+
+/** 今天 / 昨天 / N 天前 (Taipei calendar days); older than 30 days: the date. */
+export function relativeTime(iso: string | null | undefined, now: number = Date.now()): string {
+  if (!iso) return "—";
+  const at = Date.parse(iso);
+  if (!Number.isFinite(at)) return "—";
+  const days = taipeiDay(now) - taipeiDay(at);
+  if (days <= 0) return "今天";
+  if (days === 1) return "昨天";
+  if (days <= 30) return `${days} 天前`;
+  return new Date(at).toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei" });
+}

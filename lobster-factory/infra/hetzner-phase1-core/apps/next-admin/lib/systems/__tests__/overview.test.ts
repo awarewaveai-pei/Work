@@ -3,7 +3,7 @@ import type { UpdateRow } from "../projection";
 import { buildResumeMarkdown, effectiveStatus, implementedRatio, legacyDone, mdInline, overviewCounts, progressKind, recentHandoffs, type BriefInput } from "../overview";
 
 const NOW = Date.parse("2026-11-21T00:00:00Z");
-const row = (o: Partial<Parameters<typeof overviewCounts>[0][number]> = {}) => ({ status: "active" as const, inferred: false, featureCount: 3, blocker: null, lastActivityAt: "2026-11-20T00:00:00Z", ...o });
+const row = (o: Partial<Parameters<typeof overviewCounts>[0][number]> = {}) => ({ status: "active" as const, inferred: false, featureCount: 3, blocker: null, lastCommitAt: "2026-11-20T00:00:00Z", ...o });
 
 describe("overviewCounts", () => {
   it("counts total / active / needs attention / wrapped; paused, done and archived never need attention", () => {
@@ -11,22 +11,22 @@ describe("overviewCounts", () => {
       row(),
       row({ blocker: "waiting" }),
       row({ featureCount: 0 }),
-      row({ status: null, lastActivityAt: "2026-09-01T00:00:00Z" }),
+      row({ lastCommitAt: "2026-09-01T00:00:00Z" }),
       row({ status: "paused", blocker: "x" }),
       row({ status: "done", featureCount: 0 }),
       row({ status: "archived" }),
     ], NOW);
-    expect(c).toEqual({ total: 7, active: 3, needsAttention: 3, wrapped: 2 });
+    expect(c).toEqual({ total: 7, active: 4, needsAttention: 2, wrapped: 2 });
   });
 
   it("an inferred status never takes a system out of 待確認; it still counts on 開發中 / 維護", () => {
     const ago = (d: number) => new Date(NOW - d * 86400000).toISOString();
     const eff20 = effectiveStatus(null, ago(20), NOW); // no status set, last commit 20 days ago -> 維護（推定）
     expect(eff20).toEqual({ status: "maintenance", inferred: true });
-    const blocked = row({ status: eff20.status, inferred: eff20.inferred, blocker: "waiting", lastActivityAt: ago(20) });
+    const blocked = row({ status: eff20.status, inferred: eff20.inferred, blocker: "waiting", lastCommitAt: ago(20) });
     const eff90 = effectiveStatus(null, ago(90), NOW); // 暫停（推定）, silent past STALL_DAYS
-    const silent = row({ status: eff90.status, inferred: eff90.inferred, lastActivityAt: ago(90) });
-    expect(overviewCounts([blocked, silent], NOW)).toEqual({ total: 2, active: 0, needsAttention: 2, wrapped: 1 });
+    const silent = row({ status: eff90.status, inferred: eff90.inferred, lastCommitAt: ago(90) });
+    expect(overviewCounts([blocked, silent], NOW)).toEqual({ total: 2, active: 0, needsAttention: 1, wrapped: 1 });
     // set by someone: out of 待確認 even when blocked
     expect(overviewCounts([row({ status: "paused", inferred: false, blocker: "x" })], NOW).needsAttention).toBe(0);
   });
@@ -124,5 +124,14 @@ describe("implementedRatio", () => {
   it("counts implemented and verified over counted features; null when nothing counted", () => {
     expect(implementedRatio({ counted: 4, verified: 1, implemented: 2 })).toBe(0.75);
     expect(implementedRatio({ counted: 0, verified: 0, implemented: 0 })).toBeNull();
+  });
+});
+
+describe("待確認 does not count 尚未盤點", () => {
+  it("a system with 0 features, no blocker and a recent commit is not 待確認; blocked or silent 開發中 is", () => {
+    expect(overviewCounts([row({ featureCount: 0 })], NOW).needsAttention).toBe(0);
+    expect(overviewCounts([row({ featureCount: 0, blocker: "x" })], NOW).needsAttention).toBe(1);
+    expect(overviewCounts([row({ featureCount: 0, lastCommitAt: null })], NOW).needsAttention).toBe(1);
+    expect(overviewCounts([row({ status: "maintenance", lastCommitAt: "2026-01-01T00:00:00Z" })], NOW).needsAttention).toBe(0);
   });
 });

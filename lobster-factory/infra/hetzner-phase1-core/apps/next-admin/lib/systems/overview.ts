@@ -24,20 +24,19 @@ export function implementedRatio(p: { counted: number; verified: number; impleme
   return p.counted ? (p.implemented + p.verified) / p.counted : null;
 }
 
-export interface CountInput { status: EffectiveStatus | null; inferred: boolean; featureCount: number; blocker: string | null; lastActivityAt: string | null }
+export interface CountInput { status: EffectiveStatus | null; inferred: boolean; featureCount: number; blocker: string | null; lastCommitAt: string | null }
 export interface OverviewCounts { total: number; active: number; needsAttention: number; wrapped: number }
 
-/** Four stat cards. 待確認 = not set to done / archived / paused by someone (an inferred status never takes a system out:
- *  a system inferred 暫停 because nobody committed for 60 days is exactly one to look at) and either blocked, not
- *  inventoried yet (registry lists no features at all; features still on an old supervisor page count as inventoried)
- *  or silent for STALL_DAYS. Inferred values count only on 開發中 and 維護與已完成 (maintenance + done + archived). */
+/** Four stat cards. 待確認 = not set to done / archived / paused by someone (an inferred status never takes a system out)
+ *  and either blocked, or 開發中 (set or inferred) with no git commit for STALL_DAYS. 尚未盤點 (no features) is not a reason:
+ *  the table shows it on its own. Inferred values count only on 開發中 and 維護與已完成 (maintenance + done + archived). */
 export function overviewCounts(rows: readonly CountInput[], now: number): OverviewCounts {
   const stallMs = STALL_DAYS * 86400000;
   const attention = (r: CountInput) => {
     if (!r.inferred && (r.status === "done" || r.status === "archived" || r.status === "paused")) return false;
     if (r.blocker) return true;
-    if (r.featureCount === 0) return true;
-    const at = r.lastActivityAt ? Date.parse(r.lastActivityAt) : NaN;
+    if (r.status !== "active") return false;
+    const at = r.lastCommitAt ? Date.parse(r.lastCommitAt) : NaN;
     return !Number.isFinite(at) || now - at > stallMs;
   };
   return {

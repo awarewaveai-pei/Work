@@ -8,7 +8,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { SYSTEM_TYPES, type SystemType } from "@/lib/systems/contract";
 import { systemsAccess } from "@/lib/systems/access";
 import { projectSystem, SYSTEM_STATUSES, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
-import { EFFECTIVE_BADGE, EFFECTIVE_LABEL, formatTime, STATUS_LABEL, TYPE_LABEL } from "@/lib/systems/labels";
+import { EFFECTIVE_BADGE, EFFECTIVE_LABEL, formatTime, relativeTime, STATUS_LABEL, TYPE_LABEL } from "@/lib/systems/labels";
 import { effectiveStatus, gapBreakdown, implementedRatio, overviewCounts, progressKind, recentHandoffs, type EffectiveState } from "@/lib/systems/overview";
 import { importSummary } from "@/lib/systems/projection";
 import { readDefinitions, readImportRuns, readPending, readProjectionInput, type Pending } from "@/lib/systems/store";
@@ -50,6 +50,10 @@ const RESPONSIVE = `
 @media (max-width:1100px){.sys-board{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){.sys-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.sys-table{display:none}.sys-cards{display:block}.sys-page{padding:20px 16px!important}}
 `;
+
+function TimeLabel({ iso }: { iso: string | null | undefined }) {
+  return <span title={formatTime(iso)}>{relativeTime(iso)}</span>;
+}
 
 function Stat({ title, value, hint, icon, tone }: { title: string; value: number; hint: string; icon: string; tone?: "warn" | "success" }) {
   const toneStyle: React.CSSProperties = tone === "warn" ? { background: "var(--badge-yellow-bg)", color: "var(--badge-yellow-text)" } : tone === "success" ? { background: "var(--badge-green-bg)", color: "var(--badge-green-text)" } : {};
@@ -117,7 +121,7 @@ function SystemTable({ rows }: { rows: Row[] }) {
               </td>
               <td style={td}><StatusBadge eff={eff} /></td>
               <td style={td}><Progress p={p} /></td>
-              <td style={{ ...td, ...muted }}>{formatTime(p.lastActivityAt)}</td>
+              <td style={{ ...td, ...muted }}><TimeLabel iso={p.lastCommitAt} /></td>
             </tr>
           ))}
         </tbody>
@@ -128,7 +132,7 @@ function SystemTable({ rows }: { rows: Row[] }) {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
               <strong style={{ fontSize: 14 }}>{system.name}</strong><StatusBadge eff={eff} />
             </div>
-            <div style={{ ...muted, margin: "4px 0 8px" }}>{meta(system, p)}・{formatTime(p.lastActivityAt)}</div>
+            <div style={{ ...muted, margin: "4px 0 8px" }}>{meta(system, p)}・<TimeLabel iso={p.lastCommitAt} /></div>
             <Progress p={p} />
           </Link>
         ))}
@@ -146,7 +150,7 @@ function ResumePanel({ rows }: { rows: Row[] }) {
         {items.length === 0 ? <div style={muted}>還沒有接續紀錄（commit trailer 寫 Next: 後會出現在這裡）。</div> : items.map(({ system, p }) => (
           <div key={system.id} style={{ padding: "12px 0", borderBottom: "1px solid var(--card-border)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              <strong style={{ fontSize: 14 }}>{system.name}</strong><span style={muted}>{formatTime(p.handoff.lastAt)}</span>
+              <strong style={{ fontSize: 14 }}>{system.name}</strong><span style={muted}><TimeLabel iso={p.handoff.lastAt} /></span>
             </div>
             <div style={{ fontSize: 13, color: "var(--text-secondary)", margin: "6px 0" }}>{p.handoff.next ?? "（沒有寫下一步）"}</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -188,7 +192,7 @@ function PendingPanel({ pending }: { pending: Pending }) {
       <div style={panelBody}>
         {pending.proposals.map((x) => (
           <div key={x.event_key} style={{ padding: "10px 0", borderBottom: "1px solid var(--card-border)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><strong style={{ fontSize: 14 }}>{x.name}</strong><span style={muted}>{formatTime(x.at)}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><strong style={{ fontSize: 14 }}>{x.name}</strong><span style={muted}><TimeLabel iso={x.at} /></span></div>
             <div style={muted}>{TYPE_LABEL[x.type as SystemType] ?? x.type}・{x.purpose}</div>
             <details style={{ marginTop: 6 }}>
               <summary className="btn-secondary" style={{ ...smallBtn, listStyle: "none", cursor: "pointer", display: "inline-block" }}>撤回</summary>
@@ -229,9 +233,9 @@ function SyncPanel({ runs, refresh, pendingFailed }: { runs: UpdateRow[]; refres
         {pendingFailed && <div style={{ ...muted, marginBottom: 8 }}>待登記暫時讀不到。</div>}
         {!latest ? <div style={muted}>還沒有任何匯入紀錄：主機匯入器尚未跑過（或尚未開啟）。</div> : (
           <>
-            <div style={{ fontSize: 13, color: "var(--text-primary)" }}>最後成功匯入：<strong>{formatTime(lastOk?.at)}</strong></div>
+            <div style={{ fontSize: 13, color: "var(--text-primary)" }}>最後成功匯入：<strong><TimeLabel iso={lastOk?.at} /></strong></div>
             <div style={{ ...muted, margin: "4px 0 10px" }}>HEAD <code>{lastOk?.head ? lastOk.head.slice(0, 9) : "—"}</code></div>
-            {bad && <div style={{ ...errorBox, padding: "8px 12px", marginBottom: 10 }}>最近一次（{formatTime(latest.at)}）{latest.status === "history_diverged" ? "發現 Git 歷史異常，已停止增量匯入" : "失敗"}{latest.error ? `：${latest.error}` : ""}</div>}
+            {bad && <div style={{ ...errorBox, padding: "8px 12px", marginBottom: 10 }}>最近一次（<TimeLabel iso={latest.at} />）{latest.status === "history_diverged" ? "發現 Git 歷史異常，已停止增量匯入" : "失敗"}{latest.error ? `：${latest.error}` : ""}</div>}
             {gaps.map((g) => (
               <div key={g.key} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0", color: g.count ? "var(--text-primary)" : "var(--text-muted)" }}>
                 <span>{g.label}</span><strong>{g.count}</strong>
@@ -294,7 +298,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
   const shown = rows.filter(({ system, eff }) =>
     (!typeFilter || system.type === typeFilter) && (!statusFilter || (statusFilter === "unset" ? eff.status === null : eff.status === statusFilter))
     && (!needle || [system.name, system.purpose, system.slug, ...(system.aliases ?? [])].some((s) => (s ?? "").toLowerCase().includes(needle))));
-  const counts = overviewCounts(rows.map(({ p, eff }) => ({ status: eff.status, inferred: eff.inferred, featureCount: p.features.length, blocker: p.handoff.blocker, lastActivityAt: p.lastActivityAt })), Date.now());
+  const counts = overviewCounts(rows.map(({ p, eff }) => ({ status: eff.status, inferred: eff.inferred, featureCount: p.features.length, blocker: p.handoff.blocker, lastCommitAt: p.lastCommitAt })), Date.now());
   const keep = (...omit: Array<"type" | "status" | "q">) => ({
     ...(typeFilter && !omit.includes("type") ? { type: typeFilter } : {}),
     ...(statusFilter && !omit.includes("status") ? { status: statusFilter } : {}),
@@ -323,7 +327,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
       <div className="sys-stats">
         <Stat title="系統總數" icon="▦" value={counts.total} hint="registry 內所有系統" />
         <Stat title="開發中" icon="◉" value={counts.active} hint="已設或依最近 commit 推定" />
-        <Stat title="待確認" icon="!" tone="warn" value={counts.needsAttention} hint="有卡點、尚未盤點或 30 天沒動靜" />
+        <Stat title="待確認" icon="!" tone="warn" value={counts.needsAttention} hint="有卡點，或開發中卻 30 天沒有 commit" />
         <Stat title="維護與已完成" icon="✓" tone="success" value={counts.wrapped} hint="維護中、完成或封存" />
       </div>
       <div className="sys-board">
