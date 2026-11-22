@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 //
 // 客戶欄（K4）：未登記不畫、未選、已選、搜尋、換客戶清掉依附參數、客戶帳號沒有客戶清單、site 層網站按鈕在清單下方。
+// U3：類別按鈕（單選、看得見、伺服器篩）、標籤、產品門上由回應的 internalOrgId 畫「AwareWave 自己」。
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientContextProvider } from "../ClientContextProvider";
@@ -23,6 +24,10 @@ const S2 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 const org = (id: string, slug: string, name: string) => ({ id, slug, name, color: "var(--accent)", brandColors: [] });
 const ORGS = [org(A, "acme", "Acme"), org(B, "beta", "Beta"), org(INTERNAL, "aw-ops", "AwareWave Ops")];
+const CATEGORIES = [
+  { key: "all", label: "全部" }, { key: "attention", label: "需處理" }, { key: "contract", label: "訂閱" },
+  { key: "credits", label: "點數" }, { key: "test", label: "測試" },
+];
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -35,7 +40,7 @@ beforeEach(() => {
   fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.startsWith("/api/ops/org-search?q=")) return json({ ok: true, orgs: [org(B, "beta", "Beta")], total: 1 });
-    if (url.startsWith("/api/ops/org-search")) return json({ ok: true, orgs: ORGS, total: 120 });
+    if (url.startsWith("/api/ops/org-search")) return json({ ok: true, orgs: ORGS, total: 120, categories: CATEGORIES, internalOrgId: INTERNAL });
     if (url.includes("organizationId=")) {
       return json({ ok: true, sites: [{ id: S1, name: "主站", organization_id: A }, { id: S2, name: "部落格", organization_id: A }] });
     }
@@ -50,9 +55,9 @@ function Page({ layer }: { layer: Layer }) {
   return null;
 }
 
-function mount(opts: { layer?: Layer; sessionOrg?: string | null; onDoor?: boolean; hosts?: Record<string, string> } = {}) {
+function mount(opts: { layer?: Layer; sessionOrg?: string | null; onDoor?: boolean; hosts?: Record<string, string>; internalOrgId?: string | null } = {}) {
   return render(
-    <ClientContextProvider sitesPath="/api/content/sites" sessionOrg={opts.sessionOrg ?? null} hostOrg={null} internalOrgId={INTERNAL} hosts={opts.hosts ?? {}} onDoor={opts.onDoor ?? false}>
+    <ClientContextProvider sitesPath="/api/content/sites" sessionOrg={opts.sessionOrg ?? null} hostOrg={null} internalOrgId={opts.internalOrgId === undefined ? INTERNAL : opts.internalOrgId} hosts={opts.hosts ?? {}} onDoor={opts.onDoor ?? false}>
       <ClientRail />
       {opts.layer && <Page layer={opts.layer} />}
     </ClientContextProvider>,
@@ -72,8 +77,8 @@ describe("ClientRail", () => {
     expect(screen.getByText("請先選客戶")).toBeTruthy();
     expect(screen.getByRole("button", { name: "AwareWave 自己" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "AwareWave Ops" })).toBeNull();
-    expect(screen.queryByRole("button", { pressed: true })).toBeNull();
-    expect(String(fetchMock.mock.calls[0][0])).toBe("/api/ops/org-search");
+    expect(screen.getByRole("group", { name: "客戶" }).querySelector("[aria-pressed=true]")).toBeNull();
+    expect(String(fetchMock.mock.calls[0][0])).toBe("/api/ops/org-search?category=all");
   });
 
   it("staff, org in URL -> that row pressed, include asked, client page link", async () => {
@@ -81,7 +86,7 @@ describe("ClientRail", () => {
     mount({ layer: "org" });
     await waitFor(() => expect(screen.getByRole("button", { name: "Acme" }).getAttribute("aria-pressed")).toBe("true"));
     expect(screen.queryByText("請先選客戶")).toBeNull();
-    expect(fetchMock.mock.calls.some((c) => String(c[0]) === `/api/ops/org-search?include=${A}`)).toBe(true);
+    expect(fetchMock.mock.calls.some((c) => String(c[0]) === `/api/ops/org-search?category=all&include=${A}`)).toBe(true);
     expect(screen.getByRole("link", { name: "客戶頁 →" }).getAttribute("href")).toBe("/ops/clients/acme");
   });
 
@@ -159,5 +164,52 @@ describe("ClientRail", () => {
     await waitFor(() => expect(screen.getByText("網站載入失敗，請重新整理。")).toBeTruthy());
     expect(screen.queryByText("找不到網址指定的網站。")).toBeNull();
     expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it("category buttons: visible, single choice, 全部 first; a click asks the server for that category and keeps 自己 to 全部", async () => {
+    mount({ layer: "org" });
+    const group = await screen.findByRole("group", { name: "類別" });
+    const buttons = [...group.querySelectorAll("button")];
+    expect(buttons.map((b) => b.textContent)).toEqual(["全部", "需處理", "訂閱", "點數", "測試"]);
+    expect(buttons.filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent)).toEqual(["全部"]);
+    expect(document.querySelector("select")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "測試" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some((c) => String(c[0]) === "/api/ops/org-search?category=test")).toBe(true));
+    expect(screen.getByRole("button", { name: "測試" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "全部" }).getAttribute("aria-pressed")).toBe("false");
+    await waitFor(() => expect(screen.queryByRole("button", { name: "AwareWave 自己" })).toBeNull());
+  });
+
+  it("a row shows its tags in words; the dot stays the row's colour", async () => {
+    fetchMock.mockImplementation(async () => json({
+      ok: true, total: 1, categories: CATEGORIES, internalOrgId: INTERNAL,
+      orgs: [{ ...org(A, "acme", "Acme"), color: "var(--text-muted)", tags: ["attention", "credits"] }],
+    }));
+    mount({ layer: "org" });
+    const row = await screen.findByRole("button", { name: /Acme/ });
+    expect(row.textContent).toContain("需處理・點數");
+    expect((row.querySelector("span[aria-hidden]") as HTMLElement).style.background).toBe("var(--text-muted)");
+  });
+
+  it("on a door (no internal id prop) AwareWave 自己 comes from the answer", async () => {
+    mount({ layer: "org", onDoor: true, internalOrgId: null });
+    fireEvent.click(await screen.findByRole("button", { name: "AwareWave 自己" }));
+    expect(String(nav.replace.mock.calls.at(-1)?.[0])).toBe(`/tools/content?org=${INTERNAL}`);
+  });
+
+  it("100 clients: one category click shows a client the first page does not", async () => {
+    const many = Array.from({ length: 100 }, (_, i) => org(`00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, `c${i}`, `Client ${i}`));
+    const target = org("77777777-7777-4777-8777-777777777777", "late", "Late Payer");
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const cat = new URLSearchParams(String(input).split("?")[1]).get("category");
+      return cat === "attention"
+        ? json({ ok: true, orgs: [{ ...target, tags: ["attention"] }], total: 1, categories: CATEGORIES, internalOrgId: INTERNAL })
+        : json({ ok: true, orgs: many.slice(0, 50), total: 100, categories: CATEGORIES, internalOrgId: INTERNAL });
+    });
+    mount({ layer: "org" });
+    await screen.findByRole("button", { name: "Client 0" });
+    expect(screen.queryByRole("button", { name: /Late Payer/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "需處理" }));
+    expect(await screen.findByRole("button", { name: /Late Payer/ })).toBeTruthy();
   });
 });
