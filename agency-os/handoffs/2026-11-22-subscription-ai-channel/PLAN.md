@@ -38,7 +38,7 @@ App root = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`（下列
 不變量（程式強制，非慣例）：
 - I1 `owner` lane 只服務擁有者本人（`codexAllowed`）。`schedule` lane 能跑哪個 tool＝主機 worker 自報的 `tools`（裝了且登入了才有）；沒有該 tool 的段落視同離線，鏈往下走。訂閱永不服務員工或客戶的請求。
 - I2 lane 由「驗證通過的是哪一把 secret」決定，不由 worker 自報。
-- I3 文字 job 的 CLI 一律無工具（Claude `--tools ""`；Codex 關 shell/exec/browser/computer/apps/plugins/image/view_image＋`mcp_servers={}`＋空白暫存 cwd）。提示詞含外部抓來的內容＝不可信。
+- I3 文字 job 的 CLI 一律無工具、不載入使用者層設定（Claude `--tools ""`＋`--setting-sources ""`；Codex 關 shell/exec/browser/computer/apps/plugins/image/view_image/hooks/multi_agent＋`mcp_servers={}`＋空白暫存 cwd＋**專用乾淨的 `CODEX_HOME`**：`SUB_CODEX_HOME`，筆電預設 `~/.codex-sub`、主機用該使用者的預設家目錄；裡面只有登入檔，沒有就回 `sub_not_logged_in`，不複製 `~/.codex/auth.json`）。提示詞含外部抓來的內容＝不可信。錯誤分類只看 CLI 的錯誤事件與 stderr，不看模型寫出來的文字。
 - I4 worker 交回前掃描輸出：含本機任何憑證字串（`~/.codex/auth.json` 的 token、worker secret、Claude OAuth token）→ 丟棄並回 `sub_output_blocked`。
 - I5 瀏覽器請求永不等 worker（沿用 202＋輪詢）；排程在 tick 預算內等，逾時視同失敗。
 - I6 訂閱 job 不扣點、帳本記 usd 0＋實際 tokens／額度 %；失敗不記帳。
@@ -46,7 +46,7 @@ App root = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`（下列
 
 ## 3. 設計
 
-**模型目錄即通道。** `AI_TEXT_MODELS` 加一組「訂閱」：`sub-codex`（Codex 預設模型）、`sub-claude-opus`、`sub-claude-sonnet`、`sub-claude-haiku`。每列帶 `sub: { tool, cliModel }`。`TEXT_RATES` 加同名列：價 0、vendor `訂閱`。Codex 可選模型清單待 11-24 額度恢復後由 M1 實查再加列，不先猜。
+**訂閱模型另列，不進 API 目錄。**（批 1 審查更正：sub id 一旦進 `AI_TEXT_MODELS`／`TEXT_RATES`，`normalizeAiTextModel` 會把它放進只走 API 的路徑，`scripts/probe-models.mjs` 每晚會把它報成失敗。）`SUB_TEXT_MODELS`：`sub-codex`（Codex 預設模型）、`sub-claude-opus`、`sub-claude-sonnet`、`sub-claude-haiku`，各帶 `{ label, tool, cliModel }`。`AI_TEXT_MODELS`、`TEXT_RATES`、`isAiTextModel`、`normalizeAiTextModel` 維持只有 API 模型；`ChannelModel = AiTextModel | SubTextModel`。`logAiCall` 對 sub id 直接記 usd 0、vendor `訂閱`，不查價目。Codex 可選模型清單待 11-24 額度恢復後由 M1 實查再加列，不先猜。
 
 **通道＝鏈，三個值**：`chain`（`TEXT_CHAINS` 四選一，預設 `api`）＋`apiModel`（最後一段用的 API 模型）＋`claudeModel`（claude 段用哪個訂閱等級，預設 Opus）。`resolveTextChain()` 把它展開成依序的模型 id 陣列（K3）。沒有「只走訂閱、用完就停」這個選項：每條鏈都以 API 收尾。
 
@@ -56,9 +56,9 @@ App root = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`（下列
 - 改名債（明記不做）：`codex-bridge`／`codex-images`／`codex-image-worker`／`codex-wait`／`codex-laptop` 約 30 檔引用，改名零行為收益且製造部署空窗 → 僅在檔頭註解更正職責。
 
 **wire contract（K1、K2 共同依據）**
-- `POST /api/internal/codex-images/claim` body `{ waitMs?, leaving?, tools: ("codex"|"claude")[] }`（缺 `tools` ＝ `["codex"]`，相容舊 worker）。Bearer：`CODEX_WORKER_SECRET` → lane `owner`；`SUB_WORKER_HOST_SECRET` → lane `schedule`。
+- `POST /api/internal/codex-images/claim` body `{ waitMs?, leaving?, tools: ("codex"|"claude")[] }`。沒帶 `tools` ＝ 只會畫圖的舊 worker：登記 codex、`text:false`，永遠領不到文字 job（批 1 審查更正：舊 worker 收到文字 job 會崩潰）。Bearer：`CODEX_WORKER_SECRET` → lane `owner`；`SUB_WORKER_HOST_SECRET` → lane `schedule`。
 - 回 `{ ok, job }`；job＝`{ id, kind:"image", prompt, aspectRatio, refs, timeLeftMs }`（原樣）或 `{ id, kind:"text", tool, cliModel|null, system, prompt, timeLeftMs }`。舊 worker 收到沒有 `kind` 的 job＝image。
-- `POST …/complete` body：image 原樣；text `{ id, text, usage?, answeredModel? }`；失敗 `{ id, error, quotaResetsAt? }`（`error` 規則同現行 `^[a-z0-9_]{1,60}$`）。text 上限 400,000 字元。
+- `POST …/complete` body：image 原樣；text `{ id, text, usage?, answeredModel? }`；失敗 `{ id, error, quotaResetsAt?, tool? }`（`error` 規則同現行 `^[a-z0-9_]{1,60}$`；`tool` 讓 job 已過期時仍能記額度封鎖）。額度封鎖以 tool 為準、不分圖或文字（同一份方案額度）。text 上限 400,000 字元。
 - 錯誤碼新增：`sub_worker_offline`、`sub_worker_busy`、`sub_worker_timeout`、`sub_quota_exhausted`、`sub_not_logged_in`、`sub_exec_failed`、`sub_empty_output`、`sub_output_blocked`。圖沿用 `codex_*`。
 
 **每站設定**：`SiteContentDefaults` 加 `textChain?: TextChain`、`textApiModel?: string`、`textClaudeModel?: string`（全缺＝現行為：`api`＋Opus）。`articleInput` 帶入這三個值；排程走 lane `schedule`，本人按鈕走 lane `owner`。社群改寫／每月選題／每日打分（Haiku，單次 < NT$0.3）不搬。
