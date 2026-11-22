@@ -6,6 +6,10 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ReviewRelease from "../review-release/ReviewRelease";
 
+// K11: the page compares the link's organizationId with the workbench's own client (capabilities.mainSystem).
+const workbench = vi.hoisted(() => ({ loadCapabilities: async (): Promise<unknown> => ({ mainSystem: { organizationId: "39ad4149-5044-4077-8d9a-b6b916de0e21" } }) }));
+vi.mock("../workbench", () => ({ useWorkbench: () => workbench }));
+
 const ORG = "39ad4149-5044-4077-8d9a-b6b916de0e21", CUT = "a3de2011-1e4a-4624-a1e2-93eacb930757", OTHER = "b4ef3122-2f5b-4735-b2f3-a4fdc0a41868", PROJECT = "c5f04233-3a6c-4846-83a4-b50ed1b52979";
 const video = (id: string, title: string) => ({ id, object_url: `https://r2.example/video/${id}/9x16.mp4`, checksum_sha256: "a".repeat(64), created_at: "2026-11-15T05:17:00Z", asset_domain: "workbench_render", metadata: { title, ratio: "9x16" } });
 // B1: one video made in several ratios = the primary row plus ratio rows that point back at it (variantOf)
@@ -131,6 +135,24 @@ describe("ReviewRelease", () => {
     await waitFor(() => expect((approve as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(approve);
     await waitFor(() => expect(calls.some((c) => c.url === "/api/video/release" && (c.body as { candidateAssetId: string }).candidateAssetId === CUT)).toBe(true));
+  });
+
+  it("K11 another client's video: says to switch first and loads nothing", async () => {
+    const calls = stubServer([video(CUT, "第一集")]);
+    render(<ReviewRelease organizationId={OTHER} assetId={CUT} section="qa" />);
+    expect(await screen.findByText(/這支影片屬於另一個客戶，請先/)).toBeTruthy();
+    expect(calls).toEqual([]);
+  });
+
+  it("K11 a workbench not connected to the main system loads nothing", async () => {
+    const before = workbench.loadCapabilities;
+    workbench.loadCapabilities = async () => ({ mainSystem: null });
+    try {
+      const calls = stubServer([video(CUT, "第一集")]);
+      render(<ReviewRelease organizationId={ORG} assetId={CUT} section="qa" />);
+      expect(await screen.findByText(/沒有連上主系統/)).toBeTruthy();
+      expect(calls).toEqual([]);
+    } finally { workbench.loadCapabilities = before; }
   });
 
   it("without an organization or a video it says what to do and asks nothing", () => {

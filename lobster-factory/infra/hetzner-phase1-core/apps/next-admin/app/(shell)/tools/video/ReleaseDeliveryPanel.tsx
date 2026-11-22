@@ -86,7 +86,7 @@ export default function ReleaseDeliveryPanel({ initialOrganizationId, initialCan
       if (!cancelled) setAssets(items);
     });
     void getJson<{ accounts?: Account[] }>(`/api/video/social-channels?organizationId=${encodeURIComponent(org)}`).then((j) => { if (!cancelled) setAccounts(j?.accounts ?? []); });
-    void getJson<{ sites?: Site[] }>("/api/content/sites").then((j) => { if (!cancelled) setSites((j?.sites ?? []).filter((s) => s.organization_id === org)); });
+    void getJson<{ sites?: Site[] }>(`/api/content/sites?organizationId=${encodeURIComponent(org)}`).then((j) => { if (!cancelled) setSites(j?.sites ?? []); });   // the server filters (K3)
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org]);

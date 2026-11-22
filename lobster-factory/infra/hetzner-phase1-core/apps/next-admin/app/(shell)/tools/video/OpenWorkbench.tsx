@@ -1,10 +1,17 @@
 "use client";
 // The old staff video entries (/tools/video, /tools/script-forge) now only open the video workbench (plan U11 commit 1).
 // The same click carries this browser's ScriptForge history to the video host (lib/video/script-history.ts).
+// Card K11 (ADR 020 §2.4): the page registers the org layer, so the client rail shows; the workbench opens on the
+// client picked there (?org= on the handoff link). No client picked = the workbench keeps its own (VW has no "none").
 import { useEffect, useRef, useState } from "react";
 import { HANDOFF_CHANNEL, fromHandoff, readScriptHistory } from "@/lib/video/script-history";
+import { withContext } from "@/lib/client-context/contract";
+import { useClientContext } from "@/lib/client-context/use-client-context";
 
 export default function OpenWorkbench({ videoHost, open }: { videoHost: string; open: string | null }) {
+  const ctx = useClientContext("org");
+  // A client account's workbench is always its own (session/route.ts ignores the cookie for clients): nothing to carry.
+  const org = ctx.viewer === "staff" ? ctx.org : null;
   const opened = useRef<Window | null>(null);
   const [note, setNote] = useState("");
   useEffect(() => {
@@ -17,7 +24,8 @@ export default function OpenWorkbench({ videoHost, open }: { videoHost: string; 
     return () => window.removeEventListener("message", onMessage);
   }, [videoHost]);
   function start() {
-    const w = window.open(`https://${videoHost}/handoff${open ? `?open=${encodeURIComponent(open)}` : ""}`, "_blank");
+    const href = withContext(`https://${videoHost}/handoff${open ? `?open=${encodeURIComponent(open)}` : ""}`, { org });
+    const w = window.open(href, "_blank");
     if (!w) { setNote("瀏覽器擋下了新分頁。請允許這個網站開新分頁，再按一次。"); return; }
     opened.current = w;
     setNote("已在新分頁開啟。");
@@ -27,6 +35,11 @@ export default function OpenWorkbench({ videoHost, open }: { videoHost: string; 
       <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 16 }}>
         影片製作已搬到影音工作台：寫腳本、做片、審片與發布都在那裡，會開在新分頁。這台瀏覽器裡舊腳本工具的歷史紀錄會一起帶過去。
       </p>
+      {ctx.viewer === "staff" && !org && (
+        <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.7, marginBottom: 16 }}>
+          還沒在左邊客戶欄選客戶：工作台會用它目前的客戶，可在工作台頂部切換。
+        </p>
+      )}
       <button type="button" className="btn-primary" onClick={start}>開啟影音工作台</button>
       {note && <p role="status" style={{ marginTop: 12, fontSize: 13, color: "var(--text-muted)" }}>{note}</p>}
     </div>

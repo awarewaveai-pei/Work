@@ -1192,7 +1192,9 @@ export default function ScriptForge({ onSendToVideo, onStartDrafts, onQuoteDraft
   SF_NOT_USABLE = why("video.script");
   const notUsable = SF_NOT_USABLE;
   const[nav,setNav]=useState("manual");
-  const[siteId,setSiteId]=useState<string>(()=>{try{return localStorage.getItem("sf_site")||"";}catch{return "";}});
+  const[siteId,setSiteId]=useState<string>("");
+  // K11 (ADR 020): the client is the workbench's (organizationId), never a per-browser pick; the old "sf_site" key is deleted when met.
+  useEffect(()=>{try{localStorage.removeItem("sf_site");}catch{/* storage blocked: nothing to delete */}},[]);
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
   // Side menu groups fold like the app sidebar (SidebarNav.tsx): only the current module's group starts open.
   const[openGroups,setOpenGroups]=useState<Set<string>>(()=>new Set([FORGE_NAV.find(n=>n.id===nav)?.group??"生成"]));
@@ -1226,15 +1228,16 @@ export default function ScriptForge({ onSendToVideo, onStartDrafts, onQuoteDraft
   }
   // active 過濾已移到 route.ts GET 的預設（2026-08-26）；這裡原本自己濾一次，是把同一條
   // 規則放在消費端的第二份抄本 —— ContentStudio 沒抄到那份，死站就漏出去了。刪掉抄本。
-  useEffect(()=>{(async()=>{try{const r=await fetch("/api/content/sites");const j=await r.json();if(j?.ok&&Array.isArray(j.sites))setClients(j.sites);}catch{/* best-effort：未登入/無客戶 → 下拉為空 */}})();},[]);
-  // 品牌語氣只有一份：所選客戶網站的 content_defaults（lib/content/brand-voice.ts）。這台電腦只記住選了哪個客戶。
+  // Only this organization's sites, filtered by the server (K3); no organization = no list (never the whole table).
+  useEffect(()=>{setClients([]);if(!organizationId)return;let live=true;(async()=>{try{const r=await fetch(`/api/content/sites?organizationId=${encodeURIComponent(organizationId)}`);const j=await r.json();if(live&&j?.ok&&Array.isArray(j.sites))setClients(j.sites);}catch{/* best-effort：未登入/無客戶 → 清單為空 */}})();return()=>{live=false;};},[organizationId]);
+  // 品牌語氣只有一份：所選客戶網站的 content_defaults（lib/content/brand-voice.ts）。選了哪一站只留在本頁，不存瀏覽器。
   const shownClients=organizationId?clients.filter((c:any)=>c.organization_id===organizationId):clients;
   // The workbench fixes the client (its top switch); a brand with one site loads that site, no picking here.
   const site=shownClients.find((c:any)=>c.id===siteId)||(organizationId&&shownClients.length===1?shownClients[0]:null);
   SF_SITE_ID=site?.id||"";
   SF_BRAND_ORG=organizationId||site?.organization_id||"";
   const brand=useMemo(()=>site?{name:site.name,voice:renderSiteVoice(site.contentDefaults)||site.name,forbidden:site.contentDefaults?.marketing?.forbiddenClaims||"",_clientId:site.id}:null,[site]);
-  function pickSite(id:string){setSiteId(id);try{if(id)localStorage.setItem("sf_site",id);else localStorage.removeItem("sf_site");}catch{}}
+  function pickSite(id:string){setSiteId(id);}
   /** Writes the given fields into the selected client's content_defaults; undefined = keep, "" = clear. Returns an error to show, or null. */
   async function saveVoice(f:{instructions?:string;tone?:string;audience?:string;forbidden?:string;primaryCta?:string}):Promise<string|null>{
     if(!site)return "先在右上「載入客戶」選一個客戶，品牌語氣存在客戶的網站設定。";
