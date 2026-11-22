@@ -68,6 +68,11 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "gpt-5.4":                   { inputPerM: 2.5, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4", vendor: "OpenAI", status: "active", fallback: "claude-opus-5-5", verifiedAt: "2026-10-28" },
   "gpt-5.4-mini":              { inputPerM: 0.75, outputPerM: 4.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 mini", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
   "gpt-5.4-nano":              { inputPerM: 0.2, outputPerM: 1.25, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-5.4 nano", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5", verifiedAt: "2026-10-28" },
+  // GPT-6 family (developers.openai.com/api/docs/pricing 2026-11-22). cacheReadMult 0.1 = same as GPT-5.4, not looked up.
+  "gpt-6-luna":              { inputPerM: 0.1, outputPerM: 0.5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-6 luna", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5", verifiedAt: "2026-11-22" },
+  "gpt-6.1-terra":           { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-6.1 terra", vendor: "OpenAI", status: "active", fallback: "claude-haiku-5-5", verifiedAt: "2026-11-22" },
+  "gpt-6.2-sol":             { inputPerM: 2, outputPerM: 10, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-6.2 sol", vendor: "OpenAI", status: "active", fallback: "claude-opus-5-5", verifiedAt: "2026-11-22" },
+  "gpt-6.2-astra":           { inputPerM: 8, outputPerM: 40, cacheReadMult: 0.1, cacheWriteMult: 1, label: "GPT-6.2 astra", vendor: "OpenAI", status: "active", fallback: "claude-opus-5-5", verifiedAt: "2026-11-22" },
   // OpenAI deprecations page 2026-11-09: gpt-4o, gpt-4o-mini, gpt-4.1 and gpt-4.1-mini shut down 2027-01-14.
   "gpt-4o":                    { inputPerM: 2.5, outputPerM: 10, cacheReadMult: 0.5, cacheWriteMult: 1, label: "GPT-4o", vendor: "OpenAI", status: "legacy", fallback: "gpt-5.4", verifiedAt: "2026-10-28", retireOn: "2027-01-14" },
   // Former outreach default (lib/outreach/ai-openai.ts); kept for older cost-log rows.

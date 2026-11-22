@@ -6,12 +6,17 @@ import { TEXT_RATES } from "./cost-model";
 // Labels carry no parenthetical descriptor — pricing is shown separately in the picker UI.
 export const AI_TEXT_MODELS = [
   { value: "claude-haiku-5-5", label: "Claude Haiku 5.5", group: "Claude" },
+  { value: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", group: "Claude" },
   { value: "claude-opus-5-5", label: "Claude Opus 5.5", group: "Claude" },
   { value: "claude-fable-5-1", label: "Claude Fable 5.1", group: "Claude" },
+  { value: "gpt-6-luna", label: "GPT-6 luna", group: "OpenAI" },
   { value: "gpt-5.4-nano", label: "GPT-5.4 nano", group: "OpenAI" },
   { value: "gpt-5.4-mini", label: "GPT-5.4 mini", group: "OpenAI" },
+  { value: "gpt-6.1-terra", label: "GPT-6.1 terra", group: "OpenAI" },
+  { value: "gpt-6.2-sol", label: "GPT-6.2 sol", group: "OpenAI" },
   { value: "gpt-5.4", label: "GPT-5.4", group: "OpenAI" },
   { value: "gpt-5.5", label: "GPT-5.5", group: "OpenAI" },
+  { value: "gpt-6.2-astra", label: "GPT-6.2 astra", group: "OpenAI" },
 ] as const;
 
 export type AiTextModel = (typeof AI_TEXT_MODELS)[number]["value"];
