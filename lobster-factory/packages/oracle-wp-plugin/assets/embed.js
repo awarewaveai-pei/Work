@@ -1,5 +1,7 @@
 /**
- * Parent-page side of the embed protocol v1 (engine side = W2, lib/embed/protocol.ts there).
+ * Cross-origin mode only (setting embed = cross-origin): parent-page side of the embed protocol v1.
+ * The engine side of this protocol is not built (ORACLE-WP-SPEC §1: kept for a WordPress whose reverse
+ * proxy is not ours; wired when the first such site arrives). Same-origin mode = embed-same-origin.js.
  * Accepts a message only when event.origin is the configured engine origin AND event.source is one of
  * this page's oracle iframes; every reply is posted to that origin only. Config: window.AWORACLE.
  *

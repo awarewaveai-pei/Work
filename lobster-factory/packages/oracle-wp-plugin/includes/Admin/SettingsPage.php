@@ -1,9 +1,11 @@
 <?php
 /**
  * Settings → AwareWave Oracle. Everything site-specific is entered here (no addresses in code):
- * engine URLs, key id, the site's Ed25519 key (generate / rotate; only the public half is shown),
- * locale map, tool-slug → page map, member-pseudonym salt rotation, tool-list refresh.
+ * embed mode, engine URLs, key id, the site's Ed25519 key (generate / rotate; only the public half is
+ * shown), locale map, tool-slug → page map, member-pseudonym salt rotation, tool-list refresh.
  * Capability manage_options on every render and action; every action form carries its own nonce.
+ * Key / salt / tool-list actions post to admin-post.php and redirect back (Post/Redirect/Get), so a
+ * browser refresh never repeats them.
  *
  * @package AwareWave\Oracle\Admin
  */
@@ -17,13 +19,27 @@ use AwareWave\Oracle\Settings\Options;
 
 final class SettingsPage {
 
-	const CAP   = 'manage_options';
-	const SLUG  = 'aware-wave-oracle';
-	const GROUP = 'aworacle';
+	const CAP    = 'manage_options';
+	const SLUG   = 'aware-wave-oracle';
+	const GROUP  = 'aworacle';
+	const ACTION = 'aworacle_action';
+	const NOTICE = 'aworacle_notice';
+
+	/** @var array<string,bool> settings-error codes already added in this request (sanitize runs twice on the first save) */
+	private $reported = array();
 
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'menu' ) );
 		add_action( 'admin_init', array( $this, 'registerSetting' ) );
+		add_action( 'admin_post_' . self::ACTION, array( $this, 'handleAction' ) );
+		// The notice is shown once; WordPress then strips the code from the address bar.
+		add_filter(
+			'removable_query_args',
+			function ( $args ) {
+				$args[] = self::NOTICE;
+				return $args;
+			}
+		);
 	}
 
 	public function menu(): void {
@@ -50,7 +66,7 @@ final class SettingsPage {
 	}
 
 	/**
-	 * @param mixed $input
+	 * @param mixed $input form post (first pass) or the already-sanitized array (second pass on the first save)
 	 * @return array<string,mixed>
 	 */
 	public function sanitize( $input ): array {
@@ -58,39 +74,119 @@ final class SettingsPage {
 		if ( ! is_array( $input ) || ! current_user_can( self::CAP ) ) {
 			return $old;
 		}
-		$in  = wp_unslash( $input );
-		$out = Options::defaults();
-
-		$out['browser_engine_url'] = Normalize::engineUrl( (string) ( $in['browser_engine_url'] ?? '' ), false );
-		if ( $out['browser_engine_url'] === '' && trim( (string) ( $in['browser_engine_url'] ?? '' ) ) !== '' ) {
-			add_settings_error( Options::OPTION, 'browser_url', __( 'Engine URL (browser) must be an https:// address without query or fragment.', 'aware-wave-oracle' ) );
+		$errors = array();
+		$out    = Normalize::settings( wp_unslash( $input ), $errors );
+		foreach ( $errors as $e ) {
+			$this->report( $e[0], $this->errorMessage( $e[0], $e[1] ) );
 		}
-		$out['server_engine_url'] = Normalize::engineUrl( (string) ( $in['server_engine_url'] ?? '' ), true );
-		if ( $out['server_engine_url'] === '' && trim( (string) ( $in['server_engine_url'] ?? '' ) ) !== '' ) {
-			add_settings_error( Options::OPTION, 'server_url', __( 'Engine URL (server) must be an http(s):// address without query or fragment.', 'aware-wave-oracle' ) );
-		}
-		$out['key_id'] = Normalize::keyId( (string) ( $in['key_id'] ?? '' ) );
-		if ( $out['key_id'] === '' && trim( (string) ( $in['key_id'] ?? '' ) ) !== '' ) {
-			add_settings_error( Options::OPTION, 'key_id', __( 'Key ID: 3–64 characters, lowercase letters, digits, - and _.', 'aware-wave-oracle' ) );
-		}
-		$default = Normalize::engineLocale( (string) ( $in['default_locale'] ?? '' ) );
-		$out['default_locale'] = $default !== '' ? $default : 'en';
-
-		$rejected          = array();
-		$out['locale_map'] = Normalize::pairs( (string) ( $in['locale_map'] ?? '' ), Normalize::WP_LOCALE_PATTERN, Normalize::LOCALE_PATTERN, $rejected );
-		$pages             = Normalize::pairs( (string) ( $in['page_map'] ?? '' ), Normalize::SLUG_PATTERN, '/^[1-9][0-9]{0,18}$/', $rejected );
-		$out['page_map']   = array_map( 'intval', $pages );
-		if ( $rejected ) {
-			add_settings_error(
-				Options::OPTION,
-				'maps',
-				/* translators: %s: the lines that were not saved */
-				sprintf( __( 'These lines were not saved (wrong format): %s', 'aware-wave-oracle' ), implode( ' | ', $rejected ) )
-			);
+		if ( $out['embed'] === Normalize::EMBED_SAME_ORIGIN ) {
+			$this->warnEnginePrefixes();
 		}
 
-		if ( Options::serverEngineUrl() !== ( $out['server_engine_url'] !== '' ? $out['server_engine_url'] : $out['browser_engine_url'] ) ) {
+		$oldServer = $old['server_engine_url'] !== '' ? $old['server_engine_url'] : $old['browser_engine_url'];
+		$newServer = $out['server_engine_url'] !== '' ? $out['server_engine_url'] : $out['browser_engine_url'];
+		if ( $oldServer !== $newServer || $old['embed'] !== $out['embed'] ) {
 			EngineClient::forgetTools();
+		}
+		return $out;
+	}
+
+	private function report( string $code, string $message, string $type = 'error' ): void {
+		if ( isset( $this->reported[ $code ] ) ) {
+			return;
+		}
+		$this->reported[ $code ] = true;
+		add_settings_error( Options::OPTION, $code, $message, $type );
+	}
+
+	/** Messages are HTML (settings_errors prints them as-is): every piece of input is escaped here. */
+	private function errorMessage( string $code, string $detail ): string {
+		switch ( $code ) {
+			case 'browser_url':
+				return esc_html__( 'Engine URL (browser) must be an https:// address without query or fragment.', 'aware-wave-oracle' );
+			case 'server_url':
+				return esc_html__( 'Engine URL (server) must be an http(s):// address without query or fragment.', 'aware-wave-oracle' );
+			case 'key_id':
+				return esc_html__( 'Key ID: 2–24 characters, lowercase letters, digits and -, starting with a letter or digit.', 'aware-wave-oracle' );
+			case 'default_locale':
+				return esc_html__( 'Default engine language must be zh-TW or en; en was saved.', 'aware-wave-oracle' );
+			case 'cross_needs_url':
+				return esc_html__( 'Cross-origin embedding needs the engine URL (browser); tools will not show until it is set.', 'aware-wave-oracle' );
+			case 'maps':
+				/* translators: %s: the lines that were not saved */
+				return sprintf( esc_html__( 'These lines were not saved (wrong format, or a language the engine does not have — zh-TW, en): %s', 'aware-wave-oracle' ), esc_html( $detail ) );
+		}
+		return esc_html( $code );
+	}
+
+	/**
+	 * Same-origin installs hand ENGINE_PREFIXES to the engine at the reverse proxy: a page (or a translation
+	 * plugin's language slug) there can never be reached. Warn and list them; saving still goes through.
+	 */
+	private function warnEnginePrefixes(): void {
+		$hits = array();
+		foreach ( $this->postsAtEnginePrefixes() as $path => $post ) {
+			$hits[] = sprintf( '%s (%s)', wp_strip_all_tags( $post->post_title ), $path );
+		}
+		foreach ( $this->translationSlugsAtEnginePrefixes() as $slug ) {
+			/* translators: %s: a language slug in TranslatePress settings, e.g. en */
+			$hits[] = sprintf( __( 'TranslatePress language slug /%s/', 'aware-wave-oracle' ), $slug );
+		}
+		if ( ! $hits ) {
+			return;
+		}
+		$message = sprintf(
+			/* translators: 1: list of reserved path prefixes, 2: list of pages */
+			esc_html__( 'These addresses start with a path the engine uses (%1$s) and will not reach WordPress: %2$s', 'aware-wave-oracle' ),
+			esc_html( '/' . implode( '/, /', Normalize::ENGINE_PREFIXES ) . '/' ),
+			esc_html( implode( ' | ', $hits ) )
+		);
+		$this->report( 'engine_prefix', $message, 'warning' );
+	}
+
+	/** @return array<string,\WP_Post> path => post */
+	private function postsAtEnginePrefixes(): array {
+		$names = array_map( 'strtolower', Normalize::ENGINE_PREFIXES );
+		$found = get_posts(
+			array(
+				'post_type'        => get_post_types( array( 'public' => true ) ),
+				'post_status'      => array( 'publish', 'future', 'draft', 'pending', 'private' ),
+				'post_name__in'    => $names,
+				'posts_per_page'   => 50,
+				'no_found_rows'    => true,
+				'suppress_filters' => true,
+			)
+		);
+		$out = array();
+		foreach ( $found as $post ) {
+			// Drafts, pending and scheduled posts have a ?p= permalink; the sample permalink is where they will live.
+			$path = in_array( $post->post_status, array( 'publish', 'private' ), true )
+				? wp_parse_url( (string) get_permalink( $post ), PHP_URL_PATH )
+				: self::samplePath( $post );
+			if ( is_string( $path ) && Normalize::pathHitsEnginePrefix( $path ) ) {
+				$out[ $path ] = $post;
+			}
+		}
+		return $out;
+	}
+
+	/** Where an unpublished post will live once published (get_sample_permalink is admin-only; this runs in wp-admin). */
+	private static function samplePath( \WP_Post $post ) {
+		$sample = get_sample_permalink( $post );
+		return wp_parse_url( str_replace( array( '%pagename%', '%postname%' ), (string) $sample[1], (string) $sample[0] ), PHP_URL_PATH );
+	}
+
+	/** @return array<int,string> */
+	private function translationSlugsAtEnginePrefixes(): array {
+		$trp = get_option( 'trp_settings' );
+		if ( ! is_array( $trp ) || ! isset( $trp['url-slugs'] ) || ! is_array( $trp['url-slugs'] ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $trp['url-slugs'] as $slug ) {
+			if ( is_string( $slug ) && Normalize::pathHitsEnginePrefix( '/' . $slug . '/' ) ) {
+				$out[] = $slug;
+			}
 		}
 		return $out;
 	}
@@ -99,55 +195,59 @@ final class SettingsPage {
 		if ( ! current_user_can( self::CAP ) ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'aware-wave-oracle' ) );
 		}
-		$notice = $this->handleActions();
 		$s      = Options::get();
+		$notice = $this->notice();
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'AwareWave Oracle', 'aware-wave-oracle' ) . '</h1>';
 		if ( $notice ) {
-			echo '<div class="notice notice-' . esc_attr( $notice[0] ) . '"><p>' . esc_html( $notice[1] ) . '</p></div>';
+			echo '<div class="notice notice-' . esc_attr( $notice[0] ) . ' is-dismissible"><p>' . esc_html( $notice[1] ) . '</p></div>';
 		}
-		settings_errors( Options::OPTION );
+		// options-general.php prints settings errors for the Settings API save itself; this page lives there too.
 
 		// --- Main settings (Settings API; sanitize() validates) ---
 		echo '<form method="post" action="options.php">';
 		settings_fields( self::GROUP );
 		$name = Options::OPTION;
 		echo '<table class="form-table" role="presentation">';
-		$this->textRow( $name . '[browser_engine_url]', $s['browser_engine_url'], __( 'Engine URL (browser)', 'aware-wave-oracle' ), __( 'Address visitors’ browsers load the embedded tools from, e.g. https://engine.example.com', 'aware-wave-oracle' ) );
-		$this->textRow( $name . '[server_engine_url]', $s['server_engine_url'], __( 'Engine URL (server)', 'aware-wave-oracle' ), __( 'Address this WordPress server calls the engine at. Leave empty to use the browser URL; may be an internal http:// address.', 'aware-wave-oracle' ) );
+		$this->embedRow( $name . '[embed]', $s['embed'] );
+		$this->textRow( $name . '[browser_engine_url]', $s['browser_engine_url'], __( 'Engine URL (browser)', 'aware-wave-oracle' ), __( 'Cross-origin only: the address visitors’ browsers load the embedded tools from, e.g. https://engine.example.com', 'aware-wave-oracle' ) );
+		$this->textRow( $name . '[server_engine_url]', $s['server_engine_url'], __( 'Engine URL (server)', 'aware-wave-oracle' ), __( 'Address this WordPress server calls the engine at; may be an internal http:// address. Empty: this site’s own address (same-origin) or the browser URL (cross-origin).', 'aware-wave-oracle' ) );
 		$this->textRow( $name . '[key_id]', $s['key_id'], __( 'Key ID', 'aware-wave-oracle' ), __( 'The name this site is registered under at the engine.', 'aware-wave-oracle' ) );
-		$this->textRow( $name . '[default_locale]', $s['default_locale'], __( 'Default engine language', 'aware-wave-oracle' ), __( 'Used when the page language has no entry below, e.g. en or zh-TW.', 'aware-wave-oracle' ) );
-		$this->areaRow( $name . '[locale_map]', Normalize::pairsToText( $s['locale_map'] ), __( 'Language map', 'aware-wave-oracle' ), __( 'One per line: WordPress locale=engine language, e.g. zh_TW=zh-TW', 'aware-wave-oracle' ) );
+		$this->textRow( $name . '[default_locale]', $s['default_locale'], __( 'Default engine language', 'aware-wave-oracle' ), __( 'zh-TW or en. Used when the page language is neither and has no entry below.', 'aware-wave-oracle' ) );
+		$this->areaRow( $name . '[locale_map]', Normalize::pairsToText( $s['locale_map'] ), __( 'Language map', 'aware-wave-oracle' ), __( 'Optional, one per line: WordPress locale=engine language, e.g. zh_HK=zh-TW. zh_TW and en_* need no entry.', 'aware-wave-oracle' ) );
 		$this->areaRow( $name . '[page_map]', Normalize::pairsToText( $s['page_map'] ), __( 'Tool pages', 'aware-wave-oracle' ), __( 'One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page.', 'aware-wave-oracle' ) );
 		echo '</table>';
 		submit_button();
 		echo '</form>';
 
 		// --- Site key ---
-		$keypair = Options::keypair();
-		$has     = SiteKey::usable( $keypair );
+		$keypair  = Options::keypair();
+		$has      = SiteKey::usable( $keypair );
+		$constant = Options::keypairFromConstant();
 		echo '<h2>' . esc_html__( 'Site key', 'aware-wave-oracle' ) . '</h2>';
 		echo '<p>' . esc_html__( 'This site signs its requests to the engine with an Ed25519 key. The private half never leaves this site; register the public key below with the engine under the key ID above.', 'aware-wave-oracle' ) . '</p>';
 		if ( $has ) {
 			echo '<textarea readonly rows="4" class="large-text code" onclick="this.select()">' . esc_textarea( SiteKey::publicKeyPem( $keypair ) ) . '</textarea>';
+		} elseif ( $constant ) {
+			echo '<p><strong>' . esc_html__( 'AWORACLE_SITE_KEYPAIR in wp-config.php is not a valid key.', 'aware-wave-oracle' ) . '</strong></p>';
 		} else {
 			echo '<p><em>' . esc_html__( 'No key yet.', 'aware-wave-oracle' ) . '</em></p>';
 		}
-		echo '<form method="post">';
-		wp_nonce_field( 'aworacle_key' );
-		echo '<input type="hidden" name="aworacle_action" value="key">';
-		if ( $has ) {
-			echo '<p><label><input type="checkbox" name="aworacle_confirm" value="1"> ' . esc_html__( 'I understand the old key stops working until the new public key is registered at the engine.', 'aware-wave-oracle' ) . '</label></p>';
+		if ( $constant ) {
+			echo '<p>' . esc_html__( 'The key comes from the AWORACLE_SITE_KEYPAIR constant in wp-config.php; change it there.', 'aware-wave-oracle' ) . '</p>';
+		} else {
+			$this->actionFormStart( 'key' );
+			if ( $has ) {
+				echo '<p><label><input type="checkbox" name="aworacle_confirm" value="1"> ' . esc_html__( 'I understand the old key stops working until the new public key is registered at the engine.', 'aware-wave-oracle' ) . '</label></p>';
+			}
+			submit_button( $has ? __( 'Rotate key', 'aware-wave-oracle' ) : __( 'Generate key', 'aware-wave-oracle' ), $has ? 'secondary' : 'primary', 'submit', false );
+			echo '</form>';
 		}
-		submit_button( $has ? __( 'Rotate key', 'aware-wave-oracle' ) : __( 'Generate key', 'aware-wave-oracle' ), $has ? 'secondary' : 'primary', 'submit', false );
-		echo '</form>';
 
 		// --- Member pseudonym salt ---
 		echo '<h2>' . esc_html__( 'Member pseudonyms', 'aware-wave-oracle' ) . '</h2>';
 		echo '<p>' . esc_html__( 'The engine never sees member IDs or e-mails, only HMAC(salt, user ID). Rotating the salt makes every member look new to the engine (usage limits restart).', 'aware-wave-oracle' ) . '</p>';
-		echo '<form method="post">';
-		wp_nonce_field( 'aworacle_salt' );
-		echo '<input type="hidden" name="aworacle_action" value="salt">';
+		$this->actionFormStart( 'salt' );
 		echo '<p><label><input type="checkbox" name="aworacle_confirm" value="1"> ' . esc_html__( 'Yes, rotate the salt.', 'aware-wave-oracle' ) . '</label></p>';
 		submit_button( __( 'Rotate salt', 'aware-wave-oracle' ), 'secondary', 'submit', false );
 		echo '</form>';
@@ -157,43 +257,78 @@ final class SettingsPage {
 		echo '<h2>' . esc_html__( 'Tools available from the engine', 'aware-wave-oracle' ) . '</h2>';
 		echo '<p>' . ( $tools ? '<code>' . implode( '</code> <code>', array_map( 'esc_html', $tools ) ) . '</code>' : '<em>' . esc_html__( 'None — check the engine URL.', 'aware-wave-oracle' ) . '</em>' ) . '</p>';
 		echo '<p>' . esc_html__( 'Shortcode:', 'aware-wave-oracle' ) . ' <code>[aw_oracle tool="ziwei"]</code></p>';
-		echo '<form method="post">';
-		wp_nonce_field( 'aworacle_tools' );
-		echo '<input type="hidden" name="aworacle_action" value="tools">';
+		$this->actionFormStart( 'tools' );
 		submit_button( __( 'Refresh tool list', 'aware-wave-oracle' ), 'secondary', 'submit', false );
 		echo '</form></div>';
 	}
 
-	/** @return array{0:string,1:string}|null [notice type, message] */
-	private function handleActions(): ?array {
-		if ( ! isset( $_POST['aworacle_action'] ) || ! current_user_can( self::CAP ) ) {
-			return null;
+	/** admin-post.php handler: do the action, then redirect back with a notice code (Post/Redirect/Get). */
+	public function handleAction(): void {
+		if ( ! current_user_can( self::CAP ) ) {
+			wp_die( esc_html__( 'Insufficient permissions.', 'aware-wave-oracle' ), '', array( 'response' => 403 ) );
 		}
-		$action  = sanitize_key( wp_unslash( $_POST['aworacle_action'] ) );
+		$op      = isset( $_POST['op'] ) ? sanitize_key( wp_unslash( $_POST['op'] ) ) : '';
 		$confirm = isset( $_POST['aworacle_confirm'] ) && $_POST['aworacle_confirm'] === '1';
-
-		if ( $action === 'key' ) {
+		$code    = '';
+		if ( $op === 'key' ) {
 			check_admin_referer( 'aworacle_key' );
-			if ( SiteKey::usable( Options::keypair() ) && ! $confirm ) {
-				return array( 'warning', __( 'Tick the confirmation box to rotate the key.', 'aware-wave-oracle' ) );
+			if ( Options::keypairFromConstant() ) {
+				$code = 'key_constant';
+			} elseif ( SiteKey::usable( Options::keypair() ) && ! $confirm ) {
+				$code = 'key_confirm';
+			} else {
+				update_option( Options::KEY_OPTION, SiteKey::newKeypair(), false );
+				$code = 'key_done';
 			}
-			update_option( Options::KEY_OPTION, SiteKey::newKeypair(), false );
-			return array( 'success', __( 'New key created. Register the public key below at the engine.', 'aware-wave-oracle' ) );
-		}
-		if ( $action === 'salt' ) {
+		} elseif ( $op === 'salt' ) {
 			check_admin_referer( 'aworacle_salt' );
 			if ( ! $confirm ) {
-				return array( 'warning', __( 'Tick the confirmation box to rotate the salt.', 'aware-wave-oracle' ) );
+				$code = 'salt_confirm';
+			} else {
+				update_option( Options::SALT_OPTION, Options::newSalt(), false );
+				$code = 'salt_done';
 			}
-			update_option( Options::SALT_OPTION, Options::newSalt(), false );
-			return array( 'success', __( 'Salt rotated.', 'aware-wave-oracle' ) );
-		}
-		if ( $action === 'tools' ) {
+		} elseif ( $op === 'tools' ) {
 			check_admin_referer( 'aworacle_tools' );
 			EngineClient::forgetTools();
-			return array( 'success', __( 'Tool list refreshed.', 'aware-wave-oracle' ) );
+			$code = 'tools_done';
 		}
-		return null;
+		wp_safe_redirect( add_query_arg( array( 'page' => self::SLUG, self::NOTICE => $code ), admin_url( 'options-general.php' ) ) );
+		exit;
+	}
+
+	/** @return array{0:string,1:string}|null [notice type, message] from the redirect's notice code */
+	private function notice(): ?array {
+		$code     = isset( $_GET[ self::NOTICE ] ) ? sanitize_key( wp_unslash( $_GET[ self::NOTICE ] ) ) : '';
+		$messages = array(
+			'key_done'     => array( 'success', __( 'New key created. Register the public key below at the engine.', 'aware-wave-oracle' ) ),
+			'key_confirm'  => array( 'warning', __( 'Tick the confirmation box to rotate the key.', 'aware-wave-oracle' ) ),
+			'key_constant' => array( 'warning', __( 'The key comes from the AWORACLE_SITE_KEYPAIR constant in wp-config.php; change it there.', 'aware-wave-oracle' ) ),
+			'salt_done'    => array( 'success', __( 'Salt rotated.', 'aware-wave-oracle' ) ),
+			'salt_confirm' => array( 'warning', __( 'Tick the confirmation box to rotate the salt.', 'aware-wave-oracle' ) ),
+			'tools_done'   => array( 'success', __( 'Tool list refreshed.', 'aware-wave-oracle' ) ),
+		);
+		return $messages[ $code ] ?? null;
+	}
+
+	private function actionFormStart( string $op ): void {
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		wp_nonce_field( 'aworacle_' . $op );
+		echo '<input type="hidden" name="action" value="' . esc_attr( self::ACTION ) . '">';
+		echo '<input type="hidden" name="op" value="' . esc_attr( $op ) . '">';
+	}
+
+	/** Two visible choices (no dropdown). */
+	private function embedRow( string $name, string $value ): void {
+		$choices = array(
+			Normalize::EMBED_SAME_ORIGIN  => __( 'Same domain (recommended): the engine answers under this site’s address at /embed/, /api/, /_next/, /tarot/.', 'aware-wave-oracle' ),
+			Normalize::EMBED_CROSS_ORIGIN => __( 'Another domain: the engine has its own address (Engine URL below); the page and the tool talk by messages.', 'aware-wave-oracle' ),
+		);
+		echo '<tr><th scope="row">' . esc_html__( 'Embedding', 'aware-wave-oracle' ) . '</th><td><fieldset>';
+		foreach ( $choices as $v => $label ) {
+			echo '<p><label><input type="radio" name="' . esc_attr( $name ) . '" value="' . esc_attr( $v ) . '"' . checked( $value, $v, false ) . '> ' . esc_html( $label ) . '</label></p>';
+		}
+		echo '</fieldset></td></tr>';
 	}
 
 	private function textRow( string $name, string $value, string $label, string $help ): void {

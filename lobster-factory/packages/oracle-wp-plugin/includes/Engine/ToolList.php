@@ -1,8 +1,8 @@
 <?php
 /**
  * Embeddable tool slugs from the engine's GET /api/v1/systems body (WP-free).
- * Assumed interface: the engine will add `pages: string[]` (embeddable page slugs, W1/W2); until then
- * the system ids (`systems[].id`) are used. Anything that is not a legal slug is dropped.
+ * The engine's system ids (`systems[].id`) are its embeddable page slugs (ziwei-doushu lib/site.ts PAGE_SLUGS);
+ * a `pages: string[]` field, if the engine ever sends one, wins. Anything that is not a legal slug is dropped.
  *
  * @package AwareWave\Oracle\Engine
  */
