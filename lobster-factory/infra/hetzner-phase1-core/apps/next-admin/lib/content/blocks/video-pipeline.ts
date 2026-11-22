@@ -24,6 +24,8 @@ import { makeIntro, type IntroStyle } from "../video/intro-opener";
 import { generateTarotImage, isTarotModel, TAROT_MODELS } from "../../tarot/image-gen";
 import { generateVideoMotionBatch, isVideoMotionModel } from "../../tarot/video-motion-gen";
 import { grantFor } from "@/lib/entitlements/grant";
+import type { TextChain } from "../../ai/text-model-options";
+import type { SubLane } from "../../tarot/codex-bridge";
 import { VIDEO_MOTION_RATES } from "../../ai/cost-model";
 import { holdCost, logImageCost, releaseHold } from "../../ai/log-ai-call";
 import { getSupabaseWriteClient } from "../../supabase-server";
@@ -591,6 +593,10 @@ export async function prepareScenes(
     brandVoice?: string;
     /** 腳本呼叫在 ai_call_logs 記的 job_id（題目 id，N2）；省略 = 不記。 */
     costJobId?: string;
+    chain?: TextChain;
+    claudeModel?: string;
+    scriptModel?: string;
+    lane?: SubLane;
     /** 「自訂 AI 圖」數量（前端滑桿）→ 用 Flux AI 圖的場景數，其餘走 Pexels B-roll。僅 AI 生圖模式 + Claude 生腳本路徑有效。 */
     customScenes?: number;
     /** 要輸出的格式（["16x9","9x16","4x5"] 子集）→ 每格式各生一組原生圖。省略 = 全三格式。 */
@@ -636,6 +642,10 @@ export async function prepareScenes(
         sceneCount: input.sceneCount,
         brandVoice: input.brandVoice,
         costJobId: input.costJobId,
+        chain: input.chain,
+        claudeModel: input.claudeModel,
+        model: input.scriptModel,
+        lane: input.lane,
       },
       anthropicKey,
     );
@@ -734,6 +744,10 @@ register({
         videoMotionModel: ctx.videoMotionModel as string | undefined,
         brandVoice: ctx.brandVoice as string | undefined,
         costJobId: ctx.costJobId as string | undefined,
+        chain: ctx.chain as TextChain | undefined,
+        claudeModel: ctx.claudeModel as string | undefined,
+        scriptModel: ctx.scriptModel as string | undefined,
+        lane: ctx.lane as SubLane | undefined,
         onProgress,
       },
       anthropicKey,

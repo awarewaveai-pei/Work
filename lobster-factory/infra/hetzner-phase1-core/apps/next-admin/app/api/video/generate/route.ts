@@ -13,8 +13,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { startVideoJob, type VideoStartInput } from "@/lib/content/video/start";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
-import { thenRun, withFeature } from "@/lib/entitlements/grant";
+import { withFeature } from "@/lib/entitlements/grant";
 import { siteVoiceFor } from "@/lib/content/brand-voice-store";
+import { codexAllowed, deferCodexWork } from "@/lib/tarot/codex-bridge";
+import { isTextChain } from "@/lib/ai/text-model-options";
+import type { Grant } from "@/lib/entitlements/can";
 
 interface GenerateBody {
   topic?: string;
@@ -34,7 +37,17 @@ interface GenerateBody {
   outputFormats?: string[];
   /** The article's site: its stored brand voice goes into the script prompt. */
   siteId?: string;
+  /** 訂閱通道 (video-script-core.ts): the script's chain, the claude segment's model, the API segment's model. */
+  chain?: string;
+  claudeModel?: string;
+  scriptModel?: string;
 }
+
+/** A chain with subscription segments, asked by the operator herself, never holds the request open for a worker
+ *  (PLAN I5): the same start runs detached and the 202 job's result is the usual { ok, jobId } answer. */
+/** Detached, the job's own answer is the poll's final one (codex-wait.js reads any 202 as "still running"), so it is 200. */
+const runOrDefer = (deferred: boolean) => (_req: Request, grant: Grant, run: (okStatus?: number) => Promise<Response>): Promise<Response> =>
+  Promise.resolve(deferred && codexAllowed(grant.actor) ? deferCodexWork(grant.actor, () => run(200)) : run());
 
 export async function POST(req: NextRequest): Promise<Response> {
   const { role } = resolveOpsRole(req);
@@ -88,17 +101,20 @@ export async function POST(req: NextRequest): Promise<Response> {
     introDuration: body.introDuration,
     outputFormats: body.outputFormats,
     brandVoice,
+    ...(isTextChain(body.chain) && body.chain !== "api"
+      ? { chain: body.chain, ...(typeof body.claudeModel === "string" ? { claudeModel: body.claudeModel } : {}),
+          ...(typeof body.scriptModel === "string" ? { scriptModel: body.scriptModel } : {}) } : {}),
   };
 
   // The job row, the synchronous prepare and the row's result: lib/content/video/start.ts (shared with the pipeline).
   // 202 + jobId；前端輪詢 /api/video/status?jobId=（由 /status 輪詢 EU 收尾）
-  const run = async (): Promise<Response> => {
+  const run = async (okStatus = 202): Promise<Response> => {
     const started = await startVideoJob(orgId, input);
     if (!started.ok) {   // strict:false: !ok does not narrow
       return NextResponse.json({ ok: false, status: 500, error: (started as Extract<typeof started, { ok: false }>).error }, { status: 500 });
     }
-    return NextResponse.json({ ok: true, jobId: started.jobId }, { status: 202 });
+    return NextResponse.json({ ok: true, jobId: started.jobId }, { status: okStatus });
   };
   // Asked before the job row exists; billed to the video's org (ADR 017 §0 代操), inherited by every pipeline step.
-  return withFeature("video.script", thenRun, { org: () => orgId })(req, run);
+  return withFeature("video.script", runOrDefer(!!input.chain), { org: () => orgId })(req, run);
 }

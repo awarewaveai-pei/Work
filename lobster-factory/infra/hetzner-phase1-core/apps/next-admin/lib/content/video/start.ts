@@ -24,6 +24,12 @@ export interface VideoStartInput {
   brandVoice: string;
   /** The uuid the script call's ai_call_logs row carries (a topic's id, N2); left out = none. */
   costJobId?: string;
+  /** 訂閱通道: the script's chain (video-script-core.ts); absent = the Claude API as before. `scriptModel` = its API segment. */
+  chain?: import("@/lib/ai/text-model-options").TextChain;
+  claudeModel?: string;
+  scriptModel?: string;
+  /** Set by the scheduled caller only, never from a request body: whose worker runs the subscription segments. */
+  lane?: import("@/lib/tarot/codex-bridge").SubLane;
   /** Card R2: the automatic intro (lib/content/video/intro-opener.ts); null / left out = none. */
   introStyle?: import("./intro-opener").IntroStyle | null;
   /** The transition into the video (brand-voice.ts siteIntroTransition). */

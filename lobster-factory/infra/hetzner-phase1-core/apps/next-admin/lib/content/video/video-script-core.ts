@@ -8,6 +8,9 @@ import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../../ai/gateway";
+import { isAiTextModel, isOpenAiTextModel, resolveTextChain, type AiTextModel, type TextChain } from "../../ai/text-model-options";
+import { runSubText, runTextChain, skipNote } from "../../ai/sub-text";
+import { codexAllowed, type SubLane } from "../../tarot/codex-bridge";
 
 /** 與 Python pipeline.py CLAUDE_MODEL 對齊（影片生成共用同一模型 ID）。 */
 const CLAUDE_MODEL = CLAUDE_DEFAULT_MODEL;
@@ -32,6 +35,8 @@ export interface VideoScriptSuccess {
   scenes: VideoScene[];
   title: string;
   description: string;
+  /** Subscription segments that failed before the answering one (訂閱通道); present only when there were some. */
+  skipped?: ReturnType<typeof skipNote>[];
 }
 
 /**
@@ -173,6 +178,14 @@ export async function generateVideoScript(
     brandVoice?: string;
     /** The uuid this call's ai_call_logs row carries (a topic's id, N2); left out = none. */
     costJobId?: string;
+    /** 訂閱通道: the chain to try (`model` = its API segment). Absent or "api" = the Claude API call as before. */
+    chain?: TextChain;
+    /** The claude segment's subscription model (sub-claude-*); resolveTextChain defaults it. */
+    claudeModel?: string;
+    /** Whose worker runs the subscription segments: "owner" (default) or "schedule" (set by the scheduled caller, never a request body). */
+    lane?: SubLane;
+    /** The API segment's model (a Claude id; an OpenAI one is not served here and falls back to the default). */
+    model?: string;
   },
   apiKey: string
 ): Promise<VideoScriptResult> {
@@ -203,6 +216,45 @@ export async function generateVideoScript(
     `JSON 架構：\n${schemaExample(sceneCount)}` +
     (input.brandVoice?.trim() ? `\n\n品牌語氣（旁白、標題、描述都要遵守；不得使用禁用聲明）：\n${input.brandVoice.trim()}` : "");
 
+  const lane = input.lane ?? "owner";
+  const apiModel = isAiTextModel(input.model) && !isOpenAiTextModel(input.model) ? input.model : (CLAUDE_MODEL as AiTextModel);
+  const call = (model: string) => claudeScript(model, sceneCount, `${systemPrompt}
+
+${userContent}`, apiKey, input.costJobId);
+  let answer: ScriptText | null = null;
+  let skipped: ReturnType<typeof skipNote>[] = [];
+  if (input.chain && input.chain !== "api") {
+    const grant = await grantFor("video.script");
+    // The owner lane serves only the operator herself (I1): anyone else gets the API path unchanged.
+    if (lane !== "owner" || codexAllowed(grant.actor)) {
+      const out = await runTextChain(resolveTextChain({ chain: input.chain, apiModel, claudeModel: input.claudeModel }), {
+        runSub: (model) => runSubText({ grant, model, system: systemPrompt, prompt: userContent, lane,
+          signal: new AbortController().signal, route: "video/script", tool: "video", jobId: input.costJobId ?? null }),
+        runApi: async (model) => model,
+      });
+      skipped = out.skipped.map((x) => skipNote(x, lane));
+      answer = out.via === "sub" ? { ok: true, text: out.text } : await call(out.model);
+    }
+  }
+  answer ??= await call(apiModel);
+  if (!answer.ok) return answer as Extract<ScriptText, { ok: false }>;   // strict:false: !ok does not narrow
+
+  const parsed = parseScriptJson(answer.text);
+  if (!parsed) {
+    return {
+      ok: false,
+      status: 502,
+      error: `Claude 回傳 JSON 解析失敗（前 300 字：${answer.text.slice(0, 300)}）`,
+    };
+  }
+
+  return skipped.length ? { ...parsed, skipped } : parsed;
+}
+
+type ScriptText = { ok: true; text: string } | { ok: false; status: number; error: string };
+
+/** The Claude API call (the only path before 訂閱通道): the script's raw text, or the failure. */
+async function claudeScript(model: string, sceneCount: number, content: string, apiKey: string, costJobId?: string): Promise<ScriptText> {
   let response: Anthropic.Beta.Messages.BetaMessage;
   try {
     const grant = await grantFor("video.script");
@@ -213,11 +265,11 @@ export async function generateVideoScript(
     // 固定 4096 在多場景時會截斷 JSON → parseScriptJson 失敗 502（2026-06-23 場景總數滑桿修復連帶處理）。
     const maxTokens = Math.min(8192, Math.max(4096, sceneCount * 550));
     response = await client.beta.messages.create({
-      ...claudeParams(CLAUDE_MODEL, maxTokens),
-      ...claudeFallback(CLAUDE_MODEL),
-      messages: [{ role: "user", content: `${systemPrompt}\n\n${userContent}` }],
+      ...claudeParams(model, maxTokens),
+      ...claudeFallback(model),
+      messages: [{ role: "user", content }],
     });
-    void logAiCall({ route: "video/script", response, grant, tool: "video", jobId: input.costJobId ?? null });
+    void logAiCall({ route: "video/script", response, grant, tool: "video", jobId: costJobId ?? null });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, status: 502, error: `Claude API 呼叫失敗：${msg}` };
@@ -227,18 +279,6 @@ export async function generateVideoScript(
   const incomplete = claudeIncomplete(response);
   if (incomplete) return { ok: false, status: 502, error: `Claude 未完成回答（${incomplete}）` };
   const text = claudeText(response);
-  if (!text) {
-    return { ok: false, status: 502, error: "Claude 回傳非文字內容" };
-  }
-
-  const parsed = parseScriptJson(text);
-  if (!parsed) {
-    return {
-      ok: false,
-      status: 502,
-      error: `Claude 回傳 JSON 解析失敗（前 300 字：${text.slice(0, 300)}）`,
-    };
-  }
-
-  return parsed;
+  if (!text) return { ok: false, status: 502, error: "Claude 回傳非文字內容" };
+  return { ok: true, text };
 }
