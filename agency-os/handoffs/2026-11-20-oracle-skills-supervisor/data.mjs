@@ -65,7 +65,7 @@ export const STEPS = [
     gate: '過期的確認被拒；開關沒開被拒；紀錄寫入失敗時不會動主機。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'e681e8e15', depends: ['SF-B'], card: 'briefs/WP-SF-G-step-engine.md', before: '套用資料表（待決 1）之後才併入' },
   // 第三批
   { n: 13, code: 'E5', group: 'B3', title: '引擎收尾', plain: '第二批總檢留下的三件小事：補一個自動測試守住「每個網址都有送出安全政策」；每個工具的結果區加上固定標記，讓外掛知道結果出來了；部署後的自動檢查改打嵌入版頁面。',
-    gate: '測試會在漏送政策時變紅；12 個工具的結果區都有標記；部署檢查不再依賴引擎首頁。', risk: 'Low', model: 'Sonnet 5.5', status: 'in_progress', depends: ['E2'], card: 'briefs/WP-E5-engine-wrapup.md' },
+    gate: '測試會在漏送政策時變紅；12 個工具的結果區都有標記；部署檢查不再依賴引擎首頁。', risk: 'Low', model: 'Sonnet 5.5', status: 'done', commit: 'a5b58ff93', depends: ['E2'], card: 'briefs/WP-E5-engine-wrapup.md' },
   { n: 14, code: 'SF-E2', group: 'B3', title: '主機腳本加固', plain: '第二批總檢留下的主機端問題一次修完：鎖檔換到安全的位置、接內部網路要主機核准、網址占用查完整設定、外掛不被裝回舊版、裝外掛前先備份資料庫、新網站的密碼檔進加密備份、還沒裝好的站不誤報、拆站腳本的兩個小洞。',
     gate: '每一項都有測試；既有測試全部原樣通過。', risk: 'High', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-E', 'SF-F'], card: 'briefs/WP-SF-E2-host-hardening.md' },
   { n: 15, code: 'P2', group: 'B3', title: '會員命盤與「我存的對象」', plain: '會員能存自己的命盤，也能存別人的出生資料做私人合盤；只有自己看得到，資料加密保存，可匯出、可刪除。',

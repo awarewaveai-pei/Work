@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-22（續21）— oracle WP：SF-I0（MainWP 金鑰進 next-admin）完成；第三批派工；E5 併入
+
+- SF-I0（操作者同意，WP-PLAN §6 第 2 件）：主機 `/root/lobster-phase1/.env` 已有 `MAINWP_DASHBOARD_URL／CONSUMER_KEY／CONSUMER_SECRET`，compose 沒有引用。經 `safe-infra-patch.sh compose /root/lobster-phase1/docker-compose.yml next-admin` 在 `HOSTING_BRIDGE_SSH_HOST_KEY_SHA256` 後加三行 `${VAR:-}`。第一次 09:55:58Z 重建時 docker 回 `No such container`，工具自動還原（09:56:13Z，容器 49 秒內 healthy，`app.aware-wave.com` 回 307）；第二次 09:57:19Z 成功，15 秒 healthy，備份 `docker-compose.yml.bak.safe-patch-20261122-095719`。驗證：`docker exec lobster-next-admin printenv <三個名稱>` 皆 exit 0（只看存在，不印值）。repo 對照檔同步 `1341b5dde`。第一次失敗的原因未定位（重建瞬間的容器 id 消失，重試即過）。
+- 第三批派工（brief 在 `briefs/`）：線1 E5（Sonnet 5.5，`WP-E5-engine-wrapup.md`）、線2 P2（Opus 5.5，`WP-P2-member-charts.md`）、線3 SF-E2（Opus 5.5，`WP-SF-E2-host-hardening.md`）、線4 SF-J（Sonnet 5.5，`WP-SF-J-pages.md`）。線2、線3 撞 5 小時用量上限（21:20 重設）、線4 SF-J 做到一半未 commit；22:17 三線都已用訊息叫回續做。P3、SF-H、SF-I 的 brief 未寫（等同線前一張交回）。
+- E5 併入（工人 `0183c98b5`，已 push）：`proxy.test.ts`（CSP 範圍互補，用 Next 內建 path-to-regexp）；12 個工具結果區 `data-aw-result`＋`components/toolResultMarker.test.ts`；`sg-deploy.sh` oracle 頁面探針改 `/embed/zh-TW/ziwei` 並要求 `aw-oracle-root`。工人因用量上限沒跑 critic → 監工讀完整 diff 代審（17 檔、81 行；每個工具只改一個屬性）。引擎 `npx tsc --noEmit` exit 0、全套 vitest 綠；`sg-deploy-smoke-ports.test.sh` 17 passed。`sg-deploy.sh` 隨 push 同步主機；新探針要求引擎有 `/embed`，下一次部署 oracle（GO-1）帶的就是含 `/embed` 的版本。
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh compose … next-admin；docker exec lobster-next-admin printenv MAINWP_DASHBOARD_URL | exit=0 | ms=29000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,Projects/internal/ziwei-doushu | grep=data-aw-result | hits=15
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；E5 工人未跑 critic，監工讀完整 diff＋全套測試代替；SF-I0 為主機設定變更，以 printenv 與 health 驗證
 ## 2026-11-22（續20）— 系統總控中心批 4：照參考面板補齊、「立即更新」「新增系統」上線、30 系統接續卡（操作者：「為什麼你做出來的少很多東西」「好，兩顆都做」）
 
 - 根因：W6 改版漏原型元素；正式庫 0 handoff、3 status_change → 頁面多為「未設定」、接續空、已驗收 0%；且無規則要求 agent 寫 Next:。
