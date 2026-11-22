@@ -28,7 +28,7 @@ export type SiteGateReader = Pick<SiteGateClient, "provider" | "preflight" | "jo
 export const SITE_STEP_KEYS = ["preflight", "create", "wp_install", "vhost", "mainwp", "bridge", "open"] as const;
 export type SiteStepKey = (typeof SITE_STEP_KEYS)[number];
 
-/** The ops_action_catalog key of a step (seeded by migration 0175, all enabled=false). */
+/** The ops_action_catalog key of a step (seeded by migration 0176, all enabled=false). */
 export const actionKeyOf = (step: SiteStepKey): `site.${SiteStepKey}` => `site.${step}`;
 export const isSiteStepKey = (v: unknown): v is SiteStepKey => (SITE_STEP_KEYS as readonly unknown[]).includes(v);
 

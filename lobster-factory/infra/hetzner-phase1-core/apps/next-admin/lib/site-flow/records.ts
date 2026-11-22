@@ -6,7 +6,7 @@
 // - ensureOrganization never changes an existing organization. Its metadata is only ADDED to: a key the row
 //   already has keeps its value (nested objects recurse), and the keys that were not applied come back in
 //   `keptKeys`. Editing a client's settings goes through its own endpoints, not through "create".
-// - ensureEnvironment does not need the 0175 partial unique index to be idempotent (select first); with the
+// - ensureEnvironment does not need the 0176 partial unique index to be idempotent (select first); with the
 //   index applied, a concurrent insert's 23505 is read back as the existing row.
 // - An environment's hosting_provider never changes in place: moving a site to another host is archive + new row.
 

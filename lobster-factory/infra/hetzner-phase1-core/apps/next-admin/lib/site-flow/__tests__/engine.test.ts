@@ -1,5 +1,5 @@
 // lib/site-flow/engine.ts against an in-memory PostgREST fake and a fake host gate (card SF-G acceptance,
-// SITE-FLOW-COMPLETION-PLAN.md §3 SF-G row). Migration 0175 is not assumed applied: catalog rows are seeded here.
+// SITE-FLOW-COMPLETION-PLAN.md §3 SF-G row). Migration 0176 is not assumed applied: catalog rows are seeded here.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
