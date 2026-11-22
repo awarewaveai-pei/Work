@@ -87,7 +87,7 @@ NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`。需求來源
 | 客戶端沒有任何餘額／合約畫面；餘額只在員工頁 | grep「餘額」：`ops/billing`、`BillingTab.tsx:50`、`ops/collect`、`api/video/billing` |
 | 功能額度（本月可用幾次）沒有數字：`limits` 只放 `pay` 標記 | grep `limits.`：只有 `plans-admin.ts:34`、`ops/plans/page.tsx:35,98` |
 | 員工在產品門直接通過（不查持有），但仍受逐工具授權 | `door-access.ts:25`；`middleware.ts:147-150` |
-| 員工在產品門呼叫客戶搜尋＝404（門只放自己的 API） | `doors.ts:107-111`；`staff-tools.ts:20` |
+| 員工在產品門呼叫客戶搜尋：僅客戶 403；員工照授權格（U4 已做，`doors.ts` `STAFF_DOOR_APIS`） | `doors.ts:107-111`；`staff-tools.ts:20` |
 | 員工的功能清單用的是「內部帳戶」，不是目前客戶 | `subject.ts:67`；`api/entitlements/features/route.ts:11` |
 
 ---
@@ -600,7 +600,7 @@ launcher 現況問題與改法：
 | 客戶欄 | 搜尋框＋類別＋一列一個客戶（前面色點） | 無（客戶只有自己的單位） | 有（頁面登記需要客戶時才出現） |
 | 手機底列 | 工作台｜我的工具｜搜尋｜更多 | 有 | 有；「更多」含客戶 |
 
-合併對象：`SidebarNav.tsx`（97 行）與 `DoorNav.tsx`（38 行）→ 一個 `NavRail`（輸入同形狀的項目清單）；`(shell)/layout.tsx` 與 `ProductDoorShell.tsx` → `PlatformFrame`。視覺沿用 `.sidebar`／`.door-side` 的 token。
+合併對象（**K5 已完成**；`SidebarNav.tsx` 暫留一行 re-export 給主題檔，U13 刪）：`SidebarNav.tsx`（97 行）與 `DoorNav.tsx`（38 行）→ 一個 `NavRail`（輸入同形狀的項目清單）；`(shell)/layout.tsx` 與 `ProductDoorShell.tsx` → `PlatformFrame`。視覺沿用 `.sidebar`／`.door-side` 的 token。
 
 ### 9.2 以客戶 vs 以功能（兩個入口，共用元件）
 
@@ -619,7 +619,8 @@ launcher 現況問題與改法：
 | 全部 | 是 | `org-search` 預設 |
 | 需處理 | 是 | `loadOverview` 的 `row.problem`、帳務 `reasons: frozen/overdrawn/past_due/suspended`（`tables.ts:141`） |
 | 訂閱／贈送／只有點數 | 是 | 合約與權利列（`BillingAccount.contracts/grants`，`tables.ts:126-127`） |
-| 代操、經銷、買斷、TEST | **否** | 等 G3（標籤函式；合約沒有這幾種方式的記法）、G12（`kind=test`） |
+| 代操、經銷、買斷 | **否** | 等 G3（標籤函式；合約沒有這幾種方式的記法） |
+| TEST | **是** | M1 已加 `kind=test`（0175） |
 
 一個客戶可同時屬於多個類別（像郵件標籤），清單每列用小字標籤顯示。類別篩選在伺服器做（`org-search` 加參數，卡 U3，定義在 CLIENT-CONTEXT-PLAN §4）。【假設 A2：操作者說的「類別」＝方式；Q1 確認】
 
@@ -969,8 +970,8 @@ launcher 現況問題與改法：
 | 現有 | 處置 |
 |---|---|
 | `DoorNav` 的「功能」清單（`DoorNav.tsx:26-35`） | 刪；移到 `ToolCard` 與按鈕標籤 |
-| `DoorNav`＋`SidebarNav` | 合併為 `NavRail` |
-| `(shell)/layout.tsx`＋`ProductDoorShell.tsx` 的外框骨架 | 合併為 `PlatformFrame` |
+| `DoorNav`＋`SidebarNav` | 已合併（K5）為 `NavRail` |
+| `(shell)/layout.tsx`＋`ProductDoorShell.tsx` 的外框骨架 | 已合併（K5）為 `PlatformFrame` |
 | `use-paid-features.ts` 的 `WHY` 字典 | 併入 `RightBadge` |
 | launcher 的「你的產品」混排卡片 | 改為工作台＋`ToolCard` |
 | 內容頁 3 個頁內頁籤 | 升為左欄頁面 |

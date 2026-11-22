@@ -34,21 +34,21 @@
 | K4 | 左邊的客戶欄（搜尋＋清單）做好，先不放到頁面 | 新 NA `app/ClientContextProvider.tsx`、`lib/client-context/use-client-context.ts`、`app/ClientRail.tsx`＋各自 test | Medium | Opus | K2、K3 | 2 | 已併 |
 | U7 | 會員看自己點數與合約的讀取 API | 新 NA `app/portal/api/account/route.ts`＋test（客戶身分只進得了 `/portal/*`，`middleware.ts` `isClientOutsideDoor`） | Medium | Sonnet | — | 2 | 已併 |
 | U22 | 產品登記表加分類、任務、一句話等欄位 | NA `lib/portal/products.ts`、新 `lib/portal/catalog-vocab.ts`、`lib/portal/__tests__/products.test.ts`；`scripts/new-product.mjs`、`scripts/__tests__/new-product.test.mjs` | Medium | Sonnet | — | 2 | 已併 |
-| M1 | 測試用客戶標成 TEST（資料庫加 `test` 種類） | MIG 新 `0175_organizations_kind_test.sql`＋`.down.sql`；NA `lib/entitlements/subject.ts`、`tables.ts`、`wp-customers.ts`、`lib/payments/sites.ts`、`app/(shell)/ops/clients/[slug]/page.tsx`、`staff-grant-outcome.ts`＋相關 test | **High** | Opus | — | 2 | 進行中 |
-| K5 | app 與各產品子網域換成同一個外框與左欄 | NA `app/ProductDoorShell.tsx`、`app/(shell)/layout.tsx`、`app/DoorNav.tsx`、`app/SidebarNav.tsx`、新 `app/PlatformFrame.tsx`、`app/NavRail.tsx`＋test | Medium | Opus | K4 | 3 | |
-| U4 | 員工在產品子網域也能搜尋客戶 | NA `lib/portal/doors.ts`、`lib/portal/staff-tools.ts`、`app/api/ops/org-search/route.ts`、`lib/portal/__tests__/doors.test.ts`、`staff-tools.test.ts`、`registry-code.test.ts`、新 `lib/__tests__/middleware-staff-door-api.test.ts` | **High** | Opus | K3 | 3 | |
-| U21 | 工具卡片元件（三種密度） | 新 NA `components/portal/ToolCard.tsx`、`ToolGrid.tsx`＋test | Low | Sonnet | U6 | 3 | |
+| M1 | 測試用客戶標成 TEST（資料庫加 `test` 種類） | MIG 新 `0175_organizations_kind_test.sql`＋`.down.sql`；NA `lib/entitlements/subject.ts`、`tables.ts`、`wp-customers.ts`、`lib/payments/sites.ts`、`app/(shell)/ops/clients/[slug]/page.tsx`、`staff-grant-outcome.ts`＋相關 test | **High** | Opus | — | 2 | 已併（0175 已套用） |
+| K5 | app 與各產品子網域換成同一個外框與左欄 | NA `app/ProductDoorShell.tsx`、`app/(shell)/layout.tsx`、`app/DoorNav.tsx`、`app/SidebarNav.tsx`、新 `app/PlatformFrame.tsx`、`app/NavRail.tsx`＋test | Medium | Opus | K4 | 3 | 已併 |
+| U4 | 員工在產品子網域也能搜尋客戶 | NA `lib/portal/doors.ts`、`lib/portal/staff-tools.ts`、`app/api/ops/org-search/route.ts`、`lib/portal/__tests__/doors.test.ts`、`staff-tools.test.ts`、`registry-code.test.ts`、新 `lib/__tests__/middleware-staff-door-api.test.ts` | **High** | Opus | K3 | 3 | 已併 |
+| U21 | 工具卡片元件（三種密度） | 新 NA `components/portal/ToolCard.tsx`、`ToolGrid.tsx`＋test | Low | Sonnet | U6 | 3 | 已併 |
 | W1 | app 提供 WordPress「我的帳號」要畫的產品摘要 | 新 NA `app/api/auth/wp-summary/route.ts`＋test；`lib/auth/sources/awarewave-wp.ts`＋其 test | **High** | Opus | U6、U7 | 3 | |
 | U5 | 員工替客戶操作時，按鈕顯示的是該客戶的開通狀態 | NA `app/api/entitlements/features/route.ts`、新 `app/api/entitlements/features/__tests__/route-org.test.ts`、`lib/entitlements/use-paid-features.ts`、`lib/entitlements/can.ts`（`verdictOf` 多回 `source`）、`lib/entitlements/features.ts` | **High** | Opus | K4、U6 | 4 | |
-| K7 | 寫文章頁改用客戶欄挑網站，拿掉兩個下拉 | NA `app/(shell)/tools/content/ContentStudio.tsx`、`__tests__/ContentStudio.site-wiring.test.tsx`；刪 `lib/content/pick-initial-site.ts`＋test | Medium | Opus | K3、K5 | 4 | |
+| K7 | 寫文章頁改用客戶欄挑網站，拿掉兩個下拉；補：查單一網站網路失敗要顯示「載入失敗」（`ClientContextProvider.tsx` 單站查詢） | NA `app/(shell)/tools/content/ContentStudio.tsx`、`__tests__/ContentStudio.site-wiring.test.tsx`；刪 `lib/content/pick-initial-site.ts`＋test | Medium | Opus | K3、K5 | 4 | |
 | K8 | 題目、五步驟改用客戶欄；刪「題目›客戶」頁 | NA `app/(shell)/tools/content/topics/*`、`app/content/topics/DoorTopicsBoard.tsx`、刪兩個 `topics/clients/page.tsx`、`lib/portal/products.ts`、`app/sidebar-sections.ts` | Medium | Opus | K3、K5 | 4 | |
 | K9 | 網站頁只列目前客戶的網站 | NA `app/(shell)/tools/content/sites/SiteManager.tsx`、`sites/page.tsx`、`app/content/sites/page.tsx`、`sites/__tests__/SiteManager*` | Medium | Sonnet | K3、K5 | 4 | |
 | K6 | 伺服器不再「沒指定網站就拿第一個」 | NA `lib/content/wp-sites.ts`＋其 tests | **High** | Opus | K7 | 5 | |
 | K10 | 客戶頁每個網站都能改；客戶首頁列出有問題的客戶 | NA `app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx`、`app/(shell)/ops/clients/page.tsx` | Medium | Sonnet | K2、K7 | 5 | |
 | K11 | 從 app 開影片工作台會帶著目前客戶 | NA `app/(shell)/tools/video/{OpenWorkbench,WorkbenchEntry,ScriptForge,ReleaseDeliveryPanel}.tsx`、`app/video/(door)/handoff/*`、`app/video/(wb)/review-release/*`＋tests | Medium | Opus | K3、K5、U4 | 5 | |
-| U3 | 客戶欄上方的類別按鈕 | NA `app/api/ops/org-search/route.ts`、`route.test.ts`、`app/ClientRail.tsx`＋test | Medium | Opus | K4、U4；操作者答 Q1 | 5 | |
+| U3 | 客戶欄上方的類別按鈕；補：產品門上的「AwareWave 自己」列（由 org-search 回傳內部組織標記，門上不讀 service-role；K5 `PlatformFrame.tsx` 門上傳 `internalOrgId: null`） | NA `app/api/ops/org-search/route.ts`、`route.test.ts`、`app/ClientRail.tsx`＋test | Medium | Opus | K4、U4；操作者答 Q1 | 5 | |
 | K12 | 影片工作台收到別的客戶時跳確認窗再切 | VW `scripts/index-1.js`、`scripts/organization-picker.js`、`tests/` 新 cjs | **High** | Opus | K11 | 6 | |
-| U8 | 會員登入後第一頁改成「我的工作台」 | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U6、U7、U21 | 6 | |
+| U8 | 會員登入後第一頁改成「我的工作台」；補：分類顯示名從 `ToolCard.tsx:24-26` 移到 `catalog-vocab.ts` | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U6、U7、U21 | 6 | |
 | U9 | 「尚未開通」頁多一顆「了解這個產品」 | NA `app/PlatformFrame.tsx`（K5 後未開通分支所在檔） | Low | Sonnet | K5 | 6 | |
 | U10 | 會員的「點數與合約」頁 | 新 NA `app/portal/wallet/page.tsx`＋test | Medium | Sonnet | U7 | 6 | |
 | U12 | 頁面名稱＝左欄名稱＝標題的檢查器 | 新 NA `lib/portal/__tests__/page-names.test.ts`；非內容產品頁的 `metadata`／`h1`（不改 `products.ts`、不改 content） | Low | Sonnet | K7、K8 | 7 | |
@@ -58,7 +58,7 @@
 | U11 | 內容入口重排：拆頁、改名、刪功能清單、下拉改按鈕 | NA `lib/portal/products.ts`（content 列）、`app/content/*`、`ContentStudio.tsx`、`app/sidebar-sections.ts`、`app/NavRail.tsx`（刪「功能」清單） | Medium | Opus | K5、K7、K8、U12、M11 | 8 | |
 | W2 | 外掛「我的帳號」改畫 app 給的摘要（併 W3、W4） | PL `includes/MyAccountDoors.php`、新 `includes/Summary.php`、`tests/*` | Medium | Sonnet | W1 | 8 | |
 | M3 | 由合約自動算出「產品／方式」標籤與 TEST | 新 NA `lib/entitlements/member-tags.ts`＋test；`app/api/ops/org-search/route.ts`＋`route.test.ts`（類別改用它） | Medium | Sonnet | M1、M2、U3 | 8 | |
-| U13 | 5 組對比不足的顏色修正 | NA `app/globals.css`、`lib/theme/tokens.ts`＋檢查器 | Low | Sonnet | 先與主題 session 協調 | 8 | |
+| U13 | 5 組對比不足的顏色修正；補：兩個主題檔的 import 改指 `app/sidebar-sections` 後刪 `app/SidebarNav.tsx`（K5 暫留的 re-export）；加 `.badge-blue` 後換掉 `ToolCard.tsx` 行內 token | NA `app/globals.css`、`lib/theme/tokens.ts`＋檢查器 | Low | Sonnet | 先與主題 session 協調 | 8 | |
 | U14 | 手機底列 | NA `app/PlatformFrame.tsx`、`app/globals.css` | Low | Sonnet | U9、U13；先與主題 session 協調 | 9 | |
 | W5 | 本機 WordPress＋app 走一遍，寫成可重跑腳本（G9） | 新 `scripts/local-member-flow.ps1`（路徑展開時確認） | Low | Sonnet | W1、W2 | 9 | |
 | K13 | 檢查器：頁面不得私藏客戶來源 | 新 NA `lib/client-context/__tests__/no-private-context.test.ts` | Low | Sonnet | K7–K11 | 9 | |

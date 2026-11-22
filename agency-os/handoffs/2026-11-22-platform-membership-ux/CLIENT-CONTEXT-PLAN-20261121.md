@@ -104,7 +104,7 @@ NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`；VW = `lobste
 | F2 | 至少八種傳法；識別符不一：`?org`=uuid，`?slug`／`?client_slug`=slug，`?brand`=uuid，`?siteId`／`?site` 同義兩名 | 1a #1-#9、#12、#17 |
 | F3 | 「網站」層讀整表：`/api/content/sites` 無 org 篩選、無上限；`loadOverview` 也整表 | `api/content/sites/route.ts:48-53`；`lib/content/topics/overview-load.ts:54`；R10 盤點第 9 列 |
 | F4 | 挑選介面由各頁自畫，位置與規則不一；兩份選單沒有「此頁要哪一層」的資訊 | 1a #2、#6、#13、#18、#19；`products.ts:11`、`sidebar-sections.ts:9` |
-| F5 | 客戶登入時畫面若用網址 uuid 查名顯示＝誤導；產品門上 `/api/ops/org-search` 一律 404，員工在產品門無法換客戶 | `tenant-guard.ts:198-205`；`doors.ts:107-111`（`:109` not_found） |
+| F5 | **已關（U4）** 客戶登入時畫面若用網址 uuid 查名顯示＝誤導；產品門上 `/api/ops/org-search` 一律 404，員工在產品門無法換客戶 | `tenant-guard.ts:198-205`；`doors.ts:107-111`（`:109` not_found） |
 | F6 | 「沒指定就拿第一個」三處，staff 情境＝某個別人的客戶 | `TopicsBoard.tsx:159`；`pick-initial-site.test.ts:14`；`wp-sites.ts:103-105,123-126` |
 | F7 | 客戶頁內容分頁只編 `wpSites[0]`；外連用舊名 `?siteId=` | `ClientHubTabs.tsx:211-212,550,556` |
 | F8 | 內容編輯兩個 select 挑網站（違反無下拉），選擇不寫回網址 | `ContentStudio.tsx:1953,2203` |
@@ -115,7 +115,7 @@ NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`；VW = `lobste
 | F13 | 未來白牌網域＝主機本身綁一個客戶 | ADR 018 `:32` |
 | F14 | 讀網址必須 reactive；題目頁 effect 只讀一次 | `TopicsBoard.tsx:196-203` |
 | F15 | 換客戶時保留其他參數 → 舊 `site` 留著＝不一致 | `OrgPicker.tsx:180-185` |
-| F16 | org-search 只看角色：客戶身分解析為 `operator`（`ops-role.ts:11,50`），`canModifyIncidentStatus` 放行（`ops-role.ts:97-98`、`org-search/route.ts:23-25`）；今天只靠 middleware 不讓客戶到這支 | 同左 |
+| F16 | **已關（U4）** org-search 只看角色：客戶身分解析為 `operator`（`ops-role.ts:11,50`），`canModifyIncidentStatus` 放行（`ops-role.ts:97-98`、`org-search/route.ts:23-25`）；今天只靠 middleware 不讓客戶到這支 | 同左 |
 
 ## 3. 單一設計
 

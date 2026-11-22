@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-22（續12）— 平台第 3 批併入並上線：K5、U21、U4（High）、M1（High，0175 已套用）
+
+- 操作者 2026-11-22「兩張都上」＝ M1、U4 的 go。M1 工人的 session 權限拒絕 `git commit`，由監工在其 worktree 代為 commit（`f9c8f21a7` → main `66b7d681c`）。
+- K5 `24079b899`：`PlatformFrame`＋`NavRail` 取代兩套外框與選單，掛 `ClientContextProvider`，選單連結帶 `org`／`site`；`DoorNav.tsx` 刪；`SidebarNav.tsx` 暫留一行 re-export（主題 session 的兩個檔 import 它，U13 刪）。產品門傳 `internalOrgId: null`、`sitesPath` 由 `door.api` 推（掃描測試未放寬）。U21 `8210ac84d`：`components/portal/ToolCard.tsx`、`ToolGrid.tsx`，未掛頁面。U4 `d742917e6`：`doors.ts` `STAFF_DOOR_APIS`（完全相等比對）＋ org-search 路由 `staffOnly`。M1：migration 0175（約束加 `test`、兩個 slug 標 test、三個函式整份重建只改 kind 條件）＋ app `isCustomerKind`／`isCustomerRoot`。
+- 上線順序：push main → `node scripts/apply-db-migration.mjs 0175`（`APPLY_OK 1/1`）→ 正式庫查 `organizations` 恰 2 列 `test`、約束為 `internal|customer|test`、ledger 最新 0175 → `sg-deploy.sh next-admin`。套用前先查過約束名 `organizations_kind_check` 存在。
+- 順手關掉 main 原本的紅：`scripts/__tests__/down-migration-copies.test.mjs` 缺 0173、0174 的 `packages/db/scripts/*_down.sql` 副本（別的 session 的 migration），照 `migrations/*.down.sql` 逐位元組補上。
+- RISKS 處置 13 條在同資料夾 `data.mjs`；後續卡補記在 `DISPATCH.md` 的 U3（門上「AwareWave 自己」列）、K7（單站查詢失敗文案）、U8（分類顯示名移到詞表）、U13（刪 `SidebarNav.tsx`、`.badge-blue`）。文件行照 §7 改：ADR 021 G12 已關、藍圖 §0／§9.1／§9.3／§17.4、計畫 F5／F16。
+- 退回：M1 先跑 `0175_organizations_kind_test.down.sql` 再決定是否 revert app；U4／K5／U21 各自 `git revert`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin，四卡整合後全套 5273 passed) ; ssh psql select slug,kind from organizations | exit=0 | ms=700000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/2n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=isCustomerKind | hits=10
+- ORACLE_WAIVED: Codex 額度 2026-11-24 才恢復；M1、U4 各有書面對抗自審＋突變證據（M1 還原 billing 條件 → 3 紅；U4 拿掉 staffOnly → 直呼測試紅），M1 另有工人的 Deep critic，監工逐行讀過兩張卡的 diff
 ## 2026-11-22（續10）— oracle WP 第一批：E3、E4＋E4b、SF-B 程式併入；RISKS 處置（引擎線、後台線）
 
 - 併入（main，皆已 push，引擎未部署；next-admin 今晚 03:00 自動部署會帶上 SF-B 程式）：E4 `1caa8a285`、E4b `1cf4bf55b`（簽過的原文必填 `aud`＝`v1`｜`ticket`，`lib/sites/verify.ts` 在消耗 nonce 前比對，不符 401 `wrong_audience`）、SF-B 程式 `4d504c0aa`（`lib/site-flow/records.ts`：`ensureOrganization` 只補缺鍵、`ensureEnvironment` 驗站台歸屬、`provision-staging` 先寫環境列）、E3 `16d756bdd`（`lib/frontPages.ts`、`proxy.ts` 308、sitemap／robots 讓位）、`c3291e4f5`（`Projects/internal/ziwei-doushu/.next` 23 檔移出版本控制；checkpoint `5a641d872` 誤提交，使開過 dev 的機器 tsc 紅）。

@@ -26,7 +26,7 @@
 
   | 層 | 回答 | 值 | 來源（唯一寫入方） | WordPress 端 |
   |---|---|---|---|---|
-  | 1 角色 | 他是誰 | Admin／客戶／TEST | app `organizations.kind`（internal／customer／test；`test` 值未存在，G12） | WordPress 角色，建會員時由 kind 帶入；自己註冊＝客戶。除 Admin 外權限同 WooCommerce `customer` |
+  | 1 角色 | 他是誰 | Admin／客戶／TEST | app `organizations.kind`（internal／customer／test；`test` 已加（M1，0175）） | WordPress 角色，建會員時由 kind 帶入；自己註冊＝客戶。除 Admin 外權限同 WooCommerce `customer` |
   | 2 方式 | 怎麼跟我們合作 | 訂閱／代操／買斷／點數／經銷 | app 合約（ADR 017 B 軸；每單位每產品一筆） | 標籤 |
   | 3 產品 | 用在哪個產品 | `NA/lib/portal/products.ts` 的產品 key（新增產品自動多一個） | 同上 | 標籤 |
 
@@ -49,7 +49,7 @@
 | G9 | 「全部換成 local 設定跑整套測試」不存在 | 現況報告 §8 |
 | G10 | 收銀台端刪除會員／改 email → app 沒有對應事件 | 現況報告 `:188` |
 | G11 | aware-wave.com 進門不看產品 `loginSources` | `NA/lib/auth/sources/awarewave-wp.ts:75-80` |
-| G12 | 測試單位沒有標記：`e2e-verify-0704-5c1356`、`test-wp-webhook-co-c705c6` 都是 `kind=customer`；`kind` 需加值 `test` | 正式庫 `organizations` SELECT 2026-11-22（`kind` 只有 `customer`／`internal`） |
+| G12 | **已關（M1，0175，2026-11-22 已套用）**。原：測試單位沒有標記：`e2e-verify-0704-5c1356`、`test-wp-webhook-co-c705c6` 都是 `kind=customer`；`kind` 需加值 `test` | 正式庫 `organizations` SELECT 2026-11-22（`kind` 只有 `customer`／`internal`） |
 | G13 | WordPress「我的帳號」的「進入」清單來自該會員的 WooCommerce 訂單，不是 app 權益：贈送、員工建立的合約、代操客戶持有的產品不會出現 | `lobster-factory/packages/aware-wave-store-plugin/includes/MyAccountDoors.php:109-121` |
 
 開放註冊的前置條件：G1、G5、G6、G7、G10 完成，且以一個測試會員走完「註冊 → 付款 → 進產品 → 扣點」。畫面位置由 ADR 020（目前客戶）的客戶頁決定；缺口卡排在該計畫 K10 之後。
