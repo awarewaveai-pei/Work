@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-22（續14）— oracle WP 第二批：E2、P1 併入；RISKS 留待整批總檢
+
+- 併入（已 push，引擎與外掛皆未部署／未安裝）：E2 `1e3c839f2`（`lib/http/csp.ts` 唯一定義；`proxy.ts` 逐請求 nonce＋`'strict-dynamic'`，matcher 擴到所有 HTML；`/api/*` 由 `next.config.ts` 送 `default-src 'none'; frame-ancestors 'none'`；兩個 layout `await connection()` 改動態渲染；操作者在工人 session 選 (a) nonce）、P1 `93f38797e`（外掛 15 檔：1M/6n 全修、`embed: same-origin|cross-origin` 預設同網域、`assets/embed-same-origin.js` 量 `#aw-oracle-root`、`SiteKey::signedRequest()` 必帶 `aud`、存檔時警告頁面網址落在引擎前綴）。
+- 監工驗收：讀 `csp.ts`、`proxy.ts` 全文；引擎 `npx tsc --noEmit` exit 0、全套 vitest 523 passed／3 skipped；外掛 `php -l` 0 錯。工人證據：E2 production build 48 頁 CSP 違規 0、四種注入全擋；P1 乾淨 WordPress＋nginx 分路 12 工具 375px、合婚實際送出、簽章 `aud:v1` 200／`aud:ticket` 401。
+- 第二批待總檢（未處置；等 SF-E、SF-F 交回後與 SF-G 的 6 條一起看）：
+  - E2：`style-src 'unsafe-inline'`（438 處 React style 屬性）；頁面改每請求渲染（首頁中位數 3.7ms → 7.6ms）；`/_not-found` 仍靜態、其腳本被擋；`frame-ancestors 'self'` 套全站（之後做跨網域內嵌要改）；proxy matcher 與 `/api` 標頭互補沒有自動化測試。
+  - P1：同網域下框內頁可直接動父頁（規格 §2-14 的取捨，靠 E2）；cross-origin 模式在現有引擎上不可用（引擎只允許同源框、無訊息協定）；`languages/*.po` 沒補新字串；「結果出現時捲動」用推測（30 秒內長高 ≥80px），驗證訊息也會觸發；捲動沒扣佈景固定頁首（Kadence 待看）；容器內連不到自己公開網址時要填「引擎網址（伺服器用）」；multisite 移除、真手機未實測。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (oracle-int, ziwei-doushu)；php -l oracle-wp-plugin | exit=0 | ms=3880
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/8n
+- BUGHUNT_DONE: scope=Projects/internal/ziwei-doushu,lobster-factory,agency-os,scripts | grep=frame-ancestors | hits=12
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；E2 critic Deep、P1 critic Standard＋監工讀碼與全套測試代替
 ## 2026-11-22（續13）— oracle WP：0176 套用正式庫；SF-C、SF-G 併入；SF-G 造成的兩個結構紅燈修掉
 
 - 操作者同意（WP-PLAN §6 第 1 件，「同意套用」）。工人寫的 `0175_site_flow`（`441f1ea86`，參照 `refs/keep/sf-b-0175`）撞號：main 已有 `0175_organizations_kind_test.sql` → 改號 `0176_site_flow.sql`＋down，檔內 `source` 字串與 `lib/site-flow` 三處註解同步。`node scripts/apply-db-migration.mjs 0176` → `APPLY_OK 1/1`。正式庫查核：`uq_environments_site_type_live` 存在；`site.preflight／create／wp_install／vhost／mainwp／bridge／open` 七列 `enabled=f`；`schema_migrations` 有 `0176_site_flow.sql`。套用後才推 `676014cd5`。

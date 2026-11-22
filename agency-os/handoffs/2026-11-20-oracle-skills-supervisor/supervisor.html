@@ -81,8 +81,8 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>算命站 WordPress 階段 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
-  <div class="bar" data-computed><i class="d" style="width:25.925925925925924%"></i><i class="g" style="width:11.11111111111111%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>7</span>／<span data-computed>27</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:33.33333333333333%"></i><i class="g" style="width:3.7037037037037033%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>9</span>／<span data-computed>27</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">把 oracle.aware-wave.com 改成 WordPress 網站：算命工具嵌在可以排版的頁面裡，會員能存命盤，訂閱後每天收到運勢信；同時把「從後台開一個客戶網站」做成能一步一步按完的流程。共 <span data-computed>27</span> 張卡。</p>
@@ -164,25 +164,27 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>需先完成：</b><a href="#SF-C">SF-C</a></p>
         <p><b>卡片：</b><code>briefs/WP-SF-D-site-template.md</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#E2">E2</a>、<a href="#P1">P1</a>、<a href="#SF-E">SF-E</a>、<a href="#SF-F">SF-F</a>、<a href="#SF-G">SF-G</a></li><li class="step doing" id="E2">
+    </div></li><li class="grp">可同時進行：<a href="#E2">E2</a>、<a href="#P1">P1</a>、<a href="#SF-E">SF-E</a>、<a href="#SF-F">SF-F</a>、<a href="#SF-G">SF-G</a></li><li class="step done" id="E2">
     <div class="n">8</div>
     <div class="b">
       <p class="plain">引擎和 WordPress 同一個網域後，引擎頁若被植入惡意程式會波及 WordPress 後台。加上瀏覽器層的限制來擋。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（安全）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-med">風險 Medium（安全）</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>12 頁與嵌入頁都沒有被政策擋下的東西。</p>
       <details><summary>細節：E2 引擎的內容安全政策</summary>
         <p><b>需先完成：</b><a href="#E1">E1</a></p>
         <p><b>卡片：</b><code>briefs/WP-E2-csp.md</code></p>
+        <p><b>併入於：</b><code>1e3c839f2</code></p>
       </details>
-    </div></li><li class="step doing" id="P1">
+    </div></li><li class="step done" id="P1">
     <div class="n">9</div>
     <div class="b">
       <p class="plain">修掉審查找到的 7 個問題（第一次儲存設定會清空對照表等），並把嵌入方式改成同網域。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>在乾淨的 WordPress 裝起來，第一次儲存後設定還在，頁面上的工具可用。</p>
       <details><summary>細節：P1 外掛修正與同網域嵌入</summary>
         <p><b>需先完成：</b><a href="#E1">E1</a></p>
         <p><b>卡片：</b><code>briefs/WP-P1-plugin-embed.md</code></p>
+        <p><b>併入於：</b><code>93f38797e</code></p>
       </details>
     </div></li><li class="step todo" id="SF-E">
     <div class="n">10</div>
