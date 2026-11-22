@@ -164,7 +164,7 @@
       "system_slug": "meeting-ppt",
       "subject": "會議錄音到會議記錄、PPT 的全鏈以 60 分鐘真實錄音在本機跑通。",
       "blocker": "網路版安裝等操作者明確下指令。",
-      "source": "C:/Users/user1115/.claude/projects/D--Work/memory/project_meeting_to_ppt_pipeline.md:11; agency-os/TASKS.md:200"
+      "source": "memory（僅本機）/project_meeting_to_ppt_pipeline.md:11; agency-os/TASKS.md:200"
     },
     {
       "system_slug": "client-soulful",
@@ -177,7 +177,14 @@
       "system_slug": "client-aware-wave",
       "subject": "aware-wave.com 只留 WordPress，與 app 的連結全部切斷。",
       "next": "看 DMARC 報表零未解釋失敗後，把 aware-wave.com 升到 p=reject。",
-      "source": "C:/Users/user1115/.claude/projects/D--Work/memory/project_awarewave_com_wordpress_only.md:11; agency-os/TASKS.md:125"
+      "source": "memory（僅本機）/project_awarewave_com_wordpress_only.md:11; agency-os/TASKS.md:125"
+    },
+    {
+      "system_slug": "ai-subscription-channel",
+      "subject": "K11 模型清單補上五個模型（main 33775b69b）。",
+      "next": "K12：十二個模型的文章實測。",
+      "blocker": "K13 生圖實測開跑前要先問你，你回覆後才能測。",
+      "source": "agency-os/handoffs/2026-11-22-subscription-ai-channel/DISPATCH.md:18; agency-os/handoffs/2026-11-22-subscription-ai-channel/DISPATCH.md:19; agency-os/handoffs/2026-11-22-subscription-ai-channel/DISPATCH.md:20"
     }
   ],
   "missing": []
