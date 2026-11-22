@@ -65,6 +65,14 @@ curl -s https://oracle.aware-wave.com/api/mcp -H 'content-type: application/json
   - 驗過後以 `<key_id>:<member>` 計每 24 小時 AI 次數（輸入驗過、要呼叫 AI 才計；AI 端回 502／503 也算一次），超過 `ai_per_day` 回 429 `daily_limit_reached`（`Retry-After`）。計數在單一行程記憶體，重啟歸零。
   - 沒帶票 = 匿名，行為不變。
 
+## 站前面有 WordPress（`ORACLE_FRONT_PAGES`）
+- 執行期環境變數（容器的 `.env.production`，改後重啟容器；不必重 build）。未設定＝沒有 WordPress：引擎照現在顯示所有頁、自己出 sitemap 與 robots（買斷、無 WordPress 的站都是這樣）。
+- 格式：`{"pages":{"zh-TW":"/tools/{slug}/","en":"/english/{slug}/"},"home":{"zh-TW":"/","en":"/english/"}}`；`home` 選填；只收 `lib/i18n/config.ts` `locales` 內的語言鍵。
+- 有設定時：`/<語言>/<工具>`（`lib/site.ts` `PAGE_SLUGS`，可帶結尾斜線）與 `/<語言>`（有 `home` 時）308 轉到樣式算出的路徑，`{slug}` 換成工具代稱，保留查詢字串；`Location` 是同網域相對路徑。`/sitemap.xml`、`/robots.txt` 回 404（改由 WordPress／Rank Math 出）。`/embed/*`、`/api/*` 不受影響。該語言沒有樣式的照常顯示引擎頁。
+- 路徑規則：以 `/` 開頭；`pages` 恰含一次 `{slug}`、`home` 不含；不得含 `//`、`:`、`\`、`?`、`#`、`%`、`.`／`..` 段、空白或非 ASCII；`{slug}` 逐一代入每個工具後，第一段都不得是引擎佔用的 `zh-TW`、`en`、`embed`、`api`、`_next`、`tarot`（否則轉回引擎自己、無限轉向）。所以 `/{slug}/` 不合法：塔羅會算出 `/tarot/`。任何一處不合法＝整個視為未設定，容器 log 記一行 `ORACLE_FRONT_PAGES ignored: <原因>`（不印值）。
+- 驗證：`curl -sI https://<站>/zh-TW/ziwei` → 308、`location: /tools/ziwei/`；`curl -sI https://<站>/embed/zh-TW/ziwei` → 200。
+- 規格：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md` §2-3、§2-12；程式 `lib/frontPages.ts`、`proxy.ts`。
+
 ## 注意
 - `NEXT_PUBLIC_*` 在 build 時內嵌；網域預設值在 `lib/site.ts`。
 - 付費牆：`/api/interpret` 的 `premium` 回 402；`light`／`deep` 放行；每日次數計量未接。
