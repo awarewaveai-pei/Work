@@ -10,7 +10,7 @@
 //   its own reverts. Revert / orphaned events are read across every system (store.readCommitHistory).
 // - completion = verified / features not cancelled; no features = null (尚未盤點). Features of a phase that still
 //   lives on its old supervisor page (legacy_source_path, no migration event yet) are left out: that page is the source.
-// - refresh_request / system_proposed (契約 3) are requests to the host, not state: ignored.
+// - refresh_request / system_proposed / system_proposal_closed (契約 3) are requests, not state: ignored.
 import { USER_REQUEST_TYPES, type FeatureStatus } from "./contract";
 
 export interface SystemRow {

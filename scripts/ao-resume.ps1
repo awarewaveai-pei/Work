@@ -738,7 +738,7 @@ if (Test-Path -LiteralPath $capacityHealthScript) {
 
 # --- /ops/systems requests waiting for registry.json (warn-only) ---
 # The page's "new system" button only records a request; an agent has to write it into agency-os/systems/registry.json
-# (handoffs/2026-11-21-systems-control-center, contract 3). Read-only ssh query -> systems-proposals-LATEST.json ->
+# (handoffs/2026-11-21-systems-control-center, contract 3). ssh -> curl the pending route on the host -> systems-proposals-LATEST.json ->
 # one smoke blocker line per run while any is pending (smoke-status-digest.ps1 source 12; a failed query = blind spot).
 $systemsProposalsScript = Join-Path $WorkRoot "scripts\check-systems-proposals.ps1"
 if (Test-Path -LiteralPath $systemsProposalsScript) {

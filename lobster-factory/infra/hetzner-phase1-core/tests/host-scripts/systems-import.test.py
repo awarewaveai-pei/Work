@@ -68,17 +68,27 @@ def events(bodies):
 
 
 class Server:
-    """Stands in for the ingest route (records each body, answers 200) and the pending route (answers self.pending)."""
+    """Stands in for the ingest route (records each body, answers 200 unless self.refuse(body)) and the pending route
+    (answers self.pending; an accepted body with an import_run answers the refresh request, as store.ts does)."""
 
     def __init__(self):
         self.bodies = []
         self.gets = []
         self.pending = {"refresh": False, "proposals": []}
+        self.refuse = lambda body: False
         outer = self
 
         class H(BaseHTTPRequestHandler):
             def do_POST(self):
-                outer.bodies.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                outer.bodies.append(body)
+                if outer.refuse(body):
+                    self.send_response(500)
+                    self.end_headers()
+                    self.wfile.write(b'{"ok":false}')
+                    return
+                if any(e["event_type"] == "import_run" for e in body["events"]):
+                    outer.pending = dict(outer.pending, refresh=False)
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b'{"inserted":1,"skipped":0}')
@@ -265,10 +275,9 @@ class SystemsImportTest(unittest.TestCase):
         try:
             before = self.r.git("rev-parse", "refs/heads/main", cwd=self.r.mirror)
             self.r.commit({"apps/x.ts": "1"}, "new")
-            # refresh false: one GET to /pending with the token, no fetch, no POST, no state
+            # refresh false: one GET to /pending with the token, no fetch, no POST, no state, no log line
             rc, out = self.run_main("--if-requested")
-            self.assertEqual((rc, srv.bodies), (0, []), out)
-            self.assertIn("no refresh requested", out)
+            self.assertEqual((rc, srv.bodies, out), (0, [], ""))
             self.assertEqual(srv.gets, [("/api/internal/systems/pending", "Bearer tok")])
             self.assertEqual(self.r.git("rev-parse", "refs/heads/main", cwd=self.r.mirror), before)
             self.assertFalse(os.path.exists(self.r.state))
@@ -281,9 +290,33 @@ class SystemsImportTest(unittest.TestCase):
             with open(self.r.state) as f:
                 self.assertEqual(f.read().strip(), head)
             # still requested with nothing new: a run record alone is sent (else the request would stay pending)
+            srv.pending = {"refresh": True, "proposals": []}
             rc, out = self.run_main("--if-requested")
             self.assertEqual(rc, 0, out)
             self.assertEqual([(e["event_type"], e["payload"]["head"]) for e in srv.bodies[-1]["events"]], [("import_run", head)])
+        finally:
+            srv.close()
+
+    def test_if_requested_failure_still_answers_the_request(self):
+        os.environ.update(SYSTEMS_IMPORT_ENABLED="true", SYSTEMS_INGEST_TOKEN="tok")
+        srv = Server()
+        os.environ["SYSTEMS_INGEST_URL"] = srv.url
+        try:
+            self.r.commit({"apps/x.ts": "1"}, "new")
+            srv.pending = {"refresh": True, "proposals": []}
+            srv.refuse = lambda body: any(e["event_type"] != "import_run" for e in body["events"])  # the import batch fails
+            rc, out = self.run_main("--if-requested")
+            self.assertEqual(rc, 1, out)
+            self.assertFalse(os.path.exists(self.r.state))
+            last = srv.bodies[-1]["events"]
+            self.assertEqual([e["event_type"] for e in last], ["import_run"])
+            self.assertEqual(last[0]["payload"]["status"], "error")
+            self.assertIn("HTTP 500", last[0]["payload"]["error"])
+            self.assertRegex(last[0]["occurred_at"], r"\.\d{3}\+00:00$")  # milliseconds
+            # answered: the next tick does no import
+            sent = len(srv.bodies)
+            rc, out = self.run_main("--if-requested")
+            self.assertEqual((rc, len(srv.bodies), out), (0, sent, ""))
         finally:
             srv.close()
 

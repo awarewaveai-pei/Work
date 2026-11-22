@@ -149,7 +149,8 @@ export async function writeUserEvent(
   );
 }
 
-// --- 契約 3: 「立即更新」 and 「新增系統」 (migration 0177). system_id null; the projection ignores both. ---------------
+/// --- 契約 3: 「立即更新」, 「新增系統」 and withdrawing a proposal (migration 0177). system_id null; the projection
+// ignores all three. ---------------------------------------------------------------------------------------------
 
 export const PROPOSAL_READ_CAP = 200;
 
@@ -169,38 +170,62 @@ async function writeRequest(sb: SupabaseClient, type: UserRequestType, payload: 
  *  the newest import_run. */
 export const requestRefresh = (sb: SupabaseClient, actor: string) => writeRequest(sb, "refresh_request", { by: actor });
 
-/** 「新增系統」: waits on /api/internal/systems/pending until an agent writes it into registry.json. Throws on a payload
- *  that breaks 契約 3 (name / purpose 1-200 characters, type one of the five). */
+/** 「新增系統」: waits on /api/internal/systems/pending until an agent writes it into registry.json or someone closes
+ *  it. Throws on a payload that breaks 契約 3 (name / purpose 1-200 characters, type one of the five). */
 export const proposeSystem = (sb: SupabaseClient, actor: string, p: SystemProposal) =>
   writeRequest(sb, "system_proposed", { by: actor, name: p.name, type: p.type, purpose: p.purpose });
 
-export interface PendingProposal { name: string; type: string; purpose: string; at: string }
+/** Withdraws a proposal that will not become a registry entry (duplicate, mistake). Throws when `proposalEventKey` is
+ *  not a system_proposed event, or on an empty reason. */
+export async function closeProposal(sb: SupabaseClient, actor: string, proposalEventKey: string, reason: string): Promise<void> {
+  const found = check(
+    await sb.from("system_updates").select("event_key").eq("event_key", proposalEventKey).eq("event_type", "system_proposed").limit(1),
+    "system_proposed read",
+  ) as unknown[];
+  if (found.length === 0) throw new Error(`system_proposal_closed: no proposal ${proposalEventKey}`);
+  await writeRequest(sb, "system_proposal_closed", { by: actor, proposal_event_key: proposalEventKey, reason });
+}
+
+export interface PendingProposal { event_key: string; name: string; type: string; purpose: string; at: string }
 export interface Pending { refresh: boolean; proposals: PendingProposal[] }
+
+type EventIn = { event_key: string; payload: Record<string, unknown>; occurred_at: string };
 
 /** Pure part of readPending. refresh = a refresh_request newer than the newest import_run (any status: a run that
  *  failed still answered it -- the next request asks again). A proposal is pending while its name matches no live
- *  system's name / slug / alias (proposalKey); the same name asked twice is listed once, newest wins; oldest first. */
+ *  system's name / slug / alias (proposalKey) and it is not closed; closing one also closes the older proposals of the
+ *  same name (else the older copy would come back). The same name asked twice is listed once, newest wins; oldest
+ *  first. */
 export function pendingFrom(input: {
   lastRequestAt: string | null; lastRunAt: string | null;
-  proposals: ReadonlyArray<{ payload: Record<string, unknown>; occurred_at: string }>;
+  proposals: ReadonlyArray<EventIn>;
+  closed?: ReadonlyArray<{ payload: Record<string, unknown> }>;
   systems: ReadonlyArray<{ name: string; slug: string; aliases: string[] | null }>;
 }): Pending {
   const refresh = !!input.lastRequestAt && (!input.lastRunAt || Date.parse(input.lastRequestAt) > Date.parse(input.lastRunAt));
   const taken = new Set(input.systems.flatMap((s) => [s.name, s.slug, ...(s.aliases ?? [])]).map(proposalKey));
+  const closedKeys = new Set((input.closed ?? []).map((c) => c.payload.proposal_event_key).filter((k): k is string => typeof k === "string"));
+  const nameOf = (e: EventIn) => (typeof e.payload.name === "string" && e.payload.name.trim() ? proposalKey(e.payload.name) : null);
+  const closedUpTo = new Map<string, number>(); // name -> newest closed proposal time
+  for (const e of input.proposals) {
+    const n = nameOf(e);
+    if (n && closedKeys.has(e.event_key)) closedUpTo.set(n, Math.max(closedUpTo.get(n) ?? -Infinity, Date.parse(e.occurred_at)));
+  }
   const byName = new Map<string, PendingProposal>();
   for (const e of [...input.proposals].sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at))) {
-    const p = e.payload;
-    if (typeof p.name !== "string" || !p.name.trim()) continue;
-    const key = proposalKey(p.name);
-    if (taken.has(key)) continue;
-    byName.delete(key);
-    byName.set(key, { name: p.name, type: String(p.type ?? ""), purpose: String(p.purpose ?? ""), at: e.occurred_at });
+    const n = nameOf(e);
+    if (!n || taken.has(n)) continue;
+    if (closedKeys.has(e.event_key) || Date.parse(e.occurred_at) <= (closedUpTo.get(n) ?? -Infinity)) continue;
+    byName.delete(n);
+    byName.set(n, { event_key: e.event_key, name: String(e.payload.name), type: String(e.payload.type ?? ""), purpose: String(e.payload.purpose ?? ""), at: e.occurred_at });
   }
   return { refresh, proposals: [...byName.values()] };
 }
 
-/** 契約 3 JSON for the host (GET /api/internal/systems/pending). Four capped reads on the (event_type, occurred_at)
- *  index of 0174 and the live systems. */
+type Res = { data: unknown; error: { message: string } | null };
+
+/** 契約 3 JSON for the host (GET /api/internal/systems/pending). Capped reads on the (event_type, occurred_at) index of
+ *  0174, and the live systems. */
 export async function readPending(sb: SupabaseClient): Promise<Pending> {
   const newest = async (type: string) => {
     const rows = check(
@@ -209,14 +234,17 @@ export async function readPending(sb: SupabaseClient): Promise<Pending> {
     ) as Array<{ occurred_at: string }>;
     return rows[0]?.occurred_at ?? null;
   };
-  const [lastRequestAt, lastRunAt, proposals, systems] = await Promise.all([
+  const events = (type: string) =>
+    sb.from("system_updates").select("event_key,payload,occurred_at").eq("event_type", type)
+      .order("occurred_at", { ascending: false }).limit(PROPOSAL_READ_CAP)
+      .then((r) => check(r as Res, `${type} read`) as EventIn[]);
+  const [lastRequestAt, lastRunAt, proposals, closed, systems] = await Promise.all([
     newest("refresh_request"),
     newest("import_run"),
-    sb.from("system_updates").select("payload,occurred_at").eq("event_type", "system_proposed")
-      .order("occurred_at", { ascending: false }).limit(PROPOSAL_READ_CAP)
-      .then((r) => check(r as { data: unknown; error: { message: string } | null }, "system_proposed read") as Array<{ payload: Record<string, unknown>; occurred_at: string }>),
+    events("system_proposed"),
+    events("system_proposal_closed"),
     sb.from("systems").select("name,slug,aliases").eq("in_registry", true).limit(EVENT_READ_CAP)
-      .then((r) => check(r as { data: unknown; error: { message: string } | null }, "systems read") as Array<{ name: string; slug: string; aliases: string[] | null }>),
+      .then((r) => check(r as Res, "systems read") as Array<{ name: string; slug: string; aliases: string[] | null }>),
   ]);
-  return pendingFrom({ lastRequestAt, lastRunAt, proposals, systems });
+  return pendingFrom({ lastRequestAt, lastRunAt, proposals, closed, systems });
 }

@@ -132,11 +132,18 @@ function parseEvent(raw: unknown, i: number): IngestEvent {
   };
 }
 
-// 契約 3: the page's 「立即更新」 and 「新增系統」 buttons. User events with system_id null (migration 0177); the importer
-// reads them through GET /api/internal/systems/pending, the projection ignores them, the ingest route refuses them.
-export const USER_REQUEST_TYPES = ["refresh_request", "system_proposed"] as const;
+// 契約 3: the page's 「立即更新」 and 「新增系統」 buttons, and withdrawing a proposal. User events with system_id null
+// (migration 0177); the importer reads them through GET /api/internal/systems/pending, the projection ignores them, the
+// ingest route refuses them.
+export const USER_REQUEST_TYPES = ["refresh_request", "system_proposed", "system_proposal_closed"] as const;
 export type UserRequestType = (typeof USER_REQUEST_TYPES)[number];
 export interface SystemProposal { name: string; type: SystemType; purpose: string }
+
+const REQUEST_KEYS: Record<UserRequestType, string[]> = {
+  refresh_request: ["by"],
+  system_proposed: ["by", "name", "type", "purpose"],
+  system_proposal_closed: ["by", "proposal_event_key", "reason"],
+};
 
 /** A page request's payload, normalized (trimmed). `by` (the actor, as on every user event) is the only extra key. */
 export function parseUserRequest(
@@ -144,7 +151,7 @@ export function parseUserRequest(
 ): { ok: true; payload: Record<string, unknown> } | { ok: false; error: string } {
   try {
     const p = obj(raw, "payload");
-    const allowed = type === "refresh_request" ? ["by"] : ["by", "name", "type", "purpose"];
+    const allowed = REQUEST_KEYS[type];
     const extra = Object.keys(p).find((k) => !allowed.includes(k));
     if (extra) fail(`payload.${extra}`, "not allowed");
     const out: Record<string, unknown> = {};
@@ -153,6 +160,10 @@ export function parseUserRequest(
       out.name = nonEmpty(p.name, "payload.name", 200).trim();
       out.type = oneOf(p.type, SYSTEM_TYPES, "payload.type");
       out.purpose = nonEmpty(p.purpose, "payload.purpose", 200).trim();
+    }
+    if (type === "system_proposal_closed") {
+      out.proposal_event_key = nonEmpty(p.proposal_event_key, "payload.proposal_event_key", 200).trim();
+      out.reason = nonEmpty(p.reason, "payload.reason", 500).trim();
     }
     return { ok: true, payload: out };
   } catch (e) {

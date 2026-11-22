@@ -197,6 +197,12 @@ try {
     Assert-Eq "BLIND" $d20b.entries.systems_proposals.verdict "Case20b: a failed query is BLIND"
     Assert-Eq 0 @($d20b.blockers | Where-Object { $_ -like "*Systems proposals*" }).Count "Case20b: a failed query adds no blocker line"
     Assert-True ((@($d20b.entries.systems_proposals.blind) -join "") -match "exit 255") "Case20b: the reason is kept for blind_spots"
+    # Case 20c: a parser exception ([int]'abc' under StrictMode) is a blind spot too, never a blocker line
+    Write-Utf8 (Join-Path $statusDir "systems-proposals-LATEST.json") (@{ overall = "PASS"; measured = "abc"; generated_utc = $nowZ; proposals = @(); blind_spots = @() } | ConvertTo-Json -Depth 5)
+    $d20c = Get-StatusDigest -WorkRoot $root
+    Assert-Eq "BLIND" $d20c.entries.systems_proposals.verdict "Case20c: a parser exception is BLIND"
+    Assert-Eq 0 @($d20c.blockers | Where-Object { $_ -like "*Systems proposals*" }).Count "Case20c: a parser exception adds no blocker line"
+    Assert-True ((@($d20c.entries.systems_proposals.blind) -join "") -match "parser threw") "Case20c: the exception is named in blind"
 
     if ($failures.Count -eq 0) {
         Write-Host "ALL PASS (20 cases, 1 mutation proof)" -ForegroundColor Green

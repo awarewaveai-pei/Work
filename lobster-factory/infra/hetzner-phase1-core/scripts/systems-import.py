@@ -12,9 +12,14 @@ a commit or a deploy.
   --mirror <dir>   bare mirror (one-time: git clone --mirror <origin url> /root/systems-mirror.git)
   --state <file>   last imported HEAD
   --dry-run        print the request bodies, POST nothing, write no state (runs even when the import is disabled)
-  --if-requested   first GET the pending route (契約 3): refresh false -> one line, exit 0, git untouched; true -> import
-                   as usual, and send an import_run even when already up to date (that run is what answers the
-                   request). A failed GET = exit 1, nothing fetched, state untouched.
+  --if-requested   first GET the pending route (契約 3): refresh false -> silent exit 0 (it runs every 5 minutes: no log
+                   line), git untouched; true -> import as usual, and send an import_run even when already up to date
+                   (that run is what answers the request). Any failure after that (Fatal, a failed POST, the time
+                   limit) still sends a run record alone with status=error, best effort, so one request is answered
+                   once and not redone every 5 minutes. A failed GET = exit 1, nothing fetched, state untouched.
+                   Never waits for the lock.
+  --wait-lock N    wait up to N s for the lock instead of skipping (the 04:30 line: a requested run may hold it), then
+                   exit 1
 
 Settings (environment first, else a plain read of SYSTEMS_ENV_FILE -- never sourced, like poke.sh):
   SYSTEMS_IMPORT_ENABLED  anything but "true" -> one line, exit 0 (default OFF)
@@ -28,7 +33,8 @@ the route skips events it already has).
 Trailers come from %(trailers:only,unfold) in the one `git log` call: the same parser as `git interpret-trailers
 --parse`, without one process per commit (a first run walks ~4000 commits within the 300 s limit).
 Guards live in here, not as flock/timeout/nice wrappers on the cron line, so install-host-schedules.sh can still check
-the `python3 /path` form: one run at a time (non-blocking lock; a second run exits 0), 300 s alarm, nice 19 (which
+the `python3 /path` form: one run at a time (non-blocking lock, a second run exits 0; --wait-lock waits), 300 s
+alarm, nice 19 (which
 also puts git's I/O at the lowest best-effort priority).
 """
 import argparse
@@ -40,6 +46,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -383,25 +390,65 @@ def write_state(path, head):
     os.replace(tmp, path)
 
 
-def build(mirror, state_path, ref, first_days, run_when_current=False):
+class Timeout(Exception):
+    pass
+
+
+def now_iso():
+    # milliseconds: a refresh request is pending while it is newer than the newest import_run (store.ts pendingFrom)
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+GAP_KEYS = ("unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths")
+
+
+def run_event(head, prev, status, error, gaps, at):
+    return {"event_key": f"run:{head}:{at}", "system_slug": None, "phase_slug": None, "feature_slug": None,
+            "event_type": "import_run", "source": "importer", "commit_sha": head, "occurred_at": at,
+            "payload": {"head": head, "previous_head": prev, "status": status, "error": error, "gaps": gaps},
+            "evidence": None}
+
+
+def error_body(mirror, ctx, error):
+    """A body with only an import_run(status=error), or None when no valid registry is at hand (the route refuses a
+    body without one): the one this run loaded, else the one at the last imported HEAD."""
+    reg, prev = ctx.get("reg"), ctx.get("prev")
+    if reg is None and prev:
+        p = git(mirror, "show", f"{prev}:{REGISTRY_PATH}", check=False)
+        try:
+            reg = load_registry(p.stdout) if p.returncode == 0 else None
+        except Fatal:
+            reg = None
+    if reg is None:
+        return None
+    head = ctx.get("head") or prev or "unknown"
+    return {"registry": reg, "events": [run_event(head, prev, "error", str(error)[:1000], {k: [] for k in GAP_KEYS}, now_iso())]}
+
+
+def build(mirror, state_path, ref, first_days, run_when_current=False, ctx=None):
     """-> (bodies, head, status); bodies == [] when already up to date, unless run_when_current (then the one body
-    carries just the import_run: a refresh request is answered by a run record newer than it)."""
-    git(mirror, "fetch", "--prune", "--quiet", "origin")
-    head = git(mirror, "rev-parse", "--verify", f"{ref}^{{commit}}").stdout.strip()
+    carries just the import_run: a refresh request is answered by a run record newer than it). ctx (a dict) gets
+    prev / head / reg as they become known, for error_body."""
+    ctx = {} if ctx is None else ctx
     prev = None
     if os.path.exists(state_path):
         with open(state_path, encoding="utf-8") as f:
             prev = f.read().strip() or None
+    ctx["prev"] = prev
+    git(mirror, "fetch", "--prune", "--quiet", "origin")
+    head = git(mirror, "rev-parse", "--verify", f"{ref}^{{commit}}").stdout.strip()
+    ctx["head"] = head
     if prev == head and not run_when_current:
         return [], head, "ok"
     reg_text = git(mirror, "show", f"{head}:{REGISTRY_PATH}", check=False)
     if reg_text.returncode != 0:
         raise Fatal(f"{REGISTRY_PATH} missing at {head[:12]}")
     reg = load_registry(reg_text.stdout)
+    ctx["reg"] = reg
     idx = Index(reg)
     gaps = {"unowned_paths": set(), "unclassified_trailers": set()}
     events, status, error = [], "ok", None
-    at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    at = now_iso()
 
     if prev and git(mirror, "merge-base", "--is-ancestor", prev, head, check=False).returncode != 0:
         # PLAN §7: stop the increment, delete nothing; each commit that left main gets an orphaned event (the projection
@@ -423,17 +470,31 @@ def build(mirror, state_path, ref, first_days, run_when_current=False):
             events.extend(events_for(c, idx, gaps))
 
     unregistered, unclaimed, dead = head_gaps(mirror, head, reg)
-    import_run = {"head": head, "previous_head": prev, "status": status, "error": error, "gaps": {
+    run_gaps = {
         "unowned_paths": sorted(gaps["unowned_paths"])[:GAP_CAP],
         "unclassified_trailers": sorted(gaps["unclassified_trailers"])[:GAP_CAP],
-        "unregistered_products": unregistered, "unclaimed_supervisors": unclaimed, "dead_source_paths": dead}}
+        "unregistered_products": unregistered, "unclaimed_supervisors": unclaimed, "dead_source_paths": dead}
     # last of all, so the route has a run record only once every earlier batch landed; the time in the key gives every
     # run its own record (a rerun at the same HEAD must still update status and gaps)
-    events.append({"event_key": f"run:{head}:{at}", "system_slug": None, "phase_slug": None, "feature_slug": None,
-                   "event_type": "import_run", "source": "importer", "commit_sha": head,
-                   "occurred_at": at, "payload": import_run, "evidence": None})
+    events.append(run_event(head, prev, status, error, run_gaps, at))
     bodies = [{"registry": reg, "events": events[i:i + BATCH]} for i in range(0, len(events), BATCH)]
     return bodies, head, status
+
+
+def take_lock(path, wait_seconds):
+    """-> the open lock file, or None when another run holds it (after waiting up to wait_seconds)."""
+    import fcntl
+    lock = open(path, "w")
+    deadline = time.monotonic() + max(wait_seconds, 0)
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return lock
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                lock.close()
+                return None
+            time.sleep(1)
 
 
 def main(argv=None):
@@ -444,22 +505,30 @@ def main(argv=None):
     ap.add_argument("--first-days", type=int, default=90)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--if-requested", action="store_true")
+    ap.add_argument("--wait-lock", type=int, default=0)
     ap.add_argument("--lock", default="/tmp/systems-import.lock")
     ap.add_argument("--max-seconds", type=int, default=300)
     a = ap.parse_args(argv)
+    quiet = a.if_requested  # every 5 minutes: only a run that does something writes to the log
 
     if not a.dry_run and setting("SYSTEMS_IMPORT_ENABLED") != "true":
-        print("[systems-import] SYSTEMS_IMPORT_ENABLED is not true -- nothing done")
+        if not quiet:
+            print("[systems-import] SYSTEMS_IMPORT_ENABLED is not true -- nothing done")
         return 0
     if not a.dry_run and os.name == "posix":  # the host; tests also run on the Windows laptop, which has none of these
-        import fcntl
-        lock = open(a.lock, "w")
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            print("[systems-import] another run holds the lock -- skipped")
+        lock = take_lock(a.lock, 0 if a.if_requested else a.wait_lock)
+        if lock is None:
+            if a.wait_lock > 0 and not a.if_requested:
+                print(f"[systems-import] ERROR: lock still held after {a.wait_lock} s -- nothing done", file=sys.stderr)
+                return 1
+            if not quiet:
+                print("[systems-import] another run holds the lock -- skipped")
             return 0
-        signal.alarm(a.max_seconds)  # SIGALRM ends the process; state is only written at the very end
+
+        def on_alarm(signum, frame):
+            raise Timeout(f"time limit {a.max_seconds} s reached")
+        signal.signal(signal.SIGALRM, on_alarm)  # raised into the run; state is only written at the very end
+        signal.alarm(a.max_seconds)
         os.nice(19)
     token = setting("SYSTEMS_INGEST_TOKEN")
     url = setting("SYSTEMS_INGEST_URL", "http://127.0.0.1:3002/api/internal/systems/ingest")
@@ -473,30 +542,56 @@ def main(argv=None):
             print(f"[systems-import] ERROR: pending check failed: {refresh} -- nothing done", file=sys.stderr)
             return 1
         if not refresh:
-            print("[systems-import] no refresh requested -- nothing done")
             return 0
-    try:
-        bodies, head, status = build(a.mirror, a.state, a.ref, a.first_days, run_when_current=a.if_requested)
-    except Fatal as e:
-        print(f"[systems-import] ERROR: {e}", file=sys.stderr)
-        return 2
-    if not bodies:
-        print(f"[systems-import] up to date at {head[:12]}")
-        return 0
-    if a.dry_run:
-        json.dump(bodies, sys.stdout, ensure_ascii=False, indent=1)
-        print()
-        return 0
 
-    if not token:
-        print("[systems-import] ERROR: SYSTEMS_INGEST_TOKEN not set -- nothing sent", file=sys.stderr)
-        return 2
-    for n, body in enumerate(bodies, 1):
+    ctx = {}
+
+    def answer_failure(error):
+        """--if-requested only: a failed run still answers the request with a run record (status=error)."""
+        if not a.if_requested or a.dry_run or not token:
+            return
+        if os.name == "posix":
+            signal.signal(signal.SIGALRM, signal.SIG_DFL)
+            signal.alarm(60)  # the error POST gets its own short limit; past it the process just ends
+        body = error_body(a.mirror, ctx, error)
+        if body is None:
+            print("[systems-import] no valid registry at hand -- the request stays pending", file=sys.stderr)
+            return
         code, text = post(url, token, body)
-        if not 200 <= code < 300:
-            print(f"[systems-import] batch {n}/{len(bodies)} HTTP {code} {text} -- state kept, next run retries",
-                  file=sys.stderr)
-            return 1
+        if 200 <= code < 300:
+            print("[systems-import] answered the request with an error run record", file=sys.stderr)
+        else:
+            print(f"[systems-import] error run record not sent: HTTP {code} {text}", file=sys.stderr)
+
+    try:
+        try:
+            bodies, head, status = build(a.mirror, a.state, a.ref, a.first_days, run_when_current=a.if_requested, ctx=ctx)
+        except Fatal as e:
+            print(f"[systems-import] ERROR: {e}", file=sys.stderr)
+            answer_failure(e)
+            return 2
+        if not bodies:
+            print(f"[systems-import] up to date at {head[:12]}")
+            return 0
+        if a.dry_run:
+            json.dump(bodies, sys.stdout, ensure_ascii=False, indent=1)
+            print()
+            return 0
+
+        if not token:
+            print("[systems-import] ERROR: SYSTEMS_INGEST_TOKEN not set -- nothing sent", file=sys.stderr)
+            return 2
+        for n, body in enumerate(bodies, 1):
+            code, text = post(url, token, body)
+            if not 200 <= code < 300:
+                print(f"[systems-import] batch {n}/{len(bodies)} HTTP {code} {text} -- state kept, next run retries",
+                      file=sys.stderr)
+                answer_failure(f"batch {n}/{len(bodies)} HTTP {code} {text}")
+                return 1
+    except Timeout as e:
+        print(f"[systems-import] ERROR: {e} -- state kept", file=sys.stderr)
+        answer_failure(e)
+        return 1
     if status != "ok":
         print(f"[systems-import] {status}: {bodies[-1]['events'][-1]['payload']['error']} -- state kept", file=sys.stderr)
         return 1
@@ -504,7 +599,6 @@ def main(argv=None):
     total = sum(len(b["events"]) for b in bodies)
     print(f"[systems-import] imported {total} event(s) in {len(bodies)} batch(es), HEAD {head[:12]}")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

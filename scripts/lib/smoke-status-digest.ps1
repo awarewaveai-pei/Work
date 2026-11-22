@@ -609,7 +609,8 @@ function Get-StatusDigest {
         routine_freshness  = Invoke-EntrySafe -SourceLabel "Routine freshness" { Get-RoutineFreshnessEntry -StatusDir $statusDir }
         cf_security_health = Invoke-EntrySafe -SourceLabel "Cloudflare"        { Get-CfSecurityEntry -StatusDir $statusDir }
         doc_integrity_commits = Invoke-EntrySafe -SourceLabel "Doc integrity (script commits)" { Get-DocIntegrityCommitEntry -StatusDir $statusDir }
-        systems_proposals  = Invoke-EntrySafe -SourceLabel "Systems proposals" { Get-SystemsProposalsEntry -StatusDir $statusDir }
+        # not Invoke-EntrySafe: a parser exception here is a blind spot like a failed query, never a blocker line
+        systems_proposals  = $(try { Get-SystemsProposalsEntry -StatusDir $statusDir } catch { New-BlindSpotEntry -Label "Systems proposals" -Lines @(("parser threw: {0}" -f $_.Exception.Message)) })
     }
 
     $blockers = New-Object System.Collections.Generic.List[string]

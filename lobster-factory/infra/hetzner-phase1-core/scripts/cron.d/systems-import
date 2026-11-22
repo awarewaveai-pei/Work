@@ -1,11 +1,12 @@
 # /etc/cron.d/systems-import -- git commits -> /ops/systems (scripts/systems-import.py; handoffs/2026-11-21-systems-control-center).
 # Installed by install-host-schedules.sh. Times UTC: 20:30 = 04:30 Taipei, after the 04:00 auto-reboot.
 # Every 5 minutes --if-requested asks next-admin whether the page's 「立即更新」 was pressed since the last run (one GET,
-# no git work when not); same lock as the nightly line, so the two never run at once.
+# no git work and no log line when not). One lock for both: the 04:30 line waits up to 120 s for it (--wait-lock),
+# the 5-minute line never waits.
 # Does nothing until SYSTEMS_IMPORT_ENABLED=true in /root/lobster-phase1/.env. Lock, 300 s limit and nice 19 are inside
 # the script, so the line keeps the `python3 /path` form install-host-schedules.sh checks. python3, not ./: sync marks
 # only *.sh executable.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-30 20 * * * root /root/lobster-phase1/scripts/cron-run.sh systems_import 'python3 /root/lobster-phase1/scripts/systems-import.py >> /var/log/systems-import.log 2>&1'
+30 20 * * * root /root/lobster-phase1/scripts/cron-run.sh systems_import 'python3 /root/lobster-phase1/scripts/systems-import.py --wait-lock 120 >> /var/log/systems-import.log 2>&1'
 */5 * * * * root /root/lobster-phase1/scripts/cron-run.sh systems_import_requested 'python3 /root/lobster-phase1/scripts/systems-import.py --if-requested >> /var/log/systems-import.log 2>&1'
