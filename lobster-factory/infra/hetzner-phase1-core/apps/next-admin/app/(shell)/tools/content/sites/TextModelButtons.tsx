@@ -10,7 +10,7 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import TextChainButtons, { TEXT_CHAIN_LABELS } from "@/components/tools/TextChainButtons";
 import OptionButtons from "./OptionButtons";
 import { siteTextChain } from "@/lib/content/brand-voice";
-import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL, isAiTextModel, type TextChain } from "@/lib/ai/text-model-options";
+import { AI_TEXT_MODELS, DEFAULT_ARTICLE_TEXT_MODEL, isAiTextModel, type TextChain } from "@/lib/ai/text-model-options";
 
 const COPY = {
   title: "排程文章的文字 AI",
@@ -49,7 +49,7 @@ export default function TextModelButtons({ site, sites, onSaved, onApplied }: {
   const d = site.contentDefaults ?? {};
   const chain = siteTextChain(d);
   const claudeModel = typeof d.textClaudeModel === "string" ? d.textClaudeModel : "sub-claude-opus";
-  const apiModel = isAiTextModel(d.textApiModel) ? d.textApiModel : DEFAULT_AI_TEXT_MODEL;
+  const apiModel = isAiTextModel(d.textApiModel) ? d.textApiModel : DEFAULT_ARTICLE_TEXT_MODEL;
   const others = sites.filter((s) => s.id !== site.id && s.active && s.source === "db" && !!site.organization_id && s.organization_id === site.organization_id);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);

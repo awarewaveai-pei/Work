@@ -11,6 +11,7 @@ vi.mock("@/lib/content/pipeline", () => ({ runContentPipeline: m.pipeline }));
 import { topicDeps } from "../make";
 import { MakeError } from "../tick";
 import type { Topic } from "../store";
+vi.stubEnv("OPENAI_API_KEY", ""); // these tests drive the Anthropic stub: no OpenAI key -> the article default falls back to Claude (K15)
 
 // ai_call_logs as PostgREST pages it: at most 2 rows a response here, so a read that stops after one page undercounts
 type Q = { eq: () => Q; gte: () => Q; order: () => Q; range: (from: number) => Promise<{ data: unknown[]; error: null }> };
@@ -38,7 +39,7 @@ describe("topic cap across attempts", () => {
 
   it("every page of the ledger counts: spend past the first page still stops the next step at the cap", async () => {
     m.ledger.length = 0;
-    m.ledger.push({ cost_usd: 0.05 }, { cost_usd: 0.05 }, { cost_usd: 0.05 });   // ~NT$4.8 over two pages; one page ~NT$3.2
+    m.ledger.push({ cost_usd: 0.1 }, { cost_usd: 0.1 }, { cost_usd: 0.1 });   // ~NT$9.6 over two pages (the article step reserves ~NT$2 more, so the cap stops it); one page ~NT$6.4 would not
     const deps = topicDeps(sb as never, "org1", "staff:x", { capTwd: 10 });
     const err = await deps.make(topic()).catch((e) => e);
     expect(err.message).toMatch(/^這一題花到上限 NT\$10，停在〈文章〉/);

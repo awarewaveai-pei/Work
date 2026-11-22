@@ -68,6 +68,7 @@ const schedule = () => topicDeps(sb as never, "org1", "staff:x", { capTwd: 15, m
 const spent = (made: { artifacts: Record<string, unknown> }) => (made.artifacts as { budget: { spentTwd: number } }).budget.spentTwd;
 
 beforeEach(() => {
+  vi.stubEnv("OPENAI_API_KEY", ""); // these tests drive the Anthropic stub: no OpenAI key -> the article default falls back to Claude (K15)
   resetCodexBridgeForTests();
   Object.assign(m, { defaults: {}, articles: [], published: [], apiCalls: 0, subJobs: 0, subAnswer: null, orgKind: "internal", orgMeta: null });
   vi.stubEnv("SERPER_API_KEY", "");

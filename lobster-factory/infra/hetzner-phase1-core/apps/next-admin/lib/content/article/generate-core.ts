@@ -1,6 +1,6 @@
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
-import { DEFAULT_AI_TEXT_MODEL, isOpenAiTextModel, isTextChain, normalizeAiTextModel, resolveTextChain, type AiTextModel, type TextChain } from "../../ai/text-model-options";
+import { isOpenAiTextModel, isTextChain, resolveArticleTextModel, resolveTextChain, type AiTextModel, type TextChain } from "../../ai/text-model-options";
 import { runSubText, runTextChain, skipNote } from "../../ai/sub-text";
 import { codexAllowed, type SubLane } from "@/lib/tarot/codex-bridge";
 import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "../../ai/log-ai-call";
@@ -637,9 +637,8 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
     ? await fetchRealSources(keyword, str(body.language, "English"))
     : { sources: [], costUsd: 0 };
 
-  // Model selection (default: sonnet)
-  const requestedModel = str(body.model, DEFAULT_AI_TEXT_MODEL);
-  const model: AiTextModel = normalizeAiTextModel(requestedModel);
+  // Model selection: a picked model as-is; none -> the article default (gpt-6.2-sol), the shared default without an OpenAI key.
+  const model: AiTextModel = resolveArticleTextModel(body.model, !!process.env.OPENAI_API_KEY);
 
   // #3 / #5 / #6 inputs — all best-effort: the UI fetches existing categories + patterns and runs the
   // market analysis up-front, then forwards them here. Missing/empty just disables that enhancement.

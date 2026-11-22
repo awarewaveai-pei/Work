@@ -24,6 +24,14 @@ export type AiTextModel = (typeof AI_TEXT_MODELS)[number]["value"];
 export type AiTextModelGroup = (typeof AI_TEXT_MODELS)[number]["group"];
 
 export const DEFAULT_AI_TEXT_MODEL: AiTextModel = CLAUDE_DEFAULT_MODEL;
+/** Article generation only (other features keep DEFAULT_AI_TEXT_MODEL): 2026-11-22 blind test, agency-os/reports/model-bakeoff/2026-11-article/ (editor rank 2, NT$1.96/article vs Opus rank 4, NT$8.03). */
+export const DEFAULT_ARTICLE_TEXT_MODEL: AiTextModel = "gpt-6.2-sol";
+
+/** The model an article runs on when the caller picked none (or a dead id): the article default, but an install with no
+ *  OpenAI key (buyout) falls back to the shared default so it can still write. A picked/saved model is never replaced. */
+export function resolveArticleTextModel(picked: unknown, hasOpenAiKey: boolean): AiTextModel {
+  return resolveSavedAiTextModel(picked) ?? (hasOpenAiKey ? DEFAULT_ARTICLE_TEXT_MODEL : DEFAULT_AI_TEXT_MODEL);
+}
 export const AI_TEXT_MODEL_GROUPS: AiTextModelGroup[] = Array.from(new Set(AI_TEXT_MODELS.map((m) => m.group)));
 export const OPENAI_TEXT_MODELS: AiTextModel[] = AI_TEXT_MODELS
   .filter((m) => m.group === "OpenAI")

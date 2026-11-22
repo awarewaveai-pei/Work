@@ -16,7 +16,27 @@ const W9 = "2026-11-13（續9）影音工作台三張卡整合：音樂生成接
 const W12 = "2026-11-13（續12）ElevenLabs 免費額度接進配音、字幕辨識、音軌分離、去配樂・重配音效";
 const W5 = "2026-11-14（續5）破框：入口邊開格、照參考改寫提示詞、頁面畫鎖定遮罩（任務自己的輸入）";
 
+const ART = "agency-os/reports/model-bakeoff/2026-11-article/（key.json、editor-review.md）";
+
 const GROUPS: Group[] = [
+  {
+    title: "文章生成",
+    intro: "2026-11-22 正式站，同一題目同一條件各一篇；操作者選定 GPT-6.2 sol 為文章預設。名次是繁中編輯盲評（12 篇）；第 1–4 名輕修可上，第 9–12 名接近重寫。",
+    rows: [
+      { date: "2026-11-22", model: "Claude Haiku 5.5", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$0.08", result: "編輯盲評第 8 名。只有常識，沒有東西可帶走；乾淨安全。耗時 24 秒、2,621 字、SEO 59 分、未查證標記 0 處。", src: ART },
+      { date: "2026-11-22", model: "GPT-6 luna", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$0.13", result: "編輯盲評第 9 名。安全過頭，免責聲明蓋過內容。耗時 55 秒、4,297 字、SEO 82 分、未查證標記 0 處。", src: ART, verdict: "bad" },
+      { date: "2026-11-22", model: "GPT-5.4 nano", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$0.25", result: "編輯盲評第 12 名。用語不像台灣、引用標記滿篇、標題農場味，需重寫。耗時 33 秒、5,298 字、SEO 64 分、未查證標記 1 處。", src: ART, verdict: "bad" },
+      { date: "2026-11-22", model: "GPT-5.4 mini", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$0.71", result: "編輯盲評第 11 名。連結原始碼外露、內容重複、缺專線。耗時 23 秒、3,801 字、SEO 68 分、未查證標記 5 處。", src: ART, verdict: "bad" },
+      { date: "2026-11-22", model: "GPT-6.1 terra", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$1.02", result: "編輯盲評第 5 名。穩、克制、實用；要刪掉 5 處「待查」字樣。耗時 82 秒、4,328 字、SEO 77 分、未查證標記 6 處。", src: ART },
+      { date: "2026-11-22", model: "GPT-6.2 sol（選定為文章預設）", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$1.96", result: "編輯盲評第 2 名。話術具體、查對請假規則；要刪 6 處「年份未核」外露標記。耗時 80 秒、4,338 字、SEO 86 分、未查證標記 0 處。", src: ART, verdict: "good" },
+      { date: "2026-11-22", model: "Claude Sonnet 5.5", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$2.16", result: "編輯盲評第 3 名。最貼題、篇幅最剛好；有一處媒體歸屬寫錯。耗時 46 秒、3,576 字、SEO 68 分、未查證標記 0 處。", src: ART, verdict: "good" },
+      { date: "2026-11-22", model: "GPT-5.4", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$2.88", result: "編輯盲評第 10 名。假經驗口吻、空泛引用、後段灌水。耗時 84 秒、4,978 字、SEO 73 分、未查證標記 3 處。", src: ART, verdict: "bad" },
+      { date: "2026-11-22", model: "GPT-6.2 astra", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$6.68", result: "編輯盲評第 1 名。最像真人編輯寫的，話術可直接用，零杜撰。耗時 105 秒、4,117 字、SEO 82 分、未查證標記 3 處。", src: ART, verdict: "good" },
+      { date: "2026-11-22", model: "Claude Opus 5.5（原預設）", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$8.03", result: "編輯盲評第 4 名。最完整、台灣資源最齊；太長、套話多。耗時 119 秒、5,221 字、SEO 86 分、未查證標記 7 處。", src: ART, verdict: "good" },
+      { date: "2026-11-22", model: "GPT-5.5", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$8.72", result: "編輯盲評第 7 名。內容好但寫到一半被截斷；門檻數字自創。耗時 164 秒、4,850 字、SEO 77 分、未查證標記 3 處。", src: ART },
+      { date: "2026-11-22", model: "Claude Fable 5.1", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$19.56", result: "編輯盲評第 6 名。結構與切題滿分，但杜撰數字與引用最多。耗時 167 秒、5,437 字、SEO 82 分、未查證標記 13 處。", src: ART },
+    ],
+  },
   {
     title: "影片：破框貼文動畫",
     intro: "同一個流程（IG 貼文、照片當第一格、5 秒、9:16），主角要往下衝出照片。貼文文字列由我們鎖定。",
@@ -61,7 +81,7 @@ export default function MeasuredRuns() {
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>實測紀錄</h2>
-          <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>2026-11-13／14 真實呼叫</span>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>2026-11-13／14／22 真實呼叫</span>
         </div>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0, maxWidth: 900 }}>
           這一頁只放真的跑過的紀錄：哪一天、哪個模型、做了什麼、實際扣多少、標價是多少、結果如何。每個工具內便宜的排前面。
@@ -85,7 +105,7 @@ export default function MeasuredRuns() {
                     <td style={td}>{r.asked}</td>
                     <td style={{ ...td, fontVariantNumeric: "tabular-nums" }}>{r.money}</td>
                     <td style={td}>{r.result}</td>
-                    <td style={{ ...td, fontSize: 12, color: "var(--text-muted)" }}>{r.plain ? r.src : `WORKLOG ${r.src}`}</td>
+                    <td style={{ ...td, fontSize: 12, color: "var(--text-muted)" }}>{r.plain || r.src === ART ? r.src : `WORKLOG ${r.src}`}</td>
                   </tr>
                 ))}
               </tbody>

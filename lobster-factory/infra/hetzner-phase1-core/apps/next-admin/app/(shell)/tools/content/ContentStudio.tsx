@@ -12,7 +12,7 @@ import { markdownPreview } from "@/lib/content/client-markdown";
 import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
 import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
 import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
-import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
+import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS, DEFAULT_ARTICLE_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { ARTICLE_VIDEO_DEFAULTS, parseVoiceModel } from "@/lib/content/video/defaults";
@@ -405,7 +405,7 @@ const DEFAULT_FORM: GenerateForm = {
   keyword: "", title: "", language: "English", targetCountry: "全球（不指定）",
   articleType: "Pillar Article", articleSize: "medium", tone: "Friendly",
   pointOfView: "none", readability: "8th grade (recommended)",
-  removeAiWords: "none", model: DEFAULT_AI_TEXT_MODEL,
+  removeAiWords: "none", model: DEFAULT_ARTICLE_TEXT_MODEL,
   details: "", nlpKeywords: "", outline: "", externalLinks: "",
   internalLinks: "", referenceUrls: "",
   structure: { ...DEFAULT_STRUCTURE },

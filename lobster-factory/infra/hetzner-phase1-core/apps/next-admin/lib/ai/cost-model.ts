@@ -315,7 +315,7 @@ export interface FeatureProfile {
 }
 
 export const TEXT_FEATURES: FeatureProfile[] = [
-  { key: "article",     label: "文章生成 (Content Studio)", route: "/api/content/generate", model: "claude-opus-5-5", inputTok: 3500, outputTok: 8000, extraUsd: 0.006 },
+  { key: "article",     label: "文章生成 (Content Studio)", route: "/api/content/generate", model: "gpt-6.2-sol", inputTok: 5333, outputTok: 5062, extraUsd: 0.006 }, // tokens = 2026-11-22 real run (model-bakeoff/2026-11-article/ledger.jsonl)
   { key: "humanize",    label: "AI 去味 / 人性化",          route: "/api/content/humanize", model: "claude-opus-5-5", inputTok: 4000, outputTok: 6000 },
   { key: "seo-fix",     label: "SEO 修正 (RankMath)",        route: "/api/content/seo-fix",  model: "claude-haiku-5-5", inputTok: 4500, outputTok: 6000 },
   { key: "brand-voice", label: "品牌語氣擷取",               route: "/api/content/brand-voice", model: "claude-haiku-5-5", inputTok: 3000, outputTok: 1500 },
