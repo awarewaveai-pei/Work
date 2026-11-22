@@ -3,9 +3,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const state = vi.hoisted(() => ({ held: new Set<string>(), fail: false }));
+const state = vi.hoisted(() => ({ held: new Set<string>(), fail: false, rights: { contracts: [] as unknown[], grants: [] as unknown[] }, rightsFail: false }));
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-ops-user-kind": "client", "x-ops-org-id": "org-1" }),
+}));
+vi.mock("@/lib/entitlements/tables", () => ({
+  billingAccount: async () => { if (state.rightsFail) throw new Error("db down"); return { ...state.rights, all_features: null }; },
+  createEntitlementStore: () => ({ listActiveEntitlements: async () => [] }),
 }));
 vi.mock("../CreditsLine", () => ({ CreditsLine: () => <p data-credits>點數</p> }));
 vi.mock("@/app/LogoutButton", () => ({ LogoutButton: () => <button>登出</button> }));
@@ -27,7 +31,7 @@ const page = (door?: string) => PortalLauncherPage({ searchParams: Promise.resol
 const FORM = '<form action="/portal/api/door" method="post"><input type="hidden" name="product_key" value="';
 
 describe("portal launcher", () => {
-  beforeEach(() => { state.held = new Set(); state.fail = false; });
+  beforeEach(() => { state.held = new Set(); state.fail = false; state.rights = { contracts: [], grants: [] }; state.rightsFail = false; });
 
   it("a held, served door opens; a served door not held says 尚未開通; a closed door says 即將推出", async () => {
     state.held = new Set(["tarot", "cs"]);
@@ -79,6 +83,23 @@ describe("portal launcher", () => {
     const bad = renderToStaticMarkup(await page());
     expect(bad).toContain('href="/portal/launcher" class="btn-primary">重新整理<');
     expect(bad).toContain("暫時無法確認");
+  });
+
+  it("a held product's badge comes from where its right comes from: subscription 方案內, gift 贈送; a failed read draws none", async () => {
+    state.held = new Set(["tarot", "content"]);
+    state.rights = {
+      contracts: [{ product_key: "tarot", plan_key: "p", status: "active", current_period_end: "2026-12-10" }],
+      grants: [{ product_key: "content", source: "comp", state: "active", features: [], ends_at: null }],
+    };
+    const html = renderToStaticMarkup(await page());
+    expect(card(html, name("tarot"))).toContain(">方案內<");
+    expect(card(html, name("content"))).toContain(">贈送<");
+    expect(card(html, name("tarot"))).toContain(`${FORM}tarot"/>`);
+    state.rightsFail = true;
+    const bad = renderToStaticMarkup(await page());
+    for (const text of ["方案內", "贈送", "扣點"]) expect(bad).not.toContain(`>${text}<`);
+    expect(card(bad, name("tarot"))).toContain(`${FORM}tarot"/>`);
+    expect(bad).toContain("還沒開通（");
   });
 
   it("?door=<code> shows one line saying why the door did not open; no code shows none", async () => {

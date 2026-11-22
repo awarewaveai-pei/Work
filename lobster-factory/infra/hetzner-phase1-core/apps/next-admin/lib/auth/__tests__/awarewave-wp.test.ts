@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { productRight, resetHandoffNonces, signHandoff, wpHandoff, wpSummary, type HandoffDeps, type SummaryDeps } from "../sources/awarewave-wp";
+import { productRight } from "@/lib/entitlements/product-right";
+import { resetHandoffNonces, signHandoff, wpHandoff, wpSummary, type HandoffDeps, type SummaryDeps } from "../sources/awarewave-wp";
 import { pickEntitlementRow, type BillingAccount } from "@/lib/entitlements/tables";
 import type { EntitlementRecord } from "@/lib/entitlements/can";
 import { servedNextAdminProducts } from "@/lib/portal/doors";

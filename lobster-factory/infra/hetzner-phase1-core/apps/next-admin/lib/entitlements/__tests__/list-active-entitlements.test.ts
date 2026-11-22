@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 import { createEntitlementStore } from "../tables";
 import { isLiveRow, rowSource, type EntitlementRecord } from "../can";
-import { rightCounts, type RightCounts } from "@/lib/auth/sources/awarewave-wp";
+import { rightCounts, type RightCounts } from "@/lib/entitlements/product-right";
 import { servedNextAdminProducts } from "@/lib/portal/doors";
 
 // A table in memory behind the PostgREST calls the store makes (eq / lte / or ends_at / in / order / limit / range).

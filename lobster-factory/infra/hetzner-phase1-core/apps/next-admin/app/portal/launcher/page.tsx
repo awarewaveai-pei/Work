@@ -8,6 +8,9 @@ import { heldDoors } from "@/lib/portal/held-doors";
 import { LogoutButton } from "@/app/LogoutButton";
 import { rightLabel, type RightLabel } from "@/lib/entitlements/right-label";
 import { ToolCard } from "@/components/portal/ToolCard";
+import { billingAccount, createEntitlementStore } from "@/lib/entitlements/tables";
+import { heldRightInput } from "@/lib/entitlements/product-right";
+import type { NextAdminProduct } from "@/lib/portal/doors";
 import { CreditsLine } from "./CreditsLine";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +31,23 @@ async function getHeld(organizationId: string): Promise<{ held: Set<string>; fai
     console.error("[portal/launcher] entitlement read failed", { organizationId, error: error instanceof Error ? error.message : String(error) });
     return { held: new Set(), failed: true };
   }
+}
+
+// The held products' rights, read once (billing account + one list of live rows) and worded by rightLabel(); a failed read
+// returns no entry, so the card shows no badge rather than a guess.
+async function getRights(organizationId: string, held: readonly NextAdminProduct[]): Promise<Map<string, RightLabel>> {
+  const out = new Map<string, RightLabel>();
+  if (held.length === 0) return out;
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const account = await billingAccount(organizationId);
+    if (!account) return out;
+    const records = await createEntitlementStore().listActiveEntitlements({ organizationId, productKeys: held.map((p) => p.key), now });
+    for (const p of held) out.set(p.key, rightLabel({ ...heldRightInput(p, account, records, { organizationId, now }).input, viewer: "member" }));
+  } catch (error) {
+    console.error("[portal/launcher] right read failed", { organizationId, error: error instanceof Error ? error.message : String(error) });
+  }
+  return out;
 }
 
 // ?door=<code> from POST /portal/api/door (app/portal/api/door/route.ts): why 開啟 / 我的作品 did not open the door
@@ -79,7 +99,11 @@ export default async function PortalLauncherPage({ searchParams }: { searchParam
   const served = new Set(servedNextAdminProducts().map((p) => p.key));
   const now = new Date();
 
+  const heldProducts = servedNextAdminProducts().filter((p) => held.has(p.key));
+  const rights = failed ? new Map<string, RightLabel>() : await getRights(orgId, heldProducts);
   const label = ({ key, name }: (typeof PRODUCTS)[number]): RightLabel => {
+    const known = rights.get(key);
+    if (known) return quiet(known);
     const door = failed ? "unavailable" : held.has(key) ? "open" : "not_held";
     return quiet(rightLabel({ entry: null, source: null, door, comingSoon: !served.has(key), viewer: "member", mode: "enforce", productName: name }));
   };

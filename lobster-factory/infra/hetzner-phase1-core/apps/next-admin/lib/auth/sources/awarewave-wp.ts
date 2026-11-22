@@ -25,9 +25,10 @@ import { signPayment as signBody } from "@/lib/payments/hmac";
 import { AWARE_WAVE_KEY_ID, SITE_KEY_ID, findSiteByKeyId, siteIdentityProvider, siteSigns, verifySiteSignature, type SellerSite } from "@/lib/payments/sites";
 import { findBillingAccount, type BillingAccountIdentity } from "@/lib/entitlements/identities";
 import { holdsProduct } from "@/lib/entitlements/door-holds";
-import type { BillingAccount, billingAccount } from "@/lib/entitlements/tables";
-import { isLiveRow, rowSource, type EntitlementRecord } from "@/lib/entitlements/can";
-import { rightLabel, type RightInput } from "@/lib/entitlements/right-label";
+import type { billingAccount } from "@/lib/entitlements/tables";
+import type { EntitlementRecord } from "@/lib/entitlements/can";
+import { rightLabel } from "@/lib/entitlements/right-label";
+import { heldProductRight, type RightCounts, type RightKind } from "@/lib/entitlements/product-right";
 import { checkDoorAccount, mintDoorLink } from "@/lib/auth/door-link";
 import { portalHost, productHost, servedNextAdminProducts, type NextAdminProduct } from "@/lib/portal/doors";
 import type { heldDoors } from "@/lib/portal/held-doors";
@@ -124,10 +125,7 @@ export async function wpHandoff(rawBody: string, signature: string | null, env: 
 
 // ---------- wp-summary ----------
 
-export type RightKind = "contract" | "comp" | "credits" | "trial" | "none";
-/** Per feature of the product, by the row can() decides by and the source it would sign (rowSource, U5): covered =
- *  contract, gift = comp, credits = a credit-pack row (pay: "credits"), locked = no live row or one can() refuses. */
-export interface RightCounts { covered: number; gift: number; credits: number; locked: number }
+export type { RightKind, RightCounts } from "@/lib/entitlements/product-right";
 export interface WpSummaryProduct {
   key: string;
   name: string;
@@ -157,45 +155,6 @@ export interface SummaryDeps extends MemberDeps {
   entitlements: (input: { organizationId: string; productKeys: readonly string[]; now: number }) => Promise<EntitlementRecord[]>;
 }
 
-type ContractStatus = NonNullable<RightInput["contractStatus"]>;
-
-/** Where a held product's right comes from, read off the unit's own billing account: a subscription (active/trial before
- *  a gift, past_due/canceled after), a gift, or the all-features account's source; otherwise null, never guessed. */
-export function productRight(account: BillingAccount, productKey: string): Pick<RightInput, "source" | "contractStatus" | "endsAt"> {
-  const contracts = account.contracts.filter((c) => c.product_key === productKey);
-  const contract = (statuses: ContractStatus[]) => contracts.find((c) => (statuses as string[]).includes(c.status));
-  const live = contract(["active", "trial"]);
-  if (live) return { source: "contract", contractStatus: live.status as ContractStatus, endsAt: live.current_period_end };
-  const comp = account.grants.find((g) => g.product_key === productKey && g.source === "comp" && g.state === "active");
-  if (comp) return { source: "comp", contractStatus: null, endsAt: comp.ends_at };
-  const lapsing = contract(["past_due", "canceled"]);
-  if (lapsing) return { source: "contract", contractStatus: lapsing.status as ContractStatus, endsAt: lapsing.current_period_end };
-  const all = account.all_features?.source;
-  if (all === "contract" || all === "comp") return { source: all, contractStatus: null, endsAt: null };
-  return { source: null, contractStatus: null, endsAt: null };
-}
-
-/** In memory over the unit's live rows: each feature's row is re-checked as can() does (isLiveRow) and classed by the
- *  source can() would sign (rowSource). */
-export function rightCounts(product: Pick<NextAdminProduct, "key" | "features">, records: readonly EntitlementRecord[],
-  at: { organizationId: string; now: number }): RightCounts {
-  const counts: RightCounts = { covered: 0, gift: 0, credits: 0, locked: 0 };
-  for (const f of product.features) {
-    const row = records.find((r) => r.productKey === product.key && r.featureKey === f.feature_key);
-    const live = row && isLiveRow(row, { organizationId: at.organizationId, productKey: product.key, featureKey: f.feature_key, now: at.now });
-    const source = live ? rowSource(row, f) : null;
-    if (source === "contract") counts.covered += 1;
-    else if (source === "comp") counts.gift += 1;
-    else if (source === "credits") counts.credits += 1;
-    else counts.locked += 1;
-  }
-  return counts;
-}
-
-/** The product's source when the billing account names none: what can() signs for its features. */
-const featureSource = (c: RightCounts): RightInput["source"] =>
-  c.covered > 0 ? "contract" : c.gift > 0 ? "comp" : c.credits > 0 ? "credits" : null;
-
 export async function wpSummary(rawBody: string, signature: string | null, env: Env, deps: SummaryDeps): Promise<SummaryOutcome> {
   const v = await verifySignedMember(rawBody, signature, env, deps, (body, site) => {
     // A hand-off body names a product: it is not a summary request (the routes never take each other's bodies).
@@ -220,14 +179,8 @@ export async function wpSummary(rawBody: string, signature: string | null, env: 
       const l = rightLabel({ entry: null, door: "not_held", source: null, viewer: "manager", mode: "enforce", productName: p.name });
       return { key: p.key, name: p.name, right: { kind: "none", label: l.label, counts: { covered: 0, gift: 0, credits: 0, locked: p.features.length } }, can_enter: false };
     }
-    const counts = rightCounts(p, records, { organizationId: orgId, now: v.now });
-    const r = productRight(account, p.key);
-    const source = r.source ?? featureSource(counts);
-    const kind: RightKind = r.contractStatus === "trial" ? "trial" : source ?? "none";
-    const l = rightLabel({ entry: { allowed: true, verdict: true, reason: null }, door: "open", viewer: "manager", mode: "enforce",
-      productName: p.name, ...r, source });
-    return { key: p.key, name: p.name, right: { kind, label: l.label, ...(r.endsAt ? { until: r.endsAt } : {}), counts },
-      can_enter: true, url: `https://${productHost(p, env)}/` };
+    const right = heldProductRight(p, account, records, { organizationId: orgId, now: v.now });
+    return { key: p.key, name: p.name, right, can_enter: true, url: `https://${productHost(p, env)}/` };
   });
   return {
     ok: true,
