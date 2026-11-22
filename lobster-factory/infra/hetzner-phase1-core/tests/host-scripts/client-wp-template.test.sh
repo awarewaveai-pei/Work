@@ -81,7 +81,7 @@ docker exec -i "$C" bash -c 'mkdir -p /shim && cat > /fixture.sh && chmod +x /fi
 # /fixture.sh [host-vhost|product-gateway] [vhost_live 0|1]: fresh site -- registry, this site's rendered vhost
 # (enabled when live), compose file, .env, "running" containers of project sfdtest, empty call log.
 set -e
-export CLIENT_WP_SITES_ROOT=/t/sites CLIENT_WP_NGINX_DIR=/t/nginx   # = the paths dep() passes; the registry derives from them
+export CLIENT_WP_TEST_PATHS=1 CLIENT_WP_SITES_ROOT=/t/sites CLIENT_WP_NGINX_DIR=/t/nginx   # = the paths dep() passes; the registry derives from them
 rm -rf /t; mkdir -p /t/sites.d /t/sites/sfdtest /t/nginx/sites-available /t/nginx/sites-enabled
 source /s/templates/client-wp/render.sh
 ingress="${1:-host-vhost}"; live="${2:-1}"
@@ -107,7 +107,7 @@ printf '[ -f /t/nginx.fail ] && exit 1\nexit 0\n' >> /shim/nginx; printf 'exit 0
 chmod +x /shim/*
 EOF
 dep() {  # <args...> -> $out, $rc
-  out="$(docker exec -e PATH=/shim:/usr/local/bin:/usr/bin:/bin -e CLIENT_WP_SITES_ROOT=/t/sites -e CLIENT_WP_REGISTRY_DIR=/t/sites.d \
+  out="$(docker exec -e PATH=/shim:/usr/local/bin:/usr/bin:/bin -e CLIENT_WP_TEST_PATHS=1 -e CLIENT_WP_SITES_ROOT=/t/sites -e CLIENT_WP_REGISTRY_DIR=/t/sites.d \
     -e CLIENT_WP_NGINX_DIR=/t/nginx -e CLIENT_WP_LOCK_DIR=/t/lock -e DEPROVISION_ARCHIVE_DIR=/t/archive \
     "$C" bash /s/deprovision-site.sh "$@" 2>&1)"; rc=$?
 }
@@ -190,6 +190,34 @@ check "failed-create remnant without --purge-volumes -> refused (exit 2)" test "
 dep "${FULL[@]}" "${PURGE[@]}"
 check "failed-create remnant with --purge-volumes: both volumes and .env removed" \
   bash -c '[[ $1 == 0 ]] && purged_both && in_c "! test -e /t/sites/sfdtest/.env"' _ "$rc"
+
+# ── SF-E2 ──────────────────────────────────────────────────────────────────────────────────────────────────
+# #9 test path overrides count only with the explicit switch CLIENT_WP_TEST_PATHS=1.
+R="$SCRIPTS/templates/client-wp/render.sh"
+check "#9 render.sh without the switch ignores CLIENT_WP_LOCK_DIR/_SITES_ROOT (real paths)" \
+  test "$(env -u CLIENT_WP_TEST_PATHS CLIENT_WP_LOCK_DIR=/elsewhere CLIENT_WP_SITES_ROOT=/x bash -c 'source "$1"; echo "$CLIENT_WP_LOCK_DIR $CLIENT_WP_SITES_ROOT"' _ "$R")" = "/run/awarewave/site-locks /root/sites"
+check "#9 render.sh with CLIENT_WP_TEST_PATHS=1 takes them" \
+  test "$(CLIENT_WP_TEST_PATHS=1 CLIENT_WP_LOCK_DIR=/elsewhere bash -c 'source "$1"; echo "$CLIENT_WP_LOCK_DIR"' _ "$R")" = /elsewhere
+fixture
+out="$(docker exec -e PATH=/shim:/usr/local/bin:/usr/bin:/bin -e CLIENT_WP_LOCK_DIR=/t/lock "$C" bash /s/deprovision-site.sh "${FULL[@]}" 2>&1)"; rc=$?
+check "#9 deprovision-site.sh with a path override but no switch -> refused (exit 2), nothing called" \
+  bash -c '[[ $1 == 2 ]] && grep -q CLIENT_WP_TEST_PATHS <<<"$2" && no_mutation && untouched' _ "$rc" "$out"
+
+# #1 lock dir not root-only -> refused (same check as the gate).
+fixture; in_c 'mkdir -p -m 777 /t/lock && chmod 777 /t/lock'; dep "${FULL[@]}"
+check "#1 lock dir world-writable -> refused (exit 2), nothing changed" bash -c '[[ $1 == 2 ]] && no_mutation && untouched' _ "$rc"
+
+# #10 volumes kept, then another site took the domain (its vhost at the same path): the purge still runs, by slug only.
+export VH; fixture; dep "${FULL[@]}"
+in_c "CLIENT_WP_TEST_PATHS=1 CLIENT_WP_NGINX_DIR=/t/nginx bash -c 'source /s/templates/client-wp/render.sh; client_wp_render_vhost othersite $D 8160 /etc/letsencrypt/live/x > $VH' && ln -s $VH $LINK && : > /t/calls.log"
+dep "${FULL[@]}" "${PURGE[@]}"
+check "#10 purge after the domain moved to another site: exit 0, both volumes of $S deleted" bash -c '[[ $1 == 0 ]] && purged_both' _ "$rc"
+check "#10 ...the other site's vhost and link untouched, no nginx call" \
+  bash -c 'no_nginx && in_c "test \"\$(readlink $LINK)\" = $VH && head -1 $VH | grep -q othersite"'
+
+# #5 the pre-plugins DB export (customer data) goes with a purge.
+fixture; in_c 'echo x | gzip > /t/sites/sfdtest/pre-plugins.sql.gz'; dep "${FULL[@]}" "${PURGE[@]}"
+check "#5 purge removes the pre-plugins export and the site dir" bash -c '[[ $1 == 0 ]] && in_c "! test -e /t/sites/sfdtest"' _ "$rc"
 
 echo "---"
 echo "client-wp template + deprovision-site: $pass passed, $failed failed"

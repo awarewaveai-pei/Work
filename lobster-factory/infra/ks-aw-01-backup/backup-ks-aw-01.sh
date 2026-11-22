@@ -25,7 +25,8 @@
 #   EXPECT_SERVICES      — space-separated list of deployed services to back up.
 #                          Valid tokens: soulful chatwoot. Empty = pre-P5/P7 state.
 #   CLIENT_WP_REGISTRY_DIR — client site registry (default /etc/awarewave/sites.d; section 4b). Every
-#                          <slug>.json there is backed up as <slug>-db.sql.gz + <slug>-wordpress.tgz.
+#                          <slug>.json there is backed up as <slug>-db.sql.gz + <slug>-wordpress.tgz, and its
+#                          <CLIENT_WP_SITES_ROOT>/<slug>/.env (default root /root/sites) goes into env.tar.gz.enc (section 5).
 #   BACKUP_DIR           — output root (default: /root/backups)
 #   BACKUP_RETAIN_DAYS   — delete local backups older than N days (default: 7)
 #   BACKUP_ENC_KEY       — AES key for .env encryption (required once any .env exists)
@@ -158,6 +159,8 @@ fi
 # A site's failure counts in SITE_ERRORS: it fails the run and verify, but does not cost every other store its
 # offsite copy (the abort gate below reads ERRORS only). No registry files = no output here at all.
 SITES_DIR="${CLIENT_WP_REGISTRY_DIR:-/etc/awarewave/sites.d}"
+SITES_ROOT="${CLIENT_WP_SITES_ROOT:-/root/sites}"   # = render.sh client_wp_env_file: <root>/<slug>/.env
+SITE_ENV_FILES=()
 SITE_ERRORS=0
 site_error() { log "  ERROR: $1"; SITE_ERRORS=$((SITE_ERRORS + 1)); }
 if compgen -G "${SITES_DIR}/*.json" >/dev/null; then
@@ -198,6 +201,8 @@ PY
   while IFS=$'\t' read -r kind slug db vol; do
     [[ -n "$kind" ]] || continue
     if [[ "$kind" != ok ]]; then site_error "registry ${SITES_DIR}/${slug} refused: ${db} -- that site is NOT backed up"; continue; fi
+    # Its DB passwords: encrypted with the other .env files in section 5, same as Soulful/Chatwoot (present -> included).
+    [[ -f "${SITES_ROOT}/${slug}/.env" ]] && SITE_ENV_FILES+=("${SITES_ROOT}/${slug}/.env")
     for f in "${slug}-db.sql.gz" "${slug}-wordpress.tgz"; do
       [[ ! -e "${OUT}/${f}" ]] || { site_error "site ${slug}: ${f} already written by another section -- slug clashes"; continue 2; }
     done
@@ -234,6 +239,7 @@ ENV_FILES=()
 for f in /root/soulful/.env /root/chatwoot/.env; do
   [[ -f "$f" ]] && ENV_FILES+=("$f")
 done
+ENV_FILES+=(${SITE_ENV_FILES[@]+"${SITE_ENV_FILES[@]}"})   # registered client sites (4b); names only, never values
 if [[ ${#ENV_FILES[@]} -gt 0 ]]; then
   if [[ -n "${BACKUP_ENC_KEY:-}" ]]; then
     log "Archiving + encrypting ${#ENV_FILES[@]} .env file(s) (AES-256)..."

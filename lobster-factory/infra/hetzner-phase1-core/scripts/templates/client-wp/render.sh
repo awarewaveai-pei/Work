@@ -27,9 +27,10 @@
 # file whose first line / proxy_pass is not what client_wp_render_vhost produced for this slug and port.
 #
 # Caller contract (implemented by scripts/aw-hosting-gate.sh site-create/site-vhost/site-wp; grep "contract N" there):
-#  1. Lock: hold `flock` on "$(client_wp_lock_file <slug>)" for the whole of site-create / site-vhost; deprovision-site.sh
-#     takes the same lock. Choosing a free port additionally holds "$CLIENT_WP_PORT_LOCK" until the registry is written.
-#     safe-infra-patch.sh has no lock of its own: two runs on one project interleave.
+#  1. Lock: `client_wp_lock_dir_ready` first (refuse when it fails), then hold `flock` on "$(client_wp_lock_file <slug>)"
+#     for the whole of site-create / site-vhost / every site-wp sub-verb; deprovision-site.sh takes the same lock.
+#     Read-only verbs (site-preflight, site-job) take none. Choosing a free port additionally holds
+#     "$CLIENT_WP_PORT_LOCK" until the registry is written. safe-infra-patch.sh has no lock of its own.
 #  2. Image: compose-new runs `up --no-build`, so build first when missing:
 #     docker image inspect "$CLIENT_WP_IMAGE" >/dev/null 2>&1 || docker build -t "$CLIENT_WP_IMAGE" "$CLIENT_WP_TEMPLATE_DIR"
 #  3. .env: create it only when absent (umask 077; SITE_DB_PASSWORD, SITE_DB_ROOT_PASSWORD, hex only -- compose
@@ -56,11 +57,20 @@ CLIENT_WP_DOMAIN_RE='^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$'   # +
 CLIENT_WP_PATH_RE='^/[A-Za-z0-9._/-]+$'
 CLIENT_WP_PORT_MIN=8100
 CLIENT_WP_PORT_MAX=8199
-# Overrides exist for throwaway tests only.
-CLIENT_WP_SITES_ROOT="${CLIENT_WP_SITES_ROOT:-/root/sites}"
-CLIENT_WP_REGISTRY_DIR="${CLIENT_WP_REGISTRY_DIR:-/etc/awarewave/sites.d}"
-CLIENT_WP_NGINX_DIR="${CLIENT_WP_NGINX_DIR:-/etc/nginx}"
-CLIENT_WP_LOCK_DIR="${CLIENT_WP_LOCK_DIR:-/run/lock/awarewave-sites}"
+# Path overrides (CLIENT_WP_SITES_ROOT/_REGISTRY_DIR/_NGINX_DIR/_LOCK_DIR) are for throwaway tests only and count only
+# with CLIENT_WP_TEST_PATHS=1: a variable left in a root shell must not give a real run another lock or registry (SF-E2 #9).
+if [[ "${CLIENT_WP_TEST_PATHS-}" == 1 ]]; then
+  CLIENT_WP_SITES_ROOT="${CLIENT_WP_SITES_ROOT:-/root/sites}"
+  CLIENT_WP_REGISTRY_DIR="${CLIENT_WP_REGISTRY_DIR:-/etc/awarewave/sites.d}"
+  CLIENT_WP_NGINX_DIR="${CLIENT_WP_NGINX_DIR:-/etc/nginx}"
+  CLIENT_WP_LOCK_DIR="${CLIENT_WP_LOCK_DIR:-/run/awarewave/site-locks}"
+else
+  CLIENT_WP_SITES_ROOT=/root/sites
+  CLIENT_WP_REGISTRY_DIR=/etc/awarewave/sites.d
+  CLIENT_WP_NGINX_DIR=/etc/nginx
+  # Under /run (root 0755), not /run/lock (1777): nobody but root can create or replace it (SF-E2 #1).
+  CLIENT_WP_LOCK_DIR=/run/awarewave/site-locks
+fi
 CLIENT_WP_PORT_LOCK="$CLIENT_WP_LOCK_DIR/_ports.lock"   # `_` cannot start a slug
 
 client_wp__err() { echo "client-wp: $*" >&2; return 1; }
@@ -86,6 +96,19 @@ client_wp_retired_marker() { echo "$CLIENT_WP_SITES_ROOT/$1/DEPROVISIONED"; }
 client_wp_registry_file()  { echo "$CLIENT_WP_REGISTRY_DIR/$1.json"; }
 client_wp_vhost_file()     { echo "$CLIENT_WP_NGINX_DIR/sites-available/$1.conf"; }   # $1 = domain
 client_wp_lock_file()      { echo "$CLIENT_WP_LOCK_DIR/$1.lock"; }
+client_wp_db_export_file() { echo "$CLIENT_WP_SITES_ROOT/$1/pre-plugins.sql.gz"; }   # site-wp plugins, 0600, latest only
+# Lock dir (slug locks + port lock): created root-only when missing; one that exists must be a real directory owned by
+# root and not group/world-writable, and so must its parent -- else return 1 and the caller refuses (never reuses it).
+client_wp_lock_dir_ready() {
+  local d="$CLIENT_WP_LOCK_DIR" x st
+  [[ -e "$d" || -L "$d" ]] || mkdir -p -m 0700 "$d" 2>/dev/null || client_wp__err "cannot create lock dir $d" || return 1
+  for x in "$d" "$(dirname "$d")"; do
+    [[ -d "$x" && ! -L "$x" ]] || client_wp__err "lock dir $x is not a plain directory -- refusing" || return 1
+    st="$(stat -c '%u %a' "$x" 2>/dev/null)" || client_wp__err "cannot stat lock dir $x" || return 1
+    [[ "${st%% *}" == 0 ]] && (( (8#${st#* } & 8#022) == 0 )) \
+      || client_wp__err "lock dir $x must be root-owned and not group/world-writable (uid ${st%% *}, mode ${st#* }) -- refusing" || return 1
+  done
+}
 # <file> <slug> <domain> <port>: 0 only if the file is a vhost client_wp_render_vhost wrote for exactly this site.
 client_wp_vhost_owned() {
   [[ -f "$1" && ! -L "$1" ]] || return 1

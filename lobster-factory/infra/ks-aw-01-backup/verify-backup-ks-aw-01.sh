@@ -138,6 +138,9 @@ fi
 # names differ from it, and that refusal is in manifest errors above). A site registered after this backup's
 # manifest was written is first due tomorrow. Floors: a fresh WordPress has 12 core tables and ~3000 core files.
 SITES_DIR="${CLIENT_WP_REGISTRY_DIR:-/etc/awarewave/sites.d}"
+SITES_ROOT="${CLIENT_WP_SITES_ROOT:-/root/sites}"              # .env of each site: <root>/<slug>/.env (render.sh)
+CRON_STATE="${WP_CRON_STATE_DIR:-/var/lib/wp-cron-runner}"     # = wp-cron-runner.sh STATE_DIR
+SITE_ENVS=()   # registered sites' .env present on the host: must be members of env.tar.gz.enc (below)
 for reg in "${SITES_DIR}"/*.json; do
   [[ -e "$reg" ]] || continue
   slug="$(basename "$reg" .json)"
@@ -156,21 +159,40 @@ for reg in "${SITES_DIR}"/*.json; do
     ok "site ${slug} registered ${created}, after this backup started -- first due in the next one"
     continue
   fi
+  [[ ! -f "${SITES_ROOT}/${slug}/.env" ]] || SITE_ENVS+=("${SITES_ROOT#/}/${slug}/.env")
   for f in "${slug}-db.sql.gz" "${slug}-wordpress.tgz"; do
     [[ -f "${TODAY_DIR}/${f}" ]] || fail "${f} missing (site ${slug} registered in ${SITES_DIR})"
   done
+  # paused.<slug>-wp = WordPress not installed yet (the hosting gate's site-create sets it, `site-wp install` removes
+  # it): an empty database and the image's files only, so the content floors cannot hold. Both files must still be
+  # whole archives; the floors apply again the night after the flag is gone. The same flag also freezes an INSTALLED
+  # site (migration runbook), so the exemption also needs the dump to prove it: zero CREATE TABLE = never installed.
+  if [[ -e "${CRON_STATE}/paused.${slug}-wp" && -f "${TODAY_DIR}/${slug}-db.sql.gz" ]] \
+     && [[ "$(zcat "${TODAY_DIR}/${slug}-db.sql.gz" 2>/dev/null | grep -c '^CREATE TABLE' || true)" == 0 ]]; then
+    ok "site ${slug}: 尚未安裝 (WordPress not installed yet, ${CRON_STATE}/paused.${slug}-wp) -- content floors skipped"
+    if [[ -f "${TODAY_DIR}/${slug}-db.sql.gz" ]]; then require_gzip "${slug}-db.sql.gz" "site ${slug}, not installed" 1 0; fi
+    if [[ -f "${TODAY_DIR}/${slug}-wordpress.tgz" ]]; then require_tgz "${slug}-wordpress.tgz" "site ${slug}, not installed" 1 1; fi
+    continue
+  fi
   if [[ -f "${TODAY_DIR}/${slug}-db.sql.gz" ]]; then require_gzip "${slug}-db.sql.gz" "site ${slug}" 2000 12; fi
   if [[ -f "${TODAY_DIR}/${slug}-wordpress.tgz" ]]; then require_tgz "${slug}-wordpress.tgz" "site ${slug}" 1000000 1000; fi
 done
 
 # Encrypted .env bundle — required whenever any target .env exists on the host
-if [[ -f /root/soulful/.env || -f /root/chatwoot/.env ]]; then
+if [[ -f /root/soulful/.env || -f /root/chatwoot/.env || ${#SITE_ENVS[@]} -gt 0 ]]; then
   F="${TODAY_DIR}/env.tar.gz.enc"
   if [[ -f "$F" && -s "$F" ]]; then
     ok "env.tar.gz.enc ($(du -h "$F" | cut -f1), present)"
   else
     fail "env.tar.gz.enc missing or empty (secrets NOT protected, but .env file(s) exist on host)"
   fi
+  # tar -v member list written next to the bundle by backup-ks-aw-01.sh section 5 (names only, no values). GNU tar
+  # prints them as given (/root/...), the archive stores them without the leading / -- compared without it, like
+  # backup-coverage-check.py's members check.
+  for m in ${SITE_ENVS[@]+"${SITE_ENVS[@]}"}; do
+    if sed 's#^\./##; s#^/*##' "${F}.members" 2>/dev/null | grep -qxF "$m"; then ok "env.tar.gz.enc holds /${m}"
+    else fail "env.tar.gz.enc does not hold /${m} (registered site's DB passwords NOT backed up)"; fi
+  done
 fi
 
 # R2 offsite marker (.verify written by backup-ks-aw-01.sh only after upload succeeds)

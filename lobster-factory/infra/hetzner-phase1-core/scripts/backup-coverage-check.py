@@ -18,7 +18,9 @@ Reads backup-inventory.json next to this file and fails when:
     /api/internal/reconcile, one row per inventory reconcile check), or the check could not run;
   - a client site in the registry SITES_DIR (templates/client-wp/render.sh) is unreadable, or lacks its
     <slug>-db.sql.gz / <slug>-wordpress.tgz in the ks-aw-01 pipeline (backup-ks-aw-01.sh section 4b). Each registered
-    site is a store "site:<slug>" built here, so its running containers' mounts count as listed.
+    site is a store "site:<slug>" built here, so its running containers' mounts count as listed. A site whose
+    <site dir>/.env exists must also be a member of env.tar.gz.enc (section 5). A site with
+    <WP_CRON_STATE_DIR>/paused.<slug>-wp (WordPress not installed yet) is marked 尚未安裝 in its row.
 Volumes kept by deprovision-site.sh (<site dir>/DEPROVISIONED) are no longer backed up daily; they are reported in a
 "retained-volumes" PASS row as a reminder, not a failure: teardown chose to keep them, and the last snapshots
 holding them stay in R2 until the ks-aw-01/ lifecycle expires them.
@@ -47,6 +49,7 @@ CLOCK_SKEW = 300  # R2 last_modified vs. this host's clock
 # Client site registry and site dirs: same defaults and override names as templates/client-wp/render.sh.
 SITES_DIR = os.environ.get("CLIENT_WP_REGISTRY_DIR", "/etc/awarewave/sites.d")
 SITES_ROOT = os.environ.get("CLIENT_WP_SITES_ROOT", "/root/sites")
+CRON_STATE = os.environ.get("WP_CRON_STATE_DIR", "/var/lib/wp-cron-runner")  # = wp-cron-runner.sh STATE_DIR
 SITE_PIPELINE = "ks-aw-01"  # backup-ks-aw-01.sh backs registered sites up (section 4b)
 SITE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 SITE_KEYS = {"slug", "domain", "ingress", "container", "db_container", "volumes", "port", "compose_file", "vhost_file",
@@ -82,9 +85,13 @@ def r2_problems(keys, base, size, mtime, threshold):
 def site_store(site):
     """A registered client site as an inventory store (names = render.sh's, already checked by read_sites)."""
     slug = site["slug"]
+    arts = [f"{slug}-db.sql.gz", f"{slug}-wordpress.tgz"]
+    if site.get("env"):  # its DB passwords: backup-ks-aw-01.sh section 5 encrypts <site dir>/.env with the others
+        arts.append({"name": "env.tar.gz.enc", "members_file": "env.tar.gz.enc.members", "members": [site["env"]]})
     return {"id": f"site:{slug}", "pipeline": SITE_PIPELINE, "created": site.get("created"),
+            "not_installed": bool(site.get("not_installed")),
             "mounts": [f"{slug}-wp:/var/www/html", f"{slug}-db:/var/lib/mysql"],
-            "artifacts": [f"{slug}-db.sql.gz", f"{slug}-wordpress.tgz"],
+            "artifacts": arts,
             "sources": {f"{slug}-wp:/var/www/html": f"{slug}_wordpress_data"}}
 
 
@@ -99,7 +106,8 @@ def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now, drill=None,
     drill: None (no status file) | {"unreadable": why} | backup-restore-drill.py's status JSON.
     leftovers: what the drill left (labelled containers/volumes, files under its work root).
     reconcile: None | {"error": why} | /api/internal/reconcile's answer (B8, one row per inventory check).
-    sites: read_sites() -- [{"slug", "created": epoch | None} | {"file", "error"}].
+    sites: read_sites() -- [{"slug", "created": epoch | None, "env"?: member path, "not_installed"?: bool}
+           | {"file", "error"}].
     retained: [(slug, [volume, ...])] -- volumes deprovision-site.sh kept that still exist.
     """
     rows = []
@@ -170,7 +178,11 @@ def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now, drill=None,
                     problems.append("R2 listing failed")
                 else:
                     problems += r2_problems(keys, base, size, mtime, inv["split_threshold_bytes"])
-        row(s["id"], problems, f"{snap and snap['stamp']}: {len(s['artifacts'])} artifact(s) local and in R2", s.get("plan"))
+        ok_detail = f"{snap and snap['stamp']}: {len(s['artifacts'])} artifact(s) local and in R2"
+        if s.get("not_installed"):  # same checks; the row says why the content is a bare WordPress (SF-E2 #8)
+            ok_detail = "尚未安裝 (WordPress not installed yet): " + ok_detail
+            problems = [f"尚未安裝; {p}" for p in problems]
+        row(s["id"], problems, ok_detail, s.get("plan"))
 
     expected = inv["r2"]["lifecycle_max_age_seconds"]
     if lifecycle is None:
@@ -261,9 +273,10 @@ def newest_snapshot(root):
     return {"stamp": stamps[-1], "files": files, "members": members}
 
 
-def read_sites(d=None):
-    """sites.d -> [{"slug", "created": epoch | None} | {"file", "error"}]. Same refusal rule as backup-ks-aw-01.sh 4b."""
-    d = d or SITES_DIR
+def read_sites(d=None, root=None, cron_state=None):
+    """sites.d -> [{"slug", "created": epoch | None, "env"?, "not_installed"?} | {"file", "error"}]. Same refusal rule
+    as backup-ks-aw-01.sh 4b. env = the tar member name of <root>/<slug>/.env when that file exists."""
+    d, root, cron_state = d or SITES_DIR, root or SITES_ROOT, cron_state or CRON_STATE
     try:
         names = sorted(n for n in os.listdir(d) if n.endswith(".json") and not n.startswith("."))
     except FileNotFoundError:
@@ -289,7 +302,12 @@ def read_sites(d=None):
                 created = datetime.strptime(r["created_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
             except (TypeError, ValueError):
                 created = None  # unknown age: due now
-            out.append({"slug": slug, "created": created})
+            site = {"slug": slug, "created": created}
+            if os.path.isfile(os.path.join(root, slug, ".env")):
+                site["env"] = f"{root.strip('/')}/{slug}/.env"
+            if os.path.exists(os.path.join(cron_state, f"paused.{slug}-wp")):
+                site["not_installed"] = True
+            out.append(site)
     return out
 
 

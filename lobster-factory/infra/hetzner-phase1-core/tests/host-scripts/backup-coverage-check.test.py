@@ -257,6 +257,60 @@ class RegisteredSites(unittest.TestCase):
         self.assertIn("not a site slug", got["Bad.json"]["error"])
         self.assertIn("unreadable", got["c.json"]["error"])
 
+    # SF-E2 #7: a site with a .env on the host must have it in the encrypted bundle.
+    def env_eval(self, members):
+        snaps, keys, life, locks = state()
+        stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(FRESH - 600))
+        files = {"manifest.json": (100, FRESH)}
+        for art in ("a-db.sql.gz", "a-wordpress.tgz") + (("env.tar.gz.enc",) if members is not None else ()):
+            files[art] = (10, FRESH)
+            keys.setdefault("ks-aw-01", {})[f"ksw/{stamp}/{art}"] = (10, UP)
+        snaps["ks-aw-01"] = {"stamp": stamp, "files": files,
+                             "members": {} if members is None else {"env.tar.gz.enc.members": members}}
+        mounts = {k: v for k, v in self.MOUNTS.items() if not k.startswith("b-")}
+        return cov.evaluate(self.INV, mounts, snaps, keys, life, locks, NOW,
+                            sites=[{"slug": "a", "created": FRESH - 86400, "env": "root/sites/a/.env"}])
+
+    def test_site_env_in_the_bundle_passes(self):
+        self.assertEqual(fails(self.env_eval(["root/soulful/.env", "root/sites/a/.env"])), {})
+
+    def test_site_env_missing_from_the_bundle_fails(self):
+        self.assertIn("lacks root/sites/a/.env", fails(self.env_eval(["root/soulful/.env"]))["site:a"])
+
+    def test_site_env_without_any_bundle_fails(self):
+        self.assertIn("env.tar.gz.enc missing", fails(self.env_eval(None))["site:a"])
+
+    # SF-E2 #8: WordPress not installed yet -> the row says 尚未安裝; a real gap still fails.
+    def test_not_installed_site_is_marked(self):
+        rows = self.run_eval(sites=[{**self.SITES[0], "not_installed": True}, self.SITES[1]])
+        self.assertEqual(fails(rows), {})
+        self.assertIn("尚未安裝", next(r for r in rows if r["id"] == "site:a")["detail"])
+        self.assertNotIn("尚未安裝", next(r for r in rows if r["id"] == "site:b")["detail"])
+
+    def test_not_installed_site_missing_artifact_still_fails(self):
+        f = fails(self.run_eval(sites=[{**self.SITES[0], "not_installed": True}, self.SITES[1]], drop=("a-db.sql.gz",)))
+        self.assertIn("a-db.sql.gz missing", f["site:a"])
+
+    def test_read_sites_sees_env_and_paused_flag(self):
+        import json
+        import tempfile
+        good = {"slug": "a", "domain": "a.example.org", "ingress": "host-vhost", "container": "a-wp", "db_container": "a-db",
+                "volumes": ["a_wordpress_data", "a_db_data"], "port": 8100, "compose_file": "/root/sites/a/docker-compose.yml",
+                "vhost_file": None, "created_at": "2026-11-22T10:00:00Z"}
+        with tempfile.TemporaryDirectory() as d:
+            for sub in ("reg", "sites/a", "cron"):
+                os.makedirs(os.path.join(d, sub))
+            with open(os.path.join(d, "reg", "a.json"), "w", encoding="utf-8") as fh:
+                json.dump(good, fh)
+            plain = cov.read_sites(os.path.join(d, "reg"), os.path.join(d, "sites"), os.path.join(d, "cron"))[0]
+            open(os.path.join(d, "sites", "a", ".env"), "w").close()
+            open(os.path.join(d, "cron", "paused.a-wp"), "w").close()
+            both = cov.read_sites(os.path.join(d, "reg"), os.path.join(d, "sites"), os.path.join(d, "cron"))[0]
+        self.assertNotIn("env", plain)
+        self.assertNotIn("not_installed", plain)
+        self.assertTrue(both["env"].endswith("sites/a/.env") and not both["env"].startswith("/"))
+        self.assertTrue(both["not_installed"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

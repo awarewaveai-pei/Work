@@ -103,8 +103,8 @@ check "all good with uploader: exit 0" test "$(rc ok)" = 0
 
 # ── verify ──────────────────────────────────────────────────────────────────────────────────────────────
 V="$BK/verify-backup-ks-aw-01.sh"
-vrun() {  # <name> <backup dir> <sites dir>
-  env BACKUP_DIR="$2" CLIENT_WP_REGISTRY_DIR="$3" EXPECT_SERVICES= bash "$V" >"$WORK/$1.out" 2>&1; echo $? >"$WORK/$1.rc"
+vrun() {  # <name> <backup dir> <sites dir> [env...]
+  env BACKUP_DIR="$2" CLIENT_WP_REGISTRY_DIR="$3" EXPECT_SERVICES= "${@:4}" bash "$V" >"$WORK/$1.out" 2>&1; echo $? >"$WORK/$1.rc"
 }
 mksites "$WORK/vs" a b
 run vsrc "$B" "$WORK/vs" EXPECT_SERVICES= R2_API_TOKEN=test-only UPLOAD_TO_R2="$WORK/bin/upload-ok"
@@ -130,6 +130,45 @@ if [[ -n "${BASE_VERIFY:-}" ]]; then
   env BACKUP_DIR="$WORK/vsrc.d" EXPECT_SERVICES= bash "$BASE_VERIFY" >"$WORK/v-base.out" 2>&1
   check "verify, no sites.d: output line-identical to BASE_VERIFY" diff <(norm v-base) <(norm v-cur)
 fi
+
+# ── SF-E2 #7: a registered site's .env (its DB passwords) goes into the encrypted bundle; never into a log ─────────
+mksites "$WORK/e7" a b
+mkdir -p "$WORK/sroot/a" "$WORK/sroot/b"
+printf 'SITE_DB_PASSWORD=env-canary-91a\nSITE_DB_ROOT_PASSWORD=env-canary-91b\n' >"$WORK/sroot/a/.env"
+printf 'SITE_DB_PASSWORD=env-canary-92a\n' >"$WORK/sroot/b/.env"
+run e7 "$B" "$WORK/e7" EXPECT_SERVICES= CLIENT_WP_SITES_ROOT="$WORK/sroot" BACKUP_ENC_KEY=test-only-key R2_API_TOKEN=test-only UPLOAD_TO_R2="$WORK/bin/upload-ok"
+E7="$(echo "$WORK"/e7.d/*)"; M7="${WORK#/}/sroot"
+check "#7 both sites' .env listed in env.tar.gz.enc.members" bash -c 'm=$(sed "s#^/*##" "$2"); grep -qxF "$1/a/.env" <<<"$m" && grep -qxF "$1/b/.env" <<<"$m"' _ "$M7" "$E7/env.tar.gz.enc.members"
+check "#7 bundle decrypts to the site's .env" bash -c 'openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:test-only-key -in "$1" | tar xzOf - "$2/a/.env" | grep -q env-canary-91a' _ "$E7/env.tar.gz.enc" "$M7"
+check "#7 no password value in the log or the members list" bash -c '! grep -q env-canary "$1" "$2"' _ "$WORK/e7.out" "$E7/env.tar.gz.enc.members"
+check "#7 run ok (exit 0, errors=0)" bash -c '[[ $(cat "$1") == 0 ]] && grep -q "\"errors\":0" "$2"' _ "$WORK/e7.rc" "$E7/manifest.json"
+vrun v7 "$WORK/e7.d" "$WORK/e7" CLIENT_WP_SITES_ROOT="$WORK/sroot"
+check "#7 verify: each site's .env found in the bundle -> PASSED" bash -c 'grep -q "env.tar.gz.enc holds /$2/a/.env" "$1" && grep -q PASSED "$1"' _ "$WORK/v7.out" "$M7"
+sed -i "\#/sroot/b/.env#d" "$E7/env.tar.gz.enc.members"
+vrun v7b "$WORK/e7.d" "$WORK/e7" CLIENT_WP_SITES_ROOT="$WORK/sroot"
+check "#7 verify: a site's .env missing from the bundle -> FAILED" bash -c 'grep -q "does not hold /$2/b/.env" "$1" && grep -q FAILED "$1"' _ "$WORK/v7b.out" "$M7"
+
+# ── SF-E2 #8: WordPress not installed yet (paused.<slug>-wp) -> 尚未安裝, not below-floor; floors back once removed ─
+mksites "$WORK/e8" a
+run e8 "$B" "$WORK/e8" EXPECT_SERVICES= R2_API_TOKEN=test-only UPLOAD_TO_R2="$WORK/bin/upload-ok"
+E8="$(echo "$WORK"/e8.d/*)"
+printf -- '-- MariaDB dump\n-- Dump completed on 2026-11-22\n' | gzip >"$E8/a-db.sql.gz"   # a fresh, empty WordPress DB
+mkdir -p "$WORK/e8src" && : >"$WORK/e8src/index.php" && tar czf "$E8/a-wordpress.tgz" -C "$WORK/e8src" .
+mkdir -p "$WORK/cron"; : >"$WORK/cron/paused.a-wp"
+vrun v8 "$WORK/e8.d" "$WORK/e8" WP_CRON_STATE_DIR="$WORK/cron"
+check "#8 paused site: marked 尚未安裝, no floor failure, PASSED" \
+  bash -c 'grep -q "site a: 尚未安裝" "$1" && ! grep -q "below" "$1" && grep -q PASSED "$1"' _ "$WORK/v8.out"
+rm "$E8/a-db.sql.gz"; vrun v8m "$WORK/e8.d" "$WORK/e8" WP_CRON_STATE_DIR="$WORK/cron"
+check "#8 paused site with its dump missing still FAILS" bash -c 'grep -q "a-db.sql.gz missing" "$1" && grep -q FAILED "$1"' _ "$WORK/v8m.out"
+printf -- '-- MariaDB dump\n-- Dump completed on 2026-11-22\n' | gzip >"$E8/a-db.sql.gz"; rm "$WORK/cron/paused.a-wp"
+vrun v8u "$WORK/e8.d" "$WORK/e8" WP_CRON_STATE_DIR="$WORK/cron"
+check "#8 flag removed: the floors apply again -> FAILED below floor" bash -c 'grep -q "below" "$1" && grep -q FAILED "$1"' _ "$WORK/v8u.out"
+# the same flag also freezes an installed site (migration runbook): tables in the dump = installed -> floors apply
+: >"$WORK/cron/paused.a-wp"
+{ printf -- '-- MariaDB dump\n'; for i in $(seq 1 12); do printf 'CREATE TABLE `wp_t%s` (id int);\n' "$i"; done; printf -- '-- Dump completed\n'; } | gzip >"$E8/a-db.sql.gz"
+vrun v8i "$WORK/e8.d" "$WORK/e8" WP_CRON_STATE_DIR="$WORK/cron"
+check "#8 paused but installed (tables in the dump) -> no exemption, FAILED below floor" \
+  bash -c '! grep -q "尚未安裝" "$1" && grep -q "below" "$1" && grep -q FAILED "$1"' _ "$WORK/v8i.out"
 
 echo "== $pass passed, $failed failed =="
 [[ $failed -eq 0 ]]

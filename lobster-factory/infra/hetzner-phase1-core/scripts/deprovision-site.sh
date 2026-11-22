@@ -32,9 +32,18 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# Path overrides (render.sh's CLIENT_WP_* and DEPROVISION_ARCHIVE_DIR) exist for throwaway tests and need the explicit
+# switch CLIENT_WP_TEST_PATHS=1. Without it, any of them set = refused: a variable left in a root shell would otherwise
+# send a real teardown to another lock than the gate's (SF-E2 #9).
+if [[ "${CLIENT_WP_TEST_PATHS-}" != 1 ]]; then
+  for v in CLIENT_WP_SITES_ROOT CLIENT_WP_REGISTRY_DIR CLIENT_WP_NGINX_DIR CLIENT_WP_LOCK_DIR DEPROVISION_ARCHIVE_DIR; do
+    [[ -z "${!v+x}" ]] || { echo "DENIED: $v is set; test path overrides need CLIENT_WP_TEST_PATHS=1 (unset it for a real run)"; exit 2; }
+  done
+fi
 # shellcheck source=templates/client-wp/render.sh
 source "$HERE/templates/client-wp/render.sh"
-ARCHIVE_ROOT="${DEPROVISION_ARCHIVE_DIR:-/var/lib/awarewave/deprovisioned}"   # override: throwaway tests only
+ARCHIVE_ROOT=/var/lib/awarewave/deprovisioned
+[[ "${CLIENT_WP_TEST_PATHS-}" != 1 ]] || ARCHIVE_ROOT="${DEPROVISION_ARCHIVE_DIR:-$ARCHIVE_ROOT}"
 
 SLUG=""; APPLY=0; CONFIRM=""; PURGE=0; CONFIRM_PURGE=""
 say()  { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -64,7 +73,7 @@ fi
 
 # Same lock as the hosting gate's site-create/site-vhost (render.sh caller contract 1). Dry run writes nothing, so no lock.
 if (( APPLY )); then
-  mkdir -p "$CLIENT_WP_LOCK_DIR"
+  why="$(client_wp_lock_dir_ready 2>&1)" || deny "$why"
   exec 9>"$(client_wp_lock_file "$SLUG")" || deny "cannot open lock $(client_wp_lock_file "$SLUG")"
   flock -n 9 || deny "another create/teardown of $SLUG is running (lock $(client_wp_lock_file "$SLUG"))"
 fi
@@ -148,6 +157,10 @@ read -ra VOLUMES <<<"${R[volumes]}"
 project_containers() { docker ps -aq --filter "label=com.docker.compose.project=$SLUG"; }
 vol_project() { docker volume inspect -f '{{index .Labels "com.docker.compose.project"}}' "$1" 2>/dev/null; }
 
+# A retired site's vhost went away in the teardown that kept its volumes (step 1 runs before the marker is written), so
+# its domain may since serve another site from the same path: a purge never looks at, or is stopped by, that (SF-E2 #10).
+[[ "$MODE" != retired ]] || { VHOST=""; LINK=""; }
+
 # ── plan (read-only) ────────────────────────────────────────────────────────────────────────────────────────
 state() { if "$@" >/dev/null 2>&1; then echo present; else echo absent; fi; }
 case "$MODE" in
@@ -159,6 +172,8 @@ if [[ -n "$VHOST" ]]; then
   own="NOT this site's vhost -- will stop"; client_wp_vhost_owned "$VHOST" "$SLUG" "${R[domain]}" "${R[port]}" && own="this site's"
   [[ -e "$VHOST" ]] || own="gone"
   say "  1 vhost       remove link $LINK [$(state test -L "$LINK")], nginx -t, reload; archive $VHOST [$own]"
+elif [[ "$MODE" == retired ]]; then
+  say "  1 vhost       removed by the earlier teardown (archive $(dirname "$REGISTRY")) -- the domain's current vhost is not touched"
 else
   say "  1 vhost       none recorded (ingress=${R[ingress]}; a vhost is recorded only after this site's host-nginx-new) -- not touched"
 fi
@@ -167,7 +182,7 @@ for v in "${VOLUMES[@]}"; do
   if (( PURGE )); then act="DELETE"; else act="keep"; fi
   say "  3 volume      $act $v [$(state docker volume inspect "$v")]"
 done
-if (( PURGE )); then say "  3 .env        delete $ENV_FILE and $SITE_DIR"
+if (( PURGE )); then say "  3 .env        delete $ENV_FILE, the pre-plugins DB export and $SITE_DIR"
 else say "  3 .env        keep $ENV_FILE (DB password of the kept volumes); mark $MARKER"; fi
 case "$MODE" in
   live)    say "  4 registry    archive $REGISTRY" ;;
@@ -241,7 +256,7 @@ if (( PURGE )); then
     docker volume rm "$v" >/dev/null || fail "docker volume rm $v failed"
     say "3 volume $v deleted"
   done
-  rm -f "$ENV_FILE" "$MARKER" "$POINTER"
+  rm -f "$ENV_FILE" "$(client_wp_db_export_file "$SLUG")" "$(client_wp_db_export_file "$SLUG")".?????? "$MARKER" "$POINTER"   # + an export temp a killed run left
   rmdir "$SITE_DIR" 2>/dev/null || [[ ! -e "$SITE_DIR" ]] || say "3 warn: $SITE_DIR not empty, left in place"
 else
   # The marker is the only pointer to the archived registry once step 4 runs, so it is written even without a site dir.

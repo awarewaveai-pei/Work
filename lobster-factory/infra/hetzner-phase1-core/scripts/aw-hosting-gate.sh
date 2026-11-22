@@ -29,6 +29,8 @@
 # Host switch (SITE-FLOW I6): /etc/default/aw-hosting-gate.local, root-owned, not group/world-writable, containing the
 # line AW_SITE_VERBS=on. Missing/other -> every site-* verb exits 126. This script reaches the host on every merge to
 # main (sync-host-scripts.sh), so the switch is what keeps a merged-but-unapproved verb off. The file is read, never sourced.
+# Same file: AW_SITE_MAX=<n> (site cap) and AW_SITE_GATEWAY_SLUGS=<slug> <slug> (the only slugs site-create may give
+# ingress=product-gateway, i.e. a container on the shared lobster-net; missing = none).
 #
 # Output contract (gate-client.ts): exit 0 = done, 126 = not allowed, other = failed (reason on stderr); stdout's last
 # line is one JSON object. Secrets (admin passwords) appear only on that one stdout line: never on an argv, in syslog,
@@ -62,6 +64,7 @@ LOCALE_RE='^[a-z]{2,3}(_[A-Z]{2})?$'
 PLUGIN_SLUG_RE='^[a-z0-9][a-z0-9-]{0,62}$'
 # Own plugins: release assets of the company's GitHub org only (SITE-FLOW §1-3); next-admin narrows it to catalog repos.
 RELEASE_RE='^https://github\.com/awarewaveai-pei/[A-Za-z0-9][A-Za-z0-9._-]{0,99}/releases/download/[A-Za-z0-9][A-Za-z0-9._+-]{0,99}/[A-Za-z0-9][A-Za-z0-9._+-]{0,99}\.zip$'
+RELEASE_TAG_RE='/releases/download/v[0-9]+(\.[0-9]+){0,3}/'   # tag = v<plugin version>: the no-downgrade compare needs it
 MAINWP_RE='^[0-9a-f]{32,128}$'
 KEYID_RE='^[A-Za-z0-9][A-Za-z0-9_-]{0,190}$'   # wp-bridge AdminPage.php generateKey, minus a leading -
 PUBKEY_RE='^[A-Za-z0-9+/]{43}=$'               # base64 of a 32-byte Ed25519 public key
@@ -90,7 +93,7 @@ wp_args_ok() {
     plugins)
       [[ ${#rest[@]} -ge 1 && ${#rest[@]} -le 20 ]] || return 1
       for a in "${rest[@]}"; do
-        [[ "$a" =~ $PLUGIN_SLUG_RE || ( "$a" =~ $RELEASE_RE && "$a" != *..* ) ]] || return 1
+        [[ "$a" =~ $PLUGIN_SLUG_RE || ( "$a" =~ $RELEASE_RE && "$a" != *..* && "$a" =~ $RELEASE_TAG_RE ) ]] || return 1
       done ;;
     open|close|reset-admin-password) [[ ${#rest[@]} -eq 0 ]] ;;
     set-mainwp-id) [[ ${#rest[@]} -eq 1 && "${rest[0]}" =~ $MAINWP_RE ]] ;;
@@ -124,7 +127,7 @@ parse_site() {
 # The site-* verbs never take caller overrides of the paths render.sh derives (its CLIENT_WP_* knobs are for its own
 # throwaway tests); sshd passes no environment to a forced command, and this keeps it so if that ever changes.
 load_render() {
-  unset CLIENT_WP_SITES_ROOT CLIENT_WP_REGISTRY_DIR CLIENT_WP_NGINX_DIR CLIENT_WP_LOCK_DIR
+  unset CLIENT_WP_SITES_ROOT CLIENT_WP_REGISTRY_DIR CLIENT_WP_NGINX_DIR CLIENT_WP_LOCK_DIR CLIENT_WP_TEST_PATHS
   # shellcheck source=templates/client-wp/render.sh
   source "$HERE/templates/client-wp/render.sh" || die 3 "templates/client-wp/render.sh missing next to the gate"
   [[ "$CLIENT_WP_DOMAIN_RE" == "$DOMAIN_RE" && "$CLIENT_WP_SLUG_RE" == "$SLUG_RE" ]] \
@@ -154,6 +157,18 @@ switch_value() {  # <KEY>: the LAST `KEY=` line wins (a later `=off` must switch
   switch_trusted && sed -n "s/^$1=//p" "$SITE_SWITCH" | tail -n 1
 }
 site_switch_on() { [[ "$(switch_value AW_SITE_VERBS)" == on ]]; }
+# ingress=product-gateway puts the site's container on the shared lobster-net, next to every product (SF-E2 #2): only a
+# slug the host lists in AW_SITE_GATEWAY_SLUGS (same drop-in, space-separated) may ask for it; the caller cannot.
+gateway_allowed() {
+  local s
+  local list=() hit=1
+  read -r -a list <<<"$(switch_value AW_SITE_GATEWAY_SLUGS)"   # no pathname expansion of a `*` in the file
+  for s in ${list[@]+"${list[@]}"}; do
+    [[ "$s" =~ $SLUG_RE ]] || return 1   # any other token (a `# comment`, a typo) voids the whole list: fail closed
+    [[ "$s" == "$1" ]] && hit=0
+  done
+  return "$hit"
+}
 # Capacity (critic M3): one host carries every service, so a leaked key or a caller loop must not be able to start sites
 # until it falls over. AW_SITE_MAX (same drop-in) caps registered + in-flight sites; each create also needs the memory
 # its compose limits can claim (db 1G + wp 2G) plus a 1G reserve, free when its compose-new starts.
@@ -171,11 +186,7 @@ mem_available_kb() { sed -n 's/^MemAvailable: *\([0-9]*\) kB$/\1/p' /proc/meminf
 PY_HELP='
 import json, os, re, ssl, subprocess, sys, time
 cmd = sys.argv[1]
-def names_in(path):
-    try:
-        txt = open(path, encoding="utf-8", errors="replace").read()
-    except OSError:
-        return []
+def names_in_text(txt):
     txt = "\n".join(l.split("#", 1)[0] for l in txt.splitlines())
     out = []
     for m in re.finditer(r"(?:^|[\s;{}])server_name\s+([^;]*);", txt):
@@ -204,14 +215,23 @@ if cmd == "obj":
         else:
             k, v = a.split("=", 1); o[k] = v
     print(json.dumps(o, ensure_ascii=False))
-elif cmd == "occupants":                    # <domain> <sites-enabled>: every enabled file whose server_name matches
-    d, sdir = sys.argv[2:4]
-    res = []
-    for f in (sorted(os.listdir(sdir)) if os.path.isdir(sdir) else []):
-        p = os.path.join(sdir, f)
-        hit = [n for n in names_in(p) if name_matches(n, d)]
-        if hit:
-            res.append({"file": p, "target": os.path.realpath(p), "server_names": hit})
+elif cmd == "occupants":                    # <domain>: every file of the LIVE nginx config whose server_name matches
+    # `nginx -T` = the config nginx actually loads (every include: conf.d, snippets, sites-enabled), each file after a
+    # "# configuration file <path>:" line (SF-E2 #3). Cannot read it -> exit 1: nobody can prove the name is free.
+    d = sys.argv[2]
+    try:
+        r = subprocess.run(["nginx", "-T"], capture_output=True, text=True, errors="replace", timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        sys.exit(f"nginx -T did not run: {e}")
+    if r.returncode != 0:
+        sys.exit("nginx -T failed: " + " ".join(r.stderr.split())[-300:])
+    res, seen = [], set()
+    parts = re.split(r"^# configuration file (.+):$", r.stdout, flags=re.M)
+    for path, body in zip(parts[1::2], parts[2::2]):
+        hit = [n for n in names_in_text(body) if name_matches(n, d)]
+        if hit and path not in seen:
+            seen.add(path)
+            res.append({"file": path, "target": os.path.realpath(path), "server_names": hit})
     print(json.dumps(res))
 elif cmd == "certs":                        # <domain> <live dir>: unexpired certs whose SAN covers it, latest expiry first
     d, live = sys.argv[2:4]
@@ -276,9 +296,17 @@ with_secret() {
 newhex() { tr -dc 'a-f0-9' </dev/urandom | head -c 48; }    # .env: hex only (compose interpolates `$`)
 newpass() { tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24; }
 
-# contract 1: the slug lock (same file as deprovision-site.sh) and the port lock.
-slug_lock() { mkdir -p -m 0700 "$CLIENT_WP_LOCK_DIR" && exec 9>"$(client_wp_lock_file "$SLUG")" && flock -n 9; }
-slug_busy() { ( mkdir -p -m 0700 "$CLIENT_WP_LOCK_DIR" && exec 9>"$(client_wp_lock_file "$SLUG")" && ! flock -n 9 ); }
+# contract 1: the slug lock (same file as deprovision-site.sh) and the port lock, both in a root-only dir (SF-E2 #1).
+# Every verb that changes a site holds the slug lock to its end; site-preflight and site-job only read and take none.
+# slug_lock: 0 = held on fd 9 (inherited by every docker exec it starts); else LOCK_WHY says why.
+slug_lock() {
+  LOCK_WHY="$(client_wp_lock_dir_ready 2>&1)" || return 1
+  LOCK_WHY="cannot open lock $(client_wp_lock_file "$SLUG")"
+  exec 9>"$(client_wp_lock_file "$SLUG")" || return 1
+  LOCK_WHY="another create/vhost/wp/teardown of $SLUG is running"
+  flock -n 9
+}
+slug_busy() { ( exec 9>"$(client_wp_lock_file "$SLUG")" && ! flock -n 9 ); }   # after client_wp_lock_dir_ready
 
 ct_state() {  # <container> -> absent | <status>|<health>
   docker inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1" 2>/dev/null || echo absent
@@ -342,14 +370,15 @@ create_plan() {
 
 site_preflight() {
   SLUG="${argv[1]}"; DOMAIN="${argv[2]}"; INGRESS=host-vhost
-  local reg_json=null reg_err="" occ certs vols v lab
+  local reg_json=null reg_err="" occ occ_err="" certs vols v lab
   if [[ -e "$(client_wp_registry_file "$SLUG")" ]]; then
     if read_registry 2>/dev/null; then reg_json="$(obj domain="$R_DOMAIN" ingress="$R_INGRESS" port:="$R_PORT" vhost_file="$R_VHOST" created_at="$R_CREATED")"
     else reg_err="$(client_wp_read_registry "$SLUG" 2>&1 >/dev/null)"; fi
     [[ -n "${R_INGRESS-}" ]] && INGRESS="$R_INGRESS"
   fi
   create_plan
-  occ="$(py occupants "$DOMAIN" "$CLIENT_WP_NGINX_DIR/sites-enabled")"
+  # null + vhost_occupants_error = the live config could not be read: unknown, never "free".
+  occ="$(py occupants "$DOMAIN" 2>/dev/null)" || { occ_err="$(py occupants "$DOMAIN" 2>&1 >/dev/null)"; occ=null; }
   certs="$(py certs "$DOMAIN" "$LE_LIVE")"
   local vargs=()   # volume -> its compose project label, "unlabelled", or "absent"
   for v in $(client_wp_volumes "$SLUG"); do
@@ -357,7 +386,7 @@ site_preflight() {
   done
   vols="$(obj "${vargs[@]}")"
   obj slug="$SLUG" domain="$DOMAIN" registry:="$reg_json" registry_error="$(clean "$reg_err")" \
-    vhost_occupants:="$occ" certs:="$certs" volumes:="$vols" \
+    vhost_occupants:="$occ" vhost_occupants_error="$(clean "$occ_err")" certs:="$certs" volumes:="$vols" \
     wp_container="$(ct_state "$(client_wp_container "$SLUG")")" db_container="$(ct_state "$(client_wp_db_container "$SLUG")")" \
     retired:="$([[ -e "$(client_wp_retired_marker "$SLUG")" ]] && echo true || echo false)" \
     env_file:="$([[ -f "$(client_wp_env_file "$SLUG")" ]] && echo true || echo false)" \
@@ -367,8 +396,11 @@ site_preflight() {
 # ── site-create: the SSH call only queues; the work runs in its own systemd unit (Cloudflare cuts requests at ~100 s).
 site_create() {
   SLUG="${argv[1]}"; DOMAIN="${argv[2]}"; INGRESS="${argv[3]:-host-vhost}"
-  local job jf
-  slug_busy && die 3 "another create/vhost/teardown of $SLUG is running"
+  local job jf why
+  [[ "$INGRESS" != product-gateway ]] || gateway_allowed "$SLUG" \
+    || die 126 "ingress=product-gateway for $SLUG is not allowed on this host (AW_SITE_GATEWAY_SLUGS in $SITE_SWITCH)"
+  why="$(client_wp_lock_dir_ready 2>&1)" || die 3 "$why"
+  slug_busy && die 3 "another create/vhost/wp/teardown of $SLUG is running"
   mkdir -p -m 0700 "$JOB_DIR" || die 3 "cannot create $JOB_DIR"
   find "$JOB_DIR" -maxdepth 1 -type f -name 'sj-*' -mtime +30 -delete 2>/dev/null
   if [[ ! -f "$(client_wp_registry_file "$SLUG")" ]]; then   # fail fast; the job re-checks under the port lock
@@ -406,7 +438,10 @@ run_create_job() {
   py jobset "$JF" state=running pid="$BASHPID"
 
   step lock
-  slug_lock || fail_job "another create/vhost/teardown of $SLUG is running"
+  slug_lock || fail_job "$LOCK_WHY"
+  # Re-checked here: the list may have changed between the SSH call and this job (or the job file was written by hand).
+  [[ "$INGRESS" != product-gateway ]] || gateway_allowed "$SLUG" \
+    || fail_job "ingress=product-gateway for $SLUG is not allowed on this host (AW_SITE_GATEWAY_SLUGS in $SITE_SWITCH)"
   step plan
   create_plan
   cname="$(client_wp_container "$SLUG")"; paused="$CRON_STATE/paused.$cname"
@@ -497,7 +532,7 @@ site_job() {
 site_vhost() {
   SLUG="${argv[1]}"
   local vf link occ others cert content
-  slug_lock || die 3 "another create/vhost/teardown of $SLUG is running"
+  slug_lock || die 3 "$LOCK_WHY"
   read_registry || die 3 "no valid registry for $SLUG (site-create first)"
   [[ "$R_INGRESS" == host-vhost ]] || die 3 "$SLUG has ingress=$R_INGRESS: its URL is routed by the product gateway, no vhost on this host"
   DOMAIN="$R_DOMAIN"; vf="$(client_wp_vhost_file "$DOMAIN")"; link="$CLIENT_WP_NGINX_DIR/sites-enabled/$(basename "$vf")"
@@ -517,8 +552,8 @@ site_vhost() {
   local C; C="$(client_wp_container "$SLUG")"
   docker exec -u www-data "$C" php -d memory_limit=256M /usr/local/bin/wp --path="$WP_PATH" core is-installed </dev/null >/dev/null 2>&1 \
     || die 3 "blocked: WordPress in $C is not installed (site-wp $SLUG install first)"
-  occ="$(py occupants "$DOMAIN" "$CLIENT_WP_NGINX_DIR/sites-enabled")"
-  others="$(py files "$occ")"
+  occ="$(py occupants "$DOMAIN" 2>/dev/null)"     || die 3 "blocked: cannot read the live nginx config, so $DOMAIN cannot be proven free ($(clean "$(py occupants "$DOMAIN" 2>&1 >/dev/null)"))"
+  others="$(py files "$occ")" || die 3 "blocked: nginx -T occupancy for $DOMAIN unreadable -- cannot prove it free"
   [[ -z "$others" ]] || die 3 "blocked: $DOMAIN is already served by $others"
   cert="$(py first "$(py certs "$DOMAIN" "$LE_LIVE")" dir)"
   [[ -n "$cert" ]] || die 3 "blocked: no unexpired certificate under $LE_LIVE covers $DOMAIN"
@@ -547,8 +582,8 @@ add_action("template_redirect", function () {
 }, 0);
 '
 site_wp() {
-  SLUG="${argv[1]}"; local sub="${argv[2]}" rest=("${argv[@]:3}") C pw admin out a ok_list=()
-  slug_lock || die 3 "another create/vhost/teardown of $SLUG is running"
+  SLUG="${argv[1]}"; local sub="${argv[2]}" rest=("${argv[@]:3}") C pw admin out a ok_list=() kept=()
+  slug_lock || die 3 "$LOCK_WHY"
   read_registry || die 3 "no valid registry for $SLUG"
   DOMAIN="$R_DOMAIN"; C="$(client_wp_container "$SLUG")"
   [[ "$(docker inspect -f '{{.State.Running}}' "$C" 2>/dev/null)" == true ]] || die 3 "$C is not running"
@@ -586,17 +621,56 @@ site_wp() {
       else obj state=reused url="https://$DOMAIN" admin_user="$admin"; fi
       ;;
     plugins)
+      # SF-E2 #5 (SITE-FLOW §1-3): database export first; a failed plugin step restores it. Export = the site's own DB
+      # container (the WordPress image has no dump client), root password from that container's env, never an argv.
+      local exp tmp ver cur pslug
+      exp="$(client_wp_db_export_file "$SLUG")"
+      tmp="$(mktemp "$exp.XXXXXX")" || die 3 "cannot create a temp file next to $exp (nothing installed)"
+      if ! docker exec "$(client_wp_db_container "$SLUG")" sh -c \
+           'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb-dump -uroot --single-transaction --add-drop-database --databases wordpress' \
+           </dev/null 2>/dev/null | gzip >"$tmp" \
+         || ! gzip -t "$tmp" 2>/dev/null || ! zcat "$tmp" | tail -n 5 | grep -q 'Dump completed'; then
+        rm -f "$tmp"; die 3 "database export before the plugin step failed -- nothing installed"
+      fi
+      chmod 0600 "$tmp" && mv -f "$tmp" "$exp" || { rm -f "$tmp"; die 3 "cannot write $exp (nothing installed)"; }
+      local changed=0
+      wpm() { changed=1; wpc "$@"; }   # a wp call that may change the database
+      plugin_failed() {  # <plugin> <why>: restore the export if anything was attempted, then fail saying what happened
+        (( changed )) || die 3 "plugin $1 failed ($2); nothing was changed, database not touched (installed: none)"
+        zcat "$exp" | docker exec -i "$(client_wp_db_container "$SLUG")" sh -c \
+          'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb -uroot' >/dev/null 2>&1
+        if [[ "${PIPESTATUS[*]}" == "0 0" ]]; then   # both: a zcat cut short would leave a half-restored DB behind exit 0
+          die 3 "plugin $1 failed ($2); database restored from the export taken before this step (installed or upgraded before the failure: ${ok_list[*]:-none}; their files stay at the new version)"
+        fi
+        die 3 "plugin $1 failed ($2) AND the database restore failed -- export kept at $exp"
+      }
       for a in "${rest[@]}"; do
         if [[ "$a" =~ $PLUGIN_SLUG_RE ]]; then
-          if wpc plugin is-installed "$a" >/dev/null 2>&1; then wpc plugin activate "$a" >/dev/null 2>&1 || wpc plugin is-active "$a" >/dev/null 2>&1
-          else wpc plugin install "$a" --activate >/dev/null; fi || die 3 "plugin $a failed (done: ${ok_list[*]:-none})"
+          if wpc plugin is-installed "$a" >/dev/null 2>&1; then wpm plugin activate "$a" >/dev/null 2>&1 || wpc plugin is-active "$a" >/dev/null 2>&1
+          else wpm plugin install "$a" --activate >/dev/null; fi || plugin_failed "$a" "wp-cli"
         else
-          wpc plugin install "$a" --force --activate >/dev/null || die 3 "plugin $a failed (done: ${ok_list[*]:-none})"
+          # Own release zip (SF-E2 #4): never replace a version that is the same or newer -- a re-run or an old URL is a
+          # no-op. Version = the release tag (scripts/release-wp-bridge.sh tags v<plugin version>).
+          # slug = the repo (release-wp-bridge.sh: REPO=awarewaveai-pei/<slug>, asset <slug>-v<ver>.zip); the tag
+          # format is already checked by wp_args_ok, before the export.
+          ver="${a%/*}"; ver="${ver##*/}"; ver="${ver#v}"; pslug="${a#https://github.com/awarewaveai-pei/}"; pslug="${pslug%%/*}"
+          if wpc plugin is-installed "$pslug" >/dev/null 2>&1; then
+            cur="$(wpc plugin get "$pslug" --field=version 2>/dev/null)"
+            # Plain dotted numbers only: sort -V ranks 0.21.0-beta above 0.21.0, so a pre-release is not compared.
+            [[ "$cur" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]] || plugin_failed "$a" "installed $pslug version '$cur' is not plain numbers -- not compared, not replaced"
+            if [[ "$(printf '%s\n%s\n' "$cur" "$ver" | sort -V | tail -n 1)" == "$cur" ]]; then
+              wpm plugin activate "$pslug" >/dev/null 2>&1 || wpc plugin is-active "$pslug" >/dev/null 2>&1 || plugin_failed "$a" "activate"
+              kept+=("$pslug@$cur"); ok_list+=("$a"); continue
+            fi
+            wpm plugin install "$a" --force --activate >/dev/null || plugin_failed "$a" "wp-cli upgrade $cur -> $ver"
+          else
+            wpm plugin install "$a" --activate >/dev/null || plugin_failed "$a" "wp-cli"
+          fi
         fi
         ok_list+=("$a")
       done
-      log info "site-wp $SLUG plugins ${#ok_list[@]}"
-      obj state=ok plugins="${ok_list[*]}" ;;
+      log info "site-wp $SLUG plugins ${#ok_list[@]} kept=${#kept[@]}"
+      obj state=ok plugins="${ok_list[*]}" kept="${kept[*]}" db_export="$exp" ;;
     open|close)
       local on=0 pub=1; [[ "$sub" == close ]] && { on=1; pub=0; }
       ensure_uc && wpc option update aw_under_construction "$on" >/dev/null && wpc option update blog_public "$pub" >/dev/null \
@@ -657,6 +731,9 @@ if [[ "${argv[0]}" == site-* ]]; then
     exit 126
   fi
   exec </dev/null
+  # A verb that changes a site runs to its end under the slug lock even when the caller gives up (next-admin's timeout
+  # closes the SSH channel): dying half-way would free the lock while a docker exec it started still runs (SF-E2 #6).
+  trap '' HUP
   load_render
 fi
 log info "ALLOW from $src: $cmd"

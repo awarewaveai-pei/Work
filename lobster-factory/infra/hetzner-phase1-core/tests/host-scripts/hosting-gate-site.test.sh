@@ -34,7 +34,7 @@ docker exec -i "$C" bash -c 'cat > /setup.sh && chmod +x /setup.sh' <<'SETUP'
 #!/bin/bash
 # /setup.sh: fresh host state (no site, switch on, a live cert for the test domains), empty logs, shims installed.
 set -e
-rm -rf /t /root/sites /etc/awarewave /var/lib/awarewave /var/lib/wp-cron-runner /run/lock/awarewave-sites /etc/nginx /etc/letsencrypt
+rm -rf /t /root/sites /etc/awarewave /var/lib/awarewave /var/lib/wp-cron-runner /run/lock/awarewave-sites /run/awarewave /etc/nginx /etc/letsencrypt
 mkdir -p /t/state /etc/nginx/sites-available /etc/nginx/sites-enabled /etc/default
 : > /t/calls.log; : > /t/syslog
 printf '# test drop-in\nAW_SITE_VERBS=on\n' > /etc/default/aw-hosting-gate.local; chmod 600 /etc/default/aw-hosting-gate.local
@@ -61,6 +61,15 @@ cat > /usr/local/bin/curl <<'SH'
 echo "curl $*" >> /t/calls.log
 cat /t/state/http 2>/dev/null || printf 302
 SH
+# nginx -T: the live config as nginx prints it -- every file it loads after a "# configuration file <path>:" line.
+cat > /usr/local/bin/nginx <<'SH'
+#!/bin/bash
+echo "nginx $*" >> /t/calls.log
+[ "$1" = -T ] || exit 0
+[ -f /t/state/fail.nginxT ] && { echo "nginx: [emerg] simulated" >&2; exit 1; }
+for f in /etc/nginx/conf.d/*.conf /etc/nginx/sites-enabled/*; do [ -e "$f" ] && { echo "# configuration file $f:"; cat "$f"; echo; }; done
+exit 0
+SH
 cat > /usr/local/bin/systemd-run <<'SH'
 #!/bin/bash
 echo "systemd-run $*" >> /t/calls.log
@@ -86,7 +95,16 @@ shift; in=0
 while [[ "$1" == -* ]]; do case "$1" in -i) in=1; shift ;; -u|-e|-w) shift 2 ;; *) shift ;; esac; done
 c="$1"; shift
 [ -f "$S/ct.$c" ] || { echo "Error: No such container: $c" >&2; exit 1; }
-if [ "$1" = sh ]; then [ $in = 1 ] && cat > $S/stdin.uc; exit 0; fi   # mu-plugin write
+if [ "$1" = sh ]; then
+  case "$3" in   # <slug>-db: the pre-plugins export / its restore (SF-E2 #5)
+    *mariadb-dump*) [ -f $S/fail.dump ] && exit 1; printf -- '-- MariaDB dump
+CREATE TABLE t (id int);
+-- Dump completed on 2026-11-22
+'; exit 0 ;;
+    *"exec mariadb -uroot"*) cat > "$S/restored.$c"; exit 0 ;;
+  esac
+  [ $in = 1 ] && cat > $S/stdin.uc; exit 0   # mu-plugin write
+fi
 [ $in = 1 ] && cat > $S/stdin.last                 # wp-cli stdin = a secret the gate made
 while [[ $# -gt 0 && "$1" != --path=* ]]; do shift; done; shift   # php -d ... /usr/local/bin/wp --path=...
 w="$*"
@@ -98,8 +116,10 @@ case "$w" in
   "language core is-installed"*|"theme is-installed"*) exit 1 ;;
   "user list"*)        echo 1 ;;
   "user get"*)         cat "$S/wp.$c.admin" ;;
-  "plugin is-installed "*) [ -f "$S/plugin.$c.$4" ] ;;
-  "plugin install "*)  touch "$S/plugin.$c.$(basename "$3" .zip)" ;;
+  "plugin is-installed "*) [ -f "$S/plugin.$c.$3" ] ;;
+  "plugin get "*)      cat "$S/plugin.$c.$3" ;;
+  "plugin install "*)  p="$3"; case "$p" in https://*) r="${p#https://github.com/*/}"; p="${r%%/*}" ;; esac   # release URL -> repo = slug
+                       v="${3%/*}"; v="${v##*/}"; echo "${v#v}" > "$S/plugin.$c.$p" ;;   # file = installed version
   "eval"*)             echo created ;;
   *) exit 0 ;;
 esac
@@ -315,7 +335,8 @@ check "domain served by another enabled file -> blocked (3), no safe-infra-patch
   bash -c "[[ $rc == 3 ]] && grep -q 'other.conf' <<<'$err' && ! docker exec $C grep -q '^safe-infra-patch' /t/calls.log"
 setup; gate "site-create s9 nocert.example.org"; wait_job "$(jget "$out" job)" >/dev/null; in_c 'touch /t/state/wp.s9-wp.installed'; gate "site-vhost s9"
 check "no live cert covering the domain -> blocked (3)" bash -c "[[ $rc == 3 ]] && grep -q 'no unexpired certificate' <<<'$err'"
-setup; gate "site-create s10 $D product-gateway"; wait_job "$(jget "$out" job)" >/dev/null
+setup; in_c "echo 'AW_SITE_GATEWAY_SLUGS=s10' >> /etc/default/aw-hosting-gate.local"   # SF-E2 #2: host allow-list
+gate "site-create s10 $D product-gateway"; wait_job "$(jget "$out" job)" >/dev/null
 check "ingress=product-gateway: compose joins lobster-net" in_c 'grep -q "lobster-net" /root/sites/s10/docker-compose.yml'
 gate "site-vhost s10"; check "ingress=product-gateway: site-vhost refused (3)" test "$rc" = 3
 
@@ -350,6 +371,105 @@ in_c ': > /t/calls.log'; gate "site-wp nosite open"
 check "site-wp without a registry -> 3, no docker exec" bash -c "[[ $rc == 3 ]]" && check "...no docker exec" no_docker_exec
 in_c "sed -i 's/\"s1-wp\"/\"soulful-wp\"/' $REG/s1.json; : > /t/calls.log"; gate "site-wp s1 open"
 check "registry naming another container -> 3, nothing exec'd in it" bash -c "[[ $rc == 3 ]] && ! docker exec $C grep -q soulful-wp /t/calls.log"
+
+# ── SF-E2 host hardening (one block per invariant of briefs/WP-SF-E2-host-hardening.md) ──────────────────────
+LD=/run/awarewave/site-locks
+created() { setup; gate "site-create s1 $D"; wait_job "$(jget "$out" job)" >/dev/null; }
+
+# #1 lock dir: root-owned, not group/world-writable; otherwise refused, never reused.
+created
+check "#1 lock dir created root-only (0700, uid 0) under /run, not /run/lock" in_c "test \"\$(stat -c '%u %a' $LD)\" = '0 700'"
+in_c "chmod 777 $LD; : > /t/calls.log"; gate "site-wp s1 open"
+check "#1 lock dir world-writable -> site-wp refused (3), nothing exec'd" bash -c "[[ $rc == 3 ]] && grep -q 'root-owned' <<<'$err'" && check "#1 ...no docker exec" no_docker_exec
+gate "site-create s2 two.example.org"
+check "#1 lock dir world-writable -> site-create refused at once (3), no job" \
+  bash -c "[[ $rc == 3 ]] && ! docker exec $C grep -q '^systemd-run' /t/calls.log"
+in_c "chmod 700 $LD && chown 65534 $LD"; gate "site-vhost s1"
+check "#1 lock dir owned by another user -> site-vhost refused (3)" bash -c "[[ $rc == 3 ]] && grep -q 'uid 65534' <<<'$err'"
+in_c "rm -rf $LD && ln -s /tmp $LD"; gate "site-wp s1 open"
+check "#1 lock dir replaced by a symlink -> refused (3)" bash -c "[[ $rc == 3 ]] && grep -q 'not a plain directory' <<<'$err'"
+in_c "rm -f $LD && mkdir -m 700 $LD"; gate "site-wp s1 open"
+check "#1 compliant lock dir again -> site-wp works" test "$rc" = 0
+
+# #2 product-gateway (container on lobster-net) only for slugs the host lists.
+setup; gate "site-create s10 $D product-gateway"
+check "#2 product-gateway for a slug not in AW_SITE_GATEWAY_SLUGS -> 126, no job" \
+  bash -c "[[ $rc == 126 ]] && ! docker exec $C grep -q '^systemd-run' /t/calls.log"
+in_c "echo 'AW_SITE_GATEWAY_SLUGS=other s10' >> /etc/default/aw-hosting-gate.local"; gate "site-create s10 $D product-gateway"
+check "#2 listed slug -> created on lobster-net" \
+  bash -c "[[ '$(wait_job "$(jget "$out" job)")' == succeeded ]] && docker exec $C grep -q lobster-net /root/sites/s10/docker-compose.yml"
+in_c "printf 'AW_SITE_VERBS=on\nAW_SITE_GATEWAY_SLUGS=s10\nAW_SITE_GATEWAY_SLUGS=\n' > /etc/default/aw-hosting-gate.local"; gate "site-create s11 $D product-gateway"
+check "#2 a later empty AW_SITE_GATEWAY_SLUGS= wins -> 126" test "$rc" = 126
+in_c "printf 'AW_SITE_VERBS=on\nAW_SITE_GATEWAY_SLUGS=s10 # soulful later\n' > /etc/default/aw-hosting-gate.local"; gate "site-create soulful $D product-gateway"
+check "#2 a non-slug token in the list (comment) voids the whole list -> 126, even for listed-looking words" test "$rc" = 126
+setup; in_c 'mkdir -p -m 700 /var/lib/awarewave/site-jobs
+  printf "{\"job\":\"sj-20261122000000-0000000a\",\"verb\":\"site-create\",\"slug\":\"s12\",\"domain\":\"one.example.org\",\"ingress\":\"product-gateway\",\"state\":\"queued\"}" > /var/lib/awarewave/site-jobs/sj-20261122000000-0000000a.json
+  bash /g/aw-hosting-gate.sh --job-run sj-20261122000000-0000000a'
+check "#2 job file asking product-gateway for an unlisted slug -> job failed, no compose-new" \
+  bash -c "docker exec $C grep -q '\"state\": \"failed\"' /var/lib/awarewave/site-jobs/sj-20261122000000-0000000a.json && ! docker exec $C grep -q '^safe-infra-patch' /t/calls.log"
+
+# #3 domain occupancy = server_name of the config nginx actually loads (nginx -T), not only sites-enabled.
+setup; in_c "mkdir -p /etc/nginx/conf.d && printf 'server {\n  server_name $D;\n}\n' > /etc/nginx/conf.d/legacy.conf"
+gate "site-preflight s1 $D"
+check "#3 preflight: a server_name in conf.d (outside sites-enabled) is reported" has "$(jget "$out" vhost_occupants)" "/etc/nginx/conf.d/legacy.conf"
+gate "site-create s1 $D"; wait_job "$(jget "$out" job)" >/dev/null; in_c 'touch /t/state/wp.s1-wp.installed; : > /t/calls.log'
+gate "site-vhost s1"
+check "#3 site-vhost blocked (3) by the conf.d server, no safe-infra-patch" \
+  bash -c "[[ $rc == 3 ]] && grep -q 'legacy.conf' <<<'$err' && ! docker exec $C grep -q '^safe-infra-patch' /t/calls.log"
+in_c 'rm /etc/nginx/conf.d/legacy.conf; touch /t/state/fail.nginxT'; gate "site-preflight s1 $D"
+check "#3 nginx -T failing: preflight says unknown (null + error), never 'free'" \
+  bash -c '[[ $1 == 0 && $(tail -1 <<<"$2") == *"\"vhost_occupants\": null,"* && -n $3 ]]' _ "$rc" "$out" "$(jget "$out" vhost_occupants_error)"
+gate "site-vhost s1"
+check "#3 nginx -T failing: site-vhost blocked (3), no safe-infra-patch" \
+  bash -c "[[ $rc == 3 ]] && grep -q 'cannot read the live nginx config' <<<'$err' && ! docker exec $C grep -q '^safe-infra-patch' /t/calls.log"
+
+# #4 own plugin release: never replaced by the same or an older version; a newer one upgrades.
+REL=https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/download
+pver() { in_c 'cat /t/state/plugin.s1-wp.aware-wave-wp-bridge'; }
+installs() { in_c 'grep -c " plugin install " /t/calls.log' 2>/dev/null; }
+created; gate "site-wp s1 plugins $REL/v0.20.0/aware-wave-wp-bridge-v0.20.0.zip"
+check "#4 first install: no --force" bash -c "[[ $rc == 0 && '$(pver)' == 0.20.0 ]] && ! docker exec $C grep -q 'plugin install .*--force' /t/calls.log"
+in_c ': > /t/calls.log'; gate "site-wp s1 plugins $REL/v0.19.0/aware-wave-wp-bridge-v0.19.0.zip"
+check "#4 older release -> no-op (no install), 0.20.0 kept and reported" \
+  bash -c "[[ $rc == 0 && '$(pver)' == 0.20.0 && '$(installs)' == 0 ]] && grep -q 'aware-wave-wp-bridge@0.20.0' <<<'$(jget "$out" kept)'"
+gate "site-wp s1 plugins $REL/v0.20.0/aware-wave-wp-bridge-v0.20.0.zip"
+check "#4 same release again -> no-op" bash -c "[[ $rc == 0 && '$(installs)' == 0 ]]"
+gate "site-wp s1 plugins $REL/v0.21.0/aware-wave-wp-bridge-v0.21.0.zip"
+check "#4 newer release -> upgraded" bash -c "[[ $rc == 0 && '$(pver)' == 0.21.0 && '$(installs)' == 1 ]]"
+in_c ': > /t/calls.log'; gate "site-wp s1 plugins $REL/latest/aware-wave-wp-bridge-latest.zip"
+check "#4 tag that is not v<version> -> refused by the grammar (126), no export, nothing installed"   bash -c "[[ $rc == 126 && -z \"\$(docker exec $C cat /t/calls.log)\" && '$(pver)' == 0.21.0 ]]"
+in_c 'echo 0.22.0-beta > /t/state/plugin.s1-wp.aware-wave-wp-bridge; : > /t/calls.log'; gate "site-wp s1 plugins $REL/v0.22.0/aware-wave-wp-bridge-v0.22.0.zip"
+check "#4 installed pre-release is not compared -> refused (3), not replaced, DB untouched"   bash -c "[[ $rc == 3 && '$(installs)' == 0 ]] && grep -q 'not plain numbers' <<<'$err' && grep -q 'database not touched' <<<'$err'"
+
+# #5 plugins: DB export first (site dir, 0600, latest only); a failed step restores it.
+EXP=/root/sites/s1/pre-plugins.sql.gz
+created; gate "site-wp s1 plugins mainwp-child"
+check "#5 export written before the install: site dir, 0600, a complete dump from s1-db" \
+  bash -c "[[ $rc == 0 ]] && docker exec $C sh -c 'test \"\$(stat -c %a $EXP)\" = 600 && zcat $EXP | grep -q \"Dump completed\"' \
+    && l=\$(docker exec $C cat /t/calls.log) && d=\$(grep -n '^docker exec s1-db sh -c MYSQL_PWD=.* mariadb-dump' <<<\"\$l\" | head -1 | cut -d: -f1) \
+    && i=\$(grep -n ' plugin install mainwp-child' <<<\"\$l\" | head -1 | cut -d: -f1) && [[ -n \$d && -n \$i && \$d -lt \$i ]]"
+gate "site-wp s1 plugins mainwp-child"
+check "#5 only the latest export is kept" test "$(in_c 'ls /root/sites/s1 | grep -c pre-plugins')" = 1
+check "#5 root password stays in the DB container (MYSQL_PWD from its env; no -p on any mariadb argv)" \
+  bash -c "docker exec $C grep -qF 'MYSQL_PWD=\"\$MARIADB_ROOT_PASSWORD\" exec mariadb-dump -uroot' /t/calls.log && ! docker exec $C grep -q 'mariadb.* -p' /t/calls.log"
+in_c 'echo "plugin install" > /t/state/fail.wp; rm -f /t/state/restored.s1-db'; gate "site-wp s1 plugins newplugin"
+check "#5 plugin failing -> exit 3, export restored into s1-db, said so" \
+  bash -c "[[ $rc == 3 ]] && grep -q 'database restored' <<<'$err' && docker exec $C sh -c 'zcat $EXP | cmp - /t/state/restored.s1-db'"
+in_c 'rm /t/state/fail.wp; touch /t/state/fail.dump; : > /t/calls.log'; gate "site-wp s1 plugins newplugin"
+check "#5 export failing -> exit 3, nothing installed, previous export kept" \
+  bash -c "[[ $rc == 3 ]] && grep -q 'nothing installed' <<<'$err' && [[ '$(installs)' == 0 ]] && docker exec $C sh -c 'zcat $EXP | grep -q \"Dump completed\"'"
+
+# #6 one slug: every changing verb is exclusive; read-only verbs take no lock.
+created; in_c 'touch /t/state/wp.s1-wp.installed'
+docker exec -d "$C" flock $LD/s1.lock sleep 20
+for _ in $(seq 40); do in_c "! flock -n $LD/s1.lock true" && break; sleep 0.1; done
+in_c ': > /t/calls.log'
+for c in "site-wp s1 open" "site-wp s1 plugins mainwp-child" "site-wp s1 install owner@example.org" "site-wp s1 reset-admin-password" "site-vhost s1"; do
+  gate "$c"; check "#6 '$c' while another run holds the s1 lock -> refused (3)" bash -c "[[ $rc == 3 ]] && grep -q 'another create' <<<'$err'"
+done
+check "#6 ...and none of them exec'd anything" no_docker_exec
+gate "site-preflight s1 $D"; check "#6 site-preflight is not blocked by the lock" test "$rc" = 0
+gate "site-create s1 $D"; check "#6 site-create on the locked slug refused at once (3)" test "$rc" = 3
 
 echo "---"
 echo "hosting-gate site verbs: $pass passed, $failed failed"
