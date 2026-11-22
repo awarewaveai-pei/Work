@@ -4,6 +4,7 @@
 #   client_wp_render_compose  <slug> <domain> <port> <same_host_products 0|1>   -> docker-compose.yml on stdout
 #   client_wp_render_vhost    <slug> <domain> <port> <cert_dir>                 -> nginx vhost on stdout
 #   client_wp_render_registry <slug> <domain> <port> <ingress> <vhost_live 0|1> [created_at] -> sites.d/<slug>.json
+#   client_wp_write_registry  (same args)  writes it atomically   |   client_wp_read_registry <slug>  validated key=value
 # A bad parameter prints the reason on stderr, nothing on stdout, and returns 1. Container names, volumes, file paths
 # are derived from the slug here (client_wp_* helpers below), never taken from a caller.
 # Output goes to `safe-infra-patch.sh compose-new` / `host-nginx-new` on stdin; nothing here touches the host.
@@ -25,7 +26,7 @@
 # deprovision-site.sh refuses a registry whose values differ from what these helpers derive from its slug, and a vhost
 # file whose first line / proxy_pass is not what client_wp_render_vhost produced for this slug and port.
 #
-# Caller contract (the hosting gate, SF-E):
+# Caller contract (implemented by scripts/aw-hosting-gate.sh site-create/site-vhost/site-wp; grep "contract N" there):
 #  1. Lock: hold `flock` on "$(client_wp_lock_file <slug>)" for the whole of site-create / site-vhost; deprovision-site.sh
 #     takes the same lock. Choosing a free port additionally holds "$CLIENT_WP_PORT_LOCK" until the registry is written.
 #     safe-infra-patch.sh has no lock of its own: two runs on one project interleave.
@@ -141,4 +142,56 @@ client_wp_render_registry() {
   printf '{\n  "slug": "%s",\n  "domain": "%s",\n  "ingress": "%s",\n  "container": "%s",\n  "db_container": "%s",\n  "volumes": [%s],\n  "port": %d,\n  "compose_file": "%s",\n  "vhost_file": %s,\n  "created_at": "%s"\n}\n' \
     "$slug" "$domain" "$ingress" "$(client_wp_container "$slug")" "$(client_wp_db_container "$slug")" \
     "$(IFS=,; echo "${vols[*]}" | sed 's/,/, /g')" "$((10#$port))" "$(client_wp_compose_file "$slug")" "$vhost" "$at"
+}
+
+# Same arguments as client_wp_render_registry: writes sites.d/<slug>.json atomically (caller contract 5). The temp file
+# starts with `.` and does not end in .json, so a reader globbing sites.d/*.json never sees a half-written registry.
+client_wp_write_registry() {
+  local f tmp out
+  out="$(client_wp_render_registry "$@")" || return 1
+  f="$(client_wp_registry_file "$1")"
+  mkdir -p "$CLIENT_WP_REGISTRY_DIR" || return 1
+  tmp="$(mktemp "$CLIENT_WP_REGISTRY_DIR/.$1.json.XXXXXX")" || return 1
+  if printf '%s\n' "$out" >"$tmp" && chmod 0644 "$tmp" && mv -f "$tmp" "$f"; then return 0; fi
+  rm -f "$tmp"; client_wp__err "cannot write $f"
+}
+
+# <slug>: prints domain= ingress= port= vhost_file= created_at= (one per line) from sites.d/<slug>.json, or returns 1
+# with the reason on stderr when the file is missing, malformed, or any name/path differs from what this file derives
+# from the slug. Readers act on these values (container names, paths), so a hand-edited registry is never trusted.
+client_wp_read_registry() {
+  client_wp_valid_slug "$1" || return 1
+  local f; f="$(client_wp_registry_file "$1")"
+  [[ -f "$f" && ! -L "$f" ]] || client_wp__err "no registry $f" || return 1
+  python3 - "$f" "$1" "$CLIENT_WP_DOMAIN_RE" "$(client_wp_container "$1")" "$(client_wp_db_container "$1")" \
+    "$(client_wp_volumes "$1")" "$(client_wp_compose_file "$1")" "$CLIENT_WP_NGINX_DIR" \
+    "$CLIENT_WP_PORT_MIN" "$CLIENT_WP_PORT_MAX" <<'PY'
+import json, re, sys
+path, slug, domain_re, wp, db, vols, compose, nginx_dir, pmin, pmax = sys.argv[1:11]
+def bad(why):
+    sys.exit(f"client-wp: registry {path}: {why}")
+try:
+    with open(path, encoding="utf-8") as f:
+        r = json.load(f)
+except (OSError, ValueError) as e:
+    bad(f"unreadable: {e}")
+keys = {"slug", "domain", "ingress", "container", "db_container", "volumes", "port", "compose_file", "vhost_file", "created_at"}
+if not isinstance(r, dict) or set(r) != keys:
+    bad("keys differ from the template")
+d = r["domain"]
+if r["slug"] != slug or not isinstance(d, str) or len(d) > 253 or not re.fullmatch(domain_re.strip("^$"), d):
+    bad("slug or domain invalid")
+if r["ingress"] not in ("host-vhost", "product-gateway"):
+    bad("ingress invalid")
+if r["container"] != wp or r["db_container"] != db or r["volumes"] != vols.split() or r["compose_file"] != compose:
+    bad("container/volume/compose names differ from what render.sh derives for this slug")
+if type(r["port"]) is not int or not int(pmin) <= r["port"] <= int(pmax):
+    bad("port invalid")
+v = r["vhost_file"]
+if not (v is None or (r["ingress"] == "host-vhost" and v == f"{nginx_dir}/sites-available/{d}.conf")):
+    bad("vhost_file is not this site's own vhost path")
+if not isinstance(r["created_at"], str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", r["created_at"]):
+    bad("created_at invalid")
+print(f"domain={d}\ningress={r['ingress']}\nport={r['port']}\nvhost_file={v or ''}\ncreated_at={r['created_at']}")
+PY
 }

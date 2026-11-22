@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -170,6 +170,87 @@ describe("provision-staging → aw-hosting-gate contract", () => {
     expect(calls.map((c) => c.command)).toEqual(["staging-wp site-1a2b3c"]);
     expect(bridge.reads).toEqual([["HOSTING_BRIDGE", { explicit: true }]]);
     expect(gateCheck(calls[0].command).status).toBe(0);
+  });
+});
+
+// Site flow (SF-E): every command lib/site-flow/gate-client.ts builds is one the gate's grammar allows, and the grammar
+// refuses the malformed shapes SITE-FLOW §1-3 names. Behaviour on the host (switch file, locks, jobs, stdin, volumes):
+// tests/host-scripts/hosting-gate-site.test.sh.
+describe("site-flow gate-client → aw-hosting-gate site-* grammar", () => {
+  const PUBKEY = `${"A".repeat(43)}=`;
+  async function siteCommands() {
+    const { createSiteGateClient } = await import("@/lib/site-flow/gate-client");
+    const seen: { command: string; stdin?: string }[] = [];
+    const transport = {
+      exec: async (command: string, stdin?: string) => {
+        seen.push({ command, stdin });
+        if (command.startsWith("site-create ")) return { code: 0, stdout: '{"job":"sj-20261122000000-0a1b2c3d"}\n', stderr: "" };
+        if (command.startsWith("site-job ")) return { code: 0, stdout: '{"state":"running","detail":""}\n', stderr: "" };
+        return { code: 0, stdout: "{}\n", stderr: "" };
+      },
+    };
+    const c = createSiteGateClient({ provider: "ks-aw-01-docker", slug: "client-1", domain: "shop.example.org" }, transport);
+    await c.preflight();
+    await c.create();
+    await c.job("sj-20261122000000-0a1b2c3d");
+    await c.vhost();
+    await c.wp("install", ["owner@example.org", "zh_TW"]);
+    await c.wp("plugins", ["mainwp-child", "https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/download/v0.20.0/aware-wave-wp-bridge.zip"]);
+    await c.wp("open");
+    await c.wp("close");
+    await c.wp("set-mainwp-id", [UNIQUE_ID]);
+    await c.wp("put-bridge-pubkey", ["aw-next-admin-1", PUBKEY]);
+    await c.wp("reset-admin-password");
+    return seen;
+  }
+
+  it("every verb gate-client sends is ALLOWed by the gate, and none carries stdin", async () => {
+    const seen = await siteCommands();
+    expect(seen.map((s) => s.command.split(" ")[0])).toEqual(
+      expect.arrayContaining(["site-preflight", "site-create", "site-job", "site-vhost", "site-wp"]),
+    );
+    for (const { command, stdin } of seen) {
+      expect(gateCheck(command), command).toMatchObject({ status: 0 });
+      expect(stdin, command).toBeUndefined();
+    }
+  });
+
+  it("site-create may name the ingress (host-vhost | product-gateway), nothing else", () => {
+    expect(gateCheck("site-create client-1 shop.example.org product-gateway").status).toBe(0);
+    expect(gateCheck("site-create client-1 shop.example.org host-vhost").status).toBe(0);
+    expect(gateCheck("site-create client-1 shop.example.org gateway").status).toBe(126);
+  });
+
+  it.each([
+    ["tab", "site-vhost\tclient-1"],
+    ["double space", "site-vhost  client-1"],
+    ["trailing space", "site-vhost client-1 "],
+    ["domain over 253 chars", `site-preflight client-1 ${`${"a".repeat(62)}.`.repeat(4)}com`],
+    ["domain with ..", "site-preflight client-1 a..example.org"],
+    ["slug with ..", "site-vhost .."],
+    ["upper-case slug", "site-vhost Client-1"],
+    ["upper-case domain", "site-create client-1 Shop.example.org"],
+    ["unknown wp sub-verb", "site-wp client-1 eval"],
+    ["wp sub-verb with a script-ish argument", "site-wp client-1 plugins $(id)"],
+    ["release URL outside the org", "site-wp client-1 plugins https://github.com/someone/x/releases/download/v1/x.zip"],
+    ["release URL with ..", "site-wp client-1 plugins https://github.com/awarewaveai-pei/x/releases/download/../../x.zip"],
+    ["open with an argument", "site-wp client-1 open now"],
+    ["malformed job id", "site-job sj-1"],
+    ["site-create without a domain", "site-create client-1"],
+  ])("DENY: %s", (_name, cmd) => {
+    expect(gateCheck(cmd)).toMatchObject({ status: 126, stdout: "DENY" });
+  });
+
+  it("the gate's grammar and gate-client agree (sub-verbs, slug/domain/job patterns)", async () => {
+    const { WP_SUBVERBS, SITE_SLUG_RE, SITE_DOMAIN_RE, SITE_JOB_RE } = await import("@/lib/site-flow/gate-client");
+    const list = spawnSync("bash", [GATE, "--list"], { encoding: "utf8" }).stdout;
+    const wpLine = list.split("\n").find((l) => l.startsWith("site-wp ")) ?? "";
+    expect(wpLine.match(/<([^>]+)>/)?.[1].split(" ")).toEqual([...WP_SUBVERBS]);
+    const src = readFileSync(GATE, "utf8");
+    const reOf = (name: string) => src.match(new RegExp(`^${name}='([^']+)'`, "m"))?.[1];
+    expect(reOf("SLUG_RE")).toBe(SITE_SLUG_RE.source);
+    expect(reOf("DOMAIN_RE")).toBe(SITE_DOMAIN_RE.source);
+    expect(reOf("JOB_RE")).toBe(SITE_JOB_RE.source);
   });
 });
 
