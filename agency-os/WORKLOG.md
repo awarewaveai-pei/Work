@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-22（續9）— 平台（會員／目前客戶／登入後介面）第 1 批併入：K1、K2、K3、U6＋監工台
+
+- 根因：「目前客戶」在各頁各傳各的（`siteId`／`org`／退回第一個網站），權益文字散在 `use-paid-features.ts` 的對照表；規劃見 `agency-os/handoffs/2026-11-22-platform-membership-ux/DISPATCH.md`。
+- K1 `d2201ecf7`：ADR 020（網址 `org`／`site`，空＝未選，授權只在伺服器）。K2 `d09da8a7d`：`NA/lib/client-context/contract.ts`（`normalizeQuery`／`decide`／`withContext`，純函式，尚無呼叫端，K4 接）。K3 `c3c0c2624`：`org-search` 加 `?include=<uuid>`；`content/sites` GET 加 `?organizationId=`（經 `effectiveOrgId`）與 `?siteId=`，不帶參數回應不變。U6 `677f550fb`：`lib/entitlements/right-label.ts`，`why()` 改呼叫它，提示文字不變。
+- 監工台：同資料夾 `data.mjs`／`build.mjs`／`check.mjs`／`supervisor.html`（沿用 `scripts/supervisor-kit`）。`check.mjs` 風險列計數的正則漏算無狀態的 `<li class="step">`，已改。
+- RISKS 處置（全文在 `data.mjs` 的 `RISKS`）：K2 非 uuid 也算要改寫網址、客戶帳號 site 層回 loading → 保留，K4 照此寫測試；`ADR_INDEX.md` 021 列缺日期欄 → 已補；U6 `featureKey`／`note` 選填欄位、`source` 待 U5 → 保留。
+- 都未部署（next-admin 今晚 03:00 自動部署 main）；本批無 High 卡，無 migration。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin, 整合後全套) | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=usePaidFeatures|rightLabel|normalizeQuery | hits=47
+- ORACLE_WAIVED: 本批皆 Low／Medium、無 auth 判斷改動（K3 篩選走既有 `effectiveOrgId`，工人已做拔守衛突變：測試轉紅再還原）；監工逐行讀過四個 diff
 ## 2026-11-22（續8）— oracle WP 卡 A1：ADR 015／017／018 修訂；SF-A 移到第五批
 
 - 根因：ADR 018「不採用 iframe」與 ADR 015 §2 沒分跨網域／同網域，理由（第三方 cookie 被擋）只對跨網域成立；也沒有任何 ADR 寫客戶網站的會員歸屬。

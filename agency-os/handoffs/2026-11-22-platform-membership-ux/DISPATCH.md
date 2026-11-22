@@ -27,10 +27,10 @@
 
 | 卡 | 白話 | 檔案 | 風險 | 模型 | 依賴 | 批 | 狀態 |
 |---|---|---|---|---|---|---|---|
-| K1 | 把「目前客戶」規則寫成正式決策文件 ADR 020 | 新 `agency-os/docs/architecture/decisions/020-client-context.md`；`ADR_INDEX.md` | Low | Sonnet | — | 1 | 待派 |
-| K2 | 一個小函式決定「現在是哪個客戶、哪個網站」 | 新 NA `lib/client-context/contract.ts`、`lib/client-context/__tests__/contract.test.ts` | Low | Sonnet | — | 1 | 待派 |
-| K3 | 客戶搜尋與網站清單兩支 API 可以指定客戶 | NA `app/api/ops/org-search/route.ts`、`route.test.ts`、`app/api/content/sites/route.ts`、新 `app/api/content/sites/__tests__/sites-filters.test.ts` | Medium | Sonnet | — | 1 | 待派 |
-| U6 | 「方案內／贈送／扣點／未開通…」標籤只由一個函式決定 | 新 NA `lib/entitlements/right-label.ts`、`lib/entitlements/__tests__/right-label.test.ts`；`lib/entitlements/use-paid-features.ts` | Low | Sonnet | — | 1 | 待派 |
+| K1 | 把「目前客戶」規則寫成正式決策文件 ADR 020 | 新 `agency-os/docs/architecture/decisions/020-client-context.md`；`ADR_INDEX.md` | Low | Sonnet | — | 1 | 已併 |
+| K2 | 一個小函式決定「現在是哪個客戶、哪個網站」 | 新 NA `lib/client-context/contract.ts`、`lib/client-context/__tests__/contract.test.ts` | Low | Sonnet | — | 1 | 已併 |
+| K3 | 客戶搜尋與網站清單兩支 API 可以指定客戶 | NA `app/api/ops/org-search/route.ts`、`route.test.ts`、`app/api/content/sites/route.ts`、新 `app/api/content/sites/__tests__/sites-filters.test.ts` | Medium | Sonnet | — | 1 | 已併 |
+| U6 | 「方案內／贈送／扣點／未開通…」標籤只由一個函式決定 | 新 NA `lib/entitlements/right-label.ts`、`lib/entitlements/__tests__/right-label.test.ts`；`lib/entitlements/use-paid-features.ts` | Low | Sonnet | — | 1 | 已併 |
 | K4 | 左邊的客戶欄（搜尋＋清單）做好，先不放到頁面 | 新 NA `app/ClientContextProvider.tsx`、`lib/client-context/use-client-context.ts`、`app/ClientRail.tsx`＋各自 test | Medium | Opus | K2、K3 | 2 | |
 | U7 | 會員看自己點數與合約的讀取 API | 新 NA `app/api/portal/account/route.ts`＋test | Medium | Sonnet | — | 2 | |
 | U22 | 產品登記表加分類、任務、一句話等欄位 | NA `lib/portal/products.ts`、新 `lib/portal/catalog-vocab.ts`、`lib/portal/__tests__/products.test.ts`；`scripts/new-product.mjs`、`scripts/__tests__/new-product.test.mjs` | Medium | Sonnet | — | 2 | |
