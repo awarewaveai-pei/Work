@@ -184,11 +184,15 @@ function sdeps(over: { billing?: BillingAccount | null; account?: typeof ACCOUNT
   const s: SummaryDeps = { db: d.db, site: d.site, find: d.find, now: d.now,
     held: vi.fn(async () => (over.held ?? ["content", "social"]).map(door)),
     account: vi.fn(async () => (over.billing === undefined ? BILLING : over.billing)),
-    // the store's answer: the row pickEntitlementRow picks among the product's rows of that feature
-    entitlement: vi.fn(async ({ productKey, featureKey }: { productKey: string; featureKey: string }) => {
-      const row = pickEntitlementRow(((over.rows ?? ROWS)[productKey] ?? []).filter((r) => r.feature_key === featureKey));
-      return row ? ({ ...row, limits: row.limits ?? {} } as unknown as EntitlementRecord) : null;
-    }) };
+    // the store's answer (listActiveEntitlements): per feature, the row pickEntitlementRow picks
+    entitlements: vi.fn(async ({ productKeys }: { productKeys: readonly string[] }) => productKeys.flatMap((productKey) => {
+      const rows = (over.rows ?? ROWS)[productKey] ?? [];
+      return [...new Set(rows.map((r) => r.feature_key))].map((featureKey) => {
+        const row = pickEntitlementRow(rows.filter((r) => r.feature_key === featureKey))!;
+        return { id: `e-${featureKey}`, organizationId: "org-1", productKey, featureKey, source: row.source, sourceRef: null,
+          startsAt: NOW - 100, endsAt: null, status: "active", limits: row.limits ?? {} } as EntitlementRecord;
+      });
+    })) };
   return s;
 }
 const scall = (body: string, d: SummaryDeps, sig: string | null = signHandoff(body, SECRET), env: Record<string, string | undefined> = ENV) => wpSummary(body, sig, env, d);
@@ -217,12 +221,14 @@ describe("WordPress My Account summary (POST /api/auth/wp-summary)", () => {
     // not held: 未開通, no URL, nothing read for it
     expect(by("video")).toEqual({ key: "video", name: "影片製作", can_enter: false,
       right: { kind: "none", label: "未開通", counts: { covered: 0, gift: 0, credits: 0, locked: n("video") } } });
-    expect(d.entitlement).toHaveBeenCalledTimes(door("content").features.length + door("social").features.length);
+    // one store read for every held product
+    expect(d.entitlements).toHaveBeenCalledTimes(1);
+    expect(d.entitlements).toHaveBeenCalledWith({ organizationId: "org-1", productKeys: ["content", "social"], now: NOW });
     // the held list is the app's entitlements of the member's own unit, never WooCommerce orders
     expect(d.held).toHaveBeenCalledWith("org-1", undefined, NOW);
   });
 
-  it("kind from the real source: trial, a credit pack alone, a contract row without a subscription (no badge), missing rows locked", async () => {
+  it("kind from the real source: trial, a credit pack alone, a contract row without a subscription, missing rows locked", async () => {
     const trial = await ok(sdeps({ held: ["content"], billing: { ...BILLING, contracts: [{ ...BILLING.contracts[0], status: "trial" }] } }), "s-t-0123456789abcdef");
     expect(trial.products.find((p) => p.key === "content")!.right).toMatchObject({ kind: "trial", label: "試用中" });
     const noSub = { ...BILLING, contracts: [], grants: [] };
@@ -230,7 +236,10 @@ describe("WordPress My Account summary (POST /api/auth/wp-summary)", () => {
     const tarot = pack.products.find((p) => p.key === "tarot")!;
     expect(tarot.right).toEqual({ kind: "credits", label: "扣點", counts: { covered: 0, gift: 0, credits: 1, locked: door("tarot").features.length - 1 } });
     const staff = await ok(sdeps({ held: ["social"], billing: noSub, rows: { social: [{ feature_key: door("social").features[0].feature_key, source: "contract", limits: {} }] } }), "s-c-0123456789abcdef");
-    expect(staff.products.find((p) => p.key === "social")!.right).toMatchObject({ kind: "contract", label: null, counts: { covered: 1 } });
+    expect(staff.products.find((p) => p.key === "social")!.right).toMatchObject({ kind: "contract", label: "方案內", counts: { covered: 1 } });
+    // label null only when the door is held and no row of it is one can() accepts (a refused pay marker)
+    const bad = await ok(sdeps({ held: ["social"], billing: noSub, rows: { social: [{ feature_key: door("social").features[0].feature_key, source: "comp", limits: { pay: "credits" } }] } }), "s-m-0123456789abcdef");
+    expect(bad.products.find((p) => p.key === "social")!.right).toEqual({ kind: "none", label: null, counts: { covered: 0, gift: 0, credits: 0, locked: door("social").features.length } });
   });
 
   it("answers only for the member's own unit: no other unit, no parent, no payment events or provider", async () => {
@@ -265,6 +274,8 @@ describe("WordPress My Account summary (POST /api/auth/wp-summary)", () => {
         await expect(scall(sreq(), d, sig, env)).resolves.toEqual({ ok: false, status: 404, error: "source_disabled" });
       }
       expect(d.find).not.toHaveBeenCalled();
+      // without key_id (aware-wave.com) nothing at all is read before the 404: not even the seller_sites row
+      expect(d.site).not.toHaveBeenCalled();
     }
   });
 

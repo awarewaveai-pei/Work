@@ -17,7 +17,7 @@
 //   email_unverified        403  the account's email was never proven                  -> 「請先完成 email 確認」
 //   not_this_account        403  the account is no longer this unit's client           -> 「尚未連結，請聯絡我們」
 //   brand_unit_unsupported  403  the member's unit is a brand (child org)              -> 「尚未連結，請聯絡我們」
-//   source_disabled         404  no hand-off key set (production default)              -> 不顯示產品區塊
+//   source_disabled         404  no hand-off key set (production default; no key_id: no DB read) -> 不顯示產品區塊
 //   not_a_member            404  no billing identity for this WordPress user           -> 「尚未連結，請聯絡我們」
 //   auth_lookup_failed      503  GoTrue user read failed                               -> 退場畫面
 //   unavailable             503  database missing or any read failed                   -> 退場畫面
@@ -42,7 +42,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!db) return json({ ok: false, error: "unavailable" }, 503);
   try {
     const out = await wpSummary(body.raw, req.headers.get(HANDOFF_SIGNATURE_HEADER), process.env, {
-      db, site: findSiteByKeyId, find: findBillingAccount, held: heldDoors, account: billingAccount, entitlement: createEntitlementStore(db).findActiveEntitlement,
+      db, site: findSiteByKeyId, find: findBillingAccount, held: heldDoors, account: billingAccount, entitlements: createEntitlementStore(db).listActiveEntitlements,
       now: () => Math.floor(Date.now() / 1000),
     });
     if (out.ok === false) return json({ ok: false, error: out.error }, out.status);

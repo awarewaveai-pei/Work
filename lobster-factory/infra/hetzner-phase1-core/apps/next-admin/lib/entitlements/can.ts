@@ -31,8 +31,22 @@ export type CanResult = { allowed: true; payload: PermitPayload; permit: string 
  *  dependency, so a row for another account, product or feature, or outside its dates, counts as none. */
 async function liveRow(store: CanStore, organizationId: string, productKey: string, featureKey: string, now: number): Promise<EntitlementRecord | null> {
   const found = await store.findActiveEntitlement({ organizationId, productKey, featureKey, now });
-  return found && found.status === "active" && found.organizationId === organizationId && found.productKey === productKey && found.featureKey === featureKey
-    && Number.isFinite(found.startsAt) && found.startsAt <= now && (found.endsAt === null || (Number.isFinite(found.endsAt) && Math.floor(found.endsAt) > now)) ? found : null;
+  return found && isLiveRow(found, { organizationId, productKey, featureKey, now }) ? found : null;
+}
+
+/** Whether a store row is the active, current row of exactly this (account, product, feature). */
+export function isLiveRow(found: EntitlementRecord, at: { organizationId: string; productKey: string; featureKey: string; now: number }): boolean {
+  return found.status === "active" && found.organizationId === at.organizationId && found.productKey === at.productKey && found.featureKey === at.featureKey
+    && Number.isFinite(found.startsAt) && found.startsAt <= at.now && (found.endsAt === null || (Number.isFinite(found.endsAt) && Math.floor(found.endsAt) > at.now));
+}
+
+/** Who pays for a use the row allows (the permit's `source`, U5): its contract or comp covers it, or `pay: "credits"`
+ *  spends the wallet. null = a pay marker can() refuses (invalid_pay_marker). Says nothing about the wallet's balance. */
+export function rowSource(row: Pick<EntitlementRecord, "source" | "limits">, feature: { billing: "contract" | "credits" }): PermitPayload["source"] | null {
+  // `pay` is a marker only plan data writes: any value other than "credits", or "credits" on a comp row or on a
+  // contract-billed feature, is a plan mistake -- refused, never read as free use (critic 2026-10-25 M/L).
+  if (row.limits.pay === undefined) return row.source;
+  return row.limits.pay === "credits" && row.source === "contract" && feature.billing === "credits" ? "credits" : null;
 }
 
 /** Low-level signer (was `can` before ADR 017 step 3; callers use `can` below, which adds mode, subject and report). Store, policy and actor/tenant authorization are trusted server dependencies.
@@ -56,12 +70,9 @@ export async function issuePermit(request: PermitBinding, deps: CanDependencies)
   if (!row) return deny("no_active_entitlement");
   // Do not let a cached permit extend an entitlement's own deadline.
   expiresAt = Math.min(expiresAt, row.endsAt === null ? expiresAt : Math.floor(row.endsAt));
-  // `pay` is a marker only plan data writes: any value other than "credits", or "credits" on a comp row or on a
-  // contract-billed feature, is a plan mistake -- refused, never read as free use (critic 2026-10-25 M/L).
-  if (row.limits.pay !== undefined && (row.limits.pay !== "credits" || row.source !== "contract" || feature.billing !== "credits")) {
-    return deny("invalid_pay_marker");
-  }
-  if (row.limits.pay === "credits") {
+  const source = rowSource(row, feature);
+  if (source === null) return deny("invalid_pay_marker");
+  if (source === "credits") {
     const policy = await deps.creditPolicy?.(request.product_key, request.feature_key);
     if (!policy || !Number.isFinite(policy.minimumCharge) || policy.minimumCharge <= 0 || !Number.isFinite(policy.singleLimit) || policy.singleLimit < policy.minimumCharge) return deny("missing_credit_policy");
     const balance = await deps.store.getCreditBalance(request.tenant);

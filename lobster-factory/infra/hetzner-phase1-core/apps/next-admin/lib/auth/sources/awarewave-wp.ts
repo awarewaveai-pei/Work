@@ -26,7 +26,7 @@ import { AWARE_WAVE_KEY_ID, SITE_KEY_ID, findSiteByKeyId, siteIdentityProvider, 
 import { findBillingAccount, type BillingAccountIdentity } from "@/lib/entitlements/identities";
 import { holdsProduct } from "@/lib/entitlements/door-holds";
 import type { BillingAccount, billingAccount } from "@/lib/entitlements/tables";
-import type { CanStore } from "@/lib/entitlements/can";
+import { isLiveRow, rowSource, type EntitlementRecord } from "@/lib/entitlements/can";
 import { rightLabel, type RightInput } from "@/lib/entitlements/right-label";
 import { checkDoorAccount, mintDoorLink } from "@/lib/auth/door-link";
 import { portalHost, productHost, servedNextAdminProducts, type NextAdminProduct } from "@/lib/portal/doors";
@@ -63,6 +63,7 @@ export interface HandoffDeps {
   holds: typeof holdsProduct;
   now: () => number;
 }
+const AWARE_WAVE_HANDOFF = { verifyAlg: "hmac-env", handoffEnvVar: "AUTH_WP_HANDOFF_SECRET" } as SellerSite;
 type MemberDeps = Pick<HandoffDeps, "db" | "site" | "find" | "now">;
 type Verified = { ok: true; account: BillingAccountIdentity; now: number };
 
@@ -79,6 +80,9 @@ async function verifySignedMember(rawBody: string, signature: string | null, env
   } catch { return { ok: false, status: 400, error: "invalid_json" }; }
   const { wp_user_id: wpUserId, ts, nonce, key_id: keyId } = body;
   if (keyId !== undefined && (typeof keyId !== "string" || !SITE_KEY_ID.test(keyId))) return { ok: false, status: 400, error: "invalid_key_id" };
+  // No key_id = aware-wave.com, whose hand-off key is AUTH_WP_HANDOFF_SECRET (0133 seed row): with it unset the source is
+  // off before any database read, so unsigned traffic against a closed source costs nothing. Only refuses earlier.
+  if (keyId === undefined && !siteSigns(AWARE_WAVE_HANDOFF, "handoff", env)) return { ok: false, status: 404, error: "source_disabled" };
   const site = await deps.site(deps.db, (keyId as string | undefined) ?? AWARE_WAVE_KEY_ID);
   if (!site || !siteSigns(site, "handoff", env)) return { ok: false, status: 404, error: "source_disabled" };
   if (!verifySiteSignature(site, "handoff", rawBody, signature, env)) return { ok: false, status: 401, error: "invalid_signature" };
@@ -121,15 +125,16 @@ export async function wpHandoff(rawBody: string, signature: string | null, env: 
 // ---------- wp-summary ----------
 
 export type RightKind = "contract" | "comp" | "credits" | "trial" | "none";
-/** Per feature of the product, by the row that decides it (pickEntitlementRow, the rule can() uses): covered = a contract
- *  row that covers the use, gift = a comp row, credits = a credit-pack row (pay: "credits"), locked = no valid live row. */
+/** Per feature of the product, by the row can() decides by and the source it would sign (rowSource, U5): covered =
+ *  contract, gift = comp, credits = a credit-pack row (pay: "credits"), locked = no live row or one can() refuses. */
 export interface RightCounts { covered: number; gift: number; credits: number; locked: number }
 export interface WpSummaryProduct {
   key: string;
   name: string;
-  /** kind: where the right comes from (none = not held). label: rightLabel()'s badge only. It is null for a product held
-   *  by a contract row with no subscription (a staff-made contract): its period and status are unknown, so nothing is
-   *  worded until U5 gives the feature list a source column. until: the contract's period end or the gift's end. */
+  /** kind: where the right comes from (none = not held): the subscription, gift or all-features source, else the source
+   *  can() signs for its features (contract before comp before credits). label: rightLabel()'s badge only; null only when
+   *  the door is held but no feature of it has a row can() accepts (every row a refused pay marker, or rows only for
+   *  features the registry no longer lists). until: the subscription's period end or the gift's end. */
   right: { kind: RightKind; label: string | null; until?: string; counts: RightCounts };
   /** = held (heldDoors). 「進入」 asks wp-handoff with `key` for the one-time link; `url` is the door, only when held. */
   can_enter: boolean;
@@ -148,8 +153,8 @@ export type SummaryOutcome = WpSummary | Refusal;
 export interface SummaryDeps extends MemberDeps {
   held: typeof heldDoors;
   account: typeof billingAccount;
-  /** createEntitlementStore().findActiveEntitlement: the row can() decides by (pickEntitlementRow), per feature. */
-  entitlement: CanStore["findActiveEntitlement"];
+  /** createEntitlementStore().listActiveEntitlements: one read for every held product. */
+  entitlements: (input: { organizationId: string; productKeys: readonly string[]; now: number }) => Promise<EntitlementRecord[]>;
 }
 
 type ContractStatus = NonNullable<RightInput["contractStatus"]>;
@@ -170,20 +175,26 @@ export function productRight(account: BillingAccount, productKey: string): Pick<
   return { source: null, contractStatus: null, endsAt: null };
 }
 
-/** One store read per feature (as heldDoors asks per door): an all-features account's rows exceed PostgREST's row cap. */
-export async function rightCounts(organizationId: string, product: Pick<NextAdminProduct, "key" | "features">, now: number,
-  entitlement: SummaryDeps["entitlement"]): Promise<RightCounts> {
+/** In memory over the unit's live rows: each feature's row is re-checked as can() does (isLiveRow) and classed by the
+ *  source can() would sign (rowSource). */
+export function rightCounts(product: Pick<NextAdminProduct, "key" | "features">, records: readonly EntitlementRecord[],
+  at: { organizationId: string; now: number }): RightCounts {
   const counts: RightCounts = { covered: 0, gift: 0, credits: 0, locked: 0 };
-  const rows = await Promise.all(product.features.map((f) => entitlement({ organizationId, productKey: product.key, featureKey: f.feature_key, now })));
-  for (const row of rows) {
-    const pay = row?.limits?.pay;
-    if (row && pay === undefined && row.source === "contract") counts.covered += 1;
-    else if (row && pay === undefined && row.source === "comp") counts.gift += 1;
-    else if (row && pay === "credits" && row.source === "contract") counts.credits += 1;
-    else counts.locked += 1;   // no live row, or one can() refuses (malformed marker)
+  for (const f of product.features) {
+    const row = records.find((r) => r.productKey === product.key && r.featureKey === f.feature_key);
+    const live = row && isLiveRow(row, { organizationId: at.organizationId, productKey: product.key, featureKey: f.feature_key, now: at.now });
+    const source = live ? rowSource(row, f) : null;
+    if (source === "contract") counts.covered += 1;
+    else if (source === "comp") counts.gift += 1;
+    else if (source === "credits") counts.credits += 1;
+    else counts.locked += 1;
   }
   return counts;
 }
+
+/** The product's source when the billing account names none: what can() signs for its features. */
+const featureSource = (c: RightCounts): RightInput["source"] =>
+  c.covered > 0 ? "contract" : c.gift > 0 ? "comp" : c.credits > 0 ? "credits" : null;
 
 export async function wpSummary(rawBody: string, signature: string | null, env: Env, deps: SummaryDeps): Promise<SummaryOutcome> {
   const v = await verifySignedMember(rawBody, signature, env, deps, (body, site) => {
@@ -203,22 +214,21 @@ export async function wpSummary(rawBody: string, signature: string | null, env: 
   // organizations only), and the root's name and wallet are not theirs to see.
   if (account.organization_id !== orgId) return { ok: false, status: 403, error: "brand_unit_unsupported" };
   const held = new Set((await deps.held(orgId, undefined, v.now)).map((p) => p.key));
-  const products = await Promise.all(servedNextAdminProducts().map(async (p): Promise<WpSummaryProduct> => {
+  const records = held.size ? await deps.entitlements({ organizationId: orgId, productKeys: [...held], now: v.now }) : [];
+  const products = servedNextAdminProducts().map((p): WpSummaryProduct => {
     if (!held.has(p.key)) {
       const l = rightLabel({ entry: null, door: "not_held", source: null, viewer: "manager", mode: "enforce", productName: p.name });
       return { key: p.key, name: p.name, right: { kind: "none", label: l.label, counts: { covered: 0, gift: 0, credits: 0, locked: p.features.length } }, can_enter: false };
     }
-    const counts = await rightCounts(orgId, p, v.now, deps.entitlement);
+    const counts = rightCounts(p, records, { organizationId: orgId, now: v.now });
     const r = productRight(account, p.key);
-    // No subscription, gift or all-features source: a credit pack is still known by its rows; a contract row alone is not
-    // worded (see WpSummaryProduct.right).
-    const source = r.source ?? (counts.covered === 0 && counts.credits > 0 ? "credits" : null);
-    const kind: RightKind = r.contractStatus === "trial" ? "trial" : source ?? (counts.covered > 0 ? "contract" : "none");
+    const source = r.source ?? featureSource(counts);
+    const kind: RightKind = r.contractStatus === "trial" ? "trial" : source ?? "none";
     const l = rightLabel({ entry: { allowed: true, verdict: true, reason: null }, door: "open", viewer: "manager", mode: "enforce",
       productName: p.name, ...r, source });
     return { key: p.key, name: p.name, right: { kind, label: l.label, ...(r.endsAt ? { until: r.endsAt } : {}), counts },
       can_enter: true, url: `https://${productHost(p, env)}/` };
-  }));
+  });
   return {
     ok: true,
     unit: { name: account.name },

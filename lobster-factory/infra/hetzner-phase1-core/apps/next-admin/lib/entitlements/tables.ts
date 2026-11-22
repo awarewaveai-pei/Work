@@ -24,7 +24,32 @@ export function pickEntitlementRow<T extends { limits: Record<string, unknown> |
   return best;
 }
 
+const ENTITLEMENT_COLUMNS = "id, organization_id, product_key, feature_key, source, source_ref, starts_at, ends_at, status, limits";
+
+/** The one "live" filter: an organization's active rows that have started and not ended at `now`. Every read of current
+ *  rights goes through it (findActiveEntitlement, listActiveEntitlements), so they cannot disagree. */
+function activeRows(db: SupabaseClient, organizationId: string, now: number) {
+  const time = new Date(now * 1000).toISOString();
+  return db.from("organization_entitlements").select(ENTITLEMENT_COLUMNS)
+    .eq("organization_id", organizationId).eq("status", "active").lte("starts_at", time)
+    .or(`ends_at.is.null,ends_at.gt.${time}`);
+}
+
+const toRecord = (data: EntitlementRow): EntitlementRecord => ({
+  id: data.id, organizationId: data.organization_id, productKey: data.product_key,
+  featureKey: data.feature_key, source: data.source, sourceRef: data.source_ref,
+  startsAt: Date.parse(data.starts_at) / 1000,
+  endsAt: data.ends_at === null ? null : Date.parse(data.ends_at) / 1000,
+  status: data.status, limits: data.limits,
+});
+
+const LIST_PAGE = 1000;   // PostgREST's default row cap
+
 export function createEntitlementStore(client: SupabaseClient | null = getSupabaseWriteClient()): CanStore & {
+  /** Every (product, feature) of these products the organization has a live row for, each the row findActiveEntitlement
+   *  would return (pickEntitlementRow over the same filter): a summary of many features in one read instead of one per
+   *  feature. Pages past the row cap. */
+  listActiveEntitlements(input: { organizationId: string; productKeys: readonly string[]; now: number }): Promise<EntitlementRecord[]>;
   expireEntitlements(now?: Date): Promise<number>;
   endLapsedTrials(now?: Date): Promise<number>;
   ensureAllFeatures(): Promise<number>;
@@ -33,22 +58,28 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
   const db = client;
   return {
     async findActiveEntitlement({ organizationId, productKey, featureKey, now }) {
-      const time = new Date(now * 1000).toISOString();
-      const { data: rows, error } = await db.from("organization_entitlements")
-        .select("id, organization_id, product_key, feature_key, source, source_ref, starts_at, ends_at, status, limits")
-        .eq("organization_id", organizationId).eq("product_key", productKey).eq("feature_key", featureKey)
-        .eq("status", "active").lte("starts_at", time)
-        .or(`ends_at.is.null,ends_at.gt.${time}`).order("created_at").order("id").limit(20);
+      const { data: rows, error } = await activeRows(db, organizationId, now)
+        .eq("product_key", productKey).eq("feature_key", featureKey).order("created_at").order("id").limit(20);
       if (error) throw new Error(error.message);
-      const data = pickEntitlementRow((rows ?? []) as EntitlementRow[]);
-      if (!data) return null;
-      return {
-        id: data.id, organizationId: data.organization_id, productKey: data.product_key,
-        featureKey: data.feature_key, source: data.source, sourceRef: data.source_ref,
-        startsAt: Date.parse(data.starts_at) / 1000,
-        endsAt: data.ends_at === null ? null : Date.parse(data.ends_at) / 1000,
-        status: data.status, limits: data.limits,
-      } satisfies EntitlementRecord;
+      const data = pickEntitlementRow((rows ?? []) as unknown as EntitlementRow[]);
+      return data ? toRecord(data) : null;
+    },
+    async listActiveEntitlements({ organizationId, productKeys, now }) {
+      if (!productKeys.length) return [];
+      const rows: EntitlementRow[] = [];
+      for (let from = 0; ; from += LIST_PAGE) {
+        const { data, error } = await activeRows(db, organizationId, now).in("product_key", [...productKeys])
+          .order("created_at").order("id").range(from, from + LIST_PAGE - 1);
+        if (error) throw new Error(error.message);
+        rows.push(...((data ?? []) as unknown as EntitlementRow[]));
+        if (!data || data.length < LIST_PAGE) break;
+      }
+      const byFeature = new Map<string, EntitlementRow[]>();
+      for (const r of rows) {
+        const k = `${r.product_key}/${r.feature_key}`;
+        byFeature.set(k, [...(byFeature.get(k) ?? []), r]);
+      }
+      return [...byFeature.values()].map((group) => toRecord(pickEntitlementRow(group)!));
     },
     async getCreditBalance(organizationId) {
       // Aggregate in Postgres; selecting ledger rows truncates at PostgREST's row cap.
