@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto";
 import { getSupabaseWriteClient } from "../supabase-server";
 import { textCallCostUsd, resolveTextRate, imageCostUsd } from "./cost-calculator";
 import { IMAGE_RATES, DEFAULT_IMAGE_MODEL } from "./cost-model";
+import { isSubTextModel } from "./text-model-options";
 import type { Grant, Hold } from "../entitlements/can";
 import { creditsForCost } from "../entitlements/ledger";
 
@@ -53,6 +54,9 @@ export interface LogAiCallArgs {
   metadata?: Record<string, unknown>;
   jobId?: string | null;
   tool?: string | null;
+  /** 訂閱 calls: the model the CLI actually answered with; stored as metadata.answered_model. Usage figures
+   *  (tokens, codex_5h_used_pct ... = CODEX_USAGE_KEYS in lib/tarot/codex-bridge.ts) go in `metadata`. */
+  answeredModel?: string | null;
 }
 
 /**
@@ -116,6 +120,7 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
     let metadata: Record<string, unknown> | undefined;
     let jobId: string | null | undefined;
     let tool: string | null | undefined;
+    let answeredModel: string | null | undefined;
 
     if (isFromResponse(args)) {
       const u = args.response.usage ?? {};
@@ -140,18 +145,22 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       metadata = args.metadata;
       jobId = args.jobId;
       tool = args.tool;
+      answeredModel = args.answeredModel;
     }
 
+    // 訂閱 rows are logged even when the CLI reported no token counts: the row is the usage record (usd 0, I6).
+    const isSub = isSubTextModel(model);
     // Nothing to record (e.g. a request that failed before any tokens were spent).
-    if (inputTokens === 0 && outputTokens === 0 && cacheReadTokens === 0 && cacheWriteTokens === 0) return;
+    if (!isSub && inputTokens === 0 && outputTokens === 0 && cacheReadTokens === 0 && cacheWriteTokens === 0) return;
 
     const supabase = getSupabaseWriteClient();
     if (!supabase) return; // write client not configured — silently skip, never break the feature
 
-    const costUsd = textCallCostUsd({ model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens });
+    // 訂閱 ids are not in TEXT_RATES: no rate lookup, cost 0, vendor 訂閱 (I6).
+    const costUsd = isSub ? 0 : textCallCostUsd({ model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens });
     // Resolve via the same normalizer the cost uses, so vendor + the unpriced-model flag are accurate
     // even when the API echoes a dated id. rate_fallback surfaces mispriced models instead of hiding them.
-    const resolved = resolveTextRate(model);
+    const resolved = isSub ? null : resolveTextRate(model);
 
     const id = randomUUID();
     const charge = await chargeCall(args.grant, costUsd, id, route);
@@ -161,7 +170,7 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       organization_id: billedOrgId(args.grant),
       route,
       model,
-      vendor: resolved.rate.vendor,
+      vendor: resolved ? resolved.rate.vendor : "訂閱",
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       cache_read_tokens: cacheReadTokens,
@@ -171,8 +180,8 @@ export async function logAiCall(args: LogAiCallArgs | LogAiCallFromResponse): Pr
       job_id: job.job_id,
       tool: tool ?? null,
       kind: "text",
-      metadata: { ...(metadata ?? {}), ...(job.rawJobId ? { raw_job_id: job.rawJobId } : {}), ...charge,
-        ...(resolved.fallback ? { rate_fallback: true, matched_rate: resolved.matchedKey } : {}) },
+      metadata: { ...(metadata ?? {}), ...(isSub && answeredModel ? { answered_model: answeredModel } : {}), ...(job.rawJobId ? { raw_job_id: job.rawJobId } : {}), ...charge,
+        ...(resolved?.fallback ? { rate_fallback: true, matched_rate: resolved.matchedKey } : {}) },
     });
     if (error) console.warn(`[ai-cost] ${route} not recorded: ${error.message}`);
   } catch {

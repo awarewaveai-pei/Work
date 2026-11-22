@@ -50,3 +50,43 @@ export function isOpenAiTextModel(model: AiTextModel): boolean {
 export function textModelOption(model: AiTextModel): (typeof AI_TEXT_MODELS)[number] {
   return AI_TEXT_MODELS.find((m) => m.value === model) ?? AI_TEXT_MODELS[0];
 }
+
+// ---- 訂閱通道 (PLAN 2026-11-22 §3). Subscription models are NOT API models: they live only here, never in AI_TEXT_MODELS /
+// TEXT_RATES, so API-only paths (isAiTextModel, normalizeAiTextModel, price lookup, model probes) can never see a sub-* id.
+export const SUB_TEXT_MODELS = {
+  "sub-codex": { label: "Codex 訂閱", tool: "codex", cliModel: null },
+  "sub-claude-haiku": { label: "Claude 訂閱 Haiku", tool: "claude", cliModel: "haiku" },
+  "sub-claude-sonnet": { label: "Claude 訂閱 Sonnet", tool: "claude", cliModel: "sonnet" },
+  "sub-claude-opus": { label: "Claude 訂閱 Opus", tool: "claude", cliModel: "opus" },
+} as const satisfies Record<string, { label: string; tool: "codex" | "claude"; cliModel: string | null }>;
+export type SubTextModel = keyof typeof SUB_TEXT_MODELS;
+export type SubTextSpec = { label: string; tool: "codex" | "claude"; cliModel: string | null };
+/** A model a call may run on: an API model or a subscription model. */
+export type ChannelModel = AiTextModel | SubTextModel;
+export const SUB_TEXT_COST_LABEL = "NT$0（訂閱額度）";
+
+export function isSubTextModel(v: unknown): v is SubTextModel {
+  return typeof v === "string" && Object.hasOwn(SUB_TEXT_MODELS, v);
+}
+export function subTextSpec(model: unknown): SubTextSpec | undefined {
+  return isSubTextModel(model) ? SUB_TEXT_MODELS[model] : undefined;
+}
+
+/** Channel chain, tried in order; a failed segment hands over to the next. The last segment is always an API model. */
+export const TEXT_CHAINS = ["claude+codex+api", "claude+api", "codex+api", "api"] as const;
+export type TextChain = (typeof TEXT_CHAINS)[number];
+export const DEFAULT_TEXT_CHAIN: TextChain = "api";
+
+export function isTextChain(v: unknown): v is TextChain {
+  return typeof v === "string" && (TEXT_CHAINS as readonly string[]).includes(v);
+}
+
+/** chain -> ordered model ids to try. claude segment = `claudeModel` (a claude sub id, default sub-claude-opus); codex = sub-codex; api = apiModel (a sub id there -> the default API model). */
+export function resolveTextChain(a: { chain: TextChain; apiModel?: unknown; claudeModel?: unknown }): ChannelModel[] {
+  const claude: SubTextModel = isSubTextModel(a.claudeModel) && SUB_TEXT_MODELS[a.claudeModel].tool === "claude" ? a.claudeModel : "sub-claude-opus";
+  const out: ChannelModel[] = [];
+  if (a.chain.startsWith("claude")) out.push(claude);
+  if (a.chain.includes("codex")) out.push("sub-codex");
+  out.push(normalizeAiTextModel(a.apiModel));
+  return out;
+}
