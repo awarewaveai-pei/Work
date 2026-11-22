@@ -75,6 +75,16 @@ describe("runTextChain", () => {
     });
     expect(out).toEqual({ via: "api", model: apiModel, result: `api ${apiModel}`, skipped: [{ model: "sub-claude-opus", error: "sub_exec_failed" }] });
   });
+  it("停止 during a subscription segment ends the chain: the paid API segment is never started", async () => {
+    const ac = new AbortController();
+    const tried: string[] = [];
+    await expect(runTextChain(["sub-claude-opus", apiModel], {
+      runSub: async (model) => { tried.push(model); ac.abort(); return { ok: false, error: "sub_worker_timeout" }; },
+      runApi: async (model: string) => { tried.push(model); return `api ${model}`; },
+      signal: ac.signal,
+    })).rejects.toMatchObject({ name: "AbortError" });
+    expect(tried).toEqual(["sub-claude-opus"]);
+  });
   it("a skip as the page shows it", () => {
     expect(skipNote({ model: "sub-claude-haiku", error: "sub_worker_offline" })).toEqual({ model: "sub-claude-haiku", error: "sub_worker_offline", reason: "Claude 訂閱 Haiku：筆電離線" });
     expect(skipNote({ model: "sub-codex", error: "sub_worker_offline" }, "schedule").reason).toBe("Codex 訂閱：主機沒有登入這一家或離線");

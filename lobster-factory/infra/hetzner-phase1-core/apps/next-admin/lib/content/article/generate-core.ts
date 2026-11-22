@@ -713,6 +713,7 @@ export async function* streamArticleGeneration(
     runSub: (model) => runSubText({ grant, model, system: config.system, prompt: config.userPrompt, lane,
       signal: signal ?? new AbortController().signal, route: "content/article-generate", tool: "content", jobId: config.jobId }),
     runApi: async (model) => model,
+    signal,
   });
   const skipped = out.skipped.map((s) => skipNote(s, lane));
   if (out.via === "api") {

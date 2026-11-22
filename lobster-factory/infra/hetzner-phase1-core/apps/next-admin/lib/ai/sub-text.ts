@@ -78,10 +78,12 @@ export type ChainOutcome<A> =
  *  tried; the first API segment is final, whatever it returns. A one-model chain = today's API call. */
 export async function runTextChain<A>(
   models: readonly ChannelModel[],
-  run: { runSub: (model: SubTextModel) => Promise<SubTextResult>; runApi: (model: AiTextModel) => Promise<A> },
+  run: { runSub: (model: SubTextModel) => Promise<SubTextResult>; runApi: (model: AiTextModel) => Promise<A>; signal?: AbortSignal },
 ): Promise<ChainOutcome<A>> {
   const skipped: ChainSkip[] = [];
   for (const model of models) {
+    // 停止 (the caller's signal) ends the chain: a stopped segment never hands over to the next, least of all the paid API.
+    if (run.signal?.aborted) throw new DOMException("stopped", "AbortError");
     if (!isSubTextModel(model)) return { via: "api", model, result: await run.runApi(model), skipped };
     // A segment that throws is a failed segment like any other: the chain still reaches the API.
     const out: SubTextResult = await run.runSub(model).catch(() => ({ ok: false as const, error: "sub_exec_failed" }));

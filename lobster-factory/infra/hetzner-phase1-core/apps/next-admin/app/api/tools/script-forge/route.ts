@@ -158,6 +158,7 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
           runApi: () => useOpenAi
             ? streamOpenAi(capture, encoder, model, system, prompt, apiKey, ac.signal, grant, used)
             : streamAnthropic(capture, encoder, model, system, prompt, apiKey, ac.signal, grant, used),
+          signal: ac.signal,
         });
         skipped = out.skipped;
         if (out.via === "sub") { capture.enqueue(encoder.encode(out.text)); used?.(0); }
@@ -197,7 +198,9 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
     },
   });
   if (!chain) return response;
-  return deferCodexWork(grant.actor, async () => {
+  // The deferred signal = the browser's 停止 (DELETE on the job): it cuts the chain and the API stream like a disconnect.
+  return deferCodexWork(grant.actor, async (signal) => {
+    if (signal.aborted) ac.abort(); else signal.addEventListener("abort", () => ac.abort());
     const text = await response.text();
     return Response.json({ ok: true, text, ...(skipped.length ? { skipped: skipped.map((s) => skipNote(s)) } : {}),
       ...(claim ? { reservedTwd: claim.spentTwd } : {}) });

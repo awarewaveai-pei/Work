@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { CLAUDE_DEFAULT_MODEL } from "./claude-params";
 import { TEXT_RATES } from "./cost-model";
 
@@ -80,6 +81,9 @@ export function subTextSpec(model: unknown): SubTextSpec | undefined {
 /** Channel chain, tried in order; a failed segment hands over to the next. The last segment is always an API model. */
 export const TEXT_CHAINS = ["claude+codex+api", "claude+api", "codex+api", "api"] as const;
 export type TextChain = (typeof TEXT_CHAINS)[number];
+/** A page's chain buttons, handed in by a staff page only: a product door's page closure may not reach the subscription
+ *  APIs (lib/portal/__tests__/registry-code.test.ts). Absent = no buttons, the page sends API only. */
+export type ChainControl = (value: { chain: TextChain; claudeModel: string }, onChange: (next: { chain: TextChain; claudeModel: string }) => void, disabled?: boolean) => ReactNode;
 export const DEFAULT_TEXT_CHAIN: TextChain = "api";
 
 export function isTextChain(v: unknown): v is TextChain {

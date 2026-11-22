@@ -17,6 +17,7 @@ import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { ARTICLE_VIDEO_DEFAULTS, parseVoiceModel } from "@/lib/content/video/defaults";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
+import { DEFAULT_TEXT_CHAIN, type ChainControl, type TextChain } from "@/lib/ai/text-model-options";
 
 // ─── Video config constants (mirrors VideoStudio) ────────────────────────────
 
@@ -465,7 +466,7 @@ export interface ContentVideoApi {
 // Region names for the source lists (the region <select> names the same seven).
 const GEO_NAME_ZH: Record<string, string> = { TW: "台灣", HK: "香港", SG: "新加坡", US: "美國", GB: "英國", JP: "日本", AU: "澳洲" };
 
-export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
+export default function ContentStudio({ video, chainControl }: { video?: ContentVideoApi; /** 訂閱走法按鈕：只有員工版（ContentStudioStaff）傳；不傳 = 只用 API */ chainControl?: ChainControl }) {
   const { canUse, why } = usePaidFeatures();
   // The site comes only from the client rail (ADR 020: URL org/site; registering "site" makes the frame draw the rail).
   const clientContext = useClientContext("site");
@@ -572,6 +573,10 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   const [genStatus, setGenStatus] = useState<GenStatus>("idle");
   const [genError,  setGenError]  = useState("");
   const [genTruncated, setGenTruncated] = useState(false);
+  // 訂閱通道（PLAN 2026-11-22 §3）：走法 + Claude 等級；form.model = 鏈最後一段的 API 模型。
+  const [textChain, setTextChain] = useState<{ chain: TextChain; claudeModel: string }>({ chain: DEFAULT_TEXT_CHAIN, claudeModel: "sub-claude-opus" });
+  const [subWaitS, setSubWaitS] = useState<number | null>(null); // 等筆電寫作的秒數；null = 沒在等
+  const [chainSkips, setChainSkips] = useState<Array<{ error: string; reason: string }>>([]); // 被跳過的訂閱段
 
   // Article preview toggle (false = raw markdown editor, true = rendered HTML preview)
   const [showPreview, setShowPreview] = useState(false);
@@ -1156,7 +1161,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
     setGenerated(""); setMetaData(null);
     setSessionCost(null);
     jobIdRef.current = crypto.randomUUID();
-    setGenStatus("streaming"); setGenError(""); setGenTruncated(false);
+    setGenStatus("streaming"); setGenError(""); setGenTruncated(false); setChainSkips([]);
     setPubStatus("idle"); setPubResult(null); setPublishedPostId(null);
     setVideoStatus("idle"); setVideoError("");
     if (videoPollRef.current) { clearInterval(videoPollRef.current); videoPollRef.current = null; }
@@ -1219,10 +1224,18 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
         ? (patternMode === "manual" ? manualPatterns.length : form.patternCount)
         : 0;
 
-      const res = await fetch("/api/content/generate", {
+      // 有訂閱段 → 伺服器回 202，fetchAwaitingCodex 輪詢到 { ok, markdown }（PLAN I5）；只用 API = 原本的串流。
+      const { chain, claudeModel } = textChain;
+      const viaSub = !!chainControl && chain !== "api";
+      let waitTimer: ReturnType<typeof setInterval> | undefined;
+      if (viaSub) { const t0 = Date.now(); setSubWaitS(0); waitTimer = setInterval(() => setSubWaitS(Math.round((Date.now() - t0) / 1000)), 1000); }
+      let res: Response;
+      try {
+      const init: RequestInit = {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          ...(viaSub ? { chain, claudeModel } : {}),
           // Drop the multi-MB img2img reference data URL — generate never reads it (only the image
           // route does), so shipping it here is pure wire bloat (mirrors the draft-save strip).
           // ai-video 模式下後端不插 YouTube placeholder（影片由 embed-to-wp 單獨嵌入）
@@ -1237,12 +1250,23 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
           _jobId: jobIdRef.current,        // ledger grouping
         }),
         signal: ac.signal,
-      });
+      };
+      // 停止 = 不再輪詢，並 DELETE 伺服器上的背景工作（訂閱段與付費 API 段都中止）。
+      res = viaSub
+        ? await fetchAwaitingCodex("/api/content/generate", init, { waitingText: "筆電寫作中…", cancel: true })
+        : await fetch("/api/content/generate", init);
+      } finally { clearInterval(waitTimer); setSubWaitS(null); }
       if (!res.ok || !res.body) { setGenStatus("error"); setGenError(`伺服器錯誤：${res.status}`); return; }
 
+      let text = "";
+      if (viaSub) {
+        // 輪詢結果 = 整篇（含 [COST_JSON]）一次到，當成一個 chunk 走下面同一條處理路。
+        const j = await res.json().catch(() => null) as { ok?: boolean; markdown?: string; error?: string } | null;
+        if (!j?.ok || typeof j.markdown !== "string") { setGenStatus("error"); setGenError(j?.error || "產生失敗，請重試"); return; }
+        text = j.markdown;
+      } else {
       const reader = res.body.getReader();
       const dec    = new TextDecoder();
-      let text = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -1251,9 +1275,10 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
         setGenerated(text.split("\n").filter(l => !l.startsWith("[COST_JSON]")).join("\n"));
       }
       text += dec.decode();
+      }
 
       // Parse and strip [COST_JSON] sentinel lines before article processing
-      { const lines = text.split("\n"); const costLines: string[] = []; const bodyLines = lines.filter(l => { if (l.startsWith("[COST_JSON]")) { costLines.push(l.slice("[COST_JSON]".length)); return false; } return true; }); text = bodyLines.join("\n"); for (const cl of costLines) { try { const c = JSON.parse(cl) as { usd: number; model: string; vendor: string; route: string }; addCostLine({ route: c.route, model: c.model, vendor: c.vendor, usd: c.usd, kind: "text" }); } catch { /* ignore */ } } }
+      { const lines = text.split("\n"); const costLines: string[] = []; const bodyLines = lines.filter(l => { if (l.startsWith("[COST_JSON]")) { costLines.push(l.slice("[COST_JSON]".length)); return false; } return true; }); text = bodyLines.join("\n"); for (const cl of costLines) { try { const c = JSON.parse(cl) as { usd: number; model: string; vendor: string; route: string; skipped?: Array<{ error: string; reason: string }> }; addCostLine({ route: c.route, model: c.model, vendor: c.vendor, usd: c.usd, kind: "text" }); if (c.skipped?.length) setChainSkips(c.skipped); } catch { /* ignore */ } } }
 
       // Detect + strip BOTH server-side markers so neither leaks into the published article body
       // (the standard REST publish path passes pure comment lines through verbatim — critic Major).
@@ -2248,6 +2273,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
                 </select>
               </div>
             </div>
+            {chainControl && <div style={{ marginBottom: "12px" }}>{chainControl(textChain, setTextChain, isGenerating)}</div>}
 
             {/* 語氣 / 視角 / 可讀性 / AI 清理 */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
@@ -3587,10 +3613,16 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
               <button className="btn-secondary" onClick={() => { abortRef.current?.abort(); setGenStatus("idle"); }}>停止</button>
             )}
             {genStatus === "error" && <span style={{ color: "var(--color-error)", fontSize: "13px" }}>{genError}</span>}
+            {isGenerating && subWaitS !== null && <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>筆電寫作中… 已 {subWaitS} 秒</span>}
             <div style={{ marginLeft: "auto" }}>
               <CostChip cost={sessionCost} />
             </div>
           </div>
+          {chainSkips.length > 0 && (
+            <div style={{ marginTop: "-16px", marginBottom: "20px", color: "var(--text-muted)", fontSize: "12px" }}>
+              {chainSkips.map((s, i) => <div key={i}>{s.reason}，改用下一段</div>)}
+            </div>
+          )}
           {/* ═══ 輸出區 ═══ */}
           {(hasContent || isGenerating) && (
             <div className="form-block form-block--wide">

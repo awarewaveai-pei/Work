@@ -50,13 +50,14 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { config } = prepared as ArticlePrepareSuccess;
 
   if (config.chain && codexAllowed(grant.actor)) {
-    // Detached from the request: its signal ends with the 202 answer. The bridge's queue and lease timers bound the wait.
+    // Detached from the request: its signal ends with the 202 answer; the deferred signal is the browser's 停止 (DELETE
+    // on the job). The bridge's queue and lease timers bound the wait.
     // Collected here, not through streamResponse: that stream closes on a throw, so a failure would read as an empty
     // article. A throw answers as an article error, not with deferCodexWork's picture fallback.
-    return deferCodexWork(grant.actor, async () => {
+    return deferCodexWork(grant.actor, async (signal) => {
       try {
         let markdown = "";
-        for await (const chunk of streamArticleGeneration(config, apiKey, new AbortController().signal)) markdown += chunk;
+        for await (const chunk of streamArticleGeneration(config, apiKey, signal)) markdown += chunk;
         return Response.json({ ok: true, markdown });
       } catch {
         return Response.json({ ok: false, error: subErrorText("article_failed"), code: "article_failed" });

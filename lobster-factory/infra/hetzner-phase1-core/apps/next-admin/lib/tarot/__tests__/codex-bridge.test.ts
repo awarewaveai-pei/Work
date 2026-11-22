@@ -1,7 +1,7 @@
 // Codex pictures run on the operator's own plan: only she may queue one, the laptop's answer reaches the caller, and a
 // laptop that is off fails fast instead of holding the request for 4 minutes.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { claimJob, codexAllowed, completeJob, deferCodexWork, QUEUE_WAIT_MS, resetCodexBridgeForTests, RUN_LEASE_MS, runOnLaptop, takeCodexResult, workerLeft, workerOnline } from "../codex-bridge";
+import { cancelCodexWork, claimJob, codexAllowed, completeJob, deferCodexWork, QUEUE_WAIT_MS, resetCodexBridgeForTests, RUN_LEASE_MS, runOnLaptop, takeCodexResult, workerLeft, workerOnline } from "../codex-bridge";
 
 vi.mock("@/lib/ai/gateway", () => ({ providerUrl: () => "https://unused.invalid" }));
 const logged = vi.hoisted(() => [] as Record<string, unknown>[]);
@@ -150,6 +150,19 @@ describe("generateTarotImage codex-image", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(takeCodexResult(id, "ops:owner:99999999-2222-3333-4444-555555555555")).toEqual({ state: "unknown" });
     expect(takeCodexResult(id, actor)).toMatchObject({ state: "done", body: { ok: true, image: PNG } });
+  });
+
+  it("停止: only the person who asked can cancel; the work's signal aborts and the result is gone", async () => {
+    const actor = `ops:owner:${OWNER}`;
+    let seen: AbortSignal | undefined;
+    const id = deferCodexWork(actor, (signal) => { seen = signal; return new Promise<Response>(() => {}); }).headers.get("X-Codex-Job")!;
+    expect(cancelCodexWork(id, "ops:owner:99999999-2222-3333-4444-555555555555")).toBe(false);
+    expect(seen!.aborted).toBe(false);
+    expect(takeCodexResult(id, actor)).toEqual({ state: "running" });
+    expect(cancelCodexWork(id, actor)).toBe(true);
+    expect(seen!.aborted).toBe(true);
+    expect(takeCodexResult(id, actor)).toEqual({ state: "unknown" });
+    expect(cancelCodexWork(id, actor)).toBe(false);
   });
 });
 

@@ -104,7 +104,7 @@ type Job = ImageJob | TextJob;
  *  and per tool until when its allowance is spent (epoch ms). */
 interface Worker { lastPollAt: number; tools: SubTool[]; text: boolean; quotaBlockedUntil: Partial<Record<SubTool, number>> }
 /** A route's deferred tail: who asked (only they may take it) and the response it produced, once done. */
-interface Deferred { actor: string; result: { status: number; body: unknown } | null; doneAt: number }
+interface Deferred { actor: string; result: { status: number; body: unknown } | null; doneAt: number; ac?: AbortController }
 
 interface Bridge { queue: Job[]; running: Map<string, Job>; workers: Record<SubLane, Worker>; wake: Set<() => void>; deferred: Map<string, Deferred> }
 const KEY = Symbol.for("awarewave.codexImageBridge");
@@ -334,16 +334,27 @@ function sweepResults(now: number): void {
 /** Run a route's tail (generation + whatever it does with the picture) detached from the request, and answer 202 with
  *  the job id at once. The tail's own Response is kept for takeCodexResult. Cost logging stays inside the tail, so it
  *  happens once however often the browser polls. */
-export function deferCodexWork(actor: string, work: () => Promise<Response>): Response {
+export function deferCodexWork(actor: string, work: (signal: AbortSignal) => Promise<Response>): Response {
   sweepResults(Date.now());
   const id = crypto.randomUUID();
-  const entry: Deferred = { actor, result: null, doneAt: 0 };
+  const entry: Deferred = { actor, result: null, doneAt: 0, ac: new AbortController() };
   bridge().deferred.set(id, entry);
   const failed = { status: 200, body: { ok: false, error: friendlyImageError("codex_failed"), code: "codex_failed" } as unknown };
-  void deferredScope.run(true, work)
+  void deferredScope.run(true, () => work(entry.ac!.signal))
     .then(async (res) => ({ status: res.status, body: (await res.json().catch(() => failed.body)) as unknown }), () => failed)
     .then((result) => { entry.result = result; entry.doneAt = Date.now(); });
   return Response.json({ pending: true, codexJob: id }, { status: 202, headers: { [CODEX_JOB_HEADER]: id, "Cache-Control": "no-store" } });
+}
+
+/** The browser's 停止: abort a deferred tail (its signal fires) and drop it, as if taken. Only the actor who started it;
+ *  anyone else, or an unknown id, gets false and nothing changes. */
+export function cancelCodexWork(id: string, actor: string): boolean {
+  const { deferred } = bridge();
+  const entry = deferred.get(id);
+  if (!entry || entry.actor !== actor) return false;
+  deferred.delete(id);
+  entry.ac?.abort();
+  return true;
 }
 
 /** A route that can run Codex: defer its tail when it will (owner + codex-image), else run it in the request as before.
