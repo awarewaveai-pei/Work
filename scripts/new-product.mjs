@@ -87,7 +87,7 @@ export async function createProduct(options) {
   const vocab = vocabModule.CATEGORIES ? vocabModule : vocabModule.default;
   const tasks = (options.tasks ?? '').split(',').map((t) => t.trim()).filter(Boolean);
   const blurb = (options.blurb ?? '').trim();
-  assert(vocab.CATEGORIES.includes(options.category), `--category must be one of: ${vocab.CATEGORIES.join(', ')}`);
+  assert(vocab.CATEGORIES.includes(options.category), `--category must be one of: ${vocab.CATEGORIES.map((c) => `${c}（${vocab.CATEGORY_NAMES[c]}）`).join(', ')}`);
   assert(tasks.length > 0 && tasks.every((t) => Object.hasOwn(vocab.TASKS, t)), `--tasks must be one or more of: ${Object.keys(vocab.TASKS).join(', ')}`);
   assert(blurb && [...blurb].length <= 28, '--blurb is required, one line of at most 28 characters');
   assert(vocab.ICONS.includes(options.icon), `--icon must be one of: ${vocab.ICONS.join(', ')}`);

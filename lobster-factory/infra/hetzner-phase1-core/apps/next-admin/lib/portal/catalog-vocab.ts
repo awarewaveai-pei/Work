@@ -3,6 +3,10 @@
 // (scripts/new-product.mjs loads it too). No emoji, no colour codes in icons.
 export const CATEGORIES = ["content", "design", "video", "social", "service", "sales", "research", "insight"] as const;
 export type CatalogCategory = (typeof CATEGORIES)[number];
+// Shown name of each category (ToolCard, scripts/new-product.mjs); Record<> makes tsc fail when a category has none.
+export const CATEGORY_NAMES: Readonly<Record<CatalogCategory, string>> = {
+  content: "內容", design: "設計", video: "影片", social: "社群", service: "客服", sales: "開發", research: "研究", insight: "洞察",
+};
 
 export const CONTEXTS = ["ecommerce", "studio", "consulting", "education", "creator", "general"] as const;
 export type CatalogContext = (typeof CONTEXTS)[number];

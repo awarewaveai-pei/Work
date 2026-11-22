@@ -1,7 +1,7 @@
 // One tool/product card in three densities (blueprint §5): card (grid), row (list), compact (search results, side menu).
 // It never decides a right or writes a state sentence: badge, text, button caption and tone all come from rightLabel()
 // (lib/entitlements/right-label.ts); icon, category and blurb from the product's `catalog`. Colours are globals classes/tokens only.
-import type { CatalogCategory, CatalogIcon } from "@/lib/portal/catalog-vocab";
+import { CATEGORY_NAMES, type CatalogIcon } from "@/lib/portal/catalog-vocab";
 import type { CatalogMeta } from "@/lib/portal/products";
 import type { RightLabel, RightTone } from "@/lib/entitlements/right-label";
 
@@ -22,10 +22,6 @@ export interface ToolCardProps {
   now?: Date;
 }
 
-// Display names for the closed category list; Record<> makes tsc fail when a category is added without one.
-const CATEGORY_NAMES: Record<CatalogCategory, string> = {
-  content: "內容", design: "設計", video: "影片", social: "社群", service: "客服", sales: "開發", research: "研究", insight: "洞察",
-};
 // One simple outline per closed icon name; stroke = currentColor, so no colour code anywhere.
 const ICON_PATHS: Record<CatalogIcon, string> = {
   article: "M5 4h14v16H5zM8 8h8M8 12h8M8 16h5",
