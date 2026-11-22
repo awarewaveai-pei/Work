@@ -1,5 +1,6 @@
 // Product/feature delivery registry (ADR 012/017/018). New rows: scripts/new-product.mjs.
 import cognitiveInventory from "./cognitive-features.json";
+import type { CatalogCategory, CatalogContext, CatalogIcon } from "./catalog-vocab";
 export type LoginSource = "local" | "awarewave-wp" | "customer-wp";
 export const LOGIN_SOURCES: readonly LoginSource[] = ["local", "awarewave-wp", "customer-wp"];
 // anonymous: path prefixes served with no login, on this product's own door only (pages and GET/HEAD routes;
@@ -19,8 +20,22 @@ export interface ProductFeature {
   buyout: boolean;
   billing: "contract" | "credits";
 }
+// Catalog entry (blueprint §4.3), product layer. Values come from catalog-vocab.ts (products.test.ts enforces it). No price here:
+// prices live only in WooCommerce (ADR 017 §2). "New" is derived from addedAt, never stored.
+export interface CatalogMeta {
+  category: CatalogCategory;
+  tasks: readonly string[];            // >= 1 key of TASKS
+  blurb: string;                       // one line, <= 28 characters
+  icon: CatalogIcon;
+  addedAt: string;                     // YYYY-MM-DD
+  contexts?: readonly CatalogContext[];
+  keywords?: readonly string[];
+  featured?: number;                   // 1 = first; unique across products
+  intro?: string;                      // slug of the aware-wave.com intro page
+}
 interface ProductDefinition {
   key: string;
+  catalog: CatalogMeta;
   name: string;
   description: string;
   subdomain: string;
@@ -39,33 +54,33 @@ const quota = (feature_key: string, name: string, billing: ProductFeature["billi
   ({ feature_key, name, limitKind: "QUOTA", buyout: true, billing });
 const cognitiveFeatures = cognitiveInventory.map((f) => quota(f.id, f.name, f.billing as ProductFeature["billing"]));
 const PRODUCT_DEFINITIONS = [
-  { key: "cognitive", name: "AI LEGO Cognitive Engineering OS", description: "組合認知方法、研究資料與專案。", subdomain: "cognitive", door: { app: "external" },
+  { key: "cognitive", catalog: { category: "insight", tasks: ["decide-with-methods", "find-root-cause", "plan-projects"], blurb: "組合認知方法做研究與決策", icon: "compass", addedAt: "2026-01-01" }, name: "AI LEGO Cognitive Engineering OS", description: "組合認知方法、研究資料與專案。", subdomain: "cognitive", door: { app: "external" },
     loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon",
     features: cognitiveFeatures, accessChannels: ["ui"], modules: { dependsOn: ["collect"], manifest: "lib/cognitive/MODULE_MANIFEST.json" }, staffPaths: [] },
-  { key: "hci", name: "HCI-30", description: "人機互動與持續監測工具。", subdomain: "hci", door: { app: "external" },
+  { key: "hci", catalog: { category: "insight", tasks: ["continuous-monitoring"], blurb: "人機互動與持續監測", icon: "pulse", addedAt: "2026-01-01" }, name: "HCI-30", description: "人機互動與持續監測工具。", subdomain: "hci", door: { app: "external" },
     loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon",
     features: [], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/hci/MODULE_MANIFEST.json" }, staffPaths: [] },
-  { key: "social", name: "社群發文", description: "改寫、排程並派送品牌社群貼文。", subdomain: "social", door: { app: "next-admin", page: "/social", api: ["/api/social"], anonymous: ["/smartlink"] },
+  { key: "social", catalog: { category: "social", tasks: ["schedule-social-posts", "rewrite-per-platform", "auto-reply"], blurb: "改寫貼文、排程並派送到各社群", icon: "share", addedAt: "2026-01-01" }, name: "社群發文", description: "改寫、排程並派送品牌社群貼文。", subdomain: "social", door: { app: "next-admin", page: "/social", api: ["/api/social"], anonymous: ["/smartlink"] },
     loginSources: ["local", "awarewave-wp", "customer-wp"], standalone: true, status: "coming_soon",
     features: [quota("social.rewrite", "AI 多平台改寫"), quota("social.dispatch", "貼文派送", "contract"), quota("social.auto-reply", "Meta 自動回覆", "contract"), quota("social.ads", "Meta 廣告管理", "contract"), quota("social.meta", "Meta 資產設定", "contract")], accessChannels: ["ui"],
     modules: { dependsOn: [], optional: ["content"], manifest: "lib/social/MODULE_MANIFEST.json" }, staffPaths: ["tools/social"] },
-  { key: "video", name: "影片製作", description: "生成腳本、場景、動態與旁白影片。", subdomain: "video", door: { app: "next-admin", page: "/video", api: ["/api/video", "/api/tools/script-forge"],
+  { key: "video", catalog: { category: "video", tasks: ["make-short-video", "write-script", "add-voiceover"], blurb: "寫腳本、做場景與動態、配旁白", icon: "film", addedAt: "2026-01-01" }, name: "影片製作", description: "生成腳本、場景、動態與旁白影片。", subdomain: "video", door: { app: "next-admin", page: "/video", api: ["/api/video", "/api/tools/script-forge"],
       nav: [{ path: "", name: "影片工作台", staff: "tools/video" }, { path: "works", name: "我的作品", staff: "tools/designs" }], uiService: "video-workbench" },
     loginSources: ["local"], standalone: false, status: "coming_soon",
     features: [quota("video.script", "腳本生成"), quota("video.image", "場景圖生成"), quota("video.motion", "影片動態"), quota("video.tts", "付費旁白"), quota("video.transcribe", "語音轉字幕"), quota("video.bg-remove", "去背"), quota("video.3d", "圖片轉 3D"), quota("video.enhance", "AI 畫質增強"), quota("video.music", "音樂生成")],
     accessChannels: ["ui"], modules: { dependsOn: ["content"], optional: ["social"], manifest: "lib/video/MODULE_MANIFEST.json" }, staffPaths: ["tools/video", "tools/script-forge"] },
-  { key: "tarot", name: "塔羅製圖", description: "生成塔羅圖片、提示詞與動態。", subdomain: "tarot", door: { app: "next-admin", page: "/tarot", api: ["/api/tools/tarot"],
+  { key: "tarot", catalog: { category: "design", tasks: ["make-tarot-cards"], blurb: "生成塔羅牌圖片與提示詞", icon: "cards", addedAt: "2026-01-01" }, name: "塔羅製圖", description: "生成塔羅圖片、提示詞與動態。", subdomain: "tarot", door: { app: "next-admin", page: "/tarot", api: ["/api/tools/tarot"],
       nav: [{ path: "", name: "塔羅工作台", staff: "tools/tarot" }, { path: "works", name: "我的作品", staff: "tools/designs" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
     features: [quota("tarot.image", "塔羅圖生成"), quota("tarot.prompt", "提示詞建議")],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/tarot/MODULE_MANIFEST.json" }, staffPaths: ["tools/tarot"] },
   // tools/publish (POD listing to our own Woo store) is studio's and staff-only: no door page (step-8 card §6 D1).
-  { key: "studio", name: "商品設計工作室", description: "生成商品圖片、文案與修圖素材。", subdomain: "studio", door: { app: "next-admin", page: "/studio", api: ["/api/tools/studio"],
+  { key: "studio", catalog: { category: "design", tasks: ["make-product-images", "write-product-copy", "retouch-images"], blurb: "做商品圖、寫商品文案、修圖", icon: "image", addedAt: "2026-01-01" }, name: "商品設計工作室", description: "生成商品圖片、文案與修圖素材。", subdomain: "studio", door: { app: "next-admin", page: "/studio", api: ["/api/tools/studio"],
       nav: [{ path: "", name: "設計工作台", staff: "tools/studio" }, { path: "works", name: "我的作品", staff: "tools/designs" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
     features: [quota("studio.image", "圖片生成"), quota("studio.product-copy", "商品文案"), quota("studio.edit-prompt", "修圖提示詞"), quota("studio.remove-bg", "去背"), quota("studio.inpaint", "局部重繪"), quota("studio.fill", "生成填補"), quota("studio.upscale", "圖片放大")],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/studio/MODULE_MANIFEST.json" }, staffPaths: ["tools/studio", "tools/publish"] },
-  { key: "design", name: "設計編輯器", description: "編輯畫布、橫幅、模型圖與向量設計。", subdomain: "design", door: { app: "next-admin", page: "/design", api: ["/api/tools/presets", "/api/tools/printful/catalog"],
+  { key: "design", catalog: { category: "design", tasks: ["edit-design", "make-banner", "make-mockup"], blurb: "畫布、橫幅、模型圖與向量設計", icon: "palette", addedAt: "2026-01-01" }, name: "設計編輯器", description: "編輯畫布、橫幅、模型圖與向量設計。", subdomain: "design", door: { app: "next-admin", page: "/design", api: ["/api/tools/presets", "/api/tools/printful/catalog"],
       nav: [{ path: "", name: "我的設計", staff: "tools/designs" }, { path: "canvas", name: "畫布", staff: "tools/photo-pro" },
         { path: "banner", name: "橫幅", staff: "tools/banner" }, { path: "mockup", name: "模型圖", staff: "tools/mockup" },
         { path: "pro", name: "向量（專業版）", staff: "tools/vector-pro" }] },
@@ -73,7 +88,7 @@ const PRODUCT_DEFINITIONS = [
     // Paid image operations belong to studio above; Fabric editing itself calls no paid model.
     features: [quota("design.edit", "畫布與向量編輯", "contract")], accessChannels: ["ui"],
     modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-pro", "tools/photo-pro"] },
-  { key: "content", name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", api: ["/api/content"],
+  { key: "content", catalog: { category: "content", tasks: ["write-seo-article", "plan-monthly-topics", "publish-to-site"], blurb: "寫 SEO 文章、排題目、發布到你的網站", icon: "article", addedAt: "2026-01-01" }, name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", api: ["/api/content"],
       nav: [{ path: "", name: "內容編輯", staff: "tools/content" },
         { path: "topics", name: "題目", staff: "tools/content/topics" },
         { path: "topics/clients", name: "客戶", staff: "tools/content/topics/clients", under: "topics" }, { path: "topics/steps", name: "五步驟", staff: "tools/content/topics/steps", under: "topics" },
@@ -82,14 +97,14 @@ const PRODUCT_DEFINITIONS = [
     features: [quota("content.article", "文章生成"), quota("content.humanize", "文章人性化"), quota("content.seo-fix", "SEO 修正"), quota("content.brand-voice", "品牌語氣擷取"), quota("content.outline", "大綱生成"), quota("content.title", "標題建議"), quota("content.keywords", "關鍵字建議"), quota("content.hook-brief", "Hook 草稿"), quota("content.syndicate", "多平台內容改寫"), quota("content.market-analysis", "市場分析"), quota("content.plan", "每月題目規劃"), quota("content.trending", "趨勢分析"), quota("content.image", "內容配圖")],
     accessChannels: ["ui"], modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/content/MODULE_MANIFEST.json" }, staffPaths: ["tools/content", "tools/events"] },
   // cs and collect also use /api/ops/clients/[slug]/{cs-*,collection-sources}: not a prefix a door can own; ADR 017 step 8 decides.
-  { key: "cs", name: "AI 客服", description: "根據知識庫回答問題並處理客服交接。", subdomain: "cs", door: { app: "next-admin", page: "/cs", enabled: false, api: ["/api/ops/cs"] },
+  { key: "cs", catalog: { category: "service", tasks: ["answer-customer-questions", "hand-off-to-human"], blurb: "依知識庫回答客人並轉交真人", icon: "chat", addedAt: "2026-01-01" }, name: "AI 客服", description: "根據知識庫回答問題並處理客服交接。", subdomain: "cs", door: { app: "next-admin", page: "/cs", enabled: false, api: ["/api/ops/cs"] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
     features: [quota("cs.intent", "意圖分類"), quota("cs.answer", "客服回答與工具呼叫"), quota("cs.eval", "回答評測"), quota("cs.exam", "客服模擬考"), quota("cs.translate", "訊息翻譯")],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/cs/MODULE_MANIFEST.json" }, staffPaths: ["ops/cs", "ops/knowledge", "cs-widget"] },
-  { key: "collect", name: "資料蒐集器", description: "搜尋並蒐集外部網站與研究資料。", subdomain: "collect", door: { app: "next-admin", page: "/collect", enabled: false, api: [] },
+  { key: "collect", catalog: { category: "research", tasks: ["collect-web-data"], blurb: "蒐集外部網站與研究資料", icon: "search", addedAt: "2026-01-01" }, name: "資料蒐集器", description: "搜尋並蒐集外部網站與研究資料。", subdomain: "collect", door: { app: "next-admin", page: "/collect", enabled: false, api: [] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
     features: [quota("collect.fetch", "資料蒐集")], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/collect/MODULE_MANIFEST.json" }, staffPaths: ["ops/collect"] },
-  { key: "outreach", name: "行銷開發信", description: "產生開發信並管理寄送名單。", subdomain: "outreach", door: { app: "next-admin", page: "/outreach", api: ["/api/outreach"],
+  { key: "outreach", catalog: { category: "sales", tasks: ["write-outreach-emails", "find-leads", "track-replies"], blurb: "寫開發信、管名單與追蹤回信", icon: "mail", addedAt: "2026-01-01" }, name: "行銷開發信", description: "產生開發信並管理寄送名單。", subdomain: "outreach", door: { app: "next-admin", page: "/outreach", api: ["/api/outreach"],
       nav: [{ path: "", name: "名單", staff: "tools/outreach/leads" }, { path: "inbox", name: "匯入名單", staff: "tools/outreach/inbox" },
         { path: "review", name: "審核信件", staff: "tools/outreach/review" }, { path: "followups", name: "追蹤", staff: "tools/outreach/followups" }, { path: "replies", name: "回信", staff: "tools/outreach/replies" },
         { path: "connectors", name: "信箱與連線", staff: "tools/outreach/connectors" },

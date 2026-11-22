@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { PLATFORM_PAGES, RESERVED_SUBDOMAINS, STAFF_ROUTE_GROUPS, nextAdminProducts, productHost, servedNextAdminProducts } from "../doors";
 import { STAFF_PLATFORM, covers } from "../staff-tools";
 import { BACK_OFFICE, STAFF_UTILITIES, LOGIN_SOURCES, PRODUCTS } from "../products";
+import { CATEGORIES, CONTEXTS, ICONS, TASKS } from "../catalog-vocab";
 import { APP_DIR, doorPageUrls, pageUrls } from "./app-pages";
 
 // The registry is the one list of products (ADR 012 §5).
@@ -24,6 +25,27 @@ describe("product registry", () => {
   it("has unique keys and subdomains", () => {
     expect(new Set(PRODUCTS.map((p) => p.key)).size).toBe(PRODUCTS.length);
     expect(new Set(PRODUCTS.map((p) => p.subdomain)).size).toBe(PRODUCTS.length);
+  });
+
+  // Blueprint §4.3: the catalog entry is how people find a product; the vocabulary file is the only source of its keys.
+  it("every product has a catalog entry whose values come from catalog-vocab", () => {
+    const featured: number[] = [];
+    for (const p of PRODUCTS) {
+      const c = p.catalog;
+      expect(c, p.key).toBeTruthy();
+      expect(CATEGORIES, p.key).toContain(c.category);
+      expect(c.tasks.length, p.key).toBeGreaterThan(0);
+      for (const t of c.tasks) expect(Object.keys(TASKS), `${p.key}: ${t}`).toContain(t);
+      expect(new Set(c.tasks).size, p.key).toBe(c.tasks.length);
+      expect(c.blurb.trim(), p.key).not.toBe("");
+      expect([...c.blurb].length, p.key).toBeLessThanOrEqual(28);
+      expect(ICONS, p.key).toContain(c.icon);
+      expect(c.addedAt, p.key).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(Number.isNaN(Date.parse(c.addedAt)), p.key).toBe(false);
+      for (const x of c.contexts ?? []) expect(CONTEXTS, p.key).toContain(x);
+      if (c.featured !== undefined) featured.push(c.featured);
+    }
+    expect(new Set(featured).size).toBe(featured.length);
   });
 
   // ADR 018 §5: a product that leaves a delivery field out fails here, so it cannot ship without its door.

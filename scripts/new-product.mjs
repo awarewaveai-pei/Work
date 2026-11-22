@@ -82,6 +82,15 @@ export async function createProduct(options) {
   const { tsImport } = requireApp('tsx/esm/api');
   const imported = await tsImport(pathToFileURL(registry).href, import.meta.url);
   const { PRODUCTS } = imported.PRODUCTS ? imported : imported.default;
+  // Catalog entry (blueprint 4.3): every value must come from the vocabulary file, the one source of keys.
+  const vocabModule = await tsImport(pathToFileURL(path.join(app, 'lib/portal/catalog-vocab.ts')).href, import.meta.url);
+  const vocab = vocabModule.CATEGORIES ? vocabModule : vocabModule.default;
+  const tasks = (options.tasks ?? '').split(',').map((t) => t.trim()).filter(Boolean);
+  const blurb = (options.blurb ?? '').trim();
+  assert(vocab.CATEGORIES.includes(options.category), `--category must be one of: ${vocab.CATEGORIES.join(', ')}`);
+  assert(tasks.length > 0 && tasks.every((t) => Object.hasOwn(vocab.TASKS, t)), `--tasks must be one or more of: ${Object.keys(vocab.TASKS).join(', ')}`);
+  assert(blurb && [...blurb].length <= 28, '--blurb is required, one line of at most 28 characters');
+  assert(vocab.ICONS.includes(options.icon), `--icon must be one of: ${vocab.ICONS.join(', ')}`);
   for (const p of PRODUCTS) {
     assert(p.key !== key, `duplicate key: ${key}`);
     assert(p.subdomain !== options.subdomain, `duplicate subdomain: ${options.subdomain}`);
@@ -92,7 +101,7 @@ export async function createProduct(options) {
     if (entry.isDirectory() && entry.name.startsWith('(')) assert(!fs.existsSync(path.join(app, 'app', entry.name, page.slice(1))), `staff route collision: ${page}`);
   }
   const declarations = Object.fromEntries(DECLARATIONS.map((k) => [k, delivery?.declarations[k] ?? 'TODO']));
-  const product = { key, name, description: delivery?.description ?? name, subdomain: options.subdomain,
+  const product = { key, catalog: { category: options.category, tasks, blurb, icon: options.icon, addedAt: new Date().toISOString().slice(0, 10) }, name, description: delivery?.description ?? name, subdomain: options.subdomain,
     door: { app: 'next-admin', page, api: ['/api/' + key], enabled: false }, loginSources: [...new Set(loginSources)], standalone,
     status: 'coming_soon', features, accessChannels: ['ui'],
     modules: { dependsOn: from?.plan.modules ?? [], manifest: `lib/${key}/MODULE_MANIFEST.json` }, staffPaths: [] };
@@ -164,7 +173,7 @@ export async function createProduct(options) {
 }
 
 async function main() {
-  const { values } = parseArgs({ options: Object.fromEntries(['key', 'name', 'subdomain', 'page', 'login', 'standalone', 'features', 'config', 'app', 'registry', 'from-foundry'].map((k) => [k, { type: 'string' }])) });
+  const { values } = parseArgs({ options: Object.fromEntries(['key', 'name', 'subdomain', 'page', 'login', 'standalone', 'features', 'config', 'category', 'tasks', 'blurb', 'icon', 'app', 'registry', 'from-foundry'].map((k) => [k, { type: 'string' }])) });
   // A noninteractive invocation never hangs asking for missing inputs.
   if (process.stdin.isTTY) {
     const foundry = values['from-foundry'] ? readFoundry(path.resolve(values['from-foundry'])) : null;
@@ -172,7 +181,7 @@ async function main() {
     try {
       for (const [key, question] of (foundry ? [['subdomain', '子網域'], ['features', '收費功能（demo.run:QUOTA）']] : [
         ['key', '產品 key'], ['name', '產品名稱'], ['subdomain', '1. 子網域'], ['page', '2. 頁面前綴（/demo）'], ['login', '3. 登入來源（逗號分隔，必含 local）'], ['standalone', '4. 可否單獨安裝（yes/no）'], ['config', '5. 客戶 API key 設定位置'], ['features', '收費功能（demo.run:QUOTA）'],
-      ])) if (values[key] === undefined) values[key] = await prompt.question(question + ': ');
+      ]).concat([['category', '分類（catalog-vocab.ts CATEGORIES）'], ['tasks', '任務 key（逗號分隔，catalog-vocab.ts TASKS）'], ['blurb', '一句話（≤ 28 字）'], ['icon', '圖示（catalog-vocab.ts ICONS）']])) if (values[key] === undefined) values[key] = await prompt.question(question + ': ');
     } finally { prompt.close(); }
   }
   const files = await createProduct(values);

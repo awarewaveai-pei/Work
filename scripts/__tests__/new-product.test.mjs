@@ -15,7 +15,7 @@ function fixture(t) {
   const app = path.join(root, 'app');
   fs.mkdirSync(path.join(app, 'lib/portal'), { recursive: true });
   fs.mkdirSync(path.join(app, 'app'));
-  for (const f of ['package.json', 'lib/portal/products.ts', 'lib/portal/cognitive-features.json']) fs.copyFileSync(path.join(sourceApp, f), path.join(app, f));
+  for (const f of ['package.json', 'lib/portal/products.ts', 'lib/portal/catalog-vocab.ts', 'lib/portal/cognitive-features.json']) fs.copyFileSync(path.join(sourceApp, f), path.join(app, f));
   fs.symlinkSync(path.join(sourceApp, 'node_modules'), path.join(app, 'node_modules'), 'junction');
   t.after(() => {
     fs.unlinkSync(path.join(app, 'node_modules'));
@@ -25,7 +25,7 @@ function fixture(t) {
   const run = (args) => spawnSync(process.execPath, [script, '--app', app, ...args], { encoding: 'utf8', input: '' });
   return { app, root, run };
 }
-const demo = ['--key', 'demo', '--name', '示範', '--subdomain', 'demo', '--page', '/demo', '--login', 'local', '--standalone', 'no', '--features', 'demo.run:QUOTA'];
+const demo = ['--key', 'demo', '--name', '示範', '--subdomain', 'demo', '--page', '/demo', '--login', 'local', '--standalone', 'no', '--features', 'demo.run:QUOTA', '--category', 'content', '--tasks', 'write-seo-article', '--blurb', '示範用的一句話', '--icon', 'article'];
 
 test('direct CLI creates five paths, a fail-closed can point and ten TODO declarations; refuses overwrite', (t) => {
   const { app, root, run } = fixture(t);
@@ -57,7 +57,7 @@ test('Foundry CLI imports the module list and sourced declarations; missing plan
   fs.writeFileSync(path.join(project, 'cards/core.md'), '# core card\n');
   fs.writeFileSync(path.join(project, '.foundry/resolution/foundry-plan.json'), JSON.stringify({ modules: ['core'] }));
   fs.writeFileSync(path.join(project, 'PLAN.md'), '## 交付登記\n\n```json\n' + JSON.stringify({ schema_version: 1, name: 'foundry-demo', page: '/foundry-demo', loginSources: ['local'], standalone: false, modules: ['core'], declarations: Object.fromEntries(DECLARATIONS.map((k) => [k, `core contract: ${k}`])) }) + '\n```\n');
-  const result = run(['--from-foundry', project, '--key', 'demo2', '--subdomain', 'demo2', '--features', 'demo2.run:QUOTA']);
+  const result = run(['--from-foundry', project, '--key', 'demo2', '--subdomain', 'demo2', '--features', 'demo2.run:QUOTA', '--category', 'content', '--tasks', 'write-seo-article', '--blurb', '示範用的一句話', '--icon', 'article']);
   assert.equal(result.status, 0, result.stderr);
   const manifest = JSON.parse(fs.readFileSync(path.join(app, 'lib/demo2/MODULE_MANIFEST.json')));
   assert(Object.values(manifest.declarations).filter((s) => !s.includes('TODO')).length >= 6);
@@ -96,9 +96,26 @@ test('partial writes preserve the registry and remove only this generation attem
       return write(file, content, ...args);
     };
     try {
-      await assert.rejects(createProduct({ app, key: 'demo', name: '示範', subdomain: 'demo', page: '/demo', login: 'local', standalone: 'no', features: 'demo.run:QUOTA' }), /injected partial write/);
+      await assert.rejects(createProduct({ app, key: 'demo', name: '示範', subdomain: 'demo', page: '/demo', login: 'local', standalone: 'no', features: 'demo.run:QUOTA', category: 'content', tasks: 'write-seo-article', blurb: '示範', icon: 'article' }), /injected partial write/);
     } finally { fs.openSync = open; fs.writeFileSync = write; }
     assert.equal(fs.readFileSync(registry, 'utf8'), before);
     for (const file of ['app/demo', 'lib/demo', 'lib/portal/products.ts.new-product.tmp', 'lib/portal/products.ts.new-product.lock']) assert(!fs.existsSync(path.join(app, file)), file);
   }
+});
+
+test('catalog answers are required and come from the vocabulary; a valid row carries them', (t) => {
+  const { app, run } = fixture(t);
+  const registry = path.join(app, 'lib/portal/products.ts');
+  const before = fs.readFileSync(registry, 'utf8');
+  const withFlag = (flag, value) => { const args = [...demo]; args[args.indexOf(flag) + 1] = value; return args; };
+  for (const [flag, value] of [['--category', 'nope'], ['--tasks', 'write-seo-article,not-a-task'], ['--blurb', '字'.repeat(29)], ['--icon', '\u{1F600}']]) {
+    const result = run(withFlag(flag, value));
+    assert.notEqual(result.status, 0, flag);
+    assert.equal(fs.readFileSync(registry, 'utf8'), before, flag);
+  }
+  const missing = run(demo.slice(0, demo.indexOf('--category')));
+  assert.notEqual(missing.status, 0);
+  assert.equal(fs.readFileSync(registry, 'utf8'), before);
+  assert.equal(run(demo).status, 0);
+  assert.match(fs.readFileSync(registry, 'utf8'), /"catalog": \{\s*"category": "content",\s*"tasks": \[\s*"write-seo-article"\s*\],\s*"blurb": "示範用的一句話",\s*"icon": "article",\s*"addedAt": "\d{4}-\d{2}-\d{2}"/);
 });
