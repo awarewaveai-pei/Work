@@ -64,12 +64,16 @@ export const STEPS = [
   { n: 11, code: 'K13', group: 'B3c', title: '幾個生圖模型畫同一張配圖給你比', plain: '文字實測做完後接著做。拿同一篇文章的同一段、同一句英文畫面描述，讓幾個生圖模型各畫一張，並排給你看，你挑。挑中的當作文章配圖的預設。約花 NT$10。',
     gate: '你拿到並排比較頁並選出預設；結果記到「AI 模型與成本」的實測紀錄。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K12'], card: 'briefs/K10-K12.md' },
   { n: 12, code: 'DA', group: 'B3', title: '部署並在筆電實測', plain: '前三批一起部署一次，然後用筆電的 Claude 訂閱真的寫一篇文章，看內容。', gate: '線上文章頁選訂閱模型寫出一篇；成本頁出現一筆 NT$0。', risk: 'High（部署；失敗自動還原）', model: '監工', status: 'in_progress', depends: ['K4', 'K6', 'K5', 'K7', 'K11', 'K8'], card: 'DISPATCH.md' },
-  { n: 13, code: 'K10', group: 'B3d', title: '文章配圖不再亂畫', plain: '現在的配圖把中文替代文字直接丟給最便宜的模型，畫出穿西裝的人和亂碼字。改成：寫文章的 AI 另外寫一句英文的畫面描述，固定加上「圖上不要有字」，生圖模型改讀網站設定；預設用哪個模型，等你看完生圖實測再定。',
+  { n: 13, code: 'K10', group: 'B3d', title: '文章配圖不再亂畫', plain: '現在的配圖把中文替代文字直接丟給最便宜的模型，畫出穿西裝的人和亂碼字。改成：寫文章的 AI 另外寫一句英文的畫面描述，固定加上「圖上不要有字」，生圖模型改讀網站設定；預設用哪個模型，等你看完生圖實測再定。同一張卡一起修文字盲測抓到的三個範本問題：SEO 評分改成認得中文小標（快速解答、常見問題），文章就不必寫英文小標；「年份未核」這類內部註記不得寫進正文；連結不得以原始碼的樣子露出來。',
     gate: '部署後真的產一篇，圖和文章內容有關、圖上沒有字；替代文字照舊；舊文章不受影響。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['K7', 'K13'], card: 'briefs/K10-K12.md' },
   // 第四批
   { n: 14, code: 'K9', group: 'B4', title: '主機上的常駐執行程式', plain: '在主機開一個權限最小的帳號，只跑這支程式和 Codex。它讀不到網站、資料庫和其他金鑰。登入過期或額度用完會發 Telegram。',
     gate: '程式常駐；用那個帳號去讀主機其他地方全部被拒；後台顯示排程線在線。', risk: 'High（主機、憑證）', model: 'Opus 5.5', status: 'not_started', depends: ['DA'], card: K, before: '待決 1、待決 2、待決 3 之後' },
   { n: 15, code: 'M1', group: 'B4', title: '額度恢復後的實測', plain: '11-24 之後：Codex 畫一張圖、寫一篇字、試著騙它讀本機檔案（必須讀不到）；量三篇文章各花多久、吃多少額度。', gate: '三項實測結果寫進「現況」；一篇超過兩分半就另開卡把排程改成分兩輪。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K9'], card: K, before: '待決 4 之後' },
+  { n: 16, code: 'K15', group: 'B5', title: '文章預設模型換成 GPT-6.2 sol', plain: '盲測結果：GPT-6.2 sol 品質排第二，一篇約 NT$2，是原本預設（Claude Opus，約 NT$8）的四分之一。文章頁的預設和排程（網站沒另外選模型時）都改用它；畫面上的估價跟著改。十二個模型的實測結果同時記到「AI 模型與成本」的實測紀錄。',
+    gate: '沒選過模型的網站，排程寫文章用的是 GPT-6.2 sol；估價顯示新的金額；已經選了別的模型的地方不受影響；實測紀錄多一組「文章生成」。', risk: 'Medium', model: 'Sonnet 5.5', status: 'in_progress', depends: ['K12'], card: 'briefs/K15-K16.md' },
+  { n: 17, code: 'K16', group: 'B5', title: '其他寫文案的地方要不要也換', plain: '文章以外還有十幾個地方在寫字。先各測一次再換，不直接全改：有些地方要求 AI 回固定格式，換模型可能壞掉。先測三種：社群貼文、商品文案、開發信。',
+    gate: '每一種有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K15'], card: 'briefs/K15-K16.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
