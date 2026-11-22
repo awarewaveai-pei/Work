@@ -98,11 +98,16 @@ async function StaffFrame({ navLayout, internalOrgId, sitesPath, visible, inboxB
           </div>
         </nav>
 
-        <ClientRail />
-
         <div className="main">
-          {notice}
-          {children}
+          {/* The rail lives inside .main: .sidebar is position:fixed and .main only steps aside by its width, so a rail
+              placed beside .main in .shell lay under the sidebar. Always this row, so registering a layer never remounts the page. */}
+          <div style={{ display: "flex", flex: 1 }}>
+            <ClientRail />
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+              {notice}
+              {children}
+            </div>
+          </div>
         </div>
       </div>
     </ClientContextProvider>

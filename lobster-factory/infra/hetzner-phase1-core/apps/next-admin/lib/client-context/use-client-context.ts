@@ -3,12 +3,11 @@
 // 目前客戶（ADR 020）的 React 介面。頁面呼叫 useClientContext(layer)＝向外框的 ClientContextProvider 登記本頁要哪一層，
 // 外框因此知道要不要畫客戶欄（app/ClientRail.tsx）。判斷全在 contract.ts 的 decide()；這裡只接線。
 import { createContext, useContext, useEffect } from "react";
+import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { DecideStatus, Layer, SiteRow } from "./contract";
 
-/** /api/content/sites 回的一列（ClientRail 只用 id、name、organization_id）。 */
-export interface ContextSite extends SiteRow {
-  name: string;
-}
+/** /api/content/sites 回的一列：型別正本是該路由的 ManagedSite（不另寫一份）；organization_id 依 contract 的 SiteRow 視為必有。 */
+export type ContextSite = ManagedSite & SiteRow;
 
 /** Key of the staff console's origin in `hosts` (no product uses it). */
 export const STAFF_HOST_KEY = "staff";

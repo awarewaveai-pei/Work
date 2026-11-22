@@ -478,12 +478,12 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   const socialHref = useDoorHref("/tools/social");
   const [activeTab, setActiveTab] = useState<Tab>("generate");
 
-  // The current client's sites: the provider reads the same GET /api/content/sites (full ManagedSite rows; its type
-  // only names the fields it uses). Saved content defaults are kept here per site id: the provider caches a client's
-  // rows for the page's life, so without this, switching client and back would bring the old defaults back.
+  // The current client's sites (ManagedSite rows of GET /api/content/sites, read once by the provider). Saved content
+  // defaults are kept here per site id: the provider caches a client's rows for the page's life, so without this,
+  // switching client and back would bring the old defaults back.
   const [savedDefaults, setSavedDefaults] = useState<Record<string, SiteContentDefaults>>({});
-  const wpSites = useMemo(
-    () => ((clientContext.sites ?? []) as readonly ManagedSite[])
+  const wpSites: ManagedSite[] = useMemo(
+    () => (clientContext.sites ?? [])
       .map(s => (savedDefaults[s.id] ? { ...s, contentDefaults: savedDefaults[s.id] } : s)),
     [clientContext.sites, savedDefaults],
   );
