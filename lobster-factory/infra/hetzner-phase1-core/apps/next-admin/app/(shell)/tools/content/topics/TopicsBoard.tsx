@@ -397,8 +397,7 @@ export function TopicsBoard({ overview, scheduleFor, view = "topics" }: {
   const setWhen = (w: { month: string; day: number; hour: number }) => setDraftWhen({ ...w, day: Math.min(w.day, daysIn(w.month)) });
   const formats = draftFormats ?? sel?.formats ?? [];
   const selPub = sel && pub?.id === sel.id ? pub : null;
-  // the rail reads GET /api/content/sites, the same route and rows as ManagedSite; its type names only what the rail uses
-  const site = saved[siteId] ?? (ctx.sites as readonly Site[] | null)?.find((x) => x.id === siteId);
+  const site = saved[siteId] ?? ctx.sites?.find((x) => x.id === siteId);
   const siteRow = overview.rows.find((r) => r.siteId === siteId);
   // N3: the median of this brand's recent finished topics once there are enough, else the price list; the page names which
   const priceOf = (f?: readonly string[]) => topicShownTwd(f, siteRow ? overview.actual?.[siteRow.organizationId] : null);

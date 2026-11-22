@@ -15,7 +15,7 @@ const row = (siteId: string, orgName: string) => ({
 });
 // the server reads one client at a time; these tests reuse one overview for either picked client
 const overviewFor = (org: string) => ({ organizationId: org, rows: [row("s1", "甲"), row("s2", "乙")], cells: {}, actual: {}, spendNote: null }) as unknown as OverviewData;
-const site = (id: string) => ({ id, name: id, url: "https://x.example", organization_id: `o-${id}`, org_slug: id, contentDefaults: {} });
+const site = (id: string) => ({ id, name: id, url: "https://x.example", color: "", active: true, tokenSet: true, usernameSet: true, note: null, source: "db" as const, organization_id: `o-${id}`, org_slug: id, contentDefaults: {} });
 const topic = { id: "t9", organization_id: "o-s2", site_id: "s2", title: "十月的題", keyword: "k", angle: null, status: "proposed", formats: ["article"],
   scheduled_for: "2026-10-05T01:00:00Z", source: "manual", source_ref: {}, artifacts: {}, review: null, last_error: null, version: 1 };
 
