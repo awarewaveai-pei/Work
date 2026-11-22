@@ -22,7 +22,7 @@ export interface ClientContextValue {
   site: string | null;
   /** 目前客戶的網站列；null＝未載入或尚未選客戶。 */
   sites: readonly ContextSite[] | null;
-  /** 網站清單讀取失敗（與「這個客戶沒有網站」不同）。 */
+  /** 網站讀取失敗：清單，或網址指定的那一站（與「這個客戶沒有網站」「找不到」不同）。 */
   sitesFailed: boolean;
   internalOrgId: string | null;
   onDoor: boolean;

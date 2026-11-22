@@ -144,7 +144,20 @@ describe("ClientRail", () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
       String(input).startsWith("/api/ops/org-search") ? json({ ok: true, orgs: ORGS, total: 3 }) : json({ ok: false }, 500));
     mount({ layer: "site" });
-    await waitFor(() => expect(screen.getByText("網站清單載入失敗，請重新整理。")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("網站載入失敗，請重新整理。")).toBeTruthy());
     expect(screen.queryByText("這個客戶還沒有網站。")).toBeNull();
+  });
+
+  it("a site-only URL whose lookup fails on the network says the read failed, not 'not found', and leaves the URL alone", async () => {
+    nav.search = `site=${S1}`;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/ops/org-search")) return json({ ok: true, orgs: ORGS, total: 3 });
+      throw new TypeError("Failed to fetch");
+    });
+    mount({ layer: "site" });
+    await waitFor(() => expect(screen.getByText("網站載入失敗，請重新整理。")).toBeTruthy());
+    expect(screen.queryByText("找不到網址指定的網站。")).toBeNull();
+    expect(nav.replace).not.toHaveBeenCalled();
   });
 });

@@ -101,9 +101,10 @@ export function ClientRail() {
         </>
       )}
       {STATUS_TEXT[status] && <div role="alert" style={note}>{STATUS_TEXT[status]}</div>}
+      {/* outside the org-gated group: a URL with only a site (no org yet) can fail its lookup too */}
+      {layer === "site" && ctx.sitesFailed && <div role="alert" style={note}>網站載入失敗，請重新整理。</div>}
       {layer === "site" && org && (
         <div role="group" aria-label="網站" style={{ padding: 6, borderTop: staff ? "1px solid var(--card-border)" : undefined }}>
-          {ctx.sitesFailed && <div role="alert" style={note}>網站清單載入失敗，請重新整理。</div>}
           {!ctx.sitesFailed && sites === null && <div style={note}>載入網站中…</div>}
           {!ctx.sitesFailed && sites !== null && sites.length === 0 && <div style={note}>這個客戶還沒有網站。</div>}
           {sites !== null && sites.length > 0 && !site && <div style={note}>請選網站</div>}

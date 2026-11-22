@@ -75,24 +75,28 @@ export function ClientContextProvider({ sessionOrg, hostOrg, internalOrgId, site
   }, [layer, sitesOrg, sitesPath]);
   const mine = fetched && fetched.org === sitesOrg ? fetched : null;
   const sites = mine?.rows ?? null;
-  const sitesFailed = Boolean(mine && mine.rows === null);
+  const listFailed = Boolean(mine && mine.rows === null);
 
   // 只給 site、或 site 不在該客戶清單：查那一站。
+  // "failed" = the read itself failed (network, 5xx, not ok): never "not_found" -- decide() keeps waiting (nothing
+  // selected, URL untouched) and the rail says the read failed. Only an answered empty list is "not_found".
   const needLookup = Boolean(layer && query.site && (!sitesOrg || (sites && !sites.some((s) => s.id === query.site))));
-  const [lookup, setLookup] = useState<{ site: string; value: SiteLookup } | null>(null);
+  const [lookup, setLookup] = useState<{ site: string; value: SiteLookup | "failed" } | null>(null);
   useEffect(() => {
     if (!needLookup || !query.site || !sitesPath) return;
     const site = query.site;
     let live = true;
     getSites(sitesPath, new URLSearchParams({ siteId: site }).toString())
       .then(({ status, rows }) => {
-        const value: SiteLookup = status === 403 ? "forbidden" : rows?.[0] ?? "not_found";
+        const value: SiteLookup | "failed" = status === 403 ? "forbidden" : rows === null ? "failed" : rows[0] ?? "not_found";
         if (live) setLookup({ site, value });
       })
-      .catch(() => { if (live) setLookup({ site, value: "not_found" }); });
+      .catch(() => { if (live) setLookup({ site, value: "failed" }); });
     return () => { live = false; };
   }, [needLookup, query.site, sitesPath]);
-  const siteLookup: SiteLookup = lookup && lookup.site === query.site ? lookup.value : null;
+  const lookupValue = lookup && lookup.site === query.site ? lookup.value : null;
+  const siteLookup: SiteLookup = lookupValue === "failed" ? null : lookupValue;
+  const sitesFailed = listFailed || lookupValue === "failed";
 
   const decided = decide({
     viewer,

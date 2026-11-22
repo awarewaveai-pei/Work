@@ -1,11 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
-import type { WpSite } from "@/lib/content/wp-sites";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { FUNNEL_STAGES, PRICE_POSITIONS, renderMarketingBrief } from "@/lib/content/brand-voice";
-import { pickInitialSite } from "@/lib/content/pick-initial-site";
+import { FUNNEL_STAGES, PRICE_POSITIONS, renderMarketingBrief, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { useClientContext } from "@/lib/client-context/use-client-context";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
 import { SeoCheckPanel } from "./SeoCheckPanel";
@@ -469,7 +467,8 @@ const GEO_NAME_ZH: Record<string, string> = { TW: "台灣", HK: "香港", SG: "�
 
 export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   const { canUse, why } = usePaidFeatures();
-  const searchParams = useSearchParams();
+  // The site comes only from the client rail (ADR 020: URL org/site; registering "site" makes the frame draw the rail).
+  const clientContext = useClientContext("site");
   // On the content door (app/content): staff links go through useDoorHref (null = no door page, hide); the newsletter
   // (our own FluentCRM) and trending-source management are staff-only (step-8 card §5 C-R3/C-R4).
   const onDoor = useOnDoor();
@@ -477,37 +476,25 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   const sitesHref = useDoorHref("/tools/content/sites");
   const clientsHref = useDoorHref("/ops/clients");
   const socialHref = useDoorHref("/tools/social");
-  // 字串而非 searchParams 物件本身當依賴 —— 物件每次 render 都是新的，會讓下面的
-  // effect 每 render 重跑並蓋掉操作者手動選的站。
-  const paramSiteId = searchParams.get("siteId") ?? "";
-
   const [activeTab, setActiveTab] = useState<Tab>("generate");
 
-  // Multi-site (ManagedSite carries contentDefaults; WpSite is the internal server type)
-  const [wpSites,       setWpSites]       = useState<ManagedSite[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
-  // 非 null = 網址帶的 ?siteId= 在可用清單裡找不到（停用／已刪除／打錯／別的租戶）。
-  // 一定要顯示出來：吞掉它就等於讓人以為自己在對 A 客戶操作，實際卻在對 B 客戶。
-  const [unresolvedSiteParam, setUnresolvedSiteParam] = useState<string | null>(null);
-  // 區分「還沒載完」與「載完了但一個站都沒有」—— 兩者對 unresolvedSiteParam 的意義相反。
-  const [sitesLoaded, setSitesLoaded] = useState(false);
+  // The current client's sites: the provider reads the same GET /api/content/sites (full ManagedSite rows; its type
+  // only names the fields it uses). Saved content defaults are kept here per site id: the provider caches a client's
+  // rows for the page's life, so without this, switching client and back would bring the old defaults back.
+  const [savedDefaults, setSavedDefaults] = useState<Record<string, SiteContentDefaults>>({});
+  const wpSites = useMemo(
+    () => ((clientContext.sites ?? []) as readonly ManagedSite[])
+      .map(s => (savedDefaults[s.id] ? { ...s, contentDefaults: savedDefaults[s.id] } : s)),
+    [clientContext.sites, savedDefaults],
+  );
+  // "" = no site: the rail decided none (unselected, loading, mismatch...). Never the list's first row.
+  const selectedSiteId = clientContext.site ?? "";
 
-  /**
-   * 目前真正選定的站。**刻意不回退到 wpSites[0]** —— 這個檔案原本有 10 處寫著
-   *     wpSites.find(s => s.id === selectedSiteId) ?? wpSites[0]
-   * 也就是「沒選定就當作選了第一個客戶」。在 selectedSiteId 永遠非空的舊行為下這幾乎不會
-   * 觸發；但一旦「指定的站取不到 → 不選」成為一個正常狀態（見 pick-initial-site.ts），它們
-   * 就會全部活起來，用**別的客戶**的品牌／SEO 脈絡去生成內容，其中 saveAsClientDefault()
-   * 更會直接把表單預設寫進別的客戶那一列。同一條規則抄 10 次是這個 bug 的形狀，所以收斂成
-   * 一個 derived value：沒選定就是 undefined，呼叫端各自以 ?. / if (!site) 處理。
-   */
+  /** 目前選定的站；沒選定就是 undefined（從不回退到 wpSites[0]：那會用別的客戶的品牌脈絡生成、把預設寫進別人那一列）。 */
   const currentSite = useMemo(
     () => wpSites.find(s => s.id === selectedSiteId),
     [wpSites, selectedSiteId],
   );
-
-  /** 「有哪些站可選」的穩定指紋 —— 選站決策的第二個輸入（第一個是 URL 的 ?siteId=）。 */
-  const siteIdsKey = useMemo(() => wpSites.map(s => s.id).join("|"), [wpSites]);
 
   // Brand Voice
   const [showBrandVoice,    setShowBrandVoice]    = useState(false);
@@ -741,45 +728,6 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   const humAbortRef  = useRef<AbortController | null>(null);
   const seoRunRef    = useRef(0);
   const imgRunRef    = useRef(0);
-
-  // ─── Load WP sites ────────────────────────────────────────────────────────
-  // 只負責把清單載進來。**刻意不在這裡決定選哪個站** —— 見下面那個 effect 的說明。
-  useEffect(() => {
-    fetch("/api/content/sites")
-      .then(r => r.json())
-      .then((data: { ok: boolean; sites?: ManagedSite[] }) => {
-        if (!data.ok) return;              // 載入失敗 ≠ 清單為空，不可混為一談
-        setWpSites(data.sites ?? []);
-        setSitesLoaded(true);
-      })
-      .catch(() => {/* silent — single-site env works without this */});
-  }, []);
-
-  /**
-   * 「選中哪個站」的決定點 —— **只有這裡**。
-   *
-   * 不變量：選中的站必須是 (目前的 URL siteId, 目前可用的站清單) 的**函式**：任一輸入改變就
-   * 重算，而且**每個分支都要算**。這條不變量是被兩次覆審逼出來的，兩次都是同一個實作缺陷的
-   * 不同表現形式：
-   *   ① 原本這段算在 fetch 的 .then() 裡、effect 綁 []，於是「掛載後 URL 才變成另一個
-   *      ?siteId=」不會重算（App Router 同路由換 query 不會 remount，ClientHubTabs.tsx:606
-   *      就有這種連結）。
-   *   ② 原本外面包著 `if (data.ok && data.sites?.length)`，於是「清單被 active／租戶過濾成
-   *      空」時整段被跳過，pickInitialSite 根本沒被呼叫 —— 純函式處理得對，接線卻沒去問它，
-   *      使用者連「你指定的站取不到」都看不到。
-   * 把決定從載入裡拆出來之後，這兩種形狀在結構上都回不來了。
-   */
-  useEffect(() => {
-    if (!sitesLoaded) return;              // 還沒載完就判定「取不到」會是假警報
-    const picked = pickInitialSite(wpSites, paramSiteId);
-    setSelectedSiteId(picked.selectedId);
-    setUnresolvedSiteParam(picked.unresolvedRequest);
-    // wpSites 本身刻意**不**放進依賴：決策的輸入只有「URL 要哪個站」與「有哪些站可選」，
-    // 站的*內容*變了不是決策輸入。saveAsClientDefault() 成功後會 setWpSites(prev.map(...))
-    // 更新該列的 contentDefaults —— 那會產生新的陣列 identity，若它是依賴，這個 effect 就會
-    // 重跑並把操作者手動選的站踢回 URL 指定的那一個。用 id 集合當依賴才是決策的真實輸入。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sitesLoaded, siteIdsKey, paramSiteId]);
 
   // Brand Voice name follows the selected target client (📍 目標客戶) — so the operator never
   // re-types "Soulful Expression". Stops the moment they edit the field manually (bvNameTouched).
@@ -1248,9 +1196,10 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
       // inventing near-duplicates. Best-effort; failure just falls back to the generic CATEGORIES rule.
       let existingCategories: string[] = [];
       try {
-        const cr = await fetch(`/api/content/categories${selectedSiteId ? `?siteId=${encodeURIComponent(selectedSiteId)}` : ""}`);
-        const crJson = await cr.json() as { ok: boolean; categories?: string[] };
-        if (crJson.ok && crJson.categories?.length) existingCategories = crJson.categories;
+        // no site = no call (without siteId the server would answer with the first accessible site's categories)
+        const cr = selectedSiteId ? await fetch(`/api/content/categories?siteId=${encodeURIComponent(selectedSiteId)}`) : null;
+        const crJson = cr ? await cr.json() as { ok: boolean; categories?: string[] } : null;
+        if (crJson?.ok && crJson.categories?.length) existingCategories = crJson.categories;
       } catch { /* best-effort */ }
 
       // #4 — fold the structured marketing brief into `details` (backend contract unchanged).
@@ -1637,9 +1586,9 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
     // 沒選定客戶就不准發 —— 送 siteId: undefined 時伺服器會 resolveWpSite(req, undefined)，
     // 也就是「挑呼叫者有權存取的第一個站」。對 staff 而言那是全域第一列，於是文章會被發到
     // **另一個客戶**的網站上。這個伺服器端後備是給不帶 siteId 的唯讀清單呼叫用的，寫入動作
-    // 不可以沾。（wpSites 為空時不擋，讓伺服器回報真正的原因。）
-    if (!selectedSiteId && wpSites.length > 0) {
-      setPubStatus("error"); setPubError("尚未選擇目標客戶 — 請先在上方「📍 目標客戶」選定，再發布。");
+    // 不可以沾。wpSites 只剩目前客戶的站（沒選客戶時為空），所以沒選站一律擋。
+    if (!selectedSiteId) {
+      setPubStatus("error"); setPubError("尚未選擇網站 — 請先在左側客戶欄選客戶與網站，再發布。");
       return;
     }
     const resolvedMode = mode ?? pubMode;
@@ -1728,9 +1677,9 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
             clearInterval(videoPollRef.current!); videoPollRef.current = null;
             // 同 handlePublish：embed-to-wp 會**改寫**客戶站上的文章內容，沒選定客戶時
             // 伺服器端的「第一個可存取的站」後備會讓它改到別人的站去。
-            if (!selectedSiteId && wpSites.length > 0) {
+            if (!selectedSiteId) {
               setVideoStatus("error");
-              setVideoError("尚未選擇目標客戶 — 影片已產出，但未嵌入任何網站。請選定客戶後重試。");
+              setVideoError("尚未選擇網站 — 影片已產出，但未嵌入任何網站。請在左側客戶欄選定網站後重試。");
               return;
             }
             setVideoStatus("embedding");
@@ -1928,7 +1877,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
       setSaveDefaultsMsg(data.ok ? "✓ 已存為客戶預設" : `錯誤：${data.error ?? "unknown"}`);
       if (data.ok) {
         const saved = data.site?.contentDefaults ?? contentDefaults;
-        setWpSites(prev => prev.map(s => s.id === site.id ? { ...s, contentDefaults: saved } : s));
+        setSavedDefaults(prev => ({ ...prev, [site.id]: saved }));
       }
     } catch {
       setSaveDefaultsMsg("網路錯誤，請重試");
@@ -1943,21 +1892,10 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
   return (
     <div style={{ padding: "24px", maxWidth: "1400px" }}>
 
-      {/* ── Header: title + site selector + calendar link ── */}
+      {/* ── Header: title + calendar link (the site is picked in the client rail) ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
         <h1 style={{ fontSize: "20px", fontWeight: 700, margin: 0 }}>內容工作室</h1>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {wpSites.length > 1 && (
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>發布到：</span>
-              <select value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}
-                className="form-select" style={{ fontSize: "12px", padding: "4px 8px" }}>
-                {wpSites.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
           {scheduleHref && <a href={scheduleHref}
             style={{ fontSize: "12px", padding: "5px 12px", border: "1px solid var(--card-border)",
               borderRadius: "6px", color: "var(--text-muted)", textDecoration: "none",
@@ -2173,43 +2111,25 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
       {/* ══════════════ 產文頁籤 ══════════════ */}
       {activeTab === "generate" && (
         <>
-          {/* ── 目標客戶（F-Sites：一律顯示連接中的客戶名稱+網址；>1 時可下拉切換）── */}
+          {/* ── 目標網站：只顯示，挑選在左側客戶欄（ADR 020）── */}
           <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>📍 目標客戶</span>
-              {wpSites.length === 0 && (
-                <span style={{ fontSize: "12px", color: "var(--yellow)" }}>
-                  尚未連接任何網站 — 文章仍可生成，但無法推送。{" "}
+              <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>📍 目標網站</span>
+              {currentSite ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: currentSite.color, display: "inline-block" }} />
+                  <strong style={{ color: "var(--text-primary)" }}>{currentSite.name}</strong>
+                  <a href={currentSite.url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>{currentSite.url} ↗</a>
+                </span>
+              ) : !clientContext.org ? (
+                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請先在左側客戶欄選客戶。</span>
+              ) : clientContext.sites !== null && clientContext.sites.length === 0 ? (
+                <span role="status" style={{ fontSize: "12px", color: "var(--yellow)" }}>
+                  這個客戶尚未連接任何網站 — 文章仍可生成，但無法推送。{" "}
                   {sitesHref && <a href={sitesHref} style={{ color: "var(--btn-primary-bg)" }}>前往連接 ↗</a>}
                 </span>
-              )}
-              {unresolvedSiteParam && (
-                <span style={{ fontSize: "12px", color: "var(--yellow)" }}>
-                  ⚠ 網址指定的客戶（<code>{unresolvedSiteParam}</code>）不在你可用的清單裡 —
-                  可能已停用、已刪除，或不屬於你。<strong>尚未選擇目標客戶</strong>，請在右側自行選取。
-                </span>
-              )}
-              {wpSites.length === 1 && !unresolvedSiteParam && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: wpSites[0].color, display: "inline-block" }} />
-                  <strong style={{ color: "var(--text-primary)" }}>{wpSites[0].name}</strong>
-                  <a href={wpSites[0].url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>{wpSites[0].url} ↗</a>
-                </span>
-              )}
-              {/* 指定的站取不到時，即使只有一個站也要給下拉 —— 否則操作者沒有「明確選擇」的手段，
-                  畫面又會退回「看起來已經選好了」的假象。 */}
-              {(wpSites.length > 1 || (unresolvedSiteParam && wpSites.length >= 1)) && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-                  <select value={selectedSiteId} onChange={e => { setSelectedSiteId(e.target.value); if (e.target.value) setUnresolvedSiteParam(null); }}
-                    className="form-select" style={{ fontSize: "13px", padding: "4px 10px" }}>
-                    {!selectedSiteId && <option value="">— 請選擇目標客戶 —</option>}
-                    {wpSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                  {(() => {
-                    const s = wpSites.find(x => x.id === selectedSiteId);
-                    return s ? <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>{s.url} ↗</a> : null;
-                  })()}
-                </span>
+              ) : (
+                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請在左側客戶欄選網站。</span>
               )}
               <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "10px" }}>
                 {saveDefaultsMsg && (
@@ -2217,20 +2137,21 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
                     {saveDefaultsMsg}
                   </span>
                 )}
-                {(selectedSiteId || wpSites.length > 0) && (
-                  <button
-                    type="button"
-                    onClick={saveAsClientDefault}
-                    disabled={savingDefaults}
-                    style={{
-                      fontSize: "11px", padding: "3px 10px", borderRadius: "6px",
-                      border: "1px solid var(--accent)", background: "transparent",
-                      color: "var(--accent-text)", cursor: "pointer", whiteSpace: "nowrap",
-                    }}
-                  >
-                    {savingDefaults ? "儲存中…" : "💾 存為客戶預設"}
-                  </button>
-                )}
+                {/* no site = disabled: the defaults belong to one site's row */}
+                <button
+                  type="button"
+                  onClick={saveAsClientDefault}
+                  disabled={savingDefaults || !currentSite}
+                  title={currentSite ? undefined : "請先在左側客戶欄選網站"}
+                  style={{
+                    fontSize: "11px", padding: "3px 10px", borderRadius: "6px",
+                    border: "1px solid var(--accent)", background: "transparent",
+                    color: "var(--accent-text)", cursor: currentSite ? "pointer" : "not-allowed",
+                    opacity: currentSite ? 1 : 0.5, whiteSpace: "nowrap",
+                  }}
+                >
+                  {savingDefaults ? "儲存中…" : "💾 存為客戶預設"}
+                </button>
                 {clientsHref && (() => {
                   const sel = wpSites.find(x => x.id === selectedSiteId);
                   const clientHref = sel?.org_slug ? `${clientsHref}/${sel.org_slug}` : clientsHref;
@@ -3158,7 +3079,7 @@ export default function ContentStudio({ video }: { video?: ContentVideoApi }) {
                 <input className="form-input" value={bvProfileName}
                   onChange={e => { setBvProfileName(e.target.value); setBvNameTouched(true); }}
                   placeholder="例：Soulful Expression" />
-                {!bvNameTouched && wpSites.length > 0 && (
+                {!bvNameTouched && currentSite && (
                   <div className="form-hint">已自動帶入目標客戶「{currentSite?.name}」，可直接覆寫。</div>
                 )}
               </div>
