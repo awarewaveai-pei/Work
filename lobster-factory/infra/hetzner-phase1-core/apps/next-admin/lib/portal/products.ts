@@ -91,7 +91,7 @@ const PRODUCT_DEFINITIONS = [
   { key: "content", catalog: { category: "content", tasks: ["write-seo-article", "plan-monthly-topics", "publish-to-site"], blurb: "寫 SEO 文章、排題目、發布到你的網站", icon: "article", addedAt: "2026-01-01" }, name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", api: ["/api/content"],
       nav: [{ path: "", name: "內容編輯", staff: "tools/content" },
         { path: "topics", name: "題目", staff: "tools/content/topics" },
-        { path: "topics/clients", name: "客戶", staff: "tools/content/topics/clients", under: "topics" }, { path: "topics/steps", name: "五步驟", staff: "tools/content/topics/steps", under: "topics" },
+        { path: "topics/steps", name: "五步驟", staff: "tools/content/topics/steps", under: "topics" },
         { path: "sites", name: "網站", staff: "tools/content/sites" }, { path: "events", name: "節日", staff: "tools/events" }] },
     loginSources: ["local"], standalone: false, status: "coming_soon",
     features: [quota("content.article", "文章生成"), quota("content.humanize", "文章人性化"), quota("content.seo-fix", "SEO 修正"), quota("content.brand-voice", "品牌語氣擷取"), quota("content.outline", "大綱生成"), quota("content.title", "標題建議"), quota("content.keywords", "關鍵字建議"), quota("content.hook-brief", "Hook 草稿"), quota("content.syndicate", "多平台內容改寫"), quota("content.market-analysis", "市場分析"), quota("content.plan", "每月題目規劃"), quota("content.trending", "趨勢分析"), quota("content.image", "內容配圖")],

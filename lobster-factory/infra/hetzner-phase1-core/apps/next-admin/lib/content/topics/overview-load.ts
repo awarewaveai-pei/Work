@@ -1,5 +1,6 @@
 // Server-side loader for the auto-content control page (AUTO_CONTENT P9.3): every query runs once here, none per row or per
-// cell, and the client only draws. A client sees only their own sites (the caller's mayRead on every site, not a front-end filter).
+// cell, and the client only draws. One client at a time (ADR 020): no client = nothing is read; a client sees only their own
+// sites (the caller passes effectiveOrgId's answer and its mayRead on every site, not a front-end filter).
 // A failed query throws: a table built from a half-read set would show "nothing wrong" for a site it never read.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
@@ -23,6 +24,8 @@ export interface TrendCell {
   events: number;
 }
 export interface OverviewData {
+  /** The client these numbers are for (lower case); null = no client picked, nothing was read. */
+  organizationId: string | null;
   month: string; rows: OverviewRow[]; cells: Record<string, TrendCell>; spendNote: string | null;
   /** organizationId -> (formats key -> median real spend of the last 30 days' finished topics, N3); a combination without 5 topics is absent. */
   actual: Record<string, Record<string, TopicActual>>;
@@ -46,12 +49,15 @@ async function geoStat(sb: SupabaseClient, geo: string, sinceDay: string) {
   return { lastFetchedOn, count30: n.count ?? 0, sources };
 }
 
-/** `mayRead(orgId)` is the caller's authorization (the page or route passes canAccessOrg for its request): only those
- *  organizations' sites are read further. */
-export async function loadOverview(sb: SupabaseClient, mayRead: (organizationId: string) => boolean, now = new Date()): Promise<OverviewData> {
+/** `organizationId` = the current client (the caller resolves it with effectiveOrgId: a client account always gets its own);
+ *  null = none picked, and nothing is read. `mayRead(orgId)` is the caller's authorization (canAccessOrg for its request):
+ *  only those organizations' sites are read further. */
+export async function loadOverview(sb: SupabaseClient, organizationId: string | null, mayRead: (organizationId: string) => boolean, now = new Date()): Promise<OverviewData> {
   const month = monthKey(taipeiParts(now.toISOString()).month);
+  const org = organizationId?.trim().toLowerCase() || null;
+  if (!org) return { organizationId: null, month, rows: [], cells: {}, spendNote: null, actual: {} };
 
-  const siteRes = await sb.from("wp_sites").select("id, name, organization_id, content_defaults, content_plan_attempted_at, organizations(name)").eq("active", true).not("organization_id", "is", null);
+  const siteRes = await sb.from("wp_sites").select("id, name, organization_id, content_defaults, content_plan_attempted_at, organizations(name)").eq("active", true).eq("organization_id", org);
   if (siteRes.error) fail("sites", siteRes.error);
   const sites = ((siteRes.data ?? []) as unknown as Array<{
     id: string; name: string; organization_id: string; content_defaults: SiteContentDefaults | null; content_plan_attempted_at: string | null;
@@ -60,7 +66,7 @@ export async function loadOverview(sb: SupabaseClient, mayRead: (organizationId:
   }>).filter((s) => mayRead(s.organization_id));
   const orgIds = [...new Set(sites.map((s) => s.organization_id))];
   const siteIds = sites.map((s) => s.id);
-  if (!sites.length) return { month, rows: [], cells: {}, spendNote: null, actual: {} };
+  if (!sites.length) return { organizationId: org, month, rows: [], cells: {}, spendNote: null, actual: {} };
 
   const schedRes = await sb.from("client_schedules").select("organization_id, enabled, daily_limit, last_error").eq("job_key", JOB).in("organization_id", orgIds);
   if (schedRes.error) fail("schedules", schedRes.error);
@@ -121,5 +127,5 @@ export async function loadOverview(sb: SupabaseClient, mayRead: (organizationId:
       events: events.get(geos.length === 1 ? geos[0] : "") ?? 0,
     };
   }
-  return { month, rows, cells, spendNote, actual };
+  return { organizationId: org, month, rows, cells, spendNote, actual };
 }

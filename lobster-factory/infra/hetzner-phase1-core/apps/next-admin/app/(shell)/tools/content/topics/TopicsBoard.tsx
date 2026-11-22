@@ -1,8 +1,9 @@
 "use client";
-// Auto-content pages' body, one view per page (R8, operator 2026-11-21: 客戶 and 五步驟 are sub-pages of 題目 in the side
-// menu): topics = one site's month of topics, the list on the left and the clicked topic on the right (same layout as
-// /ops/schedules); clients = pick a client, see its sites' numbers, each linking to its topics; steps = one site's five steps.
-// All three read the site from ?site= (first site when absent) and share this one component's loading.
+// Auto-content pages' body, one view per page (R8: 五步驟 is a sub-page of 題目 in the side menu): topics = one site's month
+// of topics, the list on the left and the clicked topic on the right (same layout as /ops/schedules); steps = one site's
+// five steps. The site is the client rail's current one (ADR 020, useClientContext("site")): the page draws no picker of
+// its own, never falls back to a first site, and reads nothing until a site is picked. ?month=&topic= (the workbench's
+// 自動排程 link, beside ?site=) open that month and topic.
 // Buttons and checkboxes only, no dropdowns (memory feedback_no_dropdowns_multiselect). Every change goes through
 // /api/content/topics*, which checks the site's organization; a stale page gets 409 and reloads.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -17,14 +18,12 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
 import { LANE_LABEL, LANE_ORDER, approvedStartText, draftUrl, inLane, laneCounts, nextStep, pendingYoutubePostId, publishConfirm, publishNote, publishTargets,
   socialDraftsUrl, topicLane, youtubePrivacyMismatch, type DraftPrivacy, type LaneFilter, type PublishConfirm } from "@/lib/content/topics/lanes";
-import { ClientOverview, FlowCells, type ClientPickerSlot } from "./AutoContentOverview";
-import { useDoorHref } from "@/app/DoorContext";
+import { FlowCells } from "./AutoContentOverview";
+import { useClientContext } from "@/lib/client-context/use-client-context";
 
 const T = {
   noSites: "還沒有可用的客戶網站，先到「客戶網站」加一個。",
   current: "目前：",
-  otherSite: "換客戶或網站",
-  pickSite: "選網站",
   noSiteSettings: "讀不到這個網站的設定（網站沒有連到客戶，或沒有權限），五個步驟無法顯示。",
   plan: "AI 提案本月題目",
   planning: "AI 規劃中…",
@@ -147,16 +146,17 @@ const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 const dayText = (d: number) => `${d} 日`;
 const daysOf = (month: string) => Array.from({ length: daysIn(month) }, (_, i) => i + 1);
 
-export type TopicsView = "topics" | "clients" | "steps";
-const CLIENTS_PAGE = "/tools/content/topics/clients";
+export type TopicsView = "topics" | "steps";
+/** Shown until the client rail has a site (nothing is read before that). */
+export const PICK_SITE_FIRST = "在左邊的客戶欄選客戶和網站，這裡就會顯示。";
 
-export function TopicsBoard({ overview, scheduleFor, pickClient, view = "topics" }: {
-  overview: OverviewData; scheduleFor?: (orgSlug: string) => ReactNode; pickClient?: ClientPickerSlot; view?: TopicsView;
+export function TopicsBoard({ overview, scheduleFor, view = "topics" }: {
+  overview: OverviewData; scheduleFor?: (orgSlug: string) => ReactNode; view?: TopicsView;
 }) {
-  const clientsHref = useDoorHref(CLIENTS_PAGE);
-  const [sites, setSites] = useState<Site[] | null>(null);
-  // the table is sorted problems first, so the first row is the site that most needs a look
-  const [siteId, setSiteId] = useState(overview.rows[0]?.siteId ?? "");
+  const ctx = useClientContext("site");
+  const siteId = ctx.status === "ok" ? ctx.site ?? "" : "";
+  /** A site saved in step ③/⑤ replaces the rail's copy of it until the page reloads. */
+  const [saved, setSaved] = useState<Record<string, Site>>({});
   const [month, setMonth] = useState(thisMonth());
   const [topics, setTopics] = useState<Topic[]>([]);
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -180,30 +180,19 @@ export function TopicsBoard({ overview, scheduleFor, pickClient, view = "topics"
   /** Bumped by cancel / picking another topic, so a read that finishes late opens no confirmation. */
   const pubReq = useRef(0);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const j = await (await fetch("/api/content/sites")).json() as { ok: boolean; sites?: Site[] };
-        const list = (j.sites ?? []).filter((s) => s.organization_id);
-        setSites(list);
-      } catch { setSites([]); }
-    })();
-  }, []);
-
-  // a link from the workbench's 自動排程 (?site=&month=&topic=) opens that site, month and topic
-  const wantTopic = useRef("");
+  // a link from the workbench's 自動排程 (?site=&month=&topic=): the rail takes ?site=, this page the month and the topic,
+  // which opens only on the site it was linked for
+  const wantTopic = useRef<{ site: string; topic: string } | null>(null);
   const looking = useRef("");
   useEffect(() => {
     const q = new URLSearchParams(location.search);
     const s = q.get("site"), m = q.get("month"), tp = q.get("topic");
-    if (!s || !overview.rows.some((r) => r.siteId === s)) return;
-    setSiteId(s);
     if (m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m)) setMonth(m);
-    wantTopic.current = tp ?? "";
-  }, [overview.rows]);
+    if (s && tp) wantTopic.current = { site: s, topic: tp };
+  }, []);
 
   const load = useCallback(async () => {
-    if (!siteId || view === "clients") return;
+    if (!siteId) return;
     const key = `${siteId}|${month}`;
     looking.current = key;
     const r = await fetch(`/api/content/topics?siteId=${encodeURIComponent(siteId)}&month=${month}&folders=1`);
@@ -212,11 +201,12 @@ export function TopicsBoard({ overview, scheduleFor, pickClient, view = "topics"
     if (!j.ok) { setNote(j.error ?? `讀取失敗（${r.status}）`); return; }
     setTopics(j.topics ?? []);
     setYtPrivacy(j.youtubePrivacy ?? {});
-    if (wantTopic.current && j.topics?.some((x) => x.id === wantTopic.current)) { setSelId(wantTopic.current); wantTopic.current = ""; }
+    const want = wantTopic.current;
+    if (want?.site === siteId && j.topics?.some((x) => x.id === want.topic)) { setSelId(want.topic); wantTopic.current = null; }
     if (typeof j.dailyCap === "number") setDailyCap(j.dailyCap);
     setFolders(j.folders ?? []);
     setChecked(new Set());
-  }, [siteId, month, view]);
+  }, [siteId, month]);
   useEffect(() => { setSelId(""); setNote(""); pubReq.current += 1; setPub(null); void load(); }, [load]);
 
   const now = new Date();
@@ -395,10 +385,11 @@ export function TopicsBoard({ overview, scheduleFor, pickClient, view = "topics"
     } finally { await load(); setBusy(false); }
   }
 
+  if (!siteId) return <p style={{ color: "var(--text-muted)" }}>{ctx.status === "loading" ? "…" : PICK_SITE_FIRST}</p>;
+  // the numbers are read per client: until they are for the rail's client (the server page re-renders on ?org=), wait
+  if (overview.organizationId !== ctx.org) return <p style={{ color: "var(--text-muted)" }}>…</p>;
   if (!overview.rows.length) return <p style={{ color: "var(--text-muted)" }}>{T.noSites}</p>;
-  // keyed by the site: ?site= lands after the first render (the effect above), and the picked client starts from it
-  if (view === "clients") return <ClientOverview key={siteId} rows={overview.rows} note={overview.spendNote} siteId={siteId} picker={pickClient} />;
-  if (!sites) return <p style={{ color: "var(--text-muted)" }}>…</p>;
+  if (!ctx.sites && !ctx.sitesFailed && !saved[siteId]) return <p style={{ color: "var(--text-muted)" }}>…</p>;
   const editable = sel && ["proposed", "approved"].includes(sel.status);
   const selWhen = sel?.scheduled_for ? taipeiParts(sel.scheduled_for) : { month, day: 1, hour: 9 };
   const when = draftWhen ?? selWhen;
@@ -406,7 +397,8 @@ export function TopicsBoard({ overview, scheduleFor, pickClient, view = "topics"
   const setWhen = (w: { month: string; day: number; hour: number }) => setDraftWhen({ ...w, day: Math.min(w.day, daysIn(w.month)) });
   const formats = draftFormats ?? sel?.formats ?? [];
   const selPub = sel && pub?.id === sel.id ? pub : null;
-  const site = sites.find((x) => x.id === siteId);
+  // the rail reads GET /api/content/sites, the same route and rows as ManagedSite; its type names only what the rail uses
+  const site = saved[siteId] ?? (ctx.sites as readonly Site[] | null)?.find((x) => x.id === siteId);
   const siteRow = overview.rows.find((r) => r.siteId === siteId);
   // N3: the median of this brand's recent finished topics once there are enough, else the price list; the page names which
   const priceOf = (f?: readonly string[]) => topicShownTwd(f, siteRow ? overview.actual?.[siteRow.organizationId] : null);
@@ -419,18 +411,13 @@ export function TopicsBoard({ overview, scheduleFor, pickClient, view = "topics"
   const noteLine = note && <p style={{ margin: 0, color: "var(--yellow)", fontSize: "var(--font-size-sm)" }}>{note}</p>;
 
   if (view === "steps") {
-    // the site switch keeps ?site= in the address, so the page reloads and links to the same site
-    const pickSite = (id: string) => { setSiteId(id); history.replaceState(null, "", `${location.pathname}?site=${encodeURIComponent(id)}`); };
     return (
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
-        <div role="group" aria-label={T.pickSite} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {overview.rows.map((r) => <button key={r.siteId} type="button" aria-pressed={r.siteId === siteId} style={chip(r.siteId === siteId)} onClick={() => pickSite(r.siteId)}>{r.orgName}・{r.siteName}</button>)}
-        </div>
         {noteLine}
-        {!site && <p style={{ margin: 0, color: "var(--text-muted)" }}>{T.noSiteSettings}</p>}
+        {!(site && siteRow) && <p style={{ margin: 0, color: "var(--text-muted)" }}>{T.noSiteSettings}</p>}
         {siteRow && site && (
           <FlowCells site={site} row={siteRow} cell={overview.cells[siteId]} topics={topics} month={month} schedule={site.org_slug && scheduleFor ? scheduleFor(site.org_slug) : null}
-            planButton={planButton} onSiteSaved={(u) => setSites((l) => (l ?? []).map((x) => (x.id === u.id ? u : x)))} />
+            planButton={planButton} onSiteSaved={(u) => setSaved((m) => ({ ...m, [u.id]: u }))} />
         )}
       </div>
     );
@@ -439,8 +426,7 @@ export function TopicsBoard({ overview, scheduleFor, pickClient, view = "topics"
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 16 }}>
       <p style={{ margin: 0, fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
-        {T.current}<strong style={{ color: "var(--text-primary)" }}>{siteRow ? `${siteRow.orgName}・${siteRow.siteName}` : "—"}</strong>
-        {clientsHref && <>{"　"}<a href={`${clientsHref}?site=${encodeURIComponent(siteId)}`}>{T.otherSite}</a></>}
+        {T.current}<strong style={{ color: "var(--text-primary)" }}>{siteRow ? `${siteRow.orgName}・${siteRow.siteName}` : site?.name ?? "—"}</strong>
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
         <button type="button" className="btn btn-secondary" onClick={() => setMonth(shiftMonth(month, -1))}>‹ 上個月</button>

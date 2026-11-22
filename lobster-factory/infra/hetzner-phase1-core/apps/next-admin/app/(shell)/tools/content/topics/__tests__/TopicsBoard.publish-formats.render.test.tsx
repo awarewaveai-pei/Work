@@ -6,10 +6,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
 import { PUBLISH_READ_TIMEOUT_MS, TopicsBoard } from "../TopicsBoard";
+import { stubContext } from "./client-context-stub";
 
-vi.mock("../AutoContentOverview", () => ({ ClientOverview: () => null, FlowCells: () => null }));
+vi.mock("../AutoContentOverview", () => ({ FlowCells: () => null }));
 
-const overview = { rows: [{ siteId: "s1", organizationId: "o1" }], cells: {}, actual: {}, spendNote: null } as unknown as OverviewData;
+const overview = { organizationId: "o1", rows: [{ siteId: "s1", organizationId: "o1" }], cells: {}, actual: {}, spendNote: null } as unknown as OverviewData;
 const topic = (over: Record<string, unknown>) => ({
   id: "t1", organization_id: "o1", site_id: "s1", title: "感恩的心理學", keyword: "感恩", angle: null, status: "proposed",
   formats: ["article", "social"], scheduled_for: "2026-11-25T01:00:00Z", source: "manual", source_ref: {}, artifacts: {},
@@ -25,7 +26,6 @@ function stubFetch(topics: unknown[], opts: { privacy?: () => Promise<Response>;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     calls.push({ url, init });
     const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
-    if (url === "/api/content/sites") return json({ ok: true, sites: [{ id: "s1", organization_id: "o1", contentDefaults: {} }] });
     if (url.startsWith("/api/content/topics?") && url.includes("folders=1")) return json({ ok: true, topics, folders: [] });
     if (url.startsWith("/api/content/topics?")) return opts.privacy ? opts.privacy() : json({ ok: true, youtubePrivacy: { t1: "unlisted" } });
     if (init?.method === "PATCH") return opts.patch ? opts.patch() : json({ ok: true });
@@ -36,7 +36,8 @@ function stubFetch(topics: unknown[], opts: { privacy?: () => Promise<Response>;
 const reads = (calls: Call[]) => calls.filter((c) => c.url.startsWith("/api/content/topics?") && !c.url.includes("folders=1"));
 const posts = (calls: Call[]) => calls.filter((c) => c.url.endsWith("/publish"));
 async function openTopic() {
-  render(<TopicsBoard overview={overview} />);
+  // the rail's current site (ADR 020); its row is the sites API's, contentDefaults included
+  render(<TopicsBoard overview={overview} />, { wrapper: stubContext({ sites: [{ id: "s1", name: "s1", organization_id: "o1", contentDefaults: {} } as never] }).wrap });
   fireEvent.click(await screen.findByText("感恩的心理學"));
 }
 const detailPublish = () => within(document.querySelector("aside")!).getByRole("button", { name: /發布|讀取草稿設定/ });

@@ -1,18 +1,16 @@
 "use client";
-// The auto-content views besides the topic list (AUTO_CONTENT P9.3; R8: each on its own page under 題目 in the side
-// menu). ClientOverview = pick a client, then its sites' numbers, each with a link to that site's topics;
-// FlowCells = the picked site's five steps, each with its status, its control and its cost. All numbers arrive from the
-// server page in one piece (overview-load.ts); the controls reuse the existing components and APIs, so the old pages
-// (/ops/schedules, /tools/content/sites) show the same values. Buttons only, no dropdowns; colors are theme tokens.
-import { useState, type ReactNode } from "react";
+// 五步驟 (AUTO_CONTENT P9.3; R8: its own page under 題目 in the side menu): FlowCells = the picked site's five steps, each
+// with its status, its control and its cost. All numbers arrive from the server page in one piece (overview-load.ts); the
+// controls reuse the existing components and APIs, so the old pages (/ops/schedules, /tools/content/sites) show the same
+// values. Buttons only, no dropdowns; colors are theme tokens. The client and site come from the client rail (ADR 020).
+import type { ReactNode } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
+import { withContext } from "@/lib/client-context/contract";
 import type { OverviewRow } from "@/lib/content/topics/overview";
-import { NAV_FIRST, type PickOrg } from "@/app/(shell)/ops/clients/nav-orgs";
 import type { TrendCell } from "@/lib/content/topics/overview-load";
 import type { Topic } from "@/lib/content/topics/store";
 import { planCostTwd } from "@/lib/content/topics/cost";
-import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import PublishModeButtons from "../sites/PublishModeButtons";
 import TopicModeButtons from "../sites/TopicModeButtons";
@@ -20,101 +18,10 @@ import DailyTrendButtons from "../sites/DailyTrendButtons";
 
 const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 10, padding: 12 };
 const muted: React.CSSProperties = { color: "var(--text-muted)", fontSize: "var(--font-size-xs)" };
-// Each site is one block of labelled cells that wrap, so the page never scrolls sideways at any width.
-const CELLS = "repeat(auto-fit, minmax(104px, 1fr))";
-
-const T = {
-  heading: "客戶",
-  noSite: "這個客戶還沒有可用的網站。",
-  openTopics: "看這個網站的題目",
-  cols: ["客戶・網站", "總開關", "每天上限", "題目", "發布", "本月提案／上次嘗試", "待核准", "進行中", "失敗", "未開通", "本月 AI 花費（所有工具）"],
-  costLink: "到成本頁看明細",
-  on: "開", off: "關", ai: "AI 挑", human: "人挑", auto: "自動發", review: "人審",
-  proposed: "已提案", notProposed: "本月未提案", never: "未嘗試",
-  notOpened: "未開通", ok: "—",
-};
-// every amount a person reads is NT$ (operator rule); spendUsd stays the stored unit
-const fmtUsd = (n: number) => `NT$${usdToNtd(n).toFixed(0)}`;
-const taipeiText = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : T.never);
+const taipeiText = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : "未嘗試");
 
 /** The topics page of one site: the staff page, or the door's own page on a product door. */
 export const TOPICS_PAGE = "/tools/content/topics";
-export const topicsSiteHref = (base: string, siteId: string) => `${base}?site=${encodeURIComponent(siteId)}`;
-
-/** Staff only: the shared client picker (search + one row per client, OrgPicker.tsx), handed in by StaffTopicsBoard so a
- *  door page never imports an /api/ops caller. A door holds one client and gets none. */
-export type ClientPickerSlot = (p: { orgs: PickOrg[]; total: number; selected: string | null; onPick: (org: PickOrg | null) => void; badge: (org: PickOrg) => ReactNode; hint: ReactNode }) => ReactNode;
-
-/** What is wrong with a client's sites, as its picker name says it (the old table's problems-first job); null = nothing. */
-function problemTag(rows: OverviewRow[]): string | null {
-  if (!rows.some((r) => r.problem)) return null;
-  const failed = rows.reduce((n, r) => n + r.failed, 0);
-  return [failed && `失敗 ${failed}`, rows.some((r) => r.notOpened) && T.notOpened, rows.some((r) => r.lastError) && "出錯"].filter(Boolean).join("、");
-}
-
-/** The picker's first page; a picked client past it goes first, so its button shows as picked (OrgPicker contract). */
-const firstPage = (orgs: PickOrg[], picked: string | null) => {
-  const i = orgs.findIndex((o) => o.id === picked);
-  return i < NAV_FIRST ? orgs.slice(0, NAV_FIRST) : [orgs[i], ...orgs.slice(0, NAV_FIRST - 1)];
-};
-
-/** The 客戶 page: pick a client (staff), then that client's sites, one block of numbers each, with a link to its topics.
- *  The picker lists clients problems first (overview order) with a red dot and what is wrong; a client found by search
- *  with no site here says so. A door (no picker) shows its own sites. */
-export function ClientOverview({ rows, note, siteId, picker }: { rows: OverviewRow[]; note: string | null; siteId: string; picker?: ClientPickerSlot }) {
-  const base = useDoorHref(TOPICS_PAGE) ?? TOPICS_PAGE;
-  const costsHref = useDoorHref("/ops/costs");   // a staff page: a door has none, so the link is hidden there
-  const [orgId, setOrgId] = useState(rows.find((r) => r.siteId === siteId)?.organizationId ?? rows[0]?.organizationId ?? null);
-  const byOrg = new Map<string, OverviewRow[]>();
-  for (const r of rows) byOrg.set(r.organizationId, [...(byOrg.get(r.organizationId) ?? []), r]);
-  const orgs: PickOrg[] = [...byOrg.entries()].map(([id, rs]) => ({ id, slug: id, name: rs[0].orgName, color: "var(--text-muted)", brandColors: [] }));
-  // the problem mark, on the first page and on search results alike (OrgPicker badge); a client with no site here says so
-  const badge = (o: PickOrg) => {
-    const rs = byOrg.get(o.id);
-    if (!rs) return <span style={muted}>沒有網站</span>;
-    const tag = problemTag(rs);
-    return tag ? <span style={{ color: "var(--red)" }}>● {tag}</span> : null;
-  };
-  const hint = `共 ${orgs.length} 個客戶，有問題的排前面；其他請用上面的搜尋。`;
-  const shown = picker ? (orgId ? byOrg.get(orgId) ?? [] : []) : rows;
-  return (
-    <section style={{ display: "grid", gap: 12 }} aria-label={T.heading}>
-      {note && <div style={{ ...muted, color: "var(--yellow)" }}>{note}</div>}
-      {picker?.({ orgs: firstPage(orgs, orgId), total: orgs.length, selected: orgId, onPick: (o) => setOrgId(o?.id ?? null), badge, hint })}
-      {picker && orgId && !shown.length && <p style={{ margin: 0, color: "var(--text-muted)" }}>{T.noSite}</p>}
-      {shown.map((r) => {
-        const cell = (i: number, v: ReactNode, color?: string) => (
-          <span key={i} style={{ display: "grid", gap: 2, minWidth: 0 }}>
-            <span style={muted}>{T.cols[i]}</span>
-            <span style={{ color, fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}>{v}</span>
-          </span>
-        );
-        return (
-          <div key={r.siteId} style={{ ...card, display: "grid", gridTemplateColumns: CELLS, gap: 8, alignItems: "start", fontSize: "var(--font-size-sm)",
-            background: r.problem ? "color-mix(in srgb, var(--red) 6%, var(--card-bg))" : "var(--card-bg)" }}>
-            <span style={{ gridColumn: "1 / -1", minWidth: 0 }}>
-              <span style={{ display: "block", fontWeight: 600 }}>{r.orgName}</span>
-              <span style={muted}>{r.siteName}</span>
-              {r.lastError && <span style={{ display: "block", ...muted, color: "var(--red)" }}>{r.lastError}</span>}
-            </span>
-            {cell(1, r.enabled ? T.on : T.off, r.enabled ? "var(--green)" : "var(--text-muted)")}
-            {cell(2, r.dailyLimit ?? DAILY_START_CAP)}
-            {cell(3, r.topicGate === "ai" ? T.ai : T.human)}
-            {cell(4, r.publishGate === "auto" ? T.auto : T.review)}
-            {cell(5, <>{r.proposedThisMonth ? T.proposed : T.notProposed}<br />{taipeiText(r.attemptedAt)}</>, r.proposedThisMonth ? "var(--text-primary)" : "var(--text-muted)")}
-            {cell(6, r.pending, r.pending ? "var(--accent-text)" : "var(--text-muted)")}
-            {cell(7, r.inProgress)}
-            {cell(8, r.failed, r.failed ? "var(--red)" : "var(--text-muted)")}
-            {cell(9, r.notOpened ? T.notOpened : T.ok, r.notOpened ? "var(--red)" : "var(--text-muted)")}
-            {cell(10, fmtUsd(r.spendUsd))}
-            <a className="btn btn-secondary" href={topicsSiteHref(base, r.siteId)} style={{ gridColumn: "1 / -1", justifySelf: "start" }}>{T.openTopics}</a>
-          </div>
-        );
-      })}
-      {costsHref && <a href={costsHref} style={{ fontSize: "var(--font-size-xs)" }}>{T.costLink}</a>}
-    </section>
-  );
-}
 
 // wide = the step holds a table (④'s schedule row, ~900px): it takes a row of its own, and its one column may shrink
 // (minmax(0, 1fr)), so the table scrolls inside the card and never widens the page (S9, seen live 2026-11-19: scrollWidth 1925).
@@ -133,7 +40,7 @@ export function FlowCells({ site, row, cell, topics, month, schedule, planButton
   schedule?: ReactNode; planButton: ReactNode; onSiteSaved: (s: ManagedSite) => void;
 }) {
   const onDoor = useOnDoor();
-  const topicsHref = topicsSiteHref(useDoorHref(TOPICS_PAGE) ?? TOPICS_PAGE, site.id);
+  const topicsHref = withContext(useDoorHref(TOPICS_PAGE) ?? TOPICS_PAGE, { org: row.organizationId, site: site.id });
   const proposedN = topics.filter((t) => t.source !== "manual").length;
   const pending = topics.filter((t) => t.status === "proposed").length;
   return (

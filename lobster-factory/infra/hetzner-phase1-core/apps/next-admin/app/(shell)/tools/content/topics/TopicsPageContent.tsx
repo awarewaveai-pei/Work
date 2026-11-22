@@ -3,30 +3,36 @@
 import { headers } from "next/headers";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { loadOverview } from "@/lib/content/topics/overview-load";
-import { canAccessOrg } from "@/lib/tenant-guard";
+import { canAccessOrg, effectiveOrgId, OrgAccessError } from "@/lib/tenant-guard";
 import { staffGrantOf, staffMayUseTool, staffUnrestricted } from "@/lib/staff-access";
 import { StaffTopicsBoard } from "./StaffTopicsBoard";
 import type { TopicsView } from "./TopicsBoard";
 
-// R8: 題目 and its two sub-pages in the side menu (客戶, 五步驟), each one view of the same board.
+// R8: 題目 and its sub-page 五步驟 in the side menu, each one view of the same board; the client rail picks the site (K8).
 const HEAD: Record<TopicsView, [string, string]> = {
   topics: ["自動內容・題目", "一個網站一個月的題目。題目核准後才會開始製作。"],
-  clients: ["自動內容・客戶", "挑一個客戶看它每個網站的數字；有問題的客戶排在前面、名稱前是紅點。"],
   steps: ["自動內容・五步驟", "一個網站的五個步驟：搜集熱搜 → 提案題目 → 挑題 → 製作 → 發布。"],
 };
 
+/** The page's ?org= (Next 15 searchParams): the current client, as the client rail keeps it in the address (ADR 020). */
+export type TopicsSearch = Promise<Record<string, string | string[] | undefined>>;
+export async function orgParam(searchParams: TopicsSearch): Promise<string | null> {
+  const v = (await searchParams).org;
+  return typeof v === "string" ? v : null;
+}
+
 /** The staff page of one view: its heading and the board. */
-export function StaffTopicsPage({ view }: { view: TopicsView }) {
+export function StaffTopicsPage({ view, org }: { view: TopicsView; org: string | null }) {
   return (
     <div className="page" style={{ maxWidth: 1280 }}>
       <h1 style={{ fontSize: "var(--font-size-xl)", margin: "0 0 6px", color: "var(--text-primary)" }}>{HEAD[view][0]}</h1>
       <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-base)", margin: "0 0 24px" }}>{HEAD[view][1]}</p>
-      <TopicsPageContent view={view} />
+      <TopicsPageContent view={view} org={org} />
     </div>
   );
 }
 
-export async function TopicsPageContent({ view }: { view: TopicsView }) {
+export async function TopicsPageContent({ view, org }: { view: TopicsView; org: string | null }) {
   const sb = getSupabaseWriteClient();
   if (!sb) return <p style={{ color: "var(--text-muted)" }}>Supabase 未設定，無法讀取。</p>;
   const h = await headers();
@@ -35,5 +41,9 @@ export async function TopicsPageContent({ view }: { view: TopicsView }) {
   const grant = staffGrantOf(h);
   const canSchedule = view === "steps" && (staffUnrestricted(grant) || staffMayUseTool(grant!, "ops/schedules"));
   const req = new Request("http://localhost", { headers: h });
-  return <StaffTopicsBoard overview={await loadOverview(sb, (org) => canAccessOrg(req, org))} canSchedule={canSchedule} view={view} />;
+  // only the picked client is read (ADR 020); a client account always gets its own, a malformed ?org= reads nothing
+  let current: string | null;
+  try { current = effectiveOrgId(req, org); }
+  catch (e) { if (e instanceof OrgAccessError) current = null; else throw e; }
+  return <StaffTopicsBoard overview={await loadOverview(sb, current, (o) => canAccessOrg(req, o))} canSchedule={canSchedule} view={view} />;
 }

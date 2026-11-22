@@ -79,7 +79,6 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     label: '行銷',
     items: [
       { type: 'link', href: '/tools/content/topics',   icon: '🧭', label: '自動內容',     title: '全自動內容的題目：一個網站一個月的題目清單' },
-      { type: 'link', href: '/tools/content/topics/clients', icon: '·', label: '客戶', title: '全部客戶的網站一覽，點一列看那個網站的題目', under: '/tools/content/topics' },
       { type: 'link', href: '/tools/content/topics/steps',   icon: '·', label: '五步驟', title: '一個網站的五個步驟：熱搜 → 提案 → 挑題 → 製作 → 發布', under: '/tools/content/topics' },
       { type: 'link', href: '/tools/events',           icon: '🌍', label: '活動行事曆',  title: '全球活動行事曆：運動賽事、國家與文化節慶，找內容題材' },
       { type: 'link', href: '/tools/social',           icon: '📣', label: '社群貼文',     title: '多品牌社群排程（ADR 016）' },
