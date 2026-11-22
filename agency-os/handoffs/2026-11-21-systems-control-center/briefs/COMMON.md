@@ -61,5 +61,5 @@ route 行為：registry 投影 upsert 三張定義表（以 id）；events `inse
 - `system_proposed` `{ "name": 1–200 字, "type": 五類之一, "purpose": 1–200 字 }`：按「新增系統」；system_id null。待登記＝名稱（去空白、不分大小寫）不等於任何 registry 系統的 name／slug／aliases。agent 寫進 registry 後自然消失，不另寫完成事件。
 - `system_proposal_closed` `{ "proposal_event_key", "reason" }`：撤回或駁回一筆提案（打錯、重複、不做）；被關閉的提案不再算待登記。
 - 每次被受理的更新請求恰好回應一次：匯入成功或失敗都送 `import_run`（失敗為 status=error）。
-- 主機查詢：`GET /api/internal/systems/pending`（Bearer `SYSTEMS_INGEST_TOKEN`）→ `{ "refresh": bool, "proposals": [{ "name", "type", "purpose", "at" }] }`。AO-RESUME 的待登記檢查也只走這個 route（主機上 curl），不另寫 SQL。
+- 主機查詢：`GET /api/internal/systems/pending`（Bearer `SYSTEMS_INGEST_TOKEN`）→ `{ "refresh": bool, "proposals": [{ "event_key", "name", "type", "purpose", "at" }] }`（event_key 供關閉用）。AO-RESUME 的待登記檢查也只走這個 route（主機上 curl），不另寫 SQL。
 - store.ts 對外函式名（W9 實作、W10 呼叫）：`requestRefresh(sb, actor)`、`proposeSystem(sb, actor, { name, type, purpose })`、`closeProposal(sb, actor, key, reason)`、`readPending(sb)`（回同上 JSON 結構）。
