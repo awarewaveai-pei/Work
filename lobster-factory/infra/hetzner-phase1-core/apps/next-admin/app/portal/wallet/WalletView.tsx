@@ -27,7 +27,7 @@ const nt = (n: number) => `NT$${n.toLocaleString("zh-TW")}`;
 const th: React.CSSProperties = { textAlign: "left", padding: "6px 10px", fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)", whiteSpace: "nowrap" };
 const td: React.CSSProperties = { padding: "6px 10px", fontSize: 12.5, color: "var(--text-primary)", borderBottom: "1px solid var(--border-subtle)" };
 
-export function WalletView({ topUpUrl }: { topUpUrl: string }) {
+export function WalletView({ topUpUrl, canTopUp }: { topUpUrl: string; canTopUp: boolean }) {
   const [account, setAccount] = useState<Account | null>(null);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<Tab>("points");
@@ -77,7 +77,9 @@ export function WalletView({ topUpUrl }: { topUpUrl: string }) {
               <div style={{ fontSize: 28, fontWeight: 800 }}>{account.balance.toLocaleString("zh-TW")}</div>
               <p style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "4px 0 12px" }}>1 點＝NT$1，約 {nt(account.balance)}。每次依實際用量扣點。</p>
               <p style={{ fontSize: 12.5, marginBottom: manager ? 12 : 0 }}>本期到：{day(account.next_period_end)}</p>
-              {manager && <a href={topUpUrl} className="btn-primary">儲值（回 aware-wave.com）</a>}
+              {manager && (canTopUp
+                ? <a href={topUpUrl} className="btn-primary">儲值（回 aware-wave.com）</a>
+                : <p style={{ fontSize: 12.5, color: "var(--text-muted)" }}>目前請聯絡我們儲值</p>)}
             </div>
           )}
           {manager && shown === "contracts" && (

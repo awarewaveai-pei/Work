@@ -23,7 +23,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("點數與合約", () => {
   it("manager: balance in NT$, a top-up link to the shop, three visible tab buttons showing contracts and the ledger", async () => {
-    render(<WalletView topUpUrl={SHOP} />);
+    render(<WalletView topUpUrl={SHOP} canTopUp />);
     await screen.findByText("點數餘額");
     expect(screen.getByText(/NT\$1,240/)).toBeTruthy();
     expect(screen.getByRole("link", { name: /儲值/ }).getAttribute("href")).toBe(SHOP);
@@ -37,9 +37,17 @@ describe("點數與合約", () => {
     expect(screen.getByText("+500")).toBeTruthy();
   });
 
+  it("manager, shop closed: no top-up link, one line 目前請聯絡我們儲值", async () => {
+    const { container } = render(<WalletView topUpUrl={SHOP} canTopUp={false} />);
+    await screen.findByText("點數餘額");
+    expect(screen.getByText("目前請聯絡我們儲值")).toBeTruthy();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(container.innerHTML).not.toContain(SHOP);
+  });
+
   it("member: balance and end date only -- no purchase button, no tabs, no contract or ledger section", async () => {
     vi.stubGlobal("fetch", reply(MEMBER));
-    const { container } = render(<WalletView topUpUrl={SHOP} />);
+    const { container } = render(<WalletView topUpUrl={SHOP} canTopUp />);
     await screen.findByText("點數餘額");
     expect(screen.getByText(/本期到：/)).toBeTruthy();
     expect(screen.queryByRole("link")).toBeNull();
@@ -54,7 +62,7 @@ describe("點數與合約", () => {
   it("a failed read says so and the 重新整理 button reads again", async () => {
     const f = vi.fn().mockResolvedValueOnce(new Response("{}", { status: 503 })).mockResolvedValueOnce(new Response(JSON.stringify(MEMBER), { status: 200 }));
     vi.stubGlobal("fetch", f);
-    render(<WalletView topUpUrl={SHOP} />);
+    render(<WalletView topUpUrl={SHOP} canTopUp />);
     await screen.findByText(/讀取失敗/);
     fireEvent.click(screen.getByRole("button", { name: "重新整理" }));
     await waitFor(() => expect(screen.getByText("點數餘額")).toBeTruthy());
