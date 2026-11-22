@@ -1,15 +1,27 @@
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
-import { LogoutButton } from "../LogoutButton";
-import { SidebarNav } from "../SidebarNav";
+import { PlatformFrame } from "../PlatformFrame";
 import { UpdateNotice } from "../UpdateNotice";
+import { CodexLaptopButton } from "../CodexLaptopButton";
+import { OpsInboxBadge } from "./ops/inbox/components/OpsInboxBadge";
 import { getThemeConfig } from "../../lib/theme/store";
 import { currentBuildId } from "../../lib/build-id";
 import { DEFAULT_SECTIONS } from "../sidebar-sections";
 import { staffGrantOf, staffMayOpen, staffUnrestricted } from "../../lib/staff-access";
-import { CodexLaptopButton } from "../CodexLaptopButton";
-import { requestActor } from "../../lib/entitlements/subject";
+import { requestActor, resolveSubject } from "../../lib/entitlements/subject";
 import { codexAllowed } from "../../lib/tarot/codex-bridge";
+
+// The staff console's frame is app/PlatformFrame.tsx (one frame for the staff console and every product door, K5). The
+// staff-only parts are worked out and built here, not in the frame: the frame is also every door's, and a door's import
+// graph must not reach staff APIs or the service-role client (lib/portal/__tests__/registry-code.test.ts, staff-tools.test.ts).
+/** The internal org's id (「AwareWave 自己」); null when it cannot be read (the client rail then has no self row). */
+async function internalOrgId(): Promise<string | null> {
+  try {
+    return (await resolveSubject({})).orgId;
+  } catch {
+    return null;
+  }
+}
 
 export default async function ShellLayout({ children }: { children: ReactNode }) {
   const { layout: navLayout } = await getThemeConfig();
@@ -22,33 +34,15 @@ export default async function ShellLayout({ children }: { children: ReactNode })
     ? null
     : DEFAULT_SECTIONS.flatMap(s => s.items).flatMap(i => (i.type === "link" && staffMayOpen(grant, i.href) ? [i.href] : []));
 
-  return (
-    <div className="shell">
-      <nav className="sidebar">
-        <div className="sidebar-logo">
-          <div className="sidebar-logo-mark">L</div>
-          <div>
-            <div className="sidebar-logo-text">Lobster Factory</div>
-            <div className="sidebar-logo-sub">Admin Console</div>
-          </div>
-        </div>
-
-        <SidebarNav initialLayout={navLayout} visible={visible} />
-
-        {/* Wrapper takes the footer's margin-top:auto so the button sits right above it, not mid-sidebar. */}
-        <div style={{ marginTop: "auto" }}>
-          {codexOwner && <CodexLaptopButton />}
-          <div className="sidebar-footer">
-            aware-wave.com
-            <LogoutButton />
-          </div>
-        </div>
-      </nav>
-
-      <div className="main">
-        <UpdateNotice buildId={currentBuildId()} />
-        {children}
-      </div>
-    </div>
-  );
+  return PlatformFrame({
+    kind: "staff",
+    navLayout,
+    internalOrgId: await internalOrgId(),
+    sitesPath: "/api/content/sites",
+    visible,
+    inboxBadge: <OpsInboxBadge />,
+    footTop: codexOwner ? <CodexLaptopButton /> : null,
+    notice: <UpdateNotice buildId={currentBuildId()} />,
+    children,
+  });
 }

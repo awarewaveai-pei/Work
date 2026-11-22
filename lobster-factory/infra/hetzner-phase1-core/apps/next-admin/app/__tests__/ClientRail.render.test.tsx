@@ -50,9 +50,9 @@ function Page({ layer }: { layer: Layer }) {
   return null;
 }
 
-function mount(opts: { layer?: Layer; sessionOrg?: string | null } = {}) {
+function mount(opts: { layer?: Layer; sessionOrg?: string | null; onDoor?: boolean; hosts?: Record<string, string> } = {}) {
   return render(
-    <ClientContextProvider sessionOrg={opts.sessionOrg ?? null} hostOrg={null} internalOrgId={INTERNAL} hosts={{}} onDoor={false}>
+    <ClientContextProvider sitesPath="/api/content/sites" sessionOrg={opts.sessionOrg ?? null} hostOrg={null} internalOrgId={INTERNAL} hosts={opts.hosts ?? {}} onDoor={opts.onDoor ?? false}>
       <ClientRail />
       {opts.layer && <Page layer={opts.layer} />}
     </ClientContextProvider>,
@@ -130,5 +130,21 @@ describe("ClientRail", () => {
     expect(clientBtn.compareDocumentPosition(siteBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(siteBtn);
     expect(String(nav.replace.mock.calls.at(-1)?.[0])).toBe(`/tools/content?org=${A}&site=${S1}`);
+  });
+
+  it("on a product door the client page link opens on the staff host", async () => {
+    nav.search = `org=${A}`;
+    mount({ layer: "org", onDoor: true, hosts: { staff: "https://app.example.test" } });
+    const link = await screen.findByRole("link", { name: "客戶頁 →" });
+    expect(link.getAttribute("href")).toBe("https://app.example.test/ops/clients/acme");
+  });
+
+  it("a failed sites read says so, not 'no sites'", async () => {
+    nav.search = `org=${A}`;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
+      String(input).startsWith("/api/ops/org-search") ? json({ ok: true, orgs: ORGS, total: 3 }) : json({ ok: false }, 500));
+    mount({ layer: "site" });
+    await waitFor(() => expect(screen.getByText("網站清單載入失敗，請重新整理。")).toBeTruthy());
+    expect(screen.queryByText("這個客戶還沒有網站。")).toBeNull();
   });
 });

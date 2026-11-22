@@ -38,7 +38,7 @@ function Probe({ layer, tag }: { layer: Layer; tag: string }) {
 
 function tree(sessionOrg: string | null = null) {
   return (
-    <ClientContextProvider sessionOrg={sessionOrg} hostOrg={null} internalOrgId={null} hosts={{}} onDoor={false}>
+    <ClientContextProvider sitesPath="/api/content/sites" sessionOrg={sessionOrg} hostOrg={null} internalOrgId={null} hosts={{}} onDoor={false}>
       <Probe layer="site" tag="a" />
       <Probe layer="site" tag="b" />
     </ClientContextProvider>
@@ -75,5 +75,16 @@ describe("ClientContextProvider", () => {
     fetchMock.mockImplementation(() => new Promise(() => {}));
     render(tree(A));
     expect(screen.getByTestId("a").textContent).toBe(`loading|${A}|`);
+  });
+
+  it("a door without the sites API: a site-layer page is treated as org, and no sites request goes out", async () => {
+    nav.search = `org=${A}&site=${S1}`;
+    render(
+      <ClientContextProvider sitesPath={null} sessionOrg={null} hostOrg={null} internalOrgId={null} hosts={{}} onDoor>
+        <Probe layer="site" tag="a" />
+      </ClientContextProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("a").textContent).toBe(`ok|${A}|`));
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

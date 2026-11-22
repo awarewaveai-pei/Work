@@ -10,6 +10,9 @@ export interface ContextSite extends SiteRow {
   name: string;
 }
 
+/** Key of the staff console's origin in `hosts` (no product uses it). */
+export const STAFF_HOST_KEY = "staff";
+
 export interface ClientContextValue {
   viewer: "staff" | "client";
   /** 本頁登記的層；null＝本頁不需要客戶，客戶欄不出現。 */
@@ -19,6 +22,8 @@ export interface ClientContextValue {
   site: string | null;
   /** 目前客戶的網站列；null＝未載入或尚未選客戶。 */
   sites: readonly ContextSite[] | null;
+  /** 網站清單讀取失敗（與「這個客戶沒有網站」不同）。 */
+  sitesFailed: boolean;
   internalOrgId: string | null;
   onDoor: boolean;
   /** 產品 key → https://<host>（伺服器算好傳下，瀏覽器不讀 env）。 */

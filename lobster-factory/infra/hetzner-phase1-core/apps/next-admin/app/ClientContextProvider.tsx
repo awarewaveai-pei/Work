@@ -20,21 +20,25 @@ export interface ClientContextProviderProps {
   /** ② 白牌主機綁定的客戶；今天恆 null。 */
   hostOrg: string | null;
   internalOrgId: string | null;
+  /** The sites list API this frame may call; null = this door does not own it: no site layer (a page registering
+   *  "site" is treated as "org") and no sites request. */
+  sitesPath: string | null;
   hosts: Readonly<Record<string, string>>;
   onDoor: boolean;
   children: ReactNode;
 }
 
-type Fetched = { org: string; rows: ContextSite[] } | null;
+type Fetched = { org: string; rows: ContextSite[] | null } | null;   // rows null = the read failed
 
-async function getSites(qs: string): Promise<{ status: number; rows: ContextSite[] }> {
-  const res = await fetch(`/api/content/sites?${qs}`);
-  if (!res.ok) return { status: res.status, rows: [] };
+/** rows null = the read failed (not answered, not ok): never the same as "this client has no sites". */
+async function getSites(sitesPath: string, qs: string): Promise<{ status: number; rows: ContextSite[] | null }> {
+  const res = await fetch(`${sitesPath}?${qs}`);
+  if (!res.ok) return { status: res.status, rows: null };
   const json = (await res.json()) as { ok?: boolean; sites?: ContextSite[] };
-  return { status: res.status, rows: json.sites ?? [] };
+  return { status: res.status, rows: json.ok === true && Array.isArray(json.sites) ? json.sites : null };
 }
 
-export function ClientContextProvider({ sessionOrg, hostOrg, internalOrgId, hosts, onDoor, children }: ClientContextProviderProps) {
+export function ClientContextProvider({ sessionOrg, hostOrg, internalOrgId, sitesPath, hosts, onDoor, children }: ClientContextProviderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -43,7 +47,7 @@ export function ClientContextProvider({ sessionOrg, hostOrg, internalOrgId, host
   const viewer: "staff" | "client" = sessionOrg ? "client" : "staff";
 
   const [layers, setLayers] = useState<Layer[]>([]);
-  const layer: Layer | null = layers.includes("site") ? "site" : layers.includes("org") ? "org" : null;
+  const layer: Layer | null = layers.includes("site") && sitesPath ? "site" : layers.length ? "org" : null;
   const register = useCallback((l: Layer) => {
     setLayers((xs) => [...xs, l]);
     return () => setLayers((xs) => {
@@ -57,35 +61,37 @@ export function ClientContextProvider({ sessionOrg, hostOrg, internalOrgId, host
   const [fetched, setFetched] = useState<Fetched>(null);
   const cache = useRef(new Map<string, ContextSite[]>());
   useEffect(() => {
-    if (!layer || !sitesOrg) return;
+    if (!layer || !sitesOrg || !sitesPath) return;
     const hit = cache.current.get(sitesOrg);
     if (hit) { setFetched({ org: sitesOrg, rows: hit }); return; }
     let live = true;
-    getSites(new URLSearchParams({ organizationId: sitesOrg }).toString())
+    getSites(sitesPath, new URLSearchParams({ organizationId: sitesOrg }).toString())
       .then(({ rows }) => {
-        cache.current.set(sitesOrg, rows);
+        if (rows) cache.current.set(sitesOrg, rows);   // a failure is not cached: the next visit asks again
         if (live) setFetched({ org: sitesOrg, rows });
       })
-      .catch(() => { if (live) setFetched({ org: sitesOrg, rows: [] }); });
+      .catch(() => { if (live) setFetched({ org: sitesOrg, rows: null }); });
     return () => { live = false; };
-  }, [layer, sitesOrg]);
-  const sites = fetched && fetched.org === sitesOrg ? fetched.rows : null;
+  }, [layer, sitesOrg, sitesPath]);
+  const mine = fetched && fetched.org === sitesOrg ? fetched : null;
+  const sites = mine?.rows ?? null;
+  const sitesFailed = Boolean(mine && mine.rows === null);
 
   // 只給 site、或 site 不在該客戶清單：查那一站。
   const needLookup = Boolean(layer && query.site && (!sitesOrg || (sites && !sites.some((s) => s.id === query.site))));
   const [lookup, setLookup] = useState<{ site: string; value: SiteLookup } | null>(null);
   useEffect(() => {
-    if (!needLookup || !query.site) return;
+    if (!needLookup || !query.site || !sitesPath) return;
     const site = query.site;
     let live = true;
-    getSites(new URLSearchParams({ siteId: site }).toString())
+    getSites(sitesPath, new URLSearchParams({ siteId: site }).toString())
       .then(({ status, rows }) => {
-        const value: SiteLookup = status === 403 ? "forbidden" : rows[0] ?? "not_found";
+        const value: SiteLookup = status === 403 ? "forbidden" : rows?.[0] ?? "not_found";
         if (live) setLookup({ site, value });
       })
       .catch(() => { if (live) setLookup({ site, value: "not_found" }); });
     return () => { live = false; };
-  }, [needLookup, query.site]);
+  }, [needLookup, query.site, sitesPath]);
   const siteLookup: SiteLookup = lookup && lookup.site === query.site ? lookup.value : null;
 
   const decided = decide({
@@ -93,7 +99,8 @@ export function ClientContextProvider({ sessionOrg, hostOrg, internalOrgId, host
     sessionOrg,
     hostOrg,
     internalOrgId,
-    query: { org: query.org, site: query.site },
+    // no sites API on this door: no site layer, so a site in the URL is not judged (nor removed)
+    query: { org: query.org, site: sitesPath ? query.site : null },
     sites,
     siteLookup,
     layer: layer ?? "org",
@@ -145,6 +152,7 @@ export function ClientContextProvider({ sessionOrg, hostOrg, internalOrgId, host
     org: decided.orgId,
     site: decided.siteId,
     sites,
+    sitesFailed,
     internalOrgId,
     onDoor,
     hosts,

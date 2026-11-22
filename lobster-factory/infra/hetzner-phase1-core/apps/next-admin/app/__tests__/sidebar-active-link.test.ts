@@ -26,9 +26,9 @@ describe("activeLink", () => {
 import fs from "fs";
 import path from "path";
 
-describe("SidebarNav marks the current link", () => {
+describe("NavRail marks the current link", () => {
   it("the link whose href is activeLink's gets .active and aria-current", () => {
-    const src = fs.readFileSync(path.resolve(__dirname, "../SidebarNav.tsx"), "utf8");
+    const src = fs.readFileSync(path.resolve(__dirname, "../NavRail.tsx"), "utf8");
     expect(src).toMatch(/className=\{`sidebar-link\$\{item\.under \? ' sub' : ''\}\$\{item\.href === current\?\.href \? ' active' : ''\}`\}/);
     expect(src).toMatch(/aria-current=\{item\.href === current\?\.href \? 'page' : undefined\}/);
   });

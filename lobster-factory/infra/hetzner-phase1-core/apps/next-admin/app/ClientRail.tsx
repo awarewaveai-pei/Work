@@ -8,7 +8,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { OrgPicker } from "@/app/(shell)/ops/clients/OrgPicker";
 import type { PickOrg } from "@/app/(shell)/ops/clients/nav-orgs";
 import { roleHeader } from "@/lib/ops-role";
-import { useClientContextState, type ClientContextValue } from "@/lib/client-context/use-client-context";
+import { STAFF_HOST_KEY, useClientContextState, type ClientContextValue } from "@/lib/client-context/use-client-context";
 
 export const ORG_SEARCH_PATH = "/api/ops/org-search";
 const SELF_NAME = "AwareWave 自己";
@@ -79,9 +79,12 @@ export function ClientRail() {
     >
       {staff && (
         <>
-          {current && !ctx.onDoor && (
+          {current && (!ctx.onDoor || ctx.hosts[STAFF_HOST_KEY]) && (
             <div style={{ padding: "8px 8px 0", fontSize: 12 }}>
-              <Link href={`/ops/clients/${encodeURIComponent(current.slug)}`}>客戶頁 →</Link>
+              {/* /ops/clients is a staff-console page (404 on a door): from a door it opens on the staff host */}
+              {ctx.onDoor
+                ? <a href={`${ctx.hosts[STAFF_HOST_KEY]}/ops/clients/${encodeURIComponent(current.slug)}`}>客戶頁 →</a>
+                : <Link href={`/ops/clients/${encodeURIComponent(current.slug)}`}>客戶頁 →</Link>}
             </div>
           )}
           {!org && <div role="status" style={{ ...note, color: "var(--text-primary)" }}>請先選客戶</div>}
@@ -100,8 +103,9 @@ export function ClientRail() {
       {STATUS_TEXT[status] && <div role="alert" style={note}>{STATUS_TEXT[status]}</div>}
       {layer === "site" && org && (
         <div role="group" aria-label="網站" style={{ padding: 6, borderTop: staff ? "1px solid var(--card-border)" : undefined }}>
-          {sites === null && <div style={note}>載入網站中…</div>}
-          {sites !== null && sites.length === 0 && <div style={note}>這個客戶還沒有網站。</div>}
+          {ctx.sitesFailed && <div role="alert" style={note}>網站清單載入失敗，請重新整理。</div>}
+          {!ctx.sitesFailed && sites === null && <div style={note}>載入網站中…</div>}
+          {!ctx.sitesFailed && sites !== null && sites.length === 0 && <div style={note}>這個客戶還沒有網站。</div>}
           {sites !== null && sites.length > 0 && !site && <div style={note}>請選網站</div>}
           {(sites ?? []).map((s) => (
             <button key={s.id} type="button" aria-pressed={s.id === site} onClick={() => ctx.setSite(s.id)} style={siteStyle(s.id === site)}>
