@@ -53,15 +53,15 @@ export const STEPS = [
     gate: '治理文件檢查通過。', risk: 'Medium', model: '監工', status: 'done', commit: 'da53adac6', depends: [], card: SPEC },
   // 第二批
   { n: 8, code: 'E2', group: 'B2', title: '引擎的內容安全政策', plain: '引擎和 WordPress 同一個網域後，引擎頁若被植入惡意程式會波及 WordPress 後台。加上瀏覽器層的限制來擋。',
-    gate: '12 頁與嵌入頁都沒有被政策擋下的東西。', risk: 'Medium（安全）', model: 'Opus 5.5', status: 'not_started', depends: ['E1'], card: SPEC },
+    gate: '12 頁與嵌入頁都沒有被政策擋下的東西。', risk: 'Medium（安全）', model: 'Opus 5.5', status: 'in_progress', depends: ['E1'], card: 'briefs/WP-E2-csp.md' },
   { n: 9, code: 'P1', group: 'B2', title: '外掛修正與同網域嵌入', plain: '修掉審查找到的 7 個問題（第一次儲存設定會清空對照表等），並把嵌入方式改成同網域。',
-    gate: '在乾淨的 WordPress 裝起來，第一次儲存後設定還在，頁面上的工具可用。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['E1'], card: SPEC },
+    gate: '在乾淨的 WordPress 裝起來，第一次儲存後設定還在，頁面上的工具可用。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['E1'], card: 'briefs/WP-P1-plugin-embed.md' },
   { n: 10, code: 'SF-E', group: 'B2', title: '後台對主機的固定動作', plain: '後台只能請主機做幾個固定動作（檢查網址、建站、裝 WordPress、掛網址），不能執行任意指令，所以讀不到網站的會員資料。',
     gate: '每個動作只收固定格式；格式不對或開關沒開一律拒絕。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-C', 'SF-D'], card: SF },
   { n: 11, code: 'SF-F', group: 'B2', title: '每日備份自動涵蓋新網站', plain: '備份腳本改成讀「有哪些網站」的登記，新網站建好當晚就被備份。',
     gate: '新網站出現在備份清單；Soulful 的備份輸出與改前逐行相同。', risk: 'High', model: 'Opus 5.5', status: 'not_started', depends: ['SF-D'], card: SF },
   { n: 12, code: 'SF-G', group: 'B2', title: '建站步驟的共用骨架', plain: '每個會動主機的步驟都走同一套：先給你看要做什麼、你確認才做、做完檢查、失敗還原、留紀錄。紀錄寫不進去就不做。',
-    gate: '過期的確認被拒；開關沒開被拒；紀錄寫入失敗時不會動主機。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['SF-B'], card: SF, before: '套用資料表（待決 1）之後才併入' },
+    gate: '過期的確認被拒；開關沒開被拒；紀錄寫入失敗時不會動主機。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-B'], card: 'briefs/WP-SF-G-step-engine.md', before: '套用資料表（待決 1）之後才併入' },
   // 第三批
   { n: 13, code: 'P2', group: 'B3', title: '會員命盤與「我存的對象」', plain: '會員能存自己的命盤，也能存別人的出生資料做私人合盤；只有自己看得到，資料加密保存，可匯出、可刪除。',
     gate: '別的會員讀不到；資料庫備份裡查不到明文生日；刪除帳號後資料清空。', risk: 'High（個資）', model: 'Opus 5.5', status: 'not_started', depends: ['P1'], card: SPEC },
