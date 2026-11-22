@@ -1,6 +1,8 @@
 # AI 訂閱通道（API／訂閱並存）— 定案方案 2026-11-22
 
 操作者定案（2026-11-22 對話）：文字與圖都要能選 API 或訂閱；兩條都做：①本人按、筆電跑 ②主機排程。寫字偏好 GPT。開發期 Claude US$100＋ChatGPT US$20；完工後 ChatGPT 升 US$100，屆時文字與圖以 Codex 訂閱為主。5–10 個自有網站同一主機，每站各自選通道。
+同日補充定案：通道是一條「鏈」，本人按與排程都用選的，四選一：`claude+codex+api`／`claude+api`／`codex+api`／`api`；前一段失敗（離線、額度用完、逾時）就換下一段，最後一段恆為 API。排程也可選 Claude 訂閱（操作者知悉條款灰區後的決定）。
+同日補充定案：通道是一條「鏈」，本人按與排程都用選的，四選一：`claude+codex+api`／`claude+api`／`codex+api`／`api`；前一段失敗（離線、額度用完、逾時）就換下一段，最後一段恆為 API。排程也可選 Claude 訂閱（操作者知悉條款灰區後的決定）。
 
 App root = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`（下列相對路徑以此為根，`scripts/` 為 repo 根）。
 
@@ -29,12 +31,12 @@ App root = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`（下列
 |---|---|---|
 | 本人用未修改的 Claude Code＋自己的訂閱 | 可 | code.claude.com/docs/en/legal-and-compliance |
 | 產品代他人走 Claude 訂閱憑證、存其憑證 | 禁 | 同上 |
-| Claude 訂閱無人排程 | 消費者條款 3(7) 未明許 → **不做** | anthropic.com/legal/consumer-terms |
+| Claude 訂閱無人排程 | 消費者條款 3(7) 未明許（灰區）。操作者 2026-11-22 決定做成可選；主機要不要登入 Claude 由她決定（待決 3） | anthropic.com/legal/consumer-terms |
 | Codex `codex exec` 用 ChatGPT 登入跑排程／CI（受信任 runner） | 官方文件有專節 | learn.chatgpt.com/docs/non-interactive-mode「Use ChatGPT-managed auth in CI/CD (advanced)」 |
 | 帳號給他人用 | 禁（兩家） | openai.com/policies/terms-of-use |
 
 不變量（程式強制，非慣例）：
-- I1 `owner` lane 只服務擁有者本人（`codexAllowed`）；`schedule` lane 只接 `tool=codex`。Claude 訂閱永不進 schedule lane。
+- I1 `owner` lane 只服務擁有者本人（`codexAllowed`）。`schedule` lane 能跑哪個 tool＝主機 worker 自報的 `tools`（裝了且登入了才有）；沒有該 tool 的段落視同離線，鏈往下走。訂閱永不服務員工或客戶的請求。
 - I2 lane 由「驗證通過的是哪一把 secret」決定，不由 worker 自報。
 - I3 文字 job 的 CLI 一律無工具（Claude `--tools ""`；Codex 關 shell/exec/browser/computer/apps/plugins/image/view_image＋`mcp_servers={}`＋空白暫存 cwd）。提示詞含外部抓來的內容＝不可信。
 - I4 worker 交回前掃描輸出：含本機任何憑證字串（`~/.codex/auth.json` 的 token、worker secret、Claude OAuth token）→ 丟棄並回 `sub_output_blocked`。
@@ -44,11 +46,11 @@ App root = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`（下列
 
 ## 3. 設計
 
-**模型目錄即通道。** `AI_TEXT_MODELS` 加一組「訂閱」：`sub-codex`（Codex 預設模型）、`sub-claude-opus`、`sub-claude-sonnet`、`sub-claude-haiku`。每列帶 `sub: { tool, cliModel }` 與 `apiFallback`（訂閱失敗時改走的 API 模型：codex→`gpt-5.4`，claude→同級 Claude）。`TEXT_RATES` 加同名列：價 0、vendor `訂閱`。Codex 可選模型清單待 11-24 額度恢復後由 M1 實查再加列，不先猜。
+**模型目錄即通道。** `AI_TEXT_MODELS` 加一組「訂閱」：`sub-codex`（Codex 預設模型）、`sub-claude-opus`、`sub-claude-sonnet`、`sub-claude-haiku`。每列帶 `sub: { tool, cliModel }`。`TEXT_RATES` 加同名列：價 0、vendor `訂閱`。Codex 可選模型清單待 11-24 額度恢復後由 M1 實查再加列，不先猜。
 
-**「API／訂閱／訂閱優先」＝兩個值**：`model`（目錄任一列）＋`subFallback: boolean`（訂閱失敗時是否改走 `apiFallback`）。API＝選 API 模型；訂閱＝sub 模型＋false；訂閱優先＝sub 模型＋true。
+**通道＝鏈，三個值**：`chain`（`TEXT_CHAINS` 四選一，預設 `api`）＋`apiModel`（最後一段用的 API 模型）＋`claudeModel`（claude 段用哪個訂閱等級，預設 Opus）。`resolveTextChain()` 把它展開成依序的模型 id 陣列（K3）。沒有「只走訂閱、用完就停」這個選項：每條鏈都以 API 收尾。
 
-**一個入口** `lib/ai/sub-text.ts`：`runSubText({ grant, model, system, prompt, lane, signal, route, jobId, tool })` → `{ ok:true, text, answeredModel, usage } | { ok:false, error }`；內部排入 bridge、等結果、`logAiCall`（usd 0）。`withSubFallback(model, allow, runSub, runApi)`：sub 失敗且 allow → 以 `apiFallback` 跑 runApi，並在結果標 `fellBack: <error>`。呼叫點各加一個分支（它們本來就分 Claude／OpenAI）。
+**一個入口** `lib/ai/sub-text.ts`：`runSubText({ grant, model, system, prompt, lane, signal, route, jobId, tool })` → `{ ok:true, text, answeredModel, usage } | { ok:false, error }`；內部排入 bridge、等結果、`logAiCall`（usd 0）。`runTextChain(models, { runSub, runApi })`：依序試；sub 段失敗 → 記下 `{ model, error }` 換下一段；API 段的結果（成功或失敗）即最終結果，並帶 `skipped: [{model,error}…]`。呼叫點各加一個分支（它們本來就分 Claude／OpenAI）。
 
 **bridge 就地擴充（不改檔名、不改 URL）。** job 加 `kind: "image"|"text"`、`tool`、`lane`；worker 註冊表以 lane 為鍵（各自 `lastPollAt`、`tools`、`quotaBlockedUntil[tool]`）；claim 只發給「lane 相符且 worker 有該 tool 且未被額度擋」的 job。圖 job 的對外形狀與行為不變。
 - 改名債（明記不做）：`codex-bridge`／`codex-images`／`codex-image-worker`／`codex-wait`／`codex-laptop` 約 30 檔引用，改名零行為收益且製造部署空窗 → 僅在檔頭註解更正職責。
@@ -57,11 +59,11 @@ App root = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`（下列
 - `POST /api/internal/codex-images/claim` body `{ waitMs?, leaving?, tools: ("codex"|"claude")[] }`（缺 `tools` ＝ `["codex"]`，相容舊 worker）。Bearer：`CODEX_WORKER_SECRET` → lane `owner`；`SUB_WORKER_HOST_SECRET` → lane `schedule`。
 - 回 `{ ok, job }`；job＝`{ id, kind:"image", prompt, aspectRatio, refs, timeLeftMs }`（原樣）或 `{ id, kind:"text", tool, cliModel|null, system, prompt, timeLeftMs }`。舊 worker 收到沒有 `kind` 的 job＝image。
 - `POST …/complete` body：image 原樣；text `{ id, text, usage?, answeredModel? }`；失敗 `{ id, error, quotaResetsAt? }`（`error` 規則同現行 `^[a-z0-9_]{1,60}$`）。text 上限 400,000 字元。
-- 錯誤碼新增：`sub_worker_offline`、`sub_worker_busy`、`sub_worker_timeout`、`sub_quota_exhausted`、`sub_not_logged_in`、`sub_exec_failed`、`sub_empty_output`、`sub_output_blocked`、`sub_lane_refused`。圖沿用 `codex_*`。
+- 錯誤碼新增：`sub_worker_offline`、`sub_worker_busy`、`sub_worker_timeout`、`sub_quota_exhausted`、`sub_not_logged_in`、`sub_exec_failed`、`sub_empty_output`、`sub_output_blocked`。圖沿用 `codex_*`。
 
-**每站設定**：`SiteContentDefaults` 加 `textModel?: string`、`subFallback?: boolean`（缺＝現行為：Opus API）。`articleInput` 帶入 `model`；排程走 lane `schedule`，本人按鈕走 lane `owner`。社群改寫／每月選題／每日打分（Haiku，單次 < NT$0.3）不搬。
+**每站設定**：`SiteContentDefaults` 加 `textChain?: TextChain`、`textApiModel?: string`、`textClaudeModel?: string`（全缺＝現行為：`api`＋Opus）。`articleInput` 帶入這三個值；排程走 lane `schedule`，本人按鈕走 lane `owner`。社群改寫／每月選題／每日打分（Haiku，單次 < NT$0.3）不搬。
 
-**主機 worker**：ks-aw-01 專用低權限使用者＋systemd 服務跑同一支 `scripts/codex-image-worker.mjs --lane schedule --idle-min 0`；只裝 Codex。`SUB_WORKER_HOST_SECRET` 進 next-admin 容器走 `safe-infra-patch.sh compose`。登入由操作者本人在主機執行 `codex login`（不複製筆電的 `auth.json`：兩機共用同一份 refresh token 會互相作廢）。
+**主機 worker**：ks-aw-01 專用低權限使用者＋systemd 服務跑同一支 `scripts/codex-image-worker.mjs --lane schedule --idle-min 0`；必裝 Codex；Claude Code 選裝（待決 3 同意才裝、才登入）。`SUB_WORKER_HOST_SECRET` 進 next-admin 容器走 `safe-infra-patch.sh compose`。登入由操作者本人在主機執行 `codex login`（不複製筆電的 `auth.json`：兩機共用同一份 refresh token 會互相作廢）。
 
 ## 4. 卡與批次
 
@@ -71,9 +73,9 @@ App root = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`（下列
 | 1 | K2 | worker：文字 job（codex、claude）、無工具、憑證掃描、`--lane`、額度不退出 | Opus 5.5 | wire contract |
 | 1 | K3 | 目錄＋價目＋帳本：sub 模型列、`isSubTextModel`、`apiFallback`、usd 0 記帳 | Sonnet 5.5 | — |
 | 2 | K4 | `lib/ai/sub-text.ts`＋文章（route＋ContentStudio 202 輪詢）＋劇本工坊（route＋ScriptForge） | Opus 5.5 | K1 K3 |
-| 2 | K6 | 選模型按鈕：「訂閱」組、NT$0、離線／額度用完狀態、僅擁有者可見 | Sonnet 5.5 | K3 |
+| 2 | K6 | 通道四選一按鈕＋各段模型按鈕、NT$0、離線／額度用完狀態、訂閱段僅擁有者可見 | Sonnet 5.5 | K3 |
 | 3 | K5 | 影片腳本接 sub-text | Sonnet 5.5 | K4 |
-| 3 | K7 | 每站 `textModel`＋`subFallback`（設定頁按鈕＋PATCH）＋排程帶入＋lane schedule | Opus 5.5 | K4 |
+| 3 | K7 | 每站 `textChain`＋`textApiModel`＋`textClaudeModel`（設定頁按鈕＋PATCH）＋排程帶入＋lane schedule | Opus 5.5 | K4 |
 | 3 | K8 | 成本頁：訂閱用量卡（圖＋文字、各 tool 額度 %）＋每站本月 訂閱／API 篇數與金額 | Sonnet 5.5 | K3 |
 | — | 部署 A | 批 1–3 併入後一次 `sg-deploy.sh next-admin`＋smoke；筆電實跑 Claude 訂閱文章一篇 | 監工 | 批 3 |
 | 4 | K9 | 主機 worker：使用者、Codex、systemd、secret 進 compose、過期／額度 Telegram | Opus 5.5（devops） | 部署 A；待決 1、2 |
@@ -86,9 +88,10 @@ M1 的判定：Codex 文章 p90 > 150 s → 另開卡把排程文章步驟改兩
 | 風險 | 處置 |
 |---|---|
 | 提示詞注入讓 CLI 讀檔外洩到文章 | I3＋I4；主機另有 OS 使用者隔離；K2 突變測試拔掉掃描必紅 |
-| 兩把 secret 混用使 Claude 進排程 | I1＋I2；K1 測試：host secret 的 claim 永遠拿不到 claude job |
+| 兩把 secret 混用使主機領到本人線的工作 | I2；K1 突變測試 |
+| Claude 訂閱用於排程被判違規 | 操作者已知悉並選擇可選；每站鏈可改成不含 claude；主機不登入 Claude 即等於關閉 |
 | 既有 Codex 生圖壞掉 | 圖 job 形狀與 URL 不變；K1 既有測試不改斷言全綠；M1 實畫一張 |
-| Codex 額度用完（現況到 11-24） | I7＋`subFallback`；Claude lane 現在即可實測 |
+| Codex 額度用完（現況到 11-24） | I7＋鏈往下走；Claude 段現在即可實測 |
 | app 重啟丟 in-memory job | 現行為沿用：無扣款；排程下一輪重做（`tick.ts:24` 30 分鐘視為 stale） |
 | 條款變動 | I1 集中在一處；關閉＝目錄拿掉 sub 列或 worker 停掉，全部回 API |
 

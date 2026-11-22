@@ -9,7 +9,7 @@
 
 ## 要做
 1. 參數：`--lane owner|schedule`（預設 owner）。schedule：secret 讀 `SUB_WORKER_HOST_SECRET`、不讀 Windows 登錄檔、鎖檔與 idle 預設 0（常駐）；owner 現行為不變。
-2. 啟動時偵測有哪些 CLI（`codex`、`claude` 是否可執行）→ claim body 帶 `tools`。schedule lane 一律只報 `["codex"]`（即使機器上有 claude）。
+2. 啟動時偵測有哪些 CLI（`codex`、`claude` 是否可執行）→ claim body 帶 `tools`。兩條 lane 都照偵測結果回報（2026-11-22 合約變更：排程可選 Claude）。
 3. claim 回的 job：`kind` 缺或 `"image"` → 現行 `draw`；`"text"` → `write(job)`。
 4. `write(job)`：空白暫存目錄當 cwd；system＋prompt 經 stdin，不經 shell、不進命令列參數。
    - `tool:"claude"`：`claude -p --model <cliModel> --system-prompt <system> --tools "" --setting-sources "" --strict-mcp-config --disable-slash-commands --no-session-persistence --output-format json`，子行程環境拿掉 `ANTHROPIC_API_KEY`（否則走 API 計費）。讀 JSON 的 `result`、`usage.input_tokens/output_tokens`、`modelUsage` 的鍵當 `answeredModel`；`is_error` 或 `subtype !== "success"` → 錯誤。Windows 上 system 過長時改用 `--system-prompt-file`（先 `claude --help` 確認旗標存在；不存在就把 system 併進 stdin 的最前段並以明確分隔行隔開）。2026-11-22 筆電實測此組旗標可用（haiku，wall 11.9 s）。
@@ -25,7 +25,7 @@
 ## 測試（只這些）
 - `leaks`：含 token 子字串 → true；不含 → false。**突變**：讓 `write` 跳過掃描 → 測試必紅 → 還原。
 - 額度訊息 `You’ve hit your usage limit … try again at Nov 24th, 2026 11:02 AM.` → `sub_quota_exhausted`＋正確 `quotaResetsAt`。
-- schedule lane 的 claim body `tools` 恆為 `["codex"]`。
+- 機器上沒有某個 CLI 時，claim body 的 `tools` 不含它。
 - claude 文字 job 的子行程環境沒有 `ANTHROPIC_API_KEY`、參數含 `--tools ""`。
 - 實測一次（筆電、Claude haiku）：起一個本機假伺服器回一個 text job，worker `--once` 交回非空文字與 tokens；把終端輸出貼進回報。
 
