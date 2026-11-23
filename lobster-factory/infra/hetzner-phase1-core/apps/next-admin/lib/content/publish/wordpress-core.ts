@@ -20,6 +20,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { BLOCKED_CHANGE_CODE } from "@/lib/system-modes/blocked-change";
 import { scrubInternalMarkers } from "@/lib/content/internal-markers";
+import { sectionBody } from "@/lib/seo/section-headings";
 
 /** 發佈輸入。欄位型別刻意保持 unknown（與原 route body 同形），coercion 在 core 內統一做 → route 與積木共用同一套寬鬆解析。 */
 export interface WordPressPublishInput {
@@ -221,16 +222,16 @@ function extractH1(md: string): string {
   return m?.[1]?.trim() ?? "";
 }
 
-function extractExcerpt(md: string): string {
+export function extractExcerpt(md: string): string {
   const clean = md
     .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
     .replace(/<!--[\s\S]*?-->/g, "")  // non-greedy: handles comments containing >
     .trim();
-  // Prefer ## Quick Answer section (lookahead anchored to line-start headings)
-  const qaMatch = clean.match(/##\s+Quick Answer\s*\n([\s\S]+?)(?=\n#{1,6}\s|$)/);
+  // Prefer the Quick Answer section, under any of its heading names (English or Chinese)
+  const quickAnswer = sectionBody(clean, "quickAnswer");
   let source: string;
-  if (qaMatch) {
-    source = qaMatch[1];
+  if (quickAnswer) {
+    source = quickAnswer;
   } else {
     // First non-heading, non-empty paragraph
     source = clean

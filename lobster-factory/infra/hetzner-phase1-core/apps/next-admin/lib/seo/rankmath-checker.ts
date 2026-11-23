@@ -1,4 +1,5 @@
 import { containsKeyword, countKeyword, keywordPosition } from "./keyword-match";
+import { sectionHeadingRe } from "./section-headings";
 
 export interface RankMathInput {
   markdown: string;
@@ -368,10 +369,11 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
   });
 
   // 13c. faq-section — verify ## FAQ section with ≥5 question-answer pairs
-  const hasFaqHeading = /^##\s+(FAQ|常見問題|問題解答|Q&A)/im.test(markdown);
+  const faqRe = sectionHeadingRe("faq");
+  const hasFaqHeading = faqRe.test(markdown);
   // count lines that look like a question inside the FAQ section (starts with ### or contains ？/?)
   const faqBlock = hasFaqHeading
-    ? markdown.slice(markdown.search(/^##\s+(FAQ|常見問題|問題解答|Q&A)/im)).split(/\n##\s/)[0]
+    ? markdown.slice(markdown.search(faqRe)).split(/\n##\s/)[0]
     : "";
   const faqQCount = hasFaqHeading
     ? (faqBlock.match(/^###\s/gm) ?? []).length || (faqBlock.match(/\*\*[^*\n]+?[?？]\*\*/g) ?? []).length
@@ -391,7 +393,7 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
   // ── AEO / GEO checks ─────────────────────────────────────────────────────
 
   // 14. aeo-quick-answer — direct answer capsule (## Quick Answer or localized equivalent)
-  const hasQuickAnswer = /^##\s+(Quick Answer|快速解答|快速回答|快速答案|簡短答案)/im.test(markdown);
+  const hasQuickAnswer = sectionHeadingRe("quickAnswer").test(markdown);
   checks.push({
     id: "aeo-quick-answer",
     label: "AEO: Quick Answer section present",
@@ -467,7 +469,7 @@ export function checkRankMath(input: RankMathInput): RankMathReport {
     "faq-section":          !hasFaqHeading
       ? `加入 ## FAQ 段落（5–8 組問答，每個答案自給自足）；系統會自動轉成 FAQPage JSON-LD`
       : `FAQ 段落問題數不足（${faqQCount} 題）；補充到至少 5 題`,
-    "aeo-quick-answer":     `加入 ## Quick Answer 段落（文章開頭 2–3 句直接回答問題，方便 AI 引用）`,
+    "aeo-quick-answer":     `加入「## 快速解答」或「## Quick Answer」段落（文章開頭 2–3 句直接回答問題，方便 AI 引用）`,
     "aeo-subquery-coverage": `增加 H2/H3 小標題（涵蓋更多子問題面向，目前 ${h2h3Count} 個，需至少 4 個）`,
     "aeo-date-signal":      `在內文加入年份或「2024 年研究」等時間標記，提高 AI 引用可信度`,
   };

@@ -9,6 +9,7 @@ import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
 import { fetchRemotePageText } from "@/lib/collect/net/remote-file";
 import { isGlobalMarket } from "@/lib/content/geos";
 import { UNSPACED_TITLE_RULE } from "@/lib/seo/keyword-match";
+import { SECTION_HEADINGS } from "@/lib/seo/section-headings";
 
 // Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
 // (tables + nested H3 + lists) mid-sentence, cutting off the trailing CONTENT_META block →
@@ -29,12 +30,16 @@ const AI_WORDS_EXTENDED = [
   "Harnessing", "Elevating", "Robust", "Seamlessly", "Transformative",
 ];
 
+/** The Chinese names of the four fixed sections, taken from the list the SEO score and the excerpt read. */
+const SECTION_HEADING_ZH = [SECTION_HEADINGS.quickAnswer[1], SECTION_HEADINGS.keyTakeaways[1], SECTION_HEADINGS.faq[1], SECTION_HEADINGS.conclusion[1]].map((h) => `## ${h}`).join(" / ");
+
 const SYSTEM_PROMPT = `You are a professional SEO/GEO content writer. Write a complete, publication-ready article in Markdown.
 
 ⚠️ NON-NEGOTIABLE RULES (enforce BEFORE writing any section):
 A. ## Quick Answer MUST be the FIRST H2 in every article — regardless of article type (listicle, how-to, pillar, comparison) — UNLESS the user instructions explicitly say "DO NOT include a Quick Answer section". If no such instruction appears, do NOT skip it, do NOT reorder it. If you feel tempted to start directly with a numbered list or body section, STOP — insert ## Quick Answer first.
 B. EXACT KEYWORD CAP: write the exact focus keyword at most 4–6 times in the WHOLE article. After 6 uses, replace every further occurrence with a synonym, partial phrase, or pronoun. NEVER exceed 6 exact occurrences total.
 C. META DESCRIPTION LENGTH (for CJK): must be exactly 60–80 characters — count every character before writing. A 47-char meta is too short; a 160-char meta is truncated. Aim for 65–75 chars.
+D. SECTION HEADING LANGUAGE: the four fixed section names below (Quick Answer / Key Takeaways / FAQ / Conclusion) are written in the ARTICLE'S language, never left in English inside a non-English article. For a Chinese article write exactly: ${SECTION_HEADING_ZH}. English articles keep the English names. Wherever these instructions say "## Quick Answer", "## Key Takeaways", "## FAQ" or "## Conclusion", they mean that section under its name in the article's language.
 
 DEFAULT OUTPUT FORMAT (follow unless overridden in user instructions):
 1. # H1 title — the article's ONLY H1: use "# " exactly once, on the very first line, and NEVER use "# " (single-hash heading) again anywhere in the body. MUST satisfy all 4 RankMath Title Readability tests:
