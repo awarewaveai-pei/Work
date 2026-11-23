@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-23（續12）— meeting-service 側欄：補做 OwnVoice 字幕實測；查出側欄佔位會讓壓到它的 OwnVoice 視窗跳位
+
+- OwnVoice Meet.exe 16:00 起可再啟動（10:45–? 被 SAC 暫擋，未改任何設定；`Downloads` 那份 README 與 D 槽相同，內容是 SmartScreen／WebView2，不適用）。
+- 發現：側欄以 appbar 佔住右邊後，OwnVoice 字幕視窗若還原在與該條重疊的位置（操作者目前存的是 651,522、寬 833，工作區右界 1344），開啟約 5 秒後自己跳走（一次到畫面上方、一次到 -146,270）；關掉側欄不跳；位置完全在左邊（300,400）不跳。OwnVoice 原始碼無自行搬視窗的程式（`src-tauri/src/*.rs` grep `set_position|work_area|monitor` 0 筆），來源未定位。
+- 處置：保留佔位（會議軟體最大化時會讓開，是這次改動的目的）；README 寫明 OwnVoice 視窗要放側欄左邊。未改程式。
+- 驗證：OwnVoice 暫放 300,400 → 示範字幕反白＋`Ctrl+Shift+F7` → 側欄顯示該句與搜尋結果（截圖）；測後還原 `.window-state.json`（cmp 相同）。另驗到側欄程序被強制結束時工作區自動回到 1536。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell winpos.ps1（三種情境量視窗位置）; powershell e2e-hotkey.ps1（真 OwnVoice Meet.exe） | exit=0 | ms=120000
+- REVIEW_WAIVED: DOC_ONLY -- 只改 README
+- BUGHUNT_WAIVED: DOC_ONLY -- 只改 README
+- 剩餘風險：操作者第一次同時開側欄與 OwnVoice 時，字幕視窗會跳一次，需手動拖到側欄左邊
 ## 2026-11-23（續11）— oracle WP 第四批：E6、P4、SF-K、SF-J2 程式併入；SF-I2、SF-P brief 派出
 
 - 併入（已 push；引擎與外掛未部署／未安裝；next-admin 今晚 03:00 自動部署帶上）：E6 `4a7d72b9d`（`lib/ai/memberRequest.ts` 同源框內向父頁取票、401 不退回匿名重送、429 顯示用完；`lib/almanacEn.ts` 宜忌英文，醫療類宜忌英文版不列）；P4 `4863cadb2`（`scripts/release-wp-bridge.sh`、`scripts/rollout-wp-bridge.ps1` 加 `oracle`；外掛 0.5.0：`bin/build-zip.sh`、Turnstile `includes/Daily/Turnstile.php`、工具清單快取綁引擎網址、繁中補 23 條；catalog oracle 版本 0.5.0）；SF-K `2661cccb0`（觀測到的原因優先於上次失敗、客戶頁標章確認回應的確是該 WordPress、首頁與修復中心去掉寫死狀態）；SF-J2 程式 `c20ccbd0a`（新／既有客戶按鈕、`updateEnvironmentCas` 為寫環境紀錄的唯一路徑、建站流程的金鑰列在憑證兩支 route 回 409）。
