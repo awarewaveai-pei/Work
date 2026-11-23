@@ -182,6 +182,8 @@ export async function generateVideoScript(
     chain?: TextChain;
     /** The claude segment's subscription model (sub-claude-*); resolveTextChain defaults it. */
     claudeModel?: string;
+    /** The codex segment's subscription model (sub-codex-*); resolveTextChain defaults it. */
+    codexModel?: string;
     /** Whose worker runs the subscription segments: "owner" (default) or "schedule" (set by the scheduled caller, never a request body). */
     lane?: SubLane;
     /** The API segment's model (a Claude id; an OpenAI one is not served here and falls back to the default). */
@@ -227,7 +229,7 @@ ${userContent}`, apiKey, input.costJobId);
     const grant = await grantFor("video.script");
     // The owner lane serves only the operator herself (I1): anyone else gets the API path unchanged.
     if (lane !== "owner" || codexAllowed(grant.actor)) {
-      const out = await runTextChain(resolveTextChain({ chain: input.chain, apiModel, claudeModel: input.claudeModel }), {
+      const out = await runTextChain(resolveTextChain({ chain: input.chain, apiModel, claudeModel: input.claudeModel, codexModel: input.codexModel }), {
         runSub: (model) => runSubText({ grant, model, system: systemPrompt, prompt: userContent, lane,
           signal: new AbortController().signal, route: "video/script", tool: "video", jobId: input.costJobId ?? null }),
         runApi: async (model) => model,

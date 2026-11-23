@@ -51,6 +51,7 @@ interface ScriptForgeBody {
   /** 訂閱通道 (PLAN 2026-11-22 §3): the chain to try, `model` being its API segment; absent = API only. */
   chain?: unknown;
   claudeModel?: unknown;
+  codexModel?: unknown;
   autoBudget?: unknown;
 }
 
@@ -129,7 +130,7 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   // 訂閱段只給擁有者本人（PLAN I1）；其他人送來的 chain 當成只用 API。有訂閱段 = 不讓瀏覽器等 worker（I5）：同一條串流
   // 脫離請求跑，回 202，輪詢拿 { ok:true, text, skipped?, reservedTwd? }（text = 原本會串出的全文）。
   const chain = isTextChain(body.chain) && body.chain !== "api" && codexAllowed(grant.actor) ? body.chain : null;
-  const models: ChannelModel[] = chain ? resolveTextChain({ chain, apiModel: model, claudeModel: body.claudeModel }) : [model];
+  const models: ChannelModel[] = chain ? resolveTextChain({ chain, apiModel: model, claudeModel: body.claudeModel, codexModel: body.codexModel }) : [model];
   let skipped: ChainSkip[] = [];
 
   // Abort plumbing — 與 content/generate 同樣的 belt-and-suspenders：req.signal 監聽 + ReadableStream

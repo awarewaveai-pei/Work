@@ -11,12 +11,13 @@ describe("buildSiteMonth", () => {
       { model: "claude-opus-4-7", cost_usd: 0.5, job_id: "t1" },
       { model: "claude-opus-4-7", cost_usd: 1, job_id: "t2" },
       { model: "sub-codex", cost_usd: 0, job_id: null },
+      { model: "sub-codex-sol", cost_usd: 0, job_id: null },   // K17: a model-picker row counts beside the pre-picker one
     ];
     const out = buildSiteMonth(rows, new Map([["t1", "s1"], ["t2", "s2"]]), new Map([["s1", "站一"], ["s2", "站二"]]));
     expect(out.map((r) => r.name)).toEqual(["站一", "站二", "未指定"]);
     expect(out[0]).toMatchObject({ sub: 2, api: 1 });
     expect(out[0].apiTwd).toBeCloseTo(0.5 * TWD_RATE);
-    expect(out[2]).toMatchObject({ siteId: null, sub: 1, api: 0, apiTwd: 0 });
+    expect(out[2]).toMatchObject({ siteId: null, sub: 2, api: 0, apiTwd: 0 });
   });
 });
 

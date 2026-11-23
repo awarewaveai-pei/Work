@@ -115,7 +115,8 @@ export function articleInput(t: Pick<Topic, "keyword" | "title" | "angle">, d: S
     articleType: d.articleType, readability: d.readability, pointOfView: d.pointOfView, details, generateMeta: true,
     media: images > 0 ? { aiImages: "flux-schnell", imageCount: images, imageSize: "16:9" } : { aiImages: "none" },
     ...(isAiTextModel(d.textApiModel) ? { model: d.textApiModel } : {}),
-    ...(chain !== "api" ? { chain, ...(typeof d.textClaudeModel === "string" ? { claudeModel: d.textClaudeModel } : {}) } : {}),
+    ...(chain !== "api" ? { chain, ...(typeof d.textClaudeModel === "string" ? { claudeModel: d.textClaudeModel } : {}),
+      ...(typeof d.textCodexModel === "string" ? { codexModel: d.textCodexModel } : {}) } : {}),
   };
 }
 
@@ -180,7 +181,7 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
   // road), and only with time left for the API after them (I5); otherwise the site's road is read as API only.
   const budgetMs = subBudgetMs(deadline, Date.now());
   const subs = siteTextChain(site.defaults) !== "api" && budgetMs > 0 && await subscriptionOrgAllowed(t.organization_id);
-  const defaults: SiteContentDefaults = subs ? site.defaults : { ...site.defaults, textChain: undefined, textClaudeModel: undefined };
+  const defaults: SiteContentDefaults = subs ? site.defaults : { ...site.defaults, textChain: undefined, textClaudeModel: undefined, textCodexModel: undefined };
   // _jobId: the article call's ai_call_logs row carries the topic id (generate-core prepareArticleGeneration)
   const caller: ArticleCaller = { ...(maker === "schedule" ? { lane: "schedule" as const } : {}), subBudgetMs: budgetMs };
   const input = { ...articleInput(t, defaults, imageCount), _jobId: t.id, ...(subs ? { [ARTICLE_CALLER]: caller } : {}) };

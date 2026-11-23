@@ -12,7 +12,7 @@ import { logAiCall } from "../log-ai-call";
 import { can } from "@/lib/entitlements/can";
 import { CUSTOMER, gateFixture } from "@/lib/entitlements/__tests__/gate-fixtures";
 
-const SUB_IDS = ["sub-codex", "sub-claude-haiku", "sub-claude-sonnet", "sub-claude-opus"] as const;
+const SUB_IDS = ["sub-codex-luna", "sub-codex-terra", "sub-codex-sol", "sub-codex-astra", "sub-claude-haiku", "sub-claude-sonnet", "sub-claude-opus"] as const;
 beforeEach(() => { m.rows = []; });
 
 describe("訂閱 text models live apart from API models (K3)", () => {
@@ -31,10 +31,14 @@ describe("訂閱 text models live apart from API models (K3)", () => {
   });
   it("text chains", () => {
     expect(TEXT_CHAINS.map((chain) => resolveTextChain({ chain, apiModel: "gpt-5.4" }))).toEqual([
-      ["sub-claude-opus", "sub-codex", "gpt-5.4"], ["sub-claude-opus", "gpt-5.4"], ["sub-codex", "gpt-5.4"], ["gpt-5.4"]]);
+      ["sub-claude-opus", "sub-codex-sol", "gpt-5.4"], ["sub-claude-opus", "gpt-5.4"], ["sub-codex-sol", "gpt-5.4"], ["gpt-5.4"]]);
     expect(resolveTextChain({ chain: "claude+api", apiModel: "gpt-5.4", claudeModel: "sub-claude-haiku" })).toEqual(["sub-claude-haiku", "gpt-5.4"]);
-    expect(resolveTextChain({ chain: "claude+api", apiModel: "x", claudeModel: "sub-codex" })).toEqual(["sub-claude-opus", DEFAULT_AI_TEXT_MODEL]);
-    expect(resolveTextChain({ chain: "codex+api", apiModel: "sub-codex" })).toEqual(["sub-codex", DEFAULT_AI_TEXT_MODEL]);
+    expect(resolveTextChain({ chain: "claude+api", apiModel: "x", claudeModel: "sub-codex-sol" })).toEqual(["sub-claude-opus", DEFAULT_AI_TEXT_MODEL]);
+    expect(resolveTextChain({ chain: "codex+api", apiModel: "sub-codex-sol" })).toEqual(["sub-codex-sol", DEFAULT_AI_TEXT_MODEL]);
+    // K17: the codex segment takes a codex id; a claude id, the retired "sub-codex" or junk -> the codex default
+    expect(resolveTextChain({ chain: "codex+api", apiModel: "x", codexModel: "sub-codex-astra" })).toEqual(["sub-codex-astra", DEFAULT_AI_TEXT_MODEL]);
+    for (const bad of ["sub-claude-haiku", "sub-codex", "gpt-5.4", 7, undefined]) expect(resolveTextChain({ chain: "codex+api", apiModel: "x", codexModel: bad })).toEqual(["sub-codex-sol", DEFAULT_AI_TEXT_MODEL]);
+    expect(resolveTextChain({ chain: "claude+codex+api", apiModel: "x", claudeModel: "sub-claude-haiku", codexModel: "sub-codex-luna" })).toEqual(["sub-claude-haiku", "sub-codex-luna", DEFAULT_AI_TEXT_MODEL]);
     expect(isTextChain("api")).toBe(true);
     expect(isTextChain("codex")).toBe(false);
   });

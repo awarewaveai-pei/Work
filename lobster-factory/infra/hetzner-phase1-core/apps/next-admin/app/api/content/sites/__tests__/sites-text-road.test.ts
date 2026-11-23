@@ -74,7 +74,7 @@ beforeEach(() => {
 
 describe("PATCH text road", () => {
   it("a subscription id as the API model is refused and nothing is written", async () => {
-    const res = await call(PATCH, "a", owner, { textApiModel: "sub-codex" });
+    const res = await call(PATCH, "a", owner, { textApiModel: "sub-codex-sol" });
     expect(res.status).toBe(400);
     expect(row("a").content_defaults).toEqual({ tone: "Warm" });
   });
@@ -88,6 +88,18 @@ describe("PATCH text road", () => {
     expect(row("a").content_defaults).toEqual({ tone: "Warm", textChain: "claude+api", textClaudeModel: "sub-claude-haiku", textApiModel: "gpt-5.5" });
     expect((await call(PATCH, "a", staff, { textChain: "api" })).status).toBe(200);
     expect(row("a").content_defaults?.textChain).toBe("api");
+  });
+
+  it("textCodexModel: a codex id is saved, anything else is 400, and a non-owner is refused (K17)", async () => {
+    expect((await call(PATCH, "a", staff, { textCodexModel: "sub-codex-sol" })).status).toBe(403);
+    expect((await call(PATCH, "a", owner, { textCodexModel: "sub-claude-haiku" })).status).toBe(400);   // a claude id is no codex model
+    expect((await call(PATCH, "a", owner, { textCodexModel: "sub-codex" })).status).toBe(400);          // the pre-picker id is gone
+    expect(row("a").content_defaults).toEqual({ tone: "Warm" });
+    expect((await call(PATCH, "a", owner, { textChain: "codex+api", textCodexModel: "sub-codex-astra" })).status).toBe(200);
+    expect(row("a").content_defaults).toEqual({ tone: "Warm", textChain: "codex+api", textCodexModel: "sub-codex-astra" });
+    const res = await call(PATCH, "x", owner, { textCodexModel: "sub-codex-sol" });   // a customer's site, even from the owner
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe(SUB_OWN_SITES_ONLY);
   });
 
   it("a whole-defaults save from a stale page keeps the stored road", async () => {
@@ -130,13 +142,13 @@ describe("the owner's mark on a client organization (operator 2026-11-22: 「Sou
 });
 
 describe("apply the road to every site", () => {
-  it("writes only the three fields onto the organization's other active sites; another organization's site is untouched", async () => {
-    await call(PATCH, "a", owner, { textChain: "claude+codex+api", textClaudeModel: "sub-claude-sonnet" });
+  it("writes only the four road fields onto the organization's other active sites; another organization's site is untouched", async () => {
+    await call(PATCH, "a", owner, { textChain: "claude+codex+api", textClaudeModel: "sub-claude-sonnet", textCodexModel: "sub-codex-luna" });
     const before = structuredClone(db.rows);
     const res = await call(APPLY, "a", owner);
     expect(await res.json()).toEqual({ ok: true, updated: ["B"], conflicts: [] });
     // B: the road copied (its own textApiModel dropped: A has none), every other setting as it was
-    expect(row("b").content_defaults).toEqual({ tone: "Bold", publishMode: "ai_review_auto", textChain: "claude+codex+api", textClaudeModel: "sub-claude-sonnet" });
+    expect(row("b").content_defaults).toEqual({ tone: "Bold", publishMode: "ai_review_auto", textChain: "claude+codex+api", textClaudeModel: "sub-claude-sonnet", textCodexModel: "sub-codex-luna" });
     expect(row("c")).toEqual(before.find((r) => r.id === "c"));   // inactive
     expect(row("x")).toEqual(before.find((r) => r.id === "x"));   // another organization
     expect(row("a")).toEqual(before.find((r) => r.id === "a"));

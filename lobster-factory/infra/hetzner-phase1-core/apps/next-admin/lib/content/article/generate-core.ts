@@ -552,6 +552,8 @@ export interface ArticlePreparedConfig {
   chain?: TextChain;
   /** The claude segment's subscription model (sub-claude-*); resolveTextChain defaults it. */
   claudeModel?: string;
+  /** The codex segment's subscription model (sub-codex-*); resolveTextChain defaults it. */
+  codexModel?: string;
   /** Whose worker runs the subscription segments: "owner" (default, the operator's laptop) or "schedule" (set by the
    *  scheduled caller, never by a request body: PLAN I2). */
   lane?: SubLane;
@@ -692,7 +694,8 @@ export async function prepareArticleGeneration(body: ArticleGenerateInput): Prom
   const jobId = typeof body._jobId === "string" ? body._jobId : null;
   // A saved request without `chain` (or "api") = API only, as before.
   const chain = isTextChain(body.chain) && body.chain !== "api"
-    ? { chain: body.chain, ...(typeof body.claudeModel === "string" ? { claudeModel: body.claudeModel } : {}) } : {};
+    ? { chain: body.chain, ...(typeof body.claudeModel === "string" ? { claudeModel: body.claudeModel } : {}),
+      ...(typeof body.codexModel === "string" ? { codexModel: body.codexModel } : {}) } : {};
   const caller = ((body as Record<symbol, unknown>)[ARTICLE_CALLER] ?? {}) as ArticleCaller;
   const lane = {
     ...(caller.lane === "schedule" ? { lane: "schedule" as const } : {}),
@@ -721,7 +724,7 @@ export async function* streamArticleGeneration(
     yield* streamApiArticle(config, apiKey, signal, []);
     return;
   }
-  const models = resolveTextChain({ chain: config.chain!, apiModel: config.model, claudeModel: config.claudeModel });
+  const models = resolveTextChain({ chain: config.chain!, apiModel: config.model, claudeModel: config.claudeModel, codexModel: config.codexModel });
   // one deadline for every subscription segment together (a waiting or running job is dropped as sub_worker_timeout)
   const limits = [signal, config.subBudgetMs ? AbortSignal.timeout(config.subBudgetMs) : undefined].filter((s): s is AbortSignal => !!s);
   const subSignal = limits.length > 1 ? AbortSignal.any(limits) : limits[0] ?? new AbortController().signal;

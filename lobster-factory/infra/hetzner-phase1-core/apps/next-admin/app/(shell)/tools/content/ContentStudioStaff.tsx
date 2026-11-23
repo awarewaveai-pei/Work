@@ -18,7 +18,7 @@ const video: ContentVideoApi = {
 };
 
 const chainControl: ChainControl = (value, onChange, disabled) =>
-  <TextChainButtons chain={value.chain} claudeModel={value.claudeModel} onChange={onChange} lane="owner" disabled={disabled} />;
+  <TextChainButtons chain={value.chain} claudeModel={value.claudeModel} codexModel={value.codexModel} onChange={onChange} lane="owner" disabled={disabled} />;
 
 export default function ContentStudioStaff() {
   return <ContentStudio video={video} chainControl={chainControl} />;

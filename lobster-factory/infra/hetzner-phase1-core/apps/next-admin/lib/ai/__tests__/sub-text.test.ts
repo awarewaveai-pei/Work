@@ -65,8 +65,8 @@ describe("runTextChain", () => {
   it("claude+codex+api: Claude down, Codex answers", async () => {
     const models = resolveTextChain({ chain: "claude+codex+api", apiModel, claudeModel: "sub-claude-sonnet" });
     const { tried, handlers } = run(["sub-claude-sonnet"]);
-    expect(await runTextChain(models, handlers)).toEqual({ via: "sub", model: "sub-codex", text: "from sub-codex", skipped: [{ model: "sub-claude-sonnet", error: "sub_worker_offline" }] });
-    expect(tried).toEqual(["sub-claude-sonnet", "sub-codex"]);
+    expect(await runTextChain(models, handlers)).toEqual({ via: "sub", model: "sub-codex-sol", text: "from sub-codex-sol", skipped: [{ model: "sub-claude-sonnet", error: "sub_worker_offline" }] });
+    expect(tried).toEqual(["sub-claude-sonnet", "sub-codex-sol"]);
   });
   it("a segment that throws is skipped as sub_exec_failed and the API still runs", async () => {
     const out = await runTextChain(["sub-claude-opus", apiModel], {
@@ -87,6 +87,6 @@ describe("runTextChain", () => {
   });
   it("a skip as the page shows it", () => {
     expect(skipNote({ model: "sub-claude-haiku", error: "sub_worker_offline" })).toEqual({ model: "sub-claude-haiku", error: "sub_worker_offline", reason: "Claude 訂閱 Haiku：筆電離線" });
-    expect(skipNote({ model: "sub-codex", error: "sub_worker_offline" }, "schedule").reason).toBe("Codex 訂閱：主機沒有登入這一家或離線");
+    expect(skipNote({ model: "sub-codex-sol", error: "sub_worker_offline" }, "schedule").reason).toBe("Codex 訂閱 GPT-6.2 sol：主機沒有登入這一家或離線");
   });
 });

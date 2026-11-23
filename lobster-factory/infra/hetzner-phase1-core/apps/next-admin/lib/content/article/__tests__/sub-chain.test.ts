@@ -55,7 +55,7 @@ describe("article on a text chain", () => {
     expect(cost).toMatchObject({ model: "claude-opus-5-5", vendor: "Anthropic", route: "content/article-generate" });
     expect(cost.skipped).toEqual([
       { model: "sub-claude-opus", error: "sub_worker_offline", reason: "Claude 訂閱 Opus：筆電離線" },
-      { model: "sub-codex", error: "sub_worker_offline", reason: "Codex 訂閱：筆電離線" },
+      { model: "sub-codex-sol", error: "sub_worker_offline", reason: "Codex 訂閱 GPT-6.2 sol：筆電離線" },
     ]);
     expect(m.logs.map((l) => (l.response as { model?: string } | undefined)?.model)).toEqual(["claude-opus-5-5"]); // only the API call is billed
   });

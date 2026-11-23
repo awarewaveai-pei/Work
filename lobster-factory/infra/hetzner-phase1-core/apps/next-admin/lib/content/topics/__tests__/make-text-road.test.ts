@@ -107,7 +107,7 @@ describe("the scheduled article on a road", () => {
     m.defaults = { textChain: "codex+api" };
     const made = await schedule().make(topic);
     expect(m.apiCalls).toBe(1);
-    expect(costLine(m.articles[0]).skipped).toEqual([expect.objectContaining({ model: "sub-codex", error: "sub_worker_offline" })]);
+    expect(costLine(m.articles[0]).skipped).toEqual([expect.objectContaining({ model: "sub-codex-sol", error: "sub_worker_offline" })]);
     const billed = usdToNtd(textCallCostUsd({ model: "claude-opus-5-5", inputTokens: 1000, outputTokens: 2000 }));
     expect(spent(made)).toBe(Math.round(billed * 100) / 100);
     expect(billed).not.toBe(stepUpperTwd.article(0));   // the estimate was replaced, not kept

@@ -166,7 +166,7 @@ describe("POST /api/tools/script-forge", () => {
     it("every subscription segment down: the API's text and the skips, each with its sentence", async () => {
       expect(await settled(await post({ ...hooks, chain: "claude+codex+api" }))).toEqual({ ok: true, text: '{"hooks":[]}', skipped: [
         { model: "sub-claude-opus", error: "sub_worker_offline", reason: "Claude 訂閱 Opus：筆電離線" },
-        { model: "sub-codex", error: "sub_worker_offline", reason: "Codex 訂閱：筆電離線" }] });
+        { model: "sub-codex-sol", error: "sub_worker_offline", reason: "Codex 訂閱 GPT-6.2 sol：筆電離線" }] });
       expect(sent.calls).toHaveLength(1);
     });
     it("a budgeted run answered by the subscription costs NT$0 (reservation released to actual 0)", async () => {

@@ -40,6 +40,7 @@ interface GenerateBody {
   /** 訂閱通道 (video-script-core.ts): the script's chain, the claude segment's model, the API segment's model. */
   chain?: string;
   claudeModel?: string;
+  codexModel?: string;
   scriptModel?: string;
 }
 
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     brandVoice,
     ...(isTextChain(body.chain) && body.chain !== "api"
       ? { chain: body.chain, ...(typeof body.claudeModel === "string" ? { claudeModel: body.claudeModel } : {}),
+          ...(typeof body.codexModel === "string" ? { codexModel: body.codexModel } : {}),
           ...(typeof body.scriptModel === "string" ? { scriptModel: body.scriptModel } : {}) } : {}),
   };
 

@@ -4,7 +4,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { siteRowGate, siteUrlWriteGate } from "@/lib/content/wp-sites";
 import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TEXT_ROAD_API_MODELS, TEXT_ROAD_CHAINS, TEXT_ROAD_CLAUDE_MODELS, TOPIC_MODES, YOUTUBE_PRIVACIES, siteIntroCards, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TEXT_ROAD_API_MODELS, TEXT_ROAD_CHAINS, TEXT_ROAD_CLAUDE_MODELS, TEXT_ROAD_CODEX_MODELS, TOPIC_MODES, YOUTUBE_PRIVACIES, siteIntroCards, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { subscriptionRoadDenied } from "@/lib/content/text-road-guard";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { autoIntroStyles } from "@/public/editor-shared/intro-styles.js";
@@ -21,6 +21,7 @@ const GATE_MODES = [
   { field: "textChain", allowed: TEXT_ROAD_CHAINS },
   { field: "textApiModel", allowed: TEXT_ROAD_API_MODELS },
   { field: "textClaudeModel", allowed: TEXT_ROAD_CLAUDE_MODELS },
+  { field: "textCodexModel", allowed: TEXT_ROAD_CODEX_MODELS },
 ] as const;
 
 export const runtime = "nodejs";

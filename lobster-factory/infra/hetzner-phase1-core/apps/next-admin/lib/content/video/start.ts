@@ -27,6 +27,7 @@ export interface VideoStartInput {
   /** 訂閱通道: the script's chain (video-script-core.ts); absent = the Claude API as before. `scriptModel` = its API segment. */
   chain?: import("@/lib/ai/text-model-options").TextChain;
   claudeModel?: string;
+  codexModel?: string;
   scriptModel?: string;
   /** Set by the scheduled caller only, never from a request body: whose worker runs the subscription segments. */
   lane?: import("@/lib/tarot/codex-bridge").SubLane;

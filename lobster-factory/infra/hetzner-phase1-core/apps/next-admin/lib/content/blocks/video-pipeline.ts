@@ -595,6 +595,7 @@ export async function prepareScenes(
     costJobId?: string;
     chain?: TextChain;
     claudeModel?: string;
+    codexModel?: string;
     scriptModel?: string;
     lane?: SubLane;
     /** 「自訂 AI 圖」數量（前端滑桿）→ 用 Flux AI 圖的場景數，其餘走 Pexels B-roll。僅 AI 生圖模式 + Claude 生腳本路徑有效。 */
@@ -644,6 +645,7 @@ export async function prepareScenes(
         costJobId: input.costJobId,
         chain: input.chain,
         claudeModel: input.claudeModel,
+        codexModel: input.codexModel,
         model: input.scriptModel,
         lane: input.lane,
       },
@@ -746,6 +748,7 @@ register({
         costJobId: ctx.costJobId as string | undefined,
         chain: ctx.chain as TextChain | undefined,
         claudeModel: ctx.claudeModel as string | undefined,
+        codexModel: ctx.codexModel as string | undefined,
         scriptModel: ctx.scriptModel as string | undefined,
         lane: ctx.lane as SubLane | undefined,
         onProgress,

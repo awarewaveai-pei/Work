@@ -17,7 +17,7 @@ import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { ARTICLE_VIDEO_DEFAULTS, parseVoiceModel } from "@/lib/content/video/defaults";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
-import { DEFAULT_TEXT_CHAIN, type ChainControl, type TextChain } from "@/lib/ai/text-model-options";
+import { DEFAULT_SUB_CLAUDE_MODEL, DEFAULT_SUB_CODEX_MODEL, DEFAULT_TEXT_CHAIN, type ChainChoice, type ChainControl } from "@/lib/ai/text-model-options";
 
 // ─── Video config constants (mirrors VideoStudio) ────────────────────────────
 
@@ -573,8 +573,8 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
   const [genStatus, setGenStatus] = useState<GenStatus>("idle");
   const [genError,  setGenError]  = useState("");
   const [genTruncated, setGenTruncated] = useState(false);
-  // 訂閱通道（PLAN 2026-11-22 §3）：走法 + Claude 等級；form.model = 鏈最後一段的 API 模型。
-  const [textChain, setTextChain] = useState<{ chain: TextChain; claudeModel: string }>({ chain: DEFAULT_TEXT_CHAIN, claudeModel: "sub-claude-opus" });
+  // 訂閱通道（PLAN 2026-11-22 §3）：走法 + Claude 等級 + Codex 模型；form.model = 鏈最後一段的 API 模型。
+  const [textChain, setTextChain] = useState<ChainChoice>({ chain: DEFAULT_TEXT_CHAIN, claudeModel: DEFAULT_SUB_CLAUDE_MODEL, codexModel: DEFAULT_SUB_CODEX_MODEL });
   const [subWaitS, setSubWaitS] = useState<number | null>(null); // 等筆電寫作的秒數；null = 沒在等
   const [chainSkips, setChainSkips] = useState<Array<{ error: string; reason: string }>>([]); // 被跳過的訂閱段
 
@@ -1225,7 +1225,7 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
         : 0;
 
       // 有訂閱段 → 伺服器回 202，fetchAwaitingCodex 輪詢到 { ok, markdown }（PLAN I5）；只用 API = 原本的串流。
-      const { chain, claudeModel } = textChain;
+      const { chain, claudeModel, codexModel } = textChain;
       const viaSub = !!chainControl && chain !== "api";
       let waitTimer: ReturnType<typeof setInterval> | undefined;
       if (viaSub) { const t0 = Date.now(); setSubWaitS(0); waitTimer = setInterval(() => setSubWaitS(Math.round((Date.now() - t0) / 1000)), 1000); }
@@ -1235,7 +1235,7 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          ...(viaSub ? { chain, claudeModel } : {}),
+          ...(viaSub ? { chain, claudeModel, codexModel } : {}),
           // Drop the multi-MB img2img reference data URL — generate never reads it (only the image
           // route does), so shipping it here is pure wire bloat (mirrors the draft-save strip).
           // ai-video 模式下後端不插 YouTube placeholder（影片由 embed-to-wp 單獨嵌入）

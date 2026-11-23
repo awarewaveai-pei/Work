@@ -5,7 +5,7 @@
 // The subscriptions are the owner's alone (I1): anyone else gets 403 from the state route and sees one fixed "API only" button.
 import { useEffect, useState } from "react";
 import { CodexLaptopButton } from "@/app/CodexLaptopButton";
-import { SUB_TEXT_COST_LABEL, SUB_TEXT_MODELS, isSubTextModel, type SubTextModel, type TextChain } from "@/lib/ai/text-model-options";
+import { SUB_CLAUDE_MODEL_IDS, SUB_CODEX_MODEL_IDS, SUB_TEXT_COST_LABEL, SUB_TEXT_MODELS, isSubTextModel, type ChainChoice, type TextChain } from "@/lib/ai/text-model-options";
 
 type Tool = "claude" | "codex";
 type WorkerState = { tools: Tool[]; online: boolean; quotaBlockedUntil: Partial<Record<Tool, number>> };
@@ -23,12 +23,10 @@ const POLL_MS = 15_000;
 const COPY = {
   label: "文字 AI 走法",
   levelLabel: "Claude 等級",
+  codexLabel: "Codex 模型",
   chains: TEXT_CHAIN_LABELS,
-  levels: [
-    { value: "sub-claude-haiku", label: "Haiku" },
-    { value: "sub-claude-sonnet", label: "Sonnet" },
-    { value: "sub-claude-opus", label: "Opus" },
-  ] as Array<{ value: SubTextModel; label: string }>,
+  levels: SUB_CLAUDE_MODEL_IDS.map((value) => ({ value, label: SUB_TEXT_MODELS[value].label.replace("Claude 訂閱 ", "") })),
+  codexModels: SUB_CODEX_MODEL_IDS.map((value) => ({ value, label: SUB_TEXT_MODELS[value].label.replace("Codex 訂閱 ", "") })),
   codex: "Codex 訂閱",
   claude: "Claude 訂閱",
   ok: `可用 · ${SUB_TEXT_COST_LABEL}`,
@@ -53,10 +51,8 @@ const btn = (on: boolean): React.CSSProperties => ({
 const row: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" };
 const note: React.CSSProperties = { color: "var(--text-muted)", fontSize: 12 };
 
-export default function TextChainButtons({ chain, claudeModel, onChange, lane, disabled = false }: {
-  chain: TextChain;
-  claudeModel: string;
-  onChange: (next: { chain: TextChain; claudeModel: string }) => void;
+export default function TextChainButtons({ chain, claudeModel, codexModel, onChange, lane, disabled = false }: ChainChoice & {
+  onChange: (next: ChainChoice) => void;
   lane: "owner" | "schedule";
   disabled?: boolean;
 }) {
@@ -126,7 +122,7 @@ export default function TextChainButtons({ chain, claudeModel, onChange, lane, d
         <span style={note}>{COPY.label}</span>
         {COPY.chains.map((c) => (
           <button key={c.value} type="button" style={btn(chain === c.value)} disabled={disabled}
-            aria-pressed={chain === c.value} onClick={() => { if (c.value !== chain) onChange({ chain: c.value, claudeModel }); }}>
+            aria-pressed={chain === c.value} onClick={() => { if (c.value !== chain) onChange({ chain: c.value, claudeModel, codexModel }); }}>
             {c.label}
           </button>
         ))}
@@ -136,8 +132,19 @@ export default function TextChainButtons({ chain, claudeModel, onChange, lane, d
           <span style={note}>{COPY.levelLabel}</span>
           {COPY.levels.map((l) => (
             <button key={l.value} type="button" style={btn(claudeModel === l.value)} disabled={disabled}
-              aria-pressed={claudeModel === l.value} onClick={() => onChange({ chain, claudeModel: l.value })}>
+              aria-pressed={claudeModel === l.value} onClick={() => onChange({ chain, claudeModel: l.value, codexModel })}>
               {l.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {segments.includes("codex") && (
+        <div style={row}>
+          <span style={note}>{COPY.codexLabel}</span>
+          {COPY.codexModels.map((m) => (
+            <button key={m.value} type="button" style={btn(codexModel === m.value)} disabled={disabled}
+              aria-pressed={codexModel === m.value} onClick={() => onChange({ chain, claudeModel, codexModel: m.value })}>
+              {m.label}
             </button>
           ))}
         </div>
@@ -145,7 +152,8 @@ export default function TextChainButtons({ chain, claudeModel, onChange, lane, d
       {unreadable && <div style={note}>{COPY.unreadable}</div>}
       {segments.map((tool) => {
         const text = status(tool);
-        const name = tool === "claude" ? (isSubTextModel(claudeModel) ? SUB_TEXT_MODELS[claudeModel].label : COPY.claude) : COPY.codex;
+        const picked = tool === "claude" ? claudeModel : codexModel;
+        const name = isSubTextModel(picked) && SUB_TEXT_MODELS[picked].tool === tool ? SUB_TEXT_MODELS[picked].label : tool === "claude" ? COPY.claude : COPY.codex;
         return (
           <div key={tool} style={note}>
             {name}：{text}

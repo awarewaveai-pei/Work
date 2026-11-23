@@ -1,11 +1,11 @@
 /**
  * 訂閱用量 for /ops/costs: pictures counted from the ledger (ai_call_logs model "codex-image", cost 0), subscription text
- * (vendor 訂閱, model sub-codex / sub-claude-*), the plan allowance as the worker last read it from Codex (metadata codex_*
+ * (vendor 訂閱, model sub-codex-* (+ the pre-picker sub-codex) / sub-claude-*), the plan allowance as the worker last read it from Codex (metadata codex_*
  * written by lib/tarot/codex-bridge.ts), and a per-site month table of articles made on 訂閱 vs API.
  * A read that fails is null, never 0.
  */
 import { TWD_RATE } from "./cost-model";
-import { isSubTextModel } from "./text-model-options";
+import { isSubTextModel, LEGACY_SUB_CODEX_ID, SUB_CODEX_LEDGER_IDS } from "./text-model-options";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const CODEX_IMAGE_MODEL = "codex-image";
@@ -24,7 +24,7 @@ export const ARTICLE_ROUTE = "content/article-generate";
 
 export interface SubscriptionUsage {
   images: { last24h: number | null; last7d: number | null };
-  /** Subscription text (vendor 訂閱) by the CLI that answered: sub-codex vs sub-claude-*. */
+  /** Subscription text (vendor 訂閱) by the CLI that answered: sub-codex-* (and the legacy sub-codex) vs sub-claude-*. */
   textCodex: { last24h: number | null; last7d: number | null };
   textClaude: { last24h: number | null; last7d: number | null };
   /** Newest Codex reading of the plan allowance (a picture or a text job); Claude reports no percentage. null = none yet / read failed. */
@@ -47,11 +47,11 @@ export async function loadSubscriptionUsage(db: SupabaseClient, now: Date): Prom
   const pair = (narrow: Filter) => Promise.all([countRows(db, d1, narrow), countRows(db, d7, narrow)]).then(([last24h, last7d]) => ({ last24h, last7d }));
   const [images, textCodex, textClaude, latest] = await Promise.all([
     pair((q) => q.eq("model", CODEX_IMAGE_MODEL)),
-    pair((q) => q.eq("vendor", SUB_VENDOR).eq("model", "sub-codex")),
+    pair((q) => q.eq("vendor", SUB_VENDOR).in("model", SUB_CODEX_LEDGER_IDS)),
     pair((q) => q.eq("vendor", SUB_VENDOR).like("model", "sub-claude-%")),
     (async () => {
       try {
-        const { data, error } = await db.from("ai_call_logs").select("created_at, metadata").in("model", [CODEX_IMAGE_MODEL, "sub-codex"])
+        const { data, error } = await db.from("ai_call_logs").select("created_at, metadata").in("model", [CODEX_IMAGE_MODEL, ...SUB_CODEX_LEDGER_IDS])
           .order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (error) return null;
         const row = data as { created_at: string; metadata: Record<string, unknown> | null } | null;
@@ -77,7 +77,7 @@ export function buildSiteMonth(rows: ArticleLogRow[], siteOfTopic: ReadonlyMap<s
     const key = siteId ?? "";
     let row = by.get(key);
     if (!row) { row = { siteId, name: siteId ? (siteName.get(siteId) ?? siteId) : "未指定", sub: 0, api: 0, apiTwd: 0 }; by.set(key, row); }
-    if (isSubTextModel(r.model)) row.sub += 1;
+    if (isSubTextModel(r.model) || r.model === LEGACY_SUB_CODEX_ID) row.sub += 1;
     else { row.api += 1; row.apiTwd += Number(r.cost_usd) * TWD_RATE; }
   }
   return [...by.values()].sort((a, b) => (a.siteId === null ? 1 : 0) - (b.siteId === null ? 1 : 0) || b.sub + b.api - (a.sub + a.api));

@@ -68,12 +68,26 @@ export function textModelOption(model: AiTextModel): (typeof AI_TEXT_MODELS)[num
 // ---- 訂閱通道 (PLAN 2026-11-22 §3). Subscription models are NOT API models: they live only here, never in AI_TEXT_MODELS /
 // TEXT_RATES, so API-only paths (isAiTextModel, normalizeAiTextModel, price lookup, model probes) can never see a sub-* id.
 export const SUB_TEXT_MODELS = {
-  "sub-codex": { label: "Codex 訂閱", tool: "codex", cliModel: null },
+  "sub-codex-luna": { label: "Codex 訂閱 GPT-6 luna", tool: "codex", cliModel: "gpt-6-luna" },
+  "sub-codex-terra": { label: "Codex 訂閱 GPT-6.1 terra", tool: "codex", cliModel: "gpt-6.1-terra" },
+  "sub-codex-sol": { label: "Codex 訂閱 GPT-6.2 sol", tool: "codex", cliModel: "gpt-6.2-sol" },
+  "sub-codex-astra": { label: "Codex 訂閱 GPT-6.2 astra", tool: "codex", cliModel: "gpt-6.2-astra" },
   "sub-claude-haiku": { label: "Claude 訂閱 Haiku", tool: "claude", cliModel: "haiku" },
   "sub-claude-sonnet": { label: "Claude 訂閱 Sonnet", tool: "claude", cliModel: "sonnet" },
   "sub-claude-opus": { label: "Claude 訂閱 Opus", tool: "claude", cliModel: "opus" },
 } as const satisfies Record<string, { label: string; tool: "codex" | "claude"; cliModel: string | null }>;
 export type SubTextModel = keyof typeof SUB_TEXT_MODELS;
+/** The model each subscription segment runs when the caller picked none (or a model of the other tool). */
+export const DEFAULT_SUB_CODEX_MODEL = "sub-codex-sol" satisfies SubTextModel;
+export const DEFAULT_SUB_CLAUDE_MODEL = "sub-claude-opus" satisfies SubTextModel;
+/** The one id the codex segment used before the model picker (rows logged up to 2026-11-23). Never run or saved any more;
+ *  only ledger reads still count it (codex-usage.ts). */
+export const LEGACY_SUB_CODEX_ID = "sub-codex";
+const subIdsOf = (tool: "codex" | "claude"): SubTextModel[] => (Object.keys(SUB_TEXT_MODELS) as SubTextModel[]).filter((m) => SUB_TEXT_MODELS[m].tool === tool);
+/** Every id a tool's ledger rows can carry: its catalogue ids (+ the legacy codex id). */
+export const SUB_CODEX_MODEL_IDS: SubTextModel[] = subIdsOf("codex");
+export const SUB_CLAUDE_MODEL_IDS: SubTextModel[] = subIdsOf("claude");
+export const SUB_CODEX_LEDGER_IDS: string[] = [...SUB_CODEX_MODEL_IDS, LEGACY_SUB_CODEX_ID];
 export type SubTextSpec = { label: string; tool: "codex" | "claude"; cliModel: string | null };
 /** A model a call may run on: an API model or a subscription model. */
 export type ChannelModel = AiTextModel | SubTextModel;
@@ -91,19 +105,21 @@ export const TEXT_CHAINS = ["claude+codex+api", "claude+api", "codex+api", "api"
 export type TextChain = (typeof TEXT_CHAINS)[number];
 /** A page's chain buttons, handed in by a staff page only: a product door's page closure may not reach the subscription
  *  APIs (lib/portal/__tests__/registry-code.test.ts). Absent = no buttons, the page sends API only. */
-export type ChainControl = (value: { chain: TextChain; claudeModel: string }, onChange: (next: { chain: TextChain; claudeModel: string }) => void, disabled?: boolean) => ReactNode;
+export type ChainChoice = { chain: TextChain; claudeModel: string; codexModel: string };
+export type ChainControl = (value: ChainChoice, onChange: (next: ChainChoice) => void, disabled?: boolean) => ReactNode;
 export const DEFAULT_TEXT_CHAIN: TextChain = "api";
 
 export function isTextChain(v: unknown): v is TextChain {
   return typeof v === "string" && (TEXT_CHAINS as readonly string[]).includes(v);
 }
 
-/** chain -> ordered model ids to try. claude segment = `claudeModel` (a claude sub id, default sub-claude-opus); codex = sub-codex; api = apiModel (a sub id there -> the default API model). */
-export function resolveTextChain(a: { chain: TextChain; apiModel?: unknown; claudeModel?: unknown }): ChannelModel[] {
-  const claude: SubTextModel = isSubTextModel(a.claudeModel) && SUB_TEXT_MODELS[a.claudeModel].tool === "claude" ? a.claudeModel : "sub-claude-opus";
+/** chain -> ordered model ids to try. claude segment = `claudeModel` (a claude sub id), codex segment = `codexModel` (a codex
+ *  sub id); a missing or other-tool id -> that tool's default. api = apiModel (a sub id there -> the default API model). */
+export function resolveTextChain(a: { chain: TextChain; apiModel?: unknown; claudeModel?: unknown; codexModel?: unknown }): ChannelModel[] {
+  const pick = (v: unknown, tool: "codex" | "claude", dflt: SubTextModel): SubTextModel => (isSubTextModel(v) && SUB_TEXT_MODELS[v].tool === tool ? v : dflt);
   const out: ChannelModel[] = [];
-  if (a.chain.startsWith("claude")) out.push(claude);
-  if (a.chain.includes("codex")) out.push("sub-codex");
+  if (a.chain.startsWith("claude")) out.push(pick(a.claudeModel, "claude", DEFAULT_SUB_CLAUDE_MODEL));
+  if (a.chain.includes("codex")) out.push(pick(a.codexModel, "codex", DEFAULT_SUB_CODEX_MODEL));
   out.push(normalizeAiTextModel(a.apiModel));
   return out;
 }

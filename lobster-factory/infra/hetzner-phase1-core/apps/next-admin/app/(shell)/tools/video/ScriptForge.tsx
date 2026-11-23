@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, createContext, useContext, Fragment } from "react";
-import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL, DEFAULT_TEXT_CHAIN, type ChainControl, type TextChain } from "@/lib/ai/text-model-options";
+import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL, DEFAULT_SUB_CLAUDE_MODEL, DEFAULT_SUB_CODEX_MODEL, DEFAULT_TEXT_CHAIN, type ChainChoice, type ChainControl, type TextChain } from "@/lib/ai/text-model-options";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 import { buttonStyle, cardStyle, inputStyle, optionStyle } from "@/components/tools/panel-primitives";
 import StoryBibleWorkbench from "./StoryBibleWorkbench";
@@ -38,7 +38,8 @@ let SF_MODEL: string = DEFAULT_AI_TEXT_MODEL;
 // 訂閱通道（PLAN 2026-11-22 §3）：手動的 forge() 用這條鏈，SF_MODEL = 鏈最後一段的 API 模型。一鍵到草稿（autoBudget）固定只用 API。
 // 只有傳了 chainControl 的頁面（員工後台）能把它改成非 api；產品門的頁面不傳 = 永遠 api（ScriptForge 掛載時重設）。
 let SF_CHAIN: TextChain = DEFAULT_TEXT_CHAIN;
-let SF_CLAUDE_MODEL = "sub-claude-opus";
+let SF_CLAUDE_MODEL: string = DEFAULT_SUB_CLAUDE_MODEL;
+let SF_CODEX_MODEL: string = DEFAULT_SUB_CODEX_MODEL;
 // 每次走鏈的 forge() 一筆：等多久、它自己被跳過的段落、它的停止鈕。done 的那筆留到下一次開始走鏈為止。
 type SubCall = { id: number; since: number; done: boolean; skips: Array<{ error: string; reason: string }>; ac: AbortController };
 let SF_CALLS: SubCall[] = [];
@@ -107,7 +108,7 @@ async function forgeViaChain(module: string, task: string, fields: Record<string
   setSfCalls([...SF_CALLS.filter((c)=>!c.done), call]);
   const settle=(skips: SubCall["skips"])=>setSfCalls(SF_CALLS.map((c)=>c.id===call.id?{...c,done:true,skips}:c));
   try{
-    const res=await fetchAwaitingCodex("/api/tools/script-forge",{method:"POST",headers:{"Content-Type":"application/json"},signal:call.ac.signal,body:JSON.stringify({module,task,fields,siteId:SF_SITE_ID||undefined,lang:SF_LANG,sceneCount:SF_SCENE_COUNT,customScenes:SF_CUSTOM_SCENES,model:SF_MODEL,chain:SF_CHAIN,claudeModel:SF_CLAUDE_MODEL})},{waitingText:"筆電寫作中…",cancel:true});
+    const res=await fetchAwaitingCodex("/api/tools/script-forge",{method:"POST",headers:{"Content-Type":"application/json"},signal:call.ac.signal,body:JSON.stringify({module,task,fields,siteId:SF_SITE_ID||undefined,lang:SF_LANG,sceneCount:SF_SCENE_COUNT,customScenes:SF_CUSTOM_SCENES,model:SF_MODEL,chain:SF_CHAIN,claudeModel:SF_CLAUDE_MODEL,codexModel:SF_CODEX_MODEL})},{waitingText:"筆電寫作中…",cancel:true});
     if(!res.ok)throw new Error(`腳本生成失敗（${res.status}）`);
     const j=await res.json().catch(()=>null) as { ok?: boolean; text?: string; error?: string; skipped?: Array<{ error: string; reason: string }> } | null;
     settle(j?.skipped??[]);
@@ -1205,7 +1206,7 @@ export default function ScriptForge({ onSendToVideo, onStartDrafts, onQuoteDraft
   // ── 串接客戶：載入 內容工具›網站管理 的客戶 contentDefaults.marketing 當品牌語境（零新後端，GET 已回 marketing）──
   const[clients,setClients]=useState<any[]>([]);
   const[model,setModel]=useState<string>(SF_MODEL);
-  const[textChain,setTextChain]=useState<{chain:TextChain;claudeModel:string}>({chain:SF_CHAIN,claudeModel:SF_CLAUDE_MODEL});
+  const[textChain,setTextChain]=useState<ChainChoice>({chain:SF_CHAIN,claudeModel:SF_CLAUDE_MODEL,codexModel:SF_CODEX_MODEL});
   // No buttons on this page = API only, even if another page left the module-level chain on a subscription.
   useEffect(()=>{if(!chainControl){SF_CHAIN=DEFAULT_TEXT_CHAIN;setTextChain((t)=>({...t,chain:DEFAULT_TEXT_CHAIN}));}},[chainControl]);
   const[lang,setLang]=useState<string>(SF_LANG);
@@ -1308,7 +1309,7 @@ export default function ScriptForge({ onSendToVideo, onStartDrafts, onQuoteDraft
             <span style={{fontSize:10.5,color:C.mid,whiteSpace:"nowrap"}}>圖庫補 {sceneCount-customScenes} 場</span>
             <label style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>🤖 AI 模型</label>
             <div title="文字 AI 模型（與內容工具共用同一份選單）" style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:6}}>{["Claude","OpenAI"].map((g)=><Fragment key={g}><span style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>{g}</span>{AI_TEXT_MODELS.filter((m)=>m.group===g).map((m)=><button key={m.value} type="button" onClick={()=>{setModel(m.value);SF_MODEL=m.value;}} style={optionStyle(model===m.value)}>{m.label}</button>)}</Fragment>)}</div>
-            {chainControl&&<div title="手動產生的走法；一鍵到草稿固定只用 API" style={{display:"grid",gap:4}}>{chainControl(textChain,(next)=>{setTextChain(next);SF_CHAIN=next.chain;SF_CLAUDE_MODEL=next.claudeModel;})}<SubWaitNote/></div>}
+            {chainControl&&<div title="手動產生的走法；一鍵到草稿固定只用 API" style={{display:"grid",gap:4}}>{chainControl(textChain,(next)=>{setTextChain(next);SF_CHAIN=next.chain;SF_CLAUDE_MODEL=next.claudeModel;SF_CODEX_MODEL=next.codexModel;})}<SubWaitNote/></div>}
             {organizationId&&shownClients.length===1&&<div title="客戶在影音工作台頂部切換" style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>👤 目前客戶：{shownClients[0].name}</div>}
             {!(organizationId&&shownClients.length===1)&&shownClients.length>0&&<div title="載入客戶品牌語境（來自 內容工具 › 網站管理 的行銷預設）" style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:6}}><span style={{fontSize:11,color:C.mid,fontWeight:700,whiteSpace:"nowrap"}}>👤 載入客戶…</span>{shownClients.map((c:any)=><button key={c.id} type="button" onClick={()=>pickSite(siteId===c.id?"":c.id)} style={optionStyle(siteId===c.id)}>{c.name}</button>)}</div>}
             {brand?.name&&<div style={{padding:"3px 9px",background:C.jadelt,borderRadius:999,fontSize:10.5,color:C.jade,fontWeight:700,whiteSpace:"nowrap"}}>✅ {brand.name}</div>}

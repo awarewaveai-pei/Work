@@ -2,7 +2,7 @@
 
 // Card K7: which road the schedule's articles for this site take (訂閱通道 PLAN §3). The chain and the claude level are
 // the shared TextChainButtons on the schedule lane (so each subscription segment says whether the host has that tool
-// online); the API model is the chain's last segment. Each is saved on its own (PATCH { textChain, textClaudeModel } /
+// online); the API model is the chain's last segment. Each is saved on its own (PATCH { textChain, textClaudeModel, textCodexModel } /
 // { textApiModel }), never with the defaults form. 「套用到所有網站」 copies these three fields, and only them, to this
 // organization's other active sites after an in-page confirm that names them. Staff page only (the route refuses others).
 import { useState } from "react";
@@ -10,14 +10,14 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import TextChainButtons, { TEXT_CHAIN_LABELS } from "@/components/tools/TextChainButtons";
 import OptionButtons from "./OptionButtons";
 import { siteTextChain } from "@/lib/content/brand-voice";
-import { AI_TEXT_MODELS, DEFAULT_ARTICLE_TEXT_MODEL, isAiTextModel, type TextChain } from "@/lib/ai/text-model-options";
+import { AI_TEXT_MODELS, DEFAULT_ARTICLE_TEXT_MODEL, DEFAULT_SUB_CLAUDE_MODEL, DEFAULT_SUB_CODEX_MODEL, SUB_TEXT_MODELS, isAiTextModel, isSubTextModel, type ChainChoice } from "@/lib/ai/text-model-options";
 
 const COPY = {
   title: "排程文章的文字 AI",
   detail: "排程寫這個網站的文章時照這條走；前一段不能用（主機沒登入、額度用完、逾時）就換下一段，最後一段一定是 API。",
   apiModel: "最後一段的 API 模型",
   // the stored road as text: the chain buttons show only 只用 API to anyone but the owner, whatever is stored
-  stored: (chain: string, level: string | null) => `目前存的走法：${chain}${level ? `（Claude ${level}）` : ""}`,
+  stored: (chain: string, models: string[]) => `目前存的走法：${chain}${models.length ? `（${models.join("、")}）` : ""}`,
   ownerOnly: "含訂閱的走法只有擁有者能設定或套用",
   apiOnly: "只用 API",
   ownSitesOnly: "訂閱只用在自己的網站",
@@ -38,6 +38,12 @@ const COPY = {
 
 const API_OPTIONS = AI_TEXT_MODELS.map((m) => ({ value: m.value, label: m.label }));
 
+/** The subscription models a stored road names, as the page's one-line text (a segment the chain does not have is left out). */
+function storedModels(chain: string, claudeModel: string, codexModel: string): string[] {
+  const label = (id: string, tool: "claude" | "codex") => (isSubTextModel(id) && SUB_TEXT_MODELS[id].tool === tool ? SUB_TEXT_MODELS[id].label : id);
+  return [chain.startsWith("claude") ? label(claudeModel, "claude") : "", chain.includes("codex") ? label(codexModel, "codex") : ""].filter(Boolean);
+}
+
 export default function TextModelButtons({ site, sites, onSaved, onApplied }: {
   site: ManagedSite;
   /** Every site the page lists: the apply-all confirm names this organization's other active ones. */
@@ -48,7 +54,8 @@ export default function TextModelButtons({ site, sites, onSaved, onApplied }: {
 }) {
   const d = site.contentDefaults ?? {};
   const chain = siteTextChain(d);
-  const claudeModel = typeof d.textClaudeModel === "string" ? d.textClaudeModel : "sub-claude-opus";
+  const claudeModel = typeof d.textClaudeModel === "string" ? d.textClaudeModel : DEFAULT_SUB_CLAUDE_MODEL;
+  const codexModel = typeof d.textCodexModel === "string" ? d.textCodexModel : DEFAULT_SUB_CODEX_MODEL;
   const apiModel = isAiTextModel(d.textApiModel) ? d.textApiModel : DEFAULT_ARTICLE_TEXT_MODEL;
   const others = sites.filter((s) => s.id !== site.id && s.active && s.source === "db" && !!site.organization_id && s.organization_id === site.organization_id);
   const [saving, setSaving] = useState(false);
@@ -100,13 +107,14 @@ export default function TextModelButtons({ site, sites, onSaved, onApplied }: {
       <span style={{ color: "var(--text-primary)", fontSize: 12 }}>{COPY.title}</span>
       <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{COPY.detail}</div>
       <div style={{ color: "var(--text-muted)", fontSize: 12 }}>
-        {COPY.stored(TEXT_CHAIN_LABELS.find((c) => c.value === chain)?.label ?? chain, chain.startsWith("claude") ? claudeModel.replace("sub-claude-", "") : null)}
+        {COPY.stored(TEXT_CHAIN_LABELS.find((c) => c.value === chain)?.label ?? chain, storedModels(chain, claudeModel, codexModel))}
       </div>
       {site.subscriptionsAllowed ? (
         <>
-          <TextChainButtons lane="schedule" chain={chain} claudeModel={claudeModel} disabled={saving}
-            onChange={(next: { chain: TextChain; claudeModel: string }) =>
-              void save({ textChain: next.chain, ...(next.chain.startsWith("claude") ? { textClaudeModel: next.claudeModel } : {}) })} />
+          <TextChainButtons lane="schedule" chain={chain} claudeModel={claudeModel} codexModel={codexModel} disabled={saving}
+            onChange={(next: ChainChoice) =>
+              void save({ textChain: next.chain, ...(next.chain.startsWith("claude") ? { textClaudeModel: next.claudeModel } : {}),
+                ...(next.chain.includes("codex") ? { textCodexModel: next.codexModel } : {}) })} />
           {markable && site.ownerSubscription && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 12, color: "var(--text-muted)" }}>
               <span>{COPY.markOn}：{COPY.markedNote}</span>

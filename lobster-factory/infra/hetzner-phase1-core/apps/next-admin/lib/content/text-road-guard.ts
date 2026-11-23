@@ -38,12 +38,12 @@ export async function subscriptionOrgAllowed(orgId: string | null | undefined, s
 
 export const SUB_OWN_SITES_ONLY = "訂閱只用在自己的網站：這個網站屬於客戶，只能用 API";
 
-/** A chain other than "api", or a claude level, spends the owner's own subscription: only she may set it, and only on a
+/** A chain other than "api", or a claude / codex model, spends the owner's own subscription: only she may set it, and only on a
  *  site her subscriptions may serve. Going back to API only (or picking the API model) is any staff member's call.
  *  null = allowed. */
-export async function subscriptionRoadDenied(req: Request, road: { textChain?: unknown; textClaudeModel?: unknown },
+export async function subscriptionRoadDenied(req: Request, road: { textChain?: unknown; textClaudeModel?: unknown; textCodexModel?: unknown },
   orgId: () => Promise<string | null | undefined>): Promise<Response | null> {
-  const wantsSub = (road.textChain !== undefined && road.textChain !== "api") || road.textClaudeModel !== undefined;
+  const wantsSub = (road.textChain !== undefined && road.textChain !== "api") || road.textClaudeModel !== undefined || road.textCodexModel !== undefined;
   if (!wantsSub) return null;
   if (!codexAllowed(requestActor(req))) return NextResponse.json({ ok: false, error: "sub_operator_only" }, { status: 403 });
   return (await subscriptionOrgAllowed(await orgId())) ? null : NextResponse.json({ ok: false, error: SUB_OWN_SITES_ONLY }, { status: 403 });

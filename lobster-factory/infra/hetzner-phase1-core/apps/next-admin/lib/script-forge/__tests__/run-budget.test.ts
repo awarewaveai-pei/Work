@@ -10,6 +10,6 @@ describe("script cap with a subscription model", () => {
     const api = forgeRunUpperTwd({ model: DEFAULT_AI_TEXT_MODEL }, ctx);
     expect(api).toBeGreaterThan(0);
     expect(forgeRunUpperTwd({ model: "sub-claude-haiku" }, ctx)).toBe(api);
-    expect(forgeCallUpperTwd("sub-codex", "S", "P")).toBe(forgeCallUpperTwd(DEFAULT_AI_TEXT_MODEL, "S", "P"));
+    expect(forgeCallUpperTwd("sub-codex-sol", "S", "P")).toBe(forgeCallUpperTwd(DEFAULT_AI_TEXT_MODEL, "S", "P"));
   });
 });
