@@ -77,7 +77,8 @@ export const STEPS = [
     gate: '按鈕出現、選的模型真的送到執行程式；真的用訂閱寫一篇要等 Codex 額度恢復（M1）。', risk: 'Low', model: 'Sonnet', status: 'done', commit: 'db2cb07fa', depends: ['K6'], card: 'briefs/K17-codex-model.md' },  { n: 19, code: 'K18', group: 'B5', title: '中文文章改用中文小標', plain: '查出來 SEO 評分本來就認中文小標；只認英文的是另外兩處：寫文章的指令規定四個固定小標一律寫英文，發到 WordPress 的摘要只找英文的 Quick Answer。兩處都改成中英文都可以，三個地方共用同一份小標清單。十二篇盲測文章把小標換成中文重新評分，分數完全一樣。',
     gate: '部署後產一篇中文文章：四個固定小標是中文、SEO 分數不變、WordPress 摘要取自快速解答。', risk: 'Medium', model: '監工', status: 'done', commit: '5042d239c', depends: ['K15'], card: 'briefs/K10-K12.md' },  { n: 20, code: 'K19', group: 'B5', title: '商品文案不再亂寫規格、不翻譯品牌名', plain: '上次實測兩邊各錯一個：一個自己加了「棉質」和洗滌方式，一個把品牌名翻成中文。原因都在指令：它要求寫材質、印刷、保養，卻沒給這些資料；又說每個欄位都要用指定語言。已改成：沒給的規格不寫，品牌名和圖上的字照原樣。改完重測三件商品、兩個模型，品牌名都保留，沒給的規格都沒出現，有給的規格都用對。要讓頁面寫出材質，請在「文案指示」裡填。',
     gate: '三件商品重測結果在比較頁；商品文案維持 Claude Opus。', risk: 'Low', model: '監工', status: 'done', commit: '7d9e58824', depends: ['K16'], card: 'briefs/K15-K16.md' },  { n: 21, code: 'K20', group: 'B5', title: '四種文案換成 GPT-6.2 sol', plain: '你 11-23 看完比較後定案：影片腳本、社群改寫、開發信、AI 去味換成 GPT-6.2 sol；劇本工坊、競業分析、商品文案、每月選題不換。其中三種原本只接 Claude，要先補上 OpenAI 的路。每個功能的預設模型集中在一處設定。GPT-6.2 sol 回空白或被截斷時，自動改用原本的 Claude 模型重寫，不會把空白交給你。沒有 OpenAI 金鑰的安裝照舊用 Claude。',
-    gate: '四種各真跑三次，全部有內容、固定格式全部通過；空白時會退回 Claude 的測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'ff59979ef', depends: ['K16', 'K19'], card: 'briefs/K20-copy-defaults.md' },
+    gate: '四種各真跑三次，全部有內容、固定格式全部通過；空白時會退回 Claude 的測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'ff59979ef', depends: ['K16', 'K19'], card: 'briefs/K20-copy-defaults.md' },  { n: 22, code: 'K21', group: 'B5', title: '短文章被截斷：輸出上限要留思考用量', plain: '11-23 部署後在正式站實測：不選模型產一篇短文章，小標是中文、記帳是 GPT-6.2 sol，都對；但文章寫到常見問題一半就被切掉，沒有結論。原因是 GPT-6.2 sol 的思考用量算在輸出上限裡，文章、劇本工坊、修圖提示詞這三處還沒把這段空間留出來。改成全部走同一條規則，並加一個檢查，以後新寫的 OpenAI 呼叫漏了會直接變紅。預留金額一起跟著調。',
+    gate: '短文章實跑一篇沒有被截斷、有結論；檢查測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K20'], card: 'briefs/K21-openai-budget-everywhere.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
@@ -168,5 +169,9 @@ export const RISKS = [
     { card: 'K20', risk: '被內容過濾切掉一半的文字會被當成寫完；AI 去味等 OpenAI 最久會等十分鐘；用量紀錄把廠商記成 Claude。', act: '三項都已修正並併入：非正常結束一律不算數；AI 去味等 80 秒沒回就改用 Claude；用到 Claude 時才記 Claude。' },
     { card: 'K20', risk: '併入前跑全套測試時，一個影片「一鍵到草稿」畫面的測試失敗一次。', act: '查過：這次改動沒有碰那個畫面的任何檔案；單獨重跑三次都通過，是整套一起跑時畫面來不及出現。沒有改測試讓它過。若之後再出現，另開卡處理那個測試的等待方式。' },
     { card: 'K20', risk: 'AI 去味改用 GPT-6.2 sol 後，文字不再一個字一個字出現，而是等十幾秒後整段出現。', act: '這是換模型帶來的行為改變，功能正常。上線後你覺得不習慣，可以只把 AI 去味換回 Claude，其他三種不受影響。' },
+  ] },
+  { batch: '11-23 部署後正式站實測', rows: [
+    { card: 'K15', risk: '文章預設換成 GPT-6.2 sol 之後，短文章會被截斷（寫到一半、沒有結論）。11-22 換預設時只測了中等長度，沒測短的。', act: '已開 K21 修根因並派工。修好上線前：短文章請先選「中」長度，或在模型按鈕選 Claude。中等長度在 12 篇盲測時是完整的。' },
+    { card: 'K18', risk: '中文小標與記帳模型只在本機驗過。', act: '已在正式站實測：小標是「快速解答／重點整理／常見問題」，記帳模型是 gpt-6.2-sol。AI 去味也實測一次，15 秒、完整、記帳 gpt-6.2-sol。影片腳本、社群改寫要走影片流程才測得到，這次沒測。' },
   ] },
 ];
