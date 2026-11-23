@@ -68,7 +68,10 @@ RELEASE_TAG_RE='/releases/download/v[0-9]+(\.[0-9]+){0,3}/'   # tag = v<plugin v
 MAINWP_RE='^[0-9a-f]{32,128}$'
 KEYID_RE='^[A-Za-z0-9][A-Za-z0-9_-]{0,190}$'   # wp-bridge AdminPage.php generateKey, minus a leading -
 PUBKEY_RE='^[A-Za-z0-9+/]{43}=$'               # base64 of a 32-byte Ed25519 public key
-WP_SUBVERBS="install plugins open close set-mainwp-id put-bridge-pubkey reset-admin-password"
+# aware-wave-oracle "Engine URL (server)": scheme + lowercase host + optional port; no path, query, user or trailing /.
+ENGINE_URL_RE='^https?://[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:[0-9]{2,5})?$'
+ORACLE_PLUGIN=aware-wave-oracle                # its settings option: aworacle_settings (plugin Settings/Options.php)
+WP_SUBVERBS="install plugins open close set-mainwp-id put-bridge-pubkey reset-admin-password set-oracle-engine-url"
 MAX_SITE_CMD=4096
 WP_PATH=/var/www/html                          # inside <slug>-wp (official image)
 
@@ -97,6 +100,7 @@ wp_args_ok() {
       done ;;
     open|close|reset-admin-password) [[ ${#rest[@]} -eq 0 ]] ;;
     set-mainwp-id) [[ ${#rest[@]} -eq 1 && "${rest[0]}" =~ $MAINWP_RE ]] ;;
+    set-oracle-engine-url) [[ ${#rest[@]} -eq 1 && "${rest[0]}" =~ $ENGINE_URL_RE ]] ;;
     put-bridge-pubkey)
       [[ ${#rest[@]} -ge 2 && ${#rest[@]} -le 3 && "${rest[0]}" =~ $KEYID_RE && "${rest[1]}" =~ $PUBKEY_RE ]] || return 1
       [[ ${#rest[@]} -eq 2 || "${rest[2]}" == read || "${rest[2]}" == write ]] ;;
@@ -693,6 +697,22 @@ if ($row) { if ($row->public_key === $p && $row->status === "active") { echo "re
 $ok = $wpdb->insert($t, array("key_id" => $k, "public_key" => $p, "scope" => $s, "status" => "active", "ip_allowlist" => null, "created_at" => time()), array("%s", "%s", "%s", "%s", "%s", "%d"));
 echo $ok ? "created" : "failed"; exit($ok ? 0 : 3);' </dev/null)" || die 3 "put-bridge-pubkey failed: $(clean "$out")"
       obj state="$out" key_id="${rest[0]}" ;;
+    set-oracle-engine-url)
+      # One key of the plugin's settings array, through wp-cli option patch (value = an argument, never code); every
+      # other key stays as it is. Read back before answering, so the caller sees what WordPress now holds.
+      wpc plugin is-active "$ORACLE_PLUGIN" >/dev/null 2>&1 || die 3 "$ORACLE_PLUGIN is not active on $SLUG -- install it first (nothing changed)"
+      if ! wpc option get aworacle_settings >/dev/null 2>&1; then
+        wpc option add aworacle_settings '{}' --format=json >/dev/null || die 3 "cannot create option aworacle_settings"
+      fi
+      if wpc option pluck aworacle_settings server_engine_url >/dev/null 2>&1; then
+        wpc option patch update aworacle_settings server_engine_url "${rest[0]}" >/dev/null || die 3 "option patch update failed"
+      else
+        wpc option patch insert aworacle_settings server_engine_url "${rest[0]}" >/dev/null || die 3 "option patch insert failed"
+      fi
+      out="$(wpc option pluck aworacle_settings server_engine_url 2>/dev/null)"
+      [[ "$out" == "${rest[0]}" ]] || die 3 "server_engine_url reads back as '$(clean "$out")', not the value set"
+      log info "site-wp $SLUG set-oracle-engine-url"
+      obj state=ok server_engine_url="$out" ;;
     reset-admin-password)
       admin="$(first_admin)"; [[ "$admin" =~ ^[0-9]+$ ]] || die 3 "no administrator (install first)"
       pw="$(newpass)"

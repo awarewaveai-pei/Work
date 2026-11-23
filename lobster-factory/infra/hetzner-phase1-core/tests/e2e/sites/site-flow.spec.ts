@@ -1,7 +1,8 @@
 /**
  * /ops/sites UI flows (SITE-FLOW-COMPLETION-PLAN.md §3 SF-J acceptance): create -> flow page renders nine steps; a closed
  * catalog switch reads 此步驟尚未開放 and cannot be pressed; preview -> confirm -> running -> done; the one-time admin
- * password shows once and is gone after a reload. Every /api/ops/site-flow call is answered by the in-memory fake below
+ * password shows once and is gone after a reload. SF-H: steps 4 and 8 have content (backup observation, hand ticks),
+ * nothing reads 尚未提供 except the two SF-I steps, polls never overlap. Every /api/ops/site-flow call is answered by the in-memory fake below
  * (page.route), so this tests the page, never the host; the engine is covered by next-admin lib/site-flow/__tests__.
  * Run against a dev server with no Supabase (.claude/launch.json "next-admin-ui-3903"):
  *   cd lobster-factory/infra/hetzner-phase1-core/tests && PLAYWRIGHT_SITES_URL=http://localhost:3903 npx playwright test --project sites
@@ -15,17 +16,29 @@ const TITLES: Record<string, string> = { preflight: '網址檢查', create: '建
 
 type StepState = 'not_started' | 'ready' | 'blocked' | 'running' | 'done' | 'failed' | 'not_available';
 
-function fakeServer(opts: { open: boolean }) {
+function fakeServer(opts: { open: boolean; slowPollMs?: number }) {
   const state: Record<string, { state: StepState; enabled: boolean; reason?: string | null; runId?: string | null }> = {};
   for (const k of KEYS) state[k] = { state: 'not_available', enabled: false };
   if (opts.open) {
     state.preflight = { state: 'done', enabled: true };
     state.create = { state: 'ready', enabled: true };
-    state.wp_install = { state: 'blocked', enabled: true, reason: '需先完成：create' };
+    state.wp_install = { state: 'blocked', enabled: true, reason: '需先完成：建立網站主機' };
     state.vhost = { state: 'not_started', enabled: false, reason: '此步驟尚未開放' };   // catalog switch off
+    state.open = { state: 'blocked', enabled: true, reason: '需先完成：掛上網址' };
   }
   const calls: string[] = [];
   let polls = 0;
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const ticks: Record<string, { key: string; by: string; at: string; note: string } | null> = { uptime_monitor: null, wpvivid_remote: null, mail_setup: null };
+  const panels = () => ({
+    backup: { state: 'listed', detail: '已列入每日備份（主機登記檔在）', lastBackupAt: null },
+    manual_checks: [
+      { key: 'uptime_monitor', label: '已在 Uptime Kuma 加入這個網址的監控', where: 'Uptime Kuma 介面', tick: ticks.uptime_monitor },
+      { key: 'wpvivid_remote', label: '已設定 WPvivid 遠端備份', where: 'WordPress 後台', tick: ticks.wpvivid_remote },
+      { key: 'mail_setup', label: '已設定寄信（FluentSMTP）並寄出測試信', where: 'WordPress 後台', tick: ticks.mail_setup },
+    ],
+  });
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   const steps = () => KEYS.map((key) => ({
     key, title: TITLES[key], enabled: state[key].enabled, state: state[key].state, reason: state[key].reason ?? null, observation: null,
@@ -40,7 +53,11 @@ function fakeServer(opts: { open: boolean }) {
       return json(route, { ok: true, organization: { id: 'o1', slug: 'oracle-aware-wave-com', name: body.clientName, created: false }, site_id: SITE, site_created: true, environment_id: 'e1', host_slug: 'oracle-aware-wave-com', kept_keys: ['client_config.site_url'], flow_url: `/ops/sites/${SITE}` });
     }
     if (path === `/api/ops/site-flow/${SITE}` && req.method() === 'GET') {
-      return json(route, { ok: true, site: { id: SITE, name: '算命站', organization_id: 'o1' }, environment: { id: 'e1', environment_type: 'production', hosting_provider: 'ks-aw-01-docker', base_url: 'https://oracle.aware-wave.com' }, steps: steps() });
+      return json(route, { ok: true, site: { id: SITE, name: '算命站', organization_id: 'o1' }, environment: { id: 'e1', environment_type: 'production', hosting_provider: 'ks-aw-01-docker', base_url: 'https://oracle.aware-wave.com' }, steps: steps(), panels: panels() });
+    }
+    if (path === `/api/ops/site-flow/${SITE}/manual-checks`) {
+      ticks[body.key] = body.checked ? { key: body.key, by: 'ops@aware-wave.com', at: '2026-11-22T02:00:00Z', note: body.note ?? '' } : null;
+      return json(route, { ok: true });
     }
     if (path === `/api/ops/site-flow/${SITE}/create` && body?.action === 'plan') {
       return json(route, { ok: true, step: 'create', planHash: 'a'.repeat(64), plan: { summary: '建立網站容器與資料庫', items: [{ label: '容器', value: 'oracle-aware-wave-com-wp' }, { label: '內部埠', value: '127.0.0.1:8150' }], rollback: '刪除容器，保留資料卷', params: {} } });
@@ -51,6 +68,14 @@ function fakeServer(opts: { open: boolean }) {
     }
     if (path === `/api/ops/site-flow/${SITE}/create` && body?.action === 'poll') {
       polls += 1;
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      if (opts.slowPollMs) {
+        await new Promise((r) => setTimeout(r, opts.slowPollMs));
+        inFlight -= 1;
+        return json(route, { ok: true, run: { id: 'run-1', status: 'running', started_at: 'x', ended_at: null, error_summary: null } });
+      }
+      inFlight -= 1;
       state.create = { state: 'done', enabled: true, runId: null };
       state.wp_install = { state: 'ready', enabled: true };
       return json(route, { ok: true, run: { id: 'run-1', status: 'completed', started_at: 'x', ended_at: 'y', error_summary: null } });
@@ -64,10 +89,10 @@ function fakeServer(opts: { open: boolean }) {
     }
     return json(route, { ok: false, error: 'unexpected' }, 500);
   }
-  return { handle, calls, polls: () => polls };
+  return { handle, calls, polls: () => polls, maxInFlight: () => maxInFlight, setRunning: (k: string) => { state[k] = { state: 'running', enabled: true, runId: 'run-1' }; } };
 }
 
-async function arm(page: Page, opts: { open: boolean }) {
+async function arm(page: Page, opts: { open: boolean; slowPollMs?: number }) {
   const fake = fakeServer(opts);
   await page.route('**/api/ops/site-flow**', fake.handle);
   return fake;
@@ -91,14 +116,43 @@ test('creating a site shows what was not applied, then opens the flow page', asy
   expect(fake.calls[0]).toBe('POST /api/ops/site-flow');
 });
 
-test('no step bodies yet: nine steps render with their sentences and nothing is pressable', async ({ page }) => {
-  await arm(page, { open: false });
+test('nine steps all have content or a hand-check explanation; only the two SF-I steps read 尚未提供', async ({ page }) => {
+  await arm(page, { open: true });
   await page.goto(`/ops/sites/${SITE}`);
   await expect(page.locator('li[data-step]')).toHaveCount(9);
   await expect(page.getByText('第 9 步　正式開放')).toBeVisible();
-  await expect(page.locator('li[data-step]').filter({ hasText: '尚未提供' })).toHaveCount(9);
-  await expect(page.locator('li[data-step] button')).toHaveCount(0);
-  await shot(page, 'flow-empty');
+  // 第 4 步 每日備份: an observation; 第 8 步 手動項目: three ticks with where to do them
+  await expect(page.locator('li[data-step=n4]')).toContainText('已列入每日備份');
+  await expect(page.locator('li[data-step=n8] input[type=checkbox]')).toHaveCount(3);
+  await expect(page.locator('li[data-step=n8]')).toContainText('Uptime Kuma');
+  // mainwp and bridge have no step body until SF-I; every other step has one
+  await expect(page.locator('li[data-step]').filter({ hasText: '尚未提供' })).toHaveCount(2);
+  await expect(page.locator('li[data-step=mainwp]')).toContainText('尚未提供');
+  await expect(page.locator('li[data-step=bridge]')).toContainText('尚未提供');
+  // a prerequisite is named, never shown as an internal key
+  await expect(page.locator('li[data-step=wp_install]')).toContainText('需先完成：建立網站主機');
+  await shot(page, 'flow-sfh');
+});
+
+test('a hand tick is stored and shows who and when', async ({ page }) => {
+  await arm(page, { open: true });
+  await page.goto(`/ops/sites/${SITE}`);
+  const item = page.locator('li[data-check=uptime_monitor]');
+  await item.getByPlaceholder('備註（選填，勾選時一起存）').fill('監控名 oracle');
+  await item.locator('input[type=checkbox]').click();   // controlled by the server's answer: checked after the re-read
+  await expect(item).toContainText('您手動確認：ops@aware-wave.com');
+  await expect(page.locator('li[data-step=n8]')).toContainText('1 / 3 已確認');
+});
+
+test('while a step runs the others cannot start, and polls never overlap', async ({ page }) => {
+  const fake = await arm(page, { open: true, slowPollMs: 7000 });
+  fake.setRunning('create');
+  await page.goto(`/ops/sites/${SITE}`);
+  await expect(page.locator('li[data-step=create]')).toContainText('執行中');
+  await expect(page.locator('li[data-step=preflight] button')).toBeEnabled(); // a re-read is always allowed
+  await page.waitForTimeout(16_000);   // 5 s interval vs 7 s answers: an interval timer would have stacked polls
+  expect(fake.polls()).toBeGreaterThanOrEqual(1);
+  expect(fake.maxInFlight()).toBe(1);
 });
 
 test('a closed catalog switch reads 此步驟尚未開放 and the button is disabled', async ({ page }) => {
@@ -123,6 +177,7 @@ test('preview -> confirm -> running -> done, and the password shows once', async
   expect(fake.polls()).toBeGreaterThan(0);
 
   const wp = page.locator('li[data-step=wp_install]');
+  await wp.getByLabel('管理員 email（也是登入帳號，60 字以內）').fill('ops@aware-wave.com');
   await wp.getByRole('button', { name: '看要做什麼' }).click();
   await wp.getByRole('button', { name: '確認執行' }).click();
   await expect(wp).toContainText('Pw-ONLY-ONCE-123');

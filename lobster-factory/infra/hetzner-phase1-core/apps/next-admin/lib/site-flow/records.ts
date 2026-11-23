@@ -9,6 +9,8 @@
 // - ensureEnvironment does not need the 0176 partial unique index to be idempotent (select first); with the
 //   index applied, a concurrent insert's 23505 is read back as the existing row.
 // - An environment's hosting_provider never changes in place: moving a site to another host is archive + new row.
+// - environments.status is a CACHE of what the steps observed, never a source of truth (I1). Every write of it goes
+//   through ENVIRONMENT_STATUS_TRANSITIONS: setEnvironmentStatus and ensureEnvironment refuse anything else.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -33,7 +35,8 @@ export type RecordError =
   | "site_scope_mismatch"
   | "invalid_hosting_provider"
   | "invalid_ingress"
-  | "environment_provider_conflict";
+  | "environment_provider_conflict"
+  | "invalid_transition";
 
 export type RecordResult<T> = { ok: true; value: T } | { ok: false; error: RecordError; detail?: string };
 
@@ -324,7 +327,7 @@ export async function ensureEnvironment(db: Db, input: EnsureEnvironmentInput): 
   const updateExisting = async (): Promise<RecordResult<{ id: string; created: boolean }> | null> => {
     const { data, error } = await db
       .from("environments")
-      .select("id,hosting_provider,metadata")
+      .select("id,hosting_provider,status,metadata")
       .eq("site_id", input.siteId)
       .eq("environment_type", input.environmentType)
       .neq("status", "archived")
@@ -337,6 +340,9 @@ export async function ensureEnvironment(db: Db, input: EnsureEnvironmentInput): 
     if (row.hosting_provider && row.hosting_provider !== input.hostingProvider) {
       return fail("environment_provider_conflict", `existing ${input.environmentType} environment is ${String(row.hosting_provider)}`);
     }
+    if (input.status !== undefined && !canTransition(String(row.status), input.status)) {
+      return fail("invalid_transition", `${String(row.status)} -> ${input.status}`);
+    }
     const patch: Json = {
       name: input.name,
       hosting_provider: input.hostingProvider,
@@ -347,8 +353,12 @@ export async function ensureEnvironment(db: Db, input: EnsureEnvironmentInput): 
     if (input.serverRef !== undefined) patch.server_ref = input.serverRef;
     if (input.wpRootPath !== undefined) patch.wp_root_path = input.wpRootPath;
     if (input.status !== undefined) patch.status = input.status;
-    const { error: upErr } = await db.from("environments").update(patch).eq("id", row.id);
+    // With a status in the patch this is a CAS on the status checked above: a concurrent move is never overwritten.
+    let q = db.from("environments").update(patch).eq("id", row.id);
+    if (input.status !== undefined) q = q.eq("status", String(row.status));
+    const { data: moved, error: upErr } = await q.select("id");
     if (upErr) return fail("update_failed", upErr.message);
+    if (input.status !== undefined && (!Array.isArray(moved) || moved.length !== 1)) return fail("update_failed", "status changed under the write");
     return { ok: true, value: { id: String(row.id), created: false } };
   };
 
@@ -382,13 +392,50 @@ export async function ensureEnvironment(db: Db, input: EnsureEnvironmentInput): 
   return { ok: true, value: { id: String((data as Json).id), created: true } };
 }
 
-/** Moves an environment out of `provisioning` only: an archived (or already finished) row is never revived. */
+/**
+ * The status rule (SF-H item 3). Status = a cache of the last observation:
+ *   pending      created, nothing built yet          -> provisioning, archived
+ *   provisioning a step is building it               -> ready, failed, archived
+ *   failed       the last build attempt failed       -> provisioning (a re-run), archived
+ *   ready        built and observed working          -> provisioning (rebuilt by a re-run), archived
+ *   archived     torn down                           -> nothing (never revived; a new site is a new row)
+ * Writing the status a row already has is a no-op, not an error. failed -> ready goes through provisioning, so a row
+ * can never read ready without a build having been observed after the failure.
+ */
+export const ENVIRONMENT_STATUS_TRANSITIONS: Readonly<Record<EnvironmentStatus, readonly EnvironmentStatus[]>> = {
+  pending: ["provisioning", "archived"],
+  provisioning: ["ready", "failed", "archived"],
+  failed: ["provisioning", "archived"],
+  ready: ["provisioning", "archived"],
+  archived: [],
+};
+
+export function canTransition(from: string, to: EnvironmentStatus): boolean {
+  if (from === to) return true;
+  return (ENVIRONMENT_STATUS_TRANSITIONS as Record<string, readonly string[]>)[from]?.includes(to) ?? false;
+}
+
+/**
+ * Moves an environment's status along ENVIRONMENT_STATUS_TRANSITIONS. A CAS on the status it read: a row that moved
+ * meanwhile is re-read and checked again (at most twice), never overwritten blind. `invalid_transition` = refused.
+ */
 export async function setEnvironmentStatus(db: Db, environmentId: string, status: EnvironmentStatus): Promise<RecordResult<null>> {
-  const { error } = await db
-    .from("environments")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", environmentId)
-    .eq("status", "provisioning");
-  if (error) return fail("update_failed", error.message);
-  return { ok: true, value: null };
+  if (!(ENVIRONMENT_STATUSES as readonly string[]).includes(status)) return fail("invalid_input", "status");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data, error } = await db.from("environments").select("id,status").eq("id", environmentId).maybeSingle();
+    if (error) return fail("lookup_failed", error.message);
+    if (!data) return fail("lookup_failed", `environment ${environmentId} not found`);
+    const from = String((data as Json).status);
+    if (from === status) return { ok: true, value: null };
+    if (!canTransition(from, status)) return fail("invalid_transition", `${from} -> ${status}`);
+    const { data: moved, error: upErr } = await db
+      .from("environments")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", environmentId)
+      .eq("status", from)
+      .select("id");
+    if (upErr) return fail("update_failed", upErr.message);
+    if (Array.isArray(moved) && moved.length === 1) return { ok: true, value: null };
+  }
+  return fail("update_failed", "status kept changing under the write");
 }

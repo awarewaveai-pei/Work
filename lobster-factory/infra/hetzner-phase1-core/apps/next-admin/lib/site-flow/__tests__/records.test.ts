@@ -3,7 +3,7 @@
 // a repeated environment does not duplicate; invalid hosting_provider / ingress are refused.
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ensureEnvironment, ensureOrganization, mergeMetadataAddOnly } from "../records";
+import { ensureEnvironment, ensureOrganization, mergeMetadataAddOnly, setEnvironmentStatus } from "../records";
 
 type Row = Record<string, unknown>;
 
@@ -25,14 +25,15 @@ function fakeDb(seed: Record<string, Row[]> = {}) {
       maybeSingle: async () => ({ data: matching()[0] ?? null, error: null }),
       single: async () => (inserted ? { data: inserted, error: null } : { data: matching()[0] ?? null, error: null }),
       insert: (row: Row) => {
-        inserted = { id: `id-${++n}`, status: "active", created_at: "2026-11-22T00:00:00Z", metadata: {}, ...row };
+        inserted = { id: `id-${++n}`, status: table === "environments" ? "pending" : "active", created_at: "2026-11-22T00:00:00Z", metadata: {}, ...row };
         rows.push(inserted);
         return q;
       },
       update: (p: Row) => ((patch = p), q),
-      then: (resolve: (v: { error: null }) => void) => {
-        if (patch) for (const r of matching()) Object.assign(r, patch);
-        resolve({ error: null });
+      then: (resolve: (v: { error: null; data?: Row[] }) => void) => {
+        const hit = matching();
+        if (patch) for (const r of hit) Object.assign(r, patch);
+        resolve({ error: null, data: hit.map((r) => ({ id: r.id })) });
       },
     };
     return q;
@@ -109,13 +110,14 @@ describe("ensureEnvironment", () => {
   it("a repeated call returns the same row instead of a second one; ingress defaults to host-vhost", async () => {
     const { db, tables } = fakeDb({ sites: [site] });
     const a = await ensureEnvironment(db, base);
-    const b = await ensureEnvironment(db, { ...base, status: "ready" });
+    // pending (the column default) -> provisioning: an allowed move (records.ts ENVIRONMENT_STATUS_TRANSITIONS)
+    const b = await ensureEnvironment(db, { ...base, status: "provisioning" });
     expect(a).toMatchObject({ ok: true, value: { created: true } });
     expect(b).toMatchObject({ ok: true, value: { created: false } });
     if (!a.ok || !b.ok) return;
     expect(b.value.id).toBe(a.value.id);
     expect(tables.environments).toHaveLength(1);
-    expect(tables.environments[0]).toMatchObject({ organization_id: ORG, workspace_id: "ws-1", status: "ready", metadata: { ingress: "host-vhost" } });
+    expect(tables.environments[0]).toMatchObject({ organization_id: ORG, workspace_id: "ws-1", status: "provisioning", metadata: { ingress: "host-vhost" } });
   });
 
   it("an existing row keeps its ingress when the caller passes none", async () => {
@@ -140,5 +142,45 @@ describe("ensureEnvironment", () => {
     const r = await ensureEnvironment(db, { ...base, organizationId: OTHER_ORG });
     expect(r).toMatchObject({ ok: false, error: "site_scope_mismatch" });
     expect(tables.environments ?? []).toHaveLength(0);
+  });
+});
+
+// SF-H item 3: status is a cache with a written rule (records.ts ENVIRONMENT_STATUS_TRANSITIONS).
+describe("setEnvironmentStatus", () => {
+  const ENV = "e-1";
+  const at = (status: string) => fakeDb({ environments: [{ id: ENV, status }] });
+
+  it("a failed environment comes back through provisioning to ready (the re-run path)", async () => {
+    const { db, tables } = at("failed");
+    expect(await setEnvironmentStatus(db, ENV, "ready")).toMatchObject({ ok: false, error: "invalid_transition" });
+    expect(await setEnvironmentStatus(db, ENV, "provisioning")).toMatchObject({ ok: true });
+    expect(await setEnvironmentStatus(db, ENV, "ready")).toMatchObject({ ok: true });
+    expect(tables.environments[0].status).toBe("ready");
+  });
+
+  it("archived is never revived; pending cannot jump to ready; the same status is a no-op", async () => {
+    const archived = at("archived");
+    expect(await setEnvironmentStatus(archived.db, ENV, "provisioning")).toMatchObject({ ok: false, error: "invalid_transition" });
+    expect(archived.tables.environments[0].status).toBe("archived");
+    expect(await setEnvironmentStatus(at("pending").db, ENV, "ready")).toMatchObject({ ok: false, error: "invalid_transition" });
+    expect(await setEnvironmentStatus(at("ready").db, ENV, "ready")).toMatchObject({ ok: true });
+  });
+
+  it("old callers unchanged: provision-staging's provisioning -> ready and provisioning -> failed", async () => {
+    const a = at("provisioning");
+    expect(await setEnvironmentStatus(a.db, ENV, "ready")).toMatchObject({ ok: true });
+    expect(a.tables.environments[0].status).toBe("ready");
+    const b = at("provisioning");
+    expect(await setEnvironmentStatus(b.db, ENV, "failed")).toMatchObject({ ok: true });
+    expect(b.tables.environments[0].status).toBe("failed");
+  });
+
+  it("ensureEnvironment on an existing row follows the same rule (re-provisioning a staging site that failed)", async () => {
+    const site = { id: SITE, organization_id: ORG, workspace_id: "ws-1" };
+    const base = { organizationId: ORG, siteId: SITE, environmentType: "staging" as const, name: "S", hostingProvider: "ks-aw-01-staging-subdir" };
+    const { db, tables } = fakeDb({ sites: [site], environments: [{ id: "e-2", site_id: SITE, environment_type: "staging", status: "failed", hosting_provider: "ks-aw-01-staging-subdir", metadata: {} }] });
+    expect(await ensureEnvironment(db, { ...base, status: "provisioning" })).toMatchObject({ ok: true });
+    expect(tables.environments[0].status).toBe("provisioning");
+    expect(await ensureEnvironment(db, { ...base, status: "pending" })).toMatchObject({ ok: false, error: "invalid_transition" });
   });
 });

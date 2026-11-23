@@ -1,6 +1,8 @@
 // /api/ops/site-flow/[siteId]/[step] (SITE-FLOW-COMPLETION-PLAN.md §1-3, card SF-G).
-//   POST {action:"plan", environment?}             -> {plan, planHash}: what the step would do. Changes nothing.
-//   POST {action:"execute", planHash, environment?} -> runs the step if the recomputed plan has that hash (else 409).
+//   POST {action:"plan", input?, environment?}             -> {plan, planHash}: what the step would do. Changes nothing.
+//   POST {action:"execute", planHash, input?, environment?} -> runs the step if the recomputed plan has that hash (else
+//                                                            409). `input` = the step's own fields (parseInput); send
+//                                                            the same input as the plan, it is part of the hash.
 //   POST {action:"poll", runId, environment?}       -> one run; a background host job is polled and finished here
 //                                                     (can verify and roll back on the host, so a POST: CSRF-guarded).
 // Owner/admin staff only. The engine (lib/site-flow/engine.ts) owns every rule past the role check.
@@ -58,12 +60,13 @@ export async function POST(request: Request, context: Ctx) {
   const target = { site: loaded.site, environment: loaded.environment, step };
   const r =
     body.action === "plan"
-      ? await planStep(deps(db), target)
+      ? await planStep(deps(db), { ...target, input: body.input })
       : body.action === "poll"
         ? await pollRun(deps(db), { ...target, runId: typeof body.runId === "string" ? body.runId : "" })
         : await executeStep(deps(db), {
             ...target,
             planHash: body.planHash,
+            input: body.input,
             actor: { role: resolved.role, userId: request.headers.get("x-ops-user-id")?.trim() || null },
           });
   return NextResponse.json(r.body, { status: r.status });

@@ -42,7 +42,8 @@
 | 類別 | 外掛 | installSource | 說明 |
 |------|------|--------------|------|
 | **管理整合** | mainwp-child | manifest | MainWP Dashboard 連線必要；所有 4 個 manifest 均含此 step |
-| **AwareWave 整合** | AwareWave WP Bridge | release-url | 從 `awarewaveai-pei/aware-wave-wp-bridge` tag→Action 取得；Phase 1 接線中 |
+| **AwareWave 整合** | AwareWave WP Bridge | release-url | 固定版本 `releaseVersion`（現 0.22.0）的 release 檔 `aware-wave-wp-bridge-v<版本>.zip`；建站流程第 3 步安裝（catalog `resolveSiteFlowPlugins`） |
+| **產品外掛（選裝）** | AwareWave Oracle | release-url | `required: false`：建站流程第 3 步勾選才裝，並同時寫入外掛的「引擎網址（伺服器用）」；release repo 未發佈前勾選會在主機下載失敗 |
 
 ---
 
@@ -54,7 +55,7 @@
 
 | 類別 | 外掛 | installSource | WP.org Slug | 說明 |
 |------|------|--------------|-------------|------|
-| **主題框架** | Kadence Theme | wporg | `kadence` | 所有頁面基礎（旅遊站排除，改用 TravelWP） |
+| **主題框架** | Kadence Theme | wporg（佈景） | `kadence` | 所有頁面基礎（旅遊站排除，改用 TravelWP）；catalog `kind: "theme"`：不在外掛安裝清單，由閘門 `site-wp install` 安裝佈景 |
 | **主題框架** | Kadence Blocks | wporg | `kadence-blocks` | 視覺區塊編輯器（旅遊站排除，改用 Elementor） |
 | **安全** | Wordfence Security | wporg | `wordfence` | 防火牆 + 惡意掃描 |
 | **備份** | WPvivid Backup | wporg | `wpvivid-backups-and-migration` | 連動 MainWP 管理 |
@@ -383,3 +384,4 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 | 2026-07-02 | 旅遊站切換 TravelWP 主題：移除 WP Travel Engine + Amelia；加 TravelWP（manual-zip）+ Elementor + WooCommerce；新增 manifest `wp-tourism`；Kadence+KadenceBlocks 加 `excludeForModules: ["tourism"]`；決策樹 §7.3 改寫；catalog entries 40→42 |
 | 2026-07-02 | 旅遊模組補齊：加 `elementor-pro-activator`（WordPressIT bundle 必要）+ `advanced-google-maps`（取代 wp-maps-pro，操作員已有 zip）；catalog 43→44；zip 清單 6→8 |
 | 2026-07-02 | 補全 catalog：`kadence-pro`（base，exclude tourism）+ `advanced-coupons-for-woocommerce`（ecommerce + tourism 各一筆）；`kadence-shop-kit` 加 TODO 注記（zip 實體是 kadence-woo-template-builder，待測試）；catalog 44→47；zip 清單 8→10 |
+| 2026-11-23 | SF-H：Kadence 與 TravelWP 標 `kind: "theme"`（不再當外掛安裝）；自有外掛加 `releaseRepo`／`releaseVersion`（URL 由 catalog 產生，閘門只收此 org 的 `v<版本>` release）；新增選裝 `aware-wave-oracle`；catalog 55→56 |

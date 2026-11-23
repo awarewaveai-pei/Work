@@ -112,11 +112,20 @@ w="$*"
 case "$w" in
   "core is-installed") [ -f "$S/wp.$c.installed" ] ;;
   "core install "*)    touch "$S/wp.$c.installed"; for a; do case "$a" in --admin_user=*) echo "${a#*=}" > "$S/wp.$c.admin";; esac; done ;;
+  # array options (aworacle_settings): JSON in $S/json.<container>.<option>; patch/pluck as wp-cli does them
+  "option get "*)      [ -f "$S/json.$c.$3" ] && cat "$S/json.$c.$3" ;;
+  "option add "*)      [ -f "$S/json.$c.$3" ] && exit 1; [ "$4" = '{}' ] || exit 1; echo '{}' > "$S/json.$c.$3" ;;
+  "option pluck "*)    [ -f "$S/json.$c.$3" ] && /usr/bin/python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(1) if sys.argv[2] not in d else print(d[sys.argv[2]])' "$S/json.$c.$3" "$4" ;;
+  "option patch "*)    [ -f "$S/json.$c.$4" ] && /usr/bin/python3 -c '
+import json,sys
+f,op,k,v=sys.argv[1:5]; d=json.load(open(f))
+if (op=="update") != (k in d): sys.exit(1)
+d[k]=v; json.dump(d,open(f,"w"))' "$S/json.$c.$4" "$3" "$5" "$6" ;;
   "option update "*)   echo "$4" > "$S/opt.$c.$3" ;;
   "language core is-installed"*|"theme is-installed"*) exit 1 ;;
   "user list"*)        echo 1 ;;
   "user get"*)         cat "$S/wp.$c.admin" ;;
-  "plugin is-installed "*) [ -f "$S/plugin.$c.$3" ] ;;
+  "plugin is-installed "*|"plugin is-active "*) [ -f "$S/plugin.$c.$3" ] ;;   # shim: installed = active
   "plugin get "*)      cat "$S/plugin.$c.$3" ;;
   "plugin install "*)  p="$3"; case "$p" in https://*) r="${p#https://github.com/*/}"; p="${r%%/*}" ;; esac   # release URL -> repo = slug
                        v="${3%/*}"; v="${v##*/}"; echo "${v#v}" > "$S/plugin.$c.$p" ;;   # file = installed version
@@ -362,6 +371,28 @@ gate "site-wp s1 open"; check "open -> blog_public 1, construction off" in_c 'te
 gate "site-wp s1 plugins mainwp-child https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/download/v0.20.0/aware-wave-wp-bridge.zip"
 check "plugins: WordPress.org slug + own release URL installed" bash -c "[[ $rc == 0 ]] && docker exec $C test -f /t/state/plugin.s1-wp.mainwp-child && docker exec $C test -f /t/state/plugin.s1-wp.aware-wave-wp-bridge"
 gate "site-wp s1 set-mainwp-id 0123456789abcdef0123456789abcdef"; check "set-mainwp-id ok" test "$rc" = 0
+# set-oracle-engine-url (SF-H item 5): one key of aworacle_settings, through option patch; the plugin must be active
+OJ=/t/state/json.s1-wp.aworacle_settings
+in_c ': > /t/calls.log'; gate "site-wp s1 set-oracle-engine-url http://oracle-web:3000"
+check "oracle-engine-url without the oracle plugin -> 3, said so, option untouched" \
+  bash -c "[[ $rc == 3 ]] && grep -q 'aware-wave-oracle is not active' <<<'$err' && ! docker exec $C test -e $OJ"
+in_c "touch /t/state/plugin.s1-wp.aware-wave-oracle; echo '{\"embed\": \"same-origin\", \"key_id\": \"k1\"}' > $OJ"
+gate "site-wp s1 set-oracle-engine-url http://oracle-web:3000"
+check "oracle-engine-url writes server_engine_url, keeps every other key, answers the value read back" \
+  bash -c "[[ $rc == 0 && '$(jget "$out" server_engine_url)' == http://oracle-web:3000 ]] && docker exec $C python3 -c 'import json; d=json.load(open(\"$OJ\")); assert d == {\"embed\": \"same-origin\", \"key_id\": \"k1\", \"server_engine_url\": \"http://oracle-web:3000\"}, d'"
+gate "site-wp s1 set-oracle-engine-url https://engine.example.com:8443"
+check "oracle-engine-url again replaces the one key" \
+  bash -c "[[ $rc == 0 ]] && docker exec $C python3 -c 'import json; d=json.load(open(\"$OJ\")); assert d[\"server_engine_url\"] == \"https://engine.example.com:8443\" and d[\"key_id\"] == \"k1\" and len(d) == 3, d'"
+in_c "rm $OJ"; gate "site-wp s1 set-oracle-engine-url http://oracle-web:3000"
+check "oracle-engine-url on a site whose plugin never saved settings creates the option with that one key" \
+  bash -c "[[ $rc == 0 ]] && docker exec $C python3 -c 'import json; assert json.load(open(\"$OJ\")) == {\"server_engine_url\": \"http://oracle-web:3000\"}'"
+for v in "http://oracle-web:3000/" "http://x/path" "http://Oracle:3000" "http://u:p@oracle" "http://oracle?x=1" "ftp://oracle" "http://a b"; do
+  in_c ': > /t/calls.log'; gate "site-wp s1 set-oracle-engine-url $v"
+  check "oracle-engine-url '$v' -> DENY 126, nothing exec'd" bash -c "[[ $rc == 126 ]]" && check "...no docker exec ('$v')" no_docker_exec
+done
+in_c 'mv /etc/default/aw-hosting-gate.local /t/switch.bak'; gate "site-wp s1 set-oracle-engine-url http://oracle-web:3000"
+check "oracle-engine-url with the host switch file missing -> 126" test "$rc" = 126
+in_c 'mv /t/switch.bak /etc/default/aw-hosting-gate.local'
 gate "site-wp s1 put-bridge-pubkey aw-next-admin-1 $(printf 'A%.0s' {1..43})= write"
 check "put-bridge-pubkey ok" bash -c "[[ $rc == 0 && '$(jget "$out" state)' == created ]]"
 in_c ': > /t/calls.log'; gate "site-wp s1 reset-admin-password"; PW2="$(jget "$out" admin_password)"
@@ -464,7 +495,7 @@ created; in_c 'touch /t/state/wp.s1-wp.installed'
 docker exec -d "$C" flock $LD/s1.lock sleep 20
 for _ in $(seq 40); do in_c "! flock -n $LD/s1.lock true" && break; sleep 0.1; done
 in_c ': > /t/calls.log'
-for c in "site-wp s1 open" "site-wp s1 plugins mainwp-child" "site-wp s1 install owner@example.org" "site-wp s1 reset-admin-password" "site-vhost s1"; do
+for c in "site-wp s1 open" "site-wp s1 plugins mainwp-child" "site-wp s1 install owner@example.org" "site-wp s1 reset-admin-password" "site-wp s1 set-oracle-engine-url http://oracle-web:3000" "site-vhost s1"; do
   gate "$c"; check "#6 '$c' while another run holds the s1 lock -> refused (3)" bash -c "[[ $rc == 3 ]] && grep -q 'another create' <<<'$err'"
 done
 check "#6 ...and none of them exec'd anything" no_docker_exec

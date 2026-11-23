@@ -25,6 +25,9 @@ export const SITE_STEP_TIMEOUT_MAX_MS = 110 * 60_000;
 /** The gate verbs that only read the host. */
 export type SiteGateReader = Pick<SiteGateClient, "provider" | "preflight" | "job">;
 
+/** Result of a step's input check (SiteStepDefinition.parseInput). */
+export type InputCheck = { ok: true; input: Record<string, unknown> } | { ok: false; error: string };
+
 export const SITE_STEP_KEYS = ["preflight", "create", "wp_install", "vhost", "mainwp", "bridge", "open"] as const;
 export type SiteStepKey = (typeof SITE_STEP_KEYS)[number];
 
@@ -41,6 +44,8 @@ export interface SiteRow {
   project_id: string;
   name: string;
   primary_domain: string | null;
+  /** sites.locale (zh_TW, en, ...); absent on rows built by older callers. */
+  locale?: string | null;
   metadata: Json;
 }
 
@@ -56,15 +61,31 @@ export interface EnvironmentRow {
   metadata: Json;
 }
 
+/** One finished attempt of a step on this environment (I1: "the last run" half of an observation). */
+export interface RunFacts {
+  status: "completed" | "failed";
+  started_at: string;
+  input: Json;
+  /** ops_action_runs.output_payload: {plan_hash, plan, stages[{stage, ok, detail, output?}]} */
+  output: Json;
+}
+
 export interface ReadContext {
   db: SupabaseClient;
   site: SiteRow;
   environment: EnvironmentRow;
+  /** Read verbs only. Within one engine call every preflight() answers from ONE host call (item 4, SF-H). */
   gate: SiteGateReader;
+  /** The step input the operator sent with plan/execute, already checked by the step's parseInput ({} when none). */
+  input: Json;
+  /** Finished runs (completed/failed) of a step on this environment, newest first. */
+  history(step: SiteStepKey): Promise<RunFacts[]>;
 }
 
 export interface StepContext extends ReadContext {
   gate: SiteGateClient;
+  /** A pending run's place, as its last execute/verify answered it (StepResult.progress); undefined at first. */
+  progress?: Json;
 }
 
 /** One stage's answer. `jobId` (execute only): the host started a background job; the run stays running until polled. */
@@ -76,6 +97,14 @@ export interface StepResult {
   /** Returned in this HTTP response only; never written anywhere (one-time admin password). */
   reveal?: Json;
   jobId?: string;
+  /**
+   * The host may still be working after this answer (a gate call outlived the SSH timeout; the gate ignores the hangup
+   * and finishes under its slug lock). execute: the run stays `running` and every poll calls verify. verify: "not
+   * finished yet, ask again" -- never done, never failed. The step's timeoutMs bounds how long this can last.
+   */
+  pending?: boolean;
+  /** With `pending`: where the step is, handed back as StepContext.progress on the next poll (no secret in it). */
+  progress?: Json;
 }
 
 /**
@@ -107,6 +136,13 @@ export interface SiteStepDefinition {
   /** Steps whose observation must be `done` before this one can run. */
   requires: SiteStepKey[];
   timeoutMs: number;
+  /** Checks the operator's step input (plan and execute both send it; it is part of the plan, so of the hash). */
+  parseInput?(raw: unknown): InputCheck;
+  /**
+   * Non-null = on this environment the step is not run here but confirmed by hand (sites.metadata.manual_checks
+   * `key`, steps/manual-checks.ts); execute refuses. Example: vhost when ingress=product-gateway.
+   */
+  manual?(env: EnvironmentRow): { key: string; label: string } | null;
   observe(ctx: ReadContext): Promise<StepObservation>;
   precheck(ctx: StepContext): Promise<StepResult>;
   plan(ctx: ReadContext): Promise<StepPlan>;
@@ -138,4 +174,6 @@ export interface StepStatus {
   reason: string | null;
   observation: StepObservation | null;
   lastRun: StepRunSummary | null;
+  /** Set when this step is confirmed by hand on this environment (see SiteStepDefinition.manual). */
+  manual: { key: string; label: string } | null;
 }

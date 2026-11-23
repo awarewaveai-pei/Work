@@ -5,7 +5,8 @@
 // timed-out site.* runs of this environment -> write the run (write fails = stop before any gate call) -> no other
 // site.* run live on this environment -> required steps observed done -> recompute plan, hash must equal the
 // confirmed one (else 409) -> precheck -> execute -> verify -> rollback on any failure after execute started.
-// A host background job keeps the run `running`; pollRun finishes it.
+// A host background job, or a step answering `pending` (host work that outlived the SSH call), keeps the run
+// `running`; pollRun finishes it (job: site-job then verify; pending: verify again until it is no longer pending).
 //
 // Traps:
 // - Step state is never stored: getSiteFlowStatus derives it from each step's observe() plus the step's last run.
@@ -17,13 +18,20 @@
 // - The operator id goes into run metadata, not actor_user_id: that column references profiles(id), and an FK miss
 //   would fail the run write and therefore the step.
 // - observe()/plan() receive a reader that exposes only read verbs, so a step cannot change the host from a path
-//   that has no run record and no system-mode check.
+//   that has no run record and no system-mode check. Within one engine call the reader answers every preflight()
+//   from one host call (one SSH connection for the whole status page, SF-H item 4).
+// - Step input (parseInput) is checked before any run is written and is stored in the run's input_payload.input:
+//   it is part of the plan, so of the hash, and observe() reads it back through ctx.history(). No secret in it.
+// - environments.status is a cache (records.ts ENVIRONMENT_STATUS_TRANSITIONS); syncEnvironmentStatus moves it on
+//   run start/finish and ignores its own failures: the page never reads it.
 
 import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { BLOCKED_CHANGE_CODE, blockedChangeBody } from "@/lib/system-modes/blocked-change";
 import type { SiteGateClient } from "./gate-client";
+import { canTransition, setEnvironmentStatus, type EnvironmentStatus } from "./records";
+import { HOST_STEPS } from "./steps";
 import {
   actionKeyOf,
   SITE_STEP_KEYS,
@@ -31,6 +39,7 @@ import {
   SITE_STEP_TIMEOUT_MIN_MS,
   type EnvironmentRow,
   type ReadContext,
+  type RunFacts,
   type SiteGateReader,
   type SiteRow,
   type SiteStepDefinition,
@@ -45,8 +54,8 @@ import {
   type StepStatus,
 } from "./types";
 
-/** Step bodies (SF-H: preflight/create/wp_install/vhost/open; SF-I: mainwp/bridge) register here. */
-export const SITE_STEP_DEFINITIONS: SiteStepRegistry = {};
+/** Step bodies: lib/site-flow/steps/index.ts (SF-H: preflight/create/wp_install/vhost/open; SF-I adds mainwp/bridge). */
+export const SITE_STEP_DEFINITIONS: SiteStepRegistry = { ...HOST_STEPS };
 
 type Json = Record<string, unknown>;
 type Db = SupabaseClient;
@@ -57,6 +66,8 @@ export interface EngineDeps {
   steps: SiteStepRegistry;
   gateFor(environment: EnvironmentRow): SiteGateClient;
   now?: () => number;
+  /** Extra read-only page sections for getSiteFlowStatus (steps/index.ts sitePanels); same reader, same preflight. */
+  panels?: (ctx: ReadContext) => Promise<Json>;
 }
 
 export interface Actor {
@@ -132,13 +143,83 @@ async function observeSafe(def: SiteStepDefinition, ctx: ReadContext): Promise<S
   }
 }
 
-/** Only the read verbs, as a new object: a step cannot reach create/vhost/wp through it. */
+/**
+ * Only the read verbs, as a new object: a step cannot reach create/vhost/wp through it. preflight() is asked of the
+ * host once per reader; every later call shares that answer (a transport failure included: retry = a new request).
+ */
 function readerOf(gate: SiteGateClient): SiteGateReader {
-  return { provider: gate.provider, preflight: () => gate.preflight(), job: (id: string) => gate.job(id) };
+  let preflight: ReturnType<SiteGateClient["preflight"]> | null = null;
+  return { provider: gate.provider, preflight: () => (preflight ??= gate.preflight()), job: (id: string) => gate.job(id) };
 }
 
-function readContext(db: Db, site: SiteRow, environment: EnvironmentRow, gate: SiteGateClient): ReadContext {
-  return { db, site, environment, gate: readerOf(gate) };
+const HISTORY_LIMIT = 20;
+
+/** ctx.history: finished runs of a step on this environment, newest first; one query per step per engine call. */
+function historyOf(db: Db, cat: CatalogRows | null, environmentId: string): ReadContext["history"] {
+  const memo = new Map<SiteStepKey, Promise<RunFacts[]>>();
+  const load = async (step: SiteStepKey): Promise<RunFacts[]> => {
+    const row = cat?.get(actionKeyOf(step));
+    if (!row) return [];
+    const { data, error } = await db
+      .from("ops_action_runs")
+      .select("status,started_at,input_payload,output_payload")
+      .eq("action_id", row.id)
+      .eq("environment_id", environmentId)
+      .in("status", ["completed", "failed"])
+      .order("started_at", { ascending: false })
+      .limit(HISTORY_LIMIT);
+    if (error) throw new Error(`run history unreadable: ${error.message}`);
+    return ((data ?? []) as Array<{ status: RunFacts["status"]; started_at: string; input_payload: unknown; output_payload: unknown }>).map((r) => {
+      const inp = isObj(r.input_payload) ? r.input_payload : {};
+      return { status: r.status, started_at: r.started_at, input: isObj(inp.input) ? inp.input : {}, output: isObj(r.output_payload) ? r.output_payload : {} };
+    });
+  };
+  return (step) => {
+    let p = memo.get(step);
+    if (!p) memo.set(step, (p = load(step)));
+    return p;
+  };
+}
+
+function readContext(db: Db, site: SiteRow, environment: EnvironmentRow, gate: SiteGateClient, cat: CatalogRows | null, input: Json = {}): ReadContext {
+  return { db, site, environment, gate: readerOf(gate), input, history: historyOf(db, cat, environment.id) };
+}
+
+/** A step's input as its parseInput accepts it; a step without parseInput takes none. */
+function checkInput(def: SiteStepDefinition, raw: unknown): { ok: true; input: Json } | { ok: false; outcome: EngineOutcome } {
+  if (!def.parseInput) return { ok: true, input: {} };
+  const r = def.parseInput(raw);
+  return "error" in r ? { ok: false, outcome: out(400, { ok: false, error: "invalid_input", detail: r.error }) } : { ok: true, input: r.input };
+}
+
+const manualOf = (def: SiteStepDefinition, env: EnvironmentRow) => def.manual?.(env) ?? null;
+
+// ── environments.status cache ────────────────────────────────────────────────
+
+type RunEvent = "start" | "completed" | "failed";
+
+/**
+ * The cache rule on top of records.ts ENVIRONMENT_STATUS_TRANSITIONS. A site already `ready` (opened) stays ready
+ * through any later run (a password reset, a re-check); `open` completing makes it ready; anything else building it
+ * shows provisioning, and a failed attempt shows failed until the next attempt starts. null = leave it.
+ */
+export function nextEnvironmentStatus(current: string, step: SiteStepKey, event: RunEvent): EnvironmentStatus | null {
+  if (current === "archived" || current === "ready" || step === "preflight") return null;
+  const to: EnvironmentStatus | null = event === "start" ? "provisioning" : event === "failed" ? "failed" : step === "open" ? "ready" : null;
+  return to && to !== current && canTransition(current, to) ? to : null;
+}
+
+async function syncEnvironmentStatus(db: Db, environmentId: string, step: SiteStepKey, event: RunEvent): Promise<void> {
+  try {
+    const { data } = await db.from("environments").select("status").eq("id", environmentId).maybeSingle();
+    const current = data && typeof (data as Json).status === "string" ? String((data as Json).status) : null;
+    if (!current) return;
+    // "start" after a failure goes failed -> provisioning; "completed" of open goes provisioning -> ready.
+    const to = nextEnvironmentStatus(current, step, event);
+    if (to) await setEnvironmentStatus(db, environmentId, to);
+  } catch {
+    /* a cache: the page reads observations, never this column */
+  }
 }
 
 // ── loading ──────────────────────────────────────────────────────────────────
@@ -151,7 +232,7 @@ export async function loadSiteEnvironment(
   if (!UUID_RE.test(siteId)) return { ok: false, outcome: out(400, { ok: false, error: "invalid_site_id" }) };
   const { data: site, error: siteErr } = await db
     .from("sites")
-    .select("id,organization_id,workspace_id,project_id,name,primary_domain,metadata")
+    .select("id,organization_id,workspace_id,project_id,name,primary_domain,locale,metadata")
     .eq("id", siteId)
     .maybeSingle();
   if (siteErr) return { ok: false, outcome: out(503, { ok: false, error: "site_lookup_failed" }) };
@@ -309,17 +390,21 @@ async function reclaimEnvironment(deps: EngineDeps, cat: CatalogRows, environmen
 
 export async function planStep(
   deps: EngineDeps,
-  args: { site: SiteRow; environment: EnvironmentRow; step: SiteStepKey },
+  args: { site: SiteRow; environment: EnvironmentRow; step: SiteStepKey; input?: unknown },
 ): Promise<EngineOutcome> {
   const def = deps.steps[args.step];
   if (!def) return out(404, { ok: false, error: "step_not_available" });
+  const manual = manualOf(def, args.environment);
+  if (manual) return out(409, { ok: false, error: "manual_step", detail: `這一步在這個站是手動確認：${manual.label}`, manual });
+  const checked = checkInput(def, args.input);
+  if ("outcome" in checked) return checked.outcome;
   const cat = await readCatalog(deps.db);
   if (!cat) return out(503, { ok: false, error: "catalog_unreadable" });
   const row = cat.get(actionKeyOf(args.step));
   if (!row) return out(403, { ok: false, error: "step_not_registered", detail: `no ops_action_catalog row for ${actionKeyOf(args.step)}` });
   if (!row.enabled) return out(403, { ok: false, error: "step_disabled", detail: "此步驟尚未開放" });
   try {
-    const plan = await def.plan(readContext(deps.db, args.site, args.environment, deps.gateFor(args.environment)));
+    const plan = await def.plan(readContext(deps.db, args.site, args.environment, deps.gateFor(args.environment), cat, checked.input));
     return out(200, { ok: true, step: args.step, plan, planHash: planHash(args.step, args.environment.id, plan) });
   } catch (e) {
     return out(502, { ok: false, error: "plan_failed", detail: e instanceof Error ? e.message : String(e) });
@@ -341,7 +426,7 @@ const stageOf = (stage: Stage["stage"], r: StepResult): Stage => ({ stage, ok: r
 
 export async function executeStep(
   deps: EngineDeps,
-  args: { site: SiteRow; environment: EnvironmentRow; step: SiteStepKey; planHash: unknown; actor: Actor },
+  args: { site: SiteRow; environment: EnvironmentRow; step: SiteStepKey; planHash: unknown; actor: Actor; input?: unknown },
 ): Promise<EngineOutcome> {
   const { db } = deps;
   const def = deps.steps[args.step];
@@ -350,6 +435,11 @@ export async function executeStep(
     return out(400, { ok: false, error: "plan_hash_required" });
   }
   const confirmed = args.planHash;
+  const manual = manualOf(def, args.environment);
+  if (manual) return out(409, { ok: false, error: "manual_step", detail: `這一步在這個站是手動確認：${manual.label}`, manual });
+  const checked = checkInput(def, args.input);
+  if ("outcome" in checked) return checked.outcome;
+  const stepInput = checked.input;
 
   // I6: the catalog row is the per-step key. No row = refuse; never seed one.
   const cat = await readCatalog(db);
@@ -358,7 +448,7 @@ export async function executeStep(
   if (!row) return out(403, { ok: false, error: "step_not_registered", detail: `no ops_action_catalog row for ${actionKeyOf(args.step)}` });
 
   const base = { actionId: row.id, step: args.step, site: args.site, environment: args.environment, actor: args.actor };
-  const input = { plan_hash: confirmed };
+  const input = { plan_hash: confirmed, input: stepInput };
 
   if (!row.enabled) {
     const runId = await insertRun(db, { ...base, status: "blocked", inputPayload: input, errorSummary: "step_disabled" });
@@ -376,6 +466,8 @@ export async function executeStep(
   // I6: no record, no action. Nothing below this line runs without a run row.
   const runId = await insertRun(db, { ...base, status: "running", inputPayload: input });
   if (!runId) return out(503, { ok: false, error: "run_record_failed", detail: "ops_action_runs write failed; nothing was done" });
+
+  const finished = async (status: "completed" | "failed") => syncEnvironmentStatus(db, args.environment.id, args.step, status);
 
   const cancel = async (status: number, error: string, extra: Json = {}) => {
     await finishRun(db, runId, "cancelled", {}, error);
@@ -396,13 +488,15 @@ export async function executeStep(
   if ((others ?? []).length > 0) return cancel(409, "another_step_running", { detail: "這個環境有另一個步驟正在執行" });
 
   const gate = deps.gateFor(args.environment);
-  const readCtx = readContext(db, args.site, args.environment, gate);
+  const readCtx = readContext(db, args.site, args.environment, gate, cat, stepInput);
   const missing: SiteStepKey[] = [];
   for (const dep of def.requires) {
     const depDef = deps.steps[dep];
     if (!depDef || (await observeSafe(depDef, readCtx)).status !== "done") missing.push(dep);
   }
-  if (missing.length > 0) return cancel(409, "prerequisite_not_done", { missing });
+  if (missing.length > 0) {
+    return cancel(409, "prerequisite_not_done", { missing, detail: `需先完成：${missing.map((k) => titleOf(deps, k)).join("、")}` });
+  }
 
   let plan: StepPlan;
   let current: string;
@@ -416,8 +510,10 @@ export async function executeStep(
   if (current !== confirmed) {
     return cancel(409, "plan_changed", { detail: "計畫已變更，請重新檢視後再確認", plan, planHash: current });
   }
+  // Only now is this an attempt on the host: refusals above leave the status cache alone.
+  await syncEnvironmentStatus(db, args.environment.id, args.step, "start");
 
-  const ctx: StepContext = { db, site: args.site, environment: args.environment, gate };
+  const ctx: StepContext = { db, site: args.site, environment: args.environment, gate, input: stepInput, history: historyOf(db, cat, args.environment.id) };
   const stages: Stage[] = [];
   const output = () => ({ plan_hash: current, plan, stages });
   let reveal: Json | undefined;
@@ -427,6 +523,7 @@ export async function executeStep(
   /** Claim the failure first; only the winner rolls back. */
   const failWithRollback = async (reason: string) => {
     if (!(await finishRun(db, runId, "failed", output(), reason))) return reclaimed();
+    await finished("failed");
     stages.push(await rollbackIfAllowed(deps, def, ctx, plan));
     await writeOutput(db, runId, output());
     return respond(200, { ok: false, outcome: "failed", reason });
@@ -436,12 +533,25 @@ export async function executeStep(
   stages.push(stageOf("precheck", pre));
   if (!pre.ok) {
     if (!(await finishRun(db, runId, "failed", output(), "precheck_failed"))) return reclaimed();
+    await finished("failed");
     return respond(200, { ok: false, outcome: "failed", reason: "precheck_failed" });
   }
+
+  /** The host is still working: the run stays running; every poll calls verify until it stops answering pending. */
+  const keepRunning = async (progress?: Json) => {
+    const meta = runMetadata({ ...base, status: "running", inputPayload: input }, { awaiting_host: true });
+    const kept = { ...output(), ...(progress ? { progress_state: progress } : {}) };
+    if (await casRunning(db, runId, { metadata: meta, output_payload: kept })) return respond(202, { ok: true, outcome: "running" });
+    // Reclaimed meanwhile, or the write failed: without the awaiting flag no poll would ever finish this run.
+    if (!(await finishRun(db, runId, "failed", output(), "awaiting_flag_not_recorded"))) return reclaimed();
+    await finished("failed");
+    return respond(200, { ok: false, outcome: "failed", reason: "awaiting_flag_not_recorded" });
+  };
 
   const exec = await safe(() => def.execute(ctx, plan));
   stages.push(stageOf("execute", exec));
   reveal = exec.reveal;
+  if (exec.pending) return keepRunning(exec.progress);
   if (!exec.ok) return failWithRollback("execute_failed");
 
   if (exec.jobId) {
@@ -452,13 +562,16 @@ export async function executeStep(
     }
     // Reclaimed meanwhile, or the write failed: without a recorded job id no poll can finish this run.
     if (!(await finishRun(db, runId, "failed", { ...output(), host_job_id: exec.jobId }, "job_id_not_recorded"))) return reclaimed();
+    await finished("failed");
     return respond(200, { ok: false, outcome: "failed", reason: "job_id_not_recorded" });
   }
 
   const ver = await safe(() => def.verify(ctx, plan));
+  if (ver.pending) return keepRunning(ver.progress);
   stages.push(stageOf("verify", ver));
   if (!ver.ok) return failWithRollback("verify_failed");
   if (!(await finishRun(db, runId, "completed", output(), null))) return reclaimed();
+  await finished("completed");
   return respond(200, { ok: true, outcome: "completed", reason: null });
 }
 
@@ -510,38 +623,90 @@ export async function pollRun(
     return reread();
   }
   const jobId = typeof meta.host_job_id === "string" ? meta.host_job_id : null;
-  if (!jobId) return out(200, { ok: true, run: summary(run) });
+  const awaiting = meta.awaiting_host === true;
+  if (!jobId && !awaiting) return out(200, { ok: true, run: summary(run) });
 
+  const input = isObj(run.input_payload) ? run.input_payload : {};
+  const prev = isObj(run.output_payload) ? run.output_payload : {};
+  const plan = (isObj(prev.plan) ? prev.plan : input.plan) as StepPlan | undefined;
   const gate = deps.gateFor(args.environment);
-  const ctx: StepContext = { db, site: args.site, environment: args.environment, gate };
-  const job = await gate.job(jobId);
+  const cat = await readCatalog(db);
+  const ctx: StepContext = {
+    db,
+    site: args.site,
+    environment: args.environment,
+    gate,
+    input: isObj(input.input) ? input.input : {},
+    history: historyOf(db, cat, args.environment.id),
+  };
+  const priorStages: Stage[] = Array.isArray(prev.stages) ? (prev.stages as Stage[]) : [];
+  const finished = (status: "completed" | "failed") => syncEnvironmentStatus(db, args.environment.id, args.step, status);
+
+  if (awaiting && !jobId) {
+    if (!plan) {
+      if (await finishRun(db, run.id, "failed", prev, "plan_missing_on_run")) await finished("failed");
+      return reread();
+    }
+    // This verify changes the host (it continues the step), so the system mode is asked first, as execute does.
+    const mode = await checkProductionChangeAllowed(db, args.site.organization_id);
+    if (!mode.allowed) {
+      return out(200, { ok: true, run: summary(run), poll: { pending: true, blocked: mode.mode, detail: `系統模式 ${mode.mode}：暫停中；解除後若這次執行還沒逾時就會接著做，逾時則需重跑（重跑會接著已完成的部分）` } });
+    }
+    ctx.progress = isObj(prev.progress_state) ? prev.progress_state : undefined;
+    const v = await safe(() => def.verify(ctx, plan));
+    if (v.pending) {
+      await casRunning(db, run.id, { output_payload: { ...prev, progress: v.detail, ...(v.progress ? { progress_state: v.progress } : {}) } });
+      return out(200, { ok: true, run: summary(run), poll: { pending: true, detail: v.detail } });
+    }
+    const stages = [...priorStages, stageOf("verify", v)];
+    const { progress: _drop, progress_state: _state, ...rest } = prev;
+    void _drop;
+    void _state;
+    if (v.ok) {
+      if (await finishRun(db, run.id, "completed", { ...rest, stages }, null)) await finished("completed");
+      return reread();
+    }
+    if (await finishRun(db, run.id, "failed", { ...rest, stages }, "verify_failed")) {
+      await finished("failed");
+      stages.push(await rollbackIfAllowed(deps, def, ctx, plan));
+      await writeOutput(db, run.id, { ...rest, stages });
+    }
+    return reread();
+  }
+
+  const job = await gate.job(jobId as string);
   // Only a transport error is "no answer yet" (the timeout closes the run if the host never answers). A refusal
   // (switch turned off, bad id, wrong provider) is an answer: the job cannot be followed, so the run fails.
   if ("error" in job && job.error === "transport") return out(200, { ok: true, run: summary(run), poll: { error: job.error, detail: job.detail } });
   if (!("error" in job) && job.data.state === "running") return out(200, { ok: true, run: summary(run) });
 
-  const input = isObj(run.input_payload) ? run.input_payload : {};
-  const prev = isObj(run.output_payload) ? run.output_payload : {};
-  const plan = (isObj(prev.plan) ? prev.plan : input.plan) as StepPlan | undefined;
   const jobStage: Stage =
     "error" in job ? { stage: "job", ok: false, detail: `${job.error}: ${job.detail}` } : { stage: "job", ok: job.data.state === "succeeded", detail: job.data.detail };
-  const stages: Stage[] = [...(Array.isArray(prev.stages) ? (prev.stages as Stage[]) : []), jobStage];
+  const stages: Stage[] = [...priorStages, jobStage];
 
   if (!plan) {
-    await finishRun(db, run.id, "failed", { ...prev, stages }, "plan_missing_on_run");
+    if (await finishRun(db, run.id, "failed", { ...prev, stages }, "plan_missing_on_run")) await finished("failed");
     return reread();
   }
   if (jobStage.ok) {
     const v = await safe(() => def.verify(ctx, plan));
+    if (v.pending) {
+      // The job is done but its result is not settled yet (verify asks again): follow it as awaiting host work.
+      const nextMeta = { ...meta, awaiting_host: true };
+      delete (nextMeta as Json).host_job_id;
+      await casRunning(db, run.id, { metadata: nextMeta, output_payload: { ...prev, stages, progress: v.detail, ...(v.progress ? { progress_state: v.progress } : {}) } });
+      return reread();
+    }
     stages.push(stageOf("verify", v));
     if (v.ok) {
-      await finishRun(db, run.id, "completed", { ...prev, stages }, null);
+      if (await finishRun(db, run.id, "completed", { ...prev, stages }, null)) await finished("completed");
       return reread();
     }
   }
   // Claim the failure first (CAS); only the winner rolls back, so two polls never roll back twice.
   const reason = jobStage.ok ? "verify_failed" : "job_failed";
   if (await finishRun(db, run.id, "failed", { ...prev, stages }, reason)) {
+    await finished("failed");
     stages.push(await rollbackIfAllowed(deps, def, ctx, plan));
     await writeOutput(db, run.id, { ...prev, stages });
   }
@@ -556,6 +721,8 @@ export function deriveStepState(args: {
   observation: StepObservation | null;
   lastRun: StepRunSummary | null;
   missing: SiteStepKey[];
+  /** Display names for `missing` (the step's title); a key without one is shown as is. */
+  titles?: Partial<Record<SiteStepKey, string>>;
 }): { state: StepState; reason: string | null } {
   const { observation: obs, lastRun } = args;
   if (!args.implemented || !obs) return { state: "not_available", reason: "此步驟尚未提供" };
@@ -565,7 +732,7 @@ export function deriveStepState(args: {
   if (lastRun?.status === "failed") return { state: "failed", reason: lastRun.error_summary ?? "上次執行失敗" };
   if (obs.status === "blocked") return { state: "blocked", reason: obs.detail };
   if (obs.status === "unknown") return { state: "blocked", reason: `無法確認現況：${obs.detail}` };
-  if (args.missing.length > 0) return { state: "blocked", reason: `需先完成：${args.missing.join("、")}` };
+  if (args.missing.length > 0) return { state: "blocked", reason: `需先完成：${args.missing.map((k) => args.titles?.[k] ?? k).join("、")}` };
   if (!args.enabled) return { state: "not_started", reason: "此步驟尚未開放" };
   return { state: "ready", reason: null };
 }
@@ -598,7 +765,7 @@ export async function getSiteFlowStatus(
     }
   }
 
-  const ctx = readContext(db, args.site, args.environment, deps.gateFor(args.environment));
+  const ctx = readContext(db, args.site, args.environment, deps.gateFor(args.environment), cat);
   const observations = new Map<SiteStepKey, StepObservation | null>();
   await Promise.all(
     ALL_STEPS.map(async (k) => {
@@ -607,15 +774,28 @@ export async function getSiteFlowStatus(
     }),
   );
 
+  const titles: Partial<Record<SiteStepKey, string>> = {};
+  for (const k of ALL_STEPS) titles[k] = titleOf(deps, k);
   const steps: StepStatus[] = ALL_STEPS.map((k) => {
     const def = deps.steps[k];
     const row = cat.get(actionKeyOf(k));
     const lastRun = row ? lastByAction.get(row.id) ?? null : null;
     const observation = observations.get(k) ?? null;
     const missing = (def?.requires ?? []).filter((d) => observations.get(d)?.status !== "done");
-    const { state, reason } = deriveStepState({ implemented: !!def, enabled: !!row?.enabled, observation, lastRun, missing });
-    return { key: k, actionKey: actionKeyOf(k), title: def?.title ?? k, enabled: !!row?.enabled, state, reason, observation, lastRun };
+    const manual = def ? manualOf(def, args.environment) : null;
+    // A hand-confirmed step has no catalog switch to open: the tick is its whole action.
+    const { state, reason } = deriveStepState({ implemented: !!def, enabled: manual ? true : !!row?.enabled, observation, lastRun, missing, titles });
+    return { key: k, actionKey: actionKeyOf(k), title: def?.title ?? k, enabled: !!row?.enabled, state, reason, observation, lastRun, manual };
   });
+
+  let panels: Json | null = null;
+  if (deps.panels) {
+    try {
+      panels = await deps.panels(ctx);
+    } catch (e) {
+      panels = { error: e instanceof Error ? e.message : String(e) };
+    }
+  }
 
   return out(200, {
     ok: true,
@@ -627,5 +807,20 @@ export async function getSiteFlowStatus(
       base_url: args.environment.base_url,
     },
     steps,
+    ...(panels ? { panels } : {}),
   });
+}
+
+/** The name the operator reads for a step (its definition's title), never the internal key. */
+const STEP_TITLES: Record<SiteStepKey, string> = {
+  preflight: "網址檢查",
+  create: "建立網站主機",
+  wp_install: "安裝 WordPress 與外掛",
+  vhost: "掛上網址",
+  mainwp: "接上 MainWP",
+  bridge: "接上 AI 控制通道",
+  open: "正式開放",
+};
+function titleOf(deps: Pick<EngineDeps, "steps">, k: SiteStepKey): string {
+  return deps.steps[k]?.title ?? STEP_TITLES[k];
 }

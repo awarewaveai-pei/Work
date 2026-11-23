@@ -1,16 +1,21 @@
 // Host gate client for site-flow steps (SITE-FLOW-COMPLETION-PLAN.md §1-3, card SF-G). next-admin holds no host
 // shell (I3): every host action is one line to the SSH forced command scripts/aw-hosting-gate.sh.
 //
-// Output contract the gate's site-* verbs follow (card SF-E implements them): exit 0 = done, 126 = verb not
-// allowed or the host switch AW_SITE_VERBS is off, anything else = failed; stdout's last non-empty line is one JSON
-// object. site-create answers {"job":"sj-..."}; site-job answers {"state":"running"|"succeeded"|"failed","detail":"..."}.
+// Output contract the gate's site-* verbs follow (aw-hosting-gate.sh header): exit 0 = done, 126 = verb not
+// allowed, the host switch AW_SITE_VERBS is off, or (site-create) ingress=product-gateway for a slug the host does not
+// list in AW_SITE_GATEWAY_SLUGS; anything else = failed; stdout's last non-empty line is one JSON object. site-create
+// answers {"job":"sj-..."}; site-job answers {"state":"running"|"succeeded"|"failed","detail":"..."}.
 //
 // Provider adapter: ks-aw-01-docker speaks site-* verbs; ks-aw-01-staging-subdir maps the few wp sub-verbs that
 // have a staging meaning onto the existing `staging-wp <slug>` (fixed scripts built here; no caller text reaches
 // the script). Container steps (preflight/create/vhost/job) do not exist for a staging subdirectory site.
 //
 // Traps: the gate's grammar is the authority; the checks here only refuse obviously bad input before it costs an
-// SSH round trip. Never put a secret on the command line (it lands in the host's auth log) -- stdin only.
+// SSH round trip. Never put a secret on the command line (it lands in the host's auth log).
+// - site-* verbs take NO stdin: the gate answers 126 to any byte on stdin (aw-hosting-gate.sh "site verbs take no
+//   stdin"). Only the staging adapter sends stdin (its own fixed script, to staging-wp).
+// - A gate call that outlives GATE_TIMEOUT_MS is a `transport` error, but the host does NOT stop: the gate ignores the
+//   hangup and finishes under the site's slug lock. isLockBusy() reads the gate's "another ... is running" refusal.
 
 import { connectSsh, readSshTargetFromEnv, sshExec, type SshExecResult } from "@/lib/repair-center/ssh";
 import type { Client as SshClient } from "ssh2";
@@ -25,7 +30,7 @@ const STAGING_ROOT = "/var/www/html/staging"; // = aw-hosting-gate.sh ROOT
 const STAGING_ADMIN_USER = "admin"; // = provision-staging STAGING_ADMIN_USER
 const GATE_TIMEOUT_MS = 90_000; // under Cloudflare's ~100 s; anything longer is a background job
 
-export const WP_SUBVERBS = ["install", "plugins", "open", "close", "set-mainwp-id", "put-bridge-pubkey", "reset-admin-password"] as const;
+export const WP_SUBVERBS = ["install", "plugins", "open", "close", "set-mainwp-id", "put-bridge-pubkey", "reset-admin-password", "set-oracle-engine-url"] as const;
 export type WpSubverb = (typeof WP_SUBVERBS)[number];
 
 export interface GateTransport {
@@ -41,23 +46,52 @@ export interface HostJobStatus {
   detail: string;
 }
 
+export const WP_EMAIL_RE = /^[a-z0-9._%+-]{1,64}@([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/; // = gate EMAIL_RE
+export const WP_EMAIL_MAX = 60; // = gate: WordPress user_login
+export const WP_LOCALE_RE = /^[a-z]{2,3}(_[A-Z]{2})?$/; // = gate LOCALE_RE
+/** aware-wave-oracle "Engine URL (server)": = gate ENGINE_URL_RE (lowercase host, optional port, nothing after). */
+export const ENGINE_URL_RE = /^https?:\/\/[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:[0-9]{2,5})?$/;
+
+/** The call reached the host and outlived GATE_TIMEOUT_MS (sshGateTransport's timer): the host keeps going. Any other
+ *  transport failure (connect, auth) means nothing reached the host. */
+export function isGateTimeout(call: GateCall<unknown>): boolean {
+  return "error" in call && call.error === "transport" && call.detail.startsWith("gate_timeout_");
+}
+
+/** The gate's refusal when another create/vhost/wp/teardown of the same site holds its slug lock. */
+export function isLockBusy(call: GateCall<unknown>): boolean {
+  return "error" in call && call.error === "failed" && /another create\/vhost\/wp\/teardown of \S+ is running/.test(call.detail);
+}
+
 export interface SiteGateClient {
   readonly provider: string;
   preflight(): Promise<GateCall<Record<string, unknown>>>;
-  /** Starts the background container job; returns its id. */
+  /** Starts the background container job with the environment's ingress; returns its id. */
   create(): Promise<GateCall<{ jobId: string }>>;
   vhost(): Promise<GateCall<Record<string, unknown>>>;
-  wp(sub: WpSubverb, args?: string[], stdin?: string): Promise<GateCall<Record<string, unknown>>>;
+  /** Docker sites: fixed sub-verb + white-listed args, never stdin. Staging: a fixed script built here. */
+  wp(sub: WpSubverb, args?: string[]): Promise<GateCall<Record<string, unknown>>>;
   job(jobId: string): Promise<GateCall<HostJobStatus>>;
 }
+
+export type GateIngress = "host-vhost" | "product-gateway";
 
 export interface GateTarget {
   provider: string;
   slug: string | null;
   domain: string | null;
+  /** environments.metadata.ingress; anything else = null (create refuses rather than guess). */
+  ingress?: GateIngress | null;
 }
 
 type EnvLike = { hosting_provider: string | null; base_url: string | null; wp_root_path: string | null; metadata: Record<string, unknown> };
+
+/** environments.metadata.ingress; absent = host-vhost (records.ts DEFAULT_INGRESS), unknown value = null. */
+export function ingressOf(env: Pick<EnvLike, "metadata">): GateIngress | null {
+  const v = env.metadata?.ingress;
+  if (v === undefined || v === null) return "host-vhost";
+  return v === "host-vhost" || v === "product-gateway" ? v : null;
+}
 
 /**
  * Host identity of an environment. Docker sites: slug = environments.metadata.host_slug (written by the step that
@@ -81,7 +115,7 @@ export function gateTargetOf(env: EnvLike): GateTarget {
     const s = env.metadata?.host_slug;
     slug = typeof s === "string" && SITE_SLUG_RE.test(s) ? s : null;
   }
-  return { provider, slug, domain };
+  return { provider, slug, domain, ingress: ingressOf(env) };
 }
 
 const fail = <T>(error: GateError, detail: string): GateCall<T> => ({ ok: false, error, detail });
@@ -137,6 +171,7 @@ function stagingScript(slug: string, sub: WpSubverb, args: string[]): string[] |
 
 export function createSiteGateClient(target: GateTarget, transport: GateTransport): SiteGateClient {
   const { provider, slug, domain } = target;
+  const ingress = target.ingress === undefined ? "host-vhost" : target.ingress;
   const docker = provider === "ks-aw-01-docker";
   const staging = provider === "ks-aw-01-staging-subdir";
   const needSlug = <T>(): GateCall<T> | null => (slug ? null : fail("invalid_argument", "environment has no valid host slug"));
@@ -155,7 +190,8 @@ export function createSiteGateClient(target: GateTarget, transport: GateTranspor
       const bad = dockerOnly<{ jobId: string }>("site-create");
       if (bad) return bad;
       if (!domain) return fail("invalid_argument", "environment base_url has no valid domain");
-      const r = await run(transport, `site-create ${slug} ${domain}`);
+      if (!ingress) return fail("invalid_argument", "environment metadata.ingress is neither host-vhost nor product-gateway");
+      const r = await run(transport, `site-create ${slug} ${domain} ${ingress}`);
       if ("error" in r) return fail(r.error, r.detail);
       const job = r.data.job;
       return typeof job === "string" && SITE_JOB_RE.test(job) ? { ok: true, data: { jobId: job } } : fail("bad_output", "site-create returned no job id");
@@ -165,14 +201,13 @@ export function createSiteGateClient(target: GateTarget, transport: GateTranspor
       if (bad) return bad;
       return run(transport, `site-vhost ${slug}`);
     },
-    async wp(sub, args = [], stdin) {
+    async wp(sub, args = []) {
       if (!(WP_SUBVERBS as readonly string[]).includes(sub)) return fail("invalid_argument", `unknown wp sub-verb ${String(sub)}`);
       const noSlug = needSlug<Record<string, unknown>>();
       if (noSlug) return noSlug;
       if (!args.every((a) => WP_ARG_RE.test(a))) return fail("invalid_argument", "wp argument outside the allowed characters");
-      if (docker) return run(transport, ["site-wp", slug, sub, ...args].join(" "), stdin);
+      if (docker) return run(transport, ["site-wp", slug, sub, ...args].join(" "));
       if (staging) {
-        if (stdin !== undefined) return fail("unsupported_on_provider", "staging-subdir sub-verbs take no stdin");
         const script = stagingScript(slug as string, sub, args);
         if (typeof script === "string") return fail("unsupported_on_provider", script);
         return run(transport, `staging-wp ${slug}`, script.join("\n") + "\n");

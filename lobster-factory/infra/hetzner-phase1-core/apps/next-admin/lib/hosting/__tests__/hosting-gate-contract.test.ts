@@ -48,10 +48,17 @@ function fakeDb() {
     // neq/order/limit: provision-staging's environments row (lib/site-flow/records.ts ensureEnvironment).
     const q = { select: () => q, eq: () => q, neq: () => q, order: () => q, limit: () => q,
       single: async () => ({ data: table === "organizations" ? { metadata: dbState.orgMetadata } : { spec_data: spec }, error: null }),
-      // website_specs row for the seed org lookup (provision-staging resolveTargetOrg)
-      maybeSingle: async () => ({ data: { organization_id: ORG_ID, intake_form_id: null }, error: null }),
+      // website_specs row for the seed org lookup (provision-staging resolveTargetOrg); an environments row carries its
+      // status like the real column (NOT NULL; records.ts moves it only along ENVIRONMENT_STATUS_TRANSITIONS)
+      maybeSingle: async () => ({ data: { organization_id: ORG_ID, intake_form_id: null, ...(table === "environments" ? { id: "env-1", status: "provisioning" } : {}) }, error: null }),
       insert: async () => ({ error: dbState.reserveWpSite ? null : { code: "23505", message: "dup" } }),
-      update: (payload: Record<string, unknown>) => { if (table === "organizations") dbState.orgUpdates.push(payload); return q; },
+      update: (payload: Record<string, unknown>) => {
+        if (table === "organizations") dbState.orgUpdates.push(payload);
+        if (table !== "environments") return q;
+        // the status CAS reads back the rows it moved (update ... select("id")), as PostgREST answers
+        const moved = { eq: () => moved, select: () => moved, then: (res: (v: unknown) => void) => res({ data: [{ id: "env-1" }], error: null }) };
+        return moved;
+      },
       delete: () => q };
     return q;
   } };
@@ -195,12 +202,15 @@ describe("site-flow gate-client → aw-hosting-gate site-* grammar", () => {
     await c.job("sj-20261122000000-0a1b2c3d");
     await c.vhost();
     await c.wp("install", ["owner@example.org", "zh_TW"]);
-    await c.wp("plugins", ["mainwp-child", "https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/download/v0.20.0/aware-wave-wp-bridge.zip"]);
+    // own plugins as the catalog builds them (<repo>-v<version>.zip under tag v<version>, release-wp-bridge.sh)
+    const { ownReleasePlugins } = await import("@/lib/wp-plugin-stack-catalog");
+    await c.wp("plugins", ["mainwp-child", ...ownReleasePlugins().map((p) => p.url)]);
     await c.wp("open");
     await c.wp("close");
     await c.wp("set-mainwp-id", [UNIQUE_ID]);
     await c.wp("put-bridge-pubkey", ["aw-next-admin-1", PUBKEY]);
     await c.wp("reset-admin-password");
+    await c.wp("set-oracle-engine-url", ["http://oracle-web:3000"]);
     return seen;
   }
 
@@ -242,7 +252,7 @@ describe("site-flow gate-client → aw-hosting-gate site-* grammar", () => {
   });
 
   it("the gate's grammar and gate-client agree (sub-verbs, slug/domain/job patterns)", async () => {
-    const { WP_SUBVERBS, SITE_SLUG_RE, SITE_DOMAIN_RE, SITE_JOB_RE } = await import("@/lib/site-flow/gate-client");
+    const { WP_SUBVERBS, SITE_SLUG_RE, SITE_DOMAIN_RE, SITE_JOB_RE, ENGINE_URL_RE } = await import("@/lib/site-flow/gate-client");
     const list = spawnSync("bash", [GATE, "--list"], { encoding: "utf8" }).stdout;
     const wpLine = list.split("\n").find((l) => l.startsWith("site-wp ")) ?? "";
     expect(wpLine.match(/<([^>]+)>/)?.[1].split(" ")).toEqual([...WP_SUBVERBS]);
@@ -251,6 +261,7 @@ describe("site-flow gate-client → aw-hosting-gate site-* grammar", () => {
     expect(reOf("SLUG_RE")).toBe(SITE_SLUG_RE.source);
     expect(reOf("DOMAIN_RE")).toBe(SITE_DOMAIN_RE.source);
     expect(reOf("JOB_RE")).toBe(SITE_JOB_RE.source);
+    expect(reOf("ENGINE_URL_RE")).toBe(ENGINE_URL_RE.source.replaceAll("\\/", "/")); // JS escapes the slashes
   });
 });
 

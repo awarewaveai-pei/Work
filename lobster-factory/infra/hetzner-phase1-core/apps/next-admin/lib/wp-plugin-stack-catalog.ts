@@ -9,9 +9,14 @@
  * installSource:
  *   "wporg"       — WP.org; installed via `wp plugin install <slug> --activate` (default for free plugins)
  *   "manual-zip"  — Paid zip; operator uploads to /opt/lobster-plugins/ on both VPS (WordPressIT bundle)
- *   "release-url" — GitHub release zip; fetched from awarewaveai-pei/aware-wave-wp-bridge releases
+ *   "release-url" — the company's own plugin: a GitHub release zip of awarewaveai-pei/<releaseRepo>, pinned to
+ *                   releaseVersion (releaseUrlOf builds the URL; the host gate accepts only that org's release URLs
+ *                   whose tag is v<version>, aw-hosting-gate.sh RELEASE_RE / RELEASE_TAG_RE)
  *   "manifest"    — Installed by manifest step runner; NOT included in wp-install-plugins task
  *   (omitted)     — Free WP.org plugin; same as "wporg", omitted for brevity
+ *
+ * kind "theme" (Kadence, TravelWP): a theme listed here for the stack overview. It is never a `wp plugin install`
+ * slug; the site flow installs Kadence with `site-wp install` (aw-hosting-gate.sh).
  *
  * SYNC RULE: Any change here must be reflected in WP_CLIENT_PLUGIN_STACK.md, and vice versa.
  */
@@ -38,6 +43,12 @@ export interface WpPlugin {
    * "manifest"    — Installed by manifest step runner; excluded from wp-install-plugins task
    */
   installSource?: "wporg" | "manual-zip" | "release-url" | "manifest";
+  /** "theme" = not a plugin (never passed to `wp plugin install`); default "plugin". */
+  kind?: "plugin" | "theme";
+  /** installSource "release-url" only: repo under github.com/awarewaveai-pei/ (= the plugin's directory slug). */
+  releaseRepo?: string;
+  /** installSource "release-url" only: the pinned release, tag v<releaseVersion> (scripts/release-wp-bridge.sh). */
+  releaseVersion?: string;
   /**
    * Free alternative slug (↩). Used by resolveInstallableSlugs when free: false.
    * Omit if there is no free substitute and the plugin must be installed manually.
@@ -58,7 +69,7 @@ export interface WpPlugin {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Catalog — 22 base + 17 ecommerce + 1 pod + 12 tourism + 3 brand = 55 total entries
+// Catalog — 23 base + 17 ecommerce + 1 pod + 12 tourism + 3 brand = 56 total entries
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const WP_PLUGIN_CATALOG: WpPlugin[] = [
@@ -66,9 +77,12 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   // ── BASE MODULE (21 functional slots) ────────────────────────────────────
 
   { slug: "mainwp-child",                      label: "MainWP Child",                               free: true,  required: true,  module: "base", installSource: "manifest" },
-  // Phase 1 TODO: wire release-url fetcher in provisioning flow (awarewaveai-pei/aware-wave-wp-bridge tag→Action zip)
-  { slug: "aware-wave-wp-bridge",              label: "AwareWave WP Bridge",                        free: false, required: true,  module: "base", installSource: "release-url" },
-  { slug: "kadence",        label: "Kadence Theme",  free: true, required: true, module: "base", excludeForModules: ["tourism"] },
+  // Own plugins (release-url): pinned versions; bump with each scripts/release-wp-bridge.sh release.
+  { slug: "aware-wave-wp-bridge",              label: "AwareWave WP Bridge",                        free: false, required: true,  module: "base", installSource: "release-url", releaseRepo: "aware-wave-wp-bridge", releaseVersion: "0.22.0" },
+  // Opt-in per site (required: false): the site flow installs it only when the operator ticks it at the WordPress step.
+  // Its release repo is not published yet (ORACLE-WP-SPEC P4): ticking it fails at the host's download until it is.
+  { slug: "aware-wave-oracle",                 label: "AwareWave Oracle（命理工具）†",               free: false, required: false, module: "base", installSource: "release-url", releaseRepo: "aware-wave-oracle", releaseVersion: "0.2.0" },
+  { slug: "kadence",        label: "Kadence Theme",  free: true, required: true, module: "base", kind: "theme", excludeForModules: ["tourism"] },
   { slug: "kadence-blocks", label: "Kadence Blocks", free: true, required: true, module: "base", excludeForModules: ["tourism"] },
   { slug: "kadence-pro",    label: "Kadence Pro Add-on (WordPressIT)", free: false, required: true, module: "base", installSource: "manual-zip", excludeForModules: ["tourism"] },
   { slug: "wordfence",                          label: "Wordfence Security",                         free: true,  required: true,  module: "base" },
@@ -168,6 +182,7 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   {
     slug: "travelwp",
     label: "TravelWP Theme (Physcode, $35)",
+    kind: "theme",
     free: false,
     required: true,
     module: "tourism",
@@ -228,6 +243,7 @@ export function resolvePluginStack(
  * Returns slugs that can be directly passed to `wp plugin install <slug> --activate`.
  *
  * Skips:
+ *   kind "theme"                       → skip (a theme is not a plugin; Kadence is installed as a theme)
  *   condition set                      → skip (conditional: not auto-installed)
  *   installSource "manifest"           → skip (installed by manifest step)
  *   installSource "release-url"        → skip (fetched via GitHub release, not WP.org)
@@ -243,7 +259,7 @@ export function resolveInstallableSlugs(
   const seen = new Set<string>();
   const slugs: string[] = [];
   for (const plugin of resolvePluginStack(siteType, hasEcommerce)) {
-    if (plugin.condition) continue;
+    if (plugin.condition || plugin.kind === "theme") continue;
     if (plugin.installSource === "manifest" || plugin.installSource === "release-url") continue;
     const slug = plugin.free ? plugin.slug : plugin.alternativeSlug;
     if (slug && !seen.has(slug)) { seen.add(slug); slugs.push(slug); }
@@ -284,14 +300,14 @@ export function resolvePluginsForPacks(packs: WpPluginModule[]): WpPlugin[] {
 
 /**
  * Returns slugs for `wp plugin install --activate`.
- * Skips: conditional, manifest-installed, release-url, and paid-no-alt plugins.
+ * Skips: themes, conditional, manifest-installed, release-url, and paid-no-alt plugins.
  * Deduplicates: same slug appearing in multiple modules is listed once.
  */
 export function resolveInstallableSlugsForPacks(packs: WpPluginModule[]): string[] {
   const seen = new Set<string>();
   const slugs: string[] = [];
   for (const plugin of resolvePluginsForPacks(packs)) {
-    if (plugin.condition) continue;
+    if (plugin.condition || plugin.kind === "theme") continue;
     if (plugin.installSource === "manifest" || plugin.installSource === "release-url") continue;
     const slug = plugin.free ? plugin.slug : plugin.alternativeSlug;
     if (slug && !seen.has(slug)) { seen.add(slug); slugs.push(slug); }
@@ -338,4 +354,57 @@ export function deriveSmokeProfileFromPacks(packs: WpPluginModule[]): "woocommer
   if (packs.includes("brand"))     return "business";
   if (packs.includes("tourism"))   return "business";
   return "basic";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Site flow (SITE-FLOW-COMPLETION-PLAN.md §1-3, card SF-H): what `site-wp <slug> plugins` receives
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RELEASE_ORG = "https://github.com/awarewaveai-pei/";
+const RELEASE_REPO_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+const RELEASE_VERSION_RE = /^[0-9]+(\.[0-9]+){0,3}$/;
+
+export interface OwnReleasePlugin {
+  slug: string;
+  label: string;
+  required: boolean;
+  url: string;
+}
+
+/** The release asset URL of a release-url row (scripts/release-wp-bridge.sh: <repo>-v<ver>.zip under tag v<ver>). */
+export function releaseUrlOf(p: Pick<WpPlugin, "releaseRepo" | "releaseVersion">): string | null {
+  const repo = p.releaseRepo ?? "";
+  const ver = p.releaseVersion ?? "";
+  if (!RELEASE_REPO_RE.test(repo) || repo.includes("..") || !RELEASE_VERSION_RE.test(ver)) return null;
+  return `${RELEASE_ORG}${repo}/releases/download/v${ver}/${repo}-v${ver}.zip`;
+}
+
+/** The white-list: every own plugin the catalog knows, with its URL. A URL not built here is never sent to the host. */
+export function ownReleasePlugins(): OwnReleasePlugin[] {
+  const seen = new Set<string>();
+  const out: OwnReleasePlugin[] = [];
+  for (const p of WP_PLUGIN_CATALOG) {
+    if (p.installSource !== "release-url" || seen.has(p.slug)) continue;
+    const url = releaseUrlOf(p);
+    if (!url) continue;
+    seen.add(p.slug);
+    out.push({ slug: p.slug, label: p.label, required: p.required, url });
+  }
+  return out;
+}
+
+export const isOwnReleaseUrl = (url: string): boolean => ownReleasePlugins().some((p) => p.url === url);
+
+/**
+ * What a site-flow site gets for its packs: WordPress.org slugs (resolveInstallableSlugsForPacks plus the free
+ * "manifest" rows such as mainwp-child, which the site flow installs itself) and own release plugins (required ones
+ * always, optional ones only when named in `optionalOwn`).
+ */
+export function resolveSiteFlowPlugins(packs: WpPluginModule[], optionalOwn: readonly string[] = []): { wporg: string[]; releases: OwnReleasePlugin[] } {
+  const wporg = resolveInstallableSlugsForPacks(packs);
+  for (const p of resolvePluginsForPacks(packs)) {
+    if (p.installSource === "manifest" && p.free && p.kind !== "theme" && !wporg.includes(p.slug)) wporg.push(p.slug);
+  }
+  const releases = ownReleasePlugins().filter((r) => r.required || optionalOwn.includes(r.slug));
+  return { wporg, releases };
 }

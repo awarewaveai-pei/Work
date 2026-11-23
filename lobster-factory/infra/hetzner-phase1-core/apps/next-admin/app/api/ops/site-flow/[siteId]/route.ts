@@ -7,6 +7,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { staffOnly } from "@/lib/tenant-guard";
 import { environmentTypeParam, getSiteFlowStatus, loadSiteEnvironment, SITE_STEP_DEFINITIONS } from "@/lib/site-flow/engine";
 import { createSiteGateClient, gateTargetOf, sshGateTransport, unconfiguredTransport } from "@/lib/site-flow/gate-client";
+import { sitePanels } from "@/lib/site-flow/steps";
 
 export async function GET(request: Request, context: { params: Promise<{ siteId: string }> }) {
   const denied = staffOnly(request);
@@ -20,7 +21,7 @@ export async function GET(request: Request, context: { params: Promise<{ siteId:
   if ("outcome" in loaded) return NextResponse.json(loaded.outcome.body, { status: loaded.outcome.status });
   const transport = sshGateTransport() ?? unconfiguredTransport;
   const r = await getSiteFlowStatus(
-    { db, steps: SITE_STEP_DEFINITIONS, gateFor: (env) => createSiteGateClient(gateTargetOf(env), transport) },
+    { db, steps: SITE_STEP_DEFINITIONS, gateFor: (env) => createSiteGateClient(gateTargetOf(env), transport), panels: sitePanels },
     { site: loaded.site, environment: loaded.environment },
   );
   return NextResponse.json(r.body, { status: r.status });
