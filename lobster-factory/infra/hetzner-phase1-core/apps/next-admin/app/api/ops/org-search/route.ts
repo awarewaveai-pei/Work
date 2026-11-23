@@ -18,6 +18,8 @@ import { staffOnly } from "@/lib/tenant-guard";
 import { organizationGroupId } from "@/lib/analytics-group";
 // billingLedger reads with the service-role client itself (billing_ledger is granted to service_role only, 0148)
 import { billingLedger, type BillingLedger } from "@/lib/entitlements/tables";
+import { memberRole, memberTags, type MemberTags } from "@/lib/entitlements/member-tags";
+import { readExtras, NO_EXTRAS, type Extras } from "@/lib/entitlements/member-tags-reads";
 
 export const dynamic = "force-dynamic";
 
@@ -32,13 +34,16 @@ const HAS_BRAND = ["primary", "secondary", "accent"].map((k) => `${BRAND}->>${k}
 
 /** The client rail's category buttons, in order: the one vocabulary (route.test.ts refuses any other value). Only what
  *  today's data can tell (blueprint §9.3): 需處理 / 訂閱 / 點數 follow billing_ledger's own filters (the /ops/billing tabs,
- *  0148), TEST is organizations.kind (0175). 代操、經銷、買斷 wait for member tags (M3). TEST shows only under 測試.
- *  Not exported (a route file exports only handlers): the rail reads the list from the answer. */
+ *  0148), TEST is organizations.kind (0175). 訂閱／點數／代操／經銷／TEST are the member-tags function's answer
+ *  (lib/entitlements/member-tags.ts, M3); 代操 and 經銷 buttons are drawn only when some account has that tag. 買斷 is U35.
+ *  TEST shows only under 測試. Not exported (a route file exports only handlers): the rail reads the list from the answer. */
 const ORG_CATEGORIES = [
   { key: "all", label: "全部" },
   { key: "attention", label: "需處理" },
   { key: "contract", label: "訂閱" },
   { key: "credits", label: "點數" },
+  { key: "operated", label: "代操" },
+  { key: "resell", label: "經銷" },
   { key: "test", label: "測試" },
 ] as const;
 export type OrgCategory = (typeof ORG_CATEGORIES)[number]["key"];
@@ -48,9 +53,7 @@ export type TaggedOrg = PickOrg & { tags: OrgTag[] };   // + group, set by group
 
 /** A billing category = billing_ledger 'all' rows that pass the same rule as that RPC filter (0148: attention =
  *  reasons, contract = has_contract, balance = balance > 0), so one cached read answers all three and the tags. */
-const IN_CATEGORY: Readonly<Record<"attention" | "contract" | "credits", (r: LedgerRow) => boolean>> = {
-  attention: (r) => r.reasons.length > 0, contract: (r) => r.contracts.length > 0, credits: (r) => r.balance > 0,
-};
+type BillingTag = "attention" | "contract" | "credits" | "operated" | "resell";
 /** billing_ledger's page size (0148: least(p_limit, 200)). */
 const LEDGER_PAGE = 200;
 /** Pages read before giving up on the rest (10 000 accounts); past it the answer says tagsPartial. */
@@ -91,9 +94,24 @@ async function allLedger(): Promise<Ledger> {
   return ledger;
 }
 
-/** One billing account's tags, by the same rules as its /ops/billing row. */
-function ledgerTags(r: LedgerRow): OrgTag[] {
-  return (["attention", "contract", "credits"] as const).filter((c) => IN_CATEGORY[c](r));
+/** One billing account's member tags (M3): contracts and balance from its ledger row, operations and resell rights from the extra reads. */
+function accountMemberTags(r: LedgerRow, extras: Extras): MemberTags {
+  return memberTags({
+    kind: r.kind, contracts: r.contracts, balance: r.balance,
+    operations: extras.operations.get(r.organization_id) ?? [],
+    entitlements: extras.resell.get(r.organization_id) ?? [],
+  });
+}
+/** One billing account's tags: attention from its reasons (the /ops/billing rule), the rest from the member tags. */
+function ledgerTags(r: LedgerRow, extras: Extras): BillingTag[] {
+  const t = accountMemberTags(r, extras);
+  const out: BillingTag[] = [];
+  if (r.reasons.length > 0) out.push("attention");
+  if (t.ways.includes("subscription")) out.push("contract");
+  if (t.ways.includes("credits")) out.push("credits");
+  if (t.ways.includes("operated")) out.push("operated");
+  if (t.ways.includes("reseller")) out.push("resell");
+  return out;
 }
 
 /** TEST = an organization whose own kind is test or whose parent's is (a test unit's brands). One bounded read. */
@@ -114,7 +132,8 @@ function testScope<B extends Scoped<B>>(query: B, mode: "hide" | "only", testIds
   return testIds.length ? own.or(`parent_organization_id.is.null,parent_organization_id.not.in.${ids}`) : own;
 }
 
-const isTest = (r: OrgRow, testIds: readonly string[]) => r.kind === "test" || (r.parent_organization_id != null && testIds.includes(r.parent_organization_id));
+const isTest = (r: OrgRow, testIds: readonly string[]) =>
+  memberRole(r.kind === "internal" ? "internal" : r.kind === "test" ? "test" : "customer", r.parent_organization_id != null && testIds.includes(r.parent_organization_id) ? "test" : null) === "TEST";
 
 /** 全部 or 測試: the first NAV_FIRST by age, and the count of the same query. */
 function kindPage(supabase: SupabaseClient, test: boolean, testIds: readonly string[]) {
@@ -147,6 +166,7 @@ async function categoryPage(supabase: SupabaseClient, category: OrgCategory, inc
   let rows: OrgRow[];
   let total: number;
   let ledger: Ledger;
+  let extras: Extras = NO_EXTRAS;
   let tagsFailed = false;
   if (category === "all" || category === "test") {
     const { data, error, count } = await kindPage(supabase, category === "test", testIds);
@@ -154,11 +174,14 @@ async function categoryPage(supabase: SupabaseClient, category: OrgCategory, inc
     rows = (data ?? []) as unknown as OrgRow[];
     total = count ?? rows.length;
     try { ledger = await allLedger(); } catch { ledger = { rows: [], partial: false }; tagsFailed = true; }
+    if (!tagsFailed) { const x = await readExtras(supabase); extras = x.extras; tagsFailed = x.failed; }
   } else {
     try {
       ledger = await allLedger();
+      const x = await readExtras(supabase);
+      extras = x.extras; tagsFailed = x.failed;
       // the internal account is the rail's own row; TEST shows only under 測試 (ledger rows are root accounts)
-      const ids = ledger.rows.filter((r) => r.kind === "customer" && IN_CATEGORY[category](r)).map((r) => r.organization_id);
+      const ids = ledger.rows.filter((r) => r.kind === "customer" && ledgerTags(r, extras).includes(category)).map((r) => r.organization_id);
       const all = await ledgerOrgs(supabase, ids, testIds);
       rows = all.slice(0, NAV_FIRST);
       total = all.length;   // the same rows the list is cut from
@@ -171,15 +194,18 @@ async function categoryPage(supabase: SupabaseClient, category: OrgCategory, inc
     const one = await supabase.from("organizations").select(ORG_SEARCH_COLUMNS).neq("status", "inactive").eq("id", include).maybeSingle();
     if (one.data) rows.unshift(one.data as unknown as OrgRow);
   }
-  const byAccount = new Map(ledger.rows.map((r) => [r.organization_id, ledgerTags(r)]));
+  const byAccount = new Map(ledger.rows.map((r) => [r.organization_id, ledgerTags(r, extras)]));
   const orgs: TaggedOrg[] = rows.map((r) => ({
     ...grouped(toPickOrg(r)),
     tags: [...(byAccount.get(r.parent_organization_id ?? r.id) ?? []), ...(isTest(r, testIds) ? ["test" as const] : [])],
   }));
+  // a button is drawn only when the data can fill it (代操 / 經銷 start empty); the others are always there
+  const present = new Set<string>(ledger.rows.filter((r) => r.kind === "customer").flatMap((r) => ledgerTags(r, extras)));
+  const categories = ORG_CATEGORIES.filter((c) => (c.key !== "operated" && c.key !== "resell") || present.has(c.key));
   // tagsPartial: accounts past LEDGER_MAX_PAGES have no billing tags and are missing from 需處理／訂閱／點數
   // internalGroup: the internal org's own hash, so 「AwareWave 自己」 has a group even when the first page lacks its row
   const internalGroup = internalOrgId ? organizationGroupId(internalOrgId) : null;
-  return { orgs, total, internalOrgId, internalGroup, internalOrgFailed, tagsFailed, tagsPartial: ledger.partial };
+  return { orgs, total, internalOrgId, internalGroup, internalOrgFailed, tagsFailed, tagsPartial: ledger.partial || extras.partial, categories };
 }
 
 export async function GET(request: Request) {
@@ -210,7 +236,7 @@ export async function GET(request: Request) {
     if ("error" in page) {
       return NextResponse.json({ ok: false, error: "org_search_failed", details: page.error }, { status: 500 });
     }
-    return NextResponse.json({ ok: true, ...page, categories: ORG_CATEGORIES });
+    return NextResponse.json({ ok: true, ...page });
   }
 
   const q = orgSearchTerm(rawQ);

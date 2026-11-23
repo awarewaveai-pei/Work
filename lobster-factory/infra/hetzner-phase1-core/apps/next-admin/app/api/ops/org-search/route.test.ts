@@ -7,6 +7,7 @@ const calls = vi.hoisted(() => ({
   neq: [] as Array<[string, unknown]>, in: [] as Array<[string, unknown]>, rpc: [] as Array<[string, Record<string, unknown>]>,
   rows: null as unknown[] | null, ledger: null as unknown, ledgerError: null as { message: string } | null, internal: null as unknown,
   testRows: [] as unknown[], internalError: null as { message: string } | null,
+  table: "", opsRows: [] as unknown[], resellRows: [] as unknown[], extraError: null as { message: string } | null,
 }));
 // a row as the database could return it if the select ever named metadata whole
 const ROW = vi.hoisted(() => ({
@@ -26,9 +27,15 @@ vi.mock("@/lib/supabase-server", () => {
       ? { data: calls.internal, error: calls.internalError }
       : { data: calls.extra, error: null }),
     or: (f: string) => { calls.or.push(f); return q; },
+    like: () => q,
     limit: (n: number) => { calls.limit.push(n); return q; },
     // the TEST-organizations read is the select("id") that ends in a list
     then: (ok: (v: unknown) => unknown) => {
+      // M3's two extra reads (operations, resell rights): empty unless a test fills them
+      if (calls.table === "organization_product_operations" || calls.table === "organization_entitlements") {
+        const rows = calls.table === "organization_product_operations" ? calls.opsRows : calls.resellRows;
+        return ok({ data: calls.extraError ? null : rows, error: calls.extraError });
+      }
       const data = calls.select.at(-1) === "id" ? calls.testRows : calls.rows ?? [ROW];
       return ok({ data, error: null, count: data.length });
     },
@@ -42,7 +49,7 @@ vi.mock("@/lib/supabase-server", () => {
     const from = Number(args.p_offset), n = Number(args.p_limit);
     return { data: { ...all, rows: all.rows.slice(from, from + n) }, error: null };
   };
-  const client = { from: () => { calls.from++; return q; }, rpc };
+  const client = { from: (t: string) => { calls.from++; calls.table = t; return q; }, rpc };
   return { getSupabaseServerClient: () => client, getSupabaseWriteClient: () => client };
 });
 let GET: typeof import("./route").GET;
@@ -52,7 +59,7 @@ const staff = { "x-ops-user-kind": "staff", "x-ops-claims-role": "operator" };
 const get = async (qs: string) => (await GET(new Request(`https://app.aware-wave.com/api/ops/org-search${qs}`, { headers: staff }))).json();
 
 beforeEach(async () => {
-  Object.assign(calls, { select: [], or: [], limit: [], from: 0, eq: [], extra: null, neq: [], in: [], rpc: [], rows: null, ledger: null, ledgerError: null, internal: null, testRows: [], internalError: null });
+  Object.assign(calls, { select: [], or: [], limit: [], from: 0, eq: [], extra: null, neq: [], in: [], rpc: [], rows: null, ledger: null, ledgerError: null, internal: null, testRows: [], internalError: null, table: "", opsRows: [], resellRows: [], extraError: null });
   // a fresh route module: its ledger memory starts empty in every test
   vi.resetModules();
   ({ GET } = await import("./route"));
@@ -302,5 +309,51 @@ describe("GET /api/ops/org-search?category=", () => {
     calls.internalError = null;
     calls.internal = { id: INTERNAL };
     expect((await get("?category=all")).internalOrgFailed).toBe(false);
+  });
+
+  // M3: 代操 / 經銷 come from the member-tags function; their buttons exist only when the data fills them
+  const FUTURE = "2999-01-01T00:00:00Z", PAST = "2000-01-01T00:00:00Z";
+  it("代操 and 經銷: no button while nothing is operated or resold; with data, the button, the tags and the category list", async () => {
+    calls.ledger = ledger([lrow(C1, "customer", { contracts: [{ product_key: "content", status: "active" }] })]);
+    calls.rows = [org(C1, "acme")];
+    const none = await get("?category=all");
+    expect(none.categories.map((c: { key: string }) => c.key)).toEqual(["all", "attention", "contract", "credits", "test"]);
+
+    const C2 = "55555555-5555-4555-8555-555555555555";
+    calls.ledger = ledger([lrow(C1, "customer", { contracts: [{ product_key: "content", status: "active" }] }), lrow(C2, "customer")]);
+    calls.opsRows = [{ organization_id: C1, product_key: "content", operated_by: "awarewave" }];
+    calls.resellRows = [{ organization_id: C2, product_key: "video", feature_key: "video.resell", source: "comp", source_ref: null, starts_at: PAST, ends_at: FUTURE, status: "active" }];
+    vi.resetModules(); ({ GET } = await import("./route"));
+    calls.rows = [org(C1, "acme"), org(C2, "beta")];
+    const all = await get("?category=all");
+    expect(all.categories.map((c: { key: string }) => c.key)).toEqual(["all", "attention", "contract", "credits", "operated", "resell", "test"]);
+    expect(all.categories.find((c: { key: string }) => c.key === "operated").label).toBe("代操");
+    expect(all.categories.find((c: { key: string }) => c.key === "resell").label).toBe("經銷");
+    expect(all.orgs.map((o: { id: string; tags: string[] }) => [o.id, o.tags])).toEqual([[C1, ["contract", "operated"]], [C2, ["resell"]]]);
+    calls.in = [];
+    const operated = await get("?category=operated");
+    expect(calls.in).toEqual([["id", [C1]]]);
+    expect(operated.total).toBe(1);
+    calls.in = [];
+    await get("?category=resell");
+    expect(calls.in).toEqual([["id", [C2]]]);
+  });
+
+  it("an expired resell right is not 經銷; a canceled subscription is not 訂閱", async () => {
+    calls.ledger = ledger([lrow(C1, "customer", { contracts: [{ product_key: "content", status: "canceled" }] })]);
+    calls.resellRows = [{ organization_id: C1, product_key: "video", feature_key: "video.resell", source: "comp", source_ref: null, starts_at: PAST, ends_at: PAST, status: "active" }];
+    calls.rows = [org(C1, "acme")];
+    const body = await get("?category=all");
+    expect(body.orgs[0].tags).toEqual([]);
+    expect(body.categories.map((c: { key: string }) => c.key)).not.toContain("resell");
+  });
+
+  it("a failed operations/resell read: 全部 still lists clients and says tagsFailed; a billing category fails", async () => {
+    calls.rows = [org(C1, "acme")];
+    calls.ledger = ledger([lrow(C1, "customer", { balance: 2 })]);
+    calls.extraError = { message: "boom" };
+    const all = await get("?category=all");
+    expect(all.tagsFailed).toBe(true);
+    expect(all.orgs).toHaveLength(1);
   });
 });
