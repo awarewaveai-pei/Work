@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-23（續7）— oracle WP 第三批：P3 併入；確認流程改由外掛自己寄一次性連結（監工接受）
+
+- P3 併入（工人 `9a4b6de50`，已 push；外掛 0.4.0，尚未安裝到任何網站）：`includes/Daily/` 11 檔（訂閱、確認、每小時排程、Resend webhook、清理）、`includes/Members/Ticket.php`（會員票 REST，`aud:"ticket"`）、`assets/daily.js`、設定頁顯示上次排程數字。
+- 監工裁決：工人依 critic M2 把「FluentCRM 雙重確認信」改成外掛自己用 `wp_mail` 寄一次性確認連結（`Daily/Confirm.php:52,78,97`；`Daily/Store.php:187,209` 比對 token 雜湊、只能用一次；GET 只顯示、POST 才生效）。接受：原做法的確認綁在聯絡人，已確認的人再送一次表單就能改掉別人的出生資料或時區；新做法確認綁在每一次申請。寄信仍走 FluentSMTP → Resend，聯絡人仍在 FluentCRM（D3 不變）。`ORACLE-WP-SPEC.md` §2-8 同步。
+- 監工驗收：`php -l` 0 錯；讀 `Daily/Store.php:233-235` 只挑 `status = confirmed`、`Daily/Rest.php:119-129` Svix 三個標頭驗簽失敗 401。工人證據：真 WordPress `daily-check.php` 72/72 連跑兩次；`daily-parallel.php` 20 人 20 封；四次突變各使指名測試變紅（拿掉唯一鍵搶占時 20 人寄出 40 封）；PHPUnit 24 tests；P2 的 17＋9 項仍過；只寄到本機假收信匣，未呼叫真 Resend。
+- 第三批待總檢（P3 回報，未處置；SF-I 交回後一起）：Resend 標籤 `product=oracle` 帶不了（FluentSMTP 2.4.5 無 Resend 驅動，SMTP 無標籤說明；以寄件子網域區分）；引擎框內頁尚未呼叫 `window.parent.awOracleTicket()`（需引擎卡，否則會員 AI 額度不生效）；英文信的「宜／忌」是引擎給的中文（`Projects/internal/ziwei-doushu/lib/daily.ts:216`）；公開訂閱表單無人機驗證（限流＋蜜罐＋全站每日 30 封確認信上限 `Daily/Confirm.php:33`）；主機反向代理要把訪客真 IP 放進 `REMOTE_ADDR`，否則每 IP 限流變全站共用（GO-2 前查）；「已寄」＝交給 FluentCRM 佇列，實際送出靠主機 cron 跑 WP-Cron。
+- SF-I（線4）等 Playwright 與兩個 critic。
+- REALTEST_EVIDENCE: tool=Bash | cmd=php -l（oracle-wp-plugin 全部 .php，oracle-int） | exit=0 | ms=4000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/5n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=aworacle_daily_profiles | hits=6
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic Deep（3 Major 已修）＋四次突變＋監工讀挑選條件與驗簽段代替
 ## 2026-11-23（續5）— 平台第 6 批上線：U8、U9、U10＋K12（High，VW 已部署、待正式站實點後收尾）
 
 - 操作者 2026-11-22「工人們反應的 RISKS 是否需要處理，先處理完風險再部署」＝ K12 的 go。原判「不在範圍」的兩條重看後在部署前處理：VW 既有紅測試、第 5 批部署失敗根因。
