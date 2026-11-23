@@ -15,7 +15,7 @@ function openWith(value: ClientContextValue): string {
   const open = vi.fn(() => ({ postMessage: () => {} }) as unknown as Window);
   vi.stubGlobal("open", open);
   render(<ClientContext.Provider value={value}><OpenWorkbench videoHost="video.example.test" open="script-forge" /></ClientContext.Provider>);
-  fireEvent.click(screen.getByText("開啟影音工作台"));
+  fireEvent.click(screen.getByText("開啟影片工作台"));
   return (open.mock.calls[0] as unknown[])[0] as string;
 }
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });

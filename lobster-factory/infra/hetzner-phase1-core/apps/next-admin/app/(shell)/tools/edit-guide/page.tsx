@@ -293,9 +293,9 @@ export default function EditGuidePage() {
           另外試過 Luma Reframe，同一張圖連試三次都回同一個錯誤，所以沒有收進來。
         </Note>
 
-        <h2 style={h2}>十一、實測七：影音工作台的「圖片局部編輯器」，五顆鈕的差別（2026-11-13/14）</h2>
+        <h2 style={h2}>十一、實測七：影片工作台的「圖片局部編輯器」，五顆鈕的差別（2026-11-13/14）</h2>
         <p style={p0}>
-          這一節跟前面不同：前面是畫布專業版的按鈕，這一節是<b>影音工作台的圖片局部編輯器</b>，用的是同一批填色模型。
+          這一節跟前面不同：前面是畫布專業版的按鈕，這一節是<b>影片工作台的圖片局部編輯器</b>，用的是同一批填色模型。
           同一張圖（480×480）、同一個框（右上角，寬 18%、高 28%）、同一句指令、1K，各按一次。
           圖只截框附近，框外的部分五顆都沒變。
         </p>
@@ -346,7 +346,7 @@ export default function EditGuidePage() {
         </Note>
 
         <p style={{ fontSize: 13.5, ...muted, borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 36 }}>
-          47 張圖全部是真的跑出來的，沒有示意圖：前 40 張是 2026-11-09 在同一張塔羅牌上，後 7 張是 2026-11-13/14 在影音工作台的圖片局部編輯器上。
+          47 張圖全部是真的跑出來的，沒有示意圖：前 40 張是 2026-11-09 在同一張塔羅牌上，後 7 張是 2026-11-13/14 在影片工作台的圖片局部編輯器上。
           價格是 Replicate 當天牌價換算新台幣（1 美元 = 32 元）。
           模型規格見 <Link href="/tools/ai-models?tab=image-specs" style={{ color: "var(--accent-text)" }}>AI Models</Link>，
           面板在 <Link href="/tools/photo-pro" style={{ color: "var(--accent-text)" }}>畫布（專業版）</Link>。

@@ -58,7 +58,7 @@ export default function ScriptForgeWorkbench({ episode, socialHref }: { episode:
     return () => { live = false; };
   }, [workbench]);
   if (!workbench || organizationId === undefined) return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>載入中…</p>;
-  if (!organizationId) return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>這個影音工作台沒有連上主系統，腳本無法使用。</p>;
+  if (!organizationId) return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>這個影片工作台沒有連上主系統，腳本無法使用。</p>;
   return (
     <><ScriptForge sideMenu videoNeedsClient={false} organizationId={organizationId}
       onSendToVideo={(h) => send(workbench, episode, h)} videoVerb={episode ? "寫回這一集" : undefined}

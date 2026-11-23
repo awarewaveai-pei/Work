@@ -38,7 +38,7 @@ export default function OpenWorkbench({ videoHost, open }: { videoHost: string; 
   return (
     <div style={{ padding: 24, maxWidth: 640 }}>
       <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 16 }}>
-        影片製作已搬到影音工作台：寫腳本、做片、審片與發布都在那裡，會開在新分頁。這台瀏覽器裡舊腳本工具的歷史紀錄會一起帶過去。
+        影片製作已搬到影片工作台：寫腳本、做片、審片與發布都在那裡，會開在新分頁。這台瀏覽器裡舊腳本工具的歷史紀錄會一起帶過去。
       </p>
       {ctx.viewer === "staff" && !org && (
         <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.7, marginBottom: 16 }}>
@@ -50,7 +50,7 @@ export default function OpenWorkbench({ videoHost, open }: { videoHost: string; 
           工作台目前不會自動切到這個客戶，請在工作台頂部確認客戶。
         </p>
       )}
-      <button type="button" className="btn-primary" onClick={start}>開啟影音工作台</button>
+      <button type="button" className="btn-primary" onClick={start}>開啟影片工作台</button>
       {note && <p role="status" style={{ marginTop: 12, fontSize: 13, color: "var(--text-muted)" }}>{note}</p>}
     </div>
   );

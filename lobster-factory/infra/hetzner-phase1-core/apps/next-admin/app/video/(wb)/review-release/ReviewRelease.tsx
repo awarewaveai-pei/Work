@@ -27,7 +27,7 @@ export default function ReviewRelease({ organizationId, assetId, projectId, sect
   useEffect(() => { if (mine && (section === "release" || candidate !== assetId)) half.current?.scrollIntoView?.(); }, [mine, section, candidate, assetId]);
   if (!organizationId || (!assetId && !projectId)) return note("請從一支成片或一個專案打開審片與發布。");
   if (identity === undefined) return note("載入中…");
-  if (identity === null) return note("這個影音工作台沒有連上主系統，審片與發布無法使用。");
+  if (identity === null) return note("這個影片工作台沒有連上主系統，審片與發布無法使用。");
   if (!mine) return note("這支影片屬於另一個客戶，請先在工作台頂部切換到那個客戶，再重新打開。");
   return <>
     <QaStep organizationId={organizationId} projectId={assetId ? undefined : projectId} initialAssetId={assetId} includeWorkbench onContinue={(id) => { setCandidate(id); half.current?.scrollIntoView?.({ behavior: "smooth" }); }} />

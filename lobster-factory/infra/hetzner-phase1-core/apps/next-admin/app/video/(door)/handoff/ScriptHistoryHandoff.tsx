@@ -28,5 +28,5 @@ export default function ScriptHistoryHandoff({ staffHosts, open, org = null }: {
     opener.postMessage({ channel: HANDOFF_CHANNEL, type: "ready" }, "*");
     return () => { window.removeEventListener("message", onMessage); window.clearTimeout(timer); };
   }, [staffHosts, open, org]);
-  return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>正在開啟影音工作台…</p>;
+  return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>正在開啟影片工作台…</p>;
 }

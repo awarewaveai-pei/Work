@@ -44,11 +44,11 @@ export function enterWorkbench(host: Host = window as unknown as Host): Promise<
     script.async = false;
     script.src = src;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`無法載入影音工作台（${src}），請重新整理頁面。`));
+    script.onerror = () => reject(new Error(`無法載入影片工作台（${src}），請重新整理頁面。`));
     host.document.body.append(script);
   }))).then(async () => {
     const workbench = host.VideoWorkbench;
-    if (!workbench) throw new Error("影音工作台沒有啟動，請重新整理頁面。");
+    if (!workbench) throw new Error("影片工作台沒有啟動，請重新整理頁面。");
     await workbench.ready;
     return workbench;
   }));

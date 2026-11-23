@@ -15,6 +15,6 @@ export default function WorksGallery() {
     return () => { live = false; };
   }, [workbench]);
   if (organizationId === undefined) return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>載入中…</p>;
-  if (!organizationId) return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>這個影音工作台沒有連上主系統，作品無法顯示。</p>;
+  if (!organizationId) return <p style={{ padding: 24, fontSize: 13, color: "var(--text-muted)" }}>這個影片工作台沒有連上主系統，作品無法顯示。</p>;
   return <DesignsGallery initialTab="videos" organizationId={organizationId} />;
 }

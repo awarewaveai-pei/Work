@@ -476,6 +476,9 @@ function ChoiceRow<T extends string>({ label, value, options, onPick, disabled }
 }
 
 const asOptions = (xs: readonly string[]) => xs.map(x => ({ value: x, label: x }));
+/** What "the article" is for the leave guard: its markdown and SEO title / description. */
+const articleKey = (markdown: string, meta: { seoTitle?: string; metaDesc?: string } | null) =>
+  JSON.stringify([markdown, meta?.seoTitle ?? "", meta?.metaDesc ?? ""]);
 const AI_WORD_CLEANUP: readonly { value: RemoveAI; label: string }[] = [
   { value: "none", label: "關閉" }, { value: "basic", label: "基本（去除常見 AI 用詞）" }, { value: "extended", label: "加強（深度清理）" },
 ];
@@ -677,6 +680,8 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [draftsError,  setDraftsError]  = useState("");
   const draftSaveRef = useRef(0);
+  // The article as last stored in its draft row (markdown + meta). Differs from the editor = unsaved edits (U11).
+  const savedArticleRef = useRef("");
 
   // Auto-image generation counter (0 = idle, N = N images pending)
   const [autoImgN, setAutoImgN] = useState(0);
@@ -1397,6 +1402,8 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
   // same tick is stale). Returns the row id so a follow-up SEO-score save can target the same row.
   const saveDraft = useCallback(async (payload: {
     markdown: string; meta: MetaData | null; slugHint: string; seoScore?: number | null;
+    /** the site the article belongs to when the rail has just moved on (leave guard); default = the rail's site */
+    siteId?: string;
   }): Promise<string | null> => {
     const kw = form.keyword.trim();
     if (!kw || !payload.markdown.trim()) return null;
@@ -1418,7 +1425,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
           // Persist the form but drop the reference-image data URL — it's a transient img2img input
           // (multi-MB base64) that would bloat every autosave row; it never needs to survive a reload.
           formSnapshot: { ...form, media: { ...form.media, imageRefData: "" } },
-          siteId: UUID_RE.test(selectedSiteId) ? selectedSiteId : undefined,
+          siteId: UUID_RE.test(payload.siteId ?? selectedSiteId) ? (payload.siteId ?? selectedSiteId) : undefined,
         }),
       });
       const json = await res.json() as { ok: boolean; draft?: { id: string } };
@@ -1426,6 +1433,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       if (json.ok && json.draft) {
         setDraftId(json.draft.id);
         setDraftSaveState("saved");
+        savedArticleRef.current = articleKey(payload.markdown, payload.meta);
         return json.draft.id;
       }
       setDraftSaveState("error");
@@ -1482,6 +1490,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       } else setForm(prev => ({ ...prev, keyword: d.keyword }));
       setGenerated(d.markdown);
       setMetaData(d.meta ?? null);
+      savedArticleRef.current = articleKey(d.markdown, d.meta ?? null);
       setSlugHint(d.slugHint ?? "");
       setDraftId(d.id);
       setDraftSaveState("saved");
@@ -1529,6 +1538,59 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     router.replace(`${window.location.pathname}${q.size ? `?${q}` : ""}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftParam, sitesLoaded]);
+
+  // ── Leave guard (U11): edits the user made to the article are in its draft row before the page is left. Same save
+  // path as the autosave (saveDraft). Links (left menu, any in-page link) wait for the save and stay put if it fails;
+  // closing or reloading the tab asks first (beforeunload); a client-rail switch saves under the site it was written for.
+  const [leaveError, setLeaveError] = useState("");
+  const dirty = view === "generate" && genStatus !== "streaming" && generated.trim() !== ""
+    && articleKey(generated, metaData) !== savedArticleRef.current;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const flushRef = useRef<(siteId?: string) => Promise<string | null>>(async () => null);
+  flushRef.current = async (siteId) => {
+    if (!dirtyRef.current) return null;
+    if (!form.keyword.trim()) return "還沒填主要關鍵字，草稿存不進去；請先填關鍵字，或把內文複製下來。";
+    const id = await saveDraft({ markdown: generated, meta: metaData, slugHint, siteId });
+    return id ? null : "存草稿失敗（網路或伺服器錯誤），請再試一次。";
+  };
+
+  useEffect(() => {
+    if (view !== "generate") return;
+    const onClick = (e: MouseEvent) => {
+      if (!dirtyRef.current || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a || a.target === "_blank" || a.hasAttribute("download")) return;
+      const url = new URL(a.href, window.location.href);
+      if (url.origin !== window.location.origin) return;                       // leaves the app: beforeunload asks
+      if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+      e.preventDefault();
+      e.stopPropagation();                                                     // before next/link's own handler
+      setLeaveError("");
+      void flushRef.current().then((err) => {
+        if (err) setLeaveError(`沒有離開這一頁：${err}`);
+        else router.push(`${url.pathname}${url.search}${url.hash}`);
+      });
+    };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    document.addEventListener("click", onClick, true);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => { document.removeEventListener("click", onClick, true); window.removeEventListener("beforeunload", onBeforeUnload); };
+  }, [view, router]);
+
+  // The client rail moved to another site / client while the article had unsaved edits: store them under the site the
+  // article was written for (the editor keeps the text either way; a failure shows here).
+  const prevSiteRef = useRef(selectedSiteId);
+  useEffect(() => {
+    const prev = prevSiteRef.current;
+    prevSiteRef.current = selectedSiteId;
+    if (prev === selectedSiteId || !dirtyRef.current) return;
+    void flushRef.current(prev).then((err) => setLeaveError(err ? `換網站前的修改沒存進草稿：${err}` : ""));
+  }, [selectedSiteId]);
 
   // Once the background SEO check resolves AND we have a saved row, persist the score (best-effort).
   useEffect(() => {
@@ -1980,6 +2042,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       {/* ── Header: the page's name (passed in by the page, so it matches the menu) + links ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
         {heading}
+        {leaveError && <span role="alert" style={{ fontSize: "13px", color: "var(--color-error)", flexBasis: "100%" }}>{leaveError}</span>}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           {scheduleHref && <a href={scheduleHref}
             style={{ fontSize: "12px", padding: "5px 12px", border: "1px solid var(--card-border)",

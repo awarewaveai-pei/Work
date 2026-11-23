@@ -62,7 +62,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link',     href: '/tools/content',       icon: '✍', label: '寫文章',  title: 'SEO/GEO 文章產出' },
       { type: 'link',     href: '/tools/content/rewrite', icon: '·', label: '改寫', title: '把現成文字人性化或做 SEO 改寫', under: '/tools/content' },
       { type: 'link',     href: '/tools/content/drafts',  icon: '·', label: '草稿', title: '產文完成自動儲存的草稿；開啟後回到寫文章頁', under: '/tools/content' },
-      { type: 'link',     href: '/tools/video',         icon: '🎬', label: '影片工作台', title: '影音工作台：腳本、做片、審片、發布（開新分頁）' },
+      { type: 'link',     href: '/tools/video',         icon: '🎬', label: '影片工作台', title: '影片工作台：腳本、做片、審片、發布（開新分頁）' },
       { type: 'link',     href: '/tools/tarot',         icon: '🔮', label: '塔羅工作台',  title: '塔羅牌印刷檔生成工具' },
       { type: 'link',     href: '/tools/studio',        icon: '✏', label: '設計工作台',    title: 'POD 設計生成器' },
       { type: 'link',     href: '/tools/mockup',        icon: '👕', label: '模型圖',        title: 'AI 擬真商品照' },
@@ -179,12 +179,23 @@ export const DEFAULT_SECTIONS: NavSection[] = [
 
 // Saved shape: { sectionOrder: string[], itemOrders: Record<sectionId, string[]> } — see SavedLayout in lib/theme/tokens.
 //
-// A saved order applies only to the exact set it was saved against (sections, or one section's
-// items). Once the defaults gain, lose or move an entry the saved order is stale and the default
-// wins — otherwise an old Theme Editor save freezes every later regrouping and new entries pile up
-// at the bottom.
+// Section order: applies only to the exact set it was saved against; once sections are added, removed or regrouped the
+// default wins (an old save must not freeze a regroup). Items inside a section: the saved order is kept for the items
+// still there, items no longer in the section drop out, and each new item goes in at its default place (right after the
+// item it follows in the defaults) -- adding a page keeps everyone's own order and never piles new pages at the bottom.
 function sameSet(a: string[], b: string[]): boolean {
   return a.length === b.length && new Set(a).size === a.length && a.every(x => b.includes(x));
+}
+
+/** A saved item order merged with the current defaults (see above). */
+export function mergeItemOrder(saved: readonly string[], defaults: readonly string[]): string[] {
+  const live = new Set(defaults);
+  const out = saved.filter((k, i) => live.has(k) && saved.indexOf(k) === i);
+  defaults.forEach((k, i) => {
+    if (out.includes(k)) return;
+    out.splice(i === 0 ? 0 : out.indexOf(defaults[i - 1]) + 1, 0, k);
+  });
+  return out;
 }
 
 export function applyLayout(sections: NavSection[], layout: SavedLayout): NavSection[] {
@@ -196,8 +207,8 @@ export function applyLayout(sections: NavSection[], layout: SavedLayout): NavSec
   return ordered.map(sec => {
     const itemOrder = layout.itemOrders?.[sec.id];
     const itemMap = new Map(sec.items.map(item => [itemKey(item), item]));
-    if (!itemOrder || !sameSet(itemOrder, [...itemMap.keys()])) return sec;
-    return { ...sec, items: itemOrder.map(k => itemMap.get(k)!) };
+    if (!itemOrder?.length) return sec;
+    return { ...sec, items: mergeItemOrder(itemOrder, [...itemMap.keys()]).map(k => itemMap.get(k)!) };
   });
 }
 
