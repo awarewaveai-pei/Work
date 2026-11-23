@@ -20,6 +20,7 @@ import { staffGrantOf, staffMayUseTool, staffUnrestricted } from "@/lib/staff-ac
 import { billingAccount } from "@/lib/entitlements/tables";
 import { isCustomerKind } from "@/lib/entitlements/subject";
 import { staffGrantView } from "@/lib/entitlements/staff-grants";
+import { productOperations } from "@/lib/entitlements/operations";
 import { canWriteTenantConfig, readOpsRole } from "@/lib/ops-role";
 import type { BillingTabData } from "./BillingTab";
 
@@ -183,6 +184,8 @@ export default async function ClientDetailPage({
   if (billing.account && isCustomerKind(billing.account.kind)) {
     const canEdit = canWriteTenantConfig(readOpsRole(new Request("http://localhost", { headers: await headers() })));
     billing.staff = await staffGrantView(billing.account.organization_id).then(
+      (products) => ({ products, error: null, canEdit }), (e: unknown) => ({ products: null, error: e instanceof Error ? e.message : String(e), canEdit }));
+    billing.operations = await productOperations(billing.account.organization_id).then(
       (products) => ({ products, error: null, canEdit }), (e: unknown) => ({ products: null, error: e instanceof Error ? e.message : String(e), canEdit }));
     billing.notice = savedCode ? { r: savedCode, g: Number(savedGiven) || 0, t: Number(savedTaken) || 0, s: Number(savedSkipped) || 0, p: savedStop ?? null } : null;
   }

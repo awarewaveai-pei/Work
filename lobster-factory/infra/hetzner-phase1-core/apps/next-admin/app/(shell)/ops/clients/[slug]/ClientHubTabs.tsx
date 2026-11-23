@@ -12,6 +12,7 @@ import { AccountsCard } from "./AccountsCard";
 import { CustomerServiceTab } from "./CustomerServiceTab";
 import { OutreachTab } from "./OutreachTab";
 import { BillingTab, type BillingTabData } from "./BillingTab";
+import { OperationsCard } from "./OperationsCard";
 import { ScheduleTable } from "@/app/(shell)/ops/schedules/ScheduleTable";
 import { CollectionSourcesPanel } from "@/app/(shell)/ops/collect/CollectionSourcesPanel";
 import { KnowledgeDetailModal } from "./KnowledgeDetailModal";
@@ -2536,7 +2537,8 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "客服" && <CustomerServiceTab org={org} cfg={cfg} />}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
         {activeTab === "帳號" && <AccountsCard slug={org.slug} />}
-        {activeTab === "帳務" && <BillingTab data={props.billing} slug={org.slug} />}
+        {activeTab === "帳務" && <BillingTab data={props.billing} slug={org.slug}
+          operationsCard={props.billing.operations ? <OperationsCard slug={org.slug} data={props.billing.operations} /> : null} />}
         {activeTab === "憑證庫" && <CredentialsTab org={org} />}
         {activeTab === "冷開發" && <OutreachTab org={org} />}
       </div>
