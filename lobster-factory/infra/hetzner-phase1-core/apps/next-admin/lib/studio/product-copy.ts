@@ -80,11 +80,12 @@ RULES (every one is mandatory):
 - FOCUS KEYWORD: appears in productTitle, metaTitle (at the front), metaDescription, the FIRST sentence of shortDescriptionHtml, and at least one bullet. Natural, never stuffed.
 - ANSWER CAPSULE (strongest GEO signal): shortDescriptionHtml MUST open with a single <p> that is a self-contained 110-150 character answer to "what is this product?" — no links inside it.
 - shortDescriptionHtml = exactly one opening <p> answer capsule, then one <ul> of the bullets as <li>. Allowed tags ONLY: <p>, <ul>, <li>, <strong>. No headings, no scripts, no inline styles, no links.
-- BULLETS: each is one extractable unit (material, fit, print method, care, sustainability). Concrete, no fluff. AEO: phrase at least one bullet as a direct factual statement an AI could quote.
+- BULLETS: each is one extractable unit. Concrete, no fluff. AEO: phrase at least one bullet as a direct factual statement an AI could quote.
+- FACTS COME FROM THE BRIEF ONLY: state a product specification (fabric or material, weight, print method, fit or cut, sizing, care or washing instructions, sustainability, how or when it is made) ONLY when the brief or the operator instructions give that exact fact. When they do not, leave it out and write the bullets about what the design shows, the words on it, how to wear or style it, and who it suits or makes a gift for.
 - TONE: warm, specific, benefit-led. No unsupported superlatives ("best", "#1"). No medical/therapeutic claims.
-- ENTITIES (GEO): name concrete entities where true — e.g. "Bella+Canvas 3001", "ring-spun cotton", "DTG print", "unisex fit".
-- Output language: English by default — BUT if the operator instructions request another language, write EVERY field entirely in that language.
-- NEVER invent certifications, awards, or statistics.`;
+- ENTITIES (GEO): name a concrete entity (garment model, fabric, print method, fit) only when the brief or the operator instructions name it.
+- Output language: English by default — BUT if the operator instructions request another language, write EVERY field entirely in that language, with two exceptions that stay exactly as given: the brand name in the brief (never translated, transliterated or replaced) and any words printed on the design.
+- NEVER invent certifications, awards, statistics or product specifications.`;
 
 function extractJson(text: string): unknown {
   // Models sometimes wrap JSON in a fence despite instructions — strip it.
