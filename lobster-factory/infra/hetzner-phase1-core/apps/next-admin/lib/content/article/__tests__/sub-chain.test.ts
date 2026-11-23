@@ -30,6 +30,7 @@ vi.mock("@/lib/ai/log-ai-call", async (orig) => ({
 }));
 
 import { prepareArticleGeneration, streamArticleGeneration, type ArticlePreparedConfig, type ArticlePrepareSuccess } from "../generate-core";
+import { OPENAI_REASONING_HEADROOM_TOKENS } from "@/lib/ai/text-model-options";
 
 const base: ArticlePreparedConfig = { model: "claude-opus-5-5", maxTokens: 100, system: "S", userPrompt: "P", jobId: null };
 const collect = async (config: ArticlePreparedConfig) => { let out = ""; for await (const c of streamArticleGeneration(config, "k")) out += c; return out; };
@@ -74,5 +75,25 @@ describe("article on a text chain", () => {
     expect(((await prepareArticleGeneration({ ...body, chain: "api" })) as ArticlePrepareSuccess).config).toEqual(before.config);
     const chained = (await prepareArticleGeneration({ ...body, chain: "codex+api", claudeModel: "sub-claude-sonnet", lane: "schedule" })) as ArticlePrepareSuccess;
     expect(chained.config).toEqual({ ...before.config, chain: "codex+api", claudeModel: "sub-claude-sonnet" }); // a body never picks the lane
+  });
+});
+
+const NL = String.fromCharCode(10);
+describe("article on OpenAI (K21)", () => {
+  it("the request asks for the size's limit plus the thinking headroom", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "k");
+    const sent: Array<{ max_completion_tokens: number }> = [];
+    const frame = (o: object) => `data: ${JSON.stringify(o)}` + NL;
+    vi.stubGlobal("fetch", vi.fn(async (_u: unknown, init: { body: string }) => {
+      sent.push(JSON.parse(init.body));
+      return new Response(frame({ choices: [{ delta: { content: "文" }, finish_reason: "stop" }] }) + "data: [DONE]" + NL, { status: 200 });
+    }));
+    try {
+      const out = await collect({ ...base, model: "gpt-6.2-sol", maxTokens: 4096 });
+      expect(out).toBe("文");
+      expect(sent.map((b) => b.max_completion_tokens)).toEqual([4096 + OPENAI_REASONING_HEADROOM_TOKENS]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

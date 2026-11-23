@@ -34,7 +34,7 @@ vi.mock("@/lib/script-forge/run-store", () => ({
     if (budget.spentTwd + reserved > budget.budgetTwd) throw Object.assign(Error("已到上限"), { status: 409 });
     return { kind: "claim", org, key, reserved, spentTwd: budget.spentTwd + reserved };
   },
-  finishScriptRun: async (_db: unknown, claim: { spentTwd: number; reserved: number }, _text: string, actual: number | null) => ({ spentTwd: claim.spentTwd - claim.reserved + (actual ?? claim.reserved), estimated: actual === null }),
+  finishScriptRun: async (_db: unknown, claim: { spentTwd: number; reserved: number }, _text: string, actual: number | null) => ({ spentTwd: Math.round((claim.spentTwd - claim.reserved + (actual ?? claim.reserved)) * 100) / 100, estimated: actual === null }), // cents, as run-store.ts,
 }));
 const logged = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>> }));
 vi.mock("@/lib/ai/log-ai-call", async (orig) => ({
@@ -181,6 +181,24 @@ describe("POST /api/tools/script-forge", () => {
       expect(res.status).toBe(200); expect(await res.text()).toBe('{"hooks":[]}');
       expect(who.subJobs).toBe(0);
     });
+  });
+
+  it("OpenAI: the request asks for the script limit plus the thinking headroom (K21)", async () => {
+    const NL = String.fromCharCode(10);
+    vi.stubEnv("OPENAI_API_KEY", "k");
+    const { OPENAI_REASONING_HEADROOM_TOKENS } = await import("@/lib/ai/text-model-options");
+    const { FORGE_MAX_TOKENS } = await import("@/lib/script-forge/run-budget");
+    const sentBodies: Array<{ max_completion_tokens: number }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_u: unknown, init: { body: string }) => {
+      sentBodies.push(JSON.parse(init.body));
+      return new Response("data: [DONE]" + NL, { status: 200 });
+    }));
+    try {
+      await (await post({ module: "hook", task: "hooks", fields: { topic: "x" }, siteId: "own", model: "gpt-6.2-sol" })).text();
+      expect(sentBodies.map((b) => b.max_completion_tokens)).toEqual([FORGE_MAX_TOKENS + OPENAI_REASONING_HEADROOM_TOKENS]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("OpenAI: usage from the final frame is logged even when the connection breaks after it (Codex F5)", async () => {

@@ -1,6 +1,6 @@
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
-import { isOpenAiTextModel, isTextChain, resolveArticleTextModel, resolveTextChain, type AiTextModel, type TextChain } from "../../ai/text-model-options";
+import { isOpenAiTextModel, isTextChain, openAiCompletionBudget, resolveArticleTextModel, resolveTextChain, type AiTextModel, type TextChain } from "../../ai/text-model-options";
 import { runSubText, runTextChain, skipNote } from "../../ai/sub-text";
 import { codexAllowed, type SubLane } from "@/lib/tarot/codex-bridge";
 import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "../../ai/log-ai-call";
@@ -877,7 +877,7 @@ async function* streamOpenAiGeneration(
       },
       body: JSON.stringify({
         model: config.model,
-        max_completion_tokens: config.maxTokens,
+        max_completion_tokens: openAiCompletionBudget(config.maxTokens),   // thinking counts inside it (K21)
         stream: true,
         // Ask OpenAI to emit a final usage frame so the cost ledger gets exact token counts
         // (parallel to Anthropic's finalMessage().usage). Without this, streamed responses carry no usage.

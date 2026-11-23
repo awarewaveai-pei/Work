@@ -4,7 +4,7 @@ import { GEMINI_LITE_MODEL } from "./gemini-models";
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
-import { isAiTextModel, isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "./text-model-options";
+import { isAiTextModel, isOpenAiTextModel, normalizeAiTextModel, openAiCompletionBudget, type AiTextModel } from "./text-model-options";
 import { claudeFallback, claudeIncomplete, claudeParams, claudeText } from "./gateway";
 
 export const CHEAP_JSON_MODEL: AiTextModel = "gpt-5.4-nano";
@@ -48,7 +48,7 @@ export async function generateCheapJsonText(args: CheapJsonTextArgs): Promise<Ch
 
 async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextModel }): Promise<CheapJsonTextResult> {
   const grant = args.grant ?? (await grantFor("ops.cheap-json"));
-  const r = await openAiText({ grant, model: args.model, system: args.system, user: args.user, maxTokens: args.maxTokens,
+  const r = await openAiText({ grant, model: args.model, system: args.system, user: args.user, maxTokens: openAiCompletionBudget(args.maxTokens),
     route: args.route, metadata: args.metadata, tool: args.tool, temperature: args.temperature, timeoutMs: args.timeoutMs ?? DEFAULT_TIMEOUT_MS });
   return "error" in r ? { ok: false, status: r.status, error: r.error } : { ok: true, raw: r.text, model: args.model };
 }

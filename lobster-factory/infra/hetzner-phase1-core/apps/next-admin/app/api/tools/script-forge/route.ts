@@ -4,7 +4,7 @@ import { withFeature } from "@/lib/entitlements/grant";
 import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
 import type { Grant } from "@/lib/entitlements/can";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { normalizeAiTextModel, isOpenAiTextModel, isTextChain, resolveTextChain, type AiTextModel, type ChannelModel } from "@/lib/ai/text-model-options";
+import { normalizeAiTextModel, isOpenAiTextModel, isTextChain, openAiCompletionBudget, resolveTextChain, type AiTextModel, type ChannelModel } from "@/lib/ai/text-model-options";
 import { runSubText, runTextChain, skipNote, type ChainSkip } from "@/lib/ai/sub-text";
 import { codexAllowed, deferCodexWork } from "@/lib/tarot/codex-bridge";
 import { claudeFallback, claudeParams } from "@/lib/ai/gateway";
@@ -268,7 +268,7 @@ async function streamOpenAi(
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
-      max_completion_tokens: MAX_TOKENS,
+      max_completion_tokens: openAiCompletionBudget(MAX_TOKENS),
       stream: true,
       stream_options: { include_usage: true },
       messages: [

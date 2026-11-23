@@ -4,6 +4,7 @@ import {
   DEFAULT_AI_TEXT_MODEL,
   isOpenAiTextModel,
   normalizeAiTextModel,
+  openAiCompletionBudget,
   textModelOption,
   type AiTextModel,
 } from "../ai/text-model-options";
@@ -143,7 +144,7 @@ async function generateWithOpenAi(model: AiTextModel, userMessage: string, actor
       },
       body: JSON.stringify({
         model,
-        max_completion_tokens: 350,
+        max_completion_tokens: openAiCompletionBudget(350),
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
