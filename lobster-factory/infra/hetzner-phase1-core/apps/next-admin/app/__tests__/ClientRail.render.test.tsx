@@ -199,7 +199,10 @@ describe("ClientRail", () => {
       orgs: [org(A, "acme", "Acme")],
     }));
     mount({ layer: "org" });
-    fireEvent.click(await screen.findByRole("button", { name: "AwareWave 自己" }));
+    // The self row is drawn from the prop before the answer arrives; wait for a row only the answer brings, or the
+    // click races the fetch and carries no group (failed on the deploy host's test gate, 2026-11-23).
+    await screen.findByRole("button", { name: /Acme/ });
+    fireEvent.click(screen.getByRole("button", { name: "AwareWave 自己" }));
     expect(trackClientPicked).toHaveBeenLastCalledWith("feedfacefeedface", false);
   });
 
