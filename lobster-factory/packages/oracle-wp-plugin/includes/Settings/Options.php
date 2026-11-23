@@ -7,11 +7,15 @@
  *                           private key out of the database and its backups)
  *  - aworacle_member_salt   (not autoloaded; secret): salt for member pseudonyms HMAC(salt, user id),
  *                           created the first time it is needed (activation hooks do not run on every install path)
+ * Plus one constant that is never an option: AWORACLE_DATA_KEY (wp-config.php, base64 of 32 bytes) encrypts
+ * members' saved birth data (Crypto\Vault). Without it saving is off; nothing falls back to plaintext.
  *
  * @package AwareWave\Oracle\Settings
  */
 
 namespace AwareWave\Oracle\Settings;
+
+use AwareWave\Oracle\Crypto\Vault;
 
 final class Options {
 
@@ -19,6 +23,7 @@ final class Options {
 	const KEY_OPTION   = 'aworacle_site_keypair';
 	const KEY_CONSTANT = 'AWORACLE_SITE_KEYPAIR';
 	const SALT_OPTION  = 'aworacle_member_salt';
+	const DATA_KEY_CONSTANT = 'AWORACLE_DATA_KEY';
 
 	/** @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>} */
 	public static function defaults(): array {
@@ -36,7 +41,10 @@ final class Options {
 	/** @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>} */
 	public static function get(): array {
 		$stored = get_option( self::OPTION, array() );
-		return array_merge( self::defaults(), is_array( $stored ) ? $stored : array() );
+		$out    = array_merge( self::defaults(), is_array( $stored ) ? $stored : array() );
+		// Cross-origin is not supported yet: a value stored before that decision is read as same-origin.
+		$out['embed'] = Normalize::EMBED_SAME_ORIGIN;
+		return $out;
 	}
 
 	/**
@@ -67,6 +75,20 @@ final class Options {
 			return (string) constant( self::KEY_CONSTANT );
 		}
 		return (string) get_option( self::KEY_OPTION, '' );
+	}
+
+	/** 'ok', 'missing' (constant not defined) or 'invalid' (not base64 of 32 bytes). */
+	public static function dataKeyStatus(): string {
+		if ( ! defined( self::DATA_KEY_CONSTANT ) ) {
+			return 'missing';
+		}
+		$value = constant( self::DATA_KEY_CONSTANT );
+		return is_string( $value ) && Vault::keyFromBase64( $value ) !== '' ? 'ok' : 'invalid';
+	}
+
+	/** Raw 32-byte member-data key, or '' when saving is off (see dataKeyStatus()). */
+	public static function dataKey(): string {
+		return self::dataKeyStatus() === 'ok' ? Vault::keyFromBase64( (string) constant( self::DATA_KEY_CONSTANT ) ) : '';
 	}
 
 	public static function activate(): void {

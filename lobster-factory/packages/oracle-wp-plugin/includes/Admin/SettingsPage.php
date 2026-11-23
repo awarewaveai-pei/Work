@@ -13,6 +13,7 @@
 namespace AwareWave\Oracle\Admin;
 
 use AwareWave\Oracle\Crypto\SiteKey;
+use AwareWave\Oracle\Crypto\Vault;
 use AwareWave\Oracle\Engine\EngineClient;
 use AwareWave\Oracle\Settings\Normalize;
 use AwareWave\Oracle\Settings\Options;
@@ -32,6 +33,7 @@ final class SettingsPage {
 		add_action( 'admin_menu', array( $this, 'menu' ) );
 		add_action( 'admin_init', array( $this, 'registerSetting' ) );
 		add_action( 'admin_post_' . self::ACTION, array( $this, 'handleAction' ) );
+		add_action( 'admin_notices', array( $this, 'storageNotice' ) );
 		// The notice is shown once; WordPress then strips the code from the address bar.
 		add_filter(
 			'removable_query_args',
@@ -110,8 +112,8 @@ final class SettingsPage {
 				return esc_html__( 'Key ID: 2–24 characters, lowercase letters, digits and -, starting with a letter or digit.', 'aware-wave-oracle' );
 			case 'default_locale':
 				return esc_html__( 'Default engine language must be zh-TW or en; en was saved.', 'aware-wave-oracle' );
-			case 'cross_needs_url':
-				return esc_html__( 'Cross-origin embedding needs the engine URL (browser); tools will not show until it is set.', 'aware-wave-oracle' );
+			case 'cross_unsupported':
+				return esc_html__( 'Embedding from another domain is not supported yet; same domain was saved.', 'aware-wave-oracle' );
 			case 'maps':
 				/* translators: %s: the lines that were not saved */
 				return sprintf( esc_html__( 'These lines were not saved (wrong format, or a language the engine does not have — zh-TW, en): %s', 'aware-wave-oracle' ), esc_html( $detail ) );
@@ -244,6 +246,9 @@ final class SettingsPage {
 			echo '</form>';
 		}
 
+		// --- Member data key (saved charts and persons) ---
+		$this->storageSection();
+
 		// --- Member pseudonym salt ---
 		echo '<h2>' . esc_html__( 'Member pseudonyms', 'aware-wave-oracle' ) . '</h2>';
 		echo '<p>' . esc_html__( 'The engine never sees member IDs or e-mails, only HMAC(salt, user ID). Rotating the salt makes every member look new to the engine (usage limits restart).', 'aware-wave-oracle' ) . '</p>';
@@ -260,6 +265,40 @@ final class SettingsPage {
 		$this->actionFormStart( 'tools' );
 		submit_button( __( 'Refresh tool list', 'aware-wave-oracle' ), 'secondary', 'submit', false );
 		echo '</form></div>';
+	}
+
+	/** Saving is off until AWORACLE_DATA_KEY is set: say why on the dashboard and plugins screens. */
+	public function storageNotice(): void {
+		if ( ! current_user_can( self::CAP ) || Options::dataKeyStatus() === 'ok' ) {
+			return;
+		}
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || ! in_array( $screen->id, array( 'dashboard', 'plugins' ), true ) ) {
+			return;
+		}
+		echo '<div class="notice notice-warning"><p>' . esc_html( $this->storageReason() ) . ' <a href="' . esc_url( admin_url( 'options-general.php?page=' . self::SLUG ) ) . '">' . esc_html__( 'Settings → AwareWave Oracle', 'aware-wave-oracle' ) . '</a></p></div>';
+	}
+
+	private function storageReason(): string {
+		return Options::dataKeyStatus() === 'invalid'
+			? __( 'AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY in wp-config.php is not a valid key (base64 of 32 bytes).', 'aware-wave-oracle' )
+			: __( 'AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY is not set in wp-config.php.', 'aware-wave-oracle' );
+	}
+
+	/**
+	 * Status of the member-data key. When it is missing, a freshly generated key is offered to paste into
+	 * wp-config.php; it is never stored by the plugin.
+	 */
+	private function storageSection(): void {
+		echo '<h2>' . esc_html__( 'Member data', 'aware-wave-oracle' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Members can save their own charts and the people they read for ([aw_oracle_my_charts], [aw_oracle_persons]). Names and birth data are encrypted with a key kept in wp-config.php, never in the database, so database backups hold only ciphertext.', 'aware-wave-oracle' ) . '</p>';
+		if ( Options::dataKeyStatus() === 'ok' ) {
+			echo '<p><strong>' . esc_html__( 'Saving is on.', 'aware-wave-oracle' ) . '</strong> ' . esc_html__( 'Keep a copy of AWORACLE_DATA_KEY outside this server: without it the saved entries cannot be read.', 'aware-wave-oracle' ) . '</p>';
+			return;
+		}
+		echo '<p><strong>' . esc_html( $this->storageReason() ) . '</strong></p>';
+		echo '<p>' . esc_html__( 'Add this line to wp-config.php above “That’s all, stop editing!”, and keep a copy outside this server:', 'aware-wave-oracle' ) . '</p>';
+		echo '<textarea readonly rows="2" class="large-text code" onclick="this.select()">' . esc_textarea( "define( '" . Options::DATA_KEY_CONSTANT . "', '" . Vault::newKeyBase64() . "' );" ) . '</textarea>';
 	}
 
 	/** admin-post.php handler: do the action, then redirect back with a notice code (Post/Redirect/Get). */
@@ -318,16 +357,16 @@ final class SettingsPage {
 		echo '<input type="hidden" name="op" value="' . esc_attr( $op ) . '">';
 	}
 
-	/** Two visible choices (no dropdown). */
+	/**
+	 * Two visible choices (no dropdown). Cross-origin is shown but disabled: the engine only allows
+	 * same-origin frames and has no message protocol yet (Normalize::settings() refuses it as well).
+	 */
 	private function embedRow( string $name, string $value ): void {
-		$choices = array(
-			Normalize::EMBED_SAME_ORIGIN  => __( 'Same domain (recommended): the engine answers under this site’s address at /embed/, /api/, /_next/, /tarot/.', 'aware-wave-oracle' ),
-			Normalize::EMBED_CROSS_ORIGIN => __( 'Another domain: the engine has its own address (Engine URL below); the page and the tool talk by messages.', 'aware-wave-oracle' ),
-		);
 		echo '<tr><th scope="row">' . esc_html__( 'Embedding', 'aware-wave-oracle' ) . '</th><td><fieldset>';
-		foreach ( $choices as $v => $label ) {
-			echo '<p><label><input type="radio" name="' . esc_attr( $name ) . '" value="' . esc_attr( $v ) . '"' . checked( $value, $v, false ) . '> ' . esc_html( $label ) . '</label></p>';
-		}
+		echo '<p><label><input type="radio" name="' . esc_attr( $name ) . '" value="' . esc_attr( Normalize::EMBED_SAME_ORIGIN ) . '"' . checked( $value !== Normalize::EMBED_CROSS_ORIGIN, true, false ) . '> '
+			. esc_html__( 'Same domain (recommended): the engine answers under this site’s address at /embed/, /api/, /_next/, /tarot/.', 'aware-wave-oracle' ) . '</label></p>';
+		echo '<p><label><input type="radio" disabled value="' . esc_attr( Normalize::EMBED_CROSS_ORIGIN ) . '"' . checked( $value, Normalize::EMBED_CROSS_ORIGIN, false ) . '> '
+			. esc_html__( 'Another domain (not supported yet): the engine has its own address; the page and the tool would talk by messages.', 'aware-wave-oracle' ) . '</label></p>';
 		echo '</fieldset></td></tr>';
 	}
 

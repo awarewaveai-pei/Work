@@ -1,137 +1,506 @@
+# Copyright (C) 2026 AwareWave
+# This file is distributed under the Proprietary.
 msgid ""
 msgstr ""
-"Project-Id-Version: aware-wave-oracle\n"
+"Project-Id-Version: AwareWave Oracle 0.3.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/aware-wave-oracle\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-11-23T00:18:34+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: aware-wave-oracle\n"
 
+#. Plugin Name of the plugin
+#: aware-wave-oracle.php
+#: includes/Admin/SettingsPage.php:49
+#: includes/Admin/SettingsPage.php:50
+#: includes/Admin/SettingsPage.php:203
+#: includes/Embed/Block.php:36
+#: includes/Embed/Block.php:60
+#: includes/Members/Privacy.php:35
+#: includes/Members/Privacy.php:45
 msgid "AwareWave Oracle"
 msgstr ""
 
+#. Plugin URI of the plugin
+#: aware-wave-oracle.php
+msgid "https://aware-wave.com"
+msgstr ""
+
+#. Description of the plugin
+#: aware-wave-oracle.php
+msgid "Embeds the AwareWave divination engine (Zi Wei, BaZi, I Ching, Tarot …) in this site's pages with a shortcode or block. Engine address, site key and languages are site settings."
+msgstr ""
+
+#. Author of the plugin
+#: aware-wave-oracle.php
+msgid "AwareWave"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:108
 msgid "Engine URL (browser) must be an https:// address without query or fragment."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:110
 msgid "Engine URL (server) must be an http(s):// address without query or fragment."
 msgstr ""
 
-msgid "Key ID: 3–64 characters, lowercase letters, digits, - and _."
+#: includes/Admin/SettingsPage.php:112
+msgid "Key ID: 2–24 characters, lowercase letters, digits and -, starting with a letter or digit."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:114
+msgid "Default engine language must be zh-TW or en; en was saved."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:116
+msgid "Embedding from another domain is not supported yet; same domain was saved."
+msgstr ""
+
+#. translators: %s: the lines that were not saved
+#: includes/Admin/SettingsPage.php:119
 #, php-format
-msgid "These lines were not saved (wrong format): %s"
+msgid "These lines were not saved (wrong format, or a language the engine does not have — zh-TW, en): %s"
 msgstr ""
 
+#. translators: %s: a language slug in TranslatePress settings, e.g. en
+#: includes/Admin/SettingsPage.php:135
+#, php-format
+msgid "TranslatePress language slug /%s/"
+msgstr ""
+
+#. translators: 1: list of reserved path prefixes, 2: list of pages
+#: includes/Admin/SettingsPage.php:142
+#, php-format
+msgid "These addresses start with a path the engine uses (%1$s) and will not reach WordPress: %2$s"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:198
+#: includes/Admin/SettingsPage.php:307
 msgid "Insufficient permissions."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:215
 msgid "Engine URL (browser)"
 msgstr ""
 
-msgid "Address visitors’ browsers load the embedded tools from, e.g. https://engine.example.com"
+#: includes/Admin/SettingsPage.php:215
+msgid "Cross-origin only: the address visitors’ browsers load the embedded tools from, e.g. https://engine.example.com"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:216
 msgid "Engine URL (server)"
 msgstr ""
 
-msgid "Address this WordPress server calls the engine at. Leave empty to use the browser URL; may be an internal http:// address."
+#: includes/Admin/SettingsPage.php:216
+msgid "Address this WordPress server calls the engine at; may be an internal http:// address. Empty: this site’s own address (same-origin) or the browser URL (cross-origin)."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:217
 msgid "Key ID"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:217
 msgid "The name this site is registered under at the engine."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:218
 msgid "Default engine language"
 msgstr ""
 
-msgid "Used when the page language has no entry below, e.g. en or zh-TW."
+#: includes/Admin/SettingsPage.php:218
+msgid "zh-TW or en. Used when the page language is neither and has no entry below."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:219
 msgid "Language map"
 msgstr ""
 
-msgid "One per line: WordPress locale=engine language, e.g. zh_TW=zh-TW"
+#: includes/Admin/SettingsPage.php:219
+msgid "Optional, one per line: WordPress locale=engine language, e.g. zh_HK=zh-TW. zh_TW and en_* need no entry."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:220
 msgid "Tool pages"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:220
 msgid "One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:229
 msgid "Site key"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:230
 msgid "This site signs its requests to the engine with an Ed25519 key. The private half never leaves this site; register the public key below with the engine under the key ID above."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:234
+msgid "AWORACLE_SITE_KEYPAIR in wp-config.php is not a valid key."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:236
 msgid "No key yet."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:239
+#: includes/Admin/SettingsPage.php:345
+msgid "The key comes from the AWORACLE_SITE_KEYPAIR constant in wp-config.php; change it there."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:243
 msgid "I understand the old key stops working until the new public key is registered at the engine."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:245
 msgid "Rotate key"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:245
 msgid "Generate key"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:253
 msgid "Member pseudonyms"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:254
 msgid "The engine never sees member IDs or e-mails, only HMAC(salt, user ID). Rotating the salt makes every member look new to the engine (usage limits restart)."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:256
 msgid "Yes, rotate the salt."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:257
 msgid "Rotate salt"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:262
 msgid "Tools available from the engine"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:263
 msgid "None — check the engine URL."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:264
 msgid "Shortcode:"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:266
 msgid "Refresh tool list"
 msgstr ""
 
-msgid "Tick the confirmation box to rotate the key."
+#: includes/Admin/SettingsPage.php:279
+msgid "Settings → AwareWave Oracle"
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:284
+msgid "AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY in wp-config.php is not a valid key (base64 of 32 bytes)."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:285
+msgid "AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY is not set in wp-config.php."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:293
+msgid "Member data"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:294
+msgid "Members can save their own charts and the people they read for ([aw_oracle_my_charts], [aw_oracle_persons]). Names and birth data are encrypted with a key kept in wp-config.php, never in the database, so database backups hold only ciphertext."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:296
+msgid "Saving is on."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:296
+msgid "Keep a copy of AWORACLE_DATA_KEY outside this server: without it the saved entries cannot be read."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:300
+msgid "Add this line to wp-config.php above “That’s all, stop editing!”, and keep a copy outside this server:"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:343
 msgid "New key created. Register the public key below at the engine."
 msgstr ""
 
-msgid "Tick the confirmation box to rotate the salt."
+#: includes/Admin/SettingsPage.php:344
+msgid "Tick the confirmation box to rotate the key."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:346
 msgid "Salt rotated."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:347
+msgid "Tick the confirmation box to rotate the salt."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:348
 msgid "Tool list refreshed."
 msgstr ""
 
+#: includes/Admin/SettingsPage.php:365
+msgid "Embedding"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:367
+msgid "Same domain (recommended): the engine answers under this site’s address at /embed/, /api/, /_next/, /tarot/."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:369
+msgid "Another domain (not supported yet): the engine has its own address; the page and the tool would talk by messages."
+msgstr ""
+
+#: includes/Embed/Block.php:61
 msgid "Choose a tool to embed:"
 msgstr ""
 
+#: includes/Embed/Block.php:62
 msgid "Embedded tool:"
 msgstr ""
 
+#: includes/Embed/Block.php:63
 msgid "No tools available — check Settings → AwareWave Oracle."
 msgstr ""
 
+#: includes/Embed/Block.php:64
 msgid "The tool appears here on the published page."
 msgstr ""
 
-msgid "AwareWave Oracle: set the engine URL in Settings → AwareWave Oracle and use a valid tool name."
+#: includes/Embed/Renderer.php:37
+msgid "AwareWave Oracle: use a valid tool name (and, for cross-origin embedding, set the engine URL in Settings → AwareWave Oracle)."
 msgstr ""
 
+#. translators: %s: tool name, e.g. ziwei
+#: includes/Embed/Renderer.php:42
 #, php-format
 msgid "AwareWave Oracle: %s"
 msgstr ""
 
+#: includes/Members/Privacy.php:76
+msgid "AwareWave Oracle: this member has saved charts, but AWORACLE_DATA_KEY is missing or invalid in wp-config.php, so they cannot be exported."
+msgstr ""
+
+#: includes/Members/Privacy.php:79
+msgid "Saved charts"
+msgstr ""
+
+#: includes/Members/Privacy.php:80
+msgid "Saved people (private compatibility readings)"
+msgstr ""
+
+#: includes/Members/Privacy.php:163
+msgid "Saved at (UTC)"
+msgstr ""
+
+#: includes/Members/Privacy.php:169
+msgid "Content"
+msgstr ""
+
+#: includes/Members/Privacy.php:170
+msgid "Encrypted; this site’s current key cannot open it (it was saved under another key)."
+msgstr ""
+
+#: includes/Members/Privacy.php:177
+#: includes/Members/Shortcodes.php:77
+msgid "Name"
+msgstr ""
+
+#: includes/Members/Privacy.php:181
+msgid "Birth (local clock time)"
+msgstr ""
+
+#: includes/Members/Privacy.php:194
+#: includes/Members/Shortcodes.php:89
+msgid "Gender"
+msgstr ""
+
+#: includes/Members/Privacy.php:198
+msgid "Birthplace"
+msgstr ""
+
+#: includes/Members/Rest.php:73
+msgid "Log in to save."
+msgstr ""
+
+#: includes/Members/Rest.php:80
+msgid "Your session expired. Reload the page and try again."
+msgstr ""
+
+#: includes/Members/Rest.php:83
+msgid "Saving is for members of this site."
+msgstr ""
+
+#: includes/Members/Rest.php:129
+#: includes/Members/Shortcodes.php:75
+msgid "Something went wrong. Reload the page and try again."
+msgstr ""
+
+#. translators: %d: how many entries a member may keep
+#: includes/Members/Rest.php:135
+#, php-format
+msgid "You can keep up to %d entries here. Delete one first."
+msgstr ""
+
+#: includes/Members/Rest.php:175
+#: includes/Members/Shortcodes.php:44
+msgid "Saving is not available on this site yet."
+msgstr ""
+
+#: includes/Members/Rest.php:187
+msgid "Some fields are missing or not valid."
+msgstr ""
+
+#: includes/Members/Rest.php:198
+msgid "Not found."
+msgstr ""
+
+#: includes/Members/Shortcodes.php:41
+msgid "Log in to save"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:46
+msgid "Administrators: set the member-data key in Settings → AwareWave Oracle."
+msgstr ""
+
+#: includes/Members/Shortcodes.php:64
+msgid "My charts"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:65
+msgid "People I saved"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:66
+msgid "Only you can see these. Nobody is told that you saved them."
+msgstr ""
+
+#: includes/Members/Shortcodes.php:67
+msgid "Nothing saved yet."
+msgstr ""
+
+#: includes/Members/Shortcodes.php:68
+msgid "Add"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:69
+msgid "Edit"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:70
+msgid "Delete"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:71
+msgid "Delete this entry?"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:72
+msgid "Save"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:73
+msgid "Cancel"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:74
+msgid "This entry cannot be opened with the site’s current key. You can delete it."
+msgstr ""
+
+#: includes/Members/Shortcodes.php:76
+msgid "Check the highlighted fields."
+msgstr ""
+
+#: includes/Members/Shortcodes.php:78
+msgid "Calendar"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:79
+msgid "Solar (Gregorian)"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:80
+msgid "Lunar"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:81
+msgid "Leap month"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:82
+msgid "Birth date (year, month, day)"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:83
+msgid "Birth time, local clock (hour, minute)"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:84
+msgid "Year"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:85
+msgid "Month"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:86
+msgid "Day"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:87
+msgid "Hour"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:88
+msgid "Minute"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:90
+msgid "Male"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:91
+msgid "Female"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:92
+msgid "Birthplace name"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:93
+msgid "Latitude (north +)"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:94
+msgid "Longitude (east +)"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:95
+msgid "Time zone (e.g. Asia/Taipei)"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:96
+msgid "Use true solar time"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:97
+msgid "Births 23:00–24:00 count as"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:98
+msgid "the same day"
+msgstr ""
+
+#: includes/Members/Shortcodes.php:99
+msgid "the next day"
+msgstr ""

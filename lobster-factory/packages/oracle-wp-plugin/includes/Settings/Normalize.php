@@ -44,7 +44,13 @@ final class Normalize {
 	public static function settings( array $in, array &$errors = array() ): array {
 		$out = Options::defaults();
 
-		$out['embed'] = self::embedMode( self::scalar( $in['embed'] ?? '' ) );
+		// Cross-origin is not supported yet (the engine allows only same-origin frames and has no message
+		// protocol): a request for it is reported and same-origin is stored.
+		$embedRaw     = self::scalar( $in['embed'] ?? '' );
+		$out['embed'] = self::EMBED_SAME_ORIGIN;
+		if ( $embedRaw === self::EMBED_CROSS_ORIGIN ) {
+			$errors[] = array( 'cross_unsupported', '' );
+		}
 
 		$browserRaw                = self::scalar( $in['browser_engine_url'] ?? '' );
 		$out['browser_engine_url'] = self::engineUrl( $browserRaw, false );
@@ -75,14 +81,7 @@ final class Normalize {
 		if ( $rejected ) {
 			$errors[] = array( 'maps', implode( ' | ', $rejected ) );
 		}
-		if ( $out['embed'] === self::EMBED_CROSS_ORIGIN && $out['browser_engine_url'] === '' ) {
-			$errors[] = array( 'cross_needs_url', '' );
-		}
 		return $out;
-	}
-
-	public static function embedMode( string $value ): string {
-		return $value === self::EMBED_CROSS_ORIGIN ? self::EMBED_CROSS_ORIGIN : self::EMBED_SAME_ORIGIN;
 	}
 
 	/**

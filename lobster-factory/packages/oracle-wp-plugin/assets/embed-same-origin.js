@@ -4,8 +4,9 @@
  *  - Height: the frame is as tall as #aw-oracle-root (a ResizeObserver from the frame's own window, so it
  *    also fires when the content gets shorter). Root not found (engine down, error page) -> the frame keeps
  *    cfg.minHeight; it never grows to fit a document that is not the tool.
- *  - Result: after a submit or a button click inside the frame, the first growth of the content scrolls this
- *    page to the newly added block (the result), or to the frame's top when no block can be told apart.
+ *  - Result: after a submit or a button click inside the frame, when an element marked [data-aw-result]
+ *    (the engine marks each tool's result container, card E5) appears or is re-rendered, this page scrolls to
+ *    it. An engine without the marker never triggers a scroll: no guessing from height changes.
  *  - Tool links: a link inside the frame to another tool (/<lang>/<tool> or /embed/<lang>/<tool>) opens the
  *    WordPress page mapped to that tool (Settings → Tool pages), when there is one.
  * Config: window.AWORACLE_SAME = { rootId, minHeight, pages: { slug: url } }.
@@ -17,19 +18,17 @@
 
   var MIN_HEIGHT = Math.max(150, Number(cfg.minHeight) || 600);
   var ARM_MS = 30000; // a result counts when it shows up within this long after the visitor acted
-  var GROWTH_PX = 80; // smaller changes are hints, spinners, validation messages
-  var RESULT_MIN_PX = 60; // an added block shorter than this is not "the result"
+  var RESULT_SELECTOR = '[data-aw-result]';
   var TOP_GAP_PX = 16;
   var TOOL_PATH = /^\/(?:embed\/)?(?:zh-TW|en)\/([a-z0-9][a-z0-9-]{0,39})\/?$/;
 
   function attach(frame) {
-    var state = { observer: null, mutations: null, root: null, height: 0, armedAt: 0, added: [] };
+    var state = { observer: null, mutations: null, root: null, height: 0, armedAt: 0 };
 
     function reset() {
       if (state.observer) state.observer.disconnect();
       if (state.mutations) state.mutations.disconnect();
       state.observer = state.mutations = state.root = null;
-      state.added = [];
       state.armedAt = 0;
     }
 
@@ -42,34 +41,44 @@
       if (!root || !root.isConnected) return;
       var h = Math.ceil(root.getBoundingClientRect().height);
       if (!(h > 0)) return;
-      var grew = h - state.height;
       state.height = h;
       setHeight(h);
-      if (state.armedAt && grew >= GROWTH_PX && Date.now() - state.armedAt < ARM_MS) {
-        state.armedAt = 0;
-        scrollToResult();
-      }
     }
 
-    function scrollToResult() {
-      var frameTop = frame.getBoundingClientRect().top;
-      var target = null;
-      for (var i = 0; i < state.added.length; i++) {
-        var el = state.added[i];
-        if (!el.isConnected) continue;
-        var r = el.getBoundingClientRect();
-        if (r.height >= RESULT_MIN_PX && (!target || r.top < target.top)) target = r;
+    /** The [data-aw-result] element a mutation added or changed, or null. */
+    function resultIn(records) {
+      for (var i = 0; i < records.length; i++) {
+        var t = records[i].target; // an element, or a text node for characterData records
+        var host = t && (t.nodeType === 1 ? t : t.parentElement);
+        var inside = host && host.closest ? host.closest(RESULT_SELECTOR) : null;
+        if (inside) return inside;
+        var nodes = records[i].addedNodes;
+        for (var j = 0; j < nodes.length; j++) {
+          var n = nodes[j];
+          if (n.nodeType !== 1) continue;
+          if (n.matches(RESULT_SELECTOR)) return n;
+          var found = n.querySelector(RESULT_SELECTOR);
+          if (found) return found;
+        }
       }
-      state.added = [];
-      var offset = target ? frameTop + target.top : frameTop;
-      // Already in the upper part of the viewport: leave the visitor where they are.
-      if (offset >= 0 && offset < window.innerHeight / 3) return;
-      window.scrollTo({ top: window.pageYOffset + offset - TOP_GAP_PX, behavior: 'smooth' });
+      return null;
     }
 
-    function arm() {
+    function scrollTo(result) {
+      // After layout: the frame height follows the content in the same frame.
+      window.requestAnimationFrame(function () {
+        if (!result.isConnected) return;
+        var offset = frame.getBoundingClientRect().top + result.getBoundingClientRect().top;
+        // Already in the upper part of the viewport: leave the visitor where they are.
+        if (offset >= 0 && offset < window.innerHeight / 3) return;
+        window.scrollTo({ top: window.pageYOffset + offset - TOP_GAP_PX, behavior: 'smooth' });
+      });
+    }
+
+    function arm(event) {
+      var t = event && event.target;
+      if (t && t.closest && t.closest(RESULT_SELECTOR)) return; // a form inside the shown result
       state.armedAt = Date.now();
-      state.added = [];
     }
 
     function onClick(event) {
@@ -91,7 +100,8 @@
           return;
         }
       }
-      if (t && t.closest && t.closest('button, [role="button"], input[type="submit"]')) arm();
+      // Buttons inside a shown result (tabs, expanders) change the result in place: no scroll for those.
+      if (t && t.closest && t.closest('button, [role="button"], input[type="submit"]')) arm(event);
     }
 
     function bind() {
@@ -116,12 +126,16 @@
       state.observer.observe(root);
       state.mutations = new win.MutationObserver(function (records) {
         if (!state.armedAt) return;
-        for (var i = 0; i < records.length; i++) {
-          var nodes = records[i].addedNodes;
-          for (var j = 0; j < nodes.length; j++) if (nodes[j].nodeType === 1) state.added.push(nodes[j]);
+        if (Date.now() - state.armedAt >= ARM_MS) {
+          state.armedAt = 0;
+          return;
         }
+        var result = resultIn(records);
+        if (!result) return;
+        state.armedAt = 0;
+        scrollTo(result);
       });
-      state.mutations.observe(root, { childList: true, subtree: true });
+      state.mutations.observe(root, { childList: true, subtree: true, characterData: true });
       doc.addEventListener('submit', arm, true);
       doc.addEventListener('click', onClick, true);
       measure();
