@@ -40,7 +40,7 @@
 |---|---|---|
 | G1 | 代辦路徑不存在：連結只在付款事件建立；email 不符時會新建 `wp-member-<id>` 重複單位 | `wp-customers.ts:169,177-190` |
 | G2 | 現有 active 客戶組織無會員連結（僅 2 個測試列，且與 WP id 對不上） | 現況報告 §3、§7 |
-| G3 | 標籤函式與 `crm` 接頭設定不存在；WordPress 端沒有 TEST 角色（現有 7 個皆內建，`customer` 即「客戶」）；合約沒有「代操」「經銷」兩種方式的記法 | 現況報告 §8 |
+| G3 | **部分已關（M2，0178，2026-11-23）：代操可記在 `organization_product_operations`**；仍缺：標籤函式與 `crm` 接頭設定不存在；WordPress 端沒有 TEST 角色（現有 7 個皆內建，`customer` 即「客戶」）；合約沒有「代操」「經銷」兩種方式的記法 | 現況報告 §8 |
 | G4 | 客戶自己授權他人：只有員工能邀請；產品層只有 social 有成員頁 | `NA/app/api/ops/clients/[slug]/accounts/route.ts:100`；`NA/app/(shell)/tools/social/Members.tsx` |
 | G5 | 轉移會員（換管理者／聯絡人離職）無路徑：`linkIdentity` 三欄不同即 `identity_conflict` | 現況報告 `:68` |
 | G6 | 訪客結帳開著，程式假設結帳必登入 | 現況報告「矛盾」第 4 項 |

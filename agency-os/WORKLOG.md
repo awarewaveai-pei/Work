@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-23（續10）— 平台第 7 批上線：U12、U23、M11（High）、M2（High，0178 已套用）
+
+- 操作者 2026-11-23「看工人們反應的 RISKS 是否需要處理，先處理完風險再一起 4 張上線部署」＝ M2、M11 的 go。
+- M2 `c5840ee05`：設計改定。原卡在 `organization_product_subscriptions` 加 `operated_by`；派工前唯讀查正式庫，該表 10 列全是 `wp-member-2`／`wp-member-7` 的已取消點數方案，Soulful（唯一代操客戶）與 edd-research 無訂閱列（權利是 `all-features` 權利列），且操作軸不該塞進商業軸（ADR 017 §0）。改為新表 `organization_product_operations`（migration 0178：主鍵 `(organization_id, product_key)`，`operated_by in ('customer','awarewave')`，沒有列＝customer，只收根的 customer／test 帳戶，RLS 只給 service_role，不寫資料）；`product_key` 不寫死清單（工人第一版照 0110 抄一份清單，退回），寫入端 `lib/entitlements/operations.ts` 對 `products.ts` 驗。客戶頁帳務分頁加切換卡（`OperationsCard.tsx`，由 `ClientHubTabs` 放進 `BillingTab` 插槽，`/ops/billing` 不顯示）。
+- M11 `eb6fa5f87`：`awarewave-wp.ts` 新 `opensTo(來源, 門)`，aware-wave.com 進門也照 `loginSources`；8 個產品清單補 `awarewave-wp`；改前先把每扇門結果寫死成測試，改後逐門相同；三次突變皆紅。ADR 021 G11 已關（工人同 commit）。
+- U12 `d99a84f94`：`lib/portal/__tests__/page-names.test.ts`（門頁 title＝選單名＝第一個 h1；內容 5 頁在有期限的待辦清單，owner U11）；16 個門頁加視覺隱藏 h1（量過不佔版面）；三個門首頁 title 改名。U23 `776590fd2`＋`070989647`＋`fc71b8835`＋`55eea0efa`：`client_picked`／`blocked_shown`／`login_succeeded`，群組 id＝單位 id 的 SHA-256 前 16 hex、伺服器端算。
+- 整合才抓到的缺陷：U23 的 `track-picked.ts` 在產品門 import 圖裡打 `/api/ops/analytics-context`（門上 404），`registry-code.test.ts`「a built door can reach every API its pages call」穩定紅；工人兩次全套各「1 個失敗」未看檔名即歸為逾時。改由 `/api/ops/org-search` 每列帶 `group`（含內部組織的 `internalGroup`），未動 `STAFF_DOOR_APIS`、未放寬掃描。
+- 未定、不擋：員工側欄（`app/sidebar-sections.ts`）與產品門選單（`products.ts` `door.nav`）19 處名稱不同：video 影音工作台／影片工作台、我的設計／我的作品；tarot 塔羅工作室／塔羅工作台；studio POD 設計／設計工作台；design 修圖專業版／畫布、橫幅設計／橫幅、商品擬真圖／模型圖、向量專業版／向量（專業版）；content SEO 文章／內容編輯、自動內容／題目、客戶網站／網站、活動行事曆／節日；outreach 冷名單庫／名單、名單收件匣／匯入名單、文案審核／審核信件、跟進任務／追蹤、回覆處理／回信、連接器／信箱與連線（「我的設計／我的作品」在 video、tarot、studio 各一處）。預設統一成產品門名稱，記在 DISPATCH U11。
+- 上線：主機先查——另一個 session 正在部署 next-admin（新的共用鎖 `/run/lock/lobster-compose-state.lock.holder` 顯示持有者），等它結束；`node scripts/apply-db-migration.mjs 0178`（`APPLY_OK 1/1`，ledger 最新 0178，表 0 列、RLS 開、anon／authenticated 無權限）→ push `55eea0efa` → 第一次 `sg-deploy.sh next-admin` 被 CI 閘 REFUSED（新 push 取消了該 commit 的 `next-admin-test`，正式站未變）→ 等 `6250432ec` 的 CI 綠後重跑，03:12Z 完成、smoke 全過（deployed `2ef315fab`，含本批）。這也是併入後的新部署腳本第二次實跑。
+- 未驗：M2 切換卡未在正式站實看（需登入）；K12 確認窗同前。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin 5638 passed, 0 failed) ; node scripts/apply-db-migration.mjs 0178 ; ssh psql select max(filename) from schema_migrations | exit=0 | ms=800000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/6n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=organization_product_operations | hits=29
+- ORACLE_WAIVED: Codex 額度 2026-11-24 才恢復；M11 有兩個 critic（0 Critical）＋三次突變，M2 有書面對抗自審＋突變（拔 staffOnly 後客戶 403 測試紅）＋拋棄式資料庫 up、down、up；監工讀過 0178 全文與 M11 守衛
 ## 2026-11-23（續9）— oracle WP：SF-I 併入；第三批全部交回，整批 RISKS 總檢完成；新增卡 E6、SF-I2
 
 - SF-I 併入 `6250432ec`（工人 `8a6e4fbeb`，已 push；今晚 03:00 自動部署帶上，`site.mainwp`、`site.bridge` 開關關）：`lib/site-flow/steps/{mainwp,bridge}.ts`、`lib/site-flow/mainwp-client.ts`、`lib/payments/woo.ts`（加 `env:<environments.id>` 形式的已登記站，私鑰取自保管庫；`listBridgeClientsWithRegistered`；環境變數客戶端行為不變）、`lib/content/r2-delete-guard.ts:98` 改讀含登記站的清單、`engine.ts:197` `requiresOn`、`gate-client.ts:169` staging 的 `put-bridge-pubkey` 轉接、`steps/shared.ts:118` metadata 寫入 CAS。
