@@ -77,7 +77,7 @@ export const STEPS = [
     gate: '按鈕出現、選的模型真的送到執行程式；真的用訂閱寫一篇要等 Codex 額度恢復（M1）。', risk: 'Low', model: 'Sonnet', status: 'done', commit: 'db2cb07fa', depends: ['K6'], card: 'briefs/K17-codex-model.md' },  { n: 19, code: 'K18', group: 'B5', title: '中文文章改用中文小標', plain: '查出來 SEO 評分本來就認中文小標；只認英文的是另外兩處：寫文章的指令規定四個固定小標一律寫英文，發到 WordPress 的摘要只找英文的 Quick Answer。兩處都改成中英文都可以，三個地方共用同一份小標清單。十二篇盲測文章把小標換成中文重新評分，分數完全一樣。',
     gate: '部署後產一篇中文文章：四個固定小標是中文、SEO 分數不變、WordPress 摘要取自快速解答。', risk: 'Medium', model: '監工', status: 'done', commit: '5042d239c', depends: ['K15'], card: 'briefs/K10-K12.md' },  { n: 20, code: 'K19', group: 'B5', title: '商品文案不再亂寫規格、不翻譯品牌名', plain: '上次實測兩邊各錯一個：一個自己加了「棉質」和洗滌方式，一個把品牌名翻成中文。原因都在指令：它要求寫材質、印刷、保養，卻沒給這些資料；又說每個欄位都要用指定語言。已改成：沒給的規格不寫，品牌名和圖上的字照原樣。改完重測三件商品、兩個模型，品牌名都保留，沒給的規格都沒出現，有給的規格都用對。要讓頁面寫出材質，請在「文案指示」裡填。',
     gate: '三件商品重測結果在比較頁；商品文案維持 Claude Opus。', risk: 'Low', model: '監工', status: 'done', commit: '7d9e58824', depends: ['K16'], card: 'briefs/K15-K16.md' },  { n: 21, code: 'K20', group: 'B5', title: '四種文案換成 GPT-6.2 sol', plain: '你 11-23 看完比較後定案：影片腳本、社群改寫、開發信、AI 去味換成 GPT-6.2 sol；劇本工坊、競業分析、商品文案、每月選題不換。其中三種原本只接 Claude，要先補上 OpenAI 的路。每個功能的預設模型集中在一處設定。GPT-6.2 sol 回空白或被截斷時，自動改用原本的 Claude 模型重寫，不會把空白交給你。沒有 OpenAI 金鑰的安裝照舊用 Claude。',
-    gate: '四種各真跑三次，全部有內容、固定格式全部通過；空白時會退回 Claude 的測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K16', 'K19'], card: 'briefs/K20-copy-defaults.md' },
+    gate: '四種各真跑三次，全部有內容、固定格式全部通過；空白時會退回 Claude 的測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'ff59979ef', depends: ['K16', 'K19'], card: 'briefs/K20-copy-defaults.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
@@ -161,5 +161,12 @@ export const RISKS = [
   ] },
   { batch: 'K19（商品文案重測）', rows: [
     { card: 'K16', risk: 'GPT-6.2 sol 會先「思考」再寫，思考用量也算在輸出上限裡。商品文案重測時，三次裡有一次把 1,200 的上限全部用在思考，結果一個字都沒寫出來。', act: '商品文案維持 Claude，不受影響。已寫進換模型的條件：任何功能換成 GPT-6.2 sol 之前，先把該功能的輸出上限調到留得下思考用量，並各跑三次確認沒有空白。' },
+  ] },
+  { batch: 'K20（四種文案換模型）驗收', rows: [
+    { card: 'K20', risk: '第一版裡，影片腳本在 OpenAI 的 API 出錯時直接失敗，沒有改用 Claude；以前影片腳本不受 OpenAI 影響。', act: '已退回修正並併入：四種功能共用一條規則，OpenAI 只有正常寫完且有內容才算數，其餘一律改用 Claude 再寫一次。' },
+    { card: 'K20', risk: '自動流程寫社群貼文前預留的金額還照舊模型算（約 NT$0.06），換模型後實際一次約 NT$0.42，可能超過你設的預算上限。', act: '已修正並併入：預留金額改由同一張預設模型表算出，含退回 Claude 那一次；加了測試守住「預留不低於最壞花費」。' },
+    { card: 'K20', risk: '被內容過濾切掉一半的文字會被當成寫完；AI 去味等 OpenAI 最久會等十分鐘；用量紀錄把廠商記成 Claude。', act: '三項都已修正並併入：非正常結束一律不算數；AI 去味等 80 秒沒回就改用 Claude；用到 Claude 時才記 Claude。' },
+    { card: 'K20', risk: '併入前跑全套測試時，一個影片「一鍵到草稿」畫面的測試失敗一次。', act: '查過：這次改動沒有碰那個畫面的任何檔案；單獨重跑三次都通過，是整套一起跑時畫面來不及出現。沒有改測試讓它過。若之後再出現，另開卡處理那個測試的等待方式。' },
+    { card: 'K20', risk: 'AI 去味改用 GPT-6.2 sol 後，文字不再一個字一個字出現，而是等十幾秒後整段出現。', act: '這是換模型帶來的行為改變，功能正常。上線後你覺得不習慣，可以只把 AI 去味換回 Claude，其他三種不受影響。' },
   ] },
 ];
