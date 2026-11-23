@@ -6,13 +6,18 @@
  *  - deleting a user (single site), removing a user from a site, deleting them from the network
  *    (wpmu_delete_user: every site, member or not): the same erase
  *  - anything those events miss (plugin inactive at the time): Store::purgeOrphans(), daily and on install
- * P3 adds its daily-letter profile to the same exporter/eraser.
+ * Daily letter (P3): the profile(s) of this e-mail's FluentCRM contact and of the member's linked profiles are
+ * exported (time zone, language, birth data) and erased with the same tools; deleting the member erases
+ * the linked ones.
  *
  * @package AwareWave\Oracle\Members
  */
 
 namespace AwareWave\Oracle\Members;
 
+use AwareWave\Oracle\Daily\Crm;
+use AwareWave\Oracle\Daily\Store as DailyStore;
+use AwareWave\Oracle\Crypto\Vault;
 use AwareWave\Oracle\Settings\Options;
 
 final class Privacy {
@@ -60,12 +65,13 @@ final class Privacy {
 			'data' => array(),
 			'done' => true,
 		);
-		if ( ! $user || $page > 1 ) {
+		$daily = self::dailyProfiles( $email, $user ? (int) $user->ID : 0 );
+		if ( ( ! $user && ! $daily ) || $page > 1 ) {
 			return $empty;
 		}
 		$key    = Options::dataKey();
-		$kinds  = array_values( array_filter( array_keys( Store::KINDS ), array( Store::class, 'tableExists' ) ) );
-		$stored = 0;
+		$kinds  = $user ? array_values( array_filter( array_keys( Store::KINDS ), array( Store::class, 'tableExists' ) ) ) : array();
+		$stored = count( $daily );
 		foreach ( $kinds as $kind ) {
 			$stored += count( Store::listFor( $kind, (int) $user->ID, '', true ) );
 		}
@@ -91,6 +97,14 @@ final class Privacy {
 				);
 			}
 		}
+		foreach ( $daily as $profile ) {
+			$data[] = array(
+				'group_id'    => 'aworacle-daily',
+				'group_label' => __( 'Daily fortune letter', 'aware-wave-oracle' ),
+				'item_id'     => 'aworacle-daily-' . $profile['subscriber_id'],
+				'data'        => self::dailyFields( $profile, $key ),
+			);
+		}
 		return array(
 			'data' => $data,
 			'done' => true,
@@ -101,6 +115,9 @@ final class Privacy {
 	public static function erase( string $email, int $page = 1 ): array {
 		$user    = get_user_by( 'email', $email );
 		$removed = $user ? Store::deleteAllFor( (int) $user->ID ) : 0;
+		foreach ( self::dailyProfiles( $email, $user ? (int) $user->ID : 0 ) as $profile ) {
+			$removed += DailyStore::deleteForSubscriber( (int) $profile['subscriber_id'] );
+		}
 		return array(
 			'items_removed'  => $removed > 0,
 			'items_retained' => false,
@@ -112,6 +129,7 @@ final class Privacy {
 	/** @param int|string $userId */
 	public static function onDeleteUser( $userId ): void {
 		Store::deleteAllFor( (int) $userId );
+		DailyStore::deleteForUser( (int) $userId );
 	}
 
 	/**
@@ -133,6 +151,7 @@ final class Privacy {
 			foreach ( $ids as $id ) {
 				switch_to_blog( (int) $id );
 				Store::deleteAllFor( (int) $userId );
+				DailyStore::deleteForUser( (int) $userId );
 				restore_current_blog();
 			}
 		} while ( count( $ids ) === 100 );
@@ -148,9 +167,78 @@ final class Privacy {
 			switch_to_blog( (int) $blogId );
 		}
 		Store::deleteAllFor( (int) $userId );
+		DailyStore::deleteForUser( (int) $userId );
 		if ( $switch ) {
 			restore_current_blog();
 		}
+	}
+
+	/**
+	 * Daily profiles of this address's FluentCRM contact and of profiles linked to the member.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function dailyProfiles( string $email, int $userId ): array {
+		if ( ! DailyStore::tablesExist() ) {
+			return array();
+		}
+		$ids     = DailyStore::subscribersOfUser( $userId );
+		$contact = Crm::findByEmail( strtolower( trim( $email ) ) );
+		if ( $contact ) {
+			$ids[] = $contact['id'];
+		}
+		$out = array();
+		foreach ( array_unique( $ids ) as $id ) {
+			$row = DailyStore::get( (int) $id );
+			if ( $row ) {
+				$out[] = $row;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * @param array<string,mixed> $p a daily profile row
+	 * @return array<int,array{name:string,value:string}>
+	 */
+	private static function dailyFields( array $p, string $key ): array {
+		$id     = (int) $p['subscriber_id'];
+		$active = $p['data'] ? Vault::open( (string) $p['data'], $key, DailyStore::activeContext( $id ) ) : null;
+		$pend   = $p['pending_data'] ? Vault::open( (string) $p['pending_data'], $key, DailyStore::pendingContext( $id ) ) : null;
+		$out    = array(
+			array(
+				'name'  => __( 'Status', 'aware-wave-oracle' ),
+				'value' => (string) $p['status'],
+			),
+			array(
+				'name'  => __( 'Time zone', 'aware-wave-oracle' ),
+				'value' => (string) $p['tz'],
+			),
+			array(
+				'name'  => __( 'Language', 'aware-wave-oracle' ),
+				'value' => (string) $p['locale'],
+			),
+			array(
+				'name'  => __( 'Saved at (UTC)', 'aware-wave-oracle' ),
+				'value' => (string) $p['created_at'],
+			),
+		);
+		foreach ( array( 'active' => $active, 'pending' => is_array( $pend ) ? ( $pend['birth'] ?? null ) : null ) as $which => $birth ) {
+			if ( ! is_array( $birth ) ) {
+				continue;
+			}
+			$row = array(
+				'id'         => $id,
+				'data'       => array(
+					'name'  => $which === 'active' ? __( 'Daily letter', 'aware-wave-oracle' ) : __( 'Daily letter (waiting for confirmation)', 'aware-wave-oracle' ),
+					'birth' => $birth,
+				),
+				'created_at' => (string) $p['created_at'],
+				'updated_at' => (string) $p['updated_at'],
+			);
+			$out = array_merge( $out, array_slice( self::fields( $row ), 1 ) );
+		}
+		return $out;
 	}
 
 	/**

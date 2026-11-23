@@ -40,4 +40,19 @@
       return null; // server-rendered
     }
   });
+
+  // Daily-letter signup (Daily\Signup): no settings; the form appears on the published page.
+  wp.blocks.registerBlockType('aware-wave/oracle-daily', {
+    edit: function () {
+      return el(
+        'div',
+        useBlockProps({ style: { border: '1px dashed currentColor', padding: '12px' } }),
+        el('strong', null, L.dailyTitle || 'Daily fortune signup'),
+        el('p', { style: { opacity: 0.7 } }, L.dailyPreview || '')
+      );
+    },
+    save: function () {
+      return null; // server-rendered
+    }
+  });
 })(window.wp);

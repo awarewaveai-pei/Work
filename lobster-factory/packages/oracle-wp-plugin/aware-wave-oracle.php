@@ -3,7 +3,7 @@
  * Plugin Name:       AwareWave Oracle
  * Plugin URI:        https://aware-wave.com
  * Description:       Embeds the AwareWave divination engine (Zi Wei, BaZi, I Ching, Tarot …) in this site's pages with a shortcode or block. Engine address, site key and languages are site settings.
- * Version:           0.3.0
+ * Version:           0.4.0
  * Requires at least: 6.5
  * Requires PHP:      7.4
  * Author:            AwareWave
@@ -12,7 +12,8 @@
  * Domain Path:       /languages
  *
  * Entry point only: wiring. Logic lives under includes/ — the WP-free pieces (Crypto, Embed\EmbedUrl,
- * Embed\LocaleMap, Settings\Normalize, Engine\ToolList, Crypto\Vault, Members\Record) are unit-tested without WordPress.
+ * Embed\LocaleMap, Settings\Normalize, Engine\ToolList, Crypto\Vault, Members\Record, Daily\Schedule, Daily\Letter, Daily\Svix) are unit-tested
+ * without WordPress.
  * Nothing here is specific to one site: every address, key and mapping is an option on the site.
  *
  * @package AwareWave\Oracle
@@ -24,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AWORACLE_VERSION', '0.3.0' );
+define( 'AWORACLE_VERSION', '0.4.0' );
 define( 'AWORACLE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AWORACLE_URL', plugin_dir_url( __FILE__ ) );
 define( 'AWORACLE_FILE', __FILE__ );
@@ -80,3 +81,12 @@ add_action(
 ( new Members\Rest() )->register();
 ( new Members\Shortcodes() )->register();
 ( new Members\Privacy() )->register();
+// Member ticket for AI readings: POST aworacle/v1/ticket (login + nonce), handed to the frame by embed-same-origin.js.
+( new Members\Ticket() )->register();
+
+// Daily fortune letter (mailer = fluentcrm): signup [aw_oracle_daily] / block, REST daily/subscribe, Resend
+// bounce/complaint webhook, own confirmation link for already-subscribed contacts, hourly run, FluentCRM events.
+( new Daily\Signup() )->register();
+( new Daily\Rest() )->register();
+( new Daily\Confirm() )->register();
+( new Daily\Hooks() )->register();

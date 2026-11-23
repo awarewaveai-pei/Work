@@ -38,12 +38,29 @@ final class Record {
 		if ( $name === null || $name === '' ) {
 			$errors[] = 'name';
 		}
-		$b = $in['birth'] ?? null;
+		$birth = self::cleanBirth( $in['birth'] ?? null, $errors );
+		if ( $birth === null || $errors ) {
+			return null;
+		}
+		return array(
+			'name'  => $name,
+			'birth' => $birth,
+		);
+	}
+
+	/**
+	 * The birth part alone (also the daily letter's input). Appends failing paths to $errors.
+	 *
+	 * @param mixed             $b
+	 * @param array<int,string> $errors
+	 * @return array<string,mixed>|null
+	 */
+	public static function cleanBirth( $b, array &$errors ): ?array {
 		if ( ! is_array( $b ) ) {
 			$errors[] = 'birth';
 			return null;
 		}
-
+		$before            = count( $errors );
 		$birth             = array();
 		$birth['calendar'] = self::oneOf( $b['calendar'] ?? null, self::CALENDARS, 'birth.calendar', $errors );
 		$birth['year']     = self::int( $b['year'] ?? null, self::YEAR_MIN, self::YEAR_MAX, 'birth.year', $errors );
@@ -65,13 +82,7 @@ final class Record {
 				$errors[] = 'birth.day';
 			}
 		}
-		if ( $errors ) {
-			return null;
-		}
-		return array(
-			'name'  => $name,
-			'birth' => $birth,
-		);
+		return count( $errors ) > $before ? null : $birth;
 	}
 
 	/** @param mixed $v */

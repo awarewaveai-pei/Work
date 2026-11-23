@@ -1,6 +1,6 @@
 # aware-wave-oracle（WordPress 外掛）
 
-把 AwareWave 算命引擎的工具嵌進任何 WordPress 網站的頁面。oracle.aware-wave.com 只是第一個安裝的站；外掛內沒有任何網站專屬的網址或設定。設計正本：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md`（§1、§2-1～§2-6、§2-13；本外掛卡 P1′、P2′）。
+把 AwareWave 算命引擎的工具嵌進任何 WordPress 網站的頁面。oracle.aware-wave.com 只是第一個安裝的站；外掛內沒有任何網站專屬的網址或設定。設計正本：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md`（§1、§2-1～§2-10、§2-13；本外掛卡 P1′、P2′、P3′）。
 
 ## 安裝
 
@@ -20,10 +20,12 @@
 | 金鑰名稱 `key_id` | 引擎登記表的名稱，格式同引擎 `SITE_KEY_ID`：2–24 個小寫英數或 `-` |
 | 預設引擎語言、語言對照 | 引擎只有 `zh-TW`、`en`。語言＝`determine_locale()` 依序對：對照表（完整、再語言部分）→ 同名引擎語言（`zh_TW`→`zh-TW`、`en_US`→`en`）→ 預設 → `en` |
 | 工具頁對照 | `工具=頁面 ID`：框內連到另一個工具時，改開該 WordPress 頁 |
+| 每日運勢信 `mailer` | `none`（預設：不顯示訂閱表單、不寄）或 `fluentcrm`（見「每日運勢信」） |
 
 - 存檔時（same-origin）檢查：有頁面網址或 TranslatePress 語言代稱落在引擎前綴 `/embed`、`/api`、`/_next`、`/tarot`、`/zh-TW`、`/en`，顯示警告並列出（不擋存檔；這些網址到不了 WordPress）。
 - 私鑰可改放 `wp-config.php`：`define( 'AWORACLE_SITE_KEYPAIR', '<base64 金鑰對>' );`，有設定時優先、設定頁不再提供產生／更換。
-- 選項：`aworacle_settings`（自動載入，無機密）、`aworacle_site_keypair`、`aworacle_member_salt`（皆不自動載入；鹽第一次用到時自動建立）、`aworacle_db_version`（資料表版本）。移除外掛會刪掉這些選項、工具清單快取與兩張會員表（multisite 每個站）。
+- `wp-config.php` 常數：`AWORACLE_SITE_KEYPAIR`（選填，私鑰）、`AWORACLE_DATA_KEY`（會員存檔與每日信的出生資料加密）、`AWORACLE_RESEND_WEBHOOK_SECRET`（Resend webhook 簽章密鑰 `whsec_…`）。
+- 選項：`aworacle_settings`（自動載入，無機密）、`aworacle_site_keypair`、`aworacle_member_salt`（皆不自動載入；鹽第一次用到時自動建立）、`aworacle_db_version`（資料表版本）。移除外掛會刪掉這些選項、工具清單快取、兩張會員表、三張每日信表與排程、會員取票計數（multisite 每個站）；FluentCRM 的聯絡人與活動留著（屬 FluentCRM）。
 
 ## 兩種嵌入方式
 
@@ -40,6 +42,46 @@
 - 短碼 `[aw_oracle_my_charts]`、`[aw_oracle_persons]`：頁面只輸出空容器，`assets/members.js` 從 REST 取資料（出生資料不進頁面快取）；未登入顯示「登入以儲存」。
 - 隱私：工具 → 匯出個人資料含兩組（已存的命盤、已存的對象）；清除個人資料刪兩表該人全部列；刪除會員（含多站網路移除）連動刪除。
 
+## 每日運勢信（P3′）
+
+訂閱並確認後，每天在訂閱者當地 07:00 之後第一次排程寄一封，內容只用引擎 `daily` 系統算出的結果（分數、幸運色／數字／方位、宜忌；不含 AI 文字）。
+
+不變量（各自的守衛）：
+1. 沒確認的人收不到：只挑 `daily_profiles.status=confirmed` 且 FluentCRM 狀態 `subscribed`（`Daily\Schedule::pick`）。每一次申請都要用寄給那一次申請的一次性連結、按下按鈕（POST）才生效（`Daily\Store::confirm` 以 token 雜湊做 compare-and-set）；FluentCRM 自己的雙重確認不會啟用任何申請（它確認的是聯絡人，不是這次申請）。別人用你的 email 送表單，改不到也停不了你的信。
+2. 同一人同一當地日期最多一封：寄前先 `INSERT IGNORE` `daily_sent`（唯一鍵 訂閱者＋當地日期，`Store::claim`），搶到的才寄；兩個排程同時跑、夏令時間切換日都只一封。排程停擺不補寄舊日期（只看「今天」）。
+3. 退訂、退信、投訴不再被挑：FluentCRM 狀態轉成 unsubscribed／bounced／complained／spammed → 刪每日資料（寄送紀錄留著，同一天重新訂閱也不會收第二封；聯絡人被刪或隱私清除才連紀錄一起刪）（`Daily\Hooks`）；挑選時也再查一次狀態。
+4. 算不出內容不寄：引擎整批失敗、該筆 `ok:false`、結果缺欄位或日期不符（`Daily\Letter::build` 回 null）→ 不寄並釋放紀錄，下個小時可再試當天。FluentCRM 4xx（沒寄出）也釋放；其他錯誤標 `failed` 不重寄（寧可少一封，不寄兩封）。
+
+### 設定步驟
+1. 裝 FluentCRM（免費版即可）、FluentSMTP。FluentSMTP 2.4.5 沒有 Resend 專用連線：選「SMTP Server」，主機 `smtp.resend.com`、埠 465（SSL）或 587（TLS）、帳號 `resend`、密碼＝Resend API key；寄件人 `…@oracle.aware-wave.com`（已驗證的子網域）。
+2. `wp-config.php` 已有 `AWORACLE_DATA_KEY`（見會員存檔）；沒有時表單顯示「本站目前還不能訂閱」。確認信經 `wp_mail` 寄出（即 FluentSMTP → Resend），寄件人用 FluentSMTP 設定的寄件地址。
+   反向代理必須把訪客真實 IP 交給 PHP 的 `REMOTE_ADDR`（nginx `real_ip`）；否則每來源每小時 5 次的上限會變成全站共用。
+3. 設定 → AwareWave Oracle →「每日運勢信」選 FluentCRM，存檔。頁面放短碼 `[aw_oracle_daily]` 或區塊「AwareWave daily fortune signup」。
+4. Resend → Webhooks：網址 `https://<站>/wp-json/aworacle/v1/daily/resend-webhook`（設定頁會顯示），事件勾 `email.bounced`、`email.complained`；把 Signing secret 寫進 `wp-config.php`：`define( 'AWORACLE_RESEND_WEBHOOK_SECRET', 'whsec_…' );`。
+5. 排程由主機 cron 觸發，不靠訪客：`wp-config.php` 設 `define( 'DISABLE_WP_CRON', true );`，主機 crontab 每 5 分鐘 `wp cron event run --due-now --path=<WordPress 路徑>`（`aworacle_daily_run` 每小時；FluentCRM 的每分鐘佇列也靠它把信送出）。
+6. 每日信的信尾（取消訂閱字樣）用 FluentCRM 自己的設定與語言；要中文時在 FluentCRM → Settings 改。設定頁顯示上次每小時排程的數字（交給 FluentCRM／留待下小時／失敗）；「留待下小時」連續不降＝引擎或資料金鑰出問題。
+
+### 資料流
+1. 訂閱表單 → `POST aworacle/v1/daily/subscribe`（公開；同一來源位址每小時 5 次、同一聯絡人 10 分鐘 1 次、全站每天最多 30 封確認信（`Confirm::DAILY_CAP`，可用 filter `aworacle_daily_confirm_cap` 改；免費方案每天 100 封要留給每日信）；蜜罐欄位；不論 email 狀態都回同一句 202，不洩漏誰訂過）。
+2. 新地址：FluentCRM 建成 `pending`（既有聯絡人狀態不被降級或解除封鎖）。不論聯絡人原本狀態，外掛都存一份「待確認申請」（密文）並用 `wp_mail` 寄一次性連結 `/?aworacle_daily_confirm=<id>.<token>`（不經 FluentCRM，token 不會留在 `fc_campaigns`）。打開（GET）顯示要確認的出生日期時間、出生地與時區和一個按鈕，什麼都不改，信件掃描器不會替人訂閱；按下（POST）才生效，並把 FluentCRM 聯絡人設成 subscribed。新的申請會換掉舊的連結；token 只存 sha256，7 天過期，用一次。
+   bounced／complained／spammed 的地址：什麼都不做（仍回 202）。
+3. 每小時 `Daily\Runner::run`：挑人 → 依語言分批（每批 ≤200），每批送出前才搶該批的紀錄（中途被終止最多影響一批）→`POST /api/v1/batch`（站台簽章 `aud:"v1"`，`system:"daily"`，每筆＝出生資料＋訂閱者當地日期）→ `Daily\Letter` → FluentCRM `POST /fluent-crm/v2/subscribers/{id}/emails/send`（`rest_do_request`，以站上第一位管理員身分呼叫、呼叫完立即還原；FluentCRM 自動加 `List-Unsubscribe` One-Click）。FluentCRM 每個 PHP 請求只立即寄一封，其餘排進它每分鐘的佇列寄出。活動 slug `oracle-daily-<聯絡人>-<日期>`，標題改成 `oracle-daily <日期>`（FluentCRM 強制標題「Custom email to …」，以 slug 找回後改名）。
+4. 信的文字用外掛翻譯（繁中／英文，依訂閱時的頁面語言），不依賴站台裝了哪些 WordPress 語言包（`Daily\Lang`）。
+5. 資料表：`{prefix}aworacle_daily_profiles`（每聯絡人一列；明文只有 id、狀態、時區、語言、時間；出生資料是 Vault 密文，生效版綁 `daily:<id>`、待確認版綁 `daily-pending:<id>`）、`{prefix}aworacle_daily_sent`、`{prefix}aworacle_daily_events`（處理過的 webhook id）。
+6. 清理：每天刪 7 天未確認的申請、60 天前的寄送紀錄、30 天前的 webhook id、會員或聯絡人已不存在的資料；每 30 天刪本外掛 30 天前的 FluentCRM 一次性活動（只刪 slug `oracle-daily-` 開頭的，不動其他人寄的；每批 200 筆刪到完，超過 20 秒就 10 分鐘後接著刪）。
+7. 隱私：匯出含「每日運勢信」一組（狀態、時區、語言、出生資料）；清除刪該 email 聯絡人與會員連結的每日資料；刪會員連動刪除。
+
+### 退信與投訴
+Resend 不在 FluentCRM 內建的退信回報名單內，所以外掛自己收 webhook：驗 Svix 簽章（`svix-id`、`svix-timestamp` ±5 分鐘、`svix-signature`；`Daily\Svix`）→ 錯或未設密鑰一律 401、不改任何資料 → `email.bounced` 只有 `data.bounce.type` 為 `Permanent` 才處理（`Transient`／`Undetermined`，例如信箱滿了，回 200 不動）→ 資料表不在或 FluentCRM 未啟用回 503、不記下 id（Resend 會重送）→ 同一個 `svix-id` 只處理一次（重送回 200 `duplicate`）→ 把 `data.to` 的聯絡人在 FluentCRM 標成 bounced／complained → FluentCRM 的狀態事件刪掉每日資料。處理中出錯回 500 並忘記這個 id，讓 Resend 重試。
+
+### Resend 標籤 `product=oracle`
+經 FluentSMTP 帶不了：FluentSMTP 2.4.5 沒有 Resend 驅動（`app/Services/Mailer/Providers/` 無 Resend），只能走 Resend SMTP；Resend 文件只寫 SMTP 可帶自訂標頭（例 `X-Entity-Ref-ID`），沒有 SMTP 帶標籤的方法（https://resend.com/docs/send-with-smtp 、https://resend.com/docs/dashboard/emails/tags ）。依卡片不繞過 FluentSMTP 直打 Resend；改以寄件子網域 `oracle.aware-wave.com` 區分。
+
+## 會員票（AI 解讀額度，§2-7）
+- `POST aworacle/v1/ticket`：登入＋`wp_rest` nonce（缺一 401）；每位會員 10 分鐘 30 張（429）；沒設站台金鑰 503。回 `{ticket, signature, expires_in:60}`，`Cache-Control: no-store`。
+- 票＝`SiteKey::signedRequest({member}, aud "ticket")` 的原文 base64url；`member`＝`HMAC-SHA256(站台鹽, 會員 ID)`（64 個十六進位字），同一會員每次相同、看不出 ID 或 email。一次性、60 秒（引擎 `lib/sites/ticket.ts`）。
+- 交給框內頁：同網域父頁腳本（`assets/embed-same-origin.js`）在會員登入時定義 `window.awOracleTicket()`，回傳 `Promise<{ticket, signature} | null>`；框內引擎頁在要呼叫 `/api/interpret` 前呼叫 `window.parent.awOracleTicket()`，把兩個值放進標頭 `X-AwareWave-Oracle-Ticket`、`X-AwareWave-Oracle-Signature`。票不進網址。未登入時不定義＝匿名。**引擎端呼叫這個函式的程式尚未做（另卡）。**
+
 ## 簽章（站台 → 引擎）
 
 一律經 `Crypto\SiteKey::signedRequest( $payload, $aud, $keyId, $keypair )` 組＋簽，呼叫端不自己拼驗證欄位（帶了會被拒）：
@@ -48,7 +90,7 @@
 - `aud`：`v1`＝`/api/v1`（含 batch）；`ticket`＝會員票。一份簽過的原文只對一個用途有效（引擎回 `401 wrong_audience`）。
 - 標頭：`X-AwareWave-Oracle-Signature: base64(Ed25519(原始 body 位元組))`。
 - 引擎合約：`Projects/internal/ziwei-doushu/lib/sites/verify.ts`；兩邊一起改。
-- 會員代號：`HMAC-SHA256(鹽, 使用者 ID)`（`Options::memberPseudonym`），會員票用（P3′）。
+- 會員代號：`HMAC-SHA256(鹽, 使用者 ID)`（`Options::memberPseudonym`），會員票用（見上節）。
 
 ## 結構
 
@@ -60,7 +102,9 @@
 | 金鑰與簽章 | `includes/Crypto/SiteKey.php` |
 | 嵌入 | `includes/Embed/{Renderer,EmbedUrl,LocaleMap,Shortcode,Block}.php`、`assets/{embed-same-origin,embed,block}.js` |
 | 會員存檔 | `includes/Members/{Store,Rest,Shortcodes,Privacy,Record}.php`、`includes/Crypto/Vault.php`、`assets/members.js` |
-| 引擎讀取 | `includes/Engine/EngineClient.php`（工具清單 `GET /api/v1/systems`，快取 1 天；不跟隨轉址、回應上限 1 MB） |
+| 會員票 | `includes/Members/Ticket.php` |
+| 每日運勢信 | `includes/Daily/{Schedule,Letter,Svix}.php`（不依賴 WordPress）、`includes/Daily/{Store,Crm,Runner,Rest,Confirm,Signup,Hooks,Lang}.php`、`assets/daily.js` |
+| 引擎讀取 | `includes/Engine/EngineClient.php`（工具清單 `GET /api/v1/systems`，快取 1 天；每日批次 `POST /api/v1/batch`；不跟隨轉址、回應上限 1 MB／批次 8 MB） |
 | 翻譯 | `languages/`：改 `.po` 後 `wp i18n make-mo languages`、`wp i18n make-php languages` |
 
 ## 驗證
@@ -69,3 +113,4 @@
 - 語法：`composer lint`，或對每個 `.php` 跑 `php -l`（7.4 與 8.x 各一次）。
 - 實際安裝：docker WordPress＋本機 nginx（引擎前綴轉到本機引擎，其餘到 WordPress）；12 個工具各開一次、看框高與捲動。
 - 會員存檔驗收（真 WordPress，外掛啟用、已設 `AWORACLE_DATA_KEY`）：`wp eval-file tests/wp/members-check.php seed` → `wp db export` 的檔裡 grep 不到 `Zed-Canary`、`Canaryville`、`1873` → `wp eval-file tests/wp/members-check.php finish`。任一 FAIL 時 exit 1。
+- 每日信與會員票驗收（真 WordPress＋FluentCRM＋FluentSMTP 指向假收信匣 Mailpit，**不可對外寄信**；本機引擎的 `ORACLE_SITES` 登記本站公鑰）：`wp eval-file tests/wp/daily-check.php`（四時區、夏令時間、不重寄、不補寄、引擎錯不寄、退訂、webhook 驗簽、確認流程、限流、隱私、票）；並發：`tests/wp/daily-parallel.php seed`，兩個 `run` 同時跑，再 `verify`。

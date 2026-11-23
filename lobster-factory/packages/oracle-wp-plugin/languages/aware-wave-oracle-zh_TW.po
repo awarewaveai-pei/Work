@@ -492,3 +492,152 @@ msgstr "已加密；本站目前的金鑰無法開啟（這筆是用別的金鑰
 #: includes/Members/Rest.php:83
 msgid "Saving is for members of this site."
 msgstr "存檔只開放給本站會員。"
+
+msgid "Daily fortune letter"
+msgstr "每日運勢信"
+
+msgid "Off: no signup form, nothing is sent."
+msgstr "關閉：不顯示訂閱表單，不寄任何信。"
+
+msgid "On, sent through FluentCRM (signup form [aw_oracle_daily], double opt-in, one letter a day at 07:00 in each subscriber’s time zone)."
+msgstr "開啟，經 FluentCRM 寄出（訂閱表單 [aw_oracle_daily]、雙重確認、每位訂閱者當地時間 07:00 後每天一封）。"
+
+msgid "FluentCRM is not active: the signup form is hidden and nothing is sent."
+msgstr "FluentCRM 未啟用：訂閱表單不顯示，也不寄信。"
+
+msgid "AWORACLE_DATA_KEY is missing (see Member data below): the signup form shows that subscribing is not available."
+msgstr "缺少 AWORACLE_DATA_KEY（見下方「會員資料」）：訂閱表單會顯示目前無法訂閱。"
+
+msgid "Resend webhook URL (events email.bounced, email.complained):"
+msgstr "Resend webhook 網址（事件 email.bounced、email.complained）："
+
+msgid "signing secret set."
+msgstr "簽章密鑰已設定。"
+
+msgid "set its signing secret in wp-config.php: define( 'AWORACLE_RESEND_WEBHOOK_SECRET', 'whsec_…' );"
+msgstr "請在 wp-config.php 設定簽章密鑰：define( 'AWORACLE_RESEND_WEBHOOK_SECRET', 'whsec_…' );"
+
+msgid "Confirm your daily fortune letter"
+msgstr "請確認訂閱每日運勢信"
+
+msgid "Someone (hopefully you) asked to receive a daily fortune letter at this address. Open this address and press the button to confirm. If it was not you, ignore this message."
+msgstr "有人（希望是您）要求用這個信箱收每日運勢信。請開啟下面的網址並按按鈕確認。如果不是您本人，忽略這封信即可。"
+
+msgid "This confirmation link is not valid."
+msgstr "這個確認連結無效。"
+
+msgid "Press the button to start receiving the daily fortune letter."
+msgstr "按下按鈕，開始收每日運勢信。"
+
+msgid "Confirm"
+msgstr "確認"
+
+msgid "Confirmed. Your first letter arrives after 07:00 in your time zone."
+msgstr "已確認。第一封信會在您所在時區早上 07:00 之後寄到。"
+
+msgid "This confirmation link has expired or was already used."
+msgstr "這個確認連結已過期或已用過。"
+
+msgid "Subscribing is not available on this site yet."
+msgstr "本站目前還不能訂閱。"
+
+msgid "Almost done: check your inbox and confirm your e-mail address."
+msgstr "快完成了：請到信箱收信，確認您的 email。"
+
+msgid "Too many requests. Try again in an hour."
+msgstr "請求太多次，請一小時後再試。"
+
+msgid "Your daily fortune for %s"
+msgstr "%s 每日運勢"
+
+msgid "Here is today’s reading, calculated from your birth chart."
+msgstr "這是依您的命盤算出的今日運勢。"
+
+msgid "Overall"
+msgstr "整體"
+
+msgid "Love"
+msgstr "感情"
+
+msgid "Career"
+msgstr "事業"
+
+msgid "Wealth"
+msgstr "財運"
+
+msgid "Health"
+msgstr "健康"
+
+msgid "Lucky colours:"
+msgstr "幸運色："
+
+msgid "Lucky numbers:"
+msgstr "幸運數字："
+
+msgid "Lucky direction:"
+msgstr "幸運方位："
+
+msgid "Good for:"
+msgstr "宜："
+
+msgid "Avoid:"
+msgstr "忌："
+
+msgid "You receive this because you subscribed to the daily fortune. Use the unsubscribe link below to stop it."
+msgstr "您收到這封信，是因為您訂閱了每日運勢。要停止，請按下方的取消訂閱連結。"
+
+msgid "AwareWave daily fortune signup"
+msgstr "AwareWave 每日運勢訂閱"
+
+msgid "Daily fortune by e-mail"
+msgstr "每日運勢 email"
+
+msgid "One letter every morning after 07:00 in your time zone, calculated from your birth data. You can unsubscribe from any letter."
+msgstr "每天早上 07:00（您所在時區）之後寄一封，依您的出生資料計算。每封信都可以取消訂閱。"
+
+msgid "E-mail"
+msgstr "Email"
+
+msgid "Your time zone (type to search)"
+msgstr "您所在的時區（可輸入搜尋）"
+
+msgid "Birthplace time zone (e.g. Asia/Taipei)"
+msgstr "出生地時區（例：Asia/Taipei）"
+
+msgid "Subscribe"
+msgstr "訂閱"
+
+msgid "The signup form appears here on the published page (only when the daily letter is on in Settings → AwareWave Oracle)."
+msgstr "發佈後的頁面會在這裡顯示訂閱表單（需在 設定 → AwareWave Oracle 開啟每日運勢信）。"
+
+msgid "Status"
+msgstr "狀態"
+
+msgid "Time zone"
+msgstr "時區"
+
+msgid "Language"
+msgstr "語言"
+
+msgid "Daily letter"
+msgstr "每日運勢信"
+
+msgid "Daily letter (waiting for confirmation)"
+msgstr "每日運勢信（等待確認）"
+
+msgid "Too many requests. Try again in a few minutes."
+msgstr "請求太多次，請幾分鐘後再試。"
+
+msgid "AI readings for members are not available on this site yet."
+msgstr "本站目前還不提供會員 AI 解讀。"
+
+msgctxt "list separator in the daily letter"
+msgid ", "
+msgstr "、"
+
+#, php-format
+msgid "Last hourly run %1$s UTC: %2$d handed to FluentCRM, %3$d put back for a later hour (engine or data problem), %4$d failed."
+msgstr "上次每小時排程 %1$s UTC：%2$d 封交給 FluentCRM，%3$d 封留待下個小時（引擎或資料問題），%4$d 封失敗。"
+
+msgid "Birth data and time zone you sent:"
+msgstr "您送出的出生資料與時區："

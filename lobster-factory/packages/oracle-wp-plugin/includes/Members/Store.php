@@ -27,7 +27,7 @@ use AwareWave\Oracle\Crypto\Vault;
 
 final class Store {
 
-	const SCHEMA_VERSION = '1';
+	const SCHEMA_VERSION = '2'; // 2 = P3 daily-letter tables (Daily\Store)
 	const SCHEMA_OPTION  = 'aworacle_db_version';
 	const RETRY_FLAG     = 'aworacle_db_install_retry';
 	const RETRY_SECONDS  = 300;
@@ -96,10 +96,11 @@ final class Store {
 ) {$charset};"
 			);
 		}
+		$daily = \AwareWave\Oracle\Daily\Store::install( $charset );
 		self::purgeOrphans();
-		// Record the version only when both tables are really there; otherwise retry after a pause.
+		// Record the version only when every table is really there; otherwise retry after a pause.
 		foreach ( array_keys( self::KINDS ) as $kind ) {
-			if ( ! self::tableExists( $kind ) ) {
+			if ( ! $daily || ! self::tableExists( $kind ) ) {
 				set_transient( self::RETRY_FLAG, 1, self::RETRY_SECONDS );
 				return;
 			}
@@ -110,11 +111,13 @@ final class Store {
 	/** Deactivation and uninstall. */
 	public static function unschedule(): void {
 		wp_clear_scheduled_hook( self::PURGE_HOOK );
+		\AwareWave\Oracle\Daily\Hooks::unschedule();
 	}
 
-	/** Uninstall: the one list of member tables (KINDS) is dropped, with the schema markers. */
+	/** Uninstall: the member tables (KINDS) and the daily-letter tables are dropped, with the schema markers. */
 	public static function drop(): void {
 		global $wpdb;
+		\AwareWave\Oracle\Daily\Store::drop();
 		foreach ( array_keys( self::KINDS ) as $kind ) {
 			$wpdb->query( 'DROP TABLE IF EXISTS ' . self::table( $kind ) ); // phpcs:ignore WordPress.DB.PreparedSQL -- table names from KINDS
 		}
