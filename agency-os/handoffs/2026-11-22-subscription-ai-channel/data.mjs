@@ -64,7 +64,7 @@ export const STEPS = [
   { n: 11, code: 'K13', group: 'B3c', title: '幾個生圖模型畫同一張配圖給你比', plain: '文字實測做完後接著做。拿同一篇文章的同一段、同一句英文畫面描述，讓幾個生圖模型各畫一張，並排給你看，你挑。挑中的當作文章配圖的預設。約花 NT$10。',
     gate: '你拿到並排比較頁並選出預設；結果記到「AI 模型與成本」的實測紀錄。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K12'], card: 'briefs/K10-K12.md' },
   { n: 12, code: 'DA', group: 'B3', title: '部署並在筆電實測', plain: '前三批一起部署一次，然後用筆電的 Claude 訂閱真的寫一篇文章，看內容。', gate: '線上文章頁選訂閱模型寫出一篇；成本頁出現一筆 NT$0。', risk: 'High（部署；失敗自動還原）', model: '監工', status: 'in_progress', depends: ['K4', 'K6', 'K5', 'K7', 'K11', 'K8'], card: 'DISPATCH.md' },
-  { n: 13, code: 'K10', group: 'B3d', title: '文章配圖不再亂畫', plain: '現在的配圖把中文替代文字直接丟給最便宜的模型，畫出穿西裝的人和亂碼字。改成：寫文章的 AI 另外寫一句英文的畫面描述，固定加上「圖上不要有字」，生圖模型改讀網站設定；預設用哪個模型，等你看完生圖實測再定。同一張卡一起修文字盲測抓到的三個範本問題：SEO 評分改成認得中文小標（快速解答、常見問題），文章就不必寫英文小標；「年份未核」這類內部註記不得寫進正文；連結不得以原始碼的樣子露出來。',
+  { n: 13, code: 'K10', group: 'B3d', title: '文章配圖不再亂畫', plain: '現在的配圖把中文替代文字直接丟給最便宜的模型，畫出穿西裝的人和亂碼字。改成：寫文章的 AI 另外寫一句英文的畫面描述，固定加上「圖上不要有字」，生圖模型改讀網站設定；預設用哪個模型，等你看完生圖實測再定。同一張卡一起修文字盲測抓到的另外兩個範本問題：「年份未核」這類內部註記不得寫進正文；連結不得以原始碼的樣子露出來。（英文小標那一項已另外做完，見 K18。）',
     gate: '部署後真的產一篇，圖和文章內容有關、圖上沒有字；替代文字照舊；舊文章不受影響。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['K7', 'K13'], card: 'briefs/K10-K12.md' },
   // 第四批
   { n: 14, code: 'K9', group: 'B4', title: '主機上的常駐執行程式', plain: '在主機開一個權限最小的帳號，只跑這支程式和 Codex。它讀不到網站、資料庫和其他金鑰。登入過期或額度用完會發 Telegram。',
@@ -74,7 +74,8 @@ export const STEPS = [
     gate: '沒選過模型的網站，排程寫文章用的是 GPT-6.2 sol；估價顯示新的金額；已經選了別的模型的地方不受影響；實測紀錄多一組「文章生成」。', risk: 'Medium', model: 'Sonnet 5.5', status: 'done', commit: 'ed7263c36', depends: ['K12'], card: 'briefs/K15-K16.md' },
   { n: 17, code: 'K16', group: 'B5', title: '其他寫文案的地方要不要也換', plain: '文章以外寫文案的地方，八種全部各測一次再換（你 11-22 說「都要測」）：劇本工坊、影片腳本、商品文案、AI 去味、競業分析、每月選題、社群改寫、開發信寫信。每一種用一個真實的輸入，讓現在用的模型和 GPT-6.2 sol 各寫一次，並排給你看。要回固定格式的另外驗格式會不會壞。',
     gate: '八種各有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'in_progress', depends: ['K15'], card: 'briefs/K15-K16.md', before: '待決 5 之後才改預設' },  { n: 18, code: 'K17', group: 'B5', title: 'ChatGPT 訂閱也能選模型', plain: '現在 ChatGPT（Codex）訂閱只有一顆按鈕，用的是預設模型。改成和 Claude 訂閱一樣可以選：GPT-6 luna、GPT-6.1 terra、GPT-6.2 sol、GPT-6.2 astra，預設 GPT-6.2 sol。已查過你的訂閱清單裡有這四個。每個網站可以各自存。',
-    gate: '按鈕出現、選的模型真的送到執行程式；真的用訂閱寫一篇要等 Codex 額度恢復（M1）。', risk: 'Low', model: 'Sonnet', status: 'done', commit: 'db2cb07fa', depends: ['K6'], card: 'briefs/K17-codex-model.md' },
+    gate: '按鈕出現、選的模型真的送到執行程式；真的用訂閱寫一篇要等 Codex 額度恢復（M1）。', risk: 'Low', model: 'Sonnet', status: 'done', commit: 'db2cb07fa', depends: ['K6'], card: 'briefs/K17-codex-model.md' },  { n: 19, code: 'K18', group: 'B5', title: '中文文章改用中文小標', plain: '查出來 SEO 評分本來就認中文小標；只認英文的是另外兩處：寫文章的指令規定四個固定小標一律寫英文，發到 WordPress 的摘要只找英文的 Quick Answer。兩處都改成中英文都可以，三個地方共用同一份小標清單。十二篇盲測文章把小標換成中文重新評分，分數完全一樣。',
+    gate: '部署後產一篇中文文章：四個固定小標是中文、SEO 分數不變、WordPress 摘要取自快速解答。', risk: 'Medium', model: '監工', status: 'done', commit: '5042d239c', depends: ['K15'], card: 'briefs/K10-K12.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];

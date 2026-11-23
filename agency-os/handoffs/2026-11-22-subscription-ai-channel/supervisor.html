@@ -81,11 +81,11 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>AI 訂閱通道 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
-  <div class="bar" data-computed><i class="d" style="width:66.66666666666666%"></i><i class="g" style="width:11.11111111111111%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>12</span>／<span data-computed>18</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你做的事</span><small><span data-computed>5</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:68.42105263157895%"></i><i class="g" style="width:10.526315789473683%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>13</span>／<span data-computed>19</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你做的事</span><small><span data-computed>5</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">讓寫字和畫圖都能選「走 API 付費」或「走訂閱額度」。本人按的功能由筆電執行；自動排程由主機上的常駐程式執行。每個網站各自選四種走法之一：Claude 訂閱→Codex 訂閱→API、Claude 訂閱→API、Codex 訂閱→API、只用 API。前一段不能用就自動換下一段。共 <span data-computed>18</span> 張卡。</p>
+<p class="sub">讓寫字和畫圖都能選「走 API 付費」或「走訂閱額度」。本人按的功能由筆電執行；自動排程由主機上的常駐程式執行。每個網站各自選四種走法之一：Claude 訂閱→Codex 訂閱→API、Claude 訂閱→API、Codex 訂閱→API、只用 API。前一段不能用就自動換下一段。共 <span data-computed>19</span> 張卡。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>畫圖可以走訂閱（Codex 免費生圖）。<small>已上線；只限本人、筆電要開著。近 30 天只用過兩次。</small></span></li><li class="no"><b>還不行</b><span>ChatGPT 訂閱現在有額度。<small>2026-11-22 實測：本週額度用完，11-24 上午 11:02 恢復。主因是程式審查共用同一份額度。</small></span></li><li class="yes"><b>可以</b><span>Claude 訂閱可以用命令列寫字。<small>2026-11-22 筆電實測成功，一次約 12 秒；執行時不給它任何工具。</small></span></li><li class="yes"><b>可以</b><span>寫字可以選訂閱。<small>2026-11-22 已部署。正式站文章頁選「Claude 訂閱 → API」＋Haiku，筆電在 109 秒寫完一篇，成本帳本記一筆 NT$0。</small></span></li><li class="yes"><b>可以</b><span>本人按的功能可以選四種走法。<small>文章頁已上線。劇本工坊開在影片產品的入口網域，那裡不放訂閱按鈕，目前仍只走 API。</small></span></li><li class="yes"><b>可以</b><span>每個網站的排程可以各自選四種走法。<small>已上線：客戶 → 客戶網站 → 左邊選客戶 → 該網站的設定。主機的常駐程式（第四批）上線前，排程的訂閱段會自動跳過、由 API 寫。</small></span></li><li class="yes"><b>可以</b><span>內部標記不會出現在 WordPress 文章裡。<small>已上線。aware-wave.com 既有文章已手動清掉：成本紀錄六篇、審稿標記兩篇（原文備份在主機）。</small></span></li><li class="yes"><b>可以</b><span>模型選單有 GPT-6 系列與 Sonnet 5.5。<small>已上線，正式站選單看得到。十二個模型都在正式站實際寫過一篇文章，全部可用；GPT-5.5 那篇被長度上限截斷。</small></span></li><li class="yes"><b>可以</b><span>文章預設用 GPT-6.2 sol。<small>2026-11-22 盲測後你選定，當晚已部署。審稿排第二，一篇約 NT$2，原本的預設約 NT$8。結果記在「AI 模型與成本」的實測紀錄。</small></span></li><li class="no"><b>還不行</b><span>排程不開筆電也能走訂閱。<small>第四批；需要你在主機上登入一次 ChatGPT。</small></span></li><li class="no"><b>還不行</b><span>知道一篇文章吃掉多少訂閱額度。<small>11-24 額度恢復後實測三篇才有數字；在那之前不估。</small></span></li></ul></section>
 
 <section id="steps"><h2>批次與卡</h2><p class="lead">同一批的卡同時進行，各自改不同的檔案；整批交回後一起看風險，再開下一批。</p><ol class="steps"><li class="grp">可同時進行：<a href="#K1">K1</a>、<a href="#K2">K2</a>、<a href="#K3">K3</a></li><li class="step done" id="K1">
@@ -221,7 +221,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
     </div></li><li class="step todo" id="K10">
     <div class="n">13</div>
     <div class="b">
-      <p class="plain">現在的配圖把中文替代文字直接丟給最便宜的模型，畫出穿西裝的人和亂碼字。改成：寫文章的 AI 另外寫一句英文的畫面描述，固定加上「圖上不要有字」，生圖模型改讀網站設定；預設用哪個模型，等你看完生圖實測再定。同一張卡一起修文字盲測抓到的三個範本問題：SEO 評分改成認得中文小標（快速解答、常見問題），文章就不必寫英文小標；「年份未核」這類內部註記不得寫進正文；連結不得以原始碼的樣子露出來。</p>
+      <p class="plain">現在的配圖把中文替代文字直接丟給最便宜的模型，畫出穿西裝的人和亂碼字。改成：寫文章的 AI 另外寫一句英文的畫面描述，固定加上「圖上不要有字」，生圖模型改讀網站設定；預設用哪個模型，等你看完生圖實測再定。同一張卡一起修文字盲測抓到的另外兩個範本問題：「年份未核」這類內部註記不得寫進正文；連結不得以原始碼的樣子露出來。（英文小標那一項已另外做完，見 K18。）</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>部署後真的產一篇，圖和文章內容有關、圖上沒有字；替代文字照舊；舊文章不受影響。</p>
       <details><summary>細節：K10 文章配圖不再亂畫</summary>
@@ -248,7 +248,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>需先完成：</b><a href="#K9">K9</a>；待決 4 之後</p>
         <p><b>卡片：</b><code>briefs/K5-K9.md</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#K15">K15</a>、<a href="#K16">K16</a>、<a href="#K17">K17</a></li><li class="step done" id="K15">
+    </div></li><li class="grp">可同時進行：<a href="#K15">K15</a>、<a href="#K16">K16</a>、<a href="#K17">K17</a>、<a href="#K18">K18</a></li><li class="step done" id="K15">
     <div class="n">16</div>
     <div class="b">
       <p class="plain">盲測結果：GPT-6.2 sol 品質排第二，一篇約 NT$2，是原本預設（Claude Opus，約 NT$8）的四分之一。文章頁的預設和排程（網站沒另外選模型時）都改用它；畫面上的估價跟著改。十二個模型的實測結果同時記到「AI 模型與成本」的實測紀錄。</p>
@@ -279,6 +279,17 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>需先完成：</b><a href="#K6">K6</a></p>
         <p><b>卡片：</b><code>briefs/K17-codex-model.md</code></p>
         <p><b>併入於：</b><code>db2cb07fa</code></p>
+      </details>
+    </div></li><li class="step done" id="K18">
+    <div class="n">19</div>
+    <div class="b">
+      <p class="plain">查出來 SEO 評分本來就認中文小標；只認英文的是另外兩處：寫文章的指令規定四個固定小標一律寫英文，發到 WordPress 的摘要只找英文的 Quick Answer。兩處都改成中英文都可以，三個地方共用同一份小標清單。十二篇盲測文章把小標換成中文重新評分，分數完全一樣。</p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：監工</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>部署後產一篇中文文章：四個固定小標是中文、SEO 分數不變、WordPress 摘要取自快速解答。</p>
+      <details><summary>細節：K18 中文文章改用中文小標</summary>
+        <p><b>需先完成：</b><a href="#K15">K15</a></p>
+        <p><b>卡片：</b><code>briefs/K10-K12.md</code></p>
+        <p><b>併入於：</b><code>5042d239c</code></p>
       </details>
     </div></li></ol></section>
 
