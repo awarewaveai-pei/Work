@@ -1,10 +1,12 @@
 # aware-wave-oracle（WordPress 外掛）
 
+版本：0.5.0（與外掛檔頭 `Version:`、常數 `AWORACLE_VERSION` 同一個數字；`scripts/release-wp-bridge.sh --plugin oracle` 發佈前檢查三處一致）
+
 把 AwareWave 算命引擎的工具嵌進任何 WordPress 網站的頁面。oracle.aware-wave.com 只是第一個安裝的站；外掛內沒有任何網站專屬的網址或設定。設計正本：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md`（§1、§2-1～§2-10、§2-13；本外掛卡 P1′、P2′、P3′）。
 
 ## 安裝
 
-1. 把 `lobster-factory/packages/oracle-wp-plugin/` 整個資料夾放到 `wp-content/plugins/aware-wave-oracle/`（不需 composer；外掛自帶載入器）。需求：WordPress 6.5+、PHP 7.4+（簽章用 WordPress 內建的 sodium_compat，不必裝 ext-sodium）。
+1. 用發佈的 zip `aware-wave-oracle-v<版本>.zip`（`awarewaveai-pei/aware-wave-oracle` 的 Release；建站流程第 3 步勾選時自動裝）安裝；或把 `bash bin/build-zip.sh <輸出資料夾>` 打出的同一份 zip 上傳。不要直接複製整個 Work 資料夾（會帶進 tests、composer 設定）。不需 composer；外掛自帶載入器。需求：WordPress 6.5+、PHP 7.4+（簽章用 WordPress 內建的 sodium_compat，不必裝 ext-sodium）。
 2. 外掛 → 啟用。
 3. 設定 → AwareWave Oracle：選嵌入方式、填金鑰名稱、按「Generate key」，把顯示的公鑰登記到引擎的 `ORACLE_SITES`（格式見引擎 `deploy/DEPLOY.md`）。
 4. 頁面裡加「AwareWave Oracle」區塊（按鈕選工具）或短碼 `[aw_oracle tool="ziwei"]`。
@@ -21,11 +23,13 @@
 | 預設引擎語言、語言對照 | 引擎只有 `zh-TW`、`en`。語言＝`determine_locale()` 依序對：對照表（完整、再語言部分）→ 同名引擎語言（`zh_TW`→`zh-TW`、`en_US`→`en`）→ 預設 → `en` |
 | 工具頁對照 | `工具=頁面 ID`：框內連到另一個工具時，改開該 WordPress 頁 |
 | 每日運勢信 `mailer` | `none`（預設：不顯示訂閱表單、不寄）或 `fluentcrm`（見「每日運勢信」） |
+| Turnstile 網站金鑰 `turnstile_site_key` | 選填：訂閱表單的 Cloudflare 人機驗證（見「人機驗證」）。密鑰不在這個選項裡 |
 
 - 存檔時（same-origin）檢查：有頁面網址或 TranslatePress 語言代稱落在引擎前綴 `/embed`、`/api`、`/_next`、`/tarot`、`/zh-TW`、`/en`，顯示警告並列出（不擋存檔；這些網址到不了 WordPress）。
+- 工具清單快取（transient `aworacle_tools_v2`；0.4 以前的 `aworacle_tools` 不再讀，成功 1 天、失敗 10 分鐘）記著它是向哪個引擎網址要的；讀取時與目前的 `Options::serverEngineUrl()` 不同就重新要。所以任何會改變伺服器用引擎網址的變更（伺服器用／瀏覽器用網址、嵌入方式、站台網址、建站流程用 `wp option patch` 直接寫的值）下一次讀清單都會重抓，不靠「存檔時記得清快取」。
 - 私鑰可改放 `wp-config.php`：`define( 'AWORACLE_SITE_KEYPAIR', '<base64 金鑰對>' );`，有設定時優先、設定頁不再提供產生／更換。
-- `wp-config.php` 常數：`AWORACLE_SITE_KEYPAIR`（選填，私鑰）、`AWORACLE_DATA_KEY`（會員存檔與每日信的出生資料加密）、`AWORACLE_RESEND_WEBHOOK_SECRET`（Resend webhook 簽章密鑰 `whsec_…`）。
-- 選項：`aworacle_settings`（自動載入，無機密）、`aworacle_site_keypair`、`aworacle_member_salt`（皆不自動載入；鹽第一次用到時自動建立）、`aworacle_db_version`（資料表版本）。移除外掛會刪掉這些選項、工具清單快取、兩張會員表、三張每日信表與排程、會員取票計數（multisite 每個站）；FluentCRM 的聯絡人與活動留著（屬 FluentCRM）。
+- `wp-config.php` 常數：`AWORACLE_SITE_KEYPAIR`（選填，私鑰）、`AWORACLE_DATA_KEY`（會員存檔與每日信的出生資料加密）、`AWORACLE_RESEND_WEBHOOK_SECRET`（Resend webhook 簽章密鑰 `whsec_…`）、`AWORACLE_TURNSTILE_SECRET`（選填，Turnstile 密鑰；有設定時優先於設定頁存的那一份）。
+- 選項：`aworacle_settings`（自動載入，無機密）、`aworacle_site_keypair`、`aworacle_member_salt`、`aworacle_turnstile_secret`（皆不自動載入；鹽第一次用到時自動建立）、`aworacle_db_version`（資料表版本）。移除外掛會刪掉這些選項、工具清單快取、兩張會員表、三張每日信表與排程、會員取票計數（multisite 每個站）；FluentCRM 的聯絡人與活動留著（屬 FluentCRM）。
 
 ## 兩種嵌入方式
 
@@ -61,8 +65,14 @@
 5. 排程由主機 cron 觸發，不靠訪客：`wp-config.php` 設 `define( 'DISABLE_WP_CRON', true );`，主機 crontab 每 5 分鐘 `wp cron event run --due-now --path=<WordPress 路徑>`（`aworacle_daily_run` 每小時；FluentCRM 的每分鐘佇列也靠它把信送出）。
 6. 每日信的信尾（取消訂閱字樣）用 FluentCRM 自己的設定與語言；要中文時在 FluentCRM → Settings 改。設定頁顯示上次每小時排程的數字（交給 FluentCRM／留待下小時／失敗）；「留待下小時」連續不降＝引擎或資料金鑰出問題。
 
+### 人機驗證（Cloudflare Turnstile，選用）
+- 兩把金鑰都設才啟用：網站金鑰填設定頁「Turnstile 網站金鑰」；密鑰在設定頁「人機驗證」區塊另外存（只寫不讀，存成不自動載入的選項），或寫進 `wp-config.php`：`define( 'AWORACLE_TURNSTILE_SECRET', '…' );`。
+- 啟用後：表單在按鈕上方顯示 Cloudflare 的驗證框；`subscribe` 在欄位檢查之後、建立任何資料之前，向 Cloudflare 固定網址 `https://challenges.cloudflare.com/turnstile/v0/siteverify` 驗 token（5 秒逾時、不跟隨轉址）。回答不是 `success:true`（含逾時、連不上、非 200）一律 403「人機驗證沒有通過」：不建申請、不寄確認信。
+- 沒設或只設一把：表單照舊靠下面的限流、陷阱欄位與每日確認信上限運作；設定頁、儀表板與外掛頁（每日信開啟時）提示「尚未設定人機驗證」。
+- 測試用 Cloudflare 公開的測試金鑰：網站金鑰 `1x00000000000000000000AA`；密鑰 `1x0000000000000000000000000000000AA`（一律通過）、`2x0000000000000000000000000000000AA`（一律失敗）。
+
 ### 資料流
-1. 訂閱表單 → `POST aworacle/v1/daily/subscribe`（公開；同一來源位址每小時 5 次、同一聯絡人 10 分鐘 1 次、全站每天最多 30 封確認信（`Confirm::DAILY_CAP`，可用 filter `aworacle_daily_confirm_cap` 改；免費方案每天 100 封要留給每日信）；蜜罐欄位；不論 email 狀態都回同一句 202，不洩漏誰訂過）。
+1. 訂閱表單 → `POST aworacle/v1/daily/subscribe`（公開；有設定 Turnstile 時先過人機驗證；同一來源位址每小時 5 次、同一聯絡人 10 分鐘 1 次、全站每天最多 30 封確認信（`Confirm::DAILY_CAP`，可用 filter `aworacle_daily_confirm_cap` 改；免費方案每天 100 封要留給每日信）；蜜罐欄位；不論 email 狀態都回同一句 202，不洩漏誰訂過）。
 2. 新地址：FluentCRM 建成 `pending`（既有聯絡人狀態不被降級或解除封鎖）。不論聯絡人原本狀態，外掛都存一份「待確認申請」（密文）並用 `wp_mail` 寄一次性連結 `/?aworacle_daily_confirm=<id>.<token>`（不經 FluentCRM，token 不會留在 `fc_campaigns`）。打開（GET）顯示要確認的出生日期時間、出生地與時區和一個按鈕，什麼都不改，信件掃描器不會替人訂閱；按下（POST）才生效，並把 FluentCRM 聯絡人設成 subscribed。新的申請會換掉舊的連結；token 只存 sha256，7 天過期，用一次。
    bounced／complained／spammed 的地址：什麼都不做（仍回 202）。
 3. 每小時 `Daily\Runner::run`：挑人 → 依語言分批（每批 ≤200），每批送出前才搶該批的紀錄（中途被終止最多影響一批）→`POST /api/v1/batch`（站台簽章 `aud:"v1"`，`system:"daily"`，每筆＝出生資料＋訂閱者當地日期）→ `Daily\Letter` → FluentCRM `POST /fluent-crm/v2/subscribers/{id}/emails/send`（`rest_do_request`，以站上第一位管理員身分呼叫、呼叫完立即還原；FluentCRM 自動加 `List-Unsubscribe` One-Click）。FluentCRM 每個 PHP 請求只立即寄一封，其餘排進它每分鐘的佇列寄出。活動 slug `oracle-daily-<聯絡人>-<日期>`，標題改成 `oracle-daily <日期>`（FluentCRM 強制標題「Custom email to …」，以 slug 找回後改名）。
@@ -105,7 +115,15 @@ Resend 不在 FluentCRM 內建的退信回報名單內，所以外掛自己收 w
 | 會員票 | `includes/Members/Ticket.php` |
 | 每日運勢信 | `includes/Daily/{Schedule,Letter,Svix}.php`（不依賴 WordPress）、`includes/Daily/{Store,Crm,Runner,Rest,Confirm,Signup,Hooks,Lang}.php`、`assets/daily.js` |
 | 引擎讀取 | `includes/Engine/EngineClient.php`（工具清單 `GET /api/v1/systems`，快取 1 天；每日批次 `POST /api/v1/batch`；不跟隨轉址、回應上限 1 MB／批次 8 MB） |
-| 翻譯 | `languages/`：改 `.po` 後 `wp i18n make-mo languages`、`wp i18n make-php languages` |
+| 人機驗證 | `includes/Daily/Turnstile.php` |
+| 翻譯 | `languages/`：改字串後 `wp i18n make-pot . languages/aware-wave-oracle.pot --exclude=tests,bin,vendor`、`wp i18n update-po languages/aware-wave-oracle.pot languages`，補完 `.po` 的 `msgstr` 後 `wp i18n make-mo languages`、`wp i18n make-php languages` |
+| 打包與發佈 | `bin/build-zip.sh`（依 `.distignore`）；發佈 repo 的 CI／Release 在 `.github/workflows/`（由 `scripts/release-wp-bridge.sh --plugin oracle` 鏡像過去） |
+
+## 發佈
+
+- 發佈 repo：`awarewaveai-pei/aware-wave-oracle`（公開）。Release 資產 `aware-wave-oracle-v<版本>.zip`＝next-admin `lib/wp-plugin-stack-catalog.ts` 的 `releaseRepo`／`releaseVersion` 與主機閘門要求的檔名。
+- 先升版（檔頭、`AWORACLE_VERSION`、本檔第一行三處同一個數字），再 `bash scripts/release-wp-bridge.sh --plugin oracle --dry-run`（列出鏡像的檔、zip 名稱與檔數），再不帶 `--dry-run` 真發（推 main → 等 CI：PHP 7.4 與 8.3 的 `php -l`＋PHPUnit → 打 tag → `release.yml` 用 `bin/build-zip.sh` 出 zip）。發佈 repo 不存在時腳本只在 dry-run 說明，真發會停下：repo 由人建（`gh repo create awarewaveai-pei/aware-wave-oracle --public`）。
+- 發佈後：catalog 的 `releaseVersion` 改成新版（新網站裝這一版）；已裝的網站 `powershell -File scripts/rollout-wp-bridge.ps1 -Plugin oracle -DryRun`，再不帶 `-DryRun`（High）。
 
 ## 驗證
 

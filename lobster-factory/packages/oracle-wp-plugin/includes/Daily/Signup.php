@@ -4,6 +4,7 @@
  * Nothing at all when the letter is off (setting mailer = none) or FluentCRM is not active (§2-9);
  * a plain notice when the member-data key is missing (birth data is never stored in the clear).
  * The page holds an empty container; assets/daily.js builds the form and posts to REST daily/subscribe.
+ * With Turnstile set up, Cloudflare's widget sits above the button and its token goes with the post.
  *
  * @package AwareWave\Oracle\Daily
  */
@@ -18,6 +19,7 @@ final class Signup {
 	const TAG    = 'aw_oracle_daily';
 	const BLOCK  = 'aware-wave/oracle-daily';
 	const SCRIPT = 'aworacle-daily';
+	const TURNSTILE_SCRIPT = 'aworacle-turnstile';
 
 	/** @var bool */
 	private static $configured = false;
@@ -55,7 +57,14 @@ final class Signup {
 	}
 
 	private static function enqueue(): void {
-		wp_enqueue_script( self::SCRIPT, AWORACLE_URL . 'assets/daily.js', array(), AWORACLE_VERSION, true );
+		// Turnstile set up: Cloudflare's script loads first (no version query: it must not be cached or altered).
+		$turnstile = Turnstile::siteKey();
+		$deps      = array();
+		if ( $turnstile !== '' ) {
+			wp_enqueue_script( self::TURNSTILE_SCRIPT, Turnstile::SCRIPT_URL, array(), null, true ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
+			$deps[] = self::TURNSTILE_SCRIPT;
+		}
+		wp_enqueue_script( self::SCRIPT, AWORACLE_URL . 'assets/daily.js', $deps, AWORACLE_VERSION, true );
 		if ( self::$configured ) {
 			return;
 		}
@@ -64,6 +73,7 @@ final class Signup {
 			'url'    => esc_url_raw( rest_url( MembersRest::NS . '/daily/subscribe' ) ),
 			'nonce'  => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
 			'locale' => Renderer::locale(),
+			'turnstile' => $turnstile,
 			'labels' => array(
 				'title'     => __( 'Daily fortune by e-mail', 'aware-wave-oracle' ),
 				'intro'     => __( 'One letter every morning after 07:00 in your time zone, calculated from your birth data. You can unsubscribe from any letter.', 'aware-wave-oracle' ),
@@ -90,6 +100,8 @@ final class Signup {
 				'trueSolar' => __( 'Use true solar time', 'aware-wave-oracle' ),
 				'submit'    => __( 'Subscribe', 'aware-wave-oracle' ),
 				'invalid'   => __( 'Check the highlighted fields.', 'aware-wave-oracle' ),
+				'captcha'   => __( 'Complete the human check above the button first.', 'aware-wave-oracle' ),
+				'captchaBlocked' => __( 'The human check could not load. Allow challenges.cloudflare.com (an ad or script blocker may stop it) or try another browser.', 'aware-wave-oracle' ),
 				'error'     => __( 'Something went wrong. Reload the page and try again.', 'aware-wave-oracle' ),
 			),
 		);

@@ -2,23 +2,23 @@
 # This file is distributed under the Proprietary.
 msgid ""
 msgstr ""
-"Project-Id-Version: AwareWave Oracle 0.4.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/plug5\n"
+"Project-Id-Version: AwareWave Oracle 0.5.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/app\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-23T02:13:36+00:00\n"
+"POT-Creation-Date: 2026-11-23T07:09:39+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: aware-wave-oracle\n"
 
 #. Plugin Name of the plugin
 #: aware-wave-oracle.php
-#: includes/Admin/SettingsPage.php:49
-#: includes/Admin/SettingsPage.php:50
-#: includes/Admin/SettingsPage.php:203
+#: includes/Admin/SettingsPage.php:51
+#: includes/Admin/SettingsPage.php:52
+#: includes/Admin/SettingsPage.php:202
 #: includes/Embed/Block.php:36
 #: includes/Embed/Block.php:60
 #: includes/Members/Privacy.php:40
@@ -41,95 +41,107 @@ msgstr ""
 msgid "AwareWave"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:108
+#: includes/Admin/SettingsPage.php:105
 msgid "Engine URL (browser) must be an https:// address without query or fragment."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:110
+#: includes/Admin/SettingsPage.php:107
 msgid "Engine URL (server) must be an http(s):// address without query or fragment."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:112
+#: includes/Admin/SettingsPage.php:109
 msgid "Key ID: 2–24 characters, lowercase letters, digits and -, starting with a letter or digit."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:114
+#: includes/Admin/SettingsPage.php:111
 msgid "Default engine language must be zh-TW or en; en was saved."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:116
+#: includes/Admin/SettingsPage.php:113
+msgid "Turnstile site key: paste the site key exactly as Cloudflare shows it (it starts with a digit and x, e.g. 0x4AAAA…)."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:115
 msgid "Embedding from another domain is not supported yet; same domain was saved."
 msgstr ""
 
 #. translators: %s: the lines that were not saved
-#: includes/Admin/SettingsPage.php:119
+#: includes/Admin/SettingsPage.php:118
 #, php-format
 msgid "These lines were not saved (wrong format, or a language the engine does not have — zh-TW, en): %s"
 msgstr ""
 
 #. translators: %s: a language slug in TranslatePress settings, e.g. en
-#: includes/Admin/SettingsPage.php:135
+#: includes/Admin/SettingsPage.php:134
 #, php-format
 msgid "TranslatePress language slug /%s/"
 msgstr ""
 
 #. translators: 1: list of reserved path prefixes, 2: list of pages
-#: includes/Admin/SettingsPage.php:142
+#: includes/Admin/SettingsPage.php:141
 #, php-format
 msgid "These addresses start with a path the engine uses (%1$s) and will not reach WordPress: %2$s"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:198
-#: includes/Admin/SettingsPage.php:308
+#: includes/Admin/SettingsPage.php:197
+#: includes/Admin/SettingsPage.php:354
 msgid "Insufficient permissions."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:215
+#: includes/Admin/SettingsPage.php:214
 msgid "Engine URL (browser)"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:215
+#: includes/Admin/SettingsPage.php:214
 msgid "Cross-origin only: the address visitors’ browsers load the embedded tools from, e.g. https://engine.example.com"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:216
+#: includes/Admin/SettingsPage.php:215
 msgid "Engine URL (server)"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:216
+#: includes/Admin/SettingsPage.php:215
 msgid "Address this WordPress server calls the engine at; may be an internal http:// address. Empty: this site’s own address (same-origin) or the browser URL (cross-origin)."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:217
+#: includes/Admin/SettingsPage.php:216
 msgid "Key ID"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:217
+#: includes/Admin/SettingsPage.php:216
 msgid "The name this site is registered under at the engine."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:218
+#: includes/Admin/SettingsPage.php:217
 msgid "Default engine language"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:218
+#: includes/Admin/SettingsPage.php:217
 msgid "zh-TW or en. Used when the page language is neither and has no entry below."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:219
+#: includes/Admin/SettingsPage.php:218
 msgid "Language map"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:219
+#: includes/Admin/SettingsPage.php:218
 msgid "Optional, one per line: WordPress locale=engine language, e.g. zh_HK=zh-TW. zh_TW and en_* need no entry."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:220
+#: includes/Admin/SettingsPage.php:219
 msgid "Tool pages"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:220
+#: includes/Admin/SettingsPage.php:219
 msgid "One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:221
+msgid "Turnstile site key"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:221
+msgid "Optional: Cloudflare Turnstile human check on the daily-letter signup form. Site key here, secret key in the Human check section below."
 msgstr ""
 
 #: includes/Admin/SettingsPage.php:230
@@ -149,7 +161,7 @@ msgid "No key yet."
 msgstr ""
 
 #: includes/Admin/SettingsPage.php:240
-#: includes/Admin/SettingsPage.php:346
+#: includes/Admin/SettingsPage.php:407
 msgid "The key comes from the AWORACLE_SITE_KEYPAIR constant in wp-config.php; change it there."
 msgstr ""
 
@@ -165,139 +177,197 @@ msgstr ""
 msgid "Generate key"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:254
+#: includes/Admin/SettingsPage.php:257
 msgid "Member pseudonyms"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:255
+#: includes/Admin/SettingsPage.php:258
 msgid "The engine never sees member IDs or e-mails, only HMAC(salt, user ID). Rotating the salt makes every member look new to the engine (usage limits restart)."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:257
+#: includes/Admin/SettingsPage.php:260
 msgid "Yes, rotate the salt."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:258
+#: includes/Admin/SettingsPage.php:261
 msgid "Rotate salt"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:263
+#: includes/Admin/SettingsPage.php:266
 msgid "Tools available from the engine"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:264
+#: includes/Admin/SettingsPage.php:267
 msgid "None — check the engine URL."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:265
+#: includes/Admin/SettingsPage.php:268
 msgid "Shortcode:"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:267
+#: includes/Admin/SettingsPage.php:270
 msgid "Refresh tool list"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:280
+#: includes/Admin/SettingsPage.php:283
+#: includes/Admin/SettingsPage.php:326
 msgid "Settings → AwareWave Oracle"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:285
-msgid "AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY in wp-config.php is not a valid key (base64 of 32 bytes)."
+#: includes/Admin/SettingsPage.php:288
+msgid "AwareWave Oracle: the human check is not set up yet — Cloudflare Turnstile needs both the site key and the secret key. Until then the signup form relies on its rate limits, the hidden trap field and the daily cap on confirmation mails."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:286
-msgid "AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY is not set in wp-config.php."
+#: includes/Admin/SettingsPage.php:289
+msgid "AwareWave Oracle: the human check is not set up yet (Cloudflare Turnstile). Until then the signup form relies on its rate limits, the hidden trap field and the daily cap on confirmation mails."
 msgstr ""
 
 #: includes/Admin/SettingsPage.php:294
-msgid "Member data"
+msgid "Human check"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:295
-msgid "Members can save their own charts and the people they read for ([aw_oracle_my_charts], [aw_oracle_persons]). Names and birth data are encrypted with a key kept in wp-config.php, never in the database, so database backups hold only ciphertext."
-msgstr ""
-
-#: includes/Admin/SettingsPage.php:297
-msgid "Saving is on."
-msgstr ""
-
-#: includes/Admin/SettingsPage.php:297
-msgid "Keep a copy of AWORACLE_DATA_KEY outside this server: without it the saved entries cannot be read."
+#: includes/Admin/SettingsPage.php:296
+msgid "Cloudflare Turnstile is on: a signup that Cloudflare does not confirm is refused before anything is stored or mailed."
 msgstr ""
 
 #: includes/Admin/SettingsPage.php:301
-msgid "Add this line to wp-config.php above “That’s all, stop editing!”, and keep a copy outside this server:"
+#: includes/Admin/SettingsPage.php:414
+msgid "The secret key comes from the AWORACLE_TURNSTILE_SECRET constant in wp-config.php; change it there."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:344
-msgid "New key created. Register the public key below at the engine."
+#: includes/Admin/SettingsPage.php:305
+msgid "A secret key is saved (not shown). Enter a new one to replace it."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:345
-msgid "Tick the confirmation box to rotate the key."
+#: includes/Admin/SettingsPage.php:305
+msgid "No secret key yet."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:306
+msgid "It can also be set in wp-config.php instead: define( 'AWORACLE_TURNSTILE_SECRET', '…' );"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:308
+msgid "Turnstile secret key"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:311
+msgid "Remove the saved secret key (turns the human check off)."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:313
+msgid "Save secret key"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:331
+msgid "AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY in wp-config.php is not a valid key (base64 of 32 bytes)."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:332
+msgid "AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY is not set in wp-config.php."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:340
+msgid "Member data"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:341
+msgid "Members can save their own charts and the people they read for ([aw_oracle_my_charts], [aw_oracle_persons]). Names and birth data are encrypted with a key kept in wp-config.php, never in the database, so database backups hold only ciphertext."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:343
+msgid "Saving is on."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:343
+msgid "Keep a copy of AWORACLE_DATA_KEY outside this server: without it the saved entries cannot be read."
 msgstr ""
 
 #: includes/Admin/SettingsPage.php:347
+msgid "Add this line to wp-config.php above “That’s all, stop editing!”, and keep a copy outside this server:"
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:405
+msgid "New key created. Register the public key below at the engine."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:406
+msgid "Tick the confirmation box to rotate the key."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:408
 msgid "Salt rotated."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:348
+#: includes/Admin/SettingsPage.php:409
 msgid "Tick the confirmation box to rotate the salt."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:349
+#: includes/Admin/SettingsPage.php:410
 msgid "Tool list refreshed."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:366
+#: includes/Admin/SettingsPage.php:411
+msgid "Turnstile secret key saved."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:412
+msgid "Turnstile secret key removed."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:413
+msgid "That is not a Turnstile secret key (it starts with a digit and x, e.g. 0x4AAAA…); nothing was changed."
+msgstr ""
+
+#: includes/Admin/SettingsPage.php:431
 msgid "Embedding"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:368
+#: includes/Admin/SettingsPage.php:433
 msgid "Same domain (recommended): the engine answers under this site’s address at /embed/, /api/, /_next/, /tarot/."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:370
+#: includes/Admin/SettingsPage.php:435
 msgid "Another domain (not supported yet): the engine has its own address; the page and the tool would talk by messages."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:376
+#: includes/Admin/SettingsPage.php:441
 #: includes/Daily/Confirm.php:65
 #: includes/Members/Privacy.php:103
 msgid "Daily fortune letter"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:378
+#: includes/Admin/SettingsPage.php:443
 msgid "Off: no signup form, nothing is sent."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:379
+#: includes/Admin/SettingsPage.php:444
 msgid "On, sent through FluentCRM (signup form [aw_oracle_daily], double opt-in, one letter a day at 07:00 in each subscriber’s time zone)."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:387
+#: includes/Admin/SettingsPage.php:452
 msgid "FluentCRM is not active: the signup form is hidden and nothing is sent."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:389
+#: includes/Admin/SettingsPage.php:454
 msgid "AWORACLE_DATA_KEY is missing (see Member data below): the signup form shows that subscribing is not available."
 msgstr ""
 
 #. translators: 1: date and time (UTC), 2: letters handed to FluentCRM, 3: put back for a later hour, 4: failed
-#: includes/Admin/SettingsPage.php:397
+#: includes/Admin/SettingsPage.php:462
 #, php-format
 msgid "Last hourly run %1$s UTC: %2$d handed to FluentCRM, %3$d put back for a later hour (engine or data problem), %4$d failed."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:405
+#: includes/Admin/SettingsPage.php:470
 msgid "Resend webhook URL (events email.bounced, email.complained):"
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:407
+#: includes/Admin/SettingsPage.php:472
 msgid "signing secret set."
 msgstr ""
 
-#: includes/Admin/SettingsPage.php:408
+#: includes/Admin/SettingsPage.php:473
 msgid "set its signing secret in wp-config.php: define( 'AWORACLE_RESEND_WEBHOOK_SECRET', 'whsec_…' );"
 msgstr ""
 
@@ -314,8 +384,8 @@ msgid "This confirmation link is not valid."
 msgstr ""
 
 #: includes/Daily/Confirm.php:70
-#: includes/Daily/Rest.php:61
-#: includes/Daily/Signup.php:51
+#: includes/Daily/Rest.php:62
+#: includes/Daily/Signup.php:53
 msgid "Subscribing is not available on this site yet."
 msgstr ""
 
@@ -325,7 +395,7 @@ msgid "This confirmation link has expired or was already used."
 msgstr ""
 
 #: includes/Daily/Confirm.php:87
-#: includes/Daily/Signup.php:74
+#: includes/Daily/Signup.php:84
 #: includes/Members/Shortcodes.php:80
 msgid "Lunar"
 msgstr ""
@@ -346,22 +416,26 @@ msgstr ""
 msgid "Confirmed. Your first letter arrives after 07:00 in your time zone."
 msgstr ""
 
-#: includes/Daily/Rest.php:63
+#: includes/Daily/Rest.php:64
 msgid "Almost done: check your inbox and confirm your e-mail address."
 msgstr ""
 
-#: includes/Daily/Rest.php:72
+#: includes/Daily/Rest.php:73
 msgid "Too many requests. Try again in an hour."
 msgstr ""
 
-#: includes/Daily/Rest.php:96
-#: includes/Daily/Signup.php:93
+#: includes/Daily/Rest.php:93
+msgid "The human check did not pass. Try it again."
+msgstr ""
+
+#: includes/Daily/Rest.php:102
+#: includes/Daily/Signup.php:105
 #: includes/Members/Rest.php:129
 #: includes/Members/Shortcodes.php:75
 msgid "Something went wrong. Reload the page and try again."
 msgstr ""
 
-#: includes/Daily/Rest.php:172
+#: includes/Daily/Rest.php:178
 #: includes/Members/Rest.php:187
 msgid "Some fields are missing or not valid."
 msgstr ""
@@ -425,124 +499,132 @@ msgctxt "list separator in the daily letter"
 msgid ", "
 msgstr ""
 
-#: includes/Daily/Signup.php:34
+#: includes/Daily/Signup.php:36
 #: includes/Embed/Block.php:65
 msgid "AwareWave daily fortune signup"
 msgstr ""
 
-#: includes/Daily/Signup.php:68
+#: includes/Daily/Signup.php:78
 msgid "Daily fortune by e-mail"
 msgstr ""
 
-#: includes/Daily/Signup.php:69
+#: includes/Daily/Signup.php:79
 msgid "One letter every morning after 07:00 in your time zone, calculated from your birth data. You can unsubscribe from any letter."
 msgstr ""
 
-#: includes/Daily/Signup.php:70
+#: includes/Daily/Signup.php:80
 msgid "E-mail"
 msgstr ""
 
-#: includes/Daily/Signup.php:71
+#: includes/Daily/Signup.php:81
 msgid "Your time zone (type to search)"
 msgstr ""
 
-#: includes/Daily/Signup.php:72
+#: includes/Daily/Signup.php:82
 #: includes/Members/Shortcodes.php:78
 msgid "Calendar"
 msgstr ""
 
-#: includes/Daily/Signup.php:73
+#: includes/Daily/Signup.php:83
 #: includes/Members/Shortcodes.php:79
 msgid "Solar (Gregorian)"
 msgstr ""
 
-#: includes/Daily/Signup.php:75
+#: includes/Daily/Signup.php:85
 #: includes/Members/Shortcodes.php:81
 msgid "Leap month"
 msgstr ""
 
-#: includes/Daily/Signup.php:76
+#: includes/Daily/Signup.php:86
 #: includes/Members/Shortcodes.php:82
 msgid "Birth date (year, month, day)"
 msgstr ""
 
-#: includes/Daily/Signup.php:77
+#: includes/Daily/Signup.php:87
 #: includes/Members/Shortcodes.php:83
 msgid "Birth time, local clock (hour, minute)"
 msgstr ""
 
-#: includes/Daily/Signup.php:78
+#: includes/Daily/Signup.php:88
 #: includes/Members/Shortcodes.php:84
 msgid "Year"
 msgstr ""
 
-#: includes/Daily/Signup.php:79
+#: includes/Daily/Signup.php:89
 #: includes/Members/Shortcodes.php:85
 msgid "Month"
 msgstr ""
 
-#: includes/Daily/Signup.php:80
+#: includes/Daily/Signup.php:90
 #: includes/Members/Shortcodes.php:86
 msgid "Day"
 msgstr ""
 
-#: includes/Daily/Signup.php:81
+#: includes/Daily/Signup.php:91
 #: includes/Members/Shortcodes.php:87
 msgid "Hour"
 msgstr ""
 
-#: includes/Daily/Signup.php:82
+#: includes/Daily/Signup.php:92
 #: includes/Members/Shortcodes.php:88
 msgid "Minute"
 msgstr ""
 
-#: includes/Daily/Signup.php:83
+#: includes/Daily/Signup.php:93
 #: includes/Members/Privacy.php:282
 #: includes/Members/Shortcodes.php:89
 msgid "Gender"
 msgstr ""
 
-#: includes/Daily/Signup.php:84
+#: includes/Daily/Signup.php:94
 #: includes/Members/Shortcodes.php:90
 msgid "Male"
 msgstr ""
 
-#: includes/Daily/Signup.php:85
+#: includes/Daily/Signup.php:95
 #: includes/Members/Shortcodes.php:91
 msgid "Female"
 msgstr ""
 
-#: includes/Daily/Signup.php:86
+#: includes/Daily/Signup.php:96
 #: includes/Members/Shortcodes.php:92
 msgid "Birthplace name"
 msgstr ""
 
-#: includes/Daily/Signup.php:87
+#: includes/Daily/Signup.php:97
 #: includes/Members/Shortcodes.php:93
 msgid "Latitude (north +)"
 msgstr ""
 
-#: includes/Daily/Signup.php:88
+#: includes/Daily/Signup.php:98
 #: includes/Members/Shortcodes.php:94
 msgid "Longitude (east +)"
 msgstr ""
 
-#: includes/Daily/Signup.php:89
+#: includes/Daily/Signup.php:99
 msgid "Birthplace time zone (e.g. Asia/Taipei)"
 msgstr ""
 
-#: includes/Daily/Signup.php:90
+#: includes/Daily/Signup.php:100
 #: includes/Members/Shortcodes.php:96
 msgid "Use true solar time"
 msgstr ""
 
-#: includes/Daily/Signup.php:91
+#: includes/Daily/Signup.php:101
 msgid "Subscribe"
 msgstr ""
 
-#: includes/Daily/Signup.php:92
+#: includes/Daily/Signup.php:102
 #: includes/Members/Shortcodes.php:76
 msgid "Check the highlighted fields."
+msgstr ""
+
+#: includes/Daily/Signup.php:103
+msgid "Complete the human check above the button first."
+msgstr ""
+
+#: includes/Daily/Signup.php:104
+msgid "The human check could not load. Allow challenges.cloudflare.com (an ad or script blocker may stop it) or try another browser."
 msgstr ""
 
 #: includes/Embed/Block.php:61

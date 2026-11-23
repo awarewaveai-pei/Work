@@ -1,0 +1,24 @@
+# Release repo awarewaveai-pei/aware-wave-oracle: a tag v<version> publishes aware-wave-oracle-v<version>.zip
+# (the name next-admin's catalog and the host gate expect: <repo>-v<version>.zip). Built by bin/build-zip.sh,
+# the same script scripts/release-wp-bridge.sh --plugin oracle --dry-run runs on the Work copy.
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build installable plugin zip
+        run: |
+          ZIP=$(bash bin/build-zip.sh build)
+          [ "$(basename "$ZIP")" = "aware-wave-oracle-${GITHUB_REF_NAME}.zip" ] \
+            || { echo "tag ${GITHUB_REF_NAME} does not match the plugin version ($(basename "$ZIP"))"; exit 1; }
+      - name: Create GitHub release with the installable zip
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/aware-wave-oracle-*.zip
+          generate_release_notes: true

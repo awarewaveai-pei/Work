@@ -22,6 +22,8 @@ final class Normalize {
 	/** WordPress locales look like en_US, zh_TW, de_DE_formal; a bare language (zh) is also accepted as a map key. */
 	const WP_LOCALE_PATTERN = '/^[a-z]{2,3}(_[A-Za-z0-9]{2,8}){0,2}$/';
 	const PAGE_ID_PATTERN   = '/^[1-9][0-9]{0,18}$/';
+	/** Cloudflare Turnstile keys: "0x…" live, "1x…"/"2x…"/"3x…" Cloudflare's published test keys. */
+	const TURNSTILE_KEY_PATTERN = '/^[0-9]x[A-Za-z0-9_-]{10,80}$/';
 
 	const EMBED_SAME_ORIGIN  = 'same-origin';
 	const EMBED_CROSS_ORIGIN = 'cross-origin';
@@ -43,7 +45,7 @@ final class Normalize {
 	 *
 	 * @param array<string,mixed>                 $in
 	 * @param array<int,array{0:string,1:string}> $errors
-	 * @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>,mailer:string}
+	 * @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>,mailer:string,turnstile_site_key:string}
 	 */
 	public static function settings( array $in, array &$errors = array() ): array {
 		$out = Options::defaults();
@@ -79,6 +81,12 @@ final class Normalize {
 		}
 
 		$out['mailer'] = self::scalar( $in['mailer'] ?? '' ) === self::MAILER_FLUENTCRM ? self::MAILER_FLUENTCRM : self::MAILER_NONE;
+
+		$turnstileRaw              = self::scalar( $in['turnstile_site_key'] ?? '' );
+		$out['turnstile_site_key'] = self::turnstileKey( $turnstileRaw );
+		if ( $out['turnstile_site_key'] === '' && trim( $turnstileRaw ) !== '' ) {
+			$errors[] = array( 'turnstile_site_key', '' );
+		}
 
 		$rejected          = array();
 		$out['locale_map'] = self::pairs( $in['locale_map'] ?? '', self::WP_LOCALE_PATTERN, null, $rejected );
@@ -127,6 +135,12 @@ final class Normalize {
 	public static function keyId( string $value ): string {
 		$value = strtolower( trim( $value ) );
 		return preg_match( self::KEY_ID_PATTERN, $value ) ? $value : '';
+	}
+
+	/** A Turnstile site key or secret, or '' when it does not look like one. */
+	public static function turnstileKey( string $value ): string {
+		$value = trim( $value );
+		return preg_match( self::TURNSTILE_KEY_PATTERN, $value ) ? $value : '';
 	}
 
 	/** Only languages the engine serves (EmbedUrl::ENGINE_LOCALES); anything else is ''. */

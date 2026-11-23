@@ -8,7 +8,8 @@
  * never mails an address FluentCRM has as bounced, complained or spammed. Abuse limits: per source address
  * (IP_LIMIT an hour; REMOTE_ADDR must be the visitor — README), per contact (one request per
  * THROTTLE_SECONDS) and site-wide (Confirm::DAILY_CAP confirmation mails a day, so a flood of signups cannot
- * use up the sending quota the letters need).
+ * use up the sending quota the letters need). With Cloudflare Turnstile set up (Turnstile::status() 'on'), a
+ * token Cloudflare does not confirm is 403 before anything is stored or mailed.
  *
  * Webhook: a failed signature (or no secret configured) is 401 and changes nothing. Each Svix message id is
  * handled once (Store::takeEvent); a redelivery is 200 without doing anything; not ready → 503 (retried).
@@ -85,6 +86,11 @@ final class Rest {
 		$birth  = Record::cleanBirth( $body['birth'] ?? null, $errors );
 		if ( $errors || $birth === null ) {
 			return self::invalid( $errors );
+		}
+		// After the field checks (a 400 does not spend the visitor's single-use token), before anything is stored.
+		if ( Turnstile::status() === 'on'
+			&& ! Turnstile::verify( is_string( $body['turnstile'] ?? null ) ? $body['turnstile'] : '', isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '' ) ) {
+			return new \WP_Error( 'aworacle_daily_captcha', __( 'The human check did not pass. Try it again.', 'aware-wave-oracle' ), array( 'status' => 403 ) );
 		}
 
 		$existing = Crm::findByEmail( $email );

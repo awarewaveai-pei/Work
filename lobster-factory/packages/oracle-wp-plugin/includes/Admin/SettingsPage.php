@@ -4,7 +4,7 @@
  * embed mode, engine URLs, key id, the site's Ed25519 key (generate / rotate; only the public half is
  * shown), locale map, tool-slug → page map, member-pseudonym salt rotation, tool-list refresh.
  * Capability manage_options on every render and action; every action form carries its own nonce.
- * Key / salt / tool-list actions post to admin-post.php and redirect back (Post/Redirect/Get), so a
+ * Key / salt / tool-list / Turnstile-secret actions post to admin-post.php and redirect back (Post/Redirect/Get), so a
  * browser refresh never repeats them.
  *
  * @package AwareWave\Oracle\Admin
@@ -14,6 +14,7 @@ namespace AwareWave\Oracle\Admin;
 
 use AwareWave\Oracle\Crypto\SiteKey;
 use AwareWave\Oracle\Crypto\Vault;
+use AwareWave\Oracle\Daily\Turnstile;
 use AwareWave\Oracle\Engine\EngineClient;
 use AwareWave\Oracle\Settings\Normalize;
 use AwareWave\Oracle\Settings\Options;
@@ -34,6 +35,7 @@ final class SettingsPage {
 		add_action( 'admin_init', array( $this, 'registerSetting' ) );
 		add_action( 'admin_post_' . self::ACTION, array( $this, 'handleAction' ) );
 		add_action( 'admin_notices', array( $this, 'storageNotice' ) );
+		add_action( 'admin_notices', array( $this, 'turnstileNotice' ) );
 		// The notice is shown once; WordPress then strips the code from the address bar.
 		add_filter(
 			'removable_query_args',
@@ -84,12 +86,7 @@ final class SettingsPage {
 		if ( $out['embed'] === Normalize::EMBED_SAME_ORIGIN ) {
 			$this->warnEnginePrefixes();
 		}
-
-		$oldServer = $old['server_engine_url'] !== '' ? $old['server_engine_url'] : $old['browser_engine_url'];
-		$newServer = $out['server_engine_url'] !== '' ? $out['server_engine_url'] : $out['browser_engine_url'];
-		if ( $oldServer !== $newServer || $old['embed'] !== $out['embed'] ) {
-			EngineClient::forgetTools();
-		}
+		// The tool-list cache needs no clearing here: it is keyed by the engine address (EngineClient::tools).
 		return $out;
 	}
 
@@ -112,6 +109,8 @@ final class SettingsPage {
 				return esc_html__( 'Key ID: 2–24 characters, lowercase letters, digits and -, starting with a letter or digit.', 'aware-wave-oracle' );
 			case 'default_locale':
 				return esc_html__( 'Default engine language must be zh-TW or en; en was saved.', 'aware-wave-oracle' );
+			case 'turnstile_site_key':
+				return esc_html__( 'Turnstile site key: paste the site key exactly as Cloudflare shows it (it starts with a digit and x, e.g. 0x4AAAA…).', 'aware-wave-oracle' );
 			case 'cross_unsupported':
 				return esc_html__( 'Embedding from another domain is not supported yet; same domain was saved.', 'aware-wave-oracle' );
 			case 'maps':
@@ -219,6 +218,7 @@ final class SettingsPage {
 		$this->areaRow( $name . '[locale_map]', Normalize::pairsToText( $s['locale_map'] ), __( 'Language map', 'aware-wave-oracle' ), __( 'Optional, one per line: WordPress locale=engine language, e.g. zh_HK=zh-TW. zh_TW and en_* need no entry.', 'aware-wave-oracle' ) );
 		$this->areaRow( $name . '[page_map]', Normalize::pairsToText( $s['page_map'] ), __( 'Tool pages', 'aware-wave-oracle' ), __( 'One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page.', 'aware-wave-oracle' ) );
 		$this->mailerRow( $name . '[mailer]', $s['mailer'] );
+		$this->textRow( $name . '[turnstile_site_key]', $s['turnstile_site_key'], __( 'Turnstile site key', 'aware-wave-oracle' ), __( 'Optional: Cloudflare Turnstile human check on the daily-letter signup form. Site key here, secret key in the Human check section below.', 'aware-wave-oracle' ) );
 		echo '</table>';
 		submit_button();
 		echo '</form>';
@@ -247,6 +247,9 @@ final class SettingsPage {
 			echo '</form>';
 		}
 
+		// --- Turnstile secret (own form: a secret never goes through the autoloaded settings option) ---
+		$this->turnstileSection();
+
 		// --- Member data key (saved charts and persons) ---
 		$this->storageSection();
 
@@ -266,6 +269,49 @@ final class SettingsPage {
 		$this->actionFormStart( 'tools' );
 		submit_button( __( 'Refresh tool list', 'aware-wave-oracle' ), 'secondary', 'submit', false );
 		echo '</form></div>';
+	}
+
+	/** The daily letter is on without a working human check: say so on the dashboard and plugins screens. */
+	public function turnstileNotice(): void {
+		if ( ! current_user_can( self::CAP ) || Options::get()['mailer'] !== Normalize::MAILER_FLUENTCRM || Turnstile::status() === 'on' ) {
+			return;
+		}
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || ! in_array( $screen->id, array( 'dashboard', 'plugins' ), true ) ) {
+			return;
+		}
+		echo '<div class="notice notice-warning"><p>' . esc_html( self::turnstileOffText() ) . ' <a href="' . esc_url( admin_url( 'options-general.php?page=' . self::SLUG ) ) . '">' . esc_html__( 'Settings → AwareWave Oracle', 'aware-wave-oracle' ) . '</a></p></div>';
+	}
+
+	private static function turnstileOffText(): string {
+		return Turnstile::status() === 'partial'
+			? __( 'AwareWave Oracle: the human check is not set up yet — Cloudflare Turnstile needs both the site key and the secret key. Until then the signup form relies on its rate limits, the hidden trap field and the daily cap on confirmation mails.', 'aware-wave-oracle' )
+			: __( 'AwareWave Oracle: the human check is not set up yet (Cloudflare Turnstile). Until then the signup form relies on its rate limits, the hidden trap field and the daily cap on confirmation mails.', 'aware-wave-oracle' );
+	}
+
+	/** Turnstile status and the secret key form (write-only: the stored secret is never shown). */
+	private function turnstileSection(): void {
+		echo '<h2>' . esc_html__( 'Human check', 'aware-wave-oracle' ) . '</h2>';
+		if ( Turnstile::status() === 'on' ) {
+			echo '<p><strong>' . esc_html__( 'Cloudflare Turnstile is on: a signup that Cloudflare does not confirm is refused before anything is stored or mailed.', 'aware-wave-oracle' ) . '</strong></p>';
+		} else {
+			echo '<p><strong>' . esc_html( self::turnstileOffText() ) . '</strong></p>';
+		}
+		if ( Options::turnstileSecretFromConstant() ) {
+			echo '<p>' . esc_html__( 'The secret key comes from the AWORACLE_TURNSTILE_SECRET constant in wp-config.php; change it there.', 'aware-wave-oracle' ) . '</p>';
+			return;
+		}
+		$has = Options::turnstileSecret() !== '';
+		echo '<p>' . ( $has ? esc_html__( 'A secret key is saved (not shown). Enter a new one to replace it.', 'aware-wave-oracle' ) : esc_html__( 'No secret key yet.', 'aware-wave-oracle' ) ) . ' '
+			. esc_html__( 'It can also be set in wp-config.php instead: define( \'AWORACLE_TURNSTILE_SECRET\', \'…\' );', 'aware-wave-oracle' ) . '</p>';
+		$this->actionFormStart( 'turnstile' );
+		echo '<p><label for="aworacle-turnstile-secret">' . esc_html__( 'Turnstile secret key', 'aware-wave-oracle' ) . '</label> ';
+		echo '<input type="password" class="regular-text" id="aworacle-turnstile-secret" name="aworacle_turnstile_secret" value="" autocomplete="off"></p>';
+		if ( $has ) {
+			echo '<p><label><input type="checkbox" name="aworacle_turnstile_clear" value="1"> ' . esc_html__( 'Remove the saved secret key (turns the human check off).', 'aware-wave-oracle' ) . '</label></p>';
+		}
+		submit_button( __( 'Save secret key', 'aware-wave-oracle' ), 'secondary', 'submit', false );
+		echo '</form>';
 	}
 
 	/** Saving is off until AWORACLE_DATA_KEY is set: say why on the dashboard and plugins screens. */
@@ -328,6 +374,21 @@ final class SettingsPage {
 				update_option( Options::SALT_OPTION, Options::newSalt(), false );
 				$code = 'salt_done';
 			}
+		} elseif ( $op === 'turnstile' ) {
+			check_admin_referer( 'aworacle_turnstile' );
+			$raw = isset( $_POST['aworacle_turnstile_secret'] ) ? trim( (string) wp_unslash( $_POST['aworacle_turnstile_secret'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- checked against the key pattern
+			if ( Options::turnstileSecretFromConstant() ) {
+				$code = 'turnstile_constant';
+			} elseif ( isset( $_POST['aworacle_turnstile_clear'] ) && $_POST['aworacle_turnstile_clear'] === '1' ) {
+				delete_option( Options::TURNSTILE_SECRET_OPTION );
+				$code = 'turnstile_cleared';
+			} elseif ( Normalize::turnstileKey( $raw ) === '' ) {
+				$code = 'turnstile_bad';
+			} else {
+				// Not autoloaded: the secret is read only when a signup is checked.
+				update_option( Options::TURNSTILE_SECRET_OPTION, Normalize::turnstileKey( $raw ), false );
+				$code = 'turnstile_done';
+			}
 		} elseif ( $op === 'tools' ) {
 			check_admin_referer( 'aworacle_tools' );
 			EngineClient::forgetTools();
@@ -347,6 +408,10 @@ final class SettingsPage {
 			'salt_done'    => array( 'success', __( 'Salt rotated.', 'aware-wave-oracle' ) ),
 			'salt_confirm' => array( 'warning', __( 'Tick the confirmation box to rotate the salt.', 'aware-wave-oracle' ) ),
 			'tools_done'   => array( 'success', __( 'Tool list refreshed.', 'aware-wave-oracle' ) ),
+			'turnstile_done'     => array( 'success', __( 'Turnstile secret key saved.', 'aware-wave-oracle' ) ),
+			'turnstile_cleared'  => array( 'success', __( 'Turnstile secret key removed.', 'aware-wave-oracle' ) ),
+			'turnstile_bad'      => array( 'error', __( 'That is not a Turnstile secret key (it starts with a digit and x, e.g. 0x4AAAA…); nothing was changed.', 'aware-wave-oracle' ) ),
+			'turnstile_constant' => array( 'warning', __( 'The secret key comes from the AWORACLE_TURNSTILE_SECRET constant in wp-config.php; change it there.', 'aware-wave-oracle' ) ),
 		);
 		return $messages[ $code ] ?? null;
 	}

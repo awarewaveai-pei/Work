@@ -2,7 +2,8 @@
  * [aw_oracle_daily]: the daily-letter signup form, posted to REST aworacle/v1/daily/subscribe.
  * Time zone: taken from the browser, editable in a search box (input + datalist of every IANA zone),
  * never a long dropdown. Choices are visible radios / checkboxes. Values are set with textContent / value.
- * Config: window.AWORACLE_DAILY = { url, nonce, locale, labels }.
+ * Config: window.AWORACLE_DAILY = { url, nonce, locale, turnstile, labels }. turnstile = Cloudflare Turnstile site key
+ * ('' = not set up); its widget is rendered above the button and the token posted as `turnstile`.
  */
 (function () {
   'use strict';
@@ -109,6 +110,13 @@
       el('p', null, [el('button', { type: 'submit', className: 'button button-primary', text: L.submit })])
     ]);
 
+    var widget = null;
+    if (cfg.turnstile && window.turnstile) {
+      var slot = el('div', { className: 'aworacle-turnstile' });
+      form.insertBefore(slot, form.lastChild);
+      widget = window.turnstile.render(slot, { sitekey: cfg.turnstile, action: 'aworacle-daily' });
+    }
+
     function picked(wrap) {
       var on = wrap.querySelector('input:checked');
       return on ? on.value : '';
@@ -119,11 +127,17 @@
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
+      var token = widget !== null ? window.turnstile.getResponse(widget) || '' : '';
+      if (cfg.turnstile && !token) {
+        msg.textContent = window.turnstile ? L.captcha : L.captchaBlocked;
+        return;
+      }
       var body = {
         email: c.email.value.trim(),
         tz: c.tz.value.trim(),
         locale: cfg.locale,
         website: c.website.value,
+        turnstile: token,
         birth: {
           calendar: picked(cal),
           year: int(c.year),
@@ -164,6 +178,8 @@
                 box.appendChild(el('p', { className: 'aworacle-daily-done', role: 'status', text: json.message || '' }));
                 return;
               }
+              // A token is good for one check: a refused post needs a fresh one.
+              if (widget !== null) window.turnstile.reset(widget);
               msg.textContent = res.status === 400 ? L.invalid : (json && json.message) || L.error;
             });
         })

@@ -1,0 +1,35 @@
+# Release repo awarewaveai-pei/aware-wave-oracle CI. Source of truth: Work lobster-factory/packages/oracle-wp-plugin/.github/
+# (scripts/release-wp-bridge.sh --plugin oracle mirrors it). scripts/release-wp-bridge.sh waits for this run to pass
+# before it tags, so the PHP 7.4 lint below is a release gate (the plugin header says Requires PHP: 7.4).
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['7.4', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: sodium
+          tools: composer
+      - name: php -l on every shipped and test file
+        run: find . -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l
+      - run: composer install --no-interaction --prefer-dist
+      - name: Unit tests
+        run: vendor/bin/phpunit
+      - name: Security gate (no shell/eval in plugin code)
+        run: |
+          if grep -rEn "shell_exec|passthru[[:space:]]*\(|proc_open[[:space:]]*\(|popen[[:space:]]*\(|[^a-zA-Z_]eval[[:space:]]*\(" includes/ ; then
+            echo "Forbidden dangerous call found in includes/"; exit 1
+          fi
+          echo "security gate OK"
+      - name: Zip payload follows .distignore
+        run: |
+          ZIP=$(bash bin/build-zip.sh build)
+          if unzip -l "$ZIP" | grep -E "aware-wave-oracle/(tests|vendor|bin|\.github)/|composer\.json|phpunit\.xml"; then
+            echo "zip carries files .distignore excludes"; exit 1
+          fi

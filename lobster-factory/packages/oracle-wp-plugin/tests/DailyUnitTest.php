@@ -2,7 +2,7 @@
 /**
  * WP-free units for P3 (ORACLE-WP-SPEC §3 P3′): the hourly pick in four time zones (Europe/London on both
  * DST change days), never twice for one local date, only confirmed + subscribed, no back-fill; the letter
- * refuses incomplete engine results; Resend (Svix) signatures; the mailer setting.
+ * refuses incomplete engine results; Resend (Svix) signatures; the mailer setting; the Turnstile answer and key format (P4).
  */
 
 namespace AwareWave\Oracle\Tests;
@@ -11,6 +11,7 @@ use AwareWave\Oracle\Daily\Letter;
 use AwareWave\Oracle\Daily\Schedule;
 use AwareWave\Oracle\Daily\Store;
 use AwareWave\Oracle\Daily\Svix;
+use AwareWave\Oracle\Daily\Turnstile;
 use AwareWave\Oracle\Settings\Normalize;
 use PHPUnit\Framework\TestCase;
 
@@ -208,5 +209,22 @@ final class DailyUnitTest extends TestCase {
 		$on = Normalize::settings( array( 'mailer' => 'fluentcrm' ) );
 		$this->assertSame( Normalize::MAILER_FLUENTCRM, $on['mailer'] );
 		$this->assertSame( $on, Normalize::settings( $on ) ); // second sanitize pass is a no-op
+	}
+	/** Only a strict success:true passes; an action, when present, must be this form's (P4). */
+	public function testTurnstileAnswer(): void {
+		$this->assertTrue( Turnstile::passed( array( 'success' => true ) ) );
+		$this->assertTrue( Turnstile::passed( array( 'success' => true, 'action' => Turnstile::ACTION ) ) );
+		foreach ( array( null, 'ok', array(), array( 'success' => 'true' ), array( 'success' => 1 ), array( 'success' => false ), array( 'success' => true, 'action' => 'login' ) ) as $bad ) {
+			$this->assertFalse( Turnstile::passed( $bad ), (string) json_encode( $bad ) );
+		}
+	}
+
+	public function testTurnstileSiteKeySetting(): void {
+		$this->assertSame( '1x00000000000000000000AA', Normalize::settings( array( 'turnstile_site_key' => ' 1x00000000000000000000AA ' ) )['turnstile_site_key'] );
+		$errors = array();
+		$this->assertSame( '', Normalize::settings( array( 'turnstile_site_key' => '<script>' ), $errors )['turnstile_site_key'] );
+		$this->assertSame( 'turnstile_site_key', $errors[0][0] ?? '' );
+		$on = Normalize::settings( array( 'turnstile_site_key' => '0x4AAAAAAAabcdefghijk' ) );
+		$this->assertSame( $on, Normalize::settings( $on ) );
 	}
 }

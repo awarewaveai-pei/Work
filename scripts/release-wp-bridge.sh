@@ -5,6 +5,11 @@
 #                              Work copy lobster-factory/packages/wp-bridge-plugin -> awarewaveai-pei/aware-wave-wp-bridge
 #   --plugin store             aware-wave-store: AwareWave's own shop logic, aware-wave.com ONLY
 #                              Work copy lobster-factory/packages/aware-wave-store-plugin -> awarewaveai-pei/aware-wave-store (public)
+#   --plugin oracle            aware-wave-oracle: product plugin (divination tools), opt-in per site via the site flow
+#                              Work copy lobster-factory/packages/oracle-wp-plugin -> awarewaveai-pei/aware-wave-oracle (public)
+#                              Its release repo's CI and release workflows live in the Work copy (.github/) and are mirrored;
+#                              the zip is built by its bin/build-zip.sh from .distignore (the dry run builds it locally too).
+#                              A missing release repo is never created here: the dry run says so, a real run stops.
 #
 # WHY THIS EXISTS: each plugin lives in TWO GitHub repos and that bit a session once. Pushing a tag v* to the
 # release repo fires its .github/workflows/release.yml, which builds the installable zip (<slug>.php + includes/ +
@@ -13,11 +18,12 @@
 # repo's CI runs the real suite -- until 2026-10-25 it ran stale copies), tags, pushes, and verifies the zip appeared.
 #
 # USAGE:
-#   bash scripts/release-wp-bridge.sh [--plugin bridge|store]            # release the version in the plugin header
-#   bash scripts/release-wp-bridge.sh [--plugin bridge|store] --dry-run  # show what WOULD happen; no push, no tag
+#   bash scripts/release-wp-bridge.sh [--plugin bridge|store|oracle]            # release the version in the plugin header
+#   bash scripts/release-wp-bridge.sh [--plugin bridge|store|oracle] --dry-run  # show what WOULD happen; no push, no tag
 #
-# The version is the single source of truth in <slug>.php (AWBRIDGE_VERSION / AWSTORE_VERSION). Bump it there
-# BEFORE running this (the header 'Version:' line and the define must match — checked below).
+# The version is the single source of truth in <slug>.php (AWBRIDGE_VERSION / AWSTORE_VERSION / AWORACLE_VERSION). Bump it
+# there BEFORE running this (the header 'Version:' line and the define must match, and so must a README line
+# 'Version: x.y.z' / '版本：x.y.z' when the README has one — checked below).
 #
 # PRECONDITIONS: gh authenticated (gh auth status); php on PATH (lint gate); clean intent (the Work
 # copy holds the changes you want to ship — commit them to Work separately, this script only mirrors).
@@ -28,18 +34,25 @@ PLUGIN=bridge
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--dry-run) DRY_RUN=1 ;;
-		--plugin) [ $# -ge 2 ] || { echo "[release-wp-bridge] ERROR: --plugin needs bridge or store" >&2; exit 1; }
+		--plugin) [ $# -ge 2 ] || { echo "[release-wp-bridge] ERROR: --plugin needs bridge, store or oracle" >&2; exit 1; }
 		          PLUGIN="$2"; shift ;;
 		*) echo "[release-wp-bridge] ERROR: unknown argument $1" >&2; exit 1 ;;
 	esac
 	shift
 done
+# What the release repo mirrors from the Work copy (the zip payload plus what its CI needs).
+MIRROR_FILES="README.md phpunit.xml composer.json"
+MIRROR_DIRS="includes tests"
 case "$PLUGIN" in
 	bridge) SLUG=aware-wave-wp-bridge; PKG=wp-bridge-plugin;        VERSION_CONST=AWBRIDGE_VERSION
 	        NEXT="wp-bridge runs on every managed site -- roll it out: powershell -File scripts/rollout-wp-bridge.ps1 -DryRun, then without -DryRun (High)" ;;
 	store)  SLUG=aware-wave-store;     PKG=aware-wave-store-plugin; VERSION_CONST=AWSTORE_VERSION
 	        NEXT="aware-wave.com only -- first time: powershell -File scripts/rollout-wp-bridge.ps1 -Plugin store -Install -Site lobster-wordpress -DryRun; later: -Plugin store -DryRun; then without -DryRun (High)" ;;
-	*) echo "[release-wp-bridge] ERROR: --plugin must be bridge or store" >&2; exit 1 ;;
+	oracle) SLUG=aware-wave-oracle;    PKG=oracle-wp-plugin;        VERSION_CONST=AWORACLE_VERSION
+	        MIRROR_FILES="README.md phpunit.xml composer.json uninstall.php .distignore"
+	        MIRROR_DIRS="includes assets languages tests bin .github"
+	        NEXT="product plugin, opt-in per site -- new sites: set releaseVersion of aware-wave-oracle in next-admin lib/wp-plugin-stack-catalog.ts (the site flow installs that pin); sites that already have it: powershell -File scripts/rollout-wp-bridge.ps1 -Plugin oracle -DryRun, then without -DryRun (High)" ;;
+	*) echo "[release-wp-bridge] ERROR: --plugin must be bridge, store or oracle" >&2; exit 1 ;;
 esac
 
 REPO="awarewaveai-pei/$SLUG"
@@ -59,6 +72,8 @@ VER_DEFINE=$(grep -oE "${VERSION_CONST}', '[0-9]+\.[0-9]+\.[0-9]+'" "$PLUGIN_FIL
 VER_HEADER=$(grep -oE "Version:[[:space:]]+[0-9]+\.[0-9]+\.[0-9]+" "$PLUGIN_FILE" | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" || true)
 [ -n "$VER_DEFINE" ] || die "could not parse $VERSION_CONST from $PLUGIN_FILE"
 [ "$VER_DEFINE" = "$VER_HEADER" ] || die "version mismatch: header='$VER_HEADER' define='$VER_DEFINE' — fix both before release"
+VER_README=$(grep -m1 -oE "^(Version:|版本：)[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+" "$SRC/README.md" 2>/dev/null | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" || true)
+[ -z "$VER_README" ] || [ "$VER_README" = "$VER_DEFINE" ] || die "version mismatch: README='$VER_README' define='$VER_DEFINE' — fix README.md before release"
 TAG="v$VER_DEFINE"
 say "$SLUG version = $VER_DEFINE  ->  tag $TAG"
 
@@ -66,6 +81,7 @@ say "$SLUG version = $VER_DEFINE  ->  tag $TAG"
 say "php -l gate..."
 find "$SRC/includes" -name '*.php' -print0 | xargs -0 -n1 php -l >/dev/null || die "php lint failed"
 php -l "$PLUGIN_FILE" >/dev/null || die "php lint failed on plugin file"
+[ ! -f "$SRC/uninstall.php" ] || php -l "$SRC/uninstall.php" >/dev/null || die "php lint failed on uninstall.php"
 say "lint OK"
 
 # 3. Refuse to re-release an existing tag (immutable releases; bump the version instead).
@@ -74,16 +90,34 @@ if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
 fi
 
 # 4. Clone the release repo fresh and mirror the plugin payload (exactly what release.yml zips).
-say "cloning $REPO -> $TMP"
+#    A release repo that does not exist yet is created by a person on purpose (public repo), never here.
+NEW_REPO=0
+if ! VIEW_ERR=$(gh repo view "$REPO" --json name 2>&1 >/dev/null); then
+	# Only GitHub's own "no such repository" answer counts as missing; auth, network or rate-limit errors stop here.
+	case "$VIEW_ERR" in
+		*"Could not resolve to a Repository"*) NEW_REPO=1 ;;
+		*) die "cannot read $REPO ($VIEW_ERR) -- check gh auth status / network" ;;
+	esac
+fi
+if [ "$NEW_REPO" = "1" ] && [ "$DRY_RUN" != "1" ]; then
+	die "release repo $REPO does not exist -- create it first (gh repo create $REPO --public), then rerun; nothing pushed"
+fi
 rm -rf "$TMP"
-gh repo clone "$REPO" "$TMP" -- -q
+if [ "$NEW_REPO" = "1" ]; then
+	say "release repo $REPO does not exist yet -- a real run needs it created first: gh repo create $REPO --public"
+	say "mirroring into an empty repo at $TMP (what the first push would carry)"
+	mkdir -p "$TMP" && git -C "$TMP" init -q
+else
+	say "cloning $REPO -> $TMP"
+	gh repo clone "$REPO" "$TMP" -- -q
+fi
 cp "$PLUGIN_FILE" "$TMP/$SLUG.php"
-for f in README.md phpunit.xml composer.json; do
+for f in $MIRROR_FILES; do
 	[ -f "$SRC/$f" ] && cp "$SRC/$f" "$TMP/$f" || true
 done
-# Mirror includes/ and tests/ faithfully (new files added, removed ones dropped): the release repo's CI must run
+# Mirror the directories faithfully (new files added, removed ones dropped): the release repo's CI must run
 # the suite that matches the code it ships. rsync if available, else cp -r over a cleared dir.
-for d in includes tests; do
+for d in $MIRROR_DIRS; do
 	if command -v rsync >/dev/null 2>&1; then
 		rsync -a --delete "$SRC/$d/" "$TMP/$d/"
 	else
@@ -98,9 +132,20 @@ if [ -z "$(git status --porcelain)" ]; then
 	# Already mirrored but not tagged (e.g. a previous run stopped at the CI check): resume at the CI check.
 	SYNCED=0
 	say "release repo already matches Work at $VER_DEFINE and $TAG is not tagged yet -- resuming at the CI check"
+elif [ "$NEW_REPO" = "1" ]; then
+	say "files the first push would add:"
+	git status --short --untracked-files=all
 else
 	say "files changing in release repo:"
 	git status --short
+fi
+
+# A plugin that builds its own zip (bin/build-zip.sh, run by its release.yml): build it here too, from the mirror
+# that would be pushed (not the Work copy), so the dry run shows the exact asset name and payload.
+if [ -f "$TMP/bin/build-zip.sh" ]; then
+	ZIP=$(bash "$TMP/bin/build-zip.sh" "$TMP-zip") || die "bin/build-zip.sh failed"
+	[ "$(basename "$ZIP")" = "$SLUG-$TAG.zip" ] || die "zip name $(basename "$ZIP") is not $SLUG-$TAG.zip"
+	say "release asset: $SLUG-$TAG.zip ($(unzip -Z1 "$ZIP" | grep -vc '/$') files; built locally at $ZIP)"
 fi
 
 if [ "$DRY_RUN" = "1" ]; then

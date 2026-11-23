@@ -2,6 +2,9 @@
 /**
  * Server-to-engine reads. P1 needs only the tool list: GET <server engine URL>/api/v1/systems,
  * cached one day (a failed fetch is cached 10 minutes so a down engine is not hit on every page view).
+ * The cache is keyed by the address it was fetched from: whatever changes Options::serverEngineUrl()
+ * (any setting it derives from, the site address, a wp-cli `option patch` that skips the settings form)
+ * makes the next read fetch again — no caller has to remember to clear it.
  * Every call: no redirects (the engine never redirects its API; a redirect means a wrong or hijacked
  * address) and a response size cap.
  *
@@ -15,7 +18,8 @@ use AwareWave\Oracle\Settings\Options;
 
 final class EngineClient {
 
-	const TOOLS_TRANSIENT = 'aworacle_tools';
+	/** _v2: holds {base, tools}; 0.4 and earlier used aworacle_tools for a bare list (a rollback must not read this). */
+	const TOOLS_TRANSIENT = 'aworacle_tools_v2';
 	const SYSTEMS_PATH    = '/api/v1/systems';
 	/** The systems list is ~21 KB today (2026-11-22); 1 MB leaves room without letting a bad address fill memory. */
 	const MAX_RESPONSE_BYTES = 1048576;
@@ -36,20 +40,27 @@ final class EngineClient {
 
 	/** @return array<int,string> */
 	public static function tools(): array {
-		$cached = get_transient( self::TOOLS_TRANSIENT );
-		if ( is_array( $cached ) ) {
-			return $cached;
-		}
 		$base = Options::serverEngineUrl();
 		if ( $base === '' ) {
 			return array();
+		}
+		$cached = get_transient( self::TOOLS_TRANSIENT );
+		if ( is_array( $cached ) && ( $cached['base'] ?? null ) === $base && is_array( $cached['tools'] ?? null ) ) {
+			return $cached['tools'];
 		}
 		$res   = wp_remote_get( $base . self::SYSTEMS_PATH, self::requestArgs() );
 		$tools = array();
 		if ( ! is_wp_error( $res ) && (int) wp_remote_retrieve_response_code( $res ) === 200 ) {
 			$tools = ToolList::parse( json_decode( (string) wp_remote_retrieve_body( $res ), true ) );
 		}
-		set_transient( self::TOOLS_TRANSIENT, $tools, $tools ? DAY_IN_SECONDS : 10 * MINUTE_IN_SECONDS );
+		set_transient(
+			self::TOOLS_TRANSIENT,
+			array(
+				'base'  => $base,
+				'tools' => $tools,
+			),
+			$tools ? DAY_IN_SECONDS : 10 * MINUTE_IN_SECONDS
+		);
 		return $tools;
 	}
 

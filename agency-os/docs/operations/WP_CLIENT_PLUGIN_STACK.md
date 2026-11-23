@@ -2,7 +2,7 @@
 
 > **Owner File** — WordPress 客戶站外掛標準堆疊（選型 + 組合邏輯）。  
 > **不涵蓋**：更新流程 → [`WP_MANAGED_UPDATES.md`](WP_MANAGED_UPDATES.md)；交付模式 → [`WORDPRESS_CLIENT_DELIVERY_MODELS.md`](WORDPRESS_CLIENT_DELIVERY_MODELS.md)。  
-> **Last updated**: 2026-07-02  
+> **Last updated**: 2026-11-23  
 > **讀者**：營運者、AI 代理、協作工程師
 
 ---
@@ -43,7 +43,19 @@
 |------|------|--------------|------|
 | **管理整合** | mainwp-child | manifest | MainWP Dashboard 連線必要；所有 4 個 manifest 均含此 step |
 | **AwareWave 整合** | AwareWave WP Bridge | release-url | 固定版本 `releaseVersion`（現 0.22.0）的 release 檔 `aware-wave-wp-bridge-v<版本>.zip`；建站流程第 3 步安裝（catalog `resolveSiteFlowPlugins`） |
-| **產品外掛（選裝）** | AwareWave Oracle | release-url | `required: false`：建站流程第 3 步勾選才裝，並同時寫入外掛的「引擎網址（伺服器用）」；release repo 未發佈前勾選會在主機下載失敗 |
+
+產品外掛不在這張表：見下節。
+
+---
+
+## 一之二、產品外掛（AwareWave 自有、按站選裝）
+
+> 我們自己的產品做成的外掛，不是每站都要：建站流程第 3 步勾選才裝（catalog `required: false`）。不計入 §六 站型合計。
+> 發佈與升級和 wp-bridge 同一套腳本：`scripts/release-wp-bridge.sh --plugin <名>`（發版）、`scripts/rollout-wp-bridge.ps1 -Plugin <名>`（升級已裝的站；`-Install -Site` 才會裝到新站）。
+
+| 外掛 | 腳本 `--plugin` | Work 正本 | 發佈 repo（公開） | 版本（catalog `releaseVersion`） | Release 檔名 | 說明 |
+|------|-----------------|-----------|------------------|----------------------------------|-------------|------|
+| AwareWave Oracle（命理工具） | `oracle` | `lobster-factory/packages/oracle-wp-plugin/` | `awarewaveai-pei/aware-wave-oracle`（尚未建立，首次發佈前由人建） | 0.5.0 | `aware-wave-oracle-v<版本>.zip`（`bin/build-zip.sh` 依 `.distignore` 打包，不含 tests） | 勾選時同時寫入外掛的「引擎網址（伺服器用）」；發佈 repo 第一次 Release 前勾選會在主機下載失敗 |
 
 ---
 
@@ -315,7 +327,7 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 | installSource | 數量 | 說明 | 操作員介入 |
 |--------------|:----:|------|:--------:|
 | `manifest` | 1 | manifest step runner 安裝（mainwp-child） | ❌ 全自動 |
-| `release-url` | 1 | GitHub release zip 自動取得（wp-bridge，Phase 1）| ❌ 全自動（Phase 1 完成後）|
+| `release-url` | 2 | GitHub release zip 自動取得（wp-bridge 必裝；aware-wave-oracle 選裝，§一之二）| ❌ 全自動（Phase 1 完成後）|
 | `wporg` | 33 | WP.org → `wp plugin install <slug>` | ❌ 全自動 |
 | `manual-zip` + `alternativeSlug` | 2 | 付費首選，但有免費替代；替代品自動裝 | ❌ 全自動（裝替代）|
 | `manual-zip` 無替代 | 10 | 必須上傳 zip；見 §10.3 | ✅ 需操作員 |
@@ -385,3 +397,4 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 | 2026-07-02 | 旅遊模組補齊：加 `elementor-pro-activator`（WordPressIT bundle 必要）+ `advanced-google-maps`（取代 wp-maps-pro，操作員已有 zip）；catalog 43→44；zip 清單 6→8 |
 | 2026-07-02 | 補全 catalog：`kadence-pro`（base，exclude tourism）+ `advanced-coupons-for-woocommerce`（ecommerce + tourism 各一筆）；`kadence-shop-kit` 加 TODO 注記（zip 實體是 kadence-woo-template-builder，待測試）；catalog 44→47；zip 清單 8→10 |
 | 2026-11-23 | SF-H：Kadence 與 TravelWP 標 `kind: "theme"`（不再當外掛安裝）；自有外掛加 `releaseRepo`／`releaseVersion`（URL 由 catalog 產生，閘門只收此 org 的 `v<版本>` release）；新增選裝 `aware-wave-oracle`；catalog 55→56 |
+| 2026-11-23 | P4：新增「產品外掛」類別（§一之二），aware-wave-oracle 自維運層表移入；發佈／升級腳本加 `oracle`；catalog `releaseVersion` 0.2.0→0.5.0；§10.2 release-url 1→2 |

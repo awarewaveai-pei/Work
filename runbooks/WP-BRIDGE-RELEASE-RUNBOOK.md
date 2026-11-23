@@ -1,31 +1,32 @@
-# Runbook — aware-wave-wp-bridge／aware-wave-store 外掛發版
+# Runbook — aware-wave-wp-bridge／aware-wave-store／aware-wave-oracle 外掛發版
 
 > 症狀觸發：「發 wp-bridge 新版」「外掛更新」「release 到 github」「第 N 版在哪」/ 操作者看 Releases 找不到剛改的版本。
 
 ## 核心事實（曾踩過的坑）
 
-我們有兩個 WordPress 外掛，各有**兩個 repo**，發版正本不是 Work：
+我們有三個 WordPress 外掛，各有**兩個 repo**，發版正本不是 Work：
 
 | 外掛 | 裝在哪 | Work 開發副本 | 發佈正本 |
 |------|--------|---------------|----------|
 | `aware-wave-wp-bridge`（讓 AI 管 WordPress 的通道） | **每個**代管網站 | `lobster-factory/packages/wp-bridge-plugin/` | `awarewaveai-pei/aware-wave-wp-bridge`（公開） |
 | `aware-wave-store`（AW 自己的付款事件、會員驗證、進入按鈕） | **只有 aware-wave.com** | `lobster-factory/packages/aware-wave-store-plugin/` | `awarewaveai-pei/aware-wave-store`（公開） |
+| `aware-wave-oracle`（產品外掛：命理工具嵌入、會員存檔、每日信） | 建站時勾選的網站 | `lobster-factory/packages/oracle-wp-plugin/` | `awarewaveai-pei/aware-wave-oracle`（公開；**尚未建立**，首次發佈前由人建，腳本不建 repo） |
 
 push tag `v*` 到發佈正本 → Action 出 zip + Release。0.19.0 前收費程式在 wp-bridge 裡（`includes/Billing/`），2026-10-25 拆出（WORKLOG 當日）。
 
 **只 push Work ≠ 發版。** 操作者從 `aware-wave-wp-bridge` 的 **Releases** 下載 zip 安裝；Work 動了但沒打 tag，操作者那邊不會更新 → 會問「第 N 版在哪？」
 
-發佈機制：正本的 `.github/workflows/release.yml`，trigger = `push tags: ['v*']`，build = 複製 `<slug>.php` + `includes/` + `README.md` 進 `build/<slug>/`，zip 成 `<slug>-vX.Y.Z.zip`，用 `softprops/action-gh-release` 建 Release。約 15s 完成。正本另有 `ci.yml` 跑 phpunit；發版腳本連 `tests/`、`phpunit.xml`、`composer.json` 一起鏡像，CI 才是在測要出貨的那份。
+發佈機制：正本的 `.github/workflows/release.yml`，trigger = `push tags: ['v*']`，build = 複製 `<slug>.php` + `includes/` + `README.md` 進 `build/<slug>/`，zip 成 `<slug>-vX.Y.Z.zip`，用 `softprops/action-gh-release` 建 Release。約 15s 完成。oracle 例外：它的 `ci.yml`／`release.yml` 放在 Work 副本 `.github/workflows/` 一起鏡像，zip 由 `bin/build-zip.sh` 依 `.distignore` 打包（含 `assets/`、`languages/`、`uninstall.php`，不含 tests），CI 另跑 PHP 7.4 與 8.3 的 `php -l`。正本另有 `ci.yml` 跑 phpunit；發版腳本連 `tests/`、`phpunit.xml`、`composer.json` 一起鏡像，CI 才是在測要出貨的那份。
 
 ## 標準流程
 
 ```bash
-# 1. 在 Work 副本改好 code + bump 版本（header Version: 與 AWBRIDGE_VERSION／AWSTORE_VERSION define 兩處）
+# 1. 在 Work 副本改好 code + bump 版本（header Version: 與 AWBRIDGE_VERSION／AWSTORE_VERSION／AWORACLE_VERSION define 兩處；README 有「版本：」行時也要同號）
 #    通過 R0 四動作（php -l / critic / 抓蟲 / WORKLOG），commit + push Work main
 
 # 2. 一鍵發版（同步正本 + tag + 驗證 Release）；--plugin 預設 bridge
-bash scripts/release-wp-bridge.sh [--plugin store] --dry-run    # 先看會同步什麼
-bash scripts/release-wp-bridge.sh [--plugin store]              # 真發版
+bash scripts/release-wp-bridge.sh [--plugin store|oracle] --dry-run    # 先看會同步什麼（oracle 另列 zip 名稱與檔數）
+bash scripts/release-wp-bridge.sh [--plugin store|oracle]              # 真發版
 ```
 
 腳本守門：版本兩處一致、`php -l`、tag 已存在則拒（release immutable）、發版後輪詢確認 zip asset 真的掛上。
@@ -52,5 +53,6 @@ bash scripts/release-wp-bridge.sh [--plugin store]              # 真發版
 ## 相關
 
 - 指令：`.claude/commands/wp-bridge-release.md`
-- 腳本：`scripts/release-wp-bridge.sh`（發版，`--plugin bridge|store`）、`scripts/rollout-wp-bridge.ps1`（裝到網站，`-Plugin bridge|store`）
+- 腳本：`scripts/release-wp-bridge.sh`（發版，`--plugin bridge|store|oracle`）、`scripts/rollout-wp-bridge.ps1`（裝到網站，`-Plugin bridge|store|oracle`）
+- oracle 發版後：next-admin `lib/wp-plugin-stack-catalog.ts` 的 `releaseVersion` 改新版（新網站裝這版）；已裝的站 `rollout-wp-bridge.ps1 -Plugin oracle -DryRun` 再實跑（High）。分類見 `agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md` §一之二
 - 端點現況：`POST /post` `/option/{name}` `/product`（v0.7.0+）、`GET /health` `/blocks`

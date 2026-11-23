@@ -4,20 +4,22 @@
 
 .DESCRIPTION
   -Plugin bridge (default): aware-wave-wp-bridge, shared by all managed sites (aware-wave.com, client sites such as
-  soulful). -Plugin store: aware-wave-store, registered seller sites only (aware-wave.com is the first). A release (scripts/release-wp-bridge.sh) only
+  soulful). -Plugin store: aware-wave-store, registered seller sites only (aware-wave.com is the first). -Plugin oracle:
+  aware-wave-oracle, the product plugin a site gets when the operator ticks it in the site flow (upgraded only where it
+  is; -Install -Site for a site set up by hand). A release (scripts/release-wp-bridge.sh) only
   publishes the zip; this script is the rollout, so no site is left behind.
   Per site, on the host: DB dump -> copy of the current plugin folder -> wp plugin install --force (active stays
   active) -> owner fixed to the plugins folder's owner -> checks (plugin version; bridge: REST /health 200 with the
-  new version; store: plugin active; home page < 500). A failed check puts the previous plugin folder back (a fresh
+  new version; store, oracle: plugin active; home page < 500). A failed check puts the previous plugin folder back (a fresh
   -Install is removed again) and the script exits 1.
   Sites are discovered, not listed: every running container with /var/www/html/wp-config.php and the plugin
   folder, so an upgrade never installs a plugin where it was not. -Install is the one exception and needs -Site:
   the store plugin is installed only on a site named on purpose and registered as an active seller site.
-  Backups: /root/backups/wordpress/<container>-pre-<wpbridge|awstore>-<version>-<UTC>.{sql,tgz}.
+  Backups: /root/backups/wordpress/<container>-pre-<wpbridge|awstore|aworacle>-<version>-<UTC>.{sql,tgz}.
   HIGH-RISK (production and client sites): run -DryRun first; client sites then get /client-status and
   /playwright client <slug> (AGENTS.md §7 DoD "Client site").
 
-.PARAMETER Plugin    bridge (default) or store.
+.PARAMETER Plugin    bridge (default), store or oracle.
 .PARAMETER Version   Release to roll out (default: the version define in the plugin file).
 .PARAMETER Site      Only these container names (default: all discovered).
 .PARAMETER Install   Install where the plugin is missing; only together with -Site.
@@ -28,9 +30,10 @@
   .\scripts\rollout-wp-bridge.ps1
   .\scripts\rollout-wp-bridge.ps1 -Site soulful-wp
   .\scripts\rollout-wp-bridge.ps1 -Plugin store -Install -Site lobster-wordpress
+  .\scripts\rollout-wp-bridge.ps1 -Plugin oracle -DryRun
 #>
 param(
-    [ValidateSet('bridge', 'store')][string]$Plugin = 'bridge',
+    [ValidateSet('bridge', 'store', 'oracle')][string]$Plugin = 'bridge',
     [string]$Version = '',
     [string[]]$Site = @(),
     [switch]$Install,
@@ -44,6 +47,7 @@ $ErrorActionPreference = 'Stop'
 $spec = @{
     bridge = @{ Slug = 'aware-wave-wp-bridge'; Pkg = 'wp-bridge-plugin';        Const = 'AWBRIDGE_VERSION'; Short = 'wpbridge' }
     store  = @{ Slug = 'aware-wave-store';     Pkg = 'aware-wave-store-plugin'; Const = 'AWSTORE_VERSION';  Short = 'awstore' }
+    oracle = @{ Slug = 'aware-wave-oracle';    Pkg = 'oracle-wp-plugin';        Const = 'AWORACLE_VERSION'; Short = 'aworacle' }
 }[$Plugin]
 $slug        = $spec.Slug
 $repoRoot    = Split-Path $PSScriptRoot -Parent

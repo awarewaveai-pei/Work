@@ -1,6 +1,6 @@
 <?php
 /**
- * Removes the plugin's options (settings, site key, pseudonym salt), the tool-list cache and the member
+ * Removes the plugin's options (settings, site key, pseudonym salt, Turnstile secret), the tool-list cache and the member
  * tables (saved charts and persons), the daily-letter tables and schedules, and the ticket rate counters —
  * on every site of a multisite network (the plugin may have been active on any of them).
  * FluentCRM contacts and campaigns stay: they belong to FluentCRM.
@@ -22,7 +22,9 @@ function aworacle_uninstall_site(): void {
 	delete_option( 'aworacle_settings' );
 	delete_option( 'aworacle_site_keypair' );
 	delete_option( 'aworacle_member_salt' );
-	delete_transient( 'aworacle_tools' );
+	delete_option( 'aworacle_turnstile_secret' );
+	delete_transient( 'aworacle_tools' ); // 0.4 and earlier
+	delete_transient( 'aworacle_tools_v2' );
 	delete_option( 'aworacle_daily_last_run' );
 	delete_option( 'aworacle_daily_confirm_count' );
 	\AwareWave\Oracle\Members\Store::drop();
