@@ -109,11 +109,12 @@ OwnVoice 設定的存檔模式要選「錄音與逐字稿」才有錄音可做�
 
 | 功能 | 怎麼用 | 程式 |
 |---|---|---|
-| 反白查詢 | 在 OwnVoice 字幕反白 → `Ctrl+Shift+F7` → 小面板自動搜尋網路；「問 AI」按了才問（計費，用設定頁的 key） | `lookup_panel.py`、`lib/lookup.py` |
+| 反白查詢 | 在 OwnVoice 字幕反白 → `Ctrl+Shift+F7` → 右側側欄自動搜尋網路；「問 AI」按了才問（計費，用設定頁的 key） | `lookup_panel.py`、`lib/lookup.py` |
 | 會後整理 | 首頁「OwnVoice 會議」卡 →「會後整理」：各段錄音接成一檔，走跟上傳相同的流程；語言跟 OwnVoice 設定 | `lib/ownvoice.py`、`POST /api/ownvoice/import` |
 | 心智圖 | 從**逐字稿**產生：會議中 `/mindmap?session=latest`（OwnVoice 目前為止的 transcript.md）；會後 `/mindmap?job=<id>`（diarized.txt，沒有就 merged.txt）。預設「複製 prompt → 貼回 AI 的 JSON」零費用；有 API key 可直接產生（計費）。結果存 `jobs/<id>/mindmap.json` 或 `jobs/ownvoice-mindmaps/` | `lib/mindmap.py`、`templates/mindmap.html` |
 
-- 小面板由 `start_server.ps1` 順便開（重複啟動自己擋）；只用標準函式庫，因為 SAC 會擋未簽章的執行檔與 .pyd。
+- 側欄由 `start_server.ps1` 順便開（重複啟動自己擋）；只用標準函式庫，因為 SAC 會擋未簽章的執行檔與 .pyd。
+- 側欄貼在螢幕右邊整條高度，並用 `SHAppBarMessage` 向 Windows 登記佔用那一條（同工作列的機制），其他視窗最大化會讓開；「隱藏」把空間還回去，快捷鍵再叫出來（操作者 2026-11-23：不要飄浮視窗）。
 - 快捷鍵不可改成 `Ctrl+Shift+Space`／`F8`／`F9`：OwnVoice 自己佔用（2026-11-23 實測 F8 會讓它的滑鼠穿透鍵註冊失敗）。
 - 搜尋用環境變數 `SERPER_API_KEY`。搜尋與問 AI 都會把反白的文字送出這台電腦，所以只在按下時才送。
   問 AI 另外會附上這場會議逐字稿的最後一段當上下文（只取 30 分鐘內還在更新的那一場）。

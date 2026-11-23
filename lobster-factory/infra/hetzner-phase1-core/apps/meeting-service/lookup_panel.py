@@ -1,7 +1,9 @@
-"""會議中的查詢小面板（Windows）。
+"""會議中的查詢側欄（Windows）。
 
 在任何視窗反白一段字（例如 OwnVoice Meet 的字幕），按 Ctrl+Shift+F7：
-面板浮到最上層並自動搜尋網路；「問 AI」按了才問（會計費）。
+側欄出現並自動搜尋網路；「問 AI」按了才問（會計費）。
+側欄貼在螢幕右邊、整條高度，並向 Windows 登記佔用那一條（跟工作列同一種機制）：
+其他視窗最大化時會讓開，互不遮蓋（操作者 2026-11-23：不要飄浮視窗）。
 
 只用標準函式庫：這台筆電的 Smart App Control 會擋未簽章的執行檔與 .pyd，
 python.exe 本身有簽章。查詢由 meeting-service 做（lib/lookup.py），這裡只管
@@ -27,8 +29,23 @@ VK_SHIFT, VK_CONTROL, VK_MENU, VK_C, VK_F7 = 0x10, 0x11, 0x12, 0x43, 0x76
 KEYEVENTF_KEYUP = 0x2
 WM_HOTKEY = 0x0312
 FONT = "Microsoft JhengHei UI"
+WIDTH_INCHES = 4.8                      # 側欄寬度；用英吋換算，高解析度螢幕上不會變窄
+ABM_NEW, ABM_REMOVE, ABM_QUERYPOS, ABM_SETPOS, ABE_RIGHT = 0, 1, 2, 3, 2
+GA_ROOT = 2
 
 user32 = ctypes.windll.user32
+user32.GetAncestor.restype = wintypes.HWND
+user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+
+
+class APPBARDATA(ctypes.Structure):
+    _fields_ = [("cbSize", wintypes.DWORD), ("hWnd", wintypes.HWND), ("uCallbackMessage", wintypes.UINT),
+                ("uEdge", wintypes.UINT), ("rc", wintypes.RECT), ("lParam", wintypes.LPARAM)]
+
+
+shell32 = ctypes.windll.shell32
+shell32.SHAppBarMessage.restype = ctypes.c_size_t
+shell32.SHAppBarMessage.argtypes = [wintypes.DWORD, ctypes.POINTER(APPBARDATA)]
 
 
 def call(path: str, payload: dict) -> dict:
@@ -74,10 +91,9 @@ class Panel:
 
         root = self.root = tk.Tk()
         root.title("查詢")
+        root.overrideredirect(True)     # 側欄沒有標題列，不能被拖走；收起來用「隱藏」
         root.attributes("-topmost", True)
-        width, height = 440, 560
-        root.geometry(f"{width}x{height}+{root.winfo_screenwidth() - width - 24}+80")
-        root.protocol("WM_DELETE_WINDOW", root.withdraw)   # 關掉只是藏起來，快捷鍵會再叫出來
+        self.docked = None              # 已向 Windows 登記佔用螢幕邊緣時的 APPBARDATA
 
         self.query = tk.Text(root, height=3, wrap="word", font=(FONT, 11))
         self.query.pack(fill="x", padx=10, pady=(10, 6))
@@ -85,7 +101,7 @@ class Panel:
         bar.pack(fill="x", padx=10)
         for label, command in (("搜尋網路", self.search), ("問 AI（計費）", self.ask),
                                ("心智圖", lambda: webbrowser.open(SERVER + "/mindmap?session=latest")),
-                               ("結束", root.destroy)):
+                               ("隱藏", self.hide), ("結束", self.quit)):
             tk.Button(bar, text=label, command=command, font=(FONT, 10)).pack(side="left", padx=(0, 6))
         self.status = tk.Label(root, anchor="w", fg="#475569", font=(FONT, 9),
                                text=f"在任何視窗反白文字，按 {HOTKEY_LABEL}")
@@ -97,7 +113,37 @@ class Panel:
         self.out.tag_config("muted", foreground="#475569", font=(FONT, 9))
         self.out.tag_config("link", foreground="#4f52e0", underline=True)
 
+        self.show()
         root.after(100, self.pump)
+
+    # ---------- 側欄：佔用／讓出螢幕右邊 ----------
+    def show(self):
+        if self.docked:
+            return
+        root = self.root
+        root.deiconify()
+        root.update_idletasks()
+        bar = APPBARDATA(cbSize=ctypes.sizeof(APPBARDATA), hWnd=user32.GetAncestor(root.winfo_id(), GA_ROOT),
+                         uEdge=ABE_RIGHT)
+        shell32.SHAppBarMessage(ABM_NEW, ctypes.byref(bar))
+        width = int(root.winfo_fpixels("1i") * WIDTH_INCHES)
+        bar.rc = wintypes.RECT(root.winfo_screenwidth() - width, 0, root.winfo_screenwidth(), root.winfo_screenheight())
+        shell32.SHAppBarMessage(ABM_QUERYPOS, ctypes.byref(bar))    # Windows 依工作列等既有佔用修正上下邊界
+        bar.rc.left = bar.rc.right - width
+        shell32.SHAppBarMessage(ABM_SETPOS, ctypes.byref(bar))
+        root.geometry(f"{width}x{bar.rc.bottom - bar.rc.top}+{bar.rc.left}+{bar.rc.top}")
+        self.docked = bar
+
+    def hide(self):
+        """把右邊那一條還給其他視窗；快捷鍵會再叫出來。"""
+        if self.docked:
+            shell32.SHAppBarMessage(ABM_REMOVE, ctypes.byref(self.docked))
+            self.docked = None
+        self.root.withdraw()
+
+    def quit(self):
+        self.hide()
+        self.root.destroy()
 
     # ---------- 取字 ----------
     def on_hotkey(self):
@@ -113,8 +159,7 @@ class Panel:
         if copied and old is not None:
             self.root.clipboard_clear()
             self.root.clipboard_append(old)
-        self.root.deiconify()
-        self.root.lift()
+        self.show()
         if not text:
             self.status.config(text="沒有取到文字：先用滑鼠反白，再按快捷鍵")
             return

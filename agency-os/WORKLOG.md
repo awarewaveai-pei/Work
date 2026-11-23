@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-23（續8）— meeting-service：查詢面板從飄浮視窗改成右側整條側欄（操作者：「我不喜歡目前的飄浮視窗」）
+
+- 已修改：`lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/lookup_panel.py`——`overrideredirect`＋`SHAppBarMessage`（ABM_NEW／QUERYPOS／SETPOS，ABE_RIGHT）向 Windows 登記佔用螢幕右邊整條，寬 4.8 吋；`show()`／`hide()`／`quit()` 成對登記與釋放；原視窗的關閉鈕改為「隱藏」按鈕。README 同步。
+- 驗證：側欄開著時主螢幕工作區寬 1536→1075（邏輯像素），截圖確認瀏覽器讓開、互不遮蓋；滑鼠點「隱藏」→ 1536；快捷鍵再叫出 → 1075；測試視窗反白文字按 `Ctrl+Shift+F7` → 側欄顯示該文字與 5 筆搜尋結果。
+- 觀察（非本次改動造成）：`D:\OwnVoice Meet 0.2.3 portable\OwnVoice Meet.exe` 自 10:45 起被 Smart App Control 擋下（CodeIntegrity 3077／3033 連續 5 次，檔案雜湊與修改時間未變、網路正常），同一檔 10:09、10:10 可啟動。所以這次的快捷鍵實測改用自製測試視窗，不是 OwnVoice 字幕。
+- REALTEST_EVIDENCE: tool=Bash | cmd=start_server.ps1 ; python hotkey_source.py（模擬反白＋Ctrl+Shift+F7）; PowerShell 量 Screen.WorkingArea ＋ 螢幕截圖 | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 單檔視窗佈局改動，已讀回 diff 並以截圖與工作區寬度實測三個狀態（顯示／隱藏／再顯示）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=lookup_panel | hits=5
+- ORACLE_WAIVED: Codex 額度擋到 2026-11-24 11:02；單檔佈局改動，以實測代替
+- 剩餘風險：側欄程序被強制結束時，佔用的空間靠 Windows 在視窗銷毀時自動回收（未實測強殺）；多螢幕只佔主螢幕；無標題列視窗的鍵盤輸入（手動改查詢文字）未實測
+- rollback：`git revert` 本 commit，回到飄浮視窗
 ## 2026-11-23（續6）— meeting-service × OwnVoice Meet：反白查詢、會後整理、心智圖（操作者：「你決定」）
 
 - 根因／決策：操作者要把 OwnVoice Meet（會議中字幕翻譯）與 meeting-service（會後分角色＋整理）合成一個工具，另加反白查詢與心智圖。改 OwnVoice 原始碼走不通：這台筆電 Smart App Control 擋本機建出的未簽章執行檔（`cargo build` 在 build script 即 `os error 4551`）。定案：不改 OwnVoice，只讀它寫的會議資料夾；格式唯一讀取點 `apps/meeting-service/lib/ownvoice.py`。
