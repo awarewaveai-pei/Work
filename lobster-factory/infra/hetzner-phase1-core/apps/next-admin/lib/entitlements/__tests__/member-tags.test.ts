@@ -29,13 +29,28 @@ describe("memberTags: ADR 021 §2 examples and the three layers", () => {
     expect(t.ways).toEqual(ways);
   });
 
-  it("production today: only all-features rows (Soulful contract, edd-research comp) = 未分類, not a way, not 訂閱", () => {
-    for (const source of ["contract", "comp"]) {
-      const t = memberTags({ ...base, entitlements: [ent("content", "content.write", { source, sourceRef: "all-features:x" }), ent("video", "video.render", { source, sourceRef: "all-features:x" })] });
-      expect(t.pairs.map((p) => p.label)).toEqual(["content／未分類", "video／未分類"]);
-      expect(t.unclassified).toEqual(["content", "video"]);
-      expect(t.ways).toEqual([]);
-    }
+  it("production today: Soulful's only all-features contract rows = 訂閱 (ADR 021 §2), with no subscription row", () => {
+    const t = memberTags({ ...base, entitlements: [ent("content", "content.write", { sourceRef: "all-features:x" }), ent("video", "video.render", { sourceRef: "all-features:x" })] });
+    expect(t.pairs.map((p) => p.label)).toEqual(["content／訂閱", "video／訂閱"]);
+    expect(t.unclassified).toEqual([]);
+    expect(t.ways).toEqual(["subscription"]);
+  });
+
+  it("ADR 021 §2 Soulful example: all-features contract rows plus an operated product = 內容行銷／代操 and 內容行銷／訂閱", () => {
+    const t = memberTags({ ...base, entitlements: [ent("content", "content.write", { sourceRef: "all-features:x" })], operations: [{ productKey: "content", operatedBy: "awarewave" }] }, () => "內容行銷");
+    expect(t.pairs.map((p) => p.label)).toEqual(["內容行銷／代操", "內容行銷／訂閱"]);
+  });
+
+  it("a contract-source right that pays from credits is a credit pack, not a subscription", () => {
+    const t = memberTags({ ...base, entitlements: [ent("design", "design.export", { limits: { pay: "credits" } })] });
+    expect(t.pairs.map((p) => p.label)).toEqual(["design／點數"]);
+  });
+
+  it("comp (a gift, edd-research) stays 未分類 and says why: it is not one of the five ways", () => {
+    const t = memberTags({ ...base, entitlements: [ent("content", "content.write", { source: "comp", sourceRef: "all-features:x" })] });
+    expect(t.pairs.map((p) => p.label)).toEqual(["content／未分類"]);
+    expect(t.unclassified).toEqual([{ product: "content", reason: "comp" }]);
+    expect(t.ways).toEqual([]);
   });
 
   it("a held product that also has a way is not 未分類; resell rows are never 'held'", () => {

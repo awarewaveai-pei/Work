@@ -99,7 +99,7 @@ function accountMemberTags(r: LedgerRow, extras: Extras): MemberTags {
   return memberTags({
     kind: r.kind, contracts: r.contracts, balance: r.balance,
     operations: extras.operations.get(r.organization_id) ?? [],
-    entitlements: extras.resell.get(r.organization_id) ?? [],
+    entitlements: [...(extras.held.get(r.organization_id) ?? []), ...(extras.resell.get(r.organization_id) ?? [])],
   });
 }
 /** One billing account's tags: attention from its reasons (the /ops/billing rule), the rest from the member tags. */
