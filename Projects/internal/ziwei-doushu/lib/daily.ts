@@ -5,6 +5,7 @@ import type { InterpretationContext } from './divination/types';
 import { KE, SHENG, stemWuXing, type WuXing } from './ganzhi';
 import { localize, toTraditional } from './s2t';
 import { animalName, zhiXingName } from './divination/systems/zeri';
+import { PENGZU_EN, SPIRIT_EN, YIJI_EN, fetusGodEn, ganZhiPinyin, lookupEn } from './almanacEn';
 
 /**
  * 每日運勢工廠(PLAN §9)— 免費病毒漏斗,確定性、零邊際成本。
@@ -12,7 +13,7 @@ import { animalName, zhiXingName } from './divination/systems/zeri';
  * 幸運色/數/方位:由「真喜用神(扶抑法,身強弱決定;見 baziAnalysis)」查五行屬性表
  *   得出 → 純演算法、零 AI、同人同日固定。(舊版恆取「生我之印」,身強者其實忌印 → 已修)
  * 今日運勢評分:由「當日日柱五行 vs 日主五行」之生剋關係 + 確定性微擾 → 4 領域星等。
- * 宜忌與當日黃曆:lunar-javascript(computeDailyAlmanac,與出生資料無關)。
+ * 宜忌與當日黃曆:lunar-javascript(computeDailyAlmanac,與出生資料無關)。英文介面的黃曆全部譯出(lib/almanacEn.ts),不夾中文。
  * 運勢「文案」由 AI 層另行產生(本模組給結構化結果 + dailyContext 餵 AI,供快取 chart+date+locale)。
  */
 
@@ -68,12 +69,14 @@ const NINE_NUMBER_EN: Record<string, string> = {
 const NINE_COLOR_EN: Record<string, string> = {
   白: 'White', 黑: 'Black', 碧: 'Jade', 綠: 'Green', 黃: 'Yellow', 赤: 'Red', 紫: 'Purple',
 };
-/** 二十八宿英文名(天文通行譯名),鍵為繁體宿名。 */
-const MANSION_EN: Record<string, string> = {
-  角: 'Horn', 亢: 'Neck', 氐: 'Root', 房: 'Room', 心: 'Heart', 尾: 'Tail', 箕: 'Winnowing Basket',
-  斗: 'Dipper', 牛: 'Ox', 女: 'Girl', 虛: 'Emptiness', 危: 'Rooftop', 室: 'Encampment', 壁: 'Wall',
-  奎: 'Legs', 婁: 'Bond', 胃: 'Stomach', 昴: 'Hairy Head', 畢: 'Net', 觜: 'Turtle Beak', 參: 'Three Stars',
-  井: 'Well', 鬼: 'Ghost', 柳: 'Willow', 星: 'Star', 張: 'Extended Net', 翼: 'Wings', 軫: 'Chariot',
+/** 二十八宿英文名(天文通行譯名)與拼音,鍵為繁體宿名。 */
+const MANSION_EN: Record<string, readonly [string, string]> = {
+  角: ['Horn', 'Jiao'], 亢: ['Neck', 'Kang'], 氐: ['Root', 'Di'], 房: ['Room', 'Fang'], 心: ['Heart', 'Xin'],
+  尾: ['Tail', 'Wei'], 箕: ['Winnowing Basket', 'Ji'], 斗: ['Dipper', 'Dou'], 牛: ['Ox', 'Niu'], 女: ['Girl', 'Nü'],
+  虛: ['Emptiness', 'Xu'], 危: ['Rooftop', 'Wei'], 室: ['Encampment', 'Shi'], 壁: ['Wall', 'Bi'], 奎: ['Legs', 'Kui'],
+  婁: ['Bond', 'Lou'], 胃: ['Stomach', 'Wei'], 昴: ['Hairy Head', 'Mao'], 畢: ['Net', 'Bi'], 觜: ['Turtle Beak', 'Zi'],
+  參: ['Three Stars', 'Shen'], 井: ['Well', 'Jing'], 鬼: ['Ghost', 'Gui'], 柳: ['Willow', 'Liu'], 星: ['Star', 'Xing'],
+  張: ['Extended Net', 'Zhang'], 翼: ['Wings', 'Yi'], 軫: ['Chariot', 'Zhen'],
 };
 /** 方位描述(繁體)→ 英文。 */
 const DIRECTION_EN: Record<string, string> = {
@@ -85,7 +88,7 @@ const DIRECTION_EN: Record<string, string> = {
 export interface DailyAlmanac {
   /** 日九星,如「四綠木」/ Four Green (Wood) */
   nineStar: string;
-  /** 二十八宿值日:名(如「軫水蚓」/ Chariot (軫))+ 吉凶 */
+  /** 二十八宿值日:名(如「軫水蚓」/ Chariot (Zhen))+ 吉凶 */
   mansion: { name: string; auspicious: boolean };
   /** 建除十二值 */
   officer: string;
@@ -93,14 +96,14 @@ export interface DailyAlmanac {
   clash: { animal: string; ganZhi: string; sha: string };
   /** 喜神 / 財神 / 福神方位 */
   gods: { joy: string; wealth: string; fortune: string };
-  /** 胎神占方(無通行英譯,一律中文) */
+  /** 胎神占方 */
   fetusGod: string;
-  /** 彭祖百忌兩句(一律中文) */
+  /** 彭祖百忌兩句(天干句、地支句) */
   pengZu: [string, string];
-  /** 日吉神 / 日凶煞(一律中文;無則空陣列) */
+  /** 日吉神 / 日凶煞(無則空陣列) */
   luckyGods: string[];
   unluckyGods: string[];
-  /** 宜忌全部(一律中文) */
+  /** 宜忌全部 */
   yi: string[];
   ji: string[];
 }
@@ -111,13 +114,16 @@ export function computeDailyAlmanac(
 ): DailyAlmanac {
   const lunar = Solar.fromYmd(target.year, target.month, target.day).getLunar();
   const zh = (raw: string) => localize(fix(raw), locale);
-  // 英文介面查表要用繁體鍵;術語本身無英譯者仍顯示繁中。
+  // 英文介面查表要用繁體鍵(lib/almanacEn.ts);表裡沒有的詞英文介面略過,不輸出中文(窮舉測試保證不會發生)。
   const tw = (raw: string) => toTraditional(fix(raw));
   const en = locale === 'en';
-  const dir = (raw: string) => (en ? DIRECTION_EN[tw(raw)] ?? tw(raw) : zh(raw));
-  // 無英譯的術語:中文介面依語言、英文介面一律繁中。
-  const show = (raw: string) => (en ? tw(raw) : zh(raw));
-  const list = (raw: string[]) => raw.filter((x) => x !== '无').map(show);
+  const dir = (raw: string) => (en ? DIRECTION_EN[tw(raw)] ?? '' : zh(raw));
+  const list = (raw: string[], table: Readonly<Record<string, string | null>>) =>
+    raw
+      .filter((x) => x !== '无')
+      .map((x) => (en ? lookupEn(table, tw(x)) : zh(x)))
+      .filter((x): x is string => x !== null);
+  const pengZu = (raw: string) => (en ? lookupEn(PENGZU_EN, tw(raw)) ?? '' : zh(raw));
 
   const star = lunar.getDayNineStar();
   const starColor = tw(star.getColor());
@@ -131,11 +137,11 @@ export function computeDailyAlmanac(
   const chongZhi = lunar.getDayChong();
   return {
     nineStar,
-    mansion: { name: en ? `${MANSION_EN[xiu]} (${xiu})` : mansionZh, auspicious: lunar.getXiuLuck() === '吉' },
+    mansion: { name: en ? (MANSION_EN[xiu] ? `${MANSION_EN[xiu][0]} (${MANSION_EN[xiu][1]})` : '') : mansionZh, auspicious: lunar.getXiuLuck() === '吉' },
     officer: zhiXingName(tw(lunar.getZhiXing()), locale),
     clash: {
       animal: animalName(chongZhi, zh(lunar.getDayChongShengXiao()), locale),
-      ganZhi: lunar.getDayChongGan() + chongZhi,
+      ganZhi: en ? ganZhiPinyin(tw(lunar.getDayChongGan() + chongZhi)) ?? '' : lunar.getDayChongGan() + chongZhi,
       sha: dir(lunar.getDaySha()),
     },
     gods: {
@@ -143,12 +149,12 @@ export function computeDailyAlmanac(
       wealth: dir(lunar.getDayPositionCaiDesc()),
       fortune: dir(lunar.getDayPositionFuDesc()),
     },
-    fetusGod: show(lunar.getDayPositionTai()),
-    pengZu: [show(lunar.getPengZuGan()), show(lunar.getPengZuZhi())],
-    luckyGods: list(lunar.getDayJiShen()),
-    unluckyGods: list(lunar.getDayXiongSha()),
-    yi: list(lunar.getDayYi()),
-    ji: list(lunar.getDayJi()),
+    fetusGod: en ? fetusGodEn(tw(lunar.getDayPositionTai())) ?? '' : zh(lunar.getDayPositionTai()),
+    pengZu: [pengZu(lunar.getPengZuGan()), pengZu(lunar.getPengZuZhi())],
+    luckyGods: list(lunar.getDayJiShen(), SPIRIT_EN),
+    unluckyGods: list(lunar.getDayXiongSha(), SPIRIT_EN),
+    yi: list(lunar.getDayYi(), YIJI_EN),
+    ji: list(lunar.getDayJi(), YIJI_EN),
   };
 }
 
@@ -224,40 +230,54 @@ export function computeDailyFortune(
 }
 
 /**
- * 每日運勢 → AI 解讀 context(供 AiReading 產生個人化文案)。
+ * 每日運勢 → AI 解讀 context(供 AiReading 產生個人化文案;/api/v1 也回這份)。
  * systemId 用 'bazi'(本運勢由八字推),facts 明確標今日 + 評分 + 宜忌 → AI 寫每日運勢。
+ * 英文:敘述字與分隔符用英文;dayMaster／strength／pattern／favorable／luckyElement 是八字引擎共用的識別字,兩種語言都是原字。
  */
 export function dailyContext(f: DailyFortune, locale: Locale): InterpretationContext {
+  const en = locale === 'en';
+  const sep = en ? ', ' : '、';
   return {
     systemId: 'daily',
     locale,
-    headline: `今日運勢 ${f.date}`,
+    headline: en ? `Daily fortune ${f.date}` : `今日運勢 ${f.date}`,
     facts: [
-      { label: 'readingType', value: '每日運勢(今日)' },
+      { label: 'readingType', value: en ? 'Daily fortune (today)' : '每日運勢(今日)' },
       { label: 'date', value: f.date },
       { label: 'dayMaster', value: f.dayMaster },
       { label: 'strength', value: f.strength },
       { label: 'pattern', value: f.pattern },
       { label: 'favorable', value: f.favorable.join('、') || '—' },
       { label: 'luckyElement', value: f.luckyElement },
-      { label: 'luckyColors', value: f.luckyColors.join('、') },
-      { label: 'luckyNumbers', value: f.luckyNumbers.join('、') },
+      { label: 'luckyColors', value: f.luckyColors.join(sep) },
+      { label: 'luckyNumbers', value: f.luckyNumbers.join(sep) },
       { label: 'luckyDirection', value: f.luckyDirection },
       { label: 'scoreOverall', value: `${f.scores.overall}/5` },
       { label: 'scoreLove', value: `${f.scores.love}/5` },
       { label: 'scoreCareer', value: `${f.scores.career}/5` },
       { label: 'scoreWealth', value: `${f.scores.wealth}/5` },
       { label: 'scoreHealth', value: `${f.scores.health}/5` },
-      { label: 'yi', value: f.yi.join('、') || '—' },
-      { label: 'ji', value: f.ji.join('、') || '—' },
-      ...almanacFacts(f.almanac),
+      { label: 'yi', value: f.yi.join(sep) || '—' },
+      { label: 'ji', value: f.ji.join(sep) || '—' },
+      ...almanacFacts(f.almanac, en),
     ],
   };
 }
 
 /** 當日黃曆重點 → 7 條 facts(value 皆遠低於 300 字)。 */
-function almanacFacts(a: DailyAlmanac): { label: string; value: string }[] {
+function almanacFacts(a: DailyAlmanac, en: boolean): { label: string; value: string }[] {
   const cut = (s: string) => s.slice(0, 300);
+  if (en) {
+    return [
+      { label: 'almanacOfficer', value: a.officer },
+      { label: 'almanacMansion', value: `${a.mansion.name} ${a.mansion.auspicious ? 'favorable' : 'unfavorable'}` },
+      { label: 'almanacNineStar', value: a.nineStar },
+      { label: 'almanacClash', value: `${a.clash.animal} (${a.clash.ganZhi}) / sha ${a.clash.sha}` },
+      { label: 'almanacGods', value: `Joy ${a.gods.joy}, Wealth ${a.gods.wealth}, Blessing ${a.gods.fortune}` },
+      { label: 'almanacPengZu', value: cut(a.pengZu.join(' ')) },
+      { label: 'almanacSpirits', value: cut(`Auspicious: ${a.luckyGods.join(', ') || '—'}; inauspicious: ${a.unluckyGods.join(', ') || '—'}`) },
+    ];
+  }
   return [
     { label: 'almanacOfficer', value: a.officer },
     { label: 'almanacMansion', value: `${a.mansion.name} ${a.mansion.auspicious ? '吉' : '凶'}` },

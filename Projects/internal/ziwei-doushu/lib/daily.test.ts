@@ -126,18 +126,69 @@ describe('當日黃曆(computeDailyAlmanac)', () => {
     `);
   });
 
-  it('2026-06-24 英文:有通行英譯的譯出,其餘保留繁中', () => {
+  it('2026-06-24 英文:黃曆全部譯出', () => {
     const a = computeDailyAlmanac({ year: 2026, month: 6, day: 24 }, 'en');
-    expect([a.nineStar, a.mansion.name, a.officer, a.clash.animal, a.clash.sha, a.gods.joy]).toMatchInlineSnapshot(`
+    expect([a.nineStar, a.mansion.name, a.officer, a.clash.animal, a.clash.ganZhi, a.clash.sha, a.gods.joy, a.fetusGod, ...a.pengZu, ...a.luckyGods, ...a.unluckyGods, ...a.yi, ...a.ji]).toMatchInlineSnapshot(`
       [
         "Four Green (Wood)",
-        "Chariot (軫)",
+        "Chariot (Zhen)",
         "Close",
         "Pig",
+        "Gui-Hai",
         "East",
         "Northeast",
+        "Door and bed; outside the house, south",
+        "Ji (stem) days: tradition says not to break a contract, lest both parties lose.",
+        "Si days: tradition says not to travel far, lest belongings go astray.",
+        "Four Ministers",
+        "King Day",
+        "Jade Palace",
+        "Roaming Misfortune",
+        "Blood Branch",
+        "Double Day",
+        "Black Tortoise",
+        "Weddings",
+        "Making bed curtains",
+        "Tailoring",
+        "Coming-of-age rites",
+        "Felling trees",
+        "Raising the ridge beam",
+        "Moving the household shrine out",
+        "Dismantling",
+        "Moving house",
+        "Building and repairs",
+        "Breaking ground for building",
+        "Installing a door",
+        "Receiving money",
+        "Building embankments",
+        "Planting",
+        "Sealing holes",
+        "Setting up a bed",
+        "Praying for blessings",
+        "Travel",
+        "Burial",
+        "Funeral rites",
+        "Consecrating sacred images",
       ]
     `);
+  });
+
+  // 英文信與英文頁只用這些欄位;dayMaster／strength／pattern／favorable／luckyElement 是八字引擎共用的識別字(見 dailyContext 註解)
+  const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef]/u;
+  const IDENTIFIERS = new Set(['dayMaster', 'strength', 'pattern', 'favorable', 'luckyElement']);
+  it.each([
+    [2026, 6, 24],
+    [2026, 1, 8],
+    [2026, 1, 21],
+    [2026, 11, 23],
+  ])('%i-%i-%i 英文:每日運勢與 AI context 不含中日韓字元', (year, month, day) => {
+    const fe = computeDailyFortune(birth, { year, month, day }, 'en');
+    const shown = Object.fromEntries(Object.entries(fe).filter(([k]) => !IDENTIFIERS.has(k)));
+    expect(JSON.stringify(shown)).not.toMatch(CJK);
+    expect(fe.yi.length + fe.ji.length).toBeGreaterThan(0);
+    const ctx = dailyContext(fe, 'en');
+    expect(ctx.headline).not.toMatch(CJK);
+    for (const f of ctx.facts) if (!IDENTIFIERS.has(f.label)) expect(f.value, f.label).not.toMatch(CJK);
   });
 
   it('改正字:胃宿動物作雉(庫作彘)', () => {

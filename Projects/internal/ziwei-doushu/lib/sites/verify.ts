@@ -12,7 +12,7 @@ import { getSites, SITE_KEY_ID, type Site } from './registry';
  *   一份原文只對一個用途有效;aud 不符在消耗 nonce 之前就拒絕(拿錯地方的票之後仍可正常使用)。
  * nonce 記在本行程記憶體;重啟最多忘掉最後 60 秒,而那些請求的 ts 也已過期。
  */
-export const SITE_SIGNATURE_HEADER = 'x-awarewave-oracle-signature';
+export { SITE_SIGNATURE_HEADER } from './headers';
 const WINDOW_SECONDS = 60;
 const NONCE = /^[A-Za-z0-9_-]{16,100}$/;
 const AUTH_FIELDS = ['key_id', 'ts', 'nonce', 'aud'] as const;

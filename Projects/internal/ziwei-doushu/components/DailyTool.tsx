@@ -46,6 +46,7 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
   const [result, setResult] = useState<DailyFortune | null>(null);
   const [error, setError] = useState<string | null>(null);
   const t = dict.daily;
+  const sep = locale === 'en' ? ', ' : '、';
 
   function handleSubmit(req: ChartRequest) {
     try {
@@ -158,7 +159,7 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
                 {t.yi}
               </div>
               <div style={{ color: 'var(--text-body)', fontSize: '0.8125rem' }}>
-                {result.yi.join('、')}
+                {result.yi.join(sep)}
               </div>
             </div>
             <div className="ji-card">
@@ -173,7 +174,7 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
                 {t.ji}
               </div>
               <div style={{ color: 'var(--text-body)', fontSize: '0.8125rem' }}>
-                {result.ji.join('、')}
+                {result.ji.join(sep)}
               </div>
             </div>
           </div>
@@ -200,8 +201,8 @@ export default function DailyTool({ dict, locale }: { dict: Dictionary; locale: 
             />
             <AlmanacRow label={t.fetusGod} value={result.almanac.fetusGod} hint={t.fetusGodHint} />
             <AlmanacRow label={t.pengZu} value={result.almanac.pengZu.join(' ')} hint={t.pengZuHint} />
-            <AlmanacRow label={t.luckyGods} value={result.almanac.luckyGods.join('、') || '—'} hint={t.spiritsHint} />
-            <AlmanacRow label={t.unluckyGods} value={result.almanac.unluckyGods.join('、') || '—'} hint={t.spiritsHint} />
+            <AlmanacRow label={t.luckyGods} value={result.almanac.luckyGods.join(sep) || '—'} hint={t.spiritsHint} />
+            <AlmanacRow label={t.unluckyGods} value={result.almanac.unluckyGods.join(sep) || '—'} hint={t.spiritsHint} />
           </div>
 
           <AiReading context={dailyContext(result, locale)} ai={dict.ai} tier="light" />

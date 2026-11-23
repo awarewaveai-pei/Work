@@ -332,12 +332,12 @@
     "fortuneGod": "God of Blessing",
     "godsHint": "Where three auspicious deities sit today, by compass direction",
     "fetusGod": "Tai Shen (fetus spirit)",
-    "fetusGodHint": "Shown in Chinese: the spot in the house the fetus-protecting spirit occupies today; households expecting a baby avoid digging or moving heavy things there",
+    "fetusGodHint": "The spot in the house the fetus-protecting spirit occupies today; households expecting a baby avoid digging or moving heavy things there",
     "pengZu": "Peng Zu taboos",
-    "pengZuHint": "Shown in Chinese: two traditional one-line taboos, one for today's heavenly stem and one for its earthly branch",
+    "pengZuHint": "Two traditional one-line taboos, one for today's heavenly stem and one for its earthly branch",
     "luckyGods": "Auspicious spirits",
     "unluckyGods": "Inauspicious spirits",
-    "spiritsHint": "Shown in Chinese: the named almanac spirits on duty today; they have no standard English names",
+    "spiritsHint": "The named almanac spirits on duty today, given here by the meaning of their Chinese names",
     "auspicious": "Favorable",
     "inauspicious": "Unfavorable"
   },
@@ -560,6 +560,8 @@
     "interpreting": "Interpreting…",
     "error": "Reading failed, please try again",
     "disclaimer": "Note: AI reading is for reference and entertainment only.",
-    "share": "Share card"
+    "share": "Share card",
+    "dailyLimit": "You've used today's AI readings. Please try again later.",
+    "dailyLimitUntil": "You've used today's AI readings. You can try again after {time}."
   }
 }

@@ -9,7 +9,7 @@ import { verifySiteRequest } from './verify';
  * 用途由 aud 區分:票原文送去 /api/v1、v1 原文當票,都在驗簽後、消耗 nonce 前以 wrong_audience 拒絕。
  * 原文只准這五個欄位(多帶就不算票)。
  */
-export const SITE_TICKET_HEADER = 'x-awarewave-oracle-ticket';
+export { SITE_TICKET_HEADER } from './headers';
 const MEMBER = /^[A-Za-z0-9_-]{16,64}$/;
 const BASE64URL = /^[A-Za-z0-9_-]+={0,2}$/;
 /** 四個欄位的原文遠小於此;超過就不解碼。 */
