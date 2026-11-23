@@ -4,6 +4,7 @@
 // when the person presses the button -- a mail scanner that merely opens the link cannot use it up.
 // If the password save fails after the link was used, the session from verifyOtp stays: a retry, or a reload (the
 // fragment is gone by then), sets the password on that session without the link.
+import { markLoginPending } from "@/app/LoginSucceeded";
 import { useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/ssr";
 import { ACCOUNT_COPY as C } from "@/lib/accounts/invite-copy";
@@ -144,7 +145,7 @@ export function SetPasswordForm() {
           </div>
           {/* full navigation so the middleware reads the new session cookie on this door; no timer: the reader needs
               time for the sign-in address above */}
-          <button type="button" className="btn-primary" style={{ width: "100%" }} onClick={() => window.location.assign("/")}>
+          <button type="button" className="btn-primary" style={{ width: "100%" }} onClick={() => { markLoginPending("unknown"); window.location.assign("/"); }}>
             {C.go_button}
           </button>
         </>

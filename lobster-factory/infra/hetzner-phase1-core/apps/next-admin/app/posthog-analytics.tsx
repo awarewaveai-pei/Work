@@ -21,10 +21,10 @@ export function PostHogAnalytics() {
     let cancelled = false;
     fetch("/api/ops/analytics-context", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((ctx: { role?: string; source?: string; org?: string | null } | null) => {
+      .then((ctx: { role?: string; source?: string; group?: string | null } | null) => {
         if (cancelled || !ctx?.role) return;
         registerOpsSuperProperties(ctx.role, ctx.source ?? "unknown");
-        if (ctx.org) groupOrganization(ctx.org);
+        if (ctx.group) groupOrganization(ctx.group);
         if (!didGroup.current) {
           didGroup.current = true;
           groupProject();

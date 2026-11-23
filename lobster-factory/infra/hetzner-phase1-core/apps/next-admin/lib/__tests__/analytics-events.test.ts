@@ -51,11 +51,11 @@ describe("no personal data in event properties", () => {
     vi.unstubAllGlobals();
   });
 
-  it("the group is the organization id", () => {
+  it("the group is the server-made hash passed through unchanged", () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
     vi.stubGlobal("window", {});
-    groupOrganization("11111111-1111-1111-1111-111111111111");
-    expect(group).toHaveBeenCalledWith("organization", "11111111-1111-1111-1111-111111111111");
+    groupOrganization("0123456789abcdef");
+    expect(group).toHaveBeenCalledWith("organization", "0123456789abcdef");
     vi.unstubAllGlobals();
   });
 });
@@ -64,7 +64,7 @@ describe("without a PostHog key", () => {
   it("track and groupOrganization do nothing and do not throw", () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "");
     vi.stubGlobal("window", {});
-    expect(() => { track(Events.CLIENT_PICKED, { method: "row", ms_since_load: 1, surface: "workspace" }); groupOrganization("o"); }).not.toThrow();
+    expect(() => { track(Events.CLIENT_PICKED, { ms_since_load: 1, surface: "workspace" }); groupOrganization("o"); }).not.toThrow();
     expect(capture).not.toHaveBeenCalled();
     expect(group).not.toHaveBeenCalled();
     vi.unstubAllGlobals();

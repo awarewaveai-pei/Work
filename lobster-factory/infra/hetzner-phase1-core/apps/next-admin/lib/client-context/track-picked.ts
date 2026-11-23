@@ -1,12 +1,15 @@
 import { Events, groupOrganization, track } from "@/lib/analytics";
 
-/** The staff picked a client in the rail: one client_picked event and the client as the PostHog group (id only).
- *  method is "other": the rail's picker does not say which of search / category / row was used (blueprint §13.2). */
+/** The staff picked a client in the rail: the client becomes the PostHog group (the server's hash of its id, asked from
+ *  /api/ops/analytics-context: the browser never hashes) and one client_picked event is sent. Without a PostHog key:
+ *  nothing, and no request. The event is sent even if the hash cannot be fetched (then without a group). */
 export function trackClientPicked(orgId: string, onDoor: boolean): void {
-  groupOrganization(orgId);
-  track(Events.CLIENT_PICKED, {
-    method: "other",
-    ms_since_load: typeof performance !== "undefined" ? Math.round(performance.now()) : 0,
-    surface: onDoor ? "door" : "workspace",
-  });
+  if (!process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim()) return;
+  const ms = typeof performance !== "undefined" ? Math.round(performance.now()) : 0;
+  const send = () => track(Events.CLIENT_PICKED, { ms_since_load: ms, surface: onDoor ? "door" : "workspace" });
+  fetch(`/api/ops/analytics-context?org=${encodeURIComponent(orgId)}`, { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((ctx: { group?: string | null } | null) => { if (ctx?.group) groupOrganization(ctx.group); })
+    .catch(() => undefined)
+    .then(send);
 }

@@ -26,15 +26,15 @@ type Surface = "workspace" | "door" | "public";
 /** Properties of the platform events. Closed on purpose: only short enums and counters; never an email, a name, a URL,
  *  a query string or a token (analytics-no-pii.test.ts scans these keys). A client is identified only by its group id. */
 export interface PlatformEventProps {
-  client_picked: { method: "search" | "category" | "row" | "other"; ms_since_load: number; surface: Surface; product_key?: string };
+  client_picked: { ms_since_load: number; surface: Surface; product_key?: string };
   /** state = right-label code (S1, S7 ...) or "not_held"/"unavailable" for a door's not-enabled page */
   blocked_shown: { state: string; surface: Surface; product_key?: string; feature_key?: string };
-  login_succeeded: { door: "staff" | "portal" | "product"; product_key?: string };
+  login_succeeded: { door: "staff" | "portal" | "product" | "unknown"; product_key?: string };
 }
 
 /** The only property names a platform event may carry; track() drops anything else. */
 export const EVENT_PROPS: { [E in keyof PlatformEventProps]: readonly string[] } = {
-  client_picked: ["method", "ms_since_load", "surface", "product_key"],
+  client_picked: ["ms_since_load", "surface", "product_key"],
   blocked_shown: ["state", "surface", "product_key", "feature_key"],
   login_succeeded: ["door", "product_key"],
 };
@@ -57,10 +57,11 @@ export function track<E extends EventName>(event: E, ...args: PropsArg<E>) {
   posthog.capture(event, out);
 }
 
-/** The customer (organization) as a PostHog group: its id only, never its name. Silent without a PostHog key. */
-export function groupOrganization(orgId: string) {
-  if (!posthogEnabled() || !orgId) return;
-  posthog.group("organization", orgId);
+/** The customer (organization) as a PostHog group, by the server-made hash (lib/analytics-group.ts): never the id, never a
+ *  name, and never computed in the browser. Silent without a PostHog key. */
+export function groupOrganization(groupId: string) {
+  if (!posthogEnabled() || !groupId) return;
+  posthog.group("organization", groupId);
 }
 
 /** Attach to every subsequent capture (session-scoped); never put secrets here. */

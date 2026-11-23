@@ -6,6 +6,7 @@
 // work inside the sender's account. So: an open session on this door is never replaced, the exchange waits for a button
 // press, and the account it signed in to is shown with 「不是我的帳號」 before the door opens. A door already signed in to
 // the very account the link is for (uid) just continues: same person, nothing to choose.
+import { markLoginPending } from "@/app/LoginSucceeded";
 import { useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/ssr";
 
@@ -70,6 +71,7 @@ export function WpSignIn() {
     setBusy(true);
     const { data, error } = await createSupabaseBrowserClient().auth.verifyOtp({ type: "recovery", token_hash: token });
     setBusy(false);
+    if (!error && data.user) markLoginPending("product");   // reported once the page after the continue button has loaded
     setState(error || !data.user ? { kind: "failed" } : { kind: "signedIn", email: data.user.email ?? "", next });
   }
 
