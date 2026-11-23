@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-23（續2）— oracle WP 第三批：P2 併入；Resend 網域已驗證；P3 brief 派線1
+
+- P2 併入 `39b51d9cc`（工人 `bf40c8b0f`，已 push；外掛尚未安裝到任何網站）：`includes/Crypto/Vault.php`（secretbox，資料綁「種類:會員 ID」，金鑰常數 `AWORACLE_DATA_KEY`，缺金鑰 REST 503 不存明文）、`includes/Members/{Store,Rest,Privacy,Record,Shortcodes}.php`、`assets/members.js`、設定頁 cross-origin 標「尚未支援」、`assets/embed-same-origin.js:21` 只認 `[data-aw-result]`、版本 0.3.0。
+- 監工驗收：`php -l` 0 錯；讀 `Members/Store.php` 每條讀寫 SQL 皆帶 `AND user_id`（`:159,175,197,223,236,249`）、`Members/Rest.php:71-87` `permit()`（登入＋nonce，缺一 401）。工人證據：乾淨 WordPress 17＋9 項 PASS、`wp db export` 查無明文、三次突變各使指名測試變紅、PHPUnit 15 tests 綠、critic Deep 兩輪。
+- P2 的 4 條 RISKS 已判定入表：換金鑰無工具（不處理，格式留 `v1.` 版本前綴，SF-O 寫明金鑰不可換要備份）；multisite 未實測（不處理，不用）；會員 ID 重用（不處理，WordPress 的 ID 自增不重用）；PHP 7.4 未 lint（P4 補）。
+- Resend：`mcp__resend__get-domain 86fd3992-…` → `oracle.aware-wave.com` Status verified，DKIM／MX／TXT／CNAME 四筆 verified，Sending enabled。`data.mjs` 現況列改為可以。
+- 新 brief `briefs/WP-P3-daily-mail.md`（每日信四條不變量、Resend webhook 驗簽、會員票 REST、四次突變；測試只用本機假收信匣，不寄真信、不打真 Resend）。派線1（改回 Opus 5.5）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=php -l（oracle-wp-plugin 全部 .php）；mcp resend get-domain | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=AWORACLE_DATA_KEY | hits=9
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic Deep 兩輪＋三次突變＋監工讀權限與 SQL 段代替
 ## 2026-11-23（續1）— oracle WP 第三批：已交回卡的 RISKS 先行判定（操作者問）；新增卡 SF-J2；線2、線3 叫回
 
 - 操作者問「工人們反應的 RISKS 是否需要處理」。第三批未到齊（P2 未 commit、SF-H 進行中、P3 與 SF-I 未派），但已交回的 E5、SF-J、SF-E2 共 15 條先判定並寫入 `data.mjs`「第三批（進行中）」表；到齊後補列並做整批總檢。
