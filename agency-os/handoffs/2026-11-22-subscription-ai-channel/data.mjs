@@ -33,7 +33,7 @@ export const NOW = [
   { what: '每個網站的排程可以各自選四種走法。', state: 'yes', ev: '已上線：客戶 → 客戶網站 → 左邊選客戶 → 該網站的設定。主機的常駐程式（第四批）上線前，排程的訂閱段會自動跳過、由 API 寫。' },
   { what: '內部標記不會出現在 WordPress 文章裡。', state: 'yes', ev: '已上線。aware-wave.com 既有文章已手動清掉：成本紀錄六篇、審稿標記兩篇（原文備份在主機）。' },
   { what: '模型選單有 GPT-6 系列與 Sonnet 5.5。', state: 'yes', ev: '已上線，正式站選單看得到。十二個模型都在正式站實際寫過一篇文章，全部可用；GPT-5.5 那篇被長度上限截斷。' },
-  { what: '十二個模型的文章盲測頁可以看了。', state: 'yes', ev: '同一個題目各寫一篇，模型名稱遮住。等你挑出寫得好的字母。' },
+  { what: '文章預設用 GPT-6.2 sol。', state: 'yes', ev: '2026-11-22 盲測後你選定，當晚已部署。審稿排第二，一篇約 NT$2，原本的預設約 NT$8。結果記在「AI 模型與成本」的實測紀錄。' },
   { what: '排程不開筆電也能走訂閱。', state: 'no', ev: '第四批；需要你在主機上登入一次 ChatGPT。' },
   { what: '知道一篇文章吃掉多少訂閱額度。', state: 'no', ev: '11-24 額度恢復後實測三篇才有數字；在那之前不估。' },
 ];
@@ -60,7 +60,7 @@ export const STEPS = [
     gate: '五個模型各有一次成功呼叫的紀錄；打不通的不進選單並寫明原因。', risk: 'Low', model: 'Sonnet 5.5', status: 'done', commit: '33775b69b', depends: ['K3'], card: 'briefs/K10-K12.md' },
   { n: 9, code: 'K8', group: 'B2', title: '成本頁看得到訂閱用了多少', plain: '成本頁顯示：訂閱畫了幾張圖、寫了幾篇、額度用到百分之幾；每個網站本月幾篇走訂閱、幾篇走 API、API 花多少。', gate: '有改走 API 的月份兩欄都有數字；讀不到資料時顯示「讀不到」，不是 0。', risk: 'Low', model: 'Sonnet 5.5', status: 'done', commit: 'dc9e37167', depends: ['K3'], card: K },
   { n: 10, code: 'K12', group: 'B3c', title: '十二個模型寫同一篇文章給你比', plain: '同一個題目、同一組網站設定，選單上每個模型各寫一篇。全文並排給你看，模型名稱先遮住；你排名後，連同實際花費、耗時、SEO 分數記到「AI 模型與成本」的實測紀錄。約花 NT$60–70。',
-    gate: '你拿到並排比較頁；實測紀錄多一組「文章生成」，每個模型一列。', risk: 'Low', model: '監工', status: 'in_progress', depends: ['K11'], card: 'briefs/K10-K12.md' },
+    gate: '你拿到並排比較頁；實測紀錄多一組「文章生成」，每個模型一列。', risk: 'Low', model: '監工', status: 'done', commit: '2b4b15910', depends: ['K11'], card: 'briefs/K10-K12.md' },
   { n: 11, code: 'K13', group: 'B3c', title: '幾個生圖模型畫同一張配圖給你比', plain: '文字實測做完後接著做。拿同一篇文章的同一段、同一句英文畫面描述，讓幾個生圖模型各畫一張，並排給你看，你挑。挑中的當作文章配圖的預設。約花 NT$10。',
     gate: '你拿到並排比較頁並選出預設；結果記到「AI 模型與成本」的實測紀錄。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K12'], card: 'briefs/K10-K12.md' },
   { n: 12, code: 'DA', group: 'B3', title: '部署並在筆電實測', plain: '前三批一起部署一次，然後用筆電的 Claude 訂閱真的寫一篇文章，看內容。', gate: '線上文章頁選訂閱模型寫出一篇；成本頁出現一筆 NT$0。', risk: 'High（部署；失敗自動還原）', model: '監工', status: 'in_progress', depends: ['K4', 'K6', 'K5', 'K7', 'K11', 'K8'], card: 'DISPATCH.md' },
@@ -71,9 +71,9 @@ export const STEPS = [
     gate: '程式常駐；用那個帳號去讀主機其他地方全部被拒；後台顯示排程線在線。', risk: 'High（主機、憑證）', model: 'Opus 5.5', status: 'not_started', depends: ['DA'], card: K, before: '待決 1、待決 2、待決 3 之後' },
   { n: 15, code: 'M1', group: 'B4', title: '額度恢復後的實測', plain: '11-24 之後：Codex 畫一張圖、寫一篇字、試著騙它讀本機檔案（必須讀不到）；量三篇文章各花多久、吃多少額度。', gate: '三項實測結果寫進「現況」；一篇超過兩分半就另開卡把排程改成分兩輪。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K9'], card: K, before: '待決 4 之後' },
   { n: 16, code: 'K15', group: 'B5', title: '文章預設模型換成 GPT-6.2 sol', plain: '盲測結果：GPT-6.2 sol 品質排第二，一篇約 NT$2，是原本預設（Claude Opus，約 NT$8）的四分之一。文章頁的預設和排程（網站沒另外選模型時）都改用它；畫面上的估價跟著改。十二個模型的實測結果同時記到「AI 模型與成本」的實測紀錄。',
-    gate: '沒選過模型的網站，排程寫文章用的是 GPT-6.2 sol；估價顯示新的金額；已經選了別的模型的地方不受影響；實測紀錄多一組「文章生成」。', risk: 'Medium', model: 'Sonnet 5.5', status: 'in_progress', depends: ['K12'], card: 'briefs/K15-K16.md' },
-  { n: 17, code: 'K16', group: 'B5', title: '其他寫文案的地方要不要也換', plain: '文章以外還有十幾個地方在寫字。先各測一次再換，不直接全改：有些地方要求 AI 回固定格式，換模型可能壞掉。先測三種：社群貼文、商品文案、開發信。',
-    gate: '每一種有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K15'], card: 'briefs/K15-K16.md' },
+    gate: '沒選過模型的網站，排程寫文章用的是 GPT-6.2 sol；估價顯示新的金額；已經選了別的模型的地方不受影響；實測紀錄多一組「文章生成」。', risk: 'Medium', model: 'Sonnet 5.5', status: 'done', commit: 'ed7263c36', depends: ['K12'], card: 'briefs/K15-K16.md' },
+  { n: 17, code: 'K16', group: 'B5', title: '其他寫文案的地方要不要也換', plain: '文章以外寫文案的地方，八種全部各測一次再換（你 11-22 說「都要測」）：劇本工坊、影片腳本、商品文案、AI 去味、競業分析、每月選題、社群改寫、開發信寫信。每一種用一個真實的輸入，讓現在用的模型和 GPT-6.2 sol 各寫一次，並排給你看。要回固定格式的另外驗格式會不會壞。',
+    gate: '八種各有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'in_progress', depends: ['K15'], card: 'briefs/K15-K16.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
