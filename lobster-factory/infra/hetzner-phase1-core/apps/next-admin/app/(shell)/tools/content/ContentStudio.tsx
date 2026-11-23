@@ -1404,6 +1404,8 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     markdown: string; meta: MetaData | null; slugHint: string; seoScore?: number | null;
     /** the site the article belongs to when the rail has just moved on (leave guard); default = the rail's site */
     siteId?: string;
+    /** the page is going away (leave guard on unmount): the request must outlive it */
+    keepalive?: boolean;
   }): Promise<string | null> => {
     const kw = form.keyword.trim();
     if (!kw || !payload.markdown.trim()) return null;
@@ -1411,7 +1413,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     setDraftSaveState("saving");
     try {
       const res = await fetch("/api/content/drafts", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" }, keepalive: payload.keepalive,
         body: JSON.stringify({
           id: draftId || undefined,
           keyword: kw,
@@ -1547,13 +1549,18 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     && articleKey(generated, metaData) !== savedArticleRef.current;
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
-  const flushRef = useRef<(siteId?: string) => Promise<string | null>>(async () => null);
-  flushRef.current = async (siteId) => {
-    if (!dirtyRef.current) return null;
+  // Dirty as of now, not as of the last render: a save that just succeeded has already moved savedArticleRef.
+  const flushRef = useRef<(siteId?: string, keepalive?: boolean) => Promise<string | null>>(async () => null);
+  flushRef.current = async (siteId, keepalive) => {
+    if (!dirtyRef.current || articleKey(generated, metaData) === savedArticleRef.current) return null;
     if (!form.keyword.trim()) return "還沒填主要關鍵字，草稿存不進去；請先填關鍵字，或把內文複製下來。";
-    const id = await saveDraft({ markdown: generated, meta: metaData, slugHint, siteId });
+    const id = await saveDraft({ markdown: generated, meta: metaData, slugHint, siteId, keepalive });
     return id ? null : "存草稿失敗（網路或伺服器錯誤），請再試一次。";
   };
+
+  // Leaving by a way no link click passes (back / forward, a script's router.push): the editor unmounts, so send the
+  // same save on the way out (keepalive outlives the page). A link the guard already saved finds nothing left to send.
+  useEffect(() => () => { void flushRef.current(undefined, true); }, []);
 
   useEffect(() => {
     if (view !== "generate") return;

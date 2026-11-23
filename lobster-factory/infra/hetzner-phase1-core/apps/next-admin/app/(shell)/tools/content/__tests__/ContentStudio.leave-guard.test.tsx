@@ -47,7 +47,11 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const saves = () => fetchMock.mock.calls.filter(([u, i]) => String(u) === "/api/content/drafts" && (i as RequestInit | undefined)?.method === "POST");
 
 async function openWithDraft() {
-  render(
+  return (await mountWithDraft()).box;
+}
+
+async function mountWithDraft() {
+  const r = render(
     <ClientContextProvider sitesPath="/api/content/sites" sessionOrg={null} hostOrg={null} internalOrgId={null} hosts={{}} onDoor={false}>
       <a href="/tools/content/drafts">草稿</a>
       <ContentStudio view="generate" heading={<h1>寫文章</h1>} />
@@ -55,7 +59,7 @@ async function openWithDraft() {
   );
   await screen.findByText("產出文章");
   fireEvent.click(screen.getByText("✏️ 編輯 MD"));
-  return screen.getByPlaceholderText("文章將在此串流顯示…") as HTMLTextAreaElement;
+  return { box: screen.getByPlaceholderText("文章將在此串流顯示…") as HTMLTextAreaElement, unmount: r.unmount };
 }
 
 describe("寫文章 leave guard (U11)", () => {
@@ -93,5 +97,33 @@ describe("寫文章 leave guard (U11)", () => {
     const ev = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(ev);
     expect(ev.defaultPrevented).toBe(true);
+  });
+
+  // Back / forward and a script's router.push pass no link: the editor unmounts, and the save goes out on the way.
+  it("unmounting with unsaved edits sends one keepalive save with the edit", async () => {
+    const { box, unmount } = await mountWithDraft();
+    fireEvent.change(box, { target: { value: "# 舊稿內文\n上一頁前的修改" } });
+    unmount();
+    await waitFor(() => expect(saves()).toHaveLength(1));
+    const init = saves()[0][1] as RequestInit;
+    expect(init.keepalive).toBe(true);
+    expect(JSON.parse(String(init.body)).markdown).toBe("# 舊稿內文\n上一頁前的修改");
+  });
+
+  it("unmounting with no edits sends nothing", async () => {
+    const { unmount } = await mountWithDraft();
+    unmount();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(saves()).toHaveLength(0);
+  });
+
+  it("a link the guard already saved is not saved again on unmount", async () => {
+    const { box, unmount } = await mountWithDraft();
+    fireEvent.change(box, { target: { value: "# 舊稿內文\n手改的一段" } });
+    nav.push.mockImplementation(() => unmount());   // the router leaves in the same tick the save resolved
+    fireEvent.click(screen.getByText("草稿"));
+    await waitFor(() => expect(nav.push).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(saves()).toHaveLength(1);
   });
 });
