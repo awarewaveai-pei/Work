@@ -109,3 +109,47 @@ export function stageOutput(run: RunFacts | null, stage: string, okOnly = true):
 
 export const ok = (detail: string, output?: Json): StepResult => ({ ok: true, detail, ...(output ? { output } : {}) });
 export const no = (detail: string, output?: Json): StepResult => ({ ok: false, detail, ...(output ? { output } : {}) });
+
+/**
+ * Sets top-level keys of environments.metadata, keeping every other key. A CAS on updated_at (re-read and retried at
+ * most three times): records.ts ensureEnvironment also read-merge-writes this column (provision-staging, create-site),
+ * outside the one-live-run-per-environment rule, so a blind write could drop its keys or lose ours.
+ */
+export async function patchEnvironmentMetadata(
+  db: ReadContext["db"],
+  environmentId: string,
+  patch: Json,
+  columns: Json = {},
+): Promise<{ ok: true } | { ok: false; detail: string }> {
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data, error } = await db.from("environments").select("metadata,updated_at").eq("id", environmentId).maybeSingle();
+      if (error || !data) return { ok: false, detail: error ? "讀不到環境紀錄" : "環境紀錄不存在" };
+      const row = data as Json;
+      const current = isObj(row.metadata) ? row.metadata : {};
+      const { data: moved, error: upErr } = await db
+        .from("environments")
+        .update({ ...columns, metadata: { ...current, ...patch }, updated_at: new Date().toISOString() })
+        .eq("id", environmentId)
+        .eq("updated_at", row.updated_at)
+        .select("id");
+      if (upErr) return { ok: false, detail: "環境紀錄寫入失敗" };
+      if (Array.isArray(moved) && moved.length === 1) return { ok: true };
+    }
+    return { ok: false, detail: "環境紀錄同時被改動，寫入失敗" };
+  } catch {
+    return { ok: false, detail: "環境紀錄寫入失敗" };
+  }
+}
+
+/** The site's URL as MainWP and the bridge use it: base_url without a trailing slash; null when unusable. */
+export function siteUrlOf(env: EnvironmentRow): string | null {
+  if (!env.base_url) return null;
+  try {
+    const u = new URL(env.base_url);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    return `${u.origin}${u.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return null;
+  }
+}

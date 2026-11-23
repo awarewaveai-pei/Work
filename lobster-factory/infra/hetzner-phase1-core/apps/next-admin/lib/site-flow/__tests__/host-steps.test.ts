@@ -196,10 +196,10 @@ const consoleText = () => consoleSpies.map((s) => JSON.stringify(s.mock.calls)).
 // ── registry ─────────────────────────────────────────────────────────────────
 
 describe("step registry", () => {
-  it("registers the five host steps; mainwp and bridge stay for SF-I", () => {
-    expect(Object.keys(HOST_STEPS).sort()).toEqual(["create", "open", "preflight", "vhost", "wp_install"]);
-    expect(SITE_STEP_DEFINITIONS.mainwp).toBeUndefined();
-    expect(SITE_STEP_DEFINITIONS.bridge).toBeUndefined();
+  it("registers the five host steps and SF-I's mainwp and bridge", () => {
+    expect(Object.keys(HOST_STEPS).sort()).toEqual(["bridge", "create", "mainwp", "open", "preflight", "vhost", "wp_install"]);
+    expect(SITE_STEP_DEFINITIONS.mainwp?.requires).toEqual(["vhost"]);
+    expect(SITE_STEP_DEFINITIONS.bridge?.requires).toEqual(["vhost"]);
   });
 });
 

@@ -2,7 +2,7 @@
  * /ops/sites UI flows (SITE-FLOW-COMPLETION-PLAN.md §3 SF-J acceptance): create -> flow page renders nine steps; a closed
  * catalog switch reads 此步驟尚未開放 and cannot be pressed; preview -> confirm -> running -> done; the one-time admin
  * password shows once and is gone after a reload. SF-H: steps 4 and 8 have content (backup observation, hand ticks),
- * nothing reads 尚未提供 except the two SF-I steps, polls never overlap. Every /api/ops/site-flow call is answered by the in-memory fake below
+ * SF-I: mainwp and bridge have step bodies too, so nothing reads 尚未提供; polls never overlap. Every /api/ops/site-flow call is answered by the in-memory fake below
  * (page.route), so this tests the page, never the host; the engine is covered by next-admin lib/site-flow/__tests__.
  * Run against a dev server with no Supabase (.claude/launch.json "next-admin-ui-3903"):
  *   cd lobster-factory/infra/hetzner-phase1-core/tests && PLAYWRIGHT_SITES_URL=http://localhost:3903 npx playwright test --project sites
@@ -24,6 +24,8 @@ function fakeServer(opts: { open: boolean; slowPollMs?: number }) {
     state.create = { state: 'ready', enabled: true };
     state.wp_install = { state: 'blocked', enabled: true, reason: '需先完成：建立網站主機' };
     state.vhost = { state: 'not_started', enabled: false, reason: '此步驟尚未開放' };   // catalog switch off
+    state.mainwp = { state: 'blocked', enabled: false, reason: '需先完成：掛上網址' };
+    state.bridge = { state: 'blocked', enabled: false, reason: '需先完成：掛上網址' };
     state.open = { state: 'blocked', enabled: true, reason: '需先完成：掛上網址' };
   }
   const calls: string[] = [];
@@ -116,7 +118,7 @@ test('creating a site shows what was not applied, then opens the flow page', asy
   expect(fake.calls[0]).toBe('POST /api/ops/site-flow');
 });
 
-test('nine steps all have content or a hand-check explanation; only the two SF-I steps read 尚未提供', async ({ page }) => {
+test('nine steps all have content or a hand-check explanation; none reads 尚未提供', async ({ page }) => {
   await arm(page, { open: true });
   await page.goto(`/ops/sites/${SITE}`);
   await expect(page.locator('li[data-step]')).toHaveCount(9);
@@ -125,10 +127,10 @@ test('nine steps all have content or a hand-check explanation; only the two SF-I
   await expect(page.locator('li[data-step=n4]')).toContainText('已列入每日備份');
   await expect(page.locator('li[data-step=n8] input[type=checkbox]')).toHaveCount(3);
   await expect(page.locator('li[data-step=n8]')).toContainText('Uptime Kuma');
-  // mainwp and bridge have no step body until SF-I; every other step has one
-  await expect(page.locator('li[data-step]').filter({ hasText: '尚未提供' })).toHaveCount(2);
-  await expect(page.locator('li[data-step=mainwp]')).toContainText('尚未提供');
-  await expect(page.locator('li[data-step=bridge]')).toContainText('尚未提供');
+  // every step has a body (SF-I added mainwp and bridge): none reads 尚未提供, both name their prerequisite
+  await expect(page.locator('li[data-step]').filter({ hasText: '尚未提供' })).toHaveCount(0);
+  await expect(page.locator('li[data-step=mainwp]')).toContainText('需先完成：掛上網址');
+  await expect(page.locator('li[data-step=bridge]')).toContainText('需先完成：掛上網址');
   // a prerequisite is named, never shown as an internal key
   await expect(page.locator('li[data-step=wp_install]')).toContainText('需先完成：建立網站主機');
   await shot(page, 'flow-sfh');

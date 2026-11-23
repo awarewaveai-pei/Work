@@ -27,7 +27,9 @@ const WP_ARG_RE = /^[A-Za-z0-9._:/@+=][A-Za-z0-9._:/@+=-]{0,511}$/; // never sta
 const PLUGIN_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/; // = provision-staging PLUGIN_SLUG_RE
 const MAINWP_ID_RE = /^[0-9a-f]{32,128}$/; // = provision-staging prepareMainWpChild
 const STAGING_ROOT = "/var/www/html/staging"; // = aw-hosting-gate.sh ROOT
-const STAGING_ADMIN_USER = "admin"; // = provision-staging STAGING_ADMIN_USER
+export const STAGING_ADMIN_USER = "admin"; // = provision-staging STAGING_ADMIN_USER
+export const BRIDGE_KEY_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,190}$/; // = aw-hosting-gate.sh KEYID_RE
+export const BRIDGE_PUBKEY_RE = /^[A-Za-z0-9+/]{43}=$/; // = aw-hosting-gate.sh PUBKEY_RE (32-byte Ed25519 public key)
 const GATE_TIMEOUT_MS = 90_000; // under Cloudflare's ~100 s; anything longer is a background job
 
 export const WP_SUBVERBS = ["install", "plugins", "open", "close", "set-mainwp-id", "put-bridge-pubkey", "reset-admin-password", "set-oracle-engine-url"] as const;
@@ -164,6 +166,30 @@ function stagingScript(slug: string, sub: WpSubverb, args: string[]): string[] |
     case "plugins":
       if (args.length === 0 || !args.every((a) => PLUGIN_SLUG_RE.test(a))) return "plugins needs WordPress.org plugin slugs";
       return [...head, `wpcli plugin install ${args.join(" ")} --activate --quiet >/dev/null`, `echo '{"ok":true}'`];
+    case "put-bridge-pubkey": {
+      // Same PHP as aw-hosting-gate.sh site_wp put-bridge-pubkey: insert, "reused" when the same active key is there,
+      // refuse a key_id held by another key or revoked. Only the PUBLIC key travels; values pass the gate's regexes.
+      const scope = args[2] ?? "write";
+      if (args.length < 2 || args.length > 3 || !BRIDGE_KEY_ID_RE.test(args[0]) || !BRIDGE_PUBKEY_RE.test(args[1]) || !["read", "write"].includes(scope)) {
+        return "put-bridge-pubkey needs a key id, a base64 Ed25519 public key and read|write";
+      }
+      const php = [
+        'global $wpdb; $t = $wpdb->prefix . "awbridge_keys";',
+        'if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $t)) !== $t) { fwrite(STDERR, "awbridge_keys table missing (wp-bridge not active)"); exit(3); }',
+        '$k = getenv("AW_KEY_ID"); $p = getenv("AW_PUB"); $s = getenv("AW_SCOPE");',
+        '$row = $wpdb->get_row($wpdb->prepare("SELECT public_key, status FROM $t WHERE key_id = %s", $k));',
+        'if ($row) { if ($row->public_key === $p && $row->status === "active") { echo "reused"; exit(0); } fwrite(STDERR, "key_id exists with another key or is revoked"); exit(3); }',
+        '$ok = $wpdb->insert($t, array("key_id" => $k, "public_key" => $p, "scope" => $s, "status" => "active", "ip_allowlist" => null, "created_at" => time()), array("%s", "%s", "%s", "%s", "%s", "%d"));',
+        'echo $ok ? "created" : "failed"; exit($ok ? 0 : 3);',
+      ].join(" ");
+      return [
+        ...head,
+        `export AW_KEY_ID='${args[0]}' AW_PUB='${args[1]}' AW_SCOPE='${scope}'`,
+        `out="$(wpcli eval '${php}' </dev/null)"`,
+        `[ "$out" = created ] || [ "$out" = reused ] || { echo "put-bridge-pubkey: $out" >&2; exit 3; }`,
+        `printf '{"state":"%s","key_id":"%s"}\\n' "$out" '${args[0]}'`,
+      ];
+    }
     default:
       return `wp ${sub} has no staging-subdir mapping`;
   }

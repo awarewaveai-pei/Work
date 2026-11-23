@@ -18,7 +18,7 @@
 import { deleteDesignObject, deleteVideoObjects, isContentAddressedKey, r2DeleteObject, r2ListObjects } from "@/lib/storage/r2";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
-import { bridgeRead, listBridgeClients, wpSiteKey } from "@/lib/payments/woo";
+import { bridgeRead, listBridgeClientsWithRegistered, wpSiteKey } from "@/lib/payments/woo";
 
 export type AssetReference = { site: string; type: string; id: number; status: string; link: string };
 
@@ -94,7 +94,8 @@ export async function findAssetReferences(target: AssetTarget): Promise<Referenc
   // getWpSites() swallows DB errors; an empty list means "could not load", never "no site uses it".
   if (sites.length === 0) return { ok: false, error: "reference_scan_no_sites" };
   const references: AssetReference[] = [];
-  const bridges = listBridgeClients();
+  // Env clients and sites the site flow registered (their wp_sites row has no REST token: the bridge is the only way in).
+  const bridges = await listBridgeClientsWithRegistered();
   for (const site of sites) {
     const bridge = bridges.find((b) => sameSite(b.baseUrl, site.url));
     if (bridge) {

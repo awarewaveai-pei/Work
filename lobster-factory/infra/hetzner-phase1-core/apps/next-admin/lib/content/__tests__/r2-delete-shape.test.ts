@@ -12,7 +12,7 @@ vi.mock("@/lib/supabase-server", async () => {
   return { getSupabaseWriteClient: () => fakeDb(() => ({ media_assets: db.rows })) };
 });
 vi.mock("@/lib/content/wp-sites", () => ({ getWpSites: async () => ({ sites: [{ id: "s1", name: "Site", url: "https://site.example" }], tokens: { s1: "t" }, usernames: { s1: "u" } }), wpAuthHeader: () => "Basic x" }));
-vi.mock("@/lib/payments/woo", () => ({ listBridgeClients: () => [], bridgeRead: vi.fn(), wpSiteKey: () => null }));
+vi.mock("@/lib/payments/woo", () => ({ listBridgeClientsWithRegistered: async () => [], bridgeRead: vi.fn(), wpSiteKey: () => null }));
 
 const { deleteUnreferencedAsset } = await import("../r2-delete-guard");
 

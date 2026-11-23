@@ -135,6 +135,8 @@ export interface SiteStepDefinition {
   title: string;
   /** Steps whose observation must be `done` before this one can run. */
   requires: SiteStepKey[];
+  /** Per environment instead of `requires` (engine requiresOf), e.g. a staging subdirectory site has no host steps 1-5. */
+  requiresOn?(env: EnvironmentRow): SiteStepKey[];
   timeoutMs: number;
   /** Checks the operator's step input (plan and execute both send it; it is part of the plan, so of the hash). */
   parseInput?(raw: unknown): InputCheck;

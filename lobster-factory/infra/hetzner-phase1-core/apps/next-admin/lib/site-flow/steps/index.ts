@@ -1,8 +1,9 @@
-// The step registry (SITE-FLOW-COMPLETION-PLAN.md §3: SF-H host steps; SF-I adds mainwp and bridge here, one line
-// each) and the two page panels that are observations, not steps: 第 4 步 每日備份, 第 8 步 手動項目.
+// The step registry (SITE-FLOW-COMPLETION-PLAN.md §3: SF-H host steps, SF-I mainwp and bridge) and the two page panels that are observations, not steps: 第 4 步 每日備份, 第 8 步 手動項目.
 
 import type { ReadContext, SiteStepRegistry } from "../types";
+import { bridgeStep } from "./bridge";
 import { containerStep } from "./container";
+import { mainwpStep } from "./mainwp";
 import { manualPanel } from "./manual-checks";
 import { openStep } from "./open";
 import { preflightStep } from "./preflight";
@@ -15,6 +16,8 @@ export const HOST_STEPS: SiteStepRegistry = {
   create: containerStep,
   wp_install: wpInstallStep,
   vhost: vhostStep,
+  mainwp: mainwpStep,
+  bridge: bridgeStep,
   open: openStep,
 };
 

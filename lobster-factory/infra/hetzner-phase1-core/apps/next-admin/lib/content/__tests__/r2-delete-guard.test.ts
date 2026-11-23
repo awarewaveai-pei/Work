@@ -11,7 +11,7 @@ vi.mock("@/lib/storage/r2", async (orig) => ({ deleteVideoObjects, deleteDesignO
 vi.mock("@/lib/content/wp-sites", () => ({ getWpSites, wpAuthHeader: () => "Basic x" }));
 const listBridgeClients = vi.hoisted(() => vi.fn((): Array<{ id: string; name: string; baseUrl: string }> => []));
 const bridgeRead = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/payments/woo", async (orig) => ({ listBridgeClients, bridgeRead,
+vi.mock("@/lib/payments/woo", async (orig) => ({ listBridgeClientsWithRegistered: async () => listBridgeClients(), bridgeRead,
   wpSiteKey: (await orig<typeof import("@/lib/payments/woo")>()).wpSiteKey }));
 
 const { deleteUnreferencedAsset, assetTarget } = await import("../r2-delete-guard");
@@ -61,6 +61,15 @@ describe("a site with a wp-bridge client is asked through the bridge, not REST",
     expect(await deleteUnreferencedAsset(IMG)).toMatchObject({ ok: false, error: "asset_in_use", references: [{ id: 5 }] });
     expect(bridgeRead).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("SF-I: a site-flow site (wp_sites row with no REST token) is asked through its registered bridge, never refused for credentials", async () => {
+    getWpSites.mockResolvedValue({ sites: [SITE, { ...SITE, id: "s2", name: "Acme", url: "https://acme.example" }], tokens: { s1: "t", s2: "" }, usernames: { s1: "u", s2: "" } });
+    listBridgeClients.mockReturnValue([{ id: "", name: "Soulful", baseUrl: "https://SOULFUL.example" }, { id: "env:7a1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b", name: "acme.example", baseUrl: "https://acme.example" }]);
+    bridgeRead.mockResolvedValue({ ok: true, value: { ok: true, references: [] } });
+    expect(await deleteUnreferencedAsset(IMG)).toEqual({ ok: true, deleted: 1 });
+    expect(bridgeRead).toHaveBeenCalledWith("/asset-references", { match: assetTarget(IMG)!.match }, { clientId: "env:7a1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("no references -> deleted", async () => {

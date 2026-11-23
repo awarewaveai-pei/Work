@@ -32,6 +32,10 @@ const TARGET_MODULES = [
 const ALLOWLIST: Record<string, string> = {
   "lib/repair-center/ssh.ts":
     "primitive SSH transport -- not a call site; every real caller in this repo is itself gated or allowlisted below.",
+  "lib/site-flow/mainwp-client.ts":
+    "MainWP REST client for the site-flow mainwp step; imports woo only for wpSiteKey (URL normalization) and writes to MainWP, never WordPress. addMainWpSite runs only inside lib/site-flow/engine.ts executeStep (gated first); findMainWpSite is also a GET on every status-page load (mainwp observe), a read.",
+  "lib/site-flow/steps/bridge.ts":
+    "site-flow step body: runs only through lib/site-flow/engine.ts executeStep (gated before precheck/execute/verify; rollback gated again); its woo use is probeRegisteredBridge, a signed READ (POST /drafts, read scope).",
   "lib/site-flow/gate-client.ts":
     "site-flow host gate transport -- not a call site; lib/site-flow/engine.ts executeStep gates before any execute, pollRun's rollback gates again, and observe/plan get a read-only reader (preflight, job).",
   "lib/repair-center/evidence.ts":
@@ -49,7 +53,7 @@ const ALLOWLIST: Record<string, string> = {
   "lib/crm/member-newsletter.ts":
     "weekly member newsletter (N10): its one write is createNewsletter() (gate in bridgePost()); imports woo only for bridgeClientForSite(), a config lookup.",
   "lib/content/r2-delete-guard.ts":
-    "imports woo only for bridgeRead() + listBridgeClients(): the signed read-only /asset-references search before an R2 delete; writes nothing to WordPress.",
+    "imports woo only for bridgeRead() + listBridgeClientsWithRegistered(): the signed read-only /asset-references search before an R2 delete; writes nothing to WordPress.",
   "lib/crm/fluentcrm.ts":
     "draft campaign adapter delegates every write to the gated bridgePost transport in lib/payments/woo.ts.",
   "lib/studio/print-provider.ts":

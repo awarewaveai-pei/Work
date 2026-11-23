@@ -54,7 +54,7 @@ import {
   type StepStatus,
 } from "./types";
 
-/** Step bodies: lib/site-flow/steps/index.ts (SF-H: preflight/create/wp_install/vhost/open; SF-I adds mainwp/bridge). */
+/** Step bodies: lib/site-flow/steps/index.ts (SF-H: preflight/create/wp_install/vhost/open; SF-I: mainwp/bridge). */
 export const SITE_STEP_DEFINITIONS: SiteStepRegistry = { ...HOST_STEPS };
 
 type Json = Record<string, unknown>;
@@ -193,6 +193,8 @@ function checkInput(def: SiteStepDefinition, raw: unknown): { ok: true; input: J
 }
 
 const manualOf = (def: SiteStepDefinition, env: EnvironmentRow) => def.manual?.(env) ?? null;
+/** The steps that must be done first on this environment (SiteStepDefinition.requiresOn, else requires). */
+export const requiresOf = (def: SiteStepDefinition, env: EnvironmentRow): SiteStepKey[] => def.requiresOn?.(env) ?? def.requires;
 
 // ── environments.status cache ────────────────────────────────────────────────
 
@@ -490,7 +492,7 @@ export async function executeStep(
   const gate = deps.gateFor(args.environment);
   const readCtx = readContext(db, args.site, args.environment, gate, cat, stepInput);
   const missing: SiteStepKey[] = [];
-  for (const dep of def.requires) {
+  for (const dep of requiresOf(def, args.environment)) {
     const depDef = deps.steps[dep];
     if (!depDef || (await observeSafe(depDef, readCtx)).status !== "done") missing.push(dep);
   }
@@ -781,7 +783,7 @@ export async function getSiteFlowStatus(
     const row = cat.get(actionKeyOf(k));
     const lastRun = row ? lastByAction.get(row.id) ?? null : null;
     const observation = observations.get(k) ?? null;
-    const missing = (def?.requires ?? []).filter((d) => observations.get(d)?.status !== "done");
+    const missing = (def ? requiresOf(def, args.environment) : []).filter((d) => observations.get(d)?.status !== "done");
     const manual = def ? manualOf(def, args.environment) : null;
     // A hand-confirmed step has no catalog switch to open: the tick is its whole action.
     const { state, reason } = deriveStepState({ implemented: !!def, enabled: manual ? true : !!row?.enabled, observation, lastRun, missing, titles });

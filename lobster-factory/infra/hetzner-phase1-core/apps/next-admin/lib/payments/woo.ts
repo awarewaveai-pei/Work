@@ -18,12 +18,14 @@
  * convention used by the content pipeline (lib/content/wp-sites.ts `WP_SITE_<i>_*`). Each extra
  * client i (1..10) is its OWN bridge install with its OWN Ed25519 key:
  *   WPBRIDGE_SITE_<i>_BASE_URL / _KEY_ID / _PRIVATE_KEY / _NAME
- * Private keys live ONLY in env (never the DB) — they are signing secrets. A publish call carries an
- * optional `clientId` ("" = default, "1".."10" = that site); absent → default → fully backward
+ * Private keys live in env or in Supabase Vault (never a table column) — they are signing secrets. A publish call
+ * carries an optional `clientId` ("" = default, "1".."10" = that site, "env:<environments.id>" = a site the
+ * site flow registered, see "sites registered by the site flow" below); absent → default → fully backward
  * compatible with the original single-site behaviour.
  */
 import { createHash, createPrivateKey, randomUUID, sign as edSign, type KeyObject } from "node:crypto";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { getSecret } from "@/lib/secret-vault";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { BLOCKED_CHANGE_CODE } from "@/lib/system-modes/blocked-change";
 
@@ -56,14 +58,26 @@ export function wpSiteKey(url: string): string | null {
  * different orgs -> undefined: the org cannot be told, so the caller blocks.
  */
 export async function bridgeSiteOrg(db: WriteClient, baseUrl: string): Promise<string | null | undefined> {
-  const site = wpSiteKey(baseUrl);
-  if (!site) return undefined;
+  const rows = await activeWpSiteRows(db);
+  return rows ? orgOfInstall(rows, baseUrl) : undefined;
+}
+
+type WpSiteOwnerRow = { url: string; organization_id: string | null };
+
+/** Active wp_sites rows (url, owner); null when unreadable. */
+async function activeWpSiteRows(db: WriteClient): Promise<WpSiteOwnerRow[] | null> {
   const { data, error } = await db.from("wp_sites").select("url, organization_id").eq("active", true);
   if (error) {
     console.error("[wp-bridge] wp_sites lookup failed; bridge write blocked:", error.message);
-    return undefined;
+    return null;
   }
-  const rows = (data ?? []) as Array<{ url: string; organization_id: string | null }>;
+  return (data ?? []) as WpSiteOwnerRow[];
+}
+
+/** bridgeSiteOrg's rule over rows already read (one read for many sites). */
+function orgOfInstall(rows: WpSiteOwnerRow[], baseUrl: string): string | null | undefined {
+  const site = wpSiteKey(baseUrl);
+  if (!site) return undefined;
   const orgs = new Set(rows.filter((r) => wpSiteKey(r.url) === site).map((r) => r.organization_id ?? null));
   if (orgs.size > 1) return undefined;
   if (orgs.size === 1) return [...orgs][0];
@@ -107,24 +121,140 @@ function hostLabel(baseUrl: string): string {
   }
 }
 
-function getConfig(clientId?: string): { baseUrl: string; keyId: string; key: KeyObject } | null {
-  const { baseUrl, keyId, secretB64 } = rawBridgeEnv(clientId);
-  if (!baseUrl || !keyId || !secretB64) return null;
+type BridgeConfig = { baseUrl: string; keyId: string; key: KeyObject };
+
+/** base64 Ed25519 secret (64-byte libsodium or 32-byte seed) -> a signing key; anything else -> null. */
+function signingKeyOf(secretB64: string): KeyObject | null {
   try {
     const raw = Buffer.from(secretB64.trim(), "base64");
     // libsodium "secret key" = seed(32) + public(32); Node wants just the seed.
     // Accept ONLY the two unambiguous encodings — anything else is a corrupt key.
     if (raw.length !== 64 && raw.length !== 32) return null;
     const seed = raw.subarray(0, 32);
-    const key = createPrivateKey({
+    return createPrivateKey({
       key: Buffer.concat([PKCS8_ED25519_PREFIX, seed]),
       format: "der",
       type: "pkcs8",
     });
-    return { baseUrl: baseUrl.replace(/\/+$/, ""), keyId, key };
   } catch {
     return null;
   }
+}
+
+function getConfig(clientId?: string): BridgeConfig | null {
+  const { baseUrl, keyId, secretB64 } = rawBridgeEnv(clientId);
+  if (!baseUrl || !keyId || !secretB64) return null;
+  const key = signingKeyOf(secretB64);
+  return key ? { baseUrl: baseUrl.replace(/\/+$/, ""), keyId, key } : null;
+}
+
+// ── sites registered by the site flow (card SF-I) ──────────────────────────────────────────────────────────────────
+// A site built by /ops/sites carries its bridge key in environments.metadata.bridge = {key_id, credential_id}; the
+// private key is in Supabase Vault under client_credentials.secret_ref (SITE-FLOW-COMPLETION-PLAN.md §1-4, I4). Its
+// client id is `env:<environments.id>`. Such an id NEVER falls back to the default env client: a registered site that
+// cannot be loaded is "not configured", not "write to soulful".
+// Traps: the private key is read here, turned into a KeyObject and dropped; no error text carries it. The env clients
+// above keep their exact behaviour (sync, env only); only bridgePost/bridgeRead resolve both kinds.
+
+export const REGISTERED_BRIDGE_PREFIX = "env:";
+const REGISTERED_ID_RE = /^env:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+export const registeredBridgeClientId = (environmentId: string): string => `${REGISTERED_BRIDGE_PREFIX}${environmentId}`;
+/** Case-insensitive like REGISTERED_ID_RE: "ENV:<id>" must never fall through to rawBridgeEnv's default client. */
+export const isRegisteredBridgeClientId = (clientId: unknown): clientId is string => typeof clientId === "string" && /^env:/i.test(clientId);
+
+/** environments.metadata.bridge as the site flow writes it; null when absent or malformed. */
+export function bridgeRegistrationOf(metadata: unknown): { keyId: string; credentialId: string } | null {
+  const b = typeof metadata === "object" && metadata !== null ? (metadata as Record<string, unknown>).bridge : null;
+  if (typeof b !== "object" || b === null) return null;
+  const { key_id: keyId, credential_id: credentialId } = b as Record<string, unknown>;
+  return typeof keyId === "string" && keyId && typeof credentialId === "string" && credentialId ? { keyId, credentialId } : null;
+}
+
+export interface RegisteredBridgeDeps {
+  db: WriteClient | null;
+  getSecret(name: string): Promise<string | null>;
+}
+
+const defaultRegisteredDeps = (): RegisteredBridgeDeps => ({ db: getSupabaseWriteClient(), getSecret });
+
+/**
+ * The bridge config of a registered site, or null (missing row, archived, no key, vault empty, corrupt key, or -- unless
+ * the bridge step's own probe asks -- no wp_sites row giving this install to the environment's organization: a
+ * registered site is usable only once its owner is recorded, so bridgePost always gates on the right org).
+ */
+export async function registeredBridgeConfig(
+  clientId: string,
+  deps?: RegisteredBridgeDeps,
+  opts: { skipOwnerCheck?: boolean } = {},
+): Promise<BridgeConfig | null> {
+  const m = REGISTERED_ID_RE.exec(clientId);
+  if (!m) return null;
+  try {
+    const d = deps ?? defaultRegisteredDeps();
+    if (!d.db) return null;
+    const { data: env, error } = await d.db.from("environments").select("id,organization_id,base_url,status,metadata").eq("id", m[1]).maybeSingle();
+    if (error || !env) return null;
+    const row = env as { organization_id: string | null; base_url: string | null; status: string; metadata: unknown };
+    const reg = bridgeRegistrationOf(row.metadata);
+    if (row.status === "archived" || !row.base_url || !reg || !wpSiteKey(row.base_url)) return null;
+    if (!opts.skipOwnerCheck && (!row.organization_id || (await bridgeSiteOrg(d.db, row.base_url)) !== row.organization_id)) return null;
+    const { data: cred, error: credErr } = await d.db.from("client_credentials").select("id,secret_ref").eq("id", reg.credentialId).maybeSingle();
+    const ref = !credErr && cred ? (cred as { secret_ref: string | null }).secret_ref : null;
+    if (!ref) return null;
+    const secret = await d.getSecret(ref);
+    const key = secret ? signingKeyOf(secret) : null;
+    return key ? { baseUrl: row.base_url.replace(/\/+$/, ""), keyId: reg.keyId, key } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Sites the site flow registered a bridge key for and whose owner is recorded (non-secret fields only). */
+export async function listRegisteredBridgeClients(db: WriteClient | null = getSupabaseWriteClient()): Promise<BridgeClient[]> {
+  if (!db) return [];
+  const { data, error } = await db.from("environments").select("id,organization_id,base_url,status,metadata").neq("status", "archived");
+  if (error) {
+    console.error("[wp-bridge] environments lookup failed; registered bridge sites not listed:", error.message);
+    return [];
+  }
+  const out: BridgeClient[] = [];
+  const owners = await activeWpSiteRows(db);
+  if (!owners) return [];
+  for (const r of (data ?? []) as Array<{ id: string; organization_id: string | null; base_url: string | null; metadata: unknown }>) {
+    if (!r.base_url || !r.organization_id || !bridgeRegistrationOf(r.metadata) || !wpSiteKey(r.base_url)) continue;
+    if (orgOfInstall(owners, r.base_url) !== r.organization_id) continue;
+    const baseUrl = r.base_url.replace(/\/+$/, "");
+    out.push({ id: registeredBridgeClientId(r.id), name: hostLabel(baseUrl), baseUrl });
+  }
+  return out;
+}
+
+/** Env clients (unchanged order), then registered sites on an install no env client already serves. */
+export async function listBridgeClientsWithRegistered(db: WriteClient | null = getSupabaseWriteClient()): Promise<BridgeClient[]> {
+  const env = listBridgeClients();
+  const taken = new Set(env.map((c) => wpSiteKey(c.baseUrl)));
+  return [...env, ...(await listRegisteredBridgeClients(db)).filter((c) => !taken.has(wpSiteKey(c.baseUrl)))];
+}
+
+/**
+ * The site flow's bridge step proving a new key before the owner row exists (card SF-I): a signed READ with the
+ * vaulted key, no gate (writes nothing). Every other caller goes through bridgePost/bridgeRead.
+ */
+export async function probeRegisteredBridge<T>(
+  clientId: string,
+  path: string,
+  payload: unknown,
+  deps?: RegisteredBridgeDeps,
+): Promise<BridgeResult<T>> {
+  const config = await registeredBridgeConfig(clientId, deps, { skipOwnerCheck: true });
+  if (!config) return { ok: false, error: "bridge_not_configured" };
+  return signedPost<T>(config, path, payload, "", 20_000);
+}
+
+/** bridgePost/bridgeRead: env ids as before; `env:<id>` from the registry only. */
+async function resolveConfig(clientId?: string, deps?: RegisteredBridgeDeps): Promise<BridgeConfig | null> {
+  return isRegisteredBridgeClientId(clientId) ? registeredBridgeConfig(clientId, deps) : getConfig(clientId);
 }
 
 export function isBridgeConfigured(clientId?: string): boolean {
@@ -180,7 +310,7 @@ export async function bridgePost<T>(
   payload: unknown,
   options?: { dryRun?: boolean; timeoutMs?: number; clientId?: string },
 ): Promise<BridgeResult<T>> {
-  const config = getConfig(options?.clientId);
+  const config = await resolveConfig(options?.clientId);
   if (!config) return { ok: false, error: "bridge_not_configured" };
 
   // Every bridge write funnels through this one function -- gate here once, so it covers every
@@ -204,15 +334,15 @@ export async function bridgePost<T>(
 export async function bridgeRead<T>(
   path: string,
   payload: unknown,
-  options?: { timeoutMs?: number; clientId?: string },
+  options?: { timeoutMs?: number; clientId?: string; registeredDeps?: RegisteredBridgeDeps },
 ): Promise<BridgeResult<T>> {
-  const config = getConfig(options?.clientId);
+  const config = await resolveConfig(options?.clientId, options?.registeredDeps);
   if (!config) return { ok: false, error: "bridge_not_configured" };
   return signedPost<T>(config, path, payload, "", options?.timeoutMs ?? 20_000);
 }
 
 async function signedPost<T>(
-  config: { baseUrl: string; keyId: string; key: KeyObject },
+  config: BridgeConfig,
   path: string,
   payload: unknown,
   query: string,
