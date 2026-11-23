@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-23（續13）— oracle WP 第四批：SF-I2 併入
+
+- SF-I2 併入（工人 `6817539ae`，已 push；今晚 03:00 自動部署帶上）：`lib/payments/woo.ts` 新增 `bridgeClientForSiteWithRegistered`（同一站先用環境變數客戶端、其次已登記站、都沒有回 null）、`isBridgeClientConfigured`、`BRIDGE_ONLY_SITE_ERROR`；`getConfig` 對 `env:` 開頭的 id 一律回 null（舊的同步函式不會把新站當預設站）。改成涵蓋新站：`lib/content/publish/wordpress-core.ts`、`lib/content/video/embed-in-post.ts`、`lib/crm/member-newsletter.ts`、`lib/outreach/warm-leads.ts`、`app/api/tools/publish/route.ts`。刻意只服務預設站並加註解：`lib/crm/fluentcrm.ts` `isBridgeConfigured`、`app/api/content/newsletter/route.ts`。無 REST token 也無 bridge 的站回「此站只支援 bridge 通道」（`wordpress-core.ts:356-359`、`embed-in-post.ts:170,219,381`）。
+- 監工驗收：cherry-pick 無衝突；next-admin `npx tsc --noEmit` exit 0、全套 vitest 5747 passed／0 failed（線3 worktree @ 整合結果）。工人證據：突變（載入失敗退回預設站）使 2 個指名測試變紅；critic Standard pass、3 Minor 已修；既有 6 個測試檔只補 mock、斷言未改。
+- 第四批待總檢（SF-I2 回報，未處置）：Printful `external_id` 對新站形如 `env:<uuid>-<商品id>`（約 50 字、含冒號），長度與字元限制未查到規格、未打真的 Printful；卡片外仍只走 REST 的路徑對新站回 404 而非「只支援 bridge」（`app/api/content/wp-post/route.ts:22`、patterns／categories／tags 讀取）；未在 staging 新站實測。
+- SF-P（線4）等 critic。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit && npx vitest run（strange-sinoussi worktree @ 整合結果） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=bridgeClientForSiteWithRegistered | hits=8
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic＋突變＋監工全套測試代替
 ## 2026-11-23（續12）— meeting-service 側欄：補做 OwnVoice 字幕實測；查出側欄佔位會讓壓到它的 OwnVoice 視窗跳位
 
 - OwnVoice Meet.exe 16:00 起可再啟動（10:45–? 被 SAC 暫擋，未改任何設定；`Downloads` 那份 README 與 D 槽相同，內容是 SmartScreen／WebView2，不適用）。

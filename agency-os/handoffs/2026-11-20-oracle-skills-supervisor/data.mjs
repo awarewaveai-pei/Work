@@ -94,7 +94,7 @@ export const STEPS = [
   { n: 26, code: 'E6', group: 'B4', title: '引擎：會員票與英文每日信', plain: '登入會員按 AI 解讀時，引擎的頁面去跟外層的 WordPress 拿票，額度才會記在這位會員身上；每日運勢的「宜／忌」補上英文。',
     gate: '登入會員的 AI 次數記在自己名下；英文信沒有中文段落。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '4a7d72b9d', depends: ['P3', 'E4'], card: 'briefs/WP-E6-ticket-and-daily-en.md' },
   { n: 27, code: 'SF-I2', group: 'B4', title: '內容工具認得新網站', plain: '發佈文章、嵌入影片等工具的網站清單，改成也包含用新流程建的網站。',
-    gate: '新流程建的網站出現在這些工具的清單裡；既有網站的行為不變。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-I'], card: 'briefs/WP-SF-I2-content-tools.md' },
+    gate: '新流程建的網站出現在這些工具的清單裡；既有網站的行為不變。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'c8845e297', depends: ['SF-I'], card: 'briefs/WP-SF-I2-content-tools.md' },
   // 第五批
   { n: 28, code: 'SF-A', group: 'B5', title: '文件更正', plain: '把說法過時或互相矛盾的建站文件改成指向新流程。新流程實際跑過一次之後才改，免得文件先說了還不存在的東西。',
     gate: '文件連結檢查通過。', risk: 'Low', model: '監工', status: 'not_started', depends: ['SF-L'], card: SF },
