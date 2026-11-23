@@ -12,6 +12,7 @@ import {
   type Layer,
   type SiteLookup,
 } from "@/lib/client-context/contract";
+import { trackClientPicked } from "@/lib/client-context/track-picked";
 import { ClientContext, type ClientContextValue, type ContextSite } from "@/lib/client-context/use-client-context";
 
 export interface ClientContextProviderProps {
@@ -135,12 +136,13 @@ export function ClientContextProvider({ sessionOrg, hostOrg, internalOrgId, site
   }, [needsRewrite, spKey, targetOrg, targetSite, replaceQuery]);
 
   const setOrg = useCallback((org: string | null) => {
+    if (org) trackClientPicked(org, onDoor);
     replaceQuery((p) => {
       for (const k of ORG_DEPENDENT_PARAMS) p.delete(k);
       p.delete("siteId");
       if (org) p.set(PARAM.org, org); else p.delete(PARAM.org);
     });
-  }, [replaceQuery]);
+  }, [replaceQuery, onDoor]);
 
   const setSite = useCallback((site: string | null) => {
     replaceQuery((p) => {

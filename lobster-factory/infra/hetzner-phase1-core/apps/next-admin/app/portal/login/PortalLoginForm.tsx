@@ -1,5 +1,6 @@
 "use client";
 
+import { markLoginPending } from "@/app/LoginSucceeded";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/ssr";
@@ -47,6 +48,7 @@ export function PortalLoginForm({ signupUrl }: { signupUrl: string }) {
       // LoginForm: the just-set session cookie must ride a real request for middleware
       // to see it. The idempotent nginx rewrite (§7) means this is safe to land on
       // "/portal/launcher" even though this page's own URL is already rewritten.
+      markLoginPending("portal");
       window.location.assign(next);
     } catch {
       setError("登入時發生未預期的錯誤，請稍後再試。");

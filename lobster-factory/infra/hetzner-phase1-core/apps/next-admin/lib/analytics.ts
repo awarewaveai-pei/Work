@@ -13,9 +13,35 @@ export const Events = {
   // Auth (reserved for future SSO)
   ADMIN_LOGIN: "admin_login",
   ADMIN_LOGOUT: "admin_logout",
+  // Platform (blueprint §13): the three that measure "pick a client", "blocked", "login to first use"
+  CLIENT_PICKED: "client_picked",
+  BLOCKED_SHOWN: "blocked_shown",
+  LOGIN_SUCCEEDED: "login_succeeded",
 } as const;
 
-type EventName = (typeof Events)[keyof typeof Events];
+export type EventName = (typeof Events)[keyof typeof Events];
+
+type Surface = "workspace" | "door" | "public";
+
+/** Properties of the platform events. Closed on purpose: only short enums and counters; never an email, a name, a URL,
+ *  a query string or a token (analytics-no-pii.test.ts scans these keys). A client is identified only by its group id. */
+export interface PlatformEventProps {
+  client_picked: { method: "search" | "category" | "row" | "other"; ms_since_load: number; surface: Surface; product_key?: string };
+  /** state = right-label code (S1, S7 ...) or "not_held"/"unavailable" for a door's not-enabled page */
+  blocked_shown: { state: string; surface: Surface; product_key?: string; feature_key?: string };
+  login_succeeded: { door: "staff" | "portal" | "product"; product_key?: string };
+}
+
+/** The only property names a platform event may carry; track() drops anything else. */
+export const EVENT_PROPS: { [E in keyof PlatformEventProps]: readonly string[] } = {
+  client_picked: ["method", "ms_since_load", "surface", "product_key"],
+  blocked_shown: ["state", "surface", "product_key", "feature_key"],
+  login_succeeded: ["door", "product_key"],
+};
+
+type PropsArg<E extends EventName> = E extends keyof PlatformEventProps
+  ? [props: PlatformEventProps[E]]
+  : [props?: Record<string, unknown>];
 
 function posthogEnabled(): boolean {
   return Boolean(
@@ -23,9 +49,18 @@ function posthogEnabled(): boolean {
   );
 }
 
-export function track(event: EventName, props?: Record<string, unknown>) {
+export function track<E extends EventName>(event: E, ...args: PropsArg<E>) {
   if (!posthogEnabled()) return;
-  posthog.capture(event, props);
+  const props = args[0] as Record<string, unknown> | undefined;
+  const allowed = (EVENT_PROPS as Record<string, readonly string[]>)[event];
+  const out = allowed && props ? Object.fromEntries(Object.entries(props).filter(([k]) => allowed.includes(k))) : props;
+  posthog.capture(event, out);
+}
+
+/** The customer (organization) as a PostHog group: its id only, never its name. Silent without a PostHog key. */
+export function groupOrganization(orgId: string) {
+  if (!posthogEnabled() || !orgId) return;
+  posthog.group("organization", orgId);
 }
 
 /** Attach to every subsequent capture (session-scoped); never put secrets here. */

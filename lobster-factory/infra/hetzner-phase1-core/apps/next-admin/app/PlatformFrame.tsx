@@ -4,6 +4,7 @@
 // ClientContextProvider (ADR 020); the browser never reads env or imports lib/portal/hosts. The client rail
 // (app/ClientRail.tsx) draws only on a page that registers a layer, so a page that does not looks as before.
 // Markup and classes are the two frames' own (.shell/.sidebar/.main, .door-main/.door-side/.door-content).
+import { BlockedShown } from "@/components/portal/BlockedShown";
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
 import { PRODUCTS, type ProductKey } from "@/lib/portal/products";
@@ -136,6 +137,7 @@ async function DoorFrame({ productKey, bare = false, children }: { productKey: P
     return (
       <div className="shell">
         <div className="door-main"><div style={{ maxWidth: 480, margin: "80px auto", padding: 24, textAlign: "center" }}>
+          <BlockedShown state={access === "not_held" ? "not_held" : "unavailable"} surface="door" product_key={productKey} />
           {access === "not_held" ? (
             <>
               <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>「{product!.name}」尚未開通</h1>

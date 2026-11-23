@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { LoginSucceeded } from "@/app/LoginSucceeded";
 import {
+  groupOrganization,
   groupProject,
   registerOpsSuperProperties,
 } from "@/lib/analytics";
@@ -19,9 +21,10 @@ export function PostHogAnalytics() {
     let cancelled = false;
     fetch("/api/ops/analytics-context", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((ctx: { role?: string; source?: string } | null) => {
+      .then((ctx: { role?: string; source?: string; org?: string | null } | null) => {
         if (cancelled || !ctx?.role) return;
         registerOpsSuperProperties(ctx.role, ctx.source ?? "unknown");
+        if (ctx.org) groupOrganization(ctx.org);
         if (!didGroup.current) {
           didGroup.current = true;
           groupProject();
@@ -34,5 +37,5 @@ export function PostHogAnalytics() {
     };
   }, []);
 
-  return null;
+  return <LoginSucceeded />;
 }

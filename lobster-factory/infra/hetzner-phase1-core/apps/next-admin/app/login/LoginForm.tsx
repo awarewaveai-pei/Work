@@ -15,6 +15,7 @@ function safeNext(raw: string | null): string {
 /** Staff host: the admin console heading. A product door: the product's own name and, first, the way its customers come
  *  in -- from aware-wave.com, with no app password (lib/auth/door-link.ts); the form stays for accounts staff invited. */
 import type { LoginDoor } from "@/lib/portal/login-door";
+import { markLoginPending } from "@/app/LoginSucceeded";
 
 export function LoginForm({ door = null }: { door?: LoginDoor } = {}) {
   const searchParams = useSearchParams();
@@ -43,6 +44,7 @@ export function LoginForm({ door = null }: { door?: LoginDoor } = {}) {
       // Full-page navigation: the session cookie the browser client just set is sent on this
       // real request so the middleware authenticates it. A soft router.replace() against the
       // auth-gated target can hang or loop because the new cookie isn't picked up.
+      markLoginPending(door ? "product" : "staff");
       window.location.assign(next);
     } catch {
       setError("登入時發生未預期的錯誤，請稍後再試。");

@@ -7,5 +7,7 @@ import { resolveOpsRole } from "@/lib/ops-role";
  */
 export async function GET(req: Request) {
   const { role, source } = resolveOpsRole(req);
-  return NextResponse.json({ role, source });
+  // org = the customer's own organization id (set only by middleware; staff have none). An id, never a name or email.
+  const org = req.headers.get("x-ops-org-id")?.trim() || null;
+  return NextResponse.json({ role, source, org });
 }

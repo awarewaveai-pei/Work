@@ -4,6 +4,7 @@
 import { CATEGORY_NAMES, type CatalogIcon } from "@/lib/portal/catalog-vocab";
 import type { CatalogMeta } from "@/lib/portal/products";
 import type { RightLabel, RightTone } from "@/lib/entitlements/right-label";
+import { BLOCKED_CODES, BlockedShown } from "./BlockedShown";
 
 export type ToolDensity = "card" | "row" | "compact";
 export interface ToolCardProps {
@@ -61,6 +62,7 @@ export function ToolCard({ name, catalog, right, href, disabled = false, density
     : null;
   const reason = right.text ? <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }} data-reason>{right.text}</p> : null;
   const note = right.note ? <p style={{ fontSize: 11, color: "var(--text-muted)", margin: 0 }}>{right.note}</p> : null;
+  const blocked = right.code && BLOCKED_CODES.has(right.code) ? <BlockedShown state={right.code} surface="workspace" /> : null;   // reports "blocked_shown"; card and row only
   const size = density === "compact" ? 16 : 24;
   const icon = (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -87,7 +89,7 @@ export function ToolCard({ name, catalog, right, href, disabled = false, density
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{title}{fresh}<span style={{ fontSize: 12, color: "var(--text-muted)" }}>{CATEGORY_NAMES[catalog.category]}</span></div>
           <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>{catalog.blurb}</p>
-          {reason}{note}
+          {reason}{note}{blocked}
         </div>
         {badge}{button}
       </article>
@@ -102,7 +104,7 @@ export function ToolCard({ name, catalog, right, href, disabled = false, density
       </div>
       <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>{catalog.blurb}</p>
       <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{CATEGORY_NAMES[catalog.category]}</span>
-      {reason}{note}
+      {reason}{note}{blocked}
       {button}
     </article>
   );
