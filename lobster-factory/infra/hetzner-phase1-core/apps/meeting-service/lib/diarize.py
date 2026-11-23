@@ -14,6 +14,7 @@
 約 10% 段落配不到人，須靠時間鄰近推定補標（見 relabel 內註解）。
 """
 import os
+import re
 import time
 
 SR = 16000
@@ -43,6 +44,15 @@ def _load_audio(path: str):
         out.append(rf.to_ndarray().reshape(-1))
     c.close()
     return np.concatenate(out).astype(np.float32) / 32768.0
+
+
+def _join(a: str, b: str) -> str:
+    """接兩段文字：兩邊都是中文字才不加空格。規則與 lib/transcribe.py joined_text 相同；
+    本檔會被別的專案以檔案路徑單獨載入，不能 import 它，由 tests/test_text_join.py 保證兩邊一致。"""
+    a, b = a.strip(), b.strip()
+    if not a or not b:
+        return a or b
+    return a + ("" if re.search(r"[一-鿿]$", a) and re.match(r"^[一-鿿]", b) else " ") + b
 
 
 def _run_pyannote(media_path: str, log=print):
@@ -174,7 +184,7 @@ def _relabel(segments: list, spans: dict, log=print) -> dict:
     turns = []
     for s in segments:
         if turns and turns[-1]["speaker"] == s["speaker"] and s["start"] - turns[-1]["end"] < 2.0:
-            turns[-1]["text"] += s["text"]
+            turns[-1]["text"] = _join(turns[-1]["text"], s["text"])
             turns[-1]["end"] = s["end"]
         else:
             turns.append({"speaker": s["speaker"], "start": s["start"],

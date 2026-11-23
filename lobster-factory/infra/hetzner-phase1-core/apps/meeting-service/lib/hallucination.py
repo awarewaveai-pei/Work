@@ -7,13 +7,27 @@ logprob 全是 -0.23（高信心）。信心分數只反映模型對自己吐的
 兩個獨立訊號：
   1. 語速物理上限 —— 中文口語最快約 8-9 字/秒，>12 字/秒 幾乎必為幻覺
   2. 近距重複 —— 同一句在短時間窗內重複出現
+
+語速用「音節單位」算，不用字元數：中文一字一音節；英文字母數不是音節數
+（"Rosenberger" 11 字元約 3 音節），一個英文字算 1.5 單位。否則英文會議
+與中英夾雜的句子會整段被誤標成語速不可能。
 """
+import re
 from collections import defaultdict
 
 MAX_CPS = 12.0
 WARN_CPS = 9.0
 REPEAT_WINDOW = 30.0
 MIN_REPEAT_LEN = 4
+LATIN_WORD_UNITS = 1.5
+
+_CJK = re.compile(r"[一-鿿㐀-䶿぀-ヿ가-힯]")
+_WORD = re.compile(r"[A-Za-z0-9À-ɏ']+")
+
+
+def speech_units(text: str) -> float:
+    """近似音節數：中日韓字元各 1，拉丁字／數字串各 LATIN_WORD_UNITS，標點不算。"""
+    return len(_CJK.findall(text)) + LATIN_WORD_UNITS * len(_WORD.findall(text))
 
 
 def analyse(segs: list) -> dict:
@@ -24,7 +38,7 @@ def analyse(segs: list) -> dict:
         txt = s["text"].strip()
         if dur <= 0 or not txt:
             continue
-        cps = len(txt) / dur
+        cps = speech_units(txt) / dur
         if cps > MAX_CPS:
             flags["impossible_rate"].append((s, cps))
         elif cps > WARN_CPS:

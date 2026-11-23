@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>心智圖</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --accent: #6366f1; --ink: #0d1526; --muted: #475569;
+    --bg: #f2f5fb; --card: #ffffff; --border: #e6eaf4; --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--ink); }
+  header { display: flex; gap: 12px; align-items: center; padding: 12px 20px; background: var(--card); border-bottom: 1px solid var(--border); }
+  header b { font-size: 15px; }
+  #state { color: var(--muted); font-size: 12px; flex: 1; }
+  #state.err { color: var(--red); }
+  button {
+    background: var(--bg); color: var(--ink); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  #stage { overflow: auto; padding: 20px; }
+  #make { max-width: 720px; margin: 20px; padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; font-size: 13px; }
+  #make p { margin: 0 0 10px; color: var(--muted); }
+  #make textarea { width: 100%; height: 140px; margin: 10px 0; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font: 12px Consolas, monospace; }
+  #make .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button.main { background: var(--accent); color: #fff; border-color: var(--accent); }
+  svg text { font-size: 13px; fill: var(--ink); }
+  svg rect { fill: var(--card); stroke: var(--border); rx: 8; }
+  svg g.root rect { fill: var(--accent); stroke: var(--accent); }
+  svg g.root text { fill: #fff; font-weight: 700; }
+  svg g.closed rect { stroke: var(--accent); stroke-dasharray: 4 3; }
+  svg g.parent { cursor: pointer; }
+  svg path { fill: none; stroke: var(--border); stroke-width: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <b>心智圖</b>
+  <span id="state">讀取中…</span>
+  <button id="again" hidden>重新產生</button>
+  <button id="save" hidden>存成圖片</button>
+</header>
+<div id="make" hidden>
+  <p>心智圖從逐字稿整理出來。會議還在進行時，用的是目前為止的逐字稿。</p>
+  <div class="row">
+    <button id="copy" class="main">1. 複製 prompt</button>
+    <button id="api" hidden>或：用 API 直接產生（計費，逐字稿會送到 Anthropic）</button>
+  </div>
+  <p style="margin-top:10px">把 prompt 貼給任一 AI（Claude、ChatGPT 都可以），再把它回的 JSON 貼在下面。</p>
+  <textarea id="pasted" placeholder="貼上 AI 回傳的 JSON..."></textarea>
+  <button id="draw" class="main">2. 畫出心智圖</button>
+</div>
+<div id="stage"></div>
+<script>
+const query = new URLSearchParams(location.search);
+const target = query.get("job") ? { job: query.get("job") } : { session: query.get("session") || "latest" };
+const source = new URLSearchParams(target).toString();
+const $ = (id) => document.getElementById(id);
+const stage = document.getElementById("stage");
+const state = document.getElementById("state");
+const closed = new Set();                             // 收合的節點（以路徑為鍵）
+const LINE = 18, PAD = 8, GAP_X = 44, GAP_Y = 10, WRAP = 22;
+let tree = null;
+
+const units = (s) => [...s].reduce((n, c) => n + (c.charCodeAt(0) > 0x2e7f ? 1 : 0.55), 0);
+
+function wrap(text) {
+  const lines = [];
+  let line = "";
+  for (const c of text) {
+    if (units(line + c) > WRAP) { lines.push(line); line = ""; }
+    line += c;
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
+}
+
+// 先量每個節點的框，再由葉子往上排 y：父節點置中於子節點。
+function measure(node, path, depth) {
+  const lines = wrap(node.text);
+  const kids = closed.has(path) ? [] : node.children.map((c, i) => measure(c, `${path}/${i}`, depth + 1));
+  return { node, path, depth, lines, kids,
+           w: Math.max(...lines.map(units)) * 13.5 + PAD * 2, h: lines.length * LINE + PAD * 2 };
+}
+
+function place(box, colX, top) {
+  box.x = colX[box.depth];
+  if (!box.kids.length) { box.y = top; return top + box.h + GAP_Y; }
+  let next = top;
+  for (const k of box.kids) next = place(k, colX, next);
+  const first = box.kids[0], last = box.kids[box.kids.length - 1];
+  box.y = (first.y + first.h / 2 + last.y + last.h / 2) / 2 - box.h / 2;
+  return Math.max(next, box.y + box.h + GAP_Y);
+}
+
+function draw() {
+  const root = measure(tree, "r", 0);
+  const all = [];
+  (function walk(b) { all.push(b); b.kids.forEach(walk); })(root);
+  const colW = [];
+  for (const b of all) colW[b.depth] = Math.max(colW[b.depth] || 0, b.w);
+  const colX = [];
+  colW.reduce((x, w, i) => (colX[i] = x, x + w + GAP_X), 0);
+  const height = place(root, colX, 0);
+  const width = colX[colX.length - 1] + colW[colW.length - 1];
+
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  let links = "", boxes = "";
+  for (const b of all) {
+    for (const k of b.kids) {
+      const x1 = b.x + b.w, y1 = b.y + b.h / 2, x2 = k.x, y2 = k.y + k.h / 2, mid = (x1 + x2) / 2;
+      links += `<path d="M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}"/>`;
+    }
+    const cls = [b.depth ? "" : "root", b.node.children.length ? "parent" : "", closed.has(b.path) ? "closed" : ""].join(" ");
+    const text = b.lines.map((l, i) => `<tspan x="${b.x + PAD}" y="${b.y + PAD + 13 + i * LINE}">${esc(l)}</tspan>`).join("");
+    boxes += `<g class="${cls}" data-path="${b.path}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"/><text>${text}</text></g>`;
+  }
+  stage.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${width + 2}" height="${height + 2}" viewBox="-1 -1 ${width + 2} ${height + 2}">${links}${boxes}</svg>`;
+}
+
+stage.addEventListener("click", (e) => {
+  const g = e.target.closest("g.parent");
+  if (!g) return;
+  const path = g.dataset.path;
+  closed.has(path) ? closed.delete(path) : closed.add(path);
+  draw();
+});
+
+function fail(e) {
+  state.className = "err";
+  state.textContent = e.message;
+}
+
+async function api(path, options) {
+  const resp = await fetch(path, options);
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(body.detail || `HTTP ${resp.status}`);
+  return body;
+}
+
+function show(newTree) {
+  tree = newTree;
+  closed.clear();
+  $("make").hidden = !!tree;
+  $("again").hidden = $("save").hidden = !tree;
+  stage.innerHTML = "";
+  state.className = "";
+  state.textContent = tree ? "點方塊可以收合。" : "這份逐字稿還沒有心智圖。";
+  if (tree) draw();
+}
+
+async function make(text) {
+  state.className = "";
+  state.textContent = "產生中…";
+  try {
+    show((await api("/api/mindmap", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...target, text }),
+    })).tree);
+  } catch (e) { fail(e); }
+}
+
+$("copy").addEventListener("click", async () => {
+  try {
+    const resp = await fetch(`/api/mindmap/prompt?${source}`);
+    if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || `HTTP ${resp.status}`);
+    await navigator.clipboard.writeText(await resp.text());
+    state.className = "";
+    state.textContent = "prompt 已複製，貼給 AI。";
+  } catch (e) { fail(e); }
+});
+$("draw").addEventListener("click", () => {
+  const text = $("pasted").value.trim();
+  if (text) make(text); else fail(new Error("還沒貼上 AI 回傳的 JSON"));
+});
+$("api").addEventListener("click", () => make(""));
+$("again").addEventListener("click", () => { $("make").hidden = false; });
+
+api(`/api/mindmap?${source}`).then((data) => {
+  $("api").hidden = !data.has_api_key;
+  show(data.tree);
+}).catch(fail);
+
+document.getElementById("save").addEventListener("click", () => {
+  const svg = stage.querySelector("svg");
+  if (!svg) return;
+  // 樣式寫進檔案裡，離開這個頁面打開也長一樣。
+  const css = [...document.styleSheets[0].cssRules].filter((r) => r.selectorText && r.selectorText.startsWith("svg"))
+    .map((r) => r.cssText).join("").replace(/var\((--[a-z]+)\)/g, (_, v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim());
+  const file = svg.outerHTML.replace(/^<svg([^>]*)>/, `<svg$1 font-family="Segoe UI, Microsoft JhengHei, sans-serif"><style>${css}</style>`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([file], { type: "image/svg+xml" }));
+  a.download = "心智圖.svg";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+</script>
+</body>
+</html>

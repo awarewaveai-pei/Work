@@ -112,6 +112,12 @@
     </div>
   </div>
 
+  <div class="card" id="ownvoiceCard" style="display:none">
+    <b style="font-size:14px">OwnVoice 會議</b>
+    <p class="hint">OwnVoice Meet 存下來的會議。「會後整理」用錄音重做一份分角色的正式逐字稿、會議記錄和 PPT，選項沿用下方的勾選。</p>
+    <div id="ownvoiceList"></div>
+  </div>
+
   <div class="card" id="uploadCard">
     <div id="drop">
       <p class="big">拖拉檔案到這裡，或點擊選擇</p>
@@ -126,6 +132,12 @@
           <option value="medium">medium（快）</option>
         </select>
       </label>
+    </div>
+    <div class="opts" style="margin-top:10px">
+      <span style="color:var(--muted)">會議語言</span>
+      <label><input type="radio" name="langOpt" value="zh" checked> 中文</label>
+      <label><input type="radio" name="langOpt" value="en"> 英文</label>
+      <label><input type="radio" name="langOpt" value="auto"> 自動判斷</label>
     </div>
     <div class="opts" style="margin-top:10px">
       <label><input type="checkbox" id="syncDriveOpt"> 完成後同步到 Google Drive（ECT/會議記錄/日期）</label>
@@ -262,6 +274,7 @@ startBtn.addEventListener("click", async () => {
   const model = document.getElementById("modelOpt").value;
   const syncDrive = document.getElementById("syncDriveOpt").checked;
   const useApi = document.getElementById("useApiOpt").checked;
+  const language = document.querySelector("input[name=langOpt]:checked").value;
 
   const fd = new FormData();
   fd.append("file", file);
@@ -272,7 +285,7 @@ startBtn.addEventListener("click", async () => {
 
   let resp;
   try {
-    resp = await fetch(`/api/upload?diarize=${diarize}&model=${model}&sync_drive=${syncDrive}&use_api=${useApi}`, { method: "POST", body: fd });
+    resp = await fetch(`/api/upload?diarize=${diarize}&model=${model}&sync_drive=${syncDrive}&use_api=${useApi}&language=${language}`, { method: "POST", body: fd });
   } catch (e) {
     showError("上傳失敗：" + e);
     return;
@@ -284,6 +297,38 @@ startBtn.addEventListener("click", async () => {
   }
   const { job_id } = await resp.json();
   poll(job_id);
+});
+
+// --- OwnVoice 會議 ---
+const LANGUAGE_LABELS = { zh: "中文", en: "英文", auto: "自動判斷" };
+async function loadOwnvoice() {
+  const data = await (await fetch("/api/ownvoice/sessions")).json();
+  if (!data.sessions.length) return;
+  document.getElementById("ownvoiceCard").style.display = "block";
+  document.getElementById("ownvoiceList").innerHTML = data.sessions.map(s => `
+    <div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:13px">
+      <span style="flex:1">${s.id}${s.wavs ? "" : "（沒有錄音，無法會後整理）"}</span>
+      ${s.transcript ? `<a class="copyBtn" style="margin-top:0;text-decoration:none" href="/mindmap?session=${encodeURIComponent(s.id)}" target="_blank">心智圖</a>` : ""}
+      <button class="copyBtn" style="margin-top:0" data-session="${s.id}" ${s.wavs ? "" : "disabled"}>會後整理（${LANGUAGE_LABELS[data.language]}）</button>
+    </div>`).join("");
+}
+loadOwnvoice();
+
+document.getElementById("ownvoiceList").addEventListener("click", async (e) => {
+  const session = e.target.dataset.session;
+  if (!session) return;
+  document.getElementById("ownvoiceCard").style.display = "none";
+  document.getElementById("uploadCard").style.display = "none";
+  document.getElementById("progressCard").style.display = "block";
+  renderStages("preflight");
+  const resp = await fetch("/api/ownvoice/import", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session, diarize: document.getElementById("diarizeOpt").checked,
+                           use_api: document.getElementById("useApiOpt").checked }),
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showError(body.detail || `匯入失敗（HTTP ${resp.status}）`); return; }
+  poll(body.job_id);
 });
 
 function renderStages(activeStage, doneSet) {
@@ -453,7 +498,7 @@ function showResult(jobId, status) {
     }
   }
   html += `<div class="downloads">${Object.entries(DOWNLOAD_LABELS).map(([kind, label]) =>
-    `<a href="/api/download/${jobId}/${kind}" target="_blank">${label}</a>`).join("")}</div>`;
+    `<a href="/api/download/${jobId}/${kind}" target="_blank">${label}</a>`).join("")}<a href="/mindmap?job=${jobId}" target="_blank">心智圖</a></div>`;
   document.getElementById("resultBody").innerHTML = html;
 }
 </script>

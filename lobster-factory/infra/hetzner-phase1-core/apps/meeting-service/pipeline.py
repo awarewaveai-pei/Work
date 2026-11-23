@@ -99,7 +99,7 @@ def write_status(job_dir: str, **fields):
 
 def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-v3",
                          do_diarize: bool = True, sync_drive: bool = False,
-                         use_api: bool = False, api_key: str = "") -> None:
+                         use_api: bool = False, api_key: str = "", language: str = "zh") -> None:
     """呼叫端（app.py）用背景執行緒跑這個函式。結束時 stage 為
     awaiting_summary（成功）或 error（失敗），不會是 done。
 
@@ -118,7 +118,7 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
 
     try:
         write_status(job_dir, stage="transcribe")
-        result = transcribe(media_path, model_name=model_name, log=log)
+        result = transcribe(media_path, model_name=model_name, log=log, language=language)
         json.dump(result, open(os.path.join(job_dir, "transcript.json"), "w", encoding="utf-8"),
                   ensure_ascii=False, indent=2)
         write_srt(result["segments"], os.path.join(job_dir, "transcript.srt"))

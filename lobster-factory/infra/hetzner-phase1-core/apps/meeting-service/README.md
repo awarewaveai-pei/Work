@@ -101,6 +101,27 @@ python app.py
 
 **摘要階段預設不需要 API key**（人工回路模式）。想用 API 自動處理見下方「摘要階段二：API 自動處理」。
 
+## OwnVoice Meet 整合（2026-11-23）
+
+OwnVoice Meet 管會議中（字幕、翻譯、回覆），本工具管查詢與會後。**不改 OwnVoice 的程式**：
+只讀它存下的會議資料夾（文件 › OwnVoice Meet › `YYYY-MM-DD HHMM`），格式只有 `lib/ownvoice.py` 知道。
+OwnVoice 設定的存檔模式要選「錄音與逐字稿」才有錄音可做會後整理。
+
+| 功能 | 怎麼用 | 程式 |
+|---|---|---|
+| 反白查詢 | 在 OwnVoice 字幕反白 → `Ctrl+Shift+F7` → 小面板自動搜尋網路；「問 AI」按了才問（計費，用設定頁的 key） | `lookup_panel.py`、`lib/lookup.py` |
+| 會後整理 | 首頁「OwnVoice 會議」卡 →「會後整理」：各段錄音接成一檔，走跟上傳相同的流程；語言跟 OwnVoice 設定 | `lib/ownvoice.py`、`POST /api/ownvoice/import` |
+| 心智圖 | 從**逐字稿**產生：會議中 `/mindmap?session=latest`（OwnVoice 目前為止的 transcript.md）；會後 `/mindmap?job=<id>`（diarized.txt，沒有就 merged.txt）。預設「複製 prompt → 貼回 AI 的 JSON」零費用；有 API key 可直接產生（計費）。結果存 `jobs/<id>/mindmap.json` 或 `jobs/ownvoice-mindmaps/` | `lib/mindmap.py`、`templates/mindmap.html` |
+
+- 小面板由 `start_server.ps1` 順便開（重複啟動自己擋）；只用標準函式庫，因為 SAC 會擋未簽章的執行檔與 .pyd。
+- 快捷鍵不可改成 `Ctrl+Shift+Space`／`F8`／`F9`：OwnVoice 自己佔用（2026-11-23 實測 F8 會讓它的滑鼠穿透鍵註冊失敗）。
+- 搜尋用環境變數 `SERPER_API_KEY`。搜尋與問 AI 都會把反白的文字送出這台電腦，所以只在按下時才送。
+  問 AI 另外會附上這場會議逐字稿的最後一段當上下文（只取 30 分鐘內還在更新的那一場）。
+- 取字是對前景視窗送 Ctrl+C：剪貼簿原本是文字會還原；原本是圖片或檔案會被蓋掉。
+- 只在 Windows 原生模式可用；伺服器退到 WSL2 時讀不到 OwnVoice 的資料夾，首頁不顯示該卡。
+- 會議還在錄音時不能做會後整理（`lib/ownvoice.py` join_wavs 會拒絕），先在 OwnVoice 按停止。
+- 為什麼不改 OwnVoice：SAC 擋本機建出的未簽章執行檔（`cargo build` 在 build script 就 os error 4551）。
+
 ## 摘要階段一：貼上式人工回路（預設，零費用）
 
 轉錄/合併/幻覺偵測/講者分離全自動跑完後，頁面停在「等待貼上摘要」：

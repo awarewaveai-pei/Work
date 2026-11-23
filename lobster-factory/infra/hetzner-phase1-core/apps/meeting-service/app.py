@@ -17,7 +17,8 @@ import uuid
 from fastapi import Body, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
-from lib import settings, summarize
+from lib import lookup, mindmap, ownvoice, settings, summarize
+from lib.transcribe import LANGUAGES
 from pipeline import resume_after_summary, run_pipeline_phase1, run_video_transcription
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -40,16 +41,34 @@ def _job_dir(job_id: str) -> str:
     return d
 
 
+def _page(name: str) -> str:
+    with open(os.path.join(BASE_DIR, "templates", name), encoding="utf-8") as f:
+        return f.read()
+
+
+def _check_language(language: str) -> None:
+    if language not in LANGUAGES:
+        raise HTTPException(400, f"不支援的語言 {language}；可選：{', '.join(LANGUAGES)}")
+
+
+def _api_key_for(use_api: bool) -> str:
+    """key 在請求當下讀出、往下傳給背景 thread（理由見 upload()）。"""
+    api_key = settings.get_api_key() if use_api else ""
+    if use_api and not api_key:
+        raise HTTPException(400, "尚未在設定頁填入 API key，無法使用 API 自動處理")
+    return api_key
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
-    with open(os.path.join(BASE_DIR, "templates", "index.html"), encoding="utf-8") as f:
-        return f.read()
+    return _page("index.html")
 
 
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...), diarize: bool = True,
                   model: str = "large-v3", sync_drive: bool = False,
-                  use_api: bool = False):
+                  use_api: bool = False, language: str = "zh"):
+    _check_language(language)
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"不支援的副檔名 {ext}；允許：{', '.join(sorted(ALLOWED_EXT))}")
@@ -57,9 +76,7 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
     # key 在上傳當下就讀出來、往下傳給背景 thread，不要讓 thread 自己在跑到
     # 摘要階段時才去讀 settings.py 目前的值——轉錄+講者分離常常要跑好幾分鐘，
     # 這段時間夠使用者在設定頁換掉或清除 key，屆時才讀會用錯 key 或誤退回人工。
-    api_key = settings.get_api_key() if use_api else ""
-    if use_api and not api_key:
-        raise HTTPException(400, "尚未在設定頁填入 API key，無法使用 API 自動處理")
+    api_key = _api_key_for(use_api)
 
     job_id = uuid.uuid4().hex[:12]
     job_dir = os.path.join(JOBS_DIR, job_id)
@@ -85,12 +102,149 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
         target=run_pipeline_phase1,
         args=(job_dir, media_path),
         kwargs={"model_name": model, "do_diarize": diarize, "sync_drive": sync_drive,
-                "use_api": use_api, "api_key": api_key},
+                "use_api": use_api, "api_key": api_key, "language": language},
         daemon=True,
     )
     thread.start()
 
     return {"job_id": job_id}
+
+
+# ---------- OwnVoice Meet：會議中查詢、會後整理、心智圖（資料夾格式只有 lib/ownvoice.py 知道） ----------
+
+def _ownvoice(call, *args):
+    try:
+        return call(*args)
+    except KeyError as e:
+        raise HTTPException(404, str(e.args[0]))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/ownvoice/sessions")
+def ownvoice_sessions():
+    return {"sessions": ownvoice.sessions(), "language": ownvoice.language(), "dir": ownvoice.base_dir()}
+
+
+@app.post("/api/ownvoice/import")
+def ownvoice_import(body: dict = Body(...)):
+    """把一場 OwnVoice 會議的錄音接成一個檔，走跟上傳一樣的流程。"""
+    language = body.get("language") or ownvoice.language()
+    _check_language(language)
+    use_api = bool(body.get("use_api"))
+    api_key = _api_key_for(use_api)
+    # "latest" 在這裡定成實際資料夾名，之後不再重新解析（中途開了新會議也不會接到另一場）。
+    session_id = os.path.basename(_ownvoice(ownvoice.session_dir, str(body.get("session", ""))))
+
+    job_id = uuid.uuid4().hex[:12]
+    job_dir = os.path.join(JOBS_DIR, job_id)
+    os.makedirs(job_dir)
+    media_path = os.path.join(job_dir, "input.wav")
+    try:
+        _ownvoice(ownvoice.join_wavs, session_id, media_path)
+    except Exception:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
+    threading.Thread(
+        target=run_pipeline_phase1, args=(job_dir, media_path),
+        kwargs={"do_diarize": bool(body.get("diarize", True)), "use_api": use_api,
+                "api_key": api_key, "language": language},
+        daemon=True,
+    ).start()
+    return {"job_id": job_id}
+
+
+@app.post("/api/lookup/search")
+def lookup_search(body: dict = Body(...)):
+    query = str(body.get("q", "")).strip()
+    if not query:
+        raise HTTPException(400, "沒有要搜尋的文字")
+    key = os.environ.get("SERPER_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(400, "這台電腦沒有設定搜尋金鑰（環境變數 SERPER_API_KEY）")
+    try:
+        return {"results": lookup.search(query, key)}
+    except Exception as e:
+        raise HTTPException(502, f"搜尋失敗：{type(e).__name__}: {e}")
+
+
+@app.post("/api/lookup/ask")
+def lookup_ask(body: dict = Body(...)):
+    text = str(body.get("text", "")).strip()
+    if not text:
+        raise HTTPException(400, "沒有要問的文字")
+    api_key = settings.get_api_key()
+    if not api_key:
+        raise HTTPException(400, "問 AI 要先在 http://127.0.0.1:8420 的「API 設定」填入 Anthropic API key")
+    try:
+        return lookup.ask(text, ownvoice.live_transcript(), api_key)
+    except Exception as e:
+        raise HTTPException(502, f"問 AI 失敗：{type(e).__name__}: {e}")
+
+
+@app.get("/mindmap", response_class=HTMLResponse)
+def mindmap_page():
+    return _page("mindmap.html")
+
+
+def _mindmap_source(job: str, session: str) -> tuple:
+    """回傳 (逐字稿, 心智圖存檔路徑)。job = 會後的正式逐字稿；session = OwnVoice 目前為止的逐字稿。"""
+    if job:
+        job_dir = _job_dir(job)
+        for name in ("diarized.txt", "merged.txt"):     # 有分角色的版本就用它
+            path = os.path.join(job_dir, name)
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    return f.read(), os.path.join(job_dir, "mindmap.json")
+        raise HTTPException(404, "逐字稿還沒產生（轉錄完成後才能做心智圖）")
+    session_id = os.path.basename(_ownvoice(ownvoice.session_dir, session or "latest"))
+    transcript = ownvoice.read_text(session_id, "transcript.md")
+    if not transcript.strip():
+        raise HTTPException(404, "OwnVoice 還沒寫出逐字稿（存檔模式要開，而且至少說完一句話）")
+    # OwnVoice 的資料夾只讀不寫，會議中的心智圖存在自己的 jobs/ 底下
+    return transcript, os.path.join(JOBS_DIR, "ownvoice-mindmaps", f"{session_id}.json")
+
+
+@app.get("/api/mindmap")
+def mindmap_get(job: str = "", session: str = ""):
+    """已經產生過就回那張圖；還沒有回 tree=null，頁面顯示產生的做法。"""
+    _, path = _mindmap_source(job, session)
+    tree = None
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            tree = json.load(f)
+    return {"tree": tree, "has_api_key": settings.has_api_key()}
+
+
+@app.get("/api/mindmap/prompt")
+def mindmap_prompt(job: str = "", session: str = ""):
+    return PlainTextResponse(mindmap.build_prompt(_mindmap_source(job, session)[0]))
+
+
+@app.post("/api/mindmap")
+def mindmap_make(body: dict = Body(...)):
+    """body.text = 貼回的 AI 回覆（零費用）；沒給就用設定頁的 key 呼叫 API（計費，逐字稿會送出去）。"""
+    transcript, path = _mindmap_source(str(body.get("job", "")), str(body.get("session", "")))
+    pasted = str(body.get("text", "")).strip()
+    if pasted:
+        try:
+            tree = mindmap.parse_tree(pasted)
+        except ValueError as e:      # json.JSONDecodeError 也是 ValueError
+            raise HTTPException(400, f"貼回的內容看不懂：{e}")
+    else:
+        api_key = settings.get_api_key()
+        if not api_key:
+            raise HTTPException(400, "還沒在「API 設定」填 key；請用「複製 prompt → 貼回」的做法")
+        try:
+            tree = mindmap.generate(transcript, api_key)
+        except Exception as e:
+            raise HTTPException(502, f"產生失敗：{type(e).__name__}: {e}")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.tmp{os.getpid()}.{threading.get_ident()}"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(tree, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+    return {"tree": tree}
 
 
 @app.post("/api/video/transcribe")

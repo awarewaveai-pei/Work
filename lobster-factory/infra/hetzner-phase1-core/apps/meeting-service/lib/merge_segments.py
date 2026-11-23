@@ -2,7 +2,7 @@
 
 whisper + VAD 常把一句話拆成 3-4 段（實測平均 1.56 秒/段）。純後處理，不重跑轉錄。
 """
-import re
+from .transcribe import joined_text
 
 GAP_MERGE = 0.8
 MAX_CHARS = 120
@@ -28,8 +28,7 @@ def merge(segments: list) -> list:
             joinable = True
 
         if joinable:
-            sep = "" if re.search(r"[一-鿿]$", cur["text"]) and re.match(r"^[一-鿿]", s["text"]) else " "
-            cur["text"] = (cur["text"] + sep + s["text"]).strip()
+            cur["text"] = joined_text((cur["text"], s["text"]))
             cur["end"] = s["end"]
             cur["ids"].append(s["id"])
             cur["min_lp"] = min(cur["min_lp"], s["avg_logprob"])

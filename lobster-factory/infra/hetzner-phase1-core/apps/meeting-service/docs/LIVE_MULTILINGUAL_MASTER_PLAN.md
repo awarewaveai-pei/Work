@@ -27,6 +27,7 @@
 - 最後 commit：—
 - 阻塞：WC-LM-02 需操作者提供音檔與校對稿
 - 下一步：WC-LM-00
+- 先行落地（2026-11-23，OwnVoice 整合，非本計畫的卡）：`language`（zh／en／auto）已接通 `upload()`→`run_pipeline_phase1()`→`transcribe()`，幻覺偵測語速改用音節單位。P1 相關卡開工時以這個現況為基線，hotwords／LANG_PROMPTS／評測仍未做。
 
 ## §1 現況發現（全部已讀檔驗證，`file:line`）
 

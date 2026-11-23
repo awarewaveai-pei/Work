@@ -1,4 +1,42 @@
 # Worklog
+## 2026-11-23（續6）— meeting-service × OwnVoice Meet：反白查詢、會後整理、心智圖（操作者：「你決定」）
+
+- 根因／決策：操作者要把 OwnVoice Meet（會議中字幕翻譯）與 meeting-service（會後分角色＋整理）合成一個工具，另加反白查詢與心智圖。改 OwnVoice 原始碼走不通：這台筆電 Smart App Control 擋本機建出的未簽章執行檔（`cargo build` 在 build script 即 `os error 4551`）。定案：不改 OwnVoice，只讀它寫的會議資料夾；格式唯一讀取點 `apps/meeting-service/lib/ownvoice.py`。
+- 已修改（皆在 `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/`）
+  - `lib/ownvoice.py` 新：列會議、讀 transcript.md／summary.md、接合各段 WAV（錄音中拒絕）、`live_transcript()`（30 分鐘內才回）
+  - `lib/lookup.py` 新：Serper 搜尋、Anthropic `claude-haiku-5-5` 問答
+  - `lib/mindmap.py` 新＋`templates/mindmap.html` 新：逐字稿 → prompt → AI 回的 JSON（貼回，或 API）→ 驗形狀 → SVG。第一版讀摘要／minutes.json，操作者更正「是要用逐字稿去做心智圖」後重寫，舊兩條來源已刪
+  - `lookup_panel.py` 新：stdlib-only Tk 面板，`Ctrl+Shift+F7` 取反白文字
+  - `app.py`：`/api/ownvoice/sessions|import`、`/api/lookup/search|ask`、`/mindmap`、`GET|POST /api/mindmap`、`/api/mindmap/prompt`；`upload()` 加 `language`
+  - `pipeline.py`：`language` 傳給 `transcribe()`；`lib/transcribe.py`／`lib/hallucination.py`：`language` 參數、`joined_text`、音節單位語速（2026-11-22 前一個 session 留下未提交，本次接手一併提交）
+  - `lib/diarize.py`：同講者合併改用 `_join`（原本 `+=` 把英文字黏在一起）；`lib/merge_segments.py` 改用 `joined_text`
+  - `templates/index.html`：OwnVoice 會議卡、語言選項、心智圖連結；`start_server.ps1`：順便開面板
+- 實測中抓到並修掉
+  - M1 快捷鍵原用 `Ctrl+Shift+F8`，與 OwnVoice 滑鼠穿透鍵相撞（OwnVoice 狀態列顯示註冊失敗）→ 改 F7，重測無誤
+  - M2 英文會議的 `diarized.txt` 字黏在一起（`March,because`）→ 修後 `March, because`
+  - m1 會議錄音中按會後整理會接出殘缺檔 → 400「還在錄音」
+  - m2 問 AI 可能附上更早另一場會議的逐字稿 → 只取 30 分鐘內更新的那場
+  - m3 心智圖的樹來自 AI 或手貼，不可信 → `parse_tree` 只留形狀對的節點並限層數／數量／長度
+  - m4 面板：前一題的 AI 回答晚到會蓋掉新題 → 每種查詢各記最後一次的代數
+- 未修（記錄原因）
+  - 剪貼簿原本是圖片／檔案時會被取字的 Ctrl+C 蓋掉：完整備份所有格式需 ctypes 逐格式複製，換來的只是少見情況；README 已寫明
+  - WSL2 後備模式下 OwnVoice 整合不可用：WSL2 venv 本來就未建置（README），只把錯誤訊息改成說實話
+- 驗證
+  - 單元測試 30 passed（`python -m pytest tests -q`）
+  - 匯入：暫存資料夾做一場兩段英文 TTS 會議 → `/api/ownvoice/import` → 轉錄 `cuda/float16`、講者 A、兩段依序接合
+  - 搜尋：`/api/lookup/search` 真打 Serper 回 5 筆；問 AI：未設定 key 回 400 提示（真實 API 未跑）
+  - 心智圖：瀏覽器開 `/mindmap?session=latest` → 貼回一份 JSON → 畫出 8 個方塊，重新整理後由存檔讀回；無 key 的 API 路徑回 400 提示；舊 job `6a8a0cba2b3e` 的 prompt 43906 bytes（API 產生路徑未對真實 API 跑過）
+  - 面板：開真的 `OwnVoice Meet.exe` 示範字幕，模擬滑鼠反白＋快捷鍵，截圖確認面板顯示取到的句子與搜尋結果、剪貼簿還原
+  - 突變：拔掉 `session_dir` 的名稱檢查 → `test_only_existing_session_names_resolve` 3 例紅；還原 → 綠
+  - 環境觀察：測試中 `_torchaudio.pyd` 被 SAC 暫擋一次（CodeIntegrity 3077），數分鐘後自行放行；與本次改動無關，pipeline 依既有設計退回無講者標籤
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest tests -q ; curl POST /api/ownvoice/import ; curl POST /api/lookup/search ; powershell e2e-hotkey.ps1（真 OwnVoice Meet.exe） | exit=0 | ms=420000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/5n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=run_pipeline_phase1 | hits=16
+- 審查範圍註記：critic 審的是第一版；之後重寫的 `lib/mindmap.py` 與 `/api/mindmap*` 三條路由未經 critic，以書面自審代替——路徑只經 `_job_dir`／`session_dir`、樹經 `parse_tree` 裁切、頁面輸出經 `esc()`、存檔 tmp+`os.replace`；`tests/test_mindmap.py` 4 組
+- ORACLE_WAIVED: Codex 額度擋到 2026-11-24 11:02（scripts/oracle-quota.ps1 exit 3）；改由 critic 獨立審查（2 Major 已修）＋突變證據
+- 順手修：`verify-build-gates` 紅在 `scripts/__tests__/down-migration-copies.test.mjs`——SF-B（676014cd5）的 0176_site_flow 只有 `migrations/` 那份 down，補上位元組相同的 `packages/db/scripts/0176_site_flow_down.sql`（獨立 commit）
+- 剩餘風險：問 AI 與心智圖的 API 路徑未對真實 Anthropic API 跑過（設定頁無 key）；OwnVoice 改資料夾格式時要改 `lib/ownvoice.py`；真實多人會議的講者分離品質未在 OwnVoice 錄音上驗證（測試音檔為單一 TTS 聲音）
+- rollback：`git revert` 本 commit；OwnVoice 本身未被改動，無需還原
 ## 2026-11-23（續5）— 平台第 6 批上線：U8、U9、U10＋K12（High，VW 已部署、待正式站實點後收尾）
 
 - 操作者 2026-11-22「工人們反應的 RISKS 是否需要處理，先處理完風險再部署」＝ K12 的 go。原判「不在範圍」的兩條重看後在部署前處理：VW 既有紅測試、第 5 批部署失敗根因。

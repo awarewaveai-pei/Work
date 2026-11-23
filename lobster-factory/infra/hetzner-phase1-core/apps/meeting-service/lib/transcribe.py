@@ -20,6 +20,24 @@ import time
 
 ZH_PROMPT = "以下是一場繁體中文會議的錄音，請以臺灣用語的繁體中文輸出逐字稿。"
 
+# 上傳時選的語言 -> whisper 的 language 參數。"auto" = None，whisper 用前 30 秒判斷；
+# 會議前 30 秒常是寒暄或靜音，判錯就整場錯，所以預設維持 zh，auto 只在使用者選時用。
+LANGUAGES = {"zh": "zh", "en": "en", "auto": None}
+
+
+def joined_text(texts) -> str:
+    """接逐字稿片段：兩邊都是中日韓字元才不加空格，否則英文字會黏在一起。"""
+    import re
+    out = ""
+    for t in texts:
+        t = t.strip()
+        if not t:
+            continue
+        if out and not (re.search(r"[一-鿿]$", out) and re.match(r"^[一-鿿]", t)):
+            out += " "
+        out += t
+    return out
+
 
 def register_cuda_dlls():
     """CUDA 執行庫由 pip wheel 提供（nvidia-cublas-cu12 / nvidia-cudnn-cu12），
@@ -124,20 +142,23 @@ def preflight(path: str, log=print) -> float:
     return dur
 
 
-def transcribe(media_path: str, model_name: str = "large-v3", log=print) -> dict:
-    """回傳 transcript dict（不寫檔，由呼叫端決定輸出位置）。"""
+def transcribe(media_path: str, model_name: str = "large-v3", log=print, language: str = "zh") -> dict:
+    """回傳 transcript dict（不寫檔，由呼叫端決定輸出位置）。language 見 LANGUAGES。"""
+    if language not in LANGUAGES:
+        raise ValueError(f"不支援的語言 {language!r}；可選：{', '.join(LANGUAGES)}")
     preflight(media_path, log)
     log(f"[1/3] 載入模型 {model_name} ...")
     t0 = time.time()
     model, backend = pick_device(model_name, log)
     log(f"      backend={backend}  載入耗時 {time.time()-t0:.1f}s")
 
-    log(f"[2/3] 轉錄 {os.path.basename(media_path)} ...")
+    log(f"[2/3] 轉錄 {os.path.basename(media_path)}（語言 {language}）...")
     t1 = time.time()
     segments, info = model.transcribe(
         media_path,
-        language="zh",
-        initial_prompt=ZH_PROMPT,
+        language=LANGUAGES[language],
+        # 中文提示詞只給中文：給英文會議會把逐字稿拉成中文翻譯
+        initial_prompt=ZH_PROMPT if language == "zh" else None,
         vad_filter=True,
         vad_parameters={"min_silence_duration_ms": 500},
         beam_size=1,              # 實測：5->1 提速 29%
@@ -166,7 +187,7 @@ def transcribe(media_path: str, model_name: str = "large-v3", log=print) -> dict
         "transcribe_sec": round(elapsed, 2),
         "realtime_factor": round(dur / elapsed, 2) if elapsed else None,
         "segments": segs,
-        "full_text": "".join(s["text"] for s in segs),
+        "full_text": joined_text(s["text"] for s in segs),
     }
     log(f"[3/3] 完成 — 音檔 {dur:.1f}s / 轉錄 {elapsed:.1f}s / 速度 {out['realtime_factor']}x realtime")
     return out
