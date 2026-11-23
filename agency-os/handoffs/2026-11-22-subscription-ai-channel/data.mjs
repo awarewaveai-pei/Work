@@ -69,12 +69,12 @@ export const STEPS = [
   // 第四批
   { n: 14, code: 'K9', group: 'B4', title: '主機上的常駐執行程式', plain: '在主機開一個權限最小的帳號，只跑這支程式和 Codex。它讀不到網站、資料庫和其他金鑰。登入過期或額度用完會發 Telegram。',
     gate: '程式常駐；用那個帳號去讀主機其他地方全部被拒；後台顯示排程線在線。', risk: 'High（主機、憑證）', model: 'Opus 5.5', status: 'not_started', depends: ['DA'], card: K, before: '待決 1、待決 2、待決 3 之後' },
-  { n: 15, code: 'M1', group: 'B4', title: '額度恢復後的實測', plain: '11-24 之後：Codex 畫一張圖、寫一篇字、試著騙它讀本機檔案（必須讀不到）；量三篇文章各花多久、吃多少額度。', gate: '三項實測結果寫進「現況」；一篇超過兩分半就另開卡把排程改成分兩輪。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K9'], card: K, before: '待決 4 之後' },
+  { n: 15, code: 'M1', group: 'B4', title: '額度恢復後的實測', plain: '11-24 之後：Codex 畫一張圖、寫一篇字、試著騙它讀本機檔案（必須讀不到）；量三篇文章各花多久、吃多少額度。另外確認指定 GPT-6.2 sol 時 Codex 訂閱真的能寫（筆電專用登入先試，主機開通前再試）。', gate: '三項實測結果寫進「現況」；一篇超過兩分半就另開卡把排程改成分兩輪。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K9'], card: K, before: '待決 4 之後' },
   { n: 16, code: 'K15', group: 'B5', title: '文章預設模型換成 GPT-6.2 sol', plain: '盲測結果：GPT-6.2 sol 品質排第二，一篇約 NT$2，是原本預設（Claude Opus，約 NT$8）的四分之一。文章頁的預設和排程（網站沒另外選模型時）都改用它；畫面上的估價跟著改。十二個模型的實測結果同時記到「AI 模型與成本」的實測紀錄。',
     gate: '沒選過模型的網站，排程寫文章用的是 GPT-6.2 sol；估價顯示新的金額；已經選了別的模型的地方不受影響；實測紀錄多一組「文章生成」。', risk: 'Medium', model: 'Sonnet 5.5', status: 'done', commit: 'ed7263c36', depends: ['K12'], card: 'briefs/K15-K16.md' },
   { n: 17, code: 'K16', group: 'B5', title: '其他寫文案的地方要不要也換', plain: '文章以外寫文案的地方，八種全部各測一次再換（你 11-22 說「都要測」）：劇本工坊、影片腳本、商品文案、AI 去味、競業分析、每月選題、社群改寫、開發信寫信。每一種用一個真實的輸入，讓現在用的模型和 GPT-6.2 sol 各寫一次，並排給你看。要回固定格式的另外驗格式會不會壞。',
     gate: '八種各有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'in_progress', depends: ['K15'], card: 'briefs/K15-K16.md', before: '待決 5 之後才能補完 Claude 那一半' },  { n: 18, code: 'K17', group: 'B5', title: 'ChatGPT 訂閱也能選模型', plain: '現在 ChatGPT（Codex）訂閱只有一顆按鈕，用的是預設模型。改成和 Claude 訂閱一樣可以選：GPT-6 luna、GPT-6.1 terra、GPT-6.2 sol、GPT-6.2 astra，預設 GPT-6.2 sol。已查過你的訂閱清單裡有這四個。每個網站可以各自存。',
-    gate: '按鈕出現、選的模型真的送到執行程式；真的用訂閱寫一篇要等 Codex 額度恢復（M1）。', risk: 'Low', model: 'Sonnet', status: 'in_progress', depends: ['K6'], card: 'briefs/K17-codex-model.md' },
+    gate: '按鈕出現、選的模型真的送到執行程式；真的用訂閱寫一篇要等 Codex 額度恢復（M1）。', risk: 'Low', model: 'Sonnet', status: 'done', commit: 'db2cb07fa', depends: ['K6'], card: 'briefs/K17-codex-model.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
@@ -153,5 +153,8 @@ export const RISKS = [
     { card: 'K12', risk: '第一次跑到一半，另一個工作階段用正規工具改了主機設定，服務容器被重建，進行中的請求全部失敗。', act: '已查明並重跑：主機改檔紀錄上有那一筆，與實測無關。第二次改成一次跑一個模型，十二篇全部完成。' },
     { card: 'K12', risk: 'GPT-5.5 那篇被長度上限截斷。', act: '記錄：盲測頁的對照表以黃底標示；要不要調高它的長度上限，等你看完排名再定。' },
     { card: 'K12', risk: '文章頁的「本次費用」顯示的是美金。', act: '記錄：這是原本就有的顯示；併入下一張頁面小卡改成 NT$。' },
+  ] },
+  { batch: 'K17（ChatGPT 訂閱選模型）', rows: [
+    { card: 'K17', risk: '以前不指定模型，一定能跑。現在預設會指定 GPT-6.2 sol。模型清單是從筆電平常用的 Codex 查到的，寫字專用的登入和主機還沒實際試過；萬一不認這個名字，這一段會被跳過改走 API。', act: '現在沒有任何一條線在用 Codex 寫字（額度封鎖、筆電專用登入與主機都還沒設），所以今天上線不會多花錢。已加進 M1：額度恢復後先用這個模型真的寫一篇，主機那條線開通前也先試一次。' },
   ] },
 ];
