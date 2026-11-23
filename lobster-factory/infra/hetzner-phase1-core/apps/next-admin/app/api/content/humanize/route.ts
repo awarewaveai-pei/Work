@@ -5,11 +5,15 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
-import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams } from "@/lib/ai/gateway";
+import { claudeFallback, claudeIncomplete, claudeParams } from "@/lib/ai/gateway";
+import { openAiFallbackNote, openAiText, openAiUnusable } from "@/lib/ai/openai-text";
+import { isOpenAiTextModel, openAiCompletionBudget, resolveFeatureTextModel, TEXT_FEATURE_DEFAULTS } from "@/lib/ai/text-model-options";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const MAX_TOKENS = 6144;
 
 const AI_WORDS_BASIC = [
   "Additionally", "Furthermore", "Moreover", "In conclusion",
@@ -73,6 +77,8 @@ TASK: Rewrite the provided content to:
 
 Output ONLY the rewritten content in Markdown format, no preamble or explanation.`;
 
+  const model = resolveFeatureTextModel("humanize", undefined, !!process.env.OPENAI_API_KEY);
+  const claudeModel = TEXT_FEATURE_DEFAULTS.humanize.claude;
   const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   let anthropicStream: ReturnType<typeof client.beta.messages.stream> | null = null;
@@ -80,10 +86,29 @@ Output ONLY the rewritten content in Markdown format, no preamble or explanation
   const readable = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
+      const skipped: ReturnType<typeof openAiFallbackNote>[] = [];
       try {
+        // OpenAI answers whole (not streamed): an empty or cut-off answer must be seen before any of it reaches the page.
+        // Such an answer, or an OpenAI error, is redone on the feature's Claude model below; its spend still gets a cost line.
+        if (isOpenAiTextModel(model)) {
+          const r = await openAiText({ grant, model, system: systemPrompt, user: inputText, maxTokens: openAiCompletionBudget(MAX_TOKENS),
+            route: "/api/content/humanize", actorRole: role, signal: req.signal });
+          if (req.signal.aborted) return;
+          if (r.ok) {
+            const unusable = openAiUnusable(r);
+            const vendor = resolveTextRate(r.model).rate.vendor;
+            if (!unusable) {
+              controller.enqueue(encoder.encode(r.text));
+              controller.enqueue(encoder.encode(`\n[COST_JSON]${JSON.stringify({ usd: r.costUsd, model: r.model, vendor, route: "content/humanize" })}`));
+              return;
+            }
+            controller.enqueue(encoder.encode(`[COST_JSON]${JSON.stringify({ usd: r.costUsd, model: r.model, vendor, route: "content/humanize" })}\n`));
+            skipped.push(openAiFallbackNote(model, unusable));
+          }
+        }
         anthropicStream = client.beta.messages.stream({
-          ...claudeParams(CLAUDE_DEFAULT_MODEL, 6144),
-          ...claudeFallback(CLAUDE_DEFAULT_MODEL),
+          ...claudeParams(claudeModel, MAX_TOKENS),
+          ...claudeFallback(claudeModel),
           system: systemPrompt,
           messages: [{ role: "user", content: inputText }],
         });
@@ -106,7 +131,7 @@ Output ONLY the rewritten content in Markdown format, no preamble or explanation
             void logAiCall({ route: "/api/content/humanize", response: fm, actorRole: role, grant });
             const costUsd = textCallCostUsd({ model: fm.model, inputTokens: fm.usage.input_tokens, outputTokens: fm.usage.output_tokens, cacheReadTokens: fm.usage.cache_read_input_tokens, cacheWriteTokens: fm.usage.cache_creation_input_tokens });
             const { rate: hmRate } = resolveTextRate(fm.model);
-            controller.enqueue(encoder.encode(`\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: fm.model, vendor: hmRate.vendor, route: "content/humanize" })}`));
+            controller.enqueue(encoder.encode(`\n[COST_JSON]${JSON.stringify({ usd: costUsd, model: fm.model, vendor: hmRate.vendor, route: "content/humanize", ...(skipped.length ? { skipped } : {}) })}`));
           }
         }
       } catch {

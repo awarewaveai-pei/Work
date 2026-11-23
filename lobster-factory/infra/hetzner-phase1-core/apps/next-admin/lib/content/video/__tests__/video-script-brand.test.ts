@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock("@/lib/entitlements/grant", () => ({ grantFor: async () => ({}) }));
@@ -17,7 +17,9 @@ import { generateVideoScript } from "../video-script-core";
 const sent = () => m.create.mock.calls[0][0].messages[0].content as string;
 
 describe("video script prompt carries the site's brand voice", () => {
-  beforeEach(() => { m.create.mockReset().mockResolvedValue({}); });
+  beforeEach(() => { vi.stubEnv("OPENAI_API_KEY", ""); m.create.mockReset().mockResolvedValue({}); });
+  // no OpenAI key = the Claude API path these tests pin (the OpenAI default: video-script-openai.test.ts)
+  afterEach(() => vi.unstubAllEnvs());
 
   it("adds the brand block when a voice is given", async () => {
     await generateVideoScript({ topic: "感恩日記", brandVoice: "語氣: 溫暖\n避免使用/禁用聲明: 保證治癒" }, "k");

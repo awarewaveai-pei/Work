@@ -1,49 +1,31 @@
-// OpenAI API client for cold outreach message generation.
+// OpenAI for cold outreach message generation (the shared call: lib/ai/openai-text.ts).
 // SECURITY: API key is passed in; NEVER log it.
-import { providerUrl } from "@/lib/ai/gateway";
 import { OUTREACH_MAX_TOKENS, OUTREACH_AI_TIMEOUT_MS } from "./generation-schema";
 import type { Grant } from "@/lib/entitlements/can";
-import { logAiCall, openaiUsageTokens, type OpenAiUsageLike } from "@/lib/ai/log-ai-call";
+import { openAiText, openAiUnusable } from "@/lib/ai/openai-text";
+import { openAiCompletionBudget, TEXT_FEATURE_DEFAULTS } from "@/lib/ai/text-model-options";
 
 export interface OpenAIResult {
   text: string;
   model: string;
 }
 
+/** The host may pin another model with OPENAI_OUTREACH_MODEL; unset = the feature default (text-model-options.ts). */
 export const DEFAULT_OPENAI_MODEL =
-  process.env.OPENAI_OUTREACH_MODEL?.trim() || "gpt-5.4-mini";
+  process.env.OPENAI_OUTREACH_MODEL?.trim() || TEXT_FEATURE_DEFAULTS.outreach.model;
 
+/** Throws on any failure, an empty answer or one cut off at the limit included: generate.ts then hands the lead to the
+ *  next provider rung instead of parsing half an email. */
 export async function generateWithOpenAI(
   grant: Grant,
   apiKey: string,
   prompt: string,
   model = DEFAULT_OPENAI_MODEL,
 ): Promise<OpenAIResult> {
-  const resp = await fetch(providerUrl(grant, "openai", "/v1/chat/completions"), {
-    method: "POST",
-    signal: AbortSignal.timeout(OUTREACH_AI_TIMEOUT_MS),
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      // gpt-5 family: max_completion_tokens (max_tokens is a 400) and it covers reasoning tokens too.
-      max_completion_tokens: OUTREACH_MAX_TOKENS,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-  if (!resp.ok) {
-    const detail = await resp.text().catch(() => "");
-    throw new Error(`openai ${resp.status}: ${detail.slice(0, 200)}`);
-  }
-  const j = (await resp.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    model?: string;
-    usage?: OpenAiUsageLike;
-  };
-  void logAiCall({ route: "outreach/generate", model: j.model ?? model, ...openaiUsageTokens(j.usage), grant, tool: "outreach" });
-  const text = j.choices?.[0]?.message?.content?.trim() ?? "";
-  if (!text) throw new Error("openai: empty response");
-  return { text, model: j.model ?? model };
+  const r = await openAiText({ grant, apiKey, model, user: prompt, maxTokens: openAiCompletionBudget(OUTREACH_MAX_TOKENS),
+    route: "outreach/generate", tool: "outreach", timeoutMs: OUTREACH_AI_TIMEOUT_MS });
+  if ("error" in r) throw new Error(`openai ${r.error.replace(/^openai_/, "")}${r.detail ? `: ${r.detail}` : ""}`);
+  const unusable = openAiUnusable(r);
+  if (unusable) throw new Error(`openai: ${unusable === "openai_length" ? "cut off at the length limit" : "empty response"}`);
+  return { text: r.text.trim(), model: r.model };
 }

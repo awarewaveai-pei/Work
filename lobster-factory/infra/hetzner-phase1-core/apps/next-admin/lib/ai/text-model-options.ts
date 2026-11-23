@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { CLAUDE_DEFAULT_MODEL } from "./claude-params";
+import { CLAUDE_DEFAULT_MODEL, CLAUDE_FAST_MODEL } from "./claude-params";
 import { TEXT_RATES } from "./cost-model";
 
 // Ordered cheap → expensive within each group (price = lib/ai/cost-model.ts TEXT_RATES).
@@ -24,13 +24,35 @@ export type AiTextModel = (typeof AI_TEXT_MODELS)[number]["value"];
 export type AiTextModelGroup = (typeof AI_TEXT_MODELS)[number]["group"];
 
 export const DEFAULT_AI_TEXT_MODEL: AiTextModel = CLAUDE_DEFAULT_MODEL;
-/** Article generation only (other features keep DEFAULT_AI_TEXT_MODEL): 2026-11-22 blind test, agency-os/reports/model-bakeoff/2026-11-article/ (editor rank 2, NT$1.96/article vs Opus rank 4, NT$8.03). */
-export const DEFAULT_ARTICLE_TEXT_MODEL: AiTextModel = "gpt-6.2-sol";
 
-/** The model an article runs on when the caller picked none (or a dead id): the article default, but an install with no
- *  OpenAI key (buyout) falls back to the shared default so it can still write. A picked/saved model is never replaced. */
+/** Each text feature's default, declared once: `model` when the caller picked none, `claude` = the model it ran before (an
+ *  install with no OpenAI key, and the retry when an OpenAI answer comes back empty or cut off). Sources: articles
+ *  agency-os/reports/model-bakeoff/2026-11-article/ (K15); the other four 2026-11-copy/ (K16, operator 2026-11-23). */
+export const TEXT_FEATURE_DEFAULTS = {
+  article: { model: "gpt-6.2-sol", claude: DEFAULT_AI_TEXT_MODEL },
+  videoScript: { model: "gpt-6.2-sol", claude: CLAUDE_DEFAULT_MODEL },
+  socialRewrite: { model: "gpt-6.2-sol", claude: CLAUDE_FAST_MODEL },
+  humanize: { model: "gpt-6.2-sol", claude: CLAUDE_DEFAULT_MODEL },
+  outreach: { model: "gpt-6.2-sol", claude: CLAUDE_FAST_MODEL },
+} as const satisfies Record<string, { model: AiTextModel; claude: AiTextModel }>;
+export type TextFeature = keyof typeof TEXT_FEATURE_DEFAULTS;
+export const DEFAULT_ARTICLE_TEXT_MODEL: AiTextModel = TEXT_FEATURE_DEFAULTS.article.model;
+
+/** The model a feature runs on: a picked/saved model as-is (a retired id -> its successor); none (or a dead id) -> the
+ *  feature default; that default is an OpenAI model and there is no OpenAI key (buyout install) -> the feature's Claude model. */
+export function resolveFeatureTextModel(feature: TextFeature, picked: unknown, hasOpenAiKey: boolean): AiTextModel {
+  const d = TEXT_FEATURE_DEFAULTS[feature];
+  return resolveSavedAiTextModel(picked) ?? (hasOpenAiKey || !isOpenAiTextModel(d.model) ? d.model : d.claude);
+}
 export function resolveArticleTextModel(picked: unknown, hasOpenAiKey: boolean): AiTextModel {
-  return resolveSavedAiTextModel(picked) ?? (hasOpenAiKey ? DEFAULT_ARTICLE_TEXT_MODEL : DEFAULT_AI_TEXT_MODEL);
+  return resolveFeatureTextModel("article", picked, hasOpenAiKey);
+}
+
+/** An OpenAI reasoning model spends its thinking inside max_completion_tokens (product copy at 1,200: all 1,200 went to
+ *  reasoning, empty answer, 2026-11-copy/product-copy-retest.json). A feature's own output limit + this = its OpenAI budget. */
+export const OPENAI_REASONING_HEADROOM_TOKENS = 4096;
+export function openAiCompletionBudget(outputTokens: number): number {
+  return outputTokens + OPENAI_REASONING_HEADROOM_TOKENS;
 }
 export const AI_TEXT_MODEL_GROUPS: AiTextModelGroup[] = Array.from(new Set(AI_TEXT_MODELS.map((m) => m.group)));
 export const OPENAI_TEXT_MODELS: AiTextModel[] = AI_TEXT_MODELS

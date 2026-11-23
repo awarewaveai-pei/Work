@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => ({ create: vi.fn(), runSub: vi.fn(), apiText: "" }));
 vi.mock("@/lib/entitlements/grant", () => ({ grantFor: async () => ({ actor: "ops:x:someone" }) }));
@@ -21,7 +21,9 @@ const scenes = JSON.stringify({ title: "T", description: "D",
 const run = (extra: object) => generateVideoScript({ topic: "感恩日記", lane: "schedule", ...extra } as never, "k");
 
 describe("video script through the subscription chain", () => {
-  beforeEach(() => { m.create.mockReset().mockResolvedValue({}); m.runSub.mockReset(); m.apiText = scenes; });
+  beforeEach(() => { vi.stubEnv("OPENAI_API_KEY", ""); m.create.mockReset().mockResolvedValue({}); m.runSub.mockReset(); m.apiText = scenes; });
+  // no OpenAI key = the Claude API path these tests pin (the OpenAI default: video-script-openai.test.ts)
+  afterEach(() => vi.unstubAllEnvs());
 
   it("a subscription answer is parsed into scenes and the API is not called", async () => {
     m.runSub.mockResolvedValue({ text: scenes });

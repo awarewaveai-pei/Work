@@ -632,7 +632,7 @@ export async function prepareScenes(
     }));
     title = (input.articleTitle || input.topic || "影片").trim();
   } else {
-    input.onProgress?.("腳本生成中（Claude）…");
+    input.onProgress?.("腳本生成中…");
     const scriptResult = await generateVideoScript(
       {
         topic: input.topic,

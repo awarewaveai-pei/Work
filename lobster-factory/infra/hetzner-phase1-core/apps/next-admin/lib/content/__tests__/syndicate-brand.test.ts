@@ -28,6 +28,7 @@ const prompt = () => m.create.mock.calls[0][0].messages[0].content as string;
 describe("syndicate reads the site's stored brand voice", () => {
   beforeEach(() => {
     vi.stubEnv("ANTHROPIC_API_KEY", "k");
+    vi.stubEnv("OPENAI_API_KEY", ""); // the Claude path these tests pin; the OpenAI default: lib/ai/__tests__/openai-fallback.test.ts
     m.create.mockReset().mockResolvedValue({
       model: "claude-haiku", usage: { input_tokens: 1, output_tokens: 1 },
       content: [{ type: "text", text: '{"facebook":"貼文"}' }],

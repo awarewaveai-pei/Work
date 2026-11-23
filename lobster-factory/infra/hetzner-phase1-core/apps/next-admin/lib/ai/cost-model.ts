@@ -316,7 +316,7 @@ export interface FeatureProfile {
 
 export const TEXT_FEATURES: FeatureProfile[] = [
   { key: "article",     label: "文章生成 (Content Studio)", route: "/api/content/generate", model: "gpt-6.2-sol", inputTok: 5333, outputTok: 5062, extraUsd: 0.006 }, // tokens = 2026-11-22 real run (model-bakeoff/2026-11-article/ledger.jsonl)
-  { key: "humanize",    label: "AI 去味 / 人性化",          route: "/api/content/humanize", model: "claude-opus-5-5", inputTok: 4000, outputTok: 6000 },
+  { key: "humanize",    label: "AI 去味 / 人性化",          route: "/api/content/humanize", model: "gpt-6.2-sol", inputTok: 4000, outputTok: 6000 },
   { key: "seo-fix",     label: "SEO 修正 (RankMath)",        route: "/api/content/seo-fix",  model: "claude-haiku-5-5", inputTok: 4500, outputTok: 6000 },
   { key: "brand-voice", label: "品牌語氣擷取",               route: "/api/content/brand-voice", model: "claude-haiku-5-5", inputTok: 3000, outputTok: 1500 },
   { key: "outline",     label: "大綱生成",                   route: "/api/content/outline",  model: "claude-haiku-5-5", inputTok: 400, outputTok: 700 },
@@ -327,10 +327,10 @@ export const TEXT_FEATURES: FeatureProfile[] = [
   // lib/content/topics/daily.ts: 30 trend titles + the brand voice in, a score and reason each + 3 titles out
   { key: "content-daily", label: "每日熱題打分（30 則）",    route: "lib/schedules/content_pipeline:daily", model: "claude-haiku-5-5", inputTok: 2500, outputTok: 2500 },
   { key: "hook-brief",  label: "Hook Brief 草稿（批次）",     route: "/api/content/hook-brief", model: "claude-haiku-5-5", inputTok: 600, outputTok: 500 },
-  { key: "syndicate",   label: "社群多平台改寫",             route: "/api/content/syndicate", model: "claude-haiku-5-5", inputTok: 1500, outputTok: 2000 },
+  { key: "syndicate",   label: "社群多平台改寫",             route: "/api/content/syndicate", model: "gpt-6.2-sol", inputTok: 1500, outputTok: 2000 },
   { key: "tarot-prompt",label: "塔羅 prompt 建議",           route: "/api/tools/tarot/suggest-prompt", model: "claude-haiku-5-5", inputTok: 500, outputTok: 400 },
   { key: "product-copy",label: "POD 商品文案 (SEO)",         route: "lib/studio/product-copy", model: "claude-opus-5-5", inputTok: 600, outputTok: 1000 },
-  { key: "video-script",label: "影片腳本生成 (6 場景)",       route: "lib/content/video/video-script-core", model: "claude-opus-5-5", inputTok: 1200, outputTok: 2200 },
+  { key: "video-script",label: "影片腳本生成 (6 場景)",       route: "lib/content/video/video-script-core", model: "gpt-6.2-sol", inputTok: 1200, outputTok: 2200 },
   // One lead's website, the ceiling (lib/collect/run.ts LEAD_RESEARCH_BUDGET 15 pages x ~3.5k tokens in, ~400 out), plus its
   // social profile ladder at most: a search and the Facebook actor (lib/outreach/social-research.ts APIFY_USD).
   { key: "outreach-research", label: "客戶研究（網站最多 15 頁＋社群頁）", route: "/api/outreach/leads/research", model: "gpt-5.4-nano", inputTok: 52500, outputTok: 6000, extraUsd: 0.0076 },

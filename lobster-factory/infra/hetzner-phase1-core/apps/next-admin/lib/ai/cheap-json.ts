@@ -1,4 +1,5 @@
-import { geminiUsageTokens, logAiCall, openaiUsageTokens, type GeminiUsageLike } from "./log-ai-call";
+import { geminiUsageTokens, logAiCall, type GeminiUsageLike } from "./log-ai-call";
+import { openAiText } from "./openai-text";
 import { GEMINI_LITE_MODEL } from "./gemini-models";
 import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
@@ -29,12 +30,6 @@ interface CheapJsonTextArgs {
 
 const DEFAULT_TIMEOUT_MS = 600_000;
 
-interface OpenAiChatCompletion {
-  model?: string;
-  choices?: Array<{ message?: { content?: string } }>;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
-}
-
 export type CheapJsonTextResult =
   | { ok: true; raw: string; model: AiTextModel | typeof GEMINI_LITE_MODEL }
   | { ok: false; status: number; error: string };
@@ -53,46 +48,9 @@ export async function generateCheapJsonText(args: CheapJsonTextArgs): Promise<Ch
 
 async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextModel }): Promise<CheapJsonTextResult> {
   const grant = args.grant ?? (await grantFor("ops.cheap-json"));
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return { ok: false, status: 503, error: "OPENAI_API_KEY not configured" };
-
-  try {
-    const res = await fetch(providerUrl(grant, "openai", "/v1/chat/completions"), {
-      method: "POST",
-      signal: AbortSignal.timeout(args.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: args.model,
-        max_completion_tokens: args.maxTokens,
-        ...(args.temperature === undefined ? {} : { temperature: args.temperature }),
-        messages: [
-          { role: "system", content: args.system },
-          { role: "user", content: args.user },
-        ],
-      }),
-    });
-
-    if (!res.ok) return { ok: false, status: 502, error: `openai_${res.status}` };
-
-    const json = (await res.json()) as OpenAiChatCompletion;
-    const raw = json.choices?.[0]?.message?.content ?? "";
-
-    void logAiCall({
-      route: args.route,
-      model: json.model ?? args.model,
-      ...openaiUsageTokens(json.usage),
-      grant,
-      metadata: args.metadata,
-      tool: args.tool,
-    });
-
-    return { ok: true, raw, model: args.model };
-  } catch (err) {
-    return { ok: false, status: 502, error: err instanceof Error ? err.message : String(err) };
-  }
+  const r = await openAiText({ grant, model: args.model, system: args.system, user: args.user, maxTokens: args.maxTokens,
+    route: args.route, metadata: args.metadata, tool: args.tool, temperature: args.temperature, timeoutMs: args.timeoutMs ?? DEFAULT_TIMEOUT_MS });
+  return "error" in r ? { ok: false, status: r.status, error: r.error } : { ok: true, raw: r.text, model: args.model };
 }
 
 const GEMINI_RETRIES = 3;
