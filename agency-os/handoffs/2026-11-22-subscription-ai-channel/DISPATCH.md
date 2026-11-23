@@ -64,3 +64,10 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 - K12 重跑（正式站、擁有者 session、逐一）：12/12 完成，每篇存 `content_drafts` 後取出再刪（36 列測試草稿已刪）。資料 `agency-os/reports/model-bakeoff/2026-11-article/`（`drafts.jsonl`、`ledger.jsonl`、`metrics.json`、`key.json`＝字母↔模型）。總實扣約 NT$52。盲測頁 `https://claude.ai/artifact/JyYNnD8Txmmiwv53S4wMsU`。
 - 結果（字母／模型／NT$／秒／字數／SEO／未查證標記）：A opus-5-5 8.03/119/5221/86/7；B haiku-5-5 0.08/24/2621/59/0；C gpt-5.4 2.88/84/4978/73/3；D gpt-6.2-astra 6.68/105/4117/82/3；E gpt-6.2-sol 1.96/80/4338/86/0；F gpt-5.4-mini 0.71/23/3801/68/5；G gpt-5.5 8.72/164/4850/77/3（截斷）；H fable-5-1 19.56/167/5437/82/13；I gpt-5.4-nano 0.25/33/5298/64/1；J sonnet-5-5 2.16/46/3576/68/0；K gpt-6-luna 0.13/55/4297/82/0；L gpt-6.1-terra 1.02/82/4328/77/6。
 - 待操作者：回覆她選的字母 → 寫進 `app/(shell)/tools/ai-models/MeasuredRuns.tsx`「文章生成」組 → K13 開測前先問她。
+
+### 現況快照（2026-11-23，compact 前）
+- main／正式站：K1–K8、K11、K14、K15 全在 main 且已部署（`.deployed-commit` = `ed7263c36` 之後）。文章預設 `gpt-6.2-sol`（`DEFAULT_ARTICLE_TEXT_MODEL`）。
+- 進行中：K16 資料產出派給 sub-k1（`local_bb671b06-e1ea-4bab-a397-8b0c1f4b9e49`，brief `briefs/K16-harness.md`）→ 交回後監工：驗 `agency-os/reports/model-bakeoff/2026-11-copy/results.json`、cherry-pick 該 commit、照 K12 的做法做並排頁（產生器 scratchpad 已失效時重寫；K12 頁 `https://claude.ai/artifact/JyYNnD8Txmmiwv53S4wMsU`）、發布給操作者選。
+- 待做：(1) 正式站確認不選模型時帳本記 `gpt-6.2-sol`（查 `ai_call_logs` route `content/article-generate` 最新列即可）；(2) K13 生圖實測——**開跑前先問操作者，她有問題要說**；(3) K10（配圖＋三個範本問題：SEO 評分認中文小標、內部註記不進正文、`<a href>` 原始碼外露待查是轉換器還是模型）等 K13 與操作者談定；(4) 劇本工坊在影片門、無員工頁可用訂閱走法（未決）；(5) 文章頁「本次費用」顯示美金 → 改 NT$（未開卡）；(6) 批 4：K9 主機 worker（待決 1–3）、M1（11-24 11:02 後 Codex 額度恢復；待決 4）。
+- 工人：sub-k1 Opus（K16）、sub-k2 Sonnet（閒）、sub-k3 Sonnet（閒）、sub-k4 Opus（閒）。整合工作區 `D:\Worktrees\Work\sub-int`（detached；用 script 檔 commit 以避開共用 index 的 hook）。
+- 操作者決定紀錄：圖全走 API、文字走訂閱鏈；Soulful 也是她的（網站設定頁按鈕標記）；「都要測」；兩把 Gemini 金鑰曾被印進本對話輸出（已告知，是否更換由她決定）。
