@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-23（續5）— 平台第 6 批上線：U8、U9、U10＋K12（High，VW 已部署、待正式站實點後收尾）
+
+- 操作者 2026-11-22「工人們反應的 RISKS 是否需要處理，先處理完風險再部署」＝ K12 的 go。原判「不在範圍」的兩條重看後在部署前處理：VW 既有紅測試、第 5 批部署失敗根因。
+- U8 `46b8ad7fd`＋`58ce2d276`：`app/portal/launcher/page.tsx`「我的工作台」，已開通卡片徽章由新 `lib/entitlements/product-right.ts` 算（自 `awarewave-wp.ts` 抽出，W1 與工作台共用，`import-boundary` 無豁免）。U10 `35fdf6293`＋`3d6b54b64`：`app/portal/wallet/`，`member` 只見餘額與到期日；儲值鈕只在 `lib/portal/can-top-up.ts`（`seller_sites` aware-wave 列 `status=active`）為真時出現。U9 `1b7c3bb72`：未開通頁「了解這個產品」只在 `catalog.intro` 有值時畫（目前 11 產品皆無，不出現）。K12 `63cf3acba`：VW `scripts/organization-picker.js` 讀 `?org`，不同客戶先開確認窗（焦點在「返回」），確認後走原本 flush、lock、POST、BroadcastChannel；NA 刪提示的 `3b942fe09` 未併，等正式站實點。
+- VW 測試：`9ab56319d` 六組瀏覽器測試皆為測試過時（中文化 `a07784024`、模型清單、`?first=1`），產品無缺陷；`c508b0059` `tests/regressions.cjs` 偶發紅＝測試在工具仍是「載入中」空殼時就數素材庫按鈕，改成等工具載入完，連跑 10＋3 次綠。
+- 第 5 批部署失敗根因（2026-11-22 09:56Z）：新容器啟動第 2 秒被主機上另一個同時進行的操作 stop（journal：09:55:51、09:55:55 `sudo bash -l`，09:55:58 `sudo bash -s`，多個 SSH session 同時在主機），Docker 對已停止容器回 `unhealthy`，`sg-deploy.sh` 以容器名稱讀狀態而誤判並還原；還原的 `compose up` 遇 `No such container`，記 ROLLBACK_FAILED 但映像已還原。`AUTO_REMEDIATE_ENABLED` 未設。腳本三缺陷另開 session 修（分支 `claude/peaceful-mendel-714fbc` `e19a6da4d`，未併）。本次部署前先查主機無其他 deploy、compose、root shell，next-admin 與 video-workbench 皆一次成功（01:07Z、01:11Z）。
+- 未驗：K12 確認窗未在正式站實點；U8、U10 無可測客戶帳號（記到 W7）；VW 部署 log 末行 `notify_result: notify incomplete` 未查。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin 5547 passed) ; node tests/gate.cjs ; node tests/k12-org-handoff.cjs ; npm run test:regressions x3 | exit=0 | ms=900000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=VW_IGNORES_ORG_UNTIL_K12 | hits=6
+- ORACLE_WAIVED: Codex 額度 2026-11-24 才恢復；K12 有書面對抗自審＋突變（拔「無權」檢查後測試紅），監工讀過 `organization-picker.js` diff 並在合併樹上跑 gate、k12、organization-browser
 ## 2026-11-23（續4）— oracle WP 第三批：SF-H 併入；SF-I brief 派線4
 
 - SF-H 併入 `6b473629c`（工人 `d1027cb52`，已 push；今晚 03:00 自動部署帶上，catalog 七個開關全關）：`lib/site-flow/steps/{preflight,container,wp-install,vhost,open,manual-checks,shared,index}.ts`（`HOST_STEPS` 登記五步）、`app/api/ops/site-flow/[siteId]/manual-checks/route.ts`、`records.ts:405` 環境狀態轉換表（CAS）、`engine.ts:150-152` 狀態頁共用一次 `site-preflight`、`gate-client.ts`（docker 站不送 stdin、`create` 帶 ingress、install 帶 email）、`wp-plugin-stack-catalog.ts`（Kadence／TravelWP 標為佈景；自有外掛 `<repo>-v<版本>.zip`）。閘門 `aw-hosting-gate.sh` 只加 `set-oracle-engine-url`（`ENGINE_URL_RE`、`wp option patch` 改 `aworacle_settings.server_engine_url` 一鍵並讀回；外掛未啟用 exit 3）。

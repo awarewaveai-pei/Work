@@ -47,10 +47,10 @@
 | K10 | 客戶頁每個網站都能改；客戶首頁列出有問題的客戶 | NA `app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx`、`app/(shell)/ops/clients/page.tsx` | Medium | Sonnet | K2、K7 | 5 | 已併 |
 | K11 | 從 app 開影片工作台會帶著目前客戶 | NA `app/(shell)/tools/video/{OpenWorkbench,WorkbenchEntry,ScriptForge,ReleaseDeliveryPanel}.tsx`、`app/video/(door)/handoff/*`、`app/video/(wb)/review-release/*`＋tests | Medium | Opus | K3、K5、U4 | 5 | 已併 |
 | U3 | 客戶欄上方的類別按鈕；補：產品門上的「AwareWave 自己」列（由 org-search 回傳內部組織標記，門上不讀 service-role；K5 `PlatformFrame.tsx` 門上傳 `internalOrgId: null`） | NA `app/api/ops/org-search/route.ts`、`route.test.ts`、`app/ClientRail.tsx`＋test | Medium | Opus | K4、U4；操作者答 Q1 | 5 | 已併 |
-| K12 | 影片工作台收到別的客戶時跳確認窗再切；補：做完後刪 `OpenWorkbench.tsx` 的 `VW_IGNORES_ORG_UNTIL_K12` 與那行提示 | VW `scripts/index-1.js`、`scripts/organization-picker.js`、`tests/` 新 cjs | **High** | Opus | K11 | 6 | |
-| U8 | 會員登入後第一頁改成「我的工作台」；補：分類顯示名從 `ToolCard.tsx:24-26` 移到 `catalog-vocab.ts` | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U6、U7、U21 | 6 | |
-| U9 | 「尚未開通」頁多一顆「了解這個產品」 | NA `app/PlatformFrame.tsx`（K5 後未開通分支所在檔） | Low | Sonnet | K5 | 6 | |
-| U10 | 會員的「點數與合約」頁 | 新 NA `app/portal/wallet/page.tsx`＋test | Medium | Sonnet | U7 | 6 | |
+| K12 | 影片工作台收到別的客戶時跳確認窗再切；補：做完後刪 `OpenWorkbench.tsx` 的 `VW_IGNORES_ORG_UNTIL_K12` 與那行提示 | VW `scripts/index-1.js`、`scripts/organization-picker.js`、`tests/` 新 cjs | **High** | Opus | K11 | 6 | VW 已部署（63cf3acba）；待正式站實點確認窗後併 NA `3b942fe09`（刪提示） |
+| U8 | 會員登入後第一頁改成「我的工作台」；補：分類顯示名從 `ToolCard.tsx:24-26` 移到 `catalog-vocab.ts` | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U6、U7、U21 | 6 | 已併 |
+| U9 | 「尚未開通」頁多一顆「了解這個產品」 | NA `app/PlatformFrame.tsx`（K5 後未開通分支所在檔） | Low | Sonnet | K5 | 6 | 已併 |
+| U10 | 會員的「點數與合約」頁 | 新 NA `app/portal/wallet/page.tsx`＋test | Medium | Sonnet | U7 | 6 | 已併 |
 | U12 | 頁面名稱＝左欄名稱＝標題的檢查器 | 新 NA `lib/portal/__tests__/page-names.test.ts`；非內容產品頁的 `metadata`／`h1`（不改 `products.ts`、不改 content） | Low | Sonnet | K7、K8 | 7 | |
 | U23 | 埋點基礎（挑客戶、被擋、登入成功） | NA `lib/analytics.ts`、`app/posthog-analytics.tsx`、`app/api/ops/analytics-context/*` | Low | Sonnet | — | 7 | |
 | M2 | 合約能記「我們代操」 | MIG 新 migration（`organization_product_subscriptions.operated_by`）＋down；NA `lib/entitlements/contracts.ts`、`app/(shell)/ops/clients/[slug]/BillingTab.tsx`＋test | **High** | Opus | M1 | 7 | |
@@ -77,7 +77,7 @@
 | M9 | aware-wave.com 關掉訪客結帳（G6） | 正式站 WooCommerce 設定（非程式）；NA 無 | **High** | Sonnet（`wordpress-maintenance-agent` 備份閘） | — | P2 | |
 | M4 | 標籤寫進 FluentCRM、WordPress 加 TEST 角色（G3 寫入端） | 沿用既有 NA `lib/crm/fluentcrm.ts`＋wp-bridge `lobster-factory/packages/wp-bridge-plugin/includes/Crm/ContactUpserter.php`（加標籤寫入，不新建接頭）；TEST 角色註冊位置展開時定 | **High** | Opus | M3、W6 | P2 | |
 | M7 | 既有客戶逐一代辦成會員（G2） | 無程式；操作紀錄 | **High** | Opus＋操作者 | M5、M6、W6 | P2 | |
-| W7 | 真人走查：註冊→付款→進入→扣點 | 無程式；走查紀錄 | Medium | 操作者 | W6、M5、M6、M8、M9、M10 | P2 | |
+| W7 | 真人走查：註冊→付款→進入→扣點；補：用測試會員實看 `/portal/launcher`（U8）與 `/portal/wallet`（U10，管理者與被授權的人各一次） | 無程式；走查紀錄 | Medium | 操作者 | W6、M5、M6、M8、M9、M10 | P2 | |
 | U16 | 內容概覽首頁 | NA `app/content/page.tsx` | Medium | Sonnet | U11 | P2 | |
 | U17 | 工作台「繼續上次」 | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U8 | P2 | |
 | U18 | 頂列搜尋 | NA `app/PlatformFrame.tsx`、新搜尋元件 | Low | Sonnet | K5、U22 | P2 | |
