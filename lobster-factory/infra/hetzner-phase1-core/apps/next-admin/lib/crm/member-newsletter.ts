@@ -17,7 +17,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requiredBlocks, siteLanguage, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { scriptOfLanguage } from "@/lib/social/post-language";
 import { orgTimeZone } from "@/lib/content/topics/store";
-import { bridgeClientForSite, type BridgeResult } from "@/lib/payments/woo";
+import { bridgeClientForSiteWithRegistered, type BridgeResult } from "@/lib/payments/woo";
 import { addDays, instantAt, weekday, zoned } from "@/lib/social/time";
 import { raiseNotice, type Notice } from "@/lib/schedules/stop-notice";
 import { createNewsletter, type BridgeNewsletterResponse, type BridgeNewsletterSpec } from "./fluentcrm";
@@ -36,8 +36,9 @@ export interface MemberNewsletterDeps {
   timeZone(): Promise<string | null>;
   /** The site's topics published in [from, to), oldest first. */
   published(siteId: string, from: string, to: string): Promise<NewsletterItem[]>;
-  /** The bridge client id of the site ("" = the default one), null = the site has no bridge. */
-  bridgeFor(siteUrl: string): string | null;
+  /** The bridge client id of the site ("" = the default one, "env:<id>" = a site the site flow registered), null = the
+   *  site has no bridge (a registered site that cannot be loaded included -- never the default one). */
+  bridgeFor(siteUrl: string): string | null | Promise<string | null>;
   /** Takes the site's week (its Monday); false = another firing already took it (M2). */
   claimWeek(siteId: string, monday: string): Promise<boolean>;
   createDraft(spec: BridgeNewsletterSpec, clientId: string): Promise<BridgeResult<BridgeNewsletterResponse>>;
@@ -176,7 +177,7 @@ export async function runMemberNewsletter(deps: MemberNewsletterDeps, now: Date)
   const violations: string[] = [];
   for (const site of sites) {
     const head = `site=${site.id} week=${week.monday}`;
-    const clientId = deps.bridgeFor(site.url);
+    const clientId = await deps.bridgeFor(site.url);
     if (clientId === null) { lines.push(`${head} skipped: 沒有接 Bridge`); continue; }
     const items = (await deps.published(site.id, week.from, week.to))
       .filter((i) => inWeek(i.publishedAt, week)).slice(0, MAX_NEWSLETTER_ITEMS);
@@ -225,7 +226,7 @@ export function memberNewsletterDeps(sb: SupabaseClient, organizationId: string)
         .map(newsletterItem).filter((i): i is NewsletterItem => i !== null)
         .sort((a, b) => Date.parse(a.publishedAt) - Date.parse(b.publishedAt));
     },
-    bridgeFor: (siteUrl) => bridgeClientForSite(siteUrl),
+    bridgeFor: (siteUrl) => bridgeClientForSiteWithRegistered(siteUrl),
     async claimWeek(siteId, monday) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(monday)) throw new Error(`member_newsletter:bad_week:${monday}`);   // goes into the or() string below
       const { data, error } = await sb.from("wp_sites").update({ member_newsletter_week: monday }).eq("id", siteId).eq("organization_id", organizationId)

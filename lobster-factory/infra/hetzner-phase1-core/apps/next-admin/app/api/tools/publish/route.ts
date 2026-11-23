@@ -8,7 +8,10 @@ import { normalizeManyForWp } from "../../../../lib/studio/wp-web-image";
 import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
 import { thenRun, withFeature } from "../../../../lib/entitlements/grant";
-import { createWooProduct, isBridgeConfigured, listBridgeClients, bridgeSiteOrg, bridgeBaseUrl } from "../../../../lib/payments/woo";
+import {
+  createWooProduct, isBridgeConfigured, bridgeSiteOrg, bridgeBaseUrl,
+  bridgeClientBaseUrl, canonicalRegisteredBridgeClientId, isBridgeClientConfigured, isRegisteredBridgeClientId, listBridgeClientsWithRegistered,
+} from "../../../../lib/payments/woo";
 import { blockedChangeResponse } from "../../../../lib/system-modes/blocked-change";
 import { checkProductionChangeAllowed } from "../../../../lib/system-modes/production-change-gate";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
@@ -117,10 +120,13 @@ interface PublishBody {
 
 const PRICE_RE = /^\d+(\.\d{1,2})?$/;
 
-// Sanitize the caller's bridge-client selector → "" (default) or "1".."10". Anything else (incl. a
-// stray slug or injection attempt) collapses to "" so a bad value can never select a wrong/no site
-// silently — it just uses the default, which isBridgeConfigured then validates.
+// Sanitize the caller's bridge-client selector → "" (default), "1".."10", or "env:<environments.id>" (a site the site
+// flow registered, card SF-I2). An "env:" value NEVER collapses to the default: a well-formed one becomes its one
+// lower-case spelling (it namespaces the Printful externalId), anything else stays "env:invalid", which woo.ts answers
+// not configured. Anything else (a stray slug, an injection attempt) collapses to "" -- the default, which
+// isBridgeConfigured then validates.
 function normalizeClientId(raw: unknown): string {
+  if (isRegisteredBridgeClientId(raw)) return canonicalRegisteredBridgeClientId(raw) ?? "env:invalid";
   return typeof raw === "string" && /^([1-9]|10)$/.test(raw) ? raw : "";
 }
 
@@ -340,24 +346,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, pricing });
   }
 
-  // ── Multi-client: list the configured bridge clients (default + WPBRIDGE_SITE_1..10) for the UI ──
+  // ── Multi-client: list the configured bridge clients (default + WPBRIDGE_SITE_1..10, then the sites the site flow
+  //    registered, named by their client) for the UI ──
   if (body.action === "clients") {
     // Non-secret fields only (id / display name / public base URL). Empty list = bridge not configured.
-    return NextResponse.json({ ok: true, clients: listBridgeClients() });
+    return NextResponse.json({ ok: true, clients: await listBridgeClientsWithRegistered() });
   }
 
   // ── Step 2: create draft Woo product via wp-bridge ─────────────────────────
   if (body.action === "create") {
     const clientId = normalizeClientId(body.clientId);
-    if (!isBridgeConfigured(clientId)) {
+    const registered = isRegisteredBridgeClientId(clientId);
+    if (!(registered ? await isBridgeClientConfigured(clientId) : isBridgeConfigured(clientId))) {
       return NextResponse.json(
         {
           ok: false,
           error: "bridge_not_configured",
           clientId,
-          hint: clientId
-            ? `Set WPBRIDGE_SITE_${clientId}_BASE_URL / _KEY_ID / _PRIVATE_KEY for this client.`
-            : "Set WPBRIDGE_BASE_URL / WPBRIDGE_KEY_ID / WPBRIDGE_PRIVATE_KEY.",
+          hint: registered
+            ? "這個站的 bridge 金鑰載入失敗（環境、保管庫或 wp_sites 歸屬）：請到客戶頁確認建站流程的 wp-bridge 步驟。"
+            : clientId
+              ? `Set WPBRIDGE_SITE_${clientId}_BASE_URL / _KEY_ID / _PRIVATE_KEY for this client.`
+              : "Set WPBRIDGE_BASE_URL / WPBRIDGE_KEY_ID / WPBRIDGE_PRIVATE_KEY.",
         },
         { status: 503 },
       );
@@ -640,7 +650,13 @@ export async function POST(request: Request) {
     // it, means there is no site host to resolve -> global mode gate (mirrors bridgePost's own
     // "no DB client -> null" short-circuit: checkProductionChangeAllowed fails closed on a null client
     // regardless of orgId, so a missing db here still blocks rather than silently passing).
-    const pfBridgeBase = bridgeBaseUrl(pfClientId);
+    // A registered site ("env:<id>") that cannot be loaded is refused here: it has a host, just not one we can read, so
+    // the global gate would be the wrong gate (and the product is not linked to an unknown site).
+    const pfRegistered = isRegisteredBridgeClientId(pfClientId);
+    const pfBridgeBase = pfRegistered ? await bridgeClientBaseUrl(pfClientId) : bridgeBaseUrl(pfClientId);
+    if (pfRegistered && !pfBridgeBase) {
+      return NextResponse.json({ ok: false, error: "bridge_not_configured", clientId: pfClientId }, { status: 503 });
+    }
     const pfDb = getSupabaseWriteClient();
     const pfOrgId = pfBridgeBase && pfDb ? await bridgeSiteOrg(pfDb, pfBridgeBase) : null;
     if (pfOrgId === undefined) return blockedChangeResponse("unavailable");

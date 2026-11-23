@@ -142,6 +142,8 @@ function signingKeyOf(secretB64: string): KeyObject | null {
 }
 
 function getConfig(clientId?: string): BridgeConfig | null {
+  // An `env:<id>` is never an env client: rawBridgeEnv would read it as the default (card SF-I2 invariant).
+  if (isRegisteredBridgeClientId(clientId)) return null;
   const { baseUrl, keyId, secretB64 } = rawBridgeEnv(clientId);
   if (!baseUrl || !keyId || !secretB64) return null;
   const key = signingKeyOf(secretB64);
@@ -160,6 +162,12 @@ export const REGISTERED_BRIDGE_PREFIX = "env:";
 const REGISTERED_ID_RE = /^env:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
 export const registeredBridgeClientId = (environmentId: string): string => `${REGISTERED_BRIDGE_PREFIX}${environmentId}`;
+/** The one spelling of a registered client id (lower case), or null when `raw` is not one: a caller-supplied id is
+ *  normalized here so one site never has two ids (tools/publish namespaces Printful externalIds with it). */
+export function canonicalRegisteredBridgeClientId(raw: unknown): string | null {
+  const m = typeof raw === "string" ? REGISTERED_ID_RE.exec(raw) : null;
+  return m ? registeredBridgeClientId(m[1].toLowerCase()) : null;
+}
 /** Case-insensitive like REGISTERED_ID_RE: "ENV:<id>" must never fall through to rawBridgeEnv's default client. */
 export const isRegisteredBridgeClientId = (clientId: unknown): clientId is string => typeof clientId === "string" && /^env:/i.test(clientId);
 
@@ -210,24 +218,43 @@ export async function registeredBridgeConfig(
   }
 }
 
-/** Sites the site flow registered a bridge key for and whose owner is recorded (non-secret fields only). */
+/** Sites the site flow registered a bridge key for and whose owner is recorded (non-secret fields only). `name` = the
+ *  owning organization's name when it can be read (a picker shows name + URL: which client, which site), else the host. */
 export async function listRegisteredBridgeClients(db: WriteClient | null = getSupabaseWriteClient()): Promise<BridgeClient[]> {
   if (!db) return [];
+  const rows = await registeredSiteRows(db);
+  const names = await organizationNames(db, [...new Set(rows.map((r) => r.organization_id))]);
+  return rows.map((r) => ({ id: registeredBridgeClientId(r.id), name: names.get(r.organization_id) || hostLabel(r.baseUrl), baseUrl: r.baseUrl }));
+}
+
+/** Registered sites with a recorded owner (no labels): the rows behind the list and the channel choice. */
+async function registeredSiteRows(db: WriteClient): Promise<Array<{ id: string; organization_id: string; baseUrl: string }>> {
   const { data, error } = await db.from("environments").select("id,organization_id,base_url,status,metadata").neq("status", "archived");
   if (error) {
     console.error("[wp-bridge] environments lookup failed; registered bridge sites not listed:", error.message);
     return [];
   }
-  const out: BridgeClient[] = [];
+  const rows: Array<{ id: string; organization_id: string; baseUrl: string }> = [];
   const owners = await activeWpSiteRows(db);
   if (!owners) return [];
   for (const r of (data ?? []) as Array<{ id: string; organization_id: string | null; base_url: string | null; metadata: unknown }>) {
     if (!r.base_url || !r.organization_id || !bridgeRegistrationOf(r.metadata) || !wpSiteKey(r.base_url)) continue;
     if (orgOfInstall(owners, r.base_url) !== r.organization_id) continue;
-    const baseUrl = r.base_url.replace(/\/+$/, "");
-    out.push({ id: registeredBridgeClientId(r.id), name: hostLabel(baseUrl), baseUrl });
+    rows.push({ id: r.id, organization_id: r.organization_id, baseUrl: r.base_url.replace(/\/+$/, "") });
   }
-  return out;
+  return rows;
+}
+
+/** Display names of organizations; a failed read is an empty map (a label only, never a decision). */
+async function organizationNames(db: WriteClient, ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  try {
+    const { data, error } = await db.from("organizations").select("id,name").in("id", ids);
+    if (error) return new Map();
+    return new Map(((data ?? []) as Array<{ id: string; name: string | null }>).filter((o) => o.name?.trim()).map((o) => [o.id, (o.name as string).trim()]));
+  } catch {
+    return new Map();
+  }
 }
 
 /** Env clients (unchanged order), then registered sites on an install no env client already serves. */
@@ -256,6 +283,37 @@ export async function probeRegisteredBridge<T>(
 async function resolveConfig(clientId?: string, deps?: RegisteredBridgeDeps): Promise<BridgeConfig | null> {
   return isRegisteredBridgeClientId(clientId) ? registeredBridgeConfig(clientId, deps) : getConfig(clientId);
 }
+
+/** isBridgeConfigured over both kinds of id (card SF-I2): an `env:<id>` that cannot be loaded is false, never the default. */
+export async function isBridgeClientConfigured(clientId?: string, deps?: RegisteredBridgeDeps): Promise<boolean> {
+  return (await resolveConfig(clientId, deps)) !== null;
+}
+
+/** bridgeBaseUrl over both kinds of id; null when not configured (an `env:<id>` never answers the default's URL). */
+export async function bridgeClientBaseUrl(clientId?: string, deps?: RegisteredBridgeDeps): Promise<string | null> {
+  return (await resolveConfig(clientId, deps))?.baseUrl ?? null;
+}
+
+/**
+ * bridgeClientForSite over env clients AND registered sites (card SF-I2) -- the channel choice of every content tool
+ * (publish, video embed, member newsletter). An env client on the install wins (unchanged); else the registered site on
+ * the same install (`env:<id>`); else null = no bridge, standard REST. A registry that cannot be read lists no registered
+ * site, so the answer is null and the REST path refuses a site without a REST credential (BRIDGE_ONLY_SITE_ERROR) --
+ * never the default client.
+ */
+export async function bridgeClientForSiteWithRegistered(siteUrl: string, db: WriteClient | null = getSupabaseWriteClient()): Promise<string | null> {
+  const site = wpSiteKey(siteUrl);
+  if (!site) return null;
+  const env = bridgeClientForSite(siteUrl);
+  if (env !== null) return env;
+  if (!db) return null;
+  const hit = (await registeredSiteRows(db)).find((r) => wpSiteKey(r.baseUrl) === site);
+  return hit ? registeredBridgeClientId(hit.id) : null;
+}
+
+/** A site with no bridge (or one that cannot be loaded) and no REST credential: the site flow's wp_sites row carries an
+ *  empty token, so a REST request would go out unauthenticated. Answered instead of trying. */
+export const BRIDGE_ONLY_SITE_ERROR = "此站只支援 bridge 通道：bridge 金鑰未設定或載入失敗，也沒有 REST 憑證，沒有送出任何請求";
 
 export function isBridgeConfigured(clientId?: string): boolean {
   return getConfig(clientId) !== null;

@@ -1,5 +1,7 @@
 /** FluentCRM adapter. Campaign creation stays draft-only behind the signed, gated transport. */
 import { bridgePost, type BridgeResult } from "@/lib/payments/woo";
+// Env clients only, on purpose: its one user is app/api/content/newsletter/route.ts, which has no site selector and writes
+// to the default site. Per-site drafts (registered sites included) go through member-newsletter.ts with a clientId.
 export { isBridgeConfigured } from "@/lib/payments/woo";
 
 export interface BridgeNewsletterResponse {
@@ -81,7 +83,7 @@ export interface BridgeContactResponse {
 /**
  * Upsert one FluentCRM contact (email key) with lists/tags through the Bridge `/fluentcrm/contact` route
  * (ContactUpserter.php). Never starts a sequence or sends mail; an existing contact keeps its subscription status.
- * `clientId` picks the bridge site (woo.ts listBridgeClients ids; "" = default). ⚠ Always a real write.
+ * `clientId` picks the bridge site (woo.ts listBridgeClientsWithRegistered ids: "" = default, "1".."10", "env:<id>"). ⚠ Always a real write.
  */
 export function upsertContact(
   spec: BridgeContactSpec,

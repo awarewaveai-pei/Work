@@ -45,12 +45,22 @@ const createWooProduct = vi.hoisted(() =>
 );
 const bridgeBaseUrl = vi.hoisted(() => vi.fn((_clientId?: string): string | null => null));
 const bridgeSiteOrg = vi.hoisted(() => vi.fn(async (): Promise<string | null | undefined> => null));
+// Card SF-I2: sites the site flow registered ("env:<id>"); default = none registered.
+const registeredMock = vi.hoisted(() => ({
+  isRegisteredBridgeClientId: (id: unknown): id is string => typeof id === "string" && /^env:/i.test(id),
+  canonicalRegisteredBridgeClientId: (id: unknown): string | null =>
+    typeof id === "string" && /^env:[0-9a-f-]{36}$/i.test(id) ? id.toLowerCase() : null,
+  isBridgeClientConfigured: vi.fn(async (_id?: string): Promise<boolean> => false),
+  bridgeClientBaseUrl: vi.fn(async (_id?: string): Promise<string | null> => null),
+  listBridgeClientsWithRegistered: vi.fn(async (): Promise<Array<{ id: string; name: string; baseUrl: string }>> => []),
+}));
 vi.mock("../../../../lib/payments/woo", () => ({
   createWooProduct,
   isBridgeConfigured: () => true,
   listBridgeClients: () => [],
   bridgeBaseUrl,
   bridgeSiteOrg,
+  ...registeredMock,
 }));
 
 // T26 Part A: link/pfcreate/pforder each gate before their first Printful call.
@@ -230,5 +240,57 @@ describe("POST /api/tools/publish action=pforder -- system-mode gate", () => {
     printProviderMocks.createDraftOrderOnNative.mockResolvedValue({ ok: false, error: "boom" });
     await post(body());
     expect(checkProductionChangeAllowed).toHaveBeenCalledWith(expect.anything(), null);
+  });
+});
+
+// Card SF-I2: a site the site flow registered ("env:<environments.id>") is a target like an env client; one that cannot
+// be loaded is "not configured" and never the default site.
+describe("POST /api/tools/publish -- sites the site flow registered", () => {
+  const REG = "env:7a1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b";
+  const REG_ORG = "55555555-5555-4555-8555-555555555555";
+  beforeEach(() => {
+    registeredMock.isBridgeClientConfigured.mockReset().mockResolvedValue(true);
+    registeredMock.bridgeClientBaseUrl.mockReset().mockResolvedValue("https://acme.example.com");
+    registeredMock.listBridgeClientsWithRegistered.mockReset().mockResolvedValue([]);
+    printProviderMocks.isNativeStoreConfigured.mockReturnValue(true);
+  });
+  const pfBody = { action: "pfcreate", wooProductId: 123, title: "Tee", printFileUrl: `${DESIGNS_BASE}/print.png`, retailPrice: "24.99",
+    variantMap: [{ variationId: 1, color: "White", size: "M", sku: "SKU-1", price: "24.99" }], clientId: REG };
+
+  it("clients: the registered site is listed, named by its client", async () => {
+    const reg = { id: REG, name: "Acme 客戶", baseUrl: "https://acme.example.com" };
+    registeredMock.listBridgeClientsWithRegistered.mockResolvedValue([reg]);
+    expect(await (await post({ action: "clients" })).json()).toEqual({ ok: true, clients: [reg] });
+  });
+
+  it("create: writes the product through the registered site's own client id", async () => {
+    const res = await post({ action: "create", title: "Tee one", retailPrice: "24.99", clientId: REG });
+    expect(res.status).toBe(200);
+    expect(createWooProduct).toHaveBeenCalledWith(expect.anything(), REG);
+  });
+
+  it("create: a registered site that cannot be loaded is 503, nothing written, never the default site", async () => {
+    registeredMock.isBridgeClientConfigured.mockResolvedValue(false);
+    const res = await post({ action: "create", title: "Tee one", retailPrice: "24.99", clientId: REG });
+    expect(res.status).toBe(503);
+    expect((await res.json()).clientId).toBe(REG);
+    expect(createWooProduct).not.toHaveBeenCalled();
+  });
+
+  it("pfcreate: gates on the registered site's org", async () => {
+    bridgeSiteOrg.mockResolvedValue(REG_ORG);
+    printProviderMocks.getCatalogVariants.mockResolvedValue({ ok: false, error: "boom" });
+    await post(pfBody);
+    expect(bridgeSiteOrg).toHaveBeenCalledWith(expect.anything(), "https://acme.example.com");
+    expect(checkProductionChangeAllowed).toHaveBeenCalledWith(expect.anything(), REG_ORG);
+  });
+
+  it("pfcreate: a registered site that cannot be loaded is 503 before the gate and Printful, not the global gate", async () => {
+    registeredMock.bridgeClientBaseUrl.mockResolvedValue(null);
+    const res = await post(pfBody);
+    expect(res.status).toBe(503);
+    expect(checkProductionChangeAllowed).not.toHaveBeenCalled();
+    expect(printProviderMocks.getCatalogVariants).not.toHaveBeenCalled();
+    expect(bridgeBaseUrl).not.toHaveBeenCalled();
   });
 });

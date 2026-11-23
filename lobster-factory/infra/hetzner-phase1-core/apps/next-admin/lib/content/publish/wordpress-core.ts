@@ -11,7 +11,7 @@
  */
 import { resolveWpSite, getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 import { OrgAccessError } from "@/lib/tenant-guard";
-import { bridgeClientForSite, createPost } from "@/lib/payments/woo";
+import { BRIDGE_ONLY_SITE_ERROR, bridgeClientForSiteWithRegistered, createPost } from "@/lib/payments/woo";
 import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 import { decodeWpEntities } from "@/lib/content/wp-entities";
 import { normalizeManyForWp } from "@/lib/studio/wp-web-image";
@@ -321,6 +321,7 @@ export async function publishToWordPress(
   let wpToken: string | undefined;
   let wpUsername = "";
   let organizationId: string | null = null;
+  let siteFromList = false;
 
   const { sites } = await getWpSites();
   if (siteId || sites.length > 0) {
@@ -341,6 +342,7 @@ export async function publishToWordPress(
     wpToken    = resolved.token || undefined;
     wpUsername = resolved.username;
     organizationId = resolved.site.organizationId;
+    siteFromList = true;
   } else {
     // Last-resort legacy env vars (single-site deployments without WP_SITE_i_* scheme) --
     // no DB row, so no org: organizationId stays null (only the global mode applies).
@@ -349,8 +351,12 @@ export async function publishToWordPress(
   }
 
   // The channel for this site (see the Bridge path below); the REST credential is needed only without a bridge.
-  const bridgeClient = wpApiUrl ? bridgeClientForSite(wpApiUrl) : null;
+  // Env bridge clients and sites the site flow registered (`env:<id>`) alike; a registered site that cannot be loaded is
+  // null here, never the default client.
+  const bridgeClient = wpApiUrl ? await bridgeClientForSiteWithRegistered(wpApiUrl) : null;
   if (!wpApiUrl || (!wpToken && bridgeClient === null)) {
+    // A listed site without a REST credential (the site flow's wp_sites row has an empty token): say so, send nothing.
+    if (wpApiUrl && siteFromList) return { ok: false, status: 503, error: BRIDGE_ONLY_SITE_ERROR, wire: "json" };
     return { ok: false, status: 503, error: "WP_API_URL or WORDPRESS_JWT_TOKEN not configured", wire: "text" };
   }
 
@@ -387,7 +393,7 @@ export async function publishToWordPress(
   // When the target site IS a configured bridge site, route through the signed /post endpoint:
   // the plugin composes real Kadence blocks, sideloads in-article images into the media library,
   // and persists Rank Math SEO meta server-side (standard WP REST silently drops the unregistered
-  // rank_math_focus_keyword meta). bridgeClientForSite matches the same install (woo.ts wpSiteKey: origin + path) so an
+  // rank_math_focus_keyword meta). bridgeClientForSiteWithRegistered matches the same install (woo.ts wpSiteKey: origin + path) so an
   // article for a NON-bridge site -- a staging install under a path of the bridge host included -- is never
   // mis-published to the bridge site; non-bridge sites keep the standard-REST path below. The video embed
   // (lib/content/video/embed-in-post.ts) asks the same function, so it edits the post through the identity that made it.

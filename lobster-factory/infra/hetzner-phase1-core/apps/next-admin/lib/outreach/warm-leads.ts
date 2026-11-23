@@ -5,7 +5,7 @@
 // (0149). A repeat finds the row and only finishes what is missing: the FluentCRM sync when it is not 'synced'.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { upsertContact } from "@/lib/crm/fluentcrm";
-import { listBridgeClients, wpSiteKey } from "@/lib/payments/woo";
+import { listBridgeClientsWithRegistered, wpSiteKey } from "@/lib/payments/woo";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { channelTags, type Channel } from "./channels";
@@ -39,14 +39,17 @@ export type WarmLeadResult =
 interface LeadRow { id: string; status: string; do_not_contact: boolean; fluentcrm_sync_status: string; website: string | null; name: string | null }
 const COLS = "id, status, do_not_contact, fluentcrm_sync_status, website, name";
 /** The bridge client of the organization's own WordPress site: its active wp_sites install (woo.ts wpSiteKey) matched to a
- *  configured bridge; null = none ("" is the default bridge, a valid id). The one copy of this rule; leads/sync-fluentcrm/route.ts uses it too. */
+ *  configured bridge -- env clients and sites the site flow registered (`env:<id>`) alike; null = none ("" is the default
+ *  bridge, a valid id, reached only by the install match, never as a fallback). The one copy of this rule;
+ *  leads/sync-fluentcrm/route.ts uses it too. */
 export async function bridgeClientId(orgId: string | null): Promise<string | null> {
   const main = getSupabaseWriteClient();
   if (!main || !orgId) return null;
   const { data, error } = await main.from("wp_sites").select("url").eq("organization_id", orgId).eq("active", true);
   if (error) return null;
   const sites = new Set(((data ?? []) as Array<{ url: string }>).map((s) => wpSiteKey(s.url)).filter((k): k is string => !!k));
-  return listBridgeClients().find((c) => { const k = wpSiteKey(c.baseUrl); return !!k && sites.has(k); })?.id ?? null;
+  if (sites.size === 0) return null;
+  return (await listBridgeClientsWithRegistered(main)).find((c) => { const k = wpSiteKey(c.baseUrl); return !!k && sites.has(k); })?.id ?? null;
 }
 
 async function findLead(db: SupabaseClient, orgId: string | null, email: string, sourceRef: string | null): Promise<LeadRow | null> {

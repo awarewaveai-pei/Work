@@ -42,6 +42,9 @@ vi.mock("@/lib/payments/woo", async (orig) => {
   const { wpSiteKey } = await orig<typeof import("@/lib/payments/woo")>();
   return {
     bridgeClientForSite: (url: string) => (bridge.configured && wpSiteKey(url) === wpSiteKey(bridge.base) ? "" : null),
+    // no registered (site-flow) sites here: lib/payments/__tests__/registered-sites-content-tools.test.ts covers them
+    bridgeClientForSiteWithRegistered: async (url: string) => (bridge.configured && wpSiteKey(url) === wpSiteKey(bridge.base) ? "" : null),
+    BRIDGE_ONLY_SITE_ERROR: "bridge only",
     createPost: bridge.createPost,
   };
 });

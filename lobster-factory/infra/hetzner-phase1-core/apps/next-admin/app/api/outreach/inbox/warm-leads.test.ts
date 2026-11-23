@@ -8,7 +8,7 @@ const m = vi.hoisted(() => ({ upsert: vi.fn(), db: undefined as unknown }));
 vi.mock("@/lib/system-modes/production-change-gate", () => ({ checkProductionChangeAllowed: async () => ({ allowed: true, mode: "normal" }) }));
 vi.mock("@/lib/crm/fluentcrm", () => ({ upsertContact: m.upsert }));
 vi.mock("@/lib/payments/woo", async (orig) => ({ wpSiteKey: (await orig<typeof import("@/lib/payments/woo")>()).wpSiteKey,
-  listBridgeClients: () => [{ id: "1", name: "wp", baseUrl: "https://wp.example" }] }));
+  listBridgeClientsWithRegistered: async () => [{ id: "1", name: "wp", baseUrl: "https://wp.example" }] }));
 vi.mock("@/lib/outreach/suppression", () => ({ findSuppressed: async (_d: unknown, _o: unknown, leads: unknown[]) => leads.map(() => false) }));
 vi.mock("@/lib/org-client", () => ({ getOrgSupabaseWriteClient: async () => m.db }));
 vi.mock("@/lib/supabase-server", () => ({

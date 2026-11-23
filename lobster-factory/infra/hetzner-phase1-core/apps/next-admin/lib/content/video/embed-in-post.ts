@@ -7,7 +7,7 @@ import { listAccessibleWpSites, resolveWpSite, type ResolvedWpSite } from "@/lib
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { publishToWordPress } from "@/lib/content/publish/wordpress-core";
-import { bridgeClientForSite, listDraftPosts, readBridgePost, updateDraftPost } from "@/lib/payments/woo";
+import { BRIDGE_ONLY_SITE_ERROR, bridgeClientForSiteWithRegistered, listDraftPosts, readBridgePost, updateDraftPost } from "@/lib/payments/woo";
 import {
   ensureDeliveryReceipt,
   claimDeliveryReceipt,
@@ -54,7 +54,7 @@ const BRIDGE_LIVE_REFUSAL = "這篇文章已發布或已排程；這個網站經
 const CHANGED_SINCE_READ = "這篇草稿剛被別人改過，影片沒有嵌入；請重新整理後再按一次";
 
 /**
- * One site, one channel (bridgeClientForSite, the same choice publishToWordPress makes): a bridge site is read and
+ * One site, one channel (bridgeClientForSiteWithRegistered, the same choice publishToWordPress makes): a bridge site is read and
  * written only through the plugin's signed /post/read + /draft/update, which refuses a live post itself and writes only
  * over the content read (sha256); REST only without a bridge.
  * Soulful 2026-11-18: the draft was made through the bridge, the embed went to /wp/v2 with a dead application password.
@@ -149,7 +149,7 @@ export async function readArticleStatus(identity: Request | { headers: Headers }
     const site = sites.filter((s) => editUrl.startsWith(s.url.replace(/\/+$/, "") + "/wp-admin/")).sort((a, b) => b.url.length - a.url.length)[0];
     const resolved = site ? await resolveWpSite(identity, site.id) : null;
     if (!resolved || !Number.isInteger(postId) || postId <= 0) return null;
-    const read = await readPost(resolved, bridgeClientForSite(resolved.site.url), postId);
+    const read = await readPost(resolved, await bridgeClientForSiteWithRegistered(resolved.site.url), postId);
     return read.ok ? read.status : null;
   } catch {
     return null;
@@ -161,13 +161,13 @@ export async function listNotLiveDrafts(
   resolved: ResolvedWpSite,
 ): Promise<{ ok: true; posts: Array<{ id: number; title: string; status: string; modified: string }> } | { ok: false; status: number; error: string }> {
   const name = (id: number, title: string | undefined) => title || `（無標題 #${id}）`;
-  const bridgeClient = bridgeClientForSite(resolved.site.url);
+  const bridgeClient = await bridgeClientForSiteWithRegistered(resolved.site.url);
   if (bridgeClient !== null) {
     const r = await listDraftPosts(bridgeClient);
     if (!r.ok) return { ok: false, status: 502, error: bridgeError((r as { error: string }).error) };
     return { ok: true, posts: (r.value.posts ?? []).map((p) => ({ id: p.id, title: name(p.id, p.title), status: p.status, modified: p.modified })) };
   }
-  if (!resolved.token) return { ok: false, status: 404, error: "Site not found" };
+  if (!resolved.token) return { ok: false, status: 503, error: BRIDGE_ONLY_SITE_ERROR };
   try {
     const res = await fetch(`${resolved.site.url.replace(/\/+$/, "")}/wp-json/wp/v2/posts?per_page=30&status=draft,pending&orderby=modified&order=desc&context=edit&_fields=id,title,status,modified`, {
       headers: { Authorization: resolved.authHeader }, signal: AbortSignal.timeout(10_000),
@@ -215,8 +215,8 @@ export async function embedVideoInPost(
   // Resolve site auth
   const resolved = await resolveWpSite(identity, siteId);
   if (!resolved) return { ok: false, status: 404, error: "Site not found" };
-  const bridgeClient = bridgeClientForSite(resolved.site.url);
-  if (bridgeClient === null && !resolved.token) return { ok: false, status: 503, error: "No token for site" };
+  const bridgeClient = await bridgeClientForSiteWithRegistered(resolved.site.url);
+  if (bridgeClient === null && !resolved.token) return { ok: false, status: 503, error: BRIDGE_ONLY_SITE_ERROR };
 
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), resolved.site.organizationId);
   if (!gate.allowed) {
@@ -377,8 +377,8 @@ export async function swapEmbeddedVideo(
 
   const resolved = await resolveWpSite(identity, siteId);
   if (!resolved) return { ok: false, status: 404, error: "Site not found" };
-  const bridgeClient = bridgeClientForSite(resolved.site.url);
-  if (bridgeClient === null && !resolved.token) return { ok: false, status: 503, error: "No token for site" };
+  const bridgeClient = await bridgeClientForSiteWithRegistered(resolved.site.url);
+  if (bridgeClient === null && !resolved.token) return { ok: false, status: 503, error: BRIDGE_ONLY_SITE_ERROR };
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), resolved.site.organizationId);
   if (!gate.allowed) return { ok: false, blockedMode: gate.mode };
 

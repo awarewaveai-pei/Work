@@ -152,6 +152,8 @@ export async function POST(req: Request): Promise<Response> {
   const denied = staffOnly(req);
   if (denied) return denied;
 
+  // Default site only, on purpose: this route has no site selector (ContentStudio's one-off push). Sites the site flow
+  // registered get their drafts per site through lib/crm/member-newsletter.ts.
   if (!isBridgeConfigured()) {
     return NextResponse.json(
       { ok: false, error: "WP Bridge 未設定（需 WPBRIDGE_BASE_URL / WPBRIDGE_KEY_ID / WPBRIDGE_PRIVATE_KEY）" },
