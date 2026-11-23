@@ -44,6 +44,7 @@
 | SF-H | 主機步驟實作 | SITE-FLOW §3 | 批 3 前寫 | Opus 5.5 | High |
 | E5 | 引擎收尾：CSP 範圍互補測試、工具結果區標記、sg-deploy smoke 改打嵌入頁 | 第二批 RISKS | 批 3 前寫 | Sonnet 5.5 | Low（smoke 屬部署腳本，Medium） |
 | SF-E2 | 主機腳本加固（第二批 RISKS 的主機項） | 第二批 RISKS | 批 3 前寫 | Opus 5.5＋`critic` Deep | High |
+| SF-J2 | 建站表單補強：明確選新／既有客戶；`environments.metadata.host_slug` 唯一性（migration，套用需同意） | 第三批 RISKS | 批 4 前寫 | Opus 5.5＋`db-expert` | Medium |
 | SF-I0 | MainWP 金鑰進 next-admin | SITE-FLOW §3 | 監工 | 監工 | High |
 | SF-I | MainWP、wp-bridge、寫 `wp_sites` | SITE-FLOW §3 | 批 3 前寫 | Opus 5.5＋`critic` ×2（憑證） | High |
 | SF-J | 兩個頁面 | SITE-FLOW §2、§3 | 批 3 前寫 | Sonnet 5.5（`frontend-designer`） | Medium |

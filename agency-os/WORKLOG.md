@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-23（續1）— oracle WP 第三批：已交回卡的 RISKS 先行判定（操作者問）；新增卡 SF-J2；線2、線3 叫回
+
+- 操作者問「工人們反應的 RISKS 是否需要處理」。第三批未到齊（P2 未 commit、SF-H 進行中、P3 與 SF-I 未派），但已交回的 E5、SF-J、SF-E2 共 15 條先判定並寫入 `data.mjs`「第三批（進行中）」表；到齊後補列並做整批總檢。
+- 現在處理 → 新卡 SF-J2（第四批）：`environments.metadata.host_slug` 唯一性（`create-site.ts:78-87` 先查後寫；migration，套用需同意）、`ensureSite`／`ensureProject` 並發回 500、表單明確選新／既有客戶（SF-J 為避免誤併，一律建新客戶）。
+- 現在處理 → SF-H（已在 brief 或已用訊息補入）：第 4、8 步內容；前置步驟顯示名稱、讀取中狀態、執行中停用其他按鈕、輪詢不重疊；`site-wp plugins` 整庫匯出可能超過 90 秒（同 install 改送出後輪詢）；`hosting-gate-contract.test.ts` 外掛檔名對齊 `<slug>-v<版本>.zip`。SF-H 第 5 項裁決：准在該卡為閘門加固定子動詞 `set-oracle-engine-url <url>`（工人回報 `aw-hosting-gate.sh:71` 無可寫 `aworacle_settings[server_engine_url]` 的子動詞；不採「計畫列出但不執行」）。
+- 現在處理 → 監工，SF-L 前：備份腳本中單一站 `.env` 中途消失計入全域 `ERRORS` 使其他服務不上傳 R2（應計入 `SITE_ERRORS`）；放三支備份腳本上主機。
+- 排入上線步驟：`AW_SITE_GATEWAY_SLUGS` 加 oracle 的 slug（GO-2）；dev 模式「1 Issue」於 SF-H 驗收時看主控台。
+- 不處理（理由在表）：「費用方式」欄（ADR 017 商業軸四值，oracle 為自用）；375px 外殼側欄不收合（既有）；外掛失敗只還原資料庫（訊息已寫明，重跑即前進）。
+- 線3 昨晚撞 5 小時上限（03:10 重設）、線2 P2 停在未提交；08:12 兩線都已叫回。
+- REALTEST_WAIVED: DOC_ONLY -- 本條目只有風險判定與計畫更新
+- REVIEW_WAIVED: DOC_ONLY -- 同上
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=host_slug | hits=9
+- ORACLE_WAIVED: 純文件
 ## 2026-11-22（續23）— oracle WP 第三批：SF-E2 併入；SF-H brief 派線3
 
 - SF-E2 併入 `8c2468adc`（已 push；主機腳本隨 push 同步，開關檔未開；備份三支不自動同步）：10 項見 `briefs/WP-SF-E2-host-hardening.md` 對照表，工人回報逐項 file:line。監工：`bash -n` 五支過；`hosting-gate-site.test.sh` 131 passed、`client-wp-template.test.sh` 67 passed、`backup-ks-aw-01-sites.test.sh` 40 passed、`backup-coverage-check.test.py` OK；next-admin `npx tsc --noEmit` exit 0、全套 vitest 5526 passed／0 failed 後才 push。
