@@ -26,7 +26,7 @@
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_STUDIO": "optional product host",
-    "loginSources": ["local"],
+    "loginSources": ["local", "awarewave-wp"],
     "apiKeys": "REPLICATE_API_TOKEN, ANTHROPIC_API_KEY, OPENAI_API_KEY; PRINTFUL_API_KEY with PRINTFUL_STORE_ID / PRINTFUL_NATIVE_STORE_ID (lib/studio/print-provider.ts:56-87); WC_WEBHOOK_SECRET from the customer's WooCommerce (woo-order/route.ts:44); R2_* designs bucket (lib/storage/r2.ts:30-37); WPBRIDGE_* only to publish products to the customer's WordPress (lib/payments/woo.ts:86-89). Optional model pins BG_REMOVER_VERSION, GENFILL_VERSION, INPAINT_VERSION, REALESRGAN_VERSION, ANTHROPIC_MODEL.",
     "generatedByInstall": "POD_INBOX_SWEEP_TOKEN (lib/studio/pod-inbox-auth.ts:6; the host cron's poke.sh reads the same value from /root/lobster-phase1/.env)",
     "switches": "POD_DESIGNS_ENABLED=true enables the studio routes; POD_AUTO_FULFILL_ENABLED=true enables Woo -> Printful draft orders (woo-order/route.ts:39); POD_OUTPUT_INTENT_DEPLOYED and POD_ICC_* for PDF/X output (lib/studio/ghostscript-pdfx.ts:44, :63)",

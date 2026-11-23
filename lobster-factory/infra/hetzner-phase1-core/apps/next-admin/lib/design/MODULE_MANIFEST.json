@@ -25,7 +25,7 @@
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_DESIGN": "optional product host",
-    "loginSources": ["local"],
+    "loginSources": ["local", "awarewave-wp"],
     "apiKeys": "R2_API_TOKEN and R2_ACCOUNT_ID (required to save), R2_DESIGNS_BUCKET and R2_DESIGNS_PUBLIC_BASE (customer bucket and public origin; lib/storage/r2.ts:36-37). AI buttons use studio's provider keys.",
     "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
   }

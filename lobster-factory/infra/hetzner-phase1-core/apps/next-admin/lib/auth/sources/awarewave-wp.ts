@@ -64,6 +64,13 @@ export interface HandoffDeps {
   holds: typeof holdsProduct;
   now: () => number;
 }
+/** A WordPress sign-in opens a door only when its loginSources lists that site's source (products.ts, ADR 018 §3) --
+ *  aware-wave.com included (ADR 021 G11): a new product takes no WordPress sign-in until its row says so. The workspace
+ *  (door null) is aware-wave.com's only. Both routes ask this, so My Account never shows a door 「進入」 would refuse. */
+export function opensTo(source: "awarewave-wp" | "customer-wp", door: Pick<NextAdminProduct, "loginSources"> | null): boolean {
+  return door ? door.loginSources.includes(source) : source === "awarewave-wp";
+}
+
 const AWARE_WAVE_HANDOFF = { verifyAlg: "hmac-env", handoffEnvVar: "AUTH_WP_HANDOFF_SECRET" } as SellerSite;
 type MemberDeps = Pick<HandoffDeps, "db" | "site" | "find" | "now">;
 type Verified = { ok: true; account: BillingAccountIdentity; now: number };
@@ -107,12 +114,7 @@ export async function wpHandoff(rawBody: string, signature: string | null, env: 
     const workspace = body.product_key === WORKSPACE_KEY;
     product = workspace ? null : servedNextAdminProducts().find((p) => p.key === body.product_key) ?? null;
     if (!workspace && !product) return { ok: false, status: 400, error: "unknown_product" };
-    // A seller's WordPress (customer-wp) opens only the doors that list it (products.ts loginSources, ADR 018 §3).
-    // aware-wave.com is not held to the list: 4b-4 opened every served door to it while most list only "local" -- which
-    // of the two is right is the operator's call (WORKLOG 2026-10-29), and closing those doors here would be that call.
-    if (siteIdentityProvider(site) === "customer-wp" && (workspace || !product!.loginSources.includes("customer-wp"))) {
-      return { ok: false, status: 403, error: "login_source_not_allowed" };
-    }
+    if (!opensTo(siteIdentityProvider(site), product)) return { ok: false, status: 403, error: "login_source_not_allowed" };
     return null;
   });
   if (v.ok === false) return v;
@@ -142,7 +144,7 @@ export interface WpSummary {
   ok: true;
   unit: { name: string };
   wallet: { balance: number; frozen: boolean };
-  /** Every door open to members (servedNextAdminProducts), registry order; not held = kind "none", can_enter false. */
+  /** Every served door that takes aware-wave.com sign-ins (opensTo), registry order; not held = kind "none", can_enter false. */
   products: WpSummaryProduct[];
   fetched_at: string;
 }
@@ -172,9 +174,10 @@ export async function wpSummary(rawBody: string, signature: string | null, env: 
   // billing_account resolves a brand to its root; a brand's member is not a member (ADR 021 D1: member links join root
   // organizations only), and the root's name and wallet are not theirs to see.
   if (account.organization_id !== orgId) return { ok: false, status: 403, error: "brand_unit_unsupported" };
-  const held = new Set((await deps.held(orgId, undefined, v.now)).map((p) => p.key));
+  const doors = servedNextAdminProducts().filter((p) => opensTo("awarewave-wp", p));
+  const held = new Set((await deps.held(orgId, undefined, v.now)).map((p) => p.key).filter((k) => doors.some((p) => p.key === k)));
   const records = held.size ? await deps.entitlements({ organizationId: orgId, productKeys: [...held], now: v.now }) : [];
-  const products = servedNextAdminProducts().map((p): WpSummaryProduct => {
+  const products = doors.map((p): WpSummaryProduct => {
     if (!held.has(p.key)) {
       const l = rightLabel({ entry: null, door: "not_held", source: null, viewer: "manager", mode: "enforce", productName: p.name });
       return { key: p.key, name: p.name, right: { kind: "none", label: l.label, counts: { covered: 0, gift: 0, credits: 0, locked: p.features.length } }, can_enter: false };

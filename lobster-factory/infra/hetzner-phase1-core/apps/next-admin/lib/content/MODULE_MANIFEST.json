@@ -26,7 +26,7 @@
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_CONTENT": "optional product host",
-    "loginSources": ["local"],
+    "loginSources": ["local", "awarewave-wp"],
     "apiKeys": "ANTHROPIC_API_KEY and OPENAI_API_KEY for text, REPLICATE_API_TOKEN (and OPENAI_API_KEY) for images through lib/tarot/image-gen.ts:406,540, R2_* for stored images (lib/storage/r2.ts:30-37), SERPER_API_KEY optional for source links, POSTIZ_* only for social publishing, WP_API_URL + WORDPRESS_JWT_TOKEN or WPBRIDGE_* only when publishing to the customer's WordPress (wordpress-core.ts:354-355, lib/payments/woo.ts:86-89), CONTENT_TRENDING_FEEDS optional JSON feed list (trending-sources.ts:13).",
     "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
   }

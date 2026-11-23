@@ -10,6 +10,12 @@ import { createPrivateKey, sign } from "node:crypto";
 import fixture from "@/lib/payments/__tests__/fixtures/ed25519-v1.json";
 import type { SellerSite } from "@/lib/payments/sites";
 
+// the real door list, swappable per test (one test takes a door's awarewave-wp away)
+vi.mock("@/lib/portal/doors", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/portal/doors")>();
+  return { ...actual, servedNextAdminProducts: vi.fn(actual.servedNextAdminProducts) };
+});
+
 const AWC: SellerSite = { id: "site-awc", host: "aware-wave.com", keyId: "aware-wave-com", sellerOrganizationId: "org-internal", sellerKind: "internal",
   verifyAlg: "hmac-env", publicKey: null, envVar: "PAYMENTS_WOO_SECRET", handoffPublicKey: null, handoffEnvVar: "AUTH_WP_HANDOFF_SECRET", status: "active" };
 
@@ -65,12 +71,43 @@ describe("WordPress one-time sign-in into a product door (ADR 015 order 1, 4b-4)
     const social = req({ key_id: "shop-b", product_key: "social" });
     await expect(call(social, d, signShop(social))).resolves.toMatchObject({ ok: true });
     expect(d.find).toHaveBeenCalledWith(d.db, { provider: "customer-wp", siteId: "site-shop", externalId: "57" });
-    // tarot lists only "local": the seller's member is refused there, signature and all
+    // tarot does not list customer-wp: the seller's member is refused there, signature and all
     const tarot = req({ key_id: "shop-b", nonce: "n-f-0123456789abcdef" });
     await expect(call(tarot, d, signShop(tarot))).resolves.toMatchObject({ status: 403, error: "login_source_not_allowed" });
     // aware-wave.com's HMAC key never signs for the seller's site
     const forged = req({ key_id: "shop-b", product_key: "social", nonce: "n-g-0123456789abcdef" });
     await expect(call(forged, d, signHandoff(forged, SECRET))).resolves.toMatchObject({ status: 401, error: "invalid_signature" });
+  });
+
+  it("every served door's answer per sign-in source, pinned as literals (M11: listing awarewave-wp changed none of them)", async () => {
+    const { d } = deps();
+    const outcome = async (keyId: string | undefined, key: string, i: number) => {
+      const body = req({ product_key: key, nonce: `n-door-${keyId ?? "awc"}-${i}-0123456789`, ...(keyId ? { key_id: keyId } : {}) });
+      const out = await call(body, d, keyId ? signShop(body) : signHandoff(body, SECRET));
+      return out.ok === false ? `${out.status} ${out.error}` : 200;
+    };
+    const keys = [...servedNextAdminProducts().map((p) => p.key), "portal"];
+    const table = async (keyId?: string) => Object.fromEntries(await Promise.all(keys.map(async (k, i) => [k, await outcome(keyId, k, i)])));
+    await expect(table()).resolves.toEqual({ social: 200, video: 200, tarot: 200, studio: 200, design: 200, content: 200, outreach: 200, portal: 200 });
+    const refused = "403 login_source_not_allowed";
+    await expect(table("shop-b")).resolves.toEqual({ social: 200, video: refused, tarot: refused, studio: refused, design: refused, content: refused, outreach: refused, portal: refused });
+  });
+
+  it("aware-wave.com too is held to the list: a door without awarewave-wp refuses it and My Account leaves it out", async () => {
+    const real = servedNextAdminProducts();
+    vi.mocked(servedNextAdminProducts).mockReturnValue(real.map((p) => (p.key === "tarot" ? { ...p, loginSources: ["local"] as const } : p)));
+    try {
+      const { d, generateLink } = deps();
+      await expect(call(req(), d)).resolves.toEqual({ ok: false, status: 403, error: "login_source_not_allowed" });
+      expect(generateLink).not.toHaveBeenCalled();
+      await expect(call(req({ product_key: "studio", nonce: "n-st-0123456789abcdef" }), d)).resolves.toMatchObject({ ok: true });
+      const s = sdeps({ held: ["tarot", "content"] });
+      const out = await ok(s, "s-l-0123456789abcdef");
+      expect(out.products.map((p) => p.key)).toEqual(real.map((p) => p.key).filter((k) => k !== "tarot"));
+      expect(s.entitlements).toHaveBeenCalledWith({ organizationId: "org-1", productKeys: ["content"], now: NOW });
+    } finally {
+      vi.mocked(servedNextAdminProducts).mockImplementation((await vi.importActual<typeof import("@/lib/portal/doors")>("@/lib/portal/doors")).servedNextAdminProducts);
+    }
   });
 
   it("is off until its own secret is set", async () => {

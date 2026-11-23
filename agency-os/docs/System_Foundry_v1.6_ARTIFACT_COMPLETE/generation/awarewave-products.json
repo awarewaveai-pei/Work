@@ -4,6 +4,17 @@
   "products": [
     {
       "key": "cognitive",
+      "catalog": {
+        "category": "insight",
+        "tasks": [
+          "decide-with-methods",
+          "find-root-cause",
+          "plan-projects"
+        ],
+        "blurb": "組合認知方法做研究與決策",
+        "icon": "compass",
+        "addedAt": "2026-01-01"
+      },
       "name": "AI LEGO Cognitive Engineering OS",
       "description": "組合認知方法、研究資料與專案。",
       "subdomain": "cognitive",
@@ -2131,6 +2142,15 @@
     },
     {
       "key": "collect",
+      "catalog": {
+        "category": "research",
+        "tasks": [
+          "collect-web-data"
+        ],
+        "blurb": "蒐集外部網站與研究資料",
+        "icon": "search",
+        "addedAt": "2026-01-01"
+      },
       "name": "資料蒐集器",
       "description": "搜尋並蒐集外部網站與研究資料。",
       "subdomain": "collect",
@@ -2141,7 +2161,8 @@
         "api": []
       },
       "loginSources": [
-        "local"
+        "local",
+        "awarewave-wp"
       ],
       "standalone": false,
       "status": "coming_soon",
@@ -2167,6 +2188,17 @@
     },
     {
       "key": "content",
+      "catalog": {
+        "category": "content",
+        "tasks": [
+          "write-seo-article",
+          "plan-monthly-topics",
+          "publish-to-site"
+        ],
+        "blurb": "寫 SEO 文章、排題目、發布到你的網站",
+        "icon": "article",
+        "addedAt": "2026-01-01"
+      },
       "name": "內容行銷",
       "description": "產生文章、搜尋素材並安排內容發布。",
       "subdomain": "content",
@@ -2188,6 +2220,12 @@
             "staff": "tools/content/topics"
           },
           {
+            "path": "topics/steps",
+            "name": "五步驟",
+            "staff": "tools/content/topics/steps",
+            "under": "topics"
+          },
+          {
             "path": "sites",
             "name": "網站",
             "staff": "tools/content/sites"
@@ -2200,7 +2238,8 @@
         ]
       },
       "loginSources": [
-        "local"
+        "local",
+        "awarewave-wp"
       ],
       "standalone": false,
       "status": "coming_soon",
@@ -2316,6 +2355,16 @@
     },
     {
       "key": "cs",
+      "catalog": {
+        "category": "service",
+        "tasks": [
+          "answer-customer-questions",
+          "hand-off-to-human"
+        ],
+        "blurb": "依知識庫回答客人並轉交真人",
+        "icon": "chat",
+        "addedAt": "2026-01-01"
+      },
       "name": "AI 客服",
       "description": "根據知識庫回答問題並處理客服交接。",
       "subdomain": "cs",
@@ -2328,7 +2377,8 @@
         ]
       },
       "loginSources": [
-        "local"
+        "local",
+        "awarewave-wp"
       ],
       "standalone": false,
       "status": "coming_soon",
@@ -2384,6 +2434,17 @@
     },
     {
       "key": "design",
+      "catalog": {
+        "category": "design",
+        "tasks": [
+          "edit-design",
+          "make-banner",
+          "make-mockup"
+        ],
+        "blurb": "畫布、橫幅、模型圖與向量設計",
+        "icon": "palette",
+        "addedAt": "2026-01-01"
+      },
       "name": "設計編輯器",
       "description": "編輯畫布、橫幅、模型圖與向量設計。",
       "subdomain": "design",
@@ -2423,7 +2484,8 @@
         ]
       },
       "loginSources": [
-        "local"
+        "local",
+        "awarewave-wp"
       ],
       "standalone": false,
       "status": "coming_soon",
@@ -2459,6 +2521,15 @@
     },
     {
       "key": "hci",
+      "catalog": {
+        "category": "insight",
+        "tasks": [
+          "continuous-monitoring"
+        ],
+        "blurb": "人機互動與持續監測",
+        "icon": "pulse",
+        "addedAt": "2026-01-01"
+      },
       "name": "HCI-30",
       "description": "人機互動與持續監測工具。",
       "subdomain": "hci",
@@ -2483,6 +2554,17 @@
     },
     {
       "key": "outreach",
+      "catalog": {
+        "category": "sales",
+        "tasks": [
+          "write-outreach-emails",
+          "find-leads",
+          "track-replies"
+        ],
+        "blurb": "寫開發信、管名單與追蹤回信",
+        "icon": "mail",
+        "addedAt": "2026-01-01"
+      },
       "name": "行銷開發信",
       "description": "產生開發信並管理寄送名單。",
       "subdomain": "outreach",
@@ -2536,7 +2618,8 @@
         ]
       },
       "loginSources": [
-        "local"
+        "local",
+        "awarewave-wp"
       ],
       "standalone": false,
       "status": "coming_soon",
@@ -2599,6 +2682,17 @@
     },
     {
       "key": "social",
+      "catalog": {
+        "category": "social",
+        "tasks": [
+          "schedule-social-posts",
+          "rewrite-per-platform",
+          "auto-reply"
+        ],
+        "blurb": "改寫貼文、排程並派送到各社群",
+        "icon": "share",
+        "addedAt": "2026-01-01"
+      },
       "name": "社群發文",
       "description": "改寫、排程並派送品牌社群貼文。",
       "subdomain": "social",
@@ -2672,6 +2766,17 @@
     },
     {
       "key": "studio",
+      "catalog": {
+        "category": "design",
+        "tasks": [
+          "make-product-images",
+          "write-product-copy",
+          "retouch-images"
+        ],
+        "blurb": "做商品圖、寫商品文案、修圖",
+        "icon": "image",
+        "addedAt": "2026-01-01"
+      },
       "name": "商品設計工作室",
       "description": "生成商品圖片、文案與修圖素材。",
       "subdomain": "studio",
@@ -2695,7 +2800,8 @@
         ]
       },
       "loginSources": [
-        "local"
+        "local",
+        "awarewave-wp"
       ],
       "standalone": false,
       "status": "coming_soon",
@@ -2764,6 +2870,15 @@
     },
     {
       "key": "tarot",
+      "catalog": {
+        "category": "design",
+        "tasks": [
+          "make-tarot-cards"
+        ],
+        "blurb": "生成塔羅牌圖片與提示詞",
+        "icon": "cards",
+        "addedAt": "2026-01-01"
+      },
       "name": "塔羅製圖",
       "description": "生成塔羅圖片、提示詞與動態。",
       "subdomain": "tarot",
@@ -2787,7 +2902,8 @@
         ]
       },
       "loginSources": [
-        "local"
+        "local",
+        "awarewave-wp"
       ],
       "standalone": false,
       "status": "coming_soon",
@@ -2820,6 +2936,17 @@
     },
     {
       "key": "video",
+      "catalog": {
+        "category": "video",
+        "tasks": [
+          "make-short-video",
+          "write-script",
+          "add-voiceover"
+        ],
+        "blurb": "寫腳本、做場景與動態、配旁白",
+        "icon": "film",
+        "addedAt": "2026-01-01"
+      },
       "name": "影片製作",
       "description": "生成腳本、場景、動態與旁白影片。",
       "subdomain": "video",
@@ -2845,7 +2972,8 @@
         "uiService": "video-workbench"
       },
       "loginSources": [
-        "local"
+        "local",
+        "awarewave-wp"
       ],
       "standalone": false,
       "status": "coming_soon",

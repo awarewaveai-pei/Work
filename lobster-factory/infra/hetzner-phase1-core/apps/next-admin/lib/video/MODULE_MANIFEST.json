@@ -27,7 +27,7 @@
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_VIDEO": "optional product host",
-    "loginSources": ["local"],
+    "loginSources": ["local", "awarewave-wp"],
     "apiKeys": "ANTHROPIC_API_KEY, REPLICATE_API_TOKEN / OPENAI_API_KEY for images and motion, PEXELS_API_KEY, R2_* video bucket (reconcile.ts:16-19); STRIPE_SECRET_KEY with MEDIA_PAYMENT_PROVIDER and MEDIA_CHECKOUT_ALLOWED_ORIGIN only if the customer sells media credits (payment-provider.ts:24-31); MEDIA_PROVIDER_ALLOWLIST lists the providers the customer allows (provider-policy.ts:7).",
     "generatedByInstall": "VIDEO_SERVICE_URL, REMOTION_SERVICE_URL, MEDIA_RENDER_AUTH_TOKEN / VIDEO_SERVICE_SECRET / REMOTION_AUTH_TOKEN (lib/content/video/renderer-auth.ts:28-34), OPS_PROXY_SHARED_SECRET (video/cleanup/route.ts:20); MEDIA_TRANSCRIBE_WORKER_URL / _TOKEN / MEDIA_TRANSCRIBE_CALLBACK_BASE_URL only with a transcription worker.",
     "switches": "MEDIA_PRODUCTION_PERSISTENCE_ENABLED (lib/content/video/caption-qa-persistence.ts:10)",

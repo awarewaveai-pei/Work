@@ -26,7 +26,7 @@
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_OUTREACH": "optional product host",
-    "loginSources": ["local"],
+    "loginSources": ["local", "awarewave-wp"],
     "apiKeys": "The customer's Google OAuth client (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET); AI provider keys are entered per organization into the vault through /api/outreach/connectors/secret, not env. Optional model overrides CLAUDE_OUTREACH_MODEL, OPENAI_OUTREACH_MODEL, GEMINI_MODEL (lib/outreach/ai-claude.ts:12, ai-openai.ts:12, ai-gemini.ts:15).",
     "generatedByInstall": "NEXT_PUBLIC_APP_URL = the installation's own app URL, used for the OAuth redirect (lib/outreach/google-oauth.ts appBaseUrl)",
     "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."

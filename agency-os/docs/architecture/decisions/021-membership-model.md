@@ -48,7 +48,7 @@
 | G8 | 四個開關關著（NA 密鑰空、`seller_sites` disabled、店外掛停用、WP 密鑰已刪） | 現況報告 §2 |
 | G9 | 「全部換成 local 設定跑整套測試」不存在 | 現況報告 §8 |
 | G10 | 收銀台端刪除會員／改 email → app 沒有對應事件 | 現況報告 `:188` |
-| G11 | aware-wave.com 進門不看產品 `loginSources` | `NA/lib/auth/sources/awarewave-wp.ts:75-80` |
+| G11 | **已關（M11，2026-11-23）**。原：aware-wave.com 進門不看產品 `loginSources`；現 wp-handoff 與 wp-summary 都經 `opensTo` 查清單 | `NA/lib/auth/sources/awarewave-wp.ts` `opensTo` |
 | G12 | **已關（M1，0175，2026-11-22 已套用）**。原：測試單位沒有標記：`e2e-verify-0704-5c1356`、`test-wp-webhook-co-c705c6` 都是 `kind=customer`；`kind` 需加值 `test` | 正式庫 `organizations` SELECT 2026-11-22（`kind` 只有 `customer`／`internal`） |
 | G13 | WordPress「我的帳號」的「進入」清單來自該會員的 WooCommerce 訂單，不是 app 權益：贈送、員工建立的合約、代操客戶持有的產品不會出現 | `lobster-factory/packages/aware-wave-store-plugin/includes/MyAccountDoors.php:109-121` |
 

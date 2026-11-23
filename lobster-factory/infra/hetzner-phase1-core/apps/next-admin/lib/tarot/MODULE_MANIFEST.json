@@ -26,7 +26,7 @@
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_TAROT": "optional product host",
-    "loginSources": ["local"],
+    "loginSources": ["local", "awarewave-wp"],
     "apiKeys": "REPLICATE_API_TOKEN and OPENAI_API_KEY (lib/tarot/image-gen.ts:406, :540), ANTHROPIC_API_KEY for prompt suggestions (suggest-prompt/route.ts:48), R2_* (lib/storage/r2.ts:30-37), TAROT_DAILY_LIMIT optional (quota.ts:15).",
     "generatedByInstall": "TRIGGER_API_URL, TRIGGER_ACCESS_TOKEN (app/api/tools/tarot/batch/route.ts:19-20); BATCH_INTERNAL_SECRET in next-admin, copied to the Trigger worker by scripts/lobster-trigger-deploy.ps1",
     "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."

@@ -27,7 +27,7 @@
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_COLLECT": "optional product host",
-    "loginSources": ["local"],
+    "loginSources": ["local", "awarewave-wp"],
     "apiKeys": "One search vendor key is enough (Brave or Serper), FIRECRAWL_API_KEY only for COLLECT_EXTRACT_PROVIDER=firecrawl, OPENAI_API_KEY for knowledge-base embeddings (ADR 017 section 5 row collect).",
     "generatedByInstall": "RENDERER_URL, RENDERER_SHARED_SECRET, COLLECT_RESEARCH_RUNS_TOKEN, COLLECT_RESEARCH_EXECUTE_TOKEN, TRIGGER_API_URL, TRIGGER_ACCESS_TOKEN",
     "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."

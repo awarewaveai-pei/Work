@@ -27,7 +27,7 @@
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_CS": "optional product host",
-    "loginSources": ["local"],
+    "loginSources": ["local", "awarewave-wp"],
     "apiKeys": "ANTHROPIC_API_KEY (GEMINI_API_KEY as failover, lib/cs/llm.ts:25, :76), OPENAI_API_KEY for knowledge retrieval (lib/kb/rag.ts:41). Messenger / LINE channel authorisations live in Chatwoot; the Chatwoot webhook secret and API tokens are stored per organization in the secret vault, not in env (lib/cs/chatwoot-client.ts:50-62).",
     "generatedByInstall": "CS_SWEEP_TOKEN (app/api/internal/cs/sweep/route.ts:16; the host cron's poke.sh reads the same value from /root/lobster-phase1/.env)",
     "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
