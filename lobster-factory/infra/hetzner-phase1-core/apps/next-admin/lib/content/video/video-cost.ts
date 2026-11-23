@@ -11,8 +11,12 @@
  *
  * 定價來源唯一：`lib/ai/cost-model.ts`（TEXT_FEATURES / IMAGE_RATES / TWD_RATE）。改價只動那檔。
  */
-import { TEXT_FEATURES, IMAGE_RATES, DEFAULT_IMAGE_MODEL, VIDEO_MOTION_RATES } from "../../ai/cost-model";
+import { TEXT_FEATURES, TEXT_RATES, IMAGE_RATES, DEFAULT_IMAGE_MODEL, VIDEO_MOTION_RATES } from "../../ai/cost-model";
 import { featureUnitCostUsd, imageCostUsd, textCallCostUsd, usdToNtd } from "../../ai/cost-calculator";
+import { TEXT_FEATURE_DEFAULTS } from "../../ai/text-model-options";
+
+/** The script step names the model the script runs on by default (one table: text-model-options.ts). */
+const SCRIPT_RATE = TEXT_RATES[TEXT_FEATURE_DEFAULTS.videoScript.model];
 
 /** 一步的成本如何隨設定縮放。 */
 export type StepCostKind =
@@ -38,7 +42,7 @@ export interface VideoPipelineStep {
  * 想加步驟（如「背景音樂」「字幕翻譯」「升頻」）→ 在此加一筆並給 cost；想關 → enabled:false 或刪除。
  */
 export const VIDEO_PIPELINE_STEPS: VideoPipelineStep[] = [
-  { id: "script",  label: "腳本生成",     tool: "Claude Sonnet 4.6", vendor: "Anthropic",      icon: "📝", cost: { kind: "text-feature", featureKey: "video-script" }, enabled: true, note: "主題/文章 → 6 場景旁白 + 視覺提示" },
+  { id: "script",  label: "腳本生成",     tool: SCRIPT_RATE.label, vendor: SCRIPT_RATE.vendor, icon: "📝", cost: { kind: "text-feature", featureKey: "video-script" }, enabled: true, note: "主題/文章 → 6 場景旁白 + 視覺提示" },
   { id: "image",   label: "自訂場景圖",   tool: "FLUX schnell",      vendor: "BFL/Replicate",  icon: "🎨", cost: { kind: "image-per-custom-scene" },                  enabled: true, note: "每個 custom 場景一張 AI 插圖" },
   { id: "motion",  label: "AI 影片動態",  tool: "（未啟用）",        vendor: "—",              icon: "🎬", cost: { kind: "motion-per-custom-scene" },                 enabled: true, note: "選填：把自訂場景圖再過一次 image-to-video，換真實動態（非縮放特效）；未選則 $0" },
   { id: "broll",   label: "實拍 B-roll",  tool: "Pexels 影片庫",     vendor: "Pexels",         icon: "🎞️", cost: { kind: "free" },                                    enabled: true, note: "免費實拍素材（broll 場景）" },

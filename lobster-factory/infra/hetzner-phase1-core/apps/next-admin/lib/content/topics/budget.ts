@@ -88,7 +88,7 @@ function feature(key: string): number {
  *  from max tokens with thinking headroom, the article alone is ~NT$15.2 and the video script ~NT$9.3 (2026-11-19), so
  *  ceilings would stop every topic under the NT$15 default (plan O6). A step may therefore end above the cap by at most
  *  its ceiling minus its estimate; the next step then stops. A social writer call is reserved at its ceiling
- *  (auto-run-budget draftCallUpperTwd, ~NT$0.07) and settled to its exact cost. */
+ *  (auto-run-budget draftCallUpperTwd: the social default model at its limit plus the Claude retry) and settled to its exact cost. */
 export const stepUpperTwd = {
   // K7: on the site's API model (a subscription road reserves its API fallback, the most it can cost); no road = as before
   article: (images: number, road?: TopicTextRoad) => twd(feature("article") + (road ? articleModelUsd(road) - articleModelUsd() : 0)

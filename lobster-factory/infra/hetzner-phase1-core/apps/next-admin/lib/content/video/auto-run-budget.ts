@@ -1,13 +1,13 @@
-import { CLAUDE_FAST_MODEL } from "@/lib/ai/gateway";
-import { textCallCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
+import { usdToNtd } from "@/lib/ai/cost-calculator";
+import { writerCallUpperUsd } from "@/lib/social/write-posts-claude";
 import { TWD_RATE } from "@/lib/ai/cost-model";
 import { buildPrompt, MAX_WRITER_CALLS, type WriteInput } from "@/lib/social/write-posts";
 
 export interface AutoBudget { runId: string; budgetTwd: number; spentTwd: number; renderRatios?: string[]; startedAt?: string; episodeId?: string }
 
-// UTF-8 bytes bound input tokens; the writer has no cache writes and caps each answer at 2,000 tokens.
+// One writer call at its ceiling (write-posts-claude.ts writerCallUpperUsd: the default model, its limits, the Claude retry).
 export function draftCallUpperTwd(prompt: string): number {
-  return Math.ceil(textCallCostUsd({ model: CLAUDE_FAST_MODEL, inputTokens: Buffer.byteLength(prompt, "utf8") + 512, outputTokens: 2000 }) * TWD_RATE * 100) / 100;
+  return Math.ceil(writerCallUpperUsd(prompt) * TWD_RATE * 100) / 100;
 }
 export function draftQuoteUsd(input: WriteInput): number {
   if (!input.keys.length) return 0;

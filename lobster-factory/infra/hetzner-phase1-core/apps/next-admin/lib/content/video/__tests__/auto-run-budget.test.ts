@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ brief: {} as Record<string, unknown>, autonomy: "auto_after_render", calls: 0, spent: { usd: 0, model: "" } }));
 vi.mock("@/lib/entitlements/grant", () => ({ grantFor: async () => ({}), runForOrg: async (_o: string, _a: string, fn: () => unknown) => fn() }));
 vi.mock("@/lib/social/store", () => ({ listAccounts: async () => [{ id: "fb", platform: "facebook", status: "connected" }] }));
-vi.mock("@/lib/social/write-posts-claude", () => ({ claudeWriter: async () => ({ spent: state.spent, ask: async () => { state.calls++; state.spent.usd += 0.001; return "{}"; } }) }));
+vi.mock("@/lib/social/write-posts-claude", async (original) => ({ ...await original<typeof import("@/lib/social/write-posts-claude")>(), claudeWriter: async () => ({ spent: state.spent, ask: async () => { state.calls++; state.spent.usd += 0.001; return "{}"; } }) }));
 vi.mock("@/lib/social/write-posts", async (original) => ({ ...await original(), writeSocialPosts: async (_i: unknown, ask: (p: string) => Promise<string>) => { await ask("測試社群文案"); return { tooLong: [], wrongLanguage: [], posts: { facebook: "文案" } }; } }));
 vi.mock("../social-drafts-deps", () => ({ draftDeps: () => ({}), loadVideoRows: async () => [{ id: "v1", metadata: { script: "旁白" } }] }));
 vi.mock("../social-drafts", () => ({ saveVideoSocialDrafts: async () => ({ ok: true, drafts: [{}] }) }));

@@ -9,7 +9,7 @@ import { grantFor } from "@/lib/entitlements/grant";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../../ai/gateway";
 import { isOpenAiTextModel, openAiCompletionBudget, resolveFeatureTextModel, resolveTextChain, TEXT_FEATURE_DEFAULTS, type AiTextModel, type TextChain } from "../../ai/text-model-options";
-import { openAiFallbackNote, openAiText, openAiUnusable } from "../../ai/openai-text";
+import { askOpenAiText, openAiFallbackNote, type OpenAiMissReason } from "../../ai/openai-text";
 import { runSubText, runTextChain, skipNote } from "../../ai/sub-text";
 import { codexAllowed, type SubLane } from "../../tarot/codex-bridge";
 
@@ -224,15 +224,14 @@ export async function generateVideoScript(
   const claudeCall = (model: string) => claudeScript(model, maxTokens, `${systemPrompt}
 
 ${userContent}`, apiKey, input.costJobId);
-  // An OpenAI answer that is empty or cut off is redone once on the feature's Claude model, never parsed or returned.
+  // An OpenAI miss (error, no key, timeout, an answer not ended by "stop") is redone once on the feature's Claude model,
+  // never parsed or returned (askOpenAiText is the one rule for every feature).
   const call = async (model: AiTextModel): Promise<ScriptText> => {
     if (!isOpenAiTextModel(model)) return claudeCall(model);
-    const r = await openAiText({ grant: await grantFor("video.script"), model, system: systemPrompt, user: userContent,
+    const r = await askOpenAiText({ grant: await grantFor("video.script"), model, system: systemPrompt, user: userContent,
       maxTokens: openAiCompletionBudget(maxTokens), route: "video/script", tool: "video", jobId: input.costJobId ?? null });
-    if ("error" in r) return { ok: false, status: 502, error: `OpenAI API 呼叫失敗：${r.error}` };
-    const unusable = openAiUnusable(r);
-    if (!unusable) return { ok: true, text: r.text };
-    skipped = [...skipped, openAiFallbackNote(model, unusable)];
+    if (r.ok === true) return { ok: true, text: r.text };
+    skipped = [...skipped, openAiFallbackNote(model, (r as { reason: OpenAiMissReason }).reason)];
     return claudeCall(TEXT_FEATURE_DEFAULTS.videoScript.claude);
   };
   let answer: ScriptText | null = null;

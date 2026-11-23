@@ -67,15 +67,34 @@ export async function openAiText(a: OpenAiTextArgs): Promise<OpenAiTextResult> {
   }
 }
 
-/** An answer that is not one: nothing written, or cut off at the limit (all of it spent on reasoning, or half an answer).
- *  null = usable. Callers that replace the model never hand such an answer back as a success. */
-export function openAiUnusable(r: { text: string; finishReason: string }): "openai_empty" | "openai_length" | null {
+/** An answer that is not one: only finish_reason "stop" with text counts. Empty, cut off at the limit (all of it spent on
+ *  reasoning, or half an answer), content_filter or any other end = unusable. null = usable. */
+export function openAiUnusable(r: { text: string; finishReason: string }): "openai_empty" | "openai_length" | "openai_unfinished" | null {
   if (r.finishReason === "length") return "openai_length";
+  if (r.finishReason !== "stop") return "openai_unfinished";
   return r.text.trim() ? null : "openai_empty";
 }
 
-const UNUSABLE_TEXT = { openai_empty: "沒有寫出內容", openai_length: "思考用光上限，沒寫完" } as const;
+export type OpenAiMissReason = "openai_empty" | "openai_length" | "openai_unfinished" | "openai_no_key" | "openai_failed";
+/** The one rule for a feature that replaced its Claude model with an OpenAI default: a usable answer, or the reason it is
+ *  not (an error, no key, a timeout, an unusable answer: openAiUnusable). On a miss the caller asks its Claude model once and
+ *  carries openAiFallbackNote; `costUsd` = what the missed call cost (0 when none was billed). */
+export async function askOpenAiText(a: OpenAiTextArgs): Promise<
+  | { ok: true; text: string; model: string; costUsd: number; usage?: OpenAiUsageLike }
+  | { ok: false; reason: OpenAiMissReason; costUsd: number; model: string; detail?: string }> {
+  const r = await openAiText(a);
+  if ("error" in r) {
+    const reason = r.status === 503 ? "openai_no_key" : "openai_failed";
+    return { ok: false, reason, costUsd: 0, model: a.model, detail: r.detail ? `${r.error}: ${r.detail}` : r.error };
+  }
+  const unusable = openAiUnusable(r);
+  if (unusable) return { ok: false, reason: unusable, costUsd: r.costUsd, model: r.model };
+  return { ok: true, text: r.text.trim(), model: r.model, costUsd: r.costUsd, usage: r.usage };
+}
+
+const MISS_TEXT: Record<OpenAiMissReason, string> = { openai_empty: "沒有寫出內容", openai_length: "思考用光上限，沒寫完",
+  openai_unfinished: "沒有正常寫完", openai_no_key: "沒有 OpenAI 金鑰", openai_failed: "呼叫失敗" };
 /** The skip line a page shows when the OpenAI answer was dropped and the feature's Claude model answered instead. */
-export function openAiFallbackNote(model: AiTextModel, error: "openai_empty" | "openai_length") {
-  return { model, error, reason: `${textModelOption(model).label}：${UNUSABLE_TEXT[error]}，改用 Claude` };
+export function openAiFallbackNote(model: AiTextModel, error: OpenAiMissReason) {
+  return { model, error, reason: `${textModelOption(model).label}：${MISS_TEXT[error]}，改用 Claude` };
 }
