@@ -100,9 +100,9 @@
 | 2 | `rsync -av --delete --exclude='.env*' --exclude='node_modules' --exclude='.next' /root/Work/.../apps/<APP>/ /root/lobster-phase1/apps/<APP>/` | rsync 錯誤 → fail，staging 保持原狀 |
 | 2.5 | 對每個 RESTORABLE app 執行 `rollback-phase1.sh save`：快照**正在跑的 container 的 image**（沒有 container 才用 `:local`；兩者都沒有＝首次部署，印 `Saved: NONE`），並記下本次 tag（2026-09-19 起） | 腳本不可執行或 save 失敗 → 在 build 前 fail，**不在沒有回滾點的情況下部署** |
 | 3 | `docker compose build <APP>` | build fail → fail，舊 image 還在跑 |
-| 4 | `docker compose up -d <APP>`（race-condition 自動重試一次） | up fail → fail（容器名衝突時自動 stop/rm-f/up 重試；兩次皆失敗才 abort） |
+| 4 | `docker compose up -d <APP>`（race-condition 自動重試一次），成功後立刻記下每個 app 新容器的 **id** | up fail → 「容器正在被移除」兩種錯誤先 stop/rm-f/up 重試一次；仍失敗 → **自動 rollback**（舊容器可能已被 up 移除；2026-11-23 起，之前這條判斷讀錯變數從未生效） |
 | 5 | 寫 `/root/lobster-phase1/.deployed-commit` + `.deployed-at`（drift 偵測用） | — |
-| 6 | 等 healthcheck 60s | unhealthy／逾時 → **自動 rollback**（與 Step 7 共用 `do_rollback`，2026-09-19 起；之前只 fail，壞 container 會留在 prod） |
+| 6 | 等 healthcheck 60s，只查 Step 4 記下的容器 id（`wait_deployed_healthy`，兩條部署路徑共用）：要在跑、healthy、映像＝剛 build 的、名稱仍指向它 | 容器沒在跑／不見了／被換掉 → log 寫 `from outside this deploy`（＝被部署以外的操作動到，不是新版壞了），一樣自動 rollback；沒有 healthcheck＝失敗（不再「assuming OK」）；unhealthy／逾時 → **自動 rollback**（與 Step 7 共用 `do_rollback`，2026-09-19 起；之前只 fail，壞 container 會留在 prod） |
 | 7 | **HTTP smoke check + 自動 rollback**（curl 端點見 sg-deploy.sh Step 7）；**致命**：任一 endpoint 非 2xx → `do_rollback` 以 `rollback-phase1.sh restore <app> <本次 Step 2.5 的 tag>` 逐一還原 RESTORABLE_APPS（wordpress/node-api/next-admin/hci-app/renderer；不是「最新的 rollback-*」；restore 後 health 失敗算 ROLLBACK_FAILED）+ 寫 `.rollback-triggered` flag + `.deployed-commit` 還原為 PREVIOUS_COMMIT + `fail`（exit non-zero）。**Drill mode**：`AUTO_REPAIR_ROLLBACK_ON_SMOKE_FAIL=false ./sg-deploy.sh <app>` 保留舊「非致命 warn」行為供刻意降級演練。2026-05-23 Tier 3 audit C1 fix：實現 Plan v3.2 §五 第 3 層承諾的自動 rollback | 失敗 → SMOKE_WARN log + `.smoke-warn` + ROLLBACK fail + `.rollback-triggered`；`auto-deploy-next-admin.sh` 同時讀兩個 flag 在 Slack/Telegram 附加 SMOKE_WARN 與「🔴 AUTO-ROLLBACK FIRED」prefix |
 
 ### 2.2 客戶端 drift 檢查
@@ -190,6 +190,8 @@ cat /var/lib/awarewave-alert/fail_streak
 預期：service `SUCCESS`、`last_state=ok`、`fail_streak=0`。
 
 ### 2.5 已知行為與 bug 修正紀錄
+
+- **2026-11-23（2026-11-22 09:56Z 誤還原）**：部署等待期間新容器被主機上另一個操作停掉，被判成 unhealthy → 還原好的版本；還原的 `up` 又撞到同一個干擾，被記成 ROLLBACK_FAILED（實際已還原）。三處修正：(a) Step 6 只認本次 `up` 建出的容器 id（上表）；(b) **一把共用鎖** `scripts/compose-state-lock.sh`（`/run/lock/lobster-compose-state.lock`，kernel flock，持有者死掉自動釋放）：`sg-deploy.sh` 從快照到結束（前面的 CI／測試／等待階段不拿，免得擋住建站與修補；兩個 sg-deploy 互斥另用 `/run/lock/sg-deploy-run.lock`）、`rollback-phase1.sh restore`／`n8n-pin`、`safe-infra-patch.sh` 所有型別、Auto-Repair 的容器重啟都要先拿到它；拿不到＝拒絕且什麼都不動（sg-deploy 等 120 秒後 exit 75，safe-infra-patch 等 600 秒，restore 等 300 秒，重啟等 30 秒），**`--force` 不再能跳過**；誰拿著寫在 `/run/lock/lobster-compose-state.lock.holder`；(c) `restore` 的成敗看最後狀態（在跑的容器映像＝快照且 healthy），`up` 遇到 `No such container`／`already in progress` 重試一次。**鎖擋不到手打的 `docker stop`／`docker compose up`**：那種情況由 (a) 在 log 與 `.rollback-triggered` 的 reason 指名。測試：`tests/host-scripts/deploy-interference.test.sh`。
 
 - **2026-05-08**：sg-deploy.sh 首版把寫 `.deployed-commit` 放在 healthcheck wait 之後，若 `docker compose up -d` 撞容器名 race condition 失敗，drift 偵測會失明。修正：(a) `up -d` 失敗若是 race condition 自動 `stop && rm -f && up -d` 重試一次；(b) 寫 `.deployed-commit` 提前到 build 成功 + up 成功之後（healthcheck 失敗仍保留紀錄，因為 image 已 build、容器已起，drift 角度看部署已落地）。
 

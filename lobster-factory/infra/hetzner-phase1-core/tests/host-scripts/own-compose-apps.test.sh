@@ -136,19 +136,21 @@ done
 
 # ---- 3. rollback-phase1.sh restore goes through the same spec ----
 mkdir -p "$T/core/scripts"
-cp "$CORE/scripts/rollback-phase1.sh" "$LIB" "$T/core/scripts/"
+cp "$CORE/scripts/rollback-phase1.sh" "$CORE/scripts/compose-state-lock.sh" "$LIB" "$T/core/scripts/"
+export COMPOSE_STATE_LOCK_TEST_PATH="$T/compose-state.lock"   # restore takes the shared lock; keep it inside $T
 own_compose_spec video-service
 mkdir -p "$OC_DIR"; rm -f "$OC_DIR/$OC_ENV_FILE"; : > "$T/calls"
 out="$(bash "$T/core/scripts/rollback-phase1.sh" restore video-service rollback-1 2>&1)"; rc=$?
 check "restore video-service without .env.video -> refused (rc=$rc)" test "$rc" -ne 0
 check "  ... before re-tagging or starting anything" test -z "$(grep -E '^(tag|compose)' "$T/calls")"
 touch "$OC_DIR/$OC_ENV_FILE"; : > "$T/calls"
-bash "$T/core/scripts/rollback-phase1.sh" restore video-service rollback-1 >/dev/null 2>&1
+# The stub never reports a running container: ROLLBACK_HEALTH_TIMEOUT=0 ends the final-state wait at once.
+ROLLBACK_HEALTH_TIMEOUT=0 bash "$T/core/scripts/rollback-phase1.sh" restore video-service rollback-1 >/dev/null 2>&1
 check "restore video-service re-tags the snapshot" grep -qx 'tag lobster-video-service:rollback-1 lobster-video-service:local' "$T/calls"
 check "restore video-service starts it with --env-file" \
   grep -qx "compose -p video-service --project-directory $OC_DIR -f $OC_DIR/docker-compose.video.yml --env-file $OC_DIR/.env.video up -d --no-build video-service" "$T/calls"
 own_compose_spec remotion-service; mkdir -p "$OC_DIR"; : > "$T/calls"
-bash "$T/core/scripts/rollback-phase1.sh" restore remotion-service rollback-1 >/dev/null 2>&1
+ROLLBACK_HEALTH_TIMEOUT=0 bash "$T/core/scripts/rollback-phase1.sh" restore remotion-service rollback-1 >/dev/null 2>&1
 check "restore remotion-service starts the render-services project" \
   grep -qx "compose -p render-services --project-directory $OC_DIR -f $OC_DIR/docker-compose.yml up -d --no-build lobster-remotion-service" "$T/calls"
 

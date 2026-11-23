@@ -125,6 +125,16 @@ compose() {
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" | tee -a "$LOGFILE"; }
 
+# Every type restarts or reloads something a running deploy's health wait and smoke probes read, and a deploy must not
+# recreate a container under this script's health check: one lock for all of them (compose-state-lock.sh). Taken
+# before anything is written; a lock that stays busy is a refusal with nothing changed.
+# shellcheck source=compose-state-lock.sh
+source "$(dirname "${BASH_SOURCE[0]}")/compose-state-lock.sh"
+if ! compose_state_lock "safe-infra-patch $TYPE $FILE_PATH" "${SAFE_PATCH_LOCK_WAIT:-600}"; then
+  echo "ERROR: another operation is changing containers ($COMPOSE_STATE_LOCK held by: $COMPOSE_STATE_LOCK_BUSY) -- nothing was changed; run again when it is done" >&2
+  exit 1
+fi
+
 # ── Step 1: Backup (new types: nothing to back up) ───────────────────────────
 if (( ! NEW_TYPE )); then
   cp "$FILE_PATH" "$BACKUP"

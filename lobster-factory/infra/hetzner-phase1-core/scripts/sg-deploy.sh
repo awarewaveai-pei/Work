@@ -79,28 +79,37 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ─── Deploy lock (prevent concurrent runs) ───────────────────────
+# ─── Locks ───────────────────────────────────────────────────────
+# 1. The run lock: one sg-deploy at a time, from here to exit (two runs would rsync and build into the same staging
+#    dir). A kernel flock on fd 216: released however this process dies, so there is no stale lock and --force has
+#    nothing left to skip. Step 1.8's self-update `exec` keeps the fd, so the re-exec'd copy is the same holder.
+# shellcheck source=compose-state-lock.sh
+source "$(dirname "$SELF_PATH")/compose-state-lock.sh"
+[[ $FORCE -eq 0 ]] || echo "[sg-deploy] --force is ignored: neither lock is ever skipped"
+RUN_LOCK="$(dirname "$COMPOSE_STATE_LOCK")/sg-deploy-run.lock"
+if [[ ! "/proc/$$/fd/216" -ef "$RUN_LOCK" ]]; then
+  mkdir -p "$(dirname "$RUN_LOCK")"
+  exec 216>>"$RUN_LOCK"
+fi
+if ! flock -n 216; then
+  echo "[sg-deploy] REFUSED: another sg-deploy is running (PID $(cat /tmp/sg-deploy.lock 2>/dev/null || echo unknown)); $RUN_LOCK is held"
+  exit 75
+fi
+# 2. The compose-state lock (compose-state-lock.sh has the contract), shared with rollback-phase1.sh,
+#    safe-infra-patch.sh and the auto-remediation restart: taken by take_compose_state_lock right before the snapshot
+#    and held to exit -- the part of a run that reads or changes containers, not the minutes of gates before it (an
+#    infra patch or a site creation would time out waiting for an npm test). The rollback this script starts inherits it.
+take_compose_state_lock() {
+  compose_state_lock "sg-deploy ${APPS[*]}" "${SG_DEPLOY_LOCK_WAIT:-120}" \
+    || refuse "another operation is changing containers -- $COMPOSE_STATE_LOCK is held by: $COMPOSE_STATE_LOCK_BUSY; no container was touched"
+}
+# 3. /tmp/sg-deploy.lock = this run's PID, the marker sync-host-scripts.sh reads to leave a running deploy's scripts
+#    alone. It excludes nothing by itself. Written inside sync-host-scripts.sh's flock: a cron-side script sync has then
+#    either finished before this deploy exists or sees the marker and skips -- it never swaps scripts mid-deploy.
 LOCK_FILE="/tmp/sg-deploy.lock"
 LOCK_HELD=0
-# Checked and taken inside sync-host-scripts.sh's flock: a cron-side script sync has then either
-# finished before this deploy exists or sees its lock and skips -- it never swaps scripts mid-deploy.
 exec 8>/tmp/sync-host-scripts.lock
 flock -w 120 8 || { echo "[sg-deploy] a host script sync still holds /tmp/sync-host-scripts.lock after 120s"; exit 1; }
-if [ -f "$LOCK_FILE" ] && [ "$FORCE" -eq 0 ]; then
-  LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-  if [ "$LOCK_PID" = "$$" ]; then
-    # Our own lock, inherited across step 1.8's self-update `exec` (exec keeps the PID and
-    # never runs the EXIT trap). Without this, every deploy that pulled a changed
-    # sg-deploy.sh aborted here as "Another deploy is running (PID <self>)".
-    :
-  elif [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
-    echo "[sg-deploy] Another deploy is running (PID $LOCK_PID). Use --force to override."
-    exit 75
-  else
-    echo "[sg-deploy] Stale lock found, removing."
-    rm -f "$LOCK_FILE"
-  fi
-fi
 echo $$ > "$LOCK_FILE"
 LOCK_HELD=1
 exec 8>&-
@@ -170,9 +179,10 @@ log "log file: $LOG_FILE"
 if [[ $SKIP_PULL -eq 0 ]]; then
   log "--- git pull ---"
   cd "$REPO_DIR"
-  git fetch origin main 2>&1 | tee -a "$LOG_FILE"
+  # 216>&-: git's background auto-gc keeps every inherited fd; it must not carry the run lock past this deploy.
+  git fetch origin main 216>&- 2>&1 | tee -a "$LOG_FILE"
   BEFORE=$(git rev-parse HEAD)
-  git pull --ff-only origin main 2>&1 | tee -a "$LOG_FILE" || fail "git pull failed (non-FF? local edits in /root/Work?)"
+  git pull --ff-only origin main 216>&- 2>&1 | tee -a "$LOG_FILE" || fail "git pull failed (non-FF? local edits in /root/Work?)"
   AFTER=$(git rev-parse HEAD)
   if [[ "$BEFORE" != "$AFTER" ]]; then
     log "git: $BEFORE -> $AFTER"
@@ -333,6 +343,69 @@ health_fail() {
   fail "$1"
 }
 
+# Health wait for both deploy paths. Invariant: the verdict is about the container THIS run's `up` made -- its id --
+# never about whatever answers to the name. 2026-11-22 the wait asked the name for .State.Health.Status only: a
+# container stopped from outside reads "unhealthy" there (a good build was rolled back), and a name that did not
+# resolve read as "no healthcheck, assuming OK".
+# deployed_container_id <compose ps -aq output>  -> DEPLOYED_CID = the one container of the service; 1 + WAIT_FAIL otherwise.
+deployed_container_id() {
+  local id
+  DEPLOYED_CID=""
+  # `ps -a` also lists one-off containers (a stopped `docker compose run <service>` left behind): not the service's.
+  while IFS= read -r id; do
+    [[ -n "$id" ]] || continue
+    [[ "$(docker inspect --type container -f '{{index .Config.Labels "com.docker.compose.oneoff"}}' "$id" 2>/dev/null || true)" == "True" ]] && continue
+    DEPLOYED_CID+="${DEPLOYED_CID:+$'\n'}$id"
+  done <<<"$1"
+  [[ -n "$DEPLOYED_CID" && "$(wc -l <<<"$DEPLOYED_CID")" -eq 1 ]] && return 0
+  WAIT_FAIL="expected one container of the service after up, compose lists: $(tr '\n' ' ' <<<"${DEPLOYED_CID:-none}")"
+  DEPLOYED_CID=""; return 1
+}
+# wait_deployed_healthy <container name> <container id> <timeout seconds> <image id just built>
+#   0 = that container runs that image, is healthy, and is still the one behind the name.
+#   1 = WAIT_FAIL says why. "from outside this deploy" in it = the container was stopped, removed or replaced by
+#       something else on the host; the build itself was never judged.
+wait_deployed_healthy() {
+  local name="$1" cid="$2" timeout="$3" want_image="$4" i row status running exit_code health image policy now
+  local fmt='{{.State.Status}}|{{.State.Running}}|{{.State.ExitCode}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}|{{.Image}}|{{.HostConfig.RestartPolicy.Name}}'
+  WAIT_FAIL=""
+  for ((i = 1; ; i++)); do
+    if ! row="$(docker inspect --type container -f "$fmt" "$cid" 2>/dev/null)" || [[ -z "$row" ]]; then
+      now="$(docker inspect --type container -f '{{.Id}}' "$name" 2>/dev/null || true)"
+      WAIT_FAIL="$name: container ${cid:0:12} that this deploy started no longer exists -- removed or replaced from outside this deploy"
+      if [[ -n "$now" ]]; then WAIT_FAIL+=" (the name now resolves to ${now:0:12})"; else WAIT_FAIL+=" (nothing answers to the name now)"; fi
+      return 1
+    fi
+    IFS='|' read -r status running exit_code health image policy <<<"$row"
+    if [[ "$running" != "true" && "$status" != "restarting" ]]; then
+      WAIT_FAIL="$name (${cid:0:12}) is not running: status=$status exit=$exit_code restart=$policy"
+      # restart: always / unless-stopped restarts a container that exits by itself; one left stopped was stopped by someone.
+      case "$policy" in
+        always|unless-stopped) WAIT_FAIL+=" -- stopped from outside this deploy" ;;
+        *) WAIT_FAIL+=" -- it exited, or was stopped from outside this deploy" ;;
+      esac
+      return 1
+    fi
+    case "$health" in
+      healthy) break ;;
+      unhealthy) WAIT_FAIL="$name (${cid:0:12}) unhealthy"; return 1 ;;
+      # No healthcheck = nothing proves the new image works; treated as a failure, never assumed OK.
+      no-healthcheck) WAIT_FAIL="$name (${cid:0:12}) has no healthcheck"; return 1 ;;
+    esac
+    if (( i >= timeout )); then WAIT_FAIL="$name (${cid:0:12}) not healthy in ${timeout}s (status=$status health=$health)"; return 1; fi
+    sleep 1
+  done
+  # Healthy is not enough: it must be the image just built, and still the container the name leads to.
+  if [[ "$image" != "$want_image" ]]; then WAIT_FAIL="$name (${cid:0:12}) runs $image, not the image just built ($want_image)"; return 1; fi
+  now="$(docker inspect --type container -f '{{.Id}}' "$name" 2>/dev/null || true)"
+  if [[ "$now" != "$cid" ]]; then
+    WAIT_FAIL="$name now resolves to ${now:0:12}, not ${cid:0:12} that this deploy started -- replaced from outside this deploy"
+    [[ -n "$now" ]] || WAIT_FAIL="$name: nothing answers to the name, though ${cid:0:12} is healthy -- renamed from outside this deploy"
+    return 1
+  fi
+  log "$name healthy after ${i}s (container ${cid:0:12})"
+}
+
 # 2-own. An app with its own compose file (OWN_APP; spec in own-compose-apps.sh). Same gates as the staging path:
 #   label check -> source -> snapshot -> build -> tests inside the new image -> up with the spec's compose + env file
 #   -> healthy -> HTTP smoke. A failure before `up` leaves the running container untouched; any failure after it
@@ -371,6 +444,7 @@ if [[ -n "$OWN_APP" ]]; then
     exit 0
   fi
 
+  take_compose_state_lock
   snapshot_restorable_apps
   export ROLLBACK_HEALTH_TIMEOUT="${ROLLBACK_HEALTH_TIMEOUT:-$OC_HEALTH_TIMEOUT}"   # the restored copy gets the same wait
   log "--- docker build $OC_IMAGE_REPO:local ($OC_BUILD_CTX) ---"
@@ -390,19 +464,10 @@ if [[ -n "$OWN_APP" ]]; then
 
   log "--- up $OC_SERVICE ---"
   oc_compose up -d --no-build "$OC_SERVICE" 2>&1 | tee -a "$LOG_FILE" || health_fail "compose up $OC_SERVICE failed"
-  log "--- waiting for $OC_CONTAINER healthy (up to ${OC_HEALTH_TIMEOUT}s) ---"
-  for ((i = 1; ; i++)); do
-    STATUS=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$OC_CONTAINER" 2>/dev/null || echo "missing")
-    [[ "$STATUS" == "healthy" ]] && { log "$OC_CONTAINER healthy after ${i}s"; break; }
-    [[ "$STATUS" == "unhealthy" ]] && health_fail "$OC_CONTAINER unhealthy"
-    # No healthcheck = nothing proves the new image works; treated as a failure, never assumed OK.
-    [[ "$STATUS" == "no-healthcheck" ]] && health_fail "$OC_CONTAINER has no healthcheck"
-    (( i >= OC_HEALTH_TIMEOUT )) && health_fail "$OC_CONTAINER not healthy in ${OC_HEALTH_TIMEOUT}s (status=$STATUS)"
-    sleep 1
-  done
-  # Healthy is not enough: an old container that `up` did not replace is healthy too.
-  _running="$(docker inspect -f '{{.Image}}' "$OC_CONTAINER" 2>/dev/null || true)"
-  [[ "$_running" == "$OC_NEW_IMAGE" ]] || health_fail "$OC_CONTAINER runs ${_running:-nothing}, not the image just built ($OC_NEW_IMAGE)"
+  deployed_container_id "$(oc_compose ps -aq "$OC_SERVICE" 2>/dev/null || true)" || health_fail "$OC_CONTAINER: $WAIT_FAIL"
+  OC_CID="$DEPLOYED_CID"
+  log "--- waiting for $OC_CONTAINER (${OC_CID:0:12}) healthy (up to ${OC_HEALTH_TIMEOUT}s) ---"
+  wait_deployed_healthy "$OC_CONTAINER" "$OC_CID" "$OC_HEALTH_TIMEOUT" "$OC_NEW_IMAGE" || health_fail "$WAIT_FAIL"
 
   log "--- HTTP smoke check ($OWN_APP) ---"
   http=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" "$OC_SMOKE_URL" 2>/dev/null) || http="000"
@@ -557,6 +622,7 @@ fi
 #     SNAPSHOT_TAG[app] = this run's tag, so rollback restores exactly it, never "latest
 #     rollback-*" (which a failed save would silently turn into an older deploy's image).
 #     Empty = first deploy of that app (save printed "Saved: NONE"): nothing to roll back to.
+take_compose_state_lock
 snapshot_restorable_apps
 if [[ ${#NON_RESTORABLE_APPS[@]} -gt 0 ]]; then
   log "WARN: apps outside rollback-phase1.sh IMAGE_MAP, no auto-rollback for: ${NON_RESTORABLE_APPS[*]}"
@@ -568,6 +634,18 @@ log "--- docker compose build ${APPS[*]} ---"
 BUILD_ARGS=()
 [[ "${TYPECHECK_GATE_PASSED:-0}" == "1" ]] && BUILD_ARGS+=(--build-arg NEXT_TYPECHECK_DONE=1)
 docker compose build "${BUILD_ARGS[@]}" "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || fail "docker build failed"
+# The image each app must end up running (step 6 compares the new container against it).
+declare -A NEW_IMAGE=()
+for APP in "${APPS[@]}"; do
+  # The service's OWN image from the resolved config. Not `config --images <service>`: that also prints the images of
+  # everything the service depends_on, in no fixed order (next-admin -> node-api -> redis).
+  _img_ref="$(docker compose config --format json 2>/dev/null | python3 -c '
+import json, sys
+cfg = json.load(sys.stdin)
+print(cfg["services"][sys.argv[1]].get("image") or "%s-%s" % (cfg["name"], sys.argv[1]))' "$APP" 2>/dev/null || true)"
+  NEW_IMAGE[$APP]="$(docker image inspect -f '{{.Id}}' "$_img_ref" 2>/dev/null)" \
+    || fail "cannot read the image just built for $APP (compose names '${_img_ref:-nothing}') -- deploy aborted before up; the running container is unchanged"
+done
 
 # 3.5 post-build gate (video-workbench): tests/gate.cjs inside the just-built image (Dockerfile.gate adds tests/ to a copy;
 #     the runtime image stays test-free). Nothing is up yet, so a failure leaves the running container untouched.
@@ -583,21 +661,31 @@ if [[ " ${APPS[*]} " =~ " video-workbench " ]]; then
   log "video-workbench gate passed"
 fi
 
-# 4. up -d (with race-condition retry)
+# 4. up -d (with race-condition retry). A failed `up` may already have removed the old container, so a failure from
+#    here on goes through health_fail (auto-rollback), not a bare fail.
+#    Until 2026-11-23 UP_STATUS read ${PIPESTATUS[0]} after `UP_OUT=$(... | tee ... || true)`, which is always 0: a
+#    failed `up` was never seen here and the retry below never ran.
 log "--- docker compose up -d ${APPS[*]} ---"
-UP_OUT=$(docker compose up -d "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || true)
-UP_STATUS=${PIPESTATUS[0]}
+UP_STATUS=0
+UP_OUT="$(docker compose up -d "${APPS[@]}" 2>&1)" || UP_STATUS=$?
+printf '%s\n' "$UP_OUT" | tee -a "$LOG_FILE"
 if [[ $UP_STATUS -ne 0 ]]; then
-  if echo "$UP_OUT" | grep -q "removal of container .* is already in progress"; then
-    log "race condition: previous container still being removed; cleaning + retrying"
+  if grep -qE "removal of container .* is already in progress|No such container" <<<"$UP_OUT"; then
+    log "race condition: a container was being removed under up; cleaning + retrying"
     sleep 8
     docker compose stop "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || true
     docker compose rm -f "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || true
-    docker compose up -d "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || fail "docker up failed after retry"
+    docker compose up -d "${APPS[@]}" 2>&1 | tee -a "$LOG_FILE" || health_fail "docker compose up failed after retry"
   else
-    fail "docker up failed"
+    health_fail "docker compose up failed (exit $UP_STATUS)"
   fi
 fi
+# The containers `up` just made, by id, read before anything else can happen to them (step 6 waits on these ids).
+declare -A NEW_CID=() NEW_CID_ERR=()
+for APP in "${APPS[@]}"; do
+  deployed_container_id "$(docker compose ps -aq "$APP" 2>/dev/null || true)" || NEW_CID_ERR[$APP]="$WAIT_FAIL"
+  NEW_CID[$APP]="$DEPLOYED_CID"
+done
 
 # 5. record deployed commit IMMEDIATELY after successful up (before healthcheck wait).
 #    This way drift detector knows what we shipped even if healthcheck flakes.
@@ -611,24 +699,12 @@ echo "$NEW_COMMIT" > "$STAGING_DIR/.deployed-commit"
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAGING_DIR/.deployed-at"
 log "wrote .deployed-commit = $NEW_COMMIT (previous: ${PREVIOUS_COMMIT:-none})"
 
-# 6. wait for healthy. Failure -> auto-rollback (see do_rollback).
+# 6. wait for healthy, per container id taken in step 4 (wait_deployed_healthy has the rules). Failure -> auto-rollback.
 for APP in "${APPS[@]}"; do
   CONTAINER="$(app_container_name "$APP")"
-  log "--- waiting for $CONTAINER healthy ---"
-  for i in $(seq 1 60); do
-    STATUS=$(docker inspect --format '{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "no-healthcheck")
-    if [[ "$STATUS" == "healthy" ]]; then
-      log "$CONTAINER healthy after ${i}s"; break
-    fi
-    if [[ "$STATUS" == "no-healthcheck" ]]; then
-      log "$CONTAINER no healthcheck defined; assuming OK"; break
-    fi
-    if [[ "$STATUS" == "unhealthy" ]]; then
-      health_fail "$CONTAINER unhealthy"
-    fi
-    sleep 1
-    [[ $i -eq 60 ]] && health_fail "$CONTAINER did not become healthy in 60s (status=$STATUS)"
-  done
+  [[ -n "${NEW_CID[$APP]}" ]] || health_fail "$CONTAINER: ${NEW_CID_ERR[$APP]}"
+  log "--- waiting for $CONTAINER (${NEW_CID[$APP]:0:12}) healthy ---"
+  wait_deployed_healthy "$CONTAINER" "${NEW_CID[$APP]}" 60 "${NEW_IMAGE[$APP]}" || health_fail "$WAIT_FAIL"
 done
 
 

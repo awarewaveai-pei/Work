@@ -47,6 +47,14 @@ declare -A IMAGE_MAP=(
 # Apps with their own compose file (video-service, remotion-service): spec + oc_compose.
 # shellcheck source=own-compose-apps.sh
 source "$(dirname "${BASH_SOURCE[0]}")/own-compose-apps.sh"
+# restore and n8n-pin change running containers: they take the lock every such entry point shares (inherited, not taken
+# again, when sg-deploy.sh's auto-rollback calls this script).
+# shellcheck source=compose-state-lock.sh
+source "$(dirname "${BASH_SOURCE[0]}")/compose-state-lock.sh"
+take_compose_state_lock() {
+  compose_state_lock "$1" "${ROLLBACK_LOCK_WAIT:-300}" \
+    || die "another operation is changing containers ($COMPOSE_STATE_LOCK held by: $COMPOSE_STATE_LOCK_BUSY) -- nothing was changed; run again when it is done"
+}
 
 # ---------- helpers ----------
 
@@ -67,29 +75,33 @@ require_env() {
 
 image_exists() { docker image inspect "$1" > /dev/null 2>&1; }
 
-# Wait for a service's Docker healthcheck to pass (uses docker inspect — no curl/wget needed).
-wait_healthy() {
-  local svc="$1" elapsed=0 cname hc status
-  cname=$(svc_compose "$svc" ps -q "$(svc_name "$svc")" 2>/dev/null | head -1 || true)
-  [[ -z "$cname" ]] && { echo "  (container not found after up — inspect logs)"; return 1; }
-  hc=$(docker inspect --format='{{if .Config.Healthcheck}}yes{{end}}' "$cname" 2>/dev/null || true)
-  if [[ "$hc" != "yes" ]]; then
-    echo "  (no healthcheck on $svc)"
-    return 0
-  fi
-  echo -n "  Waiting for $svc health"
+# The verdict of a restore is the state at the end, not what `up` printed: the service's running container uses the
+# snapshot image and is healthy (uses docker inspect — no curl/wget needed). The container is looked up again on every
+# round, so one that was removed and recreated while we wait is judged as what it finally is.
+# 2026-11-22: `up` met a container another operation was removing, exited non-zero, and `set -e` reported
+# ROLLBACK_FAILED for a restore that had in fact put the snapshot back.
+wait_restored() {  # <service> <image id of the snapshot>
+  local svc="$1" want="$2" elapsed=0 cid row running health image
+  echo -n "  Waiting for $svc to run the snapshot, healthy"
   while true; do
-    status=$(docker inspect --format='{{.State.Health.Status}}' "$cname" 2>/dev/null || echo "unknown")
-    case "$status" in
-      healthy)   echo " PASS (${elapsed}s)"; return 0 ;;
-      unhealthy) echo " FAIL"; return 1 ;;
-    esac
-    sleep 3; elapsed=$(( elapsed + 3 ))
-    printf "."
+    cid=$(svc_compose "$svc" ps -q "$(svc_name "$svc")" 2>/dev/null | head -1 || true)
+    row=""
+    [[ -n "$cid" ]] && row=$(docker inspect --type container \
+      --format='{{.State.Running}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}|{{.Image}}' "$cid" 2>/dev/null || true)
+    IFS='|' read -r running health image <<<"$row"
+    if [[ "$running" == "true" && -n "$want" && "$image" == "$want" ]]; then
+      case "$health" in
+        healthy)        echo " PASS (${elapsed}s)"; return 0 ;;
+        no-healthcheck) echo " PASS (${elapsed}s; runs the snapshot, no healthcheck on $svc)"; return 0 ;;
+        unhealthy)      echo " FAIL (unhealthy)"; return 1 ;;
+      esac
+    fi
     if [[ $elapsed -ge $HEALTH_TIMEOUT ]]; then
-      echo " TIMEOUT (${HEALTH_TIMEOUT}s)"
+      echo " TIMEOUT (${HEALTH_TIMEOUT}s; container=${cid:0:12} running=${running:-?} health=${health:-?} image=${image:-none} want=$want)"
       return 1
     fi
+    sleep 3; elapsed=$(( elapsed + 3 ))
+    printf "."
   done
 }
 
@@ -161,15 +173,28 @@ case "$cmd" in
     fi
 
     image_exists "$img:$snapshot_tag" || die "snapshot $img:$snapshot_tag not found (run 'list' to see available)"
+    take_compose_state_lock "rollback-phase1 restore $svc"
     echo "Restoring $img:$snapshot_tag → $img:local …"
     docker tag "$img:$snapshot_tag" "$img:local"
-    svc_compose "$svc" up -d --no-build "$(svc_name "$svc")"
-    log "restore | service=$svc | from=$img:$snapshot_tag | user=${USER:-unknown}"
-    if wait_healthy "$svc"; then
+    want_image="$(docker image inspect -f '{{.Id}}' "$img:$snapshot_tag" 2>/dev/null || true)"
+    # `up` once more only for the two errors that mean "a container was being removed under me"; whatever `up` says
+    # in the end, wait_restored decides.
+    up_rc=0
+    up_out="$(svc_compose "$svc" up -d --no-build "$(svc_name "$svc")" 2>&1)" || up_rc=$?
+    printf '%s\n' "$up_out"
+    if [[ $up_rc -ne 0 ]] && grep -qE 'No such container|is already in progress' <<<"$up_out"; then
+      echo "  up met a container that was being removed -- retrying once"
+      sleep 5
+      up_rc=0
+      svc_compose "$svc" up -d --no-build "$(svc_name "$svc")" || up_rc=$?
+    fi
+    [[ $up_rc -eq 0 ]] || echo "  up exited $up_rc -- the final state decides"
+    log "restore | service=$svc | from=$img:$snapshot_tag | up_exit=$up_rc | user=${USER:-unknown}"
+    if wait_restored "$svc" "$want_image"; then
       log "health | service=$svc | status=PASS"
     else
       log "health | service=$svc | status=FAIL"
-      echo "ERROR: restored $svc did not pass its health check — inspect logs: docker logs \$(docker ps -aqf label=com.docker.compose.service=$(svc_name "$svc"))"
+      echo "ERROR: $svc is not running the restored snapshot healthy — inspect logs: docker logs \$(docker ps -aqf label=com.docker.compose.service=$(svc_name "$svc"))"
       # Non-zero so sg-deploy counts it as ROLLBACK_FAILED instead of reporting a clean revert.
       exit 1
     fi
@@ -221,6 +246,7 @@ case "$cmd" in
     [[ "$tag" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9._-]+)?$ ]] \
       || die "tag '$tag' does not look like semver (expected e.g. 2.18.5)"
     require_env
+    take_compose_state_lock "rollback-phase1 n8n-pin $tag"
     cp "$ENV_FILE" "${ENV_FILE}.bak"
     old_tag=$(grep '^N8N_IMAGE_TAG=' "$ENV_FILE" | cut -d= -f2 || echo "(unset)")
     if grep -q '^N8N_IMAGE_TAG=' "$ENV_FILE"; then

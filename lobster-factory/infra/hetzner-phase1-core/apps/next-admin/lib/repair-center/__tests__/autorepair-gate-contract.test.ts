@@ -254,7 +254,10 @@ describe("aw-autorepair-gate denies anything else", () => {
     ["allowed command plus trailing space", `${probe} `],
     ["case variant", probe.toUpperCase()],
     ["empty (interactive shell request)", ""],
-    ["remediation restart (deliberately not allowed)", "cd /root/lobster-phase1 && docker compose restart next-admin"],
+    [
+      "remediation restart (deliberately not allowed)",
+      "cd /root/lobster-phase1 && ./scripts/compose-state-lock.sh auto-remediate-restart 30 docker compose restart next-admin",
+    ],
   ])("%s", (_name, cmd) => {
     expect(gate(["--check"], cmd)).toMatchObject({ status: 126, stdout: "DENY" });
   });

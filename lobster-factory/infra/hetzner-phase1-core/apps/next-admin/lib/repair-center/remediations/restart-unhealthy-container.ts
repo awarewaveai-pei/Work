@@ -94,11 +94,16 @@ export const restartUnhealthyContainer: Remediation = {
     if (!svc) return { ok: false, detail: "invalid service name" };
     const target = readSshTarget("SG");
     if (!target) return { ok: false, detail: "AUTO_REPAIR_SG_SSH_* not configured" };
+    // Under the host's compose-state lock (scripts/compose-state-lock.sh): a restart in the middle of a deploy's
+    // health wait reads as a failed build and rolls it back (2026-11-22). Busy for 30 s → exit 75, nothing restarted.
     const result = await sshExecOnce(
       target,
-      `cd ${phase1Root()} && docker compose restart ${svc}`,
+      `cd ${phase1Root()} && ./scripts/compose-state-lock.sh auto-remediate-restart 30 docker compose restart ${svc}`,
       EXEC_TIMEOUT_MS,
     );
+    if (result.code === 75) {
+      return { ok: false, detail: `not restarted: a deploy or infra patch holds the compose-state lock (${result.stderr.slice(0, 200)})` };
+    }
     return result.code === 0
       ? { ok: true, detail: `docker compose restart ${svc} → exit 0` }
       : { ok: false, detail: `restart failed exit=${result.code}: ${result.stderr.slice(0, 300)}` };

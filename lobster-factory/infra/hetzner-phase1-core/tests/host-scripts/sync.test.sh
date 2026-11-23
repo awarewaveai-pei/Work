@@ -164,8 +164,12 @@ t_auto_deploy_maps_refusal() {
 
   reset_world
   echo v2 > "$SEED/$P/apps/next-admin/app.txt"; push_change drift
-  sleep 300 & local pin=$!
+  # A running deploy = it holds sg-deploy.sh's run lock (what refuses a second deploy) and its PID is in
+  # /tmp/sg-deploy.lock (what the sync reads). `exec sleep` keeps fd 216, so $pin is the holder.
+  mkdir -p /run/lock
+  bash -c 'exec 216>>/run/lock/sg-deploy-run.lock; flock -n 216 && exec sleep 300' & local pin=$!
   echo "$pin" > /tmp/sg-deploy.lock
+  sleep 0.5
   cron_auto_deploy
   kill "$pin"; wait "$pin" 2>/dev/null || true; rm -f /tmp/sg-deploy.lock
   check "refusal(busy): the sync skipped for the running deploy" grep -q "skipped: sg-deploy PID $pin" "$ADLOG"

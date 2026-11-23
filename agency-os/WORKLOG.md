@@ -31,6 +31,23 @@
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=AWORACLE_DATA_KEY | hits=9
 - ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic Deep 兩輪＋三次突變＋監工讀權限與 SQL 段代替
+## 2026-11-23（續3）— 部署等待期間容器被外部動到：不再誤還原、誤報（分支 claude/peaceful-mendel-714fbc，未併 main、未上主機）
+
+- 起因：2026-11-22 09:56Z next-admin 部署，新容器 `up` 後第 2 秒被主機上另一個操作停掉 → 判成 unhealthy 自動還原 → 還原記成 ROLLBACK_FAILED（實際已還原）。
+- 根因 D1：`sg-deploy.sh` 第 6 步用容器名稱讀 `.State.Health.Status`，不記 id、不看 Running；停掉的容器讀到 unhealthy；名稱查不到回 `no-healthcheck` 還「assuming OK」。修：`wait_deployed_healthy`（兩條路徑共用）只認 `up` 後記下的 id，一次讀 Status／Running／Health／Image／RestartPolicy；沒在跑、消失、被換掉 → reason 寫 `from outside this deploy`；映像必須＝剛 build 的；沒 healthcheck＝失敗。
+- 根因 D1b（順手查到）：第 4 步 `UP_STATUS=${PIPESTATUS[0]}` 接在 `UP_OUT=$(… | tee || true)` 後面恆為 0，`up` 失敗從未被看見、重試從未執行。修：取真正的結束碼；失敗走 `health_fail`（自動還原）。
+- 根因 D2：`/tmp/sg-deploy.lock` 只擋另一個 sg-deploy、`--force` 可跳過；restore／safe-infra-patch／Auto-Repair 重啟都不互斥。修：新檔 `scripts/compose-state-lock.sh`（`/run/lock/lobster-compose-state.lock`，kernel flock，fd 217，子程序繼承）；sg-deploy 從快照到結束持有、`rollback-phase1.sh restore`／`n8n-pin`、`safe-infra-patch.sh` 全型別、`restart-unhealthy-container.ts` 都先拿它；`--force` 無效。兩個 sg-deploy 互斥改用 `/run/lock/sg-deploy-run.lock`（fd 216）。`/tmp/sg-deploy.lock` 只剩 PID 標記給 `sync-host-scripts.sh` 讀。
+- 根因 D3：`rollback-phase1.sh restore` 在 `set -e` 下以單次 `up` 的結束碼判成敗。修：`No such container`／`already in progress` 重試一次；成敗由 `wait_restored` 看最後狀態（在跑的容器映像＝快照 id 且 healthy）。
+- critic（Standard，獨立）1c/1m/4n：C1 `compose config --images <svc> | tail -1` 會連 depends_on 的映像一起印 → 好版本被誤還原：已改讀 `config --format json` 的該服務 image，測試加依賴服務；突變（改回舊寫法）紅 2 項。M1 鎖涵蓋整個部署擋住建站／修補：已縮到快照之後。m1 `ps -aq` 含 one-off 容器：已過濾。m2 取映像失敗無聲退出：已改。m3 git auto-gc 繼承鎖：fetch／pull 加 `216>&-`，compose 鎖在 pull 之後才拿。m4 Auto-Repair precheck 與 restart 之間的時間差：未改（該指令被 `aw-autorepair-gate.sh` 刻意不放行、開關預設 OFF），列 RISKS。
+- 突變證據：新測試用 HEAD 的舊腳本跑 → 12 項紅（A 重現「unhealthy」誤判、C 重現 restore exit 1）；現行腳本 18 項綠。
+- 不變量：部署／還原的判定只針對「這次建出的容器」與「最後狀態」；同一時間只有一個入口改容器。鎖擋不到手打的 `docker stop`，那種情況由 reason 指名。
+- 上機方式：腳本由 `sync-host-scripts.sh` 從 origin/main 同步（`auto-deploy-next-admin.sh`、`check-drift-and-alert.sh`、`sg-deploy.sh` step 1.8 都會跑它）＝併入 main 即上機，無另外的手動步驟；等操作者決定。
+- 避免再發生：`tests/host-scripts/deploy-interference.test.sh` 進 `.github/workflows/deploy-scripts.yml` e2e。
+- 範圍外發現（未改）：`sg-deploy.sh` 第 7 步 `next_admin_port=$(docker port lobster-next-admin … | head -1 | sed …)` 在 pipefail 下，lobster-next-admin 不存在時腳本無聲結束、不還原（部署其他 app 而 next-admin 剛好不在時才會遇到）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash tests/host-scripts/deploy-interference.test.sh（真 Docker，18/18）＋own-compose-deploy 29/29＋sync.test.sh 69/69（ubuntu:24.04）＋own-compose-apps 59/59＋sg-deploy-smoke-ports 17/17＋safe-infra-patch-* 三支 72/72＋vitest 三檔 35/35＋npx tsc --noEmit | exit=0 | ms=87000
+- REVIEW_DONE: critic=Standard | verdict=fail→修後重測綠 | findings=1c/1m/4n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=wait_healthy | hits=0
+- ORACLE_WAIVED: Codex 額度鎖到 2026-11-24 11:02（scripts/oracle-quota.ps1 exit 3）；改以獨立 critic＋舊腳本／突變變紅證據代替
 ## 2026-11-23（續1）— oracle WP 第三批：已交回卡的 RISKS 先行判定（操作者問）；新增卡 SF-J2；線2、線3 叫回
 
 - 操作者問「工人們反應的 RISKS 是否需要處理」。第三批未到齊（P2 未 commit、SF-H 進行中、P3 與 SF-I 未派），但已交回的 E5、SF-J、SF-E2 共 15 條先判定並寫入 `data.mjs`「第三批（進行中）」表；到齊後補列並做整批總檢。
