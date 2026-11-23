@@ -73,10 +73,11 @@ export const STEPS = [
   { n: 16, code: 'K15', group: 'B5', title: '文章預設模型換成 GPT-6.2 sol', plain: '盲測結果：GPT-6.2 sol 品質排第二，一篇約 NT$2，是原本預設（Claude Opus，約 NT$8）的四分之一。文章頁的預設和排程（網站沒另外選模型時）都改用它；畫面上的估價跟著改。十二個模型的實測結果同時記到「AI 模型與成本」的實測紀錄。',
     gate: '沒選過模型的網站，排程寫文章用的是 GPT-6.2 sol；估價顯示新的金額；已經選了別的模型的地方不受影響；實測紀錄多一組「文章生成」。', risk: 'Medium', model: 'Sonnet 5.5', status: 'done', commit: 'ed7263c36', depends: ['K12'], card: 'briefs/K15-K16.md' },
   { n: 17, code: 'K16', group: 'B5', title: '其他寫文案的地方要不要也換', plain: '文章以外寫文案的地方，八種全部各測一次再換（你 11-22 說「都要測」）：劇本工坊、影片腳本、商品文案、AI 去味、競業分析、每月選題、社群改寫、開發信寫信。每一種用一個真實的輸入，讓現在用的模型和 GPT-6.2 sol 各寫一次，並排給你看。要回固定格式的另外驗格式會不會壞。',
-    gate: '八種各有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'in_progress', depends: ['K15'], card: 'briefs/K15-K16.md', before: '待決 5 之後才改預設' },  { n: 18, code: 'K17', group: 'B5', title: 'ChatGPT 訂閱也能選模型', plain: '現在 ChatGPT（Codex）訂閱只有一顆按鈕，用的是預設模型。改成和 Claude 訂閱一樣可以選：GPT-6 luna、GPT-6.1 terra、GPT-6.2 sol、GPT-6.2 astra，預設 GPT-6.2 sol。已查過你的訂閱清單裡有這四個。每個網站可以各自存。',
+    gate: '八種各有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'done', commit: '4066ff696', depends: ['K15'], card: 'briefs/K15-K16.md', },  { n: 18, code: 'K17', group: 'B5', title: 'ChatGPT 訂閱也能選模型', plain: '現在 ChatGPT（Codex）訂閱只有一顆按鈕，用的是預設模型。改成和 Claude 訂閱一樣可以選：GPT-6 luna、GPT-6.1 terra、GPT-6.2 sol、GPT-6.2 astra，預設 GPT-6.2 sol。已查過你的訂閱清單裡有這四個。每個網站可以各自存。',
     gate: '按鈕出現、選的模型真的送到執行程式；真的用訂閱寫一篇要等 Codex 額度恢復（M1）。', risk: 'Low', model: 'Sonnet', status: 'done', commit: 'db2cb07fa', depends: ['K6'], card: 'briefs/K17-codex-model.md' },  { n: 19, code: 'K18', group: 'B5', title: '中文文章改用中文小標', plain: '查出來 SEO 評分本來就認中文小標；只認英文的是另外兩處：寫文章的指令規定四個固定小標一律寫英文，發到 WordPress 的摘要只找英文的 Quick Answer。兩處都改成中英文都可以，三個地方共用同一份小標清單。十二篇盲測文章把小標換成中文重新評分，分數完全一樣。',
     gate: '部署後產一篇中文文章：四個固定小標是中文、SEO 分數不變、WordPress 摘要取自快速解答。', risk: 'Medium', model: '監工', status: 'done', commit: '5042d239c', depends: ['K15'], card: 'briefs/K10-K12.md' },  { n: 20, code: 'K19', group: 'B5', title: '商品文案不再亂寫規格、不翻譯品牌名', plain: '上次實測兩邊各錯一個：一個自己加了「棉質」和洗滌方式，一個把品牌名翻成中文。原因都在指令：它要求寫材質、印刷、保養，卻沒給這些資料；又說每個欄位都要用指定語言。已改成：沒給的規格不寫，品牌名和圖上的字照原樣。改完重測三件商品、兩個模型，品牌名都保留，沒給的規格都沒出現，有給的規格都用對。要讓頁面寫出材質，請在「文案指示」裡填。',
-    gate: '三件商品重測結果在比較頁；商品文案維持 Claude Opus。', risk: 'Low', model: '監工', status: 'done', commit: '7d9e58824', depends: ['K16'], card: 'briefs/K15-K16.md' },
+    gate: '三件商品重測結果在比較頁；商品文案維持 Claude Opus。', risk: 'Low', model: '監工', status: 'done', commit: '7d9e58824', depends: ['K16'], card: 'briefs/K15-K16.md' },  { n: 21, code: 'K20', group: 'B5', title: '四種文案換成 GPT-6.2 sol', plain: '你 11-23 看完比較後定案：影片腳本、社群改寫、開發信、AI 去味換成 GPT-6.2 sol；劇本工坊、競業分析、商品文案、每月選題不換。其中三種原本只接 Claude，要先補上 OpenAI 的路。每個功能的預設模型集中在一處設定。GPT-6.2 sol 回空白或被截斷時，自動改用原本的 Claude 模型重寫，不會把空白交給你。沒有 OpenAI 金鑰的安裝照舊用 Claude。',
+    gate: '四種各真跑三次，全部有內容、固定格式全部通過；空白時會退回 Claude 的測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K16', 'K19'], card: 'briefs/K20-copy-defaults.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
@@ -84,8 +85,7 @@ export const OPEN = [
   { n: 1, what: '把主機執行程式專用的一把密鑰放進後台容器（主機設定變更，走失敗會自動還原的工具）。', before: 'K9', src: 'PLAN.md 第 3 節', options: ASK('排程線可以開始接工作。', '排程維持全部走 API。') },
   { n: 2, what: '你本人在主機上登入一次 ChatGPT 帳號。指令由監工備好，你照著貼上並在手機確認。', before: 'K9', src: 'PLAN.md 第 3 節', options: ASK('主機可以用你的訂閱額度寫字。', '只有筆電能用訂閱。') },
   { n: 3, what: '要不要也在主機上登入 Claude 帳號，讓排程能用 Claude 訂閱。Claude 的條款沒有明確允許無人排程，這是三段裡風險最高的一段。', before: 'K9', src: 'PLAN.md 第 2 節', options: ASK('排程的走法裡 Claude 那一段會真的被用到。', '排程選了含 Claude 的走法時，那一段自動跳過。') },
-  { n: 4, what: '在筆電上為「Codex 寫字」另外登入一次 ChatGPT（寫字用乾淨的專用資料夾，和你平常寫程式的 Codex 分開）。指令由監工備好。', before: 'M1', src: 'PLAN.md 第 2 節 I3', options: ASK('你本人按的功能可以用 Codex 訂閱寫字。', '筆電只用 Claude 訂閱寫字；Codex 那一段自動跳過。') },  { n: 5, what: '八種文案的並排比較頁做好了（https://claude.ai/artifact/2yijESBAer4rY4aDuRWDis）。請看完告訴監工：每一種要換成 GPT-6.2 sol，還是維持現在用的模型。', before: 'K16', src: 'agency-os/reports/model-bakeoff/2026-11-copy/results.json', options: ASK('選定的功能改預設模型；只接 Claude 的功能先補上 OpenAI 的路。', '全部維持現狀，這張卡結案。') },
-];
+  { n: 4, what: '在筆電上為「Codex 寫字」另外登入一次 ChatGPT（寫字用乾淨的專用資料夾，和你平常寫程式的 Codex 分開）。指令由監工備好。', before: 'M1', src: 'PLAN.md 第 2 節 I3', options: ASK('你本人按的功能可以用 Codex 訂閱寫字。', '筆電只用 Claude 訂閱寫字；Codex 那一段自動跳過。') },];
 
 export const SAFE = [
   { h: '現有的 API 路徑', t: '一行不刪。沒選訂閱模型時，文章、劇本、排程的行為與今天逐字相同。' },
