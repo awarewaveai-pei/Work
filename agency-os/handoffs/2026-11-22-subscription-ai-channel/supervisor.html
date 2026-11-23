@@ -81,8 +81,8 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>AI 訂閱通道 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
-  <div class="bar" data-computed><i class="d" style="width:72.72727272727273%"></i><i class="g" style="width:9.090909090909092%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>16</span>／<span data-computed>22</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你做的事</span><small><span data-computed>4</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:77.27272727272727%"></i><i class="g" style="width:4.545454545454546%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>17</span>／<span data-computed>22</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你做的事</span><small><span data-computed>4</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">讓寫字和畫圖都能選「走 API 付費」或「走訂閱額度」。本人按的功能由筆電執行；自動排程由主機上的常駐程式執行。每個網站各自選四種走法之一：Claude 訂閱→Codex 訂閱→API、Claude 訂閱→API、Codex 訂閱→API、只用 API。前一段不能用就自動換下一段。共 <span data-computed>22</span> 張卡。</p>
@@ -314,15 +314,16 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>卡片：</b><code>briefs/K20-copy-defaults.md</code></p>
         <p><b>併入於：</b><code>ff59979ef</code></p>
       </details>
-    </div></li><li class="step doing" id="K21">
+    </div></li><li class="step done" id="K21">
     <div class="n">22</div>
     <div class="b">
       <p class="plain">11-23 部署後在正式站實測：不選模型產一篇短文章，小標是中文、記帳是 GPT-6.2 sol，都對；但文章寫到常見問題一半就被切掉，沒有結論。原因是 GPT-6.2 sol 的思考用量算在輸出上限裡，文章、劇本工坊、修圖提示詞這三處還沒把這段空間留出來。改成全部走同一條規則，並加一個檢查，以後新寫的 OpenAI 呼叫漏了會直接變紅。預留金額一起跟著調。</p>
-      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已併入</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>短文章實跑一篇沒有被截斷、有結論；檢查測試通過。</p>
       <details><summary>細節：K21 短文章被截斷：輸出上限要留思考用量</summary>
         <p><b>需先完成：</b><a href="#K20">K20</a></p>
         <p><b>卡片：</b><code>briefs/K21-openai-budget-everywhere.md</code></p>
+        <p><b>併入於：</b><code>837416fe5</code></p>
       </details>
     </div></li></ol></section>
 

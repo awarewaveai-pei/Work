@@ -78,7 +78,7 @@ export const STEPS = [
     gate: '部署後產一篇中文文章：四個固定小標是中文、SEO 分數不變、WordPress 摘要取自快速解答。', risk: 'Medium', model: '監工', status: 'done', commit: '5042d239c', depends: ['K15'], card: 'briefs/K10-K12.md' },  { n: 20, code: 'K19', group: 'B5', title: '商品文案不再亂寫規格、不翻譯品牌名', plain: '上次實測兩邊各錯一個：一個自己加了「棉質」和洗滌方式，一個把品牌名翻成中文。原因都在指令：它要求寫材質、印刷、保養，卻沒給這些資料；又說每個欄位都要用指定語言。已改成：沒給的規格不寫，品牌名和圖上的字照原樣。改完重測三件商品、兩個模型，品牌名都保留，沒給的規格都沒出現，有給的規格都用對。要讓頁面寫出材質，請在「文案指示」裡填。',
     gate: '三件商品重測結果在比較頁；商品文案維持 Claude Opus。', risk: 'Low', model: '監工', status: 'done', commit: '7d9e58824', depends: ['K16'], card: 'briefs/K15-K16.md' },  { n: 21, code: 'K20', group: 'B5', title: '四種文案換成 GPT-6.2 sol', plain: '你 11-23 看完比較後定案：影片腳本、社群改寫、開發信、AI 去味換成 GPT-6.2 sol；劇本工坊、競業分析、商品文案、每月選題不換。其中三種原本只接 Claude，要先補上 OpenAI 的路。每個功能的預設模型集中在一處設定。GPT-6.2 sol 回空白或被截斷時，自動改用原本的 Claude 模型重寫，不會把空白交給你。沒有 OpenAI 金鑰的安裝照舊用 Claude。',
     gate: '四種各真跑三次，全部有內容、固定格式全部通過；空白時會退回 Claude 的測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'ff59979ef', depends: ['K16', 'K19'], card: 'briefs/K20-copy-defaults.md' },  { n: 22, code: 'K21', group: 'B5', title: '短文章被截斷：輸出上限要留思考用量', plain: '11-23 部署後在正式站實測：不選模型產一篇短文章，小標是中文、記帳是 GPT-6.2 sol，都對；但文章寫到常見問題一半就被切掉，沒有結論。原因是 GPT-6.2 sol 的思考用量算在輸出上限裡，文章、劇本工坊、修圖提示詞這三處還沒把這段空間留出來。改成全部走同一條規則，並加一個檢查，以後新寫的 OpenAI 呼叫漏了會直接變紅。預留金額一起跟著調。',
-    gate: '短文章實跑一篇沒有被截斷、有結論；檢查測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K20'], card: 'briefs/K21-openai-budget-everywhere.md' },
+    gate: '短文章實跑一篇沒有被截斷、有結論；檢查測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '837416fe5', depends: ['K20'], card: 'briefs/K21-openai-budget-everywhere.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
