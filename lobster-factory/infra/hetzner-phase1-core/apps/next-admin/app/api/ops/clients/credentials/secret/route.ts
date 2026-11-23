@@ -3,6 +3,7 @@ import { resolveOpsRole, canWriteTenantConfig } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { putSecret, deleteSecret, clientCredSecretRef } from "@/lib/secret-vault";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { isSiteFlowCredential, SITE_FLOW_CREDENTIAL_ERROR, SITE_FLOW_CREDENTIAL_TEXT } from "@/lib/site-flow/managed-credential";
 
 // Per-client credential vault — secret byte ingestion (migration 0050).
 //
@@ -16,11 +17,16 @@ import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tena
 //   vault write succeeds → DB update fails → deleteSecret to avoid orphan vault entry.
 //
 // Gate: canWriteTenantConfig (owner | admin only).
+// Site-flow rows (the wp-bridge private key, lib/site-flow/managed-credential.ts) are refused here (409): overwriting
+// or clearing that vault entry would cut the site's AI channel behind the flow's back.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const TABLE = "client_credentials";
+
+const refuseManaged = (): Response =>
+  NextResponse.json({ ok: false, error: SITE_FLOW_CREDENTIAL_ERROR, message: SITE_FLOW_CREDENTIAL_TEXT }, { status: 409 });
 
 // POST { credentialId, value } — vault the secret, attach ref to the credential row.
 export async function POST(req: Request): Promise<Response> {
@@ -43,13 +49,14 @@ export async function POST(req: Request): Promise<Response> {
   // Confirm the credential row exists and belongs to the caller's org (prevents vault writes for phantom/foreign IDs).
   const { data: row, error: readErr } = await supabase
     .from(TABLE)
-    .select("id, client_id")
+    .select("id, client_id, metadata")
     .eq("id", credentialId)
     .maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
   if (!row)    return NextResponse.json({ ok: false, error: "credential not found" }, { status: 404 });
   try { assertOrgAccess(req, (row as Record<string, unknown>).client_id as string | null); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (isSiteFlowCredential((row as Record<string, unknown>).metadata)) return refuseManaged();
 
   const ref = clientCredSecretRef(credentialId);
 
@@ -89,13 +96,14 @@ export async function DELETE(req: Request): Promise<Response> {
 
   const { data: credRow, error: credReadErr } = await supabase
     .from(TABLE)
-    .select("client_id")
+    .select("client_id, metadata")
     .eq("id", credentialId)
     .maybeSingle();
   if (credReadErr) return NextResponse.json({ ok: false, error: credReadErr.message }, { status: 500 });
   if (!credRow) return NextResponse.json({ ok: false, error: "credential not found" }, { status: 404 });
   try { assertOrgAccess(req, (credRow as Record<string, unknown>).client_id as string | null); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (isSiteFlowCredential((credRow as Record<string, unknown>).metadata)) return refuseManaged();
 
   const ref = clientCredSecretRef(credentialId);
 

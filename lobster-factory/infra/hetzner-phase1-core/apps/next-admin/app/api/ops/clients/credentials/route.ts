@@ -3,6 +3,7 @@ import { resolveOpsRole, canWriteTenantConfig } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { deleteSecret } from "@/lib/secret-vault";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { isSiteFlowCredential, SITE_FLOW_CREDENTIAL_ERROR, SITE_FLOW_CREDENTIAL_TEXT } from "@/lib/site-flow/managed-credential";
 
 // Per-client credential vault — metadata CRUD (migration 0050).
 //
@@ -12,6 +13,10 @@ import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } 
 // Secret bytes flow exclusively through /api/ops/clients/credentials/secret.
 //
 // Gate: canWriteTenantConfig (owner | admin only).
+//
+// Site-flow rows (metadata.source = site-flow, lib/site-flow/managed-credential.ts; the wp-bridge key) belong to the
+// site flow: GET marks them managedBy "site_flow", PATCH/DELETE refuse them (409), and POST/PATCH refuse to stamp that
+// source on any other row.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +34,15 @@ function looksLikeSecret(s: string): boolean {
   if (/^(sk-|re_|tr_|AIza|ghp_|gho_|xox[baprs]-|pat-|key-|Bearer\s)/i.test(v)) return true;
   if (v.length >= 40 && !/\s/.test(v) && /[A-Za-z]/.test(v) && /[0-9]/.test(v)) return true;
   return false;
+}
+
+/** A site-flow row: only the site flow changes or deletes it. */
+function refuseManaged(): Response {
+  return NextResponse.json({ ok: false, error: SITE_FLOW_CREDENTIAL_ERROR, message: SITE_FLOW_CREDENTIAL_TEXT }, { status: 409 });
+}
+/** metadata.source = site-flow is the flow's mark: a hand-made row may not carry it (it would lock itself). */
+function refuseStamp(): Response {
+  return NextResponse.json({ ok: false, error: "reserved_metadata_source", message: "metadata.source「site-flow」只保留給建站流程使用。" }, { status: 400 });
 }
 
 // GET ?clientId=<uuid> — list all credentials for a client.
@@ -60,6 +74,7 @@ export async function GET(req: Request): Promise<Response> {
   const credentials = (data ?? []).map(({ secret_ref, ...rest }) => ({
     ...rest,
     secretSet: typeof secret_ref === "string" && secret_ref.length > 0,
+    managedBy: isSiteFlowCredential(rest.metadata) ? "site_flow" : null,
   }));
 
   return NextResponse.json({ ok: true, credentials });
@@ -96,6 +111,7 @@ export async function POST(req: Request): Promise<Response> {
   const metadata = (body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata))
     ? body.metadata as Record<string, unknown>
     : {};
+  if (isSiteFlowCredential(metadata)) return refuseStamp();
 
   // Defense-in-depth: reject any field that looks like a raw secret value.
   for (const [field, val] of [["label", label], ["identifier", identifier], ["note", note]] as const) {
@@ -132,11 +148,12 @@ export async function PATCH(req: Request): Promise<Response> {
   const id = str(body.id);
   if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });
 
-  const { data: existing, error: existErr } = await supabase.from(TABLE).select("client_id").eq("id", id).maybeSingle();
+  const { data: existing, error: existErr } = await supabase.from(TABLE).select("client_id, metadata").eq("id", id).maybeSingle();
   if (existErr) return NextResponse.json({ ok: false, error: existErr.message }, { status: 500 });
   if (!existing) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   try { assertOrgAccess(req, (existing as Record<string, unknown>).client_id as string | null); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (isSiteFlowCredential((existing as Record<string, unknown>).metadata)) return refuseManaged();
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.label !== undefined) {
@@ -155,6 +172,7 @@ export async function PATCH(req: Request): Promise<Response> {
   if (body.note       !== undefined) patch.note       = str(body.note);
   if (body.sortOrder  !== undefined) patch.sort_order = typeof body.sortOrder === "number" ? body.sortOrder : 0;
   if (body.metadata   !== undefined && typeof body.metadata === "object" && !Array.isArray(body.metadata)) {
+    if (isSiteFlowCredential(body.metadata)) return refuseStamp();
     patch.metadata = body.metadata;
   }
 
@@ -195,13 +213,14 @@ export async function DELETE(req: Request): Promise<Response> {
   // Read secret_ref + client_id before deleting so we can clean the vault and verify org ownership.
   const { data: row, error: readErr } = await supabase
     .from(TABLE)
-    .select("secret_ref, client_id")
+    .select("secret_ref, client_id, metadata")
     .eq("id", id)
     .maybeSingle();
   if (readErr) return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
   if (!row) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
   try { assertOrgAccess(req, (row as Record<string, unknown>).client_id as string | null); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+  if (isSiteFlowCredential((row as Record<string, unknown>).metadata)) return refuseManaged();
 
   // Best-effort vault cleanup before DB delete (so if DB delete succeeds, no orphan).
   if (row.secret_ref) {

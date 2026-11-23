@@ -21,6 +21,7 @@ import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
 import type { DepartmentSummaryPayload } from "@/app/api/ops/clients/[slug]/department-summary/route";
 import { FUNNEL_STAGES, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import type { ImportSummary } from "@/lib/cognitive-os/import-sources";
+import { SITE_FLOW_CREDENTIAL_TEXT } from "@/lib/site-flow/managed-credential";
 
 // ── Content-defaults dropdown options (mirror ContentStudio constants) ─────────
 
@@ -2054,6 +2055,8 @@ type CredentialItem = {
   identifier: string | null;
   note: string | null;
   secretSet: boolean;
+  /** "site_flow" = the site flow's row (GET /api/ops/clients/credentials): shown read-only, the routes refuse changes. */
+  managedBy?: "site_flow" | null;
   sort_order: number;
   created_at: string;
 };
@@ -2357,6 +2360,7 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
                 const isSaving = saving === cred.id;
                 const secretInput = secretInputs[cred.id] ?? "";
                 const isVisible = secretVisible[cred.id] ?? false;
+                const managed = cred.managedBy === "site_flow";
                 return (
                   <div
                     key={cred.id}
@@ -2393,17 +2397,26 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
                         }}>
                           {cred.secretSet ? "已設密碼" : "未設密碼"}
                         </span>
-                        <button
-                          disabled={isSaving}
-                          onClick={() => handleDelete(cred.id, cred.label)}
-                          style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", cursor: isSaving ? "default" : "pointer" }}
-                        >
-                          刪除
-                        </button>
+                        {managed ? (
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10, background: "var(--accent-light)", color: "var(--accent-text)" }}>
+                            由建站流程管理
+                          </span>
+                        ) : (
+                          <button
+                            disabled={isSaving}
+                            onClick={() => handleDelete(cred.id, cred.label)}
+                            style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", cursor: isSaving ? "default" : "pointer" }}
+                          >
+                            刪除
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    {/* Secret controls */}
+                    {/* Secret controls; a site-flow row (the wp-bridge key) is changed only by the site flow (the routes refuse it) */}
+                    {managed ? (
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{SITE_FLOW_CREDENTIAL_TEXT}</div>
+                    ) : (
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                       <div style={{ position: "relative", flex: "1 1 200px" }}>
                         <input
@@ -2439,6 +2452,7 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
                         </button>
                       )}
                     </div>
+                    )}
                   </div>
                 );
               })}

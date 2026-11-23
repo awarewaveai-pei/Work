@@ -19,7 +19,8 @@
 //   existing rows are never changed.
 // rollback (verify failed): nothing to undo -- vault and site hold the same key and a re-run reuses it. To retire a
 // key: revoke it on the site (WordPress admin > AwareWave Bridge) and delete client_credentials <credential_id> with its
-// vault entry; the gate has no revoke sub-verb.
+// vault entry in the database; the gate has no revoke sub-verb, and the client page's credential routes refuse this
+// row (metadata.source = site-flow, managed-credential.ts).
 
 import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -28,6 +29,7 @@ import { bridgeRegistrationOf, bridgeSiteOrg, probeRegisteredBridge, registeredB
 import { clientCredSecretRef, deleteSecret, getSecret, putSecret } from "@/lib/secret-vault";
 import { WP_PLUGIN_CATALOG } from "@/lib/wp-plugin-stack-catalog";
 import { gateText, no, ok, patchEnvironmentMetadata, siteUrlOf } from "./shared";
+import { SITE_FLOW_CREDENTIAL_SOURCE } from "../managed-credential";
 
 type Json = Record<string, unknown>;
 type Db = ReadContext["db"];
@@ -123,7 +125,7 @@ async function registerNewKey(ctx: StepContext, url: string): Promise<{ ok: true
     label: `WordPress AI 控制通道金鑰（${host}）`,
     identifier: keyId,
     note: url,
-    metadata: { source: "site-flow", site_id: site.id, environment_id: environment.id, key_id: keyId },
+    metadata: { source: SITE_FLOW_CREDENTIAL_SOURCE, site_id: site.id, environment_id: environment.id, key_id: keyId },
   });
   if (insErr) return { ok: false, detail: "金鑰紀錄（client_credentials）寫入失敗，沒有產生任何東西" };
   const ref = clientCredSecretRef(credentialId);

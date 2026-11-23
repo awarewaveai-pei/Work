@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
 
 const STATUS: Record<string, number> = {
   invalid_domain: 400, invalid_name: 400, invalid_locale: 400, invalid_pack: 400, invalid_billing: 400, invalid_site_id: 400, invalid_input: 400,
+  invalid_client: 400, client_not_found: 404, environment_not_found: 404, client_inactive: 409,
   host_slug_taken: 409, slug_taken: 409, slug_id_mismatch: 409, site_scope_mismatch: 409, environment_provider_conflict: 409,
+  idempotency_key_reused: 409, invalid_transition: 409, conflict: 409,
 };
 
 export async function POST(request: Request) {

@@ -216,7 +216,11 @@ export function createErrorText(code: string): string {
     case "invalid_locale": case "invalid_pack": return "有一個選項不在清單內，請重新選。";
     case "host_slug_taken": return "這個網址已經有另一個站在使用主機代號，請換網址或先處理那個站。";
     case "site_scope_mismatch": case "idempotency_key_reused": return "這次建立的內容和先前送出的不同，請重新整理頁面後再建立。";
-    case "slug_taken": return "這個網址對應的客戶代號已經存在，不會自動併進既有客戶。請確認網址，或先處理既有客戶。";
+    case "slug_taken": return "這個網址對應的客戶代號已經存在，不會自動併進既有客戶。要替既有客戶加網站，請選「既有客戶」再挑客戶。";
+    case "invalid_client": return "請選一個既有客戶。";
+    case "client_not_found": return "找不到選的客戶，請重新搜尋再選一次。";
+    case "client_inactive": return "這個客戶已停用或暫停，不能替它加網站。";
+    case "invalid_transition": case "conflict": return "這個站的紀錄剛被改動，請重新整理頁面後再試。";
     case "environment_provider_conflict": return "這個站已經有正式環境，且主機類型不同。";
     case "forbidden": case "forbidden_role": return "只有擁有者與管理員可以建立網站。";
     case "supabase_write_not_configured": return "資料庫尚未連上。";

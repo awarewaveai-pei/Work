@@ -2,7 +2,8 @@
  * /ops/sites UI flows (SITE-FLOW-COMPLETION-PLAN.md §3 SF-J acceptance): create -> flow page renders nine steps; a closed
  * catalog switch reads 此步驟尚未開放 and cannot be pressed; preview -> confirm -> running -> done; the one-time admin
  * password shows once and is gone after a reload. SF-H: steps 4 and 8 have content (backup observation, hand ticks),
- * SF-I: mainwp and bridge have step bodies too, so nothing reads 尚未提供; polls never overlap. Every /api/ops/site-flow call is answered by the in-memory fake below
+ * SF-I: mainwp and bridge have step bodies too, so nothing reads 尚未提供; polls never overlap. SF-J2: 新客戶 / 既有客戶 buttons,
+ * an existing client picked through the client search (GET /api/ops/org-search, faked) is sent by id. Every /api/ops/site-flow call is answered by the in-memory fake below
  * (page.route), so this tests the page, never the host; the engine is covered by next-admin lib/site-flow/__tests__.
  * Run against a dev server with no Supabase (.claude/launch.json "next-admin-ui-3903"):
  *   cd lobster-factory/infra/hetzner-phase1-core/tests && PLAYWRIGHT_SITES_URL=http://localhost:3903 npx playwright test --project sites
@@ -29,6 +30,7 @@ function fakeServer(opts: { open: boolean; slowPollMs?: number }) {
     state.open = { state: 'blocked', enabled: true, reason: '需先完成：掛上網址' };
   }
   const calls: string[] = [];
+  const bodies: Array<Record<string, unknown>> = [];
   let polls = 0;
   let inFlight = 0;
   let maxInFlight = 0;
@@ -52,7 +54,8 @@ function fakeServer(opts: { open: boolean; slowPollMs?: number }) {
     const body = req.postDataJSON?.() ?? null;
     calls.push(`${req.method()} ${path}${body?.action ? ` ${body.action}` : ''}`);
     if (path === '/api/ops/site-flow' && req.method() === 'POST') {
-      return json(route, { ok: true, organization: { id: 'o1', slug: 'oracle-aware-wave-com', name: body.clientName, created: false }, site_id: SITE, site_created: true, environment_id: 'e1', host_slug: 'oracle-aware-wave-com', kept_keys: ['client_config.site_url'], flow_url: `/ops/sites/${SITE}` });
+      bodies.push(body);
+      return json(route, { ok: true, organization: { id: body.organizationId ?? 'o1', slug: 'oracle-aware-wave-com', name: body.clientName ?? 'Soulful', created: false }, site_id: SITE, site_created: true, environment_id: 'e1', host_slug: 'oracle-aware-wave-com', kept_keys: ['client_config.site_url'], flow_url: `/ops/sites/${SITE}` });
     }
     if (path === `/api/ops/site-flow/${SITE}` && req.method() === 'GET') {
       return json(route, { ok: true, site: { id: SITE, name: '算命站', organization_id: 'o1' }, environment: { id: 'e1', environment_type: 'production', hosting_provider: 'ks-aw-01-docker', base_url: 'https://oracle.aware-wave.com' }, steps: steps(), panels: panels() });
@@ -91,7 +94,7 @@ function fakeServer(opts: { open: boolean; slowPollMs?: number }) {
     }
     return json(route, { ok: false, error: 'unexpected' }, 500);
   }
-  return { handle, calls, polls: () => polls, maxInFlight: () => maxInFlight, setRunning: (k: string) => { state[k] = { state: 'running', enabled: true, runId: 'run-1' }; } };
+  return { handle, calls, bodies, polls: () => polls, maxInFlight: () => maxInFlight, setRunning: (k: string) => { state[k] = { state: 'running', enabled: true, runId: 'run-1' }; } };
 }
 
 async function arm(page: Page, opts: { open: boolean; slowPollMs?: number }) {
@@ -116,6 +119,31 @@ test('creating a site shows what was not applied, then opens the flow page', asy
   await page.getByRole('link', { name: '前往建站流程' }).click();
   await expect(page).toHaveURL(new RegExp(`/ops/sites/${SITE}$`), { timeout: 60_000 });   // first hit compiles the page
   expect(fake.calls[0]).toBe('POST /api/ops/site-flow');
+});
+
+test('SF-J2: 既有客戶 is picked with the client search and the create sends its id, never a name', async ({ page }) => {
+  const fake = await arm(page, { open: true });
+  const ORG_ID = '0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a';
+  const searches: string[] = [];
+  await page.route('**/api/ops/org-search**', (route) => {
+    searches.push(new URL(route.request().url()).searchParams.get('q') ?? '');
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, orgs: [{ id: ORG_ID, slug: 'soulful', name: 'Soulful', color: '#4ade80', brandColors: [] }] }) });
+  });
+  await page.goto('/ops/sites/new');
+  await expect(page.getByRole('button', { name: /^新客戶/ })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: /^既有客戶/ }).click();
+  await expect(page.getByLabel('客戶名稱')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '建立', exact: true })).toBeDisabled();   // no client picked yet
+  await page.getByLabel('搜尋客戶').fill('soul');
+  await page.getByRole('button', { name: 'Soulful', exact: true }).click();
+  await expect(page.getByText('網站會掛在「Soulful」底下。')).toBeVisible();
+  await page.getByLabel('網址').fill('shop.soulful.example');
+  await page.getByRole('button', { name: '建立', exact: true }).click();
+  await expect(page.getByText('客戶「Soulful」已經存在，已替它加上這個網站。')).toBeVisible();
+  expect(searches).toContain('soul');
+  expect(fake.bodies[0]).toMatchObject({ clientMode: 'existing', organizationId: ORG_ID, domain: 'shop.soulful.example' });
+  expect(fake.bodies[0]).not.toHaveProperty('clientName');
+  await shot(page, 'new-site-existing-client');
 });
 
 test('nine steps all have content or a hand-check explanation; none reads 尚未提供', async ({ page }) => {

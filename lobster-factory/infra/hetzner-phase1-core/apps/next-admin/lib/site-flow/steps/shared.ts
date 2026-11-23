@@ -8,6 +8,7 @@
 
 import type { GateCall } from "../gate-client";
 import { ingressOf, type GateIngress } from "../gate-client";
+import { updateEnvironmentCas } from "../records";
 import type { EnvironmentRow, ReadContext, RunFacts, StepObservation, StepResult } from "../types";
 
 type Json = Record<string, unknown>;
@@ -111,9 +112,8 @@ export const ok = (detail: string, output?: Json): StepResult => ({ ok: true, de
 export const no = (detail: string, output?: Json): StepResult => ({ ok: false, detail, ...(output ? { output } : {}) });
 
 /**
- * Sets top-level keys of environments.metadata, keeping every other key. A CAS on updated_at (re-read and retried at
- * most three times): records.ts ensureEnvironment also read-merge-writes this column (provision-staging, create-site),
- * outside the one-live-run-per-environment rule, so a blind write could drop its keys or lose ours.
+ * Sets top-level keys of environments.metadata, keeping every other key, through records.ts updateEnvironmentCas (the
+ * one CAS write path that ensureEnvironment uses too), so neither write drops the other's keys.
  */
 export async function patchEnvironmentMetadata(
   db: ReadContext["db"],
@@ -122,21 +122,15 @@ export async function patchEnvironmentMetadata(
   columns: Json = {},
 ): Promise<{ ok: true } | { ok: false; detail: string }> {
   try {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const { data, error } = await db.from("environments").select("metadata,updated_at").eq("id", environmentId).maybeSingle();
-      if (error || !data) return { ok: false, detail: error ? "讀不到環境紀錄" : "環境紀錄不存在" };
-      const row = data as Json;
-      const current = isObj(row.metadata) ? row.metadata : {};
-      const { data: moved, error: upErr } = await db
-        .from("environments")
-        .update({ ...columns, metadata: { ...current, ...patch }, updated_at: new Date().toISOString() })
-        .eq("id", environmentId)
-        .eq("updated_at", row.updated_at)
-        .select("id");
-      if (upErr) return { ok: false, detail: "環境紀錄寫入失敗" };
-      if (Array.isArray(moved) && moved.length === 1) return { ok: true };
-    }
-    return { ok: false, detail: "環境紀錄同時被改動，寫入失敗" };
+    const w = await updateEnvironmentCas(db, environmentId, "metadata", (row) => ({
+      ok: true,
+      patch: { ...columns, metadata: { ...(isObj(row.metadata) ? row.metadata : {}), ...patch } },
+    }));
+    if (!("error" in w)) return { ok: true };
+    if (w.error === "lookup_failed") return { ok: false, detail: "讀不到環境紀錄" };
+    if (w.error === "environment_not_found") return { ok: false, detail: "環境紀錄不存在" };
+    if (w.detail === "environment kept changing under the write") return { ok: false, detail: "環境紀錄同時被改動，寫入失敗" };
+    return { ok: false, detail: "環境紀錄寫入失敗" };
   } catch {
     return { ok: false, detail: "環境紀錄寫入失敗" };
   }

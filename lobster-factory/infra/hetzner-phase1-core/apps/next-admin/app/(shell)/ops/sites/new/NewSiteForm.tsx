@@ -1,9 +1,13 @@
 "use client";
 
 // The new-site form: visible buttons and checkboxes only (no dropdowns). One POST /api/ops/site-flow; the form mints
-// the idempotency key once, so a second press or a retry after a timeout returns the same site.
+// the idempotency key once per (client choice, domain), so a second press or a retry after a timeout returns the same
+// site. 新客戶 / 既有客戶 is an explicit choice (SF-J2): an existing client is picked with the client block (OrgPicker,
+// by id) and is never changed by the create.
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { OrgPicker } from "../../clients/OrgPicker";
+import type { PickOrg } from "../../clients/nav-orgs";
 import {
   LOCALES, PLUGIN_PACKS, createErrorText, hostSlugOf, keptKeysText, normalizeDomain,
   type Locale, type PackKey,
@@ -23,7 +27,12 @@ function Choice({ on, onClick, label, note }: { on: boolean; onClick: () => void
 
 interface Created { flowUrl: string; keptKeys: string[]; orgCreated: boolean; orgName: string }
 
-export function NewSiteForm() {
+type ClientMode = "new" | "existing";
+
+/** orgs/total: the client block's first page (page.tsx); typing searches the rest. */
+export function NewSiteForm({ orgs, total }: { orgs: PickOrg[]; total: number }) {
+  const [mode, setMode] = useState<ClientMode>("new");
+  const [client, setClient] = useState<PickOrg | null>(null);
   const [name, setName] = useState("");
   const [domainRaw, setDomainRaw] = useState("");
   const [locale, setLocale] = useState<Locale>("zh-TW");
@@ -36,14 +45,16 @@ export function NewSiteForm() {
 
   const domain = normalizeDomain(domainRaw);
   const slug = domain ? hostSlugOf(domain) : null;
-  const canSubmit = !!name.trim() && !!domain && !!slug && !busy;
+  const clientReady = mode === "new" ? !!name.trim() : !!client;
+  const canSubmit = clientReady && !!domain && !!slug && !busy;
 
   const togglePack = (p: PackKey) => setPacks((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
 
   async function submit() {
     if (!canSubmit || !domain) return;
-    // a changed domain is a different site: it gets its own key
-    if (keyDomainRef.current !== domain) { siteIdRef.current = null; keyDomainRef.current = domain; }
+    // a changed domain or client choice is a different request: it gets its own key
+    const key = `${mode}|${mode === "existing" ? client?.id ?? "" : ""}|${domain}`;
+    if (keyDomainRef.current !== key) { siteIdRef.current = null; keyDomainRef.current = key; }
     siteIdRef.current ??= crypto.randomUUID();
     setBusy(true);
     setError(null);
@@ -51,14 +62,18 @@ export function NewSiteForm() {
       const r = await fetch("/api/ops/site-flow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteId: siteIdRef.current, clientName: name.trim(), domain, locale, packs }),
+        body: JSON.stringify({
+          siteId: siteIdRef.current,
+          ...(mode === "existing" ? { clientMode: "existing", organizationId: client?.id } : { clientMode: "new", clientName: name.trim() }),
+          domain, locale, packs,
+        }),
       });
       const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; flow_url?: string; kept_keys?: string[]; organization?: { created: boolean; name: string } };
       if (!r.ok || !j.ok || !j.flow_url) {
         setError(createErrorText(j.error ?? `http_${r.status}`));
         return;
       }
-      setCreated({ flowUrl: j.flow_url, keptKeys: j.kept_keys ?? [], orgCreated: !!j.organization?.created, orgName: j.organization?.name ?? name.trim() });
+      setCreated({ flowUrl: j.flow_url, keptKeys: j.kept_keys ?? [], orgCreated: !!j.organization?.created, orgName: j.organization?.name ?? (mode === "existing" ? client?.name ?? "" : name.trim()) });
     } catch {
       setError("連不上伺服器，請稍後再按一次「建立」（不會重複建立）。");
     } finally {
@@ -81,10 +96,25 @@ export function NewSiteForm() {
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-      <div style={FIELD}>
-        <label htmlFor="sf-name" style={LABEL}>客戶名稱</label>
-        <input id="sf-name" className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：AwareWave 算命站" maxLength={120} />
+      <div style={FIELD} role="group" aria-label="客戶">
+        <span style={LABEL}>客戶</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Choice on={mode === "new"} onClick={() => setMode("new")} label="新客戶" note="建立一個新客戶，網站掛在它底下" />
+          <Choice on={mode === "existing"} onClick={() => setMode("existing")} label="既有客戶" note="替已經有的客戶加一個網站，客戶設定不變" />
+        </div>
       </div>
+      {mode === "new" ? (
+        <div style={FIELD}>
+          <label htmlFor="sf-name" style={LABEL}>客戶名稱</label>
+          <input id="sf-name" className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：AwareWave 算命站" maxLength={120} />
+        </div>
+      ) : (
+        <div style={FIELD}>
+          <span style={LABEL}>選客戶</span>
+          <OrgPicker searchPath="/api/ops/org-search" orgs={orgs} total={total} selected={client?.id ?? null} by="id" onPick={setClient} disabled={busy} />
+          <p className="form-hint">{client ? `網站會掛在「${client.name}」底下。` : "在上面搜尋並按一個客戶。"}</p>
+        </div>
+      )}
       <div style={FIELD}>
         <label htmlFor="sf-domain" style={LABEL}>網址</label>
         <input id="sf-domain" className="form-input" value={domainRaw} onChange={(e) => setDomainRaw(e.target.value)} placeholder="oracle.aware-wave.com" autoCapitalize="none" spellCheck={false} />

@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureEnvironment, ensureOrganization, mergeMetadataAddOnly, setEnvironmentStatus } from "../records";
+import { patchEnvironmentMetadata } from "../steps/shared";
 
 type Row = Record<string, unknown>;
 
@@ -182,5 +183,67 @@ describe("setEnvironmentStatus", () => {
     expect(await ensureEnvironment(db, { ...base, status: "provisioning" })).toMatchObject({ ok: true });
     expect(tables.environments[0].status).toBe("provisioning");
     expect(await ensureEnvironment(db, { ...base, status: "pending" })).toMatchObject({ ok: false, error: "invalid_transition" });
+  });
+});
+
+// Card SF-J2: ensureEnvironment and the steps' patchEnvironmentMetadata both read-merge-write environments.metadata
+// through updateEnvironmentCas. Another writer landing between one's read and its write must not lose either key.
+describe("environments.metadata under concurrent writes", () => {
+  const ENV = "e0e0e0e0-e0e0-4e0e-8e0e-e0e0e0e0e0e0";
+  /** environments + sites; reads return copies (a snapshot, like the wire); `between` runs once, after the first
+   *  environments read that carries updated_at and before the write that follows it (the other request's commit). */
+  function racingDb(between: (row: Row) => void) {
+    const tables: Record<string, Row[]> = {
+      sites: [{ id: SITE, organization_id: ORG, workspace_id: "w1" }],
+      environments: [{ id: ENV, site_id: SITE, environment_type: "production", hosting_provider: "ks-aw-01-docker", status: "pending", updated_at: "2026-11-22T00:00:00.000000+00:00", metadata: { ingress: "host-vhost" } }],
+    };
+    let fired = false;
+    const from = (table: string) => {
+      const filters: ((r: Row) => boolean)[] = [];
+      let patch: Row | null = null;
+      let cols = "";
+      const matching = () => tables[table].filter((r) => filters.every((f) => f(r)));
+      const q = {
+        select: (c = "") => ((cols = c), q),
+        eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
+        neq: (c: string, v: unknown) => (filters.push((r) => r[c] !== v), q),
+        order: () => q,
+        limit: () => q,
+        maybeSingle: async () => {
+          const row = matching()[0];
+          const copy = row ? structuredClone(row) : null;
+          if (table === "environments" && row && cols.includes("updated_at") && !fired) { fired = true; between(row); }
+          return { data: copy, error: null };
+        },
+        update: (p: Row) => ((patch = p), q),
+        then: (resolve: (v: { error: null; data: Row[] }) => void) => {
+          const hit = matching();
+          if (patch) for (const r of hit) Object.assign(r, patch);
+          resolve({ error: null, data: hit.map((r) => ({ id: r.id })) });
+        },
+      };
+      return q;
+    };
+    return { db: { from } as unknown as SupabaseClient, env: () => tables.environments[0] };
+  }
+  const commit = (row: Row, key: string, value: unknown) => {
+    row.metadata = { ...(row.metadata as Row), [key]: value };
+    row.updated_at = "2026-11-22T00:00:01.000Z";
+  };
+
+  it("create-site's ensureEnvironment keeps a bridge key the bridge step wrote between its read and its write", async () => {
+    const bridge = { key_id: "aw-1", credential_id: "c1" };
+    const { db, env } = racingDb((row) => commit(row, "bridge", bridge));
+    const r = await ensureEnvironment(db, { organizationId: ORG, siteId: SITE, environmentType: "production", name: "production", hostingProvider: "ks-aw-01-docker", metadata: { host_slug: "oracle-aware-wave-com" } });
+    expect(r.ok).toBe(true);
+    expect(env().metadata).toMatchObject({ bridge, host_slug: "oracle-aware-wave-com", ingress: "host-vhost" });
+  });
+
+  it("the bridge step's patchEnvironmentMetadata keeps a host_slug written between its read and its write", async () => {
+    const bridge = { key_id: "aw-1", credential_id: "c1" };
+    const { db, env } = racingDb((row) => commit(row, "host_slug", "oracle-aware-wave-com"));
+    expect(await patchEnvironmentMetadata(db, ENV, { bridge }, { credentials_ref: "c1" })).toEqual({ ok: true });
+    expect(env().metadata).toMatchObject({ bridge, host_slug: "oracle-aware-wave-com", ingress: "host-vhost" });
+    expect(env().credentials_ref).toBe("c1");
   });
 });
