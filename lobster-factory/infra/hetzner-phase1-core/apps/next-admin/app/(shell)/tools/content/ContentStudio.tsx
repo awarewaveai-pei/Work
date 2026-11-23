@@ -12,6 +12,7 @@ import { markdownPreview } from "@/lib/content/client-markdown";
 import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
 import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
 import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
+import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS, DEFAULT_ARTICLE_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
@@ -3180,8 +3181,8 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                     <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ai-text)" }}>素材模式</span>
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                       {([
-                        { id: "pexels-video", label: "📹 真實影片", badge: "$0" },
-                        { id: "pexels-all",   label: "🖼 照片動畫", badge: "$0" },
+                        { id: "pexels-video", label: "📹 真實影片", badge: "免費" },
+                        { id: "pexels-all",   label: "🖼 照片動畫", badge: "免費" },
                         { id: "__ai__",       label: "✨ AI 生圖",  badge: "按模型" },
                       ] as { id: string; label: string; badge: string }[]).map(({ id, label, badge }) => {
                         const isAiBtn = id === "__ai__";
@@ -3221,7 +3222,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                         {Object.entries(IMAGE_RATES)
                           .filter(([id]) => id !== "pexels-video" && id !== "pexels-all")
                           .map(([id, r]) => (
-                            <option key={id} value={id}>{r.label} — ${r.usd}/張</option>
+                            <option key={id} value={id}>{r.label} — 約 NT${usdToNtd(r.usd)}/張</option>
                           ))}
                       </select>
                     )}

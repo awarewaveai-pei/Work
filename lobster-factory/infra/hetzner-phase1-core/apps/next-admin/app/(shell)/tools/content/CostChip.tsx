@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usdToNtd } from "@/lib/ai/cost-calculator";
 
 export interface CostLineItem {
   route: string;
@@ -39,11 +40,11 @@ function routeLabel(route: string): string {
   return ROUTE_LABEL[route] ?? route;
 }
 
-function fmt(usd: number): string {
-  if (usd === 0) return "$0.0000";
-  if (usd < 0.00005) return `$${usd.toFixed(6)}`;
-  if (usd < 0.01)    return `$${usd.toFixed(5)}`;
-  return `$${usd.toFixed(4)}`;
+/** What the operator reads: NT$ by the repo's one rate (usdToNtd). The ledger and these props stay in USD. */
+export function fmt(usd: number): string {
+  if (usd === 0) return "NT$0";
+  const ntd = usdToNtd(usd);
+  return ntd < 0.01 ? "< NT$0.01" : `NT$${ntd.toFixed(2)}`;
 }
 
 export function CostChip({ cost }: Props) {
