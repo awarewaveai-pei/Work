@@ -75,7 +75,8 @@ export const STEPS = [
   { n: 17, code: 'K16', group: 'B5', title: '其他寫文案的地方要不要也換', plain: '文章以外寫文案的地方，八種全部各測一次再換（你 11-22 說「都要測」）：劇本工坊、影片腳本、商品文案、AI 去味、競業分析、每月選題、社群改寫、開發信寫信。每一種用一個真實的輸入，讓現在用的模型和 GPT-6.2 sol 各寫一次，並排給你看。要回固定格式的另外驗格式會不會壞。',
     gate: '八種各有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'in_progress', depends: ['K15'], card: 'briefs/K15-K16.md', before: '待決 5 之後才改預設' },  { n: 18, code: 'K17', group: 'B5', title: 'ChatGPT 訂閱也能選模型', plain: '現在 ChatGPT（Codex）訂閱只有一顆按鈕，用的是預設模型。改成和 Claude 訂閱一樣可以選：GPT-6 luna、GPT-6.1 terra、GPT-6.2 sol、GPT-6.2 astra，預設 GPT-6.2 sol。已查過你的訂閱清單裡有這四個。每個網站可以各自存。',
     gate: '按鈕出現、選的模型真的送到執行程式；真的用訂閱寫一篇要等 Codex 額度恢復（M1）。', risk: 'Low', model: 'Sonnet', status: 'done', commit: 'db2cb07fa', depends: ['K6'], card: 'briefs/K17-codex-model.md' },  { n: 19, code: 'K18', group: 'B5', title: '中文文章改用中文小標', plain: '查出來 SEO 評分本來就認中文小標；只認英文的是另外兩處：寫文章的指令規定四個固定小標一律寫英文，發到 WordPress 的摘要只找英文的 Quick Answer。兩處都改成中英文都可以，三個地方共用同一份小標清單。十二篇盲測文章把小標換成中文重新評分，分數完全一樣。',
-    gate: '部署後產一篇中文文章：四個固定小標是中文、SEO 分數不變、WordPress 摘要取自快速解答。', risk: 'Medium', model: '監工', status: 'done', commit: '5042d239c', depends: ['K15'], card: 'briefs/K10-K12.md' },
+    gate: '部署後產一篇中文文章：四個固定小標是中文、SEO 分數不變、WordPress 摘要取自快速解答。', risk: 'Medium', model: '監工', status: 'done', commit: '5042d239c', depends: ['K15'], card: 'briefs/K10-K12.md' },  { n: 20, code: 'K19', group: 'B5', title: '商品文案不再亂寫規格、不翻譯品牌名', plain: '上次實測兩邊各錯一個：一個自己加了「棉質」和洗滌方式，一個把品牌名翻成中文。原因都在指令：它要求寫材質、印刷、保養，卻沒給這些資料；又說每個欄位都要用指定語言。已改成：沒給的規格不寫，品牌名和圖上的字照原樣。改完重測三件商品、兩個模型，品牌名都保留，沒給的規格都沒出現，有給的規格都用對。要讓頁面寫出材質，請在「文案指示」裡填。',
+    gate: '三件商品重測結果在比較頁；商品文案維持 Claude Opus。', risk: 'Low', model: '監工', status: 'done', commit: '7d9e58824', depends: ['K16'], card: 'briefs/K15-K16.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
@@ -157,5 +158,8 @@ export const RISKS = [
   ] },
   { batch: 'K17（ChatGPT 訂閱選模型）', rows: [
     { card: 'K17', risk: '以前不指定模型，一定能跑。現在預設會指定 GPT-6.2 sol。模型清單是從筆電平常用的 Codex 查到的，寫字專用的登入和主機還沒實際試過；萬一不認這個名字，這一段會被跳過改走 API。', act: '現在沒有任何一條線在用 Codex 寫字（額度封鎖、筆電專用登入與主機都還沒設），所以今天上線不會多花錢。已加進 M1：額度恢復後先用這個模型真的寫一篇，主機那條線開通前也先試一次。' },
+  ] },
+  { batch: 'K19（商品文案重測）', rows: [
+    { card: 'K16', risk: 'GPT-6.2 sol 會先「思考」再寫，思考用量也算在輸出上限裡。商品文案重測時，三次裡有一次把 1,200 的上限全部用在思考，結果一個字都沒寫出來。', act: '商品文案維持 Claude，不受影響。已寫進換模型的條件：任何功能換成 GPT-6.2 sol 之前，先把該功能的輸出上限調到留得下思考用量，並各跑三次確認沒有空白。' },
   ] },
 ];
