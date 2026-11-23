@@ -1,9 +1,10 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   assert = require("node:assert/strict");
+let b;
 (async () => {
   const { base } = await require("./isolated-server.cjs").isolatedServer("vw-regressions-");
-  const b = await chromium.launch({ channel: "msedge" }),
-    p = await b.newPage();
+  b = await chromium.launch({ channel: "msedge" });
+  const p = await b.newPage();
   p.setDefaultTimeout(8000);
   await p.goto(base);
   await p.waitForFunction(() => VideoWorkbench?.models);
@@ -62,6 +63,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   let listed = false;
   for (const act of lib) {
     await tools.locator(`[data-act="${act}"]`).click();
+    // A tool whose scripts are not loaded yet first shows a "載入中…" frame (scripts/tools-0.js render) without its buttons;
+    // counting library buttons before it is replaced skipped the image tools (region, breakout) at random.
+    await tools.locator("#app p[role=status]", { hasText: "載入中" }).waitFor({ state: "detached" });
     if (await tools.locator('[data-act^="library:"]').count()) {
       await tools.locator('[data-act^="library:"]').first().click();
       await tools.locator(".asset-workspace").waitFor();
@@ -74,7 +78,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright"),
   assert(listed, "no tool library lists the edited character");
   console.log("PASS 角色素材可在工具庫選取");
   await b.close();
-})().catch((e) => {
+})().catch(async (e) => {
   console.error(e);
   process.exitCode = 1;
+  await b?.close().catch(() => {}); // an open browser keeps the process alive after a failure
 });
