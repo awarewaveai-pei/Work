@@ -31,7 +31,7 @@ export const NOW = [
   { what: '工具嵌在 WordPress 頁面裡。', state: 'no', ev: '引擎的嵌入版與外掛都做好並併入，還沒部署、還沒裝到網站；要等上線三步。' },
   { what: '會員能存命盤、訂閱每日信。', state: 'no', ev: '第三批。' },
   { what: 'AI 解讀分成免費簡批與付費深度報告。', state: 'no', ev: '2026-11-22 已定：用 OpenAI、單次購買、簡批下方列出這張命盤還有哪些深度內容可付費得知；紫微補上十二宮互動與流年流月。排在 WordPress 階段之後，共三張卡，尚未派工。' },
-  { what: '從後台一步一步開一個客戶網站。', state: 'no', ev: '資料紀錄、主機工具、網站範本、步驟骨架已併入；主機固定動作與頁面還沒做。' },
+  { what: '從後台一步一步開一個客戶網站。', state: 'no', ev: '頁面與主機那五步都做好併入了，但開關全關、還沒在真的主機上跑過；MainWP 與控制通道兩步進行中。' },
 ];
 
 const SPEC = 'briefs/ORACLE-WP-SPEC.md';
@@ -73,11 +73,11 @@ export const STEPS = [
   { n: 16, code: 'P3', group: 'B3', title: '每日運勢信', plain: '訂閱並確認後，每天在訂閱者當地早上 7 點寄運勢信；同一天不重寄；退訂、退信、投訴的人不再寄。',
     gate: '四個時區都在當地 7 點後寄一次；算不出內容就不寄；退信的人被停寄。', risk: 'High（寄信、個資）', model: 'Opus 5.5', status: 'in_progress', depends: ['P1', 'E4'], card: 'briefs/WP-P3-daily-mail.md' },
   { n: 17, code: 'SF-H', group: 'B3', title: '建站的主機步驟', plain: '網址檢查、建立網站主機、安裝 WordPress 與外掛、掛上網址、正式開放，五個步驟接上骨架。',
-    gate: '在測試站實際跑過；管理員密碼不出現在任何紀錄裡。', risk: 'High', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-E', 'SF-G', 'SF-E2'], card: 'briefs/WP-SF-H-host-steps.md' },
+    gate: '在測試站實際跑過；管理員密碼不出現在任何紀錄裡。', risk: 'High', model: 'Opus 5.5', status: 'done', commit: '6b473629c', depends: ['SF-E', 'SF-G', 'SF-E2'], card: 'briefs/WP-SF-H-host-steps.md' },
   { n: 18, code: 'SF-I0', group: 'B3', title: 'MainWP 連線金鑰', plain: '讓後台能把新網站加進 MainWP（一次性的主機設定）。',
     gate: '後台容器讀得到這三個設定值。', risk: 'High', model: '監工', status: 'done', commit: '1341b5dde', depends: [], card: SF, before: '待決 2' },
   { n: 19, code: 'SF-I', group: 'B3', title: '接上 MainWP 與 AI 控制通道', plain: '新網站自動加進 MainWP、建立與後台之間的簽章通道，並登記這個網站屬於哪個客戶。',
-    gate: '測試站出現在 MainWP 且連線正常；通道簽章請求成功；私鑰不出現在任何紀錄。', risk: 'High（憑證）', model: 'Opus 5.5', status: 'not_started', depends: ['SF-G', 'SF-I0'], card: SF },
+    gate: '測試站出現在 MainWP 且連線正常；通道簽章請求成功；私鑰不出現在任何紀錄。', risk: 'High（憑證）', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-G', 'SF-I0'], card: 'briefs/WP-SF-I-integrations.md' },
   { n: 20, code: 'SF-J', group: 'B3', title: '建站流程頁面', plain: '「新增客戶網站」與「建站流程」兩個頁面：一欄由上到下九步，每步顯示狀態，會動主機的步驟都要按兩下。',
     gate: '九步都顯示；開關沒開時按鈕顯示「尚未開放」；密碼只顯示一次。', risk: 'Medium', model: 'Sonnet 5.5', status: 'done', commit: 'dcc3c8922', depends: ['SF-G'], card: 'briefs/WP-SF-J-pages.md' },
   // 第四批

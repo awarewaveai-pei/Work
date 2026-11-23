@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-23（續4）— oracle WP 第三批：SF-H 併入；SF-I brief 派線4
+
+- SF-H 併入 `6b473629c`（工人 `d1027cb52`，已 push；今晚 03:00 自動部署帶上，catalog 七個開關全關）：`lib/site-flow/steps/{preflight,container,wp-install,vhost,open,manual-checks,shared,index}.ts`（`HOST_STEPS` 登記五步）、`app/api/ops/site-flow/[siteId]/manual-checks/route.ts`、`records.ts:405` 環境狀態轉換表（CAS）、`engine.ts:150-152` 狀態頁共用一次 `site-preflight`、`gate-client.ts`（docker 站不送 stdin、`create` 帶 ingress、install 帶 email）、`wp-plugin-stack-catalog.ts`（Kadence／TravelWP 標為佈景；自有外掛 `<repo>-v<版本>.zip`）。閘門 `aw-hosting-gate.sh` 只加 `set-oracle-engine-url`（`ENGINE_URL_RE`、`wp option patch` 改 `aworacle_settings.server_engine_url` 一鍵並讀回；外掛未啟用 exit 3）。
+- 監工驗收：讀閘門 diff（只有子動詞清單一行改動與新增區塊，符合裁決範圍）；`hosting-gate-site.test.sh` 151 passed；next-admin `npx tsc --noEmit` exit 0、全套 vitest 5596 passed／0 failed 後才 push。工人證據：Playwright sites 7 項、兩次突變、critic Deep＋複查 0c/0m。
+- 第三批待總檢（SF-H 回報，未處置）：`ENGINE_URL_RE` 接受 >65535 的埠與預設埠（監工定的文法，值錯只會連不上）；改網址後外掛工具清單快取不清；引擎網址用內部名稱時只有 product-gateway 的站連得到（計畫只警告）；oracle 外掛 release repo 未發佈（P4）前勾選會在主機下載失敗；閘門不回報最近備份時間（第 4 步顯示「主機目前不回報」）；安裝進度靠頁面開著輪詢，45 分鐘沒輪詢被收回（重跑接續）；兩個分頁同時輪詢可能重裝同批外掛一次（冪等）；「正式開放」由 next-admin 打公開網址確認，可能 hairpin 逾時而自動改回建置中；安裝與開放的觀測依最後一次執行紀錄，看不到主機上的手動改動；既有測試改三處（`records.test.ts` pending 不能直跳 ready、兩個假 DB 補形狀）。
+- 新 brief `briefs/WP-SF-I-integrations.md`（MainWP 與 wp-bridge 兩步、`wp_sites` 歸屬、私鑰不外洩斷言、三次突變、兩個獨立 critic）；派線4（改回 Opus 5.5）。P3（線1）等 critic。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash tests/host-scripts/hosting-gate-site.test.sh；next-admin npx tsc --noEmit && npx vitest run（quizzical worktree @ 整合結果） | exit=0 | ms=58000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/3m/7n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=set-oracle-engine-url | hits=6
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic Deep 加複查（3 Major 已修）＋兩次突變＋監工讀閘門 diff 與全套測試代替
 ## 2026-11-23（續2）— oracle WP 第三批：P2 併入；Resend 網域已驗證；P3 brief 派線1
 
 - P2 併入 `39b51d9cc`（工人 `bf40c8b0f`，已 push；外掛尚未安裝到任何網站）：`includes/Crypto/Vault.php`（secretbox，資料綁「種類:會員 ID」，金鑰常數 `AWORACLE_DATA_KEY`，缺金鑰 REST 503 不存明文）、`includes/Members/{Store,Rest,Privacy,Record,Shortcodes}.php`、`assets/members.js`、設定頁 cross-origin 標「尚未支援」、`assets/embed-same-origin.js:21` 只認 `[data-aw-result]`、版本 0.3.0。
