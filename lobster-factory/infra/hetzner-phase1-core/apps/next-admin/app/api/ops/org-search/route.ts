@@ -34,7 +34,7 @@ const HAS_BRAND = ["primary", "secondary", "accent"].map((k) => `${BRAND}->>${k}
 
 /** The client rail's category buttons, in order: the one vocabulary (route.test.ts refuses any other value). Only what
  *  today's data can tell (blueprint §9.3): 需處理 / 訂閱 / 點數 follow billing_ledger's own filters (the /ops/billing tabs,
- *  0148), TEST is organizations.kind (0175). 訂閱／點數／代操／經銷／TEST are the member-tags function's answer
+ *  0148), TEST is organizations.kind (0175). 訂閱／點數／代操／經銷／贈送／TEST are the member-tags function's answer
  *  (lib/entitlements/member-tags.ts, M3); 代操 and 經銷 buttons are drawn only when some account has that tag. 買斷 is U35.
  *  TEST shows only under 測試. Not exported (a route file exports only handlers): the rail reads the list from the answer. */
 const ORG_CATEGORIES = [
@@ -44,6 +44,7 @@ const ORG_CATEGORIES = [
   { key: "credits", label: "點數" },
   { key: "operated", label: "代操" },
   { key: "resell", label: "經銷" },
+  { key: "comp", label: "贈送" },
   { key: "test", label: "測試" },
 ] as const;
 export type OrgCategory = (typeof ORG_CATEGORIES)[number]["key"];
@@ -53,7 +54,7 @@ export type TaggedOrg = PickOrg & { tags: OrgTag[] };   // + group, set by group
 
 /** A billing category = billing_ledger 'all' rows that pass the same rule as that RPC filter (0148: attention =
  *  reasons, contract = has_contract, balance = balance > 0), so one cached read answers all three and the tags. */
-type BillingTag = "attention" | "contract" | "credits" | "operated" | "resell";
+type BillingTag = "attention" | "contract" | "credits" | "operated" | "resell" | "comp";
 /** billing_ledger's page size (0148: least(p_limit, 200)). */
 const LEDGER_PAGE = 200;
 /** Pages read before giving up on the rest (10 000 accounts); past it the answer says tagsPartial. */
@@ -111,6 +112,7 @@ function ledgerTags(r: LedgerRow, extras: Extras): BillingTag[] {
   if (t.ways.includes("credits")) out.push("credits");
   if (t.ways.includes("operated")) out.push("operated");
   if (t.ways.includes("reseller")) out.push("resell");
+  if (t.ways.includes("comp")) out.push("comp");
   return out;
 }
 
@@ -201,7 +203,7 @@ async function categoryPage(supabase: SupabaseClient, category: OrgCategory, inc
   }));
   // a button is drawn only when the data can fill it (代操 / 經銷 start empty); the others are always there
   const present = new Set<string>(ledger.rows.filter((r) => r.kind === "customer").flatMap((r) => ledgerTags(r, extras)));
-  const categories = ORG_CATEGORIES.filter((c) => (c.key !== "operated" && c.key !== "resell") || present.has(c.key));
+  const categories = ORG_CATEGORIES.filter((c) => (c.key !== "operated" && c.key !== "resell" && c.key !== "comp") || present.has(c.key));
   // tagsPartial: accounts past LEDGER_MAX_PAGES have no billing tags and are missing from 需處理／訂閱／點數
   // internalGroup: the internal org's own hash, so 「AwareWave 自己」 has a group even when the first page lacks its row
   const internalGroup = internalOrgId ? organizationGroupId(internalOrgId) : null;

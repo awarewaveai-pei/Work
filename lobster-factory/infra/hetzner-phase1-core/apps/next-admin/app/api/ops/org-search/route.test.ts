@@ -7,7 +7,7 @@ const calls = vi.hoisted(() => ({
   neq: [] as Array<[string, unknown]>, in: [] as Array<[string, unknown]>, rpc: [] as Array<[string, Record<string, unknown>]>,
   rows: null as unknown[] | null, ledger: null as unknown, ledgerError: null as { message: string } | null, internal: null as unknown,
   testRows: [] as unknown[], internalError: null as { message: string } | null,
-  heldCalls: 0, heldRows: [] as unknown[], table: "", opsRows: [] as unknown[], resellRows: [] as unknown[], extraError: null as { message: string } | null,
+  heldError: null as { message: string } | null, heldCalls: 0, heldRows: [] as unknown[], table: "", opsRows: [] as unknown[], resellRows: [] as unknown[], extraError: null as { message: string } | null,
 }));
 // a row as the database could return it if the select ever named metadata whole
 const ROW = vi.hoisted(() => ({
@@ -42,7 +42,7 @@ vi.mock("@/lib/supabase-server", () => {
   };
   const rpc = async (name: string, args: Record<string, unknown>) => {
     // M3's grouped read of held products is counted apart: calls.rpc stays the ledger's pages
-    if (name === "entitlement_held_products") { calls.heldCalls++; return { data: calls.extraError ? null : calls.heldRows, error: calls.extraError }; }
+    if (name === "entitlement_held_products") { calls.heldCalls++; const err = calls.heldError ?? calls.extraError; return { data: err ? null : calls.heldRows, error: err }; }
     calls.rpc.push([name, args]);
     if (calls.ledgerError) return { data: null, error: calls.ledgerError };
     // calls.ledger = every row; the mock pages it like billing_ledger (limit / offset)
@@ -61,7 +61,7 @@ const staff = { "x-ops-user-kind": "staff", "x-ops-claims-role": "operator" };
 const get = async (qs: string) => (await GET(new Request(`https://app.aware-wave.com/api/ops/org-search${qs}`, { headers: staff }))).json();
 
 beforeEach(async () => {
-  Object.assign(calls, { select: [], or: [], limit: [], from: 0, eq: [], extra: null, neq: [], in: [], rpc: [], rows: null, ledger: null, ledgerError: null, internal: null, testRows: [], internalError: null, table: "", heldCalls: 0, heldRows: [], opsRows: [], resellRows: [], extraError: null });
+  Object.assign(calls, { select: [], or: [], limit: [], from: 0, eq: [], extra: null, neq: [], in: [], rpc: [], rows: null, ledger: null, ledgerError: null, internal: null, testRows: [], internalError: null, table: "", heldError: null, heldCalls: 0, heldRows: [], opsRows: [], resellRows: [], extraError: null });
   // a fresh route module: its ledger memory starts empty in every test
   vi.resetModules();
   ({ GET } = await import("./route"));
@@ -359,7 +359,7 @@ describe("GET /api/ops/org-search?category=", () => {
     expect(all.orgs).toHaveLength(1);
   });
 
-  it("訂閱 includes an account that holds only contract-source rights (Soulful), by the grouped read -- not the right rows; a gift or a credit pack is not 訂閱", async () => {
+  it("訂閱 includes an account that holds only contract-source rights (Soulful), by the grouped read -- not the right rows; a gift (贈送) or a credit pack is not 訂閱", async () => {
     const C2 = "55555555-5555-4555-8555-555555555555", C3 = "66666666-6666-4666-8666-666666666666";
     calls.ledger = ledger([lrow(C1, "customer"), lrow(C2, "customer"), lrow(C3, "customer")]);
     calls.heldRows = [
@@ -369,11 +369,39 @@ describe("GET /api/ops/org-search?category=", () => {
     ];
     calls.rows = [org(C1, "soulful"), org(C2, "edd"), org(C3, "pack")];
     const all = await get("?category=all");
-    expect(all.orgs.map((o: { id: string; tags: string[] }) => [o.id, o.tags])).toEqual([[C1, ["contract"]], [C2, []], [C3, ["credits"]]]);
+    expect(all.orgs.map((o: { id: string; tags: string[] }) => [o.id, o.tags])).toEqual([[C1, ["contract"]], [C2, ["comp"]], [C3, ["credits"]]]);
     expect(calls.heldCalls).toBe(1);   // one grouped read answers every category; the 60 s reuse holds across the two calls below
     calls.in = [];
     const sub = await get("?category=contract");
     expect(calls.in).toEqual([["id", [C1]]]);
     expect(sub.total).toBe(1);
+  });
+
+  it("贈送: a comp-source account is tagged and gets the button; the internal account's comp rights do not", async () => {
+    const C2 = "55555555-5555-4555-8555-555555555555";
+    calls.ledger = ledger([lrow(C1, "customer"), lrow(INTERNAL, "internal")]);
+    calls.heldRows = [
+      { organization_id: C1, product_key: "content", source: "comp", pay: "" },
+      { organization_id: INTERNAL, product_key: "content", source: "comp", pay: "" },
+    ];
+    calls.rows = [org(C1, "edd"), org(C2, "other")];
+    const all = await get("?category=all");
+    expect(all.categories.map((c: { key: string; label: string }) => [c.key, c.label]).filter(([k]: string[]) => k === "comp")).toEqual([["comp", "贈送"]]);
+    expect(all.orgs[0].tags).toEqual(["comp"]);
+    calls.in = [];
+    const gift = await get("?category=comp");
+    expect(calls.in).toEqual([["id", [C1]]]);
+    expect(gift.total).toBe(1);
+  });
+
+  it("migration 0179 not applied (the rpc is missing): 全部 still answers the clients with tagsFailed, no button for 贈送", async () => {
+    calls.rows = [org(C1, "acme")];
+    calls.ledger = ledger([lrow(C1, "customer", { balance: 2 })]);
+    calls.heldError = { message: "Could not find the function public.entitlement_held_products() in the schema cache" };
+    const all = await get("?category=all");
+    expect(all.ok).toBe(true);
+    expect(all.tagsFailed).toBe(true);
+    expect(all.orgs.map((o: { id: string }) => o.id)).toEqual([C1]);
+    expect(all.categories.map((c: { key: string }) => c.key)).not.toContain("comp");
   });
 });

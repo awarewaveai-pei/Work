@@ -46,11 +46,34 @@ describe("memberTags: ADR 021 §2 examples and the three layers", () => {
     expect(t.pairs.map((p) => p.label)).toEqual(["design／點數"]);
   });
 
-  it("comp (a gift, edd-research) stays 未分類 and says why: it is not one of the five ways", () => {
+  it("comp (edd-research) = 贈送: the pair 「產品／贈送」 and the way tag; contract and comp rows on one product give both pairs", () => {
     const t = memberTags({ ...base, entitlements: [ent("content", "content.write", { source: "comp", sourceRef: "all-features:x" })] });
-    expect(t.pairs.map((p) => p.label)).toEqual(["content／未分類"]);
-    expect(t.unclassified).toEqual([{ product: "content", reason: "comp" }]);
-    expect(t.ways).toEqual([]);
+    expect(t.pairs.map((p) => p.label)).toEqual(["content／贈送"]);
+    expect(t.ways).toEqual(["comp"]);
+    expect(t.unclassified).toEqual([]);
+    const both = memberTags({ ...base, entitlements: [ent("content", "content.write"), ent("content", "content.read", { source: "comp" })] });
+    expect(both.pairs.map((p) => p.label)).toEqual(["content／贈送", "content／訂閱"]);
+  });
+
+  it("every valid source (the entitlements table allows contract and comp only, 0110) maps to a way: nothing falls to 未分類", () => {
+    for (const source of ["contract", "comp"]) {
+      for (const pay of [undefined, "credits"]) {
+        const t = memberTags({ ...base, entitlements: [ent("p", "p.f", { source, limits: pay ? { pay } : {} })] });
+        expect(t.unclassified, `${source}/${pay}`).toEqual([]);
+        expect(t.pairs.length, `${source}/${pay}`).toBeGreaterThan(0);
+      }
+    }
+    expect(memberTags({ ...base, entitlements: [ent("p", "p.f", { source: "mystery" })] }).unclassified).toEqual([{ product: "p", reason: "other" }]);
+  });
+
+  it("internal (Admin): its comp rights give no way tag and no pair; a customer's do", () => {
+    const rows = [ent("content", "content.write", { source: "comp", sourceRef: "all-features:x" })];
+    const admin = memberTags({ ...base, kind: "internal", entitlements: rows });
+    expect(admin.role).toBe("Admin");
+    expect(admin.pairs).toEqual([]);
+    expect(admin.ways).toEqual([]);
+    expect(admin.unclassified).toEqual([]);
+    expect(memberTags({ ...base, entitlements: rows }).ways).toEqual(["comp"]);
   });
 
   it("a held product that also has a way is not 未分類; resell rows are never 'held'", () => {

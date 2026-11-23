@@ -5,11 +5,12 @@ import { sellerLicenceKey } from "./can";
 
 export type Role = "Admin" | "客戶" | "TEST";
 /** subscription = a live subscription row or a live contract-source right (staffOpenedContract); operated = organization_product_operations says awarewave; reseller = a live
- *  <product>.resell right; credits = balance > 0 or a live right that pays from credits; unclassified = held, but no
- *  source above explains it (today only gifts: comp rights). */
-export type Way = "subscription" | "operated" | "reseller" | "credits" | "unclassified";
+ *  <product>.resell right; credits = balance > 0 or a live right that pays from credits; comp = a live comp-source right
+ *  (贈送, ADR 017 §0 commercial axis; 2026-11-23 operator left it to the supervisor); unclassified = held, but no source
+ *  above explains it (no valid source reaches it today: the lock is member-tags.test.ts). */
+export type Way = "subscription" | "operated" | "reseller" | "credits" | "comp" | "unclassified";
 export const WAY_LABELS: Readonly<Record<Way, string>> = {
-  subscription: "訂閱", operated: "代操", reseller: "經銷", credits: "點數", unclassified: "未分類",
+  subscription: "訂閱", operated: "代操", reseller: "經銷", credits: "點數", comp: "贈送", unclassified: "未分類",
 };
 
 export interface MemberTagsInput {
@@ -29,8 +30,8 @@ export interface MemberTags {
   pairs: Array<{ product: string; way: Way; label: string }>;
   /** the way tags: each distinct way once, "unclassified" excluded (it is a flag, listed in `unclassified`) */
   ways: Way[];
-  /** products held with no explainable way, and why ("comp" = a gift: not one of the five ways, operator's call) */
-  unclassified: Array<{ product: string; reason: "comp" | "other" }>;
+  /** products held with no explainable way (a source this function does not know) */
+  unclassified: Array<{ product: string; reason: "other" }>;
 }
 
 export function memberRole(kind: MemberTagsInput["kind"], parentKind?: MemberTagsInput["parentKind"]): Role {
@@ -50,21 +51,24 @@ export function memberTags(i: MemberTagsInput, productName: (key: string) => str
   const add = (p: string, w: Way) => { byProduct.set(p, (byProduct.get(p) ?? new Set()).add(w)); };
   for (const c of i.contracts) if (!c.status || !ENDED.has(c.status)) add(c.product_key, "subscription");
   for (const o of i.operations) if (o.operatedBy === "awarewave") add(o.productKey, "operated");
+  const role = memberRole(i.kind, i.parentKind);
   const held = new Set<string>();
   for (const e of i.entitlements) {
     if (e.featureKey === sellerLicenceKey(e.productKey)) { add(e.productKey, "reseller"); continue; }
+    // AwareWave's own account holds everything as comp: Admin is not a customer, so no way tag
+    if (role === "Admin" && e.source === "comp") continue;
     held.add(e.productKey);
     if (e.limits?.pay === "credits") add(e.productKey, "credits");
     else if (staffOpenedContract(e)) add(e.productKey, "subscription");
+    else if (e.source === "comp") add(e.productKey, "comp");
   }
-  // held with no way above: a gift (comp) -- not one of the five ways, so say so and why, do not pick a way
-  const unclassified = [...held].filter((p) => !byProduct.has(p)).sort()
-    .map((product) => ({ product, reason: i.entitlements.some((e) => e.productKey === product && e.source === "comp") ? "comp" as const : "other" as const }));
+  // held with no way above = a source this function does not know: say so, do not pick a way
+  const unclassified = [...held].filter((p) => !byProduct.has(p)).sort().map((product) => ({ product, reason: "other" as const }));
   const pairs = [...byProduct.entries()].sort(([a], [b]) => a.localeCompare(b)).flatMap(([p, ws]) =>
     [...ws].sort().map((w) => ({ product: p, way: w, label: `${productName(p)}／${WAY_LABELS[w]}` })));
   for (const { product: p } of unclassified) pairs.push({ product: p, way: "unclassified", label: `${productName(p)}／${WAY_LABELS.unclassified}` });
   const ways = new Set<Way>(pairs.map((x) => x.way).filter((w) => w !== "unclassified"));
   if (i.balance > 0) ways.add("credits");
-  const order: Way[] = ["subscription", "operated", "reseller", "credits"];
-  return { role: memberRole(i.kind, i.parentKind), pairs, ways: order.filter((w) => ways.has(w)), unclassified };
+  const order: Way[] = ["subscription", "operated", "reseller", "credits", "comp"];
+  return { role, pairs, ways: order.filter((w) => ways.has(w)), unclassified };
 }

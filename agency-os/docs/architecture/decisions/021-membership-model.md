@@ -27,7 +27,7 @@
   | 層 | 回答 | 值 | 來源（唯一寫入方） | WordPress 端 |
   |---|---|---|---|---|
   | 1 角色 | 他是誰 | Admin／客戶／TEST | app `organizations.kind`（internal／customer／test；`test` 已加（M1，0175）） | WordPress 角色，建會員時由 kind 帶入；自己註冊＝客戶。除 Admin 外權限同 WooCommerce `customer` |
-  | 2 方式 | 怎麼跟我們合作 | 訂閱／代操／買斷／點數／經銷 | app 合約（ADR 017 B 軸；每單位每產品一筆） | 標籤 |
+  | 2 方式 | 怎麼跟我們合作 | 訂閱／代操／買斷／點數／經銷／贈送 | 由資料算出（`NA/lib/entitlements/member-tags.ts`）：訂閱＝有效訂閱列或有效 contract 來源權利列；代操＝`organization_product_operations`；經銷＝有效 `<產品>.resell` 權利列；點數＝餘額大於 0 或該產品走扣點；贈送＝有效 comp 來源權利列（2026-11-23 操作者交監工決定）；買斷未做（U35） | 標籤 |
   | 3 產品 | 用在哪個產品 | `NA/lib/portal/products.ts` 的產品 key（新增產品自動多一個） | 同上 | 標籤 |
 
   標籤由單一函式（放 `NA/lib/entitlements/`）算出，經 `crm` 接頭單向寫入（ADR 017 §0b 第 5 條 `crm: fluentcrm | none`）：每筆合約一張成對標籤「產品／方式」，另每種方式一張方式標籤。收銀台端不改。角色只表身分，不表方式或產品（同一單位可同時「影片／買斷」「內容行銷／訂閱」）。
