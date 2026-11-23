@@ -82,19 +82,19 @@ export const STEPS = [
     gate: '九步都顯示；開關沒開時按鈕顯示「尚未開放」；密碼只顯示一次。', risk: 'Medium', model: 'Sonnet 5.5', status: 'done', commit: 'dcc3c8922', depends: ['SF-G'], card: 'briefs/WP-SF-J-pages.md' },
   // 第四批
   { n: 21, code: 'P4', group: 'B4', title: '外掛發佈管道', plain: '讓這支外掛能像其他自有外掛一樣打包、發佈、安裝到網站。',
-    gate: '發佈與安裝腳本預演正確。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['P1'], card: 'briefs/WP-P4-plugin-release.md' },
+    gate: '發佈與安裝腳本預演正確。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '4863cadb2', depends: ['P1'], card: 'briefs/WP-P4-plugin-release.md' },
   { n: 22, code: 'SF-K', group: 'B4', title: '清掉假的狀態顯示', plain: '後台幾處寫死的「已完成」打勾與過時說明，改成顯示真實狀態。',
-    gate: '清單上每一處都改掉。', risk: 'Low', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-J'], card: 'briefs/WP-SF-K-fake-status.md' },
+    gate: '清單上每一處都改掉。', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '2661cccb0', depends: ['SF-J'], card: 'briefs/WP-SF-K-fake-status.md' },
   { n: 23, code: 'SF-P', group: 'B4', title: '舊的建站頁退場', plain: '舊的兩個建站頁刪除並轉到新流程；它們還有用的兩塊設定搬到客戶頁。',
-    gate: '既有客戶的設定在新位置看得到；全站沒有連到舊頁的連結。', risk: 'Medium', model: 'Sonnet 5.5', status: 'not_started', depends: ['SF-J'], card: SF },
+    gate: '既有客戶的設定在新位置看得到；全站沒有連到舊頁的連結。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-J'], card: 'briefs/WP-SF-P-old-pages.md' },
   { n: 24, code: 'SF-L', group: 'B4', title: '用測試網域完整跑一次', plain: '後台部署後，用一個拋棄式網域從頭到尾建一個站，當晚確認有被備份，再整個拆掉，確認沒留下任何東西。',
-    gate: '每一步都有成功紀錄；拆掉後容器、設定、登記都不存在。', risk: 'High', model: '監工', status: 'not_started', depends: ['SF-F', 'SF-H', 'SF-I', 'SF-J'], card: SF, before: '待決 3' },
+    gate: '每一步都有成功紀錄；拆掉後容器、設定、登記都不存在。', risk: 'High', model: '監工', status: 'not_started', depends: ['SF-F', 'SF-H', 'SF-I', 'SF-J'], card: SF, before: '待決 3、待決 7' },
   { n: 25, code: 'SF-J2', group: 'B4', title: '建站表單補強', plain: '表單上用按鈕明確選「新客戶」或「既有客戶」，才能替已經有的客戶再加網站；並在資料庫加上限制，同一個網址不會被建成兩筆。',
     gate: '既有客戶加第二個網站成功；同一個網址同時送兩次只會成功一次。', risk: 'Medium（資料表異動套用是 High）', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-J', 'SF-H'], card: 'briefs/WP-SF-J2-site-form.md' },
   { n: 26, code: 'E6', group: 'B4', title: '引擎：會員票與英文每日信', plain: '登入會員按 AI 解讀時，引擎的頁面去跟外層的 WordPress 拿票，額度才會記在這位會員身上；每日運勢的「宜／忌」補上英文。',
-    gate: '登入會員的 AI 次數記在自己名下；英文信沒有中文段落。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['P3', 'E4'], card: 'briefs/WP-E6-ticket-and-daily-en.md' },
+    gate: '登入會員的 AI 次數記在自己名下；英文信沒有中文段落。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '4a7d72b9d', depends: ['P3', 'E4'], card: 'briefs/WP-E6-ticket-and-daily-en.md' },
   { n: 27, code: 'SF-I2', group: 'B4', title: '內容工具認得新網站', plain: '發佈文章、嵌入影片等工具的網站清單，改成也包含用新流程建的網站。',
-    gate: '新流程建的網站出現在這些工具的清單裡；既有網站的行為不變。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['SF-I'], card: SF },
+    gate: '新流程建的網站出現在這些工具的清單裡；既有網站的行為不變。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['SF-I'], card: 'briefs/WP-SF-I2-content-tools.md' },
   // 第五批
   { n: 28, code: 'SF-A', group: 'B5', title: '文件更正', plain: '把說法過時或互相矛盾的建站文件改成指向新流程。新流程實際跑過一次之後才改，免得文件先說了還不存在的東西。',
     gate: '文件連結檢查通過。', risk: 'Low', model: '監工', status: 'not_started', depends: ['SF-L'], card: SF },
@@ -103,7 +103,7 @@ export const STEPS = [
   { n: 30, code: 'GO-1', group: 'B5', title: '上線一：部署引擎', plain: '把引擎的新版本（含嵌入版頁面）部署上去。這一步之後訪客看到的網站沒有任何變化。',
     gate: '原有網址逐頁與部署前相同；嵌入版頁面打得開。', risk: 'High', model: '監工', status: 'not_started', depends: ['E1', 'E3', 'E4', 'E2'], card: SPEC, before: '待決 4' },
   { n: 31, code: 'GO-2', group: 'B5', title: '上線二：接上 WordPress（建置中）', plain: '建好 oracle 的 WordPress，讓它接手引擎沒用到的網址，並設成建置中。訪客原本的網址都不變；你登入後開始建頁面、設定外掛與寄信。',
-    gate: '原有網址不變；你能登入 WordPress 後台。', risk: 'High', model: '監工', status: 'not_started', depends: ['GO-1', 'SF-L', 'P1', 'P4'], card: SPEC, before: '待決 5' },
+    gate: '原有網址不變；你能登入 WordPress 後台。', risk: 'High', model: '監工', status: 'not_started', depends: ['GO-1', 'SF-L', 'P1', 'P4'], card: SPEC, before: '待決 5、待決 8' },
   { n: 32, code: 'GO-3', group: 'B5', title: '上線三：正式開放', plain: '你確認頁面與每日信都沒問題後，首頁換成 WordPress，舊工具網址轉到新頁面，關掉建置中。',
     gate: '首頁是 WordPress；頁面裡的工具可用；訂閱測試信收得到。', risk: 'High', model: '監工', status: 'not_started', depends: ['GO-2', 'P2', 'P3'], card: SPEC, before: '待決 6' },
 ];
@@ -116,6 +116,8 @@ export const OPEN = [
   { n: 4, what: '部署引擎新版本（含目前所有尚未部署的引擎改動）。', before: 'GO-1', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('失敗會自動還原到現在的版本。', '引擎維持 2026-11-20 的版本。') },
   { n: 5, what: '改 oracle 網域的分流設定，讓 WordPress 接手引擎沒用到的網址（建置中）。', before: 'GO-2', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('訪客原本的網址不變；失敗自動還原。', 'WordPress 只能在主機內部看。') },
   { n: 6, what: '首頁換成 WordPress 並正式開放。', before: 'GO-3', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('可以一步退回建置中的狀態。', '維持建置中。') },
+  { n: 7, what: '把「同一個網址只能建一筆」的資料表異動套用到正式資料庫（只新增一個索引，不改既有資料，可退回）。', before: 'SF-L', src: '第三批風險總檢', options: ASK('監工套用並驗證後才推上主線。', '程式照樣會先查再寫，只是兩人同時送時少一層保障。') },
+  { n: 8, what: '建立算命外掛的公開下載位置（GitHub 上一個新的公開專案）並發佈第一版。', before: 'GO-2', src: 'ORACLE-WP-SPEC.md P4', options: ASK('建站流程才裝得到這支外掛。', '外掛改成手動上傳安裝。') },
 ];
 
 export const SAFE = [

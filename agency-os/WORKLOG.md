@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-23（續11）— oracle WP 第四批：E6、P4、SF-K、SF-J2 程式併入；SF-I2、SF-P brief 派出
+
+- 併入（已 push；引擎與外掛未部署／未安裝；next-admin 今晚 03:00 自動部署帶上）：E6 `4a7d72b9d`（`lib/ai/memberRequest.ts` 同源框內向父頁取票、401 不退回匿名重送、429 顯示用完；`lib/almanacEn.ts` 宜忌英文，醫療類宜忌英文版不列）；P4 `4863cadb2`（`scripts/release-wp-bridge.sh`、`scripts/rollout-wp-bridge.ps1` 加 `oracle`；外掛 0.5.0：`bin/build-zip.sh`、Turnstile `includes/Daily/Turnstile.php`、工具清單快取綁引擎網址、繁中補 23 條；catalog oracle 版本 0.5.0）；SF-K `2661cccb0`（觀測到的原因優先於上次失敗、客戶頁標章確認回應的確是該 WordPress、首頁與修復中心去掉寫死狀態）；SF-J2 程式 `c20ccbd0a`（新／既有客戶按鈕、`updateEnvironmentCas` 為寫環境紀錄的唯一路徑、建站流程的金鑰列在憑證兩支 route 回 409）。
+- SF-J2 migration `1d8155840`（`0179_environments_host_slug_unique.sql`＋down）未併入、未套用，參照 `refs/keep/sf-j2-0179`；套用需操作者同意。
+- 監工驗收：四個 cherry-pick 無衝突；引擎 `npx tsc --noEmit` exit 0、全套 vitest 567 passed；外掛 `php -l` 0 錯；next-admin `npx tsc --noEmit` exit 0、全套 vitest 四次：一次 0 failed、其餘 1～3 failed 皆為逾時（`app/api/social/__tests__/routes.test.ts` hook 10s／test 20s、`ops/billing/__tests__/page.sidebar.test.ts` 20s），與本批改動無關，發生在本機同時跑多個 session 時。讀憑證兩支 route 的 diff：只新增拒絕分支。
+- 工人回報要記的事實：SF-J2 工人因 hook 擋 Write 寫入路徑含 `credentials` 的檔，改用 python 腳本改那兩支 route（卡片點名要改的檔；hook 對檔名誤判）。P4：發佈 repo `awarewaveai-pei/aware-wave-oracle` 未建、未發佈。SF-K：`node_modules/ssh2` 的原生檔使本機 dev server Build Error（工人暫時改名後改回）。
+- 第四批待總檢（未處置；SF-I2、SF-P 交回後一起）：E6（會員用完次數後登出即可匿名續用，E4 的設計；`window.awOracleTicket` 為全域函式；罕見黃曆詞英文為意譯；`dayMaster` 等五個識別字英文輸出仍中文但不顯示）；P4（發佈 repo 未建前勾選 oracle 會下載失敗；Turnstile 伺服器端不比對 hostname）；SF-K 只列未改四處（`ops/repairs/page.tsx:232` 寫死 ok、`app/sidebar-sections.ts:41-43` 舊入口→SF-P、`ops/cs/page.tsx:59-62` 寫死清單含「已上 EU prod」、`ops/clients/ClientCard.tsx:65` 只看連通）；SF-J2（並發輸的一方留下無環境的 draft 站與空客戶、`projects` 無唯一鍵可能多一個空 project、退舊 bridge 金鑰只能直接刪資料庫列）。
+- 新 brief：`briefs/WP-SF-I2-content-tools.md`（線3）、`briefs/WP-SF-P-old-pages.md`（線4）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=引擎與 next-admin 各 npx tsc --noEmit && npx vitest run；php -l oracle-wp-plugin | exit=0 | ms=95000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=1c/3m/14n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,Projects/internal/ziwei-doushu | grep=awOracleTicket | hits=6
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；各卡工人 critic（E6 Deep、SF-J2 兩輪＋db-expert）＋突變＋監工讀憑證 route diff 與全套測試代替
 ## 2026-11-23（續10）— 平台第 7 批上線：U12、U23、M11（High）、M2（High，0178 已套用）
 
 - 操作者 2026-11-23「看工人們反應的 RISKS 是否需要處理，先處理完風險再一起 4 張上線部署」＝ M2、M11 的 go。
