@@ -62,6 +62,8 @@ final class Block {
 				'chosen'  => __( 'Embedded tool:', 'aware-wave-oracle' ),
 				'none'    => __( 'No tools available — check Settings → AwareWave Oracle.', 'aware-wave-oracle' ),
 				'preview' => __( 'The tool appears here on the published page.', 'aware-wave-oracle' ),
+				'dailyTitle'   => __( 'AwareWave daily fortune signup', 'aware-wave-oracle' ),
+				'dailyPreview' => __( 'The signup form appears here on the published page (only when the daily letter is on in Settings → AwareWave Oracle).', 'aware-wave-oracle' ),
 			),
 		);
 		wp_add_inline_script( self::EDITOR, 'window.AWORACLE_BLOCK=' . wp_json_encode( $data ) . ';', 'before' );

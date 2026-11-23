@@ -75,6 +75,13 @@ final class Renderer {
 			'rootId'    => EmbedUrl::ROOT_ID,
 			'minHeight' => self::MIN_HEIGHT,
 			'pages'     => (object) self::pages( $s ),
+			// Logged-in members only: the framed page asks the parent for a member ticket (Members\Ticket).
+			'ticket'    => is_user_logged_in()
+				? array(
+					'url'   => esc_url_raw( rest_url( \AwareWave\Oracle\Members\Rest::NS . '/ticket' ) ),
+					'nonce' => wp_create_nonce( 'wp_rest' ),
+				)
+				: null,
 		);
 		wp_add_inline_script( self::SCRIPT_SAME, 'window.AWORACLE_SAME=' . wp_json_encode( $config ) . ';', 'before' );
 	}

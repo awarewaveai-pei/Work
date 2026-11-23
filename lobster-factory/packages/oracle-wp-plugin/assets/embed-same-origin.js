@@ -9,7 +9,12 @@
  *    it. An engine without the marker never triggers a scroll: no guessing from height changes.
  *  - Tool links: a link inside the frame to another tool (/<lang>/<tool> or /embed/<lang>/<tool>) opens the
  *    WordPress page mapped to that tool (Settings → Tool pages), when there is one.
- * Config: window.AWORACLE_SAME = { rootId, minHeight, pages: { slug: url } }.
+ *  - Member ticket (logged-in visitors only): window.awOracleTicket() resolves to
+ *    { ticket, signature } from REST aworacle/v1/ticket (cookie + X-WP-Nonce), or null. The framed engine page
+ *    calls window.parent.awOracleTicket() right before an AI reading and sends the two values as headers
+ *    X-AwareWave-Oracle-Ticket / X-AwareWave-Oracle-Signature (never in a URL). Each call is a fresh,
+ *    single-use, 60-second ticket. Not defined for anonymous visitors: the engine then reads anonymously.
+ * Config: window.AWORACLE_SAME = { rootId, minHeight, pages: { slug: url }, ticket: { url, nonce } | null }.
  */
 (function () {
   'use strict';
@@ -21,6 +26,26 @@
   var RESULT_SELECTOR = '[data-aw-result]';
   var TOP_GAP_PX = 16;
   var TOOL_PATH = /^\/(?:embed\/)?(?:zh-TW|en)\/([a-z0-9][a-z0-9-]{0,39})\/?$/;
+
+  if (cfg.ticket && cfg.ticket.url && typeof window.fetch === 'function') {
+    window.awOracleTicket = function () {
+      return fetch(cfg.ticket.url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'X-WP-Nonce': cfg.ticket.nonce, Accept: 'application/json' }
+      })
+        .then(function (res) {
+          return res.ok ? res.json() : null;
+        })
+        .then(function (json) {
+          return json && json.ticket && json.signature ? { ticket: json.ticket, signature: json.signature } : null;
+        })
+        .catch(function () {
+          return null;
+        });
+    };
+  }
 
   function attach(frame) {
     var state = { observer: null, mutations: null, root: null, height: 0, armedAt: 0 };

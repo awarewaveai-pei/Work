@@ -26,6 +26,10 @@ final class Normalize {
 	const EMBED_SAME_ORIGIN  = 'same-origin';
 	const EMBED_CROSS_ORIGIN = 'cross-origin';
 
+	/** Daily letter sender (ORACLE-WP-SPEC §2-9). none = no signup block, no sending. */
+	const MAILER_FLUENTCRM = 'fluentcrm';
+	const MAILER_NONE      = 'none';
+
 	/**
 	 * Path prefixes the engine owns on a same-origin install (ORACLE-WP-SPEC §2-1): the reverse proxy sends
 	 * them to the engine, so a WordPress page or language slug there is unreachable.
@@ -39,7 +43,7 @@ final class Normalize {
 	 *
 	 * @param array<string,mixed>                 $in
 	 * @param array<int,array{0:string,1:string}> $errors
-	 * @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>}
+	 * @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>,mailer:string}
 	 */
 	public static function settings( array $in, array &$errors = array() ): array {
 		$out = Options::defaults();
@@ -73,6 +77,8 @@ final class Normalize {
 		if ( $default === '' && trim( $defaultRaw ) !== '' ) {
 			$errors[] = array( 'default_locale', '' );
 		}
+
+		$out['mailer'] = self::scalar( $in['mailer'] ?? '' ) === self::MAILER_FLUENTCRM ? self::MAILER_FLUENTCRM : self::MAILER_NONE;
 
 		$rejected          = array();
 		$out['locale_map'] = self::pairs( $in['locale_map'] ?? '', self::WP_LOCALE_PATTERN, null, $rejected );

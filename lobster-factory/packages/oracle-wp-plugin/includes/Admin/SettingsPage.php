@@ -218,6 +218,7 @@ final class SettingsPage {
 		$this->textRow( $name . '[default_locale]', $s['default_locale'], __( 'Default engine language', 'aware-wave-oracle' ), __( 'zh-TW or en. Used when the page language is neither and has no entry below.', 'aware-wave-oracle' ) );
 		$this->areaRow( $name . '[locale_map]', Normalize::pairsToText( $s['locale_map'] ), __( 'Language map', 'aware-wave-oracle' ), __( 'Optional, one per line: WordPress locale=engine language, e.g. zh_HK=zh-TW. zh_TW and en_* need no entry.', 'aware-wave-oracle' ) );
 		$this->areaRow( $name . '[page_map]', Normalize::pairsToText( $s['page_map'] ), __( 'Tool pages', 'aware-wave-oracle' ), __( 'One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page.', 'aware-wave-oracle' ) );
+		$this->mailerRow( $name . '[mailer]', $s['mailer'] );
 		echo '</table>';
 		submit_button();
 		echo '</form>';
@@ -367,6 +368,46 @@ final class SettingsPage {
 			. esc_html__( 'Same domain (recommended): the engine answers under this site’s address at /embed/, /api/, /_next/, /tarot/.', 'aware-wave-oracle' ) . '</label></p>';
 		echo '<p><label><input type="radio" disabled value="' . esc_attr( Normalize::EMBED_CROSS_ORIGIN ) . '"' . checked( $value, Normalize::EMBED_CROSS_ORIGIN, false ) . '> '
 			. esc_html__( 'Another domain (not supported yet): the engine has its own address; the page and the tool would talk by messages.', 'aware-wave-oracle' ) . '</label></p>';
+		echo '</fieldset></td></tr>';
+	}
+
+	/** Daily letter: two visible choices, then what is missing (FluentCRM, data key, webhook secret) and the webhook URL. */
+	private function mailerRow( string $name, string $value ): void {
+		echo '<tr><th scope="row">' . esc_html__( 'Daily fortune letter', 'aware-wave-oracle' ) . '</th><td><fieldset>';
+		$choices = array(
+			Normalize::MAILER_NONE      => __( 'Off: no signup form, nothing is sent.', 'aware-wave-oracle' ),
+			Normalize::MAILER_FLUENTCRM => __( 'On, sent through FluentCRM (signup form [aw_oracle_daily], double opt-in, one letter a day at 07:00 in each subscriber’s time zone).', 'aware-wave-oracle' ),
+		);
+		foreach ( $choices as $v => $label ) {
+			echo '<p><label><input type="radio" name="' . esc_attr( $name ) . '" value="' . esc_attr( $v ) . '"' . checked( $value, $v, false ) . '> ' . esc_html( $label ) . '</label></p>';
+		}
+		if ( $value === Normalize::MAILER_FLUENTCRM ) {
+			$reason = \AwareWave\Oracle\Daily\Runner::offReason();
+			if ( $reason === 'fluentcrm' ) {
+				echo '<p><strong>' . esc_html__( 'FluentCRM is not active: the signup form is hidden and nothing is sent.', 'aware-wave-oracle' ) . '</strong></p>';
+			} elseif ( $reason === 'data_key' ) {
+				echo '<p><strong>' . esc_html__( 'AWORACLE_DATA_KEY is missing (see Member data below): the signup form shows that subscribing is not available.', 'aware-wave-oracle' ) . '</strong></p>';
+			}
+			$last = get_option( \AwareWave\Oracle\Daily\Runner::LAST_RUN_OPTION );
+			if ( is_array( $last ) && isset( $last['at'], $last['stats'] ) ) {
+				$st = (array) $last['stats'];
+				echo '<p class="description">' . esc_html(
+					sprintf(
+						/* translators: 1: date and time (UTC), 2: letters handed to FluentCRM, 3: put back for a later hour, 4: failed */
+						__( 'Last hourly run %1$s UTC: %2$d handed to FluentCRM, %3$d put back for a later hour (engine or data problem), %4$d failed.', 'aware-wave-oracle' ),
+						gmdate( 'Y-m-d H:i', (int) $last['at'] ),
+						(int) ( $st['sent'] ?? 0 ),
+						(int) ( $st['released'] ?? 0 ),
+						(int) ( $st['failed'] ?? 0 )
+					)
+				) . '</p>';
+			}
+			echo '<p class="description">' . esc_html__( 'Resend webhook URL (events email.bounced, email.complained):', 'aware-wave-oracle' ) . ' <code>' . esc_html( rest_url( 'aworacle/v1/daily/resend-webhook' ) ) . '</code> — '
+				. ( Options::webhookSecret() !== ''
+					? esc_html__( 'signing secret set.', 'aware-wave-oracle' )
+					: esc_html__( 'set its signing secret in wp-config.php: define( \'AWORACLE_RESEND_WEBHOOK_SECRET\', \'whsec_…\' );', 'aware-wave-oracle' ) )
+				. '</p>';
+		}
 		echo '</fieldset></td></tr>';
 	}
 

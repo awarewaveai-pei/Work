@@ -71,7 +71,7 @@ export const STEPS = [
   { n: 15, code: 'P2', group: 'B3', title: '會員命盤與「我存的對象」', plain: '會員能存自己的命盤，也能存別人的出生資料做私人合盤；只有自己看得到，資料加密保存，可匯出、可刪除。',
     gate: '別的會員讀不到；資料庫備份裡查不到明文生日；刪除帳號後資料清空。', risk: 'High（個資）', model: 'Opus 5.5', status: 'done', commit: '39b51d9cc', depends: ['P1'], card: 'briefs/WP-P2-member-charts.md' },
   { n: 16, code: 'P3', group: 'B3', title: '每日運勢信', plain: '訂閱並確認後，每天在訂閱者當地早上 7 點寄運勢信；同一天不重寄；退訂、退信、投訴的人不再寄。',
-    gate: '四個時區都在當地 7 點後寄一次；算不出內容就不寄；退信的人被停寄。', risk: 'High（寄信、個資）', model: 'Opus 5.5', status: 'in_progress', depends: ['P1', 'E4'], card: 'briefs/WP-P3-daily-mail.md' },
+    gate: '四個時區都在當地 7 點後寄一次；算不出內容就不寄；退信的人被停寄。', risk: 'High（寄信、個資）', model: 'Opus 5.5', status: 'done', commit: '94e7b066a', depends: ['P1', 'E4'], card: 'briefs/WP-P3-daily-mail.md' },
   { n: 17, code: 'SF-H', group: 'B3', title: '建站的主機步驟', plain: '網址檢查、建立網站主機、安裝 WordPress 與外掛、掛上網址、正式開放，五個步驟接上骨架。',
     gate: '在測試站實際跑過；管理員密碼不出現在任何紀錄裡。', risk: 'High', model: 'Opus 5.5', status: 'done', commit: '6b473629c', depends: ['SF-E', 'SF-G', 'SF-E2'], card: 'briefs/WP-SF-H-host-steps.md' },
   { n: 18, code: 'SF-I0', group: 'B3', title: 'MainWP 連線金鑰', plain: '讓後台能把新網站加進 MainWP（一次性的主機設定）。',
