@@ -88,7 +88,7 @@ final class FakeHttp implements HttpClient {
 	public $status;
 	/** @var string */
 	public $body;
-	/** @var list<array{url:string,headers:array,body:string}> */
+	/** @var list<array{url:string,headers:array,body:string,timeout:int}> */
 	public $requests = array();
 
 	public function __construct( ?int $status, string $body = '' ) {
@@ -96,8 +96,8 @@ final class FakeHttp implements HttpClient {
 		$this->body   = $body;
 	}
 
-	public function post( string $url, array $headers, string $body ): array {
-		$this->requests[] = array( 'url' => $url, 'headers' => $headers, 'body' => $body );
+	public function post( string $url, array $headers, string $body, int $timeout = 15 ): array {
+		$this->requests[] = array( 'url' => $url, 'headers' => $headers, 'body' => $body, 'timeout' => $timeout );
 		return array( 'status' => $this->status, 'body' => $this->body, 'error' => $this->status === null ? 'timeout' : '' );
 	}
 }

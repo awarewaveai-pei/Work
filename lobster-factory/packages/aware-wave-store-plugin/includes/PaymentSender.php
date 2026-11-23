@@ -28,8 +28,11 @@ final class PaymentSender {
 	private $shop;
 	/** @var callable():int */
 	private $clock;
+	/** @var SummaryCache|null */
+	private $cache;
 
-	public function __construct( HttpClient $http, Queue $queue, Shop $shop, ?callable $clock = null ) {
+	public function __construct( HttpClient $http, Queue $queue, Shop $shop, ?callable $clock = null, ?SummaryCache $cache = null ) {
+		$this->cache = $cache;
 		$this->http  = $http;
 		$this->queue = $queue;
 		$this->shop  = $shop;
@@ -82,6 +85,11 @@ final class PaymentSender {
 		$status  = $res['status'];
 		$outcome = self::classify( $status );
 		if ( $outcome === 'done' ) {
+			// the member's My Account summary (60 s cache) is now stale: the app just took a payment event for them
+			$event = json_decode( $body, true );
+			if ( $this->cache !== null && is_array( $event ) && isset( $event['wp_user_id'] ) && (int) $event['wp_user_id'] > 0 ) {
+				$this->cache->forget( (int) $event['wp_user_id'] );
+			}
 			$this->shop->addNote( $noteId, 'AwareWave：已送付款事件 ' . $eventId . '（HTTP ' . $status . '）。' );
 			return 'done';
 		}

@@ -9,13 +9,13 @@ namespace AwareWave\Store;
 
 final class WpHttpClient implements HttpClient {
 
-	public function post( string $url, array $headers, string $body ): array {
+	public function post( string $url, array $headers, string $body, int $timeout = 15 ): array {
 		$res = wp_remote_post(
 			$url,
 			array(
 				'headers'     => $headers,
 				'body'        => $body,
-				'timeout'     => 15,
+				'timeout'     => max( 1, $timeout ),
 				'redirection' => 0,
 				'data_format' => 'body',
 			)

@@ -48,7 +48,7 @@ final class StoreModule {
 		add_action(
 			PaymentSender::ACTION,
 			function ( $job ) use ( $http, $queue, $shop ) {
-				( new PaymentSender( $http, $queue, $shop ) )->deliver( (array) $job, Settings::fromOptions() );
+				( new PaymentSender( $http, $queue, $shop, null, new TransientSummaryCache() ) )->deliver( (array) $job, Settings::fromOptions() );
 			}
 		);
 
@@ -110,6 +110,6 @@ final class StoreModule {
 		( new GoogleSignup() )->register();
 		( new WelcomeGift( $settings->welcomeProductId, $shop ) )->register();
 		( new CheckoutGate( $shop, $settings ) )->register();
-		( new MyAccountDoors( $settings, $shop, $http ) )->register();
+		( new MyAccountDoors( $settings, $shop, $http, new Summary( $settings, $http, new TransientSummaryCache() ) ) )->register();
 	}
 }

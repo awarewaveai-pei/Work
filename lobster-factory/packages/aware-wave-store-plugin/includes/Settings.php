@@ -85,6 +85,22 @@ final class Settings {
 		return $this->isReseller() ? Signature::signWithKeypair( $body, $this->handoffKeypair ) : Signature::sign( $body, $this->handoffSecret );
 	}
 
+	/**
+	 * One signed hand-off-family POST (wp-handoff and wp-summary share it: same header, same key, same bytes signed).
+	 *
+	 * @param array<string,mixed> $body
+	 * @return array{status:int|null,body:string,error:string}
+	 */
+	public function handoffPost( HttpClient $http, string $path, array $body, int $timeout = 15 ): array {
+		$raw = (string) json_encode( $body, JSON_UNESCAPED_SLASHES );
+		return $http->post(
+			$this->target . $path,
+			array( 'Content-Type' => 'application/json', Signature::HANDOFF_HEADER => $this->handoffSignature( $raw ) ),
+			$raw,
+			$timeout
+		);
+	}
+
 	/** Same shape as the control plane's seller_sites.key_id check (migration 0133). */
 	public static function keyIdUsable( string $keyId ): bool {
 		return (bool) preg_match( '/^[a-z0-9][a-z0-9-]{1,23}$/', $keyId );
