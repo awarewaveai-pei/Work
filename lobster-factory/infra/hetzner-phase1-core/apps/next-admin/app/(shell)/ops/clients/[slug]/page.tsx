@@ -23,21 +23,9 @@ import { staffGrantView } from "@/lib/entitlements/staff-grants";
 import { productOperations } from "@/lib/entitlements/operations";
 import { canWriteTenantConfig, readOpsRole } from "@/lib/ops-role";
 import type { BillingTabData } from "./BillingTab";
+import { clientHealth } from "./site-health";
 
 export const dynamic = "force-dynamic";
-
-async function probeHealth(url: string | undefined) {
-  if (!url) return null;
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 5000);
-    const resp = await fetch(url, { method: "HEAD", signal: ctrl.signal });
-    clearTimeout(timer);
-    return { ok: resp.ok || resp.status < 400, statusCode: resp.status };
-  } catch {
-    return { ok: false, statusCode: null };
-  }
-}
 
 export default async function ClientDetailPage({
   params,
@@ -72,7 +60,18 @@ export default async function ClientDetailPage({
 
   // ── Parallel fetches ────────────────────────────────────────────────────────
   const [health, runsResult, installRunsResult, integrationsResult, wpSitesResult, flowSitesResult] = await Promise.all([
-    probeHealth(cfg.site_url),
+    // Site-flow production environments: the header badge checks these for identity, not a bare 200 (site-health.ts).
+    Promise.resolve(
+      supabase
+        .from("environments")
+        .select("base_url")
+        .eq("organization_id", org.id)
+        .eq("environment_type", "production")
+        .neq("status", "archived")
+        .order("created_at"),
+    ).then(({ data, error }) =>
+      clientHealth(cfg.site_url, ((data ?? []) as Array<{ base_url: string | null }>).map((e) => e.base_url ?? "").filter(Boolean), fetch, !!error),
+    ),
     supabase
       .from("ops_action_runs")
       .select("id,action_id,status,started_at,ended_at,metadata")

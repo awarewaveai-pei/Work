@@ -41,7 +41,7 @@ async function fetchHealth(path: string): Promise<HealthResult> {
 export const dynamic = "force-dynamic";
 
 type Card = { href: string; icon: string; iconClass: string; title: string; desc: string; external?: boolean };
-// 建站三步序列與 SidebarNav 的 build-onboard 區一致（intake → 精靈 → 部署）；Repair & Control 與 repair-control 區一致。
+// 客戶建站只有一條流程（/ops/sites/new → 建站流程頁）；問卷是另一件事，不是它的第 1 步。Repair & Control 與 repair-control 區一致。
 const DASHBOARD_SECTIONS: Array<{ title: string; cards: Card[] }> = [
   { title: "Monitoring", cards: [
     { href: "/ops/inbox", icon: "📥", iconClass: "icon-ops", title: "Ops Inbox", desc: "Sentry · Uptime Kuma · Grafana 警報收件匣" },
@@ -54,9 +54,8 @@ const DASHBOARD_SECTIONS: Array<{ title: string; cards: Card[] }> = [
     { href: "/ops/system-modes", icon: "◐", iconClass: "icon-ops", title: "System Modes", desc: "全域 Kill Switch · 維護模式切換" },
   ] },
   { title: "Build & Onboard", cards: [
-    { href: "/ops/onboarding", icon: "✨", iconClass: "icon-prov", title: "Onboarding（客戶 Intake）", desc: "建站第 1 步：客戶探索式問卷" },
-    { href: "/onboard", icon: "✦", iconClass: "icon-prov", title: "建站精靈（技術）", desc: "建站第 2 步：資訊 → 部門選型 → 服務開通 → Build" },
-    { href: "/build", icon: "⚡", iconClass: "icon-prov", title: "Build Console", desc: "建站第 3 步：部署執行（plan_only 預覽或 enqueue 送 Trigger.dev）" },
+    { href: "/ops/sites/new", icon: "✦", iconClass: "icon-prov", title: "客戶建站", desc: "新增客戶網站，接著在建站流程頁一步一步建好" },
+    { href: "/ops/onboarding", icon: "✨", iconClass: "icon-prov", title: "Onboarding（客戶 Intake）", desc: "客戶探索式問卷" },
   ] },
   { title: "External Services", cards: [
     { href: "https://n8n.aware-wave.com", icon: "⚙", iconClass: "icon-ext", title: "n8n Workflows", desc: "自動化工作流程引擎", external: true },

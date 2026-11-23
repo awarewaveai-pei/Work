@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// 一鍵架站「租 Hetzner 主機 + day-1 硬化 + Cloudflare DNS」已寫好且真機驗證通過 (2026-06-06)。
-// 要把它接進一鍵架站流程（機層 = 站層之前）→ 直接呼叫 `provisionClient()`，**不要重寫**。
-// 精確 recipe：lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md
-// 核心函式：packages/workflows/src/provision/provisionClient.ts（真機驗收見 WORKLOG 2026-06-06 Phase 4）
+// 舊建站精靈（/onboard）的 build 入口。客戶建站現在走 /ops/sites/new → 建站流程頁（lib/site-flow/）。
+// 租新主機（`provisionClient()`、EMBED_PROVISION_INTO_APP.md）沒有接進任何流程，列在
+// agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/SITE-FLOW-COMPLETION-PLAN.md §1 第 1 列「之後」，
+// 要接時從那裡排卡，不要從這裡呼叫。
 // ─────────────────────────────────────────────────────────────────────────────
 import { NextResponse } from "next/server";
 import {

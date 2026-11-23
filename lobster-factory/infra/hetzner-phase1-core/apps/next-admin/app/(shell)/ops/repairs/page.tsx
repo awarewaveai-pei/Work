@@ -137,8 +137,8 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
               </div>
             ) : null}
             <p style={{ fontSize: 14, color: "var(--text-secondary)", maxWidth: 820, lineHeight: 1.7 }}>
-              Repair Center 是維修主控台：事件、AI 分析、備份、核准、GitHub handoff、手動部署與結案證據都應在這裡收斂。
-              Incident intake 是底層引擎，Approvals / System Modes / Build Console 是安全閘門。
+              Repair Center 是維修主控台：事件、AI 分析、備份、核准、GitHub handoff、部署與結案證據都應在這裡收斂。
+              Incident intake 是底層引擎，Approvals / System Modes 是安全閘門。
             </p>
           </div>
           <div style={{ display: "grid", gap: 8, minWidth: 280 }}>
@@ -149,7 +149,6 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
             />
             <QuickLink href="/ops/approvals" label="高風險指令：Approvals" />
             <QuickLink href="/ops/system-modes" label={`系統模式：${displaySystemMode(systemMode)}`} tone={blocked ? "danger" : "ok"} />
-            <QuickLink href="/build" label="部署維持手動：Build Console" />
           </div>
         </header>
 
@@ -229,12 +228,12 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
             <SafetyRow name="客戶串接補件" ok={integrationBlockers.length === 0} value={integrationBlockers.length ? `${integrationBlockers.length} 個待補` : "已清空"} link="/ops/integrations" />
             <SafetyRow name="備份閘門" ok={backupGate.ok} value={backupGate.value} />
             <SafetyRow name="GitHub Issue 閘門" ok={githubGate} value={githubGate ? "已設定" : "缺少 AUTO_REPAIR_GITHUB_TOKEN"} />
-            <SafetyRow name="部署閘門" ok value="僅能透過 sg-deploy.sh / Build Console 手動部署" link="/build" />
+            <SafetyRow name="部署方式" value="每天 03:00 自動部署 main；手動提前＝sg-deploy.sh" />
             <SafetyRow name="Incident intake 健康檢查" ok value="底層事件引擎 /api/ops/inbox/health" link="/api/ops/inbox/health" />
           </Panel>
         </div>
 
-        <Panel title="修復紀錄" subtitle="狀態流程：已核准 -> 備份 -> GitHub -> PR -> 手動部署" style={{ marginBottom: 16 }}>
+        <Panel title="修復紀錄" subtitle="狀態流程：已核准 -> 備份 -> GitHub -> PR -> 部署（合併後每天 03:00 自動）" style={{ marginBottom: 16 }}>
           {recentRuns.length === 0 ? (
             <Empty text="目前尚無修復流程紀錄。" />
           ) : (
@@ -329,11 +328,12 @@ function Alert({ title, body, tone }: { title: string; body: string; tone: "dang
   );
 }
 
-function SafetyRow({ name, ok, value, link }: { name: string; ok: boolean; value: string; link?: string }) {
+/** ok omitted = a fact with no live check behind it: shown as plain text, never as 正常 (I1). */
+function SafetyRow({ name, ok, value, link }: { name: string; ok?: boolean; value: string; link?: string }) {
   const content = (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid var(--border)" }}>
       <span style={{ fontSize: 13, fontWeight: 650, color: "var(--text-primary)" }}>{name}</span>
-      <span style={{ fontSize: 12, color: ok ? "var(--badge-green-text)" : "var(--build-risk-medium-text)", textAlign: "right" }}>{ok ? "正常" : "已阻擋"} · {value}</span>
+      <span style={{ fontSize: 12, color: ok === undefined ? "var(--text-secondary)" : ok ? "var(--badge-green-text)" : "var(--build-risk-medium-text)", textAlign: "right" }}>{ok === undefined ? value : `${ok ? "正常" : "已阻擋"} · ${value}`}</span>
     </div>
   );
   return link ? <Link href={link} style={{ textDecoration: "none" }}>{content}</Link> : content;

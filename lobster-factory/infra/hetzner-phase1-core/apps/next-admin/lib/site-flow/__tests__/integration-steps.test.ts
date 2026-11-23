@@ -349,6 +349,10 @@ describe("mainwp (item 1)", () => {
     const o = await observe(engine(db, gate.transport), tables, "mainwp");
     expect(o.observation?.status).toBe("blocked");
     expect((o.observation as { detail?: string }).detail).toContain("Reconnect");
+    // SF-K: the failed run just above must not hide the hand step: the shown state and reason are the observed cause.
+    expect(runsOf(tables, "mainwp").some((x) => x.status === "failed")).toBe(true);
+    expect(o.state).toBe("blocked");
+    expect(o.reason).toContain("Reconnect");
     world.mainwpSites[0].sync_errors = ""; // the operator reconnected in MainWP
     expect((await observe(engine(db, gate.transport), tables, "mainwp")).state).toBe("done");
   });

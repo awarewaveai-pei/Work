@@ -731,8 +731,13 @@ export function deriveStepState(args: {
   if (lastRun?.status === "running") return { state: "running", reason: null };
   if (obs.status === "done") return { state: "done", reason: null };
   if (obs.status === "partial") return { state: "failed", reason: `部分完成：${obs.detail}` };
+  // A cause observed now (e.g. MainWP lists the site but it is disconnected: "press Reconnect") outranks the last
+  // run's failure text, which is history and usually just the code of that refusal.
+  if (obs.status === "blocked") {
+    const last = lastRun?.status === "failed" ? `（上次執行失敗：${lastRun.error_summary ?? "未記錄原因"}）` : "";
+    return { state: "blocked", reason: `${obs.detail}${last}` };
+  }
   if (lastRun?.status === "failed") return { state: "failed", reason: lastRun.error_summary ?? "上次執行失敗" };
-  if (obs.status === "blocked") return { state: "blocked", reason: obs.detail };
   if (obs.status === "unknown") return { state: "blocked", reason: `無法確認現況：${obs.detail}` };
   if (args.missing.length > 0) return { state: "blocked", reason: `需先完成：${args.missing.map((k) => args.titles?.[k] ?? k).join("、")}` };
   if (!args.enabled) return { state: "not_started", reason: "此步驟尚未開放" };

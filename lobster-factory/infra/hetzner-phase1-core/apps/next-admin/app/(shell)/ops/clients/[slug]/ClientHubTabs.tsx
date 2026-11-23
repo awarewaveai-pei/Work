@@ -8,6 +8,7 @@ import { WpUpdateButtons } from "./WpUpdateButtons";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
 import { SiteWatchCard } from "./SiteWatchCard";
 import { SiteFlowSummary, type FlowSite } from "./SiteFlowSummary";
+import type { ClientHealth } from "./site-health";
 import { AccountsCard } from "./AccountsCard";
 import { CustomerServiceTab } from "./CustomerServiceTab";
 import { OutreachTab } from "./OutreachTab";
@@ -110,7 +111,7 @@ export interface InstallRunRow {
 export interface ClientHubTabsProps {
   org: { id: string; slug: string; name: string; type: string; status: string };
   cfg: ClientConfig;
-  health: { ok: boolean; statusCode: number | null } | null;
+  health: ClientHealth | null;
   wp: WpUpdateLatest | null;
   runs: RunRow[];
   installRuns: InstallRunRow[];
@@ -2497,8 +2498,8 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
               border: `1px solid ${health.ok ? "var(--green)" : "var(--red)"}`,
             }}>
               <span style={{ fontSize: 9 }}>●</span>
-              {health.ok ? "上線中" : "離線"}
-              {health.statusCode && <span style={{ opacity: 0.7 }}>HTTP {health.statusCode}</span>}
+              {health.statusCode === null ? "離線" : health.ok ? (health.kind === "wp" ? "上線中" : "可連通") : health.kind === "wp" ? "未確認" : "異常"}
+              <span style={{ opacity: 0.7 }}>{health.detail}{health.statusCode ? ` · HTTP ${health.statusCode}` : ""}</span>
             </div>
           )}
         </div>
