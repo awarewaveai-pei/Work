@@ -1405,7 +1405,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
 
   return (
     <div className="page">
-      <h1 style={{ fontSize: 22, margin: "0 0 4px" }}>🖼 Banner Studio</h1>
+      <h2 style={{ fontSize: 22, margin: "0 0 4px" }}>🖼 橫幅</h2>
       <p className="form-hint" style={{ marginBottom: 20 }}>
         WP 網站 + 社交平台 · AI 文案 + 產品圖去背 + AI 背景 · 匯出高解析 PNG
       </p>

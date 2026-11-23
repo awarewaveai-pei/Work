@@ -1,12 +1,12 @@
 import TarotStudioStaff from "./TarotStudioStaff";
 
-export const metadata = { title: "Tarot Print Generator · Lobster Factory" };
+export const metadata = { title: "塔羅工作台 · Lobster Factory" };
 
 export default function TarotToolPage() {
   return (
     <>
       <div className="topbar">
-        <span className="topbar-title">Tarot Print Generator</span>
+        <h1 className="topbar-title" style={{ margin: 0, fontFamily: "inherit" }}>塔羅工作台</h1>
       </div>
       <TarotStudioStaff />
     </>

@@ -5,5 +5,5 @@ export const metadata = { title: "節日行事曆" };
 // content.<base domain>/events: the read view; the cache refresh (/api/tools/events/sync) is staff-only and only the
 // staff page passes `sync`.
 export default function ContentDoorEventsPage() {
-  return <EventsCalendar />;
+  return <EventsCalendar heading={<h1 style={{ margin: 0, fontSize: 22 }}>節日行事曆</h1>} />;
 }

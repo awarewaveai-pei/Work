@@ -2,7 +2,8 @@
 // Staff-only (/tools/content): ContentStudio plus its AI-video calls to the video product. A content door page renders
 // ContentStudio without this file, so its import closure names no /api/video route (step-8 card §2 S1). The subscription
 // chain buttons are staff-only the same way (they call /api/tools/sub-worker and /api/tools/codex-laptop).
-import ContentStudio, { type ContentVideoApi } from "./ContentStudio";
+import type { ReactNode } from "react";
+import ContentStudio, { type ContentVideoApi, type ContentView } from "./ContentStudio";
 import TextChainButtons from "@/components/tools/TextChainButtons";
 import type { ChainControl } from "@/lib/ai/text-model-options";
 
@@ -20,6 +21,6 @@ const video: ContentVideoApi = {
 const chainControl: ChainControl = (value, onChange, disabled) =>
   <TextChainButtons chain={value.chain} claudeModel={value.claudeModel} codexModel={value.codexModel} onChange={onChange} lane="owner" disabled={disabled} />;
 
-export default function ContentStudioStaff() {
-  return <ContentStudio video={video} chainControl={chainControl} />;
+export default function ContentStudioStaff({ view, heading }: { view?: ContentView; heading?: ReactNode }) {
+  return <ContentStudio video={video} chainControl={chainControl} view={view} heading={heading} />;
 }

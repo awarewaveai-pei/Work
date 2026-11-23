@@ -1,12 +1,12 @@
 import BannerStudioStaff from "./BannerStudioStaff";
 
-export const metadata = { title: "Banner Studio · Lobster Factory" };
+export const metadata = { title: "橫幅 · Lobster Factory" };
 
 export default function BannerPage() {
   return (
     <>
       <div className="topbar">
-        <span className="topbar-title">Banner Studio</span>
+        <h1 className="topbar-title" style={{ margin: 0, fontFamily: "inherit" }}>橫幅</h1>
       </div>
       <BannerStudioStaff />
     </>

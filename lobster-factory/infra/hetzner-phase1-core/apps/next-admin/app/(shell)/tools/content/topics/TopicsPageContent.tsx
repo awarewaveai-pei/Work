@@ -9,9 +9,10 @@ import { StaffTopicsBoard } from "./StaffTopicsBoard";
 import type { TopicsView } from "./TopicsBoard";
 
 // R8: 題目 and its sub-page 五步驟 in the side menu, each one view of the same board; the client rail picks the site (K8).
-const HEAD: Record<TopicsView, [string, string]> = {
-  topics: ["自動內容・題目", "一個網站一個月的題目。題目核准後才會開始製作。"],
-  steps: ["自動內容・五步驟", "一個網站的五個步驟：搜集熱搜 → 提案題目 → 挑題 → 製作 → 發布。"],
+// The <h1> is written in each page file (its name = the menu name, page-names.test.ts); this is the line under it.
+const LEAD: Record<TopicsView, string> = {
+  topics: "一個網站一個月的題目。題目核准後才會開始製作。",
+  steps: "一個網站的五個步驟：搜集熱搜 → 提案題目 → 挑題 → 製作 → 發布。",
 };
 
 /** The page's ?org= (Next 15 searchParams): the current client, as the client rail keeps it in the address (ADR 020). */
@@ -22,11 +23,11 @@ export async function orgParam(searchParams: TopicsSearch): Promise<string | nul
 }
 
 /** The staff page of one view: its heading and the board. */
-export function StaffTopicsPage({ view, org }: { view: TopicsView; org: string | null }) {
+export function StaffTopicsPage({ view, org, heading }: { view: TopicsView; org: string | null; heading: React.ReactNode }) {
   return (
     <div className="page" style={{ maxWidth: 1280 }}>
-      <h1 style={{ fontSize: "var(--font-size-xl)", margin: "0 0 6px", color: "var(--text-primary)" }}>{HEAD[view][0]}</h1>
-      <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-base)", margin: "0 0 24px" }}>{HEAD[view][1]}</p>
+      {heading}
+      <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-base)", margin: "0 0 24px" }}>{LEAD[view]}</p>
       <TopicsPageContent view={view} org={org} />
     </div>
   );

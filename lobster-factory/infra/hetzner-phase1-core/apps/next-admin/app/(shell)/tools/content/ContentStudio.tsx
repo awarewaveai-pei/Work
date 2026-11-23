@@ -15,6 +15,9 @@ import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
 import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS, DEFAULT_ARTICLE_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
+import { useRouter, useSearchParams } from "next/navigation";
+import { withContext } from "@/lib/client-context/contract";
+import { chipStyle } from "@/components/tools/panel-primitives";
 import { ARTICLE_VIDEO_DEFAULTS, parseVoiceModel } from "@/lib/content/video/defaults";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 import { DEFAULT_SUB_CLAUDE_MODEL, DEFAULT_SUB_CODEX_MODEL, DEFAULT_TEXT_CHAIN, type ChainChoice, type ChainControl } from "@/lib/ai/text-model-options";
@@ -213,7 +216,8 @@ const LAYOUT_OPTIONS = [
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Tab       = "generate" | "humanize" | "drafts";
+/** Which page of the content tool this is: 寫文章 / 改寫 / 草稿 are three menu pages (blueprint §15A), not tabs. */
+export type ContentView = "generate" | "humanize" | "drafts";
 type GenStatus = "idle" | "streaming" | "done" | "error";
 type PubStatus = "idle" | "publishing" | "done" | "error";
 type SynStatus = "idle" | "generating" | "done" | "error";
@@ -452,6 +456,30 @@ function ChipBtn({ label, active, onClick, disabled }: { label: string; active: 
   );
 }
 
+// One setting as visible buttons, one pressed (blueprint §15A: the article settings are not dropdowns).
+function ChoiceRow<T extends string>({ label, value, options, onPick, disabled }: {
+  label: string; value: T; options: readonly { value: T; label: string }[]; onPick: (v: T) => void; disabled?: boolean;
+}) {
+  return (
+    <div style={{ marginBottom: "12px" }}>
+      <div className="form-label">{label}</div>
+      <div role="group" aria-label={label} style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+        {options.map(o => (
+          <button key={o.value} type="button" aria-pressed={o.value === value} disabled={disabled} onClick={() => onPick(o.value)}
+            style={{ ...chipStyle(o.value === value), fontSize: "13px", padding: "4px 12px" }}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const asOptions = (xs: readonly string[]) => xs.map(x => ({ value: x, label: x }));
+const AI_WORD_CLEANUP: readonly { value: RemoveAI; label: string }[] = [
+  { value: "none", label: "關閉" }, { value: "basic", label: "基本（去除常見 AI 用詞）" }, { value: "extended", label: "加強（深度清理）" },
+];
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 // The article's AI video comes from the video product, which a content door does not serve (it is only optional):
@@ -466,7 +494,14 @@ export interface ContentVideoApi {
 // Region names for the source lists (the region <select> names the same seven).
 const GEO_NAME_ZH: Record<string, string> = { TW: "台灣", HK: "香港", SG: "新加坡", US: "美國", GB: "英國", JP: "日本", AU: "澳洲" };
 
-export default function ContentStudio({ video, chainControl }: { video?: ContentVideoApi; /** 訂閱走法按鈕：只有員工版（ContentStudioStaff）傳；不傳 = 只用 API */ chainControl?: ChainControl }) {
+export default function ContentStudio({ video, chainControl, view = "generate", heading }: {
+  video?: ContentVideoApi;
+  /** 訂閱走法按鈕：只有員工版（ContentStudioStaff）傳；不傳 = 只用 API */
+  chainControl?: ChainControl;
+  view?: ContentView;
+  /** The page's <h1>, written in the page file so page-names.test.ts reads it next to the menu name. */
+  heading?: React.ReactNode;
+}) {
   const { canUse, why } = usePaidFeatures();
   // The site comes only from the client rail (ADR 020: URL org/site; registering "site" makes the frame draw the rail).
   const clientContext = useClientContext("site");
@@ -477,7 +512,11 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
   const sitesHref = useDoorHref("/tools/content/sites");
   const clientsHref = useDoorHref("/ops/clients");
   const socialHref = useDoorHref("/tools/social");
-  const [activeTab, setActiveTab] = useState<Tab>("generate");
+  // 草稿 → 寫文章: the drafts page opens a draft by going to the 寫文章 page with ?draft=<id> (same org / site).
+  const writeHref = useDoorHref("/tools/content");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const draftParam = view === "generate" ? searchParams?.get("draft") ?? null : null;
 
   // The current client's sites (ManagedSite rows of GET /api/content/sites, read once by the provider). Saved content
   // defaults are kept here per site id: the provider caches a client's rows for the page's life, so without this,
@@ -687,6 +726,7 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
   const [showStruct,   setShowStruct]   = useState(true);
   const [showMedia,    setShowMedia]    = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showMore,     setShowMore]     = useState(false); // 進階設定: everything after the first screen
   const [showAudProfile, setShowAudProfile] = useState(false); // audience chip UI (above #4)
   const [showMarketing, setShowMarketing] = useState(false); // #4 structured brand-tone form
   const [showPatterns, setShowPatterns] = useState(false);   // #6 Kadence funnel patterns
@@ -910,7 +950,6 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
   }
 
   function pickTrendKeyword(kw: string) {
-    setActiveTab("generate");
     setF("keyword", kw);
     setShowTrending(false);
   }
@@ -1409,8 +1448,10 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
     finally { setDraftsLoading(false); }
   }, [selectedSiteId]);
 
-  // Re-open a saved draft into the generate editor (full fetch: markdown + meta + form snapshot).
+  // Re-open a saved draft into the 寫文章 editor (full fetch: markdown + meta + form snapshot). Only a draft of the client /
+  // site the rail has picked: saving would otherwise move the row to this site and publishing would push it here.
   async function openDraft(id: string) {
+    const fail = (msg: string) => { setGenStatus("error"); setGenError(msg); };
     try {
       const res  = await fetch(`/api/content/drafts?id=${encodeURIComponent(id)}`);
       const json = await res.json() as {
@@ -1418,10 +1459,15 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
         draft?: {
           id: string; markdown: string; meta: MetaData | null; slugHint: string | null;
           formSnapshot: GenerateForm | null; keyword: string;
+          organizationId: string | null; siteId: string | null;
         };
       };
-      if (!json.ok || !json.draft) { setDraftsError("草稿開啟失敗"); return; }
+      if (!json.ok || !json.draft) { fail("草稿開啟失敗：找不到這篇草稿，或你沒有權限。"); return; }
       const d = json.draft;
+      if ((d.organizationId && d.organizationId !== clientContext.org) || (d.siteId && d.siteId !== selectedSiteId)) {
+        fail("這篇草稿屬於另一個客戶或網站，請先在左側客戶欄切到它所屬的網站再開啟。");
+        return;
+      }
       // Restore the form snapshot (fall back to a minimal form if an old row lacks one).
       if (d.formSnapshot) {
         const restored = { ...DEFAULT_FORM, ...d.formSnapshot };
@@ -1445,8 +1491,7 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
       if (videoPollRef.current) { clearInterval(videoPollRef.current); videoPollRef.current = null; }
       setSeoReport(null); setSeoChecking(false); setAutoImgN(0);
       setGenStatus("done"); setGenError(""); setGenTruncated(false);
-      setActiveTab("generate");
-    } catch { setDraftsError("網路錯誤，請重試"); }
+    } catch { fail("網路錯誤，草稿未開啟，請重試"); }
   }
 
   async function deleteDraft(id: string) {
@@ -1460,8 +1505,30 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
     } catch { /* silent — list refresh will reconcile */ }
   }
 
-  // Load the drafts list whenever the drafts tab is opened.
-  useEffect(() => { if (activeTab === "drafts") void loadDrafts(); }, [activeTab, loadDrafts]);
+  // The drafts page loads its list (again when the client rail's site changes).
+  useEffect(() => { if (view === "drafts") void loadDrafts(); }, [view, loadDrafts]);
+
+  /** 草稿頁「開啟」: the editor lives on the 寫文章 page. */
+  function openDraftInEditor(id: string) {
+    if (!writeHref) return;
+    const href = withContext(writeHref, { org: clientContext.org ?? undefined, site: clientContext.site ?? undefined });
+    router.push(`${href}${href.includes("?") ? "&" : "?"}draft=${encodeURIComponent(id)}`);
+  }
+
+  // 寫文章 page reached with ?draft=<id>: once the rail's sites are loaded (so the site-defaults fill above has already run
+  // and cannot overwrite the restored snapshot), load that draft once, then drop ?draft from the address so a reload or a
+  // later client switch never reopens it under another client.
+  const openedDraftRef = useRef<string | null>(null);
+  const sitesLoaded = clientContext.sites !== null || clientContext.sitesFailed || !clientContext.org;
+  useEffect(() => {
+    if (!draftParam || openedDraftRef.current === draftParam || !sitesLoaded) return;
+    openedDraftRef.current = draftParam;
+    void openDraft(draftParam);
+    const q = new URLSearchParams(searchParams?.toString() ?? "");
+    q.delete("draft");
+    router.replace(`${window.location.pathname}${q.size ? `?${q}` : ""}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftParam, sitesLoaded]);
 
   // Once the background SEO check resolves AND we have a saved row, persist the score (best-effort).
   useEffect(() => {
@@ -1842,13 +1909,6 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
 
   // ─── Styles ───────────────────────────────────────────────────────────────
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: "8px 18px", border: "none", cursor: "pointer", background: "none", fontSize: "13px",
-    fontWeight: active ? 600 : 400,
-    color: active ? "var(--btn-primary-bg)" : "var(--text-muted)",
-    borderBottom: active ? "2px solid var(--btn-primary-bg)" : "2px solid transparent",
-    marginBottom: "-1px",
-  });
   const checkRow: React.CSSProperties   = { display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "6px" };
   const checkLabel: React.CSSProperties = { display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer", userSelect: "none" };
 
@@ -1917,9 +1977,9 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
   return (
     <div style={{ padding: "24px", maxWidth: "1400px" }}>
 
-      {/* ── Header: title + calendar link (the site is picked in the client rail) ── */}
+      {/* ── Header: the page's name (passed in by the page, so it matches the menu) + links ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-        <h1 style={{ fontSize: "20px", fontWeight: 700, margin: 0 }}>內容工作室</h1>
+        {heading}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           {scheduleHref && <a href={scheduleHref}
             style={{ fontSize: "12px", padding: "5px 12px", border: "1px solid var(--card-border)",
@@ -1936,14 +1996,63 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
         </div>
       </div>
 
-      {/* ── Trending Keywords Panel ── */}
-      <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
+      {/* ══════════════ 寫文章 ══════════════ */}
+      {view === "generate" && (
+        <>
+          {/* ── 第一屏：主要關鍵字、文章標題、生成；其餘收進「進階設定」（blueprint §15A） ── */}
+          <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
+            {/* 關鍵字 + 標題 */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
+              <div>
+                <label className="form-label">主要關鍵字 *</label>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <input className="form-input" value={form.keyword} onChange={e => setF("keyword", e.target.value)}
+                    placeholder="例：藝術療癒" disabled={isGenerating} style={{ flex: "1 1 100%", minWidth: 0 }} />
+                  <div style={{ position: "relative" }}>
+                    <button title={why("content.title")} className="btn-secondary" onClick={handleSuggestTitles}
+                      disabled={(isGenerating || !form.keyword.trim() || titleLoading) || !canUse("content.title")}
+                      style={{ whiteSpace: "nowrap", fontSize: "12px" }}>
+                      {titleLoading ? "…" : "✨ 建議標題"}
+                    </button>
+                    {showTitleDrop && titleSugs.length > 0 && (
+                      <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 50,
+                        background: "var(--bg-card, #fff)", border: "1px solid var(--card-border)",
+                        borderRadius: "6px", boxShadow: "0 4px 12px rgba(0,0,0,.12)", minWidth: "340px", padding: "6px" }}>
+                        {titleSugs.map((t, i) => (
+                          <button key={i} onClick={() => { setF("title", t); setShowTitleDrop(false); }}
+                            style={{ display: "block", width: "100%", textAlign: "left", padding: "7px 10px",
+                              background: "none", border: "none", cursor: "pointer", fontSize: "12px",
+                              lineHeight: 1.4, color: "var(--text-primary)", borderRadius: "4px" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-hover, #f5f5f5)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "none")}>
+                            {t}
+                          </button>
+                        ))}
+                        <button onClick={() => setShowTitleDrop(false)}
+                          style={{ fontSize: "11px", color: "var(--text-muted)", padding: "4px 10px", background: "none", border: "none", cursor: "pointer" }}>
+                          關閉
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <button type="button" className="btn-secondary" aria-expanded={showTrending} onClick={() => setShowTrending(v => !v)}
+                    style={{ whiteSpace: "nowrap", fontSize: "12px" }}>
+                    🔥 熱門搜尋
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="form-label">文章標題 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（空白則自動生成）</span></label>
+                <input className="form-input" value={form.title} onChange={e => setF("title", e.target.value)}
+                  placeholder="例：什麼是藝術療癒？" disabled={isGenerating} />
+              </div>
+            </div>
+
+            {/* ── 熱門搜尋（關鍵字旁的按鈕打開） ── */}
+            {showTrending && (
+              <div style={{ marginBottom: "14px", paddingTop: "12px", borderTop: "1px solid var(--card-border)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <button onClick={() => setShowTrending(v => !v)}
-              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", padding: 0, display: "flex", alignItems: "center", gap: "6px" }}>
-              <span>🔥</span> {showTrending ? "▲" : "▼"} 熱門搜尋 / 關鍵字探索
-            </button>
             {showTrending && (
               <div style={{ display: "flex", gap: "4px" }}>
                 {(["trending", "suggest", "questions", "sources"] as const).filter(t => !onDoor || t !== "sources").map(t => (
@@ -2122,20 +2231,31 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
             )}
           </div>
         )}
-      </div>
+              </div>
+            )}
 
-      {/* ── Tab bar ── */}
-      <div style={{ display: "flex", borderBottom: "1px solid var(--card-border)", marginBottom: "24px" }}>
-        {(["generate", "humanize", "drafts"] as Tab[]).map(t => (
-          <button key={t} style={tabStyle(activeTab === t)} onClick={() => setActiveTab(t)}>
-            {t === "generate" ? "產文" : t === "humanize" ? "人性化 / 改寫" : "📁 我的草稿"}
-          </button>
-        ))}
-      </div>
+          {/* ── 產生按鈕 ── */}
+          <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "4px", flexWrap: "wrap" }}>
+            <button className="btn-primary" onClick={handleGenerate}
+              disabled={isGenerating || !form.keyword.trim()} style={{ fontSize: "14px", padding: "10px 24px" }}>
+              {isGenerating ? "產生中…" : "產生文章"}
+            </button>
+            {isGenerating && (
+              <button className="btn-secondary" onClick={() => { abortRef.current?.abort(); setGenStatus("idle"); }}>停止</button>
+            )}
+            {genStatus === "error" && <span style={{ color: "var(--color-error)", fontSize: "13px" }}>{genError}</span>}
+            {isGenerating && subWaitS !== null && <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>筆電寫作中… 已 {subWaitS} 秒</span>}
+            <div style={{ marginLeft: "auto" }}>
+              <CostChip cost={sessionCost} />
+            </div>
+          </div>
+          {chainSkips.length > 0 && (
+            <div style={{ marginTop: "-16px", marginBottom: "20px", color: "var(--text-muted)", fontSize: "12px" }}>
+              {chainSkips.map((s, i) => <div key={i}>{s.reason}，改用下一段</div>)}
+            </div>
+          )}
+          </div>
 
-      {/* ══════════════ 產文頁籤 ══════════════ */}
-      {activeTab === "generate" && (
-        <>
           {/* ── 目標網站：只顯示，挑選在左側客戶欄（ADR 020）── */}
           <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
@@ -2190,122 +2310,315 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
             </div>
           </div>
 
-          <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
-            <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "14px", color: "var(--text-primary)" }}>文章設定</div>
+          {/* ═══ 輸出區 ═══ */}
+          {(hasContent || isGenerating) && (
+            <div className="form-block form-block--wide">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
+                <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
+                  產出文章
+                  {isGenerating && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>串流中…</span>}
+                  {genStatus === "done" && <span style={{ fontWeight: 400, color: "var(--green)", marginLeft: 8 }}>✓ 完成</span>}
+                  {genStatus === "done" && draftSaveState === "saving" && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 儲存中…</span>}
+                  {genStatus === "done" && draftSaveState === "saved"  && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 已存草稿</span>}
+                  {genStatus === "done" && draftSaveState === "error"  && <span style={{ fontWeight: 400, color: "var(--yellow)", marginLeft: 8, fontSize: "12px" }}>⚠ 草稿未存（文章不受影響）</span>}
+                  {genStatus === "done" && genTruncated && (
+                    <span style={{ fontWeight: 500, color: "var(--yellow)", marginLeft: 8, fontSize: "12px" }}>
+                      ⚠ 可能被截斷（超過長度上限）— 建議選短篇或拆主題重新生成
+                    </span>
+                  )}
+                </div>
+                <CostChip cost={sessionCost} />
+              </div>
 
-            {/* 關鍵字 + 標題 */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
-              <div>
-                <label className="form-label">主要關鍵字 *</label>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <input className="form-input" value={form.keyword} onChange={e => setF("keyword", e.target.value)}
-                    placeholder="例：藝術療癒" disabled={isGenerating} style={{ flex: 1 }} />
-                  <div style={{ position: "relative" }}>
-                    <button title={why("content.title")} className="btn-secondary" onClick={handleSuggestTitles}
-                      disabled={(isGenerating || !form.keyword.trim() || titleLoading) || !canUse("content.title")}
-                      style={{ whiteSpace: "nowrap", fontSize: "12px" }}>
-                      {titleLoading ? "…" : "✨ 建議標題"}
-                    </button>
-                    {showTitleDrop && titleSugs.length > 0 && (
-                      <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 50,
-                        background: "var(--bg-card, #fff)", border: "1px solid var(--card-border)",
-                        borderRadius: "6px", boxShadow: "0 4px 12px rgba(0,0,0,.12)", minWidth: "340px", padding: "6px" }}>
-                        {titleSugs.map((t, i) => (
-                          <button key={i} onClick={() => { setF("title", t); setShowTitleDrop(false); }}
-                            style={{ display: "block", width: "100%", textAlign: "left", padding: "7px 10px",
-                              background: "none", border: "none", cursor: "pointer", fontSize: "12px",
-                              lineHeight: 1.4, color: "var(--text-primary)", borderRadius: "4px" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-hover, #f5f5f5)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "none")}>
-                            {t}
-                          </button>
-                        ))}
-                        <button onClick={() => setShowTitleDrop(false)}
-                          style={{ fontSize: "11px", color: "var(--text-muted)", padding: "4px 10px", background: "none", border: "none", cursor: "pointer" }}>
-                          關閉
-                        </button>
+              {/* ── Preview / Edit toggle ── */}
+              <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  style={{ fontSize: "12px", padding: "3px 10px", borderRadius: 4, border: "1px solid var(--card-border)",
+                    background: !showPreview ? "var(--btn-primary-bg)" : "transparent",
+                    color: !showPreview ? "var(--btn-primary-text)" : "var(--text-muted)", cursor: "pointer" }}>
+                  ✏️ 編輯 MD
+                </button>
+                <button
+                  onClick={() => setShowPreview(true)}
+                  style={{ fontSize: "12px", padding: "3px 10px", borderRadius: 4, border: "1px solid var(--card-border)",
+                    background: showPreview ? "var(--btn-primary-bg)" : "transparent",
+                    color: showPreview ? "var(--btn-primary-text)" : "var(--text-muted)", cursor: "pointer" }}>
+                  👁 預覽排版
+                </button>
+              </div>
+
+              {showPreview ? (
+                <div
+                  style={{ width: "100%", minHeight: "480px", padding: "20px 24px", border: "1px solid var(--card-border)",
+                    borderRadius: "6px", background: "var(--card-bg)", color: "var(--text-primary)", boxSizing: "border-box",
+                    fontFamily: "'Noto Sans TC',sans-serif", fontSize: "15px", lineHeight: 1.8, overflowY: "auto" }}
+                  dangerouslySetInnerHTML={{ __html: markdownPreview(generated) }}
+                />
+              ) : (
+                <textarea
+                  style={{ width: "100%", minHeight: "480px", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.6,
+                    padding: "12px", border: "1px solid var(--card-border)", borderRadius: "6px",
+                    background: "var(--bg-page)", color: "var(--text-primary)", resize: "vertical", boxSizing: "border-box" }}
+                  value={generated} onChange={e => setGenerated(e.target.value)} spellCheck={false}
+                  placeholder="文章將在此串流顯示…" />
+              )}
+
+              {metaData && (
+                <div style={{ marginTop: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div>
+                    <label className="form-label">SEO 標題 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（{metaData.seoTitle.length} 字元）</span></label>
+                    <input className="form-input" value={metaData.seoTitle}
+                      onChange={e => setMetaData(prev => prev ? { ...prev, seoTitle: e.target.value } : prev)} />
+                  </div>
+                  <div>
+                    <label className="form-label">
+                      Meta 描述{" "}
+                      <span style={{ fontWeight: 400, color: metaData.metaDesc.length > 160 ? "var(--red)" : "var(--text-muted)" }}>
+                        （{metaData.metaDesc.length} / 160 字元{metaData.metaDesc.length > 160 ? " ⚠ 超過上限" : ""}）
+                      </span>
+                    </label>
+                    <input className="form-input" value={metaData.metaDesc}
+                      onChange={e => setMetaData(prev => prev ? { ...prev, metaDesc: e.target.value } : prev)} />
+                    {metaData.metaDesc.length > 160 && (
+                      <div className="form-hint" style={{ color: "var(--red)", marginTop: 2 }}>
+                        RankMath 上限 160 字元；超出部分在搜尋結果會被截斷。請縮短後再發布。
                       </div>
                     )}
                   </div>
                 </div>
+              )}
+              <div className="form-hint" style={{ marginTop: "6px" }}>
+                可直接編輯後推送。<code>{"<!-- NEEDS_BRAND_VERIFY -->"}</code> = 填入真實品牌資料。
               </div>
-              <div>
-                <label className="form-label">文章標題 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（空白則自動生成）</span></label>
-                <input className="form-input" value={form.title} onChange={e => setF("title", e.target.value)}
-                  placeholder="例：什麼是藝術療癒？" disabled={isGenerating} />
-              </div>
-            </div>
 
-            {/* 語言 / 地區 / 類型 / 長度 / 模型 */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
-              <div>
-                <label className="form-label">語言</label>
-                <select className="form-select" value={form.language} onChange={e => setF("language", e.target.value)} disabled={isGenerating}>
-                  {LANGUAGES.map(l => <option key={l}>{l}</option>)}
-                </select>
+              {/* ── 輸出動作列（移到文章下方：先讀後操作，UX 較順）── */}
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginTop: "12px",
+                paddingTop: "12px", borderTop: "1px solid var(--card-border)" }}>
+                {hasContent && (
+                  <>
+                    <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => void navigator.clipboard.writeText(generated)}>複製 MD</button>
+                    <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => downloadMd(generated, `${slugify(form.keyword) || "article"}.md`)}>↓ .md</button>
+                  </>
+                )}
+                {hasContent && pubStatus === "idle" && (
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
+                    <button className="btn-secondary" style={{ fontSize: "12px" }}
+                      onClick={() => handlePublish("draft")}>📝 草稿</button>
+                    <button className="btn-primary" style={{ fontSize: "12px" }}
+                      onClick={() => handlePublish("publish")}>🚀 直接發佈</button>
+                    <button className="btn-secondary" style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: 4 }}
+                      onClick={() => setPubMode(prev => prev === "future" ? "draft" : "future")}>
+                      📅 排程{pubMode === "future" ? " ▴" : " ▾"}
+                    </button>
+                    {pubMode === "future" && (
+                      <>
+                        <input type="datetime-local" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)}
+                          style={{ fontSize: "12px", padding: "3px 6px", border: "1px solid var(--card-border)", borderRadius: 4, background: "var(--bg-page)", color: "var(--text-primary)" }} />
+                        <button className="btn-primary" style={{ fontSize: "12px" }}
+                          disabled={!scheduleDate}
+                          onClick={() => handlePublish("future")}>確認排程</button>
+                      </>
+                    )}
+                  </div>
+                )}
+                {pubStatus === "publishing" && <button className="btn-primary" disabled style={{ fontSize: "13px" }}>推送中…</button>}
+                {pubStatus === "done" && pubResult?.edit_url && (
+                  <span style={{ fontSize: "13px", color: "var(--green)" }}>
+                    ✓ {pubMode === "publish" ? "已發佈" : pubMode === "future" ? "已排程" : "草稿已建立"} —{" "}
+                    <a href={pubResult.edit_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>WP 後台編輯 ↗</a>
+                    {pubResult.view_url && pubMode === "publish" && (
+                      <> · <a href={pubResult.view_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>查看文章 ↗</a></>
+                    )}
+                  </span>
+                )}
+                {pubStatus === "error" && <span style={{ fontSize: "12px", color: "var(--color-error)" }}>推送失敗：{pubError}</span>}
               </div>
-              <div>
-                <label className="form-label">目標地區</label>
-                <select className="form-select" value={form.targetCountry} onChange={e => setF("targetCountry", e.target.value)} disabled={isGenerating}>
-                  {COUNTRIES.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">文章類型</label>
-                <select className="form-select" value={form.articleType} onChange={e => setF("articleType", e.target.value)} disabled={isGenerating}>
-                  {ARTICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">文章長度</label>
-                <select className="form-select" value={form.articleSize} onChange={e => setF("articleSize", e.target.value)} disabled={isGenerating}>
-                  {SIZES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">AI 模型</label>
-                <select className="form-select" value={form.model} onChange={e => setF("model", e.target.value)} disabled={isGenerating}>
-                  {AI_MODEL_GROUPS.map(g => (
-                    <optgroup key={g} label={g}>
-                      {AI_MODELS.filter(m => m.group === g).map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </optgroup>
+
+              {/* ── 影片（自動觸發 — 文章推送後自動生成並嵌入）── */}
+              {pubStatus === "done" && publishedPostId && (
+                <div style={{ marginTop: "10px", padding: "10px 14px", borderRadius: "6px",
+                  background: "var(--ai-bg)", border: "1px solid var(--ai-bg)", fontSize: "13px" }}>
+                  🎬 影片生成中（自動）：文章已推送，影片完成後自動嵌入文章
+                  {videoStatus === "generating" && <span style={{ marginLeft: 10, color: "var(--severity-low)" }}>⏳ 影片生成中（預計 5-15 分鐘）…</span>}
+                  {videoStatus === "embedding"  && <span style={{ marginLeft: 10, color: "var(--severity-low)" }}>⏳ 嵌入影片到 WP…</span>}
+                  {videoStatus === "done"       && <span style={{ marginLeft: 10, color: "var(--green)" }}>✓ 影片已嵌入文章</span>}
+                  {videoStatus === "error"      && (
+                    <>
+                      <span style={{ marginLeft: 10, color: "var(--color-error)" }}>影片失敗：{videoError}（文章不受影響）</span>
+                      <button className="btn-secondary" style={{ fontSize: "11px", marginLeft: "8px" }}
+                        onClick={() => { setVideoError(""); void handleGenerateVideo(publishedPostId); }}>重試</button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ── RankMath SEO 合規分數 ── */}
+              <SeoCheckPanel
+                report={seoReport}
+                loading={seoChecking}
+                articleMarkdown={generated}
+                focusKeyword={form.keyword}
+                seoTitle={metaData?.seoTitle ?? ""}
+                metaDescription={metaData?.metaDesc ?? ""}
+                slug={slugHint || slugify(form.keyword)}
+                onFixApply={handleFixApply}
+                onCost={(c) => addCostLine({ route: "content/seo-fix", model: c.model, vendor: c.vendor, usd: c.usd, kind: "text" })}
+              />
+
+              {/* ── 自動圖片生成進度 ── */}
+              {autoImgN > 0 && (
+                <div style={{
+                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
+                  background: "var(--ai-bg)", border: "1px solid var(--ai-bg)",
+                  fontSize: "12px", color: "var(--severity-low)",
+                }}>
+                  🎨 正在生成 {autoImgN} 張圖片…
+                </div>
+              )}
+
+              {/* ── 精選圖片（hero）生成狀態 ── */}
+              {(heroLoading || heroImageUrl) && (
+                <div style={{
+                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
+                  background: heroImageUrl ? "#f0fdf4" : "#f0f9ff",
+                  border: `1px solid ${heroImageUrl ? "#bbf7d0" : "#bae6fd"}`,
+                  fontSize: "12px", color: heroImageUrl ? "#16a34a" : "#0284c7",
+                }}>
+                  {heroLoading ? "🖼️ 正在生成精選圖片（featured image）…" : "🖼️ 精選圖片已就緒，發佈時自動設為文章首圖"}
+                </div>
+              )}
+
+              {/* ── 圖片生成警告（ok:false / 連線失敗 / 參考圖被拒）── */}
+              {imgGenWarn && (
+                <div style={{
+                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
+                  background: "#fffbeb", border: "1px solid #fde68a",
+                  fontSize: "12px", color: "#b45309",
+                  display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px",
+                }}>
+                  <span>⚠️ {imgGenWarn}</span>
+                  <button type="button" onClick={() => setImgGenWarn("")}
+                    style={{ background: "none", border: "none", color: "#b45309", cursor: "pointer", fontSize: "14px", lineHeight: 1, padding: 0 }}
+                    aria-label="關閉警告">×</button>
+                </div>
+              )}
+
+              {/* ── YouTube 影片嵌入（Phase 2：貼 URL 解析 placeholder）── */}
+              {ytPlaceholders.length > 0 && (
+                <div style={{
+                  marginTop: "10px", padding: "12px 14px", borderRadius: "6px",
+                  background: "#fef2f2", border: "1px solid #fecaca", fontSize: "12px", color: "#b91c1c",
+                }}>
+                  <div style={{ fontWeight: 600, marginBottom: "8px" }}>
+                    🎬 {ytPlaceholders.length} 個 YouTube 影片待嵌入
+                    <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: 6 }}>
+                      貼上 YouTube 網址→自動轉真嵌入；留空發佈時自動移除
+                    </span>
+                  </div>
+                  {ytPlaceholders.map(({ n, query }) => (
+                    <div key={n} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
+                      <span style={{ minWidth: "180px", color: "#6b7280" }}>#{n}：建議搜尋「{query}」</span>
+                      <input
+                        style={{ flex: 1, minWidth: "220px", fontSize: "12px", padding: "5px 8px",
+                          border: "1px solid #fecaca", borderRadius: "4px", background: "#fff", color: "#111" }}
+                        placeholder="https://www.youtube.com/watch?v=…"
+                        value={ytUrlInputs[n] ?? ""}
+                        onChange={e => setYtUrlInputs(prev => ({ ...prev, [n]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === "Enter") resolveYouTube(n, ytUrlInputs[n] ?? ""); }} />
+                      <button className="btn-secondary" style={{ fontSize: "12px", padding: "5px 12px" }}
+                        disabled={!canonicalYouTube(ytUrlInputs[n] ?? "")}
+                        onClick={() => resolveYouTube(n, ytUrlInputs[n] ?? "")}>嵌入</button>
+                    </div>
                   ))}
-                </select>
-              </div>
+                </div>
+              )}
+
+              {/* ── 社群圖片生成 ── */}
+              {genStatus === "done" && hasContent && (
+                <div style={{ marginTop: "16px", borderTop: "1px solid var(--card-border)", paddingTop: "14px" }}>
+                  <button onClick={() => setShowImgGen(v => !v)}
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "var(--text-primary)", padding: 0 }}>
+                    {showImgGen ? "▲" : "▼"} 社群圖片生成
+                  </button>
+                  {showImgGen && (
+                    <div style={{ marginTop: "12px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                        <div>
+                          <label className="form-label">目標平台 / 尺寸</label>
+                          <select className="form-select" value={imgPlatform} onChange={e => setImgPlatform(e.target.value)}>
+                            {PLATFORM_IMG_PRESETS.map(p => (
+                              <option key={p.platform} value={p.platform}>{p.label} — {p.w}×{p.h}（{p.note}）</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <label className="form-label">圖片描述提示詞</label>
+                      <textarea className="form-textarea" style={{ minHeight: "72px" }}
+                        value={imgPrompt} onChange={e => setImgPrompt(e.target.value)}
+                        placeholder={`例：${form.keyword}主題的概念插圖，溫暖色調，簡潔留白，適合社群媒體`} />
+                      <div style={{ marginTop: "8px", display: "flex", gap: "10px", alignItems: "center" }}>
+                        <button className="btn-primary" style={{ fontSize: "12px", padding: "6px 16px" }}
+                          onClick={handleGenerateImage} disabled={imgLoading || !imgPrompt.trim()}>
+                          {imgLoading ? "生成中…" : "🎨 生成圖片"}
+                        </button>
+                        {imgError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{imgError}</span>}
+                      </div>
+                      {/* Platform specs reference */}
+                      <div style={{ marginTop: "12px" }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>各平台標準尺寸參考：</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                          {PLATFORM_IMG_PRESETS.map(p => (
+                            <button key={p.platform} onClick={() => setImgPlatform(p.platform)}
+                              style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", cursor: "pointer",
+                                border: imgPlatform === p.platform ? "1px solid #5855d0" : "1px solid var(--card-border)",
+                                background: imgPlatform === p.platform ? "#ede9fe" : "var(--bg-card)",
+                                color: imgPlatform === p.platform ? "#5855d0" : "var(--text-muted)" }}>
+                              {p.label} {p.w}×{p.h}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {imgResult && (
+                        <div style={{ marginTop: "12px" }}>
+                          <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "6px" }}>
+                            {imgResult.spec.label} — {imgResult.spec.width}×{imgResult.spec.height}
+                          </div>
+                          <img src={imgResult.imageUrl} alt="Generated social media image"
+                            style={{ maxWidth: "100%", borderRadius: "8px", border: "1px solid var(--card-border)" }} />
+                          <a href={imgResult.imageUrl} download="social-image.webp" target="_blank" rel="noopener noreferrer"
+                            style={{ display: "inline-block", marginTop: "8px", fontSize: "12px", color: "#5855d0" }}>
+                            ↓ 下載圖片
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
+          )}
+
+          {/* ── 進階設定：預設收合 ── */}
+          <SectionToggle label="進階設定（語言、長度、模型、語氣、結構、媒體、SEO、連結、品牌語氣、分發、發布）" open={showMore} onToggle={() => setShowMore(v => !v)}>
+          <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
+            <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "14px", color: "var(--text-primary)" }}>文章設定</div>
+            {/* 語言 / 地區 / 類型 / 長度 / 模型 / 語氣 / 人稱 / 難度 / AI 用詞清理：看得見的按鈕組 */}
+            <ChoiceRow label="語言" value={form.language} options={asOptions(LANGUAGES)} onPick={v => setF("language", v)} disabled={isGenerating} />
+            <ChoiceRow label="目標地區" value={form.targetCountry} options={asOptions(COUNTRIES)} onPick={v => setF("targetCountry", v)} disabled={isGenerating} />
+            <ChoiceRow label="文章類型" value={form.articleType} options={ARTICLE_TYPES} onPick={v => setF("articleType", v)} disabled={isGenerating} />
+            <ChoiceRow label="文章長度" value={form.articleSize} options={SIZES} onPick={v => setF("articleSize", v)} disabled={isGenerating} />
+            {AI_MODEL_GROUPS.map(g => (
+              <ChoiceRow key={g} label={`AI 模型（${g}）`} value={form.model} options={AI_MODELS.filter(m => m.group === g)}
+                onPick={v => setF("model", v)} disabled={isGenerating} />
+            ))}
             {chainControl && <div style={{ marginBottom: "12px" }}>{chainControl(textChain, setTextChain, isGenerating)}</div>}
-
-            {/* 語氣 / 視角 / 可讀性 / AI 清理 */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
-              <div>
-                <label className="form-label">語氣風格</label>
-                <select className="form-select" value={form.tone} onChange={e => setF("tone", e.target.value)} disabled={isGenerating}>
-                  {TONES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">人稱視角</label>
-                <select className="form-select" value={form.pointOfView} onChange={e => setF("pointOfView", e.target.value)} disabled={isGenerating}>
-                  {POVS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">閱讀難度</label>
-                <select className="form-select" value={form.readability} onChange={e => setF("readability", e.target.value)} disabled={isGenerating}>
-                  {READABILITIES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">AI 用詞清理</label>
-                <select className="form-select" value={form.removeAiWords} onChange={e => setF("removeAiWords", e.target.value as RemoveAI)} disabled={isGenerating}>
-                  <option value="none">關閉</option>
-                  <option value="basic">基本（去除常見 AI 用詞）</option>
-                  <option value="extended">加強（深度清理）</option>
-                </select>
-              </div>
-            </div>
+            <ChoiceRow label="語氣風格" value={form.tone} options={TONES} onPick={v => setF("tone", v)} disabled={isGenerating} />
+            <ChoiceRow label="人稱視角" value={form.pointOfView} options={POVS} onPick={v => setF("pointOfView", v)} disabled={isGenerating} />
+            <ChoiceRow label="閱讀難度" value={form.readability} options={READABILITIES} onPick={v => setF("readability", v)} disabled={isGenerating} />
+            <ChoiceRow label="AI 用詞清理" value={form.removeAiWords} options={AI_WORD_CLEANUP} onPick={v => setF("removeAiWords", v)} disabled={isGenerating} />
           </div>
-
 
           {/* ══════════════════════════════════════════════════════════════════════════════════════════ */}
           {/* ═══════════════════════════ A：文章 / 內容設定 ═══════════════════════════════════════ */}
@@ -2316,7 +2629,7 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
             </div>
             <div style={{ padding: "0 16px" }}>
           {/* ── 文章結構 ── */}
-          <SectionToggle label="Structure" open={showStruct} onToggle={() => setShowStruct(v => !v)}>
+          <SectionToggle label="文章結構" open={showStruct} onToggle={() => setShowStruct(v => !v)}>
             {/* Introductory Hook Brief */}
             <div style={{ marginBottom: "16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
@@ -2611,19 +2924,19 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
           </SectionToggle>
 
           {/* ── Media Hub ── */}
-          <SectionToggle label="Media Hub" open={showMedia} onToggle={() => setShowMedia(v => !v)}>
+          <SectionToggle label="媒體" open={showMedia} onToggle={() => setShowMedia(v => !v)}>
             <div style={{ background: "var(--build-risk-medium-bg)", border: "1px solid var(--yellow)", borderRadius: "6px", padding: "14px" }}>
               {/* Row 1: AI Images + count + size + style */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto 1fr", gap: "12px", marginBottom: "12px", alignItems: "end" }}>
                 <div>
-                  <label className="form-label">AI Images</label>
+                  <label className="form-label">AI 圖片</label>
                   <select className="form-select" value={form.media.aiImages} disabled={isGenerating}
                     onChange={e => setMedia("aiImages", e.target.value)}>
                     {AI_IMAGE_PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">Number of images</label>
+                  <label className="form-label">圖片數量</label>
                   <select className="form-select" value={form.media.imageCount}
                     disabled={isGenerating || form.media.aiImages === "none"}
                     onChange={e => setMedia("imageCount", Number(e.target.value))}>
@@ -2631,7 +2944,7 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">Image Size</label>
+                  <label className="form-label">圖片尺寸</label>
                   <select className="form-select" value={form.media.imageSize}
                     disabled={isGenerating || form.media.aiImages === "none"}
                     onChange={e => setMedia("imageSize", e.target.value)}>
@@ -3602,324 +3915,16 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
           </div>
             </div>
           </div>
-
-          {/* ── 產生按鈕 ── */}
-          <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "28px", flexWrap: "wrap" }}>
-            <button className="btn-primary" onClick={handleGenerate}
-              disabled={isGenerating || !form.keyword.trim()} style={{ fontSize: "14px", padding: "10px 24px" }}>
-              {isGenerating ? "產生中…" : "產生文章"}
-            </button>
-            {isGenerating && (
-              <button className="btn-secondary" onClick={() => { abortRef.current?.abort(); setGenStatus("idle"); }}>停止</button>
-            )}
-            {genStatus === "error" && <span style={{ color: "var(--color-error)", fontSize: "13px" }}>{genError}</span>}
-            {isGenerating && subWaitS !== null && <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>筆電寫作中… 已 {subWaitS} 秒</span>}
-            <div style={{ marginLeft: "auto" }}>
-              <CostChip cost={sessionCost} />
-            </div>
-          </div>
-          {chainSkips.length > 0 && (
-            <div style={{ marginTop: "-16px", marginBottom: "20px", color: "var(--text-muted)", fontSize: "12px" }}>
-              {chainSkips.map((s, i) => <div key={i}>{s.reason}，改用下一段</div>)}
-            </div>
-          )}
-          {/* ═══ 輸出區 ═══ */}
-          {(hasContent || isGenerating) && (
-            <div className="form-block form-block--wide">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
-                <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
-                  產出文章
-                  {isGenerating && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>串流中…</span>}
-                  {genStatus === "done" && <span style={{ fontWeight: 400, color: "var(--green)", marginLeft: 8 }}>✓ 完成</span>}
-                  {genStatus === "done" && draftSaveState === "saving" && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 儲存中…</span>}
-                  {genStatus === "done" && draftSaveState === "saved"  && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 已存草稿</span>}
-                  {genStatus === "done" && draftSaveState === "error"  && <span style={{ fontWeight: 400, color: "var(--yellow)", marginLeft: 8, fontSize: "12px" }}>⚠ 草稿未存（文章不受影響）</span>}
-                  {genStatus === "done" && genTruncated && (
-                    <span style={{ fontWeight: 500, color: "var(--yellow)", marginLeft: 8, fontSize: "12px" }}>
-                      ⚠ 可能被截斷（超過長度上限）— 建議選短篇或拆主題重新生成
-                    </span>
-                  )}
-                </div>
-                <CostChip cost={sessionCost} />
-              </div>
-
-              {/* ── Preview / Edit toggle ── */}
-              <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
-                <button
-                  onClick={() => setShowPreview(false)}
-                  style={{ fontSize: "12px", padding: "3px 10px", borderRadius: 4, border: "1px solid var(--card-border)",
-                    background: !showPreview ? "var(--btn-primary-bg)" : "transparent",
-                    color: !showPreview ? "var(--btn-primary-text)" : "var(--text-muted)", cursor: "pointer" }}>
-                  ✏️ 編輯 MD
-                </button>
-                <button
-                  onClick={() => setShowPreview(true)}
-                  style={{ fontSize: "12px", padding: "3px 10px", borderRadius: 4, border: "1px solid var(--card-border)",
-                    background: showPreview ? "var(--btn-primary-bg)" : "transparent",
-                    color: showPreview ? "var(--btn-primary-text)" : "var(--text-muted)", cursor: "pointer" }}>
-                  👁 預覽排版
-                </button>
-              </div>
-
-              {showPreview ? (
-                <div
-                  style={{ width: "100%", minHeight: "480px", padding: "20px 24px", border: "1px solid var(--card-border)",
-                    borderRadius: "6px", background: "var(--card-bg)", color: "var(--text-primary)", boxSizing: "border-box",
-                    fontFamily: "'Noto Sans TC',sans-serif", fontSize: "15px", lineHeight: 1.8, overflowY: "auto" }}
-                  dangerouslySetInnerHTML={{ __html: markdownPreview(generated) }}
-                />
-              ) : (
-                <textarea
-                  style={{ width: "100%", minHeight: "480px", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.6,
-                    padding: "12px", border: "1px solid var(--card-border)", borderRadius: "6px",
-                    background: "var(--bg-page)", color: "var(--text-primary)", resize: "vertical", boxSizing: "border-box" }}
-                  value={generated} onChange={e => setGenerated(e.target.value)} spellCheck={false}
-                  placeholder="文章將在此串流顯示…" />
-              )}
-
-              {metaData && (
-                <div style={{ marginTop: "12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <div>
-                    <label className="form-label">SEO 標題 <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>（{metaData.seoTitle.length} 字元）</span></label>
-                    <input className="form-input" value={metaData.seoTitle}
-                      onChange={e => setMetaData(prev => prev ? { ...prev, seoTitle: e.target.value } : prev)} />
-                  </div>
-                  <div>
-                    <label className="form-label">
-                      Meta 描述{" "}
-                      <span style={{ fontWeight: 400, color: metaData.metaDesc.length > 160 ? "var(--red)" : "var(--text-muted)" }}>
-                        （{metaData.metaDesc.length} / 160 字元{metaData.metaDesc.length > 160 ? " ⚠ 超過上限" : ""}）
-                      </span>
-                    </label>
-                    <input className="form-input" value={metaData.metaDesc}
-                      onChange={e => setMetaData(prev => prev ? { ...prev, metaDesc: e.target.value } : prev)} />
-                    {metaData.metaDesc.length > 160 && (
-                      <div className="form-hint" style={{ color: "var(--red)", marginTop: 2 }}>
-                        RankMath 上限 160 字元；超出部分在搜尋結果會被截斷。請縮短後再發布。
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              <div className="form-hint" style={{ marginTop: "6px" }}>
-                可直接編輯後推送。<code>{"<!-- NEEDS_BRAND_VERIFY -->"}</code> = 填入真實品牌資料。
-              </div>
-
-              {/* ── 輸出動作列（移到文章下方：先讀後操作，UX 較順）── */}
-              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginTop: "12px",
-                paddingTop: "12px", borderTop: "1px solid var(--card-border)" }}>
-                {hasContent && (
-                  <>
-                    <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => void navigator.clipboard.writeText(generated)}>複製 MD</button>
-                    <button className="btn-secondary" style={{ fontSize: "12px" }} onClick={() => downloadMd(generated, `${slugify(form.keyword) || "article"}.md`)}>↓ .md</button>
-                  </>
-                )}
-                {hasContent && pubStatus === "idle" && (
-                  <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
-                    <button className="btn-secondary" style={{ fontSize: "12px" }}
-                      onClick={() => handlePublish("draft")}>📝 草稿</button>
-                    <button className="btn-primary" style={{ fontSize: "12px" }}
-                      onClick={() => handlePublish("publish")}>🚀 直接發佈</button>
-                    <button className="btn-secondary" style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: 4 }}
-                      onClick={() => setPubMode(prev => prev === "future" ? "draft" : "future")}>
-                      📅 排程{pubMode === "future" ? " ▴" : " ▾"}
-                    </button>
-                    {pubMode === "future" && (
-                      <>
-                        <input type="datetime-local" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)}
-                          style={{ fontSize: "12px", padding: "3px 6px", border: "1px solid var(--card-border)", borderRadius: 4, background: "var(--bg-page)", color: "var(--text-primary)" }} />
-                        <button className="btn-primary" style={{ fontSize: "12px" }}
-                          disabled={!scheduleDate}
-                          onClick={() => handlePublish("future")}>確認排程</button>
-                      </>
-                    )}
-                  </div>
-                )}
-                {pubStatus === "publishing" && <button className="btn-primary" disabled style={{ fontSize: "13px" }}>推送中…</button>}
-                {pubStatus === "done" && pubResult?.edit_url && (
-                  <span style={{ fontSize: "13px", color: "var(--green)" }}>
-                    ✓ {pubMode === "publish" ? "已發佈" : pubMode === "future" ? "已排程" : "草稿已建立"} —{" "}
-                    <a href={pubResult.edit_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>WP 後台編輯 ↗</a>
-                    {pubResult.view_url && pubMode === "publish" && (
-                      <> · <a href={pubResult.view_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>查看文章 ↗</a></>
-                    )}
-                  </span>
-                )}
-                {pubStatus === "error" && <span style={{ fontSize: "12px", color: "var(--color-error)" }}>推送失敗：{pubError}</span>}
-              </div>
-
-              {/* ── 影片（自動觸發 — 文章推送後自動生成並嵌入）── */}
-              {pubStatus === "done" && publishedPostId && (
-                <div style={{ marginTop: "10px", padding: "10px 14px", borderRadius: "6px",
-                  background: "var(--ai-bg)", border: "1px solid var(--ai-bg)", fontSize: "13px" }}>
-                  🎬 影片生成中（自動）：文章已推送，影片完成後自動嵌入文章
-                  {videoStatus === "generating" && <span style={{ marginLeft: 10, color: "var(--severity-low)" }}>⏳ 影片生成中（預計 5-15 分鐘）…</span>}
-                  {videoStatus === "embedding"  && <span style={{ marginLeft: 10, color: "var(--severity-low)" }}>⏳ 嵌入影片到 WP…</span>}
-                  {videoStatus === "done"       && <span style={{ marginLeft: 10, color: "var(--green)" }}>✓ 影片已嵌入文章</span>}
-                  {videoStatus === "error"      && (
-                    <>
-                      <span style={{ marginLeft: 10, color: "var(--color-error)" }}>影片失敗：{videoError}（文章不受影響）</span>
-                      <button className="btn-secondary" style={{ fontSize: "11px", marginLeft: "8px" }}
-                        onClick={() => { setVideoError(""); void handleGenerateVideo(publishedPostId); }}>重試</button>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* ── RankMath SEO 合規分數 ── */}
-              <SeoCheckPanel
-                report={seoReport}
-                loading={seoChecking}
-                articleMarkdown={generated}
-                focusKeyword={form.keyword}
-                seoTitle={metaData?.seoTitle ?? ""}
-                metaDescription={metaData?.metaDesc ?? ""}
-                slug={slugHint || slugify(form.keyword)}
-                onFixApply={handleFixApply}
-                onCost={(c) => addCostLine({ route: "content/seo-fix", model: c.model, vendor: c.vendor, usd: c.usd, kind: "text" })}
-              />
-
-              {/* ── 自動圖片生成進度 ── */}
-              {autoImgN > 0 && (
-                <div style={{
-                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
-                  background: "var(--ai-bg)", border: "1px solid var(--ai-bg)",
-                  fontSize: "12px", color: "var(--severity-low)",
-                }}>
-                  🎨 正在生成 {autoImgN} 張圖片…
-                </div>
-              )}
-
-              {/* ── 精選圖片（hero）生成狀態 ── */}
-              {(heroLoading || heroImageUrl) && (
-                <div style={{
-                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
-                  background: heroImageUrl ? "#f0fdf4" : "#f0f9ff",
-                  border: `1px solid ${heroImageUrl ? "#bbf7d0" : "#bae6fd"}`,
-                  fontSize: "12px", color: heroImageUrl ? "#16a34a" : "#0284c7",
-                }}>
-                  {heroLoading ? "🖼️ 正在生成精選圖片（featured image）…" : "🖼️ 精選圖片已就緒，發佈時自動設為文章首圖"}
-                </div>
-              )}
-
-              {/* ── 圖片生成警告（ok:false / 連線失敗 / 參考圖被拒）── */}
-              {imgGenWarn && (
-                <div style={{
-                  marginTop: "10px", padding: "8px 12px", borderRadius: "6px",
-                  background: "#fffbeb", border: "1px solid #fde68a",
-                  fontSize: "12px", color: "#b45309",
-                  display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px",
-                }}>
-                  <span>⚠️ {imgGenWarn}</span>
-                  <button type="button" onClick={() => setImgGenWarn("")}
-                    style={{ background: "none", border: "none", color: "#b45309", cursor: "pointer", fontSize: "14px", lineHeight: 1, padding: 0 }}
-                    aria-label="關閉警告">×</button>
-                </div>
-              )}
-
-              {/* ── YouTube 影片嵌入（Phase 2：貼 URL 解析 placeholder）── */}
-              {ytPlaceholders.length > 0 && (
-                <div style={{
-                  marginTop: "10px", padding: "12px 14px", borderRadius: "6px",
-                  background: "#fef2f2", border: "1px solid #fecaca", fontSize: "12px", color: "#b91c1c",
-                }}>
-                  <div style={{ fontWeight: 600, marginBottom: "8px" }}>
-                    🎬 {ytPlaceholders.length} 個 YouTube 影片待嵌入
-                    <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: 6 }}>
-                      貼上 YouTube 網址→自動轉真嵌入；留空發佈時自動移除
-                    </span>
-                  </div>
-                  {ytPlaceholders.map(({ n, query }) => (
-                    <div key={n} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
-                      <span style={{ minWidth: "180px", color: "#6b7280" }}>#{n}：建議搜尋「{query}」</span>
-                      <input
-                        style={{ flex: 1, minWidth: "220px", fontSize: "12px", padding: "5px 8px",
-                          border: "1px solid #fecaca", borderRadius: "4px", background: "#fff", color: "#111" }}
-                        placeholder="https://www.youtube.com/watch?v=…"
-                        value={ytUrlInputs[n] ?? ""}
-                        onChange={e => setYtUrlInputs(prev => ({ ...prev, [n]: e.target.value }))}
-                        onKeyDown={e => { if (e.key === "Enter") resolveYouTube(n, ytUrlInputs[n] ?? ""); }} />
-                      <button className="btn-secondary" style={{ fontSize: "12px", padding: "5px 12px" }}
-                        disabled={!canonicalYouTube(ytUrlInputs[n] ?? "")}
-                        onClick={() => resolveYouTube(n, ytUrlInputs[n] ?? "")}>嵌入</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* ── 社群圖片生成 ── */}
-              {genStatus === "done" && hasContent && (
-                <div style={{ marginTop: "16px", borderTop: "1px solid var(--card-border)", paddingTop: "14px" }}>
-                  <button onClick={() => setShowImgGen(v => !v)}
-                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "var(--text-primary)", padding: 0 }}>
-                    {showImgGen ? "▲" : "▼"} 社群圖片生成
-                  </button>
-                  {showImgGen && (
-                    <div style={{ marginTop: "12px" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
-                        <div>
-                          <label className="form-label">目標平台 / 尺寸</label>
-                          <select className="form-select" value={imgPlatform} onChange={e => setImgPlatform(e.target.value)}>
-                            {PLATFORM_IMG_PRESETS.map(p => (
-                              <option key={p.platform} value={p.platform}>{p.label} — {p.w}×{p.h}（{p.note}）</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <label className="form-label">圖片描述提示詞</label>
-                      <textarea className="form-textarea" style={{ minHeight: "72px" }}
-                        value={imgPrompt} onChange={e => setImgPrompt(e.target.value)}
-                        placeholder={`例：${form.keyword}主題的概念插圖，溫暖色調，簡潔留白，適合社群媒體`} />
-                      <div style={{ marginTop: "8px", display: "flex", gap: "10px", alignItems: "center" }}>
-                        <button className="btn-primary" style={{ fontSize: "12px", padding: "6px 16px" }}
-                          onClick={handleGenerateImage} disabled={imgLoading || !imgPrompt.trim()}>
-                          {imgLoading ? "生成中…" : "🎨 生成圖片"}
-                        </button>
-                        {imgError && <span style={{ color: "var(--color-error, #ef4444)", fontSize: "12px" }}>{imgError}</span>}
-                      </div>
-                      {/* Platform specs reference */}
-                      <div style={{ marginTop: "12px" }}>
-                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>各平台標準尺寸參考：</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                          {PLATFORM_IMG_PRESETS.map(p => (
-                            <button key={p.platform} onClick={() => setImgPlatform(p.platform)}
-                              style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", cursor: "pointer",
-                                border: imgPlatform === p.platform ? "1px solid #5855d0" : "1px solid var(--card-border)",
-                                background: imgPlatform === p.platform ? "#ede9fe" : "var(--bg-card)",
-                                color: imgPlatform === p.platform ? "#5855d0" : "var(--text-muted)" }}>
-                              {p.label} {p.w}×{p.h}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      {imgResult && (
-                        <div style={{ marginTop: "12px" }}>
-                          <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "6px" }}>
-                            {imgResult.spec.label} — {imgResult.spec.width}×{imgResult.spec.height}
-                          </div>
-                          <img src={imgResult.imageUrl} alt="Generated social media image"
-                            style={{ maxWidth: "100%", borderRadius: "8px", border: "1px solid var(--card-border)" }} />
-                          <a href={imgResult.imageUrl} download="social-image.webp" target="_blank" rel="noopener noreferrer"
-                            style={{ display: "inline-block", marginTop: "8px", fontSize: "12px", color: "#5855d0" }}>
-                            ↓ 下載圖片
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-            </div>
-          )}
+          </SectionToggle>
         </>
       )}
 
-      {/* ══════════════ 人性化頁籤 ══════════════ */}
-      {activeTab === "humanize" && (
+
+      {/* ══════════════ 改寫 ══════════════ */}
+      {view === "humanize" && (
         <div>
           <div className="form-block" style={{ marginBottom: "16px" }}>
-            <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "14px", color: "var(--text-primary)" }}>人性化 / 改寫設定</div>
+            <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "14px", color: "var(--text-primary)" }}>改寫設定</div>
             <div style={{ display: "flex", gap: "0", marginBottom: "16px", border: "1px solid var(--card-border)", borderRadius: "6px", overflow: "hidden", width: "fit-content" }}>
               {(["humanize", "rewrite"] as HumMode[]).map(m => (
                 <button key={m} onClick={() => setHumMode(m)}
@@ -3995,13 +4000,13 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
         </div>
       )}
 
-      {/* ══════════════ 我的草稿頁籤 ══════════════ */}
-      {activeTab === "drafts" && (
+      {/* ══════════════ 草稿 ══════════════ */}
+      {view === "drafts" && (
         <div>
           <div className="form-block" style={{ marginBottom: "16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
-                我的草稿
+                草稿列表
                 <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>
                   （產文完成自動儲存；最多顯示 100 篇，新到舊）
                 </span>
@@ -4017,7 +4022,7 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
 
           {!draftsLoading && drafts.length === 0 && !draftsError && (
             <div style={{ padding: "60px 40px", textAlign: "center", color: "var(--text-muted)", border: "1px dashed var(--card-border)", borderRadius: "8px" }}>
-              還沒有草稿。到「產文」頁籤生成一篇文章，完成後會自動存到這裡。
+              還沒有草稿。到「寫文章」頁生成一篇文章，完成後會自動存到這裡。
             </div>
           )}
 
@@ -4054,7 +4059,7 @@ export default function ContentStudio({ video, chainControl }: { video?: Content
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
-                    <button className="btn-primary" style={{ fontSize: "12px", padding: "5px 12px" }} onClick={() => void openDraft(d.id)}>
+                    <button className="btn-primary" style={{ fontSize: "12px", padding: "5px 12px" }} onClick={() => openDraftInEditor(d.id)} disabled={!writeHref}>
                       開啟
                     </button>
                     <button className="btn-secondary" style={{ fontSize: "12px", padding: "5px 10px", color: "var(--color-error, #ef4444)" }}

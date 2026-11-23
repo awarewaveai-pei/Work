@@ -12,12 +12,17 @@ import { DoorProvider } from "../DoorContext";
 import { listedFeatureKeys } from "@/lib/entitlements/features";
 import { PRODUCTS } from "@/lib/portal/products";
 
-describe("door menu -- every feature bought separately or given by us", () => {
-  it("lists the product's features and greys the ones the account does not hold", () => {
-    const html = renderToStaticMarkup(<NavRail kind="door" page="/video" name="影片製作" features={[{ key: "video.script", name: "腳本生成" }, { key: "video.tts", name: "付費旁白" }]} />);
+describe("door menu -- the product's pages, no feature list (blueprint §15A)", () => {
+  it("shows the product name and its pages, and no 功能 list", () => {
+    const html = renderToStaticMarkup(
+      <DoorProvider nav={[{ path: "", name: "影片工作台" }, { path: "works", name: "我的作品" }] as never}>
+        <NavRail kind="door" page="/video" name="影片製作" />
+      </DoorProvider>,
+    );
     expect(html).toContain("影片製作");
-    expect(html).toMatch(/class="door-feature"[^>]*>腳本生成</);
-    expect(html).toMatch(/class="door-feature off" title="尚未開通此功能">付費旁白</);
+    expect(html).toContain(">我的作品</a>");
+    expect(html).not.toContain("door-feature");
+    expect(html).not.toContain("功能");
   });
 
   it("the signed list covers every feature a door lists, including ones asked outside a route", () => {
@@ -47,7 +52,7 @@ describe("NavRail links keep the URL's current client (ADR 020)", () => {
   it("door pages carry org and site; nothing in the URL leaves them alone", () => {
     const door = () => renderToStaticMarkup(
       <DoorProvider nav={[{ path: "", name: "首頁" }, { path: "topics", name: "題目" }] as never}>
-        <NavRail kind="door" page="/content" name="內容行銷" features={[]} />
+        <NavRail kind="door" page="/content" name="內容行銷" />
       </DoorProvider>,
     );
     expect(door()).toContain('href="/topics"');

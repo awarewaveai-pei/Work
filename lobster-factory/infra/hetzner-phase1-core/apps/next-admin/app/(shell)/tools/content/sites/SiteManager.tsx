@@ -592,7 +592,7 @@ export type TextRoadControl = (p: {
   onApplied: () => void;
 }) => ReactNode;
 
-export default function SiteManager({ textRoad }: { textRoad?: TextRoadControl } = {}) {
+export default function SiteManager({ textRoad, heading }: { textRoad?: TextRoadControl; /** the page's <h1> */ heading?: React.ReactNode } = {}) {
   // On the content door a customer edits its own sites, but adding one or changing a URL is staff-only
   // (siteUrlWriteGate, lib/content/wp-sites.ts): those controls do not show there.
   const onDoor = useOnDoor();
@@ -713,7 +713,7 @@ export default function SiteManager({ textRoad }: { textRoad?: TextRoadControl }
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h2 style={{ color: "var(--text-primary)", margin: 0, fontSize: 22 }}>WordPress 網站連線</h2>
+          {heading}
           <p style={{ color: "var(--text-muted)", margin: "4px 0 0", fontSize: 13 }}>
             {onDoor ? "你的 WordPress 網站。" : "目前客戶的 WP 站點。"}Token 加密儲存，不會顯示明文。
           </p>

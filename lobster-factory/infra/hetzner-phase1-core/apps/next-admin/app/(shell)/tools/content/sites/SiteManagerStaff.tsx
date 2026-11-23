@@ -7,6 +7,6 @@ import TextModelButtons from "./TextModelButtons";
 
 const textRoad: TextRoadControl = (p) => <TextModelButtons {...p} />;
 
-export default function SiteManagerStaff() {
-  return <SiteManager textRoad={textRoad} />;
+export default function SiteManagerStaff({ heading }: { heading?: React.ReactNode }) {
+  return <SiteManager textRoad={textRoad} heading={heading} />;
 }

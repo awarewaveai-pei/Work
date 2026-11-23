@@ -1,12 +1,7 @@
-"use client";
-// Staff page: the shared calendar plus the cache refresh (/api/tools/events/sync), which no door serves.
-import EventsCalendar, { type EventsSyncResult } from "./EventsCalendar";
+import EventsCalendarStaff from "./EventsCalendarStaff";
 
-async function sync(): Promise<EventsSyncResult> {
-  const res = await fetch("/api/tools/events/sync", { method: "POST" });
-  return res.json() as Promise<EventsSyncResult>;
-}
+export const metadata = { title: "節日行事曆" };
 
 export default function EventsPage() {
-  return <EventsCalendar sync={sync} />;
+  return <EventsCalendarStaff heading={<h1 style={{ margin: 0, fontSize: 22 }}>節日行事曆</h1>} />;
 }

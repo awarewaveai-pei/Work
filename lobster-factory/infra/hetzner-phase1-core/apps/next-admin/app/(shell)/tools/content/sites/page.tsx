@@ -1,15 +1,8 @@
 import SiteManagerStaff from "./SiteManagerStaff";
 
-export const metadata = { title: "WordPress 網站管理 | AwareWave" };
+export const metadata = { title: "客戶網站" };
 
+// Staff keep the name 客戶網站 (every client's sites); the content door calls its own page 我的網站 (blueprint §15A).
 export default function SitesPage() {
-  return (
-    <>
-      <div className="topbar">
-        <span className="topbar-title">WordPress 網站管理</span>
-        <span className="topbar-env">新增、編輯、移除客戶 WP 連線</span>
-      </div>
-      <SiteManagerStaff />
-    </>
-  );
+  return <SiteManagerStaff heading={<h1 style={{ color: "var(--text-primary)", margin: 0, fontSize: 22 }}>客戶網站</h1>} />;
 }

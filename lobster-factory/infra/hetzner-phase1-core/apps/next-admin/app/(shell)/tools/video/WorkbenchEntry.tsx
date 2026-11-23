@@ -8,7 +8,7 @@ export default function WorkbenchEntry({ open }: { open: string | null }) {
   return (
     <>
       <div className="topbar">
-        <span className="topbar-title">影音工作台</span>
+        <h1 className="topbar-title" style={{ margin: 0, fontFamily: "inherit" }}>影片工作台</h1>
         <span className="topbar-env">腳本 → 做片 → 審片 → 發布</span>
       </div>
       <OpenWorkbench videoHost={productHost(video)} open={open} />

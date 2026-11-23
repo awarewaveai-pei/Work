@@ -63,7 +63,7 @@ function daysUntil(isoDate: string): number {
 
 export interface EventsSyncResult { log?: string[]; upserted?: number; skippedFresh?: boolean; errors?: string[] }
 
-export default function EventsCalendar({ sync }: { sync?: () => Promise<EventsSyncResult> }) {
+export default function EventsCalendar({ sync, heading }: { sync?: () => Promise<EventsSyncResult>; /** the page's <h1> */ heading?: React.ReactNode }) {
   const [events, setEvents] = useState<EventView[]>([]);
   const [windowDays, setWindowDays] = useState<number>(365);
   const [filter, setFilter] = useState<string>("all");
@@ -125,7 +125,7 @@ export default function EventsCalendar({ sync }: { sync?: () => Promise<EventsSy
   return (
     <div style={{ padding: 20, maxWidth: 1080, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <h1 style={{ margin: 0, fontSize: 22 }}>🌍 全球活動行事曆</h1>
+        {heading}
         {sync && <button className="btn-secondary" style={{ fontSize: 12, marginLeft: "auto" }} onClick={triggerSync} disabled={syncing}>
           {syncing ? "⏳ 檢查中…" : "🔄 本月更新"}
         </button>}

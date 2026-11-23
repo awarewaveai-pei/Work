@@ -1,6 +1,6 @@
 'use client';
 // The one left menu (blueprint §9.1, CLIENT-CONTEXT-PLAN K5): the staff console's sections (sidebar-sections.ts, saved order,
-// tool grant) and a product door's pages + features (registry door.nav, ADR 018 §2) -- same component, the markup and
+// tool grant) and a product door's pages (registry door.nav, ADR 018 §2) -- same component, the markup and
 // classes each frame had before (.sidebar-* / .door-*), so neither looks different. Every internal link keeps the
 // URL's current org / site (ADR 020, withContext); a page that does not register a layer ignores them. External links
 // carry nothing.
@@ -10,7 +10,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { SavedLayout } from '../lib/theme/tokens';
 import { DEFAULT_SECTIONS, activeLink, applyLayout, visibleSections } from './sidebar-sections';
 import { useDoorNav } from './DoorContext';
-import { usePaidFeatures } from '@/lib/entitlements/use-paid-features';
 import { normalizeQuery, withContext } from '@/lib/client-context/contract';
 
 export type NavRailProps =
@@ -28,7 +27,6 @@ export type NavRailProps =
       kind: 'door';
       page: string;
       name: string;
-      features: readonly { key: string; name: string }[];
     };
 
 /** The URL's current org / site, as withContext takes them (undefined = leave the link alone). */
@@ -126,15 +124,13 @@ function StaffRail({ initialLayout, visible = null, inboxBadge = null }: Extract
   );
 }
 
-// Door: the product name, its pages (door.nav links are door-relative and middleware serves them under the door's page
-// prefix, so either spelling of the current path marks the active item), and its features from the signed list -- each
-// bought separately or given by us, so one not held is greyed (operator 2026-10-24). The tools' own buttons still grey
-// and the API still asks can().
-function DoorRail({ page, name, features }: Extract<NavRailProps, { kind: 'door' }>) {
+// Door: the product name and its pages (door.nav links are door-relative and middleware serves them under the door's page
+// prefix, so either spelling of the current path marks the active item). No feature list here (blueprint §15A: it repeated
+// the page's own buttons); what is held shows on 我的工具 cards and on each button, and the API still asks can().
+function DoorRail({ page, name }: Extract<NavRailProps, { kind: 'door' }>) {
   const nav = useDoorNav();
   const pathname = usePathname() ?? '/';
   const carry = useCarry();
-  const { holds, why } = usePaidFeatures();
   return (
     <aside className="door-side">
       <div className="door-side-title">{name}</div>
@@ -146,16 +142,6 @@ function DoorRail({ page, name, features }: Extract<NavRailProps, { kind: 'door'
             return <a key={n.path} href={carry(href)} className={`door-nav-link${n.under !== undefined ? " sub" : ""}${active ? " active" : ""}`}>{n.name}</a>;
           })}
         </nav>
-      ) : null}
-      {features.length > 0 ? (
-        <>
-          <div className="door-side-head">功能</div>
-          <ul className="door-features">
-            {features.map((f) => (
-              <li key={f.key} className={holds(f.key) ? "door-feature" : "door-feature off"} title={why(f.key)}>{f.name}</li>
-            ))}
-          </ul>
-        </>
       ) : null}
     </aside>
   );

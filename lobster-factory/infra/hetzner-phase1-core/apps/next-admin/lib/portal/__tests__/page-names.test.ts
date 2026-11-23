@@ -2,10 +2,13 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { PRODUCTS } from "../products";
+import { DEFAULT_SECTIONS } from "../../../app/sidebar-sections";
 import { APP_DIR } from "./app-pages";
 
-// A door page's name is one word in three places: the door menu (door.nav[].name), the page's <title> (metadata) and its
-// first <h1> (blueprint §15A). This reads the registry, so a new door page or a renamed menu item is checked without edit.
+// A page's name is one word in three places: its menu item, the page's <title> (metadata) and its first <h1> (blueprint
+// §15A). Two menus: a door's (door.nav[].name) and the staff sidebar's (app/sidebar-sections.ts). This reads both lists, so
+// a new page or a renamed menu item is checked without edit. Staff and door names of one page agree except where the
+// staff page is a different scope (客戶網站 = every client's sites; the door's 我的網站 = the customer's own).
 const ROOT = path.join(APP_DIR, "..");
 
 function pageFiles(dir: string, url: string, out: Map<string, string>): Map<string, string> {
@@ -69,16 +72,52 @@ function mismatch({ name, file }: Item): string | null {
   return bad.length ? bad.join("; ") : null;
 }
 
-// Door pages still to be renamed. A to-do, not an exemption: `owner` is the card that fixes the page, and the test fails
-// the day the page already matches so the row gets deleted. Every row is a content page (products.ts and the content
-// pages belong to card U11, which re-lays out the content door); nothing outside this list may mismatch.
-const TODO: Record<string, { owner: string; until: string }> = {
-  "/content": { owner: "U11", until: "第 8 批" },
-  "/content/topics": { owner: "U11", until: "第 8 批" },
-  "/content/topics/steps": { owner: "U11", until: "第 8 批" },
-  "/content/sites": { owner: "U11", until: "第 8 批" },
-  "/content/events": { owner: "U11", until: "第 8 批" },
+// Pages still to be renamed. A to-do, not an exemption: `owner` is the card that fixes the page, and the test fails the
+// day the page already matches so the row gets deleted; nothing outside these lists may mismatch.
+const TODO: Record<string, { owner: string; until: string }> = {};
+
+// Staff sidebar pages (keyed by href) whose <title>/<h1> predate the rule: operations and back-office pages that mirror no
+// door page. U36 (registered by the supervisor) renames them; /tools/theme is the theme session's (no other card edits it).
+const STAFF_TODO: Record<string, { owner: string; until: string }> = {
+  "/": { owner: "U36", until: "第 9 批" },
+  "/api-check": { owner: "U36", until: "第 9 批" },
+  "/api-check-client": { owner: "U36", until: "第 9 批" },
+  "/build": { owner: "U36", until: "第 9 批" },
+  "/cs-widget": { owner: "U36", until: "第 9 批" },
+  "/onboard": { owner: "U36", until: "第 9 批" },
+  "/ops-console": { owner: "U36", until: "第 9 批" },
+  "/ops/approvals": { owner: "U36", until: "第 9 批" },
+  "/ops/clients": { owner: "U36", until: "第 9 批" },
+  "/ops/collect": { owner: "U36", until: "第 9 批" },
+  "/ops/costs": { owner: "U36", until: "第 9 批" },
+  "/ops/cs": { owner: "U36", until: "第 9 批" },
+  "/ops/inbox": { owner: "U36", until: "第 9 批" },
+  "/ops/integrations": { owner: "U36", until: "第 9 批" },
+  "/ops/knowledge": { owner: "U36", until: "第 9 批" },
+  "/ops/onboarding": { owner: "U36", until: "第 9 批" },
+  "/ops/repairs": { owner: "U36", until: "第 9 批" },
+  "/ops/schedules": { owner: "U36", until: "第 9 批" },
+  "/ops/staff": { owner: "U36", until: "第 9 批" },
+  "/ops/system-modes": { owner: "U36", until: "第 9 批" },
+  "/ops/tools": { owner: "U36", until: "第 9 批" },
+  "/tools/ai-models": { owner: "U36", until: "第 9 批" },
+  "/tools/canvas": { owner: "U36", until: "第 9 批" },
+  "/tools/edit-guide": { owner: "U36", until: "第 9 批" },
+  "/tools/outreach": { owner: "U36", until: "第 9 批" },
+  "/tools/outreach/guide": { owner: "U36", until: "第 9 批" },
+  "/tools/outreach/settings": { owner: "U36", until: "第 9 批" },
+  "/tools/publish": { owner: "U36", until: "第 9 批" },
+  "/tools/social": { owner: "U36", until: "第 9 批" },
+  "/tools/theme": { owner: "U36", until: "第 9 批" },
 };
+
+// Staff sidebar links and the page file each opens (app/(shell) or app/(full)); an href with no page file is not checked.
+const staffItems: Item[] = DEFAULT_SECTIONS.flatMap((s) => s.items).flatMap((i) => {
+  if (i.type !== "link") return [];
+  const href = i.href.split("?")[0];
+  const file = ["(shell)", "(full)"].map((g) => path.join(APP_DIR, g, href.slice(1), "page.tsx")).find((f) => existsSync(f));
+  return file ? [{ key: href, name: i.label, file }] : [];
+});
 
 describe("door page names (menu = <title> = first <h1>)", () => {
   it("reads every door.nav item that has a page file", () => {
@@ -99,5 +138,29 @@ describe("door page names (menu = <title> = first <h1>)", () => {
       return mismatch(item) ? [] : [`${key}: already matches "${item.name}" -- delete the row`];
     });
     expect(bad, bad.join("\n")).toEqual([]);
+  });
+});
+
+const NL = "\n";
+
+describe("staff sidebar page names (sidebar label = <title> = first <h1>)", () => {
+  it("reads every sidebar link that has a page file", () => {
+    expect(staffItems.length).toBeGreaterThan(40);
+  });
+
+  it("no page outside the to-do list mismatches its sidebar label", () => {
+    const bad = staffItems.filter((i) => !STAFF_TODO[i.key]).flatMap((i) => { const m = mismatch(i); return m ? [`${i.key} (sidebar "${i.name}"): ${m}`] : []; });
+    expect(bad, bad.join(NL)).toEqual([]);
+  });
+
+  it("every to-do row names a real sidebar page, an owner card and a deadline, and still mismatches", () => {
+    const byKey = new Map(staffItems.map((i) => [i.key, i]));
+    const bad = Object.entries(STAFF_TODO).flatMap(([key, t]) => {
+      const item = byKey.get(key);
+      if (!item) return [`${key}: not a sidebar page any more -- delete the row`];
+      if (!/^[A-Z]\d+$/.test(t.owner) || !t.until) return [`${key}: needs an owner card and a deadline`];
+      return mismatch(item) ? [] : [`${key}: already matches "${item.name}" -- delete the row`];
+    });
+    expect(bad, bad.join(NL)).toEqual([]);
   });
 });

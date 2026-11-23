@@ -1286,7 +1286,7 @@ export default function TarotStudio({ staff }: { staff?: TarotStaffApi }) {
             }}
           >
             <div style={{ fontSize: 64, lineHeight: 1 }}>🔮</div>
-            <h1 style={{ fontSize: 20, margin: 0 }}>塔羅牌印刷檔生成工具</h1>
+            <h2 style={{ fontSize: 20, margin: 0 }}>塔羅工作台</h2>
             <p className="form-hint" style={{ maxWidth: 360 }}>
               在右側選擇圖片模型 → 選風格 → 點「生成預覽」查看效果 → 滿意後鎖定，整套 78 張同風格生成
             </p>

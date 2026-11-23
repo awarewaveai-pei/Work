@@ -160,7 +160,7 @@ async function DoorFrame({ productKey, bare = false, children }: { productKey: P
       <div className="shell">
         <div className="door-main">
           <DoorProvider nav={door.nav ?? []}>
-            {!bare && <NavRail kind="door" page={door.page} name={product!.name} features={product!.features.map((f) => ({ key: f.feature_key, name: f.name }))} />}
+            {!bare && <NavRail kind="door" page={door.page} name={product!.name} />}
             {!bare && <ClientRail />}
             <div className="door-content">
               {children}

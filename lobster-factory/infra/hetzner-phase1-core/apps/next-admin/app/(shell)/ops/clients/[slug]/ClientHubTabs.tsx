@@ -798,7 +798,7 @@ function BrandColorsCard({ slug, initial }: { slug: string; initial?: { primary?
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
-      setMsg("✓ 已儲存，Banner Studio 即可選此品牌帶入配色");
+      setMsg("✓ 已儲存，橫幅工具即可選此品牌帶入配色");
     } catch (e) {
       setMsg(`⚠ ${String(e)}`);
     } finally {
@@ -818,7 +818,7 @@ function BrandColorsCard({ slug, initial }: { slug: string; initial?: { primary?
   return (
     <Card title="🎨 品牌色 (brandColors)">
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 6px" }}>
-        設定後，Banner Studio 的「配色 / 品牌色」可直接選此客戶帶入。
+        設定後，橫幅工具的「配色 / 品牌色」可直接選此客戶帶入。
       </p>
       {row("主色", primary, setPrimary)}
       {row("次色", secondary, setSecondary)}
