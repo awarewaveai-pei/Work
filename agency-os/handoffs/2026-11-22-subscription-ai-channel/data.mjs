@@ -73,7 +73,8 @@ export const STEPS = [
   { n: 16, code: 'K15', group: 'B5', title: '文章預設模型換成 GPT-6.2 sol', plain: '盲測結果：GPT-6.2 sol 品質排第二，一篇約 NT$2，是原本預設（Claude Opus，約 NT$8）的四分之一。文章頁的預設和排程（網站沒另外選模型時）都改用它；畫面上的估價跟著改。十二個模型的實測結果同時記到「AI 模型與成本」的實測紀錄。',
     gate: '沒選過模型的網站，排程寫文章用的是 GPT-6.2 sol；估價顯示新的金額；已經選了別的模型的地方不受影響；實測紀錄多一組「文章生成」。', risk: 'Medium', model: 'Sonnet 5.5', status: 'done', commit: 'ed7263c36', depends: ['K12'], card: 'briefs/K15-K16.md' },
   { n: 17, code: 'K16', group: 'B5', title: '其他寫文案的地方要不要也換', plain: '文章以外寫文案的地方，八種全部各測一次再換（你 11-22 說「都要測」）：劇本工坊、影片腳本、商品文案、AI 去味、競業分析、每月選題、社群改寫、開發信寫信。每一種用一個真實的輸入，讓現在用的模型和 GPT-6.2 sol 各寫一次，並排給你看。要回固定格式的另外驗格式會不會壞。',
-    gate: '八種各有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'in_progress', depends: ['K15'], card: 'briefs/K15-K16.md' },
+    gate: '八種各有並排比較和實際花費；你選定後才改預設。', risk: 'Low', model: '監工', status: 'in_progress', depends: ['K15'], card: 'briefs/K15-K16.md', before: '待決 5 之後才能補完 Claude 那一半' },  { n: 18, code: 'K17', group: 'B5', title: 'ChatGPT 訂閱也能選模型', plain: '現在 ChatGPT（Codex）訂閱只有一顆按鈕，用的是預設模型。改成和 Claude 訂閱一樣可以選：GPT-6 luna、GPT-6.1 terra、GPT-6.2 sol、GPT-6.2 astra，預設 GPT-6.2 sol。已查過你的訂閱清單裡有這四個。每個網站可以各自存。',
+    gate: '按鈕出現、選的模型真的送到執行程式；真的用訂閱寫一篇要等 Codex 額度恢復（M1）。', risk: 'Low', model: 'Sonnet', status: 'in_progress', depends: ['K6'], card: 'briefs/K17-codex-model.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
@@ -81,7 +82,7 @@ export const OPEN = [
   { n: 1, what: '把主機執行程式專用的一把密鑰放進後台容器（主機設定變更，走失敗會自動還原的工具）。', before: 'K9', src: 'PLAN.md 第 3 節', options: ASK('排程線可以開始接工作。', '排程維持全部走 API。') },
   { n: 2, what: '你本人在主機上登入一次 ChatGPT 帳號。指令由監工備好，你照著貼上並在手機確認。', before: 'K9', src: 'PLAN.md 第 3 節', options: ASK('主機可以用你的訂閱額度寫字。', '只有筆電能用訂閱。') },
   { n: 3, what: '要不要也在主機上登入 Claude 帳號，讓排程能用 Claude 訂閱。Claude 的條款沒有明確允許無人排程，這是三段裡風險最高的一段。', before: 'K9', src: 'PLAN.md 第 2 節', options: ASK('排程的走法裡 Claude 那一段會真的被用到。', '排程選了含 Claude 的走法時，那一段自動跳過。') },
-  { n: 4, what: '在筆電上為「Codex 寫字」另外登入一次 ChatGPT（寫字用乾淨的專用資料夾，和你平常寫程式的 Codex 分開）。指令由監工備好。', before: 'M1', src: 'PLAN.md 第 2 節 I3', options: ASK('你本人按的功能可以用 Codex 訂閱寫字。', '筆電只用 Claude 訂閱寫字；Codex 那一段自動跳過。') },
+  { n: 4, what: '在筆電上為「Codex 寫字」另外登入一次 ChatGPT（寫字用乾淨的專用資料夾，和你平常寫程式的 Codex 分開）。指令由監工備好。', before: 'M1', src: 'PLAN.md 第 2 節 I3', options: ASK('你本人按的功能可以用 Codex 訂閱寫字。', '筆電只用 Claude 訂閱寫字；Codex 那一段自動跳過。') },  { n: 5, what: '筆電上的 Claude 指令列登入過期了（2026-11-23 發現）。請在終端機輸入 claude，再打 /login，選訂閱帳號登入。', before: 'K16', src: 'DISPATCH.md 現況快照', options: ASK('八種文案實測可以補完；「Claude 訂閱」走法恢復可用。', '實測只有 GPT 那一半；Claude 訂閱走法會自動改走 API。') },
 ];
 
 export const SAFE = [
