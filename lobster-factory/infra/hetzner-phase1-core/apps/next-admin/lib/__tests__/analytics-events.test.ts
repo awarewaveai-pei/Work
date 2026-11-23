@@ -70,3 +70,28 @@ describe("without a PostHog key", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("trackClientPicked", () => {
+  it("sets the group to the picked row's hash, then sends client_picked; it calls no API and holds no /api string", async () => {
+    const { trackClientPicked } = await import("../client-context/track-picked");
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
+    vi.stubGlobal("window", {});
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    trackClientPicked("0123456789abcdef", false);
+    expect(group).toHaveBeenCalledWith("organization", "0123456789abcdef");
+    expect(capture).toHaveBeenCalledWith("client_picked", expect.objectContaining({ surface: "workspace" }));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(readFileSync(path.join(ROOT, "lib/client-context/track-picked.ts"), "utf8")).not.toContain("/api/");
+    vi.unstubAllGlobals();
+  });
+  it("a row without a hash: the event goes, no group", async () => {
+    const { trackClientPicked } = await import("../client-context/track-picked");
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test");
+    vi.stubGlobal("window", {});
+    trackClientPicked(undefined, true);
+    expect(group).not.toHaveBeenCalled();
+    expect(capture).toHaveBeenCalledWith("client_picked", expect.objectContaining({ surface: "door" }));
+    vi.unstubAllGlobals();
+  });
+});

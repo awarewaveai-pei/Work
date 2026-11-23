@@ -15,6 +15,7 @@ import { resolveOpsRole, canModifyIncidentStatus } from "@/lib/ops-role";
 import { NAV_FIRST, NAV_SEARCH_LIMIT, toPickOrg, type PickOrg } from "@/app/(shell)/ops/clients/nav-orgs";
 import { orgNameFilter, orgSearchTerm } from "@/lib/org-search";
 import { staffOnly } from "@/lib/tenant-guard";
+import { organizationGroupId } from "@/lib/analytics-group";
 // billingLedger reads with the service-role client itself (billing_ledger is granted to service_role only, 0148)
 import { billingLedger, type BillingLedger } from "@/lib/entitlements/tables";
 
@@ -43,7 +44,7 @@ const ORG_CATEGORIES = [
 export type OrgCategory = (typeof ORG_CATEGORIES)[number]["key"];
 /** A row's tag = a category it belongs to (never "all"). */
 export type OrgTag = Exclude<OrgCategory, "all">;
-export type TaggedOrg = PickOrg & { tags: OrgTag[] };
+export type TaggedOrg = PickOrg & { tags: OrgTag[] };   // + group, set by grouped()
 
 /** A billing category = billing_ledger 'all' rows that pass the same rule as that RPC filter (0148: attention =
  *  reasons, contract = has_contract, balance = balance > 0), so one cached read answers all three and the tags. */
@@ -62,6 +63,9 @@ const TEST_ORGS_MAX = 500;
 type OrgRow = { id: string; slug: string; name?: string | null; kind?: string | null; parent_organization_id?: string | null; color?: unknown; brandColors?: unknown };
 type LedgerRow = BillingLedger["rows"][number];
 type Ledger = { rows: LedgerRow[]; partial: boolean };
+
+/** Every row the route answers carries its analytics group id (staffOnly below: a customer never gets this answer). */
+const grouped = <T extends { id: string }>(o: T): T & { group: string } => ({ ...o, group: organizationGroupId(o.id) });
 
 const isCategory = (v: string): v is OrgCategory => ORG_CATEGORIES.some((c) => c.key === v);
 
@@ -169,7 +173,7 @@ async function categoryPage(supabase: SupabaseClient, category: OrgCategory, inc
   }
   const byAccount = new Map(ledger.rows.map((r) => [r.organization_id, ledgerTags(r)]));
   const orgs: TaggedOrg[] = rows.map((r) => ({
-    ...toPickOrg(r),
+    ...grouped(toPickOrg(r)),
     tags: [...(byAccount.get(r.parent_organization_id ?? r.id) ?? []), ...(isTest(r, testIds) ? ["test" as const] : [])],
   }));
   // tagsPartial: accounts past LEDGER_MAX_PAGES have no billing tags and are missing from 需處理／訂閱／點數
@@ -233,12 +237,12 @@ export async function GET(request: Request) {
   if (error) {
     return NextResponse.json({ ok: false, error: "org_search_failed", details: error.message }, { status: 500 });
   }
-  const orgs = ((data ?? []) as unknown as OrgRow[]).map(toPickOrg);
+  const orgs = ((data ?? []) as unknown as OrgRow[]).map((r) => grouped(toPickOrg(r)));
   // ?include=<uuid>: the client named in the URL shows even when it is not in this page (same columns, first row).
   const include = params.get("include");
   if (include && UUID.test(include) && !orgs.some((o) => o.id === include)) {
     const one = await supabase.from("organizations").select(ORG_SEARCH_COLUMNS).neq("status", "inactive").eq("id", include).maybeSingle();
-    if (one.data) orgs.unshift(toPickOrg(one.data as unknown as OrgRow));
+    if (one.data) orgs.unshift(grouped(toPickOrg(one.data as unknown as OrgRow)));
   }
   // total: every matching client (no q only; a search reports what it returned)
   return NextResponse.json({ ok: true, orgs, total: count ?? orgs.length });

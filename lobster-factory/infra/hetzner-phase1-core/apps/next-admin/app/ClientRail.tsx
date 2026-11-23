@@ -101,7 +101,7 @@ export function ClientRail() {
   const internalOrgId = page.internalOrgId ?? ctx.internalOrgId;
   // under 全部, or wherever it is the picked client (it must not vanish from the list)
   const self: PickOrg | null = internalOrgId && (category === "all" || org === internalOrgId)
-    ? { id: internalOrgId, slug: "", name: SELF_NAME, color: SELF_DOT, brandColors: [] }
+    ? { id: internalOrgId, slug: "", name: SELF_NAME, color: SELF_DOT, brandColors: [], group: page.first.find((o) => o.id === internalOrgId)?.group }
     : null;
   const others = page.first.filter((o) => o.id !== internalOrgId);
   const rows: PickOrg[] = self ? [self, ...others] : others;
@@ -155,7 +155,7 @@ export function ClientRail() {
             total={page.total + (self ? 1 : 0)}
             selected={org}
             by="id"
-            onPick={(o) => ctx.setOrg(o ? o.id : null)}
+            onPick={(o) => ctx.setOrg(o ? o.id : null, o?.group)}
             searchPath={ORG_SEARCH_PATH}
             badge={badge}
             hint={hint}

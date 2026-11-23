@@ -22,12 +22,11 @@ describe("analytics-context", () => {
     expect(Object.keys(j).sort()).toEqual(["group", "role", "source"]);
     expect(JSON.stringify(j)).not.toContain(A);
   });
-  it("a customer cannot ask for another organization's hash", async () => {
+  it("a customer cannot ask for another organization's hash: ?org is ignored", async () => {
     expect((await get(`?org=${B}`, { "x-ops-org-id": A, "x-ops-user-kind": "client" })).group).toBe(organizationGroupId(A));
   });
-  it("staff: no group without ?org, the hash of the picked client with it, nothing for a non-uuid", async () => {
+  it("staff have no group here, with or without ?org", async () => {
     expect((await get("")).group).toBeNull();
-    expect((await get(`?org=${B}`)).group).toBe(organizationGroupId(B));
-    expect((await get("?org=not-a-uuid")).group).toBeNull();
+    expect((await get(`?org=${B}`)).group).toBeNull();
   });
 });

@@ -13,6 +13,9 @@ export interface PickOrg {
   name: string;
   color: string;
   brandColors: string[];
+  /** Analytics group id (lib/analytics-group.ts): made by GET /api/ops/org-search only, never by the browser. Absent on rows
+   *  built elsewhere (the pickers that do not report it). */
+  group?: string;
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;

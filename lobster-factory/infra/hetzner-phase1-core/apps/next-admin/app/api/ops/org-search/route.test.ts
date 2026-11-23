@@ -62,7 +62,7 @@ describe("GET /api/ops/org-search", () => {
   it("selects no whole metadata column and returns only the picker's fields", async () => {
     const body = await get("?q=ac");
     for (const col of calls.select.find((c) => c.includes("slug"))!.split(",")) expect(col.includes("metadata") ? col.includes("->") : true, col).toBe(true);
-    expect(body.orgs.map((o: object) => Object.keys(o).sort())).toEqual([["brandColors", "color", "id", "name", "slug"]]);
+    expect(body.orgs.map((o: object) => Object.keys(o).sort())).toEqual([["brandColors", "color", "group", "id", "name", "slug"]]);
     expect(body.orgs[0].brandColors).toEqual(["#112233"]);   // a non-hex value is not a colour
   });
 
@@ -81,6 +81,23 @@ describe("GET /api/ops/org-search", () => {
     expect(body.orgs.map((o: { id: string }) => o.id)).toEqual([INC, "o1"]);
     expect(calls.eq).toEqual([["id", INC]]);
     expect(calls.select[1]).toBe(calls.select[0]);
+  });
+
+  it("every row carries the analytics group hash, the same value analytics-context gives for that organization: search, first page, ?include= and category rows", async () => {
+    const { organizationGroupId } = await import("@/lib/analytics-group");
+    calls.extra = { id: INC, slug: "far", name: "Far", color: null, brandColors: null };
+    const body = await get(`?include=${INC}`);
+    expect(body.orgs.map((o: { id: string; group: string }) => [o.id, o.group])).toEqual([[INC, organizationGroupId(INC)], ["o1", organizationGroupId("o1")]]);
+    const search = await get("?q=ac");
+    expect(search.orgs[0].group).toBe(organizationGroupId("o1"));
+    const C = "55555555-5555-4555-8555-555555555555";
+    calls.rows = [{ id: C, slug: "acme", name: "Acme", color: null, brandColors: null }];
+    calls.internal = { id: "o3" };
+    calls.ledger = { rows: [], matching: 0 };
+    const cat = await get("?category=all");
+    expect(cat.orgs[0].group).toBe(organizationGroupId(C));
+    const ctx = await (await import("../analytics-context/route")).GET(new Request("http://x/api/ops/analytics-context", { headers: { "x-ops-org-id": C, "x-ops-user-kind": "client" } })).then((r) => r.json());
+    expect(ctx.group).toBe(cat.orgs[0].group);   // one function, one value, on either route
   });
 
   it("?include=<uuid> adds no duplicate when the client is already in the page", async () => {
@@ -159,7 +176,7 @@ describe("GET /api/ops/org-search?category=", () => {
     expect(body.orgs.map((o: { id: string; tags: string[] }) => [o.id, o.tags])).toEqual([
       [C1, ["attention", "contract", "credits"]], [BRAND, ["attention", "contract", "credits"]],
     ]);
-    for (const o of body.orgs) expect(Object.keys(o).sort()).toEqual(["brandColors", "color", "id", "name", "slug", "tags"]);
+    for (const o of body.orgs) expect(Object.keys(o).sort()).toEqual(["brandColors", "color", "group", "id", "name", "slug", "tags"]);
   });
 
   it("test: only kind = test, each tagged test", async () => {

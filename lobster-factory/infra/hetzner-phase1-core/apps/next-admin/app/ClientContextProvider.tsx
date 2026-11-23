@@ -135,8 +135,8 @@ export function ClientContextProvider({ sessionOrg, hostOrg, internalOrgId, site
     });
   }, [needsRewrite, spKey, targetOrg, targetSite, replaceQuery]);
 
-  const setOrg = useCallback((org: string | null) => {
-    if (org) trackClientPicked(org, onDoor);
+  const setOrg = useCallback((org: string | null, group?: string | null) => {
+    if (org) trackClientPicked(group, onDoor);
     replaceQuery((p) => {
       for (const k of ORG_DEPENDENT_PARAMS) p.delete(k);
       p.delete("siteId");

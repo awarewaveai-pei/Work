@@ -28,7 +28,8 @@ export interface ClientContextValue {
   /** 產品 key → https://<host>（伺服器算好傳下，瀏覽器不讀 env）。 */
   hosts: Readonly<Record<string, string>>;
   /** 換客戶：一律清掉 ORG_DEPENDENT_PARAMS。null＝回到未選。 */
-  setOrg(org: string | null): void;
+  /** group = the picked row's analytics group id (org-search), for the client_picked event only. */
+  setOrg(org: string | null, group?: string | null): void;
   setSite(site: string | null): void;
   /** 內部：登記本頁的層，回傳取消登記。 */
   register(layer: Layer): () => void;
