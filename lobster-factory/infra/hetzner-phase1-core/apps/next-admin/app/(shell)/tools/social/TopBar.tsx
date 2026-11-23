@@ -31,7 +31,7 @@ export default function TopBar({ section, brands, total = brands.length, brand, 
   const pick = (b: Brand) => { setOpen(false); setSearch(""); onBrand(b.id, found ? b : undefined); };
   return (
     <header className="sm-topbar">
-      <h1>社群發文</h1>
+      <h1>社群貼文</h1>
       <nav className="sm-sections" aria-label="功能">
         {SECTIONS.map((s) => (
           <button type="button" key={s.key} data-view={s.key} className={s.key === section ? "sm-on" : ""} aria-current={s.key === section ? "page" : undefined}

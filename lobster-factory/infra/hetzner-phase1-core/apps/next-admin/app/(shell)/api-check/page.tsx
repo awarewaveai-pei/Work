@@ -1,4 +1,7 @@
 import { ApiCheckTelemetry } from "./ApiCheckTelemetry";
+import { SR_ONLY } from "@/lib/portal/sr-only";
+
+export const metadata = { title: "API 健康" };
 
 async function getHealth() {
   const base =
@@ -18,6 +21,7 @@ export default async function ApiCheckPage() {
 
   return (
     <>
+      <h1 style={SR_ONLY}>API 健康</h1>
       <div className="topbar">
         <span className="topbar-title">API Health — Server</span>
         <span className={`card-badge ${ok ? "badge-green" : "badge-red"}`}>

@@ -2211,8 +2211,18 @@
         "nav": [
           {
             "path": "",
-            "name": "內容編輯",
+            "name": "寫文章",
             "staff": "tools/content"
+          },
+          {
+            "path": "rewrite",
+            "name": "改寫",
+            "staff": "tools/content/rewrite"
+          },
+          {
+            "path": "drafts",
+            "name": "草稿",
+            "staff": "tools/content/drafts"
           },
           {
             "path": "topics",
@@ -2227,12 +2237,12 @@
           },
           {
             "path": "sites",
-            "name": "網站",
+            "name": "我的網站",
             "staff": "tools/content/sites"
           },
           {
             "path": "events",
-            "name": "節日",
+            "name": "節日行事曆",
             "staff": "tools/events"
           }
         ]
@@ -2463,7 +2473,7 @@
           },
           {
             "path": "canvas",
-            "name": "畫布",
+            "name": "修圖（專業版）",
             "staff": "tools/photo-pro"
           },
           {

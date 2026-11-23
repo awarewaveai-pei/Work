@@ -77,38 +77,9 @@ function mismatch({ name, file }: Item): string | null {
 const TODO: Record<string, { owner: string; until: string }> = {};
 
 // Staff sidebar pages (keyed by href) whose <title>/<h1> predate the rule: operations and back-office pages that mirror no
-// door page. U36 (registered by the supervisor) renames them; /tools/theme is the theme session's (no other card edits it).
+// door page. /tools/theme is the theme session's (no other card edits it); U13 renames it.
 const STAFF_TODO: Record<string, { owner: string; until: string }> = {
-  "/": { owner: "U36", until: "第 9 批" },
-  "/api-check": { owner: "U36", until: "第 9 批" },
-  "/api-check-client": { owner: "U36", until: "第 9 批" },
-  "/build": { owner: "U36", until: "第 9 批" },
-  "/cs-widget": { owner: "U36", until: "第 9 批" },
-  "/onboard": { owner: "U36", until: "第 9 批" },
-  "/ops-console": { owner: "U36", until: "第 9 批" },
-  "/ops/approvals": { owner: "U36", until: "第 9 批" },
-  "/ops/clients": { owner: "U36", until: "第 9 批" },
-  "/ops/collect": { owner: "U36", until: "第 9 批" },
-  "/ops/costs": { owner: "U36", until: "第 9 批" },
-  "/ops/cs": { owner: "U36", until: "第 9 批" },
-  "/ops/inbox": { owner: "U36", until: "第 9 批" },
-  "/ops/integrations": { owner: "U36", until: "第 9 批" },
-  "/ops/knowledge": { owner: "U36", until: "第 9 批" },
-  "/ops/onboarding": { owner: "U36", until: "第 9 批" },
-  "/ops/repairs": { owner: "U36", until: "第 9 批" },
-  "/ops/schedules": { owner: "U36", until: "第 9 批" },
-  "/ops/staff": { owner: "U36", until: "第 9 批" },
-  "/ops/system-modes": { owner: "U36", until: "第 9 批" },
-  "/ops/tools": { owner: "U36", until: "第 9 批" },
-  "/tools/ai-models": { owner: "U36", until: "第 9 批" },
-  "/tools/canvas": { owner: "U36", until: "第 9 批" },
-  "/tools/edit-guide": { owner: "U36", until: "第 9 批" },
-  "/tools/outreach": { owner: "U36", until: "第 9 批" },
-  "/tools/outreach/guide": { owner: "U36", until: "第 9 批" },
-  "/tools/outreach/settings": { owner: "U36", until: "第 9 批" },
-  "/tools/publish": { owner: "U36", until: "第 9 批" },
-  "/tools/social": { owner: "U36", until: "第 9 批" },
-  "/tools/theme": { owner: "U36", until: "第 9 批" },
+  "/tools/theme": { owner: "U13", until: "第 8 批" },
 };
 
 // Staff sidebar links and the page file each opens (app/(shell) or app/(full)); an href with no page file is not checked.

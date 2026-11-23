@@ -21,7 +21,7 @@ import {
 import { CostsTabs, type CostsData } from "./CostsTabs";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "AI & 工具成本 · Ops" };
+export const metadata = { title: "AI 成本" };
 
 /** 流水帳 and the 真實花費 daily chart cover the same 30 Taipei days; 月報 covers the current Taipei month plus the 11 before it. */
 const WINDOW_DAYS = 30;
@@ -101,7 +101,7 @@ export default async function CostsPage() {
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>
-            AI &amp; 工具成本
+            AI 成本
           </h1>
           <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>
             報價匯率 {TWD_RATE}（cost-model.ts）；會計匯率見月報（央行月平均，可人工覆蓋）

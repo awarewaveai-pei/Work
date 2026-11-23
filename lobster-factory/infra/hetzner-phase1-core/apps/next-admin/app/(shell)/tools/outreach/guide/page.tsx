@@ -1,6 +1,7 @@
 import { CAUTIONS, FAQ, INTRO, LIMITS, PRIVACY, SECTIONS } from "./content";
+import { SR_ONLY } from "@/lib/portal/sr-only";
 
-export const metadata = { title: "Guide 操作手冊 · Cold Outreach" };
+export const metadata = { title: "操作指南" };
 
 const link = { color: "var(--text-primary)", textDecoration: "none", display: "block", padding: "6px 0", fontSize: 13 } as const;
 const muted = { color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.7 } as const;
@@ -9,6 +10,7 @@ const tag = { display: "inline-flex", marginRight: 8 } as const;
 export default function OutreachGuidePage() {
   return (
     <>
+      <h1 style={SR_ONLY}>操作指南</h1>
       <div className="topbar">
         <span className="topbar-title">Guide 操作手冊</span>
         <span className="topbar-env">從設定到寄出，一步一步做</span>

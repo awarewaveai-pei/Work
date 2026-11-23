@@ -11,6 +11,8 @@ import type { RepairIncident, RepairRun } from "@/lib/repair-center/types";
 import { RepairActions } from "./RepairActions";
 import { AutoRefresh } from "@/app/AutoRefresh";
 
+export const metadata = { title: "維修中心" };
+
 export const dynamic = "force-dynamic";
 
 const ACTIVE_STATES = ["detected", "triage_needed", "approved", "backing_up", "repairing", "pr_ready", "deploy_pending", "deploying"];
@@ -130,7 +132,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
 
         <header style={{ display: "flex", justifyContent: "space-between", gap: 24, marginBottom: 22, alignItems: "flex-start" }}>
           <div>
-            <h1 style={{ fontSize: 26, fontWeight: 750, color: "var(--text-primary)", marginBottom: 6 }}>修復中心</h1>
+            <h1 style={{ fontSize: 26, fontWeight: 750, color: "var(--text-primary)", marginBottom: 6 }}>維修中心</h1>
             {clientSlug ? (
               <div style={{ fontSize: 12, color: "var(--accent-text)", fontWeight: 650, marginBottom: 6 }}>
                 client: {clientSlug}

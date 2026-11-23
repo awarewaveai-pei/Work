@@ -3,6 +3,9 @@ import AiJobForm from "./AiJobForm";
 import TenantConfigForm from "./TenantConfigForm";
 import { OpsConsoleTelemetry } from "./OpsConsoleTelemetry";
 import DepartmentSelector from "./DepartmentSelector";
+import { SR_ONLY } from "@/lib/portal/sr-only";
+
+export const metadata = { title: "營運主控台" };
 
 interface OpsSummary {
   generatedAt: string;
@@ -102,6 +105,7 @@ export default async function OpsConsolePage() {
   return (
     <>
       <OpsConsoleTelemetry />
+      <h1 style={SR_ONLY}>營運主控台</h1>
       <div className="topbar">
         <span className="topbar-title">Ops Console</span>
         <span className="topbar-env">

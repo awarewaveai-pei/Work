@@ -14,6 +14,8 @@ import { NAV_FIRST, toPickOrg, type PickOrg } from "../clients/nav-orgs";
 import { OrgUrlPicker } from "../clients/OrgPicker";
 import { CollectionSourcesPanel } from "./CollectionSourcesPanel";
 
+export const metadata = { title: "資料蒐集" };
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 

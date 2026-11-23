@@ -1,18 +1,13 @@
-"use client";
+import CanvasPage from "./ToolsCanvasPageClient";
+import { SR_ONLY } from "@/lib/portal/sr-only";
 
-/**
- * /tools/canvas [1-h] — host page for the Fabric.js quick editor.
- *
- * ssr:false because Fabric touches window/document; the editor reads its source image
- * from sessionStorage (set by OutputTrackBar's ✏️ 快速編輯), so no searchParams here.
- */
-import dynamic from "next/dynamic";
+export const metadata = { title: "畫布編輯器" };
 
-const CanvasEditor = dynamic(() => import("./CanvasEditor"), {
-  ssr: false,
-  loading: () => <p style={{ padding: 16, opacity: 0.6 }}>載入編輯器…</p>,
-});
-
-export default function CanvasPage() {
-  return <CanvasEditor />;
+export default function Page() {
+  return (
+    <>
+      <h1 style={SR_ONLY}>畫布編輯器</h1>
+      <CanvasPage />
+    </>
+  );
 }

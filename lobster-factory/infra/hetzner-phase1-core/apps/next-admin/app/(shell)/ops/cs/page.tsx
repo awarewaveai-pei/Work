@@ -6,6 +6,8 @@
 import Link from "next/link";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
+export const metadata = { title: "客服總覽" };
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -36,7 +38,7 @@ export default async function CustomerServiceOverview() {
 
   return (
     <div style={{ padding: "24px 28px", maxWidth: 920 }}>
-      <h1 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>AI 客服營運中心</h1>
+      <h1 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>客服總覽</h1>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "6px 0 20px", lineHeight: 1.6 }}>
         跨客戶的客服營運面。每個客戶的知識庫 / 意圖 / kill-switch 在
         <Link href="/ops/clients" style={{ color: "var(--accent-text)", textDecoration: "none" }}> 客戶中心 → 客服分頁</Link>。

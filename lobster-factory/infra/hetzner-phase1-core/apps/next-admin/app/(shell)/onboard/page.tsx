@@ -1,10 +1,12 @@
 import OnboardWizard from "./OnboardWizard";
+import { SR_ONLY } from "@/lib/portal/sr-only";
 
-export const metadata = { title: "New Client Onboarding — Lobster Factory" };
+export const metadata = { title: "建站精靈" };
 
 export default function OnboardPage() {
   return (
     <>
+      <h1 style={SR_ONLY}>建站精靈</h1>
       <div className="topbar">
         <span className="topbar-title">New Client Onboarding</span>
         <span className="topbar-env">

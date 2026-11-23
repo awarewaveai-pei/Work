@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import SocialApp from "./SocialApp";
 
-export const metadata = { title: "社群發文 · Lobster Factory" };
+export const metadata = { title: "社群貼文" };
 
 export default function SocialPage() {
   return (

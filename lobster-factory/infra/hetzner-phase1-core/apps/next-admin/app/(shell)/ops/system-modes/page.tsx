@@ -6,6 +6,8 @@ import { canChangeSystemMode, readOpsRole } from "@/lib/ops-role";
 import { getPodOrderInboxStats, type PodOrderInboxStats } from "@/lib/studio/pod-order-inbox";
 import { SystemModeControl } from "./SystemModeControl";
 
+export const metadata = { title: "系統模式" };
+
 export const dynamic = "force-dynamic";
 
 interface ModeRow {

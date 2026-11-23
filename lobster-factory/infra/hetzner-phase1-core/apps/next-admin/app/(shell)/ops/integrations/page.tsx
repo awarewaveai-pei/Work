@@ -10,6 +10,8 @@ import { NAV_FIRST, toPickOrg, type PickOrg } from "../clients/nav-orgs";
 import { OrgUrlPicker } from "../clients/OrgPicker";
 import { IntegrationCreatePanel, IntegrationRowActions } from "./IntegrationControls";
 
+export const metadata = { title: "工具串接" };
+
 export const dynamic = "force-dynamic";
 
 const PROVIDERS = [
@@ -133,7 +135,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
     <div style={{ background: "var(--bg-canvas)", minHeight: "100vh", padding: "28px 32px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-start", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 750, color: "var(--text-primary)", marginBottom: 4 }}>Integrations</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 750, color: "var(--text-primary)", marginBottom: 4 }}>工具串接</h1>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7, maxWidth: 760 }}>
             Client connection center. Every monitoring, AI, notification, repository, automation, and hosting connection should be visible here before it powers Repair Center.
           </p>

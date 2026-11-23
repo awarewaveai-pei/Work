@@ -9,6 +9,8 @@ import { InboxGuidePanel } from "./components/InboxGuidePanel";
 import { AutoRefresh } from "@/app/AutoRefresh";
 import type { Incident, IncidentSeverity, IncidentSource, IncidentStatus } from "@/lib/ops-inbox/types";
 
+export const metadata = { title: "事件收件匣" };
+
 interface SearchParams {
   status?: string;
   severity?: string;
@@ -62,7 +64,7 @@ export default async function OpsInboxListPage({ searchParams }: { searchParams:
       {/* ── Page header ─────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>Ops Inbox</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>事件收件匣</h1>
           <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>警報收件匣（非監控儀表）</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

@@ -14,7 +14,7 @@ export function PhotoProFrame() {
       dockSrc="/photo-pro-dock/dock.js"
       dockId="photo-pro-dock"
       fallback={{ href: "/tools/canvas", label: "Canvas 編輯器" }}
-      title="畫布（專業版）"
+      title="修圖（專業版）"
       product="PhotoCraft"
     />
   );

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { OutreachStub } from "../_components/OutreachStub";
+import { SR_ONLY } from "@/lib/portal/sr-only";
 
-export const metadata = { title: "Settings · Cold Outreach" };
+export const metadata = { title: "外聯設定" };
 
 export default function OutreachSettingsPage() {
   return (
     <>
+      <h1 style={SR_ONLY}>外聯設定</h1>
       <div className="topbar">
         <span className="topbar-title">Settings 設定</span>
         <span className="topbar-env">Service Profile · 禁用詞 · Suppression · 同步規則</span>

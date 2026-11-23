@@ -3,7 +3,7 @@ import AiModelsClient from "./AiModelsClient";
 import ImageModelSpecs from "./ImageModelSpecs";
 import MeasuredRuns from "./MeasuredRuns";
 
-export const metadata = { title: "AI Model Guide · Lobster Factory" };
+export const metadata = { title: "AI 模型" };
 
 function SummaryCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (

@@ -8,6 +8,8 @@ import { effectiveOrgId, OrgAccessError } from "@/lib/tenant-guard";
 import { ApprovalList } from "./ApprovalList";
 import { AutoRefresh } from "@/app/AutoRefresh";
 
+export const metadata = { title: "簽核" };
+
 export const dynamic = "force-dynamic";
 
 interface CommandRequestRow {

@@ -11,6 +11,8 @@
 import Link from "next/link";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
+export const metadata = { title: "知識庫" };
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 

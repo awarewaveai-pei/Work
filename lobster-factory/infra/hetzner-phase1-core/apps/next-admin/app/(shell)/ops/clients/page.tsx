@@ -7,6 +7,8 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { canAccessOrg } from "@/lib/tenant-guard";
 import { loadClientProblems, type ClientProblem } from "@/lib/content/topics/overview-load";
 
+export const metadata = { title: "全部客戶" };
+
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
@@ -23,7 +25,7 @@ export default async function ClientsPage() {
   }
   return (
     <div className="page" style={{ maxWidth: 720 }}>
-      <h1 style={{ fontSize: "var(--font-size-xl)", margin: "0 0 6px", color: "var(--text-primary)" }}>客戶</h1>
+      <h1 style={{ fontSize: "var(--font-size-xl)", margin: "0 0 6px", color: "var(--text-primary)" }}>全部客戶</h1>
       <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-base)", margin: "0 0 20px" }}>
         從左側選擇客戶。下面只列「自動內容排程出錯，或這個月有題目失敗」的客戶；沒有列出，不代表一切正常（例如還沒開通的客戶不在這裡）。
       </p>

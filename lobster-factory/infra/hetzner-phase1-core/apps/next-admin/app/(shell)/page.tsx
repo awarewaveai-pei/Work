@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { staffGrantOf, staffMayOpen, staffUnrestricted } from "@/lib/staff-access";
+import { SR_ONLY } from "@/lib/portal/sr-only";
+
+export const metadata = { title: "儀表板" };
 
 function getInternalApiBase(): string {
   const raw = process.env.INTERNAL_API_BASE_URL?.trim();
@@ -122,6 +125,7 @@ export default async function DashboardPage() {
 
   return (
     <>
+      <h1 style={SR_ONLY}>儀表板</h1>
       <div className="topbar">
         <span className="topbar-title">Dashboard</span>
         <span className="topbar-env">
