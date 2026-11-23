@@ -81,7 +81,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>算命站 WordPress 階段 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
-  <div class="bar" data-computed><i class="d" style="width:62.5%"></i><i class="g" style="width:0%"></i></div>
+  <div class="bar" data-computed><i class="d" style="width:62.5%"></i><i class="g" style="width:12.5%"></i></div>
   <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>20</span>／<span data-computed>32</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你點頭</span><small><span data-computed>6</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
@@ -308,25 +308,25 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>卡片：</b><code>briefs/WP-SF-J-pages.md</code></p>
         <p><b>併入於：</b><code>dcc3c8922</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#P4">P4</a>、<a href="#SF-K">SF-K</a>、<a href="#SF-P">SF-P</a>、<a href="#SF-L">SF-L</a>、<a href="#SF-J2">SF-J2</a>、<a href="#E6">E6</a>、<a href="#SF-I2">SF-I2</a></li><li class="step todo" id="P4">
+    </div></li><li class="grp">可同時進行：<a href="#P4">P4</a>、<a href="#SF-K">SF-K</a>、<a href="#SF-P">SF-P</a>、<a href="#SF-L">SF-L</a>、<a href="#SF-J2">SF-J2</a>、<a href="#E6">E6</a>、<a href="#SF-I2">SF-I2</a></li><li class="step doing" id="P4">
     <div class="n">21</div>
     <div class="b">
       <p class="plain">讓這支外掛能像其他自有外掛一樣打包、發佈、安裝到網站。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>發佈與安裝腳本預演正確。</p>
       <details><summary>細節：P4 外掛發佈管道</summary>
         <p><b>需先完成：</b><a href="#P1">P1</a></p>
-        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+        <p><b>卡片：</b><code>briefs/WP-P4-plugin-release.md</code></p>
       </details>
-    </div></li><li class="step todo" id="SF-K">
+    </div></li><li class="step doing" id="SF-K">
     <div class="n">22</div>
     <div class="b">
       <p class="plain">後台幾處寫死的「已完成」打勾與過時說明，改成顯示真實狀態。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Sonnet 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-low">風險 Low</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>清單上每一處都改掉。</p>
       <details><summary>細節：SF-K 清掉假的狀態顯示</summary>
         <p><b>需先完成：</b><a href="#SF-J">SF-J</a></p>
-        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+        <p><b>卡片：</b><code>briefs/WP-SF-K-fake-status.md</code></p>
       </details>
     </div></li><li class="step todo" id="SF-P">
     <div class="n">23</div>
@@ -348,25 +348,25 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>需先完成：</b><a href="#SF-F">SF-F</a>、<a href="#SF-H">SF-H</a>、<a href="#SF-I">SF-I</a>、<a href="#SF-J">SF-J</a>；待決 3</p>
         <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
       </details>
-    </div></li><li class="step todo" id="SF-J2">
+    </div></li><li class="step doing" id="SF-J2">
     <div class="n">25</div>
     <div class="b">
       <p class="plain">表單上用按鈕明確選「新客戶」或「既有客戶」，才能替已經有的客戶再加網站；並在資料庫加上限制，同一個網址不會被建成兩筆。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（資料表異動套用是 High）</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium（資料表異動套用是 High）</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>既有客戶加第二個網站成功；同一個網址同時送兩次只會成功一次。</p>
       <details><summary>細節：SF-J2 建站表單補強</summary>
         <p><b>需先完成：</b><a href="#SF-J">SF-J</a>、<a href="#SF-H">SF-H</a></p>
-        <p><b>卡片：</b><code>briefs/SITE-FLOW-COMPLETION-PLAN.md</code></p>
+        <p><b>卡片：</b><code>briefs/WP-SF-J2-site-form.md</code></p>
       </details>
-    </div></li><li class="step todo" id="E6">
+    </div></li><li class="step doing" id="E6">
     <div class="n">26</div>
     <div class="b">
       <p class="plain">登入會員按 AI 解讀時，引擎的頁面去跟外層的 WordPress 拿票，額度才會記在這位會員身上；每日運勢的「宜／忌」補上英文。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
       <p class="donewhen"><b>完成的樣子：</b>登入會員的 AI 次數記在自己名下；英文信沒有中文段落。</p>
       <details><summary>細節：E6 引擎：會員票與英文每日信</summary>
         <p><b>需先完成：</b><a href="#P3">P3</a>、<a href="#E4">E4</a></p>
-        <p><b>卡片：</b><code>briefs/ORACLE-WP-SPEC.md</code></p>
+        <p><b>卡片：</b><code>briefs/WP-E6-ticket-and-daily-en.md</code></p>
       </details>
     </div></li><li class="step todo" id="SF-I2">
     <div class="n">27</div>
