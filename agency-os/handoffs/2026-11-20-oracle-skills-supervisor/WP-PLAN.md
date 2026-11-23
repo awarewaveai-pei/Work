@@ -15,7 +15,7 @@
 | 1 | E1 → E3 | E4 | SF-C → SF-D | SF-B | A1 |
 | 2 | E2 | P1 | SF-E → SF-F | SF-G | 套 migration（SF-B，需同意） |
 | 3 | E5（Sonnet 5.5）→ P3 | P2 | SF-E2 → SF-H | SF-J（Sonnet 5.5）；SF-I 等 SF-I0 | SF-I0（需同意） |
-| 4 | — | P4 | SF-K | SF-P | 一次部署 next-admin＋smoke；SF-L（需同意） |
+| 4 | E6 | P4（含訂閱表單人機驗證、網址變更清快取、7.4 檢查、翻譯） | SF-K → SF-I2 | SF-J2 → SF-P | SF-L 前置（備份腳本修正與上主機）；SF-L（需同意） |
 | 5 | — | — | — | — | GO-1 → GO-2 → GO-3（每步需同意）；SF-O、SF-A（文件要指到 SF-L 跑完才存在的手冊與流程） |
 
 - 關鍵路徑：E1 → P1 → P3 → GO-3；平台 SF-C → SF-D → SF-E → SF-H → SF-L → GO-2。
@@ -45,6 +45,8 @@
 | E5 | 引擎收尾：CSP 範圍互補測試、工具結果區標記、sg-deploy smoke 改打嵌入頁 | 第二批 RISKS | 批 3 前寫 | Sonnet 5.5 | Low（smoke 屬部署腳本，Medium） |
 | SF-E2 | 主機腳本加固（第二批 RISKS 的主機項） | 第二批 RISKS | 批 3 前寫 | Opus 5.5＋`critic` Deep | High |
 | SF-J2 | 建站表單補強：明確選新／既有客戶；`environments.metadata.host_slug` 唯一性（migration，套用需同意） | 第三批 RISKS | 批 4 前寫 | Opus 5.5＋`db-expert` | Medium |
+| E6 | 引擎：框內頁向父頁取會員票（`window.parent.awOracleTicket()`）；`lib/daily.ts` 宜忌英文 | 第三批 RISKS | 批 4 前寫 | Opus 5.5 | Medium |
+| SF-I2 | `listBridgeClients`／`bridgeClientForSite` 的呼叫端改讀 `listBridgeClientsWithRegistered` | 第三批 RISKS | 批 4 前寫 | Opus 5.5 | Medium |
 | SF-I0 | MainWP 金鑰進 next-admin | SITE-FLOW §3 | 監工 | 監工 | High |
 | SF-I | MainWP、wp-bridge、寫 `wp_sites` | SITE-FLOW §3 | 批 3 前寫 | Opus 5.5＋`critic` ×2（憑證） | High |
 | SF-J | 兩個頁面 | SITE-FLOW §2、§3 | 批 3 前寫 | Sonnet 5.5（`frontend-designer`） | Medium |

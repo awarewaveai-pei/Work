@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-23（續9）— oracle WP：SF-I 併入；第三批全部交回，整批 RISKS 總檢完成；新增卡 E6、SF-I2
+
+- SF-I 併入 `6250432ec`（工人 `8a6e4fbeb`，已 push；今晚 03:00 自動部署帶上，`site.mainwp`、`site.bridge` 開關關）：`lib/site-flow/steps/{mainwp,bridge}.ts`、`lib/site-flow/mainwp-client.ts`、`lib/payments/woo.ts`（加 `env:<environments.id>` 形式的已登記站，私鑰取自保管庫；`listBridgeClientsWithRegistered`；環境變數客戶端行為不變）、`lib/content/r2-delete-guard.ts:98` 改讀含登記站的清單、`engine.ts:197` `requiresOn`、`gate-client.ts:169` staging 的 `put-bridge-pubkey` 轉接、`steps/shared.ts:118` metadata 寫入 CAS。
+- 監工驗收：讀 `r2-delete-guard.ts` 與 `woo.ts` 的 diff（`env:` 開頭的 id 不會退回預設客戶端）、`steps/bridge.ts:337-352` verify（公開 `/health` 版本＋簽章唯讀請求＋`wp_sites` 歸屬讀回）；next-admin `npx tsc --noEmit` exit 0、全套 vitest 5671 passed／0 failed 後才 push。工人證據：私鑰外洩斷言涵蓋 run、console、閘門參數與 stdin、對外網址、資料表；三次突變；兩個獨立 critic Deep＋修正輪 critic，6 Major 全修；Playwright sites 7/7。
+- 第三批全部交回（E5、P2、SF-E2、SF-J、SF-H、P3、SF-I；SF-I0 監工）。整批 RISKS 總檢：`data.mjs` 第三批表共 40 列，本次補 SF-H 7、P3 6、SF-I 8 列。
+  - 現在處理 → 第四批新卡 E6：引擎框內頁呼叫 `window.parent.awOracleTicket()`（否則會員 AI 額度不生效，`oracle-wp-plugin/assets/embed-same-origin.js:31`）；`Projects/internal/ziwei-doushu/lib/daily.ts:216` 宜忌英文。
+  - 現在處理 → 第四批新卡 SF-I2：`listBridgeClients`／`bridgeClientForSite` 的呼叫端（發佈、warm-leads、影片嵌入）改讀登記站。
+  - 現在處理 → 併入 P4：訂閱表單 Cloudflare Turnstile；`server_engine_url` 變更時清工具清單快取；PHP 7.4 lint；`.po`；發佈管道本身（SF-H 回報勾選 oracle 外掛會下載失敗）。P4 模型由 Sonnet 改 Opus（含表單驗證）。
+  - 現在處理 → 併入 SF-J2：憑證分頁可改刪建站流程產生的金鑰紀錄（`credentials/route.ts`、`credentials/secret/route.ts`）；`records.ts:349-357` `ensureEnvironment` 寫 metadata 無 CAS。併入 SF-K：MainWP 連線中斷的提示被「失敗」蓋住（`engine.ts:733`）。
+  - 實測（SF-L／GO-2）：MainWP v2 欄位（`mainwp-client.ts:10-14`）；「正式開放」打公開網址的 hairpin；`REMOTE_ADDR` 真 IP；WP-Cron 實際寄出。
+  - 接受／不處理（理由在表）：Resend 標籤（FluentSMTP 2.4.5 無 Resend 驅動，以寄件子網域區分）；`ENGINE_URL_RE` 埠號範圍；閘門不回報備份時間；閘門無撤銷金鑰子動詞（重跑沿用同一把）；安裝進度靠頁面輪詢；狀態頁唯讀打 MainWP 與站。
+- `WP-PLAN.md` 第四批改為：線1 E6；線2 P4；線3 SF-K → SF-I2；線4 SF-J2 → SF-P；監工 SF-L 前置（備份腳本 `.env` 錯誤計入 `SITE_ERRORS`、三支備份腳本上主機）。`data.mjs` 共 32 張。第四批 brief 未寫、未派工。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit && npx vitest run（quizzical worktree @ 整合結果） | exit=0 | ms=41000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/6m/9n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=listBridgeClientsWithRegistered | hits=5
+- ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；SF-I 兩個獨立 critic Deep＋修正輪（6 Major 已修）＋三次突變＋監工讀 diff 與全套測試代替
 ## 2026-11-23（續8）— meeting-service：查詢面板從飄浮視窗改成右側整條側欄（操作者：「我不喜歡目前的飄浮視窗」）
 
 - 已修改：`lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/lookup_panel.py`——`overrideredirect`＋`SHAppBarMessage`（ABM_NEW／QUERYPOS／SETPOS，ABE_RIGHT）向 Windows 登記佔用螢幕右邊整條，寬 4.8 吋；`show()`／`hide()`／`quit()` 成對登記與釋放；原視窗的關閉鈕改為「隱藏」按鈕。README 同步。
