@@ -97,6 +97,7 @@ describe("GET /api/ops/org-search", () => {
     const cat = await get("?category=all");
     expect(cat.orgs[0].group).toBe(organizationGroupId(C));
     const ctx = await (await import("../analytics-context/route")).GET(new Request("http://x/api/ops/analytics-context", { headers: { "x-ops-org-id": C, "x-ops-user-kind": "client" } })).then((r) => r.json());
+    expect(cat.internalGroup).toBe(organizationGroupId("o3"));   // the internal org's hash rides the answer itself, not a first-page row
     expect(ctx.group).toBe(cat.orgs[0].group);   // one function, one value, on either route
   });
 

@@ -6,9 +6,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClientContextProvider } from "../ClientContextProvider";
 import { ClientRail } from "../ClientRail";
+import { trackClientPicked } from "@/lib/client-context/track-picked";
 import { useClientContext } from "@/lib/client-context/use-client-context";
 import type { Layer } from "@/lib/client-context/contract";
 
+vi.mock("@/lib/client-context/track-picked", () => ({ trackClientPicked: vi.fn() }));
 const nav = vi.hoisted(() => ({ search: "", replace: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: nav.replace }),
@@ -189,6 +191,16 @@ describe("ClientRail", () => {
     const row = await screen.findByRole("button", { name: /Acme/ });
     expect(row.textContent).toContain("需處理・點數");
     expect((row.querySelector("span[aria-hidden]") as HTMLElement).style.background).toBe("var(--text-muted)");
+  });
+
+  it("AwareWave 自己 carries the answer's internalGroup even when the first page has no internal row", async () => {
+    fetchMock.mockImplementation(async () => json({
+      ok: true, total: 1, categories: CATEGORIES, internalOrgId: INTERNAL, internalGroup: "feedfacefeedface",
+      orgs: [org(A, "acme", "Acme")],
+    }));
+    mount({ layer: "org" });
+    fireEvent.click(await screen.findByRole("button", { name: "AwareWave 自己" }));
+    expect(trackClientPicked).toHaveBeenLastCalledWith("feedfacefeedface", false);
   });
 
   it("on a door (no internal id prop) AwareWave 自己 comes from the answer", async () => {

@@ -177,7 +177,9 @@ async function categoryPage(supabase: SupabaseClient, category: OrgCategory, inc
     tags: [...(byAccount.get(r.parent_organization_id ?? r.id) ?? []), ...(isTest(r, testIds) ? ["test" as const] : [])],
   }));
   // tagsPartial: accounts past LEDGER_MAX_PAGES have no billing tags and are missing from 需處理／訂閱／點數
-  return { orgs, total, internalOrgId, internalOrgFailed, tagsFailed, tagsPartial: ledger.partial };
+  // internalGroup: the internal org's own hash, so 「AwareWave 自己」 has a group even when the first page lacks its row
+  const internalGroup = internalOrgId ? organizationGroupId(internalOrgId) : null;
+  return { orgs, total, internalOrgId, internalGroup, internalOrgFailed, tagsFailed, tagsPartial: ledger.partial };
 }
 
 export async function GET(request: Request) {

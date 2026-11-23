@@ -59,11 +59,12 @@ interface RailPage {
   failed: boolean;
   categories: Array<{ key: OrgCategory; label: string }>;
   internalOrgId: string | null;
+  internalGroup: string | null;
 }
 
 /** 員工的客戶第一頁（這個類別；+ 網址指定的那一個），交給 OrgPicker 畫。 */
 function useFirstPage(enabled: boolean, category: OrgCategory, include: string | null): RailPage {
-  const [state, setState] = useState<RailPage>({ category: null, first: [], total: 0, failed: false, tagsFailed: false, tagsPartial: false, internalOrgFailed: false, categories: [], internalOrgId: null });
+  const [state, setState] = useState<RailPage>({ category: null, first: [], total: 0, failed: false, tagsFailed: false, tagsPartial: false, internalOrgFailed: false, categories: [], internalOrgId: null, internalGroup: null });
   useEffect(() => {
     if (!enabled) return;
     let live = true;
@@ -80,6 +81,7 @@ function useFirstPage(enabled: boolean, category: OrgCategory, include: string |
           tagsPartial: json.tagsPartial === true, internalOrgFailed: json.internalOrgFailed === true,
           categories: Array.isArray(json.categories) ? json.categories : [],
           internalOrgId: typeof json.internalOrgId === "string" ? json.internalOrgId : null,
+          internalGroup: typeof json.internalGroup === "string" ? json.internalGroup : null,
         });
       })
       .catch(() => { if (live) setState((s) => ({ ...s, failed: true })); });
@@ -101,7 +103,7 @@ export function ClientRail() {
   const internalOrgId = page.internalOrgId ?? ctx.internalOrgId;
   // under 全部, or wherever it is the picked client (it must not vanish from the list)
   const self: PickOrg | null = internalOrgId && (category === "all" || org === internalOrgId)
-    ? { id: internalOrgId, slug: "", name: SELF_NAME, color: SELF_DOT, brandColors: [], group: page.first.find((o) => o.id === internalOrgId)?.group }
+    ? { id: internalOrgId, slug: "", name: SELF_NAME, color: SELF_DOT, brandColors: [], group: page.internalGroup ?? undefined }
     : null;
   const others = page.first.filter((o) => o.id !== internalOrgId);
   const rows: PickOrg[] = self ? [self, ...others] : others;
