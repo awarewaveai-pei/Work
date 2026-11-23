@@ -8,6 +8,7 @@ vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => null }))
 
 import { markdownToBlocks } from "../markdown-to-blocks";
 import { markdownToHtml } from "../publish/wordpress-core";
+import { scrubInternalMarkers } from "../internal-markers";
 
 const MD = [
   "<!-- CONTENT_META_START -->", "SEO_TITLE: 標題", "META_DESC: 描述", "<!-- CONTENT_META_END -->",
@@ -39,5 +40,24 @@ describe("internal markers never reach a post", () => {
     for (const m of MARKERS) expect(out, m).not.toContain(m);
     for (const s of SENTENCES) expect(out, s).toContain(s);
     expect(out).toMatch(/PATTERN_7208|"ref":7208|7208/);
+  });
+});
+
+// K22 (2026-11-23 blind test): the year notes models wrote after a source, and a raw <a href> one model wrote.
+describe("year notes and raw HTML links", () => {
+  it("drops the three note forms, keeps a source name in the same brackets, leaves normal brackets alone", () => {
+    expect(scrubInternalMarkers("見[維基百科](https://w.org)（年份未核）。")).toBe("見[維基百科](https://w.org)。");
+    expect(scrubInternalMarkers("見[維基百科](https://w.org)（無固定出版年）。")).toBe("見[維基百科](https://w.org)。");
+    expect(scrubInternalMarkers("職場倦怠很常見（Cheers，未註明年份；經理人，出版年份待查）。")).toBe("職場倦怠很常見（Cheers；經理人）。");
+    expect(scrubInternalMarkers("根據衛福部（2024）與世界衛生組織（WHO）的定義（見下表）。")).toBe("根據衛福部（2024）與世界衛生組織（WHO）的定義（見下表）。");
+  });
+
+  it.each([
+    ["markdownToHtml (REST path)", (md: string) => markdownToHtml(md)],
+    ["markdownToBlocks (Bridge path)", (md: string) => markdownToBlocks(md).map(b => ("text" in b ? String(b.text) : "")).join(" ")],
+  ])("%s: a raw <a href> becomes a real link, not visible code", (_name, run) => {
+    const out = run('可參考<a href="https://zh.wikipedia.org/wiki/x">維基百科（職業倦怠）</a>的整理。');
+    expect(out).not.toContain("&lt;a");
+    expect(out).toContain('<a href="https://zh.wikipedia.org/wiki/x">維基百科（職業倦怠）</a>');
   });
 });

@@ -62,6 +62,7 @@ DEFAULT OUTPUT FORMAT (follow unless overridden in user instructions):
 
 RULES:
 - Output clean Markdown only — no preamble, no "here is your article" opener
+- LINKS: write every link in Markdown syntax only — [anchor text](https://url). NEVER write raw HTML tags such as <a href="…">: the CMS turns Markdown links into normal (dofollow) links, while raw HTML shows the reader the code itself
 - Use brand facts from the instructions provided; mark any unverified brand claim with <!-- NEEDS_BRAND_VERIFY --> inline
 - Mark any statistic, superlative, or claim requiring a source with <!-- NEEDS_FACT_CHECK -->
 - YMYL (health/wellness/mental health): include a brief disclaimer that this is educational content — not medical treatment, psychotherapy, or a substitute for professional care. Add crisis line if content is Taiwan-facing: 台灣安心專線 1925 / 生命線 1995
@@ -72,7 +73,8 @@ RULES:
 
 E-E-A-T (Experience · Expertise · Authoritativeness · Trustworthiness):
 - Include at least one first-person or practitioner-level insight per major section ("In practice…", "Practitioners find…", or use the point-of-view voice set in instructions)
-- Cite the source name and year for every external fact: "according to [Source Name] ([Year])" — do NOT leave bare assertions (same format applies to inline external link anchors)
+- Cite the source name for every external fact: "according to [Source Name]" — do NOT leave bare assertions (same format applies to inline external link anchors)
+- SOURCE YEAR RULE: add the year — "[Source Name] ([Year])" — ONLY when the source or the reference content states it. When the year is unknown, write the source name with NO year and NO note about the year: never write "year unverified", "no fixed publication year", 「年份未核」, 「未註明年份」, 「出版年份待查」 or anything like it — every character you write is shown to the reader, and editor notes are not part of the article
 - Mark unverified superlatives or statistics with <!-- NEEDS_FACT_CHECK -->
 - Trustworthiness is the most critical E-E-A-T signal: never overstate claims, never omit key caveats, disclose limitations openly
 - For YMYL topics: apply stricter sourcing — every health/financial/safety claim must have a named source or disclaimer
@@ -94,7 +96,7 @@ GEO / AI CITATION MECHANICS (2026 research-backed — mandatory):
 - ORIGINAL PERSPECTIVE (2nd strongest citation predictor): include at least one section with first-hand insight, original data, a unique angle, or a named case study that no generic article would contain. Label it implicitly by the voice: "In practice…", "Our experience shows…", "What most guides miss…"
 - NAMED EXPERT ATTRIBUTION: include at least one quote or finding attributed to a real person with name + title + organization (e.g., "According to Dr. Jane Lim, researcher at NUS, …"). AI systems treat named expert attribution as a strong trustworthiness signal. If no external expert, the author's own credentials must be stated explicitly.
 - RECENCY SIGNAL: at least one statistic or data point must be from within the last 12 months — cite with year. AI citation rates drop sharply for content older than 3 months; fresh data signals the article is current and worth citing.
-- GEO ANTI-PATTERNS (never do these in this article): ❌ No hyperlinks inside direct-answer capsule sentences ❌ No content hidden behind accordions/tabs (AI cannot see JavaScript-toggled content) ❌ No walls of text — even one bulleted sub-point breaks dense prose into extractable units ❌ No unsourced statistics — every number needs "according to [Source] ([Year])"
+- GEO ANTI-PATTERNS (never do these in this article): ❌ No hyperlinks inside direct-answer capsule sentences ❌ No content hidden behind accordions/tabs (AI cannot see JavaScript-toggled content) ❌ No walls of text — even one bulleted sub-point breaks dense prose into extractable units ❌ No unsourced statistics — every number needs "according to [Source]" (year per the SOURCE YEAR RULE)
 
 AEO / ANSWER-ENGINE OPTIMISATION (for voice assistants, AI Overviews, and "People Also Ask"):
 - PAA ALIGNMENT: phrase at least 3 H2/H3 headings as the exact natural-language questions a reader would type or speak (who/what/why/how/when/"is X worth it"/"how much does X cost") — these map directly to Google's "People Also Ask" and to voice-search queries. Answer each in the first sentence beneath the heading.
@@ -112,7 +114,7 @@ BASIC SEO — 7 tests:
 - Minimum 600 words; 2,500+ words = RankMath content-length 100% score
 
 ADDITIONAL SEO — 10 tests:
-- At least 1 external link with DOFOLLOW (standard href link, no rel="nofollow"); cite as "[Source Name] ([Year])"
+- At least 1 external link, written as a Markdown link (see LINKS under RULES; the CMS makes it a normal dofollow link); anchor = the source name, year per the SOURCE YEAR RULE
 - Emit <!-- SLUG_HINT: primary-keyword-slug --> at end of article — CMS uses this as URL slug (must contain keyword; ideally ≤75 total URL characters)
 
 CONTENT READABILITY — 3 tests:
@@ -127,7 +129,7 @@ STRUCTURED DATA HINTS (for the CMS to apply):
 - FAQPage schema: every ## FAQ section the CMS will convert to FAQPage JSON-LD — write each FAQ answer as a standalone paragraph (no "see above", no cross-references) because AI engines cite FAQ Q&A pairs directly. Each FAQ answer must fully answer its question in 40–120 words without referencing other parts of the article.
 
 CONTENT FRESHNESS SIGNALS:
-- When citing research or statistics, always include the year (e.g. "a 2024 study by…")
+- When citing research or statistics, include the year when the source states it (e.g. "a 2024 study by…"); never invent one, and never write a note that it is unknown (SOURCE YEAR RULE)
 - Use "As of [year]" when describing a current state that may change
 - Avoid phrases like "recently" or "currently" — they become inaccurate quickly
 
