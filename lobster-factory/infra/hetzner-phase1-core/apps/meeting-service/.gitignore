@@ -10,3 +10,5 @@ __pycache__/
 *.pyc
 .workspace.json
 .live-usage.json
+.live-script.json
+.live-script.json.corrupt-*

@@ -21,6 +21,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from lib import gpu_gate, lookup, mindmap, ownvoice, settings, summarize, workspace
 from lib.live import hub as live_hub
+from lib.live import script_store
+from lib.live.translate import TranslateError
 from lib.transcribe import LANGUAGES
 from pipeline import resume_after_summary, run_pipeline_phase1, run_video_transcription
 
@@ -132,6 +134,40 @@ async def live_ws(ws: WebSocket):
         return
     await ws.accept()
     await LIVE.serve(ws)
+
+
+# 這三個端點用 async def：要在事件迴圈裡呼叫 LIVE.set_script（它把事件放進各頁的佇列，不能在 thread pool 裡做）。
+@app.get("/api/live/script")
+async def live_script_get():
+    return script_store.load()
+
+
+@app.put("/api/live/script")
+async def live_script_put(body: dict = Body(...)):
+    """body 可以只有 script 或只有 glossary；另一欄不動。存好後其他開著的頁會收到 script 事件。"""
+    try:
+        saved = script_store.save(live_hub.clean_text(body.get("script")), live_hub.clean_text(body.get("glossary")))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    LIVE.set_script(saved["script"], saved["glossary"])
+    return saved
+
+
+@app.post("/api/live/script/gloss")
+async def live_script_gloss(body: dict = Body(...)):
+    """補對照（計費）：把講稿缺的那一半交給翻譯模型，結果存成目前的講稿。"""
+    text = body.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise HTTPException(400, "沒有講稿可以補對照")
+    try:
+        filled, n = await LIVE.gloss_script(text)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except live_hub.ScriptChanged as e:
+        raise HTTPException(409, str(e))
+    except TranslateError as e:
+        raise HTTPException(502, str(e))
+    return {"text": filled, "filled": n}
 
 
 @app.post("/api/upload")

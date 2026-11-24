@@ -205,14 +205,22 @@ class Translator:
         self._usage.add_tokens(model, usage)
         return to_taiwan(zh)
 
-    async def complete(self, system: list, user: str) -> str:
-        """The whole answer without streaming it anywhere (replies, summaries); raises TranslateError."""
+    async def stream_text(self, system: list, user: str, on_delta: Optional[Callable[[str], None]] = None) -> str:
+        """One completion as the model wrote it (no Chinese conversion: for English replies); `on_delta`
+        gets the whole text so far each time more arrives. Usage is recorded. Raises TranslateError."""
         text = ""
 
         def on_text(d: str) -> None:
             nonlocal text
             text += d
+            if on_delta is not None:
+                on_delta(text)
 
         model, usage = await self._stream(system, user, on_text, None)
         self._usage.add_tokens(model, usage)
-        return to_taiwan(text)
+        return text
+
+    async def complete(self, system: list, user: str) -> str:
+        """The whole answer without streaming it anywhere (summaries, script glosses), in Taiwan
+        Traditional Chinese where it is Chinese; raises TranslateError."""
+        return to_taiwan(await self.stream_text(system, user))

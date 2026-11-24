@@ -4,6 +4,7 @@ calls open / interim / finish / drop / fail; the Chinese streams in through `tra
 window needs goes out through `emit(event)`:
   {"type":"caption","id":int,"en":str,"zh":str,"final":bool}  {"type":"caption-remove","id":int}
   {"type":"status","text":str}                                  {"type":"clear"}
+  {"type":"reply","id":int,"zh":str,"en":str,"done":bool}      (compose_reply; only the newest reply emits)
 Must be used from the running asyncio loop (translations are tasks)."""
 import asyncio
 import time
@@ -11,7 +12,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from .captions import _SEQ_MAX, Line, reads_as_subtitle
-from .prompts import LISTEN_SYSTEM, listen_user, parse_glossary, system_blocks
+from .prompts import LISTEN_SYSTEM, REPLY_SYSTEM, listen_user, parse_glossary, reply_user, system_blocks
 from .translate import TranslateError
 
 # Captions kept in memory; older ones scroll away.
@@ -29,8 +30,10 @@ class Segment:
 
 
 class Session:
-    def __init__(self, translate, emit: Callable[[dict], None], clock: Callable[[], float] = time.monotonic, context_lines: int = CONTEXT_LINES):
+    def __init__(self, translate, emit: Callable[[dict], None], clock: Callable[[], float] = time.monotonic, context_lines: int = CONTEXT_LINES, compose=None):
         self.translate = translate
+        # `await compose(system, user, on_delta) -> str`: the English of a reply, untouched by the Chinese conversion.
+        self.compose = compose
         self.emit = emit
         self.clock = clock
         self.context_lines = context_lines
@@ -39,6 +42,9 @@ class Session:
         self.my_lines: list = []
         self.script = ""
         self.glossary = ""
+        self.reply: Optional[dict] = None
+        self._reply_seq = 0
+        self._reply_task: Optional[asyncio.Task] = None
         self.status_text = ""
         # Called synchronously: on_final(id, en) when a line's English is final,
         # on_translated(id, zh) when its final Chinese is on screen.
@@ -100,6 +106,41 @@ class Session:
         self.segments.clear()
         self.my_lines.clear()
         self.emit({"type": "clear"})
+
+    # ---- replies (llm.rs spawn_reply) ----
+
+    def compose_reply(self, zh: str) -> int:
+        """Turn typed Chinese into English to read aloud. A newer reply replaces this one: the older
+        one is cancelled (no more cost, no events, not remembered). Returns the new reply's id; the
+        work runs as a task."""
+        if self._reply_task is not None and not self._reply_task.done():
+            self._reply_task.cancel()
+        self._reply_seq += 1
+        id = self._reply_seq
+        self.reply = {"id": id, "zh": zh, "en": "", "done": False}
+        self.emit({"type": "reply", **self.reply})
+        task = self._reply_task = asyncio.create_task(self._reply(id, zh))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return id
+
+    def _show_reply(self, id: int, en: str, done: bool) -> None:
+        if self.reply is None or self.reply["id"] != id:
+            return
+        self.reply = {"id": id, "zh": self.reply["zh"], "en": en, "done": done}
+        self.emit({"type": "reply", **self.reply})
+
+    async def _reply(self, id: int, zh: str) -> None:
+        system = system_blocks(REPLY_SYSTEM, parse_glossary(self.glossary), self.script)
+        user = reply_user(self.context(None), zh)
+        try:
+            en = (await self.compose(system, user, lambda part: self._show_reply(id, part, False))).strip()
+        except TranslateError as e:
+            return self._show_reply(id, f"[Failed: {e}]", True)
+        except Exception as e:
+            return self._show_reply(id, f"[Failed: {type(e).__name__}]", True)
+        self._show_reply(id, en, True)
+        self.my_lines.append((self.segments[-1].id if self.segments else 0, en))
 
     # ---- caption bookkeeping (captions.rs) ----
 

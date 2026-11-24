@@ -23,6 +23,10 @@ Based on OwnVoice Meet by Zaious, ChronicleCore Studio.
 | `lib/live/stt_local.py` | `src-tauri/src/stt_chunk.rs`, `src-tauri/src/captions.rs` (`iso639`) |
 | `lib/live/idle.py` | `src-tauri/src/idle.rs` (`Gate`, `minutes`, `minutes_label`) |
 | `templates/workspace.html` (follow-the-bottom scrolling) | `src/shared/follow.ts` |
+| `lib/live/gloss.py` | `src-tauri/src/gloss.rs` (`plan`, `merge`, `parse_answers`, `fill_with`) |
+| `lib/live/session.py` (`compose_reply`) | `src-tauri/src/llm.rs` (`spawn_reply`) |
+| `templates/workspace.html` (reply panel) | `src/reply/main.ts` |
+| `templates/workspace.html` (script panel: format parser, template, edit/preview/autosave, 補對照 button) | `src/script/format.ts`, `src/script/template.ts`, `src/script/main.ts` |
 
 ## Third-party notice carried over (from OwnVoice Meet `THIRD_PARTY_NOTICES.md`)
 

@@ -85,6 +85,43 @@
   .cap-idle { white-space: nowrap; }
   .cap-idle input { width: 44px; font: inherit; padding: 1px 4px; border: 1px solid var(--border); border-radius: 6px; color: var(--ink); background: var(--card); }
 
+  .rp { height: 100%; display: flex; flex-direction: column; }
+  .rp-bar { flex: none; display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .rp-bar .tbtn { padding: 5px 10px; font-size: 12px; }
+  .rp-view { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
+  .rp-zh { color: var(--muted); font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 6px; }
+  .rp-en { font-weight: 600; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+  .rp-in {
+    flex: none; height: 84px; margin: 0 10px 10px; resize: vertical; font: inherit; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: var(--card);
+  }
+  .rp-in:focus, .sc-src:focus, .sc-gl:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  .sc { height: 100%; display: flex; flex-direction: column; }
+  .sc [hidden] { display: none !important; }
+  .sc-bar { flex: none; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .sc-bar .tbtn { padding: 5px 10px; font-size: 12px; }
+  .sc-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+  .sc-note { flex: none; padding: 4px 12px; font-size: 12px; color: var(--muted); }
+  .sc-note:empty { display: none; }
+  .sc-src, .sc-gl {
+    flex: none; margin: 6px 10px 0; resize: vertical; font: 13px/1.5 Consolas, "Microsoft JhengHei", monospace; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: var(--card);
+  }
+  .sc-src { flex: 1 1 50%; min-height: 90px; resize: none; }
+  .sc-gl { height: 110px; }
+  .sc-body { flex: 1 1 50%; min-height: 0; overflow-y: auto; padding: 8px 16px 16px; }
+  .sc-body .empty { color: var(--muted); font-size: 13px; padding: 16px 0; }
+  .sc-body h2 { font-size: 1.25em; margin: 18px 0 6px; }
+  .sc-body .sub { color: var(--accent); font-weight: 600; margin: 14px 0 4px; }
+  .sc-body .cue { color: var(--muted); font-size: 0.87em; margin: 2px 0 4px; }
+  .sc-body .line { font-size: 1.33em; line-height: 1.4; margin: 6px 0 2px; }
+  .sc-body .question { font-size: 1.2em; font-weight: 600; line-height: 1.4; color: var(--accent); margin: 16px 0 2px; }
+  .sc-body .gloss { color: var(--accent-hover); margin: 0 0 12px; }
+  .sc-body .copy { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 4px 0 10px; }
+  .sc-body .copy pre { margin: 0 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; font: 0.9em/1.4 Consolas, monospace; }
+  .sc-body .copy .tbtn { padding: 3px 10px; font-size: 12px; }
+
   .lookup { display: flex; flex-direction: column; gap: 10px; }
   .lk-q {
     flex: none; min-height: 56px; width: 100%; resize: vertical; font: inherit; padding: 8px 10px;
@@ -121,7 +158,25 @@
 <script>
 window.Workspace = (function () {
   const handlers = {};
+  // 與伺服器的唯一一條 WebSocket，字幕／回覆／講稿面板共用。
+  // live.on(type, fn)：伺服器事件（snapshot、caption、reply、script…）；另有 "close" = 連線斷了（約 2 秒後自動重連）。
+  const listeners = {};
+  let ws = null;
+  function emit(type, ev) { (listeners[type] || []).forEach(fn => fn(ev)); }
+  const live = {
+    on(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+    ready() { return !!ws && ws.readyState === 1; },
+    send(obj) { if (live.ready()) ws.send(JSON.stringify(obj)); },
+    sendBinary(buf) { if (live.ready()) ws.send(buf); },
+    connect() {
+      ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/live/ws");
+      ws.binaryType = "arraybuffer";
+      ws.onmessage = e => { const ev = JSON.parse(e.data); emit(ev.type, ev); };
+      ws.onclose = () => { emit("close", {}); setTimeout(live.connect, 2000); };
+    },
+  };
   return {
+    live,
     onPanel(id, fn) { (handlers[id] = handlers[id] || []).push(fn); },
     mount(id, root) { (handlers[id] || []).forEach(fn => fn(root)); },
   };
@@ -164,25 +219,21 @@ window.Workspace = (function () {
   const EMPTY = "按「聆聽」開始。對方說的英文會出現在這裡，中文跟在下面。";
   const prefs = Object.assign({ mic: true, tab: false, stt: "gemini", zhOnly: false, size: 18, pauseMin: 3, endMin: 30 }, loadPrefs());
   const state = { segs: new Map(), status: "", listening: false, usage: null, level: 0 };
-  let root = null, ws = null, audio = null, following = true, ours = false;
+  let root = null, audio = null, following = true, ours = false;
+  const live = window.Workspace.live;
 
   function loadPrefs() { try { return JSON.parse(localStorage.getItem("ws-captions") || "{}"); } catch (e) { return {}; } }
   function savePrefs() { try { localStorage.setItem("ws-captions", JSON.stringify(prefs)); } catch (e) {} }
 
-  // ---------- 與伺服器的連線 ----------
-  function connect() {
-    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/live/ws");
-    ws.binaryType = "arraybuffer";
-    ws.onmessage = e => handle(JSON.parse(e.data));
-    ws.onclose = () => {
-      stopAudio();
-      state.listening = false;
-      state.status = "和會議工具的連線斷了，正在重連…";
-      paintBar();
-      setTimeout(connect, 2000);
-    };
-  }
-  function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+  // ---------- 與伺服器的連線（連線本體在 Workspace.live，三個面板共用） ----------
+  function send(obj) { live.send(obj); }
+  ["snapshot", "caption", "caption-remove", "clear", "status", "listening", "usage"].forEach(t => live.on(t, handle));
+  live.on("close", () => {
+    stopAudio();
+    state.listening = false;
+    state.status = "和會議工具的連線斷了，正在重連…";
+    paintBar();
+  });
 
   function handle(ev) {
     if (ev.type === "snapshot") {
@@ -242,7 +293,7 @@ window.Workspace = (function () {
           buf[n++] = x * 32767;
           sum += x * x;
           if (n === CHUNK) {
-            if (ws && ws.readyState === 1) ws.send(buf.slice().buffer);
+            live.sendBinary(buf.slice().buffer);
             state.level = sum / CHUNK;
             paintLevel();
             n = 0; sum = 0;
@@ -274,7 +325,7 @@ window.Workspace = (function () {
   async function listen(on) {
     if (!on) { stopAudio(); send({ type: "stop" }); return; }
     if (!prefs.mic && !prefs.tab) { state.status = "「麥克風」和「電腦聲音」至少要開一個"; return paintBar(); }
-    if (!ws || ws.readyState !== 1) { state.status = "還沒連上會議工具，等一下再按"; return paintBar(); }
+    if (!live.ready()) { state.status = "還沒連上會議工具，等一下再按"; return paintBar(); }
     if (await startAudio()) send({ type: "start", stt: prefs.stt, language: "en-US", pause_min: prefs.pauseMin, end_min: prefs.endMin });
   }
 
@@ -378,20 +429,374 @@ window.Workspace = (function () {
     }));
     paintAll();
   });
-
-  connect();
 })();
 </script>
 
 <template id="tpl-reply">
-  <div class="panel-body"><p class="placeholder">回覆會顯示在這裡</p></div>
+  <div class="rp">
+    <div class="rp-bar">
+      <span class="placeholder">打中文，下面出現可以照唸的英文</span><span class="spacer"></span>
+      <button type="button" class="tbtn" data-act="smaller" title="字小一點">A−</button>
+      <button type="button" class="tbtn" data-act="bigger" title="字大一點">A＋</button>
+    </div>
+    <div class="rp-view" aria-live="polite"><div class="rp-zh"></div><div class="rp-en"></div></div>
+    <textarea class="rp-in" placeholder="打下你想說的中文，按 Enter 送出（Shift+Enter 換行）"></textarea>
+  </div>
 </template>
-<!-- C8 reply 的 <script> 區塊放在這裡（Workspace.onPanel("reply", root => {...})） -->
+<script>
+// 回覆面板：打中文 → 大字英文（照 OwnVoice Meet src/reply/main.ts，Apache-2.0）。回覆內容在頁面層，
+// 面板關掉再開還在；聆聽中與否都能用。
+(function () {
+  const prefs = Object.assign({ size: 28 }, loadPrefs());
+  const live = window.Workspace.live;
+  let reply = null;       // 最近一則 { id, zh, en, done }
+  let seen = 0;           // 看過的最大回覆代號（伺服器每則回覆給一個遞增的新代號）
+  let awaiting = null;    // 剛送出、伺服器還沒回第一個事件的中文；這段時間舊回覆（代號 ≤ seen）的事件不能蓋掉它
+  let root = null;
+
+  function loadPrefs() { try { return JSON.parse(localStorage.getItem("ws-reply") || "{}"); } catch (e) { return {}; } }
+  function savePrefs() { try { localStorage.setItem("ws-reply", JSON.stringify(prefs)); } catch (e) {} }
+
+  function paint() {
+    if (!root) return;
+    const en = root.querySelector(".rp-en");
+    en.style.fontSize = prefs.size + "px";
+    root.querySelector(".rp-zh").textContent = reply ? reply.zh : "";
+    en.textContent = reply ? (reply.en || "…") : "";
+  }
+
+  live.on("snapshot", ev => { reply = ev.reply; seen = reply ? reply.id : 0; awaiting = null; paint(); });
+  live.on("reply", ev => {
+    if (awaiting !== null && ev.id <= seen) return;
+    awaiting = null;
+    seen = ev.id;
+    reply = ev;
+    paint();
+  });
+  live.on("close", () => {
+    if (awaiting === null) return;
+    reply = { id: 0, zh: awaiting, en: "[和會議工具的連線斷了，這句沒有送出去]", done: true };
+    awaiting = null;
+    paint();
+  });
+
+  function submit(box) {
+    const zh = Array.from(box.value.trim()).slice(0, 2000).join("").trim();      // 按字元（不是 UTF-16 單位）數，不會切開一個表情符號
+    if (!zh) return;
+    box.value = "";
+    if (!live.ready()) {
+      reply = { id: 0, zh, en: "[還沒連上會議工具，等一下再送]", done: true };
+      return paint();
+    }
+    awaiting = zh;
+    reply = { id: 0, zh, en: "", done: false };
+    live.send({ type: "reply", zh });
+    paint();
+  }
+
+  window.Workspace.onPanel("reply", el => {
+    root = el;
+    const box = el.querySelector(".rp-in");
+    box.addEventListener("keydown", e => {
+      if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;   // 輸入法組字中的 Enter 只是確認字
+      e.preventDefault();
+      submit(box);
+    });
+    el.querySelector(".rp-bar").addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      prefs.size = Math.max(14, Math.min(72, prefs.size + (b.dataset.act === "bigger" ? 2 : -2)));
+      savePrefs();
+      paint();
+    });
+    paint();
+  });
+})();
+</script>
 
 <template id="tpl-script">
-  <div class="panel-body"><p class="placeholder">講稿會顯示在這裡</p></div>
+  <div class="sc">
+    <div class="sc-bar">
+      <span class="sc-tabs"></span><span class="spacer"></span>
+      <button type="button" class="tbtn" data-act="template" hidden title="在游標處插入一份範例">範本</button>
+      <button type="button" class="tbtn" data-act="edit" aria-pressed="false">編輯</button>
+      <button type="button" class="tbtn" data-act="open">開啟講稿…</button>
+      <button type="button" class="tbtn" data-act="gloss" title="把缺的另一半（英文的中文意思、中文的英文）交給 AI 補上（計費）">補對照</button>
+      <button type="button" class="tbtn" data-act="glossary" aria-pressed="false" title="固定譯法：每行「中文 = English」">詞彙表</button>
+      <input type="file" accept=".md,.txt" hidden>
+    </div>
+    <div class="sc-note" aria-live="polite"></div>
+    <textarea class="sc-gl" hidden spellcheck="false" placeholder="每行一個固定譯法：中文 = English（# 開頭是註解）"></textarea>
+    <textarea class="sc-src" hidden spellcheck="false"></textarea>
+    <div class="sc-body"></div>
+  </div>
 </template>
-<!-- C9 script 的 <script> 區塊放在這裡（Workspace.onPanel("script", root => {...})） -->
+<script>
+// 講稿面板與詞彙表。格式解析、範本、編輯／預覽／自動存、補對照移植自 OwnVoice Meet
+// src/script/format.ts、template.ts、main.ts（Apache-2.0）；補對照的伺服器端見 lib/live/gloss.py。
+// 講稿與詞彙表存在伺服器（.live-script.json），翻譯與回覆都會用；這裡的頁面層狀態讓面板關掉再開不會掉。
+(function () {
+  const live = window.Workspace.live;
+  const EMPTY = "還沒有講稿。按「編輯」直接寫，或「開啟講稿…」讀 .md 檔。只寫英文或只寫中文都可以，按「補對照」補上另一半。";
+  const TEMPLATE = `# 開場
+! 灰色提示：這行不用唸，例如「切到第 2 張投影片」
+Hi everyone, thanks for having me.
+> 大家好，謝謝邀請。
+寫中文也可以，按「補對照」會幫你產生要唸的英文。
+
+# Q&A
+Q: How is this different from other tools?
+> 問：這跟其他工具有什麼不同？
+它不會替你作答，你說的是自己的話。
+
+## 救急句
+Sorry, could you repeat the question?
+> 抱歉，可以請你再說一次問題嗎？
+`;
+  const state = { script: "", glossary: "" };   // 伺服器上存的版本
+  const echoes = { script: new Set(), glossary: new Set() };   // 我們自己剛存出去的內容：它回來的事件不要覆蓋正在打的字
+  let ui = null, saveTimer = 0, glTimer = 0, previewTimer = 0;
+
+  // ---------- 格式（format.ts） ----------
+  function parse(source) {
+    const sections = [], items = [];
+    let block = null;
+    for (const raw of source.replace(/^﻿/, "").split(/\r?\n/)) {
+      const line = raw.trimEnd();
+      if (block) {
+        if (line.trim() === "```") { items.push({ kind: "copy", name: block.name, text: block.lines.join("\n") }); block = null; }
+        else block.lines.push(line);
+        continue;
+      }
+      if (!line.trim()) continue;
+      if (line.startsWith("```copy:")) block = { name: line.slice(8).trim(), lines: [] };
+      else if (line.startsWith("# ")) { items.push({ kind: "section", text: line.slice(2).trim(), index: sections.length }); sections.push(line.slice(2).trim()); }
+      else if (line.startsWith("## ")) items.push({ kind: "sub", text: line.slice(3).trim() });
+      else if (line.startsWith("! ")) items.push({ kind: "cue", text: line.slice(2) });
+      else if (line.startsWith("> ")) items.push({ kind: "gloss", text: line.slice(2) });
+      else if (line.startsWith("Q: ")) items.push({ kind: "question", text: line.slice(3) });
+      else items.push({ kind: "line", text: line });
+    }
+    if (block) items.push({ kind: "copy", name: block.name, text: block.lines.join("\n") });   // 沒收尾的區塊照樣顯示，打錯字不會讓內容消失
+    return { sections, items };
+  }
+  function missingGloss(items) {
+    return items.filter((it, i) => (it.kind === "line" || it.kind === "question") && (!items[i + 1] || items[i + 1].kind !== "gloss"));
+  }
+
+  // ---------- 畫面 ----------
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    e.className = cls;
+    e.textContent = text;
+    return e;
+  }
+  function setNote(text) { if (ui) ui.note.textContent = text; }
+
+  function render(source) {
+    if (!ui) return;
+    const top = ui.body.scrollTop;
+    const { sections, items } = parse(source);
+    ui.body.replaceChildren();
+    ui.tabs.replaceChildren();
+    if (!source.trim()) {
+      ui.body.append(el("div", "empty", EMPTY));
+      if (!ui.busy) setNote("");
+      return;
+    }
+    for (const it of items) {
+      if (it.kind === "section") {
+        const h = el("h2", "", it.text);
+        h.dataset.s = it.index;
+        ui.body.append(h);
+      } else if (it.kind === "copy") {
+        const box = el("div", "copy", "");
+        const btn = el("button", "tbtn", "複製");
+        btn.type = "button";
+        btn.addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(it.text); btn.textContent = "已複製"; }
+          catch (e) { btn.textContent = "複製失敗"; }
+          setTimeout(() => { btn.textContent = "複製"; }, 1200);
+        });
+        box.append(el("pre", "", it.text), btn);
+        ui.body.append(box);
+      } else {
+        ui.body.append(el("div", it.kind, it.kind === "question" ? "Q: " + it.text : it.text));
+      }
+    }
+    sections.forEach((title, i) => {
+      const b = el("button", "tbtn", title);
+      b.type = "button";
+      b.addEventListener("click", () => {
+        const h = ui && ui.body.querySelector('[data-s="' + i + '"]');
+        if (h) h.scrollIntoView({ block: "start" });
+      });
+      ui.tabs.append(b);
+    });
+    if (!ui.busy) {
+      const missing = missingGloss(items).length;
+      setNote(missing ? missing + " 句還沒有對照，按「補對照」自動補上。" : "");
+    }
+    ui.body.scrollTop = top;
+  }
+
+  function setValue(box, value) {
+    const a = box.selectionStart, b = box.selectionEnd;
+    box.value = value;
+    box.setSelectionRange(Math.min(a, value.length), Math.min(b, value.length));
+  }
+
+  // ---------- 存檔 ----------
+  async function put(field, text) {
+    echoes[field].add(text);
+    if (echoes[field].size > 5) echoes[field].delete(echoes[field].values().next().value);
+    try {
+      const resp = await fetch("/api/live/script", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: text }),
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body.detail || "伺服器回了 " + resp.status);
+      }
+      return true;
+    } catch (e) {
+      echoes[field].delete(text);
+      setNote("存檔失敗：" + (e.message && e.message !== "Failed to fetch" ? e.message : "連不到會議工具"));
+      return false;
+    }
+  }
+
+  // 伺服器上的講稿／詞彙表變了（snapshot 或 script 事件）。只有「別處改的」才寫進輸入框，
+  // 自己剛存出去的內容回來時不動輸入框，游標才不會被打斷（照 OwnVoice main.ts:160-166）。
+  function applyRemote(script, glossary) {
+    const scriptChanged = script !== state.script, glChanged = glossary !== state.glossary;
+    const scriptEcho = echoes.script.delete(script), glEcho = echoes.glossary.delete(glossary);
+    state.script = script;
+    state.glossary = glossary;
+    if (!ui) return;
+    if (scriptChanged && !scriptEcho && ui.editing && script !== ui.src.value) setValue(ui.src, script);
+    if (glChanged && !glEcho && glossary !== ui.gl.value) setValue(ui.gl, glossary);
+    render(ui.editing ? ui.src.value : script);
+  }
+  live.on("snapshot", ev => applyRemote(ev.script, ev.glossary));
+  live.on("script", ev => applyRemote(ev.script, ev.glossary));
+
+  // ---------- 動作 ----------
+  async function setEditing(on) {
+    const p = ui;
+    if (!on) {
+      clearTimeout(saveTimer);
+      const text = p.src.value;
+      if (text !== state.script) await put("script", text);
+      render(text);
+    }
+    p.editing = on;
+    p.src.hidden = !on;
+    p.templateBtn.hidden = !on;
+    p.editBtn.setAttribute("aria-pressed", String(on));
+    if (on) {
+      p.src.value = state.script;
+      p.src.focus();
+    }
+  }
+
+  async function gloss() {
+    const p = ui;
+    const text = p.editing ? p.src.value : state.script;
+    if (!text.trim()) return setNote("先寫一點講稿，再按「補對照」。");
+    clearTimeout(saveTimer);
+    p.busy = true;
+    p.glossBtn.disabled = p.openBtn.disabled = p.templateBtn.disabled = true;      // 範本、開啟講稿會直接改輸入框／講稿，readOnly 擋不住
+    p.src.readOnly = true;
+    setNote("補對照中…（會計費）");
+    let msg, shown = null;
+    try {
+      if (p.editing && text !== state.script && !(await put("script", text))) return;      // put 已經把原因寫在提示列
+      const resp = await fetch("/api/live/script/gloss", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const body = await resp.json().catch(() => ({}));
+      if (resp.status === 409) throw Object.assign(new Error(body.detail), { plain: true });       // 講稿在等待期間被改過，結果沒有套用：原句直接顯示
+      if (!resp.ok) throw new Error(body.detail || "伺服器回了 " + resp.status);
+      if (body.filled && p.editing && p.src.value !== body.text) setValue(p.src, body.text);
+      shown = body.text;
+      msg = body.filled ? "補好了 " + body.filled + " 行。" : "每一行都已經有對照了。";
+    } catch (e) {
+      msg = e.plain ? e.message : "補對照失敗：" + (e.message && e.message !== "Failed to fetch" ? e.message : "連不到會議工具");
+    } finally {
+      p.busy = false;
+      p.glossBtn.disabled = p.openBtn.disabled = p.templateBtn.disabled = false;
+      p.src.readOnly = false;
+    }
+    if (ui === p) {
+      render(p.editing ? p.src.value : (shown === null ? state.script : shown));
+      p.note.textContent = msg;
+    }
+  }
+
+  window.Workspace.onPanel("script", el => {
+    const q = s => el.querySelector(s);
+    const p = ui = {
+      body: q(".sc-body"), tabs: q(".sc-tabs"), note: q(".sc-note"), src: q(".sc-src"), gl: q(".sc-gl"), file: q('input[type="file"]'),
+      editBtn: q('[data-act="edit"]'), openBtn: q('[data-act="open"]'), templateBtn: q('[data-act="template"]'), glossBtn: q('[data-act="gloss"]'), glBtn: q('[data-act="glossary"]'),
+      editing: false, busy: false,
+    };
+    p.gl.value = state.glossary;
+
+    q(".sc-bar").addEventListener("click", e => {
+      const b = e.target.closest("button[data-act]");
+      if (!b || b.disabled) return;
+      const act = b.dataset.act;
+      if (act === "edit") setEditing(!p.editing);
+      else if (act === "open") p.file.click();
+      else if (act === "gloss") gloss();
+      else if (act === "glossary") {
+        p.gl.hidden = !p.gl.hidden;
+        b.setAttribute("aria-pressed", String(!p.gl.hidden));
+        if (!p.gl.hidden) p.gl.focus();
+      } else if (act === "template") {
+        if (!p.src.value.trim()) p.src.value = TEMPLATE;
+        else {
+          const at = p.src.selectionStart;
+          p.src.value = p.src.value.slice(0, at) + "\n" + TEMPLATE + "\n" + p.src.value.slice(at);
+        }
+        p.src.dispatchEvent(new Event("input"));
+      }
+    });
+
+    p.src.addEventListener("input", () => {
+      const text = p.src.value;
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(() => { if (ui === p) render(text); }, 250);
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => put("script", text), 1000);     // 存的是打字當下的內容，面板關掉也不會存成空白
+    });
+
+    p.gl.addEventListener("input", () => {
+      const text = p.gl.value;
+      clearTimeout(glTimer);
+      glTimer = setTimeout(() => put("glossary", text), 1000);
+    });
+    p.gl.addEventListener("blur", () => {
+      clearTimeout(glTimer);
+      if (p.gl.value !== state.glossary) put("glossary", p.gl.value);
+    });
+
+    p.file.addEventListener("change", async () => {
+      const f = p.file.files[0];
+      p.file.value = "";
+      if (!f) return;
+      const text = await f.text();
+      clearTimeout(saveTimer);
+      if (await put("script", text) && p.editing) setValue(p.src, text);
+    });
+
+    render(state.script);
+  });
+})();
+</script>
 
 <template id="tpl-lookup">
   <div class="panel-body lookup">
@@ -581,6 +986,7 @@ window.Workspace = (function () {
     api.onDidLayoutChange(scheduleSave);
   }
   init();
+  window.Workspace.live.connect();      // 所有面板的 live.on 都登記完了才連線
 })();
 </script>
 </body>

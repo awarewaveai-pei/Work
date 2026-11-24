@@ -216,6 +216,23 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=bridgeClientForSiteWithRegistered | hits=8
 - ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic＋突變＋監工全套測試代替
+## 2026-11-24（續17）— meeting-service 會議工作區段 2（C8 回覆面板、C9 講稿面板；9／11）
+
+- 步驟（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`；fullstack-engineer 實作，主 session 驗收）：
+  - C8：`MS/lib/live/session.py` `compose_reply`（移植 OwnVoice `llm.rs` `spawn_reply`）；`translate.py` 公開 `stream_text`（英文不過 `to_taiwan`）；`hub.py` `reply` 指令、`_refresh_keys`（不聆聽也能回覆）；`workspace.html` `tpl-reply`
+  - C9：新 `MS/lib/live/gloss.py`（移植 `gloss.rs`）、`script_store.py`（`.live-script.json`）；`app.py` `GET|PUT /api/live/script`、`POST /api/live/script/gloss`；`workspace.html` `tpl-script`（移植 `format.ts`／`template.ts`／`script/main.ts`）＋詞彙表
+  - `workspace.html`：WebSocket 連線抽成頁面層 `Workspace.live`，三個面板共用一條
+  - critic（Standard）0c/2m/6n。修：M1 補對照結果只套用在送出時那一版（`hub.ScriptChanged` → 409；進行中停用「開啟講稿」「範本」）；M2 孤立代理字元（`hub.clean_text` 用在 reply／set_script／PUT／gloss 入口；`_send` 失敗即關 ws 讓頁面重連）；m1 新回覆取消舊回覆的 task；m2 `_reply` 收尾所有例外；m3 補對照答案壓單行、帶結構前綴即整批失敗；m4 先擋存不下的長講稿；m5 損毀檔改名保留。未修（已知限制）：兩個分頁同時編輯講稿靠 echo 比對，可能互蓋；補對照批次按 40 行不按字數
+  - 工人違反 brief 對真實模型呼叫補對照一次（一行，費用近零）
+- 驗證：
+  - `python -m pytest tests -q` → 91 passed
+  - 瀏覽器＋真實模型（8431）：回覆「我們三月會先做資料庫遷移…」→ 兩句英文串流顯示；補對照補 2 行、標題／提示／copy 區塊不動；結尾帶孤立代理的回覆仍正常出英文；補對照進行中由別處改講稿 → 409 訊息、伺服器講稿保持別處那一版、三顆按鈕停用
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest tests -q; 內建瀏覽器 javascript_exec 對 8431（真實 Gemini Flash-Lite：reply、gloss、409 衝突） | exit=0 | ms=40000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/6n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=translator\.complete\(|compose_reply\( | hits=2
+- ORACLE_WAIVED: 本輪以 critic Standard 一輪＋兩個 Major 在瀏覽器重現後修復驗證；Codex 未用（卡片實作由 Sonnet 工人、審查由 Opus critic，已是不同模型）
+- 剩餘風險：未實際點過「開啟講稿…」選檔、複製按鈕、兩分頁 `script` 事件同步；Anthropic 路徑未對真實 API；真實麥克風未測
+- rollback：`git revert` 本 commit；`.live-script.json` 為本機檔
 ## 2026-11-24（續7）— meeting-service 會議工作區 C7：刪舊查詢側欄，8420 換成新版（段 1 完成 7／11）
 
 - 決策：操作者 2026-11-24「不試了，做卡 7」——真實麥克風未實測即進行收尾。

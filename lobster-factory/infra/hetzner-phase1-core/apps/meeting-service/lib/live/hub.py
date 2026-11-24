@@ -3,8 +3,11 @@
 A page connects over WebSocket (/api/live/ws). Text frames are JSON commands, binary frames are audio
 (16 kHz mono PCM16) from the page that pressed 聆聽. Everything a page shows comes back as JSON events:
 the Session's own (caption, caption-remove, status, clear) plus
-  {"type":"snapshot","segments":[...],"status":str,"listening":bool,"stt":str,"usage":{...}}
+  {"type":"snapshot","segments":[...],"status":str,"listening":bool,"stt":str,"usage":{...},
+   "reply":{id,zh,en,done}|null,"script":str,"glossary":str}
   {"type":"listening","on":bool,"stt":str}      {"type":"usage", ...Usage.today()}
+  {"type":"reply","id","zh","en","done"}        {"type":"script","script":str,"glossary":str}
+Commands from the page include {"type":"reply","zh":str} (works without listening).
 Keys never leave the server: Gemini from the environment, Anthropic from the settings page."""
 import asyncio
 import json
@@ -14,7 +17,8 @@ from urllib.parse import urlsplit
 
 from lib import settings
 
-from . import idle, stt_gemini, stt_local
+from . import gloss, idle, script_store, stt_gemini, stt_local
+from .prompts import parse_glossary
 from .session import Session
 from .translate import Translator
 from .usage import Usage
@@ -28,6 +32,8 @@ IDLE_TICK = 1.0
 # Minutes without a new caption before the paid speech service is let go / before listening ends.
 PAUSE_MIN, END_MIN = 3.0, 30.0
 LOCAL_HOSTS = ("127.0.0.1", "localhost")
+# Longest Chinese a page may send to be turned into an English reply.
+REPLY_MAX = 2000
 
 
 def origin_allowed(origin: str, host: str) -> bool:
@@ -54,6 +60,16 @@ def _minutes(value, default: float) -> float:
     return 0.0 if v <= 0 else min(max(v, 0.1), 24 * 60.0)
 
 
+def clean_text(s):
+    """Text from a page without lone surrogates (a half emoji from a cut string): they cannot be
+    encoded, so one in an event would stop every page's event stream. Non-strings pass through."""
+    return s.encode("utf-8", "ignore").decode("utf-8") if isinstance(s, str) else s
+
+
+class ScriptChanged(Exception):
+    """The script was edited while a 補對照 was running; its result was not applied."""
+
+
 class Hub:
     def __init__(self, usage: Usage = None):
         self.usage = usage or Usage()
@@ -71,11 +87,51 @@ class Hub:
 
     def _session(self) -> Session:
         if self.session is None:
-            self.session = Session(self._translate, self.emit)
+            self.session = Session(self._translate, self.emit, compose=self._compose)
+            saved = script_store.load()
+            self.session.script, self.session.glossary = saved["script"], saved["glossary"]
         return self.session
 
     async def _translate(self, system, user, on_delta, stop, early):
         return await self.translator(system, user, on_delta, stop, early)
+
+    def _refresh_keys(self) -> str:
+        """Read the keys now (the settings page may have changed them); returns the Gemini key."""
+        gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        self.translator.set_keys(settings.get_api_key(), gemini_key)
+        return gemini_key
+
+    async def _compose(self, system, user, on_delta):
+        self._refresh_keys()
+        return await self.translator.stream_text(system, user, on_delta)
+
+    def set_script(self, script=None, glossary=None) -> None:
+        """New script and/or glossary (None = keep): translations and replies use them from now on,
+        and every open page shows them."""
+        s = self._session()
+        if script is not None:
+            s.script = clean_text(script)
+        if glossary is not None:
+            s.glossary = clean_text(glossary)
+        self.emit({"type": "script", "script": s.script, "glossary": s.glossary})
+
+    async def gloss_script(self, text: str) -> tuple:
+        """補對照 on `text`; when something was filled, the result becomes the saved script, but only
+        if the script is still `text` (the result belongs to that version, not to a later edit).
+        Returns (script, lines filled); raises TranslateError, ValueError (too long), ScriptChanged."""
+        text = clean_text(text)
+        script_store.check("講稿", text)
+        # The filled script is longer than the original: refuse now what could not be saved afterwards.
+        if len(text.encode("utf-8")) * 2 > script_store.MAX_BYTES:
+            raise ValueError("講稿太長，無法補對照")
+        self._refresh_keys()
+        filled, n = await gloss.fill(self.translator.complete, parse_glossary(self._session().glossary), text)
+        if n:
+            if self._session().script != text:
+                raise ScriptChanged("講稿在補對照期間被改過，這次的結果沒有套用，請再按一次")
+            script_store.save(script=filled)
+            self.set_script(filled)
+        return filled, n
 
     @property
     def listening(self) -> bool:
@@ -96,6 +152,9 @@ class Hub:
             "listening": self.listening,
             "stt": self.stt,
             "usage": self.usage.today(),
+            "reply": s.reply,
+            "script": s.script,
+            "glossary": s.glossary,
         }
 
     def transcript_tail(self) -> str:
@@ -114,10 +173,9 @@ class Hub:
         session = self._session()
         if stt not in STT:
             return self._refuse(f"不認得的辨識方式：{stt}")
-        gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        gemini_key = self._refresh_keys()
         if stt == "gemini" and not gemini_key:
             return self._refuse("這台電腦沒有設定 Gemini 金鑰（環境變數 GEMINI_API_KEY），請改用「本機（免費）」")
-        self.translator.set_keys(settings.get_api_key(), gemini_key)
         self.audio = asyncio.Queue(maxsize=AUDIO_QUEUE)
         self.owner, self.stt = owner, stt
         if stt == "gemini":
@@ -256,8 +314,16 @@ class Hub:
                 await self.stop()
 
     async def _send(self, ws, out: asyncio.Queue) -> None:
-        while True:
-            await ws.send_text(json.dumps(await out.get(), ensure_ascii=False))
+        try:
+            while True:
+                await ws.send_text(json.dumps(await out.get(), ensure_ascii=False))
+        except Exception:
+            # An event that cannot be sent must not leave a socket that is open but silent: close it,
+            # so the page reconnects (and gets a fresh snapshot).
+            try:
+                await ws.close()
+            except Exception:
+                pass
 
     async def _command(self, ws, text: str) -> None:
         try:
@@ -272,3 +338,7 @@ class Hub:
             await self.stop()
         elif kind == "clear":
             self._session().clear()
+        elif kind == "reply":
+            zh = clean_text(str(cmd.get("zh", ""))).strip()[:REPLY_MAX].strip()
+            if zh:
+                self._session().compose_reply(zh)
