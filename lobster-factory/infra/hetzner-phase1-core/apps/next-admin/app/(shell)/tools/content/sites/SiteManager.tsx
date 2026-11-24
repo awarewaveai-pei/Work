@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback, type ReactNode } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { useClientContext } from "@/lib/client-context/use-client-context";
-import { FUNNEL_STAGES, MAX_TREND_FEEDS, PRICE_POSITIONS, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { FUNNEL_STAGES, MAX_TREND_FEEDS, PRICE_POSITIONS, siteCover, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { ARTICLE_IMAGE_MODELS, articleImageModel, articleImagesOff } from "@/lib/content/image/article-image";
+import CoverSettingsFields, { brandStart, useBrandColors } from "./CoverSettingsFields";
 import PublishModeButtons from "./PublishModeButtons";
 import TopicModeButtons from "./TopicModeButtons";
 import DailyTrendButtons from "./DailyTrendButtons";
@@ -31,15 +33,14 @@ const IMAGE_MODELS = [
 
 const LANGUAGES = [{ value: "", label: "不指定" }, ...["Traditional Chinese", "Simplified Chinese", "English", "Japanese", "Korean"].map(l => ({ value: l, label: l }))];
 
-const IMAGE_FONTS = [
-  { value: "sans",  label: "無黑體（Noto Sans CJK）" },
-  { value: "serif", label: "明體（Noto Serif CJK）" },
-  { value: "none",  label: "不疊標題文字" },
-];
-const IMAGE_TITLE_POSITIONS = [
-  { value: "bottom", label: "底部漸層（推薦）" },
-  { value: "center", label: "正中央" },
-];
+/** K25 (6): a stored model the automatic articles cannot draw with (codex-image, a stock-photo row, one saved from the
+ *  article page) gets a line under the buttons; "" and None are choices, not models. */
+export function articleModelNote(model: string | undefined): string | null {
+  if (!model || articleImagesOff(model) || (ARTICLE_IMAGE_MODELS as readonly string[]).includes(model)) return null;
+  const fallback = articleImageModel(undefined);
+  const name = IMAGE_MODELS.find((m) => m.value === fallback)?.label.replace(/（.*）$/, "") ?? fallback;
+  return `自動產文用不了這個模型，會改用 ${name}；手動產文可以用`;
+}
 
 const ARTICLE_TYPES = [
   { value: "",                label: "不指定" },
@@ -78,7 +79,6 @@ const POVS = [
 const EMPTY_DEFAULTS: SiteContentDefaults = {
   language: "", targetCountry: "", imageModel: "",
   tone: "", articleType: "", readability: "", pointOfView: "none",
-  featuredImageFont: "sans", featuredImageTitlePosition: "bottom",
   marketing: { audience: "", positioning: "", usp: "", primaryCta: "", funnelStage: "", pricePositioning: "", emotionalTriggers: "", objections: "", forbiddenClaims: "" },
 };
 
@@ -88,6 +88,11 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
   const [err, setErr]       = useState("");
+  const brandColors         = useBrandColors(site.organization_id);
+  // the cover as used: the site's own, else the client's brand colour (with the old font carried over), else the defaults
+  const brandCover = brandStart(brandColors);
+  const cover = d.cover ? siteCover(d) : brandCover ? { ...brandCover, font: siteCover(d).font } : siteCover(d);
+  const modelNote = articleModelNote(d.imageModel);
 
   function setM(k: keyof NonNullable<SiteContentDefaults["marketing"]>, v: string) {
     setD(p => ({ ...p, marketing: { ...p.marketing, [k]: v } }));
@@ -100,7 +105,8 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
       const res  = await fetch(`/api/content/sites/${site.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         // requiredBlocks has its own always-visible field (RequiredBlocksField); send the stored list so this form never overwrites it
-        body: JSON.stringify({ contentDefaults: { ...d, requiredBlocks: site.contentDefaults?.requiredBlocks } }),
+        // cover: what the preview shows is what gets stored (a site never set keeps its brand/default start once saved)
+        body: JSON.stringify({ contentDefaults: { ...d, cover, requiredBlocks: site.contentDefaults?.requiredBlocks } }),
       });
       const json = await res.json() as { ok: boolean; site?: ManagedSite; error?: string };
       if (json.ok && json.site) { onSaved(json.site); setSaved(true); setD(p => ({ ...p, trendFeeds: json.site?.contentDefaults?.trendFeeds ?? p.trendFeeds })); }
@@ -132,7 +138,10 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
             <input style={inp} value={d.targetCountry ?? ""} placeholder="例：台灣"
               onChange={e => { setD(p => ({ ...p, targetCountry: e.target.value })); setSaved(false); }} />
           </label>
-          <OptionButtons label="圖片模型" value={d.imageModel ?? ""} options={IMAGE_MODELS} onChange={v => { setD(p => ({ ...p, imageModel: v })); setSaved(false); }} />
+          <div>
+            <OptionButtons label="圖片模型" value={d.imageModel ?? ""} options={IMAGE_MODELS} onChange={v => { setD(p => ({ ...p, imageModel: v })); setSaved(false); }} />
+            {modelNote && <div className="form-hint" style={{ marginTop: 4 }}>{modelNote}</div>}
+          </div>
           {/* K10: the style of every article image (cover and body); an article can change it for itself only */}
           <ImageStyleButtons label="文章配圖風格" value={d.imageStyle ?? ""} onChange={v => { setD(p => ({ ...p, imageStyle: v || undefined })); setSaved(false); }} />
 
@@ -160,9 +169,8 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
             </div>
           </div>
 
-          {/* Featured image overlay settings */}
-          <OptionButtons label="精選圖片標題字型" value={d.featuredImageFont ?? "sans"} options={IMAGE_FONTS} onChange={v => { setD(p => ({ ...p, featuredImageFont: v })); setSaved(false); }} />
-          <OptionButtons label="標題文字位置" value={d.featuredImageTitlePosition ?? "bottom"} options={IMAGE_TITLE_POSITIONS} onChange={v => { setD(p => ({ ...p, featuredImageTitlePosition: v })); setSaved(false); }} />
+          {/* K25: the one article cover layout, this site's colours and font */}
+          <CoverSettingsFields value={cover} brandColors={brandColors} onChange={v => { setD(p => ({ ...p, cover: v })); setSaved(false); }} />
 
           {/* Marketing grid — 2-col, matches ContentStudio layout */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>

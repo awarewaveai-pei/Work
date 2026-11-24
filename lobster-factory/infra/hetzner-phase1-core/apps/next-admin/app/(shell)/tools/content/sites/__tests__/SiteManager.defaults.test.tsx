@@ -57,14 +57,14 @@ describe("site defaults as buttons", () => {
     expect(calls[0].body?.contentDefaults).toMatchObject({ tone: "Professional", language: "English" });
   });
 
-  it("each of the ten groups writes its own field", async () => {
+  it("each of the nine groups writes its own field", async () => {
     const calls = stubFetch(site());
     render(<SiteManager />);
     await openPanel();
     const picks: Array<[string, string]> = [
       ["語氣風格", "溫暖可信"], ["文章類型", "列表文章"], ["可讀性", "大學程度"], ["人稱視角", "第二人稱（你）"],
-      ["語言", "Japanese"], ["圖片模型", "Flux Dev（高品質）"], ["精選圖片標題字型", "明體（Noto Serif CJK）"],
-      ["標題文字位置", "正中央"], ["漏斗階段預設", "決策（準備行動／購買）"], ["價格定位", "平價親民（可近性）"],
+      ["語言", "Japanese"], ["圖片模型", "Flux Dev（高品質）"], ["字型", "明體（Noto Serif）"],
+      ["漏斗階段預設", "決策（準備行動／購買）"], ["價格定位", "平價親民（可近性）"],
     ];
     for (const [group, name] of picks) {
       fireEvent.click(Array.from(screen.getByRole("group", { name: group }).querySelectorAll("button")).find((b) => b.textContent === name)!);
@@ -74,7 +74,7 @@ describe("site defaults as buttons", () => {
     const d = calls[0].body?.contentDefaults as Record<string, unknown> & { marketing: Record<string, string> };
     expect(d).toMatchObject({
       tone: "Warm & Credible", articleType: "Listicle", readability: "College", pointOfView: "Second person",
-      language: "Japanese", imageModel: "flux-dev", featuredImageFont: "serif", featuredImageTitlePosition: "center",
+      language: "Japanese", imageModel: "flux-dev", cover: { font: "serif" },
     });
     expect(d.marketing).toMatchObject({ funnelStage: "decision", pricePositioning: "value" });
   });

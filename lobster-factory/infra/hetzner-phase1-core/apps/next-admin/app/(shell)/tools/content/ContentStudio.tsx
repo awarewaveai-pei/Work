@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import type { ManagedSite } from "@/app/api/content/sites/route";
-import { FUNNEL_STAGES, PRICE_POSITIONS, renderMarketingBrief, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { FUNNEL_STAGES, PRICE_POSITIONS, renderMarketingBrief, siteCover, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import CoverPreview from "./CoverPreview";
 import { useClientContext } from "@/lib/client-context/use-client-context";
 import type { BrandVoiceProfile } from "@/app/api/content/brand-voice/route";
 import type { RankMathReport } from "@/lib/seo/rankmath-checker";
@@ -814,6 +815,8 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       setForm(prev => ({ ...prev, structure: { ...prev.structure, [key]: value } })),
     []
   );
+  // K25: the image model / style chosen by hand for this article (a site switch then keeps it instead of the site's)
+  const mediaTouched = useRef({ aiImages: false, imageStyle: false });
   const setMedia = useCallback(
     <K extends keyof MediaHub>(key: K, value: MediaHub[K]) =>
       setForm(prev => ({ ...prev, media: { ...prev.media, [key]: value } })),
@@ -1119,11 +1122,12 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       if (d.articleType   && prev.articleType   === DEFAULT_FORM.articleType)   next.articleType   = d.articleType;
       if (d.readability   && prev.readability   === DEFAULT_FORM.readability)   next.readability   = d.readability;
       if (d.pointOfView   && prev.pointOfView   === DEFAULT_FORM.pointOfView)   next.pointOfView   = d.pointOfView;
-      if (d.imageModel    && prev.media.aiImages === DEFAULT_MEDIA.aiImages)
-        next.media = { ...prev.media, aiImages: d.imageModel };
-      // K10: the site's image style, for this article only (changing it here never writes the site back)
-      if (d.imageStyle    && prev.media.imageStyle === DEFAULT_MEDIA.imageStyle && STYLE_CATALOG.some(s => s.zh === d.imageStyle))
-        next.media = { ...next.media, imageStyle: d.imageStyle };
+      // K10/K25: the image model and style follow the site picked (switching sites brings the new site's), for this article
+      // only (never written back to the site) -- unless this article's own choice was made by hand, which stays
+      if (!mediaTouched.current.aiImages)
+        next.media = { ...next.media, aiImages: d.imageModel || DEFAULT_MEDIA.aiImages };
+      if (!mediaTouched.current.imageStyle)
+        next.media = { ...next.media, imageStyle: d.imageStyle && STYLE_CATALOG.some(s => s.zh === d.imageStyle) ? d.imageStyle : DEFAULT_MEDIA.imageStyle };
       if (d.brandVoiceInstructions && !prev.details.trim())
         next.details = d.brandVoiceInstructions;
       if (d.marketing) {
@@ -1491,6 +1495,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
           restored.media = { ...restored.media, youtubeSource: "none" };
         }
         setForm(restored);
+        mediaTouched.current = { aiImages: true, imageStyle: true };   // the draft's own choices
         // If the snapshot has a non-empty brandName, lock it so the auto-populate effect
         // doesn't overwrite it with the site name after restore.
         if (d.formSnapshot.media?.brandName) setBrandNameTouched(true);
@@ -1702,13 +1707,10 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       const res = await fetchAwaitingCodex("/api/content/image", {
         method: "POST", headers: { "Content-Type": "application/json" },
         // Hero/featured (K10): the cover scene at 16:9 (the cover layout's picture area; a program constant). Same model +
-        // style + seed + reference image as the body images so the hero matches the article's look.
-        // titleText → Sharp SVG overlay (bottom gradient bar + white title text) baked into the WebP.
+        // style + seed + reference image as the body images so the hero matches the article's look. No text on it: the
+        // short title and subtitle go on at publish, in the site's cover layout (K25, publishCover).
         body: JSON.stringify({
           prompt, platform: "facebook_link", aspectRatio: ARTICLE_COVER_RATIO, ...mediaImageParams(), purpose: "article",
-          titleText: metaData?.seoTitle || form.keyword || "",
-          featuredImageFont: currentSite?.contentDefaults?.featuredImageFont ?? "sans",
-          featuredImageTitlePosition: currentSite?.contentDefaults?.featuredImageTitlePosition ?? "bottom",
           _jobId: jobIdRef.current,
         }),
       });
@@ -1725,6 +1727,28 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       }
     } catch { if (genRun === imgRunRef.current) setImgGenWarn("首圖：圖片生成連線失敗，請稍後重試"); }
     finally { if (genRun === imgRunRef.current) setHeroLoading(false); }
+  }
+
+  // ─── Article cover (K25) ──────────────────────────────────────────────────
+  // The featured image is the site's one cover layout (lib/content/cover) on the hero picture, with the short title and
+  // subtitle the AI wrote (editable above the article). Drawn live by CoverPreview; stored once per text at publish.
+  const coverSettings = useMemo(() => siteCover(currentSite?.contentDefaults), [currentSite]);
+  const coverTitle = (metaData?.cover?.title || metaData?.seoTitle || form.title || form.keyword).trim();
+  const coverSubtitle = (metaData?.cover?.subtitle ?? "").trim();
+  const storedCoverRef = useRef<{ key: string; url: string } | null>(null);
+  async function publishCover(): Promise<string> {
+    const body = JSON.stringify({ title: coverTitle, subtitle: coverSubtitle, settings: coverSettings, imageUrl: heroImageUrl });
+    if (storedCoverRef.current?.key === body) return storedCoverRef.current.url;
+    let why = "";
+    try {
+      const r = await fetch("/api/content/cover", { method: "POST", headers: { "Content-Type": "application/json" }, body });
+      const j = await r.json().catch(() => null) as { ok?: boolean; imageUrl?: string; error?: string } | null;
+      if (j?.ok && j.imageUrl) { storedCoverRef.current = { key: body, url: j.imageUrl }; return j.imageUrl; }
+      why = j?.error ?? `HTTP ${r.status}`;
+    } catch { why = "連線失敗"; }
+    // never blocks the publish: the plain picture goes out, and the page says so
+    setImgGenWarn(`封面未套版（${why}），精選圖片用沒有字的底圖`);
+    return heroImageUrl;
   }
 
   // ─── SEO Fix Apply ────────────────────────────────────────────────────────
@@ -1762,6 +1786,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     setPubMode(resolvedMode);
     setPubStatus("publishing"); setPubError(""); setPubResult(null);
     try {
+      const featured = heroImageUrl && coverTitle ? await publishCover() : heroImageUrl;
       const res  = await fetch("/api/content/publish", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1781,9 +1806,9 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
             ? form.wpTags.split(",").map(s => s.trim()).filter(Boolean)
             : (metaData?.tags?.length ? metaData.tags : undefined),
           // Issue 四: hero image (Bridge path only — plugin sets it as the post thumbnail).
-          featuredImageUrl: heroImageUrl || undefined,
+          featuredImageUrl: featured || undefined,
           // alt only meaningful with a hero URL (plugin reads alt solely inside its featured-image block).
-          featuredImageAlt: heroImageUrl && form.keyword ? form.keyword : undefined,
+          featuredImageAlt: featured && form.keyword ? form.keyword : undefined,
           // Issue 七: focus keyword → ILJ ilj_linkdefinition so other posts auto-link to this one.
           internalLinkKeywords: form.keyword.trim() ? [form.keyword.trim()] : undefined,
         }),
@@ -2003,7 +2028,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     if (!site) { setSaveDefaultsMsg("✗ 尚未選擇目標客戶"); return; }
     setSavingDefaults(true);
     setSaveDefaultsMsg(null);
-    // Merge: preserve fields not managed by the form (featuredImageFont, featuredImageTitlePosition)
+    // Merge: preserve fields not managed by the form (the cover, the modes, the intro settings, ...)
     const existing = site.contentDefaults ?? {};
     const contentDefaults = {
       ...existing,
@@ -2462,12 +2487,21 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                       </div>
                     )}
                   </div>
-                  {/* K10: the cover's short title and subtitle (laid on the cover by K25); shown so they can be checked */}
-                  {(metaData.cover?.title || metaData.cover?.subtitle) && (
-                    <div className="form-hint" style={{ gridColumn: "1 / -1" }}>
-                      封面短標題：{metaData.cover?.title || "（沒有）"}　｜　封面副標：{metaData.cover?.subtitle || "（沒有）"}
+                  {/* K25: the cover's short title and subtitle (written by the AI, K10), editable; the cover drawn beside them */}
+                  <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
+                    <div style={{ flex: "1 1 240px", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <label className="form-label">封面短標題
+                        <input className="form-input" value={metaData.cover?.title ?? ""} placeholder={metaData.seoTitle}
+                          onChange={e => setMetaData(prev => prev ? { ...prev, cover: { ...prev.cover, title: e.target.value } } : prev)} />
+                      </label>
+                      <label className="form-label">封面副標
+                        <input className="form-input" value={metaData.cover?.subtitle ?? ""}
+                          onChange={e => setMetaData(prev => prev ? { ...prev, cover: { ...prev.cover, subtitle: e.target.value } } : prev)} />
+                      </label>
+                      <div className="form-hint">發佈時套用網站的封面版型（網站設定 › 文章封面）；短標題空白就用 SEO 標題。</div>
                     </div>
-                  )}
+                    {coverTitle && <CoverPreview title={coverTitle} subtitle={coverSubtitle} settings={coverSettings} imageUrl={heroImageUrl || undefined} width={260} />}
+                  </div>
                 </div>
               )}
               <div className="form-hint" style={{ marginTop: "6px" }}>
@@ -3013,7 +3047,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                 <div>
                   <label className="form-label">AI 圖片</label>
                   <select className="form-select" value={form.media.aiImages} disabled={isGenerating}
-                    onChange={e => setMedia("aiImages", e.target.value)}>
+                    onChange={e => { mediaTouched.current.aiImages = true; setMedia("aiImages", e.target.value); }}>
                     {AI_IMAGE_PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                   </select>
                 </div>
@@ -3031,7 +3065,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                 onPick={v => setMedia("imageSize", v)} disabled={isGenerating || form.media.aiImages === "none"} />
               <div style={{ marginBottom: "12px" }}>
                 <ImageStyleButtons label="配圖風格（只改這篇）" value={form.media.imageStyle}
-                  onChange={v => setMedia("imageStyle", v)} disabled={isGenerating || form.media.aiImages === "none"} />
+                  onChange={v => { mediaTouched.current.imageStyle = true; setMedia("imageStyle", v); }} disabled={isGenerating || form.media.aiImages === "none"} />
               </div>
 
               {/* Row 1b: Reference image (img2img / 以圖生圖) + Seed (固定風格 / 種子值) — model-gated */}
