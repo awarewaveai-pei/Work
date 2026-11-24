@@ -27,6 +27,10 @@ Based on OwnVoice Meet by Zaious, ChronicleCore Studio.
 | `lib/live/session.py` (`compose_reply`) | `src-tauri/src/llm.rs` (`spawn_reply`) |
 | `templates/workspace.html` (reply panel) | `src/reply/main.ts` |
 | `templates/workspace.html` (script panel: format parser, template, edit/preview/autosave, 補對照 button) | `src/script/format.ts`, `src/script/template.ts`, `src/script/main.ts` |
+| `lib/live/archive.py` | `src-tauri/src/archive.rs` (folder and file names, transcript rendering, segments, summary.md), `src-tauri/src/recorder.rs` (WAV writing, header rewrite, gap filling) |
+| `lib/live/summary.py` | `src-tauri/src/batch.rs` (batches, `due`, `requeue`, flush), `src-tauri/src/summary.rs` (update, `transcript`) |
+| `templates/workspace.html` (caption panel: save switch, segment name and 新段落, divider lines) | `src/captions/main.ts` (segments of a saved session) |
+| `templates/workspace.html` (summary panel) | `src/summary/main.ts` |
 
 ## Third-party notice carried over (from OwnVoice Meet `THIRD_PARTY_NOTICES.md`)
 

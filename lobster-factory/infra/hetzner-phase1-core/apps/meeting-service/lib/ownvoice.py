@@ -112,8 +112,19 @@ def live_transcript(max_age_sec: int = 1800) -> str:
         return ""
 
 
+def _raw_pcm(path: str, frame_bytes: int) -> bytes:
+    """沒收尾的檔（程式被殺）：檔頭的長度是舊的，資料都在。照檔案大小從 44 位元組檔頭後讀到檔尾，尾端不足一個取樣的捨去。"""
+    with open(path, "rb") as f:
+        head = f.read(44)
+        if len(head) < 44 or head[36:40] != b"data":
+            raise ValueError(f"{os.path.basename(path)} 沒有收尾，而且檔頭不是標準格式，無法接合")
+        data = f.read()
+    return data[: len(data) // frame_bytes * frame_bytes]
+
+
 def join_wavs(session_id: str, out_path: str) -> float:
-    """把各段錄音依序接成一個 WAV，回傳秒數。還在錄音就拒絕：檔頭長度落後實際資料，會接出殘缺的檔。"""
+    """把各段錄音依序接成一個 WAV，回傳秒數。還在錄音（10 秒內被寫過）就拒絕。
+    檔案已經安靜夠久但檔頭少記長度＝沒有人在錄、只是沒收尾，照實際大小讀；不改寫原檔。"""
     folder = session_dir(session_id)
     parts = sorted(f for f in os.listdir(folder) if f.lower().endswith(".wav"))
     if not parts:
@@ -125,9 +136,10 @@ def join_wavs(session_id: str, out_path: str) -> float:
             path = os.path.join(folder, name)
             with wave.open(path, "rb") as src:
                 this = (src.getnchannels(), src.getsampwidth(), src.getframerate())
-                undeclared = os.path.getsize(path) - src.getnframes() * this[0] * this[1]
-                if undeclared > WAV_HEADER_SLACK_BYTES or time.time() - os.path.getmtime(path) < RECORDING_QUIET_SEC:
+                if time.time() - os.path.getmtime(path) < RECORDING_QUIET_SEC:
                     raise ValueError("這場會議還在錄音：先在 OwnVoice 按停止，再做會後整理")
+                frame_bytes = this[0] * this[1]
+                unfinished = os.path.getsize(path) - src.getnframes() * frame_bytes > WAV_HEADER_SLACK_BYTES
                 if fmt is None:
                     fmt = this
                     out.setnchannels(this[0])
@@ -135,6 +147,11 @@ def join_wavs(session_id: str, out_path: str) -> float:
                     out.setframerate(this[2])
                 elif this != fmt:
                     raise ValueError(f"{name} 的音訊格式 {this} 與前面的 {fmt} 不同，無法接合")
+                if unfinished:
+                    pcm = _raw_pcm(path, frame_bytes)
+                    out.writeframes(pcm)
+                    frames += len(pcm) // frame_bytes
+                    continue
                 while chunk := src.readframes(1 << 16):
                     out.writeframes(chunk)
                 frames += src.getnframes()

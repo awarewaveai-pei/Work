@@ -50,6 +50,10 @@ class Session:
         # on_translated(id, zh) when its final Chinese is on screen.
         self.on_final: list = []
         self.on_translated: list = []
+        # on_open(id) when speech began, on_drop(id) when a line came to nothing, on_clear() when the captions were cleared.
+        self.on_open: list = []
+        self.on_drop: list = []
+        self.on_clear: list = []
         self._seg_seq = 0
         self._lines: dict = {}
         self._tasks: set = set()
@@ -106,6 +110,8 @@ class Session:
         self.segments.clear()
         self.my_lines.clear()
         self.emit({"type": "clear"})
+        for cb in self.on_clear:
+            cb()
 
     # ---- replies (llm.rs spawn_reply) ----
 
@@ -149,6 +155,8 @@ class Session:
         id = self._seg_seq
         self._upsert(Segment(id, "…", "", False))
         self._lines[id] = Line(self.clock())
+        for cb in self.on_open:
+            cb(id)
         return id
 
     def interim(self, id: int, text: str) -> None:
@@ -177,6 +185,8 @@ class Session:
         self.segments[:] = [s for s in self.segments if s.id != id]
         self.emit({"type": "caption-remove", "id": id})
         self._forget(id)
+        for cb in self.on_drop:
+            cb(id)
 
     def fail(self, id: int, msg: str) -> None:
         """Show an error in place of a line's text, without translating it."""

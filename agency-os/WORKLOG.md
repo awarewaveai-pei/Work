@@ -216,6 +216,21 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=bridgeClientForSiteWithRegistered | hits=8
 - ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic＋突變＋監工全套測試代替
+## 2026-11-24（續19）— meeting-service 會議工作區段 3（C10 存檔、C11 會議中摘要；11／11）
+
+- 步驟（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`；fullstack-engineer 實作，主 session 驗收）：
+  - C10 新 `MS/lib/live/archive.py`（移植 OwnVoice `archive.rs`＋`recorder.rs`）：寫出 OwnVoice 資料夾格式（`NN-段名.wav`、`transcript.md`、各段 `.md`、`summary.md`）；`hub.py` `save` 欄位、`segment` 事件、`segment-next`／`segment-rename`；字幕面板「存檔」（預設開）、段名、新段落
+  - C11 新 `MS/lib/live/summary.py`（移植 `batch.rs`＋`summary.rs`）：預設關、每 N 分鐘且 ≥3 句才呼叫；第五個面板 `summary`
+  - critic（Standard）0c/3m/7n。修：M1 `lib/ownvoice.py` `join_wavs` 對「已 ≥10 秒沒寫入但檔頭少記」的檔照實際大小讀（行程被殺的錄音可匯入）＋`app.py` lifespan shutdown 收尾；M2 停止時只等翻譯不取消；M3 `Summary.begin` 歸零＋generation；m 寫檔 `errors=replace`／PermissionError 重試／定時任務不因例外死掉、補靜音改成落後 >2 秒才補、`_ended` 只收自己那場、`summary.enabled` 顯示「摘要計費中」、WAV 近 4 GB 自動分段。未修：每 3 秒重寫全部段落檔 O(S×N)
+- 驗證：
+  - `python -m pytest tests -q` → 117 passed；「沒開存檔不寫檔」「沒開摘要不呼叫模型」各突變一次（紅→綠）
+  - 真實 Gemini（測試埠 8433，`OWNVOICE_SESSIONS_DIR=D:/tmp/ws-sessions`，critic 修正前的版本）：存檔＋摘要開 → `01-段落 1.wav`（985 KB）、`transcript.md` 兩句英中、`summary.md` 三條；`POST /api/ownvoice/import` 對該資料夾跑完 → `diarized.txt` 分角色逐字稿
+- REALTEST_EVIDENCE: tool=Bash | cmd=python feed2.py en.wav gemini 8433; curl POST /api/ownvoice/import; python -m pytest tests -q | exit=0 | ms=150000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/7n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,Projects | grep=join_wavs\( | hits=3
+- ORACLE_WAIVED: critic Standard 一輪（Opus，實作為 Sonnet 工人）＋兩個守衛突變證據
+- 剩餘風險：**critic 修正後的版本只跑過單元測試，未重做真實錄音與瀏覽器驗收（本 session 用量上限）**；8420 仍是段 2 版本、未重啟；改段名／新段落／摘要開關／「摘要計費中」未實際點過；真實麥克風未測；`join_wavs` 行為改變的下游只有本服務
+- rollback：`git revert` 本 commit
 ## 2026-11-24（續17）— meeting-service 會議工作區段 2（C8 回覆面板、C9 講稿面板；9／11）
 
 - 步驟（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`；fullstack-engineer 實作，主 session 驗收）：

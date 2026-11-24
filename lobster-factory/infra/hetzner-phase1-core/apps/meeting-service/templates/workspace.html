@@ -73,6 +73,11 @@
   .cap-listen[aria-pressed="true"] { background: var(--red); border-color: var(--red); }
   .cap-listen[aria-pressed="true"]:hover { background: var(--red); }
   .cap-level { font-size: 12px; color: var(--green); letter-spacing: 1px; min-width: 52px; }
+  .cap-seg { display: inline-flex; gap: 4px; align-items: center; padding-left: 6px; border-left: 1px solid var(--border); }
+  .cap-seg[hidden], .cap-seg [hidden] { display: none; }
+  .cap-segname.rec { color: var(--red); }
+  .cap-segedit { width: 160px; font: inherit; font-size: 12px; padding: 4px 8px; border: 1px solid var(--accent); border-radius: 8px; color: var(--ink); background: var(--card); }
+  .cap-list .divider { margin: 14px 0 10px; color: var(--muted); font-size: 0.8em; text-align: center; overflow-wrap: anywhere; }
   .cap-list { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px; line-height: 1.5; }
   .cap-list .seg { margin-bottom: 12px; }
   .cap-list .en { color: var(--ink); }
@@ -81,6 +86,7 @@
   .cap-list.zh-only .en { display: none; }
   .cap-foot { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
   .cap-usage { white-space: nowrap; }
+  .cap-sum { white-space: nowrap; color: var(--yellow); font-weight: 600; }
   .cap-foot { align-items: center; flex-wrap: wrap; }
   .cap-idle { white-space: nowrap; }
   .cap-idle input { width: 44px; font: inherit; padding: 1px 4px; border: 1px solid var(--border); border-radius: 6px; color: var(--ink); background: var(--card); }
@@ -122,6 +128,16 @@
   .sc-body .copy pre { margin: 0 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; font: 0.9em/1.4 Consolas, monospace; }
   .sc-body .copy .tbtn { padding: 3px 10px; font-size: 12px; }
 
+  .sm { height: 100%; display: flex; flex-direction: column; }
+  .sm-bar { flex: none; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .sm-bar .tbtn { padding: 5px 10px; font-size: 12px; }
+  .sm-every { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .sm-every input { width: 48px; font: inherit; padding: 1px 4px; border: 1px solid var(--border); border-radius: 6px; color: var(--ink); background: var(--card); }
+  .sm-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px; line-height: 1.6; }
+  .sm-body ul { margin: 0; padding-left: 20px; }
+  .sm-body li { margin-bottom: 6px; overflow-wrap: anywhere; }
+  .sm-foot { flex: none; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); min-height: 30px; }
+
   .lookup { display: flex; flex-direction: column; gap: 10px; }
   .lk-q {
     flex: none; min-height: 56px; width: 100%; resize: vertical; font: inherit; padding: 8px 10px;
@@ -144,6 +160,7 @@
   <button class="tbtn" type="button" data-panel="reply" aria-pressed="true">回覆</button>
   <button class="tbtn" type="button" data-panel="script" aria-pressed="true">講稿</button>
   <button class="tbtn" type="button" data-panel="lookup" aria-pressed="true">查詢</button>
+  <button class="tbtn" type="button" data-panel="summary" aria-pressed="true">摘要</button>
   <span class="sep"></span>
   <button class="tbtn" type="button" id="resetLayout">恢復預設版面</button>
   <span class="spacer"></span>
@@ -177,6 +194,8 @@ window.Workspace = (function () {
   };
   return {
     live,
+    // 按「聆聽」時，每個函式回傳的欄位會併進 start 指令（例如摘要面板的開關）。
+    startExtras: [],
     onPanel(id, fn) { (handlers[id] = handlers[id] || []).push(fn); },
     mount(id, root) { (handlers[id] || []).forEach(fn => fn(root)); },
   };
@@ -195,6 +214,12 @@ window.Workspace = (function () {
         <button type="button" class="tbtn" data-stt="gemini" aria-pressed="true">Gemini（計費）</button>
         <button type="button" class="tbtn" data-stt="local" aria-pressed="false">本機（免費）</button>
       </span>
+      <button type="button" class="tbtn" data-act="save" aria-pressed="true" title="把錄音和逐字稿存到「文件 › OwnVoice Meet」，首頁「OwnVoice 會議」卡的「會後整理」可以直接用。聆聽中不能改">存檔</button>
+      <span class="cap-seg" hidden>
+        <button type="button" class="tbtn cap-segname" data-act="segname"></button>
+        <input type="text" class="cap-segedit" maxlength="80" aria-label="段落名稱，Enter 確認，Esc 取消" hidden>
+        <button type="button" class="tbtn" data-act="segnext" title="結束這一段：錄音和逐字稿從新的一段開始">新段落</button>
+      </span>
       <span class="cap-level" aria-hidden="true"></span>
       <span class="spacer"></span>
       <button type="button" class="tbtn" data-act="zh-only" aria-pressed="false">只看中文</button>
@@ -205,6 +230,7 @@ window.Workspace = (function () {
     <div class="cap-list" aria-live="polite"></div>
     <div class="cap-foot">
       <span class="cap-status"></span><span class="spacer"></span>
+      <span class="cap-sum" hidden title="這場聆聽有開「會議中摘要」，每隔幾分鐘會呼叫一次 AI，每次都計費">摘要計費中</span>
       <label class="cap-idle" title="Gemini 連線中，安靜也照秒計費。這麼久沒有新字幕就先斷開不計費，有人說話會自動接回。0 = 不暫停">安靜 <input type="number" data-idle="pauseMin" min="0" max="120" step="1"> 分鐘暫停</label>
       <label class="cap-idle" title="這麼久沒有新字幕就自動停止聆聽。0 = 不自動結束">、<input type="number" data-idle="endMin" min="0" max="600" step="1"> 分鐘結束</label>
       <span class="cap-usage"></span>
@@ -217,8 +243,9 @@ window.Workspace = (function () {
 (function () {
   const RATE = 16000, CHUNK = RATE / 10, MAX_ROWS = 500, NEAR_BOTTOM_PX = 30;
   const EMPTY = "按「聆聽」開始。對方說的英文會出現在這裡，中文跟在下面。";
-  const prefs = Object.assign({ mic: true, tab: false, stt: "gemini", zhOnly: false, size: 18, pauseMin: 3, endMin: 30 }, loadPrefs());
-  const state = { segs: new Map(), status: "", listening: false, usage: null, level: 0 };
+  const prefs = Object.assign({ mic: true, tab: false, stt: "gemini", zhOnly: false, size: 18, pauseMin: 3, endMin: 30, save: true }, loadPrefs());
+  // segment：伺服器正在存的段落（index 0 = 沒在存）；dividers：新段落的分隔線，after = 開新段時最後一句字幕的代號
+  const state = { segs: new Map(), status: "", listening: false, usage: null, level: 0, segment: { index: 0, name: "", recording: false, dir: "" }, dividers: [], renaming: false, summaryOn: false };
   let root = null, audio = null, following = true, ours = false;
   const live = window.Workspace.live;
 
@@ -227,7 +254,7 @@ window.Workspace = (function () {
 
   // ---------- 與伺服器的連線（連線本體在 Workspace.live，三個面板共用） ----------
   function send(obj) { live.send(obj); }
-  ["snapshot", "caption", "caption-remove", "clear", "status", "listening", "usage"].forEach(t => live.on(t, handle));
+  ["snapshot", "caption", "caption-remove", "clear", "status", "listening", "usage", "segment", "summary"].forEach(t => live.on(t, handle));
   live.on("close", () => {
     stopAudio();
     state.listening = false;
@@ -239,6 +266,7 @@ window.Workspace = (function () {
     if (ev.type === "snapshot") {
       state.segs = new Map(ev.segments.map(s => [s.id, s]));
       state.status = ev.status; state.listening = ev.listening; state.usage = ev.usage;
+      state.segment = ev.segment; state.renaming = false; state.summaryOn = ev.summary.enabled;
       if (!ev.listening) stopAudio();
       paintAll();
     } else if (ev.type === "caption") {
@@ -250,8 +278,19 @@ window.Workspace = (function () {
       const row = root && root.querySelector('[data-seg="' + ev.id + '"]');
       if (row) row.remove();
       paintEmpty();
+    } else if (ev.type === "summary") {
+      state.summaryOn = ev.enabled; paintBar();
+    } else if (ev.type === "segment") {
+      const next = ev.index > state.segment.index && state.segment.index > 0;
+      state.segment = ev; state.renaming = false;
+      if (next) {
+        const d = { after: state.segs.size ? Math.max(...state.segs.keys()) : 0, text: "── " + pad2(ev.index) + " · " + ev.name + " ──" };
+        state.dividers.push(d);
+        paintDivider(d);
+      }
+      paintSegment();
     } else if (ev.type === "clear") {
-      state.segs.clear(); paintAll();
+      state.segs.clear(); state.dividers = []; paintAll();
     } else if (ev.type === "status") {
       state.status = ev.text; paintBar();
     } else if (ev.type === "listening") {
@@ -326,11 +365,39 @@ window.Workspace = (function () {
     if (!on) { stopAudio(); send({ type: "stop" }); return; }
     if (!prefs.mic && !prefs.tab) { state.status = "「麥克風」和「電腦聲音」至少要開一個"; return paintBar(); }
     if (!live.ready()) { state.status = "還沒連上會議工具，等一下再按"; return paintBar(); }
-    if (await startAudio()) send({ type: "start", stt: prefs.stt, language: "en-US", pause_min: prefs.pauseMin, end_min: prefs.endMin });
+    if (await startAudio()) {
+      send(Object.assign({ type: "start", stt: prefs.stt, language: "en-US", pause_min: prefs.pauseMin, end_min: prefs.endMin, save: prefs.save },
+        ...window.Workspace.startExtras.map(f => f())));
+    }
   }
 
   // ---------- 畫面 ----------
+  function pad2(n) { return String(n).padStart(2, "0"); }
   function list() { return root && root.querySelector(".cap-list"); }
+  function paintDivider(d) {
+    const el = list();
+    if (!el) return;
+    const empty = el.querySelector(".empty");
+    if (empty) empty.remove();
+    const div = document.createElement("div");
+    div.className = "divider";
+    div.textContent = d.text;
+    el.append(div);
+    settle();
+  }
+  function paintSegment() {
+    if (!root) return;
+    const seg = state.segment, on = seg.index > 0;
+    const wrap = root.querySelector(".cap-seg");
+    wrap.hidden = !on;
+    if (!on) return;
+    const name = wrap.querySelector(".cap-segname"), edit = wrap.querySelector(".cap-segedit");
+    name.hidden = state.renaming;
+    edit.hidden = !state.renaming;
+    name.textContent = (seg.recording ? "● " : "") + pad2(seg.index) + " · " + seg.name;
+    name.classList.toggle("rec", seg.recording);
+    name.title = (seg.recording ? "錄音中。" : "只存逐字稿。") + "點一下改名。存在 " + seg.dir;
+  }
   function settle() {
     const el = list();
     if (!el || !following) return;
@@ -342,7 +409,7 @@ window.Workspace = (function () {
     const el = list();
     if (!el) return;
     const empty = el.querySelector(".empty");
-    if (state.segs.size) { if (empty) empty.remove(); return; }
+    if (state.segs.size || state.dividers.length) { if (empty) empty.remove(); return; }
     if (!empty) {
       const p = document.createElement("p");
       p.className = "placeholder empty";
@@ -384,6 +451,11 @@ window.Workspace = (function () {
     root.querySelectorAll("[data-stt]").forEach(x => { x.setAttribute("aria-pressed", String(prefs.stt === x.dataset.stt)); x.disabled = state.listening; });
     root.querySelector('[data-act="zh-only"]').setAttribute("aria-pressed", String(prefs.zhOnly));
     root.querySelectorAll("[data-idle]").forEach(x => { if (document.activeElement !== x) x.value = prefs[x.dataset.idle]; x.disabled = state.listening; });
+    const save = root.querySelector('[data-act="save"]');
+    save.setAttribute("aria-pressed", String(prefs.save));
+    save.disabled = state.listening;
+    paintSegment();
+    root.querySelector(".cap-sum").hidden = !(state.listening && state.summaryOn);
     const l = list();
     l.classList.toggle("zh-only", prefs.zhOnly);
     l.style.fontSize = prefs.size + "px";
@@ -397,7 +469,10 @@ window.Workspace = (function () {
     if (!root) return;
     list().replaceChildren();
     paintEmpty();
-    state.segs.forEach(paintRow);
+    const pending = state.dividers.slice();
+    const placeDividers = id => { while (pending.length && pending[0].after < id) paintDivider(pending.shift()); };
+    state.segs.forEach(s => { placeDividers(s.id); paintRow(s); });
+    placeDividers(Infinity);
     paintBar();
   }
 
@@ -417,10 +492,33 @@ window.Workspace = (function () {
       else if (b.dataset.act === "smaller") prefs.size = Math.max(12, prefs.size - 2);
       else if (b.dataset.act === "bigger") prefs.size = Math.min(40, prefs.size + 2);
       else if (b.dataset.act === "clear") return send({ type: "clear" });
+      else if (b.dataset.act === "save") prefs.save = !prefs.save;
+      else if (b.dataset.act === "segnext") return send({ type: "segment-next", name: null });
+      else if (b.dataset.act === "segname") {
+        state.renaming = true;
+        paintSegment();
+        const edit = el.querySelector(".cap-segedit");
+        edit.value = state.segment.name;
+        edit.focus();
+        edit.select();
+        return;
+      }
       savePrefs();
       paintBar();
       settle();
     });
+    const edit = el.querySelector(".cap-segedit");
+    edit.addEventListener("keydown", e => {
+      if (e.isComposing) return;      // 輸入法組字中的 Enter／Esc 只是確認字或取消組字
+      if (e.key === "Escape") { state.renaming = false; paintSegment(); }
+      else if (e.key === "Enter") {
+        const name = edit.value.trim();
+        state.renaming = false;
+        if (name) send({ type: "segment-rename", name });
+        paintSegment();
+      }
+    });
+    edit.addEventListener("blur", () => { if (state.renaming) { state.renaming = false; paintSegment(); } });
     el.querySelectorAll("[data-idle]").forEach(x => x.addEventListener("change", () => {
       const v = Number(x.value);
       prefs[x.dataset.idle] = Number.isFinite(v) && v >= 0 ? v : 0;
@@ -895,17 +993,93 @@ Sorry, could you repeat the question?
 })();
 </script>
 
+<template id="tpl-summary">
+  <div class="sm">
+    <div class="sm-bar">
+      <button type="button" class="tbtn" data-act="on" aria-pressed="false" title="聆聽時每隔幾分鐘，把新的字幕交給 AI 整理成要點，每次都會計費。聆聽中不能改">會議中摘要（計費）</button>
+      <label class="sm-every" title="至少要有 3 句新字幕才會整理">每 <input type="number" data-every min="1" max="60" step="1"> 分鐘更新</label>
+    </div>
+    <div class="sm-body" aria-live="polite"></div>
+    <div class="sm-foot"></div>
+  </div>
+</template>
+<script>
+// 摘要面板：條列顯示與狀態列照 OwnVoice Meet src/summary/main.ts（Apache-2.0）；整理的排程在伺服器（lib/live/summary.py）。
+// 開關與間隔存在 localStorage，按「聆聽」時由字幕面板併進 start 指令；預設關。
+(function () {
+  const live = window.Workspace.live;
+  const EMPTY_OFF = "還沒有開啟。打開上面的「會議中摘要」再按「聆聽」，每隔幾分鐘就會把新的字幕整理成要點（每次都計費）。";
+  const EMPTY_ON = "還沒有摘要。有新的字幕後，到了更新時間會自動整理。";
+  const prefs = Object.assign({ on: false, every: 5 }, loadPrefs());
+  const view = { text: "", updated: "", lines: 0, working: false, error: "", enabled: false };
+  let listening = false, root = null;
+
+  function loadPrefs() { try { return JSON.parse(localStorage.getItem("ws-summary") || "{}"); } catch (e) { return {}; } }
+  function savePrefs() { try { localStorage.setItem("ws-summary", JSON.stringify(prefs)); } catch (e) {} }
+
+  window.Workspace.startExtras.push(() => ({ summary: prefs.on, summary_min: prefs.every }));
+  live.on("snapshot", ev => { Object.assign(view, ev.summary); listening = ev.listening; paint(); });
+  live.on("summary", ev => { Object.assign(view, ev); paint(); });
+  live.on("listening", ev => { listening = ev.on; paint(); });
+
+  function paint() {
+    if (!root) return;
+    const on = root.querySelector('[data-act="on"]');
+    on.setAttribute("aria-pressed", String(listening ? view.enabled : prefs.on));      // 聆聽中以伺服器實際開著的為準
+    on.disabled = listening;
+    const every = root.querySelector("[data-every]");
+    if (document.activeElement !== every) every.value = prefs.every;
+    every.disabled = listening;
+    const body = root.querySelector(".sm-body");
+    const items = String(view.text).split("\n").map(raw => raw.replace(/^\s*[-•*]\s*/, "").trim()).filter(Boolean);
+    if (items.length) {
+      const ul = document.createElement("ul");
+      items.forEach(t => { const li = document.createElement("li"); li.textContent = t; ul.append(li); });
+      body.replaceChildren(ul);
+    } else {
+      const p = document.createElement("p");
+      p.className = "placeholder";
+      p.textContent = prefs.on ? EMPTY_ON : EMPTY_OFF;
+      body.replaceChildren(p);
+    }
+    const parts = [];
+    if (view.working) parts.push("整理中…");
+    else if (view.updated) parts.push(view.updated + " 更新，共 " + view.lines + " 句");
+    if (view.error) parts.push(view.error);
+    root.querySelector(".sm-foot").textContent = parts.join("　");
+  }
+
+  window.Workspace.onPanel("summary", el => {
+    root = el;
+    el.querySelector('[data-act="on"]').addEventListener("click", e => {
+      if (e.currentTarget.disabled) return;
+      prefs.on = !prefs.on;
+      savePrefs();
+      paint();
+    });
+    el.querySelector("[data-every]").addEventListener("change", e => {
+      const v = Math.round(Number(e.target.value));
+      if (Number.isFinite(v)) prefs.every = Math.min(60, Math.max(1, v));
+      savePrefs();
+      paint();
+    });
+    paint();
+  });
+})();
+</script>
+
 <script src="/static/vendor/dockview-core-8.9.1.min.js"></script>
 <script>
 (function () {
   const dv = window["dockview-core"];
-  const PANELS = { captions: "字幕", reply: "回覆", script: "講稿", lookup: "查詢" };
+  const PANELS = { captions: "字幕", reply: "回覆", script: "講稿", lookup: "查詢", summary: "摘要" };
   // 重新打開被關掉的面板時，優先併在這些面板旁邊；都不在就加進目前的群組。
   const REOPEN_NEXT_TO = {
     captions: [["reply", "above"], ["lookup", "left"]],
     reply: [["captions", "below"], ["script", "left"]],
     script: [["lookup", "below"], ["reply", "right"]],
     lookup: [["script", "above"], ["captions", "right"]],
+    summary: [["lookup", "within"], ["captions", "right"]],
   };
   const el = document.getElementById("dock");
 
@@ -937,6 +1111,8 @@ Sorry, could you repeat the question?
     addPanel("lookup", { referencePanel: "captions", direction: "right" }, { initialWidth: Math.round(w * 0.4) });
     addPanel("reply", { referencePanel: "captions", direction: "below" }, { initialHeight: Math.round(h * 0.35) });
     addPanel("script", { referencePanel: "lookup", direction: "below" }, { initialHeight: Math.round(h * 0.5) });
+    addPanel("summary", { referencePanel: "lookup", direction: "within" });
+    api.getPanel("lookup").api.setActive();
   }
 
   function syncButtons() {

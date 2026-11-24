@@ -103,7 +103,7 @@ python app.py
 
 ## 會議工作區（2026-11-24）
 
-`http://127.0.0.1:8420/workspace`：一頁四個可停靠面板（字幕、回覆、講稿、查詢），可拖曳換位、拉分隔線、疊成分頁，
+`http://127.0.0.1:8420/workspace`：一頁五個可停靠面板（字幕、回覆、講稿、查詢、摘要），可拖曳換位、拉分隔線、疊成分頁，
 版面存 `.workspace.json`。取代 OwnVoice Meet 的漂浮視窗與舊的查詢側欄（`lookup_panel.py` 已刪）。
 卡片、定案與進度：`docs/WORKSPACE_PAGE_CARDS.md`；移植來源與授權：`lib/live/NOTICE.md`（OwnVoice Meet，Apache-2.0）。
 
@@ -112,15 +112,16 @@ python app.py
 | 即時字幕＋中文 | 字幕面板按「聆聽」。聲音來源「麥克風／電腦聲音」可同開。辨識二選一：「Gemini（計費）」說話中就有灰字，約 NT$17／小時；「本機（免費）」用這台的顯卡，講完一句才出字 | `lib/live/`、`WebSocket /api/live/ws` |
 | 閒置暫停 | Gemini 連線中靜音也計費：沒有新字幕 3 分鐘先斷線不計費，有聲音自動接回；30 分鐘自動結束。兩個數字在面板底列可改，0 = 不啟用 | `lib/live/idle.py` |
 | 查詢 | 頁面內反白 ≥ 2 個字 → 查詢面板自動搜尋網路；「問 AI（計費）」「心智圖」按了才呼叫 | `lib/lookup.py` |
+| 存檔 | 字幕面板的「存檔」（預設開，聆聽中不能改）：錄音（16 kHz 單聲道）與逐字稿存到 `文件 › OwnVoice Meet › YYYY-MM-DD HHMM`，格式與 OwnVoice 相同，首頁「OwnVoice 會議」卡的「會後整理」可直接用。「新段落」開新的一段（新錄音檔、新逐字稿段落），點段名可改名；閒置暫停期間錄音不停；剩餘空間不到 1 GB 就這場不存檔（照常聆聽） | `lib/live/archive.py` |
+| 會議中摘要 | 摘要面板打開「會議中摘要（計費）」（預設關，聆聽中不能改），每 N 分鐘（預設 5）且至少 3 句新字幕才呼叫一次模型，停止時補最後一批；有存檔就寫 `summary.md` | `lib/live/summary.py` |
 
 - 金鑰都在伺服器端：Gemini 讀環境變數 `GEMINI_API_KEY`；翻譯用設定頁的 Anthropic key（Claude Haiku），沒填就用同一把 Gemini key（Flash-Lite）。
 - 今日用量（NT$，依牌價估算）顯示在字幕面板右下，存 `.live-usage.json`。
 - 本機辨識與「會後整理」不同時用顯卡（`lib/gpu_gate.py`）：一邊在跑，另一邊會被告知要等；本機聆聽停止時會卸載模型。
 - 只收本機來的請求：`TrustedHostMiddleware`（Host 只認 127.0.0.1／localhost）＋ WebSocket 檢查 Origin。
-- 還沒做（見卡片）：回覆、講稿兩個面板的內容；存錄音與逐字稿；會議中摘要。**在存檔做好之前，這一頁的會議不會留下錄音**，
-  要「會後整理」或會議中心智圖的會議仍用 OwnVoice Meet 錄。
+- 存檔位置與「OwnVoice 整合」同一個（`lib/ownvoice.base_dir()`，測試用環境變數 `OWNVOICE_SESSIONS_DIR` 指到暫存資料夾）；沒開「存檔」就不寫任何檔。
 - 沒有的：字幕不能浮在會議軟體上、沒有全域快捷鍵、別的程式裡反白的字要貼進查詢面板。
-- 未實測：真實麥克風與「電腦聲音」收音（開發時的測試瀏覽器沒有收音裝置）；Anthropic 翻譯對真實 API。
+- 未實測：真實麥克風與「電腦聲音」收音（開發時的測試瀏覽器沒有收音裝置）；Anthropic 翻譯與摘要對真實 API；存檔與摘要面板在真實瀏覽器裡的點擊操作。
 
 ## OwnVoice Meet 整合（2026-11-23）
 

@@ -70,11 +70,22 @@ def test_join_wavs_refuses_a_session_still_recording(base, tmp_path):
     os.utime(live)                                  # 剛剛才被寫過
     with pytest.raises(ValueError, match="還在錄音"):
         ownvoice.join_wavs("latest", str(tmp_path / "a.wav"))
-    with open(live, "ab") as f:                     # 檔頭還沒回填：資料比宣告的多
+    with open(live, "ab") as f:                     # 檔頭還沒回填：資料比宣告的多，而且剛剛才寫過
         f.write(bytes(32000))
-    os.utime(live, (time.time() - 60,) * 2)
     with pytest.raises(ValueError, match="還在錄音"):
         ownvoice.join_wavs("latest", str(tmp_path / "b.wav"))
+
+
+def test_join_wavs_reads_an_unfinished_file_by_its_size_once_it_is_quiet(base, tmp_path):
+    live = base / "2026-11-22 1630-2" / "02-Panel.wav"
+    with open(live, "ab") as f:                     # 程式被殺：檔頭沒回填，另有半個取樣的尾巴
+        f.write(bytes(32000) + b"\x01")
+    os.utime(live, (time.time() - 60,) * 2)
+    out = tmp_path / "c.wav"
+    assert ownvoice.join_wavs("latest", str(out)) == pytest.approx(2.5)
+    with wave.open(str(out), "rb") as w:
+        assert w.getnframes() == 16000 + 8000 + 16000
+    assert os.path.getsize(live) == 44 + 16000 + 32000 + 1   # 原檔沒被改寫
 
 
 def test_live_transcript_only_when_recently_written(base):

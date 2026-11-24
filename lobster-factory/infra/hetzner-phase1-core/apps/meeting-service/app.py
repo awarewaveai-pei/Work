@@ -8,6 +8,8 @@
 
 不部署到 SG/EU（無 GPU，見 README.md）。
 """
+import asyncio
+import contextlib
 import json
 import os
 import shutil
@@ -30,7 +32,20 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JOBS_DIR = os.path.join(BASE_DIR, "jobs")
 os.makedirs(JOBS_DIR, exist_ok=True)
 
-app = FastAPI(title="Meeting Service (local only)")
+LIVE_SHUTDOWN_WAIT = 30.0
+
+
+@contextlib.asynccontextmanager
+async def _lifespan(_app):
+    yield
+    # 伺服器關閉時還在聆聽：先正常停止，錄音檔頭與逐字稿才會收尾（LIVE 在下方定義）。
+    await LIVE.stop()
+    await asyncio.sleep(0)
+    if LIVE.finalizing is not None:
+        await asyncio.wait({LIVE.finalizing}, timeout=LIVE_SHUTDOWN_WAIT)
+
+
+app = FastAPI(title="Meeting Service (local only)", lifespan=_lifespan)
 # 只認本機的主機名：別的網域就算解析到 127.0.0.1（DNS rebinding），瀏覽器送來的 Host 也不會過，
 # 那個網頁就讀不到逐字稿、也叫不動會計費的端點。
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
