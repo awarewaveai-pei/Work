@@ -12,6 +12,19 @@
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
   - external oracle = Codex CLI (codex exec -s read-only)，2 項已修、1 項依計畫留 M6
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=member_invite | hits=66
+## 2026-11-24（續9）— ks-aw-01：soulfulexpression.org 主機憑證改用 nginx 驗證並續期；失效的 Cloudflare token 檔移除（操作者：「你決定」）
+
+- [根因] `/etc/letsencrypt/renewal/soulfulexpression.org.conf` 是主機上唯一 `authenticator = dns-cloudflare` 的憑證（搬站時 DNS 還沒指到本機，只能 dns-01）；它依賴的 `/etc/letsencrypt/cloudflare.ini`（2026-08-27）token 已被 Cloudflare 拒絕（9109 Invalid access token）。`certbot.service` 與每週排程 `certbot_renew` 因此連續失敗（`/var/lib/awarewave/jobs/certbot_renew.json` 2026-11-23 `exit_code:1`；journal 2026-11-23 23:39 "Failed to renew certificate soulfulexpression.org"），憑證剩一天（notAfter 2026-11-25 06:38 GMT）。SF-L 簽測試憑證時撞到同一個 token 才發現。
+- [影響] 未中斷：zone `soulfulexpression.org` Cloudflare SSL=full（不驗主機憑證效期），邊緣憑證到 2027-01-11。
+- [步驟] 不補 token，改成與其他四張同一種方式（不變量：主機上每張憑證都能不靠額外憑證自動續期）：備份 renewal conf → `certbot renew --cert-name soulfulexpression.org --authenticator nginx --installer nginx --dry-run` 成功 → 同指令去掉 `--dry-run` → renewal conf 刪兩行殘留的 `dns_cloudflare_*` → `rm /etc/letsencrypt/cloudflare.ini`（已無任何 renewal conf 引用）。
+- [驗證] 新憑證 notAfter 2027-02-22 02:09 GMT，SAN 兩個網域不變；`openssl s_client -connect 127.0.0.1:443 -servername www.soulfulexpression.org` 送出的是新憑證；`https://www.soulfulexpression.org/`、`https://soulfulexpression.org/` 200；`nginx -t` ok；`systemctl start certbot.service` → Result=success（先前為 exit-code）；renewal conf `authenticator = nginx`、`installer = nginx`。每週排程 `certbot_renew` 已經由 `cron-run.sh` 重跑以更新狀態檔。
+- [避免再發生] 新站憑證一律走 nginx 驗證（DNS 指到本機後）；搬站期間用 dns-01 簽的憑證，cutover 後當場改回。偵測本來就有（`certbot_renew` 排程狀態），失敗沒被處理：AO-RESUME 的 §6 要把 host schedule 的失敗列出來，另案。
+- [rollback] `/root/soulfulexpression.org.renewal.bak-20261124` 還原 renewal conf；舊憑證檔在 `/etc/letsencrypt/archive/soulfulexpression.org/`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=certbot renew --cert-name soulfulexpression.org --authenticator nginx --installer nginx；systemctl start certbot.service；curl https://www.soulfulexpression.org/ | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=cloudflare.ini | hits=5
+- BUGHUNT_SCOPE_NARROW: 5 筆皆為舊規劃文件與一份 vhost 註解中的簽證範例（`lobster-factory/docs/hosting/HETZNER_HOSTING_LAYER_PLAN.md:331`、`.claude/plans/hetzner-hosting-layer-PLAN.md:331`、`nginx/system-sites/aware-wave-app-api-subdomains.conf:17`），不是現行設定，未改
+- ORACLE_WAIVED: 無程式碼改動（主機設定與憑證）；dry-run 先行、實測驗證
 ## 2026-11-24（續5）— oracle WP：SF-L 拋棄式網域全流程在正式主機跑完並拆除；實跑修掉四個本機測不到的問題
 
 - [根因] 建站流程（SF-C～SF-J）全部只對 docker／wp-cli 的 shim 測過，沒在真主機跑過（操作者 2026-11-24 同意待決 3）。實跑逐一撞到四個 shim 與真實環境不同之處：
