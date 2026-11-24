@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-24（續2）— oracle WP 第四批收尾：SF-P 併入；整批 RISKS 總檢完成（21 列）；SF-K 清單外兩處假狀態補修
+
+- [根因] 第四批最後一張 SF-P（工人 `dc2a9c8d5`，線 4）已提交未驗收；E6、P4、SF-K、SF-J2、SF-I2 的未處置風險（2026-11-23 續11、續13）等它交回才能一起判。
+- [步驟] SF-P：監工讀完整 diff（新增與修改 1553 行；刪除的 5 檔只看清單）→ `D:/Worktrees/Work/oracle-int` cherry-pick 無衝突 = `e6aa5ff91` → push。看工人截圖兩張（部門選型、外部服務分頁）。grep 殘留：程式內 `href="/build"`／`href="/onboard"`／`04-onboard-page`／`OnboardWizard`／`BuildConsole` 0 筆（剩下都在歷史文件，SF-A 處理）；`/api/build/runs` 已無頁面或排程呼叫端（`lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts:159` 只是註解）。
+- [步驟] SF-K 清單外四處：`app/(shell)/ops/repairs/page.tsx:234` 寫死 `ok` 拿掉、`app/(shell)/ops/cs/page.tsx:58-63` 寫死打勾清單改成「在哪裡操作」一句 = `417e04dbc`；側欄舊入口已由 SF-P 移除；`ops/clients/ClientCard.tsx:65` 顯示的是實際 HTTP 狀態碼，不改。
+- [步驟] 總檢 21 列寫進 `data.mjs`「第四批」表並重新發布監工台（Version 23）。判定依據（唯讀查正式庫，`timeout 60 ssh … docker exec -i supabase-db psql`）：`intake_forms` 9 筆（building 3／pending 1／spec_generated 5，皆測試資料）、`website_specs` 8 筆、8 個 organizations 的 `client_config.department_selection` 全空、`tenant_integration_bindings` 12 筆。
+  - C1 SF-P 問卷後續四件（規格產內容、品牌色、綁回問卷、問卷狀態）：本階段不做；第一個真客戶走問卷時再開卡。
+  - C2 SF-J2 migration 撞號：`refs/keep/sf-j2-0179` 的 `0179_environments_host_slug_unique` 與已套用的 `0179_entitlement_held_products` 同號；待決 7 點頭時改下一個空號再併入、套用（已寫進 `WP-PLAN.md` §0）。
+  - C3 其餘 19 列（E6 ×4、P4 ×2、SF-K ×1、SF-J2 ×2、SF-I2 ×3、SF-P ×7）處置見 `agency-os/handoffs/2026-11-20-oracle-skills-supervisor/data.mjs` 最後一張表，不在此重述。
+- [驗證] SF-P 整合結果：next-admin `npx tsc --noEmit` exit 0；全套 `npx vitest run` 690 檔／5762 passed／0 failed（`quizzical-pasteur` worktree @ `e6aa5ff91`）。SF-K 補修：tsc exit 0；`npx vitest run "app/(shell)/ops/cs" "app/(shell)/ops/repairs" app/__tests__` 9 檔／51 passed；`scripts/audit-tools/dogfood-auto-repair.ps1 -Mode HealthOnly` 10/10。`node build.mjs && node check.mjs`：32 cards、133 risk rows、8 open。
+- [避免再發生] 兩條線各自取 migration 編號會撞號：寫 migration 的卡在 brief 註明「併入當下才定號」，監工併入前 `ls lobster-factory/packages/db/migrations | tail` 對一次。
+- [未做] SF-P 的 308 尚未在正式站驗證（等 next-admin 下一次 03:00 自動部署）；`0179` 改號與套用等操作者同意（待決 7）；SF-L 前置（備份腳本修正與上主機）未開始。
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx tsc --noEmit && npx vitest run（quizzical-pasteur worktree @ e6aa5ff91） | exit=0 | ms=160000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/3m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,.claude,docs,mcp | grep=04-onboard-page|OnboardWizard|BuildConsole|href="/build"|href="/onboard" | hits=27
+- BUGHUNT_SCOPE_NARROW: 27 筆全在歷史規格與計畫文件（`agency-os/docs/`、`docs/spec/raw/`、`lobster-factory/docs/`），程式與腳本 0 筆；文件更正屬 SF-A（批 5，SF-L 跑完才改）
+- ORACLE_WAIVED: Codex 額度封到 2026-11-24 11:02（`oracle-quota.ps1 -Action check -Tool codex` exit 3）；SF-P 工人 critic 一輪（M1、M2 已修，M3 = C1）＋監工讀完整 diff 與全套測試代替
 ## 2026-11-24（續1）— 平台第 8 批上線：U11、W2、M3（High，0179 已套用）＋員工後台頁名
 
 - 操作者 2026-11-23「一起上」＝ M3（migration 0179）的 go；同日兩次「你決定」：贈送＝一種方式、「畫布」改名。
