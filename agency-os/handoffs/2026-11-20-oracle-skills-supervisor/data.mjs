@@ -31,7 +31,7 @@ export const NOW = [
   { what: '工具嵌在 WordPress 頁面裡。', state: 'no', ev: '引擎的嵌入版與外掛都做好並併入，還沒部署、還沒裝到網站；要等上線三步。' },
   { what: '會員能存命盤、訂閱每日信。', state: 'no', ev: '外掛的功能做好併入了，還沒裝到任何網站；要等上線三步。' },
   { what: 'AI 解讀分成免費簡批與付費深度報告。', state: 'no', ev: '2026-11-22 已定：用 OpenAI、單次購買、簡批下方列出這張命盤還有哪些深度內容可付費得知；紫微補上十二宮互動與流年流月。排在 WordPress 階段之後，共三張卡，尚未派工。' },
-  { what: '從後台一步一步開一個客戶網站。', state: 'no', ev: '頁面與九個步驟都做好併入了，但開關全關、還沒在真的主機上跑過；要等「用測試網域完整跑一次」。舊的兩個建站頁已移除，建站只剩這一條路；後台已於 2026-11-24 部署到這個版本。' },
+  { what: '從後台一步一步開一個客戶網站。', state: 'yes', ev: '2026-11-24 用測試網域在正式主機完整跑過一次：九步走完、網站對外可開、當晚備份含此站並實際還原成功，之後整個拆掉。開關目前關著，要建站時再開。' },
 ];
 
 const SPEC = 'briefs/ORACLE-WP-SPEC.md';
@@ -88,7 +88,7 @@ export const STEPS = [
   { n: 23, code: 'SF-P', group: 'B4', title: '舊的建站頁退場', plain: '舊的兩個建站頁刪除並轉到新流程；它們還有用的兩塊設定搬到客戶頁。',
     gate: '既有客戶的設定在新位置看得到；全站沒有連到舊頁的連結。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'e6aa5ff91', depends: ['SF-J'], card: 'briefs/WP-SF-P-old-pages.md' },
   { n: 24, code: 'SF-L', group: 'B4', title: '用測試網域完整跑一次', plain: '後台部署後，用一個拋棄式網域從頭到尾建一個站，當晚確認有被備份，再整個拆掉，確認沒留下任何東西。',
-    gate: '每一步都有成功紀錄；拆掉後容器、設定、登記都不存在。', risk: 'High', model: '監工', status: 'not_started', depends: ['SF-F', 'SF-H', 'SF-I', 'SF-J'], card: SF, before: '待決 3、待決 7' },
+    gate: '每一步都有成功紀錄；拆掉後容器、設定、登記都不存在。', risk: 'High', model: '監工', status: 'done', commit: 'a3b97256b', depends: ['SF-F', 'SF-H', 'SF-I', 'SF-J'], card: SF, before: '待決 3' },
   { n: 25, code: 'SF-J2', group: 'B4', title: '建站表單補強', plain: '表單上用按鈕明確選「新客戶」或「既有客戶」，才能替已經有的客戶再加網站；並在資料庫加上限制，同一個網址不會被建成兩筆。',
     gate: '既有客戶加第二個網站成功；同一個網址同時送兩次只會成功一次。', risk: 'Medium（資料表異動套用是 High）', model: 'Opus 5.5', status: 'done', commit: 'c20ccbd0a', depends: ['SF-J', 'SF-H'], card: 'briefs/WP-SF-J2-site-form.md', before: '資料庫的限制還沒套用，等待決 7' },
   { n: 26, code: 'E6', group: 'B4', title: '引擎：會員票與英文每日信', plain: '登入會員按 AI 解讀時，引擎的頁面去跟外層的 WordPress 拿票，額度才會記在這位會員身上；每日運勢的「宜／忌」補上英文。',
@@ -103,7 +103,7 @@ export const STEPS = [
   { n: 30, code: 'GO-1', group: 'B5', title: '上線一：部署引擎', plain: '把引擎的新版本（含嵌入版頁面）部署上去。這一步之後訪客看到的網站沒有任何變化。',
     gate: '原有網址逐頁與部署前相同；嵌入版頁面打得開。', risk: 'High', model: '監工', status: 'not_started', depends: ['E1', 'E3', 'E4', 'E2'], card: SPEC, before: '待決 4' },
   { n: 31, code: 'GO-2', group: 'B5', title: '上線二：接上 WordPress（建置中）', plain: '建好 oracle 的 WordPress，讓它接手引擎沒用到的網址，並設成建置中。訪客原本的網址都不變；你登入後開始建頁面、設定外掛與寄信。',
-    gate: '原有網址不變；你能登入 WordPress 後台。', risk: 'High', model: '監工', status: 'not_started', depends: ['GO-1', 'SF-L', 'P1', 'P4'], card: SPEC, before: '待決 5、待決 8' },
+    gate: '原有網址不變；你能登入 WordPress 後台。', risk: 'High', model: '監工', status: 'not_started', depends: ['GO-1', 'SF-L', 'P1', 'P4'], card: SPEC, before: '待決 5、待決 7、待決 8' },
   { n: 32, code: 'GO-3', group: 'B5', title: '上線三：正式開放', plain: '你確認頁面與每日信都沒問題後，首頁換成 WordPress，舊工具網址轉到新頁面，關掉建置中。',
     gate: '首頁是 WordPress；頁面裡的工具可用；訂閱測試信收得到。', risk: 'High', model: '監工', status: 'not_started', depends: ['GO-2', 'P2', 'P3'], card: SPEC, before: '待決 6' },
 ];
@@ -112,12 +112,12 @@ const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要',
 export const OPEN = [
   { n: 1, what: '把「網站與環境的紀錄」的資料表異動套用到正式資料庫（只新增索引與幾列預設關閉的開關，不改既有資料）。', before: 'SF-G', decided: '2026-11-22 同意。已套用（編號 0176）並驗證：索引存在、七個開關全關。', src: 'WP-PLAN.md 第 6 節', options: ASK('監工套用並驗證後才推上主線。', '平台線停在第一批。') },
   { n: 2, what: '把 MainWP 的連線金鑰放進後台容器（主機設定變更，走會自動還原的工具）。', before: 'SF-I0', decided: '2026-11-22 同意。已完成：後台容器讀得到三個設定值，後台正常。', src: 'SITE-FLOW 第 4 節第 3 題', options: ASK('之後新網站能自動加進 MainWP。', '這一步改成你手動在 MainWP 加站。') },
-  { n: 3, what: '打開主機與後台的建站開關，建一筆測試網域的 DNS，跑一次完整的拋棄式建站再拆掉。', before: 'SF-L', src: 'WP-PLAN.md 第 6 節', options: ASK('跑完確認沒留下東西再關回開關。', '流程只在本機驗證。') },
+  { n: 3, what: '打開主機與後台的建站開關，建一筆測試網域的 DNS，跑一次完整的拋棄式建站再拆掉。', before: 'SF-L', decided: '2026-11-24 同意。已完成：九步走完、當晚備份含此站並實際還原、拆除後沒有留下東西，兩道開關已關回。', src: 'WP-PLAN.md 第 6 節', options: ASK('跑完確認沒留下東西再關回開關。', '流程只在本機驗證。') },
   { n: 4, what: '部署引擎新版本（含目前所有尚未部署的引擎改動）。', before: 'GO-1', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('失敗會自動還原到現在的版本。', '引擎維持 2026-11-20 的版本。') },
   { n: 5, what: '改 oracle 網域的分流設定，讓 WordPress 接手引擎沒用到的網址（建置中）。', before: 'GO-2', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('訪客原本的網址不變；失敗自動還原。', 'WordPress 只能在主機內部看。') },
   { n: 6, what: '首頁換成 WordPress 並正式開放。', before: 'GO-3', src: 'ORACLE-WP-SPEC.md 上線', options: ASK('可以一步退回建置中的狀態。', '維持建置中。') },
-  { n: 7, what: '把「同一個網址只能建一筆」的資料表異動套用到正式資料庫（只新增一個索引，不改既有資料，可退回）。', before: 'SF-L', src: '第三批風險總檢', options: ASK('監工套用並驗證後才推上主線。', '程式照樣會先查再寫，只是兩人同時送時少一層保障。') },
-  { n: 8, what: '建立算命外掛的公開下載位置（GitHub 上一個新的公開專案）並發佈第一版。', before: 'GO-2', src: 'ORACLE-WP-SPEC.md P4', options: ASK('建站流程才裝得到這支外掛。', '外掛改成手動上傳安裝。') },
+  { n: 7, what: '把「同一個網址只能建一筆」的資料表異動套用到正式資料庫（只新增一個索引，不改既有資料，可退回）。', before: 'GO-2', src: '第三批風險總檢', options: ASK('監工套用並驗證後才推上主線。', '程式照樣會先查再寫，只是兩人同時送時少一層保障。') },
+  { n: 8, what: '建立算命外掛的公開下載位置（GitHub 上一個新的公開專案）並發佈第一版。', before: 'GO-2', decided: '2026-11-24 改做法：你決定自有外掛不公開。安裝檔改由主機自己留一份，建站時從那份安裝；算命外掛照同一個做法，不需要公開專案。', src: 'ORACLE-WP-SPEC.md P4', options: ASK('建站流程才裝得到這支外掛。', '外掛改成手動上傳安裝。') },
 ];
 
 export const SAFE = [
@@ -273,5 +273,21 @@ export const RISKS = [
     { card: 'SF-P', risk: '舊的建站接口遇到「代號已屬於別的客戶」現在會拒絕，以前會直接沿用那個客戶。', act: '接受：這樣比較安全。監工查過，全站已沒有頁面或排程呼叫這支接口。' },
     { card: 'SF-P', risk: '部署後的自動檢查原本是打開舊的建站精靈頁，現在改成確認兩個舊網址有轉到新頁。', act: '已實測：2026-11-24 部署後台後，正式站兩個舊網址都轉到新頁；部署後的瀏覽器檢查全部通過。' },
     { card: 'SF-P', risk: 'Codex 額度到 2026-11-24 上午才恢復，這張卡沒有做跨模型審查。', act: '已用替代：工人跑一輪獨立審查（找到的兩個主要問題已修），監工讀完整份改動並重跑全套測試（5762 個全過）。' },
+  ] },
+  { batch: '用測試網域完整跑一次（2026-11-24，正式主機實跑）', rows: [
+    { card: 'SF-L', risk: '主機把每一個新網站都當成「已有同名容器」而拒絕建立。', act: '已處理（1a34b4b1f）：真的 docker 對不存在的容器會多印一個空行，主機腳本因此誤判；測試用的假 docker 沒有這個行為，所以先前測試全過。兩邊都改了。' },
+    { card: 'SF-L', risk: '基本包有兩個外掛的代號在 WordPress.org 上不存在（WPvivid、Internal Link Juicer），安裝到第三個外掛就失敗。', act: '已處理（d2bbad5a1）：改成正確代號；其他組合包的代號也全部向 WordPress.org 查過。' },
+    { card: 'SF-L', risk: '電商包的 fluent-reviews 在 WordPress.org 上找不到對應的外掛。', act: '等你說是哪一個外掛。在那之前，選電商包的網站會在這個外掛停下。' },
+    { card: 'SF-L', risk: 'wp-bridge 的發佈專案是私有的，主機下載不到安裝檔。', act: '已處理（1ea446da7）：2026-11-24 你決定不公開。安裝檔改由主機自己留一份（只有主機管理者讀得到），建站時從那份安裝；主機上不放 GitHub 金鑰。' },
+    { card: 'SF-L', risk: '發佈腳本還不會自動把新版安裝檔放上主機；目前那一版是監工手動放的。', act: '上線二之前由監工補進發佈腳本。在那之前 wp-bridge 出新版，要手動放一次。' },
+    { card: 'SF-L', risk: 'wp-bridge 的原始碼目前放在公開的 Work 專案裡，發佈專案設成私有並擋不住別人看到程式。', act: '不處理（本階段）：要賣之前另開卡，把要賣的外掛原始碼搬出公開專案。' },
+    { card: 'SF-L', risk: '剛裝好的 WordPress 沒有設固定網址，後台用來確認網站的路徑因此被「建置中」頁擋掉；掛網址那一步失敗並自動還原。', act: '已處理（a3b97256b）：安裝步驟會設好固定網址。還原機制有照設計動作，主機其他網站不受影響。' },
+    { card: 'SF-L', risk: '步驟失敗時，頁面只顯示一個代碼，看不到原因；這次三次失敗都要到主機日誌才知道為什麼。', act: '上線二之前修：把主機回報的原因顯示在頁面上。' },
+    { card: 'SF-L', risk: '建站工作進行的那幾十秒，第 1 步會短暫顯示「已有同名容器」。', act: '上線二之前一起修。' },
+    { card: 'SF-L', risk: '第 3 步完成後沒有重跑的按鈕。', act: '接受：之後新建的網站在安裝時就一次設好；這次的測試站由監工在主機用同一個安裝動作補設。' },
+    { card: 'SF-L', risk: '主機上給憑證自動續期用的 Cloudflare 金鑰已經失效；Soulful 網域的主機憑證 2026-11-25 到期。', act: '已實測：Soulful 網站不會中斷——訪客看到的是 Cloudflare 的憑證（到 2027 年 1 月），而且 Cloudflare 不檢查主機憑證是否過期。主機那張仍要續：等你點頭後，監工用這次測試站同樣的方式手動續一次；金鑰要你在 Cloudflare 重建一把。' },
+    { card: 'SF-L', risk: '拆站後主機上還留著兩個空的鎖檔、一份建站工作紀錄，以及一份被封存的設定檔。', act: '不處理：都不影響運作；封存的設定檔是拆站腳本刻意留的紀錄。' },
+    { card: 'SF-L', risk: '內容工具對新網站的錯誤訊息，原本要在測試站上試，拆站前漏做了。', act: '改到上線二的建置中階段，在算命站上試。' },
+    { card: 'SF-L', risk: '先前幾批留到這次才能驗證的項目。', act: '已實測：加進 MainWP 成功（之後已從 MainWP 移除）；正式開放沒有逾時；管理員密碼沒有出現在任何執行紀錄；排程巡檢在建站後與拆站後都正常；當晚備份含此站、隔半小時的驗證通過；用備份實際還原成功。' },
   ] },
 ];
