@@ -235,21 +235,41 @@ PY
 fi
 
 # --- 5. Secrets: any .env files present, ENCRYPTED before leaving host ---
-ENV_FILES=()
+CORE_ENV_FILES=()
 for f in /root/soulful/.env /root/chatwoot/.env; do
-  [[ -f "$f" ]] && ENV_FILES+=("$f")
+  [[ -f "$f" ]] && CORE_ENV_FILES+=("$f")
 done
-ENV_FILES+=(${SITE_ENV_FILES[@]+"${SITE_ENV_FILES[@]}"})   # registered client sites (4b); names only, never values
+# Registered client sites (4b); names only, never values. Same rule as 4b: a site's failure is a SITE_ERROR, never an
+# ERROR -- a site .env that is gone by now (site torn down mid-run) must not cost the other stores their upload.
+SITE_ENV_OK=()
+for f in ${SITE_ENV_FILES[@]+"${SITE_ENV_FILES[@]}"}; do
+  if [[ -r "$f" ]]; then SITE_ENV_OK+=("$f"); else site_error "site .env ${f} gone or unreadable -- NOT in the encrypted bundle"; fi
+done
+ENV_FILES=(${CORE_ENV_FILES[@]+"${CORE_ENV_FILES[@]}"} ${SITE_ENV_OK[@]+"${SITE_ENV_OK[@]}"})
+# tar -v lists members on stderr -> env.tar.gz.enc.members (checked by backup-coverage-check.py; "tar: " lines
+# there are notices or errors, not members).
+encrypt_env() {
+  tar czvf - "$@" 2>"${OUT}/env.tar.gz.enc.members" \
+    | openssl enc -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -out "${OUT}/env.tar.gz.enc" 2>/dev/null \
+    && [[ -s "${OUT}/env.tar.gz.enc" ]]
+}
 if [[ ${#ENV_FILES[@]} -gt 0 ]]; then
   if [[ -n "${BACKUP_ENC_KEY:-}" ]]; then
     log "Archiving + encrypting ${#ENV_FILES[@]} .env file(s) (AES-256)..."
     export BACKUP_ENC_KEY
-    # tar -v lists members on stderr -> env.tar.gz.enc.members (checked by backup-coverage-check.py; "tar: " lines
-    # there are notices or errors, not members).
-    if tar czvf - "${ENV_FILES[@]}" 2>"${OUT}/env.tar.gz.enc.members" \
-         | openssl enc -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -out "${OUT}/env.tar.gz.enc" 2>/dev/null \
-         && [[ -s "${OUT}/env.tar.gz.enc" ]]; then
+    if encrypt_env "${ENV_FILES[@]}"; then
       SIZE=$(du -h "${OUT}/env.tar.gz.enc" | cut -f1); log "  env.tar.gz.enc OK (${SIZE})"
+    elif [[ ${#SITE_ENV_OK[@]} -gt 0 ]]; then
+      # A site file went between the check above and tar: bundle the others' secrets without the sites'.
+      site_error ".env encrypt failed with ${#SITE_ENV_OK[@]} registered-site file(s) in it -- site .env files NOT backed up"
+      rm -f "${OUT}/env.tar.gz.enc" "${OUT}/env.tar.gz.enc.members"
+      if [[ ${#CORE_ENV_FILES[@]} -gt 0 ]]; then
+        if encrypt_env "${CORE_ENV_FILES[@]}"; then
+          SIZE=$(du -h "${OUT}/env.tar.gz.enc" | cut -f1); log "  env.tar.gz.enc OK without site files (${SIZE})"
+        else
+          log "  ERROR: .env encrypt failed"; ERRORS=$((ERRORS + 1))
+        fi
+      fi
     else
       log "  ERROR: .env encrypt failed"; ERRORS=$((ERRORS + 1))
     fi

@@ -23,6 +23,7 @@ case "$1" in
   ps) printf '%s\n' $FAKE_CONTAINERS ;;
   volume) [[ " $FAKE_VOLUMES " == *" $3 "* ]] ;;
   exec)
+    [[ -z "${SHIM_RM_ON_EXEC:-}" ]] || rm -f "$SHIM_RM_ON_EXEC"   # a site torn down while its dump runs
     printf -- '-- MariaDB dump\n'
     for i in $(seq 1 12); do printf 'CREATE TABLE `wp_t%s` (id int);\n' "$i"; done
     head -c 3000 /dev/urandom | base64
@@ -147,6 +148,17 @@ check "#7 verify: each site's .env found in the bundle -> PASSED" bash -c 'grep 
 sed -i "\#/sroot/b/.env#d" "$E7/env.tar.gz.enc.members"
 vrun v7b "$WORK/e7.d" "$WORK/e7" CLIENT_WP_SITES_ROOT="$WORK/sroot"
 check "#7 verify: a site's .env missing from the bundle -> FAILED" bash -c 'grep -q "does not hold /$2/b/.env" "$1" && grep -q FAILED "$1"' _ "$WORK/v7b.out" "$M7"
+
+# a site's .env that vanishes mid-run is that site's failure: the run fails, the other site's .env and every store still upload
+mkdir -p "$WORK/sroot9/a" "$WORK/sroot9/b"
+printf 'SITE_DB_PASSWORD=env-canary-93a\n' >"$WORK/sroot9/a/.env"
+printf 'SITE_DB_PASSWORD=env-canary-93b\n' >"$WORK/sroot9/b/.env"
+run e9 "$B" "$WORK/e7" EXPECT_SERVICES= CLIENT_WP_SITES_ROOT="$WORK/sroot9" SHIM_RM_ON_EXEC="$WORK/sroot9/a/.env" BACKUP_ENC_KEY=test-only-key R2_API_TOKEN=test-only UPLOAD_TO_R2="$WORK/bin/upload-ok"
+E9="$(echo "$WORK"/e9.d/*)"
+check ".env gone mid-run: ERROR names the site file" grep -q "site .env .*/sroot9/a/.env gone or unreadable" "$WORK/e9.out"
+check ".env gone mid-run: the other site's .env is in the bundle" bash -c 'sed "s#^/*##" "$2" | grep -qxF "$1/sroot9/b/.env"' _ "${WORK#/}" "$E9/env.tar.gz.enc.members"
+check ".env gone mid-run: other stores uploaded" grep -q "R2 upload OK" "$WORK/e9.out"
+check ".env gone mid-run: run exits 1" test "$(rc e9)" = 1
 
 # ── SF-E2 #8: WordPress not installed yet (paused.<slug>-wp) -> 尚未安裝, not below-floor; floors back once removed ─
 mksites "$WORK/e8" a
