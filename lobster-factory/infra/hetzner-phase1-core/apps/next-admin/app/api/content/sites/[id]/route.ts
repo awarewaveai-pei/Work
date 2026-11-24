@@ -7,6 +7,7 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TEXT_ROAD_API_MODELS, TEXT_ROAD_CHAINS, TEXT_ROAD_CLAUDE_MODELS, TEXT_ROAD_CODEX_MODELS, TOPIC_MODES, YOUTUBE_PRIVACIES, siteIntroCards, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { subscriptionRoadDenied } from "@/lib/content/text-road-guard";
 import { isSafePublicHttps } from "@/lib/content/public-https";
+import { coverSettingsError, parseCoverSettings } from "@/lib/content/cover/settings";
 import { autoIntroStyles } from "@/public/editor-shared/intro-styles.js";
 import { orgDesignIds } from "@/lib/content/video/opener-designs";
 import Transitions from "@/public/editor-shared/transitions.js";
@@ -132,6 +133,15 @@ export async function PATCH(
         const long = blocks.find((b) => b.length > MAX_REQUIRED_BLOCK_CHARS);
         if (long) return NextResponse.json({ ok: false, error: `每篇必附段落每段最多 ${MAX_REQUIRED_BLOCK_CHARS} 字：「${long.slice(0, 20)}…」太長` }, { status: 400 });
         next.requiredBlocks = blocks;
+      }
+    }
+    // K25: the article cover's colours and font -- a bad value is refused (never stored as a silent fallback)
+    if (defaultsGiven && "cover" in next) {
+      if (next.cover === undefined || next.cover === null) delete next.cover;
+      else {
+        const bad = coverSettingsError(next.cover);
+        if (bad) return NextResponse.json({ ok: false, error: bad }, { status: 400 });
+        next.cover = parseCoverSettings(next.cover);
       }
     }
     const intro = autoIntroStyles(introGiven ? body.introStyles : (stored as SiteContentDefaults).introStyles);

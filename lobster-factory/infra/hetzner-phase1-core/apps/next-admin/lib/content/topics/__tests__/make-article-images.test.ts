@@ -1,6 +1,7 @@
 // K10: an automatic article's images -- every body placeholder drawn from its scene on the site's model and style at 4:3,
 // then a cover of its own from the meta block's scene at 16:9 (the cover layout's picture area); the cover (not the first body image) is the draft's featured
-// image, and its scene, short title and subtitle are kept on the topic.
+// image, and its scene, short title and subtitle are kept on the topic. K25: the featured image is the cover layout
+// (renderCover, mocked) on that picture with the short title, subtitle and the site's cover settings.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => ({
@@ -8,10 +9,27 @@ const m = vi.hoisted(() => ({
   calls: [] as Array<{ model: string; prompt: string; aspectRatio: string; imageStyle?: string; purpose?: string }>,
   published: [] as Array<Record<string, unknown>>,
   article: "",
+  covers: [] as Array<{ bg: string; text: { title: string; subtitle?: string }; settings: unknown }>,
+  coverFails: false,
+  stored: 0,
 }));
 vi.mock("@/lib/entitlements/grant", () => ({ runForOrg: (_o: string, _a: string, fn: () => unknown) => fn(), grantFor: async () => ({ actor: "staff:x" }) }));
 vi.mock("@/lib/content/brand-voice-store", () => ({ loadSiteBrand: async () => ({ organizationId: "org1", defaults: m.defaults }) }));
-vi.mock("@/lib/storage/r2", () => ({ isR2Configured: () => true }));
+vi.mock("@/lib/storage/r2", () => ({
+  isR2Configured: () => true,
+  isDesignsAsset: (u: unknown) => typeof u === "string" && u.startsWith("https://cdn/"),
+  getDesignObjectByUrl: async (u: string) => ({ ok: true, body: Buffer.from(u), contentType: "image/webp" }),
+  parseImageDataUrl: () => null,
+  buildDesignKey: () => "designs/2026-11/cover.webp",
+  putDesignObject: async () => ({ ok: true, publicUrl: `https://cdn/cover-${++m.stored}.webp` }),
+}));
+vi.mock("@/lib/content/cover/render", () => ({
+  renderCover: async (bg: Buffer, text: { title: string; subtitle?: string }, settings: unknown) => {
+    m.covers.push({ bg: bg.toString(), text, settings });
+    if (m.coverFails) throw new Error("render broke");
+    return { buffer: Buffer.from("cover"), mime: "image/webp" };
+  },
+}));
 vi.mock("@/lib/content/image/make-image", () => ({
   makeContentImage: async (i: (typeof m.calls)[number]) => { m.calls.push(i); return { ok: true, stored: true, imageUrl: `https://cdn/${m.calls.length}.webp`, seed: null }; },
 }));
@@ -45,7 +63,7 @@ const WATERCOLOR = STYLE_CATALOG.find((s) => s.group === "媒材")!;
 const make = () => topicDeps(sb as never, "org1", "staff:x", { capTwd: 100 }).make(topic);
 type Article = { cover?: Record<string, unknown> };
 
-beforeEach(() => { Object.assign(m, { defaults: {}, calls: [], published: [], article: ARTICLE }); vi.stubEnv("SERPER_API_KEY", ""); });
+beforeEach(() => { Object.assign(m, { defaults: {}, calls: [], published: [], article: ARTICLE, covers: [], coverFails: false, stored: 0 }); vi.stubEnv("SERPER_API_KEY", ""); });
 
 describe("automatic article images (K10)", () => {
   it("4 body images from their scenes plus 1 cover from its own scene; the cover is the featured image, not body image 1", async () => {
@@ -55,10 +73,10 @@ describe("automatic article images (K10)", () => {
       .concat("A quiet lake at sunrise with a woman sitting cross-legged on the shore"));
     expect(m.calls.map((c) => c.aspectRatio)).toEqual(["4:3", "4:3", "4:3", "4:3", "16:9"]);
     expect(m.calls.every((c) => c.purpose === "article")).toBe(true);
-    expect(m.published[0].featuredImageUrl).toBe("https://cdn/5.webp");
+    expect(m.published[0].featuredImageUrl).toBe("https://cdn/cover-1.webp");
     expect(String(m.published[0].markdown)).toContain("![第1段](https://cdn/1.webp)");
     expect((made.artifacts.article as Article).cover).toEqual({ scene: "A quiet lake at sunrise with a woman sitting cross-legged on the shore",
-      title: "正念呼吸入門", subtitle: "五分鐘找回平靜", image_url: "https://cdn/5.webp" });
+      title: "正念呼吸入門", subtitle: "五分鐘找回平靜", image_url: "https://cdn/cover-1.webp", base_url: "https://cdn/5.webp" });
   });
 
   it("the site's style and model are used; no style = the photo look; an unusable model = the default", async () => {
@@ -91,6 +109,34 @@ describe("automatic article images (K10)", () => {
     m.article = "<!-- CONTENT_META_START -->\n\nSEO_TITLE: 標題\n\nMETA_DESC: 描述\n\n<!-- CONTENT_META_END -->\n\n![呼吸](IMAGE_PLACEHOLDER_1)";
     const made = await make();
     expect(m.calls.map((c) => c.prompt)).toEqual(["呼吸", "標題"]);
-    expect((made.artifacts.article as Article).cover).toEqual({ image_url: "https://cdn/2.webp" });
+    expect((made.artifacts.article as Article).cover).toEqual({ image_url: "https://cdn/cover-1.webp", base_url: "https://cdn/2.webp" });
+  });
+});
+
+describe("the featured image is the cover layout (K25)", () => {
+  type Checks = { checks: Array<{ name: string; pass: boolean; detail: string }> };
+
+  it("renderCover gets the cover picture, the short title, the subtitle and the site's cover settings", async () => {
+    m.defaults = { cover: { bandColor: "#123456", titleColor: "#ffffff", subtitleColor: "#abcdef", font: "serif" } };
+    await make();
+    expect(m.covers).toEqual([{ bg: "https://cdn/5.webp", text: { title: "正念呼吸入門", subtitle: "五分鐘找回平靜" },
+      settings: { bandColor: "#123456", titleColor: "#ffffff", subtitleColor: "#abcdef", font: "serif" } }]);
+    expect(m.published[0].featuredImageUrl).toBe("https://cdn/cover-1.webp");
+  });
+
+  it("no short title: the article's title goes on the cover", async () => {
+    m.article = ARTICLE.replace("COVER_TITLE: 正念呼吸入門", "");
+    await make();
+    expect(m.covers[0].text.title).toBe("正念呼吸 7 個方法");
+  });
+
+  it("renderCover fails: the article is still saved, its featured image is the plain picture, and the checks say 封面未套版", async () => {
+    m.coverFails = true;
+    const made = await make();
+    expect(m.published).toHaveLength(1);
+    expect(m.published[0].featuredImageUrl).toBe("https://cdn/5.webp");
+    const note = (made.artifacts.article as Checks).checks.find((c) => c.name === "cover");
+    expect(note?.detail).toContain("封面未套版");
+    expect(note?.pass).toBe(true);
   });
 });

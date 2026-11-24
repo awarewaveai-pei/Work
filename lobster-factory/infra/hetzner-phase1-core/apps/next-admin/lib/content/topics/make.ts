@@ -14,7 +14,7 @@ import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
-import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteIntroCards, siteIntroStyles, siteIntroTransition, siteLanguage, siteTextChain, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
+import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteCover, siteIntroCards, siteIntroStyles, siteIntroTransition, siteLanguage, siteTextChain, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { ARTICLE_CALLER, type ArticleCaller } from "@/lib/content/article/generate-core";
 import { subscriptionOrgAllowed } from "@/lib/content/text-road-guard";
 import { isAiTextModel } from "@/lib/ai/text-model-options";
@@ -24,6 +24,7 @@ import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
 import { parseArticleMeta } from "@/lib/content/article/meta";
 import { makeContentImage } from "@/lib/content/image/make-image";
+import { storeCoverOn } from "@/lib/content/cover/store";
 import type { TarotModel } from "@/lib/tarot/image-gen";
 import { isR2Configured } from "@/lib/storage/r2";
 import { accountPlatforms, addVideo, getPost, listAccounts, savePost } from "@/lib/social/store";
@@ -59,9 +60,10 @@ export interface TopicArtifacts {
     wp_post_id: number | null; wp_edit_url: string | null; seo_score: number | null; summary: string; source: string; checks: ReviewCheck[];
     /** N1b: the site's must-carry paragraphs this article's checks looked for (absent on articles made before N1b). */
     required?: string[];
-    /** K10: the cover's scene, short title and subtitle from the meta block, and its picture (the draft's featured image;
-     *  null = none was made). K25 lays the title on it. Absent on articles made before K10. */
-    cover?: { scene?: string; title?: string; subtitle?: string; image_url: string | null };
+    /** K10: the cover's scene, short title and subtitle from the meta block; image_url = the draft's featured image (K25:
+     *  the cover layout on base_url's picture, or that picture alone when the layout failed; null = none). Absent on
+     *  articles made before K10; base_url absent on those made before K25. */
+    cover?: { scene?: string; title?: string; subtitle?: string; image_url: string | null; base_url?: string | null };
     /** title = the title WordPress published it under (K23: the Facebook / Instagram link comment names it) */
     published?: { status: string; link: string; at: string; title?: string };
   };
@@ -219,14 +221,15 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
     // WordPress takes only http(s) images: an unstored (data URL) image would vanish at publish
     return img.ok && (img as { stored: boolean }).stored ? (img as { imageUrl: string }).imageUrl : null;
   };
-  const { markdown } = await fillArticleImages(article, (scene) => draw(scene), imageCount);
+  const { markdown, images } = await fillArticleImages(article, (scene) => draw(scene), imageCount);
   const meta = parseArticleMeta(markdown);
   // the cover: its own picture from its own scene, 16:9 (before K10 the first body image stood in for it)
   const cover = meta?.cover;
-  const coverUrl = coverCount ? await draw(cover?.scene || meta?.seoTitle || t.title, ARTICLE_COVER_RATIO).catch(() => null) : null;
+  const baseUrl = coverCount ? await draw(cover?.scene || meta?.seoTitle || t.title, ARTICLE_COVER_RATIO).catch(() => null) : null;
+  const laid = coverCount ? await layCover(baseUrl, images[0] ?? null, cover?.title || meta?.seoTitle || t.title, cover?.subtitle, siteCover(site.defaults)) : null;
   const p = await runContentPipeline({
     markdown, focusKeyword: meta?.focusKeyword || t.keyword, seoTitle: meta?.seoTitle, metaDescription: meta?.metaDesc,
-    categories: meta?.categories, tags: meta?.tags, slug: meta?.slug, siteId: t.site_id, publishStatus: "draft", featuredImageUrl: coverUrl ?? undefined,
+    categories: meta?.categories, tags: meta?.tags, slug: meta?.slug, siteId: t.site_id, publishStatus: "draft", featuredImageUrl: laid?.url ?? undefined,
     request: orgIdentity(t.organization_id),
   }, { stages: ["quality", "publish"] });
   if (!p.ok) throw new Error(`WordPress 草稿失敗（${(p as PipelineFailure).failedStage}）：${(p as PipelineFailure).error}`);
@@ -236,10 +239,28 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
     summary: meta?.metaDesc || t.title,
     // what the social writer reads (it uses the first 3000 characters), kept so a retry can write posts without the article
     source: markdown.replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "").trim().slice(0, 3000),
-    checks: articleChecks(markdown, report, forbiddenTerms(site.defaults), requiredBlocks(site.defaults)),
+    checks: [...articleChecks(markdown, report, forbiddenTerms(site.defaults), requiredBlocks(site.defaults)), ...(laid?.note ? [laid.note] : [])],
     required: requiredBlocks(site.defaults),
-    ...(coverCount ? { cover: { ...cover, image_url: coverUrl } } : {}),
+    ...(laid ? { cover: { ...cover, image_url: laid.url, base_url: laid.base } } : {}),
   };
+}
+
+/** K25: the article's featured image = the one cover layout (lib/content/cover) on the cover picture, or on the first
+ *  body image when the cover picture was not made. Never fails the article: a layout that fails leaves the plain picture,
+ *  no picture at all leaves none, and each says so as a passing check (a note on the topic, not a reason to hold it). */
+export async function layCover(coverUrl: string | null, firstBodyUrl: string | null, title: string, subtitle: string | undefined,
+  settings: ReturnType<typeof siteCover>): Promise<{ url: string | null; base: string | null; note?: ReviewCheck }> {
+  const note = (detail: string): ReviewCheck => ({ name: "cover", pass: true, detail });
+  const base = coverUrl ?? firstBodyUrl;
+  if (!base) return { url: null, base: null, note: note("沒有精選圖片：封面底圖和內文圖都沒有生成") };
+  const fallback = coverUrl ? undefined : "封面底圖改用內文第一張";
+  try {
+    const url = await storeCoverOn(base, { title, ...(subtitle ? { subtitle } : {}) }, settings);
+    return { url, base, ...(fallback ? { note: note(fallback) } : {}) };
+  } catch (e) {
+    const why = `封面未套版（${e instanceof Error ? e.message : String(e)}），精選圖片用沒有字的底圖`;
+    return { url: base, base, note: note(fallback ? `${fallback}；${why}` : why) };
+  }
 }
 
 /** YouTube channels only for a topic that chose youtube (they need its video); the other channels only for social. */

@@ -131,9 +131,6 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
       imageStyle: typeof body.imageStyle === "string" ? body.imageStyle : "",
       // the article page's body and cover images (K10): the prompt is the scene; style + no-text tail added there
       ...(body.purpose === "article" ? { purpose: "article" as const } : {}),
-      titleText: typeof body.titleText === "string" ? body.titleText.trim() : "",
-      featuredImageFont: typeof body.featuredImageFont === "string" ? body.featuredImageFont.trim() : "sans",
-      featuredImageTitlePosition: typeof body.featuredImageTitlePosition === "string" ? body.featuredImageTitlePosition.trim() : "bottom",
       costLog: { route: "content/image", tool: "content", jobId: typeof body._jobId === "string" ? body._jobId : null },
     }, grant);
     if (!result.ok) {

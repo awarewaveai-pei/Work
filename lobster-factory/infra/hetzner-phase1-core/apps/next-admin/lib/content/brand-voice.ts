@@ -3,6 +3,7 @@
 // renderer, with no server imports, so the browser tools and the server render the same prompt text.
 import { autoIntroStyles } from "../../public/editor-shared/intro-styles.js";
 import Transitions from "../../public/editor-shared/transitions.js";
+import { parseCoverSettings, type CoverSettings } from "./cover/settings";
 import { ALLOWED_TEXT_MODELS, DEFAULT_TEXT_CHAIN, SUB_CLAUDE_MODEL_IDS, SUB_CODEX_MODEL_IDS, TEXT_CHAINS, isTextChain, type TextChain } from "../ai/text-model-options";
 
 export interface MarketingBrief {
@@ -82,8 +83,8 @@ export interface SiteContentDefaults {
   articleType?: string;
   readability?: string;
   pointOfView?: string;
-  featuredImageFont?: string;
-  featuredImageTitlePosition?: string;
+  /** K25: the article cover's colours and font (lib/content/cover); read only through siteCover(). */
+  cover?: CoverSettings;
   brandVoiceInstructions?: string;
   marketing?: MarketingBrief;
   audienceProfile?: {
@@ -155,6 +156,16 @@ export function renderSiteVoice(d: SiteContentDefaults | undefined): string {
 /** The forbidden claims as separate terms, for the rule check that runs before anything is published. */
 export function forbiddenTerms(d: SiteContentDefaults | undefined): string[] {
   return t(d?.marketing?.forbiddenClaims).split(/[,，、;；\n]/).map(s => s.trim()).filter(Boolean);
+}
+
+/** The overlay's old font field (before K25 the title was written on the picture): kept in stored rows, read here only. */
+const LEGACY_COVER_FONT = "featuredImageFont";
+
+/** K25: the site's article cover settings as used. No `cover` (every site before K25) = the defaults, with the old font
+ *  carried over: "serif" -> serif; "none" (no title on the picture) is not honoured -- every cover has the one layout. */
+export function siteCover(d: SiteContentDefaults | undefined): CoverSettings {
+  if (d?.cover) return parseCoverSettings(d.cover);
+  return parseCoverSettings({ font: (d as Record<string, unknown> | undefined)?.[LEGACY_COVER_FONT] === "serif" ? "serif" : "sans" });
 }
 
 /** Only the exact stored value turns auto publish on: missing, misspelt or any other value = human review. */
