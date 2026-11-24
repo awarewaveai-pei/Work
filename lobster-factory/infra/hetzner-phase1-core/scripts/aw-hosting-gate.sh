@@ -65,6 +65,11 @@ PLUGIN_SLUG_RE='^[a-z0-9][a-z0-9-]{0,62}$'
 # Own plugins: release assets of the company's GitHub org only (SITE-FLOW §1-3); next-admin narrows it to catalog repos.
 RELEASE_RE='^https://github\.com/awarewaveai-pei/[A-Za-z0-9][A-Za-z0-9._-]{0,99}/releases/download/[A-Za-z0-9][A-Za-z0-9._+-]{0,99}/[A-Za-z0-9][A-Za-z0-9._+-]{0,99}\.zip$'
 RELEASE_TAG_RE='/releases/download/v[0-9]+(\.[0-9]+){0,3}/'   # tag = v<plugin version>: the no-downgrade compare needs it
+# Own plugins whose release repo is private cannot be downloaded from here (GitHub answers 404 without a token, and
+# this host holds none). The host keeps the release files itself: <RELEASE_MIRROR>/<repo>/<tag>/<asset>.zip, root-only,
+# put there by scripts/release-wp-bridge.sh. A release URL whose file is in the mirror is installed from that file;
+# one that is not is downloaded as before (public repos).
+RELEASE_MIRROR=/var/lib/awarewave/plugin-releases
 MAINWP_RE='^[0-9a-f]{32,128}$'
 KEYID_RE='^[A-Za-z0-9][A-Za-z0-9_-]{0,190}$'   # wp-bridge AdminPage.php generateKey, minus a leading -
 PUBKEY_RE='^[A-Za-z0-9+/]{43}=$'               # base64 of a 32-byte Ed25519 public key
@@ -655,6 +660,15 @@ site_wp() {
         fi
         die 3 "plugin $1 failed ($2) AND the database restore failed -- export kept at $exp"
       }
+      local src mfile mbase
+      release_src() {  # <release url> -> sets src: the mirror's file copied into the container, else the URL itself
+        mfile="$RELEASE_MIRROR/${1#https://github.com/awarewaveai-pei/}"; mfile="${mfile/\/releases\/download\//\/}"; mbase="${1##*/}"
+        src="$1"
+        [[ -f "$mfile" && ! -L "$mfile" && -O "$mfile" ]] || return 0
+        docker exec -i -u www-data "$C" sh -c 'cat >"/tmp/$1"' _ "$mbase" <"$mfile" || return 1
+        src="/tmp/$mbase"
+      }
+      release_src_done() { [[ "$src" != /tmp/* ]] || docker exec -u www-data "$C" rm -f "$src" </dev/null >/dev/null 2>&1 || true; }
       for a in "${rest[@]}"; do
         if [[ "$a" =~ $PLUGIN_SLUG_RE ]]; then
           if wpc plugin is-installed "$a" >/dev/null 2>&1; then wpm plugin activate "$a" >/dev/null 2>&1 || wpc plugin is-active "$a" >/dev/null 2>&1
@@ -673,10 +687,13 @@ site_wp() {
               wpm plugin activate "$pslug" >/dev/null 2>&1 || wpc plugin is-active "$pslug" >/dev/null 2>&1 || plugin_failed "$a" "activate"
               kept+=("$pslug@$cur"); ok_list+=("$a"); continue
             fi
-            wpm plugin install "$a" --force --activate >/dev/null || plugin_failed "$a" "wp-cli upgrade $cur -> $ver"
+            release_src "$a" || plugin_failed "$a" "could not copy $mfile into the container"
+            wpm plugin install "$src" --force --activate >/dev/null || { release_src_done; plugin_failed "$a" "wp-cli upgrade $cur -> $ver"; }
           else
-            wpm plugin install "$a" --activate >/dev/null || plugin_failed "$a" "wp-cli"
+            release_src "$a" || plugin_failed "$a" "could not copy $mfile into the container"
+            wpm plugin install "$src" --activate >/dev/null || { release_src_done; plugin_failed "$a" "wp-cli"; }
           fi
+          release_src_done
         fi
         ok_list+=("$a")
       done

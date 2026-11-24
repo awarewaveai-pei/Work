@@ -95,6 +95,7 @@ shift; in=0
 while [[ "$1" == -* ]]; do case "$1" in -i) in=1; shift ;; -u|-e|-w) shift 2 ;; *) shift ;; esac; done
 c="$1"; shift
 [ -f "$S/ct.$c" ] || { echo "Error: No such container: $c" >&2; exit 1; }
+[ "$1" = rm ] && { rm -f "$S/copied.$c.$(basename "$3")"; exit 0; }   # the gate removing its mirror copy
 if [ "$1" = sh ]; then
   case "$3" in   # <slug>-db: the pre-plugins export / its restore (SF-E2 #5)
     *mariadb-dump*) [ -f $S/fail.dump ] && exit 1; printf -- '-- MariaDB dump
@@ -102,6 +103,7 @@ CREATE TABLE t (id int);
 -- Dump completed on 2026-11-22
 '; exit 0 ;;
     *"exec mariadb -uroot"*) cat > "$S/restored.$c"; exit 0 ;;
+    *'cat >"/tmp/$1"'*) cat > "$S/copied.$c.$5"; exit 0 ;;   # a host mirror file arriving in the container
   esac
   [ $in = 1 ] && cat > $S/stdin.uc; exit 0   # mu-plugin write
 fi
@@ -127,6 +129,10 @@ d[k]=v; json.dump(d,open(f,"w"))' "$S/json.$c.$4" "$3" "$5" "$6" ;;
   "user get"*)         cat "$S/wp.$c.admin" ;;
   "plugin is-installed "*|"plugin is-active "*) [ -f "$S/plugin.$c.$3" ] ;;   # shim: installed = active
   "plugin get "*)      cat "$S/plugin.$c.$3" ;;
+  "plugin install /tmp/"*)   # a file from the host mirror: only if it was copied in; its content = "<slug> <version>"
+                       f="$S/copied.$c.$(basename "$3")"; [ -f "$f" ] || { echo "wp: no such file $3" >&2; exit 1; }
+                       read -r p v < "$f"; echo "$v" > "$S/plugin.$c.$p" ;;
+  "plugin install https://github.com/awarewaveai-pei/private-"*) echo "wp: download failed (404)" >&2; exit 1 ;;   # a private repo
   "plugin install "*)  p="$3"; case "$p" in https://*) r="${p#https://github.com/*/}"; p="${r%%/*}" ;; esac   # release URL -> repo = slug
                        v="${3%/*}"; v="${v##*/}"; echo "${v#v}" > "$S/plugin.$c.$p" ;;   # file = installed version
   "eval"*)             echo created ;;
@@ -467,6 +473,16 @@ gate "site-wp s1 plugins $REL/v0.20.0/aware-wave-wp-bridge-v0.20.0.zip"
 check "#4 same release again -> no-op" bash -c "[[ $rc == 0 && '$(installs)' == 0 ]]"
 gate "site-wp s1 plugins $REL/v0.21.0/aware-wave-wp-bridge-v0.21.0.zip"
 check "#4 newer release -> upgraded" bash -c "[[ $rc == 0 && '$(pver)' == 0.21.0 && '$(installs)' == 1 ]]"
+
+# A private release repo cannot be downloaded (no token on the host): the host installs from its own mirror file.
+PRIV=https://github.com/awarewaveai-pei/private-plug/releases/download
+gate "site-wp s1 plugins $PRIV/v1.0.0/private-plug-v1.0.0.zip"
+check "mirror: private repo and no mirror file -> the step fails" bash -c "[[ $rc == 3 ]]"
+in_c 'd=/var/lib/awarewave/plugin-releases/private-plug/v1.0.0; mkdir -p $d && echo "private-plug 1.0.0" > $d/private-plug-v1.0.0.zip; : > /t/calls.log'
+gate "site-wp s1 plugins $PRIV/v1.0.0/private-plug-v1.0.0.zip"
+check "mirror: file on the host -> installed from it, the URL never reaches wp" \
+  bash -c "[[ $rc == 0 && '$(in_c 'cat /t/state/plugin.s1-wp.private-plug')' == 1.0.0 ]] && docker exec $C grep -q 'plugin install /tmp/private-plug-v1.0.0.zip' /t/calls.log && ! docker exec $C grep -q 'plugin install https://' /t/calls.log"
+check "mirror: the copy is removed from the container afterwards" bash -c "! docker exec $C test -e /t/state/copied.s1-wp.private-plug-v1.0.0.zip"
 in_c ': > /t/calls.log'; gate "site-wp s1 plugins $REL/latest/aware-wave-wp-bridge-latest.zip"
 check "#4 tag that is not v<version> -> refused by the grammar (126), no export, nothing installed"   bash -c "[[ $rc == 126 && -z \"\$(docker exec $C cat /t/calls.log)\" && '$(pver)' == 0.21.0 ]]"
 in_c 'echo 0.22.0-beta > /t/state/plugin.s1-wp.aware-wave-wp-bridge; : > /t/calls.log'; gate "site-wp s1 plugins $REL/v0.22.0/aware-wave-wp-bridge-v0.22.0.zip"
