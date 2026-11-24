@@ -326,8 +326,8 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
       {capped && <div style={errorBox}>事件超過讀取上限，最舊的一段沒有算進來。</div>}
       <div className="sys-stats">
         <Stat title="系統總數" icon="▦" value={counts.total} hint="registry 內所有系統" />
-        <Stat title="開發中" icon="◉" value={counts.active} hint="還有功能沒做完，180 天內有 commit" />
-        <Stat title="待確認" icon="!" tone="warn" value={counts.needsAttention} hint="有卡點，或開發中卻 30 天沒有 commit" />
+        <Stat title="開發中" icon="◉" value={counts.active} hint="還有功能沒做完、沒卡住，180 天內有 commit" />
+        <Stat title="待確認" icon="!" tone="warn" value={counts.needsAttention} hint="最新一次提交寫了卡點，或還沒做完卻 30 天沒動" />
         <Stat title="維護與已完成" icon="✓" tone="success" value={counts.wrapped} hint="功能都已做好的系統（維護中、完成或封存）" />
       </div>
       <div className="sys-board">

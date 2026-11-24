@@ -6,7 +6,7 @@ const NOW = Date.parse("2026-11-21T00:00:00Z");
 const row = (o: Partial<Parameters<typeof overviewCounts>[0][number]> = {}) => ({ status: "active" as const, inferred: false, featureCount: 3, blocker: null, lastCommitAt: "2026-11-20T00:00:00Z", ...o });
 
 describe("overviewCounts", () => {
-  it("counts total / active / needs attention / wrapped; paused, done and archived never need attention", () => {
+  it("the three cards split the systems: 待確認 is taken out of 開發中 / 維護與已完成; set paused, done, archived never need attention", () => {
     const c = overviewCounts([
       row(),
       row({ blocker: "waiting" }),
@@ -16,7 +16,7 @@ describe("overviewCounts", () => {
       row({ status: "done", featureCount: 0 }),
       row({ status: "archived" }),
     ], NOW);
-    expect(c).toEqual({ total: 7, active: 4, needsAttention: 2, wrapped: 2 });
+    expect(c).toEqual({ total: 7, active: 2, needsAttention: 2, wrapped: 2 }); // 2 + 2 + 2 + one set 暫停 = 7
   });
 
   it("an inferred status never takes a system out of 待確認; it still counts on 開發中 / 維護", () => {
@@ -27,7 +27,7 @@ describe("overviewCounts", () => {
     const blocked = row({ status: eff20.status, inferred: eff20.inferred, blocker: "waiting", lastCommitAt: ago(20) });
     const eff90 = effectiveStatus(null, ago(90), NOW); // open work, silent past STALL_DAYS but within PAUSE_DAYS -> 開發中（推定）
     const silent = row({ status: eff90.status, inferred: eff90.inferred, lastCommitAt: ago(90) });
-    expect(overviewCounts([blocked, silent], NOW)).toEqual({ total: 2, active: 1, needsAttention: 2, wrapped: 1 });
+    expect(overviewCounts([blocked, silent], NOW)).toEqual({ total: 2, active: 0, needsAttention: 2, wrapped: 0 });
     // inferred 暫停 (half a year, work open) is 待確認; set by someone it is not
     const dormant = effectiveStatus(null, ago(200), NOW);
     expect(overviewCounts([row({ status: dormant.status, inferred: dormant.inferred, lastCommitAt: ago(200) })], NOW).needsAttention).toBe(1);

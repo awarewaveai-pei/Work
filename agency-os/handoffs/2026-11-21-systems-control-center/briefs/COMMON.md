@@ -46,7 +46,7 @@
 ```
 payload 依 event_type：
 - `activity` `{ "subject": "<commit 主旨>", "files": <數量> }`（有歸屬、無 trailer 的 commit；有 trailer 時，沒拿到 handoff 的路徑主人也送這筆）
-- `handoff` `{ "subject", "next"?: str, "blocker"?: str, "blocker_cleared"?: true, "explicit"?: true }`：只送給 `System:` 指名的系統（帶 `explicit`），沒寫就送給唯一的路徑主人；路徑主人有多個又沒寫 `System:` 時，送一筆未分類並列入缺口。投影略過同一 commit 落在多個系統、又沒帶 `explicit` 的 handoff，但其中的 `blocker_cleared` 照樣生效
+- `handoff` `{ "subject", "next"?: str, "blocker"?: str, "blocker_cleared"?: true, "explicit"?: true }`（卡點只看該系統最新一筆 handoff：較新的沒寫 `blocker` 就算解除；`blocker_cleared` 仍接受）：只送給 `System:` 指名的系統（帶 `explicit`），沒寫就送給唯一的路徑主人；路徑主人有多個又沒寫 `System:` 時，送一筆未分類並列入缺口。投影略過同一 commit 落在多個系統、又沒帶 `explicit` 的 handoff，但其中的 `blocker_cleared` 照樣生效
 - `feature_update` `{ "status": "todo|in_progress|implemented|verified|blocked|cancelled", "test"?: str }`（importer 只送 ≤ implemented；verified 只能來自 review／CI）
 - `revert` `{ "reverted_sha": "<sha>" }`（一個 commit 撤多個 → 多筆；revert 被 revert → 依時間順序來回切換）
 - `orphaned` `{ "sha": "<sha>" }`（歷史分叉後不再可達的 commit；投影排除其事件，事件不刪）

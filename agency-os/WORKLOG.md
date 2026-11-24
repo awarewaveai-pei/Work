@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-24（續13）— 系統總控中心批 7：卡點只看最新一次提交、四張統計卡不重疊（操作者截圖：「很奇怪的邏輯」，開發中 24／待確認 12／維護與已完成 6）
+
+- 根因：
+  - 「待確認」的 12 個全部來自 11-21 起始資料的卡點。卡點規則是「只有 Blocker-Cleared 才解除」，但 agent 幾乎不寫，所以早已解決的卡點永遠亮著。
+  - 「待確認」和「開發中」重疊，24＋12＋6 對不上總數 30。
+- 修正：
+  - projection：卡點只看該系統最新一筆 handoff，較新的一筆沒寫 Blocker: 就算解除。AGENTS.md §8 改成「還卡住就每次都寫 Blocker:」，COMMON 契約同步更新。
+  - overviewCounts：先判斷待確認，開發中和維護與已完成都排除待確認，三張卡分割全部系統。
+- 正式資料推算：待確認 12 → 8，剩下的都是真的等操作者決定（Studio 自動扣款、外聯買次網域、Meta 審核等）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run systems → 46 passed | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql handoff 時序 → 依新規則重算卡點 8 個 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=blocker_cleared | hits=7
+- ORACLE_WAIVED: 規則改兩行＋測試覆蓋兩條新規則；自審
 ## 2026-11-24（續12）— 系統總控中心批 6：還在進行的監工頁每晚同步到總控頁；「維護與已完成」改看功能完成度、半年沒動才算暫停（操作者：「進度在監工頁的要查啊」「維護與已完成 4 這個很奇怪」「半年好了」）
 
 - 根因 1：還在進行的 11 個監工頁（共 213 張卡）只在切換凍結時搬一次，所以總控頁一直顯示「進度在舊監工頁」。

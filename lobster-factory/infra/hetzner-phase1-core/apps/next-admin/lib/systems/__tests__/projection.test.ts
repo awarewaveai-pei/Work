@@ -48,14 +48,19 @@ describe("projectSystem", () => {
     expect(effectiveStatus(p.status, p.lastCommitAt, NOW)).toEqual({ status: "active", inferred: true });
   });
 
-  it("handoff card: next is kept when a later handoff leaves it out; blocker clears only on blocker_cleared", () => {
+  it("handoff card: next is kept when a later handoff leaves it out; blocker is the newest handoff's only", () => {
     const p = projectSystem({ phases: [], features: [], events: [
       ev("handoff", { subject: "a", next: "write the route", blocker: "waiting on token" }, "2026-11-01T00:00:00Z"),
       ev("handoff", { subject: "b" }, "2026-11-02T00:00:00Z"),
     ] });
     expect(p.handoff.next).toBe("write the route");
-    expect(p.handoff.blocker).toBe("waiting on token");
+    expect(p.handoff.blocker).toBeNull(); // a newer handoff without Blocker: clears it (11-21 seed blockers outlived their cause)
     expect(p.handoff.lastSubject).toBe("b");
+    const still = projectSystem({ phases: [], features: [], events: [
+      ev("handoff", { subject: "a", blocker: "waiting on token" }, "2026-11-01T00:00:00Z"),
+      ev("handoff", { subject: "b", blocker: "still waiting" }, "2026-11-02T00:00:00Z"),
+    ] });
+    expect(still.handoff.blocker).toBe("still waiting");
 
     const cleared = projectSystem({ phases: [], features: [], events: [
       ev("handoff", { subject: "a", blocker: "waiting on token" }, "2026-11-01T00:00:00Z"),

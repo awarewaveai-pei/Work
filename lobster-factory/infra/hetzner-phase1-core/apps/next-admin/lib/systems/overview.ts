@@ -52,9 +52,10 @@ export function overviewCounts(rows: readonly CountInput[], now: number): Overvi
   };
   return {
     total: rows.length,
-    active: rows.filter((r) => r.status === "active").length,
+    // 待確認 first, so the three cards split the systems: 開發中 + 待確認 + 維護與已完成 (+ set 暫停 / 未設定) = 總數
+    active: rows.filter((r) => r.status === "active" && !attention(r)).length,
     needsAttention: rows.filter(attention).length,
-    wrapped: rows.filter((r) => r.status === "done" || r.status === "archived" || r.status === "maintenance").length,
+    wrapped: rows.filter((r) => (r.status === "done" || r.status === "archived" || r.status === "maintenance") && !attention(r)).length,
   };
 }
 

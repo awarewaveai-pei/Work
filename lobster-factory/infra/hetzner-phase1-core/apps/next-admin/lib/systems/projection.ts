@@ -1,8 +1,9 @@
 // What a system looks like now, computed from its events (PLAN §3, §4, §8, §9). Pure: no I/O, so the page and the tests
 // read the same answer. Rules:
 // - status / priority: the newest status_change that carries each one.
-// - handoff card: `next` = newest handoff that names one (absent = keep the previous); `blocker` is set by a handoff
-//   and cleared only by one with blocker_cleared, never by a handoff that just leaves it out.
+// - handoff card: `next` = newest handoff that names one (absent = keep the previous); `blocker` = the newest handoff's
+//   Blocker: only -- a newer handoff without one clears it (agents restate Blocker: while still blocked, AGENTS §8;
+//   a sticky blocker outlived its cause: 12 of 30 systems showed 11-21 seed blockers on 11-24).
 // - feature status: newest feature_update / migration (mapped_status) / review for that feature. Only a review may say
 //   verified: a feature_update or migration that claims it counts as implemented.
 // - a commit's events are hidden while the commit is reverted by a commit still in force; a revert that is itself
@@ -139,9 +140,8 @@ export function projectSystem(input: {
       handoff.lastAt = e.occurred_at;
       const next = asStr(e.payload.next);
       if (next) { handoff.next = next; handoff.nextAt = e.occurred_at; }
-      if (e.payload.blocker_cleared === true) { handoff.blocker = null; handoff.blockerAt = e.occurred_at; }
       const blocker = asStr(e.payload.blocker);
-      if (blocker) { handoff.blocker = blocker; handoff.blockerAt = e.occurred_at; }
+      if (blocker || handoff.blocker) { handoff.blocker = blocker ?? null; handoff.blockerAt = e.occurred_at; }
     }
     if (e.feature_id) {
       if (e.event_type === "migration") {
