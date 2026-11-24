@@ -36,7 +36,7 @@ const LEGACY: Readonly<Record<string, string>> = {
   "app/(shell)/tools/video/OrganizationPicker.tsx": "L6 workbench pages: own OrgPicker over /api/video/workbench/bootstrap",
 };
 
-const scanDirs = (): string[] => {
+export const scanDirs = (): string[] => {
   const dirs = ["components", ...STAFF_ROUTE_GROUPS.map((g) => `app/${g}`), ...nextAdminProducts().map((p) => `app${p.door.page}`)];
   return [...new Set(dirs)].filter((d) => existsSync(path.join(ROOT, d)));   // a reserved door has no directory yet
 };

@@ -277,7 +277,7 @@
     // then opened. Ids are made here; nothing the page sent becomes a picture (EpisodeSpine.newShot). A shot whose scene
     // names a cast member (shot.character = its key) is bound to it, so the shot's picture uses that one's references.
     if (action === "spine-create") {
-      if (!Spine) throw new Error("影音工作台沒有載入專案主線");
+      if (!Spine) throw new Error("影片工作台沒有載入專案主線");
       // U6.5: reopening the same scheduled movie resumes its editable copy. Never starts an automatic run.
       const sourceProjectId = typeof payload.sourceProjectId === "string" && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(payload.sourceProjectId) ? payload.sourceProjectId : null;
       if (sourceProjectId) {

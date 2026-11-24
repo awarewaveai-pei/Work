@@ -15,7 +15,7 @@ const close = (server) => new Promise((resolve) => server.close(resolve));
     const appOrigin = await listen(app);
     const bundle = await esbuild.build({
       stdin: {
-        contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import Frame from './components/tools/AwareWaveThemeFrame'; createRoot(document.getElementById('root')).render(<Frame src=${JSON.stringify(appOrigin)} title="影音工作台"/>);`,
+        contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import Frame from './components/tools/AwareWaveThemeFrame'; createRoot(document.getElementById('root')).render(<Frame src=${JSON.stringify(appOrigin)} title="影片工作台"/>);`,
         sourcefile: "appearance-test.tsx", resolveDir: appDir, loader: "tsx",
       },
       bundle: true, write: false, format: "iife", platform: "browser", jsx: "automatic", tsconfig: path.join(appDir, "tsconfig.json"),

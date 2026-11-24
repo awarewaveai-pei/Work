@@ -228,7 +228,7 @@
     try {
       const bridge = SeedStar.generator;
       if (!bridge) {
-        toast("請在影音工作台內使用此功能");
+        toast("請在影片工作台內使用此功能");
         return;
       }
       const result = await bridge.import({

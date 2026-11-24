@@ -334,7 +334,7 @@ if (require.main === module) {
   // Local default 127.0.0.1; the container sets VW_HOST=0.0.0.0 (no host port is published, only lobster-net).
   const host = process.env.VW_HOST || "127.0.0.1", port = process.env.PORT || 4178;
   createServer().listen(port, host, () =>
-    console.log("AwareWave 影音工作台: http://" + host + ":" + port),
+    console.log("AwareWave 影片工作台: http://" + host + ":" + port),
   );
 }
 module.exports = { createServer };
