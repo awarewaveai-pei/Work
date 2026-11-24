@@ -6,7 +6,7 @@ import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { useClientContext } from "@/lib/client-context/use-client-context";
 import { FUNNEL_STAGES, MAX_TREND_FEEDS, PRICE_POSITIONS, siteCover, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { ARTICLE_IMAGE_MODELS, articleImageModel, articleImagesOff } from "@/lib/content/image/article-image";
-import CoverSettingsFields, { brandStart, useBrandColors } from "./CoverSettingsFields";
+import CoverSettingsFields from "./CoverSettingsFields";
 import PublishModeButtons from "./PublishModeButtons";
 import TopicModeButtons from "./TopicModeButtons";
 import DailyTrendButtons from "./DailyTrendButtons";
@@ -88,10 +88,8 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
   const [err, setErr]       = useState("");
-  const brandColors         = useBrandColors(site.organization_id);
-  // the cover as used: the site's own, else the client's brand colour (with the old font carried over), else the defaults
-  const brandCover = brandStart(brandColors);
-  const cover = d.cover ? siteCover(d) : brandCover ? { ...brandCover, font: siteCover(d).font } : siteCover(d);
+  // the cover as used: the site's own, else the layout's defaults (with the old overlay font carried over)
+  const cover = siteCover(d);
   const modelNote = articleModelNote(d.imageModel);
 
   function setM(k: keyof NonNullable<SiteContentDefaults["marketing"]>, v: string) {
@@ -105,7 +103,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
       const res  = await fetch(`/api/content/sites/${site.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         // requiredBlocks has its own always-visible field (RequiredBlocksField); send the stored list so this form never overwrites it
-        // cover: what the preview shows is what gets stored (a site never set keeps its brand/default start once saved)
+        // cover: what the preview shows is what gets stored
         body: JSON.stringify({ contentDefaults: { ...d, cover, requiredBlocks: site.contentDefaults?.requiredBlocks } }),
       });
       const json = await res.json() as { ok: boolean; site?: ManagedSite; error?: string };
@@ -170,7 +168,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
           </div>
 
           {/* K25: the one article cover layout, this site's colours and font */}
-          <CoverSettingsFields value={cover} brandColors={brandColors} onChange={v => { setD(p => ({ ...p, cover: v })); setSaved(false); }} />
+          <CoverSettingsFields value={cover} onChange={v => { setD(p => ({ ...p, cover: v })); setSaved(false); }} />
 
           {/* Marketing grid — 2-col, matches ContentStudio layout */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>

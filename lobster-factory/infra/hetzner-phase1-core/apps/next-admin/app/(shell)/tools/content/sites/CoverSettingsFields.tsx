@@ -1,33 +1,12 @@
 "use client";
 // K25: 文章封面 -- the one cover layout's colours and font for this site, as swatches and buttons (no dropdowns), with the
-// cover drawn live beside them. The starting point for a site that never set it: the client's brand colour (the same
-// list the banner tool's brand picker reads, GET /api/ops/org-search), else the layout's defaults.
-import { useEffect, useState } from "react";
-import { roleHeader } from "@/lib/ops-role";
-import { brandCoverSettings, type CoverSettings } from "@/lib/content/cover/settings";
+// cover drawn live beside them. A site that never set it starts from the layout's defaults (siteCover).
+import type { CoverSettings } from "@/lib/content/cover/settings";
 import OptionButtons from "./OptionButtons";
 import CoverPreview from "../CoverPreview";
 
 const FONTS = [{ value: "sans", label: "黑體（Noto Sans）" }, { value: "serif", label: "明體（Noto Serif）" }];
 const BASE_SWATCHES = ["#1f2430", "#ffffff", "#c9ced8", "#000000", "#2f4f4f", "#7a2e2e", "#1e3a5f", "#5b4636", "#f4efe6"];
-
-/** The client's brand colours (valid hex), [] when none or the list is staff only. */
-export function useBrandColors(organizationId: string | null | undefined): string[] {
-  const [colors, setColors] = useState<string[]>([]);
-  useEffect(() => {
-    if (!organizationId) return;
-    let cancelled = false;
-    fetch(`/api/ops/org-search?include=${encodeURIComponent(organizationId)}`, { headers: { ...roleHeader("operator") } })
-      .then(async (r) => (r.ok ? ((await r.json()) as { orgs?: Array<{ id: string; brandColors?: string[] }> }) : null))
-      .then((d) => { if (!cancelled) setColors(d?.orgs?.find((o) => o.id === organizationId)?.brandColors ?? []); })
-      .catch(() => {});   // no brand colours: the layout's defaults stay
-    return () => { cancelled = true; };
-  }, [organizationId]);
-  return colors;
-}
-
-/** The brand's starting cover, or null when the client has no brand colour. */
-export const brandStart = (colors: string[]): CoverSettings | null => (colors[0] ? brandCoverSettings(colors[0]) : null);
 
 function ColorRow({ label, value, swatches, onChange }: { label: string; value: string; swatches: string[]; onChange(v: string): void }) {
   return (
@@ -47,10 +26,8 @@ function ColorRow({ label, value, swatches, onChange }: { label: string; value: 
   );
 }
 
-export default function CoverSettingsFields({ value, brandColors, onChange }: {
-  value: CoverSettings; brandColors: string[]; onChange(next: CoverSettings): void;
-}) {
-  const swatches = [...brandColors, ...BASE_SWATCHES];
+export default function CoverSettingsFields({ value, onChange }: { value: CoverSettings; onChange(next: CoverSettings): void }) {
+  const swatches = BASE_SWATCHES;
   const set = (patch: Partial<CoverSettings>) => onChange({ ...value, ...patch });
   return (
     <div>

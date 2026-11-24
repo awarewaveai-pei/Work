@@ -32,16 +32,6 @@ export function coverSettingsError(raw: unknown): string | null {
   return null;
 }
 
-/** A client's brand colour as the cover's band (the site settings' starting point): the title white on a dark band,
- *  the default band colour on a light one, so it stays readable. */
-export function brandCoverSettings(brandColor: string): CoverSettings {
-  if (!HEX.test(brandColor)) return { ...DEFAULT_COVER_SETTINGS };
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(brandColor.slice(i, i + 2), 16));
-  const light = 0.299 * r + 0.587 * g + 0.114 * b > 160;
-  return { bandColor: brandColor.toLowerCase(), titleColor: light ? DEFAULT_COVER_SETTINGS.bandColor : "#ffffff",
-    subtitleColor: light ? "#3a4150" : DEFAULT_COVER_SETTINGS.subtitleColor, font: DEFAULT_COVER_SETTINGS.font };
-}
-
 /** Field by field: a bad field falls back alone, the good ones are kept. */
 export function parseCoverSettings(raw: unknown): CoverSettings {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
