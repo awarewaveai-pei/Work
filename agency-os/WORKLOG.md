@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-24（續10）— oracle WP：GO-2 前置三項（發佈檔上主機鏡像、失敗原因顯示、preflight busy）併入 `72e407787`
+
+- [根因] SF-L 實跑留下三個缺口（同日 SF-L 條目）：主機鏡像沒有寫入者；失敗只顯示 `error_summary` 的代碼；`site-create` 進行中 `site-preflight` 把 job 的半成品報成「not ours」。
+- [步驟] ① 新 `scripts/mirror-plugin-release.sh`（gh 下載 → scp → `install -m 600` 到 `/var/lib/awarewave/plugin-releases/<slug>/<tag>/` → 主機 sha256 與 asset 相同才 exit 0）；`scripts/release-wp-bridge.sh:190-194` 發佈驗證後呼叫；文字改 private repo。② `NA/lib/site-flow/engine.ts` `failedStageDetail`＋`StepRunSummary.error_detail`（`types.ts`），status 查詢多選 `output_payload`，失敗 reason 先取 detail。③ `aw-hosting-gate.sh` `site-preflight` 輸出 `busy`（slug lock 被持有）；`steps/shared.ts` 解析、`steps/preflight.ts` busy 時不判 blocked。
+- [驗證] `bash scripts/mirror-plugin-release.sh aware-wave-wp-bridge v0.22.0` 對 ks-aw-01 → sha `64e95d0e…` 相同；壞 slug／壞 tag 皆拒。`hosting-gate-site.test.sh` 158 passed／0 failed。next-admin `npx tsc --noEmit` exit 0；全套 `npx vitest run` 691 檔／5773 passed；突變（舊 `engine.ts`）新測試「a failed run shows why」變紅。
+- [未做] 未部署（無站可觀察；03:00 自動部署帶上，主機腳本同次同步）。`steps/preflight.ts` 的 busy 分支沒有專屬單元測試（主機契約由閘門測試守）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/mirror-plugin-release.sh aware-wave-wp-bridge v0.22.0；hosting-gate-site.test.sh；next-admin npx tsc --noEmit && npx vitest run | exit=0 | ms=420000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=error_summary | hits=31
+- ORACLE_WAIVED: Codex 額度封鎖期間完成；突變證據＋全套測試
 ## 2026-11-24（續8）— 平台第 9 批上線：K13、W5、M5（High，0180 已套用）；U14 未派
 
 - 操作者 2026-11-24「可以」＝ M5（migration 0180＋會員身分連結）的 go。U14 未派：`D:\Work` 的 next-admin `app/globals.css` 仍有主題 session 未提交改動（與 U13 同等）。
