@@ -63,7 +63,7 @@ export function draftUrl(t: Pick<Topic, "artifacts">): string | null {
   return typeof url === "string" && /^https:\/\//.test(url) ? url : null;
 }
 
-type PublishArts = { article?: { wp_post_id?: unknown; published?: unknown }; social?: { post_id?: unknown; youtube_post_id?: unknown; sent?: unknown }; publish?: { youtube?: { url?: unknown } } } | null;
+type PublishArts = { article?: { wp_post_id?: unknown; published?: unknown }; social?: { post_id?: unknown; youtube_post_id?: unknown; sent?: unknown; link_in_comment?: Array<{ channel?: unknown; sent?: unknown }> }; publish?: { youtube?: { url?: unknown } } } | null;
 
 /** The YouTube draft 「發布」 would still send (its id), or null when there is none or it is already on YouTube. */
 export function pendingYoutubePostId(t: Pick<Topic, "artifacts">): string | null {
@@ -95,6 +95,10 @@ export function publishTargets(t: Pick<Topic, "formats" | "artifacts">, youtube:
   if (pendingYoutubePostId(t)) out.push(`YouTube（這則草稿：${draftText(youtube)}）`);
   if (t.formats.includes("article") && a?.article?.wp_post_id && !a.article.published) out.push("網站文章（WordPress 草稿改成公開）");
   if (a?.social?.post_id && !a.social.sent) out.push("其他社群頻道（排在文章上線後）");
+  // K23: Facebook's / Instagram's own drafts, the article's link in their first comment
+  for (const p of a?.social?.link_in_comment ?? []) {
+    if (!p.sent) out.push(`${p.channel === "facebook" ? "Facebook" : "Instagram"}（排在文章上線後，文章連結放在第一則留言）`);
+  }
   return out;
 }
 

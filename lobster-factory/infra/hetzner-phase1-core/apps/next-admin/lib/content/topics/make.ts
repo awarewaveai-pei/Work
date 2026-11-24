@@ -25,7 +25,7 @@ import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline
 import { parseArticleMeta } from "@/lib/content/article/meta";
 import { makeContentImage } from "@/lib/content/image/make-image";
 import { isR2Configured } from "@/lib/storage/r2";
-import { addVideo, getPost, listAccounts, savePost } from "@/lib/social/store";
+import { accountPlatforms, addVideo, getPost, listAccounts, savePost } from "@/lib/social/store";
 import { applyAction } from "@/lib/social/actions";
 import { requiresReview } from "@/lib/social/review";
 import { textsForAccounts, writerKeysFor, writeSocialPosts } from "@/lib/social/write-posts";
@@ -44,7 +44,9 @@ import { TOPIC_ARTICLE_IMAGES } from "./cost";
 import { DEFAULT_TOPIC_CAP_TWD, reserveStep, settleStep, spentSince, stepUpperTwd, topicBudget, type TopicBudget } from "./budget";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { MakeError, NOW_FORMATS, brandDay, personAsked, waitsForVideo, type Made, type Published, type PublishRun, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
-import { publishSteps, type PublishLog, type YoutubeLook } from "./publish-steps";
+import { publishSteps, type LinkInCommentPost, type PublishLog, type YoutubeLook } from "./publish-steps";
+import { linkInCommentChannel, linkInCommentTexts, withLinkInComment, type LinkInCommentChannel } from "@/lib/social/link-in-comment";
+import { commentsOverLimit, hashtagsOverLimit, overLimit } from "@/lib/social/limits";
 
 /** N5b: the article was published by a person before 發布 reached it; its video is still the file (artifacts.publish.article.note). */
 export const ARTICLE_LIVE_NOTE = "文章已先被手動發布，影片仍是原檔，沒有換成 YouTube 連結";
@@ -55,12 +57,14 @@ export interface TopicArtifacts {
     wp_post_id: number | null; wp_edit_url: string | null; seo_score: number | null; summary: string; source: string; checks: ReviewCheck[];
     /** N1b: the site's must-carry paragraphs this article's checks looked for (absent on articles made before N1b). */
     required?: string[];
-    published?: { status: string; link: string; at: string };
+    /** title = the title WordPress published it under (K23: the Facebook / Instagram link comment names it) */
+    published?: { status: string; link: string; at: string; title?: string };
   };
   /** post_id = the draft of every channel but YouTube (null = none, or no channel the writer can write for: the checks
    *  say so); youtube_post_id = the YouTube channels' own draft (N5a; absent on a topic made before, whose post_id draft
-   *  may hold YouTube too and goes out as before). */
-  social?: { post_id: string | null; youtube_post_id?: string | null; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string } };
+   *  may hold YouTube too and goes out as before). link_in_comment = Facebook's and Instagram's own drafts (K23, only
+   *  for a topic with an article): the link goes in their first comment; absent = made before, post_id holds them too. */
+  social?: { post_id: string | null; youtube_post_id?: string | null; link_in_comment?: LinkInCommentPost[]; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string } };
   /** The topic's video job; url once it finished, then when it went into the article and onto each social draft. */
   video?: VideoArtifact & { embedded_at?: string; media_id?: string; youtube_media_id?: string };
   /** N5a: each publish step, recorded before and after its outside write (publish-steps.ts). */
@@ -253,27 +257,54 @@ async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["ar
   const mediaType = waitsForVideo(t) ? "video" : "text";
   const w = await writeSocialPosts({ article: source, keys, mediaType, voice: renderSiteVoice(site.defaults), siteLanguage: siteLanguage(site.defaults) }, ask);
   const custom = textsForAccounts(w, accounts);
-  // YouTube is its own draft (N5a): it goes out first and the article waits for its link; every other channel shares one
+  // YouTube is its own draft (N5a): it goes out first and the article waits for its link; Facebook and Instagram each
+  // their own when an article's link will come (K23: the link goes in the post's comment, which is the whole post's);
+  // every other channel shares one
   const fields = { body: socialBody(article?.summary, t.title, w.language), notes: `自動內容管線：題目「${t.title}」` };
-  const draft = async (group: typeof accounts, format?: string) => group.length
-    ? (await savePost(t.organization_id, null, null, fields,
-      group.map((a) => ({ account_id: a.id, custom_body: custom[a.id] ?? null, ...(format ? { format } : {}) })), null, actor)).id
-    : null;
-  const postId = await draft(accounts.filter((a) => a.platform !== "youtube"));
-  const youtubePostId = await draft(accounts.filter((a) => a.platform === "youtube"), youtubeFormat(site.defaults)).catch(async (e) => {
-    // the topic records neither draft (this throws): the first one goes to the trash, or a retry would leave it behind
-    if (postId) {
-      await getPost(t.organization_id, postId)
+  const groups = draftGroups(accounts, t.formats.includes("article"));
+  const made: string[] = [];
+  const draft = async (group: typeof accounts, format?: string) => {
+    if (!group.length) return null;
+    const id = (await savePost(t.organization_id, null, null, fields,
+      group.map((a) => ({ account_id: a.id, custom_body: custom[a.id] ?? null, ...(format ? { format } : {}) })), null, actor)).id;
+    made.push(id);
+    return id;
+  };
+  let postId: string | null, youtubePostId: string | null;
+  const linkInComment: LinkInCommentPost[] = [];
+  try {
+    postId = await draft(groups.other);
+    for (const channel of ["facebook", "instagram"] as const) {
+      const id = await draft(groups[channel]);
+      if (id) linkInComment.push({ post_id: id, channel });
+    }
+    youtubePostId = await draft(groups.youtube, youtubeFormat(site.defaults));
+  } catch (e) {
+    // the topic records none of the drafts (this throws): those made go to the trash, or a retry would leave them behind
+    for (const id of made) {
+      await getPost(t.organization_id, id)
         .then((p) => applyAction(t.organization_id, p, "delete", "editor", {}, actor, { source: "content_pipeline", topic_id: t.id }))
-        .catch((d) => console.error(`[content/topics] ${t.id} social draft ${postId} left behind: ${d instanceof Error ? d.message : d}`));
+        .catch((d) => console.error(`[content/topics] ${t.id} social draft ${id} left behind: ${d instanceof Error ? d.message : d}`));
     }
     throw e;
-  });
+  }
   const texts = Object.values(custom);
   const problems = [...w.tooLong.map((x) => `${x.key} 太長（${x.length}/${x.limit}）`), ...w.missing.map((k) => `${k} 沒有寫出來`),
     ...w.wrongLanguage.map((k) => `${k} 不是${w.language}，沒有採用`)];
   if (!problems.length && texts.length < accounts.length) problems.push(`${accounts.length - texts.length} 個頻道沒有專屬貼文`);
-  return { post_id: postId, ...(youtubePostId ? { youtube_post_id: youtubePostId } : {}), checks: socialChecks({ texts, channels: accounts.length, problems }, forbidden) };
+  return { post_id: postId, ...(youtubePostId ? { youtube_post_id: youtubePostId } : {}), ...(linkInComment.length ? { link_in_comment: linkInComment } : {}),
+    checks: socialChecks({ texts, channels: accounts.length, problems }, forbidden) };
+}
+
+/** Which draft each channel goes in (makeSocial): YouTube its own; Facebook and Instagram their own only when the topic
+ *  has an article (its link is what goes in their comment), otherwise with the rest. */
+export function draftGroups<A extends { platform: string }>(accounts: A[], withArticle: boolean): Record<"other" | "youtube" | LinkInCommentChannel, A[]> {
+  const g: Record<"other" | "youtube" | LinkInCommentChannel, A[]> = { other: [], youtube: [], facebook: [], instagram: [] };
+  for (const a of accounts) {
+    const channel = withArticle ? linkInCommentChannel(a.platform) : null;
+    g[a.platform === "youtube" ? "youtube" : channel ?? "other"].push(a);
+  }
+  return g;
 }
 
 /** The topic's cap guard: each check reads the ledger (budget.ts) and records the spend on `artifacts.budget`. */
@@ -306,12 +337,33 @@ async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string, capTwd: n
   return { artifacts: artifacts as Record<string, unknown>, review: reviewOf(checks, new Date()) };
 }
 
-/** The topic's social draft: the article's link, then scheduled (or submitted, when the brand requires social review). */
-async function sendSocial(t: Topic, postId: string, link: string | undefined, now: Date, actor: string): Promise<NonNullable<NonNullable<TopicArtifacts["social"]>["sent"]>> {
+/** The topic's social draft: the article's link, then scheduled (or submitted, when the brand requires social review).
+ *  linkInComment (K23, Facebook's / Instagram's own draft): no link_url (composeText would put the address in the
+ *  text); the channel's ending goes under the text and its comment first, written on the draft before it goes out. */
+async function sendSocial(t: Topic, postId: string, link: string | undefined, now: Date, actor: string, language: string,
+  linkInComment?: { channel: LinkInCommentChannel; title: string | undefined }): Promise<NonNullable<NonNullable<TopicArtifacts["social"]>["sent"]>> {
   let post = await getPost(t.organization_id, postId);
   // a person already scheduled, submitted or deleted it: theirs, left as it is
   if (post.state !== "draft") return { state: post.state, scheduled_at: post.scheduled_at, at: now.toISOString() };
-  if (link && !post.link_url) {
+  if (linkInComment) {
+    if (link) {
+      // the title WordPress published it under; an article published before K23 recorded none: the topic's title
+      const { ending, comment } = linkInCommentTexts(linkInComment.channel, language, linkInComment.title || t.title, link, post.link_utm);
+      const next = withLinkInComment(post, ending, comment);
+      if (next) {
+        // checked before the write, as the editor's save checks (posts.ts): too long is refused, never cut
+        const platforms = await accountPlatforms(t.organization_id, post.targets.map((x) => x.account_id));
+        const targets = (next.targets ?? post.targets).map((x) => ({ accountId: x.account_id, platform: platforms.get(x.account_id) ?? "", customBody: x.custom_body }));
+        const commentBodies = (next.comments ?? post.comments).map((c) => c.body);
+        const long = [...overLimit(next.body, targets), ...commentsOverLimit(commentBodies, targets),
+          ...hashtagsOverLimit(targets.map((x) => ({ accountId: x.accountId, platform: x.platform, text: x.customBody ?? next.body })), commentBodies)];
+        if (long.length) throw new Error(`${linkInComment.channel === "facebook" ? "Facebook" : "Instagram"} 貼文加上文章連結的結尾或留言後超過字數或主題標籤上限，沒有排程（草稿還在，請到社群草稿縮短）`);
+        const saved = await savePost(t.organization_id, post.id, post.version, { body: next.body }, next.targets, null, actor,
+          next.comments ? { comments: next.comments } : {});
+        post = { ...post, version: saved.version };
+      }
+    }
+  } else if (link && !post.link_url) {
     const saved = await savePost(t.organization_id, post.id, post.version, { link_url: link }, null, null, actor);
     post = { ...post, link_url: link, version: saved.version };
   }
@@ -355,7 +407,7 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
   }
   return publishSteps(t, {
     now: () => new Date(),
-    sendPost: (postId, link, now) => sendSocial(t, postId, link, now, actor),
+    sendPost: (postId, link, now, linkInComment) => sendSocial(t, postId, link, now, actor, siteLanguage(site.defaults), linkInComment),
     lookYoutube: (postId) => lookYoutube(t.organization_id, postId),
     publishArticle: async (wpPostId, youtubeUrl) => {
       if (!t.site_id) throw new Error("沒有 WordPress 草稿編號，無法發布");
@@ -375,7 +427,7 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
       }
       const r = await updateWpPost(orgIdentity(t.organization_id), t.site_id, wpPostId, { status: "publish" });
       if (!r.ok) throw new Error(`WordPress 發布失敗：${(r as Extract<typeof r, { ok: false }>).error}`);   // strict:false
-      return { status: r.post.status, link: r.post.link, ...(note ? { note } : {}) };
+      return { status: r.post.status, link: r.post.link, ...(r.post.title ? { title: r.post.title } : {}), ...(note ? { note } : {}) };
     },
   }, save, fresh);
 }
@@ -467,17 +519,28 @@ export async function attachTopicVideo(t: Topic, url: string, actor: string, sav
       await step();
     }
     const s = artifacts.social;
-    // each social draft (the other channels', then YouTube's own since N5a) gets the video once; one upload serves both
-    for (const [postId, key] of [[s?.post_id, "media_id"], [s?.youtube_post_id, "youtube_media_id"]] as const) {
-      if (!postId || video[key]) continue;
-      const post = await getPost(t.organization_id, postId);
+    // each social draft (the other channels', YouTube's own since N5a, Facebook's and Instagram's since K23) gets the
+    // video once; one upload serves them all. The first two record it on the video, the K23 ones on their own entry.
+    const linkPosts = [...(s?.link_in_comment ?? [])];
+    const drafts: Array<{ postId: string | null | undefined; done: () => string | undefined; record: (mediaId: string) => void }> = [
+      { postId: s?.post_id, done: () => video.media_id, record: (m) => { video.media_id = m; } },
+      { postId: s?.youtube_post_id, done: () => video.youtube_media_id, record: (m) => { video.youtube_media_id = m; } },
+      ...linkPosts.map((p, i) => ({ postId: p.post_id, done: () => linkPosts[i].media_id, record: (m: string) => {
+        linkPosts[i] = { ...linkPosts[i], media_id: m };
+        artifacts.social = { ...artifacts.social!, link_in_comment: [...linkPosts] };
+      } })),
+    ];
+    const uploaded = () => video.media_id ?? video.youtube_media_id ?? linkPosts.find((p) => p.media_id)?.media_id;
+    for (const d of drafts) {
+      if (!d.postId || d.done()) continue;
+      const post = await getPost(t.organization_id, d.postId);
       // scheduled, submitted or deleted by a person: theirs, left as it is; media already there: an earlier attempt's
       if (post.state === "draft" && !post.media.length) {
-        const mediaId = video.media_id ?? video.youtube_media_id ?? (await addVideo(t.organization_id, url, `topic-${t.id}.mp4`, actor)).id;
+        const mediaId = uploaded() ?? (await addVideo(t.organization_id, url, `topic-${t.id}.mp4`, actor)).id;
         await savePost(t.organization_id, post.id, post.version, {}, null, [{ media_id: mediaId, position: 0 }], actor);
-        video[key] = mediaId;
-      } else if (post.media.length) video[key] = post.media[0].media_id;
-      if (video[key]) await step();
+        d.record(mediaId);
+      } else if (post.media.length) d.record(post.media[0].media_id);
+      if (d.done()) await step();
     }
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);

@@ -31,8 +31,8 @@ export async function redoTopic(sb: SupabaseClient, t: Topic, actor: string): Pr
       throw new TopicMoveRefused(`WordPress 文章已經是 ${status}（有人處理過），不能退回重做`);
     }
   }
-  // the other channels' draft and, since N5a, YouTube's own draft
-  for (const id of [a.social?.post_id, a.social?.youtube_post_id]) {
+  // the other channels' draft and, since N5a, YouTube's own draft; since K23 Facebook's and Instagram's own
+  for (const id of [a.social?.post_id, a.social?.youtube_post_id, ...(a.social?.link_in_comment ?? []).map((p) => p.post_id)]) {
     if (!id) continue;
     const post = await getPost(t.organization_id, id)
       .catch((e) => { if (e instanceof SocialStoreError && e.status === 404) return null; throw e; });

@@ -19,7 +19,8 @@ export interface WpPostPatch {
 }
 
 export type WpPostUpdate =
-  | { ok: true; post: { id: number; status: string; date: string; link: string } }
+  /** title = WordPress's raw title (an update answers in the edit context); absent when WordPress sent none. */
+  | { ok: true; post: { id: number; status: string; date: string; link: string; title?: string } }
   /** code = WordPress's own error code when WordPress answered (rest_post_invalid_id = no such post); absent for our refusals. */
   | { ok: false; status: number; error: string; code?: string; mode?: undefined }
   /** The system mode blocked the write: the HTTP shell answers with the shared 423 contract (blockedChangeResponse). */
@@ -84,6 +85,8 @@ async function writePost(identity: Request | { headers: Headers }, siteId: strin
     return { ok: false, status: res.status, error: typeof json.message === "string" ? json.message.slice(0, 200) : `WP error ${res.status}`,
       ...(typeof json.code === "string" ? { code: json.code } : {}) };
   }
-  return { ok: true, post: { id: json.id as number, status: json.status as string, date: json.date as string, link: json.link as string } };
+  const t = json.title as { raw?: unknown; rendered?: unknown } | undefined;
+  const title = typeof t?.raw === "string" ? t.raw : typeof t?.rendered === "string" ? t.rendered : undefined;
+  return { ok: true, post: { id: json.id as number, status: json.status as string, date: json.date as string, link: json.link as string, ...(title ? { title } : {}) } };
 }
 

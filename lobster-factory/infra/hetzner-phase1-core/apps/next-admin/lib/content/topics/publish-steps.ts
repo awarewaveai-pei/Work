@@ -6,7 +6,10 @@
 // anything twice. YouTube not live YOUTUBE_LIVE_TIMEOUT_MS after it was sent = the topic fails with the article and
 // the other posts still drafts. A topic made before the split (one social draft, no youtube_post_id) has no YouTube
 // step: article, then its social draft, as before. A step started by another run less than STEP_LEASE_MS ago is left to it.
+// K23: Facebook's and Instagram's own drafts (social.link_in_comment) go out after the other channels', each with the
+// article's link in its first comment (make.ts sendSocial); a topic made before K23 has none and goes out as before.
 import { MakeError } from "./tick";
+import type { LinkInCommentChannel } from "@/lib/social/link-in-comment";
 import type { Topic } from "./store";
 
 export interface PublishStep {
@@ -25,7 +28,8 @@ export interface PublishStep {
 }
 /** requestedBy / requestedAt: the person who pressed 發布 (N6) for this run into 'publishing' -- the only way a topic of
  *  a site set to human review goes out (make.ts publishDrafts reads it; tick.ts publishNow clears it on an auto entry). */
-export interface PublishLog { youtube?: PublishStep; article?: PublishStep; social?: PublishStep; requestedBy?: string; requestedAt?: string }
+/** link_in_comment: one step per Facebook / Instagram draft (K23), by its post id. */
+export interface PublishLog { youtube?: PublishStep; article?: PublishStep; social?: PublishStep; link_in_comment?: Record<string, PublishStep>; requestedBy?: string; requestedAt?: string }
 
 export const YOUTUBE_LIVE_TIMEOUT_MS = 60 * 60_000;
 /** A step recorded as started (started_at, no sent_at) less than this ago is another run's, still at its outside write:
@@ -38,18 +42,23 @@ export type YoutubeLook = { state: "waiting" } | { state: "live"; url: string } 
 
 export interface PublishPorts {
   now(): Date;
-  /** Schedules (or submits for review) a social draft; a post a person already moved is left as it is. */
-  sendPost(postId: string, link: string | undefined, now: Date): Promise<{ state: string; scheduled_at: string | null; at: string }>;
+  /** Schedules (or submits for review) a social draft; a post a person already moved is left as it is. linkInComment
+   *  (K23): the link goes in the draft's first comment under this channel's wording, with the article's title. */
+  sendPost(postId: string, link: string | undefined, now: Date, linkInComment?: { channel: LinkInCommentChannel; title: string | undefined }): Promise<{ state: string; scheduled_at: string | null; at: string }>;
   lookYoutube(postId: string): Promise<YoutubeLook>;
   /** WordPress draft -> publish; throws when WordPress refused. youtubeUrl = YouTube's link (N5b): the article's
    *  embedded video file becomes that link first, while the article is still a draft. */
-  publishArticle(wpPostId: number, youtubeUrl?: string): Promise<{ status: string; link: string; note?: string }>;
+  publishArticle(wpPostId: number, youtubeUrl?: string): Promise<{ status: string; link: string; title?: string; note?: string }>;
 }
+
+type Sent = { state: string; scheduled_at: string | null; at: string };
+/** K23: a Facebook or Instagram draft of its own (make.ts makeSocial); media_id = the video attached to it (attachTopicVideo). */
+export interface LinkInCommentPost { post_id: string; channel: LinkInCommentChannel; media_id?: string; sent?: Sent }
 
 /** The artifacts publish-steps reads and writes (make.ts TopicArtifacts holds the same fields). */
 interface Arts {
-  article?: { wp_post_id: number | null; published?: { status: string; link: string; at: string } } & Record<string, unknown>;
-  social?: { post_id: string | null; youtube_post_id?: string | null; sent?: { state: string; scheduled_at: string | null; at: string } } & Record<string, unknown>;
+  article?: { wp_post_id: number | null; published?: { status: string; link: string; at: string; title?: string } } & Record<string, unknown>;
+  social?: { post_id: string | null; youtube_post_id?: string | null; sent?: Sent; link_in_comment?: LinkInCommentPost[] } & Record<string, unknown>;
   publish?: PublishLog;
   [k: string]: unknown;
 }
@@ -107,7 +116,7 @@ export async function publishSteps(t: Pick<Topic, "formats" | "artifacts">, port
       log.article = { started_at: at };
       await step();
       const r = await ports.publishArticle(article.wp_post_id, log.youtube?.url);
-      a.article = { ...article, published: { status: r.status, link: r.link, at } };
+      a.article = { ...article, published: { status: r.status, link: r.link, at, ...(r.title ? { title: r.title } : {}) } };
       log.article = { ...log.article, sent_at: at, state: r.status, url: r.link, ...(r.note ? { note: r.note } : {}) };
       await step();
     }
@@ -120,6 +129,21 @@ export async function publishSteps(t: Pick<Topic, "formats" | "artifacts">, port
       const sent = await ports.sendPost(s.post_id, a.article?.published?.link, now);
       a.social = { ...s, sent };
       log.social = { ...log.social, sent_at: sent.at, state: sent.state };
+      await step();
+    }
+
+    for (const [i, p] of (a.social?.link_in_comment ?? []).entries()) {
+      if (p.sent) continue;
+      const steps = { ...(log.link_in_comment ?? {}) };
+      if (held(steps[p.post_id])) return wait;
+      log.link_in_comment = steps;
+      steps[p.post_id] = { post_id: p.post_id, started_at: at };
+      await step();
+      const sent = await ports.sendPost(p.post_id, a.article?.published?.link, now, { channel: p.channel, title: a.article?.published?.title });
+      const posts = [...a.social!.link_in_comment!];
+      posts[i] = { ...p, sent };
+      a.social = { ...a.social!, link_in_comment: posts };
+      steps[p.post_id] = { ...steps[p.post_id], sent_at: sent.at, state: sent.state };
       await step();
     }
   } catch (e) {

@@ -560,7 +560,7 @@ export function TopicsBoard({ overview, scheduleFor, view = "topics" }: {
               {sel.last_error && <p style={{ margin: 0, fontSize: "var(--font-size-sm)", color: "var(--red)" }}>{T.error}：{sel.last_error}</p>}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: "var(--font-size-sm)" }}>
                 {draftUrl(sel) && <a href={draftUrl(sel)!} target="_blank" rel="noreferrer">{T.wpDraft}</a>}
-                {((sel.artifacts as TopicArtifacts).social?.post_id || (sel.artifacts as TopicArtifacts).social?.youtube_post_id) &&
+                {((sel.artifacts as TopicArtifacts).social?.post_id || (sel.artifacts as TopicArtifacts).social?.youtube_post_id || (sel.artifacts as TopicArtifacts).social?.link_in_comment?.length) &&
                   <a href={socialDraftsUrl(sel.organization_id)} target="_blank" rel="noreferrer">{T.socialDrafts}</a>}
               </div>
               {sel.status === "reviewed" && (
