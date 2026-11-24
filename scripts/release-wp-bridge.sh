@@ -6,10 +6,14 @@
 #   --plugin store             aware-wave-store: AwareWave's own shop logic, aware-wave.com ONLY
 #                              Work copy lobster-factory/packages/aware-wave-store-plugin -> awarewaveai-pei/aware-wave-store (public)
 #   --plugin oracle            aware-wave-oracle: product plugin (divination tools), opt-in per site via the site flow
-#                              Work copy lobster-factory/packages/oracle-wp-plugin -> awarewaveai-pei/aware-wave-oracle (public)
+#                              Work copy lobster-factory/packages/oracle-wp-plugin -> awarewaveai-pei/aware-wave-oracle (private)
 #                              Its release repo's CI and release workflows live in the Work copy (.github/) and are mirrored;
 #                              the zip is built by its bin/build-zip.sh from .distignore (the dry run builds it locally too).
 #                              A missing release repo is never created here: the dry run says so, a real run stops.
+#
+# The release repos of plugins that are for sale are PRIVATE (operator 2026-11-24), and the host has no GitHub token:
+# after the release is verified, scripts/mirror-plugin-release.sh copies the zip to the host, which is where the site
+# flow installs it from. A release that is not on the host cannot be installed by the site flow.
 #
 # WHY THIS EXISTS: each plugin lives in TWO GitHub repos and that bit a session once. Pushing a tag v* to the
 # release repo fires its .github/workflows/release.yml, which builds the installable zip (<slug>.php + includes/ +
@@ -90,7 +94,7 @@ if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
 fi
 
 # 4. Clone the release repo fresh and mirror the plugin payload (exactly what release.yml zips).
-#    A release repo that does not exist yet is created by a person on purpose (public repo), never here.
+#    A release repo that does not exist yet is created by a person on purpose (private repo), never here.
 NEW_REPO=0
 if ! VIEW_ERR=$(gh repo view "$REPO" --json name 2>&1 >/dev/null); then
 	# Only GitHub's own "no such repository" answer counts as missing; auth, network or rate-limit errors stop here.
@@ -100,11 +104,11 @@ if ! VIEW_ERR=$(gh repo view "$REPO" --json name 2>&1 >/dev/null); then
 	esac
 fi
 if [ "$NEW_REPO" = "1" ] && [ "$DRY_RUN" != "1" ]; then
-	die "release repo $REPO does not exist -- create it first (gh repo create $REPO --public), then rerun; nothing pushed"
+	die "release repo $REPO does not exist -- create it first (gh repo create $REPO --private), then rerun; nothing pushed"
 fi
 rm -rf "$TMP"
 if [ "$NEW_REPO" = "1" ]; then
-	say "release repo $REPO does not exist yet -- a real run needs it created first: gh repo create $REPO --public"
+	say "release repo $REPO does not exist yet -- a real run needs it created first: gh repo create $REPO --private"
 	say "mirroring into an empty repo at $TMP (what the first push would carry)"
 	mkdir -p "$TMP" && git -C "$TMP" init -q
 else
@@ -149,7 +153,7 @@ if [ -f "$TMP/bin/build-zip.sh" ]; then
 fi
 
 if [ "$DRY_RUN" = "1" ]; then
-	say "DRY RUN — would: commit, push main, wait for CI to pass, tag $TAG, push tag, verify release. Stopping."
+	say "DRY RUN — would: commit, push main, wait for CI to pass, tag $TAG, push tag, verify release, copy the zip to the host. Stopping."
 	exit 0
 fi
 
@@ -185,6 +189,9 @@ for i in $(seq 1 9); do
 	if gh release view "$TAG" -R "$REPO" 2>/dev/null | grep -q "$SLUG-$TAG.zip"; then
 		say "RELEASE OK: $TAG with asset $SLUG-$TAG.zip"
 		gh release view "$TAG" -R "$REPO" | grep -E "tag:|asset:|url:"
+		# 8. The host installs from its own copy (private repo, no token there).
+		bash "$SCRIPT_DIR/mirror-plugin-release.sh" "$SLUG" "$TAG" \
+			|| die "release $TAG is published but NOT on the host -- rerun: bash scripts/mirror-plugin-release.sh $SLUG $TAG"
 		say "NEXT: $NEXT"
 		exit 0
 	fi

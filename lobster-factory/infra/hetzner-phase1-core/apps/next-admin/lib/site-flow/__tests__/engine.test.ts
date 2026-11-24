@@ -322,6 +322,24 @@ describe("stale running runs (process killed mid-step)", () => {
 });
 
 describe("getSiteFlowStatus (I1: state from observation)", () => {
+  it("a failed run shows why: the failed stage's own detail, not the reason code, and never the rollback's", async () => {
+    const failed = {
+      id: "r-bad", action_id: "cat-create", environment_id: ENV_ID, status: "failed", error_summary: "execute_failed",
+      started_at: new Date(T0 - 1000).toISOString(), ended_at: new Date(T0 - 500).toISOString(),
+      output_payload: { stages: [
+        { stage: "precheck", ok: true, detail: "ok" },
+        { stage: "execute", ok: false, detail: "host-nginx-new failed and rolled back" },
+        { stage: "rollback", ok: false, detail: "nothing to undo" },
+      ] },
+    };
+    const { db } = fakeDb({ ops_action_catalog: catalog(true), ops_action_runs: [failed] });
+    const { gate } = fakeGate();
+    const r = await getSiteFlowStatus(deps(db, step({}, { status: "absent", detail: "" }).def, gate), { site, environment });
+    const create = (r.body.steps as Array<Row>).find((s) => s.key === "create");
+    expect(create).toMatchObject({ state: "failed", reason: "host-nginx-new failed and rolled back" });
+  });
+
+
   it("a completed run does not make a step done; only its observation does", async () => {
     const done = { id: "r-done", action_id: "cat-create", environment_id: ENV_ID, status: "completed", started_at: new Date(T0 - 1000).toISOString() };
     const { db } = fakeDb({ ops_action_catalog: catalog(true), ops_action_runs: [done] });

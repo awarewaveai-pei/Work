@@ -35,7 +35,8 @@ export const preflightStep: SiteStepDefinition = {
     const mode = ingress(ctx.environment);
     if (!mode) return { status: "blocked", detail: "環境設定的 ingress 不是 host-vhost 或 product-gateway" };
     const findings = urlFindings(r.pf, mode);
-    if (r.pf.createPlan === "refuse") {
+    // While the host is working on this site its plan is about half-done work: the address facts still stand.
+    if (r.pf.createPlan === "refuse" && !r.pf.busy) {
       return { status: "blocked", detail: `主機不會建立這個站：${r.pf.createRefusal}`, facts: { findings } };
     }
     return { status: "done", detail: findings.join("；"), facts: { findings, create_plan: r.pf.createPlan } };

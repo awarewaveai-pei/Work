@@ -312,7 +312,11 @@ gate "site-create s7 $D"; j1="$(jget "$out" job)"
 for _ in $(seq 40); do in_c 'grep -q "^safe-infra-patch compose-new" /t/calls.log' && break; sleep 0.25; done
 gate "site-create s7 $D"
 check "second site-create while the first holds the slug lock -> refused at once (3)" bash -c "[[ $rc == 3 ]] && grep -q 'another create' <<<'$err'"
+gate "site-preflight s7 $D"
+check "preflight while the create job runs -> busy true" test "$(jget "$out" busy)" = True
 check "first job still succeeds" test "$(wait_job "$j1")" = succeeded
+gate "site-preflight s7 $D"
+check "preflight after the job -> busy false" test "$(jget "$out" busy)" = False
 # The launcher's check races a job that has not taken the lock yet; the job-level lock closes that window.
 setup; in_c 'echo 3 > /t/state/slow; mkdir -p -m 700 /var/lib/awarewave/site-jobs
   for j in sj-20261122000000-00000001 sj-20261122000000-00000002; do

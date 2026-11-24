@@ -592,12 +592,25 @@ interface RunRow {
   metadata: unknown;
 }
 
-const summary = (r: RunRow): StepRunSummary => ({
+/** The detail of the last stage that failed (never the rollback stage: it says how the undo went, not why). */
+function failedStageDetail(output: unknown): string | null {
+  const stages = (output as { stages?: unknown } | null)?.stages;
+  if (!Array.isArray(stages)) return null;
+  for (let i = stages.length - 1; i >= 0; i--) {
+    const s = stages[i] as Partial<Stage> | null;
+    if (s && s.ok === false && s.stage !== "rollback" && typeof s.detail === "string" && s.detail) return s.detail;
+  }
+  return null;
+}
+
+type RunSummaryRow = Pick<RunRow, "id" | "status" | "started_at" | "ended_at" | "error_summary" | "output_payload">;
+const summary = (r: RunSummaryRow): StepRunSummary => ({
   id: r.id,
   status: r.status,
   started_at: r.started_at,
   ended_at: r.ended_at,
   error_summary: r.error_summary,
+  error_detail: r.status === "failed" ? failedStageDetail(r.output_payload) : null,
 });
 
 export async function pollRun(
@@ -734,10 +747,11 @@ export function deriveStepState(args: {
   // A cause observed now (e.g. MainWP lists the site but it is disconnected: "press Reconnect") outranks the last
   // run's failure text, which is history and usually just the code of that refusal.
   if (obs.status === "blocked") {
-    const last = lastRun?.status === "failed" ? `（上次執行失敗：${lastRun.error_summary ?? "未記錄原因"}）` : "";
+    const last = lastRun?.status === "failed" ? `（上次執行失敗：${lastRun.error_detail ?? lastRun.error_summary ?? "未記錄原因"}）` : "";
     return { state: "blocked", reason: `${obs.detail}${last}` };
   }
-  if (lastRun?.status === "failed") return { state: "failed", reason: lastRun.error_summary ?? "上次執行失敗" };
+  // The failed stage's own words (the host's message), not the run's reason code: the page shows this line.
+  if (lastRun?.status === "failed") return { state: "failed", reason: lastRun.error_detail ?? lastRun.error_summary ?? "上次執行失敗" };
   if (obs.status === "unknown") return { state: "blocked", reason: `無法確認現況：${obs.detail}` };
   if (args.missing.length > 0) return { state: "blocked", reason: `需先完成：${args.missing.map((k) => args.titles?.[k] ?? k).join("、")}` };
   if (!args.enabled) return { state: "not_started", reason: "此步驟尚未開放" };
@@ -760,7 +774,7 @@ export async function getSiteFlowStatus(
     // query so a flood of refusals cannot push a live run out of the window.
     const { data, error } = await db
       .from("ops_action_runs")
-      .select("id,action_id,status,started_at,ended_at,error_summary")
+      .select("id,action_id,status,started_at,ended_at,error_summary,output_payload")
       .eq("environment_id", args.environment.id)
       .in("action_id", actionIds)
       .in("status", ["running", "failed", "completed"])

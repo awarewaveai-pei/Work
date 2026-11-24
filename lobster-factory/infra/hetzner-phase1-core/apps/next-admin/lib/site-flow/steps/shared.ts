@@ -34,6 +34,8 @@ export interface Preflight {
   wpContainer: string;
   dbContainer: string;
   retired: boolean;
+  /** A create / vhost / wp / teardown of this site is running on the host: createPlan describes its half-done work. */
+  busy: boolean;
   createPlan: "new" | "retry" | "reused" | "refuse" | string;
   createRefusal: string;
 }
@@ -57,6 +59,7 @@ export function parsePreflight(d: Json): Preflight {
     wpContainer: str(d.wp_container),
     dbContainer: str(d.db_container),
     retired: d.retired === true,
+    busy: d.busy === true,
     createPlan: str(d.create_plan),
     createRefusal: str(d.create_refusal),
   };

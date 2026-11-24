@@ -384,6 +384,8 @@ create_plan() {
   fi
 }
 
+# Takes no lock. `busy` = a verb that changes this site holds the slug lock right now: create_plan then describes that
+# verb's half-done work (containers up, registry not written yet reads as "refuse ... not ours"), not a foreign site.
 site_preflight() {
   SLUG="${argv[1]}"; DOMAIN="${argv[2]}"; INGRESS=host-vhost
   local reg_json=null reg_err="" occ occ_err="" certs vols v lab
@@ -406,6 +408,7 @@ site_preflight() {
     wp_container="$(ct_state "$(client_wp_container "$SLUG")")" db_container="$(ct_state "$(client_wp_db_container "$SLUG")")" \
     retired:="$([[ -e "$(client_wp_retired_marker "$SLUG")" ]] && echo true || echo false)" \
     env_file:="$([[ -f "$(client_wp_env_file "$SLUG")" ]] && echo true || echo false)" \
+    busy:="$(client_wp_lock_dir_ready >/dev/null 2>&1 && slug_busy && echo true || echo false)" \
     create_plan="$PLAN" create_refusal="$(clean "$PLAN_WHY")"
 }
 

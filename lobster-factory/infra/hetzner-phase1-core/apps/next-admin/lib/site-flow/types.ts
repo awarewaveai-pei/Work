@@ -164,6 +164,8 @@ export interface StepRunSummary {
   started_at: string;
   ended_at: string | null;
   error_summary: string | null;
+  /** Why a failed run failed, in the words of the stage that failed (output_payload.stages); null when none. */
+  error_detail: string | null;
 }
 
 export interface StepStatus {
