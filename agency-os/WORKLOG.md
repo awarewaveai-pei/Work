@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-24（續16）— oracle WP：GO-2 算命站 WordPress 建好並接上同網域（建置中），nginx `32b218619`
+
+- [根因] oracle 區塊全部路徑都到引擎；WordPress 前門要同網域分路，且 GO-3 前訪客網址不得變。操作者同意待決 5。
+- [步驟] ① `sg-deploy.sh next-admin` → `6d1829dc0`。② 開關：`/etc/default/aw-hosting-gate.local`（`AW_SITE_VERBS=on`、`AW_SITE_GATEWAY_SLUGS=oracle-aware-wave-com`）＋`ops_action_catalog` `site.*` 七列 enabled。③ `/ops/sites/new` 建紀錄（site `dd88b1bb…`，env `878ea75e…`）；SQL `jsonb_set(metadata,'{ingress}','"product-gateway"')`（表單無此選項＝設計，SITE-FLOW §1 #6）。④ 流程第 2、3 步（容器在 `lobster-net`；19 外掛＋`aware-wave-oracle` 0.5.0）。⑤ `safe-infra-patch.sh nginx`：`map $uri $oracle_backend`。⑥ 第 5 步手動勾、第 6 步 MainWP。⑦ 第 7 步失敗：`steps/bridge.ts:212` 打 `/?rest_route=…`，`/` 被 map 送到引擎 → 第二次 patch 加 `map $args $oracle_home_backend`（WP query var → WordPress）→ 重試通過。⑧ 站上建 site keypair（同 `SettingsPage.php:366`）、`key_id=oracle`、引擎 `.env.production` 加 `ORACLE_SITES`（備份 `.bak-go2-20261124`）、`docker compose up -d --no-build oracle-web`。
+- [驗證] `capture.py` 32 URL 前後：31 全同；`/no-such-page-go1` 307→503（WP 建置中）。`/?rest_route=/aware-wave-bridge/v1/health` 200 JSON；`/?utm_source=x` 307（引擎）；`/wp-admin/` 302；`/wp-json/` 200。流程頁 1–7 完成、4「已列入」。`docker exec oracle-web node -e`：sites=1、pem_ok=true。站內 `EngineClient::tools()`=12、`EngineClient::batch()` 回逐筆 `invalid_input`（＝簽章被接受）。repo `nginx/default.conf` 與 live diff 0 行。
+- [未做] `/wp-login.php` 有 Cloudflare challenge（curl 403、自動化瀏覽器過不去）→ 「能登入後台」待操作者確認；管理員密碼未讀；開關仍開（留給重設密碼）；第 8 步三項；SF-I2 內容工具訊息實測；org 名是 `Oracle` 非 SPEC §7-3 的名稱。
+- [rollback] nginx：`default.conf.bak.safe-patch-20261124-072745`（GO-2 前）經 `safe-infra-patch.sh nginx` 放回；站：`deprovision-site.sh --apply --confirm oracle-aware-wave-com`；引擎 env：`.bak-go2-20261124`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh nginx ×2；capture.py go2-before/after；curl 分路 12 條；wp eval EngineClient::batch | exit=0 | ms=900000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,Projects | grep=rest_route= | hits=22
+- ORACLE_WAIVED: nginx 設定＋文件；行為以正式站前後比對與分路實測為證
 ## 2026-11-24（續15）— oracle WP：待決 7 → migration `0181` 套用；oracle 外掛 `v0.5.0` 首發（private repo＋主機鏡像）
 
 - [根因] GO-2 前置剩兩項：`host_slug` 唯一索引（原 `0179`，撞號未併入）；oracle 外掛無 release，建站勾選會在主機下載失敗。操作者對待決 7 回「你是專家」＝監工判斷。
