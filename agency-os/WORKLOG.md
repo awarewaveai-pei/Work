@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-24（續1）— 平台第 8 批上線：U11、W2、M3（High，0179 已套用）＋員工後台頁名
+
+- 操作者 2026-11-23「一起上」＝ M3（migration 0179）的 go；同日兩次「你決定」：贈送＝一種方式、「畫布」改名。
+- M3 `d74a205e9`＋`f2690b9e3`＋`0393b5c1f`：`lib/entitlements/member-tags.ts`（純函式：角色、成對「產品／方式」、方式集合）。方式來源：訂閱＝有效訂閱列或有效 contract 來源權利列（ADR 021 §2 操作者自己的 Soulful 例子；正式庫 Soulful 無訂閱列）；代操＝`organization_product_operations`；經銷＝有效 `<產品>.resell`；點數＝餘額或扣點；贈送＝有效 comp 來源權利列（新增第六種，ADR 021 §2 已改）；internal＝Admin 不出方式標籤。migration 0179 `entitlement_held_products()`（唯讀彙總函式，service_role only；Soulful 單一單位 300+ 權利列，不整批拉回）。org-search 類別改用它，加 代操／經銷／贈送（算得出才顯示）。卡片原列 Medium，因新增 migration 升為 High（DISPATCH 已改）。
+- W2 `82b9e5716`：`lobster-factory/packages/aware-wave-store-plugin/` `includes/Summary.php` 等，「我的帳號」改讀 app `wp-summary`，讀不到顯示退場畫面、不回頭用訂單；phpunit 38 passed。**只改 repo**；站上外掛仍停用、未發版。
+- U11 `803a466b7`＋`d737ce7a9`＋`ba4f4b82d`：內容門 寫文章／改寫／草稿 由頁籤拆成選單頁，第一屏＝關鍵字、標題、生成；刪左欄「功能」清單；員工側欄名稱＝產品門選單名稱。拆頁帶來的資料遺失（手改未存內文換頁即失）：離開前先走既有 `saveDraft`，連結點擊可攔（失敗留在原頁），上一頁／下一頁與程式導頁在卸載時以 keepalive 送出。critic 抓到並修：`?draft=` 不檢查草稿所屬客戶。側欄自訂排序在新增項目後保留（`mergeItemOrder`）。
+- 頁名 `d32e4caa3`：員工後台 29 頁 title＋第一個 h1 含側欄名稱（無 h1 者加視覺隱藏 h1）；`STAFF_TODO` 只剩 `/tools/theme`（主題 session 禁區，owner U13）；PhotoCraft 專業版在側欄與設計門都改名「修圖（專業版）」（原統一成「畫布」，緊鄰「畫布編輯器」）。
+- 上線：主機確認無其他部署 → `node scripts/apply-db-migration.mjs 0179`（`APPLY_OK`；ledger 最新 0179；函式在正式資料回 Soulful＝contract、edd-research 與 awarewave-ops＝comp；anon／authenticated 無執行權）→ push。手動部署兩次未成：① CI 閘 REFUSED（新 push 取消該 commit 的 test run）② 主機 `npm test` 1 紅：`app/__tests__/ClientRail.render.test.tsx`「AwareWave 自己 carries the answer's internalGroup…」——「AwareWave 自己」列由 `internalOrgId` prop 先畫出，`findByRole` 可在 org-search 回應前點到，本機與 CI 綠、主機紅＝測試競態；`68b4dc7eb` 改成先等回應帶來的列再點。兩次正式站皆未變動。2026-11-23 19:05Z 夜間自動部署上線 `68b4dc7eb`（healthy after 15s，smoke 全過）。
+- 正式站實看（操作者登入，2026-11-23）：客戶欄類別按鈕、TEST 預設隱藏、sticky 正常（U3 的 PostgREST `.or(...not.in...)` 在真資料上正確）；Soulful 客戶頁帳務分頁「誰在操作」切換卡 11 產品正常（未點）；客戶欄「共 5 個客戶」實列 4 個＝多算 1（記到 W5）。K12 確認窗未看（video 子網域需另外登入）。
+- 未驗：U11 新版面與 M3 的 訂閱／贈送 類別未在正式站實看；W2 未在真 WordPress 看過（W5）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin 整合樹 5729 passed, 0 failed) ; node scripts/apply-db-migration.mjs 0179 ; ssh psql select * from entitlement_held_products() ; curl login x3 | exit=0 | ms=900000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/2m/3n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=entitlement_held_products | hits=20
+- ORACLE_WAIVED: Codex 額度當時仍鎖（2026-11-24 11:02 才恢復）；M3 有拋棄式資料庫 up、down、up 測試與權限測試，U11 有 critic（兩個 Major 已修）與草稿守衛、離開守衛的突變，監工讀過 0179 全文並在正式資料上查證函式輸出
 ## 2026-11-23（續13）— oracle WP 第四批：SF-I2 併入
 
 - SF-I2 併入（工人 `6817539ae`，已 push；今晚 03:00 自動部署帶上）：`lib/payments/woo.ts` 新增 `bridgeClientForSiteWithRegistered`（同一站先用環境變數客戶端、其次已登記站、都沒有回 null）、`isBridgeClientConfigured`、`BRIDGE_ONLY_SITE_ERROR`；`getConfig` 對 `env:` 開頭的 id 一律回 null（舊的同步函式不會把新站當預設站）。改成涵蓋新站：`lib/content/publish/wordpress-core.ts`、`lib/content/video/embed-in-post.ts`、`lib/crm/member-newsletter.ts`、`lib/outreach/warm-leads.ts`、`app/api/tools/publish/route.ts`。刻意只服務預設站並加註解：`lib/crm/fluentcrm.ts` `isBridgeConfigured`、`app/api/content/newsletter/route.ts`。無 REST token 也無 bridge 的站回「此站只支援 bridge 通道」（`wordpress-core.ts:356-359`、`embed-in-post.ts:170,219,381`）。

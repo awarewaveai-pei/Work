@@ -50,7 +50,7 @@
 | G10 | 收銀台端刪除會員／改 email → app 沒有對應事件 | 現況報告 `:188` |
 | G11 | **已關（M11，2026-11-23）**。原：aware-wave.com 進門不看產品 `loginSources`；現 wp-handoff 與 wp-summary 都經 `opensTo` 查清單 | `NA/lib/auth/sources/awarewave-wp.ts` `opensTo` |
 | G12 | **已關（M1，0175，2026-11-22 已套用）**。原：測試單位沒有標記：`e2e-verify-0704-5c1356`、`test-wp-webhook-co-c705c6` 都是 `kind=customer`；`kind` 需加值 `test` | 正式庫 `organizations` SELECT 2026-11-22（`kind` 只有 `customer`／`internal`） |
-| G13 | WordPress「我的帳號」的「進入」清單來自該會員的 WooCommerce 訂單，不是 app 權益：贈送、員工建立的合約、代操客戶持有的產品不會出現 | `lobster-factory/packages/aware-wave-store-plugin/includes/MyAccountDoors.php:109-121` |
+| G13 | **程式已改（W1 app 摘要＋W2 外掛改讀摘要，2026-11-23）；站上外掛仍停用，啟用後才算關閉**。原：WordPress「我的帳號」的「進入」清單來自該會員的 WooCommerce 訂單，不是 app 權益：贈送、員工建立的合約、代操客戶持有的產品不會出現 | `lobster-factory/packages/aware-wave-store-plugin/includes/MyAccountDoors.php:109-121` |
 
 開放註冊的前置條件：G1、G5、G6、G7、G10 完成，且以一個測試會員走完「註冊 → 付款 → 進產品 → 扣點」。畫面位置由 ADR 020（目前客戶）的客戶頁決定；缺口卡排在該計畫 K10 之後。
 

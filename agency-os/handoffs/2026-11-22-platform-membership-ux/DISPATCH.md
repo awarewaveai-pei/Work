@@ -55,15 +55,15 @@
 | U23 | 埋點基礎（挑客戶、被擋、登入成功） | NA `lib/analytics.ts`、`app/posthog-analytics.tsx`、`app/api/ops/analytics-context/*` | Low | Sonnet | — | 7 | 已併 |
 | M2 | 合約能記「我們代操」 | MIG 新 migration（`organization_product_subscriptions.operated_by`）＋down；NA `lib/entitlements/contracts.ts`、`app/(shell)/ops/clients/[slug]/BillingTab.tsx`＋test | **High** | Opus | M1 | 7 | 已併（0178 已套用；設計改為獨立表 `organization_product_operations`，見 §3 M2 列註） |
 | M11 | aware-wave.com 進門照產品的登入來源清單 | NA `lib/auth/sources/awarewave-wp.ts`＋test、`lib/portal/products.ts`（`loginSources`） | **High** | Opus | W1、K8、U22 | 7 | 已併 |
-| U11 | 內容入口重排：拆頁、改名、刪功能清單、下拉改按鈕；補：員工側欄與產品門選單 19 處名稱不同（清單在 2026-11-23 WORKLOG 平台第 7 批條目），預設統一成產品門名稱，連同頁面可見舊標題與 `page-names.test.ts` 待辦清單 5 頁一起收 | NA `lib/portal/products.ts`（content 列）、`app/content/*`、`ContentStudio.tsx`、`app/sidebar-sections.ts`、`app/NavRail.tsx`（刪「功能」清單） | Medium | Opus | K5、K7、K8、U12、M11 | 8 | |
-| W2 | 外掛「我的帳號」改畫 app 給的摘要（併 W3、W4）；補：啟用外掛前先在 Cloudflare 對 `/api/auth/wp-summary`、`/api/auth/wp-handoff` 加限流（NA 無既有入站限流；改正式站安全設定，先問操作者） | PL `includes/MyAccountDoors.php`、新 `includes/Summary.php`、`tests/*` | Medium | Sonnet | W1 | 8 | |
-| M3 | 由合約自動算出「產品／方式」標籤與 TEST | 新 NA `lib/entitlements/member-tags.ts`＋test；`app/api/ops/org-search/route.ts`＋`route.test.ts`（類別改用它） | Medium | Sonnet | M1、M2、U3 | 8 | |
-| U13 | 5 組對比不足的顏色修正；補：兩個主題檔的 import 改指 `app/sidebar-sections` 後刪 `app/SidebarNav.tsx`（K5 暫留的 re-export）；加 `.badge-blue` 後換掉 `ToolCard.tsx` 行內 token | NA `app/globals.css`、`lib/theme/tokens.ts`＋檢查器 | Low | Sonnet | 先與主題 session 協調 | 8 | |
+| U11 | 內容入口重排：拆頁、改名、刪功能清單、下拉改按鈕；補：員工側欄與產品門選單 19 處名稱不同（清單在 2026-11-23 WORKLOG 平台第 7 批條目），預設統一成產品門名稱，連同頁面可見舊標題與 `page-names.test.ts` 待辦清單 5 頁一起收 | NA `lib/portal/products.ts`（content 列）、`app/content/*`、`ContentStudio.tsx`、`app/sidebar-sections.ts`、`app/NavRail.tsx`（刪「功能」清單） | Medium | Opus | K5、K7、K8、U12、M11 | 8 | 已併 |
+| W2 | 外掛「我的帳號」改畫 app 給的摘要（併 W3、W4）；補：啟用外掛前先在 Cloudflare 對 `/api/auth/wp-summary`、`/api/auth/wp-handoff` 加限流（NA 無既有入站限流；改正式站安全設定，先問操作者） | PL `includes/MyAccountDoors.php`、新 `includes/Summary.php`、`tests/*` | Medium | Sonnet | W1 | 8 | 已併（只改 repo；站上外掛仍停用，啟用在 W6） |
+| M3 | 由合約自動算出「產品／方式」標籤與 TEST | 新 NA `lib/entitlements/member-tags.ts`＋test；`app/api/ops/org-search/route.ts`＋`route.test.ts`（類別改用它）；MIG `0179_entitlement_held_products.sql`＋down（唯讀彙總函式，實作時新增 → 升為 High） | **High** | Sonnet | M1、M2、U3 | 8 | 已併 |
+| U13 | 5 組對比不足的顏色修正；補：兩個主題檔的 import 改指 `app/sidebar-sections` 後刪 `app/SidebarNav.tsx`（K5 暫留的 re-export）；加 `.badge-blue` 後換掉 `ToolCard.tsx` 行內 token；補：`/tools/theme` 頁名對上左欄（`page-names.test.ts` `STAFF_TODO` 最後一列）；刪 `globals.css` 已無人用的 `.door-feature*` | NA `app/globals.css`、`lib/theme/tokens.ts`＋檢查器 | Low | Sonnet | 先與主題 session 協調 | 8 | |
 | U14 | 手機底列；補：員工後台手機寬 375 客戶欄把內容擠到 0 寬（`.sidebar` 固定 248＋客戶欄 220）；內容門手機直排時客戶欄不撐滿、內容在一屏以下 | NA `app/PlatformFrame.tsx`、`app/globals.css` | Low | Sonnet | U9、U13；先與主題 session 協調 | 9 | |
-| W5 | 本機 WordPress＋app 走一遍，寫成可重跑腳本（G9） | 新 `scripts/local-member-flow.ps1`（路徑展開時確認） | Low | Sonnet | W1、W2 | 9 | |
+| W5 | 本機 WordPress＋app 走一遍，寫成可重跑腳本（G9）；補：本機 WordPress 實看 W2 的「我的帳號」畫面（持有／未開通／退場）；另修客戶欄「共 N 個客戶」多算 1（`ClientRail.tsx` 把內部組織加了兩次，2026-11-23 正式站實看） | 新 `scripts/local-member-flow.ps1`（路徑展開時確認） | Low | Sonnet | W1、W2 | 9 | |
 | K13 | 檢查器：頁面不得私藏客戶來源 | 新 NA `lib/client-context/__tests__/no-private-context.test.ts` | Low | Sonnet | K7–K11 | 9 | |
 | M5 | 員工替既有客戶代辦會員（app 端） | MIG 新 migration（待驗證的會員邀請）；NA `lib/entitlements/wp-customers.ts`、`lib/entitlements/identities.ts`、`app/api/ops/clients/[slug]/accounts/route.ts`、`app/(shell)/ops/clients/[slug]/AccountsCard.tsx`＋tests | **High** | Opus | M1、K10 | 9 | |
-| K14 | 新增產品入口零手改的驗收測試；補：collect／outreach／design 自己的挑客戶清單（org-search 不帶 category）仍列出 TEST 單位，換成客戶欄後消失 | 新 NA `lib/client-context/__tests__/new-door.test.ts` | Low | Sonnet | K5、K13 | 10 | |
+| K14 | 新增產品入口零手改的驗收測試；補：collect／outreach／design 自己的挑客戶清單（org-search 不帶 category）仍列出 TEST 單位，換成客戶欄後消失；補：VW app（`apps/video-workbench`）內可見的「影音工作台」改「影片工作台」，同一次 VW 部署 | 新 NA `lib/client-context/__tests__/new-door.test.ts` | Low | Sonnet | K5、K13 | 10 | |
 | M6 | 代辦（外掛端）：會員驗證 email 後才連上 | PL 新 `includes/MemberInvite.php`、主檔註冊、`tests/*` | **High** | Opus | W2、M5 | 10 | |
 | M8 | 轉移會員（換單位管理者） | MIG 新 migration（轉移函式）；NA 新 `app/api/ops/clients/[slug]/member-transfer/route.ts`、`AccountsCard.tsx` | **High** | Opus | M5 | 10 | |
 | K15 | 目前客戶期末閘＋P1 驗收 | 無程式；WORKLOG、本檔狀態欄 | — | Opus | 全部 K | 11 | |
@@ -206,7 +206,7 @@ P2、P3：P1 全部併入後，監工依 §1 依賴排批（同樣每批 ≤ 4�
 3. 跑該卡 TESTS 行的同一指令（不跑全套）；`.ts/.tsx` 卡在 NA 跑 `npx tsc --noEmit`。
 4. RISKS 逐項處理：當場修、實測證明無事、或寫明為何不處理（記 WORKLOG），不轉述。
 5. critic 一個（`.claude/commands/review.md` 依風險選 tier）；High 卡加書面對抗自審＋卡內突變證據；Codex 2026-11-24 後改 `/codex-review`。
-6. High 卡（K6、K12、U4、U5、W1、M1、M2、M5、M6、M8、M10、M11）：驗收過後**停下問操作者**「可以併 main 嗎」，附一句白話風險與 rollback；未獲 go 不併。
+6. High 卡（K6、K12、U4、U5、W1、M1、M2、M3、M5、M6、M8、M10、M11）：驗收過後**停下問操作者**「可以併 main 嗎」，附一句白話風險與 rollback；未獲 go 不併。
 7. 併 main：`git -C D:\Work` 以 pathspec commit／cherry-pick 該卡 commit（AGENTS.md §8）；`agency-os/WORKLOG.md` 用 `scripts/git-partial-worktree-commit.py stage`；WORKLOG 四行證據（REALTEST／REVIEW／BUGHUNT／ORACLE）。
 8. 更新本檔 §1 狀態欄；若卡完成觸發 §7 的文件行，同一 commit 更新。
 9. 移除 worktree 前先 `rmdir` 其中的 junction（`node_modules` 等），再 `git worktree remove`。
@@ -226,7 +226,7 @@ P2、P3：P1 全部併入後，監工依 §1 依賴排批（同樣每批 ≤ 4�
 | K7、K8 | A §2 F7、F8、F14 標「已關」；B §15A P9 標「K7 已刪」 |
 | K13 | A §2 F12 標「已關」 |
 | W2 | C §3 G13 列標「已關（W2）」；B §2A.2「缺口」列與 §17.4 `heldProducts()` 列改為已完成；補：啟用外掛前先在 Cloudflare 對 `/api/auth/wp-summary`、`/api/auth/wp-handoff` 加限流（NA 無既有入站限流；改正式站安全設定，先問操作者） |
-| W5 | C §3 G9 標「已關（W5）」 |
+| W5 | C §3 G9 標「已關（W5）」；補：本機 WordPress 實看 W2 的「我的帳號」畫面（持有／未開通／退場）；另修客戶欄「共 N 個客戶」多算 1（`ClientRail.tsx` 把內部組織加了兩次，2026-11-23 正式站實看） |
 | W6 | C §3 G8、G7 標「已關（W2＋W6）」；C `:3` 狀態改「部分實作」 |
 | M1 | C §2 三層表「`test` 值未存在，G12」改為「已加（M1）」；C §3 G12 標「已關」；B §9.3 類別表 TEST 列改「是」 |
 | M2、M3 | C §3 G3 標「部分已關（M2、M3）」；B §9.3 代操、經銷列改「是」；B 一頁結論 Q1 列補「代操／經銷已算得出」 |
