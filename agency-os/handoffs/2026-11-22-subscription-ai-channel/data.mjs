@@ -64,8 +64,8 @@ export const STEPS = [
   { n: 11, code: 'K13', group: 'B3c', title: '幾個生圖模型畫同一張配圖給你比', plain: '文字實測做完後接著做。拿同一篇文章的同一段、同一句英文畫面描述，讓幾個生圖模型各畫一張，並排給你看，你挑。挑中的當作文章配圖的預設。約花 NT$10。',
     gate: '你拿到並排比較頁並選出預設；結果記到「AI 模型與成本」的實測紀錄。', risk: 'Low', model: '監工', status: 'not_started', depends: ['K12'], card: 'briefs/K10-K12.md' },
   { n: 12, code: 'DA', group: 'B3', title: '部署並在筆電實測', plain: '前三批一起部署一次，然後用筆電的 Claude 訂閱真的寫一篇文章，看內容。', gate: '線上文章頁選訂閱模型寫出一篇；成本頁出現一筆 NT$0。', risk: 'High（部署；失敗自動還原）', model: '監工', status: 'in_progress', depends: ['K4', 'K6', 'K5', 'K7', 'K11', 'K8'], card: 'DISPATCH.md' },
-  { n: 13, code: 'K10', group: 'B3d', title: '文章配圖不再亂畫', plain: '現在的配圖把中文替代文字直接丟給最便宜的模型，畫出穿西裝的人和亂碼字。改成：寫文章的 AI 另外寫一句英文的畫面描述，固定加上「圖上不要有字」，生圖模型改讀網站設定；預設用哪個模型，等你看完生圖實測再定。（文字盲測抓到的三個範本問題已另外做完，見 K18、K22；這張卡只剩配圖。）',
-    gate: '部署後真的產一篇，圖和文章內容有關、圖上沒有字；替代文字照舊；舊文章不受影響。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['K7', 'K13'], card: 'briefs/K10-K12.md' },
+  { n: 13, code: 'K10', group: 'B3d', title: '文章配圖：畫什麼、什麼風格、幾張', plain: '之前的配圖把中文替代文字直接丟給模型，畫出跟文章無關的圖。改成你 11-24 定的做法。寫文章的 AI 為每張圖多寫一句英文畫面描述，講那一段的具體場景，可以有人物。封面另外畫一張，代表整篇主題，不再拿內文第一張充當。內文圖短文章三張、其餘四張。封面和內文圖都是 4:3。風格在網站設定裡選一次，全站固定；文章頁帶入網站的設定，可以單篇修改。下拉選單改成按鈕。AI 也順便寫封面要用的短標題和副標。預設的生圖模型先不換，等你看完實測。',
+    gate: '測試通過；部署後真的產一篇，每張圖跟它那一段有關、圖上沒有字、封面不是內文第一張。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K7'], card: 'briefs/K10-article-images.md' },
   // 第四批
   { n: 14, code: 'K9', group: 'B4', title: '主機上的常駐執行程式', plain: '在主機開一個權限最小的帳號，只跑這支程式和 Codex。它讀不到網站、資料庫和其他金鑰。登入過期或額度用完會發 Telegram。',
     gate: '程式常駐；用那個帳號去讀主機其他地方全部被拒；後台顯示排程線在線。', risk: 'High（主機、憑證）', model: 'Opus 5.5', status: 'not_started', depends: ['DA'], card: K, before: '待決 1、待決 2、待決 3 之後' },
@@ -82,6 +82,10 @@ export const STEPS = [
     gate: '全套測試通過；電子報的新測試在舊程式上會失敗、在新程式上通過。', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '6c699c1d5', depends: ['K12'], card: 'briefs/K22-article-template-leaks.md' },
   { n: 24, code: 'K23', group: 'B5', title: '自動貼文的文章連結改放留言', plain: '現在自動產文會把文章網址接在每個平台的貼文內文最後：臉書因此觸及率低，IG 則是一串不能點的字。改成你 11-24 指定的格式。臉書：內文結尾寫「完整文章內容請看留言區」，第一則留言放文章標題和網址。IG：內文結尾和第一則留言都寫文章標題，請讀者點個人檔案連結後搜尋標題，不放網址。留言是整則貼文共用的，所以臉書和 IG 會變成兩則分開的草稿。只影響自動產文；手動貼文不變。其他語言的網站用對應的英文句。',
     gate: '測試證明臉書與 IG 送出的內文都不含網址、留言逐字符合；部署後看一則真的草稿。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '5699897f8', depends: ['K22'], card: 'briefs/K23-social-link-in-comment.md' },
+  { n: 25, code: 'K24', group: 'B3d', title: '文章封面的統一版型', plain: '所有文章封面同一個排版：上面四分之三是底圖，下面四分之一是色塊，放短標題和副標。字不會蓋到圖。標題最多兩行，太長先縮字。色塊顏色、字色、字型每個網站可以設。同一份排法之後可以換尺寸，IG 的直式就是這樣加。用主機上已經有的繪圖功能和中文字型，不裝新套件。這張卡只做出排版功能和預覽，還沒接到發文流程。',
+    gate: '測試通過；產出短標題、長標題、英文標題三張樣張。', risk: 'Low', model: 'Opus 5.5', status: 'in_progress', depends: ['K22'], card: 'briefs/K24-cover-template.md' },
+  { n: 26, code: 'K25', group: 'B3d', title: '封面版型接上網站設定和發文流程', plain: 'K10 和 K24 都做完後接起來。網站設定頁多一區「文章封面」：色塊顏色、字色、字型，旁邊有即時預覽。自動產文和手動文章頁都用這個版型出封面，放上 AI 寫的短標題和副標。文章舊的那套壓字功能刪掉，全站只剩一種封面做法。',
+    gate: '部署後產一篇：精選圖片是套好版型的封面；網站設定改顏色後預覽跟著變。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['K10', 'K24'], card: 'briefs/K24-cover-template.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
