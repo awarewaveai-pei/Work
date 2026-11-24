@@ -41,11 +41,14 @@ export const STAFF_API_OWNERS: Readonly<Record<string, readonly string[]>> = {
   "/api/ops/tenants": ["ops-console"],
   "/api/ops/workflow-runs": ["ops-console"],
   "/api/ops/audit-events": ["ops-console"],
-  "/api/ops/organizations": ["onboard"],
   "/api/ops/site-flow": ["ops/clients"],
-  "/api/build/provision-services": ["onboard"],
-  "/api/build/runs": ["build"],
-  "/api/provision": ["build"],
+  // The old /onboard and /build pages retired (card SF-P). provision-services: the client page 外部服務 tab. The rest
+  // have no page caller left (script / sync-key only); build/runs and provision start builds and rent machines, so they
+  // go to a cell few staff hold, not to 客戶.
+  "/api/ops/organizations": ["ops/clients"],
+  "/api/build/provision-services": ["ops/clients"],
+  "/api/build/runs": ["ops/system-modes"],
+  "/api/provision": ["ops/system-modes"],
   "/api/onboarding": ["ops/onboarding"],
   "/api/theme": ["tools/theme"],   // only the theme page calls it; POST changes every staff member's console
   "/api/tools/events/sync": ["content"],

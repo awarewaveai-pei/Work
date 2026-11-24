@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// 舊建站精靈（/onboard）的 build 入口。客戶建站現在走 /ops/sites/new → 建站流程頁（lib/site-flow/）。
+// 舊的建站入口（x-ops-sync-key 或員工直呼）；頁面已不呼叫：客戶問卷帶規格去 /ops/sites/new → 建站流程頁（lib/site-flow/，卡 SF-P）。
 // 租新主機（`provisionClient()`、EMBED_PROVISION_INTO_APP.md）沒有接進任何流程，列在
 // agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/SITE-FLOW-COMPLETION-PLAN.md §1 第 1 列「之後」，
 // 要接時從那裡排卡，不要從這裡呼叫。

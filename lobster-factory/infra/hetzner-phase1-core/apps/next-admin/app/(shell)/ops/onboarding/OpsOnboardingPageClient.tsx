@@ -1,5 +1,8 @@
 "use client";
 
+// 客戶問卷（選用）：AI 依問卷產生網站規格。「用問卷資料預填建站」帶著問卷到 /ops/sites/new（預先填好客戶、網址、語言、外掛組合；報價未核准的不預填），
+// 建站本身只走那一條流程（SITE-FLOW-COMPLETION-PLAN.md §1 第 2 列，卡 SF-P）。
+import Link from "next/link";
 import { useState } from "react";
 import type { IntakeForm, WebsiteSpec } from "@/lib/onboarding/intake-form";
 import { IntakeFormSteps } from "@/lib/onboarding/intake-form-steps";
@@ -14,6 +17,11 @@ interface IntakeHistoryItem {
   website_spec_id?: string | null;
 }
 
+/** The new-site form, prefilled from this intake's spec (app/(shell)/ops/sites/new/page.tsx reads both ids). */
+function newSiteHref(websiteSpecId: string, intakeFormId: string): string {
+  return `/ops/sites/new?${new URLSearchParams({ spec: websiteSpecId, intake: intakeFormId }).toString()}`;
+}
+
 function statusBadge(status: string): string {
   if (status === "live") return "badge-green";
   if (status === "building" || status === "spec_generated") return "badge-gray";
@@ -26,9 +34,6 @@ function IntakeHistory() {
   const [items, setItems] = useState<IntakeHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [triggering, setTriggering] = useState<string | null>(null);
-  const [triggered, setTriggered] = useState<Set<string>>(new Set());
-  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
 
   async function load() {
     if (loading) return;
@@ -44,35 +49,6 @@ function IntakeHistory() {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleRowTrigger(item: IntakeHistoryItem) {
-    if (!item.website_spec_id) {
-      setRowErrors((e) => ({ ...e, [item.id]: "無規格 ID，請重新生成規格" }));
-      return;
-    }
-    setTriggering(item.id);
-    setRowErrors((e) => { const n = { ...e }; delete n[item.id]; return n; });
-    try {
-      const res = await fetch("/api/onboarding/trigger-build", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ website_spec_id: item.website_spec_id, intake_form_id: item.id }),
-      });
-      const text = await res.text();
-      let data: { ok?: boolean; error?: string; run_id?: string };
-      try { data = JSON.parse(text) as typeof data; } catch { data = {}; }
-      if (!res.ok || !data.ok) {
-        setRowErrors((e) => ({ ...e, [item.id]: data.error ?? `HTTP ${res.status}` }));
-      } else {
-        setTriggered((s) => new Set([...s, item.id]));
-        setItems((prev) => prev.map((r) => r.id === item.id ? { ...r, status: "building" } : r));
-      }
-    } catch (e) {
-      setRowErrors((prev) => ({ ...prev, [item.id]: e instanceof Error ? e.message : String(e) }));
-    } finally {
-      setTriggering(null);
     }
   }
 
@@ -114,24 +90,10 @@ function IntakeHistory() {
                     <td style={{ padding: "7px 8px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{item.submitted_at ? new Date(item.submitted_at).toLocaleString("zh-TW") : "—"}</td>
                     <td style={{ padding: "7px 8px", color: "var(--text-secondary)" }}>{item.submitted_by}</td>
                     <td style={{ padding: "7px 8px" }}>
-                      {triggered.has(item.id) ? (
-                        <span style={{ color: "var(--badge-green-text, green)", fontSize: 12 }}>已排入 ✓</span>
-                      ) : item.status === "spec_generated" && item.website_spec_id ? (
-                        <>
-                          <button
-                            onClick={() => void handleRowTrigger(item)}
-                            disabled={triggering === item.id}
-                            className="btn-primary"
-                            style={{ fontSize: 12, padding: "3px 10px" }}
-                          >
-                            {triggering === item.id ? "排入中…" : "觸發建站"}
-                          </button>
-                          {rowErrors[item.id] && (
-                            <p style={{ color: "var(--badge-red-text, red)", fontSize: 11, margin: "2px 0 0" }}>{rowErrors[item.id]}</p>
-                          )}
-                        </>
-                      ) : rowErrors[item.id] ? (
-                        <span style={{ color: "var(--badge-red-text, red)", fontSize: 11 }}>{rowErrors[item.id]}</span>
+                      {item.status === "spec_generated" && item.website_spec_id ? (
+                        <Link href={newSiteHref(item.website_spec_id, item.id)} className="btn-primary" style={{ fontSize: 12, padding: "3px 10px" }}>
+                          用問卷資料預填建站
+                        </Link>
                       ) : null}
                     </td>
                   </tr>
@@ -147,14 +109,12 @@ function IntakeHistory() {
 }
 
 export default function OnboardingPage() {
-  const [flow, setFlow] = useState<"form" | "submitting" | "generating" | "done" | "triggering" | "triggered" | "error">("form");
+  const [flow, setFlow] = useState<"form" | "submitting" | "generating" | "done" | "error">("form");
   const [formStep, setFormStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [spec, setSpec] = useState<WebsiteSpec | null>(null);
   const [intakeId, setIntakeId] = useState<string | null>(null);
   const [websiteSpecId, setWebsiteSpecId] = useState<string | null>(null);
-  const [runId, setRunId] = useState<string | null>(null);
-  const [buildStatus, setBuildStatus] = useState<string | null>(null);
 
   const [form, setForm] = useState<Partial<IntakeForm>>({
     industry: "service",
@@ -251,44 +211,8 @@ export default function OnboardingPage() {
     }
   }
 
-  async function handleTriggerBuild() {
-    if (!websiteSpecId || !intakeId) {
-      setError("無法觸發建站：規格 ID 遺失，請重新產生規格。");
-      return;
-    }
-    setError(null);
-    setFlow("triggering");
-    try {
-      const res = await fetch("/api/onboarding/trigger-build", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ website_spec_id: websiteSpecId, intake_form_id: intakeId }),
-      });
-      const text = await res.text();
-      let data: { ok?: boolean; error?: string; details?: string; run_id?: string; build_status?: string };
-      try {
-        data = JSON.parse(text);
-      } catch {
-        setError(`觸發建站失敗：伺服器回應非預期（HTTP ${res.status}）${text ? ` — ${text.slice(0, 160)}` : ""}`);
-        setFlow("done");
-        return;
-      }
-      if (!res.ok || !data.ok) {
-        setError(`觸發建站失敗：${data.error ?? `HTTP ${res.status}`}${data.details ? ` — ${data.details}` : ""}`);
-        setFlow("done");
-        return;
-      }
-      setRunId(data.run_id ?? null);
-      setBuildStatus(data.build_status ?? null);
-      setFlow("triggered");
-    } catch (e) {
-      setError(`觸發建站失敗：${e instanceof Error ? e.message : String(e)}`);
-      setFlow("done");
-    }
-  }
-
   // ── Spec result view ──────────────────────────────────────────
-  if ((flow === "done" || flow === "triggering" || flow === "triggered") && spec) {
+  if (flow === "done" && spec) {
     return (
       <div>
       <IntakeHistory />
@@ -349,26 +273,20 @@ export default function OnboardingPage() {
             </pre>
           </details>
 
-          {flow === "triggered" && runId ? (
-            <div className="intake-success-banner">
-              <strong>{buildStatus === "completed" ? "建站已完成" : buildStatus === "failed" ? "建站執行失敗" : "建站 Run 已建立"}</strong>
-              <p style={{ margin: "0.5rem 0 0", fontSize: "0.85rem" }}>Run ID：<code>{runId}</code></p>
-              {buildStatus ? <p style={{ margin: "0.25rem 0 0", fontSize: "0.85rem" }}>Build status：<code>{buildStatus}</code></p> : null}
-              <a href={`/build?runId=${encodeURIComponent(runId)}`} className="intake-success-link">前往 /build 查看進度 →</a>
-            </div>
-          ) : (
-            <div className="intake-result-actions">
-              {error && <p className="intake-error-inline">{error}</p>}
-              <button onClick={handleTriggerBuild} disabled={flow === "triggering"} className="btn-primary intake-btn-full">
-                {flow === "triggering" ? "排入中..." : "觸發建站 →"}
-              </button>
-              <button
-                onClick={() => { setFlow("form"); setFormStep(1); setSpec(null); setIntakeId(null); setWebsiteSpecId(null); setRunId(null); setBuildStatus(null); setError(null); }}
-                className="btn-secondary">
-                建立另一個
-              </button>
-            </div>
-          )}
+          <div className="intake-result-actions">
+            {websiteSpecId && intakeId ? (
+              <Link href={newSiteHref(websiteSpecId, intakeId)} className="btn-primary intake-btn-full">
+                用問卷資料預填建站 →
+              </Link>
+            ) : (
+              <p className="intake-error-inline">規格 ID 遺失，請重新產生規格。</p>
+            )}
+            <button
+              onClick={() => { setFlow("form"); setFormStep(1); setSpec(null); setIntakeId(null); setWebsiteSpecId(null); setError(null); }}
+              className="btn-secondary">
+              建立另一個
+            </button>
+          </div>
         </div>
       </div>
       </div>

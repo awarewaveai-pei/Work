@@ -40,10 +40,8 @@ export interface ClientConfig {
     wave3?: string[];
   };
 
-  // M3: 20-department capability selection for this client.
-  // Source of truth: agency-os/tenants/<slug>/core/DEPARTMENT_SELECTION.json
-  // Synced here so the console can display coverage without reading repo files at runtime.
-  // Use DEPARTMENT_CATALOG SMB_DEFAULT_CLUSTERS as initial value for SMB clients.
+  // M3: 20-department capability selection for this client. Set on the client page 部門選型 tab
+  // (PATCH /api/ops/clients/[slug]/departments); ids the catalog no longer lists are kept as stored.
   department_selection?: ClusterId[];
 
   // ISO date of last department selection review (populated alongside department_selection)

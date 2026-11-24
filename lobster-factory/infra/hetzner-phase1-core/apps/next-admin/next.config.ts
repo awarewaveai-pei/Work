@@ -24,10 +24,14 @@ const nextConfig: NextConfig = {
   // whose root holds what nginx's alias /srv/vector-pro/ holds: /vector-pro/current/x -> <origin>/current/x.
   // Our dock lives at /vector-pro-dock/ (public/), outside this prefix, so neither nginx nor this rewrite takes it.
   // The old Vector Editor retired 2026-11-05 (R0-PLAN C7.3): its page and file answer with the professional editor.
+  // The old site-building pages /onboard and /build retired 2026-11-23 (card SF-P): building a client site is the one
+  // flow at /ops/sites/new; their department and service settings moved to the client page tabs 部門選型 / 外部服務.
   async redirects() {
     return [
       { source: "/tools/vector-editor", destination: "/tools/vector-pro", permanent: true },
       { source: "/vector-editor.html", destination: "/tools/vector-pro", permanent: true },
+      { source: "/onboard", destination: "/ops/sites/new", permanent: true },
+      { source: "/build", destination: "/ops/sites/new", permanent: true },
     ];
   },
   // Our own editor modules and shared styles keep fixed, unversioned URLs (ES module imports between them can't carry a

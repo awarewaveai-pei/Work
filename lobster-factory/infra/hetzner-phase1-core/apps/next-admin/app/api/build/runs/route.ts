@@ -12,6 +12,7 @@ import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { kickActionRunDispatcher } from "../../../../lib/kick-dispatcher";
 import { checkProductionChangeAllowed } from "../../../../lib/system-modes/production-change-gate";
 import { blockedChangeResponse } from "../../../../lib/system-modes/blocked-change";
+import { ensureOrganization, ensureProject, ensureSite, ensureWorkspace, type RecordResult } from "../../../../lib/site-flow/records";
 
 type SupabaseWriteClient = NonNullable<ReturnType<typeof getSupabaseWriteClient>>;
 
@@ -42,6 +43,12 @@ function localeForSite(locale: string | undefined): string {
   return locale;
 }
 
+/**
+ * organization -> default workspace -> wordpress project -> site through the one write path (lib/site-flow/records.ts,
+ * card SF-P: this route used to carry its own copy). An organizationId that already exists is used as is; a new one is
+ * created with that id, and a slug that belongs to another organization is refused (slug_id_mismatch), never adopted.
+ * The workspace and project are always the organization's default ones; caller-sent workspaceId/projectId are replaced.
+ */
 async function ensureBuildRegistryRows(
   supabase: SupabaseWriteClient,
   input: BuildRunRequest,
@@ -52,185 +59,68 @@ async function ensureBuildRegistryRows(
   if (!input.organizationId || !input.clientName) {
     return { input };
   }
-
-  let organizationId = input.organizationId;
   const clientName = input.clientName;
-  const slug = input.clientSlug ?? slugifyClientName(clientName, organizationId);
+  // records' own codes (site_scope_mismatch, slug_id_mismatch, ...) are returned as is; the stage goes in details.
+  const failed = (stage: string, r: RecordResult<unknown>) =>
+    "error" in r ? { error: r.error, details: `${stage}: ${r.detail ?? r.error}` } : { error: "create_failed", details: stage };
 
   const { data: orgById, error: orgByIdError } = await supabase
     .from("organizations")
-    .select("id, slug")
-    .eq("id", organizationId)
+    .select("id")
+    .eq("id", input.organizationId)
     .maybeSingle();
   if (orgByIdError) return { error: "organization_lookup_failed", details: orgByIdError.message };
-
+  let organizationId = input.organizationId;
   if (!orgById) {
-    const { data: orgBySlug, error: orgBySlugError } = await supabase
-      .from("organizations")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (orgBySlugError) return { error: "organization_lookup_failed", details: orgBySlugError.message };
-
-    if (orgBySlug?.id) {
-      organizationId = orgBySlug.id as string;
-    } else {
-      const { data: org, error: orgInsertError } = await supabase
-        .from("organizations")
-        .insert({
-          id: organizationId,
-          type: "client",
-          name: clientName,
-          slug,
-          status: "active",
-          default_locale: localeForSite(input.locale),
-          metadata: {
-            source: "build_console",
-            client_config: {
-              platform: "wordpress",
-              ...(input.domain ? { site_url: `https://${input.domain.replace(/^https?:\/\//, "").replace(/\/$/, "")}` } : {}),
-              ...(input.siteUrl ? { site_url: input.siteUrl.replace(/\/$/, "") } : {}),
-              ...(input.wpAdminUrl ? { wp_admin_url: input.wpAdminUrl } : {}),
-            },
-          },
-        })
-        .select("id")
-        .single();
-      if (orgInsertError || !org?.id) {
-        return { error: "organization_create_failed", details: orgInsertError?.message ?? "insert returned no id" };
-      }
-    }
+    const configUrl = input.siteUrl
+      ? input.siteUrl.replace(/\/$/, "")
+      : input.domain ? `https://${input.domain.replace(/^https?:\/\//, "").replace(/\/$/, "")}` : undefined;
+    const org = await ensureOrganization(supabase, {
+      id: organizationId,
+      slug: input.clientSlug ?? slugifyClientName(clientName, organizationId),
+      name: clientName,
+      type: "client",
+      status: "active",
+      defaultLocale: localeForSite(input.locale),
+      metadata: {
+        source: "build_console",
+        client_config: {
+          platform: "wordpress",
+          ...(configUrl ? { site_url: configUrl } : {}),
+          ...(input.wpAdminUrl ? { wp_admin_url: input.wpAdminUrl } : {}),
+        },
+      },
+    });
+    if (!org.ok) return failed("organization", org);
+    organizationId = org.value.id;
   }
 
-  let workspaceId = input.workspaceId;
-  if (workspaceId) {
-    const { data: workspace, error } = await supabase
-      .from("workspaces")
-      .select("id, organization_id")
-      .eq("id", workspaceId)
-      .maybeSingle();
-    if (error) return { error: "workspace_lookup_failed", details: error.message };
-    if (workspace && workspace.organization_id !== organizationId) {
-      return { error: "workspace_org_mismatch", details: "workspaceId belongs to a different organization" };
-    }
-    if (!workspace) workspaceId = undefined;
-  }
-  if (!workspaceId) {
-    const { data: existingWorkspace, error: existingWorkspaceError } = await supabase
-      .from("workspaces")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("slug", "default")
-      .maybeSingle();
-    if (existingWorkspaceError) return { error: "workspace_lookup_failed", details: existingWorkspaceError.message };
-    workspaceId = existingWorkspace?.id as string | undefined;
-  }
-  if (!workspaceId) {
-    workspaceId = input.workspaceId ?? crypto.randomUUID();
-    const { error } = await supabase
-      .from("workspaces")
-      .insert({
-        id: workspaceId,
-        organization_id: organizationId,
-        name: `${clientName} - Default`,
-        slug: "default",
-        workspace_type: "default",
-        status: "active",
-      });
-    if (error) return { error: "workspace_create_failed", details: error.message };
-  }
-
-  let projectId = input.projectId;
-  if (projectId) {
-    const { data: project, error } = await supabase
-      .from("projects")
-      .select("id, organization_id, workspace_id")
-      .eq("id", projectId)
-      .maybeSingle();
-    if (error) return { error: "project_lookup_failed", details: error.message };
-    if (project && (project.organization_id !== organizationId || project.workspace_id !== workspaceId)) {
-      return { error: "project_scope_mismatch", details: "projectId belongs to a different organization/workspace" };
-    }
-    if (!project) projectId = undefined;
-  }
-  if (!projectId) {
-    const { data: existingProject, error: existingProjectError } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("workspace_id", workspaceId)
-      .eq("project_type", "wordpress")
-      .maybeSingle();
-    if (existingProjectError) return { error: "project_lookup_failed", details: existingProjectError.message };
-    projectId = existingProject?.id as string | undefined;
-  }
-  if (!projectId) {
-    projectId = input.projectId ?? crypto.randomUUID();
-    const { error } = await supabase
-      .from("projects")
-      .insert({
-        id: projectId,
-        organization_id: organizationId,
-        workspace_id: workspaceId,
-        name: `${clientName} Website`,
-        project_type: "wordpress",
-        status: "active",
-      });
-    if (error) return { error: "project_create_failed", details: error.message };
-  }
-
-  let siteId = input.siteId;
-  if (siteId) {
-    const { data: site, error } = await supabase
-      .from("sites")
-      .select("id, organization_id, workspace_id, project_id")
-      .eq("id", siteId)
-      .maybeSingle();
-    if (error) return { error: "site_lookup_failed", details: error.message };
-    if (site && (site.organization_id !== organizationId || site.workspace_id !== workspaceId || site.project_id !== projectId)) {
-      return { error: "site_scope_mismatch", details: "siteId belongs to a different organization/workspace/project" };
-    }
-    if (!site) siteId = undefined;
-  }
-  if (!siteId) {
-    const { data: existingSite, error: existingSiteError } = await supabase
-      .from("sites")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("project_id", projectId)
-      .eq("status", "draft")
-      .maybeSingle();
-    if (existingSiteError) return { error: "site_lookup_failed", details: existingSiteError.message };
-    siteId = existingSite?.id as string | undefined;
-  }
-  if (!siteId) {
-    siteId = input.siteId ?? crypto.randomUUID();
-    const siteUrl = input.profile === "profile_c" ? input.siteUrl : input.domain;
-    const { error } = await supabase
-      .from("sites")
-      .insert({
-        id: siteId,
-        organization_id: organizationId,
-        workspace_id: workspaceId,
-        project_id: projectId,
-        site_type: input.profile === "profile_c" ? "existing_wp" : "new_client",
-        name: clientName,
-        primary_domain: siteUrl?.replace(/^https?:\/\//, "").replace(/\/$/, "") ?? null,
-        locale: localeForSite(input.locale),
-        status: "draft",
-        theme_family: input.packageSlug === "wp-tourism" ? "elementor" : "kadence",
-        stack_profile: input.packageSlug ?? "wp-basic",
-      });
-    if (error) return { error: "site_create_failed", details: error.message };
-  }
+  const ws = await ensureWorkspace(supabase, { organizationId, name: `${clientName} - Default` });
+  if (!ws.ok) return failed("workspace", ws);
+  const proj = await ensureProject(supabase, { organizationId, workspaceId: ws.value.id, name: `${clientName} Website` });
+  if (!proj.ok) return failed("project", proj);
+  const siteUrl = input.profile === "profile_c" ? input.siteUrl : input.domain;
+  const site = await ensureSite(supabase, {
+    organizationId,
+    workspaceId: ws.value.id,
+    projectId: proj.value.id,
+    siteId: input.siteId,
+    name: clientName,
+    primaryDomain: siteUrl?.replace(/^https?:\/\//, "").replace(/\/$/, "") ?? null,
+    locale: localeForSite(input.locale),
+    themeFamily: input.packageSlug === "wp-tourism" ? "elementor" : "kadence",
+    stackProfile: input.packageSlug ?? "wp-basic",
+    siteType: input.profile === "profile_c" ? "existing_wp" : "new_client",
+  });
+  if (!site.ok) return failed("site", site);
 
   return {
     input: {
       ...input,
       organizationId,
-      workspaceId,
-      projectId,
-      siteId,
+      workspaceId: ws.value.id,
+      projectId: proj.value.id,
+      siteId: site.value.id,
     },
   };
 }

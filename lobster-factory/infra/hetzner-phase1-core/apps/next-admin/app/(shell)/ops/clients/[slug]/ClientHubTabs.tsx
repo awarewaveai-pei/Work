@@ -8,6 +8,8 @@ import { WpUpdateButtons } from "./WpUpdateButtons";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
 import { SiteWatchCard } from "./SiteWatchCard";
 import { SiteFlowSummary, type FlowSite } from "./SiteFlowSummary";
+import { DepartmentsTab } from "./DepartmentsTab";
+import { ExternalServicesTab } from "./ExternalServicesTab";
 import type { ClientHealth } from "./site-health";
 import { AccountsCard } from "./AccountsCard";
 import { CustomerServiceTab } from "./CustomerServiceTab";
@@ -617,7 +619,7 @@ function IntegrationsTab({ integrations }: Pick<ClientHubTabsProps, "integration
   );
 }
 
-function ProvisioningTab({ deptSummary, runs, sites }: Pick<ClientHubTabsProps, "deptSummary" | "runs" | "sites">) {
+function ProvisioningTab({ deptSummary, runs, sites, onEditDepartments }: Pick<ClientHubTabsProps, "deptSummary" | "runs" | "sites"> & { onEditDepartments: () => void }) {
   // action_key resolved from the catalog by page.tsx; the legacy action_id
   // check never matched (action_id is a uuid) — kept only as a harmless fallback.
   const buildRuns = runs.filter((r) => {
@@ -644,9 +646,9 @@ function ProvisioningTab({ deptSummary, runs, sites }: Pick<ClientHubTabsProps, 
             </span>
           </div>
         ))}
-        <Link href={`/ops/clients/${deptSummary.slug}`} style={{ fontSize: 11, color: "var(--accent-text)", textDecoration: "none", display: "block", marginTop: 6 }}>
+        <button type="button" onClick={onEditDepartments} style={{ fontSize: 11, color: "var(--accent-text)", background: "none", border: "none", padding: 0, cursor: "pointer", display: "block", marginTop: 6 }}>
           設定部門覆蓋 →
-        </Link>
+        </button>
       </Card>
 
       <SiteFlowSummary sites={sites} />
@@ -731,7 +733,7 @@ function MaintenanceTab({ org, cfg, wp, runs, installRuns }: Pick<ClientHubTabsP
         badge={installRuns.length > 0 ? `${installRuns.length} 筆` : "尚無記錄"}
       >
         {installRuns.length === 0 ? (
-          <NoData>透過 Onboard Wizard 觸發 Build 後自動安裝</NoData>
+          <NoData>尚無初始外掛安裝紀錄</NoData>
         ) : (
           <>
             <MetricGrid items={[
@@ -2466,13 +2468,19 @@ function CredentialsTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "知識庫", "資料蒐集", "客服", "社群頻道", "帳號", "帳務", "憑證庫", "冷開發"] as const;
+const TABS = ["內容工具", "整合", "佈建", "部門選型", "外部服務", "維護", "設定", "品牌識別", "知識庫", "資料蒐集", "客服", "社群頻道", "帳號", "帳務", "憑證庫", "冷開發"] as const;
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
   const { org, cfg, health, wp, runs, installRuns, deptSummary, integrations, wpSites, sites, hiddenTabs = [] } = props;
   const tabs = TABS.filter((t) => !hiddenTabs.includes(t));
   const [activeTab, setActiveTab] = useState<Tab>(() => tabs.find((t) => t === props.initialTab) ?? "維護");
+  // The saved department selection lives here, not in the tab: the tab unmounts when another tab opens, and a remount
+  // must start from what was last saved, not from the page load's cfg (else the next save drops it).
+  const [departments, setDepartments] = useState(() => ({
+    selection: Array.isArray(cfg.department_selection) ? [...cfg.department_selection] as string[] : [],
+    reviewedAt: cfg.department_selection_reviewed_at ?? null,
+  }));
 
   const initials = org.name
     .split(/\s+/)
@@ -2543,7 +2551,9 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
       <div style={{ flex: 1, overflowY: "auto", padding: "18px 24px", background: "var(--bg-canvas)" }}>
         {activeTab === "內容工具" && <ContentTab org={org} cfg={cfg} wpSites={wpSites} />}
         {activeTab === "整合" && <IntegrationsTab integrations={integrations} />}
-        {activeTab === "佈建" && <ProvisioningTab deptSummary={deptSummary} runs={runs} sites={sites} />}
+        {activeTab === "佈建" && <ProvisioningTab deptSummary={deptSummary} runs={runs} sites={sites} onEditDepartments={() => setActiveTab("部門選型")} />}
+        {activeTab === "部門選型" && <DepartmentsTab slug={org.slug} stored={departments.selection} reviewedAt={departments.reviewedAt} onSaved={(selection, reviewedAt) => setDepartments({ selection, reviewedAt })} />}
+        {activeTab === "外部服務" && <ExternalServicesTab org={org} siteUrl={cfg.site_url} bindings={integrations} />}
         {activeTab === "維護" && <MaintenanceTab org={org} cfg={cfg} wp={wp} runs={runs} installRuns={installRuns} />}
         {activeTab === "設定" && <SettingsTab org={org} cfg={cfg} wpSites={wpSites} />}
         {activeTab === "品牌識別" && <BrandIdentityTab org={org} cfg={cfg} />}

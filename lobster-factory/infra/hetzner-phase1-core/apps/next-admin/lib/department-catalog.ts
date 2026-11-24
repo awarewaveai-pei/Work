@@ -431,3 +431,24 @@ export const GROUP_LABELS: Record<DepartmentCluster["group"], string> = {
   cross_border: "跨境治理",
   horizontal: "橫向（全客戶）",
 };
+
+/**
+ * The selection a save may store in client_config.department_selection (client page 部門選型 tab). Every id must be in
+ * the catalog or already stored: an id the catalog no longer lists survives a save unchanged, so a client's stored
+ * selection is never silently narrowed. Order is the request's, duplicates dropped.
+ */
+export function nextDepartmentSelection(
+  stored: unknown,
+  requested: unknown,
+): { ok: true; value: string[] } | { ok: false; error: "invalid_selection"; detail: string } {
+  if (!Array.isArray(requested) || requested.some((v) => typeof v !== "string")) {
+    return { ok: false, error: "invalid_selection", detail: "selection must be an array of strings" };
+  }
+  const known = new Set<string>([
+    ...DEPARTMENT_CATALOG.map((d) => d.clusterId),
+    ...(Array.isArray(stored) ? stored.filter((v): v is string => typeof v === "string") : []),
+  ]);
+  const unknown = (requested as string[]).filter((v) => !known.has(v));
+  if (unknown.length) return { ok: false, error: "invalid_selection", detail: `unknown cluster ids: ${unknown.join(", ")}` };
+  return { ok: true, value: [...new Set(requested as string[])] };
+}

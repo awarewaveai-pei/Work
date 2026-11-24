@@ -1,5 +1,5 @@
 // POST /api/ops/organizations — ensure an organization record (by slug)
-// Called from /onboard Step 3→4 to auto-register new clients in Supabase.
+// Its page caller, the /onboard wizard, retired (card SF-P); new clients are made by the site flow (/ops/sites/new).
 // GET is handled by /api/ops/clients/route.ts (reads organizations table).
 // An existing organization is never overwritten: its metadata is only added to (lib/site-flow/records.ts
 // ensureOrganization); `kept_keys` lists the submitted values that were not applied.

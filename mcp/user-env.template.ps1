@@ -111,7 +111,7 @@ $vars = @{
     GRAFANA_BASIC_USER           = ""
     GRAFANA_BASIC_PASSWORD       = ""
     # app.aware-wave.com + studio.aware-wave.com nginx auth_basic (htpasswd_studio).
-    # Used by Playwright smoke spec smoke/04-onboard-page.spec.ts.
+    # Used by Playwright smoke spec smoke/04-old-site-pages-redirect.spec.ts.
     # Fill from AWARE_WAVE_CREDENTIALS.md §三.
     OPS_BASIC_USER               = ""
     OPS_BASIC_PASSWORD           = ""

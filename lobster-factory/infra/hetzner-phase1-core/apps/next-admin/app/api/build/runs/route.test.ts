@@ -117,3 +117,31 @@ describe("POST /api/build/runs -- system-mode gate", () => {
     expect(kickActionRunDispatcher).toHaveBeenCalledTimes(1);
   });
 });
+
+// SF-P: profile_b registry rows go through lib/site-flow/records.ts. A new organizationId whose slug already belongs to
+// another client is refused, never adopted (critic m3), and nothing is written.
+describe("POST /api/build/runs -- registry rows through records.ts", () => {
+  it("a slug owned by another organization: 409 slug_id_mismatch, no insert anywhere", async () => {
+    const inserts: string[] = [];
+    const from = vi.fn((table: string) => {
+      if (table !== "organizations") throw new Error(`unexpected table ${table}`);
+      return {
+        select: () => ({
+          eq: (col: string) => ({
+            maybeSingle: async () => (col === "slug"
+              ? { data: { id: "99999999-9999-4999-8999-999999999999", slug: "taken", name: "Other", type: "client", status: "active", created_at: "x", metadata: {} }, error: null }
+              : { data: null, error: null }),
+          }),
+        }),
+        insert: () => { inserts.push(table); return { select: () => ({ single: async () => ({ data: null, error: { message: "no" } }) }) }; },
+        update: () => { inserts.push(`${table}:update`); return { eq: async () => ({ error: null }) }; },
+      };
+    });
+    getSupabaseWriteClient.mockReturnValue({ from });
+    const res = await post({ profile: "profile_b", clientSlug: "taken", provider: "manual" });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe("slug_id_mismatch");
+    expect(inserts).toEqual([]);
+    expect(kickActionRunDispatcher).not.toHaveBeenCalled();
+  });
+});

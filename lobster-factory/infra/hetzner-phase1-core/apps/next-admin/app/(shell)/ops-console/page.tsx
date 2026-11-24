@@ -132,7 +132,7 @@ export default async function OpsConsolePage() {
         >
           <strong>診斷 / 參考頁</strong> — 此頁是架構邊界參考 + 部門選型。日常操作請用正式頁：
           租戶健康看 <a href="/ops/clients" style={{ color: "var(--build-risk-medium-text)", fontWeight: 600 }}>Clients</a>、
-          建站執行看 <a href="/build" style={{ color: "var(--build-risk-medium-text)", fontWeight: 600 }}>Build Console</a>。
+          客戶建站走 <a href="/ops/sites/new" style={{ color: "var(--build-risk-medium-text)", fontWeight: 600 }}>客戶建站</a>。
           下方「Tenant Config」「AI Image Job」為實驗性（AI Image Job 尚未接 Trigger.dev 處理，建立後會停在 queued）。
         </div>
 

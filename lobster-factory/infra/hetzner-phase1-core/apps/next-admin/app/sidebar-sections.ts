@@ -31,16 +31,15 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link', href: '/', icon: '◈', label: '儀表板' },
     ],
   },
-  // ── 建站三步序列（intake → 技術精靈 → 部署）刻意相鄰且照順序，對映 MASTER PLAN §1
-  // 資料流：submit → generate-spec → trigger-build → create-wp-site。
+  // ── 客戶建站只有一條流程：/ops/sites/new → 建站流程頁（SITE-FLOW-COMPLETION-PLAN.md §1 第 2 列）。
+  // 客戶問卷是選用的需求問卷，問完帶著規格去 /ops/sites/new，不是建站的一步。
   // 招新客（生新站）與下方 Clients（顧舊客）刻意分區。
   {
     id: 'build-onboard',
     label: '建站與開通',
     items: [
-      { type: 'link', href: '/ops/onboarding', icon: '✨', label: '客戶問卷', title: '建站第 1 步：客戶探索式問卷' },
-      { type: 'link', href: '/onboard',        icon: '✦', label: '建站精靈',   title: '建站第 2 步：技術建站精靈' },
-      { type: 'link', href: '/build',          icon: '⚡', label: '部署執行', title: '建站第 3 步：部署執行（plan_only 或 enqueue）' },
+      { type: 'link', href: '/ops/sites/new',  icon: '✦', label: '新增客戶網站', title: '新增客戶網站，接著在建站流程頁一步一步建好' },
+      { type: 'link', href: '/ops/onboarding', icon: '✨', label: '客戶問卷', title: '選用的客戶需求問卷，問完帶著規格去新增客戶網站' },
     ],
   },
   // ── 既有客戶的監看 / 串接 / 例行工作（營運面，非新建站）

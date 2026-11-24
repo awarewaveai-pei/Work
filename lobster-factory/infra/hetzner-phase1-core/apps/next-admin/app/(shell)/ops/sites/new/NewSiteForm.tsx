@@ -3,7 +3,7 @@
 // The new-site form: visible buttons and checkboxes only (no dropdowns). One POST /api/ops/site-flow; the form mints
 // the idempotency key once per (client choice, domain), so a second press or a retry after a timeout returns the same
 // site. 新客戶 / 既有客戶 is an explicit choice (SF-J2): an existing client is picked with the client block (OrgPicker,
-// by id) and is never changed by the create.
+// by id) and is never changed by the create. `prefill` (客戶問卷 spec, page.tsx) only sets the starting values.
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { OrgPicker } from "../../clients/OrgPicker";
@@ -12,6 +12,7 @@ import {
   LOCALES, PLUGIN_PACKS, createErrorText, hostSlugOf, keptKeysText, normalizeDomain,
   type Locale, type PackKey,
 } from "@/lib/site-flow/page-model";
+import type { NewSitePrefill } from "@/lib/site-flow/intake-prefill";
 
 const FIELD: React.CSSProperties = { marginBottom: 22 };
 const LABEL: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8 };
@@ -30,13 +31,17 @@ interface Created { flowUrl: string; keptKeys: string[]; orgCreated: boolean; or
 type ClientMode = "new" | "existing";
 
 /** orgs/total: the client block's first page (page.tsx); typing searches the rest. */
-export function NewSiteForm({ orgs, total }: { orgs: PickOrg[]; total: number }) {
-  const [mode, setMode] = useState<ClientMode>("new");
-  const [client, setClient] = useState<PickOrg | null>(null);
-  const [name, setName] = useState("");
-  const [domainRaw, setDomainRaw] = useState("");
-  const [locale, setLocale] = useState<Locale>("zh-TW");
-  const [packs, setPacks] = useState<PackKey[]>(["base"]);
+export function NewSiteForm({ orgs, total, prefill = null }: {
+  orgs: PickOrg[];
+  total: number;
+  prefill?: (Omit<NewSitePrefill, "organizationId"> & { client: PickOrg | null }) | null;
+}) {
+  const [mode, setMode] = useState<ClientMode>(prefill?.client ? "existing" : "new");
+  const [client, setClient] = useState<PickOrg | null>(prefill?.client ?? null);
+  const [name, setName] = useState(prefill?.name ?? "");
+  const [domainRaw, setDomainRaw] = useState(prefill?.domain ?? "");
+  const [locale, setLocale] = useState<Locale>(prefill?.locale ?? "zh-TW");
+  const [packs, setPacks] = useState<PackKey[]>(prefill?.packs ?? ["base"]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
