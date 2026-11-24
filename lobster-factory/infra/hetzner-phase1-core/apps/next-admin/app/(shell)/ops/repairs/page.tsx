@@ -231,7 +231,7 @@ export default async function RepairsPage({ searchParams }: { searchParams?: Pro
             <SafetyRow name="備份閘門" ok={backupGate.ok} value={backupGate.value} />
             <SafetyRow name="GitHub Issue 閘門" ok={githubGate} value={githubGate ? "已設定" : "缺少 AUTO_REPAIR_GITHUB_TOKEN"} />
             <SafetyRow name="部署方式" value="每天 03:00 自動部署 main；手動提前＝sg-deploy.sh" />
-            <SafetyRow name="Incident intake 健康檢查" ok value="底層事件引擎 /api/ops/inbox/health" link="/api/ops/inbox/health" />
+            <SafetyRow name="Incident intake 健康檢查" value="底層事件引擎 /api/ops/inbox/health" link="/api/ops/inbox/health" />
           </Panel>
         </div>
 
