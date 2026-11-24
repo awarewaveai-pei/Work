@@ -1,4 +1,17 @@
 # Worklog
+## 2026-11-24（續8）— 平台第 9 批上線：K13、W5、M5（High，0180 已套用）；U14 未派
+
+- 操作者 2026-11-24「可以」＝ M5（migration 0180＋會員身分連結）的 go。U14 未派：`D:\Work` 的 next-admin `app/globals.css` 仍有主題 session 未提交改動（與 U13 同等）。
+- K13 `867ffc0fc`＋`f691cfa67`：新 `lib/client-context/__tests__/no-private-context.test.ts`（掃 `app/(shell)`、`app/(full)`、各 `door.page` 目錄、`components/`；`LEGACY` 6 檔只減不增：outreach `OrgSwitcher.tsx` L1、`ops/collect/page.tsx`＋`ops/integrations/page.tsx` L2、`BannerStudio.tsx`＋`BannerStudioStaff.tsx` L5、video `OrganizationPicker.tsx` L6；`BLOCK_USES` 3 檔留並寫理由）。工人回報 `TopicsBoard.tsx:189` 自讀 `?site=`（K8 遺留）→ 監工擴大本卡範圍當場修：`wantTopic` 只存題目 id（id 唯一，在目前網站清單找到即網站正確），從 `LEGACY` 拿掉。
+- W5 `40a78e243`：新 `scripts/local-member-flow.ps1`（本機 WordPress＋WooCommerce＋本 repo 外掛；app 端為只回固定 `wp-summary` JSON 並驗簽章的 node stub；持有／未開通／退場三情境各截圖判 PASS）。連跑兩次 exit 0；監工看過 `my-account-held.png`（單位、點數、產品列、「進入」皆畫出）。外掛畫面問題（按鈕字小、狀態字離產品名遠；本機佈景 Twenty Twenty-Five，非正式站佈景）記到 DISPATCH M6 補。`ClientRail.tsx`「共 N 個」多算 1：根因 `org-search/route.ts` 「全部」類別 `total` 已含內部組織，畫面又加 1；只在其他類別才加。
+- M5 `85673ba17`＋`40df0e36d`：migration `0180_member_invites`（待驗證會員邀請：單位、聯絡人 email、碼的 sha256、期限、建立者、用掉它的 identity；一單位一筆有效邀請；service_role 只有 select＋update(voided_at)）。`wp-customers.ts` `redeemMemberInvite`：事件帶 `inviteCode` 才走；email 已驗證、來源為 aware-wave.com、邀請未作廢／未過期／未被別人用、email 相同、單位仍是無會員的根客戶，全過才連到邀請指定的單位，不新建單位；沒帶碼＝原路徑不變（`adoptableClient` 未動）。客戶頁帳號區＋`accounts/route.ts`：發起、狀態（待驗證／已過期／已連上）、作廢重發；不寄信。
+- Codex 審查（`agency-os/reports/oracle/2026-11-24-partialreview-913609a4.md`，3 項）：① 併發兌換可讓兩人連到同一單位（檢查與兩次寫入分屬不同請求）→ 成立，退回：`member_invite_redeem`（security definer，同一交易 advisory lock 單位→再查→寫 identity→標記已用，冪等）；② 作廢重發非原子 → 成立，退回：`member_invite_issue` 同一交易；③ `lib/payments/woo-billing.ts:122` 未把碼傳入 → 照計畫留 M6（事件欄位由外掛端定），已寫 DISPATCH M6 補。未處理並記 M8：付款自動連結的舊路不拿同一把鎖。
+- 上線：主機鎖 `flock -n` 可取得（holder 檔是已結束的 safe-infra-patch 殘留，pid 不存在）→ `node scripts/apply-db-migration.mjs 0180`（`APPLY_OK`；psql：`member_invites` 0 列、3 個函式在、authenticated 無 select）→ `git push origin HEAD:main`（`f8c8b0468..40df0e36d`）→ CI 四項綠 → `sg-deploy.sh next-admin` exit 0（healthy 15s、smoke 5/5、`.deployed-commit`＝`40df0e36d`）→ curl：app／content／video `/login` 200、`/api/ops/clients/soulful/accounts` 未登入 401。
+- 未驗：客戶頁帳號區「aware-wave.com 會員」新畫面未在正式站實看（要操作者登入 app.aware-wave.com）；K12 確認窗、U11 版面、M3 類別同前。整合樹 `.next/types` 過期殘檔（指向 SF-P 已刪的 `/build`、`/onboard`）已移到 scratchpad 才讓 tsc 綠，不在 git。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin 整合樹 691 files / 5772 passed, 0 failed) ; node scripts/apply-db-migration.mjs 0180 ; ssh psql select count(*) from member_invites ; sg-deploy.sh next-admin ; curl login x3 + accounts 401 | exit=0 | ms=900000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI (codex exec -s read-only)，2 項已修、1 項依計畫留 M6
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=member_invite | hits=66
 ## 2026-11-24（續5）— oracle WP：SF-L 拋棄式網域全流程在正式主機跑完並拆除；實跑修掉四個本機測不到的問題
 
 - [根因] 建站流程（SF-C～SF-J）全部只對 docker／wp-cli 的 shim 測過，沒在真主機跑過（操作者 2026-11-24 同意待決 3）。實跑逐一撞到四個 shim 與真實環境不同之處：

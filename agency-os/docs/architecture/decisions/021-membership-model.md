@@ -38,7 +38,7 @@
 
 | # | 缺口 | 證據 |
 |---|---|---|
-| G1 | 代辦路徑不存在：連結只在付款事件建立；email 不符時會新建 `wp-member-<id>` 重複單位 | `wp-customers.ts:169,177-190` |
+| G1 | **app 端已做（M5，0180）；外掛端 M6 未做** 代辦路徑不存在：連結只在付款事件建立；email 不符時會新建 `wp-member-<id>` 重複單位 | `wp-customers.ts:169,177-190` |
 | G2 | 現有 active 客戶組織無會員連結（僅 2 個測試列，且與 WP id 對不上） | 現況報告 §3、§7 |
 | G3 | **部分已關（M2，0178，2026-11-23）：代操可記在 `organization_product_operations`**；仍缺：標籤函式與 `crm` 接頭設定不存在；WordPress 端沒有 TEST 角色（現有 7 個皆內建，`customer` 即「客戶」）；合約沒有「代操」「經銷」兩種方式的記法 | 現況報告 §8 |
 | G4 | 客戶自己授權他人：只有員工能邀請；產品層只有 social 有成員頁 | `NA/app/api/ops/clients/[slug]/accounts/route.ts:100`；`NA/app/(shell)/tools/social/Members.tsx` |
@@ -46,7 +46,7 @@
 | G6 | 訪客結帳開著，程式假設結帳必登入 | 現況報告「矛盾」第 4 項 |
 | G7 | 登入頁叫客戶去 aware-wave.com 註冊，但該處關著且無進入鈕 | 現況報告「矛盾」第 1 項 |
 | G8 | 四個開關關著（NA 密鑰空、`seller_sites` disabled、店外掛停用、WP 密鑰已刪） | 現況報告 §2 |
-| G9 | 「全部換成 local 設定跑整套測試」不存在 | 現況報告 §8 |
+| G9 | **已關（W5，`scripts/local-member-flow.ps1`）** 「全部換成 local 設定跑整套測試」不存在 | 現況報告 §8 |
 | G10 | 收銀台端刪除會員／改 email → app 沒有對應事件 | 現況報告 `:188` |
 | G11 | **已關（M11，2026-11-23）**。原：aware-wave.com 進門不看產品 `loginSources`；現 wp-handoff 與 wp-summary 都經 `opensTo` 查清單 | `NA/lib/auth/sources/awarewave-wp.ts` `opensTo` |
 | G12 | **已關（M1，0175，2026-11-22 已套用）**。原：測試單位沒有標記：`e2e-verify-0704-5c1356`、`test-wp-webhook-co-c705c6` 都是 `kind=customer`；`kind` 需加值 `test` | 正式庫 `organizations` SELECT 2026-11-22（`kind` 只有 `customer`／`internal`） |

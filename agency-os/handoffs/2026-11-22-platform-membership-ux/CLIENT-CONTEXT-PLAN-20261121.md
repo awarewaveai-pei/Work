@@ -111,7 +111,7 @@ NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`；VW = `lobste
 | F9 | **已關（K10）** R8「題目›客戶」刪除後：員工問題清單無處放（`/ops/clients` 落地頁空白）；入口客戶的各站數字五步驟已有 | `ops/clients/page.tsx:6-18`；`AutoContentOverview.tsx:64-117,130-176` |
 | F10 | 跨網域只能靠網址（1c）；主機只能在伺服器推導 | `hosts.ts:26-28`；`door-link.ts:12,30` |
 | F11 | 兩條客戶清單 API、權限門檻不同 | `org-search/route.ts:24`；`bootstrap/route.ts:19` |
-| F12 | R10 檢查器只管客戶清單，不管網站清單與私藏來源 | `client-picker-rule.test.ts:13-18` |
+| F12 | **已關（K13）** R10 檢查器只管客戶清單，不管網站清單與私藏來源 | `client-picker-rule.test.ts:13-18` |
 | F13 | 未來白牌網域＝主機本身綁一個客戶 | ADR 018 `:32` |
 | F14 | **已關（K7、K8）** 讀網址必須 reactive；題目頁 effect 只讀一次 | `TopicsBoard.tsx:196-203` |
 | F15 | 換客戶時保留其他參數 → 舊 `site` 留著＝不一致 | `OrgPicker.tsx:180-185` |
