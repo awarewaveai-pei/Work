@@ -12,13 +12,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { findAuthUserByEmail, inviteClientAccount, verifiedClientAccount } from "@/lib/accounts/client-invite";
 import { servedNextAdminProducts } from "@/lib/portal/doors";
 import { AWARE_WAVE_KEY_ID, siteIdentityProvider, type SellerSite } from "@/lib/payments/sites";
-import { findBillingAccount, linkIdentity, type Identity } from "./identities";
+import { claimMemberInvite, findBillingAccount, findMemberInviteByCode, inviteTarget, isInviteCode, linkIdentity, type Identity } from "./identities";
 import { isCustomerRoot } from "./subject";
 
 /** emailVerified: WordPress (the wp-bridge plugin) proved this member owns the address. WooCommerce does not, so the
- *  plugin must; an account is never made for an unproven address (critic 2026-10-25 second pass, M). */
+ *  plugin must; an account is never made for an unproven address (critic 2026-10-25 second pass, M).
+ *  inviteCode: the one-time code of a staff invite (0180) the member signed up through; absent = the event is the
+ *  member's own (every line of the path without it is unchanged). */
 export type MemberSite = Pick<SellerSite, "id" | "keyId" | "sellerOrganizationId">;
-export interface WpMember { site: MemberSite; wpUserId: number; email: string; displayName?: string | null; emailVerified: boolean }
+export interface WpMember { site: MemberSite; wpUserId: number; email: string; displayName?: string | null; emailVerified: boolean; inviteCode?: string }
 
 /** Refusals the sender must not retry unchanged (the member's email is already someone else's account, ...). */
 export class WpCustomerRefused extends Error {
@@ -144,10 +146,17 @@ export interface WpCustomerDeps {
   verified: typeof verifiedClientAccount;
   productKey: (db: SupabaseClient, planKey: string | undefined) => Promise<string>;
 }
+/** The staff-invite path's reads and writes (0180), apart so the path without a code keeps its own deps. */
+export interface MemberInviteDeps {
+  memberInvite: typeof findMemberInviteByCode;
+  inviteTarget: typeof inviteTarget;
+  claimInvite: typeof claimMemberInvite;
+}
 const DEFAULT_DEPS: WpCustomerDeps = {
   find: findBillingAccount, link: linkIdentity, existingOrganization: findWpOrganization, organization: ensureWpOrganization,
   emailOwner, adoptable: adoptableClient, invite: inviteClientAccount, verified: verifiedClientAccount, productKey: inviteProductKey,
 };
+const DEFAULT_INVITE_DEPS: MemberInviteDeps = { memberInvite: findMemberInviteByCode, inviteTarget, claimInvite: claimMemberInvite };
 
 async function linkOrRefuse(db: SupabaseClient, deps: WpCustomerDeps, identity: Identity, userId: string, organizationId: string): Promise<void> {
   try {
@@ -163,8 +172,9 @@ async function linkOrRefuse(db: SupabaseClient, deps: WpCustomerDeps, identity: 
  *  Throws WpCustomerRefused for a final refusal, any other error for an outage (the sender retries the same event).
  *  A repeated first payment re-sends the set-password mail (each link replaces the last): the retry's known cost. */
 export async function ensureWpCustomer(db: SupabaseClient, member: WpMember, planKey: string | undefined, create: boolean,
-  deps: WpCustomerDeps = DEFAULT_DEPS): Promise<{ organizationId: string; created: boolean }> {
+  deps: WpCustomerDeps = DEFAULT_DEPS, inviteDeps: MemberInviteDeps = DEFAULT_INVITE_DEPS): Promise<{ organizationId: string; created: boolean }> {
   const identity = identityOf(member.site, member.wpUserId);
+  if (member.inviteCode !== undefined) return redeemMemberInvite(db, member, identity, deps, inviteDeps);
   const known = await deps.find(db, identity);
   if (known) return { organizationId: known.organizationId, created: false };
   if (!create) throw new WpCustomerRefused("unknown_member");
@@ -207,4 +217,40 @@ export async function ensureWpCustomer(db: SupabaseClient, member: WpMember, pla
   if (invited.ok === false) console.warn(`[wp-customer] wp_user_id=${member.wpUserId} account made, mail failed: ${invited.error}`);
   await linkOrRefuse(db, deps, identity, invited.userId as string, org.id);
   return { organizationId: org.id, created: true };
+}
+
+/** A member who signed up through a staff invite (ADR 021 D4): linked to the account the invite names, never to one
+ *  found by email, and no organization is made. All of these must hold, else a refusal naming the first that failed:
+ *  the site proved the email (emailVerified), the site is aware-wave.com (invites are its memberships, D1), the code
+ *  names an invite staff did not void, the invite is not past expiry and nobody else used it, the email is the invited
+ *  one, and the account is still a root customer that no other member holds. Safe to repeat: a retried event finds its
+ *  own claim (claimMemberInvite) or its own identity row. `create` does not apply: the invite, not a payment, allows it. */
+async function redeemMemberInvite(db: SupabaseClient, member: WpMember, identity: Identity, deps: WpCustomerDeps,
+  invites: MemberInviteDeps): Promise<{ organizationId: string; created: boolean }> {
+  if (member.emailVerified !== true) throw new WpCustomerRefused("email_unverified");
+  if (member.site.keyId !== AWARE_WAVE_KEY_ID) throw new WpCustomerRefused("invite_wrong_site");
+  const code = member.inviteCode;
+  const inv = isInviteCode(code) ? await invites.memberInvite(db, code) : null;
+  if (!inv || inv.voidedAt) throw new WpCustomerRefused("invite_invalid");
+  const known = await deps.find(db, identity);
+  if (known) {
+    if (known.organizationId === inv.organizationId) return { organizationId: known.organizationId, created: false };
+    throw new WpCustomerRefused("invite_member_linked");
+  }
+  const mine = inv.usedSiteId === identity.siteId && inv.usedExternalId === identity.externalId;
+  if (inv.usedAt && !mine) throw new WpCustomerRefused("invite_used");
+  if (!inv.usedAt && Date.parse(inv.expiresAt) <= Date.now()) throw new WpCustomerRefused("invite_expired");
+  if (member.email.trim().toLowerCase() !== inv.email.toLowerCase()) throw new WpCustomerRefused("invite_email_mismatch");
+  const target = await invites.inviteTarget(db, inv.organizationId);
+  if (!target.customerRoot) throw new WpCustomerRefused("invite_not_customer");
+  if (target.linked) throw new WpCustomerRefused("invite_org_linked");
+  // The account first: a refusal here (the email is staff's or another account's) leaves the invite unused.
+  const made = await deps.verified(db, { orgId: inv.organizationId, email: inv.email });
+  if (made.ok === false && (made.status === 409 || made.status === 400)) throw new WpCustomerRefused(made.error);
+  if (made.ok === false) throw new Error(`wp customer account failed: ${made.error}`);
+  if (!(await invites.claimInvite(db, inv.id, { siteId: identity.siteId, externalId: identity.externalId }))) {
+    throw new WpCustomerRefused("invite_used");
+  }
+  await linkOrRefuse(db, deps, identity, made.userId, inv.organizationId);
+  return { organizationId: inv.organizationId, created: false };
 }

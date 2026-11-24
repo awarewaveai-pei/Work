@@ -148,6 +148,18 @@ describe("POST accounts", () => {
     expect(mail).not.toHaveBeenCalled();
   });
 
+  it("a client identity cannot start a member invite (ADR 021 D4): 403, nothing written", async () => {
+    const req = new Request("http://localhost/api/ops/clients/soulful/accounts", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-ops-user-kind": "client", "x-ops-claims-role": "admin" },
+      body: JSON.stringify({ action: "member_invite", email: "boss@soulful.tw" }),
+    });
+    const res = await POST(req, ctx());
+    expect(res.status).toBe(403);
+    expect(inserts).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
   it("creates the account unverified, mails a fragment link on the product door, never returns the token", async () => {
     const res = await POST(post({ "x-ops-claims-role": "admin" }), ctx());
     const text = await res.text();

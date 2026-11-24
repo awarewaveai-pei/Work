@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
-import { adoptableClient, ensureWpOrganization, findWpOrganization, wpOrgSlug, type EmailOwner } from "../wp-customers";
+import { adoptableClient, ensureWpCustomer, ensureWpOrganization, findWpOrganization, wpOrgSlug, type EmailOwner, type MemberInviteDeps, type WpCustomerDeps } from "../wp-customers";
 
 const AWC = { id: "site-awc", keyId: "aware-wave-com", sellerOrganizationId: "org-internal" };
 const SHOP = { id: "site-shop", keyId: "shop-b", sellerOrganizationId: "org-reseller" };
@@ -115,5 +115,65 @@ describe("an account a member may take over (decision 2026-10-30 §5)", () => {
     // a colleague in the same organization already linked a member: two members on one account is refused (L1)
     await expect(adoptableClient(idDb([], null, [{ organization_id: "org-inv" }]).db, INVITED)).resolves.toBeNull();
     expect(confirm).not.toHaveBeenCalled();
+  });
+});
+
+describe("a member who signed up through a staff invite (ADR 021 D4, 0180)", () => {
+  const CODE = "A".repeat(43);
+  const ORG_INV = "org-soulful";
+  const live = { id: "inv-1", organizationId: ORG_INV, email: "boss@soulful.tw", expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    createdAt: new Date().toISOString(), usedAt: null, usedSiteId: null, usedExternalId: null, voidedAt: null };
+  function deps(inv: Partial<typeof live> | null = {}) {
+    const linked: unknown[] = [];
+    const d: WpCustomerDeps = {
+      find: vi.fn(async () => null),
+      link: vi.fn(async (_db, input) => { linked.push(input); return { organizationId: input.organizationId, userId: input.userId, created: true }; }),
+      existingOrganization: vi.fn(async () => null),
+      organization: vi.fn(async () => ({ id: "org-new", name: "new" })),
+      emailOwner: vi.fn(async () => null),
+      adoptable: vi.fn(async () => null),
+      invite: vi.fn(async () => ({ ok: true as const, userId: "u-mail", kind: "invite" as const, created: true })),
+      verified: vi.fn(async () => ({ ok: true as const, userId: "u-boss", created: true })),
+      productKey: vi.fn(async () => "social"),
+    };
+    const i: MemberInviteDeps = {
+      memberInvite: vi.fn(async () => (inv === null ? null : { ...live, ...inv })),
+      inviteTarget: vi.fn(async () => ({ customerRoot: true, linked: false })),
+      claimInvite: vi.fn(async () => true),
+    };
+    return { d, i, linked };
+  }
+  const db = {} as SupabaseClient;
+  const invited = { ...MEMBER, email: "Boss@Soulful.tw", inviteCode: CODE };
+
+  it("email verified on aware-wave.com: one identity row on the invited account, no new organization", async () => {
+    const { d, i, linked } = deps();
+    await expect(ensureWpCustomer(db, invited, undefined, false, d, i)).resolves.toEqual({ organizationId: ORG_INV, created: false });
+    expect(linked).toEqual([{ provider: "awarewave-wp", siteId: "site-awc", externalId: "57", userId: "u-boss", organizationId: ORG_INV }]);
+    expect(d.verified).toHaveBeenCalledWith(db, { orgId: ORG_INV, email: "boss@soulful.tw" });
+    expect(i.claimInvite).toHaveBeenCalledWith(db, "inv-1", { siteId: "site-awc", externalId: "57" });
+    expect(d.organization).not.toHaveBeenCalled();
+    expect(d.emailOwner).not.toHaveBeenCalled();   // never found by email
+  });
+
+  it("refused, nothing linked: email not verified, expired, other email, used by someone else", async () => {
+    for (const [why, member, inv] of [
+      ["email_unverified", { ...invited, emailVerified: false }, {}],
+      ["invite_expired", invited, { expiresAt: new Date(Date.now() - 1000).toISOString() }],
+      ["invite_email_mismatch", { ...invited, email: "someone@else.tw" }, {}],
+      ["invite_used", invited, { usedAt: new Date().toISOString(), usedSiteId: "site-awc", usedExternalId: "99" }],
+    ] as const) {
+      const { d, i, linked } = deps(inv);
+      await expect(ensureWpCustomer(db, member, undefined, true, d, i), why).rejects.toMatchObject({ code: why });
+      expect(linked, why).toEqual([]);
+      expect(d.organization, why).not.toHaveBeenCalled();
+    }
+  });
+
+  it("no code: the path of today, the invite is never read", async () => {
+    const { d, i, linked } = deps();
+    await expect(ensureWpCustomer(db, MEMBER, undefined, true, d, i)).resolves.toEqual({ organizationId: "org-new", created: true });
+    expect(i.memberInvite).not.toHaveBeenCalled();
+    expect(linked).toEqual([{ provider: "awarewave-wp", siteId: "site-awc", externalId: "57", userId: "u-boss", organizationId: "org-new" }]);
   });
 });
