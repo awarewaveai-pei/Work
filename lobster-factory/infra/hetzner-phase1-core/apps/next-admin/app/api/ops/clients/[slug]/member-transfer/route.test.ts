@@ -10,6 +10,9 @@ const rpc = vi.hoisted(() => vi.fn(async (_fn: string, _args: Record<string, unk
 const audit = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => undefined));
 
 vi.mock("@/lib/ops-audit", () => ({ recordOpsAudit: audit }));
+// the cash-register host comes from aware-wave.com's seller_sites row, never from the code (a non-default host proves it)
+const siteByKey = vi.hoisted(() => vi.fn(async (_db: unknown, keyId: string) => (keyId === "aware-wave-com" ? { host: "shop.example.test" } : null)));
+vi.mock("@/lib/payments/sites", async (importOriginal) => ({ ...(await importOriginal<object>()), findSiteByKeyId: siteByKey }));
 vi.mock("@/lib/supabase-server", () => ({
   getSupabaseWriteClient: () => ({
     rpc,
@@ -63,5 +66,15 @@ describe("member-transfer route", () => {
     }));
     expect(audit).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(audit.mock.calls[0])).not.toContain(body.code);
+  });
+
+  it("the answer carries the landing link on the site row's host: https://<host>/?aw_invite=<code>", async () => {
+    const res = await POST(post("staff", "owner"), ctx());
+    const body = (await res.json()) as { code: string; url: string | null };
+    expect(body.url).toBe(`https://shop.example.test/?aw_invite=${body.code}`);
+    siteByKey.mockResolvedValueOnce(null);   // no site row: the code alone, never a guessed host
+    const bare = (await (await POST(post("staff", "owner"), ctx())).json()) as { code: string; url: string | null };
+    expect(bare.code).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(bare.url).toBeNull();
   });
 });

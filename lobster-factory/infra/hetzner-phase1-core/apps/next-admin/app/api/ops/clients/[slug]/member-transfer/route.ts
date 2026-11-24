@@ -1,7 +1,7 @@
 // GET/POST/DELETE /api/ops/clients/[slug]/member-transfer -- hand this account's aware-wave.com membership (= its manager,
 // ADR 021 D5) to another person (G5, migration 0182). Staff owner/admin only, as the accounts route next door.
 // GET    → { manager: { userId, email } | null, transfer: { email, reason, createdAt, expiresAt, status } | null }
-// POST   { email, reason } → a transfer invite (voids any live invite); its one-time code is in this answer only. The new
+// POST   { email, reason } → a transfer invite (voids any live invite); its one-time code and link are in this answer only. The new
 //        person proves the email on aware-wave.com with it; only then does the database swap the member (and audit it).
 //        Until then the current manager stays. Audited here without the code.
 // DELETE → voids the live transfer. Audited.
@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { clientOrg, staffAdmin, type ClientRouteCtx as Ctx } from "@/lib/accounts/client-route-guards";
 import { recordOpsAudit } from "@/lib/ops-audit";
+import { memberInviteLink } from "@/lib/accounts/member-invite-link";
 import { normalizeEmail } from "@/lib/accounts/client-invite";
 import { createMemberTransfer, memberTransferStatus, voidMemberInvite } from "@/lib/entitlements/identities";
 
@@ -51,14 +52,15 @@ export async function POST(request: Request, context: Ctx) {
   const org = await clientOrg(context);
   if (org instanceof Response) return org;
   try {
-    const out = await createMemberTransfer(getSupabaseWriteClient()!, {
+    const sb = getSupabaseWriteClient()!;
+    const out = await createMemberTransfer(sb, {
       organizationId: org.id, email, reason, createdBy: who.actorUserId ?? `${who.role}:${who.source}`, actorRole: who.role,
     });
     if (out.ok === false) return NextResponse.json({ ok: false, error: out.error }, { status: 409 });
     await recordOpsAudit(org.id, who.role, who.source, "member_transfer_created", {
       email, reason, expires_at: out.expiresAt, actor_user_id: who.actorUserId,
     });
-    return NextResponse.json({ ok: true, code: out.code, email, expiresAt: out.expiresAt });
+    return NextResponse.json({ ok: true, code: out.code, url: await memberInviteLink(sb, out.code), email, expiresAt: out.expiresAt });
   } catch (e) {
     console.error("[member-transfer] issue failed", { org: org.id, error: String(e) });
     return NextResponse.json({ ok: false, error: "member_transfer_failed" }, { status: 503 });

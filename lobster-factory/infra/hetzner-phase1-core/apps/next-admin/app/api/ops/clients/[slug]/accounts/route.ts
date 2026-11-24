@@ -8,13 +8,14 @@
 // DELETE  ?userId → removes an account of this client that holds no brand role (a mistyped email). Audited.
 // Member invite (ADR 021 D4, migration 0180): GET also answers `member` = { eligible, linked, invite } (null when it
 //         cannot be read, e.g. before 0180 is applied -- the accounts list still loads). POST { action:"member_invite",
-//         email } → a new invite (voids the live one = 作廢重發); its one-time code is in this answer only. DELETE
+//         email } → a new invite (voids the live one = 作廢重發); its one-time code (and its link) is in this answer only. DELETE
 //         ?memberInvite=1 → voids the live invite. Both audited without the code. No mail is sent (the landing page is M6).
 
 import { NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { clientOrg, staffAdmin, type ClientOrg as Org, type ClientRouteCtx as Ctx, type StaffAdmin } from "@/lib/accounts/client-route-guards";
 import { recordOpsAudit } from "@/lib/ops-audit";
+import { memberInviteLink } from "@/lib/accounts/member-invite-link";
 import { heldDoors } from "@/lib/portal/held-doors";
 import { listMembers } from "@/lib/social/store";
 import { ROLE_NAMES } from "@/app/(shell)/tools/social/model";
@@ -81,7 +82,8 @@ async function createInvite(who: StaffAdmin, org: Org, email: string) {
     await recordOpsAudit(org.id, who.role, who.source, "member_invite_created", {
       invite_id: out.invite.id, email, expires_at: out.invite.expiresAt, actor_user_id: who.actorUserId,
     });
-    return NextResponse.json({ ok: true, code: out.code, email, expiresAt: out.invite.expiresAt });
+    // url = the landing link on the cash-register site (null when its row cannot be read: the code still works)
+    return NextResponse.json({ ok: true, code: out.code, url: await memberInviteLink(sb, out.code), email, expiresAt: out.invite.expiresAt });
   } catch (e) {
     console.error("[accounts] member invite failed", { org: org.id, error: String(e) });
     return NextResponse.json({ ok: false, error: "member_invite_failed" }, { status: 503 });

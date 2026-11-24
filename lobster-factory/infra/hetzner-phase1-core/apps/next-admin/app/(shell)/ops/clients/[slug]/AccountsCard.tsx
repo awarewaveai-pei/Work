@@ -59,6 +59,9 @@ const M = {
   transfer_void_confirm: "作廢轉移給 {email}？對方手上的碼會失效，目前管理者不變。",
   transfer_voided: "轉移已作廢。",
   transfer_issued: "轉移碼（只顯示這一次，請交給新聯絡人）：",
+  link_label: "或直接把這個連結交給對方（開啟後在網站上驗證 email）：",
+  copy: "複製連結",
+  copied: "已複製",
 } as const;
 const MEMBER_ERRORS: Record<string, string> = {
   member_linked: "這個單位已連上會員，不能再發起。",
@@ -94,8 +97,10 @@ export function AccountsCard({ slug }: { slug: string }) {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [member, setMember] = useState<Member>(null);
   const [memberEmail, setMemberEmail] = useState("");
-  const [issued, setIssued] = useState<string | null>(null);
+  /** the one-time code and its landing link (null when the API could not build one) */
+  const [issued, setIssued] = useState<{ code: string; url: string | null } | null>(null);
   const [transfer, setTransfer] = useState<Transfer>(null);
+  const [copied, setCopied] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferEmail, setTransferEmail] = useState("");
   const [transferReason, setTransferReason] = useState("");
@@ -143,6 +148,16 @@ export function AccountsCard({ slug }: { slug: string }) {
     else setTransfer(null);
   }, [linked, loadTransfer]);
 
+  async function copyLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);   // the link stays selectable (userSelect all)
+    }
+  }
+
   async function startTransfer() {
     setBusy("transfer");
     setNotice(null);
@@ -153,11 +168,11 @@ export function AccountsCard({ slug }: { slug: string }) {
         headers: { "Content-Type": "application/json", ...roleHeader("admin") },
         body: JSON.stringify({ email: transferEmail.trim().toLowerCase(), reason: transferReason.trim() }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string; code?: string };
+      const data = (await res.json()) as { ok?: boolean; error?: string; code?: string; url?: string | null };
       if (!res.ok || !data.ok || !data.code) {
         setNotice({ tone: "error", text: (data.error && MEMBER_ERRORS[data.error]) || C.err_generic });
       } else {
-        setIssued(data.code);
+        setIssued({ code: data.code, url: data.url ?? null });
         setTransferOpen(false);
         setTransferEmail("");
         setTransferReason("");
@@ -244,11 +259,11 @@ export function AccountsCard({ slug }: { slug: string }) {
         headers: { "Content-Type": "application/json", ...roleHeader("admin") },
         body: JSON.stringify({ action: "member_invite", email: target }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string; code?: string };
+      const data = (await res.json()) as { ok?: boolean; error?: string; code?: string; url?: string | null };
       if (!res.ok || !data.ok || !data.code) {
         setNotice({ tone: "error", text: (data.error && MEMBER_ERRORS[data.error]) || C.err_generic });
       } else {
-        setIssued(data.code);
+        setIssued({ code: data.code, url: data.url ?? null });
         setMemberEmail("");
       }
     } catch {
@@ -284,6 +299,10 @@ export function AccountsCard({ slug }: { slug: string }) {
     background: disabled ? "var(--card-border)" : "var(--accent)", color: "var(--btn-primary-text)",
     opacity: disabled ? 0.7 : 1,
   });
+  const codeBox = {
+    display: "block", marginTop: 4, padding: "6px 10px", borderRadius: 6, wordBreak: "break-all", userSelect: "all",
+    border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)",
+  } as const;
   const smallBtn = {
     padding: "2px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer",
     border: "1px solid var(--card-border)", background: "transparent", color: "var(--text-secondary)",
@@ -457,14 +476,18 @@ export function AccountsCard({ slug }: { slug: string }) {
         {issued && (
           <div style={{ marginTop: 8 }}>
             {member?.linked ? M.transfer_issued : M.issued}
-            <code
-              style={{
-                display: "block", marginTop: 4, padding: "6px 10px", borderRadius: 6, wordBreak: "break-all", userSelect: "all",
-                border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)",
-              }}
-            >
-              {issued}
-            </code>
+            <code style={codeBox}>{issued.code}</code>
+            {issued.url && (
+              <div style={{ marginTop: 8 }}>
+                {M.link_label}
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                  <code style={{ ...codeBox, marginTop: 0, flex: 1, minWidth: 0 }}>{issued.url}</code>
+                  <button type="button" style={smallBtn} onClick={() => copyLink(issued.url!)}>
+                    {copied ? M.copied : M.copy}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
