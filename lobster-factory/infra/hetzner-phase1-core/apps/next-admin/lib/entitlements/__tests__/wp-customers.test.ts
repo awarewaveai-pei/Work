@@ -139,7 +139,7 @@ describe("a member who signed up through a staff invite (ADR 021 D4, 0180)", () 
     const i: MemberInviteDeps = {
       memberInvite: vi.fn(async () => (inv === null ? null : { ...live, ...inv })),
       inviteTarget: vi.fn(async () => ({ customerRoot: true, linked: false })),
-      claimInvite: vi.fn(async () => true),
+      redeem: vi.fn(async () => "ok"),
     };
     return { d, i, linked };
   }
@@ -149,9 +149,10 @@ describe("a member who signed up through a staff invite (ADR 021 D4, 0180)", () 
   it("email verified on aware-wave.com: one identity row on the invited account, no new organization", async () => {
     const { d, i, linked } = deps();
     await expect(ensureWpCustomer(db, invited, undefined, false, d, i)).resolves.toEqual({ organizationId: ORG_INV, created: false });
-    expect(linked).toEqual([{ provider: "awarewave-wp", siteId: "site-awc", externalId: "57", userId: "u-boss", organizationId: ORG_INV }]);
     expect(d.verified).toHaveBeenCalledWith(db, { orgId: ORG_INV, email: "boss@soulful.tw" });
-    expect(i.claimInvite).toHaveBeenCalledWith(db, "inv-1", { siteId: "site-awc", externalId: "57" });
+    // the identity row is written by 0180 member_invite_redeem (checked on a throwaway database), never by link
+    expect(i.redeem).toHaveBeenCalledWith(db, { provider: "awarewave-wp", siteId: "site-awc", externalId: "57", inviteId: "inv-1", userId: "u-boss", email: "Boss@Soulful.tw" });
+    expect(linked).toEqual([]);
     expect(d.organization).not.toHaveBeenCalled();
     expect(d.emailOwner).not.toHaveBeenCalled();   // never found by email
   });
@@ -165,6 +166,7 @@ describe("a member who signed up through a staff invite (ADR 021 D4, 0180)", () 
     ] as const) {
       const { d, i, linked } = deps(inv);
       await expect(ensureWpCustomer(db, member, undefined, true, d, i), why).rejects.toMatchObject({ code: why });
+      expect(i.redeem, why).not.toHaveBeenCalled();
       expect(linked, why).toEqual([]);
       expect(d.organization, why).not.toHaveBeenCalled();
     }

@@ -12,7 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { findAuthUserByEmail, inviteClientAccount, verifiedClientAccount } from "@/lib/accounts/client-invite";
 import { servedNextAdminProducts } from "@/lib/portal/doors";
 import { AWARE_WAVE_KEY_ID, siteIdentityProvider, type SellerSite } from "@/lib/payments/sites";
-import { claimMemberInvite, findBillingAccount, findMemberInviteByCode, inviteTarget, isInviteCode, linkIdentity, type Identity } from "./identities";
+import { findBillingAccount, findMemberInviteByCode, inviteTarget, isInviteCode, linkIdentity, redeemMemberInviteAtomic, type Identity } from "./identities";
 import { isCustomerRoot } from "./subject";
 
 /** emailVerified: WordPress (the wp-bridge plugin) proved this member owns the address. WooCommerce does not, so the
@@ -150,13 +150,13 @@ export interface WpCustomerDeps {
 export interface MemberInviteDeps {
   memberInvite: typeof findMemberInviteByCode;
   inviteTarget: typeof inviteTarget;
-  claimInvite: typeof claimMemberInvite;
+  redeem: typeof redeemMemberInviteAtomic;
 }
 const DEFAULT_DEPS: WpCustomerDeps = {
   find: findBillingAccount, link: linkIdentity, existingOrganization: findWpOrganization, organization: ensureWpOrganization,
   emailOwner, adoptable: adoptableClient, invite: inviteClientAccount, verified: verifiedClientAccount, productKey: inviteProductKey,
 };
-const DEFAULT_INVITE_DEPS: MemberInviteDeps = { memberInvite: findMemberInviteByCode, inviteTarget, claimInvite: claimMemberInvite };
+const DEFAULT_INVITE_DEPS: MemberInviteDeps = { memberInvite: findMemberInviteByCode, inviteTarget, redeem: redeemMemberInviteAtomic };
 
 async function linkOrRefuse(db: SupabaseClient, deps: WpCustomerDeps, identity: Identity, userId: string, organizationId: string): Promise<void> {
   try {
@@ -224,7 +224,7 @@ export async function ensureWpCustomer(db: SupabaseClient, member: WpMember, pla
  *  the site proved the email (emailVerified), the site is aware-wave.com (invites are its memberships, D1), the code
  *  names an invite staff did not void, the invite is not past expiry and nobody else used it, the email is the invited
  *  one, and the account is still a root customer that no other member holds. Safe to repeat: a retried event finds its
- *  own claim (claimMemberInvite) or its own identity row. `create` does not apply: the invite, not a payment, allows it. */
+ *  own identity row (0180 member_invite_redeem answers ok). `create` does not apply: the invite, not a payment, allows it. */
 async function redeemMemberInvite(db: SupabaseClient, member: WpMember, identity: Identity, deps: WpCustomerDeps,
   invites: MemberInviteDeps): Promise<{ organizationId: string; created: boolean }> {
   if (member.emailVerified !== true) throw new WpCustomerRefused("email_unverified");
@@ -248,9 +248,8 @@ async function redeemMemberInvite(db: SupabaseClient, member: WpMember, identity
   const made = await deps.verified(db, { orgId: inv.organizationId, email: inv.email });
   if (made.ok === false && (made.status === 409 || made.status === 400)) throw new WpCustomerRefused(made.error);
   if (made.ok === false) throw new Error(`wp customer account failed: ${made.error}`);
-  if (!(await invites.claimInvite(db, inv.id, { siteId: identity.siteId, externalId: identity.externalId }))) {
-    throw new WpCustomerRefused("invite_used");
-  }
-  await linkOrRefuse(db, deps, identity, made.userId, inv.organizationId);
+  // The checks above only spare a needless account; the decision is the database's, in one transaction.
+  const why = await invites.redeem(db, { ...identity, inviteId: inv.id, userId: made.userId, email: member.email });
+  if (why !== "ok") throw new WpCustomerRefused(why);
   return { organizationId: inv.organizationId, created: false };
 }

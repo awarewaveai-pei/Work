@@ -171,20 +171,20 @@ export async function voidMemberInvite(db: SupabaseClient, organizationId: strin
   return (data ?? []).length > 0;
 }
 
-/** A new invite for this account, voiding the live one (作廢重發). Returns the plain code: shown once, never stored.
- *  The caller checked inviteTarget; 0180's trigger refuses a non-customer account again. A second staff pressing at the
- *  same moment loses on the one-live-invite index: "invite_busy", press again. */
+/** A new invite for this account, voiding the live one (作廢重發) in the same transaction (0180 member_invite_issue): a
+ *  failed insert leaves the old code valid. Returns the plain code: shown once, never stored. The caller checked
+ *  inviteTarget; 0180's trigger refuses a non-customer account again. A unique clash: "invite_busy", press again. */
 export async function createMemberInvite(db: SupabaseClient, input: { organizationId: string; email: string; createdBy: string },
 ): Promise<{ ok: true; code: string; invite: MemberInvite } | { ok: false; error: "invite_busy" }> {
-  await voidMemberInvite(db, input.organizationId);
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const code = Buffer.from(bytes).toString("base64url");
   const expires = new Date(Date.now() + MEMBER_INVITE_DAYS * 86_400_000).toISOString();
-  const { data, error } = await db.from("member_invites")
-    .insert({ organization_id: input.organizationId, email: input.email, code_hash: await hashInviteCode(code), expires_at: expires, created_by: input.createdBy })
-    .select(INVITE_COLS).single();
+  const { data, error } = await db.rpc("member_invite_issue", {
+    p_organization_id: input.organizationId, p_email: input.email, p_code_hash: await hashInviteCode(code),
+    p_expires_at: expires, p_created_by: input.createdBy,
+  });
   if (error?.code === "23505") return { ok: false, error: "invite_busy" };
-  if (error || !data) throw new Error(`member invite insert failed: ${error?.message ?? "no row"}`);
+  if (error || !data) throw new Error(`member invite issue failed: ${error?.message ?? "no row"}`);
   return { ok: true, code, invite: invite(data as InviteRow) };
 }
 
@@ -195,17 +195,16 @@ export async function findMemberInviteByCode(db: SupabaseClient, code: string): 
   return data ? invite(data as InviteRow) : null;
 }
 
-/** Marks the invite used by this member. True also when this same member used it before (a retried event); false when
- *  someone else took it, staff voided it, or it expired in the meantime. */
-export async function claimMemberInvite(db: SupabaseClient, inviteId: string, by: { siteId: string; externalId: string }): Promise<boolean> {
-  const now = new Date().toISOString();
-  const { data, error } = await db.from("member_invites")
-    .update({ used_at: now, used_site_id: by.siteId, used_external_id: by.externalId })
-    .eq("id", inviteId).is("used_at", null).is("voided_at", null).gt("expires_at", now).select("id");
-  if (error) throw new Error(error.message);
-  if ((data ?? []).length > 0) return true;
-  const again = await db.from("member_invites").select("used_site_id, used_external_id").eq("id", inviteId).maybeSingle();
-  if (again.error) throw new Error(again.error.message);
-  const row = again.data as { used_site_id: string | null; used_external_id: string | null } | null;
-  return !!row && row.used_site_id === by.siteId && row.used_external_id === by.externalId;
+/** Links this member to the invite's account and marks the invite used, in one transaction under the account's lock
+ *  (0180 member_invite_redeem): every check is made again there, so two invites of one account never both link.
+ *  "ok" also for this member's retried event; else a refusal code (invite_used, invite_org_linked, ...). */
+export async function redeemMemberInviteAtomic(db: SupabaseClient, input: Identity & { inviteId: string; userId: string; email: string },
+): Promise<string> {
+  const { data, error } = await db.rpc("member_invite_redeem", {
+    p_invite_id: input.inviteId, p_provider: input.provider, p_site_id: input.siteId, p_external_id: input.externalId,
+    p_user_id: input.userId, p_email: input.email,
+  });
+  if (error) throw new Error(`member invite redeem failed: ${error.message}`);
+  if (typeof data !== "string" || !data) throw new Error("member invite redeem returned no reason");
+  return data;
 }

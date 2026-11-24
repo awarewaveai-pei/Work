@@ -12,6 +12,8 @@ begin
   end if;
 end $$;
 
+drop function if exists public.member_invite_redeem(uuid, text, uuid, text, uuid, text);
+drop function if exists public.member_invite_issue(uuid, text, text, timestamptz, text);
 drop table if exists public.member_invites;
 drop function if exists public.member_invites_account_check();
 
