@@ -101,26 +101,40 @@ python app.py
 
 **摘要階段預設不需要 API key**（人工回路模式）。想用 API 自動處理見下方「摘要階段二：API 自動處理」。
 
+## 會議工作區（2026-11-24）
+
+`http://127.0.0.1:8420/workspace`：一頁四個可停靠面板（字幕、回覆、講稿、查詢），可拖曳換位、拉分隔線、疊成分頁，
+版面存 `.workspace.json`。取代 OwnVoice Meet 的漂浮視窗與舊的查詢側欄（`lookup_panel.py` 已刪）。
+卡片、定案與進度：`docs/WORKSPACE_PAGE_CARDS.md`；移植來源與授權：`lib/live/NOTICE.md`（OwnVoice Meet，Apache-2.0）。
+
+| 功能 | 怎麼用 | 程式 |
+|---|---|---|
+| 即時字幕＋中文 | 字幕面板按「聆聽」。聲音來源「麥克風／電腦聲音」可同開。辨識二選一：「Gemini（計費）」說話中就有灰字，約 NT$17／小時；「本機（免費）」用這台的顯卡，講完一句才出字 | `lib/live/`、`WebSocket /api/live/ws` |
+| 閒置暫停 | Gemini 連線中靜音也計費：沒有新字幕 3 分鐘先斷線不計費，有聲音自動接回；30 分鐘自動結束。兩個數字在面板底列可改，0 = 不啟用 | `lib/live/idle.py` |
+| 查詢 | 頁面內反白 ≥ 2 個字 → 查詢面板自動搜尋網路；「問 AI（計費）」「心智圖」按了才呼叫 | `lib/lookup.py` |
+
+- 金鑰都在伺服器端：Gemini 讀環境變數 `GEMINI_API_KEY`；翻譯用設定頁的 Anthropic key（Claude Haiku），沒填就用同一把 Gemini key（Flash-Lite）。
+- 今日用量（NT$，依牌價估算）顯示在字幕面板右下，存 `.live-usage.json`。
+- 本機辨識與「會後整理」不同時用顯卡（`lib/gpu_gate.py`）：一邊在跑，另一邊會被告知要等；本機聆聽停止時會卸載模型。
+- 只收本機來的請求：`TrustedHostMiddleware`（Host 只認 127.0.0.1／localhost）＋ WebSocket 檢查 Origin。
+- 還沒做（見卡片）：回覆、講稿兩個面板的內容；存錄音與逐字稿；會議中摘要。**在存檔做好之前，這一頁的會議不會留下錄音**，
+  要「會後整理」或會議中心智圖的會議仍用 OwnVoice Meet 錄。
+- 沒有的：字幕不能浮在會議軟體上、沒有全域快捷鍵、別的程式裡反白的字要貼進查詢面板。
+- 未實測：真實麥克風與「電腦聲音」收音（開發時的測試瀏覽器沒有收音裝置）；Anthropic 翻譯對真實 API。
+
 ## OwnVoice Meet 整合（2026-11-23）
 
-OwnVoice Meet 管會議中（字幕、翻譯、回覆），本工具管查詢與會後。**不改 OwnVoice 的程式**：
-只讀它存下的會議資料夾（文件 › OwnVoice Meet › `YYYY-MM-DD HHMM`），格式只有 `lib/ownvoice.py` 知道。
+**不改 OwnVoice 的程式**：只讀它存下的會議資料夾（文件 › OwnVoice Meet › `YYYY-MM-DD HHMM`），格式只有 `lib/ownvoice.py` 知道。
 OwnVoice 設定的存檔模式要選「錄音與逐字稿」才有錄音可做會後整理。
 
 | 功能 | 怎麼用 | 程式 |
 |---|---|---|
-| 反白查詢 | 在 OwnVoice 字幕反白 → `Ctrl+Shift+F7` → 右側側欄自動搜尋網路；「問 AI」按了才問（計費，用設定頁的 key） | `lookup_panel.py`、`lib/lookup.py` |
 | 會後整理 | 首頁「OwnVoice 會議」卡 →「會後整理」：各段錄音接成一檔，走跟上傳相同的流程；語言跟 OwnVoice 設定 | `lib/ownvoice.py`、`POST /api/ownvoice/import` |
 | 心智圖 | 從**逐字稿**產生：會議中 `/mindmap?session=latest`（OwnVoice 目前為止的 transcript.md）；會後 `/mindmap?job=<id>`（diarized.txt，沒有就 merged.txt）。預設「複製 prompt → 貼回 AI 的 JSON」零費用；有 API key 可直接產生（計費）。結果存 `jobs/<id>/mindmap.json` 或 `jobs/ownvoice-mindmaps/` | `lib/mindmap.py`、`templates/mindmap.html` |
 
-- 側欄由 `start_server.ps1` 順便開（重複啟動自己擋）；只用標準函式庫，因為 SAC 會擋未簽章的執行檔與 .pyd。
-- 側欄貼在螢幕右邊整條高度，並用 `SHAppBarMessage` 向 Windows 登記佔用那一條（同工作列的機制），其他視窗最大化會讓開；「隱藏」把空間還回去，快捷鍵再叫出來（操作者 2026-11-23：不要飄浮視窗）。
-- 側欄開著時，OwnVoice 的視窗要放在側欄左邊：它記住的位置若壓到側欄那一條，開啟幾秒後會自己跳到別處（2026-11-23 實測 651,522 → -146,270；完全在左邊時不跳）。拖到左邊一次，它關閉時會記住新位置。
 - OwnVoice Meet.exe 沒有簽章，SAC 偶爾會暫時擋它（2026-11-23 10:45 擋、16:00 放行，檔案未變）；這不是本工具能處理的，等它放行。
-- 快捷鍵不可改成 `Ctrl+Shift+Space`／`F8`／`F9`：OwnVoice 自己佔用（2026-11-23 實測 F8 會讓它的滑鼠穿透鍵註冊失敗）。
-- 搜尋用環境變數 `SERPER_API_KEY`。搜尋與問 AI 都會把反白的文字送出這台電腦，所以只在按下時才送。
-  問 AI 另外會附上這場會議逐字稿的最後一段當上下文（只取 30 分鐘內還在更新的那一場）。
-- 取字是對前景視窗送 Ctrl+C：剪貼簿原本是文字會還原；原本是圖片或檔案會被蓋掉。
+- 搜尋用環境變數 `SERPER_API_KEY`。搜尋與問 AI 都會把反白的文字送出這台電腦。
+  問 AI 另外會附上這場會議逐字稿的最後一段當上下文（工作區這場的字幕；沒有才取 OwnVoice 30 分鐘內還在更新的那一場）。
 - 只在 Windows 原生模式可用；伺服器退到 WSL2 時讀不到 OwnVoice 的資料夾，首頁不顯示該卡。
 - 會議還在錄音時不能做會後整理（`lib/ownvoice.py` join_wavs 會拒絕），先在 OwnVoice 按停止。
 - 為什麼不改 OwnVoice：SAC 擋本機建出的未簽章執行檔（`cargo build` 在 build script 就 os error 4551）。

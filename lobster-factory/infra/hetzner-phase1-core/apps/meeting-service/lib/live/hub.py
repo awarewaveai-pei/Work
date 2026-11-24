@@ -98,6 +98,12 @@ class Hub:
             "usage": self.usage.today(),
         }
 
+    def transcript_tail(self) -> str:
+        """What has been said so far in this page's meeting (finished lines), for 問 AI's context."""
+        if self.session is None:
+            return ""
+        return "\n".join(f"{g.en}\n{g.zh}".strip() for g in self.session.segments if g.final)
+
     # ---- listening ----
 
     async def start(self, owner, stt: str, language: str, pause_min: float = PAUSE_MIN, end_min: float = END_MIN) -> None:

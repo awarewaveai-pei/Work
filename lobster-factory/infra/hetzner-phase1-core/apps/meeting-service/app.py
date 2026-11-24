@@ -240,7 +240,8 @@ def lookup_ask(body: dict = Body(...)):
     if not api_key:
         raise HTTPException(400, "問 AI 要先在 http://127.0.0.1:8420 的「API 設定」填入 Anthropic API key")
     try:
-        return lookup.ask(text, ownvoice.live_transcript(), api_key)
+        # 上下文：會議工作區這場的字幕；沒有的話才看 OwnVoice 正在寫的逐字稿。
+        return lookup.ask(text, LIVE.transcript_tail() or ownvoice.live_transcript(), api_key)
     except Exception as e:
         raise HTTPException(502, f"問 AI 失敗：{type(e).__name__}: {e}")
 

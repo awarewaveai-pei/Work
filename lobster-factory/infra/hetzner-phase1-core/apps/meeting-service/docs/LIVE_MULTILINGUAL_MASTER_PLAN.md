@@ -27,6 +27,7 @@
 - 最後 commit：—
 - 阻塞：WC-LM-02 需操作者提供音檔與校對稿
 - 下一步：WC-LM-00
+- 先行落地（2026-11-24，會議工作區，非本計畫的卡）：瀏覽器收音（AudioWorklet 16 kHz PCM16）、WebSocket `/api/live/ws`、即時字幕＋翻譯（Gemini Live 或本機 faster-whisper，`lib/live/`）、顯卡互斥 `lib/gpu_gate.py` 已做，見 `docs/WORKSPACE_PAGE_CARDS.md`。該頁推翻本計畫 D1（輪詢）、D6（不做即時翻譯）；P2 的 WC-LM-20／21／23／24 開工前先對照 `lib/live/`，不要重做。
 - 先行落地（2026-11-23，OwnVoice 整合，非本計畫的卡）：`language`（zh／en／auto）已接通 `upload()`→`run_pipeline_phase1()`→`transcribe()`，幻覺偵測語速改用音節單位。P1 相關卡開工時以這個現況為基線，hotwords／LANG_PROMPTS／評測仍未做。
 
 ## §1 現況發現（全部已讀檔驗證，`file:line`）

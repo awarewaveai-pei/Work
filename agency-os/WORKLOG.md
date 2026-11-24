@@ -216,6 +216,24 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=bridgeClientForSiteWithRegistered | hits=8
 - ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic＋突變＋監工全套測試代替
+## 2026-11-24（續7）— meeting-service 會議工作區 C7：刪舊查詢側欄，8420 換成新版（段 1 完成 7／11）
+
+- 決策：操作者 2026-11-24「不試了，做卡 7」——真實麥克風未實測即進行收尾。
+- 步驟（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）：
+  - 刪 `MS/lookup_panel.py`（296 行；Tk 側欄、`Ctrl+Shift+F7`、appbar 佔位）；`MS/start_server.ps1` 刪 `Start-LookupPanel` 函式與兩處呼叫
+  - `MS/app.py` `lookup_ask`：上下文優先用工作區這場的字幕（`Hub.transcript_tail()`），沒有才讀 OwnVoice 的逐字稿
+  - `MS/README.md` 新增「會議工作區」一節、OwnVoice 一節移除側欄相關五條；`MS/docs/LIVE_MULTILINGUAL_MASTER_PLAN.md` §0 加先行落地一行；`MS/docs/WORKSPACE_PAGE_CARDS.md` 進度 7／11 與偏離卡片原文之處；`agency-os/docs/operations/RUNNABLE_DEMOS.md` 加一列
+  - 8420：原本沒有行程在聽（側欄也沒在跑）；`start_server.ps1` 啟動新版
+- 驗證：
+  - `python -m pytest tests -q` → 78 passed；`start_server.ps1` 以 PowerShell Parser 解析 0 錯
+  - 8420：`/`、`/workspace`、`/static/vendor/dockview-core-8.9.1.min.js`、`/api/ownvoice/sessions` 皆 200；本機辨識對 8420 實跑一次（定稿 +1.5 s、中文 +2.3 s）；無 `lookup_panel` 行程
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell start_server.ps1; curl 8420 四個路徑; python feed.py en.wav local 8420 | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 刪除一支獨立程式＋文件；唯一邏輯改動是 `lookup_ask` 一行取上下文（`Hub.transcript_tail` 8 行），已讀回並實跑
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,.claude | grep=lookup_panel|Start-LookupPanel | hits=9
+- BUGHUNT_SCOPE_NARROW: 命中皆為歷史記錄（WORKLOG 舊條目、`agency-os/handoffs/2026-11-24-0918-ownvoice-workspace-page.md`、RUNNABLE_DEMOS 2026-11-23 列、WORKSPACE_PAGE_CARDS 卡片原文）；程式與啟動腳本 0 筆
+- ORACLE_WAIVED: 無新邏輯可審（刪除＋文件＋一行取上下文）；段 1 主體已由 critic Standard＋Quick 審過
+- 剩餘風險：真實麥克風／電腦聲音未實測；工作區的會議在 C10 之前不存錄音，要會後整理仍須用 OwnVoice 錄；OwnVoice 使用時已無反白查詢快捷鍵（改貼到工作區查詢面板）；2026-11-23 的 RUNNABLE_DEMOS 列（F7 側欄）已不可重現
+- rollback：`git revert` 本 commit 即還原 `lookup_panel.py` 與啟動腳本
 ## 2026-11-24（續6）— meeting-service 會議工作區 C6：閒置暫停計費（Gemini 安靜即斷線、有聲音接回、太久自動結束）
 
 - 根因：Gemini Live 連線中靜音也照秒計費；頁面放著聆聽會一直扣款（約 NT$17／小時）。

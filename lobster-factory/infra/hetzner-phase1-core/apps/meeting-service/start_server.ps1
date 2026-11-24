@@ -34,15 +34,6 @@ function Test-ServerListening {
     (Get-NetTCPConnection -LocalPort 8420 -State Listen -ErrorAction SilentlyContinue) -ne $null
 }
 
-# 會議中的查詢小面板（lookup_panel.py）：純標準函式庫、跑在 Windows 這側。
-# 它自己擋重複啟動（快捷鍵已被註冊就直接結束），所以每次都叫一次即可。
-function Start-LookupPanel {
-    $pythonw = Join-Path (Split-Path (Get-Command python).Source) "pythonw.exe"
-    if (Test-Path $pythonw) {
-        Start-Process -FilePath $pythonw -ArgumentList "lookup_panel.py" -WorkingDirectory $PSScriptRoot
-    }
-}
-
 function Start-OnWindows {
     $env:HF_TOKEN = [Environment]::GetEnvironmentVariable("HF_TOKEN", "User")
     $env:MEETING_DRIVE_BASE = [Environment]::GetEnvironmentVariable("MEETING_DRIVE_BASE", "User")
@@ -88,7 +79,6 @@ function Start-OnWsl2 {
 
 if (Test-ServerListening) {
     Write-Host "已經在跑了：http://127.0.0.1:8420" -ForegroundColor Green
-    Start-LookupPanel
     Start-Process "http://127.0.0.1:8420"
     exit
 }
@@ -135,7 +125,6 @@ for ($i = 0; $i -lt 30; $i++) {
 
 if ($ok) {
     Write-Host "啟動成功（$mode）-> http://127.0.0.1:8420" -ForegroundColor Green
-    Start-LookupPanel
     Start-Process "http://127.0.0.1:8420"
 } else {
     Write-Host "15 秒內沒有偵測到 8420 在監聽。查看 log：" -ForegroundColor Red
