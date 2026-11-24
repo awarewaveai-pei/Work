@@ -12,6 +12,7 @@ import YoutubePrivacyButtons from "./YoutubePrivacyButtons";
 import IntroStyleButtons from "./IntroStyleButtons";
 import RequiredBlocksField from "./RequiredBlocksField";
 import OptionButtons from "./OptionButtons";
+import ImageStyleButtons from "../ImageStyleButtons";
 
 const MKT_PRESETS: Record<string, string[]> = {
   audience: ["台灣 30-45 歲女性", "有焦慮/壓力的上班族", "正在尋找自我療癒的成人", "對心理健康有興趣的父母", "藝術愛好者（非專業）", "身心科/諮商後進階探索者"],
@@ -132,6 +133,8 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
               onChange={e => { setD(p => ({ ...p, targetCountry: e.target.value })); setSaved(false); }} />
           </label>
           <OptionButtons label="圖片模型" value={d.imageModel ?? ""} options={IMAGE_MODELS} onChange={v => { setD(p => ({ ...p, imageModel: v })); setSaved(false); }} />
+          {/* K10: the style of every article image (cover and body); an article can change it for itself only */}
+          <ImageStyleButtons label="文章配圖風格" value={d.imageStyle ?? ""} onChange={v => { setD(p => ({ ...p, imageStyle: v || undefined })); setSaved(false); }} />
 
           {/* Industry feeds (P9.4): read when the month is planned, this brand's prompt only */}
           <div>

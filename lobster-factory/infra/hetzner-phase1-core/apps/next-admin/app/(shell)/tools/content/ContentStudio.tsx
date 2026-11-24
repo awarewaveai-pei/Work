@@ -10,6 +10,9 @@ import { SeoCheckPanel } from "./SeoCheckPanel";
 import { CostChip } from "./CostChip";
 import { markdownPreview } from "@/lib/content/client-markdown";
 import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
+import { ARTICLE_COVER_RATIO, ARTICLE_IMAGE_RATIO, articleBodyImages, fillPlaceholder, imagePlaceholders, placeholderScene } from "@/lib/content/image/article-image";
+import { parseArticleCover, type ArticleCover } from "@/lib/content/article/meta";
+import ImageStyleButtons from "./ImageStyleButtons";
 import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
 import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
@@ -195,16 +198,13 @@ const AI_IMAGE_PROVIDERS: { value: string; label: string; seed: boolean; img2img
   { value: "flux-2-max",           label: "Flux.2 Max（旗艦畫質）",                seed: true,  img2img: false },
 ];
 
-// <optgroup> sections for the IMAGE STYLE picker, in catalog order (西方畫家 / 亞洲畫家 / 媒材 / 風格).
-const STYLE_GROUPS = [...new Set(STYLE_CATALOG.map(s => s.group))];
-
 // Media ratios = flux-schnell aspect_ratio enum values (these are sent through verbatim and actually
 // take effect; the old "1344x768"-style size strings were ignored by the model — every image came out
 // 1:1). 16:9 / 3:2 / 4:3 are the article-body friendly horizontals; 1:1 / 9:16 kept for social reuse.
 const IMAGE_SIZES = [
+  { value: "4:3",  label: "4:3（橫式 · 預設）" },
   { value: "16:9", label: "16:9（橫式 · Google Discover 最佳）" },
   { value: "3:2",  label: "3:2（橫式 · 攝影比例）" },
-  { value: "4:3",  label: "4:3（橫式 · 經典）" },
   { value: "1:1",  label: "1:1（方形）" },
   { value: "9:16", label: "9:16（直式）" },
 ];
@@ -251,7 +251,7 @@ interface MediaHub {
   aiImages: string;
   imageCount: number;
   imageSize: string;
-  imageStyle: string;     // STYLE_CATALOG `zh` key ("" = 不套用風格); resolved to its English .prompt at gen time
+  imageStyle: string;     // STYLE_CATALOG `zh` key ("" = 照片感, article-image.ts ARTICLE_DEFAULT_STYLE); resolved to its English .prompt at gen time
   imageSeed: string;      // numeric seed string ("" = 隨機); only honoured when the model supports seed
   imageRefData: string;   // single reference-image data: URL for img2img ("" = none); model-gated
   imageInstructions: string;
@@ -308,7 +308,7 @@ interface GenerateForm {
   patternCount: number;   // #6 — how many Kadence funnel patterns to weave in (0 = off)
 }
 
-interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; categories?: string[]; tags?: string[]; }
+interface MetaData { seoTitle: string; metaDesc: string; focusKeyword?: string; categories?: string[]; tags?: string[]; cover?: ArticleCover; }
 
 // #5 — shape returned by /api/content/market-analysis (mirrors its MarketAnalysis interface).
 interface MarketAnalysisResult {
@@ -358,6 +358,7 @@ function extractMeta(text: string): MetaData | null {
     focusKeyword: kwM?.[1]?.trim(),
     categories: splitCsv(catM?.[1]),
     tags: splitCsv(tagM?.[1]),
+    cover: parseArticleCover(text),
   };
 }
 
@@ -393,7 +394,7 @@ const DEFAULT_STRUCTURE: ArticleStructure = {
 };
 
 const DEFAULT_MEDIA: MediaHub = {
-  aiImages: "none", imageCount: 3, imageSize: "16:9",
+  aiImages: "none", imageCount: articleBodyImages("medium"), imageSize: ARTICLE_IMAGE_RATIO,
   imageStyle: "", imageSeed: "", imageRefData: "",
   imageInstructions: "", brandName: "",
   includeKeywordAlt: true, autoAltText: false,
@@ -1120,6 +1121,9 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       if (d.pointOfView   && prev.pointOfView   === DEFAULT_FORM.pointOfView)   next.pointOfView   = d.pointOfView;
       if (d.imageModel    && prev.media.aiImages === DEFAULT_MEDIA.aiImages)
         next.media = { ...prev.media, aiImages: d.imageModel };
+      // K10: the site's image style, for this article only (changing it here never writes the site back)
+      if (d.imageStyle    && prev.media.imageStyle === DEFAULT_MEDIA.imageStyle && STYLE_CATALOG.some(s => s.zh === d.imageStyle))
+        next.media = { ...next.media, imageStyle: d.imageStyle };
       if (d.brandVoiceInstructions && !prev.details.trim())
         next.details = d.brandVoiceInstructions;
       if (d.marketing) {
@@ -1385,7 +1389,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
         const myImgRun = imgRunRef.current;
         void autoReplaceImages(cleanMd, myImgRun);
         // Issue 四: also generate a dedicated hero/featured image (OG ratio) for the post thumbnail.
-        void generateHeroImage(meta?.seoTitle || form.title || form.keyword, myImgRun);
+        void generateHeroImage(meta?.cover?.scene || meta?.seoTitle || form.title || form.keyword, myImgRun);
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") setGenStatus("idle");
@@ -1629,7 +1633,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
   // ─── Auto-replace IMAGE_PLACEHOLDER_N with Replicate URLs ─────────────────
 
   async function autoReplaceImages(md: string, genRun: number) {
-    const placeholders = [...md.matchAll(/!\[([^\]]*)\]\(IMAGE_PLACEHOLDER_(\d+)\)/g)];
+    const placeholders = [...md.matchAll(imagePlaceholders())];
     if (!placeholders.length) return;
     setAutoImgN(placeholders.length);
     setImgGenWarn("");
@@ -1637,7 +1641,8 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     let lastErr = "";
     for (const m of placeholders) {
       if (genRun !== imgRunRef.current) break; // user re-generated, abort
-      const altText = m[1].trim() || form.keyword;
+      // K10: drawn from the placeholder's English scene; a draft without one (before K10) from its alt text
+      const scene = placeholderScene(m) || m[1].trim() || form.keyword;
       const n = m[2];
       try {
         const res = await fetchAwaitingCodex("/api/content/image", {
@@ -1645,12 +1650,12 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
           // form.media.imageSize is now a flux aspect_ratio (e.g. "16:9") — pass it so the chosen
           // ratio actually applies to body images (previously hardcoded twitter_post → ignored → 1:1).
           // mediaImageParams() adds the chosen model + style preset + seed + reference image (img2img).
-          body: JSON.stringify({ prompt: altText, platform: "twitter_post", aspectRatio: form.media.imageSize, ...mediaImageParams(), _jobId: jobIdRef.current }),
+          body: JSON.stringify({ prompt: scene, platform: "twitter_post", aspectRatio: form.media.imageSize, ...mediaImageParams(), purpose: "article", _jobId: jobIdRef.current }),
         });
         if (genRun !== imgRunRef.current) break;
         const json = await res.json() as { ok: boolean; imageUrl?: string; error?: string; cost_usd?: number; model?: string };
         if (json.ok && json.imageUrl) {
-          setGenerated(prev => prev.replace(`IMAGE_PLACEHOLDER_${n}`, () => json.imageUrl!));
+          setGenerated(prev => fillPlaceholder(prev, n, json.imageUrl!));
           if (json.cost_usd && json.model) addCostLine({ route: "content/image", model: json.model, vendor: "Image", usd: json.cost_usd, kind: "image" });
         } else {
           lastErr = (typeof json.error === "string" && json.error) || "圖片生成失敗";
@@ -1696,11 +1701,11 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     try {
       const res = await fetchAwaitingCodex("/api/content/image", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        // Hero/featured = 16:9 (Google Discover + OG preview both favour the wide ratio). Same model +
+        // Hero/featured (K10): the cover scene at 16:9 (the cover layout's picture area; a program constant). Same model +
         // style + seed + reference image as the body images so the hero matches the article's look.
         // titleText → Sharp SVG overlay (bottom gradient bar + white title text) baked into the WebP.
         body: JSON.stringify({
-          prompt, platform: "facebook_link", aspectRatio: "16:9", ...mediaImageParams(),
+          prompt, platform: "facebook_link", aspectRatio: ARTICLE_COVER_RATIO, ...mediaImageParams(), purpose: "article",
           titleText: metaData?.seoTitle || form.keyword || "",
           featuredImageFont: currentSite?.contentDefaults?.featuredImageFont ?? "sans",
           featuredImageTitlePosition: currentSite?.contentDefaults?.featuredImageTitlePosition ?? "bottom",
@@ -2457,6 +2462,12 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                       </div>
                     )}
                   </div>
+                  {/* K10: the cover's short title and subtitle (laid on the cover by K25); shown so they can be checked */}
+                  {(metaData.cover?.title || metaData.cover?.subtitle) && (
+                    <div className="form-hint" style={{ gridColumn: "1 / -1" }}>
+                      封面短標題：{metaData.cover?.title || "（沒有）"}　｜　封面副標：{metaData.cover?.subtitle || "（沒有）"}
+                    </div>
+                  )}
                 </div>
               )}
               <div className="form-hint" style={{ marginTop: "6px" }}>
@@ -2679,7 +2690,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
             <ChoiceRow label="語言" value={form.language} options={asOptions(LANGUAGES)} onPick={v => setF("language", v)} disabled={isGenerating} />
             <ChoiceRow label="目標地區" value={form.targetCountry} options={asOptions(COUNTRIES)} onPick={v => setF("targetCountry", v)} disabled={isGenerating} />
             <ChoiceRow label="文章類型" value={form.articleType} options={ARTICLE_TYPES} onPick={v => setF("articleType", v)} disabled={isGenerating} />
-            <ChoiceRow label="文章長度" value={form.articleSize} options={SIZES} onPick={v => setF("articleSize", v)} disabled={isGenerating} />
+            <ChoiceRow label="文章長度" value={form.articleSize} options={SIZES} onPick={v => { setF("articleSize", v); setMedia("imageCount", articleBodyImages(v)); }} disabled={isGenerating} />
             {AI_MODEL_GROUPS.map(g => (
               <ChoiceRow key={g} label={`AI 模型（${g}）`} value={form.model} options={AI_MODELS.filter(m => m.group === g)}
                 onPick={v => setF("model", v)} disabled={isGenerating} />
@@ -2998,7 +3009,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
           <SectionToggle label="媒體" open={showMedia} onToggle={() => setShowMedia(v => !v)}>
             <div style={{ background: "var(--build-risk-medium-bg)", border: "1px solid var(--yellow)", borderRadius: "6px", padding: "14px" }}>
               {/* Row 1: AI Images + count + size + style */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto 1fr", gap: "12px", marginBottom: "12px", alignItems: "end" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "12px", marginBottom: "12px", alignItems: "end" }}>
                 <div>
                   <label className="form-label">AI 圖片</label>
                   <select className="form-select" value={form.media.aiImages} disabled={isGenerating}
@@ -3014,29 +3025,13 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                     {[1,2,3,4,5].map(n => <option key={n}>{n}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="form-label">圖片尺寸</label>
-                  <select className="form-select" value={form.media.imageSize}
-                    disabled={isGenerating || form.media.aiImages === "none"}
-                    onChange={e => setMedia("imageSize", e.target.value)}>
-                    {IMAGE_SIZES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Image style / 風格預設</label>
-                  <select className="form-select" value={form.media.imageStyle}
-                    disabled={isGenerating || form.media.aiImages === "none"}
-                    onChange={e => setMedia("imageStyle", e.target.value)}>
-                    <option value="">None（不套用風格）</option>
-                    {STYLE_GROUPS.map(g => (
-                      <optgroup key={g} label={g}>
-                        {STYLE_CATALOG.filter(s => s.group === g).map(s => (
-                          <option key={s.zh} value={s.zh}>{s.zh}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
+              </div>
+              {/* K10: ratio (body images; the cover is always 16:9) and style (cover and body) as visible buttons, no dropdowns */}
+              <ChoiceRow label="內文圖片比例" value={form.media.imageSize} options={IMAGE_SIZES}
+                onPick={v => setMedia("imageSize", v)} disabled={isGenerating || form.media.aiImages === "none"} />
+              <div style={{ marginBottom: "12px" }}>
+                <ImageStyleButtons label="配圖風格（只改這篇）" value={form.media.imageStyle}
+                  onChange={v => setMedia("imageStyle", v)} disabled={isGenerating || form.media.aiImages === "none"} />
               </div>
 
               {/* Row 1b: Reference image (img2img / 以圖生圖) + Seed (固定風格 / 種子值) — model-gated */}
