@@ -1,7 +1,7 @@
 // K13 (ADR 020, plan CLIENT-CONTEXT-PLAN-20261121 F12): the current client/site comes only from the URL (`org`/`site`),
 // registered through useClientContext. A page that finds its own source -- reads org/site/slug/brand from searchParams,
 // stores one in localStorage, draws a site <select>, lists every site, or draws its own OrgPicker -- fails here.
-// Scope: every page directory a door or the staff host serves (STAFF_ROUTE_GROUPS + each door.page), api routes excluded.
+// Scope: components/ (pages import them) and every page directory a door or the staff host serves (STAFF_ROUTE_GROUPS + each door.page), api routes excluded.
 // LEGACY = files not moved yet (plan 4d, L1-L8): shrink only. The last test fails when an entry no longer violates.
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -34,11 +34,10 @@ const LEGACY: Readonly<Record<string, string>> = {
   "app/(shell)/tools/banner/BannerStudio.tsx": "L5 banner: reads ?org",
   "app/(shell)/tools/banner/BannerStudioStaff.tsx": "L5 banner: own OrgPicker",
   "app/(shell)/tools/video/OrganizationPicker.tsx": "L6 workbench pages: own OrgPicker over /api/video/workbench/bootstrap",
-  "app/(shell)/tools/content/topics/TopicsBoard.tsx": "K8 leftover: deep link re-reads ?site= beside the rail (line 189) -- take it from the hook, then delete this entry",
 };
 
 const scanDirs = (): string[] => {
-  const dirs = [...STAFF_ROUTE_GROUPS.map((g) => `app/${g}`), ...nextAdminProducts().map((p) => `app${p.door.page}`)];
+  const dirs = ["components", ...STAFF_ROUTE_GROUPS.map((g) => `app/${g}`), ...nextAdminProducts().map((p) => `app${p.door.page}`)];
   return [...new Set(dirs)].filter((d) => existsSync(path.join(ROOT, d)));   // a reserved door has no directory yet
 };
 const sourceFiles = (): string[] => scanDirs().flatMap((d) => sources(path.join(ROOT, d)).map(posix)).filter((f) => !f.startsWith("app/api/"));

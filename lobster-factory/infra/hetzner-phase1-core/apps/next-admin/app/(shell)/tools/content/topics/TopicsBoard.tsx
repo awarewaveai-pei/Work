@@ -181,14 +181,14 @@ export function TopicsBoard({ overview, scheduleFor, view = "topics" }: {
   const pubReq = useRef(0);
 
   // a link from the workbench's 自動排程 (?site=&month=&topic=): the rail takes ?site=, this page the month and the topic,
-  // which opens only on the site it was linked for
-  const wantTopic = useRef<{ site: string; topic: string } | null>(null);
+  // which opens only if the current site's list holds it (topic ids are unique)
+  const wantTopic = useRef<string | null>(null);
   const looking = useRef("");
   useEffect(() => {
     const q = new URLSearchParams(location.search);
-    const s = q.get("site"), m = q.get("month"), tp = q.get("topic");
+    const m = q.get("month"), tp = q.get("topic");
     if (m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m)) setMonth(m);
-    if (s && tp) wantTopic.current = { site: s, topic: tp };
+    if (tp) wantTopic.current = tp;
   }, []);
 
   const load = useCallback(async () => {
@@ -202,7 +202,7 @@ export function TopicsBoard({ overview, scheduleFor, view = "topics" }: {
     setTopics(j.topics ?? []);
     setYtPrivacy(j.youtubePrivacy ?? {});
     const want = wantTopic.current;
-    if (want?.site === siteId && j.topics?.some((x) => x.id === want.topic)) { setSelId(want.topic); wantTopic.current = null; }
+    if (want && j.topics?.some((x) => x.id === want)) { setSelId(want); wantTopic.current = null; }
     if (typeof j.dailyCap === "number") setDailyCap(j.dailyCap);
     setFolders(j.folders ?? []);
     setChecked(new Set());
