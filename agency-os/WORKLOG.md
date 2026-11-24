@@ -3,7 +3,7 @@
 
 - [根因] 第四批最後一張 SF-P（工人 `dc2a9c8d5`，線 4）已提交未驗收；E6、P4、SF-K、SF-J2、SF-I2 的未處置風險（2026-11-23 續11、續13）等它交回才能一起判。
 - [步驟] SF-P：監工讀完整 diff（新增與修改 1553 行；刪除的 5 檔只看清單）→ `D:/Worktrees/Work/oracle-int` cherry-pick 無衝突 = `e6aa5ff91` → push。看工人截圖兩張（部門選型、外部服務分頁）。grep 殘留：程式內 `href="/build"`／`href="/onboard"`／`04-onboard-page`／`OnboardWizard`／`BuildConsole` 0 筆（剩下都在歷史文件，SF-A 處理）；`/api/build/runs` 已無頁面或排程呼叫端（`lobster-factory/packages/workflows/src/trigger/dispatch-action-run.ts:159` 只是註解）。
-- [步驟] SF-K 清單外四處：`app/(shell)/ops/repairs/page.tsx:234` 寫死 `ok` 拿掉、`app/(shell)/ops/cs/page.tsx:58-63` 寫死打勾清單改成「在哪裡操作」一句 = `417e04dbc`；側欄舊入口已由 SF-P 移除；`ops/clients/ClientCard.tsx:65` 顯示的是實際 HTTP 狀態碼，不改。
+- [步驟] SF-K 清單外四處：`app/(shell)/ops/repairs/page.tsx:234` 寫死 `ok` 拿掉、`app/(shell)/ops/cs/page.tsx:58-63` 寫死打勾清單改成「在哪裡操作」一句 = `3fbbf1968`；側欄舊入口已由 SF-P 移除；`ops/clients/ClientCard.tsx:65` 顯示的是實際 HTTP 狀態碼，不改。
 - [步驟] 總檢 21 列寫進 `data.mjs`「第四批」表並重新發布監工台（Version 23）。判定依據（唯讀查正式庫，`timeout 60 ssh … docker exec -i supabase-db psql`）：`intake_forms` 9 筆（building 3／pending 1／spec_generated 5，皆測試資料）、`website_specs` 8 筆、8 個 organizations 的 `client_config.department_selection` 全空、`tenant_integration_bindings` 12 筆。
   - C1 SF-P 問卷後續四件（規格產內容、品牌色、綁回問卷、問卷狀態）：本階段不做；第一個真客戶走問卷時再開卡。
   - C2 SF-J2 migration 撞號：`refs/keep/sf-j2-0179` 的 `0179_environments_host_slug_unique` 與已套用的 `0179_entitlement_held_products` 同號；待決 7 點頭時改下一個空號再併入、套用（已寫進 `WP-PLAN.md` §0）。

@@ -8,7 +8,7 @@
 
 ## 0. 現況快照（2026-11-24；接手先讀這節，再讀 `data.mjs`）
 
-- 批 1–4 全部併入，四批 RISKS 總檢完成（`data.mjs` 四張表；第四批 21 列，2026-11-24）。批 4：E6、P4、SF-K、SF-J2 程式、SF-I2、SF-P（`e6aa5ff91`）；SF-K 清單外兩處假狀態由監工補修（`417e04dbc`）。SF-P 的問卷後續（規格產內容、品牌色、綁回問卷、問卷狀態）判定本階段不做：正式庫問卷 9 筆皆測試資料。
+- 批 1–4 全部併入，四批 RISKS 總檢完成（`data.mjs` 四張表；第四批 21 列，2026-11-24）。批 4：E6、P4、SF-K、SF-J2 程式、SF-I2、SF-P（`e6aa5ff91`）；SF-K 清單外兩處假狀態由監工補修（`3fbbf1968`）。SF-P 的問卷後續（規格產內容、品牌色、綁回問卷、問卷狀態）判定本階段不做：正式庫問卷 9 筆皆測試資料。
 - 下一步依序：① next-admin 下一次 03:00 自動部署後，打 `https://app.aware-wave.com/onboard` 與 `/build` 確認回 308 到 `/ops/sites/new`（SF-P 風險列）。② 監工自己：備份腳本單站 `.env` 錯誤改計 `SITE_ERRORS`、三支備份腳本上主機（SF-L 前置）。③ 批 5：SF-L → GO-1 → GO-2 → GO-3、SF-O、SF-A。
 - 等操作者點頭（`data.mjs` `OPEN`，到時一次問一件）：#3 SF-L、#4 GO-1、#5 GO-2、#6 GO-3、#7 套用 migration `0179_environments_host_slug_unique`（未併入，參照 `refs/keep/sf-j2-0179`；**編號已被平台線 `0179_entitlement_held_products` 用掉，併入前改成下一個空號**，檔名、down 檔與檔內註解一起改）、#8 建 `awarewaveai-pei/aware-wave-oracle` 公開 repo 並發佈外掛第一版。#1（0176）、#2（MainWP 金鑰）已完成。
 - 部署狀態：引擎線上仍是 2026-11-20 版，main 上所有引擎卡未部署（GO-1）；主機 `oracle-web` env `OPENAI_MODEL_DEEP=gpt-4o-2024-11-20` 要在 GO-1 移除；外掛 0.5.0 未安裝到任何網站；next-admin 每晚 03:00 自動部署，`site.*` 七個 catalog 開關全關、主機開關檔未設 `AW_SITE_VERBS=on`；`AW_SITE_GATEWAY_SLUGS` 未設（GO-2 前加 oracle 的 slug）。
