@@ -10,6 +10,9 @@
 //   its own reverts. Revert / orphaned events are read across every system (store.readCommitHistory).
 // - completion = verified / features not cancelled; no features = null (尚未盤點). Features of a phase that still
 //   lives on its old supervisor page (legacy_source_path, no migration event yet) are left out: that page is the source.
+// - a handoff from a commit whose handoff also landed on another system is skipped unless the commit named it (System:,
+//   payload.explicit): the old importer pasted one Next: on every path owner (spreadCommits). Its blocker_cleared
+//   still applies.
 // - refresh_request / system_proposed / system_proposal_closed (契約 3) are requests, not state: ignored.
 import { USER_REQUEST_TYPES, type FeatureStatus } from "./contract";
 
@@ -94,6 +97,13 @@ function featureStatusOf(e: UpdateRow): FeatureStatus | null {
   return raw;
 }
 
+/** Commits with a handoff on more than one system. projectSystem still keeps the ones System: named (payload.explicit). */
+export function spreadCommits(rows: ReadonlyArray<{ commit_sha: string; system_id: string }>): Set<string> {
+  const systems = new Map<string, Set<string>>();
+  for (const r of rows) systems.set(r.commit_sha, (systems.get(r.commit_sha) ?? new Set()).add(r.system_id));
+  return new Set([...systems].filter(([, ids]) => ids.size > 1).map(([sha]) => sha));
+}
+
 export function projectSystem(input: {
   phases: readonly PhaseRow[]; features: readonly FeatureRow[]; events: readonly UpdateRow[];
   /** revert and orphaned events of every system, not only this one's (store.readCommitHistory) */
@@ -101,6 +111,8 @@ export function projectSystem(input: {
   /** newest git commit of this system, from view system_last_commit (store.readProjectionInput lastCommitAt[system id]);
    *  not derived from `events`: the capped state read leaves trailer-less (activity) commits out. Absent = null. */
   lastCommitAt?: string | null;
+  /** commits whose handoff landed on several systems (store.readSpreadCommits); absent = none */
+  spreadCommits?: ReadonlySet<string>;
 }): SystemProjection {
   const events = chronological(liveEvents(input.events, input.history));
   let status: SystemStatus | null = null;
@@ -117,6 +129,9 @@ export function projectSystem(input: {
     if (e.event_type === "status_change") {
       if ((SYSTEM_STATUSES as readonly unknown[]).includes(e.payload.status)) status = e.payload.status as SystemStatus;
       if ((PRIORITIES as readonly unknown[]).includes(e.payload.priority)) priority = e.payload.priority as Priority;
+    } else if (e.event_type === "handoff" && e.commit_sha && input.spreadCommits?.has(e.commit_sha) && e.payload.explicit !== true) {
+      // pasted, not about this system -- but a pasted Blocker-Cleared still clears: a missed clear is a false red
+      if (e.payload.blocker_cleared === true) { handoff.blocker = null; handoff.blockerAt = e.occurred_at; }
     } else if (e.event_type === "handoff") {
       handoff.lastSubject = asStr(e.payload.subject) ?? handoff.lastSubject;
       handoff.lastAt = e.occurred_at;

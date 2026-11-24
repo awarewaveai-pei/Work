@@ -254,8 +254,100 @@
         "scripts/load-art-therapy-source-archive.mjs",
         "scripts/sync-cognitive-product-features.py"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "075bdfdc-053c-49c1-88c9-87350835a2dc",
+          "slug": "cos-methods",
+          "name": "方法與工作流",
+          "legacy_source_path": null
+        },
+        {
+          "id": "9cb7f481-89ee-435e-b50a-46c9a9552a97",
+          "slug": "cos-projects",
+          "name": "專案",
+          "legacy_source_path": null
+        },
+        {
+          "id": "61e64b93-4210-44d4-b3f9-93a48a164f73",
+          "slug": "cos-learning",
+          "name": "學習與群組",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "1c97bce1-c18d-4c3b-9428-cf3288573264",
+          "slug": "cos-method-library",
+          "name": "方法庫瀏覽",
+          "phase": "cos-methods"
+        },
+        {
+          "id": "804e8c4a-2b9c-49f5-a830-6bd856e3191f",
+          "slug": "cos-method-run",
+          "name": "套用方法並填寫執行",
+          "phase": "cos-methods"
+        },
+        {
+          "id": "1c4fe7ac-8c1b-405a-b6e8-333ea3f7b9b4",
+          "slug": "cos-workflow-list",
+          "name": "工作流清單",
+          "phase": "cos-methods"
+        },
+        {
+          "id": "520d698f-73ed-4f45-85ce-4e5584f4e74d",
+          "slug": "cos-project-create",
+          "name": "建立新專案",
+          "phase": "cos-projects"
+        },
+        {
+          "id": "1758a115-dc0d-4162-aa1f-1f9e894b7b8f",
+          "slug": "cos-project-workspace",
+          "name": "專案工作台（感知、思考、決策、驗證各步）",
+          "phase": "cos-projects"
+        },
+        {
+          "id": "db4ab7a6-fad3-4eb3-b1e5-3871efa8684c",
+          "slug": "cos-open-from-app",
+          "name": "從 app 一鍵開啟認知 OS",
+          "phase": "cos-projects"
+        },
+        {
+          "id": "b0692adf-d730-49da-ae14-95b08c685d45",
+          "slug": "cos-research-lines",
+          "name": "三條研究線做成專案工作流",
+          "phase": "cos-projects"
+        },
+        {
+          "id": "fbac1545-0a45-4880-a1b5-ad09efb80668",
+          "slug": "cos-report-approval-roles",
+          "name": "報告核准角色與來源搜尋規模",
+          "phase": "cos-projects"
+        },
+        {
+          "id": "64b07151-61d9-40ba-99f3-52f4010f7250",
+          "slug": "cos-page-render-gates",
+          "name": "各頁渲染閘與示意稿剩餘動作",
+          "phase": "cos-projects"
+        },
+        {
+          "id": "a87aac1e-747b-4ee7-b5d2-e63b158f3c20",
+          "slug": "cos-lessons",
+          "name": "課程學習",
+          "phase": "cos-learning"
+        },
+        {
+          "id": "c994a9f9-4080-4653-bcec-d067a910e188",
+          "slug": "cos-groups",
+          "name": "群組與帶領",
+          "phase": "cos-learning"
+        },
+        {
+          "id": "12bc011d-dfbd-4234-a3db-541d5ac4e0bb",
+          "slug": "cos-my-data",
+          "name": "我的資料匯出與管理",
+          "phase": "cos-learning"
+        }
+      ]
     },
     {
       "id": "b58f758a-d287-41ff-97ca-6d62d0042132",
@@ -279,8 +371,82 @@
         "agency-os/docs/CODEX_HANDOFF_HCI_SOP_GAP_CHECK_2026-08-31.md",
         "scripts/apply-hci-postgres-migration.mjs"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "bda58a3f-1739-4f50-a794-b86462dd8288",
+          "slug": "hci-cases",
+          "name": "個案與證據",
+          "legacy_source_path": null
+        },
+        {
+          "id": "9aba0a2a-b292-471c-888c-2f4bda57bf89",
+          "slug": "hci-sources",
+          "name": "來源情報與登入",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "e3a970d9-ca1f-4efb-a930-e06ec11d3825",
+          "slug": "hci-persons",
+          "name": "人物資料建立與查詢",
+          "phase": "hci-cases"
+        },
+        {
+          "id": "2fff464c-6d22-4740-b695-5b53a5ec457b",
+          "slug": "hci-case-create",
+          "name": "建立個案",
+          "phase": "hci-cases"
+        },
+        {
+          "id": "74d46055-4eec-40d0-854f-1ac05be2c8e6",
+          "slug": "hci-case-risk-tier",
+          "name": "個案重開與風險分級",
+          "phase": "hci-cases"
+        },
+        {
+          "id": "a7f51a0b-ee8c-4311-8478-d99e81499502",
+          "slug": "hci-evidence-records",
+          "name": "個案證據紀錄",
+          "phase": "hci-cases"
+        },
+        {
+          "id": "79dc953e-1c05-468c-8d26-ab1e96d38559",
+          "slug": "hci-decisions",
+          "name": "個案決策紀錄",
+          "phase": "hci-cases"
+        },
+        {
+          "id": "feeb38e8-5e07-4533-b9cf-e814e8d1a8f0",
+          "slug": "hci-reports",
+          "name": "個案報告產出",
+          "phase": "hci-cases"
+        },
+        {
+          "id": "60a03cbb-8067-4862-b07f-1db77ba82efc",
+          "slug": "hci-rule-auto-promote",
+          "name": "規則發現自動升級為證據",
+          "phase": "hci-cases"
+        },
+        {
+          "id": "bb420048-bcb0-4028-8ce6-ea2c1c0d06bf",
+          "slug": "hci-seed-review",
+          "name": "種子來源審核（採用／駁回）",
+          "phase": "hci-sources"
+        },
+        {
+          "id": "d72e05cd-fd65-4f89-b52b-22d85ae43519",
+          "slug": "hci-snapshot-charset",
+          "name": "快照保存抓取時的編碼資訊",
+          "phase": "hci-sources"
+        },
+        {
+          "id": "356a46c8-5791-4580-aebc-1b14433842c0",
+          "slug": "hci-real-login",
+          "name": "真實登入串接（C6）",
+          "phase": "hci-sources"
+        }
+      ]
     },
     {
       "id": "de418890-d3e4-450c-a05a-db5fbec6202d",
@@ -1000,8 +1166,70 @@
         "lobster-factory/packages/db/scripts/0119_tarot_batch_actor_down.sql",
         "lobster-factory/packages/db/scripts/0162_tarot_batch_deck_key_down.sql"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "b1ff1007-da10-4866-8fb8-e00eeeda8ed2",
+          "slug": "tarot-generation",
+          "name": "塔羅生圖",
+          "legacy_source_path": null
+        },
+        {
+          "id": "3c8b98e7-80b2-4697-84f1-ffd5aa2a26f1",
+          "slug": "tarot-commerce",
+          "name": "上架與販售",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "fa4d926f-23d3-4cde-8a71-774f5fa1ce38",
+          "slug": "tarot-studio-page",
+          "name": "塔羅工作台頁",
+          "phase": "tarot-generation"
+        },
+        {
+          "id": "89b1d2b3-1831-4099-b8db-26acbcb20800",
+          "slug": "tarot-customer-door",
+          "name": "客戶專屬塔羅網址",
+          "phase": "tarot-generation"
+        },
+        {
+          "id": "13d7f032-980e-4539-9500-a2283d12c8cc",
+          "slug": "tarot-single-card",
+          "name": "塔羅單張生圖",
+          "phase": "tarot-generation"
+        },
+        {
+          "id": "28579a0a-a136-451c-9e2d-25c20ee59bf0",
+          "slug": "tarot-prompt-suggest",
+          "name": "塔羅提示詞建議",
+          "phase": "tarot-generation"
+        },
+        {
+          "id": "653d50ab-88e9-4de7-9225-7de3279f1928",
+          "slug": "tarot-prompt-translate",
+          "name": "塔羅提示詞翻譯",
+          "phase": "tarot-generation"
+        },
+        {
+          "id": "91da247b-be26-456a-8ba7-39199c25dc1f",
+          "slug": "tarot-deck-batch",
+          "name": "整副牌批次生成",
+          "phase": "tarot-generation"
+        },
+        {
+          "id": "e7d62c55-126a-4593-aea5-ac152b06bd0f",
+          "slug": "tarot-works-gallery",
+          "name": "塔羅作品集",
+          "phase": "tarot-generation"
+        },
+        {
+          "id": "fe12c255-d82d-42de-9e02-a0a3354d272d",
+          "slug": "tarot-woo-roadmap",
+          "name": "塔羅到 WooCommerce 販售路線",
+          "phase": "tarot-commerce"
+        }
+      ]
     },
     {
       "id": "1a18adb8-4837-4187-8461-88eda6dc139b",
@@ -1038,8 +1266,94 @@
         "lobster-factory/packages/db/migrations/0093_pod_order_inbox.sql",
         "lobster-factory/packages/db/scripts/0093_pod_order_inbox_down.sql"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "7795f764-e49d-4b97-985b-d8f85cb8deab",
+          "slug": "studio-image",
+          "name": "生圖與修圖",
+          "legacy_source_path": null
+        },
+        {
+          "id": "926ab992-2f88-4f36-8a95-1989225e3a92",
+          "slug": "studio-pod",
+          "name": "POD 商品與訂單",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "9902e5e9-6834-4a0d-805d-7ab3a388deb5",
+          "slug": "studio-workbench",
+          "name": "商品設計工作台",
+          "phase": "studio-image"
+        },
+        {
+          "id": "000c406d-f18f-40f7-88bf-8e3247e40d4b",
+          "slug": "studio-generate",
+          "name": "AI 生成商品圖",
+          "phase": "studio-image"
+        },
+        {
+          "id": "f828f355-6db1-4ed3-857a-98979ef6d9a7",
+          "slug": "studio-remove-bg",
+          "name": "一鍵去背",
+          "phase": "studio-image"
+        },
+        {
+          "id": "ee2946df-01e3-4fe5-9ac4-1ab8236c4c5e",
+          "slug": "studio-inpaint",
+          "name": "局部重繪",
+          "phase": "studio-image"
+        },
+        {
+          "id": "de7bf492-4a26-44c7-a184-97976e3dc59b",
+          "slug": "studio-culture-ideas",
+          "name": "地區文化題材靈感",
+          "phase": "studio-image"
+        },
+        {
+          "id": "f1b4bb2a-abac-4b44-abaa-1aa554294cf5",
+          "slug": "studio-image-output",
+          "name": "圖片輸出處理（格式與尺寸）",
+          "phase": "studio-image"
+        },
+        {
+          "id": "91bc9f09-401c-4a09-a9b6-e44e41400a19",
+          "slug": "studio-works",
+          "name": "我的作品集",
+          "phase": "studio-image"
+        },
+        {
+          "id": "dcb1acec-68f5-4b6b-ad3b-8a364e2dc84d",
+          "slug": "studio-mockup",
+          "name": "商品樣機圖",
+          "phase": "studio-pod"
+        },
+        {
+          "id": "153ea9b7-8d9d-453e-a5ff-f1973b262e9c",
+          "slug": "studio-fabric-print",
+          "name": "布料印花檔",
+          "phase": "studio-pod"
+        },
+        {
+          "id": "66b81823-f90a-420a-ab05-840807ab21eb",
+          "slug": "studio-pod-order-inbox",
+          "name": "POD 訂單收件匣",
+          "phase": "studio-pod"
+        },
+        {
+          "id": "d0286f2f-03a2-4342-bf65-fee5680afc49",
+          "slug": "studio-pod-one-click-publish",
+          "name": "POD 設計圖一鍵自動上架",
+          "phase": "studio-pod"
+        },
+        {
+          "id": "753fc760-3563-4c03-9691-0dbcdb985afd",
+          "slug": "studio-woo-webhook-reconcile",
+          "name": "Woo 訂單通知對帳",
+          "phase": "studio-pod"
+        }
+      ]
     },
     {
       "id": "ed74d881-d8f6-4b77-8451-9d24169bdb46",
@@ -1392,8 +1706,82 @@
         "lobster-factory/packages/db/scripts/0107_cs_holding_reply_kinds_down.sql",
         "lobster-factory/packages/db/scripts/0108_cs_conversation_staff_replies_down.sql"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "895040b5-fa57-4425-831a-3ad91eb34a76",
+          "slug": "cs-replies",
+          "name": "AI 回覆與真人交接",
+          "legacy_source_path": null
+        },
+        {
+          "id": "d2ed62f6-f4a1-427d-97ef-61888ccf21b6",
+          "slug": "cs-knowledge",
+          "name": "知識庫",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "cbe0e5f8-726b-4203-8eba-6df2221d638b",
+          "slug": "cs-conversations-page",
+          "name": "客服對話頁",
+          "phase": "cs-replies"
+        },
+        {
+          "id": "38584b00-1304-4fc5-bf7d-f642dfef2e0d",
+          "slug": "cs-chatwoot-ai-reply",
+          "name": "Chatwoot 收訊與 AI 回覆",
+          "phase": "cs-replies"
+        },
+        {
+          "id": "d40b31fa-d7ad-4e06-bf76-cb6921eec443",
+          "slug": "cs-site-widget",
+          "name": "網站客服小視窗",
+          "phase": "cs-replies"
+        },
+        {
+          "id": "7a4ab614-9b33-48b2-83f3-60a6d3e5e4e5",
+          "slug": "cs-holding-sweep",
+          "name": "逾時與危機訊息暫時回覆",
+          "phase": "cs-replies"
+        },
+        {
+          "id": "d23bdecf-5863-433c-9836-589b84afeb67",
+          "slug": "cs-chatwoot-baseline",
+          "name": "Chatwoot 自動結案設定",
+          "phase": "cs-replies"
+        },
+        {
+          "id": "803de6a4-f09e-4ea5-9b6b-137ed981bea8",
+          "slug": "cs-crisis-live-test",
+          "name": "真人接手中的危機訊息上線實測",
+          "phase": "cs-replies"
+        },
+        {
+          "id": "7411ae18-c588-42f8-93da-95113eeb44cb",
+          "slug": "cs-full-auto",
+          "name": "全自動客服（剩 U6）",
+          "phase": "cs-replies"
+        },
+        {
+          "id": "62953bff-d136-4557-b703-3cba8d032fd9",
+          "slug": "cs-knowledge-page",
+          "name": "知識庫管理",
+          "phase": "cs-knowledge"
+        },
+        {
+          "id": "204e0963-4c2a-4499-915b-e18284d292fc",
+          "slug": "cs-reply-exam",
+          "name": "AI 回覆考試閘",
+          "phase": "cs-knowledge"
+        },
+        {
+          "id": "492320dd-be48-4bfa-83ef-35b4fb36dc08",
+          "slug": "cs-exam-expiry",
+          "name": "知識庫變動後自動重考",
+          "phase": "cs-knowledge"
+        }
+      ]
     },
     {
       "id": "6ee8a514-ea66-4319-a59f-2c3bb1403866",
@@ -1432,8 +1820,76 @@
         "lobster-factory/packages/db/scripts/0095_collect_claimreview_mirror-local-verify.sql",
         "lobster-factory/packages/db/scripts/0095_collect_claimreview_mirror_down.sql"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "f5d14e66-0f79-4aa6-8155-5181932ebad4",
+          "slug": "collect-runs",
+          "name": "蒐集執行",
+          "legacy_source_path": null
+        },
+        {
+          "id": "932d1b95-acb6-47ee-b179-18ad6805839e",
+          "slug": "collect-quality",
+          "name": "品質與來源",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "e698783c-b757-4c7e-9c04-a81ee617e75b",
+          "slug": "collect-page",
+          "name": "資料蒐集管理頁",
+          "phase": "collect-runs"
+        },
+        {
+          "id": "be58c437-000d-4361-9fb1-6ff7cdea3fb7",
+          "slug": "collect-run-execute",
+          "name": "執行一輪蒐集",
+          "phase": "collect-runs"
+        },
+        {
+          "id": "58b32974-9904-4004-b764-09c76c01d299",
+          "slug": "collect-run-progress",
+          "name": "蒐集進度回報",
+          "phase": "collect-runs"
+        },
+        {
+          "id": "fbd55f3b-ff21-439f-9dc7-6405dc365812",
+          "slug": "collect-lookups",
+          "name": "來源查詢",
+          "phase": "collect-runs"
+        },
+        {
+          "id": "2a81a4a1-9812-4d50-889e-581d78e3a6ef",
+          "slug": "collect-renderer",
+          "name": "真瀏覽器網頁渲染",
+          "phase": "collect-runs"
+        },
+        {
+          "id": "001ac5b0-d2d1-4d6f-9aa3-a491515d59de",
+          "slug": "collect-research-bridges",
+          "name": "研究資料橋接",
+          "phase": "collect-runs"
+        },
+        {
+          "id": "1b3e339e-d492-47c4-a34f-58a50a3d4891",
+          "slug": "collect-provenance-stamp",
+          "name": "來源證據戳記",
+          "phase": "collect-quality"
+        },
+        {
+          "id": "b345e678-a57b-441a-b5e6-6c84455345d2",
+          "slug": "collect-density-veto",
+          "name": "文字密度否決規則",
+          "phase": "collect-quality"
+        },
+        {
+          "id": "69251fc8-0646-493c-ae12-4e2bf6a59004",
+          "slug": "collect-provenance-to-kb",
+          "name": "來源與作者帶進知識庫",
+          "phase": "collect-quality"
+        }
+      ]
     },
     {
       "id": "b18eed87-8ec8-4bac-9b19-0050f55cae17",
@@ -2297,7 +2753,9 @@
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/NavRail.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/PlatformFrame.tsx",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/client-context/",
-        "agency-os/handoffs/2026-11-22-platform-membership-ux/"
+        "agency-os/handoffs/2026-11-22-platform-membership-ux/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/LoginSucceeded.tsx",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/analytics-group.ts"
       ],
       "phases": [
         {
@@ -2812,8 +3270,94 @@
         "lobster-factory/packages/db/migrations/0077_organization_hierarchy.sql",
         "lobster-factory/packages/db/migrations/0078_validate_organization_hierarchy_checks.sql"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "b19811e1-11d6-45b4-88fe-d44ea337ba2f",
+          "slug": "ops-clients",
+          "name": "客戶與組織",
+          "legacy_source_path": null
+        },
+        {
+          "id": "c478a03c-b778-400e-8714-cf5b0b1f899a",
+          "slug": "ops-admin",
+          "name": "後台管理",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "a7e95c2b-918b-4a50-8350-db4d07549387",
+          "slug": "ops-client-list",
+          "name": "客戶列表",
+          "phase": "ops-clients"
+        },
+        {
+          "id": "ceef9b71-54d9-44d4-ac74-07967e84004f",
+          "slug": "ops-client-detail",
+          "name": "單一客戶頁",
+          "phase": "ops-clients"
+        },
+        {
+          "id": "80fbe7b3-af51-4c59-a3ee-0bcdf0895383",
+          "slug": "ops-client-credentials",
+          "name": "客戶帳密保管",
+          "phase": "ops-clients"
+        },
+        {
+          "id": "57325d19-6595-4158-a0c3-790575449b75",
+          "slug": "ops-org-search",
+          "name": "組織搜尋",
+          "phase": "ops-clients"
+        },
+        {
+          "id": "76bcb9f7-e395-49ca-93cf-dc722fdf0e87",
+          "slug": "ops-inbox",
+          "name": "營運收件匣",
+          "phase": "ops-admin"
+        },
+        {
+          "id": "17d59c53-569a-4e92-bcce-bbbde9e2deed",
+          "slug": "ops-approvals",
+          "name": "待審批事項",
+          "phase": "ops-admin"
+        },
+        {
+          "id": "d1dbfe6d-bc88-4694-a207-b00e982f970b",
+          "slug": "ops-costs",
+          "name": "成本與廠商帳單",
+          "phase": "ops-admin"
+        },
+        {
+          "id": "8fcacbdf-ef87-4d7a-929f-7d1e9925eaf7",
+          "slug": "ops-integrations",
+          "name": "整合設定",
+          "phase": "ops-admin"
+        },
+        {
+          "id": "62db9f0f-f6ea-4389-a652-9b826b13545c",
+          "slug": "ops-system-modes",
+          "name": "系統模式開關",
+          "phase": "ops-admin"
+        },
+        {
+          "id": "5f6a3193-7426-41db-a116-b954bee18fa4",
+          "slug": "ops-ai-models",
+          "name": "AI 模型清單",
+          "phase": "ops-admin"
+        },
+        {
+          "id": "bdf87e53-60e6-4e95-90b8-822bb384146a",
+          "slug": "ops-tool-catalog",
+          "name": "工具目錄",
+          "phase": "ops-admin"
+        },
+        {
+          "id": "ad7bb2a1-7926-41bc-8e9e-dab378ab3b01",
+          "slug": "ops-ia-consolidation",
+          "name": "建站與上線頁面重整",
+          "phase": "ops-admin"
+        }
+      ]
     },
     {
       "id": "fd587109-7d12-4981-a91f-f3a58d0b135a",
@@ -2873,8 +3417,82 @@
         "lobster-factory/packages/db/scripts/0058_ops_incidents_parent_incident_down.sql",
         "lobster-factory/packages/db/scripts/0091_site_watch_down.sql"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "be4a24e1-b471-4540-8021-1fbe7679cb59",
+          "slug": "repair-detect",
+          "name": "偵測與告警",
+          "legacy_source_path": null
+        },
+        {
+          "id": "72421596-1318-4702-a623-81550d73bafb",
+          "slug": "repair-act",
+          "name": "修復與指令",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "9d41c289-a49b-4f22-bb77-81cbc7e04716",
+          "slug": "repair-alert-webhooks",
+          "name": "接收監控告警（Sentry 等）",
+          "phase": "repair-detect"
+        },
+        {
+          "id": "cca667fc-5a50-4a67-a7d7-8a29288952ba",
+          "slug": "repair-health-probes",
+          "name": "服務健康探針",
+          "phase": "repair-detect"
+        },
+        {
+          "id": "9170d660-3778-4d58-9f72-cc44cc8647be",
+          "slug": "repair-site-watch",
+          "name": "網站巡檢",
+          "phase": "repair-detect"
+        },
+        {
+          "id": "9d3673f0-68b4-4c0e-b958-25fae20f56a5",
+          "slug": "repair-endpoint-alert",
+          "name": "本機端點告警",
+          "phase": "repair-detect"
+        },
+        {
+          "id": "817ecb2b-e984-4b48-b54a-639d1cebdc48",
+          "slug": "repair-drift-alert",
+          "name": "部署漂移告警",
+          "phase": "repair-detect"
+        },
+        {
+          "id": "2b268d85-ab9c-436a-a35f-9e0db9b2efe7",
+          "slug": "repair-incidents-page",
+          "name": "事故與修復紀錄頁",
+          "phase": "repair-act"
+        },
+        {
+          "id": "72cdf2d2-828d-4e36-8511-35109a72e05d",
+          "slug": "repair-auto-remediate",
+          "name": "自動修復（重啟不健康容器）",
+          "phase": "repair-act"
+        },
+        {
+          "id": "e9100d51-5c00-4fa5-a441-4358202fb270",
+          "slug": "repair-telegram-commands",
+          "name": "Telegram 指令台",
+          "phase": "repair-act"
+        },
+        {
+          "id": "07b811d1-92ba-4831-875e-e1160effa5e8",
+          "slug": "repair-slack-commands",
+          "name": "Slack 指令",
+          "phase": "repair-act"
+        },
+        {
+          "id": "c8d5099a-d0f4-4bdc-aded-5200a923650f",
+          "slug": "repair-signed-sources",
+          "name": "告警來源簽章與事故指紋 v2",
+          "phase": "repair-detect"
+        }
+      ]
     },
     {
       "id": "3b1a4748-9ff6-4180-b1bb-0b04292c1215",
@@ -2913,10 +3531,97 @@
         "lobster-factory/docs/ONE_CLICK_BUILD_SOP.md",
         "lobster-factory/docs/WORDPRESS_FACTORY_EXECUTION_SPEC.md",
         "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/site-flow/",
-        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/site-flow/"
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/site-flow/",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/sites/"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "2a44050a-9930-44e5-8d62-db5227486b8c",
+          "slug": "prov-intake",
+          "name": "客戶上線",
+          "legacy_source_path": null
+        },
+        {
+          "id": "a023daa1-a78b-42ec-a354-ac54f7aa4ba0",
+          "slug": "prov-build",
+          "name": "建站與開機",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "4fcd9a59-89ff-4e79-b29d-4b49b3a45048",
+          "slug": "prov-intake-form",
+          "name": "新客戶需求表",
+          "phase": "prov-intake"
+        },
+        {
+          "id": "9b91242e-799d-4d2b-92ab-446ae6cf74b4",
+          "slug": "prov-quote",
+          "name": "自動報價",
+          "phase": "prov-intake"
+        },
+        {
+          "id": "6c0de365-fc36-4719-97c2-2a320165c7d3",
+          "slug": "prov-onboarding-page",
+          "name": "新客戶上線頁",
+          "phase": "prov-intake"
+        },
+        {
+          "id": "43491e55-150a-45d9-a026-40d56cfa4777",
+          "slug": "prov-trigger-build",
+          "name": "觸發建站",
+          "phase": "prov-build"
+        },
+        {
+          "id": "1b26b56f-3e03-48a5-9b65-e691936c969e",
+          "slug": "prov-new-site-form",
+          "name": "新增網站表單",
+          "phase": "prov-build"
+        },
+        {
+          "id": "b021f201-e47e-4044-aa8e-cc7b6819c237",
+          "slug": "prov-site-flow",
+          "name": "建站流程逐步頁",
+          "phase": "prov-build"
+        },
+        {
+          "id": "2e6100e6-ce28-4adb-9118-a3b7fb343675",
+          "slug": "prov-staging-site",
+          "name": "開測試站",
+          "phase": "prov-build"
+        },
+        {
+          "id": "74f26bb1-d697-4cc0-861a-8faaab01c3f8",
+          "slug": "prov-rent-server",
+          "name": "一鍵租主機",
+          "phase": "prov-build"
+        },
+        {
+          "id": "17d919a5-60d5-4dee-a3e3-8c6880498f12",
+          "slug": "prov-master-plan",
+          "name": "一鍵架站總藍圖",
+          "phase": "prov-build"
+        },
+        {
+          "id": "6a524f90-858a-4c61-bd5b-b40a2ad76b2f",
+          "slug": "prov-embed-rent-button",
+          "name": "一鍵租機接進建站按鈕",
+          "phase": "prov-build"
+        },
+        {
+          "id": "af828e06-e311-4b69-bd10-09e5832484fe",
+          "slug": "prov-client-host-stack",
+          "name": "客戶主機開機後全棧部署",
+          "phase": "prov-build"
+        },
+        {
+          "id": "46965963-c11d-40a2-81aa-82e45617030a",
+          "slug": "prov-dispatcher-followup",
+          "name": "佈建派工器上線前補強",
+          "phase": "prov-build"
+        }
+      ]
     },
     {
       "id": "e4f31e66-d044-4161-8b71-7060f2cc11c0",
@@ -2964,8 +3669,94 @@
         "lobster-factory/packages/db/scripts/0057_seed_wp_maintenance_action_down.sql",
         "lobster-factory/packages/db/scripts/0061_wp_sites_add_org_down.sql"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "633041ce-6261-4626-b9d8-9bf1eeaad398",
+          "slug": "wp-bridge",
+          "name": "橋接外掛",
+          "legacy_source_path": null
+        },
+        {
+          "id": "3b93eb36-2e36-4626-ada0-9f9e51550b1a",
+          "slug": "wp-maintenance",
+          "name": "站點維護",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "1a9155ae-1a8a-4c80-9fc4-aeffbc714c98",
+          "slug": "wp-bridge-signature",
+          "name": "簽章驗證的遠端呼叫",
+          "phase": "wp-bridge"
+        },
+        {
+          "id": "5e356c9e-3907-40c0-9ff0-587e4a564046",
+          "slug": "wp-bridge-posts",
+          "name": "遠端發文與草稿",
+          "phase": "wp-bridge"
+        },
+        {
+          "id": "4e927717-85d1-444b-91fa-4187ceb39181",
+          "slug": "wp-bridge-products",
+          "name": "WooCommerce 建商品",
+          "phase": "wp-bridge"
+        },
+        {
+          "id": "e119db85-777b-4ccb-bd67-e8971601836c",
+          "slug": "wp-bridge-fluentcrm",
+          "name": "FluentCRM 聯絡人與電子報",
+          "phase": "wp-bridge"
+        },
+        {
+          "id": "7ad83a99-3fd1-4ed5-8669-d9b0091d119a",
+          "slug": "wp-bridge-color-swatches",
+          "name": "商品色票",
+          "phase": "wp-bridge"
+        },
+        {
+          "id": "afabe0fb-4786-4137-a188-1580f1978e69",
+          "slug": "wp-bridge-release",
+          "name": "外掛發版流程",
+          "phase": "wp-bridge"
+        },
+        {
+          "id": "85cebfc7-b520-4f65-a566-ca086f569569",
+          "slug": "wp-bridge-product-dry-run",
+          "name": "建商品試跑模式",
+          "phase": "wp-bridge"
+        },
+        {
+          "id": "d1e4960f-edee-4cea-9c08-377e340d3b14",
+          "slug": "wp-bridge-more-operations",
+          "name": "精選圖片與商品更新刪除",
+          "phase": "wp-bridge"
+        },
+        {
+          "id": "6c18ad7b-b742-439f-8b50-792dfc9ee3eb",
+          "slug": "wp-cron-runner",
+          "name": "WordPress 排程統一執行",
+          "phase": "wp-maintenance"
+        },
+        {
+          "id": "79e387bf-b893-4723-9959-ffa0f4ddfcff",
+          "slug": "wp-plugin-batch-update",
+          "name": "客戶站外掛批次更新",
+          "phase": "wp-maintenance"
+        },
+        {
+          "id": "93219aa0-37cd-4aaf-a614-56c9446dd815",
+          "slug": "wp-mainwp-dashboard",
+          "name": "MainWP 主控台",
+          "phase": "wp-maintenance"
+        },
+        {
+          "id": "7e3321c8-194a-44ee-a6ec-1cbe7d31710e",
+          "slug": "wp-mainwp-auto-join",
+          "name": "建站自動接上 MainWP",
+          "phase": "wp-maintenance"
+        }
+      ]
     },
     {
       "id": "5ec95120-9df2-4923-b156-d03b836a60fe",
@@ -3020,8 +3811,100 @@
         "lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml",
         "lobster-factory/infra/hetzner-phase1-core/docker-compose.recommended-ai-native.yml"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "e7914e90-e960-407d-9369-158f585024f9",
+          "slug": "host-deploy",
+          "name": "部署",
+          "legacy_source_path": null
+        },
+        {
+          "id": "491ee982-8b58-4ed4-980d-6552c9e1316a",
+          "slug": "host-backup-security",
+          "name": "備份與安全",
+          "legacy_source_path": null
+        },
+        {
+          "id": "5741466c-1078-47ed-a9fc-13e0e593423c",
+          "slug": "host-monitoring",
+          "name": "監控",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "63ad2c97-2b28-4053-97dc-58fb14f14272",
+          "slug": "host-sg-deploy",
+          "name": "部署閘（測試、健檢、失敗自動回滾）",
+          "phase": "host-deploy"
+        },
+        {
+          "id": "3a0177f6-a0a5-4bf1-b625-dfa716a209b9",
+          "slug": "host-nightly-deploy",
+          "name": "每晚自動部署後台",
+          "phase": "host-deploy"
+        },
+        {
+          "id": "5ed8d978-fd68-4b9a-b698-f26ad8a5dda0",
+          "slug": "host-safe-infra-patch",
+          "name": "安全修改容器與 nginx 設定",
+          "phase": "host-deploy"
+        },
+        {
+          "id": "461a984f-1928-48f1-8282-190b0aa72a03",
+          "slug": "host-trigger-env-sync",
+          "name": "Trigger 部署環境變數補齊",
+          "phase": "host-deploy"
+        },
+        {
+          "id": "f6078c4d-754c-4a59-9443-32b679cb9726",
+          "slug": "host-daily-backup",
+          "name": "每日備份",
+          "phase": "host-backup-security"
+        },
+        {
+          "id": "167b28d5-6724-49ce-b691-9d06865e13c5",
+          "slug": "host-offsite-backup",
+          "name": "異地備份",
+          "phase": "host-backup-security"
+        },
+        {
+          "id": "965cec6e-fb44-4bd3-ada5-c1dc79ecdbbd",
+          "slug": "host-restore-drill",
+          "name": "每月還原演練",
+          "phase": "host-backup-security"
+        },
+        {
+          "id": "c77eb8a6-1d02-42b8-b43e-f04bba387343",
+          "slug": "host-fail2ban",
+          "name": "暴力登入封鎖",
+          "phase": "host-backup-security"
+        },
+        {
+          "id": "153e4ea9-dd7f-4a4c-b4a3-19385ebebcab",
+          "slug": "host-cf-origin-lockdown",
+          "name": "只放行 Cloudflare 來源",
+          "phase": "host-backup-security"
+        },
+        {
+          "id": "64d4c6a0-5dc0-4179-bf06-9bfec3a2a16e",
+          "slug": "host-auto-reboot",
+          "name": "每日自動重開機",
+          "phase": "host-monitoring"
+        },
+        {
+          "id": "b3067877-d749-49a0-8174-c6a829315388",
+          "slug": "host-log-dashboards",
+          "name": "日誌監控儀表板",
+          "phase": "host-monitoring"
+        },
+        {
+          "id": "c3799a6c-59d3-4797-9351-733dda8075a8",
+          "slug": "host-public-status-page",
+          "name": "對外服務狀態頁",
+          "phase": "host-monitoring"
+        }
+      ]
     },
     {
       "id": "0900b9f7-f09f-496b-be87-0518ea59f259",
@@ -3039,8 +3922,70 @@
         "lobster-factory/packages/db/",
         "agency-os/supabase/"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "8328b362-40e4-4b0d-ae4b-dd9375dc1a25",
+          "slug": "db-schema",
+          "name": "Schema 與 migration",
+          "legacy_source_path": null
+        },
+        {
+          "id": "02400b83-7059-460a-a423-f75f9a4f5a87",
+          "slug": "db-audit",
+          "name": "安全稽核",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "3d7931b3-2358-437a-a156-a0e5ee3caf34",
+          "slug": "db-migrations",
+          "name": "資料表 migration 與回滾檔",
+          "phase": "db-schema"
+        },
+        {
+          "id": "707ab6a1-6ce9-47fc-a176-00dde40d8481",
+          "slug": "db-migration-tests",
+          "name": "migration 寫入測試",
+          "phase": "db-schema"
+        },
+        {
+          "id": "80a264ce-093b-4108-aa92-951b13d14296",
+          "slug": "db-local-verify",
+          "name": "migration 本機驗證腳本",
+          "phase": "db-schema"
+        },
+        {
+          "id": "dda22c34-d003-41a5-bafa-cd28d6bcb45e",
+          "slug": "db-deploy-migration-gate",
+          "name": "上線前 migration 閘",
+          "phase": "db-schema"
+        },
+        {
+          "id": "c64a7f3a-69f5-4b92-b70a-80d6b41c083f",
+          "slug": "db-kb-hnsw-explain",
+          "name": "知識庫向量索引實際使用驗證",
+          "phase": "db-schema"
+        },
+        {
+          "id": "91ba0a34-e6f3-4288-a4d8-7289fab02858",
+          "slug": "db-kb-0076-deferred",
+          "name": "知識庫 migration 0076 延後項",
+          "phase": "db-schema"
+        },
+        {
+          "id": "2ec491a6-6479-4f9a-960c-b4c6903a01c7",
+          "slug": "db-security-definer-allowlist",
+          "name": "高權限函式白名單",
+          "phase": "db-audit"
+        },
+        {
+          "id": "0a6ca7a2-535b-4253-9c03-29f3c7e17567",
+          "slug": "db-rls-audit",
+          "name": "公開資料表 RLS 稽核",
+          "phase": "db-audit"
+        }
+      ]
     },
     {
       "id": "5b677cb7-3c30-40d2-8992-c14ea3632ba2",
@@ -3089,8 +4034,82 @@
         "scripts/oracle-quota.ps1",
         "scripts/write-oracle-artifact.ps1"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "89dc28aa-c445-49dc-bf6e-22a272c0b04e",
+          "slug": "gov-rules",
+          "name": "工作規則",
+          "legacy_source_path": null
+        },
+        {
+          "id": "ffa278f4-64b0-4a04-924f-bf23c554b0e3",
+          "slug": "gov-gates",
+          "name": "機械閘與審查",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "7e3a6198-90f2-4443-9a7c-295995ceff6d",
+          "slug": "gov-agent-rules",
+          "name": "AI 工作規則（AGENTS）",
+          "phase": "gov-rules"
+        },
+        {
+          "id": "3ef2fef2-060d-4cdf-a09f-210f4efd5863",
+          "slug": "gov-slash-commands",
+          "name": "斜線指令與技能",
+          "phase": "gov-rules"
+        },
+        {
+          "id": "bfc49b52-d881-4c47-a706-b07c419b8756",
+          "slug": "gov-mcp-registry",
+          "name": "MCP 工具登記與同步",
+          "phase": "gov-rules"
+        },
+        {
+          "id": "8c2f02d3-b361-45b0-8d0c-1f1758c34673",
+          "slug": "gov-routing-spec",
+          "name": "工具路由三件套",
+          "phase": "gov-rules"
+        },
+        {
+          "id": "a384ad51-8bd2-4e8d-93a3-3598f82dfc7b",
+          "slug": "gov-pointer-check",
+          "name": "治理文件指標檢查",
+          "phase": "gov-rules"
+        },
+        {
+          "id": "a11b42a0-c4ec-4c9c-8fd1-d6bc14d2f467",
+          "slug": "gov-hooks",
+          "name": "Claude hooks 機械閘",
+          "phase": "gov-gates"
+        },
+        {
+          "id": "767a9d84-3697-4958-a415-d17a09e7429a",
+          "slug": "gov-cross-model-oracle",
+          "name": "跨模型審查（Codex 審 Claude）",
+          "phase": "gov-gates"
+        },
+        {
+          "id": "3e3600e1-7b5e-4803-9b93-e2660a3a6457",
+          "slug": "gov-bughunt-oracle",
+          "name": "抓蟲宣告驗真",
+          "phase": "gov-gates"
+        },
+        {
+          "id": "4d0f0e84-c7f8-4249-b0bf-92aa5c57a1df",
+          "slug": "gov-ci-release-gate",
+          "name": "CI 上線閘",
+          "phase": "gov-gates"
+        },
+        {
+          "id": "cdacf55b-76c8-4e1d-b243-5dacebd3c4ef",
+          "slug": "gov-codex-queue-sandbox",
+          "name": "Codex 佇列驗收改在沙箱內跑",
+          "phase": "gov-gates"
+        }
+      ]
     },
     {
       "id": "34358804-4fb9-4cb0-8f45-cf616b258f47",
@@ -3271,8 +4290,70 @@
         "agency-os/handoffs/2026-09-10-1737-f08-strategy-closeout.md",
         "agency-os/handoffs/2026-09-30-codex-work-review.md"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "298ea916-7591-455d-9d66-ef02cccd41fe",
+          "slug": "ao-lifecycle",
+          "name": "開工與收工",
+          "legacy_source_path": null
+        },
+        {
+          "id": "ae4082a1-d2e8-4711-b4e8-5156a3f34699",
+          "slug": "ao-tools",
+          "name": "健康與工具",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "c7f75b48-5869-4557-9e25-594198830bed",
+          "slug": "ao-resume-report",
+          "name": "開工報告（AO-RESUME）",
+          "phase": "ao-lifecycle"
+        },
+        {
+          "id": "4d8dd30f-5f64-4dd6-89c5-30a84419de17",
+          "slug": "ao-close-run",
+          "name": "收工流程（AO-CLOSE）",
+          "phase": "ao-lifecycle"
+        },
+        {
+          "id": "0d108725-b69f-483f-ba87-f243162c72e7",
+          "slug": "ao-closeout-completeness",
+          "name": "收工證據完整性檢查",
+          "phase": "ao-lifecycle"
+        },
+        {
+          "id": "2e4433ad-1391-4edf-a92d-975608222e86",
+          "slug": "ao-health-score",
+          "name": "系統健康分數",
+          "phase": "ao-tools"
+        },
+        {
+          "id": "3687613d-2cde-4a5e-8b2c-38aaa1b230d8",
+          "slug": "ao-daily-smoke",
+          "name": "每日 smoke 測試",
+          "phase": "ao-tools"
+        },
+        {
+          "id": "54c15463-4cb1-4f5d-8ff7-fc915d886038",
+          "slug": "ao-worklog-numbering",
+          "name": "WORKLOG 條目續號",
+          "phase": "ao-tools"
+        },
+        {
+          "id": "25b5e32b-714f-4490-b501-005a8b797b2e",
+          "slug": "ao-shared-file-commit",
+          "name": "共用檔分段提交",
+          "phase": "ao-tools"
+        },
+        {
+          "id": "eea132a1-712c-4623-ac86-2290b6502aee",
+          "slug": "ao-external-signals",
+          "name": "抓取 Slack／Telegram 訊號",
+          "phase": "ao-tools"
+        }
+      ]
     },
     {
       "id": "6f716d82-7d1d-4063-b9bf-6d1c7b2f5ece",
@@ -3287,8 +4368,88 @@
       "source_paths": [
         "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "bb6ddb7c-c9e1-4b83-874e-7d10e72fa83e",
+          "slug": "meet-batch",
+          "name": "錄音轉文件",
+          "legacy_source_path": null
+        },
+        {
+          "id": "e21aa744-f1aa-42fa-8745-893fc41610a9",
+          "slug": "meet-live",
+          "name": "即時會議工作區",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "62812c51-8092-4d7a-8425-2acf7052de3b",
+          "slug": "meet-upload-transcribe",
+          "name": "錄音上傳轉逐字稿",
+          "phase": "meet-batch"
+        },
+        {
+          "id": "cbad5388-e30d-4e59-9ff5-6c0df891ec00",
+          "slug": "meet-diarize",
+          "name": "分辨說話者",
+          "phase": "meet-batch"
+        },
+        {
+          "id": "e545ec90-4f67-4b7b-94f4-a5cbed6b8814",
+          "slug": "meet-summary",
+          "name": "會議摘要",
+          "phase": "meet-batch"
+        },
+        {
+          "id": "fe2fbc8c-08d2-4c8a-9d86-629de0773c53",
+          "slug": "meet-deck",
+          "name": "產出簡報",
+          "phase": "meet-batch"
+        },
+        {
+          "id": "a3c61afe-83df-4578-acc4-323090eb2ef2",
+          "slug": "meet-word-excel",
+          "name": "產出 Word 紀錄與 Excel 行動清單",
+          "phase": "meet-batch"
+        },
+        {
+          "id": "410467c5-b890-4b58-9459-be097fc7301d",
+          "slug": "meet-mindmap",
+          "name": "逐字稿心智圖",
+          "phase": "meet-batch"
+        },
+        {
+          "id": "84412784-5073-4378-84c0-426ecbd10c82",
+          "slug": "meet-ownvoice-import",
+          "name": "匯入 OwnVoice 錄音",
+          "phase": "meet-batch"
+        },
+        {
+          "id": "3c07e989-efb0-4664-8cc8-096890e0e0b4",
+          "slug": "meet-network-install",
+          "name": "會議服務網路版安裝",
+          "phase": "meet-batch"
+        },
+        {
+          "id": "4edd0338-3d69-4f52-a139-e4f6f16f8a2a",
+          "slug": "meet-live-captions",
+          "name": "即時字幕與翻譯",
+          "phase": "meet-live"
+        },
+        {
+          "id": "1a6e50fc-73fd-4d45-93aa-f47d7bf44b2b",
+          "slug": "meet-lookup",
+          "name": "會中查詢與問 AI",
+          "phase": "meet-live"
+        },
+        {
+          "id": "e6a58eea-9287-4ad1-832e-c4844061ea46",
+          "slug": "meet-workspace",
+          "name": "可停靠面板的會議工作區",
+          "phase": "meet-live"
+        }
+      ]
     },
     {
       "id": "3d3cb5b4-74b6-4a43-923a-8dde251faaa5",
@@ -3306,8 +4467,82 @@
         "lobster-factory/infra/soulful/",
         "scripts/verify-soulful-cutover.ps1"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "6ef8cea6-3ddf-47ef-854f-abcd63adb04f",
+          "slug": "soulful-hosting",
+          "name": "網站代管",
+          "legacy_source_path": null
+        },
+        {
+          "id": "4eef54c2-089e-45e7-be88-bf32616d799b",
+          "slug": "soulful-content",
+          "name": "客服與內容",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "96bceea5-17cf-4581-b06f-5f968165d28d",
+          "slug": "soulful-site-container",
+          "name": "Soulful 網站容器",
+          "phase": "soulful-hosting"
+        },
+        {
+          "id": "4db7b73d-7375-4c35-94e0-18e3ad52b08a",
+          "slug": "soulful-scanner-block",
+          "name": "掃描器封鎖",
+          "phase": "soulful-hosting"
+        },
+        {
+          "id": "438125f8-f4fc-4bab-b0df-8d108107ee6e",
+          "slug": "soulful-slow-log",
+          "name": "慢請求紀錄",
+          "phase": "soulful-hosting"
+        },
+        {
+          "id": "23b58f80-5e93-4efd-ad6b-0eb04aaabe24",
+          "slug": "soulful-plugin-update-config",
+          "name": "外掛安全更新設定",
+          "phase": "soulful-hosting"
+        },
+        {
+          "id": "ceb6e809-ef9d-4983-a785-537308bf716f",
+          "slug": "soulful-cutover-sync",
+          "name": "搬站資料同步",
+          "phase": "soulful-hosting"
+        },
+        {
+          "id": "93daf451-fa7a-429c-bf63-022e6f59e247",
+          "slug": "soulful-domain-transfer",
+          "name": "網域轉 Cloudflare",
+          "phase": "soulful-hosting"
+        },
+        {
+          "id": "a27e72db-a42c-4d84-a4de-443dc6bd7b1f",
+          "slug": "soulful-cs-faq",
+          "name": "Soulful 客服常見問答",
+          "phase": "soulful-content"
+        },
+        {
+          "id": "848e90ae-abfb-4294-903e-4f1067b06c95",
+          "slug": "soulful-course-auto-reply",
+          "name": "課程類問題 AI 自動回覆",
+          "phase": "soulful-content"
+        },
+        {
+          "id": "8cf8adae-7f51-4cbf-b3de-ca9f6bc40001",
+          "slug": "soulful-faq-final-data",
+          "name": "常見問答正式資料",
+          "phase": "soulful-content"
+        },
+        {
+          "id": "f93ded6d-ac48-4924-a166-09d9c9a88eec",
+          "slug": "soulful-seo-articles",
+          "name": "SEO 定位與文章",
+          "phase": "soulful-content"
+        }
+      ]
     },
     {
       "id": "af947890-3086-421b-86a9-161a7ccff458",
@@ -3323,8 +4558,46 @@
       "source_paths": [
         "lobster-factory/infra/hetzner-phase1-core/apps/wordpress/"
       ],
-      "phases": [],
-      "features": []
+      "phases": [
+        {
+          "id": "986f2fe6-b3a5-4584-80cb-d3d703482d30",
+          "slug": "aw-site",
+          "name": "官網維運",
+          "legacy_source_path": null
+        }
+      ],
+      "features": [
+        {
+          "id": "9ce6472b-57ff-4dc7-b268-762ed2705b8a",
+          "slug": "aw-wp-container",
+          "name": "官網 WordPress 容器",
+          "phase": "aw-site"
+        },
+        {
+          "id": "56c2fb27-84f3-4236-81ed-d2e017b6e4fd",
+          "slug": "aw-login-audit",
+          "name": "登入稽核",
+          "phase": "aw-site"
+        },
+        {
+          "id": "2ff6ce5a-8bab-4368-9031-79a0a287305f",
+          "slug": "aw-posthog",
+          "name": "官網 PostHog 追蹤",
+          "phase": "aw-site"
+        },
+        {
+          "id": "e5183040-d59a-4a7d-83a0-1f696bc2e578",
+          "slug": "aw-sentry",
+          "name": "官網錯誤回報",
+          "phase": "aw-site"
+        },
+        {
+          "id": "181a0c06-a901-4d74-a263-5fb06cf32253",
+          "slug": "aw-dmarc-reject",
+          "name": "DMARC 升到 p=reject",
+          "phase": "aw-site"
+        }
+      ]
     }
   ]
 }

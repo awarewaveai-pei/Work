@@ -39,7 +39,7 @@ async function systemsWrite(systemId: string, write: (ctx: { sb: SupabaseClient;
       // A feature of a phase still on its old supervisor page has its status there (PLAN §8: one source per phase).
       isLegacy: async (id) => {
         const input = await readProjectionInput(sb, systemId);
-        const p = projectSystem({ phases: defs.phases, features: defs.features, events: input.events, history: input.history, lastCommitAt: input.lastCommitAt[systemId] ?? null });
+        const p = projectSystem({ phases: defs.phases, features: defs.features, events: input.events, history: input.history, lastCommitAt: input.lastCommitAt[systemId] ?? null, spreadCommits: input.spreadCommits });
         return p.features.some((f) => f.feature.id === id && f.legacy);
       },
     });

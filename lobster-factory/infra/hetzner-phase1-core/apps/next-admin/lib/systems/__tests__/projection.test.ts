@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { effectiveStatus } from "../overview";
-import { projectSystem, type FeatureRow, type PhaseRow, type UpdateRow } from "../projection";
+import { projectSystem, spreadCommits, type FeatureRow, type PhaseRow, type UpdateRow } from "../projection";
 import { readProjectionInput } from "../store";
 
 const SYS = "00000000-0000-4000-8000-000000000001";
@@ -63,6 +63,27 @@ describe("projectSystem", () => {
     ] });
     expect(cleared.handoff.blocker).toBeNull();
     expect(cleared.handoff.next).toBe("ship");
+  });
+
+  it("a Next: the old importer pasted on several systems is skipped; one named by System: (explicit) is kept", () => {
+    const OTHER = "00000000-0000-4000-8000-000000000002";
+    const spread = spreadCommits([
+      { commit_sha: "aaa", system_id: SYS }, { commit_sha: "aaa", system_id: OTHER },
+      { commit_sha: "bbb", system_id: SYS }, { commit_sha: "bbb", system_id: OTHER },
+      { commit_sha: "ccc", system_id: SYS },
+    ]);
+    expect([...spread].sort()).toEqual(["aaa", "bbb"]);
+    const p = projectSystem({ phases: [], features: [], spreadCommits: spread, events: [
+      ev("handoff", { subject: "mine", next: "own step", blocker: "token" }, "2026-11-01T00:00:00Z", { commit_sha: "ccc" }),
+      ev("handoff", { subject: "rename", next: "pasted everywhere", blocker_cleared: true }, "2026-11-02T00:00:00Z", { commit_sha: "aaa" }),
+    ] });
+    expect(p.handoff.next).toBe("own step");
+    expect(p.handoff.lastSubject).toBe("mine");
+    expect(p.handoff.blocker).toBeNull(); // a pasted Blocker-Cleared still clears
+    const named = projectSystem({ phases: [], features: [], spreadCommits: spread, events: [
+      ev("handoff", { subject: "both", next: "named step", explicit: true }, "2026-11-03T00:00:00Z", { commit_sha: "bbb" }),
+    ] });
+    expect(named.handoff.next).toBe("named step");
   });
 
   it("completion = verified / features not cancelled; no features = 尚未盤點 (null)", () => {

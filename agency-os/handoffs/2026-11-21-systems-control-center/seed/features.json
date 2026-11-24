@@ -1,0 +1,1020 @@
+{
+  "generated_at": "2026-11-24T04:59:11Z",
+  "items": [
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-method-library",
+      "status": "implemented",
+      "source": "Projects/internal/cognitive-engineering-os/apps/cognitive-web/app/(shell)/methods/page.tsx:5"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-method-run",
+      "status": "implemented",
+      "source": "Projects/internal/cognitive-engineering-os/apps/cognitive-web/app/(shell)/methods/[id]/run/page.tsx:8"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-workflow-list",
+      "status": "implemented",
+      "source": "Projects/internal/cognitive-engineering-os/apps/cognitive-web/app/(shell)/workflows/page.tsx:31"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-project-create",
+      "status": "implemented",
+      "source": "Projects/internal/cognitive-engineering-os/apps/cognitive-web/app/(shell)/projects/new/page.tsx:5"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-project-workspace",
+      "status": "implemented",
+      "source": "Projects/internal/cognitive-engineering-os/apps/cognitive-web/app/(shell)/projects/[id]/page.tsx:5"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-open-from-app",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/cognitive-os/open/route.ts:50"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-research-lines",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:153"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-report-approval-roles",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:154"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-page-render-gates",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:346"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-lessons",
+      "status": "implemented",
+      "source": "Projects/internal/cognitive-engineering-os/apps/cognitive-web/app/(shell)/learn/[id]/page.tsx:15"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-groups",
+      "status": "implemented",
+      "source": "Projects/internal/cognitive-engineering-os/apps/cognitive-web/app/(shell)/groups/page.tsx:4"
+    },
+    {
+      "system_slug": "cognitive-os",
+      "feature_slug": "cos-my-data",
+      "status": "implemented",
+      "source": "Projects/internal/cognitive-engineering-os/apps/cognitive-web/app/(shell)/me/data/page.tsx:4"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-persons",
+      "status": "implemented",
+      "source": "Projects/internal/hci30/app/server.mjs:305"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-case-create",
+      "status": "implemented",
+      "source": "Projects/internal/hci30/app/server.mjs:168"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-case-risk-tier",
+      "status": "implemented",
+      "source": "Projects/internal/hci30/app/server.mjs:235"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-evidence-records",
+      "status": "implemented",
+      "source": "Projects/internal/hci30/app/server.mjs:477"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-decisions",
+      "status": "implemented",
+      "source": "Projects/internal/hci30/app/server.mjs:536"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-reports",
+      "status": "implemented",
+      "source": "Projects/internal/hci30/app/server.mjs:428"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-rule-auto-promote",
+      "status": "implemented",
+      "source": "Projects/internal/hci30/app/server.mjs:263"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-seed-review",
+      "status": "implemented",
+      "source": "Projects/internal/hci30/app/server.mjs:726"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-snapshot-charset",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:268"
+    },
+    {
+      "system_slug": "hci30",
+      "feature_slug": "hci-real-login",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:217"
+    },
+    {
+      "system_slug": "tarot",
+      "feature_slug": "tarot-studio-page",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/tarot/page.tsx:5"
+    },
+    {
+      "system_slug": "tarot",
+      "feature_slug": "tarot-customer-door",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tarot/page.tsx:7"
+    },
+    {
+      "system_slug": "tarot",
+      "feature_slug": "tarot-single-card",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/generate/route.ts:27"
+    },
+    {
+      "system_slug": "tarot",
+      "feature_slug": "tarot-prompt-suggest",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/suggest-prompt/route.ts:29"
+    },
+    {
+      "system_slug": "tarot",
+      "feature_slug": "tarot-prompt-translate",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/translate/route.ts:16"
+    },
+    {
+      "system_slug": "tarot",
+      "feature_slug": "tarot-deck-batch",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/batch/route.ts:30"
+    },
+    {
+      "system_slug": "tarot",
+      "feature_slug": "tarot-works-gallery",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tarot/works/page.tsx:7"
+    },
+    {
+      "system_slug": "tarot",
+      "feature_slug": "tarot-woo-roadmap",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:417"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-workbench",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/studio/page.tsx:5"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-generate",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/studio/generate/route.ts:41"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-remove-bg",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/studio/remove-bg/route.ts:16"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-inpaint",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/studio/inpaint/route.ts:18"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-culture-ideas",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/studio/culture/route.ts:61"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-image-output",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/image/process/route.ts:86"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-works",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/studio/works/page.tsx:7"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-mockup",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/studio/mockup/route.ts:22"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-fabric-print",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/studio/fabric-print/route.ts:68"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-pod-order-inbox",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/pod-orders/sweep/route.ts:16"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-pod-one-click-publish",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:372"
+    },
+    {
+      "system_slug": "studio",
+      "feature_slug": "studio-woo-webhook-reconcile",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:284"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-conversations-page",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/cs/page.tsx:36"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-chatwoot-ai-reply",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/chatwoot/route.ts:62"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-site-widget",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/cs-widget/page.tsx:5"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-holding-sweep",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/cs/sweep/route.ts:21"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-chatwoot-baseline",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/cs/chatwoot-baseline.ts:21"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-crisis-live-test",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:209"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-full-auto",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:356"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-knowledge-page",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/knowledge/page.tsx:130"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-reply-exam",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/cs/eval/route.ts:22"
+    },
+    {
+      "system_slug": "cs",
+      "feature_slug": "cs-exam-expiry",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:211"
+    },
+    {
+      "system_slug": "collect",
+      "feature_slug": "collect-page",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/collect/page.tsx:42"
+    },
+    {
+      "system_slug": "collect",
+      "feature_slug": "collect-run-execute",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/collect/runs/execute/route.ts:41"
+    },
+    {
+      "system_slug": "collect",
+      "feature_slug": "collect-run-progress",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/collect/runs/progress/route.ts:26"
+    },
+    {
+      "system_slug": "collect",
+      "feature_slug": "collect-lookups",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/collect/lookups/route.ts:25"
+    },
+    {
+      "system_slug": "collect",
+      "feature_slug": "collect-renderer",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/renderer/server.mjs:1"
+    },
+    {
+      "system_slug": "collect",
+      "feature_slug": "collect-research-bridges",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/research-bridges.ts:13"
+    },
+    {
+      "system_slug": "collect",
+      "feature_slug": "collect-provenance-stamp",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/provenance.ts:31"
+    },
+    {
+      "system_slug": "collect",
+      "feature_slug": "collect-density-veto",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:155"
+    },
+    {
+      "system_slug": "collect",
+      "feature_slug": "collect-provenance-to-kb",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:251"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-client-list",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/clients/page.tsx:14"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-client-detail",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/clients/[slug]/page.tsx:30"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-client-credentials",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/clients/credentials/route.ts:50"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-org-search",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/org-search/route.ts:213"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-inbox",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/inbox/page.tsx:22"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-approvals",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/approvals/page.tsx:30"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-costs",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/costs/page.tsx:86"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-integrations",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/integrations/page.tsx:47"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-system-modes",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/system-modes/page.tsx:24"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-ai-models",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/ai-models/page.tsx:4"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-tool-catalog",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/tools/page.tsx:5"
+    },
+    {
+      "system_slug": "ops-console",
+      "feature_slug": "ops-ia-consolidation",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:473"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-alert-webhooks",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/webhooks/sentry/route.ts:18"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-health-probes",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/health/route.ts:350"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-site-watch",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/site-watch/run/[targetId]/route.ts:15"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-endpoint-alert",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/endpoint-alert.sh:1"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-drift-alert",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/check-drift-and-alert.sh:1"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-incidents-page",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/repairs/page.tsx:24"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-auto-remediate",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/ops/repairs/remediate/route.ts:18"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-telegram-commands",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/commands/telegram/route.ts:56"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-slack-commands",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/commands/slack/route.ts:28"
+    },
+    {
+      "system_slug": "repair-center",
+      "feature_slug": "repair-signed-sources",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:463"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-intake-form",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(public)/intake/page.tsx:22"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-quote",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/onboarding/quote/route.ts:26"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-onboarding-page",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/onboarding/page.tsx:5"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-trigger-build",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/onboarding/trigger-build/route.ts:43"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-new-site-form",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/sites/new/page.tsx:24"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-site-flow",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/ops/sites/[siteId]/page.tsx:10"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-staging-site",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/hosting/provision-staging/route.ts:380"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-rent-server",
+      "status": "implemented",
+      "source": "lobster-factory/packages/workflows/src/provision/provisionClient.ts:49"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-master-plan",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:454"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-embed-rent-button",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:469"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-client-host-stack",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:470"
+    },
+    {
+      "system_slug": "provisioning",
+      "feature_slug": "prov-dispatcher-followup",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:464"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-bridge-signature",
+      "status": "implemented",
+      "source": "lobster-factory/packages/wp-bridge-plugin/includes/Auth/SignatureVerifier.php:30"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-bridge-posts",
+      "status": "implemented",
+      "source": "lobster-factory/packages/wp-bridge-plugin/includes/Http/RestController.php:63"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-bridge-products",
+      "status": "implemented",
+      "source": "lobster-factory/packages/wp-bridge-plugin/includes/Http/RestController.php:106"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-bridge-fluentcrm",
+      "status": "implemented",
+      "source": "lobster-factory/packages/wp-bridge-plugin/includes/Http/RestController.php:139"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-bridge-color-swatches",
+      "status": "implemented",
+      "source": "lobster-factory/packages/wp-bridge-plugin/includes/Frontend/ColorSwatches.php:29"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-bridge-release",
+      "status": "implemented",
+      "source": "scripts/release-wp-bridge.sh:1"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-bridge-product-dry-run",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:388"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-bridge-more-operations",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:389"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-cron-runner",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/wp-cron-runner.sh:1"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-plugin-batch-update",
+      "status": "implemented",
+      "source": "scripts/update-client-wp-plugins.ps1:72"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-mainwp-dashboard",
+      "status": "implemented",
+      "source": "lobster-factory/infra/mainwp/docker-compose.yml:3"
+    },
+    {
+      "system_slug": "wordpress-ops",
+      "feature_slug": "wp-mainwp-auto-join",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:441"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-sg-deploy",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-nightly-deploy",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/auto-deploy-next-admin.sh:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-safe-infra-patch",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/safe-infra-patch.sh:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-trigger-env-sync",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:450"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-daily-backup",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/backup-phase1.sh:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-offsite-backup",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/setup-offsite-backup.sh:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-restore-drill",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/backup-restore-drill.py:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-fail2ban",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/fail2ban/jail.d/99-awarewave.conf:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-cf-origin-lockdown",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/cf-origin-lockdown.sh:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-auto-reboot",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/auto-reboot/ks-aw-01-auto-reboot.conf:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-log-dashboards",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/observability/grafana/dashboards/aw-obs-overview.json:1"
+    },
+    {
+      "system_slug": "host-infra",
+      "feature_slug": "host-public-status-page",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:489"
+    },
+    {
+      "system_slug": "database",
+      "feature_slug": "db-migrations",
+      "status": "implemented",
+      "source": "lobster-factory/packages/db/migrations/0178_organization_product_operations.sql:1"
+    },
+    {
+      "system_slug": "database",
+      "feature_slug": "db-migration-tests",
+      "status": "implemented",
+      "source": "lobster-factory/packages/db/tests/test_0136_control_plane_writes.py:1"
+    },
+    {
+      "system_slug": "database",
+      "feature_slug": "db-local-verify",
+      "status": "implemented",
+      "source": "lobster-factory/packages/db/scripts/kb-local-verify.sh:1"
+    },
+    {
+      "system_slug": "database",
+      "feature_slug": "db-deploy-migration-gate",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/scripts/check-migrations-applied.sh:1"
+    },
+    {
+      "system_slug": "database",
+      "feature_slug": "db-kb-hnsw-explain",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:448"
+    },
+    {
+      "system_slug": "database",
+      "feature_slug": "db-kb-0076-deferred",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:278"
+    },
+    {
+      "system_slug": "database",
+      "feature_slug": "db-security-definer-allowlist",
+      "status": "implemented",
+      "source": "lobster-factory/packages/db/security-definer-allowlist.json:1"
+    },
+    {
+      "system_slug": "database",
+      "feature_slug": "db-rls-audit",
+      "status": "implemented",
+      "source": "lobster-factory/packages/db/scripts/verify-public-rls-supabase-advisor.sql:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-agent-rules",
+      "status": "implemented",
+      "source": "agency-os/AGENTS.md:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-slash-commands",
+      "status": "implemented",
+      "source": ".claude/commands/review.md:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-mcp-registry",
+      "status": "implemented",
+      "source": "mcp/registry.template.json:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-routing-spec",
+      "status": "implemented",
+      "source": "lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-pointer-check",
+      "status": "implemented",
+      "source": "scripts/verify-governance-pointers.mjs:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-hooks",
+      "status": "implemented",
+      "source": "mcp/claude-userlevel/hooks/runner.js:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-cross-model-oracle",
+      "status": "implemented",
+      "source": "scripts/codex-oracle.ps1:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-bughunt-oracle",
+      "status": "implemented",
+      "source": "scripts/bughunt-oracle.ps1:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-ci-release-gate",
+      "status": "implemented",
+      "source": ".github/workflows/release-gate-main.yml:1"
+    },
+    {
+      "system_slug": "governance",
+      "feature_slug": "gov-codex-queue-sandbox",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:244"
+    },
+    {
+      "system_slug": "ao-operations",
+      "feature_slug": "ao-resume-report",
+      "status": "implemented",
+      "source": "scripts/ao-resume.ps1:1"
+    },
+    {
+      "system_slug": "ao-operations",
+      "feature_slug": "ao-close-run",
+      "status": "implemented",
+      "source": "scripts/ao-close.ps1:15"
+    },
+    {
+      "system_slug": "ao-operations",
+      "feature_slug": "ao-closeout-completeness",
+      "status": "implemented",
+      "source": "scripts/verify-closeout-completeness.ps1:1"
+    },
+    {
+      "system_slug": "ao-operations",
+      "feature_slug": "ao-health-score",
+      "status": "implemented",
+      "source": "scripts/system-health-check.ps1:1"
+    },
+    {
+      "system_slug": "ao-operations",
+      "feature_slug": "ao-daily-smoke",
+      "status": "implemented",
+      "source": "scripts/check-smoke-tests.ps1:28"
+    },
+    {
+      "system_slug": "ao-operations",
+      "feature_slug": "ao-worklog-numbering",
+      "status": "implemented",
+      "source": "scripts/worklog-insert-entry.py:41"
+    },
+    {
+      "system_slug": "ao-operations",
+      "feature_slug": "ao-shared-file-commit",
+      "status": "implemented",
+      "source": "scripts/git-partial-worktree-commit.py:364"
+    },
+    {
+      "system_slug": "ao-operations",
+      "feature_slug": "ao-external-signals",
+      "status": "implemented",
+      "source": "scripts/fetch-external-signals.ps1:22"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "feature_slug": "meet-upload-transcribe",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/app.py:67"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "feature_slug": "meet-diarize",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/lib/diarize.py:58"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "feature_slug": "meet-summary",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/app.py:309"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "feature_slug": "meet-deck",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/lib/deck.py:270"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "feature_slug": "meet-word-excel",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/lib/word.py:301"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "feature_slug": "meet-mindmap",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/app.py:224"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "feature_slug": "meet-ownvoice-import",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/app.py:129"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "feature_slug": "meet-network-install",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:200"
+    },
+    {
+      "system_slug": "meeting-ppt",
+      "feature_slug": "meet-lookup",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/app.py:157"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-site-container",
+      "status": "implemented",
+      "source": "lobster-factory/infra/soulful/docker-compose.yml:1"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-scanner-block",
+      "status": "implemented",
+      "source": "lobster-factory/infra/soulful/nginx/scanner-block.inc:1"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-slow-log",
+      "status": "implemented",
+      "source": "lobster-factory/infra/soulful/mu-plugins/aw-slow-log.php:1"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-plugin-update-config",
+      "status": "implemented",
+      "source": "agency-os/tenants/company-soulful-expression/core/wp-update-config.json:1"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-cutover-sync",
+      "status": "implemented",
+      "source": "lobster-factory/infra/soulful/cutover-sync.sh:1"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-domain-transfer",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:139"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-cs-faq",
+      "status": "implemented",
+      "source": "agency-os/tenants/company-soulful-expression/core/cs-faq.json:1"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-course-auto-reply",
+      "status": "in_progress",
+      "source": "agency-os/TASKS.md:207"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-faq-final-data",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:213"
+    },
+    {
+      "system_slug": "client-soulful",
+      "feature_slug": "soulful-seo-articles",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:415"
+    },
+    {
+      "system_slug": "client-aware-wave",
+      "feature_slug": "aw-wp-container",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/wordpress/Dockerfile:1"
+    },
+    {
+      "system_slug": "client-aware-wave",
+      "feature_slug": "aw-login-audit",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/wordpress/mu-plugins/aw-login-audit.php:1"
+    },
+    {
+      "system_slug": "client-aware-wave",
+      "feature_slug": "aw-posthog",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/wordpress/mu-plugins/posthog.php:1"
+    },
+    {
+      "system_slug": "client-aware-wave",
+      "feature_slug": "aw-sentry",
+      "status": "implemented",
+      "source": "lobster-factory/infra/hetzner-phase1-core/apps/wordpress/mu-plugins/sentry.php:1"
+    },
+    {
+      "system_slug": "client-aware-wave",
+      "feature_slug": "aw-dmarc-reject",
+      "status": "todo",
+      "source": "agency-os/TASKS.md:125"
+    }
+  ],
+  "missing": []
+}

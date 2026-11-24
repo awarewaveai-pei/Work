@@ -149,10 +149,21 @@ class SystemsImportTest(unittest.TestCase):
         self.assertEqual(got, [("handoff", "alpha", "p1", None), ("handoff", "beta", None, None),
                                ("handoff", None, None, None), ("feature_update", "alpha", "p1", "send-mail"),
                                ("feature_update", None, None, None)])
-        self.assertEqual(evs[0]["payload"], {"subject": "plan", "next": "write the route"})
+        self.assertEqual(evs[0]["payload"], {"subject": "plan", "next": "write the route", "explicit": True})
         self.assertEqual(evs[2]["payload"]["unclassified"], "unknown system: nope")
         self.assertEqual(evs[3]["payload"], {"status": "implemented", "test": "t1"})  # a commit cannot claim verified
         self.assertEqual(evs[4]["payload"]["unclassified"], "unknown feature: ghost")
+
+    def test_next_lands_on_one_system_only(self):
+        # d32e4ca: one Next: pasted on 15 systems because the commit touched all their paths
+        spread = self.r.commit({"apps/x.ts": "2", "apps/b/y.ts": "2"}, "rename pages\n\nNext: align titles")
+        named = self.r.commit({"apps/x.ts": "3", "apps/b/y.ts": "3"}, "fix beta\n\nSystem: beta\nNext: deploy")
+        bodies = self.build()[0]
+        got = lambda sha: [(e["event_type"], e["system_slug"]) for e in events(bodies) if e["commit_sha"] == sha]
+        self.assertEqual(got(spread), [("handoff", None), ("activity", "alpha"), ("activity", "beta")])
+        self.assertEqual(got(named), [("activity", "alpha"), ("handoff", "beta")])
+        gaps = bodies[-1]["events"][-1]["payload"]["gaps"]["unclassified_trailers"]
+        self.assertIn(f"{spread[:7]} handoff spans 2 systems (add System: <slug>)", gaps)
 
     def test_revert_and_revert_of_revert(self):
         bad = self.r.commit({"apps/x.ts": "1"}, "bad change")

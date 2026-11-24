@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-24（續11）— 系統總控中心批 5：接續卡不再一句貼到十幾個系統、17 個沒監工頁的系統有了功能清單（操作者：「還有很多沒處理好，而且有的是沒有監控台的，應該怎麼辦?」）
+
+- 根因 1：`systems-import.py` events_for() 把 handoff 發給所有路徑主人。改到多系統的 commit（d32e4ca 一句貼到 15 個系統）讓 42 個 commit 的 Next 出現在不相干的系統。
+- 根因 2：17 個系統在 registry 裡沒有 phases／features，進度欄只會顯示「尚未盤點」。這些系統沒有監工頁，也不需要另建；總控頁本身就是它們的監控台。
+- 修正：
+  - 匯入器：handoff 只送給 `System:` 指名的系統（`explicit`），或唯一的路徑主人；多個主人又沒寫 `System:` 時改成未分類加缺口，路徑主人改收 activity。
+  - 舊資料（append-only）：`store.readSpreadCommits` 加 `projection.spreadCommits`，略過落在多系統、又沒寫 explicit 的 handoff，但 `blocker_cleared` 照樣生效。
+  - AGENTS.md §8：改到多個系統的 commit 要寫 `System:`。COMMON 契約 2 同步更新。
+  - W12：17 系統 36 phases／171 features，`seed/features.json` 169 筆有出處（2 筆會議功能只在別 session 未推的 commit 裡，先不 seed）；5 個沒歸屬的路徑已登記。
+- 審查：critic Standard 0c/2m/5n，全修：
+  - spread 判定不看 explicit，交給投影逐筆放行。
+  - 被略過的 handoff 照樣套用 blocker_cleared（prod 2 筆）。
+  - 未分類文字固定，event_key 不隨 registry 變動。
+  - 註解與契約同步。
+  - 讀取依 occurred_at 排序，再以 commit_sha 打破平手。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tests/host-scripts/systems-import.test.py → Ran 14 OK | exit=0 | ms=16000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/systems → 32 passed | exit=0 | ms=440
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 多系統 handoff 查詢 → 42 commits，blocker_cleared 2 筆 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=warn→pass | findings=0c/2m/5n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=spreadCommits | hits=16
+- ORACLE_WAIVED: Codex 額度到 11/24；critic 一輪＋兩個新測試覆蓋兩條規則
 ## 2026-11-24（續10）— oracle WP：GO-2 前置三項（發佈檔上主機鏡像、失敗原因顯示、preflight busy）併入 `72e407787`
 
 - [根因] SF-L 實跑留下三個缺口（同日 SF-L 條目）：主機鏡像沒有寫入者；失敗只顯示 `error_summary` 的代碼；`site-create` 進行中 `site-preflight` 把 job 的半成品報成「not ours」。

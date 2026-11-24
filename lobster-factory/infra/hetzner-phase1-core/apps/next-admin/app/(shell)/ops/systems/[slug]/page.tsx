@@ -207,7 +207,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
         features: all.features.filter((x) => x.system_id === system!.id),
         events: state.events,
         history: state.history,
-        lastCommitAt: state.lastCommitAt[system!.id] ?? null,
+        lastCommitAt: state.lastCommitAt[system!.id] ?? null, spreadCommits: state.spreadCommits,
       });
       hist = legacyDone(state.events, state.history, new Set(p.features.map((f) => f.feature.id)));
     }

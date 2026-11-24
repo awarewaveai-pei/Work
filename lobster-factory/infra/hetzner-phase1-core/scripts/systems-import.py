@@ -273,7 +273,7 @@ def events_for(c, idx, gaps):
         return [v for kk, v in tr if kk == k and v]
 
     trailer_systems, unknown_systems = [], []
-    for v in vals("system"):  # adds to the path owners; never removes one
+    for v in vals("system"):  # names who the handoff is about; path owners still get activity / revert
         slug = idx.alias.get(v.lower())
         if slug:
             trailer_systems.append(slug)
@@ -305,7 +305,22 @@ def events_for(c, idx, gaps):
             emit("activity", s, {"subject": c["subject"], "files": per_system[s]})
 
     if tr:
-        for s in targets:
+        # A Next:/Blocker: is about one piece of work, so it lands only where the commit says (System:) or on its single
+        # path owner. A commit that touches several systems with no System: would otherwise paste the same 下一步 on
+        # every one (d32e4ca put one line on 15 systems): those owners get activity, the handoff goes unclassified.
+        if trailer_systems:
+            handoff_to = sorted(set(trailer_systems))
+            handoff["explicit"] = True
+        elif len(per_system) == 1:
+            handoff_to = list(per_system)
+        else:
+            handoff_to = []
+            if len(per_system) > 1 and any(k not in ("feature", "test") for k, _ in tr):
+                gaps["unclassified_trailers"].add(f"{short} handoff spans {len(per_system)} systems (add System: <slug>)")
+                emit("handoff", None, dict(handoff, unclassified="spans several systems, no System trailer"))
+        for s in sorted(set(per_system) - set(handoff_to)):
+            emit("activity", s, {"subject": c["subject"], "files": per_system[s]})
+        for s in handoff_to:
             ph = idx.phase_of(s, phase) if phase else None
             if phase and not ph:
                 gaps["unclassified_trailers"].add(f"{short} Phase: {phase} (not a phase of {s})")

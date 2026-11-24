@@ -5,11 +5,13 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseUserRequest, proposalKey } from "./contract";
 import type { IngestBody, Registry, SystemProposal, UserRequestType } from "./contract";
+import { spreadCommits } from "./projection";
 import type { FeatureRow, PhaseRow, SystemRow, UpdateRow } from "./projection";
 
 const CHUNK = 500;
 export const HISTORY_READ_CAP = 20000;
 export const MIGRATION_READ_CAP = 20000;
+export const SPREAD_READ_CAP = 20000;
 export const EVENT_READ_CAP = 5000;
 export const ACTIVITY_READ_CAP = 100;
 const UPDATE_COLUMNS = "id,event_key,system_id,phase_id,feature_id,event_type,source,commit_sha,occurred_at,payload,created_at";
@@ -118,9 +120,22 @@ export async function readProjectionInput(sb: SupabaseClient, systemId?: string)
   events: UpdateRow[]; history: UpdateRow[]; capped: boolean;
   /** system id -> newest git commit (view system_last_commit, migration 0177): pass as projectSystem's lastCommitAt */
   lastCommitAt: Record<string, string>;
+  /** pass as projectSystem's spreadCommits */
+  spreadCommits: Set<string>;
 }> {
-  const [state, migrations, history, lastCommitAt] = await Promise.all([readStateEvents(sb, systemId), readMigrationEvents(sb, systemId), readCommitHistory(sb), readLastCommits(sb, systemId)]);
-  return { events: [...migrations.events, ...state.events], history: history.events, capped: state.capped || migrations.capped || history.capped, lastCommitAt };
+  const [state, migrations, history, lastCommitAt, spread] = await Promise.all([readStateEvents(sb, systemId), readMigrationEvents(sb, systemId), readCommitHistory(sb), readLastCommits(sb, systemId), readSpreadCommits(sb)]);
+  return { events: [...migrations.events, ...state.events], history: history.events, capped: state.capped || migrations.capped || history.capped, lastCommitAt, spreadCommits: spread.shas };
+}
+
+/** Commits whose handoff landed on more than one system without System: (importer before 2026-11-24 pasted one Next:
+ *  on every path owner). projectSystem skips those handoffs; read across all systems, like the commit history. */
+export async function readSpreadCommits(sb: SupabaseClient): Promise<{ shas: Set<string>; capped: boolean }> {
+  const rows = check(await sb.from("system_updates").select("commit_sha,system_id")
+    .eq("event_type", "handoff").not("commit_sha", "is", null).not("system_id", "is", null)
+    .order("occurred_at", { ascending: false }).order("commit_sha").limit(SPREAD_READ_CAP + 1), "handoff spread read") as unknown as
+    Array<{ commit_sha: string; system_id: string }>;
+  // capped: the oldest commits fall out, so a pasted handoff that old may count again -- only if nothing newer exists
+  return { shas: spreadCommits(rows.slice(0, SPREAD_READ_CAP)), capped: rows.length > SPREAD_READ_CAP };
 }
 
 /** View system_last_commit (migration 0177): one row per system that has a git commit event, any type -- the inferred
