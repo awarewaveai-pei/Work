@@ -208,3 +208,63 @@ export async function redeemMemberInviteAtomic(db: SupabaseClient, input: Identi
   if (typeof data !== "string" || !data) throw new Error("member invite redeem returned no reason");
   return data;
 }
+
+// ── Transfer the membership to another person (ADR 021 D5, G5; migration 0182) ─────────────────────────────────────────
+// A transfer is a member invite that names the identity it replaces (member_invites.transfer_of). Nothing changes until
+// the new person redeems it on aware-wave.com: then 0182 member_invite_redeem deletes the old identity, writes the audit
+// row and the new identity in one transaction under the account's lock. Before that the old member stays the manager.
+
+export interface MemberTransferStatus {
+  /** the current manager (the identity holder); email null when its profile has none */
+  manager: { userId: string; email: string | null } | null;
+  /** the live transfer, null if none (an expired one stays live until staff reissue or void it) */
+  transfer: { email: string; reason: string; createdAt: string; expiresAt: string } | null;
+}
+
+export async function memberTransferStatus(db: SupabaseClient, organizationId: string): Promise<MemberTransferStatus> {
+  const held = await db.from("customer_identities").select("user_id").eq("organization_id", organizationId).maybeSingle();
+  if (held.error) throw new Error(held.error.message);
+  const userId = (held.data as { user_id: string } | null)?.user_id ?? null;
+  let manager: MemberTransferStatus["manager"] = null;
+  if (userId) {
+    const prof = await db.from("profiles").select("email").eq("id", userId).maybeSingle();
+    if (prof.error) throw new Error(prof.error.message);
+    manager = { userId, email: (prof.data as { email: string | null } | null)?.email ?? null };
+  }
+  const live = await db.from("member_invites").select("email, transfer_reason, created_at, expires_at, transfer_of")
+    .eq("organization_id", organizationId).is("used_at", null).is("voided_at", null).maybeSingle();
+  if (live.error) throw new Error(live.error.message);
+  const row = live.data as { email: string; transfer_reason: string | null; created_at: string; expires_at: string; transfer_of: string | null } | null;
+  const transfer = row?.transfer_of
+    ? { email: row.email, reason: row.transfer_reason ?? "", createdAt: row.created_at, expiresAt: row.expires_at }
+    : null;
+  return { manager, transfer };
+}
+
+/** The identity a transfer invite replaces, null for an ordinary invite. */
+export async function memberInviteTransferOf(db: SupabaseClient, inviteId: string): Promise<string | null> {
+  const { data, error } = await db.from("member_invites").select("transfer_of").eq("id", inviteId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as { transfer_of: string | null } | null)?.transfer_of ?? null;
+}
+
+const TRANSFER_REFUSALS = ["not_linked", "same_member"] as const;
+export type MemberTransferRefusal = (typeof TRANSFER_REFUSALS)[number] | "invite_busy";
+
+/** A transfer invite for this account (0182 member_transfer_issue: voids the live invite in the same transaction). The
+ *  account must have a member, and the email must not be that member's own. Returns the plain code: shown once. */
+export async function createMemberTransfer(db: SupabaseClient, input: {
+  organizationId: string; email: string; reason: string; createdBy: string; actorRole: "owner" | "admin";
+}): Promise<{ ok: true; code: string; expiresAt: string } | { ok: false; error: MemberTransferRefusal }> {
+  const code = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
+  const expires = new Date(Date.now() + MEMBER_INVITE_DAYS * 86_400_000).toISOString();
+  const { data, error } = await db.rpc("member_transfer_issue", {
+    p_organization_id: input.organizationId, p_email: input.email, p_code_hash: await hashInviteCode(code),
+    p_expires_at: expires, p_created_by: input.createdBy, p_reason: input.reason, p_actor_role: input.actorRole,
+  });
+  if (error?.code === "23505") return { ok: false, error: "invite_busy" };
+  const refused = TRANSFER_REFUSALS.find((r) => error?.message?.includes(`member_transfer:${r}`));
+  if (refused) return { ok: false, error: refused };
+  if (error || !data) throw new Error(`member transfer issue failed: ${error?.message ?? "no row"}`);
+  return { ok: true, code, expiresAt: (data as InviteRow).expires_at };
+}

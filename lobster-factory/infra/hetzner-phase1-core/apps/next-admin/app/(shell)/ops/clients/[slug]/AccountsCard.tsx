@@ -5,6 +5,9 @@
 // Products = what this client holds; each row shows the person's role per product, read from that product's own list.
 // aware-wave.com 會員 (ADR 021 D4, migration 0180): staff invite this account's contact to become its member; the link is
 // made only after the person proves the email on aware-wave.com. The one-time code is shown once, right after issuing.
+// 轉移給別人 (ADR 021 D5, migration 0182; API ./member-transfer): on a linked account staff hand the membership (= the
+// manager) to another person the same way -- the swap happens only when that person proves the email; until then the
+// current manager stays.
 import { useCallback, useEffect, useState } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import { ACCOUNT_COPY as C } from "@/lib/accounts/invite-copy";
@@ -16,6 +19,12 @@ type Product = { key: string; name: string; settings: string | null };
 type Notice = { tone: "ok" | "error"; text: string };
 /** null = could not be read; invite = the live one (expired until staff reissue). */
 type Member = { eligible: boolean; linked: boolean; invite: { email: string; createdAt: string; expiresAt: string; status: "pending" | "expired" } | null } | null;
+
+/** GET /member-transfer; null = not loaded or could not be read. */
+type Transfer = {
+  manager: { userId: string; email: string | null } | null;
+  transfer: { email: string; reason: string; expiresAt: string; status: "pending" | "expired" } | null;
+} | null;
 
 const M = {
   title: "aware-wave.com 會員",
@@ -35,11 +44,29 @@ const M = {
   void_confirm: "作廢給 {email} 的邀請？對方手上的碼會失效。",
   issued: "邀請碼（只顯示這一次，請交給聯絡人）：",
   voided: "邀請已作廢。",
+  manager: "目前管理者：{email}",
+  transfer_open: "轉移給別人",
+  transfer_intro: "換成另一個人管理這個單位的會員（例如聯絡人離職）。新的人在 aware-wave.com 驗證 email 後才會換；在那之前仍由目前管理者管理。權利、合約與點數都跟著單位，不會變。",
+  transfer_email: "新聯絡人 email",
+  transfer_reason: "原因",
+  transfer_reason_placeholder: "例如：聯絡人離職",
+  transfer_start: "發起轉移",
+  cancel: "取消",
+  transfer_pending: "轉移待驗證",
+  transfer_expired: "轉移已過期",
+  transfer_text: "轉移給 {email}，{date} 前有效；驗證前仍由目前管理者管理。原因：{reason}",
+  transfer_text_expired: "轉移給 {email} 已在 {date} 過期。原因：{reason}",
+  transfer_void_confirm: "作廢轉移給 {email}？對方手上的碼會失效，目前管理者不變。",
+  transfer_voided: "轉移已作廢。",
+  transfer_issued: "轉移碼（只顯示這一次，請交給新聯絡人）：",
 } as const;
 const MEMBER_ERRORS: Record<string, string> = {
   member_linked: "這個單位已連上會員，不能再發起。",
   not_a_customer_account: "這個單位不能成為會員。",
   invite_busy: "剛好有人同時發起，請再按一次。",
+  not_linked: "這個單位還沒連上會員，請改用「發起邀請」。",
+  same_member: "這個 email 就是目前的管理者。",
+  invalid_reason: "請填原因（500 字以內）。",
   invalid_email: C.err_invalid_email,
   forbidden_role: C.err_forbidden,
 };
@@ -68,7 +95,12 @@ export function AccountsCard({ slug }: { slug: string }) {
   const [member, setMember] = useState<Member>(null);
   const [memberEmail, setMemberEmail] = useState("");
   const [issued, setIssued] = useState<string | null>(null);
+  const [transfer, setTransfer] = useState<Transfer>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferEmail, setTransferEmail] = useState("");
+  const [transferReason, setTransferReason] = useState("");
   const url =`/api/ops/clients/${encodeURIComponent(slug)}/accounts`;
+  const transferUrl = `/api/ops/clients/${encodeURIComponent(slug)}/member-transfer`;
 
   const load = useCallback(async () => {
     try {
@@ -95,6 +127,67 @@ export function AccountsCard({ slug }: { slug: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadTransfer = useCallback(async () => {
+    try {
+      const res = await fetch(transferUrl, { headers: { ...roleHeader("admin") } });
+      const data = (await res.json()) as { ok?: boolean; manager?: NonNullable<Transfer>["manager"]; transfer?: NonNullable<Transfer>["transfer"] };
+      setTransfer(res.ok && data.ok ? { manager: data.manager ?? null, transfer: data.transfer ?? null } : null);
+    } catch {
+      setTransfer(null);
+    }
+  }, [transferUrl]);
+  const linked = member?.linked === true;
+  useEffect(() => {
+    if (linked) void loadTransfer();
+    else setTransfer(null);
+  }, [linked, loadTransfer]);
+
+  async function startTransfer() {
+    setBusy("transfer");
+    setNotice(null);
+    setIssued(null);
+    try {
+      const res = await fetch(transferUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ email: transferEmail.trim().toLowerCase(), reason: transferReason.trim() }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string; code?: string };
+      if (!res.ok || !data.ok || !data.code) {
+        setNotice({ tone: "error", text: (data.error && MEMBER_ERRORS[data.error]) || C.err_generic });
+      } else {
+        setIssued(data.code);
+        setTransferOpen(false);
+        setTransferEmail("");
+        setTransferReason("");
+      }
+    } catch {
+      setNotice({ tone: "error", text: C.err_generic });
+    } finally {
+      setBusy(null);
+      void loadTransfer();
+    }
+  }
+
+  async function voidTransfer(email: string) {
+    if (!window.confirm(M.transfer_void_confirm.replace("{email}", email))) return;
+    setBusy("transfer");
+    setNotice(null);
+    setIssued(null);
+    try {
+      const res = await fetch(transferUrl, { method: "DELETE", headers: { ...roleHeader("admin") } });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      setNotice(res.ok && data.ok
+        ? { tone: "ok", text: M.transfer_voided }
+        : { tone: "error", text: (data.error && MEMBER_ERRORS[data.error]) || C.err_generic });
+    } catch {
+      setNotice({ tone: "error", text: C.err_generic });
+    } finally {
+      setBusy(null);
+      void loadTransfer();
+    }
+  }
 
   async function send(target: string) {
     setBusy(target);
@@ -253,9 +346,72 @@ export function AccountsCard({ slug }: { slug: string }) {
         {member === null ? (
           <NoData>{M.unknown}</NoData>
         ) : member.linked ? (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Tag tone="green" dot>{M.linked_tag}</Tag>
-            <span>{M.linked}</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <Tag tone="green" dot>{M.linked_tag}</Tag>
+              <span>{M.linked}</span>
+              {transfer?.manager?.email && <span>{M.manager.replace("{email}", transfer.manager.email)}</span>}
+            </div>
+            {transfer?.transfer ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <Tag tone={transfer.transfer.status === "expired" ? "gray" : "yellow"} dot>
+                  {transfer.transfer.status === "expired" ? M.transfer_expired : M.transfer_pending}
+                </Tag>
+                <span>
+                  {(transfer.transfer.status === "expired" ? M.transfer_text_expired : M.transfer_text)
+                    .replace("{email}", transfer.transfer.email)
+                    .replace("{date}", day(transfer.transfer.expiresAt))
+                    .replace("{reason}", transfer.transfer.reason)}
+                </span>
+                <button type="button" style={{ ...smallBtn, color: "var(--red)" }} disabled={busy !== null} onClick={() => voidTransfer(transfer.transfer!.email)}>
+                  {M.void}
+                </button>
+              </div>
+            ) : transferOpen ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <NoData>{M.transfer_intro}</NoData>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <input
+                    type="email"
+                    className="form-input"
+                    style={{ maxWidth: 320 }}
+                    placeholder={C.email_placeholder}
+                    aria-label={M.transfer_email}
+                    value={transferEmail}
+                    onChange={(e) => setTransferEmail(e.target.value)}
+                    disabled={busy !== null}
+                  />
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{ maxWidth: 320 }}
+                    maxLength={500}
+                    placeholder={M.transfer_reason_placeholder}
+                    aria-label={M.transfer_reason}
+                    value={transferReason}
+                    onChange={(e) => setTransferReason(e.target.value)}
+                    disabled={busy !== null}
+                  />
+                  <button
+                    type="button"
+                    style={btn(busy !== null || !transferEmail.trim() || !transferReason.trim())}
+                    disabled={busy !== null || !transferEmail.trim() || !transferReason.trim()}
+                    onClick={() => startTransfer()}
+                  >
+                    {busy === "transfer" ? C.sending : M.transfer_start}
+                  </button>
+                  <button type="button" style={smallBtn} disabled={busy !== null} onClick={() => setTransferOpen(false)}>
+                    {M.cancel}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <button type="button" style={smallBtn} disabled={busy !== null || transfer === null} onClick={() => setTransferOpen(true)}>
+                  {M.transfer_open}
+                </button>
+              </div>
+            )}
           </div>
         ) : !member.eligible ? (
           <NoData>{M.not_eligible}</NoData>
@@ -300,7 +456,7 @@ export function AccountsCard({ slug }: { slug: string }) {
         )}
         {issued && (
           <div style={{ marginTop: 8 }}>
-            {M.issued}
+            {member?.linked ? M.transfer_issued : M.issued}
             <code
               style={{
                 display: "block", marginTop: 4, padding: "6px 10px", borderRadius: 6, wordBreak: "break-all", userSelect: "all",
