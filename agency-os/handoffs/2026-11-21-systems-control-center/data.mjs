@@ -4,7 +4,7 @@
 
 export const META = {
   title: '系統總控中心 監工台',
-  updated: '2026-11-21',
+  updated: '2026-11-24',
   plan: 'agency-os/handoffs/2026-11-21-systems-control-center/PLAN.md',
   dispatch: 'agency-os/handoffs/2026-11-21-systems-control-center/DISPATCH.md',
   self: 'agency-os/handoffs/2026-11-21-systems-control-center/',
@@ -26,6 +26,8 @@ export const COPY = {
 export const NOW = [
   { what: '總控頁上線，照你給的面板補齊，含「立即更新」「新增系統」。', state: 'yes', ev: '2026-11-22 部署；按「立即更新」實測約 3 分鐘內匯入完成。' },
   { what: '30 個系統都有接續卡（最近完成、下一步、卡點）。', state: 'yes', ev: '30 筆有出處的起始資料已匯入；之後由 commit 的 Next: 自動更新。' },
+  { what: '每個系統的「下一步」只寫它自己的事，不再被別的系統的提交貼上。', state: 'yes', ev: '2026-11-24 部署 2438b1792；42 筆被貼到多個系統的舊下一步已略過，新提交改到多個系統又沒寫 System: 時列入缺口。' },
+  { what: '沒有監工頁的 17 個系統也有功能清單和進度，總控頁就是它們的監控台。', state: 'yes', ev: '新增 171 個功能，其中 169 筆狀態有出處、已匯入；之後靠 commit 的 Feature: 更新。' },
   { what: '已結束的監工頁搬進總控頁。', state: 'yes', ev: '6 頁搬入並凍結；其餘頁收尾後再搬。' },
 ];
 
@@ -48,6 +50,12 @@ export const STEPS = [
   { n: 6, code: 'B3', group: 'B3', title: '系統盤點與其餘監工頁切換', plain: '把所有系統寫進清單，讓程式路徑都有歸屬；其餘舊監工頁一次一個階段切換過來。',
     gate: '近 90 天非共用程式路徑全部有歸屬；切換的舊頁改成指向新頁。', risk: 'Medium', model: '待定', status: 'done', commit: 'f11c4ceaa', doneAt: '2026-11-21', decided: '你 2026-11-21 確認系統清單（29 個）。搬入：社群 v1.5、Foundry v1.7、內容行銷、排程脫離 Trigger、影片工具、VectorCraft。未搬：客戶怎麼來、員工權限、外聯、PhotoCraft（卡未完）、影音工作台（計畫有一張卡不在頁上）、影片剪輯補齊（ED.14 進行中）、影片融合（下一階段派工中）。', depends: ['B2'],
     what: 'PLAN.md 第 10 節步驟 3、4。', card: 'PLAN.md' },
+  { n: 7, code: 'W12', group: 'B5', title: '沒有監工頁的系統補功能清單', plain: '17 個系統沒有監工頁，也不另建；在系統清單寫下它們的功能，總控頁就能顯示進度。',
+    gate: '清單通過契約檢查；每筆狀態都有檔案行號出處；監工抽查三個系統。', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '2438b1792',
+    what: 'registry.json、seed/features.json。', depends: [], card: 'briefs/W12-feature-inventory.md' },
+  { n: 8, code: 'B5', group: 'B5', title: '下一步只歸一個系統', plain: '一個提交改到多個系統時，它的下一步不再貼到每個系統。',
+    gate: '匯入器與頁面測試綠；正式庫重算後每個系統顯示自己的下一步。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '2438b1792',
+    what: 'systems-import.py、projection.ts、store.ts、AGENTS.md §8。', depends: [], card: 'briefs/COMMON.md' },
 ];
 
 export const OPEN = [
@@ -86,6 +94,13 @@ export const RISKS = [
     { card: 'W1', risk: '主線被倒退又推回原處時，那段提交會一直被當成失效。', act: '從源頭關掉：GitHub 主線禁止強推（待決 3，需你同意改帳號設定）。' },
     { card: 'W1', risk: '一次撤銷多個提交並用預設訊息時，git 只記最後一個。', act: '記錄不處理：這是 git 本身的行為，agent 很少這樣用。' },
     { card: 'W2', risk: '後台資料夾的套件目錄是連到主工作區的捷徑，刪工作區前沒先移除會清空主工作區的套件。', act: '記錄：移除任何工作區前先拆捷徑（既有教訓）。' },
+  ] },
+  { batch: '第五批', rows: [
+    { card: 'B5', risk: '一個提交改到很多系統時，它的下一步被貼到每個系統（同一句出現在 15 個系統）。', act: '已修：下一步只給 System: 指名的系統或唯一的路徑主人；舊資料由頁面略過；AGENTS.md 規定改到多系統要寫 System:。' },
+    { card: 'B5', risk: '被略過的舊下一步裡如果帶「卡點已解除」，卡點會重新亮紅（審查發現）。', act: '已修：被略過的那筆照樣解除卡點；有測試。' },
+    { card: 'W12', risk: '17 個系統沒有功能清單，進度欄只顯示「尚未盤點」。', act: '已修：W12 依程式與 TASKS 建清單，每筆附出處；監工抽查塔羅、治理、Soulful 三個系統。' },
+    { card: 'W12', risk: '會議轉簡報的即時字幕與工作區頁只存在另一個 session 還沒推的提交裡。', act: '記錄：這 2 筆先不給狀態（顯示未開始），等那個 session 推上去後用 Feature: 更新。' },
+    { card: 'B5', risk: 'agent 仍常常改到多個系統卻沒寫 System:（本輪匯入有 12 筆）。', act: '接受：這些下一步改進缺口清單，不會貼錯；規則已寫進 AGENTS.md，之後會越來越少。' },
   ] },
   { batch: '第四批', rows: [
     { card: 'B3', risk: '正式頁少了原型的英文小標、圖示、整列可點、說明卡；資料空所以看起來壞掉。', act: '已修：逐元素對照原型補齊；狀態依最近 commit 推定並標「推定」；30 個系統匯入有出處的接續卡。' },
