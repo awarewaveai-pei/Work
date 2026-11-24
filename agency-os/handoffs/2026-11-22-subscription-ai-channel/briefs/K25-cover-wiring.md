@@ -9,6 +9,11 @@
 4. **刪掉舊的壓字**：`lib/content/image/make-image.ts` `toWebP` 的 `titleText` 疊字與 `buildTitleSvg`、`ContentImageInput.titleText/featuredImageFont/featuredImageTitlePosition`、網站設定頁的「精選圖片標題字型」「標題文字位置」兩個選項（`SiteManager.tsx:161-162`）。`featuredImageFont` 的既有值搬成 `cover.font`（讀取時相容，不改資料庫裡的舊資料）；`featuredImageTitlePosition` 不再使用（B 版型沒有位置選項）。grep 這三個識別符到 0 個使用點（測試一起清）。全站只剩一種封面做法。
 5. **社群貼文的圖**：先查自動產文的社群草稿現在附的是哪一張圖（操作者截圖裡草稿有一張圖）。若附的是文章的精選圖片／第一張內文圖 → 改成附套好版型的封面；若現在不附圖 → 不在本卡加，回報現況。
 
+6. **K10 驗收後交過來的三件**（監工 2026-11-24）：
+   - 封面底圖生不出來（`make.ts` K10 的 `coverUrl === null`）→ 拿內文第一張當底圖套版（`renderCover` 會 cover-fit 裁進圖區），題目的檢查項寫明「封面底圖改用內文第一張」；內文也一張都沒有 → 沒有精選圖片，寫明。
+   - 手動文章頁切換網站時，重新帶入新網站的風格與模型；這一篇已手動改過的欄位不覆蓋（K10 只在欄位為空時帶入，A 站切 B 站會沿用 A 站的風格）。
+   - 網站設定頁的圖片模型：選到自動產文用不了的（不在 `lib/content/image/article-image.ts` `ARTICLE_IMAGE_MODELS` 內，例如 `codex-image`、pexels 類）時，在該選項下方顯示一行說明「自動產文用不了這個模型，會改用 <預設模型的顯示名稱>；手動產文可以用」。文字照 UI 既有樣式，不新增元件庫。
+
 ## 既有資料
 已發佈文章的精選圖片不重做。網站沒有 `cover` 設定 → 預設值。舊的 `featuredImageFont: "serif"` → 封面字型 serif；`"none"`（原意：不要壓字）→ 封面仍套版型（操作者要全站統一），在回報的 RISKS 寫明哪些網站受影響。
 
