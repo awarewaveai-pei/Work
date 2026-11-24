@@ -14,7 +14,7 @@ oracle 是 `sg-deploy.sh` 的一個 app：`oracle-web`。主機與 SSH 見 `agen
 ## 主機上的位置
 - 原始碼（rsync 目的地）：`/root/lobster-phase1/apps/oracle-web/`；來源 `Projects/internal/ziwei-doushu/`（`sg-deploy.sh` `app_git_source_root`）。
 - 容器設定：`/root/lobster-phase1/docker-compose.yml` 的 `oracle-web` 服務（機器本地；repo 對照檔 `lobster-factory/infra/hetzner-phase1-core/docker-compose.yml`）。改它用 `safe-infra-patch.sh compose`。
-- 金鑰：`/root/lobster-phase1/apps/oracle-web/.env.production`（600；`OPENAI_API_KEY`、`OPENAI_MODEL_DEEP`）。不進 git、rsync 不動、不進映像（`.dockerignore`）。
+- 金鑰：`/root/lobster-phase1/apps/oracle-web/.env.production`（600；`OPENAI_API_KEY`；模型用 `lib/ai/models.ts` 預設，要覆寫才加 `OPENAI_MODEL_*`）。不進 git、rsync 不動、不進映像（`.dockerignore`）。
 - 對外：host nginx vhost → `127.0.0.1:3010`；`lobster-nginx` 以 `oracle-web:3000` 走 `lobster-net`（容器名不可改）。範本 `deploy/nginx/oracle.aware-wave.com.conf`。
 
 ## 上線後驗證（從外部）

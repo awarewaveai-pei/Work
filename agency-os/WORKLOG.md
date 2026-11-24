@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-24（續14）— oracle WP：GO-1 引擎部署（`a83b4284b`），原有網址逐頁不變
+
+- [根因] 引擎線上停在 2026-11-20；E1–E6 全未部署。操作者同意待決 4。
+- [步驟] ① 部署前：`lobster-nginx` access.log 尾 5000 筆 private=10／public=4990／distinct=53 → `X-Real-IP` 是訪客（`default.conf:33-40` `real_ip_header CF-Connecting-IP`）；基準 `capture.py before.json`（32 URL）。② `.env.production` 備份 `.bak-go1-20261124` 後刪 `OPENAI_MODEL_DEEP`。③ `sg-deploy.sh oracle-web`。④ `capture.py after.json` 比對。
+- [驗證] 部署 exit 0，smoke 10 項 OK（含 `oracle-web embed page`）。32 URL：status／Location／title／canonical／description／text_sha 全同；差異僅 `csp` False→True（30）、頁面 `Cache-Control` `s-maxage=31536000`→`no-store`（26）；sitemap／robots 標頭同。`docker exec oracle-web printenv OPENAI_MODEL_DEEP` exit 1；`ORACLE_SITES` exit 1。`POST /api/interpret` tier=deep → 200、`model=gpt-5.4`、2830 字、39.8s。外部 TTFB 0.64–0.74s ×5 頁；容器 96MiB／768MiB。
+- [未做] `ORACLE_SITES` 改到 GO-2（金鑰由外掛產生）；`lib/ai/models.ts` 預設仍是 5.4 系列（SPEC §8 的 6 系列屬 Z 卡）；`lobster-nginx` access.log 270MB 無輪替（記在監工台）。
+- [rollback] `rollback-phase1.sh restore oracle-web`；env：`cp -p .env.production.bak-go1-20261124 .env.production` 後 recreate。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh oracle-web；capture.py before/after 比對；docker exec oracle-web printenv OPENAI_MODEL_DEEP；curl POST /api/interpret | exit=0 | ms=240000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,Projects | grep=OPENAI_MODEL_DEEP | hits=6
+- ORACLE_WAIVED: 本次無 source 改動（部署＋文件）
 ## 2026-11-24（續13）— 系統總控中心批 7：卡點只看最新一次提交、四張統計卡不重疊（操作者截圖：「很奇怪的邏輯」，開發中 24／待確認 12／維護與已完成 6）
 
 - 根因：
