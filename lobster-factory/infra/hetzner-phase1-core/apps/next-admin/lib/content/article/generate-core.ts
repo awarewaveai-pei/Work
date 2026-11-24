@@ -456,7 +456,10 @@ function buildUserPrompt(params: {
       if (m.includeKeywordAlt) lines.push(`- First image alt-text must include the primary keyword`);
       if (m.autoAltText)       lines.push(`- Write descriptive SEO alt-text for every image placeholder`);
       if (m.strictUnderHeadings) lines.push(`- Place all images strictly under an H2 or H3 heading`);
-      lines.push(`- Format each placeholder as: ![alt-text here](IMAGE_PLACEHOLDER_N) where N = 1, 2, 3...`);
+      // K10: the quoted part is what the picture shows (the image prompt); the alt text stays for search engines. Every
+      // reader of a placeholder takes both forms (lib/content/image/article-image.ts imagePlaceholders).
+      lines.push(`- Format each placeholder as: ![alt-text here](IMAGE_PLACEHOLDER_N "English scene description") where N = 1, 2, 3...`);
+      lines.push(`- The alt text is in the article's language, for search engines. The quoted scene is ONE English sentence of what the picture shows for the section it sits in: a concrete subject, what it is doing, the setting and the light (people are fine). Never ask for words, letters, signs, logos or captions in the picture. No double quotes inside the scene.`);
     }
     if (m.youtubeSource && m.youtubeSource !== "none") {
       const layoutMap: Record<string, string> = {
@@ -519,6 +522,12 @@ function buildUserPrompt(params: {
       lines.push("CATEGORIES: [1-2 broad, conventional WordPress category names for this article, comma-separated — prefer terms a site would already have; do NOT invent narrow one-off categories]");
     }
     lines.push("TAGS: [4-6 specific topical tags, comma-separated]");
+    // K10: the cover picture is drawn from its own scene; its short title and subtitle are laid over it later (K25)
+    if (m?.aiImages && m.aiImages !== "none") {
+      lines.push("COVER_SCENE: [ONE English sentence of the cover picture for the whole article: a concrete subject, what it is doing, the setting and the light; no words, letters, signs or logos in the picture]");
+      lines.push("COVER_TITLE: [cover short title in the article's language, at most 16 full-width characters (about 32 Latin): what this article is; not the article title]");
+      lines.push("COVER_SUBTITLE: [cover subtitle in the article's language, at most 18 full-width characters (about 36 Latin): why it is worth reading]");
+    }
     lines.push("<!-- CONTENT_META_END -->");
     lines.push("");
     lines.push("Now output the meta block above, then write the complete article below it.");

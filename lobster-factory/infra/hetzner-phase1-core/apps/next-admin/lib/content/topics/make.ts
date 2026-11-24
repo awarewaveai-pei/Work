@@ -24,6 +24,7 @@ import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
 import { parseArticleMeta } from "@/lib/content/article/meta";
 import { makeContentImage } from "@/lib/content/image/make-image";
+import type { TarotModel } from "@/lib/tarot/image-gen";
 import { isR2Configured } from "@/lib/storage/r2";
 import { accountPlatforms, addVideo, getPost, listAccounts, savePost } from "@/lib/social/store";
 import { applyAction } from "@/lib/social/actions";
@@ -40,7 +41,8 @@ import { finalizeVideoJob } from "@/lib/content/video/finalize";
 import { embedVideoInPost, swapEmbeddedVideo } from "@/lib/content/video/embed-in-post";
 import { releaseTopicVideo } from "./video-release";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
-import { TOPIC_ARTICLE_IMAGES } from "./cost";
+import { TOPIC_ARTICLE_IMAGES, TOPIC_COVER_IMAGES } from "./cost";
+import { ARTICLE_COVER_RATIO, ARTICLE_IMAGE_RATIO, articleImageModel, articleImagesOff, articleStylePrompt, imagePlaceholders, placeholderScene } from "@/lib/content/image/article-image";
 import { DEFAULT_TOPIC_CAP_TWD, reserveStep, settleStep, spentSince, stepUpperTwd, topicBudget, type TopicBudget } from "./budget";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { MakeError, NOW_FORMATS, brandDay, personAsked, waitsForVideo, type Made, type Published, type PublishRun, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
@@ -57,6 +59,9 @@ export interface TopicArtifacts {
     wp_post_id: number | null; wp_edit_url: string | null; seo_score: number | null; summary: string; source: string; checks: ReviewCheck[];
     /** N1b: the site's must-carry paragraphs this article's checks looked for (absent on articles made before N1b). */
     required?: string[];
+    /** K10: the cover's scene, short title and subtitle from the meta block, and its picture (the draft's featured image;
+     *  null = none was made). K25 lays the title on it. Absent on articles made before K10. */
+    cover?: { scene?: string; title?: string; subtitle?: string; image_url: string | null };
     /** title = the title WordPress published it under (K23: the Facebook / Instagram link comment names it) */
     published?: { status: string; link: string; at: string; title?: string };
   };
@@ -82,19 +87,20 @@ type Guard = ((upperTwd: number, step: string) => Promise<void>) & { exact(reser
 export const SOCIAL_NOW_LEAD_MS = 2 * 60_000;
 
 export { TOPIC_ARTICLE_IMAGES };   // defined in cost.ts (the price counts the same images)
-const IMAGE_PLACEHOLDER = /!\[([^\]]*)\]\(IMAGE_PLACEHOLDER_\d+\)/g;
 
-/** Each image placeholder becomes a stored image (alt text = its prompt) or is removed; nothing unresolved reaches WordPress.
- *  At most `max` are made (the count the topic's cap reserved, N2): placeholders past it are removed, never paid for. */
-export async function fillArticleImages(markdown: string, make: (prompt: string) => Promise<string | null>, max = TOPIC_ARTICLE_IMAGES): Promise<{ markdown: string; images: string[] }> {
+/** Each image placeholder becomes a stored image or is removed; nothing unresolved reaches WordPress. The picture is drawn
+ *  from the placeholder's scene (K10), else its alt text (a draft before K10, a model that wrote none); the image keeps
+ *  only the alt text. At most `max` are made (the count the topic's cap reserved, N2): placeholders past it are removed,
+ *  never paid for. */
+export async function fillArticleImages(markdown: string, make: (scene: string) => Promise<string | null>, max = TOPIC_ARTICLE_IMAGES): Promise<{ markdown: string; images: string[] }> {
   const urls: Array<string | null> = [];
-  for (const m of markdown.matchAll(IMAGE_PLACEHOLDER)) {
+  for (const m of markdown.matchAll(imagePlaceholders())) {
     // one at a time: Replicate's low-balance burst limit is 1
-    urls.push(urls.length < max ? await make(m[1].trim()).catch(() => null) : null);
+    urls.push(urls.length < max ? await make(placeholderScene(m) || m[1].trim()).catch(() => null) : null);
   }
   const images: string[] = [];
   let i = 0;
-  const filled = markdown.replace(IMAGE_PLACEHOLDER, (_all, alt: string) => {
+  const filled = markdown.replace(imagePlaceholders(), (_all, alt: string) => {
     const url = urls[i++];
     if (!url) return "";
     images.push(url);
@@ -112,12 +118,13 @@ export async function optionalImageGrant(ask: () => Promise<Grant> = () => grant
  *  images = how many placeholders to ask for (0 when the organization has no content.image). The site's text road (K7)
  *  rides along only when set: a site without one gets exactly the input it got before (API only, default model). */
 export function articleInput(t: Pick<Topic, "keyword" | "title" | "angle">, d: SiteContentDefaults, images = 0): Record<string, unknown> {
+  // the model name only tells the writer images are wanted; makeArticle draws them on the same articleImageModel
   const details = [renderBrandVoice(d.marketing, d.brandVoiceInstructions), t.angle ? `切入角度：${t.angle}` : "", requiredBlocks(d).length ? `文末逐字附上以下段落，一字不改，每段自成一段：\n${requiredBlocks(d).join("\n\n")}` : ""].filter(Boolean).join("\n\n");
   const chain = siteTextChain(d);
   return {
     keyword: t.keyword, title: t.title, language: siteLanguage(d), targetCountry: d.targetCountry, tone: d.tone,
     articleType: d.articleType, readability: d.readability, pointOfView: d.pointOfView, details, generateMeta: true,
-    media: images > 0 ? { aiImages: "flux-schnell", imageCount: images, imageSize: "16:9" } : { aiImages: "none" },
+    media: images > 0 ? { aiImages: articleImageModel(d.imageModel), imageCount: images, imageSize: ARTICLE_IMAGE_RATIO } : { aiImages: "none" },
     ...(isAiTextModel(d.textApiModel) ? { model: d.textApiModel } : {}),
     ...(chain !== "api" ? { chain, ...(typeof d.textClaudeModel === "string" ? { claudeModel: d.textClaudeModel } : {}),
       ...(typeof d.textCodexModel === "string" ? { codexModel: d.textCodexModel } : {}) } : {}),
@@ -179,7 +186,8 @@ export type TopicMaker = "schedule" | "person";
 
 async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: TopicMaker, deadline?: number): Promise<NonNullable<TopicArtifacts["article"]>> {
   // no R2 = nowhere to keep an image WordPress can fetch, so none is paid for
-  const imageGrant = isR2Configured() ? await optionalImageGrant() : null;
+  // a site set to "None（不生成）" gets none either (K10)
+  const imageGrant = isR2Configured() && !articleImagesOff(site.defaults.imageModel) ? await optionalImageGrant() : null;
   const imageCount = imageGrant ? TOPIC_ARTICLE_IMAGES : 0;
   // The subscriptions run only for the operator's own organization (I1: never for a customer's site, whoever made the
   // road), and only with time left for the API after them (I5); otherwise the site's road is read as API only.
@@ -189,8 +197,11 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
   // _jobId: the article call's ai_call_logs row carries the topic id (generate-core prepareArticleGeneration)
   const caller: ArticleCaller = { ...(maker === "schedule" ? { lane: "schedule" as const } : {}), subBudgetMs: budgetMs };
   const input = { ...articleInput(t, defaults, imageCount), _jobId: t.id, ...(subs ? { [ARTICLE_CALLER]: caller } : {}) };
-  const road = { textChain: defaults.textChain, textApiModel: defaults.textApiModel };
-  const upper = stepUpperTwd.article(imageCount, road);
+  // K10: the images on the site's model and style, body + cover reserved together
+  const imageModel = articleImageModel(site.defaults.imageModel);
+  const coverCount = imageGrant ? TOPIC_COVER_IMAGES : 0;
+  const road = { textChain: defaults.textChain, textApiModel: defaults.textApiModel, imageModel };
+  const upper = stepUpperTwd.article(imageCount + coverCount, road);
   await guard(upper, "文章");
   const a = await runContentPipeline(input, { stages: ["article"] });
   if (!a.ok) throw new Error(`文章生成失敗：${(a as PipelineFailure).error}`);   // strict:false: !ok does not narrow
@@ -199,17 +210,23 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
   // a road with subscriptions: the article call's own cost replaces its reservation (a subscription answer = 0, the API
   // fallback = what it was billed); the images part stays until they are made. An API-only site keeps the estimate, as before.
   if (subs && billedTwd !== null) guard.exact(upper, billedTwd + (upper - stepUpperTwd.article(0, road)));
-  const { markdown, images } = await fillArticleImages(article, async (prompt) => {
+  const imageStyle = articleStylePrompt(site.defaults.imageStyle);
+  const draw = async (scene: string, aspectRatio: typeof ARTICLE_IMAGE_RATIO | typeof ARTICLE_COVER_RATIO = ARTICLE_IMAGE_RATIO) => {
     if (!imageGrant) return null;
-    const img = await makeContentImage({ model: "flux-schnell", prompt: prompt || t.title, aspectRatio: "16:9", seed: null,
+    const img = await makeContentImage({ model: imageModel as TarotModel, prompt: scene || t.title,
+      aspectRatio, seed: null, imageStyle, purpose: "article",
       costLog: { route: "content/topics", tool: "content", jobId: t.id } }, imageGrant);
     // WordPress takes only http(s) images: an unstored (data URL) image would vanish at publish
     return img.ok && (img as { stored: boolean }).stored ? (img as { imageUrl: string }).imageUrl : null;
-  }, imageCount);
+  };
+  const { markdown } = await fillArticleImages(article, (scene) => draw(scene), imageCount);
   const meta = parseArticleMeta(markdown);
+  // the cover: its own picture from its own scene, 16:9 (before K10 the first body image stood in for it)
+  const cover = meta?.cover;
+  const coverUrl = coverCount ? await draw(cover?.scene || meta?.seoTitle || t.title, ARTICLE_COVER_RATIO).catch(() => null) : null;
   const p = await runContentPipeline({
     markdown, focusKeyword: meta?.focusKeyword || t.keyword, seoTitle: meta?.seoTitle, metaDescription: meta?.metaDesc,
-    categories: meta?.categories, tags: meta?.tags, slug: meta?.slug, siteId: t.site_id, publishStatus: "draft", featuredImageUrl: images[0],
+    categories: meta?.categories, tags: meta?.tags, slug: meta?.slug, siteId: t.site_id, publishStatus: "draft", featuredImageUrl: coverUrl ?? undefined,
     request: orgIdentity(t.organization_id),
   }, { stages: ["quality", "publish"] });
   if (!p.ok) throw new Error(`WordPress 草稿失敗（${(p as PipelineFailure).failedStage}）：${(p as PipelineFailure).error}`);
@@ -221,6 +238,7 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
     source: markdown.replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "").trim().slice(0, 3000),
     checks: articleChecks(markdown, report, forbiddenTerms(site.defaults), requiredBlocks(site.defaults)),
     required: requiredBlocks(site.defaults),
+    ...(coverCount ? { cover: { ...cover, image_url: coverUrl } } : {}),
   };
 }
 

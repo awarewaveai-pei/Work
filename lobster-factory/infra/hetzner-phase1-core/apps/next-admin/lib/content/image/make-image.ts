@@ -4,6 +4,7 @@ import sharp from "sharp";
 import type { Grant } from "@/lib/entitlements/can";
 import { generateTarotImage, type AspectRatio, type TarotModel } from "@/lib/tarot/image-gen";
 import { isR2Configured, buildDesignKey, putDesignObject } from "@/lib/storage/r2";
+import { articleImagePrompt, articleStylePrompt } from "./article-image";
 
 /** Parse a data URL → { buffer, mime }. Returns null on malformed input. */
 function parseDataUrl(dataUrl: string): { buffer: Buffer; mime: string } | null {
@@ -99,8 +100,10 @@ export interface ContentImageInput {
   aspectRatio: AspectRatio;
   seed: number | null;
   referenceImages?: string[];
-  /** English style prompt (STYLE_CATALOG); empty = the plain social-graphic look. */
+  /** English style prompt (STYLE_CATALOG); empty = the plain social-graphic look (an article image: the photo look). */
   imageStyle?: string;
+  /** "article" (K10): prompt = the picture's scene, and the result = scene + style + the no-text tail (article-image.ts). */
+  purpose?: "article";
   /** Title overlay on hero/featured images; font "none" skips it. */
   titleText?: string;
   featuredImageFont?: string;
@@ -110,8 +113,10 @@ export interface ContentImageInput {
 
 /** A stable https URL when stored in R2 (stored), else a WebP data URL; ok:false carries the generator's error code. */
 export async function makeContentImage(i: ContentImageInput, grant: Grant): Promise<{ ok: true; imageUrl: string; stored: boolean; seed: number | null } | { ok: false; code: string }> {
-  const style = (i.imageStyle ?? "").trim().slice(0, 600);
-  const prompt = style ? `${i.prompt}, ${style}` : `${i.prompt}, professional social media graphic, high quality, clean composition, no text overlay`;
+  // a size guard for a client-sent style, above the catalog's longest prompt (659 chars, 2026-11-24): 600 cut 5 styles mid-word
+  const style = (i.imageStyle ?? "").trim().slice(0, 1000);
+  const prompt = i.purpose === "article" ? articleImagePrompt(i.prompt, style || articleStylePrompt(undefined))
+    : style ? `${i.prompt}, ${style}` : `${i.prompt}, professional social media graphic, high quality, clean composition, no text overlay`;
   const result = await generateTarotImage({ model: i.model, prompt, aspectRatio: i.aspectRatio, seed: i.seed, referenceImages: i.referenceImages, costLog: i.costLog }, grant);
   if (!result.ok) return { ok: false, code: (result as { ok: false; error: string }).error };
   const parsed = parseDataUrl(result.image);

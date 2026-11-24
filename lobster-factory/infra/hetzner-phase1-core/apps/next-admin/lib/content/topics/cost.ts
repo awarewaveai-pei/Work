@@ -2,14 +2,17 @@
 // presses it (memory: AI only on a button with its cost). Browser-safe: no server imports.
 import { featureUnitCostUsd, textCallCostUsd } from "@/lib/ai/cost-calculator";
 import { isAiTextModel, isTextChain } from "@/lib/ai/text-model-options";
-import { DEFAULT_IMAGE_MODEL, IMAGE_RATES, TEXT_FEATURES, TWD_RATE } from "@/lib/ai/cost-model";
+import { TEXT_FEATURES, TWD_RATE } from "@/lib/ai/cost-model";
+import { articleBodyImages, articleImageUsd } from "@/lib/content/image/article-image";
 import { MAX_WRITER_CALLS } from "@/lib/social/write-posts";
 import { articleVideoCostUsd } from "@/lib/content/video/defaults";
 
-/** Images per automatic article (the cheapest model, ~US$0.003 each): the article writes this many placeholders (make.ts)
- *  and the price below counts them -- one constant, so the estimate cannot drift from what is made (U11.5: 3 images were
- *  the gap between NT$7.4 shown and NT$10.2 spent). */
-export const TOPIC_ARTICLE_IMAGES = 3;
+/** Body images per automatic article (it is written at the default size, so 4: articleBodyImages): the article writes
+ *  this many placeholders (make.ts) and the price below counts them, plus the cover -- one constant, so the estimate
+ *  cannot drift from what is made (U11.5: 3 images were the gap between NT$7.4 shown and NT$10.2 spent). */
+export const TOPIC_ARTICLE_IMAGES = articleBodyImages();
+/** K10: the cover is its own picture (its own scene), not the first body image. */
+export const TOPIC_COVER_IMAGES = 1;
 
 /** A topic's median real spend (actual-cost.ts) replaces the price-list estimate once this many finished topics have one. */
 export const ACTUAL_MIN_TOPICS = 5;
@@ -28,8 +31,9 @@ export function dailyCostTwd(): number {
   return Math.ceil(featureUnitCostUsd(f) * TWD_RATE * 10) / 10;
 }
 
-/** Card K7: the site's text road as the price reads it (SiteContentDefaults textChain / textApiModel). */
-export interface TopicTextRoad { textChain?: unknown; textApiModel?: unknown }
+/** Card K7: the site's text road as the price reads it (SiteContentDefaults textChain / textApiModel); K10: and its
+ *  imageModel, which prices the article's images. */
+export interface TopicTextRoad { textChain?: unknown; textApiModel?: unknown; imageModel?: unknown }
 
 /** The article call's model part, USD: the feature's estimate on the site's API model (none set = the feature's own). */
 export function articleModelUsd(road?: TopicTextRoad): number {
@@ -41,7 +45,7 @@ export function articleModelUsd(road?: TopicTextRoad): number {
 export const subFirst = (road?: TopicTextRoad) => isTextChain(road?.textChain) && road.textChain !== "api";
 
 /** One topic made by the pipeline, in USD, for the formats it makes (default article + social): the article with its
- *  images (TOPIC_ARTICLE_IMAGES), the social rewrite (max = with the one shorter rewrite) and the video at the article page's default settings.
+ *  images (TOPIC_ARTICLE_IMAGES + the cover, on the site's image model), the social rewrite (max = with the one shorter rewrite) and the video at the article page's default settings.
  *  `road` (K7): the article on the site's API model; a road starting on a subscription leaves the article text out of
  *  the usual and keeps it in the max (the API writes it when the subscriptions cannot). */
 export function topicCostUsd(formats: readonly string[] = ["article", "social"], road?: TopicTextRoad): { usual: number; max: number } {
@@ -53,7 +57,7 @@ export function topicCostUsd(formats: readonly string[] = ["article", "social"],
   const round = (usd: number) => Math.ceil(usd * 100) / 100;
   const hasArticle = formats.includes("article");
   const swap = hasArticle && road ? articleModelUsd(road) - articleModelUsd() : 0;   // no road = the feature's own price, as before
-  const article = hasArticle ? unit("article") + swap + TOPIC_ARTICLE_IMAGES * (IMAGE_RATES[DEFAULT_IMAGE_MODEL]?.usd ?? 0) : 0;
+  const article = hasArticle ? unit("article") + swap + (TOPIC_ARTICLE_IMAGES + TOPIC_COVER_IMAGES) * articleImageUsd(road?.imageModel) : 0;
   const saved = hasArticle && subFirst(road) ? articleModelUsd(road) : 0;
   const social = formats.includes("social") || formats.includes("youtube") ? unit("syndicate") : 0;   // youtube's text is written too
   const video = formats.includes("video") || formats.includes("youtube") ? articleVideoCostUsd() : 0;

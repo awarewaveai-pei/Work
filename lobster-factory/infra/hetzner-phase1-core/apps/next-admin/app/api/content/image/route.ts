@@ -129,6 +129,8 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
     const result = await makeContentImage({
       model, prompt, aspectRatio, seed, referenceImages,
       imageStyle: typeof body.imageStyle === "string" ? body.imageStyle : "",
+      // the article page's body and cover images (K10): the prompt is the scene; style + no-text tail added there
+      ...(body.purpose === "article" ? { purpose: "article" as const } : {}),
       titleText: typeof body.titleText === "string" ? body.titleText.trim() : "",
       featuredImageFont: typeof body.featuredImageFont === "string" ? body.featuredImageFont.trim() : "sans",
       featuredImageTitlePosition: typeof body.featuredImageTitlePosition === "string" ? body.featuredImageTitlePosition.trim() : "bottom",

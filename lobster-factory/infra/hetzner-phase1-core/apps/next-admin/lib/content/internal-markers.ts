@@ -10,6 +10,8 @@
 // raw <a href> that both converters escape into visible code. The prompt forbids both (generate-core.ts SOURCE YEAR RULE,
 // LINKS); this is the guard for a model that ignores it. The year notes are an explicit list, so 「（2024）」 stays.
 
+import { imagePlaceholders } from "@/lib/content/image/article-image";
+
 /** The markers, for the record and for the test that runs all of them through both converters. */
 export const INTERNAL_MARKERS = [
   { marker: "<!-- CONTENT_META_START --> … <!-- CONTENT_META_END -->", source: "prompt: the meta block (title, description, slug…)", handling: "block removed" },
@@ -20,7 +22,7 @@ export const INTERNAL_MARKERS = [
   { marker: "<!-- any other HTML comment -->", source: "model or pasted text", handling: "removed; only a Gutenberg <!-- wp:… --> comment is kept" },
   { marker: "[COST_JSON]{…}", source: "stream: cost note for the browser", handling: "line removed" },
   { marker: "[YOUTUBE_PLACEHOLDER_N: …]", source: "prompt: video cue", handling: "removed (a resolved one is a bare URL already)" },
-  { marker: "![alt](IMAGE_PLACEHOLDER_N)", source: "prompt: image cue", handling: "removed when still unresolved (make.ts / the studio fill it first)" },
+  { marker: "![alt](IMAGE_PLACEHOLDER_N \"scene\")", source: "prompt: image cue (the scene since K10)", handling: "removed when still unresolved (make.ts / the studio fill it first)" },
   { marker: "[KADENCE_PATTERN: id] inside a sentence", source: "prompt: pattern cue", handling: "removed; ALONE on its line it is a feature (converted to a wp:block ref) and kept" },
   { marker: "（年份未核）（無固定出版年）（出版年份待查）（X，未註明年份）…", source: "model: editor note on an unknown source year", handling: "note removed; a source name in the same brackets kept, emptied brackets dropped" },
   { marker: "<a href=\"https://…\">text</a>", source: "model: raw HTML link instead of Markdown", handling: "rewritten to [text](url), so the converters' URL check and link output apply" },
@@ -54,7 +56,9 @@ export function scrubInternalMarkers(md: string): string {
     .replace(/[ \t]*<!--(?!\s*\/?wp:)[\s\S]*?-->/g, "")
     .replace(/^[ \t]*\[COST_JSON\].*$/gm, "")
     .replace(/\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]/g, "")
-    .replace(/!\[[^\]]*\]\(IMAGE_PLACEHOLDER_\d+\)/g, "")
+    .replace(imagePlaceholders(), "")
+    // any other leftover shape of the cue (a scene quoted some other way): the whole cue goes, never its text
+    .replace(/!\[[^\]\n]*\]\(IMAGE_PLACEHOLDER_\d+[^\n]*?\)/g, "")
     // only INLINE pattern leftovers; a standalone line is converted by the converters' main loop
     .replace(/(?<=\S)[ \t]*\[KADENCE_PATTERN:\s*\d+\s*\]/gi, "")
     .replace(/\[KADENCE_PATTERN:\s*\d+\s*\][ \t]*(?=\S)/gi, "")

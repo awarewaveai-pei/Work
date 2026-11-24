@@ -75,6 +75,9 @@ export interface SiteContentDefaults {
   language?: string;
   targetCountry?: string;
   imageModel?: string;
+  /** K10: the article images' style, a STYLE_CATALOG key (public/editor-shared/art-styles.js), never the prompt itself;
+   *  missing or unknown = the photo look (lib/content/image/article-image.ts articleStyleKey). */
+  imageStyle?: string;
   tone?: string;
   articleType?: string;
   readability?: string;

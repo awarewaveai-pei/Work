@@ -6,7 +6,7 @@ import { featureUnitCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { DEFAULT_IMAGE_MODEL, IMAGE_RATES, TEXT_FEATURES } from "@/lib/ai/cost-model";
 import { ACTUAL_FIRST_DAY, medianOf, recentTopicActual } from "../actual-cost";
 import { TOPIC_BUDGET_EPOCH } from "../budget";
-import { ACTUAL_MIN_TOPICS, TOPIC_ARTICLE_IMAGES, costBasisNote, topicCostUsd, topicShownTwd } from "../cost";
+import { ACTUAL_MIN_TOPICS, TOPIC_ARTICLE_IMAGES, TOPIC_COVER_IMAGES, costBasisNote, topicCostUsd, topicShownTwd } from "../cost";
 import { TOPIC_ARTICLE_IMAGES as MAKE_IMAGES } from "../make";
 
 type Row = Record<string, unknown>;
@@ -38,10 +38,15 @@ const topic = (i: number, day: string, formats = ["article", "social"]) => ({ id
 const logs = (spentUsd: number[], at: string) => spentUsd.map((usd, i) => ({ id: i + 1, job_id: `t${i}`, cost_usd: usd, created_at: at }));
 
 describe("topic price counts the article's images", () => {
-  it("the article price = the article feature + TOPIC_ARTICLE_IMAGES images, and the constant is the one make.ts writes", () => {
+  it("the article price = the article feature + TOPIC_ARTICLE_IMAGES body images + the cover, and the constant is the one make.ts writes", () => {
     const f = TEXT_FEATURES.find((x) => x.key === "article")!;
-    const expected = Math.ceil((featureUnitCostUsd(f) + TOPIC_ARTICLE_IMAGES * IMAGE_RATES[DEFAULT_IMAGE_MODEL].usd) * 100) / 100;
+    const images = TOPIC_ARTICLE_IMAGES + TOPIC_COVER_IMAGES;
+    const expected = Math.ceil((featureUnitCostUsd(f) + images * IMAGE_RATES[DEFAULT_IMAGE_MODEL].usd) * 100) / 100;
     expect(topicCostUsd(["article"]).usual).toBe(expected);
+    // K10: on the site's image model (an unusable one = the default)
+    const onMax = Math.ceil((featureUnitCostUsd(f) + images * IMAGE_RATES["flux-2-max"].usd) * 100) / 100;
+    expect(topicCostUsd(["article"], { imageModel: "flux-2-max" }).usual).toBe(onMax);
+    expect(topicCostUsd(["article"], { imageModel: "codex-image" }).usual).toBe(expected);
     expect(topicCostUsd(["article"]).usual).toBeGreaterThan(Math.ceil(featureUnitCostUsd(f) * 100) / 100);
     expect(MAKE_IMAGES).toBe(TOPIC_ARTICLE_IMAGES);
   });

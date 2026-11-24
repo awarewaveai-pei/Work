@@ -34,7 +34,13 @@ describe("article image instructions", () => {
 
   it("requested images: numbered placeholders the image step replaces", async () => {
     const c = await prompts({ ...base, media: { aiImages: "flux", imageCount: 2 } });
-    expect(c.userPrompt).toContain("![alt-text here](IMAGE_PLACEHOLDER_N)");
+    expect(c.userPrompt).toContain('![alt-text here](IMAGE_PLACEHOLDER_N "English scene description")');
     expect(c.userPrompt).not.toContain("IMAGES: none");
+  });
+
+  it("requested images with meta: the meta block asks for the cover's scene, short title and subtitle (K10)", async () => {
+    const c = await prompts({ ...base, generateMeta: true, media: { aiImages: "flux", imageCount: 2 } });
+    for (const k of ["COVER_SCENE:", "COVER_TITLE:", "COVER_SUBTITLE:"]) expect(c.userPrompt).toContain(k);
+    expect((await prompts({ ...base, generateMeta: true })).userPrompt).not.toContain("COVER_SCENE:");
   });
 });
