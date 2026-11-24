@@ -15,12 +15,15 @@
     - 登入：mu-plugin 一次性探針（?awbridge_probe=<本機產生的 token>）替測試會員設 cookie 後導向「我的帳號」。
     - 截圖：Edge headless（--disable-gpu，不用 GPU）；PASS／FAIL 以同一頁的 DOM 文字判斷。
 
-  三種情境（stub 讀 $env:TEMP\local-member-flow\scenario.txt）：
+  情境（stub 讀 $env:TEMP\local-member-flow\scenario.txt）：
     held   = 持有：內容行銷 方案內 9（可進入）、影片製作 未開通（不可進入），點數 1,240
     none   = 未開通：兩個產品都未開通，沒有任何「進入」產品按鈕（只剩工作台）
     down   = 退場：app 回 503 → 「暫時讀不到你的產品清單」＋工作台＋重新整理
+    代辦（M6，ADR 021 D4）：會員開邀請連結 /?aw_invite=<碼>，外掛以付款事件同一把密鑰簽 member_invite 送 stub：
+      invite-ok      = stub 回 200 → 「已連上〈Local Test Co〉」＋「到我的帳號」
+      invite-expired = stub 回 409 invite_expired → 「這個邀請已過期」＋下一步
 
-  結束碼：0 = 三種都 PASS；1 = 有 FAIL；2 = 環境起不來（附原因）。密鑰與 token 只存在本機 $env:TEMP，不寫進 repo。
+  結束碼：0 = 全部情境都 PASS；1 = 有 FAIL；2 = 環境起不來（附原因）。密鑰與 token 只存在本機 $env:TEMP，不寫進 repo。
 
 .PARAMETER Port
   本機 WordPress 的 php -S 埠（預設 18770）。
@@ -125,11 +128,14 @@ $null = Invoke-WpOk "activate aware-wave-store" plugin activate aware-wave-store
 # 3) local-only secrets (new each run; never written under the repo)
 function New-Secret([int]$n) { -join ((48..57) + (65..90) + (97..122) | Get-Random -Count $n | ForEach-Object { [char]$_ }) }
 $handoffSecret = New-Secret 40
+$paymentsSecret = New-Secret 40   # member events are signed like payment events (Settings::paymentHeaders)
+$inviteCode = New-Secret 43        # shape of next-admin identities.ts INVITE_CODE_RE
 $probeToken = New-Secret 32
 [IO.File]::WriteAllText((Join-Path $work "probe-token.txt"), $probeToken, $utf8)
 $null = Invoke-WpOk "payments on" option update aware_wave_payments_enabled 1
 $null = Invoke-WpOk "target" option update aware_wave_payments_target $stubUrl
 $null = Invoke-WpOk "handoff secret" option update aware_wave_handoff_secret $handoffSecret
+$null = Invoke-WpOk "payments secret" option update aware_wave_payments_secret $paymentsSecret
 
 # 4) test member (customer, email already verified: the verify click is covered by EmailVerification tests)
 $email = "member-flow@local.test"
@@ -154,6 +160,8 @@ add_action('init', function () {
 	if (!$u) { status_header(404); exit('no member'); }
 	wp_set_current_user($u->ID);
 	wp_set_auth_cookie($u->ID);
+	// &aw_invite=<code>: land on the invite link signed in (MemberInvite handles it on the next request)
+	if (!empty($_GET['aw_invite'])) { wp_safe_redirect(add_query_arg('aw_invite', rawurlencode((string) $_GET['aw_invite']), home_url('/'))); exit; }
 	wp_safe_redirect(function_exists('wc_get_page_permalink') ? wc_get_page_permalink('myaccount') : home_url('/'));
 	exit;
 });
@@ -162,7 +170,7 @@ add_action('init', function () {
 
 $stubJs = @'
 const http = require("http"), crypto = require("crypto"), fs = require("fs");
-const [port, secret, scenarioFile, logFile] = process.argv.slice(2);
+const [port, secret, scenarioFile, logFile, paySecret] = process.argv.slice(2);
 const log = (o) => fs.appendFileSync(logFile, JSON.stringify(o) + "\n");
 const held = { ok: true, unit: { name: "Local Test Co" }, wallet: { balance: 1240, frozen: false }, products: [
   { key: "content", name: "內容行銷", right: { kind: "contract", label: "方案內 9", counts: {} }, can_enter: true, url: "https://content.aware-wave.com/" },
@@ -175,6 +183,21 @@ http.createServer((req, res) => {
   req.on("data", (c) => (raw += c));
   req.on("end", () => {
     const send = (status, obj) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
+    const sc = fs.readFileSync(scenarioFile, "utf8").trim();
+    if (req.url === "/api/webhooks/awarewave-wp-member") {
+      // member events: the payment-event signature (X-AwareWave-Payment-Signature, payments secret), no ts
+      const pw = crypto.createHmac("sha256", paySecret).update(raw).digest("base64");
+      const pg = String(req.headers["x-awarewave-payment-signature"] || "");
+      let mb = {}; try { mb = JSON.parse(raw); } catch (e) {}
+      const mSig = pg.length === pw.length && crypto.timingSafeEqual(Buffer.from(pg), Buffer.from(pw));
+      const mShape = req.method === "POST" && mb.kind === "member_invite" && Number.isInteger(mb.wp_user_id) && mb.wp_user_id > 0
+        && typeof mb.email === "string" && mb.email_verified === true && /^[A-Za-z0-9_-]{43}$/.test(String(mb.invite_code));
+      log({ path: req.url, sigOk: mSig, fresh: true, shape: mShape, keys: Object.keys(mb).sort() });
+      if (!mSig) return send(401, { ok: false, error: "invalid_signature" });
+      if (!mShape) return send(400, { ok: false, error: "invalid_json" });
+      if (sc === "invite-expired") return send(409, { ok: false, error: "invite_expired" });
+      return send(200, { ok: true, organization: { name: "Local Test Co" } });
+    }
     const want = crypto.createHmac("sha256", secret).update(raw).digest("base64");
     const got = String(req.headers["x-awarewave-handoff-signature"] || "");
     let body = {}; try { body = JSON.parse(raw); } catch (e) {}
@@ -184,7 +207,6 @@ http.createServer((req, res) => {
     log({ path: req.url, sigOk, fresh, shape, keys: Object.keys(body).sort() });
     if (!sigOk || !fresh) return send(401, { ok: false, error: !sigOk ? "invalid_signature" : "stale_request" });
     if (!shape) return send(400, { ok: false, error: "invalid_json" });
-    const sc = fs.readFileSync(scenarioFile, "utf8").trim();
     if (sc === "down") return send(503, { ok: false, error: "unavailable" });
     return send(200, sc === "none" ? none : held);
   });
@@ -230,7 +252,7 @@ $fails = 0
 $results = @()
 try {
     Set-Content -LiteralPath $scenarioFile -Value "held" -Encoding ASCII
-    $procs += Start-Process -FilePath node -ArgumentList @("`"$stubPath`"", $StubPort, $handoffSecret, "`"$scenarioFile`"", "`"$stubLog`"") -WindowStyle Hidden -PassThru
+    $procs += Start-Process -FilePath node -ArgumentList @("`"$stubPath`"", $StubPort, $handoffSecret, "`"$scenarioFile`"", "`"$stubLog`"", $paymentsSecret) -WindowStyle Hidden -PassThru
     $procs += Start-Process -FilePath php -ArgumentList @("-S", "127.0.0.1:$Port", "-t", "`"$wpRoot`"") -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $work "php-out.log") -RedirectStandardError (Join-Path $work "php-err.log")
     $deadline = (Get-Date).AddSeconds(30)
@@ -247,15 +269,22 @@ try {
         @{ name = "none"; must = @("我的 AwareWave 產品", "內容行銷", "影片製作", "未開通", "進入我的工作台");
            mustNot = @("方案內", "暫時讀不到你的產品清單"); entries = 1 },   # workspace only
         @{ name = "down"; must = @("暫時讀不到你的產品清單", "進入我的工作台", "重新整理");
-           mustNot = @("內容行銷", "影片製作", "方案內"); entries = 1 }
+           mustNot = @("內容行銷", "影片製作", "方案內"); entries = 1 },
+        # 代辦 (M6): the probe lands on /?aw_invite=<code> signed in; the summary is the held one
+        @{ name = "invite-ok"; invite = $true; must = @("單位邀請", "已連上〈Local Test Co〉", "到我的帳號", "我的 AwareWave 產品");
+           mustNot = @("已過期", "暫時連不上"); entries = 2 },
+        @{ name = "invite-expired"; invite = $true; must = @("單位邀請", "這個邀請已過期", "請聯絡我們重新發一個邀請");
+           mustNot = @("已連上〈", "暫時連不上"); entries = 2 }
     )
     foreach ($c in $cases) {
         Set-Content -LiteralPath $scenarioFile -Value $c.name -Encoding ASCII
         $null = Invoke-Wp transient delete --all          # the plugin keeps a success 60 s per user
+        foreach ($k in @("aware_wave_member_invite_code", "aware_wave_member_invite_result")) { $null = Invoke-Wp user meta delete $uid $k }
         $png = Join-Path $work ("my-account-{0}.png" -f $c.name)
         $dom = Join-Path $work ("my-account-{0}.html" -f $c.name)
         foreach ($f in @($png, $dom)) { if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force } }
         $url = "$base/?awbridge_probe=$probeToken"
+        if ($c.ContainsKey("invite")) { $url += "&aw_invite=$inviteCode" }
         $common = @("--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars", "--disable-sync", "--log-level=3", "--window-size=1024,1400", "--virtual-time-budget=15000")
         $run = Get-Date -Format "HHmmssfff"
         $ok1 = Invoke-Edge "$work\edge-$run-shot" ($common + @("--screenshot=`"$png`"", "`"$url`"")) $png
@@ -276,6 +305,8 @@ try {
     # the stub saw only well-formed, correctly signed, fresh requests (signature + body shape + no wp-handoff body)
     $reqs = if (Test-Path -LiteralPath $stubLog) { @(Get-Content -LiteralPath $stubLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json }) } else { @() }
     $bad = @($reqs | Where-Object { -not ($_.sigOk -and $_.fresh -and $_.shape) })
+    $memberReqs = @($reqs | Where-Object { $_.path -eq "/api/webhooks/awarewave-wp-member" })
+    if ($memberReqs.Count -lt 2) { $fails++; $results += [pscustomobject]@{ Scenario = "invite-wire"; Verdict = "FAIL"; Screenshot = "-"; Problems = "stub saw $($memberReqs.Count) member_invite events, expected >= 2" } }
     if ($reqs.Count -lt 3) { $fails++; $results += [pscustomobject]@{ Scenario = "wire"; Verdict = "FAIL"; Screenshot = "-"; Problems = "stub saw $($reqs.Count) requests, expected >= 3" } }
     elseif ($bad.Count -gt 0) { $fails++; $results += [pscustomobject]@{ Scenario = "wire"; Verdict = "FAIL"; Screenshot = "-"; Problems = "$($bad.Count) request(s) with bad signature/ts/shape: $stubLog" } }
     else { $results += [pscustomobject]@{ Scenario = "wire"; Verdict = "PASS"; Screenshot = "-"; Problems = "" } }

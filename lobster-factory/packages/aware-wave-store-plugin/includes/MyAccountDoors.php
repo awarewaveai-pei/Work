@@ -104,7 +104,9 @@ final class MyAccountDoors {
 		return $host === $parent || substr( $host, -strlen( '.' . $parent ) ) === '.' . $parent;
 	}
 
-	const CSS = '.awbridge-doors{list-style:none;margin:0 0 12px;padding:0}.awbridge-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 8px}.awbridge-name{flex:1 1 12em}.awbridge-doors form{margin:0}.awbridge-actions{display:flex;flex-wrap:wrap;gap:8px}.awbridge-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;box-sizing:border-box}';
+	// The buttons look like buttons on a theme without .button styles (W5: a bare <button> is 13px): :where() = zero
+	// specificity, so a theme's own .button rules still win. The status label sits right after the name; the 進入 goes right.
+	const CSS = '.awbridge-doors{list-style:none;margin:0 0 12px;padding:0}.awbridge-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 8px}.awbridge-name{flex:0 1 auto}.awbridge-doors form{margin:0}.awbridge-doors .awbridge-row form{margin:0 0 0 auto}.awbridge-actions{display:flex;flex-wrap:wrap;gap:8px}.awbridge-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;box-sizing:border-box}:where(.awbridge-btn){font:inherit;font-weight:600;line-height:1.2;padding:.5em 1.2em;border:1px solid currentColor;border-radius:4px;background:transparent;color:inherit;text-decoration:none;cursor:pointer}';
 
 	private static function e( string $text ): string {
 		return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );

@@ -107,6 +107,8 @@ final class StoreModule {
 		}
 
 		( new EmailVerification() )->register();
+		// Staff-invited members (ADR 021 D4): the code is sent only after the email is verified (MemberInvite).
+		( new MemberInvite( $settings, $http, new WpMembers(), new TransientSummaryCache() ) )->register();
 		( new GoogleSignup() )->register();
 		( new WelcomeGift( $settings->welcomeProductId, $shop ) )->register();
 		( new CheckoutGate( $shop, $settings ) )->register();
