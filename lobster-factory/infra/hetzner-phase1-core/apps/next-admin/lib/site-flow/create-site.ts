@@ -7,7 +7,7 @@
 // - environments.metadata.host_slug is what gate-client.ts gateTargetOf reads as the site's code on the host
 //   (container <slug>-wp, volume <slug>_wordpress_data). It is derived from the domain and written here, once.
 // - Two sites must never share a host_slug (one container name): checked against every non-archived environment
-//   first; with 0179 applied a concurrent create's insert also fails (records `conflict`) and is read as taken.
+//   first; with 0181 applied a concurrent create's insert also fails (records `conflict`) and is read as taken.
 // - A new client's organization gets id = siteId, so a repeat or a concurrent twin of the same request finds ITS
 //   organization (records createOnly + id) while any other client with the same slug is still `slug_taken`.
 // - An existing client is never changed: no organization write at all; only a workspace/project is added when it has
@@ -145,7 +145,7 @@ export async function createSiteFlow(db: SupabaseClient, input: CreateSiteInput)
     ...(site.value.created ? { status: "pending" as const } : {}),
     metadata: { host_slug: hostSlug, plugin_packs: input.packs, source: "site_flow" },
   });
-  // conflict = 0179 refused the write: a concurrent create put this host_slug on another site's live environment. The
+  // conflict = 0181 refused the write: a concurrent create put this host_slug on another site's live environment. The
   // site row stays (environment-less draft): deleting it would cascade (environments, 0001_core.sql:138) into a twin
   // request's environment written meanwhile.
   if ("error" in env) return env.error === "conflict" ? fail("host_slug_taken", hostSlug) : fail(env.error, env.detail);

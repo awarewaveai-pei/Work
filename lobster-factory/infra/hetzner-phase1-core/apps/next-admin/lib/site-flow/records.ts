@@ -6,9 +6,9 @@
 // - ensureOrganization never changes an existing organization. Its metadata is only ADDED to: a key the row
 //   already has keeps its value (nested objects recurse), and the keys that were not applied come back in
 //   `keptKeys`. Editing a client's settings goes through its own endpoints, not through "create".
-// - ensureEnvironment does not need the 0176 / 0179 partial unique indexes to be idempotent (select first); with them
+// - ensureEnvironment does not need the 0176 / 0181 partial unique indexes to be idempotent (select first); with them
 //   applied, a concurrent insert's 23505 is read back as the existing row, or is `conflict` when the row that holds the
-//   key is not this site's (0179: another site's live environment already uses the host_slug).
+//   key is not this site's (0181: another site's live environment already uses the host_slug).
 // - Every write of environments.metadata goes through updateEnvironmentCas (CAS on updated_at): ensureEnvironment and
 //   the steps' patchEnvironmentMetadata both read-merge-write it, so a blind write would drop the other's keys.
 // - Concurrent creates of the same thing converge on one row: ensureSite reads a 23505 back, ensureProject (no unique
@@ -420,7 +420,7 @@ export async function ensureEnvironment(db: Db, input: EnsureEnvironmentInput): 
     if (isUniqueViolation(error)) {
       const raced = await updateExisting();
       if (raced) return raced;
-      // the key is held by a row that is not this site's live environment (0179: another site's host_slug)
+      // the key is held by a row that is not this site's live environment (0181: another site's host_slug)
       return fail("conflict", "unique key held by another row");
     }
     return fail("create_failed", error.message);
@@ -465,7 +465,7 @@ export async function updateEnvironmentCas(
       .eq("id", environmentId)
       .eq("updated_at", row.updated_at)
       .select("id");
-    // 23505 here = the merged metadata took a key another live row holds (0179 host_slug): the caller's `conflict`
+    // 23505 here = the merged metadata took a key another live row holds (0181 host_slug): the caller's `conflict`
     if (upErr) return isUniqueViolation(upErr) ? fail("conflict", "unique key held by another row") : fail("update_failed", upErr.message);
     if (Array.isArray(moved) && moved.length === 1) return { ok: true, value: null };
   }
