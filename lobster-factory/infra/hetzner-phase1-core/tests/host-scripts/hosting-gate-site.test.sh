@@ -83,9 +83,9 @@ echo "docker $*" >> /t/calls.log
 case "$1" in
   image)  [ -f $S/image ]; exit ;;
   build)  touch $S/image; exit 0 ;;
-  volume) v="${@: -1}"; [ -f "$S/vol.$v" ] || exit 1; cat "$S/vol.$v"; exit 0 ;;
+  volume) v="${@: -1}"; [ -f "$S/vol.$v" ] || { echo; exit 1; }; cat "$S/vol.$v"; exit 0 ;;   # docker 29: empty line on stdout when missing
   inspect)
-    c="${@: -1}"; [ -f "$S/ct.$c" ] || exit 1
+    c="${@: -1}"; [ -f "$S/ct.$c" ] || { echo; exit 1; }
     case "$*" in *State.Running*) [ "$(cut -d'|' -f1 "$S/ct.$c")" = running ] && echo true || echo false ;; *) cat "$S/ct.$c" ;; esac
     exit 0 ;;
   exec) ;;

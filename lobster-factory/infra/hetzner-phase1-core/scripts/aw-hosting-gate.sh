@@ -313,7 +313,14 @@ slug_lock() {
 slug_busy() { ( exec 9>"$(client_wp_lock_file "$SLUG")" && ! flock -n 9 ); }   # after client_wp_lock_dir_ready
 
 ct_state() {  # <container> -> absent | <status>|<health>
-  docker inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1" 2>/dev/null || echo absent
+  # Decided by the exit status, never by appending to the output: docker 29 prints an empty line on stdout when the
+  # object does not exist, so "inspect ... || echo absent" gave an empty line plus absent, and no == absent matched.
+  local s
+  if s="$(docker inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1" 2>/dev/null)"; then
+    echo "$s"
+  else
+    echo absent
+  fi
 }
 vol_label() { docker volume inspect -f '{{index .Labels "com.docker.compose.project"}}' "$1" 2>/dev/null; }
 internal_code() {  # <port> <domain>: HTTP code of the site on its loopback port with its own Host header
