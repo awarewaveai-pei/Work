@@ -6,6 +6,16 @@
 
 設計正本：產品 `briefs/ORACLE-WP-SPEC.md`；平台 `briefs/SITE-FLOW-COMPLETION-PLAN.md`；決策 `agency-os/reports/decisions/2026-11-21-oracle-wp-front-door-architecture.md`。本檔只寫「誰做、何時做、怎麼收」，不重述做法。
 
+## 0. 現況快照（2026-11-24；接手先讀這節，再讀 `data.mjs`）
+
+- 批 1、2、3 全部併入，整批 RISKS 總檢完成（`data.mjs` 三張表）。批 4 六張：E6、P4、SF-K、SF-J2 程式、SF-I2 已併入；**SF-P 未提交**（線 4 `wp-admin`，worktree `D:/Worktrees/Work/quizzical-pasteur-f7ea2d`，32 檔已 staged，續做法在該 worktree 的 `HANDOFF-SF-P.md`；2026-11-24 已叫回提交）。
+- 下一步依序：① SF-P 交回 → 讀回報與盤點表 → `pick`（下述做法）→ next-admin 全套 vitest → push。② 批 4 整批 RISKS 總檢：未處置清單在 `agency-os/WORKLOG.md` 2026-11-23 續11（E6、P4、SF-K、SF-J2）與續13（SF-I2），加 SF-P 的；寫進 `data.mjs` 新表「第四批」。③ 監工自己：備份腳本單站 `.env` 錯誤改計 `SITE_ERRORS`、三支備份腳本上主機（SF-L 前置）。④ 批 5：SF-L → GO-1 → GO-2 → GO-3、SF-O、SF-A。
+- 等操作者點頭（`data.mjs` `OPEN`，到時一次問一件）：#3 SF-L、#4 GO-1、#5 GO-2、#6 GO-3、#7 套用 migration `0179_environments_host_slug_unique`（未併入，參照 `refs/keep/sf-j2-0179`）、#8 建 `awarewaveai-pei/aware-wave-oracle` 公開 repo 並發佈外掛第一版。#1（0176）、#2（MainWP 金鑰）已完成。
+- 部署狀態：引擎線上仍是 2026-11-20 版，main 上所有引擎卡未部署（GO-1）；主機 `oracle-web` env `OPENAI_MODEL_DEEP=gpt-4o-2024-11-20` 要在 GO-1 移除；外掛 0.5.0 未安裝到任何網站；next-admin 每晚 03:00 自動部署，`site.*` 七個 catalog 開關全關、主機開關檔未設 `AW_SITE_VERBS=on`；`AW_SITE_GATEWAY_SLUGS` 未設（GO-2 前加 oracle 的 slug）。
+- 併入做法（`D:\Work` 常被別的 session 的本機 commit 卡住，不在那裡併）：在 `D:/Worktrees/Work/oracle-int` `git fetch && git checkout --detach origin/main && git cherry-pick <sha>` → 引擎在該處跑 `npx tsc --noEmit`＋`npx vitest run`；next-admin 要到有 `node_modules` 的工人 worktree（閒置的那個）`git checkout --detach <整合後 sha>` 跑全套 → `git push origin HEAD:main`。文件與 WORKLOG 也在 `oracle-int` 提交（`python /d/Work/scripts/worklog-insert-entry.py <檔> --date <日> --worklog agency-os/WORKLOG.md`）。監工台從 `oracle-int` 的 `supervisor.html` 發布並帶 `url=`。
+- 工人：四條線的 session id 用 `list_sessions {linked:true}` 依 name 查（`wp-engine-a`／`wp-engine-b`／`wp-host`／`wp-admin`）。同帳號共用額度，四個同時跑約一小時多撞 5 小時上限；停了就等重設後用訊息叫回（讀各自的 `HANDOFF-<卡>.md`）。next-admin 全套 vitest 在本機同時跑多個 session 時會有 `app/api/social`、`ops/billing` 的逾時紅燈，重跑即過。
+- 規格外的後續（未派工）：`ORACLE-WP-SPEC.md` §8 深度付費報告（Z1–Z3；單次購買、OpenAI、免費版約 1,500 字六段＋一段完整試讀、結尾一次收束）、§9 梅花易數（M1–M3）。Codex 額度 2026-11-24 起恢復，之後的卡可恢復 `/codex-review`。
+
 ## 1. 批次
 
 同一批內的卡同時做（各自 worktree、檔案不重疊）；一條線＝一個工人 session，線內依序。批與批之間做一次「一起看 RISKS」（§5）。
