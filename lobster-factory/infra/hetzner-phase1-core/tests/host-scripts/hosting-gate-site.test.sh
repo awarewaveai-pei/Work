@@ -124,6 +124,7 @@ f,op,k,v=sys.argv[1:5]; d=json.load(open(f))
 if (op=="update") != (k in d): sys.exit(1)
 d[k]=v; json.dump(d,open(f,"w"))' "$S/json.$c.$4" "$3" "$5" "$6" ;;
   "option update "*)   echo "$4" > "$S/opt.$c.$3" ;;
+  "rewrite structure "*) echo "$3" > "$S/json.$c.permalink_structure" ;;   # read back by `option get permalink_structure`
   "language core is-installed"*|"theme is-installed"*) exit 1 ;;
   "user list"*)        echo 1 ;;
   "user get"*)         cat "$S/wp.$c.admin" ;;
@@ -363,6 +364,7 @@ check "install failing after core install -> exit 3, wp-cron-runner still paused
 setup; gate "site-create s1 $D"; wait_job "$(jget "$out" job)" >/dev/null; in_c ': > /t/calls.log'
 gate "site-wp s1 install owner@example.org zh_TW"
 PW="$(jget "$out" admin_password)"
+check "install sets a permalink structure (REST at /wp-json/ needs one)" in_c 'grep -q "rewrite structure /%postname%/" /t/calls.log'
 check "install -> installed, admin = operator email, password returned once" \
   bash -c "[[ $rc == 0 && '$(jget "$out" state)' == installed && '$(jget "$out" admin_user)' == owner@example.org && ${#PW} -ge 20 ]]"
 check "password reached wp-cli on stdin" test "$(in_c 'head -1 /t/state/stdin.last')" = "$PW"
@@ -373,6 +375,7 @@ check "install removed the wp-cron-runner pause (contract 3b)" in_c 'test ! -e /
 check "container came from the registry: every wp call went to s1-wp" bash -c "! docker exec $C grep '^docker exec' /t/calls.log | grep -v ' s1-wp ' | grep -q ."
 gate "site-wp s1 install owner@example.org"
 check "install again -> reused, no password" bash -c "[[ '$(jget "$out" state)' == reused && -z '$(jget "$out" admin_password)' ]]"
+check "install again: a permalink structure that is set is not set again" in_c 'test "$(grep -c "rewrite structure" /t/calls.log)" = 1'
 gate "site-wp s1 open"; check "open -> blog_public 1, construction off" in_c 'test "$(cat /t/state/opt.s1-wp.blog_public)" = 1 && test "$(cat /t/state/opt.s1-wp.aw_under_construction)" = 0'
 gate "site-wp s1 plugins mainwp-child https://github.com/awarewaveai-pei/aware-wave-wp-bridge/releases/download/v0.20.0/aware-wave-wp-bridge.zip"
 check "plugins: WordPress.org slug + own release URL installed" bash -c "[[ $rc == 0 ]] && docker exec $C test -f /t/state/plugin.s1-wp.mainwp-child && docker exec $C test -f /t/state/plugin.s1-wp.aware-wave-wp-bridge"

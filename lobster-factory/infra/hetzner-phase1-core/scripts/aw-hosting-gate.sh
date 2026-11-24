@@ -630,6 +630,12 @@ site_wp() {
       wpc theme is-installed kadence >/dev/null 2>&1 || wpc theme install kadence >/dev/null \
         || die 3 "theme kadence failed (WordPress is installed: re-run install; reset-admin-password to log in)"
       wpc theme activate kadence >/dev/null || die 3 "theme activate failed"
+      # A fresh WordPress has no permalink structure, and then /wp-json/ is not the REST API: it falls through to the
+      # under-construction 503. The vhost probe, MainWP and wp-bridge all call /wp-json/. Set once, only while empty.
+      if [[ -z "$(wpc option get permalink_structure 2>/dev/null)" ]]; then
+        wpc rewrite structure '/%postname%/' >/dev/null \
+          || die 3 "permalink structure failed (WordPress is installed: re-run install; reset-admin-password to log in)"
+      fi
       rm -f "$CRON_STATE/paused.$C"   # contract 3b: WordPress answers wp-cli now; the runner may schedule it
       admin="$(wpc user get "$(first_admin)" --field=user_login 2>/dev/null)"
       log info "site-wp $SLUG install state=$state"
