@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-24（續18）— oracle WP：建站第 8 步——Kuma 監控完成；寄信卡 Resend 422；WPvivid 遠端待操作者授權
+
+- [根因] 操作者要監工代做第 8 步三項；並回報 `wp-login.php` 的 Cloudflare 驗證一直重複。
+- [步驟] ① Kuma：`.backup kuma.db.bak-20261124-oracle-monitors` → `BEGIN IMMEDIATE` 複製 monitor 26／27 成 28（`https://oracle.aware-wave.com/wp-json/`）、29（`/zh-TW` keyword `命理`）＋`monitor_notification` 3、4 → `docker restart uptime-kuma`。② FluentSMTP：主站 `fluentMailGetSettings()` 的預設連線經 pipe 進 oracle 站 `fluentMailSetSettings()`（密碼不落地、不顯示；`stored_plain=no`），sender `noreply@oracle.aware-wave.com`；`wp_mail` 測試。③ 讀 Cloudflare `http_request_firewall_custom`／`http_ratelimit`（唯讀）。
+- [驗證] Kuma heartbeat：28 `200 - OK`×2、29 `200 - OK, keyword is found`×2；流程頁第 8 步 1／3。寄信：`wp_mail=FAILED`，`fsmpt_email_logs.response` code 422；Resend 兩個網域皆 verified，key 只有 `aware-wave.com WordPress` 與 `mcp`（推定前者限網域，未證實）。Cloudflare：`wp-login.php` managed_challenge 全 zone；ratelimit 50／10s 的 WP 後台路徑放行只列 `aware-wave.com`、`www`。
+- [未做] 新 Resend key（建 key 要操作者同意，且值會出現在對話）；WPvivid Google 授權；ratelimit 放行 oracle（放寬安全規則，待同意）；Cloudflare 分析權限不足（token 無 `analytics.read`），無法查是哪條規則造成重複驗證。
+- [rollback] Kuma：刪 monitor 28、29 與其 `monitor_notification` 後重啟，或還原備份。寄信：oracle 站 `wp option delete fluentmail-settings`。
+- 首次腳本以 `bash -s` 經 stdin 餵入時被 `docker exec -i` 吃掉（無輸出、無變更）；改成先放主機檔再執行。
+- REALTEST_EVIDENCE: tool=SSH | cmd=kuma sqlite heartbeat 查詢；wp eval wp_mail；Cloudflare rulesets GET | exit=0 | ms=200000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（主機資料與文件）
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-24（續16）— oracle WP：GO-2 算命站 WordPress 建好並接上同網域（建置中），nginx `32b218619`
 
 - [根因] oracle 區塊全部路徑都到引擎；WordPress 前門要同網域分路，且 GO-3 前訪客網址不得變。操作者同意待決 5。
