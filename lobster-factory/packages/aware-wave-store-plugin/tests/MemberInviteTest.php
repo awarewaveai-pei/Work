@@ -27,6 +27,9 @@ final class MemberInviteTest extends TestCase {
 		return str_repeat( 'Ab-_', 10 ) . 'xyz';
 	}
 
+	/** @var int */
+	private $now = 1700000000;
+
 	private function invite( FakeHttp $http ): MemberInvite {
 		$this->members = $this->members ?? new FakeMembers();
 		return new MemberInvite(
@@ -44,7 +47,10 @@ final class MemberInviteTest extends TestCase {
 				'delete' => function ( int $uid, string $key ): void {
 					unset( $this->store[ $uid ][ $key ] );
 				},
-			)
+			),
+			function (): int {
+				return $this->now;
+			}
 		);
 	}
 
@@ -142,6 +148,21 @@ final class MemberInviteTest extends TestCase {
 		$this->assertTrue( $invite->hold( self::UID, $this->code() ) );
 		$this->assertFalse( $invite->hold( self::UID, str_repeat( 'Z', 43 ) ), 'a second GET link must not swap out the waiting code' );
 		$this->assertSame( $this->code(), $this->store[ self::UID ][ MemberInvite::META_CODE ] );
+	}
+
+	public function test_a_code_held_past_the_invite_days_is_dropped_and_never_sent(): void {
+		$this->member( false );
+		$http   = new FakeHttp( 200, '{"ok":true}' );
+		$invite = $this->invite( $http );
+		$invite->hold( self::UID, $this->code() );
+		$this->now += MemberInvite::CODE_TTL + 1;   // the member never verified within 14 days
+		$this->member( true );
+		$invite = $this->invite( $http );
+		$this->assertNull( $invite->process( self::UID ) );
+		$this->assertSame( array(), $http->requests, 'an expired code is not sent' );
+		$this->assertSame( array(), $this->store[ self::UID ], 'the plain code and its time are deleted' );
+		$this->assertNull( $invite->current( self::UID ) );
+		$this->assertSame( 14 * 86400, MemberInvite::CODE_TTL, 'same as next-admin MEMBER_INVITE_DAYS' );
 	}
 
 	public function test_a_member_without_a_code_is_unchanged(): void {
