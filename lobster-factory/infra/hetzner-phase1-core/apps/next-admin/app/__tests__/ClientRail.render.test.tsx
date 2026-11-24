@@ -206,6 +206,15 @@ describe("ClientRail", () => {
     expect(trackClientPicked).toHaveBeenLastCalledWith("feedfacefeedface", false);
   });
 
+  it("全部: the count shown is the answer's total (it already holds AwareWave 自己), not total + 1", async () => {
+    // the line only shows while the page is shorter than the total, so total 120 over a 3-row page
+    fetchMock.mockImplementation(async () => json({ ok: true, total: 120, categories: CATEGORIES, internalOrgId: INTERNAL, orgs: ORGS }));
+    mount({ layer: "org" });
+    await screen.findByRole("button", { name: "Acme" });
+    expect(screen.getByText(/共 120 個客戶/)).toBeTruthy();
+    expect(screen.queryByText(/共 121/)).toBeNull();
+  });
+
   it("on a door (no internal id prop) AwareWave 自己 comes from the answer", async () => {
     mount({ layer: "org", onDoor: true, internalOrgId: null });
     fireEvent.click(await screen.findByRole("button", { name: "AwareWave 自己" }));

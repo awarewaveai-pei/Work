@@ -154,7 +154,8 @@ export function ClientRail() {
           {page.internalOrgFailed && !internalOrgId && <div role="alert" style={note}>AwareWave 自己 載入失敗</div>}
           <OrgPicker
             orgs={rows}
-            total={page.total + (self ? 1 : 0)}
+            // under 全部 the answer's total (kindPage count) already counts the internal org; the other categories exclude it
+            total={page.total + (self && category !== "all" ? 1 : 0)}
             selected={org}
             by="id"
             onPick={(o) => ctx.setOrg(o ? o.id : null, o?.group)}
