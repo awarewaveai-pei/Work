@@ -44,8 +44,20 @@ interface DraftLike {
 }
 type Comment = { body: string; delay_minutes: 0 | 1 | 5 | 60; media_id: string | null };
 
-const withEnding = (text: string, ending: string) =>
-  text.trimEnd().endsWith(ending) ? text : text.trim() ? `${text.trimEnd()}\n\n${ending}` : ending;
+// The ending goes above the text's last lines when those are only hashtags (operator 2026-11-24: under a row of tags a
+// reader misses it); a tag inside a sentence is not such a line, so that text gets the ending at its end.
+const TAG_LINE = /^(?:\s*#[\p{L}\p{M}\p{N}_]+)+\s*$/u;
+export function withEnding(text: string, ending: string): string {
+  if (text.includes(ending)) return text;
+  if (!text.trim()) return ending;
+  const lines = text.trimEnd().split("\n");
+  let i = lines.length;
+  while (i > 0 && (TAG_LINE.test(lines[i - 1]) || !lines[i - 1].trim())) i--;
+  while (i < lines.length && !lines[i].trim()) i++;
+  if (i === lines.length) return `${lines.join("\n")}\n\n${ending}`;
+  const tags = lines.slice(i).join("\n"), head = lines.slice(0, i).join("\n").trimEnd();
+  return head ? `${head}\n\n${ending}\n\n${tags}` : `${ending}\n\n${tags}`;
+}
 
 /**
  * The draft with the ending under its text and the comment first. What is there already is not added again (a rerun

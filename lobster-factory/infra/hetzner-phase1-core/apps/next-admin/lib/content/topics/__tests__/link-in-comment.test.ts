@@ -153,3 +153,18 @@ describe("K23: Facebook / Instagram take the article's link in the first comment
     expect(sent("shared", "facebook").text).toBe(`${SUMMARY}\n\n${LINK}`);
   });
 });
+
+describe("K23: the ending goes above a closing row of hashtags", () => {
+  const ending = "完整文章｜〈一個人也自在〉\n點擊「個人檔案連結」，搜尋文章標題";
+  it("the operator's example: text, the two lines, then the tags; a second run adds nothing", async () => {
+    const { withEnding } = await import("@/lib/social/link-in-comment");
+    const out = withEnding("一個人吃飯、一個人旅行，不是孤單，是練習。\n\n#獨處 #自我成長 #正念", ending);
+    expect(out).toBe(`一個人吃飯、一個人旅行，不是孤單，是練習。\n\n${ending}\n\n#獨處 #自我成長 #正念`);
+    expect(withEnding(out, ending)).toBe(out);
+  });
+  it("no closing row of tags (none, or a tag inside the last sentence): the ending is last", async () => {
+    const { withEnding } = await import("@/lib/social/link-in-comment");
+    expect(withEnding("練習獨處。", ending)).toBe(`練習獨處。\n\n${ending}`);
+    expect(withEnding("練習 #獨處 的一天。", ending)).toBe(`練習 #獨處 的一天。\n\n${ending}`);
+  });
+});
