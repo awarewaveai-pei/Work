@@ -172,6 +172,19 @@ describe("a member who signed up through a staff invite (ADR 021 D4, 0180)", () 
     }
   });
 
+  it("the member a transfer replaces uses its code: refused transfer_same_member; an ordinary invite stays an idempotent ok (0182)", async () => {
+    const holder = { organizationId: ORG_INV, userId: "u-old" };
+    const t = deps();
+    t.d.find = vi.fn(async () => holder);
+    t.i.transferOf = vi.fn(async () => "identity-old");
+    await expect(ensureWpCustomer(db, invited, undefined, false, t.d, t.i)).rejects.toMatchObject({ code: "transfer_same_member" });
+    expect(t.i.redeem).not.toHaveBeenCalled();
+    const o = deps();
+    o.d.find = vi.fn(async () => holder);
+    o.i.transferOf = vi.fn(async () => null);
+    await expect(ensureWpCustomer(db, invited, undefined, false, o.d, o.i)).resolves.toEqual({ organizationId: ORG_INV, created: false });
+  });
+
   it("no code: the path of today, the invite is never read", async () => {
     const { d, i, linked } = deps();
     await expect(ensureWpCustomer(db, MEMBER, undefined, true, d, i)).resolves.toEqual({ organizationId: "org-new", created: true });

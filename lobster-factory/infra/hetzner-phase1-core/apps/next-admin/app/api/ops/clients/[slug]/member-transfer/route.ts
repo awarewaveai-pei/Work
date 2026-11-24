@@ -8,9 +8,8 @@
 // No mail is sent; the rights, subscriptions and credits stay with the account (they never name the person).
 
 import { NextResponse } from "next/server";
-import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { resolveTenant } from "@/lib/tenant-guard";
+import { clientOrg, staffAdmin, type ClientRouteCtx as Ctx } from "@/lib/accounts/client-route-guards";
 import { recordOpsAudit } from "@/lib/ops-audit";
 import { normalizeEmail } from "@/lib/accounts/client-invite";
 import { createMemberTransfer, memberTransferStatus, voidMemberInvite } from "@/lib/entitlements/identities";
@@ -18,29 +17,7 @@ import { createMemberTransfer, memberTransferStatus, voidMemberInvite } from "@/
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Ctx = { params: Promise<{ slug: string }> };
 const REASON_MAX = 500;
-
-/** owner/admin staff, else the 403 response (same rule as ../accounts: a client identity never reaches /api/ops). */
-function staffAdmin(request: Request) {
-  const resolved = resolveOpsRole(request);
-  if (resolveTenant(request).userKind !== "staff" || !canWriteTenantConfig(resolved.role)) {
-    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
-  }
-  return { ...resolved, role: resolved.role as "owner" | "admin" /* canWriteTenantConfig: owner or admin only */, actorUserId: request.headers.get("x-ops-user-id")?.trim() || null };
-}
-
-async function clientOrg(context: Ctx): Promise<{ id: string } | Response> {
-  const { slug } = await context.params;
-  const sb = getSupabaseWriteClient();
-  if (!sb) return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
-  const { data, error } = await sb.from("organizations").select("id, type").eq("slug", slug).maybeSingle();
-  if (error) return NextResponse.json({ ok: false, error: "org_lookup_failed" }, { status: 503 });
-  const org = data as { id: string; type: string } | null;
-  if (!org) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
-  if (org.type !== "client") return NextResponse.json({ ok: false, error: "not_a_client_org" }, { status: 409 });
-  return { id: org.id };
-}
 
 export async function GET(request: Request, context: Ctx) {
   const who = staffAdmin(request);

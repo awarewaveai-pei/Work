@@ -235,12 +235,18 @@ async function redeemMemberInvite(db: SupabaseClient, member: WpMember, identity
   const code = member.inviteCode;
   const inv = isInviteCode(code) ? await invites.memberInvite(db, code) : null;
   if (!inv || inv.voidedAt) throw new WpCustomerRefused("invite_invalid");
+  const mine = inv.usedSiteId === identity.siteId && inv.usedExternalId === identity.externalId;
   const known = await deps.find(db, identity);
   if (known) {
-    if (known.organizationId === inv.organizationId) return { organizationId: known.organizationId, created: false };
-    throw new WpCustomerRefused("invite_member_linked");
+    if (known.organizationId !== inv.organizationId) throw new WpCustomerRefused("invite_member_linked");
+    // This member already holds the account. A retry of the event that used this invite, or an ordinary invite, is ok
+    // (idempotent). A transfer not done by this member means this member IS the one being replaced: refuse, as 0182's
+    // redeem does, so the member never sees success while the transfer stays pending.
+    if (!(inv.usedAt && mine) && await (invites.transferOf ?? memberInviteTransferOf)(db, inv.id)) {
+      throw new WpCustomerRefused("transfer_same_member");
+    }
+    return { organizationId: known.organizationId, created: false };
   }
-  const mine = inv.usedSiteId === identity.siteId && inv.usedExternalId === identity.externalId;
   if (inv.usedAt && !mine) throw new WpCustomerRefused("invite_used");
   if (!inv.usedAt && Date.parse(inv.expiresAt) <= Date.now()) throw new WpCustomerRefused("invite_expired");
   if (member.email.trim().toLowerCase() !== inv.email.toLowerCase()) throw new WpCustomerRefused("invite_email_mismatch");

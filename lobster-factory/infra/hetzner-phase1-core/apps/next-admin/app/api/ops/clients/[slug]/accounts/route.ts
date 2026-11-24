@@ -12,9 +12,8 @@
 //         ?memberInvite=1 → voids the live invite. Both audited without the code. No mail is sent (the landing page is M6).
 
 import { NextResponse } from "next/server";
-import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { resolveTenant } from "@/lib/tenant-guard";
+import { clientOrg, staffAdmin, type ClientOrg as Org, type ClientRouteCtx as Ctx, type StaffAdmin } from "@/lib/accounts/client-route-guards";
 import { recordOpsAudit } from "@/lib/ops-audit";
 import { heldDoors } from "@/lib/portal/held-doors";
 import { listMembers } from "@/lib/social/store";
@@ -25,8 +24,6 @@ import { createMemberInvite, inviteTarget, liveMemberInvite, voidMemberInvite } 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Ctx = { params: Promise<{ slug: string }> };
-type Org = { id: string; name: string };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Products whose people each hold a role, read from the product's own list; staff change it at `settings`. */
@@ -36,29 +33,6 @@ const MEMBER_LISTS: Readonly<Record<string, { roles: (orgId: string) => Promise<
     settings: (orgId) => `/tools/social?brand=${orgId}&view=settings`,
   },
 };
-
-/** owner/admin staff, else the 403 response. A client identity never reaches /api/ops (middleware), checked again here. */
-function staffAdmin(request: Request) {
-  const resolved = resolveOpsRole(request);
-  if (resolveTenant(request).userKind !== "staff" || !canWriteTenantConfig(resolved.role)) {
-    return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
-  }
-  // who pressed it, for the audit (set only by middleware)
-  return { ...resolved, actorUserId: request.headers.get("x-ops-user-id")?.trim() || null };
-}
-
-async function clientOrg(context: Ctx): Promise<Org | Response> {
-  const { slug } = await context.params;
-  const sb = getSupabaseWriteClient();
-  if (!sb) return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
-  const { data, error } = await sb.from("organizations").select("id, name, type").eq("slug", slug).maybeSingle();
-  if (error) return NextResponse.json({ ok: false, error: "org_lookup_failed" }, { status: 503 });
-  const org = data as { id: string; name: string; type: string } | null;
-  if (!org) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
-  // client accounts belong to client organizations only; an internal org's people are staff
-  if (org.type !== "client") return NextResponse.json({ ok: false, error: "not_a_client_org" }, { status: 409 });
-  return { id: org.id, name: org.name };
-}
 
 export async function GET(request: Request, context: Ctx) {
   const who = staffAdmin(request);
@@ -96,7 +70,7 @@ async function memberStatus(orgId: string) {
   }
 }
 
-async function createInvite(who: Exclude<ReturnType<typeof staffAdmin>, Response>, org: Org, email: string) {
+async function createInvite(who: StaffAdmin, org: Org, email: string) {
   const sb = getSupabaseWriteClient()!;
   try {
     const target = await inviteTarget(sb, org.id);
