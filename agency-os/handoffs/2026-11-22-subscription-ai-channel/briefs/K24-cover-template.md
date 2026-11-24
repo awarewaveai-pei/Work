@@ -10,7 +10,7 @@
 ## 要做（新檔，放 `lib/content/cover/`）
 1. `settings.ts`：`CoverSettings { bandColor; titleColor; subtitleColor; font: "sans" | "serif" }`＋預設值＋`parseCoverSettings(unknown)`（顏色只收 `#rrggbb`，其餘退回預設——之後會從網站設定讀，不能信任輸入）。
 2. `layout.ts`（純函式，無 I/O）：B 版型＝上圖下字。輸入 `{ width, height, title, subtitle? }`，輸出圖區與色塊的矩形、標題各行、字級、副標字級與位置。規則：
-   - 色塊在下方，高度約畫面 25%（4:3，1200×900）；之後會有直式 4:5，所以規則以寬高計算，不寫死像素。
+   - 色塊在下方，高度＝畫面 25%（4:3，1200×900 → 圖區 1200×675＝16:9，K10 產的封面底圖就是 16:9，進圖區不裁切）；之後會有直式 4:5，所以規則以寬高計算，不寫死像素。
    - 標題最多 2 行，副標 1 行；放不下先縮字到下限，仍放不下才在第 2 行尾截斷加「…」；副標放不下就截斷。左右留安全邊距。
    - 斷行寬度用估算（全形字 1em、半形約 0.55em，照 `make-image.ts` 現有估法並留 8% 餘裕）；中文不得把標點放行首；英文在空白斷。
 3. `render.ts`：`renderCover(background: Buffer, text: { title: string; subtitle?: string }, settings: CoverSettings, size = { width: 1200, height: 900 }): Promise<{ buffer: Buffer; mime: "image/webp" }>`。底圖 cover-fit 裁進圖區（不變形、不壓暗、文字不蓋到圖）；色塊純色；字用 SVG 疊上（字型族照 `make-image.ts` 現有的 Noto 名稱）；文字一律 XML 轉義；輸出 WebP ≤200KB（照 `toWebP` 的兩段品質）。沒有標題 → 丟錯（呼叫端決定退路）。

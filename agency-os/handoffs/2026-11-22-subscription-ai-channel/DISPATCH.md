@@ -74,3 +74,10 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 - 等待中：M1（Codex 額度 11-24 11:02 後；待決 4 她在筆電 `~/.codex-sub` 登入）含「指定 gpt-6.2-sol 的 Codex 實寫」；K9（待決 1–3）。
 - 未關風險（都在 `data.mjs` RISKS）：一鍵到草稿的畫面測試整套跑時偶發逾時（另一條線的測試，未改）；成本頁每站表格月上限五千筆；兩把 Gemini 金鑰曾印到對話（她決定）。
 - 比較頁：八種文案 `https://claude.ai/artifact/2yijESBAer4rY4aDuRWDis`；監工台 `https://claude.ai/artifact/VzfEtmLYzLcAueyCU2bVqJ`。
+
+### 配圖定案與派工（2026-11-24 下午；接在上面快照之後）
+- 操作者定案：封面 1 張＋內文 3–4 張（各對應段落，可以有人物、重點是貼題）；內文圖 4:3；封面成品 4:3、B 版型（上圖下字，字不蓋圖，短標題＋副標）；封面版型全站統一、底圖與內文圖同一個全站風格；設定在 `/tools/content/sites`，文章頁帶入可單篇改；IG 另出直式 4:5（她同意，第二步）；順序＝先做版型與設定，再做生圖實測。
+- 卡：K10（畫面描述／風格／張數，`briefs/K10-article-images.md`，sub-k4）、K24（封面 renderer，`briefs/K24-cover-template.md`，sub-k1）同時進行、檔案不重疊；K25（接線＋刪舊壓字，`briefs/K25-cover-wiring.md`）等兩張併入後派；K13（實測，`briefs/K13-image-bakeoff.md`）在 K25 部署後，開跑前在對話告知一聲。
+- K23 已併入（`5699897f8`、`0de363251`）：自動產文的 FB／IG 貼文內文不放網址、連結在第一則留言、結尾在主題標籤前；FB 與 IG 各自一則草稿。未在正式站看過真的草稿。
+- 她還沒回答：圖片來源順序（訂閱 → Pexels → 付費預設關閉）；她傳的「工具設定」四個字指什麼（程式裡找不到同名頁面，已問一次）。
+- 工人回報後照常：讀 diff → sub-int cherry-pick → tsc＋全套 `npm test` → 判斷 RISKS 寫進 `data.mjs` → 推 main → clear 工人。文件提交用 scratchpad 的 `ship24.sh` 模式（在 sub-int 複製 `data.mjs`／`supervisor.html`／briefs 後 commit；D:\Work 的共用 index 有別人 staged 的 WORKLOG，不能在那裡 commit）。
