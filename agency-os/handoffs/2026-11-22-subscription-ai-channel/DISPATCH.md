@@ -65,9 +65,12 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 - 結果（字母／模型／NT$／秒／字數／SEO／未查證標記）：A opus-5-5 8.03/119/5221/86/7；B haiku-5-5 0.08/24/2621/59/0；C gpt-5.4 2.88/84/4978/73/3；D gpt-6.2-astra 6.68/105/4117/82/3；E gpt-6.2-sol 1.96/80/4338/86/0；F gpt-5.4-mini 0.71/23/3801/68/5；G gpt-5.5 8.72/164/4850/77/3（截斷）；H fable-5-1 19.56/167/5437/82/13；I gpt-5.4-nano 0.25/33/5298/64/1；J sonnet-5-5 2.16/46/3576/68/0；K gpt-6-luna 0.13/55/4297/82/0；L gpt-6.1-terra 1.02/82/4328/77/6。
 - 待操作者：回覆她選的字母 → 寫進 `app/(shell)/tools/ai-models/MeasuredRuns.tsx`「文章生成」組 → K13 開測前先問她。
 
-### 現況快照（2026-11-23，compact 前）
-- main／正式站：K1–K8、K11、K14、K15 全在 main 且已部署（`.deployed-commit` = `ed7263c36` 之後）。文章預設 `gpt-6.2-sol`（`DEFAULT_ARTICLE_TEXT_MODEL`）。
-- 進行中：K16 資料產出派給 sub-k1（`local_bb671b06-e1ea-4bab-a397-8b0c1f4b9e49`，brief `briefs/K16-harness.md`）→ 交回後監工：驗 `agency-os/reports/model-bakeoff/2026-11-copy/results.json`、cherry-pick 該 commit、照 K12 的做法做並排頁（產生器 scratchpad 已失效時重寫；K12 頁 `https://claude.ai/artifact/JyYNnD8Txmmiwv53S4wMsU`）、發布給操作者選。
-- 待做：(1) 正式站確認不選模型時帳本記 `gpt-6.2-sol`（查 `ai_call_logs` route `content/article-generate` 最新列即可）；(2) K13 生圖實測——**開跑前先問操作者，她有問題要說**；(3) K10（配圖＋三個範本問題：SEO 評分認中文小標、內部註記不進正文、`<a href>` 原始碼外露待查是轉換器還是模型）等 K13 與操作者談定；(4) 劇本工坊在影片門、無員工頁可用訂閱走法（未決）；(5) 文章頁「本次費用」顯示美金 → 改 NT$（未開卡）；(6) 批 4：K9 主機 worker（待決 1–3）、M1（11-24 11:02 後 Codex 額度恢復；待決 4）。
-- 工人：sub-k1 Opus（K16）、sub-k2 Sonnet（閒）、sub-k3 Sonnet（閒）、sub-k4 Opus（閒）。整合工作區 `D:\Worktrees\Work\sub-int`（detached；用 script 檔 commit 以避開共用 index 的 hook）。
-- 操作者決定紀錄：圖全走 API、文字走訂閱鏈；Soulful 也是她的（網站設定頁按鈕標記）；「都要測」；兩把 Gemini 金鑰曾被印進本對話輸出（已告知，是否更換由她決定）。
+### 現況快照（2026-11-24，compact 前；取代 11-23 那份）
+- 上線：部署版 `0781c2a9a`（2026-11-24 01:13Z，sg-deploy exit 0、容器 healthy）。含 K17（Codex 訂閱選模型）、K18（中文小標）、K19（商品文案提示詞）、K20（影片腳本／社群改寫／開發信／AI 去味預設 gpt-6.2-sol，OpenAI 失手退回 Claude）、K21（所有 OpenAI 上限＝`openAiCompletionBudget`，結構測試守）、K22（年份註記、`<a href>`、NT$）＋電子報走 `scrubInternalMarkers`（`6c699c1d5`）。
+- 正式站已實測：文章不選模型 → 中文小標、帳本 gpt-6.2-sol、短文章不截斷（K21 後）；AI 去味 15 秒完整。**未實測**：K22 上線後正文無年份註記（Chrome 外掛斷線，沒測成）；影片腳本與社群改寫（僅本機經改後路徑各真跑 3 次）。
+- 工人：四個都已 clear、閒置。sub-k1 `local_bb671b06…`、sub-k2 `local_8466f158…`（Sonnet）、sub-k3 `local_1a22899c…`、sub-k4 `local_3da5453e…`（Opus）。整合一律在 `D:\Worktrees\Work\sub-int`（detached）cherry-pick → tsc＋`npm test` → `git push origin HEAD:main`。
+- D:\Work 共用 checkout 落後 origin/main，被別的 session 未提交的 `agency-os/TASKS.md` 擋住 parity-merge；不要動它。文件 commit 也走 sub-int cherry-pick。
+- 下一步（操作者 2026-11-24）：**compact 後討論配圖**（K10 只剩配圖；K13 生圖實測開跑前要先告訴她、她有問題要說）。配圖現況先讀 `data.mjs` K10／K13 的 plain 與 `briefs/K10-K12.md`。
+- 等待中：M1（Codex 額度 11-24 11:02 後；待決 4 她在筆電 `~/.codex-sub` 登入）含「指定 gpt-6.2-sol 的 Codex 實寫」；K9（待決 1–3）。
+- 未關風險（都在 `data.mjs` RISKS）：一鍵到草稿的畫面測試整套跑時偶發逾時（另一條線的測試，未改）；成本頁每站表格月上限五千筆；兩把 Gemini 金鑰曾印到對話（她決定）。
+- 比較頁：八種文案 `https://claude.ai/artifact/2yijESBAer4rY4aDuRWDis`；監工台 `https://claude.ai/artifact/VzfEtmLYzLcAueyCU2bVqJ`。
