@@ -34,6 +34,12 @@ anthropic==0.122.0
 # 操作頁面
 fastapi==0.137.0
 uvicorn==0.49.0
+# 會議工作區：瀏覽器 ↔ 伺服器的 WebSocket（uvicorn 靠它收）、伺服器 → Gemini Live；翻譯串流用 httpx
+websockets==16.0
+httpx==0.28.1
 python-multipart==0.0.32
 
 numpy==2.4.6
+
+# 即時字幕：翻譯偶爾混入簡體字時轉回臺灣繁體（純 Python，沒有 .pyd）
+opencc-python-reimplemented==0.1.7

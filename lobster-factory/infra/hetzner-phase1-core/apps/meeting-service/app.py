@@ -14,10 +14,13 @@ import shutil
 import threading
 import uuid
 
-from fastapi import Body, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Body, Depends, FastAPI, File, Header, HTTPException, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from lib import lookup, mindmap, ownvoice, settings, summarize
+from lib import gpu_gate, lookup, mindmap, ownvoice, settings, summarize, workspace
+from lib.live import hub as live_hub
 from lib.transcribe import LANGUAGES
 from pipeline import resume_after_summary, run_pipeline_phase1, run_video_transcription
 
@@ -26,6 +29,10 @@ JOBS_DIR = os.path.join(BASE_DIR, "jobs")
 os.makedirs(JOBS_DIR, exist_ok=True)
 
 app = FastAPI(title="Meeting Service (local only)")
+# 只認本機的主機名：別的網域就算解析到 127.0.0.1（DNS rebinding），瀏覽器送來的 Host 也不會過，
+# 那個網頁就讀不到逐字稿、也叫不動會計費的端點。
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 MAX_UPLOAD_MB = 500
 ALLOWED_EXT = {".mp4", ".m4a", ".mp3", ".wav", ".mov", ".mkv", ".webm", ".aac", ".flac"}
@@ -51,6 +58,36 @@ def _check_language(language: str) -> None:
         raise HTTPException(400, f"不支援的語言 {language}；可選：{', '.join(LANGUAGES)}")
 
 
+class _BatchGpu:
+    """一個批次工作對顯卡的登記：從請求一進來，到它的背景執行緒結束。"""
+
+    def __init__(self):
+        self.handed = False
+
+    def start(self, target, *args, **kwargs) -> None:
+        def run():
+            try:
+                target(*args, **kwargs)
+            finally:
+                gpu_gate.release_batch()
+
+        threading.Thread(target=run, daemon=True).start()
+        self.handed = True
+
+
+def _batch_gpu():
+    """會用顯卡的批次端點的依賴：本機即時辨識進行中就回 409（8 GB 顯存放不下兩份模型）。
+    登記在請求開頭就完成，上傳檔案那幾分鐘裡即時辨識也拿不到顯卡；沒交給執行緒就結束（失敗）時在這裡登出。"""
+    if not gpu_gate.acquire_batch():
+        raise HTTPException(409, "會議工作區正在用這台電腦的顯卡做即時辨識，請先按停止，再做會後整理")
+    claim = _BatchGpu()
+    try:
+        yield claim
+    finally:
+        if not claim.handed:
+            gpu_gate.release_batch()
+
+
 def _api_key_for(use_api: bool) -> str:
     """key 在請求當下讀出、往下傳給背景 thread（理由見 upload()）。"""
     api_key = settings.get_api_key() if use_api else ""
@@ -64,10 +101,44 @@ def index():
     return _page("index.html")
 
 
+@app.get("/workspace", response_class=HTMLResponse)
+def workspace_page():
+    return _page("workspace.html")
+
+
+@app.get("/api/workspace/layout")
+def workspace_layout_get():
+    """沒存過或檔案壞掉回 JSON null，頁面改用預設版面。"""
+    return workspace.load()
+
+
+@app.put("/api/workspace/layout")
+def workspace_layout_put(body: dict = Body(...)):
+    try:
+        workspace.save(body)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+LIVE = live_hub.Hub()
+
+
+@app.websocket("/api/live/ws")
+async def live_ws(ws: WebSocket):
+    """會議工作區的即時字幕。只收本服務自己頁面開的連線（見 hub.origin_allowed）。"""
+    if not live_hub.origin_allowed(ws.headers.get("origin", ""), ws.headers.get("host", "")):
+        await ws.close(code=1008)
+        return
+    await ws.accept()
+    await LIVE.serve(ws)
+
+
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...), diarize: bool = True,
                   model: str = "large-v3", sync_drive: bool = False,
-                  use_api: bool = False, language: str = "zh"):
+                  use_api: bool = False, language: str = "zh",
+                  gpu: _BatchGpu = Depends(_batch_gpu)):
     _check_language(language)
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ALLOWED_EXT:
@@ -98,14 +169,9 @@ async def upload(file: UploadFile = File(...), diarize: bool = True,
     # 真的會計費；key 由使用者自行在 /api/settings 填入，不共用操作者的訂閱。
     # 講者分離缺 HF_TOKEN 也不擋主流程——pipeline 內會自動退回無標籤繼續跑。
 
-    thread = threading.Thread(
-        target=run_pipeline_phase1,
-        args=(job_dir, media_path),
-        kwargs={"model_name": model, "do_diarize": diarize, "sync_drive": sync_drive,
-                "use_api": use_api, "api_key": api_key, "language": language},
-        daemon=True,
-    )
-    thread.start()
+    gpu.start(run_pipeline_phase1, job_dir, media_path,
+              model_name=model, do_diarize=diarize, sync_drive=sync_drive,
+              use_api=use_api, api_key=api_key, language=language)
 
     return {"job_id": job_id}
 
@@ -127,7 +193,7 @@ def ownvoice_sessions():
 
 
 @app.post("/api/ownvoice/import")
-def ownvoice_import(body: dict = Body(...)):
+def ownvoice_import(body: dict = Body(...), gpu: _BatchGpu = Depends(_batch_gpu)):
     """把一場 OwnVoice 會議的錄音接成一個檔，走跟上傳一樣的流程。"""
     language = body.get("language") or ownvoice.language()
     _check_language(language)
@@ -145,12 +211,9 @@ def ownvoice_import(body: dict = Body(...)):
     except Exception:
         shutil.rmtree(job_dir, ignore_errors=True)
         raise
-    threading.Thread(
-        target=run_pipeline_phase1, args=(job_dir, media_path),
-        kwargs={"do_diarize": bool(body.get("diarize", True)), "use_api": use_api,
-                "api_key": api_key, "language": language},
-        daemon=True,
-    ).start()
+    gpu.start(run_pipeline_phase1, job_dir, media_path,
+              do_diarize=bool(body.get("diarize", True)), use_api=use_api,
+              api_key=api_key, language=language)
     return {"job_id": job_id}
 
 
@@ -248,7 +311,8 @@ def mindmap_make(body: dict = Body(...)):
 
 
 @app.post("/api/video/transcribe")
-async def video_transcribe(file: UploadFile = File(...), model: str = "large-v3", authorization: str = Header(default="")):
+async def video_transcribe(file: UploadFile = File(...), model: str = "large-v3", authorization: str = Header(default=""),
+                           gpu: _BatchGpu = Depends(_batch_gpu)):
     """Local-only Whisper worker boundary for video captions.
 
     The caller uploads the source bytes; the worker never fetches arbitrary URLs.
@@ -277,7 +341,7 @@ async def video_transcribe(file: UploadFile = File(...), model: str = "large-v3"
     except Exception:
         shutil.rmtree(job_dir, ignore_errors=True)
         raise
-    threading.Thread(target=run_video_transcription, args=(job_dir, media_path), kwargs={"model_name": model}, daemon=True).start()
+    gpu.start(run_video_transcription, job_dir, media_path, model_name=model)
     return {"job_id": job_id, "kind": "video_transcription"}
 
 

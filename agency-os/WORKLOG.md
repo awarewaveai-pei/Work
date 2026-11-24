@@ -216,6 +216,30 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=bridgeClientForSiteWithRegistered | hits=8
 - ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic＋突變＋監工全套測試代替
+## 2026-11-24（續4）— meeting-service 會議工作區段 1（C1–C5）：一頁四面板＋查詢＋即時字幕翻譯，Gemini 與本機兩種辨識
+
+- 根因／決策：操作者要 OwnVoice 三個漂浮視窗＋查詢側欄合成一頁可停靠面板；OwnVoice 執行檔改不了（SAC），功能移植進 meeting-service。語音辨識操作者定「兩個都要」（Gemini Live 計費＋本機 faster-whisper 免費）；查過 repo／git log／WORKLOG／session 記錄，以前沒有即時版，只有 `docs/LIVE_MULTILINGUAL_MASTER_PLAN.md`（0／19）。卡與定案：`lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/docs/WORKSPACE_PAGE_CARDS.md`。
+- 步驟（`MS` = 上述 meeting-service）：
+  - C1 `MS/templates/workspace.html`＋`MS/static/vendor/dockview-core-8.9.1.min.js`（MIT，單檔）＋`MS/lib/workspace.py`（版面存 `.workspace.json`）；`app.py` `/workspace`、`/static`、`GET|PUT /api/workspace/layout`
+  - C2 查詢面板：頁內反白 ≥2 字自動搜尋，問 AI／心智圖按了才呼叫
+  - C3 `MS/lib/live/captions.py`、`prompts.py`、`respace.py`（移植 OwnVoice `captions.rs`／`prompts.rs`／`gemini.rs`，提示詞逐字比對相同）；`NOTICE.md`
+  - C4 `session.py`、`translate.py`（Anthropic 串流；無 key 走 Gemini Flash-Lite）、`usage.py`（NT$）、`zh.py`、`vad.py`、`stt_gemini.py`、`stt_local.py`、`MS/lib/gpu_gate.py`
+  - C5 `MS/lib/live/hub.py`＋`app.py` WebSocket `/api/live/ws`；字幕面板（AudioWorklet 16 kHz PCM16、麥克風／電腦聲音、Gemini／本機按鈕、只看中文、字級、用量）
+  - critic（Standard）0c/6m/3n，Major 全修：M1 顯卡登記改成請求開頭原子登記（`app.py` `_batch_gpu` 依賴）；M2 停止時卸載常駐模型（`stt_local._unload`，實測停止後顯存 104 MiB）；M3 `Hub.start` 檢查到設 task 之間不再有 await（原本兩頁同時按會留下孤兒 Gemini 連線持續計費）；M4 requirements 補 `websockets`／`httpx`；M5 `TrustedHostMiddleware`（DNS rebinding 整類，含既有的 lookup／mindmap 端點）；M6 start 被拒也送 `listening:false`、頁面 `startAudio` 先 `stopAudio`。Minor：重啟不再關翻譯 client、停止時丟掉未辨識的「…」列；本機佇列上限未做（CPU 退回時才會累積）。
+  - 派工：C1、C3、C4a、C4b 由 fullstack-engineer；C2、C5、驗收與修正由主 session。工人 RISKS 處置：斷線退避期間按停止停不下來 → `_drain`；本機中文偏簡體 → `ZH_PROMPT`；opencc 釘進 requirements（純 Python）。
+- 驗證：
+  - `python -m pytest tests -q` → 70 passed
+  - 真實鏈路（Windows 語音合成兩句英文，以 WebSocket 即時速度送進 8431 測試埠）：Gemini Live 灰字 0.8 s、定稿貼齊句尾、中文 +0.5 s、11 秒長句第 6 秒先出中文；本機 定稿 +1.5 s、中文 +2.3 s，冷啟動載模型 5.4 s 有狀態文字
+  - 瀏覽器：拖曳疊分頁／拉分隔線／關面板後重新整理版面不變；壞版面檔回預設；反白 → 搜尋結果；字幕面板即時顯示英中（截圖）
+  - Origin 守衛突變：拔掉 `origin_allowed` 檢查 → `test_a_foreign_page_cannot_open_the_socket` 紅 → 還原綠；`Host: evil.example` → 400
+- REALTEST_EVIDENCE: tool=Bash | cmd=python feed.py en.wav gemini; python feed.py en.wav local（真實 Gemini Live＋Flash-Lite＋faster-whisper，8431）; python -m pytest tests -q | exit=0 | ms=95000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/6m/3n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,Projects | grep=_in_batch|_refuse_if_live|gpu_gate\.batch | hits=1
+- BUGHUNT_SCOPE_NARROW: 三個 pattern 為本次中途改掉的舊介面，唯一命中是不相干的測試名 `Projects/internal/cognitive-engineering-os/tests/unit/test_collect_lookups.py:93`（asked_in_batches），無殘留呼叫；另查 8420 無 meeting-service 的外部 HTTP 呼叫者（命中皆為 cognitive-engineering-os 自己的 8420）
+- ORACLE_WAIVED: Codex 額度擋到 2026-11-24 11:02（oracle-quota exit 3）；改以 critic Standard 一輪＋Origin 守衛突變證據
+- 剩餘風險：真實麥克風與 `getDisplayMedia` 電腦聲音未測（測試瀏覽器無收音裝置，只驗 AudioWorklet 16 kHz 可載入）；Anthropic 翻譯路徑只有模擬測試（設定頁無 key，實測走 Gemini）；C6 閒置暫停未做，Gemini 聆聽中安靜也計費；8420 仍是舊行程，未重啟
+- rollback：`git revert` 本 commit；`.workspace.json`／`.live-usage.json` 為本機檔可直接刪
+- 避免再發生：互斥類守衛要「檢查＋登記」同一把鎖；行程內有 await 的 start／stop 先設狀態再 await
 ## 2026-11-23（續12）— meeting-service 側欄：補做 OwnVoice 字幕實測；查出側欄佔位會讓壓到它的 OwnVoice 視窗跳位
 
 - OwnVoice Meet.exe 16:00 起可再啟動（10:45–? 被 SAC 暫擋，未改任何設定；`Downloads` 那份 README 與 D 槽相同，內容是 SmartScreen／WebView2，不適用）。

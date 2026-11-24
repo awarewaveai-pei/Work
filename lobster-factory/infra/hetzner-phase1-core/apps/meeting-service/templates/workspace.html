@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>會議工作區（本機）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --accent: #6366f1; --accent-hover: #4f52e0;
+    --ink: #0d1526; --muted: #475569;
+    --bg: #f2f5fb; --card: #ffffff; --border: #e6eaf4;
+    --green: #10b981; --red: #ef4444; --yellow: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+    background: var(--bg); color: var(--ink);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #topbar {
+    flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 12px; background: var(--card); border-bottom: 1px solid var(--border);
+  }
+  #topbar h1 { font-size: 16px; margin: 0 8px 0 0; }
+  #topbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
+  #topbar .spacer { flex: 1; }
+  #topbar a.home { color: var(--muted); font-size: 13px; text-decoration: none; }
+  #topbar a.home:hover { color: var(--accent); }
+  .tbtn {
+    background: var(--bg); color: var(--muted); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .tbtn:hover { border-color: var(--accent); color: var(--accent); }
+  .tbtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tbtn[aria-pressed="true"]:hover { background: var(--accent-hover); color: #fff; }
+  #dock { flex: 1; min-height: 0; }
+
+  /* dockview 主題色對到本站的 CSS 變數；沿用內建 light 主題，只覆寫顏色與間距 */
+  .dockview-theme-light.aw-dock {
+    --dv-group-view-background-color: var(--card);
+    --dv-tabs-and-actions-container-background-color: var(--bg);
+    --dv-activegroup-visiblepanel-tab-background-color: var(--card);
+    --dv-activegroup-hiddenpanel-tab-background-color: var(--bg);
+    --dv-inactivegroup-visiblepanel-tab-background-color: var(--card);
+    --dv-inactivegroup-hiddenpanel-tab-background-color: var(--bg);
+    --dv-tab-divider-color: var(--border);
+    --dv-activegroup-visiblepanel-tab-color: var(--ink);
+    --dv-activegroup-hiddenpanel-tab-color: var(--muted);
+    --dv-inactivegroup-visiblepanel-tab-color: var(--muted);
+    --dv-inactivegroup-hiddenpanel-tab-color: var(--muted);
+    --dv-separator-border: var(--border);
+    --dv-sash-color: var(--border);
+    --dv-active-sash-color: var(--accent);
+    --dv-active-sash-transition-duration: 0.1s;
+    --dv-active-sash-transition-delay: 0s;
+    --dv-drag-over-background-color: rgba(99, 102, 241, 0.18);
+    --dv-drag-over-border-color: var(--accent);
+    --dv-tabs-and-actions-container-font-size: 13px;
+    --dv-tabs-and-actions-container-height: 34px;
+    background: var(--bg);
+  }
+  .panel-body { height: 100%; overflow: auto; padding: 16px; font-size: 14px; color: var(--ink); }
+  .panel-body .placeholder { color: var(--muted); font-size: 13px; }
+  a.tbtn { text-decoration: none; display: inline-block; }
+  .tbtn:disabled { opacity: 0.55; cursor: default; }
+  .spacer { flex: 1; }
+
+  .cap { height: 100%; display: flex; flex-direction: column; }
+  .cap-bar { flex: none; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .cap-bar .tbtn { padding: 5px 10px; font-size: 12px; }
+  .cap-group { display: inline-flex; gap: 2px; padding-left: 6px; border-left: 1px solid var(--border); }
+  .cap-listen[aria-pressed="true"] { background: var(--red); border-color: var(--red); }
+  .cap-listen[aria-pressed="true"]:hover { background: var(--red); }
+  .cap-level { font-size: 12px; color: var(--green); letter-spacing: 1px; min-width: 52px; }
+  .cap-list { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px; line-height: 1.5; }
+  .cap-list .seg { margin-bottom: 12px; }
+  .cap-list .en { color: var(--ink); }
+  .cap-list .interim .en { color: var(--muted); }
+  .cap-list .zh { color: var(--accent-hover); min-height: 1em; }
+  .cap-list.zh-only .en { display: none; }
+  .cap-foot { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .cap-usage { white-space: nowrap; }
+
+  .lookup { display: flex; flex-direction: column; gap: 10px; }
+  .lk-q {
+    flex: none; min-height: 56px; width: 100%; resize: vertical; font: inherit; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: var(--card);
+  }
+  .lk-q:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .lk-btns { flex: none; display: flex; gap: 8px; flex-wrap: wrap; }
+  .lk-answer { white-space: pre-wrap; line-height: 1.6; background: var(--bg); border-radius: 8px; padding: 10px 12px; }
+  .lk-item { padding: 8px 0; border-top: 1px solid var(--border); }
+  .lk-item a { color: var(--accent); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+  .lk-item a:hover { text-decoration: underline; }
+  .lk-item p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <h1>會議工作區 <span style="font-size:11px;font-weight:400;color:var(--muted)">僅限本機</span></h1>
+  <span class="sep"></span>
+  <button class="tbtn" type="button" data-panel="captions" aria-pressed="true">字幕</button>
+  <button class="tbtn" type="button" data-panel="reply" aria-pressed="true">回覆</button>
+  <button class="tbtn" type="button" data-panel="script" aria-pressed="true">講稿</button>
+  <button class="tbtn" type="button" data-panel="lookup" aria-pressed="true">查詢</button>
+  <span class="sep"></span>
+  <button class="tbtn" type="button" id="resetLayout">恢復預設版面</button>
+  <span class="spacer"></span>
+  <a class="home" href="/">← 回首頁</a>
+</div>
+<div id="dock" class="aw-dock"></div>
+
+<!-- 面板擴充點：後面的卡只填自己的 <template> 與自己的 <script> 區塊，互不干擾。
+     面板每次被打開（含重新整理、關掉再開）都會複製 template 內容，再呼叫
+     Workspace.onPanel(id, fn)，fn(root) 的 root 是該面板的根元素；
+     事件與狀態請綁在 root 底下，不要用全域 id 選取（面板可能被關閉後重建）。 -->
+<script>
+window.Workspace = (function () {
+  const handlers = {};
+  return {
+    onPanel(id, fn) { (handlers[id] = handlers[id] || []).push(fn); },
+    mount(id, root) { (handlers[id] || []).forEach(fn => fn(root)); },
+  };
+})();
+</script>
+
+<template id="tpl-captions">
+  <div class="cap">
+    <div class="cap-bar">
+      <button type="button" class="tbtn cap-listen" data-act="listen" aria-pressed="false">▶ 聆聽</button>
+      <span class="cap-group" title="聲音從哪裡來，可以兩個都開">
+        <button type="button" class="tbtn" data-src="mic" aria-pressed="true">麥克風</button>
+        <button type="button" class="tbtn" data-src="tab" aria-pressed="false">電腦聲音</button>
+      </span>
+      <span class="cap-group" title="誰來聽寫">
+        <button type="button" class="tbtn" data-stt="gemini" aria-pressed="true">Gemini（計費）</button>
+        <button type="button" class="tbtn" data-stt="local" aria-pressed="false">本機（免費）</button>
+      </span>
+      <span class="cap-level" aria-hidden="true"></span>
+      <span class="spacer"></span>
+      <button type="button" class="tbtn" data-act="zh-only" aria-pressed="false">只看中文</button>
+      <button type="button" class="tbtn" data-act="smaller" title="字小一點">A−</button>
+      <button type="button" class="tbtn" data-act="bigger" title="字大一點">A＋</button>
+      <button type="button" class="tbtn" data-act="clear">清除</button>
+    </div>
+    <div class="cap-list" aria-live="polite"></div>
+    <div class="cap-foot"><span class="cap-status"></span><span class="spacer"></span><span class="cap-usage"></span></div>
+  </div>
+</template>
+<script>
+// 字幕面板。連線、收音與字幕資料留在頁面層（面板關掉再開不會斷），面板只負責畫。
+// 貼底捲動移植自 OwnVoice Meet src/shared/follow.ts（Apache-2.0）。
+(function () {
+  const RATE = 16000, CHUNK = RATE / 10, MAX_ROWS = 500, NEAR_BOTTOM_PX = 30;
+  const EMPTY = "按「聆聽」開始。對方說的英文會出現在這裡，中文跟在下面。";
+  const prefs = Object.assign({ mic: true, tab: false, stt: "gemini", zhOnly: false, size: 18 }, loadPrefs());
+  const state = { segs: new Map(), status: "", listening: false, usage: null, level: 0 };
+  let root = null, ws = null, audio = null, following = true, ours = false;
+
+  function loadPrefs() { try { return JSON.parse(localStorage.getItem("ws-captions") || "{}"); } catch (e) { return {}; } }
+  function savePrefs() { try { localStorage.setItem("ws-captions", JSON.stringify(prefs)); } catch (e) {} }
+
+  // ---------- 與伺服器的連線 ----------
+  function connect() {
+    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/live/ws");
+    ws.binaryType = "arraybuffer";
+    ws.onmessage = e => handle(JSON.parse(e.data));
+    ws.onclose = () => {
+      stopAudio();
+      state.listening = false;
+      state.status = "和會議工具的連線斷了，正在重連…";
+      paintBar();
+      setTimeout(connect, 2000);
+    };
+  }
+  function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+  function handle(ev) {
+    if (ev.type === "snapshot") {
+      state.segs = new Map(ev.segments.map(s => [s.id, s]));
+      state.status = ev.status; state.listening = ev.listening; state.usage = ev.usage;
+      if (!ev.listening) stopAudio();
+      paintAll();
+    } else if (ev.type === "caption") {
+      state.segs.set(ev.id, ev);
+      if (state.segs.size > MAX_ROWS) state.segs.delete(state.segs.keys().next().value);
+      paintRow(ev);
+    } else if (ev.type === "caption-remove") {
+      state.segs.delete(ev.id);
+      const row = root && root.querySelector('[data-seg="' + ev.id + '"]');
+      if (row) row.remove();
+      paintEmpty();
+    } else if (ev.type === "clear") {
+      state.segs.clear(); paintAll();
+    } else if (ev.type === "status") {
+      state.status = ev.text; paintBar();
+    } else if (ev.type === "listening") {
+      state.listening = ev.on;
+      if (!ev.on) stopAudio();
+      paintBar();
+    } else if (ev.type === "usage") {
+      state.usage = ev; paintBar();
+    }
+  }
+
+  // ---------- 收音：麥克風／電腦聲音 → 16 kHz 單聲道 PCM16，每 100 ms 一包 ----------
+  const WORKLET = "registerProcessor('pcm',class extends AudioWorkletProcessor{process(i){const c=i[0];if(c.length){const n=c[0].length,m=new Float32Array(n);for(const ch of c)for(let k=0;k<n;k++)m[k]+=ch[k]/c.length;this.port.postMessage(m,[m.buffer]);}return true;}});";
+
+  async function startAudio() {
+    stopAudio();
+    const streams = [];
+    try {
+      if (prefs.tab) {
+        const s = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        streams.push(s);
+        if (!s.getAudioTracks().length) throw new Error("沒有取得電腦聲音。請重新按聆聽，在分享視窗勾選「同時分享音訊」");
+        s.getVideoTracks().forEach(t => { t.enabled = false; });
+      }
+      if (prefs.mic) {
+        streams.push(await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        }));
+      }
+      const ctx = new AudioContext({ sampleRate: RATE });
+      await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "text/javascript" })));
+      const node = new AudioWorkletNode(ctx, "pcm");
+      streams.forEach(s => ctx.createMediaStreamSource(new MediaStream(s.getAudioTracks())).connect(node));
+      const buf = new Int16Array(CHUNK);
+      let n = 0, sum = 0;
+      node.port.onmessage = e => {
+        for (const v of e.data) {
+          const x = Math.max(-1, Math.min(1, v));
+          buf[n++] = x * 32767;
+          sum += x * x;
+          if (n === CHUNK) {
+            if (ws && ws.readyState === 1) ws.send(buf.slice().buffer);
+            state.level = sum / CHUNK;
+            paintLevel();
+            n = 0; sum = 0;
+          }
+        }
+      };
+      audio = { ctx, streams };
+      // 使用者在瀏覽器的分享列按了「停止分享」：整個停止。
+      streams.forEach(s => s.getTracks().forEach(t => t.addEventListener("ended", () => { if (audio) listen(false); })));
+      return true;
+    } catch (e) {
+      streams.forEach(s => s.getTracks().forEach(t => t.stop()));
+      state.status = e.name === "NotAllowedError" ? "沒有拿到收音的許可（瀏覽器網址列左邊可以重新允許）" : String(e.message || e);
+      paintBar();
+      return false;
+    }
+  }
+
+  function stopAudio() {
+    if (!audio) return;
+    const a = audio;
+    audio = null;
+    a.streams.forEach(s => s.getTracks().forEach(t => t.stop()));
+    a.ctx.close();
+    state.level = 0;
+    paintLevel();
+  }
+
+  async function listen(on) {
+    if (!on) { stopAudio(); send({ type: "stop" }); return; }
+    if (!prefs.mic && !prefs.tab) { state.status = "「麥克風」和「電腦聲音」至少要開一個"; return paintBar(); }
+    if (!ws || ws.readyState !== 1) { state.status = "還沒連上會議工具，等一下再按"; return paintBar(); }
+    if (await startAudio()) send({ type: "start", stt: prefs.stt, language: "en-US" });
+  }
+
+  // ---------- 畫面 ----------
+  function list() { return root && root.querySelector(".cap-list"); }
+  function settle() {
+    const el = list();
+    if (!el || !following) return;
+    ours = true;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; ours = false; });
+  }
+  function paintEmpty() {
+    const el = list();
+    if (!el) return;
+    const empty = el.querySelector(".empty");
+    if (state.segs.size) { if (empty) empty.remove(); return; }
+    if (!empty) {
+      const p = document.createElement("p");
+      p.className = "placeholder empty";
+      p.textContent = EMPTY;
+      el.replaceChildren(p);
+    }
+  }
+  function paintRow(seg) {
+    const el = list();
+    if (!el) return;
+    paintEmpty();
+    let row = el.querySelector('[data-seg="' + seg.id + '"]');
+    if (!row) {
+      row = document.createElement("div");
+      row.dataset.seg = seg.id;
+      const en = document.createElement("div"); en.className = "en";
+      const zh = document.createElement("div"); zh.className = "zh";
+      row.append(en, zh);
+      el.append(row);
+      while (el.querySelectorAll("[data-seg]").length > MAX_ROWS) el.querySelector("[data-seg]").remove();
+    }
+    row.className = "seg" + (seg.final ? "" : " interim");
+    row.querySelector(".en").textContent = seg.en;
+    row.querySelector(".zh").textContent = seg.zh || (seg.final ? "…" : "");
+    settle();
+  }
+  function paintLevel() {
+    const el = root && root.querySelector(".cap-level");
+    if (!el) return;
+    const bars = audio ? Math.min(5, Math.round(Math.sqrt(state.level) * 12)) : 0;
+    el.textContent = audio ? "▮".repeat(bars) + "▯".repeat(5 - bars) : "";
+  }
+  function paintBar() {
+    if (!root) return;
+    const b = root.querySelector('[data-act="listen"]');
+    b.setAttribute("aria-pressed", String(state.listening));
+    b.textContent = state.listening ? "■ 停止" : "▶ 聆聽";
+    root.querySelectorAll("[data-src]").forEach(x => { x.setAttribute("aria-pressed", String(prefs[x.dataset.src])); x.disabled = state.listening; });
+    root.querySelectorAll("[data-stt]").forEach(x => { x.setAttribute("aria-pressed", String(prefs.stt === x.dataset.stt)); x.disabled = state.listening; });
+    root.querySelector('[data-act="zh-only"]').setAttribute("aria-pressed", String(prefs.zhOnly));
+    const l = list();
+    l.classList.toggle("zh-only", prefs.zhOnly);
+    l.style.fontSize = prefs.size + "px";
+    root.querySelector(".cap-status").textContent = state.status;
+    const u = state.usage;
+    root.querySelector(".cap-usage").textContent = u ? "今天約 NT$" + u.total_twd.toFixed(1) : "";
+    root.querySelector(".cap-usage").title = u ? u.models.map(m => m.label + "：NT$" + m.twd.toFixed(1)).join("\n") + "\n（依牌價估算，實際以各家帳單為準）" : "";
+    paintLevel();
+  }
+  function paintAll() {
+    if (!root) return;
+    list().replaceChildren();
+    paintEmpty();
+    state.segs.forEach(paintRow);
+    paintBar();
+  }
+
+  window.Workspace.onPanel("captions", el => {
+    root = el;
+    following = true;
+    const l = list();
+    l.addEventListener("scroll", () => { if (!ours) following = l.scrollTop + l.clientHeight >= l.scrollHeight - NEAR_BOTTOM_PX; });
+    new ResizeObserver(settle).observe(l);
+    el.querySelector(".cap-bar").addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (!b || b.disabled) return;
+      if (b.dataset.src) prefs[b.dataset.src] = !prefs[b.dataset.src];
+      else if (b.dataset.stt) prefs.stt = b.dataset.stt;
+      else if (b.dataset.act === "listen") return void listen(!state.listening);
+      else if (b.dataset.act === "zh-only") prefs.zhOnly = !prefs.zhOnly;
+      else if (b.dataset.act === "smaller") prefs.size = Math.max(12, prefs.size - 2);
+      else if (b.dataset.act === "bigger") prefs.size = Math.min(40, prefs.size + 2);
+      else if (b.dataset.act === "clear") return send({ type: "clear" });
+      savePrefs();
+      paintBar();
+      settle();
+    });
+    paintAll();
+  });
+
+  connect();
+})();
+</script>
+
+<template id="tpl-reply">
+  <div class="panel-body"><p class="placeholder">回覆會顯示在這裡</p></div>
+</template>
+<!-- C8 reply 的 <script> 區塊放在這裡（Workspace.onPanel("reply", root => {...})） -->
+
+<template id="tpl-script">
+  <div class="panel-body"><p class="placeholder">講稿會顯示在這裡</p></div>
+</template>
+<!-- C9 script 的 <script> 區塊放在這裡（Workspace.onPanel("script", root => {...})） -->
+
+<template id="tpl-lookup">
+  <div class="panel-body lookup">
+    <textarea class="lk-q" rows="2" placeholder="在任何面板反白文字，或直接在這裡打字"></textarea>
+    <div class="lk-btns">
+      <button type="button" class="tbtn" data-act="search">搜尋網路</button>
+      <button type="button" class="tbtn" data-act="ask">問 AI（計費）</button>
+      <a class="tbtn" href="/mindmap?session=latest" target="_blank" rel="noopener">心智圖</a>
+    </div>
+    <div class="lk-out" data-kind="ask" aria-live="polite"></div>
+    <div class="lk-out" data-kind="search" aria-live="polite"></div>
+  </div>
+</template>
+<script>
+// 查詢面板：反白（≥2 字）自動搜尋網路；問 AI 與心智圖按了才呼叫。
+(function () {
+  let root = null, query = "";
+  const latest = { search: 0, ask: 0 };       // 每種查詢各自的代號：舊回應晚到就丟掉
+
+  function out(kind) { return root && root.querySelector('.lk-out[data-kind="' + kind + '"]'); }
+  function note(kind, text) {
+    const p = document.createElement("p");
+    p.className = "placeholder";
+    p.textContent = text;
+    out(kind).replaceChildren(p);
+  }
+
+  async function run(kind) {
+    const text = query.trim();
+    if (!root || !text) return;
+    const mine = ++latest[kind];
+    note(kind, kind === "search" ? "搜尋中…" : "問 AI 中…");
+    let body, ok;
+    try {
+      const resp = await fetch("/api/lookup/" + kind, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(kind === "search" ? { q: text } : { text }),
+      });
+      ok = resp.ok;
+      body = await resp.json();
+    } catch (e) { ok = false; body = { detail: "連不到會議工具" }; }
+    if (mine !== latest[kind] || !root) return;
+    if (!ok) return note(kind, String(body.detail || "失敗"));
+    if (kind === "ask") {
+      const d = document.createElement("div");
+      d.className = "lk-answer";
+      d.textContent = body.answer;
+      const u = document.createElement("p");
+      u.className = "placeholder";
+      u.textContent = "AI 用量：輸入 " + body.input_tokens + "、輸出 " + body.output_tokens + " token";
+      return out(kind).replaceChildren(d, u);
+    }
+    if (!body.results.length) return note(kind, "沒有找到結果");
+    out(kind).replaceChildren(...body.results.map(r => {
+      const item = document.createElement("div");
+      item.className = "lk-item";
+      const a = document.createElement("a");
+      a.textContent = r.title;
+      if (/^https?:\/\//.test(r.link)) a.href = r.link;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      const s = document.createElement("p");
+      s.textContent = r.snippet;
+      item.append(a, s);
+      return item;
+    }));
+  }
+
+  function setQuery(text) {
+    query = text;
+    const box = root && root.querySelector(".lk-q");
+    if (box && box.value !== text) box.value = text;
+  }
+
+  window.Workspace.onPanel("lookup", el => {
+    root = el;
+    const box = el.querySelector(".lk-q");
+    box.value = query;
+    box.addEventListener("input", () => { query = box.value; });
+    box.addEventListener("keydown", e => {
+      if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+      e.preventDefault();
+      run("search");
+    });
+    el.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => run(b.dataset.act)));
+  });
+
+  // 頁面內任何面板的反白；輸入框裡的選取不算（那是在編輯）。
+  document.addEventListener("mouseup", e => {
+    if (e.target.closest && e.target.closest("textarea, input, .lk-out a")) return;
+    const text = String(window.getSelection()).trim();
+    if (text.length < 2 || text === query || !root || !root.isConnected) return;
+    setQuery(text);
+    run("search");
+  });
+})();
+</script>
+
+<script src="/static/vendor/dockview-core-8.9.1.min.js"></script>
+<script>
+(function () {
+  const dv = window["dockview-core"];
+  const PANELS = { captions: "字幕", reply: "回覆", script: "講稿", lookup: "查詢" };
+  // 重新打開被關掉的面板時，優先併在這些面板旁邊；都不在就加進目前的群組。
+  const REOPEN_NEXT_TO = {
+    captions: [["reply", "above"], ["lookup", "left"]],
+    reply: [["captions", "below"], ["script", "left"]],
+    script: [["lookup", "below"], ["reply", "right"]],
+    lookup: [["script", "above"], ["captions", "right"]],
+  };
+  const el = document.getElementById("dock");
+
+  const api = dv.createDockview(el, {
+    theme: dv.themeLight,
+    disableFloatingGroups: true,        // 不要漂浮視窗；tab 右鍵選單未設定 = 沒有「浮動／彈出視窗」選項
+    createComponent(opts) {
+      if (!(opts.name in PANELS)) throw new Error("未知的面板：" + opts.name);
+      const element = document.createElement("div");
+      element.style.height = "100%";
+      return {
+        element,
+        init() {
+          element.replaceChildren(document.getElementById("tpl-" + opts.name).content.cloneNode(true));
+          window.Workspace.mount(opts.name, element);
+        },
+      };
+    },
+  });
+
+  function addPanel(id, position, size) {
+    api.addPanel(Object.assign({ id, component: id, title: PANELS[id], position }, size));
+  }
+
+  function buildDefault() {
+    api.clear();
+    const w = el.clientWidth, h = el.clientHeight;
+    addPanel("captions");
+    addPanel("lookup", { referencePanel: "captions", direction: "right" }, { initialWidth: Math.round(w * 0.4) });
+    addPanel("reply", { referencePanel: "captions", direction: "below" }, { initialHeight: Math.round(h * 0.35) });
+    addPanel("script", { referencePanel: "lookup", direction: "below" }, { initialHeight: Math.round(h * 0.5) });
+  }
+
+  function syncButtons() {
+    document.querySelectorAll("#topbar [data-panel]").forEach(b => {
+      b.setAttribute("aria-pressed", api.getPanel(b.dataset.panel) ? "true" : "false");
+    });
+  }
+
+  let saveTimer = null;
+  function putLayout() {
+    return fetch("/api/workspace/layout", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(api.toJSON()),
+    }).catch(() => {});
+  }
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(putLayout, 500);
+  }
+
+  document.querySelectorAll("#topbar [data-panel]").forEach(b => {
+    b.addEventListener("click", () => {
+      const id = b.dataset.panel, existing = api.getPanel(id);
+      if (existing) { api.removePanel(existing); return; }
+      const next = REOPEN_NEXT_TO[id].find(([ref]) => api.getPanel(ref));
+      addPanel(id, next ? { referencePanel: next[0], direction: next[1] } : undefined);
+    });
+  });
+  document.getElementById("resetLayout").addEventListener("click", () => { buildDefault(); scheduleSave(); });
+
+  async function init() {
+    let saved = null;
+    try {
+      const resp = await fetch("/api/workspace/layout");
+      if (resp.ok) saved = await resp.json();
+    } catch (e) { saved = null; }
+    let restored = false;
+    if (saved && typeof saved === "object") {
+      delete saved.floatingGroups;      // 舊檔裡若有漂浮／彈出群組一律丟掉
+      delete saved.popoutGroups;
+      try { api.fromJSON(saved); restored = true; } catch (e) { restored = false; }
+    }
+    if (!restored) { buildDefault(); await putLayout(); }
+    syncButtons();
+    api.onDidAddPanel(syncButtons);
+    api.onDidRemovePanel(syncButtons);
+    api.onDidLayoutChange(scheduleSave);
+  }
+  init();
+})();
+</script>
+</body>
+</html>

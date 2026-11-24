@@ -8,3 +8,5 @@ server.err.log
 *.venv/
 __pycache__/
 *.pyc
+.workspace.json
+.live-usage.json
