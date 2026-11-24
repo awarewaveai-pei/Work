@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-24（續3）— oracle WP：next-admin 部署 `a7a8367b5`（SF-P 上線驗證）；備份腳本單站 `.env` 錯誤不再擋全體上傳
+
+- [根因] ① SF-P 的 308 只在本機驗過，操作者指示「如果需要部署才能接著做 就要部署，凌晨 03:00 自動部署只是以防萬一」。② 第三批總檢留給監工的 SF-L 前置：`backup-ks-aw-01.sh` 第 5 段把登記站的 `.env` 與 Soulful／Chatwoot 的放同一個 tar，站在備份途中被拆、`.env` 消失時 tar 失敗計入 `ERRORS`，abort gate 讓所有服務當晚都不上傳 R2。
+- [步驟] 部署：`scripts/check-deploy-drift.ps1`（落後 5、無 hold、compose 變數無漂移）→ 主機 `sg-deploy.sh next-admin`（exit 0，容器 healthy，主機 smoke 5 項 OK，`.deployed-commit` = `a7a8367b5`，前一版 `0781c2a9a`）。
+- [步驟] 備份修正 `00f14c40a`（不變量：登記站的失敗永遠是 `SITE_ERRORS`）：`lobster-factory/infra/ks-aw-01-backup/backup-ks-aw-01.sh` 第 5 段打包前逐一複查站的 `.env`，不見或不可讀 = `site_error` 並排除；打包仍失敗且含站檔 = `site_error`，改只包 Soulful／Chatwoot 重做；不含站檔的失敗才計 `ERRORS`。測試 `tests/host-scripts/backup-ks-aw-01-sites.test.sh` 加 4 項（docker shim 在站 a 傾印時刪它的 `.env`）。
+- [驗證] 正式站：主機內 `curl http://127.0.0.1:3002/onboard`、`/build` → 308 `/ops/sites/new`；帶 `Host: app.aware-wave.com` 的 `/ops/sites/new` 與 `/ops/clients` 同為 307 → `/login`（未登入行為一致）。`scripts/playwright-runner.ps1 -Mode smoke`（從 `oracle-int` 跑，含新的 `04-old-site-pages-redirect.spec.ts`）30 passed／0 failed／22 skipped。備份：測試 41 passed／0 failed；突變（換回舊腳本）新 4 項中 2 項變紅（ERROR 行、other stores uploaded），還原後全綠；`BASE=<舊腳本>` 無 sites.d 輸出逐行相同。
+- [避免再發生] 批內含 next-admin 卡且下一步要用到它時，驗收併入後當場部署一次（整批一次），不等 03:00。
+- [未做] 三支備份腳本未上主機（待決 3）；`0179` 改號與套用（待決 7）；SF-L 未開始。`D:\Work` 的 `04-onboard-page.spec.ts` 仍是舊檔（本機 main 落後 origin），從那裡跑 smoke 會紅，parity 後即消失。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin；curl 127.0.0.1:3002/onboard、/build | exit=0 | ms=240000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=SITE_ERRORS | hits=9
+- ORACLE_WAIVED: Codex 額度封到 2026-11-24 11:02；備份修正以突變證據（舊腳本使指名測試變紅）＋監工自審代替
 ## 2026-11-24（續2）— oracle WP 第四批收尾：SF-P 併入；整批 RISKS 總檢完成（21 列）；SF-K 清單外兩處假狀態補修
 
 - [根因] 第四批最後一張 SF-P（工人 `dc2a9c8d5`，線 4）已提交未驗收；E6、P4、SF-K、SF-J2、SF-I2 的未處置風險（2026-11-23 續11、續13）等它交回才能一起判。
