@@ -4,6 +4,7 @@ import { isBridgeConfigured, createNewsletter } from "@/lib/crm/fluentcrm";
 import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 import { staffOnly } from "@/lib/tenant-guard";
 import { EMAIL_FRAME_OPEN, EMAIL_H1, EMAIL_P, escapeHtml, safeUrl } from "@/lib/crm/newsletter-html";
+import { scrubInternalMarkers } from "@/lib/content/internal-markers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,11 +36,8 @@ function inline(s: string): string {
  * are flattened to nothing fancy; images are kept as <img>. Internal generation markers are scrubbed.
  */
 function markdownToEmailHtml(md: string): string {
-  const clean = md
-    .replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "")
-    .replace(/<!--\s*SLUG_HINT:[^>]*-->/g, "")   // self-contained scrub (client strips it too)
-    .replace(/\[YOUTUBE_PLACEHOLDER_\d+:[^\]]*\]/g, "")
-    .replace(/<!--\s*GENERATION_(?:TRUNCATED|ERROR):[\s\S]*?-->/g, "")
+  // The one scrub every reader-facing output goes through (cost lines, review notes, year notes, placeholders).
+  const clean = scrubInternalMarkers(md)
     .trim();
 
   const lines = clean.split("\n");

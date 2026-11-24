@@ -49,6 +49,17 @@ describe("POST /api/content/newsletter -- bridge gate result", () => {
 });
 
 // The bridge is our own FluentCRM, not the customer's (step-8 card C-R4).
+describe("POST /api/content/newsletter -- internal markers never reach the email", () => {
+  it("cost line, review note, year note and placeholders are gone from the HTML sent to the bridge", async () => {
+    const markdown = ["# 標題", "", "正文一段（年份未核）。<!-- NEEDS_FACT_CHECK: 數字 -->", "", "[YOUTUBE_PLACEHOLDER_1: demo]",
+      '[COST_JSON]{"usd":0.04,"model":"gpt-6.2-sol"}', "<!-- GENERATION_TRUNCATED: x -->"].join("\n");
+    await POST(new Request("http://localhost/api/content/newsletter", { method: "POST", body: JSON.stringify({ subject: "S", markdown }) }));
+    const sent = JSON.stringify(createNewsletter.mock.calls[0]);
+    expect(sent).toContain("正文一段");
+    for (const leak of ["COST_JSON", "NEEDS_FACT_CHECK", "年份未核", "YOUTUBE_PLACEHOLDER", "GENERATION_TRUNCATED"]) expect(sent).not.toContain(leak);
+  });
+});
+
 describe("POST /api/content/newsletter -- customer", () => {
   it("403 before anything reaches the bridge", async () => {
     const res = await POST(new Request("http://localhost/api/content/newsletter", { method: "POST",
