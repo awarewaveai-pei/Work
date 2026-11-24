@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-24（續15）— oracle WP：待決 7 → migration `0181` 套用；oracle 外掛 `v0.5.0` 首發（private repo＋主機鏡像）
+
+- [根因] GO-2 前置剩兩項：`host_slug` 唯一索引（原 `0179`，撞號未併入）；oracle 外掛無 release，建站勾選會在主機下載失敗。操作者對待決 7 回「你是專家」＝監工判斷。
+- [步驟] ① `refs/keep/sf-j2-0179` 的 SQL 改名 `0181_environments_host_slug_unique(.down).sql`（檔內編號、down 回 0180），`lib/site-flow/create-site.ts`／`records.ts` 六處註解 0179→0181（`403b297d6`）；`node scripts/apply-db-migration.mjs 0181`。② `gh repo create awarewaveai-pei/aware-wave-oracle --private` → `bash scripts/release-wp-bridge.sh --plugin oracle`。③ `wp-plugin-stack-catalog.ts` 刪過時註解一行。
+- [驗證] `APPLY_OK 1/1: 0181`；`pg_get_indexdef` = partial unique on `metadata->>'host_slug'` where status 非 archived；`schema_migrations` 有列；`environments` 0 列。next-admin `npx tsc --noEmit` exit 0、`npx vitest run lib/site-flow` 9 檔／127 passed。外掛：release repo CI passed → tag `v0.5.0` → `RELEASE OK`；`mirror-plugin-release.sh` 主機 sha `b21a1c84…` 與 asset 相同；外掛目錄金鑰樣式 grep 0 命中。
+- [未做] 外掛未安裝到任何站（GO-2）。
+- [rollback] 索引：`0181_environments_host_slug_unique.down.sql`。外掛：刪 release／tag 與主機鏡像目錄。
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0181；psql pg_get_indexdef；bash scripts/release-wp-bridge.sh --plugin oracle | exit=0 | ms=300000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=0179_environments | hits=0
+- BUGHUNT_SCOPE_NARROW: 只查撞號檔名的殘留引用
+- ORACLE_WAIVED: source 改動僅註解；SQL 已於 SF-J2（批 4）經 db-expert 審
 ## 2026-11-24（續14）— oracle WP：GO-1 引擎部署（`a83b4284b`），原有網址逐頁不變
 
 - [根因] 引擎線上停在 2026-11-20；E1–E6 全未部署。操作者同意待決 4。

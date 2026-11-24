@@ -81,7 +81,6 @@ export const WP_PLUGIN_CATALOG: WpPlugin[] = [
   { slug: "aware-wave-wp-bridge",              label: "AwareWave WP Bridge",                        free: false, required: true,  module: "base", installSource: "release-url", releaseRepo: "aware-wave-wp-bridge", releaseVersion: "0.22.0" },
   // Opt-in per site (required: false): the site flow installs it only when the operator ticks it at the WordPress step.
   // Release: scripts/release-wp-bridge.sh --plugin oracle (repo awarewaveai-pei/aware-wave-oracle, asset aware-wave-oracle-v<ver>.zip).
-  // Until that repo's first release is published, ticking it fails at the host's download.
   { slug: "aware-wave-oracle",                 label: "AwareWave Oracle（命理工具）†",               free: false, required: false, module: "base", installSource: "release-url", releaseRepo: "aware-wave-oracle", releaseVersion: "0.5.0" },
   { slug: "kadence",        label: "Kadence Theme",  free: true, required: true, module: "base", kind: "theme", excludeForModules: ["tourism"] },
   { slug: "kadence-blocks", label: "Kadence Blocks", free: true, required: true, module: "base", excludeForModules: ["tourism"] },
