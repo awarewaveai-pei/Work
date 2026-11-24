@@ -8,7 +8,7 @@
 
 ## 0. 現況快照（2026-11-24；接手先讀這節，再讀 `data.mjs`）
 
-- 批 1、2、3 全部併入，整批 RISKS 總檢完成（`data.mjs` 三張表）。批 4 六張：E6、P4、SF-K、SF-J2 程式、SF-I2 已併入；**SF-P 未提交**（線 4 `wp-admin`，worktree `D:/Worktrees/Work/quizzical-pasteur-f7ea2d`，32 檔已 staged，續做法在該 worktree 的 `HANDOFF-SF-P.md`；2026-11-24 已叫回提交）。
+- 批 1、2、3 全部併入，整批 RISKS 總檢完成（`data.mjs` 三張表）。批 4 六張：E6、P4、SF-K、SF-J2 程式、SF-I2 已併入；**SF-P 已提交、未驗收、未併入**：工人 commit `dc2a9c8d5`（線 4 `wp-admin`，worktree `D:/Worktrees/Work/quizzical-pasteur-f7ea2d`，基底 origin/main `e95938d09`，32 檔；工人自報 rebase 後 tsc 0、全套 vitest 綠）。工人回報有三件「沒接進建站流程」要監工決定（規格內容產網站、品牌色、問卷綁定）：用 `list_events` 讀線 4 最後一則完整回報與盤點表再判。
 - 下一步依序：① SF-P 交回 → 讀回報與盤點表 → `pick`（下述做法）→ next-admin 全套 vitest → push。② 批 4 整批 RISKS 總檢：未處置清單在 `agency-os/WORKLOG.md` 2026-11-23 續11（E6、P4、SF-K、SF-J2）與續13（SF-I2），加 SF-P 的；寫進 `data.mjs` 新表「第四批」。③ 監工自己：備份腳本單站 `.env` 錯誤改計 `SITE_ERRORS`、三支備份腳本上主機（SF-L 前置）。④ 批 5：SF-L → GO-1 → GO-2 → GO-3、SF-O、SF-A。
 - 等操作者點頭（`data.mjs` `OPEN`，到時一次問一件）：#3 SF-L、#4 GO-1、#5 GO-2、#6 GO-3、#7 套用 migration `0179_environments_host_slug_unique`（未併入，參照 `refs/keep/sf-j2-0179`）、#8 建 `awarewaveai-pei/aware-wave-oracle` 公開 repo 並發佈外掛第一版。#1（0176）、#2（MainWP 金鑰）已完成。
 - 部署狀態：引擎線上仍是 2026-11-20 版，main 上所有引擎卡未部署（GO-1）；主機 `oracle-web` env `OPENAI_MODEL_DEEP=gpt-4o-2024-11-20` 要在 GO-1 移除；外掛 0.5.0 未安裝到任何網站；next-admin 每晚 03:00 自動部署，`site.*` 七個 catalog 開關全關、主機開關檔未設 `AW_SITE_VERBS=on`；`AW_SITE_GATEWAY_SLUGS` 未設（GO-2 前加 oracle 的 slug）。
