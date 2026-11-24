@@ -351,6 +351,95 @@ def events_for(c, idx, gaps):
     return evs
 
 
+# data.mjs is plain data (no imports). node reads it from a throwaway dir with no environment, as nobody when run as
+# root, killed after 20s: a broken or hostile page costs one gap line, never the run or a secret.
+# card code / commit = scripts/systems-migrate-supervisor.mjs (cardCode; step commit, else the last done item's commit)
+STEPS_JS = ("const m=await import(process.argv[1]);process.stdout.write(JSON.stringify((m.STEPS||[]).map(s=>({"
+            "code:s.code!==undefined&&s.code!==null?String(s.code):String(s.n),status:s.status??null,"
+            "commit:s.commit||[...(s.items||[])].reverse().find(i=>i.status==='done'&&i.commit)?.commit||null}))))")
+MAPPED = {"done": "implemented", "in_progress": "in_progress", "todo": "todo", "not_started": "todo"}
+
+
+def read_cards(mirror, rev, folder):
+    """-> list of {code, status, commit}, or None when data.mjs is missing / unreadable at rev."""
+    src = git(mirror, "show", f"{rev}:{folder}/data.mjs", check=False)
+    if src.returncode != 0:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "data.mjs")
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(src.stdout)
+        cmd = ["node", "--input-type=module", "-e", STEPS_JS, "file://" + path.replace(os.sep, "/")]
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            os.chmod(d, 0o755)
+            os.chmod(path, 0o644)
+            cmd = ["runuser", "-u", "nobody", "--"] + cmd
+        try:
+            r = subprocess.run(cmd, cwd=d, capture_output=True, encoding="utf-8", timeout=20,
+                               env={k: v for k, v in os.environ.items() if k in ("PATH", "SYSTEMROOT")})  # SYSTEMROOT: Windows tests
+            cards = json.loads(r.stdout) if r.returncode == 0 else None
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            cards = None
+    return cards if isinstance(cards, list) else None
+
+
+def supervisor_snapshots(mirror, head, prev, reg, gaps, baseline=False):
+    """-> (events, live_phase_ids). Phases whose supervisor page is still live (legacy_source_path, no FROZEN.json at
+    HEAD) are read every run; each card whose (status, commit) differs from the page at `prev` becomes a migration event
+    (payload.live) keyed by the data.mjs version, so A -> B -> A lands three events, never a dropped duplicate. Every card
+    goes out when the phase is new since prev, there is no prev, or `baseline` (first rollout: --snapshot-baseline); a card
+    whose feature was registered since prev goes out once even if the page did not change.
+    Card -> feature by legacy_code exactly; a card with no feature, or an unknown status, is a gap -- never guessed."""
+    events, live = [], []
+    prev_reg_text = git(mirror, "show", f"{prev}:{REGISTRY_PATH}", check=False) if prev else None
+    prev_folders, prev_features = set(), set()
+    if prev_reg_text is not None and prev_reg_text.returncode == 0:
+        try:
+            prev_systems = json.loads(prev_reg_text.stdout)["systems"]
+            prev_folders = {(p.get("legacy_source_path") or "").rstrip("/") for x in prev_systems for p in x.get("phases", [])}
+            prev_features = {f.get("id") for x in prev_systems for f in x.get("features", [])}
+        except (ValueError, KeyError, TypeError, AttributeError):
+            prev_folders, prev_features = set(), set()
+    for s in reg["systems"]:
+        for ph in s.get("phases", []):
+            folder = (ph.get("legacy_source_path") or "").rstrip("/")
+            if not folder or git(mirror, "cat-file", "-e", f"{head}:{folder}/FROZEN.json", check=False).returncode == 0:
+                continue
+            live.append(ph["id"])
+            full = baseline or not prev or folder not in prev_folders
+            blob = lambda rev: git(mirror, "rev-parse", "--verify", "--quiet", f"{rev}:{folder}/data.mjs", check=False).stdout.strip()
+            feats = {f.get("legacy_code"): f for f in s.get("features", []) if f.get("phase") == ph["slug"] and f.get("legacy_code")}
+            fresh = {f["id"] for f in feats.values() if f["id"] not in prev_features}  # registered since prev: send once
+            if not full and not fresh and blob(prev) == blob(head):
+                continue
+            cards = read_cards(mirror, head, folder)
+            if cards is None:
+                gaps["unmapped_cards"].add(f"{folder}/ data.mjs missing or unreadable")
+                continue
+            before = {} if full else {c.get("code"): c for c in (read_cards(mirror, prev, folder) or [])}
+            log = git(mirror, "log", "-1", "--format=%H %cI", head, "--", f"{folder}/data.mjs").stdout.split()
+            src_sha, at = (log + [None, None])[:2]
+            for c in cards:
+                f = feats.get(c["code"])
+                if f is None:
+                    gaps["unmapped_cards"].add(f"{folder}/ {c['code']}")
+                    continue
+                if c["status"] not in MAPPED:
+                    gaps["unmapped_cards"].add(f"{folder}/ {c['code']} status={c['status']}")
+                old = before.get(c["code"])
+                if f["id"] not in fresh and old is not None and (old.get("status"), old.get("commit")) == (c["status"], c["commit"]):
+                    continue
+                mapped = MAPPED.get(c["status"], "todo")
+                events.append({"event_key": f"mig:{f['id']}:{(src_sha or head)[:12]}", "system_slug": s["slug"],
+                               "phase_slug": ph["slug"], "feature_slug": f["slug"], "event_type": "migration",
+                               "source": "migration", "commit_sha": None, "occurred_at": at or now_iso(),
+                               "payload": {"legacy_status": str(c["status"]), "mapped_status": mapped,
+                                           "evidence_level": "commit" if c["commit"] else "none",
+                                           "source_path": folder + "/", "source_sha": src_sha, "live": True},
+                               "evidence": {"commit": c["commit"]} if c["commit"] else None})
+    return events, live
+
+
 def head_gaps(mirror, head, reg):
     """products.ts keys with no registry product_key; supervisor data.mjs folders no phase claims; registry file paths
     (no trailing /) that are not a file at HEAD -- such an entry owns nothing, so its commits fall through silently.
@@ -421,13 +510,15 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
 
-GAP_KEYS = ("unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths")
+GAP_KEYS = ("unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths",
+            "unmapped_cards")
 
 
-def run_event(head, prev, status, error, gaps, at):
+def run_event(head, prev, status, error, gaps, at, live_phases=None):
     return {"event_key": f"run:{head}:{at}", "system_slug": None, "phase_slug": None, "feature_slug": None,
             "event_type": "import_run", "source": "importer", "commit_sha": head, "occurred_at": at,
-            "payload": {"head": head, "previous_head": prev, "status": status, "error": error, "gaps": gaps},
+            "payload": {"head": head, "previous_head": prev, "status": status, "error": error, "gaps": gaps,
+                        "live_phases": live_phases or []},
             "evidence": None}
 
 
@@ -447,7 +538,7 @@ def error_body(mirror, ctx, error):
     return {"registry": reg, "events": [run_event(head, prev, "error", str(error)[:1000], {k: [] for k in GAP_KEYS}, now_iso())]}
 
 
-def build(mirror, state_path, ref, first_days, run_when_current=False, ctx=None):
+def build(mirror, state_path, ref, first_days, run_when_current=False, ctx=None, snapshot_baseline=False):
     """-> (bodies, head, status); bodies == [] when already up to date, unless run_when_current (then the one body
     carries just the import_run: a refresh request is answered by a run record newer than it). ctx (a dict) gets
     prev / head / reg as they become known, for error_body."""
@@ -468,7 +559,7 @@ def build(mirror, state_path, ref, first_days, run_when_current=False, ctx=None)
     reg = load_registry(reg_text.stdout)
     ctx["reg"] = reg
     idx = Index(reg)
-    gaps = {"unowned_paths": set(), "unclassified_trailers": set()}
+    gaps = {"unowned_paths": set(), "unclassified_trailers": set(), "unmapped_cards": set()}
     events, status, error = [], "ok", None
     at = now_iso()
 
@@ -491,14 +582,19 @@ def build(mirror, state_path, ref, first_days, run_when_current=False, ctx=None)
         for c in commits(mirror, rng):
             events.extend(events_for(c, idx, gaps))
 
+    live_phases = []
+    if status == "ok":
+        snap, live_phases = supervisor_snapshots(mirror, head, prev, reg, gaps, baseline=snapshot_baseline)
+        events.extend(snap)
     unregistered, unclaimed, dead = head_gaps(mirror, head, reg)
     run_gaps = {
+        "unmapped_cards": sorted(gaps["unmapped_cards"])[:GAP_CAP],
         "unowned_paths": sorted(gaps["unowned_paths"])[:GAP_CAP],
         "unclassified_trailers": sorted(gaps["unclassified_trailers"])[:GAP_CAP],
         "unregistered_products": unregistered, "unclaimed_supervisors": unclaimed, "dead_source_paths": dead}
     # last of all, so the route has a run record only once every earlier batch landed; the time in the key gives every
     # run its own record (a rerun at the same HEAD must still update status and gaps)
-    events.append(run_event(head, prev, status, error, run_gaps, at))
+    events.append(run_event(head, prev, status, error, run_gaps, at, live_phases))
     bodies = [{"registry": reg, "events": events[i:i + BATCH]} for i in range(0, len(events), BATCH)]
     return bodies, head, status
 
@@ -572,6 +668,8 @@ def main(argv=None):
     ap.add_argument("--first-days", type=int, default=90)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--if-requested", action="store_true")
+    # once per rollout: send every live supervisor card, not only the ones changed since the previous run
+    ap.add_argument("--snapshot-baseline", action="store_true")
     ap.add_argument("--wait-lock", type=int, default=None)
     ap.add_argument("--lock", default="/tmp/systems-import.lock")
     ap.add_argument("--max-seconds", type=int, default=300)
@@ -648,7 +746,8 @@ def run(a, files, token, url):
 
     try:
         try:
-            bodies, head, status = build(a.mirror, a.state, a.ref, a.first_days, run_when_current=a.if_requested, ctx=ctx)
+            bodies, head, status = build(a.mirror, a.state, a.ref, a.first_days, run_when_current=a.if_requested or a.snapshot_baseline, ctx=ctx,
+                                         snapshot_baseline=a.snapshot_baseline)
         except Fatal as e:
             files.error(f"[systems-import] ERROR: {e}")
             answer_failure(e)

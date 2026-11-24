@@ -10,6 +10,8 @@
 //   its own reverts. Revert / orphaned events are read across every system (store.readCommitHistory).
 // - completion = verified / features not cancelled; no features = null (尚未盤點). Features of a phase that still
 //   lives on its old supervisor page (legacy_source_path, no migration event yet) are left out: that page is the source.
+//   A live page is copied every night (importer supervisor_snapshots: migration events with payload.live), so its phase
+//   counts like a cut-over one; which phases are live now is the newest ok import_run's live_phases (overview.livePhases).
 // - a handoff from a commit whose handoff also landed on another system is skipped unless the commit named it (System:,
 //   payload.explicit): the old importer pasted one Next: on every path owner (spreadCommits). Its blocker_cleared
 //   still applies.

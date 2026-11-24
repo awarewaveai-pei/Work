@@ -1,4 +1,33 @@
 # Worklog
+## 2026-11-24（續12）— 系統總控中心批 6：還在進行的監工頁每晚同步到總控頁；「維護與已完成」改看功能完成度、半年沒動才算暫停（操作者：「進度在監工頁的要查啊」「維護與已完成 4 這個很奇怪」「半年好了」）
+
+- 根因 1：還在進行的 11 個監工頁（共 213 張卡）只在切換凍結時搬一次，所以總控頁一直顯示「進度在舊監工頁」。
+- 根因 2：狀態推定只看時鐘，15–60 天沒 commit 就推成「維護中」，安靜被當成做完。例如 hci30 有卡點，也被算進「維護與已完成」。
+- 修正：
+  - 匯入器 `supervisor_snapshots()`：每輪用 node 讀還沒凍結的 data.mjs。node 在暫存目錄執行、不帶環境變數；root 執行時改用 nobody 身分、20 秒逾時。
+    - 只送和上一輪不同的卡，event_key 帶 data.mjs 版本，所以 A→B→A 不會撞號。
+    - 新登記的卡送一次；第一次上線用 `--snapshot-baseline` 全送一次。
+    - 找不到功能、或狀態不認得的卡，列入新缺口 `unmapped_cards`。
+    - import_run 帶 `live_phases`；詳情頁依最新一筆 ok 的匯入標示「每晚從監工頁同步」。
+  - `effectiveStatus`：
+    - 功能全部已實作：14 天內有 commit＝維護中，否則＝已完成。
+    - 還有沒做完的：半年（180 天）內有 commit＝開發中，否則＝暫停。
+    - 推定暫停算進「待確認」。
+  - registry：補 14 張監工頁卡（oracle 3、總控 3、訂閱通道 8）。
+- 審查：critic Standard 0c/1m/7n，全修：
+  - key 撞號（A→B→A）。
+  - 同步標記凍結後不會消失。
+  - 推定暫停從所有卡片消失。
+  - 未知狀態沒記缺口。
+  - commit 取法與舊腳本不一致。
+  - node 權限與環境。
+  - 契約沒同步更新。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tests/host-scripts/systems-import.test.py → Ran 15 OK | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run systems → 7 files / 46 passed | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=supervisor_snapshots 對真 repo（origin/main，baseline）→ 213 events、11 live phases、0 gaps、key 唯一 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=warn→pass | findings=0c/1m/7n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=live_phases | hits=15
+- ORACLE_WAIVED: Codex 額度到 11/24；critic 一輪＋A→B→A／凍結／新登記卡三段測試
 ## 2026-11-24（續11）— 系統總控中心批 5：接續卡不再一句貼到十幾個系統、17 個沒監工頁的系統有了功能清單（操作者：「還有很多沒處理好，而且有的是沒有監控台的，應該怎麼辦?」）
 
 - 根因 1：`systems-import.py` events_for() 把 handoff 發給所有路徑主人。改到多系統的 commit（d32e4ca 一句貼到 15 個系統）讓 42 個 commit 的 Next 出現在不相干的系統。

@@ -9,7 +9,7 @@ export const FEATURE_STATUSES = ["todo", "in_progress", "implemented", "verified
 export const IMPORTER_EVENT_TYPES = ["activity", "handoff", "feature_update", "revert", "orphaned", "migration", "import_run"] as const;
 export const IMPORTER_SOURCES = ["agent", "migration", "importer"] as const;
 export const IMPORT_RUN_STATUSES = ["ok", "history_diverged", "error"] as const;
-export const GAP_KEYS = ["unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths"] as const;
+export const GAP_KEYS = ["unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths", "unmapped_cards"] as const;
 
 export type SystemType = (typeof SYSTEM_TYPES)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
@@ -25,6 +25,8 @@ export interface Registry { version: 1; shared_paths: string[]; ignore_paths: st
 export interface ImportRun {
   head: string; previous_head: string | null; status: (typeof IMPORT_RUN_STATUSES)[number]; error: string | null;
   gaps: Record<(typeof GAP_KEYS)[number], unknown[]>;
+  /** phase ids whose supervisor page is still live and read every run (importer supervisor_snapshots) */
+  live_phases: string[];
 }
 export interface IngestEvent {
   event_key: string; system_slug: string | null; phase_slug: string | null; feature_slug: string | null;
@@ -108,6 +110,7 @@ function parseImportRun(raw: unknown, where: string): ImportRun {
   return {
     head: nonEmpty(r.head, `${where}.head`, 64), previous_head: strOrNull(r.previous_head, `${where}.previous_head`, 64),
     status: oneOf(r.status, IMPORT_RUN_STATUSES, `${where}.status`), error: strOrNull(r.error, `${where}.error`), gaps,
+    live_phases: r.live_phases === undefined ? [] : strArr(r.live_phases, `${where}.live_phases`),
   };
 }
 

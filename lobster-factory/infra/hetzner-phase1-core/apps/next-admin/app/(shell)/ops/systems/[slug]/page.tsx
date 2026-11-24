@@ -11,7 +11,7 @@ import { importSummary, PRIORITIES, projectSystem, SYSTEM_STATUSES, type Feature
 import {
   EFFECTIVE_BADGE, EFFECTIVE_LABEL, EVENT_LABEL, FEATURE_BADGE, FEATURE_LABEL, formatTime, PRIORITY_LABEL, RESULT_MESSAGES, SOURCE_LABEL, STATUS_LABEL, TYPE_LABEL,
 } from "@/lib/systems/labels";
-import { buildResumeMarkdown, effectiveStatus, implementedRatio, legacyDone, progressKind, type EffectiveState } from "@/lib/systems/overview";
+import { buildResumeMarkdown, effectiveStatus, implementedRatio, legacyDone, livePhases, progressKind, type EffectiveState } from "@/lib/systems/overview";
 import { readDefinitions, readImportRuns, readProjectionInput, readRecentEvents } from "@/lib/systems/store";
 import { reviewFeature, setSystemStatus } from "../actions";
 import { CopyBrief } from "../CopyBrief";
@@ -27,7 +27,7 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px" };
 const row: React.CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--card-border)", fontSize: 13, color: "var(--text-primary)" };
 
-function Overview({ system, p, eff, hist, brief }: { system: SystemRow; p: SystemProjection; eff: EffectiveState; hist: ReturnType<typeof legacyDone>; brief: string }) {
+function Overview({ system, p, eff, hist, brief, live }: { system: SystemRow; p: SystemProjection; eff: EffectiveState; hist: ReturnType<typeof legacyDone>; brief: string; live: Set<string> }) {
   const kind = progressKind(p);
   const hidden = (
     <>
@@ -79,7 +79,7 @@ function Overview({ system, p, eff, hist, brief }: { system: SystemRow; p: Syste
       {p.phases.length === 0 ? <div style={muted}>沒有階段。</div> : p.phases.map(({ phase, legacy }) => (
         <div key={phase.id} style={row}>
           <strong>{phase.name}</strong>
-          {legacy && phase.legacy_source_path ? <span style={muted}>舊監工頁（未切換）：<code>{phase.legacy_source_path}</code></span> : <span style={muted}>在這裡追蹤</span>}
+          {legacy && phase.legacy_source_path ? <span style={muted}>舊監工頁（未切換）：<code>{phase.legacy_source_path}</code></span> : live.has(phase.id) && phase.legacy_source_path ? <span style={muted}>每晚從監工頁同步：<code>{phase.legacy_source_path}</code></span> : <span style={muted}>在這裡追蹤</span>}
         </div>
       ))}
       <h3 style={{ margin: "20px 0 8px" }}>功能清單</h3>
@@ -224,7 +224,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
     );
   }
 
-  const eff = effectiveStatus(p.status, p.lastCommitAt, Date.now());
+  const eff = effectiveStatus(p.status, p.lastCommitAt, Date.now(), p);
   const imp = importSummary(runs);
   const brief = buildResumeMarkdown({
     name: system.name, purpose: system.purpose, type: TYPE_LABEL[system.type as SystemType] ?? system.type, sourcePaths: system.source_paths ?? [],
@@ -248,7 +248,7 @@ export default async function SystemPage({ params, searchParams }: { params: Pro
           <Link key={t} href={`/ops/systems/${system!.slug}?tab=${t}`} className={tab === t ? "btn-primary" : "btn-secondary"} style={{ ...smallBtn, textDecoration: "none" }}>{label}</Link>
         ))}
       </div>
-      {tab === "overview" && <Overview system={system} p={p} eff={eff} hist={hist} brief={brief} />}
+      {tab === "overview" && <Overview system={system} p={p} eff={eff} hist={hist} brief={brief} live={livePhases(runs)} />}
       {tab === "log" && <Log events={recent} />}
     </div>
   );

@@ -13,9 +13,9 @@ const ev = (event_type: string, payload: Record<string, unknown>, at: string, ex
 });
 
 describe("projectSystem", () => {
-  it("the inferred status reads lastCommitAt as given: a review today leaves a 94-day-silent system 暫停（推定）", () => {
+  it("the inferred status reads lastCommitAt as given: a review today leaves a 200-day-silent system 暫停（推定）", () => {
     const NOW = Date.parse("2026-11-22T00:00:00Z");
-    const old = "2026-08-20T00:00:00Z"; // 94 days before NOW
+    const old = "2026-05-06T00:00:00Z"; // 200 days before NOW
     const p = projectSystem({ phases: [], features: [feature("f1")], lastCommitAt: old, events: [
       ev("review", { status: "verified", by: "u" }, "2026-11-21T00:00:00Z", { source: "user", feature_id: "f1", event_key: "user:r1" }),
     ] });

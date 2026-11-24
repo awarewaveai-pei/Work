@@ -165,6 +165,49 @@ class SystemsImportTest(unittest.TestCase):
         gaps = bodies[-1]["events"][-1]["payload"]["gaps"]["unclassified_trailers"]
         self.assertIn(f"{spread[:7]} handoff spans 2 systems (add System: <slug>)", gaps)
 
+    def test_live_supervisor_page_sends_changed_cards_until_frozen(self):
+        reg = json.loads(json.dumps(REGISTRY))
+        beta = reg["systems"][1]
+        beta["phases"] = [{"id": "00000000-0000-4000-8000-0000000000b1", "slug": "v1", "name": "一",
+                           "legacy_source_path": "agency-os/handoffs/sup/"}]
+        beta["features"] = [{"id": "00000000-0000-4000-8000-0000000000b2", "slug": "card-a", "name": "甲卡", "phase": "v1",
+                             "legacy_code": "A1"},
+                            {"id": "00000000-0000-4000-8000-0000000000b3", "slug": "card-b", "name": "乙卡", "phase": "v1",
+                             "legacy_code": "B1"}]
+        page = lambda a: ("export const STEPS = [\n  { n: 1, code: 'A1', " + a + " },\n"
+                          "  { n: 2, code: 'B1', status: 'todo' },\n  { n: 3, code: 'C9', status: 'weird' },\n];\n")
+        done = "status: 'done', commit: 'abc1234def'"
+
+        def run(files, msg):
+            self.r.commit(files, msg)
+            bodies, head, _ = self.build()
+            si.write_state(self.r.state, head)
+            mig = [(e["feature_slug"], e["payload"]["mapped_status"], e["payload"]["live"])
+                   for e in events(bodies) if e["event_type"] == "migration"]
+            return mig, bodies[-1]["events"][-1]["payload"], [e["event_key"] for e in events(bodies) if e["event_type"] == "migration"]
+
+        mig, run1, keys1 = run({"agency-os/systems/registry.json": json.dumps(reg), "agency-os/handoffs/sup/data.mjs": page(done)}, "p")
+        self.assertEqual(mig, [("card-a", "implemented", True), ("card-b", "todo", True)])  # new phase: every card
+        self.assertEqual(run1["gaps"]["unmapped_cards"], ["agency-os/handoffs/sup/ C9"])
+        self.assertEqual(run1["live_phases"], ["00000000-0000-4000-8000-0000000000b1"])
+        # A -> B -> A with the same commit: each step lands (keys carry the page version), unchanged card-b stays quiet
+        mig, _, keys2 = run({"agency-os/handoffs/sup/data.mjs": page("status: 'in_progress', commit: 'abc1234def'")}, "back")
+        self.assertEqual(mig, [("card-a", "in_progress", True)])
+        mig, _, keys3 = run({"agency-os/handoffs/sup/data.mjs": page(done)}, "again")
+        self.assertEqual(mig, [("card-a", "implemented", True)])
+        self.assertEqual(len({keys1[0], keys2[0], keys3[0]}), 3)
+        # a commit elsewhere: the page is unchanged, nothing is sent, the phase is still live
+        mig, run4, _ = run({"apps/x.ts": "9"}, "other")
+        self.assertEqual((mig, run4["live_phases"]), ([], ["00000000-0000-4000-8000-0000000000b1"]))
+        # a card registered later (an unmapped_cards gap fixed) is sent once although the page did not change
+        reg["systems"][1]["features"].append({"id": "00000000-0000-4000-8000-0000000000b4", "slug": "card-c", "name": "丙卡",
+                                              "phase": "v1", "legacy_code": "C9"})
+        mig, _, _ = run({"agency-os/systems/registry.json": json.dumps(reg)}, "register C9")
+        self.assertEqual(mig, [("card-c", "todo", True)])
+        # frozen = cut over: the page is no longer read and no longer live
+        mig, run5, _ = run({"agency-os/handoffs/sup/FROZEN.json": "{}"}, "freeze")
+        self.assertEqual((mig, run5["live_phases"]), ([], []))
+
     def test_revert_and_revert_of_revert(self):
         bad = self.r.commit({"apps/x.ts": "1"}, "bad change")
         self.r.git("revert", "--no-edit", "HEAD")

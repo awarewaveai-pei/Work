@@ -2120,6 +2120,27 @@
           "name": "上線三：正式開放",
           "phase": "oracle-wp-front-door",
           "legacy_code": "GO-3"
+        },
+        {
+          "id": "56089774-280b-4b51-97bb-70500bb2be41",
+          "slug": "oracle-wp-front-door-sf-j2",
+          "name": "建站表單補強",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-J2"
+        },
+        {
+          "id": "91d47dc3-54f6-4add-afad-c96a1132181f",
+          "slug": "oracle-wp-front-door-e6",
+          "name": "引擎：會員票與英文每日信",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "E6"
+        },
+        {
+          "id": "70dae400-bcb4-4366-a0f7-ec76a0a784c9",
+          "slug": "oracle-wp-front-door-sf-i2",
+          "name": "內容工具認得新網站",
+          "phase": "oracle-wp-front-door",
+          "legacy_code": "SF-I2"
         }
       ]
     },
@@ -2583,6 +2604,27 @@
           "name": "系統盤點與其餘監工頁切換",
           "phase": "control-center-v1",
           "legacy_code": "B3"
+        },
+        {
+          "id": "9d8a64f1-db05-4c9b-a75c-81f461e1d330",
+          "slug": "control-center-v1-w12",
+          "name": "沒有監工頁的系統補功能清單",
+          "phase": "control-center-v1",
+          "legacy_code": "W12"
+        },
+        {
+          "id": "69fd6374-2478-437e-be85-2c957e6c1987",
+          "slug": "control-center-v1-b5",
+          "name": "下一步只歸一個系統",
+          "phase": "control-center-v1",
+          "legacy_code": "B5"
+        },
+        {
+          "id": "1ca2085a-3033-4e51-acf8-38935d1a4817",
+          "slug": "control-center-v1-b6",
+          "name": "監工頁進度每晚同步、狀態推定看功能",
+          "phase": "control-center-v1",
+          "legacy_code": "B6"
         }
       ]
     },
@@ -4254,6 +4296,62 @@
           "name": "額度恢復後的實測",
           "phase": "subscription-ai-channel",
           "legacy_code": "M1"
+        },
+        {
+          "id": "19910fb8-d5fa-4606-b21d-fb59e481dc82",
+          "slug": "subscription-ai-channel-k15",
+          "name": "文章預設模型換成 GPT-6.2 sol",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K15"
+        },
+        {
+          "id": "1375a50f-8354-460f-b3b7-790af6f56006",
+          "slug": "subscription-ai-channel-k16",
+          "name": "其他寫文案的地方要不要也換",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K16"
+        },
+        {
+          "id": "9e38ef3b-a44a-4ea2-b340-dd49762d6389",
+          "slug": "subscription-ai-channel-k17",
+          "name": "ChatGPT 訂閱也能選模型",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K17"
+        },
+        {
+          "id": "13fdc8da-e879-450d-8016-910ab75cb486",
+          "slug": "subscription-ai-channel-k18",
+          "name": "中文文章改用中文小標",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K18"
+        },
+        {
+          "id": "eac45fc9-59d5-49c8-b87e-5da2da657b50",
+          "slug": "subscription-ai-channel-k19",
+          "name": "商品文案不再亂寫規格、不翻譯品牌名",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K19"
+        },
+        {
+          "id": "5bc58a7a-5370-4398-af37-73878bf36ece",
+          "slug": "subscription-ai-channel-k20",
+          "name": "四種文案換成 GPT-6.2 sol",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K20"
+        },
+        {
+          "id": "04ef190c-9af3-4e68-b405-65141a53f21e",
+          "slug": "subscription-ai-channel-k21",
+          "name": "短文章被截斷：輸出上限要留思考用量",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K21"
+        },
+        {
+          "id": "43fd9b18-061b-451f-9235-bd564a1ed64e",
+          "slug": "subscription-ai-channel-k22",
+          "name": "文章不再出現內部註記、連結原始碼、美金",
+          "phase": "subscription-ai-channel",
+          "legacy_code": "K22"
         }
       ]
     },

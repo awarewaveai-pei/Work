@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UpdateRow } from "../projection";
-import { buildResumeMarkdown, effectiveStatus, implementedRatio, legacyDone, mdInline, overviewCounts, progressKind, recentHandoffs, type BriefInput } from "../overview";
+import { buildResumeMarkdown, effectiveStatus, implementedRatio, legacyDone, livePhases, mdInline, overviewCounts, progressKind, recentHandoffs, type BriefInput } from "../overview";
 
 const NOW = Date.parse("2026-11-21T00:00:00Z");
 const row = (o: Partial<Parameters<typeof overviewCounts>[0][number]> = {}) => ({ status: "active" as const, inferred: false, featureCount: 3, blocker: null, lastCommitAt: "2026-11-20T00:00:00Z", ...o });
@@ -21,12 +21,16 @@ describe("overviewCounts", () => {
 
   it("an inferred status never takes a system out of 待確認; it still counts on 開發中 / 維護", () => {
     const ago = (d: number) => new Date(NOW - d * 86400000).toISOString();
-    const eff20 = effectiveStatus(null, ago(20), NOW); // no status set, last commit 20 days ago -> 維護（推定）
-    expect(eff20).toEqual({ status: "maintenance", inferred: true });
+    const built = { counted: 2, verified: 1, implemented: 1 };
+    const eff20 = effectiveStatus(null, ago(20), NOW, built); // every feature built, last commit 20 days ago -> 已完成（推定）
+    expect(eff20).toEqual({ status: "done", inferred: true });
     const blocked = row({ status: eff20.status, inferred: eff20.inferred, blocker: "waiting", lastCommitAt: ago(20) });
-    const eff90 = effectiveStatus(null, ago(90), NOW); // 暫停（推定）, silent past STALL_DAYS
+    const eff90 = effectiveStatus(null, ago(90), NOW); // open work, silent past STALL_DAYS but within PAUSE_DAYS -> 開發中（推定）
     const silent = row({ status: eff90.status, inferred: eff90.inferred, lastCommitAt: ago(90) });
-    expect(overviewCounts([blocked, silent], NOW)).toEqual({ total: 2, active: 0, needsAttention: 1, wrapped: 1 });
+    expect(overviewCounts([blocked, silent], NOW)).toEqual({ total: 2, active: 1, needsAttention: 2, wrapped: 1 });
+    // inferred 暫停 (half a year, work open) is 待確認; set by someone it is not
+    const dormant = effectiveStatus(null, ago(200), NOW);
+    expect(overviewCounts([row({ status: dormant.status, inferred: dormant.inferred, lastCommitAt: ago(200) })], NOW).needsAttention).toBe(1);
     // set by someone: out of 待確認 even when blocked
     expect(overviewCounts([row({ status: "paused", inferred: false, blocker: "x" })], NOW).needsAttention).toBe(0);
   });
@@ -105,14 +109,31 @@ describe("buildResumeMarkdown", () => {
   });
 });
 
+describe("livePhases", () => {
+  it("reads the newest ok run only: an error run says nothing", () => {
+    const run = (at: string, status: string, live?: unknown) => ({ id: at, event_key: `run:${at}`, system_id: null, phase_id: null, feature_id: null,
+      event_type: "import_run", source: "importer", commit_sha: null, occurred_at: at, payload: { status, live_phases: live } });
+    expect([...livePhases([run("2026-11-01T00:00:00Z", "ok", ["p1", "p2"]), run("2026-11-02T00:00:00Z", "error", [])])]).toEqual(["p1", "p2"]);
+    expect([...livePhases([run("2026-11-01T00:00:00Z", "ok", ["p1"]), run("2026-11-02T00:00:00Z", "ok", [])])]).toEqual([]);
+    expect([...livePhases([])]).toEqual([]);
+  });
+});
+
 describe("effectiveStatus", () => {
   const ago = (d: number) => new Date(NOW - d * 86400000).toISOString();
-  it("infers from the last commit: <=14 days active, 15-60 maintenance, older paused, no activity unset", () => {
-    expect(effectiveStatus(null, ago(14), NOW)).toEqual({ status: "active", inferred: true });
-    expect(effectiveStatus(null, ago(15), NOW)).toEqual({ status: "maintenance", inferred: true });
-    expect(effectiveStatus(null, ago(60), NOW)).toEqual({ status: "maintenance", inferred: true });
-    expect(effectiveStatus(null, ago(61), NOW)).toEqual({ status: "paused", inferred: true });
+  it("quiet is not finished: open work stays 開發中 for 180 days, then 暫停; no activity unset", () => {
+    const open = { counted: 3, verified: 0, implemented: 2 };
+    expect(effectiveStatus(null, ago(60), NOW, open)).toEqual({ status: "active", inferred: true });
+    expect(effectiveStatus(null, ago(180), NOW, open)).toEqual({ status: "active", inferred: true });
+    expect(effectiveStatus(null, ago(181), NOW, open)).toEqual({ status: "paused", inferred: true });
+    expect(effectiveStatus(null, ago(181), NOW)).toEqual({ status: "paused", inferred: true }); // no feature list: same clock
     expect(effectiveStatus(null, null, NOW)).toEqual({ status: null, inferred: false });
+  });
+  it("every feature built: commit within 14 days 維護中, older 已完成", () => {
+    const built = { counted: 3, verified: 1, implemented: 2 };
+    expect(effectiveStatus(null, ago(14), NOW, built)).toEqual({ status: "maintenance", inferred: true });
+    expect(effectiveStatus(null, ago(15), NOW, built)).toEqual({ status: "done", inferred: true });
+    expect(effectiveStatus(null, ago(400), NOW, built)).toEqual({ status: "done", inferred: true });
   });
   it("a recorded status_change wins over any activity", () => {
     expect(effectiveStatus("done", ago(1), NOW)).toEqual({ status: "done", inferred: false });

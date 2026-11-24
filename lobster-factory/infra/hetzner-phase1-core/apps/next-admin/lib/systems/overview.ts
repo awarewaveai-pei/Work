@@ -2,21 +2,30 @@
 import { chronological, liveEvents, type SystemProjection, type UpdateRow } from "./projection";
 
 export const STALL_DAYS = 30;
+/** all features done: a commit within this many days = 維護中, older = 已完成 */
 export const ACTIVE_DAYS = 14;
-export const MAINTENANCE_DAYS = 60;
+/** work still open: 開發中 until this many days without a commit, then 暫停 (operator 2026-11-24: half a year) */
+export const PAUSE_DAYS = 180;
 
 export type EffectiveStatus = NonNullable<SystemProjection["status"]> | "maintenance";
 export interface EffectiveState { status: EffectiveStatus | null; inferred: boolean }
 
-/** A recorded status_change always wins. Without one, infer from the last commit (projection lastCommitAt -- a page
- *  click such as a review is not work on the system): <= 14 days 開發中 (active), <= 60 days
- *  維護中, older 暫停; no activity at all stays null (未設定). `inferred` drives the 「（推定）」 suffix. */
-export function effectiveStatus(status: SystemProjection["status"], lastCommitAt: string | null, now: number): EffectiveState {
+/** A recorded status_change always wins. Without one, infer from the features and the last commit (projection
+ *  lastCommitAt -- a page click such as a review is not work on the system). Quiet is not finished:
+ *  - every counted feature implemented or verified: commit <= ACTIVE_DAYS 維護中, older 已完成;
+ *  - otherwise (open work, or no feature list): <= PAUSE_DAYS 開發中, older 暫停.
+ *  No commit at all stays null (未設定). `inferred` drives the 「（推定）」 suffix. */
+export function effectiveStatus(
+  status: SystemProjection["status"], lastCommitAt: string | null, now: number,
+  work?: { counted: number; verified: number; implemented: number },
+): EffectiveState {
   if (status) return { status, inferred: false };
   const at = lastCommitAt ? Date.parse(lastCommitAt) : NaN;
   if (!Number.isFinite(at)) return { status: null, inferred: false };
   const days = (now - at) / 86400000;
-  return { status: days <= ACTIVE_DAYS ? "active" : days <= MAINTENANCE_DAYS ? "maintenance" : "paused", inferred: true };
+  const allBuilt = !!work && work.counted > 0 && work.verified + work.implemented >= work.counted;
+  if (allBuilt) return { status: days <= ACTIVE_DAYS ? "maintenance" : "done", inferred: true };
+  return { status: days <= PAUSE_DAYS ? "active" : "paused", inferred: true };
 }
 
 /** 已實作 = (implemented + verified) / counted features; null when nothing is counted. */
@@ -28,13 +37,15 @@ export interface CountInput { status: EffectiveStatus | null; inferred: boolean;
 export interface OverviewCounts { total: number; active: number; needsAttention: number; wrapped: number }
 
 /** Four stat cards. 待確認 = not set to done / archived / paused by someone (an inferred status never takes a system out)
- *  and either blocked, or 開發中 (set or inferred) with no git commit for STALL_DAYS. 尚未盤點 (no features) is not a reason:
+ *  and either blocked, 暫停（推定） (open work, no commit for PAUSE_DAYS), or 開發中 (set or inferred) with no git commit
+ *  for STALL_DAYS. 尚未盤點 (no features) is not a reason:
  *  the table shows it on its own. Inferred values count only on 開發中 and 維護與已完成 (maintenance + done + archived). */
 export function overviewCounts(rows: readonly CountInput[], now: number): OverviewCounts {
   const stallMs = STALL_DAYS * 86400000;
   const attention = (r: CountInput) => {
     if (!r.inferred && (r.status === "done" || r.status === "archived" || r.status === "paused")) return false;
     if (r.blocker) return true;
+    if (r.inferred && r.status === "paused") return true; // half a year untouched with work open: decide, don't forget
     if (r.status !== "active") return false;
     const at = r.lastCommitAt ? Date.parse(r.lastCommitAt) : NaN;
     return !Number.isFinite(at) || now - at > stallMs;
@@ -57,8 +68,16 @@ export function recentHandoffs<T extends HandoffInput>(rows: readonly T[], limit
 
 export const GAP_LABEL: Record<string, string> = {
   unowned_paths: "未歸屬路徑", unclassified_trailers: "未分類 trailer", unregistered_products: "未登記產品",
-  unclaimed_supervisors: "未認領監工頁", dead_source_paths: "失效來源路徑",
+  unclaimed_supervisors: "未認領監工頁", dead_source_paths: "失效來源路徑", unmapped_cards: "監工頁卡未登記",
 };
+
+/** Phase ids whose supervisor page the newest ok import run still reads (payload.live_phases): 每晚從監工頁同步. An
+ *  error or diverged run reads no page, so it says nothing either way. */
+export function livePhases(runs: readonly UpdateRow[]): Set<string> {
+  const latest = chronological(runs.filter((r) => r.event_type === "import_run" && r.payload.status === "ok")).pop();
+  const ids = latest?.payload.live_phases;
+  return new Set(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : []);
+}
 
 /** Gap counts of the newest import run, by kind (zero kinds kept so the page can say "0"). */
 export function gapBreakdown(runs: readonly UpdateRow[]): Array<{ key: string; label: string; count: number }> {

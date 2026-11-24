@@ -50,8 +50,8 @@ payload 依 event_type：
 - `feature_update` `{ "status": "todo|in_progress|implemented|verified|blocked|cancelled", "test"?: str }`（importer 只送 ≤ implemented；verified 只能來自 review／CI）
 - `revert` `{ "reverted_sha": "<sha>" }`（一個 commit 撤多個 → 多筆；revert 被 revert → 依時間順序來回切換）
 - `orphaned` `{ "sha": "<sha>" }`（歷史分叉後不再可達的 commit；投影排除其事件，事件不刪）
-- `migration` `{ "legacy_status": str, "mapped_status": str, "evidence_level": "none|commit|test", "source_path": str, "source_sha": str }`
-- `import_run` `{ "head", "previous_head", "status": "ok|history_diverged|error", "error", "gaps": { "unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths" } }`；importer 只在**最後一批**送，route 不自建（一輪只在全部批次落地後才算成功）
+- `migration` `{ "legacy_status": str, "mapped_status": str, "evidence_level": "none|commit|test", "source_path": str, "source_sha": str }`；監工頁還沒凍結（無 `FROZEN.json`）時，匯入器每輪讀該頁 `data.mjs`，只送比上一輪有變的卡，event_key `mig:<feature_id>:<data.mjs 版本 sha 前 12 碼>`、payload 加 `"live": true`；第一次上線用 `--snapshot-baseline` 全送一次
+- `import_run` `{ "head", "previous_head", "status": "ok|history_diverged|error", "error", "gaps": { "unowned_paths", "unclassified_trailers", "unregistered_products", "unclaimed_supervisors", "dead_source_paths", "unmapped_cards" }, "live_phases": [<phase id>] }`（`unmapped_cards`＝監工頁卡找不到 legacy_code 相符的功能、或狀態不認得；`live_phases`＝這輪還在讀的監工頁階段，頁面標「每晚從監工頁同步」只看最新一筆 ok 的 run）；importer 只在**最後一批**送，route 不自建（一輪只在全部批次落地後才算成功）
 未分類：`system_slug=null`，payload 加 `"unclassified": "<原因>"`。
 route 行為：registry 投影 upsert 三張定義表（以 id）；events `insert … on conflict (event_key) do nothing`；回 `{ inserted, skipped }`。頁面另寫 `status_change`／`review` 事件（source=user），不經此 route。
 
