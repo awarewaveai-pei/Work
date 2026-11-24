@@ -7,6 +7,7 @@ export const ROUTE_FEATURES: Readonly<Record<string, string | readonly string[]>
   "/api/content/hook-brief": "content.hook-brief",
   "/api/content/humanize": "content.humanize",
   "/api/content/image": "content.image",
+  "/api/content/cover-preview": "content.image",
   "/api/content/keywords": "content.keywords",
   "/api/content/market-analysis": "content.market-analysis",
   "/api/content/topics/plan": "content.plan",
