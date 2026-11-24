@@ -81,6 +81,9 @@
   .cap-list.zh-only .en { display: none; }
   .cap-foot { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
   .cap-usage { white-space: nowrap; }
+  .cap-foot { align-items: center; flex-wrap: wrap; }
+  .cap-idle { white-space: nowrap; }
+  .cap-idle input { width: 44px; font: inherit; padding: 1px 4px; border: 1px solid var(--border); border-radius: 6px; color: var(--ink); background: var(--card); }
 
   .lookup { display: flex; flex-direction: column; gap: 10px; }
   .lk-q {
@@ -145,7 +148,12 @@ window.Workspace = (function () {
       <button type="button" class="tbtn" data-act="clear">清除</button>
     </div>
     <div class="cap-list" aria-live="polite"></div>
-    <div class="cap-foot"><span class="cap-status"></span><span class="spacer"></span><span class="cap-usage"></span></div>
+    <div class="cap-foot">
+      <span class="cap-status"></span><span class="spacer"></span>
+      <label class="cap-idle" title="Gemini 連線中，安靜也照秒計費。這麼久沒有新字幕就先斷開不計費，有人說話會自動接回。0 = 不暫停">安靜 <input type="number" data-idle="pauseMin" min="0" max="120" step="1"> 分鐘暫停</label>
+      <label class="cap-idle" title="這麼久沒有新字幕就自動停止聆聽。0 = 不自動結束">、<input type="number" data-idle="endMin" min="0" max="600" step="1"> 分鐘結束</label>
+      <span class="cap-usage"></span>
+    </div>
   </div>
 </template>
 <script>
@@ -154,7 +162,7 @@ window.Workspace = (function () {
 (function () {
   const RATE = 16000, CHUNK = RATE / 10, MAX_ROWS = 500, NEAR_BOTTOM_PX = 30;
   const EMPTY = "按「聆聽」開始。對方說的英文會出現在這裡，中文跟在下面。";
-  const prefs = Object.assign({ mic: true, tab: false, stt: "gemini", zhOnly: false, size: 18 }, loadPrefs());
+  const prefs = Object.assign({ mic: true, tab: false, stt: "gemini", zhOnly: false, size: 18, pauseMin: 3, endMin: 30 }, loadPrefs());
   const state = { segs: new Map(), status: "", listening: false, usage: null, level: 0 };
   let root = null, ws = null, audio = null, following = true, ours = false;
 
@@ -267,7 +275,7 @@ window.Workspace = (function () {
     if (!on) { stopAudio(); send({ type: "stop" }); return; }
     if (!prefs.mic && !prefs.tab) { state.status = "「麥克風」和「電腦聲音」至少要開一個"; return paintBar(); }
     if (!ws || ws.readyState !== 1) { state.status = "還沒連上會議工具，等一下再按"; return paintBar(); }
-    if (await startAudio()) send({ type: "start", stt: prefs.stt, language: "en-US" });
+    if (await startAudio()) send({ type: "start", stt: prefs.stt, language: "en-US", pause_min: prefs.pauseMin, end_min: prefs.endMin });
   }
 
   // ---------- 畫面 ----------
@@ -324,6 +332,7 @@ window.Workspace = (function () {
     root.querySelectorAll("[data-src]").forEach(x => { x.setAttribute("aria-pressed", String(prefs[x.dataset.src])); x.disabled = state.listening; });
     root.querySelectorAll("[data-stt]").forEach(x => { x.setAttribute("aria-pressed", String(prefs.stt === x.dataset.stt)); x.disabled = state.listening; });
     root.querySelector('[data-act="zh-only"]').setAttribute("aria-pressed", String(prefs.zhOnly));
+    root.querySelectorAll("[data-idle]").forEach(x => { if (document.activeElement !== x) x.value = prefs[x.dataset.idle]; x.disabled = state.listening; });
     const l = list();
     l.classList.toggle("zh-only", prefs.zhOnly);
     l.style.fontSize = prefs.size + "px";
@@ -361,6 +370,12 @@ window.Workspace = (function () {
       paintBar();
       settle();
     });
+    el.querySelectorAll("[data-idle]").forEach(x => x.addEventListener("change", () => {
+      const v = Number(x.value);
+      prefs[x.dataset.idle] = Number.isFinite(v) && v >= 0 ? v : 0;
+      savePrefs();
+      paintBar();
+    }));
     paintAll();
   });
 

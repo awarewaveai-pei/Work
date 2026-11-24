@@ -9,11 +9,12 @@ Keys never leave the server: Gemini from the environment, Anthropic from the set
 import asyncio
 import json
 import os
+import time
 from urllib.parse import urlsplit
 
 from lib import settings
 
-from . import stt_gemini, stt_local
+from . import idle, stt_gemini, stt_local
 from .session import Session
 from .translate import Translator
 from .usage import Usage
@@ -23,6 +24,9 @@ STT = ("gemini", "local")
 AUDIO_QUEUE = 100
 USAGE_EVERY = 5.0
 STOP_TIMEOUT = 5.0
+IDLE_TICK = 1.0
+# Minutes without a new caption before the paid speech service is let go / before listening ends.
+PAUSE_MIN, END_MIN = 3.0, 30.0
 LOCAL_HOSTS = ("127.0.0.1", "localhost")
 
 
@@ -36,6 +40,20 @@ def origin_allowed(origin: str, host: str) -> bool:
     return o.scheme == "http" and bool(host) and o.netloc == host and o.hostname in LOCAL_HOSTS
 
 
+def _minutes(value, default: float) -> float:
+    """A number of minutes from the page; anything else means the default. 0 (or less) = never.
+    Shorter than 0.1 min would drop and reopen the paid connection on every sentence."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    try:
+        v = float(value)
+    except OverflowError:
+        return default
+    if v != v:
+        return default
+    return 0.0 if v <= 0 else min(max(v, 0.1), 24 * 60.0)
+
+
 class Hub:
     def __init__(self, usage: Usage = None):
         self.usage = usage or Usage()
@@ -47,6 +65,7 @@ class Hub:
         self.audio = None
         self.owner = None
         self.stt = ""
+        self.last_caption = time.monotonic()
 
     # ---- state ----
 
@@ -63,6 +82,8 @@ class Hub:
         return self.task is not None and not self.task.done()
 
     def emit(self, event: dict) -> None:
+        if event.get("type") == "caption":
+            self.last_caption = time.monotonic()
         for q in self.clients.values():
             q.put_nowait(event)
 
@@ -79,7 +100,7 @@ class Hub:
 
     # ---- listening ----
 
-    async def start(self, owner, stt: str, language: str) -> None:
+    async def start(self, owner, stt: str, language: str, pause_min: float = PAUSE_MIN, end_min: float = END_MIN) -> None:
         # No await between this check and `self.task = ...`: two pages pressing 聆聽 at once must not
         # both get through (the first task would be orphaned and keep a paid connection open).
         if self.listening:
@@ -94,13 +115,75 @@ class Hub:
         self.audio = asyncio.Queue(maxsize=AUDIO_QUEUE)
         self.owner, self.stt = owner, stt
         if stt == "gemini":
-            run = stt_gemini.run(session, self.usage, gemini_key, language, self.audio)
+            def run(audio):
+                return stt_gemini.run(session, self.usage, gemini_key, language, audio)
         else:
-            run = stt_local.run(session, self.usage, language, self.audio)
-        self.task = asyncio.ensure_future(run)
+            # Local recognition costs nothing while quiet, and pausing would unload the model:
+            # only the end time applies.
+            pause_min = 0
+
+            def run(audio):
+                return stt_local.run(session, self.usage, language, audio)
+        self.task = asyncio.ensure_future(self._supervise(run, pause_min, end_min))
         self.task.add_done_callback(self._ended)
         self.ticker = asyncio.ensure_future(self._tick())
         self.emit({"type": "listening", "on": True, "stt": stt})
+
+    async def _supervise(self, run, pause_min: float, end_min: float) -> None:
+        """Sit between the page's audio and the speech service (idle.py): forward audio, let the
+        service go when it is quiet, bring it back when someone speaks, end when quiet too long."""
+        session = self._session()
+        gate = idle.Gate(idle.minutes(pause_min), idle.minutes(end_min))
+        self.last_caption = time.monotonic()
+        inner = task = None
+
+        def begin(first):
+            nonlocal inner, task
+            inner = asyncio.Queue(maxsize=AUDIO_QUEUE)
+            for c in first:
+                inner.put_nowait(c)
+            task = asyncio.ensure_future(run(inner))
+
+        async def end():
+            nonlocal inner, task
+            if task is None:
+                return
+            if inner.full():
+                inner.get_nowait()
+            inner.put_nowait(None)
+            await task
+            inner = task = None
+
+        begin([])
+        try:
+            while True:
+                try:
+                    chunk = await asyncio.wait_for(self.audio.get(), IDLE_TICK)
+                except asyncio.TimeoutError:
+                    chunk = b""
+                if chunk is None:
+                    return await end()
+                if task is not None and task.done():
+                    return  # the speech service gave up on its own (a rejected key, say) and said why
+                quiet = time.monotonic() - self.last_caption
+                step, payload = gate.on_chunk(chunk, idle.rms(chunk), quiet) if chunk else gate.on_tick(quiet)
+                if step == idle.FORWARD:
+                    if inner.full():
+                        inner.get_nowait()
+                    inner.put_nowait(payload)
+                elif step == idle.PAUSE:
+                    await end()
+                    session.status(f"已暫停辨識：安靜超過 {idle.minutes_label(pause_min)} 分鐘，不再送出聲音、不計費；有人說話會自動接上")
+                elif step == idle.RESUME:
+                    session.status("有聲音，重新連線中…")
+                    begin(payload)
+                elif step == idle.END:
+                    await end()
+                    session.status(f"安靜超過 {idle.minutes_label(end_min)} 分鐘，已自動結束聆聽")
+                    return
+        finally:
+            if task is not None and not task.done():
+                task.cancel()
 
     def _refuse(self, why: str) -> None:
         """Not started: say why, and tell the page so it lets go of the microphone it already opened."""
@@ -177,7 +260,8 @@ class Hub:
         except (ValueError, KeyError, TypeError):
             return
         if kind == "start":
-            await self.start(ws, str(cmd.get("stt", "")), str(cmd.get("language", "en-US"))[:16])
+            await self.start(ws, str(cmd.get("stt", "")), str(cmd.get("language", "en-US"))[:16],
+                             _minutes(cmd.get("pause_min"), PAUSE_MIN), _minutes(cmd.get("end_min"), END_MIN))
         elif kind == "stop":
             await self.stop()
         elif kind == "clear":

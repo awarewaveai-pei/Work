@@ -21,6 +21,8 @@ Based on OwnVoice Meet by Zaious, ChronicleCore Studio.
 | `lib/live/stt_gemini.py` | `src-tauri/src/gemini.rs` (connect, session loop, `Live`), `src-tauri/src/audio.rs` (`chunk_len`) |
 | `lib/live/vad.py` | `src-tauri/src/vad.rs` |
 | `lib/live/stt_local.py` | `src-tauri/src/stt_chunk.rs`, `src-tauri/src/captions.rs` (`iso639`) |
+| `lib/live/idle.py` | `src-tauri/src/idle.rs` (`Gate`, `minutes`, `minutes_label`) |
+| `templates/workspace.html` (follow-the-bottom scrolling) | `src/shared/follow.ts` |
 
 ## Third-party notice carried over (from OwnVoice Meet `THIRD_PARTY_NOTICES.md`)
 

@@ -216,6 +216,23 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/3n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=bridgeClientForSiteWithRegistered | hits=8
 - ORACLE_WAIVED: Codex 額度 2026-11-24 前不可用；工人 critic＋突變＋監工全套測試代替
+## 2026-11-24（續6）— meeting-service 會議工作區 C6：閒置暫停計費（Gemini 安靜即斷線、有聲音接回、太久自動結束）
+
+- 根因：Gemini Live 連線中靜音也照秒計費；頁面放著聆聽會一直扣款（約 NT$17／小時）。
+- 步驟（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）：
+  - 新 `MS/lib/live/idle.py`：移植 OwnVoice `idle.rs` 的 `Gate`（暫停／喚醒／結束的判斷，2 秒 preroll、依環境音量喚醒）
+  - `MS/lib/live/hub.py`：`_supervise` 夾在頁面音訊與辨識供應者之間；`start` 收 `pause_min`／`end_min`（預設 3／30，`_minutes` 夾限）；本機辨識只套用自動結束（暫停會卸載模型且本來不計費）
+  - `MS/templates/workspace.html`：字幕面板底列兩格分鐘數
+  - 途中：`.git/index.lock`（09:46 建立、0 位元組、無 git 程序）擋住共用 index，導致上一筆 private-index commit 後的 index 同步沒跑；確認無 git 程序後移除鎖檔並 `git reset -q -- <MS>`（worktree 未動）
+- 驗證：
+  - `python -m pytest tests -q` → 78 passed（`tests/test_live_idle.py` 8 條逐一移植 `idle.rs` 測試）
+  - 真實 Gemini（8431，`pause_min=0.1`、`end_min=0.5`，兩段英文中間 20 秒靜音）：第一段後 7.5 s 暫停、計費秒數停在 111.0 不再增加；第二段開口 0.2 s 內重連、首句完整；之後 30 s 自動結束；88 s 內計費約 50 s
+- REALTEST_EVIDENCE: tool=Bash | cmd=python feed_idle.py en.wav（真實 Gemini Live，8431）; python -m pytest tests -q | exit=0 | ms=96000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/2n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=stt_gemini\.run\(|stt_local\.run\( | hits=2
+- ORACLE_WAIVED: Codex 額度擋到 2026-11-24 11:02（提交時仍在斷路期內未重試）；critic Quick 一輪，2 個 Minor（超長整數 OverflowError、極小分鐘數反覆重連）已修
+- 剩餘風險：真實麥克風環境下的喚醒門檻未實測（測試音訊的靜音是純 0）；8420 仍是舊行程
+- rollback：`git revert` 本 commit
 ## 2026-11-24（續4）— meeting-service 會議工作區段 1（C1–C5）：一頁四面板＋查詢＋即時字幕翻譯，Gemini 與本機兩種辨識
 
 - 根因／決策：操作者要 OwnVoice 三個漂浮視窗＋查詢側欄合成一頁可停靠面板；OwnVoice 執行檔改不了（SAC），功能移植進 meeting-service。語音辨識操作者定「兩個都要」（Gemini Live 計費＋本機 faster-whisper 免費）；查過 repo／git log／WORKLOG／session 記錄，以前沒有即時版，只有 `docs/LIVE_MULTILINGUAL_MASTER_PLAN.md`（0／19）。卡與定案：`lobster-factory/infra/hetzner-phase1-core/apps/meeting-service/docs/WORKSPACE_PAGE_CARDS.md`。
