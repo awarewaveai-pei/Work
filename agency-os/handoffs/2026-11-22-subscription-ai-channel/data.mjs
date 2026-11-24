@@ -80,6 +80,8 @@ export const STEPS = [
     gate: '四種各真跑三次，全部有內容、固定格式全部通過；空白時會退回 Claude 的測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'ff59979ef', depends: ['K16', 'K19'], card: 'briefs/K20-copy-defaults.md' },  { n: 22, code: 'K21', group: 'B5', title: '短文章被截斷：輸出上限要留思考用量', plain: '11-23 部署後在正式站實測：不選模型產一篇短文章，小標是中文、記帳是 GPT-6.2 sol，都對；但文章寫到常見問題一半就被切掉，沒有結論。原因是 GPT-6.2 sol 的思考用量算在輸出上限裡，文章、劇本工坊、修圖提示詞這三處還沒把這段空間留出來。改成全部走同一條規則，並加一個檢查，以後新寫的 OpenAI 呼叫漏了會直接變紅。預留金額一起跟著調。',
     gate: '短文章實跑一篇沒有被截斷、有結論；檢查測試通過。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '837416fe5', depends: ['K20'], card: 'briefs/K21-openai-budget-everywhere.md' },  { n: 23, code: 'K22', group: 'B5', title: '文章不再出現內部註記、連結原始碼、美金', plain: '十二篇盲測抓到的三個問題，跟配圖無關，先拆出來做完。一、正文出現「年份未核」：指令要求每個來源都寫年份，但給模型的來源只有網址，它只好寫註記；改成有年份才寫。二、連結露出原始碼：模型自己寫了 HTML 連結；改成只用一般連結寫法，漏網的自動轉回。三、文章頁的本次費用和生圖單價改成 NT$。另外把電子報也接到同一個清除功能，全站只剩一個清除點。',
     gate: '全套測試通過；電子報的新測試在舊程式上會失敗、在新程式上通過。', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '6c699c1d5', depends: ['K12'], card: 'briefs/K22-article-template-leaks.md' },
+  { n: 24, code: 'K23', group: 'B5', title: '自動貼文的文章連結改放留言', plain: '現在自動產文會把文章網址接在每個平台的貼文內文最後：臉書因此觸及率低，IG 則是一串不能點的字。改成你 11-24 指定的格式。臉書：內文結尾寫「完整文章內容請看留言區」，第一則留言放文章標題和網址。IG：內文結尾和第一則留言都寫文章標題，請讀者點個人檔案連結後搜尋標題，不放網址。留言是整則貼文共用的，所以臉書和 IG 會變成兩則分開的草稿。只影響自動產文；手動貼文不變。其他語言的網站用對應的英文句。',
+    gate: '測試證明臉書與 IG 送出的內文都不含網址、留言逐字符合；部署後看一則真的草稿。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K22'], card: 'briefs/K23-social-link-in-comment.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
