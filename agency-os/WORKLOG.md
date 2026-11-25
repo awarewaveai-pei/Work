@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-25（續21）— aware-wave.com 部落格列表封面改 4:3（文章頁維持 3:2）
+
+- 更正續19：aware-wave.com 佈景主題是 Twenty Twenty-Five（區塊主題），不是 Kadence。列表（home/archive）原本用 pattern `twentytwentyfive/template-query-loop`，特色圖 `aspectRatio 3/2`；文章頁 `templates/single.html:8` 本來就是 3/2。
+- 做法：用 wp eval-file 建網站編輯器範本覆寫 `wp_template` id 72（home）、73（archive），內容＝主題原檔把 pattern 展開、只改 `3/2`→`4/3`（腳本斷言恰好 1 處）。之前沒有任何覆寫。
+- 還原：`docker exec lobster-wordpress wp --allow-root post delete 72 73 --force`（或後台 外觀→編輯器→範本→重設）。
+- 代價：這兩個範本之後不吃主題更新（TT25 1.4→1.5 待更新）；要吃新版就重設後重跑同一改法。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl aware-wave.com/ 與分類頁 grep aspect-ratio → 4/3；文章頁 → 3/2；瀏覽器量首張卡片 645×484=1.333；首頁 200 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- 只動線上 WP 範本，repo 無程式改動
+- ORACLE_WAIVED: 無程式碼，WP 範本設定，已線上實測
 ## 2026-11-25（續19）— Banner 加「4:3 部落格封面」「3:2 部落格內文圖」兩顆尺寸
 
 - 操作者定案：WP 部落格封面 4:3（列表卡片飽滿），內文 3:2；文章頁特色圖由 Kadence 裁成 3:2。1.91:1 改為只標「連結分享預覽（OG）」（Rank Math 另設分享圖）。
