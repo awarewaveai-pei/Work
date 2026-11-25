@@ -95,3 +95,9 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 - 還沒做、等她說：畫面描述加「符合網站目標地區」（內文圖人物偏西方臉）；自動社群草稿附封面圖；風格目錄的畫家組在文章這邊收起來；IG 直式 4:5；免費圖庫。
 - 未驗：文章頁的封面短標題／副標欄位；真的自動文章的封面與 FB／IG 草稿（等下一篇自動文章）。
 - 教訓：在瀏覽器頁面裡跑長流程，結果要每完成一項就寫進 `localStorage` 並取出存檔；只放 `window` 變數，頁面一重新整理就全丟（11-25 丟過一次）。
+
+### 配圖第二輪（2026-11-25 晚；接在「配圖收尾」之後）
+- 已併入 main、**尚未部署**（今晚 03:00 自動上線）：K27（`PEOPLE_IN_PICTURES`：看情境才畫人、有人時寫明樣貌、同篇不同人；`attachTopicCover`：只有文章的題目把封面附到社群草稿，IG 無圖會有不通過的檢查）、K28（三份完整比較頁嵌在 `/tools/ai-models?tab=measured`，`content/model-bakeoff/` ＋ `scripts/sync-model-bakeoff-pages.mjs`）、K29（`lib/content/cover/sizes.ts`：FB／IG／Bluesky 等 1080×1350，網站 1200×900，直式底圖只在需要時多畫一張）。
+- 上線後監工要看（都未驗）：實測紀錄分頁三份嵌入頁在正式容器是否顯示（`outputFileTracingIncludes`）；產一篇看畫面描述的人物規則；FB／IG／Bluesky 草稿是否附直式封面；第一則實際 Bluesky 貼文直式是否被裁（被裁 → `sizes.ts` 的 bluesky 改橫式）。
+- 操作者提過但未開卡：Banner 設計工具的尺寸選單（她貼的整份尺寸表；屬設計工具那條線，表上多數格未經官方驗證）；免費圖庫；風格目錄的畫家組在文章這邊收起來。
+- 正式資料（11-25）：連著的頻道 facebook 2、instagram 2、youtube 2、bluesky 1。
