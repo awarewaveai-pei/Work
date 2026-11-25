@@ -59,3 +59,8 @@ jobs:
 
       - name: Deny-list parity (workstation template + remote-session mirror)
         run: node --test tests/hooks/settings-deny-parity.test.mjs
+
+      # Every migration from 0100 on keeps its down file in two places, byte-identical (migrations/*.down.sql and
+      # scripts/*_down.sql). Only /verify ran this, so 0181 and 0183 reached main with one copy (2026-11-25).
+      - name: Down-migration copies
+        run: node --test scripts/__tests__/down-migration-copies.test.mjs
