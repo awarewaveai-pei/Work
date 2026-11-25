@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-25（續5）— oracle WP：算命站 WPvivid 遠端備份（沿用主站 Google Drive 授權），建站第 8 步全部完成
+
+- [根因] 第 8 步剩 WPvivid 遠端；操作者要監工做。`/wp-login.php` 的 Cloudflare challenge 連操作者的 Chrome（擴充功能分頁）也擋，UI 路徑不通。
+- [步驟] 讀 `class-wpvivid-google-drive.php:770-806`：`is_encrypt` 只是 base64、refresh 走 `auth.wpvivid.com`，授權非站台專屬 → 主站預設 googledrive remote 經 pipe 到 oracle 站：`WPvivid_Setting::add_remote_options`＋`update_remote_option`、`remote_selected`、`update_user_history`、`WPvivid_Schedule::set_schedule_ex`（weekly、files+db、remote）。再 `wp cron event run wpvivid_main_schedule_event`。
+- [驗證] `remote=wpvivid-remote-6b066da64cbab name=Update_Backup path=wpvivid_backup schedule=success next=2026-11-30T00:25:54Z`。`wpvivid_backup_list`：1 筆，remote=`googledrive:Update_Backup`，size 114980956；task `completed`；log `Finished uploading oracle.aware-wave.com_wpvivid-e00297af17019_2026-11-25-05-10_backup_all.zip`／`Upload success`。流程頁第 8 步「完成」（三格皆有確認紀錄）。
+- [未做] 未從 Drive 端列檔核對（只有外掛 log）；未做還原演練（主機整機備份的還原已於 SF-L 驗過）。與主站、Soulful 共用同一 Drive 資料夾，檔名以網域開頭區分。
+- [rollback] oracle 站 WPvivid 設定頁刪該 remote，或 `wp option delete wpvivid_upload_setting wpvivid_schedule_setting`＋`wp cron event delete wpvivid_main_schedule_event`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp cron event run wpvivid_main_schedule_event（oracle 站）；wp eval wpvivid_backup_list；grep wpvivid_log | exit=0 | ms=120000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（站台設定與文件）
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-25（續3）— 平台第 10 批上線：K14、M6、M8（High，0182 已套用）＋正式站實看、U13／U14 解除卡點
 
 - 操作者 2026-11-25「可以」＝ M6、M8 的 go；同日「全部去處理好, 還有其他工人反映的 risks」＝ 逐條清監工台未結風險。
