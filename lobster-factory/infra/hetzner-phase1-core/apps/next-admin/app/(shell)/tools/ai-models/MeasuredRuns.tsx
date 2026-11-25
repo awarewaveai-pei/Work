@@ -23,7 +23,7 @@ const ARTIMG = "agency-os/reports/model-bakeoff/2026-11-article-image/（runs.js
 const GROUPS: Group[] = [
   {
     title: "文章配圖",
-    intro: "2026-11-25 正式站。目的：哪一個來源畫得出符合文章內容的圖。寫文章的 AI 為每張圖寫一句英文畫面描述，同一組描述給六個來源各畫一次，封面套上統一版型；另用改版前的做法畫一組對照。照新做法畫的每一張都跟它那一段有關；操作者看過後判定 GPT-Image-2 低、Nano Banana 2.1、FLUX dev 三個沒有出錯。中文一篇、英文一篇（「workplace burnout」），六個來源在兩篇上都是完整的四張。免費圖庫沒有測。預設來源尚未更換。",
+    intro: "2026-11-25 正式站。目的：哪一個來源畫得出符合文章內容的圖。寫文章的 AI 為每張圖寫一句英文畫面描述，同一組描述給六個來源各畫一次，封面套上統一版型；另用改版前的做法畫一組對照。照新做法畫的每一張都跟它那一段有關；操作者看過後判定 GPT-Image-2 低、Nano Banana 2.1、FLUX dev 三個沒有出錯。中文一篇、英文一篇（「workplace burnout」），六個來源在兩篇上都是完整的四張。免費圖庫沒有測。操作者的決定（2026-11-25）：預設維持 FLUX schnell；另外保留 GPT-Image-2 低、Nano Banana 2.1 和 Codex 免費生圖可以選，之後再測一次再決定要不要換。FLUX dev 和 FLUX 2 Klein 4B 不放進文章的選單。",
     rows: [
       { date: "2026-11-25", model: "Codex 免費生圖（ChatGPT 訂閱）", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$0", result: "四張都跟段落有關。每張 42–55 秒，四張共 3 分 14 秒，沒有被額度擋下。只能本人按、筆電要開著；排程用不了。操作者：留著當免費選項。英文文章也測過四張（每張 50–59 秒），同樣貼題。", src: ARTIMG, plain: true },
       { date: "2026-11-25", model: "FLUX 2 Klein 4B", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$0.06／張", result: "四張都跟段落有關，每張約 8 秒。操作者沒有列入「沒出錯」的三個。英文文章也測過四張，同樣貼題。", src: ARTIMG, plain: true },
