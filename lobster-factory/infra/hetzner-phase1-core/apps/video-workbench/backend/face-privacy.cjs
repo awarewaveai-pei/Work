@@ -24,7 +24,7 @@ const STRENGTH = {
   馬賽克: { 低: 1 / 10, 中: 1 / 7, 高: 1 / 4 }, // pixelize block = width x ratio
   模糊: { 低: 0.05, 中: 0.08, 高: 0.12 }, // gblur sigma = width x ratio
 };
-const NOTE = (peak) => `已遮蓋人臉，同時最多 ${peak} 張；側臉、遮擋、太小的臉可能漏掉，發布前請逐段檢查`;
+const NOTE = (peak) => `已遮蓋人臉，同一格最多 ${peak} 處（含誤判）；側臉、遮擋、太小的臉可能漏掉，發布前請逐段檢查`;
 
 // ---- pure functions (tests/privacy.cjs) ----
 function iou(a, b) {

@@ -1167,6 +1167,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     if (videoEnhance.isAi(input)) return videoEnhance.TIMEOUT_MS;
     if (op === "music") return 900000; // a 5-minute Eleven song is made in one request
     if (op === "privacy") return require("./face-privacy.cjs").TIMEOUT_MS;
+    if (op === "depth") return require("./depth-video.cjs").TIMEOUT_MS;
+    if (audioTools.handles(input)) return 1800000; // a vendor row is billed once sent: an hour of 只留人聲 must not be cut at the default 10 min
     return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? hostTranscribeTimeout(input) : op === "remotion-template" || op === "caption-reburn" ? 780000 : op === "quick-render" ? quickRender.POLL_LIMIT_MS + 300000 : 600000;
   }
   // 破框's inputs, decided before the permit and any paid call by the readers finishing uses: the first frame decodes
