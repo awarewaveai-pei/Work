@@ -1481,7 +1481,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       if (!json.ok || !json.draft) { fail("草稿開啟失敗：找不到這篇草稿，或你沒有權限。"); return; }
       const d = json.draft;
       if ((d.organizationId && d.organizationId !== clientContext.org) || (d.siteId && d.siteId !== selectedSiteId)) {
-        fail("這篇草稿屬於另一個客戶或網站，請先在左側客戶欄切到它所屬的網站再開啟。");
+        fail("這篇草稿屬於另一個客戶或網站，請先在客戶欄切到它所屬的網站再開啟。");
         return;
       }
       // Restore the form snapshot (fall back to a minimal form if an old row lacks one).
@@ -1778,7 +1778,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     // **另一個客戶**的網站上。這個伺服器端後備是給不帶 siteId 的唯讀清單呼叫用的，寫入動作
     // 不可以沾。wpSites 只剩目前客戶的站（沒選客戶時為空），所以沒選站一律擋。
     if (!selectedSiteId) {
-      setPubStatus("error"); setPubError("尚未選擇網站 — 請先在左側客戶欄選客戶與網站，再發布。");
+      setPubStatus("error"); setPubError("尚未選擇網站 — 請先在客戶欄選客戶與網站，再發布。");
       return;
     }
     const resolvedMode = mode ?? pubMode;
@@ -1870,7 +1870,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
             // 伺服器端的「第一個可存取的站」後備會讓它改到別人的站去。
             if (!selectedSiteId) {
               setVideoStatus("error");
-              setVideoError("尚未選擇網站 — 影片已產出，但未嵌入任何網站。請在左側客戶欄選定網站後重試。");
+              setVideoError("尚未選擇網站 — 影片已產出，但未嵌入任何網站。請在客戶欄選定網站後重試。");
               return;
             }
             setVideoStatus("embedding");
@@ -2356,7 +2356,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
           )}
           </div>
 
-          {/* ── 目標網站：只顯示，挑選在左側客戶欄（ADR 020）── */}
+          {/* ── 目標網站：只顯示，挑選在客戶欄（ADR 020）── */}
           <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>📍 目標網站</span>
@@ -2367,18 +2367,18 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                   <a href={currentSite.url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>{currentSite.url} ↗</a>
                 </span>
               ) : !clientContext.org ? (
-                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請先在左側客戶欄選客戶。</span>
+                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請先在客戶欄選客戶。</span>
               ) : clientContext.sites !== null && clientContext.sites.length === 0 ? (
-                <span role="status" style={{ fontSize: "12px", color: "var(--yellow)" }}>
+                <span role="status" style={{ fontSize: "12px", color: "var(--badge-yellow-text)" }}>
                   這個客戶尚未連接任何網站 — 文章仍可生成，但無法推送。{" "}
                   {sitesHref && <a href={sitesHref} style={{ color: "var(--btn-primary-bg)" }}>前往連接 ↗</a>}
                 </span>
               ) : (
-                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請在左側客戶欄選網站。</span>
+                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請在客戶欄選網站。</span>
               )}
               <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "10px" }}>
                 {saveDefaultsMsg && (
-                  <span style={{ fontSize: "11px", color: saveDefaultsMsg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>
+                  <span style={{ fontSize: "11px", color: saveDefaultsMsg.startsWith("✓") ? "var(--badge-green-text)" : "var(--badge-red-text)" }}>
                     {saveDefaultsMsg}
                   </span>
                 )}
@@ -2387,7 +2387,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                   type="button"
                   onClick={saveAsClientDefault}
                   disabled={savingDefaults || !currentSite}
-                  title={currentSite ? undefined : "請先在左側客戶欄選網站"}
+                  title={currentSite ? undefined : "請先在客戶欄選網站"}
                   style={{
                     fontSize: "11px", padding: "3px 10px", borderRadius: "6px",
                     border: "1px solid var(--accent)", background: "transparent",
@@ -2417,12 +2417,12 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                 <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
                   產出文章
                   {isGenerating && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8 }}>串流中…</span>}
-                  {genStatus === "done" && <span style={{ fontWeight: 400, color: "var(--green)", marginLeft: 8 }}>✓ 完成</span>}
+                  {genStatus === "done" && <span style={{ fontWeight: 400, color: "var(--badge-green-text)", marginLeft: 8 }}>✓ 完成</span>}
                   {genStatus === "done" && draftSaveState === "saving" && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 儲存中…</span>}
                   {genStatus === "done" && draftSaveState === "saved"  && <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "12px" }}>💾 已存草稿</span>}
-                  {genStatus === "done" && draftSaveState === "error"  && <span style={{ fontWeight: 400, color: "var(--yellow)", marginLeft: 8, fontSize: "12px" }}>⚠ 草稿未存（文章不受影響）</span>}
+                  {genStatus === "done" && draftSaveState === "error"  && <span style={{ fontWeight: 400, color: "var(--badge-yellow-text)", marginLeft: 8, fontSize: "12px" }}>⚠ 草稿未存（文章不受影響）</span>}
                   {genStatus === "done" && genTruncated && (
-                    <span style={{ fontWeight: 500, color: "var(--yellow)", marginLeft: 8, fontSize: "12px" }}>
+                    <span style={{ fontWeight: 500, color: "var(--badge-yellow-text)", marginLeft: 8, fontSize: "12px" }}>
                       ⚠ 可能被截斷（超過長度上限）— 建議選短篇或拆主題重新生成
                     </span>
                   )}
@@ -2474,14 +2474,14 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                   <div>
                     <label className="form-label">
                       Meta 描述{" "}
-                      <span style={{ fontWeight: 400, color: metaData.metaDesc.length > 160 ? "var(--red)" : "var(--text-muted)" }}>
+                      <span style={{ fontWeight: 400, color: metaData.metaDesc.length > 160 ? "var(--badge-red-text)" : "var(--text-muted)" }}>
                         （{metaData.metaDesc.length} / 160 字元{metaData.metaDesc.length > 160 ? " ⚠ 超過上限" : ""}）
                       </span>
                     </label>
                     <input className="form-input" value={metaData.metaDesc}
                       onChange={e => setMetaData(prev => prev ? { ...prev, metaDesc: e.target.value } : prev)} />
                     {metaData.metaDesc.length > 160 && (
-                      <div className="form-hint" style={{ color: "var(--red)", marginTop: 2 }}>
+                      <div className="form-hint" style={{ color: "var(--badge-red-text)", marginTop: 2 }}>
                         RankMath 上限 160 字元；超出部分在搜尋結果會被截斷。請縮短後再發布。
                       </div>
                     )}
@@ -2539,7 +2539,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                 )}
                 {pubStatus === "publishing" && <button className="btn-primary" disabled style={{ fontSize: "13px" }}>推送中…</button>}
                 {pubStatus === "done" && pubResult?.edit_url && (
-                  <span style={{ fontSize: "13px", color: "var(--green)" }}>
+                  <span style={{ fontSize: "13px", color: "var(--badge-green-text)" }}>
                     ✓ {pubMode === "publish" ? "已發佈" : pubMode === "future" ? "已排程" : "草稿已建立"} —{" "}
                     <a href={pubResult.edit_url} target="_blank" rel="noreferrer" style={{ color: "var(--btn-primary-bg)" }}>WP 後台編輯 ↗</a>
                     {pubResult.view_url && pubMode === "publish" && (
@@ -2557,7 +2557,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                   🎬 影片生成中（自動）：文章已推送，影片完成後自動嵌入文章
                   {videoStatus === "generating" && <span style={{ marginLeft: 10, color: "var(--severity-low)" }}>⏳ 影片生成中（預計 5-15 分鐘）…</span>}
                   {videoStatus === "embedding"  && <span style={{ marginLeft: 10, color: "var(--severity-low)" }}>⏳ 嵌入影片到 WP…</span>}
-                  {videoStatus === "done"       && <span style={{ marginLeft: 10, color: "var(--green)" }}>✓ 影片已嵌入文章</span>}
+                  {videoStatus === "done"       && <span style={{ marginLeft: 10, color: "var(--badge-green-text)" }}>✓ 影片已嵌入文章</span>}
                   {videoStatus === "error"      && (
                     <>
                       <span style={{ marginLeft: 10, color: "var(--color-error)" }}>影片失敗：{videoError}（文章不受影響）</span>
@@ -3020,7 +3020,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
               // the server reads only https (lib/collect/net/remote-file.ts); say so before the article runs without it
               const plain = form.referenceUrls.split("\n").map(u => u.trim()).filter(u => u && !u.startsWith("https://"));
               return plain.length > 0 && (
-                <div style={{ fontSize: "11px", color: "var(--yellow)", marginTop: 4 }}>
+                <div style={{ fontSize: "11px", color: "var(--badge-yellow-text)", marginTop: 4 }}>
                   這些不是 https:// 開頭的網址，不會被讀取：{plain.join("、")}
                 </div>
               );
@@ -3480,7 +3480,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                 })}
               </div>
             ) : (
-              <div className="form-hint" style={{ marginTop: 8, color: patternsNote && !patternsNote.includes("no auth") ? "var(--red)" : "var(--text-muted)" }}>
+              <div className="form-hint" style={{ marginTop: 8, color: patternsNote && !patternsNote.includes("no auth") ? "var(--badge-red-text)" : "var(--text-muted)" }}>
                 {patternsLoading ? "" : patternsNote
                   ? patternsNote.includes("no auth")
                     ? "此站台尚未設定 Application Password，無法讀取 wp_block（WordPress → 使用者 → 你的帳號 → 應用程式密碼 → 新增）。"
@@ -3583,7 +3583,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                 disabled={(marketLoading || !form.keyword.trim()) || !canUse("content.market-analysis")} style={{ fontSize: "12px" }}>
                 {marketLoading ? "分析中（約 10–30 秒）…" : "🔍 分析競業與痛點"}
               </button>
-              {marketContext && <span style={{ color: "var(--green)", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
+              {marketContext && <span style={{ color: "var(--badge-green-text)", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
               {marketError && <span style={{ color: "var(--color-error)", fontSize: "12px" }}>{marketError}</span>}
             </div>
             <div className="form-hint">用 AI 多角度分析，從競爭對手、讀者痛點、搜尋意圖、轉換疑慮、差異化機會五個角度，結果會引導文章定位。需先填關鍵字。</div>
@@ -3794,7 +3794,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
           <div style={{ border: "1px solid rgba(34,197,94,0.3)", borderRadius: "12px", marginBottom: "20px", overflow: "hidden" }}>
             <div style={{ background: "linear-gradient(135deg,rgba(34,197,94,0.08),rgba(34,197,94,0.02))", borderBottom: "1px solid rgba(34,197,94,0.2)", padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "15px" }}>📢</span>
-              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--green)" }}>分發設定</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--badge-green-text)" }}>分發設定</span>
               <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: 4 }}>— 生成文章後才能使用</span>
             </div>
             <div style={{ padding: "0 16px" }}>
@@ -3951,7 +3951,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                     {nlStatus === "sending" ? "推送中…" : "📧 建立 FluentCRM 導讀草稿"}
                   </button>
                   {!nlArticleUrl.trim() && (
-                    <span style={{ fontSize: "11px", color: "var(--yellow)" }}>未填文章連結 — 導讀將不含按鈕</span>
+                    <span style={{ fontSize: "11px", color: "var(--badge-yellow-text)" }}>未填文章連結 — 導讀將不含按鈕</span>
                   )}
                 </div>
                 {nlStatus === "done" && (
@@ -3963,7 +3963,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                   </div>
                 )}
                 {nlStatus === "error" && (
-                  <div style={{ marginTop: "10px", fontSize: "12px", color: "var(--red)" }}>
+                  <div style={{ marginTop: "10px", fontSize: "12px", color: "var(--badge-red-text)" }}>
                     {nlResult?.error ?? "推送失敗"}
                   </div>
                 )}

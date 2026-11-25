@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { DEFAULT_SECTIONS, applyLayout, itemKey, type NavSection } from '@/app/SidebarNav';
+import { DEFAULT_SECTIONS, applyLayout, itemKey, type NavSection } from '@/app/sidebar-sections';
 import { COLOR_GROUPS, TYPOGRAPHY_GROUPS, type SavedLayout, type TokenGroup } from '@/lib/theme/tokens';
 import PalettePresets from './PalettePresets';
 import FontChoices from './FontChoices';
@@ -166,7 +166,7 @@ export default function ThemePage() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Theme Editor</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>主題編輯器</h1>
           <p style={{ color: 'var(--text-muted)', marginTop: 4, fontSize: 13 }}>
             Changes apply live across the whole app.
             {(changedCount > 0 || orderChanged) && (

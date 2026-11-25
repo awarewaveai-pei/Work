@@ -459,7 +459,8 @@ function buildUserPrompt(params: {
       // K10: the quoted part is what the picture shows (the image prompt); the alt text stays for search engines. Every
       // reader of a placeholder takes both forms (lib/content/image/article-image.ts imagePlaceholders).
       lines.push(`- Format each placeholder as: ![alt-text here](IMAGE_PLACEHOLDER_N "English scene description") where N = 1, 2, 3...`);
-      lines.push(`- The alt text is in the article's language, for search engines. The quoted scene is ONE English sentence of what the picture shows for the section it sits in: a concrete subject, what it is doing, the setting and the light (people are fine). Never ask for words, letters, signs, logos or captions in the picture. No double quotes inside the scene.`);
+      lines.push(`- The alt text is in the article's language, for search engines. The quoted scene is ONE English sentence of what the picture shows for the section it sits in: a concrete subject, what it is doing, the setting and the light. Never ask for words, letters, signs, logos or captions in the picture. No double quotes inside the scene.`);
+      lines.push(PEOPLE_IN_PICTURES);
     }
     if (m.youtubeSource && m.youtubeSource !== "none") {
       const layoutMap: Record<string, string> = {
@@ -524,7 +525,7 @@ function buildUserPrompt(params: {
     lines.push("TAGS: [4-6 specific topical tags, comma-separated]");
     // K10: the cover picture is drawn from its own scene; its short title and subtitle are laid over it later (K25)
     if (m?.aiImages && m.aiImages !== "none") {
-      lines.push("COVER_SCENE: [ONE English sentence of the cover picture for the whole article: a concrete subject, what it is doing, the setting and the light; no words, letters, signs or logos in the picture]");
+      lines.push("COVER_SCENE: [ONE English sentence of the cover picture for the whole article: a concrete subject, what it is doing, the setting and the light; no words, letters, signs or logos in the picture; people only if they belong there, per PEOPLE IN PICTURES above, and then someone different from every body picture]");
       lines.push("COVER_TITLE: [cover short title in the article's language, at most 16 full-width characters (about 32 Latin): what this article is; not the article title]");
       lines.push("COVER_SUBTITLE: [cover subtitle in the article's language, at most 18 full-width characters (about 36 Latin): why it is worth reading]");
     }
@@ -554,6 +555,12 @@ export type ArticleGenerateInput = Record<string, unknown>;
  *  subscription segments run: `lane` "schedule" = the host's worker (only the schedule sets it, lib/content/topics/make.ts;
  *  absent = the owner lane), `subBudgetMs` = how long all of them together may take before the chain moves on to the API
  *  (PLAN I5: the schedule waits only within its tick budget). */
+/** K27: who is in the pictures. Without it every image source drew Western faces (K13 runs.json). People only where the
+ *  section naturally has them (no quota); when they appear they are spelled out per picture and differ across one
+ *  article, never tied to the site's country. Read by the body
+ *  placeholders and COVER_SCENE (the meta block, written first, points at it). */
+export const PEOPLE_IN_PICTURES = "- PEOPLE IN PICTURES (body scenes and the cover scene): first decide whether the section calls for people at all. A section about an object, a process, a place or an idea shows the object, the setting, the space, hands at work or a still life, with nobody in it; never add people just to show variety. Draw people only where they naturally belong in the scene; no picture has to have people and there is no minimum. When a scene has people, name one or two of them and how they look: age range, gender, and an ethnic or regional background; across this article's pictures, cover included, use different people from different parts of the world, never one region for the whole article, and never follow the site's target country; no costumes, no stereotyped props or places. Good, with a person: a woman in her sixties of West African descent repotting a fern on a sunny apartment balcony, soft morning light. Good, without people: a ceramic teapot and two cups on a worn wooden table by a rain-streaked window, soft grey daylight. Bad: a diverse group of smiling people in traditional dress posing together for the camera.";
+
 export const ARTICLE_CALLER: unique symbol = Symbol("article.caller");
 export interface ArticleCaller { lane?: "schedule"; subBudgetMs?: number }
 

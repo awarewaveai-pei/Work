@@ -833,7 +833,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         }
         // A vendor-made result (backend/audio-tools.cjs: ElevenLabs) records its model, provider and bill like music does.
         const origin = result.ai ? { kind: "ai_generated", model: result.ai.model, provider: result.ai.provider, costUsd: result.ai.costUsd } : { kind: "render" };
-        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), ...(result.verification ? { verification: result.verification } : {}), origin: { ...origin, jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
+        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), ...(result.verification ? { verification: result.verification } : {}), ...(result.note ? { note: result.note } : {}), origin: { ...origin, jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
         if (result.ai) job.disclosure = "AI 處理聲音";
         job.progress = 100;
         job.status = "succeeded";
@@ -1166,6 +1166,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     const op = input?.operation;
     if (videoEnhance.isAi(input)) return videoEnhance.TIMEOUT_MS;
     if (op === "music") return 900000; // a 5-minute Eleven song is made in one request
+    if (op === "privacy") return require("./face-privacy.cjs").TIMEOUT_MS;
+    if (op === "depth") return require("./depth-video.cjs").TIMEOUT_MS;
+    if (audioTools.handles(input)) return 1800000; // a vendor row is billed once sent: an hour of 只留人聲 must not be cut at the default 10 min
     return blender3d().operations.includes(op) ? blender3d().timeoutMs(input) : op === "image-to-3d" ? imageTo3d.TIMEOUT_MS : op === "editor-transcribe" ? hostTranscribeTimeout(input) : op === "remotion-template" || op === "caption-reburn" ? 780000 : op === "quick-render" ? quickRender.POLL_LIMIT_MS + 300000 : 600000;
   }
   // 破框's inputs, decided before the permit and any paid call by the readers finishing uses: the first frame decodes
@@ -1268,8 +1271,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
     if (feature && editModel) costs.priceOf("fill", editModel.value);
-    else if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music" }[feature] || feature,
-      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id }[feature]);
+    else if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music", "video.audio-tools": "audio-tools" }[feature] || feature,
+      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id, "video.audio-tools": audioTools.handles(input) && audioTools.rateKey(input, env) }[feature]);
     const lockMask = input.operation === "breakout" ? await breakoutInputs(input, extra?.retryOf) : null;
     // Card U4.4: a retry of a scene picture next-admin already drew and billed takes that picture (sceneImage.kept).
     const keptScene = isScene && extra?.retryOf ? sceneImage.kept(jobs.find((j) => j.id === extra.retryOf)) : null;
@@ -1636,6 +1639,17 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           const asked = music.request(input, env);
           music.key(asked.model, env);
           json(res, 200, { quoteId: crypto.randomUUID(), costUsd: costs.musicUsd(asked.model.id, asked.seconds || 0), estimate: !!asked.seconds }); // per-minute rows: charged on the longer of asked and returned length
+          return true;
+        }
+        // 音軌分離／去配樂 (backend/audio-tools.cjs): the chosen row's price for the source's own length (the local row: 0).
+        if (audioTools.handles(input)) {
+          if (elevenlabs.keyOf(env)) await elevenlabs.account(env, fetchImpl); // an ElevenLabs row runs only on a known paid plan
+          const row = audioTools.check(input, env), file = localFile(input.references?.src?.url);
+          const seconds = file && fs.existsSync(file) ? (await require("./media-inspect.cjs").inspectMedia(file).catch(() => null))?.duration : 0;
+          if (!(seconds > 0)) throw Object.assign(Error("讀不到影片長度"), { status: 400 });
+          // Over the tool's limit = the job would be refused when it runs: no price for it (never a capped one).
+          if (seconds > audioTools.MAX_SECONDS[input.operation]) throw Object.assign(Error(`影片最長 ${audioTools.MAX_SECONDS[input.operation] / 60} 分鐘`), { status: 400 });
+          json(res, 200, { quoteId: crypto.randomUUID(), costUsd: audioTools.usdOf(input.operation + ":" + row.id, seconds), estimate: !!row.estimate });
           return true;
         }
         if (jobInput(input).type === "audio") speech.key(speech.pick(input.speechModel, env), env);

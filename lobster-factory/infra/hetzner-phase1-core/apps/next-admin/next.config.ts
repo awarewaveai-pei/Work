@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   // basePath is not needed — routing is handled at the domain/edge layer.
   // Keep file tracing scoped to this app (avoid parent monorepo lockfile warnings in Docker / CI).
   outputFileTracingRoot: path.join(__dirname),
+  // The bake-off pages are read with fs at request time, so the tracer cannot see them; this copies them into
+  // .next/standalone/content/ (the Dockerfile copies standalone whole). Keys are picomatch globs on the route, and
+  // "[slug]" would be a character class there, hence "*".
+  outputFileTracingIncludes: { "/tools/ai-models/bakeoff/*": ["./content/model-bakeoff/**/*"] },
   // sg-deploy runs `npm run typecheck` (next typegen + tsc, the same route-type validation next build does) as a gate
   // before the image build and then passes NEXT_TYPECHECK_DONE=1, so the build skips its second, ~60s copy. Any
   // other build (local, CI) still checks.

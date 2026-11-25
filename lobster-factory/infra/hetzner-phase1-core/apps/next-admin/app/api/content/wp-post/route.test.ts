@@ -90,3 +90,24 @@ describe("DELETE /api/content/wp-post -- system-mode gate", () => {
     expect(checkProductionChangeAllowed).toHaveBeenCalledWith(null, ORG_ID);
   });
 });
+
+// Card SF-I2: a site the site flow registered has no REST credential. Both writes say so (503) and send nothing --
+// before this they answered 404 "Site not found", which reads as a wrong site id.
+describe("/api/content/wp-post -- a site with no REST credential", () => {
+  const noToken = { site: { id: "9", url: "https://reg.example", organizationId: ORG_ID }, token: "", username: "", authHeader: "" };
+  it("PATCH and DELETE: 503 bridge-only, no WordPress request", async () => {
+    for (const [fn, method] of [[PATCH, "PATCH"], [DELETE, "DELETE"]] as const) {
+      resolveWpSite.mockResolvedValueOnce(noToken);
+      const res = await fn(req(method, { siteId: "9", postId: 5, title: "x" }));
+      expect(res.status).toBe(503);
+      expect((await res.json()).error).toContain("bridge");
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("a site that does not exist is still 404", async () => {
+    resolveWpSite.mockResolvedValueOnce(null as never);
+    expect((await DELETE(req("DELETE", { siteId: "nope", postId: 5 }))).status).toBe(404);
+    resolveWpSite.mockResolvedValueOnce(null as never);
+    expect((await PATCH(req("PATCH", { siteId: "nope", postId: 5, title: "x" }))).status).toBe(404);
+  });
+});

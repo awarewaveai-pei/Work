@@ -1,5 +1,7 @@
 ﻿# app.aware-wave.com — 目前狀態權威文件（CURRENT STATE）
 
+> **建站現況（2026-11-23 起）**：`/onboard`、`/build` 兩頁已刪（308 到 `/ops/sites/new`），開客戶站見 [建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。本檔提到舊頁／舊接口當作現行做法的段落是歷史紀錄。
+
 > **這份檔的用途**：任何 AI / 工程師要改 app.aware-wave.com（Lobster Factory Admin Console）**之前先讀這份**，了解網站「現在」長怎樣、怎麼登入、怎麼部署、有哪些陷阱。
 > **與其他文件分工**：
 > - 本檔 = **現況 + 怎麼操作**（live state，每次重大改動後更新）。

@@ -3,7 +3,7 @@
  * Plugin Name:       AwareWave Oracle
  * Plugin URI:        https://aware-wave.com
  * Description:       Embeds the AwareWave divination engine (Zi Wei, BaZi, I Ching, Tarot …) in this site's pages with a shortcode or block. Engine address, site key and languages are site settings.
- * Version:           0.5.0
+ * Version:           0.5.1
  * Requires at least: 6.5
  * Requires PHP:      7.4
  * Author:            AwareWave
@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AWORACLE_VERSION', '0.5.0' );
+define( 'AWORACLE_VERSION', '0.5.1' );
 define( 'AWORACLE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AWORACLE_URL', plugin_dir_url( __FILE__ ) );
 define( 'AWORACLE_FILE', __FILE__ );
@@ -75,6 +75,9 @@ add_action(
 // [aw_oracle tool="..."] and the "AwareWave Oracle" block — both render the same iframe embed (Embed\Renderer).
 ( new Embed\Shortcode() )->register();
 ( new Embed\Block() )->register();
+
+// Translated sites (TranslatePress): <title>, description, og/twitter in the page's language. After its functions exist.
+add_action( 'plugins_loaded', array( Seo\TranslatedTitles::class, 'register' ), 20 );
 
 // Members' saved charts and persons: REST aworacle/v1, [aw_oracle_my_charts] / [aw_oracle_persons],
 // privacy export / erase and account-deletion cleanup.
