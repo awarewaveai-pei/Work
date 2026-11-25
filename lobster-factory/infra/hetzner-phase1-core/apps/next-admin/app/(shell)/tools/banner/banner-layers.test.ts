@@ -47,6 +47,25 @@ describe("banner layered SVG", () => {
   });
 });
 
+describe("banner layer shadows (C2)", () => {
+  // Photoshop's angle is where the light comes FROM: a shadow straight down = 90, straight right = 180
+  const shadowed: RasterDoc = { ...doc, layers: [
+    { name: "按鈕底", pixels: px((x, y) => x > 2 && x < 10 && y > 2 && y < 8), shadow: { color: "#ff0000", opacity: 0.5, blur: 8, x: 0, y: 10 } },
+    { name: "角標底", pixels: px((x, y) => x > 20 && y < 5), shadow: { color: "#000000", opacity: 0.3, blur: 4, x: 10, y: 0 } },
+  ] };
+  it("PSD: drop shadow effect with angle / distance / size from the offsets", () => {
+    const psd = readPsd(buildBannerPsd(shadowed), { skipLayerImageData: true, skipCompositeImageData: true, skipThumbnail: true });
+    const [a, b] = (psd.children ?? []).map((l) => l.effects?.dropShadow?.[0]);
+    expect(a).toMatchObject({ angle: 90, distance: { value: 10 }, size: { value: 8 }, blendMode: "normal" });
+    expect(b).toMatchObject({ angle: 180, distance: { value: 10 }, size: { value: 4 } });
+  });
+  it("SVG: feDropShadow on the layer group, stdDeviation = blur / 2", () => {
+    const svg = buildBannerSvg(shadowed, () => "data:image/png;base64,AA==");
+    expect(svg).toContain('<feDropShadow dx="0" dy="10" stdDeviation="4" flood-color="#ff0000" flood-opacity="0.5"/>');
+    expect(svg).toMatch(/<g id="layer1" [^>]*filter="url\(#shadow1\)"/);
+  });
+});
+
 describe("banner layered PSD", () => {
   it("reads back with the type layers' text and names", () => {
     const psd = readPsd(buildBannerPsd(doc), { skipLayerImageData: true, skipCompositeImageData: true, skipThumbnail: true });

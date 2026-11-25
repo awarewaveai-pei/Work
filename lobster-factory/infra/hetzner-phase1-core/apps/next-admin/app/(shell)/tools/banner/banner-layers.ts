@@ -21,6 +21,33 @@ export interface BannerFields {
   badgeText: string; badgeStyle: "ribbon" | "pill" | "burst"; badgeColor: string; badgePos: "tl" | "tr"; badgeScale: number;
   showPrice: boolean; priceNow: string; priceWas: string;
   trustType: "none" | "stars" | "reviews" | "guarantee"; trustStars: number; trustText: string;
+  /** Background picture (upload / AI): size as a multiple of "cover" and centre offset as a share of the canvas. */
+  bgImgScale: number; bgImgX: number; bgImgY: number;
+  /** 文字陰影 (all stack text), CTA 按鈕, 促銷徽章 (null = the style's own default: only the pill has one). */
+  textShadow: ShadowSpec; ctaShadow: ShadowSpec; badgeShadow: ShadowSpec | null;
+}
+
+/** A drop shadow; blur / x / y are shares of the element's height (font size, button height, badge height), so the
+ *  look stays the same at every banner size. */
+export interface ShadowSpec { on: boolean; color: string; opacity: number; blur: number; x: number; y: number }
+/** A shadow in pixels, as drawn. */
+export interface LayerShadow { color: string; opacity: number; blur: number; x: number; y: number }
+
+/** Defaults = the look before shadows were settable, so an untouched design draws exactly as before. */
+export const DEFAULT_TEXT_SHADOW: ShadowSpec = { on: false, color: "#000000", opacity: 0.5, blur: 0.12, x: 0.03, y: 0.05 };
+export const DEFAULT_CTA_SHADOW: ShadowSpec = { on: true, color: "#000000", opacity: 0.32, blur: 0.28, x: 0, y: 0.12 };
+export function badgeShadowOf(style: BannerFields["badgeStyle"], spec: ShadowSpec | null): ShadowSpec {
+  return spec ?? { on: style === "pill", color: "#000000", opacity: 0.28, blur: 0.25, x: 0, y: 0.1 };
+}
+
+function rgba(hex: string, a: number): string {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  const [r, g, b] = m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
+  return `rgba(${r},${g},${b},${a})`;
+}
+function applyShadow(ctx: CanvasRenderingContext2D, sh: LayerShadow | undefined) {
+  if (!sh) { ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; return; }
+  ctx.shadowColor = rgba(sh.color, sh.opacity); ctx.shadowBlur = sh.blur; ctx.shadowOffsetX = sh.x; ctx.shadowOffsetY = sh.y;
 }
 
 export interface TextRun { text: string; color: string }
@@ -44,7 +71,8 @@ export interface TextSpec {
   /** Radians about (cx, cy); absent = 0. */
   rotate?: { angle: number; cx: number; cy: number };
 }
-export interface BannerLayer { name: string; canvas: HTMLCanvasElement; text?: TextSpec }
+/** `shadow`: drawn by whoever stacks the layer (composite, PSD effect, SVG filter) -- not in the layer's pixels. */
+export interface BannerLayer { name: string; canvas: HTMLCanvasElement; text?: TextSpec; shadow?: LayerShadow }
 export interface BannerLayers { w: number; h: number; layers: BannerLayer[] }
 
 /** Canvas family (first name in the CSS list) -> the family the pro editors ship (scripts/vectorcraft-pro/web-fonts.patch).
@@ -177,15 +205,39 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
   const p = size;
   const layers: BannerLayer[] = [];
   let flat: CanvasRenderingContext2D | null = null;
-  const layer = (name: string, text?: TextSpec): CanvasRenderingContext2D => {
-    if (flat) { flat.restore(); flat.save(); return flat; }
+  // `shadow`: flat -> drawn now (set on the fresh context); layered -> recorded on the layer, pixels stay shadow-free.
+  let pending: { cv: HTMLCanvasElement; sh: LayerShadow } | null = null;
+  let scratch: HTMLCanvasElement | null = null; // one reused canvas for flat-mode shadowed layers (one pending at a time)
+  const scratchCtx = () => {
+    if (!scratch) { scratch = newCanvas(p.w, p.h); scratch.getContext("2d")?.save(); }
+    return scratch;
+  };
+  const flush = () => {
+    if (!pending || !flat) return;
+    flat.restore(); flat.save(); applyShadow(flat, pending.sh); flat.drawImage(pending.cv, 0, 0);
+    pending = null;
+  };
+  // `whole`: the shadow is the shadow of the finished layer (text: glyphs + their outline glow), not of each draw call.
+  const layer = (name: string, text?: TextSpec, shadow?: LayerShadow, whole = false): CanvasRenderingContext2D => {
+    flush();
+    if (flat && shadow && whole) {
+      const cv = scratchCtx(), c = cv.getContext("2d");
+      if (!c) throw new Error("canvas_unavailable");
+      // restore() + save() = a fresh default state for this use (the scratch was saved once when made)
+      c.restore(); c.save(); c.clearRect(0, 0, p.w, p.h);
+      pending = { cv, sh: shadow };
+      return c;
+    }
+    if (flat) { flat.restore(); flat.save(); applyShadow(flat, shadow); return flat; }
     const cv = newCanvas(p.w, p.h);
     const c = cv.getContext("2d");
     if (!c) throw new Error("canvas_unavailable");
-    layers.push({ name, canvas: cv, ...(text ? { text } : {}) });
-    if (opts.flat) { flat = c; c.save(); }
+    layers.push({ name, canvas: cv, ...(text ? { text } : {}), ...(shadow && !opts.flat ? { shadow } : {}) });
+    if (opts.flat) { flat = c; c.save(); applyShadow(c, shadow); }
     return c;
   };
+  const px = (sp: ShadowSpec | null | undefined, unit: number): LayerShadow | undefined =>
+    sp && sp.on ? { color: sp.color, opacity: sp.opacity, blur: sp.blur * unit, x: sp.x * unit, y: sp.y * unit } : undefined;
   const mctx = newCanvas(1, 1).getContext("2d"); // measuring only
   if (!mctx) throw new Error("canvas_unavailable");
 
@@ -211,10 +263,13 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       ctx.fillRect(0, 0, p.w, p.h);
     } else if (state.bgImage) {
       const img   = await loadImage(state.bgImage);
-      const scale = Math.max(p.w / img.width, p.h / img.height);
+      // moved / zoomed by the user (dragged on the preview): what the picture no longer covers shows the background colour
+      const k = state.bgImgScale || 1, ox = (state.bgImgX || 0) * p.w, oy = (state.bgImgY || 0) * p.h;
+      if (k !== 1 || ox || oy) { ctx.fillStyle = state.bgColor; ctx.fillRect(0, 0, p.w, p.h); }
+      const scale = Math.max(p.w / img.width, p.h / img.height) * k;
       const sw    = img.width  * scale;
       const sh    = img.height * scale;
-      ctx.drawImage(img, (p.w - sw) / 2, (p.h - sh) / 2, sw, sh);
+      ctx.drawImage(img, (p.w - sw) / 2 + ox, (p.h - sh) / 2 + oy, sw, sh);
     } else {
       ctx.fillStyle = state.bgColor;
       ctx.fillRect(0, 0, p.w, p.h);
@@ -310,7 +365,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
         const color = (r: AccentRun) => r.accent ? (plate(r) ? "#1a1a1a" : state.accentColor) : state.textColor;
         const ctx = layer("標題", spec(hFont, 700, state.headlineSize,
           lines.map((ln) => ln.map((r) => ({ text: r.text, color: color(r) }))), align, anchorX, top + below,
-          { lineHeight: lineH, letterSpacing: state.letterSpacing }));
+          { lineHeight: lineH, letterSpacing: state.letterSpacing }), px(state.textShadow, state.headlineSize), true);
         ctx.font = fontStr;
         setLetterSpacing(ctx, state.letterSpacing);
         ctx.textAlign = "left"; ctx.textBaseline = "top";
@@ -348,7 +403,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       h: lines.length * lineH, w,
       draw: (top) => {
         const ctx = layer("副標", spec(font, 400, state.subtextSize, lines.map((l) => [{ text: l, color: state.textColor }]),
-          align, anchorX, top + below, { lineHeight: lineH, opacity: 0.95 }));
+          align, anchorX, top + below, { lineHeight: lineH, opacity: 0.95 }), px(state.textShadow, state.subtextSize), true);
         ctx.font = fontStr;
         ctx.textAlign = align; ctx.textBaseline = "top";
         let y = top;
@@ -380,7 +435,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
         let x = leftOf(rowW);
         const baseY = top + nowSize;
         if (state.priceNow) {
-          const ctx = layer("現價", spec(font, 700, nowSize, [[{ text: state.priceNow, color: state.textColor }]], "left", x, baseY));
+          const ctx = layer("現價", spec(font, 700, nowSize, [[{ text: state.priceNow, color: state.textColor }]], "left", x, baseY), px(state.textShadow, nowSize), true);
           ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
           ctx.font = `bold ${nowSize}px ${font}`;
           ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = nowSize * 0.12;
@@ -390,7 +445,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
         }
         if (state.priceWas) {
           const wy = baseY;
-          const ctx = layer("原價", spec(font, 400, wasSize, [[{ text: state.priceWas, color: state.textColor }]], "left", x, wy, { opacity: 0.7 }));
+          const ctx = layer("原價", spec(font, 400, wasSize, [[{ text: state.priceWas, color: state.textColor }]], "left", x, wy, { opacity: 0.7 }), px(state.textShadow, wasSize), true);
           ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
           ctx.font = `${wasSize}px ${font}`;
           ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.7;
@@ -422,8 +477,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       h: bh, w: bw,
       draw: (top) => {
         const left = leftOf(bw);
-        const bg = layer("按鈕底");
-        bg.shadowColor = "rgba(0,0,0,0.32)"; bg.shadowBlur = bh * 0.28; bg.shadowOffsetY = bh * 0.12;
+        const bg = layer("按鈕底", undefined, px(state.ctaShadow ?? DEFAULT_CTA_SHADOW, bh));
         roundRectPath(bg, left, top, bw, bh, bh / 2);
         bg.fillStyle = state.ctaBg; bg.fill();
         const cx = left + bw / 2, my = top + bh / 2 + bf * 0.06;
@@ -459,12 +513,12 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
         let x = leftOf(rowW);
         const by = top + tSize;
         if (starsStr) {
-          const ctx = layer("星星", spec(font, 400, tSize, [[{ text: starsStr, color: "#fbbf24" }]], "left", x, by));
+          const ctx = layer("星星", spec(font, 400, tSize, [[{ text: starsStr, color: "#fbbf24" }]], "left", x, by), px(state.textShadow, tSize), true);
           ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${tSize}px ${font}`;
           ctx.fillStyle = "#fbbf24"; ctx.fillText(starsStr, x, by); x += starW + gapT;
         }
         if (label) {
-          const ctx = layer("信任說明", spec(font, 400, tSize, [[{ text: label, color: state.textColor }]], "left", x, by, { opacity: 0.92 }));
+          const ctx = layer("信任說明", spec(font, 400, tSize, [[{ text: label, color: state.textColor }]], "left", x, by, { opacity: 0.92 }), px(state.textShadow, tSize), true);
           ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${tSize}px ${font}`;
           ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.92; ctx.fillText(label, x, by);
         }
@@ -514,6 +568,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     mctx.font = `bold ${bf}px ${font}`;
     const tw = mctx.measureText(state.badgeText).width;
     const onLeft = state.badgePos === "tl";
+    const badgeSh = px(badgeShadowOf(state.badgeStyle, state.badgeShadow), bf * 1.9);
     const white = (fs: number, x: number, y: number, extra: Partial<TextSpec> = {}) => {
       mctx.font = `bold ${fs}px ${font}`;
       const below = baselineBelow(mctx, "middle", fs);
@@ -528,7 +583,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       const cxb = onLeft ? margin + r : p.w - margin - r;
       const cyb = margin + r;
       const angle = (onLeft ? -1 : 1) * 0.18;
-      const ctx = layer("角標底");
+      const ctx = layer("角標底", undefined, badgeSh);
       ctx.translate(cxb, cyb);
       ctx.rotate(angle);
       ctx.beginPath();
@@ -550,7 +605,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       const bw = tw + padX * 2 + notch;
       const x = onLeft ? margin : p.w - margin - bw;
       const y = margin;
-      const ctx = layer("角標底");
+      const ctx = layer("角標底", undefined, badgeSh);
       ctx.fillStyle = state.badgeColor;
       ctx.beginPath();
       if (onLeft) {
@@ -570,14 +625,14 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       const padX = bf * 0.8, bh = bf * 1.9, bw = tw + padX * 2;
       const x = onLeft ? margin : p.w - margin - bw;
       const y = margin;
-      const ctx = layer("角標底");
-      ctx.shadowColor = "rgba(0,0,0,0.28)"; ctx.shadowBlur = bh * 0.25; ctx.shadowOffsetY = bh * 0.1;
+      const ctx = layer("角標底", undefined, badgeSh);
       roundRectPath(ctx, x, y, bw, bh, bh / 2);
       ctx.fillStyle = state.badgeColor; ctx.fill();
       white(bf, x + bw / 2, y + bh / 2).fillText(state.badgeText, x + bw / 2, y + bh / 2);
     }
   }
 
+  flush();
   if (flat) (flat as CanvasRenderingContext2D).restore();
   return { w: p.w, h: p.h, layers };
 }
@@ -587,7 +642,7 @@ export function compositeLayers(doc: BannerLayers): HTMLCanvasElement {
   const cv = newCanvas(doc.w, doc.h);
   const ctx = cv.getContext("2d");
   if (!ctx) throw new Error("canvas_unavailable");
-  for (const l of doc.layers) ctx.drawImage(l.canvas, 0, 0);
+  for (const l of doc.layers) { applyShadow(ctx, l.shadow); ctx.drawImage(l.canvas, 0, 0); }
   return cv;
 }
 
@@ -595,7 +650,7 @@ export function compositeLayers(doc: BannerLayers): HTMLCanvasElement {
 // Pure over RGBA pixels (RasterDoc) so node tests can run them; rasterize() is the browser step.
 
 export interface Pixels { width: number; height: number; data: Uint8ClampedArray }
-export interface RasterLayer { name: string; pixels: Pixels; text?: TextSpec }
+export interface RasterLayer { name: string; pixels: Pixels; text?: TextSpec; shadow?: LayerShadow }
 export interface RasterDoc { w: number; h: number; layers: RasterLayer[]; composite: Pixels }
 export interface Box { left: number; top: number; right: number; bottom: number }
 
@@ -608,7 +663,7 @@ function pixelsOf(cv: HTMLCanvasElement): Pixels {
 export function rasterize(doc: BannerLayers): RasterDoc {
   return {
     w: doc.w, h: doc.h,
-    layers: doc.layers.map((l) => ({ name: l.name, pixels: pixelsOf(l.canvas), ...(l.text ? { text: l.text } : {}) })),
+    layers: doc.layers.map((l) => ({ name: l.name, pixels: pixelsOf(l.canvas), ...(l.text ? { text: l.text } : {}), ...(l.shadow ? { shadow: l.shadow } : {}) })),
     composite: pixelsOf(compositeLayers(doc)),
   };
 }
@@ -672,7 +727,12 @@ export function buildBannerSvg(doc: RasterDoc, encodePng: (px: Pixels) => string
       const b = opaqueBox(l.pixels);
       if (b) body = `<image x="${b.left}" y="${b.top}" width="${b.right - b.left}" height="${b.bottom - b.top}" href="${encodePng(cropPixels(l.pixels, b))}"/>`;
     }
-    return `<g id="layer${i + 1}" inkscape:groupmode="layer" inkscape:label="${esc(l.name)}">${body}</g>`;
+    const sh = l.shadow;
+    const filter = sh
+      ? `<filter id="shadow${i + 1}" filterUnits="userSpaceOnUse" x="0" y="0" width="${doc.w}" height="${doc.h}" color-interpolation-filters="sRGB">` +
+        `<feDropShadow dx="${num(sh.x)}" dy="${num(sh.y)}" stdDeviation="${num(sh.blur / 2)}" flood-color="${esc(sh.color)}" flood-opacity="${num(sh.opacity)}"/></filter>`
+      : "";
+    return `${filter}<g id="layer${i + 1}" inkscape:groupmode="layer" inkscape:label="${esc(l.name)}"${sh ? ` filter="url(#shadow${i + 1})"` : ""}>${body}</g>`;
   }).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
     `xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${doc.w}" height="${doc.h}" viewBox="0 0 ${doc.w} ${doc.h}">\n${groups}\n</svg>\n`;
@@ -733,6 +793,14 @@ export function buildBannerPsd(doc: RasterDoc): ArrayBuffer {
       Object.assign(out, { left: b.left, top: b.top, right: b.right, bottom: b.bottom, imageData: px });
     }
     if (l.text) { out.text = textToPsd(l.text); if (l.text.opacity < 1) out.opacity = l.text.opacity; }
+    if (l.shadow) {
+      const { x, y, blur, color, opacity } = l.shadow;
+      out.effects = { dropShadow: [{
+        enabled: true, present: true, showInDialog: true, blendMode: "normal", color: rgb(color), opacity,
+        angle: Math.round((Math.atan2(y, -x) * 180) / Math.PI), useGlobalLight: false,
+        distance: { units: "Pixels", value: Math.round(Math.hypot(x, y)) }, size: { units: "Pixels", value: Math.round(blur) },
+      }] };
+    }
     return out;
   });
   const psd: Psd = { width: doc.w, height: doc.h, imageData: doc.composite, children };

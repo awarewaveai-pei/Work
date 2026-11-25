@@ -5,7 +5,10 @@ import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_STAFF_HREF, canvasTarget, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
 import { BANNER_RETURN_TOOL, applyBannerCanvasReturn } from "./banner-canvas-return";
-import { buildBannerPsd, buildBannerSvg, loadImage, rasterize, renderBannerLayers, type Pixels } from "./banner-layers";
+import {
+  DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, badgeShadowOf, buildBannerPsd, buildBannerSvg, loadImage, rasterize, renderBannerLayers,
+  type Pixels, type ShadowSpec,
+} from "./banner-layers";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel, type AspectRatio } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
@@ -204,6 +207,14 @@ interface State {
   badgeScale:          number;
   textScrimOpacity:    number;
   dimOverlayOpacity:   number;
+  // background picture placement (dragged / wheel-zoomed on the preview): scale x "cover", centre offset / canvas size
+  bgImgScale: number;
+  bgImgX:     number;
+  bgImgY:     number;
+  // shadows (blur / offsets in shares of the element's height); badgeShadow null = the badge style's own default
+  textShadow:  ShadowSpec;
+  ctaShadow:   ShadowSpec;
+  badgeShadow: ShadowSpec | null;
   // export
   saving:    boolean;
   saved:     boolean;
@@ -275,6 +286,12 @@ const INIT: State = {
   badgeScale:          1.0,
   textScrimOpacity:    0.5,
   dimOverlayOpacity:   0.45,
+  bgImgScale: 1,
+  bgImgX:     0,
+  bgImgY:     0,
+  textShadow:  DEFAULT_TEXT_SHADOW,
+  ctaShadow:   DEFAULT_CTA_SHADOW,
+  badgeShadow: null,
   saving:    false,
   saved:     false,
   error:     null,
@@ -382,6 +399,43 @@ function templatePatch(t: (typeof TEMPLATES)[number], preset: PresetKey): Partia
   if (!t.fit) return t.patch;
   const { w, h } = PRESETS[preset], headlineSize = Math.round(Math.min(w * t.fit, h * 0.15));
   return { ...t.patch, balanceTitle: true, headlineSize, subtextSize: Math.round(headlineSize * 0.42) };
+}
+
+const BG_PLACE_RESET = { bgImgScale: 1, bgImgX: 0, bgImgY: 0 } as const satisfies Partial<State>;
+
+/** One shadow setting: on/off, colour, opacity, blur, X / Y offset -- all visible controls (no dropdowns). */
+function ShadowControls({ label, unit, value, onChange, testId }: {
+  label: string; unit: string; value: ShadowSpec; onChange: (v: ShadowSpec) => void; testId: string;
+}) {
+  const slider = (name: string, key: "opacity" | "blur" | "x" | "y", min: number, max: number, step: number) => (
+    <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+      <span style={{ minWidth: 48 }}>{name}</span>
+      <input type="range" min={min} max={max} step={step} value={value[key]} data-testid={`${testId}-${key}`}
+        onChange={(e) => onChange({ ...value, [key]: Number(e.target.value) })} style={{ flex: 1, minWidth: 80 }} />
+      <span style={{ opacity: 0.7, minWidth: 36, textAlign: "right" }}>{Math.round(value[key] * 100)}%</span>
+    </label>
+  );
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+        <input type="checkbox" checked={value.on} data-testid={`${testId}-on`} onChange={(e) => onChange({ ...value, on: e.target.checked })} />
+        {label}
+        {value.on && (
+          <input type="color" value={value.color} onChange={(e) => onChange({ ...value, color: e.target.value })} aria-label={`${label}顏色`}
+            style={{ width: 32, height: 22, border: "none", background: "none", cursor: "pointer" }} />
+        )}
+      </label>
+      {value.on && (
+        <>
+          {slider("不透明度", "opacity", 0, 1, 0.02)}
+          {slider("模糊", "blur", 0, 1, 0.02)}
+          {slider("X 位移", "x", -0.5, 0.5, 0.01)}
+          {slider("Y 位移", "y", -0.5, 0.5, 0.01)}
+          <span className="form-hint">模糊與位移以{unit}為 100%，換尺寸時比例不變。</span>
+        </>
+      )}
+    </div>
+  );
 }
 
 /** An opener on an empty card shows nothing to look at: fill a placeholder title (and subtitle for 標題＋副標) only
@@ -504,6 +558,19 @@ function sanitizeDesign(raw: Record<string, unknown>): Partial<State> {
   assign("gradTo", hex(raw.gradTo));
   assign("aiBgSubject", str(raw.aiBgSubject));
   assign("aiBgVibe", str(raw.aiBgVibe));
+  // shadows: a malformed object is dropped whole. The background picture's placement is never AI-set (the AI never
+  // switches the background to a picture).
+  const num = (v: unknown, lo: number, hi: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : undefined);
+  const shadow = (v: unknown): ShadowSpec | undefined => {
+    if (!v || typeof v !== "object") return undefined;
+    const o = v as Record<string, unknown>;
+    const on = bool(o.on), color = hex(o.color), opacity = num(o.opacity, 0, 1), blur = num(o.blur, 0, 1), x = num(o.x, -0.5, 0.5), y = num(o.y, -0.5, 0.5);
+    return on === undefined || !color || opacity === undefined || blur === undefined || x === undefined || y === undefined
+      ? undefined : { on, color, opacity, blur, x, y };
+  };
+  assign("textShadow", shadow(raw.textShadow));
+  assign("ctaShadow", shadow(raw.ctaShadow));
+  assign("badgeShadow", shadow(raw.badgeShadow));
   return out;
 }
 
@@ -678,6 +745,9 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   // 傳回 (C8.3): decide from the latest render and place the image at once (the dock waits ~2 s for the ack).
   const sRef = useRef(s);
   sRef.current = s;
+  // dragging the background picture on the preview (pointer start + the offsets then); while set the preview renders at once
+  const bgDragRef = useRef<{ x: number; y: number; bx: number; by: number; w: number; h: number } | null>(null);
+  const previewImgRef = useRef<HTMLImageElement>(null);
   useCanvasReturn(BANNER_RETURN_TOOL, (slot, image) => {
     if (!applyBannerCanvasReturn(sRef.current, slot, image)) return false;
     setS((prev) => applyBannerCanvasReturn(prev, slot, image) ?? prev);
@@ -717,7 +787,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     let cancelled = false;
     const t = setTimeout(() => {
       exportToPng(s).then((url) => { if (!cancelled) setPreviewUrl(url); }).catch(() => { /* mid-edit, ignore */ });
-    }, 220);
+    }, bgDragRef.current ? 16 : 220);
     return () => { cancelled = true; clearTimeout(t); };
   }, [s]);
 
@@ -854,7 +924,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload  = () => setS((prev) => ({ ...prev, bgImage: reader.result as string, bgMode: "upload", bgImageHasProduct: false, error: null }));
+    reader.onload  = () => setS((prev) => ({ ...prev, bgImage: reader.result as string, bgMode: "upload", bgImageHasProduct: false, ...BG_PLACE_RESET, error: null }));
     reader.onerror = () => setS((prev) => ({ ...prev, error: "upload_read_failed" }));
     reader.readAsDataURL(file);
   }
@@ -935,7 +1005,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       });
       const data = await res.json() as { ok: boolean; image?: string; error?: string };
       if (!data.ok || !data.image) throw new Error(data.error ?? "generation_failed");
-      setS((prev) => ({ ...prev, bgImage: data.image!, bgMode: "ai", bgImageHasProduct: compositing, generating: false }));
+      setS((prev) => ({ ...prev, bgImage: data.image!, bgMode: "ai", bgImageHasProduct: compositing, ...BG_PLACE_RESET, generating: false }));
     } catch (err) {
       setS((prev) => ({ ...prev, generating: false, error: String(err) }));
     }
@@ -1061,6 +1131,21 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       setS((prev) => ({ ...prev, error: String(err) }));
     }
   }
+
+  // the background picture is placed on the preview: drag = move, wheel = zoom (a non-passive listener, so the page
+  // does not scroll while zooming)
+  const bgMovable = (s.bgMode === "upload" || s.bgMode === "ai") && !!s.bgImage;
+  useEffect(() => {
+    const el = previewImgRef.current;
+    if (!el || !bgMovable) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setS((prev) => ({ ...prev, bgImgScale: Math.min(3, Math.max(0.5, prev.bgImgScale * Math.exp(-e.deltaY * 0.0015))), saved: false, error: null }));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [bgMovable, previewUrl]);
+  const clampOff = (v: number) => Math.max(-1.5, Math.min(1.5, v));
 
   const bgCanvasButton = s.bgImage && canvasHref ? (
     <button className="btn btn-ghost" style={{ fontSize: 12, marginLeft: 6 }} data-testid="banner-bg-canvas"
@@ -1356,6 +1441,23 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   {s.bgImage ? "✓ 已上傳，點此換圖" : "選擇圖片…"}
                 </button>
                 {bgCanvasButton}
+              </div>
+            )}
+
+            {(s.bgMode === "upload" || s.bgMode === "ai") && s.bgImage && (
+              <div className="form-row" style={{ marginTop: 10, flexWrap: "wrap", gap: 6 }}>
+                <label className="form-label">圖片位置</label>
+                <span className="form-hint" style={{ width: "100%" }}>在預覽圖上按住拖曳移動、滾輪放大縮小；縮小露出的地方是背景色。</span>
+                <span style={{ fontSize: 12 }}>大小</span>
+                <input type="range" min={0.5} max={3} step={0.05} value={s.bgImgScale} data-testid="banner-bg-scale"
+                  onChange={(e) => set("bgImgScale", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, minWidth: 40 }}>{Math.round(s.bgImgScale * 100)}%</span>
+                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                  底色 <input type="color" value={s.bgColor} onChange={(e) => set("bgColor", e.target.value)} data-testid="banner-bg-under-color"
+                    style={{ width: 32, height: 26, border: "none", background: "none", cursor: "pointer" }} />
+                </label>
+                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }} data-testid="banner-bg-reset"
+                  onClick={() => setS((prev) => ({ ...prev, ...BG_PLACE_RESET, saved: false, error: null }))}>重設</button>
               </div>
             )}
 
@@ -1689,6 +1791,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   onChange={(e) => set("textOutline", e.target.checked)} />
                 <span className="form-hint" style={{ marginLeft: 6 }}>文字在雜亂背景上也清楚</span>
               </div>
+              <ShadowControls label="文字陰影（標題、副標、價格、評價一起）" unit="字的大小" testId="banner-text-shadow"
+                value={s.textShadow} onChange={(v) => set("textShadow", v)} />
               <div className="form-row">
                 <label className="form-label">文字底襯</label>
                 <input type="checkbox" checked={s.textScrim}
@@ -1743,6 +1847,10 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                     </label>
                   </div>
                 )}
+                {s.ctaText && (
+                  <ShadowControls label="按鈕陰影" unit="按鈕高度" testId="banner-cta-shadow"
+                    value={s.ctaShadow} onChange={(v) => set("ctaShadow", v)} />
+                )}
               </AccordionSection>
 
               {/* 促銷徽章 */}
@@ -1781,6 +1889,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                         onChange={(e) => set("badgeScale", Number(e.target.value))} style={{ flex: 1 }} />
                       <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>{s.badgeScale.toFixed(1)}×</span>
                     </div>
+                    <ShadowControls label="徽章陰影" unit="徽章高度" testId="banner-badge-shadow"
+                      value={badgeShadowOf(s.badgeStyle, s.badgeShadow)} onChange={(v) => set("badgeShadow", v)} />
                   </>
                 )}
               </AccordionSection>
@@ -1937,8 +2047,23 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
             }}>
               {previewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={previewUrl} alt="banner preview"
-                  style={{ display: "block", maxWidth: "100%", maxHeight: "calc(100vh - 230px)", width: "auto", height: "auto" }} />
+                <img src={previewUrl} alt="banner preview" ref={previewImgRef} draggable={false} data-testid="banner-preview"
+                  onPointerDown={(e) => {
+                    if (!bgMovable || e.button !== 0) return;
+                    const r = e.currentTarget.getBoundingClientRect();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    bgDragRef.current = { x: e.clientX, y: e.clientY, bx: s.bgImgX, by: s.bgImgY, w: r.width, h: r.height };
+                    e.preventDefault();
+                  }}
+                  onPointerMove={(e) => {
+                    const d = bgDragRef.current;
+                    if (!d) return;
+                    setS((prev) => ({ ...prev, bgImgX: clampOff(d.bx + (e.clientX - d.x) / d.w), bgImgY: clampOff(d.by + (e.clientY - d.y) / d.h), saved: false, error: null }));
+                  }}
+                  onPointerUp={() => { bgDragRef.current = null; }}
+                  onPointerCancel={() => { bgDragRef.current = null; }}
+                  style={{ display: "block", maxWidth: "100%", maxHeight: "calc(100vh - 230px)", width: "auto", height: "auto",
+                    cursor: bgMovable ? "grab" : undefined, touchAction: bgMovable ? "none" : undefined }} />
               )}
               {(s.generating || s.productRemoving || s.designing) && (
                 <div style={{

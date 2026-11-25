@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續7）— 橫幅 C2：背景圖在預覽上拖移／滾輪縮放；文字、CTA 按鈕、促銷徽章陰影可設定（PSD/SVG 帶圖層效果）
+
+- 根因／決策：操作者要「上傳圖後可拖移、放大縮小」與「文字／CTA／徽章可加陰影設定」。背景層 `NA/app/(shell)/tools/banner/banner-layers.ts` 依 `bgImgScale`（cover 倍數 0.5–3）、`bgImgX/Y`（畫布比例位移）畫，未蓋到處鋪 `bgColor`。陰影 `ShadowSpec` 的模糊／位移以元素高度為單位（換尺寸比例不變，C5 多尺寸直接沿用）；預設＝舊畫面（CTA 0.32/0.28/0.12、膠囊徽章 0.28/0.25/0.1、`badgeShadow=null` 表示依樣式預設、文字陰影預設關）。分層時陰影是圖層效果（`layer.shadow`，像素不含）：PSD `effects.dropShadow`（normal 混合、angle=atan2(y,-x)）、SVG `<filter><feDropShadow>`（userSpaceOnUse 整張畫布）；flat 模式文字陰影用一張重用暫存畫布整層套陰影。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`banner-layers.ts` 背景變換、`applyShadow`／`px()`、`layer(name,text,shadow,whole)`、`compositeLayers` 套陰影、PSD/SVG 效果；`BannerStudio.tsx` State 6 欄（designSig 自動含）、`sanitizeDesign` 驗證陰影、上傳／AI 換圖歸零、預覽 pointer 拖曳（左鍵、capture）＋非 passive wheel 縮放、背景步驟「圖片位置」列（大小滑桿、底色、重設）、`ShadowControls` 三組（開關、色塊、不透明度、模糊、X、Y）；`banner-canvas-return.ts` PhotoCraft 傳回背景時位置歸零（＋測試）。
+- 驗證：tsc 綠；vitest banner 7 passed（新增：PSD dropShadow angle 90/180、distance、size、normal；SVG feDropShadow/filter）；瀏覽器比對 C1(HEAD) vs C2 flat 預設 0/255（3 組），陰影開時分層 vs flat ≤4/255；本機實開：拖曳後圖右移、滾輪縮到 65% 露出底色、重設回 100%、文字陰影開／按鈕陰影關／徽章陰影開（`$env:TEMP/banner-c2-bg-drag-zoom.jpg`、`banner-c2-shadows.jpg`）。
+- 剩餘：現價原有的固定小陰影保留在像素（改了會動預設畫面）；描邊光暈在 PSD/SVG 可編輯文字中仍不見（C1 起）；PhotoCraft／VectorCraft 對 dropShadow／feDropShadow 的支援未實測。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" | exit=0 | ms=500
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/7n（M=PSD 陰影 multiply→normal 已修；n 已修：SVG filter 範圍、傳回背景歸零、底色選擇器、只收左鍵、陰影換算測試、暫存畫布重用；保留：現價固定陰影）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=applyBannerCanvasReturn|bgImgScale|ctaShadow | hits=5
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續3）— 橫幅匯出可編輯圖層：拆層繪圖、PSD／SVG 文字保持文字、JPG／WebP 目標 KB、專業版兩顆按鈕、片頭按鈕填預設字
 
 - 根因／決策：操作者硬需求「PSD、SVG 裡的字要能改」。舊 `exportToPng` 把所有元素畫在一張畫布，只能出平面 PNG。改成一份繪圖程式產圖層清單（`NA/app/(shell)/tools/banner/banner-layers.ts` `renderBannerLayers`），每層一張全尺寸畫布，文字層帶 TextSpec（行、每段顏色、字型、錨點、首行基線、行高、字距、不透明度、旋轉）；PNG／預覽用同一程式的 `flat` 模式（全部畫在一張畫布，每層從乾淨 context 開始）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
