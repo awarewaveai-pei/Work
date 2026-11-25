@@ -67,3 +67,71 @@ describe("accent color is not used for text", () => {
     expect(hits.filter((h) => !KNOWN_DEBT.some((k) => h.split(path.sep).join("/").includes(k)))).toEqual([]);
   });
 });
+
+// --red / --green / --yellow are dots and borders; as words they are 2.15–3.76:1 on white (blueprint §19.6 #5). Words read
+// --badge-red-text / --badge-green-text / --badge-yellow-text.
+describe("status colors are not used for text", () => {
+  // Uses that predate the rule, counted per file. Only goes down: fix some, lower the number; no file may join or grow.
+  const STATUS_TEXT_DEBT: Record<string, number> = {
+    "app/(shell)/ops/backup/page.tsx": 2,
+    "app/(shell)/ops/clients/[slug]/AccountsCard.tsx": 4,
+    "app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx": 28,
+    "app/(shell)/ops/clients/[slug]/CsIntentsCard.tsx": 12,
+    "app/(shell)/ops/clients/[slug]/CustomerServiceTab.tsx": 2,
+    "app/(shell)/ops/clients/[slug]/DepartmentsTab.tsx": 1,
+    "app/(shell)/ops/clients/[slug]/ExternalServicesTab.tsx": 3,
+    "app/(shell)/ops/clients/[slug]/KnowledgeDetailModal.tsx": 1,
+    "app/(shell)/ops/clients/[slug]/SiteWatchCard.tsx": 2,
+    "app/(shell)/ops/clients/page.tsx": 1,
+    "app/(shell)/ops/collect/page.tsx": 1,
+    "app/(shell)/ops/costs/CodexQuotaCard.tsx": 2,
+    "app/(shell)/ops/costs/CostsTabs.tsx": 1,
+    "app/(shell)/ops/costs/FreeQuotaCard.tsx": 1,
+    "app/(shell)/ops/schedules/ScheduleTable.tsx": 5,
+    "app/(shell)/ops/staff/StaffAccess.tsx": 3,
+    "app/(shell)/ops/system-modes/page.tsx": 2,
+    "app/(shell)/ops/tools/OpsToolsPageClient.tsx": 4,
+    "app/(shell)/tools/banner/BannerStudio.tsx": 6,
+    "app/(shell)/tools/canvas/CanvasEditor.tsx": 2,
+    "app/(shell)/tools/content/CoverPreview.tsx": 1,
+    "app/(shell)/tools/content/SeoCheckPanel.tsx": 3,
+    "app/(shell)/tools/content/sites/DailyTrendButtons.tsx": 2,
+    "app/(shell)/tools/content/sites/IntroStyleButtons.tsx": 1,
+    "app/(shell)/tools/content/sites/PublishModeButtons.tsx": 1,
+    "app/(shell)/tools/content/sites/RequiredBlocksField.tsx": 3,
+    "app/(shell)/tools/content/sites/SiteManager.tsx": 7,
+    "app/(shell)/tools/content/sites/TextModelButtons.tsx": 1,
+    "app/(shell)/tools/content/sites/TopicModeButtons.tsx": 1,
+    "app/(shell)/tools/content/sites/YoutubePrivacyButtons.tsx": 1,
+    "app/(shell)/tools/content/topics/AutoContentOverview.tsx": 2,
+    "app/(shell)/tools/content/topics/TopicsBoard.tsx": 9,
+    "app/(shell)/tools/designs/DesignsGallery.tsx": 1,
+    "app/(shell)/tools/mockup/MockupStudio.tsx": 5,
+    "app/(shell)/tools/mockup/ModelLibraryStudio.tsx": 6,
+    "app/(shell)/tools/mockup/ModelMockupPanel.tsx": 3,
+    "app/(shell)/tools/publish/PublishWizard.tsx": 23,
+    "app/(shell)/tools/social/(sections)/analytics/analytics.css": 2,
+    "app/(shell)/tools/social/(sections)/inbox/Inbox.tsx": 1,
+    "app/(shell)/tools/social/compose/compose.css": 1,
+    "app/(shell)/tools/social/social.css": 5,
+    "app/(shell)/tools/studio/StudioWorkbench.tsx": 11,
+    "app/(shell)/tools/tarot/TarotStudio.tsx": 11,
+    "app/(shell)/tools/video/ReleaseDeliveryPanel.tsx": 3,
+    "app/(shell)/tools/video/StoryBibleWorkbench.tsx": 1,
+    "app/content/topics/DoorTopicsBoard.tsx": 1,
+    "app/globals.css": 6,
+    "app/login/set-password/SetPasswordForm.tsx": 1,
+    "components/tools/panel-primitives.ts": 1,
+  };
+  it("no new style paints text with var(--red) / var(--green) / var(--yellow)", () => {
+    const VALUE = /(?<![-\w])color\s*:\s*[^,;{}\n]*/g;   // direct or either branch of a ternary
+    const STATUS = /var\(--(red|green|yellow)[,)]/;
+    const found: Record<string, number> = {};
+    for (const f of ["app", "components", "lib"].flatMap((d) => walk(path.join(ROOT, d)))) {
+      const n = fs.readFileSync(f, "utf8").split("\n")
+        .reduce((sum, line) => sum + [...line.matchAll(VALUE)].filter((m) => STATUS.test(m[0])).length, 0);
+      if (n) found[path.relative(ROOT, f).split(path.sep).join("/")] = n;
+    }
+    expect(found).toEqual(STATUS_TEXT_DEBT);
+  });
+});
