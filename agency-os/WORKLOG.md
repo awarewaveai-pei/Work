@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-25（續6）— 「自動啟動 Claude」主機上線：.env＋compose、實際觸發成功、該列打開
+
+- [步驟] ① 主機 `.env` 備份 `.env.bak-cuw-20261125051611` 後追加 `CLAUDE_USAGE_WINDOW_FIRE_URL／_TOKEN`（值經管道，不進對話）。② `safe-infra-patch.sh compose … next-admin`：`SCHEDULE_INGEST_TOKEN` 後加兩行 `${VAR:-}`，healthy 15s，backup `docker-compose.yml.bak.safe-patch-20261125-051631`。③ 容器內 node fetch fire 端點 → `200 routine_fire cse_01XLtHX1DbWjgvurk7R9JxiP`；RemoteTrigger list_runs 見 05:17:36Z run、5 秒結束。④ 正式庫 insert `client_schedules`（awarewave-ops、claude_usage_window、enabled、weekdays、`{NULL,8,8,8,8,8,7}`）。⑤ 金鑰也寫入 `AWARE_WAVE_CREDENTIALS.md` 8.6（操作者要求）。
+- [未做] routine 自己的 cron 與週六 routine 保留到 app 首次觸發驗證後（11-26 08:00 雙觸發為預期）；一次性排程 `claude-usage-window-cutover-2026-11-26`（09:30 台北）驗證後移除。
+- [事故] 本 session 查憑證總表標題時 grep／cut 帶出 Supabase service role key 一行與 OpenAI／Anthropic key 前段到對話紀錄（已告知操作者）。
+- [rollback] compose：`cp docker-compose.yml.bak.safe-patch-20261125-051631 docker-compose.yml` 走 safe-infra-patch；`.env` 用備份；該列 `update client_schedules set enabled=false where job_key='claude_usage_window'`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv CLAUDE_USAGE_WINDOW_FIRE_URL/_TOKEN；node fetch fire → 200 routine_fire | exit=0 | ms=6000
+- REVIEW_WAIVED: NA -- 主機設定與資料列，程式已在續4審查
+- BUGHUNT_WAIVED: NA -- 無程式改動
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-25（續4）— 排程頁：「自動啟動 Claude」每天各自時間，app 時鐘觸發 claude.ai routine
 
 - [根因] 操作者要在 app.aware-wave.com 自己改「自動啟動 Claude」時間；時間原本存在 claude.ai routine 的 cron（`trig_01LfZEYHtBxdGKjNB2dUeugP` 平日、`trig_01DgzPJzGcnF11AdpooyEukn` 週六），app 改不到。放 claude.ai 登入權杖上主機＝整個帳號權限，不採用。改成 app 決定時間、到點打 routine 的 per-routine fire 端點（只能啟動該 routine）。
