@@ -5,6 +5,7 @@
 import { buildDesignKey, getDesignObjectByUrl, isDesignsAsset, parseImageDataUrl, putDesignObject } from "@/lib/storage/r2";
 import { renderCover } from "./render";
 import type { CoverSettings } from "./settings";
+import { SITE_COVER_SIZE, type CoverSize } from "./sizes";
 
 export const MAX_COVER_IMAGE_BYTES = 9_000_000;   // one big photo, as the image route's reference limit
 
@@ -31,8 +32,9 @@ export async function readCoverBackground(imageUrl: string): Promise<CoverBackgr
 
 /** The cover laid on the picture and stored in the designs bucket; its public URL. Throws on any failure (the caller
  *  decides the fallback: the automatic pipeline keeps the plain picture). */
-export async function storeCover(background: Buffer, text: { title: string; subtitle?: string }, settings: CoverSettings): Promise<string> {
-  const out = await renderCover(background, text, settings);
+export async function storeCover(background: Buffer, text: { title: string; subtitle?: string }, settings: CoverSettings,
+  size: CoverSize = SITE_COVER_SIZE): Promise<string> {
+  const out = await renderCover(background, text, settings, size);
   const key = buildDesignKey(out.mime);
   if (!key) throw new Error("cover_key_failed");
   const put = await putDesignObject(key, out.buffer, out.mime);
@@ -40,9 +42,11 @@ export async function storeCover(background: Buffer, text: { title: string; subt
   return put.publicUrl;
 }
 
-/** readCoverBackground + storeCover: the cover on a stored picture (the automatic pipeline's images). */
-export async function storeCoverOn(imageUrl: string, text: { title: string; subtitle?: string }, settings: CoverSettings): Promise<string> {
+/** readCoverBackground + storeCover: the cover on a stored picture (the automatic pipeline's images); size = K29's
+ *  per-channel size (sizes.ts), the website's by default. */
+export async function storeCoverOn(imageUrl: string, text: { title: string; subtitle?: string }, settings: CoverSettings,
+  size: CoverSize = SITE_COVER_SIZE): Promise<string> {
   const bg = await readCoverBackground(imageUrl);
   if (!bg.ok) throw new Error((bg as { error: string }).error);   // strict:false: !ok does not narrow
-  return storeCover(bg.buffer, text, settings);
+  return storeCover(bg.buffer, text, settings, size);
 }

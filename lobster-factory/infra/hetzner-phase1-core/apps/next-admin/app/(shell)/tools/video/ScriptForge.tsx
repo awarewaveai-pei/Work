@@ -1197,7 +1197,7 @@ export default function ScriptForge({ onSendToVideo, onStartDrafts, onQuoteDraft
   // K11 (ADR 020): the client is the workbench's (organizationId), never a per-browser pick; the old "sf_site" key is deleted when met.
   useEffect(()=>{try{localStorage.removeItem("sf_site");}catch{/* storage blocked: nothing to delete */}},[]);
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
-  // Side menu groups fold like the app sidebar (SidebarNav.tsx): only the current module's group starts open.
+  // Side menu groups fold like the app sidebar (NavRail.tsx): only the current module's group starts open.
   const[openGroups,setOpenGroups]=useState<Set<string>>(()=>new Set([FORGE_NAV.find(n=>n.id===nav)?.group??"生成"]));
   // Switching module (e.g. 紀錄's 「開始生成腳本」) opens its group, so the current item is never hidden.
   useEffect(()=>{const g=FORGE_NAV.find(n=>n.id===nav)?.group;if(g)setOpenGroups(prev=>prev.has(g)?prev:new Set(prev).add(g));},[nav]);
