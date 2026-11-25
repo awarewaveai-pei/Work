@@ -230,6 +230,14 @@ const peak = (file, from, to) => {
     assert.equal(upload.form.at(-1), "file", "檔案要放在最後一個欄位");
     const out = path.join(h.dir, done.result.url.slice(1));
     assert(peak(out, 1, 5) > -30, "成品要有 Mirelo 的音效與人聲");
+    // Mirelo charged nothing (their docs: an unmetered key's finished job has credits: null) = the customer is charged
+    // nothing, never the seconds' estimate (Codex 2026-11-25; operator: 不扣款).
+    const free = await harness({ mireloCredits: null }),
+      freeSent = await free.post("/generations", { ...free.job("sfx", "mirelo"), settings: {} }),
+      freeDone = await free.settle(freeSent.body.id);
+    assert.equal(freeDone.status, "succeeded", freeDone.error);
+    assert.equal(freeDone.result.origin.costUsd, 0);
+    assert.deepEqual((await free.usageSettled()).map((u) => u.cost_usd).filter((usd) => usd > 0), [], "沒扣點就不扣款");
     assert.equal(h.calls.vendor.some((c) => /elevenlabs|gemini/.test(c.route)), false, "A 路不該呼叫 ElevenLabs 或 Gemini");
     const h2 = await harness({ mireloStatus: "failed" });
     assert.equal((await h2.settle((await h2.post("/generations", h2.job("sfx", "mirelo"))).body.id)).status, "failed");

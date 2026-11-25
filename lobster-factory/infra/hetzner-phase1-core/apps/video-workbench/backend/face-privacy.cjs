@@ -99,17 +99,14 @@ function fillTrack(track) {
   }
   return out;
 }
-// The box each side grown by EXPAND of its size, clamped to the picture.
-function expandBox(box, width, height, ratio = EXPAND) {
-  const x = Math.max(0, box.x - box.w * ratio),
-    y = Math.max(0, box.y - box.h * ratio),
-    right = Math.min(width, box.x + box.w * (1 + ratio)),
-    bottom = Math.min(height, box.y + box.h * (1 + ratio));
-  return { x, y, w: right - x, h: bottom - y };
+// The box each side grown by EXPAND of its size. Not clamped to the picture: drawMask cuts the ellipse at the frame, so a
+// face against an edge keeps its whole box under the mask (clamping here moved the ellipse off the face's corner).
+function expandBox(box, ratio = EXPAND) {
+  return { x: box.x - box.w * ratio, y: box.y - box.h * ratio, w: box.w * (1 + 2 * ratio), h: box.h * (1 + 2 * ratio) };
 }
 // Per-frame covered boxes + stats: faces = tracks (one face may split into several), peak = most boxes in one frame (shown). Zero faces anywhere = the job fails (I3): an untouched video is never
 // delivered as a protected one.
-function planMasks(frames, { fps = FPS, width, height }) {
+function planMasks(frames, { fps = FPS } = {}) {
   const totalFrames = frames.length,
     tracks = buildTracks(frames, { fps });
   if (!tracks.length) throw Error("沒有偵測到人臉");
@@ -121,7 +118,7 @@ function planMasks(frames, { fps = FPS, width, height }) {
       last = filled.at(-1);
     for (let f = Math.max(0, first.frame - extend); f < first.frame; f++) filled.push({ frame: f, box: first.box });
     for (let f = last.frame + 1; f <= Math.min(totalFrames - 1, last.frame + extend); f++) filled.push({ frame: f, box: last.box });
-    for (const { frame, box } of filled) perFrame[frame].push(expandBox(box, width, height));
+    for (const { frame, box } of filled) perFrame[frame].push(expandBox(box));
   }
   return { perFrame, stats: { faces: tracks.length, peak: Math.max(...perFrame.map((b) => b.length)), coveredFrames: perFrame.filter((b) => b.length).length, totalFrames } };
 }

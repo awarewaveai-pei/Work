@@ -99,9 +99,10 @@ async function generate({ file, seconds, prompt = "", env, fetchImpl = fetch, si
     }
     return to;
   };
-  // The docs show a `credits` field on the job without its shape: a plain number is taken, anything else = the estimate.
-  const credits = typeof job.credits === "number" ? job.credits : NaN;
-  return { sfx: await save(sfx, dest("sfx")), speech: speech?.url ? await save(speech, dest("speech")) : null, credits: credits > 0 ? credits : undefined, jobId: job.id };
+  // credits: what Mirelo charged this job. A number (0 included) or null (their docs: an unmetered key's finished job) =
+  // that is the bill, null = nothing; the field missing or another shape = unknown, the caller prices the seconds.
+  const credits = job.credits === null ? 0 : typeof job.credits === "number" && job.credits >= 0 ? job.credits : undefined;
+  return { sfx: await save(sfx, dest("sfx")), speech: speech?.url ? await save(speech, dest("speech")) : null, credits, jobId: job.id };
 }
 
 module.exports = { API, MODEL, keyOf, key, generate };

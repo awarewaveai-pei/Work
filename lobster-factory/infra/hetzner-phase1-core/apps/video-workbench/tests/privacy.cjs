@@ -36,12 +36,18 @@ const empty = (n) => Array.from({ length: n }, () => []);
   // I2 expansion: every side grows by >= 25% of the face, and the drawn ellipse still covers the whole face box.
   {
     const box = face(400, 300, 100, 120),
-      grown = fp.expandBox(box, W, H);
+      grown = fp.expandBox(box);
     assert.ok(box.x - grown.x >= 25 && box.y - grown.y >= 30);
     assert.ok(grown.x + grown.w - (box.x + box.w) >= 25 && grown.y + grown.h - (box.y + box.h) >= 30);
     const mask = fp.drawMask([grown], W, H, 1);
     for (const [x, y] of [[box.x, box.y], [box.x + box.w - 1, box.y], [box.x, box.y + box.h - 1], [box.x + box.w - 1, box.y + box.h - 1]])
       assert.equal(mask[y * W + x], 255, `face corner ${x},${y} under the mask`);
+    // A face against the picture's edge (Codex 2026-11-25): the frame cuts the mask, it never moves or shrinks it.
+    for (const edge of [face(0, 0, 100, 100), face(W - 100, H - 120, 100, 120), face(0, H - 80, 60, 80)]) {
+      const cut = fp.drawMask([fp.expandBox(edge)], W, H, 1);
+      for (const [x, y] of [[edge.x, edge.y], [edge.x + edge.w - 1, edge.y], [edge.x, edge.y + edge.h - 1], [edge.x + edge.w - 1, edge.y + edge.h - 1]])
+        assert.equal(cut[y * W + x], 255, `edge face corner ${x},${y} under the mask`);
+    }
   }
   // Two faces passing each other keep their own tracks (no swap at the crossing).
   {

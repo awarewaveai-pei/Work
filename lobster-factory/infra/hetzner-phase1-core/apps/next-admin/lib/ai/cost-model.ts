@@ -285,13 +285,14 @@ export const MIRELO_RATES: Record<string, { label: string; usdPerCredit: number;
   ] },
 };
 
-/** USD of one Mirelo run: the job's reported credits when given, else output seconds x that day's credits per second
+/** USD of one Mirelo run: the job's reported credits when given (0 = nothing charged), else output seconds x that day's credits per second
  *  (one variant), at usdPerCredit. */
 export function mireloUsd(model: string, seconds: unknown, credits?: unknown, at?: number | string | Date): number {
   const rate = MIRELO_RATES[model];
   if (!rate) throw new Error("not a priced Mirelo model: " + model);
-  const charged = Number(credits);
-  if (charged > 0) return Math.round(charged * rate.usdPerCredit * 1e6) / 1e6;
+  // credits given (0 = Mirelo charged nothing, e.g. an unmetered key) is the bill; only an unknown bill is estimated.
+  const charged = credits === undefined || credits === null ? NaN : Number(credits);
+  if (charged >= 0) return Math.round(charged * rate.usdPerCredit * 1e6) / 1e6;
   const day = new Date(at ?? Date.now()).toISOString().slice(0, 10), price = rate.prices.filter((p) => p.from <= day).at(-1) ?? rate.prices[0];
   return Math.round(Math.max(0, Number(seconds) || 0) * price.creditsPerSec * rate.usdPerCredit * 1e6) / 1e6;
 }
