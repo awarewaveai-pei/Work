@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-25（續2）— oracle WP：算命站寄信改用獨立 Resend 帳號（網域搬移、DKIM 換新、新 key）
+
+- [根因] 主站與算命站共用一個 Resend 免費帳號（`get-usage`：100／日、3000／月、Domains 2/3）；每日信會吃主站交易信額度，帳號層停權兩站同死。操作者提出分帳號並自行以 Google `oracle.aware@gmail.com` 註冊、建 Full access key（存憑證檔）。
+- [步驟] ① 新帳號 `POST /domains` → 403 `domain has been registered already` → 操作者明示同意後主帳號 `remove-domain 86fd3992…`。② 新帳號加入網域（`7da94026…`）。③ Cloudflare：`resend._domainkey.oracle` TXT 換新值；`send.oracle` MX／TXT、`rsend.oracle` CNAME 內容相同未動。④ `POST /domains/{id}/verify` → 約 40 秒 verified。⑤ `newkey.py`：新帳號建 sending key（限網域）→ ssh stdin → `fluentMailSetSettings` → `wp_mail` → 寫回憑證檔（token 未進對話）。
+- [驗證] `nslookup -type=TXT resend._domainkey.oracle.aware-wave.com 1.1.1.1` 含新 key 片段；domain status `verified`（四筆 record 皆 verified）；`key_saved=ok stored_plain=no`、`wp_mail=sent`、log `status=sent`。新帳號 keys：`oracle.aware-wave.com WordPress`、`admin`、`Onboarding`。
+- [未做] 主帳號舊 key `751962ff…`（已隨網域失效）尚未刪除；新帳號 `admin`（Full access）與 `Onboarding` 兩把待操作者決定是否刪；退信 webhook（GO-3 前）。
+- [rollback] 新帳號刪網域 → 主帳號重新加入並驗證（DKIM 要再換一次）→ FluentSMTP 換回主帳號的 key。
+- REALTEST_EVIDENCE: tool=SSH | cmd=newkey.py（Resend POST /api-keys → ssh wp eval wp_mail）；Resend GET /domains/{id}；nslookup TXT | exit=0 | ms=120000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（外部帳號、DNS 與文件）
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-25（續1）— oracle WP：算命站寄信通（新 Resend key）、Cloudflare 流量限制放行後台、建站開關關回
 
 - [根因] 第 8 步寄信 422（續18，2026-11-24）；Cloudflare `http_ratelimit` 的 WP 後台路徑放行未含 oracle；操作者確認能登入後開關不必再開。三項皆操作者 2026-11-25 同意。
