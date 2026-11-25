@@ -20,7 +20,7 @@
 | 期 | 內容 | 完成定義（缺一不算） | 狀態 |
 |---|---|---|---|
 | **Slice 1** | 每客戶 1 URL（`client_config.site_url` 首頁）、daily（22:00 UTC 桶）、`/snapshot`、pixelmatch、incident（連 2 次）+ Telegram 告警／恢復各 1 則、30 天清理、kill switch、客戶頁設定卡、watchdog | §7 步 10f–g 通過；`check-site-watch-health.ps1` 在 AO-RESUME 出現一次 🟢；RUNNABLE_DEMOS 一列；WORKLOG 四動作 + 非作者模型 review；§0 更新 | 本機 §7 步進行中（見 §0），未上線 |
-| **Slice 2** | 多頁（手填 ≤10／客戶）、hourly／every_6h／update_only、每頁遮罩 selector、總覽表（未開巡檢標黃）、wp-update 前後比對（C11）、OnboardWizard「網站巡檢」＋MainWP 接線、「MainWP 有、系統沒有」安全網清單、容量閘（R6） | ≥1 電商客戶 hourly 多頁跑 7 天，遮罩後 visual 誤報 0；wp-update 真跑一次前後比對；總覽表上線；OnboardWizard 勾選一次真接上 MainWP | 未開始 |
+| **Slice 2** | 多頁（手填 ≤10／客戶）、hourly／every_6h／update_only、每頁遮罩 selector、總覽表（未開巡檢標黃）、wp-update 前後比對（C11）、建站表單「網站巡檢」＋MainWP 接線、「MainWP 有、系統沒有」安全網清單、容量閘（R6） | ≥1 電商客戶 hourly 多頁跑 7 天，遮罩後 visual 誤報 0；wp-update 真跑一次前後比對；總覽表上線；建站表單勾選一次真接上 MainWP | 未開始 |
 | **P2** | 登入後流程：另開容器帶憑證（vault）、只連自己與客戶網域 | 一個登入流程真跑；憑證只存 vault、訊息／log 0 洩漏；容器 egress 實測只到白名單 | 未開始 |
 | **P3** | sg-deploy 後瀏覽器 smoke（JS 錯誤 → rollback） | 一次演練：故意注入 pageerror → sg-deploy 自動 rollback 並通知 | 未開始 |
 
@@ -31,7 +31,7 @@
 - 不留垃圾：基準圖每頁只留最新 1 張；正常結果只記一行、30 天自動刪；失敗證據 30 天自動刪。
 - 總覽表列全部網站狀態，未開巡檢者標黃（Slice 2）。
 - 負擔上限：沿用 renderer 現有 2G／2 CPU／1024 pids；全域 kill switch。
-- 自建網站接入唯一動作 = 在系統新增客戶（填網址）；OnboardWizard 加「網站巡檢」項預設勾（Slice 2）。
+- 自建網站接入唯一動作 = 在系統新增客戶（填網址）；建站表單（`/ops/sites/new`）加「網站巡檢」項預設勾（Slice 2）。
 
 ## 3. 架構（實作即 SSOT；`file:line` 以 2026-09-23 為準，改程式時同步 §3／§4）
 ### 3.1 資料流
@@ -210,7 +210,7 @@
 - **遮罩 selector**：每頁 `mask_selectors text[]`；renderer `/snapshot` 接 `masks[]`，截圖前 `page.evaluate` 蓋住；C6 門檻不變；D1 若降 low 在此升回 medium。
 - **總覽表**：`/ops/clients` 列表加狀態欄；未開巡檢標黃；資料 = `site_watch_targets` ⋈ `site_watch_page_state`。
 - **C11 wp-update 前後比對**：見 §4.2 C11；掛點 `NA/app/api/ops/clients/[slug]/wp-update/route.ts`。
-- **MainWP 接線**：`addSiteToMainWp`（`WF/src/integrations/integration-steps.ts:371`，已對齊 MainWP 6.0.12：`sites/add`、Basic auth、`url/name/admin/uniqueid`；commit `7faa4f68a`／`363a505f4`）；OnboardWizard `PROVIDERS`（`NA/app/(shell)/onboard/OnboardWizard.tsx:69`）尚無 MainWP 與「網站巡檢」項 → 加兩項、預設勾。安全網：「MainWP 有、系統沒有」清單需新增唯讀 MainWP 站點清單讀取（next-admin 現無）。
+- **MainWP 接線**：`addSiteToMainWp`（`WF/src/integrations/integration-steps.ts:371`，已對齊 MainWP 6.0.12：`sites/add`、Basic auth、`url/name/admin/uniqueid`；commit `7faa4f68a`／`363a505f4`）；建站表單（`NA/app/(shell)/ops/sites/new/NewSiteForm.tsx`）尚無「網站巡檢」項 → 加上、預設勾（MainWP 由建站流程第 6 步接）。安全網：「MainWP 有、系統沒有」清單需新增唯讀 MainWP 站點清單讀取（next-admin 現無）。
 - **R4 補洞**：org inactive → runner 仍跑 retire／結束訊息（或 sync 時對 inactive org 走 `disabled`）。
 - **P2 登入後流程**：另開容器（不共用 renderer）帶憑證；憑證走 vault（`client_credentials` + `lib/secret-vault.ts`）；egress 只允許自己與客戶網域；High。
 - **P3 部署後 smoke**：sg-deploy 後對 app.aware-wave.com 關鍵頁 `/snapshot`，pageErrors >0 → 觸發 rollback；掛在 `sg-deploy.sh` 步 7 smoke 段（步 4 的 `/snapshot` smoke 是它的雛形）。

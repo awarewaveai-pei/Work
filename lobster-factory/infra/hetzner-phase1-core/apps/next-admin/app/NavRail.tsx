@@ -30,7 +30,7 @@ export type NavRailProps =
     };
 
 /** The URL's current org / site, as withContext takes them (undefined = leave the link alone). */
-function useCarry(): (href: string) => string {
+export function useCarry(): (href: string) => string {
   const sp = useSearchParams();
   const q = normalizeQuery(new URLSearchParams(sp?.toString() ?? ''));
   return (href) => (q.org || q.site ? withContext(href, { org: q.org ?? undefined, site: q.site ?? undefined }) : href);
@@ -139,7 +139,8 @@ function DoorRail({ page, name }: Extract<NavRailProps, { kind: 'door' }>) {
           {nav.map((n) => {
             const href = `/${n.path}`;
             const active = pathname === href || pathname === (n.path ? `${page}/${n.path}` : page);
-            return <a key={n.path} href={carry(href)} className={`door-nav-link${n.under !== undefined ? " sub" : ""}${active ? " active" : ""}`}>{n.name}</a>;
+            return <a key={n.path} href={carry(href)} className={`door-nav-link${n.under !== undefined ? " sub" : ""}${active ? " active" : ""}`}
+              aria-current={active ? "page" : undefined}>{n.name}</a>;
           })}
         </nav>
       ) : null}
