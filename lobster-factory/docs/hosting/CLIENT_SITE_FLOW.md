@@ -116,7 +116,7 @@ https://app.aware-wave.com/ops/sites/new（owner／admin 登入）：新客戶�
 | 6 | 接上 MainWP | 設站上連線碼、MainWP 加站 | 5 | MainWP 列出且 connected | 重跑沿用已加入的站。顯示斷線＝到 MainWP 按 Reconnect（重跑修不了） |
 | 7 | 接上 AI 控制通道 | 產金鑰（私鑰只進 Vault）、公鑰寫到站上、寫 `wp_sites` | 5 | 簽章請求成功且 `wp_sites` 屬於此客戶 | 重跑沿用同一把金鑰。`wp_sites` 歸屬衝突＝停下由工程師確認 |
 | 8 | 手動項目 | Uptime Kuma 監控、WPvivid 遠端備份、FluentSMTP 寄信測試；做完回來勾選加備註 | 5（要能開站的後台） | 三項已勾（您手動確認） | 取消勾選可重勾 |
-| 9 | 正式開放 | 關建置中、允許搜尋引擎收錄 | 5（系統不檢查 6–8，由人確認） | 後台打開首頁不是維護頁（共用網域站此確認無效，見 §6） | 確認不到會自動改回建置中；修好重跑。10 分鐘逾時 |
+| 9 | 正式開放 | 關建置中、允許搜尋引擎收錄 | 5（系統不檢查 6–8，由人確認） | 後台打開 `/aw-open-check/` 不是維護頁 | 確認不到會自動改回建置中；修好重跑。10 分鐘逾時 |
 
 「重設管理員密碼」按鈕在第 3 步，同樣需要雙鑰開著。
 
@@ -223,14 +223,7 @@ echo "update public.environments set metadata = metadata || '{\"ingress\":\"prod
    - `/wp-json/`、`/wp-admin/`、`/wp-login.php`、`/wp-content/`、`/wp-includes/`
    - `/` 帶 WordPress 查詢參數（`rest_route=`、`p=`、`page_id=`、`preview=`、`post_type=`、`customize_changeset_uuid=`）。漏了 `rest_route=`，第 7 步必失敗。
 4. 拆除腳本不碰閘道設定，要另外還原。
-5. 第 9 步的自動確認只打 `https://<domain>/`；首頁分給別的服務時，WordPress 仍在建置中也會顯示完成。開放後人工確認一個分到 WordPress 的不存在路徑：
-
-```bash
-curl -s -o /dev/null -w "%{http_code}
-" https://<domain>/no-such-page-check
-```
-
-回 404 才算開放；503＝還在建置中。
+5. 第 9 步的自動確認打 `https://<domain>/aw-open-check/`（`NA/lib/site-flow/steps/open.ts` `OPEN_PROBE_PATH`）：這個路徑必須分到 WordPress（上面的 `map` 預設就是），不得列為別的服務的前綴。
 
 ## 7. 注意事項
 
