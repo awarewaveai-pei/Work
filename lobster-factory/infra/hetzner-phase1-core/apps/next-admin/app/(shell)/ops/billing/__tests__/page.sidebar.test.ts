@@ -72,3 +72,11 @@ describe("/ops/billing sidebar", () => {
     expect(html).toContain(`name="seller" value="${RESELLER}"`);
   });
 });
+
+describe("/ops/billing list column (K15: the same phone rules as /ops/clients)", () => {
+  it("the column and its frame use globals.css .client-panel / .client-panel-frame, keeping this page's 280px", async () => {
+    const html = await render({});
+    expect(html).toMatch(/<div class="client-panel-frame"[^>]*>/);
+    expect(html).toMatch(/<nav aria-label="客戶帳戶" class="client-panel" style="--client-panel-w:280px">/);
+  });
+});

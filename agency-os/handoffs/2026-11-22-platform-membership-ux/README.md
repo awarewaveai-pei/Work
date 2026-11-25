@@ -8,7 +8,7 @@
 | 塊 | 解決什麼 | 正本 |
 |---|---|---|
 | 會員模型 | 誰是會員、身分怎麼分、代辦、授權 | `agency-os/docs/architecture/decisions/021-membership-model.md` |
-| 目前客戶 | 員工替哪個客戶操作：全系統一種傳法、一個挑選方式 | `CLIENT-CONTEXT-PLAN-20261121.md`（卡 K1–K15；**待依藍圖改**，見 §4） |
+| 目前客戶 | 員工替哪個客戶操作：全系統一種傳法、一個挑選方式 | `CLIENT-CONTEXT-PLAN-20261121.md`（卡 K1–K15 完成，2026-11-25 期末閘） |
 | 登入後介面 | 會員與員工看到的版面、導覽、權益顯示；WordPress 怎麼接 | `PLATFORM-UX-BLUEPRINT-20261122.md`＋`platform-ux-wireframes.html` |
 
 ## 2. 操作者已定
@@ -49,7 +49,7 @@
 
 ## 4. 尚未做
 
-1. `CLIENT-CONTEXT-PLAN` 依藍圖改：頂部挑選列→側欄客戶欄；產品子網域上員工可換客戶；要改的節與卡列在藍圖（搜尋「CLIENT-CONTEXT-PLAN」）。
+1. ~~`CLIENT-CONTEXT-PLAN` 依藍圖改~~：已改（2026-11-22），K1–K15 完成（2026-11-25 期末閘）；後續批 L1–L8 見該檔 §4d。
 2. ADR 021 加缺口 G13（「進入」清單來自訂單而非權益，`aware-wave-store-plugin/includes/MyAccountDoors.php:109-121`）。
 3. 藍圖 §17 的卡與 K 卡、G 缺口排成一份開工順序。
 4. 線框圖未在瀏覽器逐頁看過（手機寬是否橫向捲動未驗）。

@@ -561,14 +561,15 @@ button.sidebar-link {
   background: var(--bg-card);
 }
 
-/* /ops/clients' own list column (ClientPanelNav.tsx) and the full-height frame it sits in (ops/clients/layout.tsx). */
+/* /ops/clients' and /ops/billing's own list column (ClientPanelNav.tsx, ops/billing/page.tsx) and the full-height frame it
+   sits in (ops/clients/layout.tsx, ops/billing/page.tsx). */
 .client-panel-frame { display: flex; height: 100vh; overflow: hidden; }
 /* The client page's row of tabs scrolls sideways at every width instead of widening the page (17 tabs: wider than 1440). */
 .client-tabs { overflow-x: auto; }
 .client-panel {
   display: flex;
   flex-direction: column;
-  width: 220px;
+  width: var(--client-panel-w, 220px);   /* /ops/billing sets 280px */
   flex-shrink: 0;
   background: var(--bg-card);
   border-right: 1px solid var(--card-border);
