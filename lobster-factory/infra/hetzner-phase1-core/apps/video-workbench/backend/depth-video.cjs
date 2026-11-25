@@ -26,11 +26,12 @@ const NOTE = "逐格估算再做去閃；快速運鏡時邊緣可能抖動";
 const TIMEOUT_MS = 10 * 60_000;
 
 // ---- pure functions (tests/depth.cjs) ----
-// I2: the clip the job asks for. Settings arrive as numbers or numeric strings (number inputs).
+// I2: the clip the job asks for. Settings arrive as numbers or numeric strings (number inputs). No start = 0; no end =
+// 30 s after the start or the end of the video, whichever comes first. A value that is given is checked as given.
 function clipRange(settings, duration) {
-  const num = (v) => (v === "" || v === null || v === undefined ? NaN : Number(v));
-  const start = num(settings?.depthStart ?? 0),
-    end = num(settings?.depthEnd);
+  const blank = (v) => v === "" || v === null || v === undefined;
+  const start = blank(settings?.depthStart) ? 0 : Number(settings.depthStart),
+    end = blank(settings?.depthEnd) ? Math.min(duration, start + MAX_CLIP_SECONDS) : Number(settings.depthEnd);
   if (!Number.isFinite(start) || !Number.isFinite(end)) throw Error("請填寫起始與結束時間（秒）");
   if (start < 0) throw Error("起始時間不能小於 0");
   if (end <= start) throw Error("結束時間必須大於起始時間");

@@ -52,9 +52,12 @@ const meanAbsDiff = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) /
     assert.deepEqual(dv.clipRange({ depthStart: 0, depthEnd: 30 }, 60), { start: 0, end: 30 });
     assert.deepEqual(dv.clipRange({ depthStart: "2.5", depthEnd: "12.5" }, 60), { start: 2.5, end: 12.5 });
     assert.deepEqual(dv.clipRange({ depthStart: 0, depthEnd: 10.03 }, 10), { start: 0, end: 10 });
+    // No end = 30 s after the start, or the end of the video; no start = 0.
+    assert.deepEqual(dv.clipRange({ depthStart: 5 }, 60), { start: 5, end: 35 });
+    assert.deepEqual(dv.clipRange({ depthStart: "50", depthEnd: "" }, 60), { start: 50, end: 60 });
+    assert.deepEqual(dv.clipRange({}, 12), { start: 0, end: 12 });
+    assert.throws(() => dv.clipRange({ depthStart: 70 }, 60), /大於起始/);
     for (const [settings, message] of [
-      [{ depthStart: 0 }, /起始與結束/],
-      [{ depthStart: 0, depthEnd: "" }, /起始與結束/],
       [{ depthStart: "a", depthEnd: 5 }, /起始與結束/],
       [{ depthStart: -1, depthEnd: 5 }, /小於 0/],
       [{ depthStart: 5, depthEnd: 5 }, /大於起始/],
