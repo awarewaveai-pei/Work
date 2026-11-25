@@ -120,7 +120,7 @@ function toolWorkflowScreen(t) {
     content =
       wfSource() +
       (files.src
-        ? `<aside class="side"><h3>時間軸裁切</h3>${wfField("depthStart", "起始時間（秒）", "number", 'min="0" step="0.1"')}${wfField("depthEnd", "結束時間（秒）", "number", 'min="0" step="0.1"')}${wfCheck("depthPreview", "預覽所選片段")}<p class="note">每次最多 30 秒；可以從較長的來源片選出區間。</p>${wfStats()}${btn("開始提取深度圖", "submit", "primary")}</aside>`
+        ? `<aside class="side"><h3>時間軸裁切</h3>${wfField("depthStart", "起始時間（秒）", "number", 'min="0" step="0.1"')}${wfField("depthEnd", "結束時間（秒）", "number", 'min="0" step="0.1"')}${wfCheck("depthPreview", "預覽所選片段")}<p class="note">每次最多 30 秒；可以從較長的來源片選出區間。在主機本機計算，畫面不送到外部服務；輸出黑白深度影片（越近越白、無聲），原片不會被修改，成品存成新素材。</p><p class="note">逐格估算再做去閃；快速運鏡時邊緣可能抖動。</p>${wfStats()}${btn("開始提取深度圖", "submit", "primary")}</aside>`
         : '<aside class="side"><p>選取影片後顯示時間軸裁切和輸出資料。</p></aside>');
   } else if (t.id === "separate") {
     content =

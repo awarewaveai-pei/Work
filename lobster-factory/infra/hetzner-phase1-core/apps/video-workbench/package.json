@@ -14,7 +14,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "postinstall": "node scripts/vendor-vision.cjs && node scripts/vendor-ffprobe.cjs && node scripts/vendor-fonts.cjs && node scripts/vendor-face.cjs",
+    "postinstall": "node scripts/vendor-vision.cjs && node scripts/vendor-ffprobe.cjs && node scripts/vendor-fonts.cjs && node scripts/vendor-face.cjs && node scripts/vendor-depth.cjs",
     "start": "node server.cjs",
     "test:ui": "node tests/interactions.cjs",
     "test:services": "node tests/services.cjs",
@@ -26,6 +26,7 @@
     "test:generate": "node tests/generate-parity.cjs",
     "test:host": "node tests/host-adapter.cjs",
     "test:modes": "node tests/generate-mode-audit.cjs",
-    "test:privacy": "node tests/privacy.cjs"
+    "test:privacy": "node tests/privacy.cjs",
+    "test:depth": "node tests/depth.cjs"
   }
 }

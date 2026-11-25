@@ -28,6 +28,11 @@ WORKDIR /app
 COPY vendor/fonts/sources.json vendor/fonts/sources.json
 COPY scripts/vendor-fonts.cjs scripts/vendor-fonts.cjs
 RUN node scripts/vendor-fonts.cjs
+# The 影片轉深度影片 model (67 MB, sha256-pinned), same reasoning as the fonts: its own layer before COPY . ., and
+# .dockerignore keeps a local copy out of the context. postinstall (vendor-depth.cjs) then only re-checks it.
+COPY vendor/depth/sources.json vendor/depth/sources.json
+COPY scripts/vendor-depth.cjs scripts/vendor-depth.cjs
+RUN node scripts/vendor-depth.cjs
 COPY . .
 
 # postinstall = vendor-vision.cjs (copies from node_modules, SHA-256 checked) + vendor-ffprobe.cjs (skips off Windows).
