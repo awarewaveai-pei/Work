@@ -30,6 +30,7 @@ function customerDeps(state: { identity?: string; orgCalls?: number; orgMade?: b
   const calls: string[] = [];
   const deps: WpCustomerDeps = {
     find: vi.fn(async () => { calls.push("find"); return state.identity ? { organizationId: state.identity, userId: "u1" } : null; }),
+    former: vi.fn(async () => null),
     existingOrganization: vi.fn(async () => (state.orgMade ? { id: ORG, name: "A B" } : null)),
     emailOwner: vi.fn(async () => state.owner ?? null),
     organization: vi.fn(async () => { calls.push("organization"); state.orgCalls = (state.orgCalls ?? 0) + 1; state.orgMade = true; return { id: ORG, name: "A B" }; }),

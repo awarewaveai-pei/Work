@@ -2,9 +2,17 @@
 -- read transfer_of). A live transfer invite is voided (it would read as an ordinary invite on an account that has a
 -- member); a used one keeps its row without the transfer columns -- what it did stays in ops_audit_events
 -- (member_transferred, member_transfer_created / _voided). Identity rows are never touched: a completed transfer stays.
--- The 0180 functions below are 0180's text verbatim.
+-- The 0180 functions below are 0180's text verbatim. Refused once a transfer has completed (former_customer_identities
+-- has rows): those rows route the replaced member's payments to the account, so 0182 is rolled forward, not down.
 begin;
 set local lock_timeout = '5s';
+
+lock table public.former_customer_identities in access exclusive mode;
+do $$ begin
+  if exists (select 1 from public.former_customer_identities) then
+    raise exception 'former_customer_identities has rows: 0182 is rolled forward, not down';
+  end if;
+end $$;
 
 do $$
 begin
@@ -70,6 +78,8 @@ begin
     where id = p_invite_id;
   return 'ok';
 end $$;
+
+drop table public.former_customer_identities;
 
 alter table public.member_invites
   drop constraint member_invites_transfer_whole,

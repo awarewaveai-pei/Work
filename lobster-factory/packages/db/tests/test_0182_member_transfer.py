@@ -136,6 +136,11 @@ def test_transfer_redeem_replaces_the_identity_and_writes_one_audit_row(db):
         == f"admin|staff-1|聯絡人離職|{OLD_USER}|{NEW_USER}"
     assert redeem(db, invite, "22", NEW_USER, "new@unit.test") == "ok"   # the sender's retry
     assert holders(db) == f"22:{NEW_USER}"
+    # the replaced member's money stays this account's: one former row, written in the same transaction
+    assert db.one(f"""select string_agg(concat_ws(':', external_id, user_id, organization_id, invite_id), ',')
+                      from public.former_customer_identities""") == f"11:{OLD_USER}:{ORG}:{invite}"
+    assert db.one("select has_table_privilege('service_role', 'public.former_customer_identities', 'insert')") == "f"
+    assert db.one("select has_table_privilege('service_role', 'public.former_customer_identities', 'select')") == "t"
 
 
 def test_an_ordinary_invite_on_an_account_with_a_member_is_still_refused(db):
@@ -163,6 +168,10 @@ def test_a_transfer_redeem_racing_the_payment_path_leaves_one_identity(db):
 
 
 def test_down_restores_0180_and_up_again(db):
+    # a completed transfer's former rows route money: down refuses while they exist
+    refused = db.psql((MIGRATIONS / DOWN).read_text(encoding="utf-8"), check=False)
+    assert refused.returncode != 0 and "rolled forward, not down" in refused.stderr
+    db.psql("delete from public.former_customer_identities")
     db.migration(DOWN)
     assert db.shape() == db.before
     db.migration(UP)

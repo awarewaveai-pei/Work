@@ -12,7 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { findAuthUserByEmail, inviteClientAccount, verifiedClientAccount } from "@/lib/accounts/client-invite";
 import { servedNextAdminProducts } from "@/lib/portal/doors";
 import { AWARE_WAVE_KEY_ID, siteIdentityProvider, type SellerSite } from "@/lib/payments/sites";
-import { findBillingAccount, findMemberInviteByCode, inviteTarget, isInviteCode, linkIdentity, memberInviteTransferOf, redeemMemberInviteAtomic, type Identity } from "./identities";
+import { findBillingAccount, findFormerAccount, findMemberInviteByCode, inviteTarget, isInviteCode, linkIdentity, memberInviteTransferOf, redeemMemberInviteAtomic, type Identity } from "./identities";
 import { isCustomerRoot } from "./subject";
 
 /** emailVerified: WordPress (the wp-bridge plugin) proved this member owns the address. WooCommerce does not, so the
@@ -137,6 +137,8 @@ export async function adoptableClient(db: SupabaseClient, owner: EmailOwner): Pr
 
 export interface WpCustomerDeps {
   find: typeof findBillingAccount;
+  /** 0182: the account a transfer replaced this member on -- the payment path only, after `find` misses */
+  former: typeof findFormerAccount;
   link: typeof linkIdentity;
   existingOrganization: typeof findWpOrganization;
   organization: typeof ensureWpOrganization;
@@ -155,7 +157,7 @@ export interface MemberInviteDeps {
   transferOf?: typeof memberInviteTransferOf;
 }
 const DEFAULT_DEPS: WpCustomerDeps = {
-  find: findBillingAccount, link: linkIdentity, existingOrganization: findWpOrganization, organization: ensureWpOrganization,
+  find: findBillingAccount, former: findFormerAccount, link: linkIdentity, existingOrganization: findWpOrganization, organization: ensureWpOrganization,
   emailOwner, adoptable: adoptableClient, invite: inviteClientAccount, verified: verifiedClientAccount, productKey: inviteProductKey,
 };
 const DEFAULT_INVITE_DEPS: MemberInviteDeps = { memberInvite: findMemberInviteByCode, inviteTarget, redeem: redeemMemberInviteAtomic, transferOf: memberInviteTransferOf };
@@ -179,6 +181,10 @@ export async function ensureWpCustomer(db: SupabaseClient, member: WpMember, pla
   if (member.inviteCode !== undefined) return redeemMemberInvite(db, member, identity, deps, inviteDeps);
   const known = await deps.find(db, identity);
   if (known) return { organizationId: known.organizationId, created: false };
+  // A member a transfer replaced (0182): what they paid, refunded or cancelled stays the account they managed -- no new
+  // account, no identity written (they no longer sign in there).
+  const former = await deps.former(db, identity);
+  if (former) return { organizationId: former.organizationId, created: false };
   if (!create) throw new WpCustomerRefused("unknown_member");
   if (member.emailVerified !== true) throw new WpCustomerRefused("email_unverified");
   const trusted = member.site.keyId === AWARE_WAVE_KEY_ID;

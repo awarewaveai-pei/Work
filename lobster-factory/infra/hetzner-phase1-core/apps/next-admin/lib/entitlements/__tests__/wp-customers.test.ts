@@ -127,6 +127,7 @@ describe("a member who signed up through a staff invite (ADR 021 D4, 0180)", () 
     const linked: unknown[] = [];
     const d: WpCustomerDeps = {
       find: vi.fn(async () => null),
+      former: vi.fn(async () => null),
       link: vi.fn(async (_db, input) => { linked.push(input); return { organizationId: input.organizationId, userId: input.userId, created: true }; }),
       existingOrganization: vi.fn(async () => null),
       organization: vi.fn(async () => ({ id: "org-new", name: "new" })),

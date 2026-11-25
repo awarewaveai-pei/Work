@@ -2,8 +2,9 @@
 -- account holding its customer_identities row (0124, insert-only for the app). Staff on the client hub issue a transfer
 -- = a 0180 member invite that names the identity it replaces; nothing changes until the new person proves the invited
 -- email on aware-wave.com and its signed event brings the code back (member_invite_redeem). Then, in one transaction
--- under the account's 0180 lock: the old identity row is deleted, an ops_audit_events row records who started it, why,
--- and both identities, and the new row is written. Before that the old manager stays the manager.
+-- under the account's 0180 lock: the old identity row moves to former_customer_identities (its money stays the
+-- account's), an ops_audit_events row records who started it, why, and both identities, and the new row is written.
+-- Before that the old manager stays the manager.
 -- Invariant made a database rule here: one account, at most one member link (every write path already keeps it --
 -- wp-customers.ts: a site-made account is per member slug, adoptableClient and 0180 refuse an account already held --
 -- but the payment path checked and inserted without 0180's lock; the unique index closes every path, a race is a
@@ -33,6 +34,31 @@ alter table public.member_invites
   add column transfer_actor_role text check (transfer_actor_role is null or transfer_actor_role in ('owner','admin')),
   add constraint member_invites_transfer_whole check (
     (transfer_of is null) = (transfer_reason is null) and (transfer_of is null) = (transfer_actor_role is null));
+
+-- Who held an account's member link before a transfer. Money a member moved while managing the account (a payment still
+-- in the plugin's queue, a later refund or cancel of it) stays the account's: the payment path (wp-customers.ts
+-- ensureWpCustomer, its findFormerAccount) reads this when the member has no current identity. Sign-in and visibility
+-- never read it (the replaced manager is out). Written only by member_invite_redeem below; a member replaced twice has
+-- two rows, the latest wins. Rows are never deleted: the money history needs them.
+create table public.former_customer_identities (
+  id uuid primary key default gen_random_uuid(),
+  identity_id uuid not null,   -- the deleted customer_identities row (no foreign key: it is gone)
+  provider text not null,
+  site_id uuid not null references public.seller_sites(id) on delete restrict,
+  external_id text not null check (length(external_id) between 1 and 100),
+  user_id uuid not null,
+  organization_id uuid not null references public.organizations(id) on delete restrict,
+  linked_at timestamptz not null,
+  replaced_at timestamptz not null default now(),
+  invite_id uuid not null references public.member_invites(id) on delete restrict
+);
+create index former_customer_identities_member_idx on public.former_customer_identities(site_id, external_id, replaced_at desc);
+alter table public.former_customer_identities enable row level security;
+revoke all on table public.former_customer_identities from public, anon, authenticated;
+revoke all on table public.former_customer_identities from service_role;
+grant select on table public.former_customer_identities to service_role;
+create policy former_customer_identities_service_role on public.former_customer_identities
+  for select to service_role using (true);
 
 create or replace function public.member_invites_account_check() returns trigger
 language plpgsql security invoker set search_path = public, pg_temp as $$
@@ -125,6 +151,10 @@ begin
     if not found or v_old.id <> inv.transfer_of then return 'transfer_stale'; end if;
     begin
       delete from public.customer_identities where id = v_old.id;
+      insert into public.former_customer_identities(identity_id, provider, site_id, external_id, user_id, organization_id,
+                                                    linked_at, invite_id)
+        values (v_old.id, v_old.provider, v_old.site_id, v_old.external_id, v_old.user_id, v_old.organization_id,
+                v_old.created_at, inv.id);
       insert into public.customer_identities(provider, site_id, external_id, user_id, organization_id)
         values (p_provider, p_site_id, p_external_id, p_user_id, v_org) returning * into v_new;
       insert into public.ops_audit_events(organization_id, actor_role, event_type, target_type, target_id, trace_id, payload)
