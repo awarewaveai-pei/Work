@@ -31,7 +31,7 @@ const empty = (n) => Array.from({ length: n }, () => []);
     assert.equal(perFrame[69].length, 1);
     assert.equal(perFrame[20].length, 0);
     assert.equal(perFrame[70].length, 0);
-    assert.deepEqual(stats, { faces: 1, coveredFrames: 49, totalFrames: 100 });
+    assert.deepEqual(stats, { faces: 1, peak: 1, coveredFrames: 49, totalFrames: 100 });
   }
   // I2 expansion: every side grows by >= 25% of the face, and the drawn ellipse still covers the whole face box.
   {

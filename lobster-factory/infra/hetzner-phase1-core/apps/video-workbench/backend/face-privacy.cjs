@@ -17,13 +17,14 @@ const FPS = 30,
   EXPAND = 0.25, // each side grows by 25% of the face box (I2)
   EXTEND_SECONDS = 0.3,
   GAP_SECONDS = 1, // a face missing for up to 1 s stays the same track; the gap is interpolated (I2)
-  MASK_SCALE = 4;
+  MASK_SCALE = 4,
+  TIMEOUT_MS = 30 * 60_000; // job limit (backend/api.cjs jobTimeoutMs): ~1x video length measured in a container, slower hosts need room
 // Strength = effect size relative to the face width (the 90th-percentile covered box, so large faces get enough).
 const STRENGTH = {
   馬賽克: { 低: 1 / 10, 中: 1 / 7, 高: 1 / 4 }, // pixelize block = width x ratio
   模糊: { 低: 0.05, 中: 0.08, 高: 0.12 }, // gblur sigma = width x ratio
 };
-const NOTE = (faces) => `偵測到 ${faces} 張臉；側臉、遮擋、太小的臉可能漏掉，發布前請逐段檢查`;
+const NOTE = (peak) => `已遮蓋人臉，同時最多 ${peak} 張；側臉、遮擋、太小的臉可能漏掉，發布前請逐段檢查`;
 
 // ---- pure functions (tests/privacy.cjs) ----
 function iou(a, b) {
@@ -106,7 +107,7 @@ function expandBox(box, width, height, ratio = EXPAND) {
     bottom = Math.min(height, box.y + box.h * (1 + ratio));
   return { x, y, w: right - x, h: bottom - y };
 }
-// Per-frame covered boxes + the I7 stats. Zero faces anywhere = the job fails (I3): an untouched video is never
+// Per-frame covered boxes + stats: faces = tracks (one face may split into several), peak = most boxes in one frame (shown). Zero faces anywhere = the job fails (I3): an untouched video is never
 // delivered as a protected one.
 function planMasks(frames, { fps = FPS, width, height }) {
   const totalFrames = frames.length,
@@ -122,7 +123,7 @@ function planMasks(frames, { fps = FPS, width, height }) {
     for (let f = last.frame + 1; f <= Math.min(totalFrames - 1, last.frame + extend); f++) filled.push({ frame: f, box: last.box });
     for (const { frame, box } of filled) perFrame[frame].push(expandBox(box, width, height));
   }
-  return { perFrame, stats: { faces: tracks.length, coveredFrames: perFrame.filter((b) => b.length).length, totalFrames } };
+  return { perFrame, stats: { faces: tracks.length, peak: Math.max(...perFrame.map((b) => b.length)), coveredFrames: perFrame.filter((b) => b.length).length, totalFrames } };
 }
 // I4: one mask per video frame, or the result is refused.
 function verifyCounts(masks, frames) {
@@ -306,10 +307,10 @@ async function privacy(input, { file, output, signal }) {
     verifyCounts(written, encoded);
     const ms = times.reduce((a, b) => a + b, 0);
     console.log(`[vw] privacy ${stats.totalFrames} frames, ${stats.faces} faces, detect avg ${(ms / times.length).toFixed(1)} ms/frame, total ${((Date.now() - started) / 1000).toFixed(1)} s`);
-    return { type: "video", url: result.url, width, height, note: NOTE(stats.faces), privacy: stats };
+    return { type: "video", url: result.url, width, height, note: NOTE(stats.peak), privacy: stats };
   } catch (error) {
     fs.rmSync(result.file, { force: true }); // a refused or cancelled run leaves no file behind (I3, I6)
     throw error;
   }
 }
-module.exports = { privacy, iou, buildTracks, fillTrack, expandBox, planMasks, verifyCounts, drawMask, decode, detectFaces, MODEL, LIMIT_SECONDS, NOTE };
+module.exports = { privacy, iou, buildTracks, fillTrack, expandBox, planMasks, verifyCounts, drawMask, decode, detectFaces, MODEL, LIMIT_SECONDS, TIMEOUT_MS, NOTE };

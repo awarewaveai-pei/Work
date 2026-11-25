@@ -114,7 +114,7 @@ function toolWorkflowScreen(t) {
     wfDefaults({ privacyType: "馬賽克", privacyStrength: "中" });
     content =
       wfSource() +
-      `<aside class="side"><h3>保護設定</h3><label>保護方式</label>${wfChoice("privacyType", ["馬賽克", "模糊"])}<label>強度</label>${wfChoice("privacyStrength", ["低", "中", "高"])}<p class="note">在主機本機偵測人臉，畫面不送到外部服務；影片最長 5 分鐘，原片不會被修改，成品存成新素材。完成後會寫出偵測到幾張臉；側臉、遮擋、太小的臉可能漏掉，發布前請逐段檢查。</p>${wfStats()}${btn("開始保護", "submit", "primary")}</aside>`;
+      `<aside class="side"><h3>保護設定</h3><label>保護方式</label>${wfChoice("privacyType", ["馬賽克", "模糊"])}<label>強度</label>${wfChoice("privacyStrength", ["低", "中", "高"])}<p class="note">在主機本機偵測人臉，畫面不送到外部服務；影片最長 5 分鐘，原片不會被修改，成品存成新素材。完成後會寫出同時最多遮蓋幾張臉；側臉、遮擋、太小的臉可能漏掉，發布前請逐段檢查。</p>${wfStats()}${btn("開始保護", "submit", "primary")}</aside>`;
   } else if (t.id === "depth") {
     wfDefaults({ depthStart: 0, depthPreview: false });
     content =
