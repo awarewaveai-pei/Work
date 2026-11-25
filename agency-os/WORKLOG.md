@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-25（續7）— oracle WP：算命站 zh-TW 頁面、選單、首頁、外掛 page_map（wp-cli 建）
+
+- [根因] GO-2 後站上沒有頁面；操作者要監工建頁面、放工具。`/wp-login.php` Cloudflare challenge 擋自動化 → 走主機 wp-cli。
+- [步驟] `build-pages.sh`（依 path 查頁，存在就沿用）：`/tools/`＋十二工具子頁（內容＝一行說明＋`[aw_oracle tool="<slug>"]`；說明取自引擎現有 meta description）、`home`（設 `page_on_front`）、`/my-charts/`（`[aw_oracle_my_charts]`、`[aw_oracle_persons]`）、`/daily-letter/`（`[aw_oracle_daily]`）；`aworacle_settings.page_map`；選單「主選單」掛 `primary`、`mobile`；範例文章／頁面進回收桶。
+- [驗證] 16 頁 publish（id 5–20，子頁 parent=5）；`apply_filters('the_content')`：`tools/ziwei` iframe `src=/embed/zh-TW/ziwei`、permalink `https://oracle.aware-wave.com/tools/ziwei/`；`Renderer::locale()=zh-TW`；`page_map=12`；`wp menu list` locations `primary,mobile`；`my-charts` 輸出「登入以儲存」。`/embed/zh-TW/ziwei` 200（GO-1 已驗）。
+- [踩坑] `wp eval '<code>' <arg>` 不收額外參數（`Too many positional arguments`）→ 第一次跑頁面建了、查頁失敗；改用 `docker exec -e A0=`＋`getenv`。`wp menu list --fields=name` 無此欄位；`wp menu location assign` 用中文名稱不成功，改用 term id。皆未造成重複頁（重跑全部 `kept`）。
+- [未做] 未在瀏覽器看實際畫面；`daily-letter` 表單不輸出（`mailer=none`）；`dataKeyStatus=missing`、`users_can_register=0`、Turnstile／webhook secret 空；英文頁。
+- [rollback] `wp post delete 5..20`（進回收桶）、`wp menu delete 2`、`wp option update show_on_front posts`、`wp option patch delete aworacle_settings page_map`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=build-pages.sh（wp post create／menu／option）；wp eval the_content 輸出 | exit=0 | ms=180000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/1n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（站台內容與文件）
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-25（續6）— 「自動啟動 Claude」主機上線：.env＋compose、實際觸發成功、該列打開
 
 - [步驟] ① 主機 `.env` 備份 `.env.bak-cuw-20261125051611` 後追加 `CLAUDE_USAGE_WINDOW_FIRE_URL／_TOKEN`（值經管道，不進對話）。② `safe-infra-patch.sh compose … next-admin`：`SCHEDULE_INGEST_TOKEN` 後加兩行 `${VAR:-}`，healthy 15s，backup `docker-compose.yml.bak.safe-patch-20261125-051631`。③ 容器內 node fetch fire 端點 → `200 routine_fire cse_01XLtHX1DbWjgvurk7R9JxiP`；RemoteTrigger list_runs 見 05:17:36Z run、5 秒結束。④ 正式庫 insert `client_schedules`（awarewave-ops、claude_usage_window、enabled、weekdays、`{NULL,8,8,8,8,8,7}`）。⑤ 金鑰也寫入 `AWARE_WAVE_CREDENTIALS.md` 8.6（操作者要求）。
