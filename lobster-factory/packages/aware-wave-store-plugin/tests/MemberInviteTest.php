@@ -6,12 +6,32 @@
 
 namespace AwareWave\Store\Tests;
 
+use AwareWave\Store\HttpClient;
 use AwareWave\Store\MemberInvite;
 use AwareWave\Store\Settings;
 use AwareWave\Store\Signature;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/BillingFakes.php';
+
+/** Answers each member_invite by the code it carries; records the codes in send order. */
+final class ScriptedHttp implements HttpClient {
+	/** @var array<string,array{0:int|null,1:string}> */
+	private $by;
+	/** @var list<string> */
+	public $sent = array();
+
+	public function __construct( array $by ) {
+		$this->by = $by;
+	}
+
+	public function post( string $url, array $headers, string $body, int $timeout = 15 ): array {
+		$code         = (string) ( json_decode( $body, true )['invite_code'] ?? '' );
+		$this->sent[] = $code;
+		$ans          = $this->by[ $code ] ?? array( null, '' );
+		return array( 'status' => $ans[0], 'body' => $ans[1], 'error' => $ans[0] === null ? 'timeout' : '' );
+	}
+}
 
 final class MemberInviteTest extends TestCase {
 
@@ -27,10 +47,16 @@ final class MemberInviteTest extends TestCase {
 		return str_repeat( 'Ab-_', 10 ) . 'xyz';
 	}
 
+	/** @return list<string> the held codes, oldest first */
+	private function held(): array {
+		$list = $this->store[ self::UID ][ MemberInvite::META_CODE ] ?? array();
+		return array_map( function ( $h ) { return $h['code']; }, is_array( $list ) ? $list : array() );
+	}
+
 	/** @var int */
 	private $now = 1700000000;
 
-	private function invite( FakeHttp $http ): MemberInvite {
+	private function invite( HttpClient $http ): MemberInvite {
 		$this->members = $this->members ?? new FakeMembers();
 		return new MemberInvite(
 			new Settings( true, 'https://app.aware-wave.com', self::SECRET, self::SECRET ),
@@ -70,7 +96,7 @@ final class MemberInviteTest extends TestCase {
 		$invite->hold( self::UID, $this->code() );
 		$this->assertNull( $invite->process( self::UID ) );
 		$this->assertSame( array(), $http->requests, 'no event before the email is verified' );
-		$this->assertSame( $this->code(), $this->store[ self::UID ][ MemberInvite::META_CODE ], 'the code waits for the verify click' );
+		$this->assertSame( array( $this->code() ), $this->held(), 'the code waits for the verify click' );
 		$html = MemberInvite::html( $invite->current( self::UID ), $this->ctx() );
 		$this->assertStringContainsString( '確認後會自動連上', $html );
 		$this->assertStringContainsString( '重寄確認信', $html );
@@ -95,7 +121,7 @@ final class MemberInviteTest extends TestCase {
 		);
 		$this->assertSame( Signature::sign( $req['body'], self::SECRET ), $req['headers'][ Signature::PAYMENT_HEADER ], 'the payment events\' signature over the exact bytes' );
 		$this->assertSame( array( 'view' => MemberInvite::LINKED, 'code' => '', 'unit' => 'Soulful <b>' ), $out );
-		$this->assertArrayNotHasKey( MemberInvite::META_CODE, $this->store[ self::UID ], 'the plain code is not kept after a success' );
+		$this->assertSame( array(), $this->held(), 'the plain code is not kept after a success' );
 
 		$html = MemberInvite::html( $invite->current( self::UID ), $this->ctx() );
 		$this->assertStringContainsString( '已連上〈Soulful &lt;b&gt;〉', $html );
@@ -118,7 +144,7 @@ final class MemberInviteTest extends TestCase {
 		$invite = $this->invite( new FakeHttp( 409, '{"ok":false,"error":"' . $code . '"}' ) );
 		$invite->hold( self::UID, $this->code() );
 		$this->assertSame( array( 'view' => MemberInvite::REFUSED, 'code' => $code, 'unit' => '' ), $invite->process( self::UID ) );
-		$this->assertArrayNotHasKey( MemberInvite::META_CODE, $this->store[ self::UID ] );
+		$this->assertSame( array(), $this->held() );
 		$html = MemberInvite::html( $invite->current( self::UID ), $this->ctx() );
 		$this->assertStringContainsString( htmlspecialchars( $why, ENT_QUOTES, 'UTF-8' ), $html );
 		$this->assertStringContainsString( htmlspecialchars( MemberInvite::REFUSALS[ $code ][1], ENT_QUOTES, 'UTF-8' ), $html );
@@ -135,19 +161,51 @@ final class MemberInviteTest extends TestCase {
 			$invite      = $this->invite( new FakeHttp( $status, '{"ok":false,"error":"member_event_not_recorded"}' ) );
 			$invite->hold( self::UID, $this->code() );
 			$this->assertSame( MemberInvite::RETRY_VIEW, $invite->process( self::UID )['view'] );
-			$this->assertSame( $this->code(), $this->store[ self::UID ][ MemberInvite::META_CODE ], 'kept for 再試一次' );
+			$this->assertSame( array( $this->code() ), $this->held(), 'kept for 再試一次' );
 			$html = MemberInvite::html( $invite->current( self::UID ), $this->ctx() );
 			$this->assertStringContainsString( '暫時連不上', $html );
 			$this->assertStringContainsString( 'value="' . MemberInvite::RETRY . '"', $html );
 		}
 	}
 
-	public function test_a_held_code_is_not_replaced_by_another_link(): void {
+	public function test_after_void_and_reissue_the_new_link_is_sent_and_everything_is_cleared(): void {
+		$a = str_repeat( 'A', 43 );
+		$b = str_repeat( 'B', 43 );
+		$this->member( false );
+		$http   = new ScriptedHttp( array( $a => array( 409, '{"ok":false,"error":"invite_invalid"}' ), $b => array( 200, '{"ok":true,"organization":{"name":"Soulful"}}' ) ) );
+		$invite = $this->invite( $http );
+		$invite->hold( self::UID, $a );   // staff then voids A and reissues B
+		$this->now += 60;
+		$invite->hold( self::UID, $b );
+		$this->member( true );
+		$invite = $this->invite( $http );
+		$this->assertSame( MemberInvite::LINKED, $invite->process( self::UID )['view'] );
+		$this->assertSame( array( $b ), $http->sent, 'the newest link goes first; the void A is never needed' );
+		$this->assertSame( array(), $this->held() );
+	}
+
+	public function test_when_the_newest_is_refused_the_next_valid_one_is_sent(): void {
+		$a = str_repeat( 'A', 43 );
+		$b = str_repeat( 'B', 43 );
+		$this->member( true );
+		$http   = new ScriptedHttp( array( $b => array( 409, '{"ok":false,"error":"invite_invalid"}' ), $a => array( 200, '{"ok":true,"organization":{"name":"Soulful"}}' ) ) );
+		$invite = $this->invite( $http );
+		$invite->hold( self::UID, $a );
+		$invite->hold( self::UID, $b );
+		$this->assertSame( array( 'view' => MemberInvite::LINKED, 'code' => '', 'unit' => 'Soulful' ), $invite->process( self::UID ) );
+		$this->assertSame( array( $b, $a ), $http->sent );
+		$this->assertSame( array(), $this->held() );
+	}
+
+	public function test_a_fourth_link_pushes_out_the_oldest(): void {
 		$this->member( false );
 		$invite = $this->invite( new FakeHttp( 200, '{"ok":true}' ) );
-		$this->assertTrue( $invite->hold( self::UID, $this->code() ) );
-		$this->assertFalse( $invite->hold( self::UID, str_repeat( 'Z', 43 ) ), 'a second GET link must not swap out the waiting code' );
-		$this->assertSame( $this->code(), $this->store[ self::UID ][ MemberInvite::META_CODE ] );
+		foreach ( array( 'A', 'B', 'C', 'D' ) as $c ) {
+			$this->now += 1;
+			$this->assertTrue( $invite->hold( self::UID, str_repeat( $c, 43 ) ) );
+		}
+		$this->assertSame( array( str_repeat( 'B', 43 ), str_repeat( 'C', 43 ), str_repeat( 'D', 43 ) ), $this->held() );
+		$this->assertFalse( $invite->hold( self::UID, str_repeat( 'D', 43 ) ), 'the same link twice is held once' );
 	}
 
 	public function test_a_code_held_past_the_invite_days_is_dropped_and_never_sent(): void {

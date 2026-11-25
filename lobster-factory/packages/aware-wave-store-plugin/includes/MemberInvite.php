@@ -7,7 +7,8 @@
  * One signed event, POST <target>/api/webhooks/awarewave-wp-member {kind:"member_invite", wp_user_id, email,
  * email_verified, invite_code}, same signature and site header as the payment events (Settings::paymentHeaders); the app
  * links the member to the invited account (next-admin lib/entitlements/wp-customers.ts redeemMemberInvite) and answers.
- * The plain code lives in user meta only until a success or a final refusal; a retryable answer keeps it for 「再試一次」.
+ * The plain codes (every invite link opened, at most 3, 14 days each) live in user meta only until a success or a
+ * final refusal; sent newest first; a retryable answer keeps them for 「再試一次」.
  * My Account's dashboard is the result page (one-shot for a success or refusal). A member without a code sees nothing new.
  *
  * @package AwareWave\Store
@@ -19,8 +20,9 @@ final class MemberInvite {
 
 	const QUERY       = 'aw_invite';
 	const COOKIE      = 'aw_member_invite';
+	/** list<array{code:string,at:int}>, oldest first: every invite link the member opened, at most MAX_HELD. */
 	const META_CODE   = 'aware_wave_member_invite_code';
-	const META_CODE_AT = 'aware_wave_member_invite_code_at';
+	const MAX_HELD    = 3;
 	/** = next-admin lib/entitlements/identities.ts MEMBER_INVITE_DAYS (14): a code held longer is past its invite anyway,
 	 *  so the plain code is dropped instead of kept forever (a member who never verifies). Change both together. */
 	const CODE_TTL    = 14 * 86400;
@@ -176,34 +178,55 @@ final class MemberInvite {
 		return call_user_func( $this->meta['get'], $uid, $key );
 	}
 
-	private function drop( int $uid ): void {
-		call_user_func( $this->meta['delete'], $uid, self::META_CODE );
-		call_user_func( $this->meta['delete'], $uid, self::META_CODE_AT );
+	/** @param list<array{code:string,at:int}> $held */
+	private function save( int $uid, array $held ): void {
+		if ( $held === array() ) {
+			call_user_func( $this->meta['delete'], $uid, self::META_CODE );
+		} else {
+			call_user_func( $this->meta['set'], $uid, self::META_CODE, array_values( $held ) );
+		}
 	}
 
-	/** The held code, or '' -- a code older than CODE_TTL (or with no stored time) is deleted here, never sent. */
-	private function heldCode( int $uid ): string {
-		$code = (string) $this->get( $uid, self::META_CODE );
-		if ( $code === '' ) {
-			return '';
+	/** The held codes, oldest first. One older than CODE_TTL (or malformed, or with no time) is deleted here, never sent. */
+	private function held( int $uid ): array {
+		$stored = $this->get( $uid, self::META_CODE );
+		if ( ! is_array( $stored ) || $stored === array() ) {
+			if ( $stored !== '' && $stored !== null ) {
+				$this->save( $uid, array() );
+			}
+			return array();
 		}
-		$at = (int) $this->get( $uid, self::META_CODE_AT );
-		if ( ! self::isCode( $code ) || $at < 1 || (int) call_user_func( $this->clock ) - $at > self::CODE_TTL ) {
-			$this->drop( $uid );
-			return '';
+		$now  = (int) call_user_func( $this->clock );
+		$live = array();
+		foreach ( $stored as $h ) {
+			$at = is_array( $h ) ? (int) ( $h['at'] ?? 0 ) : 0;
+			if ( is_array( $h ) && is_string( $h['code'] ?? null ) && self::isCode( $h['code'] ) && $at > 0 && $now - $at <= self::CODE_TTL ) {
+				$live[] = array( 'code' => $h['code'], 'at' => $at );
+			}
 		}
-		return $code;
+		if ( count( $live ) !== count( $stored ) ) {
+			$this->save( $uid, $live );
+		}
+		return $live;
 	}
 
-	/** A code for this member (from the link or the cookie). A code already held is never replaced: opening a link is a
-	 *  bare GET, so a forged one must not swap out a real code waiting for the verify click (critic 2026-11-24 m). The held
-	 *  one is sent and answered first (success or refusal drops it); a newer link works after that. */
+	/**
+	 * A code for this member (from the link or the cookie). Added to the list, never replacing another: a link is a bare
+	 * GET, so a forged one must not push out a real code (critic 2026-11-24 m), and staff void-and-reissue (A then B) must
+	 * leave B sendable (Codex 2026-11-25). Past MAX_HELD the oldest is dropped.
+	 */
 	public function hold( int $uid, string $code ): bool {
-		if ( $uid < 1 || ! self::isCode( $code ) || $this->heldCode( $uid ) !== '' ) {
+		if ( $uid < 1 || ! self::isCode( $code ) ) {
 			return false;
 		}
-		call_user_func( $this->meta['set'], $uid, self::META_CODE, $code );
-		call_user_func( $this->meta['set'], $uid, self::META_CODE_AT, (int) call_user_func( $this->clock ) );
+		$held = $this->held( $uid );
+		foreach ( $held as $h ) {
+			if ( hash_equals( $h['code'], $code ) ) {
+				return false;
+			}
+		}
+		$held[] = array( 'code' => $code, 'at' => (int) call_user_func( $this->clock ) );
+		$this->save( $uid, array_slice( $held, -self::MAX_HELD ) );
 		call_user_func( $this->meta['delete'], $uid, self::META_RESULT );
 		return true;
 	}
@@ -218,31 +241,45 @@ final class MemberInvite {
 	}
 
 	/**
-	 * Sends the held code if the member's current email is verified. null = nothing sent (no code, no member, or not
-	 * verified yet: the verify click sends it). The answer is stored for the dashboard.
+	 * Sends the held codes, newest first, if the member's current email is verified. A success clears them all; a final
+	 * refusal drops that code and tries the next; a retryable answer stops and keeps the rest. When all are refused the
+	 * page shows the newest one's reason (the link the member just opened). null = nothing sent (no code, no member, or
+	 * not verified yet: the verify click sends them). The answer is stored for the dashboard.
 	 *
 	 * @return array{view:string,code:string,unit:string}|null
 	 */
 	public function process( int $uid ): ?array {
-		$code = $this->heldCode( $uid );
-		if ( $code === '' ) {
+		$held = $this->held( $uid );
+		if ( $held === array() ) {
 			return null;
 		}
 		$m = $this->member( $uid );
 		if ( $m === null || ! $m['verified'] ) {
 			return null;
 		}
-		$raw = (string) json_encode( self::body( $uid, $m['email'], $code ), JSON_UNESCAPED_SLASHES );
-		$res = $this->settings->paymentsReady()
-			? $this->http->post( $this->settings->target . self::PATH, $this->settings->paymentHeaders( $raw ), $raw, self::TIMEOUT )
-			: array( 'status' => null, 'body' => '', 'error' => 'not_configured' );
-		$out = self::outcome( $res );
-		if ( $out['view'] !== self::RETRY_VIEW ) {
-			$this->drop( $uid );   // used up: never kept past the answer
+		$first = null;
+		while ( $held !== array() ) {
+			$code = $held[ count( $held ) - 1 ]['code'];
+			$raw  = (string) json_encode( self::body( $uid, $m['email'], $code ), JSON_UNESCAPED_SLASHES );
+			$res  = $this->settings->paymentsReady()
+				? $this->http->post( $this->settings->target . self::PATH, $this->settings->paymentHeaders( $raw ), $raw, self::TIMEOUT )
+				: array( 'status' => null, 'body' => '', 'error' => 'not_configured' );
+			$out  = self::outcome( $res );
+			if ( $out['view'] === self::LINKED ) {
+				$held = array();   // linked: the other codes are for the same member and no longer needed
+				if ( $this->cache !== null ) {
+					$this->cache->forget( $uid );   // My Account's summary now has a unit
+				}
+				break;
+			}
+			if ( $out['view'] === self::RETRY_VIEW ) {
+				break;   // kept, this one and the older ones, for 再試一次
+			}
+			array_pop( $held );   // a final refusal: used up, never kept past the answer
+			$first = $first ?? $out;
+			$out   = $first;
 		}
-		if ( $out['view'] === self::LINKED && $this->cache !== null ) {
-			$this->cache->forget( $uid );   // My Account's summary now has a unit
-		}
+		$this->save( $uid, $held );
 		call_user_func( $this->meta['set'], $uid, self::META_RESULT, $out );
 		return $out;
 	}
@@ -252,7 +289,7 @@ final class MemberInvite {
 		$result = $this->get( $uid, self::META_RESULT );
 		$result = is_array( $result ) ? $result : null;
 		$m      = $this->member( $uid );
-		$state  = self::state( $result, $this->heldCode( $uid ) !== '', $m !== null && $m['verified'] );
+		$state  = self::state( $result, $this->held( $uid ) !== array(), $m !== null && $m['verified'] );
 		if ( $state !== null && in_array( $state['view'], array( self::LINKED, self::REFUSED ), true ) ) {
 			call_user_func( $this->meta['delete'], $uid, self::META_RESULT );
 		}
