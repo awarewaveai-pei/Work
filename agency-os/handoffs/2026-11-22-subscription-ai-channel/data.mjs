@@ -93,6 +93,8 @@ export const STEPS = [
     gate: '全套測試通過；部署後下一篇自動文章：圖裡的人不是清一色同一種臉，臉書和 IG 的草稿有封面圖。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K26'], card: 'briefs/K27-global-people-and-social-cover.md' },
   { n: 29, code: 'K28', group: 'B5', title: '完整的實測比較頁放進「AI 模型與成本」', plain: '你 11-25 指出：實測紀錄那一頁只有文字表格，沒有把文章和圖片的測試頁面完整放上。原因是監工只寫了摘要列，完整頁面只發布成外面的私人連結。改成：在實測紀錄那一頁直接看得到完整比較頁，包含文章盲測的全文、文章配圖的並排圖、八種文案。每組另有一個「另開完整頁面」的按鈕。只有登入的員工看得到。',
     gate: '全套測試通過；部署後在實測紀錄那一頁看得到三份完整比較頁。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K26'], card: 'briefs/K28-bakeoff-pages-in-app.md' },
+  { n: 30, code: 'K29', group: 'B3d', title: '文章封面按頻道出不同尺寸', plain: '你 11-25 決定要做。網站的封面維持橫的。臉書、IG、Bluesky 的貼文改附直式的封面，在手機上佔的畫面比較大。同一個版型換尺寸，不重畫排法。直式的底圖另外畫一張，每篇多約 NT$0.1；網站沒有連這些頻道就不畫、不多花錢。尺寸對照表只寫在一個地方，以後加頻道只要加一列。IG 和臉書有依據；Bluesky 查不到官方說法，先用直式，上線後看第一則實際的貼文，被裁就改。等 K27 併入後才派。',
+    gate: '全套測試通過；部署後下一篇自動文章：臉書和 IG 的草稿是直式封面，網站的精選圖片還是橫的。', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['K27'], card: 'briefs/K29-cover-size-per-channel.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];

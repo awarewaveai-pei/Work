@@ -81,11 +81,11 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
 <aside><div class="in">
   <h1>AI 訂閱通道 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-11-22</span></p>
-  <div class="bar" data-computed><i class="d" style="width:82.75862068965517%"></i><i class="g" style="width:10.344827586206897%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>24</span>／<span data-computed>29</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你做的事</span><small><span data-computed>4</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:80%"></i><i class="g" style="width:10%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>批次與卡</span><small><span data-computed>24</span>／<span data-computed>30</span> 已併入</small></a><a href="#safe"><span>不會弄壞現有的東西</span><small></small></a><a href="#open"><span>到時要你做的事</span><small><span data-computed>4</span> 項</small></a><a href="#risks"><span>風險與處置</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
-<p class="sub">讓寫字和畫圖都能選「走 API 付費」或「走訂閱額度」。本人按的功能由筆電執行；自動排程由主機上的常駐程式執行。每個網站各自選四種走法之一：Claude 訂閱→Codex 訂閱→API、Claude 訂閱→API、Codex 訂閱→API、只用 API。前一段不能用就自動換下一段。共 <span data-computed>29</span> 張卡。</p>
+<p class="sub">讓寫字和畫圖都能選「走 API 付費」或「走訂閱額度」。本人按的功能由筆電執行；自動排程由主機上的常駐程式執行。每個網站各自選四種走法之一：Claude 訂閱→Codex 訂閱→API、Claude 訂閱→API、Codex 訂閱→API、只用 API。前一段不能用就自動換下一段。共 <span data-computed>30</span> 張卡。</p>
 <section id="now"><h2>現況</h2><p class="lead">目前真的能不能用。</p><ul class="yn"><li class="yes"><b>可以</b><span>畫圖可以走訂閱（Codex 免費生圖）。<small>已上線；只限本人、筆電要開著。近 30 天只用過兩次。</small></span></li><li class="no"><b>還不行</b><span>ChatGPT 訂閱現在有額度。<small>2026-11-22 實測：本週額度用完，11-24 上午 11:02 恢復。主因是程式審查共用同一份額度。</small></span></li><li class="yes"><b>可以</b><span>Claude 訂閱可以用命令列寫字。<small>2026-11-22 筆電實測成功，一次約 12 秒；執行時不給它任何工具。</small></span></li><li class="yes"><b>可以</b><span>寫字可以選訂閱。<small>2026-11-22 已部署。正式站文章頁選「Claude 訂閱 → API」＋Haiku，筆電在 109 秒寫完一篇，成本帳本記一筆 NT$0。</small></span></li><li class="yes"><b>可以</b><span>本人按的功能可以選四種走法。<small>文章頁已上線。劇本工坊開在影片產品的入口網域，那裡不放訂閱按鈕，目前仍只走 API。</small></span></li><li class="yes"><b>可以</b><span>每個網站的排程可以各自選四種走法。<small>已上線：客戶 → 客戶網站 → 左邊選客戶 → 該網站的設定。主機的常駐程式（第四批）上線前，排程的訂閱段會自動跳過、由 API 寫。</small></span></li><li class="yes"><b>可以</b><span>內部標記不會出現在 WordPress 文章裡。<small>已上線。aware-wave.com 既有文章已手動清掉：成本紀錄六篇、審稿標記兩篇（原文備份在主機）。</small></span></li><li class="yes"><b>可以</b><span>模型選單有 GPT-6 系列與 Sonnet 5.5。<small>已上線，正式站選單看得到。十二個模型都在正式站實際寫過一篇文章，全部可用；GPT-5.5 那篇被長度上限截斷。</small></span></li><li class="yes"><b>可以</b><span>文章預設用 GPT-6.2 sol。<small>2026-11-22 盲測後你選定，當晚已部署。審稿排第二，一篇約 NT$2，原本的預設約 NT$8。結果記在「AI 模型與成本」的實測紀錄。</small></span></li><li class="no"><b>還不行</b><span>文章配圖跟文章內容有關。<small>做法已改並併入主線：每張圖一句具體的畫面描述，加上網站的風格。11-25 正式站實測：六個來源照新做法畫的二十四張，每一張都跟它那一段有關；改版前的做法畫出寺廟風景和熱氣球，跟文章無關。比較頁已給你，等你看過、選定來源才算數。</small></span></li><li class="yes"><b>可以</b><span>所有文章封面同一個版型。<small>11-25 已上線：自動產文和手動文章頁都用同一個版型，網站設定頁可以改顏色和字型。還沒在正式站看過真的封面。</small></span></li><li class="no"><b>還不行</b><span>排程不開筆電也能走訂閱。<small>第四批；需要你在主機上登入一次 ChatGPT。</small></span></li><li class="no"><b>還不行</b><span>知道一篇文章吃掉多少訂閱額度。<small>11-24 額度恢復後實測三篇才有數字；在那之前不估。</small></span></li></ul></section>
 
 <section id="steps"><h2>批次與卡</h2><p class="lead">同一批的卡同時進行，各自改不同的檔案；整批交回後一起看風險，再開下一批。</p><ol class="steps"><li class="grp">可同時進行：<a href="#K1">K1</a>、<a href="#K2">K2</a>、<a href="#K3">K3</a></li><li class="step done" id="K1">
@@ -219,7 +219,7 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
         <p><b>卡片：</b><code>briefs/K13-image-bakeoff.md</code></p>
         <p><b>併入於：</b><code>0699cd72b</code></p>
       </details>
-    </div></li><li class="grp">可同時進行：<a href="#K10">K10</a>、<a href="#K24">K24</a>、<a href="#K25">K25</a>、<a href="#K26">K26</a>、<a href="#K27">K27</a></li><li class="step done" id="K10">
+    </div></li><li class="grp">可同時進行：<a href="#K10">K10</a>、<a href="#K24">K24</a>、<a href="#K25">K25</a>、<a href="#K26">K26</a>、<a href="#K27">K27</a>、<a href="#K29">K29</a></li><li class="step done" id="K10">
     <div class="n">13</div>
     <div class="b">
       <p class="plain">之前的配圖把中文替代文字直接丟給模型，畫出跟文章無關的圖。改成你 11-24 定的做法。寫文章的 AI 為每張圖多寫一句英文畫面描述，講那一段的具體場景，可以有人物。封面另外畫一張，代表整篇主題，不再拿內文第一張充當。內文圖短文章三張、其餘四張。內文圖是 4:3；封面成品也是 4:3，它上方的圖區是寬的，所以封面底圖畫成寬的才不會被裁。風格在網站設定裡選一次，全站固定；文章頁帶入網站的設定，可以單篇修改。下拉選單改成按鈕。AI 也順便寫封面要用的短標題和副標。預設的生圖模型先不換，等你看完實測。</p>
@@ -272,6 +272,16 @@ ul.opts li.pick{color:var(--ink)} ul.opts li.pick b{color:var(--done)}
       <details><summary>細節：K27 圖裡的人有地球村的感覺；自動貼文附上文章封面</summary>
         <p><b>需先完成：</b><a href="#K26">K26</a></p>
         <p><b>卡片：</b><code>briefs/K27-global-people-and-social-cover.md</code></p>
+      </details>
+    </div></li><li class="step todo" id="K29">
+    <div class="n">30</div>
+    <div class="b">
+      <p class="plain">你 11-25 決定要做。網站的封面維持橫的。臉書、IG、Bluesky 的貼文改附直式的封面，在手機上佔的畫面比較大。同一個版型換尺寸，不重畫排法。直式的底圖另外畫一張，每篇多約 NT$0.1；網站沒有連這些頻道就不畫、不多花錢。尺寸對照表只寫在一個地方，以後加頻道只要加一列。IG 和臉書有依據；Bluesky 查不到官方說法，先用直式，上線後看第一則實際的貼文，被裁就改。等 K27 併入後才派。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">模型：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成的樣子：</b>全套測試通過；部署後下一篇自動文章：臉書和 IG 的草稿是直式封面，網站的精選圖片還是橫的。</p>
+      <details><summary>細節：K29 文章封面按頻道出不同尺寸</summary>
+        <p><b>需先完成：</b><a href="#K27">K27</a></p>
+        <p><b>卡片：</b><code>briefs/K29-cover-size-per-channel.md</code></p>
       </details>
     </div></li><li class="grp">可同時進行：<a href="#K9">K9</a>、<a href="#M1">M1</a></li><li class="step todo" id="K9">
     <div class="n">14</div>
