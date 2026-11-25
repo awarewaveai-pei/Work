@@ -4,7 +4,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockStats, blocksForSystem, isLive, usageMatrix } from "../blocks";
+import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockStats, blocksForSystem, catalogHref, isLive } from "../blocks";
 
 const APP = resolve(__dirname, "../../..");
 const REPO = resolve(APP, "../../../../..");
@@ -55,13 +55,17 @@ describe("積木目錄 shape", () => {
     expect(dead).toEqual([]);
   });
 
-  it("stats, per-system lookup and the heat map agree with the list", () => {
+  it("catalogHref leaves defaults out and opens the list filtered by system", () => {
+    expect(catalogHref()).toBe("/ops/systems/blocks");
+    expect(catalogHref({ view: "systems", tier: "block" })).toBe("/ops/systems/blocks");
+    expect(catalogHref({ view: "blocks", sys: "studio" })).toBe("/ops/systems/blocks?view=blocks&sys=studio");
+  });
+
+  it("stats and per-system lookup agree with the list", () => {
     const s = blockStats();
     const blocks = LEGO_BLOCKS.filter((b) => b.tier === "block");
     expect(s.live + s.planned + s.retired).toBe(blocks.length);
     expect(blocksForSystem("studio").every((b) => b.usedBy.includes("studio") && isLive(b))).toBe(true);
-    const studioRow = usageMatrix().get("studio") ?? {};
-    expect(Object.values(studioRow).reduce((a, n) => a + (n ?? 0), 0)).toBe(blocksForSystem("studio").length);
   });
 });
 

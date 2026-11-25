@@ -7,7 +7,7 @@ import { headers } from "next/headers";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { SystemType } from "@/lib/systems/contract";
 import { systemsAccess } from "@/lib/systems/access";
-import { BLOCK_LAYERS, blocksForSystem } from "@/lib/systems/blocks";
+import { BLOCK_LAYERS, blocksForSystem, catalogHref } from "@/lib/systems/blocks";
 import { importSummary, PRIORITIES, projectSystem, SYSTEM_STATUSES, type FeatureView, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
 import {
   EFFECTIVE_BADGE, EFFECTIVE_LABEL, EVENT_LABEL, FEATURE_BADGE, FEATURE_LABEL, formatTime, PRIORITY_LABEL, RESULT_MESSAGES, SOURCE_LABEL, STATUS_LABEL, TYPE_LABEL,
@@ -30,7 +30,7 @@ const row: React.CSSProperties = { display: "flex", flexWrap: "wrap", alignItems
 
 function UsedBlocks({ slug }: { slug: string }) {
   const used = blocksForSystem(slug);
-  if (used.length === 0) return <div style={muted}>沒有用到功能積木。<Link href="/ops/systems/blocks">看積木目錄</Link></div>;
+  if (used.length === 0) return <div style={muted}>沒有用到功能積木。<Link href={catalogHref()}>看積木目錄</Link></div>;
   return (
     <div>
       {used.map((b) => (
@@ -39,7 +39,7 @@ function UsedBlocks({ slug }: { slug: string }) {
           <span style={muted}>{BLOCK_LAYERS.find((l) => l.key === b.layer)?.name}・共 {b.usedBy.length} 個系統用</span>
         </div>
       ))}
-      <Link href={`/ops/systems/blocks?sys=${encodeURIComponent(slug)}#list`} className="btn-secondary" style={{ ...smallBtn, display: "inline-block", marginTop: 8, textDecoration: "none" }}>在積木目錄看詳細</Link>
+      <Link href={catalogHref({ view: "blocks", sys: slug })} className="btn-secondary" style={{ ...smallBtn, display: "inline-block", marginTop: 8, textDecoration: "none" }}>在積木目錄看詳細</Link>
     </div>
   );
 }

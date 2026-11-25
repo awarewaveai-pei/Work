@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-26（續2）— /ops/systems/blocks 改三分頁：系統卡片取代要左右捲的熱度表；積木目錄網址只由 catalogHref 產生
+
+- 根因／決策：操作者不要左右捲（10 欄熱度表在 1100px 版面必溢出）。改分頁（連結 ?view=）：系統用了哪些積木（預設，每系統一列：名稱／狀態／完成度＋各層顆數標籤自動換行、展開全部編號）／積木清單／圖解。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`NA/app/(shell)/ops/systems/blocks/page.tsx` 重排；`NA/lib/systems/blocks.ts` 刪 usageMatrix（無人用），新 `catalogHref()` 為唯一網址產生器；`NA/app/(shell)/ops/systems/[slug]/page.tsx` 兩個連結改用它（Codex 1m：舊 `?sys=…#list` 會落在系統分頁）；`blocks.test.ts` 加 catalogHref 測試
+- 驗證：`npx tsc --noEmit` exit 0；`npx vitest run lib/systems app/(shell)/ops/systems app/__tests__/sidebar-coverage.test.ts` 63 passed；本機 :3904 實看 scrollWidth 1009 < 視窗 1024、無區塊溢出，三分頁正常
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run lib/systems app/(shell)/ops/systems app/__tests__/sidebar-coverage.test.ts | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-26-partialreview-321fc165.md），1m 已修
+- ORACLE_WAIVED: 1m 修在 artifact 之後（catalogHref 抽出＋[slug] 兩連結），由新測試與 63 passed 覆蓋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ops/systems/blocks\? | hits=2
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續1）— 手動提前部署 next-admin 6de5a4196（LEGO 積木目錄 5c1ec7fa2＋更正 4b154dac7）
 
 - 決策：操作者「部署」；DEPLOY_HOLD 不在 main。

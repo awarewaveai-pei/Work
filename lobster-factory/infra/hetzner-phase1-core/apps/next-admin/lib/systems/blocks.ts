@@ -285,16 +285,15 @@ export function blockStats(blocks: LegoBlock[] = LEGO_BLOCKS) {
   };
 }
 
-/** System × layer counts of live 功能積木 (the heat map). */
-export function usageMatrix(blocks: LegoBlock[] = LEGO_BLOCKS): Map<string, Partial<Record<BlockLayer, number>>> {
-  const m = new Map<string, Partial<Record<BlockLayer, number>>>();
-  for (const b of blocks) {
-    if (b.tier !== "block" || !isLive(b) || !b.layer) continue;
-    for (const s of b.usedBy) {
-      const row = m.get(s) ?? {};
-      row[b.layer] = (row[b.layer] ?? 0) + 1;
-      m.set(s, row);
-    }
-  }
-  return m;
+/** /ops/systems/blocks URL. Defaults (view=systems, tier=block) are left out; every link to the page goes through here. */
+export type CatalogView = "systems" | "blocks" | "diagram";
+export function catalogHref(p: { view?: CatalogView; tier?: Tier; layer?: BlockLayer | null; sys?: string | null; q?: string | null } = {}): string {
+  const q = new URLSearchParams();
+  if (p.view && p.view !== "systems") q.set("view", p.view);
+  if (p.tier && p.tier !== "block") q.set("tier", p.tier);
+  if (p.layer) q.set("layer", p.layer);
+  if (p.sys) q.set("sys", p.sys);
+  if (p.q) q.set("q", p.q);
+  const s = q.toString();
+  return `/ops/systems/blocks${s ? `?${s}` : ""}`;
 }
