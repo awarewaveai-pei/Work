@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-25（續10）— oracle WP：英文頁定案（TranslatePress，網址代稱 `english`）＋SF-I2 內容工具實測與修正
+
+- [根因] ① 英文頁未做：引擎佔 `/en`、`/zh-TW`（`nginx/default.conf` `map $uri $oracle_backend`），TranslatePress 能否用別的代稱未試（SPEC §6）。② SF-I2 第四批 RISK「只走 REST 的讀寫對登記站回找不到」未實測：`wp-post-core.ts` `writePost` 與 `app/api/content/wp-post/route.ts` DELETE 把「沒有這個站」與「站沒有 REST 憑證」合成一個 404。
+- [步驟] ① oracle 站 `wp plugin install translatepress-multilingual --version=3.4.1 --activate`（安裝輸出尾段有 wp-cli 堆疊，外掛 active、`/wp-json/` 200）；經外掛自己的 `sanitize_settings` 寫 `trp_settings`：`translation-languages=[zh_TW,en_US]`、`url-slugs={zh_TW:zh,en_US:english}`、預設語言不加子目錄（原值存 option `trp_settings_bak_20261125`）；逐頁以英文請求登記字串後，47 列翻譯寫入 `wp_trp_dictionary_zh_tw_en_us`（`status=2`）。② 正式站以操作者登入中的瀏覽器打 API（只讀＋一次無憑證即回的 PATCH）；修 `4d14a6a2a`：有站無憑證 → 503 `BRIDGE_ONLY_SITE_ERROR`，不送請求；`route.test.ts` 加兩個測試。
+- [驗證] ① 主機內經 `lobster-nginx`：未登入 `/english/tools/ziwei/` 503（建置中，WordPress 回應）、`/en/ziwei` 200（引擎）；五分鐘臨時登入：`/english/tools/ziwei/` 200 `lang="en-US"` iframe `src="/embed/en/ziwei"`、hreflang zh-TW／en-US／zh／en 四條、選單連結 `/english/tools/<slug>/`；`/tools/ziwei/` `lang="zh-TW"` `/embed/zh-TW/ziwei`；翻譯後 `/english/tools/bazi/`、`/english/tools/`、`/english/`、`/english/daily-letter/` 內文無中文，只剩 `<title>`。② `POST /api/tools/publish {action:"clients"}` 200 含 `env:878ea75e-17fe-4941-911f-5aff18db83e3` Oracle；`/api/content/categories`、`/tags`、`/api/video/wp-posts`（siteId `f787d53e…`）200 空清單；`PATCH /api/content/wp-post` 修前 404 `Site not found or token missing`。修後 `npx tsc --noEmit` exit 0；vitest 3 檔 23 測試全過。
+- [未做／剩餘風險] 英文頁 `<title>` 與 Rank Math description 仍中文（TranslatePress 免費版不翻）→ 定案由 oracle 外掛 0.5.1 過濾 `rank_math/frontend/title`／`description`（`trp_translate()`），GO-3 前做；`4d14a6a2a` 未部署（03:00 自動部署），部署後未重打；臨時登入第一次誤用 `destroy_all()`，操作者在 oracle 站的登入被清（要重登），第二次起只 `destroy($token)`；未登入訪客的英文頁要等 GO-3 開放才看得到；`/api/social/wp-article` 需 brand 參數，未試。
+- [避免再發生] 主機上代登入只銷毀自己建的那一筆 session token。REST 路徑新增時：`!resolved` 與 `!resolved.token` 分開回（後者 `BRIDGE_ONLY_SITE_ERROR`）。
+- [rollback] 英文頁：`wp plugin deactivate translatepress-multilingual`（資料表與 option 留著無害）；程式：`git revert 4d14a6a2a`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -H "Host: oracle.aware-wave.com" http://127.0.0.1:<lobster-nginx>/english/tools/ziwei/（含臨時登入 cookie）；瀏覽器 fetch PATCH /api/content/wp-post | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=Site not found or token missing | hits=2
+- ORACLE_WAIVED: 3 檔 32 行，只把一個既有的拒絕分成兩種訊息與狀態碼，兩條路徑都不送請求；非 auth／個資／金流。讀回 diff 自審＋兩個新測試。
 ## 2026-11-25（續9）— meeting-service「問 AI」改成先搜尋再請模型整理並附來源（操作者：「我要完整的答案」）
 
 - 根因／決策：操作者問「問哪個資料最齊全、最便宜」並要求實測。三題（句子意思／冷門技術名詞／今年十月的小眾產品名）× Claude Haiku 5.5、Gemini 3.5 Flash-Lite、OpenAI gpt-6-luna × 單獨回答與附搜尋結果，共 18 次：單獨回答時 Gemini 對不認識的產品名兩輪都編出不同的答案，Claude 與 OpenAI 答「不確定」；附上搜尋結果後三家都不編。每次花費皆 < NT$0.02。操作者選完整答案 → 問 AI 一律先搜尋。
