@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-25（續1）— oracle WP：算命站寄信通（新 Resend key）、Cloudflare 流量限制放行後台、建站開關關回
+
+- [根因] 第 8 步寄信 422（續18，2026-11-24）；Cloudflare `http_ratelimit` 的 WP 後台路徑放行未含 oracle；操作者確認能登入後開關不必再開。三項皆操作者 2026-11-25 同意。
+- [步驟] ① Cloudflare PATCH 規則 `b8ffa72d…`：WP 路徑放行子句加 `or http.host eq "oracle.aware-wave.com"`（其餘不動）。② Resend 建 key `oracle.aware-wave.com WordPress`（`sending_access`、限網域 `86fd3992…`）→ 經 ssh stdin 寫入 oracle 站 FluentSMTP 既有連線（`fluentMailSetSettings`）→ `wp_mail` 測試 → 本機暫存檔刪除。③ 刪 `/etc/default/aw-hosting-gate.local`（內容與自己寫的相同才刪，mtime 未變）＋`site.*` 七列 `enabled=false`。
+- [驗證] Cloudflare 回傳 expression 尾段含三個 host、`enabled=true`、`ratelimit` 不變。`key_saved=ok stored_plain=no`；`wp_mail=sent`；`fsmpt_email_logs` 最新一筆 `status=sent`、from `noreply@oracle.aware-wave.com`。`UPDATE 7` 全 `f`。
+- [未做] 流程頁第 8 步寄信那格（瀏覽器窗格的後台登入過期，留給操作者勾）；WPvivid 遠端；操作者是否收到測試信未回報。key 值出現在本對話的工具輸出一次（操作者已知情同意）。
+- [rollback] Cloudflare：expression 刪回該子句。寄信：Resend 撤銷 key `751962ff…`。開關：重建 drop-in＋七列 true。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval wp_mail（oracle 站）；Cloudflare rulesets PATCH 回讀；psql update returning | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（外部設定與文件）
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-24（續18）— oracle WP：建站第 8 步——Kuma 監控完成；寄信卡 Resend 422；WPvivid 遠端待操作者授權
 
 - [根因] 操作者要監工代做第 8 步三項；並回報 `wp-login.php` 的 Cloudflare 驗證一直重複。
