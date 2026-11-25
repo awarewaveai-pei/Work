@@ -18,7 +18,22 @@ const W5 = "2026-11-14（續5）破框：入口邊開格、照參考改寫提示
 
 const ART = "agency-os/reports/model-bakeoff/2026-11-article/（key.json、editor-review.md）";
 
+const ARTIMG = "agency-os/reports/model-bakeoff/2026-11-article-image/（runs.json、image-bakeoff.html）";
+
 const GROUPS: Group[] = [
+  {
+    title: "文章配圖",
+    intro: "2026-11-25 正式站。目的：哪一個來源畫得出符合文章內容的圖。寫文章的 AI 為每張圖寫一句英文畫面描述，同一組描述給六個來源各畫一次，封面套上統一版型；另用改版前的做法畫一組對照。照新做法畫的每一張都跟它那一段有關；操作者看過後判定 GPT-Image-2 低、Nano Banana 2.1、FLUX dev 三個沒有出錯。免費圖庫沒有測。預設來源尚未更換。",
+    rows: [
+      { date: "2026-11-25", model: "Codex 免費生圖（ChatGPT 訂閱）", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$0", result: "四張都跟段落有關。每張 42–55 秒，四張共 3 分 14 秒，沒有被額度擋下。只能本人按、筆電要開著；排程用不了。操作者：留著當免費選項。", src: ARTIMG, plain: true },
+      { date: "2026-11-25", model: "FLUX 2 Klein 4B", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$0.06／張", result: "四張都跟段落有關，每張約 8 秒。操作者沒有列入「沒出錯」的三個。", src: ARTIMG, plain: true },
+      { date: "2026-11-25", model: "FLUX schnell（原本的預設）", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$0.10／張", result: "四張都跟段落有關，每張 5–8 秒，最快。操作者沒有列入「沒出錯」的三個。", src: ARTIMG, plain: true },
+      { date: "2026-11-25", model: "GPT-Image-2 低", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$0.64／張", result: "操作者判定沒有出錯。每張 15–18 秒。英文文章「workplace burnout」也測過四張，同樣貼題。", src: ARTIMG, plain: true, verdict: "good" },
+      { date: "2026-11-25", model: "FLUX dev", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$0.80／張", result: "操作者判定沒有出錯。每張 8–12 秒。英文文章也測過四張，同樣貼題。", src: ARTIMG, plain: true, verdict: "good" },
+      { date: "2026-11-25", model: "Nano Banana 2.1", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$1.82／張", result: "操作者判定沒有出錯。每張 28–33 秒，最貴也最慢。英文文章只留下封面一張（頁面中途重新整理，三張內文圖沒有重畫）。", src: ARTIMG, plain: true, verdict: "good" },
+      { date: "2026-11-25", model: "對照：改版前的做法（FLUX schnell＋中文替代文字）", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$0.10／張", result: "四張都跟文章無關：封面畫成寺廟與湖景，「跟主管談工作量」那一段畫成熱氣球和小花。問題出在只給替代文字，不在模型。", src: ARTIMG, plain: true, verdict: "bad" },
+    ],
+  },
   {
     title: "文章生成",
     intro: "2026-11-22 正式站，同一題目同一條件各一篇；操作者選定 GPT-6.2 sol 為文章預設。名次是繁中編輯盲評（12 篇）；第 1–4 名輕修可上，第 9–12 名接近重寫。",

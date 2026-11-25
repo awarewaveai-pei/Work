@@ -228,5 +228,115 @@
     ]
    }
   }
- ]
+ ],
+ "en": {
+  "article": {
+   "keyword": "workplace burnout",
+   "language": "English",
+   "ms": 46338,
+   "seoTitle": "Workplace Burnout: 5 Essential Ways to Reduce Strain"
+  },
+  "cover": {
+   "title": "A Guide to Work Burnout",
+   "subtitle": "Find what needs to change"
+  },
+  "note": "頁面中途被重新整理，D 的三張內文圖沒有留下網址，沒有重畫（最貴的一個）；A 的三張內文圖與 F 的第三張是補畫的。",
+  "slots": [
+   {
+    "key": "cover",
+    "ratio": "16:9",
+    "label": "英文文章的封面",
+    "scene": "A worker closes a laptop at a kitchen table in soft evening light.",
+    "alt": "Workplace Burnout: 5 Essential Ways to Reduce Strain",
+    "heading": "",
+    "text": ""
+   },
+   {
+    "key": "body1",
+    "ratio": "4:3",
+    "label": "英文文章的內文圖一",
+    "scene": "In a 4:3 frame, an employee rests their hands beside a laptop at a crowded office desk in cool afternoon light.",
+    "alt": "Workplace burnout signs as an employee pauses at a crowded desk",
+    "heading": "How Can You Tell Burnout From a Rough Week?",
+    "text": "In practice, compare the past few weeks with your usual rhythm, not with a coworker's. Maybe you still meet deadlines, but routine tasks take longer and small requests feel harder to handle."
+   },
+   {
+    "key": "body2",
+    "ratio": "4:3",
+    "label": "英文文章的內文圖二",
+    "scene": "In a 4:3 frame, a worker moves plain colored cards across a home office desk in bright morning light.",
+    "alt": "Employee sorting competing priorities at a home office desk",
+    "heading": "What Can Keep Work Stress Going?",
+    "text": "Try describing the pattern without judging yourself: \"Every Thursday, urgent requests arrive after the schedule is full.\" That gives you something concrete to discuss."
+   },
+   {
+    "key": "body3",
+    "ratio": "4:3",
+    "label": "英文文章的內文圖三",
+    "scene": "In a 4:3 frame, two coworkers discuss a stack of folders at a small meeting table in warm window light.",
+    "alt": "Employee and manager discussing workload priorities in a quiet meeting room",
+    "heading": "What Can You Do About Work Burnout?",
+    "text": "Ask what can wait. If a new assignment comes in, ask which existing deadline should move. Protect time off. Agree on which issues truly need an after-hours reply and who covers them."
+   }
+  ],
+  "runs": [
+   {
+    "id": "openai-low",
+    "usdEach": 0.02,
+    "laid": "888d79fc-d70c-4ac0-9ca2-dbf4ce1e993a",
+    "images": {
+     "cover": [
+      "1750b5a2-51b7-4704-8851-071ec047a5d4",
+      17908
+     ],
+     "body1": [
+      "f56ee698-0297-4157-b032-b1311b5fbd63",
+      15998
+     ],
+     "body2": [
+      "bb1b1457-b68a-44db-a632-94e936e71275",
+      17844
+     ],
+     "body3": [
+      "92b4e013-b7fc-4796-83e1-a310cd80c9b8",
+      16889
+     ]
+    }
+   },
+   {
+    "id": "nano-banana-2",
+    "usdEach": 0.057,
+    "laid": "a324ac41-bb84-436f-a3ab-48e9951b4832",
+    "images": {
+     "cover": [
+      "f09e3a63-f640-4ef6-8b4e-83e7df6070f6",
+      29563
+     ]
+    }
+   },
+   {
+    "id": "flux-dev",
+    "usdEach": 0.025,
+    "laid": "6b3a8078-1d78-431c-96d2-0f06aff95c74",
+    "images": {
+     "cover": [
+      "0005272d-e6ed-49e3-a76d-a423db416de2",
+      10744
+     ],
+     "body1": [
+      "dce22f36-12eb-4901-b595-43140985751c",
+      9469
+     ],
+     "body2": [
+      "11688e1b-2f92-48f1-aa6e-235b9aaba2ce",
+      10128
+     ],
+     "body3": [
+      "9abc243c-32d2-4416-94e5-e323bd5cfb44",
+      9848
+     ]
+    }
+   }
+  ]
+ }
 }
