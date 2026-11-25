@@ -527,7 +527,6 @@ button.sidebar-link {
 }
 @media (max-width: 640px) {
   .door-main { flex-direction: column; }
-  .door-side { width: auto; border-right: 0; border-bottom: 1px solid var(--sidebar-border); }
 }
 .door-nav-link {
   padding: 6px 12px;
@@ -2882,4 +2881,78 @@ pre {
   .designs-filter-panel {
     padding: 10px 12px;
   }
+}
+
+/* ── Phone frame (blueprint §9.1, §11, §19.4; app/MobileShell.tsx) ─ */
+.bottom-bar { display: none; }
+@media (max-width: 640px) {
+  .shell { --bottom-bar-h: calc(56px + env(safe-area-inset-bottom)); padding-bottom: var(--bottom-bar-h); }
+  .bottom-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 41;
+    height: var(--bottom-bar-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--sidebar-bg);
+    border-top: 1px solid var(--sidebar-border);
+  }
+  .bottom-bar > * {
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    font-size: 13px;
+    color: var(--sidebar-text);
+    background: transparent;
+    border: 0;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .bottom-bar > [aria-current="page"], .bottom-bar > [aria-expanded="true"] {
+    color: var(--sidebar-text-active);
+    background: var(--sidebar-active-bg);
+    font-weight: var(--font-weight-semibold);
+  }
+  /* The side columns take no room; the client rail's own layout is inline, hence !important. */
+  .main { margin-left: 0; min-height: 0; }
+  .door-main { min-height: 0; }
+  .sidebar, .door-side { display: none; }
+  .client-rail { display: none !important; }
+  .shell[data-more="open"] > .sidebar,
+  .shell[data-more="open"] .door-side {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--bottom-bar-h);
+    width: auto;
+    overflow-y: auto;
+    z-index: 40;
+  }
+  /* A page that needs a client: the rail takes the upper half, the menu the lower. */
+  .shell[data-more="open"] .client-rail {
+    display: flex !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0;
+    right: 0;
+    width: auto !important;
+    height: 50vh !important;
+    z-index: 40;
+    border-bottom: 1px solid var(--sidebar-border);
+  }
+  .shell[data-more="open"]:has(.client-rail) > .sidebar,
+  .shell[data-more="open"]:has(.client-rail) .door-side { top: 50vh; }
+  .sidebar-link, .door-nav-link { min-height: 44px; display: flex; align-items: center; flex-shrink: 0; }
+  .topbar { padding: 10px 16px; }
+  .page { padding: 16px; }
+  .door-foot { padding: 8px 16px 16px; }
 }

@@ -120,6 +120,7 @@ export function ClientRail() {
   return (
     <aside
       aria-label="客戶欄"
+      className="client-rail"   // ≤ 640 globals.css moves it into 「更多」
       style={{
         // a long page scrolls the window: the rail stays in view and scrolls its own list (both frames' rows are flex)
         position: "sticky", top: 0, alignSelf: "flex-start", height: "100vh", overflowY: "auto",
