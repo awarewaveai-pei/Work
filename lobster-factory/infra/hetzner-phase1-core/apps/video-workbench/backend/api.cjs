@@ -833,7 +833,7 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
         }
         // A vendor-made result (backend/audio-tools.cjs: ElevenLabs) records its model, provider and bill like music does.
         const origin = result.ai ? { kind: "ai_generated", model: result.ai.model, provider: result.ai.provider, costUsd: result.ai.costUsd } : { kind: "render" };
-        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), ...(result.verification ? { verification: result.verification } : {}), origin: { ...origin, jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
+        job.result = { url: result.url, ...(result.sourceUrl ? { sourceUrl: result.sourceUrl } : {}), ...(result.width ? { width: result.width, height: result.height } : {}), ...(result.verification ? { verification: result.verification } : {}), ...(result.note ? { note: result.note } : {}), origin: { ...origin, jobId: job.id, ...(typeof parentAssetId === "string" ? { parentAssetId } : {}) } };
         if (result.ai) job.disclosure = "AI 處理聲音";
         job.progress = 100;
         job.status = "succeeded";
