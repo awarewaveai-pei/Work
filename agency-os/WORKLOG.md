@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-25（續15）— 影片工作台：肖像權保護／深度影片／去配樂三個工具接上並部署（`8f477587d`）
+
+- [根因] 三個工具畫面在、送出鈕被 `video-workbench/scripts/tools-0.js` 一張寫死的 `unsupported` 表鎖住：privacy、depth 後端零程式；sfx 有 ElevenLabs 後端但付費一律拒絕、無功能鍵、不看畫面。不變量：工具能不能按只由 `/capabilities` 決定；會花錢的列有許可才跑、成功才按實際成本扣。
+- [步驟] 監工派工（`agency-os/handoffs/2026-11-25-video-tools-unlock/`：PLAN／DISPATCH／briefs／RESEARCH）。P1 肖像權保護（本機 YuNet＋FFmpeg 遮罩）、D1 深度影片（本機 MiDaS v2.1 small＋跨格對齊）、S1a 功能鍵 `video.audio-tools`＋Gemini 看片→ElevenLabs、S1b Mirelo SFX 2.0、X1 刪寫死鎖＋逾時。整合工作區 detached，rebase 後 `git push origin HEAD:main`（9 個程式 commit＋oracle artifact，`git log 4a25006a7..8f477587d`）。
+- [驗證] 整合版：`node tests/{privacy,depth,sfx-billing,elevenlabs-free-tier,backend,p6-main-system,services,paid-price,u7-audio-policy,capabilities-boot,package-sources,awarewave-files}.cjs` 全 exit 0；next-admin `npx tsc --noEmit` 0、vitest 5944 passed（第一次全套 1 failed、重跑 0 failed＝既有不穩定測試，未定位）。真 Edge 實按：privacy、depth 工作成功並實看成品格；sfx 無金鑰正確鎖住。`docker build` 過，映像內兩個模型 sha256 相符。部署 `sg-deploy.sh next-admin video-workbench` → `.deployed-commit` `8f477587d`，兩容器 healthy，HTTP smoke 全 OK；Playwright smoke 30 passed／0 failed。正式機同映像臨時容器（`--cpus 8`）：34 秒片 privacy 28.4 秒（每格偵測 13.1 ms）；30 秒片 depth 68.7 秒（每格 66.1 ms）。
+- [Codex 審查] 3 條皆驗真並修（`0655120d6`）：貼邊人臉遮罩偏移漏蓋（新測試舊碼紅）；Mirelo `credits:null` 仍估價扣款（突變 `>=0`→`>0` 紅）；compose 對照檔缺 `MIRELO_API_KEY`。
+- [剩餘風險] Mirelo 路未實跑（無金鑰；正式機 compose 尚未加 `MIRELO_API_KEY`，給金鑰時走 `safe-infra-patch.sh compose`）；ElevenLabs 生成未實跑（帳號為免費方案，不可商用，`separate`「只留人聲」與 sfx B 路現為未啟用）；配音、字幕仍走 ElevenLabs 免費方案（本次未動）；正式站登入後頁面未由操作者實按；深度為逐格小模型，細節粗。逐條見 `DISPATCH.md` RISKS。
+- [rollback] 主機 `sg-deploy.sh` 回前一版 `67b4051c3`；程式 `git revert 0655120d6 be6017918 ba4a87a96` 及其前 6 個 P1／D1／S1a commit。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin video-workbench；docker run --rm <deployed image> node prod-time.cjs | exit=0 | ms=840000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI（`agency-os/reports/oracle/2026-11-25-partialreview-4bf6848e.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=尚未設定人臉偵測|尚未設定深度影片模型|尚未設定配樂分離 | hits=0
 ## 2026-11-25（續14）— 建站流程：SF-O 手冊、SF-A 文件更正併入；第 9 步改在 WordPress 專屬路徑確認開放
 
 - [根因] ① SF-O／SF-A 兩張文件卡未做（批 5）。② 工人寫手冊時讀到 `NA/lib/site-flow/steps/open.ts` verify 打 `https://<domain>/`：共用網域站（`ingress=product-gateway`，oracle）首頁屬引擎，WordPress 仍建置中也回 200 → 「正式開放」假成功。不變量：開放的證明必須由該站自己回答。
