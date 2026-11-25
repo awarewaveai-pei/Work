@@ -25,7 +25,8 @@ import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline
 import { extractH1, parseArticleMeta } from "@/lib/content/article/meta";
 import { makeContentImage } from "@/lib/content/image/make-image";
 import { storeCoverOn } from "@/lib/content/cover/store";
-import type { TarotModel } from "@/lib/tarot/image-gen";
+import { SITE_COVER_SIZE, baseRatioFor, coverSizeFor, coverSizesFor, draftCoverSize, extraBaseRatios, isSiteSize, sizeKey, type CoverSize } from "@/lib/content/cover/sizes";
+import type { AspectRatio, TarotModel } from "@/lib/tarot/image-gen";
 import { isR2Configured } from "@/lib/storage/r2";
 import { accountPlatforms, addImage, addVideo, getPost, listAccounts, savePost, type MediaInput } from "@/lib/social/store";
 import { applyAction } from "@/lib/social/actions";
@@ -43,7 +44,7 @@ import { embedVideoInPost, swapEmbeddedVideo } from "@/lib/content/video/embed-i
 import { releaseTopicVideo } from "./video-release";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
 import { TOPIC_ARTICLE_IMAGES, TOPIC_COVER_IMAGES } from "./cost";
-import { ARTICLE_COVER_RATIO, ARTICLE_IMAGE_RATIO, articleImagesOff, articleStylePrompt, scheduleImageModel, imagePlaceholders, placeholderScene } from "@/lib/content/image/article-image";
+import { ARTICLE_IMAGE_RATIO, articleImagesOff, articleStylePrompt, scheduleImageModel, imagePlaceholders, placeholderScene } from "@/lib/content/image/article-image";
 import { DEFAULT_TOPIC_CAP_TWD, reserveStep, settleStep, spentSince, stepUpperTwd, topicBudget, type TopicBudget } from "./budget";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { MakeError, NOW_FORMATS, brandDay, personAsked, waitsForVideo, type Made, type Published, type PublishRun, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
@@ -62,8 +63,11 @@ export interface TopicArtifacts {
     required?: string[];
     /** K10: the cover's scene, short title and subtitle from the meta block; image_url = the draft's featured image (K25:
      *  the cover layout on base_url's picture, or that picture alone when the layout failed; null = none). Absent on
-     *  articles made before K10; base_url absent on those made before K25. */
-    cover?: { scene?: string; title?: string; subtitle?: string; image_url: string | null; base_url?: string | null };
+     *  articles made before K10; base_url absent on those made before K25. sizes (K29) = the social drafts' other sizes
+     *  (cover/sizes.ts sizeKey -> that cover, null = its layout failed, and the picture it was laid on); present (maybe
+     *  empty) only when the topic had social drafts to give it to -- absent = made before K29: they get image_url. */
+    cover?: { scene?: string; title?: string; subtitle?: string; image_url: string | null; base_url?: string | null;
+      sizes?: CoverSizes };
     /** K27: the title the WordPress draft was saved under (its SEO title, else its H1); the cover's alt text on the social
      *  drafts. Absent on articles made before K27: the topic's title stands in. */
     title?: string;
@@ -76,8 +80,9 @@ export interface TopicArtifacts {
    *  for a topic with an article): the link goes in their first comment; absent = made before, post_id holds them too. */
   social?: { post_id: string | null; youtube_post_id?: string | null; link_in_comment?: LinkInCommentPost[]; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string };
     /** K27, a topic without a video: the article's cover uploaded once (media_id) and the drafts already handled (done:
-     *  given it, or left as they were because they had media of their own). Absent = not tried yet. */
-    cover_media?: { media_id: string | null; done: string[] } };
+     *  given it, or left as they were because they had media of their own). Absent = not tried yet. K29: media_id = the
+     *  website-size cover's upload; media_ids = each other size's (sizeKey -> upload), absent when there was none. */
+    cover_media?: { media_id: string | null; done: string[]; media_ids?: Record<string, string> } };
   /** The topic's video job; url once it finished, then when it went into the article and onto each social draft. */
   video?: VideoArtifact & { embedded_at?: string; media_id?: string; youtube_media_id?: string };
   /** N5a: each publish step, recorded before and after its outside write (publish-steps.ts). */
@@ -85,6 +90,9 @@ export interface TopicArtifacts {
   /** N2: when this topic's spending cap began, the cap and the spend last read (budget.ts; the ledger is the source). */
   budget?: TopicBudget;
 }
+
+/** K29: an article's cover in the social sizes other than the website's (sizeKey -> the cover and its picture). */
+export type CoverSizes = Record<string, { image_url: string | null; base_url: string }>;
 
 /** Checks the topic's cap before one paid step and reserves the step's most (budget.ts reserveStep); `exact` (the name "settle" is kept for wallet holds: lib/ai/__tests__/settle-through-ledger.test.ts) swaps a
  *  reservation for the call's exact cost once known (0 = the call failed: whatever it was billed is in the ledger, which
@@ -208,8 +216,10 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
   const input = { ...articleInput(t, defaults, imageCount), _jobId: t.id, ...(subs ? { [ARTICLE_CALLER]: caller } : {}) };
   // K10: the images on the site's model and style, body + cover reserved together
   const coverCount = imageGrant ? TOPIC_COVER_IMAGES : 0;
+  // K29: the sizes its social drafts take the cover in; a base picture more only for a picture area the website's lacks
+  const socialSizes = coverCount ? await socialCoverSizes(t) : [];
   const road = { textChain: defaults.textChain, textApiModel: defaults.textApiModel, imageModel };
-  const upper = stepUpperTwd.article(imageCount + coverCount, road);
+  const upper = stepUpperTwd.article(imageCount + coverCount + extraBaseRatios(socialSizes).length, road);
   await guard(upper, "文章");
   const a = await runContentPipeline(input, { stages: ["article"] });
   if (!a.ok) throw new Error(`文章生成失敗：${(a as PipelineFailure).error}`);   // strict:false: !ok does not narrow
@@ -219,7 +229,7 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
   // fallback = what it was billed); the images part stays until they are made. An API-only site keeps the estimate, as before.
   if (subs && billedTwd !== null) guard.exact(upper, billedTwd + (upper - stepUpperTwd.article(0, road)));
   const imageStyle = articleStylePrompt(site.defaults.imageStyle);
-  const draw = async (scene: string, aspectRatio: typeof ARTICLE_IMAGE_RATIO | typeof ARTICLE_COVER_RATIO = ARTICLE_IMAGE_RATIO) => {
+  const draw = async (scene: string, aspectRatio: AspectRatio = ARTICLE_IMAGE_RATIO) => {
     if (!imageGrant) return null;
     const img = await makeContentImage({ model: imageModel as TarotModel, prompt: scene || t.title,
       aspectRatio, seed: null, imageStyle, purpose: "article",
@@ -229,10 +239,15 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
   };
   const { markdown, images } = await fillArticleImages(article, (scene) => draw(scene), imageCount);
   const meta = parseArticleMeta(markdown);
-  // the cover: its own picture from its own scene, 16:9 (before K10 the first body image stood in for it)
+  // the cover: its own picture from its own scene, at the website size's picture area = 16:9 (before K10 the first body
+  // image stood in for it)
   const cover = meta?.cover;
-  const baseUrl = coverCount ? await draw(cover?.scene || meta?.seoTitle || t.title, ARTICLE_COVER_RATIO).catch(() => null) : null;
-  const laid = coverCount ? await layCover(baseUrl, images[0] ?? null, cover?.title || meta?.seoTitle || t.title, cover?.subtitle, siteCover(site.defaults)) : null;
+  const scene = cover?.scene || meta?.seoTitle || t.title, coverTitle = cover?.title || meta?.seoTitle || t.title;
+  const baseUrl = coverCount ? await draw(scene, baseRatioFor(SITE_COVER_SIZE)).catch(() => null) : null;
+  const laid = coverCount ? await layCover(baseUrl, images[0] ?? null, coverTitle, cover?.subtitle, siteCover(site.defaults)) : null;
+  const channel = laid?.base && socialSizes.length
+    ? await layChannelCovers(socialSizes.filter((x) => !isSiteSize(x)), laid.base, (ratio) => draw(scene, ratio), coverTitle, cover?.subtitle, siteCover(site.defaults))
+    : null;
   const p = await runContentPipeline({
     markdown, focusKeyword: meta?.focusKeyword || t.keyword, seoTitle: meta?.seoTitle, metaDescription: meta?.metaDesc,
     categories: meta?.categories, tags: meta?.tags, slug: meta?.slug, siteId: t.site_id, publishStatus: "draft", featuredImageUrl: laid?.url ?? undefined,
@@ -246,9 +261,9 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
     title: meta?.seoTitle?.trim() || extractH1(markdown) || t.title,   // as wordpress-core names the draft
     // what the social writer reads (it uses the first 3000 characters), kept so a retry can write posts without the article
     source: markdown.replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "").trim().slice(0, 3000),
-    checks: [...articleChecks(markdown, report, forbiddenTerms(site.defaults), requiredBlocks(site.defaults)), ...(laid?.note ? [laid.note] : [])],
+    checks: [...articleChecks(markdown, report, forbiddenTerms(site.defaults), requiredBlocks(site.defaults)), ...(laid?.note ? [laid.note] : []), ...(channel?.notes ?? [])],
     required: requiredBlocks(site.defaults),
-    ...(laid ? { cover: { ...cover, image_url: laid.url, base_url: laid.base } } : {}),
+    ...(laid ? { cover: { ...cover, image_url: laid.url, base_url: laid.base, ...(channel ? { sizes: channel.sizes } : {}) } } : {}),
   };
 }
 
@@ -268,6 +283,44 @@ export async function layCover(coverUrl: string | null, firstBodyUrl: string | n
     const why = `封面未套版（${e instanceof Error ? e.message : String(e)}），精選圖片用沒有字的底圖`;
     return { url: base, base, note: note(fallback ? `${fallback}；${why}` : why) };
   }
+}
+
+/** K29: the sizes this topic's social drafts take its cover in, from the channels makeSocial will write for, grouped as
+ *  it groups them (draftGroups). None for a topic with a video (the video goes on its drafts) or without social posts;
+ *  YouTube's draft never takes a picture. */
+async function socialCoverSizes(t: Topic): Promise<CoverSize[]> {
+  if (waitsForVideo(t) || !t.formats.includes("social")) return [];
+  const accounts = (await listAccounts(t.organization_id, { hydrateProfile: false }))
+    .filter((a) => a.status === "connected" && topicTargets(t.formats, a.platform));
+  const g = draftGroups(accounts, true);
+  return coverSizesFor([g.other, g.facebook, g.instagram].map((x) => x.map((a) => a.platform)));
+}
+
+/** K29: the cover in each social size besides the website's, on the base picture its picture area needs -- drawn once
+ *  per ratio (drawBase), shared by every size on it; a size on the website's ratio uses the website's base. A base not
+ *  drawn: the website's base, cover-fitted in; a layout that fails: null (that size's drafts get the website's cover).
+ *  Each fallback is a passing check. */
+export async function layChannelCovers(sizes: readonly CoverSize[], siteBase: string, drawBase: (ratio: AspectRatio) => Promise<string | null>,
+  title: string, subtitle: string | undefined, settings: ReturnType<typeof siteCover>): Promise<{ sizes: CoverSizes; notes: ReviewCheck[] }> {
+  const notes: ReviewCheck[] = [];
+  const note = (detail: string) => { notes.push({ name: "cover", pass: true, detail }); };
+  const bases = new Map<AspectRatio, string>();
+  for (const ratio of extraBaseRatios(sizes)) {
+    const url = await drawBase(ratio).catch(() => null);
+    if (url) bases.set(ratio, url);
+    else note(`社群封面（${sizes.filter((x) => baseRatioFor(x) === ratio).map(sizeKey).join("、")}）的 ${ratio} 底圖沒有生成，改用網站封面的底圖裁進去`);
+  }
+  const out: CoverSizes = {};
+  for (const size of sizes) {
+    const base = bases.get(baseRatioFor(size)) ?? siteBase;
+    try {
+      out[sizeKey(size)] = { image_url: await storeCoverOn(base, { title, ...(subtitle ? { subtitle } : {}) }, settings, size), base_url: base };
+    } catch (e) {
+      out[sizeKey(size)] = { image_url: null, base_url: base };
+      note(`社群封面 ${sizeKey(size)} 未套版（${e instanceof Error ? e.message : String(e)}），這個尺寸的頻道附網站封面`);
+    }
+  }
+  return { sizes: out, notes };
 }
 
 /** YouTube channels only for a topic that chose youtube (they need its video); the other channels only for social. */
@@ -572,32 +625,63 @@ async function attachToDrafts(orgId: string, drafts: MediaDraft[], uploaded: () 
  *  only. Alt text = the article's title. No cover, or the upload fails: nothing attached, and a check says the posts have
  *  no picture -- failing only while an Instagram draft is left without one (Postiz refuses an Instagram post without
  *  media: instagram.provider.ts checkValidity "Should have at least one media"), so it waits for a person instead of
- *  failing at send. Never fails the topic. Recorded on artifacts.social.cover_media; the row is saved when the step ends. */
+ *  failing at send. Never fails the topic. Recorded on artifacts.social.cover_media; the row is saved when the step ends.
+ *  K29: each draft gets the cover in its channels' size (cover/sizes.ts draftCoverSize), one upload per size; a size
+ *  whose cover is missing gets the website's; a topic made before K29 (no cover.sizes) gets the website's on every draft.
+ *  Channels given a size not their own are named in a passing check. */
 export async function attachTopicCover(t: Pick<Topic, "id" | "organization_id" | "title" | "formats">, artifacts: TopicArtifacts, actor: string): Promise<void> {
   const a = artifacts.article, s = artifacts.social;
   if (!a || !s || waitsForVideo(t)) return;
   const ids = [s.post_id, ...(s.link_in_comment ?? []).map((p) => p.post_id)].filter((id): id is string => !!id);
   if (!ids.length) return;
-  const state = { media_id: s.cover_media?.media_id ?? null, done: [...(s.cover_media?.done ?? [])] };
+  const SITE = sizeKey(SITE_COVER_SIZE);
+  const prev = s.cover_media;
+  const uploads: Record<string, string> = { ...(prev?.media_ids ?? {}), ...(prev?.media_id ? { [SITE]: prev.media_id } : {}) };
+  const done = [...(prev?.done ?? [])], given = new Set<string>();
   const url = a.cover?.image_url ?? null;
   const alt = a.title || t.title;
+  const off = new Map<string, string>();   // draft -> its channels given a size not their own
   let problem = url ? null : "文章沒有封面";
   if (url) {
     try {
-      await attachToDrafts(t.organization_id,
-        ids.map((postId) => ({ postId, done: () => (state.done.includes(postId) ? postId : undefined),
-          record: (mediaId: string, ours: boolean) => { state.done.push(postId); if (ours) state.media_id = mediaId; } })),
-        () => state.media_id, async () => String((await addImage(t.organization_id, url, `topic-${t.id}-cover.webp`, actor)).id),
-        (mediaId) => ({ media_id: mediaId, position: 0, alt_text: alt }), actor, async () => {});
+      const bySize = new Map<string, { url: string; ids: string[] }>();
+      for (const postId of ids.filter((id) => !done.includes(id))) {
+        const c = a.cover?.sizes ? await draftCover(t.organization_id, postId, url, a.cover.sizes) : { key: SITE, url, off: [] };
+        if (c.off.length) off.set(postId, `${c.off.join("、")} 用了 ${c.key.replace("x", "×")} 的封面`);
+        bySize.set(c.key, { url: c.url, ids: [...(bySize.get(c.key)?.ids ?? []), postId] });
+      }
+      for (const [key, group] of bySize) {
+        await attachToDrafts(t.organization_id,
+          group.ids.map((postId) => ({ postId, done: () => (done.includes(postId) ? postId : undefined),
+            record: (mediaId: string, ours: boolean) => { done.push(postId); if (ours) { uploads[key] = mediaId; given.add(postId); } } })),
+          () => uploads[key], async () => String((await addImage(t.organization_id, group.url, `topic-${t.id}-cover${key === SITE ? "" : `-${key}`}.webp`, actor)).id),
+          (mediaId) => ({ media_id: mediaId, position: 0, alt_text: alt }), actor, async () => {});
+      }
     } catch (e) {
       problem = `封面沒有附上（${e instanceof Error ? e.message : String(e)}）`;
     }
   }
-  const instagram = (s.link_in_comment ?? []).some((p) => p.channel === "instagram" && !state.done.includes(p.post_id));
+  const instagram = (s.link_in_comment ?? []).some((p) => p.channel === "instagram" && !done.includes(p.post_id));
   const checks = s.checks.filter((c) => c.name !== "social_image");
   if (problem) checks.push({ name: "social_image", pass: !instagram,
     detail: `社群貼文沒有圖：${problem}${instagram ? "；Instagram 沒有圖發不出去，請到社群草稿加一張圖" : ""}` });
-  artifacts.social = { ...s, cover_media: state, checks };
+  // only drafts given the cover in this run (one handled before already has its line; a person's own media is theirs)
+  const sizeLines = [...off].filter(([id]) => given.has(id)).map(([, line]) => line);
+  if (sizeLines.length) checks.push({ name: "cover", pass: true, detail: `封面不是這些頻道自己的尺寸：${sizeLines.join("；")}` });
+  const { [SITE]: siteUpload, ...others } = uploads;
+  artifacts.social = { ...s, cover_media: { media_id: siteUpload ?? null, done, ...(Object.keys(others).length ? { media_ids: others } : {}) }, checks };
+}
+
+/** K29: the cover a draft gets -- its channels' size (draftCoverSize); that size's cover missing (its layout failed) =
+ *  the website's, and then every channel not on the website's size is off its own. */
+async function draftCover(orgId: string, postId: string, siteUrl: string, sizes: CoverSizes): Promise<{ key: string; url: string; off: string[] }> {
+  const post = await getPost(orgId, postId);
+  const platforms = [...(await accountPlatforms(orgId, post.targets.map((x) => x.account_id))).values()];
+  const { size, mismatched } = draftCoverSize(platforms);
+  const key = sizeKey(size);
+  const own = isSiteSize(size) ? siteUrl : sizes[key]?.image_url;
+  if (own) return { key, url: own, off: mismatched };
+  return { key: sizeKey(SITE_COVER_SIZE), url: siteUrl, off: platforms.filter((p) => !isSiteSize(coverSizeFor(p))) };
 }
 
 /** The finished video into the article draft and onto the social draft, each once: every step is saved on the row as it
