@@ -2,6 +2,7 @@
 seller_sites, customer_identities, ops_audit_events); 0180 and 0182 are applied from their files."""
 
 from pathlib import Path
+import hashlib
 import secrets
 import subprocess
 import time
@@ -106,13 +107,19 @@ def issue(db, org, email):
                       now() + interval '14 days', 'staff-1')""")
 
 
+def sha(*parts):
+    """The route hashes the signed body; here the parts that make one event's content stand in for it."""
+    return hashlib.sha256("|".join(map(str, parts)).encode()).hexdigest()
+
+
 def invite_event(db, event_id, at, invite, external, user, email):
-    return db.one(f"""select public.member_event_invite('{SITE}', '{event_id}', '{at}', '{invite}', 'awarewave-wp',
-                      '{external}', '{user}', '{email}')""")
+    return db.one(f"""select public.member_event_invite('{SITE}', '{event_id}', '{at}', '{sha(event_id, at, invite)}', '{invite}',
+                      'awarewave-wp', '{external}', '{user}', '{email}')""")
 
 
 def deleted_event(db, event_id, at, external):
-    return db.one(f"select public.member_event_deleted('{SITE}', '{event_id}', '{at}', 'awarewave-wp', '{external}')")
+    return db.one(f"""select public.member_event_deleted('{SITE}', '{event_id}', '{at}', '{sha(event_id, at, external)}',
+                      'awarewave-wp', '{external}')""")
 
 
 def holder(db, org):
@@ -129,10 +136,15 @@ def test_an_invite_event_links_and_its_replay_is_not_redone(db):
     assert holder(db, ORG) == "11"
     assert invite_event(db, "member_invite:11:a1", T1, invite, "11", USER, "owner@unit.test") == "ok"
     assert count(db, "from public.member_events where event_id = 'member_invite:11:a1'") == 1
+    # the same id with other content (another invite code) is refused, and nothing is redeemed a second time
+    other = issue(db, ORG_FREE, "owner@unit.test")
+    assert invite_event(db, "member_invite:11:a1", T1, other, "11", USER, "owner@unit.test") == "event_id_reused"
+    assert db.one(f"select used_at is null from public.member_invites where id = '{other}'") == "t"
+    assert holder(db, ORG_FREE) == ""
     # the unstamped entry point is closed to the app
     assert db.one("select has_function_privilege('service_role', 'public.member_invite_redeem(uuid, text, uuid, text, uuid, text)', 'execute')") == "f"
-    assert db.one("select has_function_privilege('service_role', 'public.member_event_invite(uuid, text, timestamptz, uuid, text, text, uuid, text)', 'execute')") == "t"
-    assert db.one("select has_function_privilege('anon', 'public.member_event_deleted(uuid, text, timestamptz, text, text)', 'execute')") == "f"
+    assert db.one("select has_function_privilege('service_role', 'public.member_event_invite(uuid, text, timestamptz, text, uuid, text, text, uuid, text)', 'execute')") == "t"
+    assert db.one("select has_function_privilege('anon', 'public.member_event_deleted(uuid, text, timestamptz, text, text, text)', 'execute')") == "f"
 
 
 def test_member_deleted_moves_the_identity_out_with_one_former_row_and_one_audit_row(db):
@@ -156,7 +168,8 @@ def test_an_older_invite_after_the_deletion_is_refused_and_never_links_again(db)
     assert invite_event(db, "member_invite:11:late", T1, invite, "11", USER, "owner@unit.test") == "event_stale"
     assert holder(db, ORG) == ""
     assert db.one(f"select used_at is null from public.member_invites where id = '{invite}'") == "t"
-    assert db.one(f"""select public.member_event_check('{SITE}', 'member_invite:11:late', 'member_invite', '11', '{T1}')->>'result'""") == "event_stale"
+    assert db.one(f"""select public.member_event_check('{SITE}', 'member_invite:11:late', 'member_invite', '11', '{T1}',
+                      '{sha("member_invite:11:late", T1, invite)}')->>'result'""") == "event_stale"
 
 
 def test_a_deleted_member_with_no_identity_is_recorded_and_a_late_invite_stays_refused(db):
@@ -169,8 +182,8 @@ def test_a_deleted_member_with_no_identity_is_recorded_and_a_late_invite_stays_r
 def test_email_changed_only_audits_domains(db):
     invite = issue(db, ORG_FREE, "late@unit.test")
     assert invite_event(db, "member_invite:88:a", T3, invite, "88", LATE_USER, "late@unit.test") == "ok"
-    out = db.one(f"""select public.member_event_email_changed('{SITE}', 'member_email:88:e', '{T3}', 'awarewave-wp', '88',
-                     'unit.test', 'new.test')""")
+    out = db.one(f"""select public.member_event_email_changed('{SITE}', 'member_email:88:e', '{T3}', '{sha("e", T3)}',
+                     'awarewave-wp', '88', 'unit.test', 'new.test')""")
     assert out == "audited"
     assert holder(db, ORG_FREE) == "88"
     assert db.one("select concat_ws('|', payload->>'old_email_domain', payload->>'new_email_domain', payload ? 'email') "

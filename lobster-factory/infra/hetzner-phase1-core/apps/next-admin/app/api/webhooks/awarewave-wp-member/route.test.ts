@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PAYMENT_SIGNATURE_HEADER, signPayment } from "@/lib/payments/hmac";
-import { findBillingAccount } from "@/lib/entitlements/identities";
+import { findBillingAccount, findFormerAccount } from "@/lib/entitlements/identities";
 import { resetHandoffNonces, signHandoff, wpHandoff } from "@/lib/auth/sources/awarewave-wp";
 
 const real = vi.hoisted(() => ({ ensure: null as null | ((...a: unknown[]) => unknown) }));
@@ -18,6 +19,23 @@ const store = vi.hoisted(() => ({
   audits: [] as Array<Record<string, unknown>>,
   prior: null as null | { result: string; organization_id: string | null },
   rpc: [] as Array<[string, Record<string, unknown>]>,
+  former: [] as Array<Record<string, unknown>>,
+  deletedEvents: new Set<string>(),
+  accounts: new Set<string>(),        // app accounts that still exist (auth user + profile + membership)
+  deleteFails: 0,
+  opsAudits: [] as Array<[string, Record<string, unknown>]>,
+}));
+// the app account removal (client-invite.ts deleteClientAccount, tested on its own in lib/accounts/__tests__)
+const removeAccount = vi.fn(async (_db: unknown, orgId: string, userId: string, opts?: { sourceDeleted?: boolean }) => {
+  if (store.deleteFails > 0) { store.deleteFails--; return { ok: false as const, status: 502 as const, error: "delete_failed" }; }
+  const had = store.accounts.delete(userId);
+  void orgId; void opts;
+  return had ? { ok: true as const, email: "x", brandsWithoutOwner: [{ id: "brand-1", name: "Soulful 品牌" }] } : { ok: true as const, email: "", gone: true };
+});
+vi.mock("@/lib/accounts/client-invite", async (orig) => ({ ...(await orig<object>()),
+  deleteClientAccount: (...a: Parameters<typeof removeAccount>) => removeAccount(...a) }));
+vi.mock("@/lib/ops-audit", () => ({
+  recordOpsAudit: async (_org: string, _role: string, _src: string, event: string, payload: Record<string, unknown>) => { store.opsAudits.push([event, payload]); },
 }));
 const orgName = vi.fn(async () => ({ data: { name: "Soulful" }, error: null }));
 const fakeDb = {
@@ -26,6 +44,10 @@ const fakeDb = {
     const q = {
       select: () => q,
       eq: (col: string, v: unknown) => { filters[col] = v; return q; },
+      order: () => q,
+      // former_customer_identities (0182/0184): the newest row of this member
+      limit: async () => ({ data: store.former.filter((r) => r.external_id === filters.external_id
+        && (filters.reason === undefined || r.reason === filters.reason)).slice(-1), error: null }),
       maybeSingle: async () => {
         if (table === "organizations") return orgName();
         const row = store.identity;
@@ -38,9 +60,13 @@ const fakeDb = {
     store.rpc.push([fn, args]);
     if (fn === "member_event_check") return { data: store.prior, error: null };
     if (fn === "member_event_deleted") {
-      const had = store.identity?.external_id === args.p_external_id;
-      if (had) store.identity = null;
-      return { data: had ? "deleted" : "no_identity", error: null };
+      if (store.deletedEvents.has(String(args.p_event_id))) return { data: "deleted", error: null };   // stored answer
+      const row = store.identity?.external_id === args.p_external_id ? store.identity : null;
+      if (!row) return { data: "no_identity", error: null };
+      store.identity = null;
+      store.former.push({ ...row, reason: "deleted" });
+      store.deletedEvents.add(String(args.p_event_id));
+      return { data: "deleted", error: null };
     }
     if (fn === "member_event_email_changed") {
       store.audits.push({ old: args.p_old_domain, new: args.p_new_domain });
@@ -80,7 +106,9 @@ describe("POST /api/webhooks/awarewave-wp-member", () => {
     vi.stubEnv("PAYMENTS_WOO_SECRET", SECRET);
     ensure.mockClear();
     orgName.mockClear();
-    Object.assign(store, { identity: null, audits: [], prior: null, rpc: [] });
+    Object.assign(store, { identity: null, audits: [], prior: null, rpc: [], former: [], deletedEvents: new Set(), accounts: new Set(["user-42"]),
+      deleteFails: 0, opsAudits: [] });
+    removeAccount.mockClear();
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
   afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
@@ -134,12 +162,42 @@ describe("POST /api/webhooks/awarewave-wp-member", () => {
     };
     resetHandoffNonces();
     expect(await findBillingAccount(fakeDb as never, { provider: "awarewave-wp", siteId: "site-awc", externalId: "42" })).toEqual({ organizationId: ORG, userId: "user-42" });
-    expect(await post(deleted())).toEqual([200, { ok: true, result: "deleted" }]);
+    expect(await post(deleted())).toEqual([200, { ok: true, result: "deleted", account: "deleted" }]);
+    // the hash is of the exact signed bytes: a replay with other content under the same id is the database's event_id_reused
     expect(store.rpc).toEqual([["member_event_deleted", { p_site_id: "site-awc", p_event_id: "member_deleted:42:aa",
-      p_occurred_at: "2026-11-24T11:00:00.000Z", p_provider: "awarewave-wp", p_external_id: "42" }]]);
+      p_occurred_at: "2026-11-24T11:00:00.000Z", p_body_sha256: createHash("sha256").update(deleted()).digest("hex"),
+      p_provider: "awarewave-wp", p_external_id: "42" }]]);
     await expect(handoff("n-after-delete-0123456789")).resolves.toMatchObject({ ok: false, status: 404, error: "not_a_member" });
     // a member who never linked: recorded, 200, nothing to undo
     expect(await post(deleted({ wp_user_id: 43, event_id: "member_deleted:43:bb" }))).toEqual([200, { ok: true, result: "no_identity" }]);
+  });
+
+  it("after member_deleted the member's app account no longer exists; the former row keeps the unit, so a refund still lands there", async () => {
+    store.identity = { external_id: "42", organization_id: ORG, user_id: "user-42" };
+    expect(await post(deleted())).toEqual([200, { ok: true, result: "deleted", account: "deleted" }]);
+    expect(removeAccount).toHaveBeenCalledWith(fakeDb, ORG, "user-42", { sourceDeleted: true });
+    expect(store.accounts.has("user-42")).toBe(false);
+    expect(store.opsAudits).toEqual([["member_account_deleted", expect.objectContaining({ user_id: "user-42",
+      brands_without_owner: [{ id: "brand-1", name: "Soulful 品牌" }] })]]);
+    expect(await findFormerAccount(fakeDb as never, { provider: "awarewave-wp", siteId: "site-awc", externalId: "42" })).toEqual({ organizationId: ORG });
+  });
+
+  it("a failed account removal is a retryable 503; the resent event finishes it", async () => {
+    store.identity = { external_id: "42", organization_id: ORG, user_id: "user-42" };
+    store.deleteFails = 1;
+    expect(await post(deleted())).toEqual([503, { ok: false, error: "member_account_not_removed" }]);
+    expect(store.accounts.has("user-42")).toBe(true);
+    expect(await post(deleted())).toEqual([200, { ok: true, result: "deleted", account: "deleted" }]);
+    expect(store.accounts.has("user-42")).toBe(false);
+    expect(removeAccount).toHaveBeenCalledTimes(2);
+  });
+
+  it("an account that is not this unit's client is kept and recorded, 200", async () => {
+    store.identity = { external_id: "42", organization_id: ORG, user_id: "user-42" };
+    removeAccount.mockResolvedValueOnce({ ok: false, status: 409, error: "not_this_client" } as never);
+    expect(await post(deleted())).toEqual([200, { ok: true, result: "deleted", account: "kept_not_client" }]);
+    expect(store.accounts.has("user-42")).toBe(true);
+    expect(store.opsAudits.map(([e]) => e)).toEqual(["member_account_kept"]);
   });
 
   it("member_email_changed only audits the two domains; identities stay", async () => {

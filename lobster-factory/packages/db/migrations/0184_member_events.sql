@@ -3,7 +3,8 @@
 -- now stamps each one with event_id (the payment events' format) and occurred_at (the site's clock).
 -- member_events = every event the database decided, one row per (site, event_id). Rules, decided under the member's
 -- lock in the same transaction as the change they guard:
---   * the same event_id again -> nothing is redone, the first answer is returned;
+--   * the same event_id again with the same bytes (sha256 of the signed body) -> nothing is redone, the first answer
+--     is returned; the same event_id with other bytes -> event_id_reused (final);
 --   * an event older than the member's latest applied state change (member_invite that linked, member_deleted) is
 --     refused, final: event_stale. A tie with a deletion is refused too (a deleted member stays deleted).
 -- Locks: the member's own (site + external id) first, then the account's 0180 lock when an account is touched -- every
@@ -22,6 +23,7 @@ create table public.member_events (
   site_id uuid not null references public.seller_sites(id) on delete restrict,
   event_id text not null check (event_id ~ '^[A-Za-z0-9_.:/#-]{1,200}$'),   -- = next-admin woo-billing.ts EVENT_ID
   kind text not null check (kind in ('member_invite', 'member_deleted', 'member_email_changed')),
+  body_sha256 text not null check (body_sha256 ~ '^[0-9a-f]{64}$'),   -- the signed body: one id, one content
   external_id text not null check (length(external_id) between 1 and 100),
   occurred_at timestamptz not null,
   result text not null check (result ~ '^[a-z0-9_]{1,60}$'),
@@ -48,19 +50,20 @@ alter table public.former_customer_identities
 create index former_customer_identities_org_idx on public.former_customer_identities(organization_id, replaced_at desc);
 
 -- The stored answer for this event id, or event_stale, or null = a new event to decide. Callers hold the member's lock.
--- event_id_reused: the id is already another member's or another kind's event (the sender's bug; final).
+-- event_id_reused: the id is already another content's event -- another member, kind, code or time (final).
 create function public.member_event_prior(p_site_id uuid, p_event_id text, p_kind text, p_external_id text,
-  p_occurred_at timestamptz) returns text
+  p_occurred_at timestamptz, p_body_sha256 text) returns text
 language sql stable security invoker set search_path = public, pg_temp as $$
   select coalesce(
-    (select case when e.kind = p_kind and e.external_id = p_external_id then e.result else 'event_id_reused' end
+    (select case when e.kind = p_kind and e.external_id = p_external_id and e.body_sha256 = p_body_sha256
+                 then e.result else 'event_id_reused' end
        from public.member_events e where e.site_id = p_site_id and e.event_id = p_event_id),
     (select 'event_stale' from public.member_events e
        where e.site_id = p_site_id and e.external_id = p_external_id and e.applied
          and (e.occurred_at > p_occurred_at or (e.occurred_at = p_occurred_at and e.kind = 'member_deleted'))
        limit 1));
 $$;
-revoke all on function public.member_event_prior(uuid, text, text, text, timestamptz) from public, anon, authenticated, service_role;
+revoke all on function public.member_event_prior(uuid, text, text, text, timestamptz, text) from public, anon, authenticated, service_role;
 
 create function public.member_event_lock(p_site_id uuid, p_external_id text) returns void
 language sql volatile security invoker set search_path = public, pg_temp as $$
@@ -71,27 +74,27 @@ revoke all on function public.member_event_lock(uuid, text) from public, anon, a
 -- The route's early answer (no lock, read only): a known event's stored answer with its account, or event_stale, so a
 -- replayed or late member_invite makes no app account before the locked decision below refuses it.
 create function public.member_event_check(p_site_id uuid, p_event_id text, p_kind text, p_external_id text,
-  p_occurred_at timestamptz) returns jsonb
+  p_occurred_at timestamptz, p_body_sha256 text) returns jsonb
 language sql stable security definer set search_path = public, pg_temp as $$
   select case when v.result is null then null else jsonb_build_object('result', v.result, 'organization_id',
     (select e.organization_id from public.member_events e where e.site_id = p_site_id and e.event_id = p_event_id
-       and e.kind = p_kind and e.external_id = p_external_id)) end
-  from (select public.member_event_prior(p_site_id, p_event_id, p_kind, p_external_id, p_occurred_at) as result) v;
+       and e.kind = p_kind and e.external_id = p_external_id and e.body_sha256 = p_body_sha256)) end
+  from (select public.member_event_prior(p_site_id, p_event_id, p_kind, p_external_id, p_occurred_at, p_body_sha256) as result) v;
 $$;
 
 -- member_invite: 0182's member_invite_redeem, decided once per event and never for a stale one.
-create function public.member_event_invite(p_site_id uuid, p_event_id text, p_occurred_at timestamptz, p_invite_id uuid,
-  p_provider text, p_external_id text, p_user_id uuid, p_email text) returns text
+create function public.member_event_invite(p_site_id uuid, p_event_id text, p_occurred_at timestamptz, p_body_sha256 text,
+  p_invite_id uuid, p_provider text, p_external_id text, p_user_id uuid, p_email text) returns text
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v text;
 begin
   perform public.member_event_lock(p_site_id, p_external_id);
-  v := public.member_event_prior(p_site_id, p_event_id, 'member_invite', p_external_id, p_occurred_at);
+  v := public.member_event_prior(p_site_id, p_event_id, 'member_invite', p_external_id, p_occurred_at, p_body_sha256);
   if v is not null then return v; end if;
   v := public.member_invite_redeem(p_invite_id, p_provider, p_site_id, p_external_id, p_user_id, p_email);
-  insert into public.member_events(site_id, event_id, kind, external_id, occurred_at, result, applied, organization_id)
-    values (p_site_id, p_event_id, 'member_invite', p_external_id, p_occurred_at, v, v = 'ok',
+  insert into public.member_events(site_id, event_id, kind, body_sha256, external_id, occurred_at, result, applied, organization_id)
+    values (p_site_id, p_event_id, 'member_invite', p_body_sha256, p_external_id, p_occurred_at, v, v = 'ok',
             (select organization_id from public.member_invites where id = p_invite_id));
   return v;
 end $$;
@@ -99,7 +102,7 @@ end $$;
 -- member_deleted: the member's identity leaves (deleted), a live transfer naming it is voided (it can never complete),
 -- one audit row. A member with no identity: recorded (applied, so a late invite of theirs stays refused), no_identity.
 create function public.member_event_deleted(p_site_id uuid, p_event_id text, p_occurred_at timestamptz,
-  p_provider text, p_external_id text) returns text
+  p_body_sha256 text, p_provider text, p_external_id text) returns text
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v text;
@@ -107,7 +110,7 @@ declare
   v_event uuid;
 begin
   perform public.member_event_lock(p_site_id, p_external_id);
-  v := public.member_event_prior(p_site_id, p_event_id, 'member_deleted', p_external_id, p_occurred_at);
+  v := public.member_event_prior(p_site_id, p_event_id, 'member_deleted', p_external_id, p_occurred_at, p_body_sha256);
   if v is not null then return v; end if;
   select * into v_old from public.customer_identities where site_id = p_site_id and external_id = p_external_id;
   if found then
@@ -116,12 +119,12 @@ begin
     select * into v_old from public.customer_identities where id = v_old.id for update;
   end if;
   if v_old.id is null then
-    insert into public.member_events(site_id, event_id, kind, external_id, occurred_at, result, applied)
-      values (p_site_id, p_event_id, 'member_deleted', p_external_id, p_occurred_at, 'no_identity', true);
+    insert into public.member_events(site_id, event_id, kind, body_sha256, external_id, occurred_at, result, applied)
+      values (p_site_id, p_event_id, 'member_deleted', p_body_sha256, p_external_id, p_occurred_at, 'no_identity', true);
     return 'no_identity';
   end if;
-  insert into public.member_events(site_id, event_id, kind, external_id, occurred_at, result, applied, organization_id)
-    values (p_site_id, p_event_id, 'member_deleted', p_external_id, p_occurred_at, 'deleted', true, v_old.organization_id)
+  insert into public.member_events(site_id, event_id, kind, body_sha256, external_id, occurred_at, result, applied, organization_id)
+    values (p_site_id, p_event_id, 'member_deleted', p_body_sha256, p_external_id, p_occurred_at, 'deleted', true, v_old.organization_id)
     returning id into v_event;
   delete from public.customer_identities where id = v_old.id;
   insert into public.former_customer_identities(identity_id, provider, site_id, external_id, user_id, organization_id,
@@ -141,7 +144,7 @@ end $$;
 
 -- member_email_changed: audit only (identities never follow an email; the domains only, never an address).
 create function public.member_event_email_changed(p_site_id uuid, p_event_id text, p_occurred_at timestamptz,
-  p_provider text, p_external_id text, p_old_domain text, p_new_domain text) returns text
+  p_body_sha256 text, p_provider text, p_external_id text, p_old_domain text, p_new_domain text) returns text
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v text;
@@ -151,12 +154,12 @@ begin
     raise exception 'member_event:invalid_domain';
   end if;
   perform public.member_event_lock(p_site_id, p_external_id);
-  v := public.member_event_prior(p_site_id, p_event_id, 'member_email_changed', p_external_id, p_occurred_at);
+  v := public.member_event_prior(p_site_id, p_event_id, 'member_email_changed', p_external_id, p_occurred_at, p_body_sha256);
   if v is not null then return v; end if;
   select organization_id into v_org from public.customer_identities where site_id = p_site_id and external_id = p_external_id;
   v := case when v_org is null then 'no_identity' else 'audited' end;
-  insert into public.member_events(site_id, event_id, kind, external_id, occurred_at, result, applied, organization_id)
-    values (p_site_id, p_event_id, 'member_email_changed', p_external_id, p_occurred_at, v, false, v_org);
+  insert into public.member_events(site_id, event_id, kind, body_sha256, external_id, occurred_at, result, applied, organization_id)
+    values (p_site_id, p_event_id, 'member_email_changed', p_body_sha256, p_external_id, p_occurred_at, v, false, v_org);
   if v_org is not null then
     insert into public.ops_audit_events(organization_id, actor_role, event_type, target_type, target_id, trace_id, payload)
       values (v_org, 'operator', 'member_email_changed', 'organizations', v_org::text, gen_random_uuid()::text,
@@ -167,14 +170,14 @@ begin
   return v;
 end $$;
 
-revoke all on function public.member_event_check(uuid, text, text, text, timestamptz) from public, anon, authenticated;
-grant execute on function public.member_event_check(uuid, text, text, text, timestamptz) to service_role;
-revoke all on function public.member_event_invite(uuid, text, timestamptz, uuid, text, text, uuid, text) from public, anon, authenticated;
-grant execute on function public.member_event_invite(uuid, text, timestamptz, uuid, text, text, uuid, text) to service_role;
-revoke all on function public.member_event_deleted(uuid, text, timestamptz, text, text) from public, anon, authenticated;
-grant execute on function public.member_event_deleted(uuid, text, timestamptz, text, text) to service_role;
-revoke all on function public.member_event_email_changed(uuid, text, timestamptz, text, text, text, text) from public, anon, authenticated;
-grant execute on function public.member_event_email_changed(uuid, text, timestamptz, text, text, text, text) to service_role;
+revoke all on function public.member_event_check(uuid, text, text, text, timestamptz, text) from public, anon, authenticated;
+grant execute on function public.member_event_check(uuid, text, text, text, timestamptz, text) to service_role;
+revoke all on function public.member_event_invite(uuid, text, timestamptz, text, uuid, text, text, uuid, text) from public, anon, authenticated;
+grant execute on function public.member_event_invite(uuid, text, timestamptz, text, uuid, text, text, uuid, text) to service_role;
+revoke all on function public.member_event_deleted(uuid, text, timestamptz, text, text, text) from public, anon, authenticated;
+grant execute on function public.member_event_deleted(uuid, text, timestamptz, text, text, text) to service_role;
+revoke all on function public.member_event_email_changed(uuid, text, timestamptz, text, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.member_event_email_changed(uuid, text, timestamptz, text, text, text, text, text) to service_role;
 -- Every redeem now goes through member_event_invite (stamped, replay-checked): the app loses the unstamped entry point.
 revoke execute on function public.member_invite_redeem(uuid, text, uuid, text, uuid, text) from service_role;
 

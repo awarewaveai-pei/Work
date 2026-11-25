@@ -136,6 +136,7 @@ describe("a member who signed up through a staff invite (ADR 021 D4, 0180)", () 
       invite: vi.fn(async () => ({ ok: true as const, userId: "u-mail", kind: "invite" as const, created: true })),
       verified: vi.fn(async () => ({ ok: true as const, userId: "u-boss", created: true })),
       productKey: vi.fn(async () => "social"),
+      discard: vi.fn(async () => ({ ok: true as const, email: "boss@soulful.tw" })),
     };
     const i: MemberInviteDeps = {
       memberInvite: vi.fn(async () => (inv === null ? null : { ...live, ...inv })),
@@ -184,6 +185,27 @@ describe("a member who signed up through a staff invite (ADR 021 D4, 0180)", () 
     o.d.find = vi.fn(async () => holder);
     o.i.transferOf = vi.fn(async () => null);
     await expect(ensureWpCustomer(db, invited, undefined, false, o.d, o.i)).resolves.toEqual({ organizationId: ORG_INV, created: false });
+  });
+
+  it("a deletion decided between the early check and the locked redeem: refused, and the account this call made is removed", async () => {
+    // the interleaving: the account is made (verified), then member_deleted commits, then the redeem answers event_stale
+    const { d, i, linked } = deps();
+    i.redeem = vi.fn(async () => "event_stale");
+    await expect(ensureWpCustomer(db, invited, undefined, false, d, i)).rejects.toMatchObject({ code: "event_stale" });
+    expect(d.verified).toHaveBeenCalledTimes(1);
+    expect(d.discard).toHaveBeenCalledWith(db, ORG_INV, "u-boss");   // auth user, profile, membership: nothing left
+    expect(linked).toEqual([]);
+    // an account that existed before this call is never removed
+    const before = deps();
+    before.d.verified = vi.fn(async () => ({ ok: true as const, userId: "u-staff-made", created: false }));
+    before.i.redeem = vi.fn(async () => "event_stale");
+    await expect(ensureWpCustomer(db, invited, undefined, false, before.d, before.i)).rejects.toMatchObject({ code: "event_stale" });
+    expect(before.d.discard).not.toHaveBeenCalled();
+    // the no-code path (account first, link after) is the same class: an identity_conflict removes what it made
+    const own = deps();
+    own.d.link = vi.fn(async () => { throw new Error("identity_conflict"); });
+    await expect(ensureWpCustomer(db, MEMBER, undefined, true, own.d, own.i)).rejects.toMatchObject({ code: "identity_conflict" });
+    expect(own.d.discard).toHaveBeenCalledWith(db, "org-new", "u-boss");
   });
 
   it("no code: the path of today, the invite is never read", async () => {

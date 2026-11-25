@@ -44,7 +44,8 @@ const DEFAULT_DEPS: WooBillingDeps = {
 };
 /** Only a payment may create an account (wp-customers.ts ensureWpCustomer). */
 const PAYMENT_KINDS = new Set(["subscription_paid", "credit_pack"]);
-const EVENT_ID = /^[\w.:\-/#]{1,200}$/;
+/** A payment or member event id (the member-event route and 0184 member_events check the same set). */
+export const EVENT_ID = /^[\w.:\-/#]{1,200}$/;
 /** What another seller's site may be told about its own member; any other account refusal (whose account an email is:
  *  staff, another seller's customer, ...) reaches it only as customer_refused, the detail goes to the incident. */
 const SITE_LOCAL_REFUSALS = new Set(["unknown_member", "email_unverified", "unknown_plan"]);

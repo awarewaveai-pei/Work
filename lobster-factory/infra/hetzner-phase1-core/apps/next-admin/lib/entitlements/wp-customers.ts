@@ -9,7 +9,7 @@
 // identity row (0124, unique per member and per user) is written last and is the "done" mark. Every step is safe to
 // repeat, so a half-made account is finished by the sender's retry. GoTrue and Postgres cannot share a transaction.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { findAuthUserByEmail, inviteClientAccount, verifiedClientAccount } from "@/lib/accounts/client-invite";
+import { deleteClientAccount, findAuthUserByEmail, inviteClientAccount, verifiedClientAccount } from "@/lib/accounts/client-invite";
 import { servedNextAdminProducts } from "@/lib/portal/doors";
 import { AWARE_WAVE_KEY_ID, siteIdentityProvider, type SellerSite } from "@/lib/payments/sites";
 import { findBillingAccount, findFormerAccount, findMemberInviteByCode, inviteTarget, isInviteCode, linkIdentity, memberInviteTransferOf, redeemMemberInviteAtomic, type Identity } from "./identities";
@@ -147,6 +147,8 @@ export interface WpCustomerDeps {
   invite: typeof inviteClientAccount;
   verified: typeof verifiedClientAccount;
   productKey: (db: SupabaseClient, planKey: string | undefined) => Promise<string>;
+  /** M10: removes an account THIS call created when the link is then refused (client-invite.ts deleteClientAccount) */
+  discard?: typeof deleteClientAccount;
 }
 /** The staff-invite path's reads and writes (0180), apart so the path without a code keeps its own deps. */
 export interface MemberInviteDeps {
@@ -162,11 +164,34 @@ const DEFAULT_DEPS: WpCustomerDeps = {
 };
 const DEFAULT_INVITE_DEPS: MemberInviteDeps = { memberInvite: findMemberInviteByCode, inviteTarget, redeem: redeemMemberInviteAtomic, transferOf: memberInviteTransferOf };
 
-async function linkOrRefuse(db: SupabaseClient, deps: WpCustomerDeps, identity: Identity, userId: string, organizationId: string): Promise<void> {
+/** Invariant (M10): a refused link leaves no account and no unit access behind. The account is made before the
+ *  database's locked decision (GoTrue and Postgres share no transaction), so a final refusal after it removes what
+ *  this call made -- the auth user, then its profile and membership (deleteClientAccount, the staff 刪除 path).
+ *  An account that existed before this call (made.created false) is never touched. A failed removal is logged: the
+ *  refusal still stands (a retry is answered from member_events before reaching here). */
+async function refuseAfterMade(db: SupabaseClient, deps: WpCustomerDeps, organizationId: string,
+  made: { userId: string; created: boolean }, code: string): Promise<never> {
+  if (made.created) {
+    let error: string | null;
+    try {
+      const out = await (deps.discard ?? deleteClientAccount)(db, organizationId, made.userId);
+      error = out.ok === false ? out.error : null;
+    } catch (e) {
+      error = String(e).slice(0, 200);
+    }
+    if (error) console.error("[wp-customer] refused link, made account not removed", { organizationId, userId: made.userId, code, error });
+  }
+  throw new WpCustomerRefused(code);
+}
+
+async function linkOrRefuse(db: SupabaseClient, deps: WpCustomerDeps, identity: Identity, userId: string, organizationId: string,
+  created = false): Promise<void> {
   try {
     await deps.link(db, { ...identity, userId, organizationId });
   } catch (error) {
-    if (error instanceof Error && error.message === "identity_conflict") throw new WpCustomerRefused("identity_conflict");
+    if (error instanceof Error && error.message === "identity_conflict") {
+      return refuseAfterMade(db, deps, organizationId, { userId, created }, "identity_conflict");
+    }
     throw error;
   }
 }
@@ -213,7 +238,7 @@ export async function ensureWpCustomer(db: SupabaseClient, member: WpMember, pla
     const made = await deps.verified(db, { orgId: org.id, email: member.email });
     if (made.ok === false && (made.status === 409 || made.status === 400)) throw new WpCustomerRefused(made.error);
     if (made.ok === false) throw new Error(`wp customer account failed: ${made.error}`);
-    await linkOrRefuse(db, deps, identity, made.userId, org.id);
+    await linkOrRefuse(db, deps, identity, made.userId, org.id, made.created);
     return { organizationId: org.id, created: true };
   }
   const invited = await deps.invite(db, { orgId: org.id, orgName: org.name, email: member.email, productKey });
@@ -223,7 +248,7 @@ export async function ensureWpCustomer(db: SupabaseClient, member: WpMember, pla
   if (invited.ok === false && (invited.status === 409 || invited.status === 400)) throw new WpCustomerRefused(invited.error);
   if (invited.ok === false && !invited.userId) throw new Error(`wp customer invite failed: ${invited.error}`);
   if (invited.ok === false) console.warn(`[wp-customer] wp_user_id=${member.wpUserId} account made, mail failed: ${invited.error}`);
-  await linkOrRefuse(db, deps, identity, invited.userId as string, org.id);
+  await linkOrRefuse(db, deps, identity, invited.userId as string, org.id, invited.created === true);
   return { organizationId: org.id, created: true };
 }
 
@@ -266,6 +291,6 @@ async function redeemMemberInvite(db: SupabaseClient, member: WpMember, identity
   if (made.ok === false) throw new Error(`wp customer account failed: ${made.error}`);
   // The checks above only spare a needless account; the decision is the database's, in one transaction.
   const why = await invites.redeem(db, { ...identity, inviteId: inv.id, userId: made.userId, email: member.email });
-  if (why !== "ok") throw new WpCustomerRefused(why);
+  if (why !== "ok") return refuseAfterMade(db, deps, inv.organizationId, made, why);
   return { organizationId: inv.organizationId, created: false };
 }

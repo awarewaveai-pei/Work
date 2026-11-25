@@ -294,7 +294,8 @@ export async function createMemberTransfer(db: SupabaseClient, input: {
 // applied state change (an invite that linked, a deletion) is event_stale. member_deleted moves the identity to
 // former_customer_identities (reason "deleted"), so sign-in answers not_a_member; money keeps findFormerAccount.
 
-export interface MemberEventStamp { eventId: string; occurredAt: string }
+/** bodySha256: sha256 (hex) of the signed body -- the same event_id with other content is event_id_reused. */
+export interface MemberEventStamp { eventId: string; occurredAt: string; bodySha256: string }
 export type MemberEventKind = "member_invite" | "member_deleted" | "member_email_changed";
 
 async function rpcText(db: SupabaseClient, fn: string, args: Record<string, unknown>): Promise<string> {
@@ -310,6 +311,7 @@ export async function memberEventCheck(db: SupabaseClient, input: Identity & Mem
 ): Promise<{ result: string; organizationId: string | null } | null> {
   const { data, error } = await db.rpc("member_event_check", {
     p_site_id: input.siteId, p_event_id: input.eventId, p_kind: input.kind, p_external_id: input.externalId, p_occurred_at: input.occurredAt,
+    p_body_sha256: input.bodySha256,
   });
   if (error) throw new Error(`member_event_check failed: ${error.message}`);
   const row = data as { result?: unknown; organization_id?: unknown } | null;
@@ -321,7 +323,7 @@ export async function memberEventCheck(db: SupabaseClient, input: Identity & Mem
 export async function redeemMemberInviteEvent(db: SupabaseClient,
   input: Identity & MemberEventStamp & { inviteId: string; userId: string; email: string }): Promise<string> {
   return rpcText(db, "member_event_invite", {
-    p_site_id: input.siteId, p_event_id: input.eventId, p_occurred_at: input.occurredAt, p_invite_id: input.inviteId,
+    p_site_id: input.siteId, p_event_id: input.eventId, p_occurred_at: input.occurredAt, p_body_sha256: input.bodySha256, p_invite_id: input.inviteId,
     p_provider: input.provider, p_external_id: input.externalId, p_user_id: input.userId, p_email: input.email,
   });
 }
@@ -329,7 +331,7 @@ export async function redeemMemberInviteEvent(db: SupabaseClient,
 /** deleted | no_identity | event_stale | event_id_reused */
 export async function memberDeletedEvent(db: SupabaseClient, input: Identity & MemberEventStamp): Promise<string> {
   return rpcText(db, "member_event_deleted", {
-    p_site_id: input.siteId, p_event_id: input.eventId, p_occurred_at: input.occurredAt,
+    p_site_id: input.siteId, p_event_id: input.eventId, p_occurred_at: input.occurredAt, p_body_sha256: input.bodySha256,
     p_provider: input.provider, p_external_id: input.externalId,
   });
 }
@@ -338,16 +340,35 @@ export async function memberDeletedEvent(db: SupabaseClient, input: Identity & M
 export async function memberEmailChangedEvent(db: SupabaseClient,
   input: Identity & MemberEventStamp & { oldDomain: string; newDomain: string }): Promise<string> {
   return rpcText(db, "member_event_email_changed", {
-    p_site_id: input.siteId, p_event_id: input.eventId, p_occurred_at: input.occurredAt,
+    p_site_id: input.siteId, p_event_id: input.eventId, p_occurred_at: input.occurredAt, p_body_sha256: input.bodySha256,
     p_provider: input.provider, p_external_id: input.externalId, p_old_domain: input.oldDomain, p_new_domain: input.newDomain,
   });
 }
 
-/** When this account's member was deleted on the site (its latest former link, if that was a deletion), else null. */
-export async function memberDeletedAt(db: SupabaseClient, organizationId: string): Promise<string | null> {
+/** The app account a member_deleted took the identity from (0184 former row, reason "deleted"): the route removes it
+ *  (client-invite.ts deleteClientAccount sourceDeleted). Read again on every retry of the event, so nothing else stores it. */
+export async function deletedMemberAccount(db: SupabaseClient, id: Identity): Promise<BillingAccountIdentity | null> {
+  const { data, error } = await db.from("former_customer_identities").select("organization_id, user_id")
+    .eq("site_id", id.siteId).eq("external_id", id.externalId).eq("reason", "deleted")
+    .order("replaced_at", { ascending: false }).limit(1);
+  if (error) throw new Error(error.message);
+  const row = (data ?? [])[0] as { organization_id: string; user_id: string } | undefined;
+  return row ? { organizationId: row.organization_id, userId: row.user_id } : null;
+}
+
+/** When this account's member was deleted on the site (its latest former link, if that was a deletion), with the
+ *  brands that deletion left without an owner row (the route's member_account_deleted audit), else null. */
+export async function memberDeletedStatus(db: SupabaseClient, organizationId: string,
+): Promise<{ at: string; brandsWithoutOwner: string[] } | null> {
   const { data, error } = await db.from("former_customer_identities").select("reason, replaced_at")
     .eq("organization_id", organizationId).order("replaced_at", { ascending: false }).limit(1);
   if (error) throw new Error(error.message);
   const row = (data ?? [])[0] as { reason: string; replaced_at: string } | undefined;
-  return row?.reason === "deleted" ? row.replaced_at : null;
+  if (row?.reason !== "deleted") return null;
+  const audit = await db.from("ops_audit_events").select("payload").eq("organization_id", organizationId)
+    .eq("event_type", "member_account_deleted").order("created_at", { ascending: false }).limit(1);
+  if (audit.error) throw new Error(audit.error.message);
+  const brands = ((audit.data ?? [])[0] as { payload?: { brands_without_owner?: unknown } } | undefined)?.payload?.brands_without_owner;
+  const names = Array.isArray(brands) ? brands.map((b) => (b as { name?: unknown })?.name).filter((n): n is string => typeof n === "string") : [];
+  return { at: row.replaced_at, brandsWithoutOwner: names };
 }

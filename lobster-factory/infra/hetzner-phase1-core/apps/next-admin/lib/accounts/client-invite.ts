@@ -255,17 +255,81 @@ export async function verifiedClientAccount(
   return { ok: true, userId: ready.userId, created: ready.created };
 }
 
-export type DeleteOutcome = { ok: true; email: string } | { ok: false; status: 404 | 409 | 502 | 503; error: string };
+/** gone: the account was already removed (a retried source deletion). brandsWithoutOwner: with sourceDeleted, the
+ *  unit's brands whose last owner row this person was (staff owner/admin still manage them, 0103:8; someone to add). */
+export type DeleteOutcome = { ok: true; email: string; gone?: boolean; brandsWithoutOwner?: Array<{ id: string; name: string }> }
+  | { ok: false; status: 404 | 409 | 502 | 503; error: string };
+
+/** sourceDeleted: the cash-register site deleted this person (ADR 021 G10, M10 member_deleted). Their brand roles in
+ *  this unit's brands go with the account, the last owner row included -- the account cannot outlive its person to keep
+ *  them. Off (staff pressing 刪除) = unchanged: a brand role is a 409 still_member. */
+export interface DeleteOptions { sourceDeleted?: boolean }
+
+/** The unit and its brands (child organizations): where a client account of the unit can hold a brand role. */
+async function unitBrandIds(sb: SupabaseClient, orgId: string): Promise<string[] | null> {
+  const { data, error } = await sb.from("organizations").select("id").eq("parent_organization_id", orgId);
+  return error ? null : [orgId, ...((data ?? []) as Array<{ id: string }>).map((r) => r.id)];
+}
+
+/** Removes the person's brand roles in the unit's brands; each removal is written to social_audit_log first (0103 §3:
+ *  every member change audited), so a retry after a failed delete repeats at most an audit row, never loses one. Then
+ *  names the brands this person's removals left with no owner row (read from the audit, so a retry still names them). */
+async function dropUnitBrandRoles(sb: SupabaseClient, orgId: string, userId: string,
+): Promise<{ ok: true; brandsWithoutOwner: Array<{ id: string; name: string }> } | { ok: false; error: string }> {
+  const brands = await unitBrandIds(sb, orgId);
+  if (!brands) return { ok: false, error: "brand_lookup_failed" };
+  const held = await sb.from("social_brand_members").select("organization_id, role").eq("user_id", userId).in("organization_id", brands);
+  if (held.error) return { ok: false, error: "member_lookup_failed" };
+  const rows = (held.data ?? []) as Array<{ organization_id: string; role: string }>;
+  if (rows.length) {
+    const audit = await sb.from("social_audit_log").insert(rows.map((r) => ({
+      organization_id: r.organization_id, actor: "member_event", action: "member_remove",
+      detail: { user_id: userId, role: r.role, reason: "source_deleted" },
+    })));
+    if (audit.error) return { ok: false, error: "brand_audit_failed" };
+    const del = await sb.from("social_brand_members").delete().eq("user_id", userId).in("organization_id", brands);
+    if (del.error) return { ok: false, error: "brand_role_delete_failed" };
+  }
+  // every brand this person was removed from as owner by a source deletion (this try or an earlier one) ...
+  const owned = await sb.from("social_audit_log").select("organization_id, detail").eq("action", "member_remove")
+    .in("organization_id", brands).contains("detail", { user_id: userId, role: "owner", reason: "source_deleted" });
+  if (owned.error) return { ok: false, error: "brand_audit_lookup_failed" };
+  const ownedIds = [...new Set(((owned.data ?? []) as Array<{ organization_id: string }>).map((r) => r.organization_id))];
+  if (!ownedIds.length) return { ok: true, brandsWithoutOwner: [] };
+  // ... that has no owner row now
+  const owners = await sb.from("social_brand_members").select("organization_id").eq("role", "owner").in("organization_id", ownedIds);
+  if (owners.error) return { ok: false, error: "member_lookup_failed" };
+  const still = new Set(((owners.data ?? []) as Array<{ organization_id: string }>).map((r) => r.organization_id));
+  const orphanIds = ownedIds.filter((id) => !still.has(id));
+  if (!orphanIds.length) return { ok: true, brandsWithoutOwner: [] };
+  const names = await sb.from("organizations").select("id, name").in("id", orphanIds);
+  if (names.error) return { ok: false, error: "brand_lookup_failed" };
+  return { ok: true, brandsWithoutOwner: ((names.data ?? []) as Array<{ id: string; name: string }>).map((r) => ({ id: r.id, name: r.name })) };
+}
 
 /**
  * Remove a client account of `orgId` (a mistyped email, a person who left). Brand roles are removed first in
- * 社群發文 → 成員, where the last-owner rule lives (0103); an account that still has one is refused here.
+ * 社群發文 → 成員, where the last-owner rule lives (0103); an account that still has one is refused here -- unless
+ * `sourceDeleted` (DeleteOptions), which removes them here. Every step is safe to repeat.
  * Auth user first: that ends sign-in at once; the profile (and its membership, by cascade) follows.
  */
-export async function deleteClientAccount(sb: SupabaseClient, orgId: string, userId: string): Promise<DeleteOutcome> {
+export async function deleteClientAccount(sb: SupabaseClient, orgId: string, userId: string, opts: DeleteOptions = {}): Promise<DeleteOutcome> {
   const { data: got, error: getErr } = await sb.auth.admin.getUserById(userId);
   if (getErr && getErr.status !== 404) return { ok: false, status: 503, error: "auth_lookup_failed" };
   const user = got?.user;
+  let brandsWithoutOwner: Array<{ id: string; name: string }> | undefined;
+  if (opts.sourceDeleted) {
+    if (!user) {
+      // an earlier try removed the sign-in: finish its profile (membership by cascade), only if it is this unit's
+      const { error } = await sb.from("profiles").delete().eq("id", userId).eq("default_organization_id", orgId);
+      if (error) return { ok: false, status: 503, error: "profile_delete_failed" };
+      return { ok: true, email: "", gone: true };
+    }
+    if (!belongsTo(user, orgId)) return { ok: false, status: 409, error: "not_this_client" };   // staff, another unit
+    const dropped = await dropUnitBrandRoles(sb, orgId, userId);
+    if (dropped.ok === false) return { ok: false, status: 503, error: dropped.error };
+    brandsWithoutOwner = dropped.brandsWithoutOwner;
+  }
   if (!user || !belongsTo(user, orgId)) return { ok: false, status: 404, error: "account_not_found" };
   const { count, error: memErr } = await sb
     .from("social_brand_members")
@@ -278,5 +342,5 @@ export async function deleteClientAccount(sb: SupabaseClient, orgId: string, use
   const { error: profErr } = await sb.from("profiles").delete().eq("id", userId);
   // sign-in is already gone; a leftover profile is cleared by the next press for this email (readyAccount)
   if (profErr) console.error("[client-invite] account deleted, profile left behind", { userId, error: profErr.message });
-  return { ok: true, email: user.email ?? "" };
+  return brandsWithoutOwner ? { ok: true, email: user.email ?? "", brandsWithoutOwner } : { ok: true, email: user.email ?? "" };
 }

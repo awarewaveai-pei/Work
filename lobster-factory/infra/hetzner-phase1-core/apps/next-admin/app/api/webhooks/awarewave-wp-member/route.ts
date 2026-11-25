@@ -8,17 +8,20 @@
 // the bytes; no header = aware-wave.com). /api/webhooks is outside middleware. Answers, read by the plugin
 // (PaymentSender::classify's rule): 200 done; 4xx final (409 carries the refusal code unchanged); 401 / 404 / 5xx (a
 // closed site too) = the sender retries the same event.
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { normalizeEmail } from "@/lib/accounts/client-invite";
+import { deleteClientAccount, normalizeEmail } from "@/lib/accounts/client-invite";
 import {
-  findMemberInviteByCode, inviteTarget, memberDeletedEvent, memberEmailChangedEvent, memberEventCheck, memberInviteTransferOf,
+  deletedMemberAccount, findMemberInviteByCode, inviteTarget, memberDeletedEvent, memberEmailChangedEvent, memberEventCheck, memberInviteTransferOf,
   redeemMemberInviteEvent, type Identity, type MemberEventStamp,
 } from "@/lib/entitlements/identities";
 import { ensureWpCustomer, WpCustomerRefused, type MemberInviteDeps } from "@/lib/entitlements/wp-customers";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { paymentProvider } from "@/lib/payments";
+import { EVENT_ID } from "@/lib/payments/woo-billing";
 import { siteIdentityProvider, type SellerSite } from "@/lib/payments/sites";
+import { recordOpsAudit } from "@/lib/ops-audit";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -28,8 +31,6 @@ type Json = Record<string, unknown>;
 type Event = { site: SellerSite; body: Json; stamp: MemberEventStamp; identity: Identity };
 const fail = (error: string, status: number) => NextResponse.json({ ok: false, error }, { status });
 
-/** = lib/payments/woo-billing.ts EVENT_ID (not exported there; 0184 member_events checks the same set). */
-const EVENT_ID = /^[\w.:\-/#]{1,200}$/;
 /** The plugin's gmdate('Y-m-d\TH:i:s\Z'); fractions allowed. */
 const OCCURRED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/;
 /** A stamp this far past the app's clock is a broken site clock: it would make the member's later events stale. */
@@ -76,9 +77,33 @@ async function memberInvite(db: SupabaseClient, ev: Event): Promise<Response> {
 const answer = (result: string) => (STAMP_REFUSALS.has(result) ? fail(result, 409) : NextResponse.json({ ok: true, result }));
 
 /** member_deleted: {kind, wp_user_id, event_id, occurred_at}. Sent for every deleted user: the app decides (no identity =
- *  recorded, 200). */
+ *  recorded, 200; a member a transfer replaced has none, so their account stays staff's call). The database moves the
+ *  identity (0184, one transaction); then the app account it named is removed -- a client account belongs to one unit
+ *  only, so ending its access there is ending it (deleteClientAccount sourceDeleted: brand roles too). A failed removal
+ *  is a retryable 503: the plugin resends the same event, the database answers its stored "deleted", the removal runs
+ *  again (an account already gone counts as done). */
 async function memberDeleted(db: SupabaseClient, ev: Event): Promise<Response> {
-  return answer(await memberDeletedEvent(db, { ...ev.identity, ...ev.stamp }));
+  const result = await memberDeletedEvent(db, { ...ev.identity, ...ev.stamp });
+  if (result !== "deleted") return answer(result);
+  const account = await deletedMemberAccount(db, ev.identity);
+  if (!account) throw new Error("member_deleted without its former row");
+  const out = await deleteClientAccount(db, account.organizationId, account.userId, { sourceDeleted: true });
+  const audit = { user_id: account.userId, event_id: ev.stamp.eventId, site_id: ev.site.id };
+  if (out.ok === false && out.error === "not_this_client") {
+    // not a client account of this unit (an identity only ever links one; kept and recorded, never removed)
+    await recordOpsAudit(account.organizationId, "operator", "member_event", "member_account_kept", { ...audit, why: out.error });
+    return NextResponse.json({ ok: true, result, account: "kept_not_client" });
+  }
+  if (out.ok === false && out.error === "still_member") {
+    // a brand role in another unit's brand: not this event's to remove; final, staff decide
+    await recordOpsAudit(account.organizationId, "operator", "member_event", "member_account_kept", { ...audit, why: out.error });
+    return fail("member_account_kept_brand_role_elsewhere", 409);
+  }
+  if (out.ok === false) return fail("member_account_not_removed", 503);
+  await recordOpsAudit(account.organizationId, "operator", "member_event", "member_account_deleted", {
+    ...audit, already_gone: out.gone === true, brands_without_owner: out.brandsWithoutOwner ?? [],
+  });
+  return NextResponse.json({ ok: true, result, account: "deleted" });
 }
 
 /** member_email_changed: {kind, wp_user_id, old_email, new_email, event_id, occurred_at}. Audit only, by email domain. */
@@ -128,7 +153,8 @@ export async function POST(req: Request): Promise<Response> {
   if (!db) return fail("member_event_not_recorded", 500);
   const ev: Event = {
     site, body,
-    stamp: { eventId: body.event_id, occurredAt: new Date(at).toISOString() },
+    // the signed bytes' hash: a replay must be the same content, not only the same id (0184 member_event_prior)
+    stamp: { eventId: body.event_id, occurredAt: new Date(at).toISOString(), bodySha256: createHash("sha256").update(read.raw, "utf8").digest("hex") },
     identity: { provider: siteIdentityProvider(site), siteId: site.id, externalId: String(wpUserId) },
   };
   try {

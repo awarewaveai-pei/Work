@@ -19,12 +19,12 @@ begin
 end $$;
 
 grant execute on function public.member_invite_redeem(uuid, text, uuid, text, uuid, text) to service_role;
-drop function if exists public.member_event_email_changed(uuid, text, timestamptz, text, text, text, text);
-drop function if exists public.member_event_deleted(uuid, text, timestamptz, text, text);
-drop function if exists public.member_event_invite(uuid, text, timestamptz, uuid, text, text, uuid, text);
-drop function if exists public.member_event_check(uuid, text, text, text, timestamptz);
+drop function if exists public.member_event_email_changed(uuid, text, timestamptz, text, text, text, text, text);
+drop function if exists public.member_event_deleted(uuid, text, timestamptz, text, text, text);
+drop function if exists public.member_event_invite(uuid, text, timestamptz, text, uuid, text, text, uuid, text);
+drop function if exists public.member_event_check(uuid, text, text, text, timestamptz, text);
 drop function if exists public.member_event_lock(uuid, text);
-drop function if exists public.member_event_prior(uuid, text, text, text, timestamptz);
+drop function if exists public.member_event_prior(uuid, text, text, text, timestamptz, text);
 
 drop index if exists public.former_customer_identities_org_idx;
 alter table public.former_customer_identities

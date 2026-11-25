@@ -18,8 +18,9 @@ type Account = { userId: string; email: string; verified: boolean; createdAt: st
 type Product = { key: string; name: string; settings: string | null };
 type Notice = { tone: "ok" | "error"; text: string };
 /** null = could not be read; invite = the live one (expired until staff reissue). */
-/** deletedAt: the member was deleted on aware-wave.com (M10) and nobody holds the account since; staff invite again. */
-type Member = { eligible: boolean; linked: boolean; invite: { email: string; createdAt: string; expiresAt: string; status: "pending" | "expired" } | null; deletedAt?: string | null } | null;
+/** deletedAt: the member was deleted on aware-wave.com (M10; their app account went with it) and nobody holds the account
+ *  since; staff invite again. brandsWithoutOwner: brands that deletion left with no owner row (someone to add). */
+type Member = { eligible: boolean; linked: boolean; invite: { email: string; createdAt: string; expiresAt: string; status: "pending" | "expired" } | null; deletedAt?: string | null; brandsWithoutOwner?: string[] } | null;
 
 /** GET /member-transfer; null = not loaded or could not be read. */
 type Transfer = {
@@ -36,6 +37,7 @@ const M = {
   unknown: "目前讀不到會員狀態。",
   deleted_tag: "會員已刪除",
   deleted: "會員已在 aware-wave.com 被刪除（{date}）。可以重新發起邀請。",
+  deleted_brands: "這些品牌因此沒有負責人，請補人：{brands}",
   pending: "待驗證",
   expired: "已過期",
   invited: "已邀請 {email}，{date} 前有效。",
@@ -369,6 +371,9 @@ export function AccountsCard({ slug }: { slug: string }) {
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
             <Tag tone="gray" dot>{M.deleted_tag}</Tag>
             <span>{M.deleted.replace("{date}", day(member.deletedAt))}</span>
+            {(member.brandsWithoutOwner ?? []).length > 0 && (
+              <span>{M.deleted_brands.replace("{brands}", (member.brandsWithoutOwner ?? []).join("、"))}</span>
+            )}
           </div>
         )}
         {member === null ? (
