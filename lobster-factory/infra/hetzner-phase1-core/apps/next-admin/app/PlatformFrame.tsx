@@ -17,6 +17,8 @@ import { NavRail } from "./NavRail";
 import { LogoutButton } from "./LogoutButton";
 import { ClientContextProvider } from "./ClientContextProvider";
 import { ClientRail } from "./ClientRail";
+import { MobileShell } from "./MobileShell";
+import { bottomItems } from "./bottom-items";
 import { STAFF_HOST_KEY } from "@/lib/client-context/use-client-context";
 
 
@@ -84,7 +86,7 @@ async function StaffFrame({ navLayout, internalOrgId, sitesPath, visible, inboxB
 
   return (
     <ClientContextProvider {...contextProps(h, false, internalOrgId, sitesPath)}>
-      <div className="shell">
+      <MobileShell items={bottomItems({ kind: "staff", visible })}>
         <nav className="sidebar">
           <div className="sidebar-logo">
             <div className="sidebar-logo-mark">L</div>
@@ -117,7 +119,7 @@ async function StaffFrame({ navLayout, internalOrgId, sitesPath, visible, inboxB
             </div>
           </div>
         </div>
-      </div>
+      </MobileShell>
     </ClientContextProvider>
   );
 }
@@ -155,20 +157,25 @@ async function DoorFrame({ productKey, bare = false, children }: { productKey: P
       </div>
     );
   }
-  return (
-    <ClientContextProvider {...contextProps(h, true, null, doorSitesPath(door.api))}>
-      <div className="shell">
-        <div className="door-main">
-          <DoorProvider nav={door.nav ?? []}>
-            {!bare && <NavRail kind="door" page={door.page} name={product!.name} />}
-            {!bare && <ClientRail />}
-            <div className="door-content">
-              {children}
-              {!bare && <div className="door-foot"><LogoutButton variant="page" /></div>}
-            </div>
-          </DoorProvider>
+  const context = contextProps(h, true, null, doorSitesPath(door.api));
+  const body = (
+    <div className="door-main">
+      <DoorProvider nav={door.nav ?? []}>
+        {!bare && <NavRail kind="door" page={door.page} name={product!.name} />}
+        {!bare && <ClientRail />}
+        <div className="door-content">
+          {children}
+          {!bare && <div className="door-foot"><LogoutButton variant="page" /></div>}
         </div>
-      </div>
+      </DoorProvider>
+    </div>
+  );
+  const items = bottomItems(resolveTenant({ headers: h }).userKind === "client"
+    ? { kind: "member", portalOrigin: `https://${portalHost()}` }
+    : { kind: "staff-door", staffOrigin: context.hosts[STAFF_HOST_KEY] });
+  return (
+    <ClientContextProvider {...context}>
+      {bare ? <div className="shell">{body}</div> : <MobileShell items={items}>{body}</MobileShell>}
     </ClientContextProvider>
   );
 }

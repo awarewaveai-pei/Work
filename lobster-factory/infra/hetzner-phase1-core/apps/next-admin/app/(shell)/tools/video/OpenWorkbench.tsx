@@ -42,7 +42,7 @@ export default function OpenWorkbench({ videoHost, open }: { videoHost: string; 
       </p>
       {ctx.viewer === "staff" && !org && (
         <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.7, marginBottom: 16 }}>
-          還沒在左邊客戶欄選客戶：工作台會用它目前的客戶，可在工作台頂部切換。
+          還沒在客戶欄選客戶：工作台會用它目前的客戶，可在工作台頂部切換。
         </p>
       )}
       {VW_IGNORES_ORG_UNTIL_K12 && org && (

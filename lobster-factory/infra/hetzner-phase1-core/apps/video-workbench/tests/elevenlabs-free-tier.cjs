@@ -1,7 +1,8 @@
 // ElevenLabs free-tier card (backend/elevenlabs.cjs): the 驗收閘. The ElevenLabs rows (配音, 字幕辨識, 音軌分離, 去配樂・重配音效)
-// appear only with the key; on the free plan they are 免費 with the credits left as a note, on any other plan the list price
-// (cost-model.ts ELEVENLABS_RATES); a quota / paid_plan_required refusal fails the job and charges nothing; an old draft of
-// each touched tool still opens. Fake vendor only.
+// appear only with the key; on the free plan 配音／字幕 are 免費 with the credits left as a note, while 音軌分離／去配樂 are
+// off (card S1 B2: the free plan is not for commercial use; their billing is tests/sfx-billing.cjs); on any other plan the
+// list price (cost-model.ts ELEVENLABS_RATES); a quota / paid_plan_required refusal fails the job and charges nothing; an
+// old draft of each touched tool still opens. Fake vendor only.
 const assert = require("node:assert/strict"),
   fs = require("node:fs"),
   path = require("node:path"),
@@ -81,17 +82,22 @@ const source = (dataDir) => {
     const fake = fakeEleven();
     const { base } = await isolatedServer("vw-eleven-free-", { env, fetchImpl: fake.fetchImpl });
     const c = await caps(base), r = row(c);
-    for (const [tool, x] of Object.entries(r)) {
-      assert.equal(x.available, true, tool);
-      assert.equal(x.price.usd, 0, tool);
-      assert.match(x.note, /ElevenLabs 免費額度，本月剩 7,553 點。$/, tool);
+    for (const tool of ["speech", "transcribe"]) {
+      assert.equal(r[tool].available, true, tool);
+      assert.equal(r[tool].price.usd, 0, tool);
+      assert.match(r[tool].note, /ElevenLabs 免費額度，本月剩 7,553 點。$/, tool);
+    }
+    for (const tool of ["separate", "sfx"]) {
+      assert.equal(r[tool].available, false, tool);
+      assert.match(r[tool].note, /^ElevenLabs 免費方案不可商用，升級後可用。/, tool);
     }
     assert.deepEqual(c.speech.models.map((m) => m.id).slice(0, 2), ["edge-tts", "eleven_multilingual_v2"], "免費列排在付費列前面");
     assert.deepEqual(c.transcribe.engines.map((e) => e.id).slice(0, 2), ["host", "elevenlabs"]);
-    assert.deepEqual([c.audioTools.separate.defaultEngine, c.audioTools.sfx.defaultEngine], ["local", "elevenlabs"]);
+    // sfx: no row can run here (no Mirelo key, ElevenLabs free plan), so its default is the list's first row, Mirelo (card S1b).
+    assert.deepEqual([c.audioTools.separate.defaultEngine, c.audioTools.sfx.defaultEngine], ["local", "mirelo"]);
     await caps(base);
     assert.equal(fake.calls.filter((x) => x.route === "/v1/user/subscription").length, 1, "方案每次開頁都重查");
-    pass("免費方案：四列都是免費（usd 0）＋本月剩餘點數；免費排前面；方案 10 分鐘內只查一次");
+    pass("免費方案：配音、辨識是免費（usd 0）＋本月剩餘點數，音軌分離、去配樂不可商用而停用；免費排前面；方案 10 分鐘內只查一次");
     // Eleven Music: 402 paid_plan_required on the free plan -> off with its reason, refused before any vendor call.
     const em = c.music.models.find((m) => m.id === "music_v2_5");
     assert.deepEqual([em.available, em.note], [false, "需要 ElevenLabs 付費方案"]);
@@ -107,23 +113,25 @@ const source = (dataDir) => {
     assert.match(fake.calls.find((x) => x.route.startsWith("/v1/text-to-speech/")).route, /JBFqnCBsd6RMkjVDRZzb$/);
     pass("免費方案配音：成功、扣 0；別家男聲對到 ElevenLabs 男聲");
   }
-  // 3. A paid plan: the list price (cost-model.ts), no free note; 音軌分離 / 去配樂 have no paid feature key, so they are off.
+  // 3. A paid plan: the list price (cost-model.ts), no free note; 音軌分離 / 去配樂 run as the paid feature video.audio-tools.
   {
     elevenlabs.forget();
-    const { base } = await isolatedServer("vw-eleven-paid-", { env, fetchImpl: fakeEleven({ plan: "creator" }).fetchImpl });
+    const { base } = await isolatedServer("vw-eleven-paid-", { env: { ...env, GEMINI_API_KEY: "test-only" }, fetchImpl: fakeEleven({ plan: "creator" }).fetchImpl });
     const r = row(await caps(base));
     assert.deepEqual(r.speech.price, { usd: elevenlabsListUsd("eleven_multilingual_v2", 1000), unit: "千字" });
     assert.deepEqual(r.transcribe.price, { usd: elevenlabsListUsd("scribe_v2", 60), unit: "分鐘" });
     assert(r.speech.price.usd > 0 && r.transcribe.price.usd > 0);
-    assert.deepEqual([r.speech.available, r.transcribe.available, r.separate.available, r.sfx.available], [true, true, false, false]);
+    assert.deepEqual(r.separate.price, { usd: elevenlabsListUsd("audio-isolation", 60), unit: "分鐘" });
+    assert(r.sfx.price.usd > r.separate.price.usd && r.sfx.price.estimate);
+    assert.deepEqual([r.speech.available, r.transcribe.available, r.separate.available, r.sfx.available], [true, true, true, true]);
     assert.equal((await caps(base)).music.models.find((m) => m.id === "music_v2_5").available, true, "付費方案時 Eleven Music 可用");
     assert.doesNotMatch(JSON.stringify(r), /免費額度/);
-    pass("付費方案：配音／辨識照 cost-model.ts 牌價；音軌分離與去配樂沒有付費鍵，標未啟用");
+    pass("付費方案：配音／辨識／音軌分離／去配樂照 cost-model.ts 牌價，四列可用");
   }
   // 4. Refusals: quota used up and paid_plan_required fail the job with a plain message and charge nothing.
   {
     elevenlabs.forget();
-    const fake = fakeEleven({ refuse: { "/v1/text-to-speech": [401, { status: "quota_exceeded", message: "This request exceeds your quota" }], "/v1/audio-isolation": [402, { status: "paid_plan_required", message: "x" }] } });
+    const fake = fakeEleven({ plan: "creator", refuse: { "/v1/text-to-speech": [401, { status: "quota_exceeded", message: "This request exceeds your quota" }], "/v1/audio-isolation": [402, { status: "paid_plan_required", message: "x" }] } });
     const { base, dataDir } = await isolatedServer("vw-eleven-refuse-", { env, fetchImpl: fake.fetchImpl });
     const spoken = await settle(base, (await post(base, "/generations", { type: "spoken", prompt: "你好", speechModel: "eleven_multilingual_v2" })).body.id);
     assert.equal(spoken.status, "failed");
@@ -135,19 +143,16 @@ const source = (dataDir) => {
     assert.equal(sep.result, undefined);
     pass("額度用完（401 quota_exceeded）與需付費方案（402）：任務失敗、中文說明、不扣款");
   }
-  // 5. Real runs through our routes (fake vendor): 只留人聲, 去配樂＋音效, Scribe; old drafts without an engine keep the old way.
+  // 5. Real runs through our routes (fake vendor, paid plan): 只留人聲 at the list price, Scribe; old drafts without an engine
+  //    keep the free local way. (去配樂 way B: tests/sfx-billing.cjs.)
   {
     elevenlabs.forget();
-    const fake = fakeEleven();
+    const fake = fakeEleven({ plan: "creator" });
     const { base, dataDir } = await isolatedServer("vw-eleven-run-", { env, fetchImpl: fake.fetchImpl });
     const sep = await settle(base, (await post(base, "/generations", { type: "video", operation: "separate", references: { src: source(dataDir) }, settings: { separateEngine: "elevenlabs" } })).body.id);
     assert.equal(sep.status, "succeeded", sep.error);
-    assert.deepEqual([sep.type, sep.result.origin.kind, sep.result.origin.provider, sep.result.origin.costUsd], ["audio", "ai_generated", "ElevenLabs", 0]);
-    const sfx = await settle(base, (await post(base, "/generations", { type: "video", operation: "sfx", references: { src: source(dataDir) }, settings: { sfxPrompt: "雨打在窗上" } })).body.id);
-    assert.equal(sfx.status, "succeeded", sfx.error);
-    const info = await require("../backend/media-inspect.cjs").inspectMedia(path.join(dataDir, sfx.result.url.slice(1)));
-    assert(info.audio && info.duration > 5.5, "成品要有聲音且是全片長度");
-    assert.equal(JSON.parse(fake.calls.find((x) => x.route === "/v1/sound-generation").body).text, "雨打在窗上");
+    const seconds = (await require("../backend/media-inspect.cjs").inspectMedia(video)).duration;
+    assert.deepEqual([sep.type, sep.result.origin.kind, sep.result.origin.provider, sep.result.origin.costUsd], ["audio", "ai_generated", "ElevenLabs", elevenlabsListUsd("audio-isolation", seconds)]);
     const spending = () => fake.calls.filter((x) => x.route !== "/v1/user/subscription").length, before = spending();
     const old = await settle(base, (await post(base, "/generations", { type: "video", operation: "separate", references: { src: source(dataDir) }, settings: {} })).body.id);
     assert.equal(old.status, "succeeded", old.error);
@@ -157,7 +162,7 @@ const source = (dataDir) => {
     assert.equal(words.status, 200, JSON.stringify(words.body));
     assert.deepEqual(words.body.segments.map((s) => s.text), ["大家好。"]);
     assert.deepEqual(words.body.words.map((w) => w.text), ["大家", "好"]);
-    pass("經我們的路由：只留人聲、去配樂＋音效（全片長、有聲）、Scribe 逐字；舊的音軌分離草稿仍走本機");
+    pass("經我們的路由：只留人聲（牌價）、Scribe 逐字；舊的音軌分離草稿仍走本機");
   }
   // 6. The page: each touched tool opens from an old draft and shows its vendor buttons (no dropdown), ElevenLabs 免費.
   {
@@ -183,16 +188,24 @@ const source = (dataDir) => {
         await p.evaluate((x) => VideoWorkbench.tools.acceptAsset(x), { tool, settings, ...(asset ? { asset } : {}) });
         const button = p.locator(`[data-flow-choice="${key}"]`).filter({ hasText: "ElevenLabs" });
         await button.waitFor({ timeout: 15000 });
+        assert.equal(await p.locator(`select[data-key="${key}"]`).count(), 0, tool + " 不可用下拉");
+        if (tool === "separate" || tool === "sfx") {
+          // Card S1 B2: off on the free plan, with the reason under the buttons when it is the shown row.
+          assert.match(await button.innerText(), /（未啟用）$/, tool);
+          assert.equal(await button.isDisabled(), true, tool);
+          // sfx shows its default row, Mirelo (card S1b), off here for want of its key.
+          if (tool === "sfx") await p.getByText("尚未設定 Mirelo 金鑰。", { exact: false }).first().waitFor();
+          if (tool === "separate") assert.equal(await p.locator('[data-flow-choice="separateEngine"][aria-pressed="true"]').getAttribute("data-flow-value"), "local", "舊草稿預設仍是本機原音軌");
+          continue;
+        }
         assert.match(await button.innerText(), /ElevenLabs.* · 免費$/, tool);
         assert.equal(await button.isDisabled(), false, tool);
-        assert.equal(await p.locator(`select[data-key="${key}"]`).count(), 0, tool + " 不可用下拉");
-        if (tool === "separate") assert.equal(await p.locator('[data-flow-choice="separateEngine"][aria-pressed="true"]').getAttribute("data-flow-value"), "local", "舊草稿預設仍是本機原音軌");
         await button.click();
         await p.getByText("本月剩 7,553 點").first().waitFor();
         if (shots) await p.screenshot({ path: path.join(shots, "eleven-" + tool + ".png"), fullPage: false });
       }
       assert.deepEqual(errors, []);
-      pass("頁面：配音、字幕、音軌分離、去配樂四個工具從舊草稿開啟，ElevenLabs 按鈕顯示免費＋剩餘點數，無下拉");
+      pass("頁面：四個工具從舊草稿開啟、無下拉；配音、字幕的 ElevenLabs 按鈕顯示免費＋剩餘點數，音軌分離、去配樂的標未啟用（不可商用）");
     } finally {
       await browser.close();
     }

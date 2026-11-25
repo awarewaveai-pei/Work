@@ -51,7 +51,9 @@ export const subFirst = (road?: TopicTextRoad) => isTextChain(road?.textChain) &
  *  images (TOPIC_ARTICLE_IMAGES + the cover, on the site's image model), the social rewrite (max = with the one shorter rewrite) and the video at the article page's default settings.
  *  `road` (K7): the article on the site's API model; a road starting on a subscription leaves the article text out of
  *  the usual and keeps it in the max (the API writes it when the subscriptions cannot). */
-export function topicCostUsd(formats: readonly string[] = ["article", "social"], road?: TopicTextRoad): { usual: number; max: number } {
+/** coverBases (K29): the extra cover pictures the topic's social channels need (cover/sizes.ts extraBaseRatios; 0 =
+ *  none, or not known: the topic page has no channel list). */
+export function topicCostUsd(formats: readonly string[] = ["article", "social"], road?: TopicTextRoad, coverBases = 0): { usual: number; max: number } {
   const unit = (key: string) => {
     const f = TEXT_FEATURES.find((x) => x.key === key);
     if (!f) throw new Error(`cost-model has no ${key} feature`);
@@ -60,7 +62,7 @@ export function topicCostUsd(formats: readonly string[] = ["article", "social"],
   const round = (usd: number) => Math.ceil(usd * 100) / 100;
   const hasArticle = formats.includes("article");
   const swap = hasArticle && road ? articleModelUsd(road) - articleModelUsd() : 0;   // no road = the feature's own price, as before
-  const article = hasArticle ? unit("article") + swap + (TOPIC_ARTICLE_IMAGES + TOPIC_COVER_IMAGES) * topicImageUsd(road) : 0;
+  const article = hasArticle ? unit("article") + swap + (TOPIC_ARTICLE_IMAGES + TOPIC_COVER_IMAGES + coverBases) * topicImageUsd(road) : 0;
   const saved = hasArticle && subFirst(road) ? articleModelUsd(road) : 0;
   const social = formats.includes("social") || formats.includes("youtube") ? unit("syndicate") : 0;   // youtube's text is written too
   const video = formats.includes("video") || formats.includes("youtube") ? articleVideoCostUsd() : 0;

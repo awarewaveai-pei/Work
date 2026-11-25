@@ -21,7 +21,7 @@ export default async function ClientsLayout({ children }: { children: ReactNode 
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+    <div className="client-panel-frame">
       <ClientPanelNav orgs={orgs} total={total} />
       <div style={{ flex: 1, overflowY: "auto", minWidth: 0 }}>
         {children}
