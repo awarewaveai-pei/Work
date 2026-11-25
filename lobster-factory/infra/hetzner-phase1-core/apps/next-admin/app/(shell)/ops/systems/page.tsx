@@ -7,14 +7,14 @@ import { headers } from "next/headers";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { SYSTEM_TYPES, type SystemType } from "@/lib/systems/contract";
 import { systemsAccess } from "@/lib/systems/access";
-import { projectSystem, SYSTEM_STATUSES, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
-import { EFFECTIVE_BADGE, EFFECTIVE_LABEL, formatTime, relativeTime, STATUS_LABEL, TYPE_LABEL } from "@/lib/systems/labels";
-import { effectiveStatus, gapBreakdown, implementedRatio, overviewCounts, progressKind, recentHandoffs, type EffectiveState } from "@/lib/systems/overview";
+import { SYSTEM_STATUSES, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
+import { formatTime, relativeTime, STATUS_LABEL, TYPE_LABEL } from "@/lib/systems/labels";
+import { gapBreakdown, overviewCounts, projectAll, recentHandoffs, type SystemOverviewRow } from "@/lib/systems/overview";
 import { importSummary } from "@/lib/systems/projection";
 import { readDefinitions, readImportRuns, readPending, readProjectionInput, type Pending } from "@/lib/systems/store";
 import { refreshState, type RefreshState } from "./refresh-state";
-import { proposeNewSystem, requestSystemsRefresh, withdrawProposal } from "./actions";
-import { Refused, box, errorBox, muted, page } from "./parts";
+import { requestSystemsRefresh, withdrawProposal } from "./actions";
+import { AddSystemForm, HEADER_CSS, Progress, Refused, StatusBadge, SystemsHeader, box, errorBox, muted, page, panel, panelBody, panelHead, smallBtn } from "./parts";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "系統總控中心 · Ops" };
@@ -32,12 +32,8 @@ const NOTICES: Record<string, { ok: boolean; text: string }> = {
   db_unavailable: { ok: false, text: "資料庫暫時讀寫不了，沒有記下。" },
 };
 const NO_PENDING: Pending = { refresh: false, requestedAt: null, proposals: [] };
-type Row = { system: SystemRow; p: SystemProjection; eff: EffectiveState };
+type Row = SystemOverviewRow;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px", textDecoration: "none" };
-const panel: React.CSSProperties = { background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)", minWidth: 0 };
-const panelHead: React.CSSProperties = { padding: "16px 20px", borderBottom: "1px solid var(--card-border)" };
-const panelBody: React.CSSProperties = { padding: "16px 20px" };
 
 const RESPONSIVE = `
 .sys-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
@@ -45,7 +41,6 @@ const RESPONSIVE = `
 .sys-right{display:flex;flex-direction:column;gap:16px}
 .sys-cards{display:none}
 .sys-row{position:relative}.sys-row:hover{background:var(--bg-subtle)}.sys-row a::after{content:"";position:absolute;inset:0}
-.sys-add{position:relative}.sys-add summary::-webkit-details-marker{display:none}.sys-type input{position:absolute;opacity:0;pointer-events:none}.sys-type{position:relative}.sys-type input:checked+span{background:var(--accent);color:var(--btn-primary-text)}.sys-type input:focus-visible+span{outline:2px solid var(--accent)}
 .sys-icon{height:30px;width:30px;border-radius:10px;display:grid;place-items:center;background:var(--accent-light);color:var(--accent-text);font-size:14px}
 @media (max-width:1100px){.sys-board{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){.sys-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.sys-table{display:none}.sys-cards{display:block}.sys-page{padding:20px 16px!important}}
@@ -66,27 +61,6 @@ function Stat({ title, value, hint, icon, tone }: { title: string; value: number
   );
 }
 
-function Progress({ p }: { p: SystemProjection }) {
-  const kind = progressKind(p);
-  if (kind === "empty") return <span style={muted}>尚未盤點</span>;
-  if (kind === "legacy") return <span style={muted}>進度在舊監工頁</span>;
-  const pct = Math.round((p.completion ?? 0) * 100);
-  const impl = Math.round((implementedRatio(p) ?? 0) * 100);
-  return (
-    <div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent-text)" }}>已驗收 {pct}%・{p.verified}／{p.counted}</div>
-      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>已實作 {impl}%</div>
-      <div style={{ position: "relative", height: 6, maxWidth: 120, borderRadius: 99, background: "var(--bg-subtle)", overflow: "hidden", marginTop: 5 }}>
-        <div style={{ position: "absolute", inset: 0, width: `${impl}%`, background: "var(--accent)", opacity: 0.4 }} />
-        <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: "var(--accent)" }} />
-      </div>
-    </div>
-  );
-}
-
-const StatusBadge = ({ eff }: { eff: EffectiveState }) => (
-  <span className={`card-badge ${eff.status ? EFFECTIVE_BADGE[eff.status] : "badge-gray"}`} style={{ display: "inline-flex", whiteSpace: "nowrap" }}>{eff.status ? `${EFFECTIVE_LABEL[eff.status]}${eff.inferred ? "（推定）" : ""}` : "未設定"}</span>
-);
 const meta = (s: SystemRow, p: SystemProjection) => `${TYPE_LABEL[s.type as SystemType] ?? s.type}・${p.phases.length} 個階段`;
 const link: React.CSSProperties = { color: "var(--text-primary)", textDecoration: "none" };
 
@@ -161,26 +135,6 @@ function ResumePanel({ rows }: { rows: Row[] }) {
         ))}
       </div>
     </section>
-  );
-}
-
-function AddSystemForm() {
-  const field: React.CSSProperties = { fontSize: 13, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-subtle)", color: "var(--text-primary)", minWidth: 0 };
-  return (
-    <details className="sys-add">
-      <summary className="btn-primary" style={{ listStyle: "none", cursor: "pointer", display: "inline-block", fontSize: 13, padding: "8px 14px" }}>＋ 新增系統</summary>
-      <form action={proposeNewSystem} style={{ ...panel, position: "absolute", right: 0, zIndex: 5, width: 340, maxWidth: "calc(100vw - 32px)", marginTop: 8, padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-        <input name="name" required maxLength={200} placeholder="系統名稱" aria-label="系統名稱" style={field} />
-        <div role="radiogroup" aria-label="類型" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {SYSTEM_TYPES.map((t, i) => (
-            <label key={t} className="sys-type"><input type="radio" name="type" value={t} required defaultChecked={i === 0} /><span className="btn-secondary" style={smallBtn}>{TYPE_LABEL[t]}</span></label>
-          ))}
-        </div>
-        <input name="purpose" required maxLength={200} placeholder="一句話：這個系統做什麼" aria-label="用途" style={field} />
-        <button type="submit" className="btn-primary" style={{ fontSize: 13, padding: "8px 14px" }}>送出</button>
-        <div style={muted}>送出後會列在「待登記」，下一次 agent 開工時寫進系統清單。</div>
-      </form>
-    </details>
   );
 }
 
@@ -270,17 +224,7 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
       const [defs, state, importRuns] = await Promise.all([readDefinitions(sb), readProjectionInput(sb), readImportRuns(sb)]);
       runs = importRuns;
       capped = state.capped;
-      const now = Date.now();
-      rows = defs.systems.map((system) => {
-        const p = projectSystem({
-          phases: defs.phases.filter((x) => x.system_id === system.id),
-          features: defs.features.filter((x) => x.system_id === system.id),
-          events: state.events.filter((e) => e.system_id === system.id),
-          history: state.history,
-          lastCommitAt: state.lastCommitAt[system.id] ?? null, spreadCommits: state.spreadCommits,
-        });
-        return { system, p, eff: effectiveStatus(p.status, p.lastCommitAt, now, p) };
-      });
+      rows = projectAll(defs, state, Date.now());
     } catch (e) {
       failure = String(e instanceof Error ? e.message : e);
     }
@@ -307,19 +251,13 @@ export default async function SystemsPage({ searchParams }: { searchParams?: Pro
 
   return (
     <div style={page} className="sys-page">
-      <style>{RESPONSIVE}</style>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontSize: 11, letterSpacing: 2.2, fontWeight: 800, color: "var(--accent-text)" }}>DEVELOPMENT COMMAND CENTER</div>
-          <h1 style={{ margin: "8px 0 6px" }}>系統總控中心</h1>
-        </div>
-        <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
-          <form action={requestSystemsRefresh}>
-            <button type="submit" className="btn-secondary" style={{ fontSize: 13, padding: "8px 14px" }} disabled={refresh.kind === "waiting"}>{refresh.kind === "waiting" ? "更新排隊中" : "◷ 立即更新"}</button>
-          </form>
-          <AddSystemForm />
-        </div>
-      </div>
+      <style>{RESPONSIVE + HEADER_CSS}</style>
+      <SystemsHeader current="systems" title="系統總控中心">
+        <form action={requestSystemsRefresh}>
+          <button type="submit" className="btn-secondary" style={{ fontSize: 13, padding: "8px 14px" }} disabled={refresh.kind === "waiting"}>{refresh.kind === "waiting" ? "更新排隊中" : "◷ 立即更新"}</button>
+        </form>
+        <AddSystemForm />
+      </SystemsHeader>
       {notice && <div style={notice.ok ? box : errorBox}>{notice.text}</div>}
       <p style={{ ...muted, fontSize: 14, marginBottom: 20 }}>不必記住每一個專案：這裡看每個系統的用途、進度、卡點與下一步。這裡只能改系統狀態與驗收功能，其餘從 Git 匯入。</p>
       {failure && <div style={errorBox}>讀不到資料：{failure}</div>}

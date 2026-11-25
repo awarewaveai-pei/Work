@@ -23,6 +23,7 @@ const store = vi.hoisted(() => ({
 vi.mock("@/lib/systems/store", () => store);
 
 const { default: SystemsPage } = await import("../page");
+const { default: BlocksPage } = await import("../blocks/page");
 const { setSystemStatus, requestSystemsRefresh, proposeNewSystem, withdrawProposal } = await import("../actions");
 
 const form = (fields: Record<string, string>) => {
@@ -118,5 +119,23 @@ describe("撤回 error codes and the stale refresh lock", () => {
     store.readPending.mockResolvedValue({ refresh: true, requestedAt: new Date(Date.now() - 16 * 60000).toISOString(), proposals: [] });
     try { await requestSystemsRefresh(); } catch (e) { expect(String((e as Error).message)).toBe("REDIRECT /ops/systems?r=refresh_queued"); }
     expect(store.requestRefresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("/ops/systems/blocks", () => {
+  it("refuses a non-owner without reading anything", async () => {
+    role.value = "operator";
+    const html = renderToStaticMarkup(await BlocksPage({}));
+    expect(html).toContain("只有擁有者或管理員能看");
+    expect(store.readDefinitions).not.toHaveBeenCalled();
+  });
+
+  it("shows the numbered catalog to an owner even when the system read fails", async () => {
+    role.value = "owner";
+    store.readDefinitions.mockRejectedValue(new Error("db down"));
+    const html = renderToStaticMarkup(await BlocksPage({}));
+    expect(html).toContain("讀不到系統進度");
+    expect(html).toContain("B-001");
+    expect(html).toContain("＋ 新增系統");
   });
 });

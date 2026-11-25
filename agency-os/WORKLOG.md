@@ -9,6 +9,27 @@
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=featured-og|ig-portrait|linkedin-post|twitter-x | hits=0
 - ORACLE_WAIVED: UI 常數表與按鈕排版，無邏輯分支；本機預覽 3903 實測點 4:5、?ratio=9:16／4:5 皆正確。
 - 避免再發生：尺寸清單以比例為主鍵，新平台只加到 `where`，不新增按鈕。
+## 2026-11-25（續17）— /ops/systems/blocks LEGO 積木目錄：固定編號、圖解、系統×積木進度表；登記成總控中心階段 lego-catalog
+
+- 根因／決策：積木只散在 `lib/content/blocks/README.md` 表格（不可機讀、有死路徑如 `wp-bridge-client.ts`），沒有編號、看不出哪個系統用哪顆。操作者要全部列出＋用在哪些系統＋圖解＋從總控中心監督進度；問「是重複功能嗎」→ 前端面板與後端 API 算同一顆（例 `public/editor-shared/blocks/bg-remove.js` 呼叫 `/api/tools/studio/remove-bg`），唯一真重複＝調色兩套引擎（Sharp `lib/studio/color-grade.ts:1-12` vs Fabric `public/editor-shared/color-grade.js:1-4`，標 B-028↔B-029，開 feature `lego-merge-color-grade` 追）。
+- 步驟（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+  - 新 `NA/lib/systems/blocks.ts`：唯一清單。B-001..065 功能積木（52 在用／8 規劃／5 退場，編號永不重用）、M-01..11 產品模組、C-01..30 認知方法族；`covers` 收 register() id 與 dock 面板
+  - 新 `NA/lib/systems/__tests__/blocks.test.ts`：編號連續、路徑存在、registry `listAll()` 實際註冊的 id／dock 面板／MODULE_MANIFEST／認知方法族數量全覆蓋、`@/` import 者 ⊆ usedBy（抓到 B-005 實際 8 系統用、認知 knowledge 實為 2）
+  - 新 `NA/app/(shell)/ops/systems/blocks/page.tsx`：疊層圖解、系統×層熱度表（含狀態＋完成度，全部系統都列）、編號清單；`parts.tsx` 收 SystemsHeader（分頁）／AddSystemForm／Progress／StatusBadge 給兩頁共用；`overview.ts` 新 `projectAll()`（總控中心改用它）；`[slug]/page.tsx` 加「用到的積木」
+  - `NA/lib/content/blocks/README.md` 目錄表刪除，改一行指向 blocks.ts；`agency-os/systems/registry.json` systems-control-center 加階段 `lego-catalog`＋4 features；`NA/app/__tests__/sidebar-coverage.test.ts` 登記 /ops/systems/blocks 為分頁
+  - Codex 第 1 輪 2m 全修：Apify 迴圈註冊的 search/dcard|x|tiktok|instagram 漏列（測試改讀 `listAll()`，拔 search/tiktok → 紅）；熱度表漏掉無積木系統（改列全部系統）
+  - Codex 第 2 輪 2m 全修：主機設了 CONTENT_TRENDING_FEEDS 會讓覆蓋測試擋部署（測試先 `vi.stubEnv` 清空；帶 feed 實跑 11 passed）；積木頁漏了讀取上限截斷提醒（補上，同總控中心）
+- 驗證：
+  - `npx tsc --noEmit` exit 0；`npx vitest run lib/systems app/(shell)/ops/systems app/__tests__/sidebar-coverage.test.ts` 62 passed；`npx vitest run lib/content` 705 passed
+  - 突變：拔 blocks 頁 `if (!access.allowed) return <Refused />` → systems-access 1 紅，還原綠
+  - 瀏覽器（本機無 Supabase、模擬擁有者 :3904）：/ops/systems/blocks 渲染、篩選 ?sys=studio&layer=process 回 B-027..035、總控中心分頁與＋新增系統正常；無本頁錯誤（僅主題讀 Supabase 失敗）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run lib/systems app/(shell)/ops/systems app/__tests__/sidebar-coverage.test.ts lib/content | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
+  - external oracle = Codex CLI 兩輪（agency-os/reports/oracle/2026-11-25-partialreview-9c0f86a0.md、2026-11-25-partialreview-c281eae4.md），4m 全修
+- ORACLE_WAIVED: 第 2 輪後只改 2 處（測試 stubEnv、頁面 capped 提示），以帶 feed 實跑與 62 passed 為證，不跑第 3 輪
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=LEGO_BLOCKS|blocksForSystem|projectAll|SystemsHeader|完整積木目錄 | hits=10
+- 剩餘風險：正式站系統名／進度未在瀏覽器看過（本機無資料庫）；新增積木要手動加進 blocks.ts（覆蓋測試會擋漏列）
+- rollback：`git revert` 本 commit
 ## 2026-11-25（續16）— meeting-service：Gemini 聆聽把不停頓的講話一句一則（移植 OwnVoice 斷句器）
 
 - 根因：Gemini Live 只在停頓時結束一輪，interim 是整輪假設。操作者錄的對話沒有停頓 → 60 秒只有 1 則字幕，翻譯越翻越慢，摘要永遠湊不到 3 句（`MS/lib/live/summary.py` MIN_LINES）、心智圖說沒有逐字稿。本機（faster-whisper）路徑本來就按段切，不受影響。

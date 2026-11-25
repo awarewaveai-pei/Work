@@ -10,6 +10,7 @@ const REACHED_ELSEWHERE: Record<string, string> = {
   "/tools/seedstar": "linked from /tools/theme; the local workbench shares the shell's saved theme",
   "/no-access": "middleware sends a page refused by staff tool grants here (lib/staff-access.ts)",
   "/ops/ai-models": "redirects to /tools/ai-models?tab=image-specs",
+  "/ops/systems/blocks": "tab of /ops/systems (SystemsHeader in ops/systems/parts.tsx)",
   "/tools/outreach/settings/service-profiles": "tab of /tools/outreach/settings",
   "/tools/outreach/settings/suppression": "tab of /tools/outreach/settings",
   "/tools/social/ads": "social app side nav (tools/social/routes.ts)",

@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { SystemType } from "@/lib/systems/contract";
 import { systemsAccess } from "@/lib/systems/access";
+import { BLOCK_LAYERS, blocksForSystem } from "@/lib/systems/blocks";
 import { importSummary, PRIORITIES, projectSystem, SYSTEM_STATUSES, type FeatureView, type SystemProjection, type SystemRow, type UpdateRow } from "@/lib/systems/projection";
 import {
   EFFECTIVE_BADGE, EFFECTIVE_LABEL, EVENT_LABEL, FEATURE_BADGE, FEATURE_LABEL, formatTime, PRIORITY_LABEL, RESULT_MESSAGES, SOURCE_LABEL, STATUS_LABEL, TYPE_LABEL,
@@ -26,6 +27,22 @@ type Sp = { tab?: string | string[]; r?: string | string[] };
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const smallBtn: React.CSSProperties = { fontSize: 12, padding: "4px 10px" };
 const row: React.CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--card-border)", fontSize: 13, color: "var(--text-primary)" };
+
+function UsedBlocks({ slug }: { slug: string }) {
+  const used = blocksForSystem(slug);
+  if (used.length === 0) return <div style={muted}>沒有用到功能積木。<Link href="/ops/systems/blocks">看積木目錄</Link></div>;
+  return (
+    <div>
+      {used.map((b) => (
+        <div key={b.no} style={row}>
+          <code>{b.no}</code><strong>{b.name}</strong>
+          <span style={muted}>{BLOCK_LAYERS.find((l) => l.key === b.layer)?.name}・共 {b.usedBy.length} 個系統用</span>
+        </div>
+      ))}
+      <Link href={`/ops/systems/blocks?sys=${encodeURIComponent(slug)}#list`} className="btn-secondary" style={{ ...smallBtn, display: "inline-block", marginTop: 8, textDecoration: "none" }}>在積木目錄看詳細</Link>
+    </div>
+  );
+}
 
 function Overview({ system, p, eff, hist, brief, live }: { system: SystemRow; p: SystemProjection; eff: EffectiveState; hist: ReturnType<typeof legacyDone>; brief: string; live: Set<string> }) {
   const kind = progressKind(p);
@@ -84,6 +101,8 @@ function Overview({ system, p, eff, hist, brief, live }: { system: SystemRow; p:
       ))}
       <h3 style={{ margin: "20px 0 8px" }}>功能清單</h3>
       <Features system={system} p={p} />
+      <h3 style={{ margin: "20px 0 8px" }}>用到的積木</h3>
+      <UsedBlocks slug={system.slug} />
       <h3 style={{ margin: "20px 0 8px" }}>下次從這裡繼續</h3>
       <Handoff p={p} />
       <div style={{ marginTop: 16 }}><CopyBrief text={brief} /></div>

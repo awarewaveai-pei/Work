@@ -1,5 +1,5 @@
 // Pure helpers for the /ops/systems overview and detail pages (no I/O, no clock reads: `now` is passed in).
-import { chronological, liveEvents, type SystemProjection, type UpdateRow } from "./projection";
+import { chronological, liveEvents, projectSystem, type FeatureRow, type PhaseRow, type SystemProjection, type SystemRow, type UpdateRow } from "./projection";
 
 export const STALL_DAYS = 30;
 /** all features done: a commit within this many days = 維護中, older = 已完成 */
@@ -154,4 +154,24 @@ export function buildResumeMarkdown(i: BriefInput, formatTime: (iso: string | nu
     "- 狀態以 /ops/systems 事件投影為準；「已驗收」只來自操作者驗收事件。",
   ];
   return lines.join("\n");
+}
+
+export interface SystemOverviewRow { system: SystemRow; p: SystemProjection; eff: EffectiveState }
+
+/** Every system projected once with its effective status (store.readDefinitions + store.readProjectionInput). */
+export function projectAll(
+  defs: { systems: readonly SystemRow[]; phases: readonly PhaseRow[]; features: readonly FeatureRow[] },
+  state: { events: readonly UpdateRow[]; history: readonly UpdateRow[]; lastCommitAt: Record<string, string>; spreadCommits: Set<string> },
+  now: number,
+): SystemOverviewRow[] {
+  return defs.systems.map((system) => {
+    const p = projectSystem({
+      phases: defs.phases.filter((x) => x.system_id === system.id),
+      features: defs.features.filter((x) => x.system_id === system.id),
+      events: state.events.filter((e) => e.system_id === system.id),
+      history: state.history,
+      lastCommitAt: state.lastCommitAt[system.id] ?? null, spreadCommits: state.spreadCommits,
+    });
+    return { system, p, eff: effectiveStatus(p.status, p.lastCommitAt, now, p) };
+  });
 }

@@ -2563,6 +2563,12 @@
           "slug": "control-center-v1",
           "name": "系統總控中心 v1",
           "legacy_source_path": "agency-os/handoffs/2026-11-21-systems-control-center/"
+        },
+        {
+          "id": "a3104d12-5e29-407d-9af8-c3ee0af8cbba",
+          "slug": "lego-catalog",
+          "name": "LEGO 積木目錄",
+          "legacy_source_path": null
         }
       ],
       "features": [
@@ -2628,6 +2634,30 @@
           "name": "監工頁進度每晚同步、狀態推定看功能",
           "phase": "control-center-v1",
           "legacy_code": "B6"
+        },
+        {
+          "id": "85aee0c9-b8db-4645-9629-9fdba4a4d098",
+          "slug": "lego-catalog-data",
+          "name": "積木資料、固定編號與守門測試",
+          "phase": "lego-catalog"
+        },
+        {
+          "id": "1b457053-5f89-4b2e-b6ba-df02caa2838d",
+          "slug": "lego-catalog-page",
+          "name": "積木頁：圖解、系統對照與進度",
+          "phase": "lego-catalog"
+        },
+        {
+          "id": "e31692b9-f86d-4bea-a062-b717f9e9ff26",
+          "slug": "lego-catalog-system-page",
+          "name": "單一系統頁顯示用到的積木",
+          "phase": "lego-catalog"
+        },
+        {
+          "id": "a51b247f-b110-4904-ab6a-8ab2fdea312a",
+          "slug": "lego-merge-color-grade",
+          "name": "合併重複的調色引擎（B-028／B-029）",
+          "phase": "lego-catalog"
         }
       ]
     },
