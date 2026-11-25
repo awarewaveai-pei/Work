@@ -563,6 +563,8 @@ button.sidebar-link {
 
 /* /ops/clients' own list column (ClientPanelNav.tsx) and the full-height frame it sits in (ops/clients/layout.tsx). */
 .client-panel-frame { display: flex; height: 100vh; overflow: hidden; }
+/* The client page's row of tabs scrolls sideways at every width instead of widening the page (17 tabs: wider than 1440). */
+.client-tabs { overflow-x: auto; }
 .client-panel {
   display: flex;
   flex-direction: column;
@@ -2982,10 +2984,8 @@ pre {
   }
   .shell[data-more="open"]:has(.client-rail, .client-panel) > .sidebar,
   .shell[data-more="open"]:has(.client-rail, .client-panel) .door-side { top: 50vh; }
-  /* The page scrolls the window like every other page (a 100vh inner scroller would end behind the bottom bar), and the
-     client page's row of tabs scrolls sideways instead of widening the page. */
+  /* The page scrolls the window like every other page (a 100vh inner scroller would end behind the bottom bar). */
   .client-panel-frame { height: auto; overflow: visible; }
-  .client-tabs { overflow-x: auto; }
   .sidebar-link, .door-nav-link { min-height: 44px; display: flex; align-items: center; flex-shrink: 0; }
   .topbar { padding: 10px 16px; }
   .page { padding: 16px; }
