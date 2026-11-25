@@ -40,22 +40,28 @@ export interface OverviewCounts { total: number; active: number; needsAttention:
  *  and either blocked, 暫停（推定） (open work, no commit for PAUSE_DAYS), or 開發中 (set or inferred) with no git commit
  *  for STALL_DAYS. 尚未盤點 (no features) is not a reason:
  *  the table shows it on its own. Inferred values count only on 開發中 and 維護與已完成 (maintenance + done + archived). */
+export type OverviewGroup = "active" | "attention" | "wrapped";
+
+/** Which stat card a system falls in; null = a status set to 暫停 / 未設定 (no card). 待確認 wins, so the cards split. */
+export function overviewGroup(r: CountInput, now: number): OverviewGroup | null {
+  const settled = !r.inferred && (r.status === "done" || r.status === "archived" || r.status === "paused");
+  const at = r.lastCommitAt ? Date.parse(r.lastCommitAt) : NaN;
+  const attention = !settled && (!!r.blocker || (r.inferred && r.status === "paused") // half a year untouched with work open
+    || (r.status === "active" && (!Number.isFinite(at) || now - at > STALL_DAYS * 86400000)));
+  if (attention) return "attention";
+  if (r.status === "active") return "active";
+  if (r.status === "done" || r.status === "archived" || r.status === "maintenance") return "wrapped";
+  return null;
+}
+
 export function overviewCounts(rows: readonly CountInput[], now: number): OverviewCounts {
-  const stallMs = STALL_DAYS * 86400000;
-  const attention = (r: CountInput) => {
-    if (!r.inferred && (r.status === "done" || r.status === "archived" || r.status === "paused")) return false;
-    if (r.blocker) return true;
-    if (r.inferred && r.status === "paused") return true; // half a year untouched with work open: decide, don't forget
-    if (r.status !== "active") return false;
-    const at = r.lastCommitAt ? Date.parse(r.lastCommitAt) : NaN;
-    return !Number.isFinite(at) || now - at > stallMs;
-  };
+  const groups = rows.map((r) => overviewGroup(r, now));
   return {
     total: rows.length,
-    // 待確認 first, so the three cards split the systems: 開發中 + 待確認 + 維護與已完成 (+ set 暫停 / 未設定) = 總數
-    active: rows.filter((r) => r.status === "active" && !attention(r)).length,
-    needsAttention: rows.filter(attention).length,
-    wrapped: rows.filter((r) => (r.status === "done" || r.status === "archived" || r.status === "maintenance") && !attention(r)).length,
+    // 開發中 + 待確認 + 維護與已完成 (+ set 暫停 / 未設定) = 總數
+    active: groups.filter((g) => g === "active").length,
+    needsAttention: groups.filter((g) => g === "attention").length,
+    wrapped: groups.filter((g) => g === "wrapped").length,
   };
 }
 

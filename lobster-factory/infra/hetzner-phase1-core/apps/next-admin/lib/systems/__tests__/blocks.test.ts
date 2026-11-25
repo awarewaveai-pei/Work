@@ -59,6 +59,7 @@ describe("積木目錄 shape", () => {
     expect(catalogHref()).toBe("/ops/systems/blocks");
     expect(catalogHref({ view: "systems", tier: "block" })).toBe("/ops/systems/blocks");
     expect(catalogHref({ view: "blocks", sys: "studio" })).toBe("/ops/systems/blocks?view=blocks&sys=studio");
+    expect(catalogHref({ grp: "attention" })).toBe("/ops/systems/blocks?grp=attention");
   });
 
   it("stats and per-system lookup agree with the list", () => {
@@ -104,28 +105,44 @@ describe("積木目錄 coverage", () => {
 });
 
 describe.skipIf(!hasRepo)("積木目錄 against the system registry", () => {
-  const registry = hasRepo ? (JSON.parse(readFileSync(REGISTRY, "utf8")) as { systems: Array<{ slug: string; source_paths: string[] }> }) : { systems: [] };
+  const registry = hasRepo ? (JSON.parse(readFileSync(REGISTRY, "utf8")) as { shared_paths: string[]; systems: Array<{ slug: string; source_paths: string[] }> }) : { shared_paths: [], systems: [] };
   const prefixes = registry.systems.flatMap((s) => s.source_paths.map((p) => ({ p, slug: s.slug }))).sort((a, b) => b.p.length - a.p.length);
-  const owner = (repoPath: string) => prefixes.find(({ p }) => (p.endsWith("/") ? repoPath.startsWith(p) : repoPath === p))?.slug ?? null;
+  const under = (path: string, p: string) => (p.endsWith("/") ? path.startsWith(p) : path === p);
+  const owner = (repoPath: string) => prefixes.find(({ p }) => under(repoPath, p))?.slug ?? null;
+  // every "@/x" import of a source file, resolved to an app-relative file path, with the importer's system
+  const imports = ["app", "lib", "components"].flatMap((d) => walk(join(APP, d))).flatMap((f) => {
+    const sys = owner(APP_FROM_REPO + rel(f));
+    if (!sys) return [];
+    return [...readFileSync(f, "utf8").matchAll(/["']@\/([^"']+)["']/g)].flatMap(([, spec]) => {
+      // every module kind tsconfig resolves (allowJs, resolveJsonModule): the spec itself, then the extension-less forms
+      const file = ["", ".ts", ".tsx", ".js", ".mjs", ".json", "/index.ts", "/index.tsx", "/index.js"].map((x) => spec + x)
+        .find((c) => existsSync(join(APP, c)) && statSync(join(APP, c)).isFile());
+      return file ? [{ file, sys, from: rel(f) }] : [];
+    });
+  });
+  const liveEntries = (b: (typeof LEGO_BLOCKS)[number]) => b.entry.filter((e) => !e.startsWith("repo:"));
 
   it("every usedBy slug is a registered system", () => {
     const slugs = new Set(registry.systems.map((s) => s.slug));
     expect(LEGO_BLOCKS.flatMap((b) => b.usedBy.filter((s) => !slugs.has(s)).map((s) => `${b.no}: ${s}`))).toEqual([]);
   });
 
-  it("every system importing a block through @/ is in that block's usedBy", () => {
-    const sources = ["app", "lib", "components"].flatMap((d) => walk(join(APP, d))).map((f) => ({ f, text: readFileSync(f, "utf8") }));
+  it("every system importing a block through @/ is in that block's usedBy (file and folder entries)", () => {
     const missing = new Set<string>();
     for (const b of LEGO_BLOCKS) {
-      for (const e of b.entry.filter((p) => /^(lib|components)\/.+\.tsx?$/.test(p))) {
-        const re = new RegExp(`["']@/${e.replace(/\.tsx?$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`);
-        for (const { f, text } of sources) {
-          if (!re.test(text)) continue;
-          const slug = owner(APP_FROM_REPO + rel(f));
-          if (slug && !b.usedBy.includes(slug)) missing.add(`${b.no} <- ${slug} (${rel(f)})`);
-        }
+      for (const { file, sys, from } of imports) {
+        if (liveEntries(b).some((e) => under(file, e)) && !b.usedBy.includes(sys)) missing.add(`${b.no} <- ${sys} (${from})`);
       }
     }
     expect([...missing]).toEqual([]);
+  });
+
+  it("every file two or more systems assemble belongs to a block (or is registry shared plumbing)", () => {
+    const users = new Map<string, Set<string>>();
+    for (const { file, sys } of imports) users.set(file, (users.get(file) ?? new Set()).add(sys));
+    const entries = LEGO_BLOCKS.filter(isLive).flatMap(liveEntries);
+    const orphans = [...users].filter(([file, s]) => s.size >= 2 && !entries.some((e) => under(file, e))
+      && !registry.shared_paths.some((p) => under(APP_FROM_REPO + file, p))).map(([file, s]) => `${file} <- ${[...s].sort().join(",")}`);
+    expect(orphans).toEqual([]);
   });
 });

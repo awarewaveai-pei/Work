@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-26（續4）— 積木＝可組裝到不同系統的零件：補 25 顆共用底座／營運積木、自動守「跨系統共用必屬某積木」、系統分頁篩選鈕
+
+- 根因／決策：操作者定義「積木＝像樂高可組裝成不同東西」。掃 `@/` import：171 檔被 ≥2 系統使用，扣掉產品模組資料夾仍有 93 檔不屬任何積木，含組裝最多的核心（`lib/ops-role.ts` 17 系統、`lib/security/timingSafeEqual.ts` 15、`lib/ai/gateway.ts` 11、`lib/tenant-guard.ts` 11）→ 目錄原本偏重圖像功能、漏了底座。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：
+  - `NA/lib/systems/blocks.ts`：新層 ops；B-066..B-090（AI 閘道、AI 花費、事故收件匣、自動修復、排程、變更閘、目前客戶、知識庫、R2、Woo、邀請、角色、安全、租戶隔離、稽核、研究橋接、登入、分析、自動重整、備份、建站流程、節日、寄信 CRM、分頁讀取、轉場）；B-001→`lib/entitlements/`、B-005→`lib/portal/`、B-017 加 `image-models.js`；產品模組涵蓋 `lib/<模組>/`；usedBy 由實際 import 算出
+  - `NA/lib/systems/__tests__/blocks.test.ts`：import 檢查支援資料夾／app 條目與 .js/.json（Codex 1m：只解析 .ts 會漏 allowJs/resolveJsonModule 匯入，修後抓出 transitions.js、image-models.js）；新檢查：被 ≥2 系統 import 的檔必在某積木或 registry shared_paths
+  - `NA/lib/systems/overview.ts`：`overviewGroup()` 自 overviewCounts 抽出（語意不變，overview 15 測過）；積木頁系統分頁加 全部／開發中／待確認／維護與已完成／沒用積木（catalogHref `grp`）；頁首說明改用樂高定義
+- 驗證：`npx tsc --noEmit` exit 0；`npx vitest run lib/systems app/(shell)/ops/systems app/__tests__/sidebar-coverage.test.ts lib/studio/__tests__/editor-ai-panels.test.ts` 92 passed；突變：B-079 entry 改壞 → 「跨系統共用必屬積木」紅（列出 tenant-guard 11 系統），還原綠；本機 :3904 實看系統分頁與篩選鈕
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run lib/systems app/(shell)/ops/systems app/__tests__/sidebar-coverage.test.ts lib/studio/__tests__/editor-ai-panels.test.ts | exit=0 | ms=50000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-26-partialreview-4f28d0dd.md），1m 已修
+- ORACLE_WAIVED: 1m 修在 artifact 之後（解析副檔名＋補 B-017/B-090），由 13 項積木測試覆蓋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=overviewGroup|catalogHref|CatalogGroup | hits=8
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續2）— /ops/systems/blocks 改三分頁：系統卡片取代要左右捲的熱度表；積木目錄網址只由 catalogHref 產生
 
 - 根因／決策：操作者不要左右捲（10 欄熱度表在 1100px 版面必溢出）。改分頁（連結 ?view=）：系統用了哪些積木（預設，每系統一列：名稱／狀態／完成度＋各層顆數標籤自動換行、展開全部編號）／積木清單／圖解。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）

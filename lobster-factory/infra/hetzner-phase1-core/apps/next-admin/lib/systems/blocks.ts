@@ -15,7 +15,8 @@ export type Tier = (typeof TIERS)[number]["key"];
 
 /** Layers of the 功能積木 tier, bottom (shared base) to top (what the user touches). */
 export const BLOCK_LAYERS = [
-  { key: "platform", name: "共用底座", hint: "權限、AI 成本、模型清單、訂閱通道、產品門。" },
+  { key: "platform", name: "共用底座", hint: "身分、權限、權利、AI 呼叫、儲存、安全：幾乎每個系統都踩在上面。" },
+  { key: "ops", name: "營運與監控", hint: "事故收件匣、自動修復、排程、備份、稽核。" },
   { key: "content", name: "內容後端", hint: "registry.ts 自我註冊，編排器按種類取用。" },
   { key: "image", name: "生圖", hint: "生圖入口、模型、風格庫。" },
   { key: "ai", name: "AI 提示詞", hint: "人話 → 給模型的英文指令。" },
@@ -67,18 +68,18 @@ const retired = (no: string, id: string, name: string, purpose: string): LegoBlo
     note: `舊向量編輯器面板 ${id}；2026-11-05 隨舊編輯器刪除，由 VectorCraft 原生功能取代（agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C4）` });
 const planned = (no: string, layer: BlockLayer, name: string, purpose: string, usedBy: string[]): LegoBlock =>
   block({ no, layer, name, status: ["planned"], purpose, entry: [], usedBy });
-const productModule = (no: string, id: string, name: string, purpose: string, usedBy: string[]): LegoBlock =>
-  ({ no, tier: "module", name, status: ["module"], purpose, entry: [`lib/${id}/MODULE_MANIFEST.json`], covers: [`module/${id}`], usedBy });
+const productModule = (no: string, id: string, name: string, purpose: string, usedBy: string[], more: string[] = []): LegoBlock =>
+  ({ no, tier: "module", name, status: ["module"], purpose, entry: [`lib/${id}/MODULE_MANIFEST.json`, `lib/${id}/`, ...more], covers: [`module/${id}`], usedBy });
 const COS = "repo:Projects/internal/cognitive-engineering-os/ai_lego/modules/";
 const method = (no: string, family: string, name: string, count: number, purpose: string): LegoBlock =>
   ({ no, tier: "method", name, status: ["registered"], purpose, entry: [`${COS}${family}/`], covers: [`cognitive/${family}`], usedBy: ["cognitive-os"], count });
 
 export const LEGO_BLOCKS: LegoBlock[] = [
   // ── 共用底座 ──
-  block({ no: "B-001", layer: "platform", name: "許可判斷 can()", status: ["toolkit"],
-    purpose: "唯一的許可問法 can(主體, feature_key, actor)：訂閱、點數、買斷、代操都走它，不另建帳本。",
-    entry: ["lib/entitlements/can.ts"], deps: ["Supabase"],
-    usedBy: ["commerce", "content", "outbound-os", "studio", "tarot", "video", "social", "cs", "collect", "ai-subscription-channel", "app-platform", "ops-console"] }),
+  block({ no: "B-001", layer: "platform", name: "許可與權利 can()", status: ["toolkit"],
+    purpose: "唯一的許可問法 can(主體, feature_key, actor)＋權利、錢包、發放：訂閱、點數、買斷、代操都走它，不另建帳本。",
+    entry: ["lib/entitlements/"], deps: ["Supabase"],
+    usedBy: ["commerce", "ops-console", "systems-control-center", "design", "content", "studio", "tarot", "video", "app-platform", "provisioning", "outbound-os", "cs", "social", "ai-subscription-channel", "collect", "repair-center"] }),
   block({ no: "B-002", layer: "platform", name: "AI 成本表", status: ["toolkit"],
     purpose: "每個文字／生圖模型的單價與狀態；成本計算與模型選單都讀它。", entry: ["lib/ai/cost-model.ts"],
     usedBy: ["app-platform", "content", "video", "ops-console", "outbound-os", "social", "tarot", "studio", "commerce", "schedules", "ai-subscription-channel"] }),
@@ -88,9 +89,10 @@ export const LEGO_BLOCKS: LegoBlock[] = [
   block({ no: "B-004", layer: "platform", name: "訂閱額度文字通道", status: ["toolkit"],
     purpose: "文字生成改走 Claude／Codex 訂閱額度，不花 API 費用並記用量。", entry: ["lib/ai/sub-text.ts"], deps: ["訂閱工人（筆電或主機）"],
     usedBy: ["ai-subscription-channel", "content", "video"] }),
-  block({ no: "B-005", layer: "platform", name: "產品門登記", status: ["toolkit"],
-    purpose: "每個對外產品的網址、登入來源與門；新產品先填這裡（ADR 018）。", entry: ["lib/portal/products.ts"],
-    usedBy: ["commerce", "app-platform", "ops-console", "video", "outbound-os", "social", "content", "schedules"] }),
+  block({ no: "B-005", layer: "platform", name: "產品門", status: ["toolkit", "ui"],
+    purpose: "每個對外產品的網址、登入來源與門（products.ts，新產品先填，ADR 018），以及門的連結與畫面外框。",
+    entry: ["lib/portal/", "app/DoorContext.tsx"],
+    usedBy: ["commerce", "app-platform", "design", "ops-console", "staff-access", "content", "studio", "outbound-os", "social", "tarot", "video", "schedules"] }),
 
   // ── 內容後端 ──
   block({ no: "B-006", layer: "content", name: "後端積木註冊表", status: ["registered"],
@@ -122,8 +124,8 @@ export const LEGO_BLOCKS: LegoBlock[] = [
   // ── 生圖 ──
   block({ no: "B-016", layer: "image", name: "通用生圖", status: ["toolkit"], purpose: "17 個模型的共用生圖入口，輸出統一格式。",
     entry: ["lib/tarot/image-gen.ts"], deps: ["REPLICATE_API_TOKEN", "OPENAI_API_KEY"], usedBy: ["tarot", "studio", "content", "video"] }),
-  block({ no: "B-017", layer: "image", name: "生圖模型清單", status: ["toolkit"], purpose: "生圖模型選單與每個模型可帶幾張參考圖。",
-    entry: ["lib/studio/model-options.ts"], usedBy: ["studio", "design", "tarot", "app-platform"] }),
+  block({ no: "B-017", layer: "image", name: "生圖模型清單", status: ["toolkit"], purpose: "每個生圖模型／修圖工具的價格與名稱（瀏覽器與伺服器讀同一份），以及可帶幾張參考圖。",
+    entry: ["public/editor-shared/image-models.js", "lib/studio/model-options.ts"], usedBy: ["studio", "design", "tarot", "app-platform", "content", "video"] }),
   block({ no: "B-018", layer: "image", name: "風格設計工作台", status: ["registered", "ui"],
     purpose: "選模型、風格、主角、參考圖，多模型比較後鎖定風格，輸出可重用的 styleAnchor。",
     entry: ["lib/content/blocks/image-style-design-workbench.ts", "lib/studio/style-design-workbench.ts", "app/(shell)/tools/tarot/TarotStudio.tsx"],
@@ -140,7 +142,7 @@ export const LEGO_BLOCKS: LegoBlock[] = [
   block({ no: "B-023", layer: "image", name: "生圖提示詞建議", status: ["route"], purpose: "中文或英文簡述 → 英文美術指令。",
     entry: ["app/api/tools/tarot/suggest-prompt/route.ts"], deps: ["ANTHROPIC_API_KEY"], usedBy: ["tarot", "studio"] }),
   block({ no: "B-024", layer: "image", name: "藝術風格庫", status: ["toolkit"], purpose: "103 個風格（畫家、媒材、風格），中文顯示、英文進模型。",
-    entry: ["public/editor-shared/art-styles.js", "app/(shell)/tools/tarot/tarotStyles.ts"], usedBy: ["design", "tarot", "studio", "video"] }),
+    entry: ["public/editor-shared/art-styles.js", "app/(shell)/tools/tarot/tarotStyles.ts"], usedBy: ["design", "tarot", "studio", "video", "content"] }),
   block({ no: "B-025", layer: "image", name: "影片風格庫", status: ["toolkit"], purpose: "B-024＋影片預設合併成影片工作台的風格清單。",
     entry: ["public/editor-shared/video-styles.js"], usedBy: ["video", "design"] }),
 
@@ -220,18 +222,70 @@ export const LEGO_BLOCKS: LegoBlock[] = [
   planned("B-064", "pod", "履約對帳帳本", "Woo 訂單 ↔ Printful 草稿訂單對帳。", ["studio"]),
   planned("B-065", "pod", "物流回寫", "Printful 物流 webhook → WooCommerce。", ["studio"]),
 
+  // ── 共用底座與營運（跨系統組裝最多的積木） ──
+  block({ no: "B-066", layer: "platform", name: "AI 呼叫閘道與記帳", status: ["toolkit"], purpose: "所有 AI 呼叫走同一個閘道：選供應商、估成本、記每一次呼叫；OpenAI／Gemini／Claude／Replicate 共用參數與輪詢。",
+    entry: ["lib/ai/gateway.ts", "lib/ai/log-ai-call.ts", "lib/ai/cost-calculator.ts", "lib/ai/openai-text.ts", "lib/ai/gemini-models.ts", "lib/ai/claude-params.ts", "lib/ai/cheap-json.ts", "lib/ai/replicate-poll.ts", "lib/ai/replicate-output.ts", "lib/ai/model-comparison.ts"], deps: ["各家 AI 金鑰"], usedBy: ["app-platform", "ops-console", "content", "outbound-os", "video", "tarot", "repair-center", "cs", "provisioning", "social", "studio"] }),
+  block({ no: "B-067", layer: "ops", name: "AI 花費報表與匯率", status: ["toolkit"], purpose: "把 AI 花費依工具、供應商、客戶彙整，換算成新台幣。",
+    entry: ["lib/ai/spend-report.ts", "lib/ai/spend-loader.ts", "lib/ai/fx-cbc.ts"], usedBy: ["app-platform", "ops-console", "commerce", "content"] }),
+  block({ no: "B-068", layer: "ops", name: "事故收件匣與通知", status: ["toolkit"], purpose: "任何系統把事故丟進同一個收件匣：驗 token、去重、分類、遮蔽密鑰，再發 Telegram 通知。",
+    entry: ["lib/ops-inbox/"], deps: ["Telegram"], usedBy: ["ops-console", "app-platform", "commerce", "repair-center", "outbound-os", "schedules", "provisioning", "cs", "host-infra", "collect", "content", "social"] }),
+  block({ no: "B-069", layer: "ops", name: "自動修復與巡檢", status: ["toolkit"], purpose: "事故關聯、修復政策、網站巡檢、Telegram 指令台；能修的自動修，修不好就通知。",
+    entry: ["lib/repair-center/", "lib/repair-os/", "lib/site-watch/", "lib/command-plane/"], deps: ["SSH 到主機"], usedBy: ["repair-center", "ops-console", "provisioning", "host-infra", "schedules"] }),
+  block({ no: "B-070", layer: "ops", name: "排程", status: ["toolkit"], purpose: "定時工作的設定、紀錄與排程表；主機 cron 準時叫醒。",
+    entry: ["lib/schedules/", "app/(shell)/ops/schedules/ScheduleTable.tsx"], usedBy: ["schedules", "ops-console", "content", "social"] }),
+  block({ no: "B-071", layer: "platform", name: "正式環境變更閘", status: ["toolkit"], purpose: "系統處於保護模式時，擋下會改動正式環境的動作並說明原因。",
+    entry: ["lib/system-modes/"], usedBy: ["ops-console", "content", "repair-center", "outbound-os", "provisioning", "video", "cs", "commerce", "social", "studio"] }),
+  block({ no: "B-072", layer: "platform", name: "目前客戶切換", status: ["toolkit"], purpose: "整個後台共用的「現在在幫哪個客戶做」：客戶搜尋、選擇器、側欄客戶清單。",
+    entry: ["lib/client-context/", "lib/org-search.ts", "app/(shell)/ops/clients/nav-orgs.ts", "app/(shell)/ops/clients/OrgPicker.tsx"], usedBy: ["app-platform", "ops-console", "content", "video", "commerce", "social"] }),
+  block({ no: "B-073", layer: "platform", name: "知識庫", status: ["toolkit"], purpose: "知識庫資料夾、關鍵字＋向量混合搜尋（RAG）；客服、內容、研究共用。",
+    entry: ["lib/kb/"], deps: ["Supabase pgvector"], usedBy: ["cs", "content", "cognitive-os", "collect", "ops-console", "hci30"] }),
+  block({ no: "B-074", layer: "platform", name: "檔案儲存（R2）", status: ["toolkit"], purpose: "上傳、下載、簽名網址；圖、影片、備份都放這裡。",
+    entry: ["lib/storage/"], deps: ["Cloudflare R2"], usedBy: ["app-platform", "design", "content", "tarot", "video", "studio", "repair-center"] }),
+  block({ no: "B-075", layer: "platform", name: "WooCommerce 與收款", status: ["toolkit"], purpose: "WooCommerce 連線、收款站設定、帳單與對帳。",
+    entry: ["lib/payments/"], deps: ["WooCommerce", "wp-bridge"], usedBy: ["commerce", "app-platform", "content", "ops-console", "outbound-os", "provisioning"] }),
+  block({ no: "B-076", layer: "platform", name: "帳號邀請", status: ["toolkit"], purpose: "邀請客戶、會員、員工建立帳號，邀請信文案共用。",
+    entry: ["lib/accounts/"], usedBy: ["commerce", "ops-console", "social", "staff-access", "app-platform"] }),
+  block({ no: "B-077", layer: "platform", name: "員工角色與工具權限", status: ["toolkit"], purpose: "擁有者／管理員／操作員／檢視者的判斷，以及每位員工能用哪些工具。",
+    entry: ["lib/ops-role.ts", "lib/staff-access.ts", "lib/ops-contracts.ts"], usedBy: ["staff-access", "ops-console", "app-platform", "commerce", "repair-center", "schedules", "design", "content", "tarot", "cognitive-os", "provisioning", "cs", "outbound-os", "social", "video", "studio", "systems-control-center"] }),
+  block({ no: "B-078", layer: "platform", name: "安全基本件", status: ["toolkit"], purpose: "定時比對（防時序攻擊）、對外頁面 SRI、密鑰保管庫讀取。",
+    entry: ["lib/security/", "lib/secret-vault.ts"], usedBy: ["app-platform", "commerce", "ai-subscription-channel", "cognitive-os", "collect", "cs", "content", "outbound-os", "schedules", "social", "tarot", "video", "ops-console", "provisioning", "repair-center", "studio", "systems-control-center"] }),
+  block({ no: "B-079", layer: "platform", name: "租戶隔離", status: ["toolkit"], purpose: "每個請求只能碰自己組織的資料。",
+    entry: ["lib/tenant-guard.ts"], usedBy: ["app-platform", "ops-console", "repair-center", "content", "provisioning", "staff-access", "outbound-os", "social", "video", "tarot", "commerce"] }),
+  block({ no: "B-080", layer: "ops", name: "營運稽核紀錄", status: ["toolkit"], purpose: "誰在什麼時候做了什麼營運動作。",
+    entry: ["lib/ops-audit.ts"], usedBy: ["ops-console", "schedules", "cs", "commerce"] }),
+  block({ no: "B-081", layer: "platform", name: "研究資料橋接", status: ["toolkit"], purpose: "研究資料在資料蒐集器、認知工程 OS、後台之間傳遞。",
+    entry: ["lib/research-bridges.ts"], usedBy: ["collect", "ops-console", "cognitive-os"] }),
+  block({ no: "B-082", layer: "platform", name: "登入與身分", status: ["toolkit"], purpose: "登入工作階段、門的登入連結、登入成功處理。",
+    entry: ["lib/auth/", "lib/supabase/", "app/LoginSucceeded.tsx"], deps: ["Supabase Auth"], usedBy: ["app-platform", "commerce"] }),
+  block({ no: "B-083", layer: "ops", name: "使用分析", status: ["toolkit"], purpose: "頁面與動作事件送 PostHog。",
+    entry: ["lib/analytics.ts"], deps: ["PostHog"], usedBy: ["app-platform", "ops-console"] }),
+  block({ no: "B-084", layer: "ui", name: "自動重整", status: ["toolkit"], purpose: "營運頁面定時自動重新整理。",
+    entry: ["app/AutoRefresh.tsx"], usedBy: ["ops-console", "repair-center"] }),
+  block({ no: "B-085", layer: "ops", name: "備份涵蓋檢查", status: ["toolkit"], purpose: "檢查每個站與資料庫都有備份。",
+    entry: ["lib/backup/"], usedBy: ["host-infra", "schedules"] }),
+  block({ no: "B-086", layer: "ops", name: "建站流程", status: ["toolkit"], purpose: "一鍵建站的步驟引擎、MainWP 連線與頁面模型。",
+    entry: ["lib/site-flow/"], deps: ["MainWP"], usedBy: ["provisioning", "ops-console"] }),
+  block({ no: "B-087", layer: "platform", name: "節日與國家資料", status: ["toolkit"], purpose: "各國節日行事曆（Calendarific＋自訂），內容與商品選題共用。",
+    entry: ["lib/events/"], deps: ["Calendarific"], usedBy: ["content", "studio"] }),
+  block({ no: "B-088", layer: "platform", name: "寄信與 CRM", status: ["toolkit"], purpose: "Resend 寄信、FluentCRM 聯絡人與電子報。",
+    entry: ["lib/mail/", "lib/crm/"], deps: ["Resend", "FluentCRM"], usedBy: ["app-platform", "ops-console", "content", "outbound-os", "commerce", "schedules", "social"] }),
+  block({ no: "B-089", layer: "platform", name: "資料庫分頁讀取", status: ["toolkit"], purpose: "Supabase 大量資料分頁讀完。",
+    entry: ["lib/supabase-paging.ts"], usedBy: ["app-platform", "commerce", "social"] }),
+  block({ no: "B-090", layer: "image", name: "轉場效果庫", status: ["toolkit", "ui"], purpose: "唯一的轉場清單、讀法與選擇器；影片剪輯、片頭片尾、自動影片、網站設定共用。",
+    entry: ["public/editor-shared/transitions.js", "components/tools/TransitionButtons.tsx"], usedBy: ["content", "video"] }),
+
   // ── 產品模組 ──
-  productModule("M-01", "outreach", "外聯", "找客戶、查證據、產信、輪流寄、回信停後續。", ["outbound-os"]),
-  productModule("M-02", "content", "內容", "熱門話題 → 文章／貼文 → 檢查 → 發佈。", ["content", "video"]),
-  productModule("M-03", "social", "社群", "社群貼文改寫、排程、派送與數據。", ["social"]),
+  productModule("M-01", "outreach", "外聯", "找客戶、查證據、產信、輪流寄、回信停後續。", ["outbound-os", "ops-console", "social"]),
+  productModule("M-02", "content", "內容", "熱門話題 → 文章／貼文 → 檢查 → 發佈。", ["content", "ops-console", "social", "video", "schedules", "app-platform", "commerce"], ["app/api/content/"]),
+  productModule("M-03", "social", "社群", "社群貼文改寫、排程、派送與數據。", ["social", "video", "content", "commerce", "ops-console", "cs", "outbound-os", "schedules"]),
   productModule("M-04", "video", "影片", "腳本、鏡頭、剪輯、旁白到輸出。", ["video"]),
-  productModule("M-05", "tarot", "塔羅", "塔羅牌圖片、提示詞與整副批次。", ["tarot"]),
-  productModule("M-06", "studio", "商品設計", "POD 商品圖、文案、修圖與訂單收件。", ["studio"]),
+  productModule("M-05", "tarot", "塔羅", "塔羅牌圖片、提示詞與整副批次。", ["tarot", "ops-console", "app-platform", "content", "studio", "ai-subscription-channel", "video"], ["app/(shell)/tools/tarot/"]),
+  productModule("M-06", "studio", "商品設計", "POD 商品圖、文案、修圖與訂單收件。", ["studio", "ops-console", "app-platform", "design", "content", "tarot", "video", "ai-subscription-channel"]),
   productModule("M-07", "design", "設計編輯器", "向量／照片專業版、畫布、橫幅、模型圖。", ["design"]),
-  productModule("M-08", "cs", "AI 客服", "依知識庫回答，必要時交給真人。", ["cs"]),
-  productModule("M-09", "collect", "資料蒐集", "蒐集外部資料，存成可引用來源。", ["collect", "cognitive-os", "outbound-os"]),
-  productModule("M-10", "hci", "HCI-30", "人機互動研究與持續監測。", ["hci30"]),
-  productModule("M-11", "cognitive", "認知工程", "認知方法、研究資料與專案組合平台（獨立資料庫）。", ["cognitive-os"]),
+  productModule("M-08", "cs", "AI 客服", "依知識庫回答，必要時交給真人。", ["cs", "ops-console", "social", "schedules"]),
+  productModule("M-09", "collect", "資料蒐集", "蒐集外部資料，存成可引用來源。", ["collect", "content", "schedules", "ops-console", "outbound-os", "repair-center"]),
+  productModule("M-10", "hci", "HCI-30", "人機互動研究與持續監測。", ["hci30", "ops-console"]),
+  productModule("M-11", "cognitive", "認知工程", "認知方法、研究資料與專案組合平台（獨立資料庫）。", ["cognitive-os", "ops-console", "collect", "commerce"], ["lib/cognitive-os/"]),
 
   // ── 認知方法族 ──
   method("C-01", "architecture", "架構", 10, "ADR、ATAM、DDD、事件風暴、取捨矩陣。"),
@@ -287,9 +341,12 @@ export function blockStats(blocks: LegoBlock[] = LEGO_BLOCKS) {
 
 /** /ops/systems/blocks URL. Defaults (view=systems, tier=block) are left out; every link to the page goes through here. */
 export type CatalogView = "systems" | "blocks" | "diagram";
-export function catalogHref(p: { view?: CatalogView; tier?: Tier; layer?: BlockLayer | null; sys?: string | null; q?: string | null } = {}): string {
+/** 系統分頁的篩選：總控中心的三張卡（overviewGroup）＋沒用到功能積木的系統 */
+export type CatalogGroup = "active" | "attention" | "wrapped" | "none";
+export function catalogHref(p: { view?: CatalogView; grp?: CatalogGroup | null; tier?: Tier; layer?: BlockLayer | null; sys?: string | null; q?: string | null } = {}): string {
   const q = new URLSearchParams();
   if (p.view && p.view !== "systems") q.set("view", p.view);
+  if (p.grp) q.set("grp", p.grp);
   if (p.tier && p.tier !== "block") q.set("tier", p.tier);
   if (p.layer) q.set("layer", p.layer);
   if (p.sys) q.set("sys", p.sys);

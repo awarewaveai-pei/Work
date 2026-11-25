@@ -5,8 +5,8 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { systemsAccess } from "@/lib/systems/access";
-import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockStats, blocksForSystem, catalogHref, isLive, type BlockLayer, type CatalogView, type LegoBlock, type Tier } from "@/lib/systems/blocks";
-import { projectAll, type SystemOverviewRow } from "@/lib/systems/overview";
+import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockStats, blocksForSystem, catalogHref, isLive, type BlockLayer, type CatalogGroup, type CatalogView, type LegoBlock, type Tier } from "@/lib/systems/blocks";
+import { overviewGroup, projectAll, type SystemOverviewRow } from "@/lib/systems/overview";
 import { readDefinitions, readProjectionInput } from "@/lib/systems/store";
 import { AddSystemForm, HEADER_CSS, Progress, Refused, StatusBadge, SystemsHeader, errorBox, muted, page, panel, panelBody, panelHead, smallBtn } from "../parts";
 
@@ -15,14 +15,16 @@ export const metadata = { title: "LEGO 積木目錄 · Ops" };
 
 const VIEWS: Array<[CatalogView, string]> = [["systems", "系統用了哪些積木"], ["blocks", "積木清單"], ["diagram", "圖解"]];
 type View = CatalogView;
-type Sp = { view?: string | string[]; tier?: string | string[]; layer?: string | string[]; sys?: string | string[]; q?: string | string[] };
-type Filters = { view: View; tier: Tier; layer: BlockLayer | null; sys: string; q: string };
+type Sp = { view?: string | string[]; grp?: string | string[]; tier?: string | string[]; layer?: string | string[]; sys?: string | string[]; q?: string | string[] };
+type Filters = { view: View; grp: CatalogGroup | null; tier: Tier; layer: BlockLayer | null; sys: string; q: string };
+type SysRow = { slug: string; sys: SystemOverviewRow | undefined; blocks: LegoBlock[]; grp: CatalogGroup | null };
+const GROUPS: Array<[CatalogGroup, string]> = [["active", "開發中"], ["attention", "待確認"], ["wrapped", "維護與已完成"], ["none", "沒用積木"]];
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 /** URL for the current filters with `patch` applied (null = drop that filter). */
 function hrefOf(f: Filters, patch: Partial<Record<keyof Filters, string | null>>): string {
-  const m = { view: f.view, tier: f.tier, layer: f.layer, sys: f.sys || null, q: f.q || null, ...patch };
-  return catalogHref({ view: (m.view ?? "systems") as View, tier: (m.tier ?? "block") as Tier, layer: m.layer as BlockLayer | null, sys: m.sys, q: m.q });
+  const m = { view: f.view, grp: f.grp, tier: f.tier, layer: f.layer, sys: f.sys || null, q: f.q || null, ...patch };
+  return catalogHref({ view: (m.view ?? "systems") as View, grp: m.grp as CatalogGroup | null, tier: (m.tier ?? "block") as Tier, layer: m.layer as BlockLayer | null, sys: m.sys, q: m.q });
 }
 
 const CSS = `
@@ -58,12 +60,20 @@ function Stat({ title, value, hint }: { title: string; value: number; hint: stri
 }
 
 /** One card per system: name, status, completion, then its blocks per layer as wrapping chips (stronger = more blocks). */
-function SystemsView({ rows, f, nameOf }: { rows: Array<{ slug: string; sys: SystemOverviewRow | undefined; blocks: LegoBlock[] }>; f: Filters; nameOf: (s: string) => string }) {
+function SystemsView({ rows, f, nameOf }: { rows: SysRow[]; f: Filters; nameOf: (s: string) => string }) {
   const max = Math.max(1, ...rows.flatMap((r) => BLOCK_LAYERS.map((l) => r.blocks.filter((b) => b.layer === l.key).length)));
+  const shown = f.grp ? rows.filter((r) => r.grp === f.grp) : rows;
   return (
     <section style={panel}>
       <div style={panelHead}><h2 style={{ margin: 0, fontSize: 16 }}>系統用了哪些積木</h2><div style={muted}>每個系統的狀態、完成度與用到的積木；點標籤看是哪幾顆</div></div>
-      {rows.map(({ slug, sys, blocks }) => (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "12px 18px", borderBottom: "1px solid var(--card-border)" }}>
+        <Link href={hrefOf(f, { grp: null })} className={!f.grp ? "btn-primary" : "btn-secondary"} style={smallBtn}>全部 {rows.length}</Link>
+        {GROUPS.map(([g, label]) => (
+          <Link key={g} href={hrefOf(f, { grp: g })} className={f.grp === g ? "btn-primary" : "btn-secondary"} style={smallBtn}>{label} {rows.filter((r) => r.grp === g).length}</Link>
+        ))}
+      </div>
+      {shown.length === 0 && <div style={{ ...muted, padding: "24px 18px", textAlign: "center" }}>這一類沒有系統</div>}
+      {shown.map(({ slug, sys, blocks }) => (
         <div key={slug} className="lg-sys">
           <div style={{ minWidth: 0 }}>
             <div className="lg-sys-head">
@@ -217,6 +227,7 @@ export default async function BlocksPage({ searchParams }: { searchParams?: Prom
   const sp = searchParams ? await searchParams : {};
   const f: Filters = {
     view: (VIEWS.some(([k]) => k === first(sp.view)) ? first(sp.view) : "systems") as View,
+    grp: GROUPS.some(([g]) => g === first(sp.grp)) ? (first(sp.grp) as CatalogGroup) : null,
     tier: (TIERS.some((t) => t.key === first(sp.tier)) ? first(sp.tier) : "block") as Tier,
     layer: BLOCK_LAYERS.some((l) => l.key === first(sp.layer)) ? (first(sp.layer) as BlockLayer) : null,
     sys: (first(sp.sys) ?? "").slice(0, 100),
@@ -242,14 +253,21 @@ export default async function BlocksPage({ searchParams }: { searchParams?: Prom
   // every registered system is a row (one with no block still shows its status and completion); catalog-only slugs too
   const catalogSlugs = LEGO_BLOCKS.filter((b) => b.tier === "block" && isLive(b)).flatMap((b) => b.usedBy);
   const rows = [...new Set([...systems.map((r) => r.system.slug), ...catalogSlugs])]
-    .map((slug) => ({ slug, sys: bySlug.get(slug), blocks: blocksForSystem(slug) }))
+    .map((slug): SysRow => {
+      const sys = bySlug.get(slug);
+      const blocks = blocksForSystem(slug);
+      const grp: CatalogGroup | null = blocks.length === 0 ? "none" : sys
+        ? overviewGroup({ status: sys.eff.status, inferred: sys.eff.inferred, featureCount: sys.p.features.length, blocker: sys.p.handoff.blocker, lastCommitAt: sys.p.lastCommitAt }, Date.now())
+        : null;
+      return { slug, sys, blocks, grp };
+    })
     .sort((a, b) => b.blocks.length - a.blocks.length || a.slug.localeCompare(b.slug));
 
   return (
     <div style={page} className="sys-page">
       <style>{CSS + HEADER_CSS}</style>
       <SystemsHeader current="blocks" title="LEGO 積木目錄"><AddSystemForm /></SystemsHeader>
-      <p style={{ ...muted, fontSize: 14, marginBottom: 18 }}>每顆積木有固定編號（B＝功能積木、M＝產品模組、C＝認知方法族），編號永不重用；前端面板和後端 API 算同一顆。</p>
+      <p style={{ ...muted, fontSize: 14, marginBottom: 18 }}>積木＝可以拿去組裝成不同系統的零件，就像樂高。每顆有固定編號（B＝功能積木、M＝產品模組、C＝認知方法族），編號永不重用；被 2 個以上系統用到的程式一定屬於某顆積木（自動測試守）。</p>
       {failure && <div style={errorBox}>讀不到系統進度：{failure}（積木清單照常顯示）</div>}
       {capped && <div style={errorBox}>事件超過讀取上限，最舊的一段沒有算進來，狀態與完成度可能不準。</div>}
       <div className="lg-stats">
@@ -259,7 +277,7 @@ export default async function BlocksPage({ searchParams }: { searchParams?: Prom
       </div>
       <nav className="lg-tabs" aria-label="積木目錄分頁">
         {VIEWS.map(([k, label]) => (
-          <Link key={k} href={k === "blocks" ? hrefOf(f, { view: "blocks" }) : hrefOf({ ...f, sys: "", q: "", layer: null, tier: "block" }, { view: k })}
+          <Link key={k} href={k === "blocks" ? hrefOf(f, { view: "blocks" }) : hrefOf({ ...f, grp: null, sys: "", q: "", layer: null, tier: "block" }, { view: k })}
             aria-current={f.view === k ? "page" : undefined} className={f.view === k ? "btn-primary" : "btn-secondary"} style={{ fontSize: 13, padding: "7px 16px", textDecoration: "none" }}>{label}</Link>
         ))}
       </nav>
