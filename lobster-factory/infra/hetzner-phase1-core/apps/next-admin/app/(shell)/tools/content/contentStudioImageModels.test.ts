@@ -1,25 +1,25 @@
-// Contract test: the curated image-model subset that Content Studio's Media Hub exposes
-// (ContentStudio.tsx `AI_IMAGE_PROVIDERS`) must stay valid against the shared image-gen toolkit
-// (lib/tarot/image-gen.ts `TAROT_MODELS`). image-gen.ts is actively edited (model ids + capabilities
-// drift), so this guards against: a typo'd / renamed model id reaching the dropdown, or an img2img /
-// seed capability flag that no longer matches what the model actually honours (which would surface a
-// disabled-knob that silently no-ops, or an enabled knob that 422s the request).
-//
-// AI_IMAGE_PROVIDERS lives inside a "use client" component and isn't importable here, so the curated
-// list is mirrored below. Keep the two in sync — this test exists precisely to fail loudly if the
-// toolkit moves underneath them.
+// Contract test: the article image sources (lib/content/image/article-image.ts ARTICLE_IMAGE_SOURCES, K26 -- the one list
+// behind the article page, the site's default and the schedule's choice) must stay valid against the shared image-gen
+// toolkit (lib/tarot/image-gen.ts TAROT_MODELS): a renamed model id, or an img2img / seed flag that no longer matches
+// what the model honours (a disabled knob that silently no-ops, or an enabled knob that 422s the request).
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it, expect } from "vitest";
 import { TAROT_MODELS, isTarotModel, isAspectRatio, type TarotModel } from "@/lib/tarot/image-gen";
 import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
+import { ARTICLE_IMAGE_MODELS, ARTICLE_IMAGE_SOURCES } from "@/lib/content/image/article-image";
 
-// Mirror of ContentStudio.tsx AI_IMAGE_PROVIDERS (minus the "none" sentinel, which never reaches the toolkit).
-const CURATED: { value: TarotModel; seed: boolean; img2img: boolean }[] = [
-  { value: "flux-schnell",         seed: true,  img2img: false },
-  { value: "flux-dev",             seed: true,  img2img: true  },
-  { value: "ideogram-v3-balanced", seed: true,  img2img: false },
-  { value: "nano-banana-pro",      seed: false, img2img: true  },
-  { value: "flux-2-max",           seed: true,  img2img: false },
-];
+const CURATED = ARTICLE_IMAGE_SOURCES as readonly { value: TarotModel; seed: boolean; img2img: boolean }[];
+
+describe("K26 the article image sources have one list", () => {
+  it("the article page and the site settings page keep no model list of their own", () => {
+    for (const f of ["ContentStudio.tsx", "sites/SiteManager.tsx", "sites/ScheduleImageButtons.tsx"]) {
+      const src = readFileSync(path.join(__dirname, f), "utf8");
+      expect(src).toContain("ARTICLE_IMAGE_SOURCES");
+      for (const id of [...ARTICLE_IMAGE_MODELS, "ideogram-v3-balanced", "nano-banana-pro", "flux-2-max"]) expect(src, `${f} names ${id}`).not.toContain(`"${id}"`);
+    }
+  });
+});
 
 describe("Content Studio curated image models ↔ toolkit contract", () => {
   for (const m of CURATED) {
@@ -44,6 +44,9 @@ describe("Content Studio curated image models ↔ toolkit contract", () => {
           const input = cfg.buildInput!({ prompt: "x", aspectRatio: "16:9", seed: SEED, referenceImages: [] });
           const forwardsSeed = input.seed === SEED;
           expect(forwardsSeed).toBe(m.seed);
+        } else if (cfg.provider === "openai" || cfg.provider === "gemini" || cfg.provider === "codex") {
+          // these generators take no seed (image-gen.ts: their results carry seed null)
+          expect(m.seed).toBe(false);
         } else {
           throw new Error(`unexpected provider ${cfg.provider} for ${m.value}`);
         }

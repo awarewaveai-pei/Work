@@ -5,7 +5,8 @@ import type { ManagedSite } from "@/app/api/content/sites/route";
 import { useDoorHref, useOnDoor } from "@/app/DoorContext";
 import { useClientContext } from "@/lib/client-context/use-client-context";
 import { FUNNEL_STAGES, MAX_TREND_FEEDS, PRICE_POSITIONS, siteCover, type SiteContentDefaults } from "@/lib/content/brand-voice";
-import { ARTICLE_IMAGE_MODELS, articleImageModel, articleImagesOff } from "@/lib/content/image/article-image";
+import { ARTICLE_IMAGE_SOURCES, articleImageChoice, articleImageSourceLabel, articleImagesOff, scheduleImageModel } from "@/lib/content/image/article-image";
+import ScheduleImageButtons from "./ScheduleImageButtons";
 import CoverSettingsFields from "./CoverSettingsFields";
 import PublishModeButtons from "./PublishModeButtons";
 import TopicModeButtons from "./TopicModeButtons";
@@ -22,24 +23,23 @@ const MKT_PRESETS: Record<string, string[]> = {
   emotionalTriggers: ["渴望被理解與接納", "想找回創造力與自信", "希望減輕焦慮與壓力", "尋找內心平靜與自我探索", "渴望與人真實連結", "想為孩子找到非藥物支持"],
   objections: ["我沒有繪畫天份", "會不會很貴？值得嗎？", "我不確定這對我有效", "我沒有時間", "這跟一般心理諮商有什麼不同？", "我的孩子適合嗎？"],
 };
-const IMAGE_MODELS = [
-  { value: "",                     label: "不指定（用 Studio 預設）" },
-  { value: "none",                 label: "None（不生成）" },
-  { value: "flux-schnell",         label: "Flux Schnell（預設）" },
-  { value: "flux-dev",             label: "Flux Dev（高品質）" },
-  { value: "ideogram-v3-balanced", label: "Ideogram v3" },
-  { value: "flux-2-max",           label: "Flux.2 Max（旗艦）" },
+// K26: the article page's default image source -- every source of the one list (article-image.ts), with its price
+const IMAGE_CHOICES = [
+  { value: "",     label: "不指定（用 Studio 預設）" },
+  { value: "none", label: "None（不生成）" },
+  ...ARTICLE_IMAGE_SOURCES.map((s) => ({ value: s.value, label: articleImageSourceLabel(s) })),
 ];
 
 const LANGUAGES = [{ value: "", label: "不指定" }, ...["Traditional Chinese", "Simplified Chinese", "English", "Japanese", "Korean"].map(l => ({ value: l, label: l }))];
 
-/** K25 (6): a stored model the automatic articles cannot draw with (codex-image, a stock-photo row, one saved from the
- *  article page) gets a line under the buttons; "" and None are choices, not models. */
-export function articleModelNote(model: string | undefined): string | null {
-  if (!model || articleImagesOff(model) || (ARTICLE_IMAGE_MODELS as readonly string[]).includes(model)) return null;
-  const fallback = articleImageModel(undefined);
-  const name = IMAGE_MODELS.find((m) => m.value === fallback)?.label.replace(/（.*）$/, "") ?? fallback;
-  return `自動產文用不了這個模型，會改用 ${name}；手動產文可以用`;
+/** K25 (6) / K26: a manual default the schedule cannot use (codex-image) gets a line under the buttons naming what the
+ *  schedule draws with instead -- its own setting, ScheduleImageButtons. */
+export function articleModelNote(d: Pick<SiteContentDefaults, "imageModel" | "scheduleImageModel">): string | null {
+  const own = ARTICLE_IMAGE_SOURCES.find((s) => s.value === d.imageModel);
+  if (!own || own.schedule) return null;
+  const used = scheduleImageModel(d);
+  const name = articleImagesOff(used) ? "不配圖" : ARTICLE_IMAGE_SOURCES.find((s) => s.value === used)?.label ?? used;
+  return `排程文章用不了這個來源，照「排程文章的圖片來源」：${name}；手動產文可以用`;
 }
 
 const ARTICLE_TYPES = [
@@ -90,7 +90,8 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
   const [err, setErr]       = useState("");
   // the cover as used: the site's own, else the layout's defaults (with the old overlay font carried over)
   const cover = siteCover(d);
-  const modelNote = articleModelNote(d.imageModel);
+  // the schedule's source is saved on its own (ScheduleImageButtons), so the note reads the site as stored
+  const modelNote = articleModelNote({ imageModel: d.imageModel, scheduleImageModel: site.contentDefaults?.scheduleImageModel });
 
   function setM(k: keyof NonNullable<SiteContentDefaults["marketing"]>, v: string) {
     setD(p => ({ ...p, marketing: { ...p.marketing, [k]: v } }));
@@ -137,7 +138,7 @@ function ContentDefaultsPanel({ site, onSaved }: { site: ManagedSite; onSaved: (
               onChange={e => { setD(p => ({ ...p, targetCountry: e.target.value })); setSaved(false); }} />
           </label>
           <div>
-            <OptionButtons label="圖片模型" value={d.imageModel ?? ""} options={IMAGE_MODELS} onChange={v => { setD(p => ({ ...p, imageModel: v })); setSaved(false); }} />
+            <OptionButtons label="圖片模型" value={articleImageChoice(d.imageModel)} options={IMAGE_CHOICES} onChange={v => { setD(p => ({ ...p, imageModel: v })); setSaved(false); }} />
             {modelNote && <div className="form-hint" style={{ marginTop: 4 }}>{modelNote}</div>}
           </div>
           {/* K10: the style of every article image (cover and body); an article can change it for itself only */}
@@ -831,6 +832,12 @@ export default function SiteManager({ textRoad, heading }: { textRoad?: TextRoad
               onSaved: updated => setSites(s => s.map(x => x.id === updated.id ? updated : x)),
               onApplied: () => void loadSites(),
             })}
+            {/* K26: the schedule's articles' image source, beside its text road */}
+            <ScheduleImageButtons
+              site={sites.find(x => x.id === site.id) ?? site}
+              onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}
+              readOnly={onDoor}
+            />
             <IntroStyleButtons
               site={sites.find(x => x.id === site.id) ?? site}
               onSaved={updated => setSites(s => s.map(x => x.id === updated.id ? updated : x))}

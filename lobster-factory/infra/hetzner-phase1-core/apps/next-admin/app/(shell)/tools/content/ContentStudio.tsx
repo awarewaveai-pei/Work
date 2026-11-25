@@ -11,7 +11,7 @@ import { SeoCheckPanel } from "./SeoCheckPanel";
 import { CostChip } from "./CostChip";
 import { markdownPreview } from "@/lib/content/client-markdown";
 import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
-import { ARTICLE_COVER_RATIO, ARTICLE_IMAGE_RATIO, articleBodyImages, fillPlaceholder, imagePlaceholders, placeholderScene } from "@/lib/content/image/article-image";
+import { ARTICLE_COVER_RATIO, ARTICLE_IMAGE_RATIO, ARTICLE_IMAGE_SOURCES, articleBodyImages, articleImageChoice, articleImageSourceLabel, fillPlaceholder, imagePlaceholders, placeholderScene } from "@/lib/content/image/article-image";
 import { parseArticleCover, type ArticleCover } from "@/lib/content/article/meta";
 import ImageStyleButtons from "./ImageStyleButtons";
 import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
@@ -190,13 +190,10 @@ const HOOK_TYPE_LABELS: Record<typeof HOOK_TYPES[number], string> = {
 // generateTarotImage. `seed`/`img2img` mirror each model's live capability (image-gen.ts TAROT_MODELS):
 // they drive the enable/disable of the Seed + 參考圖(img2img) controls so the UI never offers a knob the
 // model ignores. "none" = 不生成 AI 圖片 — short-circuits autoReplaceImages + generateHeroImage as before.
+// K26: this article's image source -- the one list (article-image.ts) with each price, plus no images
 const AI_IMAGE_PROVIDERS: { value: string; label: string; seed: boolean; img2img: boolean }[] = [
-  { value: "none",                 label: "None（不生成）",                       seed: false, img2img: false },
-  { value: "flux-schnell",         label: "Flux Schnell（快速 · 預設）",          seed: true,  img2img: false },
-  { value: "flux-dev",             label: "Flux Dev（高品質 · 支援參考圖）",      seed: true,  img2img: true  },
-  { value: "ideogram-v3-balanced", label: "Ideogram v3（文字/排版精準）",          seed: true,  img2img: false },
-  { value: "nano-banana-pro",      label: "Nano Banana Pro（Google · 支援參考圖）", seed: false, img2img: true  },
-  { value: "flux-2-max",           label: "Flux.2 Max（旗艦畫質）",                seed: true,  img2img: false },
+  { value: "none", label: "None（不生成）", seed: false, img2img: false },
+  ...ARTICLE_IMAGE_SOURCES.map(src => ({ value: src.value, label: articleImageSourceLabel(src), seed: src.seed, img2img: src.img2img })),
 ];
 
 // Media ratios = flux-schnell aspect_ratio enum values (these are sent through verbatim and actually
@@ -1125,7 +1122,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       // K10/K25: the image model and style follow the site picked (switching sites brings the new site's), for this article
       // only (never written back to the site) -- unless this article's own choice was made by hand, which stays
       if (!mediaTouched.current.aiImages)
-        next.media = { ...next.media, aiImages: d.imageModel || DEFAULT_MEDIA.aiImages };
+        next.media = { ...next.media, aiImages: articleImageChoice(d.imageModel) || DEFAULT_MEDIA.aiImages };
       if (!mediaTouched.current.imageStyle)
         next.media = { ...next.media, imageStyle: d.imageStyle && STYLE_CATALOG.some(s => s.zh === d.imageStyle) ? d.imageStyle : DEFAULT_MEDIA.imageStyle };
       if (d.brandVoiceInstructions && !prev.details.trim())
@@ -1494,6 +1491,8 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
         if (!["none", ...(video ? ["ai-video"] : [])].includes(restored.media?.youtubeSource)) {
           restored.media = { ...restored.media, youtubeSource: "none" };
         }
+        // K26: a draft saved on a source dropped from the list starts with no images (never sent on a model no button shows)
+        if (!articleImageChoice(restored.media?.aiImages)) restored.media = { ...restored.media, aiImages: "none" };
         setForm(restored);
         mediaTouched.current = { aiImages: true, imageStyle: true };   // the draft's own choices
         // If the snapshot has a non-empty brandName, lock it so the auto-populate effect
@@ -3043,22 +3042,15 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
           <SectionToggle label="媒體" open={showMedia} onToggle={() => setShowMedia(v => !v)}>
             <div style={{ background: "var(--build-risk-medium-bg)", border: "1px solid var(--yellow)", borderRadius: "6px", padding: "14px" }}>
               {/* Row 1: AI Images + count + size + style */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "12px", marginBottom: "12px", alignItems: "end" }}>
-                <div>
-                  <label className="form-label">AI 圖片</label>
-                  <select className="form-select" value={form.media.aiImages} disabled={isGenerating}
-                    onChange={e => { mediaTouched.current.aiImages = true; setMedia("aiImages", e.target.value); }}>
-                    {AI_IMAGE_PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">圖片數量</label>
-                  <select className="form-select" value={form.media.imageCount}
-                    disabled={isGenerating || form.media.aiImages === "none"}
-                    onChange={e => setMedia("imageCount", Number(e.target.value))}>
-                    {[1,2,3,4,5].map(n => <option key={n}>{n}</option>)}
-                  </select>
-                </div>
+              <ChoiceRow label="AI 圖片" value={form.media.aiImages} options={AI_IMAGE_PROVIDERS} disabled={isGenerating}
+                onPick={v => { mediaTouched.current.aiImages = true; setMedia("aiImages", v); }} />
+              <div style={{ marginBottom: "12px", maxWidth: "160px" }}>
+                <label className="form-label">圖片數量</label>
+                <select className="form-select" value={form.media.imageCount}
+                  disabled={isGenerating || form.media.aiImages === "none"}
+                  onChange={e => setMedia("imageCount", Number(e.target.value))}>
+                  {[1,2,3,4,5].map(n => <option key={n}>{n}</option>)}
+                </select>
               </div>
               {/* K10: ratio (body images; the cover is always 16:9) and style (cover and body) as visible buttons, no dropdowns */}
               <ChoiceRow label="內文圖片比例" value={form.media.imageSize} options={IMAGE_SIZES}

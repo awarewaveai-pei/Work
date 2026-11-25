@@ -63,7 +63,7 @@ describe("site defaults as buttons", () => {
     await openPanel();
     const picks: Array<[string, string]> = [
       ["語氣風格", "溫暖可信"], ["文章類型", "列表文章"], ["可讀性", "大學程度"], ["人稱視角", "第二人稱（你）"],
-      ["語言", "Japanese"], ["圖片模型", "Flux Dev（高品質）"], ["字型", "明體（Noto Serif）"],
+      ["語言", "Japanese"], ["圖片模型", "FLUX dev（NT$0.8／張）"], ["字型", "明體（Noto Serif）"],
       ["漏斗階段預設", "決策（準備行動／購買）"], ["價格定位", "平價親民（可近性）"],
     ];
     for (const [group, name] of picks) {
@@ -84,7 +84,7 @@ describe("site defaults as buttons", () => {
     render(<SiteManager />);
     await openPanel();
     expect(pressed("語氣風格", "目前：Playful")).toBe("true");
-    expect(pressed("圖片模型", "目前：flux-1.1-pro")).toBe("true");
+    expect(pressed("圖片模型", "不指定（用 Studio 預設）")).toBe("true");   // K26: a model off the list reads as not set
 
     fireEvent.click(screen.getByRole("button", { name: "儲存預設" }));
     await waitFor(() => expect(calls).toHaveLength(1));

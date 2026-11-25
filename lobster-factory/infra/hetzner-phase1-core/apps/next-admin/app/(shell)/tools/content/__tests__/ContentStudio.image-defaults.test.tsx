@@ -22,7 +22,7 @@ const WATERCOLOR = STYLE_CATALOG.find((s) => s.group === "媒材")!;
 const OIL = STYLE_CATALOG.find((s) => s.group === "西方畫家")!;
 const SITE: ManagedSite = {
   id: S1, name: "主站", url: "https://aaaa.example.com", color: "var(--accent)", active: true, tokenSet: true, usernameSet: true,
-  note: null, source: "db", organization_id: A, contentDefaults: { imageStyle: WATERCOLOR.zh, imageModel: "flux-2-max" },
+  note: null, source: "db", organization_id: A, contentDefaults: { imageStyle: WATERCOLOR.zh, imageModel: "nano-banana-2" },
 };
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -51,7 +51,7 @@ describe("ContentStudio -- the site's image defaults (K10)", () => {
     await waitFor(() => expect(within(style).getByRole("button", { name: WATERCOLOR.zh.split("｜")[0] }).getAttribute("aria-pressed")).toBe("true"));
     const ratio = screen.getByRole("group", { name: "內文圖片比例" });
     expect(within(ratio).getByRole("button", { name: /^4:3/ }).getAttribute("aria-pressed")).toBe("true");
-    expect((screen.getByDisplayValue(/Flux\.2 Max/) as HTMLSelectElement).value).toBe("flux-2-max");
+    expect(within(screen.getByRole("group", { name: "AI 圖片" })).getByRole("button", { name: /^Nano Banana 2\.1/ }).getAttribute("aria-pressed")).toBe("true");
 
     fireEvent.click(within(style).getByRole("button", { name: "西方畫家" }));
     fireEvent.click(within(style).getByRole("button", { name: OIL.zh.split("｜")[0] }));
