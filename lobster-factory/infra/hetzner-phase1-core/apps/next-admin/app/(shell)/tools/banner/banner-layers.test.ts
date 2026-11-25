@@ -1,0 +1,61 @@
+// Card (banner editable layers) tests (b) and (c): the SVG keeps every text as <text> with one Inkscape layer per Layer,
+// and the PSD read back by ag-psd has the type layers' text. Pixel parity of the stacked PNG needs a real canvas: it was
+// run in the browser (WORKLOG of this card).
+import { describe, expect, it } from "vitest";
+import { readPsd } from "ag-psd";
+import { buildBannerPsd, buildBannerSvg, type Pixels, type RasterDoc, type TextSpec } from "./banner-layers";
+
+const W = 40, H = 20;
+function px(fill: (x: number, y: number) => boolean): Pixels {
+  const data = new Uint8ClampedArray(W * H * 4);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (fill(x, y)) data.set([200, 30, 30, 255], (y * W + x) * 4);
+  return { width: W, height: H, data };
+}
+const text = (lines: TextSpec["lines"], extra: Partial<TextSpec> = {}): TextSpec => ({
+  lines, cssFamily: "'Noto Serif TC', serif", editorFont: "Noto Serif TC", weight: 700, size: 12, align: "center",
+  x: 20, y: 12, lineHeight: 14, letterSpacing: 1, opacity: 1, ...extra,
+});
+const title = text([[{ text: "夏日", color: "#ffffff" }, { text: "特賣", color: "#fbbf24" }], [{ text: "<全面>&五折", color: "#ffffff" }]]);
+const badge = text([[{ text: "限時優惠", color: "#ffffff" }]], { rotate: { angle: 0.18, cx: 30, cy: 6 }, opacity: 0.92 });
+const doc: RasterDoc = {
+  w: W, h: H,
+  layers: [
+    { name: "背景", pixels: px(() => true) },
+    { name: "商品圖", pixels: px((x, y) => x > 5 && x < 12 && y > 4 && y < 9) },
+    { name: "標題", pixels: px((x, y) => y === 10), text: title },
+    { name: "按鈕底", pixels: px(() => false) },
+    { name: "角標文字", pixels: px((x, y) => x === 30 && y === 6), text: badge },
+  ],
+  composite: px(() => true),
+};
+
+describe("banner layered SVG", () => {
+  it("one Inkscape layer per Layer; every text is a <text>; pixel layers are cropped images", () => {
+    const crops: Pixels[] = [];
+    const svg = buildBannerSvg(doc, (p) => { crops.push(p); return "data:image/png;base64,AA=="; });
+    expect(svg).toContain('xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"');
+    expect(svg.match(/<g [^>]*inkscape:groupmode="layer"/g)).toHaveLength(doc.layers.length);
+    for (const l of doc.layers) expect(svg).toContain(`inkscape:label="${l.name}"`);
+    expect(svg.match(/<text /g)).toHaveLength(2);
+    expect(svg).not.toMatch(/<image[^>]*>[^<]*夏日/);
+    // the title: line tspans at x/y, the accent run in its own fill, markup escaped
+    expect(svg).toContain('<tspan x="20" y="12">夏日<tspan fill="#fbbf24">特賣</tspan></tspan><tspan x="20" y="26">&lt;全面&gt;&amp;五折</tspan>');
+    // two pixel layers with something on them (the empty 按鈕底 gets no image); the product is cropped to its box
+    expect(crops).toHaveLength(2);
+    expect(crops[1]).toMatchObject({ width: 6, height: 4 });
+    expect(svg).toContain('<image x="6" y="5" width="6" height="4"');
+  });
+});
+
+describe("banner layered PSD", () => {
+  it("reads back with the type layers' text and names", () => {
+    const psd = readPsd(buildBannerPsd(doc), { skipLayerImageData: true, skipCompositeImageData: true, skipThumbnail: true });
+    expect(psd.width).toBe(W);
+    expect(psd.children?.map((l) => l.name)).toEqual(doc.layers.map((l) => l.name));
+    const t = psd.children?.find((l) => l.name === "標題")?.text;
+    expect(t?.text).toBe("夏日特賣\n<全面>&五折");
+    expect(t?.style?.font?.name).toBe("Noto Serif TC");
+    expect(t?.paragraphStyle?.justification).toBe("center");
+    expect(psd.children?.find((l) => l.name === "角標文字")?.text?.text).toBe("限時優惠");
+  });
+});

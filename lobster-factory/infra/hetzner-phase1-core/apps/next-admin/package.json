@@ -16,6 +16,7 @@
     "@sentry/nextjs": "^9",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.49.8",
+    "ag-psd": "^34.2.3",
     "aws4fetch": "^1.0.20",
     "fabric": "^7.4.0",
     "jspdf": "2.5.1",

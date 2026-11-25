@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-26（續3）— 橫幅匯出可編輯圖層：拆層繪圖、PSD／SVG 文字保持文字、JPG／WebP 目標 KB、專業版兩顆按鈕、片頭按鈕填預設字
+
+- 根因／決策：操作者硬需求「PSD、SVG 裡的字要能改」。舊 `exportToPng` 把所有元素畫在一張畫布，只能出平面 PNG。改成一份繪圖程式產圖層清單（`NA/app/(shell)/tools/banner/banner-layers.ts` `renderBannerLayers`），每層一張全尺寸畫布，文字層帶 TextSpec（行、每段顏色、字型、錨點、首行基線、行高、字距、不透明度、旋轉）；PNG／預覽用同一程式的 `flat` 模式（全部畫在一張畫布，每層從乾淨 context 開始）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 為什麼 PNG 不用疊層：8-bit 預乘 alpha 疊回時柔邊陰影會二次取整，實測最大差 2/255（約 50 像素）> 卡片的 1/255；flat 模式實測 0 差，且預覽每格少建 ~15 張全尺寸畫布。
+- 步驟：`banner-layers.ts`（新）繪圖＋`buildBannerPsd`（ag-psd，文字層 = `layer.text` + 像素快取、不透明度移到圖層）＋`buildBannerSvg`（Inkscape layer `<g>`、像素層只放非透明裁切的 PNG、文字層 `<text>`/`<tspan>`）；字型對照表 `EDITOR_FONTS`（黑體→Noto Sans TC、明體→Noto Serif TC、楷書／圓體→Noto Sans TC（編輯器沒有）、Inter→Inter，依 `scripts/vectorcraft-pro/web-fonts.patch`）。`BannerStudio.tsx`：刪舊繪圖 460 行、匯出區加 JPG／WebP＋目標 KB（二分搜尋 quality，壓不到寫實際 KB）、下載 PSD／SVG、「在修圖（專業版）開啟」(PSD) 與「在向量（專業版）開啟」(SVG)；片頭三鈕標題空白時填「片頭標題」（標題＋副標再填「副標題」），說明改白話。`package.json` 加 `ag-psd ^34.2.3`。`tests/e2e/smoke/06-photo-pro.spec.ts` 跟著改按鈕名與 .psd。
+- 已知差異：「重點字底色」開＋標題換行時，所有行的底色現在都在所有文字下面（舊版第 2 行底色會蓋到第 1 行光暈），實測該情境差 18/255。
+- 驗證：
+  - tsc：`npx next typegen && npx tsc --noEmit` exit 0。
+  - 卡片 (b)(c)：`npx vitest run "app/(shell)/tools/banner/"` 5 passed（SVG 圖層數＝Layer 數、文字全是 `<text>`；`readPsd` 讀回 `layer.text.text` 等於原字）。
+  - 卡片 (a)：瀏覽器比對（HEAD 版 exportToPng vs 新版，同 state，5 組尺寸／版型）：flat 0/255 ×4；疊層 2/255；換行＋重點字底色 18/255（上列已知差異）。
+  - 本機實開 localhost:3907（編輯器靜態檔代理線上 /photo-pro、/vector-pro）：做含 **重點字**、副標、價格、按鈕、角標、商品圖的 banner；PhotoCraft 開 PSD，標題／按鈕文字／星星／角標文字是文字圖層，按鈕字改成「馬上搶購」成功（`$env:TEMP/banner-photocraft-edited.jpg`）；VectorCraft 開 SVG，按鈕文字是文字物件（Noto Sans TC Bold 33pt 置中），插字成功（`$env:TEMP/banner-vectorcraft-edited.jpg`）；JPG 目標 60KB→59.3KB、WebP 56KB、目標 3KB→提示實際 13KB。
+- 避免再發生：新增匯出格式只在 banner-layers.ts 加一個 build 函式吃 RasterDoc，不另寫繪圖。
+- 剩餘：PhotoCraft 把 PSD 粗體顯示成常規（ag-psd fauxBold 沒被讀）；Noto Serif TC 未載入時 PhotoCraft 警告並用替代字；文字的陰影光暈在編輯器重排後消失；彈窗被擋時退回同分頁開編輯器（現有慣例）會離開橫幅頁。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" | exit=0 | ms=439
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n（全修：Safari 不能編 WebP 時明說不出假檔；JPG 透明處先鋪 bgColor；SVG esc 剔除 XML 不合法控制字元；另採建議：開編輯器用 raster.composite 不重疊一次。accent-not-text 閘抓到 var(--red) 字色已改 --badge-red-text）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,.claude | grep=在 Canvas Editor 開啟|handleOpenInCanvas|影片片頭（存到我的設計後 | hits=3
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續2）— /ops/systems/blocks 改三分頁：系統卡片取代要左右捲的熱度表；積木目錄網址只由 catalogHref 產生
 
 - 根因／決策：操作者不要左右捲（10 欄熱度表在 1100px 版面必溢出）。改分頁（連結 ?view=）：系統用了哪些積木（預設，每系統一列：名稱／狀態／完成度＋各層顆數標籤自動換行、展開全部編號）／積木清單／圖解。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）

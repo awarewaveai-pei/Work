@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { roleHeader } from "@/lib/ops-role";
-import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
+import { CANVAS_STAFF_HREF, canvasTarget, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
 import { BANNER_RETURN_TOOL, applyBannerCanvasReturn } from "./banner-canvas-return";
+import { buildBannerPsd, buildBannerSvg, loadImage, rasterize, renderBannerLayers, type Pixels } from "./banner-layers";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel, type AspectRatio } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
@@ -383,468 +384,72 @@ function templatePatch(t: (typeof TEMPLATES)[number], preset: PresetKey): Partia
   return { ...t.patch, balanceTitle: true, headlineSize, subtextSize: Math.round(headlineSize * 0.42) };
 }
 
-// ---------------------------------------------------------------------------
-// Canvas export — single source of truth (preview renders this too).
-// Layer order: bg → dim → product → scrim → text stack (headline/subtext/price/
-// CTA/trust) → corner badge.
-// ---------------------------------------------------------------------------
-
-function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
-  ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
+/** An opener on an empty card shows nothing to look at: fill a placeholder title (and subtitle for 標題＋副標) only
+ *  where the field is empty -- typed words are never replaced. */
+function openerPlaceholders(key: string, s: Pick<State, "headline" | "subtext">): Partial<State> {
+  return {
+    ...(s.headline.trim() ? {} : { headline: "片頭標題" }),
+    ...(key === "opener-title-sub" && !s.subtext.trim() ? { subtext: "副標題" } : {}),
+  };
 }
 
-// Decoded-image cache keyed by src — the preview re-renders the whole canvas on
-// every state change, so re-decoding the (possibly 2K) bg/product each time would lag.
-// LRU-bounded: a long "generate many AI backgrounds" session would otherwise pin every
-// decoded 2K image (keyed by a multi-MB data URL) for the page lifetime.
-const _imgCache = new Map<string, HTMLImageElement>();
-const _IMG_CACHE_MAX = 12;
-async function loadImage(src: string): Promise<HTMLImageElement> {
-  const cached = _imgCache.get(src);
-  if (cached?.complete) {
-    _imgCache.delete(src); _imgCache.set(src, cached); // touch → most-recent
-    return cached;
-  }
-  return new Promise((res, rej) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload  = () => {
-      _imgCache.set(src, img);
-      while (_imgCache.size > _IMG_CACHE_MAX) {
-        const oldest = _imgCache.keys().next().value;
-        if (oldest === undefined) break;
-        _imgCache.delete(oldest);
-      }
-      res(img);
-    };
-    img.onerror = () => rej(new Error("image_load_failed"));
-    img.src = src;
-  });
-}
+// ---------------------------------------------------------------------------
+// Canvas export — single source of truth (preview renders this too). The drawing lives in banner-layers.ts as one
+// canvas per part; the PNG draws the same parts on one canvas (flat), the PSD / SVG keep them apart (text stays editable).
+// ---------------------------------------------------------------------------
+
+const bannerLayers = (state: State) => renderBannerLayers(state, PRESETS[state.preset]);
+const flatCanvas = async (state: State) => (await renderBannerLayers(state, PRESETS[state.preset], { flat: true })).layers[0].canvas;
 
 async function exportToPng(state: State): Promise<string> {
-  const p   = PRESETS[state.preset];
-  const cv  = document.createElement("canvas");
-  cv.width  = p.w;
-  cv.height = p.h;
+  return (await flatCanvas(state)).toDataURL("image/png");
+}
+
+const dataUrlBytes = (u: string) => Math.floor(((u.length - u.indexOf(",") - 1) * 3) / 4);
+
+/** JPG / WebP: quality 0.92, or with a KB target the highest quality (binary search) whose file is <= target; when even
+ *  the lowest quality is over, that lowest one (`over` = true). */
+function encodeLossy(cv: HTMLCanvasElement, mime: "image/jpeg" | "image/webp", targetKb: number | null): { url: string; kb: number; over: boolean } {
+  if (!targetKb) { const url = cv.toDataURL(mime, 0.92); return { url, kb: dataUrlBytes(url) / 1024, over: false }; }
+  const max = targetKb * 1024, MIN_Q = 0.05;
+  let best: string | null = null, lo = MIN_Q, hi = 1;
+  for (let i = 0; i < 8; i++) {
+    const q = (lo + hi) / 2, url = cv.toDataURL(mime, q);
+    if (dataUrlBytes(url) <= max) { best = url; lo = q; } else hi = q;
+  }
+  if (!best) {
+    const low = cv.toDataURL(mime, MIN_Q);
+    if (dataUrlBytes(low) <= max) best = low;
+    else return { url: low, kb: dataUrlBytes(low) / 1024, over: true };
+  }
+  return { url: best, kb: dataUrlBytes(best) / 1024, over: false };
+}
+
+function pngOfPixels(px: Pixels): string {
+  const cv = document.createElement("canvas");
+  cv.width = px.width; cv.height = px.height;
   const ctx = cv.getContext("2d");
   if (!ctx) throw new Error("canvas_unavailable");
-
-  if (state.bgMode === "color") {
-    ctx.fillStyle = state.bgColor;
-    ctx.fillRect(0, 0, p.w, p.h);
-  } else if (state.bgMode === "gradient") {
-    const deg    = Number.isFinite(parseFloat(state.gradAngle)) ? parseFloat(state.gradAngle) : 135;
-    const rad    = (deg * Math.PI) / 180;
-    const cx     = p.w / 2;
-    const cy     = p.h / 2;
-    const half   = Math.sqrt(cx * cx + cy * cy);
-    const grd    = ctx.createLinearGradient(
-      cx - Math.cos(rad) * half, cy - Math.sin(rad) * half,
-      cx + Math.cos(rad) * half, cy + Math.sin(rad) * half,
-    );
-    grd.addColorStop(0, state.gradFrom);
-    grd.addColorStop(1, state.gradTo);
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, p.w, p.h);
-  } else if (state.bgImage) {
-    const img   = await loadImage(state.bgImage);
-    const scale = Math.max(p.w / img.width, p.h / img.height);
-    const sw    = img.width  * scale;
-    const sh    = img.height * scale;
-    ctx.drawImage(img, (p.w - sw) / 2, (p.h - sh) / 2, sw, sh);
-  } else {
-    ctx.fillStyle = state.bgColor;
-    ctx.fillRect(0, 0, p.w, p.h);
-  }
-
-  if (state.dimOverlay) {
-    ctx.fillStyle = `rgba(0,0,0,${state.dimOverlayOpacity})`;
-    ctx.fillRect(0, 0, p.w, p.h);
-  }
-
-  // Skip overlaying the product when the active AI background already has it baked in.
-  // Keyed off bgImageHasProduct (set at generation time), NOT the live toggle — so flipping
-  // the toggle after a composite generate can't double-draw the product.
-  const aiComposited = state.bgImageHasProduct && state.bgMode === "ai" && !!state.bgImage;
-  if (state.productImage && !aiComposited) {
-    const img  = await loadImage(state.productImage);
-    const isCtr = state.productPos === "center";
-    const maxW  = p.w * state.productScale * (isCtr ? 0.7 : 0.45);
-    const maxH  = p.h * 0.85;
-    const scale = Math.min(maxW / img.width, maxH / img.height);
-    const sw    = img.width  * scale;
-    const sh    = img.height * scale;
-    const pad   = p.w * 0.05;
-    let x: number, y: number;
-    switch (state.productPos) {
-      case "left":         x = pad;              y = (p.h - sh) / 2;  break;
-      case "right":        x = p.w - sw - pad;   y = (p.h - sh) / 2;  break;
-      case "bottom-right": x = p.w - sw - pad;   y = p.h - sh - pad;  break;
-      default:             x = (p.w - sw) / 2;   y = (p.h - sh) / 2;
-    }
-    ctx.drawImage(img, x, y, sw, sh);
-  }
-
-  // ── unified content stack: headline → subtext → price → CTA → trust ──
-  const font     = state.fontFamily;
-  const padding  = Math.round(p.w * 0.06);
-  const maxWidth = p.w - padding * 2;
-  const align    = state.textAlignH;
-  const anchorX  = align === "left" ? padding : align === "right" ? p.w - padding : p.w / 2;
-  const gapV     = Math.round(state.subtextSize * 0.62);
-  // left edge of a w-wide block under the current alignment
-  const leftOf   = (w: number) => align === "left" ? anchorX : align === "right" ? anchorX - w : anchorX - w / 2;
-
-  type Block = { h: number; w: number; draw: (top: number) => void };
-  const blocks: Block[] = [];
-
-  // headline — own font, letter-spacing, accent words (**字**), outlined for legibility
-  if (state.headline) {
-    const hFont = state.headlineFont || font;
-    ctx.font = `bold ${state.headlineSize}px ${hFont}`;
-    setLetterSpacing(ctx, state.letterSpacing);
-    const runs = parseAccentRuns(state.headline);
-    let lines = layoutAccentLines(ctx, runs, maxWidth);
-    // card R3: even lines -- the narrowest width that still gives this many lines (off = the wrap as before)
-    if (state.balanceTitle && lines.length > 1) {
-      let lo = maxWidth / lines.length, hi = maxWidth;
-      for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (layoutAccentLines(ctx, runs, mid).length > lines.length) lo = mid; else hi = mid; }
-      lines = layoutAccentLines(ctx, runs, hi);
-    }
-    const lineW = (ln: AccentRun[]) => ln.reduce((s, r) => s + ctx.measureText(r.text).width, 0);
-    const lineH = state.headlineSize * 1.16;
-    const w = Math.min(maxWidth, Math.max(1, ...lines.map(lineW)));
-    setLetterSpacing(ctx, 0);
-    blocks.push({
-      h: lines.length * lineH, w,
-      draw: (top) => {
-        ctx.font = `bold ${state.headlineSize}px ${hFont}`;
-        setLetterSpacing(ctx, state.letterSpacing);
-        ctx.textAlign = "left"; ctx.textBaseline = "top";
-        let y = top;
-        for (const ln of lines) {
-          const lw = lineW(ln);
-          let x = align === "left" ? anchorX : align === "right" ? anchorX - lw : anchorX - lw / 2;
-          // accent highlight rects (behind text)
-          if (state.accentHighlight) {
-            let hx = x;
-            for (const r of ln) {
-              const rw = ctx.measureText(r.text).width;
-              if (r.accent && r.text.trim()) {
-                ctx.fillStyle = state.accentColor;
-                roundRectPath(ctx, hx - state.headlineSize * 0.06, y - state.headlineSize * 0.08,
-                  rw + state.headlineSize * 0.12, state.headlineSize * 1.22, state.headlineSize * 0.12);
-                ctx.fill();
-              }
-              hx += rw;
-            }
-          }
-          for (const r of ln) {
-            const rw = ctx.measureText(r.text).width;
-            const plated = r.accent && state.accentHighlight;
-            ctx.fillStyle = r.accent ? (plated ? "#1a1a1a" : state.accentColor) : state.textColor;
-            if (state.textOutline && !plated) {
-              // Two-pass shadow halo: no strokeText (avoid per-stroke outline on CJK)
-              ctx.shadowColor = "rgba(0,0,0,0.85)";
-              ctx.shadowBlur = state.headlineSize * 0.22;
-              ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-              ctx.fillText(r.text, x, y);
-              ctx.shadowBlur = state.headlineSize * 0.08;
-            }
-            ctx.fillText(r.text, x, y);
-            ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-            x += rw;
-          }
-          y += lineH;
-        }
-        setLetterSpacing(ctx, 0);
-      },
-    });
-  }
-
-  // subtext
-  if (state.subtext) {
-    ctx.font = `${state.subtextSize}px ${font}`;
-    const lines = wrapText(ctx, state.subtext, maxWidth);
-    const lineH = state.subtextSize * 1.32;
-    const w = Math.min(maxWidth, Math.max(1, ...lines.map((l) => ctx.measureText(l).width)));
-    blocks.push({
-      h: lines.length * lineH, w,
-      draw: (top) => {
-        ctx.font = `${state.subtextSize}px ${font}`;
-        ctx.textAlign = align; ctx.textBaseline = "top";
-        let y = top;
-        for (const line of lines) {
-          if (state.textOutline) { ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = state.subtextSize * 0.18; }
-          ctx.fillStyle = state.textColor;
-          ctx.globalAlpha = 0.95;
-          ctx.fillText(line, anchorX, y);
-          ctx.globalAlpha = 1; ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
-          y += lineH;
-        }
-      },
-    });
-  }
-
-  // price row (now big bold + was struck-through)
-  if (state.showPrice && (state.priceNow || state.priceWas)) {
-    const nowSize = Math.round(state.headlineSize * 0.78);
-    const wasSize = Math.round(state.subtextSize * 0.9);
-    ctx.font = `bold ${nowSize}px ${font}`;
-    const nowW = state.priceNow ? ctx.measureText(state.priceNow).width : 0;
-    ctx.font = `${wasSize}px ${font}`;
-    const wasW = state.priceWas ? ctx.measureText(state.priceWas).width : 0;
-    const gapP = state.priceNow && state.priceWas ? Math.round(nowSize * 0.35) : 0;
-    const rowW = nowW + gapP + wasW;
-    blocks.push({
-      h: nowSize * 1.1, w: rowW,
-      draw: (top) => {
-        let x = leftOf(rowW);
-        const baseY = top + nowSize;
-        ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-        if (state.priceNow) {
-          ctx.font = `bold ${nowSize}px ${font}`;
-          ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = nowSize * 0.12;
-          ctx.fillStyle = state.textColor;
-          ctx.fillText(state.priceNow, x, baseY);
-          ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
-          x += nowW + gapP;
-        }
-        if (state.priceWas) {
-          ctx.font = `${wasSize}px ${font}`;
-          ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.7;
-          const wy = baseY;
-          ctx.fillText(state.priceWas, x, wy);
-          ctx.strokeStyle = state.textColor;
-          ctx.lineWidth = Math.max(2, wasSize * 0.08);
-          ctx.beginPath();
-          ctx.moveTo(x, wy - wasSize * 0.32);
-          ctx.lineTo(x + wasW, wy - wasSize * 0.32);
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
-      },
-    });
-  }
-
-  // CTA button (the conversion driver)
-  if (state.ctaText) {
-    const bf   = Math.round(state.subtextSize * 1.02);
-    ctx.font = `bold ${bf}px ${font}`;
-    const tw   = ctx.measureText(state.ctaText).width;
-    const padX = Math.round(bf * 0.95);
-    const padY = Math.round(bf * 0.56);
-    const bw   = tw + padX * 2;
-    const bh   = bf + padY * 2;
-    blocks.push({
-      h: bh, w: bw,
-      draw: (top) => {
-        const left = leftOf(bw);
-        ctx.save();
-        ctx.shadowColor = "rgba(0,0,0,0.32)"; ctx.shadowBlur = bh * 0.28; ctx.shadowOffsetY = bh * 0.12;
-        roundRectPath(ctx, left, top, bw, bh, bh / 2);
-        ctx.fillStyle = state.ctaBg; ctx.fill();
-        ctx.restore();
-        ctx.fillStyle = state.ctaTextColor;
-        ctx.font = `bold ${bf}px ${font}`;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText(state.ctaText, left + bw / 2, top + bh / 2 + bf * 0.06);
-      },
-    });
-  }
-
-  // trust signals
-  if (state.trustType !== "none") {
-    const tSize = Math.round(state.subtextSize * 0.88);
-    let starsStr = "";
-    let label = "";
-    if (state.trustType === "stars" || state.trustType === "reviews") {
-      const n = Math.max(0, Math.min(5, Math.round(state.trustStars)));
-      starsStr = "★".repeat(n) + "☆".repeat(5 - n);
-      if (state.trustType === "reviews") label = state.trustText || "12,000+ 則好評";
-    } else {
-      label = "✓ " + (state.trustText || "30 天滿意保證");
-    }
-    ctx.font = `${tSize}px ${font}`;
-    const starW = starsStr ? ctx.measureText(starsStr).width : 0;
-    const labW  = label ? ctx.measureText(label).width : 0;
-    const gapT  = starsStr && label ? Math.round(tSize * 0.45) : 0;
-    const rowW  = starW + gapT + labW;
-    blocks.push({
-      h: tSize * 1.1, w: rowW,
-      draw: (top) => {
-        let x = leftOf(rowW);
-        const by = top + tSize;
-        ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-        ctx.font = `${tSize}px ${font}`;
-        if (starsStr) { ctx.fillStyle = "#fbbf24"; ctx.fillText(starsStr, x, by); x += starW + gapT; }
-        if (label) { ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.92; ctx.fillText(label, x, by); ctx.globalAlpha = 1; }
-      },
-    });
-  }
-
-  // position the whole stack
-  const stackH = blocks.reduce((sum, b) => sum + b.h, 0) + gapV * Math.max(0, blocks.length - 1);
-  let stackTop = state.textPos === "top" ? padding
-    : state.textPos === "bottom" ? p.h - padding - stackH
-    : (p.h - stackH) / 2;
-  stackTop = Math.max(padding, stackTop);
-
-  // localized scrim behind the stack (cleaner than dimming the whole image)
-  if (state.textScrim && blocks.length) {
-    const maxW = Math.max(...blocks.map((b) => b.w));
-    const sPadX = Math.round(state.subtextSize * 0.95);
-    const sPadY = Math.round(state.subtextSize * 0.75);
-    const sx = Math.max(0, leftOf(maxW) - sPadX);
-    const sw = Math.min(p.w - sx, maxW + sPadX * 2);
-    const sy = Math.max(0, stackTop - sPadY);
-    const sh = Math.min(p.h - sy, stackH + sPadY * 2);
-    ctx.fillStyle = `rgba(0,0,0,${state.textScrimOpacity})`;
-    roundRectPath(ctx, sx, sy, sw, sh, Math.round(state.subtextSize * 0.6));
-    ctx.fill();
-  }
-
-  // card R3: the brand colour bar beside a left-aligned stack, the stack's height, in the left margin
-  if (state.brandBar && blocks.length && align === "left") {
-    const barW = Math.max(6, Math.round(state.headlineSize * 0.12));
-    ctx.fillStyle = state.accentColor;
-    roundRectPath(ctx, Math.round(padding * 0.55), stackTop, barW, stackH, barW / 2);
-    ctx.fill();
-  }
-
-  // draw stack top-down
-  let cy = stackTop;
-  for (const b of blocks) { b.draw(cy); cy += b.h + gapV; }
-  ctx.globalAlpha = 1; ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-
-  // corner offer badge (independent of the stack)
-  if (state.badgeText) {
-    const bf = Math.round(state.subtextSize * 0.95 * state.badgeScale);
-    const margin = Math.round(p.w * 0.035);
-    ctx.font = `bold ${bf}px ${font}`;
-    const tw = ctx.measureText(state.badgeText).width;
-    const onLeft = state.badgePos === "tl";
-    if (state.badgeStyle === "burst") {
-      const r = Math.max(bf * 1.9, tw * 0.62 + bf * 0.4);
-      const cxb = onLeft ? margin + r : p.w - margin - r;
-      const cyb = margin + r;
-      ctx.save();
-      ctx.translate(cxb, cyb);
-      ctx.rotate((onLeft ? -1 : 1) * 0.18);
-      ctx.beginPath();
-      const spikes = 16;
-      for (let i = 0; i < spikes * 2; i++) {
-        const rr = i % 2 === 0 ? r : r * 0.84;
-        const a = (Math.PI / spikes) * i - Math.PI / 2;
-        ctx[i === 0 ? "moveTo" : "lineTo"](Math.cos(a) * rr, Math.sin(a) * rr);
-      }
-      ctx.closePath();
-      ctx.fillStyle = state.badgeColor; ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      const fit = Math.min(bf, (r * 1.5) / Math.max(1, tw / bf));
-      ctx.font = `bold ${Math.round(fit)}px ${font}`;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(state.badgeText, 0, 0);
-      ctx.restore();
-    } else if (state.badgeStyle === "ribbon") {
-      const padX = bf * 0.7, bh = bf * 1.9, notch = bh * 0.45;
-      const bw = tw + padX * 2 + notch;
-      const x = onLeft ? margin : p.w - margin - bw;
-      const y = margin;
-      ctx.fillStyle = state.badgeColor;
-      ctx.beginPath();
-      if (onLeft) {
-        ctx.moveTo(x, y); ctx.lineTo(x + bw, y);
-        ctx.lineTo(x + bw - notch, y + bh / 2); ctx.lineTo(x + bw, y + bh);
-        ctx.lineTo(x, y + bh);
-      } else {
-        ctx.moveTo(x + bw, y); ctx.lineTo(x, y);
-        ctx.lineTo(x + notch, y + bh / 2); ctx.lineTo(x, y + bh);
-        ctx.lineTo(x + bw, y + bh);
-      }
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${bf}px ${font}`;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(state.badgeText, onLeft ? x + (bw - notch) / 2 : x + notch + (bw - notch) / 2, y + bh / 2);
-    } else {
-      // pill
-      const padX = bf * 0.8, bh = bf * 1.9, bw = tw + padX * 2;
-      const x = onLeft ? margin : p.w - margin - bw;
-      const y = margin;
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.28)"; ctx.shadowBlur = bh * 0.25; ctx.shadowOffsetY = bh * 0.1;
-      roundRectPath(ctx, x, y, bw, bh, bh / 2);
-      ctx.fillStyle = state.badgeColor; ctx.fill();
-      ctx.restore();
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${bf}px ${font}`;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(state.badgeText, x + bw / 2, y + bh / 2);
-    }
-  }
-
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(px.data), px.width, px.height), 0, 0);
   return cv.toDataURL("image/png");
 }
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const isCjk   = /[　-鿿豈-﫿]/.test(text);
-  const tokens   = isCjk ? text.split("") : text.split(" ");
-  const lines: string[] = [];
-  let current = "";
-  for (const tok of tokens) {
-    const test = isCjk ? current + tok : (current ? `${current} ${tok}` : tok);
-    if (ctx.measureText(test).width <= maxWidth) { current = test; }
-    else { if (current) lines.push(current); current = tok; }
-  }
-  if (current) lines.push(current);
-  return lines.length ? lines : [text];
+async function exportToSvg(state: State): Promise<string> {
+  return buildBannerSvg(rasterize(await bannerLayers(state)), pngOfPixels);
 }
-
-// `**字**` → accent runs. Returns segments with an accent flag.
-type AccentRun = { text: string; accent: boolean };
-function parseAccentRuns(text: string): AccentRun[] {
-  const out: AccentRun[] = [];
-  const re = /\*\*([^*]+)\*\*/g;
-  let last = 0; let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push({ text: text.slice(last, m.index), accent: false });
-    out.push({ text: m[1], accent: true });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) out.push({ text: text.slice(last), accent: false });
-  return out.length ? out : [{ text, accent: false }];
+async function exportToPsd(state: State): Promise<ArrayBuffer> {
+  return buildBannerPsd(rasterize(await bannerLayers(state)));
 }
-
-// Wrap accent runs into lines (char-level — robust for CJK + mixed digits).
-// Each line is a list of merged same-accent runs. ctx.font + letterSpacing must be set first.
-function layoutAccentLines(ctx: CanvasRenderingContext2D, runs: AccentRun[], maxWidth: number): AccentRun[][] {
-  const lines: AccentRun[][] = [];
-  let line: AccentRun[] = []; let lineW = 0;
-  for (const r of runs) {
-    for (const ch of Array.from(r.text)) {
-      const w = ctx.measureText(ch).width;
-      if (lineW + w > maxWidth && line.length) { lines.push(line); line = []; lineW = 0; }
-      const last = line[line.length - 1];
-      if (last && last.accent === r.accent) last.text += ch;
-      else line.push({ text: ch, accent: r.accent });
-      lineW += w;
-    }
-  }
-  if (line.length) lines.push(line);
-  return lines.length ? lines : [[{ text: "", accent: false }]];
+function bytesToDataUrl(bytes: ArrayBuffer, mime: string): string {
+  const u8 = new Uint8Array(bytes);
+  let bin = "";
+  for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+  return `data:${mime};base64,${btoa(bin)}`;
 }
-
-function setLetterSpacing(ctx: CanvasRenderingContext2D, px: number) {
-  try { (ctx as unknown as { letterSpacing: string }).letterSpacing = `${px}px`; } catch { /* unsupported browser — no-op */ }
+const textDataUrl = (text: string, mime: string) => bytesToDataUrl(new TextEncoder().encode(text).buffer as ArrayBuffer, mime);
+function downloadUrl(url: string, name: string) {
+  const link = document.createElement("a");
+  link.href = url; link.download = name; link.click();
 }
 
 // History signature: excludes transient flags; reduces big image data-URLs to their length
@@ -1062,6 +667,9 @@ export interface BannerStaffApi {
 
 export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
+  const vectorHref = useDoorHref(canvasTarget(".svg").staffHref);
+  const [targetKb, setTargetKb] = useState("");
+  const [lossyNote, setLossyNote] = useState<string | null>(null);
   const { canUse, why } = usePaidFeatures();
   const designsHref = useDoorHref("/tools/designs");
   const [s, setS]         = useState<State>(INIT);
@@ -1378,21 +986,77 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
 
   async function handleDownload() {
     try {
-      const png  = await exportToPng(s);
-      const link = document.createElement("a");
-      link.href     = png;
-      link.download = `banner-${s.preset}.png`;
-      link.click();
+      downloadUrl(await exportToPng(s), `banner-${s.preset}.png`);
     } catch (err) {
       setS((prev) => ({ ...prev, error: String(err) }));
     }
   }
 
-  async function handleOpenInCanvas() {
+  // JPG / WebP: 目標 KB empty = quality 0.92; filled = squeezed to <= that size (lossyNote says when it could not be).
+  async function handleDownloadLossy(kind: "jpg" | "webp") {
+    setLossyNote(null);
+    try {
+      const kb = Number(targetKb);
+      const mime = kind === "jpg" ? "image/jpeg" : "image/webp";
+      let cv = await flatCanvas(s);
+      // Safari cannot encode WebP (WebKit 226950): toDataURL silently returns a PNG -- say so instead of a fake .webp
+      if (!cv.toDataURL(mime, 0.5).startsWith(`data:${mime}`)) {
+        setLossyNote(`這個瀏覽器不能存 ${kind.toUpperCase()}，請改用 Chrome／Edge，或下載 JPG／PNG。`);
+        return;
+      }
+      if (kind === "jpg") {
+        // JPG has no alpha: a transparent background image would turn black -- lay the background colour under it
+        const solid = document.createElement("canvas");
+        solid.width = cv.width; solid.height = cv.height;
+        const sctx = solid.getContext("2d");
+        if (!sctx) throw new Error("canvas_unavailable");
+        sctx.fillStyle = s.bgColor; sctx.fillRect(0, 0, solid.width, solid.height); sctx.drawImage(cv, 0, 0);
+        cv = solid;
+      }
+      const out = encodeLossy(cv, mime, Number.isFinite(kb) && kb > 0 ? kb : null);
+      downloadUrl(out.url, `banner-${s.preset}.${kind}`);
+      if (out.over) setLossyNote(`${kind.toUpperCase()} 壓到最低畫質仍有 ${Math.ceil(out.kb)} KB，比目標 ${kb} KB 大；已照最低畫質下載。`);
+    } catch (err) {
+      setS((prev) => ({ ...prev, error: String(err) }));
+    }
+  }
+
+  async function handleDownloadPsd() {
+    try {
+      downloadUrl(bytesToDataUrl(await exportToPsd(s), "image/vnd.adobe.photoshop"), `banner-${s.preset}.psd`);
+    } catch (err) {
+      setS((prev) => ({ ...prev, error: String(err) }));
+    }
+  }
+
+  async function handleDownloadSvg() {
+    try {
+      downloadUrl(textDataUrl(await exportToSvg(s), "image/svg+xml"), `banner-${s.preset}.svg`);
+    } catch (err) {
+      setS((prev) => ({ ...prev, error: String(err) }));
+    }
+  }
+
+  // 專業版: PhotoCraft opens the layered PSD (type layers stay editable text), VectorCraft the layered SVG.
+  async function handleOpenInPhotoPro() {
     if (!canvasHref) return;
     try {
-      const png = await exportToPng(s);
-      openInCanvas(png, `banner-${s.preset}`, canvasHref);
+      const raster = rasterize(await bannerLayers(s));
+      const png = pngOfPixels(raster.composite);
+      const base = `banner-${s.preset}`;
+      void openInCanvas(png, base, canvasHref, { url: bytesToDataUrl(buildBannerPsd(raster), "image/vnd.adobe.photoshop"), name: `${base}.psd` });
+    } catch (err) {
+      setS((prev) => ({ ...prev, error: String(err) }));
+    }
+  }
+
+  async function handleOpenInVectorPro() {
+    if (!vectorHref) return;
+    try {
+      const raster = rasterize(await bannerLayers(s));
+      const png = pngOfPixels(raster.composite);
+      const base = `banner-${s.preset}`;
+      void openInCanvas(png, base, vectorHref, { url: textDataUrl(buildBannerSvg(raster, pngOfPixels), "image/svg+xml"), name: `${base}.svg` });
     } catch (err) {
       setS((prev) => ({ ...prev, error: String(err) }));
     }
@@ -1479,12 +1143,12 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
               ))}
             </div>
             {/* card R3: cards a video opens with (存到我的設計 -> the editor's 片頭 「從我的設計挑」) */}
-            <p className="form-hint" style={{ margin: "10px 0 6px" }}>影片片頭（存到我的設計後，可在影片剪輯的片頭選「橫幅字卡」使用）</p>
+            <p className="form-hint" style={{ margin: "10px 0 6px" }}>做影片開頭的標題卡：選一種版面 → 改字 → 存到我的設計，之後在影片剪輯的片頭選「橫幅字卡」使用</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {TEMPLATES.filter((t) => t.group === "opener").map((t) => (
                 <button key={t.key} className="btn btn-ghost"
                   style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
-                  onClick={() => applyTemplate(templatePatch(t, s.preset))}>
+                  onClick={() => applyTemplate({ ...templatePatch(t, s.preset), ...openerPlaceholders(t.key, s) })}>
                   <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
                 </button>
               ))}
@@ -2189,11 +1853,50 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 disabled={s.generating || s.productRemoving}>
                 下載 PNG
               </button>
-              {canvasHref && <button className="btn btn-ghost" onClick={handleOpenInCanvas}
-                disabled={s.generating || s.productRemoving}>
-                在 Canvas Editor 開啟
-              </button>}
             </div>
+            {/* JPG / WebP: optional size target (KB); PNG is lossless, so it has none */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+              <button className="btn btn-ghost" onClick={() => void handleDownloadLossy("jpg")} data-testid="banner-download-jpg"
+                disabled={s.generating || s.productRemoving}>
+                下載 JPG
+              </button>
+              <button className="btn btn-ghost" onClick={() => void handleDownloadLossy("webp")} data-testid="banner-download-webp"
+                disabled={s.generating || s.productRemoving}>
+                下載 WebP
+              </button>
+              <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+                目標
+                <input className="form-input" type="number" min={1} step={1} inputMode="numeric" placeholder="不限"
+                  value={targetKb} onChange={(e) => { setTargetKb(e.target.value); setLossyNote(null); }}
+                  style={{ width: 80, fontSize: 12 }} data-testid="banner-target-kb" />
+                KB
+              </label>
+            </div>
+            <p className="form-hint" style={{ margin: "4px 0 0" }}>目標空白＝畫質 92%；填了就壓到不超過這個大小。</p>
+            {lossyNote && <p className="form-hint" style={{ margin: "4px 0 0", color: "var(--badge-red-text)" }}>{lossyNote}</p>}
+            {/* editable layers: text stays text (PSD type layers / SVG <text>) */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+              <button className="btn btn-ghost" onClick={() => void handleDownloadPsd()} data-testid="banner-download-psd"
+                disabled={s.generating || s.productRemoving}>
+                下載 PSD（可編輯圖層）
+              </button>
+              <button className="btn btn-ghost" onClick={() => void handleDownloadSvg()} data-testid="banner-download-svg"
+                disabled={s.generating || s.productRemoving}>
+                下載 SVG（可編輯圖層）
+              </button>
+            </div>
+            {(canvasHref || vectorHref) && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                {canvasHref && <button className="btn btn-ghost" onClick={() => void handleOpenInPhotoPro()} data-testid="banner-open-photo-pro"
+                  disabled={s.generating || s.productRemoving}>
+                  在修圖（專業版）開啟
+                </button>}
+                {vectorHref && <button className="btn btn-ghost" onClick={() => void handleOpenInVectorPro()} data-testid="banner-open-vector-pro"
+                  disabled={s.generating || s.productRemoving}>
+                  在向量（專業版）開啟
+                </button>}
+              </div>
+            )}
             {s.saved && (
               <p className="form-hint" style={{ marginTop: 8, color: "var(--green)" }}>
                 ✓ 已儲存至 {designsHref ? <a href={designsHref} style={{ color: "var(--green)" }}>My Designs</a> : "My Designs"}
