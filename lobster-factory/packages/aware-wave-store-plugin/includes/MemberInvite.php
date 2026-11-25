@@ -7,7 +7,9 @@
  * One signed event, POST <target>/api/webhooks/awarewave-wp-member {kind:"member_invite", wp_user_id, email,
  * email_verified, invite_code, event_id, occurred_at}, same signature and site header as the payment events
  * (Settings::paymentHeaders). event_id / occurred_at (card M10) belong to the held code: made when the member opened the
- * link, the same on every retry, so the app decides the event once and refuses it after the member was deleted; the app
+ * link, the same on every retry, so the app decides the event once and refuses it after the member was deleted. The
+ * serialized body is fixed at its first send and stored with the code: every retry sends (and signs) the same bytes, as
+ * the payment queue's job does (PaymentSender), even if the member's email changed meanwhile; the app
  * links the member to the invited account (next-admin lib/entitlements/wp-customers.ts redeemMemberInvite) and answers.
  * The plain codes (every invite link opened, at most 3, 14 days each) live in user meta only until a success or a
  * final refusal; sent newest first; a retryable answer keeps them for 「再試一次」.
@@ -22,7 +24,8 @@ final class MemberInvite {
 
 	const QUERY       = 'aw_invite';
 	const COOKIE      = 'aw_member_invite';
-	/** list<array{code:string,at:int,event_id:string}>, oldest first: every invite link the member opened, at most MAX_HELD. */
+	/** list<array{code:string,at:int,event_id:string,body?:string}>, oldest first: every invite link the member opened, at
+	 *  most MAX_HELD; body = the event's bytes once first sent. */
 	const META_CODE   = 'aware_wave_member_invite_code';
 	const MAX_HELD    = 3;
 	/** = next-admin lib/entitlements/identities.ts MEMBER_INVITE_DAYS (14): a code held longer is past its invite anyway,
@@ -194,7 +197,7 @@ final class MemberInvite {
 		return call_user_func( $this->meta['get'], $uid, $key );
 	}
 
-	/** @param list<array{code:string,at:int,event_id:string}> $held */
+	/** @param list<array{code:string,at:int,event_id:string,body?:string}> $held */
 	private function save( int $uid, array $held ): void {
 		if ( $held === array() ) {
 			call_user_func( $this->meta['delete'], $uid, self::META_CODE );
@@ -219,7 +222,11 @@ final class MemberInvite {
 			$at = is_array( $h ) ? (int) ( $h['at'] ?? 0 ) : 0;
 			if ( is_array( $h ) && is_string( $h['code'] ?? null ) && self::isCode( $h['code'] ) && $at > 0 && $now - $at <= self::CODE_TTL ) {
 				$id     = is_string( $h['event_id'] ?? null ) && $h['event_id'] !== '' ? $h['event_id'] : self::newEventId( $uid );
-				$live[] = array( 'code' => $h['code'], 'at' => $at, 'event_id' => $id );
+				$keep   = array( 'code' => $h['code'], 'at' => $at, 'event_id' => $id );
+				if ( is_string( $h['body'] ?? null ) && $h['body'] !== '' ) {
+					$keep['body'] = $h['body'];
+				}
+				$live[] = $keep;
 			}
 		}
 		if ( $live !== $stored ) {
@@ -277,8 +284,14 @@ final class MemberInvite {
 		}
 		$first = null;
 		while ( $held !== array() ) {
-			$top  = $held[ count( $held ) - 1 ];
-			$raw  = (string) json_encode( self::body( $uid, $m['email'], $top['code'], $top['event_id'], $top['at'] ), JSON_UNESCAPED_SLASHES );
+			$top = $held[ count( $held ) - 1 ];
+			if ( ! isset( $top['body'] ) ) {
+				// fixed now, stored before the send: a retry is the same event, byte for byte
+				$top['body']                 = (string) json_encode( self::body( $uid, $m['email'], $top['code'], $top['event_id'], $top['at'] ), JSON_UNESCAPED_SLASHES );
+				$held[ count( $held ) - 1 ] = $top;
+				$this->save( $uid, $held );
+			}
+			$raw  = $top['body'];
 			$res  = $this->settings->paymentsReady()
 				? $this->http->post( $this->settings->target . self::PATH, $this->settings->paymentHeaders( $raw ), $raw, self::TIMEOUT )
 				: array( 'status' => null, 'body' => '', 'error' => 'not_configured' );

@@ -193,6 +193,22 @@ final class MemberInviteTest extends TestCase {
 		$this->assertNotSame( $ids[0], json_decode( end( $http->requests )['body'], true )['event_id'], 'a new acceptance is a new event' );
 	}
 
+	public function test_a_retry_sends_the_first_bytes_even_after_the_member_changed_email(): void {
+		$this->member( true );
+		$http   = new FakeHttp( 503, '{"ok":false,"error":"member_event_not_recorded"}' );
+		$invite = $this->invite( $http );
+		$invite->hold( self::UID, $this->code() );
+		$invite->process( self::UID );
+		$this->members->members[ self::UID ] = array( 'email' => 'New@Soulful.tw', 'display_name' => 'Owner', 'verified_email' => 'new@soulful.tw' );
+		$this->now += 3600;
+		$invite = $this->invite( $http );
+		$invite->process( self::UID );   // 再試一次
+		$this->assertCount( 2, $http->requests );
+		$this->assertSame( $http->requests[0]['body'], $http->requests[1]['body'], 'the same bytes, so the same signature' );
+		$this->assertSame( $http->requests[0]['headers'], $http->requests[1]['headers'] );
+		$this->assertSame( 'Owner@Soulful.tw', json_decode( $http->requests[1]['body'], true )['email'] );
+	}
+
 	public function test_after_void_and_reissue_the_new_link_is_sent_and_everything_is_cleared(): void {
 		$a = str_repeat( 'A', 43 );
 		$b = str_repeat( 'B', 43 );
