@@ -43,4 +43,15 @@ describe("article image instructions", () => {
     for (const k of ["COVER_SCENE:", "COVER_TITLE:", "COVER_SUBTITLE:"]) expect(c.userPrompt).toContain(k);
     expect((await prompts({ ...base, generateMeta: true })).userPrompt).not.toContain("COVER_SCENE:");
   });
+
+  it("K27: body scenes and the cover scene name each person's look, differ across the article and never follow the site's country", async () => {
+    const c = await prompts({ ...base, generateMeta: true, targetCountry: "Taiwan", media: { aiImages: "flux", imageCount: 2 } });
+    const rule = c.userPrompt.split("\n").find((l) => l.startsWith("- PEOPLE IN PICTURES"))!;
+    for (const s of ["age range, gender, and an ethnic or regional background", "different people from different parts of the world",
+      "never follow the site's target country", "no posed group of diverse people", "Good:", "Bad:"]) expect(rule).toContain(s);
+    expect(c.userPrompt).not.toContain("people are fine");
+    expect(c.userPrompt.split("\n").find((l) => l.startsWith("COVER_SCENE:"))).toContain("people follow PEOPLE IN PICTURES above, someone different from every body picture");
+    expect(c.userPrompt.indexOf("- PEOPLE IN PICTURES")).toBeLessThan(c.userPrompt.indexOf("COVER_SCENE:"));
+    expect((await prompts(base)).userPrompt).not.toContain("PEOPLE IN PICTURES");
+  });
 });
