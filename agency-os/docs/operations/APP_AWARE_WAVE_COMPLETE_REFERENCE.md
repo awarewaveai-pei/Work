@@ -1,5 +1,7 @@
 # app.aware-wave.com 完整技術參考手冊
 
+> **建站現況（2026-11-23 起）**：`/onboard`、`/build` 兩頁已刪（308 到 `/ops/sites/new`），開客戶站見 [建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。本檔提到舊頁／舊接口當作現行做法的段落是歷史紀錄。
+
 > **SSOT**：本文件由 2026-06-04 全讀 codebase 產生，涵蓋 app.aware-wave.com（Lobster Factory Admin Console）的每個頁面、API、lib 模組、資料庫、基礎設施。  
 > **用途**：完整 code 級參考（深入查某頁/API/lib/DB 怎麼運作時讀）。  
 > **⚠️ 改動前先讀現況文件**：[`APP_AWARE_WAVE_CURRENT_STATE.md`](APP_AWARE_WAVE_CURRENT_STATE.md) — 網站「目前」長怎樣、怎麼登入、怎麼部署、有哪些陷阱（2026-06-05 大修後最新）。本檔某些段落（尤其 §3 認證、§14 問題）已被大修改變，以現況文件為準。  

@@ -6,6 +6,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 import { updateWpPost, wpPostPatch } from "@/lib/content/publish/wp-post-core";
+import { BRIDGE_ONLY_SITE_ERROR } from "@/lib/payments/woo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,13 +14,15 @@ export const dynamic = "force-dynamic";
 // Resolve site auth server-side from siteId.
 // `req` 必須傳進來：租戶檢查在 resolveWpSite 裡，少了 req 就沒有身分可驗 —— 這條 route 會
 // **發文到該站**，是本批七條裡風險最高的兩條之一。
-// @throws OrgAccessError（呼叫端轉 403）；回 null = 找不到站或缺 token（呼叫端回 404）。
+// @throws OrgAccessError（呼叫端轉 403）；回 null = 找不到站（404）；"bridge-only" = 站在但沒有 REST 憑證
+// （建站流程登記的站，woo.ts BRIDGE_ONLY_SITE_ERROR；呼叫端回 503，不送任何請求）。
 async function getSiteAuth(
   req: Request,
   siteId: string,
-): Promise<{ url: string; authHeader: string; organizationId: string | null } | null> {
+): Promise<{ url: string; authHeader: string; organizationId: string | null } | "bridge-only" | null> {
   const resolved = await resolveWpSite(req, siteId);
-  if (!resolved || !resolved.token) return null;
+  if (!resolved) return null;
+  if (!resolved.token) return "bridge-only";
   return { url: resolved.site.url, authHeader: resolved.authHeader, organizationId: resolved.site.organizationId };
 }
 
@@ -67,6 +70,7 @@ export async function DELETE(req: Request): Promise<Response> {
   try { site = await getSiteAuth(req, siteId); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   if (!site) return NextResponse.json({ ok: false, error: "Site not found" }, { status: 404 });
+  if (site === "bridge-only") return NextResponse.json({ ok: false, error: BRIDGE_ONLY_SITE_ERROR }, { status: 503 });
 
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), site.organizationId);
   if (!gate.allowed) {

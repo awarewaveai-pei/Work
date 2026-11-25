@@ -56,18 +56,17 @@ export function articleImagePrompt(scene: string, stylePrompt: string): string {
   return `${s}. ${st}. ${ARTICLE_IMAGE_TAIL}`;
 }
 
-/** K26 (operator 2026-11-25): the image sources an article may use -- the six measured in K13
+/** K26 (operator 2026-11-25): the image sources an article may use. Six were measured in K13; the operator kept four
+ *  (2026-11-25): flux-schnell as the default, openai-low, nano-banana-2 and the free Codex one, to re-test later
  *  (agency-os/reports/model-bakeoff/2026-11-article-image/runs.json). The one list behind the article page, the site's
  *  manual default and the schedule's own choice; name and price come from the image catalog (image-models.js).
  *  seed / img2img = what generateTarotImage honours on that model (contract: contentStudioImageModels.test.ts).
  *  schedule = a schedule run may use it: codex-image runs only for the operator with her laptop worker on
  *  (lib/tarot/image-gen.ts codex_not_deferred / codex_operator_only). */
 const SOURCES = [
+  { value: "flux-schnell", seed: true, img2img: false, schedule: true },
   { value: "openai-low", seed: false, img2img: true, schedule: true },
   { value: "nano-banana-2", seed: false, img2img: true, schedule: true },
-  { value: "flux-dev", seed: true, img2img: true, schedule: true },
-  { value: "flux-schnell", seed: true, img2img: false, schedule: true },
-  { value: "flux-2-klein-4b", seed: true, img2img: true, schedule: true },
   { value: "codex-image", seed: false, img2img: true, schedule: false },
 ] as const;
 
