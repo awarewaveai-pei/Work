@@ -561,6 +561,19 @@ button.sidebar-link {
   background: var(--bg-card);
 }
 
+/* /ops/clients' own list column (ClientPanelNav.tsx) and the full-height frame it sits in (ops/clients/layout.tsx). */
+.client-panel-frame { display: flex; height: 100vh; overflow: hidden; }
+.client-panel {
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border-right: 1px solid var(--card-border);
+  height: 100%;
+  overflow: hidden;
+}
+
 .topbar {
   background: var(--topbar-bg);
   border-bottom: 1px solid var(--card-border);
@@ -2940,7 +2953,8 @@ pre {
   .main { margin-left: 0; min-height: 0; }
   .door-main { min-height: 0; }
   .sidebar, .door-side { display: none; }
-  .client-rail { display: none; }
+  /* .client-rail (any page that needs a client) and .client-panel (/ops/clients) share every phone rule. */
+  .client-rail, .client-panel { display: none; }
   .shell[data-more="open"] > .sidebar,
   .shell[data-more="open"] .door-side {
     display: flex;
@@ -2954,10 +2968,11 @@ pre {
     overflow-y: auto;
     z-index: 40;
   }
-  /* A page that needs a client: the rail takes the upper half, the menu the lower. */
-  .shell[data-more="open"] .client-rail {
+  /* A page with a client list: the list takes the upper half, the menu the lower. */
+  .shell[data-more="open"] :is(.client-rail, .client-panel) {
     display: flex;
     position: fixed;
+    top: 0;
     left: 0;
     right: 0;
     width: auto;
@@ -2965,8 +2980,12 @@ pre {
     z-index: 40;
     border-bottom: 1px solid var(--sidebar-border);
   }
-  .shell[data-more="open"]:has(.client-rail) > .sidebar,
-  .shell[data-more="open"]:has(.client-rail) .door-side { top: 50vh; }
+  .shell[data-more="open"]:has(.client-rail, .client-panel) > .sidebar,
+  .shell[data-more="open"]:has(.client-rail, .client-panel) .door-side { top: 50vh; }
+  /* The page scrolls the window like every other page (a 100vh inner scroller would end behind the bottom bar), and the
+     client page's row of tabs scrolls sideways instead of widening the page. */
+  .client-panel-frame { height: auto; overflow: visible; }
+  .client-tabs { overflow-x: auto; }
   .sidebar-link, .door-nav-link { min-height: 44px; display: flex; align-items: center; flex-shrink: 0; }
   .topbar { padding: 10px 16px; }
   .page { padding: 16px; }
