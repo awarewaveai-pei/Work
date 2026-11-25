@@ -3,6 +3,11 @@
 ## 目的
 - 用固定流程建立新客戶公司（tenant），確保資料隔離、權限安全、可立即開案
 
+## 要開一個 WordPress 網站（頁面建站）
+- 在 app.aware-wave.com 的 `/ops/sites/new` 建客戶與站，照[建站流程手冊](../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)走九步。
+- 頁面建的站，網址以資料庫 `environments.base_url` 為準，不必抄進 `core/ENVIRONMENT_REGISTRY.md`（該檔寫一行指向客戶頁）。
+- 下面 Step 1–7 是 repo 內的租戶資料夾（合約、權限、專案文件），與頁面建站各自獨立。
+
 ## 命名規範
 - 公司資料夾：`company-<slug>`
 - 站點資料夾：`<brand-or-domain-slug>`
@@ -41,7 +46,7 @@
 5. 初始化 `ACCESS_REGISTER.md`：補齊 MFA、Secret Location、Rotation Due、Approver、Audit Evidence
 6. 例行工作排程：客戶例行工作的筆電排程（tenant 自動化）已於 2026-10-14 退役：它從沒真的運作過，見 `docs/operations/tenant-scheduling.md`。之後改在 app.aware-wave.com 的排程頁設定（規劃中，見 TASKS.md）。
 7. 填寫 1-4 使用指南，對齊該客戶的角色、流程、工具與排程
-8. 填寫 `core/ENVIRONMENT_REGISTRY.md`（staging/prod 必填）
+8. 填寫 `core/ENVIRONMENT_REGISTRY.md`（staging/prod 必填；經頁面建站的環境寫一行指向客戶頁）
 9. 預先建立 `core/RELEASE_GATES_CHECKLIST.md` 與 `core/BACKUP_RESTORE_PROOF.md` 第一版
 10. 依規模填寫 `core/DEPARTMENT_CLUSTER_CATALOG.md`（與客戶過選型）、`core/DEPARTMENT_SELECTION.json`、`core/DEPARTMENT_COVERAGE_MATRIX.md`、`core/CROSS_BORDER_GOVERNANCE.md`（與 `PROFILE`／`FINANCIAL_LEDGER` 幣別欄位對齊）；**未採購**的模組在矩陣 **Notes** 寫 `N/A — …`，並在 `DEPARTMENT_SELECTION.json` 的 `excluded_explicit` 或 `planned_future` 留痕
 
@@ -95,14 +100,14 @@
 - [ ] 至少 1 個 site 建立完成且可維護
 - [ ] 第 1 個專案已開立並有 Discovery 初版
 - [ ] 權限與憑證已分離且可輪替
-- [ ] `core/ENVIRONMENT_REGISTRY.md` 已填妥 staging/prod、備份、回滾責任人
+- [ ] `core/ENVIRONMENT_REGISTRY.md` 已填妥 staging/prod（經頁面建站者指向客戶頁）、備份、回滾責任人
 - [ ] `core/RELEASE_GATES_CHECKLIST.md` 已建立首版（含 GO/NO-GO 欄位）
 - [ ] `core/BACKUP_RESTORE_PROOF.md` 已建立首版（至少有備份紀錄）
 - [ ] `core/DEPARTMENT_COVERAGE_MATRIX.md` 已備置（企業客戶勾列；SMB 可註記 `N/A`）
 - [ ] `core/CROSS_BORDER_GOVERNANCE.md` 已備置（跨境／外包／外部審閱索引；無則最小填）
 - [ ] 已套用至少 1 組產業 Overlay（`industry/*`）並完成必填 QA 場景
 - [ ] 任務板、工作日誌、記憶文件已同步
-- [ ] 每日/每週/每月/不定時任務排程已啟用
+- [ ] 例行工作排程：租戶筆電排程已於 2026-10-14 退役（Step 2-6），此項不適用；app 排程頁可用後改在那裡設定
 - [ ] 最新健康檢查分數 **100%**（與本 repo `AO-CLOSE`／`AGENTS.md` 預設一致）
 - [ ] （若使用 Lobster）已依 Step 7 對齊 `OPERABLE_E2E_PLAYBOOK`，並記錄預計／實際執行證據路徑
 

@@ -15,7 +15,7 @@
 | **誰能改外觀**（權限）、API 驗證規則 | `app/api/theme/route.ts` | `canWriteTenantConfig` / 驗證迴圈 |
 | **存哪裡 / DB 讀寫 / fail-open / timeout** | `lib/theme/store.ts` | `getThemeConfig` / `saveThemeConfig` |
 | **主題怎麼套到每一頁**（注入機制） | `app/layout.tsx` | `<html style={themeStyle}>` |
-| **側欄選單項目 / 預設順序** | `app/SidebarNav.tsx` | `DEFAULT_SECTIONS` |
+| **側欄選單項目 / 預設順序** | `app/sidebar-sections.ts` | `DEFAULT_SECTIONS` |
 | **出廠預設配色本身** | `app/globals.css` | `:root { … }` |
 | **共用表單樣式** | `public/awarewave/forms.css` | shell 與本機工具讀同一份；`--form-input-bg` 在 Form Controls 調整 |
 | **本機影音工作台的外觀同步** | `components/tools/AwareWaveThemeFrame.tsx` + `app/(shell)/tools/seedstar/page.tsx` | 從外觀管理進入；只向指定本機 iframe 傳送目前 tokens，不另存主題 |
@@ -62,7 +62,7 @@
 
 | 改了什麼 | 上線方式 |
 |---|---|
-| 只改 `.ts` / `.tsx`（tokens / page / route / layout / SidebarNav） | `npx tsc --noEmit` → `/sg-deploy next-admin` |
+| 只改 `.ts` / `.tsx`（tokens / page / route / layout / NavRail） | `npx tsc --noEmit` → `/sg-deploy next-admin` |
 | 改 `globals.css` 預設 | 同上（重 build） |
 | 改 DB 表結構（新 migration） | 先套 migration 到 prod Supabase（EU，High-risk 要明示 go）→ 再 `/sg-deploy` |
 | 只是在編輯器調色 + 按 Save | **不用 deploy** —— 直接存 DB，重整即套用所有裝置 |
@@ -79,7 +79,7 @@
 | `lib/theme/store.ts` | server 端 DB 讀寫（fail-open）|
 | `app/api/theme/route.ts` | API：GET 取目前外觀 / POST 存（含權限閘）|
 | `app/layout.tsx` | 每頁 server 端注入主題到 `<html>` |
-| `app/SidebarNav.tsx` | 側欄渲染 + 順序（吃 server prop）|
+| `app/sidebar-sections.ts`＋`app/NavRail.tsx` | 側欄清單／順序＋渲染（吃 server prop）|
 | `app/tools/theme/page.tsx` | 編輯器 UI（操作者實際看到的頁面）|
 | `app/globals.css` | 出廠預設 `:root` 變數值 |
 | `packages/db/migrations/0052_app_theme.sql` | DB 表 schema（**別改，要動結構開新 migration**）|

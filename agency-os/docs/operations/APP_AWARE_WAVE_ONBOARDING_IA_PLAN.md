@@ -1,5 +1,7 @@
 # app.aware-wave.com — Onboarding / Provisioning 資訊架構（IA）重整計畫
 
+> **建站現況（2026-11-23 起）**：`/onboard`、`/build` 兩頁已刪（308 到 `/ops/sites/new`），開客戶站見 [建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。本檔的收斂計畫已由建站流程取代，保留為歷史紀錄。
+
 > **這份檔的用途**：app.aware-wave 後台的「建站/佈建」相關頁面目前**碎裂成 4 個互相重疊的介面**（操作者「不知道用哪個」）。本檔是把它們收斂成**一條連貫的客戶生命週期管線**的**正式計畫**——分析、目標架構、分階段實作、風險、回滾、驗證。改任何 code 前先讀本檔。
 > **狀態**：📋 規劃完成、**尚未實作**（等操作者批准 Phase 1）。
 > **相關文件**：[`APP_AWARE_WAVE_CURRENT_STATE.md`](APP_AWARE_WAVE_CURRENT_STATE.md)（現況權威）、[`APP_AWARE_WAVE_COMPLETE_REFERENCE.md`](APP_AWARE_WAVE_COMPLETE_REFERENCE.md)（code 級參考）、[`../architecture/client-onboarding-portal-spec.md`](../architecture/client-onboarding-portal-spec.md)（Portal 14 段規格，未來願景）。

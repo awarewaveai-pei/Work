@@ -17,8 +17,8 @@ export const COLOR_GROUPS: TokenGroup[] = [
     tokens: [
       { name: "--accent", default: "#6366f1", type: "color" },
       { name: "--accent-hover", default: "#818cf8", type: "color" },
-      // follows --accent unless set, so a saved accent keeps coloring links exactly as before
-      { name: "--accent-text", default: "var(--accent)", type: "color" },
+      // a darker accent for words; a saved --accent without its own --accent-text keeps colouring links (globals.css)
+      { name: "--accent-text", default: "#4f52e0", type: "color" },
     ],
   },
   {
@@ -26,8 +26,8 @@ export const COLOR_GROUPS: TokenGroup[] = [
     // primary button had no group of its own, and .btn-primary painted --accent instead)
     label: "Button Primary",
     tokens: [
-      { name: "--btn-primary-bg", default: "#6366f1", type: "color" },
-      { name: "--btn-primary-hover", default: "#4f52e0", type: "color" },
+      { name: "--btn-primary-bg", default: "#5154e3", type: "color" },
+      { name: "--btn-primary-hover", default: "#4346c8", type: "color" },
       { name: "--btn-primary-text", default: "#ffffff", type: "color" },
     ],
   },
@@ -35,7 +35,7 @@ export const COLOR_GROUPS: TokenGroup[] = [
     label: "Text",
     tokens: [
       { name: "--text-primary", default: "#0d1526", type: "color" },
-      { name: "--text-muted", default: "#64748b", type: "color" },
+      { name: "--text-muted", default: "#586579", type: "color" },
       { name: "--text-secondary", default: "#64748b", type: "color" },
     ],
   },
@@ -60,7 +60,7 @@ export const COLOR_GROUPS: TokenGroup[] = [
       { name: "--sidebar-text-hover", default: "#0d1526", type: "color" },
       { name: "--sidebar-text-active", default: "#0d1526", type: "color" },
       { name: "--sidebar-active-bar", default: "#6366f1", type: "color" },
-      { name: "--sidebar-section-label", default: "#94a3b8", type: "color" },
+      { name: "--sidebar-section-label", default: "#5b6a80", type: "color" },
       { name: "--sidebar-section-label-hover", default: "var(--sidebar-text)", type: "color" },
       { name: "--sidebar-hover", default: "color-mix(in srgb, var(--accent) 8%, transparent)", type: "color" },
       { name: "--sidebar-active-bg", default: "color-mix(in srgb, var(--accent) 14%, transparent)", type: "color" },
@@ -144,7 +144,7 @@ export const TYPOGRAPHY_GROUPS: TokenGroup[] = [
       { name: "--font-size-md", default: "15px", type: "text" },
       { name: "--font-size-lg", default: "17px", type: "text" },
       { name: "--font-size-xl", default: "22px", type: "text" },
-      { name: "--sidebar-section-label-size", default: "9px", type: "text" },
+      { name: "--sidebar-section-label-size", default: "12px", type: "text" },
       { name: "--tab-font-size", default: "14px", type: "text" },
     ],
   },

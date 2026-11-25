@@ -64,7 +64,7 @@ describe("article image model and count", () => {
     for (const old of ["flux-2-max", "ideogram-v3-balanced", "nano-banana-pro", "x", undefined, 3]) expect(articleImageChoice(old)).toBe("");
     for (const ok of [...ARTICLE_IMAGE_MODELS, "none"]) expect(articleImageChoice(ok)).toBe(ok);
     expect(scheduleImageModel({ imageModel: "ideogram-v3-balanced" })).toBe("flux-schnell");
-    expect(scheduleImageModel({ scheduleImageModel: "codex-image", imageModel: "flux-dev" })).toBe("flux-dev");
+    expect(scheduleImageModel({ scheduleImageModel: "codex-image", imageModel: "openai-low" })).toBe("openai-low");
   });
 
   it("no catalog style is cut by the size guard", () => {
@@ -72,7 +72,7 @@ describe("article image model and count", () => {
   });
 
   it("K26 the six K13 sources; every one a generator model, and only the laptop's Codex kept off the schedule", () => {
-    expect([...ARTICLE_IMAGE_MODELS].sort()).toEqual(["codex-image", "flux-2-klein-4b", "flux-dev", "flux-schnell", "nano-banana-2", "openai-low"]);
+    expect([...ARTICLE_IMAGE_MODELS].sort()).toEqual(["codex-image", "flux-schnell", "nano-banana-2", "openai-low"]);
     for (const id of ARTICLE_IMAGE_MODELS) expect(isTarotModel(id)).toBe(true);
     expect(ARTICLE_IMAGE_SOURCES.filter((s) => !s.schedule).map((s) => s.value))
       .toEqual(ARTICLE_IMAGE_MODELS.filter((id) => TAROT_MODELS[id as keyof typeof TAROT_MODELS].provider === "codex"));
