@@ -1,4 +1,20 @@
 # Worklog
+## 2026-11-25（續11）— 平台 U13、U14 上線＋風險盤點：主題未提交改動收進主線、down 副本檢查進 CI
+
+- 操作者 2026-11-25「看工人們反應的 RISKS 是否需要處理，先處理完風險再繼續做」「你決定」。
+- R1（根因）主線引用了從未提交的檔：`video-workbench/scripts/package.cjs:27`、`tests/appearance.cjs:18` 引用 `components/tools/AwareWaveThemeFrame.tsx`、`app/(shell)/tools/seedstar/page.tsx`，兩檔 2026-10-30 寫完只在 `D:\Work` 未追蹤，另有六個主題檔未提交（mtime 2026-11-23 10:41:08＝parity 帶過去的時間）。後果：`appearance.cjs` 在主線跑不過；U13／U14 被「主題 session」擋數週（無此 session）。處置 `1880e357c`：原樣搬入＋`lib/portal/products.ts` `STAFF_UTILITIES` 加 `tools/seedstar`（`tool: "tools/theme"`）＋可見名稱「影片工作台」；tsc 0、vitest 5855、`appearance.cjs` 3 PASS。`D:\Work` 六檔 `git show HEAD:f > f` 還原、兩個未追蹤檔移除（還原前 `git diff` 與 `D:\tmp\plat-briefs\theme-dirty.patch` 逐位元相同；hook 提示 `sidebar-coverage.test.ts` 62 分鐘前被 session 9c7e8634 寫過，內容已全在主線）。
+- R2 down 副本只放一處兩次（0181 `403b297d6`、0183 `0e4931dd8`）：`scripts/__tests__/down-migration-copies.test.mjs` 只有本機 `/verify` 跑。處置 `a1acc13c1`（補 0181）、`db6ac40f0`（補 0183＋該測試成為 `.github/workflows/shared-asset-gates.yml` 一步；CI 已綠）。
+- R3 工人只跑卡片點名測試（K14 弄紅 VW 閘）：`D:\tmp\plat-briefs\COMMON.md`、DISPATCH §0 加「改 VW 跑 `node tests/gate.cjs`、改外掛跑外掛全套」。
+- 判定不做（條件寫在 DISPATCH／監工台）：會員事件防重送（M10 開工第一項；今唯一事件 `member_invite` 冪等且入口在正式站關閉）；Cloudflare 限流（三入口皆關，W6 前加）；會員工作台實看（需 W6 後的測試會員，W7）。
+- U13 `1eff89930`：預設主題 5 組對比 ≥ 4.5:1（`globals.css` `:root`＋`lib/theme/tokens.ts`）；`accent-not-text.test.ts` 新增「狀態色不得當文字色」（每檔債務數只減不增，197 處）；刪 `app/SidebarNav.tsx`；`tools/theme/layout.tsx` 放 title；`.badge-blue`；刪 `.door-feature*`。
+- U14 `2e9758630`＋`6faf5f0f6`＋`b2b8659c3`＋`c44a06263`＋`1cee12873`：`app/MobileShell.tsx`（底列＋「更多」）、`app/bottom-items.ts`；≤ 640 `.sidebar`／`.door-side`／`.client-rail`／`.client-panel` 不佔位、`data-more="open"` 時覆蓋；客戶欄與 `ClientPanelNav` 行內版面樣式搬進 class（手機段零 `!important`）；`.client-tabs { overflow-x: auto }` 全寬度；文案不再寫「左側客戶欄」。
+- Codex 審查（`agency-os/reports/oracle/2026-11-25-partialreview-a28698cc.md`，3 項皆成立皆修）：① 底列絕對網址未經 `carry`，跨主機丟 `org`／`site` → 一律 `carry`；② 「更多」開啟時焦點可進被蓋住的頁 → 內容區 `inert`、焦點進選單、關閉回按鈕；③ 檢查器逐行掃漏跨行宣告 → 整段比對＋自我測試。
+- 上線：push `1cee12873` → CI 五項綠（含新的 Down-migration copies）→ `sg-deploy.sh next-admin` exit 0（smoke 5/5）。正式站內建瀏覽器：寬 375 `/tools/content` `scrollWidth`=375、底列三項各 125×55、`.sidebar` 與 `.client-rail` `display:none`；按「更多」→ `data-more=open`、一個 `[inert]`、焦點在選單首項、上半客戶欄下半選單；寬 1440 `/ops/clients/soulful-expression` `scrollWidth`=1440、`.client-tabs` client 924／scroll 1076。
+- 未做：手機仍擠窄的頁（5 個編輯器＝桌面工具不修；`/ops/billing` 280px 清單欄記 K15 量；outreach guide、costs、theme、social 不修）；video／content 子網域未登入未看；正式站用自訂主題，新預設色只在「重設」後可見。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (706 files passed) ; node tests/appearance.cjs ; node --test scripts/__tests__/down-migration-copies.test.mjs ; sg-deploy.sh next-admin ; 內建瀏覽器正式站 375／1440 量測 | exit=0 | ms=1500000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI (codex exec -s read-only)，3 項皆修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=MobileShell | hits=14
 ## 2026-11-25（續10）— oracle WP：英文頁定案（TranslatePress，網址代稱 `english`）＋SF-I2 內容工具實測與修正
 
 - [根因] ① 英文頁未做：引擎佔 `/en`、`/zh-TW`（`nginx/default.conf` `map $uri $oracle_backend`），TranslatePress 能否用別的代稱未試（SPEC §6）。② SF-I2 第四批 RISK「只走 REST 的讀寫對登記站回找不到」未實測：`wp-post-core.ts` `writePost` 與 `app/api/content/wp-post/route.ts` DELETE 把「沒有這個站」與「站沒有 REST 憑證」合成一個 404。
