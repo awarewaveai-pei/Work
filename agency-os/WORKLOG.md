@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-25（續13）— oracle WP：外掛 0.5.1（英文頁 `<title>` 走翻譯）發佈並裝到算命站
+
+- [根因] TranslatePress 免費版只翻 body；`/english/…` 的 `<title>` 仍中文（同日「英文頁定案」條的未解項）。
+- [步驟] 工人 `wp-plugin-051`（Sonnet 5.5）交 `a43511de5` → 監工讀 diff（`includes/Seo/TranslatedTitles.php` 一個類別、`aware-wave-oracle.php` 一處載入）→ `oracle-int` cherry-pick（`6ce09b1b7`）→ `scripts/release-wp-bridge.sh --plugin oracle`（dry-run 後真發：release repo CI 過、tag `v0.5.1`、主機鏡像 sha `233064ac…`）→ catalog `releaseVersion` 0.5.1（`b38af511b`）→ oracle 站 `docker cp` 鏡像 zip＋`wp plugin install --force`。
+- [驗證] `wp plugin list` aware-wave-oracle active 0.5.1；主機內臨時登入（只銷毀自己的 token）：`/english/tools/ziwei/` `<title>Zi Wei Dou Shu &#8211; oracle.aware-wave.com`、`/english/tools/` `Divination Tools`、`/english/daily-letter/` `Daily Fortune Letter`、`/tools/ziwei/` 仍 `紫微斗數`，iframe `src` 不變；工人 phpunit 30/30、`php -l` 7.4／8.3；next-admin vitest `wp-plugin-stack hosting` 4 檔 60 測試過。
+- [RISKS 總檢] ① 工人未做跨模型審查、未上真站 → 監工讀 diff＋真站實測。② 新發現：站 `blog_public=0`；中英文頁都無 meta description／og，`wp eval` 渲染 `wp_head` 無 Rank Math 輸出，`rank_math_is_configured` 不存在 → 原因未查明，列 GO-3 前置（WP-PLAN §0）。③ description／og 的翻譯路徑因此在真站未被執行，只有單元測試。
+- [rollback] 站：`wp plugin install /var/lib/awarewave/plugin-releases/aware-wave-oracle/v0.5.0/aware-wave-oracle-v0.5.0.zip --force`；repo：revert `b38af511b`、`6ce09b1b7`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin install <mirror zip> --force；curl -b <temp cookie> /english/tools/ziwei/ | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=releaseVersion: "0.5.0" | hits=0
+- ORACLE_WAIVED: 工人 critic Quick 一輪（1 Major 1 Minor 已修）＋監工讀 diff＋真站實測；非 auth／個資／金流，站尚未對外開放。
 ## 2026-11-25（續12）— oracle：Cloudflare 限流不計引擎的 `/_next/static/`（操作者開 `/en` 遇 Error 1015）
 
 - [根因] `http_ratelimit` 規則 `b8ffa72d…`（同 IP＋colo 10 秒 50 次，擋 10 秒）對 oracle 只放行 WP 後台路徑；引擎一頁就接近上限：`/en` HTML 含 15 個 `/_next/static/` 檔＋12 條工具連結（Next 預先載入），連開兩頁即超過。無 Analytics Read 權限，未能讀該 Ray 的實際請求數（推定）。
