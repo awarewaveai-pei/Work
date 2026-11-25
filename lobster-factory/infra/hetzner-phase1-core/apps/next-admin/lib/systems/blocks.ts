@@ -52,8 +52,6 @@ export interface LegoBlock {
   deps?: string[];
   /** registry system slugs, owner first */
   usedBy: string[];
-  /** another block doing the same job, by number (a real duplicate to retire later) */
-  overlaps?: string;
   note?: string;
   /** 認知方法族: method files in the family */
   count?: number;
@@ -157,11 +155,12 @@ export const LEGO_BLOCKS: LegoBlock[] = [
     entry: ["app/api/tools/image/process/route.ts"], deps: ["Sharp", "Ghostscript"], usedBy: ["studio"] }),
   block({ no: "B-028", layer: "process", name: "調色（伺服器烘焙）", status: ["toolkit", "ui"],
     purpose: "色相、飽和、色階、銳利度，Sharp 烘焙進商品圖與印刷檔；塔羅、商品設計用。",
-    entry: ["lib/studio/color-grade.ts", "components/tools/ColorGradePanel.tsx"], usedBy: ["studio", "tarot", "design"], overlaps: "B-029" }),
+    entry: ["lib/studio/color-grade.ts", "components/tools/ColorGradePanel.tsx"], usedBy: ["studio", "tarot", "design"],
+    note: "與 B-029 共用同一組調色參數（drift 測試守）；這顆在伺服器烘焙，B-029 在瀏覽器即時預覽，兩個執行環境各一顆。" }),
   block({ no: "B-029", layer: "process", name: "調色（編輯器）", status: ["toolkit", "ui"],
     purpose: "畫布與專業版編輯器的調色面板：預設風格、色階、色彩平衡、Camera RAW、HSL；調整存在圖片上。",
     entry: ["public/editor-shared/color-grade.js", "public/editor-shared/blocks/color-grade.js", "lib/studio/editor-color-grade.ts"], covers: ["panel/color-grade"],
-    usedBy: ["design", "studio"], overlaps: "B-028" }),
+    usedBy: ["design", "studio"], note: "與 B-028 共用同一組調色參數（lib/studio/__tests__/editor-color-grade-drift.test.ts 守）。" }),
   block({ no: "B-030", layer: "process", name: "商品頁方圖", status: ["toolkit"], purpose: "輸出商品頁正方形 WebP。",
     entry: ["lib/studio/to-product-image.ts"], deps: ["Sharp"], usedBy: ["studio"] }),
   block({ no: "B-031", layer: "process", name: "印刷檔與放大", status: ["toolkit"], purpose: "POD 印刷檔與高解析放大。",
@@ -279,7 +278,6 @@ export function blockStats(blocks: LegoBlock[] = LEGO_BLOCKS) {
   return {
     live: live.length,
     shared: live.filter((b) => b.usedBy.length >= 2).length,
-    overlaps: live.filter((b) => b.overlaps).length,
     planned: blocks.filter((b) => b.status.includes("planned")).length,
     retired: blocks.filter((b) => b.status.includes("retired")).length,
     modules: blocks.filter((b) => b.tier === "module").length,

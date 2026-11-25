@@ -34,15 +34,13 @@ describe("積木目錄 shape", () => {
     }
   });
 
-  it("status is known, usedBy is non-empty, 功能積木 have a layer, overlaps point at a real block both ways", () => {
+  it("status is known, usedBy is non-empty, 功能積木 have a layer", () => {
     const layers = BLOCK_LAYERS.map((l) => l.key as string);
-    const byNo = new Map(LEGO_BLOCKS.map((b) => [b.no, b]));
     for (const b of LEGO_BLOCKS) {
       for (const s of b.status) expect(Object.keys(BLOCK_STATUS), b.no).toContain(s);
       expect(b.usedBy.length, b.no).toBeGreaterThan(0);
       expect(new Set(b.usedBy).size, `${b.no} lists a system twice`).toBe(b.usedBy.length);
       expect(b.tier === "block" ? layers.includes(b.layer ?? "") : b.layer === undefined, b.no).toBe(true);
-      if (b.overlaps) expect(byNo.get(b.overlaps)?.overlaps, b.no).toBe(b.no);
     }
   });
 

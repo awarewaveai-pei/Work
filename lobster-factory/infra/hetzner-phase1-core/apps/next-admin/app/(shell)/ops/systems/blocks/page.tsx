@@ -18,7 +18,7 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 const LAYER_NAME = Object.fromEntries(BLOCK_LAYERS.map((l) => [l.key, l.name])) as Record<BlockLayer, string>;
 
 const CSS = `
-.lg-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.lg-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}
 .lg-diagram{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:16px;margin-bottom:20px;align-items:start}
 .lg-band{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;border:1px solid var(--card-border);text-decoration:none;color:var(--text-primary);font-size:13px}
 .lg-band:hover{border-color:var(--accent)}
@@ -125,7 +125,6 @@ function BlockCard({ b, nameOf }: { b: LegoBlock; nameOf: (s: string) => string 
         {b.count !== undefined && <span style={muted}>{b.count} 個方法</span>}
       </div>
       <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>{b.purpose}</div>
-      {b.overlaps && <div className="card-badge badge-yellow" style={{ display: "inline-flex", marginTop: 6 }}>與 <a href={`#${b.overlaps}`} style={{ color: "inherit", margin: "0 3px" }}>{b.overlaps}</a> 功能重複，待合併</div>}
       {b.note && <div style={{ ...muted, marginTop: 6 }}>{b.note}</div>}
       <div style={{ marginTop: 8 }}>
         <span style={{ ...muted, marginRight: 6 }}>用在 {b.usedBy.length} 個系統</span>
@@ -201,13 +200,12 @@ export default async function BlocksPage({ searchParams }: { searchParams?: Prom
     <div style={page} className="sys-page">
       <style>{CSS + HEADER_CSS}</style>
       <SystemsHeader current="blocks" title="LEGO 積木目錄"><AddSystemForm /></SystemsHeader>
-      <p style={{ ...muted, fontSize: 14, marginBottom: 20 }}>每顆積木有固定編號（B＝功能積木、M＝產品模組、C＝認知方法族），編號永不重用。前端面板和後端 API 算同一顆；同一個功能有兩套的標「功能重複」。</p>
+      <p style={{ ...muted, fontSize: 14, marginBottom: 20 }}>每顆積木有固定編號（B＝功能積木、M＝產品模組、C＝認知方法族），編號永不重用。前端面板和後端 API 算同一顆。</p>
       {failure && <div style={errorBox}>讀不到系統進度：{failure}（積木清單照常顯示）</div>}
       {capped && <div style={errorBox}>事件超過讀取上限，最舊的一段沒有算進來，狀態與完成度可能不準。</div>}
       <div className="lg-stats">
         <Stat title="功能積木" value={stats.live} hint={`另有產品模組 ${stats.modules}、認知方法族 ${stats.methods}`} />
         <Stat title="共用積木" value={stats.shared} hint="用在 2 個以上系統" />
-        <Stat title="功能重複" value={stats.overlaps} hint="兩顆做同一件事，待合併成一顆" />
         <Stat title="規劃中／已退場" value={stats.planned + stats.retired} hint={`規劃 ${stats.planned}・退場 ${stats.retired}（保留編號）`} />
       </div>
       <div className="lg-diagram">

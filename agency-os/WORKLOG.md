@@ -9,6 +9,16 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
 - BUGHUNT_WAIVED: NA -- 只動線上 WP 範本，repo 無程式改動
 - ORACLE_WAIVED: 無程式碼，WP 範本設定，已線上實測
+## 2026-11-25（續20）— 積木目錄更正：調色 B-028／B-029 不是重複，不合併；拿掉 overlaps
+
+- 根因：（續17）把 B-028（Sharp 烘焙 `NA/lib/studio/color-grade.ts:292-314`）與 B-029（Fabric 編輯器 `NA/public/editor-shared/color-grade.js:341-379`）標為功能重複。實為同一參數模型（GRADE_LIMITS `color-grade.ts:90-101` = `color-grade.js:18-29`，平衡 ×0.6 `:237`/`:350`），已由 `NA/lib/studio/__tests__/editor-color-grade-drift.test.ts:18-22` 守；兩個執行環境（伺服器 CMYK/WebP 烘焙 vs 瀏覽器即時＋HSL/RAW 等效果）無法共用程式。合併只增印刷輸出風險，無收益 → 不合併。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`NA/lib/systems/blocks.ts` 刪 `overlaps` 欄位與統計，B-028／B-029 改 note 說明關係；`NA/app/(shell)/ops/systems/blocks/page.tsx` 刪「功能重複」統計卡、標籤與說明句（統計 4→3 欄）；`blocks.test.ts` 刪 overlaps 檢查；總控中心 feature `lego-merge-color-grade` 以 trailer 設 cancelled
+- 驗證：`npx tsc --noEmit` exit 0；`npx vitest run lib/systems app/(shell)/ops/systems lib/studio/__tests__/editor-color-grade-drift.test.ts` 70 passed
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run lib/systems app/(shell)/ops/systems lib/studio/__tests__/editor-color-grade-drift.test.ts | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-25-partialreview-ea1667a9.md）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=b\.overlaps|overlaps\?: | hits=0
+- rollback：`git revert` 本 commit
 ## 2026-11-25（續19）— Banner 加「4:3 部落格封面」「3:2 部落格內文圖」兩顆尺寸
 
 - 操作者定案：WP 部落格封面 4:3（列表卡片飽滿），內文 3:2；文章頁特色圖由 Kadence 裁成 3:2。1.91:1 改為只標「連結分享預覽（OG）」（Rank Math 另設分享圖）。
