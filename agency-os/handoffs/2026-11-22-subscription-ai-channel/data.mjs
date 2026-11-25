@@ -87,7 +87,8 @@ export const STEPS = [
   { n: 25, code: 'K24', group: 'B3d', title: '文章封面的統一版型', plain: '所有文章封面同一個排版：上面四分之三是底圖，下面四分之一是色塊，放短標題和副標。字不會蓋到圖。標題最多兩行，太長先縮字。色塊顏色、字色、字型每個網站可以設。同一份排法之後可以換尺寸，IG 的直式就是這樣加。用主機上已經有的繪圖功能和中文字型，不裝新套件。這張卡只做出排版功能和預覽，還沒接到發文流程。',
     gate: '測試通過；產出短標題、長標題、英文標題三張樣張。', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: 'cff923c7e', depends: ['K22'], card: 'briefs/K24-cover-template.md' },
   { n: 26, code: 'K25', group: 'B3d', title: '封面版型接上網站設定和發文流程', plain: 'K10 和 K24 都做完後接起來。網站設定頁多一區「文章封面」：色塊顏色、字色、字型，旁邊有即時預覽。自動產文和手動文章頁都用這個版型出封面，放上 AI 寫的短標題和副標。文章舊的那套壓字功能刪掉，全站只剩一種封面做法。套版失敗時文章照樣存草稿，封面先用沒有字的底圖並標明。自動貼文附的圖如果是文章的圖，也改成這張封面。',
-    gate: '部署後產一篇：精選圖片是套好版型的封面；網站設定改顏色後預覽跟著變。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'e01e1d515', depends: ['K10', 'K24'], card: 'briefs/K25-cover-wiring.md' },
+    gate: '部署後產一篇：精選圖片是套好版型的封面；網站設定改顏色後預覽跟著變。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'e01e1d515', depends: ['K10', 'K24'], card: 'briefs/K25-cover-wiring.md' },  { n: 27, code: 'K26', group: 'B3d', title: '文章配圖的來源可以選，排程也可以選', plain: '你 11-25 看完實測後的決定：測過的來源都留著讓你選，免費的 Codex 也留著。現在的問題是，你判定沒出錯的三個來源裡有兩個不在文章的選單上，選了也沒用。改成：測過的六個來源都能選，按鈕上看得到每張多少錢。排程另外有自己的一排「排程文章的圖片來源」，放在排程文字 AI 那一區旁邊。Codex 免費生圖只能你本人按、筆電要開著，所以只出現在手動那一排。預設值這張卡不改，等你指定。',
+    gate: '全套測試通過；部署後在網站設定頁看得到兩排按鈕，排程那一排沒有 Codex。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K25'], card: 'briefs/K26-image-source-choice.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
