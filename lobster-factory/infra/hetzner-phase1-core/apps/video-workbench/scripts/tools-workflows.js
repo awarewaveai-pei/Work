@@ -109,23 +109,23 @@ function toolWorkflowScreen(t) {
   } else if (t.id === "sfx") {
     content =
       wfSource() +
-      `<aside class="side"><h3>去配樂・重配音效</h3><p>保留對白、去掉原配樂與音效，再依描述配上新音效；影片最長 2 分鐘。</p>${wfProviderChoice("sfx", "sfxEngine", "處理方式")}${wfArea("sfxPrompt", "想要的音效（選填，例如：雨打在窗上）", 200)}${wfStats()}${btn("開始處理", "submit", "primary")}</aside>`;
+      `<aside class="side"><h3>去配樂・重配音效</h3><p>保留對白、去掉原配樂與音效，再依畫面配上新音效；畫面不變，影片最長 2 分鐘。</p>${wfProviderChoice("sfx", "sfxEngine", "處理方式")}${wfArea("sfxPrompt", "額外指示（選填，例如：加一點雨聲）", 200)}${wfStats()}<button class="btn primary" data-act="submit" data-paid="video.audio-tools" data-paid-model="${esc("sfx:" + (wfProviderCurrent("sfx", values.sfxEngine) || ""))}">開始處理</button></aside>`;
   } else if (t.id === "privacy") {
     wfDefaults({ privacyType: "馬賽克", privacyStrength: "中" });
     content =
       wfSource() +
-      `<aside class="side"><h3>保護設定</h3><label>保護方式</label>${wfChoice("privacyType", ["馬賽克", "模糊"])}<label>強度</label>${wfChoice("privacyStrength", ["低", "中", "高"])}${wfStats()}${btn("開始保護", "submit", "primary")}</aside>`;
+      `<aside class="side"><h3>保護設定</h3><label>保護方式</label>${wfChoice("privacyType", ["馬賽克", "模糊"])}<label>強度</label>${wfChoice("privacyStrength", ["低", "中", "高"])}<p class="note">在主機本機偵測人臉，畫面不送到外部服務；影片最長 5 分鐘，原片不會被修改，成品存成新素材。完成後會寫出同時最多遮蓋幾張臉；側臉、遮擋、太小的臉可能漏掉，發布前請逐段檢查。</p>${wfStats()}${btn("開始保護", "submit", "primary")}</aside>`;
   } else if (t.id === "depth") {
     wfDefaults({ depthStart: 0, depthPreview: false });
     content =
       wfSource() +
       (files.src
-        ? `<aside class="side"><h3>時間軸裁切</h3>${wfField("depthStart", "起始時間（秒）", "number", 'min="0" step="0.1"')}${wfField("depthEnd", "結束時間（秒）", "number", 'min="0" step="0.1"')}${wfCheck("depthPreview", "預覽所選片段")}<p class="note">每次最多 30 秒；可以從較長的來源片選出區間。</p>${wfStats()}${btn("開始提取深度圖", "submit", "primary")}</aside>`
+        ? `<aside class="side"><h3>時間軸裁切</h3>${wfField("depthStart", "起始時間（秒）", "number", 'min="0" step="0.1"')}${wfField("depthEnd", "結束時間（秒）", "number", 'min="0" step="0.1" placeholder="不填＝起始後 30 秒或片尾"')}${wfCheck("depthPreview", "預覽所選片段")}<p class="note">每次最多 30 秒；可以從較長的來源片選出區間。在主機本機計算，畫面不送到外部服務；輸出黑白深度影片（越近越白、無聲），原片不會被修改，成品存成新素材。</p><p class="note">逐格估算再做去閃；快速運鏡時邊緣可能抖動。</p>${wfStats()}${btn("開始提取深度圖", "submit", "primary")}</aside>`
         : '<aside class="side"><p>選取影片後顯示時間軸裁切和輸出資料。</p></aside>');
   } else if (t.id === "separate") {
     content =
       wfSource() +
-      `<aside class="side"><h3>${files.src ? "來源影片" : "音軌分離說明"}</h3>${wfStats()}${wfProviderChoice("separate", "separateEngine", "分離方式")}<p>輸出 MP3 · 48 kHz · 192 kbps，完成後加入素材庫。</p>${files.src ? btn("開始分離音軌", "submit", "primary") : ""}</aside>`;
+      `<aside class="side"><h3>${files.src ? "來源影片" : "音軌分離說明"}</h3>${wfStats()}${wfProviderChoice("separate", "separateEngine", "分離方式")}<p>輸出 MP3 · 48 kHz · 192 kbps，完成後加入素材庫。</p>${files.src ? `<button class="btn primary" data-act="submit" data-paid="video.audio-tools" data-paid-model="${esc("separate:" + (wfProviderCurrent("separate", values.separateEngine) || ""))}">開始分離音軌</button>` : ""}</aside>`;
   } else if (t.id === "upscale") {
     wfDefaults({ upscaleQuality: "1080p" });
     content = `<div class="row">${btn("上傳影片", "upload:src")}${btn("從素材庫選取", "library:src")}</div>${wfField("searchAssets", "搜尋影片名稱")}<div class="flow-video-gallery" data-flow-video-gallery></div>${files.src ? wfSource() + `<aside class="side"><h3>目標畫質</h3>${wfChoice("upscaleQuality", ["1080p", "2K", "4K"])}<p class="note">目前使用本機高品質縮放；不代表 AI 重建細節。</p>${wfStats()}${btn("開始處理", "submit", "primary")}</aside>` : '<p class="note">選一支影片開啟詳情，再選擇目標畫質與確認處理。</p>'}`;

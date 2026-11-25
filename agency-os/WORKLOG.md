@@ -87,6 +87,80 @@
 - ORACLE_WAIVED: critic Quick 一輪＋突變證據；改動限即時字幕斷句，已對真實 Gemini 實跑
 - 剩餘風險：今晚已存的場次逐字稿仍是一大則（會後整理會用錄音重新辨識）；不停講超過 9 分 50 秒時輪替會在句中切一刀；真實麥克風／系統音擷取仍未實測
 - rollback：`git revert` 本 commit
+## 2026-11-25（續15）— 影片工作台：肖像權保護／深度影片／去配樂三個工具接上並部署（`8f477587d`）
+
+- [根因] 三個工具畫面在、送出鈕被 `video-workbench/scripts/tools-0.js` 一張寫死的 `unsupported` 表鎖住：privacy、depth 後端零程式；sfx 有 ElevenLabs 後端但付費一律拒絕、無功能鍵、不看畫面。不變量：工具能不能按只由 `/capabilities` 決定；會花錢的列有許可才跑、成功才按實際成本扣。
+- [步驟] 監工派工（`agency-os/handoffs/2026-11-25-video-tools-unlock/`：PLAN／DISPATCH／briefs／RESEARCH）。P1 肖像權保護（本機 YuNet＋FFmpeg 遮罩）、D1 深度影片（本機 MiDaS v2.1 small＋跨格對齊）、S1a 功能鍵 `video.audio-tools`＋Gemini 看片→ElevenLabs、S1b Mirelo SFX 2.0、X1 刪寫死鎖＋逾時。整合工作區 detached，rebase 後 `git push origin HEAD:main`（9 個程式 commit＋oracle artifact，`git log 4a25006a7..8f477587d`）。
+- [驗證] 整合版：`node tests/{privacy,depth,sfx-billing,elevenlabs-free-tier,backend,p6-main-system,services,paid-price,u7-audio-policy,capabilities-boot,package-sources,awarewave-files}.cjs` 全 exit 0；next-admin `npx tsc --noEmit` 0、vitest 5944 passed（第一次全套 1 failed、重跑 0 failed＝既有不穩定測試，未定位）。真 Edge 實按：privacy、depth 工作成功並實看成品格；sfx 無金鑰正確鎖住。`docker build` 過，映像內兩個模型 sha256 相符。部署 `sg-deploy.sh next-admin video-workbench` → `.deployed-commit` `8f477587d`，兩容器 healthy，HTTP smoke 全 OK；Playwright smoke 30 passed／0 failed。正式機同映像臨時容器（`--cpus 8`）：34 秒片 privacy 28.4 秒（每格偵測 13.1 ms）；30 秒片 depth 68.7 秒（每格 66.1 ms）。
+- [Codex 審查] 3 條皆驗真並修（`0655120d6`）：貼邊人臉遮罩偏移漏蓋（新測試舊碼紅）；Mirelo `credits:null` 仍估價扣款（突變 `>=0`→`>0` 紅）；compose 對照檔缺 `MIRELO_API_KEY`。
+- [剩餘風險] Mirelo 路未實跑（無金鑰；正式機 compose 尚未加 `MIRELO_API_KEY`，給金鑰時走 `safe-infra-patch.sh compose`）；ElevenLabs 生成未實跑（帳號為免費方案，不可商用，`separate`「只留人聲」與 sfx B 路現為未啟用）；配音、字幕仍走 ElevenLabs 免費方案（本次未動）；正式站登入後頁面未由操作者實按；深度為逐格小模型，細節粗。逐條見 `DISPATCH.md` RISKS。
+- [rollback] 主機 `sg-deploy.sh` 回前一版 `67b4051c3`；程式 `git revert 0655120d6 be6017918 ba4a87a96` 及其前 6 個 P1／D1／S1a commit。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin video-workbench；docker run --rm <deployed image> node prod-time.cjs | exit=0 | ms=840000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI（`agency-os/reports/oracle/2026-11-25-partialreview-4bf6848e.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=尚未設定人臉偵測|尚未設定深度影片模型|尚未設定配樂分離 | hits=0
+## 2026-11-25（續14）— 建站流程：SF-O 手冊、SF-A 文件更正併入；第 9 步改在 WordPress 專屬路徑確認開放
+
+- [根因] ① SF-O／SF-A 兩張文件卡未做（批 5）。② 工人寫手冊時讀到 `NA/lib/site-flow/steps/open.ts` verify 打 `https://<domain>/`：共用網域站（`ingress=product-gateway`，oracle）首頁屬引擎，WordPress 仍建置中也回 200 → 「正式開放」假成功。不變量：開放的證明必須由該站自己回答。
+- [步驟] 工人 `wp-docs`（Sonnet 5.5）交 `548e1e5ae`、`58ff8ceb9` → `oracle-int` cherry-pick（`4fda08fdb` 手冊＋RUNNABLE_DEMOS＋impact map；`f19c3b752` 21 檔指向手冊）→ 監工 `95aa5ec19`：`open.ts` `publicSiteIsOpen` 改打 `OPEN_PROBE_PATH=/aw-open-check/`（404＝開放、503＋標記＝未開放）、`host-steps.test.ts` 加一測、手冊 §3-3／§6 對齊、`TOOL_TRIGGER_MAP.md` 加建站列→`gen-trigger-index.mjs --write`（`AGENTS.md` 產生區塊）。
+- [驗證] 在 `95aa5ec19` 上：`npx tsc --noEmit` exit 0；`npx vitest run lib/site-flow app/api/ops/site-flow` 10 檔 132 測試過；`node scripts/verify-governance-pointers.mjs` PASSED（180 pointers）；`git grep publicHomeIsOpen` 0 命中。第一次測試誤跑在 `f19c3b752`（commit 被 scope guard 擋、訊息檔未寫出），已在正確 sha 重跑。
+- [RISKS 總檢] 見 `data.mjs` 第五批 7 列。未處理並記錄：`backup-restore-drill.py` 不讀 `sites.d`（每晚 verify 含新站、SF-L 實際還原過一次、手冊有手動還原指令）；手冊正式機指令未逐條重跑；manual 憑證轉 nginx 續期未在流程 vhost 驗。SF-D 列「再執行一次即可」更正為需手動重載。
+- [剩餘風險] `95aa5ec19` 未部署（03:00 自動部署）；`/aw-open-check/` 在正式站未實打，GO-3 按第 9 步時驗。
+- [rollback] `git revert 95aa5ec19 f19c3b752 4fda08fdb`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run lib/site-flow app/api/ops/site-flow；node scripts/verify-governance-pointers.mjs | exit=0 | ms=20000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/3m/7n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=publicHomeIsOpen | hits=0
+- ORACLE_WAIVED: 程式改動 2 檔（確認網址常數＋一個測試），不涉 auth／個資／金流；讀回 diff 自審，132 測試；文件由工人 critic 一輪。
+## 2026-11-25（續13）— oracle WP：外掛 0.5.1（英文頁 `<title>` 走翻譯）發佈並裝到算命站
+
+- [根因] TranslatePress 免費版只翻 body；`/english/…` 的 `<title>` 仍中文（同日「英文頁定案」條的未解項）。
+- [步驟] 工人 `wp-plugin-051`（Sonnet 5.5）交 `a43511de5` → 監工讀 diff（`includes/Seo/TranslatedTitles.php` 一個類別、`aware-wave-oracle.php` 一處載入）→ `oracle-int` cherry-pick（`6ce09b1b7`）→ `scripts/release-wp-bridge.sh --plugin oracle`（dry-run 後真發：release repo CI 過、tag `v0.5.1`、主機鏡像 sha `233064ac…`）→ catalog `releaseVersion` 0.5.1（`b38af511b`）→ oracle 站 `docker cp` 鏡像 zip＋`wp plugin install --force`。
+- [驗證] `wp plugin list` aware-wave-oracle active 0.5.1；主機內臨時登入（只銷毀自己的 token）：`/english/tools/ziwei/` `<title>Zi Wei Dou Shu &#8211; oracle.aware-wave.com`、`/english/tools/` `Divination Tools`、`/english/daily-letter/` `Daily Fortune Letter`、`/tools/ziwei/` 仍 `紫微斗數`，iframe `src` 不變；工人 phpunit 30/30、`php -l` 7.4／8.3；next-admin vitest `wp-plugin-stack hosting` 4 檔 60 測試過。
+- [RISKS 總檢] ① 工人未做跨模型審查、未上真站 → 監工讀 diff＋真站實測。② 新發現：站 `blog_public=0`；中英文頁都無 meta description／og，`wp eval` 渲染 `wp_head` 無 Rank Math 輸出，`rank_math_is_configured` 不存在 → 原因未查明，列 GO-3 前置（WP-PLAN §0）。③ description／og 的翻譯路徑因此在真站未被執行，只有單元測試。
+- [rollback] 站：`wp plugin install /var/lib/awarewave/plugin-releases/aware-wave-oracle/v0.5.0/aware-wave-oracle-v0.5.0.zip --force`；repo：revert `b38af511b`、`6ce09b1b7`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin install <mirror zip> --force；curl -b <temp cookie> /english/tools/ziwei/ | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=releaseVersion: "0.5.0" | hits=0
+- ORACLE_WAIVED: 工人 critic Quick 一輪（1 Major 1 Minor 已修）＋監工讀 diff＋真站實測；非 auth／個資／金流，站尚未對外開放。
+## 2026-11-25（續12）— oracle：Cloudflare 限流不計引擎的 `/_next/static/`（操作者開 `/en` 遇 Error 1015）
+
+- [根因] `http_ratelimit` 規則 `b8ffa72d…`（同 IP＋colo 10 秒 50 次，擋 10 秒）對 oracle 只放行 WP 後台路徑；引擎一頁就接近上限：`/en` HTML 含 15 個 `/_next/static/` 檔＋12 條工具連結（Next 預先載入），連開兩頁即超過。無 Analytics Read 權限，未能讀該 Ray 的實際請求數（推定）。
+- [步驟] 操作者同意後，Cloudflare API `PATCH rulesets/<id>/rules/b8ffa72d…`：expression 尾端加 ` and not (http.host eq "oracle.aware-wave.com" and starts_with(http.request.uri.path, "/_next/static/"))`，其餘欄位原樣（1146→1250 字）。
+- [驗證] 讀回 `enabled=true action=block period=10 requests_per_period=50`、尾段為新增條件；本機同一來源平行 70 次 `GET /_next/static/chunks/01599w_myoj4b.js` 全 200，隨後 `GET /en` 200。
+- [剩餘風險] 非 static 的請求（HTML、RSC 預先載入、`/api/*`）仍計次：GO-3 後一個工具頁＝WP 頁＋引擎框，未量過真實瀏覽的計次；GO-3 驗收時用瀏覽器連開數頁確認。
+- [rollback] 刪掉 expression 尾端新增的那段。
+- REALTEST_EVIDENCE: tool=Bash | cmd=70x curl https://oracle.aware-wave.com/_next/static/chunks/01599w_myoj4b.js；curl /en | exit=0 | ms=8000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（Cloudflare 規則與文件）
+- ORACLE_WAIVED: 無 source 改動
+## 2026-11-25（續11）— 平台 U13、U14 上線＋風險盤點：主題未提交改動收進主線、down 副本檢查進 CI
+
+- 操作者 2026-11-25「看工人們反應的 RISKS 是否需要處理，先處理完風險再繼續做」「你決定」。
+- R1（根因）主線引用了從未提交的檔：`video-workbench/scripts/package.cjs:27`、`tests/appearance.cjs:18` 引用 `components/tools/AwareWaveThemeFrame.tsx`、`app/(shell)/tools/seedstar/page.tsx`，兩檔 2026-10-30 寫完只在 `D:\Work` 未追蹤，另有六個主題檔未提交（mtime 2026-11-23 10:41:08＝parity 帶過去的時間）。後果：`appearance.cjs` 在主線跑不過；U13／U14 被「主題 session」擋數週（無此 session）。處置 `1880e357c`：原樣搬入＋`lib/portal/products.ts` `STAFF_UTILITIES` 加 `tools/seedstar`（`tool: "tools/theme"`）＋可見名稱「影片工作台」；tsc 0、vitest 5855、`appearance.cjs` 3 PASS。`D:\Work` 六檔 `git show HEAD:f > f` 還原、兩個未追蹤檔移除（還原前 `git diff` 與 `D:\tmp\plat-briefs\theme-dirty.patch` 逐位元相同；hook 提示 `sidebar-coverage.test.ts` 62 分鐘前被 session 9c7e8634 寫過，內容已全在主線）。
+- R2 down 副本只放一處兩次（0181 `403b297d6`、0183 `0e4931dd8`）：`scripts/__tests__/down-migration-copies.test.mjs` 只有本機 `/verify` 跑。處置 `a1acc13c1`（補 0181）、`db6ac40f0`（補 0183＋該測試成為 `.github/workflows/shared-asset-gates.yml` 一步；CI 已綠）。
+- R3 工人只跑卡片點名測試（K14 弄紅 VW 閘）：`D:\tmp\plat-briefs\COMMON.md`、DISPATCH §0 加「改 VW 跑 `node tests/gate.cjs`、改外掛跑外掛全套」。
+- 判定不做（條件寫在 DISPATCH／監工台）：會員事件防重送（M10 開工第一項；今唯一事件 `member_invite` 冪等且入口在正式站關閉）；Cloudflare 限流（三入口皆關，W6 前加）；會員工作台實看（需 W6 後的測試會員，W7）。
+- U13 `1eff89930`：預設主題 5 組對比 ≥ 4.5:1（`globals.css` `:root`＋`lib/theme/tokens.ts`）；`accent-not-text.test.ts` 新增「狀態色不得當文字色」（每檔債務數只減不增，197 處）；刪 `app/SidebarNav.tsx`；`tools/theme/layout.tsx` 放 title；`.badge-blue`；刪 `.door-feature*`。
+- U14 `2e9758630`＋`6faf5f0f6`＋`b2b8659c3`＋`c44a06263`＋`1cee12873`：`app/MobileShell.tsx`（底列＋「更多」）、`app/bottom-items.ts`；≤ 640 `.sidebar`／`.door-side`／`.client-rail`／`.client-panel` 不佔位、`data-more="open"` 時覆蓋；客戶欄與 `ClientPanelNav` 行內版面樣式搬進 class（手機段零 `!important`）；`.client-tabs { overflow-x: auto }` 全寬度；文案不再寫「左側客戶欄」。
+- Codex 審查（`agency-os/reports/oracle/2026-11-25-partialreview-a28698cc.md`，3 項皆成立皆修）：① 底列絕對網址未經 `carry`，跨主機丟 `org`／`site` → 一律 `carry`；② 「更多」開啟時焦點可進被蓋住的頁 → 內容區 `inert`、焦點進選單、關閉回按鈕；③ 檢查器逐行掃漏跨行宣告 → 整段比對＋自我測試。
+- 上線：push `1cee12873` → CI 五項綠（含新的 Down-migration copies）→ `sg-deploy.sh next-admin` exit 0（smoke 5/5）。正式站內建瀏覽器：寬 375 `/tools/content` `scrollWidth`=375、底列三項各 125×55、`.sidebar` 與 `.client-rail` `display:none`；按「更多」→ `data-more=open`、一個 `[inert]`、焦點在選單首項、上半客戶欄下半選單；寬 1440 `/ops/clients/soulful-expression` `scrollWidth`=1440、`.client-tabs` client 924／scroll 1076。
+- 未做：手機仍擠窄的頁（5 個編輯器＝桌面工具不修；`/ops/billing` 280px 清單欄記 K15 量；outreach guide、costs、theme、social 不修）；video／content 子網域未登入未看；正式站用自訂主題，新預設色只在「重設」後可見。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (706 files passed) ; node tests/appearance.cjs ; node --test scripts/__tests__/down-migration-copies.test.mjs ; sg-deploy.sh next-admin ; 內建瀏覽器正式站 375／1440 量測 | exit=0 | ms=1500000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI (codex exec -s read-only)，3 項皆修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=MobileShell | hits=14
+## 2026-11-25（續10）— oracle WP：英文頁定案（TranslatePress，網址代稱 `english`）＋SF-I2 內容工具實測與修正
+
+- [根因] ① 英文頁未做：引擎佔 `/en`、`/zh-TW`（`nginx/default.conf` `map $uri $oracle_backend`），TranslatePress 能否用別的代稱未試（SPEC §6）。② SF-I2 第四批 RISK「只走 REST 的讀寫對登記站回找不到」未實測：`wp-post-core.ts` `writePost` 與 `app/api/content/wp-post/route.ts` DELETE 把「沒有這個站」與「站沒有 REST 憑證」合成一個 404。
+- [步驟] ① oracle 站 `wp plugin install translatepress-multilingual --version=3.4.1 --activate`（安裝輸出尾段有 wp-cli 堆疊，外掛 active、`/wp-json/` 200）；經外掛自己的 `sanitize_settings` 寫 `trp_settings`：`translation-languages=[zh_TW,en_US]`、`url-slugs={zh_TW:zh,en_US:english}`、預設語言不加子目錄（原值存 option `trp_settings_bak_20261125`）；逐頁以英文請求登記字串後，47 列翻譯寫入 `wp_trp_dictionary_zh_tw_en_us`（`status=2`）。② 正式站以操作者登入中的瀏覽器打 API（只讀＋一次無憑證即回的 PATCH）；修 `4d14a6a2a`：有站無憑證 → 503 `BRIDGE_ONLY_SITE_ERROR`，不送請求；`route.test.ts` 加兩個測試。
+- [驗證] ① 主機內經 `lobster-nginx`：未登入 `/english/tools/ziwei/` 503（建置中，WordPress 回應）、`/en/ziwei` 200（引擎）；五分鐘臨時登入：`/english/tools/ziwei/` 200 `lang="en-US"` iframe `src="/embed/en/ziwei"`、hreflang zh-TW／en-US／zh／en 四條、選單連結 `/english/tools/<slug>/`；`/tools/ziwei/` `lang="zh-TW"` `/embed/zh-TW/ziwei`；翻譯後 `/english/tools/bazi/`、`/english/tools/`、`/english/`、`/english/daily-letter/` 內文無中文，只剩 `<title>`。② `POST /api/tools/publish {action:"clients"}` 200 含 `env:878ea75e-17fe-4941-911f-5aff18db83e3` Oracle；`/api/content/categories`、`/tags`、`/api/video/wp-posts`（siteId `f787d53e…`）200 空清單；`PATCH /api/content/wp-post` 修前 404 `Site not found or token missing`。修後 `npx tsc --noEmit` exit 0；vitest 3 檔 23 測試全過。
+- [未做／剩餘風險] 英文頁 `<title>` 與 Rank Math description 仍中文（TranslatePress 免費版不翻）→ 定案由 oracle 外掛 0.5.1 過濾 `rank_math/frontend/title`／`description`（`trp_translate()`），GO-3 前做；`4d14a6a2a` 未部署（03:00 自動部署），部署後未重打；臨時登入第一次誤用 `destroy_all()`，操作者在 oracle 站的登入被清（要重登），第二次起只 `destroy($token)`；未登入訪客的英文頁要等 GO-3 開放才看得到；`/api/social/wp-article` 需 brand 參數，未試。
+- [避免再發生] 主機上代登入只銷毀自己建的那一筆 session token。REST 路徑新增時：`!resolved` 與 `!resolved.token` 分開回（後者 `BRIDGE_ONLY_SITE_ERROR`）。
+- [rollback] 英文頁：`wp plugin deactivate translatepress-multilingual`（資料表與 option 留著無害）；程式：`git revert 4d14a6a2a`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -H "Host: oracle.aware-wave.com" http://127.0.0.1:<lobster-nginx>/english/tools/ziwei/（含臨時登入 cookie）；瀏覽器 fetch PATCH /api/content/wp-post | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=Site not found or token missing | hits=2
+- ORACLE_WAIVED: 3 檔 32 行，只把一個既有的拒絕分成兩種訊息與狀態碼，兩條路徑都不送請求；非 auth／個資／金流。讀回 diff 自審＋兩個新測試。
 ## 2026-11-25（續9）— meeting-service「問 AI」改成先搜尋再請模型整理並附來源（操作者：「我要完整的答案」）
 
 - 根因／決策：操作者問「問哪個資料最齊全、最便宜」並要求實測。三題（句子意思／冷門技術名詞／今年十月的小眾產品名）× Claude Haiku 5.5、Gemini 3.5 Flash-Lite、OpenAI gpt-6-luna × 單獨回答與附搜尋結果，共 18 次：單獨回答時 Gemini 對不認識的產品名兩輪都編出不同的答案，Claude 與 OpenAI 答「不確定」；附上搜尋結果後三家都不編。每次花費皆 < NT$0.02。操作者選完整答案 → 問 AI 一律先搜尋。

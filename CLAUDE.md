@@ -53,7 +53,7 @@ SSOT `mcp/registry.template.json`，改後跑 `scripts/sync-mcp-config.ps1`。`~
 | `lobster-factory/` | clients／infra／packages／workflows |
 | `scripts/` | 全域腳本 |
 | `mcp/` | MCP registry + user-level SSOT |
-| `agency-os/tenants/<slug>/core/ENVIRONMENT_REGISTRY.md` | 各客戶 Staging URL SSOT |
+| `agency-os/tenants/<slug>/core/ENVIRONMENT_REGISTRY.md` | 手建客戶的 Staging URL SSOT；頁面建的站以 DB `environments` 為準（`lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md`） |
 
 ## 換機
 
