@@ -61,9 +61,9 @@ flowchart TB
 
 下列為 **預設假設**；若與未來商業決策不一致，以 **新 ADR 或 README 一句覆寫** 即可（不當成對話必答題）。
 
-- **主路線**：**內部與受控呼叫方**——`next-admin`（`https://app.aware-wave.com/`，含 `/build`、`/ops-console`、`/ops/inbox`）、未來 **Internal Ops 控制台**（TASKS 已列）、n8n／Trigger 經 Nginx **伺服器側** 呼叫 `node-api`。**不是**預設對外公開給任意 mobile／匿名流量（該路線需 rate limit、金鑰、資料分類 ADR）。
+- **主路線**：**內部與受控呼叫方**——`next-admin`（`https://app.aware-wave.com/`，含 `/ops/sites/new`、`/ops-console`、`/ops/inbox`）、未來 **Internal Ops 控制台**（TASKS 已列）、n8n／Trigger 經 Nginx **伺服器側** 呼叫 `node-api`。**不是**預設對外公開給任意 mobile／匿名流量（該路線需 rate limit、金鑰、資料分類 ADR）。
 - **Auth 預設**：與 Enterprise 工具層敘事一致——**B2B 營運身分**由 **JWT/OIDC** 在 `node-api` 驗簽（不綁 Clerk）；**不**預設自建帳密 DB 為主身分。
-- **`app.aware-wave.com`**：正式工具入口，直接反代到 `next-admin`。Build Console 的 canonical URL 是 **`https://app.aware-wave.com/build`**；舊 `/admin` 書籤只保留 redirect，不再作為主要入口。
+- **`app.aware-wave.com`**：正式工具入口，直接反代到 `next-admin`。客戶建站入口是 **`https://app.aware-wave.com/ops/sites/new`**（舊 `/build` 308 到此）；舊 `/admin` 書籤只保留 redirect，不再作為主要入口。
 
 ### 1.3 功能分層（層 0／1／2）與本計畫 P0～P4 對照
 

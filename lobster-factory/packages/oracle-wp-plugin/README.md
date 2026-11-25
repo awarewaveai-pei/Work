@@ -1,6 +1,6 @@
 # aware-wave-oracle（WordPress 外掛）
 
-版本：0.5.0（與外掛檔頭 `Version:`、常數 `AWORACLE_VERSION` 同一個數字；`scripts/release-wp-bridge.sh --plugin oracle` 發佈前檢查三處一致）
+版本：0.5.1（與外掛檔頭 `Version:`、常數 `AWORACLE_VERSION` 同一個數字；`scripts/release-wp-bridge.sh --plugin oracle` 發佈前檢查三處一致）
 
 把 AwareWave 算命引擎的工具嵌進任何 WordPress 網站的頁面。oracle.aware-wave.com 只是第一個安裝的站；外掛內沒有任何網站專屬的網址或設定。設計正本：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md`（§1、§2-1～§2-10、§2-13；本外掛卡 P1′、P2′、P3′）。
 
@@ -36,6 +36,13 @@
 - **same-origin（預設）**：反向代理把引擎前綴送到引擎，其餘送到 WordPress（ORACLE-WP-SPEC §1）。區塊／短碼輸出 `<iframe src="/embed/<語言>/<工具>" title loading="lazy">`（相對路徑）。`assets/embed-same-origin.js` 直接讀框內 `#aw-oracle-root` 的高度（框內視窗的 `ResizeObserver`，內容變矮框也變矮）；讀不到時框維持 600px。訪客在框內送出或按按鈕（不含結果區內的按鈕）後 30 秒內，框內出現或重繪帶 `[data-aw-result]` 的元素（引擎卡 E5 加在每個工具的結果容器）時，父頁捲到它；沒有這個屬性的舊引擎不捲，不用高度猜。
   安全取捨：同源框內的引擎頁可以直接存取父頁（WordPress 的 DOM、REST nonce、登入狀態），`sandbox` 擋不住。引擎的一個 XSS 等同裝了外掛的每個 WordPress 的 XSS；引擎的 CSP 與依賴審查要比照 WordPress 後台的等級（ORACLE-WP-SPEC §2-14）。
 - **cross-origin（尚未支援，設定不可選）**：引擎在另一個網域（客戶自己的主機、反向代理不在我們手上）。輸出 `<iframe src="<瀏覽器用引擎網址>/embed/…">` 與 `assets/embed.js`（postMessage 協定 v1：父頁只收引擎 origin、且來源是本頁嵌入框的訊息）。**引擎端尚未實作此協定，且嵌入頁送 `frame-ancestors 'self'`**：有第一個這種客戶時另開卡。
+
+## 翻譯站的標題與描述（P5，0.5.1）
+
+裝了 TranslatePress（免費版只翻內文）時，非預設語言的前台頁面把 `<title>`、meta description、og／twitter 的標題與描述過 `trp_translate()`（`includes/Seo/TranslatedTitles.php`）。翻譯來源是站上字典；沒有翻譯的字串原樣輸出。組合標題在組合前翻各段（`document_title_parts`；Rank Math 的 `%title%`、`%sitename%` 等變數值）。後台、REST、feed、sitemap、翻譯編輯器預覽框不動；已是譯文（加標點）的字串不再送回 TranslatePress。沒裝 TranslatePress 不掛任何 filter。
+
+- 字典沒有的字串，TranslatePress 會登記成「未翻譯」（含部分翻到的整句標題），可在它的編輯器補翻。
+- 要翻的頁名、站名、站台說明必須逐字等於字典裡的原文；由內文自動截出的摘要通常對不到，要英文描述請填該頁摘要或 Rank Math 描述後在字典補翻。
 
 ## 會員存檔（P2′）
 
@@ -116,6 +123,7 @@ Resend 不在 FluentCRM 內建的退信回報名單內，所以外掛自己收 w
 | 每日運勢信 | `includes/Daily/{Schedule,Letter,Svix}.php`（不依賴 WordPress）、`includes/Daily/{Store,Crm,Runner,Rest,Confirm,Signup,Hooks,Lang}.php`、`assets/daily.js` |
 | 引擎讀取 | `includes/Engine/EngineClient.php`（工具清單 `GET /api/v1/systems`，快取 1 天；每日批次 `POST /api/v1/batch`；不跟隨轉址、回應上限 1 MB／批次 8 MB） |
 | 人機驗證 | `includes/Daily/Turnstile.php` |
+| 翻譯站的標題與描述 | `includes/Seo/TranslatedTitles.php` |
 | 翻譯 | `languages/`：改字串後 `wp i18n make-pot . languages/aware-wave-oracle.pot --exclude=tests,bin,vendor`、`wp i18n update-po languages/aware-wave-oracle.pot languages`，補完 `.po` 的 `msgstr` 後 `wp i18n make-mo languages`、`wp i18n make-php languages` |
 | 打包與發佈 | `bin/build-zip.sh`（依 `.distignore`）；發佈 repo 的 CI／Release 在 `.github/workflows/`（由 `scripts/release-wp-bridge.sh --plugin oracle` 鏡像過去） |
 

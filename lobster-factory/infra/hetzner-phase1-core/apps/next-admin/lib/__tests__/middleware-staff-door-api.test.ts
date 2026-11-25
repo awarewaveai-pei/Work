@@ -63,6 +63,22 @@ describe("GET /api/ops/org-search on a product door", () => {
   });
 });
 
+describe("GET /api/ops/org-search on a door moved to its own domain (K15 ⑥, PRODUCT_HOST_CONTENT=brand-x.test)", () => {
+  const BRAND = "brand-x.test";
+  const onBrand = (path: string, cookie?: string) =>
+    middleware(new NextRequest(`https://${BRAND}${path}`, { headers: { host: BRAND, ...(cookie ? { cookie } : {}) } }));
+
+  it("the same rules: owner passes, a customer is 403, no session is 401, other staff APIs stay 404", async () => {
+    vi.stubEnv("PRODUCT_HOST_CONTENT", BRAND);
+    vi.stubEnv("STAFF_TOOLS_MODE", "enforce");
+    expect(passed(await onBrand(SEARCH, as({ ops_role: "owner", staff_tools: [] })))).toBe(true);
+    expect((await onBrand(SEARCH, as({ ops_role: "owner", user_kind: "client", org_id: "11111111-1111-4111-8111-111111111111" }))).status).toBe(403);
+    user.current = null;
+    expect((await onBrand(SEARCH)).status).toBe(401);
+    expect((await onBrand("/api/ops/clients", as({ ops_role: "owner" }))).status).toBe(404);
+  });
+});
+
 describe("GET /api/ops/org-search called directly", () => {
   it("a customer identity is 403 even with a role that passes the role check", async () => {
     const res = await GET(new Request(`https://${DOOR}${SEARCH}`, { headers: { "x-ops-user-kind": "client", "x-ops-org-id": "o1", "x-ops-claims-role": "operator" } }));

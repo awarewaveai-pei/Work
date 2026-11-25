@@ -63,7 +63,7 @@ describe("site defaults as buttons", () => {
     await openPanel();
     const picks: Array<[string, string]> = [
       ["語氣風格", "溫暖可信"], ["文章類型", "列表文章"], ["可讀性", "大學程度"], ["人稱視角", "第二人稱（你）"],
-      ["語言", "Japanese"], ["圖片模型", "FLUX dev（NT$0.8／張）"], ["字型", "明體（Noto Serif）"],
+      ["語言", "Japanese"], ["圖片模型", "GPT-Image-2 低（NT$0.64／張）"], ["字型", "明體（Noto Serif）"],
       ["漏斗階段預設", "決策（準備行動／購買）"], ["價格定位", "平價親民（可近性）"],
     ];
     for (const [group, name] of picks) {
@@ -74,7 +74,7 @@ describe("site defaults as buttons", () => {
     const d = calls[0].body?.contentDefaults as Record<string, unknown> & { marketing: Record<string, string> };
     expect(d).toMatchObject({
       tone: "Warm & Credible", articleType: "Listicle", readability: "College", pointOfView: "Second person",
-      language: "Japanese", imageModel: "flux-dev", cover: { font: "serif" },
+      language: "Japanese", imageModel: "openai-low", cover: { font: "serif" },
     });
     expect(d.marketing).toMatchObject({ funnelStage: "decision", pricePositioning: "value" });
   });

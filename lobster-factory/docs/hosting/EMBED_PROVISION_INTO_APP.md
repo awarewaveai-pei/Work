@@ -1,6 +1,8 @@
-# 把「一鍵租機 + 硬化」嵌進 app.aware-wave.com（Phase 5 — READY，未做）
+# 把「一鍵租機 + 硬化」嵌進 app.aware-wave.com（未接，列入之後）
 
-> **狀態（2026-06-06）**：機層 provisioning 程式**已寫好 + 真機驗證通過**（cpx12@sin 實測：IPv4+IPv6 防火牆、key-only SSH、無孤兒）。
+> **現況（2026-11-25）：未接。** `app/api/provision/route.ts` 派的 Trigger 任務 `provision-machine` 不存在，也沒有頁面呼叫這支 route；租新主機列入之後。在現有主機開客戶站走[建站流程手冊](CLIENT_SITE_FLOW.md)。下文是接線 recipe。
+>
+> **機層程式（2026-06-06）**：機層 provisioning 程式**已寫好 + 真機驗證通過**（cpx12@sin 實測：IPv4+IPv6 防火牆、key-only SSH、無孤兒）。
 > **這份文件 = 之後要把它接進 app 一鍵架站按鈕時的精確 recipe。不要重做，直接呼叫現成函式。**
 
 ## 1. 現成的東西（已驗證，直接用）
