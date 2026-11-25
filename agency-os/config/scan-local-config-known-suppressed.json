@@ -170,6 +170,12 @@
       "pattern": "OpenAI API key",
       "sourceKey": "STABILITY_API_KEY",
       "reason": "Stability AI key shares the sk- prefix with the OpenAI pattern; known local MCP env registry entry; gitignored; value in the local vault (2026-11-04)."
+    },
+    {
+      "file": "mcp/user-env.ps1",
+      "pattern": "Anthropic API key",
+      "sourceKey": "CLAUDE_USAGE_WINDOW_FIRE_TOKEN",
+      "reason": "claude.ai routine Fire token (sk-a prefix) for 自動啟動 Claude; registered in mcp/user-env.template.ps1 (0e4931dd8); gitignored; value in the local vault and host .env."
     }
   ]
 }
