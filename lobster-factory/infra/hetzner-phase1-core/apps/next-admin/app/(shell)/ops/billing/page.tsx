@@ -26,7 +26,9 @@ const card: React.CSSProperties = { background: "var(--card-bg)", border: "1px s
 const muted: React.CSSProperties = { fontSize: 12, color: "var(--text-muted)" };
 const tag: React.CSSProperties = { fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 999, background: "var(--badge-red-bg)", color: "var(--badge-red-text)", marginRight: 4, whiteSpace: "nowrap" };
 const link: React.CSSProperties = { color: "var(--accent-text)" };
-const nav: React.CSSProperties = { display: "flex", flexDirection: "column", width: 280, flexShrink: 0, background: "var(--bg-card)", borderRight: "1px solid var(--card-border)", height: "100%", overflow: "hidden" };
+// The list column and its frame are globals.css .client-panel / .client-panel-frame (as /ops/clients): beside the page, inside
+// 「更多」 at <= 640. Only the desktop width is this page's own (it keeps 280 here, 220 there).
+const panelWidth = { "--client-panel-w": "280px" } as React.CSSProperties;
 
 const n = (v: number) => v.toLocaleString("zh-TW");
 const day = (iso: string) => new Date(iso).toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -99,8 +101,8 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
   const pages = data ? Math.max(1, Math.ceil(data.matching / PAGE)) : 1;
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--bg-canvas)" }}>
-      <nav aria-label="客戶帳戶" style={nav}>
+    <div className="client-panel-frame" style={{ background: "var(--bg-canvas)" }}>
+      <nav aria-label="客戶帳戶" className="client-panel" style={panelWidth}>
         <div style={{ padding: "12px 12px 8px", borderBottom: "1px solid var(--card-border)" }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.06em", marginBottom: 8 }}>客戶</div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
@@ -184,7 +186,7 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", margin: "0 0 4px" }}>帳務</h1>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0, maxWidth: 900 }}>
-            全部帳戶的總帳。左邊可用名稱、代號、成員 email、訂單或付款編號搜尋；點帳戶，明細在右邊打開。這頁只看不改。
+            全部帳戶的總帳。帳戶清單可用名稱、代號、成員 email、訂單或付款編號搜尋；點帳戶，明細在這頁打開。這頁只看不改。
           </p>
         </div>
 
@@ -257,7 +259,7 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
             <BillingTab data={detail} slug={detail.account?.slug ?? ""} />
           </div>
         ) : (
-          <div style={{ ...card, ...muted, fontSize: 13 }}>點左邊的帳戶，明細會在這裡打開。</div>
+          <div style={{ ...card, ...muted, fontSize: 13 }}>點帳戶清單裡的帳戶，明細會在這裡打開。</div>
         )}
       </div>
     </div>

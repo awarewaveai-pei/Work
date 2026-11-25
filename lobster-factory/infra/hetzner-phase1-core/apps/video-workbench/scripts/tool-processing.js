@@ -69,7 +69,7 @@ async function submitTool() {
       instructions;
     // The region tool's prompt, source, mask and model settings: scripts/tools-region.js.
     if (tool === "region") ({ prompt, references, settings, mask, instructions } = await regionJobInput());
-    // paid: video.image (the region tool; the other tools reaching here run locally)
+    // paid: video.image (the region tool), video.audio-tools (音軌分離／去配樂 vendor rows); the other tools here run locally
     const job = await VideoWorkbench.generations.create({
       type,
       prompt,

@@ -17,13 +17,13 @@
   --code-bg: #07101f;   /* dedicated dark bg for <pre> code blocks (was --sidebar-bg) */
   --accent: #6366f1;
   --accent-hover: #818cf8;
-  --accent-text: var(--accent);   /* words in the accent role; follows --accent until a preset or edit sets it */
+  --accent-text: #4f52e0;   /* words in the accent role; a saved --accent still colours them, see below */
   --accent-light: color-mix(in srgb, var(--accent) 8%, transparent);
   --body-bg: #f2f5fb;
   --card-bg: #ffffff;
   --card-border: #e6eaf4;
   --text-primary: #0d1526;
-  --text-muted: #64748b;
+  --text-muted: #586579;
   --green: #10b981;
   --red: #ef4444;
   --yellow: #f59e0b;
@@ -47,8 +47,8 @@
   --severity-low: #0284c7;
   --ai-bg: #e0f2fe;
   --ai-text: #0369a1;
-  --btn-primary-bg: #6366f1;
-  --btn-primary-hover: #4f52e0;
+  --btn-primary-bg: #5154e3;
+  --btn-primary-hover: #4346c8;
   --btn-primary-text: #ffffff;
   --btn-secondary-bg: #ffffff;
   --btn-secondary-border: #d4d9e8;
@@ -60,12 +60,12 @@
   --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-family-heading: var(--font-family-base);
   --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --sidebar-section-label: #94a3b8;
+  --sidebar-section-label: #5b6a80;
   --sidebar-section-label-hover: var(--sidebar-text);
-  --sidebar-section-label-size: 9px;
+  --sidebar-section-label-size: 12px;
   --sidebar-disabled-text: #aab4c5;
   --sidebar-coming-soon-bg: rgba(245,158,11,.15);
-  --sidebar-coming-soon-text: #d97706;
+  --sidebar-coming-soon-text: #92400e;
   --topbar-bg: var(--card-bg);
   --pre-text: #e2e8f0;
   --badge-green-bg: #d1fae5;
@@ -243,6 +243,9 @@
   --p-yt: #c4302b;
   --p-ink: #ffffff;
 }
+/* A saved or live-edited --accent (inline on <html>) keeps colouring accent words, as before the darker default; a theme's
+   own --accent-text is inline too and wins over this. */
+html[style*="--accent:"] { --accent-text: var(--accent); }
 
 body {
   font-family: var(--font-family-base);
@@ -340,7 +343,7 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-family-heading); }
   margin-bottom: 5px;
 }
 
-/* Foldable section header: the same label, as a full-width button (SidebarNav.tsx). */
+/* Foldable section header: the same label, as a full-width button (NavRail.tsx). */
 .sidebar-section-toggle {
   display: flex;
   align-items: center;
@@ -522,12 +525,8 @@ button.sidebar-link {
   flex-direction: column;
   gap: 2px;
 }
-.door-features { list-style: none; margin: 0; padding: 0; }
-.door-feature { padding: 5px 12px; font-size: 13px; color: var(--sidebar-text); }
-.door-feature.off { color: var(--sidebar-disabled-text); cursor: not-allowed; }
 @media (max-width: 640px) {
   .door-main { flex-direction: column; }
-  .door-side { width: auto; border-right: 0; border-bottom: 1px solid var(--sidebar-border); }
 }
 .door-nav-link {
   padding: 6px 12px;
@@ -543,6 +542,39 @@ button.sidebar-link {
   color: var(--sidebar-text-active);
   background: var(--sidebar-active-bg);
   font-weight: var(--font-weight-semibold);
+}
+
+/* The client rail (app/ClientRail.tsx), both frames. A long page scrolls the window: the rail stays in view and scrolls
+   its own list (both frames' rows are flex). */
+.client-rail {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--card-border);
+  background: var(--bg-card);
+}
+
+/* /ops/clients' and /ops/billing's own list column (ClientPanelNav.tsx, ops/billing/page.tsx) and the full-height frame it
+   sits in (ops/clients/layout.tsx, ops/billing/page.tsx). */
+.client-panel-frame { display: flex; height: 100vh; overflow: hidden; }
+/* The client page's row of tabs scrolls sideways at every width instead of widening the page (17 tabs: wider than 1440). */
+.client-tabs { overflow-x: auto; }
+.client-panel {
+  display: flex;
+  flex-direction: column;
+  width: var(--client-panel-w, 220px);   /* /ops/billing sets 280px */
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border-right: 1px solid var(--card-border);
+  height: 100%;
+  overflow: hidden;
 }
 
 .topbar {
@@ -640,6 +672,7 @@ button.sidebar-link {
 .badge-red    { background: var(--badge-red-bg); color: var(--badge-red-text); }
 .badge-gray   { background: var(--badge-gray-bg); color: var(--badge-gray-text); }
 .badge-yellow { background: var(--badge-yellow-bg); color: var(--badge-yellow-text); }
+.badge-blue   { background: var(--ai-bg); color: var(--ai-text); }
 
 .card-value {
   font-size: 24px;
@@ -2881,4 +2914,81 @@ pre {
   .designs-filter-panel {
     padding: 10px 12px;
   }
+}
+
+/* ── Phone frame (blueprint §9.1, §11, §19.4; app/MobileShell.tsx) ─ */
+.bottom-bar { display: none; }
+@media (max-width: 640px) {
+  .shell { --bottom-bar-h: calc(56px + env(safe-area-inset-bottom)); padding-bottom: var(--bottom-bar-h); }
+  .bottom-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 41;
+    height: var(--bottom-bar-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--sidebar-bg);
+    border-top: 1px solid var(--sidebar-border);
+  }
+  .bottom-bar > * {
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    font-size: 13px;
+    color: var(--sidebar-text);
+    background: transparent;
+    border: 0;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .bottom-bar > [aria-current="page"], .bottom-bar > [aria-expanded="true"] {
+    color: var(--sidebar-text-active);
+    background: var(--sidebar-active-bg);
+    font-weight: var(--font-weight-semibold);
+  }
+  /* The side columns take no room. */
+  .main { margin-left: 0; min-height: 0; }
+  .door-main { min-height: 0; }
+  .sidebar, .door-side { display: none; }
+  /* .client-rail (any page that needs a client) and .client-panel (/ops/clients) share every phone rule. */
+  .client-rail, .client-panel { display: none; }
+  .shell[data-more="open"] > .sidebar,
+  .shell[data-more="open"] .door-side {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--bottom-bar-h);
+    width: auto;
+    overflow-y: auto;
+    z-index: 40;
+  }
+  /* A page with a client list: the list takes the upper half, the menu the lower. */
+  .shell[data-more="open"] :is(.client-rail, .client-panel) {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 50vh;
+    z-index: 40;
+    border-bottom: 1px solid var(--sidebar-border);
+  }
+  .shell[data-more="open"]:has(.client-rail, .client-panel) > .sidebar,
+  .shell[data-more="open"]:has(.client-rail, .client-panel) .door-side { top: 50vh; }
+  /* The page scrolls the window like every other page (a 100vh inner scroller would end behind the bottom bar). */
+  .client-panel-frame { height: auto; overflow: visible; }
+  .sidebar-link, .door-nav-link { min-height: 44px; display: flex; align-items: center; flex-shrink: 0; }
+  .topbar { padding: 10px 16px; }
+  .page { padding: 16px; }
+  .door-foot { padding: 8px 16px 16px; }
 }
