@@ -20,6 +20,17 @@
 - ORACLE_WAIVED: critic Quick 一輪；改動為提示詞＋一個端點，已對真實服務實跑
 - 剩餘風險：樣本僅三題；搜尋結果每次不同，答案品質隨之浮動；模型整理仍可能誤讀來源（實測一句）；critic 修正後未重跑真實呼叫，只跑單元測試與 import；Claude 翻譯路徑在本工具仍未實測
 - rollback：`git revert` 本 commit；要回到只用 Gemini，清掉首頁「API 設定」的 key
+## 2026-11-25（續8）— oracle WP：會員存檔金鑰、每日信（FluentCRM）、Turnstile、Resend 退信 webhook 設定完成
+
+- [根因] 頁面建好後功能未開：`dataKeyStatus=missing`、`mailer=none`、Turnstile 與 webhook secret 空（同日續7）。操作者說接著做。
+- [步驟] `member-setup.py`：站內 `php random_bytes(32)` → `wp config set AWORACLE_DATA_KEY`（已有則拒絕）；oracle Resend 帳號 `POST /webhooks`（endpoint `/wp-json/aworacle/v1/daily/resend-webhook`，events bounced＋complained）→ signing secret 經 ssh stdin → `wp config set AWORACLE_RESEND_WEBHOOK_SECRET`。Cloudflare `POST /accounts/{id}/challenges/widgets`（managed，domain oracle）→ `daily-setup.py`：secret 經 stdin → `AWORACLE_TURNSTILE_SECRET`；`aworacle_settings` 經外掛 `Normalize` 寫 `turnstile_site_key`、`mailer=fluentcrm`。三把密鑰副本寫入操作者憑證檔。
+- [驗證] `data_key=ok webhook_secret=set`；`mailer=fluentcrm site_key=ok turnstile_secret=set from_constant=yes`；`/daily-letter/` 的 `the_content` 尾段 `div class="aworacle-daily"`，已註冊 script `aworacle-turnstile,aworacle-daily`；`next_daily_run=2026-11-25T06:28:01Z`；`fc_tables=17 subscribers=0`。
+- [未做] 訂閱→確認→收信未實走（Turnstile 需真人；不改用測試金鑰繞過）；`users_can_register=0`；FluentCRM 信尾預設值；Turnstile secret 經 Cloudflare MCP 回傳時進過對話一次（資料金鑰與 webhook secret 沒有）。
+- [rollback] `wp config delete` 三個常數（資料金鑰只在尚無會員資料時可刪）；`mailer` 設回 `none`；Resend 刪 webhook `f33c2fc7…`；Cloudflare 刪 widget。
+- REALTEST_EVIDENCE: tool=SSH | cmd=member-setup.py；daily-setup.py（wp config set／wp eval-file 讀回）| exit=0 | ms=90000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（站台設定、外部帳號與文件）
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-25（續7）— oracle WP：算命站 zh-TW 頁面、選單、首頁、外掛 page_map（wp-cli 建）
 
 - [根因] GO-2 後站上沒有頁面；操作者要監工建頁面、放工具。`/wp-login.php` Cloudflare challenge 擋自動化 → 走主機 wp-cli。
