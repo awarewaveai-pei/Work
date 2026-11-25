@@ -44,3 +44,9 @@ export function parseArticleMeta(markdown: string): ArticleMeta | null {
     ...(cover ? { cover } : {}),
   };
 }
+
+/** The article's first H1 ("" = none): with the SEO title, what wordpress-core names the draft (K27 keeps that title). */
+export function extractH1(md: string): string {
+  const m = md.match(/^#\s+(.+)$/m);
+  return m?.[1]?.trim() ?? "";
+}

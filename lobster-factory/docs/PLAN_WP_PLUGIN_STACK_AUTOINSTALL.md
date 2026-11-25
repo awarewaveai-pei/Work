@@ -1,5 +1,7 @@
 # PLAN_WP_PLUGIN_STACK_AUTOINSTALL.md
 
+> **建站現況（2026-11-23 起）**：`/onboard`、`/build` 兩頁已刪（308 到 `/ops/sites/new`），開客戶站見 [建站流程手冊](hosting/CLIENT_SITE_FLOW.md)。本檔提到舊頁／舊接口當作現行做法的段落是歷史紀錄。
+
 > **Owner File** — WordPress 外掛堆疊自動安裝功能實作計畫（已完成）。  
 > **所屬系統**：`app.aware-wave.com` Build System（Lobster Factory Phase 1）  
 > **不涵蓋**：Build System 整體架構 → [`ONE_CLICK_BUILD_SYSTEM.md`](ONE_CLICK_BUILD_SYSTEM.md)；外掛選型依據 → [`agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md) §八（自動化執行系統，含下游消費者地圖、安裝來源策略、漂移防護）  

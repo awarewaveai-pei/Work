@@ -39,6 +39,8 @@ function paidFeature(input, type) {
   if (op === "editor-transcribe") return "video.transcribe"; // card ED.10 整片字幕
   if (op === "music") return "video.music"; // backend/music.cjs 音樂生成
   if (require("./video-enhance.cjs").isAi(input)) return "video.enhance"; // card ED.12.3: before localTool (enhance is also a free ffmpeg op)
+  // 音軌分離／去配樂 vendor rows (backend/audio-tools.cjs paid): before localTool (both are media.cjs ops); the local row is free.
+  if (require("./audio-tools.cjs").paid(input)) return "video.audio-tools";
   // Card U4.4: a shot drawn by a main-system scene model is billed by next-admin itself (scene-image route, runForOrg).
   if (require("./scene-image.cjs").modelOf(input)) return null;
   if (op === "remotion-template" || op === "caption-reburn" || op === "quick-render" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || localTool(op)) return null;
@@ -51,6 +53,7 @@ function ledgerKind(job) {
   if (op === "image-to-3d" || op === "meshy-image-to-3d") return "3d"; // meshy-image-to-3d: jobs recorded before card S4b
   if (op === "editor-transcribe") return "transcribe";
   if (require("./video-enhance.cjs").isAi(job.input)) return "video"; // card ED.12.3: an AI-made video (jobs/route.ts KINDS)
+  if (require("./audio-tools.cjs").paid(job.input)) return op === "separate" ? "audio" : "video"; // vendor-made sound (只留人聲 / 重配音效)
   if (op === "remotion-template" || op === "caption-reburn" || op === "quick-render" || op === "blender-retarget" || op === "blender-render" || op === "blender-autorig" || op === "engine-render" || localTool(op)) return "render";
   return ["image", "video", "audio"].includes(job.type) ? job.type : "render";
 }

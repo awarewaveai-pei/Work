@@ -27,7 +27,7 @@ export default async function ClientsPage() {
     <div className="page" style={{ maxWidth: 720 }}>
       <h1 style={{ fontSize: "var(--font-size-xl)", margin: "0 0 6px", color: "var(--text-primary)" }}>全部客戶</h1>
       <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-base)", margin: "0 0 20px" }}>
-        從左側選擇客戶。下面只列「自動內容排程出錯，或這個月有題目失敗」的客戶；沒有列出，不代表一切正常（例如還沒開通的客戶不在這裡）。
+        從客戶清單選擇客戶。下面只列「自動內容排程出錯，或這個月有題目失敗」的客戶；沒有列出，不代表一切正常（例如還沒開通的客戶不在這裡）。
       </p>
       {failure ? (
         <p style={{ color: "var(--red)" }}>讀取失敗：{failure}</p>
@@ -48,7 +48,7 @@ export default async function ClientsPage() {
               </li>
             ))}
           </ul>
-          {result.more && <p style={{ color: "var(--text-muted)", marginTop: 12 }}>還有更多，請用左側搜尋。</p>}
+          {result.more && <p style={{ color: "var(--text-muted)", marginTop: 12 }}>還有更多，請用客戶清單的搜尋。</p>}
         </>
       )}
     </div>
