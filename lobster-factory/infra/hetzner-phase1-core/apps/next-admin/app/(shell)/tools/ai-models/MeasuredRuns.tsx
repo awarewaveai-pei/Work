@@ -4,13 +4,15 @@
 import Link from "next/link";
 import { MUSIC_RATES, musicUsd } from "@/lib/ai/cost-model";
 import { nt } from "@/lib/studio/model-options";
+import { bakeoffHref, type BakeoffSlug } from "./bakeoff-pages";
 
 /** NT$ of one song from the app's own music price table, so a list price here cannot drift from the app. */
 const songNt = (id: keyof typeof MUSIC_RATES) => `NT$${nt(musicUsd(id)).toFixed(2)}`;
 
 const LINE = "var(--card-border)";
 type Row = { date: string; model: string; asked: string; money: string; result: string; src: string; verdict?: "good" | "bad" | "todo"; plain?: boolean };
-type Group = { title: string; intro?: string; rows: Row[]; image?: { src: string; alt: string; caption: string } };
+// page: the full bake-off page embedded above the table (sandboxed iframe from the staff-only bakeoff route).
+type Group = { title: string; intro?: string; rows: Row[]; image?: { src: string; alt: string; caption: string }; page?: BakeoffSlug };
 
 const W9 = "2026-11-13（續9）影音工作台三張卡整合：音樂生成接三模型、圖片局部編輯器補齊、新工具破框貼文動畫";
 const W12 = "2026-11-13（續12）ElevenLabs 免費額度接進配音、字幕辨識、音軌分離、去配樂・重配音效";
@@ -23,6 +25,7 @@ const ARTIMG = "agency-os/reports/model-bakeoff/2026-11-article-image/（runs.js
 const GROUPS: Group[] = [
   {
     title: "文章配圖",
+    page: "image",
     intro: "2026-11-25 正式站。目的：哪一個來源畫得出符合文章內容的圖。寫文章的 AI 為每張圖寫一句英文畫面描述，同一組描述給六個來源各畫一次，封面套上統一版型；另用改版前的做法畫一組對照。照新做法畫的每一張都跟它那一段有關；操作者看過後判定 GPT-Image-2 低、Nano Banana 2.1、FLUX dev 三個沒有出錯。中文一篇、英文一篇（「workplace burnout」），六個來源在兩篇上都是完整的四張。免費圖庫沒有測。操作者的決定（2026-11-25）：預設維持 FLUX schnell；另外保留 GPT-Image-2 低、Nano Banana 2.1 和 Codex 免費生圖可以選，之後再測一次再決定要不要換。FLUX dev 和 FLUX 2 Klein 4B 不放進文章的選單。",
     rows: [
       { date: "2026-11-25", model: "Codex 免費生圖（ChatGPT 訂閱）", asked: "「職場倦怠」一篇文章的封面底圖＋三張內文圖，同一句英文畫面描述、照片感", money: "實扣 NT$0", result: "四張都跟段落有關。每張 42–55 秒，四張共 3 分 14 秒，沒有被額度擋下。只能本人按、筆電要開著；排程用不了。操作者：留著當免費選項。英文文章也測過四張（每張 50–59 秒），同樣貼題。", src: ARTIMG, plain: true },
@@ -36,6 +39,7 @@ const GROUPS: Group[] = [
   },
   {
     title: "文章生成",
+    page: "article",
     intro: "2026-11-22 正式站，同一題目同一條件各一篇；操作者選定 GPT-6.2 sol 為文章預設。名次是繁中編輯盲評（12 篇）；第 1–4 名輕修可上，第 9–12 名接近重寫。",
     rows: [
       { date: "2026-11-22", model: "Claude Haiku 5.5", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$0.08", result: "編輯盲評第 8 名。只有常識，沒有東西可帶走；乾淨安全。耗時 24 秒、2,621 字、SEO 59 分、未查證標記 0 處。", src: ART },
@@ -51,6 +55,12 @@ const GROUPS: Group[] = [
       { date: "2026-11-22", model: "GPT-5.5", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$8.72", result: "編輯盲評第 7 名。內容好但寫到一半被截斷；門檻數字自創。耗時 164 秒、4,850 字、SEO 77 分、未查證標記 3 處。", src: ART },
       { date: "2026-11-22", model: "Claude Fable 5.1", asked: "「職場倦怠」一篇文章，同題目同條件", money: "實扣 NT$19.56", result: "編輯盲評第 6 名。結構與切題滿分，但杜撰數字與引用最多。耗時 167 秒、5,437 字、SEO 82 分、未查證標記 13 處。", src: ART },
     ],
+  },
+  {
+    title: "八種文案",
+    page: "copy",
+    intro: "八種文案工作（標題、社群貼文、商品文案等）各用多個模型實際跑過的完整比較：每一種的原文、花費與耗時都在下面的頁面裡。",
+    rows: [],
   },
   {
     title: "影片：破框貼文動畫",
@@ -109,7 +119,16 @@ export default function MeasuredRuns() {
         <section key={g.title} style={{ marginBottom: 28 }}>
           <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)", margin: "0 0 6px" }}>{g.title}</h3>
           {g.intro ? <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 10px", maxWidth: 900 }}>{g.intro}</p> : null}
-          <div style={{ overflowX: "auto", background: "var(--card-bg)", border: `1px solid ${LINE}`, borderRadius: 12 }}>
+          {g.page ? (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+                <a href={bakeoffHref(g.page)} target="_blank" rel="noopener" className="btn btn-secondary" style={{ textDecoration: "none" }}>另開完整頁面</a>
+              </div>
+              <iframe src={bakeoffHref(g.page)} sandbox="allow-scripts" title={`${g.title}：完整比較頁`} loading="lazy"
+                style={{ display: "block", width: "100%", height: 760, border: `1px solid ${LINE}`, borderRadius: 12, background: "var(--card-bg)" }} />
+            </div>
+          ) : null}
+          {g.rows.length ? <div style={{ overflowX: "auto", background: "var(--card-bg)", border: `1px solid ${LINE}`, borderRadius: 12 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 860 }}>
               <thead><tr>{["日期", "模型", "做了什麼", "實扣／標價", "結果", "出處"].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
               <tbody>
@@ -125,7 +144,7 @@ export default function MeasuredRuns() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div> : null}
           {g.image ? (
             <figure style={{ margin: "12px 0 0" }}>
               <img src={g.image.src} alt={g.image.alt} style={{ display: "block", width: "100%", maxWidth: 900, borderRadius: 8, border: `1px solid ${LINE}` }} />
