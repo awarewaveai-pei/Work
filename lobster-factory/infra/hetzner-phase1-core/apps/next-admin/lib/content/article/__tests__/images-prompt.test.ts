@@ -43,4 +43,17 @@ describe("article image instructions", () => {
     for (const k of ["COVER_SCENE:", "COVER_TITLE:", "COVER_SUBTITLE:"]) expect(c.userPrompt).toContain(k);
     expect((await prompts({ ...base, generateMeta: true })).userPrompt).not.toContain("COVER_SCENE:");
   });
+
+  it("K27: people only where the section calls for them; when present, each one's look is named, differing across the article, never the site's country", async () => {
+    const c = await prompts({ ...base, generateMeta: true, targetCountry: "Taiwan", media: { aiImages: "flux", imageCount: 2 } });
+    const rule = c.userPrompt.split("\n").find((l) => l.startsWith("- PEOPLE IN PICTURES"))!;
+    for (const s of ["first decide whether the section calls for people at all", "never add people just to show variety",
+      "no picture has to have people and there is no minimum", "age range, gender, and an ethnic or regional background",
+      "different people from different parts of the world", "never follow the site's target country",
+      "Good, with a person:", "Good, without people:", "Bad: a diverse group of smiling people"]) expect(rule).toContain(s);
+    expect(c.userPrompt).not.toContain("people are fine");
+    expect(c.userPrompt.split("\n").find((l) => l.startsWith("COVER_SCENE:"))).toContain("people only if they belong there, per PEOPLE IN PICTURES above");
+    expect(c.userPrompt.indexOf("- PEOPLE IN PICTURES")).toBeLessThan(c.userPrompt.indexOf("COVER_SCENE:"));
+    expect((await prompts(base)).userPrompt).not.toContain("PEOPLE IN PICTURES");
+  });
 });

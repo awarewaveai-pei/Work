@@ -2527,7 +2527,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         </div>
 
         {/* Tab bar */}
-        <div style={{ display: "flex", gap: 0 }}>
+        <div className="client-tabs" style={{ display: "flex", gap: 0 }}>
           {tabs.map((tab) => (
             <button
               key={tab}

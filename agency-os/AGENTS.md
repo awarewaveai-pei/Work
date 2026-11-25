@@ -159,7 +159,7 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - Data/Analytics（PostHog / funnel / 轉換率） → `posthog-analyst`
 - Technical decision（工具選型 / 架構 / A vs B） → `/decide`
 - System health（健康 / 監控 / 是否正常） → `/health` → `/smoke-test`
-**使用者提到 → 先讀／先跑**（17）
+**使用者提到 → 先讀／先跑**（18）
 - 改外觀 / 改顏色 / 改主題 / theme / 字體 / 側欄樣式 / 換配色 / 外… → `app/(shell)/tools/theme/THEME_ARCHITECTURE_APPEARANCE.md`
 - 某段時間的 Slack / Telegram / 告警 / incident → `scripts/fetch-external-signals.ps1 -From ... -To ...`
 - AO-RESUME → `reports/status/cf-security-LATEST.md`
@@ -175,7 +175,8 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - 任何 audit / 抓蟲 / bug class / encoding / silent… → `docs/operations/BUG_HUNT_PROTOCOL.md`
 - 搬站／換主機／機器買好了／二手 Hetzner／soulful 搬／Hostinger 到… → `tenants/company-soulful-expression/core/SITE_MIGRATION_RUNBOOK.md`
 - 一鍵架站／自動開站／provision／租主機／Hetzner 開機/要在 app.awa… → `lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`
-- app.aware-wave／onboarding／建站／佈建／企業佈建／ops-cons… → `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`
+- app.aware-wave／onboarding／佈建／企業佈建／ops-console… → `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`
+- 建站／開一個客戶網站／建站流程／/ops/sites／拆站／deprovision／共用網… → `lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md`
 - 規劃／設計一個新的、需要長期維護的系統或專案治理架構（新產品線、新治理框架、docs/HC… → `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
 <!-- TRIGGER-INDEX:END -->
 
