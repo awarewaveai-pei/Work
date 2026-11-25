@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-25（續12）— oracle：Cloudflare 限流不計引擎的 `/_next/static/`（操作者開 `/en` 遇 Error 1015）
+
+- [根因] `http_ratelimit` 規則 `b8ffa72d…`（同 IP＋colo 10 秒 50 次，擋 10 秒）對 oracle 只放行 WP 後台路徑；引擎一頁就接近上限：`/en` HTML 含 15 個 `/_next/static/` 檔＋12 條工具連結（Next 預先載入），連開兩頁即超過。無 Analytics Read 權限，未能讀該 Ray 的實際請求數（推定）。
+- [步驟] 操作者同意後，Cloudflare API `PATCH rulesets/<id>/rules/b8ffa72d…`：expression 尾端加 ` and not (http.host eq "oracle.aware-wave.com" and starts_with(http.request.uri.path, "/_next/static/"))`，其餘欄位原樣（1146→1250 字）。
+- [驗證] 讀回 `enabled=true action=block period=10 requests_per_period=50`、尾段為新增條件；本機同一來源平行 70 次 `GET /_next/static/chunks/01599w_myoj4b.js` 全 200，隨後 `GET /en` 200。
+- [剩餘風險] 非 static 的請求（HTML、RSC 預先載入、`/api/*`）仍計次：GO-3 後一個工具頁＝WP 頁＋引擎框，未量過真實瀏覽的計次；GO-3 驗收時用瀏覽器連開數頁確認。
+- [rollback] 刪掉 expression 尾端新增的那段。
+- REALTEST_EVIDENCE: tool=Bash | cmd=70x curl https://oracle.aware-wave.com/_next/static/chunks/01599w_myoj4b.js；curl /en | exit=0 | ms=8000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（Cloudflare 規則與文件）
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-25（續11）— 平台 U13、U14 上線＋風險盤點：主題未提交改動收進主線、down 副本檢查進 CI
 
 - 操作者 2026-11-25「看工人們反應的 RISKS 是否需要處理，先處理完風險再繼續做」「你決定」。
