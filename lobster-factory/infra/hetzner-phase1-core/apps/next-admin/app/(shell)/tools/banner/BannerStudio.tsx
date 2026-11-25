@@ -25,8 +25,10 @@ const PRESETS = {
   "r3x4":   { ratio: "3:4",    w: 1080, h: 1440, aspect: "3:4",  shape: "tall",   use: "個人頁格狀不裁切的直式貼文",      where: "IG" },
   "r4x5":   { ratio: "4:5",    w: 1080, h: 1350, aspect: "4:5",  shape: "tall",   use: "直式貼文、多圖貼文",              where: "IG、FB、Threads、X、LinkedIn、Bluesky", star: true },
   "r1x1":   { ratio: "1:1",    w: 1080, h: 1080, aspect: "1:1",  shape: "square", use: "方形貼文、商品圖、手機版 Hero",    where: "IG、FB、Threads、X、LinkedIn、Bluesky、WooCommerce" },
+  "r4x3":   { ratio: "4:3",    w: 1200, h: 900,  aspect: "4:3",  shape: "wide",   use: "部落格封面（特色圖片）",          where: "WP 部落格列表卡片；文章頁由佈景主題裁成 3:2" },
+  "r3x2":   { ratio: "3:2",    w: 1200, h: 800,  aspect: "3:2",  shape: "wide",   use: "部落格內文圖",                    where: "WP 文章內文" },
   "r16x9":  { ratio: "16:9",   w: 1920, h: 1080, aspect: "16:9", shape: "wide",   use: "橫式貼文、影片縮圖、網站全版 Hero", where: "IG、FB、Threads、X、LinkedIn、Bluesky、YouTube 縮圖、WP 網站" },
-  "r191x1": { ratio: "1.91:1", w: 1200, h: 630,  aspect: "16:9", shape: "wide",   use: "連結分享預覽（OG）、文章特色圖",   where: "FB／LinkedIn／X 連結預覽、WP 特色圖" },
+  "r191x1": { ratio: "1.91:1", w: 1200, h: 630,  aspect: "16:9", shape: "wide",   use: "連結分享預覽（OG）",              where: "FB／LinkedIn／X／LINE 連結預覽（Rank Math 另設的分享圖）" },
   "r3x1":   { ratio: "3:1",    w: 1920, h: 640,  aspect: "16:9", shape: "wide",   use: "網站橫幅",                        where: "WP 網站桌機 Hero" },
 } as const satisfies Record<string, { ratio: string; w: number; h: number; aspect: AspectRatio; shape: "tall" | "square" | "wide"; use: string; where: string; star?: boolean }>;
 type PresetKey = keyof typeof PRESETS;

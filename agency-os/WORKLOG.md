@@ -1,4 +1,12 @@
 # Worklog
+## 2026-11-25（續19）— Banner 加「4:3 部落格封面」「3:2 部落格內文圖」兩顆尺寸
+
+- 操作者定案：WP 部落格封面 4:3（列表卡片飽滿），內文 3:2；文章頁特色圖由 Kadence 裁成 3:2。1.91:1 改為只標「連結分享預覽（OG）」（Rank Math 另設分享圖）。
+- 檔案：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/banner/BannerStudio.tsx` PRESETS 加 `r4x3` 1200×900、`r3x2` 1200×800（AI 背景比例 4:3／3:2 皆為模型可收值）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit + 本機 :3903 點 4:3／3:2 → 預覽 1200×900／1200×800 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- 只新增兩筆常數，無既有 symbol 改名
+- ORACLE_WAIVED: 兩筆尺寸常數與說明字，無邏輯分支；本機預覽實測
 ## 2026-11-25（續18）— Banner 尺寸改成「一個比例一顆鈕」，下方列出用得到的平台
 
 - 根因：`app/(shell)/tools/banner/BannerStudio.tsx` 尺寸清單按平台列，同尺寸重複（IG 直式＝FB Post 1080×1350；Hero 手機＝WooCommerce 1000×1000），比例標錯（1920×640 標 16:9、1200×627 標 3:2），缺 3:4（IG 新格狀 1080×1440）、OG 1.91:1 1200×630、Threads／Bluesky／TikTok／YouTube。
