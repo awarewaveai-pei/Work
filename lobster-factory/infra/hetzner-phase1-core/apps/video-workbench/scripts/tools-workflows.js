@@ -109,7 +109,7 @@ function toolWorkflowScreen(t) {
   } else if (t.id === "sfx") {
     content =
       wfSource() +
-      `<aside class="side"><h3>去配樂・重配音效</h3><p>保留對白、去掉原配樂與音效，再依描述配上新音效；影片最長 2 分鐘。</p>${wfProviderChoice("sfx", "sfxEngine", "處理方式")}${wfArea("sfxPrompt", "想要的音效（選填，例如：雨打在窗上）", 200)}${wfStats()}${btn("開始處理", "submit", "primary")}</aside>`;
+      `<aside class="side"><h3>去配樂・重配音效</h3><p>保留對白、去掉原配樂與音效，再依畫面配上新音效；畫面不變，影片最長 2 分鐘。</p>${wfProviderChoice("sfx", "sfxEngine", "處理方式")}${wfArea("sfxPrompt", "額外指示（選填，例如：加一點雨聲）", 200)}${wfStats()}<button class="btn primary" data-act="submit" data-paid="video.audio-tools" data-paid-model="${esc("sfx:" + (wfProviderCurrent("sfx", values.sfxEngine) || ""))}">開始處理</button></aside>`;
   } else if (t.id === "privacy") {
     wfDefaults({ privacyType: "馬賽克", privacyStrength: "中" });
     content =
@@ -125,7 +125,7 @@ function toolWorkflowScreen(t) {
   } else if (t.id === "separate") {
     content =
       wfSource() +
-      `<aside class="side"><h3>${files.src ? "來源影片" : "音軌分離說明"}</h3>${wfStats()}${wfProviderChoice("separate", "separateEngine", "分離方式")}<p>輸出 MP3 · 48 kHz · 192 kbps，完成後加入素材庫。</p>${files.src ? btn("開始分離音軌", "submit", "primary") : ""}</aside>`;
+      `<aside class="side"><h3>${files.src ? "來源影片" : "音軌分離說明"}</h3>${wfStats()}${wfProviderChoice("separate", "separateEngine", "分離方式")}<p>輸出 MP3 · 48 kHz · 192 kbps，完成後加入素材庫。</p>${files.src ? `<button class="btn primary" data-act="submit" data-paid="video.audio-tools" data-paid-model="${esc("separate:" + (wfProviderCurrent("separate", values.separateEngine) || ""))}">開始分離音軌</button>` : ""}</aside>`;
   } else if (t.id === "upscale") {
     wfDefaults({ upscaleQuality: "1080p" });
     content = `<div class="row">${btn("上傳影片", "upload:src")}${btn("從素材庫選取", "library:src")}</div>${wfField("searchAssets", "搜尋影片名稱")}<div class="flow-video-gallery" data-flow-video-gallery></div>${files.src ? wfSource() + `<aside class="side"><h3>目標畫質</h3>${wfChoice("upscaleQuality", ["1080p", "2K", "4K"])}<p class="note">目前使用本機高品質縮放；不代表 AI 重建細節。</p>${wfStats()}${btn("開始處理", "submit", "primary")}</aside>` : '<p class="note">選一支影片開啟詳情，再選擇目標畫質與確認處理。</p>'}`;

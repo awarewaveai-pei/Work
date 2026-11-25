@@ -1269,8 +1269,8 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
     const paidFeature = mainSystemTools.paidFeature(input, parsed.type), feature = main && paidFeature;
     // No paid call without a price: the model a paid job will run must be in next-admin's cost model.
     if (feature && editModel) costs.priceOf("fill", editModel.value);
-    else if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music" }[feature] || feature,
-      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id }[feature]);
+    else if (feature) costs.priceOf({ "video.image": "image", "video.motion": "video", "video.tts": "audio", "video.bg-remove": "remove-bg", "video.transcribe": "transcribe", "video.3d": "3d", "video.enhance": "enhance", "video.music": "music", "video.audio-tools": "audio-tools" }[feature] || feature,
+      { "video.image": providerModels.image, "video.motion": videoModel?.id || providerModels.video, "video.tts": parsed.type === "audio" && speech.pick(input.speechModel, env).id, "video.transcribe": isTranscribe && transcribe.pick(input.settings?.engine, env).model, "video.3d": isImageTo3d && imageTo3d.rateKey(input), "video.enhance": input.settings?.enhanceResolution, "video.music": isMusic && music.pick(input.musicModel, env).id, "video.audio-tools": audioTools.handles(input) && audioTools.rateKey(input, env) }[feature]);
     const lockMask = input.operation === "breakout" ? await breakoutInputs(input, extra?.retryOf) : null;
     // Card U4.4: a retry of a scene picture next-admin already drew and billed takes that picture (sceneImage.kept).
     const keptScene = isScene && extra?.retryOf ? sceneImage.kept(jobs.find((j) => j.id === extra.retryOf)) : null;
@@ -1637,6 +1637,15 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           const asked = music.request(input, env);
           music.key(asked.model, env);
           json(res, 200, { quoteId: crypto.randomUUID(), costUsd: costs.musicUsd(asked.model.id, asked.seconds || 0), estimate: !!asked.seconds }); // per-minute rows: charged on the longer of asked and returned length
+          return true;
+        }
+        // 音軌分離／去配樂 (backend/audio-tools.cjs): the chosen row's price for the source's own length (the local row: 0).
+        if (audioTools.handles(input)) {
+          if (elevenlabs.keyOf(env)) await elevenlabs.account(env, fetchImpl); // an ElevenLabs row runs only on a known paid plan
+          const row = audioTools.check(input, env), file = localFile(input.references?.src?.url);
+          const seconds = file && fs.existsSync(file) ? (await require("./media-inspect.cjs").inspectMedia(file).catch(() => null))?.duration : 0;
+          if (!(seconds > 0)) throw Object.assign(Error("讀不到影片長度"), { status: 400 });
+          json(res, 200, { quoteId: crypto.randomUUID(), costUsd: audioTools.usdOf(input.operation + ":" + row.id, Math.min(seconds, audioTools.MAX_SECONDS[input.operation])), estimate: !!row.estimate });
           return true;
         }
         if (jobInput(input).type === "audio") speech.key(speech.pick(input.speechModel, env), env);

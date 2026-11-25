@@ -23,6 +23,12 @@ function textUsd(model, usage, bound = {}) {
   const cached = Math.min(tok(usage.input_tokens_details?.cached_tokens), tok(usage.input_tokens));
   return round(((tok(usage.input_tokens) - cached) + cached * rate.cacheReadMult) * rate.inputPerM / 1e6 + tok(usage.output_tokens) * rate.outputPerM / 1e6);
 }
+// A text model on Gemini's Interactions API (backend/video-describe.cjs): its usage names the counts total_input_tokens /
+// total_output_tokens / total_thought_tokens (thinking bills as output), which textUsd's input_tokens would miss.
+function interactionsTextUsd(model, usage, bound = {}) {
+  const counted = usage && Number.isFinite(Number(usage.total_input_tokens));
+  return textUsd(model, counted ? { input_tokens: tok(usage.total_input_tokens), output_tokens: tok(usage.total_output_tokens) + tok(usage.total_thought_tokens) } : null, bound);
+}
 // Token-billed OpenAI image models (OPENAI_TOKEN_PRICED_IMAGE_MODELS; a dated snapshot = its base id); no usage = the
 // highest per-image estimate. A model only priced by name resemblance is refused.
 function imageUsd(model, usage) {
@@ -83,6 +89,12 @@ function elevenUsd(model, amount) {
   return require("./elevenlabs.cjs").freePlan() ? 0 : rates.elevenlabsListUsd(model, amount);
 }
 const isEleven = (model) => Object.hasOwn(rates.ELEVENLABS_RATES || {}, model);
+// The list price whatever the plan: 音軌分離／去配樂 rows run only on a paid plan (backend/audio-tools.cjs refuses the free
+// plan, whose terms forbid commercial use), so their price and their charge are always the list price.
+function elevenListUsd(model, amount) {
+  if (!isEleven(model)) throw unpriced(model);
+  return rates.elevenlabsListUsd(model, amount);
+}
 // Per-character models: chars only. Token-billed gpt-4o-mini-tts (cost-model.ts OPENAI_TTS_RATES): the published rules,
 // text <= 1 token per character + audio out per second of the returned audio. No measured duration (ffprobe failed) =
 // 0.5 s per character, above any normal reading pace.
@@ -140,6 +152,7 @@ function priceOf(kind, model) {
   else if (kind === "enhance") enhanceUsd(model, 0); // model = the job's enhanceResolution
   else if (kind === "music") musicUsd(model, 0);
   else if (kind === "3d") toolUsd(model); // card S4b: model = the TOOL_RATES key of the image -> 3D way
+  else if (kind === "audio-tools") require("./audio-tools.cjs").usdOf(model, 60); // model = "<tool>:<row id>"; throws when a rate it reads is missing
   else throw unpriced(kind);
 }
 
@@ -162,10 +175,12 @@ function displayPrices({ text, image, audio, transcribe, music }) {
     "video.music": musicPrice(music),
     // The least one run costs; a run's own estimate comes from POST /generations/quote (its source length).
     "video.enhance": at(() => ({ usd: enhanceUsd("720P", 0), unit: "次起", estimate: true })),
+    // 音軌分離／去配樂 paid rows: the cheapest row's minute; a row's own price is its button (capabilities audioTools).
+    "video.audio-tools": at(() => require("./audio-tools.cjs").displayPrice()),
   };
 }
 
 // Replicate models billed per GPU second (TOOL_RATES usdPerSec): the one function, next-admin cost-model.ts replicateRunUsd.
 const runUsd = (key, predictTimeSec) => rates.replicateRunUsd(key, predictTimeSec);
 
-module.exports = { elevenUsd, textUsd, imageUsd, geminiImageUsd, fillUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };
+module.exports = { elevenUsd, elevenListUsd, interactionsTextUsd, textUsd,imageUsd, geminiImageUsd, fillUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };

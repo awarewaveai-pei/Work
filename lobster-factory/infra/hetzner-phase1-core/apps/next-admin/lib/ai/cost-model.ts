@@ -268,6 +268,8 @@ export const MUSIC_RATES: Record<string, { label: string; vendor: "Google" | "El
 export const ELEVENLABS_RATES: Record<string, { label: string; usdPerKChars?: number; usdPerMinute?: number }> = {
   "eleven_multilingual_v2": { label: "ElevenLabs Multilingual v2", usdPerKChars: 0.08 },
   "scribe_v2":              { label: "ElevenLabs Scribe v2", usdPerMinute: 0.2 / 60 },
+  // Sound Effects re-read 2026-11-25 (agency-os/handoffs/2026-11-25-video-tools-unlock/RESEARCH.md §B): "$0.12" per minute,
+  // the price video-workbench charges for eleven_text_to_sound_v3 (backend/elevenlabs.cjs SOUND_MODEL).
   "sound-generation":       { label: "ElevenLabs Sound Effects", usdPerMinute: 0.12 },
   "audio-isolation":        { label: "ElevenLabs Voice Isolator", usdPerMinute: 0.12 },
 };

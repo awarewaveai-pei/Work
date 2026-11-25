@@ -27,6 +27,7 @@
     "test:host": "node tests/host-adapter.cjs",
     "test:modes": "node tests/generate-mode-audit.cjs",
     "test:privacy": "node tests/privacy.cjs",
-    "test:depth": "node tests/depth.cjs"
+    "test:depth": "node tests/depth.cjs",
+    "test:sfx": "node tests/sfx-billing.cjs"
   }
 }
