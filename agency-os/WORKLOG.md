@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-25（續18）— Banner 尺寸改成「一個比例一顆鈕」，下方列出用得到的平台
+
+- 根因：`app/(shell)/tools/banner/BannerStudio.tsx` 尺寸清單按平台列，同尺寸重複（IG 直式＝FB Post 1080×1350；Hero 手機＝WooCommerce 1000×1000），比例標錯（1920×640 標 16:9、1200×627 標 3:2），缺 3:4（IG 新格狀 1080×1440）、OG 1.91:1 1200×630、Threads／Bluesky／TikTok／YouTube。
+- 做法：PRESETS 改成 8 個比例（9:16、2:3、3:4、4:5★、1:1、16:9、1.91:1、3:1），分直式／方形／橫式；每顆鈕＝比例＋px＋用途，第二行列平台（含 WP）。`aspect` 改為 AI 背景模型可收的最近比例（1.91:1、3:1 → 16:9）。影片編輯器 `?ratio=` 對照表改新 key。Featured/OG 由 1200×800 改為 OG 標準 1200×630。
+- 來源：Sprout Social／Buffer／Metricool 2026 尺寸指南（WebSearch 2026-11-25）。Pinterest 官方建議仍為 2:3，故不放在 9:16。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run "app/(shell)/tools/banner" lib/client-context/__tests__/no-private-context.test.ts | exit=0 | ms=13000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=featured-og|ig-portrait|linkedin-post|twitter-x | hits=0
+- ORACLE_WAIVED: UI 常數表與按鈕排版，無邏輯分支；本機預覽 3903 實測點 4:5、?ratio=9:16／4:5 皆正確。
+- 避免再發生：尺寸清單以比例為主鍵，新平台只加到 `where`，不新增按鈕。
 ## 2026-11-25（續16）— meeting-service：Gemini 聆聽把不停頓的講話一句一則（移植 OwnVoice 斷句器）
 
 - 根因：Gemini Live 只在停頓時結束一輪，interim 是整輪假設。操作者錄的對話沒有停頓 → 60 秒只有 1 則字幕，翻譯越翻越慢，摘要永遠湊不到 3 句（`MS/lib/live/summary.py` MIN_LINES）、心智圖說沒有逐字稿。本機（faster-whisper）路徑本來就按段切，不受影響。

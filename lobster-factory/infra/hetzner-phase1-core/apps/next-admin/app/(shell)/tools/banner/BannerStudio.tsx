@@ -5,7 +5,7 @@ import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
 import { BANNER_RETURN_TOOL, applyBannerCanvasReturn } from "./banner-canvas-return";
-import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel } from "@/lib/studio/model-options";
+import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel, type AspectRatio } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
@@ -17,25 +17,25 @@ import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 // Size presets & constants
 // ---------------------------------------------------------------------------
 
+// One button per ratio; `where` lists every platform that takes it (checked 2026-11 against Sprout Social / Buffer /
+// Metricool guides). `aspect` = nearest ratio the AI background models accept (lib/studio/model-options).
 const PRESETS = {
-  "hero-desktop":  { label: "Hero 桌機",     w: 1920, h: 640,  aspect: "16:9", group: "wp" as const },
-  "hero-full":     { label: "Hero 全版",      w: 1920, h: 1080, aspect: "16:9", group: "wp" as const },
-  "hero-mobile":   { label: "Hero 手機",      w: 1000, h: 1000, aspect: "1:1",  group: "wp" as const },
-  "featured-og":   { label: "Featured / OG", w: 1200, h: 800,  aspect: "3:2",  group: "wp" as const },
-  "woo-product":   { label: "WooCommerce",    w: 1000, h: 1000, aspect: "1:1",  group: "wp" as const },
-  "ig-square":     { label: "IG 方形",        w: 1080, h: 1080, aspect: "1:1",  group: "social" as const },
-  "ig-portrait":   { label: "IG 直式 ★",     w: 1080, h: 1350, aspect: "4:5",  group: "social" as const },
-  "ig-story":      { label: "IG Story/Reels", w: 1080, h: 1920, aspect: "9:16", group: "social" as const },
-  "fb-post":       { label: "FB Post",        w: 1080, h: 1350, aspect: "4:5",  group: "social" as const },
-  "twitter-x":     { label: "X (Twitter)",    w: 1200, h: 675,  aspect: "16:9", group: "social" as const },
-  "pinterest":     { label: "Pinterest Pin",  w: 1000, h: 1500, aspect: "2:3",  group: "social" as const },
-  "linkedin-post": { label: "LinkedIn Post",  w: 1200, h: 627,  aspect: "3:2",  group: "social" as const },
-} as const satisfies Record<string, { label: string; w: number; h: number; aspect: string; group: "wp" | "social" }>;
+  "r9x16":  { ratio: "9:16",   w: 1080, h: 1920, aspect: "9:16", shape: "tall",   use: "限時動態、Reels、直式圖片貼文",   where: "IG Story／Reels、FB Story、TikTok 圖文、YouTube Shorts" },
+  "r2x3":   { ratio: "2:3",    w: 1000, h: 1500, aspect: "2:3",  shape: "tall",   use: "Pin 圖",                          where: "Pinterest" },
+  "r3x4":   { ratio: "3:4",    w: 1080, h: 1440, aspect: "3:4",  shape: "tall",   use: "個人頁格狀不裁切的直式貼文",      where: "IG" },
+  "r4x5":   { ratio: "4:5",    w: 1080, h: 1350, aspect: "4:5",  shape: "tall",   use: "直式貼文、多圖貼文",              where: "IG、FB、Threads、X、LinkedIn、Bluesky", star: true },
+  "r1x1":   { ratio: "1:1",    w: 1080, h: 1080, aspect: "1:1",  shape: "square", use: "方形貼文、商品圖、手機版 Hero",    where: "IG、FB、Threads、X、LinkedIn、Bluesky、WooCommerce" },
+  "r16x9":  { ratio: "16:9",   w: 1920, h: 1080, aspect: "16:9", shape: "wide",   use: "橫式貼文、影片縮圖、網站全版 Hero", where: "IG、FB、Threads、X、LinkedIn、Bluesky、YouTube 縮圖、WP 網站" },
+  "r191x1": { ratio: "1.91:1", w: 1200, h: 630,  aspect: "16:9", shape: "wide",   use: "連結分享預覽（OG）、文章特色圖",   where: "FB／LinkedIn／X 連結預覽、WP 特色圖" },
+  "r3x1":   { ratio: "3:1",    w: 1920, h: 640,  aspect: "16:9", shape: "wide",   use: "網站橫幅",                        where: "WP 網站桌機 Hero" },
+} as const satisfies Record<string, { ratio: string; w: number; h: number; aspect: AspectRatio; shape: "tall" | "square" | "wide"; use: string; where: string; star?: boolean }>;
 type PresetKey = keyof typeof PRESETS;
+const presetLabel = (k: PresetKey) => `${PRESETS[k].ratio} ${PRESETS[k].use}`;
 
-const PRESET_GROUPS: { key: "wp" | "social"; label: string }[] = [
-  { key: "wp",     label: "WP 網站" },
-  { key: "social", label: "社交平台" },
+const PRESET_GROUPS: { key: "tall" | "square" | "wide"; label: string }[] = [
+  { key: "tall",   label: "直式" },
+  { key: "square", label: "方形" },
+  { key: "wide",   label: "橫式" },
 ];
 
 const FONTS = [
@@ -208,7 +208,7 @@ interface State {
 }
 
 const INIT: State = {
-  preset:       "featured-og",
+  preset:       "r191x1",
   copyBrief:    "",
   copyTone:     "促銷",
   copyGenerating: false,
@@ -373,7 +373,7 @@ const TEMPLATES: { key: string; label: string; icon: string; patch: Partial<Stat
   },
 ];
 /** Card R3: the video ratios the editor opens this tool with (?ratio=) -> the size of that shape. */
-const RATIO_PRESET: Record<string, PresetKey> = { "16:9": "hero-full", "9:16": "ig-story", "4:5": "ig-portrait", "1:1": "ig-square" };
+const RATIO_PRESET: Record<string, PresetKey> = { "16:9": "r16x9", "9:16": "r9x16", "4:5": "r4x5", "1:1": "r1x1" };
 /** A template's patch at a size: an opener's title (and subtitle) sized to that card's width; any other unchanged. */
 function templatePatch(t: (typeof TEMPLATES)[number], preset: PresetKey): Partial<State> {
   if (!t.fit) return t.patch;
@@ -1174,7 +1174,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     setS((prev) => ({ ...prev, designing: true, error: null }));
     try {
       if (!staff) return;
-      const res = await staff.scriptForge("design", { brief: s.copyBrief, label: p.label, w: p.w, h: p.h });
+      const res = await staff.scriptForge("design", { brief: s.copyBrief, label: presetLabel(s.preset), w: p.w, h: p.h });
       if (!res.ok || !res.body) throw new Error(`設計生成失敗（${res.status}）`);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -1335,9 +1335,9 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     if (!s.copyBrief.trim()) return;
     setS((prev) => ({ ...prev, copyGenerating: true, copyVariants: [], copyStream: "", error: null }));
     try {
-      const platform = p.group === "wp" ? "WP 網站 Banner" : "社交媒體貼文圖";
+      const platform = `${p.use}（${p.where}）`;
       if (!staff) return;
-      const res = await staff.scriptForge("copy", { platform, label: p.label, w: p.w, h: p.h, tone: s.copyTone, brief: s.copyBrief });
+      const res = await staff.scriptForge("copy", { platform, label: presetLabel(s.preset), w: p.w, h: p.h, tone: s.copyTone, brief: s.copyBrief });
       if (!res.ok || !res.body) throw new Error(`文案生成失敗（${res.status}）`);
       const reader = res.body.getReader();
       const dec    = new TextDecoder();
@@ -1554,20 +1554,26 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, opacity: 0.5, marginBottom: 6 }}>
                   {grp.label}
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                   {(Object.keys(PRESETS) as PresetKey[])
-                    .filter((k) => PRESETS[k].group === grp.key)
-                    .map((k) => (
-                      <button key={k}
-                        className={s.preset === k ? "btn btn-primary" : "btn btn-ghost"}
-                        style={{ fontSize: 11, padding: "3px 8px" }}
-                        onClick={() => set("preset", k)}>
-                        {PRESETS[k].label}
-                        <span style={{ opacity: 0.55, marginLeft: 4, fontSize: 9 }}>
-                          {PRESETS[k].w}×{PRESETS[k].h}
-                        </span>
-                      </button>
-                    ))}
+                    .filter((k) => PRESETS[k].shape === grp.key)
+                    .map((k) => {
+                      const ps = PRESETS[k];
+                      return (
+                        <button key={k}
+                          className={s.preset === k ? "btn btn-primary" : "btn btn-ghost"}
+                          style={{ fontSize: 11, padding: "5px 8px", display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", height: "auto", gap: 2 }}
+                          title={ps.use}
+                          onClick={() => set("preset", k)}>
+                          <span>
+                            <b style={{ fontSize: 12 }}>{ps.ratio}</b>{"star" in ps && ps.star ? " ★" : ""}
+                            <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 10 }}>{ps.w}×{ps.h}</span>
+                            <span style={{ opacity: 0.75, marginLeft: 6 }}>{ps.use}</span>
+                          </span>
+                          <span style={{ opacity: 0.6, fontSize: 10, whiteSpace: "normal" }}>{ps.where}</span>
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
             ))}
@@ -2205,7 +2211,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
           <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <h2 style={{ fontSize: 15, margin: 0 }}>
-                預覽 · {p.label}
+                預覽 · {presetLabel(s.preset)}
                 <span style={{ fontWeight: 400, opacity: 0.6, fontSize: 12, marginLeft: 6 }}>{p.w}×{p.h}</span>
               </h2>
               <div style={{ display: "flex", gap: 4 }}>
