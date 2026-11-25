@@ -22,6 +22,8 @@
     代辦（M6，ADR 021 D4）：會員開邀請連結 /?aw_invite=<碼>，外掛以付款事件同一把密鑰簽 member_invite 送 stub：
       invite-ok      = stub 回 200 → 「已連上〈Local Test Co〉」＋「到我的帳號」
       invite-expired = stub 回 409 invite_expired → 「這個邀請已過期」＋下一步
+    刪會員（M10）：wp user delete 一個暫時會員 → 外掛排入 Action Scheduler → wp action-scheduler run 送出；
+      member-deleted = stub 收到恰好一則、簽章正確、帶 event_id／occurred_at 的 member_deleted
 
   結束碼：0 = 全部情境都 PASS；1 = 有 FAIL；2 = 環境起不來（附原因）。密鑰與 token 只存在本機 $env:TEMP，不寫進 repo。
 
@@ -190,11 +192,15 @@ http.createServer((req, res) => {
       const pg = String(req.headers["x-awarewave-payment-signature"] || "");
       let mb = {}; try { mb = JSON.parse(raw); } catch (e) {}
       const mSig = pg.length === pw.length && crypto.timingSafeEqual(Buffer.from(pg), Buffer.from(pw));
-      const mShape = req.method === "POST" && mb.kind === "member_invite" && Number.isInteger(mb.wp_user_id) && mb.wp_user_id > 0
-        && typeof mb.email === "string" && mb.email_verified === true && /^[A-Za-z0-9_-]{43}$/.test(String(mb.invite_code));
-      log({ path: req.url, sigOk: mSig, fresh: true, shape: mShape, keys: Object.keys(mb).sort() });
+      // every member event carries the stamp the app requires (M10): event_id (payment-event format) + occurred_at (UTC)
+      const stamped = /^[\w.:\-/#]{1,200}$/.test(String(mb.event_id)) && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(mb.occurred_at));
+      const member = req.method === "POST" && Number.isInteger(mb.wp_user_id) && mb.wp_user_id > 0 && stamped;
+      const mShape = member && (mb.kind === "member_deleted"
+        || (mb.kind === "member_invite" && typeof mb.email === "string" && mb.email_verified === true && /^[A-Za-z0-9_-]{43}$/.test(String(mb.invite_code))));
+      log({ path: req.url, kind: mb.kind, wp_user_id: mb.wp_user_id, sigOk: mSig, fresh: true, shape: mShape, keys: Object.keys(mb).sort() });
       if (!mSig) return send(401, { ok: false, error: "invalid_signature" });
       if (!mShape) return send(400, { ok: false, error: "invalid_json" });
+      if (mb.kind === "member_deleted") return send(200, { ok: true, result: "deleted" });
       if (sc === "invite-expired") return send(409, { ok: false, error: "invite_expired" });
       return send(200, { ok: true, organization: { name: "Local Test Co" } });
     }
@@ -302,10 +308,25 @@ try {
         $results += [pscustomobject]@{ Scenario = $c.name; Verdict = $verdict; Screenshot = $png; Problems = ($problems -join "; ") }
     }
 
+    # 刪會員 (M10): WordPress deletes a user -> the plugin queues one signed member_deleted (Action Scheduler), sent here
+    $null = Invoke-Wp user delete member-flow-gone --yes   # a leftover from an earlier run
+    $pwGone = New-Secret 24
+    $null = Invoke-WpOk "create member to delete" user create member-flow-gone member-flow-gone@local.test --role=customer "--user_pass=$pwGone"
+    $goneId = [int](Invoke-WpOk "deleted member id" user get member-flow-gone --field=ID).Trim()
+    $null = Invoke-WpOk "delete member" user delete $goneId --yes
+    $null = Invoke-WpOk "run member events" action-scheduler run --hooks=awstore_send_member_event --force
+    $delReqs = @(Get-Content -LiteralPath $stubLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.path -eq "/api/webhooks/awarewave-wp-member" -and $_.kind -eq "member_deleted" -and $_.wp_user_id -eq $goneId })
+    if ($delReqs.Count -eq 1 -and $delReqs[0].sigOk -and $delReqs[0].shape) {
+        $results += [pscustomobject]@{ Scenario = "member-deleted"; Verdict = "PASS"; Screenshot = "-"; Problems = "" }
+    } else {
+        $fails++
+        $results += [pscustomobject]@{ Scenario = "member-deleted"; Verdict = "FAIL"; Screenshot = "-"; Problems = "stub saw $($delReqs.Count) member_deleted events for user $goneId (expected 1, signed, stamped)" }
+    }
+
     # the stub saw only well-formed, correctly signed, fresh requests (signature + body shape + no wp-handoff body)
     $reqs = if (Test-Path -LiteralPath $stubLog) { @(Get-Content -LiteralPath $stubLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json }) } else { @() }
     $bad = @($reqs | Where-Object { -not ($_.sigOk -and $_.fresh -and $_.shape) })
-    $memberReqs = @($reqs | Where-Object { $_.path -eq "/api/webhooks/awarewave-wp-member" })
+    $memberReqs = @($reqs | Where-Object { $_.path -eq "/api/webhooks/awarewave-wp-member" -and $_.kind -eq "member_invite" })
     if ($memberReqs.Count -lt 2) { $fails++; $results += [pscustomobject]@{ Scenario = "invite-wire"; Verdict = "FAIL"; Screenshot = "-"; Problems = "stub saw $($memberReqs.Count) member_invite events, expected >= 2" } }
     if ($reqs.Count -lt 3) { $fails++; $results += [pscustomobject]@{ Scenario = "wire"; Verdict = "FAIL"; Screenshot = "-"; Problems = "stub saw $($reqs.Count) requests, expected >= 3" } }
     elseif ($bad.Count -gt 0) { $fails++; $results += [pscustomobject]@{ Scenario = "wire"; Verdict = "FAIL"; Screenshot = "-"; Problems = "$($bad.Count) request(s) with bad signature/ts/shape: $stubLog" } }

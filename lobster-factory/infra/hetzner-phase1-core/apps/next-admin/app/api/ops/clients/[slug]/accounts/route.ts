@@ -10,6 +10,8 @@
 //         cannot be read, e.g. before 0180 is applied -- the accounts list still loads). POST { action:"member_invite",
 //         email } → a new invite (voids the live one = 作廢重發); its one-time code (and its link) is in this answer only. DELETE
 //         ?memberInvite=1 → voids the live invite. Both audited without the code. No mail is sent (the landing page is M6).
+//         member.deletedAt (M10, migration 0184): when the account's member was deleted on aware-wave.com, while no member
+//         holds it again; staff then issue an ordinary invite.
 
 import { NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
@@ -20,7 +22,7 @@ import { heldDoors } from "@/lib/portal/held-doors";
 import { listMembers } from "@/lib/social/store";
 import { ROLE_NAMES } from "@/app/(shell)/tools/social/model";
 import { deleteClientAccount, inviteClientAccount, listClientAccounts, normalizeEmail } from "@/lib/accounts/client-invite";
-import { createMemberInvite, inviteTarget, liveMemberInvite, voidMemberInvite } from "@/lib/entitlements/identities";
+import { createMemberInvite, inviteTarget, liveMemberInvite, memberDeletedAt, voidMemberInvite } from "@/lib/entitlements/identities";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,12 +61,12 @@ export async function GET(request: Request, context: Ctx) {
 async function memberStatus(orgId: string) {
   try {
     const sb = getSupabaseWriteClient()!;
-    const [target, live] = await Promise.all([inviteTarget(sb, orgId), liveMemberInvite(sb, orgId)]);
+    const [target, live, deletedAt] = await Promise.all([inviteTarget(sb, orgId), liveMemberInvite(sb, orgId), memberDeletedAt(sb, orgId)]);
     const invite = live && {
       email: live.email, createdAt: live.createdAt, expiresAt: live.expiresAt,
       status: Date.parse(live.expiresAt) <= Date.now() ? "expired" : "pending",
     };
-    return { eligible: target.customerRoot, linked: target.linked, invite };
+    return { eligible: target.customerRoot, linked: target.linked, invite, deletedAt: target.linked ? null : deletedAt };
   } catch (e) {
     console.error("[accounts] member status failed", { org: orgId, error: String(e) });
     return null;

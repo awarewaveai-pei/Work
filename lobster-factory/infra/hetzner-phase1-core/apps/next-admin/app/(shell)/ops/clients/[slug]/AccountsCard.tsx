@@ -18,7 +18,8 @@ type Account = { userId: string; email: string; verified: boolean; createdAt: st
 type Product = { key: string; name: string; settings: string | null };
 type Notice = { tone: "ok" | "error"; text: string };
 /** null = could not be read; invite = the live one (expired until staff reissue). */
-type Member = { eligible: boolean; linked: boolean; invite: { email: string; createdAt: string; expiresAt: string; status: "pending" | "expired" } | null } | null;
+/** deletedAt: the member was deleted on aware-wave.com (M10) and nobody holds the account since; staff invite again. */
+type Member = { eligible: boolean; linked: boolean; invite: { email: string; createdAt: string; expiresAt: string; status: "pending" | "expired" } | null; deletedAt?: string | null } | null;
 
 /** GET /member-transfer; null = not loaded or could not be read. */
 type Transfer = {
@@ -33,6 +34,8 @@ const M = {
   linked: "這個單位已是 aware-wave.com 會員。",
   not_eligible: "這個單位不能成為會員（子品牌或內部單位跟著上層單位）。",
   unknown: "目前讀不到會員狀態。",
+  deleted_tag: "會員已刪除",
+  deleted: "會員已在 aware-wave.com 被刪除（{date}）。可以重新發起邀請。",
   pending: "待驗證",
   expired: "已過期",
   invited: "已邀請 {email}，{date} 前有效。",
@@ -362,6 +365,12 @@ export function AccountsCard({ slug }: { slug: string }) {
       <SubLabel>{M.title}</SubLabel>
       <NoData>{M.intro}</NoData>
       <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.7 }}>
+        {member?.deletedAt && !member.linked && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+            <Tag tone="gray" dot>{M.deleted_tag}</Tag>
+            <span>{M.deleted.replace("{date}", day(member.deletedAt))}</span>
+          </div>
+        )}
         {member === null ? (
           <NoData>{M.unknown}</NoData>
         ) : member.linked ? (

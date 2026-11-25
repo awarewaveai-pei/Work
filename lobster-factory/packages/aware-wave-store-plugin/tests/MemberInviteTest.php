@@ -115,9 +115,13 @@ final class MemberInviteTest extends TestCase {
 		$this->assertCount( 1, $http->requests );
 		$req = $http->requests[0];
 		$this->assertSame( 'https://app.aware-wave.com/api/webhooks/awarewave-wp-member', $req['url'] );
+		$sent = json_decode( $req['body'], true );
+		$this->assertMatchesRegularExpression( '/^member_invite:42:[0-9a-f]{24}$/', $sent['event_id'] );
+		$this->assertSame( gmdate( 'Y-m-d\TH:i:s\Z', $this->now ), $sent['occurred_at'], 'occurred_at = when the member opened the link' );
+		unset( $sent['event_id'], $sent['occurred_at'] );
 		$this->assertSame(
 			array( 'kind' => 'member_invite', 'wp_user_id' => self::UID, 'email' => 'Owner@Soulful.tw', 'email_verified' => true, 'invite_code' => $this->code() ),
-			json_decode( $req['body'], true )
+			$sent
 		);
 		$this->assertSame( Signature::sign( $req['body'], self::SECRET ), $req['headers'][ Signature::PAYMENT_HEADER ], 'the payment events\' signature over the exact bytes' );
 		$this->assertSame( array( 'view' => MemberInvite::LINKED, 'code' => '', 'unit' => 'Soulful <b>' ), $out );
@@ -166,6 +170,27 @@ final class MemberInviteTest extends TestCase {
 			$this->assertStringContainsString( '暫時連不上', $html );
 			$this->assertStringContainsString( 'value="' . MemberInvite::RETRY . '"', $html );
 		}
+	}
+
+	public function test_a_retry_sends_the_same_event_id_and_a_refusal_then_a_reopened_link_is_a_new_event(): void {
+		$this->member( true );
+		$http   = new FakeHttp( 503, '{"ok":false,"error":"member_event_not_recorded"}' );
+		$invite = $this->invite( $http );
+		$invite->hold( self::UID, $this->code() );
+		$invite->process( self::UID );
+		$this->now += 3600;
+		$invite->process( self::UID );   // 再試一次
+		$ids = array_map( function ( $r ) { return json_decode( $r['body'], true )['event_id']; }, $http->requests );
+		$at  = array_map( function ( $r ) { return json_decode( $r['body'], true )['occurred_at']; }, $http->requests );
+		$this->assertCount( 2, $ids );
+		$this->assertSame( $ids[0], $ids[1], 'a retry is the same event' );
+		$this->assertSame( $at[0], $at[1] );
+		$http->status = 409;
+		$http->body   = '{"ok":false,"error":"invite_email_mismatch"}';
+		$invite->process( self::UID );   // final: the code is dropped
+		$invite->hold( self::UID, $this->code() );   // the member fixed the email and opened the link again
+		$invite->process( self::UID );
+		$this->assertNotSame( $ids[0], json_decode( end( $http->requests )['body'], true )['event_id'], 'a new acceptance is a new event' );
 	}
 
 	public function test_after_void_and_reissue_the_new_link_is_sent_and_everything_is_cleared(): void {

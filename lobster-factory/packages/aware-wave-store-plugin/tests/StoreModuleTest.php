@@ -9,6 +9,7 @@
 
 namespace AwareWave\Store\Tests;
 
+use AwareWave\Store\MemberEvents;
 use AwareWave\Store\PaymentSender;
 use AwareWave\Store\StoreModule;
 use PHPUnit\Framework\TestCase;
@@ -48,7 +49,7 @@ final class StoreModuleTest extends TestCase {
 		$hooks = $this->hooks();
 		$this->assertFalse( StoreModule::legacyBridgeBillingLoaded() );
 		$this->assertNotContains( 'admin_notices', $hooks );
-		foreach ( array( 'admin_menu', PaymentSender::ACTION, 'woocommerce_payment_complete', 'woocommerce_order_status_refunded', 'woocommerce_subscription_status_cancelled' ) as $hook ) {
+		foreach ( array( 'admin_menu', PaymentSender::ACTION, 'woocommerce_payment_complete', 'woocommerce_order_status_refunded', 'woocommerce_subscription_status_cancelled', MemberEvents::ACTION, 'delete_user', 'profile_update' ) as $hook ) {
 			$this->assertContains( $hook, $hooks );
 		}
 	}

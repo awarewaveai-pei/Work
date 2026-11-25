@@ -1,51 +1,99 @@
 // POST /api/webhooks/awarewave-wp-member — member events a cash-register site's plugin (aware-wave-store) signs, apart
-// from payments: today `member_invite` (ADR 021 D4, M6: a member who signed up through a staff invite and proved the
-// email). The next card adds more kinds to EVENTS (M10: member deleted / email changed); a kind not listed is 400.
-// Auth = the payment-event signature and site row (lib/payments/woo-billing.ts verify: X-AwareWave-Site names the
-// seller_sites key id, that row's own payment key proves the bytes; no header = aware-wave.com). /api/webhooks is outside
-// middleware. Answers, read by the plugin (PaymentSender::classify's rule): 200 done; 4xx final (409 carries the refusal
-// code from lib/entitlements/wp-customers.ts unchanged); 401 / 404 / 5xx (a closed site too) = the sender retries.
-// No ts / event id yet: a replayed member_invite only re-redeems the same identity; M10 must add one before unlink events.
+// from payments: `member_invite` (ADR 021 D4, M6: a member who signed up through a staff invite and proved the email),
+// `member_deleted` and `member_email_changed` (G10, M10: WordPress deleted the user / changed its email). A kind not
+// listed is 400. Every event carries event_id (the payment events' format) and occurred_at (the site's clock, ISO UTC);
+// the database decides each once (0184 member_events): the same event_id answers its first result, an event older than
+// the member's latest applied change is event_stale (final). Auth = the payment-event signature and site row
+// (lib/payments/woo-billing.ts verify: X-AwareWave-Site names the seller_sites key id, that row's own payment key proves
+// the bytes; no header = aware-wave.com). /api/webhooks is outside middleware. Answers, read by the plugin
+// (PaymentSender::classify's rule): 200 done; 4xx final (409 carries the refusal code unchanged); 401 / 404 / 5xx (a
+// closed site too) = the sender retries the same event.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { normalizeEmail } from "@/lib/accounts/client-invite";
-import { ensureWpCustomer, WpCustomerRefused } from "@/lib/entitlements/wp-customers";
+import {
+  findMemberInviteByCode, inviteTarget, memberDeletedEvent, memberEmailChangedEvent, memberEventCheck, memberInviteTransferOf,
+  redeemMemberInviteEvent, type Identity, type MemberEventStamp,
+} from "@/lib/entitlements/identities";
+import { ensureWpCustomer, WpCustomerRefused, type MemberInviteDeps } from "@/lib/entitlements/wp-customers";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { paymentProvider } from "@/lib/payments";
-import type { SellerSite } from "@/lib/payments/sites";
+import { siteIdentityProvider, type SellerSite } from "@/lib/payments/sites";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Json = Record<string, unknown>;
+type Event = { site: SellerSite; body: Json; stamp: MemberEventStamp; identity: Identity };
 const fail = (error: string, status: number) => NextResponse.json({ ok: false, error }, { status });
 
-/** member_invite: {kind, wp_user_id, email, email_verified, invite_code}. Linking is wp-customers.ts's decision
- *  (redeemMemberInvite: every refusal, email_unverified first); this only checks the shape and names the unit. */
-async function memberInvite(db: SupabaseClient, site: SellerSite, body: Json): Promise<Response> {
-  const wpUserId = body.wp_user_id;
-  if (!Number.isSafeInteger(wpUserId) || (wpUserId as number) < 1) return fail("invalid_wp_user_id", 400);
+/** = lib/payments/woo-billing.ts EVENT_ID (not exported there; 0184 member_events checks the same set). */
+const EVENT_ID = /^[\w.:\-/#]{1,200}$/;
+/** The plugin's gmdate('Y-m-d\TH:i:s\Z'); fractions allowed. */
+const OCCURRED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/;
+/** A stamp this far past the app's clock is a broken site clock: it would make the member's later events stale. */
+const MAX_FUTURE_MS = 3_600_000;
+/** Answers that are the event's own fault, final for the sender. */
+const STAMP_REFUSALS = new Set(["event_stale", "event_id_reused"]);
+
+const orgName = async (db: SupabaseClient, organizationId: string | null): Promise<string | null> => {
+  if (!organizationId) return null;
+  // The result page's 「已連上〈單位〉」; the link is already made, so an unreadable name is not a failure.
+  const org = await db.from("organizations").select("name").eq("id", organizationId).maybeSingle();
+  return !org.error && typeof (org.data as { name?: unknown } | null)?.name === "string" ? (org.data as { name: string }).name : null;
+};
+
+/** member_invite: {kind, wp_user_id, email, email_verified, invite_code, event_id, occurred_at}. Linking is
+ *  wp-customers.ts's decision (redeemMemberInvite: every refusal, email_unverified first) with the database's redeem
+ *  replaced by the stamped one; a known or stale event is answered before any app account is made. */
+async function memberInvite(db: SupabaseClient, ev: Event): Promise<Response> {
+  const { body, site, stamp, identity } = ev;
   const email = normalizeEmail(body.email);
   if (!email) return fail("invalid_email", 400);
   if (typeof body.invite_code !== "string" || body.invite_code === "") return fail("invalid_invite_code", 400);
+  const prior = await memberEventCheck(db, { ...identity, ...stamp, kind: "member_invite" });
+  if (prior) {
+    if (prior.result !== "ok") return fail(prior.result, 409);
+    return NextResponse.json({ ok: true, organization: { name: await orgName(db, prior.organizationId) } });
+  }
+  const inviteDeps: MemberInviteDeps = {
+    memberInvite: findMemberInviteByCode, inviteTarget, transferOf: memberInviteTransferOf,
+    redeem: (d, input) => redeemMemberInviteEvent(d, { ...input, ...stamp }),
+  };
   let organizationId: string;
   try {
     ({ organizationId } = await ensureWpCustomer(db, {
-      site, wpUserId: wpUserId as number, email, emailVerified: body.email_verified === true, inviteCode: body.invite_code,
-    }, undefined, false));
+      site, wpUserId: body.wp_user_id as number, email, emailVerified: body.email_verified === true, inviteCode: body.invite_code,
+    }, undefined, false, undefined, inviteDeps));
   } catch (error) {
     if (error instanceof WpCustomerRefused) return fail(error.code, 409);
     throw error;
   }
-  // The result page's 「已連上〈單位〉」; the link is already made, so an unreadable name is not a failure.
-  const org = await db.from("organizations").select("name").eq("id", organizationId).maybeSingle();
-  const name = !org.error && typeof (org.data as { name?: unknown } | null)?.name === "string" ? (org.data as { name: string }).name : null;
-  return NextResponse.json({ ok: true, organization: { name } });
+  return NextResponse.json({ ok: true, organization: { name: await orgName(db, organizationId) } });
 }
 
-const EVENTS: Record<string, (db: SupabaseClient, site: SellerSite, body: Json) => Promise<Response>> = {
+const answer = (result: string) => (STAMP_REFUSALS.has(result) ? fail(result, 409) : NextResponse.json({ ok: true, result }));
+
+/** member_deleted: {kind, wp_user_id, event_id, occurred_at}. Sent for every deleted user: the app decides (no identity =
+ *  recorded, 200). */
+async function memberDeleted(db: SupabaseClient, ev: Event): Promise<Response> {
+  return answer(await memberDeletedEvent(db, { ...ev.identity, ...ev.stamp }));
+}
+
+/** member_email_changed: {kind, wp_user_id, old_email, new_email, event_id, occurred_at}. Audit only, by email domain. */
+async function memberEmailChanged(db: SupabaseClient, ev: Event): Promise<Response> {
+  const oldEmail = normalizeEmail(ev.body.old_email);
+  const newEmail = normalizeEmail(ev.body.new_email);
+  if (!oldEmail || !newEmail) return fail("invalid_email", 400);
+  const domain = (e: string) => e.slice(e.lastIndexOf("@") + 1);
+  return answer(await memberEmailChangedEvent(db, { ...ev.identity, ...ev.stamp, oldDomain: domain(oldEmail), newDomain: domain(newEmail) }));
+}
+
+const EVENTS: Record<string, (db: SupabaseClient, ev: Event) => Promise<Response>> = {
   member_invite: memberInvite,
+  member_deleted: memberDeleted,
+  member_email_changed: memberEmailChanged,
 };
 
 export async function POST(req: Request): Promise<Response> {
@@ -64,18 +112,29 @@ export async function POST(req: Request): Promise<Response> {
   if (!site) return fail("invalid_signature", 401);
   // A closed site (key rotation, ...) is retryable here: a final 4xx would make the plugin drop an unused invite code.
   if (site.status !== "active") return fail("site_disabled", 503);
-  let body: unknown;
-  try { body = JSON.parse(read.raw); } catch { return fail("invalid_json", 400); }
-  if (!body || typeof body !== "object" || Array.isArray(body)) return fail("not_an_object", 400);
-  const kind = (body as Json).kind;
+  let parsed: unknown;
+  try { parsed = JSON.parse(read.raw); } catch { return fail("invalid_json", 400); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fail("not_an_object", 400);
+  const body = parsed as Json;
+  const kind = body.kind;
   const handle = typeof kind === "string" && Object.prototype.hasOwnProperty.call(EVENTS, kind) ? EVENTS[kind] : null;
   if (!handle) return fail("unknown_kind", 400);
+  if (typeof body.event_id !== "string" || !EVENT_ID.test(body.event_id)) return fail("invalid_event_id", 400);
+  const at = typeof body.occurred_at === "string" && OCCURRED_AT.test(body.occurred_at) ? Date.parse(body.occurred_at) : NaN;
+  if (!Number.isFinite(at) || at > Date.now() + MAX_FUTURE_MS) return fail("invalid_occurred_at", 400);
+  const wpUserId = body.wp_user_id;
+  if (!Number.isSafeInteger(wpUserId) || (wpUserId as number) < 1) return fail("invalid_wp_user_id", 400);
   const db = getSupabaseWriteClient();
   if (!db) return fail("member_event_not_recorded", 500);
+  const ev: Event = {
+    site, body,
+    stamp: { eventId: body.event_id, occurredAt: new Date(at).toISOString() },
+    identity: { provider: siteIdentityProvider(site), siteId: site.id, externalId: String(wpUserId) },
+  };
   try {
-    return await handle(db, site, body as Json);
+    return await handle(db, ev);
   } catch (error) {
-    // Not recorded: every step is safe to repeat (wp-customers.ts), so the sender retries the same event.
+    // Not recorded: the database decides inside one transaction, so the sender retries the same event.
     console.error("[wp-member] event failed", String(kind), String(error).slice(0, 200));
     return fail("member_event_not_recorded", 500);
   }

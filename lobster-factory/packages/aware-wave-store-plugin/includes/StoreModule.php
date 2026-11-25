@@ -52,6 +52,14 @@ final class StoreModule {
 			}
 		);
 
+		// Member events (M10) likewise: an already-queued one is logged as not sent when the switch is off.
+		add_action(
+			MemberEvents::ACTION,
+			function ( $job ) use ( $http ) {
+				( new MemberEvents( Settings::fromOptions(), $http ) )->deliver( (array) $job );
+			}
+		);
+
 		if ( ! $settings->enabled ) {
 			return;
 		}
@@ -109,6 +117,8 @@ final class StoreModule {
 		( new EmailVerification() )->register();
 		// Staff-invited members (ADR 021 D4): the code is sent only after the email is verified (MemberInvite).
 		( new MemberInvite( $settings, $http, new WpMembers(), new TransientSummaryCache() ) )->register();
+		// WordPress deleted a user / changed an email -> the app knows (ADR 021 G10, M10).
+		( new MemberEvents( $settings, $http ) )->register();
 		( new GoogleSignup() )->register();
 		( new WelcomeGift( $settings->welcomeProductId, $shop ) )->register();
 		( new CheckoutGate( $shop, $settings ) )->register();

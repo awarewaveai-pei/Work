@@ -5,7 +5,9 @@
  * form and moves to user meta there. Signed in: user meta at once. The code is sent only once the member's CURRENT email
  * is the verified one (EmailVerification); an unverified member is sent when the verify click fires WelcomeGift::VERIFIED.
  * One signed event, POST <target>/api/webhooks/awarewave-wp-member {kind:"member_invite", wp_user_id, email,
- * email_verified, invite_code}, same signature and site header as the payment events (Settings::paymentHeaders); the app
+ * email_verified, invite_code, event_id, occurred_at}, same signature and site header as the payment events
+ * (Settings::paymentHeaders). event_id / occurred_at (card M10) belong to the held code: made when the member opened the
+ * link, the same on every retry, so the app decides the event once and refuses it after the member was deleted; the app
  * links the member to the invited account (next-admin lib/entitlements/wp-customers.ts redeemMemberInvite) and answers.
  * The plain codes (every invite link opened, at most 3, 14 days each) live in user meta only until a success or a
  * final refusal; sent newest first; a retryable answer keeps them for 「再試一次」.
@@ -20,7 +22,7 @@ final class MemberInvite {
 
 	const QUERY       = 'aw_invite';
 	const COOKIE      = 'aw_member_invite';
-	/** list<array{code:string,at:int}>, oldest first: every invite link the member opened, at most MAX_HELD. */
+	/** list<array{code:string,at:int,event_id:string}>, oldest first: every invite link the member opened, at most MAX_HELD. */
 	const META_CODE   = 'aware_wave_member_invite_code';
 	const MAX_HELD    = 3;
 	/** = next-admin lib/entitlements/identities.ts MEMBER_INVITE_DAYS (14): a code held longer is past its invite anyway,
@@ -50,6 +52,7 @@ final class MemberInvite {
 		'invite_not_customer'   => array( '這個單位目前不能加入會員。', '請聯絡我們確認。' ),
 		'email_unverified'      => array( '你的 email 還沒確認。', '請到信箱按確認連結，確認後會自動連上。' ),
 		'identity_conflict'     => array( '你的帳號和另一筆會員資料衝突。', '請聯絡我們處理。' ),
+		'event_stale'           => array( '這個邀請已經不能再用（帳號狀態在那之後有變動）。', '請聯絡我們重新發一個邀請。' ),
 	);
 	const OTHER = array( '無法連上這個單位。', '請聯絡我們，並附上代碼：' );
 
@@ -57,9 +60,22 @@ final class MemberInvite {
 		return (bool) preg_match( self::CODE, $code );
 	}
 
-	/** @return array{kind:string,wp_user_id:int,email:string,email_verified:bool,invite_code:string} */
-	public static function body( int $userId, string $email, string $code ): array {
-		return array( 'kind' => 'member_invite', 'wp_user_id' => $userId, 'email' => $email, 'email_verified' => true, 'invite_code' => $code );
+	/** A new event id for a held code: next-admin woo-billing.ts EVENT_ID shape. */
+	public static function newEventId( int $userId ): string {
+		return 'member_invite:' . $userId . ':' . bin2hex( random_bytes( 12 ) );
+	}
+
+	/** @return array{kind:string,wp_user_id:int,email:string,email_verified:bool,invite_code:string,event_id:string,occurred_at:string} */
+	public static function body( int $userId, string $email, string $code, string $eventId, int $occurredAt ): array {
+		return array(
+			'kind'           => 'member_invite',
+			'wp_user_id'     => $userId,
+			'email'          => $email,
+			'email_verified' => true,
+			'invite_code'    => $code,
+			'event_id'       => $eventId,
+			'occurred_at'    => gmdate( 'Y-m-d\TH:i:s\Z', $occurredAt ),
+		);
 	}
 
 	/**
@@ -178,7 +194,7 @@ final class MemberInvite {
 		return call_user_func( $this->meta['get'], $uid, $key );
 	}
 
-	/** @param list<array{code:string,at:int}> $held */
+	/** @param list<array{code:string,at:int,event_id:string}> $held */
 	private function save( int $uid, array $held ): void {
 		if ( $held === array() ) {
 			call_user_func( $this->meta['delete'], $uid, self::META_CODE );
@@ -187,7 +203,8 @@ final class MemberInvite {
 		}
 	}
 
-	/** The held codes, oldest first. One older than CODE_TTL (or malformed, or with no time) is deleted here, never sent. */
+	/** The held codes, oldest first. One older than CODE_TTL (or malformed, or with no time) is deleted here, never sent.
+	 *  One held before event ids existed gets its id here, once (stored, so its retries carry the same one). */
 	private function held( int $uid ): array {
 		$stored = $this->get( $uid, self::META_CODE );
 		if ( ! is_array( $stored ) || $stored === array() ) {
@@ -201,10 +218,11 @@ final class MemberInvite {
 		foreach ( $stored as $h ) {
 			$at = is_array( $h ) ? (int) ( $h['at'] ?? 0 ) : 0;
 			if ( is_array( $h ) && is_string( $h['code'] ?? null ) && self::isCode( $h['code'] ) && $at > 0 && $now - $at <= self::CODE_TTL ) {
-				$live[] = array( 'code' => $h['code'], 'at' => $at );
+				$id     = is_string( $h['event_id'] ?? null ) && $h['event_id'] !== '' ? $h['event_id'] : self::newEventId( $uid );
+				$live[] = array( 'code' => $h['code'], 'at' => $at, 'event_id' => $id );
 			}
 		}
-		if ( count( $live ) !== count( $stored ) ) {
+		if ( $live !== $stored ) {
 			$this->save( $uid, $live );
 		}
 		return $live;
@@ -225,7 +243,7 @@ final class MemberInvite {
 				return false;
 			}
 		}
-		$held[] = array( 'code' => $code, 'at' => (int) call_user_func( $this->clock ) );
+		$held[] = array( 'code' => $code, 'at' => (int) call_user_func( $this->clock ), 'event_id' => self::newEventId( $uid ) );
 		$this->save( $uid, array_slice( $held, -self::MAX_HELD ) );
 		call_user_func( $this->meta['delete'], $uid, self::META_RESULT );
 		return true;
@@ -259,8 +277,8 @@ final class MemberInvite {
 		}
 		$first = null;
 		while ( $held !== array() ) {
-			$code = $held[ count( $held ) - 1 ]['code'];
-			$raw  = (string) json_encode( self::body( $uid, $m['email'], $code ), JSON_UNESCAPED_SLASHES );
+			$top  = $held[ count( $held ) - 1 ];
+			$raw  = (string) json_encode( self::body( $uid, $m['email'], $top['code'], $top['event_id'], $top['at'] ), JSON_UNESCAPED_SLASHES );
 			$res  = $this->settings->paymentsReady()
 				? $this->http->post( $this->settings->target . self::PATH, $this->settings->paymentHeaders( $raw ), $raw, self::TIMEOUT )
 				: array( 'status' => null, 'body' => '', 'error' => 'not_configured' );
