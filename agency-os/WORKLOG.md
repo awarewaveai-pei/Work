@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-25（續16）— meeting-service：Gemini 聆聽把不停頓的講話一句一則（移植 OwnVoice 斷句器）
+
+- 根因：Gemini Live 只在停頓時結束一輪，interim 是整輪假設。操作者錄的對話沒有停頓 → 60 秒只有 1 則字幕，翻譯越翻越慢，摘要永遠湊不到 3 句（`MS/lib/live/summary.py` MIN_LINES）、心智圖說沒有逐字稿。本機（faster-whisper）路徑本來就按段切，不受影響。
+- 步驟（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）：
+  - 新 `MS/lib/live/sentences.py`：移植 OwnVoice `src-tauri/src/sentences.rs`（以字對位、句尾停 1.5 秒才算、短句併下一句）；未移植 `skip()`；加 `final=True`（整輪結束全數完成）與 `follows()`（最終文字是否對得上已完成的字）
+  - `MS/lib/live/stt_gemini.py` `Live`：interim 交給 Tracker，每 100 ms `tick()`；FINAL 事件各自成一則；最終文字改寫了已完成的字（interim 黏字 `oldbuild`）→ 改用已聽到的 interim 收尾，不重複、不遺漏；`run()` 每次連線結束（停止／輪替／斷線／拒絕）都 `live.close()`，灰色列不殘留
+  - `MS/lib/live/hub.py`：送事件失敗時記 `log.exception`
+  - `MS/templates/workspace.html` 摘要空白提示寫明「每 N 分鐘、至少 3 句新字幕、停止時再整理」；`MS/templates/mindmap.html` 提示改「按下面的按鈕產生」
+  - `MS/lib/live/NOTICE.md` 加 sentences.py 列；測試資料 `MS/tests/data/live-captions-en-trace.json` 取自 OwnVoice testdata
+  - critic（Quick）1m/1n 全修：最終文字對不上時重複或遺失句子；重連／拒絕時未說完的句子遺失或卡灰
+- 驗證：
+  - `python -m pytest tests -q` → 132 passed（OwnVoice 斷句測試 10 條照搬、不停頓對話 1 條、改寫最終文字 1 條、連線中途結束 1 條）；突變：拔掉 `follows` 判斷與 `run()` 的 `live.close()` → 後兩條變紅，還原變綠
+  - 真實 Gemini（8431，`feed.py her1912.wav gemini`，操作者今晚錄音）：修前 1 則；修後 13 則（#14–#26），每句中文在英文完成後 0.6–0.9 秒；本次 NT$2.4
+- REALTEST_EVIDENCE: tool=Bash | cmd=python feed.py her1912.wav gemini 8431; python -m pytest tests -q | exit=0 | ms=75000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/1n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=Live\(session|live\.close\(|live\.tick\(|tracker\.follows|lib\.live\.sentences | hits=8
+- ORACLE_WAIVED: critic Quick 一輪＋突變證據；改動限即時字幕斷句，已對真實 Gemini 實跑
+- 剩餘風險：今晚已存的場次逐字稿仍是一大則（會後整理會用錄音重新辨識）；不停講超過 9 分 50 秒時輪替會在句中切一刀；真實麥克風／系統音擷取仍未實測
+- rollback：`git revert` 本 commit
 ## 2026-11-25（續9）— meeting-service「問 AI」改成先搜尋再請模型整理並附來源（操作者：「我要完整的答案」）
 
 - 根因／決策：操作者問「問哪個資料最齊全、最便宜」並要求實測。三題（句子意思／冷門技術名詞／今年十月的小眾產品名）× Claude Haiku 5.5、Gemini 3.5 Flash-Lite、OpenAI gpt-6-luna × 單獨回答與附搜尋結果，共 18 次：單獨回答時 Gemini 對不認識的產品名兩輪都編出不同的答案，Claude 與 OpenAI 答「不確定」；附上搜尋結果後三家都不編。每次花費皆 < NT$0.02。操作者選完整答案 → 問 AI 一律先搜尋。

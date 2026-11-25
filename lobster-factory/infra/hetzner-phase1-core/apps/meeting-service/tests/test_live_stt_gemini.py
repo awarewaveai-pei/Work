@@ -65,5 +65,62 @@ class LiveTests(unittest.TestCase):
         self.assertEqual(self.session.calls, [])
 
 
+    def test_speech_without_pauses_comes_out_a_sentence_at_a_time(self):
+        # 2026-11-25: a read-out dialogue with no pauses became one caption for a whole minute (Gemini
+        # only ends a turn at a pause). Words arrive every 0.3 s, the 100 ms tick runs, no final until the end.
+        said = ("Also, yes, we've reviewed it internally. Overall, we're satisfied with the product specifications. "
+                "However, the unit price of $125 is slightly above our budget. I understand your concern. "
+                "Due to the recent increase in raw material costs, we've had to adjust our pricing by approximately 8%. "
+                "That's understandable. What about the lead time?")
+        now = [0.0]
+        live = Live(self.session, clock=lambda: now[0])
+        words = said.split(" ")
+        for i in range(1, len(words) + 1):
+            live.handle(interim(" ".join(words[:i])))
+            for _ in range(3):
+                now[0] += 0.1
+                live.tick()
+        live.handle(final(said))
+        done = [c[2] for c in self.session.calls if c[0] == "finish"]
+        self.assertGreaterEqual(len(done), 6, done)
+        self.assertTrue(all(done), done)
+        self.assertEqual(" ".join(done), said)
+        self.assertIsNone(live.current)
+
+    def test_a_final_that_rewrites_finished_words_neither_repeats_nor_drops_a_sentence(self):
+        # Interim glued "old build"; the final splits it. Two sentences went out, a third was still gray.
+        now = [0.0]
+        live = Live(self.session, clock=lambda: now[0])
+        heard = "We start the migration today. Then we retire the oldbuild servers. And the third one"
+        live.handle(interim(heard))
+        now[0] = 2.0
+        live.tick()
+        live.handle(final("We start the migration today. Then we retire the old build servers. And the third one."))
+        done = [c[2] for c in self.session.calls if c[0] == "finish" and c[2]]
+        self.assertEqual(done, ["We start the migration today.", "Then we retire the oldbuild servers.", "And the third one"])
+
+    def test_a_connection_that_ends_mid_turn_finishes_what_was_heard(self):
+        # A refusal, a drop or a rotation starts a new hypothesis; the old gray line must not stay gray or vanish.
+        import asyncio
+        from lib.live import stt_gemini
+
+        class Session(FakeSession):
+            def status(self, text):
+                pass
+
+        session = Session()
+
+        async def refused(_session, usage, key, language, audio, live, clock=None):
+            live.handle(interim("Then we retire the old build servers"))
+            raise stt_gemini._Fatal("401")
+
+        real, stt_gemini._session = stt_gemini._session, refused
+        try:
+            asyncio.run(stt_gemini.run(session, None, "k", "", asyncio.Queue()))
+        finally:
+            stt_gemini._session = real
+        self.assertEqual(session.calls[-1], ("finish", 1, "Then we retire the old build servers"))
+
+
 if __name__ == "__main__":
     unittest.main()

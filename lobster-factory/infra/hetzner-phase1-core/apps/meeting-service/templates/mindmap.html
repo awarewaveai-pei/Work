@@ -147,7 +147,7 @@ function show(newTree) {
   $("again").hidden = $("save").hidden = !tree;
   stage.innerHTML = "";
   state.className = "";
-  state.textContent = tree ? "點方塊可以收合。" : "這份逐字稿還沒有心智圖。";
+  state.textContent = tree ? "點方塊可以收合。" : "還沒產生心智圖：按下面的按鈕產生。";
   if (tree) draw();
 }
 

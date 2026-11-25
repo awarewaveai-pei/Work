@@ -31,6 +31,7 @@ Based on OwnVoice Meet by Zaious, ChronicleCore Studio.
 | `lib/live/summary.py` | `src-tauri/src/batch.rs` (batches, `due`, `requeue`, flush), `src-tauri/src/summary.rs` (update, `transcript`) |
 | `templates/workspace.html` (caption panel: save switch, segment name and 新段落, divider lines) | `src/captions/main.ts` (segments of a saved session) |
 | `templates/workspace.html` (summary panel) | `src/summary/main.ts` |
+| `lib/live/sentences.py` | `src-tauri/src/sentences.rs` (sentence tracker, `clean`, `words`; `skip` not ported) |
 
 ## Third-party notice carried over (from OwnVoice Meet `THIRD_PARTY_NOTICES.md`)
 

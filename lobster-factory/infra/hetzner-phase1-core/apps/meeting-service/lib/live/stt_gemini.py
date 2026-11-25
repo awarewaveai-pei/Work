@@ -18,6 +18,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus
 
 from lib.live.respace import Respace
+from lib.live.sentences import DROP, FINAL, INTERIM, Tracker
 
 RATE = 16_000
 MODEL = "gemini-3.5-transcribe-live"
@@ -48,12 +49,18 @@ def _scrub(text: str, key: str) -> str:
 
 
 class Live:
-    """Which caption the live hypothesis belongs to. It persists across reconnects."""
+    """Which caption line the live hypothesis belongs to; one per listening run, across reconnects.
+    Gemini ends a turn only at a pause, and its interim text is the whole turn so far: speech without
+    pauses would grow one line for minutes. The turn is cut into sentences as they settle
+    (sentences.py), so each sentence gets its own line, translation and transcript entry."""
 
-    def __init__(self, session):
+    def __init__(self, session, clock=time.monotonic):
         self.session = session
+        self.clock = clock
         self.current = None
         self.spacing = Respace()
+        self.tracker = Tracker()
+        self.text = ""   # the turn's hypothesis so far
 
     def handle(self, v: dict) -> None:
         sc = v.get("serverContent")
@@ -69,19 +76,48 @@ class Live:
     def interim(self, text: str) -> None:
         if not text:
             return
-        text = self.spacing.fix(text)
-        if self.current is None:
-            self.current = self.session.open()
-        self.session.interim(self.current, text)
+        self.text = self.spacing.fix(text)
+        self._apply(self.tracker.update(self.text, self.clock()))
+
+    def tick(self) -> None:
+        """Time passed without a new hypothesis: a sentence end may have settled."""
+        if self.text:
+            self._apply(self.tracker.update(self.text, self.clock()))
 
     def finish(self, text: str) -> None:
+        """The turn ended: what is left of it is finished, a sentence at a time."""
         self.spacing.reset()
+        if text and not self.tracker.follows(text):
+            # The final text rewrote words already finished (interim glues words, "oldbuild"): going on
+            # from it would repeat or skip a sentence. What was heard so far is finished instead.
+            text = self.text
+        if text:
+            self._apply(self.tracker.update(text, self.clock(), final=True))
         if self.current is not None:
-            # Empty: nothing final came of the hypothesis, and the gray line is dropped.
+            # Nothing final came of the rest of the hypothesis: the gray line is dropped.
             line, self.current = self.current, None
-            self.session.finish(line, text)
-        elif text:
-            self.session.finish(self.session.open(), text)
+            self.session.finish(line, "")
+        self.tracker = Tracker()
+        self.text = ""
+
+    def close(self) -> None:
+        """Listening stopped before Gemini ended the turn: finish what was heard."""
+        if self.text:
+            self.finish(self.text)
+
+    def _apply(self, events) -> None:
+        for kind, text in events:
+            if kind == INTERIM:
+                if self.current is None:
+                    self.current = self.session.open()
+                self.session.interim(self.current, text)
+            elif kind == FINAL:
+                line = self.current if self.current is not None else self.session.open()
+                self.current = None
+                self.session.finish(line, text)
+            elif kind == DROP and self.current is not None:
+                line, self.current = self.current, None
+                self.session.finish(line, "")
 
 
 def _parse(raw):
@@ -222,6 +258,7 @@ async def _session(session, usage, key: str, language: str, audio: asyncio.Queue
             now = clock()
             if now - last_tick >= TICK:
                 last_tick = now
+                live.tick()
                 if now - last_audio > SILENCE_AFTER:
                     await ws.send(audio_message(silence))
                     usage.add_audio("gemini-live", len(silence) / 2 / RATE)
@@ -266,6 +303,10 @@ async def run(session, usage, key: str, language: str, audio: asyncio.Queue):
             if _drain(audio):
                 return
             continue
+        finally:
+            # Every connection's end (stop, rotation, a drop, a refusal) ends the turn: a new connection
+            # starts its own hypothesis, so what was heard of this one is finished now, never left gray.
+            live.close()
         if end == _AUDIO_CLOSED:
             return
         backoff = 1

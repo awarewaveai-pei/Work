@@ -436,6 +436,7 @@ class Hub:
         except Exception:
             # An event that cannot be sent must not leave a socket that is open but silent: close it,
             # so the page reconnects (and gets a fresh snapshot).
+            log.exception("event send failed; closing this page's socket")
             try:
                 await ws.close()
             except Exception:

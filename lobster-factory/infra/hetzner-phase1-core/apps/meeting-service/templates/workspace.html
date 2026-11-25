@@ -1029,7 +1029,8 @@ Sorry, could you repeat the question?
 (function () {
   const live = window.Workspace.live;
   const EMPTY_OFF = "還沒有開啟。打開上面的「會議中摘要」再按「聆聽」，每隔幾分鐘就會把新的字幕整理成要點（每次都計費）。";
-  const EMPTY_ON = "還沒有摘要。有新的字幕後，到了更新時間會自動整理。";
+  // 條件同 lib/live/summary.py：每 N 分鐘一次，且至少 3 句新字幕（MIN_LINES）。
+  const emptyOn = () => "還沒有摘要。每 " + prefs.every + " 分鐘整理一次，而且要累積至少 3 句新字幕；停止聆聽時會把剩下的再整理一次。";
   const prefs = Object.assign({ on: false, every: 5 }, loadPrefs());
   const view = { text: "", updated: "", lines: 0, working: false, error: "", enabled: false };
   let listening = false, root = null;
@@ -1059,7 +1060,7 @@ Sorry, could you repeat the question?
     } else {
       const p = document.createElement("p");
       p.className = "placeholder";
-      p.textContent = prefs.on ? EMPTY_ON : EMPTY_OFF;
+      p.textContent = prefs.on ? emptyOn() : EMPTY_OFF;
       body.replaceChildren(p);
     }
     const parts = [];
