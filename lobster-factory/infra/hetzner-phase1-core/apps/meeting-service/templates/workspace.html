@@ -926,7 +926,7 @@ Sorry, could you repeat the question?
     const text = query.trim();
     if (!root || !text) return;
     const mine = ++latest[kind];
-    note(kind, kind === "search" ? "搜尋中…" : "問 AI 中…");
+    note(kind, kind === "search" ? "搜尋中…" : "先查網路，再請 AI 整理…");
     let body, ok;
     try {
       const resp = await fetch("/api/lookup/" + kind, {
@@ -942,10 +942,30 @@ Sorry, could you repeat the question?
       const d = document.createElement("div");
       d.className = "lk-answer";
       d.textContent = body.answer;
-      const u = document.createElement("p");
-      u.className = "placeholder";
-      u.textContent = "AI 用量：輸入 " + body.input_tokens + "、輸出 " + body.output_tokens + " token";
-      return out(kind).replaceChildren(d, u);
+      const parts = [d];
+      if (body.note) {
+        const n = document.createElement("p");
+        n.className = "placeholder";
+        n.textContent = body.note;
+        parts.push(n);
+      }
+      // 只列答案裡真的引用到的來源（[1]、[2, 3] 這種標記）。
+      // 模型偶爾會寫成 [2，3]、［1］、【1】或全形數字：一併認得。
+      const half = String(body.answer).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+      const marks = half.match(/[\[［【]\s*\d+(?:\s*[,，、]\s*\d+)*\s*[\]］】]/g) || [];
+      const cited = new Set(marks.join(" ").match(/\d+/g) || []);
+      (body.sources || []).filter(s => cited.has(String(s.n))).forEach(s => {
+        const item = document.createElement("div");
+        item.className = "lk-item";
+        const a = document.createElement("a");
+        a.textContent = "[" + s.n + "] " + s.title;
+        if (/^https?:\/\//.test(s.link)) a.href = s.link;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        item.append(a);
+        parts.push(item);
+      });
+      return out(kind).replaceChildren(...parts);
     }
     if (!body.results.length) return note(kind, "沒有找到結果");
     out(kind).replaceChildren(...body.results.map(r => {

@@ -4,7 +4,7 @@
 跟會議記錄同一套兩條路：預設把 prompt 貼給任一 AI 再貼回（零費用）；有 API key 可直接產生（計費）。
 節點 = {"text": str, "children": [節點]}。
 """
-from .lookup import MODEL
+from .live.translate import ANTHROPIC_MODEL as MODEL   # 會議中用的快模型，與翻譯同一個
 from .summarize import MAX_TRANSCRIPT_CHARS, parse_pasted_json
 
 MAX_DEPTH = 4            # 根算第 1 層

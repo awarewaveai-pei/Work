@@ -215,6 +215,11 @@ class Hub:
             "summary": {k: v for k, v in self.summary.view().items() if k != "type"},
         }
 
+    async def ask(self, system: str, user: str) -> str:
+        """One answer from the meeting's language model (Claude, else Gemini); counted in today's usage."""
+        self._refresh_keys()
+        return await self.translator.complete([{"type": "text", "text": system}], user)
+
     def transcript_tail(self) -> str:
         """What has been said so far in this page's meeting (finished lines), for 問 AI's context."""
         if self.session is None:

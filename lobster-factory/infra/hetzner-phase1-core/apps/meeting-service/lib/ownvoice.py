@@ -106,7 +106,8 @@ def live_transcript(max_age_sec: int = 1800) -> str:
         path = os.path.join(session_dir("latest"), "transcript.md")
         if time.time() - os.path.getmtime(path) > max_age_sec:
             return ""
-        with open(path, encoding="utf-8") as f:
+        # 錄音中這個檔每幾秒重寫一次；讀到寫一半的中文字不該讓呼叫端整個失敗。
+        with open(path, encoding="utf-8", errors="replace") as f:
             return f.read()
     except (KeyError, OSError):
         return ""

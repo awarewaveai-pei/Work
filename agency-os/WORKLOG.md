@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-25（續9）— meeting-service「問 AI」改成先搜尋再請模型整理並附來源（操作者：「我要完整的答案」）
+
+- 根因／決策：操作者問「問哪個資料最齊全、最便宜」並要求實測。三題（句子意思／冷門技術名詞／今年十月的小眾產品名）× Claude Haiku 5.5、Gemini 3.5 Flash-Lite、OpenAI gpt-6-luna × 單獨回答與附搜尋結果，共 18 次：單獨回答時 Gemini 對不認識的產品名兩輪都編出不同的答案，Claude 與 OpenAI 答「不確定」；附上搜尋結果後三家都不編。每次花費皆 < NT$0.02。操作者選完整答案 → 問 AI 一律先搜尋。
+- 步驟（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）：
+  - `MS/lib/lookup.py`：刪除直接用 anthropic SDK 的 `ask()` 與 `MODEL`；新增 `ask_user(text, context, results)`；`ASK_SYSTEM` 改寫（事實只能來自搜尋結果與逐字稿、半形 `[n]` 標來源、查不到就說查不到、純文字、最多六句）
+  - `MS/app.py` `lookup_ask`：改 async；Serper 搜尋（執行緒）→ `Hub.ask`（共用 `Translator`：有 Claude key 用 Claude，否則 Gemini，計入今日用量）→ 回 `{answer, sources, note}`；搜尋失敗或無金鑰只加註、照常回答
+  - `MS/lib/live/hub.py` `ask()`；`MS/lib/mindmap.py` 模型名改取 `lib/live/translate.ANTHROPIC_MODEL`
+  - `MS/templates/workspace.html`：答案下方只列被引用的來源連結
+  - `MS/lib/ownvoice.py` `live_transcript`：`errors="replace"`（錄音中讀到寫一半的字不再丟例外）
+  - 操作者自行執行一支腳本，把 ClaudeAgent 以 DPAPI 加密保存的 Anthropic key 複製進會議工具的 `.settings.json`（金鑰未經主 session 之手）；副作用：翻譯／回覆／摘要也改走 Claude
+  - critic（Quick）0c/0m/4n 全修：讀逐字稿移到執行緒並納入 try、非 TranslateError 也回 502、引用標記認全形與頓號、重複 import
+- 驗證：
+  - `python -m pytest tests -q` → 119 passed（新 `tests/test_lookup.py` 2 條）
+  - 真實 Serper＋Claude（8431）三題：句子意思完整解釋；Smart App Control 附 Microsoft 官方與 Reddit 來源；OwnVoice Meet 依 GitHub／官網答對。每題 3–6 秒
+  - 頁面：按「問 AI」→ 答案＋被引用的來源連結（截圖）
+- REALTEST_EVIDENCE: tool=Bash | cmd=python ask_real.py（POST /api/lookup/ask ×3，真實 Serper＋Claude Haiku）; python ask_compare2.py / ask_compare3.py（18 次比較）; python -m pytest tests -q | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0m/4n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,Projects | grep=lookup\.ask\(|lookup\.MODEL|from \.lookup import MODEL | hits=0
+- ORACLE_WAIVED: critic Quick 一輪；改動為提示詞＋一個端點，已對真實服務實跑
+- 剩餘風險：樣本僅三題；搜尋結果每次不同，答案品質隨之浮動；模型整理仍可能誤讀來源（實測一句）；critic 修正後未重跑真實呼叫，只跑單元測試與 import；Claude 翻譯路徑在本工具仍未實測
+- rollback：`git revert` 本 commit；要回到只用 Gemini，清掉首頁「API 設定」的 key
 ## 2026-11-25（續7）— oracle WP：算命站 zh-TW 頁面、選單、首頁、外掛 page_map（wp-cli 建）
 
 - [根因] GO-2 後站上沒有頁面；操作者要監工建頁面、放工具。`/wp-login.php` Cloudflare challenge 擋自動化 → 走主機 wp-cli。
