@@ -8,7 +8,11 @@ const run = vi.hoisted(() => vi.fn());
 const ingestIncident = vi.hoisted(() => vi.fn());
 const refreshClaimReviewIfDue = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/schedules/store", () => ({ listEnabledSchedules, recordScheduleRun, recordScheduleError, claimScheduleRun }));
-vi.mock("@/lib/schedules/jobs", () => ({ clientJob: (key: string) => (key === "collect_crawl" ? { key, run } : undefined), asRegistered: <T,>(row: T) => row }));
+vi.mock("@/lib/schedules/jobs", () => ({
+  clientJob: (key: string) => (key === "collect_crawl" ? { key, run } : key === "claude_usage_window" ? { key, run, onlyOrgSlugs: ["awarewave-ops"] } : undefined),
+  asRegistered: <T,>(row: T) => row,
+  jobAppliesTo: (job: { onlyOrgSlugs?: string[] }, slug?: string) => !job.onlyOrgSlugs || (!!slug && job.onlyOrgSlugs.includes(slug)),
+}));
 vi.mock("@/lib/ops-inbox/ingest", () => ({ ingestIncident }));
 vi.mock("@/lib/collect/lookups/answer", () => ({ refreshClaimReviewIfDue }));
 // In-memory tables: eq/in filter, order/limit kept simple. projects = media_production_projects rows of the test.
@@ -127,6 +131,13 @@ describe("POST /api/internal/schedules/run-due", () => {
     expect(run).toHaveBeenCalledWith(ORG_A, body.started[0], expect.objectContaining({ organizationId: ORG_A, jobKey: "collect_crawl" }));
     expect(recordScheduleRun).toHaveBeenCalledWith(ORG_A, "collect_crawl");
     expect(ingestIncident).not.toHaveBeenCalled();
+  });
+
+  it("a job limited to the platform organization never runs for a client row (organizations mock = acme)", async () => {
+    listEnabledSchedules.mockResolvedValue([dueSchedule(ORG_A, "claude_usage_window")]);
+    await sweep();
+    expect(run).not.toHaveBeenCalled();
+    expect(recordScheduleError).toHaveBeenCalledWith(ORG_A, "claude_usage_window", expect.stringContaining("job_not_for_organization"));
   });
 
   it("the job runs AFTER the answer: a heartbeat that gives up early does not cut the job short", async () => {

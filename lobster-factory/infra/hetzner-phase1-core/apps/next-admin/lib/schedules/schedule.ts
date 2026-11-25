@@ -6,8 +6,11 @@
 // day encoding: JS Date#getUTCDay() (0=Sunday..6=Saturday) here and in the table -- one encoding, no
 // translation table to get off by one.
 
-/** client_schedules.frequency (0097; every_5m since 0121; monthly/quarterly/yearly since 0123). */
-export type Frequency = "daily" | "weekly" | "every_5m" | "monthly" | "quarterly" | "yearly";
+/** client_schedules.frequency (0097; every_5m since 0121; monthly/quarterly/yearly since 0123; weekdays since 0183). */
+export type Frequency = "daily" | "weekly" | "every_5m" | "monthly" | "quarterly" | "yearly" | "weekdays";
+
+/** 0183 weekday_hours: index = TAIPEI weekday (0=Sunday), value = Taipei hour 0-23, null = that day off. */
+export type WeekdayHours = ReadonlyArray<number | null>;
 
 /** Frequencies that fire once per calendar period on `dayOfMonth` (quarterly: in Jan/Apr/Jul/Oct; yearly: in January). */
 export const PERIODIC: readonly Frequency[] = ["monthly", "quarterly", "yearly"];
@@ -20,6 +23,8 @@ export interface Schedule {
   dayOfWeekUtc: number;
   /** 1-28, a TAIPEI calendar day (0123): only consulted for monthly / quarterly / yearly. */
   dayOfMonth: number;
+  /** Only consulted when frequency === "weekdays" (0183); null/absent = every day off. */
+  weekdayHours?: WeekdayHours | null;
   /** ISO 8601, or null if this schedule has never fired. */
   lastRunAt: string | null;
 }
@@ -50,6 +55,7 @@ export function isDueNow(schedule: Schedule, now: Date): boolean {
     const last = schedule.lastRunAt ? new Date(schedule.lastRunAt).getTime() : NaN;
     return Number.isNaN(last) || now.getTime() - last >= EVERY_5M_GAP_MS;
   }
+  if (schedule.frequency === "weekdays") return weekdaysDue(schedule, now);
   if (now.getUTCHours() !== schedule.hourUtc) return false;
   if (PERIODIC.includes(schedule.frequency)) return periodicDue(schedule, now);
   if (schedule.frequency === "weekly" && now.getUTCDay() !== schedule.dayOfWeekUtc) return false;
@@ -66,6 +72,21 @@ export function isDueNow(schedule: Schedule, now: Date): boolean {
 
 /** Taipei wall clock as UTC fields (Taipei has no DST). */
 const taipeiClock = (d: Date) => new Date(d.getTime() + TAIPEI_OFFSET_H * 3_600_000);
+
+/** "YYYY-MM-DD" of `d` on the Taipei calendar. */
+const taipeiDate = (d: Date) => taipeiClock(d).toISOString().slice(0, 10);
+
+/** weekdays: the hour set for today's Taipei weekday, once per Taipei day. No catch-up: a missed hour (host down) waits
+ *  for the next set day. Moving today's hour after today's run does not run it again (same Taipei day). */
+function weekdaysDue(schedule: Schedule, now: Date): boolean {
+  const t = taipeiClock(now);
+  const hour = schedule.weekdayHours?.[t.getUTCDay()];
+  if (hour === null || hour === undefined || t.getUTCHours() !== hour) return false;
+  if (!schedule.lastRunAt) return true;
+  const last = new Date(schedule.lastRunAt);
+  if (Number.isNaN(last.getTime())) return true;
+  return taipeiDate(last) !== taipeiDate(now);
+}
 
 /** Which calendar period (Taipei) `d` falls in, for this frequency: "2026-10" / "2026-Q3" / "2026". */
 function periodKey(frequency: Frequency, d: Date): string {
@@ -89,9 +110,10 @@ function periodicDue(schedule: Schedule, now: Date): boolean {
 }
 
 /** A stable run key for one scheduled firing — `scheduled-<job>-<org 8 chars>-<UTC date>`, plus the 5-minute
- *  slot `HHmm` for every_5m (the claim then allows one run per slot instead of one per day). */
+ *  slot `HHmm` for every_5m (the claim then allows one run per slot instead of one per day). weekdays uses the TAIPEI date:
+ *  Fri 07:00 and Thu 08:00 Taipei are both Thursday in UTC, and one UTC-date key would let only the first run. */
 export function scheduledRunKey(organizationId: string, jobKey: string, now: Date, frequency: Frequency = "daily"): string {
-  const date = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const date = (frequency === "weekdays" ? taipeiDate(now) : now.toISOString().slice(0, 10)).replace(/-/g, "");
   const slot = frequency === "every_5m"
     ? `-${String(now.getUTCHours()).padStart(2, "0")}${String(now.getUTCMinutes() - (now.getUTCMinutes() % 5)).padStart(2, "0")}`
     : "";

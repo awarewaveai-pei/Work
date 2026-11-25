@@ -78,6 +78,7 @@ export async function siteWatchCells(sb: SupabaseClient, orgs: WatchOrg[]): Prom
       hourUtc: target?.hour_utc ?? SITE_WATCH_DEFAULTS.hour_utc,
       dayOfWeekUtc: 0,
       dayOfMonth: 1,
+      weekdayHours: null,
       dailyLimit: null,
       perTopicCap: null,
       lastRunAt: target?.last_completed_bucket_start ?? null,

@@ -4,7 +4,7 @@
 // "could not read" (that is how automation silently stops while the heartbeat stays green).
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import type { Frequency, Schedule } from "@/lib/schedules/schedule";
+import type { Frequency, Schedule, WeekdayHours } from "@/lib/schedules/schedule";
 
 export interface StoredSchedule extends Schedule {
   organizationId: string;
@@ -18,6 +18,8 @@ export interface StoredSchedule extends Schedule {
   dailyLimit: number | null;
   /** 1-1000 NT$ per topic (0168); null = the job's default (jobs.ts perTopicCap). Only jobs with a perTopicCap read it. */
   perTopicCapTwd: number | null;
+  /** 0183; null = none stored. Only the 'weekdays' frequency reads it. */
+  weekdayHours: WeekdayHours | null;
 }
 
 interface Row {
@@ -30,6 +32,7 @@ interface Row {
   day_of_month: number;
   daily_limit?: number | null;
   per_topic_cap_twd?: number | null;
+  weekday_hours?: Array<number | null> | null;
   last_run_at: string | null;
   last_run_key: string | null;
   last_error: string | null;
@@ -55,6 +58,7 @@ function toSchedule(r: Row): StoredSchedule {
     updatedAt: r.updated_at,
     dailyLimit: r.daily_limit ?? null,
     perTopicCapTwd: r.per_topic_cap_twd ?? null,
+    weekdayHours: r.weekday_hours ?? null,
   };
 }
 
@@ -94,8 +98,16 @@ export interface UpsertScheduleInput {
   dailyLimit?: number;
   /** 1-1000 NT$ (0168). Left out = an existing row keeps its cap; a new row gets null (the job's default). */
   perTopicCapTwd?: number;
+  /** 0183: 7 entries (Taipei weekday 0=Sunday), each a Taipei hour 0-23 or null. Left out = an existing row keeps its
+   *  hours; a new row gets null. */
+  weekdayHours?: WeekdayHours;
   /** "role:source", same shape as collection_sources.approved_by. */
   updatedBy: string;
+}
+
+/** 7 entries, each null or a whole hour 0-23 (the 0183 CHECK, checked before Postgres). */
+export function validWeekdayHours(v: unknown): v is WeekdayHours {
+  return Array.isArray(v) && v.length === 7 && v.every((h) => h === null || (Number.isInteger(h) && h >= 0 && h <= 23));
 }
 
 export interface WriteResult {
@@ -112,6 +124,7 @@ export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteR
   if (input.dayOfMonth !== undefined && (!Number.isInteger(input.dayOfMonth) || input.dayOfMonth < 1 || input.dayOfMonth > 28)) return { ok: false, errors: ["day_of_month_out_of_range"] };
   if (input.dailyLimit !== undefined && (!Number.isInteger(input.dailyLimit) || input.dailyLimit < 1 || input.dailyLimit > 10)) return { ok: false, errors: ["daily_limit_out_of_range"] };
   if (input.perTopicCapTwd !== undefined && (!Number.isInteger(input.perTopicCapTwd) || input.perTopicCapTwd < 1 || input.perTopicCapTwd > 1000)) return { ok: false, errors: ["per_topic_cap_out_of_range"] };
+  if (input.weekdayHours !== undefined && !validWeekdayHours(input.weekdayHours)) return { ok: false, errors: ["weekday_hours_invalid"] };
   const sb = getSupabaseWriteClient();
   if (!sb) return { ok: false, errors: ["no_supabase_client"] };
 
@@ -128,6 +141,7 @@ export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteR
         ...(input.dayOfMonth !== undefined ? { day_of_month: input.dayOfMonth } : {}),
         ...(input.dailyLimit !== undefined ? { daily_limit: input.dailyLimit } : {}),
         ...(input.perTopicCapTwd !== undefined ? { per_topic_cap_twd: input.perTopicCapTwd } : {}),
+        ...(input.weekdayHours !== undefined ? { weekday_hours: [...input.weekdayHours] } : {}),
         updated_by: input.updatedBy,
         updated_at: new Date().toISOString(),
       },
@@ -143,7 +157,7 @@ export async function upsertSchedule(input: UpsertScheduleInput): Promise<WriteR
  * send day or hour it read earlier over one the staff just changed. No row yet = the job's defaults, switched as asked. */
 export async function setScheduleEnabled(
   organizationId: string, jobKey: string, enabled: boolean, updatedBy: string,
-  defaults: Pick<UpsertScheduleInput, "frequency" | "hourUtc" | "dayOfWeekUtc" | "dayOfMonth">,
+  defaults: Pick<UpsertScheduleInput, "frequency" | "hourUtc" | "dayOfWeekUtc" | "dayOfMonth" | "weekdayHours">,
 ): Promise<WriteResult> {
   const { data, error } = await client()
     .from("client_schedules")

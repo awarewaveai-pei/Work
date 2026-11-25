@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const upsertSchedule = vi.hoisted(() => vi.fn());
 const writeSiteWatchCell = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/schedules/store", () => ({ upsertSchedule }));
+vi.mock("@/lib/schedules/store", async (orig) => ({ upsertSchedule, validWeekdayHours: ((await orig()) as { validWeekdayHours: unknown }).validWeekdayHours }));
 vi.mock("@/lib/schedules/jobs", () => ({
   clientJob: (key: string) =>
     key === "collect_crawl"
@@ -10,7 +10,10 @@ vi.mock("@/lib/schedules/jobs", () => ({
       : key === "content_pipeline"
         ? { key, label: "自動內容管線", frequencies: [{ value: "every_5m" }], defaults: { frequency: "every_5m", hourUtc: 0, dayOfWeekUtc: 1 },
             dailyLimit: { label: "每天最多開始", unit: "題", options: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], default: 2 } }
-        : undefined,
+        : key === "claude_usage_window"
+          ? { key, label: "自動啟動 Claude", frequencies: [{ value: "weekdays", usesWeekdayHours: true }], defaults: { frequency: "weekdays", hourUtc: 0, dayOfWeekUtc: 1 }, onlyOrgSlugs: ["awarewave-ops"] }
+          : undefined,
+  jobAppliesTo: (job: { onlyOrgSlugs?: string[] }, slug: string) => !job.onlyOrgSlugs || job.onlyOrgSlugs.includes(slug),
 }));
 vi.mock("@/lib/schedules/adapters/site-watch", () => ({ SITE_WATCH_JOB: { key: "site_watch" }, writeSiteWatchCell }));
 
@@ -48,6 +51,18 @@ describe("PATCH /api/ops/clients/[slug]/schedules/[job]", () => {
     const res = await PATCH(req({ role: "admin", body: { enabled: true, frequency: "daily" } }), ctx("rm_rf"));
     expect(res.status).toBe(404);
     expect(upsertSchedule).not.toHaveBeenCalled();
+  });
+
+  it("a job limited to the platform organization is 404 for a client, and weekday hours are only stored when valid", async () => {
+    const hours = [null, 8, 8, 8, 8, 8, 7];
+    expect((await PATCH(req({ role: "admin", body: { enabled: true, frequency: "weekdays", weekdayHours: hours } }), ctx("claude_usage_window"))).status).toBe(404);
+    expect(upsertSchedule).not.toHaveBeenCalled();
+    const own = { params: Promise.resolve({ slug: "awarewave-ops", job: "claude_usage_window" }) };
+    expect((await PATCH(req({ role: "admin", body: { enabled: true, frequency: "weekdays", weekdayHours: [8, 8] } }), own)).status).toBe(400);
+    expect(upsertSchedule).not.toHaveBeenCalled();
+    upsertSchedule.mockResolvedValueOnce({ ok: true, schedule: { enabled: true }, errors: [] });
+    expect((await PATCH(req({ role: "admin", body: { enabled: true, frequency: "weekdays", weekdayHours: hours } }), { params: Promise.resolve({ slug: "awarewave-ops", job: "claude_usage_window" }) })).status).toBe(200);
+    expect(upsertSchedule.mock.calls[0][0]).toMatchObject({ jobKey: "claude_usage_window", weekdayHours: hours });
   });
 
   it("a frequency the job does not offer is rejected before any write", async () => {

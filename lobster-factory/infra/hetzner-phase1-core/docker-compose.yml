@@ -308,6 +308,10 @@ services:
       # token across unrelated callers is a blast-radius mistake already paid for once.
       # Empty = the endpoint fails closed (401 to every caller) until set.
       SCHEDULE_INGEST_TOKEN: ${SCHEDULE_INGEST_TOKEN:-}
+      # 「自動啟動 Claude」 schedule job (lib/schedules/claude-usage-window.ts): the claude.ai routine's fire URL and its own
+      # per-routine token (starts that one routine only). Empty = the row shows 主機還沒設定觸發金鑰 and nothing fires.
+      CLAUDE_USAGE_WINDOW_FIRE_URL: ${CLAUDE_USAGE_WINDOW_FIRE_URL:-}
+      CLAUDE_USAGE_WINDOW_FIRE_TOKEN: ${CLAUDE_USAGE_WINDOW_FIRE_TOKEN:-}
       # Host systems importer (scripts/systems-import.py) -> /api/internal/systems/ingest. Own token; empty = 401 for all.
       SYSTEMS_INGEST_TOKEN: ${SYSTEMS_INGEST_TOKEN:-}
       PAYMENTS_PROVIDERS: ${PAYMENTS_PROVIDERS:-}

@@ -9,6 +9,8 @@ export interface FrequencyOption {
   usesDay: boolean;
   /** The day-of-month picker (1-28, Taipei) applies to this frequency (monthly / quarterly / yearly). */
   usesDayOfMonth?: boolean;
+  /** One Taipei hour per weekday, or that day off (the 'weekdays' frequency, 0183). */
+  usesWeekdayHours?: boolean;
 }
 
 export interface JobMeta {
@@ -39,6 +41,8 @@ export interface ScheduleCell {
   dayOfWeekUtc: number;
   /** 1-28, Taipei calendar day; only meaningful for a frequency with usesDayOfMonth. */
   dayOfMonth: number;
+  /** Index = Taipei weekday (0=Sunday), value = Taipei hour or null (off); only meaningful with usesWeekdayHours. */
+  weekdayHours: ReadonlyArray<number | null> | null;
   /** The limit in force (stored, or the job's default); null = the job has no dailyLimit. */
   dailyLimit: number | null;
   /** The per-topic cap in force, NT$ (stored, or the job's default); null = the job has no perTopicCap. */

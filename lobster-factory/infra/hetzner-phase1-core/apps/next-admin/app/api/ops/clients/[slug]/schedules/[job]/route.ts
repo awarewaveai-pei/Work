@@ -2,15 +2,15 @@
 //
 // job = a registry key (lib/schedules/jobs.ts) → client_schedules; job = "site_watch" → site-watch's own
 // locked update (adapters/site-watch.ts). Any other key is 404: the page cannot invent a job.
-// Body: { enabled, frequency, hourUtc, dayOfWeekUtc, dayOfMonth, dailyLimit?, perTopicCap? } (+ expectedVersion for site_watch; 409 on a
-// concurrent edit). owner/admin only, every write audited. The table reloads its view after a write.
+// Body: { enabled, frequency, hourUtc, dayOfWeekUtc, dayOfMonth, dailyLimit?, perTopicCap?, weekdayHours? } (+ expectedVersion for site_watch; 409 on a
+// concurrent edit). A job limited to some organizations (onlyOrgSlugs) is 404 for the others. owner/admin only, every write audited. The table reloads its view after a write.
 
 import type { Frequency } from "@/lib/schedules/schedule";
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { clientJob } from "@/lib/schedules/jobs";
-import { upsertSchedule } from "@/lib/schedules/store";
+import { clientJob, jobAppliesTo } from "@/lib/schedules/jobs";
+import { upsertSchedule, validWeekdayHours } from "@/lib/schedules/store";
 import { SITE_WATCH_JOB, writeSiteWatchCell } from "@/lib/schedules/adapters/site-watch";
 import { recordOpsAudit } from "@/lib/ops-audit";
 
@@ -38,6 +38,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
   const { data: org } = await sb.from("organizations").select("id").eq("slug", slug).maybeSingle();
   if (!org) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
   const orgId = org.id as string;
+  if (job && !jobAppliesTo(job, slug)) return NextResponse.json({ ok: false, error: "unknown_job" }, { status: 404 });
 
   if (!job) {
     const r = await writeSiteWatchCell(sb, orgId, body, resolved);
@@ -50,6 +51,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     if (dailyLimit !== undefined && !job.dailyLimit?.options.includes(dailyLimit)) return NextResponse.json({ ok: false, error: "daily_limit_invalid" }, { status: 400 });
     const perTopicCapTwd = body.perTopicCap === undefined || body.perTopicCap === null ? undefined : Number(body.perTopicCap);
     if (perTopicCapTwd !== undefined && !job.perTopicCap?.options.includes(perTopicCapTwd)) return NextResponse.json({ ok: false, error: "per_topic_cap_invalid" }, { status: 400 });
+    // left out = the row keeps its hours; only a job with a weekdays frequency stores them
+    const rawHours = body.weekdayHours;
+    const weekdayHours = rawHours !== undefined && job.frequencies.some((f) => f.usesWeekdayHours) && validWeekdayHours(rawHours) ? rawHours : undefined;
+    if (rawHours !== undefined && !weekdayHours) return NextResponse.json({ ok: false, error: "weekday_hours_invalid" }, { status: 400 });
     const result = await upsertSchedule({
       organizationId: orgId,
       jobKey: job.key,
@@ -61,6 +66,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       dayOfMonth: Number.isInteger(body.dayOfMonth) ? (body.dayOfMonth as number) : undefined,
       dailyLimit,
       perTopicCapTwd,
+      weekdayHours,
       updatedBy: `${resolved.role}:${resolved.source}`,
     });
     if (!result.ok) return NextResponse.json({ ok: false, error: result.errors.join(",") }, { status: 400 });
@@ -73,6 +79,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       dayOfMonth: result.schedule?.dayOfMonth,
       dailyLimit: result.schedule?.dailyLimit,
       perTopicCapTwd: result.schedule?.perTopicCapTwd,
+      weekdayHours: result.schedule?.weekdayHours,
     });
   }
 

@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-25（續4）— 排程頁：「自動啟動 Claude」每天各自時間，app 時鐘觸發 claude.ai routine
+
+- [根因] 操作者要在 app.aware-wave.com 自己改「自動啟動 Claude」時間；時間原本存在 claude.ai routine 的 cron（`trig_01LfZEYHtBxdGKjNB2dUeugP` 平日、`trig_01DgzPJzGcnF11AdpooyEukn` 週六），app 改不到。放 claude.ai 登入權杖上主機＝整個帳號權限，不採用。改成 app 決定時間、到點打 routine 的 per-routine fire 端點（只能啟動該 routine）。
+- [步驟] ① migration `0183_client_schedules_weekday_hours`：`weekday_hours int[7]`（索引＝台北星期 0=日，值＝台北小時或 null）、frequency 加 `weekdays`、CHECK 一維／1 起算／7 格、`weekdays` 必有 hours；down 先備份到 `client_schedules_0183_backup`。② `lib/schedules/schedule.ts` `weekdaysDue`（每台北日一次）、`scheduledRunKey` 對 weekdays 用台北日期（週四 08:00 與週五 07:00 台北同為 UTC 週四）。③ `jobs.ts` `onlyOrgSlugs`＋`jobAppliesTo`：view 不出格、PATCH 404、run-due 不跑（同一判斷三處共用）；新 job `claude_usage_window` 只給 `awarewave-ops`，預設一到五 8 點、六 7 點、日關。④ `lib/schedules/claude-usage-window.ts`：POST `api.anthropic.com/v1/claude_code/routines/{trig}/fire`，URL 用 regex 鎖死，錯誤訊息不含 token。⑤ `ScheduleTable.tsx` 新欄「每天時間（台北）」：日～六各一格 GridPicker（含「不啟動」）。⑥ repo compose 對照檔、`mcp/user-env.template.ps1` 加 `CLAUDE_USAGE_WINDOW_FIRE_URL／_TOKEN`。⑦ `lib/db/__tests__/migration-numbers-unique.test.ts`：同號 up migration 只准一個（本次原用 0182，與 `0182_member_transfer` 撞號，`apply-db-migration.mjs:79` 會拒、夜間 migration 閘會擋全部部署）。
+- [驗證] vitest `lib/schedules`＋兩支 route 測試＋撞號測試 13 檔 141 passed；tsc 0（排除 `.next` 舊型別）。突變：拔 run-due 組織守衛 → 「platform organization」測試紅，還原綠。正式庫 `apply-db-migration.mjs 0183` → `APPLY_OK 1/1`；回讀 `weekday_hours:ARRAY`、約束 `client_schedules_weekday_hours_check`、`client_schedules_weekdays_has_hours` 存在、`schema_migrations` 有 0183。
+- [未做] 主機 `.env`＋compose（`safe-infra-patch.sh compose`）；03:00 部署後：開啟該列、試觸發一次、routine 拿掉 cron、停用週六 routine。畫面未實看（需登入的正式資料），部署後看。`lib/portal` 兩個 seedstar 失敗＝別的 session 未追蹤資料夾，與本次無關。
+- [避免再發生] migration 編號撞號現由結構測試擋（sg-deploy test gate 會跑）。
+- [rollback] 程式：revert 本 commit（先關該列，否則舊程式每週一認領一次報 unknown_job）→ `0183_client_schedules_weekday_hours.down.sql`。routine：把 cron 設回 `0 0 * * 1-5`、重新啟用週六 routine。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/schedules app/api/internal/schedules app/api/ops/clients/[slug]/schedules lib/db/__tests__/migration-numbers-unique.test.ts | exit=0 | ms=1650
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0183；psql information_schema/pg_constraint/schema_migrations 回讀 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=fail→修正後 pass | findings=1c/0m/6n（撞號、CHECK 維度、weekdays 必有 hours、run-due 錯誤訊息、守衛無測試、註解、測試名，全修）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n（Codex `agency-os/reports/oracle/2026-11-25-partialreview-627147d8.md`：主機 compose 不隨部署更新——即上線第 3 步 safe-infra-patch）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,mcp | grep=claude_usage_window|CLAUDE_USAGE_WINDOW | hits=23
+- BUGHUNT_DONE: scope=lobster-factory | grep=weekday_hours|weekdayHours | hits=45
 ## 2026-11-25（續2）— oracle WP：算命站寄信改用獨立 Resend 帳號（網域搬移、DKIM 換新、新 key）
 
 - [根因] 主站與算命站共用一個 Resend 免費帳號（`get-usage`：100／日、3000／月、Domains 2/3）；每日信會吃主站交易信額度，帳號層停權兩站同死。操作者提出分帳號並自行以 Google `oracle.aware@gmail.com` 註冊、建 Full access key（存憑證檔）。

@@ -41,12 +41,14 @@ const T = {
   shown: "顯示 {n} / {total} 個 · 失敗的排在最上面",
   serverReadOnly: "伺服器排程只能查看，不能在這裡修改。",
   cost: "每次執行費用",
-  col: { site: "網站", on: "開關", freq: "頻率", day: "星期", dom: "日期", hour: "台北時間", limit: "每天最多開始", cap: "每題上限", last: "上次結果", job: "排程", when: "執行時間", state: "狀態" },
+  col: { site: "網站", on: "開關", freq: "頻率", day: "星期", dom: "日期", hour: "台北時間", week: "每天時間（台北）", limit: "每天最多開始", cap: "每題上限", last: "上次結果", job: "排程", when: "執行時間", state: "狀態" },
   detail: { what: "工作內容", when: "執行時間", where: "結果存放位置", look: "查看位置", fail: "失敗處理" },
   cellBlocked: "已啟用，無法執行：",
   panelOn: "啟用排程",
   pickHour: "選擇台北時間",
   pickDom: "選擇日期（每月 1–28 號）",
+  pickWeekday: "選擇星期{d}的台北時間",
+  dayOff: "不啟動",
   resultOk: "成功",
   resultNever: "尚未執行",
   resultFailed: "失敗：",
@@ -95,20 +97,24 @@ const input: CSSProperties = {
 const fixedCadence = (j: JobMeta) => j.frequencies.length === 1 && !j.frequencies[0].usesHour && !j.frequencies[0].usesDay && !j.frequencies[0].usesDayOfMonth;
 /** Client-job rows: select | site | on | frequency | weekday | day of month | hour | daily limit | last result. A column
  *  exists only when some job on screen uses it (a monthly job has no weekday, the content pipeline has no hour). */
-type Cols = { freq: boolean; day: boolean; dom: boolean; hour: boolean; limit: boolean; cap: boolean };
+type Cols = { freq: boolean; day: boolean; dom: boolean; hour: boolean; week: boolean; limit: boolean; cap: boolean };
 const colsOf = (jobs: JobMeta[]): Cols => ({
   freq: jobs.some((j) => !fixedCadence(j)),
   day: jobs.some((j) => j.frequencies.some((f) => f.usesDay)),
   dom: jobs.some((j) => j.frequencies.some((f) => f.usesDayOfMonth)),
   hour: jobs.some((j) => j.frequencies.some((f) => f.usesHour)),
+  week: jobs.some((j) => j.frequencies.some((f) => f.usesWeekdayHours)),
   limit: jobs.some((j) => j.dailyLimit),
   cap: jobs.some((j) => j.perTopicCap),
 });
 const jobGrid = (cols: Cols) =>
-  `28px minmax(140px, 1.2fr) 48px${cols.freq ? " minmax(150px, 1.3fr)" : ""}${cols.day ? " 236px" : ""}${cols.dom ? " 96px" : ""}${cols.hour ? " 118px" : ""}${cols.limit ? " 130px" : ""}${cols.cap ? " 110px" : ""} minmax(170px, 1.4fr)`;
+  `28px minmax(140px, 1.2fr) 48px${cols.freq ? " minmax(150px, 1.3fr)" : ""}${cols.day ? " 236px" : ""}${cols.dom ? " 96px" : ""}${cols.hour ? " 118px" : ""}${cols.week ? " minmax(560px, 3fr)" : ""}${cols.limit ? " 130px" : ""}${cols.cap ? " 110px" : ""} minmax(170px, 1.4fr)`;
 const limitText = (unit: string) => (n: number) => `${n} ${unit}`;
 const capText = (n: number) => `NT$${n}`;
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
+/** A weekday's choices: -1 = that day off (stored null), then every hour. */
+const DAY_HOURS = [-1, ...HOURS];
+const dayHourText = (h: number) => (h < 0 ? T.dayOff : hh(h));
 /** 1-28: every month has them (0123). */
 const MONTH_DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
 const domText = (d: number) => `${d} 號`;
@@ -116,7 +122,7 @@ const domText = (d: number) => `${d} 號`;
 const SERVER_GRID = "minmax(220px, 2fr) minmax(130px, 1fr) minmax(150px, 1fr) 96px";
 
 type TabKey = `job:${string}` | `group:${NonNullable<SystemRow["group"]>}`;
-type Patch = Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc" | "dayOfMonth" | "dailyLimit" | "perTopicCap">>;
+type Patch = Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc" | "dayOfMonth" | "dailyLimit" | "perTopicCap" | "weekdayHours">>;
 type JobFilter = "all" | "failed" | "on" | "off";
 
 export function ScheduleTable({ only, jobOnly }: { only?: string; jobOnly?: string }) {
@@ -175,6 +181,8 @@ export function ScheduleTable({ only, jobOnly }: { only?: string; jobOnly?: stri
           // only when changed: a switch flip must not store today's default as the client's own limit
           ...(patch.dailyLimit !== undefined ? { dailyLimit: patch.dailyLimit } : {}),
           ...(patch.perTopicCap !== undefined ? { perTopicCap: patch.perTopicCap } : {}),
+          // a weekdays job sends its hours every time: a first write stores the defaults shown, not an all-off row
+          ...(next.weekdayHours ? { weekdayHours: next.weekdayHours } : {}),
           ...(cell.version !== null ? { expectedVersion: cell.version } : {}),
         }),
       });
@@ -385,6 +393,7 @@ function JobTable({ job, orgs, cells, query, setQuery, filter, setFilter, select
           {cols.day && <span style={headCell}>{T.col.day}</span>}
           {cols.dom && <span style={headCell}>{T.col.dom}</span>}
           {cols.hour && <span style={headCell}>{T.col.hour}</span>}
+          {cols.week && <span style={headCell}>{T.col.week}</span>}
           {cols.limit && <span style={headCell}>{T.col.limit}</span>}{cols.cap && <span style={headCell}>{T.col.cap}</span>}
           <span style={headCell}>{T.col.last}</span>
         </div>
@@ -414,6 +423,7 @@ function ClientJobs({ jobs, cells, saving, savedKeys, save }: {
         {cols.day && <span style={headCell}>{T.col.day}</span>}
         {cols.dom && <span style={headCell}>{T.col.dom}</span>}
         {cols.hour && <span style={headCell}>{T.col.hour}</span>}
+        {cols.week && <span style={headCell}>{T.col.week}</span>}
         {cols.limit && <span style={headCell}>{T.col.limit}</span>}{cols.cap && <span style={headCell}>{T.col.cap}</span>}
         <span style={headCell}>{T.col.last}</span>
       </div>
@@ -472,6 +482,20 @@ function JobRow({ job, c, name, sub, single, cols, picked, onPick, saving, saved
       {cols.hour && (
         <span style={dim}>
           {freq?.usesHour ? <GridPicker value={tp.hour} options={HOURS} format={hh} label={T.pickHour} disabled={saving} onChange={(h) => onSave(utcFromTaipei(tp.day, h))} /> : <span style={muted}>—</span>}
+        </span>
+      )}
+      {cols.week && (
+        <span style={{ display: "flex", gap: 8, flexWrap: "wrap", ...dim }}>
+          {freq?.usesWeekdayHours ? DAYS.map((d, day) => {
+            const h = c.weekdayHours?.[day] ?? null;
+            return (
+              <span key={day} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                <span style={muted}>{d}</span>
+                <GridPicker value={h ?? -1} options={DAY_HOURS} format={dayHourText} label={`${fill(T.pickWeekday, { d })} · ${name}`} columns={5} disabled={saving}
+                  onChange={(v) => onSave({ weekdayHours: (c.weekdayHours ?? Array<number | null>(7).fill(null)).map((x, i) => (i === day ? (v < 0 ? null : v) : x ?? null)) })} />
+              </span>
+            );
+          }) : <span style={muted}>—</span>}
         </span>
       )}
       {cols.limit && (

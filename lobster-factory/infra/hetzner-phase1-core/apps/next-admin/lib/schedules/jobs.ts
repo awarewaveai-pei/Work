@@ -15,7 +15,8 @@ import { DEFAULT_TOPIC_CAP_TWD } from "@/lib/content/topics/budget";
 import type { SiteContentDefaults } from "@/lib/content/brand-voice";
 import { raiseNotice, withTopicStopNotices } from "./stop-notice";
 import type { JobMeta } from "./types";
-import type { Frequency } from "./schedule";
+import type { Frequency, WeekdayHours } from "./schedule";
+import { CLAUDE_USAGE_WINDOW_JOB, claudeUsageWindowUnavailable, fireClaudeUsageWindow } from "./claude-usage-window";
 import type { StoredSchedule } from "./store";
 
 /** A fixed USD price shown in NT$ (the page rule: every amount a person reads is NT$). */
@@ -29,9 +30,14 @@ export interface JobClientFacts {
   wpSites?: number;
 }
 
+/** The AwareWave platform organization (the same slug app/api/ops/clients/route.ts reads as first_party). */
+export const PLATFORM_ORG_SLUG = "awarewave-ops";
+
 export interface ClientJob extends JobMeta {
   /** What a client with no row reads as. enabled is always false (AGENTS.md 自動化預設 OFF). */
-  defaults: { frequency: Frequency; hourUtc: number; dayOfWeekUtc: number; dayOfMonth: number };
+  defaults: { frequency: Frequency; hourUtc: number; dayOfWeekUtc: number; dayOfMonth: number; weekdayHours?: WeekdayHours };
+  /** Organizations (slugs) the job exists for; absent = every client. Others get no cell, no PATCH (404) and no run. */
+  onlyOrgSlugs?: readonly string[];
   /** Throws on any failure, including one the job reports instead of throwing; the sweep records it and
    * raises the incident. Returns a one-line summary. */
   run(organizationId: string, runKey: string, schedule?: StoredSchedule): Promise<string>;
@@ -165,8 +171,20 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
       if (trendsError) throw new Error(`${summary}; content_pipeline:trends:${trendsError}`);
       return summary;
     },
+  },  {
+    ...CLAUDE_USAGE_WINDOW_JOB,
+    // Taipei Mon-Fri 08:00, Sat 07:00, Sun off: what the cloud routines ran before this job (2026-11-23)
+    defaults: { frequency: "weekdays", hourUtc: 0, dayOfWeekUtc: 1, dayOfMonth: 1, weekdayHours: [null, 8, 8, 8, 8, 8, 7] },
+    onlyOrgSlugs: [PLATFORM_ORG_SLUG],
+    unavailable: () => claudeUsageWindowUnavailable(process.env),
+    run: () => fireClaudeUsageWindow(process.env),
   },
 ];
+
+/** False = the job does not exist for this organization (onlyOrgSlugs). The one gate the page, the PATCH and the sweep share. */
+export function jobAppliesTo(job: Pick<ClientJob, "onlyOrgSlugs">, orgSlug: string | null | undefined): boolean {
+  return !job.onlyOrgSlugs || (!!orgSlug && job.onlyOrgSlugs.includes(orgSlug));
+}
 
 export function clientJob(key: string): ClientJob | undefined {
   return CLIENT_JOBS.find((j) => j.key === key);

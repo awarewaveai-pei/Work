@@ -17,6 +17,10 @@ $vars = @{
     # fal.ai (FASHN / FLUX virtual try-on tests, 2026-11-01): https://fal.ai/dashboard/keys
     FAL_KEY                      = ""
     SERPER_API_KEY               = "xxx"
+    # 「自動啟動 Claude」 (/ops/schedules, lib/schedules/claude-usage-window.ts): claude.ai/code/routines -> the routine ->
+    # Edit -> Trigger + -> API: copy Fire URL, Generate token (shown once). Starts that one routine only. Goes to the host .env.
+    CLAUDE_USAGE_WINDOW_FIRE_URL   = ""
+    CLAUDE_USAGE_WINDOW_FIRE_TOKEN = ""
     # Outreach mailbox verification (SPEC D25); after filling run scripts/outreach-verifier-keys.ps1. Free tiers:
     # Reoon 20/day https://emailverifier.reoon.com , ZeroBounce 100/month (business-domain signup), Hunter 100 verifications + 50 searches/month.
     REOON_API_KEY                = ""

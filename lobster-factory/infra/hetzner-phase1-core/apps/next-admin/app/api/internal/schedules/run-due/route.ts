@@ -24,7 +24,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { ingestIncident } from "@/lib/ops-inbox/ingest";
 import { claimScheduleRun, listEnabledSchedules, recordScheduleError, recordScheduleRun, type StoredSchedule } from "@/lib/schedules/store";
 import { NotDueYet, isDueNow, scheduledRunKey } from "@/lib/schedules/schedule";
-import { asRegistered, clientJob } from "@/lib/schedules/jobs";
+import { asRegistered, clientJob, jobAppliesTo } from "@/lib/schedules/jobs";
 import { refreshClaimReviewIfDue } from "@/lib/collect/lookups/answer";
 import { raiseNotice, videoStopNotice } from "@/lib/schedules/stop-notice";
 import { advanceAutoProjects, autoAdvanceDeps, autoAdvanceOrganizations } from "@/lib/content/video/advance-auto-projects";
@@ -68,6 +68,14 @@ async function runClaimed(claimed: Array<{ schedule: StoredSchedule; runKey: str
     try {
       const job = clientJob(schedule.jobKey);
       if (!job) throw new Error(`unknown_job:${schedule.jobKey} (row exists, registry entry does not)`);
+      if (job.onlyOrgSlugs) {
+        // a row for an organization the job is not for (written around the PATCH gate) never runs
+        const sb = getSupabaseWriteClient();
+        if (!sb) throw new Error("schedules_db:org_slug:no_supabase_client");
+        const { data: org, error } = await sb.from("organizations").select("slug").eq("id", schedule.organizationId).maybeSingle();
+        if (error) throw new Error(`schedules_db:org_slug:${error.message}`);
+        if (!jobAppliesTo(job, org?.slug as string | undefined)) throw new Error(`job_not_for_organization:${schedule.jobKey}`);
+      }
       const summary = await job.run(schedule.organizationId, runKey, schedule);
       await recordScheduleRun(schedule.organizationId, schedule.jobKey);
       console.info(`[schedules] ${runKey} ok ${summary}`);
