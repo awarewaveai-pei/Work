@@ -7,6 +7,7 @@ import { STAFF_ROUTE_GROUPS } from "../../lib/portal/doors";
 // A built page nobody can click to is a page nobody uses: every static page under a staff route group is
 // linked from the sidebar, or listed here with the page that links to it.
 const REACHED_ELSEWHERE: Record<string, string> = {
+  "/tools/seedstar": "linked from /tools/theme; the local workbench shares the shell's saved theme",
   "/no-access": "middleware sends a page refused by staff tool grants here (lib/staff-access.ts)",
   "/ops/ai-models": "redirects to /tools/ai-models?tab=image-specs",
   "/tools/outreach/settings/service-profiles": "tab of /tools/outreach/settings",

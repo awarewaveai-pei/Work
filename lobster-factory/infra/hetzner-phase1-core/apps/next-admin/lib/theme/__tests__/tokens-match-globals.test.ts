@@ -58,7 +58,7 @@ describe("theme tokens", () => {
       if (e.isDirectory()) return e.name === "node_modules" || e.name === "__tests__" ? [] : walk(p);
       return /\.(tsx?|css)$/.test(e.name) ? [p] : [];
     });
-    const src = ["app", "components", "lib"].flatMap((d) => walk(path.join(ROOT, d)))
+    const src = ["app", "components", "lib", "public/awarewave"].flatMap((d) => walk(path.join(ROOT, d)))
       .filter((f) => !f.replace(/\\/g, "/").includes("/lib/theme/"))
       .map((f) => fs.readFileSync(f, "utf8")).join("\n");
     const unused = ALL_TOKEN_GROUPS.flatMap((g) => g.tokens.map((t) => t.name))
