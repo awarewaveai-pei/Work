@@ -1,4 +1,16 @@
 # Worklog
+## 2026-11-25（續14）— 建站流程：SF-O 手冊、SF-A 文件更正併入；第 9 步改在 WordPress 專屬路徑確認開放
+
+- [根因] ① SF-O／SF-A 兩張文件卡未做（批 5）。② 工人寫手冊時讀到 `NA/lib/site-flow/steps/open.ts` verify 打 `https://<domain>/`：共用網域站（`ingress=product-gateway`，oracle）首頁屬引擎，WordPress 仍建置中也回 200 → 「正式開放」假成功。不變量：開放的證明必須由該站自己回答。
+- [步驟] 工人 `wp-docs`（Sonnet 5.5）交 `548e1e5ae`、`58ff8ceb9` → `oracle-int` cherry-pick（`06abaf0e1` 手冊＋RUNNABLE_DEMOS＋impact map；`b66fedfe4` 21 檔指向手冊）→ 監工 `889b303e2`：`open.ts` `publicSiteIsOpen` 改打 `OPEN_PROBE_PATH=/aw-open-check/`（404＝開放、503＋標記＝未開放）、`host-steps.test.ts` 加一測、手冊 §3-3／§6 對齊、`TOOL_TRIGGER_MAP.md` 加建站列→`gen-trigger-index.mjs --write`（`AGENTS.md` 產生區塊）。
+- [驗證] 在 `889b303e2` 上：`npx tsc --noEmit` exit 0；`npx vitest run lib/site-flow app/api/ops/site-flow` 10 檔 132 測試過；`node scripts/verify-governance-pointers.mjs` PASSED（180 pointers）；`git grep publicHomeIsOpen` 0 命中。第一次測試誤跑在 `b66fedfe4`（commit 被 scope guard 擋、訊息檔未寫出），已在正確 sha 重跑。
+- [RISKS 總檢] 見 `data.mjs` 第五批 7 列。未處理並記錄：`backup-restore-drill.py` 不讀 `sites.d`（每晚 verify 含新站、SF-L 實際還原過一次、手冊有手動還原指令）；手冊正式機指令未逐條重跑；manual 憑證轉 nginx 續期未在流程 vhost 驗。SF-D 列「再執行一次即可」更正為需手動重載。
+- [剩餘風險] `889b303e2` 未部署（03:00 自動部署）；`/aw-open-check/` 在正式站未實打，GO-3 按第 9 步時驗。
+- [rollback] `git revert 889b303e2 b66fedfe4 06abaf0e1`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run lib/site-flow app/api/ops/site-flow；node scripts/verify-governance-pointers.mjs | exit=0 | ms=20000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/3m/7n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=publicHomeIsOpen | hits=0
+- ORACLE_WAIVED: 程式改動 2 檔（確認網址常數＋一個測試），不涉 auth／個資／金流；讀回 diff 自審，132 測試；文件由工人 critic 一輪。
 ## 2026-11-25（續13）— oracle WP：外掛 0.5.1（英文頁 `<title>` 走翻譯）發佈並裝到算命站
 
 - [根因] TranslatePress 免費版只翻 body；`/english/…` 的 `<title>` 仍中文（同日「英文頁定案」條的未解項）。
