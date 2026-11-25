@@ -186,7 +186,7 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", margin: "0 0 4px" }}>帳務</h1>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0, maxWidth: 900 }}>
-            全部帳戶的總帳。左邊可用名稱、代號、成員 email、訂單或付款編號搜尋；點帳戶，明細在右邊打開。這頁只看不改。
+            全部帳戶的總帳。帳戶清單可用名稱、代號、成員 email、訂單或付款編號搜尋；點帳戶，明細在這頁打開。這頁只看不改。
           </p>
         </div>
 
@@ -259,7 +259,7 @@ export default async function BillingPage({ searchParams }: { searchParams?: Pro
             <BillingTab data={detail} slug={detail.account?.slug ?? ""} />
           </div>
         ) : (
-          <div style={{ ...card, ...muted, fontSize: 13 }}>點左邊的帳戶，明細會在這裡打開。</div>
+          <div style={{ ...card, ...muted, fontSize: 13 }}>點帳戶清單裡的帳戶，明細會在這裡打開。</div>
         )}
       </div>
     </div>
