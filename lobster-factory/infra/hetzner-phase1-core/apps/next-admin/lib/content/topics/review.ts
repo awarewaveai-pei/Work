@@ -8,7 +8,7 @@ import { unspacedWordGaps } from "@/lib/seo/keyword-match";
 /** Below this the article is a broken generation, not a short one (CJK and Latin both: characters of body text). */
 export const MIN_BODY_CHARS = 1000;
 
-export type ReviewCheck = { name: "complete" | "length" | "seo" | "forbidden" | "social" | "social_forbidden" | "required" | "title_spacing" | "cover"; pass: boolean; detail: string };
+export type ReviewCheck = { name: "complete" | "length" | "seo" | "forbidden" | "social" | "social_forbidden" | "required" | "title_spacing" | "cover" | "social_image"; pass: boolean; detail: string };
 /** A type, not an interface: it is stored in content_topics.review (Topic.review is a plain record). */
 export type TopicReview = { pass: boolean; checks: ReviewCheck[]; at: string };
 

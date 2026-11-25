@@ -460,6 +460,14 @@
                       "targets":  [
                                       "docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md"
                                   ]
+                  },
+                  {
+                      "source":  "../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md",
+                      "targets":  [
+                                      "docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md",
+                                      "tenants/NEW_TENANT_ONBOARDING_SOP.md",
+                                      "docs/operations/RUNNABLE_DEMOS.md"
+                                  ]
                   }
               ]
 }

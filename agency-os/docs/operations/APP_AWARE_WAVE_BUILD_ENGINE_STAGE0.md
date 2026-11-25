@@ -1,5 +1,7 @@
 # app.aware-wave 建站引擎 — Stage 0 診斷 + 活化 Runbook
 
+> **建站現況（2026-11-23 起）**：`/onboard`、`/build` 兩頁已刪（308 到 `/ops/sites/new`），開客戶站見 [建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。本檔提到舊頁／舊接口當作現行做法的段落是歷史紀錄。
+
 > **用途**：把 onboarding「觸發建站」從「假成功、不生站」變成「真的長出可登入 staging WP」。本檔含**完整診斷**（已完成）+ **turnkey 活化步驟**（下一步點火）。
 > **狀態**：✅ 診斷完成 + ✅ code 接線/回寫已 commit（`847a6389`）｜⏳ **活化未執行**（finicky prod Trigger.dev redeploy，留專注時段做）。
 > **建立**：2026-06-06。相關：[`APP_AWARE_WAVE_ONBOARDING_IA_PLAN.md`](APP_AWARE_WAVE_ONBOARDING_IA_PLAN.md)、[`APP_AWARE_WAVE_CURRENT_STATE.md`](APP_AWARE_WAVE_CURRENT_STATE.md)。

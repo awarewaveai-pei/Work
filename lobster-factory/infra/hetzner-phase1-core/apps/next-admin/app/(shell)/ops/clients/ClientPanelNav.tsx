@@ -7,17 +7,6 @@ import { usePathname } from "next/navigation";
 import { OrgPicker } from "./OrgPicker";
 import type { PickOrg } from "./nav-orgs";
 
-const NAV_STYLE: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  width: 220,
-  flexShrink: 0,
-  background: "var(--bg-card)",
-  borderRight: "1px solid var(--card-border)",
-  height: "100%",
-  overflow: "hidden",
-};
-
 /** The client slug the current path is under (/ops/clients/<slug>[/...]), or null. */
 function slugIn(pathname: string): string | null {
   const m = /^\/ops\/clients\/([^/]+)/.exec(pathname);
@@ -28,7 +17,7 @@ function slugIn(pathname: string): string | null {
 export function ClientPanelNav({ orgs, total }: { orgs: PickOrg[]; total: number }) {
   const pathname = usePathname();
   return (
-    <nav aria-label="客戶列表" style={NAV_STYLE}>
+    <nav aria-label="客戶列表" className="client-panel">   {/* globals.css: beside the page, or inside 「更多」 at ≤ 640 */}
       <div style={{ padding: "12px 12px 0", fontSize: 10, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
         客戶
       </div>

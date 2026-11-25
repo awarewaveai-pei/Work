@@ -179,7 +179,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Section titles mirror SidebarNav (repair-control, build-onboard). A restricted staff member sees only the
+        {/* Section titles mirror the sidebar (repair-control, build-onboard). A restricted staff member sees only the
             cards of the tools ticked for them (lib/staff-access.ts); a section left empty is not drawn. */}
         {DASHBOARD_SECTIONS.map((sec) => ({ ...sec, cards: sec.cards.filter((c) => (c.external ? unrestricted : staffMayOpen(grant, c.href))) }))
           .filter((sec) => sec.cards.length > 0)
