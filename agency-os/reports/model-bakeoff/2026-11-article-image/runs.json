@@ -1,0 +1,232 @@
+{
+ "date": "2026-11-25",
+ "where": "production app.aware-wave.com, deployed 0a8301ff4; /api/content/generate -> /api/content/image (purpose article) -> /api/content/cover",
+ "article": {
+  "keyword": "職場倦怠",
+  "writer": "site default (gpt-6.2-sol)",
+  "ms": 73739,
+  "seoTitle": "職場倦怠完整指南：3個實用調整方向"
+ },
+ "urlPrefix": "https://pub-a88b06f569bd41a3b9e27e29644d520e.r2.dev/designs/2026-11/",
+ "cover": {
+  "title": "工作耗竭指南",
+  "subtitle": "分清累在哪，找出能改的事"
+ },
+ "slots": [
+  {
+   "key": "cover",
+   "ratio": "16:9",
+   "label": "封面底圖（整篇主題）",
+   "scene": "An office worker pauses beside an open laptop at a Taipei apartment desk in soft evening light.",
+   "alt": "職場倦怠完整指南：3個實用調整方向",
+   "heading": "",
+   "text": ""
+  },
+  {
+   "key": "body1",
+   "ratio": "4:3",
+   "label": "內文圖一",
+   "scene": "An office worker compares two open notebook pages beside a laptop at a home desk in soft morning light in a 4:3 composition.",
+   "alt": "職場倦怠與短期疲勞的休息前後紀錄",
+   "heading": "職場倦怠和一般工作疲勞有什麼不同？",
+   "text": "下表是整理經驗用的觀察表，不是評估工具。（這一段在比較短期疲勞與長期倦怠：休息前後的狀態有沒有差別。）"
+  },
+  {
+   "key": "body2",
+   "ratio": "4:3",
+   "label": "內文圖二",
+   "scene": "Two coworkers compare a paper schedule at a small meeting table in bright afternoon window light in a 4:3 composition.",
+   "alt": "員工和主管在會議桌旁討論工作量與交期",
+   "heading": "工作耗竭怎麼改善？從工作安排找出3個調整方向",
+   "text": "工作量太大，怎麼跟主管談取捨？把衝突放到桌上：「週五前能完成報表或簡報初稿，哪一件先交？」若兩件都不能延，就談縮小交付範圍、減少審閱輪次或加派人手。會後留一則簡短確認，讓彼此記得最後選了什麼。"
+  },
+  {
+   "key": "body3",
+   "ratio": "4:3",
+   "label": "內文圖三",
+   "scene": "A worker gathers a notebook and phone at a quiet kitchen table in warm evening light in a 4:3 composition.",
+   "alt": "工作者整理睡眠與工作壓力紀錄準備求助",
+   "heading": "工作耗竭已影響生活，什麼時候該求助？",
+   "text": "面對持續的工作耗竭，不必先確定問題叫什麼，才決定要休息、談分工或安排專業評估。先分開兩個問題：現在怎麼讓日常生活少受一點影響，以及接下來要改哪個工作條件。"
+  }
+ ],
+ "runs": [
+  {
+   "id": "flux-2-klein-4b",
+   "label": "FLUX 2 Klein 4B",
+   "kind": "付費",
+   "usdEach": 0.002,
+   "laid": "23bb67e7-a518-41ae-82b1-8a9c562801a7",
+   "images": {
+    "cover": [
+     "e92db097-71cf-47f6-933c-dc37376ce225",
+     8840
+    ],
+    "body1": [
+     "b1c7e764-b719-46f7-a346-9e43c394124c",
+     7570
+    ],
+    "body2": [
+     "ad6b595c-ecf1-4c27-b693-0cbcc7f168a3",
+     8368
+    ],
+    "body3": [
+     "de6a50e8-536a-472d-b699-09d63599334a",
+     8438
+    ]
+   }
+  },
+  {
+   "id": "flux-schnell",
+   "label": "FLUX schnell（現在的預設）",
+   "kind": "付費",
+   "usdEach": 0.003,
+   "laid": "318c9577-18e7-493a-ad23-5c3b85cb4349",
+   "images": {
+    "cover": [
+     "80f52322-c5e2-4f26-9659-1147e758f66a",
+     7733
+    ],
+    "body1": [
+     "5b6b66e5-46fd-4e03-b7f6-f643409075ed",
+     5006
+    ],
+    "body2": [
+     "3f2c6aae-e526-49ba-a020-f1e0efaa3b6c",
+     5824
+    ],
+    "body3": [
+     "6ca94cc6-bd2e-4e13-ab6c-836c4e0174ef",
+     6324
+    ]
+   },
+   "note": "現在的預設"
+  },
+  {
+   "id": "openai-low",
+   "label": "GPT-Image-2 低",
+   "kind": "付費",
+   "usdEach": 0.02,
+   "laid": "8ebc3468-5aa1-42b6-8c77-9a355fefdcf4",
+   "images": {
+    "cover": [
+     "8fa23c3c-ffae-4dfd-8614-563ab11b8d14",
+     17948
+    ],
+    "body1": [
+     "3d5c5735-0f78-4160-92e9-2870d4dad2c2",
+     15373
+    ],
+    "body2": [
+     "5ec390f0-8818-4ffc-aa69-f11d8b36540e",
+     15683
+    ],
+    "body3": [
+     "8060722c-18a8-4368-8fe2-8ade5880975b",
+     14725
+    ]
+   }
+  },
+  {
+   "id": "flux-dev",
+   "label": "FLUX dev",
+   "kind": "付費",
+   "usdEach": 0.025,
+   "laid": "2e6df901-d655-4877-85d7-56f55c1fa3c6",
+   "images": {
+    "cover": [
+     "2c2a1459-c01f-427a-935b-6deef135529d",
+     12382
+    ],
+    "body1": [
+     "32201a61-ce90-4559-bdb2-faabdf290687",
+     9224
+    ],
+    "body2": [
+     "5d0972f3-fb0c-48a6-9939-9f08fdb50588",
+     10677
+    ],
+    "body3": [
+     "f2c8f9fe-0145-4261-9c58-9aaceea6972a",
+     7890
+    ]
+   }
+  },
+  {
+   "id": "nano-banana-2",
+   "label": "Nano Banana 2.1",
+   "kind": "付費",
+   "usdEach": 0.057,
+   "laid": "0340b36f-6400-462e-af0f-d456d513cee2",
+   "images": {
+    "cover": [
+     "2a8d1fd9-747c-4799-bc97-62d679f9743f",
+     32981
+    ],
+    "body1": [
+     "c934c69e-f838-4d52-8807-80137f7db5d3",
+     28535
+    ],
+    "body2": [
+     "766520df-a1ef-48aa-947b-1537c1264f0c",
+     27585
+    ],
+    "body3": [
+     "c166b344-eea4-4530-96b1-357cbbcff547",
+     30094
+    ]
+   }
+  },
+  {
+   "id": "codex-image",
+   "label": "Codex 免費生圖（ChatGPT 訂閱）",
+   "kind": "訂閱",
+   "usdEach": 0,
+   "laid": "78404dd6-3427-4354-b253-98d90cc582c1",
+   "note": "只能你本人按、筆電要開著；自動產文用不了",
+   "images": {
+    "cover": [
+     "724a3299-25f2-4200-8689-84e1c6e1a7b7",
+     42235
+    ],
+    "body1": [
+     "5d1a14bc-99e1-44fd-b476-d96b40134d22",
+     50186
+    ],
+    "body2": [
+     "87089649-27f3-4280-a879-d0931a9fa35e",
+     41908
+    ],
+    "body3": [
+     "3b3f31a5-a701-44f2-84bc-659ca9459426",
+     54927
+    ]
+   }
+  },
+  {
+   "id": "old-flux-schnell",
+   "label": "改版前的做法（FLUX schnell＋中文替代文字）",
+   "kind": "對照",
+   "usdEach": 0.003,
+   "laid": null,
+   "images": {
+    "cover": [
+     "7d15b458-537b-41b4-8b60-87ff718e5039",
+     8363
+    ],
+    "body1": [
+     "6c013d10-5753-4d71-a610-744e6cc210ff",
+     5039
+    ],
+    "body2": [
+     "fb537f39-494e-4e93-b624-29236f173cf4",
+     5169
+    ],
+    "body3": [
+     "58481c8d-8fe8-43c3-a2c6-7f32c7d44364",
+     5783
+    ]
+   }
+  }
+ ]
+}

@@ -81,3 +81,9 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 - K23 已併入（`5699897f8`、`0de363251`）：自動產文的 FB／IG 貼文內文不放網址、連結在第一則留言、結尾在主題標籤前；FB 與 IG 各自一則草稿。未在正式站看過真的草稿。
 - 她還沒回答：圖片來源順序（訂閱 → Pexels → 付費預設關閉）；她傳的「工具設定」四個字指什麼（程式裡找不到同名頁面，已問一次）。
 - 工人回報後照常：讀 diff → sub-int cherry-pick → tsc＋全套 `npm test` → 判斷 RISKS 寫進 `data.mjs` → 推 main → clear 工人。文件提交用 scratchpad 的 `ship24.sh` 模式（在 sub-int 複製 `data.mjs`／`supervisor.html`／briefs 後 commit；D:\Work 的共用 index 有別人 staged 的 WORKLOG，不能在那裡 commit）。
+
+### 配圖進度（2026-11-25）
+- 上線：部署版 `0a8301ff4`（11-25 04:03Z）含 K10、K23、K24、K25。正式站已看過網站設定頁（風格按鈕、封面區、即時預覽、中文字型正常）。
+- K13 實測已跑完（正式站）：比較頁 `https://claude.ai/artifact/QDYm5geq9V9ztRgLrEZtrg`，資料 `agency-os/reports/model-bakeoff/2026-11-article-image/`（`runs.json`、`img/`、`image-bakeoff.html`；產生器在 scratchpad `build_image_page.cjs`，重建需重寫）。來源 A–F＝openai-low、codex-image、flux-schnell、nano-banana-2、flux-2-klein-4b、flux-dev；另有改版前做法對照。**等操作者選預設來源** → 改 `DEFAULT_IMAGE_MODEL`／`ARTICLE_IMAGE_MODELS`，寫進 `MeasuredRuns.tsx` 新組「文章配圖」。
+- 待她決定：畫面描述加「符合網站目標地區」（內文圖的人物偏西方臉）；自動社群草稿附封面圖（現在只有影片題目才附媒體，`make.ts` attachTopicVideo）；風格目錄的畫家組在文章這邊要不要收起來；IG 直式 4:5。
+- 未驗：文章頁的封面短標題／副標欄位；真的自動文章的封面；FB／IG 真實草稿。
