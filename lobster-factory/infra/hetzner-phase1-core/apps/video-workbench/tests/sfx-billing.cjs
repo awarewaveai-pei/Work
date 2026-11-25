@@ -24,13 +24,30 @@ const CUES = [{ start: 1, end: 2, prompt: "a door slams shut" }, { start: 4, end
 const USAGE = { total_input_tokens: 1800, total_output_tokens: 120, total_thought_tokens: 0 };
 
 // One server: a fake next-admin (permit, usage, jobs, assets, audio policy) + fake ElevenLabs + fake Gemini.
-async function harness({ plan = "creator", env: extra = {}, permit = true, gemini = () => Response.json({ steps: [{ content: [{ type: "text", text: JSON.stringify(CUES) }] }], usage: USAGE }), refuse = {} } = {}) {
+const MIRELO_SPEECH = fs.readFileSync(make("speech.wav", ["-f", "lavfi", "-i", "sine=frequency=220:duration=6", "-ar", "48000", "-ac", "1"]));
+const MIRELO_SFX = fs.readFileSync(make("sfx.wav", ["-f", "lavfi", "-i", "sine=frequency=1200:duration=6", "-ar", "48000", "-ac", "1"]));
+async function harness({ plan = "creator", env: extra = {}, permit = true, mireloStatus = "succeeded", mireloCredits = 60, gemini = () => Response.json({ steps: [{ content: [{ type: "text", text: JSON.stringify(CUES) }] }], usage: USAGE }), refuse = {} } = {}) {
   elevenlabs.forget();
   const { signPermit } = await import(pathToFileURL(path.join(appDir, "lib/entitlements/permit.ts")).href);
   const dir = fs.mkdtempSync(path.join(tmp, "data-"));
   const calls = { permits: [], usage: [], vendor: [] };
   async function fetchImpl(url, options = {}) {
     url = String(url);
+    if (url.startsWith("https://api.mirelo.ai/") || url.startsWith("https://upload.mirelo.test/") || url.startsWith("https://cdn.mirelo.test/")) {
+      const u = new URL(url);
+      calls.vendor.push({ route: "mirelo " + (options.method || "GET") + " " + u.pathname, body: typeof options.body === "string" ? options.body : null, auth: options.headers?.Authorization, form: options.body instanceof FormData ? [...options.body.keys()] : null });
+      if (u.pathname === "/v3/assets") return Response.json({ id: "asset_1", upload_url: "https://upload.mirelo.test/put", max_bytes: 1073741824, fields: { key: "k", Policy: "p" } }, { status: 201 });
+      if (u.host === "upload.mirelo.test") return new Response(null, { status: 204 });
+      if (u.pathname === "/v3/video-to-sfx/generations") return Response.json({ id: "gen_1", status: "queued", urls: { self: "https://api.mirelo.ai/v3/video-to-sfx/generations/gen_1" } }, { status: 202 });
+      if (u.pathname === "/v3/video-to-sfx/generations/gen_1") return Response.json({ id: "gen_1", status: mireloStatus, credits: mireloCredits, result: mireloStatus !== "succeeded" ? null : { outputs: [
+        { type: "mix", status: "succeeded", variants: [{ files: { audio: { url: "https://cdn.mirelo.test/sfx.wav", bytes: MIRELO_SFX.length } } }] },
+        { type: "sfx", status: "succeeded", variants: [{ files: { audio: { url: "https://cdn.mirelo.test/sfx.wav", bytes: MIRELO_SFX.length } } }] },
+        { type: "speech", status: "succeeded", variants: [{ files: { audio: { url: "https://cdn.mirelo.test/speech.wav", bytes: MIRELO_SPEECH.length } } }] },
+      ] } });
+      if (u.pathname === "/sfx.wav") return new Response(MIRELO_SFX);
+      if (u.pathname === "/speech.wav") return new Response(MIRELO_SPEECH);
+      throw Error("unexpected Mirelo route " + url);
+    }
     if (url === GEMINI) { calls.vendor.push({ route: "gemini", body: options.body }); return gemini(JSON.parse(options.body)); }
     if (url.startsWith("https://api.elevenlabs.io/")) {
       const route = new URL(url).pathname;
@@ -57,7 +74,7 @@ async function harness({ plan = "creator", env: extra = {}, permit = true, gemin
   }
   const env = {
     VW_INTERNAL_BASE: BASE, VW_INTERNAL_TOKEN: "internal-secret", ENTITLEMENT_ISSUER_TOKEN_VIDEO: "issuer-secret", ENTITLEMENT_PUBLIC_KEYS: "k1:" + pair.publicKey.replace(/\n/g, "\\n"),
-    OPENAI_API_KEY: "test-only", GEMINI_API_KEY: "test-only", ELEVENLABS_API_KEY: "test-only", VW_USAGE_RETRY_MS: "50", ...extra,
+    OPENAI_API_KEY: "test-only", GEMINI_API_KEY: "test-only", ELEVENLABS_API_KEY: "test-only", MIRELO_API_KEY: "test-only", VW_MIRELO_POLL_MS: "20", VW_USAGE_RETRY_MS: "50", ...extra,
   };
   for (const [k, v] of Object.entries(env)) if (v === undefined) delete env[k];
   const api = createApi({ dataDir: dir, env, fetchImpl, appDir, orgId: ORG });
@@ -190,6 +207,39 @@ const peak = (file, from, to) => {
     assert.throws(() => videoDescribe.parseCues(JSON.stringify([{ start: 1, end: 9, prompt: "rain" }]), 6), /超出影片長度/);
     assert.throws(() => videoDescribe.parseCues(JSON.stringify([{ start: 1, end: 3, prompt: "rain" }, { start: 2, end: 4, prompt: "wind" }]), 6), /重疊/);
     assert.throws(() => videoDescribe.parseCues(JSON.stringify(Array.from({ length: 13 }, (_, i) => ({ start: i * 0.4, end: i * 0.4 + 0.3, prompt: "tick" }))), 6), /超過 12 段/);
-    pass("Gemini 回傳驗證：越界、重疊、超過 12 段都拒絕");
+    assert.throws(() => videoDescribe.parseCues(JSON.stringify([{ start: 3, end: 3.04, prompt: "click" }]), 6), /短於 0.5 秒/, "critic m2: 太短的段落會被付費卻無聲");
+    pass("Gemini 回傳驗證：越界、重疊、超過 12 段、短於 0.5 秒都拒絕");
+  }
+  // 8. Way A (Mirelo, card S1b): the default row; preserve_speech off + separate_speech on; the upload carries no key;
+  //    charged = the job's reported credits at cost-model.ts usdPerCredit; the result = Mirelo's effects + its speech.
+  {
+    const h = await harness({ mireloCredits: 61 });
+    assert.equal((await h.caps()).audioTools.sfx.defaultEngine, "mirelo");
+    const sent = await h.post("/generations", { ...h.job("sfx", "mirelo"), settings: {} });
+    assert.equal(sent.status, 202, JSON.stringify(sent.body));
+    const done = await h.settle(sent.body.id);
+    assert.equal(done.status, "succeeded", done.error);
+    const { MIRELO_RATES } = require(path.join(appDir, "lib/ai/cost-model.ts"));
+    const expected = Math.round(61 * MIRELO_RATES["sfx-2.0"].usdPerCredit * 1e6) / 1e6;
+    assert.deepEqual([done.result.origin.provider, done.result.origin.model, done.result.origin.costUsd], ["Mirelo", "sfx-2.0", expected]);
+    assert.deepEqual((await h.usageSettled()).map((u) => [u.feature_key, u.cost_usd]), [["video.audio-tools", expected]]);
+    const create = JSON.parse(h.calls.vendor.find((c) => c.route === "mirelo POST /v3/video-to-sfx/generations").body);
+    assert.deepEqual([create.model, create.num_variants, create.controls, create.input.video], ["sfx-2.0", 1, { preserve_speech: false, separate_speech: true }, { type: "asset", id: "asset_1" }]);
+    const upload = h.calls.vendor.find((c) => c.route.startsWith("mirelo POST /put"));
+    assert.equal(upload.auth, undefined, "上傳網址不可帶金鑰");
+    assert.equal(upload.form.at(-1), "file", "檔案要放在最後一個欄位");
+    const out = path.join(h.dir, done.result.url.slice(1));
+    assert(peak(out, 1, 5) > -30, "成品要有 Mirelo 的音效與人聲");
+    assert.equal(h.calls.vendor.some((c) => /elevenlabs|gemini/.test(c.route)), false, "A 路不該呼叫 ElevenLabs 或 Gemini");
+    const h2 = await harness({ mireloStatus: "failed" });
+    assert.equal((await h2.settle((await h2.post("/generations", h2.job("sfx", "mirelo"))).body.id)).status, "failed");
+    await new Promise((r) => setTimeout(r, 300));
+    assert.deepEqual(h2.calls.usage, []);
+    const h3 = await harness({ env: { MIRELO_API_KEY: undefined } });
+    const row = (await h3.caps()).audioTools.sfx.engines.find((e) => e.id === "mirelo");
+    assert.deepEqual([row.available, /^尚未設定 Mirelo 金鑰。/.test(row.note)], [false, true]);
+    assert.equal((await h3.post("/generations", h3.job("sfx", "mirelo"))).status, 503);
+    assert.deepEqual(h3.calls.vendor, [], "沒有 Mirelo 金鑰不可改用 B 路");
+    pass("A 路 Mirelo：預設列；只要音效＋分離人聲、上傳不帶金鑰；扣回報的 credits；失敗不扣；沒金鑰 503 不改用別家");
   }
 })().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });

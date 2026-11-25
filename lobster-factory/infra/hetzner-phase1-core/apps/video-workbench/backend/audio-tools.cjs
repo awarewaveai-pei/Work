@@ -8,15 +8,15 @@
 // - its rates are in next-admin cost-model.ts (usd() throws otherwise: no price = not offered).
 const fs = require("node:fs"), path = require("node:path"), crypto = require("node:crypto");
 const providers = require("./providers.cjs");
-const { elevenListUsd } = require("./provider-cost.cjs");
+const { elevenListUsd, mireloUsd } = require("./provider-cost.cjs");
 const elevenlabs = require("./elevenlabs.cjs");
-const videoDescribe = require("./video-describe.cjs");
+const videoDescribe = require("./video-describe.cjs"), mirelo = require("./mirelo.cjs");
 const { KEPT_HERE } = require("./transcribe.cjs");
 
 const at = (f) => { try { return f(); } catch { return null; } };
 const round = (usd) => Math.round(usd * 1e6) / 1e6;
 const elevenRefusal = (env) => (!elevenlabs.keyOf(env) ? "此電腦尚未設定 ELEVENLABS_API_KEY；請先設定服務。"
-  : !elevenlabs.known() ? "讀不到 ElevenLabs 帳號方案，暫停使用；請稍後再試。"
+  : !elevenlabs.known()?.tier ? "讀不到 ElevenLabs 帳號方案，暫停使用；請稍後再試。" // a reply without its tier = unknown, never paid
   : elevenlabs.freePlan() ? "ElevenLabs 免費方案不可商用，升級後可用。" : null);
 // sends = where the row's sound / picture goes (backend/audio-policy.cjs outbound reports it); none = the vendor.
 const TOOLS = Object.freeze({
@@ -27,6 +27,12 @@ const TOOLS = Object.freeze({
       note: "去掉配樂與環境聲，只留人聲；影片至少 4.6 秒；聲音送到 ElevenLabs。" }),
   ]),
   sfx: Object.freeze([
+    // Way A (the default: first paid row that can run): Mirelo SFX 2.0 watches the whole video itself.
+    Object.freeze({ id: "mirelo", vendor: "Mirelo", label: "Mirelo SFX 2.0（看整支影片）", paid: true, unit: "分鐘",
+      sends: "Mirelo（影片與聲音）",
+      usd: (s) => mireloUsd(mirelo.MODEL, s),
+      refusal: (env) => (mirelo.keyOf(env) ? null : "尚未設定 Mirelo 金鑰。"),
+      note: "Mirelo SFX 2.0 看整支影片、生成貼合畫面的音效；對白由 Mirelo 分離後放回原聲（不重新合成），原配樂與音效去掉，畫面不變。影片最長 2 分鐘；影片連同聲音送到 Mirelo（德國）。" }),
     // Way B (operator 2026-11-25): Gemini looks, ElevenLabs makes the sounds. id kept from the row it replaces (old drafts).
     Object.freeze({ id: "elevenlabs", vendor: "ElevenLabs", label: "Gemini 看畫面＋ElevenLabs 生成", paid: true, unit: "分鐘", estimate: true,
       sends: "Google（畫面，不含聲音）與 ElevenLabs（聲音）",
@@ -98,8 +104,10 @@ async function lookAndGenerate({ source, seconds, info, input, env, fetchImpl, s
   if (voice) usd += elevenListUsd("audio-isolation", seconds);
   const effects = [];
   for (const cue of look.cues) {
-    for (let start = cue.start; cue.end - start > 0.05; start += elevenlabs.SOUND_MAX_SECONDS) {
-      const length = Math.min(elevenlabs.SOUND_MAX_SECONDS, cue.end - start);
+    // Pieces of at most 30 s, none under the cue floor: a piece is shortened so the remainder keeps MIN_CUE_SECONDS.
+    for (let start = cue.start, length; cue.end - start >= videoDescribe.MIN_CUE_SECONDS - 1e-9; start += length) {
+      const rest = cue.end - start, over = rest - elevenlabs.SOUND_MAX_SECONDS;
+      length = over <= 0 ? rest : over < videoDescribe.MIN_CUE_SECONDS ? rest - videoDescribe.MIN_CUE_SECONDS : elevenlabs.SOUND_MAX_SECONDS;
       const sound = await elevenlabs.soundEffect({ apiKey, prompt: cue.prompt, seconds: length, fetchImpl, signal });
       const f = temp("mp3");
       fs.writeFileSync(f, sound.audio);
@@ -109,6 +117,13 @@ async function lookAndGenerate({ source, seconds, info, input, env, fetchImpl, s
   }
   const note = "Gemini 配了 " + look.cues.length + " 段音效：" + look.cues.map((c) => `${c.start}–${c.end} 秒 ${c.prompt}`).join("；");
   return { voice, effects, usd, note: note.length > 300 ? note.slice(0, 299) + "…" : note };
+}
+// Way A: an MP4 copy (picture + sound, 720p at most) to Mirelo; its sound-effects track and its separated speech come back.
+async function mireloGenerate({ source, seconds, info, input, env, fetchImpl, signal, ffmpeg, temp }) {
+  const copy = temp("mp4");
+  await ffmpeg(["-y", "-hide_banner", "-i", source, "-vf", "scale=-2:'min(720,ih)'", "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p", ...(info.audio ? ["-c:a", "aac", "-b:a", "160k"] : ["-an"]), "-t", String(seconds), copy], signal);
+  const made = await mirelo.generate({ file: copy, seconds, prompt: String(input.settings?.sfxPrompt || "").trim().slice(0, 200), env, fetchImpl, signal, dest: () => temp("wav") });
+  return { voice: made.speech, effects: [{ file: made.sfx, start: 0, length: seconds }], usd: mireloUsd(mirelo.MODEL, seconds, made.credits), note: "Mirelo SFX 2.0 依整支影片生成音效" + (made.speech ? "，對白為原聲" : "（沒有偵測到對白）") };
 }
 async function isolateVoice({ source, apiKey, fetchImpl, signal, ffmpeg, temp }) {
   const mixed = temp("mp3"), voice = temp("mp3");
@@ -126,6 +141,7 @@ async function mixInto({ source, seconds, voice, effects, output, ffmpeg, signal
     parts.push(`[${inputs.length / 2 - 1}:a]aresample=48000,atrim=0:${e.length.toFixed(3)},volume=0.8,adelay=${ms}:all=1[e${i}]`);
     labels.push(`[e${i}]`);
   });
+  if (!labels.length) throw Error("沒有可混入的聲音"); // never an empty filter graph
   const graph = parts.join(";") + ";" + labels.join("") + (labels.length > 1 ? `amix=inputs=${labels.length}:duration=longest:normalize=0,apad[out]` : "apad[out]");
   await ffmpeg(["-y", "-hide_banner", ...inputs, "-filter_complex", graph, "-map", "0:v:0", "-map", "[out]", "-t", String(seconds), "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", result.file], signal);
   return result;
@@ -142,7 +158,8 @@ async function run(input, { file, output, signal, run: ffmpeg, inspect, env, fet
   if (!(seconds > 0)) throw Error("無法讀取素材長度");
   if (seconds > MAX_SECONDS[tool]) throw Error(`影片最長 ${MAX_SECONDS[tool] / 60} 分鐘`);
   if (tool === "separate" && !info.audio) throw Error("影片沒有聲音軌");
-  if (info.audio && seconds < elevenlabs.ISOLATE_MIN_SECONDS) throw Error("ElevenLabs 人聲分離需要至少 4.6 秒的聲音");
+  if (row.vendor === "ElevenLabs" && info.audio && seconds < elevenlabs.ISOLATE_MIN_SECONDS) throw Error("ElevenLabs 人聲分離需要至少 4.6 秒的聲音");
+  if (row.id === "mirelo" && seconds < 1) throw Error("Mirelo 需要至少 1 秒的影片");
   const made = [], temp = (ext) => {
     const f = path.join(path.dirname(output("tmp").file), "tmp-" + crypto.randomUUID() + "." + ext);
     made.push(f);
@@ -155,9 +172,9 @@ async function run(input, { file, output, signal, run: ffmpeg, inspect, env, fet
       await ffmpeg(["-y", "-hide_banner", "-i", voice, "-ar", "48000", "-b:a", "192k", result.file], signal);
       return { type: "audio", url: result.url, ai: { model: "audio-isolation", provider: row.vendor, costUsd: elevenListUsd("audio-isolation", seconds) } };
     }
-    const sound = await lookAndGenerate({ source, seconds, info, input, env, fetchImpl, signal, ffmpeg, temp });
+    const sound = await (row.id === "mirelo" ? mireloGenerate : lookAndGenerate)({ source, seconds, info, input, env, fetchImpl, signal, ffmpeg, temp });
     const result = await mixInto({ source, seconds, voice: sound.voice, effects: sound.effects, output, ffmpeg, signal });
-    return { type: "video", url: result.url, note: sound.note, ai: { model: elevenlabs.SOUND_MODEL, provider: row.vendor, costUsd: round(sound.usd) } };
+    return { type: "video", url: result.url, note: sound.note, ai: { model: row.id === "mirelo" ? mirelo.MODEL : elevenlabs.SOUND_MODEL, provider: row.vendor, costUsd: round(sound.usd) } };
   } finally {
     for (const f of made) fs.rmSync(f, { force: true });
   }

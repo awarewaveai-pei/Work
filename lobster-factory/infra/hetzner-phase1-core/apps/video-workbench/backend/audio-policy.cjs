@@ -4,8 +4,8 @@
 //   editor-transcribe (整片／單檔辨識 job)  transcribe.cjs recognize -> ElevenLabs / Google / OpenAI (not the host worker)
 //   POST /transcriptions (sync, one file)    same recognize call                     -> transcribeOut()
 //   separate / sfx (音軌分離、去配樂)         audio-tools.cjs run -> the row's `sends` (else its vendor): ElevenLabs
-//                                            audio-isolation; sfx way B also sends the picture, without sound, to Google
-//                                            (the local row stays here)
+//                                            audio-isolation; sfx way B also sends the picture, without sound, to Google;
+//                                            sfx way A sends the video with its sound to Mirelo (the local row stays here)
 //   enhance AI 大模型增強                     video-enhance.cjs upscale -> Replicate gets the whole file, its sound included
 // Everything else sends text (speech, music, translation, agent) or pictures (image/video models, remove-bg, 3D) only.
 // A new vendor call that carries sound = one row here, or it is unguarded.

@@ -14,6 +14,9 @@ const MAX_SEGMENTS = 12, MAX_OUTPUT_TOKENS = 2048;
 const TOKENS_PER_SECOND = 300;
 // A cue may end past the source by this much (Gemini rounds to whole seconds); more = refused, not trimmed.
 const END_SLACK_SECONDS = 1;
+// Shortest cue: ElevenLabs makes no sound under 0.5 s (elevenlabs.cjs soundEffect), so a shorter cue is refused here
+// rather than paid for and silently dropped. audio-tools.cjs pieces a long cue with the same floor.
+const MIN_CUE_SECONDS = 0.5;
 
 function key(env) {
   const k = String(env?.GEMINI_API_KEY || "").trim();
@@ -28,7 +31,7 @@ const estimateUsd = (seconds) => costs.textUsd(MODEL, { input_tokens: Math.ceil(
 const instructions = (seconds, extra) => [
   `You are a foley designer. Watch this silent ${seconds.toFixed(1)}-second video and list the sound effects its picture needs.`,
   "Answer only a JSON array, no prose, no code fence: [{\"start\": <seconds>, \"end\": <seconds>, \"prompt\": \"<English sound description>\"}].",
-  `Rules: at most ${MAX_SEGMENTS} items; sorted by start; items never overlap; 0 <= start < end <= ${seconds.toFixed(1)}; each item at most 30 seconds;`,
+  `Rules: at most ${MAX_SEGMENTS} items; sorted by start; items never overlap; 0 <= start < end <= ${seconds.toFixed(1)}; each item ${MIN_CUE_SECONDS} to 30 seconds long;`,
   "each prompt is plain English, under 200 characters, describing only non-musical sound: no music of any kind (no instrument, even one played on screen), no singing, no speech or dialogue.",
   "Cover the whole video back to back where sound is heard; when an ambience and an action happen at once, describe both in that one item's prompt (never a second item over the same time).",
   ...(extra ? ["The user also asked for (may be written in Chinese; follow it where the picture allows): " + extra] : []),
@@ -48,7 +51,9 @@ function parseCues(text, seconds) {
     if (!Number.isFinite(start) || !Number.isFinite(end0) || start < 0 || end0 <= start) throw bad(`第 ${i + 1} 段時間不合理`);
     if (start >= seconds || end0 > seconds + END_SLACK_SECONDS) throw bad(`第 ${i + 1} 段超出影片長度`);
     if (prompt.length < 3 || prompt.length > 300 || /[　-鿿＀-￯]/.test(prompt)) throw bad(`第 ${i + 1} 段描述不是英文短句`);
-    return { start, end: Math.min(end0, seconds), prompt };
+    const end = Math.min(end0, seconds);
+    if (end - start < MIN_CUE_SECONDS) throw bad(`第 ${i + 1} 段短於 ${MIN_CUE_SECONDS} 秒`);
+    return { start, end, prompt };
   });
   for (let i = 1; i < cues.length; i++) {
     if (cues[i].start < cues[i - 1].start) throw bad("段落沒有依時間排序");
@@ -63,17 +68,23 @@ async function describe({ file, seconds, extra = "", env, fetchImpl = fetch, sig
   const apiKey = key(env), small = tmp("mp4");
   await run(["-y", "-hide_banner", "-i", file, "-an", "-vf", "fps=2,scale=-2:360", "-c:v", "libx264", "-preset", "veryfast", "-crf", "32", "-pix_fmt", "yuv420p", "-t", String(seconds), small], signal);
   const prompt = instructions(seconds, String(extra || "").trim().slice(0, 200));
-  const r = await fetchImpl(API, {
-    method: "POST",
-    headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: MODEL,
-      input: [{ type: "text", text: prompt }, { type: "video", data: fs.readFileSync(small).toString("base64"), mime_type: "video/mp4" }],
-      generation_config: { temperature: 0.2, max_output_tokens: MAX_OUTPUT_TOKENS },
-      store: false,
-    }),
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(300000)]) : AbortSignal.timeout(300000),
+  const body = JSON.stringify({
+    model: MODEL,
+    input: [{ type: "text", text: prompt }, { type: "video", data: fs.readFileSync(small).toString("base64"), mime_type: "video/mp4" }],
+    generation_config: { temperature: 0.2, max_output_tokens: MAX_OUTPUT_TOKENS },
+    store: false,
   });
+  // 503 "high demand" / 429 pass within a minute (transcribe.cjs gemini, same endpoint): two more tries, 10 s then 20 s.
+  let r;
+  for (const pause of [0, Number(env?.VW_GEMINI_RETRY_MS) || 10000, (Number(env?.VW_GEMINI_RETRY_MS) || 10000) * 2]) {
+    if (pause) await new Promise((resolve, reject) => {
+      const t = setTimeout(resolve, pause);
+      signal?.addEventListener("abort", () => { clearTimeout(t); reject(signal.reason); }, { once: true });
+    });
+    r = await fetchImpl(API, { method: "POST", headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" }, body,
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(300000)]) : AbortSignal.timeout(300000) });
+    if (r.status !== 503 && r.status !== 429) break;
+  }
   const value = await r.json().catch(() => null);
   if (!r.ok) throw Object.assign(Error("看片服務失敗：Google " + r.status + " " + String(value?.error?.message || "").slice(0, 300)), { status: r.status });
   const text = (value?.steps || []).flatMap((s) => s?.content || []).filter((c) => c?.type === "text").map((c) => c.text).join("");
@@ -86,4 +97,4 @@ async function describe({ file, seconds, extra = "", env, fetchImpl = fetch, sig
   }
 }
 
-module.exports = { MODEL, MAX_SEGMENTS, TOKENS_PER_SECOND, key, keyOf, estimateUsd, instructions, parseCues, describe };
+module.exports = { MODEL, MAX_SEGMENTS, MIN_CUE_SECONDS, TOKENS_PER_SECOND, key, keyOf, estimateUsd, instructions, parseCues, describe };

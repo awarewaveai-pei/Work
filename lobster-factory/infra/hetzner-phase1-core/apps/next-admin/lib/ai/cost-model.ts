@@ -274,6 +274,28 @@ export const ELEVENLABS_RATES: Record<string, { label: string; usdPerKChars?: nu
   "audio-isolation":        { label: "ElevenLabs Voice Isolator", usdPerMinute: 0.12 },
 };
 
+/** video-workbench 去配樂 way A, Mirelo SFX 2.0 on Mirelo's own API (backend/mirelo.cjs). mirelo.ai/api-docs.md, read
+ *  2026-11-25: 15 credits per output second per variant, "discounted 33%" to 10 until 2026-12-12; separate_speech at no
+ *  extra cost. USD per credit = the Creator plan's additional credits, "$1.00" per 1,000 (mirelo.ai/pricing, 2026-11-25).
+ *  prices[].from = the day a rate starts (the run's day picks it). */
+export const MIRELO_RATES: Record<string, { label: string; usdPerCredit: number; prices: readonly { from: string; creditsPerSec: number }[] }> = {
+  "sfx-2.0": { label: "Mirelo SFX 2.0", usdPerCredit: 0.001, prices: [
+    { from: "2026-01-01", creditsPerSec: 10 },
+    { from: "2026-12-13", creditsPerSec: 15 },
+  ] },
+};
+
+/** USD of one Mirelo run: the job's reported credits when given, else output seconds x that day's credits per second
+ *  (one variant), at usdPerCredit. */
+export function mireloUsd(model: string, seconds: unknown, credits?: unknown, at?: number | string | Date): number {
+  const rate = MIRELO_RATES[model];
+  if (!rate) throw new Error("not a priced Mirelo model: " + model);
+  const charged = Number(credits);
+  if (charged > 0) return Math.round(charged * rate.usdPerCredit * 1e6) / 1e6;
+  const day = new Date(at ?? Date.now()).toISOString().slice(0, 10), price = rate.prices.filter((p) => p.from <= day).at(-1) ?? rate.prices[0];
+  return Math.round(Math.max(0, Number(seconds) || 0) * price.creditsPerSec * rate.usdPerCredit * 1e6) / 1e6;
+}
+
 /** USD of one ElevenLabs call at list price: characters x per-1K price, or seconds x per-minute price / 60. */
 export function elevenlabsListUsd(model: string, amount: unknown): number {
   const rate = ELEVENLABS_RATES[model];

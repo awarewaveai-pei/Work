@@ -1645,7 +1645,9 @@ function createApi({ dataDir, env = process.env, fetchImpl = fetch, appDir, orgI
           const row = audioTools.check(input, env), file = localFile(input.references?.src?.url);
           const seconds = file && fs.existsSync(file) ? (await require("./media-inspect.cjs").inspectMedia(file).catch(() => null))?.duration : 0;
           if (!(seconds > 0)) throw Object.assign(Error("讀不到影片長度"), { status: 400 });
-          json(res, 200, { quoteId: crypto.randomUUID(), costUsd: audioTools.usdOf(input.operation + ":" + row.id, Math.min(seconds, audioTools.MAX_SECONDS[input.operation])), estimate: !!row.estimate });
+          // Over the tool's limit = the job would be refused when it runs: no price for it (never a capped one).
+          if (seconds > audioTools.MAX_SECONDS[input.operation]) throw Object.assign(Error(`影片最長 ${audioTools.MAX_SECONDS[input.operation] / 60} 分鐘`), { status: 400 });
+          json(res, 200, { quoteId: crypto.randomUUID(), costUsd: audioTools.usdOf(input.operation + ":" + row.id, seconds), estimate: !!row.estimate });
           return true;
         }
         if (jobInput(input).type === "audio") speech.key(speech.pick(input.speechModel, env), env);

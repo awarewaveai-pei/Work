@@ -135,6 +135,11 @@ function musicUsd(model, seconds) {
   if (!Object.hasOwn(rates.MUSIC_RATES, model)) throw unpriced(model);
   return rates.musicUsd(model, seconds);
 }
+// 去配樂 way A (backend/mirelo.cjs): next-admin cost-model.ts mireloUsd -- the job's reported credits, else its seconds.
+function mireloUsd(model, seconds, credits) {
+  if (!Object.hasOwn(rates.MIRELO_RATES || {}, model)) throw unpriced(model);
+  return rates.mireloUsd(model, seconds, credits);
+}
 const toolUsd = (key) => {
   if (!rates.TOOL_RATES[key]) throw unpriced(key);
   return rates.TOOL_RATES[key].usd;
@@ -183,4 +188,4 @@ function displayPrices({ text, image, audio, transcribe, music }) {
 // Replicate models billed per GPU second (TOOL_RATES usdPerSec): the one function, next-admin cost-model.ts replicateRunUsd.
 const runUsd = (key, predictTimeSec) => rates.replicateRunUsd(key, predictTimeSec);
 
-module.exports = { elevenUsd, elevenListUsd, interactionsTextUsd, textUsd,imageUsd, geminiImageUsd, fillUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };
+module.exports = { elevenUsd, elevenListUsd, interactionsTextUsd, mireloUsd, textUsd,imageUsd, geminiImageUsd, fillUsd, videoUsd, speechUsd, transcribeUsd, enhanceUsd, musicUsd, toolUsd, runUsd, priceOf, displayPrices, speechPrice, transcribePrice, musicPrice };

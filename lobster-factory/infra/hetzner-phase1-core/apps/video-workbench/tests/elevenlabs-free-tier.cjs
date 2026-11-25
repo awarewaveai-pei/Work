@@ -93,7 +93,8 @@ const source = (dataDir) => {
     }
     assert.deepEqual(c.speech.models.map((m) => m.id).slice(0, 2), ["edge-tts", "eleven_multilingual_v2"], "免費列排在付費列前面");
     assert.deepEqual(c.transcribe.engines.map((e) => e.id).slice(0, 2), ["host", "elevenlabs"]);
-    assert.deepEqual([c.audioTools.separate.defaultEngine, c.audioTools.sfx.defaultEngine], ["local", "elevenlabs"]);
+    // sfx: no row can run here (no Mirelo key, ElevenLabs free plan), so its default is the list's first row, Mirelo (card S1b).
+    assert.deepEqual([c.audioTools.separate.defaultEngine, c.audioTools.sfx.defaultEngine], ["local", "mirelo"]);
     await caps(base);
     assert.equal(fake.calls.filter((x) => x.route === "/v1/user/subscription").length, 1, "方案每次開頁都重查");
     pass("免費方案：配音、辨識是免費（usd 0）＋本月剩餘點數，音軌分離、去配樂不可商用而停用；免費排前面；方案 10 分鐘內只查一次");
@@ -192,7 +193,8 @@ const source = (dataDir) => {
           // Card S1 B2: off on the free plan, with the reason under the buttons when it is the shown row.
           assert.match(await button.innerText(), /（未啟用）$/, tool);
           assert.equal(await button.isDisabled(), true, tool);
-          if (tool === "sfx") await p.getByText("ElevenLabs 免費方案不可商用，升級後可用。", { exact: false }).first().waitFor();
+          // sfx shows its default row, Mirelo (card S1b), off here for want of its key.
+          if (tool === "sfx") await p.getByText("尚未設定 Mirelo 金鑰。", { exact: false }).first().waitFor();
           if (tool === "separate") assert.equal(await p.locator('[data-flow-choice="separateEngine"][aria-pressed="true"]').getAttribute("data-flow-value"), "local", "舊草稿預設仍是本機原音軌");
           continue;
         }
