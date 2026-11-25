@@ -22,12 +22,12 @@ import { introPlanFor } from "@/public/editor-shared/intro-styles.js";
 import { orgDesign } from "@/lib/content/video/opener-designs";
 import { updateWpPost } from "@/lib/content/publish/wp-post-core";
 import { runContentPipeline, type PipelineFailure } from "@/lib/content/pipeline";
-import { parseArticleMeta } from "@/lib/content/article/meta";
+import { extractH1, parseArticleMeta } from "@/lib/content/article/meta";
 import { makeContentImage } from "@/lib/content/image/make-image";
 import { storeCoverOn } from "@/lib/content/cover/store";
 import type { TarotModel } from "@/lib/tarot/image-gen";
 import { isR2Configured } from "@/lib/storage/r2";
-import { accountPlatforms, addVideo, getPost, listAccounts, savePost } from "@/lib/social/store";
+import { accountPlatforms, addImage, addVideo, getPost, listAccounts, savePost, type MediaInput } from "@/lib/social/store";
 import { applyAction } from "@/lib/social/actions";
 import { requiresReview } from "@/lib/social/review";
 import { textsForAccounts, writerKeysFor, writeSocialPosts } from "@/lib/social/write-posts";
@@ -64,6 +64,9 @@ export interface TopicArtifacts {
      *  the cover layout on base_url's picture, or that picture alone when the layout failed; null = none). Absent on
      *  articles made before K10; base_url absent on those made before K25. */
     cover?: { scene?: string; title?: string; subtitle?: string; image_url: string | null; base_url?: string | null };
+    /** K27: the title the WordPress draft was saved under (its SEO title, else its H1); the cover's alt text on the social
+     *  drafts. Absent on articles made before K27: the topic's title stands in. */
+    title?: string;
     /** title = the title WordPress published it under (K23: the Facebook / Instagram link comment names it) */
     published?: { status: string; link: string; at: string; title?: string };
   };
@@ -71,7 +74,10 @@ export interface TopicArtifacts {
    *  say so); youtube_post_id = the YouTube channels' own draft (N5a; absent on a topic made before, whose post_id draft
    *  may hold YouTube too and goes out as before). link_in_comment = Facebook's and Instagram's own drafts (K23, only
    *  for a topic with an article): the link goes in their first comment; absent = made before, post_id holds them too. */
-  social?: { post_id: string | null; youtube_post_id?: string | null; link_in_comment?: LinkInCommentPost[]; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string } };
+  social?: { post_id: string | null; youtube_post_id?: string | null; link_in_comment?: LinkInCommentPost[]; checks: ReviewCheck[]; sent?: { state: string; scheduled_at: string | null; at: string };
+    /** K27, a topic without a video: the article's cover uploaded once (media_id) and the drafts already handled (done:
+     *  given it, or left as they were because they had media of their own). Absent = not tried yet. */
+    cover_media?: { media_id: string | null; done: string[] } };
   /** The topic's video job; url once it finished, then when it went into the article and onto each social draft. */
   video?: VideoArtifact & { embedded_at?: string; media_id?: string; youtube_media_id?: string };
   /** N5a: each publish step, recorded before and after its outside write (publish-steps.ts). */
@@ -237,6 +243,7 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
   return {
     wp_post_id: p.publish?.post_id ?? null, wp_edit_url: p.publish?.edit_url ?? null, seo_score: report?.score ?? null,
     summary: meta?.metaDesc || t.title,
+    title: meta?.seoTitle?.trim() || extractH1(markdown) || t.title,   // as wordpress-core names the draft
     // what the social writer reads (it uses the first 3000 characters), kept so a retry can write posts without the article
     source: markdown.replace(/<!-- CONTENT_META_START -->[\s\S]*?<!-- CONTENT_META_END -->/g, "").trim().slice(0, 3000),
     checks: [...articleChecks(markdown, report, forbiddenTerms(site.defaults), requiredBlocks(site.defaults)), ...(laid?.note ? [laid.note] : [])],
@@ -366,6 +373,9 @@ async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string, capTwd: n
   try {
     if (t.formats.includes("article") && !artifacts.article) artifacts.article = await makeArticle(t, site, guard, maker, deadline);
     if ((t.formats.includes("social") || t.formats.includes("youtube")) && !artifacts.social) artifacts.social = await makeSocial(t, site, artifacts.article, actor, guard);
+    // K27: the cover is laid in makeArticle, the social drafts made after it; here both exist (also on a retry, and for a
+    // topic made before K27 that runs this step again)
+    await attachTopicCover(t, artifacts, actor);
   } catch (e) {
     // a failed attempt keeps none of its own reservations (budget.ts header): what it was billed is in the ledger, which
     // the retry's first check reads, so a refusal or a WordPress failure does not hold back money never spent
@@ -535,6 +545,61 @@ export async function pollTopicVideo(t: Topic, jobId: string): Promise<VideoPoll
   return url?.startsWith("https://") ? { state: "done", url } : { state: "error", error: "影片做好了但沒有可用的網址" };
 }
 
+/** One draft a topic's media goes on: done = what it recorded (absent = not handled yet); record(mediaId, ours): ours =
+ *  the upload went on it, otherwise it already had media (an earlier attempt's, or a person's own) and keeps it. */
+type MediaDraft = { postId: string | null | undefined; done: () => string | undefined; record: (mediaId: string, ours: boolean) => void };
+
+/** The topic's video (attachTopicVideo) or cover (attachTopicCover) onto its social drafts: one upload serves them all,
+ *  each draft records its own and is saved (step) before the next. Scheduled, submitted or deleted by a person: theirs,
+ *  left as it is; media already there (an earlier attempt's, or a person's own): kept, never replaced -- so a rerun adds
+ *  nothing twice. */
+async function attachToDrafts(orgId: string, drafts: MediaDraft[], uploaded: () => string | null | undefined, upload: () => Promise<string>,
+  media: (mediaId: string) => MediaInput, actor: string, step: () => Promise<void>): Promise<void> {
+  for (const d of drafts) {
+    if (!d.postId || d.done()) continue;
+    const post = await getPost(orgId, d.postId);
+    if (post.state === "draft" && !post.media.length) {
+      const mediaId = uploaded() || await upload();
+      await savePost(orgId, post.id, post.version, {}, null, [media(mediaId)], actor);
+      d.record(mediaId, true);
+    } else if (post.media.length) d.record(post.media[0].media_id, false);
+    if (d.done()) await step();
+  }
+}
+
+/** K27: a topic with an article and no video gets the article's laid-out cover (K25, artifacts.article.cover.image_url) on
+ *  its social drafts -- the other channels' and Facebook's / Instagram's own (K23); never YouTube's, which takes a video
+ *  only. Alt text = the article's title. No cover, or the upload fails: nothing attached, and a check says the posts have
+ *  no picture -- failing only while an Instagram draft is left without one (Postiz refuses an Instagram post without
+ *  media: instagram.provider.ts checkValidity "Should have at least one media"), so it waits for a person instead of
+ *  failing at send. Never fails the topic. Recorded on artifacts.social.cover_media; the row is saved when the step ends. */
+export async function attachTopicCover(t: Pick<Topic, "id" | "organization_id" | "title" | "formats">, artifacts: TopicArtifacts, actor: string): Promise<void> {
+  const a = artifacts.article, s = artifacts.social;
+  if (!a || !s || waitsForVideo(t)) return;
+  const ids = [s.post_id, ...(s.link_in_comment ?? []).map((p) => p.post_id)].filter((id): id is string => !!id);
+  if (!ids.length) return;
+  const state = { media_id: s.cover_media?.media_id ?? null, done: [...(s.cover_media?.done ?? [])] };
+  const url = a.cover?.image_url ?? null;
+  const alt = a.title || t.title;
+  let problem = url ? null : "文章沒有封面";
+  if (url) {
+    try {
+      await attachToDrafts(t.organization_id,
+        ids.map((postId) => ({ postId, done: () => (state.done.includes(postId) ? postId : undefined),
+          record: (mediaId: string, ours: boolean) => { state.done.push(postId); if (ours) state.media_id = mediaId; } })),
+        () => state.media_id, async () => String((await addImage(t.organization_id, url, `topic-${t.id}-cover.webp`, actor)).id),
+        (mediaId) => ({ media_id: mediaId, position: 0, alt_text: alt }), actor, async () => {});
+    } catch (e) {
+      problem = `封面沒有附上（${e instanceof Error ? e.message : String(e)}）`;
+    }
+  }
+  const instagram = (s.link_in_comment ?? []).some((p) => p.channel === "instagram" && !state.done.includes(p.post_id));
+  const checks = s.checks.filter((c) => c.name !== "social_image");
+  if (problem) checks.push({ name: "social_image", pass: !instagram,
+    detail: `社群貼文沒有圖：${problem}${instagram ? "；Instagram 沒有圖發不出去，請到社群草稿加一張圖" : ""}` });
+  artifacts.social = { ...s, cover_media: state, checks };
+}
+
 /** The finished video into the article draft and onto the social draft, each once: every step is saved on the row as it
  *  is done, and each write also checks the outside state (the article already has the URL, the post already has media),
  *  so a restart between a write and its save does not do it twice. Before either, every time, the video passes the
@@ -570,17 +635,8 @@ export async function attachTopicVideo(t: Topic, url: string, actor: string, sav
       } })),
     ];
     const uploaded = () => video.media_id ?? video.youtube_media_id ?? linkPosts.find((p) => p.media_id)?.media_id;
-    for (const d of drafts) {
-      if (!d.postId || d.done()) continue;
-      const post = await getPost(t.organization_id, d.postId);
-      // scheduled, submitted or deleted by a person: theirs, left as it is; media already there: an earlier attempt's
-      if (post.state === "draft" && !post.media.length) {
-        const mediaId = uploaded() ?? (await addVideo(t.organization_id, url, `topic-${t.id}.mp4`, actor)).id;
-        await savePost(t.organization_id, post.id, post.version, {}, null, [{ media_id: mediaId, position: 0 }], actor);
-        d.record(mediaId);
-      } else if (post.media.length) d.record(post.media[0].media_id);
-      if (d.done()) await step();
-    }
+    await attachToDrafts(t.organization_id, drafts, uploaded, async () => (await addVideo(t.organization_id, url, `topic-${t.id}.mp4`, actor)).id,
+      (mediaId) => ({ media_id: mediaId, position: 0 }), actor, step);
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);
     await updateTopicProject(sb, t.organization_id, t.id, { last_error: why });   // the project page says why too
