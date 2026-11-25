@@ -123,13 +123,21 @@ describe("status colors are not used for text", () => {
     "app/login/set-password/SetPasswordForm.tsx": 1,
     "components/tools/panel-primitives.ts": 1,
   };
+  // Over the whole source, not line by line: the declaration (or either branch of a ternary) may wrap. It ends at , ; { }.
+  const statusTextUses = (src: string): number =>
+    [...src.matchAll(/(?<![-\w])color\s*:[^,;{}]*/g)].filter((m) => /var\(--(red|green|yellow)[,)]/.test(m[0])).length;
+
+  it("catches a declaration written over two lines", () => {
+    expect(statusTextUses('style={{ color:\n  "var(--red)" }}')).toBe(1);
+    expect(statusTextUses(".x {\n  color:\n    var(--green);\n}")).toBe(1);
+    expect(statusTextUses('{ color: ok\n  ? "var(--text-muted)"\n  : "var(--yellow)", margin: 0 }')).toBe(1);
+    expect(statusTextUses('{ borderColor: "var(--red)", color: "var(--badge-red-text)",\n background: "var(--red)" }')).toBe(0);
+  });
+
   it("no new style paints text with var(--red) / var(--green) / var(--yellow)", () => {
-    const VALUE = /(?<![-\w])color\s*:\s*[^,;{}\n]*/g;   // direct or either branch of a ternary
-    const STATUS = /var\(--(red|green|yellow)[,)]/;
     const found: Record<string, number> = {};
     for (const f of ["app", "components", "lib"].flatMap((d) => walk(path.join(ROOT, d)))) {
-      const n = fs.readFileSync(f, "utf8").split("\n")
-        .reduce((sum, line) => sum + [...line.matchAll(VALUE)].filter((m) => STATUS.test(m[0])).length, 0);
+      const n = statusTextUses(fs.readFileSync(f, "utf8"));
       if (n) found[path.relative(ROOT, f).split(path.sep).join("/")] = n;
     }
     expect(found).toEqual(STATUS_TEXT_DEBT);

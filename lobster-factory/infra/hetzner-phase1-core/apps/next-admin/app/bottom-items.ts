@@ -3,6 +3,9 @@
 export interface BottomItem {
   label: string;
   href: string;
+  /** Leave the URL's current org / site off this link: a customer's own portal pages take neither (their URL may still
+   *  hold them, added by the client context). Every other item carries them, other hosts included (ADR 020). */
+  noCarry?: true;
 }
 
 export type BottomViewer =
@@ -17,7 +20,7 @@ const STAFF: BottomItem[] = [{ label: "工作台", href: "/" }, { label: "客戶
 
 export function bottomItems(v: BottomViewer): BottomItem[] {
   if (v.kind === "member") {
-    return [{ label: "工作台", href: `${v.portalOrigin}/launcher` }, { label: "點數與合約", href: `${v.portalOrigin}/wallet` }];
+    return [{ label: "工作台", href: `${v.portalOrigin}/launcher`, noCarry: true }, { label: "點數與合約", href: `${v.portalOrigin}/wallet`, noCarry: true }];
   }
   if (v.kind === "staff-door") return v.staffOrigin ? STAFF.map((i) => ({ ...i, href: `${v.staffOrigin}${i.href}` })) : [];
   return STAFF.filter((i) => !v.visible || v.visible.includes(i.href));
