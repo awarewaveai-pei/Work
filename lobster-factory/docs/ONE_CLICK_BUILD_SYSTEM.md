@@ -1,6 +1,6 @@
 # One-Click Build System
 
-> **已退場（2026-11-23，卡 SF-P）**：`/build` 與 `/onboard` 兩頁已刪，網址 308 到 `/ops/sites/new`；客戶建站只走建站流程（`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/SITE-FLOW-COMPLETION-PLAN.md`）。`POST /api/build/runs` 仍在（無頁面呼叫）。下文為歷史規格。
+> **已退場（2026-11-23，卡 SF-P）**：`/build` 與 `/onboard` 兩頁已刪，網址 308 到 `/ops/sites/new`；客戶建站只走建站流程（[手冊](hosting/CLIENT_SITE_FLOW.md)）。`POST /api/build/runs` 仍在（無頁面呼叫）。下文為歷史規格。
 
 > Version: v2.1
 > Date: 2026-05-03

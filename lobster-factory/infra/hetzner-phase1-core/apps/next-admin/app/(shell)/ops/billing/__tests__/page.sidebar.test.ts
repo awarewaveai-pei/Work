@@ -51,7 +51,8 @@ describe("/ops/billing sidebar", () => {
     expect(html).toContain("+500 / −300");
     expect(html).toContain("錢包凍結</span>");    // the row's tag, not the 需要處理 card's note
     expect(html).toContain("本期到 2026/12/01");    // Taipei date
-    expect(html).toContain("點左邊的帳戶");
+    expect(html).toContain("點帳戶清單裡的帳戶");
+    expect(html).not.toMatch(/左邊|右邊/);   // the list is not on the left on a phone (U14: copy names no side)
     expect(html).not.toContain("name=\"account\"");
   });
 
@@ -70,5 +71,13 @@ describe("/ops/billing sidebar", () => {
     expect(html).toContain(`/ops/billing?account=${OPEN}"`);   // 所有狀態 chip drops the seller
     expect(html).not.toContain(`name="f"`);
     expect(html).toContain(`name="seller" value="${RESELLER}"`);
+  });
+});
+
+describe("/ops/billing list column (K15: the same phone rules as /ops/clients)", () => {
+  it("the column and its frame use globals.css .client-panel / .client-panel-frame, keeping this page's 280px", async () => {
+    const html = await render({});
+    expect(html).toMatch(/<div class="client-panel-frame"[^>]*>/);
+    expect(html).toMatch(/<nav aria-label="客戶帳戶" class="client-panel" style="--client-panel-w:280px">/);
   });
 });
