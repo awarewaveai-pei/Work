@@ -5,6 +5,8 @@
 // mindfulness article got a man in a suit and fake Chinese lettering.
 import { STYLE_CATALOG } from "@/public/editor-shared/art-styles.js";
 import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
+import { usdToNtd } from "@/lib/ai/cost-calculator";
+import { IMAGE_MODELS } from "@/public/editor-shared/image-models.js";
 
 /** Body images (the article page can pick another per article). A program constant, not a site setting. */
 export const ARTICLE_IMAGE_RATIO = "4:3" as const;
@@ -54,17 +56,59 @@ export function articleImagePrompt(scene: string, stylePrompt: string): string {
   return `${s}. ${st}. ${ARTICLE_IMAGE_TAIL}`;
 }
 
-/** Models an article image may use: drawn at once by generateTarotImage with no reference image (the article page's own
- *  menu). Not codex-image (it runs only detached from a browser request, for the operator: image-gen.ts generateCodex
- *  codex_not_deferred / codex_operator_only), not the pexels stock rows (no generator), not reference-only models. */
-export const ARTICLE_IMAGE_MODELS = ["flux-schnell", "flux-dev", "ideogram-v3-balanced", "nano-banana-pro", "flux-2-max"] as const;
+/** K26 (operator 2026-11-25): the image sources an article may use -- the six measured in K13
+ *  (agency-os/reports/model-bakeoff/2026-11-article-image/runs.json). The one list behind the article page, the site's
+ *  manual default and the schedule's own choice; name and price come from the image catalog (image-models.js).
+ *  seed / img2img = what generateTarotImage honours on that model (contract: contentStudioImageModels.test.ts).
+ *  schedule = a schedule run may use it: codex-image runs only for the operator with her laptop worker on
+ *  (lib/tarot/image-gen.ts codex_not_deferred / codex_operator_only). */
+const SOURCES = [
+  { value: "openai-low", seed: false, img2img: true, schedule: true },
+  { value: "nano-banana-2", seed: false, img2img: true, schedule: true },
+  { value: "flux-dev", seed: true, img2img: true, schedule: true },
+  { value: "flux-schnell", seed: true, img2img: false, schedule: true },
+  { value: "flux-2-klein-4b", seed: true, img2img: true, schedule: true },
+  { value: "codex-image", seed: false, img2img: true, schedule: false },
+] as const;
+
+export type ArticleImageModel = (typeof SOURCES)[number]["value"];
+export interface ArticleImageSource { value: ArticleImageModel; label: string; usd: number; seed: boolean; img2img: boolean; schedule: boolean }
+
+export const ARTICLE_IMAGE_SOURCES: readonly ArticleImageSource[] = SOURCES.map((s) => {
+  const row = (IMAGE_MODELS as readonly { value: string; label: string; usd: number }[]).find((m) => m.value === s.value);
+  if (!row) throw new Error(`image-models.js has no ${s.value}`);
+  return { ...s, label: row.label, usd: row.usd };
+});
+export const ARTICLE_IMAGE_MODELS: readonly string[] = ARTICLE_IMAGE_SOURCES.map((s) => s.value);
+/** What the schedule's own setting takes (SiteContentDefaults.scheduleImageModel): the schedulable sources and "none". */
+export const SCHEDULE_IMAGE_CHOICES: readonly string[] = [...ARTICLE_IMAGE_SOURCES.filter((s) => s.schedule).map((s) => s.value), "none"];
+
+/** A button's text: the name and the price per image in NT$; the free Codex row says who and what it needs instead. */
+export const articleImageSourceLabel = (s: ArticleImageSource): string =>
+  s.value === "codex-image" ? `${s.label}（免費，只限本人、筆電要開著）` : `${s.label}（NT$${usdToNtd(s.usd)}／張）`;
 
 /** The site chose "None（不生成）" (SiteManager): its automatic articles get no images, and none are priced. */
 export const articleImagesOff = (model: unknown): boolean => model === "none";
 
-/** The site's image model as an article uses it: one of the above, else the default. */
+/** A stored choice as the menus read it: a listed source or "none"; anything else (a model dropped from the list, a
+ *  hand-edited row) = not set (""). */
+export function articleImageChoice(model: unknown): string {
+  return typeof model === "string" && (articleImagesOff(model) || ARTICLE_IMAGE_MODELS.includes(model)) ? model : "";
+}
+
+/** An image model as an article uses it: a listed source, else the default. */
 export function articleImageModel(model: unknown): string {
-  return typeof model === "string" && (ARTICLE_IMAGE_MODELS as readonly string[]).includes(model) ? model : DEFAULT_IMAGE_MODEL;
+  return typeof model === "string" && ARTICLE_IMAGE_MODELS.includes(model) ? model : DEFAULT_IMAGE_MODEL;
+}
+
+const schedulable = (model: unknown): model is string => typeof model === "string" && SCHEDULE_IMAGE_CHOICES.includes(model);
+
+/** What the schedule's articles draw with ("none" = no images): the site's scheduleImageModel, else its manual default
+ *  imageModel when a schedule can use it, else the default. One answer for the pipeline and its price (topics/make.ts). */
+export function scheduleImageModel(d: { scheduleImageModel?: unknown; imageModel?: unknown } | undefined): string {
+  if (schedulable(d?.scheduleImageModel)) return d.scheduleImageModel;
+  if (schedulable(d?.imageModel)) return d.imageModel;
+  return DEFAULT_IMAGE_MODEL;
 }
 
 /** One article image's price on that model, USD. */

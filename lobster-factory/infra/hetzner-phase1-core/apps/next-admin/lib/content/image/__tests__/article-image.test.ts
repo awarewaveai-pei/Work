@@ -9,7 +9,7 @@ vi.mock("@/lib/tarot/image-gen", async (orig) => ({
 }));
 vi.mock("@/lib/storage/r2", () => ({ isR2Configured: () => false, buildDesignKey: () => null, putDesignObject: async () => ({ ok: false }) }));
 
-import { ARTICLE_DEFAULT_STYLE, ARTICLE_IMAGE_MODELS, ARTICLE_IMAGE_TAIL, articleBodyImages, articleImageModel, articleStylePrompt, fillPlaceholder, imagePlaceholders, placeholderScene } from "../article-image";
+import { ARTICLE_DEFAULT_STYLE, ARTICLE_IMAGE_MODELS, ARTICLE_IMAGE_SOURCES, ARTICLE_IMAGE_TAIL, articleBodyImages, articleImageChoice, articleImageModel, articleStylePrompt, fillPlaceholder, imagePlaceholders, placeholderScene, scheduleImageModel } from "../article-image";
 import { makeContentImage } from "../make-image";
 import { isTarotModel, TAROT_MODELS } from "@/lib/tarot/image-gen";
 import { markdownToHtml } from "@/lib/content/publish/wordpress-core";
@@ -54,20 +54,28 @@ describe("article image prompt", () => {
 });
 
 describe("article image model and count", () => {
-  it("a usable model is kept; codex-image, a stock row, an unknown or missing one fall back to the default", () => {
-    expect(articleImageModel("flux-2-max")).toBe("flux-2-max");
-    for (const bad of ["codex-image", "pexels-all", "ideogram-character", "nope", undefined]) expect(articleImageModel(bad)).toBe("flux-schnell");
+  it("a listed source is kept; a stock row, a dropped or unknown model, or none fall back to the default", () => {
+    expect(articleImageModel("nano-banana-2")).toBe("nano-banana-2");
+    expect(articleImageModel("codex-image")).toBe("codex-image");
+    for (const bad of ["flux-2-max", "pexels-all", "ideogram-character", "nope", undefined]) expect(articleImageModel(bad)).toBe("flux-schnell");
+  });
+
+  it("K26 a stored value outside the list reads as not set; listed sources and none read as themselves", () => {
+    for (const old of ["flux-2-max", "ideogram-v3-balanced", "nano-banana-pro", "x", undefined, 3]) expect(articleImageChoice(old)).toBe("");
+    for (const ok of [...ARTICLE_IMAGE_MODELS, "none"]) expect(articleImageChoice(ok)).toBe(ok);
+    expect(scheduleImageModel({ imageModel: "ideogram-v3-balanced" })).toBe("flux-schnell");
+    expect(scheduleImageModel({ scheduleImageModel: "codex-image", imageModel: "flux-dev" })).toBe("flux-dev");
   });
 
   it("no catalog style is cut by the size guard", () => {
     expect(Math.max(...STYLE_CATALOG.map((s) => s.prompt.length))).toBeLessThanOrEqual(1000);
   });
 
-  it("every allowed model is a generator model that draws at once (not the laptop's Codex)", () => {
-    for (const id of ARTICLE_IMAGE_MODELS) {
-      expect(isTarotModel(id)).toBe(true);
-      expect(TAROT_MODELS[id as keyof typeof TAROT_MODELS].provider).not.toBe("codex");
-    }
+  it("K26 the six K13 sources; every one a generator model, and only the laptop's Codex kept off the schedule", () => {
+    expect([...ARTICLE_IMAGE_MODELS].sort()).toEqual(["codex-image", "flux-2-klein-4b", "flux-dev", "flux-schnell", "nano-banana-2", "openai-low"]);
+    for (const id of ARTICLE_IMAGE_MODELS) expect(isTarotModel(id)).toBe(true);
+    expect(ARTICLE_IMAGE_SOURCES.filter((s) => !s.schedule).map((s) => s.value))
+      .toEqual(ARTICLE_IMAGE_MODELS.filter((id) => TAROT_MODELS[id as keyof typeof TAROT_MODELS].provider === "codex"));
   });
 
   it("a short article gets 3 body images, any other size 4", () => {

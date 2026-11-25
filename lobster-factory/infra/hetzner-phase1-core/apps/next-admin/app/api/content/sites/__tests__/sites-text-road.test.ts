@@ -168,3 +168,21 @@ describe("apply the road to every site", () => {
     expect(row("b").content_defaults?.textChain).toBeUndefined();
   });
 });
+
+describe("K26 PATCH scheduleImageModel", () => {
+  it("is saved on its own and read back; a whole-defaults save keeps it", async () => {
+    const res = await call(PATCH, "a", staff, { scheduleImageModel: "nano-banana-2" });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { site: { contentDefaults: Record<string, unknown> } }).site.contentDefaults).toEqual({ tone: "Warm", scheduleImageModel: "nano-banana-2" });
+    await call(PATCH, "a", staff, { contentDefaults: { tone: "Bright", scheduleImageModel: "openai-low" } });
+    expect(row("a").content_defaults).toEqual({ tone: "Bright", scheduleImageModel: "nano-banana-2" });
+  });
+
+  it("codex-image (the laptop's, never a schedule's) and a model off the list are refused; nothing is written", async () => {
+    for (const bad of ["codex-image", "flux-2-max"]) {
+      const res = await call(PATCH, "a", staff, { scheduleImageModel: bad });
+      expect(res.status).toBe(400);
+    }
+    expect(row("a").content_defaults).toEqual({ tone: "Warm" });
+  });
+});

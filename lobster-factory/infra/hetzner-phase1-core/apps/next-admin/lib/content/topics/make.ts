@@ -43,7 +43,7 @@ import { embedVideoInPost, swapEmbeddedVideo } from "@/lib/content/video/embed-i
 import { releaseTopicVideo } from "./video-release";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
 import { TOPIC_ARTICLE_IMAGES, TOPIC_COVER_IMAGES } from "./cost";
-import { ARTICLE_COVER_RATIO, ARTICLE_IMAGE_RATIO, articleImageModel, articleImagesOff, articleStylePrompt, imagePlaceholders, placeholderScene } from "@/lib/content/image/article-image";
+import { ARTICLE_COVER_RATIO, ARTICLE_IMAGE_RATIO, articleImagesOff, articleStylePrompt, scheduleImageModel, imagePlaceholders, placeholderScene } from "@/lib/content/image/article-image";
 import { DEFAULT_TOPIC_CAP_TWD, reserveStep, settleStep, spentSince, stepUpperTwd, topicBudget, type TopicBudget } from "./budget";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { MakeError, NOW_FORMATS, brandDay, personAsked, waitsForVideo, type Made, type Published, type PublishRun, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
@@ -120,13 +120,13 @@ export async function optionalImageGrant(ask: () => Promise<Grant> = () => grant
  *  images = how many placeholders to ask for (0 when the organization has no content.image). The site's text road (K7)
  *  rides along only when set: a site without one gets exactly the input it got before (API only, default model). */
 export function articleInput(t: Pick<Topic, "keyword" | "title" | "angle">, d: SiteContentDefaults, images = 0): Record<string, unknown> {
-  // the model name only tells the writer images are wanted; makeArticle draws them on the same articleImageModel
+  // the model name only tells the writer images are wanted; makeArticle draws them on the same scheduleImageModel
   const details = [renderBrandVoice(d.marketing, d.brandVoiceInstructions), t.angle ? `切入角度：${t.angle}` : "", requiredBlocks(d).length ? `文末逐字附上以下段落，一字不改，每段自成一段：\n${requiredBlocks(d).join("\n\n")}` : ""].filter(Boolean).join("\n\n");
   const chain = siteTextChain(d);
   return {
     keyword: t.keyword, title: t.title, language: siteLanguage(d), targetCountry: d.targetCountry, tone: d.tone,
     articleType: d.articleType, readability: d.readability, pointOfView: d.pointOfView, details, generateMeta: true,
-    media: images > 0 ? { aiImages: articleImageModel(d.imageModel), imageCount: images, imageSize: ARTICLE_IMAGE_RATIO } : { aiImages: "none" },
+    media: images > 0 ? { aiImages: scheduleImageModel(d), imageCount: images, imageSize: ARTICLE_IMAGE_RATIO } : { aiImages: "none" },
     ...(isAiTextModel(d.textApiModel) ? { model: d.textApiModel } : {}),
     ...(chain !== "api" ? { chain, ...(typeof d.textClaudeModel === "string" ? { claudeModel: d.textClaudeModel } : {}),
       ...(typeof d.textCodexModel === "string" ? { codexModel: d.textCodexModel } : {}) } : {}),
@@ -188,8 +188,9 @@ export type TopicMaker = "schedule" | "person";
 
 async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: TopicMaker, deadline?: number): Promise<NonNullable<TopicArtifacts["article"]>> {
   // no R2 = nowhere to keep an image WordPress can fetch, so none is paid for
-  // a site set to "None（不生成）" gets none either (K10)
-  const imageGrant = isR2Configured() && !articleImagesOff(site.defaults.imageModel) ? await optionalImageGrant() : null;
+  // a site whose schedule images are "None（不生成）" gets none either (K10); K26: the schedule's own source first
+  const imageModel = scheduleImageModel(site.defaults);
+  const imageGrant = isR2Configured() && !articleImagesOff(imageModel) ? await optionalImageGrant() : null;
   const imageCount = imageGrant ? TOPIC_ARTICLE_IMAGES : 0;
   // The subscriptions run only for the operator's own organization (I1: never for a customer's site, whoever made the
   // road), and only with time left for the API after them (I5); otherwise the site's road is read as API only.
@@ -200,7 +201,6 @@ async function makeArticle(t: Topic, site: SiteBrand, guard: Guard, maker: Topic
   const caller: ArticleCaller = { ...(maker === "schedule" ? { lane: "schedule" as const } : {}), subBudgetMs: budgetMs };
   const input = { ...articleInput(t, defaults, imageCount), _jobId: t.id, ...(subs ? { [ARTICLE_CALLER]: caller } : {}) };
   // K10: the images on the site's model and style, body + cover reserved together
-  const imageModel = articleImageModel(site.defaults.imageModel);
   const coverCount = imageGrant ? TOPIC_COVER_IMAGES : 0;
   const road = { textChain: defaults.textChain, textApiModel: defaults.textApiModel, imageModel };
   const upper = stepUpperTwd.article(imageCount + coverCount, road);

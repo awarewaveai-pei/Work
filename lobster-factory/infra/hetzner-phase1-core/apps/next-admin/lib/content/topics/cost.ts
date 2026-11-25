@@ -3,7 +3,7 @@
 import { featureUnitCostUsd, textCallCostUsd } from "@/lib/ai/cost-calculator";
 import { isAiTextModel, isTextChain } from "@/lib/ai/text-model-options";
 import { TEXT_FEATURES, TWD_RATE } from "@/lib/ai/cost-model";
-import { articleBodyImages, articleImageUsd } from "@/lib/content/image/article-image";
+import { articleBodyImages, articleImageUsd, scheduleImageModel } from "@/lib/content/image/article-image";
 import { MAX_WRITER_CALLS } from "@/lib/social/write-posts";
 import { articleVideoCostUsd } from "@/lib/content/video/defaults";
 
@@ -31,9 +31,12 @@ export function dailyCostTwd(): number {
   return Math.ceil(featureUnitCostUsd(f) * TWD_RATE * 10) / 10;
 }
 
-/** Card K7: the site's text road as the price reads it (SiteContentDefaults textChain / textApiModel); K10: and its
- *  imageModel, which prices the article's images. */
-export interface TopicTextRoad { textChain?: unknown; textApiModel?: unknown; imageModel?: unknown }
+/** Card K7: the site's text road as the price reads it (SiteContentDefaults textChain / textApiModel); K10/K26: and its
+ *  image source (scheduleImageModel / imageModel), which prices the article's images. */
+export interface TopicTextRoad { textChain?: unknown; textApiModel?: unknown; imageModel?: unknown; scheduleImageModel?: unknown }
+
+/** One automatic article image's price, USD: on the model the pipeline draws with (scheduleImageModel, make.ts). */
+export const topicImageUsd = (road?: TopicTextRoad): number => articleImageUsd(scheduleImageModel(road));
 
 /** The article call's model part, USD: the feature's estimate on the site's API model (none set = the feature's own). */
 export function articleModelUsd(road?: TopicTextRoad): number {
@@ -57,7 +60,7 @@ export function topicCostUsd(formats: readonly string[] = ["article", "social"],
   const round = (usd: number) => Math.ceil(usd * 100) / 100;
   const hasArticle = formats.includes("article");
   const swap = hasArticle && road ? articleModelUsd(road) - articleModelUsd() : 0;   // no road = the feature's own price, as before
-  const article = hasArticle ? unit("article") + swap + (TOPIC_ARTICLE_IMAGES + TOPIC_COVER_IMAGES) * articleImageUsd(road?.imageModel) : 0;
+  const article = hasArticle ? unit("article") + swap + (TOPIC_ARTICLE_IMAGES + TOPIC_COVER_IMAGES) * topicImageUsd(road) : 0;
   const saved = hasArticle && subFirst(road) ? articleModelUsd(road) : 0;
   const social = formats.includes("social") || formats.includes("youtube") ? unit("syndicate") : 0;   // youtube's text is written too
   const video = formats.includes("video") || formats.includes("youtube") ? articleVideoCostUsd() : 0;

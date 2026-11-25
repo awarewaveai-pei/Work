@@ -43,10 +43,12 @@ describe("topic price counts the article's images", () => {
     const images = TOPIC_ARTICLE_IMAGES + TOPIC_COVER_IMAGES;
     const expected = Math.ceil((featureUnitCostUsd(f) + images * IMAGE_RATES[DEFAULT_IMAGE_MODEL].usd) * 100) / 100;
     expect(topicCostUsd(["article"]).usual).toBe(expected);
-    // K10: on the site's image model (an unusable one = the default)
-    const onMax = Math.ceil((featureUnitCostUsd(f) + images * IMAGE_RATES["flux-2-max"].usd) * 100) / 100;
-    expect(topicCostUsd(["article"], { imageModel: "flux-2-max" }).usual).toBe(onMax);
+    // K10/K26: on the model the schedule draws with -- its own source, else the site's when a schedule can use it, else the default
+    const on = (model: string) => Math.ceil((featureUnitCostUsd(f) + images * IMAGE_RATES[model].usd) * 100) / 100;
+    expect(topicCostUsd(["article"], { imageModel: "nano-banana-2" }).usual).toBe(on("nano-banana-2"));
+    expect(topicCostUsd(["article"], { imageModel: "nano-banana-2", scheduleImageModel: "openai-low" }).usual).toBe(on("openai-low"));
     expect(topicCostUsd(["article"], { imageModel: "codex-image" }).usual).toBe(expected);
+    expect(topicCostUsd(["article"], { imageModel: "flux-2-max" }).usual).toBe(expected);   // dropped from the list = not set
     expect(topicCostUsd(["article"]).usual).toBeGreaterThan(Math.ceil(featureUnitCostUsd(f) * 100) / 100);
     expect(MAKE_IMAGES).toBe(TOPIC_ARTICLE_IMAGES);
   });

@@ -75,7 +75,11 @@ export interface SiteContentDefaults {
   requiredBlocks?: string[];
   language?: string;
   targetCountry?: string;
+  /** The article images' source, the article page's default (lib/content/image/article-image.ts ARTICLE_IMAGE_SOURCES). */
   imageModel?: string;
+  /** K26: the schedule's articles' image source (SCHEDULE_IMAGE_CHOICES, never codex-image); missing = imageModel when a
+   *  schedule can use it, else the default (scheduleImageModel()). Its own PATCH field, like textApiModel. */
+  scheduleImageModel?: string;
   /** K10: the article images' style, a STYLE_CATALOG key (public/editor-shared/art-styles.js), never the prompt itself;
    *  missing or unknown = the photo look (lib/content/image/article-image.ts articleStyleKey). */
   imageStyle?: string;

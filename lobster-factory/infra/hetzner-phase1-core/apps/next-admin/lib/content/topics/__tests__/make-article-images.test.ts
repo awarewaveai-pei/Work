@@ -80,13 +80,29 @@ describe("automatic article images (K10)", () => {
   });
 
   it("the site's style and model are used; no style = the photo look; an unusable model = the default", async () => {
-    m.defaults = { imageStyle: WATERCOLOR.zh, imageModel: "flux-2-max" };
+    m.defaults = { imageStyle: WATERCOLOR.zh, imageModel: "nano-banana-2" };
     await make();
-    expect(m.calls.every((c) => c.imageStyle === WATERCOLOR.prompt && c.model === "flux-2-max")).toBe(true);
+    expect(m.calls.every((c) => c.imageStyle === WATERCOLOR.prompt && c.model === "nano-banana-2")).toBe(true);
     m.calls = [];
-    m.defaults = { imageModel: "codex-image" };
+    m.defaults = { imageModel: "flux-2-max" };   // K26: an old value dropped from the list = not set
     await make();
     expect(m.calls.every((c) => c.imageStyle === articleStylePrompt(undefined) && c.model === "flux-schnell")).toBe(true);
+  });
+
+  it("K26 the schedule's source: its own setting first, then the site's when a schedule can use it, then the default", async () => {
+    m.defaults = { imageModel: "nano-banana-2", scheduleImageModel: "openai-low" };
+    await make();
+    expect(m.calls.length).toBe(TOPIC_ARTICLE_IMAGES + 1);
+    expect(m.calls.every((c) => c.model === "openai-low")).toBe(true);
+    m.calls = [];
+    m.defaults = { imageModel: "codex-image" };   // the manual default only the operator's laptop can draw: not for the schedule
+    await make();
+    expect(m.calls.length).toBe(TOPIC_ARTICLE_IMAGES + 1);
+    expect(m.calls.every((c) => c.model === "flux-schnell")).toBe(true);
+    m.calls = [];
+    m.defaults = { imageModel: "codex-image", scheduleImageModel: "none" };
+    await make();
+    expect(m.calls).toEqual([]);
   });
 
   it("a site set to None（不生成）: no image is drawn or reserved, and the article asks for none", async () => {
@@ -98,11 +114,19 @@ describe("automatic article images (K10)", () => {
   });
 
   it("the reservation counts body + cover on the site's model", async () => {
-    const road = { textChain: undefined, textApiModel: undefined, imageModel: "flux-2-max" };
+    const road = { textChain: undefined, textApiModel: undefined, imageModel: "nano-banana-2" };
     expect(stepUpperTwd.article(5, road)).toBeGreaterThan(stepUpperTwd.article(5, { ...road, imageModel: "flux-schnell" }));
-    m.defaults = { imageModel: "flux-2-max" };
+    m.defaults = { imageModel: "nano-banana-2" };
     const made = await make();
     expect((made.artifacts as { budget: { spentTwd: number } }).budget.spentTwd).toBe(stepUpperTwd.article(TOPIC_ARTICLE_IMAGES + 1, road));
+  });
+
+  it("K26 the reservation is priced on the model actually drawn with (the schedule's own source)", async () => {
+    m.defaults = { imageModel: "flux-schnell", scheduleImageModel: "nano-banana-2" };
+    const made = await make();
+    expect(new Set(m.calls.map((c) => c.model))).toEqual(new Set(["nano-banana-2"]));
+    expect((made.artifacts as { budget: { spentTwd: number } }).budget.spentTwd)
+      .toBe(stepUpperTwd.article(TOPIC_ARTICLE_IMAGES + 1, { imageModel: "nano-banana-2" }));
   });
 
   it("an article without a scene or cover fields (old model behaviour): alt text draws the body, the SEO title the cover", async () => {

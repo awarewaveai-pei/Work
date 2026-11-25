@@ -12,10 +12,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { featureUnitCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { TEXT_FEATURES } from "@/lib/ai/cost-model";
-import { articleImageUsd } from "@/lib/content/image/article-image";
 import { draftCallUpperTwd } from "@/lib/content/video/auto-run-budget";
 import { articleVideoCostUsd } from "@/lib/content/video/defaults";
-import { articleModelUsd, type TopicTextRoad } from "./cost";
+import { articleModelUsd, topicImageUsd, type TopicTextRoad } from "./cost";
 
 /** The cap when the content_pipeline row sets none (0168 per_topic_cap_twd null). */
 export const DEFAULT_TOPIC_CAP_TWD = 15;
@@ -92,9 +91,9 @@ function feature(key: string): number {
  *  (auto-run-budget draftCallUpperTwd: the social default model at its limit plus the Claude retry) and settled to its exact cost. */
 export const stepUpperTwd = {
   // K7: on the site's API model (a subscription road reserves its API fallback, the most it can cost); no road = as before.
-  // K10: images = body + cover, each at the site's image model (articleImageModel: an unusable one = the default)
+  // K10/K26: images = body + cover, each on the model the pipeline draws with (topicImageUsd)
   article: (images: number, road?: TopicTextRoad) => twd(feature("article") + (road ? articleModelUsd(road) - articleModelUsd() : 0)
-    + images * articleImageUsd(road?.imageModel)),
+    + images * topicImageUsd(road)),
   video: () => twd(articleVideoCostUsd()),
   socialCall: (prompt: string) => draftCallUpperTwd(prompt),
 };

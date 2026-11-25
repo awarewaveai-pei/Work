@@ -6,6 +6,7 @@ import { staffOnly } from "@/lib/tenant-guard";
 import type { ManagedSite } from "@/app/api/content/sites/route";
 import { MAX_REQUIRED_BLOCKS, MAX_REQUIRED_BLOCK_CHARS, MAX_TREND_FEEDS, PUBLISH_MODES, TEXT_ROAD_API_MODELS, TEXT_ROAD_CHAINS, TEXT_ROAD_CLAUDE_MODELS, TEXT_ROAD_CODEX_MODELS, TOPIC_MODES, YOUTUBE_PRIVACIES, siteIntroCards, type SiteContentDefaults } from "@/lib/content/brand-voice";
 import { subscriptionRoadDenied } from "@/lib/content/text-road-guard";
+import { SCHEDULE_IMAGE_CHOICES } from "@/lib/content/image/article-image";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { coverSettingsError, parseCoverSettings } from "@/lib/content/cover/settings";
 import { autoIntroStyles } from "@/public/editor-shared/intro-styles.js";
@@ -23,6 +24,8 @@ const GATE_MODES = [
   { field: "textApiModel", allowed: TEXT_ROAD_API_MODELS },
   { field: "textClaudeModel", allowed: TEXT_ROAD_CLAUDE_MODELS },
   { field: "textCodexModel", allowed: TEXT_ROAD_CODEX_MODELS },
+  // K26: the schedule's image source spends money without a person; codex-image is not one of them (article-image.ts)
+  { field: "scheduleImageModel", allowed: SCHEDULE_IMAGE_CHOICES },
 ] as const;
 
 export const runtime = "nodejs";
