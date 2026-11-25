@@ -87,3 +87,11 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 - K13 實測已跑完（正式站）：比較頁 `https://claude.ai/artifact/QDYm5geq9V9ztRgLrEZtrg`，資料 `agency-os/reports/model-bakeoff/2026-11-article-image/`（`runs.json`、`img/`、`image-bakeoff.html`；產生器在 scratchpad `build_image_page.cjs`，重建需重寫）。來源 A–F＝openai-low、codex-image、flux-schnell、nano-banana-2、flux-2-klein-4b、flux-dev；另有改版前做法對照。**等操作者選預設來源** → 改 `DEFAULT_IMAGE_MODEL`／`ARTICLE_IMAGE_MODELS`，寫進 `MeasuredRuns.tsx` 新組「文章配圖」。
 - 待她決定：畫面描述加「符合網站目標地區」（內文圖的人物偏西方臉）；自動社群草稿附封面圖（現在只有影片題目才附媒體，`make.ts` attachTopicVideo）；風格目錄的畫家組在文章這邊要不要收起來；IG 直式 4:5。
 - 未驗：文章頁的封面短標題／副標欄位；真的自動文章的封面；FB／IG 真實草稿。
+
+### 配圖收尾（2026-11-25 下午）
+- 上線：部署版 `67b4051c3`（11-25 06:31Z，sg-deploy exit 0、healthy、Playwright smoke 30 過 0 敗）。含 K26（來源清單＋`scheduleImageModel`）、實測紀錄「文章配圖」、操作者定案的四個來源。
+- 操作者定案：預設維持 C（`flux-schnell`）；保留 A（`openai-low`）、D（`nano-banana-2`）、`codex-image` 可選；E、F 不放進文章選單；每個按鈕標 NT$／張；之後她再測一次才決定要不要換預設。K13 已完成（中文、英文各一篇，六個來源各四張；比較頁 `https://claude.ai/artifact/QDYm5geq9V9ztRgLrEZtrg`）。
+- 正式站已看：`/tools/content/sites` 排程那一排與手動預設那一排的按鈕與價錢；`/tools/ai-models?tab=measured` 的「文章配圖」。
+- 還沒做、等她說：畫面描述加「符合網站目標地區」（內文圖人物偏西方臉）；自動社群草稿附封面圖；風格目錄的畫家組在文章這邊收起來；IG 直式 4:5；免費圖庫。
+- 未驗：文章頁的封面短標題／副標欄位；真的自動文章的封面與 FB／IG 草稿（等下一篇自動文章）。
+- 教訓：在瀏覽器頁面裡跑長流程，結果要每完成一項就寫進 `localStorage` 並取出存檔；只放 `window` 變數，頁面一重新整理就全丟（11-25 丟過一次）。
