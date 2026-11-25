@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { systemsAccess } from "@/lib/systems/access";
 import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockStats, blocksForSystem, catalogHref, isLive, type BlockLayer, type CatalogGroup, type CatalogView, type LegoBlock, type Tier } from "@/lib/systems/blocks";
-import { overviewGroup, projectAll, type SystemOverviewRow } from "@/lib/systems/overview";
+import { overviewGroup, projectAll, type OverviewGroup, type SystemOverviewRow } from "@/lib/systems/overview";
 import { readDefinitions, readProjectionInput } from "@/lib/systems/store";
 import { AddSystemForm, HEADER_CSS, Progress, Refused, StatusBadge, SystemsHeader, errorBox, muted, page, panel, panelBody, panelHead, smallBtn } from "../parts";
 
@@ -17,7 +17,9 @@ const VIEWS: Array<[CatalogView, string]> = [["systems", "系統用了哪些積�
 type View = CatalogView;
 type Sp = { view?: string | string[]; grp?: string | string[]; tier?: string | string[]; layer?: string | string[]; sys?: string | string[]; q?: string | string[] };
 type Filters = { view: View; grp: CatalogGroup | null; tier: Tier; layer: BlockLayer | null; sys: string; q: string };
-type SysRow = { slug: string; sys: SystemOverviewRow | undefined; blocks: LegoBlock[]; grp: CatalogGroup | null };
+type SysRow = { slug: string; sys: SystemOverviewRow | undefined; blocks: LegoBlock[]; grp: OverviewGroup | null };
+/** 狀態三類與總控中心統計卡同一套（overviewGroup）；「沒用積木」獨立看，不搶狀態類的數字 */
+const inGroup = (r: SysRow, g: CatalogGroup) => (g === "none" ? r.blocks.length === 0 : r.grp === g);
 const GROUPS: Array<[CatalogGroup, string]> = [["active", "開發中"], ["attention", "待確認"], ["wrapped", "維護與已完成"], ["none", "沒用積木"]];
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -62,14 +64,14 @@ function Stat({ title, value, hint }: { title: string; value: number; hint: stri
 /** One card per system: name, status, completion, then its blocks per layer as wrapping chips (stronger = more blocks). */
 function SystemsView({ rows, f, nameOf }: { rows: SysRow[]; f: Filters; nameOf: (s: string) => string }) {
   const max = Math.max(1, ...rows.flatMap((r) => BLOCK_LAYERS.map((l) => r.blocks.filter((b) => b.layer === l.key).length)));
-  const shown = f.grp ? rows.filter((r) => r.grp === f.grp) : rows;
+  const shown = f.grp ? rows.filter((r) => inGroup(r, f.grp as CatalogGroup)) : rows;
   return (
     <section style={panel}>
       <div style={panelHead}><h2 style={{ margin: 0, fontSize: 16 }}>系統用了哪些積木</h2><div style={muted}>每個系統的狀態、完成度與用到的積木；點標籤看是哪幾顆</div></div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "12px 18px", borderBottom: "1px solid var(--card-border)" }}>
         <Link href={hrefOf(f, { grp: null })} className={!f.grp ? "btn-primary" : "btn-secondary"} style={smallBtn}>全部 {rows.length}</Link>
         {GROUPS.map(([g, label]) => (
-          <Link key={g} href={hrefOf(f, { grp: g })} className={f.grp === g ? "btn-primary" : "btn-secondary"} style={smallBtn}>{label} {rows.filter((r) => r.grp === g).length}</Link>
+          <Link key={g} href={hrefOf(f, { grp: g })} className={f.grp === g ? "btn-primary" : "btn-secondary"} style={smallBtn}>{label} {rows.filter((r) => inGroup(r, g)).length}</Link>
         ))}
       </div>
       {shown.length === 0 && <div style={{ ...muted, padding: "24px 18px", textAlign: "center" }}>這一類沒有系統</div>}
@@ -256,7 +258,7 @@ export default async function BlocksPage({ searchParams }: { searchParams?: Prom
     .map((slug): SysRow => {
       const sys = bySlug.get(slug);
       const blocks = blocksForSystem(slug);
-      const grp: CatalogGroup | null = blocks.length === 0 ? "none" : sys
+      const grp = sys
         ? overviewGroup({ status: sys.eff.status, inferred: sys.eff.inferred, featureCount: sys.p.features.length, blocker: sys.p.handoff.blocker, lastCommitAt: sys.p.lastCommitAt }, Date.now())
         : null;
       return { slug, sys, blocks, grp };

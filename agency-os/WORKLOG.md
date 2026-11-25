@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-26（續6）— 積木頁篩選數字與總控中心統計卡對齊：「沒用積木」不再搶走狀態類
+
+- 根因：正式站實看，總控中心卡 開發中16／待確認9／維護與已完成5，積木頁同名按鈕卻是 10／8／3——`blocks/page.tsx` 把沒用積木的系統 grp 設成 `"none"`，蓋掉 overviewGroup，同名分類兩處數字不同。
+- 修正：`NA/app/(shell)/ops/systems/blocks/page.tsx` grp 一律 overviewGroup；「沒用積木」改 `inGroup()` 以 `blocks.length===0` 獨立判斷（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）。正式站另三分頁（系統卡、積木清單、圖解）實看正常。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run "app/(shell)/ops/systems" lib/systems | exit=0 | ms=12000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 5 行頁面篩選修正，語意由 overviewGroup（overview 測試）定義，本機 tsc＋56 測過
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=inGroup|CatalogGroup | hits=14
+- rollback：`git revert` 本 commit；今晚 03:00 自動部署上線
 ## 2026-11-26（續4）— 積木＝可組裝到不同系統的零件：補 25 顆共用底座／營運積木、自動守「跨系統共用必屬某積木」、系統分頁篩選鈕
 
 - 根因／決策：操作者定義「積木＝像樂高可組裝成不同東西」。掃 `@/` import：171 檔被 ≥2 系統使用，扣掉產品模組資料夾仍有 93 檔不屬任何積木，含組裝最多的核心（`lib/ops-role.ts` 17 系統、`lib/security/timingSafeEqual.ts` 15、`lib/ai/gateway.ts` 11、`lib/tenant-guard.ts` 11）→ 目錄原本偏重圖像功能、漏了底座。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
