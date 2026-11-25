@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續1）— 手動提前部署 next-admin 6de5a4196（LEGO 積木目錄 5c1ec7fa2＋更正 4b154dac7）
+
+- 決策：操作者「部署」；DEPLOY_HOLD 不在 main。
+- 步驟：主機 `sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin` → test gate 過、build、healthy 15s、HTTP smoke 5/5；`.deployed-commit` 8f477587d → 6de5a4196；容器 `lobster-next-admin` 名稱正常；容器內 `.next/server/app/(shell)/ops/systems/blocks/page.js` 存在
+- 驗證：`scripts/playwright-runner.ps1 -Mode smoke -SkipInstall` 30 passed／22 skipped
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin; playwright-runner.ps1 -Mode smoke | exit=0 | ms=420000
+- REVIEW_WAIVED: NA -- 部署動作；程式審查在 5c1ec7fa2／4b154dac7 條目
+- BUGHUNT_WAIVED: NA -- 部署動作，無程式改動
+- 剩餘風險：瀏覽器窗格未登入，正式站積木頁的系統名稱與進度未親眼看過
+- rollback：主機 `sg-deploy.sh` 以前一個 commit 8f477587d 重部署（`agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.1）
 ## 2026-11-25（續21）— aware-wave.com 部落格列表封面改 4:3（文章頁維持 3:2）
 
 - 更正續19：aware-wave.com 佈景主題是 Twenty Twenty-Five（區塊主題），不是 Kadence。列表（home/archive）原本用 pattern `twentytwentyfive/template-query-loop`，特色圖 `aspectRatio 3/2`；文章頁 `templates/single.html:8` 本來就是 3/2。
