@@ -14,6 +14,7 @@ const supported = [
   "image-output",
   "follow-manual",
   "follow-track",
+  "privacy", // 肖像權保護: backend/face-privacy.cjs (local YuNet + FFmpeg)
   "subtitle-burn",
   "voice-overlay",
   "editor-export",
@@ -70,6 +71,7 @@ async function media(input, { file, output, signal, env, fetchImpl }) {
   const audioTools = require("./audio-tools.cjs");
   if (audioTools.handles(input) && !audioTools.runsLocally(input, env)) return audioTools.run(input, { file, output, signal, run, inspect: require("./media-inspect.cjs").inspectMedia, env, fetchImpl });
   if (input.operation === 'follow-track') return require('./follow.cjs').follow(input, { file, output, signal, run });
+  if (input.operation === 'privacy') return require('./face-privacy.cjs').privacy(input, { file, output, signal });
   if (input.operation === 'editor-export') return require('./editor-export.cjs').exportEditor(input.settings?.project, { file, output, signal, run }, input.settings?.quality);
   const source = file(input.references?.src?.url);
   if (!source) throw Error("請先選擇來源影片");

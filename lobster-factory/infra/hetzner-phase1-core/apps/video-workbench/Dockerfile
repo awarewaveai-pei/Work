@@ -33,7 +33,8 @@ COPY . .
 # postinstall = vendor-vision.cjs (copies from node_modules, SHA-256 checked) + vendor-ffprobe.cjs (skips off Windows).
 # The Craft engines (engines/filmcraft, engines/effectcraft) are not in the image: their pinned builds are served from the
 # host's static folder (card FC.4); without them the "專業剪輯／專業特效" cards simply stay hidden.
-RUN npm ci --omit=dev \
+# onnxruntime-node (肖像權保護, CPU only): skip its optional CUDA download from NuGet; the host has no GPU.
+RUN ONNXRUNTIME_NODE_INSTALL=skip npm ci --omit=dev \
     && node scripts/vendor-three.cjs
 # The editor's fonts (layer above; postinstall finds them in place): preview and export read these files; the image has
 # no CJK font of its own. Re-run = verify every file's sha256, so a missing or changed file fails the build.
