@@ -1481,7 +1481,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
       if (!json.ok || !json.draft) { fail("草稿開啟失敗：找不到這篇草稿，或你沒有權限。"); return; }
       const d = json.draft;
       if ((d.organizationId && d.organizationId !== clientContext.org) || (d.siteId && d.siteId !== selectedSiteId)) {
-        fail("這篇草稿屬於另一個客戶或網站，請先在左側客戶欄切到它所屬的網站再開啟。");
+        fail("這篇草稿屬於另一個客戶或網站，請先在客戶欄切到它所屬的網站再開啟。");
         return;
       }
       // Restore the form snapshot (fall back to a minimal form if an old row lacks one).
@@ -1778,7 +1778,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
     // **另一個客戶**的網站上。這個伺服器端後備是給不帶 siteId 的唯讀清單呼叫用的，寫入動作
     // 不可以沾。wpSites 只剩目前客戶的站（沒選客戶時為空），所以沒選站一律擋。
     if (!selectedSiteId) {
-      setPubStatus("error"); setPubError("尚未選擇網站 — 請先在左側客戶欄選客戶與網站，再發布。");
+      setPubStatus("error"); setPubError("尚未選擇網站 — 請先在客戶欄選客戶與網站，再發布。");
       return;
     }
     const resolvedMode = mode ?? pubMode;
@@ -1870,7 +1870,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
             // 伺服器端的「第一個可存取的站」後備會讓它改到別人的站去。
             if (!selectedSiteId) {
               setVideoStatus("error");
-              setVideoError("尚未選擇網站 — 影片已產出，但未嵌入任何網站。請在左側客戶欄選定網站後重試。");
+              setVideoError("尚未選擇網站 — 影片已產出，但未嵌入任何網站。請在客戶欄選定網站後重試。");
               return;
             }
             setVideoStatus("embedding");
@@ -2356,7 +2356,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
           )}
           </div>
 
-          {/* ── 目標網站：只顯示，挑選在左側客戶欄（ADR 020）── */}
+          {/* ── 目標網站：只顯示，挑選在客戶欄（ADR 020）── */}
           <div className="form-block form-block--wide" style={{ marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", whiteSpace: "nowrap" }}>📍 目標網站</span>
@@ -2367,14 +2367,14 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                   <a href={currentSite.url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "var(--text-muted)", textDecoration: "none" }}>{currentSite.url} ↗</a>
                 </span>
               ) : !clientContext.org ? (
-                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請先在左側客戶欄選客戶。</span>
+                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請先在客戶欄選客戶。</span>
               ) : clientContext.sites !== null && clientContext.sites.length === 0 ? (
                 <span role="status" style={{ fontSize: "12px", color: "var(--badge-yellow-text)" }}>
                   這個客戶尚未連接任何網站 — 文章仍可生成，但無法推送。{" "}
                   {sitesHref && <a href={sitesHref} style={{ color: "var(--btn-primary-bg)" }}>前往連接 ↗</a>}
                 </span>
               ) : (
-                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請在左側客戶欄選網站。</span>
+                <span role="status" style={{ fontSize: "12px", color: "var(--text-muted)" }}>請在客戶欄選網站。</span>
               )}
               <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "10px" }}>
                 {saveDefaultsMsg && (
@@ -2387,7 +2387,7 @@ export default function ContentStudio({ video, chainControl, view = "generate", 
                   type="button"
                   onClick={saveAsClientDefault}
                   disabled={savingDefaults || !currentSite}
-                  title={currentSite ? undefined : "請先在左側客戶欄選網站"}
+                  title={currentSite ? undefined : "請先在客戶欄選網站"}
                   style={{
                     fontSize: "11px", padding: "3px 10px", borderRadius: "6px",
                     border: "1px solid var(--accent)", background: "transparent",

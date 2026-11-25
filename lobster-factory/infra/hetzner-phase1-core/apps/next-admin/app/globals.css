@@ -544,6 +544,23 @@ button.sidebar-link {
   font-weight: var(--font-weight-semibold);
 }
 
+/* The client rail (app/ClientRail.tsx), both frames. A long page scrolls the window: the rail stays in view and scrolls
+   its own list (both frames' rows are flex). */
+.client-rail {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--card-border);
+  background: var(--bg-card);
+}
+
 .topbar {
   background: var(--topbar-bg);
   border-bottom: 1px solid var(--card-border);
@@ -2919,11 +2936,11 @@ pre {
     background: var(--sidebar-active-bg);
     font-weight: var(--font-weight-semibold);
   }
-  /* The side columns take no room; the client rail's own layout is inline, hence !important. */
+  /* The side columns take no room. */
   .main { margin-left: 0; min-height: 0; }
   .door-main { min-height: 0; }
   .sidebar, .door-side { display: none; }
-  .client-rail { display: none !important; }
+  .client-rail { display: none; }
   .shell[data-more="open"] > .sidebar,
   .shell[data-more="open"] .door-side {
     display: flex;
@@ -2939,13 +2956,12 @@ pre {
   }
   /* A page that needs a client: the rail takes the upper half, the menu the lower. */
   .shell[data-more="open"] .client-rail {
-    display: flex !important;
-    position: fixed !important;
-    top: 0 !important;
+    display: flex;
+    position: fixed;
     left: 0;
     right: 0;
-    width: auto !important;
-    height: 50vh !important;
+    width: auto;
+    height: 50vh;
     z-index: 40;
     border-bottom: 1px solid var(--sidebar-border);
   }
