@@ -124,6 +124,7 @@ export const PRODUCTS: readonly PortalProduct[] = PRODUCT_DEFINITIONS;
 export interface StaffPage { name: string; why: string; tool?: string }
 export const STAFF_UTILITIES: Readonly<Record<string, StaffPage>> = {
   "tools/theme": { name: "後台外觀", why: "員工調整後台外觀，不呼叫付費 AI。" },
+  "tools/seedstar": { name: "本機影片工作台的外觀", why: "把後台外觀套到員工自己電腦上的影片工作台（只連 loopback），不呼叫付費 AI。", tool: "tools/theme" },
   "tools/ai-models": { name: "模型資料", why: "員工查閱模型資料，不呼叫付費 AI。" },
   "tools/edit-guide": { name: "改圖怎麼挑", why: "說明頁：改圖面板怎麼用、每顆模型鈕差在哪，不呼叫付費 AI。" },
 };

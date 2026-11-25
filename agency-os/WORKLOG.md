@@ -23,6 +23,32 @@
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n（Codex `agency-os/reports/oracle/2026-11-25-partialreview-627147d8.md`：主機 compose 不隨部署更新——即上線第 3 步 safe-infra-patch）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude,mcp | grep=claude_usage_window|CLAUDE_USAGE_WINDOW | hits=23
 - BUGHUNT_DONE: scope=lobster-factory | grep=weekday_hours|weekdayHours | hits=45
+## 2026-11-25（續5）— oracle WP：算命站 WPvivid 遠端備份（沿用主站 Google Drive 授權），建站第 8 步全部完成
+
+- [根因] 第 8 步剩 WPvivid 遠端；操作者要監工做。`/wp-login.php` 的 Cloudflare challenge 連操作者的 Chrome（擴充功能分頁）也擋，UI 路徑不通。
+- [步驟] 讀 `class-wpvivid-google-drive.php:770-806`：`is_encrypt` 只是 base64、refresh 走 `auth.wpvivid.com`，授權非站台專屬 → 主站預設 googledrive remote 經 pipe 到 oracle 站：`WPvivid_Setting::add_remote_options`＋`update_remote_option`、`remote_selected`、`update_user_history`、`WPvivid_Schedule::set_schedule_ex`（weekly、files+db、remote）。再 `wp cron event run wpvivid_main_schedule_event`。
+- [驗證] `remote=wpvivid-remote-6b066da64cbab name=Update_Backup path=wpvivid_backup schedule=success next=2026-11-30T00:25:54Z`。`wpvivid_backup_list`：1 筆，remote=`googledrive:Update_Backup`，size 114980956；task `completed`；log `Finished uploading oracle.aware-wave.com_wpvivid-e00297af17019_2026-11-25-05-10_backup_all.zip`／`Upload success`。流程頁第 8 步「完成」（三格皆有確認紀錄）。
+- [未做] 未從 Drive 端列檔核對（只有外掛 log）；未做還原演練（主機整機備份的還原已於 SF-L 驗過）。與主站、Soulful 共用同一 Drive 資料夾，檔名以網域開頭區分。
+- [rollback] oracle 站 WPvivid 設定頁刪該 remote，或 `wp option delete wpvivid_upload_setting wpvivid_schedule_setting`＋`wp cron event delete wpvivid_main_schedule_event`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp cron event run wpvivid_main_schedule_event（oracle 站）；wp eval wpvivid_backup_list；grep wpvivid_log | exit=0 | ms=120000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（站台設定與文件）
+- ORACLE_WAIVED: 無 source 改動
+## 2026-11-25（續3）— 平台第 10 批上線：K14、M6、M8（High，0182 已套用）＋正式站實看、U13／U14 解除卡點
+
+- 操作者 2026-11-25「可以」＝ M6、M8 的 go；同日「全部去處理好, 還有其他工人反映的 risks」＝ 逐條清監工台未結風險。
+- K14 `25337b53d`＋`b1d748bac`：新 `lib/client-context/__tests__/new-door.test.ts`（T1–T6；突變 `withContext` 拼網域 → T3、T5 紅，`ClientRail` import `hosts` → T4 紅）；VW 五檔可見字串「影音工作台」→「影片工作台」。**推上後 VW 部署閘紅**：`scripts/storyboards-0.js` 受 `tests/storyboards-baseline.cjs` 雜湊保護，基準未同 commit 更新（工人本機只跑三個 VW 測試，沒跑 `gate.cjs`）→ 監工更新 `tests/storyboards-design-baseline.json` 一個雜湊（差異只有那句提示），閘綠後才部署。
+- M6 `71b50a370`＋`b0439a950`＋`6a06ac00a`：新 `app/api/webhooks/awarewave-wp-member/route.ts`（與付款事件同一套簽章與站點驗證；事件種類分派，今只有 `member_invite` → `ensureWpCustomer` 帶 `inviteCode`；拒絕 409 帶原因碼、站點停用 503 可重試）；外掛 `includes/MemberInvite.php`（`/?aw_invite=<碼>` 落地、email 驗證後才送、結果頁）、`MyAccountDoors.php` 按鈕與產品列樣式；`scripts/local-member-flow.ps1` 加 invite-ok／invite-expired。**監工決定**：代辦不是付款，不動 `woo-billing.ts`（DISPATCH M6 列原補充已刪）。
+- M8 `3a721e688`＋`a16161b25`＋`640921ab2`＋`c497eed55`：migration `0182_member_transfer`（`customer_identities(organization_id)` 唯一索引；`member_invites` 加 `transfer_of`／`transfer_reason`／`transfer_actor_role`；`member_transfer_issue`；`member_invite_redeem` 加轉移分支：同一交易同一把單位鎖下刪舊 identity、寫 `ops_audit_events`、寫 `former_customer_identities`、寫新 identity）；新 `app/api/ops/clients/[slug]/member-transfer/route.ts`；`lib/accounts/client-route-guards.ts`（`staffAdmin`／`clientOrg` 兩條路由共用）；`AccountsCard.tsx` 轉移鈕＋邀請完整連結（host 取 `seller_sites` aware-wave.com 列）。
+- Codex 審查（`agency-os/reports/oracle/2026-11-24-partialreview-91a8a0f8.md`，2 項皆成立、皆退回修畢）：① 轉移早於佇列中的付款事件送達 → 事件被拒、已付權益未記 → `former_customer_identities`＋`findFormerAccount`（只有 `ensureWpCustomer` 無碼路徑讀；`isAccountManager`、`wp-handoff`、`wp-summary`、`awarewave-wp.ts` 只認現任；突變：`isAccountManager` 讀前任表 → 測試紅）；② 外掛 `hold()` 保留舊碼使「作廢重發」的新碼被丟 → 暫存改最多 3 個、互不覆蓋、最新先送、被拒換下一個。修後未送第二輪 Codex（操作者規則：一輪）。
+- 工人 RISKS 監工處置（另兩次退回）：M8 舊管理者自拿轉移碼 app 提前回 ok → 改拒 `transfer_same_member`；權限檢查複製一份 → 抽共用模組；M6 外掛明文碼無期限 → 14 天。
+- 上線：主機鎖可取得 → `node scripts/apply-db-migration.mjs 0182`（`APPLY_OK`；psql：唯一索引在、`former_customer_identities` 0 列、service_role 無 insert、authenticated 無 select、identities 仍 2 列）→ push `c497eed55` → 修基準 push `b1d748bac` → CI 綠 → `sg-deploy.sh next-admin` exit 0（healthy 15s、smoke 5/5）→ 本機 `node tests/k12-org-handoff.cjs` ok → `sg-deploy.sh video-workbench` exit 0（smoke 含 vw healthz、video `/login`、vw api 401）→ curl：app／content／video `/login` 200、`member-transfer` 未登入 401、`awarewave-wp-member` 未簽章 404（`member_events_disabled`，付款開關未開，預期）。
+- 正式站實看（內建瀏覽器，app.aware-wave.com 已登入）：測試單位 `test-wp-webhook-co-c705c6` 帳號分頁發起邀請 → 待驗證＋碼＋`https://aware-wave.com/?aw_invite=…`＋複製連結；重新整理後狀態在、碼不再顯示；作廢 →「邀請已作廢。」（`window.confirm` 被內建瀏覽器自動取消，先設 `window.confirm=()=>true`）；psql 確認該列先 `voided=f` 後作廢。Soulful 帳務分頁「誰在操作」卡在。`/tools/content`：U11 第一屏＝關鍵字／標題／產生文章，客戶欄六類別、Soulful＝訂閱、EdD＝贈送、TEST 隱藏、「AwareWave 自己」首列；點 Soulful 網址帶 `org`＋`site`；`/tools/content/topics` 同；`/tools/content/sites` 未選客戶顯示「請先選客戶」。**未驗**：`video.aware-wave.com`（K12 確認窗）與 content 子網域要另外登入。
+- U13／U14 卡點查明：`D:\Work` 的 `app/globals.css`、`lib/theme/tokens.ts`、`tools/theme/page.tsx` 等未提交改動 mtime 同為 2026-11-23 10:41:08（AO-RESUME parity 帶過去的時間），內容是 10-30 的 SeedStar 外框（`AwareWaveThemeFrame.tsx` mtime 10-30），無任何 session 在做 → 存成 `D:\tmp\plat-briefs\theme-dirty.patch`，U13＋U14 派給 plat-u6（避開 patch 的行、交回前 `git apply --3way --check`）；DISPATCH §0 該列改寫。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (next-admin 整合樹 703 files / 5855 passed, 0 failed) ; node scripts/apply-db-migration.mjs 0182 ; ssh psql pg_indexes+former_customer_identities ; sg-deploy.sh next-admin ; sg-deploy.sh video-workbench ; curl x5 ; 內建瀏覽器正式站實點 | exit=0 | ms=1800000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - external oracle = Codex CLI (codex exec -s read-only)，2 項皆修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=former_customer_identities | hits=29
 ## 2026-11-25（續2）— oracle WP：算命站寄信改用獨立 Resend 帳號（網域搬移、DKIM 換新、新 key）
 
 - [根因] 主站與算命站共用一個 Resend 免費帳號（`get-usage`：100／日、3000／月、Domains 2/3）；每日信會吃主站交易信額度，帳號層停權兩站同死。操作者提出分帳號並自行以 Google `oracle.aware@gmail.com` 註冊、建 Full access key（存憑證檔）。

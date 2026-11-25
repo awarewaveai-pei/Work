@@ -75,6 +75,12 @@ export const COLOR_GROUPS: TokenGroup[] = [
     ],
   },
   {
+    label: "Form Controls",
+    tokens: [
+      { name: "--form-input-bg", default: "var(--card-bg)", type: "color" },
+    ],
+  },
+  {
     label: "Status",
     tokens: [
       { name: "--green", default: "#10b981", type: "color" },

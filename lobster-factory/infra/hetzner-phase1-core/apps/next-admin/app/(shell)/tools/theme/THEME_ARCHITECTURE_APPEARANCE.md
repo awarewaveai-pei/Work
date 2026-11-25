@@ -17,6 +17,8 @@
 | **主題怎麼套到每一頁**（注入機制） | `app/layout.tsx` | `<html style={themeStyle}>` |
 | **側欄選單項目 / 預設順序** | `app/SidebarNav.tsx` | `DEFAULT_SECTIONS` |
 | **出廠預設配色本身** | `app/globals.css` | `:root { … }` |
+| **共用表單樣式** | `public/awarewave/forms.css` | shell 與本機工具讀同一份；`--form-input-bg` 在 Form Controls 調整 |
+| **本機影音工作台的外觀同步** | `components/tools/AwareWaveThemeFrame.tsx` + `app/(shell)/tools/seedstar/page.tsx` | 從外觀管理進入；只向指定本機 iframe 傳送目前 tokens，不另存主題 |
 | **DB 表結構**（加欄位等） | 開**新** migration（`0053_*.sql`…），**別改 `0052`** | `packages/db/migrations/` |
 
 > 路徑相對：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`

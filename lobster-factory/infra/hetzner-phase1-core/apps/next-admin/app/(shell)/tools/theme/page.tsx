@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { DEFAULT_SECTIONS, applyLayout, itemKey, type NavSection } from '@/app/SidebarNav';
 import { COLOR_GROUPS, TYPOGRAPHY_GROUPS, type SavedLayout, type TokenGroup } from '@/lib/theme/tokens';
 import PalettePresets from './PalettePresets';
@@ -179,6 +180,7 @@ export default function ThemePage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <Link className="btn-secondary" href="/tools/seedstar">影片工作台</Link>
           <button className="btn-secondary" onClick={handleReset}  style={{ fontSize: 13 }}>Reset all</button>
           <button className="btn-secondary" onClick={handleCopy}   style={{ fontSize: 13 }}>{copiedMsg || 'Copy CSS'}</button>
           <button className="btn-primary"   onClick={handleSave}   style={{ fontSize: 13 }}>{savedMsg  || 'Save'}</button>

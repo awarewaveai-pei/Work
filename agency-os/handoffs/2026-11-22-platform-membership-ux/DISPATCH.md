@@ -16,8 +16,8 @@
 | 測試 | 只寫卡片點名的測試；突變只做在隱私／可見範圍／擁有權守衛，一個守衛一次；`.ts/.tsx` 交回前 `npx tsc --noEmit` 綠 |
 | 審查 | 每卡 1 個 critic（Codex 額度 2026-11-24 才恢復；之前 High 卡加書面對抗自審＋突變證據） |
 | 交回 | 三行 `FILES:`／`TESTS:`（指令＋通過數）／`RISKS:`；不寫散文報告 |
-| 主題 session 佔用中 | NA `app/globals.css`、`lib/theme/tokens.ts`、`app/(shell)/tools/theme/*`、`app/__tests__/sidebar-coverage.test.ts`、`lib/theme/__tests__/tokens-match-globals.test.ts`、`app/(shell)/tools/seedstar/`、`components/tools/AwareWaveThemeFrame.tsx`：要改的卡標「先與主題 session 協調」 |
-| migration 編號 | 目前最後一號 `0180`（`0180_member_invites.sql`，2026-11-24 已套用）。M 卡開工時 `ls MIG | tail` 取下一號；同批只准一張卡寫 migration |
+| 主題未提交改動（2026-11-25 查明：沒有 session 在做，是 10 月底留在 `D:\Work` 的未提交檔） | 不得改到 `D:\tmp\plat-briefs\theme-dirty.patch` 所在的行（`globals.css` 開頭 import、`--form-input-bg`、`.form-*` 段；`tokens.ts` `COLOR_GROUPS` 插入處；`theme/page.tsx` `:1`、`:180`；`sidebar-coverage.test.ts:7`；`tokens-match-globals.test.ts:58`）；其餘可改，交回前 `git apply --3way --check` 該 patch 必過。`app/(shell)/tools/seedstar/`、`components/tools/AwareWaveThemeFrame.tsx` 不在 git，不建立不引用（VW `tests/appearance.cjs` 因此在主線上跑不過，不在部署閘內） |
+| migration 編號 | 目前最後一號 `0182`（`0182_member_transfer.sql`，2026-11-25 已套用；`0181` 是別條線的）。M 卡開工時 `ls MIG | tail` 取下一號；同批只准一張卡寫 migration |
 
 ## 1. 全部卡總表
 
@@ -58,22 +58,22 @@
 | U11 | 內容入口重排：拆頁、改名、刪功能清單、下拉改按鈕；補：員工側欄與產品門選單 19 處名稱不同（清單在 2026-11-23 WORKLOG 平台第 7 批條目），預設統一成產品門名稱，連同頁面可見舊標題與 `page-names.test.ts` 待辦清單 5 頁一起收 | NA `lib/portal/products.ts`（content 列）、`app/content/*`、`ContentStudio.tsx`、`app/sidebar-sections.ts`、`app/NavRail.tsx`（刪「功能」清單） | Medium | Opus | K5、K7、K8、U12、M11 | 8 | 已併 |
 | W2 | 外掛「我的帳號」改畫 app 給的摘要（併 W3、W4）；補：啟用外掛前先在 Cloudflare 對 `/api/auth/wp-summary`、`/api/auth/wp-handoff` 加限流（NA 無既有入站限流；改正式站安全設定，先問操作者） | PL `includes/MyAccountDoors.php`、新 `includes/Summary.php`、`tests/*` | Medium | Sonnet | W1 | 8 | 已併（只改 repo；站上外掛仍停用，啟用在 W6） |
 | M3 | 由合約自動算出「產品／方式」標籤與 TEST | 新 NA `lib/entitlements/member-tags.ts`＋test；`app/api/ops/org-search/route.ts`＋`route.test.ts`（類別改用它）；MIG `0179_entitlement_held_products.sql`＋down（唯讀彙總函式，實作時新增 → 升為 High） | **High** | Sonnet | M1、M2、U3 | 8 | 已併 |
-| U13 | 5 組對比不足的顏色修正；補：兩個主題檔的 import 改指 `app/sidebar-sections` 後刪 `app/SidebarNav.tsx`（K5 暫留的 re-export）；加 `.badge-blue` 後換掉 `ToolCard.tsx` 行內 token；補：`/tools/theme` 頁名對上左欄（`page-names.test.ts` `STAFF_TODO` 最後一列）；刪 `globals.css` 已無人用的 `.door-feature*` | NA `app/globals.css`、`lib/theme/tokens.ts`＋檢查器 | Low | Sonnet | 先與主題 session 協調 | 8 | |
-| U14 | 手機底列；補：員工後台手機寬 375 客戶欄把內容擠到 0 寬（`.sidebar` 固定 248＋客戶欄 220）；內容門手機直排時客戶欄不撐滿、內容在一屏以下 | NA `app/PlatformFrame.tsx`、`app/globals.css` | Low | Sonnet | U9、U13；先與主題 session 協調 | 9 | 未派（等主題 session 釋出 `app/globals.css`，與 U13 一起） |
+| U13 | 5 組對比不足的顏色修正；補：兩個主題檔的 import 改指 `app/sidebar-sections` 後刪 `app/SidebarNav.tsx`（K5 暫留的 re-export）；加 `.badge-blue` 後換掉 `ToolCard.tsx` 行內 token；補：`/tools/theme` 頁名對上左欄（`page-names.test.ts` `STAFF_TODO` 最後一列）；刪 `globals.css` 已無人用的 `.door-feature*` | NA `app/globals.css`、`lib/theme/tokens.ts`＋檢查器 | Low | Sonnet | 先與主題 session 協調 | 8 | 進行中（2026-11-25 派出；避開 `D:\tmp\plat-briefs\theme-dirty.patch` 的行） |
+| U14 | 手機底列；補：員工後台手機寬 375 客戶欄把內容擠到 0 寬（`.sidebar` 固定 248＋客戶欄 220）；內容門手機直排時客戶欄不撐滿、內容在一屏以下 | NA `app/PlatformFrame.tsx`、`app/globals.css` | Low | Sonnet | U9、U13；先與主題 session 協調 | 9 | 進行中（同 U13 工人，U13 之後） |
 | W5 | 本機 WordPress＋app 走一遍，寫成可重跑腳本（G9）；補：本機 WordPress 實看 W2 的「我的帳號」畫面（持有／未開通／退場）；另修客戶欄「共 N 個客戶」多算 1（`ClientRail.tsx` 把內部組織加了兩次，2026-11-23 正式站實看） | 新 `scripts/local-member-flow.ps1`（路徑展開時確認） | Low | Sonnet | W1、W2 | 9 | 已併 |
 | K13 | 檢查器：頁面不得私藏客戶來源 | 新 NA `lib/client-context/__tests__/no-private-context.test.ts` | Low | Sonnet | K7–K11 | 9 | 已併（舊頁名單剩 6 檔，只減不增） |
 | M5 | 員工替既有客戶代辦會員（app 端） | MIG 新 migration（待驗證的會員邀請）；NA `lib/entitlements/wp-customers.ts`、`lib/entitlements/identities.ts`、`app/api/ops/clients/[slug]/accounts/route.ts`、`app/(shell)/ops/clients/[slug]/AccountsCard.tsx`＋tests | **High** | Opus | M1、K10 | 9 | 已併（0180 已套用；兌換與重發走資料庫函式 `member_invite_redeem`／`member_invite_issue`） |
-| K14 | 新增產品入口零手改的驗收測試；補：collect／outreach／design 自己的挑客戶清單（org-search 不帶 category）仍列出 TEST 單位，換成客戶欄後消失；補：VW app（`apps/video-workbench`）內可見的「影音工作台」改「影片工作台」，同一次 VW 部署 | 新 NA `lib/client-context/__tests__/new-door.test.ts` | Low | Sonnet | K5、K13 | 10 | |
-| M6 | 代辦（外掛端）：會員驗證 email 後才連上；補：事件帶邀請碼的欄位由本卡定，並在 NA `lib/payments/woo-billing.ts` 的 `ensureCustomer` 呼叫把碼傳進 `ensureWpCustomer`（M5 app 端已收 `WpMember.inviteCode`）；外掛按鈕自帶樣式不靠佈景、產品列狀態字靠近產品名（W5 本機實看）；啟用前換正式站佈景再跑一次 `scripts/local-member-flow.ps1` | PL 新 `includes/MemberInvite.php`、主檔註冊、`tests/*` | **High** | Opus | W2、M5 | 10 |  |
-| M8 | 轉移會員（換單位管理者）；補：把「一個單位一個管理會員」做成資料庫層規則（M5 的鎖只管邀請這條路，付款自動連結的舊路沒拿同一把鎖） | MIG 新 migration（轉移函式）；NA 新 `app/api/ops/clients/[slug]/member-transfer/route.ts`、`AccountsCard.tsx` | **High** | Opus | M5 | 10 |  |
+| K14 | 新增產品入口零手改的驗收測試；補：collect／outreach／design 自己的挑客戶清單（org-search 不帶 category）仍列出 TEST 單位，換成客戶欄後消失；補：VW app（`apps/video-workbench`）內可見的「影音工作台」改「影片工作台」，同一次 VW 部署 | 新 NA `lib/client-context/__tests__/new-door.test.ts` | Low | Sonnet | K5、K13 | 10 | 已併（VW 已部署 2026-11-25） |
+| M6 | 代辦（外掛端）：會員驗證 email 後才連上；外掛按鈕自帶樣式不靠佈景、產品列狀態字靠近產品名（W5 本機實看）；啟用前換正式站佈景再跑一次 `scripts/local-member-flow.ps1` | PL 新 `includes/MemberInvite.php`、主檔註冊、`tests/*` | **High** | Opus | W2、M5 | 10 | 已併（另開 `app/api/webhooks/awarewave-wp-member`，付款事件不動；外掛仍停用，啟用在 W6） |
+| M8 | 轉移會員（換單位管理者）；補：把「一個單位一個管理會員」做成資料庫層規則（M5 的鎖只管邀請這條路，付款自動連結的舊路沒拿同一把鎖） | MIG 新 migration（轉移函式）；NA 新 `app/api/ops/clients/[slug]/member-transfer/route.ts`、`AccountsCard.tsx` | **High** | Opus | M5 | 10 | 已併（0182 已套用：一單位一 identity 唯一索引、`former_customer_identities`、轉移走 `member_invite_redeem`） |
 | K15 | 目前客戶期末閘＋P1 驗收 | 無程式；WORKLOG、本檔狀態欄 | — | Opus | 全部 K | 11 | |
-| M10 | WordPress 刪會員／改 email 時 app 跟著知道 | PL 新 `includes/MemberEvents.php`、主檔註冊；NA 新 `app/api/webhooks/awarewave-wp-member/route.ts`、`lib/entitlements/identities.ts` | **High** | Opus | M5、M6 | 11 | |
+| M10 | WordPress 刪會員／改 email 時 app 跟著知道；補：會員事件加時間戳／事件編號並擋重送（M6 路由 `app/api/webhooks/awarewave-wp-member/route.ts` 開頭註解已標明），刪會員事件上線前必做；轉移後舊會員的事件規則沿用 `former_customer_identities` | PL 新 `includes/MemberEvents.php`、主檔註冊；NA 新 `app/api/webhooks/awarewave-wp-member/route.ts`、`lib/entitlements/identities.ts` | **High** | Opus | M5、M6 | 11 |  |
 
 ### P2（開放註冊前；P1 全部併完後才排批、展開）
 
 | 卡 | 白話 | 檔案 | 風險 | 模型 | 依賴 | 批 | 狀態 |
 |---|---|---|---|---|---|---|---|
-| W6 | 正式站重開店外掛與兩把密鑰（＝G8） | 正式站設定與 `seller_sites` 資料（非程式） | **High** | Opus＋操作者 go | W5 | P2 | |
+| W6 | 正式站重開店外掛與兩把密鑰（＝G8）；補：檢查清單加「邀請落地頁 `/?aw_invite=` 打得開」（邀請掛在付款模組下）；啟用前換正式站佈景跑一次 `scripts/local-member-flow.ps1` | 正式站設定與 `seller_sites` 資料（非程式） | **High** | Opus＋操作者 go | W5 | P2 |  |
 | M9 | aware-wave.com 關掉訪客結帳（G6） | 正式站 WooCommerce 設定（非程式）；NA 無 | **High** | Sonnet（`wordpress-maintenance-agent` 備份閘） | — | P2 | |
 | M4 | 標籤寫進 FluentCRM、WordPress 加 TEST 角色（G3 寫入端） | 沿用既有 NA `lib/crm/fluentcrm.ts`＋wp-bridge `lobster-factory/packages/wp-bridge-plugin/includes/Crm/ContactUpserter.php`（加標籤寫入，不新建接頭）；TEST 角色註冊位置展開時定 | **High** | Opus | M3、W6 | P2 | |
 | M7 | 既有客戶逐一代辦成會員（G2） | 無程式；操作紀錄 | **High** | Opus＋操作者 | M5、M6、W6 | P2 | |
