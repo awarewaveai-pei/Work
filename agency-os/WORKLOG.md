@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-26（續38）— oracle WP：裝 Kadence Pro 1.1.16（操作者要求）
+
+- [根因] 操作者「裝 kadence、kadence pro」。Kadence 佈景 1.6.0.1 與 Kadence Blocks 3.9.1.2 建站流程已裝且啟用；缺的只有付費外掛 `kadence-pro`（catalog `installSource: "manual-zip"`，流程不自動裝）。
+- [步驟] 本機 `D:\Work\_paid-plugins\kadence-pro-1.1.16.zip`（與同目錄 `kadence-pro.zip` 同大小同版本）→ scp 主機 `/tmp` → `docker cp` → `wp plugin install --activate` → 兩處暫存檔刪除。
+- [驗證] `wp plugin list`：`kadence-pro active 1.1.16`、`kadence-blocks active 3.9.1.2`；佈景 `kadence 1.6.0.1` active；外部 `/`、`/tools/ziwei/`、`/english/`、`/wp-json/` 皆 200、無 fatal 字樣；容器 log 近 2 分鐘無 PHP Fatal／Warning。
+- [未做] Kadence Pro 的授權碼未輸入（後台會顯示未啟用授權，功能可用但不會自動更新）；Pro 的各模組（Header Addons、Hooked Elements 等）預設全關，未開任何一個；`kadence-blocks-pro` 未裝（操作者沒要求；zip 在同目錄）。
+- [rollback] `wp plugin deactivate kadence-pro && wp plugin delete kadence-pro`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin install /tmp/kadence-pro.zip --activate；curl 四個網址 | exit=0 | ms=30000
+- REVIEW_WAIVED: NA -- 無 repo 程式改動（站台外掛安裝）
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-26（續37）— 排程頁新增「寄信額度提醒」（mail_quota_watch）；算命站 Resend 帳號金鑰進 next-admin
 
 - [根因] 操作者問每日信會不會花很多錢、要快到上限時提醒。Resend 免費方案每帳號每天 100 封、每月 3,000 封，到上限寄不出去；沒有任何提醒。主帳號由 `awarewave-ops`、`soulful-expression` 共用，算命站是獨立帳號，next-admin 沒有它的金鑰。
