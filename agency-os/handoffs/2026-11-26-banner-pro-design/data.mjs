@@ -8,14 +8,31 @@ export const META = {
 };
 
 // todo｜doing｜review｜done（done 要在 COMMITS 填 commit）
-export const PROGRESS = { 'R2-A': 'doing', 'R2-B1': 'doing' };
-export const COMMITS = {};
+export const PROGRESS = { 'R2-A': 'done', 'R2-B1': 'done', 'R2-B2': 'doing', 'R2-C': 'doing' };
+export const COMMITS = { 'R2-A': 'ef6572105', 'R2-B1': '528cb59d5' };
 
 // 等你決定：要提前手動部署或高風險時才放這裡。{ card, what, rollback }
 export const GO = [];
 
 // 工人交回的 RISKS 與處置 { card, said, handling }。一批全部交回後一起看，處理完才部署。
-export const RISKS = [];
+export const RISKS = [
+  { card: 'R2-A', said: 'AI 每個尺寸會回徽章角與 logo 角，但這兩個欄位還不算「各尺寸自己的設定」，會漏到主設計。', handling: 'R2-B2 把它們加進各尺寸設定。R2-A 合併時先放部署暫停檔，第二批做完才一起部署。' },
+  { card: 'R2-A', said: 'AI 一鍵設計套用版面時，沒有經過「按鈕清掉拖曳位置」的同一條路。', handling: 'R2-B2 改成一律經同一條路。' },
+  { card: 'R2-A', said: '關掉自動字級、字又放不下時，仍可能重疊或超出畫面；logo 拉到最大的長條 logo 也會超出。', handling: '保留：那是你手動指定的大小。新設計預設開自動字級（R2-B2）。' },
+  { card: 'R2-A', said: '寬尺寸與商品放側邊時，文字位置和以前不同（邊距與文字欄重算）。', handling: '保留：這是本輪要的改法（文字讓開商品）。' },
+  { card: 'R2-A', said: '按位置按鈕只清「正在編輯的尺寸」的拖曳位置。', handling: '確認照這樣：每個尺寸的拖曳各自獨立。' },
+  { card: 'R2-A', said: 'Codex：直式 logo（例如高是寬的四倍）在 3:1 會超出畫面大半。', handling: '已修 c278c1b58：logo 高度上限為畫高的四分之一，重疊測試含直式 logo。' },
+  { card: 'R2-B1', said: 'Codex：剛打完字就按清除，復原找不回（歷史半秒後才寫入）。', handling: '已修 c8bb7b463：清除前先寫入歷史，有測試。' },
+  { card: 'R2-B1', said: 'Codex：只剩生成的文案清單時，清除鈕是灰的，清單清不掉。', handling: '已修 c8bb7b463。' },
+  { card: 'R2-A', said: '數值範圍表目前只給排版引擎用，滑桿還沒接。', handling: 'R2-B2 接上。' },
+  { card: 'R2-A', said: '重疊測試的尺寸清單寫在測試檔裡，新加的 2:1 不會自動進測試。', handling: 'R2-B2 改成讀尺寸總表。' },
+  { card: 'R2-B1', said: '改了交辦外的字色測試：拆檔後六處紅綠字色改用規則要的徽章字色，字色會稍微變。', handling: '保留：照全站字色規則，測試清單同步。' },
+  { card: 'R2-B1', said: '2:1 的用途只查到 X 大圖連結卡，附的是舊版文件網址。', handling: '已查：X 開發者文件 summary_large_image 寫 2:1（最小 300×157），沿用；AI 背景用 16:9 再裁。' },
+  { card: 'R2-B1', said: '本機驗收沒登入、文案 API 用假資料，AI 一鍵設計沒實測。', handling: 'R2-C 實打一次 AI 一鍵設計；部署後正式站再看一次。' },
+  { card: 'R2-B1', said: '客戶搜尋的「品牌色」查詢參數在橫幅這邊沒人用了。', handling: '查過只剩這條死路徑：R2-B2 一併刪掉（選單的篩選參數與 API 的查詢參數），回應欄位保留。' },
+  { card: 'R2-B1', said: '步驟摘要的測試標記跟著新編號變了。', handling: '保留：查過沒有測試引用。' },
+
+];
 
 // 有預設、沒答就照做（PLAN-R2 §4 代決）
 export const DECIDE = [
