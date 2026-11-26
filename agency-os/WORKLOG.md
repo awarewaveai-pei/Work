@@ -1,4 +1,27 @@
 # Worklog
+## 2026-11-26（續29）— 橫幅 C13：右欄依做圖順序重排成「開始＋1–6」，收合時顯示目前的值
+
+- 根因／決策：右欄 9 張卡用 CSS `order` 排，編號亂（配色無編號在第 1、Step 0 文案在第 6、Step 4.5）；主入口（主題＋AI 一鍵設計）埋在第 6 張；「存到哪個客戶」在最底的匯出區且是一長串清單，但它同時決定品牌套組；預覽空白是一塊黑框。改為照做一張圖的順序：頂部「開始」（永遠展開、不編號）→ 1 尺寸 → 2 文字 → 3 畫面 → 4 行銷元素 → 5 風格 → 6 匯出；各區內容整塊搬移、控制項與 testId 不改。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 修：`NA/app/(shell)/tools/banner/BannerStudio.tsx`：`StepCard` 拿掉 `order`、改成圓形編號＋右側 `summary`（`banner-step-summary-<n>`）；新 `SubHead`（區內小標）、`BG_MODE_LABEL`、`useWide`（≥960px 預覽 sticky，窄時預覽在上、設定在下）；右欄 `flex: 1 1 340px; maxWidth 420; minWidth 0`、預覽 `minWidth 0`（375 寬無橫捲）；「開始」區：客戶名＋「更換」才展開 `SaveOrgPicker`（選完收起），文案描述改名「主題」；AI 一鍵設計按鈕拿掉 hex 漸層改單一 `btn-primary`；色票框 `#0002` → `var(--border)`；預覽棋盤格 hex 背景拿掉；設計全空時顯示 `banner-empty-hint`「先在「開始」輸入主題，再按 ✨ AI 一鍵設計」。`BannerStudioStaff.tsx`：`SaveOrgPicker.onPick` 多回傳客戶名稱。
+- 控制項對照（舊位置 → 新位置；區塊內容整塊搬移，原 testId 全保留）：
+  - 配色／品牌色卡（BrandKitPanel、logo 大小 `banner-logo-scale`、拿掉 logo、BrandPicker 其他客戶品牌色、從參考圖擷取配色、色票、自動套用整組配色、選中色套到 7 個目標）→ 5 風格「配色／品牌色」
+  - 版型模板卡（一般模板 6 個、影片片頭字卡 3 個）→ 5 風格「版型模板」
+  - Step 0 文案生成（描述→「主題」、語氣 4 鈕、文案模型 `banner-model-copy-*`、設計模型 `banner-model-design-*`、生成文案（新 `banner-ai-copy`）、AI 一鍵設計（新 `banner-ai-design`）、串流預覽、5 組文案選擇）→ 開始
+  - 匯出卡的「存到哪個客戶的我的設計」SaveOrgPicker → 開始「為哪個客戶做」（`banner-client-name`＋`banner-client-change`）
+  - Step 1 尺寸（`banner-size-<k>`、`banner-size-edit-<k>`）→ 1 尺寸
+  - Step 4 文字（標題、副標、字體配對、標題／內文字體 `banner-{headlineFont,fontFamily}-*`、字重 `banner-{headlineWeight,bodyWeight}-*`、字色、重點字色、重點字底色、標題字距、`banner-headline-leading`、`banner-body-tracking`、`banner-body-leading`、`banner-kinsoku`、`banner-cjk-spacing`、標題 px、副標 px、垂直、水平、描邊陰影、文字陰影 `banner-text-shadow-*`、文字底襯＋濃度、暗化背景＋濃度）→ 2 文字
+  - Step 3 背景（類型 4 鈕、背景色、漸層起／迄／方向、上傳圖、圖片位置 `banner-bg-scale`／`banner-bg-under-color`／`banner-bg-reset`、在畫布編輯 `banner-bg-canvas`、AI：圖片模型群組＋模型、產品場景模板、Subject、Vibe、打光、風格＋清除、參考圖、產品圖處理、提示詞預覽＋編輯＋還原、生成／合成背景）→ 3 畫面「背景」
+  - Step 2 產品圖（上傳／換圖、一鍵去背、`banner-product-canvas`、移除、位置 4 鈕、大小、商品擬真 `banner-ground-shadow`／`banner-ground-reflection`／`banner-ground-tone`＋各滑桿）→ 3 畫面「產品圖」
+  - Step 4.5 行銷元素（CTA 文字＋預設＋底色＋字色＋`banner-cta-shadow-*`、徽章文字＋預設＋樣式＋位置＋顏色＋大小＋`banner-badge-shadow-*`、價格開關＋現價＋原價、信任標記 4 鈕＋星數＋文字）→ 4 行銷元素
+  - Step 5 匯出（存到圖庫、PNG、`banner-download-jpg`、`banner-download-webp`、`banner-target-kb`、`banner-download-psd`、`banner-download-svg`、`banner-open-photo-pro`、`banner-open-vector-pro`、已儲存連結）→ 6 匯出
+  - 預覽欄（復原、重做、`banner-auto-layout`、`banner-preview`、`banner-drag-guides`、`banner-multi-done`、多尺寸卡 `banner-multi-*`）→ 不動
+  - 機械比對：舊／新檔 `data-testid`、`onClick`、`onChange`、`<input>`、`<textarea>`、`AccordionSection` 計數 diff 只有新增（5 個新 testId＋「更換」1 個 onClick），無減少。
+- 驗證：tsc 綠；vitest banner＋lib/theme＋blocks＋script-forge＋client-context＋ops/clients 192 passed；本機 dev（:3907）1440 寬：開始區在右上、1–6 連號、摘要「1.91:1／未填標題／純色／無／自訂配色／圖庫 · PNG…」、空白預覽顯示引導、捲動時預覽固定；375 寬：預覽在上、設定在下、`scrollWidth`=375；輸入標題 → 摘要「夏日限定咖啡」、引導消失；加 9:16 → 摘要「2 個 · 編輯 1.91:1」、多尺寸卡出現。截圖 `$env:TEMP/banner-c13-1440.jpg`、`$env:TEMP/banner-c13-375.jpg`。
+- 剩餘：「從其他客戶帶入配色」的 BrandPicker 仍是第二個客戶清單（借別家品牌色，功能不同，保留在 5 風格）；以 ?org= 開啟時客戶名稱顯示「開啟時指定的客戶」（清單 API 未回名稱前）；各區塊內部原有的小字級（11–13px）與間距未逐一改成 8 的倍數，只統一了區塊標題、區塊間距與內距；本機無資料庫，客戶選擇器的清單內容未實看。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme lib/systems/__tests__/blocks.test.ts lib/script-forge lib/client-context "app/(shell)/ops/clients" | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=空白引導寬度在 inline-block 父層被縮成 316px，已改父層 block）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=step="Step | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續28）— 橫幅 C12 審查修正：對比度守衛改用最壞點、半透明字、重點字底牌、徽章後備、百分位範圍
 
 - 根因（Codex 審查 5 項，監工讀碼確認）：`NA/app/(shell)/tools/banner/design-colors.ts` 1) 原價／副標／信任說明 renderer 以 0.7／0.95／0.92 透明度畫，守衛卻用原色碼算；2) accentHighlight 時字是 #1a1a1a、accentColor 是底牌，守衛卻比 accentColor 對背景；3) 徽章沒有套組色撐得住白字時只記 unmet 就放行；4) zoneRatio 只看 lo／hi 兩端，文字亮度落在區間內時漏判；5) 亮度範圍用平均±標準差，小亮斑被平均掉。不變量：守衛算的是畫出來的實際像素對比，且每個角色都有必定達標的最後手段（unmet 恆空）。
