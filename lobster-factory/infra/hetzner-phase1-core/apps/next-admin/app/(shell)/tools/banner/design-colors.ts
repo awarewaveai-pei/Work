@@ -334,3 +334,28 @@ export function bgForPrompt(bg: BgInfo): { mode: BgMode; colors: string[]; meanL
   })) as Record<TextPos, { lum: number; busy: number }>;
   return { mode: bg.mode, colors: bg.colors.slice(0, 6), meanLum: r2(bg.meanLum), zones };
 }
+
+/** The design fields the guard reads: the colours and which text-coloured elements it shows. */
+export type DrawnFields = ColorFields & { subtext: string; trustType: string; showPrice: boolean; priceNow: string; priceWas: string };
+/** One size as the renderer drew it: the canvas and the boxes of the elements drawn in textColor. */
+export interface DrawnSize { w: number; h: number; boxes: PxBox[] }
+
+/**
+ * Contrast on what is drawn now (R2-C): `drawn[i]` is size i as rendered from the design, `bg` the background measured from
+ * that same design (bg.grids[i] = size i). With `roles` (an AI answer and the palette its indices refer to) the colour
+ * roles are taken from the answer first; without, the design's own colours are only guarded (a word set swapped in).
+ */
+export function guardDrawn(
+  st: DrawnFields, bg: BgInfo, drawn: readonly DrawnSize[], kit: readonly string[] | null,
+  roles?: { raw: Record<string, unknown>; palette: readonly string[] },
+): GuardResult {
+  const places: TextPlace[] = drawn.map((d, i) => ({ ...d, grid: bg.grids?.[i] }));
+  const content: TextContent = {
+    subtext: !!st.subtext.trim(), trust: st.trustType !== "none",
+    priceNow: st.showPrice && !!st.priceNow, priceWas: st.showPrice && !!st.priceWas,
+  };
+  const palette = roles?.palette ?? usablePalette(bg, kit);
+  return roles
+    ? resolveDesignColors(roles.raw, st, bg, places, palette, kit, content)
+    : guardContrast(st, bg, places, palette, kit, content);
+}

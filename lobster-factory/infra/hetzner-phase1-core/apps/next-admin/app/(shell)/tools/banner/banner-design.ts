@@ -4,9 +4,7 @@
 import { BANNER_COPY_VARIANTS, BANNER_DESIGN_COPY_VARIANTS } from "@/lib/script-forge/modules";
 import { AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
 import { textCallCostUsd, toolCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
-import { applySemantic, dropPositions, semanticElems } from "./banner-layout";
-import type { BannerFields } from "./banner-layers";
-import type { CopyVariant, PresetKey, SizePatch, State } from "./banner-state";
+import type { CopyVariant, State } from "./banner-state";
 
 /** The models offered on the banner's AI buttons (operator 2026-11-26). Defaults from the bake-off on production
  *  (ai_call_logs, same brief, 2026-11-26): 一鍵設計 stays Claude Opus 5.5. 生成文案 = Claude Sonnet 5.5 (operator 2026-11-26,
@@ -93,8 +91,6 @@ export function designPlan(raw: Record<string, unknown>, main: SizeSpec, chosen:
 
 /** One word set of AI 一鍵設計 (the 生成文案 list holds headline + subtext only; the other two are then absent). */
 export interface DesignCopy extends CopyVariant { ctaText?: string; badgeText?: string }
-/** Fields the design sets that State gets from R2-B2 (banner-state.ts); harmless once State has them. */
-export type DesignState = State & Pick<BannerFields, "logoPos" | "typeAuto">;
 
 const COPY_MAX = { headline: 60, subtext: 120, ctaText: 30, badgeText: 30 } as const;
 /** The answer's copyVariants: objects with a headline, each field a trimmed string within its length, the same headline
@@ -127,26 +123,6 @@ export function copyWords(c: DesignCopy): Partial<State> {
 export const showsCopy = (st: State, c: DesignCopy): boolean =>
   st.headline === c.headline && st.subtext === c.subtext &&
   (c.ctaText === undefined || st.ctaText === c.ctaText) && (c.badgeText === undefined || st.badgeText === c.badgeText);
-
-/**
- * The AI design's layout onto the main design, through applySemantic: every element a position field moves loses its
- * drag, at the main size and at every tweaked size that inherits the field. Each chosen size's own layout goes onto its
- * existing tweak the same way (its other tweaks stay). `st` is the main design (not inside a size tweak).
- */
-export function applyDesignLayout(st: DesignState, main: Partial<DesignState>, overrides: Record<string, LayoutPatch>): DesignState {
-  const next = applySemantic(st, main);
-  const moved = semanticElems(main);
-  type Key = PresetKey;
-  type Tweak = SizePatch & LayoutPatch;
-  const sizeOverrides: Partial<Record<Key, Tweak>> = {};
-  for (const [k, o] of Object.entries(st.sizeOverrides) as [Key, Tweak][]) {
-    // a size that sets the field itself keeps its drags for the elements that field moves
-    const inherits = moved.filter((e) => !semanticElems(o).includes(e));
-    sizeOverrides[k] = o.positions ? { ...o, positions: dropPositions(o.positions, inherits) } : o;
-  }
-  for (const [k, l] of Object.entries(overrides) as [Key, LayoutPatch][]) sizeOverrides[k] = applySemantic<Tweak>(sizeOverrides[k] ?? {}, l);
-  return { ...next, sizeOverrides };
-}
 
 // ── C10: reading the AI's JSON answer ──
 // Production 2026-11-26: a full, billed 2,055-token design answer failed JSON.parse once and worked on the next press.

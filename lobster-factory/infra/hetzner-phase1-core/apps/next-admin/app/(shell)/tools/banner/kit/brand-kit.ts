@@ -82,7 +82,7 @@ type ExistingBrand = {
   cis?: { logo?: { primary?: unknown }; typography?: { headingFont?: unknown; bodyFont?: unknown } } | null;
 };
 
-/** The org's kit: the saved bannerKit, else one built from its brand colours (the data org-search?brandColors=1 shows)
+/** The org's kit: the saved bannerKit, else one built from its brand colours (metadata.client_config.brandColors)
  *  and CIS logo / fonts. null when the org has neither. `saved` tells the panel which one it is; `externalLogo`: a logo
  *  was there but on another website, so it was left out (the panel asks for an upload). */
 export function kitFromClientConfig(orgName: string, cc: ExistingBrand, ownLogo: OwnLogo = () => true): { kit: Omit<BrandKit, "orgId">; saved: boolean; externalLogo: boolean } | null {

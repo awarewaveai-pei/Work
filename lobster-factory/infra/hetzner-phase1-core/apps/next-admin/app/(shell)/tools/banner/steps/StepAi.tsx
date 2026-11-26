@@ -2,23 +2,41 @@
 // AI 文案與設計 (staff only): topic, tone, the two models and the two AI buttons; the copy pairs to pick from.
 import { useState, type MutableRefObject } from "react";
 import {
-  BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, aiFormatError, applyDesignLayout, askJsonWithRetry, bannerCallNtd, copyWords,
-  designPlan, ntdLabel, readAiStream, sanitizeCopyVariants, showsCopy, type BannerAiModel, type DesignCopy, type DesignState, type SizeSpec,
+  BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, aiFormatError, askJsonWithRetry, bannerCallNtd, copyWords,
+  designPlan, ntdLabel, readAiStream, sanitizeCopyVariants, showsCopy, type BannerAiModel, type DesignCopy, type SizeSpec,
 } from "../banner-design";
 import { renderBannerLayers } from "../banner-layers";
-import { bgForPrompt, bgStatsFromColors, resolveDesignColors, usablePalette, type PxBox, type TextPlace } from "../design-colors";
+import { guardLane, sameDrawInputs } from "../contrast-run";
+import { applySemantic } from "../banner-layout";
+import { bgForPrompt, bgStatsFromColors, guardDrawn, usablePalette, type GuardResult, type PxBox } from "../design-colors";
 import { brandKitPatch } from "../kit/apply-kit";
 import type { useBrandKit } from "../kit/useBrandKit";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import {
-  COPY_TONES, PRESETS, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes, variantOf,
-  type BannerStaffApi, type CopyVariant, type PresetKey, type State,
+  COPY_TONES, PRESETS, applyLayout, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes, variantOf,
+  type BannerStaffApi, type CopyVariant, type PresetKey, type SizePatch, type State,
 } from "../banner-state";
 import type { StepSlot } from "./order";
 import { StepCard, type StepCtx } from "./ui";
 
+const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 /** The elements drawn in textColor: the contrast guard measures the background under these boxes. */
 const TEXT_ELEMS = ["headline", "subtext", "price", "trust"] as const;
+
+/** Contrast on `st` as the renderer draws it: every picked size rendered for its text boxes, the background measured from
+ *  `st` itself (never an earlier measurement), then guardDrawn. Free (browser only). A result is applied only through a
+ *  guardLane (contrast-run.ts): to a design whose inputs are still the ones measured here, by the newest run. */
+async function guardOnDrawn(st: State, kit: readonly string[] | null, roles?: { raw: Record<string, unknown>; palette: readonly string[] }): Promise<GuardResult> {
+  const sel = selectedSizes(st), m = mainOf(st);
+  const bg = await measureBackground(m, sel); // a picture that cannot be read fails the check (no stand-in background)
+  const drawn = await Promise.all(sel.map(async (k) => {
+    const doc = await renderBannerLayers(variantOf(st, k), PRESETS[k], { flat: true });
+    return { w: doc.w, h: doc.h, boxes: TEXT_ELEMS.map((e) => doc.boxes[e]).filter((b): b is PxBox => !!b) };
+  }));
+  const g = guardDrawn(st, bg, drawn, kit, roles);
+  if (g.unmet.length) console.warn("[banner] contrast not met after the guard:", g.unmet);
+  return g;
+}
 
 export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg, saveOrgRef }: StepCtx & {
   slot: StepSlot; sRef: MutableRefObject<State>; staff: BannerStaffApi; brand: ReturnType<typeof useBrandKit>;
@@ -28,6 +46,10 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
   const p = PRESETS[s.preset];
   const picked = selectedSizes(s);
   const multi = picked.length > 1;
+  // one lane per action: a newer AI design / word-set pick supersedes an older one still being checked
+  const lane = () => guardLane<State, GuardResult>({ same: sameDrawInputs, current: () => sRef.current, apply: setS });
+  const [designLane] = useState(lane);
+  const [copyLane] = useState(lane);
 
   // ── AI 一鍵設計整張：LLM 回傳一個 State patch（renderer 直接吃 → 幾乎零渲染成本）──
   async function generateFullDesign() {
@@ -70,31 +92,36 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
       if (saveOrgRef.current !== orgAtStart) throw new Error("設計途中換了客戶：這次結果用的是前一個客戶的品牌色，沒有套用，請再按一次。");
       const variants = sanitizeCopyVariants(raw.copyVariants);
       const plan = designPlan(raw, spec(m.preset), chosen);
-      // the design on a given state: the answer, the first word set, the kit's fonts / logo, and the layout through
-      // applySemantic (a moved element loses its drag at every size that inherits the move); type sized automatically
-      const build = (prev: State): DesignState => applyDesignLayout(leaveSize(prev) as DesignState, {
-        ...sanitizeDesign(raw), ...(variants[0] ? copyWords(variants[0]) : {}), ...(kitPart?.patch ?? {}),
-        ...(variants.length ? { copyVariants: variants } : {}), ...plan.main, typeAuto: true,
-      }, chosen.length ? plan.overrides : {});
-      // contrast: the colours are shared by every size, so the text must read where it is drawn at each of them --
-      // the boxes the renderer draws, over that size's measured background (bg.grids[i] = sel[i])
-      const draft = build(sRef.current);
-      const places: TextPlace[] = await Promise.all(sel.map(async (k, i) => {
-        const doc = await renderBannerLayers(variantOf(draft, k), PRESETS[k], { flat: true });
-        const boxes = TEXT_ELEMS.map((e) => doc.boxes[e]).filter((b): b is PxBox => !!b);
-        return { w: doc.w, h: doc.h, boxes, grid: bg.grids?.[i] };
-      }));
-      const content = {
-        subtext: !!draft.subtext.trim(), trust: draft.trustType !== "none",
-        priceNow: draft.showPrice && !!draft.priceNow, priceWas: draft.showPrice && !!draft.priceWas,
+      // the design on a given state: the answer, the first word set, the kit's fonts / logo and type sized automatically,
+      // through applyLayout like any position button (a moved element loses its drag at every size that inherits the
+      // move); then each chosen size's own layout onto its tweak, the same way
+      const build = (prev: State): State => {
+        const main = applyLayout(leaveSize(prev), {
+          ...sanitizeDesign(raw), ...(variants[0] ? copyWords(variants[0]) : {}), ...(kitPart?.patch ?? {}),
+          ...(variants.length ? { copyVariants: variants } : {}), ...plan.main, typeAuto: true,
+        });
+        const sizeOverrides = { ...main.sizeOverrides };
+        for (const [k, l] of Object.entries(plan.overrides) as [PresetKey, SizePatch][]) sizeOverrides[k] = applySemantic(sizeOverrides[k] ?? {}, l);
+        return { ...main, sizeOverrides };
       };
-      const col = resolveDesignColors(raw, draft, bg, places, palette, kitColors, content);
-      if (col.unmet.length) console.warn("[banner] contrast not met after the guard:", col.unmet);
-      setS((prev) => ({ ...build(prev), ...col.patch, designing: false, saved: false, ...(kitPart?.logoError ? { error: kitPart.logoError } : {}) }));
+      // contrast on what will be drawn: the latest state with the answer on it (a background changed while the AI answered
+      // is measured again); the roles index the palette the prompt was given
+      await designLane.run(build, (st) => guardOnDrawn(st, kitColors, { raw, palette }),
+        (built, col) => ({ ...built, ...col.patch, designing: false, saved: false, ...(kitPart?.logoError ? { error: kitPart.logoError } : {}) }),
+        (prev, err) => ({ ...prev, designing: false, error: `對比檢查失敗（${errText(err)}）：這次設計沒有套用，請再按一次。` }));
     } catch (err) {
       setAiRetrying(null);
       setS((prev) => ({ ...prev, designing: false, error: err instanceof Error ? err.message : String(err) }));
     }
+  }
+
+  // a word set swapped in: the new words' boxes are checked like an AI design (only colours that fail change); one
+  // history step (words and any colour fix together)
+  async function pickCopy(v: DesignCopy) {
+    const kitColors = brand.kit?.colors.length ? brand.kit.colors : null;
+    await copyLane.run((prev) => ({ ...prev, ...copyWords(v) }), (st) => guardOnDrawn(st, kitColors),
+      (built, g) => ({ ...built, ...g.patch, saved: false, error: null }),
+      (prev, err) => ({ ...prev, error: `對比檢查失敗（${errText(err)}）：沒有換成這組字，請再點一次。` }));
   }
 
   // card C9: the model each AI button runs on (visible buttons, NT$ per call shown); defaults from the 2026-11-26 bake-off
@@ -185,11 +212,11 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
         )}
         {s.copyVariants.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
-            <p className="form-hint" style={{ margin: 0 }}>點一組就換上這組字；版面與配色不變。</p>
+            <p className="form-hint" style={{ margin: 0 }}>點一組就換上這組字；版面不變，字變長時會自動確保看得清楚。</p>
             {(s.copyVariants as DesignCopy[]).map((v, i) => (
               <button key={i} type="button" className="choice-card" data-testid={`banner-copy-${i}`}
                 aria-pressed={showsCopy(s, v)}
-                onClick={() => setS((prev) => ({ ...prev, ...copyWords(v), saved: false, error: null }))}>
+                onClick={() => void pickCopy(v)}>
                 <span className="choice-card-title">{v.headline.replaceAll("**", "")}</span>
                 <span className="choice-card-note">{v.subtext}</span>
                 {(v.ctaText || v.badgeText) && (
