@@ -10,6 +10,7 @@ import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { assertOrgAccess, effectiveOrgId, OrgAccessError, resolveTenant, staffOnly, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { kitFromClientConfig, sanitizeBrandKit } from "@/app/(shell)/tools/banner/kit/brand-kit";
+import { isPublicBucketAsset } from "@/lib/storage/r2";
 
 export const runtime = "nodejs";
 
@@ -50,8 +51,12 @@ export async function GET(request: Request) {
   }
   if (!data) return NextResponse.json({ ok: false, error: "org_not_found" }, { status: 404 });
   const row = data as unknown as { name?: string; bannerKit?: unknown; brandColors?: never; cis?: never };
-  const found = kitFromClientConfig(row.name ?? "", row);
-  return NextResponse.json({ ok: true, orgId: org, kit: found ? { ...found.kit, orgId: org } : null, saved: found?.saved ?? false, canEdit: canEdit(request) });
+  // only a logo the banner canvas can read (our bucket) enters the kit; another website's is reported, not used
+  const found = kitFromClientConfig(row.name ?? "", row, isPublicBucketAsset);
+  return NextResponse.json({
+    ok: true, orgId: org, kit: found ? { ...found.kit, orgId: org } : null, saved: found?.saved ?? false,
+    externalLogo: found?.externalLogo ?? false, canEdit: canEdit(request),
+  });
 }
 
 export async function PUT(request: Request) {
@@ -70,7 +75,7 @@ export async function PUT(request: Request) {
   if (!body || typeof body !== "object") return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   const org = kitOrg(request, typeof body.orgId === "string" && body.orgId.trim() ? body.orgId.trim() : null);
   if (org instanceof Response) return org;
-  const kit = sanitizeBrandKit(body.kit);
+  const kit = sanitizeBrandKit(body.kit, isPublicBucketAsset);
   if (!kit) return NextResponse.json({ ok: false, error: "kit needs at least one #rrggbb colour" }, { status: 400 });
 
   const supabase = getSupabaseWriteClient();

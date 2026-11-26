@@ -51,14 +51,20 @@ export function storableLogo(v: unknown): string | undefined {
   }
 }
 
-/** The stored shape: anything else in the body is dropped. null when there is no usable kit. */
-export function sanitizeBrandKit(raw: unknown): Omit<BrandKit, "orgId"> | null {
+/** Whether a logo URL is one the banner canvas can read (ours: the designs / video bucket). The server passes
+ *  lib/storage/r2 isPublicBucketAsset; this file also runs in the browser, so it takes the check instead of importing it. */
+export type OwnLogo = (url: string) => boolean;
+
+/** The stored shape: anything else in the body is dropped. null when there is no usable kit. A logo the canvas could not
+ *  read (`ownLogo` false: another website, whose image taints the canvas and our download route refuses) is dropped. */
+export function sanitizeBrandKit(raw: unknown, ownLogo: OwnLogo = () => true): Omit<BrandKit, "orgId"> | null {
   if (!raw || typeof raw !== "object") return null;
   const b = raw as Record<string, unknown>;
   const colors = (Array.isArray(b.colors) ? b.colors : []).map(hex).filter((c): c is string => !!c).slice(0, COLOR_ROLES.length);
   if (colors.length === 0) return null;
   const name = typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, MAX_NAME) : "品牌套組";
-  const logo = storableLogo(b.logo);
+  const url = storableLogo(b.logo);
+  const logo = url && ownLogo(url) ? url : undefined;
   return {
     name,
     ...(logo ? { logo } : {}),
@@ -77,10 +83,12 @@ type ExistingBrand = {
 };
 
 /** The org's kit: the saved bannerKit, else one built from its brand colours (the data org-search?brandColors=1 shows)
- *  and CIS logo / fonts. null when the org has neither. `saved` tells the panel which one it is. */
-export function kitFromClientConfig(orgName: string, cc: ExistingBrand): { kit: Omit<BrandKit, "orgId">; saved: boolean } | null {
-  const saved = sanitizeBrandKit(cc.bannerKit);
-  if (saved) return { kit: saved, saved: true };
+ *  and CIS logo / fonts. null when the org has neither. `saved` tells the panel which one it is; `externalLogo`: a logo
+ *  was there but on another website, so it was left out (the panel asks for an upload). */
+export function kitFromClientConfig(orgName: string, cc: ExistingBrand, ownLogo: OwnLogo = () => true): { kit: Omit<BrandKit, "orgId">; saved: boolean; externalLogo: boolean } | null {
+  const outside = (v: unknown) => { const u = storableLogo(v); return !!u && !ownLogo(u); };
+  const saved = sanitizeBrandKit(cc.bannerKit, ownLogo);
+  if (saved) return { kit: saved, saved: true, externalLogo: outside((cc.bannerKit as { logo?: unknown } | undefined)?.logo) };
   const bc = cc.brandColors ?? {};
   const brand = [hex(bc.primary), hex(bc.secondary), hex(bc.accent)];
   const primary = brand[0] ?? brand[1] ?? brand[2];
@@ -92,6 +100,6 @@ export function kitFromClientConfig(orgName: string, cc: ExistingBrand): { kit: 
     colors,
     headlineFont: cc.cis?.typography?.headingFont,
     bodyFont: cc.cis?.typography?.bodyFont,
-  });
-  return kit ? { kit, saved: false } : null;
+  }, ownLogo);
+  return kit ? { kit, saved: false, externalLogo: outside(cc.cis?.logo?.primary) } : null;
 }

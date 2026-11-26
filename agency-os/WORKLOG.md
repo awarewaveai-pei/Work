@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-26（續14）— 橫幅 Codex 審查 F3／F4：品牌套組只收畫布讀得到的 logo；色調匹配兩種匯出取樣同一畫面
+
+- F3 根因：品牌套組沒存過時以 CIS `cis.logo.primary` 帶入 logo（`NA/app/(shell)/tools/banner/kit/brand-kit.ts` kitFromClientConfig），那常是外部網站圖；套用時 `urlToBlob` 走 `/api/tools/designs/download`，該路由只收自家 bucket → 400，logo 套不上。不變量：只有畫布讀得到像素的 logo（自家 bucket）才進套組。修：`sanitizeBrandKit`／`kitFromClientConfig` 收 `ownLogo` 判斷（route 傳 `isPublicBucketAsset`；brand-kit.ts 也在瀏覽器跑，不能 import 伺服器的 r2），外部 logo 濾掉並回 `externalLogo`；面板顯示「CIS 的 logo 在外部網站，橫幅讀不到；請在這裡上傳一份。」；route 錯誤碼（orgId_required 等 9 個）轉繁中句子。`route.test.ts` 的 logo 改成自家 bucket 網址。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- F4 根因：`banner-layers.ts` 色調匹配取樣在平面模式是同一張畫布（含暗化），分層模式只含背景層 → 開暗化＋色調匹配時 PNG 與 PSD/SVG 商品顏色不同。不變量：兩模式取樣同一內容＝商品後方實際畫面（背景＋暗化）。修：`behindProduct()` 在暗化之後、商品之前合成目前已畫的層成快照，只在開色調匹配時做，兩模式都用它。
+- 驗證：tsc 綠；vitest presets＋banner＋accent-not-text 26 passed；瀏覽器：開暗化（0.6）＋色調匹配（強度 1）時分層疊回 vs 平面最大差 2/255（≤4），平面輸出與修前 0 差；預設值與修前 0 差。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/tools/presets "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=4000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（Codex 外部審查 F3/F4 的修正；書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=kitFromClientConfig|sanitizeBrandKit | hits=3
+- ORACLE_WAIVED: 審查來源即 Codex oracle（agency-os/reports/oracle/2026-11-26-partialreview-67d77480.md），監工合併前再看
 ## 2026-11-26（續12）— 橫幅 C8：接上品牌套組（C6）與商品擬真（C7）；logo 成為可拖曳元素
 
 - 根因／決策：C6／C7 模組（banner-modules，13a718295）已完成但沒接進畫面。合併 `claude/busy-nash-b53413`（只新增檔＋design-upload 修正，無衝突）。`NA/app/(shell)/tools/banner/banner-layers.ts`：`grounding` 有任一開關時呼叫 `groundProduct`，輸出「商品陰影」「商品倒影」「商品圖」三層（背景層供色調取樣；全關走原 drawImage，PNG 不變）；新增 `logoImage`／`logoScale` → 「Logo」層，預設左下、可依 C4 拖曳、多尺寸各自可調大小。`BannerStudio.tsx`：配色步驟放 `BrandKitPanel`（`useBrandKit(saveOrg)`），套用時 主→漸層起＋徽章、輔→漸層迄、重點→重點字＋按鈕底、文字→字色、底→底色，字型字重照套，logo 經 `urlToBlob`（同網域下載路由）轉 data URL 再畫，匯出不被跨網域污染；logo 列有大小滑桿與拿掉；產品圖步驟加「商品擬真」：接觸陰影（濃度、柔和、下移）、倒影（長度、濃度、間距）、色調匹配（強度）皆為勾選＋滑桿。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）

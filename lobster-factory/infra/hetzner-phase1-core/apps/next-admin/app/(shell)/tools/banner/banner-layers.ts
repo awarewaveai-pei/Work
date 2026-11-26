@@ -356,10 +356,8 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
   if (!mctx) throw new Error("canvas_unavailable");
 
   // 背景
-  let bgSource: HTMLCanvasElement | null = null;
   {
     const ctx = layer("背景");
-    bgSource = ctx.canvas;
     if (state.bgMode === "color") {
       ctx.fillStyle = state.bgColor;
       ctx.fillRect(0, 0, p.w, p.h);
@@ -398,6 +396,18 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     ctx.fillRect(0, 0, p.w, p.h);
   }
 
+  // What is behind the product (background + dim), the same pixels in flat and layered output: the tone match samples it
+  // (sampling the flat canvas vs the background layer alone made the PNG and the PSD / SVG product colours differ).
+  const behindProduct = (): HTMLCanvasElement => {
+    flush();
+    const snap = newCanvas(p.w, p.h), sc = snap.getContext("2d");
+    if (!sc) throw new Error("canvas_unavailable");
+    const f = flat as CanvasRenderingContext2D | null;
+    if (f) sc.drawImage(f.canvas, 0, 0);
+    else for (const l of layers) { applyShadow(sc, l.shadow); sc.drawImage(l.canvas, 0, 0); }
+    return snap;
+  };
+
   // Skip overlaying the product when the active AI background already has it baked in (keyed off bgImageHasProduct,
   // set at generation time, NOT the live toggle -- so flipping the toggle can't double-draw the product).
   const aiComposited = state.bgImageHasProduct && state.bgMode === "ai" && !!state.bgImage;
@@ -421,7 +431,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     const g = state.grounding;
     if (g?.shadow?.enabled || g?.reflection?.enabled || g?.tone?.enabled) {
       // C7: shadow and reflection under the product, each its own layer (PSD / SVG keep them apart)
-      const out = groundProduct({ product: img, box: { x, y, w: sw, h: sh }, canvasW: p.w, canvasH: p.h, background: bgSource ?? undefined, opts: g });
+      const out = groundProduct({ product: img, box: { x, y, w: sw, h: sh }, canvasW: p.w, canvasH: p.h, background: g.tone?.enabled ? behindProduct() : undefined, opts: g });
       if (out.shadow) layer("商品陰影").drawImage(out.shadow, 0, 0);
       if (out.reflection) layer("商品倒影").drawImage(out.reflection, 0, 0);
       layer("商品圖").drawImage(out.product, 0, 0);

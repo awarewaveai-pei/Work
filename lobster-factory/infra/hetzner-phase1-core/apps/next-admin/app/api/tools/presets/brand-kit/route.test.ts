@@ -38,12 +38,14 @@ vi.mock("@/lib/supabase-server", () => {
   return { getSupabaseWriteClient: () => client, getSupabaseReadClient: () => client };
 });
 import { GET, PUT } from "./route";
+import { getDesignsPublicBase } from "@/lib/storage/r2";
 
 const admin = { "x-ops-user-kind": "staff", "x-ops-claims-role": "admin" };
 const customer = { "x-ops-user-kind": "client", "x-ops-org-id": ORG };
 const url = (q = "") => `https://design.aware-wave.com/api/tools/presets/brand-kit${q}`;
+// the logo is in our designs bucket: another website's logo is dropped (the banner canvas could not read it)
 const KIT = {
-  name: "Acme", logo: "https://designs.example/acme.png", colors: ["#112233", "#445566", "#ff8800", "#1a1a1a", "#ffffff"],
+  name: "Acme", logo: `${getDesignsPublicBase()}/designs/acme.png`, colors: ["#112233", "#445566", "#ff8800", "#1a1a1a", "#ffffff"],
   headlineFont: "'Noto Serif TC', 'Songti TC', serif", bodyFont: "'Noto Sans TC', 'PingFang TC', sans-serif", headlineWeight: 800, bodyWeight: 400,
 };
 

@@ -16,6 +16,8 @@ export type BrandKitState = {
   canEdit: boolean;
   status: "loading" | "ready" | "saving" | "error";
   error: string | null;
+  /** The organization has a logo on another website (CIS): left out of the kit, the panel asks for an upload. */
+  externalLogo: boolean;
   save(kit: BrandKit): Promise<boolean>;
   reload(): void;
 };
@@ -30,6 +32,7 @@ export function useBrandKit(orgId: string | null): BrandKitState {
   const [canEdit, setCanEdit] = useState(false);
   const [status, setStatus] = useState<BrandKitState["status"]>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [externalLogo, setExternalLogo] = useState(false);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -38,7 +41,8 @@ export function useBrandKit(orgId: string | null): BrandKitState {
     setError(null);
     fetch(orgId ? `${API}?orgId=${encodeURIComponent(orgId)}` : API, { credentials: "same-origin" })
       .then(async (r) => {
-        const j = (await r.json().catch(() => ({}))) as { ok?: boolean; kit?: BrandKit | null; saved?: boolean; canEdit?: boolean; error?: string };
+        const j = (await r.json().catch(() => ({}))) as { ok?: boolean; kit?: BrandKit | null; saved?: boolean; canEdit?: boolean; externalLogo?: boolean; error?: string };
+        if (!cancelled) setExternalLogo(!!j.externalLogo);
         if (cancelled) return;
         if (!r.ok || !j.ok) { setKit(null); setStatus("error"); setError(j.error ?? `HTTP ${r.status}`); return; }
         setKit(j.kit ?? null); setSaved(!!j.saved); setCanEdit(!!j.canEdit); setStatus("ready");
@@ -69,5 +73,5 @@ export function useBrandKit(orgId: string | null): BrandKitState {
     return true;
   }, [orgId]);
 
-  return { kit, saved, canEdit, status, error, save, reload: () => setTick((t) => t + 1) };
+  return { kit, saved, canEdit, status, error, externalLogo, save, reload: () => setTick((t) => t + 1) };
 }

@@ -8,6 +8,20 @@ import type { BrandKitState } from "./useBrandKit";
 
 const LOGO_TYPES = "image/png,image/jpeg,image/webp";
 
+/** The brand-kit route's error codes as sentences; anything else is shown with its code. */
+const ERROR_TEXT: Record<string, string> = {
+  orgId_required: "還沒選客戶：請在匯出區「存到哪個客戶的我的設計」選一個客戶，就會帶出那個客戶的品牌套組。",
+  org_not_found: "找不到這個客戶。",
+  forbidden_role: "你的帳號不能修改品牌套組（需要負責人或管理員）。",
+  supabase_not_configured: "資料庫沒有連上，暫時讀不到品牌套組。",
+  supabase_write_not_configured: "資料庫沒有連上，暫時存不了品牌套組。",
+  read_failed: "讀取品牌套組失敗，請稍後再試。",
+  update_failed: "儲存品牌套組失敗，請稍後再試。",
+  invalid_json: "送出的資料格式不對，請重新整理後再試。",
+  "kit needs at least one #rrggbb colour": "品牌套組至少要有一個顏色。",
+};
+const errorText = (e: string) => ERROR_TEXT[e] ?? (/[\u4e00-\u9fff]/.test(e) ? e : `品牌套組發生錯誤（${e}）。`);
+
 export type BrandKitPanelProps = {
   brand: BrandKitState;
   onApply(kit: BrandKit): void;
@@ -28,7 +42,7 @@ export default function BrandKitPanel({ brand, onApply, getCurrent }: BrandKitPa
   const fileRef = useRef<HTMLInputElement>(null);
   // The logo is a My Designs object: deleting it there leaves this URL dead (nothing stops that delete yet).
   const [brokenLogo, setBrokenLogo] = useState<string | null>(null);
-  const { kit, saved, canEdit, status, error } = brand;
+  const { kit, saved, canEdit, status, error, externalLogo } = brand;
   const busy = status === "saving" || status === "loading";
 
   const fromCurrent = (): BrandKit => {
@@ -85,7 +99,8 @@ export default function BrandKitPanel({ brand, onApply, getCurrent }: BrandKitPa
         )}
       </div>
       {status === "saving" && <p className="form-hint">儲存中…</p>}
-      {error && <p className="form-hint" style={{ color: "var(--badge-red-text)" }}>{error}</p>}
+      {externalLogo && !kit?.logo && <p className="form-hint">CIS 的 logo 在外部網站，橫幅讀不到；請在這裡上傳一份。</p>}
+      {error && <p className="form-hint" style={{ color: "var(--badge-red-text)" }}>{errorText(error)}</p>}
     </div>
   );
 }
