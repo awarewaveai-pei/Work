@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCAL_SIGNATURE_HEADER, signLocalPayment } from "@/lib/payments/local";
+import { featureList, resetFeatureListCache } from "@/lib/entitlements/features";
+import { gateFixture } from "@/lib/entitlements/__tests__/gate-fixtures";
+import { doorAccess, forgetDoorAccess } from "@/lib/portal/door-access";
 
 const apply = vi.fn();
 vi.mock("@/lib/entitlements/contracts", () => ({ applyPaymentEvent: (...args: unknown[]) => apply(...args) }));
@@ -108,5 +111,31 @@ describe("POST /api/webhooks/payments/[provider]", () => {
     expect((await POST(req, { params: Promise.resolve({ provider: "local" }) })).status).toBe(413);
     expect(text).not.toHaveBeenCalled();
     expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("a payment applied: the account's next feature list and door check are new; another account keeps its cached ones (U28)", async () => {
+    resetFeatureListCache();
+    forgetDoorAccess();
+    const OTHER = "00000000-0000-4000-8000-0000000000c2";
+    const payer = { orgId: ORG, kind: "customer" as const };
+    const other = { orgId: OTHER, kind: "customer" as const };
+    const keys = ["social.dispatch"];
+    const unpaid = gateFixture({ entitlement: null }).deps;
+    const paid = gateFixture({ entitlement: { organizationId: ORG } }).deps;
+    const client = (org: string) => new Headers({ "x-ops-user-kind": "client", "x-ops-org-id": org });
+    const held = (yes: boolean) => vi.fn(async () => yes);
+
+    expect((await featureList(payer, "client:x:u", unpaid, keys)).list.features["social.dispatch"].allowed).toBe(false);
+    const otherList = await featureList(other, "client:x:u", unpaid, keys);
+    expect(await doorAccess(client(ORG), "social", held(false))).toBe("not_held");
+    expect(await doorAccess(client(OTHER), "social", held(false))).toBe("not_held");
+
+    apply.mockResolvedValueOnce({ ok: true, event: "e1", kind: "credit_pack", ledger: "l1", units: 500 });
+    expect((await post(raw, signLocalPayment(raw, SECRET))).status).toBe(200);
+
+    expect((await featureList(payer, "client:x:u", paid, keys)).list.features["social.dispatch"].allowed).toBe(true);
+    expect(await featureList(other, "client:x:u", paid, keys)).toBe(otherList);
+    expect(await doorAccess(client(ORG), "social", held(true))).toBe("open");
+    expect(await doorAccess(client(OTHER), "social", held(true))).toBe("not_held");
   });
 });

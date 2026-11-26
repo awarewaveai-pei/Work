@@ -3,6 +3,8 @@
 // A provider answers only when PAYMENTS_PROVIDERS names it: `local` (operator-recorded bank transfer), `woo` (wp-bridge).
 import { NextResponse } from "next/server";
 import { applyPaymentEvent } from "@/lib/entitlements/contracts";
+import { forgetFeatureListFor } from "@/lib/entitlements/features";
+import { forgetDoorAccessFor } from "@/lib/portal/door-access";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { PaymentParseError, paymentProvider } from "@/lib/payments";
 
@@ -43,6 +45,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       await provider.refused?.(raw, outcome.code, sender);
       return NextResponse.json({ ok: false, error: outcome.code }, { status: outcome.status });
     }
+    // The account's rights may have changed: its next feature list and door check read them again (U28).
+    forgetFeatureListFor(received.event.organization_id);
+    forgetDoorAccessFor(received.event.organization_id);
     return NextResponse.json(outcome);
   } catch (error) {
     // 500 = not recorded (the transaction rolled back): the sender retries with the same event id.

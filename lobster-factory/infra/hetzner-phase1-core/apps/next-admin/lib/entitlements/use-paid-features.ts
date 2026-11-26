@@ -27,7 +27,11 @@ export function usePaidFeatures() {
     let live = true;
     setFeatures(null);   // never show the previous client's list while the next one loads
     void load(org).then((f) => { if (live) setFeatures(f); });
-    return () => { live = false; };
+    // Back from paying on aware-wave.com (the shop link opens in this tab): the browser may restore this page from its
+    // back-forward cache without mounting it again, so read the list once more (U28; the server dropped its copy).
+    const onReturn = (event: PageTransitionEvent) => { if (event.persisted) void load(org).then((f) => { if (live) setFeatures(f); }); };
+    window.addEventListener("pageshow", onReturn);
+    return () => { live = false; window.removeEventListener("pageshow", onReturn); };
   }, [org]);
   const canUse = (featureKey: string) => features?.[featureKey]?.allowed ?? true;
   /** Held per a loaded list: false while loading, on an error or for a key the list lacks. A screen that STATES what the

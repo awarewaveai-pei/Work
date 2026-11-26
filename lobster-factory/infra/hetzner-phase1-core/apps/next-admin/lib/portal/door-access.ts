@@ -17,8 +17,18 @@ const MAX_ENTRIES = 5_000;
 const remembered = new Map<string, { access: DoorAccess; until: number }>();
 // A page's calls arrive together, before the first lookup returns: they share that one lookup.
 const inFlight = new Map<string, Promise<DoorAccess>>();
+// Bumped by forgetDoorAccessFor: a lookup that started before the account's rights changed answers its caller but is
+// neither remembered nor shared with later calls.
+const epochs = new Map<string, number>();
 /** Tests only. */
-export function forgetDoorAccess(): void { remembered.clear(); inFlight.clear(); }
+export function forgetDoorAccess(): void { remembered.clear(); inFlight.clear(); epochs.clear(); }
+/** A payment changed this account's rights (U28): its next door check looks up again; other accounts keep theirs.
+ *  In-memory, this module instance only (middleware.ts runs in its own edge sandbox, another container in its own process). */
+export function forgetDoorAccessFor(organizationId: string): void {
+  epochs.set(organizationId, (epochs.get(organizationId) ?? 0) + 1);
+  for (const key of [...remembered.keys()]) if (key.startsWith(`${organizationId}:`)) remembered.delete(key);
+  for (const key of [...inFlight.keys()]) if (key.startsWith(`${organizationId}:`)) inFlight.delete(key);
+}
 
 export async function doorAccess(headers: Headers, productKey: string, holds: Holds = holdsProduct,
   now = Math.floor(Date.now() / 1000)): Promise<DoorAccess> {
@@ -31,6 +41,7 @@ export async function doorAccess(headers: Headers, productKey: string, holds: Ho
   if (hit && hit.until > at) return hit.access;
   const pending = inFlight.get(key);
   if (pending) return pending;
+  const epoch = epochs.get(organizationId) ?? 0;
   const lookup = (async (): Promise<DoorAccess> => {
     let access: DoorAccess;
     try {
@@ -39,10 +50,11 @@ export async function doorAccess(headers: Headers, productKey: string, holds: Ho
       console.error(`[door] ${productKey}: holdsProduct failed: ${String(error).slice(0, 200)}`);
       access = "unavailable";
     }
+    if ((epochs.get(organizationId) ?? 0) !== epoch) return access;
     if (remembered.size >= MAX_ENTRIES) remembered.clear();
     remembered.set(key, { access, until: Date.now() + (access === "open" ? HELD_MS : access === "not_held" ? NOT_HELD_MS : FAILED_MS) });
     return access;
-  })().finally(() => inFlight.delete(key));
+  })().finally(() => { if (inFlight.get(key) === lookup) inFlight.delete(key); });
   inFlight.set(key, lookup);
   return lookup;
 }
