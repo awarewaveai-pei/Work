@@ -148,9 +148,13 @@ describe("registry claims match the code", () => {
   // The one exception, read for it: the door's own "does this account hold the product" check (ProductDoorShell).
   const DOOR_OWN_ORG_READS: Readonly<Record<string, string>> = {
     "lib/entitlements/door-holds.ts": "reads only the caller's own organization's entitlement rows (x-ops-org-id set by middleware); the table is service-role-only",
+    "lib/entitlements/account-manager.ts": "reads only the caller's own organization's member link for the caller's own user id (x-ops-org-id / x-ops-user-id); customer_identities is service-role-only",
   };
   // Each exception has a test that pins its organization filter (Codex 2026-10-24 F2: an import check cannot).
-  const DOOR_OWN_ORG_READ_TESTS: Readonly<Record<string, string>> = { "lib/entitlements/door-holds.ts": "lib/entitlements/__tests__/door-holds.test.ts" };
+  const DOOR_OWN_ORG_READ_TESTS: Readonly<Record<string, string>> = {
+    "lib/entitlements/door-holds.ts": "lib/entitlements/__tests__/door-holds.test.ts",
+    "lib/entitlements/account-manager.ts": "lib/entitlements/__tests__/account-manager.test.ts",
+  };
   it("a built door's signed-in pages never read with the service-role client", () => {
     for (const p of builtDoors()) {
       const direct = [...doorFiles(loginPages(p))].filter((f) => !(f in DOOR_OWN_ORG_READS) && FILES.get(f)!.imports.some((r) => r === "lib/supabase-server"));

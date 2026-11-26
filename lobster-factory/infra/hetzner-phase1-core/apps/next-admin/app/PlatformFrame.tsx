@@ -11,6 +11,7 @@ import { PRODUCTS, type ProductKey } from "@/lib/portal/products";
 import { baseDomain, portalHost, productHost, staffHosts } from "@/lib/portal/hosts";
 import { doorAccess } from "@/lib/portal/door-access";
 import { resolveTenant } from "@/lib/tenant-guard";
+import { callerManagesUnit } from "@/lib/entitlements/account-manager";
 import type { SavedLayout } from "@/lib/theme/tokens";
 import { DoorProvider } from "./DoorContext";
 import { NavRail } from "./NavRail";
@@ -170,8 +171,9 @@ async function DoorFrame({ productKey, bare = false, children }: { productKey: P
       </DoorProvider>
     </div>
   );
-  const items = bottomItems(resolveTenant({ headers: h }).userKind === "client"
-    ? { kind: "member", portalOrigin: `https://${portalHost()}` }
+  const tenant = resolveTenant({ headers: h });
+  const items = bottomItems(tenant.userKind === "client"
+    ? { kind: "member", portalOrigin: `https://${portalHost()}`, manager: await callerManagesUnit(tenant.orgId, h.get("x-ops-user-id")) }
     : { kind: "staff-door", staffOrigin: context.hosts[STAFF_HOST_KEY] });
   return (
     <ClientContextProvider {...context}>

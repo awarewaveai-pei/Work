@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import { ensureWpCustomer, type WpCustomerDeps } from "../wp-customers";
-import { isAccountManager } from "../identities";
+import { isAccountManager } from "../account-manager";
 
 const AWC = { id: "site-awc", keyId: "aware-wave-com", sellerOrganizationId: "org-internal" };
 const OLD_MEMBER = { site: AWC, wpUserId: 11, email: "old@unit.tw", displayName: "Old", emailVerified: true };

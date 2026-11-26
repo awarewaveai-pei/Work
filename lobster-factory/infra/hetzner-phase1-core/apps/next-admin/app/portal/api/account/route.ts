@@ -2,7 +2,7 @@
 // The unit comes only from the server-side identity (requireClientOrg); no query or body names a unit. The manager (holder of
 // the unit's member link, ADR 021 D5) gets contracts, grants and the recent ledger; an authorized member gets balance and
 // end dates only. Never returned: payment events, provider, source refs, hold reason.
-import { isAccountManager } from "@/lib/entitlements/identities";
+import { isAccountManager } from "@/lib/entitlements/account-manager";
 import { billingAccount } from "@/lib/entitlements/tables";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { PortalAccessError, requireClientOrg } from "@/lib/tenant-guard";

@@ -10,7 +10,7 @@ const STRANGER = "00000000-0000-4000-8000-0000000000d3";   // another unit's cli
 const h = vi.hoisted(() => ({
   accounts: new Map<string, string>(),
   invites: [] as Array<{ orgId: string; email: string; productKey: string }>,
-  audits: [] as Array<[string, string, Record<string, unknown>]>,
+  audits: [] as Array<[string, string, Record<string, unknown>, string]>,
   manager: "",
 }));
 vi.mock("@/lib/accounts/client-invite", async (orig) => ({
@@ -27,12 +27,12 @@ vi.mock("@/lib/accounts/client-invite", async (orig) => ({
     return { ok: true, email: "x" };
   }),
 }));
-vi.mock("@/lib/entitlements/identities", () => ({
+vi.mock("@/lib/entitlements/account-manager", () => ({
   isAccountManager: vi.fn(async (_db: unknown, orgId: string, userId: string) => orgId === ORG && userId === h.manager),
 }));
 vi.mock("@/lib/portal/held-doors", () => ({ heldDoors: vi.fn(async () => [{ key: "content", name: "內容行銷" }]) }));
 vi.mock("@/lib/ops-audit", () => ({
-  recordOpsAudit: vi.fn(async (org: string, _role: string, _src: string, event: string, payload: Record<string, unknown>) => { h.audits.push([org, event, payload]); }),
+  recordOpsAudit: vi.fn(async (org: string, role: string, _src: string, event: string, payload: Record<string, unknown>) => { h.audits.push([org, event, payload, role]); }),
 }));
 vi.mock("@/lib/supabase-server", () => ({
   getSupabaseWriteClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { name: "Unit" }, error: null }) }) }) }) }),
@@ -63,9 +63,9 @@ describe("/portal/api/people (U19)", () => {
     expect(h.invites).toEqual([{ orgId: ORG, email: "new@unit.test", productKey: "content" }, { orgId: ORG, email: "d2@unit.test", productKey: "content" }]);
     expect((await del(MANAGER, COLLEAGUE)).status).toBe(200);
     expect(h.accounts.has(COLLEAGUE)).toBe(false);
-    expect(h.audits.map(([org, event, p]) => [org, event, p.actor_user_id, p.actor_kind])).toEqual([
+    expect(h.audits.map(([org, event, p, role]) => [org, event, p.actor_user_id, role])).toEqual([
       [ORG, "client_account_link_sent", MANAGER, "client"], [ORG, "client_account_link_sent", MANAGER, "client"],
-      [ORG, "client_account_deleted", MANAGER, "client"]]);
+      [ORG, "client_account_deleted", MANAGER, "client"]]);   // actor_role client (0185), never a staff role
   });
 
   it("an authorized person: the page data is the role only, and every action is 403 with nothing done", async () => {

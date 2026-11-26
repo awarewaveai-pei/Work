@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const billing = vi.hoisted(() => vi.fn());
 const manager = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/entitlements/tables", () => ({ billingAccount: billing }));
-vi.mock("@/lib/entitlements/identities", () => ({ isAccountManager: manager }));
+vi.mock("@/lib/entitlements/account-manager", () => ({ isAccountManager: manager }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => ({}) }));
 
 import { GET } from "../route";

@@ -32,11 +32,20 @@ describe("phone bottom bar (blueprint §9.1)", () => {
   });
 
   it("a customer on a door: their workspace and credits on the portal host", () => {
-    const html = bar({ kind: "member", portalOrigin: "https://portal.example.test" }, "/topics");
+    const html = bar({ kind: "member", portalOrigin: "https://portal.example.test", manager: false }, "/topics");
     expect(labels(html)).toEqual(["工作台", "點數與合約", "更多"]);
     expect(html).toContain('href="https://portal.example.test/launcher"');
     expect(html).toContain('href="https://portal.example.test/wallet"');
     expect(current(html)).toEqual([]);
+  });
+
+  it("成員 (U19): only the unit's manager gets it, on the portal host; an authorized person does not", () => {
+    const manager = bar({ kind: "member", portalOrigin: "https://portal.example.test", manager: true });
+    expect(labels(manager)).toEqual(["工作台", "點數與合約", "成員", "更多"]);
+    expect(manager).toContain('href="https://portal.example.test/people"');
+    const member = bar({ kind: "member", portalOrigin: "https://portal.example.test", manager: false });
+    expect(labels(member)).not.toContain("成員");
+    expect(member).not.toContain("/people");
   });
 
   it("staff on a door: links go to the console host, and none without one", () => {
@@ -55,7 +64,7 @@ describe("phone bottom bar keeps the current client (ADR 020)", () => {
     const staff = bar({ kind: "staff-door", staffOrigin: "https://app.example.test" });
     expect(staff).toContain(`href="https://app.example.test/?org=${A}&amp;site=${S}"`);
     expect(staff).toContain(`href="https://app.example.test/ops/clients?org=${A}&amp;site=${S}"`);
-    const member = bar({ kind: "member", portalOrigin: "https://portal.example.test" });
+    const member = bar({ kind: "member", portalOrigin: "https://portal.example.test", manager: false });
     expect(member).toContain('href="https://portal.example.test/launcher"');
     expect(member).toContain('href="https://portal.example.test/wallet"');
   });

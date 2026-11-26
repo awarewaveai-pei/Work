@@ -95,7 +95,7 @@ export async function linkIdentity(
 
 /** PAYMENT PATH ONLY (wp-customers.ts ensureWpCustomer): the account a member managed before a transfer replaced them
  *  (0182 former_customer_identities, latest replacement first), so money they moved while managing it stays its. Never
- *  for sign-in or visibility (wp-handoff, wp-summary, awarewave-wp source, isAccountManager use the current identity
+ *  for sign-in or visibility (wp-handoff, wp-summary, awarewave-wp source, account-manager.ts use the current identity
  *  only): the replaced manager is out. A caller asks findBillingAccount first -- a current identity always wins. */
 export async function findFormerAccount(db: SupabaseClient, id: Identity): Promise<{ organizationId: string } | null> {
   const { data, error } = await db
@@ -111,17 +111,6 @@ export async function findFormerAccount(db: SupabaseClient, id: Identity): Promi
   return row ? { organizationId: row.organization_id } : null;
 }
 
-/** The unit's manager = the app account holding the unit's member link (ADR 021 D5). Fails closed: a failed or empty
- *  lookup reads as "not the manager" (a screen shows less, never more). */
-export async function isAccountManager(db: SupabaseClient, organizationId: string, userId: string): Promise<boolean> {
-  const { data, error } = await db
-    .from("customer_identities")
-    .select("user_id")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    .limit(1);
-  return !error && Array.isArray(data) && data.length > 0;
-}
 
 // ── Staff sign an existing account up as a member (ADR 021 D4, G1; migration 0180 member_invites) ─────────────────────
 // Staff name the account and its contact's email; the member proves that email on aware-wave.com, whose signed event

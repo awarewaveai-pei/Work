@@ -13,14 +13,16 @@ export type BottomViewer =
   | { kind: "staff"; visible: readonly string[] | null }
   /** staff on a product door: the console is another host (undefined = none configured, no link) */
   | { kind: "staff-door"; staffOrigin: string | undefined }
-  /** a customer on a product door: their workspace is on the portal host */
-  | { kind: "member"; portalOrigin: string };
+  /** a customer on a product door: their workspace is on the portal host. manager = holds the unit's member link
+   *  (isAccountManager, ADR 021 D5): only they get 成員 (U19 /people); false when it could not be read */
+  | { kind: "member"; portalOrigin: string; manager: boolean };
 
 const STAFF: BottomItem[] = [{ label: "工作台", href: "/" }, { label: "客戶", href: "/ops/clients" }];
 
 export function bottomItems(v: BottomViewer): BottomItem[] {
   if (v.kind === "member") {
-    return [{ label: "工作台", href: `${v.portalOrigin}/launcher`, noCarry: true }, { label: "點數與合約", href: `${v.portalOrigin}/wallet`, noCarry: true }];
+    const items: BottomItem[] = [{ label: "工作台", href: `${v.portalOrigin}/launcher`, noCarry: true }, { label: "點數與合約", href: `${v.portalOrigin}/wallet`, noCarry: true }];
+    return v.manager ? [...items, { label: "成員", href: `${v.portalOrigin}/people`, noCarry: true }] : items;
   }
   if (v.kind === "staff-door") return v.staffOrigin ? STAFF.map((i) => ({ ...i, href: `${v.staffOrigin}${i.href}` })) : [];
   return STAFF.filter((i) => !v.visible || v.visible.includes(i.href));

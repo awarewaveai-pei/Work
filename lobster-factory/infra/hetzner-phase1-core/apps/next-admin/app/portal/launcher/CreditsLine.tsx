@@ -1,6 +1,7 @@
 "use client";
-// One line: points balance (+ earliest end date) from GET /portal/api/account. A manager gets a link to the wallet page
-// (U10, /portal/wallet); an authorized member sees balance and date only, no top-up button (blueprint §7.3).
+// One line: points balance (+ earliest end date) from GET /portal/api/account. A manager gets links to the wallet page
+// (U10, /portal/wallet) and to 成員授權 (U19, /portal/people) -- both by the same role the API answered; an authorized
+// member sees balance and date only, no top-up button (blueprint §7.3).
 import { useEffect, useState } from "react";
 
 interface Account { ok: true; role: "manager" | "member"; balance: number; frozen: boolean; next_period_end: string | null }
@@ -25,6 +26,7 @@ export function CreditsLine() {
       <span>點數 <strong style={{ color: "var(--text-primary)" }}>{state.balance}</strong></span>
       {end && <span>合約到 {end}</span>}
       {state.role === "manager" && <a href="/portal/wallet" className="btn-secondary">點數與合約</a>}
+      {state.role === "manager" && <a href="/portal/people" className="btn-secondary">成員</a>}
     </p>
   );
 }

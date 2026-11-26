@@ -11,7 +11,7 @@
 // DELETE ?userId → removes an account of the unit; never the manager's own (cannot_delete_self).
 import { NextResponse } from "next/server";
 import { deleteClientAccount, inviteClientAccount, listClientAccounts, normalizeEmail } from "@/lib/accounts/client-invite";
-import { isAccountManager } from "@/lib/entitlements/identities";
+import { isAccountManager } from "@/lib/entitlements/account-manager";
 import { recordOpsAudit } from "@/lib/ops-audit";
 import { heldDoors } from "@/lib/portal/held-doors";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
@@ -25,8 +25,8 @@ const json = (body: unknown, status = 200) => NextResponse.json(body, { status, 
 
 type Caller = { orgId: string; userId: string; manager: boolean };
 
-/** The caller's unit and role, or the refusal. ops_audit_events.actor_role takes staff roles only (0011 check): a
- *  customer acts as "viewer", named by actor_user_id + role_source "portal_manager". */
+/** The caller's unit and role, or the refusal. Audited as actor_role "client" (0185 adds it to 0011's staff-only
+ *  check), named by actor_user_id + role_source "portal_manager". */
 async function caller(req: Request): Promise<Caller | Response> {
   if (!req.headers.get("x-ops-user-kind")) return json({ ok: false, error: "unauthorized" }, 401);
   let orgId: string;
@@ -44,7 +44,7 @@ async function caller(req: Request): Promise<Caller | Response> {
 }
 
 const audit = (c: Caller, event: string, payload: Record<string, unknown>) =>
-  recordOpsAudit(c.orgId, "viewer", "portal_manager", event, { ...payload, actor_user_id: c.userId, actor_kind: "client" });
+  recordOpsAudit(c.orgId, "client", "portal_manager", event, { ...payload, actor_user_id: c.userId, actor_kind: "client" });
 
 export async function GET(req: Request): Promise<Response> {
   const c = await caller(req);
