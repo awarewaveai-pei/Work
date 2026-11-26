@@ -280,7 +280,9 @@ async function dropBrandRoles(sb: SupabaseClient, userId: string,
       detail: { user_id: userId, role: r.role, reason: "source_deleted" },
     })));
     if (audit.error) return { ok: false, error: "brand_audit_failed" };
-    const del = await sb.from("social_brand_members").delete().eq("user_id", userId);
+    // only the rows read and audited above: a read capped by PostgREST's max rows must not delete unaudited ones;
+    // what is left is found by the count below (503, the resent event's next round)
+    const del = await sb.from("social_brand_members").delete().eq("user_id", userId).in("organization_id", rows.map((r) => r.organization_id));
     if (del.error) return { ok: false, error: "brand_role_delete_failed" };
   }
   // every brand this person was removed from as owner by a source deletion (this try or an earlier one) ...
@@ -329,8 +331,9 @@ export async function deleteClientAccount(sb: SupabaseClient, orgId: string, use
     .select("organization_id", { count: "exact", head: true })
     .eq("user_id", userId);
   if (memErr) return { ok: false, status: 503, error: "member_lookup_failed" };
-  // sourceDeleted removed them all just above: a role here was added meanwhile (a race) -- retry, never final
-  if ((count ?? 0) > 0) return opts.sourceDeleted ? { ok: false, status: 503, error: "brand_role_added_meanwhile" } : { ok: false, status: 409, error: "still_member" };
+  // sourceDeleted removed what it read just above: a role left here was past the read's row cap or added meanwhile --
+  // retry (the next round removes it), never final
+  if ((count ?? 0) > 0) return opts.sourceDeleted ? { ok: false, status: 503, error: "brand_roles_remaining" } : { ok: false, status: 409, error: "still_member" };
   const { error: delErr } = await sb.auth.admin.deleteUser(userId);
   if (delErr) return { ok: false, status: 502, error: "delete_failed" };
   const { error: profErr } = await sb.from("profiles").delete().eq("id", userId);

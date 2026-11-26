@@ -13,6 +13,7 @@ const USER = "00000000-0000-4000-8000-0000000000b1";
 let tables: Record<string, Row[]>;
 let users: Map<string, { id: string; email: string; app_metadata: Row }>;
 let deleteUserFails = 0;
+let rowCap = Infinity;   // PostgREST's max rows on a plain read (PGRST_DB_MAX_ROWS)
 
 function query(table: string) {
   const filters: Array<(r: Row) => boolean> = [];
@@ -37,7 +38,7 @@ function query(table: string) {
         if (table === "profiles") tables.organization_memberships = tables.organization_memberships.filter((m) => !hit.some((p) => p.id === m.user_id));
         return resolve({ error: null });
       }
-      return resolve(head ? { count: hit.length, error: null } : { data: hit, error: null });
+      return resolve(head ? { count: hit.length, error: null } : { data: hit.slice(0, rowCap), error: null });
     },
   };
   return q;
@@ -60,6 +61,7 @@ const accountGone = () => !users.has(USER) && !tables.profiles.some((p) => p.id 
 describe("deleteClientAccount: the cash-register site deleted the person (M10 sourceDeleted)", () => {
   beforeEach(() => {
     deleteUserFails = 0;
+    rowCap = Infinity;
     users = new Map([[USER, { id: USER, email: "boss@unit.test", app_metadata: { user_kind: "client", org_id: UNIT } }]]);
     tables = {
       organizations: [{ id: UNIT, parent_organization_id: null, name: "Unit" }, { id: BRAND, parent_organization_id: UNIT, name: "Unit 品牌" },
@@ -96,6 +98,16 @@ describe("deleteClientAccount: the cash-register site deleted the person (M10 so
     expect(tables.social_brand_members).toEqual([]);
     expect(tables.social_audit_log.map((r) => r.organization_id).sort()).toEqual([BRAND, OTHER_BRAND].sort());
     expect(accountGone()).toBe(true);
+  });
+
+  it("on: a read capped below the person's roles deletes only what it read and audited, and answers a retryable 503", async () => {
+    tables.organizations.push({ id: OTHER_BRAND, parent_organization_id: OTHER, name: "Other 品牌" });
+    tables.social_brand_members.push({ organization_id: OTHER_BRAND, user_id: USER, role: "owner" });
+    rowCap = 1;
+    await expect(deleteClientAccount(sb, UNIT, USER, { sourceDeleted: true })).resolves.toEqual({ ok: false, status: 503, error: "brand_roles_remaining" });
+    expect(tables.social_brand_members).toEqual([{ organization_id: OTHER_BRAND, user_id: USER, role: "owner" }]);
+    expect(tables.social_audit_log.map((r) => r.organization_id)).toEqual([BRAND]);   // deleted = audited
+    expect(users.has(USER)).toBe(true);
   });
 
   it("on: a failure after the brand roles went is retryable, and the retry finishes and still names the brand", async () => {
