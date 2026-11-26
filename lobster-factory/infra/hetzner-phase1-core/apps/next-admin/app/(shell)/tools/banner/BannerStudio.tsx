@@ -9,6 +9,10 @@ import {
   DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, badgeShadowOf, buildBannerPsd, buildBannerSvg, loadImage, rasterize, renderBannerLayers,
   type ElemBox, type ElemKey, type ElemPositions, type Pixels, type ShadowSpec,
 } from "./banner-layers";
+import type { GroundingOpts } from "./product-grounding";
+import BrandKitPanel from "./kit/BrandKitPanel";
+import { useBrandKit } from "./kit/useBrandKit";
+import type { BrandKit } from "./kit/brand-kit";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel, type AspectRatio } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
@@ -242,6 +246,10 @@ interface State {
   multiSizes:    PresetKey[];
   sizeOverrides: Partial<Record<PresetKey, SizePatch>>;
   editingSize:   { key: PresetKey; main: SizePatch & { preset: PresetKey } } | null;
+  // C8: product grounding (C7 module) and the brand logo (C6 kit; a same-origin data URL so exports stay untainted)
+  grounding: GroundingOpts;
+  logoImage: string | null;
+  logoScale: number;
   // export
   saving:    boolean;
   saved:     boolean;
@@ -330,6 +338,13 @@ const INIT: State = {
   multiSizes:    [],
   sizeOverrides: {},
   editingSize:   null,
+  grounding: {
+    shadow:     { enabled: false, opacity: 0.5, softness: 0.35, distance: 0 },
+    reflection: { enabled: false, height: 0.35, fade: 0.3, gap: 0 },
+    tone:       { enabled: false, strength: 0.4 },
+  },
+  logoImage: null,
+  logoScale: 0.16,
   saving:    false,
   saved:     false,
   error:     null,
@@ -345,7 +360,7 @@ const INIT: State = {
 /** The fields a size may set for itself; everything else (words, colours, images, fonts…) is shared by all sizes. */
 const SIZE_KEYS = [
   "positions", "headlineSize", "subtextSize", "letterSpacing", "bodyLetterSpacing", "productScale", "productPos",
-  "badgeScale", "textPos", "textAlignH", "bgImgScale", "bgImgX", "bgImgY",
+  "badgeScale", "textPos", "textAlignH", "bgImgScale", "bgImgX", "bgImgY", "logoScale",
 ] as const;
 type SizePatch = Partial<Pick<State, (typeof SIZE_KEYS)[number]>>;
 const pickSize = (st: State): SizePatch => Object.fromEntries(SIZE_KEYS.map((k) => [k, st[k]])) as SizePatch;
@@ -553,7 +568,7 @@ async function renderPreview(state: State): Promise<{ url: string; boxes: Partia
   return { url: doc.layers[0].canvas.toDataURL("image/png"), boxes: doc.boxes };
 }
 /** Topmost first: what a click on the preview grabs. */
-const HIT_ORDER: readonly ElemKey[] = ["badge", "cta", "trust", "price", "subtext", "headline", "product"];
+const HIT_ORDER: readonly ElemKey[] = ["badge", "logo", "cta", "trust", "price", "subtext", "headline", "product"];
 /** Snap lines (shares of the canvas): centre and thirds. */
 const SNAP_AT = [1 / 3, 0.5, 2 / 3];
 const SNAP_DIST = 0.015;
@@ -965,6 +980,32 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   // &org=<uuid>): that video's shape, its title as the headline, the opener layout, and the organization 存到我的設計 saves
   // into (staff work for a customer; the designs route checks access). Read once; unknown values are ignored.
   const [saveOrg, setSaveOrg] = useState<string | null>(null);
+  // C8: the brand kit of the organization this banner is saved for (null = own / default organization)
+  const brand = useBrandKit(saveOrg);
+  async function applyBrandKit(kit: BrandKit) {
+    const [main, second, accent, text, bg] = kit.colors;
+    let logoImage: string | null = null;
+    if (kit.logo) {
+      try {
+        // the logo lives in the bucket (another origin): fetch it through our download route so the canvas stays readable
+        const blob = await urlToBlob(kit.logo);
+        logoImage = await new Promise<string>((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => fail(r.error); r.readAsDataURL(blob); });
+      } catch (err) {
+        setS((prev) => ({ ...prev, error: `logo 讀取失敗：${err instanceof Error ? err.message : String(err)}` }));
+      }
+    }
+    setS((prev) => ({
+      ...prev,
+      ...(main ? { gradFrom: main, badgeColor: main } : {}),
+      ...(second ? { gradTo: second } : {}),
+      ...(accent ? { accentColor: accent, ctaBg: accent } : {}),
+      ...(text ? { textColor: text } : {}),
+      ...(bg ? { bgColor: bg } : {}),
+      headlineFont: kit.headlineFont, fontFamily: kit.bodyFont, headlineWeight: kit.headlineWeight, bodyWeight: kit.bodyWeight,
+      ...(logoImage ? { logoImage } : {}),
+      saved: false,
+    }));
+  }
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const org = q.get("org") ?? "";
@@ -1396,6 +1437,24 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
           display: "flex", flexDirection: "column", gap: 12 }}>
 
           <StepCard title="配色 / 品牌色" icon="🎨" order={1}>
+            <BrandKitPanel brand={brand} onApply={(kit) => void applyBrandKit(kit)}
+              getCurrent={() => {
+                const c = sRef.current;
+                return { colors: [c.gradFrom, c.gradTo, c.accentColor, c.textColor, c.bgColor], headlineFont: c.headlineFont, bodyFont: c.fontFamily, headlineWeight: c.headlineWeight, bodyWeight: c.bodyWeight };
+              }} />
+            {s.logoImage && (
+              <div className="form-row" style={{ marginTop: 8, flexWrap: "wrap", gap: 6 }}>
+                <label className="form-label">Logo</label>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={s.logoImage} alt="logo" style={{ height: 28, maxWidth: 80, objectFit: "contain" }} />
+                <span style={{ fontSize: 12 }}>大小</span>
+                <input type="range" min={0.04} max={0.6} step={0.01} value={s.logoScale} data-testid="banner-logo-scale"
+                  onChange={(e) => set("logoScale", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+                <span style={{ fontSize: 12, opacity: 0.7 }}>{Math.round(s.logoScale * 100)}%</span>
+                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => set("logoImage", null)}>拿掉 logo</button>
+                <span className="form-hint" style={{ width: "100%" }}>預設在左下角，可在預覽上拖曳。</span>
+              </div>
+            )}
             {staff ? <staff.BrandPicker onPick={(colors) => { setPalette(colors); setSelSwatch(colors[0] ?? null); }} /> : null}
 
             <input ref={colorRefFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleColorRefUpload} />
@@ -1616,6 +1675,47 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 </>
               )}
             </div>
+            {s.productImage && (() => {
+              const g = s.grounding;
+              const setG = <K extends keyof GroundingOpts>(k: K, v: NonNullable<GroundingOpts[K]>) => set("grounding", { ...g, [k]: v });
+              const slider = (label: string, value: number, min: number, max: number, step: number, on: (v: number) => void, unit = "%", id = "") => (
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                  <span style={{ minWidth: 48 }}>{label}</span>
+                  <input type="range" min={min} max={max} step={step} value={value} data-testid={id || undefined}
+                    onChange={(e) => on(Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+                  <span style={{ opacity: 0.7, minWidth: 40, textAlign: "right" }}>{unit === "%" ? `${Math.round(value * 100)}%` : `${value}${unit}`}</span>
+                </label>
+              );
+              const sh = g.shadow ?? { enabled: false }, rf = g.reflection ?? { enabled: false }, tn = g.tone ?? { enabled: false };
+              return (
+                <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>商品擬真</div>
+                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" checked={!!sh.enabled} data-testid="banner-ground-shadow" onChange={(e) => setG("shadow", { ...sh, enabled: e.target.checked })} />
+                    接觸陰影（商品放在桌面上的影子）
+                  </label>
+                  {sh.enabled && (<>
+                    {slider("濃度", sh.opacity ?? 0.5, 0, 1, 0.05, (v) => setG("shadow", { ...sh, opacity: v }))}
+                    {slider("柔和", sh.softness ?? 0.35, 0, 1, 0.05, (v) => setG("shadow", { ...sh, softness: v }))}
+                    {slider("下移", sh.distance ?? 0, -40, 80, 1, (v) => setG("shadow", { ...sh, distance: v }), "px")}
+                  </>)}
+                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" checked={!!rf.enabled} data-testid="banner-ground-reflection" onChange={(e) => setG("reflection", { ...rf, enabled: e.target.checked })} />
+                    倒影（光滑桌面）
+                  </label>
+                  {rf.enabled && (<>
+                    {slider("長度", rf.height ?? 0.35, 0, 1, 0.05, (v) => setG("reflection", { ...rf, height: v }))}
+                    {slider("濃度", rf.fade ?? 0.3, 0, 1, 0.05, (v) => setG("reflection", { ...rf, fade: v }))}
+                    {slider("間距", rf.gap ?? 0, 0, 60, 1, (v) => setG("reflection", { ...rf, gap: v }), "px")}
+                  </>)}
+                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" checked={!!tn.enabled} data-testid="banner-ground-tone" onChange={(e) => setG("tone", { ...tn, enabled: e.target.checked })} />
+                    色調匹配（商品顏色往背景靠一點，最多 ±12%）
+                  </label>
+                  {tn.enabled && slider("強度", tn.strength ?? 0.4, 0, 1, 0.05, (v) => setG("tone", { ...tn, strength: v }))}
+                </div>
+              );
+            })()}
           </StepCard>
 
           {/* Step 3: 背景 */}

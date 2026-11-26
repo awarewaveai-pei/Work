@@ -5,6 +5,7 @@
 // (before, line 2's plate could cover line 1's glow) -- only with 重點字底色 on and a wrapped title.
 
 import { writePsd, type Psd, type Layer as PsdLayer, type TextStyle, type TextStyleRun } from "ag-psd";
+import { groundProduct, type GroundingOpts } from "./product-grounding";
 
 /** The design fields the drawing reads (BannerStudio's State has all of them). */
 export interface BannerFields {
@@ -30,10 +31,14 @@ export interface BannerFields {
   kinsoku: boolean; cjkSpacing: boolean;
   /** C4: an element dragged on the preview -> its box centre as a share of the canvas; absent = the automatic layout. */
   positions?: ElemPositions;
+  /** C8 (C7 module): contact shadow / reflection / tone match of the product; all off = the plain draw. */
+  grounding?: GroundingOpts;
+  /** C8 (C6 brand kit): a logo (same-origin data URL) and its width as a share of the canvas width. */
+  logoImage?: string | null; logoScale?: number;
 }
 
 /** The elements that can be dragged (each moves with all of its layers). */
-export const ELEM_KEYS = ["headline", "subtext", "price", "cta", "trust", "product", "badge"] as const;
+export const ELEM_KEYS = ["headline", "subtext", "price", "cta", "trust", "product", "badge", "logo"] as const;
 export type ElemKey = (typeof ELEM_KEYS)[number];
 export type ElemPositions = Partial<Record<ElemKey, { x: number; y: number }>>;
 /** An element's drawn box in canvas pixels. */
@@ -351,8 +356,10 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
   if (!mctx) throw new Error("canvas_unavailable");
 
   // 背景
+  let bgSource: HTMLCanvasElement | null = null;
   {
     const ctx = layer("背景");
+    bgSource = ctx.canvas;
     if (state.bgMode === "color") {
       ctx.fillStyle = state.bgColor;
       ctx.fillRect(0, 0, p.w, p.h);
@@ -411,7 +418,16 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       default:             x = (p.w - sw) / 2;   y = (p.h - sh) / 2;
     }
     shift = place("product", { x, y, w: sw, h: sh });
-    layer("商品圖").drawImage(img, x, y, sw, sh);
+    const g = state.grounding;
+    if (g?.shadow?.enabled || g?.reflection?.enabled || g?.tone?.enabled) {
+      // C7: shadow and reflection under the product, each its own layer (PSD / SVG keep them apart)
+      const out = groundProduct({ product: img, box: { x, y, w: sw, h: sh }, canvasW: p.w, canvasH: p.h, background: bgSource ?? undefined, opts: g });
+      if (out.shadow) layer("商品陰影").drawImage(out.shadow, 0, 0);
+      if (out.reflection) layer("商品倒影").drawImage(out.reflection, 0, 0);
+      layer("商品圖").drawImage(out.product, 0, 0);
+    } else {
+      layer("商品圖").drawImage(img, x, y, sw, sh);
+    }
     shift = { dx: 0, dy: 0 };
   }
 
@@ -701,6 +717,17 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
 
   // draw stack top-down
   for (const q of placed) { shift = q.off; q.b.draw(q.top); shift = { dx: 0, dy: 0 }; }
+
+  // C8: the brand logo (bottom-left by default; draggable like the rest)
+  if (state.logoImage) {
+    const img = await loadImage(state.logoImage);
+    const lw = p.w * Math.max(0.04, Math.min(0.6, state.logoScale ?? 0.16)), lh = (lw * img.height) / Math.max(1, img.width);
+    const m = Math.round(p.w * 0.035);
+    const r = { x: m, y: p.h - m - lh, w: lw, h: lh };
+    shift = place("logo", r);
+    layer("Logo").drawImage(img, r.x, r.y, r.w, r.h);
+    shift = { dx: 0, dy: 0 };
+  }
 
   // corner offer badge (independent of the stack)
   if (state.badgeText) {

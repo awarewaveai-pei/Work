@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續12）— 橫幅 C8：接上品牌套組（C6）與商品擬真（C7）；logo 成為可拖曳元素
+
+- 根因／決策：C6／C7 模組（banner-modules，13a718295）已完成但沒接進畫面。合併 `claude/busy-nash-b53413`（只新增檔＋design-upload 修正，無衝突）。`NA/app/(shell)/tools/banner/banner-layers.ts`：`grounding` 有任一開關時呼叫 `groundProduct`，輸出「商品陰影」「商品倒影」「商品圖」三層（背景層供色調取樣；全關走原 drawImage，PNG 不變）；新增 `logoImage`／`logoScale` → 「Logo」層，預設左下、可依 C4 拖曳、多尺寸各自可調大小。`BannerStudio.tsx`：配色步驟放 `BrandKitPanel`（`useBrandKit(saveOrg)`），套用時 主→漸層起＋徽章、輔→漸層迄、重點→重點字＋按鈕底、文字→字色、底→底色，字型字重照套，logo 經 `urlToBlob`（同網域下載路由）轉 data URL 再畫，匯出不被跨網域污染；logo 列有大小滑桿與拿掉；產品圖步驟加「商品擬真」：接觸陰影（濃度、柔和、下移）、倒影（長度、濃度、間距）、色調匹配（強度）皆為勾選＋滑桿。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 另修：合併進來的 `kit/BrandKitPanel.tsx` 錯誤訊息字色 `var(--red)` 違反 accent-not-text 閘，改 `var(--badge-red-text)`。
+- 驗證：tsc 綠；vitest banner＋presets＋lib/studio＋accent-not-text 456 passed；瀏覽器 C5(HEAD) vs C8 flat 預設 0/255（2 組）；開擬真＋logo 後圖層多出 商品陰影／商品倒影／Logo，分層 vs flat ≤2/255，PSD 1.7MB 寫出；本機實開杯子商品接觸陰影＋倒影正確（`$env:TEMP/banner-c8-grounding-brandkit.jpg`）。
+- 剩餘：本機無資料庫的 dev server 上品牌套組 API 回 `orgId_required`，「套用到這張」「存成套組」「上傳 logo」未實測，需上線後驗；面板直接顯示英文錯誤碼（C6 檔）；色調匹配在分層匯出取樣「背景層」、在 PNG 取樣「背景＋暗化」，開暗化時兩者色調微差。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" app/api/tools/presets lib/studio lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=合併檔 var(--red) 字色，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=groundProduct|useBrandKit|BrandKitPanel | hits=4
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續11）— 橫幅 C5：多尺寸輸出（勾選尺寸、縮圖、單一尺寸微調、全部下載 zip、全部存到我的設計）
 
 - 根因／決策：同一張 banner 要出 IG 直式、方形、橫式等多尺寸時只能一個一個切換重做。`NA/app/(shell)/tools/banner/BannerStudio.tsx`：`multiSizes`（勾選，看得到的勾選框）、`variantOf()`＝主設計換到該尺寸（C4 位置本來就是畫布比例並夾在畫面內，字級／字距依短邊比例縮放）再套該尺寸覆寫 `sizeOverrides[k]`；點縮圖＝`enterSize()` 把該尺寸當成目前設計編輯，主設計的尺寸欄位暫存在 `editingSize.main`，「完成，回主尺寸」`leaveSize()` 只存與推導結果不同的欄位（SIZE_KEYS：位置、字級、字距、商品圖大小／位置、徽章大小、文字位置／對齊、背景圖位置）；文字、顏色、圖片永遠全部尺寸共用。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）

@@ -85,7 +85,7 @@ export default function BrandKitPanel({ brand, onApply, getCurrent }: BrandKitPa
         )}
       </div>
       {status === "saving" && <p className="form-hint">儲存中…</p>}
-      {error && <p className="form-hint" style={{ color: "var(--red)" }}>{error}</p>}
+      {error && <p className="form-hint" style={{ color: "var(--badge-red-text)" }}>{error}</p>}
     </div>
   );
 }
