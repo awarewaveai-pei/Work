@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續11）— 橫幅 C5：多尺寸輸出（勾選尺寸、縮圖、單一尺寸微調、全部下載 zip、全部存到我的設計）
+
+- 根因／決策：同一張 banner 要出 IG 直式、方形、橫式等多尺寸時只能一個一個切換重做。`NA/app/(shell)/tools/banner/BannerStudio.tsx`：`multiSizes`（勾選，看得到的勾選框）、`variantOf()`＝主設計換到該尺寸（C4 位置本來就是畫布比例並夾在畫面內，字級／字距依短邊比例縮放）再套該尺寸覆寫 `sizeOverrides[k]`；點縮圖＝`enterSize()` 把該尺寸當成目前設計編輯，主設計的尺寸欄位暫存在 `editingSize.main`，「完成，回主尺寸」`leaveSize()` 只存與推導結果不同的欄位（SIZE_KEYS：位置、字級、字距、商品圖大小／位置、徽章大小、文字位置／對齊、背景圖位置）；文字、顏色、圖片永遠全部尺寸共用。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：尺寸步驟加多尺寸勾選；預覽下方「多尺寸」卡：各尺寸縮圖（600ms 防抖、320px JPEG）、已微調／編輯中標記、清除微調、格式按鈕（PNG／JPG／WebP／PSD／SVG，沿用 C1 匯出，JPG/WebP 用匯出區目標 KB）、全部下載（jszip，`banner-9x16.psd` 等）、全部存到我的設計（逐張 saveDesign，帶目前選的客戶）。單張 JPG/WebP 下載改走共用 `encodeDesign`。
+- 驗證：tsc 綠；vitest banner＋accent-not-text 16 passed；本機實開：勾 1.91:1／9:16／1:1／16:9 四張縮圖正確比例，點 9:16 微調標題 160px→完成後主尺寸仍 64px、9:16 標「已微調」，PSD 全部下載 zip 3.3MB 含 4 個 `banner-*.psd`（`$env:TEMP/banner-c5-multisize.jpg`、`banner-c5-tweaked.jpg`）。繪圖程式未改，PNG 與 C4 一致。
+- 剩餘：直式尺寸商品圖沿用主設計「靠右」可能偏小，需要時點縮圖微調；縮圖每次改動會重繪所有勾選尺寸（已防抖）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=清除正在微調尺寸時會把未存改動重新存回→改為直接丟棄重開，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=handleDownloadLossy|encodeLossy | hits=1
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續10）— 橫幅 C4：標題、副標、價格、按鈕、評價、商品圖、徽章可在預覽上直接拖曳（格線／三分線／置中吸附）
 
 - 根因／決策：版面只能靠「上中下／左中右」與版型，元素無法自由擺放。`NA/app/(shell)/tools/banner/banner-layers.ts`：`positions`（元素外框中心佔畫布比例；沒有＝自動堆疊）→ `place()` 算位移並夾在畫面內（比畫面大則置中），位移以 ctx.translate 套到該元素所有圖層、TextSpec x/y（含旋轉中心）同步移動，所以 PNG／PSD／SVG 位置一致；被拖走的元素保留原堆疊位置不讓其他元素跳動，文字底襯與品牌色條只包住沒拖走的元素；渲染回傳每個元素實際外框 `boxes` 供點選。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）

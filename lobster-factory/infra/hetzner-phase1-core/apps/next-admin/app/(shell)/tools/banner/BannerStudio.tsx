@@ -237,6 +237,11 @@ interface State {
   kinsoku:            boolean;  // 避頭尾
   cjkSpacing:         boolean;  // 中英間距
   positions:          ElemPositions; // C4: elements dragged on the preview (box centre / canvas); {} = automatic layout
+  // C5 multi-size: the sizes made together, each size's own tweaks (only the SIZE_KEYS fields), and the size being tweaked
+  // now (`main` = the main design's size fields and preset, put back when the tweak ends)
+  multiSizes:    PresetKey[];
+  sizeOverrides: Partial<Record<PresetKey, SizePatch>>;
+  editingSize:   { key: PresetKey; main: SizePatch & { preset: PresetKey } } | null;
   // export
   saving:    boolean;
   saved:     boolean;
@@ -322,10 +327,69 @@ const INIT: State = {
   kinsoku:            true,
   cjkSpacing:         true,
   positions:          {},
+  multiSizes:    [],
+  sizeOverrides: {},
+  editingSize:   null,
   saving:    false,
   saved:     false,
   error:     null,
 };
+
+// ---------------------------------------------------------------------------
+// C5 multi-size. A size of the design = the main design at that size: positions are shares of the canvas (kept inside by
+// the renderer), type scales with the shorter side, then that size's own tweaks. Tweaking a size = editing it as the
+// design (s.preset = that size) with the main design's size fields parked in editingSize.main; leaving stores only what
+// differs from the derived size.
+// ---------------------------------------------------------------------------
+
+/** The fields a size may set for itself; everything else (words, colours, images, fonts…) is shared by all sizes. */
+const SIZE_KEYS = [
+  "positions", "headlineSize", "subtextSize", "letterSpacing", "bodyLetterSpacing", "productScale", "productPos",
+  "badgeScale", "textPos", "textAlignH", "bgImgScale", "bgImgX", "bgImgY",
+] as const;
+type SizePatch = Partial<Pick<State, (typeof SIZE_KEYS)[number]>>;
+const pickSize = (st: State): SizePatch => Object.fromEntries(SIZE_KEYS.map((k) => [k, st[k]])) as SizePatch;
+
+/** The main design (outside a size tweak). */
+function mainOf(st: State): State {
+  return st.editingSize ? { ...st, ...st.editingSize.main, editingSize: null } : st;
+}
+/** Size `k` of the design (the live state itself while `k` is being tweaked). */
+function variantOf(st: State, k: PresetKey, withTweaks = true): State {
+  if (withTweaks && st.editingSize?.key === k) return st;
+  const m = mainOf(st);
+  const a = PRESETS[m.preset], b = PRESETS[k];
+  const f = Math.min(b.w, b.h) / Math.min(a.w, a.h);
+  const r = (v: number) => Math.round(v * f);
+  return {
+    ...m, preset: k, editingSize: null,
+    headlineSize: r(m.headlineSize), subtextSize: r(m.subtextSize), letterSpacing: r(m.letterSpacing), bodyLetterSpacing: r(m.bodyLetterSpacing),
+    ...(withTweaks ? m.sizeOverrides[k] : {}),
+  };
+}
+/** End a size tweak: store what differs from the derived size, put the main design's size fields back. */
+function leaveSize(st: State): State {
+  if (!st.editingSize) return st;
+  const { key, main } = st.editingSize;
+  const back: State = { ...st, ...main, editingSize: null };
+  const base = variantOf(back, key, false);
+  const patch = Object.fromEntries(SIZE_KEYS.filter((f) => JSON.stringify(st[f]) !== JSON.stringify(base[f])).map((f) => [f, st[f]])) as SizePatch;
+  return { ...back, sizeOverrides: { ...st.sizeOverrides, [key]: patch } };
+}
+/** Drop size `k`'s tweaks; while `k` is being tweaked, its unsaved edits go too (it reopens as derived). */
+function clearSizeTweak(st: State, k: PresetKey): State {
+  const sizeOverrides = { ...st.sizeOverrides };
+  delete sizeOverrides[k];
+  if (st.editingSize?.key !== k) return { ...st, sizeOverrides };
+  const back: State = { ...st, ...st.editingSize.main, editingSize: null, sizeOverrides };
+  return enterSize(back, k);
+}
+/** Start tweaking size `k` (the main size = just leave any tweak). */
+function enterSize(st: State, k: PresetKey): State {
+  const m = leaveSize(st);
+  if (k === m.preset) return m;
+  return { ...variantOf(m, k), editingSize: { key: k, main: { preset: m.preset, ...pickSize(m) } } };
+}
 
 // ---------------------------------------------------------------------------
 // Layout templates — pre-composed conversion arrangements (eye-flow tested).
@@ -530,6 +594,45 @@ function pngOfPixels(px: Pixels): string {
   if (!ctx) throw new Error("canvas_unavailable");
   ctx.putImageData(new ImageData(new Uint8ClampedArray(px.data), px.width, px.height), 0, 0);
   return cv.toDataURL("image/png");
+}
+
+type ExportFormat = "png" | "jpg" | "webp" | "psd" | "svg";
+const EXPORT_FORMATS: { key: ExportFormat; label: string }[] = [
+  { key: "png", label: "PNG" }, { key: "jpg", label: "JPG" }, { key: "webp", label: "WebP" }, { key: "psd", label: "PSD（可編輯）" }, { key: "svg", label: "SVG（可編輯）" },
+];
+/** One file of a design in a format; JPG / WebP squeezed to `targetKb` when given. `note` = why it is not as asked. */
+async function encodeDesign(st: State, fmt: ExportFormat, targetKb: number | null): Promise<{ url: string; note?: string }> {
+  if (fmt === "png") return { url: await exportToPng(st) };
+  if (fmt === "psd") return { url: bytesToDataUrl(await exportToPsd(st), "image/vnd.adobe.photoshop") };
+  if (fmt === "svg") return { url: textDataUrl(await exportToSvg(st), "image/svg+xml") };
+  const mime = fmt === "jpg" ? "image/jpeg" : "image/webp";
+  let cv = await flatCanvas(st);
+  // Safari cannot encode WebP (WebKit 226950): toDataURL silently returns a PNG -- say so instead of a fake .webp
+  if (!cv.toDataURL(mime, 0.5).startsWith(`data:${mime}`)) throw new Error(`這個瀏覽器不能存 ${fmt.toUpperCase()}，請改用 Chrome／Edge，或下載 JPG／PNG。`);
+  if (fmt === "jpg") {
+    // JPG has no alpha: a transparent background image would turn black -- lay the background colour under it
+    const solid = document.createElement("canvas");
+    solid.width = cv.width; solid.height = cv.height;
+    const sctx = solid.getContext("2d");
+    if (!sctx) throw new Error("canvas_unavailable");
+    sctx.fillStyle = st.bgColor; sctx.fillRect(0, 0, solid.width, solid.height); sctx.drawImage(cv, 0, 0);
+    cv = solid;
+  }
+  const out = encodeLossy(cv, mime, targetKb);
+  return { url: out.url, ...(out.over ? { note: `${fmt.toUpperCase()} 壓到最低畫質仍有 ${Math.ceil(out.kb)} KB，比目標 ${targetKb} KB 大；已照最低畫質。` } : {}) };
+}
+/** A file name per size: banner-9x16.png, banner-1.91x1.psd … */
+const sizeFileName = (k: PresetKey, fmt: ExportFormat) => `banner-${PRESETS[k].ratio.replace(":", "x")}.${fmt}`;
+/** A small JPEG of a design for the size thumbnails. */
+async function thumbOf(st: State): Promise<string> {
+  const full = await flatCanvas(st);
+  const k = 320 / Math.max(full.width, full.height);
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(full.width * k); cv.height = Math.round(full.height * k);
+  const ctx = cv.getContext("2d");
+  if (!ctx) throw new Error("canvas_unavailable");
+  ctx.drawImage(full, 0, 0, cv.width, cv.height);
+  return cv.toDataURL("image/jpeg", 0.8);
 }
 
 async function exportToSvg(state: State): Promise<string> {
@@ -1129,27 +1232,76 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     setLossyNote(null);
     try {
       const kb = Number(targetKb);
-      const mime = kind === "jpg" ? "image/jpeg" : "image/webp";
-      let cv = await flatCanvas(s);
-      // Safari cannot encode WebP (WebKit 226950): toDataURL silently returns a PNG -- say so instead of a fake .webp
-      if (!cv.toDataURL(mime, 0.5).startsWith(`data:${mime}`)) {
-        setLossyNote(`這個瀏覽器不能存 ${kind.toUpperCase()}，請改用 Chrome／Edge，或下載 JPG／PNG。`);
-        return;
-      }
-      if (kind === "jpg") {
-        // JPG has no alpha: a transparent background image would turn black -- lay the background colour under it
-        const solid = document.createElement("canvas");
-        solid.width = cv.width; solid.height = cv.height;
-        const sctx = solid.getContext("2d");
-        if (!sctx) throw new Error("canvas_unavailable");
-        sctx.fillStyle = s.bgColor; sctx.fillRect(0, 0, solid.width, solid.height); sctx.drawImage(cv, 0, 0);
-        cv = solid;
-      }
-      const out = encodeLossy(cv, mime, Number.isFinite(kb) && kb > 0 ? kb : null);
+      const out = await encodeDesign(s, kind, Number.isFinite(kb) && kb > 0 ? kb : null);
       downloadUrl(out.url, `banner-${s.preset}.${kind}`);
-      if (out.over) setLossyNote(`${kind.toUpperCase()} 壓到最低畫質仍有 ${Math.ceil(out.kb)} KB，比目標 ${kb} KB 大；已照最低畫質下載。`);
+      if (out.note) setLossyNote(out.note);
     } catch (err) {
-      setS((prev) => ({ ...prev, error: String(err) }));
+      setLossyNote(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  // ── C5: every chosen size at once ──
+  const [multiFormat, setMultiFormat] = useState<ExportFormat>("png");
+  const [multiBusy, setMultiBusy] = useState<string | null>(null);
+  const [multiNote, setMultiNote] = useState<string | null>(null);
+  const [thumbs, setThumbs] = useState<Partial<Record<PresetKey, string>>>({});
+  useEffect(() => {
+    if (!s.multiSizes.length) { setThumbs({}); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const out: Partial<Record<PresetKey, string>> = {};
+      for (const k of s.multiSizes) {
+        try { out[k] = await thumbOf(variantOf(s, k)); } catch { /* mid-edit */ }
+        if (cancelled) return;
+      }
+      setThumbs(out);
+    }, 600);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [s, fontEpoch]);
+  const toggleSize = (k: PresetKey) => setS((prev) => {
+    const base = prev.editingSize?.key === k ? leaveSize(prev) : prev;
+    const has = base.multiSizes.includes(k);
+    const order = Object.keys(PRESETS) as PresetKey[];
+    return { ...base, multiSizes: has ? base.multiSizes.filter((x) => x !== k) : order.filter((x) => x === k || base.multiSizes.includes(x)), saved: false, error: null };
+  });
+  async function handleDownloadAll() {
+    setMultiNote(null);
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      const kb = Number(targetKb), notes: string[] = [];
+      for (const [i, k] of s.multiSizes.entries()) {
+        setMultiBusy(`打包中 ${i + 1}/${s.multiSizes.length}…`);
+        const out = await encodeDesign(variantOf(s, k), multiFormat, Number.isFinite(kb) && kb > 0 ? kb : null);
+        zip.file(sizeFileName(k, multiFormat), await urlToBlob(out.url));
+        if (out.note) notes.push(`${PRESETS[k].ratio}：${out.note}`);
+      }
+      const url = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
+      downloadUrl(url, `banner-${s.multiSizes.length}-sizes.zip`);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (notes.length) setMultiNote(notes.join("\n"));
+    } catch (err) {
+      setMultiNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMultiBusy(null);
+    }
+  }
+  async function handleSaveAll() {
+    setMultiNote(null);
+    try {
+      for (const [i, k] of s.multiSizes.entries()) {
+        setMultiBusy(`存到我的設計 ${i + 1}/${s.multiSizes.length}…`);
+        const v = variantOf(s, k);
+        const res = await saveDesign(await urlToBlob(await exportToPng(v)), {
+          source: "banner", prompt: v.headline || undefined, modelName: v.bgMode === "ai" ? v.aiBgModel : undefined, subject: k,
+        }, { organizationId: saveOrg ?? undefined });
+        if (!res.ok) throw new Error(`${PRESETS[k].ratio}：${(res as { ok: false; error: string }).error}`);
+      }
+      setMultiNote(`✓ ${s.multiSizes.length} 個尺寸都已存到我的設計`);
+    } catch (err) {
+      setMultiNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMultiBusy(null);
     }
   }
 
@@ -1385,7 +1537,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                           className={s.preset === k ? "btn btn-primary" : "btn btn-ghost"}
                           style={{ fontSize: 11, padding: "5px 8px", display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", height: "auto", gap: 2 }}
                           title={ps.use}
-                          onClick={() => set("preset", k)}>
+                          onClick={() => setS((prev) => ({ ...leaveSize(prev), preset: k, saved: false, error: null }))}>
                           <span>
                             <b style={{ fontSize: 12 }}>{ps.ratio}</b>{"star" in ps && ps.star ? " ★" : ""}
                             <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 10 }}>{ps.w}×{ps.h}</span>
@@ -1398,6 +1550,18 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 </div>
               </div>
             ))}
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 4 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>多尺寸輸出</div>
+              <p className="form-hint" style={{ margin: "0 0 6px" }}>勾選要一起做的尺寸：位置照比例換算、字依短邊縮放、商品圖和標題留在畫面內。縮圖在預覽下方，點縮圖可單獨微調那個尺寸。</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {(Object.keys(PRESETS) as PresetKey[]).map((k) => (
+                  <label key={k} style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" checked={s.multiSizes.includes(k)} onChange={() => toggleSize(k)} data-testid={`banner-multi-${k}`} />
+                    <b>{PRESETS[k].ratio}</b><span style={{ opacity: 0.7 }}>{PRESETS[k].use}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </StepCard>
 
           {/* Step 2: 產品圖 */}
@@ -2227,7 +2391,62 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 </div>
               )}
             </div>
+            {s.editingSize && (
+              <div className="form-message" style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <span>正在單獨微調 {PRESETS[s.editingSize.key].ratio}：這時改的位置、字級、對齊只套這個尺寸；文字、顏色、圖片仍是全部一起改。</span>
+                <button className="btn btn-primary" style={{ fontSize: 12 }} data-testid="banner-multi-done"
+                  onClick={() => setS((prev) => ({ ...leaveSize(prev), saved: false }))}>完成，回主尺寸</button>
+              </div>
+            )}
           </div>
+
+          {s.multiSizes.length > 0 && (
+            <div className="card" style={{ marginBottom: 16 }} data-testid="banner-multi-card">
+              <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>多尺寸 · {s.multiSizes.length} 個</h2>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {s.multiSizes.map((k) => {
+                  const editing = s.editingSize ? s.editingSize.key === k : s.preset === k;
+                  const tweaked = Object.keys(s.sizeOverrides[k] ?? {}).length > 0;
+                  return (
+                    <div key={k} style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                      <button className={editing ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-multi-thumb-${k}`}
+                        style={{ padding: 4, height: "auto" }} onClick={() => setS((prev) => ({ ...enterSize(prev, k), saved: false }))}
+                        title="點一下單獨微調這個尺寸">
+                        {thumbs[k]
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={thumbs[k]} alt={PRESETS[k].ratio} style={{ display: "block", maxWidth: 160, maxHeight: 160 }} />
+                          : <span style={{ display: "block", width: 120, height: 80, fontSize: 11 }}>產生中…</span>}
+                      </button>
+                      <span style={{ fontSize: 12 }}>
+                        <b>{PRESETS[k].ratio}</b>{tweaked ? "・已微調" : ""}{editing ? "・編輯中" : ""}
+                      </span>
+                      {tweaked && (
+                        <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 6px" }}
+                          onClick={() => setS((prev) => ({ ...clearSizeTweak(prev, k), saved: false }))}>清除微調</button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+                <span style={{ fontSize: 12 }}>格式</span>
+                {EXPORT_FORMATS.map((f) => (
+                  <button key={f.key} className={multiFormat === f.key ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-multi-format-${f.key}`}
+                    style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => setMultiFormat(f.key)}>{f.label}</button>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                <button className="btn btn-primary" disabled={!!multiBusy || s.generating || s.productRemoving} onClick={() => void handleDownloadAll()} data-testid="banner-multi-download">
+                  全部下載（zip）
+                </button>
+                <button className="btn btn-ghost" disabled={!!multiBusy || s.generating || s.productRemoving} onClick={() => void handleSaveAll()} data-testid="banner-multi-save">
+                  全部存到我的設計
+                </button>
+              </div>
+              <p className="form-hint" style={{ margin: "6px 0 0" }}>JPG／WebP 的「目標 KB」沿用匯出區的設定。</p>
+              {(multiBusy || multiNote) && <p className="form-hint" style={{ margin: "4px 0 0", whiteSpace: "pre-line" }}>{multiBusy ?? multiNote}</p>}
+            </div>
+          )}
 
         </div>
       </div>
