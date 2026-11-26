@@ -3,7 +3,7 @@
 // run in the browser (WORKLOG of this card).
 import { describe, expect, it } from "vitest";
 import { readPsd } from "ag-psd";
-import { buildBannerPsd, buildBannerSvg, type Pixels, type RasterDoc, type TextSpec } from "./banner-layers";
+import { autospace, autospaceRuns, buildBannerPsd, buildBannerSvg, wrapChars, type Pixels, type RasterDoc, type TextSpec } from "./banner-layers";
 
 const W = 40, H = 20;
 function px(fill: (x: number, y: number) => boolean): Pixels {
@@ -76,5 +76,31 @@ describe("banner layered PSD", () => {
     expect(t?.style?.font?.name).toBe("Noto Serif TC");
     expect(t?.paragraphStyle?.justification).toBe("center");
     expect(psd.children?.find((l) => l.name === "角標文字")?.text?.text).toBe("限時優惠");
+  });
+});
+
+// C3 critic findings: 避頭尾 never pushes more than one mark past the edge, never leaves a mark at a line start, and the
+// 中英間距 space at an accent boundary stays plain.
+describe("banner CJK wrap (C3)", () => {
+  const wrap = (text: string, perLine: number, rules = true) =>
+    wrapChars(Array.from(text), (c) => c, (l) => l.length <= perLine, rules).map((l) => l.join(""));
+  it("one closing mark hangs; a second pushes the last character down with them", () => {
+    expect(wrap("限時優惠！", 4)).toEqual(["限時優惠！"]);
+    expect(wrap("限時優惠！」", 4)).toEqual(["限時優", "惠！」"]);
+    expect(wrap("好好好！！！", 3)).toEqual(["好好", "好！！！"]);
+    for (const line of wrap("數量有限！！！今天開賣，「限量」款！", 4).slice(1)) expect("，。、；：！？）」』…".includes(line[0])).toBe(false);
+  });
+  it("an opening bracket moves down; no line is wider than one hung mark", () => {
+    expect(wrap("好好「限量」", 3)).toEqual(["好好", "「限量」"]);
+    for (const line of wrap("今天「「限量」」開賣，數量有限！！", 5)) expect(line.length).toBeLessThanOrEqual(6);
+  });
+  it("rules off = plain greedy wrap; edge spaces dropped", () => {
+    expect(wrap("限時優惠！", 4, false)).toEqual(["限時優惠", "！"]);
+    expect(wrap("滿999 送", 4)).toEqual(["滿999", "送"]);
+  });
+  it("中英間距: a gap between an accent and a plain run is plain", () => {
+    expect(autospace("iPhone17限定")).toBe("iPhone17 限定");
+    expect(autospaceRuns([{ text: "限時", accent: true }, { text: "5折", accent: false }]))
+      .toEqual([{ text: "限時", accent: true }, { text: " 5 折", accent: false }]);
   });
 });

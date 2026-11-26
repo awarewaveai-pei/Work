@@ -43,10 +43,15 @@ const nextConfig: NextConfig = {
   // dock for hours, and could mix old and new modules. no-cache = revalidate every load (a 304 when unchanged); private:
   // these are login-gated, so no shared cache keeps them (Cloudflare keeps an origin `private`).
   async headers() {
-    return UNVERSIONED_PUBLIC_DIRS.map((dir) => ({
-      source: `/${dir}/:path*`,
-      headers: [{ key: "Cache-Control", value: "private, no-cache" }],
-    }));
+    return [
+      ...UNVERSIONED_PUBLIC_DIRS.map((dir) => ({
+        source: `/${dir}/:path*`,
+        headers: [{ key: "Cache-Control", value: "private, no-cache" }],
+      })),
+      // Banner font slices are named by content (scripts/fetch-banner-fonts.mjs): never revalidate them. Listed last: for
+      // the same header key the last matching rule wins, so fonts.css beside them stays no-cache.
+      { source: "/banner-fonts/:dir/:file([0-9a-f]+\\.woff2)", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
+    ];
   },
   // Local dev only: the Craft editors' static web builds (nginx /vector-pro/, /photo-pro/ in prod) from a dev origin.
   // Unset in prod = no rewrite.

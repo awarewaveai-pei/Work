@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續8）— 橫幅 C3：中文排版（字重五級、行距字距、避頭尾、中英間距）＋自架 OFL 字型 9 族
+
+- 根因／決策：操作者要專業設計師水準的中文排版。字重只有 bold、行距寫死、無避頭尾、字型只有 5 個且靠外部 CDN／系統字。改：`NA/app/(shell)/tools/banner/banner-layers.ts` 字重（300/400/500/700/900）、標題／內文行距、內文字距、`wrapChars`（換行時量寬：行首禁則字最多懸掛 1 個，第 2 個起連前一字推到下一行；行尾開括號下移；行首尾空格去掉）、`autospace`/`autospaceRuns`（中英數字間補半形空格，重點字邊界空格歸一般字）、`loadDesignFonts`（document.fonts.load 等需要的切片，4 秒逾時）。字型自架 `NA/public/banner-fonts/`（`NA/scripts/fetch-banner-fonts.mjs` 下載 Google Fonts 的 unicode-range 切片＋各族 OFL.txt，先下到暫存目錄成功才換上；黑體／明體可變字重、霞鶩文楷 300/400/700、粉圓、Inter、Montserrat、Playfair Display、Oswald、Bebas Neue，共 29MB，瀏覽器只抓用到的切片）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`BannerStudio.tsx` 字型下拉改成按鈕（各自用該字型顯示，操作者規則：不要下拉）、標題／內文字重按鈕、標題行距、內文字距、內文行距、避頭尾／中英間距開關、注入 `/banner-fonts/fonts.css` 並在字型載完重繪；EDITOR_FONTS 加新字族（粉圓→Noto Sans TC）；SVG generic 加 Playfair→serif；PSD 字重：PhotoCraft 實測 fauxBold 會畫粗、字型名帶 Bold 反而常規，所以 ≥600 用 fauxBold。`lib/portal/doors.ts` STATIC_PAGES 與 `lib/public-asset-cache.ts` 加 `/banner-fonts`（設計門與受限員工也能載字型）；`next.config.ts` woff2 切片（內容命名）長快取 immutable，fonts.css 仍 no-cache。
+- 驗證：tsc 綠；vitest（banner＋lib/portal＋public-asset-cache＋accent-not-text）102 passed（新增 wrap/避頭尾/間距 4 案）；瀏覽器 C2(HEAD) vs C3 flat 預設 4 組 0/255；本機實開：粉圓特粗標題、楷書內文加字距行距、「iPhone17 限定」「滿 999 送 100 元」自動間距、括號不落行尾（`$env:TEMP/banner-c3-typography.jpg`）。
+- 剩餘：預設開「中英間距」，中英混排的既有文案會多出半形空格（可關）；PSD 只分粗／不粗（300/500/900 在 PhotoCraft 無法表達）；repo 多 29MB 字型。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/__tests__/public-asset-cache.test.ts lib/portal lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=6000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/8n（M=避頭尾連續標點無上限掛出畫面→改為換行中最多懸掛 1 字＋追い出し；n 全修：空行殘留禁則字、括號下移超寬、重點字邊界空格、行首尾空格、Playfair generic、woff2 快取、抓字型腳本路徑與原子性、補測試）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=STATIC_PAGES|UNVERSIONED_PUBLIC_DIRS|kinsoku | hits=9
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續7）— 橫幅 C2：背景圖在預覽上拖移／滾輪縮放；文字、CTA 按鈕、促銷徽章陰影可設定（PSD/SVG 帶圖層效果）
 
 - 根因／決策：操作者要「上傳圖後可拖移、放大縮小」與「文字／CTA／徽章可加陰影設定」。背景層 `NA/app/(shell)/tools/banner/banner-layers.ts` 依 `bgImgScale`（cover 倍數 0.5–3）、`bgImgX/Y`（畫布比例位移）畫，未蓋到處鋪 `bgColor`。陰影 `ShadowSpec` 的模糊／位移以元素高度為單位（換尺寸比例不變，C5 多尺寸直接沿用）；預設＝舊畫面（CTA 0.32/0.28/0.12、膠囊徽章 0.28/0.25/0.1、`badgeShadow=null` 表示依樣式預設、文字陰影預設關）。分層時陰影是圖層效果（`layer.shadow`，像素不含）：PSD `effects.dropShadow`（normal 混合、angle=atan2(y,-x)）、SVG `<filter><feDropShadow>`（userSpaceOnUse 整張畫布）；flat 模式文字陰影用一張重用暫存畫布整層套陰影。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）

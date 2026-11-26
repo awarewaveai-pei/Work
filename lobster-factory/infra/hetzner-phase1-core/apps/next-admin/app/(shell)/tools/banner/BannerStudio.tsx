@@ -44,13 +44,23 @@ const PRESET_GROUPS: { key: "tall" | "square" | "wide"; label: string }[] = [
   { key: "wide",   label: "橫式" },
 ];
 
+// Self-hosted, all SIL OFL (public/banner-fonts, scripts/fetch-banner-fonts.mjs). English display faces fall back to
+// 黑體 / 明體 for Chinese characters. Index order is used by FONT_PAIRS and INIT.
 const FONTS = [
-  { value: "'Noto Sans TC', 'PingFang TC', sans-serif",  label: "黑體" },
-  { value: "'Noto Serif TC', 'Songti TC', serif",         label: "明體" },
-  { value: "'LXGW WenKai TC', cursive",                   label: "楷書" },
-  { value: "'jf-openhuninn', sans-serif",                  label: "圓體" },
-  { value: "'Inter', 'Helvetica Neue', sans-serif",        label: "Inter" },
+  { value: "'Noto Sans TC', 'PingFang TC', sans-serif",         label: "黑體" },
+  { value: "'Noto Serif TC', 'Songti TC', serif",                label: "明體" },
+  { value: "'LXGW WenKai TC', cursive",                          label: "楷書（霞鶩文楷）" },
+  { value: "'Huninn', 'jf-openhuninn', sans-serif",              label: "圓體（粉圓）" },
+  { value: "'Inter', 'Helvetica Neue', sans-serif",              label: "Inter" },
+  { value: "'Montserrat', 'Noto Sans TC', sans-serif",           label: "Montserrat" },
+  { value: "'Playfair Display', 'Noto Serif TC', serif",         label: "Playfair Display" },
+  { value: "'Oswald', 'Noto Sans TC', sans-serif",               label: "Oswald" },
+  { value: "'Bebas Neue', 'Noto Sans TC', sans-serif",           label: "Bebas Neue" },
 ];
+const WEIGHTS: { value: number; label: string }[] = [
+  { value: 300, label: "細" }, { value: 400, label: "常規" }, { value: 500, label: "中" }, { value: 700, label: "粗" }, { value: 900, label: "特粗" },
+];
+const BANNER_FONTS_CSS = "/banner-fonts/fonts.css";
 
 // Curated headline × body pairings (Tier 2 — instant "designed" hierarchy)
 const FONT_PAIRS: { label: string; headline: string; body: string }[] = [
@@ -60,6 +70,9 @@ const FONT_PAIRS: { label: string; headline: string; body: string }[] = [
   { label: "圓體 × 圓體",     headline: FONTS[3].value, body: FONTS[3].value },
   { label: "Inter 標 × 黑體文", headline: FONTS[4].value, body: FONTS[0].value },
   { label: "明體 × 明體",     headline: FONTS[1].value, body: FONTS[1].value },
+  { label: "Playfair 標 × 黑體文", headline: FONTS[6].value, body: FONTS[0].value },
+  { label: "Bebas 標 × 黑體文", headline: FONTS[8].value, body: FONTS[0].value },
+  { label: "Montserrat × 黑體", headline: FONTS[5].value, body: FONTS[0].value },
 ];
 
 // Marketing art-direction presets for the AI background (Tier 3 — commercial moods, not fine-art)
@@ -215,6 +228,14 @@ interface State {
   textShadow:  ShadowSpec;
   ctaShadow:   ShadowSpec;
   badgeShadow: ShadowSpec | null;
+  // C3 typography
+  headlineWeight:     number;   // 300 細 / 400 常規 / 500 中 / 700 粗 / 900 特粗
+  bodyWeight:         number;
+  headlineLineHeight: number;   // x font size
+  bodyLineHeight:     number;
+  bodyLetterSpacing:  number;   // px (letterSpacing = the title's)
+  kinsoku:            boolean;  // 避頭尾
+  cjkSpacing:         boolean;  // 中英間距
   // export
   saving:    boolean;
   saved:     boolean;
@@ -292,6 +313,13 @@ const INIT: State = {
   textShadow:  DEFAULT_TEXT_SHADOW,
   ctaShadow:   DEFAULT_CTA_SHADOW,
   badgeShadow: null,
+  headlineWeight:     700,
+  bodyWeight:         400,
+  headlineLineHeight: 1.16,
+  bodyLineHeight:     1.32,
+  bodyLetterSpacing:  0,
+  kinsoku:            true,
+  cjkSpacing:         true,
   saving:    false,
   saved:     false,
   error:     null,
@@ -757,6 +785,19 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const colorRefFileRef   = useRef<HTMLInputElement>(null);
   const [aiBgStyleGroup, setAiBgStyleGroup] = useState("不指定");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // self-hosted fonts: one stylesheet; each finished font load re-renders the preview (the first draw may be a fallback)
+  const [fontEpoch, setFontEpoch] = useState(0);
+  useEffect(() => {
+    if (!document.querySelector(`link[href="${BANNER_FONTS_CSS}"]`)) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet"; link.href = BANNER_FONTS_CSS;
+      link.onload = () => setFontEpoch((e) => e + 1);
+      document.head.appendChild(link);
+    }
+    const bump = () => setFontEpoch((e) => e + 1);
+    document.fonts?.addEventListener?.("loadingdone", bump);
+    return () => document.fonts?.removeEventListener?.("loadingdone", bump);
+  }, []);
   // colour tools (not part of design State / undo history — derived/fetched data)
   const [palette, setPalette]     = useState<string[]>([]);
   const [selSwatch, setSelSwatch] = useState<string | null>(null);
@@ -789,7 +830,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       exportToPng(s).then((url) => { if (!cancelled) setPreviewUrl(url); }).catch(() => { /* mid-edit, ignore */ });
     }, bgDragRef.current ? 16 : 220);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [s]);
+  }, [s, fontEpoch]);
 
   // ── template apply ──
   const applyTemplate = useCallback((patch: Partial<State>) =>
@@ -1714,18 +1755,28 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   })}
                 </div>
               </div>
-              <div className="form-row">
-                <label className="form-label">標題字體</label>
-                <select className="form-select" value={s.headlineFont} onChange={(e) => set("headlineFont", e.target.value)}>
-                  {FONTS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-                </select>
-              </div>
-              <div className="form-row">
-                <label className="form-label">內文字體</label>
-                <select className="form-select" value={s.fontFamily} onChange={(e) => set("fontFamily", e.target.value)}>
-                  {FONTS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-                </select>
-              </div>
+              {([["標題字體", "headlineFont", "headlineWeight"], ["內文字體", "fontFamily", "bodyWeight"]] as const).map(([label, fk, wk]) => (
+                <div key={fk} className="form-row" style={{ flexWrap: "wrap" }}>
+                  <label className="form-label">{label}</label>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
+                    {FONTS.map((f) => (
+                      <button key={f.value} className={s[fk] === f.value ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-${fk}-${f.label}`}
+                        style={{ fontSize: 12, padding: "2px 8px", fontFamily: f.value }} onClick={() => set(fk, f.value)}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", width: "100%", marginTop: 4 }}>
+                    <span style={{ fontSize: 12, opacity: 0.7, minWidth: 36 }}>字重</span>
+                    {WEIGHTS.map((w) => (
+                      <button key={w.value} className={s[wk] === w.value ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-${wk}-${w.value}`}
+                        style={{ fontSize: 12, padding: "2px 8px", fontWeight: w.value }} onClick={() => set(wk, w.value)}>
+                        {w.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
               <div className="form-row">
                 <label className="form-label">字色</label>
                 <input type="color" value={s.textColor} onChange={(e) => set("textColor", e.target.value)}
@@ -1742,10 +1793,38 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 <span className="form-hint" style={{ marginLeft: 6 }}>標題用 **字** 標重點，例：省 **50%**</span>
               </div>
               <div className="form-row">
-                <label className="form-label">字距</label>
+                <label className="form-label">標題字距</label>
                 <input type="range" min={-2} max={16} value={s.letterSpacing}
                   onChange={(e) => set("letterSpacing", Number(e.target.value))} style={{ flex: 1 }} />
                 <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.letterSpacing}</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">標題行距</label>
+                <input type="range" min={0.9} max={2} step={0.02} value={s.headlineLineHeight} data-testid="banner-headline-leading"
+                  onChange={(e) => set("headlineLineHeight", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.headlineLineHeight.toFixed(2)}</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">內文字距</label>
+                <input type="range" min={-2} max={16} value={s.bodyLetterSpacing} data-testid="banner-body-tracking"
+                  onChange={(e) => set("bodyLetterSpacing", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.bodyLetterSpacing}</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">內文行距</label>
+                <input type="range" min={1} max={2.4} step={0.02} value={s.bodyLineHeight} data-testid="banner-body-leading"
+                  onChange={(e) => set("bodyLineHeight", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.bodyLineHeight.toFixed(2)}</span>
+              </div>
+              <div className="form-row" style={{ flexWrap: "wrap", gap: 12 }}>
+                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="checkbox" checked={s.kinsoku} onChange={(e) => set("kinsoku", e.target.checked)} data-testid="banner-kinsoku" />
+                  避頭尾（，。」等不放行首，「（等不放行尾）
+                </label>
+                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="checkbox" checked={s.cjkSpacing} onChange={(e) => set("cjkSpacing", e.target.checked)} data-testid="banner-cjk-spacing" />
+                  中英數字之間自動空半格
+                </label>
               </div>
               <div className="form-row">
                 <label className="form-label">標題 px</label>

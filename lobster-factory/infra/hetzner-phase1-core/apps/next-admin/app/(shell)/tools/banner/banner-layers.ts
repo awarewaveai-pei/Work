@@ -25,6 +25,56 @@ export interface BannerFields {
   bgImgScale: number; bgImgX: number; bgImgY: number;
   /** 文字陰影 (all stack text), CTA 按鈕, 促銷徽章 (null = the style's own default: only the pill has one). */
   textShadow: ShadowSpec; ctaShadow: ShadowSpec; badgeShadow: ShadowSpec | null;
+  /** C3 typography: weights (300/400/500/700/900), line height (x font size), body tracking (px), 避頭尾, 中英間距. */
+  headlineWeight: number; bodyWeight: number; headlineLineHeight: number; bodyLineHeight: number; bodyLetterSpacing: number;
+  kinsoku: boolean; cjkSpacing: boolean;
+}
+
+// ── CJK typesetting ──
+/** May not start a line (closing punctuation) / may not end one (opening brackets). */
+const NO_START = new Set(Array.from("，。、；：！？）」』】〉》〕…‥・％,.;:!?)]}%"));
+const NO_END = new Set(Array.from("（「『【〈《〔([{"));
+/** Greedy wrap of characters with 避頭尾 (`rules`): a closing mark that no longer fits hangs past the edge (ぶら下げ, one
+ *  mark at most); a second one pushes the marks and the character before them to the next line (追い出し); an opening
+ *  bracket never ends a line. `fits(line)` = the line is within the width. Spaces at the edges of a wrapped line are
+ *  dropped (a 中英間距 space must not indent or shift a line). Rules off = the plain greedy wrap. */
+export function wrapChars<T>(items: T[], ch: (t: T) => string, fits: (line: T[]) => boolean, rules: boolean): T[][] {
+  const lines: T[][] = [];
+  let line: T[] = [];
+  for (const it of items) {
+    const next = [...line, it];
+    if (!line.length || fits(next)) { line = next; continue; }
+    const c = ch(it);
+    if (rules && NO_START.has(c) && fits(line)) { line = next; continue; } // hang one closing mark
+    const carry: T[] = [];
+    if (rules) {
+      if (NO_START.has(c)) {
+        while (line.length > 1 && NO_START.has(ch(line[line.length - 1]))) carry.unshift(line.pop()!);
+        if (line.length > 1) carry.unshift(line.pop()!);
+      }
+      while (line.length > 1 && NO_END.has(ch(line[line.length - 1]))) carry.unshift(line.pop()!);
+    }
+    lines.push(line);
+    line = [...carry, it];
+  }
+  if (line.length) lines.push(line);
+  const blank = (t: T) => ch(t) === " ";
+  return lines
+    .map((l) => { let a = 0, b = l.length; while (a < b && blank(l[a])) a++; while (b > a && blank(l[b - 1])) b--; return l.slice(a, b); })
+    .filter((l) => l.length);
+}
+const CJK_CHAR = /[\u3040-\u30ff\u3100-\u312f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+const LATIN_CHAR = /[A-Za-z0-9]/;
+/** 中英間距: a half-width space between a CJK character and a Latin letter / digit (either order), unless one is there. */
+export function autospace(text: string): string {
+  const cs = Array.from(text);
+  let out = "";
+  cs.forEach((c, i) => {
+    const prev = cs[i - 1];
+    if (prev && ((CJK_CHAR.test(prev) && LATIN_CHAR.test(c)) || (LATIN_CHAR.test(prev) && CJK_CHAR.test(c)))) out += " ";
+    out += c;
+  });
+  return out;
 }
 
 /** A drop shadow; blur / x / y are shares of the element's height (font size, button height, badge height), so the
@@ -58,7 +108,8 @@ export interface TextSpec {
   cssFamily: string;
   /** The family name both pro editors know (EDITOR_FONTS). */
   editorFont: string;
-  weight: 400 | 700;
+  /** CSS weight (300 細 … 900 特粗). */
+  weight: number;
   size: number;
   align: "left" | "center" | "right";
   /** Anchor: left edge / centre / right edge of every line, by `align`. */
@@ -76,13 +127,18 @@ export interface BannerLayer { name: string; canvas: HTMLCanvasElement; text?: T
 export interface BannerLayers { w: number; h: number; layers: BannerLayer[] }
 
 /** Canvas family (first name in the CSS list) -> the family the pro editors ship (scripts/vectorcraft-pro/web-fonts.patch).
- *  楷書 (LXGW WenKai TC) and 圓體 (jf-openhuninn) are not in the editors' list -> Noto Sans TC. */
+ *  楷書 (LXGW WenKai TC) and 圓體 (Huninn / jf-openhuninn) are not in the editors' list -> Noto Sans TC. */
 export const EDITOR_FONTS: Record<string, string> = {
   "Noto Sans TC": "Noto Sans TC",
   "Noto Serif TC": "Noto Serif TC",
   "LXGW WenKai TC": "Noto Sans TC",
   "jf-openhuninn": "Noto Sans TC",
+  "Huninn": "Noto Sans TC",
   "Inter": "Inter",
+  "Montserrat": "Montserrat",
+  "Playfair Display": "Playfair Display",
+  "Oswald": "Oswald",
+  "Bebas Neue": "Bebas Neue",
 };
 export function editorFont(cssFamily: string): string {
   const first = cssFamily.split(",")[0].trim().replace(/^['"]|['"]$/g, "");
@@ -129,13 +185,17 @@ export async function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, noBreakRules = false): string[] {
   const isCjk   = /[　-鿿豈-﫿]/.test(text);
-  const tokens   = isCjk ? text.split("") : text.split(" ");
+  if (isCjk) {
+    const lines = wrapChars(Array.from(text), (c) => c, (l) => ctx.measureText(l.join("")).width <= maxWidth, noBreakRules).map((l) => l.join(""));
+    return lines.length ? lines : [text];
+  }
+  const tokens   = text.split(" ");
   const lines: string[] = [];
   let current = "";
   for (const tok of tokens) {
-    const test = isCjk ? current + tok : (current ? `${current} ${tok}` : tok);
+    const test = current ? `${current} ${tok}` : tok;
     if (ctx.measureText(test).width <= maxWidth) { current = test; }
     else { if (current) lines.push(current); current = tok; }
   }
@@ -158,21 +218,30 @@ export function parseAccentRuns(text: string): AccentRun[] {
   return out.length ? out : [{ text, accent: false }];
 }
 
-// Wrap accent runs into lines (char-level — robust for CJK + mixed digits). ctx.font + letterSpacing must be set first.
-function layoutAccentLines(ctx: CanvasRenderingContext2D, runs: AccentRun[], maxWidth: number): AccentRun[][] {
-  const lines: AccentRun[][] = [];
-  let line: AccentRun[] = []; let lineW = 0;
-  for (const r of runs) {
-    for (const ch of Array.from(r.text)) {
-      const w = ctx.measureText(ch).width;
-      if (lineW + w > maxWidth && line.length) { lines.push(line); line = []; lineW = 0; }
-      const last = line[line.length - 1];
-      if (last && last.accent === r.accent) last.text += ch;
-      else line.push({ text: ch, accent: r.accent });
-      lineW += w;
+/** autospace over accent runs (a space between an accent and a plain run is plain). */
+export function autospaceRuns(runs: AccentRun[]): AccentRun[] {
+  const chars = runs.flatMap((r) => Array.from(r.text).map((ch) => ({ ch, accent: r.accent })));
+  const out: AccentRun[] = [];
+  chars.forEach((c, i) => {
+    const prev = chars[i - 1];
+    const gap = prev && ((CJK_CHAR.test(prev.ch) && LATIN_CHAR.test(c.ch)) || (LATIN_CHAR.test(prev.ch) && CJK_CHAR.test(c.ch)));
+    for (const [ch, accent] of gap ? [[" ", prev.accent && c.accent], [c.ch, c.accent]] as const : [[c.ch, c.accent]] as const) {
+      const last = out[out.length - 1];
+      if (last && last.accent === accent) last.text += ch; else out.push({ text: ch, accent });
     }
-  }
-  if (line.length) lines.push(line);
+  });
+  return out.length ? out : runs;
+}
+
+// Wrap accent runs into lines (char-level — robust for CJK + mixed digits). ctx.font + letterSpacing must be set first.
+function layoutAccentLines(ctx: CanvasRenderingContext2D, runs: AccentRun[], maxWidth: number, noBreakRules = false): AccentRun[][] {
+  const items = runs.flatMap((r) => Array.from(r.text).map((ch) => ({ ch, accent: r.accent, w: ctx.measureText(ch).width })));
+  const lines = wrapChars(items, (i) => i.ch, (l) => l.reduce((sum, i) => sum + i.w, 0) <= maxWidth, noBreakRules)
+    .map((ln) => ln.reduce<AccentRun[]>((acc, c) => {
+      const last = acc[acc.length - 1];
+      if (last && last.accent === c.accent) last.text += c.ch; else acc.push({ text: c.ch, accent: c.accent });
+      return acc;
+    }, []));
   return lines.length ? lines : [[{ text: "", accent: false }]];
 }
 
@@ -198,10 +267,24 @@ function newCanvas(w: number, h: number): HTMLCanvasElement {
   return cv;
 }
 
+/** Load the font slices the design's text needs (a no-op where FontFace loading is unavailable, e.g. node tests). */
+async function loadDesignFonts(state: BannerFields): Promise<void> {
+  const fonts = typeof document !== "undefined" ? document.fonts : undefined;
+  if (!fonts?.load) return;
+  const body = [state.subtext, state.ctaText, state.badgeText, state.priceNow, state.priceWas, state.trustText, "12,000+ 則好評 ✓ 30 天滿意保證 ★☆"].join("");
+  const jobs = [
+    fonts.load(`${state.headlineWeight || 700} 40px ${state.headlineFont || state.fontFamily}`, state.headline.replace(/\*\*/g, "") || "字"),
+    fonts.load(`${state.bodyWeight || 400} 40px ${state.fontFamily}`, body || "字"),
+    fonts.load(`700 40px ${state.fontFamily}`, body || "字"),
+  ];
+  await Promise.race([Promise.all(jobs).catch(() => undefined), new Promise((r) => setTimeout(r, 4000))]);
+}
+
 /** Every part of the banner on its own full-size canvas, bottom to top. `flat`: every part on ONE canvas instead (each
  *  part still starts from a fresh context state) -- the PNG / preview: stacking 8-bit layers re-rounds soft shadow edges
  *  (up to 2/255 on ~50 px, measured), and one canvas is also ~15x less memory per preview frame. */
 export async function renderBannerLayers(state: BannerFields, size: { w: number; h: number }, opts: { flat?: boolean } = {}): Promise<BannerLayers> {
+  await loadDesignFonts(state);
   const p = size;
   const layers: BannerLayer[] = [];
   let flat: CanvasRenderingContext2D | null = null;
@@ -312,7 +395,9 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
   const anchorX  = align === "left" ? padding : align === "right" ? p.w - padding : p.w / 2;
   const gapV     = Math.round(state.subtextSize * 0.62);
   const leftOf   = (w: number) => align === "left" ? anchorX : align === "right" ? anchorX - w : anchorX - w / 2;
-  const spec = (cssFamily: string, weight: 400 | 700, sz: number, lines: TextRun[][], al: TextSpec["align"], x: number, y: number,
+  const sp = (t: string) => (state.cjkSpacing ? autospace(t) : t);
+  const hW = state.headlineWeight || 700, bW = state.bodyWeight || 400;
+  const spec = (cssFamily: string, weight: number, sz: number, lines: TextRun[][], al: TextSpec["align"], x: number, y: number,
     extra: Partial<TextSpec> = {}): TextSpec =>
     ({ lines, cssFamily, editorFont: editorFont(cssFamily), weight, size: sz, align: al, x, y, lineHeight: sz * 1.2, letterSpacing: 0, opacity: 1, ...extra });
 
@@ -322,20 +407,21 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
   // headline — own font, letter-spacing, accent words (**字**), outlined for legibility
   if (state.headline) {
     const hFont = state.headlineFont || font;
-    const fontStr = `bold ${state.headlineSize}px ${hFont}`;
+    const fontStr = `${hW} ${state.headlineSize}px ${hFont}`;
     mctx.font = fontStr;
     setLetterSpacing(mctx, state.letterSpacing);
-    const runs = parseAccentRuns(state.headline);
-    let lines = layoutAccentLines(mctx, runs, maxWidth);
+    const parsed = parseAccentRuns(state.headline);
+    const runs = state.cjkSpacing ? autospaceRuns(parsed) : parsed;
+    let lines = layoutAccentLines(mctx, runs, maxWidth, state.kinsoku);
     // card R3: even lines -- the narrowest width that still gives this many lines (off = the wrap as before)
     if (state.balanceTitle && lines.length > 1) {
       let lo = maxWidth / lines.length, hi = maxWidth;
-      for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (layoutAccentLines(mctx, runs, mid).length > lines.length) lo = mid; else hi = mid; }
-      lines = layoutAccentLines(mctx, runs, hi);
+      for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (layoutAccentLines(mctx, runs, mid, state.kinsoku).length > lines.length) lo = mid; else hi = mid; }
+      lines = layoutAccentLines(mctx, runs, hi, state.kinsoku);
     }
     const runW = lines.map((ln) => ln.map((r) => mctx.measureText(r.text).width));
     const lineWs = runW.map((ws) => ws.reduce((a, b) => a + b, 0));
-    const lineH = state.headlineSize * 1.16;
+    const lineH = state.headlineSize * (state.headlineLineHeight || 1.16);
     const w = Math.min(maxWidth, Math.max(1, ...lineWs));
     const below = baselineBelow(mctx, "top", state.headlineSize);
     setLetterSpacing(mctx, 0);
@@ -363,7 +449,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
           });
         }
         const color = (r: AccentRun) => r.accent ? (plate(r) ? "#1a1a1a" : state.accentColor) : state.textColor;
-        const ctx = layer("標題", spec(hFont, 700, state.headlineSize,
+        const ctx = layer("標題", spec(hFont, hW, state.headlineSize,
           lines.map((ln) => ln.map((r) => ({ text: r.text, color: color(r) }))), align, anchorX, top + below,
           { lineHeight: lineH, letterSpacing: state.letterSpacing }), px(state.textShadow, state.headlineSize), true);
         ctx.font = fontStr;
@@ -393,18 +479,22 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
 
   // subtext
   if (state.subtext) {
-    const fontStr = `${state.subtextSize}px ${font}`;
+    const fontStr = `${bW} ${state.subtextSize}px ${font}`;
+    const bodyLs = state.bodyLetterSpacing || 0;
     mctx.font = fontStr;
-    const lines = wrapText(mctx, state.subtext, maxWidth);
-    const lineH = state.subtextSize * 1.32;
+    setLetterSpacing(mctx, bodyLs);
+    const lines = wrapText(mctx, sp(state.subtext), maxWidth, state.kinsoku);
+    const lineH = state.subtextSize * (state.bodyLineHeight || 1.32);
     const w = Math.min(maxWidth, Math.max(1, ...lines.map((l) => mctx.measureText(l).width)));
+    setLetterSpacing(mctx, 0);
     const below = baselineBelow(mctx, "top", state.subtextSize);
     blocks.push({
       h: lines.length * lineH, w,
       draw: (top) => {
-        const ctx = layer("副標", spec(font, 400, state.subtextSize, lines.map((l) => [{ text: l, color: state.textColor }]),
-          align, anchorX, top + below, { lineHeight: lineH, opacity: 0.95 }), px(state.textShadow, state.subtextSize), true);
+        const ctx = layer("副標", spec(font, bW, state.subtextSize, lines.map((l) => [{ text: l, color: state.textColor }]),
+          align, anchorX, top + below, { lineHeight: lineH, opacity: 0.95, letterSpacing: bodyLs }), px(state.textShadow, state.subtextSize), true);
         ctx.font = fontStr;
+        setLetterSpacing(ctx, bodyLs);
         ctx.textAlign = align; ctx.textBaseline = "top";
         let y = top;
         for (const line of lines) {
@@ -425,7 +515,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     const wasSize = Math.round(state.subtextSize * 0.9);
     mctx.font = `bold ${nowSize}px ${font}`;
     const nowW = state.priceNow ? mctx.measureText(state.priceNow).width : 0;
-    mctx.font = `${wasSize}px ${font}`;
+    mctx.font = `${bW} ${wasSize}px ${font}`;
     const wasW = state.priceWas ? mctx.measureText(state.priceWas).width : 0;
     const gapP = state.priceNow && state.priceWas ? Math.round(nowSize * 0.35) : 0;
     const rowW = nowW + gapP + wasW;
@@ -445,9 +535,9 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
         }
         if (state.priceWas) {
           const wy = baseY;
-          const ctx = layer("原價", spec(font, 400, wasSize, [[{ text: state.priceWas, color: state.textColor }]], "left", x, wy, { opacity: 0.7 }), px(state.textShadow, wasSize), true);
+          const ctx = layer("原價", spec(font, bW, wasSize, [[{ text: state.priceWas, color: state.textColor }]], "left", x, wy, { opacity: 0.7 }), px(state.textShadow, wasSize), true);
           ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-          ctx.font = `${wasSize}px ${font}`;
+          ctx.font = `${bW} ${wasSize}px ${font}`;
           ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.7;
           ctx.fillText(state.priceWas, x, wy);
           const st = layer("原價刪除線");
@@ -465,9 +555,10 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
 
   // CTA button (the conversion driver)
   if (state.ctaText) {
+    const ctaText = sp(state.ctaText);
     const bf   = Math.round(state.subtextSize * 1.02);
     mctx.font = `bold ${bf}px ${font}`;
-    const tw   = mctx.measureText(state.ctaText).width;
+    const tw   = mctx.measureText(ctaText).width;
     const below = baselineBelow(mctx, "middle", bf);
     const padX = Math.round(bf * 0.95);
     const padY = Math.round(bf * 0.56);
@@ -481,11 +572,11 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
         roundRectPath(bg, left, top, bw, bh, bh / 2);
         bg.fillStyle = state.ctaBg; bg.fill();
         const cx = left + bw / 2, my = top + bh / 2 + bf * 0.06;
-        const ctx = layer("按鈕文字", spec(font, 700, bf, [[{ text: state.ctaText, color: state.ctaTextColor }]], "center", cx, my + below));
+        const ctx = layer("按鈕文字", spec(font, 700, bf, [[{ text: ctaText, color: state.ctaTextColor }]], "center", cx, my + below));
         ctx.fillStyle = state.ctaTextColor;
         ctx.font = `bold ${bf}px ${font}`;
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText(state.ctaText, cx, my);
+        ctx.fillText(ctaText, cx, my);
       },
     });
   }
@@ -502,7 +593,8 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     } else {
       label = "✓ " + (state.trustText || "30 天滿意保證");
     }
-    mctx.font = `${tSize}px ${font}`;
+    label = sp(label);
+    mctx.font = `${bW} ${tSize}px ${font}`;
     const starW = starsStr ? mctx.measureText(starsStr).width : 0;
     const labW  = label ? mctx.measureText(label).width : 0;
     const gapT  = starsStr && label ? Math.round(tSize * 0.45) : 0;
@@ -513,13 +605,13 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
         let x = leftOf(rowW);
         const by = top + tSize;
         if (starsStr) {
-          const ctx = layer("星星", spec(font, 400, tSize, [[{ text: starsStr, color: "#fbbf24" }]], "left", x, by), px(state.textShadow, tSize), true);
-          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${tSize}px ${font}`;
+          const ctx = layer("星星", spec(font, bW, tSize, [[{ text: starsStr, color: "#fbbf24" }]], "left", x, by), px(state.textShadow, tSize), true);
+          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${bW} ${tSize}px ${font}`;
           ctx.fillStyle = "#fbbf24"; ctx.fillText(starsStr, x, by); x += starW + gapT;
         }
         if (label) {
-          const ctx = layer("信任說明", spec(font, 400, tSize, [[{ text: label, color: state.textColor }]], "left", x, by, { opacity: 0.92 }), px(state.textShadow, tSize), true);
-          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${tSize}px ${font}`;
+          const ctx = layer("信任說明", spec(font, bW, tSize, [[{ text: label, color: state.textColor }]], "left", x, by, { opacity: 0.92 }), px(state.textShadow, tSize), true);
+          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${bW} ${tSize}px ${font}`;
           ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.92; ctx.fillText(label, x, by);
         }
       },
@@ -563,16 +655,17 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
 
   // corner offer badge (independent of the stack)
   if (state.badgeText) {
+    const badgeText = sp(state.badgeText);
     const bf = Math.round(state.subtextSize * 0.95 * state.badgeScale);
     const margin = Math.round(p.w * 0.035);
     mctx.font = `bold ${bf}px ${font}`;
-    const tw = mctx.measureText(state.badgeText).width;
+    const tw = mctx.measureText(badgeText).width;
     const onLeft = state.badgePos === "tl";
     const badgeSh = px(badgeShadowOf(state.badgeStyle, state.badgeShadow), bf * 1.9);
     const white = (fs: number, x: number, y: number, extra: Partial<TextSpec> = {}) => {
       mctx.font = `bold ${fs}px ${font}`;
       const below = baselineBelow(mctx, "middle", fs);
-      const ctx = layer("角標文字", spec(font, 700, fs, [[{ text: state.badgeText, color: "#ffffff" }]], "center", x, y + below, extra));
+      const ctx = layer("角標文字", spec(font, 700, fs, [[{ text: badgeText, color: "#ffffff" }]], "center", x, y + below, extra));
       ctx.fillStyle = "#ffffff";
       ctx.font = `bold ${fs}px ${font}`;
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -599,7 +692,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       const t = white(fit, cxb, cyb, { rotate: { angle, cx: cxb, cy: cyb } });
       t.translate(cxb, cyb);
       t.rotate(angle);
-      t.fillText(state.badgeText, 0, 0);
+      t.fillText(badgeText, 0, 0);
     } else if (state.badgeStyle === "ribbon") {
       const padX = bf * 0.7, bh = bf * 1.9, notch = bh * 0.45;
       const bw = tw + padX * 2 + notch;
@@ -619,7 +712,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       }
       ctx.closePath(); ctx.fill();
       const tx = onLeft ? x + (bw - notch) / 2 : x + notch + (bw - notch) / 2;
-      white(bf, tx, y + bh / 2).fillText(state.badgeText, tx, y + bh / 2);
+      white(bf, tx, y + bh / 2).fillText(badgeText, tx, y + bh / 2);
     } else {
       // pill
       const padX = bf * 0.8, bh = bf * 1.9, bw = tw + padX * 2;
@@ -628,7 +721,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       const ctx = layer("角標底", undefined, badgeSh);
       roundRectPath(ctx, x, y, bw, bh, bh / 2);
       ctx.fillStyle = state.badgeColor; ctx.fill();
-      white(bf, x + bw / 2, y + bh / 2).fillText(state.badgeText, x + bw / 2, y + bh / 2);
+      white(bf, x + bw / 2, y + bh / 2).fillText(badgeText, x + bw / 2, y + bh / 2);
     }
   }
 
@@ -697,7 +790,7 @@ export function cropPixels(px: Pixels, b: Box): Pixels {
 // XML 1.0 forbids most C0 controls (a Word soft return  pasted into a title would make the SVG unreadable): drop them.
 const esc = (s: string) => s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const num = (n: number) => String(Math.round(n * 100) / 100);
-const GENERIC: Record<string, string> = { "Noto Serif TC": "serif" };
+const GENERIC: Record<string, string> = { "Noto Serif TC": "serif", "Playfair Display": "serif" };
 
 /** SVG text element for a TextSpec: one <tspan> per line (x, y), a nested <tspan fill> per differently coloured run. */
 export function textToSvg(t: TextSpec): string {
@@ -746,7 +839,7 @@ function rgb(hex: string): { r: number; g: number; b: number } {
 /** ag-psd text data for a TextSpec: point text whose origin (transform) is the first line's anchor on its baseline. */
 export function textToPsd(t: TextSpec): NonNullable<PsdLayer["text"]> {
   const style = (color: string): TextStyle => ({
-    font: { name: t.editorFont }, fontSize: t.size, fauxBold: t.weight >= 700, fillColor: rgb(color),
+    font: { name: t.editorFont }, fontSize: t.size, fauxBold: t.weight >= 600, fillColor: rgb(color),
     tracking: Math.round((t.letterSpacing / t.size) * 1000), autoLeading: false, leading: t.lineHeight,
   });
   const runs: { length: number; color: string }[] = [];
