@@ -6,13 +6,14 @@ import {
   designPlan, ntdLabel, readAiStream, sanitizeCopyVariants, showsCopy, type BannerAiModel, type DesignCopy, type SizeSpec,
 } from "../banner-design";
 import { renderBannerLayers } from "../banner-layers";
+import { guardLane } from "../contrast-run";
 import { applySemantic } from "../banner-layout";
 import { bgForPrompt, bgStatsFromColors, guardDrawn, usablePalette, type GuardResult, type PxBox } from "../design-colors";
 import { brandKitPatch } from "../kit/apply-kit";
 import type { useBrandKit } from "../kit/useBrandKit";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import {
-  COPY_TONES, PRESETS, applyLayout, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes, variantOf,
+  COPY_TONES, PRESETS, applyLayout, designSig, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes, variantOf,
   type BannerStaffApi, type CopyVariant, type PresetKey, type SizePatch, type State,
 } from "../banner-state";
 import type { StepSlot } from "./order";
@@ -22,7 +23,8 @@ import { StepCard, type StepCtx } from "./ui";
 const TEXT_ELEMS = ["headline", "subtext", "price", "trust"] as const;
 
 /** Contrast on `st` as the renderer draws it: every picked size rendered for its text boxes, the background measured from
- *  `st` itself (never an earlier measurement), then guardDrawn. Free (browser only). */
+ *  `st` itself (never an earlier measurement), then guardDrawn. Free (browser only). A result is applied only through a
+ *  guardLane (contrast-run.ts): to a design whose inputs are still the ones measured here, by the newest run. */
 async function guardOnDrawn(st: State, kit: readonly string[] | null, roles?: { raw: Record<string, unknown>; palette: readonly string[] }): Promise<GuardResult> {
   const sel = selectedSizes(st), m = mainOf(st);
   const bg = await measureBackground(m, sel).catch(() => ({ ...bgStatsFromColors("color", m.bgColor), mode: m.bgMode }));
@@ -43,6 +45,10 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
   const p = PRESETS[s.preset];
   const picked = selectedSizes(s);
   const multi = picked.length > 1;
+  // one lane per action: a newer AI design / word-set pick supersedes an older one still being checked
+  const lane = () => guardLane<State, GuardResult>({ sig: designSig, current: () => sRef.current, apply: setS });
+  const [designLane] = useState(lane);
+  const [copyLane] = useState(lane);
 
   // ── AI 一鍵設計整張：LLM 回傳一個 State patch（renderer 直接吃 → 幾乎零渲染成本）──
   async function generateFullDesign() {
@@ -99,8 +105,10 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
       };
       // contrast on what will be drawn: the latest state with the answer on it (a background changed while the AI answered
       // is measured again); the roles index the palette the prompt was given
-      const col = await guardOnDrawn(build(sRef.current), kitColors, { raw, palette });
-      setS((prev) => ({ ...build(prev), ...col.patch, designing: false, saved: false, ...(kitPart?.logoError ? { error: kitPart.logoError } : {}) }));
+      await designLane.run(build, (st) => guardOnDrawn(st, kitColors, { raw, palette }), (built, col) => ({
+        ...built, ...(col?.patch ?? {}), designing: false, saved: false,
+        ...(col ? (kitPart?.logoError ? { error: kitPart.logoError } : {}) : { error: "對比檢查失敗：配色沒有套用，請再按一次。" }),
+      }));
     } catch (err) {
       setAiRetrying(null);
       setS((prev) => ({ ...prev, designing: false, error: err instanceof Error ? err.message : String(err) }));
@@ -111,8 +119,8 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
   // history step (words and any colour fix together)
   async function pickCopy(v: DesignCopy) {
     const kitColors = brand.kit?.colors.length ? brand.kit.colors : null;
-    const g = await guardOnDrawn({ ...sRef.current, ...copyWords(v) }, kitColors).catch(() => null);
-    setS((prev) => ({ ...prev, ...copyWords(v), ...(g?.patch ?? {}), saved: false, error: null }));
+    await copyLane.run((prev) => ({ ...prev, ...copyWords(v) }), (st) => guardOnDrawn(st, kitColors),
+      (built, g) => ({ ...built, ...(g?.patch ?? {}), saved: false, error: null }));
   }
 
   // card C9: the model each AI button runs on (visible buttons, NT$ per call shown); defaults from the 2026-11-26 bake-off
