@@ -48,7 +48,7 @@ export default function ScheduleImageButtons({ site, onSaved, readOnly = false }
     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
       <OptionButtons label={LABEL} value={current} options={OPTIONS} onChange={(v) => void save(v)} />
       <div className="form-hint">Codex 免費生圖要等主機常駐上線後才能給排程用</div>
-      {error && <div style={{ color: "var(--red)", fontSize: 12 }}>{error}</div>}
+      {error && <div style={{ color: "var(--badge-red-text)", fontSize: 12 }}>{error}</div>}
     </div>
   );
 }

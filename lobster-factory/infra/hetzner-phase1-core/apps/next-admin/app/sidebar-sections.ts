@@ -1,5 +1,5 @@
 // The sidebar's links and its pure helpers. A plain module (not 'use client') so server code can read the list: the
-// shell layout filters it by the staff member's tool grant (lib/staff-access.ts) before SidebarNav renders it.
+// shell layout filters it by the staff member's tool grant (lib/staff-access.ts) before NavRail renders it.
 import type { SavedLayout } from '../lib/theme/tokens';
 
 // ── Nav data ────────────────────────────────────────────────────────────────

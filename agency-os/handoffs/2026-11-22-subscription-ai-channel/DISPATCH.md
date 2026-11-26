@@ -87,3 +87,27 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 - K13 實測已跑完（正式站）：比較頁 `https://claude.ai/artifact/QDYm5geq9V9ztRgLrEZtrg`，資料 `agency-os/reports/model-bakeoff/2026-11-article-image/`（`runs.json`、`img/`、`image-bakeoff.html`；產生器在 scratchpad `build_image_page.cjs`，重建需重寫）。來源 A–F＝openai-low、codex-image、flux-schnell、nano-banana-2、flux-2-klein-4b、flux-dev；另有改版前做法對照。**等操作者選預設來源** → 改 `DEFAULT_IMAGE_MODEL`／`ARTICLE_IMAGE_MODELS`，寫進 `MeasuredRuns.tsx` 新組「文章配圖」。
 - 待她決定：畫面描述加「符合網站目標地區」（內文圖的人物偏西方臉）；自動社群草稿附封面圖（現在只有影片題目才附媒體，`make.ts` attachTopicVideo）；風格目錄的畫家組在文章這邊要不要收起來；IG 直式 4:5。
 - 未驗：文章頁的封面短標題／副標欄位；真的自動文章的封面；FB／IG 真實草稿。
+
+### 配圖收尾（2026-11-25 下午）
+- 上線：部署版 `67b4051c3`（11-25 06:31Z，sg-deploy exit 0、healthy、Playwright smoke 30 過 0 敗）。含 K26（來源清單＋`scheduleImageModel`）、實測紀錄「文章配圖」、操作者定案的四個來源。
+- 操作者定案：預設維持 C（`flux-schnell`）；保留 A（`openai-low`）、D（`nano-banana-2`）、`codex-image` 可選；E、F 不放進文章選單；每個按鈕標 NT$／張；之後她再測一次才決定要不要換預設。K13 已完成（中文、英文各一篇，六個來源各四張；比較頁 `https://claude.ai/artifact/QDYm5geq9V9ztRgLrEZtrg`）。
+- 正式站已看：`/tools/content/sites` 排程那一排與手動預設那一排的按鈕與價錢；`/tools/ai-models?tab=measured` 的「文章配圖」。
+- 還沒做、等她說：畫面描述加「符合網站目標地區」（內文圖人物偏西方臉）；自動社群草稿附封面圖；風格目錄的畫家組在文章這邊收起來；IG 直式 4:5；免費圖庫。
+- 未驗：文章頁的封面短標題／副標欄位；真的自動文章的封面與 FB／IG 草稿（等下一篇自動文章）。
+- 教訓：在瀏覽器頁面裡跑長流程，結果要每完成一項就寫進 `localStorage` 並取出存檔；只放 `window` 變數，頁面一重新整理就全丟（11-25 丟過一次）。
+
+### 配圖第二輪（2026-11-25 晚；接在「配圖收尾」之後）
+- 已併入 main、**尚未部署**（今晚 03:00 自動上線）：K27（`PEOPLE_IN_PICTURES`：看情境才畫人、有人時寫明樣貌、同篇不同人；`attachTopicCover`：只有文章的題目把封面附到社群草稿，IG 無圖會有不通過的檢查）、K28（三份完整比較頁嵌在 `/tools/ai-models?tab=measured`，`content/model-bakeoff/` ＋ `scripts/sync-model-bakeoff-pages.mjs`）、K29（`lib/content/cover/sizes.ts`：FB／IG／Bluesky 等 1080×1350，網站 1200×900，直式底圖只在需要時多畫一張）。
+- 上線後監工要看（都未驗）：實測紀錄分頁三份嵌入頁在正式容器是否顯示（`outputFileTracingIncludes`）；產一篇看畫面描述的人物規則；FB／IG／Bluesky 草稿是否附直式封面；第一則實際 Bluesky 貼文直式是否被裁（被裁 → `sizes.ts` 的 bluesky 改橫式）。
+- 操作者提過但未開卡：Banner 設計工具的尺寸選單（她貼的整份尺寸表；屬設計工具那條線，表上多數格未經官方驗證）；免費圖庫；風格目錄的畫家組在文章這邊收起來。
+- 正式資料（11-25）：連著的頻道 facebook 2、instagram 2、youtube 2、bluesky 1。
+
+### 現況快照（2026-11-26，compact 前；以這段為準）
+- 監工改用 Opus 5.5（操作者 11-26：Fable 貴）。工作性質＝驗收、派工、正式站檢查，Opus 足夠。
+- 上線：部署版 `236b8fc60`，含 K10、K23–K29 全部；容器 healthy；主線沒有未上線的 next-admin 改動。四個工人都已 clear、閒置（sub-k1 `local_bb671b06…`、sub-k2 `local_8466f158…`、sub-k3 `local_1a22899c…`、sub-k4 `local_3da5453e…`）。
+- 已驗：三份比較頁檔案在正式容器內（`content/model-bakeoff/*/index.html`）；未登入打 `/tools/ai-models/bakeoff/<slug>` 會導去登入頁。
+- **待驗（等操作者在內建瀏覽器面板登入 app.aware-wave.com，或她自己看）**：① `/tools/ai-models?tab=measured` 三組上方的嵌入頁是否顯示；② 產一篇文章（`fetch('/api/content/generate', {keyword, language, articleSize:'short', generateMeta:true, media:{aiImages:'flux-schnell', imageCount:3, imageSize:'4:3'}})`，約 NT$2）看 `PEOPLE_IN_PICTURES`：沒人的段落不硬塞人、有人的幾張是不同的人；③ 下一篇自動文章的 FB／IG／Bluesky 草稿是否附 1080×1350 封面；④ 第一則實際 Bluesky 貼文直式是否被裁（被裁 → `lib/content/cover/sizes.ts` 的 bluesky 改橫式）。
+- 在瀏覽器頁面跑長流程：結果每完成一項就寫 `localStorage` 並取出存檔（11-25 只放 `window` 變數，頁面重新整理後全丟）。
+- 提交方式不變：`D:\Worktrees\Work\sub-int`（detached）整合；文件用 scratchpad 的 `ship24.sh`（複製 `data.mjs`／`supervisor.html`／`DISPATCH.md`／briefs 到 sub-int 後 commit、push）；scratchpad 被清掉就照這個做法重寫一支。新增 brief 檔要記得加進複製與 `git add`（11-25 漏過一次）。
+- 操作者提過但沒有卡：Banner 設計工具的尺寸選單（另有「Banner pro-design」那條線）；免費圖庫；風格目錄的畫家組在文章這邊收起來；IG 可點連結（Meta One，需付費且只能在 App 手動加）。
+- 仍在等：M1（Codex 文字實跑；待決 4）；K9 主機常駐（待決 1–3）——做完後排程才能用 Codex 免費生圖。

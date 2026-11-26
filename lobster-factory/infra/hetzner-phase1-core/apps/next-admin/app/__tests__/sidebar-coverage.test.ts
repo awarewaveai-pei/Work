@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
-import { DEFAULT_SECTIONS, activeSectionId, applyLayout, itemKey } from "../SidebarNav";
+import { DEFAULT_SECTIONS, activeSectionId, applyLayout, itemKey } from "../sidebar-sections";
 import { STAFF_ROUTE_GROUPS } from "../../lib/portal/doors";
 
 // A built page nobody can click to is a page nobody uses: every static page under a staff route group is

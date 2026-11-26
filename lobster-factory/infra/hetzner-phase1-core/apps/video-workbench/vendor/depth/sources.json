@@ -1,0 +1,12 @@
+{
+  "note": "Depth model for 影片轉深度影片 (backend/depth-video.cjs). Too large for git: fetched by scripts/vendor-depth.cjs (postinstall, and its own Dockerfile layer) and checked by bytes + sha256 every install. A mismatch means the file changed: stop and investigate, never edit this file to make it pass. Runtime never connects to the network.",
+  "files": [
+    {
+      "name": "midas_v21_small.onnx",
+      "url": "https://github.com/isl-org/MiDaS/releases/download/v2_1/model-small.onnx",
+      "bytes": 66764249,
+      "sha256": "2d8c6cb8f415229daf1eb041024208e2608c9f98e17c81cc7c6ecb449c56fd58",
+      "license": "MIT License, Copyright (c) 2019 Intel ISL (Intel Intelligent Systems Lab) (isl-org/MiDaS LICENSE at tag v2_1)"
+    }
+  ]
+}
