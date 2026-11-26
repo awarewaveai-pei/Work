@@ -1,7 +1,7 @@
 "use client";
 // content.<base domain>/ (blueprint §15A rule 4: home = status + main action). Three numbers for the current client (and
 // its site, when one is picked), read from the APIs the destination pages use; a number whose read failed shows "—",
-// never 0. No client = nothing is read (ADR 020).
+// never 0. Nothing is read unless the client context is "ok" (ADR 020); the client rail shows why it is not.
 import { useEffect, useState } from "react";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
 import { useClientContext } from "@/lib/client-context/use-client-context";
@@ -23,7 +23,7 @@ async function read<T>(url: string): Promise<T> {
 export function ContentOverview() {
   const { org, site, status } = useClientContext("site");
   const carry = useCarry();
-  const key = org && status !== "loading" ? `${org}|${site ?? ""}` : null;
+  const key = org && status === "ok" ? `${org}|${site ?? ""}` : null;
   const [got, setGot] = useState<{ key: string; counts: Counts } | null>(null);
 
   useEffect(() => {
@@ -34,8 +34,8 @@ export function ContentOverview() {
     };
     const failed = (e: unknown) => console.error("[content overview]", e);
 
-    // the drafts page filters by site only, so a picked site is counted the same way
-    const by = site ? `siteId=${encodeURIComponent(site)}` : `organizationId=${encodeURIComponent(org)}`;
+    // always this client's rows: a site id alone would also count another client's drafts saved under it
+    const by = `organizationId=${encodeURIComponent(org)}${site ? `&siteId=${encodeURIComponent(site)}` : ""}`;
     read<{ drafts: unknown[] }>(`/api/content/drafts?${by}`)
       .then(({ drafts }) => put({ drafts: drafts.length >= DRAFT_LIMIT ? `${DRAFT_LIMIT}+` : String(drafts.length) }))
       .catch(failed);
@@ -63,7 +63,7 @@ export function ContentOverview() {
 
   return (
     <>
-      {!org && <p style={{ color: "var(--text-muted)" }}>先選一個客戶，這裡才有數字。</p>}
+      {!org && status === "unselected" && <p style={{ color: "var(--text-muted)" }}>先選一個客戶，這裡才有數字。</p>}
       <div className="card-grid" style={{ marginTop: 16 }}>
         {cards.map((c) => (
           <a key={c.label} className="card" href={carry(c.href)} style={{ textDecoration: "none" }}>

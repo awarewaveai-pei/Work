@@ -8,8 +8,9 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/content",
   useSearchParams: () => new URLSearchParams(`org=${A}`),
 }));
+const ctx = vi.hoisted(() => ({ site: null as string | null, status: "ok" }));
 vi.mock("@/lib/client-context/use-client-context", () => ({
-  useClientContext: () => ({ org: A, site: null, status: "ok" }),
+  useClientContext: () => ({ org: A, ...ctx }),
 }));
 
 import { ContentOverview } from "../ContentOverview";
@@ -19,7 +20,29 @@ const card = (label: string) => screen.getByText(label, { selector: ".card-label
 const value = (label: string) => card(label).querySelector(".card-value")!.textContent;
 
 describe("ContentOverview", () => {
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); ctx.site = null; ctx.status = "ok"; });
+
+  it("asks for drafts of this client even when a site is picked", async () => {
+    ctx.site = "s1";
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => json({ ok: true, drafts: [], overview: { month: "2026-11-01", rows: [] } }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ContentOverview />);
+    await waitFor(() => expect(value("草稿")).toBe("0"));
+    const drafts = fetchMock.mock.calls.map((c) => String(c[0])).filter((u) => u.startsWith("/api/content/drafts"));
+    expect(drafts).toEqual([`/api/content/drafts?organizationId=${A}&siteId=s1`]);
+  });
+
+  it("reads nothing unless the client context is ok", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    for (const status of ["loading", "unselected", "rejected", "site_mismatch", "not_found", "forbidden"]) {
+      ctx.status = status;
+      render(<ContentOverview />);
+      expect([value("待核准題目"), value("草稿"), value("已排程")], status).toEqual(["—", "—", "—"]);
+      cleanup();
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
   it("shows the three numbers, each linking to its page with the current client, and the 寫文章 button", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
