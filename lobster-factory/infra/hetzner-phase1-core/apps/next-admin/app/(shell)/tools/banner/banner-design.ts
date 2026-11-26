@@ -91,3 +91,95 @@ export function designPlan(raw: Record<string, unknown>, main: SizeSpec, chosen:
   for (const s of chosen) if (s.key !== main.key) overrides[s.key] = layoutOf(s);
   return { main: layouts[main.key] ? sanitizeLayout(layouts[main.key], main) : {}, overrides };
 }
+
+// ── C10: reading the AI's JSON answer ──
+// Production 2026-11-26: a full, billed 2,055-token design answer failed JSON.parse once and worked on the next press.
+// Invariant: an answer that holds one complete object is usable; only a really broken one fails, and it is kept to look at.
+
+/** The stream's trailing markers (app/api/tools/script-forge/route.ts): a receipt and an error line. */
+const STREAM_MARKERS = ["\n[SF_BUDGET]", "[SF_BUDGET]", "\n[ERROR]", "[ERROR]"];
+
+/** The first complete JSON object / array in `text` (strings and escapes respected), or null when it never closes. */
+function firstBalanced(text: string): string | null {
+  const start = text.search(/[[{]/);
+  if (start < 0) return null;
+  const stack: string[] = [];
+  let inStr = false, esc = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === "{" || c === "[") stack.push(c === "{" ? "}" : "]");
+    else if (c === "}" || c === "]") { if (stack.pop() !== c) return null; if (!stack.length) return text.slice(start, i + 1); }
+  }
+  return null;
+}
+/** Small repairs outside / inside strings: trailing commas dropped, raw line breaks and tabs inside strings escaped. */
+function repairJson(s: string): string {
+  let out = "", inStr = false, esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) { esc = false; out += c; continue; }
+      if (c === "\\") { esc = true; out += c; continue; }
+      if (c === '"') { inStr = false; out += c; continue; }
+      out += c === "\n" ? "\\n" : c === "\r" ? "\\r" : c === "\t" ? "\\t" : c;
+      continue;
+    }
+    if (c === '"') { inStr = true; out += c; continue; }
+    if (c === ",") { const rest = s.slice(i + 1).match(/^\s*([}\]])/); if (rest) continue; }
+    out += c;
+  }
+  return out;
+}
+export type AiJson = { ok: true; value: unknown } | { ok: false; error: string };
+/** Parse the AI's answer: markers and code fences cut, the first complete object taken, common slips repaired. */
+export function parseAiJson(text: string): AiJson {
+  let body = text;
+  let streamError = "";
+  for (const m of STREAM_MARKERS) {
+    const i = body.indexOf(m);
+    if (i >= 0) { if (m.includes("ERROR")) streamError = text.slice(text.indexOf(m) + m.length).split("\n")[0].trim(); body = body.slice(0, i); }
+  }
+  body = body.replace(/```(?:json)?/gi, "");
+  const found = firstBalanced(body);
+  if (!found) return { ok: false, error: streamError || "no complete JSON object" };
+  for (const candidate of [found, repairJson(found)]) {
+    try { return { ok: true, value: JSON.parse(candidate) }; } catch { /* try the repaired one */ }
+  }
+  return { ok: false, error: streamError || "JSON.parse failed" };
+}
+
+/** Ask, parse; an answer that does not parse is asked once more (same model, same fields). `raw` = the last answer text. */
+export async function askJsonWithRetry(call: () => Promise<string>, onRetry?: () => void):
+  Promise<{ ok: true; value: unknown; calls: number } | { ok: false; error: string; calls: number; raw: string }> {
+  let raw = "";
+  for (let calls = 1; calls <= 2; calls++) {
+    if (calls === 2) onRetry?.();
+    raw = await call();
+    const parsed = parseAiJson(raw);
+    if ("value" in parsed) return { ok: true, value: parsed.value, calls };
+    if (calls === 2) return { ok: false, error: "error" in parsed ? parsed.error : "JSON.parse failed", calls, raw };
+  }
+  return { ok: false, error: "unreachable", calls: 2, raw };
+}
+
+/** The whole streamed answer text; `onChunk` sees it grow (the copy card shows the tail while it streams). */
+export async function readAiStream(res: Response, onChunk?: (full: string) => void): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let full = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    full += dec.decode(value, { stream: true });
+    onChunk?.(full);
+  }
+  return full + dec.decode();
+}
+/** The message after a retried answer still did not parse; the raw answer (first 2,000 characters) goes to the console. */
+export function aiFormatError(got: { error: string; calls: number; raw: string }, ntdPerCall: number): string {
+  console.error("[banner] AI answer did not parse:", got.error, got.raw.slice(0, 2000));
+  return `AI 回傳格式錯誤（已重試一次），本次已計費${ntdLabel(ntdPerCall * got.calls)}`;
+}

@@ -10,7 +10,7 @@ import {
   type ElemBox, type ElemKey, type ElemPositions, type Pixels, type ShadowSpec,
 } from "./banner-layers";
 import type { GroundingOpts } from "./product-grounding";
-import { BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, bannerCallNtd, designPlan, ntdLabel, removeBgNtd, type BannerAiModel, type SizeSpec } from "./banner-design";
+import { BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, aiFormatError, askJsonWithRetry, bannerCallNtd, designPlan, ntdLabel, readAiStream, removeBgNtd, type BannerAiModel, type SizeSpec } from "./banner-design";
 import BrandKitPanel from "./kit/BrandKitPanel";
 import { useBrandKit } from "./kit/useBrandKit";
 import type { BrandKit } from "./kit/brand-kit";
@@ -1057,35 +1057,27 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
 
   // ── AI 一鍵設計整張：LLM 回傳一個 State patch（renderer 直接吃 → 幾乎零渲染成本）──
   async function generateFullDesign() {
-    if (!s.copyBrief.trim()) return;
+    if (!s.copyBrief.trim() || !staff) return;
     setS((prev) => ({ ...prev, designing: true, error: null }));
     try {
-      if (!staff) return;
       // 多尺寸 ticked: one call, shared words / colours + a layout per size (card C9); none = the single-size call as before
       const m = mainOf(s);
       const spec = (k: PresetKey): SizeSpec => ({ key: k, ratio: PRESETS[k].ratio, use: PRESETS[k].use, w: PRESETS[k].w, h: PRESETS[k].h });
       const chosen = s.multiSizes.map(spec);
       const mp = PRESETS[m.preset];
-      const res = await staff.scriptForge("design", {
+      const fields = {
         brief: s.copyBrief, label: presetLabel(m.preset), w: mp.w, h: mp.h,
         ...(chosen.length ? { sizes: [spec(m.preset), ...chosen.filter((c) => c.key !== m.preset)] } : {}),
-      }, designModel);
-      if (!res.ok || !res.body) throw new Error(`設計生成失敗（${res.status}）`);
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let full = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        full += dec.decode(value, { stream: true });
-      }
-      full += dec.decode();
-      let raw: Record<string, unknown>;
-      try {
-        raw = JSON.parse(full.replace(/```json|```/g, "").trim()) as Record<string, unknown>;
-      } catch {
-        throw new Error("AI 回傳格式錯誤，請重試");
-      }
+      };
+      // C10: an answer that does not parse is asked once more; still broken = an error naming what was billed
+      const got = await askJsonWithRetry(async () => {
+        const res = await staff.scriptForge("design", fields, designModel);
+        if (!res.ok || !res.body) throw new Error(`設計生成失敗（${res.status}）`);
+        return readAiStream(res);
+      }, () => setAiRetrying("design"));
+      setAiRetrying(null);
+      if ("raw" in got) throw new Error(aiFormatError(got, bannerCallNtd(designModel, "design", Math.max(1, chosen.length))));
+      const raw = (got.value && typeof got.value === "object" ? got.value : {}) as Record<string, unknown>;
       const patch = sanitizeDesign(raw);
       const plan = designPlan(raw, spec(m.preset), chosen);
       setS((prev) => {
@@ -1097,7 +1089,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
         };
       });
     } catch (err) {
-      setS((prev) => ({ ...prev, designing: false, error: String(err) }));
+      setAiRetrying(null);
+      setS((prev) => ({ ...prev, designing: false, error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
@@ -1237,6 +1230,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   // card C9: the model each AI button runs on (visible buttons, NT$ per call shown); defaults from the 2026-11-26 bake-off
   const [copyModel, setCopyModel] = useState<BannerAiModel>(DEFAULT_COPY_MODEL);
   const [designModel, setDesignModel] = useState<BannerAiModel>(DEFAULT_DESIGN_MODEL);
+  // C10: the AI button whose answer did not parse and is being asked once more
+  const [aiRetrying, setAiRetrying] = useState<"copy" | "design" | null>(null);
   const modelRow = (label: string, value: BannerAiModel, onPick: (v: BannerAiModel) => void, task: "copy" | "design") => (
     <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }} data-testid={`banner-model-${task}`}>
       <span style={{ fontSize: 12, minWidth: 56 }}>{label}</span>
@@ -1250,28 +1245,24 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   );
 
   async function generateCopy() {
-    if (!s.copyBrief.trim()) return;
+    if (!s.copyBrief.trim() || !staff) return;
     setS((prev) => ({ ...prev, copyGenerating: true, copyVariants: [], copyStream: "", error: null }));
     try {
       const platform = `${p.use}（${p.where}）`;
-      if (!staff) return;
-      const res = await staff.scriptForge("copy", { platform, label: presetLabel(s.preset), w: p.w, h: p.h, tone: s.copyTone, brief: s.copyBrief }, copyModel);
-      if (!res.ok || !res.body) throw new Error(`文案生成失敗（${res.status}）`);
-      const reader = res.body.getReader();
-      const dec    = new TextDecoder();
-      let full     = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        full += dec.decode(value, { stream: true });
-        setS((prev) => ({ ...prev, copyStream: full }));
-      }
-      full += dec.decode();
-      const parsed = JSON.parse(full.replace(/```json|```/g, "").trim()) as { variants?: CopyVariant[] };
-      const variants = Array.isArray(parsed?.variants) ? parsed.variants : [];
+      const fields = { platform, label: presetLabel(s.preset), w: p.w, h: p.h, tone: s.copyTone, brief: s.copyBrief };
+      const got = await askJsonWithRetry(async () => {
+        const res = await staff.scriptForge("copy", fields, copyModel);
+        if (!res.ok || !res.body) throw new Error(`文案生成失敗（${res.status}）`);
+        return readAiStream(res, (full) => setS((prev) => ({ ...prev, copyStream: full })));
+      }, () => setAiRetrying("copy"));
+      setAiRetrying(null);
+      if ("raw" in got) throw new Error(aiFormatError(got, bannerCallNtd(copyModel, "copy")));
+      const parsed = (got.value && typeof got.value === "object" ? got.value : {}) as { variants?: CopyVariant[] };
+      const variants = Array.isArray(parsed.variants) ? parsed.variants : [];
       setS((prev) => ({ ...prev, copyGenerating: false, copyVariants: variants, copyStream: "" }));
     } catch (err) {
-      setS((prev) => ({ ...prev, copyGenerating: false, copyStream: "", error: String(err) }));
+      setAiRetrying(null);
+      setS((prev) => ({ ...prev, copyGenerating: false, copyStream: "", error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
@@ -1584,12 +1575,12 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button title={why("video.script")} className="btn btn-primary" disabled={(s.copyGenerating || s.designing || !s.copyBrief.trim()) || !canUse("video.script")}
                   onClick={generateCopy}>
-                  {s.copyGenerating ? "生成中…" : `生成文案（${ntdLabel(bannerCallNtd(copyModel, "copy"))}）`}
+                  {aiRetrying === "copy" ? "重試中…" : s.copyGenerating ? "生成中…" : `生成文案（${ntdLabel(bannerCallNtd(copyModel, "copy"))}）`}
                 </button>
                 <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || s.copyGenerating || !s.copyBrief.trim()) || !canUse("video.script")}
                   onClick={generateFullDesign}
                   style={{ background: "linear-gradient(135deg,#7c3aed,#ec4899)", border: "none" }}>
-                  {s.designing ? "設計中…" : `✨ AI 一鍵設計整張（${ntdLabel(bannerCallNtd(designModel, "design", Math.max(1, s.multiSizes.length)))}）`}
+                  {aiRetrying === "design" ? "重試中…" : s.designing ? "設計中…" : `✨ AI 一鍵設計整張（${ntdLabel(bannerCallNtd(designModel, "design", Math.max(1, s.multiSizes.length)))}）`}
                 </button>
               </div>
               <p className="form-hint">「一鍵設計」讓 AI 直接配好標題/重點字/CTA/徽章/價格/配色/版面 — 再微調即可。{s.multiSizes.length > 0 ? `已勾 ${s.multiSizes.length} 個尺寸：文案配色共用，每個尺寸各排一個版面。` : ""}</p>
