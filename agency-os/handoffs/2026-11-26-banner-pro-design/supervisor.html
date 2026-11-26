@@ -1,0 +1,147 @@
+<title>橫幅工具第二輪監工台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* 左側欄＋右側單欄內容；手機時側欄在上。顏色只載意義：有／沒有、狀態、風險。 */
+:root{
+  --bg:#f4f5f7; --paper:#ffffff; --ink:#1b2230; --muted:#5d6878; --line:#d8dde5; --accent:#2b4ea2; --rail:#e9ecf1;
+  --todo:#8b95a5; --doing:#c2410c; --done:#1f7a3a; --no:#b42318; --high:#b42318; --med:#9a6700; --low:#1f7a3a; --onDot:#ffffff;
+  --display:"Noto Serif TC","Songti TC",serif; --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;--onDot:#121722;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;--onDot:#121722;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.6;font-size:16px}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100%}
+@media (max-width:820px){.shell{grid-template-columns:1fr}}
+aside{background:var(--rail);border-right:1px solid var(--line);padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px}
+@media (max-width:820px){aside{border-right:0;border-bottom:1px solid var(--line);padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}}
+aside .in{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}
+@media (max-width:820px){aside .in{position:static}}
+aside h1{font-family:var(--display);font-size:20px;margin:0 0 4px;text-wrap:balance}
+aside .upd{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+.bar{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--line);margin:0 0 16px}
+.bar i{display:block;height:100%}.bar .d{background:var(--done)}.bar .g{background:var(--doing)}
+nav{display:grid;gap:2px}
+@media (max-width:820px){nav{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}}
+nav a{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:15px}
+nav a:hover,nav a:focus-visible{background:var(--paper);outline:none}
+nav a small{color:var(--muted);font-size:12.5px;white-space:nowrap}
+main{min-width:0;max-width:820px;padding-block:24px 56px;padding-left:24px;padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:820px){main{padding-left:max(16px,env(safe-area-inset-left,0px))}}
+.sub{color:var(--muted);margin:0 0 24px;font-size:15px}
+section{margin-bottom:36px;scroll-margin-top:16px}
+section>h2{font-family:var(--display);font-size:21px;margin:0 0 4px}
+section>.lead{color:var(--muted);margin:0 0 14px;font-size:15px}
+.sub-h{font-size:15px;margin:14px 0 8px;color:var(--muted);font-weight:500}
+code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border-radius:4px;padding:1px 5px;color:var(--muted)}
+small{display:block;color:var(--muted);font-size:13px;font-weight:400}
+ul.yn{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+ul.yn li{display:grid;grid-template-columns:64px 1fr;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+ul.yn li.yes b{color:var(--done)}ul.yn li.no b{color:var(--no)}
+ul.yn li span{min-width:0}
+ul.yn.rules li{grid-template-columns:130px 1fr}ul.yn.rules li b{color:var(--accent)}
+ul.yn.rules small a{color:var(--accent)}
+ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ol.steps li.grp{color:var(--muted);font-size:13.5px;padding:4px 2px 0}
+ol.steps li.grp a{color:var(--accent)}
+ol.open{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ol.steps li.step,ol.open li{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0;scroll-margin-top:16px}
+ol.steps .n,ol.open .n{width:30px;height:30px;border-radius:50%;background:var(--todo);color:var(--onDot);text-align:center;line-height:30px;font-weight:700;font-size:14px}
+.step.doing .n{background:var(--doing)}.step.done .n{background:var(--done)}
+ol.open .n{background:var(--accent)}
+.b{min-width:0}
+.plain{margin:0 0 6px;font-size:16px;font-weight:500}
+.meta{margin:0 0 6px;display:flex;flex-wrap:wrap;gap:6px 10px;font-size:13px;align-items:center}
+.pill{border-radius:999px;padding:1px 9px;border:1px solid currentColor;white-space:nowrap}
+.st-todo{color:var(--todo)}.st-doing{color:var(--doing)}.st-done{color:var(--done)}
+.risk-high{color:var(--high)}.risk-med{color:var(--med)}.risk-low{color:var(--low)}
+.who{color:var(--muted)} a.who{color:var(--accent)} .wait{color:var(--med)}
+.donewhen{margin:0 0 6px;font-size:14px}
+details{font-size:13.5px;color:var(--muted)}
+details summary{cursor:pointer;color:var(--accent)}
+details p{margin:6px 0 0}
+details a{color:var(--accent)}
+details code{font-size:12px;word-break:break-all}
+.paths{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.paths div{display:grid;grid-template-columns:130px 1fr;gap:8px;padding:5px 0;border-top:1px solid var(--line);min-width:0}
+.paths div:first-child{border-top:0}
+.paths code{word-break:break-all}
+@media (max-width:560px){.paths div{grid-template-columns:1fr}}
+:target{box-shadow:0 0 0 2px var(--accent)}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+.st-review{color:var(--accent)} .step.review .n{background:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 14px}
+.stats div{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.stats b{display:block;font-size:22px;font-family:var(--display)} .stats span{color:var(--muted);font-size:13.5px}
+ul.cur{list-style:none;margin:0 0 6px;padding:0;display:grid;gap:6px}
+ul.cur li{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0}
+ul.cur a{color:var(--accent);font-family:var(--mono);font-size:13px}
+.seen{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 12px;font-size:15px}
+.seen b{color:var(--accent)}
+.bprog{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:0 0 10px;font-size:14px;color:var(--muted)}
+.card-id{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-right:6px}
+.empty{background:var(--paper);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;color:var(--muted);margin:0}
+details.bd{margin:10px 0 0}
+ol.go .n{background:var(--high)}
+</style>
+<div class="shell">
+<aside><div class="in">
+  <h1>橫幅工具第二輪監工台</h1>
+  <p class="upd">更新於 <span data-computed>2026-11-26</span></p>
+  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#open"><span>等你決定</span><small><span data-computed>0</span> 項</small></a><a href="#b1"><span>第一批</span><small><span data-computed>0</span>／<span data-computed>2</span></small></a><a href="#b2"><span>第二批</span><small><span data-computed>0</span>／<span data-computed>2</span></small></a><a href="#risks"><span>風險</span><small><span data-computed>0</span> 項</small></a></nav>
+</div></aside>
+<main>
+<p class="sub">你的十點回饋，共 <span data-computed>4</span> 張卡，分兩批做；每批交回後先處理風險再上線。</p>
+<section id="now"><h2>現況</h2><p class="lead">做到哪。</p><div class="stats">
+    <div><b><span data-computed>0</span>／<span data-computed>4</span></b><span>張卡完成</span></div>
+    <div><b><span data-computed>0</span></b><span>張進行中</span></div>
+    <div><b><span data-computed>0</span></b><span>張待驗收</span></div>
+    <div><b><span data-computed>0</span></b><span>項等你決定</span></div>
+  </div><p class="sub-h">現在在做</p><p class="plain"><a class="who" href="#b1">第一批：排版引擎與介面流程（兩個工人同時做）</a></p><p class="sub-h">進行中與待驗收的卡</p><p class="empty">目前沒有進行中的卡。</p></section>
+
+<section id="open"><h2>等你決定</h2><p class="lead">要你點頭才往下的事。</p><p class="empty">目前沒有要你點頭的事。</p><p class="sub-h">我先代決的（不同意直接說）</p><ul class="yn rules"><li><b>AI 一鍵設計的多版本是什麼？</b><span>同一個設計附五組文案可換，一次呼叫（你更正過）。<small>影響：R2-C</small></span></li><li><b>清除設計保留什麼？</b><span>保留客戶與已選尺寸，其餘全清；按復原可找回。<small>影響：R2-B1</small></span></li><li><b>「文案類型」是什麼？</b><span>視為「文案模型」。<small>影響：R2-B1</small></span></li><li><b>2:1 用在哪些平台？</b><span>工人查官方文件後寫，註解附網址。<small>影響：R2-B1</small></span></li></ul></section>
+
+<section id="b1"><h2>第一批：排版引擎與介面流程（兩個工人同時做）</h2><p class="seen"><b>做完你會看到：</b>工具順序變成：開始、風格、尺寸、畫面、AI 文案與設計、版型模板、文字、行銷元素、匯出。預設 4:5、多了 2:1；文案卡會換行；多尺寸縮圖塞得進一個畫面；滾輪不再縮放背景（按住 Ctrl 才縮放）；有「清除設計」。排版引擎先做好，按鈕接上在第二批。</p><p class="bprog"><span><span data-computed>0</span>／<span data-computed>2</span> 完成</span><span>進行中 <span data-computed>0</span></span><span>待驗收 <span data-computed>0</span></span></p><ol class="steps"><li class="step todo" id="R2-A">
+    <div class="n">1</div>
+    <div class="b">
+      <p class="plain"><span class="card-id">R2-A</span>排版引擎：元素互不重疊、字的大小依尺寸自動算、倒影跟著商品、底襯和描邊一定看得到、AI 只決定放哪一區。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險中</span></p>
+      <details><summary>細節</summary>
+        <p><b>要先完成：</b>沒有</p>
+        <p><b>模型：</b>Opus 5.5</p>
+      </details>
+    </div></li><li class="step todo" id="R2-B1">
+    <div class="n">2</div>
+    <div class="b">
+      <p class="plain"><span class="card-id">R2-B1</span>介面：拆檔、照你的順序重排九步、預設 4:5 加 2:1、文案卡換行、縮圖塞進畫面、Ctrl 才縮放、清除設計。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險中</span></p>
+      <details><summary>細節</summary>
+        <p><b>要先完成：</b>沒有</p>
+        <p><b>模型：</b>Opus 5.5</p>
+      </details>
+    </div></li></ol><details class="bd"><summary>怎麼驗收與要退回時</summary><p><b>怎麼驗收：</b>型別檢查與橫幅測試全綠（含重疊測試：所有尺寸下元素不互撞）；本機瀏覽器照你的四張截圖情境重跑並截圖；Codex 審過。</p><p><b>要退回時：</b>每張卡一個 commit，單獨還原。</p></details></section>
+
+<section id="b2"><h2>第二批：按鈕接上引擎、AI 文案多版本與 logo</h2><p class="seen"><b>做完你會看到：</b>AI 一鍵設計後，所有位置按鈕都有效；設計附五組文案，點哪組換哪組；有品牌套組時 logo 和字體一起進設計且不壓到其他元素。</p><p class="bprog"><span><span data-computed>0</span>／<span data-computed>2</span> 完成</span><span>進行中 <span data-computed>0</span></span><span>待驗收 <span data-computed>0</span></span></p><ol class="steps"><li class="step todo" id="R2-B2">
+    <div class="n">3</div>
+    <div class="b">
+      <p class="plain"><span class="card-id">R2-B2</span>把位置按鈕、模板、字級滑桿接上引擎：按了就一定有效，手拖的位置被按鈕取代。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險中</span></p>
+      <details><summary>細節</summary>
+        <p><b>要先完成：</b>R2-A、R2-B1</p>
+        <p><b>模型：</b>Opus 5.5</p>
+      </details>
+    </div></li><li class="step todo" id="R2-C">
+    <div class="n">4</div>
+    <div class="b">
+      <p class="plain"><span class="card-id">R2-C</span>AI 一鍵設計附五組文案可換；品牌 logo 與字體一起進設計；對比檢查改量真實文字位置。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險中</span></p>
+      <details><summary>細節</summary>
+        <p><b>要先完成：</b>R2-A、R2-B1</p>
+        <p><b>模型：</b>Opus 5.5</p>
+      </details>
+    </div></li></ol><details class="bd"><summary>怎麼驗收與要退回時</summary><p><b>怎麼驗收：</b>型別檢查與測試全綠；本機實按一次 AI 一鍵設計（約 NT$1.6）：五張文案卡可換、logo 出現、位置按鈕都會動、對比沒有未達標。</p><p><b>要退回時：</b>每張卡一個 commit，單獨還原。</p></details></section>
+
+<section id="risks"><h2>風險</h2><p class="lead">工人交回時回報的風險，以及怎麼處理。</p><p class="empty">還沒有工人交回。</p></section>
+</main>
+</div>
