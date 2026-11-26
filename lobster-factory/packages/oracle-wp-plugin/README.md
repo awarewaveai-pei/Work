@@ -1,6 +1,6 @@
 # aware-wave-oracle（WordPress 外掛）
 
-版本：0.5.1（與外掛檔頭 `Version:`、常數 `AWORACLE_VERSION` 同一個數字；`scripts/release-wp-bridge.sh --plugin oracle` 發佈前檢查三處一致）
+版本：0.5.2（與外掛檔頭 `Version:`、常數 `AWORACLE_VERSION` 同一個數字；`scripts/release-wp-bridge.sh --plugin oracle` 發佈前檢查三處一致）
 
 把 AwareWave 算命引擎的工具嵌進任何 WordPress 網站的頁面。oracle.aware-wave.com 只是第一個安裝的站；外掛內沒有任何網站專屬的網址或設定。設計正本：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md`（§1、§2-1～§2-10、§2-13；本外掛卡 P1′、P2′、P3′）。
 
@@ -52,6 +52,10 @@
 - REST `aworacle/v1`：`GET|POST /{charts|persons}`、`GET|PUT|DELETE /{kind}/{id}`。需登入＋`wp_rest` nonce（`X-WP-Nonce`），外掛自己驗，兩者缺一 401；別人的 id 一律 404（每條 SQL 都帶 `AND user_id = 本人`）；欄位錯 400 附 `data.fields`。
 - 短碼 `[aw_oracle_my_charts]`、`[aw_oracle_persons]`：頁面只輸出空容器，`assets/members.js` 從 REST 取資料（出生資料不進頁面快取）；未登入顯示「登入以儲存」。
 - 隱私：工具 → 匯出個人資料含兩組（已存的命盤、已存的對象）；清除個人資料刪兩表該人全部列；刪除會員（含多站網路移除）連動刪除。
+
+## 出生地（P6，0.5.2）
+
+訂閱表單與會員表單共用 `assets/birthplace.js`（`includes/Places/Birthplace.php`）：用引擎自己的城市資料搜尋（`GET /api/v1/places`，GeoNames CC BY 4.0），結果是按鈕；沒有緯度、經度、時區輸入。沒選時的預設＝瀏覽器時區的代表城市（同一個搜尋查），查不到就台北（座標同引擎 `components/PlaceField.tsx`），都顯示在畫面上、可改。已存的命盤打開時保留原座標，除非另選城市。資料層（`Members\Record`）仍要求完整座標。訂閱被拒時，按鈕旁寫明「尚未訂閱成功」與要改的欄位。
 
 ## 每日運勢信（P3′）
 
@@ -124,6 +128,7 @@ Resend 不在 FluentCRM 內建的退信回報名單內，所以外掛自己收 w
 | 引擎讀取 | `includes/Engine/EngineClient.php`（工具清單 `GET /api/v1/systems`，快取 1 天；每日批次 `POST /api/v1/batch`；不跟隨轉址、回應上限 1 MB／批次 8 MB） |
 | 人機驗證 | `includes/Daily/Turnstile.php` |
 | 翻譯站的標題與描述 | `includes/Seo/TranslatedTitles.php` |
+| 出生地城市搜尋 | `includes/Places/Birthplace.php`、`assets/birthplace.js` |
 | 翻譯 | `languages/`：改字串後 `wp i18n make-pot . languages/aware-wave-oracle.pot --exclude=tests,bin,vendor`、`wp i18n update-po languages/aware-wave-oracle.pot languages`，補完 `.po` 的 `msgstr` 後 `wp i18n make-mo languages`、`wp i18n make-php languages` |
 | 打包與發佈 | `bin/build-zip.sh`（依 `.distignore`）；發佈 repo 的 CI／Release 在 `.github/workflows/`（由 `scripts/release-wp-bridge.sh --plugin oracle` 鏡像過去） |
 

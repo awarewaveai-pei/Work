@@ -13,6 +13,7 @@ namespace AwareWave\Oracle\Daily;
 
 use AwareWave\Oracle\Embed\Renderer;
 use AwareWave\Oracle\Members\Rest as MembersRest;
+use AwareWave\Oracle\Places\Birthplace;
 
 final class Signup {
 
@@ -59,7 +60,7 @@ final class Signup {
 	private static function enqueue(): void {
 		// Turnstile set up: Cloudflare's script loads first (no version query: it must not be cached or altered).
 		$turnstile = Turnstile::siteKey();
-		$deps      = array();
+		$deps      = array( Birthplace::enqueue() );
 		if ( $turnstile !== '' ) {
 			wp_enqueue_script( self::TURNSTILE_SCRIPT, Turnstile::SCRIPT_URL, array(), null, true ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
 			$deps[] = self::TURNSTILE_SCRIPT;
@@ -93,13 +94,13 @@ final class Signup {
 				'gender'    => __( 'Gender', 'aware-wave-oracle' ),
 				'male'      => __( 'Male', 'aware-wave-oracle' ),
 				'female'    => __( 'Female', 'aware-wave-oracle' ),
-				'place'     => __( 'Birthplace name', 'aware-wave-oracle' ),
-				'lat'       => __( 'Latitude (north +)', 'aware-wave-oracle' ),
-				'lon'       => __( 'Longitude (east +)', 'aware-wave-oracle' ),
-				'zone'      => __( 'Birthplace time zone (e.g. Asia/Taipei)', 'aware-wave-oracle' ),
+				'place'     => __( 'Birthplace', 'aware-wave-oracle' ),
 				'trueSolar' => __( 'Use true solar time', 'aware-wave-oracle' ),
 				'submit'    => __( 'Subscribe', 'aware-wave-oracle' ),
-				'invalid'   => __( 'Check the highlighted fields.', 'aware-wave-oracle' ),
+				'notSubscribed' => __( 'You are not subscribed yet.', 'aware-wave-oracle' ),
+				'invalid'   => __( 'Please correct:', 'aware-wave-oracle' ),
+				/* translators: separator between field names in a list */
+				'listSeparator' => __( ', ', 'aware-wave-oracle' ),
 				'captcha'   => __( 'Complete the human check above the button first.', 'aware-wave-oracle' ),
 				'captchaBlocked' => __( 'The human check could not load. Allow challenges.cloudflare.com (an ad or script blocker may stop it) or try another browser.', 'aware-wave-oracle' ),
 				'error'     => __( 'Something went wrong. Reload the page and try again.', 'aware-wave-oracle' ),

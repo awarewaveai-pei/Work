@@ -151,10 +151,9 @@
         gender: '男',
         dayDivide: 'current',
         trueSolar: false,
-        isLeapMonth: false,
-        place: { label: '', zone: guessZone() }
+        isLeapMonth: false
       };
-      var p = b.place || {};
+      var place = window.awOraclePlace(b.place);
       var c = {
         name: el('input', { type: 'text', maxlength: '100' }),
         year: num(b.year, 1800, 2200, 6, L.year),
@@ -163,16 +162,10 @@
         hour: num(b.hour, 0, 23, 4, L.hour),
         minute: num(b.minute, 0, 59, 4, L.minute),
         leap: el('input', { type: 'checkbox' }),
-        placeLabel: el('input', { type: 'text', maxlength: '100' }),
-        lat: num(p.lat, -90, 90, 10, L.lat),
-        lon: num(p.lon, -180, 180, 10, L.lon),
-        zone: el('input', { type: 'text', maxlength: '64', placeholder: 'Asia/Taipei' }),
         trueSolar: el('input', { type: 'checkbox' })
       };
       c.name.value = item.name || '';
       c.leap.checked = !!b.isLeapMonth;
-      c.placeLabel.value = p.label || '';
-      c.zone.value = p.zone || '';
       c.trueSolar.checked = !!b.trueSolar;
       var cal = radios(group + '-cal', b.calendar, [['solar', L.solar], ['lunar', L.lunar]]);
       var gender = radios(group + '-gender', b.gender, [['男', L.male], ['女', L.female]]);
@@ -193,10 +186,7 @@
         el('p', { className: 'aworacle-field', 'data-field': 'birth.year birth.month birth.day' }, [el('span', { text: L.date + ' ' }), c.year, c.month, c.day]),
         el('p', { className: 'aworacle-field', 'data-field': 'birth.hour birth.minute' }, [el('span', { text: L.time + ' ' }), c.hour, c.minute]),
         field(L.gender, gender, 'birth.gender'),
-        field(L.place, c.placeLabel, 'birth.place.label'),
-        field(L.lat, c.lat, 'birth.place.lat'),
-        field(L.lon, c.lon, 'birth.place.lon'),
-        field(L.zone, c.zone, 'birth.place.zone'),
+        el('div', { className: 'aworacle-field', 'data-field': 'birth.place birth.place.label birth.place.lat birth.place.lon birth.place.zone' }, [el('span', { text: L.place + ' ' }), place.node]),
         field(L.trueSolar, c.trueSolar, 'birth.trueSolar'),
         field(L.dayDivide, divide, 'birth.dayDivide'),
         el('p', null, [
@@ -228,7 +218,7 @@
             minute: int(c.minute),
             isLeapMonth: c.leap.checked,
             gender: picked(gender),
-            place: { label: c.placeLabel.value, lat: int(c.lat), lon: int(c.lon), zone: c.zone.value.trim() },
+            place: place.value(),
             trueSolar: c.trueSolar.checked,
             dayDivide: picked(divide)
           }
@@ -268,14 +258,6 @@
         });
       });
       return f;
-    }
-
-    function guessZone() {
-      try {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-      } catch (e) {
-        return '';
-      }
     }
 
     function fail() {

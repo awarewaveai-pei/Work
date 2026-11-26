@@ -305,7 +305,7 @@ msgid "Content"
 msgstr "內容"
 
 #: includes/Members/Privacy.php:265
-#: includes/Members/Shortcodes.php:77
+#: includes/Members/Shortcodes.php:78
 msgid "Name"
 msgstr "名字"
 
@@ -313,13 +313,15 @@ msgstr "名字"
 msgid "Birth (local clock time)"
 msgstr "出生（當地鐘錶時間）"
 
-#: includes/Daily/Signup.php:93
+#: includes/Daily/Signup.php:94
 #: includes/Members/Privacy.php:282
-#: includes/Members/Shortcodes.php:89
+#: includes/Members/Shortcodes.php:90
 msgid "Gender"
 msgstr "性別"
 
+#: includes/Daily/Signup.php:97
 #: includes/Members/Privacy.php:286
+#: includes/Members/Shortcodes.php:93
 msgid "Birthplace"
 msgstr "出生地"
 
@@ -338,7 +340,7 @@ msgid "You can keep up to %d entries here. Delete one first."
 msgstr "這裡最多存 %d 筆，請先刪掉一筆。"
 
 #: includes/Members/Rest.php:175
-#: includes/Members/Shortcodes.php:44
+#: includes/Members/Shortcodes.php:45
 msgid "Saving is not available on this site yet."
 msgstr "本站目前還不能存檔。"
 
@@ -351,169 +353,149 @@ msgstr "有欄位沒填或格式不對。"
 msgid "Not found."
 msgstr "找不到。"
 
-#: includes/Members/Shortcodes.php:41
+#: includes/Members/Shortcodes.php:42
 msgid "Log in to save"
 msgstr "登入以儲存"
 
-#: includes/Members/Shortcodes.php:46
+#: includes/Members/Shortcodes.php:47
 msgid "Administrators: set the member-data key in Settings → AwareWave Oracle."
 msgstr "管理員：請到「設定 → AwareWave 命理」設定會員資料金鑰。"
 
-#: includes/Members/Shortcodes.php:64
+#: includes/Members/Shortcodes.php:65
 msgid "My charts"
 msgstr "我的命盤"
 
-#: includes/Members/Shortcodes.php:65
+#: includes/Members/Shortcodes.php:66
 msgid "People I saved"
 msgstr "我存的對象"
 
-#: includes/Members/Shortcodes.php:66
+#: includes/Members/Shortcodes.php:67
 msgid "Only you can see these. Nobody is told that you saved them."
 msgstr "只有你看得到。不會通知任何人你存了他們。"
 
-#: includes/Members/Shortcodes.php:67
+#: includes/Members/Shortcodes.php:68
 msgid "Nothing saved yet."
 msgstr "還沒有存任何資料。"
 
-#: includes/Members/Shortcodes.php:68
+#: includes/Members/Shortcodes.php:69
 msgid "Add"
 msgstr "新增"
 
-#: includes/Members/Shortcodes.php:69
+#: includes/Members/Shortcodes.php:70
 msgid "Edit"
 msgstr "編輯"
 
-#: includes/Members/Shortcodes.php:70
+#: includes/Members/Shortcodes.php:71
 msgid "Delete"
 msgstr "刪除"
 
-#: includes/Members/Shortcodes.php:71
+#: includes/Members/Shortcodes.php:72
 msgid "Delete this entry?"
 msgstr "要刪除這一筆嗎？"
 
-#: includes/Members/Shortcodes.php:72
+#: includes/Members/Shortcodes.php:73
 msgid "Save"
 msgstr "儲存"
 
-#: includes/Members/Shortcodes.php:73
+#: includes/Members/Shortcodes.php:74
 msgid "Cancel"
 msgstr "取消"
 
-#: includes/Members/Shortcodes.php:74
+#: includes/Members/Shortcodes.php:75
 msgid "This entry cannot be opened with the site’s current key. You can delete it."
 msgstr "這一筆無法用本站目前的金鑰開啟，可以刪除。"
 
 #: includes/Daily/Rest.php:102
-#: includes/Daily/Signup.php:105
+#: includes/Daily/Signup.php:106
 #: includes/Members/Rest.php:129
-#: includes/Members/Shortcodes.php:75
+#: includes/Members/Shortcodes.php:76
 msgid "Something went wrong. Reload the page and try again."
 msgstr "出了點問題，請重新整理頁面再試一次。"
 
-#: includes/Daily/Signup.php:102
-#: includes/Members/Shortcodes.php:76
+#: includes/Members/Shortcodes.php:77
 msgid "Check the highlighted fields."
 msgstr "請檢查標出的欄位。"
 
-#: includes/Daily/Signup.php:82
-#: includes/Members/Shortcodes.php:78
+#: includes/Daily/Signup.php:83
+#: includes/Members/Shortcodes.php:79
 msgid "Calendar"
 msgstr "曆法"
 
-#: includes/Daily/Signup.php:83
-#: includes/Members/Shortcodes.php:79
+#: includes/Daily/Signup.php:84
+#: includes/Members/Shortcodes.php:80
 msgid "Solar (Gregorian)"
 msgstr "國曆"
 
 #: includes/Daily/Confirm.php:87
-#: includes/Daily/Signup.php:84
-#: includes/Members/Shortcodes.php:80
+#: includes/Daily/Signup.php:85
+#: includes/Members/Shortcodes.php:81
 msgid "Lunar"
 msgstr "農曆"
 
-#: includes/Daily/Signup.php:85
-#: includes/Members/Shortcodes.php:81
+#: includes/Daily/Signup.php:86
+#: includes/Members/Shortcodes.php:82
 msgid "Leap month"
 msgstr "閏月"
 
-#: includes/Daily/Signup.php:86
-#: includes/Members/Shortcodes.php:82
+#: includes/Daily/Signup.php:87
+#: includes/Members/Shortcodes.php:83
 msgid "Birth date (year, month, day)"
 msgstr "出生日期（年、月、日）"
 
-#: includes/Daily/Signup.php:87
-#: includes/Members/Shortcodes.php:83
+#: includes/Daily/Signup.php:88
+#: includes/Members/Shortcodes.php:84
 msgid "Birth time, local clock (hour, minute)"
 msgstr "出生時間，當地鐘錶時間（時、分）"
 
-#: includes/Daily/Signup.php:88
-#: includes/Members/Shortcodes.php:84
+#: includes/Daily/Signup.php:89
+#: includes/Members/Shortcodes.php:85
 msgid "Year"
 msgstr "年"
 
-#: includes/Daily/Signup.php:89
-#: includes/Members/Shortcodes.php:85
+#: includes/Daily/Signup.php:90
+#: includes/Members/Shortcodes.php:86
 msgid "Month"
 msgstr "月"
 
-#: includes/Daily/Signup.php:90
-#: includes/Members/Shortcodes.php:86
+#: includes/Daily/Signup.php:91
+#: includes/Members/Shortcodes.php:87
 msgid "Day"
 msgstr "日"
 
-#: includes/Daily/Signup.php:91
-#: includes/Members/Shortcodes.php:87
+#: includes/Daily/Signup.php:92
+#: includes/Members/Shortcodes.php:88
 msgid "Hour"
 msgstr "時"
 
-#: includes/Daily/Signup.php:92
-#: includes/Members/Shortcodes.php:88
+#: includes/Daily/Signup.php:93
+#: includes/Members/Shortcodes.php:89
 msgid "Minute"
 msgstr "分"
 
-#: includes/Daily/Signup.php:94
-#: includes/Members/Shortcodes.php:90
+#: includes/Daily/Signup.php:95
+#: includes/Members/Shortcodes.php:91
 msgid "Male"
 msgstr "男"
 
-#: includes/Daily/Signup.php:95
-#: includes/Members/Shortcodes.php:91
+#: includes/Daily/Signup.php:96
+#: includes/Members/Shortcodes.php:92
 msgid "Female"
 msgstr "女"
 
-#: includes/Daily/Signup.php:96
-#: includes/Members/Shortcodes.php:92
-msgid "Birthplace name"
-msgstr "出生地名稱"
-
-#: includes/Daily/Signup.php:97
-#: includes/Members/Shortcodes.php:93
-msgid "Latitude (north +)"
-msgstr "緯度（北為正）"
-
 #: includes/Daily/Signup.php:98
 #: includes/Members/Shortcodes.php:94
-msgid "Longitude (east +)"
-msgstr "經度（東為正）"
-
-#: includes/Members/Shortcodes.php:95
-msgid "Time zone (e.g. Asia/Taipei)"
-msgstr "時區（例如 Asia/Taipei）"
-
-#: includes/Daily/Signup.php:100
-#: includes/Members/Shortcodes.php:96
 msgid "Use true solar time"
 msgstr "使用真太陽時"
 
-#: includes/Members/Shortcodes.php:97
+#: includes/Members/Shortcodes.php:95
 msgid "Births 23:00–24:00 count as"
 msgstr "23:00–24:00 出生算作"
 
-#: includes/Members/Shortcodes.php:98
+#: includes/Members/Shortcodes.php:96
 msgid "the same day"
 msgstr "當天"
 
-#: includes/Members/Shortcodes.php:99
+#: includes/Members/Shortcodes.php:97
 msgid "the next day"
 msgstr "隔天"
 
@@ -594,7 +576,7 @@ msgstr "這個確認連結已過期或已用過。"
 
 #: includes/Daily/Confirm.php:70
 #: includes/Daily/Rest.php:62
-#: includes/Daily/Signup.php:53
+#: includes/Daily/Signup.php:54
 msgid "Subscribing is not available on this site yet."
 msgstr "本站目前還不能訂閱。"
 
@@ -660,32 +642,28 @@ msgstr "忌："
 msgid "You receive this because you subscribed to the daily fortune. Use the unsubscribe link below to stop it."
 msgstr "您收到這封信，是因為您訂閱了每日運勢。要停止，請按下方的取消訂閱連結。"
 
-#: includes/Daily/Signup.php:36
+#: includes/Daily/Signup.php:37
 #: includes/Embed/Block.php:65
 msgid "AwareWave daily fortune signup"
 msgstr "AwareWave 每日運勢訂閱"
 
-#: includes/Daily/Signup.php:78
+#: includes/Daily/Signup.php:79
 msgid "Daily fortune by e-mail"
 msgstr "每日運勢 email"
 
-#: includes/Daily/Signup.php:79
+#: includes/Daily/Signup.php:80
 msgid "One letter every morning after 07:00 in your time zone, calculated from your birth data. You can unsubscribe from any letter."
 msgstr "每天早上 07:00（您所在時區）之後寄一封，依您的出生資料計算。每封信都可以取消訂閱。"
 
-#: includes/Daily/Signup.php:80
+#: includes/Daily/Signup.php:81
 msgid "E-mail"
 msgstr "電子郵件"
 
-#: includes/Daily/Signup.php:81
+#: includes/Daily/Signup.php:82
 msgid "Your time zone (type to search)"
 msgstr "您所在的時區（可輸入搜尋）"
 
 #: includes/Daily/Signup.php:99
-msgid "Birthplace time zone (e.g. Asia/Taipei)"
-msgstr "出生地時區（例：Asia/Taipei）"
-
-#: includes/Daily/Signup.php:101
 msgid "Subscribe"
 msgstr "訂閱"
 
@@ -810,10 +788,43 @@ msgstr "這不是 Turnstile 密鑰（開頭是一個數字加 x，例如 0x4AAAA
 msgid "The human check did not pass. Try it again."
 msgstr "人機驗證沒有通過，請再試一次。"
 
-#: includes/Daily/Signup.php:103
+#: includes/Daily/Signup.php:104
 msgid "Complete the human check above the button first."
 msgstr "請先完成按鈕上方的人機驗證。"
 
-#: includes/Daily/Signup.php:104
+#: includes/Daily/Signup.php:105
 msgid "The human check could not load. Allow challenges.cloudflare.com (an ad or script blocker may stop it) or try another browser."
 msgstr "人機驗證載入失敗。請允許 challenges.cloudflare.com（廣告或指令碼封鎖工具可能擋住它），或改用其他瀏覽器。"
+
+#: includes/Daily/Signup.php:100
+msgid "You are not subscribed yet."
+msgstr "尚未訂閱成功。"
+
+#: includes/Daily/Signup.php:101
+msgid "Please correct:"
+msgstr "請修改："
+
+#. translators: separator between field names in a list
+#: includes/Daily/Signup.php:103
+msgid ", "
+msgstr "、"
+
+#: includes/Places/Birthplace.php:56
+msgid "Born somewhere else? Type a city name"
+msgstr "出生在別處？請輸入城市名稱"
+
+#: includes/Places/Birthplace.php:57
+msgid "Searching…"
+msgstr "搜尋中…"
+
+#: includes/Places/Birthplace.php:58
+msgid "No city found. Try a larger city nearby."
+msgstr "找不到城市，請改用附近較大的城市。"
+
+#: includes/Places/Birthplace.php:59
+msgid "City search is not working right now. Try again later."
+msgstr "城市搜尋暫時無法使用，請稍後再試。"
+
+#: includes/Places/Birthplace.php:60
+msgid "City data: GeoNames (CC BY 4.0)"
+msgstr "城市資料：GeoNames（CC BY 4.0）"

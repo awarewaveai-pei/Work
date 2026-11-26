@@ -2,14 +2,14 @@
 # This file is distributed under the Proprietary.
 msgid ""
 msgstr ""
-"Project-Id-Version: AwareWave Oracle 0.5.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/app\n"
+"Project-Id-Version: AwareWave Oracle 0.5.2\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/oracle-wp-plugin\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-23T07:09:39+00:00\n"
+"POT-Creation-Date: 2026-11-26T06:42:30+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: aware-wave-oracle\n"
@@ -385,7 +385,7 @@ msgstr ""
 
 #: includes/Daily/Confirm.php:70
 #: includes/Daily/Rest.php:62
-#: includes/Daily/Signup.php:53
+#: includes/Daily/Signup.php:54
 msgid "Subscribing is not available on this site yet."
 msgstr ""
 
@@ -395,8 +395,8 @@ msgid "This confirmation link has expired or was already used."
 msgstr ""
 
 #: includes/Daily/Confirm.php:87
-#: includes/Daily/Signup.php:84
-#: includes/Members/Shortcodes.php:80
+#: includes/Daily/Signup.php:85
+#: includes/Members/Shortcodes.php:81
 msgid "Lunar"
 msgstr ""
 
@@ -429,9 +429,9 @@ msgid "The human check did not pass. Try it again."
 msgstr ""
 
 #: includes/Daily/Rest.php:102
-#: includes/Daily/Signup.php:105
+#: includes/Daily/Signup.php:106
 #: includes/Members/Rest.php:129
-#: includes/Members/Shortcodes.php:75
+#: includes/Members/Shortcodes.php:76
 msgid "Something went wrong. Reload the page and try again."
 msgstr ""
 
@@ -499,131 +499,126 @@ msgctxt "list separator in the daily letter"
 msgid ", "
 msgstr ""
 
-#: includes/Daily/Signup.php:36
+#: includes/Daily/Signup.php:37
 #: includes/Embed/Block.php:65
 msgid "AwareWave daily fortune signup"
 msgstr ""
 
-#: includes/Daily/Signup.php:78
+#: includes/Daily/Signup.php:79
 msgid "Daily fortune by e-mail"
 msgstr ""
 
-#: includes/Daily/Signup.php:79
+#: includes/Daily/Signup.php:80
 msgid "One letter every morning after 07:00 in your time zone, calculated from your birth data. You can unsubscribe from any letter."
 msgstr ""
 
-#: includes/Daily/Signup.php:80
+#: includes/Daily/Signup.php:81
 msgid "E-mail"
 msgstr ""
 
-#: includes/Daily/Signup.php:81
-msgid "Your time zone (type to search)"
-msgstr ""
-
 #: includes/Daily/Signup.php:82
-#: includes/Members/Shortcodes.php:78
-msgid "Calendar"
+msgid "Your time zone (type to search)"
 msgstr ""
 
 #: includes/Daily/Signup.php:83
 #: includes/Members/Shortcodes.php:79
-msgid "Solar (Gregorian)"
+msgid "Calendar"
 msgstr ""
 
-#: includes/Daily/Signup.php:85
-#: includes/Members/Shortcodes.php:81
-msgid "Leap month"
+#: includes/Daily/Signup.php:84
+#: includes/Members/Shortcodes.php:80
+msgid "Solar (Gregorian)"
 msgstr ""
 
 #: includes/Daily/Signup.php:86
 #: includes/Members/Shortcodes.php:82
-msgid "Birth date (year, month, day)"
+msgid "Leap month"
 msgstr ""
 
 #: includes/Daily/Signup.php:87
 #: includes/Members/Shortcodes.php:83
-msgid "Birth time, local clock (hour, minute)"
+msgid "Birth date (year, month, day)"
 msgstr ""
 
 #: includes/Daily/Signup.php:88
 #: includes/Members/Shortcodes.php:84
-msgid "Year"
+msgid "Birth time, local clock (hour, minute)"
 msgstr ""
 
 #: includes/Daily/Signup.php:89
 #: includes/Members/Shortcodes.php:85
-msgid "Month"
+msgid "Year"
 msgstr ""
 
 #: includes/Daily/Signup.php:90
 #: includes/Members/Shortcodes.php:86
-msgid "Day"
+msgid "Month"
 msgstr ""
 
 #: includes/Daily/Signup.php:91
 #: includes/Members/Shortcodes.php:87
-msgid "Hour"
+msgid "Day"
 msgstr ""
 
 #: includes/Daily/Signup.php:92
 #: includes/Members/Shortcodes.php:88
-msgid "Minute"
+msgid "Hour"
 msgstr ""
 
 #: includes/Daily/Signup.php:93
-#: includes/Members/Privacy.php:282
 #: includes/Members/Shortcodes.php:89
-msgid "Gender"
+msgid "Minute"
 msgstr ""
 
 #: includes/Daily/Signup.php:94
+#: includes/Members/Privacy.php:282
 #: includes/Members/Shortcodes.php:90
-msgid "Male"
+msgid "Gender"
 msgstr ""
 
 #: includes/Daily/Signup.php:95
 #: includes/Members/Shortcodes.php:91
-msgid "Female"
+msgid "Male"
 msgstr ""
 
 #: includes/Daily/Signup.php:96
 #: includes/Members/Shortcodes.php:92
-msgid "Birthplace name"
+msgid "Female"
 msgstr ""
 
 #: includes/Daily/Signup.php:97
+#: includes/Members/Privacy.php:286
 #: includes/Members/Shortcodes.php:93
-msgid "Latitude (north +)"
+msgid "Birthplace"
 msgstr ""
 
 #: includes/Daily/Signup.php:98
 #: includes/Members/Shortcodes.php:94
-msgid "Longitude (east +)"
-msgstr ""
-
-#: includes/Daily/Signup.php:99
-msgid "Birthplace time zone (e.g. Asia/Taipei)"
-msgstr ""
-
-#: includes/Daily/Signup.php:100
-#: includes/Members/Shortcodes.php:96
 msgid "Use true solar time"
 msgstr ""
 
-#: includes/Daily/Signup.php:101
+#: includes/Daily/Signup.php:99
 msgid "Subscribe"
 msgstr ""
 
-#: includes/Daily/Signup.php:102
-#: includes/Members/Shortcodes.php:76
-msgid "Check the highlighted fields."
+#: includes/Daily/Signup.php:100
+msgid "You are not subscribed yet."
 msgstr ""
 
+#: includes/Daily/Signup.php:101
+msgid "Please correct:"
+msgstr ""
+
+#. translators: separator between field names in a list
 #: includes/Daily/Signup.php:103
-msgid "Complete the human check above the button first."
+msgid ", "
 msgstr ""
 
 #: includes/Daily/Signup.php:104
+msgid "Complete the human check above the button first."
+msgstr ""
+
+#: includes/Daily/Signup.php:105
 msgid "The human check could not load. Allow challenges.cloudflare.com (an ad or script blocker may stop it) or try another browser."
 msgstr ""
 
@@ -703,16 +698,12 @@ msgid "Encrypted; this site’s current key cannot open it (it was saved under a
 msgstr ""
 
 #: includes/Members/Privacy.php:265
-#: includes/Members/Shortcodes.php:77
+#: includes/Members/Shortcodes.php:78
 msgid "Name"
 msgstr ""
 
 #: includes/Members/Privacy.php:269
 msgid "Birth (local clock time)"
-msgstr ""
-
-#: includes/Members/Privacy.php:286
-msgid "Birthplace"
 msgstr ""
 
 #: includes/Members/Rest.php:73
@@ -734,7 +725,7 @@ msgid "You can keep up to %d entries here. Delete one first."
 msgstr ""
 
 #: includes/Members/Rest.php:175
-#: includes/Members/Shortcodes.php:44
+#: includes/Members/Shortcodes.php:45
 msgid "Saving is not available on this site yet."
 msgstr ""
 
@@ -742,71 +733,71 @@ msgstr ""
 msgid "Not found."
 msgstr ""
 
-#: includes/Members/Shortcodes.php:41
+#: includes/Members/Shortcodes.php:42
 msgid "Log in to save"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:46
+#: includes/Members/Shortcodes.php:47
 msgid "Administrators: set the member-data key in Settings → AwareWave Oracle."
 msgstr ""
 
-#: includes/Members/Shortcodes.php:64
+#: includes/Members/Shortcodes.php:65
 msgid "My charts"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:65
+#: includes/Members/Shortcodes.php:66
 msgid "People I saved"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:66
+#: includes/Members/Shortcodes.php:67
 msgid "Only you can see these. Nobody is told that you saved them."
 msgstr ""
 
-#: includes/Members/Shortcodes.php:67
+#: includes/Members/Shortcodes.php:68
 msgid "Nothing saved yet."
 msgstr ""
 
-#: includes/Members/Shortcodes.php:68
+#: includes/Members/Shortcodes.php:69
 msgid "Add"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:69
+#: includes/Members/Shortcodes.php:70
 msgid "Edit"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:70
+#: includes/Members/Shortcodes.php:71
 msgid "Delete"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:71
+#: includes/Members/Shortcodes.php:72
 msgid "Delete this entry?"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:72
+#: includes/Members/Shortcodes.php:73
 msgid "Save"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:73
+#: includes/Members/Shortcodes.php:74
 msgid "Cancel"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:74
+#: includes/Members/Shortcodes.php:75
 msgid "This entry cannot be opened with the site’s current key. You can delete it."
 msgstr ""
 
-#: includes/Members/Shortcodes.php:95
-msgid "Time zone (e.g. Asia/Taipei)"
+#: includes/Members/Shortcodes.php:77
+msgid "Check the highlighted fields."
 msgstr ""
 
-#: includes/Members/Shortcodes.php:97
+#: includes/Members/Shortcodes.php:95
 msgid "Births 23:00–24:00 count as"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:98
+#: includes/Members/Shortcodes.php:96
 msgid "the same day"
 msgstr ""
 
-#: includes/Members/Shortcodes.php:99
+#: includes/Members/Shortcodes.php:97
 msgid "the next day"
 msgstr ""
 
@@ -817,4 +808,24 @@ msgstr ""
 #: includes/Members/Ticket.php:49
 #: includes/Members/Ticket.php:54
 msgid "AI readings for members are not available on this site yet."
+msgstr ""
+
+#: includes/Places/Birthplace.php:56
+msgid "Born somewhere else? Type a city name"
+msgstr ""
+
+#: includes/Places/Birthplace.php:57
+msgid "Searching…"
+msgstr ""
+
+#: includes/Places/Birthplace.php:58
+msgid "No city found. Try a larger city nearby."
+msgstr ""
+
+#: includes/Places/Birthplace.php:59
+msgid "City search is not working right now. Try again later."
+msgstr ""
+
+#: includes/Places/Birthplace.php:60
+msgid "City data: GeoNames (CC BY 4.0)"
 msgstr ""

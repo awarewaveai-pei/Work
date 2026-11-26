@@ -12,6 +12,7 @@
 namespace AwareWave\Oracle\Members;
 
 use AwareWave\Oracle\Admin\SettingsPage;
+use AwareWave\Oracle\Places\Birthplace;
 use AwareWave\Oracle\Settings\Options;
 
 final class Shortcodes {
@@ -52,7 +53,7 @@ final class Shortcodes {
 	}
 
 	private static function enqueue(): void {
-		wp_enqueue_script( self::SCRIPT, AWORACLE_URL . 'assets/members.js', array(), AWORACLE_VERSION, true );
+		wp_enqueue_script( self::SCRIPT, AWORACLE_URL . 'assets/members.js', array( Birthplace::enqueue() ), AWORACLE_VERSION, true );
 		if ( self::$configured ) {
 			return;
 		}
@@ -89,10 +90,7 @@ final class Shortcodes {
 				'gender'      => __( 'Gender', 'aware-wave-oracle' ),
 				'male'        => __( 'Male', 'aware-wave-oracle' ),
 				'female'      => __( 'Female', 'aware-wave-oracle' ),
-				'place'       => __( 'Birthplace name', 'aware-wave-oracle' ),
-				'lat'         => __( 'Latitude (north +)', 'aware-wave-oracle' ),
-				'lon'         => __( 'Longitude (east +)', 'aware-wave-oracle' ),
-				'zone'        => __( 'Time zone (e.g. Asia/Taipei)', 'aware-wave-oracle' ),
+				'place'       => __( 'Birthplace', 'aware-wave-oracle' ),
 				'trueSolar'   => __( 'Use true solar time', 'aware-wave-oracle' ),
 				'dayDivide'   => __( 'Births 23:00–24:00 count as', 'aware-wave-oracle' ),
 				'sameDay'     => __( 'the same day', 'aware-wave-oracle' ),

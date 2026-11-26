@@ -75,24 +75,19 @@
       hour: num(0, 23, L.hour),
       minute: num(0, 59, L.minute),
       leap: el('input', { type: 'checkbox' }),
-      placeLabel: el('input', { type: 'text', maxlength: '100' }),
-      lat: num(-90, 90, L.lat),
-      lon: num(-180, 180, L.lon),
-      zone: el('input', { type: 'text', list: id + '-zones', maxlength: '64' }),
       trueSolar: el('input', { type: 'checkbox' }),
       website: el('input', { type: 'text', tabindex: '-1', autocomplete: 'off', 'aria-hidden': 'true' })
     };
     c.tz.value = zone();
-    c.zone.value = zone();
+    var place = window.awOraclePlace();
     var cal = radios(id + '-cal', 'solar', [['solar', L.solar], ['lunar', L.lunar]]);
     var gender = radios(id + '-gender', '男', [['男', L.male], ['女', L.female]]);
-    var msg = el('p', { className: 'aworacle-daily-message', role: 'status' });
+    var msg = el('p', { className: 'aworacle-daily-message', role: 'alert' });
     var trap = el('p', { style: 'position:absolute;left:-9999px' }, [c.website]);
 
     var form = el('form', { className: 'aworacle-daily-form', novalidate: 'novalidate' }, [
       el('h3', { text: L.title }),
       el('p', { text: L.intro }),
-      msg,
       row(L.email, 'email', [c.email]),
       row(L.tz, 'tz', [c.tz]),
       row(L.calendar, 'birth.calendar', [cal]),
@@ -100,13 +95,11 @@
       row(L.date, 'birth.year birth.month birth.day birth', [c.year, c.month, c.day]),
       row(L.time, 'birth.hour birth.minute', [c.hour, c.minute]),
       row(L.gender, 'birth.gender', [gender]),
-      row(L.place, 'birth.place.label birth.place', [c.placeLabel]),
-      row(L.lat, 'birth.place.lat', [c.lat]),
-      row(L.lon, 'birth.place.lon', [c.lon]),
-      row(L.zone, 'birth.place.zone', [c.zone]),
+      el('div', { className: 'aworacle-field', 'data-field': 'birth.place birth.place.label birth.place.lat birth.place.lon birth.place.zone' }, [el('span', { text: L.place + ' ' }), place.node]),
       row(L.trueSolar, 'birth.trueSolar', [c.trueSolar]),
       trap,
       list,
+      msg, // next to the button: a refusal must be seen where it was pressed
       el('p', null, [el('button', { type: 'submit', className: 'button button-primary', text: L.submit })])
     ]);
 
@@ -124,12 +117,16 @@
     function int(input) {
       return input.value === '' ? null : Number(input.value);
     }
+    function refused(why) {
+      msg.textContent = L.notSubscribed + ' ' + why;
+      if (msg.scrollIntoView) msg.scrollIntoView({ block: 'nearest' });
+    }
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
       var token = widget !== null ? window.turnstile.getResponse(widget) || '' : '';
       if (cfg.turnstile && !token) {
-        msg.textContent = window.turnstile ? L.captcha : L.captchaBlocked;
+        refused(window.turnstile ? L.captcha : L.captchaBlocked);
         return;
       }
       var body = {
@@ -147,11 +144,12 @@
           minute: int(c.minute),
           isLeapMonth: c.leap.checked,
           gender: picked(gender),
-          place: { label: c.placeLabel.value, lat: int(c.lat), lon: int(c.lon), zone: c.zone.value.trim() },
+          place: place.value(),
           trueSolar: c.trueSolar.checked,
           dayDivide: 'current'
         }
       };
+      msg.textContent = '';
       var headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
       if (cfg.nonce) headers['X-WP-Nonce'] = cfg.nonce;
       fetch(cfg.url, { method: 'POST', credentials: 'same-origin', headers: headers, body: JSON.stringify(body) })
@@ -164,6 +162,7 @@
             .then(function (json) {
               var bad = (json && json.data && json.data.fields) || [];
               var marks = form.querySelectorAll('[data-field]');
+              var names = [];
               for (var i = 0; i < marks.length; i++) {
                 var hit = marks[i]
                   .getAttribute('data-field')
@@ -172,6 +171,7 @@
                     return bad.indexOf(k) !== -1;
                   });
                 marks[i].style.outline = hit ? '2px solid currentColor' : '';
+                if (hit) names.push(marks[i].querySelector('span').textContent.trim());
               }
               if (res.ok) {
                 box.textContent = '';
@@ -180,11 +180,12 @@
               }
               // A token is good for one check: a refused post needs a fresh one.
               if (widget !== null) window.turnstile.reset(widget);
-              msg.textContent = res.status === 400 ? L.invalid : (json && json.message) || L.error;
+              if (res.status === 400) refused(names.length ? L.invalid + ' ' + names.join(L.listSeparator) : L.error);
+              else refused((json && json.message) || L.error);
             });
         })
         .catch(function () {
-          msg.textContent = L.error;
+          refused(L.error);
         });
     });
     box.appendChild(form);
