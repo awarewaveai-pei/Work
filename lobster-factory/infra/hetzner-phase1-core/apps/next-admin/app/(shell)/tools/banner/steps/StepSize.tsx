@@ -22,18 +22,16 @@ export default function StepSize({ slot, s, setS }: StepCtx & { slot: StepSlot }
                 return (
                   <div key={k} style={{ display: "flex", gap: 4, alignItems: "stretch" }}>
                   <button data-testid={`banner-size-${k}`} aria-pressed={isPicked}
-                    className={isPicked ? "btn btn-primary" : "btn btn-ghost"}
-                    style={{ fontSize: 11, padding: "5px 8px", display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", height: "auto", gap: 2, flex: 1,
-                      ...(isEditing && multi ? { outline: "2px solid var(--text-primary)", outlineOffset: 2 } : {}) }}
+                    className="choice-card" style={{ flex: 1, ...(isEditing && multi ? { outline: "2px solid var(--text-primary)", outlineOffset: 2 } : {}) }}
                     title={isPicked ? (picked.length > 1 ? "再按一下：不輸出這個尺寸" : "至少要留一個尺寸") : "按一下：加入要輸出的尺寸"}
                     onClick={() => setS((prev) => ({ ...toggleSizePick(prev, k), saved: false, error: null }))}>
-                    <span>
-                      <b style={{ fontSize: 12 }}>{ps.ratio}</b>{"star" in ps && ps.star ? " ★" : ""}
-                      <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 10 }}>{ps.w}×{ps.h}</span>
-                      <span style={{ opacity: 0.75, marginLeft: 6 }}>{ps.use}</span>
+                    <span className="choice-card-title">
+                      {ps.ratio}{"star" in ps && ps.star ? " ★" : ""}
+                      <span style={{ fontWeight: 400, marginLeft: 6 }}>{ps.use}</span>
+                      <span className="choice-card-note" style={{ display: "inline", marginLeft: 6 }}>{ps.w}×{ps.h}</span>
                     </span>
-                    <span style={{ opacity: 0.6, fontSize: 10, whiteSpace: "normal" }}>{ps.where}</span>
-                    {isEditing && multi && <span style={{ fontSize: 10, fontWeight: 700 }}>✎ 編輯中（預覽顯示這張）</span>}
+                    <span className="choice-card-note">{ps.where}</span>
+                    {isEditing && multi && <span className="choice-card-note" style={{ fontWeight: 700 }}>✎ 編輯中（預覽顯示這張）</span>}
                   </button>
                   {isPicked && !isEditing && (
                     <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 6px", height: "auto" }} data-testid={`banner-size-edit-${k}`}
@@ -45,7 +43,7 @@ export default function StepSize({ slot, s, setS }: StepCtx & { slot: StepSlot }
           </div>
         </div>
       ))}
-      <p className="form-hint" style={{ margin: "4px 0 0" }}>可以選好幾個尺寸一起做：按一下加入、再按一下取消。位置照比例換算、字依短邊縮放；按「改這張」單獨微調那個尺寸，縮圖與全部下載在預覽下方。</p>
+      <p className="form-hint" style={{ margin: "4px 0 0" }}>可以選好幾個尺寸一起做：按一下加入、再按一下取消。位置照比例換算、字依短邊縮放；按「改這張」或點預覽下方的縮圖單獨微調那個尺寸；全部下載在「匯出」。</p>
     </StepCard>
   );
 }

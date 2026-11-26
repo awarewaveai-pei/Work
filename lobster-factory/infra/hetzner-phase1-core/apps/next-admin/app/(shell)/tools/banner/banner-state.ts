@@ -16,7 +16,9 @@ import { resolveStylePrompt } from "../tarot/cards";
 // ---------------------------------------------------------------------------
 
 // One button per ratio; `where` lists every platform that takes it (checked 2026-11 against Sprout Social / Buffer /
-// Metricool guides). `aspect` = nearest ratio the AI background models accept (lib/studio/model-options).
+// Metricool guides). 2:1: X documents its large-image link card as 2:1
+// (https://dev.twitter.com/cards/types/summary-large-image, min 300x157); no other platform found documenting 2:1.
+// `aspect` = nearest ratio the AI background models accept (lib/studio/model-options).
 export const PRESETS = {
   "r9x16":  { ratio: "9:16",   w: 1080, h: 1920, aspect: "9:16", shape: "tall",   use: "限時動態、Reels、直式圖片貼文",   where: "IG Story／Reels、FB Story、TikTok 圖文、YouTube Shorts" },
   "r2x3":   { ratio: "2:3",    w: 1000, h: 1500, aspect: "2:3",  shape: "tall",   use: "Pin 圖",                          where: "Pinterest" },
@@ -27,6 +29,7 @@ export const PRESETS = {
   "r3x2":   { ratio: "3:2",    w: 1200, h: 800,  aspect: "3:2",  shape: "wide",   use: "部落格內文圖",                    where: "WP 文章內文" },
   "r16x9":  { ratio: "16:9",   w: 1920, h: 1080, aspect: "16:9", shape: "wide",   use: "橫式貼文、影片縮圖、網站全版 Hero", where: "IG、FB、Threads、X、LinkedIn、Bluesky、YouTube 縮圖、WP 網站" },
   "r191x1": { ratio: "1.91:1", w: 1200, h: 630,  aspect: "16:9", shape: "wide",   use: "連結分享預覽（OG）",              where: "FB／LinkedIn／X／LINE 連結預覽（Rank Math 另設的分享圖）" },
+  "r2x1":   { ratio: "2:1",    w: 1200, h: 600,  aspect: "16:9", shape: "wide",   use: "X 大圖連結卡",                    where: "X 連結預覽（summary_large_image）" },
   "r3x1":   { ratio: "3:1",    w: 1920, h: 640,  aspect: "16:9", shape: "wide",   use: "網站橫幅",                        where: "WP 網站桌機 Hero" },
 } as const satisfies Record<string, { ratio: string; w: number; h: number; aspect: AspectRatio; shape: "tall" | "square" | "wide"; use: string; where: string; star?: boolean }>;
 export type PresetKey = keyof typeof PRESETS;
@@ -189,7 +192,7 @@ export interface State {
 
 /** The blank design (exported for the size-selection tests). */
 export const INIT: State = {
-  preset:       "r191x1",
+  preset:       "r4x5",
   copyBrief:    "",
   copyTone:     "促銷",
   copyGenerating: false,
@@ -500,6 +503,13 @@ export function isUntouched(st: State): boolean {
   return designSig({ ...st, ...notPicture }) === designSig(INIT);
 }
 
+/** 清除設計: the blank design, keeping the picked sizes (main size + the others); size tweaks, words, topic, images go. The
+ *  client is not in State, so it stays too. Undo brings the design back (it is one history step). */
+export function clearDesign(st: State): State {
+  const m = mainOf(st);
+  return { ...INIT, preset: m.preset, multiSizes: m.multiSizes };
+}
+
 export function designSig(st: State): string {
   // typed → tsc catches any future transient field that's misspelled or forgotten here
   const skip = new Set<keyof State>(["saving", "saved", "error", "generating", "designing", "productRemoving", "copyGenerating", "copyStream", "copyVariants"]);
@@ -632,14 +642,12 @@ export function aiBgPromptOf(s: State): string {
 }
 
 // Calls a design door does not serve: AI copy and one-click design bill video.script through /api/tools/script-forge
-// (video is only optional to design), and brand colours come from the staff client list. The staff page passes them in
-// (BannerStudioStaff.tsx); without them the AI copy card and the brand picker do not render (step-8 card §6 D-V2/D-V3).
+// (video is only optional to design), and the client list is staff-only. The staff page passes them in
+// (BannerStudioStaff.tsx); without them 開始 and AI 文案與設計 do not render (step-8 card §6 D-V2/D-V3).
 export interface BannerStaffApi {
   /** The text model's streamed answer to `prompt` (the script-forge response). */
   /** One task of the server's banner module (lib/script-forge/modules.ts): the prompt is built there, not here. */
   scriptForge(task: "design" | "copy", fields: Record<string, unknown>, model: BannerAiModel): Promise<Response>;
-  /** The brand picker (a client search over GET /api/ops/clients): onPick gets the picked client's brand colours. */
-  BrandPicker: ComponentType<{ onPick(colors: string[]): void }>;
   /** Card R3: which client's 我的設計 存到圖庫 saves into (staff work for a customer); null = 自用 (the default org). */
   SaveOrgPicker: ComponentType<{ selected: string | null; onPick(orgId: string | null, name?: string): void }>;
 }

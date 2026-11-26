@@ -248,7 +248,7 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
       {(s.bgMode === "upload" || s.bgMode === "ai") && s.bgImage && (
         <div className="form-row" style={{ marginTop: 10, flexWrap: "wrap", gap: 6 }}>
           <label className="form-label">圖片位置</label>
-          <span className="form-hint" style={{ width: "100%" }}>在預覽圖上按住拖曳移動、滾輪放大縮小；縮小露出的地方是背景色。</span>
+          <span className="form-hint" style={{ width: "100%" }}>在預覽圖上按住拖曳移動；按住 Ctrl（Mac 按 ⌘）再滾輪，或觸控板兩指開合，放大縮小。一般滾輪是捲動頁面。縮小露出的地方是背景色。</span>
           <span style={{ fontSize: 12 }}>大小</span>
           <input type="range" min={0.5} max={3} step={0.05} value={s.bgImgScale} data-testid="banner-bg-scale"
             onChange={(e) => set("bgImgScale", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />

@@ -1,28 +1,20 @@
 "use client";
-import { useCallback, useRef, useState, type MutableRefObject } from "react";
+import { useRef, useState, type MutableRefObject } from "react";
 import { urlToBlob } from "@/lib/studio/design-upload";
 import BrandKitPanel from "../kit/BrandKitPanel";
 import type { useBrandKit } from "../kit/useBrandKit";
 import type { BrandKit } from "../kit/brand-kit";
-import {
-  TEMPLATES, extractPalette, luminance, openerPlaceholders, saturation, templatePatch,
-  type BannerStaffApi, type State,
-} from "../banner-state";
+import { extractPalette, luminance, saturation, type State } from "../banner-state";
 import type { StepSlot } from "./order";
 import { StepCard, SubHead, type StepCtx } from "./ui";
 
-export default function StepStyle({ slot, s, set, setS, sRef, brand, staff }: StepCtx & {
-  slot: StepSlot; sRef: MutableRefObject<State>; brand: ReturnType<typeof useBrandKit>; staff?: BannerStaffApi;
+export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx & {
+  slot: StepSlot; sRef: MutableRefObject<State>; brand: ReturnType<typeof useBrandKit>;
 }) {
   const colorRefFileRef   = useRef<HTMLInputElement>(null);
   // colour tools (not part of design State / undo history — derived/fetched data)
   const [palette, setPalette]     = useState<string[]>([]);
   const [selSwatch, setSelSwatch] = useState<string | null>(null);
-
-  // ── template apply ──
-  const applyTemplate = useCallback((patch: Partial<State>) =>
-    setS((prev) => ({ ...prev, brandBar: false, balanceTitle: false, ...patch, saved: false, error: null }))
-  , []);
 
   async function applyBrandKit(kit: BrandKit) {
     const [main, second, accent, text, bg] = kit.colors;
@@ -110,7 +102,6 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand, staff }: St
           <span className="form-hint" style={{ width: "100%" }}>預設在左下角，可在預覽上拖曳。</span>
         </div>
       )}
-      {staff ? <staff.BrandPicker onPick={(colors) => { setPalette(colors); setSelSwatch(colors[0] ?? null); }} /> : null}
 
       <input ref={colorRefFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleColorRefUpload} />
       <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 8 }} onClick={() => colorRefFileRef.current?.click()}>
@@ -150,28 +141,6 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand, staff }: St
           )}
         </>
       )}
-      <SubHead first={false}>版型模板</SubHead>
-      <p className="form-hint" style={{ marginBottom: 8, marginTop: 4 }}>套用後再填內容；只改版面/元素，不動你的文字與圖。</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-        {TEMPLATES.filter((t) => !t.group).map((t) => (
-          <button key={t.key} className="btn btn-ghost"
-            style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
-            onClick={() => applyTemplate(t.patch)}>
-            <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
-          </button>
-        ))}
-      </div>
-      {/* card R3: cards a video opens with (存到我的設計 -> the editor's 片頭 「從我的設計挑」) */}
-      <p className="form-hint" style={{ margin: "10px 0 6px" }}>做影片開頭的標題卡：選一種版面 → 改字 → 存到我的設計，之後在影片剪輯的片頭選「橫幅字卡」使用</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-        {TEMPLATES.filter((t) => t.group === "opener").map((t) => (
-          <button key={t.key} className="btn btn-ghost"
-            style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
-            onClick={() => applyTemplate({ ...templatePatch(t, s.preset), ...openerPlaceholders(t.key, s) })}>
-            <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
-          </button>
-        ))}
-      </div>
     </StepCard>
   );
 }

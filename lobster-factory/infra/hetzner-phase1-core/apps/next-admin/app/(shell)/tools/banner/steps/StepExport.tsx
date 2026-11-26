@@ -4,19 +4,63 @@ import { CANVAS_STAFF_HREF, canvasTarget, openInCanvas } from "@/components/tool
 import { useDoorHref } from "@/app/DoorContext";
 import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 import { buildBannerPsd, buildBannerSvg, rasterize } from "../banner-layers";
-import { aiBgPromptOf } from "../banner-state";
-import { bannerLayers, bytesToDataUrl, downloadUrl, encodeDesign, exportToPng, exportToPsd, exportToSvg, pngOfPixels, textDataUrl } from "./export-files";
+import { PRESETS, aiBgPromptOf, selectedSizes, variantOf } from "../banner-state";
+import { EXPORT_FORMATS, bannerLayers, bytesToDataUrl, downloadUrl, encodeDesign, exportToPng, exportToPsd, exportToSvg, pngOfPixels, sizeFileName, textDataUrl, type ExportFormat } from "./export-files";
 import type { StepSlot } from "./order";
 import { StepCard, type StepCtx } from "./ui";
 
-export default function StepExport({ slot, s, setS, saveOrg, targetKb, setTargetKb }: StepCtx & {
-  slot: StepSlot; saveOrg: string | null; targetKb: string; setTargetKb(v: string): void;
-}) {
+export default function StepExport({ slot, s, setS, saveOrg }: StepCtx & { slot: StepSlot; saveOrg: string | null }) {
+  const [targetKb, setTargetKb] = useState("");
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const vectorHref = useDoorHref(canvasTarget(".svg").staffHref);
   const [lossyNote, setLossyNote] = useState<string | null>(null);
   const designsHref = useDoorHref("/tools/designs");
   const effectiveBgPrompt = aiBgPromptOf(s);
+  // ── C5: every picked size at once ──
+  const picked = selectedSizes(s);
+  const [multiFormat, setMultiFormat] = useState<ExportFormat>("png");
+  const [multiBusy, setMultiBusy] = useState<string | null>(null);
+  const [multiNote, setMultiNote] = useState<string | null>(null);
+  async function handleDownloadAll() {
+    setMultiNote(null);
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      const kb = Number(targetKb), notes: string[] = [];
+      for (const [i, k] of picked.entries()) {
+        setMultiBusy(`打包中 ${i + 1}/${picked.length}…`);
+        const out = await encodeDesign(variantOf(s, k), multiFormat, Number.isFinite(kb) && kb > 0 ? kb : null);
+        zip.file(sizeFileName(k, multiFormat), await urlToBlob(out.url));
+        if (out.note) notes.push(`${PRESETS[k].ratio}：${out.note}`);
+      }
+      const url = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
+      downloadUrl(url, `banner-${picked.length}-sizes.zip`);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (notes.length) setMultiNote(notes.join("\n"));
+    } catch (err) {
+      setMultiNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMultiBusy(null);
+    }
+  }
+  async function handleSaveAll() {
+    setMultiNote(null);
+    try {
+      for (const [i, k] of picked.entries()) {
+        setMultiBusy(`存到我的設計 ${i + 1}/${picked.length}…`);
+        const v = variantOf(s, k);
+        const res = await saveDesign(await urlToBlob(await exportToPng(v)), {
+          source: "banner", prompt: v.headline || undefined, modelName: v.bgMode === "ai" ? v.aiBgModel : undefined, subject: k,
+        }, { organizationId: saveOrg ?? undefined });
+        if (!res.ok) throw new Error(`${PRESETS[k].ratio}：${(res as { ok: false; error: string }).error}`);
+      }
+      setMultiNote(`✓ ${picked.length} 個尺寸都已存到我的設計`);
+    } catch (err) {
+      setMultiNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMultiBusy(null);
+    }
+  }
 
   async function handleSave() {
     setS((prev) => ({ ...prev, saving: true, error: null }));
@@ -100,6 +144,28 @@ export default function StepExport({ slot, s, setS, saveOrg, targetKb, setTarget
   return (
     <StepCard title={slot.title} step={slot.no} icon="📦" summary={s.saved ? "✓ 已存到圖庫" : "圖庫 · PNG / JPG / WebP / PSD / SVG"}>
       <div style={{ marginTop: 8 }} />
+      {picked.length > 1 && (
+        <div data-testid="banner-multi-export" style={{ paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid var(--border)" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>全部 {picked.length} 個尺寸</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 12 }}>格式</span>
+            {EXPORT_FORMATS.map((f) => (
+              <button key={f.key} className={multiFormat === f.key ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-multi-format-${f.key}`}
+                style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => setMultiFormat(f.key)}>{f.label}</button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            <button className="btn btn-primary" disabled={!!multiBusy || s.generating || s.productRemoving} onClick={() => void handleDownloadAll()} data-testid="banner-multi-download">
+              全部下載（zip）
+            </button>
+            <button className="btn btn-ghost" disabled={!!multiBusy || s.generating || s.productRemoving} onClick={() => void handleSaveAll()} data-testid="banner-multi-save">
+              全部存到我的設計
+            </button>
+          </div>
+          <p className="form-hint" style={{ margin: "6px 0 0" }}>JPG／WebP 的「目標 KB」沿用下面的設定。下面的單張按鈕只輸出正在編輯的尺寸。</p>
+          {(multiBusy || multiNote) && <p className="form-hint" style={{ margin: "4px 0 0", whiteSpace: "pre-line" }}>{multiBusy ?? multiNote}</p>}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="btn btn-primary" onClick={handleSave}
           disabled={s.saving || s.generating || s.productRemoving}>

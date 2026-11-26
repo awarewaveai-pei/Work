@@ -5,15 +5,16 @@ import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
 import { BANNER_RETURN_TOOL, applyBannerCanvasReturn } from "./banner-canvas-return";
 import { renderBannerLayers, type ElemBox, type ElemKey } from "./banner-layers";
 import { useBrandKit } from "./kit/useBrandKit";
-import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 import {
-  BANNER_FONTS_CSS, INIT, PRESETS, RATIO_PRESET, TEMPLATES, clearSizeTweak, designSig, enterSize, isUntouched, leaveSize,
+  BANNER_FONTS_CSS, INIT, PRESETS, RATIO_PRESET, TEMPLATES, clearDesign, clearSizeTweak, designSig, editingSizeOf, enterSize, isUntouched, leaveSize,
   presetLabel, selectedSizes, templatePatch, variantOf,
   type BannerStaffApi, type PresetKey, type State,
 } from "./banner-state";
-import { EXPORT_FORMATS, downloadUrl, encodeDesign, exportToPng, sizeFileName, thumbOf, type ExportFormat } from "./steps/export-files";
+import { thumbOf } from "./steps/export-files";
 import { stepRef, stepsFor, type StepSlot } from "./steps/order";
 import StepStart from "./steps/StepStart";
+import StepAi from "./steps/StepAi";
+import StepTemplate from "./steps/StepTemplate";
 import StepSize from "./steps/StepSize";
 import StepText from "./steps/StepText";
 import StepCanvas from "./steps/StepCanvas";
@@ -42,6 +43,10 @@ const snap = (v: number) => {
   return hit === undefined ? { v, line: null } : { v: hit, line: hit };
 };
 
+/** The size strip under the preview: a fixed height (thumbnail + label + header line) so preview + strip fit the window. */
+const THUMB_H = 64;
+const STRIP_H = 132;
+
 /** Desktop width: the preview stays in view (sticky) while the controls scroll; narrower, it sits above them. */
 function useWide(minPx = 960): boolean {
   const [wide, setWide] = useState(true);
@@ -56,7 +61,6 @@ function useWide(minPx = 960): boolean {
 }
 
 export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
-  const [targetKb, setTargetKb] = useState("");
   const [s, setS]         = useState<State>(INIT);
   // 傳回 (C8.3): decide from the latest render and place the image at once (the dock waits ~2 s for the ack).
   const sRef = useRef(s);
@@ -163,10 +167,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const canUndo = histIdxRef.current > 0;
   const canRedo = histIdxRef.current < historyRef.current.length - 1;
 
-  // ── C5: every chosen size at once ──
-  const [multiFormat, setMultiFormat] = useState<ExportFormat>("png");
-  const [multiBusy, setMultiBusy] = useState<string | null>(null);
-  const [multiNote, setMultiNote] = useState<string | null>(null);
+  // ── C5: the picked sizes' thumbnails (the strip under the preview) ──
   const [thumbs, setThumbs] = useState<Partial<Record<PresetKey, string>>>({});
   useEffect(() => {
     const sel = selectedSizes(s);
@@ -184,54 +185,16 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   }, [s, fontEpoch]);
   const picked = selectedSizes(s);
   const multi = picked.length > 1;
-  async function handleDownloadAll() {
-    setMultiNote(null);
-    try {
-      const JSZip = (await import("jszip")).default;
-      const zip = new JSZip();
-      const kb = Number(targetKb), notes: string[] = [];
-      for (const [i, k] of picked.entries()) {
-        setMultiBusy(`打包中 ${i + 1}/${picked.length}…`);
-        const out = await encodeDesign(variantOf(s, k), multiFormat, Number.isFinite(kb) && kb > 0 ? kb : null);
-        zip.file(sizeFileName(k, multiFormat), await urlToBlob(out.url));
-        if (out.note) notes.push(`${PRESETS[k].ratio}：${out.note}`);
-      }
-      const url = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
-      downloadUrl(url, `banner-${picked.length}-sizes.zip`);
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      if (notes.length) setMultiNote(notes.join("\n"));
-    } catch (err) {
-      setMultiNote(err instanceof Error ? err.message : String(err));
-    } finally {
-      setMultiBusy(null);
-    }
-  }
-  async function handleSaveAll() {
-    setMultiNote(null);
-    try {
-      for (const [i, k] of picked.entries()) {
-        setMultiBusy(`存到我的設計 ${i + 1}/${picked.length}…`);
-        const v = variantOf(s, k);
-        const res = await saveDesign(await urlToBlob(await exportToPng(v)), {
-          source: "banner", prompt: v.headline || undefined, modelName: v.bgMode === "ai" ? v.aiBgModel : undefined, subject: k,
-        }, { organizationId: saveOrg ?? undefined });
-        if (!res.ok) throw new Error(`${PRESETS[k].ratio}：${(res as { ok: false; error: string }).error}`);
-      }
-      setMultiNote(`✓ ${picked.length} 個尺寸都已存到我的設計`);
-    } catch (err) {
-      setMultiNote(err instanceof Error ? err.message : String(err));
-    } finally {
-      setMultiBusy(null);
-    }
-  }
+  const editing = editingSizeOf(s);
 
-  // the background picture is placed on the preview: drag = move, wheel = zoom (a non-passive listener, so the page
-  // does not scroll while zooming)
+  // the background picture is placed on the preview: drag = move, Ctrl/⌘ + wheel or a trackpad pinch (ctrlKey) = zoom.
+  // A plain wheel scrolls the page. Non-passive so the zoom gesture does not also zoom the browser page.
   const bgMovable = (s.bgMode === "upload" || s.bgMode === "ai") && !!s.bgImage;
   useEffect(() => {
     const el = previewImgRef.current;
     if (!el || !bgMovable) return;
     const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       setS((prev) => ({ ...prev, bgImgScale: Math.min(3, Math.max(0.5, prev.bgImgScale * Math.exp(-e.deltaY * 0.0015))), saved: false, error: null }));
     };
@@ -249,15 +212,24 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const hasPositions = Object.keys(s.positions).length > 0;
   // C13: nothing designed yet (no words, pictures, button, badge or logo) -> a line of guidance instead of an empty canvas
   const blank = isUntouched(s) && !s.designing;
+  // the left column (preview card + size strip) never runs past the window: the preview gives up the strip's height
+  const previewMaxH = `calc(100vh - ${230 + (multi ? STRIP_H + 16 : 0)}px)`;
+  // 清除設計: the cleared state itself, so the note shows until the next change (or 復原)
+  const [cleared, setCleared] = useState<State | null>(null);
+  const busy = s.generating || s.designing || s.productRemoving || s.saving || s.copyGenerating;
   const ctx = { s, set, setS };
   const renderStep = (slot: StepSlot) => {
     switch (slot.key) {
+      case "start": return staff && <StepStart slot={slot} setS={setS} staff={staff} brand={brand} saveOrg={saveOrg} setSaveOrg={setSaveOrg}
+        saveOrgName={saveOrgName} setSaveOrgName={setSaveOrgName} />;
+      case "ai": return staff && <StepAi slot={slot} {...ctx} staff={staff} brand={brand} saveOrg={saveOrg} saveOrgRef={saveOrgRef} />;
+      case "template": return <StepTemplate slot={slot} {...ctx} />;
       case "size": return <StepSize slot={slot} {...ctx} />;
       case "text": return <StepText slot={slot} {...ctx} />;
       case "canvas": return <StepCanvas slot={slot} {...ctx} />;
       case "marketing": return <StepMarketing slot={slot} {...ctx} />;
-      case "style": return <StepStyle slot={slot} {...ctx} sRef={sRef} brand={brand} staff={staff} />;
-      case "export": return <StepExport slot={slot} {...ctx} saveOrg={saveOrg} targetKb={targetKb} setTargetKb={setTargetKb} />;
+      case "style": return <StepStyle slot={slot} {...ctx} sRef={sRef} brand={brand} />;
+      case "export": return <StepExport slot={slot} {...ctx} saveOrg={saveOrg} />;
     }
   };
 
@@ -279,11 +251,6 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
         {/* ── Controls (right side) ── */}
         <div style={{ order: 2, flex: "1 1 340px", maxWidth: wide ? 420 : "100%", minWidth: 0,
           display: "flex", flexDirection: "column", gap: 16 }}>
-
-          {staff && (
-            <StepStart s={s} set={set} setS={setS} staff={staff} brand={brand} saveOrg={saveOrg} setSaveOrg={setSaveOrg}
-              saveOrgName={saveOrgName} setSaveOrgName={setSaveOrgName} saveOrgRef={saveOrgRef} />
-          )}
 
           {stepsFor(!!staff).map((slot) => <Fragment key={slot.key}>{renderStep(slot)}</Fragment>)}
 
@@ -307,6 +274,9 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   disabled={!canUndo} onClick={undo} title="復原">↩ 復原</button>
                 <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }}
                   disabled={!canRedo} onClick={redo} title="重做">↪ 重做</button>
+                <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }} data-testid="banner-clear"
+                  disabled={busy || designSig(clearDesign(s)) === designSig(s)} title="回到空白設計（保留客戶與已選尺寸）"
+                  onClick={() => { const next = clearDesign(s); setCleared(next); setS(next); }}>清除設計</button>
                 {hasPositions && (
                   <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }} data-testid="banner-auto-layout"
                     onClick={() => setS((prev) => ({ ...prev, positions: {}, saved: false, error: null }))}>回到自動排版</button>
@@ -320,11 +290,11 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
             }}>
               {blank && (
                 <div data-testid="banner-empty-hint" style={{
-                  width: 720, maxWidth: "100%", aspectRatio: `${p.w} / ${p.h}`, maxHeight: "calc(100vh - 230px)", minHeight: 160,
+                  width: 720, maxWidth: "100%", aspectRatio: `${p.w} / ${p.h}`, maxHeight: previewMaxH, minHeight: 160,
                   display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 16,
                   border: "1px dashed var(--border)", borderRadius: 6, color: "var(--text-muted)", fontSize: 14,
                 }}>
-                  {staff ? "先在「開始」輸入主題，再按 ✨ AI 一鍵設計" : `先在${stepRef("text", false)}輸入標題，或在${stepRef("canvas", false)}放背景與產品圖`}
+                  {staff ? `先在${stepRef("ai", true)}輸入主題，再按 ✨ AI 一鍵設計` : `先在${stepRef("text", false)}輸入標題，或在${stepRef("canvas", false)}放背景與產品圖`}
                 </div>
               )}
               {previewUrl && !blank && (
@@ -361,7 +331,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   onPointerUp={endDrag}
                   onPointerCancel={endDrag}
                   onPointerLeave={() => setHoverHit(null)}
-                  style={{ display: "block", maxWidth: "100%", maxHeight: "calc(100vh - 230px)", width: "auto", height: "auto",
+                  style={{ display: "block", maxWidth: "100%", maxHeight: previewMaxH, width: "auto", height: "auto",
                     cursor: hoverHit || guides ? "move" : bgMovable ? "grab" : undefined, touchAction: "none" }} />
               )}
               {previewUrl && !blank && guides && (
@@ -397,60 +367,44 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 </div>
               )}
             </div>
-            {s.editingSize && (
-              <div className="form-message" style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <span>正在單獨微調 {PRESETS[s.editingSize.key].ratio}：這時改的位置、字級、對齊只套這個尺寸；文字、顏色、圖片仍是全部一起改。</span>
-                <button className="btn btn-primary" style={{ fontSize: 12 }} data-testid="banner-multi-done"
-                  onClick={() => setS((prev) => ({ ...leaveSize(prev), saved: false }))}>完成，回主尺寸</button>
-              </div>
+            {cleared === s && (
+              <p className="form-hint" role="status" data-testid="banner-cleared" style={{ margin: "8px 0 0" }}>已清除，可按「↩ 復原」找回。</p>
             )}
           </div>
 
           {multi && (
-            <div className="card" style={{ marginBottom: 16 }} data-testid="banner-multi-card">
-              <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>多尺寸 · {picked.length} 個</h2>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div className="card" data-testid="banner-multi-card"
+              style={{ height: STRIP_H, boxSizing: "border-box", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6, overflow: "hidden" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, minHeight: 24 }}>
+                <b style={{ flexShrink: 0 }}>{picked.length} 個尺寸</b>
+                <span style={{ color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                  {s.editingSize ? `單獨微調 ${PRESETS[s.editingSize.key].ratio}：位置、字級、對齊只改這張` : "點縮圖單獨微調那個尺寸"}
+                </span>
+                {Object.keys(s.sizeOverrides[editing] ?? {}).length > 0 && (
+                  <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 6px", flexShrink: 0 }} data-testid="banner-multi-clear-tweak"
+                    onClick={() => setS((prev) => ({ ...clearSizeTweak(prev, editing), saved: false }))}>清除這張的微調</button>
+                )}
+                {s.editingSize && (
+                  <button className="btn btn-primary" style={{ fontSize: 11, padding: "1px 8px", flexShrink: 0, marginLeft: "auto" }} data-testid="banner-multi-done"
+                    onClick={() => setS((prev) => ({ ...leaveSize(prev), saved: false }))}>完成，回主尺寸</button>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, overflowX: "auto", flex: 1, minHeight: 0, alignItems: "stretch" }}>
                 {picked.map((k) => {
-                  const editing = s.editingSize ? s.editingSize.key === k : s.preset === k;
                   const tweaked = Object.keys(s.sizeOverrides[k] ?? {}).length > 0;
                   return (
-                    <div key={k} style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
-                      <button className={editing ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-multi-thumb-${k}`}
-                        style={{ padding: 4, height: "auto" }} onClick={() => setS((prev) => ({ ...enterSize(prev, k), saved: false }))}
-                        title="點一下單獨微調這個尺寸">
-                        {thumbs[k]
-                          // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={thumbs[k]} alt={PRESETS[k].ratio} style={{ display: "block", maxWidth: 160, maxHeight: 160 }} />
-                          : <span style={{ display: "block", width: 120, height: 80, fontSize: 11 }}>產生中…</span>}
-                      </button>
-                      <span style={{ fontSize: 12 }}>
-                        <b>{PRESETS[k].ratio}</b>{tweaked ? "・已微調" : ""}{editing ? "・編輯中" : ""}
-                      </span>
-                      {tweaked && (
-                        <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 6px" }}
-                          onClick={() => setS((prev) => ({ ...clearSizeTweak(prev, k), saved: false }))}>清除微調</button>
-                      )}
-                    </div>
+                    <button key={k} type="button" className="choice-card" aria-pressed={editing === k} data-testid={`banner-multi-thumb-${k}`}
+                      style={{ width: "auto", flexShrink: 0, padding: 4, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}
+                      onClick={() => setS((prev) => ({ ...enterSize(prev, k), saved: false }))} title="點一下單獨微調這個尺寸">
+                      {thumbs[k]
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={thumbs[k]} alt={PRESETS[k].ratio} style={{ display: "block", height: THUMB_H, width: "auto" }} />
+                        : <span style={{ display: "flex", alignItems: "center", height: THUMB_H, fontSize: 11 }}>產生中…</span>}
+                      <span style={{ fontSize: 11 }}><b>{PRESETS[k].ratio}</b>{tweaked ? "・已微調" : ""}</span>
+                    </button>
                   );
                 })}
               </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-                <span style={{ fontSize: 12 }}>格式</span>
-                {EXPORT_FORMATS.map((f) => (
-                  <button key={f.key} className={multiFormat === f.key ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-multi-format-${f.key}`}
-                    style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => setMultiFormat(f.key)}>{f.label}</button>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                <button className="btn btn-primary" disabled={!!multiBusy || s.generating || s.productRemoving} onClick={() => void handleDownloadAll()} data-testid="banner-multi-download">
-                  全部下載（zip）
-                </button>
-                <button className="btn btn-ghost" disabled={!!multiBusy || s.generating || s.productRemoving} onClick={() => void handleSaveAll()} data-testid="banner-multi-save">
-                  全部存到我的設計
-                </button>
-              </div>
-              <p className="form-hint" style={{ margin: "6px 0 0" }}>JPG／WebP 的「目標 KB」沿用匯出區的設定。</p>
-              {(multiBusy || multiNote) && <p className="form-hint" style={{ margin: "4px 0 0", whiteSpace: "pre-line" }}>{multiBusy ?? multiNote}</p>}
             </div>
           )}
 

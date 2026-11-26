@@ -51,3 +51,21 @@ describe("empty-preview guidance", () => {
     expect(isUntouched({ ...INIT, gradFrom: "#000000" })).toBe(false);
   });
 });
+
+// R2-B1 (PLAN-R2 §4): 清除設計 = the blank design, keeping the picked sizes; a size being tweaked comes back as its main size.
+describe("清除設計", () => {
+  it("keeps the picked sizes, clears everything else", async () => {
+    const { clearDesign, designSig } = await import("./banner-state");
+    const st: State = {
+      ...toggleSizePick(base, "r9x16"), headline: "夏日", copyBrief: "咖啡", bgColor: "#123456",
+      sizeOverrides: { r9x16: { textPos: "top" } },
+    };
+    const tweaking: State = { ...st, preset: "r9x16", editingSize: { key: "r9x16", main: { preset: "r191x1", headlineSize: 64 } } };
+    for (const s of [st, tweaking]) {
+      const c = clearDesign(s);
+      expect(selectedSizes(c)).toEqual(["r9x16", "r191x1"]);
+      expect(c.preset).toBe("r191x1");
+      expect(designSig({ ...c, preset: INIT.preset, multiSizes: [] })).toBe(designSig(INIT));
+    }
+  });
+});
