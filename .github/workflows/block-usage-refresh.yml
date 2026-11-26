@@ -40,6 +40,13 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: lobster-factory/infra/hetzner-phase1-core/apps/next-admin/package-lock.json
+
+      # the generator loads the content block registry (lib/content/blocks/register-all), which imports app dependencies
+      - name: Install dependencies
+        working-directory: ${{ env.APP }}
+        run: npm ci
 
       - name: Regenerate and commit when changed
         run: |
@@ -51,7 +58,7 @@ jobs:
           for attempt in 1 2 3; do
             git fetch -q --depth=1 origin main
             git reset -q --hard origin/main
-            (cd "$APP" && npx -y tsx@4.23.15 scripts/gen-block-usage.ts)
+            (cd "$APP" && npm run -s blocks:usage)
             if git diff --quiet -- "$GEN"; then echo "block usage unchanged"; exit 0; fi
             git add -- "$GEN"
             git commit -q -m "chore(systems): refresh LEGO block usage from the real imports (bot)" \

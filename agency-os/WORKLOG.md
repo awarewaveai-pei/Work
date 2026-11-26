@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續23）— block-usage-refresh 首跑失敗（run 45744677662）：產生器載入內容積木 registry 需要 app 依賴，補 npm ci
+
+- 根因：`gen-block-usage.ts` import `lib/content/blocks/register-all` → `lib/supabase-server.ts` 需要 `@supabase/*`；workflow 只用 `npx tsx`、沒裝 next-admin 依賴 → MODULE_NOT_FOUND。本機有 node_modules 所以沒踩到。
+- 修正：`.github/workflows/block-usage-refresh.yml` setup-node 加 npm cache、新增 `npm ci`（同 next-admin-test.yml），改跑 `npm run -s blocks:usage`。
+- 驗證：YAML 解析步驟正確；推送後看該 workflow 的 run。
+- REALTEST_EVIDENCE: tool=Bash | cmd=gh run view 45744677662 --log-failed | exit=0 | ms=3000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: workflow 補安裝步驟，照抄 next-admin-test.yml 既有寫法
+- BUGHUNT_DONE: scope=.github,lobster-factory | grep=blocks:usage | hits=4
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續22）— 小工具不算積木＋積木目錄永不擋開發：5 個改共用小工具、目錄資料由 GitHub 每次推送後自動更新、跟不上的列「待處理」
 
 - 根因／決策：操作者「一個小功能就成為一個積木很怪」「我會一直增加修改功能」。原規則把「≥2 系統共用」當成「是積木」，21 行的分頁讀取也被編號；且 usedBy、覆蓋、方法數、entry 路徑全是 CI 閘，任何功能開發都可能被目錄擋（6b9032f09、5880756a8 兩次）。不變量改為：**只有改壞 blocks.ts 本身才會紅；跟著程式走的資料全自動產生；要人判斷的列待處理**。
