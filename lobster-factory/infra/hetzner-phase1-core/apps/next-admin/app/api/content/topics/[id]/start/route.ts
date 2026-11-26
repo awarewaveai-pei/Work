@@ -62,7 +62,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   };
   // the paid part it starts: the article when it makes one, else the social rewrite, else the video's script (literal
-  // keys: the registry test reads them)
+  // keys: the registry test reads them). Every other feature the topic uses is checked by deps.blocker (make.ts
+  // topicFeatures), before a daily slot or any money is used.
   const opts = { org: () => t.organization_id };
   if (t.formats.includes("article")) return withFeature("content.article", thenRun, opts)(req, run);
   if (t.formats.includes("social")) return withFeature("content.syndicate", thenRun, opts)(req, run);

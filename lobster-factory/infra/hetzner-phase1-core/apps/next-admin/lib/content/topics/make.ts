@@ -12,6 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { grantFor, runForOrg } from "@/lib/entitlements/grant";
 import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
+import { PRODUCTS } from "@/lib/portal/products";
 import { orgIdentity } from "@/lib/tenant-guard";
 import { loadSiteBrand, type SiteBrand } from "@/lib/content/brand-voice-store";
 import { autoPublishes, forbiddenTerms, renderBrandVoice, renderSiteVoice, requiredBlocks, siteCover, siteIntroCards, siteIntroStyles, siteIntroTransition, siteLanguage, siteTextChain, youtubeFormat, type SiteContentDefaults } from "@/lib/content/brand-voice";
@@ -337,6 +338,34 @@ async function youtubeChannels(orgId: string) {
   const yt = (await listAccounts(orgId, { hydrateProfile: false })).filter((a) => a.status === "connected" && a.platform === "youtube");
   if (!yt.length) throw new Error(NO_YOUTUBE_TEXT);
   return yt;
+}
+
+/** K30b: every paid feature a topic's making asks, the one list both starts check: the article (makeArticle), the
+ *  social and YouTube texts (makeSocial), the video's script (startTopicVideo). content.image is an add-on, never a
+ *  reason to stop (optionalImageGrant). */
+export function topicFeatures(formats: readonly string[]): string[] {
+  const keys: string[] = [];
+  if (formats.includes("article")) keys.push("content.article");
+  if (formats.includes("social") || formats.includes("video")) keys.push("content.syndicate");
+  if (formats.includes("video")) keys.push("video.script");
+  return keys;
+}
+
+/** K30b: the first of the topic's features the organization cannot use now, as the topic's note; null = it can use all.
+ *  Asked exactly as the making asks them (runForOrg + grantFor, so the same verdict, shadow included): a verdict only,
+ *  no usage row (only a paid seam's Grant.recordUse writes one). */
+async function missingFeature(organizationId: string, actor: string, formats: readonly string[]): Promise<string | null> {
+  return runForOrg(organizationId, actor, async () => {
+    for (const key of topicFeatures(formats)) {
+      try { await grantFor(key); } catch (e) {
+        // a lookup that failed is not a refusal: thrown, so the button answers 500 and the schedule retries next firing
+        if (!(e instanceof EntitlementRequired) || e.code === "infrastructure_error") throw e;
+        const name = PRODUCTS.flatMap((p) => p.features).find((f) => f.feature_key === key)?.name ?? key;
+        return `這個帳號沒有「${name}」權限（${key}），題目沒有開始，也沒有花錢；開通後再核准`;
+      }
+    }
+    return null;
+  });
 }
 
 /** The social draft's shared text: the article's summary (its meta description), or the title when the summary is not in
@@ -811,6 +840,8 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
       own(t);
       const s = await siteFor(sb, t);
       if (typeof s === "string") return s;
+      const missing = await missingFeature(organizationId, actor, t.formats);   // K30b: before anything is paid for
+      if (missing) return missing;
       if (waitsForVideo(t)) return youtubeChannels(t.organization_id).then(() => null, (e: Error) => e.message);   // K30
       return null;
     },
