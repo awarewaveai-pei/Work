@@ -1,5 +1,7 @@
 # Client Onboarding Portal — 14 段完整工程規格
 
+> **建站現況（2026-11-23 起）**：`/onboard`、`/build` 兩頁已刪（308 到 `/ops/sites/new`），開客戶站見 [建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。本檔提到舊頁／舊接口當作現行做法的段落是歷史紀錄。
+
 > **狀態**：規格完成 2026-06-02，尚未實作。
 > **使用方式**：每段標 `✅已有` 或 `🆕要做`。工程師/AI 照這份逐段 build，不需重新研究。
 > **研究底稿**：`agency-os/docs/specs/client-onboarding-portal-CODEBASE-MAP.md`（所有 file:line）

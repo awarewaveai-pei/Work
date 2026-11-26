@@ -1,0 +1,55 @@
+name: next-admin — door host from env (production build)
+
+# A product door moved to its own domain by PRODUCT_HOST_<KEY> alone (ADR 018 §2, K14) must work in the PRODUCTION build:
+# the middleware runs on the edge runtime, which vitest (Node) never exercises and `next dev` gets wrong locally (K15).
+# Builds the real Dockerfile and compares a container without and with PRODUCT_HOST_CONTENT; the script is the check.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/middleware.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/next.config.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/Dockerfile'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/package.json'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/package-lock.json'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/check-door-host-env.sh'
+      - '.github/workflows/next-admin-door-host.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/middleware.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/next.config.ts'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/Dockerfile'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/package.json'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/package-lock.json'
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/check-door-host-env.sh'
+      - '.github/workflows/next-admin-door-host.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: next-admin-door-host-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  door-host:
+    name: brand host via env, production image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: lobster-factory/infra/hetzner-phase1-core/apps/next-admin
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the image and compare doors
+        run: bash scripts/check-door-host-env.sh

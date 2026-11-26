@@ -38,9 +38,7 @@ const ICON_PATHS: Record<CatalogIcon, string> = {
   pulse: "M3 12h4l3-8 4 16 3-8h4",
 };
 
-// badge-blue does not exist in globals yet (blueprint §19.4); the existing --ai tokens carry it until it does.
-const TONE_CLASS: Record<Exclude<RightTone, "blue">, string> = { green: "badge-green", gray: "badge-gray", yellow: "badge-yellow", red: "badge-red" };
-const BLUE_STYLE = { background: "var(--ai-bg)", color: "var(--ai-text)" } as const;
+const TONE_CLASS: Record<RightTone, string> = { green: "badge-green", blue: "badge-blue", gray: "badge-gray", yellow: "badge-yellow", red: "badge-red" };
 
 const NEW_DAYS = 60;
 const isNew = (addedAt: string, now: Date): boolean => {
@@ -50,9 +48,8 @@ const isNew = (addedAt: string, now: Date): boolean => {
 
 export function ToolCard({ name, catalog, right, href, disabled = false, density = "card", primaryLabel = "開啟", now = new Date() }: ToolCardProps) {
   const usable = !!href && !disabled;
-  const blue = right.tone === "blue";
   const badge = right.label
-    ? <span className={blue ? "card-badge" : `card-badge ${TONE_CLASS[right.tone as Exclude<RightTone, "blue">]}`} style={blue ? BLUE_STYLE : undefined} data-tone={right.tone}>{right.label}</span>
+    ? <span className={`card-badge ${TONE_CLASS[right.tone]}`} data-tone={right.tone}>{right.label}</span>
     : null;
   const caption = right.action ?? (usable ? primaryLabel : null);   // no link and no label from rightLabel = no button
   const button = caption

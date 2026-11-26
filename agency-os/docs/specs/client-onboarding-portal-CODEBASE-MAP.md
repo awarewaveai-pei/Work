@@ -1,5 +1,7 @@
 ﻿# Client Onboarding Portal — Codebase Map + Reading List
 
+> **建站現況（2026-11-23 起）**：`/onboard`、`/build` 兩頁已刪（308 到 `/ops/sites/new`），開客戶站見 [建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。本檔提到舊頁／舊接口當作現行做法的段落是歷史紀錄。
+
 > **狀態**：研究完成（2026-05-30），14 段規格**尚未撰寫**。
 > 這份檔的用途：讓任何機器、任何 session 的 Claude「開工就接得回來」，不必重新研究。
 > 對應任務：`TASKS.md` → `### 未完成` → `#### G. ▶️ 可直接做 — 基礎建設與客戶站`（2026-08-26 換軸前為 `#### 待釐清 / 明日提醒`）（onboarding portal 那兩行）。

@@ -440,11 +440,11 @@ function render() {
   if (tool === "region" && files.image) setupRegionCanvas();
   if (typeof toolWorkflowAfterRender === "function") toolWorkflowAfterRender();
   if (typeof toolEngineHostAfterRender === "function") toolEngineHostAfterRender();
-  const unsupported = {
-    sfx: "尚未設定配樂分離與畫面音效模型",
-    privacy: "尚未設定人臉偵測與追蹤模型",
-    depth: "尚未設定深度影片模型",
-  };
+  // A tool is locked only by what the server can run now (/capabilities, loaded before the first render by
+  // tools-boot.js): the audio tools' rows (backend/audio-tools.cjs). No tool is locked by a list written here.
+  const unsupported = {},
+    engines = VideoWorkbench.capabilities?.audioTools?.[tool]?.engines;
+  if (engines?.length && !engines.some((e) => e.available)) unsupported[tool] = "目前沒有可用的處理方式，原因見各選項的說明";
   if (tool === "enhance" && (val("enhanceType", "音訊") === "畫面" || !["人聲降噪","音量均衡","音質美化"].includes(val("enhanceOption", "人聲降噪")))) unsupported.enhance = "所選增強方式尚未接入專用模型，設定仍會保留";
   if (unsupported[tool]) {
     const note = document.createElement("p");

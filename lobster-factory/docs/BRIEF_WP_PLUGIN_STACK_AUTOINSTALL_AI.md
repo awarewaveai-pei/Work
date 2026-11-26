@@ -1,5 +1,7 @@
 # BRIEF_WP_PLUGIN_STACK_AUTOINSTALL_AI.md
 
+> **建站現況（2026-11-23 起）**：`/onboard`、`/build` 兩頁已刪（308 到 `/ops/sites/new`），開客戶站見 [建站流程手冊](hosting/CLIENT_SITE_FLOW.md)。本檔提到舊頁／舊接口當作現行做法的段落是歷史紀錄。
+
 > **這份文件的用途**：歷史參考 — Phase 0-4 已全部實作完成（2026-05-13）。  
 > **未來修改外掛清單**：請改 [`WP_CLIENT_PLUGIN_STACK.md`](../../agency-os/docs/operations/WP_CLIENT_PLUGIN_STACK.md)（SSOT），不再回頭改本檔。  
 > Last updated: 2026-05-13 — Status: ✅ Implemented (commits 41a773a / a6ce672 / 02455c5 / 45dce6c)
