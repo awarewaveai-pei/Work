@@ -1,7 +1,7 @@
 // Card C11 (named tests): the 尺寸 buttons are a multi-select -- press adds / drops, dropping the size being edited moves
 // editing to the first size left, and with one size picked nothing differs from the single-size tool.
 import { describe, expect, it } from "vitest";
-import { INIT, editingSizeOf, selectedSizes, toggleSizePick, type State } from "./BannerStudio";
+import { INIT, editingSizeOf, selectedSizes, toggleSizePick, type State } from "./banner-state";
 
 const base: State = { ...INIT, preset: "r191x1", headlineSize: 64 };
 
@@ -43,7 +43,7 @@ describe("尺寸 multi-select", () => {
 // Codex round 2 (C13): the guidance line covers only a design nobody touched; a background colour alone shows the preview.
 describe("empty-preview guidance", () => {
   it("only the untouched design counts as empty", async () => {
-    const { isUntouched } = await import("./BannerStudio");
+    const { isUntouched } = await import("./banner-state");
     expect(isUntouched(INIT)).toBe(true);
     expect(isUntouched({ ...INIT, copyBrief: "咖啡", multiSizes: ["r9x16"] })).toBe(true);   // the topic and sizes are not the picture
     expect(isUntouched({ ...INIT, bgColor: "#123456" })).toBe(false);

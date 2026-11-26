@@ -3,7 +3,8 @@
 // script-forge (video) and brand colours from the staff client list. A door page renders BannerStudio without this
 // file, so its import closure names neither route (step-8 card §2 S1).
 import { useEffect, useState } from "react";
-import BannerStudio, { type BannerStaffApi } from "./BannerStudio";
+import BannerStudio from "./BannerStudio";
+import type { BannerStaffApi } from "./banner-state";
 import { roleHeader } from "@/lib/ops-role";
 import type { PickOrg } from "../../ops/clients/nav-orgs";
 import { OrgPicker } from "../../ops/clients/OrgPicker";
