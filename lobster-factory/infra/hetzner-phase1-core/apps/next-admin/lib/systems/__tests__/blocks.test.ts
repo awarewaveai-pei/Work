@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockHref, blockStats, blocksForSystem, catalogHref, isLive } from "../blocks";
-import { APP, GENERATED, GEN_CMD, REPO, derivedUsedBy, hasRepo as repoPresent, inShared, liveEntries, readRegistry, scanImports, serialize, under } from "../block-usage";
+import { APP, GENERATED, GEN_CMD, REPO, derivedUsedBy, hasRepo as repoPresent, inShared, liveEntries, readRegistry, scanImports, under } from "../block-usage";
 
 const hasRepo = repoPresent();
 const abs = (p: string) => (p.startsWith("repo:") ? join(REPO, p.slice(5)) : join(APP, p));
@@ -103,8 +103,9 @@ describe.skipIf(!hasRepo)("積木目錄 against the system registry", () => {
   });
 
   it("block-usage.generated.json matches the real @/ imports (file and folder entries)", () => {
-    const fresh = serialize(derivedUsedBy(LEGO_BLOCKS, imports));
-    expect(readFileSync(GENERATED, "utf8"), `a system started (or stopped) importing a block -- run \`${GEN_CMD}\` in apps/next-admin and commit the file`).toBe(fresh);
+    // parsed first so a failure prints which block / system differs, not a truncated JSON string
+    expect(JSON.parse(readFileSync(GENERATED, "utf8")), `a system started (or stopped) importing a block -- run \`${GEN_CMD}\` in apps/next-admin and commit the file`)
+      .toEqual(derivedUsedBy(LEGO_BLOCKS, imports));
   });
 
   it("every file two or more systems assemble belongs to a block (or is registry shared plumbing)", () => {

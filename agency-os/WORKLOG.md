@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續18）— main CI 紅（next-admin-test run 45736249682）：block-usage 產生檔落後 Banner 新 import，重產＋失敗訊息改顯示差異
+
+- 根因：續15 的產生檔取自較早的 origin/main 快照；合併時 Banner 已新增 design 對 AI 閘道（B-066）的 import → 產生檔過時，CI 正確擋下（機制本身按設計運作）。
+- 修正：`NA/lib/systems/block-usage.generated.json` 以合併後 e2242089f 重產（`+ B-066 design`）；`NA/lib/systems/__tests__/blocks.test.ts` 改比對解析後物件，失敗時直接列出哪顆積木／哪個系統不同（原本只印被截斷的 JSON 字串）（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）。
+- 驗證：在 e2242089f 拋棄式 worktree：舊產生檔 → 紅且輸出含 `"B-066"` 差異；新產生檔 → 綠；vitest lib/systems＋ops/systems 56 passed。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run blocks:usage; npx vitest run lib/systems "app/(shell)/ops/systems" | exit=0 | ms=15000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 產生資料重產＋一個斷言改比對物件，續15 已經 Codex 審查同一機制
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=block-usage.generated | hits=6
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續15）— 積木 usedBy 自動補：程式的 import 自己說誰在用，不再手抄進 blocks.ts
 
 - 根因：usedBy 是 import 已表達之事的手抄副本；新程式一用共用積木，CI 就擋到有人手改 blocks.ts（`6b9032f09` B-079 補 design，CI run 45729915966 擋 Banner 部署）。操作者開發中反映困擾 → 改成自動產生。
