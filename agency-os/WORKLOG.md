@@ -1,4 +1,22 @@
 # Worklog
+## 2026-11-26（續17）— 橫幅 C9 追加：每顆會花錢的按鈕標「約 NT$x」；生成文案預設改 GPT-6.2 sol
+
+- 根因／決策：操作者「會花錢的按鍵要標示台幣價格」。橫幅頁打付費 API 的按鈕（grep `fetch(`／`fetchAwaitingCodex(`／`scriptForge(`）：生成文案、AI 一鍵設計整張（script-forge）、一鍵去背（remove-bg，Replicate）、生成背景／重新生成／合成產品到場景／重新合成（studio/generate）。其餘（預覽、下載、存圖庫、品牌套組、開編輯器）不花 AI 錢不標。價格來源：背景＝所選圖片模型 `STUDIO_MODEL_OPTIONS.costNt`（studio 共用 image-models.js 單價）；去背＝cost-model TOOL_RATES `bg-remove`（toolCostUsd）；文字＝正式站 ai_call_logs 同一 brief 實測（Opus 0.60／Sonnet 0.39／sol 0.10／Haiku 0.01），一鍵設計依成本表價差按較長輸出（典型 1,000 入／1,100 出，每多一尺寸 +120／+250）放大，多尺寸仍是一次呼叫標一次價。按鈕取到 NT$0.1，不足 0.05 顯示「不到 NT$0.1」。依比較結果：生成文案預設 GPT-6.2 sol，一鍵設計維持 Claude Opus 5.5。（`NA/app/(shell)/tools/banner/banner-design.ts`、`BannerStudio.tsx`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋blocks＋script-forge＋accent-not-text 55 passed；本機實開讀出按鈕：生成文案（約 NT$0.1）、AI 一鍵設計整張（約 NT$0.8）、一鍵去背（不到 NT$0.1）、生成背景（約 NT$0.8，FLUX dev）、文案預設 GPT-6.2 sol（`$env:TEMP/banner-c9-prices.jpg`）。
+- 剩餘：一鍵設計價格為估算（文案為實測）；去背按秒計費、標的是典型一次；背景模型按鈕沿用 studio 既有顯示（兩位小數）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/systems/__tests__/blocks.test.ts lib/script-forge lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=8000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=DEFAULT_BANNER_AI_MODEL | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續16）— 橫幅 C9：AI 一鍵設計整張依勾選尺寸各排一個版面；文案／設計各一排模型按鈕（標每次約 NT$）
+
+- 根因／決策：操作者「選多張版面時 AI 須因應不同版面給予適當設計」。原 `generateFullDesign` 只用主尺寸呼叫一次，其他尺寸只靠 `variantOf` 按比例縮字。改：勾了多尺寸時一次呼叫帶 `sizes`，伺服器 `NA/lib/script-forge/modules.ts` banner `design` 任務加 `bannerSizesPart()`（只在有 sizes 時附加，單尺寸 prompt 一字不變），要求共用文案配色＋`layouts[<尺寸 key>]`（textPos、textAlignH、字級、商品位置縮放、元素座標），並寫明直式上文下圖、方形置中、橫式左文右圖。前端新純模組 `NA/app/(shell)/tools/banner/banner-design.ts`：`sanitizeLayout`（列舉／數值範圍／字級依短邊上限）、`designPlan`（主尺寸 layout 進主 state，其他勾選尺寸寫 `sizeOverrides[k]`；AI 漏給的尺寸用 `shapeLayout` 依形狀補）、模型子集 `BANNER_AI_MODELS`（Claude Opus 5.5／Sonnet 5.5／Haiku 5.5／GPT-6.2 sol，預設 Opus）與 `bannerCallNtd`（成本表 textCallCostUsd×usdToNtd 匯率 32，典型 token 數估算）。`BannerStudio.tsx` 文案生成卡加「文案模型」「設計模型」兩排按鈕；`BannerStudioStaff.tsx` 照選的模型送 `model`。`lib/systems/blocks.ts` B-066 usedBy 加 design。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋blocks＋script-forge＋accent-not-text 55 passed（新增指名 2 案：多尺寸時每個勾選尺寸都有自己的 override、未勾時無 layouts 且 prompt 與單尺寸相同）；本機實開（script-forge 本機無金鑰 → 頁內 mock 回應）：請求帶 model=claude-sonnet-5-5 與 4 個尺寸，9:16／1:1／16:9 都標「已微調」且排法不同；8 顆模型按鈕顯示約 NT$0.01–1.4（`$env:TEMP/banner-c9-ai-multisize.jpg`）。
+- 剩餘：真實模型回的 layouts 品質未驗（本機 mock）；NT$ 為典型 token 估算，非收據；多尺寸 10 個時輸出可能逼近 FORGE_MAX_TOKENS 4000。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/systems/__tests__/blocks.test.ts lib/script-forge lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=8000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=scriptForge|DEFAULT_AI_TEXT_MODEL | hits=13
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續15）— 橫幅 C1–C8 合併上線（f287df2c5 → 部署 6b9032f09）
 
 - 合併：worker 分支 `claude/modest-ellis-5bccc9`（含 `claude/busy-nash-b53413` C6/C7）→ main `f287df2c5`。Codex 審查 4 點：F1 ag-psd 不在清單、F2 字型未進建置 = 誤報（審查封包只含篩選後的程式差異，package.json 與 695 個 woff2 實際已 commit）；F3 CIS 外部 logo、F4 色調匹配取樣不一致 = 屬實，worker 修於 `ebe1fa65b`。
