@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-26（續37）— 排程頁新增「寄信額度提醒」（mail_quota_watch）；算命站 Resend 帳號金鑰進 next-admin
+
+- [根因] 操作者問每日信會不會花很多錢、要快到上限時提醒。Resend 免費方案每帳號每天 100 封、每月 3,000 封，到上限寄不出去；沒有任何提醒。主帳號由 `awarewave-ops`、`soulful-expression` 共用，算命站是獨立帳號，next-admin 沒有它的金鑰。
+- [步驟]
+  - 金鑰（操作者同意；先說成「唯讀」，查實 Resend 只有 sending／full 兩種後更正並再問一次）：主機 `/root/lobster-phase1/.env` 加 `RESEND_API_KEY_ORACLE`（備份 `.env.bak-resend-oracle-20261126`；值由憑證檔經 stdin 傳，未顯示）；`safe-infra-patch.sh compose … next-admin` 加 `environment` 一行（備份 `docker-compose.yml.bak.safe-patch-20261126-074535`）；repo 對照檔 `e9367e90c`。
+  - 功能：工人 `mail-quota-watch`（Opus 5.5）`4f70af281` → cherry-pick `b6493130b`：`lib/mail/resend-accounts.ts`（帳號↔公司唯一對應表）、`lib/schedules/mail-quota.ts`（`GET https://api.resend.com/usage`；每日或每月 ≥80% 以 `raiseNotice` 通知，fingerprint＝帳號＋期別＋UTC 日，同日一次；讀不到丟錯）、`jobs.ts` 一筆工作（預設關、`every_5m`）。
+- [驗證] 容器內兩把金鑰實打 `GET /usage` 皆 200：主帳號今日 0/100、本月 8/3000；算命站帳號今日 4/100、本月 5/3000。`docker exec lobster-next-admin printenv RESEND_API_KEY_ORACLE` exit 0、容器 healthy。vitest `lib/schedules lib/mail` 等 11 檔 119 測試過。`npx tsc --noEmit` 只有 `ag-psd` 兩個找不到模組（另一條線新加的依賴，本 worktree 的 node_modules 沒裝；與本改動無關）。三個 org slug 已對正式庫核對。
+- [RISKS 總檢] ① 主帳號金鑰是否能讀用量 → 已實測 200。② Resend 讀不到時錯誤按公司各報一次 → 接受。③ 月用量過 80% 後每天提醒一次到重設 → 接受。④ 排程頁那一格不顯示用量摘要（既有欄位只有最近執行時間與錯誤）→ 記錄，不加新 UI。⑤ Resend 文件對「每日」是 UTC 日或滾動 24 小時說法不一 → 以 UTC 日去重，最多一天一次。
+- [未做] 尚未部署（03:00 自動部署）；部署後要到 `/ops/schedules` 替三家公司打開並看第一次執行。
+- [rollback] 功能：revert `b6493130b`；金鑰：主機兩個備份檔放回＋`docker compose up -d --no-build next-admin`，repo revert `e9367e90c`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin node -e fetch(api.resend.com/usage) ×2 金鑰 | exit=0 | ms=4000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=RESEND_API_KEY_ORACLE | hits=4
+- ORACLE_WAIVED: 工人 critic 一輪（1 Major＝金鑰權限未實測，監工已在主機實打）＋監工讀完整 diff；只讀用量、不寄信；金鑰只從 env 讀。
 ## 2026-11-26（續36）— oracle WP：外掛 0.5.2，每日信訂閱表單不再要訪客填經緯度（操作者訂閱被 400 退回）
 
 - [根因] 操作者在 `/daily-letter/` 訂閱：容器 access log 06:34:02 UTC `POST /wp-json/aworacle/v1/daily/subscribe` 400，無 `fc_subscribers`／`aworacle_daily_profiles` 新列、無寄信。表單（0.5.1 `assets/daily.js:78-81,150`）要訪客輸入緯度、經度，留空送 null → `Members/Record.php:153-160` 判無效；畫面只顯示「請檢查標示的欄位」。GO-3 前監工只測了表單之後的流程，沒有以訪客身分填表單（這一段當時標為「沒有人走過」）。
