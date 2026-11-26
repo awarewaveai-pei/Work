@@ -4,7 +4,6 @@
 import { BANNER_COPY_VARIANTS } from "@/lib/script-forge/modules";
 import { AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
 import { textCallCostUsd, toolCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
-import { ELEM_KEYS, type ElemPositions } from "./banner-layers";
 
 /** The models offered on the banner's AI buttons (operator 2026-11-26). Defaults from the bake-off on production
  *  (ai_call_logs, same brief, 2026-11-26): 一鍵設計 stays Claude Opus 5.5. 生成文案 = Claude Sonnet 5.5 (operator 2026-11-26,
@@ -38,50 +37,38 @@ export function ntdLabel(v: number): string {
   return v < 0.05 ? "不到 NT$0.1" : `約 NT$${(Math.round(v * 10) / 10).toFixed(1)}`;
 }
 
-/** The layout fields one size may get from the AI (a subset of BannerStudio SIZE_KEYS). */
+/** What the AI decides for one size: intent only (where the words / product / badge / logo go). Sizes, positions and
+ *  every pixel are the layout engine's (banner-layout.ts), so a position button always works on an AI design. */
 export interface LayoutPatch {
   textPos?: "top" | "center" | "bottom";
   textAlignH?: "left" | "center" | "right";
-  headlineSize?: number;
-  subtextSize?: number;
   productPos?: "center" | "left" | "right" | "bottom-right";
-  productScale?: number;
-  positions?: ElemPositions;
+  badgePos?: "tl" | "tr";
+  logoPos?: "bl" | "br" | "tl" | "tr";
 }
 export interface SizeSpec { key: string; ratio: string; use: string; w: number; h: number }
 
 const enumOf = <T extends string>(v: unknown, allowed: readonly T[]) => (typeof v === "string" && (allowed as readonly string[]).includes(v) ? (v as T) : undefined);
-const numIn = (v: unknown, lo: number, hi: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : undefined);
 
-/** One size's layout from the AI answer: unknown keys and out-of-range values dropped, sizes clamped to the canvas. */
-export function sanitizeLayout(raw: unknown, size: { w: number; h: number }): LayoutPatch {
+/** One size's layout from the AI answer: the intent fields with a known value; anything else (old answers' pixel sizes
+ *  and positions included) is dropped. */
+export function sanitizeLayout(raw: unknown): LayoutPatch {
   if (!raw || typeof raw !== "object") return {};
   const r = raw as Record<string, unknown>;
   const out: LayoutPatch = {};
   const tp = enumOf(r.textPos, ["top", "center", "bottom"] as const); if (tp) out.textPos = tp;
   const ta = enumOf(r.textAlignH, ["left", "center", "right"] as const); if (ta) out.textAlignH = ta;
-  const short = Math.min(size.w, size.h);
-  const hs = numIn(r.headlineSize, 16, Math.round(short * 0.25)); if (hs !== undefined) out.headlineSize = Math.round(hs);
-  const ss = numIn(r.subtextSize, 10, Math.round(short * 0.12)); if (ss !== undefined) out.subtextSize = Math.round(ss);
   const pp = enumOf(r.productPos, ["center", "left", "right", "bottom-right"] as const); if (pp) out.productPos = pp;
-  const ps = numIn(r.productScale, 0.2, 1.2); if (ps !== undefined) out.productScale = ps;
-  if (r.positions && typeof r.positions === "object") {
-    const pos: ElemPositions = {};
-    for (const k of ELEM_KEYS) {
-      const p = (r.positions as Record<string, unknown>)[k] as { x?: unknown; y?: unknown } | undefined;
-      const x = numIn(p?.x, 0, 1), y = numIn(p?.y, 0, 1);
-      if (x !== undefined && y !== undefined) pos[k] = { x, y };
-    }
-    if (Object.keys(pos).length) out.positions = pos;
-  }
+  const bp = enumOf(r.badgePos, ["tl", "tr"] as const); if (bp) out.badgePos = bp;
+  const lp = enumOf(r.logoPos, ["bl", "br", "tl", "tr"] as const); if (lp) out.logoPos = lp;
   return out;
 }
 
-/** A sensible layout by shape when the AI left a size out: tall = words in the top third, product low; wide = words left,
+/** A sensible layout by shape when the AI left a size out: tall = words on top, product under them; wide = words left,
  *  product right; square = centred stack. */
 export function shapeLayout(size: { w: number; h: number }): LayoutPatch {
   const r = size.w / size.h;
-  if (r < 0.9) return { textPos: "top", textAlignH: "center", productPos: "center", positions: { product: { x: 0.5, y: 0.66 } } };
+  if (r < 0.9) return { textPos: "top", textAlignH: "center", productPos: "center" };
   if (r > 1.25) return { textPos: "center", textAlignH: "left", productPos: "right" };
   return { textPos: "center", textAlignH: "center", productPos: "center" };
 }
@@ -91,10 +78,10 @@ export function shapeLayout(size: { w: number; h: number }): LayoutPatch {
 export function designPlan(raw: Record<string, unknown>, main: SizeSpec, chosen: readonly SizeSpec[]): { main: LayoutPatch; overrides: Record<string, LayoutPatch> } {
   if (!chosen.length) return { main: {}, overrides: {} };
   const layouts = raw.layouts && typeof raw.layouts === "object" ? (raw.layouts as Record<string, unknown>) : {};
-  const layoutOf = (s: SizeSpec) => { const l = sanitizeLayout(layouts[s.key], s); return Object.keys(l).length ? l : shapeLayout(s); };
+  const layoutOf = (s: SizeSpec) => { const l = sanitizeLayout(layouts[s.key]); return Object.keys(l).length ? l : shapeLayout(s); };
   const overrides: Record<string, LayoutPatch> = {};
   for (const s of chosen) if (s.key !== main.key) overrides[s.key] = layoutOf(s);
-  return { main: layouts[main.key] ? sanitizeLayout(layouts[main.key], main) : {}, overrides };
+  return { main: layouts[main.key] ? sanitizeLayout(layouts[main.key]) : {}, overrides };
 }
 
 // ── C10: reading the AI's JSON answer ──

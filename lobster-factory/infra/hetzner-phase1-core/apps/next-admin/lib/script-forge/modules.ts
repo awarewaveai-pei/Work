@@ -45,19 +45,19 @@ export interface ForgeModule {
 export const s = (v: unknown): string => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
 
 /** Card C9: AI 一鍵設計整張 for several sizes at once -- the shared words / colours above plus one layout per size. Only
- *  when the page sends `sizes` (its 多尺寸 ticks): without it the prompt is the single-size one, unchanged. */
+ *  when the page sends `sizes` (its 多尺寸 ticks): without it the prompt is the single-size one, unchanged. R2-A: a layout
+ *  is intent only (which area); sizes and coordinates are the page's layout engine's (tools/banner/banner-layout.ts). */
 function bannerSizesPart(sizes: unknown): string {
   const list = (Array.isArray(sizes) ? sizes : []).slice(0, 12).map((v) => v as Record<string, unknown>)
     .filter((v) => /^r[0-9x]+$/.test(s(v.key)) && Number(v.w) > 0 && Number(v.h) > 0);
   if (!list.length) return "";
   return `\n\n【多尺寸】同一張設計要同時出下列尺寸。上面的文案與配色所有尺寸共用；另外加一個 "layouts" 欄位，替每個尺寸各給一個版面（key 照下列原樣）：\n` +
     list.map((v) => `- ${s(v.key)}：${s(v.ratio)} ${s(v.w)}×${s(v.h)}（${s(v.use)}）`).join("\n") +
-    `\n"layouts":{"<key>":{"textPos":"top|center|bottom","textAlignH":"left|center|right","headlineSize":像素整數,"subtextSize":像素整數,` +
-    `"productPos":"center|left|right|bottom-right","productScale":0.2到1.2,` +
-    `"positions":{"headline":{"x":0到1,"y":0到1},"subtext":{...},"price":{...},"cta":{...},"trust":{...},"product":{...},"badge":{...}}}}\n` +
-    `positions 是各元素外框中心佔畫布寬高的比例（可只給需要移動的元素，沒給的照自動排版）。` +
-    `依形狀真的換排法：直式（9:16、2:3、3:4、4:5）文字集中上方三分之一、商品在下半部、字要大到手機看得清；` +
-    `方形（1:1）置中堆疊；橫式（16:9、1.91:1、3:1、4:3、3:2）左文右圖、文字靠左。字級以該尺寸像素計（短邊越長字越大），元素不得超出畫面。`;
+    `\n"layouts":{"<key>":{"textPos":"top|center|bottom","textAlignH":"left|center|right",` +
+    `"productPos":"center|left|right|bottom-right","badgePos":"tl|tr","logoPos":"bl|br|tl|tr"}}\n` +
+    `每個尺寸只決定各元素放哪一區；字級、大小與精確位置由程式依尺寸自動排、互不重疊，不要給像素或座標。` +
+    `依形狀真的換排法：直式（9:16、2:3、3:4、4:5）文字在上方、商品在文字下方；` +
+    `方形（1:1）置中堆疊；橫式（16:9、1.91:1、3:1、4:3、3:2）左文右圖、文字靠左。`;
 }
 /** Card C12: the background the page measured ({mode, colors, meanLum, zones: {top|center|bottom: {lum, busy}}}), read
  *  defensively. null = not sent (the old prompt). */

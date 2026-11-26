@@ -12,13 +12,14 @@ describe("AI 一鍵設計 across sizes", () => {
   it("every chosen size gets its own override (from the answer, else by shape)", () => {
     const raw = { headline: "x", layouts: {
       r191x1: { textAlignH: "left", productPos: "right" },
-      r9x16: { textPos: "top", headlineSize: 140, positions: { product: { x: 0.5, y: 0.7 }, cta: { x: 2, y: 0.9 } } },
+      // an old-style answer: pixel sizes and coordinates are dropped, only the intent stays
+      r9x16: { textPos: "top", badgePos: "tr", logoPos: "nowhere", headlineSize: 140, positions: { product: { x: 0.5, y: 0.7 } } },
       r1x1: { nonsense: 1 },
     } };
     const plan = designPlan(raw, MAIN, [MAIN, TALL, SQUARE, WIDE]);
     expect(Object.keys(plan.overrides).sort()).toEqual(["r16x9", "r1x1", "r9x16"]);
     for (const o of Object.values(plan.overrides)) expect(Object.keys(o).length).toBeGreaterThan(0);
-    expect(plan.overrides.r9x16).toEqual({ textPos: "top", headlineSize: 140, positions: { product: { x: 0.5, y: 0.7 }, cta: { x: 1, y: 0.9 } } });
+    expect(plan.overrides.r9x16).toEqual({ textPos: "top", badgePos: "tr" });
     expect(plan.overrides.r1x1.textAlignH).toBe("center");   // left out / unusable -> square = centred
     expect(plan.overrides.r16x9.productPos).toBe("right");   // wide = words left, product right
     expect(plan.main).toEqual({ textAlignH: "left", productPos: "right" });

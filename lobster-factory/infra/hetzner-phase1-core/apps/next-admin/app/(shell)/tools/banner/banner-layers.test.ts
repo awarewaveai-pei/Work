@@ -3,7 +3,8 @@
 // run in the browser (WORKLOG of this card).
 import { describe, expect, it } from "vitest";
 import { readPsd } from "ag-psd";
-import { autospace, autospaceRuns, buildBannerPsd, buildBannerSvg, wrapChars, type Pixels, type RasterDoc, type TextSpec } from "./banner-layers";
+import { buildBannerPsd, buildBannerSvg, type Pixels, type RasterDoc, type TextSpec } from "./banner-layers";
+import { autospace, autospaceRuns, wrapChars } from "./banner-layout";
 
 const W = 40, H = 20;
 function px(fill: (x: number, y: number) => boolean): Pixels {
