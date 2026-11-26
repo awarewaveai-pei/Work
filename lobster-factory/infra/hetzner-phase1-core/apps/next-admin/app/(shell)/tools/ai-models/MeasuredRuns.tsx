@@ -10,7 +10,7 @@ import { bakeoffHref, type BakeoffSlug } from "./bakeoff-pages";
 const songNt = (id: keyof typeof MUSIC_RATES) => `NT$${nt(musicUsd(id)).toFixed(2)}`;
 
 const LINE = "var(--card-border)";
-type Row = { date: string; model: string; asked: string; money: string; result: string; src: string; verdict?: "good" | "bad" | "todo"; plain?: boolean };
+type Row = { date: string; model: string; asked: string; money: string; result: string; copies?: string[]; src: string; verdict?: "good" | "bad" | "todo"; plain?: boolean };
 // page: the full bake-off page embedded above the table (sandboxed iframe from the staff-only bakeoff route).
 type Group = { title: string; intro?: string; rows: Row[]; image?: { src: string; alt: string; caption: string }; page?: BakeoffSlug };
 
@@ -21,6 +21,22 @@ const W5 = "2026-11-14（續5）破框：入口邊開格、照參考改寫提示
 const ART = "agency-os/reports/model-bakeoff/2026-11-article/（key.json、editor-review.md）";
 
 const BANNER_COPY = "正式站 ai_call_logs 2026-11-26 11:05 的 12 筆（WORKLOG 2026-11-26 橫幅生成文案 12 模型實測）";
+
+// The five 標題／副標 pairs each model returned in the 2026-11-26 banner copy run, verbatim.
+const BANNER_COPIES: Record<string, string[]> = {
+  haiku: ["限時優惠！塔羅占卜首次體驗半價／現在預約塔羅諮詢，名額有限，立即搶購專屬解惑時段", "今日特惠，揭開你的命運之牌／塔羅解牌限時五折起，點擊即刻開始你的指引之旅", "限量促銷！塔羅牌組買一送一／精選正版塔羅牌限時優惠，數量有限，先搶先得", "心中有疑問？塔羅給你答案／促銷期間加購解讀服務享八折，馬上預約你的專屬占卜", "週末限定！塔羅占卜超值方案／三次解讀組合價大幅優惠，立即點擊，把握這次機會"],
+  nano: ["今晚就問塔羅：準到爆／立即抽牌，解鎖你的答案與下一步", "塔羅開運特惠：抽一次就中／現在點進來，讓命運告訴你該怎麼走", "想知道未來？用塔羅秒解／快速抽牌，掌握感情、工作與財運方向", "塔羅牌占卜促銷中／趕快體驗，獲得你的專屬指引與破解法", "一句提問，塔羅給你答案／馬上抽牌，找到行動策略與好運入口"],
+  luna: ["揭開命運指引，遇見更好的自己／即刻預約塔羅占卜，探索感情與職涯方向", "塔羅解讀迷惘，讓下一步更清晰／限時優惠開放中，現在預約專屬牌卡解讀", "抽一張牌，聽見內心真正的答案／用塔羅探索心中疑問，預約你的專屬解讀", "感情事業怎麼選？塔羅陪你看方向／預約塔羅占卜，為重要選擇多一份參考", "你的近期運勢，現在就來揭曉／立即預約塔羅解讀，探索近期生活新方向"],
+  mini: ["塔羅牌揭曉你的答案／立即分享預覽，看看今天的關鍵訊息", "一抽看見命運轉向／現在就打開預覽，發現專屬指引", "今天適合問塔羅牌／點開連結預覽，秒懂你的下一步", "迷霧中的答案在這／馬上查看分享預覽，抓住你的運勢", "你的專屬塔羅提示／立即預覽，讓今天的選擇更清楚"],
+  terra: ["用塔羅探索你的下一步／現在體驗塔羅，為心中的疑問找方向", "心中有疑問就來抽張牌／感情、工作或生活，讓塔羅陪你探索", "你的專屬塔羅時刻到了／立即開啟塔羅，聆聽內心真正的想法", "讓塔羅為迷惘帶來靈感／給自己一點時間，探索更多可能性", "翻開塔羅看見不同視角／準備好探索自己了嗎？現在就開始"],
+  sol: ["抽張塔羅看看此刻的你／帶著心中的疑問，抽一張牌找找新方向", "感情卡關就來抽張牌／選一張塔羅牌，看看這段關係裡你在意什麼", "找一副讓你心動的塔羅／逛逛不同畫風，挑一副你想天天翻的牌", "從第一張牌開始學塔羅／不用硬背牌義，先從看懂牌面故事開始", "每天一張牌陪你理思緒／把抽牌留給自己，今天就開始這個小儀式"],
+  gpt54: ["今天的答案牌上見／立即抽牌占卜，解開感情工作疑問", "你的下一步塔羅告訴你／限時體驗占卜，現在就看專屬指引", "愛情事業運勢一次看／一鍵抽牌，快速獲得當下清晰方向", "迷惘時刻讓塔羅指路／立即測問未來走向，把握關鍵時機", "專屬塔羅解讀立即揭曉／現在就抽一張牌，看看宇宙想告訴你"],
+  sonnet: ["塔羅解惑｜限時首次體驗85折／感情、事業、財運一次看清，立即預約你的專屬牌陣解讀", "迷惘時刻，讓塔羅給你答案／本週預約加贈延伸追問10分鐘，名額有限，立即搶位", "抽一張牌，看見未來的方向／新客限定免費抽牌指引，現在點擊即可領取你的牌義", "年度運勢塔羅，早鳥優惠開跑／整年運勢完整解析，現在下單享早鳥價，優惠只到本月底", "愛情卡關？塔羅幫你找出關鍵／專業牌卡老師一對一解讀，今日預約再送牌陣解析報告"],
+  gpt55: ["塔羅指引限時開占／現在預約，揭開你的關鍵答案", "看見命運下一步／專屬塔羅解讀，限時優惠中", "愛情事業一牌看清／立即抽牌，掌握你的轉機", "你的答案牌裡有／限時體驗塔羅，為迷惘找方向", "開啟專屬塔羅訊息／今日占卜優惠，錯過再等下次"],
+  astra: ["你的第一副塔羅牌／從最吸引你的牌面開始挑吧", "一眼心動的塔羅牌／看看各款牌面，挑出百看不膩的那副", "把每日一抽變成小儀式／挑副喜歡的塔羅牌，陪你開啟每一天", "換張牌，換個角度想／帶著心裡的問題，從一張塔羅牌聊起", "送一副塔羅，聊一晚心事／挑一副送給好友，下次見面一起抽"],
+  fable: ["塔羅限時優惠，解答你的迷惘／本週下單享85折，立即預約專屬占卜", "愛情事業財運，一次看清／新客首占只要299元，點我搶先預約", "你的未來，牌早就知道／限量名額每日開放，點擊鎖定今日折扣", "迷惘時刻，讓塔羅指路／買一送一體驗價，分享給需要的朋友", "三張牌，看透眼前的選擇／活動只到月底，現在預約再送解牌報告"],
+  opus: ["新手塔羅牌組限時75折／附中文解牌手冊，今天下單免運到府", "抽一張牌，看清你的下一步／經典偉特塔羅牌，首購再折百元立即入手", "買塔羅送牌布，數量有限／精美絨布牌袋＋占卜桌布，送完為止快搶購", "週末塔羅特賣，全館8折起／原創牌卡、水晶配件一次買齊，點擊搶先逛", "78張牌，解答你的心中疑問／零基礎也能上手，買牌加贈線上教學課程"],
+};
 
 const ARTIMG ="agency-os/reports/model-bakeoff/2026-11-article-image/（runs.json、image-bakeoff.html）";
 
@@ -68,18 +84,18 @@ const GROUPS: Group[] = [
     title: "橫幅：生成文案",
     intro: "2026-11-26 正式站，橫幅工具的「生成文案」鈕。12 個模型同時各跑一次，條件都一樣：主題只打「塔羅牌」、語氣「促銷」、尺寸 1.91:1 連結分享預覽；每次回 5 組標題＋副標。操作者先前用 GPT-6.2 sol 測「精油」，判定不佳（只像心理測驗、沒有促銷感）。其餘好壞是 Claude 的初判，標準是有沒有照「促銷」寫、能不能直接放上橫幅。注意：主題沒給價錢或折扣，有些模型自己編了「85折」「299元」這類數字，用之前要換成真的。",
     rows: [
-      { date: "2026-11-26", model: "Claude Haiku 5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.01", result: "例：「心中有疑問？塔羅給你答案／促銷期間加購解讀服務享八折」。有照促銷寫，但五組都是「限時」「限量」，變化少；自己編了半價、八折。4 秒。", src: BANNER_COPY, plain: true },
-      { date: "2026-11-26", model: "GPT-5.4 nano", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.01", result: "例：「今晚就問塔羅：準到爆」「抽一次就中」。誇大、廣告味重，不能用。5 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
-      { date: "2026-11-26", model: "GPT-6 luna", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.01", result: "例：「揭開命運指引，遇見更好的自己」。通順但空泛，五組都差不多，沒有促銷感。7 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
-      { date: "2026-11-26", model: "GPT-5.4 mini", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.03", result: "例：「塔羅牌揭曉你的答案／立即分享預覽，看看今天的關鍵訊息」。把尺寸名稱「分享預覽」寫進副標，不能用。4 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
-      { date: "2026-11-26", model: "GPT-6.1 terra", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.05", result: "例：「用塔羅探索你的下一步」。平淡，沒有照促銷寫。7 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
-      { date: "2026-11-26", model: "GPT-6.2 sol（目前預設）", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.10", result: "例：「抽張塔羅看看此刻的你」「從第一張牌開始學塔羅」。溫和、像生活提案，完全沒有促銷；操作者測「精油」也判定不佳。9 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
-      { date: "2026-11-26", model: "GPT-5.4", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.11", result: "例：「迷惘時刻讓塔羅指路／立即測問未來走向，把握關鍵時機」。短、可用，但用語普通。6 秒。", src: BANNER_COPY, plain: true },
-      { date: "2026-11-26", model: "Claude Sonnet 5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.14", result: "例：「愛情卡關？塔羅幫你找出關鍵／專業牌卡老師一對一解讀，今日預約再送牌陣解析報告」。五組角度都不同（新客、感情、年度運勢），促銷具體；有自編的 85 折。6 秒。", src: BANNER_COPY, plain: true, verdict: "good" },
-      { date: "2026-11-26", model: "GPT-5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.25", result: "例：「愛情事業一牌看清／立即抽牌，掌握你的轉機」。最短，可用但普通。7 秒。", src: BANNER_COPY, plain: true },
-      { date: "2026-11-26", model: "GPT-6.2 astra", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.38", result: "例：「送一副塔羅，聊一晚心事」。文字最有質感，但跟 sol 一樣沒有促銷。8 秒。", src: BANNER_COPY, plain: true },
-      { date: "2026-11-26", model: "Claude Fable 5.1", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.59", result: "例：「你的未來，牌早就知道／限量名額每日開放，點擊鎖定今日折扣」「三張牌，看透眼前的選擇」。標題最有記憶點，促銷具體；有自編的 299 元。9 秒。", src: BANNER_COPY, plain: true, verdict: "good" },
-      { date: "2026-11-26", model: "Claude Opus 5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.72", result: "例：「78張牌，解答你的心中疑問／零基礎也能上手，買牌加贈線上教學課程」。唯一把塔羅牌當商品賣，優惠具體；有自編的 75 折。12 秒，最慢最貴。", src: BANNER_COPY, plain: true, verdict: "good" },
+      { date: "2026-11-26", model: "Claude Haiku 5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.01", result: "例：「心中有疑問？塔羅給你答案／促銷期間加購解讀服務享八折」。有照促銷寫，但五組都是「限時」「限量」，變化少；自己編了半價、八折。4 秒。", src: BANNER_COPY, copies: BANNER_COPIES.haiku, plain: true },
+      { date: "2026-11-26", model: "GPT-5.4 nano", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.01", result: "例：「今晚就問塔羅：準到爆」「抽一次就中」。誇大、廣告味重，不能用。5 秒。", src: BANNER_COPY, copies: BANNER_COPIES.nano, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-6 luna", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.01", result: "例：「揭開命運指引，遇見更好的自己」。通順但空泛，五組都差不多，沒有促銷感。7 秒。", src: BANNER_COPY, copies: BANNER_COPIES.luna, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-5.4 mini", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.03", result: "例：「塔羅牌揭曉你的答案／立即分享預覽，看看今天的關鍵訊息」。把尺寸名稱「分享預覽」寫進副標，不能用。4 秒。", src: BANNER_COPY, copies: BANNER_COPIES.mini, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-6.1 terra", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.05", result: "例：「用塔羅探索你的下一步」。平淡，沒有照促銷寫。7 秒。", src: BANNER_COPY, copies: BANNER_COPIES.terra, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-6.2 sol（目前預設）", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.10", result: "例：「抽張塔羅看看此刻的你」「從第一張牌開始學塔羅」。溫和、像生活提案，完全沒有促銷；操作者測「精油」也判定不佳。9 秒。", src: BANNER_COPY, copies: BANNER_COPIES.sol, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-5.4", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.11", result: "例：「迷惘時刻讓塔羅指路／立即測問未來走向，把握關鍵時機」。短、可用，但用語普通。6 秒。", src: BANNER_COPY, copies: BANNER_COPIES.gpt54, plain: true },
+      { date: "2026-11-26", model: "Claude Sonnet 5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.14", result: "例：「愛情卡關？塔羅幫你找出關鍵／專業牌卡老師一對一解讀，今日預約再送牌陣解析報告」。五組角度都不同（新客、感情、年度運勢），促銷具體；有自編的 85 折。6 秒。", src: BANNER_COPY, copies: BANNER_COPIES.sonnet, plain: true, verdict: "good" },
+      { date: "2026-11-26", model: "GPT-5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.25", result: "例：「愛情事業一牌看清／立即抽牌，掌握你的轉機」。最短，可用但普通。7 秒。", src: BANNER_COPY, copies: BANNER_COPIES.gpt55, plain: true },
+      { date: "2026-11-26", model: "GPT-6.2 astra", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.38", result: "例：「送一副塔羅，聊一晚心事」。文字最有質感，但跟 sol 一樣沒有促銷。8 秒。", src: BANNER_COPY, copies: BANNER_COPIES.astra, plain: true },
+      { date: "2026-11-26", model: "Claude Fable 5.1", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.59", result: "例：「你的未來，牌早就知道／限量名額每日開放，點擊鎖定今日折扣」「三張牌，看透眼前的選擇」。標題最有記憶點，促銷具體；有自編的 299 元。9 秒。", src: BANNER_COPY, copies: BANNER_COPIES.fable, plain: true, verdict: "good" },
+      { date: "2026-11-26", model: "Claude Opus 5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.72", result: "例：「78張牌，解答你的心中疑問／零基礎也能上手，買牌加贈線上教學課程」。唯一把塔羅牌當商品賣，優惠具體；有自編的 75 折。12 秒，最慢最貴。", src: BANNER_COPY, copies: BANNER_COPIES.opus, plain: true, verdict: "good" },
     ],
   },
   {
@@ -158,7 +174,9 @@ export default function MeasuredRuns() {
                     <td style={{ ...td, fontWeight: 700, color: tone(r.verdict) }}>{r.model}</td>
                     <td style={td}>{r.asked}</td>
                     <td style={{ ...td, fontVariantNumeric: "tabular-nums" }}>{r.money}</td>
-                    <td style={td}>{r.result}</td>
+                    <td style={td}>{r.result}{r.copies ? (
+                      <ol style={{ margin: "6px 0 0", paddingLeft: 20, color: "var(--text-secondary)" }}>{r.copies.map((c) => <li key={c}>{c}</li>)}</ol>
+                    ) : null}</td>
                     <td style={{ ...td, fontSize: 12, color: "var(--text-muted)" }}>{r.plain || r.src === ART ? r.src : `WORKLOG ${r.src}`}</td>
                   </tr>
                 ))}

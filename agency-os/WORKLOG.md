@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-26（續25）— 橫幅生成文案實測頁：每個模型回的 5 組標題／副標全部列出
+
+- 起因：操作者「每個模型回 5 組 都要列出」；原本每列只摘一例。
+- 改動：`NA/app/(shell)/tools/ai-models/MeasuredRuns.tsx` Row 加選填 `copies`，結果欄下方以編號清單列出；`BANNER_COPIES` 12 個模型各 5 組，逐字取自同次（11:05）script-forge 回應。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . (only pre-existing ag-psd module errors) | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 展示用資料＋一個選填欄位
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=BANNER_COPIES | hits=13
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續24）— 橫幅生成文案 12 模型實測（主題「塔羅牌」），結果寫進 /tools/ai-models 實測紀錄
 
 - 起因：操作者用 GPT-6.2 sol（生成文案預設）測「精油」判定不佳，要求各模型實測並寫進「AI 模型與成本」。
