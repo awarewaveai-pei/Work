@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { listContentDrafts } from "@/lib/content/drafts-list";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,6 @@ export const dynamic = "force-dynamic";
 // Autosaves every generated article so it survives reload / regenerate and is re-openable
 // across machines. Service-role-only table; this route is the only accessor (ops-role gated).
 
-const LIST_LIMIT = 100;
 const MAX_MARKDOWN_BYTES = 600_000; // ~600KB guard — articles are far smaller; reject runaway payloads
 
 interface DraftRow {
@@ -46,21 +46,6 @@ function toFull(r: DraftRow) {
     seoScore: r.seo_score,
     status: r.status,
     formSnapshot: r.form_snapshot,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  };
-}
-
-function toListItem(r: Omit<DraftRow, "markdown" | "meta" | "form_snapshot">) {
-  return {
-    id: r.id,
-    keyword: r.keyword,
-    title: r.title,
-    language: r.language,
-    articleType: r.article_type,
-    slugHint: r.slug_hint,
-    seoScore: r.seo_score,
-    status: r.status,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -105,17 +90,9 @@ export async function GET(req: Request): Promise<Response> {
   try { orgFilter = effectiveOrgId(req, sp.get("organizationId")); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
-  let query = supabase
-    .from("content_drafts")
-    .select("id, organization_id, site_id, keyword, title, language, article_type, slug_hint, seo_score, status, created_at, updated_at")
-    .order("created_at", { ascending: false })
-    .limit(LIST_LIMIT);
-  if (siteId) query = query.eq("site_id", siteId);
-  if (orgFilter) query = query.eq("organization_id", orgFilter);
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-
-  const drafts = (data as Array<Omit<DraftRow, "markdown" | "meta" | "form_snapshot">>).map(toListItem);
+  let drafts;
+  try { drafts = await listContentDrafts(supabase, { organizationId: orgFilter, siteId }); }
+  catch (e) { return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 }); }
   return NextResponse.json({ ok: true, drafts });
 }
 

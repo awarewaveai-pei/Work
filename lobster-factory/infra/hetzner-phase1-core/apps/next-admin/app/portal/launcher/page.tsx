@@ -12,6 +12,7 @@ import { billingAccount, createEntitlementStore } from "@/lib/entitlements/table
 import { heldRightInput } from "@/lib/entitlements/product-right";
 import type { NextAdminProduct } from "@/lib/portal/doors";
 import { CreditsLine } from "./CreditsLine";
+import { DoorForm, ResumeSection, loadResume } from "./ResumeSection";
 
 export const dynamic = "force-dynamic";
 
@@ -57,16 +58,6 @@ const DOOR_NOTICE: Record<string, string> = {
 };
 const DOOR_NOTICE_DEFAULT = "暫時無法進入，請稍後再試";
 
-function DoorForm({ productKey, next, label }: { productKey: string; next?: string; label: string }) {
-  return (
-    <form method="post" action="/portal/api/door">
-      <input type="hidden" name="product_key" value={productKey} />
-      {next && <input type="hidden" name="next" value={next} />}
-      <button className="btn-primary">{label}</button>
-    </form>
-  );
-}
-
 function AccessDenied() {
   return (
     <div style={{ maxWidth: 480, margin: "80px auto", padding: 24, textAlign: "center" }}>
@@ -101,6 +92,7 @@ export default async function PortalLauncherPage({ searchParams }: { searchParam
 
   const heldProducts = servedNextAdminProducts().filter((p) => held.has(p.key));
   const rights = failed ? new Map<string, RightLabel>() : await getRights(orgId, heldProducts);
+  const resume = failed ? [] : await loadResume(orgId, held);
   const label = ({ key, name }: (typeof PRODUCTS)[number]): RightLabel => {
     const known = rights.get(key);
     if (known) return quiet(known);
@@ -119,6 +111,8 @@ export default async function PortalLauncherPage({ searchParams }: { searchParam
         </p>
       )}
       <CreditsLine />
+      {/* the unit's newest works and drafts; orgId is requireClientOrg's, never a request value (card U17) */}
+      {!failed && <ResumeSection items={resume} />}
       {failed && (
         <div style={{ margin: "0 0 24px" }}>
           <p style={{ fontSize: 13.5, color: "var(--badge-red-text)", margin: "0 0 8px" }}>讀取產品清單時發生錯誤，請重新整理頁面再試一次。</p>
