@@ -107,6 +107,7 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 - 上線：部署版 `236b8fc60`，含 K10、K23–K29 全部；容器 healthy；主線沒有未上線的 next-admin 改動。四個工人都已 clear、閒置（sub-k1 `local_bb671b06…`、sub-k2 `local_8466f158…`、sub-k3 `local_1a22899c…`、sub-k4 `local_3da5453e…`）。
 - 已驗：三份比較頁檔案在正式容器內（`content/model-bakeoff/*/index.html`）；未登入打 `/tools/ai-models/bakeoff/<slug>` 會導去登入頁。
 - **待驗（等操作者在內建瀏覽器面板登入 app.aware-wave.com，或她自己看）**：① `/tools/ai-models?tab=measured` 三組上方的嵌入頁是否顯示；② 產一篇文章（`fetch('/api/content/generate', {keyword, language, articleSize:'short', generateMeta:true, media:{aiImages:'flux-schnell', imageCount:3, imageSize:'4:3'}})`，約 NT$2）看 `PEOPLE_IN_PICTURES`：沒人的段落不硬塞人、有人的幾張是不同的人；③ 下一篇自動文章的 FB／IG／Bluesky 草稿是否附 1080×1350 封面；④ 第一則實際 Bluesky 貼文直式是否被裁（被裁 → `lib/content/cover/sizes.ts` 的 bluesky 改橫式）。
+- **11-26 已驗 ①②**（Opus 監工）：三份嵌入頁皆顯示（配圖頁圖有載入）；產「小型咖啡店如何經營熟客」：內文 3 張僅 1 張有人且寫明兩個不同人、封面無人。③④ 仍待下一篇自動文章。
 - 在瀏覽器頁面跑長流程：結果每完成一項就寫 `localStorage` 並取出存檔（11-25 只放 `window` 變數，頁面重新整理後全丟）。
 - 提交方式不變：`D:\Worktrees\Work\sub-int`（detached）整合；文件用 scratchpad 的 `ship24.sh`（複製 `data.mjs`／`supervisor.html`／`DISPATCH.md`／briefs 到 sub-int 後 commit、push）；scratchpad 被清掉就照這個做法重寫一支。新增 brief 檔要記得加進複製與 `git add`（11-25 漏過一次）。
 - 操作者提過但沒有卡：Banner 設計工具的尺寸選單（另有「Banner pro-design」那條線）；免費圖庫；風格目錄的畫家組在文章這邊收起來；IG 可點連結（Meta One，需付費且只能在 App 手動加）。
