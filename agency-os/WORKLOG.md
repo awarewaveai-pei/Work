@@ -46,6 +46,95 @@
 - ORACLE_WAIVED: 1m 修在 artifact 之後（解析副檔名＋補 B-017/B-090），由 13 項積木測試覆蓋
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=overviewGroup|catalogHref|CatalogGroup | hits=8
 - rollback：`git revert` 本 commit
+## 2026-11-26（續14）— 橫幅 Codex 審查 F3／F4：品牌套組只收畫布讀得到的 logo；色調匹配兩種匯出取樣同一畫面
+
+- F3 根因：品牌套組沒存過時以 CIS `cis.logo.primary` 帶入 logo（`NA/app/(shell)/tools/banner/kit/brand-kit.ts` kitFromClientConfig），那常是外部網站圖；套用時 `urlToBlob` 走 `/api/tools/designs/download`，該路由只收自家 bucket → 400，logo 套不上。不變量：只有畫布讀得到像素的 logo（自家 bucket）才進套組。修：`sanitizeBrandKit`／`kitFromClientConfig` 收 `ownLogo` 判斷（route 傳 `isPublicBucketAsset`；brand-kit.ts 也在瀏覽器跑，不能 import 伺服器的 r2），外部 logo 濾掉並回 `externalLogo`；面板顯示「CIS 的 logo 在外部網站，橫幅讀不到；請在這裡上傳一份。」；route 錯誤碼（orgId_required 等 9 個）轉繁中句子。`route.test.ts` 的 logo 改成自家 bucket 網址。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- F4 根因：`banner-layers.ts` 色調匹配取樣在平面模式是同一張畫布（含暗化），分層模式只含背景層 → 開暗化＋色調匹配時 PNG 與 PSD/SVG 商品顏色不同。不變量：兩模式取樣同一內容＝商品後方實際畫面（背景＋暗化）。修：`behindProduct()` 在暗化之後、商品之前合成目前已畫的層成快照，只在開色調匹配時做，兩模式都用它。
+- 驗證：tsc 綠；vitest presets＋banner＋accent-not-text 26 passed；瀏覽器：開暗化（0.6）＋色調匹配（強度 1）時分層疊回 vs 平面最大差 2/255（≤4），平面輸出與修前 0 差；預設值與修前 0 差。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/tools/presets "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=4000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（Codex 外部審查 F3/F4 的修正；書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=kitFromClientConfig|sanitizeBrandKit | hits=3
+- ORACLE_WAIVED: 審查來源即 Codex oracle（agency-os/reports/oracle/2026-11-26-partialreview-67d77480.md），監工合併前再看
+## 2026-11-26（續12）— 橫幅 C8：接上品牌套組（C6）與商品擬真（C7）；logo 成為可拖曳元素
+
+- 根因／決策：C6／C7 模組（banner-modules，13a718295）已完成但沒接進畫面。合併 `claude/busy-nash-b53413`（只新增檔＋design-upload 修正，無衝突）。`NA/app/(shell)/tools/banner/banner-layers.ts`：`grounding` 有任一開關時呼叫 `groundProduct`，輸出「商品陰影」「商品倒影」「商品圖」三層（背景層供色調取樣；全關走原 drawImage，PNG 不變）；新增 `logoImage`／`logoScale` → 「Logo」層，預設左下、可依 C4 拖曳、多尺寸各自可調大小。`BannerStudio.tsx`：配色步驟放 `BrandKitPanel`（`useBrandKit(saveOrg)`），套用時 主→漸層起＋徽章、輔→漸層迄、重點→重點字＋按鈕底、文字→字色、底→底色，字型字重照套，logo 經 `urlToBlob`（同網域下載路由）轉 data URL 再畫，匯出不被跨網域污染；logo 列有大小滑桿與拿掉；產品圖步驟加「商品擬真」：接觸陰影（濃度、柔和、下移）、倒影（長度、濃度、間距）、色調匹配（強度）皆為勾選＋滑桿。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 另修：合併進來的 `kit/BrandKitPanel.tsx` 錯誤訊息字色 `var(--red)` 違反 accent-not-text 閘，改 `var(--badge-red-text)`。
+- 驗證：tsc 綠；vitest banner＋presets＋lib/studio＋accent-not-text 456 passed；瀏覽器 C5(HEAD) vs C8 flat 預設 0/255（2 組）；開擬真＋logo 後圖層多出 商品陰影／商品倒影／Logo，分層 vs flat ≤2/255，PSD 1.7MB 寫出；本機實開杯子商品接觸陰影＋倒影正確（`$env:TEMP/banner-c8-grounding-brandkit.jpg`）。
+- 剩餘：本機無資料庫的 dev server 上品牌套組 API 回 `orgId_required`，「套用到這張」「存成套組」「上傳 logo」未實測，需上線後驗；面板直接顯示英文錯誤碼（C6 檔）；色調匹配在分層匯出取樣「背景層」、在 PNG 取樣「背景＋暗化」，開暗化時兩者色調微差。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" app/api/tools/presets lib/studio lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=合併檔 var(--red) 字色，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=groundProduct|useBrandKit|BrandKitPanel | hits=4
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續11）— 橫幅 C5：多尺寸輸出（勾選尺寸、縮圖、單一尺寸微調、全部下載 zip、全部存到我的設計）
+
+- 根因／決策：同一張 banner 要出 IG 直式、方形、橫式等多尺寸時只能一個一個切換重做。`NA/app/(shell)/tools/banner/BannerStudio.tsx`：`multiSizes`（勾選，看得到的勾選框）、`variantOf()`＝主設計換到該尺寸（C4 位置本來就是畫布比例並夾在畫面內，字級／字距依短邊比例縮放）再套該尺寸覆寫 `sizeOverrides[k]`；點縮圖＝`enterSize()` 把該尺寸當成目前設計編輯，主設計的尺寸欄位暫存在 `editingSize.main`，「完成，回主尺寸」`leaveSize()` 只存與推導結果不同的欄位（SIZE_KEYS：位置、字級、字距、商品圖大小／位置、徽章大小、文字位置／對齊、背景圖位置）；文字、顏色、圖片永遠全部尺寸共用。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：尺寸步驟加多尺寸勾選；預覽下方「多尺寸」卡：各尺寸縮圖（600ms 防抖、320px JPEG）、已微調／編輯中標記、清除微調、格式按鈕（PNG／JPG／WebP／PSD／SVG，沿用 C1 匯出，JPG/WebP 用匯出區目標 KB）、全部下載（jszip，`banner-9x16.psd` 等）、全部存到我的設計（逐張 saveDesign，帶目前選的客戶）。單張 JPG/WebP 下載改走共用 `encodeDesign`。
+- 驗證：tsc 綠；vitest banner＋accent-not-text 16 passed；本機實開：勾 1.91:1／9:16／1:1／16:9 四張縮圖正確比例，點 9:16 微調標題 160px→完成後主尺寸仍 64px、9:16 標「已微調」，PSD 全部下載 zip 3.3MB 含 4 個 `banner-*.psd`（`$env:TEMP/banner-c5-multisize.jpg`、`banner-c5-tweaked.jpg`）。繪圖程式未改，PNG 與 C4 一致。
+- 剩餘：直式尺寸商品圖沿用主設計「靠右」可能偏小，需要時點縮圖微調；縮圖每次改動會重繪所有勾選尺寸（已防抖）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=清除正在微調尺寸時會把未存改動重新存回→改為直接丟棄重開，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=handleDownloadLossy|encodeLossy | hits=1
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續10）— 橫幅 C4：標題、副標、價格、按鈕、評價、商品圖、徽章可在預覽上直接拖曳（格線／三分線／置中吸附）
+
+- 根因／決策：版面只能靠「上中下／左中右」與版型，元素無法自由擺放。`NA/app/(shell)/tools/banner/banner-layers.ts`：`positions`（元素外框中心佔畫布比例；沒有＝自動堆疊）→ `place()` 算位移並夾在畫面內（比畫面大則置中），位移以 ctx.translate 套到該元素所有圖層、TextSpec x/y（含旋轉中心）同步移動，所以 PNG／PSD／SVG 位置一致；被拖走的元素保留原堆疊位置不讓其他元素跳動，文字底襯與品牌色條只包住沒拖走的元素；渲染回傳每個元素實際外框 `boxes` 供點選。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`BannerStudio.tsx` 預覽改用 `renderPreview`（PNG＋boxes）；按下先判斷點到哪個元素（徽章>按鈕>評價>價格>副標>標題>商品圖），點到就拖元素，否則拖背景圖；中心靠近 1/3、1/2、2/3 吸附；拖曳中疊 SVG 參考線（10% 格線、三分虛線、吸附線與外框用主題 accent）；滑過元素游標變 move；標題列「回到自動排版」。
+- 驗證：tsc 綠；vitest banner＋accent-not-text 16 passed；瀏覽器 C3(HEAD) vs C4 flat 預設 0/255（2 組），拖過的元素分層 vs flat ≤2/255，外框夾在畫面內、PSD 標題文字座標跟著移；本機實開：拖商品圖到中央、拖徽章到左上、參考線出現（`$env:TEMP/banner-c4-dragged.jpg`、`banner-c4-guides.png`）。
+- 剩餘：預覽用上一張渲染的外框判斷點選（打字後 220ms 內外框是舊的）；手機觸控只做 pointer 拖曳，無雙指縮放。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n（書面自審，監工指示不派背景代理；M=拖走元素後底襯包住全部遠處元素→改只包沒拖走的，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=renderBannerLayers|exportToPng | hits=3
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續8）— 橫幅 C3：中文排版（字重五級、行距字距、避頭尾、中英間距）＋自架 OFL 字型 9 族
+
+- 根因／決策：操作者要專業設計師水準的中文排版。字重只有 bold、行距寫死、無避頭尾、字型只有 5 個且靠外部 CDN／系統字。改：`NA/app/(shell)/tools/banner/banner-layers.ts` 字重（300/400/500/700/900）、標題／內文行距、內文字距、`wrapChars`（換行時量寬：行首禁則字最多懸掛 1 個，第 2 個起連前一字推到下一行；行尾開括號下移；行首尾空格去掉）、`autospace`/`autospaceRuns`（中英數字間補半形空格，重點字邊界空格歸一般字）、`loadDesignFonts`（document.fonts.load 等需要的切片，4 秒逾時）。字型自架 `NA/public/banner-fonts/`（`NA/scripts/fetch-banner-fonts.mjs` 下載 Google Fonts 的 unicode-range 切片＋各族 OFL.txt，先下到暫存目錄成功才換上；黑體／明體可變字重、霞鶩文楷 300/400/700、粉圓、Inter、Montserrat、Playfair Display、Oswald、Bebas Neue，共 29MB，瀏覽器只抓用到的切片）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`BannerStudio.tsx` 字型下拉改成按鈕（各自用該字型顯示，操作者規則：不要下拉）、標題／內文字重按鈕、標題行距、內文字距、內文行距、避頭尾／中英間距開關、注入 `/banner-fonts/fonts.css` 並在字型載完重繪；EDITOR_FONTS 加新字族（粉圓→Noto Sans TC）；SVG generic 加 Playfair→serif；PSD 字重：PhotoCraft 實測 fauxBold 會畫粗、字型名帶 Bold 反而常規，所以 ≥600 用 fauxBold。`lib/portal/doors.ts` STATIC_PAGES 與 `lib/public-asset-cache.ts` 加 `/banner-fonts`（設計門與受限員工也能載字型）；`next.config.ts` woff2 切片（內容命名）長快取 immutable，fonts.css 仍 no-cache。
+- 驗證：tsc 綠；vitest（banner＋lib/portal＋public-asset-cache＋accent-not-text）102 passed（新增 wrap/避頭尾/間距 4 案）；瀏覽器 C2(HEAD) vs C3 flat 預設 4 組 0/255；本機實開：粉圓特粗標題、楷書內文加字距行距、「iPhone17 限定」「滿 999 送 100 元」自動間距、括號不落行尾（`$env:TEMP/banner-c3-typography.jpg`）。
+- 剩餘：預設開「中英間距」，中英混排的既有文案會多出半形空格（可關）；PSD 只分粗／不粗（300/500/900 在 PhotoCraft 無法表達）；repo 多 29MB 字型。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/__tests__/public-asset-cache.test.ts lib/portal lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=6000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/8n（M=避頭尾連續標點無上限掛出畫面→改為換行中最多懸掛 1 字＋追い出し；n 全修：空行殘留禁則字、括號下移超寬、重點字邊界空格、行首尾空格、Playfair generic、woff2 快取、抓字型腳本路徑與原子性、補測試）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=STATIC_PAGES|UNVERSIONED_PUBLIC_DIRS|kinsoku | hits=9
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續7）— 橫幅 C2：背景圖在預覽上拖移／滾輪縮放；文字、CTA 按鈕、促銷徽章陰影可設定（PSD/SVG 帶圖層效果）
+
+- 根因／決策：操作者要「上傳圖後可拖移、放大縮小」與「文字／CTA／徽章可加陰影設定」。背景層 `NA/app/(shell)/tools/banner/banner-layers.ts` 依 `bgImgScale`（cover 倍數 0.5–3）、`bgImgX/Y`（畫布比例位移）畫，未蓋到處鋪 `bgColor`。陰影 `ShadowSpec` 的模糊／位移以元素高度為單位（換尺寸比例不變，C5 多尺寸直接沿用）；預設＝舊畫面（CTA 0.32/0.28/0.12、膠囊徽章 0.28/0.25/0.1、`badgeShadow=null` 表示依樣式預設、文字陰影預設關）。分層時陰影是圖層效果（`layer.shadow`，像素不含）：PSD `effects.dropShadow`（normal 混合、angle=atan2(y,-x)）、SVG `<filter><feDropShadow>`（userSpaceOnUse 整張畫布）；flat 模式文字陰影用一張重用暫存畫布整層套陰影。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`banner-layers.ts` 背景變換、`applyShadow`／`px()`、`layer(name,text,shadow,whole)`、`compositeLayers` 套陰影、PSD/SVG 效果；`BannerStudio.tsx` State 6 欄（designSig 自動含）、`sanitizeDesign` 驗證陰影、上傳／AI 換圖歸零、預覽 pointer 拖曳（左鍵、capture）＋非 passive wheel 縮放、背景步驟「圖片位置」列（大小滑桿、底色、重設）、`ShadowControls` 三組（開關、色塊、不透明度、模糊、X、Y）；`banner-canvas-return.ts` PhotoCraft 傳回背景時位置歸零（＋測試）。
+- 驗證：tsc 綠；vitest banner 7 passed（新增：PSD dropShadow angle 90/180、distance、size、normal；SVG feDropShadow/filter）；瀏覽器比對 C1(HEAD) vs C2 flat 預設 0/255（3 組），陰影開時分層 vs flat ≤4/255；本機實開：拖曳後圖右移、滾輪縮到 65% 露出底色、重設回 100%、文字陰影開／按鈕陰影關／徽章陰影開（`$env:TEMP/banner-c2-bg-drag-zoom.jpg`、`banner-c2-shadows.jpg`）。
+- 剩餘：現價原有的固定小陰影保留在像素（改了會動預設畫面）；描邊光暈在 PSD/SVG 可編輯文字中仍不見（C1 起）；PhotoCraft／VectorCraft 對 dropShadow／feDropShadow 的支援未實測。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" | exit=0 | ms=500
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/7n（M=PSD 陰影 multiply→normal 已修；n 已修：SVG filter 範圍、傳回背景歸零、底色選擇器、只收左鍵、陰影換算測試、暫存畫布重用；保留：現價固定陰影）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=applyBannerCanvasReturn|bgImgScale|ctaShadow | hits=5
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續3）— 橫幅匯出可編輯圖層：拆層繪圖、PSD／SVG 文字保持文字、JPG／WebP 目標 KB、專業版兩顆按鈕、片頭按鈕填預設字
+
+- 根因／決策：操作者硬需求「PSD、SVG 裡的字要能改」。舊 `exportToPng` 把所有元素畫在一張畫布，只能出平面 PNG。改成一份繪圖程式產圖層清單（`NA/app/(shell)/tools/banner/banner-layers.ts` `renderBannerLayers`），每層一張全尺寸畫布，文字層帶 TextSpec（行、每段顏色、字型、錨點、首行基線、行高、字距、不透明度、旋轉）；PNG／預覽用同一程式的 `flat` 模式（全部畫在一張畫布，每層從乾淨 context 開始）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 為什麼 PNG 不用疊層：8-bit 預乘 alpha 疊回時柔邊陰影會二次取整，實測最大差 2/255（約 50 像素）> 卡片的 1/255；flat 模式實測 0 差，且預覽每格少建 ~15 張全尺寸畫布。
+- 步驟：`banner-layers.ts`（新）繪圖＋`buildBannerPsd`（ag-psd，文字層 = `layer.text` + 像素快取、不透明度移到圖層）＋`buildBannerSvg`（Inkscape layer `<g>`、像素層只放非透明裁切的 PNG、文字層 `<text>`/`<tspan>`）；字型對照表 `EDITOR_FONTS`（黑體→Noto Sans TC、明體→Noto Serif TC、楷書／圓體→Noto Sans TC（編輯器沒有）、Inter→Inter，依 `scripts/vectorcraft-pro/web-fonts.patch`）。`BannerStudio.tsx`：刪舊繪圖 460 行、匯出區加 JPG／WebP＋目標 KB（二分搜尋 quality，壓不到寫實際 KB）、下載 PSD／SVG、「在修圖（專業版）開啟」(PSD) 與「在向量（專業版）開啟」(SVG)；片頭三鈕標題空白時填「片頭標題」（標題＋副標再填「副標題」），說明改白話。`package.json` 加 `ag-psd ^34.2.3`。`tests/e2e/smoke/06-photo-pro.spec.ts` 跟著改按鈕名與 .psd。
+- 已知差異：「重點字底色」開＋標題換行時，所有行的底色現在都在所有文字下面（舊版第 2 行底色會蓋到第 1 行光暈），實測該情境差 18/255。
+- 驗證：
+  - tsc：`npx next typegen && npx tsc --noEmit` exit 0。
+  - 卡片 (b)(c)：`npx vitest run "app/(shell)/tools/banner/"` 5 passed（SVG 圖層數＝Layer 數、文字全是 `<text>`；`readPsd` 讀回 `layer.text.text` 等於原字）。
+  - 卡片 (a)：瀏覽器比對（HEAD 版 exportToPng vs 新版，同 state，5 組尺寸／版型）：flat 0/255 ×4；疊層 2/255；換行＋重點字底色 18/255（上列已知差異）。
+  - 本機實開 localhost:3907（編輯器靜態檔代理線上 /photo-pro、/vector-pro）：做含 **重點字**、副標、價格、按鈕、角標、商品圖的 banner；PhotoCraft 開 PSD，標題／按鈕文字／星星／角標文字是文字圖層，按鈕字改成「馬上搶購」成功（`$env:TEMP/banner-photocraft-edited.jpg`）；VectorCraft 開 SVG，按鈕文字是文字物件（Noto Sans TC Bold 33pt 置中），插字成功（`$env:TEMP/banner-vectorcraft-edited.jpg`）；JPG 目標 60KB→59.3KB、WebP 56KB、目標 3KB→提示實際 13KB。
+- 避免再發生：新增匯出格式只在 banner-layers.ts 加一個 build 函式吃 RasterDoc，不另寫繪圖。
+- 剩餘：PhotoCraft 把 PSD 粗體顯示成常規（ag-psd fauxBold 沒被讀）；Noto Serif TC 未載入時 PhotoCraft 警告並用替代字；文字的陰影光暈在編輯器重排後消失；彈窗被擋時退回同分頁開編輯器（現有慣例）會離開橫幅頁。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" | exit=0 | ms=439
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n（全修：Safari 不能編 WebP 時明說不出假檔；JPG 透明處先鋪 bgColor；SVG esc 剔除 XML 不合法控制字元；另採建議：開編輯器用 raster.composite 不重疊一次。accent-not-text 閘抓到 var(--red) 字色已改 --badge-red-text）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,.claude | grep=在 Canvas Editor 開啟|handleOpenInCanvas|影片片頭（存到我的設計後 | hits=3
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續5）— Banner C6 品牌套組＋C7 商品擬真（新模組，banner-layers 之後接線）
+
+- 決策：C6 套組存 `organizations.metadata.client_config.bannerKit`（與 brandColors／CIS brandKit 同一 JSONB，免 migration）；沒存過時由 brandColors＋CIS logo／字型組出初值。API `NA/app/api/tools/presets/brand-kit/route.ts`（掛設計門頁既有 /api/tools/presets 前綴）：GET 客戶只讀自己 org、指名他 org 403；PUT 限員工 owner/admin（canWriteTenantConfig，同 brand-colors／cis 路由），只換 bannerKit、其他 client_config 鍵保留；GET 只 select 品牌三鍵，不外流 SSH 等設定。logo 先經 saveDesign 存進我的設計，org 列只存 URL。
+- C7 `NA/app/(shell)/tools/banner/product-grounding.ts`：groundProduct → product／shadow／reflection 全畫布層；接觸陰影取 alpha 底部 18% 輪廓壓扁兩層模糊；倒影以接觸線鏡像漸淡；色調依背景環帶均色，每通道增益限 ±12%。全關＝直接 drawImage。
+- Codex F1（CONFIRMED，既有缺陷）：`NA/lib/studio/design-upload.ts` saveDesign 的 organizationId 只給上傳、沒給登記 → 存到指定客戶會被拒（BannerStudio「存到客戶」同樣受影響）；已修並加 `NA/lib/studio/__tests__/design-upload.test.ts`。
+- Codex F2：從我的設計刪掉 logo 圖會讓套組 URL 失效（刪除守衛不知道 bannerKit 引用）；本卡只做面板載入失敗提示，治本需改共用刪除守衛 → RISKS。F3：與 brand-colors／cis 並行讀改寫可互相覆蓋（既有同型）；原子更新需 migration（High）→ RISKS。
+- 驗證：`npx tsc --noEmit` exit 0；vitest brand-kit route 2＋design-upload 1＋registry-code 15＝18 passed。權限守衛突變：拔 `assertOrgAccess` → 「他 org 403」測試紅（expected 200 to be 403）→ 還原綠。C7 headless Chromium 臨時頁：全關與 drawImage 逐位元組比對 diff=0／2,880,000（整數與小數 box 各 2 組），截圖 `$env:TEMP\c7-grounding-demo.png`；臨時頁未 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run app/api/tools/presets/brand-kit/route.test.ts lib/studio/__tests__/design-upload.test.ts lib/portal/__tests__/registry-code.test.ts; chrome --headless --dump-dom c7-demo.html | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-26-review-f6a1fa0c.md），F1 已修，F2 面板提示＋RISKS，F3 RISKS
+- ORACLE_WAIVED: F1 修正與面板提示在 artifact 之後，由新測試與 18 passed＋tsc 覆蓋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=saveDesign\( | hits=15
+- rollback：`git revert` 本 commit（新檔＋design-upload 一行，無資料遷移；已存的 bannerKit 鍵無人讀即無作用）
 ## 2026-11-26（續2）— /ops/systems/blocks 改三分頁：系統卡片取代要左右捲的熱度表；積木目錄網址只由 catalogHref 產生
 
 - 根因／決策：操作者不要左右捲（10 欄熱度表在 1100px 版面必溢出）。改分頁（連結 ?view=）：系統用了哪些積木（預設，每系統一列：名稱／狀態／完成度＋各層顆數標籤自動換行、展開全部編號）／積木清單／圖解。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
