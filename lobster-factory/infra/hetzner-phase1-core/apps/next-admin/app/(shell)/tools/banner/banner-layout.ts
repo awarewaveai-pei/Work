@@ -129,6 +129,8 @@ export function productShown(f: BannerFields): boolean {
   return !!f.productImage && !(f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage);
 }
 
+/** The logo's height at most this share of the canvas height (its width is logoScale x the canvas width). */
+const LOGO_MAX_H = 0.25;
 /** A picture's size, or null when it has none (an SVG without width / height reads 0x0 in some browsers). */
 const picture = (m: LayoutMeasure, src: string) => { const n = m.image(src); return n && n.w > 0 && n.h > 0 ? n : null; };
 const overlapX =(a: ElemBox, x0: number, x1: number) => a.x < x1 && a.x + a.w > x0;
@@ -206,11 +208,17 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
   let logo: { box: ElemBox } | undefined;
   const logoNat = f.logoImage ? picture(measure, f.logoImage) : null;
   if (logoNat) {
-    const lw = W * (clampField("logoScale", f.logoScale ?? 0.16) ?? 0.16), lh = (lw * logoNat.h) / Math.max(1, logoNat.w);
     const lp: LogoPos = f.logoPos ?? "bl";
-    const x = lp[1] === "l" ? margin : W - margin - lw;
-    // a top corner the badge already holds: the logo goes under the badge
-    const under = badge && !pos.badge && lp[0] === "t" && overlapX(badge.box, x, x + lw) ? badge.box.y + badge.box.h + gapY : margin;
+    // logoScale is a share of the width; a tall logo is also held to LOGO_MAX_H of the height (else 100x400 on 3:1
+    // came out 1229 px high)
+    const fit = (maxH: number) => Math.min((W * (clampField("logoScale", f.logoScale ?? 0.16) ?? 0.16)) / logoNat.w, maxH / logoNat.h);
+    let k = fit(H * LOGO_MAX_H);
+    const xAt = (w: number) => (lp[1] === "l" ? margin : W - margin - w);
+    // a top corner the badge already holds: the logo goes under the badge (and shrinks to the room left there)
+    const under = badge && !pos.badge && lp[0] === "t" && overlapX(badge.box, xAt(logoNat.w * k), xAt(logoNat.w * k) + logoNat.w * k)
+      ? badge.box.y + badge.box.h + gapY : margin;
+    if (lp[0] === "t" && !pos.logo) k = Math.min(k, fit(Math.max(1, H - margin - under)));
+    const lw = logoNat.w * k, lh = logoNat.h * k, x = xAt(lw);
     const box = pos.logo ? dropAt(pos.logo, lw, lh, W, H) : { x, y: lp[0] === "t" ? under : H - margin - lh, w: lw, h: lh };
     if (!pos.logo) obstacles.push(box);
     logo = { box };

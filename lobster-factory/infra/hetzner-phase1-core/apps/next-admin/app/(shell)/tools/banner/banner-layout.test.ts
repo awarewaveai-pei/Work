@@ -19,7 +19,7 @@ const measure: LayoutMeasure = {
     const px = Number(/(\d+)px/.exec(font)?.[1] ?? REF_PX);
     return Array.from(t).reduce((sum, c) => sum + (/[　-鿿豈-￯]/.test(c) ? px : px * 0.55), 0);
   },
-  image: (src) => ({ product: { w: 800, h: 1000 }, slim: { w: 300, h: 900 }, logo: { w: 400, h: 160 } } as Record<string, { w: number; h: number }>)[src] ?? null,
+  image: (src) => ({ product: { w: 800, h: 1000 }, slim: { w: 300, h: 900 }, logo: { w: 400, h: 160 }, tallLogo: { w: 100, h: 400 } } as Record<string, { w: number; h: number }>)[src] ?? null,
 };
 
 const base: BannerFields = {
@@ -47,20 +47,21 @@ const overlap = (a: ElemBox, b: ElemBox) => a.x < b.x + b.w - 0.5 && b.x < a.x +
 const inside = (a: ElemBox, s: { w: number; h: number }) => a.x >= -0.5 && a.y >= -0.5 && a.x + a.w <= s.w + 0.5 && a.y + a.h <= s.h + 0.5;
 
 describe("(a) the automatic layout never overlaps and stays inside", () => {
-  it("10 sizes x badge tl/tr x logo 4 corners x product 4 places (wide and slim picture) x text top/center/bottom", () => {
+  it("10 sizes x badge tl/tr x logo 4 corners x product 4 places (wide and slim picture) x logo wide / tall x text top/center/bottom", () => {
     const bad: string[] = [];
     for (const productImage of ["product", "slim"])
+    for (const logoImage of ["logo", "tallLogo"])
     for (const [key, size] of Object.entries(SIZES))
       for (const badgePos of ["tl", "tr"] as const)
         for (const logoPos of ["tl", "tr", "bl", "br"] as const)
           for (const productPos of ["center", "left", "right", "bottom-right"] as const)
             for (const textPos of ["top", "center", "bottom"] as const) {
-              const L = layoutBanner({ ...everything, productImage, badgePos, logoPos, productPos, textPos }, size, measure);
+              const L = layoutBanner({ ...everything, productImage, logoImage, badgePos, logoPos, productPos, textPos }, size, measure);
               const named: [string, ElemBox][] = [
                 ...(["headline", "subtext", "price", "cta", "trust", "badge", "logo"] as const).map((k) => [k, L.boxes[k]!] as [string, ElemBox]),
                 ["product", L.product!.box], ["reflection", L.product!.reflection!],
               ];
-              const at = `${productImage} ${key} badge=${badgePos} logo=${logoPos} product=${productPos} text=${textPos}`;
+              const at = `${productImage} ${logoImage} ${key} badge=${badgePos} logo=${logoPos} product=${productPos} text=${textPos}`;
               for (const [n, b] of named) {
                 if (!b) { bad.push(`${at}: ${n} missing`); continue; }
                 if (!inside(b, size)) bad.push(`${at}: ${n} outside ${JSON.stringify(b)}`);
