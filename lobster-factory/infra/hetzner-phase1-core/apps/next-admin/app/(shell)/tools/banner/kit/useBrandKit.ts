@@ -37,6 +37,8 @@ export function useBrandKit(orgId: string | null): BrandKitState {
 
   useEffect(() => {
     let cancelled = false;
+    // the kit always belongs to the organization picked now: the previous one's is dropped before this one loads
+    setKit(null); setSaved(false); setCanEdit(false); setExternalLogo(false);
     setStatus("loading");
     setError(null);
     fetch(orgId ? `${API}?orgId=${encodeURIComponent(orgId)}` : API, { credentials: "same-origin" })
@@ -47,7 +49,7 @@ export function useBrandKit(orgId: string | null): BrandKitState {
         if (!r.ok || !j.ok) { setKit(null); setStatus("error"); setError(j.error ?? `HTTP ${r.status}`); return; }
         setKit(j.kit ?? null); setSaved(!!j.saved); setCanEdit(!!j.canEdit); setStatus("ready");
       })
-      .catch((e) => { if (!cancelled) { setStatus("error"); setError(e instanceof Error ? e.message : String(e)); } });
+      .catch((e) => { if (!cancelled) { setKit(null); setStatus("error"); setError(e instanceof Error ? e.message : String(e)); } });
     return () => { cancelled = true; };
   }, [orgId, tick]);
 

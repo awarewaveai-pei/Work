@@ -11,6 +11,7 @@ import {
 } from "./banner-layers";
 import type { GroundingOpts } from "./product-grounding";
 import { BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, aiFormatError, askJsonWithRetry, bannerCallNtd, designPlan, ntdLabel, readAiStream, removeBgNtd, type BannerAiModel, type SizeSpec } from "./banner-design";
+import { bgForPrompt, bgStatsFromColors, bgStatsFromPixels, mergeBgInfo, resolveDesignColors, usablePalette, type BgInfo } from "./design-colors";
 import BrandKitPanel from "./kit/BrandKitPanel";
 import { useBrandKit } from "./kit/useBrandKit";
 import type { BrandKit } from "./kit/brand-kit";
@@ -710,6 +711,13 @@ function downloadUrl(url: string, name: string) {
 
 // History signature: excludes transient flags; reduces big image data-URLs to their length
 // (so comparing snapshots never stringifies multi-MB base64).
+/** C13: nothing about the picture changed yet -- the blank design (the topic / tone typed in 開始 and the sizes picked are
+ *  not the picture). Any other change (a background colour, a gradient, words, an image, a template…) shows the preview. */
+export function isUntouched(st: State): boolean {
+  const notPicture: Partial<State> = { copyBrief: INIT.copyBrief, copyTone: INIT.copyTone, preset: INIT.preset, multiSizes: [], sizeOverrides: {}, editingSize: null };
+  return designSig({ ...st, ...notPicture }) === designSig(INIT);
+}
+
 function designSig(st: State): string {
   // typed → tsc catches any future transient field that's misspelled or forgotten here
   const skip = new Set<keyof State>(["saving", "saved", "error", "generating", "designing", "productRemoving", "copyGenerating", "copyStream", "copyVariants"]);
@@ -735,12 +743,11 @@ function sanitizeDesign(raw: Record<string, unknown>): Partial<State> {
 
   assign("headline", str(raw.headline));
   assign("subtext", str(raw.subtext));
+  // C12: every colour (text / accent / CTA / badge / background, scrim, outline) is set by resolveDesignColors -- the
+  // palette, the picture background and contrast are checked there, not here
   assign("ctaText", str(raw.ctaText));
-  assign("ctaBg", hex(raw.ctaBg));
-  assign("ctaTextColor", hex(raw.ctaTextColor));
   assign("badgeText", str(raw.badgeText));
   assign("badgeStyle", enumOf<BadgeStyle>(raw.badgeStyle, ["ribbon", "pill", "burst"]));
-  assign("badgeColor", hex(raw.badgeColor));
   assign("badgePos", enumOf<BadgePos>(raw.badgePos, ["tl", "tr"]));
   assign("showPrice", bool(raw.showPrice));
   assign("priceNow", str(raw.priceNow));
@@ -748,16 +755,9 @@ function sanitizeDesign(raw: Record<string, unknown>): Partial<State> {
   assign("trustType", enumOf<TrustType>(raw.trustType, ["none", "stars", "reviews", "guarantee"]));
   if (typeof raw.trustStars === "number") assign("trustStars", Math.max(1, Math.min(5, Math.round(raw.trustStars))));
   assign("trustText", str(raw.trustText));
-  assign("textColor", hex(raw.textColor));
-  assign("accentColor", hex(raw.accentColor));
   assign("accentHighlight", bool(raw.accentHighlight));
   assign("textPos", enumOf<TextPos>(raw.textPos, ["top", "center", "bottom"]));
   assign("textAlignH", enumOf<TextAlignH>(raw.textAlignH, ["left", "center", "right"]));
-  assign("textScrim", bool(raw.textScrim));
-  assign("textOutline", bool(raw.textOutline));
-  assign("bgMode", enumOf<BgMode>(raw.bgMode, ["color", "gradient"])); // never let AI flip to upload/ai
-  assign("gradFrom", hex(raw.gradFrom));
-  assign("gradTo", hex(raw.gradTo));
   assign("aiBgSubject", str(raw.aiBgSubject));
   assign("aiBgVibe", str(raw.aiBgVibe));
   // shadows: a malformed object is dropped whole. The background picture's placement is never AI-set (the AI never
@@ -814,6 +814,31 @@ async function extractPalette(src: string, n = 6): Promise<string[]> {
     if (out.length >= n) break;
   }
   return out.map((c) => rgbToHex(c.r, c.g, c.b));
+}
+
+/** C12: the background as the AI and the contrast guard see it (free, before the call). A picture is drawn small the way
+ *  the renderer places it, once per size made (each crops it differently); a colour / gradient is read from its settings. */
+async function measureBackground(st: State, sizes: readonly PresetKey[]): Promise<BgInfo> {
+  if ((st.bgMode === "upload" || st.bgMode === "ai") && st.bgImage) {
+    const img = await loadImage(st.bgImage);
+    const colors = await extractPalette(st.bgImage, 6);
+    const infos = (sizes.length ? sizes : [st.preset]).map((k) => {
+      const v = variantOf(st, k), ps = PRESETS[k];
+      const w = 64, h = Math.max(8, Math.round((64 * ps.h) / ps.w));
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+      const ctx = cv.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return bgStatsFromColors("color", st.bgColor);
+      ctx.fillStyle = v.bgColor; ctx.fillRect(0, 0, w, h);
+      const sc = Math.max(w / img.width, h / img.height) * (v.bgImgScale || 1);
+      const sw = img.width * sc, sh = img.height * sc;
+      ctx.drawImage(img, (w - sw) / 2 + (v.bgImgX || 0) * w, (h - sh) / 2 + (v.bgImgY || 0) * h, sw, sh);
+      return bgStatsFromPixels(ctx.getImageData(0, 0, w, h).data, w, h, colors, st.bgMode);
+    });
+    return mergeBgInfo(infos);
+  }
+  if (st.bgMode === "gradient") return bgStatsFromColors("gradient", st.gradFrom, st.gradTo);
+  // a colour, or a picture mode with no picture yet (the renderer then fills the background colour)
+  return { ...bgStatsFromColors("color", st.bgColor), mode: st.bgMode };
 }
 
 // ---------------------------------------------------------------------------
@@ -882,39 +907,62 @@ function PresetChips({ chips, onSelect, selected }: { chips: string[]; onSelect:
   );
 }
 
+/** C13: one numbered section of the controls; the header shows what is set now, so a closed section still tells its state. */
 function StepCard({
-  title, step, icon, hint, children, defaultOpen = false, order,
+  title, step, icon, hint, summary, children, defaultOpen = false,
 }: {
-  title: string; step?: string; icon?: string; hint?: string; children: React.ReactNode; defaultOpen?: boolean; order?: number;
+  title: string; step?: string; icon?: string; hint?: string; summary?: string; children: React.ReactNode; defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="card" style={{ padding: 0, overflow: "hidden", ...(order !== undefined ? { order } : {}) }}>
+    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         style={{
           width: "100%", background: "none", border: "none",
-          padding: "13px 16px", cursor: "pointer", display: "flex",
+          padding: 16, cursor: "pointer", display: "flex", gap: 8,
           alignItems: "center", justifyContent: "space-between",
           color: "var(--text-primary)", textAlign: "left",
         }}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {step && <span style={{ fontSize: 12, fontWeight: 700, minWidth: 24, height: 24, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--chip-bg)", color: "var(--text-muted)" }}>{step}</span>}
           {icon && <span style={{ fontSize: 16 }}>{icon}</span>}
-          {step && <span style={{ fontSize: 10, opacity: 0.35, fontWeight: 400, letterSpacing: 0.5 }}>{step}</span>}
           <span style={{ fontSize: 15, fontWeight: 700 }}>{title}</span>
-          {hint && <span style={{ fontSize: 11, opacity: 0.45, fontWeight: 400, marginLeft: 2 }}>{hint}</span>}
+          {hint && <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 400 }}>{hint}</span>}
         </span>
-        <span style={{ opacity: 0.35, fontSize: 11, flexShrink: 0, marginLeft: 8 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          {summary && <span data-testid={`banner-step-summary-${step ?? title}`} style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{summary}</span>}
+          <span style={{ color: "var(--text-muted)", fontSize: 11, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+        </span>
       </button>
       {open && (
-        <div style={{ padding: "4px 16px 16px", borderTop: "1px solid var(--border)" }}>
+        <div style={{ padding: "8px 16px 16px", borderTop: "1px solid var(--border)" }}>
           {children}
         </div>
       )}
     </div>
   );
+}
+
+/** A part inside a section (e.g. 背景 / 產品圖 in 畫面). */
+function SubHead({ children, first = false }: { children: React.ReactNode; first?: boolean }) {
+  return <div style={{ fontSize: 13, fontWeight: 700, margin: first ? "8px 0 8px" : "24px 0 8px", paddingTop: first ? 0 : 16, borderTop: first ? undefined : "1px solid var(--border)" }}>{children}</div>;
+}
+const BG_MODE_LABEL: Record<BgMode, string> = { color: "純色", gradient: "漸層", upload: "上傳圖", ai: "AI 生成" };
+
+/** Desktop width: the preview stays in view (sticky) while the controls scroll; narrower, it sits above them. */
+function useWide(minPx = 960): boolean {
+  const [wide, setWide] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${minPx}px)`);
+    const on = () => setWide(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [minPx]);
+  return wide;
 }
 
 // ---------------------------------------------------------------------------
@@ -931,7 +979,7 @@ export interface BannerStaffApi {
   /** The brand picker (a client search over GET /api/ops/clients): onPick gets the picked client's brand colours. */
   BrandPicker: ComponentType<{ onPick(colors: string[]): void }>;
   /** Card R3: which client's 我的設計 存到圖庫 saves into (staff work for a customer); null = 自用 (the default org). */
-  SaveOrgPicker: ComponentType<{ selected: string | null; onPick(orgId: string | null): void }>;
+  SaveOrgPicker: ComponentType<{ selected: string | null; onPick(orgId: string | null, name?: string): void }>;
 }
 
 export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
@@ -1020,8 +1068,13 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   // &org=<uuid>): that video's shape, its title as the headline, the opener layout, and the organization 存到我的設計 saves
   // into (staff work for a customer; the designs route checks access). Read once; unknown values are ignored.
   const [saveOrg, setSaveOrg] = useState<string | null>(null);
+  const [saveOrgName, setSaveOrgName] = useState<string | null>(null);
+  const [pickingOrg, setPickingOrg] = useState(false);
+  const wide = useWide();
   // C8: the brand kit of the organization this banner is saved for (null = own / default organization)
   const brand = useBrandKit(saveOrg);
+  const saveOrgRef = useRef(saveOrg);
+  saveOrgRef.current = saveOrg;
   async function applyBrandKit(kit: BrandKit) {
     const [main, second, accent, text, bg] = kit.colors;
     let logoImage: string | null = null;
@@ -1096,7 +1149,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
 
   // ── AI 一鍵設計整張：LLM 回傳一個 State patch（renderer 直接吃 → 幾乎零渲染成本）──
   async function generateFullDesign() {
-    if (!s.copyBrief.trim() || !staff) return;
+    // the brand colours must be the picked client's: never design while its kit is still loading
+    if (!s.copyBrief.trim() || !staff || brand.status === "loading") return;
     setS((prev) => ({ ...prev, designing: true, error: null }));
     try {
       // 多尺寸 ticked: one call, shared words / colours + a layout per size (card C9); none = the single-size call as before
@@ -1105,8 +1159,15 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       const sel = selectedSizes(s);
       const chosen = sel.length > 1 ? sel.map(spec) : [];
       const mp = PRESETS[m.preset];
+      // C12: the background (measured here, free) and the palette the AI assigns from: the brand kit's colours when the
+      // organization has one, else the background's colours
+      const bg = await measureBackground(m, sel).catch(() => ({ ...bgStatsFromColors("color", m.bgColor), mode: m.bgMode }));
+      const kitColors = brand.kit?.colors.length ? brand.kit.colors : null;
+      const orgAtStart = saveOrg;
+      const palette = usablePalette(bg, kitColors);
       const fields = {
         brief: s.copyBrief, label: presetLabel(m.preset), w: mp.w, h: mp.h,
+        bg: bgForPrompt(bg), palette, brandKit: !!kitColors,
         ...(chosen.length ? { sizes: [spec(m.preset), ...chosen.filter((c) => c.key !== m.preset)] } : {}),
       };
       // C10: an answer that does not parse is asked once more; still broken = an error naming what was billed
@@ -1118,15 +1179,25 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       setAiRetrying(null);
       if ("raw" in got) throw new Error(aiFormatError(got, bannerCallNtd(designModel, "design", Math.max(1, chosen.length))));
       const raw = (got.value && typeof got.value === "object" ? got.value : {}) as Record<string, unknown>;
+      // the client was changed while the AI answered: these colours are the previous client's -- not applied
+      if (saveOrgRef.current !== orgAtStart) throw new Error("設計途中換了客戶：這次結果用的是前一個客戶的品牌色，沒有套用，請再按一次。");
       const patch = sanitizeDesign(raw);
       const plan = designPlan(raw, spec(m.preset), chosen);
       setS((prev) => {
         const base = leaveSize(prev);
-        return {
+        const next: State = {
           ...base, ...patch, ...plan.main,
           sizeOverrides: chosen.length ? { ...base.sizeOverrides, ...plan.overrides } : base.sizeOverrides,
-          designing: false, saved: false,
         };
+        // colours are shared by every size: the text must read where it sits at each of them
+        const places = selectedSizes(next).map((k) => { const v = variantOf(next, k); return { pos: v.textPos, align: v.textAlignH }; });
+        const content = {
+          subtext: !!next.subtext.trim(), trust: next.trustType !== "none",
+          priceNow: next.showPrice && !!next.priceNow, priceWas: next.showPrice && !!next.priceWas,
+        };
+        const col = resolveDesignColors(raw, next, bg, places, palette, kitColors, content);
+        if (col.unmet.length) console.warn("[banner] contrast not met after the guard:", col.unmet);
+        return { ...next, ...col.patch, designing: false, saved: false };
       });
     } catch (err) {
       setAiRetrying(null);
@@ -1469,6 +1540,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   };
   const endDrag = () => { bgDragRef.current = null; elemDragRef.current = null; setGuides(null); };
   const hasPositions = Object.keys(s.positions).length > 0;
+  // C13: nothing designed yet (no words, pictures, button, badge or logo) -> a line of guidance instead of an empty canvas
+  const blank = isUntouched(s) && !s.designing;
 
   const bgCanvasButton = s.bgImage && canvasHref ? (
     <button className="btn btn-ghost" style={{ fontSize: 12, marginLeft: 6 }} data-testid="banner-bg-canvas"
@@ -1493,99 +1566,31 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
 
         {/* ── Controls (right side) ── */}
-        <div style={{ order: 2, flex: "0 0 380px", width: 380,
-          display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ order: 2, flex: "1 1 340px", maxWidth: wide ? 420 : "100%", minWidth: 0,
+          display: "flex", flexDirection: "column", gap: 16 }}>
 
-          <StepCard title="配色 / 品牌色" icon="🎨" order={1}>
-            <BrandKitPanel brand={brand} onApply={(kit) => void applyBrandKit(kit)}
-              getCurrent={() => {
-                const c = sRef.current;
-                return { colors: [c.gradFrom, c.gradTo, c.accentColor, c.textColor, c.bgColor], headlineFont: c.headlineFont, bodyFont: c.fontFamily, headlineWeight: c.headlineWeight, bodyWeight: c.bodyWeight };
-              }} />
-            {s.logoImage && (
-              <div className="form-row" style={{ marginTop: 8, flexWrap: "wrap", gap: 6 }}>
-                <label className="form-label">Logo</label>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={s.logoImage} alt="logo" style={{ height: 28, maxWidth: 80, objectFit: "contain" }} />
-                <span style={{ fontSize: 12 }}>大小</span>
-                <input type="range" min={0.04} max={0.6} step={0.01} value={s.logoScale} data-testid="banner-logo-scale"
-                  onChange={(e) => set("logoScale", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
-                <span style={{ fontSize: 12, opacity: 0.7 }}>{Math.round(s.logoScale * 100)}%</span>
-                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => set("logoImage", null)}>拿掉 logo</button>
-                <span className="form-hint" style={{ width: "100%" }}>預設在左下角，可在預覽上拖曳。</span>
+          {/* 開始: whose banner (= brand kit + where it is saved), the topic, and the two AI buttons -- always open */}
+          {staff && (
+            <div className="card" data-testid="banner-start" style={{ padding: 16 }}>
+              <h2 style={{ fontSize: 15, margin: "0 0 8px" }}>開始</h2>
+              <div className="form-row" style={{ flexWrap: "wrap", gap: 8 }}>
+                <label className="form-label">為哪個客戶做</label>
+                <span style={{ fontSize: 13, fontWeight: 600 }} data-testid="banner-client-name">{saveOrg ? (saveOrgName ?? "開啟時指定的客戶") : "自用"}</span>
+                {brand.kit && <span className="form-hint">· 有品牌套組</span>}
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }} data-testid="banner-client-change"
+                  onClick={() => setPickingOrg((v) => !v)}>{pickingOrg ? "收起" : "更換"}</button>
               </div>
-            )}
-            {staff ? <staff.BrandPicker onPick={(colors) => { setPalette(colors); setSelSwatch(colors[0] ?? null); }} /> : null}
-
-            <input ref={colorRefFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleColorRefUpload} />
-            <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 8 }} onClick={() => colorRefFileRef.current?.click()}>
-              📷 從參考圖擷取配色
-            </button>
-
-            {palette.length > 0 && (
-              <>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-                  {palette.map((c, i) => (
-                    <button key={`${c}-${i}`} onClick={() => setSelSwatch(c)} title={c}
-                      style={{
-                        width: 30, height: 30, borderRadius: 6, background: c, cursor: "pointer", padding: 0,
-                        border: selSwatch === c ? "3px solid var(--accent)" : "1px solid var(--border)",
-                      }} />
-                  ))}
+              {pickingOrg && (
+                <div style={{ marginTop: 8 }}>
+                  <staff.SaveOrgPicker selected={saveOrg} onPick={(id, name) => {
+                    setSaveOrg(id); setSaveOrgName(name ?? null); setPickingOrg(false); setS((prev) => ({ ...prev, saved: false }));
+                  }} />
                 </div>
-                <button className="btn btn-primary" style={{ fontSize: 12, marginTop: 10 }} onClick={() => autoApplyPalette(palette)}>
-                  ✨ 自動套用整組配色
-                </button>
-                {selSwatch && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
-                      把選中色
-                      <span style={{ display: "inline-block", width: 13, height: 13, background: selSwatch, borderRadius: 3, border: "1px solid #0002" }} />
-                      套到：
-                    </div>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      {SWATCH_TARGETS.map((t) => (
-                        <button key={t.key} className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
-                          onClick={() => { if (selSwatch) set(t.key, selSwatch); }}>
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </StepCard>
-
-          <StepCard title="版型模板" icon="✨" hint="一鍵套用" order={5}>
-            <p className="form-hint" style={{ marginBottom: 8, marginTop: 4 }}>套用後再填內容；只改版面/元素，不動你的文字與圖。</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              {TEMPLATES.filter((t) => !t.group).map((t) => (
-                <button key={t.key} className="btn btn-ghost"
-                  style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
-                  onClick={() => applyTemplate(t.patch)}>
-                  <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
-                </button>
-              ))}
-            </div>
-            {/* card R3: cards a video opens with (存到我的設計 -> the editor's 片頭 「從我的設計挑」) */}
-            <p className="form-hint" style={{ margin: "10px 0 6px" }}>做影片開頭的標題卡：選一種版面 → 改字 → 存到我的設計，之後在影片剪輯的片頭選「橫幅字卡」使用</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              {TEMPLATES.filter((t) => t.group === "opener").map((t) => (
-                <button key={t.key} className="btn btn-ghost"
-                  style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
-                  onClick={() => applyTemplate({ ...templatePatch(t, s.preset), ...openerPlaceholders(t.key, s) })}>
-                  <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
-                </button>
-              ))}
-            </div>
-          </StepCard>
-
-          {/* Step 0: 文案生成 */}
-          {staff && <StepCard title="文案生成" step="Step 0" icon="✍️" hint="選填" order={6}>
+              )}
+              <p className="form-hint" style={{ margin: "8px 0 0" }}>選的客戶同時決定品牌套組（第 5 步）和存到誰的我的設計。</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
               <div className="form-row">
-                <label className="form-label">描述</label>
+                <label className="form-label">主題</label>
                 <textarea
                   className="form-input"
                   rows={2}
@@ -1611,15 +1616,17 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
               {modelRow("設計模型", designModel, setDesignModel, "design")}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button title={why("video.script")} className="btn btn-primary" disabled={(s.copyGenerating || s.designing || !s.copyBrief.trim()) || !canUse("video.script")}
-                  onClick={generateCopy}>
+                  onClick={generateCopy} data-testid="banner-ai-copy">
                   {aiRetrying === "copy" ? "重試中…" : s.copyGenerating ? "生成中…" : `生成文案（${ntdLabel(bannerCallNtd(copyModel, "copy"))}）`}
                 </button>
-                <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || s.copyGenerating || !s.copyBrief.trim()) || !canUse("video.script")}
-                  onClick={generateFullDesign}
-                  style={{ background: "linear-gradient(135deg,#7c3aed,#ec4899)", border: "none" }}>
-                  {aiRetrying === "design" ? "重試中…" : s.designing ? "設計中…" : `✨ AI 一鍵設計整張（${ntdLabel(bannerCallNtd(designModel, "design", picked.length))}）`}
+                <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || s.copyGenerating || !s.copyBrief.trim() || brand.status === "loading") || !canUse("video.script")}
+                  onClick={generateFullDesign} data-testid="banner-ai-design">
+                  {aiRetrying === "design" ? "重試中…" : s.designing ? "設計中…" : brand.status === "loading" ? "正在載入品牌色…" : `✨ AI 一鍵設計整張（${ntdLabel(bannerCallNtd(designModel, "design", picked.length))}）`}
                 </button>
               </div>
+              {brand.status === "error" && !brand.kit && (
+                <p className="form-hint" data-testid="banner-kit-failed" style={{ margin: 0, color: "var(--badge-red-text)" }}>這個客戶的品牌色載入失敗：這次 AI 一鍵設計不套品牌色。</p>
+              )}
               <p className="form-hint">「一鍵設計」讓 AI 直接配好標題/重點字/CTA/徽章/價格/配色/版面 — 再微調即可。{multi ? `已選 ${picked.length} 個尺寸：文案配色共用，每個尺寸各排一個版面。` : ""}</p>
               {s.copyGenerating && s.copyStream && (
                 <div style={{ fontSize: 11, opacity: 0.5, fontFamily: "monospace", maxHeight: 40, overflow: "hidden" }}>
@@ -1639,10 +1646,10 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 </div>
               )}
             </div>
-          </StepCard>}
+            </div>
+          )}
 
-          {/* Step 1: 尺寸 */}
-          <StepCard title="尺寸" step="Step 1" icon="📐" order={2}>
+          <StepCard title="尺寸" step="1" icon="📐" summary={multi ? `${picked.length} 個 · 編輯 ${PRESETS[editingSizeOf(s)].ratio}` : PRESETS[s.preset].ratio}>
             {PRESET_GROUPS.map((grp) => (
               <div key={grp.key} style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, opacity: 0.5, marginBottom: 6 }}>
@@ -1683,103 +1690,182 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
             <p className="form-hint" style={{ margin: "4px 0 0" }}>可以選好幾個尺寸一起做：按一下加入、再按一下取消。位置照比例換算、字依短邊縮放；按「改這張」單獨微調那個尺寸，縮圖與全部下載在預覽下方。</p>
           </StepCard>
 
-          {/* Step 2: 產品圖 */}
-          <StepCard title="產品圖" step="Step 2" icon="🖼" hint="選填" order={3}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-              <input ref={productFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleProductUpload} />
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => productFileRef.current?.click()}>
-                  {s.productImage ? "換圖" : "上傳產品圖"}
-                </button>
-                {s.productOrig && (
-                  <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={s.productRemoving} onClick={removeProductBg}>
-                    {s.productRemoving ? "去背中…" : s.productImage !== s.productOrig ? "✓ 已去背" : `一鍵去背（${ntdLabel(removeBgNtd())}）`}
-                  </button>
-                )}
-                {s.productImage && canvasHref && (
-                  <button className="btn btn-ghost" style={{ fontSize: 12 }} data-testid="banner-product-canvas"
-                    onClick={() => void openInCanvas(s.productImage!, `banner-${s.preset}-商品圖`, canvasHref, undefined, { tool: BANNER_RETURN_TOOL, slot: "product", label: "Banner 商品圖" })}>
-                    ✏️ 在畫布編輯
-                  </button>
-                )}
-                {s.productImage && (
-                  <button className="btn btn-ghost" style={{ fontSize: 12, color: "var(--red)" }}
-                    onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, aiBgCompositeProduct: false, saved: false }))}>
-                    移除
-                  </button>
+          <StepCard title="文字" step="2" icon="✍" summary={s.headline.replace(/\*\*/g, "").trim().slice(0, 14) || "未填標題"}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+              <div className="form-row">
+                <label className="form-label">標題</label>
+                <input className="form-input" type="text" placeholder="主標題…"
+                  value={s.headline} onChange={(e) => set("headline", e.target.value)} />
+              </div>
+              <div className="form-row">
+                <label className="form-label">副標</label>
+                <input className="form-input" type="text" placeholder="副標題或 CTA…"
+                  value={s.subtext} onChange={(e) => set("subtext", e.target.value)} />
+              </div>
+              <div className="form-row">
+                <label className="form-label">字體配對</label>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {FONT_PAIRS.map((fp) => {
+                    const active = s.headlineFont === fp.headline && s.fontFamily === fp.body;
+                    return (
+                      <button key={fp.label}
+                        className={active ? "btn btn-primary" : "btn btn-ghost"}
+                        style={{ fontSize: 11, padding: "2px 7px" }}
+                        onClick={() => setS((prev) => ({ ...prev, headlineFont: fp.headline, fontFamily: fp.body, saved: false }))}>
+                        {fp.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {([["標題字體", "headlineFont", "headlineWeight"], ["內文字體", "fontFamily", "bodyWeight"]] as const).map(([label, fk, wk]) => (
+                <div key={fk} className="form-row" style={{ flexWrap: "wrap" }}>
+                  <label className="form-label">{label}</label>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
+                    {FONTS.map((f) => (
+                      <button key={f.value} className={s[fk] === f.value ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-${fk}-${f.label}`}
+                        style={{ fontSize: 12, padding: "2px 8px", fontFamily: f.value }} onClick={() => set(fk, f.value)}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", width: "100%", marginTop: 4 }}>
+                    <span style={{ fontSize: 12, opacity: 0.7, minWidth: 36 }}>字重</span>
+                    {WEIGHTS.map((w) => (
+                      <button key={w.value} className={s[wk] === w.value ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-${wk}-${w.value}`}
+                        style={{ fontSize: 12, padding: "2px 8px", fontWeight: w.value }} onClick={() => set(wk, w.value)}>
+                        {w.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="form-row">
+                <label className="form-label">字色</label>
+                <input type="color" value={s.textColor} onChange={(e) => set("textColor", e.target.value)}
+                  style={{ width: 44, height: 32, border: "none", cursor: "pointer", background: "none" }} />
+              </div>
+              <div className="form-row">
+                <label className="form-label">重點字</label>
+                <input type="color" value={s.accentColor} onChange={(e) => set("accentColor", e.target.value)}
+                  style={{ width: 44, height: 32, border: "none", cursor: "pointer", background: "none" }} />
+                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4, marginLeft: 8 }}>
+                  <input type="checkbox" checked={s.accentHighlight} onChange={(e) => set("accentHighlight", e.target.checked)} />
+                  螢光底
+                </label>
+                <span className="form-hint" style={{ marginLeft: 6 }}>標題用 **字** 標重點，例：省 **50%**</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">標題字距</label>
+                <input type="range" min={-2} max={16} value={s.letterSpacing}
+                  onChange={(e) => set("letterSpacing", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.letterSpacing}</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">標題行距</label>
+                <input type="range" min={0.9} max={2} step={0.02} value={s.headlineLineHeight} data-testid="banner-headline-leading"
+                  onChange={(e) => set("headlineLineHeight", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.headlineLineHeight.toFixed(2)}</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">內文字距</label>
+                <input type="range" min={-2} max={16} value={s.bodyLetterSpacing} data-testid="banner-body-tracking"
+                  onChange={(e) => set("bodyLetterSpacing", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.bodyLetterSpacing}</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">內文行距</label>
+                <input type="range" min={1} max={2.4} step={0.02} value={s.bodyLineHeight} data-testid="banner-body-leading"
+                  onChange={(e) => set("bodyLineHeight", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.bodyLineHeight.toFixed(2)}</span>
+              </div>
+              <div className="form-row" style={{ flexWrap: "wrap", gap: 12 }}>
+                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="checkbox" checked={s.kinsoku} onChange={(e) => set("kinsoku", e.target.checked)} data-testid="banner-kinsoku" />
+                  避頭尾（，。」等不放行首，「（等不放行尾）
+                </label>
+                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                  <input type="checkbox" checked={s.cjkSpacing} onChange={(e) => set("cjkSpacing", e.target.checked)} data-testid="banner-cjk-spacing" />
+                  中英數字之間自動空半格
+                </label>
+              </div>
+              <div className="form-row">
+                <label className="form-label">標題 px</label>
+                <input type="range" min={24} max={200} value={s.headlineSize}
+                  onChange={(e) => set("headlineSize", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.headlineSize}</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">副標 px</label>
+                <input type="range" min={12} max={120} value={s.subtextSize}
+                  onChange={(e) => set("subtextSize", Number(e.target.value))} style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.subtextSize}</span>
+              </div>
+              <div className="form-row">
+                <label className="form-label">垂直</label>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {(["top", "center", "bottom"] as TextPos[]).map((pos) => (
+                    <button key={pos}
+                      className={s.textPos === pos ? "btn btn-primary" : "btn btn-ghost"}
+                      style={{ fontSize: 12, padding: "3px 10px" }}
+                      onClick={() => set("textPos", pos)}>
+                      {{ top: "上", center: "中", bottom: "下" }[pos]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-row">
+                <label className="form-label">水平</label>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {(["left", "center", "right"] as TextAlignH[]).map((a) => (
+                    <button key={a}
+                      className={s.textAlignH === a ? "btn btn-primary" : "btn btn-ghost"}
+                      style={{ fontSize: 12, padding: "3px 10px" }}
+                      onClick={() => set("textAlignH", a)}>
+                      {{ left: "左", center: "中", right: "右" }[a]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-row">
+                <label className="form-label">描邊陰影</label>
+                <input type="checkbox" checked={s.textOutline}
+                  onChange={(e) => set("textOutline", e.target.checked)} />
+                <span className="form-hint" style={{ marginLeft: 6 }}>文字在雜亂背景上也清楚</span>
+              </div>
+              <ShadowControls label="文字陰影（標題、副標、價格、評價一起）" unit="字的大小" testId="banner-text-shadow"
+                value={s.textShadow} onChange={(v) => set("textShadow", v)} />
+              <div className="form-row">
+                <label className="form-label">文字底襯</label>
+                <input type="checkbox" checked={s.textScrim}
+                  onChange={(e) => set("textScrim", e.target.checked)} />
+                <span className="form-hint" style={{ marginLeft: 6 }}>文字後方半透明板（比整張暗化高級）</span>
+                {s.textScrim && (
+                  <>
+                    <input type="range" min={0.05} max={0.9} step={0.05} value={s.textScrimOpacity}
+                      onChange={(e) => set("textScrimOpacity", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+                    <span style={{ fontSize: 12, opacity: 0.7, minWidth: 32 }}>{Math.round(s.textScrimOpacity * 100)}%</span>
+                  </>
                 )}
               </div>
-              {s.productImage && (
-                <>
-                  <div className="form-row">
-                    <label className="form-label">位置</label>
-                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                      {(["center", "left", "right", "bottom-right"] as ProductPos[]).map((pos) => (
-                        <button key={pos}
-                          className={s.productPos === pos ? "btn btn-primary" : "btn btn-ghost"}
-                          style={{ fontSize: 11, padding: "3px 8px" }}
-                          onClick={() => set("productPos", pos)}>
-                          {{ center: "中央", left: "左", right: "右", "bottom-right": "右下" }[pos]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="form-row">
-                    <label className="form-label">大小</label>
-                    <input type="range" min={0.2} max={1.0} step={0.05} value={s.productScale}
-                      onChange={(e) => set("productScale", Number(e.target.value))} style={{ flex: 1 }} />
-                    <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>
-                      {Math.round(s.productScale * 100)}%
-                    </span>
-                  </div>
-                </>
-              )}
+              <div className="form-row">
+                <label className="form-label">暗化背景</label>
+                <input type="checkbox" checked={s.dimOverlay}
+                  onChange={(e) => set("dimOverlay", e.target.checked)} />
+                <span className="form-hint" style={{ marginLeft: 6 }}>整張壓暗</span>
+                {s.dimOverlay && (
+                  <>
+                    <input type="range" min={0.05} max={0.85} step={0.05} value={s.dimOverlayOpacity}
+                      onChange={(e) => set("dimOverlayOpacity", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+                    <span style={{ fontSize: 12, opacity: 0.7, minWidth: 32 }}>{Math.round(s.dimOverlayOpacity * 100)}%</span>
+                  </>
+                )}
+              </div>
             </div>
-            {s.productImage && (() => {
-              const g = s.grounding;
-              const setG = <K extends keyof GroundingOpts>(k: K, v: NonNullable<GroundingOpts[K]>) => set("grounding", { ...g, [k]: v });
-              const slider = (label: string, value: number, min: number, max: number, step: number, on: (v: number) => void, unit = "%", id = "") => (
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                  <span style={{ minWidth: 48 }}>{label}</span>
-                  <input type="range" min={min} max={max} step={step} value={value} data-testid={id || undefined}
-                    onChange={(e) => on(Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
-                  <span style={{ opacity: 0.7, minWidth: 40, textAlign: "right" }}>{unit === "%" ? `${Math.round(value * 100)}%` : `${value}${unit}`}</span>
-                </label>
-              );
-              const sh = g.shadow ?? { enabled: false }, rf = g.reflection ?? { enabled: false }, tn = g.tone ?? { enabled: false };
-              return (
-                <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>商品擬真</div>
-                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                    <input type="checkbox" checked={!!sh.enabled} data-testid="banner-ground-shadow" onChange={(e) => setG("shadow", { ...sh, enabled: e.target.checked })} />
-                    接觸陰影（商品放在桌面上的影子）
-                  </label>
-                  {sh.enabled && (<>
-                    {slider("濃度", sh.opacity ?? 0.5, 0, 1, 0.05, (v) => setG("shadow", { ...sh, opacity: v }))}
-                    {slider("柔和", sh.softness ?? 0.35, 0, 1, 0.05, (v) => setG("shadow", { ...sh, softness: v }))}
-                    {slider("下移", sh.distance ?? 0, -40, 80, 1, (v) => setG("shadow", { ...sh, distance: v }), "px")}
-                  </>)}
-                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                    <input type="checkbox" checked={!!rf.enabled} data-testid="banner-ground-reflection" onChange={(e) => setG("reflection", { ...rf, enabled: e.target.checked })} />
-                    倒影（光滑桌面）
-                  </label>
-                  {rf.enabled && (<>
-                    {slider("長度", rf.height ?? 0.35, 0, 1, 0.05, (v) => setG("reflection", { ...rf, height: v }))}
-                    {slider("濃度", rf.fade ?? 0.3, 0, 1, 0.05, (v) => setG("reflection", { ...rf, fade: v }))}
-                    {slider("間距", rf.gap ?? 0, 0, 60, 1, (v) => setG("reflection", { ...rf, gap: v }), "px")}
-                  </>)}
-                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                    <input type="checkbox" checked={!!tn.enabled} data-testid="banner-ground-tone" onChange={(e) => setG("tone", { ...tn, enabled: e.target.checked })} />
-                    色調匹配（商品顏色往背景靠一點，最多 ±12%）
-                  </label>
-                  {tn.enabled && slider("強度", tn.strength ?? 0.4, 0, 1, 0.05, (v) => setG("tone", { ...tn, strength: v }))}
-                </div>
-              );
-            })()}
           </StepCard>
 
-          {/* Step 3: 背景 */}
-          <StepCard title="背景" step="Step 3" icon="🎆" order={4}>
+          <StepCard title="畫面" step="3" icon="🎆" summary={`${BG_MODE_LABEL[s.bgMode]}${s.productImage ? " · 產品圖" : ""}`}>
+            <SubHead first={true}>背景</SubHead>
             <div className="form-row" style={{ marginTop: 4 }}>
               <label className="form-label">類型</label>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -2077,185 +2163,101 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 </div>
               </div>
             )}
-          </StepCard>
-
-          {/* Step 4: 文字 */}
-          <StepCard title="文字" step="Step 4" icon="✍" order={7}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
-              <div className="form-row">
-                <label className="form-label">標題</label>
-                <input className="form-input" type="text" placeholder="主標題…"
-                  value={s.headline} onChange={(e) => set("headline", e.target.value)} />
-              </div>
-              <div className="form-row">
-                <label className="form-label">副標</label>
-                <input className="form-input" type="text" placeholder="副標題或 CTA…"
-                  value={s.subtext} onChange={(e) => set("subtext", e.target.value)} />
-              </div>
-              <div className="form-row">
-                <label className="form-label">字體配對</label>
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                  {FONT_PAIRS.map((fp) => {
-                    const active = s.headlineFont === fp.headline && s.fontFamily === fp.body;
-                    return (
-                      <button key={fp.label}
-                        className={active ? "btn btn-primary" : "btn btn-ghost"}
-                        style={{ fontSize: 11, padding: "2px 7px" }}
-                        onClick={() => setS((prev) => ({ ...prev, headlineFont: fp.headline, fontFamily: fp.body, saved: false }))}>
-                        {fp.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              {([["標題字體", "headlineFont", "headlineWeight"], ["內文字體", "fontFamily", "bodyWeight"]] as const).map(([label, fk, wk]) => (
-                <div key={fk} className="form-row" style={{ flexWrap: "wrap" }}>
-                  <label className="form-label">{label}</label>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
-                    {FONTS.map((f) => (
-                      <button key={f.value} className={s[fk] === f.value ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-${fk}-${f.label}`}
-                        style={{ fontSize: 12, padding: "2px 8px", fontFamily: f.value }} onClick={() => set(fk, f.value)}>
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", width: "100%", marginTop: 4 }}>
-                    <span style={{ fontSize: 12, opacity: 0.7, minWidth: 36 }}>字重</span>
-                    {WEIGHTS.map((w) => (
-                      <button key={w.value} className={s[wk] === w.value ? "btn btn-primary" : "btn btn-ghost"} data-testid={`banner-${wk}-${w.value}`}
-                        style={{ fontSize: 12, padding: "2px 8px", fontWeight: w.value }} onClick={() => set(wk, w.value)}>
-                        {w.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div className="form-row">
-                <label className="form-label">字色</label>
-                <input type="color" value={s.textColor} onChange={(e) => set("textColor", e.target.value)}
-                  style={{ width: 44, height: 32, border: "none", cursor: "pointer", background: "none" }} />
-              </div>
-              <div className="form-row">
-                <label className="form-label">重點字</label>
-                <input type="color" value={s.accentColor} onChange={(e) => set("accentColor", e.target.value)}
-                  style={{ width: 44, height: 32, border: "none", cursor: "pointer", background: "none" }} />
-                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4, marginLeft: 8 }}>
-                  <input type="checkbox" checked={s.accentHighlight} onChange={(e) => set("accentHighlight", e.target.checked)} />
-                  螢光底
-                </label>
-                <span className="form-hint" style={{ marginLeft: 6 }}>標題用 **字** 標重點，例：省 **50%**</span>
-              </div>
-              <div className="form-row">
-                <label className="form-label">標題字距</label>
-                <input type="range" min={-2} max={16} value={s.letterSpacing}
-                  onChange={(e) => set("letterSpacing", Number(e.target.value))} style={{ flex: 1 }} />
-                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.letterSpacing}</span>
-              </div>
-              <div className="form-row">
-                <label className="form-label">標題行距</label>
-                <input type="range" min={0.9} max={2} step={0.02} value={s.headlineLineHeight} data-testid="banner-headline-leading"
-                  onChange={(e) => set("headlineLineHeight", Number(e.target.value))} style={{ flex: 1 }} />
-                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.headlineLineHeight.toFixed(2)}</span>
-              </div>
-              <div className="form-row">
-                <label className="form-label">內文字距</label>
-                <input type="range" min={-2} max={16} value={s.bodyLetterSpacing} data-testid="banner-body-tracking"
-                  onChange={(e) => set("bodyLetterSpacing", Number(e.target.value))} style={{ flex: 1 }} />
-                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.bodyLetterSpacing}</span>
-              </div>
-              <div className="form-row">
-                <label className="form-label">內文行距</label>
-                <input type="range" min={1} max={2.4} step={0.02} value={s.bodyLineHeight} data-testid="banner-body-leading"
-                  onChange={(e) => set("bodyLineHeight", Number(e.target.value))} style={{ flex: 1 }} />
-                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.bodyLineHeight.toFixed(2)}</span>
-              </div>
-              <div className="form-row" style={{ flexWrap: "wrap", gap: 12 }}>
-                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
-                  <input type="checkbox" checked={s.kinsoku} onChange={(e) => set("kinsoku", e.target.checked)} data-testid="banner-kinsoku" />
-                  避頭尾（，。」等不放行首，「（等不放行尾）
-                </label>
-                <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
-                  <input type="checkbox" checked={s.cjkSpacing} onChange={(e) => set("cjkSpacing", e.target.checked)} data-testid="banner-cjk-spacing" />
-                  中英數字之間自動空半格
-                </label>
-              </div>
-              <div className="form-row">
-                <label className="form-label">標題 px</label>
-                <input type="range" min={24} max={200} value={s.headlineSize}
-                  onChange={(e) => set("headlineSize", Number(e.target.value))} style={{ flex: 1 }} />
-                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.headlineSize}</span>
-              </div>
-              <div className="form-row">
-                <label className="form-label">副標 px</label>
-                <input type="range" min={12} max={120} value={s.subtextSize}
-                  onChange={(e) => set("subtextSize", Number(e.target.value))} style={{ flex: 1 }} />
-                <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.subtextSize}</span>
-              </div>
-              <div className="form-row">
-                <label className="form-label">垂直</label>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {(["top", "center", "bottom"] as TextPos[]).map((pos) => (
-                    <button key={pos}
-                      className={s.textPos === pos ? "btn btn-primary" : "btn btn-ghost"}
-                      style={{ fontSize: 12, padding: "3px 10px" }}
-                      onClick={() => set("textPos", pos)}>
-                      {{ top: "上", center: "中", bottom: "下" }[pos]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="form-row">
-                <label className="form-label">水平</label>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {(["left", "center", "right"] as TextAlignH[]).map((a) => (
-                    <button key={a}
-                      className={s.textAlignH === a ? "btn btn-primary" : "btn btn-ghost"}
-                      style={{ fontSize: 12, padding: "3px 10px" }}
-                      onClick={() => set("textAlignH", a)}>
-                      {{ left: "左", center: "中", right: "右" }[a]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="form-row">
-                <label className="form-label">描邊陰影</label>
-                <input type="checkbox" checked={s.textOutline}
-                  onChange={(e) => set("textOutline", e.target.checked)} />
-                <span className="form-hint" style={{ marginLeft: 6 }}>文字在雜亂背景上也清楚</span>
-              </div>
-              <ShadowControls label="文字陰影（標題、副標、價格、評價一起）" unit="字的大小" testId="banner-text-shadow"
-                value={s.textShadow} onChange={(v) => set("textShadow", v)} />
-              <div className="form-row">
-                <label className="form-label">文字底襯</label>
-                <input type="checkbox" checked={s.textScrim}
-                  onChange={(e) => set("textScrim", e.target.checked)} />
-                <span className="form-hint" style={{ marginLeft: 6 }}>文字後方半透明板（比整張暗化高級）</span>
-                {s.textScrim && (
-                  <>
-                    <input type="range" min={0.05} max={0.9} step={0.05} value={s.textScrimOpacity}
-                      onChange={(e) => set("textScrimOpacity", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
-                    <span style={{ fontSize: 12, opacity: 0.7, minWidth: 32 }}>{Math.round(s.textScrimOpacity * 100)}%</span>
-                  </>
+            <SubHead first={false}>產品圖</SubHead>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+              <input ref={productFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleProductUpload} />
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => productFileRef.current?.click()}>
+                  {s.productImage ? "換圖" : "上傳產品圖"}
+                </button>
+                {s.productOrig && (
+                  <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={s.productRemoving} onClick={removeProductBg}>
+                    {s.productRemoving ? "去背中…" : s.productImage !== s.productOrig ? "✓ 已去背" : `一鍵去背（${ntdLabel(removeBgNtd())}）`}
+                  </button>
+                )}
+                {s.productImage && canvasHref && (
+                  <button className="btn btn-ghost" style={{ fontSize: 12 }} data-testid="banner-product-canvas"
+                    onClick={() => void openInCanvas(s.productImage!, `banner-${s.preset}-商品圖`, canvasHref, undefined, { tool: BANNER_RETURN_TOOL, slot: "product", label: "Banner 商品圖" })}>
+                    ✏️ 在畫布編輯
+                  </button>
+                )}
+                {s.productImage && (
+                  <button className="btn btn-ghost" style={{ fontSize: 12, color: "var(--red)" }}
+                    onClick={() => setS((prev) => ({ ...prev, productOrig: null, productImage: null, aiBgCompositeProduct: false, saved: false }))}>
+                    移除
+                  </button>
                 )}
               </div>
-              <div className="form-row">
-                <label className="form-label">暗化背景</label>
-                <input type="checkbox" checked={s.dimOverlay}
-                  onChange={(e) => set("dimOverlay", e.target.checked)} />
-                <span className="form-hint" style={{ marginLeft: 6 }}>整張壓暗</span>
-                {s.dimOverlay && (
-                  <>
-                    <input type="range" min={0.05} max={0.85} step={0.05} value={s.dimOverlayOpacity}
-                      onChange={(e) => set("dimOverlayOpacity", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
-                    <span style={{ fontSize: 12, opacity: 0.7, minWidth: 32 }}>{Math.round(s.dimOverlayOpacity * 100)}%</span>
-                  </>
-                )}
-              </div>
+              {s.productImage && (
+                <>
+                  <div className="form-row">
+                    <label className="form-label">位置</label>
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                      {(["center", "left", "right", "bottom-right"] as ProductPos[]).map((pos) => (
+                        <button key={pos}
+                          className={s.productPos === pos ? "btn btn-primary" : "btn btn-ghost"}
+                          style={{ fontSize: 11, padding: "3px 8px" }}
+                          onClick={() => set("productPos", pos)}>
+                          {{ center: "中央", left: "左", right: "右", "bottom-right": "右下" }[pos]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <label className="form-label">大小</label>
+                    <input type="range" min={0.2} max={1.0} step={0.05} value={s.productScale}
+                      onChange={(e) => set("productScale", Number(e.target.value))} style={{ flex: 1 }} />
+                    <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>
+                      {Math.round(s.productScale * 100)}%
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
+            {s.productImage && (() => {
+              const g = s.grounding;
+              const setG = <K extends keyof GroundingOpts>(k: K, v: NonNullable<GroundingOpts[K]>) => set("grounding", { ...g, [k]: v });
+              const slider = (label: string, value: number, min: number, max: number, step: number, on: (v: number) => void, unit = "%", id = "") => (
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                  <span style={{ minWidth: 48 }}>{label}</span>
+                  <input type="range" min={min} max={max} step={step} value={value} data-testid={id || undefined}
+                    onChange={(e) => on(Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+                  <span style={{ opacity: 0.7, minWidth: 40, textAlign: "right" }}>{unit === "%" ? `${Math.round(value * 100)}%` : `${value}${unit}`}</span>
+                </label>
+              );
+              const sh = g.shadow ?? { enabled: false }, rf = g.reflection ?? { enabled: false }, tn = g.tone ?? { enabled: false };
+              return (
+                <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>商品擬真</div>
+                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" checked={!!sh.enabled} data-testid="banner-ground-shadow" onChange={(e) => setG("shadow", { ...sh, enabled: e.target.checked })} />
+                    接觸陰影（商品放在桌面上的影子）
+                  </label>
+                  {sh.enabled && (<>
+                    {slider("濃度", sh.opacity ?? 0.5, 0, 1, 0.05, (v) => setG("shadow", { ...sh, opacity: v }))}
+                    {slider("柔和", sh.softness ?? 0.35, 0, 1, 0.05, (v) => setG("shadow", { ...sh, softness: v }))}
+                    {slider("下移", sh.distance ?? 0, -40, 80, 1, (v) => setG("shadow", { ...sh, distance: v }), "px")}
+                  </>)}
+                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" checked={!!rf.enabled} data-testid="banner-ground-reflection" onChange={(e) => setG("reflection", { ...rf, enabled: e.target.checked })} />
+                    倒影（光滑桌面）
+                  </label>
+                  {rf.enabled && (<>
+                    {slider("長度", rf.height ?? 0.35, 0, 1, 0.05, (v) => setG("reflection", { ...rf, height: v }))}
+                    {slider("濃度", rf.fade ?? 0.3, 0, 1, 0.05, (v) => setG("reflection", { ...rf, fade: v }))}
+                    {slider("間距", rf.gap ?? 0, 0, 60, 1, (v) => setG("reflection", { ...rf, gap: v }), "px")}
+                  </>)}
+                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="checkbox" checked={!!tn.enabled} data-testid="banner-ground-tone" onChange={(e) => setG("tone", { ...tn, enabled: e.target.checked })} />
+                    色調匹配（商品顏色往背景靠一點，最多 ±12%）
+                  </label>
+                  {tn.enabled && slider("強度", tn.strength ?? 0.4, 0, 1, 0.05, (v) => setG("tone", { ...tn, strength: v }))}
+                </div>
+              );
+            })()}
           </StepCard>
 
-          {/* Step 4.5: 行銷元素 — conversion drivers */}
-          <StepCard title="行銷元素" step="Step 4.5" icon="🛒" hint="讓人點擊下單" order={8}>
+          <StepCard title="行銷元素" step="4" icon="🛒" summary={[s.ctaText, s.badgeText, s.showPrice ? s.priceNow || "價格" : "", s.trustType !== "none" ? "信任標記" : ""].filter(Boolean).join(" · ") || "無"}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
 
               {/* CTA 按鈕 */}
@@ -2376,16 +2378,92 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
             </div>
           </StepCard>
 
-          {/* Export */}
-          <div className="card" style={{ order: 9 }}>
-            <h2 style={{ fontSize: 15, margin: "0 0 12px" }}>Step 5 · 匯出</h2>
-            {/* card R3: staff choose whose 我的設計 it goes to (opened from a customer's video or site = that customer) */}
-            {staff && (
-              <div className="form-row" style={{ marginBottom: 12 }}>
-                <label className="form-label">存到哪個客戶的我的設計</label>
-                <staff.SaveOrgPicker selected={saveOrg} onPick={(id) => { setSaveOrg(id); setS((prev) => ({ ...prev, saved: false })); }} />
+          <StepCard title="風格" step="5" icon="🎨" summary={brand.kit ? `品牌套組 · ${brand.kit.name}` : "自訂配色"}>
+            <SubHead first={true}>配色／品牌色</SubHead>
+            <BrandKitPanel brand={brand} onApply={(kit) => void applyBrandKit(kit)}
+              getCurrent={() => {
+                const c = sRef.current;
+                return { colors: [c.gradFrom, c.gradTo, c.accentColor, c.textColor, c.bgColor], headlineFont: c.headlineFont, bodyFont: c.fontFamily, headlineWeight: c.headlineWeight, bodyWeight: c.bodyWeight };
+              }} />
+            {s.logoImage && (
+              <div className="form-row" style={{ marginTop: 8, flexWrap: "wrap", gap: 6 }}>
+                <label className="form-label">Logo</label>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={s.logoImage} alt="logo" style={{ height: 28, maxWidth: 80, objectFit: "contain" }} />
+                <span style={{ fontSize: 12 }}>大小</span>
+                <input type="range" min={0.04} max={0.6} step={0.01} value={s.logoScale} data-testid="banner-logo-scale"
+                  onChange={(e) => set("logoScale", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
+                <span style={{ fontSize: 12, opacity: 0.7 }}>{Math.round(s.logoScale * 100)}%</span>
+                <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => set("logoImage", null)}>拿掉 logo</button>
+                <span className="form-hint" style={{ width: "100%" }}>預設在左下角，可在預覽上拖曳。</span>
               </div>
             )}
+            {staff ? <staff.BrandPicker onPick={(colors) => { setPalette(colors); setSelSwatch(colors[0] ?? null); }} /> : null}
+
+            <input ref={colorRefFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleColorRefUpload} />
+            <button className="btn btn-ghost" style={{ fontSize: 12, marginTop: 8 }} onClick={() => colorRefFileRef.current?.click()}>
+              📷 從參考圖擷取配色
+            </button>
+
+            {palette.length > 0 && (
+              <>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                  {palette.map((c, i) => (
+                    <button key={`${c}-${i}`} onClick={() => setSelSwatch(c)} title={c}
+                      style={{
+                        width: 30, height: 30, borderRadius: 6, background: c, cursor: "pointer", padding: 0,
+                        border: selSwatch === c ? "3px solid var(--accent)" : "1px solid var(--border)",
+                      }} />
+                  ))}
+                </div>
+                <button className="btn btn-primary" style={{ fontSize: 12, marginTop: 10 }} onClick={() => autoApplyPalette(palette)}>
+                  ✨ 自動套用整組配色
+                </button>
+                {selSwatch && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+                      把選中色
+                      <span style={{ display: "inline-block", width: 13, height: 13, background: selSwatch, borderRadius: 3, border: "1px solid var(--border)" }} />
+                      套到：
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {SWATCH_TARGETS.map((t) => (
+                        <button key={t.key} className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+                          onClick={() => { if (selSwatch) set(t.key, selSwatch); }}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            <SubHead first={false}>版型模板</SubHead>
+            <p className="form-hint" style={{ marginBottom: 8, marginTop: 4 }}>套用後再填內容；只改版面/元素，不動你的文字與圖。</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {TEMPLATES.filter((t) => !t.group).map((t) => (
+                <button key={t.key} className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
+                  onClick={() => applyTemplate(t.patch)}>
+                  <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
+                </button>
+              ))}
+            </div>
+            {/* card R3: cards a video opens with (存到我的設計 -> the editor's 片頭 「從我的設計挑」) */}
+            <p className="form-hint" style={{ margin: "10px 0 6px" }}>做影片開頭的標題卡：選一種版面 → 改字 → 存到我的設計，之後在影片剪輯的片頭選「橫幅字卡」使用</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {TEMPLATES.filter((t) => t.group === "opener").map((t) => (
+                <button key={t.key} className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
+                  onClick={() => applyTemplate({ ...templatePatch(t, s.preset), ...openerPlaceholders(t.key, s) })}>
+                  <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
+                </button>
+              ))}
+            </div>
+          </StepCard>
+
+          <StepCard title="匯出" step="6" icon="📦" summary={s.saved ? "✓ 已存到圖庫" : "圖庫 · PNG / JPG / WebP / PSD / SVG"}>
+            <div style={{ marginTop: 8 }} />
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="btn btn-primary" onClick={handleSave}
                 disabled={s.saving || s.generating || s.productRemoving}>
@@ -2444,14 +2522,14 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 ✓ 已儲存至 {designsHref ? <a href={designsHref} style={{ color: "var(--green)" }}>My Designs</a> : "My Designs"}
               </p>
             )}
-          </div>
+          </StepCard>
 
         </div>
 
         {/* ── Preview (left side, sticky) ── */}
         <div style={{
-          order: 1, flex: "1.7 1 520px", minWidth: 320,
-          position: "sticky", top: 12, alignSelf: "flex-start",
+          order: 1, flex: "1.7 1 520px", minWidth: 0,
+          ...(wide ? { position: "sticky" as const, top: 16, alignSelf: "flex-start" } : {}),
         }}>
 
           {/* Preview */}
@@ -2473,15 +2551,20 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
               </div>
             </div>
             <div style={{
-              display: "inline-block", maxWidth: "100%", minHeight: previewUrl ? undefined : 240,
+              display: blank ? "block" : "inline-block", maxWidth: "100%", minHeight: previewUrl || blank ? undefined : 240,
               position: "relative", borderRadius: 6, overflow: "hidden",
               background: "var(--chip-surface)",
-              backgroundImage:
-                "linear-gradient(45deg,#0001 25%,transparent 25%),linear-gradient(-45deg,#0001 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#0001 75%),linear-gradient(-45deg,transparent 75%,#0001 75%)",
-              backgroundSize: "20px 20px",
-              backgroundPosition: "0 0,0 10px,10px -10px,-10px 0",
             }}>
-              {previewUrl && (
+              {blank && (
+                <div data-testid="banner-empty-hint" style={{
+                  width: 720, maxWidth: "100%", aspectRatio: `${p.w} / ${p.h}`, maxHeight: "calc(100vh - 230px)", minHeight: 160,
+                  display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 16,
+                  border: "1px dashed var(--border)", borderRadius: 6, color: "var(--text-muted)", fontSize: 14,
+                }}>
+                  {staff ? "先在「開始」輸入主題，再按 ✨ AI 一鍵設計" : "先在「2 文字」輸入標題，或在「3 畫面」放背景與產品圖"}
+                </div>
+              )}
+              {previewUrl && !blank && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={previewUrl} alt="banner preview" ref={previewImgRef} draggable={false} data-testid="banner-preview"
                   onPointerDown={(e) => {
@@ -2518,7 +2601,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   style={{ display: "block", maxWidth: "100%", maxHeight: "calc(100vh - 230px)", width: "auto", height: "auto",
                     cursor: hoverHit || guides ? "move" : bgMovable ? "grab" : undefined, touchAction: "none" }} />
               )}
-              {previewUrl && guides && (
+              {previewUrl && !blank && guides && (
                 // C4 drag guides: a 10% grid, the thirds, the centre; the line the element snapped to and its box highlighted
                 <svg viewBox={`0 0 ${p.w} ${p.h}`} preserveAspectRatio="none" data-testid="banner-drag-guides"
                   style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
