@@ -221,7 +221,7 @@ echo "update public.environments set metadata = metadata || '{\"ingress\":\"prod
 2. 主機開關檔加 `AW_SITE_GATEWAY_SLUGS=<slug>`。容器會加入 `lobster-net`，與所有產品同網。
 3. 第 5 步不建 vhost：工程師用 `HS/safe-infra-patch.sh nginx` 改 `lobster-nginx` 的分路（`agency-os/AGENTS.md` §0），再勾「工程師已在產品閘道把這個網址接到這個站」。必須送到 `<slug>-wp` 的路徑（現成範本：`lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 的 `map $uri $oracle_backend` 與 `map $args $oracle_home_backend`）：
    - `/wp-json/`、`/wp-admin/`、`/wp-login.php`、`/wp-content/`、`/wp-includes/`
-   - `/` 帶 WordPress 查詢參數（`rest_route=`、`p=`、`page_id=`、`preview=`、`post_type=`、`customize_changeset_uuid=`）。漏了 `rest_route=`，第 7 步必失敗。
+   - 首頁還留給別的服務的期間：`/` 帶 WordPress 查詢參數（`rest_route=`、`p=`、`page_id=`、`preview=`、`post_type=`、`customize_changeset_uuid=`）也要送到 WordPress，漏了 `rest_route=` 第 7 步必失敗（做法見 `git show 32b218619 -- lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 的 `$oracle_home_backend`；oracle 於 2026-11-26 把整個 `/` 交給 WordPress 後已移除）。
 4. 拆除腳本不碰閘道設定，要另外還原。
 5. 第 9 步的自動確認打 `https://<domain>/aw-open-check/`（`NA/lib/site-flow/steps/open.ts` `OPEN_PROBE_PATH`）：這個路徑必須分到 WordPress（上面的 `map` 預設就是），不得列為別的服務的前綴。
 

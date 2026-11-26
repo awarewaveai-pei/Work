@@ -66,7 +66,7 @@ curl -s https://oracle.aware-wave.com/api/mcp -H 'content-type: application/json
   - 沒帶票 = 匿名，行為不變。
 
 ## 站前面有 WordPress（`ORACLE_FRONT_PAGES`）
-- 正式站現況（2026-11-24 GO-2）：`lobster-nginx` oracle 區塊的 `map $uri $oracle_backend`（`lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`）列出引擎的路徑，其餘到 WordPress 容器 `oracle-aware-wave-com-wp`；`ORACLE_SITES` 已登記 key_id `oracle`；`ORACLE_FRONT_PAGES` 未設（GO-3 才設，同時刪 map 裡 `/`、`/robots.txt`、`/sitemap.xml` 三行與 `$oracle_home_backend`）。
+- 正式站現況（2026-11-26 GO-3）：`lobster-nginx` oracle 區塊的 `map $uri $oracle_backend`（`lobster-factory/infra/hetzner-phase1-core/nginx/default.conf`）只把 `/zh-TW`、`/en`、`/embed`、`/api`、`/_next`、`/tarot`、`/favicon.ico` 給引擎，其餘（含 `/`、`/robots.txt`、`/sitemap.xml`）到 WordPress 容器 `oracle-aware-wave-com-wp`；`ORACLE_SITES` 已登記 key_id `oracle`；`ORACLE_FRONT_PAGES` 已設（`pages` zh-TW `/tools/{slug}/`、en `/english/tools/{slug}/`；`home` zh-TW `/`、en `/english/`；備份 `.env.production.bak-go3-20261126`）。
 - 執行期環境變數（容器的 `.env.production`，改後重啟容器；不必重 build）。未設定＝沒有 WordPress：引擎照現在顯示所有頁、自己出 sitemap 與 robots（買斷、無 WordPress 的站都是這樣）。
 - 格式：`{"pages":{"zh-TW":"/tools/{slug}/","en":"/english/tools/{slug}/"},"home":{"zh-TW":"/","en":"/english/"}}`；`home` 選填；只收 `lib/i18n/config.ts` `locales` 內的語言鍵。
 - 有設定時：`/<語言>/<工具>`（`lib/site.ts` `PAGE_SLUGS`，可帶結尾斜線）與 `/<語言>`（有 `home` 時）308 轉到樣式算出的路徑，`{slug}` 換成工具代稱，保留查詢字串；`Location` 是同網域相對路徑。`/sitemap.xml`、`/robots.txt` 回 404（改由 WordPress／Rank Math 出）。`/embed/*`、`/api/*` 不受影響。該語言沒有樣式的照常顯示引擎頁。
