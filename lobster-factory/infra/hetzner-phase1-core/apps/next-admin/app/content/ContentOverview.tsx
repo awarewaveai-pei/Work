@@ -1,7 +1,8 @@
 "use client";
-// content.<base domain>/ (blueprint §15A rule 4: home = status + main action). Three numbers for the current client (and
-// its site, when one is picked), read from the APIs the destination pages use; a number whose read failed shows "—",
-// never 0. Nothing is read unless the client context is "ok" (ADR 020); the client rail shows why it is not.
+// content.<base domain>/ (blueprint §15A rule 4: home = status + main action). Three numbers for the current client, an
+// org-layer page: the whole client, or one site when the URL names one. Read from the APIs the destination pages use; a
+// number whose read failed shows "—", never 0. Nothing is read unless the client context is "ok" (ADR 020); the client
+// rail shows why it is not.
 import { useEffect, useState } from "react";
 import type { OverviewData } from "@/lib/content/topics/overview-load";
 import { useClientContext } from "@/lib/client-context/use-client-context";
@@ -21,7 +22,7 @@ async function read<T>(url: string): Promise<T> {
 }
 
 export function ContentOverview() {
-  const { org, site, status } = useClientContext("site");
+  const { org, site, status } = useClientContext("org");
   const carry = useCarry();
   const key = org && status === "ok" ? `${org}|${site ?? ""}` : null;
   const [got, setGot] = useState<{ key: string; counts: Counts } | null>(null);

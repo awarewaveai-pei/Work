@@ -8,9 +8,9 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/content",
   useSearchParams: () => new URLSearchParams(`org=${A}`),
 }));
-const ctx = vi.hoisted(() => ({ site: null as string | null, status: "ok" }));
+const ctx = vi.hoisted(() => ({ site: null as string | null, status: "ok", layer: "" }));
 vi.mock("@/lib/client-context/use-client-context", () => ({
-  useClientContext: () => ({ org: A, ...ctx }),
+  useClientContext: (layer: string) => { ctx.layer = layer; return { org: A, site: ctx.site, status: ctx.status }; },
 }));
 
 import { ContentOverview } from "../ContentOverview";
@@ -30,6 +30,19 @@ describe("ContentOverview", () => {
     await waitFor(() => expect(value("草稿")).toBe("0"));
     const drafts = fetchMock.mock.calls.map((c) => String(c[0])).filter((u) => u.startsWith("/api/content/drafts"));
     expect(drafts).toEqual([`/api/content/drafts?organizationId=${A}&siteId=s1`]);
+  });
+
+  // org layer: decide() answers "ok" with no site however many sites the client has (a site layer would be "unselected")
+  it("a client with several sites and none picked is counted as a whole", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => json({ ok: true, drafts: [{}], overview: { month: "2026-11-01", rows: [] } }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ContentOverview />);
+    await waitFor(() => expect(value("草稿")).toBe("1"));
+    expect(ctx.layer).toBe("org");
+    expect(fetchMock.mock.calls.map((c) => String(c[0])).sort()).toEqual([
+      `/api/content/drafts?organizationId=${A}`,
+      `/api/content/topics/overview?organizationId=${A}`,
+    ]);
   });
 
   it("reads nothing unless the client context is ok", () => {
