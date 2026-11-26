@@ -1,4 +1,27 @@
 # Worklog
+## 2026-11-26（續30）— /tools/ai-models 實測紀錄：每項測試一個子分頁，依文字／圖片／影片／音訊分類，總覽卡片＋結論先行的版面
+
+[任務] 操作者：「把裡面的每種測試用 tab 分開，要按邏輯分類歸納，UI/UX 排版要有國際頂尖設計師水準」。
+
+[已修改]
+- `app/(shell)/tools/ai-models/MeasuredRuns.tsx`：七項測試各一個子分頁 `?tab=measured&test=<key>`，導覽列依 文字（文章生成／八種文案／橫幅文案）→ 圖片（文章配圖）→ 影片（破框貼文動畫）→ 音訊（音樂生成／語音與音效）分組；不帶 test 或未知 test = 總覽（七張卡：類別、日期、模型數、要回答的問題、結論、通過／未通過／待測）。測試頁：問題 → 日期／已測／判定 → 結論 → 做法 → 完整比較頁（K28 iframe）→ 結果列（模型＋判定標籤＋盲評名次｜實扣／標價｜結果）。全組相同的「做了什麼／出處」只在頁首或頁尾寫一次，不同的才在該列註明。資料列原文保留，只有三處改動：盲評名次從結果文字抽成 `rank`；文章配圖對照列的「做了什麼」改成實情「只給中文替代文字」（依 `agency-os/reports/model-bakeoff/2026-11-article-image/build_image_page.cjs:41`）；對照列加 `control`，不算進模型數。
+- `page.tsx`：把 `test` 傳給 MeasuredRuns。`app/globals.css`：新增 `.mr-*`，只用 token，≤760px 時結果列改成單欄。
+- `__tests__/bakeoff-pages.test.ts`：iframe 斷言改成逐個子分頁渲染；新增「總覽連到每個子分頁、沒有 iframe；未知 test = 總覽」。
+- 本機 main 落後 origin 91 個 commit，且被別的 session 的未追蹤檔擋住 ff；本次在 `D:\Worktrees\mr-tabs`（以 origin/main 為底）重做後直接推上去。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run "app/(shell)/tools/ai-models/__tests__/bakeoff-pages.test.ts"`（worktree） | exit=0 | ms=678 | result=7 passed
+- `npx tsc --noEmit`：ai-models 零錯誤；僅 `banner-layers.ts` 缺 `ag-psd`。原因是共用的 node_modules 比 origin 的 package.json 舊，跟本次改動無關。
+- 版面：用 tsx 把元件渲染成靜態 HTML、套 globals.css，再用 headless Chromium 截圖檢查 1440 寬，以及 375 寬 iframe 裡的手機寬度。手機寬 scrollWidth ≤ 視窗寬，沒有橫向捲動。dev server 需要 Supabase 登入，未代填密碼。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/6m/0n
+  - Codex 三輪（`agency-os/reports/oracle/2026-11-26-partialreview-1df97c49.md`、`-363d2654.md`、`-598b2f5b.md`）6 項全部成立且已修：對照組誤標同輸入、計數單位是列不是次、對照列算成模型、八種文案缺日期（取資料 commit `4066ff696` 的 2026-11-23）、語音四列是 API 不是模型（`unit`）、橫幅結論漏「自編折扣要換真的」。
+  - 不變量（同一 reviewer 第 3 輪前）：頁面上每個數字／日期的意思必須跟它的標籤一致。模型數 = 實際跑過的不同模型（排除待測與對照）；單位不是模型時由組自帶 `unit`；沒有資料列的組明寫 `date`／`models`。
+- ORACLE_WAIVED: 第 3 輪後的最後一次修改只套用該輪兩項 finding（`unit` 欄位與一句結論文字），tsc 與指名測試重跑皆綠；再跑一輪等於重審同一份程式，無效益。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=MeasuredRuns|tab=measured | hits=12
+  - 程式呼叫點只有 page.tsx 與測試，已更新。handoffs 文件提到的 `?tab=measured` 網址仍然有效（落在總覽）。
+
+[剩餘風險] 每項測試的完整比較頁 iframe 只在正式站實際載入（路由限員工）；今晚 03:00 自動部署後才會在線上看到。本機 `D:\Work` 仍落後 origin，要等 AO-RESUME 的 parity 或擋住的未追蹤檔處理後才會跟上。
+[rollback] `git revert <本 commit>`：只動 ai-models 三個檔＋globals.css 末段＋本條 WORKLOG。
 ## 2026-11-26（續27）— 實測紀錄「橫幅：生成文案」改成依結論分組的卡片排版
 
 - 起因：操作者「要按邏輯分類歸納，UI/UX 排版要國際頂尖設計師水準」（兩頁都要；本條是實測紀錄頁，橫幅工具左欄另開 C13）。

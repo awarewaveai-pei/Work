@@ -18,7 +18,7 @@ vi.mock("@/lib/supabase/ssr", () => ({
 
 import { middleware } from "../../../../../middleware";
 import { GET } from "../bakeoff/[slug]/route";
-import MeasuredRuns from "../MeasuredRuns";
+import MeasuredRuns, { TEST_KEYS } from "../MeasuredRuns";
 import { BAKEOFF_SLUGS } from "../bakeoff-pages";
 
 const APP = path.resolve(__dirname, "../../../../..");
@@ -63,13 +63,20 @@ describe("bakeoff route", () => {
 });
 
 describe("實測紀錄 tab", () => {
-  it("embeds each full page in a sandboxed iframe, each with an open-in-full link", () => {
-    const html = renderToStaticMarkup(MeasuredRuns());
+  it("embeds each full page in a sandboxed iframe on its own test sub-tab, each with an open-in-full link", () => {
+    const html = TEST_KEYS.map((test) => renderToStaticMarkup(MeasuredRuns({ test }))).join("");
     for (const slug of BAKEOFF_SLUGS) {
       const href = `/tools/ai-models/bakeoff/${slug}`;
       expect(html, slug).toMatch(new RegExp(`<iframe src="${href}" sandbox="allow-scripts"`));
       expect(html, slug).toMatch(new RegExp(`<a href="${href}" target="_blank"[^>]*>另開完整頁面</a>`));
     }
+  });
+
+  it("the overview links every test sub-tab; an unknown test falls back to the overview", () => {
+    const overview = renderToStaticMarkup(MeasuredRuns());
+    for (const k of TEST_KEYS) expect(overview, k).toContain(`href="/tools/ai-models?tab=measured&amp;test=${k}"`);
+    expect(overview).not.toContain("<iframe");
+    expect(renderToStaticMarkup(MeasuredRuns({ test: "nope" }))).toBe(overview);
   });
 });
 
