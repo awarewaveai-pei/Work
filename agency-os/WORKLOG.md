@@ -1,4 +1,10 @@
 # Worklog
+## 2026-11-26（續32）— 自動啟動 Claude 過渡收尾：app 觸發確認、routine cron 移除、週六 routine 停用
+
+- 結果：app run-due 於 2026-11-25 23:00 UTC（台北 11-26 07:00）觸發成功，`last_error` 空；時間是 07:00 不是 08:00，因操作者 11-25 10:52 UTC 在 /ops/schedules 把 weekday_hours 改成 `{NULL,7,7,7,7,7,7}`（非 bug）。routine `trig_01LfZEYHtBxdGKjNB2dUeugP` list_runs 見 23:00:02（app）與 00:04:13（自身 cron）兩個 run → 已 `update {"cron_expression": ""}`，get 確認 `enabled:true`、`api_token_hint` 在、無 `next_run_at`；週六 routine `trig_01DgzPJzGcnF11AdpooyEukn` 已 `enabled:false`（app 週六 07:00 已涵蓋）。`SCHEDULES_PAGE_PLAN.md` §0 該列已註記。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql -c "select last_run_at, last_error, weekday_hours from client_schedules where job_key='claude_usage_window'" + RemoteTrigger get/list_runs | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 無程式改動，只改 routine 設定與文件一行
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-11-26（續15）— 積木 usedBy 自動補：程式的 import 自己說誰在用，不再手抄進 blocks.ts
 
 - 根因：usedBy 是 import 已表達之事的手抄副本；新程式一用共用積木，CI 就擋到有人手改 blocks.ts（`6b9032f09` B-079 補 design，CI run 45729915966 擋 Banner 部署）。操作者開發中反映困擾 → 改成自動產生。
