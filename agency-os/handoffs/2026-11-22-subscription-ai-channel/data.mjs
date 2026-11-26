@@ -96,7 +96,7 @@ export const STEPS = [
   { n: 30, code: 'K29', group: 'B3d', title: '文章封面按頻道出不同尺寸', plain: '你 11-25 決定要做。網站的封面維持橫的。臉書、IG、Bluesky 的貼文改附直式的封面，在手機上佔的畫面比較大。同一個版型換尺寸，不重畫排法。直式的底圖另外畫一張，每篇多約 NT$0.1；網站沒有連這些頻道就不畫、不多花錢。尺寸對照表只寫在一個地方，以後加頻道只要加一列。IG 和臉書有依據；Bluesky 查不到官方說法，先用直式，上線後看第一則實際的貼文，被裁就改。等 K27 併入後才派。',
     gate: '全套測試通過；部署後下一篇自動文章：臉書和 IG 的草稿是直式封面，網站的精選圖片還是橫的。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '5580d223d', depends: ['K27'], card: 'briefs/K29-cover-size-per-channel.md' },
   { n: 31, code: 'K30', group: 'B3d', title: '勾「影片」就一定發 YouTube', plain: '你 11-26 決定：勾了影片，就先發 YouTube，拿到連結後直接把 YouTube 播放器放進文章，文章不放影片檔；臉書、IG、Bluesky 附同一支影片。「YouTube」勾選拿掉。影片檔不進 WP。網站沒連 YouTube 就停下來通知修理，連上後按重試接著做。',
-    gate: '全套測試通過；部署後下一篇有影片的自動文章：YouTube 先發，文章裡是 YouTube 播放器，WP 媒體庫沒有影片檔。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K29'], card: 'briefs/K30-video-always-youtube.md' },
+    gate: '全套測試通過；部署後下一篇有影片的自動文章：YouTube 先發，文章裡是 YouTube 播放器，WP 媒體庫沒有影片檔。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '433149b71', depends: ['K29'], card: 'briefs/K30-video-always-youtube.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
@@ -263,5 +263,14 @@ export const RISKS = [
     { card: 'K28', risk: '三份比較頁在正式容器讀不讀得到、嵌進去後看不看得到。', act: '已驗：文章、文案、配圖三組上方的嵌入框都有完整內容，配圖那份的圖也有出來；三條路徑都回正常。' },
     { card: 'K27', risk: 'AI 會不會真的照「看情境才畫人」去寫畫面描述。', act: '已驗：產一篇「小型咖啡店如何經營熟客」。內文配圖只有點餐那張有人，寫明兩個不同的人（三十多歲摩洛哥裔女性、二十多歲波蘭裔男性）；出杯檯面、筆記本那兩張沒有人；封面也沒有人。' },
     { card: 'K29', risk: '社群草稿附的封面是不是直式、Bluesky 會不會被裁。', act: '還沒驗：要等下一篇自動文章出來才看得到。' },
+  ] },
+  { batch: 'K30（影片一定發 YouTube）驗收', rows: [
+    { card: 'K30', risk: '有人手動按「核准並開始」時，沒連 YouTube 只在畫面上顯示原因，不另外發通知。', act: '接受：人就在畫面前，看得到原因。排程自動跑的題目會發通知。' },
+    { card: 'K30', risk: '11-26 以前做的影片題目補建 YouTube 草稿時，標題和說明不經 AI，直接用文章標題和摘要。', act: '接受：不花錢，只影響舊題目。新題目照常由 AI 寫。' },
+    { card: 'K30', risk: '11-19 以前 YouTube 跟其他頻道共用同一份草稿的題目不補建，文章最後不會有影片。', act: '接受：正式資料只有 1 筆，補建的話 YouTube 會發兩次。' },
+    { card: 'K30', risk: '只勾「影片」沒勾社群的題目，估價多一筆改寫費。', act: '這是實際會花的錢（要寫 YouTube 標題和說明），估價變準了。勾社群＋影片的 42 筆不變。' },
+    { card: 'K30', risk: '單位沒開社群改寫權限時，只勾影片的題目會在製作時才失敗。', act: '還沒查兩個網站有沒有開這個權限。失敗時題目會寫明原因，不會悄悄卡住。之後新客戶開影片時，監工會一起看權限。' },
+    { card: 'K30', risk: 'AI 規劃題目時，可能替沒連 YouTube 的網站提出影片題目。', act: '這種題目會被退回並發通知，什麼都不花。' },
+    { card: 'K30', risk: '題目頁只拿掉一顆按鈕、改了一個標籤，工人沒有親眼看過畫面。', act: '今晚 03:00 自動上線後，監工去看題目頁。' },
   ] },
 ];

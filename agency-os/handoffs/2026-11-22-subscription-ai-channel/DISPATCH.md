@@ -112,3 +112,4 @@ critic Standard 整批：warn 3 major（含 1 既有線上 bug）／5 minor → 
 - 提交方式不變：`D:\Worktrees\Work\sub-int`（detached）整合；文件用 scratchpad 的 `ship24.sh`（複製 `data.mjs`／`supervisor.html`／`DISPATCH.md`／briefs 到 sub-int 後 commit、push）；scratchpad 被清掉就照這個做法重寫一支。新增 brief 檔要記得加進複製與 `git add`（11-25 漏過一次）。
 - 操作者提過但沒有卡：Banner 設計工具的尺寸選單（另有「Banner pro-design」那條線）；免費圖庫；風格目錄的畫家組在文章這邊收起來；IG 可點連結（Meta One，需付費且只能在 App 手動加）。
 - 仍在等：M1（Codex 文字實跑；待決 4）；K9 主機常駐（待決 1–3）——做完後排程才能用 Codex 免費生圖。
+- **K30 已併入 `433149b71`（11-26，未部署，今晚 03:00 自動上線）**：勾影片＝一定發 YouTube，文章只放 YouTube 連結（WP 顯示播放器），沒連 YouTube 停下來通知。上線後要看：題目頁沒有 YouTube 勾選；下一篇影片題目 YouTube 先發、文章只有 YouTube 播放器。片頭設定（11-20 接上）也還沒有自動影片實際跑過。
