@@ -1,27 +1,36 @@
 // Card C9: the banner's two AI calls -- the model buttons (a subset of the shared text-model menu, with a per-call NT$
 // estimate) and AI 一鍵設計整張 across several sizes: one call returns the shared words / colours plus one layout per chosen
 // size; designPlan() turns that into the main size's layout and every other size's override. Pure (node-testable).
-import { AI_TEXT_MODELS, isOpenAiTextModel, type AiTextModel } from "@/lib/ai/text-model-options";
-import { textCallCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
+import { AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
+import { textCallCostUsd, toolCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { ELEM_KEYS, type ElemPositions } from "./banner-layers";
 
-/** The models offered on the banner's AI buttons (operator 2026-11-26); default Opus until the bake-off picks one. */
+/** The models offered on the banner's AI buttons (operator 2026-11-26). Defaults from the bake-off on production
+ *  (ai_call_logs, same brief, 2026-11-26): 生成文案 = GPT-6.2 sol (short titles, NT$0.10); 一鍵設計 stays Claude Opus 5.5. */
 const BANNER_AI_MODEL_IDS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "gpt-6.2-sol"] as const satisfies readonly AiTextModel[];
 export const BANNER_AI_MODELS = BANNER_AI_MODEL_IDS.map((value) => ({ value, label: AI_TEXT_MODELS.find((m) => m.value === value)!.label }));
 export type BannerAiModel = (typeof BANNER_AI_MODEL_IDS)[number];
-export const DEFAULT_BANNER_AI_MODEL: BannerAiModel = "claude-opus-5-5";
+export const DEFAULT_COPY_MODEL: BannerAiModel = "gpt-6.2-sol";
+export const DEFAULT_DESIGN_MODEL: BannerAiModel = "claude-opus-5-5";
 
-/** About what one call costs, NT$: typical prompt / answer sizes of the banner tasks at the cost table's rates (an OpenAI
- *  reasoning model also spends ~1,000 thinking tokens). An estimate shown on the button, not the bill. */
+/** Measured NT$ of one 生成文案 call per model (production ai_call_logs, same brief, 2026-11-26). Each model answers at its
+ *  own length, so one token guess cannot price them all; the design call is priced from this, scaled by its longer answer. */
+const COPY_MEASURED_NTD: Record<BannerAiModel, number> = { "claude-opus-5-5": 0.6, "claude-sonnet-5-5": 0.39, "gpt-6.2-sol": 0.1, "claude-haiku-5-5": 0.01 };
+const typicalTokens = (task: "copy" | "design", sizes: number) => {
+  const m = task === "design" && sizes > 1 ? sizes : 0; // one call whatever the size count; each size adds a layout
+  return task === "copy" ? { inputTokens: 900, outputTokens: 760 } : { inputTokens: 1000 + 120 * m, outputTokens: 1100 + 250 * m };
+};
+/** About what one call costs, NT$: the measured copy price, scaled for the design call by the cost-table price of its
+ *  typical prompt / answer against the copy call's. An estimate on the button, not the bill. */
 export function bannerCallNtd(model: BannerAiModel, task: "copy" | "design", sizes = 1): number {
-  const multi = task === "design" && sizes > 1 ? sizes : 0;
-  const inputTokens = (task === "copy" ? 600 : 900) + 150 * multi;
-  const outputTokens = (task === "copy" ? 600 : 700) + 300 * multi + (isOpenAiTextModel(model) ? 1000 : 0);
-  return usdToNtd(textCallCostUsd({ model, inputTokens, outputTokens }));
+  const at = (t: "copy" | "design") => textCallCostUsd({ model, ...typicalTokens(t, sizes) });
+  return COPY_MEASURED_NTD[model] * (at(task) / at("copy"));
 }
-/** "約 NT$1.23" (two decimals under NT$1, one under NT$10, whole above). */
+/** NT$ of one product cut-out (Replicate 851-labs, cost-model TOOL_RATES "bg-remove", billed by the second). */
+export const removeBgNtd = (): number => usdToNtd(toolCostUsd("bg-remove"));
+/** A paid button's price, to NT$0.1: "約 NT$0.6"; under NT$0.05 "不到 NT$0.1". */
 export function ntdLabel(v: number): string {
-  return `約 NT$${v < 1 ? v.toFixed(2) : v < 10 ? v.toFixed(1) : Math.round(v)}`;
+  return v < 0.05 ? "不到 NT$0.1" : `約 NT$${(Math.round(v * 10) / 10).toFixed(1)}`;
 }
 
 /** The layout fields one size may get from the AI (a subset of BannerStudio SIZE_KEYS). */

@@ -10,7 +10,7 @@ import {
   type ElemBox, type ElemKey, type ElemPositions, type Pixels, type ShadowSpec,
 } from "./banner-layers";
 import type { GroundingOpts } from "./product-grounding";
-import { BANNER_AI_MODELS, DEFAULT_BANNER_AI_MODEL, bannerCallNtd, designPlan, ntdLabel, type BannerAiModel, type SizeSpec } from "./banner-design";
+import { BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, bannerCallNtd, designPlan, ntdLabel, removeBgNtd, type BannerAiModel, type SizeSpec } from "./banner-design";
 import BrandKitPanel from "./kit/BrandKitPanel";
 import { useBrandKit } from "./kit/useBrandKit";
 import type { BrandKit } from "./kit/brand-kit";
@@ -1234,9 +1234,9 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     }
   }
 
-  // card C9: the model each AI button runs on (visible buttons, NT$ per call shown); default Opus until the bake-off decides
-  const [copyModel, setCopyModel] = useState<BannerAiModel>(DEFAULT_BANNER_AI_MODEL);
-  const [designModel, setDesignModel] = useState<BannerAiModel>(DEFAULT_BANNER_AI_MODEL);
+  // card C9: the model each AI button runs on (visible buttons, NT$ per call shown); defaults from the 2026-11-26 bake-off
+  const [copyModel, setCopyModel] = useState<BannerAiModel>(DEFAULT_COPY_MODEL);
+  const [designModel, setDesignModel] = useState<BannerAiModel>(DEFAULT_DESIGN_MODEL);
   const modelRow = (label: string, value: BannerAiModel, onPick: (v: BannerAiModel) => void, task: "copy" | "design") => (
     <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }} data-testid={`banner-model-${task}`}>
       <span style={{ fontSize: 12, minWidth: 56 }}>{label}</span>
@@ -1584,12 +1584,12 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button title={why("video.script")} className="btn btn-primary" disabled={(s.copyGenerating || s.designing || !s.copyBrief.trim()) || !canUse("video.script")}
                   onClick={generateCopy}>
-                  {s.copyGenerating ? "生成中…" : "生成文案"}
+                  {s.copyGenerating ? "生成中…" : `生成文案（${ntdLabel(bannerCallNtd(copyModel, "copy"))}）`}
                 </button>
                 <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || s.copyGenerating || !s.copyBrief.trim()) || !canUse("video.script")}
                   onClick={generateFullDesign}
                   style={{ background: "linear-gradient(135deg,#7c3aed,#ec4899)", border: "none" }}>
-                  {s.designing ? "設計中…" : "✨ AI 一鍵設計整張"}
+                  {s.designing ? "設計中…" : `✨ AI 一鍵設計整張（${ntdLabel(bannerCallNtd(designModel, "design", Math.max(1, s.multiSizes.length)))}）`}
                 </button>
               </div>
               <p className="form-hint">「一鍵設計」讓 AI 直接配好標題/重點字/CTA/徽章/價格/配色/版面 — 再微調即可。{s.multiSizes.length > 0 ? `已勾 ${s.multiSizes.length} 個尺寸：文案配色共用，每個尺寸各排一個版面。` : ""}</p>
@@ -1667,7 +1667,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 </button>
                 {s.productOrig && (
                   <button className="btn btn-ghost" style={{ fontSize: 12 }} disabled={s.productRemoving} onClick={removeProductBg}>
-                    {s.productRemoving ? "去背中…" : s.productImage !== s.productOrig ? "✓ 已去背" : "一鍵去背"}
+                    {s.productRemoving ? "去背中…" : s.productImage !== s.productOrig ? "✓ 已去背" : `一鍵去背（${ntdLabel(removeBgNtd())}）`}
                   </button>
                 )}
                 {s.productImage && canvasHref && (
@@ -2038,9 +2038,9 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                     onClick={generateAiBg}>
                     {s.generating
                       ? "生成中…"
-                      : s.aiBgCompositeProduct && s.productImage
+                      : `${s.aiBgCompositeProduct && s.productImage
                         ? (s.bgImage && s.bgMode === "ai" ? "重新合成" : "合成產品到場景")
-                        : (s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景")}
+                        : (s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景")}（${ntdLabel(STUDIO_MODEL_OPTIONS.find((m) => m.value === s.aiBgModel)?.costNt ?? 0)}）`}
                   </button>
                   {s.bgImage && s.bgMode === "ai" && (
                     <span className="form-hint" style={{ color: "var(--green)" }}>
