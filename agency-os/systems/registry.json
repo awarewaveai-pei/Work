@@ -2552,6 +2552,7 @@
         "lobster-factory/infra/hetzner-phase1-core/scripts/systems-import.py",
         "lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/systems-import.test.py",
         "scripts/systems-migrate-supervisor.mjs",
+        "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/gen-block-usage.ts",
         "agency-os/systems/registry.json",
         "agency-os/handoffs/2026-11-21-systems-control-center/",
         "lobster-factory/packages/db/migrations/0174_systems_control_center.down.sql",

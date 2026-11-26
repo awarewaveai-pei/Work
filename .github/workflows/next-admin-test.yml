@@ -13,12 +13,14 @@ on:
       - main
     paths:
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/**'
+      - 'agency-os/systems/registry.json'  # system ownership feeds lib/systems/block-usage.generated.json (blocks.test.ts)
       - '.github/workflows/next-admin-test.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/**'
+      - 'agency-os/systems/registry.json'  # system ownership feeds lib/systems/block-usage.generated.json (blocks.test.ts)
       - '.github/workflows/next-admin-test.yml'
   workflow_dispatch:
 

@@ -1,10 +1,13 @@
 // LEGO 積木目錄: every reusable piece, its fixed number, what it does and which systems (registry slugs) use it.
 // Read by /ops/systems/blocks and /ops/systems/[slug]. Guarded by __tests__/blocks.test.ts (numbers, paths, coverage,
 // importers ⊆ usedBy). Rules:
+//  - usedBy = the systems written here (also users the import scan cannot see: HTTP calls, browser scripts) + every system
+//    that imports the block through "@/", from block-usage.generated.json. That file is never hand-edited: `npm run blocks:usage`.
 //  - `no` is permanent: never renumber, never reuse; a retired block keeps its number. New block = next free number.
 //  - One capability = one block: its UI panel and its API/function are both in `entry`; `covers` lists the code ids
 //    (register() id, panel/<file>) it absorbs so the coverage test can find them.
 //  - Paths are relative to apps/next-admin; "repo:" = repo root (absent on the host; checked locally / CI).
+import importers from "./block-usage.generated.json";
 
 export const TIERS = [
   { key: "block", prefix: "B", name: "功能積木", hint: "可在不同系統間共用的一個能力；前端面板與後端 API 算同一顆。" },
@@ -77,7 +80,13 @@ const COS = "repo:Projects/internal/cognitive-engineering-os/ai_lego/modules/";
 const method = (no: string, family: string, name: string, count: number, purpose: string): LegoBlock =>
   ({ no, tier: "method", name, status: ["registered"], purpose, entry: [`${COS}${family}/`], covers: [`cognitive/${family}`], usedBy: ["cognitive-os"], count });
 
-export const LEGO_BLOCKS: LegoBlock[] = [
+/** Adds the import-derived systems to each written usedBy (no duplicates, written order first). */
+const withImporters = (list: LegoBlock[]): LegoBlock[] => {
+  const found = importers as Record<string, string[]>;
+  return list.map((b) => (found[b.no] ? { ...b, usedBy: [...new Set([...b.usedBy, ...found[b.no]])] } : b));
+};
+
+export const LEGO_BLOCKS: LegoBlock[] = withImporters([
   // ── 共用底座 ──
   block({ no: "B-001", layer: "platform", name: "許可與權利 can()", status: ["toolkit"],
     purpose: "唯一的許可問法 can(主體, feature_key, actor)＋權利、錢包、發放：訂閱、點數、買斷、代操都走它，不另建帳本。",
@@ -321,7 +330,7 @@ export const LEGO_BLOCKS: LegoBlock[] = [
   method("C-28", "stakeholders", "利害關係人", 10, "利害關係人地圖與溝通。"),
   method("C-29", "strategy", "策略", 17, "競爭策略與定位。"),
   method("C-30", "systems", "系統思考", 12, "回饋迴路與系統動力。"),
-];
+]);
 
 export const isLive = (b: LegoBlock) => !b.status.includes("planned") && !b.status.includes("retired");
 

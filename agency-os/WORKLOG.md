@@ -1,4 +1,21 @@
 # Worklog
+## 2026-11-26（續15）— 積木 usedBy 自動補：程式的 import 自己說誰在用，不再手抄進 blocks.ts
+
+- 根因：usedBy 是 import 已表達之事的手抄副本；新程式一用共用積木，CI 就擋到有人手改 blocks.ts（`6b9032f09` B-079 補 design，CI run 45729915966 擋 Banner 部署）。操作者開發中反映困擾 → 改成自動產生。
+- 步驟（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+  - `NA/lib/systems/block-usage.ts`（新，Node-only）：import 掃描自 blocks.test.ts 搬入（同邏輯）＋`derivedUsedBy`
+  - `NA/scripts/gen-block-usage.ts`（新）＋`package.json` `blocks:usage`：寫 `NA/lib/systems/block-usage.generated.json`
+  - `NA/lib/systems/blocks.ts`：`withImporters` 把產生檔併入 usedBy（手寫的保留，給 HTTP／瀏覽器腳本等掃不到的使用者）
+  - `NA/lib/systems/__tests__/blocks.test.ts`：改驗「產生檔＝當下掃描」，失敗訊息直接給 `npm run blocks:usage`；「跨系統共用必屬積木」照舊
+  - `.github/workflows/next-admin-test.yml`：push／PR paths 加 `agency-os/systems/registry.json`（Codex 1m：系統歸屬變了也會改產生結果，原本不觸發 CI）
+  - `agency-os/systems/registry.json`：systems-control-center 登記 `NA/scripts/gen-block-usage.ts`
+- 驗證：本機落後 origin 74 提交（TASKS.md 衝突擋 parity），改在 `origin/main` 拋棄式 worktree 產生與測試：vitest 92 passed；B-079 手寫拿掉 design 仍由產生檔帶入；突變：產生檔刪 B-079 design → 測試紅且訊息指向 `npm run blocks:usage`，重跑指令 → 綠。tsc 只剩 `ag-psd` 未安裝（Banner 新依賴，本機 node_modules 未裝，與本改動無關）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run blocks:usage; npx vitest run lib/systems "app/(shell)/ops/systems" app/__tests__/sidebar-coverage.test.ts lib/studio/__tests__/editor-ai-panels.test.ts | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-26-partialreview-2ac4cd43.md），1m 已修（CI paths）
+- ORACLE_WAIVED: 1m 修在 artifact 之後（workflow 加一條 path＋registry 登記一行），YAML 解析確認
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=blocks:usage|block-usage | hits=19
+- rollback：`git revert` 本 commit（blocks.ts 手寫 usedBy 仍含全部既有使用者，回退後測試照舊）
 ## 2026-11-26（續13）— 積木頁 UI/UX：系統卡片列產品模組、統計卡可點＋只看共用、編號變連結、手機統計卡並排、去重複標題
 
 - 根因／決策：操作者要「哪些系統用了什麼積木」，但 `blocksForSystem` 只取 B（`NA/lib/systems/blocks.ts:329` 舊版），系統卡看不到 M 產品模組；「沒用積木」9 系統其實是程式不在後台；統計卡不能點、說明裡的 B-xx 不能點、分頁名與框內 h2 重複、手機統計卡直排把分頁推出第一屏（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）。

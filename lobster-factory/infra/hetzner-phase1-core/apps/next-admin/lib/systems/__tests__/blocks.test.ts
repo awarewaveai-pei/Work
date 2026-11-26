@@ -1,29 +1,15 @@
-// Keeps lib/systems/blocks.ts true to the code: permanent numbers, no dead path, nothing unlisted, and every system that
-// imports a block through "@/..." is in its usedBy. Registry / cognitive checks need the repo root (local and CI); the
-// host copy of next-admin has neither, so those cases skip there and the rest still run.
+// Keeps lib/systems/blocks.ts true to the code: permanent numbers, no dead path, nothing unlisted, and the import-derived
+// usedBy file is current. Registry / cognitive checks need the repo root (local and CI); the host copy of next-admin has
+// neither, so those cases skip there and the rest still run.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockHref, blockStats, blocksForSystem, catalogHref, isLive } from "../blocks";
+import { APP, GENERATED, GEN_CMD, REPO, derivedUsedBy, hasRepo as repoPresent, inShared, liveEntries, readRegistry, scanImports, serialize, under } from "../block-usage";
 
-const APP = resolve(__dirname, "../../..");
-const REPO = resolve(APP, "../../../../..");
-const REGISTRY = join(REPO, "agency-os/systems/registry.json");
-const APP_FROM_REPO = relative(REPO, APP).replace(/\\/g, "/") + "/";
-const hasRepo = existsSync(REGISTRY);
+const hasRepo = repoPresent();
 const abs = (p: string) => (p.startsWith("repo:") ? join(REPO, p.slice(5)) : join(APP, p));
-const rel = (f: string) => relative(APP, f).replace(/\\/g, "/");
 const covered = new Set(LEGO_BLOCKS.flatMap((b) => b.covers ?? []));
-
-function walk(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    if (name === "node_modules" || name === ".next" || name === "__tests__") continue;
-    const p = join(dir, name);
-    if (statSync(p).isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name)) out.push(p);
-  }
-  return out;
-}
 
 describe("積木目錄 shape", () => {
   it("numbers are unique, carry their tier prefix and run without gaps (a retired block keeps its number)", () => {
@@ -108,36 +94,17 @@ describe("積木目錄 coverage", () => {
 });
 
 describe.skipIf(!hasRepo)("積木目錄 against the system registry", () => {
-  const registry = hasRepo ? (JSON.parse(readFileSync(REGISTRY, "utf8")) as { shared_paths: string[]; systems: Array<{ slug: string; source_paths: string[] }> }) : { shared_paths: [], systems: [] };
-  const prefixes = registry.systems.flatMap((s) => s.source_paths.map((p) => ({ p, slug: s.slug }))).sort((a, b) => b.p.length - a.p.length);
-  const under = (path: string, p: string) => (p.endsWith("/") ? path.startsWith(p) : path === p);
-  const owner = (repoPath: string) => prefixes.find(({ p }) => under(repoPath, p))?.slug ?? null;
-  // every "@/x" import of a source file, resolved to an app-relative file path, with the importer's system
-  const imports = ["app", "lib", "components"].flatMap((d) => walk(join(APP, d))).flatMap((f) => {
-    const sys = owner(APP_FROM_REPO + rel(f));
-    if (!sys) return [];
-    return [...readFileSync(f, "utf8").matchAll(/["']@\/([^"']+)["']/g)].flatMap(([, spec]) => {
-      // every module kind tsconfig resolves (allowJs, resolveJsonModule): the spec itself, then the extension-less forms
-      const file = ["", ".ts", ".tsx", ".js", ".mjs", ".json", "/index.ts", "/index.tsx", "/index.js"].map((x) => spec + x)
-        .find((c) => existsSync(join(APP, c)) && statSync(join(APP, c)).isFile());
-      return file ? [{ file, sys, from: rel(f) }] : [];
-    });
-  });
-  const liveEntries = (b: (typeof LEGO_BLOCKS)[number]) => b.entry.filter((e) => !e.startsWith("repo:"));
+  const registry = hasRepo ? readRegistry() : { shared_paths: [], systems: [] };
+  const imports = hasRepo ? scanImports(registry) : [];
 
   it("every usedBy slug is a registered system", () => {
     const slugs = new Set(registry.systems.map((s) => s.slug));
     expect(LEGO_BLOCKS.flatMap((b) => b.usedBy.filter((s) => !slugs.has(s)).map((s) => `${b.no}: ${s}`))).toEqual([]);
   });
 
-  it("every system importing a block through @/ is in that block's usedBy (file and folder entries)", () => {
-    const missing = new Set<string>();
-    for (const b of LEGO_BLOCKS) {
-      for (const { file, sys, from } of imports) {
-        if (liveEntries(b).some((e) => under(file, e)) && !b.usedBy.includes(sys)) missing.add(`${b.no} <- ${sys} (${from})`);
-      }
-    }
-    expect([...missing]).toEqual([]);
+  it("block-usage.generated.json matches the real @/ imports (file and folder entries)", () => {
+    const fresh = serialize(derivedUsedBy(LEGO_BLOCKS, imports));
+    expect(readFileSync(GENERATED, "utf8"), `a system started (or stopped) importing a block -- run \`${GEN_CMD}\` in apps/next-admin and commit the file`).toBe(fresh);
   });
 
   it("every file two or more systems assemble belongs to a block (or is registry shared plumbing)", () => {
@@ -145,7 +112,7 @@ describe.skipIf(!hasRepo)("積木目錄 against the system registry", () => {
     for (const { file, sys } of imports) users.set(file, (users.get(file) ?? new Set()).add(sys));
     const entries = LEGO_BLOCKS.filter(isLive).flatMap(liveEntries);
     const orphans = [...users].filter(([file, s]) => s.size >= 2 && !entries.some((e) => under(file, e))
-      && !registry.shared_paths.some((p) => under(APP_FROM_REPO + file, p))).map(([file, s]) => `${file} <- ${[...s].sort().join(",")}`);
+      && !inShared(registry, file)).map(([file, s]) => `${file} <- ${[...s].sort().join(",")}`);
     expect(orphans).toEqual([]);
   });
 });
