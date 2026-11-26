@@ -1152,8 +1152,11 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
         };
         // colours are shared by every size: the text must read where it sits at each of them
         const places = selectedSizes(next).map((k) => { const v = variantOf(next, k); return { pos: v.textPos, align: v.textAlignH }; });
-        const smallText = !!next.subtext.trim() || (next.showPrice && !!(next.priceNow || next.priceWas)) || next.trustType !== "none";
-        const col = resolveDesignColors(raw, next, bg, places, palette, kitColors, { smallText });
+        const content = {
+          subtext: !!next.subtext.trim(), trust: next.trustType !== "none",
+          priceNow: next.showPrice && !!next.priceNow, priceWas: next.showPrice && !!next.priceWas,
+        };
+        const col = resolveDesignColors(raw, next, bg, places, palette, kitColors, content);
         if (col.unmet.length) console.warn("[banner] contrast not met after the guard:", col.unmet);
         return { ...next, ...col.patch, designing: false, saved: false };
       });

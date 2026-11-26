@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續28）— 橫幅 C12 審查修正：對比度守衛改用最壞點、半透明字、重點字底牌、徽章後備、百分位範圍
+
+- 根因（Codex 審查 5 項，監工讀碼確認）：`NA/app/(shell)/tools/banner/design-colors.ts` 1) 原價／副標／信任說明 renderer 以 0.7／0.95／0.92 透明度畫，守衛卻用原色碼算；2) accentHighlight 時字是 #1a1a1a、accentColor 是底牌，守衛卻比 accentColor 對背景；3) 徽章沒有套組色撐得住白字時只記 unmet 就放行；4) zoneRatio 只看 lo／hi 兩端，文字亮度落在區間內時漏判；5) 亮度範圍用平均±標準差，小亮斑被平均掉。不變量：守衛算的是畫出來的實際像素對比，且每個角色都有必定達標的最後手段（unmet 恆空）。
+- 修：`zoneRatio(hex, zone, alpha)` 取區間內最接近文字亮度的點（含 alpha 時先在 sRGB 空間混色再取樣）；`TEXT_ALPHA`（對照 banner-layers 副標 0.95、原價 0.7、信任說明 0.92）＋`TextContent` 讓文字色對每個實際出現的元素各自檢查（標題／現價 3:1，其餘 4.5:1）；底襯上限改 0.9（滑桿上限，白字在此必過）；accentHighlight 檢查 `PLATE_TEXT` 對 accentColor ≥3:1，無色可用退白；徽章、CTA 底無色可用退 #111111；`bgStatsFromPixels` 範圍改第 2／98 百分位（busy 照舊用標準差）。`BannerStudio.tsx` 傳 `content`。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋accent-not-text＋blocks＋script-forge 70 passed（新增指名 5 案：0.7 原價以混色判斷、底牌字對 accentColor、徽章退近黑且 unmet 空、黑白漸層上灰字 1:1、小亮斑計入而單一雜點不計）。
+- 剩餘：混色以亮度近似（非逐通道）；星星固定 #fbbf24 未檢查；本機無 AI 金鑰，按鈕整流程未實打。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts lib/systems/__tests__/blocks.test.ts lib/script-forge | exit=0 | ms=7000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/5m/0n（Codex 5 項已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=smallText | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查（Codex 已審 C12）
 ## 2026-11-26（續26）— 橫幅 C12：AI 一鍵設計的配色看背景＋品牌色，對比度由程式把關
 
 - 根因：`generateFullDesign` 只送 brief／尺寸，AI 看不到背景與品牌套組；design prompt 寫死 `"bgMode":"gradient"`，`sanitizeDesign` 只擋 upload/ai 字面值，所以使用者上傳／AI 生的背景會被換成漸層；顏色對比沒有任何檢查。不變量：背景是圖片時永不被 AI 換掉；有品牌套組時 AI 只能用套組色；最後的文字顏色一定過 WCAG 對比（標題 3:1、副標／小字／CTA 文字 4.5:1）。

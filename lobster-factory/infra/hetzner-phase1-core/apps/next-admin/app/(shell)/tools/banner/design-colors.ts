@@ -43,13 +43,17 @@ export function bgStatsFromPixels(data: ArrayLike<number>, w: number, h: number,
   }
   const zone = (pos: TextPos, al: TextAlignH) => {
     const [y0, y1] = BAND_Y[pos], [x0, x1] = BAND_X[al];
-    let n = 0, s = 0, s2 = 0;
+    const vals: number[] = [];
+    let s = 0, s2 = 0;
     for (let y = Math.floor(y0 * h); y < Math.max(Math.floor(y0 * h) + 1, Math.ceil(y1 * h)); y++)
       for (let x = Math.floor(x0 * w); x < Math.max(Math.floor(x0 * w) + 1, Math.ceil(x1 * w)); x++) {
-        const v = lum[Math.min(h - 1, y) * w + Math.min(w - 1, x)]; n++; s += v; s2 += v * v;
+        const v = lum[Math.min(h - 1, y) * w + Math.min(w - 1, x)]; vals.push(v); s += v; s2 += v * v;
       }
-    const mean = s / n, sd = Math.sqrt(Math.max(0, s2 / n - mean * mean));
-    return { lo: Math.max(0, mean - sd), hi: Math.min(1, mean + sd), busy: sd };
+    const n = vals.length, mean = s / n, sd = Math.sqrt(Math.max(0, s2 / n - mean * mean));
+    // range = 2nd..98th percentile: a small bright / dark patch counts (mean +- sd hid it), a few stray pixels do not
+    vals.sort((a, b) => a - b);
+    const pct = (q: number) => vals[Math.min(n - 1, Math.max(0, Math.round(q * (n - 1))))];
+    return { lo: pct(0.02), hi: pct(0.98), busy: sd };
   };
   const zones = Object.fromEntries(POS.map((p) => [p, Object.fromEntries(ALIGN.map((a) => [a, zone(p, a)]))])) as BgInfo["zones"];
   return { mode, colors, meanLum: sum / (w * h), zones };
@@ -77,15 +81,24 @@ export function bgStatsFromColors(mode: "color" | "gradient", c1: string, c2 = c
 /** The colour fields of the design this guard owns. */
 export interface ColorFields {
   bgMode: BgMode; bgColor: string; gradFrom: string; gradTo: string;
-  textColor: string; accentColor: string; ctaBg: string; ctaTextColor: string; badgeColor: string;
+  textColor: string; accentColor: string; accentHighlight: boolean; ctaBg: string; ctaTextColor: string; badgeColor: string;
   textScrim: boolean; textScrimOpacity: number; textOutline: boolean;
   dimOverlay: boolean; dimOverlayOpacity: number;
 }
 /** Where the text sits at each size made (main + others): the colours are shared, so all must pass. */
 export interface TextPlace { pos: TextPos; align: TextAlignH }
+/** Which text-coloured elements the design shows (each has its own size and opacity in the renderer). */
+export interface TextContent { subtext: boolean; priceNow: boolean; priceWas: boolean; trust: boolean }
 
 export const MIN_HEADLINE = 3;
 export const MIN_SMALL = 4.5;
+/** The renderer's opacity for text drawn in textColor (banner-layers.ts: 副標 globalAlpha 0.95, 原價 0.7, 信任說明 0.92).
+ *  Change them together. */
+export const TEXT_ALPHA = { subtext: 0.95, priceWas: 0.7, trust: 0.92 } as const;
+/** The text on an accent highlight plate (banner-layers.ts 標題 color(): plate -> #1a1a1a). */
+export const PLATE_TEXT = "#1a1a1a";
+/** Last resort scrim opacity (the slider's max): white text then always reads, whatever the picture. */
+const SCRIM_MAX = 0.9;
 const NEUTRALS = ["#ffffff", "#111111"];
 const isHex = (v: unknown): v is string => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v);
 const sameHex = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
@@ -127,19 +140,31 @@ export function pickColorRoles(raw: Record<string, unknown>, bgMode: BgMode, pal
 
 /** Black over the background at `alpha` (dim overlay, text scrim) scales luminance about by (1 - alpha)^2.2. */
 const darken = (z: Zone, alpha: number): Zone => { const f = (1 - alpha) ** 2.2; return { lo: z.lo * f, hi: z.hi * f }; };
-const zoneRatio = (hex: string, z: Zone) => { const l = relLum(hex); return Math.min(ratioOf(l, z.lo), ratioOf(l, z.hi)); };
+/**
+ * Worst contrast of text colour `hex`, drawn at opacity `alpha`, over any background luminance in z. Opaque text: the worst
+ * point is the one nearest the text's own luminance (inside the range = 1:1). Translucent text is first mixed with the
+ * background under it (sRGB-space blend, as the canvas does), so the range is sampled.
+ */
+export function zoneRatio(hex: string, z: Zone, alpha = 1): number {
+  const lt = relLum(hex);
+  const lo = Math.min(z.lo, z.hi), hi = Math.max(z.lo, z.hi);
+  const pts = [lo, hi, Math.min(hi, Math.max(lo, lt)), ...Array.from({ length: 17 }, (_, i) => lo + ((hi - lo) * i) / 16)];
+  const g = (l: number) => l ** (1 / 2.2);
+  return Math.min(...pts.map((lb) => ratioOf(alpha >= 1 ? lt : (alpha * g(lt) + (1 - alpha) * g(lb)) ** 2.2, lb)));
+}
 
 export interface GuardResult { patch: Partial<ColorFields>; fixes: string[]; unmet: string[] }
 
 /**
- * Enforce contrast on the final colours. Text against the zone behind it at every size made (after dim overlay and
- * scrim); CTA text against ctaBg; badge (white text) against badgeColor. Too little -> 1) another palette colour that
- * passes, 2) the text scrim (darker step by step) plus outline. An uploaded / AI background is never changed; with a kit
- * only kit colours are picked (white / near-black only when no kit colour can pass).
+ * Enforce contrast on the final colours. Every text-coloured element against the zone behind it at every size made (after
+ * dim overlay and scrim, at its renderer opacity); the accent against the background, or the plate text against the accent
+ * when highlighted; CTA text against ctaBg; badge (white text) against badgeColor. Too little -> 1) another palette colour
+ * that passes, 2) for the text the scrim (darker step by step, up to the slider max) plus outline, 3) white / near-black.
+ * An uploaded / AI background is never changed; with a kit only kit colours are picked before step 3.
  */
 export function guardContrast(
   c: ColorFields, bg: BgInfo, places: readonly TextPlace[], palette: readonly string[], kit: readonly string[] | null,
-  opts: { smallText: boolean },
+  content: TextContent,
 ): GuardResult {
   const patch: Partial<ColorFields> = {};
   const fixes: string[] = [], unmet: string[] = [];
@@ -156,35 +181,47 @@ export function guardContrast(
   };
   const textZone = () => { const s = cur(); return s.textScrim ? darken(baseZone(), s.textScrimOpacity) : baseZone(); };
   const choices = (kit ? [...kit] : [...palette, ...bg.colors]).filter(isHex);
-  const best = (cands: string[], score: (h: string) => number, need: number) => {
-    const ok = cands.filter((h) => score(h) >= need).sort((a, b) => score(b) - score(a));
-    return ok[0];
-  };
+  const best = (cands: string[], score: (h: string) => number, need: number) =>
+    cands.filter((h) => score(h) >= need).sort((a, b) => score(b) - score(a))[0];
 
-  // 1) the text colour (headline + subtext share it): 4.5 when there is small text, else 3
-  const needText = opts.smallText ? MIN_SMALL : MIN_HEADLINE;
-  if (zoneRatio(c.textColor, textZone()) < needText) {
-    const alt = best(choices, (h) => zoneRatio(h, textZone()), needText);
+  // 1) the text colour: every element drawn in it (headline, price now at headline weight; subtext, old price, trust line
+  //    small and translucent). Score = the worst margin over them (>= 1 = all pass).
+  const reqs: { alpha: number; need: number }[] = [
+    { alpha: 1, need: MIN_HEADLINE },
+    ...(content.priceNow ? [{ alpha: 1, need: MIN_HEADLINE }] : []),
+    ...(content.subtext ? [{ alpha: TEXT_ALPHA.subtext, need: MIN_SMALL }] : []),
+    ...(content.priceWas ? [{ alpha: TEXT_ALPHA.priceWas, need: MIN_SMALL }] : []),
+    ...(content.trust ? [{ alpha: TEXT_ALPHA.trust, need: MIN_SMALL }] : []),
+  ];
+  const textScore = (h: string) => Math.min(...reqs.map((r) => zoneRatio(h, textZone(), r.alpha) / r.need));
+  if (textScore(c.textColor) < 1) {
+    const alt = best(choices, textScore, 1);
     if (alt) { patch.textColor = alt; fixes.push(`textColor→${alt}`); }
     else {
       // 2) the scrim, darker step by step, with the best colour for it; outline on
       patch.textScrim = true; patch.textOutline = true;
-      let op = Math.max(c.textScrim ? c.textScrimOpacity : 0, 0.5);
+      let op = Math.min(SCRIM_MAX, Math.max(c.textScrim ? c.textScrimOpacity : 0, 0.5));
       for (;;) {
         patch.textScrimOpacity = op;
-        const pick = best(choices, (h) => zoneRatio(h, textZone()), needText) ?? best(NEUTRALS, (h) => zoneRatio(h, textZone()), needText);
+        const pick = best(choices, textScore, 1) ?? best(NEUTRALS, textScore, 1);
         if (pick) { if (!sameHex(pick, c.textColor)) patch.textColor = pick; break; }
-        if (op >= 0.85) {
-          const any = [...choices, ...NEUTRALS].sort((a, b) => zoneRatio(b, textZone()) - zoneRatio(a, textZone()))[0];
-          patch.textColor = any; unmet.push("textColor"); break;
+        if (op >= SCRIM_MAX) {
+          // cannot happen (white over a 90% black scrim passes every requirement); kept so the loop always ends
+          patch.textColor = "#ffffff"; if (textScore("#ffffff") < 1) unmet.push("textColor"); break;
         }
-        op = Math.min(0.85, Math.round((op + 0.1) * 100) / 100);
+        op = Math.min(SCRIM_MAX, Math.round((op + 0.1) * 100) / 100);
       }
       fixes.push(`textScrim ${patch.textScrimOpacity}`);
     }
   }
-  // the accent (**字** inside the headline): headline size, 3:1
-  if (zoneRatio(cur().accentColor, textZone()) < MIN_HEADLINE) {
+  // the accent (**字** inside the headline), headline size 3:1. Highlighted: the plate is the accent colour and the word on
+  // it is PLATE_TEXT, so that pair is what must read; else the accent word against the background.
+  if (cur().accentHighlight) {
+    if (contrastRatio(PLATE_TEXT, cur().accentColor) < MIN_HEADLINE) {
+      const alt = best(choices, (h) => contrastRatio(PLATE_TEXT, h), MIN_HEADLINE) ?? "#ffffff";
+      patch.accentColor = alt; fixes.push(`accentColor(plate)→${alt}`);
+    }
+  } else if (zoneRatio(cur().accentColor, textZone()) < MIN_HEADLINE) {
     const alt = best(choices, (h) => zoneRatio(h, textZone()), MIN_HEADLINE) ?? cur().textColor;
     patch.accentColor = alt; fixes.push(`accentColor→${alt}`);
   }
@@ -194,19 +231,17 @@ export function guardContrast(
     const alt = best(choices, (h) => contrastRatio(h, bgc), MIN_SMALL) ?? best(NEUTRALS, (h) => contrastRatio(h, bgc), MIN_SMALL);
     if (alt) { patch.ctaTextColor = alt; fixes.push(`ctaTextColor→${alt}`); }
     else {
-      // no text colour reads on that button: the button takes a palette colour that white / near-black reads on
-      const btn = best(choices, (h) => Math.max(...NEUTRALS.map((n) => contrastRatio(n, h))), MIN_SMALL);
-      if (btn) {
-        patch.ctaBg = btn;
-        patch.ctaTextColor = [...NEUTRALS].sort((a, b) => contrastRatio(b, btn) - contrastRatio(a, btn))[0];
-        fixes.push(`ctaBg→${btn}`);
-      } else unmet.push("ctaTextColor");
+      // no text colour reads on that button: the button takes a palette colour white / near-black reads on, else near-black
+      const btn = best(choices, (h) => Math.max(...NEUTRALS.map((n) => contrastRatio(n, h))), MIN_SMALL) ?? "#111111";
+      patch.ctaBg = btn;
+      patch.ctaTextColor = [...NEUTRALS].sort((a, b) => contrastRatio(b, btn) - contrastRatio(a, btn))[0];
+      fixes.push(`ctaBg→${btn}`);
     }
   }
-  // the badge's text is always white (renderer): its colour must carry white
+  // the badge's text is always white (renderer): its colour must carry white; no palette colour does -> near-black
   if (contrastRatio("#ffffff", cur().badgeColor) < MIN_SMALL) {
-    const alt = best(choices, (h) => contrastRatio("#ffffff", h), MIN_SMALL);
-    if (alt) { patch.badgeColor = alt; fixes.push(`badgeColor→${alt}`); } else unmet.push("badgeColor");
+    const alt = best(choices, (h) => contrastRatio("#ffffff", h), MIN_SMALL) ?? "#111111";
+    patch.badgeColor = alt; fixes.push(`badgeColor→${alt}`);
   }
   return { patch, fixes, unmet };
 }
@@ -215,12 +250,12 @@ export function guardContrast(
  *  contrast guard. Returns the colour patch to merge into the design. */
 export function resolveDesignColors(
   raw: Record<string, unknown>, current: ColorFields, bg: BgInfo, places: readonly TextPlace[],
-  palette: readonly string[], kit: readonly string[] | null, opts: { smallText: boolean },
+  palette: readonly string[], kit: readonly string[] | null, content: TextContent,
 ): GuardResult {
   const roles = pickColorRoles(raw, current.bgMode, palette, kit);
   for (const k of ["textScrim", "textOutline"] as const) if (typeof raw[k] === "boolean") (roles as Record<string, unknown>)[k] = raw[k];
   const merged = { ...current, ...roles };
-  const g = guardContrast(merged, bg, places, palette, kit, opts);
+  const g = guardContrast(merged, bg, places, palette, kit, content);
   return { patch: { ...roles, ...g.patch }, fixes: g.fixes, unmet: g.unmet };
 }
 
