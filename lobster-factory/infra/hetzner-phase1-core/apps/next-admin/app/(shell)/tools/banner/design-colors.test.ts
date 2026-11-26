@@ -1,7 +1,9 @@
 // Card C12 (named tests): contrast maths, the brand-kit palette limit, an uploaded background never replaced, and the
 // order of remedies when contrast is short (another palette colour, then the scrim + outline).
 import { describe, expect, it } from "vitest";
-import { bgStatsFromColors, bgStatsFromPixels, contrastRatio, guardContrast, resolveDesignColors, zoneRatio, type BgInfo, type ColorFields, type TextContent, type TextPlace } from "./design-colors";
+import { bgStatsFromColors, bgStatsFromPixels, contrastRatio, guardContrast, guardDrawn, resolveDesignColors, zoneRatio, type BgInfo, type ColorFields, type TextContent, type TextPlace } from "./design-colors";
+import { REF_PX, layoutBanner } from "./banner-layout";
+import { INIT, type State } from "./banner-state";
 
 const ALL: TextContent = { subtext: true, priceNow: false, priceWas: false, trust: false };
 
@@ -149,5 +151,48 @@ describe("contrast under the real text boxes", () => {
     const right = guardContrast(c, bg, at(460), ["#ffffff"], null, ALL);
     expect(right.patch.textColor).toBe("#0a0a0a");   // the dark main colour reads there
     expect(right.unmet).toEqual([]);
+  });
+});
+
+// Codex on batch 2 (named): the guard checks what is drawn last -- the words swapped in, the background as it is now.
+describe("guard on what is drawn last", () => {
+  const W = 40, H = 20;
+  const picture = (v: (x: number) => number) => {
+    const d = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const g = v(x); d.set([g, g, g, 255], (y * W + x) * 4); }
+    return bgStatsFromPixels(d, W, H, ["#0a0a0a", "#fafafa"], "upload");
+  };
+  const halves = picture((x) => (x < W / 2 ? 10 : 250));
+  // every character REF_PX wide at REF_PX: a title of n characters at 60 px is n x 60 px wide
+  const measure = { text: (_f: string, s: string) => Array.from(s).length * REF_PX, image: () => null };
+  const design = (headline: string): State => ({
+    ...INIT, headline, subtext: "", ctaText: "", badgeText: "", showPrice: false, trustType: "none",
+    textPos: "center", textAlignH: "left", typeAuto: false, headlineSize: 60, bgMode: "upload", textColor: "#ffffff",
+    textScrim: false, dimOverlay: false, accentHighlight: false,
+  });
+  const drawnAt = (st: State) => {
+    const L = layoutBanner(st, { w: 800, h: 400 }, measure);
+    return [{ w: 800, h: 400, boxes: [L.boxes.headline!] }];
+  };
+
+  it("a word set swapped in: its longer title reaching the bright half gets a fix; the short one did not need one", () => {
+    const short = design("短標"), long = design("這是一個很長很長的標題");
+    expect(drawnAt(short)[0].boxes[0].x + drawnAt(short)[0].boxes[0].w).toBeLessThan(400);
+    expect(drawnAt(long)[0].boxes[0].x + drawnAt(long)[0].boxes[0].w).toBeGreaterThan(400);
+    const a = guardDrawn(short, halves, drawnAt(short), null);
+    expect(a.patch.textColor ?? a.patch.textScrim).toBeUndefined();
+    const b = guardDrawn(long, halves, drawnAt(long), null);
+    expect(b.patch.textColor ?? b.patch.textScrim).toBeDefined();
+    expect(b.unmet).toEqual([]);
+  });
+
+  it("the background as it is when the answer lands: white chosen for the old dark picture is fixed on the new bright one", () => {
+    const st = design("短標");
+    const roles = { raw: { textColor: 0 }, palette: ["#ffffff", "#111111"] };   // index 0 of the palette the prompt had
+    const old = guardDrawn(st, picture(() => 10), drawnAt(st), null, roles);
+    expect(old.patch.textColor).toBe("#ffffff");
+    const now = guardDrawn(st, picture(() => 250), drawnAt(st), null, roles);
+    expect(now.patch.textColor === "#ffffff" && !now.patch.textScrim).toBe(false);
+    expect(now.unmet).toEqual([]);
   });
 });

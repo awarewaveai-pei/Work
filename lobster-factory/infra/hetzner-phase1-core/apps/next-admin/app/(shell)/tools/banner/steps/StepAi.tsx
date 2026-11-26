@@ -7,7 +7,7 @@ import {
 } from "../banner-design";
 import { renderBannerLayers } from "../banner-layers";
 import { applySemantic } from "../banner-layout";
-import { bgForPrompt, bgStatsFromColors, resolveDesignColors, usablePalette, type PxBox, type TextPlace } from "../design-colors";
+import { bgForPrompt, bgStatsFromColors, guardDrawn, usablePalette, type GuardResult, type PxBox } from "../design-colors";
 import { brandKitPatch } from "../kit/apply-kit";
 import type { useBrandKit } from "../kit/useBrandKit";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
@@ -20,6 +20,20 @@ import { StepCard, type StepCtx } from "./ui";
 
 /** The elements drawn in textColor: the contrast guard measures the background under these boxes. */
 const TEXT_ELEMS = ["headline", "subtext", "price", "trust"] as const;
+
+/** Contrast on `st` as the renderer draws it: every picked size rendered for its text boxes, the background measured from
+ *  `st` itself (never an earlier measurement), then guardDrawn. Free (browser only). */
+async function guardOnDrawn(st: State, kit: readonly string[] | null, roles?: { raw: Record<string, unknown>; palette: readonly string[] }): Promise<GuardResult> {
+  const sel = selectedSizes(st), m = mainOf(st);
+  const bg = await measureBackground(m, sel).catch(() => ({ ...bgStatsFromColors("color", m.bgColor), mode: m.bgMode }));
+  const drawn = await Promise.all(sel.map(async (k) => {
+    const doc = await renderBannerLayers(variantOf(st, k), PRESETS[k], { flat: true });
+    return { w: doc.w, h: doc.h, boxes: TEXT_ELEMS.map((e) => doc.boxes[e]).filter((b): b is PxBox => !!b) };
+  }));
+  const g = guardDrawn(st, bg, drawn, kit, roles);
+  if (g.unmet.length) console.warn("[banner] contrast not met after the guard:", g.unmet);
+  return g;
+}
 
 export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg, saveOrgRef }: StepCtx & {
   slot: StepSlot; sRef: MutableRefObject<State>; staff: BannerStaffApi; brand: ReturnType<typeof useBrandKit>;
@@ -83,25 +97,22 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
         for (const [k, l] of Object.entries(plan.overrides) as [PresetKey, SizePatch][]) sizeOverrides[k] = applySemantic(sizeOverrides[k] ?? {}, l);
         return { ...main, sizeOverrides };
       };
-      // contrast: the colours are shared by every size, so the text must read where it is drawn at each of them --
-      // the boxes the renderer draws, over that size's measured background (bg.grids[i] = sel[i])
-      const draft = build(sRef.current);
-      const places: TextPlace[] = await Promise.all(sel.map(async (k, i) => {
-        const doc = await renderBannerLayers(variantOf(draft, k), PRESETS[k], { flat: true });
-        const boxes = TEXT_ELEMS.map((e) => doc.boxes[e]).filter((b): b is PxBox => !!b);
-        return { w: doc.w, h: doc.h, boxes, grid: bg.grids?.[i] };
-      }));
-      const content = {
-        subtext: !!draft.subtext.trim(), trust: draft.trustType !== "none",
-        priceNow: draft.showPrice && !!draft.priceNow, priceWas: draft.showPrice && !!draft.priceWas,
-      };
-      const col = resolveDesignColors(raw, draft, bg, places, palette, kitColors, content);
-      if (col.unmet.length) console.warn("[banner] contrast not met after the guard:", col.unmet);
+      // contrast on what will be drawn: the latest state with the answer on it (a background changed while the AI answered
+      // is measured again); the roles index the palette the prompt was given
+      const col = await guardOnDrawn(build(sRef.current), kitColors, { raw, palette });
       setS((prev) => ({ ...build(prev), ...col.patch, designing: false, saved: false, ...(kitPart?.logoError ? { error: kitPart.logoError } : {}) }));
     } catch (err) {
       setAiRetrying(null);
       setS((prev) => ({ ...prev, designing: false, error: err instanceof Error ? err.message : String(err) }));
     }
+  }
+
+  // a word set swapped in: the new words' boxes are checked like an AI design (only colours that fail change); one
+  // history step (words and any colour fix together)
+  async function pickCopy(v: DesignCopy) {
+    const kitColors = brand.kit?.colors.length ? brand.kit.colors : null;
+    const g = await guardOnDrawn({ ...sRef.current, ...copyWords(v) }, kitColors).catch(() => null);
+    setS((prev) => ({ ...prev, ...copyWords(v), ...(g?.patch ?? {}), saved: false, error: null }));
   }
 
   // card C9: the model each AI button runs on (visible buttons, NT$ per call shown); defaults from the 2026-11-26 bake-off
@@ -192,11 +203,11 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
         )}
         {s.copyVariants.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
-            <p className="form-hint" style={{ margin: 0 }}>點一組就換上這組字；版面與配色不變。</p>
+            <p className="form-hint" style={{ margin: 0 }}>點一組就換上這組字；版面不變，字變長時會自動確保看得清楚。</p>
             {(s.copyVariants as DesignCopy[]).map((v, i) => (
               <button key={i} type="button" className="choice-card" data-testid={`banner-copy-${i}`}
                 aria-pressed={showsCopy(s, v)}
-                onClick={() => setS((prev) => ({ ...prev, ...copyWords(v), saved: false, error: null }))}>
+                onClick={() => void pickCopy(v)}>
                 <span className="choice-card-title">{v.headline.replaceAll("**", "")}</span>
                 <span className="choice-card-note">{v.subtext}</span>
                 {(v.ctaText || v.badgeText) && (
