@@ -95,7 +95,7 @@ export const STEPS = [
     gate: '全套測試通過；部署後在實測紀錄那一頁看得到三份完整比較頁。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '7a72a7256', depends: ['K26'], card: 'briefs/K28-bakeoff-pages-in-app.md' },
   { n: 30, code: 'K29', group: 'B3d', title: '文章封面按頻道出不同尺寸', plain: '你 11-25 決定要做。網站的封面維持橫的。臉書、IG、Bluesky 的貼文改附直式的封面，在手機上佔的畫面比較大。同一個版型換尺寸，不重畫排法。直式的底圖另外畫一張，每篇多約 NT$0.1；網站沒有連這些頻道就不畫、不多花錢。尺寸對照表只寫在一個地方，以後加頻道只要加一列。IG 和臉書有依據；Bluesky 查不到官方說法，先用直式，上線後看第一則實際的貼文，被裁就改。等 K27 併入後才派。',
     gate: '全套測試通過；部署後下一篇自動文章：臉書和 IG 的草稿是直式封面，網站的精選圖片還是橫的。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '5580d223d', depends: ['K27'], card: 'briefs/K29-cover-size-per-channel.md' },
-  { n: 31, code: 'K30', group: 'B3d', title: '勾「影片」就一定發 YouTube', plain: '你 11-26 決定：勾了影片，就先發 YouTube，再把文章裡的影片換成 YouTube 播放器；臉書、IG、Bluesky 附同一支影片。「YouTube」勾選拿掉。影片檔不進 WP。網站沒連 YouTube 就照舊用影片檔連結，題目上會提醒。',
+  { n: 31, code: 'K30', group: 'B3d', title: '勾「影片」就一定發 YouTube', plain: '你 11-26 決定：勾了影片，就先發 YouTube，拿到連結後直接把 YouTube 播放器放進文章，文章不放影片檔；臉書、IG、Bluesky 附同一支影片。「YouTube」勾選拿掉。影片檔不進 WP。網站沒連 YouTube 就照舊用影片檔連結，題目上會提醒。',
     gate: '全套測試通過；部署後下一篇有影片的自動文章：YouTube 先發，文章裡是 YouTube 播放器，WP 媒體庫沒有影片檔。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K29'], card: 'briefs/K30-video-always-youtube.md' },
 ];
 
