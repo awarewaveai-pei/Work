@@ -90,7 +90,8 @@ const PRODUCT_DEFINITIONS = [
     modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-pro", "tools/photo-pro"] },
   { key: "content", catalog: { category: "content", tasks: ["write-seo-article", "plan-monthly-topics", "publish-to-site"], blurb: "寫 SEO 文章、排題目、發布到你的網站", icon: "article", addedAt: "2026-01-01" }, name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", api: ["/api/content"],
       // blueprint §15A: 寫文章 / 改寫 / 草稿 were tabs of one page; each is a menu page now.
-      nav: [{ path: "", name: "寫文章", staff: "tools/content" },
+      nav: [{ path: "", name: "概覽", staff: "tools/events" },
+        { path: "write", name: "寫文章", staff: "tools/content" },
         { path: "rewrite", name: "改寫", staff: "tools/content/rewrite" },
         { path: "drafts", name: "草稿", staff: "tools/content/drafts" },
         { path: "topics", name: "題目", staff: "tools/content/topics" },
