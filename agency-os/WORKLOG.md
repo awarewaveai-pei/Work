@@ -54,7 +54,7 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面自審）
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=scriptForge|DEFAULT_AI_TEXT_MODEL | hits=13
 - ORACLE_WAIVED: worker 分支，監工 session 合併前審查
-## 2026-11-26（續15）— 橫幅 C1–C8 合併上線（f287df2c5 → 部署 6b9032f09）
+## 2026-11-26（續20）— 橫幅 C1–C8 合併上線（f287df2c5 → 部署 6b9032f09）
 
 - 合併：worker 分支 `claude/modest-ellis-5bccc9`（含 `claude/busy-nash-b53413` C6/C7）→ main `f287df2c5`。Codex 審查 4 點：F1 ag-psd 不在清單、F2 字型未進建置 = 誤報（審查封包只含篩選後的程式差異，package.json 與 695 個 woff2 實際已 commit）；F3 CIS 外部 logo、F4 色調匹配取樣不一致 = 屬實，worker 修於 `ebe1fa65b`。
 - 部署第一次被 CI gate 擋：`lib/systems/__tests__/blocks.test.ts:140`（另一 session 新加的積木目錄）要求 B-079 usedBy 含 design（新 `app/api/tools/presets/brand-kit/route.ts` 引 `lib/tenant-guard.ts`）。補 `lib/systems/blocks.ts:256` → `6b9032f09`，第二次部署成功。
