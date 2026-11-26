@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-26（續27）— 實測紀錄「橫幅：生成文案」改成依結論分組的卡片排版
+
+- 起因：操作者「要按邏輯分類歸納，UI/UX 排版要國際頂尖設計師水準」（兩頁都要；本條是實測紀錄頁，橫幅工具左欄另開 C13）。
+- 改動：新檔 `NA/app/(shell)/tools/ai-models/BannerCopyBakeoff.tsx`：測試條件膠囊列、結論框（建議 Sonnet 5.5）、四組（推薦／可用但普通／沒有促銷感／不能用），每個模型一張卡（價錢、秒數、一句判斷、5 組標題＋副標，自編優惠數字標紅字）。`MeasuredRuns.tsx`：Group 加 `body`，刪掉 BANNER_COPY／BANNER_COPIES／copies 欄位（資料搬進新檔，逐字不變）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . ; npx tsx renderToStaticMarkup(BannerCopyBakeoff) -> D:/tmp/bcb.html 47KB | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 展示頁排版，資料逐字搬移
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=BannerCopyBakeoff | hits=3
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續25）— 橫幅生成文案實測頁：每個模型回的 5 組標題／副標全部列出
 
 - 起因：操作者「每個模型回 5 組 都要列出」；原本每列只摘一例。
