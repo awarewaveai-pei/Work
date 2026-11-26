@@ -119,7 +119,7 @@ v1（2026-11-25，`af92d5382`）經 critic 25 條＋Codex 19 條檢視（`agency
 | 組合 | 辨識 |
 |---|---|
 | 一路 Gemini（今天） | NT$17（`lib/live/usage.py:34`） |
-| 我＝本機、對方＝Gemini | NT$17 |
+| 我＝本機、對方＝Gemini（**建議預設**：兩路只付一路的錢；自己的聲音清楚，本機夠用） | NT$17 |
 | 兩路 Gemini | NT$35 |
 | 兩路本機／即時講者 | NT$0 |
 | 翻譯 Claude Haiku | ≤ NT$12；不翻譯或同語言 NT$0 |
@@ -174,7 +174,7 @@ v1（2026-11-25，`af92d5382`）經 critic 25 條＋Codex 19 條檢視（`agency
 - 驗收：設暫存資料夾為目的地 → 會後整理產出出現在那裡。
 
 **C17 我／對方**
-- 頁面：`startAudio`（`templates/workspace.html:308-345`）兩路各一個 AudioWorklet，不混音（`:326`）；`start` 帶 `proto: 2`；兩路各自選 Gemini／本機。
+- 頁面：`startAudio`（`templates/workspace.html:308-345`）兩路各一個 AudioWorklet，不混音（`:326`）；`start` 帶 `proto: 2`；兩路各自選 Gemini／本機。兩路都開時預設＝我本機、對方 Gemini（操作者 2026-11-25 採用的省錢組合）。
 - 伺服器：`_supervise`（`lib/live/hub.py:272-326`）抽成 `Channel`；binary 解析依協定版本（`lib/live/hub.py:421-422`；長度與來源值驗證，壞包丟棄）；顯卡規則依架構定案；錄音雙聲道（今天存檔器只有一條單聲道寫入路徑 `lib/live/archive.py:249-260`）。`join_wavs` 已不限聲道數；`diarize`（`lib/diarize.py:38` 會混成單聲道）加「只取對方聲道」參數。
 - 回音守衛：「我」路的句子若與同時間「對方」路聲音包絡相關 ≥ 門檻 → 丟棄（門檻以實測定，寫在常數旁）。
 - 字幕列標「我」「對方」（主題 token）；旁檔 `who`；逐字稿 `speaker`＝「我」或對方講者名。
