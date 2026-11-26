@@ -91,7 +91,6 @@ describe("status colors are not used for text", () => {
     "app/(shell)/ops/staff/StaffAccess.tsx": 3,
     "app/(shell)/ops/system-modes/page.tsx": 2,
     "app/(shell)/ops/tools/OpsToolsPageClient.tsx": 4,
-    "app/(shell)/tools/banner/BannerStudio.tsx": 6,
     "app/(shell)/tools/canvas/CanvasEditor.tsx": 2,
     "app/(shell)/tools/content/CoverPreview.tsx": 1,
     "app/(shell)/tools/content/SeoCheckPanel.tsx": 3,

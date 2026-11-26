@@ -1,7 +1,7 @@
 // Card C11 (named tests): the 尺寸 buttons are a multi-select -- press adds / drops, dropping the size being edited moves
 // editing to the first size left, and with one size picked nothing differs from the single-size tool.
 import { describe, expect, it } from "vitest";
-import { INIT, editingSizeOf, selectedSizes, toggleSizePick, type State } from "./BannerStudio";
+import { INIT, editingSizeOf, selectedSizes, toggleSizePick, type State } from "./banner-state";
 
 const base: State = { ...INIT, preset: "r191x1", headlineSize: 64 };
 
@@ -43,11 +43,57 @@ describe("尺寸 multi-select", () => {
 // Codex round 2 (C13): the guidance line covers only a design nobody touched; a background colour alone shows the preview.
 describe("empty-preview guidance", () => {
   it("only the untouched design counts as empty", async () => {
-    const { isUntouched } = await import("./BannerStudio");
+    const { isUntouched } = await import("./banner-state");
     expect(isUntouched(INIT)).toBe(true);
     expect(isUntouched({ ...INIT, copyBrief: "咖啡", multiSizes: ["r9x16"] })).toBe(true);   // the topic and sizes are not the picture
     expect(isUntouched({ ...INIT, bgColor: "#123456" })).toBe(false);
     expect(isUntouched({ ...INIT, bgMode: "gradient" })).toBe(false);
     expect(isUntouched({ ...INIT, gradFrom: "#000000" })).toBe(false);
+  });
+});
+
+// R2-B1 (PLAN-R2 §4): 清除設計 = the blank design, keeping the picked sizes; a size being tweaked comes back as its main size.
+describe("清除設計", () => {
+  it("keeps the picked sizes, clears everything else", async () => {
+    const { clearDesign, designSig } = await import("./banner-state");
+    const st: State = {
+      ...toggleSizePick(base, "r9x16"), headline: "夏日", copyBrief: "咖啡", bgColor: "#123456",
+      sizeOverrides: { r9x16: { textPos: "top" } },
+    };
+    const tweaking: State = { ...st, preset: "r9x16", editingSize: { key: "r9x16", main: { preset: "r191x1", headlineSize: 64 } } };
+    for (const s of [st, tweaking]) {
+      const c = clearDesign(s);
+      expect(selectedSizes(c)).toEqual(["r9x16", "r191x1"]);
+      expect(c.preset).toBe("r191x1");
+      expect(designSig({ ...c, preset: INIT.preset, multiSizes: [] })).toBe(designSig(INIT));
+    }
+  });
+});
+
+// Codex review of R2-B1: clearing within the 500 ms typing debounce lost the step before it; a copy list alone could not
+// be cleared (designSig leaves copyVariants out).
+describe("清除設計 and undo", () => {
+  it("title typed then cleared at once -> undo returns the title", async () => {
+    const { clearDesign, pushHistory } = await import("./banner-state");
+    const typed: State = { ...INIT, headline: "夏日咖啡" };          // typed, the 500 ms timer not fired yet
+    let h = { hist: [INIT], idx: 0 };
+    h = pushHistory(h.hist, h.idx, typed, true);                   // commitHistoryNow: the current state first
+    h = pushHistory(h.hist, h.idx, clearDesign(typed), true);      // then the cleared design as its own step
+    expect(h.hist[h.idx].headline).toBe("");
+    expect(h.hist[h.idx - 1].headline).toBe("夏日咖啡");
+  });
+
+  it("a copy list alone can be cleared, and undo brings it back", async () => {
+    const { canClear, clearDesign, pushHistory } = await import("./banner-state");
+    const listed: State = { ...INIT, copyVariants: [{ headline: "甲", subtext: "乙" }] };
+    expect(canClear(INIT)).toBe(false);
+    expect(canClear(listed)).toBe(true);
+    // the list never got its own step: by design it equals the blank step before it
+    let h = { hist: [INIT], idx: 0 };
+    h = pushHistory(h.hist, h.idx, listed);
+    expect(h.idx).toBe(0);
+    h = pushHistory(h.hist, h.idx, listed, true);                  // commitHistoryNow
+    h = pushHistory(h.hist, h.idx, clearDesign(listed), true);
+    expect(h.hist[h.idx - 1].copyVariants).toHaveLength(1);
   });
 });
