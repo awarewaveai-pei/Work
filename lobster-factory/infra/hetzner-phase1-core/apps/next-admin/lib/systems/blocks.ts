@@ -253,7 +253,7 @@ export const LEGO_BLOCKS: LegoBlock[] = [
   block({ no: "B-078", layer: "platform", name: "安全基本件", status: ["toolkit"], purpose: "定時比對（防時序攻擊）、對外頁面 SRI、密鑰保管庫讀取。",
     entry: ["lib/security/", "lib/secret-vault.ts"], usedBy: ["app-platform", "commerce", "ai-subscription-channel", "cognitive-os", "collect", "cs", "content", "outbound-os", "schedules", "social", "tarot", "video", "ops-console", "provisioning", "repair-center", "studio", "systems-control-center"] }),
   block({ no: "B-079", layer: "platform", name: "租戶隔離", status: ["toolkit"], purpose: "每個請求只能碰自己組織的資料。",
-    entry: ["lib/tenant-guard.ts"], usedBy: ["app-platform", "ops-console", "repair-center", "content", "provisioning", "staff-access", "outbound-os", "social", "video", "tarot", "commerce"] }),
+    entry: ["lib/tenant-guard.ts"], usedBy: ["app-platform", "ops-console", "repair-center", "content", "provisioning", "staff-access", "outbound-os", "social", "video", "tarot", "commerce", "design"] }),
   block({ no: "B-080", layer: "ops", name: "營運稽核紀錄", status: ["toolkit"], purpose: "誰在什麼時候做了什麼營運動作。",
     entry: ["lib/ops-audit.ts"], usedBy: ["ops-console", "schedules", "cs", "commerce"] }),
   block({ no: "B-081", layer: "platform", name: "研究資料橋接", status: ["toolkit"], purpose: "研究資料在資料蒐集器、認知工程 OS、後台之間傳遞。",
