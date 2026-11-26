@@ -325,9 +325,9 @@ export const LEGO_BLOCKS: LegoBlock[] = [
 
 export const isLive = (b: LegoBlock) => !b.status.includes("planned") && !b.status.includes("retired");
 
-/** Live 功能積木 a system uses, in number order. */
-export function blocksForSystem(slug: string, blocks: LegoBlock[] = LEGO_BLOCKS): LegoBlock[] {
-  return blocks.filter((b) => b.tier === "block" && isLive(b) && b.usedBy.includes(slug));
+/** Live entries of one tier (default 功能積木) a system uses, in number order. */
+export function blocksForSystem(slug: string, tier: Tier = "block", blocks: LegoBlock[] = LEGO_BLOCKS): LegoBlock[] {
+  return blocks.filter((b) => b.tier === tier && isLive(b) && b.usedBy.includes(slug));
 }
 
 export function blockStats(blocks: LegoBlock[] = LEGO_BLOCKS) {
@@ -344,9 +344,9 @@ export function blockStats(blocks: LegoBlock[] = LEGO_BLOCKS) {
 
 /** /ops/systems/blocks URL. Defaults (view=systems, tier=block) are left out; every link to the page goes through here. */
 export type CatalogView = "systems" | "blocks" | "diagram";
-/** 系統分頁的篩選：總控中心的三張卡（overviewGroup）＋沒用到功能積木的系統 */
+/** 系統分頁的篩選：總控中心的三張卡（overviewGroup）＋沒用到任何積木或產品模組的系統 */
 export type CatalogGroup = "active" | "attention" | "wrapped" | "none";
-export function catalogHref(p: { view?: CatalogView; grp?: CatalogGroup | null; tier?: Tier; layer?: BlockLayer | null; sys?: string | null; q?: string | null } = {}): string {
+export function catalogHref(p: { view?: CatalogView; grp?: CatalogGroup | null; tier?: Tier; layer?: BlockLayer | null; sys?: string | null; q?: string | null; shared?: boolean } = {}): string {
   const q = new URLSearchParams();
   if (p.view && p.view !== "systems") q.set("view", p.view);
   if (p.grp) q.set("grp", p.grp);
@@ -354,6 +354,17 @@ export function catalogHref(p: { view?: CatalogView; grp?: CatalogGroup | null; 
   if (p.layer) q.set("layer", p.layer);
   if (p.sys) q.set("sys", p.sys);
   if (p.q) q.set("q", p.q);
+  if (p.shared) q.set("shared", "1");
   const s = q.toString();
   return `/ops/systems/blocks${s ? `?${s}` : ""}`;
+}
+
+/** Why a system shows no block or module: the catalog covers next-admin code and the cognitive-engineering-os methods only
+ *  (WordPress, docs, DB, meeting-service are not in it). */
+export const NOT_IN_CATALOG = "沒有用到目錄裡的積木（目錄只盤點後台 next-admin 的程式與認知工程方法）";
+
+/** One entry's card on the 積木清單 tab (B-xx, M-xx or C-xx); null = no such number. */
+export function blockHref(no: string): string | null {
+  const b = LEGO_BLOCKS.find((x) => x.no === no);
+  return b ? `${catalogHref({ view: "blocks", tier: b.tier })}#${no}` : null;
 }

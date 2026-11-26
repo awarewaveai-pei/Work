@@ -4,7 +4,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockStats, blocksForSystem, catalogHref, isLive } from "../blocks";
+import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockHref, blockStats, blocksForSystem, catalogHref, isLive } from "../blocks";
 
 const APP = resolve(__dirname, "../../..");
 const REPO = resolve(APP, "../../../../..");
@@ -60,6 +60,9 @@ describe("積木目錄 shape", () => {
     expect(catalogHref({ view: "systems", tier: "block" })).toBe("/ops/systems/blocks");
     expect(catalogHref({ view: "blocks", sys: "studio" })).toBe("/ops/systems/blocks?view=blocks&sys=studio");
     expect(catalogHref({ grp: "attention" })).toBe("/ops/systems/blocks?grp=attention");
+    expect(catalogHref({ view: "blocks", shared: true })).toBe("/ops/systems/blocks?view=blocks&shared=1");
+    expect(blockHref("M-05")).toBe("/ops/systems/blocks?view=blocks&tier=module#M-05");
+    expect(blockHref("B-999")).toBeNull();
   });
 
   it("stats and per-system lookup agree with the list", () => {

@@ -1,4 +1,19 @@
 # Worklog
+## 2026-11-26（續13）— 積木頁 UI/UX：系統卡片列產品模組、統計卡可點＋只看共用、編號變連結、手機統計卡並排、去重複標題
+
+- 根因／決策：操作者要「哪些系統用了什麼積木」，但 `blocksForSystem` 只取 B（`NA/lib/systems/blocks.ts:329` 舊版），系統卡看不到 M 產品模組；「沒用積木」9 系統其實是程式不在後台；統計卡不能點、說明裡的 B-xx 不能點、分頁名與框內 h2 重複、手機統計卡直排把分頁推出第一屏（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）。
+- 步驟：
+  - `NA/lib/systems/blocks.ts`：`blocksForSystem(slug, tier)`；`catalogHref` 加 `shared`；新 `blockHref(no)`（單號卡片網址唯一來源）、`NOT_IN_CATALOG`（範圍＝後台程式＋認知工程方法）
+  - `NA/app/(shell)/ops/systems/blocks/page.tsx`：系統卡加產品模組列；「沒用積木」＝無積木且無模組；統計卡為連結（共用→`shared=1`，規劃／退場→`#lg-planned`，兩節改常開）；`Linked` 把說明中的 B/M/C 編號變連結；刪框內 h2；窄螢幕統計卡 3 張並排、隱藏說明；`hrefOf` 去型別轉換；單一 `now`；篩選鈕 `aria-current`
+  - `NA/app/(shell)/ops/systems/[slug]/page.tsx`：用到的積木含產品模組，編號連到該卡
+- 驗證：`npx tsc --noEmit` exit 0；vitest 92 passed；本機 :3904 實看：系統卡產品模組列、`shared=1` 51 張＝統計卡 51、B-048 說明的 B-021 為連結、窄畫面統計卡並排
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run lib/systems "app/(shell)/ops/systems" app/__tests__/sidebar-coverage.test.ts lib/studio/__tests__/editor-ai-panels.test.ts | exit=0 | ms=45000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-26-partialreview-2190593a.md）：範圍文案漏認知方法、詳頁模組點不到、規劃／退場卡跳到收合區；3 項已修
+- ORACLE_WAIVED: 3m 修在 artifact 之後（文案、詳頁編號連結、兩節常開），tsc＋92 測過
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=blockHref|NOT_IN_CATALOG|shared=1|lg-planned | hits=24
+- 另見：員工後台左側選單在手機不收起（`NA/app/globals.css:266` `.sidebar` 無窄螢幕規則），全站問題，未在此修
+- rollback：`git revert` 本 commit；今晚 03:00 自動部署上線
 ## 2026-11-26（續9）— 積木目錄退場 B-050／B-051／B-052：整頁工作台不是可組裝零件
 
 - 根因／決策：操作者定義積木＝可組裝到不同系統的零件。這三筆的 entry 是整頁（`CanvasEditor.tsx`／`TarotStudio.tsx`／`StudioWorkbench.tsx`），各只屬 1 系統；同查 B-002/B-017（價格已單一來源 `lib/ai/cost-model.ts:22`）、B-047→B-034（`genfx.js:12,99`）、B-048→B-021（`ai-edit.js:10`）皆已共用，程式面無需合併。操作者批准退場。
