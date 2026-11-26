@@ -1,6 +1,6 @@
-// Node-only (fs): which registry system imports which block through "@/...". Used by scripts/gen-block-usage.ts (writes
-// block-usage.generated.json, merged into usedBy by blocks.ts) and lib/systems/__tests__/blocks.test.ts. Never import from
-// app code: the host copy of next-admin has no repo root / registry.
+// Node-only (fs): which registry system imports what through "@/...". scripts/gen-block-usage.ts writes the result to
+// block-usage.generated.json (usedBy merged by blocks.ts; 共用小工具 and 待歸類 shown on /ops/systems/blocks). GitHub refreshes
+// it after every push (.github/workflows/block-usage-refresh.yml). Never import from app code: the host has no registry.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import type { LegoBlock } from "./blocks";
@@ -62,4 +62,52 @@ export function derivedUsedBy(blocks: readonly LegoBlock[], edges: readonly Impo
   return out;
 }
 
-export const serialize = (d: Record<string, string[]>) => JSON.stringify(d, null, 2) + "\n";
+export interface ScanRow { path: string; systems: string[] }
+/** shared = 2+ systems import a file that is in no block and not shared plumbing; uncovered = a capability id the catalog
+ *  does not list yet (content registry id, dock panel, product module, cognitive family); dead = a block entry path gone. */
+export type PendingKind = "shared" | "uncovered" | "dead";
+export interface PendingRow extends ScanRow { kind: PendingKind }
+export interface CatalogScan { usedBy: Record<string, string[]>; methodCounts: Record<string, number>; shared: ScanRow[]; pending: PendingRow[] }
+/** What the generator learns outside the import graph: code ids that exist, cognitive families and their method counts. */
+export interface CodeFacts { ids: string[]; methodCounts: Record<string, number> }
+
+export const COS_MODULES = join(REPO, "Projects/internal/cognitive-engineering-os/ai_lego/modules");
+const exists = (p: string) => existsSync(p.startsWith("repo:") ? join(REPO, p.slice(5)) : join(APP, p));
+
+/** Code ids every catalog entry must cover (fs part): dock panels, product modules, cognitive families + their method counts.
+ *  Content registry ids need the registry loaded, so the generator adds those. */
+export function fsFacts(): CodeFacts {
+  const panelDir = join(APP, "public/editor-shared/blocks");
+  const panels = existsSync(panelDir) ? readdirSync(panelDir).filter((f) => f.endsWith(".js")).map((f) => `panel/${f.slice(0, -3)}`) : [];
+  const modules = readdirSync(join(APP, "lib")).filter((d) => existsSync(join(APP, "lib", d, "MODULE_MANIFEST.json"))).map((d) => `module/${d}`);
+  const methodCounts: Record<string, number> = {};
+  if (existsSync(COS_MODULES)) {
+    for (const d of readdirSync(COS_MODULES).filter((d) => !d.startsWith("_") && statSync(join(COS_MODULES, d)).isDirectory()).sort()) {
+      methodCounts[d] = readdirSync(join(COS_MODULES, d)).filter((f) => f.endsWith(".py") && !f.startsWith("__")).length;
+    }
+  }
+  return { ids: [...panels, ...modules, ...Object.keys(methodCounts).map((d) => `cognitive/${d}`)], methodCounts };
+}
+
+/** usedBy per block; 共用小工具 = registry shared_paths inside next-admin with the systems importing them (files a block
+ *  already holds left out); 待處理 = the PendingKind rows above. */
+export function scanCatalog(blocks: readonly LegoBlock[], reg: Registry, edges: readonly ImportEdge[], facts: CodeFacts): CatalogScan {
+  const live = blocks.filter((b) => !b.status.includes("planned") && !b.status.includes("retired")).flatMap(liveEntries);
+  const inBlock = (f: string) => live.some((e) => under(f, e));
+  const users = new Map<string, Set<string>>();
+  for (const { file, sys } of edges) users.set(file, (users.get(file) ?? new Set()).add(sys));
+  const shared = reg.shared_paths.filter((p) => p.startsWith(APP_FROM_REPO)).map((p) => p.slice(APP_FROM_REPO.length)).flatMap((path) => {
+    const sys = new Set([...users].filter(([f]) => under(f, path) && !inBlock(f)).flatMap(([, s]) => [...s]));
+    return sys.size ? [{ path, systems: [...sys].sort() }] : [];
+  });
+  const covered = new Set(blocks.flatMap((b) => b.covers ?? []));
+  const pending: PendingRow[] = [
+    ...[...users].filter(([f, s]) => s.size >= 2 && !inBlock(f) && !inShared(reg, f))
+      .map(([path, s]) => ({ kind: "shared" as const, path, systems: [...s].sort() })).sort((a, b) => a.path.localeCompare(b.path)),
+    ...[...new Set(facts.ids)].filter((id) => !covered.has(id)).sort().map((path) => ({ kind: "uncovered" as const, path, systems: [] })),
+    ...blocks.flatMap((b) => b.entry.filter((e) => !exists(e)).map((e) => ({ kind: "dead" as const, path: `${b.no} ${e}`, systems: [] }))),
+  ];
+  return { usedBy: derivedUsedBy(blocks, edges), methodCounts: facts.methodCounts, shared, pending };
+}
+
+export const serialize = (d: CatalogScan) => JSON.stringify(d, null, 2) + "\n";

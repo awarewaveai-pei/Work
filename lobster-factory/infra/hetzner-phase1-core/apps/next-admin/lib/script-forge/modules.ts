@@ -43,6 +43,58 @@ export interface ForgeModule {
 
 /** Field as text (missing or non-text = ""). Builders read every field through this, so a missing one never prints "undefined". */
 export const s = (v: unknown): string => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
+
+/** Card C9: AI 一鍵設計整張 for several sizes at once -- the shared words / colours above plus one layout per size. Only
+ *  when the page sends `sizes` (its 多尺寸 ticks): without it the prompt is the single-size one, unchanged. */
+function bannerSizesPart(sizes: unknown): string {
+  const list = (Array.isArray(sizes) ? sizes : []).slice(0, 12).map((v) => v as Record<string, unknown>)
+    .filter((v) => /^r[0-9x]+$/.test(s(v.key)) && Number(v.w) > 0 && Number(v.h) > 0);
+  if (!list.length) return "";
+  return `\n\n【多尺寸】同一張設計要同時出下列尺寸。上面的文案與配色所有尺寸共用；另外加一個 "layouts" 欄位，替每個尺寸各給一個版面（key 照下列原樣）：\n` +
+    list.map((v) => `- ${s(v.key)}：${s(v.ratio)} ${s(v.w)}×${s(v.h)}（${s(v.use)}）`).join("\n") +
+    `\n"layouts":{"<key>":{"textPos":"top|center|bottom","textAlignH":"left|center|right","headlineSize":像素整數,"subtextSize":像素整數,` +
+    `"productPos":"center|left|right|bottom-right","productScale":0.2到1.2,` +
+    `"positions":{"headline":{"x":0到1,"y":0到1},"subtext":{...},"price":{...},"cta":{...},"trust":{...},"product":{...},"badge":{...}}}}\n` +
+    `positions 是各元素外框中心佔畫布寬高的比例（可只給需要移動的元素，沒給的照自動排版）。` +
+    `依形狀真的換排法：直式（9:16、2:3、3:4、4:5）文字集中上方三分之一、商品在下半部、字要大到手機看得清；` +
+    `方形（1:1）置中堆疊；橫式（16:9、1.91:1、3:1、4:3、3:2）左文右圖、文字靠左。字級以該尺寸像素計（短邊越長字越大），元素不得超出畫面。`;
+}
+/** Card C12: the background the page measured ({mode, colors, meanLum, zones: {top|center|bottom: {lum, busy}}}), read
+ *  defensively. null = not sent (the old prompt). */
+function bannerBg(bg: unknown): { mode: string; colors: string[]; meanLum: number; zones: [string, number, number][] } | null {
+  if (!bg || typeof bg !== "object") return null;
+  const o = bg as Record<string, unknown>;
+  const mode = ["color", "gradient", "upload", "ai"].includes(s(o.mode)) ? s(o.mode) : "";
+  if (!mode) return null;
+  const n01 = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.round(Math.max(0, Math.min(1, v)) * 100) / 100 : 0);
+  const colors = (Array.isArray(o.colors) ? o.colors : []).map(s).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c)).slice(0, 6);
+  const z = o.zones && typeof o.zones === "object" ? (o.zones as Record<string, Record<string, unknown> | undefined>) : {};
+  const zones = (["top", "center", "bottom"] as const).map((k): [string, number, number] => [k, n01(z[k]?.lum), n01(z[k]?.busy)]);
+  return { mode, colors, meanLum: n01(o.meanLum), zones };
+}
+/** The background fields of the answer: a picture (uploaded / AI) is the user's and is never replaced. */
+function bannerBgFields(bg: unknown): string {
+  const b = bannerBg(bg);
+  if (!b) return `"bgMode":"gradient","gradFrom":"#rrggbb","gradTo":"#rrggbb",`;
+  if (b.mode === "upload" || b.mode === "ai") return "";
+  return `"bgMode":"color|gradient","bgColor":"#rrggbb 或色盤索引","gradFrom":"#rrggbb 或色盤索引","gradTo":"#rrggbb 或色盤索引",`;
+}
+/** Card C12: the measured background and the palette; the AI assigns colour roles (60-30-10), the page checks contrast. */
+function bannerColorPart(bg: unknown, palette: unknown, brandKit: unknown): string {
+  const b = bannerBg(bg);
+  if (!b) return "";
+  const pal = (Array.isArray(palette) ? palette : []).map(s).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c)).slice(0, 8);
+  const zoneText = b.zones.map(([k, lum, busy]) => `${k === "top" ? "上" : k === "center" ? "中" : "下"}帶 亮度${lum} 花${busy}`).join("、");
+  const picture = b.mode === "upload" || b.mode === "ai";
+  return `\n\n【背景與配色】背景：${picture ? "使用者的圖片（不要輸出 bgMode / bgColor / gradFrom / gradTo，背景不換）" : b.mode === "color" ? "純色" : "漸層"}；` +
+    `主要顏色 ${b.colors.join(" ") || "（無）"}；平均亮度 ${b.meanLum}（0 黑 1 白）；文字區 ${zoneText}（花 = 亮度起伏，越大越花）。\n` +
+    (pal.length ? `可用色盤（索引從 0）：${pal.map((c, i) => `${i}=${c}`).join(" ")}。` : "") +
+    (brandKit === true && pal.length
+      ? `這是品牌色：textColor / accentColor / ctaBg / ctaTextColor / badgeColor${picture ? "" : " / bgColor / gradFrom / gradTo"} 只能用色盤裡的顏色（填索引或色盤裡的 #hex），不在色盤內的會被丟棄。`
+      : `文字與按鈕顏色優先取自背景主要顏色，也可自由配色。`) +
+    `\n配色照 60-30-10：背景約 60%、文字等主色約 30%、重點約 10%；CTA 用最搶眼的一色，整張只留一個焦點。` +
+    `文字顏色要和它所在那一帶的背景拉開明暗（亮背景用深字、暗背景用淺字）；那一帶很花時把 textScrim 設 true。顏色可填 #rrggbb 或色盤索引。`;
+}
 /** The brand line the modules used to append themselves: "" without a client. */
 export const brandLine = (ctx: ForgeCtx): string => (ctx.brand?.voice ? `品牌語氣：${ctx.brand.voice}` : "");
 /** Field as a list (missing or non-list = []); builders join it the way the old page templates did. */
@@ -273,9 +325,9 @@ export const FORGE_MODULES: ForgeModule[] = [
           `"trustType":"none|stars|reviews|guarantee","trustStars":5,"trustText":"12,000+ 則好評",` +
           `"textColor":"#rrggbb","accentColor":"#rrggbb","accentHighlight":false,` +
           `"textPos":"top|center|bottom","textAlignH":"left|center|right","textScrim":true,"textOutline":true,` +
-          `"bgMode":"gradient","gradFrom":"#rrggbb","gradTo":"#rrggbb",` +
+          bannerBgFields(f.bg) +
           `"aiBgSubject":"英文場景描述(供 AI 生背景)","aiBgVibe":"英文氛圍"}\n\n` +
-          `配色和諧、對比足夠、CTA 醒目；文字用繁體中文；只輸出 JSON。`,
+          `配色和諧、對比足夠、CTA 醒目；文字用繁體中文；只輸出 JSON。` + bannerColorPart(f.bg, f.palette, f.brandKit) + bannerSizesPart(f.sizes),
       },
       copy: {
         shape: ["variants"],

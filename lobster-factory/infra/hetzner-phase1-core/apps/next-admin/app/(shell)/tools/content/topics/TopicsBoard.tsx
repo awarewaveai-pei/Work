@@ -148,7 +148,7 @@ const daysOf = (month: string) => Array.from({ length: daysIn(month) }, (_, i) =
 
 export type TopicsView = "topics" | "steps";
 /** Shown until the client rail has a site (nothing is read before that). */
-export const PICK_SITE_FIRST = "在左邊的客戶欄選客戶和網站，這裡就會顯示。";
+export const PICK_SITE_FIRST = "在客戶欄選客戶和網站，這裡就會顯示。";
 
 export function TopicsBoard({ overview, scheduleFor, view = "topics" }: {
   overview: OverviewData; scheduleFor?: (orgSlug: string) => ReactNode; view?: TopicsView;

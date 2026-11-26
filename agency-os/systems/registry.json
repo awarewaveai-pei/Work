@@ -8,7 +8,13 @@
     "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts",
     "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
     "lobster-factory/infra/hetzner-phase1-core/scripts/cron.d/",
-    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/components/"
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/components/",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/security/",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/secret-vault.ts",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/research-bridges.ts",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/analytics.ts",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/AutoRefresh.tsx",
+    "lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/supabase-paging.ts"
   ],
   "ignore_paths": [
     "agency-os/WORKLOG.md",

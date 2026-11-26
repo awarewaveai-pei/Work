@@ -5,10 +5,10 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { systemsAccess } from "@/lib/systems/access";
-import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, NOT_IN_CATALOG, TIERS, blockHref, blockStats, blocksForSystem, catalogHref, isLive, type BlockLayer, type CatalogGroup, type CatalogView, type LegoBlock, type Tier } from "@/lib/systems/blocks";
+import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, NOT_IN_CATALOG, PENDING, SHARED_TOOLS, TIERS, blockHref, blockStats, blocksForSystem, catalogHref, isLive, type BlockLayer, type CatalogGroup, type CatalogView, type LegoBlock, type PendingRow, type ScanRow, type Tier } from "@/lib/systems/blocks";
 import { overviewGroup, projectAll, type OverviewGroup, type SystemOverviewRow } from "@/lib/systems/overview";
 import { readDefinitions, readProjectionInput } from "@/lib/systems/store";
-import { AddSystemForm, HEADER_CSS, Progress, Refused, StatusBadge, SystemsHeader, errorBox, muted, page, panel, panelBody, panelHead, smallBtn } from "../parts";
+import { AddSystemForm, HEADER_CSS, Progress, Refused, StatusBadge, SystemsHeader, box, errorBox, muted, page, panel, panelBody, panelHead, smallBtn } from "../parts";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "LEGO 積木目錄 · Ops" };
@@ -169,10 +169,12 @@ function BlockCard({ b, nameOf }: { b: LegoBlock; nameOf: (s: string) => string 
       </div>
       <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}><Linked text={b.purpose} /></div>
       {b.note && <div style={{ ...muted, marginTop: 6 }}><Linked text={b.note} /></div>}
-      <div style={{ marginTop: 8 }}>
-        <div style={{ ...muted, marginBottom: 4 }}>用在 {b.usedBy.length} 個系統</div>
-        <div>{b.usedBy.map((s) => <Link key={s} href={`/ops/systems/${s}`} className="lg-chip">{nameOf(s)}</Link>)}</div>
-      </div>
+      {b.usedBy.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ ...muted, marginBottom: 4 }}>用在 {b.usedBy.length} 個系統</div>
+          <div>{b.usedBy.map((s) => <Link key={s} href={`/ops/systems/${s}`} className="lg-chip">{nameOf(s)}</Link>)}</div>
+        </div>
+      )}
       {(b.entry.length > 0 || b.deps?.length) && (
         <details style={{ marginTop: 6 }}>
           <summary style={{ ...muted, cursor: "pointer" }}>檔案與依賴</summary>
@@ -193,6 +195,28 @@ function Section({ title, hint, blocks, nameOf, id }: { title: string; hint: str
         <span style={{ ...muted, marginLeft: 8 }}>{blocks.length} 顆{hint ? `・${hint}` : ""}</span>
       </summary>
       <div className="lg-grid">{blocks.map((b) => <BlockCard key={b.no} b={b} nameOf={nameOf} />)}</div>
+    </details>
+  );
+}
+
+const PENDING_LABEL: Record<PendingRow["kind"], string> = { shared: "共用檔待歸類", uncovered: "新功能還沒編號", dead: "積木指向的檔案不見了" };
+
+/** 待處理 / 共用小工具, from the GitHub-refreshed scan (lib/systems/block-usage.ts). */
+function FileList({ id, title, hint, rows, nameOf, open }: { id: string; title: string; hint: string; rows: Array<ScanRow & { kind?: PendingRow["kind"] }>; nameOf: (s: string) => string; open: boolean }) {
+  if (rows.length === 0) return null;
+  return (
+    <details open={open} id={id} style={{ marginBottom: 18 }}>
+      <summary style={{ cursor: "pointer", marginBottom: 10 }}>
+        <span style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>{title}</span>
+        <span style={{ ...muted, marginLeft: 8 }}>{rows.length} 個・{hint}</span>
+      </summary>
+      {rows.map((r) => (
+        <div key={r.path} className="lg-card" style={{ marginBottom: 8 }}>
+          {r.kind && <span className="card-badge badge-yellow" style={{ display: "inline-flex", marginRight: 8 }}>{PENDING_LABEL[r.kind]}</span>}
+          <code style={{ fontSize: 12, wordBreak: "break-all" }}>{r.path}</code>
+          {r.systems.length > 0 && <div style={{ marginTop: 6 }}>{r.systems.map((s) => <Link key={s} href={`/ops/systems/${s}`} className="lg-chip">{nameOf(s)}</Link>)}</div>}
+        </div>
+      ))}
     </details>
   );
 }
@@ -237,7 +261,13 @@ function BlocksView({ f, nameOf }: { f: Filters; nameOf: (s: string) => string }
             <>
               {BLOCK_LAYERS.map((l) => <Section key={l.key} title={l.name} hint={l.hint} blocks={live.filter((b) => b.layer === l.key)} nameOf={nameOf} />)}
               <Section id="lg-planned" title="規劃中" hint="已預留編號，還沒做" blocks={filtered.filter((b) => b.status.includes("planned"))} nameOf={nameOf} />
-              <Section title="已退場" hint="已刪除或改為系統自己的頁面，不再列為積木；編號保留不再使用" blocks={filtered.filter((b) => b.status.includes("retired"))} nameOf={nameOf} />
+              <Section title="已退場" hint="已刪除、改為系統自己的頁面或共用小工具，不再列為積木；編號保留不再使用" blocks={filtered.filter((b) => b.status.includes("retired"))} nameOf={nameOf} />
+              {!f.layer && !f.sys && !f.q && !f.shared && (
+                <>
+                  <FileList id="lg-pending" title="待處理" hint="程式變了、目錄還沒跟上的地方；不擋開發，有空再整理" rows={PENDING} nameOf={nameOf} open />
+                  <FileList id="lg-tools" title="共用小工具" hint="每個系統都會用到的底層零件，不算積木" rows={SHARED_TOOLS} nameOf={nameOf} open={false} />
+                </>
+              )}
             </>
           ) : <Section title={TIERS.find((t) => t.key === f.tier)?.name ?? ""} hint="" blocks={filtered} nameOf={nameOf} />}
       </div>
@@ -292,7 +322,8 @@ export default async function BlocksPage({ searchParams }: { searchParams?: Prom
     <div style={page} className="sys-page">
       <style>{CSS + HEADER_CSS}</style>
       <SystemsHeader current="blocks" title="LEGO 積木目錄"><AddSystemForm /></SystemsHeader>
-      <p style={{ ...muted, fontSize: 14, marginBottom: 18 }}>積木＝可以拿去組裝成不同系統的零件，就像樂高。每顆有固定編號（B＝功能積木、M＝產品模組、C＝認知方法族），編號永不重用；被 2 個以上系統用到的程式一定屬於某顆積木（自動測試守）。</p>
+      <p style={{ ...muted, fontSize: 14, marginBottom: 18 }}>積木＝可以拿去組裝成不同系統的零件，就像樂高。每顆有固定編號（B＝功能積木、M＝產品模組、C＝認知方法族），編號永不重用。每個系統都會用到的小工具（例如分頁讀取、自動重整）不算積木，收在清單最下面的「共用小工具」；誰用了哪顆積木由 GitHub 在每次推送後自動更新。</p>
+      {PENDING.length > 0 && <div style={box}>目錄有 {PENDING.length} 項待處理（新共用檔、新功能還沒編號或檔案搬走）；不擋開發。<Link href={`${catalogHref({ view: "blocks" })}#lg-pending`}>看待處理清單</Link></div>}
       {failure && <div style={errorBox}>讀不到系統進度：{failure}（積木清單照常顯示）</div>}
       {capped && <div style={errorBox}>事件超過讀取上限，最舊的一段沒有算進來，狀態與完成度可能不準。</div>}
       <div className="lg-stats">

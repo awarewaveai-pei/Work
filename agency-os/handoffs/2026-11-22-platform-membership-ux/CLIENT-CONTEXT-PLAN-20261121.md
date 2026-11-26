@@ -1,5 +1,7 @@
 # 目前客戶（client context）統一計畫 — 2026-11-21；2026-11-22 依操作者定案改寫
 
+> K 線已於 2026-11-25 完成期末閘（K15），結果見 WORKLOG 2026-11-25 條目。
+
 NA = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`；VW = `lobster-factory/infra/hetzner-phase1-core/apps/video-workbench/`。§1a 表沿用 2026-11-21 grep 驗的盤點；2026-11-22 改寫新增的引用（§1c 末、§1d、§2 F5／F16、§3b、§4 U3–U5）已重新打開程式驗過。操作者 2026-11-22 定案：挑客戶＝**側欄客戶欄**（搜尋＋一列一個＋色點＋類別），不是頂部列；員工在 app 與**各產品子網域**都能用、都能換客戶（`README.md` §2）。開工順序與派工單只在同資料夾 `DISPATCH.md`。回報操作者一律繁體中文。規則正本已移到 ADR 020（`agency-os/docs/architecture/decisions/020-client-context.md`）。
 
 ## 1. 盤點

@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   // basePath is not needed — routing is handled at the domain/edge layer.
   // Keep file tracing scoped to this app (avoid parent monorepo lockfile warnings in Docker / CI).
   outputFileTracingRoot: path.join(__dirname),
+  // The bake-off pages are read with fs at request time, so the tracer cannot see them; this copies them into
+  // .next/standalone/content/ (the Dockerfile copies standalone whole). Keys are picomatch globs on the route, and
+  // "[slug]" would be a character class there, hence "*".
+  outputFileTracingIncludes: { "/tools/ai-models/bakeoff/*": ["./content/model-bakeoff/**/*"] },
   // sg-deploy runs `npm run typecheck` (next typegen + tsc, the same route-type validation next build does) as a gate
   // before the image build and then passes NEXT_TYPECHECK_DONE=1, so the build skips its second, ~60s copy. Any
   // other build (local, CI) still checks.
@@ -39,10 +43,15 @@ const nextConfig: NextConfig = {
   // dock for hours, and could mix old and new modules. no-cache = revalidate every load (a 304 when unchanged); private:
   // these are login-gated, so no shared cache keeps them (Cloudflare keeps an origin `private`).
   async headers() {
-    return UNVERSIONED_PUBLIC_DIRS.map((dir) => ({
-      source: `/${dir}/:path*`,
-      headers: [{ key: "Cache-Control", value: "private, no-cache" }],
-    }));
+    return [
+      ...UNVERSIONED_PUBLIC_DIRS.map((dir) => ({
+        source: `/${dir}/:path*`,
+        headers: [{ key: "Cache-Control", value: "private, no-cache" }],
+      })),
+      // Banner font slices are named by content (scripts/fetch-banner-fonts.mjs): never revalidate them. Listed last: for
+      // the same header key the last matching rule wins, so fonts.css beside them stays no-cache.
+      { source: "/banner-fonts/:dir/:file([0-9a-f]+\\.woff2)", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
+    ];
   },
   // Local dev only: the Craft editors' static web builds (nginx /vector-pro/, /photo-pro/ in prod) from a dev origin.
   // Unset in prod = no rewrite.

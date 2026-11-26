@@ -706,6 +706,11 @@ site_wp() {
         fi
         ok_list+=("$a")
       done
+      # Rank Math prints nothing in <head> (no description, no og/twitter) until its "connect an account" step is
+      # answered; this option is its own "skip" answer (includes/admin/class-registration.php). Set once, never unset.
+      if [[ " ${ok_list[*]} " == *" seo-by-rank-math "* && -z "$(wpc option get rank_math_registration_skip 2>/dev/null)" ]]; then
+        wpm option update rank_math_registration_skip 1 >/dev/null || plugin_failed seo-by-rank-math "first-run setting"
+      fi
       log info "site-wp $SLUG plugins ${#ok_list[@]} kept=${#kept[@]}"
       obj state=ok plugins="${ok_list[*]}" kept="${kept[*]}" db_export="$exp" ;;
     open|close)

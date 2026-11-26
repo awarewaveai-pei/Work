@@ -1,0 +1,86 @@
+<title>文章模型盲測</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one reading column; a sticky strip of letter buttons switches the article; the answer key sits closed at the end. */
+:root {
+  --bg: #f6f7f5; --panel: #ffffff; --ink: #1c2422; --muted: #5d6a66; --line: #d9dedb; --accent: #0f6b5c; --accent-ink: #ffffff; --mark: #fff3c4;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-data: ui-monospace, "SF Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #131816; --panel: #1b2220; --ink: #e6ece9; --muted: #9aa8a3; --line: #2e3835; --accent: #5cc9b4; --accent-ink: #0c1513; --mark: #4a4220; color-scheme: dark } }
+:root[data-theme="dark"] { --bg: #131816; --panel: #1b2220; --ink: #e6ece9; --muted: #9aa8a3; --line: #2e3835; --accent: #5cc9b4; --accent-ink: #0c1513; --mark: #4a4220; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.75;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 56px; }
+.wrap { max-width: 46rem; margin-inline: auto; display: grid; gap: 20px; min-width: 0; }
+h1 { font-size: 1.5rem; line-height: 1.3; margin: 0; text-wrap: balance; }
+.lead { color: var(--muted); margin: 0; }
+.facts { display: grid; gap: 4px; margin: 0; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: .92rem; }
+.facts div { display: flex; gap: 10px; flex-wrap: wrap; } .facts dt { color: var(--muted); min-width: 4.5em; } .facts dd { margin: 0; min-width: 0; }
+.strip { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.strip button { font: 600 1rem var(--font-data); min-width: 2.6rem; padding: 6px 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.strip button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.strip button:focus-visible, .nav button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.strip .read { opacity: .55; }
+.meta { font-size: .9rem; color: var(--muted); display: grid; gap: 2px; }
+.meta b { color: var(--ink); font-weight: 600; }
+article { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px; min-width: 0; overflow-wrap: anywhere; }
+article h1, article h2 { font-size: 1.25rem; line-height: 1.4; margin: 1.6em 0 .5em; } article h3 { font-size: 1.08rem; margin: 1.3em 0 .4em; }
+article > :first-child { margin-top: 0; } article p { margin: 0 0 1em; } article ul, article ol { padding-left: 1.4em; margin: 0 0 1em; }
+article table { border-collapse: collapse; width: 100%; font-size: .92rem; } article th, article td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+article blockquote { margin: 0 0 1em; padding: 2px 14px; border-left: 3px solid var(--line); color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+.nav { display: flex; justify-content: space-between; gap: 10px; } .nav button { font: inherit; padding: 8px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); cursor: pointer; }
+details { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+summary { cursor: pointer; font-weight: 600; }
+.key { overflow-x: auto; margin-top: 12px; } .key table { border-collapse: collapse; width: 100%; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.key th, .key td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: right; white-space: nowrap; } .key th:nth-child(-n+2), .key td:nth-child(-n+2) { text-align: left; }
+.key td.warn { background: var(--mark); }
+.note { color: var(--muted); font-size: .88rem; margin: 10px 0 0; }
+</style>
+<div class="wrap">
+  <header style="display:grid;gap:8px">
+    <h1>同一個題目，12 個模型各寫一篇</h1>
+    <p class="lead">模型名稱先遮住。請一篇一篇看，挑出你覺得寫得好的，告訴我字母。看完再打開最下面的對照表。</p>
+    <dl class="facts">
+      <div><dt>題目</dt><dd>職場倦怠的 5 個警訊，你中了幾個？</dd></div>
+      <div><dt>關鍵字</dt><dd>職場倦怠</dd></div>
+      <div><dt>切入角度</dt><dd>列出倦怠常見徵兆與自我檢測方式，並提供調整工作界線的建議</dd></div>
+      <div><dt>條件</dt><dd>繁體中文、中篇、不配圖；跟排程對 Aware Wave 站送出的內容相同，只換模型。2026-11-22 在正式站產生。</dd></div>
+    </dl>
+  </header>
+  <nav class="strip" id="strip" aria-label="選文章"></nav>
+  <div class="meta" id="meta"></div>
+  <article id="art" aria-live="polite">載入中…</article>
+  <div class="nav"><button type="button" id="prev">← 上一篇</button><button type="button" id="next">下一篇 →</button></div>
+  <details id="reveal">
+    <summary>看完再打開：每個字母是哪個模型、花多少、SEO 幾分</summary>
+    <div class="key"><table id="key"><thead><tr><th>字母</th><th>模型</th><th>實際花費</th><th>耗時</th><th>字數</th><th>SEO 分數</th><th>未查證標記</th></tr></thead><tbody></tbody></table></div>
+    <p class="note">實際花費取自成本帳本，以 32 換算成 NT$，不含每篇另外約 NT$0.2 的搜尋費。SEO 分數是系統自己的檢查（滿分 100）。未查證標記是 AI 自己標出「這句的數字或說法沒查證過」的次數。黃底代表被截斷或產生失敗。</p>
+  </details>
+</div>
+<script>
+const KEY = [{"id": "A", "model": "claude-opus-5-5", "label": "Claude Opus 5.5", "seconds": 119, "words": 5221, "seo": 86, "seoPassed": 19, "seoTotal": 22, "seoFailed": ["At least 1 internal link", "All paragraphs ≤ 120 words", "Focus keyword in at least one image alt text"], "twd": 8.03, "factMarks": 7, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "B", "model": "claude-haiku-5-5", "label": "Claude Haiku 5.5", "seconds": 24, "words": 2621, "seo": 59, "seoPassed": 13, "seoTotal": 22, "seoFailed": ["Keyword frequency 2–8 (CJK)", "At least 1 external link", "At least 1 internal link", "All paragraphs ≤ 120 words", "Title contains a power word", "Title contains a sentiment word", "Meta description 60–80 characters (CJK)", "Focus keyword in at least one image alt text", "AEO: Year/date signal in content"], "twd": 0.08, "factMarks": 0, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "C", "model": "gpt-5.4", "label": "GPT-5.4", "seconds": 84, "words": 4978, "seo": 73, "seoPassed": 16, "seoTotal": 22, "seoFailed": ["Focus keyword in URL slug", "Keyword frequency 2–8 (CJK)", "At least 1 internal link", "All paragraphs ≤ 120 words", "Meta description 60–80 characters (CJK)", "Focus keyword in at least one image alt text"], "twd": 2.88, "factMarks": 3, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "D", "model": "gpt-6.2-astra", "label": "GPT-6.2 astra", "seconds": 105, "words": 4117, "seo": 82, "seoPassed": 18, "seoTotal": 22, "seoFailed": ["At least 1 internal link", "All paragraphs ≤ 120 words", "Focus keyword in at least one image alt text", "AEO: Year/date signal in content"], "twd": 6.68, "factMarks": 3, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "E", "model": "gpt-6.2-sol", "label": "GPT-6.2 sol", "seconds": 80, "words": 4338, "seo": 86, "seoPassed": 19, "seoTotal": 22, "seoFailed": ["At least 1 internal link", "All paragraphs ≤ 120 words", "Focus keyword in at least one image alt text"], "twd": 1.96, "factMarks": 0, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "F", "model": "gpt-5.4-mini", "label": "GPT-5.4 mini", "seconds": 23, "words": 3801, "seo": 68, "seoPassed": 15, "seoTotal": 22, "seoFailed": ["Keyword frequency 2–8 (CJK)", "At least 1 external link", "At least 1 internal link", "All paragraphs ≤ 120 words", "Meta description 60–80 characters (CJK)", "Focus keyword in at least one image alt text", "AEO: Year/date signal in content"], "twd": 0.71, "factMarks": 5, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "G", "model": "gpt-5.5", "label": "GPT-5.5", "seconds": 164, "words": 4850, "seo": 77, "seoPassed": 17, "seoTotal": 22, "seoFailed": ["Focus keyword in URL slug", "Focus keyword in H2 or H3 heading", "At least 1 internal link", "All paragraphs ≤ 120 words", "Focus keyword in at least one image alt text"], "twd": 8.72, "factMarks": 3, "truncated": true, "error": false, "ledgerRows": 1}, {"id": "H", "model": "claude-fable-5-1", "label": "Claude Fable 5.1", "seconds": 167, "words": 5437, "seo": 82, "seoPassed": 18, "seoTotal": 22, "seoFailed": ["At least 1 external link", "At least 1 internal link", "All paragraphs ≤ 120 words", "Focus keyword in at least one image alt text"], "twd": 19.56, "factMarks": 13, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "I", "model": "gpt-5.4-nano", "label": "GPT-5.4 nano", "seconds": 33, "words": 5298, "seo": 64, "seoPassed": 14, "seoTotal": 22, "seoFailed": ["Focus keyword in URL slug", "Keyword frequency 2–8 (CJK)", "At least 1 external link", "At least 1 internal link", "All paragraphs ≤ 120 words", "Meta description 60–80 characters (CJK)", "Focus keyword in at least one image alt text", "AEO: Year/date signal in content"], "twd": 0.25, "factMarks": 1, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "J", "model": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "seconds": 46, "words": 3576, "seo": 68, "seoPassed": 15, "seoTotal": 22, "seoFailed": ["Keyword frequency 2–8 (CJK)", "At least 1 internal link", "All paragraphs ≤ 120 words", "Title contains a power word", "Meta description 60–80 characters (CJK)", "Focus keyword in at least one image alt text", "AEO: Year/date signal in content"], "twd": 2.16, "factMarks": 0, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "K", "model": "gpt-6-luna", "label": "GPT-6 luna", "seconds": 55, "words": 4297, "seo": 82, "seoPassed": 18, "seoTotal": 22, "seoFailed": ["Keyword frequency 2–8 (CJK)", "At least 1 internal link", "All paragraphs ≤ 120 words", "Focus keyword in at least one image alt text"], "twd": 0.13, "factMarks": 0, "truncated": false, "error": false, "ledgerRows": 1}, {"id": "L", "model": "gpt-6.1-terra", "label": "GPT-6.1 terra", "seconds": 82, "words": 4328, "seo": 77, "seoPassed": 17, "seoTotal": 22, "seoFailed": ["Focus keyword in URL slug", "At least 1 internal link", "All paragraphs ≤ 120 words", "Focus keyword in at least one image alt text", "AEO: Year/date signal in content"], "twd": 1.02, "factMarks": 6, "truncated": false, "error": false, "ledgerRows": 1}];
+let data = [], cur = 0; const seen = new Set();
+const $ = (id) => document.getElementById(id);
+function show(i) {
+  cur = (i + data.length) % data.length; const a = data[cur]; seen.add(a.id);
+  $("art").innerHTML = a.html.replace(/<table/g, '<div class="tablewrap"><table').replace(/<\/table>/g, "</table></div>");
+  $("meta").innerHTML = "<div>文章 <b>" + a.id + "</b>（第 " + (cur + 1) + "／" + data.length + " 篇）</div>" + (a.seoTitle ? "<div>搜尋結果標題：<b></b></div><div>搜尋結果描述：<span></span></div>" : "");
+  if (a.seoTitle) { $("meta").querySelector("div:nth-child(2) b").textContent = a.seoTitle; $("meta").querySelector("div:nth-child(3) span").textContent = a.metaDesc || ""; }
+  for (const b of $("strip").children) { b.setAttribute("aria-pressed", String(b.dataset.id === a.id)); b.classList.toggle("read", seen.has(b.dataset.id) && b.dataset.id !== a.id); }
+  if (location.hash.slice(1) !== a.id) history.replaceState(null, "", "#" + a.id);
+  window.scrollTo({ top: 0 });
+}
+fetch("articles.json").then((r) => r.json()).then((rows) => {
+  data = rows;
+  for (const [i, a] of rows.entries()) { const b = document.createElement("button"); b.type = "button"; b.textContent = a.id; b.dataset.id = a.id; b.id = "pick-" + a.id; b.onclick = () => show(i); $("strip").appendChild(b); }
+  const want = rows.findIndex((a) => a.id === location.hash.slice(1)); show(want >= 0 ? want : 0);
+}).catch(() => { $("art").textContent = "文章讀不到，請重新整理。"; });
+$("prev").onclick = () => show(cur - 1); $("next").onclick = () => show(cur + 1);
+window.addEventListener("hashchange", () => { const i = data.findIndex((a) => a.id === location.hash.slice(1)); if (i >= 0 && i !== cur) show(i); });
+const tb = $("key").querySelector("tbody");
+for (const k of KEY) { const tr = document.createElement("tr"); const bad = k.truncated || k.error;
+  const cells = [k.id, k.label, "NT$" + k.twd.toFixed(2), k.seconds + " 秒", k.words.toLocaleString(), k.seo + "（" + k.seoPassed + "／" + k.seoTotal + "）", String(k.factMarks) + (bad ? "　" + (k.error ? "產生失敗" : "被截斷") : "")];
+  cells.forEach((c, i) => { const td = document.createElement("td"); td.textContent = c; if (bad && i === 6) td.className = "warn"; tr.appendChild(td); }); tb.appendChild(tr); }
+</script>

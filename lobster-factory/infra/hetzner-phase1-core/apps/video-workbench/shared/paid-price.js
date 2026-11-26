@@ -34,6 +34,8 @@
     if (model && feature === "video.tts") return unitText(c.speech?.models?.find((m) => m.id === model)?.price);
     if (model && feature === "video.transcribe") return unitText(c.transcribe?.engines?.find((e) => e.id === model)?.price);
     if (model && feature === "video.music") return unitText(c.music?.models?.find((m) => m.id === model)?.price);
+    // 音軌分離／去配樂 (data-paid-model "<tool>:<row id>", capabilities audioTools): that row's price; the local row = 免費.
+    if (model && feature === "video.audio-tools") { const [tool, id] = String(model).split(":"); return unitText(c.audioTools?.[tool]?.engines?.find((e) => e.id === id)?.price); }
     return unitText(c.prices?.[feature]);
   }
   // "" = no price known yet (capabilities not loaded) or a feature without a price.

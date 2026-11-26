@@ -44,13 +44,14 @@ const under = (pathname: string, prefix: string) => pathname === prefix || pathn
 
 /** The data-free static files pages load by a fixed URL -- the one list (lib/portal/staff-tools.ts STAFF_PLATFORM.pages
  *  takes it too). /editor-shared: editor scripts and the intro style previews (content/sites IntroStyleButtons);
- *  /vector-pro-dock, /photo-pro-dock: our docks (design door /design/pro, /design/canvas). These three are public/ folders
+ *  /vector-pro-dock, /photo-pro-dock: our docks (design door /design/pro, /design/canvas); /banner-fonts: the Banner tool's
+ *  self-hosted OFL fonts (/tools/banner, /design/banner). These four are public/ folders
  *  next-admin serves to a signed-in identity on a product door (otherwise rewritten under the product's page prefix,
  *  /content/editor-shared/... -> 404: card R9) and to staff on the staff door. /vector-pro, /photo-pro: the VectorCraft /
  *  PhotoCraft builds nginx serves itself, without login (nginx/default.conf); next-admin sees them only in dev
  *  (next.config.ts rewrites). Never a route: lib/portal/__tests__/door-static-files.test.ts fails if one of these names
  *  becomes an app/ route or is neither a public/ folder nor an nginx location. */
-export const STATIC_PAGES: readonly string[] = ["/editor-shared", "/vector-pro", "/vector-pro-dock", "/photo-pro", "/photo-pro-dock"];
+export const STATIC_PAGES: readonly string[] = ["/banner-fonts", "/editor-shared", "/vector-pro", "/vector-pro-dock", "/photo-pro", "/photo-pro-dock"];
 
 /** A path the product serves with no login (registry `door.anonymous`, e.g. /smartlink). */
 export function isAnonymousPath(pathname: string, product: NextAdminProduct): boolean {

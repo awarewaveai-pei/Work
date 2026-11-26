@@ -2,12 +2,15 @@
 // Read by /ops/systems/blocks and /ops/systems/[slug]. Guarded by __tests__/blocks.test.ts (numbers, paths, coverage,
 // importers ⊆ usedBy). Rules:
 //  - usedBy = the systems written here (also users the import scan cannot see: HTTP calls, browser scripts) + every system
-//    that imports the block through "@/", from block-usage.generated.json. That file is never hand-edited: `npm run blocks:usage`.
+//    that imports the block through "@/", from block-usage.generated.json. That file is never hand-edited: GitHub refreshes it
+//    after every push (block-usage-refresh.yml); `npm run blocks:usage` does the same locally.
+//  - A block is a capability you would decide to put in a system (生圖, 去背, QR Code, 登入). A small helper every system just
+//    needs (paging, auto refresh, timing-safe compare) is not one: it goes in registry shared_paths = 共用小工具.
 //  - `no` is permanent: never renumber, never reuse; a retired block keeps its number. New block = next free number.
 //  - One capability = one block: its UI panel and its API/function are both in `entry`; `covers` lists the code ids
 //    (register() id, panel/<file>) it absorbs so the coverage test can find them.
 //  - Paths are relative to apps/next-admin; "repo:" = repo root (absent on the host; checked locally / CI).
-import importers from "./block-usage.generated.json";
+import scan from "./block-usage.generated.json";
 
 export const TIERS = [
   { key: "block", prefix: "B", name: "功能積木", hint: "可在不同系統間共用的一個能力；前端面板與後端 API 算同一顆。" },
@@ -72,17 +75,29 @@ const retired = (no: string, id: string, name: string, purpose: string): LegoBlo
 const pageNotBlock = (no: string, name: string, page: string, system: string): LegoBlock =>
   block({ no, layer: "ui", name, status: ["retired"], purpose: "整頁工作台，只屬一個系統。", entry: [], usedBy: [system],
     note: `2026-11-26 移出目錄：${page} 是該系統自己的頁面，不能拿去組裝別的系統（頁面照常運作）` });
+/** 2026-11-26 operator: a small helper is not a block. Number kept (retired), files now registry shared_paths. */
+const sharedTool = (no: string, layer: BlockLayer, name: string, purpose: string, paths: string[]): LegoBlock =>
+  block({ no, layer, name, status: ["retired"], purpose, entry: [], usedBy: [],
+    note: `2026-11-26 改為共用小工具（不算積木）：${paths.join("、")}` });
 const planned = (no: string, layer: BlockLayer, name: string, purpose: string, usedBy: string[]): LegoBlock =>
   block({ no, layer, name, status: ["planned"], purpose, entry: [], usedBy });
 const productModule = (no: string, id: string, name: string, purpose: string, usedBy: string[], more: string[] = []): LegoBlock =>
   ({ no, tier: "module", name, status: ["module"], purpose, entry: [`lib/${id}/MODULE_MANIFEST.json`, `lib/${id}/`, ...more], covers: [`module/${id}`], usedBy });
 const COS = "repo:Projects/internal/cognitive-engineering-os/ai_lego/modules/";
-const method = (no: string, family: string, name: string, count: number, purpose: string): LegoBlock =>
-  ({ no, tier: "method", name, status: ["registered"], purpose, entry: [`${COS}${family}/`], covers: [`cognitive/${family}`], usedBy: ["cognitive-os"], count });
+/** count = .py methods in the family folder, from the scan (block-usage.generated.json), never hand-written. */
+const method = (no: string, family: string, name: string, purpose: string): LegoBlock =>
+  ({ no, tier: "method", name, status: ["registered"], purpose, entry: [`${COS}${family}/`], covers: [`cognitive/${family}`], usedBy: ["cognitive-os"],
+    count: (scan.methodCounts as Record<string, number>)[family] });
+
+export interface ScanRow { path: string; systems: string[] }
+export type PendingRow = ScanRow & { kind: "shared" | "uncovered" | "dead" };
+/** 共用小工具 (registry shared_paths) and 待處理 (lib/systems/block-usage.ts PendingKind), from the last scan. */
+export const SHARED_TOOLS: ScanRow[] = scan.shared;
+export const PENDING: PendingRow[] = scan.pending as PendingRow[];
 
 /** Adds the import-derived systems to each written usedBy (no duplicates, written order first). */
 const withImporters = (list: LegoBlock[]): LegoBlock[] => {
-  const found = importers as Record<string, string[]>;
+  const found = scan.usedBy as Record<string, string[]>;
   return list.map((b) => (found[b.no] ? { ...b, usedBy: [...new Set([...b.usedBy, ...found[b.no]])] } : b));
 };
 
@@ -236,7 +251,7 @@ export const LEGO_BLOCKS: LegoBlock[] = withImporters([
 
   // ── 共用底座與營運（跨系統組裝最多的積木） ──
   block({ no: "B-066", layer: "platform", name: "AI 呼叫閘道與記帳", status: ["toolkit"], purpose: "所有 AI 呼叫走同一個閘道：選供應商、估成本、記每一次呼叫；OpenAI／Gemini／Claude／Replicate 共用參數與輪詢。",
-    entry: ["lib/ai/gateway.ts", "lib/ai/log-ai-call.ts", "lib/ai/cost-calculator.ts", "lib/ai/openai-text.ts", "lib/ai/gemini-models.ts", "lib/ai/claude-params.ts", "lib/ai/cheap-json.ts", "lib/ai/replicate-poll.ts", "lib/ai/replicate-output.ts", "lib/ai/model-comparison.ts"], deps: ["各家 AI 金鑰"], usedBy: ["app-platform", "ops-console", "content", "outbound-os", "video", "tarot", "repair-center", "cs", "provisioning", "social", "studio"] }),
+    entry: ["lib/ai/gateway.ts", "lib/ai/log-ai-call.ts", "lib/ai/cost-calculator.ts", "lib/ai/openai-text.ts", "lib/ai/gemini-models.ts", "lib/ai/claude-params.ts", "lib/ai/cheap-json.ts", "lib/ai/replicate-poll.ts", "lib/ai/replicate-output.ts", "lib/ai/model-comparison.ts"], deps: ["各家 AI 金鑰"], usedBy: ["app-platform", "ops-console", "content", "outbound-os", "video", "tarot", "repair-center", "cs", "provisioning", "social", "studio", "design"] }),
   block({ no: "B-067", layer: "ops", name: "AI 花費報表與匯率", status: ["toolkit"], purpose: "把 AI 花費依工具、供應商、客戶彙整，換算成新台幣。",
     entry: ["lib/ai/spend-report.ts", "lib/ai/spend-loader.ts", "lib/ai/fx-cbc.ts"], usedBy: ["app-platform", "ops-console", "commerce", "content"] }),
   block({ no: "B-068", layer: "ops", name: "事故收件匣與通知", status: ["toolkit"], purpose: "任何系統把事故丟進同一個收件匣：驗 token、去重、分類、遮蔽密鑰，再發 Telegram 通知。",
@@ -259,20 +274,16 @@ export const LEGO_BLOCKS: LegoBlock[] = withImporters([
     entry: ["lib/accounts/"], usedBy: ["commerce", "ops-console", "social", "staff-access", "app-platform"] }),
   block({ no: "B-077", layer: "platform", name: "員工角色與工具權限", status: ["toolkit"], purpose: "擁有者／管理員／操作員／檢視者的判斷，以及每位員工能用哪些工具。",
     entry: ["lib/ops-role.ts", "lib/staff-access.ts", "lib/ops-contracts.ts"], usedBy: ["staff-access", "ops-console", "app-platform", "commerce", "repair-center", "schedules", "design", "content", "tarot", "cognitive-os", "provisioning", "cs", "outbound-os", "social", "video", "studio", "systems-control-center"] }),
-  block({ no: "B-078", layer: "platform", name: "安全基本件", status: ["toolkit"], purpose: "定時比對（防時序攻擊）、對外頁面 SRI、密鑰保管庫讀取。",
-    entry: ["lib/security/", "lib/secret-vault.ts"], usedBy: ["app-platform", "commerce", "ai-subscription-channel", "cognitive-os", "collect", "cs", "content", "outbound-os", "schedules", "social", "tarot", "video", "ops-console", "provisioning", "repair-center", "studio", "systems-control-center"] }),
+  sharedTool("B-078", "platform", "安全基本件", "定時比對（防時序攻擊）、對外頁面 SRI、密鑰保管庫讀取。", ["lib/security/", "lib/secret-vault.ts"]),
   block({ no: "B-079", layer: "platform", name: "租戶隔離", status: ["toolkit"], purpose: "每個請求只能碰自己組織的資料。",
-    entry: ["lib/tenant-guard.ts"], usedBy: ["app-platform", "ops-console", "repair-center", "content", "provisioning", "staff-access", "outbound-os", "social", "video", "tarot", "commerce"] }),
+    entry: ["lib/tenant-guard.ts"], usedBy: ["app-platform", "ops-console", "repair-center", "content", "provisioning", "staff-access", "outbound-os", "social", "video", "tarot", "commerce", "design"] }),
   block({ no: "B-080", layer: "ops", name: "營運稽核紀錄", status: ["toolkit"], purpose: "誰在什麼時候做了什麼營運動作。",
     entry: ["lib/ops-audit.ts"], usedBy: ["ops-console", "schedules", "cs", "commerce"] }),
-  block({ no: "B-081", layer: "platform", name: "研究資料橋接", status: ["toolkit"], purpose: "研究資料在資料蒐集器、認知工程 OS、後台之間傳遞。",
-    entry: ["lib/research-bridges.ts"], usedBy: ["collect", "ops-console", "cognitive-os"] }),
+  sharedTool("B-081", "platform", "研究資料橋接", "研究資料在資料蒐集器、認知工程 OS、後台之間傳遞。", ["lib/research-bridges.ts"]),
   block({ no: "B-082", layer: "platform", name: "登入與身分", status: ["toolkit"], purpose: "登入工作階段、門的登入連結、登入成功處理。",
     entry: ["lib/auth/", "lib/supabase/", "app/LoginSucceeded.tsx"], deps: ["Supabase Auth"], usedBy: ["app-platform", "commerce"] }),
-  block({ no: "B-083", layer: "ops", name: "使用分析", status: ["toolkit"], purpose: "頁面與動作事件送 PostHog。",
-    entry: ["lib/analytics.ts"], deps: ["PostHog"], usedBy: ["app-platform", "ops-console"] }),
-  block({ no: "B-084", layer: "ui", name: "自動重整", status: ["toolkit"], purpose: "營運頁面定時自動重新整理。",
-    entry: ["app/AutoRefresh.tsx"], usedBy: ["ops-console", "repair-center"] }),
+  sharedTool("B-083", "ops", "使用分析", "頁面與動作事件送 PostHog。", ["lib/analytics.ts"]),
+  sharedTool("B-084", "ui", "自動重整", "營運頁面定時自動重新整理。", ["app/AutoRefresh.tsx"]),
   block({ no: "B-085", layer: "ops", name: "備份涵蓋檢查", status: ["toolkit"], purpose: "檢查每個站與資料庫都有備份。",
     entry: ["lib/backup/"], usedBy: ["host-infra", "schedules"] }),
   block({ no: "B-086", layer: "ops", name: "建站流程", status: ["toolkit"], purpose: "一鍵建站的步驟引擎、MainWP 連線與頁面模型。",
@@ -281,8 +292,7 @@ export const LEGO_BLOCKS: LegoBlock[] = withImporters([
     entry: ["lib/events/"], deps: ["Calendarific"], usedBy: ["content", "studio"] }),
   block({ no: "B-088", layer: "platform", name: "寄信與 CRM", status: ["toolkit"], purpose: "Resend 寄信、FluentCRM 聯絡人與電子報。",
     entry: ["lib/mail/", "lib/crm/"], deps: ["Resend", "FluentCRM"], usedBy: ["app-platform", "ops-console", "content", "outbound-os", "commerce", "schedules", "social"] }),
-  block({ no: "B-089", layer: "platform", name: "資料庫分頁讀取", status: ["toolkit"], purpose: "Supabase 大量資料分頁讀完。",
-    entry: ["lib/supabase-paging.ts"], usedBy: ["app-platform", "commerce", "social"] }),
+  sharedTool("B-089", "platform", "資料庫分頁讀取", "Supabase 大量資料分頁讀完。", ["lib/supabase-paging.ts"]),
   block({ no: "B-090", layer: "image", name: "轉場效果庫", status: ["toolkit", "ui"], purpose: "唯一的轉場清單、讀法與選擇器；影片剪輯、片頭片尾、自動影片、網站設定共用。",
     entry: ["public/editor-shared/transitions.js", "components/tools/TransitionButtons.tsx"], usedBy: ["content", "video"] }),
 
@@ -300,36 +310,36 @@ export const LEGO_BLOCKS: LegoBlock[] = withImporters([
   productModule("M-11", "cognitive", "認知工程", "認知方法、研究資料與專案組合平台（獨立資料庫）。", ["cognitive-os", "ops-console", "collect", "commerce"], ["lib/cognitive-os/"]),
 
   // ── 認知方法族 ──
-  method("C-01", "architecture", "架構", 10, "ADR、ATAM、DDD、事件風暴、取捨矩陣。"),
-  method("C-02", "art_therapy", "藝術治療", 17, "藝術反思的觀察與詮釋。"),
-  method("C-03", "association", "聯想", 6, "概念聯想與連結。"),
-  method("C-04", "causal", "因果", 10, "因果推論與因果圖。"),
-  method("C-05", "challenge", "挑戰", 10, "反方論證、紅隊。"),
-  method("C-06", "computation", "運算", 1, "運算型分析。"),
-  method("C-07", "database_data", "資料", 10, "資料建模與資料品質。"),
-  method("C-08", "decision", "決策", 14, "多準則決策、決策樹。"),
-  method("C-09", "decomposition", "拆解", 9, "把問題拆成可處理的部分。"),
-  method("C-10", "delivery", "交付", 11, "專案交付與排程。"),
-  method("C-11", "devops_sre", "DevOps／SRE", 13, "可靠性、事故檢討、SLO。"),
-  method("C-12", "divergent", "發散", 16, "腦力激盪與創意發想。"),
-  method("C-13", "epistemic", "知識論", 10, "證據強度與不確定性。"),
-  method("C-14", "evidence", "證據", 1, "證據整理。"),
-  method("C-15", "experiment", "實驗", 11, "實驗設計與 A/B。"),
-  method("C-16", "feasibility", "可行性", 9, "技術與商業可行性。"),
-  method("C-17", "finance", "財務", 1, "財務分析。"),
-  method("C-18", "foresight", "前瞻", 14, "情境規劃與趨勢。"),
-  method("C-19", "framing", "框定", 15, "重新定義問題。"),
-  method("C-20", "insight", "洞察", 9, "從資料找洞察。"),
-  method("C-21", "jurisdiction", "法域", 10, "法規與管轄分析。"),
-  method("C-22", "knowledge", "知識", 2, "知識整理與傳遞。"),
-  method("C-23", "learning", "學習", 11, "學習設計與回顧。"),
-  method("C-24", "representation", "表徵", 11, "圖示化與模型化。"),
-  method("C-25", "research", "研究", 17, "質性編碼、三角驗證、研究報告。"),
-  method("C-26", "root_cause", "根因", 9, "5 Whys、魚骨圖。"),
-  method("C-27", "security", "資安", 10, "威脅建模與資安評估。"),
-  method("C-28", "stakeholders", "利害關係人", 10, "利害關係人地圖與溝通。"),
-  method("C-29", "strategy", "策略", 17, "競爭策略與定位。"),
-  method("C-30", "systems", "系統思考", 12, "回饋迴路與系統動力。"),
+  method("C-01", "architecture", "架構", "ADR、ATAM、DDD、事件風暴、取捨矩陣。"),
+  method("C-02", "art_therapy", "藝術治療", "藝術反思的觀察與詮釋。"),
+  method("C-03", "association", "聯想", "概念聯想與連結。"),
+  method("C-04", "causal", "因果", "因果推論與因果圖。"),
+  method("C-05", "challenge", "挑戰", "反方論證、紅隊。"),
+  method("C-06", "computation", "運算", "運算型分析。"),
+  method("C-07", "database_data", "資料", "資料建模與資料品質。"),
+  method("C-08", "decision", "決策", "多準則決策、決策樹。"),
+  method("C-09", "decomposition", "拆解", "把問題拆成可處理的部分。"),
+  method("C-10", "delivery", "交付", "專案交付與排程。"),
+  method("C-11", "devops_sre", "DevOps／SRE", "可靠性、事故檢討、SLO。"),
+  method("C-12", "divergent", "發散", "腦力激盪與創意發想。"),
+  method("C-13", "epistemic", "知識論", "證據強度與不確定性。"),
+  method("C-14", "evidence", "證據", "證據整理。"),
+  method("C-15", "experiment", "實驗", "實驗設計與 A/B。"),
+  method("C-16", "feasibility", "可行性", "技術與商業可行性。"),
+  method("C-17", "finance", "財務", "財務分析。"),
+  method("C-18", "foresight", "前瞻", "情境規劃與趨勢。"),
+  method("C-19", "framing", "框定", "重新定義問題。"),
+  method("C-20", "insight", "洞察", "從資料找洞察。"),
+  method("C-21", "jurisdiction", "法域", "法規與管轄分析。"),
+  method("C-22", "knowledge", "知識", "知識整理與傳遞。"),
+  method("C-23", "learning", "學習", "學習設計與回顧。"),
+  method("C-24", "representation", "表徵", "圖示化與模型化。"),
+  method("C-25", "research", "研究", "質性編碼、三角驗證、研究報告。"),
+  method("C-26", "root_cause", "根因", "5 Whys、魚骨圖。"),
+  method("C-27", "security", "資安", "威脅建模與資安評估。"),
+  method("C-28", "stakeholders", "利害關係人", "利害關係人地圖與溝通。"),
+  method("C-29", "strategy", "策略", "競爭策略與定位。"),
+  method("C-30", "systems", "系統思考", "回饋迴路與系統動力。"),
 ]);
 
 export const isLive = (b: LegoBlock) => !b.status.includes("planned") && !b.status.includes("retired");

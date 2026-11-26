@@ -22,8 +22,8 @@ const TABS = [
   { key: "measured", label: "實測紀錄" },
 ] as const;
 
-export default async function AiModelGuidePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const { tab } = await searchParams;
+export default async function AiModelGuidePage({ searchParams }: { searchParams: Promise<{ tab?: string; test?: string }> }) {
+  const { tab, test } = await searchParams;
   const active = tab === "image-specs" ? "image-specs" : tab === "measured" ? "measured" : "compare";
   return (
     <>
@@ -43,7 +43,7 @@ export default async function AiModelGuidePage({ searchParams }: { searchParams:
           ))}
         </div>
 
-        {active === "image-specs" ? <ImageModelSpecs /> : active === "measured" ? <MeasuredRuns /> : <>
+        {active === "image-specs" ? <ImageModelSpecs /> : active === "measured" ? <MeasuredRuns test={test} /> : <>
         <div style={{ marginBottom:16 }}>
           <h1 style={{ fontSize:22, margin:"0 0 4px" }}>AI 模型比較</h1>
           <p className="form-hint">
