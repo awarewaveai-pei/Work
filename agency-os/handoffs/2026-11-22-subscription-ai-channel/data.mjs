@@ -98,7 +98,7 @@ export const STEPS = [
   { n: 31, code: 'K30', group: 'B3d', title: '勾「影片」就一定發 YouTube', plain: '你 11-26 決定：勾了影片，就先發 YouTube，拿到連結後直接把 YouTube 播放器放進文章，文章不放影片檔；臉書、IG、Bluesky 附同一支影片。「YouTube」勾選拿掉。影片檔不進 WP。網站沒連 YouTube 就停下來通知修理，連上後按重試接著做。',
     gate: '全套測試通過；部署後下一篇有影片的自動文章：YouTube 先發，文章裡是 YouTube 播放器，WP 媒體庫沒有影片檔。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '433149b71', depends: ['K29'], card: 'briefs/K30-video-always-youtube.md' },
   { n: 32, code: 'K30b', group: 'B3d', title: '題目開始前就檢查每一項權限', plain: 'K30 驗收時發現：題目開始時只檢查一項權限，其他權限要到製作中途才發現不夠，那時前面的錢已經花了。改成開始之前把會用到的每一項都檢查過，缺的話就不開始、不花錢，並寫明缺哪一項。排程自動開始的題目也一樣。',
-    gate: '全套測試通過；缺權限的題目在開始前就停下來，什麼都沒花。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K30'], card: 'briefs/K30b-start-checks-every-feature.md' },
+    gate: '全套測試通過；缺權限的題目在開始前就停下來，什麼都沒花。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'f3b3c621a', depends: ['K30'], card: 'briefs/K30b-start-checks-every-feature.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
@@ -274,5 +274,10 @@ export const RISKS = [
     { card: 'K30', risk: '單位沒開社群改寫權限時，只勾影片的題目會在製作時才失敗。', act: '要處理：開卡 K30b，開始之前把會用到的每一項權限都檢查過，缺的話不開始、不花錢。排程自動開始的題目也一樣。部署前併入。' },
     { card: 'K30', risk: 'AI 規劃題目時，可能替沒連 YouTube 的網站提出影片題目。', act: '不用處理：查過 AwareWave 和 Soulful 都已連上 YouTube。以後有網站沒連，題目會被退回並發通知，什麼都不花，這正是你要的「通知修理」。' },
     { card: 'K30', risk: '題目頁只拿掉一顆按鈕、改了一個標籤，工人沒有親眼看過畫面。', act: '監工讀過畫面改動：只拿掉「YouTube」那顆按鈕，「影片已嵌入」改成「影片已附上」，沒有其他改動。上線後再實際看一眼題目頁。' },
+  ] },
+  { batch: 'K30b（開始前檢查每一項權限）驗收', rows: [
+    { card: 'K30b', risk: '正式站現在的權限是「只記錄、不擋」模式，員工按按鈕或排程跑時檢查一律放行。', act: '不處理：這是全系統的權限模式，不是這張卡的事。製作時的判斷也一樣放行，兩邊一致。哪天改成真的擋，這個檢查就會在開始前擋下。' },
+    { card: 'K30b', risk: '「只記錄、不擋」模式下權限不足時，每個題目多一筆「本來會擋」的稽核紀錄。', act: '不處理：這不是使用量，也不扣錢，正好讓人看得到哪些題目缺權限。' },
+    { card: 'K30b', risk: '查權限的資料庫一時讀不到時，原本會被當成缺權限，把題目退回。', act: '工人已修：讀不到就當成出錯，按鈕回錯誤，排程下一輪重試，題目狀態不動。' },
   ] },
 ];
