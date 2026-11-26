@@ -7,7 +7,7 @@ import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
 import { BANNER_RETURN_TOOL, applyBannerCanvasReturn } from "./banner-canvas-return";
 import {
   DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, badgeShadowOf, buildBannerPsd, buildBannerSvg, loadImage, rasterize, renderBannerLayers,
-  type Pixels, type ShadowSpec,
+  type ElemBox, type ElemKey, type ElemPositions, type Pixels, type ShadowSpec,
 } from "./banner-layers";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel, type AspectRatio } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
@@ -236,6 +236,7 @@ interface State {
   bodyLetterSpacing:  number;   // px (letterSpacing = the title's)
   kinsoku:            boolean;  // 避頭尾
   cjkSpacing:         boolean;  // 中英間距
+  positions:          ElemPositions; // C4: elements dragged on the preview (box centre / canvas); {} = automatic layout
   // export
   saving:    boolean;
   saved:     boolean;
@@ -320,6 +321,7 @@ const INIT: State = {
   bodyLetterSpacing:  0,
   kinsoku:            true,
   cjkSpacing:         true,
+  positions:          {},
   saving:    false,
   saved:     false,
   error:     null,
@@ -481,6 +483,20 @@ function openerPlaceholders(key: string, s: Pick<State, "headline" | "subtext">)
 // ---------------------------------------------------------------------------
 
 const bannerLayers = (state: State) => renderBannerLayers(state, PRESETS[state.preset]);
+/** The preview: the flat PNG plus where each element landed (hit-testing for dragging). */
+async function renderPreview(state: State): Promise<{ url: string; boxes: Partial<Record<ElemKey, ElemBox>> }> {
+  const doc = await renderBannerLayers(state, PRESETS[state.preset], { flat: true });
+  return { url: doc.layers[0].canvas.toDataURL("image/png"), boxes: doc.boxes };
+}
+/** Topmost first: what a click on the preview grabs. */
+const HIT_ORDER: readonly ElemKey[] = ["badge", "cta", "trust", "price", "subtext", "headline", "product"];
+/** Snap lines (shares of the canvas): centre and thirds. */
+const SNAP_AT = [1 / 3, 0.5, 2 / 3];
+const SNAP_DIST = 0.015;
+const snap = (v: number) => {
+  const hit = SNAP_AT.find((a) => Math.abs(v - a) < SNAP_DIST);
+  return hit === undefined ? { v, line: null } : { v: hit, line: hit };
+};
 const flatCanvas = async (state: State) => (await renderBannerLayers(state, PRESETS[state.preset], { flat: true })).layers[0].canvas;
 
 async function exportToPng(state: State): Promise<string> {
@@ -775,6 +791,11 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   sRef.current = s;
   // dragging the background picture on the preview (pointer start + the offsets then); while set the preview renders at once
   const bgDragRef = useRef<{ x: number; y: number; bx: number; by: number; w: number; h: number } | null>(null);
+  // C4: an element being dragged (pointer start, its centre then as a canvas share, the preview's on-screen size)
+  const elemDragRef = useRef<{ key: ElemKey; x: number; y: number; cx: number; cy: number; w: number; h: number } | null>(null);
+  const [previewBoxes, setPreviewBoxes] = useState<Partial<Record<ElemKey, ElemBox>>>({});
+  const [guides, setGuides] = useState<{ key: ElemKey; v: number | null; h: number | null } | null>(null);
+  const [hoverHit, setHoverHit] = useState<ElemKey | null>(null);
   const previewImgRef = useRef<HTMLImageElement>(null);
   useCanvasReturn(BANNER_RETURN_TOOL, (slot, image) => {
     if (!applyBannerCanvasReturn(sRef.current, slot, image)) return false;
@@ -827,8 +848,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(() => {
-      exportToPng(s).then((url) => { if (!cancelled) setPreviewUrl(url); }).catch(() => { /* mid-edit, ignore */ });
-    }, bgDragRef.current ? 16 : 220);
+      renderPreview(s).then(({ url, boxes }) => { if (!cancelled) { setPreviewUrl(url); setPreviewBoxes(boxes); } }).catch(() => { /* mid-edit, ignore */ });
+    }, bgDragRef.current || elemDragRef.current ? 16 : 220);
     return () => { cancelled = true; clearTimeout(t); };
   }, [s, fontEpoch]);
 
@@ -1187,6 +1208,14 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     return () => el.removeEventListener("wheel", onWheel);
   }, [bgMovable, previewUrl]);
   const clampOff = (v: number) => Math.max(-1.5, Math.min(1.5, v));
+  /** The element under a point of the preview (canvas pixels), topmost first. */
+  const hitAt = (e: React.PointerEvent<HTMLImageElement>): ElemKey | null => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * p.w, y = ((e.clientY - r.top) / r.height) * p.h;
+    return HIT_ORDER.find((k) => { const b = previewBoxes[k]; return !!b && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h; }) ?? null;
+  };
+  const endDrag = () => { bgDragRef.current = null; elemDragRef.current = null; setGuides(null); };
+  const hasPositions = Object.keys(s.positions).length > 0;
 
   const bgCanvasButton = s.bgImage && canvasHref ? (
     <button className="btn btn-ghost" style={{ fontSize: 12, marginLeft: 6 }} data-testid="banner-bg-canvas"
@@ -2113,6 +2142,10 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   disabled={!canUndo} onClick={undo} title="復原">↩ 復原</button>
                 <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }}
                   disabled={!canRedo} onClick={redo} title="重做">↪ 重做</button>
+                {hasPositions && (
+                  <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }} data-testid="banner-auto-layout"
+                    onClick={() => setS((prev) => ({ ...prev, positions: {}, saved: false, error: null }))}>回到自動排版</button>
+                )}
               </div>
             </div>
             <div style={{
@@ -2128,21 +2161,61 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={previewUrl} alt="banner preview" ref={previewImgRef} draggable={false} data-testid="banner-preview"
                   onPointerDown={(e) => {
-                    if (!bgMovable || e.button !== 0) return;
+                    if (e.button !== 0) return;
                     const r = e.currentTarget.getBoundingClientRect();
+                    const key = hitAt(e);
+                    if (key) {
+                      // an element: drag it (its box centre, snapping to the centre / thirds lines)
+                      const b = previewBoxes[key]!;
+                      elemDragRef.current = { key, x: e.clientX, y: e.clientY, cx: (b.x + b.w / 2) / p.w, cy: (b.y + b.h / 2) / p.h, w: r.width, h: r.height };
+                      setGuides({ key, v: null, h: null });
+                    } else if (bgMovable) {
+                      bgDragRef.current = { x: e.clientX, y: e.clientY, bx: s.bgImgX, by: s.bgImgY, w: r.width, h: r.height };
+                    } else return;
                     e.currentTarget.setPointerCapture(e.pointerId);
-                    bgDragRef.current = { x: e.clientX, y: e.clientY, bx: s.bgImgX, by: s.bgImgY, w: r.width, h: r.height };
                     e.preventDefault();
                   }}
                   onPointerMove={(e) => {
+                    const el = elemDragRef.current;
+                    if (el) {
+                      const x = snap(Math.max(0, Math.min(1, el.cx + (e.clientX - el.x) / el.w)));
+                      const y = snap(Math.max(0, Math.min(1, el.cy + (e.clientY - el.y) / el.h)));
+                      setGuides({ key: el.key, v: x.line, h: y.line });
+                      setS((prev) => ({ ...prev, positions: { ...prev.positions, [el.key]: { x: x.v, y: y.v } }, saved: false, error: null }));
+                      return;
+                    }
                     const d = bgDragRef.current;
-                    if (!d) return;
+                    if (!d) { setHoverHit(hitAt(e)); return; }
                     setS((prev) => ({ ...prev, bgImgX: clampOff(d.bx + (e.clientX - d.x) / d.w), bgImgY: clampOff(d.by + (e.clientY - d.y) / d.h), saved: false, error: null }));
                   }}
-                  onPointerUp={() => { bgDragRef.current = null; }}
-                  onPointerCancel={() => { bgDragRef.current = null; }}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                  onPointerLeave={() => setHoverHit(null)}
                   style={{ display: "block", maxWidth: "100%", maxHeight: "calc(100vh - 230px)", width: "auto", height: "auto",
-                    cursor: bgMovable ? "grab" : undefined, touchAction: bgMovable ? "none" : undefined }} />
+                    cursor: hoverHit || guides ? "move" : bgMovable ? "grab" : undefined, touchAction: "none" }} />
+              )}
+              {previewUrl && guides && (
+                // C4 drag guides: a 10% grid, the thirds, the centre; the line the element snapped to and its box highlighted
+                <svg viewBox={`0 0 ${p.w} ${p.h}`} preserveAspectRatio="none" data-testid="banner-drag-guides"
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+                  {Array.from({ length: 9 }, (_, i) => (i + 1) / 10).map((f) => (
+                    <g key={f} stroke="rgba(255,255,255,0.18)" strokeWidth={p.w / 900}>
+                      <line x1={f * p.w} y1={0} x2={f * p.w} y2={p.h} /><line x1={0} y1={f * p.h} x2={p.w} y2={f * p.h} />
+                    </g>
+                  ))}
+                  {SNAP_AT.map((f) => (
+                    <g key={`s${f}`} stroke="rgba(255,255,255,0.5)" strokeWidth={p.w / 600} strokeDasharray={`${p.w / 120} ${p.w / 160}`}>
+                      <line x1={f * p.w} y1={0} x2={f * p.w} y2={p.h} /><line x1={0} y1={f * p.h} x2={p.w} y2={f * p.h} />
+                    </g>
+                  ))}
+                  <g stroke="var(--accent)" strokeWidth={p.w / 300}>
+                    {guides.v !== null && <line x1={guides.v * p.w} y1={0} x2={guides.v * p.w} y2={p.h} />}
+                    {guides.h !== null && <line x1={0} y1={guides.h * p.h} x2={p.w} y2={guides.h * p.h} />}
+                  </g>
+                  {previewBoxes[guides.key] && (() => { const b = previewBoxes[guides.key]!; return (
+                    <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke="var(--accent)" strokeWidth={p.w / 500} />
+                  ); })()}
+                </svg>
               )}
               {(s.generating || s.productRemoving || s.designing) && (
                 <div style={{

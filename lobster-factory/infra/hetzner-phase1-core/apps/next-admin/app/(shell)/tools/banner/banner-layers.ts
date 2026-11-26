@@ -28,7 +28,16 @@ export interface BannerFields {
   /** C3 typography: weights (300/400/500/700/900), line height (x font size), body tracking (px), 避頭尾, 中英間距. */
   headlineWeight: number; bodyWeight: number; headlineLineHeight: number; bodyLineHeight: number; bodyLetterSpacing: number;
   kinsoku: boolean; cjkSpacing: boolean;
+  /** C4: an element dragged on the preview -> its box centre as a share of the canvas; absent = the automatic layout. */
+  positions?: ElemPositions;
 }
+
+/** The elements that can be dragged (each moves with all of its layers). */
+export const ELEM_KEYS = ["headline", "subtext", "price", "cta", "trust", "product", "badge"] as const;
+export type ElemKey = (typeof ELEM_KEYS)[number];
+export type ElemPositions = Partial<Record<ElemKey, { x: number; y: number }>>;
+/** An element's drawn box in canvas pixels. */
+export interface ElemBox { x: number; y: number; w: number; h: number }
 
 // ── CJK typesetting ──
 /** May not start a line (closing punctuation) / may not end one (opening brackets). */
@@ -124,7 +133,7 @@ export interface TextSpec {
 }
 /** `shadow`: drawn by whoever stacks the layer (composite, PSD effect, SVG filter) -- not in the layer's pixels. */
 export interface BannerLayer { name: string; canvas: HTMLCanvasElement; text?: TextSpec; shadow?: LayerShadow }
-export interface BannerLayers { w: number; h: number; layers: BannerLayer[] }
+export interface BannerLayers { w: number; h: number; layers: BannerLayer[]; boxes: Partial<Record<ElemKey, ElemBox>> }
 
 /** Canvas family (first name in the CSS list) -> the family the pro editors ship (scripts/vectorcraft-pro/web-fonts.patch).
  *  楷書 (LXGW WenKai TC) and 圓體 (Huninn / jf-openhuninn) are not in the editors' list -> Noto Sans TC. */
@@ -300,6 +309,9 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     flat.restore(); flat.save(); applyShadow(flat, pending.sh); flat.drawImage(pending.cv, 0, 0);
     pending = null;
   };
+  // C4: the offset of the element being drawn (dragged on the preview); every layer made while it is set is translated.
+  let shift = { dx: 0, dy: 0 };
+  const moved = (c: CanvasRenderingContext2D) => { if (shift.dx || shift.dy) c.translate(shift.dx, shift.dy); return c; };
   // `whole`: the shadow is the shadow of the finished layer (text: glyphs + their outline glow), not of each draw call.
   const layer = (name: string, text?: TextSpec, shadow?: LayerShadow, whole = false): CanvasRenderingContext2D => {
     flush();
@@ -309,15 +321,29 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       // restore() + save() = a fresh default state for this use (the scratch was saved once when made)
       c.restore(); c.save(); c.clearRect(0, 0, p.w, p.h);
       pending = { cv, sh: shadow };
-      return c;
+      return moved(c);
     }
-    if (flat) { flat.restore(); flat.save(); applyShadow(flat, shadow); return flat; }
+    if (flat) { flat.restore(); flat.save(); applyShadow(flat, shadow); return moved(flat); }
     const cv = newCanvas(p.w, p.h);
     const c = cv.getContext("2d");
     if (!c) throw new Error("canvas_unavailable");
     layers.push({ name, canvas: cv, ...(text ? { text } : {}), ...(shadow && !opts.flat ? { shadow } : {}) });
     if (opts.flat) { flat = c; c.save(); applyShadow(c, shadow); }
-    return c;
+    return moved(c);
+  };
+  // Where a dragged element goes: its box centre at the stored share of the canvas, then kept inside the canvas (a box
+  // larger than the canvas is centred). Records the drawn box of every element, dragged or not (preview hit-testing).
+  const boxes: Partial<Record<ElemKey, ElemBox>> = {};
+  const place = (key: ElemKey, r: ElemBox): { dx: number; dy: number } => {
+    const want = state.positions?.[key];
+    let dx = 0, dy = 0;
+    if (want) {
+      const fit = (pos: number, size: number, room: number) => (size >= room ? (room - size) / 2 : Math.max(0, Math.min(room - size, pos)));
+      dx = fit(want.x * p.w - r.w / 2, r.w, p.w) - r.x;
+      dy = fit(want.y * p.h - r.h / 2, r.h, p.h) - r.y;
+    }
+    boxes[key] = { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h };
+    return { dx, dy };
   };
   const px = (sp: ShadowSpec | null | undefined, unit: number): LayerShadow | undefined =>
     sp && sp.on ? { color: sp.color, opacity: sp.opacity, blur: sp.blur * unit, x: sp.x * unit, y: sp.y * unit } : undefined;
@@ -384,7 +410,9 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       case "bottom-right": x = p.w - sw - pad;   y = p.h - sh - pad;  break;
       default:             x = (p.w - sw) / 2;   y = (p.h - sh) / 2;
     }
+    shift = place("product", { x, y, w: sw, h: sh });
     layer("商品圖").drawImage(img, x, y, sw, sh);
+    shift = { dx: 0, dy: 0 };
   }
 
   // ── unified content stack: headline → subtext → price → CTA → trust ──
@@ -399,9 +427,13 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
   const hW = state.headlineWeight || 700, bW = state.bodyWeight || 400;
   const spec = (cssFamily: string, weight: number, sz: number, lines: TextRun[][], al: TextSpec["align"], x: number, y: number,
     extra: Partial<TextSpec> = {}): TextSpec =>
-    ({ lines, cssFamily, editorFont: editorFont(cssFamily), weight, size: sz, align: al, x, y, lineHeight: sz * 1.2, letterSpacing: 0, opacity: 1, ...extra });
+    shifted({ lines, cssFamily, editorFont: editorFont(cssFamily), weight, size: sz, align: al, x, y, lineHeight: sz * 1.2, letterSpacing: 0, opacity: 1, ...extra });
+  function shifted(t: TextSpec): TextSpec {
+    if (!shift.dx && !shift.dy) return t;
+    return { ...t, x: t.x + shift.dx, y: t.y + shift.dy, ...(t.rotate ? { rotate: { ...t.rotate, cx: t.rotate.cx + shift.dx, cy: t.rotate.cy + shift.dy } } : {}) };
+  }
 
-  type Block = { h: number; w: number; draw: (top: number) => void };
+  type Block = { key: ElemKey; h: number; w: number; draw: (top: number) => void };
   const blocks: Block[] = [];
 
   // headline — own font, letter-spacing, accent words (**字**), outlined for legibility
@@ -426,7 +458,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     const below = baselineBelow(mctx, "top", state.headlineSize);
     setLetterSpacing(mctx, 0);
     const plate = (r: AccentRun) => r.accent && state.accentHighlight;
-    blocks.push({
+    blocks.push({ key: "headline",
       h: lines.length * lineH, w,
       draw: (top) => {
         const lineX = (i: number) => align === "left" ? anchorX : align === "right" ? anchorX - lineWs[i] : anchorX - lineWs[i] / 2;
@@ -488,7 +520,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     const w = Math.min(maxWidth, Math.max(1, ...lines.map((l) => mctx.measureText(l).width)));
     setLetterSpacing(mctx, 0);
     const below = baselineBelow(mctx, "top", state.subtextSize);
-    blocks.push({
+    blocks.push({ key: "subtext",
       h: lines.length * lineH, w,
       draw: (top) => {
         const ctx = layer("副標", spec(font, bW, state.subtextSize, lines.map((l) => [{ text: l, color: state.textColor }]),
@@ -519,7 +551,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     const wasW = state.priceWas ? mctx.measureText(state.priceWas).width : 0;
     const gapP = state.priceNow && state.priceWas ? Math.round(nowSize * 0.35) : 0;
     const rowW = nowW + gapP + wasW;
-    blocks.push({
+    blocks.push({ key: "price",
       h: nowSize * 1.1, w: rowW,
       draw: (top) => {
         let x = leftOf(rowW);
@@ -564,7 +596,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     const padY = Math.round(bf * 0.56);
     const bw   = tw + padX * 2;
     const bh   = bf + padY * 2;
-    blocks.push({
+    blocks.push({ key: "cta",
       h: bh, w: bw,
       draw: (top) => {
         const left = leftOf(bw);
@@ -599,7 +631,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     const labW  = label ? mctx.measureText(label).width : 0;
     const gapT  = starsStr && label ? Math.round(tSize * 0.45) : 0;
     const rowW  = starW + gapT + labW;
-    blocks.push({
+    blocks.push({ key: "trust",
       h: tSize * 1.1, w: rowW,
       draw: (top) => {
         let x = leftOf(rowW);
@@ -624,16 +656,34 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     : state.textPos === "bottom" ? p.h - padding - stackH
     : (p.h - stackH) / 2;
   stackTop = Math.max(padding, stackTop);
+  // each block keeps its slot in the automatic stack (dragging one never moves the others) and is offset from there
+  let slotY = stackTop;
+  const placed = blocks.map((b) => {
+    const top = slotY;
+    slotY += b.h + gapV;
+    return { b, top, off: place(b.key, { x: leftOf(b.w), y: top, w: b.w, h: b.h }) };
+  });
+  // The stack's box (scrim, brand bar): the automatic one; once something was dragged out, the union of the blocks still
+  // in the stack (a dragged block leaves the stack and its backing behind); none left = no scrim / bar.
+  let stackBox: ElemBox | null = blocks.length
+    ? { x: leftOf(Math.max(...blocks.map((b) => b.w))), y: stackTop, w: Math.max(...blocks.map((b) => b.w)), h: stackH } : null;
+  if (placed.some((q) => state.positions?.[q.b.key])) {
+    const bs = placed.filter((q) => !state.positions?.[q.b.key]).map((q) => boxes[q.b.key]!);
+    if (!bs.length) stackBox = null;
+    else {
+      const l = Math.min(...bs.map((b) => b.x)), t = Math.min(...bs.map((b) => b.y));
+      stackBox = { x: l, y: t, w: Math.max(...bs.map((b) => b.x + b.w)) - l, h: Math.max(...bs.map((b) => b.y + b.h)) - t };
+    }
+  }
 
   // localized scrim behind the stack (cleaner than dimming the whole image)
-  if (state.textScrim && blocks.length) {
-    const maxW = Math.max(...blocks.map((b) => b.w));
+  if (state.textScrim && stackBox) {
     const sPadX = Math.round(state.subtextSize * 0.95);
     const sPadY = Math.round(state.subtextSize * 0.75);
-    const sx = Math.max(0, leftOf(maxW) - sPadX);
-    const sw = Math.min(p.w - sx, maxW + sPadX * 2);
-    const sy = Math.max(0, stackTop - sPadY);
-    const sh = Math.min(p.h - sy, stackH + sPadY * 2);
+    const sx = Math.max(0, stackBox.x - sPadX);
+    const sw = Math.min(p.w - sx, stackBox.w + sPadX * 2);
+    const sy = Math.max(0, stackBox.y - sPadY);
+    const sh = Math.min(p.h - sy, stackBox.h + sPadY * 2);
     const ctx = layer("文字底襯");
     ctx.fillStyle = `rgba(0,0,0,${state.textScrimOpacity})`;
     roundRectPath(ctx, sx, sy, sw, sh, Math.round(state.subtextSize * 0.6));
@@ -641,17 +691,16 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
   }
 
   // card R3: the brand colour bar beside a left-aligned stack, the stack's height, in the left margin
-  if (state.brandBar && blocks.length && align === "left") {
+  if (state.brandBar && stackBox && align === "left") {
     const barW = Math.max(6, Math.round(state.headlineSize * 0.12));
     const ctx = layer("品牌色條");
     ctx.fillStyle = state.accentColor;
-    roundRectPath(ctx, Math.round(padding * 0.55), stackTop, barW, stackH, barW / 2);
+    roundRectPath(ctx, Math.round(padding * 0.55), stackBox.y, barW, stackBox.h, barW / 2);
     ctx.fill();
   }
 
   // draw stack top-down
-  let cy = stackTop;
-  for (const b of blocks) { b.draw(cy); cy += b.h + gapV; }
+  for (const q of placed) { shift = q.off; q.b.draw(q.top); shift = { dx: 0, dy: 0 }; }
 
   // corner offer badge (independent of the stack)
   if (state.badgeText) {
@@ -676,6 +725,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       const cxb = onLeft ? margin + r : p.w - margin - r;
       const cyb = margin + r;
       const angle = (onLeft ? -1 : 1) * 0.18;
+      shift = place("badge", { x: cxb - r, y: cyb - r, w: r * 2, h: r * 2 });
       const ctx = layer("角標底", undefined, badgeSh);
       ctx.translate(cxb, cyb);
       ctx.rotate(angle);
@@ -698,6 +748,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       const bw = tw + padX * 2 + notch;
       const x = onLeft ? margin : p.w - margin - bw;
       const y = margin;
+      shift = place("badge", { x, y, w: bw, h: bh });
       const ctx = layer("角標底", undefined, badgeSh);
       ctx.fillStyle = state.badgeColor;
       ctx.beginPath();
@@ -718,6 +769,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       const padX = bf * 0.8, bh = bf * 1.9, bw = tw + padX * 2;
       const x = onLeft ? margin : p.w - margin - bw;
       const y = margin;
+      shift = place("badge", { x, y, w: bw, h: bh });
       const ctx = layer("角標底", undefined, badgeSh);
       roundRectPath(ctx, x, y, bw, bh, bh / 2);
       ctx.fillStyle = state.badgeColor; ctx.fill();
@@ -725,9 +777,10 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     }
   }
 
+  shift = { dx: 0, dy: 0 };
   flush();
   if (flat) (flat as CanvasRenderingContext2D).restore();
-  return { w: p.w, h: p.h, layers };
+  return { w: p.w, h: p.h, layers, boxes };
 }
 
 /** All layers stacked bottom to top on one canvas (source-over, as the old single canvas drew them). */

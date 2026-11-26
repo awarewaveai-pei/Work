@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續10）— 橫幅 C4：標題、副標、價格、按鈕、評價、商品圖、徽章可在預覽上直接拖曳（格線／三分線／置中吸附）
+
+- 根因／決策：版面只能靠「上中下／左中右」與版型，元素無法自由擺放。`NA/app/(shell)/tools/banner/banner-layers.ts`：`positions`（元素外框中心佔畫布比例；沒有＝自動堆疊）→ `place()` 算位移並夾在畫面內（比畫面大則置中），位移以 ctx.translate 套到該元素所有圖層、TextSpec x/y（含旋轉中心）同步移動，所以 PNG／PSD／SVG 位置一致；被拖走的元素保留原堆疊位置不讓其他元素跳動，文字底襯與品牌色條只包住沒拖走的元素；渲染回傳每個元素實際外框 `boxes` 供點選。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`BannerStudio.tsx` 預覽改用 `renderPreview`（PNG＋boxes）；按下先判斷點到哪個元素（徽章>按鈕>評價>價格>副標>標題>商品圖），點到就拖元素，否則拖背景圖；中心靠近 1/3、1/2、2/3 吸附；拖曳中疊 SVG 參考線（10% 格線、三分虛線、吸附線與外框用主題 accent）；滑過元素游標變 move；標題列「回到自動排版」。
+- 驗證：tsc 綠；vitest banner＋accent-not-text 16 passed；瀏覽器 C3(HEAD) vs C4 flat 預設 0/255（2 組），拖過的元素分層 vs flat ≤2/255，外框夾在畫面內、PSD 標題文字座標跟著移；本機實開：拖商品圖到中央、拖徽章到左上、參考線出現（`$env:TEMP/banner-c4-dragged.jpg`、`banner-c4-guides.png`）。
+- 剩餘：預覽用上一張渲染的外框判斷點選（打字後 220ms 內外框是舊的）；手機觸控只做 pointer 拖曳，無雙指縮放。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n（書面自審，監工指示不派背景代理；M=拖走元素後底襯包住全部遠處元素→改只包沒拖走的，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=renderBannerLayers|exportToPng | hits=3
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續8）— 橫幅 C3：中文排版（字重五級、行距字距、避頭尾、中英間距）＋自架 OFL 字型 9 族
 
 - 根因／決策：操作者要專業設計師水準的中文排版。字重只有 bold、行距寫死、無避頭尾、字型只有 5 個且靠外部 CDN／系統字。改：`NA/app/(shell)/tools/banner/banner-layers.ts` 字重（300/400/500/700/900）、標題／內文行距、內文字距、`wrapChars`（換行時量寬：行首禁則字最多懸掛 1 個，第 2 個起連前一字推到下一行；行尾開括號下移；行首尾空格去掉）、`autospace`/`autospaceRuns`（中英數字間補半形空格，重點字邊界空格歸一般字）、`loadDesignFonts`（document.fonts.load 等需要的切片，4 秒逾時）。字型自架 `NA/public/banner-fonts/`（`NA/scripts/fetch-banner-fonts.mjs` 下載 Google Fonts 的 unicode-range 切片＋各族 OFL.txt，先下到暫存目錄成功才換上；黑體／明體可變字重、霞鶩文楷 300/400/700、粉圓、Inter、Montserrat、Playfair Display、Oswald、Bebas Neue，共 29MB，瀏覽器只抓用到的切片）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
