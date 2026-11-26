@@ -1,9 +1,12 @@
 // Card C9: the banner's two AI calls -- the model buttons (a subset of the shared text-model menu, with a per-call NT$
 // estimate) and AI 一鍵設計整張 across several sizes: one call returns the shared words / colours plus one layout per chosen
 // size; designPlan() turns that into the main size's layout and every other size's override. Pure (node-testable).
-import { BANNER_COPY_VARIANTS } from "@/lib/script-forge/modules";
+import { BANNER_COPY_VARIANTS, BANNER_DESIGN_COPY_VARIANTS } from "@/lib/script-forge/modules";
 import { AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
 import { textCallCostUsd, toolCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
+import { applySemantic, dropPositions, semanticElems } from "./banner-layout";
+import type { BannerFields } from "./banner-layers";
+import type { CopyVariant, PresetKey, SizePatch, State } from "./banner-state";
 
 /** The models offered on the banner's AI buttons (operator 2026-11-26). Defaults from the bake-off on production
  *  (ai_call_logs, same brief, 2026-11-26): 一鍵設計 stays Claude Opus 5.5. 生成文案 = Claude Sonnet 5.5 (operator 2026-11-26,
@@ -21,7 +24,9 @@ const COPY_VARIANTS = BANNER_COPY_VARIANTS;
 const COPY_MEASURED_NTD: Record<BannerAiModel, number> = { "claude-opus-5-5": 0.6, "claude-sonnet-5-5": 0.39, "gpt-6.2-sol": 0.1, "claude-haiku-5-5": 0.01 };
 const typicalTokens = (task: "copy" | "design", sizes: number) => {
   const m = task === "design" && sizes > 1 ? sizes : 0; // one call whatever the size count; each size adds a layout
-  return task === "copy" ? { inputTokens: 900, outputTokens: 152 * (sizes || 5) } : { inputTokens: 1350 + 120 * m, outputTokens: 1100 + 250 * m }; // C12: +~350 for the background / palette part
+  // design: C12 +~350 for the background / palette part; R2-C +~200 in / ~65 out per word set (copyVariants)
+  return task === "copy" ? { inputTokens: 900, outputTokens: 152 * (sizes || 5) }
+    : { inputTokens: 1550 + 120 * m, outputTokens: 1100 + 65 * BANNER_DESIGN_COPY_VARIANTS + 250 * m };
 };
 /** About what one call costs, NT$: the measured copy price, scaled for the design call by the cost-table price of its
  *  typical prompt / answer against the copy call's. An estimate on the button, not the bill. */
@@ -74,14 +79,73 @@ export function shapeLayout(size: { w: number; h: number }): LayoutPatch {
 }
 
 /** The AI answer's per-size layouts -> the main size's layout and an override for every other chosen size (a size the
- *  answer left out gets shapeLayout). No chosen sizes = no layouts at all: the single-size design as before. */
+ *  answer left out gets shapeLayout). No chosen sizes = the single-size answer: its top-level intent fields, no overrides. */
 export function designPlan(raw: Record<string, unknown>, main: SizeSpec, chosen: readonly SizeSpec[]): { main: LayoutPatch; overrides: Record<string, LayoutPatch> } {
-  if (!chosen.length) return { main: {}, overrides: {} };
+  if (!chosen.length) return { main: sanitizeLayout(raw), overrides: {} };
   const layouts = raw.layouts && typeof raw.layouts === "object" ? (raw.layouts as Record<string, unknown>) : {};
   const layoutOf = (s: SizeSpec) => { const l = sanitizeLayout(layouts[s.key]); return Object.keys(l).length ? l : shapeLayout(s); };
   const overrides: Record<string, LayoutPatch> = {};
   for (const s of chosen) if (s.key !== main.key) overrides[s.key] = layoutOf(s);
   return { main: layouts[main.key] ? sanitizeLayout(layouts[main.key]) : {}, overrides };
+}
+
+// ── R2-C: the word sets and applying the design ──
+
+/** One word set of AI 一鍵設計 (the 生成文案 list holds headline + subtext only; the other two are then absent). */
+export interface DesignCopy extends CopyVariant { ctaText?: string; badgeText?: string }
+/** Fields the design sets that State gets from R2-B2 (banner-state.ts); harmless once State has them. */
+export type DesignState = State & Pick<BannerFields, "logoPos" | "typeAuto">;
+
+const COPY_MAX = { headline: 60, subtext: 120, ctaText: 30, badgeText: 30 } as const;
+/** The answer's copyVariants: objects with a headline, each field a trimmed string within its length, the same headline
+ *  once, at most BANNER_DESIGN_COPY_VARIANTS. A field the AI left out stays absent (picking the set keeps that word). */
+export function sanitizeCopyVariants(raw: unknown): DesignCopy[] {
+  const out: DesignCopy[] = [];
+  for (const v of Array.isArray(raw) ? raw : []) {
+    if (!v || typeof v !== "object") continue;
+    const o = v as Record<string, unknown>;
+    const str = (k: keyof typeof COPY_MAX) => (typeof o[k] === "string" ? (o[k] as string).trim().slice(0, COPY_MAX[k]) : undefined);
+    const headline = str("headline");
+    if (!headline || out.some((c) => c.headline === headline)) continue;
+    const c: DesignCopy = { headline, subtext: str("subtext") ?? "" };
+    const cta = str("ctaText"), badge = str("badgeText");
+    if (cta !== undefined) c.ctaText = cta;
+    if (badge !== undefined) c.badgeText = badge;
+    out.push(c);
+    if (out.length >= BANNER_DESIGN_COPY_VARIANTS) break;
+  }
+  return out;
+}
+/** The words a set puts on the design (a field it does not carry is left as it is). */
+export function copyWords(c: DesignCopy): Partial<State> {
+  return {
+    headline: c.headline, subtext: c.subtext,
+    ...(c.ctaText !== undefined ? { ctaText: c.ctaText } : {}), ...(c.badgeText !== undefined ? { badgeText: c.badgeText } : {}),
+  };
+}
+/** Whether the design shows exactly this set's words. */
+export const showsCopy = (st: State, c: DesignCopy): boolean =>
+  st.headline === c.headline && st.subtext === c.subtext &&
+  (c.ctaText === undefined || st.ctaText === c.ctaText) && (c.badgeText === undefined || st.badgeText === c.badgeText);
+
+/**
+ * The AI design's layout onto the main design, through applySemantic: every element a position field moves loses its
+ * drag, at the main size and at every tweaked size that inherits the field. Each chosen size's own layout goes onto its
+ * existing tweak the same way (its other tweaks stay). `st` is the main design (not inside a size tweak).
+ */
+export function applyDesignLayout(st: DesignState, main: Partial<DesignState>, overrides: Record<string, LayoutPatch>): DesignState {
+  const next = applySemantic(st, main);
+  const moved = semanticElems(main);
+  type Key = PresetKey;
+  type Tweak = SizePatch & LayoutPatch;
+  const sizeOverrides: Partial<Record<Key, Tweak>> = {};
+  for (const [k, o] of Object.entries(st.sizeOverrides) as [Key, Tweak][]) {
+    // a size that sets the field itself keeps its drags for the elements that field moves
+    const inherits = moved.filter((e) => !semanticElems(o).includes(e));
+    sizeOverrides[k] = o.positions ? { ...o, positions: dropPositions(o.positions, inherits) } : o;
+  }
+  for (const [k, l] of Object.entries(overrides) as [Key, LayoutPatch][]) sizeOverrides[k] = applySemantic<Tweak>(sizeOverrides[k] ?? {}, l);
+  return { ...next, sizeOverrides };
 }
 
 // ── C10: reading the AI's JSON answer ──

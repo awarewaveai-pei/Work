@@ -1,9 +1,11 @@
 "use client";
 import { useRef, useState, type MutableRefObject } from "react";
-import { urlToBlob } from "@/lib/studio/design-upload";
 import BrandKitPanel from "../kit/BrandKitPanel";
 import type { useBrandKit } from "../kit/useBrandKit";
 import type { BrandKit } from "../kit/brand-kit";
+import { brandKitPatch } from "../kit/apply-kit";
+import { applySemantic, type LogoPos } from "../banner-layout";
+import type { DesignState } from "../banner-design";
 import { extractPalette, luminance, saturation, type State } from "../banner-state";
 import type { StepSlot } from "./order";
 import { StepCard, SubHead, type StepCtx } from "./ui";
@@ -17,29 +19,14 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
   const [selSwatch, setSelSwatch] = useState<string | null>(null);
 
   async function applyBrandKit(kit: BrandKit) {
-    const [main, second, accent, text, bg] = kit.colors;
-    let logoImage: string | null = null;
-    if (kit.logo) {
-      try {
-        // the logo lives in the bucket (another origin): fetch it through our download route so the canvas stays readable
-        const blob = await urlToBlob(kit.logo);
-        logoImage = await new Promise<string>((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => fail(r.error); r.readAsDataURL(blob); });
-      } catch (err) {
-        setS((prev) => ({ ...prev, error: `logo 讀取失敗：${err instanceof Error ? err.message : String(err)}` }));
-      }
-    }
-    setS((prev) => ({
-      ...prev,
-      ...(main ? { gradFrom: main, badgeColor: main } : {}),
-      ...(second ? { gradTo: second } : {}),
-      ...(accent ? { accentColor: accent, ctaBg: accent } : {}),
-      ...(text ? { textColor: text } : {}),
-      ...(bg ? { bgColor: bg } : {}),
-      headlineFont: kit.headlineFont, fontFamily: kit.bodyFont, headlineWeight: kit.headlineWeight, bodyWeight: kit.bodyWeight,
-      ...(logoImage ? { logoImage } : {}),
-      saved: false,
-    }));
+    const { patch, logoError } = await brandKitPatch(kit, true);
+    setS((prev) => ({ ...prev, ...patch, saved: false, ...(logoError ? { error: logoError } : {}) }));
   }
+  // a corner button moves the logo there and drops its drag (applySemantic), so the button always shows its effect
+  const logoPos: LogoPos = (s as DesignState).logoPos ?? "bl";
+  const LOGO_CORNERS: { pos: LogoPos; label: string }[] = [
+    { pos: "tl", label: "左上" }, { pos: "tr", label: "右上" }, { pos: "bl", label: "左下" }, { pos: "br", label: "右下" },
+  ];
 
   // ── colour-tool handlers ──
   function handleColorRefUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -99,7 +86,17 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
             onChange={(e) => set("logoScale", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
           <span style={{ fontSize: 12, opacity: 0.7 }}>{Math.round(s.logoScale * 100)}%</span>
           <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => set("logoImage", null)}>拿掉 logo</button>
-          <span className="form-hint" style={{ width: "100%" }}>預設在左下角，可在預覽上拖曳。</span>
+          <div style={{ display: "flex", gap: 4, width: "100%", alignItems: "center" }} data-testid="banner-logo-pos">
+            <span style={{ fontSize: 12, minWidth: 28 }}>位置</span>
+            {LOGO_CORNERS.map((c) => (
+              <button key={c.pos} type="button" className={logoPos === c.pos ? "btn btn-primary" : "btn btn-ghost"}
+                style={{ fontSize: 12, padding: "2px 8px" }} data-testid={`banner-logo-pos-${c.pos}`}
+                onClick={() => setS((prev) => ({ ...applySemantic(prev as DesignState, { logoPos: c.pos }), saved: false }))}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <span className="form-hint" style={{ width: "100%" }}>也可在預覽上拖曳；按位置鈕會回到那個角落。</span>
         </div>
       )}
 

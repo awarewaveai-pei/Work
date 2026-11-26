@@ -1,7 +1,7 @@
 // Card C12 (named tests): contrast maths, the brand-kit palette limit, an uploaded background never replaced, and the
 // order of remedies when contrast is short (another palette colour, then the scrim + outline).
 import { describe, expect, it } from "vitest";
-import { bgStatsFromColors, bgStatsFromPixels, contrastRatio, guardContrast, resolveDesignColors, zoneRatio, type BgInfo, type ColorFields, type TextContent } from "./design-colors";
+import { bgStatsFromColors, bgStatsFromPixels, contrastRatio, guardContrast, resolveDesignColors, zoneRatio, type BgInfo, type ColorFields, type TextContent, type TextPlace } from "./design-colors";
 
 const ALL: TextContent = { subtext: true, priceNow: false, priceWas: false, trust: false };
 
@@ -10,7 +10,8 @@ const base: ColorFields = {
   textColor: "#ffffff", accentColor: "#fbbf24", accentHighlight: false, ctaBg: "#ff5a5f", ctaTextColor: "#ffffff", badgeColor: "#be123c",
   textScrim: false, textScrimOpacity: 0.5, textOutline: true, dimOverlay: false, dimOverlayOpacity: 0.45,
 };
-const center = [{ pos: "center", align: "center" }] as const;
+/** Text drawn in the middle of a 100x100 canvas; no picture grid (a colour background, or a picture not measured). */
+const center: TextPlace[] = [{ w: 100, h: 100, boxes: [{ x: 25, y: 40, w: 50, h: 20 }] }];
 /** A photo measured in the browser: the text band is mid-grey and busy. */
 const photo: BgInfo = { ...bgStatsFromColors("color", "#808080"), mode: "upload", colors: ["#808080", "#d0c0a0", "#202830"] };
 photo.zones.center.center = { lo: 0.1, hi: 0.5, busy: 0.2 };
@@ -128,5 +129,25 @@ describe("translucent text on a coloured background", () => {
     const g = guardContrast({ ...base, bgColor: "#0000ff", textColor: "#ffffff" }, blue, center, ["#ffffff"], null, { ...ALL, priceWas: true });
     expect(g.patch.textScrim).toBe(true);
     expect(g.unmet).toEqual([]);
+  });
+});
+
+// R2-C (named): the guard measures the picture under the text boxes the layout engine drew, not a band estimate.
+describe("contrast under the real text boxes", () => {
+  it("white text over the dark half passes as is; the same text moved over the white half is fixed", () => {
+    const W = 40, H = 20;
+    const d = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const v = x < W / 2 ? 10 : 250; d.set([v, v, v, 255], (y * W + x) * 4); }
+    const bg = bgStatsFromPixels(d, W, H, ["#0a0a0a", "#fafafa"], "upload");
+    const grid = bg.grids![0];
+    const c = { ...base, bgMode: "upload" as const, textColor: "#ffffff" };
+    // the canvas is 800x400; the band estimate for centre / centre spans both halves and would call for a fix either way
+    const at = (x: number): TextPlace[] => [{ w: 800, h: 400, grid, boxes: [{ x, y: 150, w: 300, h: 100 }] }];
+    const left = guardContrast(c, bg, at(40), ["#ffffff"], null, ALL);
+    expect(left.patch.textColor).toBeUndefined();
+    expect(left.patch.textScrim).toBeUndefined();
+    const right = guardContrast(c, bg, at(460), ["#ffffff"], null, ALL);
+    expect(right.patch.textColor).toBe("#0a0a0a");   // the dark main colour reads there
+    expect(right.unmet).toEqual([]);
   });
 });
