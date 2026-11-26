@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續15）— 橫幅 C1–C8 合併上線（f287df2c5 → 部署 6b9032f09）
+
+- 合併：worker 分支 `claude/modest-ellis-5bccc9`（含 `claude/busy-nash-b53413` C6/C7）→ main `f287df2c5`。Codex 審查 4 點：F1 ag-psd 不在清單、F2 字型未進建置 = 誤報（審查封包只含篩選後的程式差異，package.json 與 695 個 woff2 實際已 commit）；F3 CIS 外部 logo、F4 色調匹配取樣不一致 = 屬實，worker 修於 `ebe1fa65b`。
+- 部署第一次被 CI gate 擋：`lib/systems/__tests__/blocks.test.ts:140`（另一 session 新加的積木目錄）要求 B-079 usedBy 含 design（新 `app/api/tools/presets/brand-kit/route.ts` 引 `lib/tenant-guard.ts`）。補 `lib/systems/blocks.ts:256` → `6b9032f09`，第二次部署成功。
+- 線上實看 app.aware-wave.com/tools/banner：新按鈕（JPG/WebP 目標 KB、PSD/SVG、修圖／向量（專業版）開啟）、品牌套組面板、多尺寸勾選 10 個比例都在；片頭按鈕填「片頭標題／副標題」；`/banner-fonts/fonts.css` 200、woff2 200 `immutable`；品牌套組 GET 200（預設 org 尚無套組）；下載 SVG 含 `<text>` 片頭標題、副標題；PSD 含 2 個 `TySh` 文字層，UTF-16 內文各命中。
+- 未線上驗：品牌套組「存成套組／上傳 logo」寫入（避免在正式客戶資料寫測試值）；修圖／向量（專業版）開 PSD/SVG 改字只在本機驗過（worker C1）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin -> deployed 6b9032f09, healthy 15s, HTTP smoke 5/5; playwright-runner -Mode smoke 30 passed 0 failed 22 skipped | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=B-079|brand-kit | hits=9
+- 避免再發生：worker brief 加一句「新增 import 共用積木（lib/*）時同 commit 更新 `lib/systems/blocks.ts` usedBy，跑 `lib/systems/__tests__/blocks.test.ts`」；oracle 封包用 -Path 篩選時，二進位與 package.json 另行人工核對。
 ## 2026-11-26（續13）— 積木頁 UI/UX：系統卡片列產品模組、統計卡可點＋只看共用、編號變連結、手機統計卡並排、去重複標題
 
 - 根因／決策：操作者要「哪些系統用了什麼積木」，但 `blocksForSystem` 只取 B（`NA/lib/systems/blocks.ts:329` 舊版），系統卡看不到 M 產品模組；「沒用積木」9 系統其實是程式不在後台；統計卡不能點、說明裡的 B-xx 不能點、分頁名與框內 h2 重複、手機統計卡直排把分頁推出第一屏（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）。
