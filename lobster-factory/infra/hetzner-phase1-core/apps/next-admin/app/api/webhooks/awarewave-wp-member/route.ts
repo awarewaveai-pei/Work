@@ -94,11 +94,6 @@ async function memberDeleted(db: SupabaseClient, ev: Event): Promise<Response> {
     await recordOpsAudit(account.organizationId, "operator", "member_event", "member_account_kept", { ...audit, why: out.error });
     return NextResponse.json({ ok: true, result, account: "kept_not_client" });
   }
-  if (out.ok === false && out.error === "still_member") {
-    // a brand role in another unit's brand: not this event's to remove; final, staff decide
-    await recordOpsAudit(account.organizationId, "operator", "member_event", "member_account_kept", { ...audit, why: out.error });
-    return fail("member_account_kept_brand_role_elsewhere", 409);
-  }
   if (out.ok === false) return fail("member_account_not_removed", 503);
   await recordOpsAudit(account.organizationId, "operator", "member_event", "member_account_deleted", {
     ...audit, already_gone: out.gone === true, brands_without_owner: out.brandsWithoutOwner ?? [],

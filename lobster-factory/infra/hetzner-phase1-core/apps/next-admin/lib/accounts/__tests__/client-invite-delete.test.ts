@@ -8,6 +8,7 @@ type Row = Record<string, unknown>;
 const UNIT = "00000000-0000-4000-8000-0000000000a1";
 const BRAND = "00000000-0000-4000-8000-0000000000a2";
 const OTHER = "00000000-0000-4000-8000-0000000000a3";
+const OTHER_BRAND = "00000000-0000-4000-8000-0000000000a4";
 const USER = "00000000-0000-4000-8000-0000000000b1";
 let tables: Record<string, Row[]>;
 let users: Map<string, { id: string; email: string; app_metadata: Row }>;
@@ -84,6 +85,17 @@ describe("deleteClientAccount: the cash-register site deleted the person (M10 so
     expect(accountGone()).toBe(true);
     expect(tables.social_audit_log).toEqual([{ organization_id: BRAND, actor: "member_event", action: "member_remove",
       detail: { user_id: USER, role: "owner", reason: "source_deleted" } }]);
+  });
+
+  it("on: a role in another unit's brand goes too -- one audit row per brand, both ownerless brands named, the account gone", async () => {
+    tables.organizations.push({ id: OTHER_BRAND, parent_organization_id: OTHER, name: "Other 品牌" });
+    tables.social_brand_members.push({ organization_id: OTHER_BRAND, user_id: USER, role: "owner" });
+    const out = await deleteClientAccount(sb, UNIT, USER, { sourceDeleted: true });
+    expect(out).toMatchObject({ ok: true, email: "boss@unit.test" });
+    expect((out as { brandsWithoutOwner: Array<{ id: string }> }).brandsWithoutOwner.map((b) => b.id).sort()).toEqual([BRAND, OTHER_BRAND].sort());
+    expect(tables.social_brand_members).toEqual([]);
+    expect(tables.social_audit_log.map((r) => r.organization_id).sort()).toEqual([BRAND, OTHER_BRAND].sort());
+    expect(accountGone()).toBe(true);
   });
 
   it("on: a failure after the brand roles went is retryable, and the retry finishes and still names the brand", async () => {
