@@ -1,4 +1,18 @@
 # Worklog
+## 2026-11-27（續1）— 橫幅 R2：操作者十點回饋全部上線（排版引擎、九步流程、AI 文案五組、品牌 logo）
+- 計畫／根因 file:line：`agency-os/handoffs/2026-11-26-banner-pro-design/PLAN-R2.md`；監工台 artifact 5gGjausYwzjkPtc8UkTkKS（data.mjs RISKS 逐條處置）。
+- 根因：AI／拖曳的絕對座標靜默蓋掉位置按鈕（banner-layers.ts:342 place()）；自動排版不預留徽章／logo／商品；字級固定 64px；AI 只出一版且不帶 logo。
+- 修法（不變量）：純函式排版引擎 `banner-layout.ts`（元素不重疊、全在畫內、自動字級、倒影用搬移後的框）；所有位置按鈕／模板／AI 版面經 `applyLayout`（清該元素拖曳）；數值範圍單一來源 `field-ranges.ts`；對比守門員量真實文字框，非同步結果只套用到它量的那份設計（`contrast-run.ts`）。
+- 卡與 merge：R2-A ef6572105、R2-B1 528cb59d5、R2-B2 06c46341e、R2-C 111061962＋收尾 e2d125cd9；DEPLOY_HOLD ce4bae009→e3ec3c494。
+- Codex 四輪共 10 條 findings 全修（artifacts reports/oracle/2026-11-26-partialreview-327abb70.md、-7f570a72.md、2026-11-27-partialreview-c2f50e52.md、-5627dfde.md、-5d262b25.md）。
+- 未驗：正式站登入後畫面（需操作者登入）；真客戶套組＋logo 的 AI 一鍵設計與帳單對帳。
+- 避免再發生：新增可拖曳元素必經 layoutBanner＋applyLayout；新數值欄位先登記 field-ranges。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (next-admin, merge e2d125cd9) | exit=0 | ms=240000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/10m/0n
+- BUGHUNT_DONE: scope=lobster-factory | grep=brandColors=1 | hits=0
+- BUGHUNT_SCOPE_NARROW: agency-os 只有本則與交辦單引用這個已刪參數（文件），scripts 無
+- ORACLE_WAIVED: 每卡 Codex 已審（artifacts 見上），合併 commit 非新程式
+
 ## 2026-11-26（續40）— 本機 D:\Work 落後 origin 139 個 commit 的根因：快轉被擋只印一行黃字＋doc-sync 每晚只改時間戳
 
 [任務] 操作者：「本機 D:\Work 落後 origin 91 個 commit?!」→「好，追上」→「好，修根因」。

@@ -116,9 +116,9 @@
 
 | 卡 | 狀態 | worker | commit |
 |---|---|---|---|
-| R2-A | 已合併 | banner-r2a | ef6572105 |
-| R2-B1 | 已合併 | banner-r2b1 | 528cb59d5 |
-| R2-B2 | 進行中（第二批） | banner-r2b1 | — |
-| R2-C | 進行中（第二批） | banner-r2a | — |
+| R2-A | 已合併、已部署 | banner-r2a | ef6572105 |
+| R2-B1 | 已合併、已部署 | banner-r2b1 | 528cb59d5 |
+| R2-B2 | 已合併、已部署 | banner-r2b1 | 06c46341e |
+| R2-C | 已合併、已部署 | banner-r2a | e2d125cd9 |
 
 監工台：`data.mjs`（唯一進度來源）→ `node build.mjs && node check.mjs` → 重發布。
