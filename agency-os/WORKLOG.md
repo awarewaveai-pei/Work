@@ -1,4 +1,30 @@
 # Worklog
+## 2026-11-26（續34）— oracle WP：GO-3 完成，oracle.aware-wave.com 首頁換成 WordPress 並正式開放
+
+- [根因] WordPress 階段最後一步（待決 6）。操作者 2026-11-26「你去做」：四項前置由監工代做能做的部分，接著上線。
+- [步驟]
+  - 前置：`users_can_register=1`（`default_role=subscriber`）；`blogname`「東西方命理」、`blogdescription`「紫微斗數・八字・易經・塔羅・占星」；首頁（post 18）`rank_math_title=%sitename% %sep% %sitedesc%`；FluentCRM `business_name`（地址未填：需操作者提供）；TranslatePress 字典補副標與頁尾兩列。
+  - 每日信實測（表單之後的整段；Turnstile 不代過）：`daily-test.php`＝`Crm::upsertPending`→`Store::savePending`→`Confirm::mail`→`Store::confirm`＋`Crm::subscribe`→`Runner::run()`→再跑一次→`Store::deleteForSubscriber`。
+  - 開放：主機開關檔（`AW_SITE_VERBS=on`、`AW_SITE_GATEWAY_SLUGS=oracle-aware-wave-com`）＋catalog `site.open`、`site.preflight` → 流程頁第 9 步「看要做什麼」→「確認執行」→ 完成 → 開關檔刪除、`site.*` 七列關回。
+  - 分流：`safe-infra-patch.sh nginx`（備份 `default.conf.bak.safe-patch-20261126-055055`）：`map $uri $oracle_backend` 去掉 `/`、`/robots.txt`、`/sitemap.xml` 三行與 `$oracle_home_backend`（`6ab210b4c`，repo＝live）。
+  - 引擎：`.env.production` 加 `ORACLE_FRONT_PAGES`（備份 `.bak-go3-20261126`）→ `docker compose up -d --no-build oracle-web`（第一次因 `cd` 權限沒重建，第二次以 root 重建）。
+- [驗證]
+  - 每日信：`confirmMail=true`、`confirm=true`、`run={"picked":1,"sent":1,"released":0,"failed":0}`、同日再跑 `sent:0`；FluentSMTP log #8「請確認訂閱每日運勢信」sent、#9「2026-11-26 每日運勢」sent；`fc_campaign_emails` #1 sent。收件信箱未讀取。
+  - 開放：流程頁第 9 步「完成」（確認網址 `/aw-open-check/`）；`aw_under_construction=0`、`blog_public=1`；首頁 `robots` `index, follow`。
+  - 外部 `go3-check.py` 71/71：`/` 200（WordPress）、`/zh-TW`→308 `/`、`/en`→308 `/english/`、12 工具 `/zh-TW/<slug>`→308 `/tools/<slug>/`、`/en/<slug>`→308 `/english/tools/<slug>/`、24 個 WordPress 工具頁 iframe `src` 對應語言、`/embed/zh-TW/<slug>` 200、`/robots.txt` 含 `sitemap_index.xml`、`/sitemap_index.xml` 200、`/aw-open-check/` 404、`/wp-json/` 200。`docker exec oracle-web printenv ORACLE_FRONT_PAGES` 有值、`ORACLE_SITES` 仍在、health healthy。
+  - 瀏覽器（操作者的 Chrome，未登入）：`/`、`/tools/ziwei/`、`/english/tools/ziwei/`、`/daily-letter/` 畫面正常（站名、選單、工具框、語言切換、訂閱表單）。首頁標題「東西方命理 - 紫微斗數・八字・易經・塔羅・占星」，英文「East & West Divination - Zi Wei · BaZi · I Ching · Tarot · Astrology」。
+- [未做／剩餘風險]
+  - 網頁表單的 Turnstile→訂閱這一段沒有人實走過；測試信寄到管理員信箱，是否進收件匣未確認。
+  - 流程頁第 3 步顯示「失敗」（GO-2 時為完成；推定與 catalog 釘 0.5.1 後的比對有關，未查）。
+  - 手機寬度、`/playwright client` 未跑；工具送出後的結果畫面未在 WordPress 頁內實點。
+  - 開放註冊走 `wp-login.php?action=register`（Cloudflare managed challenge 在前）；沒有自訂註冊頁。
+  - FluentCRM 公司地址空白（每日信信尾）。
+  - Uptime Kuma 監控 29 仍打 `/zh-TW` 關鍵字「命理」：現在 308 到 `/`，未確認監控是否跟轉址。
+- [rollback] ① 引擎：還原 `.env.production.bak-go3-20261126`＋`docker compose up -d --no-build oracle-web`。② 分流：`default.conf.bak.safe-patch-20261126-055055` 經 `safe-infra-patch.sh nginx` 放回（repo revert `6ab210b4c`）。③ 建置中：主機 `wp option update aw_under_construction 1`＋`blog_public 0`（或開開關後 `site-wp close`）。順序 ①→②→③。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python go3-check.py（71 項）；ssh wp eval-file daily-test.php；safe-infra-patch.sh nginx | exit=0 | ms=600000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/2m/4n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects | grep=oracle_home_backend | hits=1
+- ORACLE_WAIVED: repo 改動只有 nginx 設定刪 9 行（主機經 safe-infra-patch 套用並通過其檢查）與文件；無應用程式碼。
 ## 2026-11-26（續32）— 自動啟動 Claude 過渡收尾：app 觸發確認、routine cron 移除、週六 routine 停用
 
 - 結果：app run-due 於 2026-11-25 23:00 UTC（台北 11-26 07:00）觸發成功，`last_error` 空；時間是 07:00 不是 08:00，因操作者 11-25 10:52 UTC 在 /ops/schedules 把 weekday_hours 改成 `{NULL,7,7,7,7,7,7}`（非 bug）。routine `trig_01LfZEYHtBxdGKjNB2dUeugP` list_runs 見 23:00:02（app）與 00:04:13（自身 cron）兩個 run → 已 `update {"cron_expression": ""}`，get 確認 `enabled:true`、`api_token_hint` 在、無 `next_run_at`；週六 routine `trig_01DgzPJzGcnF11AdpooyEukn` 已 `enabled:false`（app 週六 07:00 已涵蓋）。`SCHEDULES_PAGE_PLAN.md` §0 該列已註記。
