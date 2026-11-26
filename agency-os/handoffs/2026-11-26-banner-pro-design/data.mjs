@@ -8,7 +8,7 @@ export const META = {
 };
 
 // todo｜doing｜review｜done（done 要在 COMMITS 填 commit）
-export const PROGRESS = {};
+export const PROGRESS = { 'R2-A': 'doing', 'R2-B1': 'doing' };
 export const COMMITS = {};
 
 // 等你決定：要提前手動部署或高風險時才放這裡。{ card, what, rollback }
