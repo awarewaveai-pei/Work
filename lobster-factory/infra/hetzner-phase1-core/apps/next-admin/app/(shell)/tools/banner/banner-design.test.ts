@@ -2,7 +2,7 @@
 // no layouts, and the server's design prompt is the single-size one.
 import { describe, expect, it } from "vitest";
 import { forgePrompt } from "@/lib/script-forge/modules";
-import { askJsonWithRetry, designPlan, parseAiJson, type SizeSpec } from "./banner-design";
+import { askJsonWithRetry, designPlan, parseAiJson, sanitizeCopyVariants, type SizeSpec } from "./banner-design";
 
 const ctx = { lang: "繁體中文", sceneCount: 6, customScenes: 3, brand: null };
 const size = (key: string, w: number, h: number): SizeSpec => ({ key, ratio: key, use: "x", w, h });
@@ -25,8 +25,9 @@ describe("AI 一鍵設計 across sizes", () => {
     expect(plan.main).toEqual({ textAlignH: "left", productPos: "right" });
   });
 
-  it("nothing ticked = as before: no layouts, and the same single-size prompt", () => {
+  it("nothing ticked = no layouts: the answer's top-level intent, and the same single-size prompt", () => {
     expect(designPlan({ headline: "x", layouts: { r191x1: { textPos: "top" } } }, MAIN, [])).toEqual({ main: {}, overrides: {} });
+    expect(designPlan({ textPos: "bottom", logoPos: "br", headlineSize: 90 }, MAIN, [])).toEqual({ main: { textPos: "bottom", logoPos: "br" }, overrides: {} });
     const fields = { brief: "咖啡", label: "1.91:1", w: 1200, h: 630 };
     const single = forgePrompt("banner", "design", fields, ctx)!.prompt;
     expect(single).not.toContain("layouts");
@@ -34,6 +35,33 @@ describe("AI 一鍵設計 across sizes", () => {
     const multi = forgePrompt("banner", "design", { ...fields, sizes: [MAIN, TALL] }, ctx)!.prompt;
     expect(multi.startsWith(single)).toBe(true);
     expect(multi).toContain("r9x16");
+  });
+});
+
+// R2-C (named): the design's word sets -- usable sets only, each field a trimmed string within its length, at most 5.
+describe("AI 一鍵設計 word sets", () => {
+  it("keeps sets with a headline, trims, caps lengths, drops duplicates and anything past 5", () => {
+    const raw = [
+      { headline: "  夏日**限定**  ", subtext: "冷壓初榨", ctaText: "立即選購", badgeText: "" },
+      { headline: "夏日**限定**", subtext: "same headline again" },
+      { subtext: "no headline" }, "text", null, { headline: 42 },
+      { headline: "A".repeat(80), subtext: 7, ctaText: "買" },
+      { headline: "三" }, { headline: "四" }, { headline: "五" }, { headline: "六" },
+    ];
+    const got = sanitizeCopyVariants(raw);
+    expect(got.map((c) => c.headline)).toEqual(["夏日**限定**", "A".repeat(60), "三", "四", "五"]);
+    expect(got[0]).toEqual({ headline: "夏日**限定**", subtext: "冷壓初榨", ctaText: "立即選購", badgeText: "" });
+    expect(got[1]).toEqual({ headline: "A".repeat(60), subtext: "", ctaText: "買" });   // no badgeText key: picking it keeps the badge
+    expect(sanitizeCopyVariants(undefined)).toEqual([]);
+    expect(sanitizeCopyVariants({ headline: "x" })).toEqual([]);
+  });
+  it("the design prompt asks for 5 sets and says what is on the banner", () => {
+    const fields = { brief: "咖啡", label: "4:5", w: 1080, h: 1350, hasProduct: true, productPos: "left", hasLogo: true };
+    const p = forgePrompt("banner", "design", fields, ctx)!.prompt;
+    expect(p).toContain('"copyVariants"');
+    expect(p).toContain("剛好 5 組");
+    expect(p).toContain("放在左側");
+    expect(p).toContain('"logoPos":"bl|br|tl|tr"');
   });
 });
 

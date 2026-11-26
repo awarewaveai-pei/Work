@@ -228,7 +228,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     switch (slot.key) {
       case "start": return staff && <StepStart slot={slot} setS={setS} staff={staff} brand={brand} saveOrg={saveOrg} setSaveOrg={setSaveOrg}
         saveOrgName={saveOrgName} setSaveOrgName={setSaveOrgName} />;
-      case "ai": return staff && <StepAi slot={slot} {...ctx} staff={staff} brand={brand} saveOrg={saveOrg} saveOrgRef={saveOrgRef} />;
+      case "ai": return staff && <StepAi slot={slot} {...ctx} sRef={sRef} staff={staff} brand={brand} saveOrg={saveOrg} saveOrgRef={saveOrgRef} />;
       case "template": return <StepTemplate slot={slot} {...ctx} />;
       case "size": return <StepSize slot={slot} {...ctx} />;
       case "text": return <StepText slot={slot} {...ctx} drawnType={drawnType} />;

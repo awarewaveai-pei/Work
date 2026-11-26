@@ -97,6 +97,20 @@ function bannerColorPart(bg: unknown, palette: unknown, brandKit: unknown): stri
 }
 /** How many 標題＋副標 pairs one banner 生成文案 call asks for (operator 2026-11-26: 5 was too few). The button price reads it. */
 export const BANNER_COPY_VARIANTS = 7;
+/** R2-C: AI 一鍵設計 returns this many word sets for its one layout (operator 2026-11-26); the button price reads it. */
+export const BANNER_DESIGN_COPY_VARIANTS = 5;
+const PRODUCT_POS_ZH: Record<string, string> = { center: "置中", left: "左側", right: "右側", "bottom-right": "右下" };
+/** R2-C: what else is on the banner (the product picture and where the user put it, a logo) and the word sets. The
+ *  layout engine keeps elements apart; this lets the AI pick a text area that is clear of them. */
+function bannerElementsPart(f: ForgeFields, multi: boolean): string {
+  const pos = PRODUCT_POS_ZH[s(f.productPos)] ?? "置中";
+  const n = BANNER_DESIGN_COPY_VARIANTS;
+  return `\n\n【畫面上的其他元素】商品圖：${f.hasProduct === true ? `有，放在${pos}；文字區要選讓得開商品的位置` : "無"}。` +
+    `Logo：${f.hasLogo === true ? (multi ? `有；每個尺寸的 layouts 都給 logoPos，不要和徽章同一角` : `有；請加 "logoPos":"bl|br|tl|tr"，不要和徽章同一角`) : "無"}。` +
+    `\n\n【文案多版本】另加 "copyVariants"：剛好 ${n} 組，每組 {"headline":"","subtext":"","ctaText":"","badgeText":""}，` +
+    `切入角度各不同（例如痛點、利益、限時、社會證明、情感）；第 1 組就是上面的 headline / subtext / ctaText / badgeText。` +
+    `${n} 組共用同一個版面與配色，所以每組字數相近：標題 8-15 字（可用 **字** 標重點），副標 10-25 字，按鈕 2-6 字，徽章 2-6 字或空字串。`;
+}
 /** The brand line the modules used to append themselves: "" without a client. */
 export const brandLine = (ctx: ForgeCtx): string => (ctx.brand?.voice ? `品牌語氣：${ctx.brand.voice}` : "");
 /** Field as a list (missing or non-list = []); builders join it the way the old page templates did. */
@@ -329,7 +343,8 @@ export const FORGE_MODULES: ForgeModule[] = [
           `"textPos":"top|center|bottom","textAlignH":"left|center|right","textScrim":true,"textOutline":true,` +
           bannerBgFields(f.bg) +
           `"aiBgSubject":"英文場景描述(供 AI 生背景)","aiBgVibe":"英文氛圍"}\n\n` +
-          `配色和諧、對比足夠、CTA 醒目；文字用繁體中文；只輸出 JSON。` + bannerColorPart(f.bg, f.palette, f.brandKit) + bannerSizesPart(f.sizes),
+          `配色和諧、對比足夠、CTA 醒目；文字用繁體中文；只輸出 JSON。` + bannerColorPart(f.bg, f.palette, f.brandKit) +
+          bannerElementsPart(f, !!bannerSizesPart(f.sizes)) + bannerSizesPart(f.sizes),
       },
       copy: {
         shape: ["variants"],

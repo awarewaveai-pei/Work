@@ -1,6 +1,7 @@
 // Card C12: AI 一鍵設計整張 colours. The page measures the background (free, in the browser) and sends it with the usable
 // palette; the AI only assigns colour roles; resolveDesignColors() keeps the brand palette, never touches an uploaded /
-// AI background, and enforces WCAG contrast (headline 3:1; subtext / small text / CTA text 4.5:1). Pure (node-testable).
+// AI background, and enforces WCAG contrast (headline 3:1; subtext / small text / CTA text 4.5:1) on the background under
+// the text boxes the layout engine drew (R2-C). Pure (node-testable).
 
 export type BgMode = "color" | "gradient" | "upload" | "ai";
 export type TextPos = "top" | "center" | "bottom";
@@ -33,17 +34,23 @@ const hexOf = (c: Rgb) => "#" + c.map((v) => Math.round(Math.max(0, Math.min(1, 
 const lumRgb = (c: Rgb) => 0.2126 * dec(c[0]) + 0.7152 * dec(c[1]) + 0.0722 * dec(c[2]);
 const greyOf = (l: number): Rgb => { const v = enc(Math.max(0, Math.min(1, l))); return [v, v, v]; };
 const mix = (top: Rgb, under: Rgb, a: number): Rgb => [0, 1, 2].map((i) => a * top[i] + (1 - a) * under[i]) as Rgb;
-/** What the page measured of the background, before any AI call. zones = per text position / alignment. */
+/** A picture background drawn small at one size: relative luminance per cell, row by row (w x h cells over the canvas). */
+export interface LumGrid { w: number; h: number; lum: ArrayLike<number> }
+/** What the page measured of the background, before any AI call. zones = per text position / alignment (the prompt's
+ *  rough description; the guard measures under the real text boxes in `grids`). */
 export interface BgInfo {
   mode: BgMode;
   colors: string[];          // 4-6 main colours
   meanLum: number;           // 0..1
   zones: Record<TextPos, Record<TextAlignH, Zone & { busy: number }>>;
+  /** A picture only: one grid per size measured, in the order measured (measureBackground: the sizes given, in order). */
+  grids?: LumGrid[];
 }
 
 const POS: readonly TextPos[] = ["top", "center", "bottom"];
 const ALIGN: readonly TextAlignH[] = ["left", "center", "right"];
-/** The band the text stack sits in, as shares of the canvas (renderer: stack top / centred / bottom, aligned left / centre / right). */
+/** The band the text stack roughly sits in, as shares of the canvas: only for describing the background to the AI before
+ *  there is a layout (the guard measures the real boxes). */
 const BAND_Y: Record<TextPos, [number, number]> = { top: [0, 0.45], center: [0.28, 0.72], bottom: [0.55, 1] };
 const BAND_X: Record<TextAlignH, [number, number]> = { left: [0, 0.62], center: [0.15, 0.85], right: [0.38, 1] };
 
@@ -55,22 +62,43 @@ export function bgStatsFromPixels(data: ArrayLike<number>, w: number, h: number,
   for (let i = 0; i < w * h; i++) {
     lum[i] = 0.2126 * lin(data[i * 4]) + 0.7152 * lin(data[i * 4 + 1]) + 0.0722 * lin(data[i * 4 + 2]); sum += lum[i];
   }
+  const grid: LumGrid = { w, h, lum };
   const zone = (pos: TextPos, al: TextAlignH) => {
     const [y0, y1] = BAND_Y[pos], [x0, x1] = BAND_X[al];
-    const vals: number[] = [];
-    let s = 0, s2 = 0;
-    for (let y = Math.floor(y0 * h); y < Math.max(Math.floor(y0 * h) + 1, Math.ceil(y1 * h)); y++)
-      for (let x = Math.floor(x0 * w); x < Math.max(Math.floor(x0 * w) + 1, Math.ceil(x1 * w)); x++) {
-        const v = lum[Math.min(h - 1, y) * w + Math.min(w - 1, x)]; vals.push(v); s += v; s2 += v * v;
-      }
-    const n = vals.length, mean = s / n, sd = Math.sqrt(Math.max(0, s2 / n - mean * mean));
-    // range = 2nd..98th percentile: a small bright / dark patch counts (mean +- sd hid it), a few stray pixels do not
-    vals.sort((a, b) => a - b);
-    const pct = (q: number) => vals[Math.min(n - 1, Math.max(0, Math.round(q * (n - 1))))];
-    return { lo: pct(0.02), hi: pct(0.98), busy: sd };
+    return gridStats(grid, [{ x: x0 * w, y: y0 * h, w: (x1 - x0) * w, h: (y1 - y0) * h }]);
   };
   const zones = Object.fromEntries(POS.map((p) => [p, Object.fromEntries(ALIGN.map((a) => [a, zone(p, a)]))])) as BgInfo["zones"];
-  return { mode, colors, meanLum: sum / (w * h), zones };
+  return { mode, colors, meanLum: sum / (w * h), zones, grids: [grid] };
+}
+
+/** A box in canvas pixels (the layout engine's ElemBox). */
+export interface PxBox { x: number; y: number; w: number; h: number }
+/** Luminance range / busyness of the grid cells under `boxes` (grid-cell units; each box covers at least one cell). */
+function gridStats(g: LumGrid, boxes: readonly PxBox[]): { lo: number; hi: number; busy: number } {
+  const vals: number[] = [];
+  const seen = new Set<number>();
+  let s = 0, s2 = 0;
+  for (const b of boxes) {
+    const x0 = Math.max(0, Math.min(g.w - 1, Math.floor(b.x))), y0 = Math.max(0, Math.min(g.h - 1, Math.floor(b.y)));
+    const x1 = Math.max(x0 + 1, Math.min(g.w, Math.ceil(b.x + b.w))), y1 = Math.max(y0 + 1, Math.min(g.h, Math.ceil(b.y + b.h)));
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = y * g.w + x;
+      if (seen.has(i)) continue;
+      seen.add(i);
+      const v = g.lum[i]; vals.push(v); s += v; s2 += v * v;
+    }
+  }
+  const n = vals.length, mean = s / n, sd = Math.sqrt(Math.max(0, s2 / n - mean * mean));
+  // range = 2nd..98th percentile: a small bright / dark patch counts (mean +- sd hid it), a few stray pixels do not
+  vals.sort((a, b) => a - b);
+  const pct = (q: number) => vals[Math.min(n - 1, Math.max(0, Math.round(q * (n - 1))))];
+  return { lo: pct(0.02), hi: pct(0.98), busy: sd };
+}
+/** The background under the text boxes drawn at one size (canvas `w` x `h` pixels), from that size's grid. */
+export function zoneUnder(g: LumGrid, boxes: readonly PxBox[], w: number, h: number): Zone {
+  const sx = g.w / w, sy = g.h / h;
+  const { lo, hi } = gridStats(g, boxes.map((b) => ({ x: b.x * sx, y: b.y * sy, w: b.w * sx, h: b.h * sy })));
+  return { lo, hi };
 }
 
 /** One picture measured at several sizes (each crops it differently): every zone spans what any size has there. */
@@ -81,7 +109,7 @@ export function mergeBgInfo(infos: readonly BgInfo[]): BgInfo {
     const zs = infos.map((i) => i.zones[p][a]);
     return [a, { lo: Math.min(...zs.map((z) => z.lo)), hi: Math.max(...zs.map((z) => z.hi)), busy: Math.max(...zs.map((z) => z.busy)) }];
   }))])) as BgInfo["zones"];
-  return { ...first, meanLum: infos.reduce((s, i) => s + i.meanLum, 0) / infos.length, zones };
+  return { ...first, meanLum: infos.reduce((s, i) => s + i.meanLum, 0) / infos.length, zones, grids: infos.flatMap((i) => i.grids ?? []) };
 }
 
 /** A flat colour / two-colour gradient background: the same zone everywhere (conservative: the gradient's whole range). */
@@ -102,8 +130,9 @@ export interface ColorFields {
   textScrim: boolean; textScrimOpacity: number; textOutline: boolean;
   dimOverlay: boolean; dimOverlayOpacity: number;
 }
-/** Where the text sits at each size made (main + others): the colours are shared, so all must pass. */
-export interface TextPlace { pos: TextPos; align: TextAlignH }
+/** Where the text is drawn at one size made (main + others; the colours are shared, so all must pass): the boxes of the
+ *  elements drawn in textColor (canvas px) and that size's background grid (a picture; absent = not measured). */
+export interface TextPlace { w: number; h: number; boxes: PxBox[]; grid?: LumGrid }
 /** Which text-coloured elements the design shows (each has its own size and opacity in the renderer). */
 export interface TextContent { subtext: boolean; priceNow: boolean; priceWas: boolean; trust: boolean }
 
@@ -189,14 +218,25 @@ export function guardContrast(
   const patch: Partial<ColorFields> = {};
   const fixes: string[] = [], unmet: string[] = [];
   const cur = () => ({ ...c, ...patch });
+  // a picture: what is under the drawn text boxes at each size; a size not measured / without boxes = the whole picture
+  const whole: Zone = {
+    lo: Math.min(...POS.flatMap((p) => ALIGN.map((a) => bg.zones[p][a].lo))), hi: Math.max(...POS.flatMap((p) => ALIGN.map((a) => bg.zones[p][a].hi))),
+  };
+  // the picture's main colours: under measured boxes only those whose luminance is in the range found there (one outside
+  // it is not under the text); unmeasured = all of them
+  const main = bg.colors.filter(isHex);
+  const pictureZones = (places.length ? places : [null]).map((p): Zone => {
+    if (!p?.grid || !p.boxes.length) return { ...whole, colors: main };
+    const z = zoneUnder(p.grid, p.boxes, p.w, p.h);
+    return { ...z, colors: main.filter((h) => { const l = relLum(h); return l >= z.lo - 0.02 && l <= z.hi + 0.02; }) };
+  });
   // zone behind the text: the background the design now has (a colour / gradient the AI chose replaces the measured one)
   const baseZone = (): Zone => {
     const s = cur();
     const zs = s.bgMode === "color" || s.bgMode === "gradient"
       ? [bgStatsFromColors(s.bgMode, s.bgMode === "color" ? s.bgColor : s.gradFrom, s.gradTo).zones.center.center]
-      : (places.length ? places : [{ pos: "center", align: "center" } as TextPlace]).map((p) => bg.zones[p.pos][p.align]);
-    // a picture: its measured main colours too (wherever they sit), besides the text band's luminance range
-    const colors = [...new Set([...zs.flatMap((q) => q.colors ?? []), ...(s.bgMode === "color" || s.bgMode === "gradient" ? [] : bg.colors.filter(isHex))])];
+      : pictureZones;
+    const colors = [...new Set(zs.flatMap((q) => q.colors ?? []))];
     let z: Zone = { lo: Math.min(...zs.map((q) => q.lo)), hi: Math.max(...zs.map((q) => q.hi)), colors };
     if (s.dimOverlay) z = darken(z, s.dimOverlayOpacity);
     return z;
