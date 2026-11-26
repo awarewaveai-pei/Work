@@ -11,12 +11,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { roleHeader } from "@/lib/ops-role";
 import { NAV_FIRST, NAV_SEARCH_LIMIT, type PickOrg } from "./nav-orgs";
 
-/** brandColors: only clients with a valid brand colour (the banner studio's brand picker). */
-export type OrgFilter = "brandColors";
-
 /** Server search for `search` at `path` (?q=, debounced). found = null while no search runs; failed = the last search did
  *  not answer. The route answers { ok, orgs: PickOrg[] }. */
-function useOrgSearch(search: string, path: string, filter?: OrgFilter): { found: PickOrg[] | null; failed: boolean } {
+function useOrgSearch(search: string, path: string): { found: PickOrg[] | null; failed: boolean } {
   const [found, setFound] = useState<PickOrg[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -27,7 +24,6 @@ function useOrgSearch(search: string, path: string, filter?: OrgFilter): { found
     const timer = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ q });
-        if (filter) params.set(filter, "1");
         const res = await fetch(`${path}?${params}`, { headers: { ...roleHeader("operator") }, signal: ctrl.signal });
         const json = await res.json();
         if (!res.ok || json.ok !== true) throw new Error(String(json.error ?? res.status));
@@ -38,7 +34,7 @@ function useOrgSearch(search: string, path: string, filter?: OrgFilter): { found
       }
     }, 250);
     return () => { clearTimeout(timer); ctrl.abort(); };
-  }, [search, path, filter]);
+  }, [search, path]);
 
   return { found, failed };
 }
@@ -82,7 +78,6 @@ export interface OrgPickerProps {
   hrefFor?(org: PickOrg): string;
   /** A first row that picks no client (onPick(null)), e.g. 自用. */
   none?: ReactNode;
-  filter?: OrgFilter;
   /** The route that answers the search (?q=): "/api/ops/org-search" on staff pages, the door's own route on a door. */
   searchPath: string;
   /** false = no search box (a list that is already the whole answer, e.g. a customer's own organization). */
@@ -98,9 +93,9 @@ export interface OrgPickerProps {
   hint?: ReactNode;
 }
 
-export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor, none, filter, searchPath, searchable = true, fill = false, disabled = false, badge, hint }: OrgPickerProps) {
+export function OrgPicker({ orgs, total, selected, by = "slug", onPick, hrefFor, none, searchPath, searchable = true, fill = false, disabled = false, badge, hint }: OrgPickerProps) {
   const [search, setSearch] = useState("");
-  const { found, failed } = useOrgSearch(searchable ? search : "", searchPath, filter);
+  const { found, failed } = useOrgSearch(searchable ? search : "", searchPath);
   // a client picked from search results stays on screen once the search box is cleared
   const [picked, setPicked] = useState<PickOrg | null>(null);
   const first = picked && picked[by] === selected && !orgs.some((o) => o[by] === selected) ? [picked, ...orgs] : orgs;

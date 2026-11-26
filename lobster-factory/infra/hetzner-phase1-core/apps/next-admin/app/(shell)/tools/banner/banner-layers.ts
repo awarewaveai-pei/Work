@@ -96,7 +96,9 @@ export interface TextSpec {
 }
 /** `shadow`: drawn by whoever stacks the layer (composite, PSD effect, SVG filter) -- not in the layer's pixels. */
 export interface BannerLayer { name: string; canvas: HTMLCanvasElement; text?: TextSpec; shadow?: LayerShadow }
-export interface BannerLayers { w: number; h: number; layers: BannerLayer[]; boxes: Partial<Record<ElemKey, ElemBox>> }
+/** `type`: the title / subtitle px drawn (the engine's when typeAuto -- the 字級 sliders show these). */
+export interface BannerLayers { w: number; h: number; layers: BannerLayer[]; boxes: Partial<Record<ElemKey, ElemBox>>; type: TypeSizes }
+export interface TypeSizes { headline: number; subtext: number }
 
 /** Canvas family (first name in the CSS list) -> the family the pro editors ship (scripts/vectorcraft-pro/web-fonts.patch).
  *  楷書 (LXGW WenKai TC) and 圓體 (Huninn / jf-openhuninn) are not in the editors' list -> Noto Sans TC. */
@@ -568,7 +570,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
 
   flush();
   if (flat) (flat as CanvasRenderingContext2D).restore();
-  return { w: p.w, h: p.h, layers, boxes: L.boxes };
+  return { w: p.w, h: p.h, layers, boxes: L.boxes, type: { headline: L.headlineSize, subtext: L.subtextSize } };
 }
 
 /** All layers stacked bottom to top on one canvas (source-over, as the old single canvas drew them). */

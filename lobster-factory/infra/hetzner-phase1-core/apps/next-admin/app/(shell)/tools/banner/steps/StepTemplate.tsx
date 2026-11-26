@@ -1,11 +1,11 @@
 "use client";
-import { TEMPLATES, openerPlaceholders, templatePatch, type State } from "../banner-state";
+import { TEMPLATES, applyLayout, openerPlaceholders, templatePatch, type State } from "../banner-state";
 import type { StepSlot } from "./order";
 import { StepCard, type StepCtx } from "./ui";
 
 export default function StepTemplate({ slot, s, setS }: StepCtx & { slot: StepSlot }) {
   const applyTemplate = (patch: Partial<State>) =>
-    setS((prev) => ({ ...prev, brandBar: false, balanceTitle: false, ...patch, saved: false, error: null }));
+    setS((prev) => ({ ...applyLayout(prev, patch), saved: false, error: null }));
   return (
     <StepCard title={slot.title} step={slot.no} icon="🧩" summary="套用排好的版面">
       <p className="form-hint" style={{ marginBottom: 8, marginTop: 8 }}>套用後再填內容；只改版面/元素，不動你的文字與圖。</p>
@@ -13,7 +13,7 @@ export default function StepTemplate({ slot, s, setS }: StepCtx & { slot: StepSl
         {TEMPLATES.filter((t) => !t.group).map((t) => (
           <button key={t.key} className="btn btn-ghost"
             style={{ fontSize: 12, padding: "8px 6px", textAlign: "left", lineHeight: 1.3 }}
-            onClick={() => applyTemplate(t.patch)}>
+            onClick={() => applyTemplate(templatePatch(t, s.preset))}>
             <span style={{ fontSize: 15, marginRight: 4 }}>{t.icon}</span>{t.label}
           </button>
         ))}

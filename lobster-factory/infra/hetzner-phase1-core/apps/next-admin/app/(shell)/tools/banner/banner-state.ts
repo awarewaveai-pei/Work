@@ -5,6 +5,7 @@ import {
   DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, loadImage,
   type ElemPositions, type ShadowSpec,
 } from "./banner-layers";
+import { applySemantic, dropPositions, semanticElems } from "./banner-layout";
 import type { GroundingOpts } from "./product-grounding";
 import type { BannerAiModel } from "./banner-design";
 import { bgStatsFromColors, bgStatsFromPixels, mergeBgInfo, type BgInfo } from "./design-colors";
@@ -81,6 +82,7 @@ export type ProductPos = "center" | "left" | "right" | "bottom-right";
 // ── Marketing / conversion element types ──
 export type BadgeStyle = "ribbon" | "pill" | "burst";
 export type BadgePos   = "tl" | "tr";
+export type LogoPos    = "bl" | "br" | "tl" | "tr";
 export type TrustType  = "none" | "stars" | "reviews" | "guarantee";
 export type TextAlignH = "left" | "center" | "right";
 
@@ -133,6 +135,7 @@ export interface State {
   letterSpacing: number;  // 標題字距 px
   headlineSize: number;
   subtextSize:  number;
+  typeAuto:     boolean;  // R2-A: title / subtitle sized by the layout engine; a moved px slider turns it off
   textPos:   TextPos;
   textAlignH: TextAlignH;
   dimOverlay: boolean;
@@ -184,6 +187,7 @@ export interface State {
   grounding: GroundingOpts;
   logoImage: string | null;
   logoScale: number;
+  logoPos:   LogoPos;
   // export
   saving:    boolean;
   saved:     boolean;
@@ -233,6 +237,7 @@ export const INIT: State = {
   letterSpacing: 0,
   headlineSize: 64,
   subtextSize:  32,
+  typeAuto:     true,
   textPos:   "center",
   textAlignH: "center",
   dimOverlay: true,
@@ -280,6 +285,7 @@ export const INIT: State = {
   },
   logoImage: null,
   logoScale: 0.16,
+  logoPos:   "bl",
   saving:    false,
   saved:     false,
   error:     null,
@@ -294,8 +300,8 @@ export const INIT: State = {
 
 /** The fields a size may set for itself; everything else (words, colours, images, fonts…) is shared by all sizes. */
 export const SIZE_KEYS = [
-  "positions", "headlineSize", "subtextSize", "letterSpacing", "bodyLetterSpacing", "productScale", "productPos",
-  "badgeScale", "textPos", "textAlignH", "bgImgScale", "bgImgX", "bgImgY", "logoScale",
+  "positions", "headlineSize", "subtextSize", "typeAuto", "letterSpacing", "bodyLetterSpacing", "productScale", "productPos",
+  "badgeScale", "textPos", "textAlignH", "badgePos", "logoPos", "bgImgScale", "bgImgX", "bgImgY", "logoScale",
 ] as const;
 export type SizePatch = Partial<Pick<State, (typeof SIZE_KEYS)[number]>>;
 export const pickSize = (st: State): SizePatch => Object.fromEntries(SIZE_KEYS.map((k) => [k, st[k]])) as SizePatch;
@@ -476,11 +482,29 @@ export const TEMPLATES: { key: string; label: string; icon: string; patch: Parti
 ];
 /** Card R3: the video ratios the editor opens this tool with (?ratio=) -> the size of that shape. */
 export const RATIO_PRESET: Record<string, PresetKey> = { "16:9": "r16x9", "9:16": "r9x16", "4:5": "r4x5", "1:1": "r1x1" };
-/** A template's patch at a size: an opener's title (and subtitle) sized to that card's width; any other unchanged. */
+/** A template's patch at a size. Any template first undoes what an opener sets (brand bar, even lines, fixed type); an
+ *  opener's title (and subtitle) is then sized to that card's width with the automatic type off. */
 export function templatePatch(t: (typeof TEMPLATES)[number], preset: PresetKey): Partial<State> {
-  if (!t.fit) return t.patch;
+  const base: Partial<State> = { brandBar: false, balanceTitle: false, typeAuto: true, ...t.patch };
+  if (!t.fit) return base;
   const { w, h } = PRESETS[preset], headlineSize = Math.round(Math.min(w * t.fit, h * 0.15));
-  return { ...t.patch, balanceTitle: true, headlineSize, subtextSize: Math.round(headlineSize * 0.42) };
+  return { ...base, balanceTitle: true, typeAuto: false, headlineSize, subtextSize: Math.round(headlineSize * 0.42) };
+}
+
+/** Every position button and template goes through here (R2-A applySemantic): the elements the patch moves lose their
+ *  drag, so the button always shows. Tweaking a size = only that size's drags go. On the main size, a size tweak that
+ *  does not set the field itself inherits the new value, so its drags of those elements go too. */
+export function applyLayout(st: State, patch: Partial<State>): State {
+  const next = applySemantic(st, patch);
+  if (st.editingSize) return next;
+  const sizeOverrides = { ...st.sizeOverrides };
+  for (const k of Object.keys(sizeOverrides) as PresetKey[]) {
+    const o = sizeOverrides[k];
+    if (!o?.positions) continue;
+    const inherited = Object.fromEntries(Object.keys(patch).filter((f) => !(f in o)).map((f) => [f, true]));
+    sizeOverrides[k] = { ...o, positions: dropPositions(o.positions, semanticElems(inherited)) };
+  }
+  return { ...next, sizeOverrides };
 }
 
 export const BG_PLACE_RESET = { bgImgScale: 1, bgImgX: 0, bgImgY: 0 } as const satisfies Partial<State>;

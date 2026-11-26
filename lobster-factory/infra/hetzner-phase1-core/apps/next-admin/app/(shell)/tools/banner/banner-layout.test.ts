@@ -3,15 +3,11 @@
 // title has no lone-character line and is legible on 3:1; the reflection grows with its length and stays in the canvas.
 import { describe, expect, it } from "vitest";
 import { applySemantic, layoutBanner, REF_PX, type LayoutMeasure } from "./banner-layout";
-import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBox, type ElemPositions } from "./banner-layers";
+import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBox, type ElemKey, type ElemPositions } from "./banner-layers";
+import { INIT, PRESETS, TEMPLATES, applyLayout, enterSize, templatePatch, type PresetKey, type State } from "./banner-state";
 
-// The 10 sizes of the tool (BannerStudio PRESETS). After R2-B moves them to banner-state.ts, import PRESETS from there so
-// a new size (2:1) is covered here automatically.
-const SIZES: Record<string, { w: number; h: number }> = {
-  r9x16: { w: 1080, h: 1920 }, r2x3: { w: 1000, h: 1500 }, r3x4: { w: 1080, h: 1440 }, r4x5: { w: 1080, h: 1350 },
-  r1x1: { w: 1080, h: 1080 }, r4x3: { w: 1200, h: 900 }, r3x2: { w: 1200, h: 800 }, r16x9: { w: 1920, h: 1080 },
-  r191x1: { w: 1200, h: 630 }, r3x1: { w: 1920, h: 640 },
-};
+// Every size of the tool: a new preset is covered by the overlap matrix automatically.
+const SIZES: Record<string, { w: number; h: number }> = PRESETS;
 
 // CJK = a square em, anything else 0.55 em; pictures by name
 const measure: LayoutMeasure = {
@@ -47,7 +43,7 @@ const overlap = (a: ElemBox, b: ElemBox) => a.x < b.x + b.w - 0.5 && b.x < a.x +
 const inside = (a: ElemBox, s: { w: number; h: number }) => a.x >= -0.5 && a.y >= -0.5 && a.x + a.w <= s.w + 0.5 && a.y + a.h <= s.h + 0.5;
 
 describe("(a) the automatic layout never overlaps and stays inside", () => {
-  it("10 sizes x badge tl/tr x logo 4 corners x product 4 places (wide and slim picture) x logo wide / tall x text top/center/bottom", () => {
+  it("every size x badge tl/tr x logo 4 corners x product 4 places (wide and slim picture) x logo wide / tall x text top/center/bottom", () => {
     const bad: string[] = [];
     for (const productImage of ["product", "slim"])
     for (const logoImage of ["logo", "tallLogo"])
@@ -122,5 +118,54 @@ describe("(d) reflection length", () => {
       expect(r.h).toBeGreaterThan(last);
       last = r.h;
     }
+  });
+});
+
+describe("R2-B2: every position button and template moves its element over a drag (applyLayout)", () => {
+  // every element dragged into the far bottom-left corner -- nowhere an automatic placement puts it
+  const corner: ElemPositions = Object.fromEntries(
+    (["headline", "subtext", "price", "cta", "trust", "product", "badge", "logo"] as const).map((k) => [k, { x: 0.02, y: 0.98 }]));
+  const dragged: State = { ...INIT, ...(everything as Partial<State>), typeAuto: true, positions: corner } as State;
+  const boxOf = (st: State, k: ElemKey) => layoutBanner(st, PRESETS[st.preset], measure).boxes[k];
+  const buttons: [string, Partial<State>, ElemKey][] = [
+    ...(["top", "center", "bottom"] as const).map((v) => [`文字 ${v}`, { textPos: v }, "headline"] as [string, Partial<State>, ElemKey]),
+    ...(["left", "center", "right"] as const).map((v) => [`對齊 ${v}`, { textAlignH: v }, "headline"] as [string, Partial<State>, ElemKey]),
+    ...(["tl", "tr"] as const).map((v) => [`徽章 ${v}`, { badgePos: v }, "badge"] as [string, Partial<State>, ElemKey]),
+    ...(["center", "left", "right", "bottom-right"] as const).map((v) => [`產品 ${v}`, { productPos: v }, "product"] as [string, Partial<State>, ElemKey]),
+    ...TEMPLATES.map((t) => [`模板 ${t.key}`, templatePatch(t, "r4x5"), "headline"] as [string, Partial<State>, ElemKey]),
+  ];
+  it.each(buttons)("%s", (_n, patch, k) => {
+    for (const preset of ["r4x5", "r16x9"] as PresetKey[]) {
+      const st = { ...dragged, preset };
+      const before = boxOf(st, k)!;
+      const after = applyLayout(st, patch);
+      expect(after.positions[k]).toBeUndefined();
+      expect(boxOf(after, k)).not.toEqual(before);
+    }
+  });
+
+  it("on the main size, a size tweak that inherits the field loses that drag; one that sets the field keeps it", () => {
+    const st: State = { ...dragged, positions: {}, multiSizes: ["r16x9", "r1x1"], sizeOverrides: {
+      r16x9: { positions: { badge: { x: 0.02, y: 0.98 }, logo: { x: 0.9, y: 0.9 } } },
+      r1x1: { badgePos: "tl", positions: { badge: { x: 0.02, y: 0.98 } } },
+    } };
+    const next = applyLayout(st, { badgePos: "tr" });
+    expect(next.sizeOverrides.r16x9?.positions).toEqual({ logo: { x: 0.9, y: 0.9 } });
+    expect(next.sizeOverrides.r1x1?.positions).toEqual({ badge: { x: 0.02, y: 0.98 } });
+  });
+
+  it("while a size is tweaked only that size's drag goes (the main design's stays)", () => {
+    const st = enterSize({ ...dragged, multiSizes: ["r16x9"] }, "r16x9");
+    const next = applyLayout(st, { productPos: "left" });
+    expect(next.positions.product).toBeUndefined();
+    expect(next.editingSize?.main.positions?.product).toEqual({ x: 0.02, y: 0.98 });
+  });
+
+  it("an opener keeps its fixed title size; any other template turns 自動字級 back on", () => {
+    const opener = TEMPLATES.find((t) => t.group === "opener")!, plain = TEMPLATES.find((t) => !t.group)!;
+    const o = applyLayout(dragged, templatePatch(opener, "r4x5"));
+    expect(o.typeAuto).toBe(false);
+    expect(o.headlineSize).toBe(Math.round(Math.min(1080 * 0.1, 1350 * 0.15)));
+    expect(applyLayout(o, templatePatch(plain, "r4x5"))).toMatchObject({ typeAuto: true, balanceTitle: false, brandBar: false });
   });
 });

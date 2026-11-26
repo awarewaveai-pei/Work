@@ -1,13 +1,14 @@
 "use client";
 import { badgeShadowOf } from "../banner-layers";
-import type { BadgePos, BadgeStyle, TrustType } from "../banner-state";
+import { FIELD_RANGES } from "../field-ranges";
+import { applyLayout, type BadgePos, type BadgeStyle, type TrustType } from "../banner-state";
 import type { StepSlot } from "./order";
 import { AccordionSection, PresetChips, ShadowControls, StepCard, type StepCtx } from "./ui";
 
 const CTA_PRESETS   = ["立即選購", "馬上搶購", "了解更多", "限時下單", "免費領取", "預約諮詢"];
 const BADGE_PRESETS = ["限時優惠", "母親節限定", "新品上市", "買一送一", "免運費", "熱賣中"];
 
-export default function StepMarketing({ slot, s, set }: StepCtx & { slot: StepSlot }) {
+export default function StepMarketing({ slot, s, set, setS }: StepCtx & { slot: StepSlot }) {
   return (
     <StepCard title={slot.title} step={slot.no} icon="🛒" summary={[s.ctaText, s.badgeText, s.showPrice ? s.priceNow || "價格" : "", s.trustType !== "none" ? "信任標記" : ""].filter(Boolean).join(" · ") || "無"}>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
@@ -61,7 +62,8 @@ export default function StepMarketing({ slot, s, set }: StepCtx & { slot: StepSl
                   <button key={pos}
                     className={s.badgePos === pos ? "btn btn-primary" : "btn btn-ghost"}
                     style={{ fontSize: 11, padding: "2px 8px" }}
-                    onClick={() => set("badgePos", pos)}>
+                    data-testid={`banner-badge-pos-${pos}`}
+                    onClick={() => setS((prev) => ({ ...applyLayout(prev, { badgePos: pos }), saved: false, error: null }))}>
                     {{ tl: "左上", tr: "右上" }[pos]}
                   </button>
                 ))}
@@ -71,7 +73,7 @@ export default function StepMarketing({ slot, s, set }: StepCtx & { slot: StepSl
               </div>
               <div className="form-row" style={{ marginTop: 8 }}>
                 <label className="form-label">徽章大小</label>
-                <input type="range" min={0.5} max={2.5} step={0.1} value={s.badgeScale}
+                <input type="range" {...FIELD_RANGES.badgeScale} value={s.badgeScale}
                   onChange={(e) => set("badgeScale", Number(e.target.value))} style={{ flex: 1 }} />
                 <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>{s.badgeScale.toFixed(1)}×</span>
               </div>
@@ -114,7 +116,7 @@ export default function StepMarketing({ slot, s, set }: StepCtx & { slot: StepSl
           {(s.trustType === "stars" || s.trustType === "reviews") && (
             <div className="form-row" style={{ marginTop: 8 }}>
               <label className="form-label">星數</label>
-              <input type="range" min={1} max={5} value={s.trustStars}
+              <input type="range" {...FIELD_RANGES.trustStars} value={s.trustStars}
                 onChange={(e) => set("trustStars", Number(e.target.value))} style={{ flex: 1 }} />
               <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6 }}>{s.trustStars}★</span>
             </div>
