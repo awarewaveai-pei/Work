@@ -21,6 +21,7 @@ import { checkProductionChangeAllowed } from "@/lib/system-modes/production-chan
 import { BLOCKED_CHANGE_CODE } from "@/lib/system-modes/blocked-change";
 import { scrubInternalMarkers } from "@/lib/content/internal-markers";
 import { sectionBody } from "@/lib/seo/section-headings";
+import { extractH1 } from "@/lib/content/article/meta";
 
 /** 發佈輸入。欄位型別刻意保持 unknown（與原 route body 同形），coercion 在 core 內統一做 → route 與積木共用同一套寬鬆解析。 */
 export interface WordPressPublishInput {
@@ -215,11 +216,6 @@ export function markdownToHtml(md: string): string {
   if (inOl) out.push("</ol>");
   if (inTable) out.push("</tbody></table>");
   return out.join("\n");
-}
-
-function extractH1(md: string): string {
-  const m = md.match(/^#\s+(.+)$/m);
-  return m?.[1]?.trim() ?? "";
 }
 
 export function extractExcerpt(md: string): string {

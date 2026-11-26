@@ -3,6 +3,7 @@
 // caller's identity (resolveWpSite: a customer, or orgIdentity for headless work, reaches only its own sites) and the
 // system mode is checked before the write, so both entries pass the same two checks.
 import { resolveWpSite } from "@/lib/content/wp-sites";
+import { BRIDGE_ONLY_SITE_ERROR } from "@/lib/payments/woo";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { blockedChangeMessage } from "@/lib/system-modes/blocked-change";
@@ -60,7 +61,9 @@ export async function trashWpPost(identity: Request | { headers: Headers }, site
 
 async function writePost(identity: Request | { headers: Headers }, siteId: string, postId: number, method: "GET" | "POST" | "DELETE", wp?: Record<string, unknown>): Promise<WpPostUpdate> {
   const site = await resolveWpSite(identity, siteId);
-  if (!site || !site.token) return { ok: false, status: 404, error: "Site not found or token missing" };
+  if (!site) return { ok: false, status: 404, error: "Site not found" };
+  // A site the site flow registered has no REST credential (woo.ts): say so instead of "not found"; nothing is sent.
+  if (!site.token) return { ok: false, status: 503, error: BRIDGE_ONLY_SITE_ERROR };
 
   if (method !== "GET") {
     const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), site.site.organizationId);

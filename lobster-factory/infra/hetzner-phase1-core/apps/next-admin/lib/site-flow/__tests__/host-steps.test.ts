@@ -12,7 +12,7 @@ import { executeStep, getSiteFlowStatus, nextEnvironmentStatus, planStep, pollRu
 import { createSiteGateClient, gateTargetOf, type GateTransport } from "../gate-client";
 import { HOST_STEPS, sitePanels } from "../steps";
 import { parseWpInstallInput, pluginArgs, pluginBatches } from "../steps/wp-install";
-import { UNDER_CONSTRUCTION_MARK } from "../steps/open";
+import { OPEN_PROBE_PATH, publicSiteIsOpen, UNDER_CONSTRUCTION_MARK } from "../steps/open";
 import { writeTick } from "../steps/manual-checks";
 import { resolveSiteFlowPlugins, ownReleasePlugins } from "@/lib/wp-plugin-stack-catalog";
 import type { EnvironmentRow, SiteRow, SiteStepKey } from "../types";
@@ -494,6 +494,17 @@ describe("item 6: partial success never reads done", () => {
     expect(r.body).toMatchObject({ ok: false, reason: "verify_failed" });
     expect(calls).toContain(`site-wp ${SLUG} close`);
     expect(tables.environments[0].status).toBe("failed");
+  });
+});
+
+// A shared-domain site's home page can be another service's: the proof asks a WordPress-only path, never "/".
+describe("publicSiteIsOpen", () => {
+  it("asks the probe path; WordPress's 404 = open, the under-construction 503 = not open", async () => {
+    const seen: string[] = [];
+    const answer = (res: Response) => (async (url: string | URL | Request) => { seen.push(String(url)); return res; }) as typeof fetch;
+    expect((await publicSiteIsOpen(DOMAIN, answer(new Response("nf", { status: 404 })))).open).toBe(true);
+    expect((await publicSiteIsOpen(DOMAIN, answer(new Response(`<p>${UNDER_CONSTRUCTION_MARK}</p>`, { status: 503 })))).open).toBe(false);
+    expect(seen).toEqual([`https://${DOMAIN}${OPEN_PROBE_PATH}`, `https://${DOMAIN}${OPEN_PROBE_PATH}`]);
   });
 });
 
