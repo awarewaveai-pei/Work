@@ -14,12 +14,11 @@ the Session's own (caption, caption-remove, status, clear) plus
 Commands from the page include {"type":"reply","zh":str} (works without listening),
 {"type":"start", ..., "save":bool, "summary":bool, "summary_min":number} (both off unless true),
 {"type":"segment-next","name":str|null} and {"type":"segment-rename","name":str} (while saving).
-Keys never leave the server: Gemini from the environment, Anthropic from the settings page."""
+Keys never leave the server; they are read through lib/settings.py (settings panel, else environment)."""
 import asyncio
 import functools
 import json
 import logging
-import os
 import time
 from urllib.parse import urlsplit
 
@@ -153,7 +152,7 @@ class Hub:
 
     def _refresh_keys(self) -> str:
         """Read the keys now (the settings page may have changed them); returns the Gemini key."""
-        gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        gemini_key = settings.key("gemini_api_key")
         self.translator.set_keys(settings.get_api_key(), gemini_key)
         return gemini_key
 
@@ -243,7 +242,7 @@ class Hub:
             return self._refuse(f"不認得的辨識方式：{stt}")
         gemini_key = self._refresh_keys()
         if stt == "gemini" and not gemini_key:
-            return self._refuse("這台電腦沒有設定 Gemini 金鑰（環境變數 GEMINI_API_KEY），請改用「本機（免費）」")
+            return self._refuse("還沒填 Gemini 金鑰：到「設定」面板填，或改用「本機（免費）」")
         self.archive = self._begin_archive(stt) if save else None
         if self.archive is not None:
             self.archive_task = asyncio.ensure_future(self._archive_loop(self.archive))

@@ -1,6 +1,6 @@
 """講者分離（pyannote）。標籤貼回既有 transcript segments。
 
-需要 HF_TOKEN 環境變數，且帳號需同意三個 gated repo（文件只寫兩個，2026-08-17
+需要 Hugging Face 金鑰（設定面板，否則環境變數 HF_TOKEN；讀法在 lib/settings.py），且帳號需同意三個 gated repo（文件只寫兩個，2026-08-17
 實測 pyannote 4.x 額外拉 PLDA 元件，缺一失敗）：
   - https://huggingface.co/pyannote/segmentation-3.0
   - https://huggingface.co/pyannote/speaker-diarization-3.1
@@ -55,11 +55,22 @@ def _join(a: str, b: str) -> str:
     return a + ("" if re.search(r"[一-鿿]$", a) and re.match(r"^[一-鿿]", b) else " ") + b
 
 
+def _hf_token() -> str:
+    # 本檔也會被別的專案按檔案路徑單獨載入（不在 lib 套件裡），不能 `from lib import settings`；
+    # 改按路徑載入同資料夾的 settings.py（只用標準庫）。
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_meeting_service_settings", os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.key("hf_token")
+
+
 def _run_pyannote(media_path: str, log=print):
     import torch
-    hf = os.environ.get("HF_TOKEN")
+    hf = _hf_token()
     if not hf:
-        raise RuntimeError("環境變數 HF_TOKEN 未設定")
+        raise RuntimeError("還沒填 Hugging Face 金鑰（到「設定」面板填）")
 
     log("[1/4] 載入音檔 ...")
     wav = _load_audio(media_path)
