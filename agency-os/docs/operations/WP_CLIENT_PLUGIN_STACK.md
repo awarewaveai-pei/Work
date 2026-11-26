@@ -53,9 +53,9 @@
 > 我們自己的產品做成的外掛，不是每站都要：建站流程第 3 步勾選才裝（catalog `required: false`）。不計入 §六 站型合計。
 > 發佈與升級和 wp-bridge 同一套腳本：`scripts/release-wp-bridge.sh --plugin <名>`（發版）、`scripts/rollout-wp-bridge.ps1 -Plugin <名>`（升級已裝的站；`-Install -Site` 才會裝到新站）。
 
-| 外掛 | 腳本 `--plugin` | Work 正本 | 發佈 repo（公開） | 版本（catalog `releaseVersion`） | Release 檔名 | 說明 |
+| 外掛 | 腳本 `--plugin` | Work 正本 | 發佈 repo | 版本（catalog `releaseVersion`） | Release 檔名 | 說明 |
 |------|-----------------|-----------|------------------|----------------------------------|-------------|------|
-| AwareWave Oracle（命理工具） | `oracle` | `lobster-factory/packages/oracle-wp-plugin/` | `awarewaveai-pei/aware-wave-oracle`（尚未建立，首次發佈前由人建） | 0.5.0 | `aware-wave-oracle-v<版本>.zip`（`bin/build-zip.sh` 依 `.distignore` 打包，不含 tests） | 勾選時同時寫入外掛的「引擎網址（伺服器用）」；發佈 repo 第一次 Release 前勾選會在主機下載失敗 |
+| AwareWave Oracle（命理工具） | `oracle` | `lobster-factory/packages/oracle-wp-plugin/` | `awarewaveai-pei/aware-wave-oracle`（private；v0.5.0 已發佈，主機有鏡像檔） | 0.5.0 | `aware-wave-oracle-v<版本>.zip`（`bin/build-zip.sh` 依 `.distignore` 打包，不含 tests） | 勾選時同時寫入外掛的「引擎網址（伺服器用）」；主機沒有對應版本的鏡像檔時安裝失敗（`lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md` §5） |
 
 ---
 
@@ -365,12 +365,12 @@ FluentSMTP 本身不提供郵件發送能力，需搭配 SMTP 供應商：
 | 角色 | 檔案 | 用途 |
 |------|------|------|
 | **TypeScript SSOT mirror** | `lobster-factory/infra/.../lib/wp-plugin-stack-catalog.ts` | 機器可讀外掛資料 + resolve 函式 |
-| **OnboardWizard Step 2** | `lobster-factory/infra/.../app/onboard/OnboardWizard.tsx` | 操作員選站型 + 顯示外掛數量 |
-| **BuildConsole** | `lobster-factory/infra/.../app/build/BuildConsole.tsx` | URL params 帶入後顯示綠色摘要 |
-| **BuildRunRequest 合約** | `lobster-factory/infra/.../lib/build-console/contracts.ts` | `packageSlug` / `pluginSlugs` 欄位 |
-| **Trigger.dev 安裝 task** | `lobster-factory/packages/workflows/src/tasks/wp-install-plugins.ts` | SSH + wp-cli install 執行層 |
-| **Trigger.dev 容器 task** | `lobster-factory/packages/workflows/src/trigger/apply-manifest.ts` | 主題 + postInstall + verification |
-| **Orchestrator workflow** | `lobster-factory/packages/workflows/src/trigger/create-wp-site.ts` | 依序觸發 apply-manifest → wp-install-plugins |
+| **建站表單** | `lobster-factory/infra/.../app/(shell)/ops/sites/new/NewSiteForm.tsx` | 操作員選外掛組合 |
+| **建站第 3 步** | `lobster-factory/infra/.../lib/site-flow/steps/wp-install.ts` | 依組合解出外掛清單，經主機閘門安裝 |
+| **BuildRunRequest 合約**（舊建站路徑） | `lobster-factory/infra/.../lib/build-console/contracts.ts` | `packageSlug` / `pluginSlugs` 欄位 |
+| **Trigger.dev 安裝 task**（舊建站路徑） | `lobster-factory/packages/workflows/src/tasks/wp-install-plugins.ts` | SSH + wp-cli install 執行層 |
+| **Trigger.dev 容器 task**（舊建站路徑） | `lobster-factory/packages/workflows/src/trigger/apply-manifest.ts` | 主題 + postInstall + verification |
+| **Orchestrator workflow**（舊建站路徑） | `lobster-factory/packages/workflows/src/trigger/create-wp-site.ts` | 依序觸發 apply-manifest → wp-install-plugins |
 
 ### 10.5 漂移防護
 

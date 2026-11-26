@@ -74,7 +74,10 @@ export async function saveDesign(
   ]);
   if (!img.ok) return { ok: false, status: 0, error: (img as { ok: false; error: string }).error, expired: false };
   if (src && !src.ok) return { ok: false, status: 0, error: (src as { ok: false; error: string }).error, expired: false };
-  return registerDesign(img.key, meta, src && src.ok ? { key: src.key, name: opts.source!.name } : undefined);
+  // The register step must name the org the upload went to: the pending key carries it, and without it the route falls
+  // back to the default org and refuses the key (a save to a picked client failed this way until 2026-11-26).
+  const registerMeta = opts.organizationId ? { ...meta, organizationId: opts.organizationId } : meta;
+  return registerDesign(img.key, registerMeta, src && src.ok ? { key: src.key, name: opts.source!.name } : undefined);
 }
 
 /** A data:, blob: or same-origin URL as a Blob, bytes unchanged. A public bucket URL (another origin, no CORS) goes through

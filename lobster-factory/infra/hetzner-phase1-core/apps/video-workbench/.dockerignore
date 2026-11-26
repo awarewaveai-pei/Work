@@ -8,6 +8,8 @@ handoff/
 vendor/ffprobe/ffprobe.exe
 vendor/fonts/*
 !vendor/fonts/sources.json
+vendor/depth/*.onnx
+vendor/depth/*.part
 engines/effectcraft/web/
 engines/effectcraft/web.new/
 engines/filmcraft/web/

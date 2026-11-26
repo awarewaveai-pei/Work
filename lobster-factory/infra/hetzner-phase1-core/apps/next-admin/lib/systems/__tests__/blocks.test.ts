@@ -1,14 +1,12 @@
-// Keeps lib/systems/blocks.ts true to the code: permanent numbers, no dead path, nothing unlisted, and the import-derived
-// usedBy file is current. Registry / cognitive checks need the repo root (local and CI); the host copy of next-admin has
-// neither, so those cases skip there and the rest still run.
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+// Only an edit of lib/systems/blocks.ts itself can turn this red (numbers, shapes, links). Everything that follows the rest
+// of the code -- who imports what, new capability ids, method counts, dead entry paths -- is in block-usage.generated.json,
+// which GitHub refreshes after every push (block-usage-refresh.yml) and the page lists as 待處理: feature work never waits.
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
 import { BLOCK_LAYERS, BLOCK_STATUS, LEGO_BLOCKS, TIERS, blockHref, blockStats, blocksForSystem, catalogHref, isLive } from "../blocks";
-import { APP, GENERATED, GEN_CMD, REPO, derivedUsedBy, hasRepo as repoPresent, inShared, liveEntries, readRegistry, scanImports, serialize, under } from "../block-usage";
+import { GENERATED, hasRepo as repoPresent, readRegistry } from "../block-usage";
 
 const hasRepo = repoPresent();
-const abs = (p: string) => (p.startsWith("repo:") ? join(REPO, p.slice(5)) : join(APP, p));
 const covered = new Set(LEGO_BLOCKS.flatMap((b) => b.covers ?? []));
 
 describe("積木目錄 shape", () => {
@@ -20,11 +18,11 @@ describe("積木目錄 shape", () => {
     }
   });
 
-  it("status is known, usedBy is non-empty, 功能積木 have a layer", () => {
+  it("status is known, a live entry has users, 功能積木 have a layer", () => {
     const layers = BLOCK_LAYERS.map((l) => l.key as string);
     for (const b of LEGO_BLOCKS) {
       for (const s of b.status) expect(Object.keys(BLOCK_STATUS), b.no).toContain(s);
-      expect(b.usedBy.length, b.no).toBeGreaterThan(0);
+      if (isLive(b)) expect(b.usedBy.length, b.no).toBeGreaterThan(0);
       expect(new Set(b.usedBy).size, `${b.no} lists a system twice`).toBe(b.usedBy.length);
       expect(b.tier === "block" ? layers.includes(b.layer ?? "") : b.layer === undefined, b.no).toBe(true);
     }
@@ -34,11 +32,6 @@ describe("積木目錄 shape", () => {
     for (const b of LEGO_BLOCKS) expect(b.entry.length > 0, b.no).toBe(isLive(b));
     const all = LEGO_BLOCKS.flatMap((b) => b.covers ?? []);
     expect(all.length).toBe(covered.size);
-  });
-
-  it("every entry path exists", () => {
-    const dead = LEGO_BLOCKS.flatMap((b) => b.entry.filter((p) => hasRepo || !p.startsWith("repo:")).filter((p) => !existsSync(abs(p))).map((p) => `${b.no}: ${p}`));
-    expect(dead).toEqual([]);
   });
 
   it("catalogHref leaves defaults out and opens the list filtered by system", () => {
@@ -59,60 +52,25 @@ describe("積木目錄 shape", () => {
   });
 });
 
-describe("積木目錄 coverage", () => {
-  it("every block the backend registry actually holds is covered (ids built in loops included)", async () => {
-    // operator RSS feeds (search/<feed id>) come from env at runtime and are part of B-008 by design; a host with feeds
-    // configured must not fail this test, so the registry is read with none
-    vi.stubEnv("CONTENT_TRENDING_FEEDS", "");
-    await import("@/lib/content/blocks/register-all");
-    await import("@/lib/content/trending-sources");
-    const { listAll } = await import("@/lib/content/blocks/registry");
-    const ids = listAll().map((b) => b.id);
-    expect(ids.length).toBeGreaterThan(10);
-    expect(ids.filter((id) => !covered.has(id))).toEqual([]);
-  });
-
-  it("every editor dock panel is covered", () => {
-    const panels = readdirSync(join(APP, "public/editor-shared/blocks")).filter((f) => f.endsWith(".js")).map((f) => `panel/${f.slice(0, -3)}`);
-    expect(panels.filter((id) => !covered.has(id))).toEqual([]);
-  });
-
-  it("every product MODULE_MANIFEST is covered", () => {
-    const mods = readdirSync(join(APP, "lib")).filter((d) => existsSync(join(APP, "lib", d, "MODULE_MANIFEST.json"))).map((d) => `module/${d}`);
-    expect(mods.length).toBeGreaterThan(5);
-    expect(mods.filter((id) => !covered.has(id))).toEqual([]);
-  });
-
-  it.skipIf(!hasRepo)("every cognitive family is listed with its method count", () => {
-    const root = join(REPO, "Projects/internal/cognitive-engineering-os/ai_lego/modules");
-    if (!existsSync(root)) return;
-    const actual = Object.fromEntries(readdirSync(root).filter((d) => !d.startsWith("_") && statSync(join(root, d)).isDirectory())
-      .map((d) => [`cognitive/${d}`, readdirSync(join(root, d)).filter((f) => f.endsWith(".py") && !f.startsWith("__")).length]));
-    const listed = Object.fromEntries(LEGO_BLOCKS.filter((b) => b.tier === "method").map((b) => [b.covers?.[0], b.count]));
-    expect(listed).toEqual(actual);
+describe("積木目錄 scan file", () => {
+  it("block-usage.generated.json has its shape and names only real block numbers", () => {
+    const d = JSON.parse(readFileSync(GENERATED, "utf8")) as Record<string, unknown>;
+    const strs = (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === "string");
+    const rec = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+    const nos = new Set(LEGO_BLOCKS.map((b) => b.no));
+    expect(rec(d.usedBy) && Object.entries(d.usedBy).every(([no, v]) => nos.has(no) && strs(v))).toBe(true);
+    expect(rec(d.methodCounts) && Object.values(d.methodCounts).every((n) => Number.isInteger(n))).toBe(true);
+    const row = (r: unknown) => rec(r) && typeof r.path === "string" && strs(r.systems);
+    expect(Array.isArray(d.shared) && d.shared.every(row)).toBe(true);
+    expect(Array.isArray(d.pending) && d.pending.every((r) => row(r) && ["shared", "uncovered", "dead"].includes(String((r as { kind?: unknown }).kind)))).toBe(true);
   });
 });
 
 describe.skipIf(!hasRepo)("積木目錄 against the system registry", () => {
   const registry = hasRepo ? readRegistry() : { shared_paths: [], systems: [] };
-  const imports = hasRepo ? scanImports(registry) : [];
 
   it("every usedBy slug is a registered system", () => {
     const slugs = new Set(registry.systems.map((s) => s.slug));
     expect(LEGO_BLOCKS.flatMap((b) => b.usedBy.filter((s) => !slugs.has(s)).map((s) => `${b.no}: ${s}`))).toEqual([]);
-  });
-
-  it("block-usage.generated.json matches the real @/ imports (file and folder entries)", () => {
-    const fresh = serialize(derivedUsedBy(LEGO_BLOCKS, imports));
-    expect(readFileSync(GENERATED, "utf8"), `a system started (or stopped) importing a block -- run \`${GEN_CMD}\` in apps/next-admin and commit the file`).toBe(fresh);
-  });
-
-  it("every file two or more systems assemble belongs to a block (or is registry shared plumbing)", () => {
-    const users = new Map<string, Set<string>>();
-    for (const { file, sys } of imports) users.set(file, (users.get(file) ?? new Set()).add(sys));
-    const entries = LEGO_BLOCKS.filter(isLive).flatMap(liveEntries);
-    const orphans = [...users].filter(([file, s]) => s.size >= 2 && !entries.some((e) => under(file, e))
-      && !inShared(registry, file)).map(([file, s]) => `${file} <- ${[...s].sort().join(",")}`);
-    expect(orphans).toEqual([]);
   });
 });

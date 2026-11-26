@@ -4,7 +4,6 @@
 // file, so its import closure names neither route (step-8 card §2 S1).
 import { useEffect, useState } from "react";
 import BannerStudio, { type BannerStaffApi } from "./BannerStudio";
-import { DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { roleHeader } from "@/lib/ops-role";
 import type { PickOrg } from "../../ops/clients/nav-orgs";
 import { OrgPicker } from "../../ops/clients/OrgPicker";
@@ -49,7 +48,7 @@ function BrandPicker({ onPick }: { onPick(colors: string[]): void }) {
 
 /** Card R3: whose 我的設計 存到圖庫 writes into -- every client (first page, then search), or 自用 (the default org). A
  *  client given by the link (?org=) that is not on the first page shows as a note until another pick. */
-function SaveOrgPicker({ selected, onPick }: { selected: string | null; onPick(orgId: string | null): void }) {
+function SaveOrgPicker({ selected, onPick }: { selected: string | null; onPick(orgId: string | null, name?: string): void }) {
   const [first, setFirst] = useState<{ orgs: PickOrg[]; total: number } | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -64,17 +63,17 @@ function SaveOrgPicker({ selected, onPick }: { selected: string | null; onPick(o
   if (!first) return null;
   return (
     <>
-      <OrgPicker searchPath="/api/ops/org-search" orgs={first.orgs} total={first.total} selected={selected} by="id" none="自用" onPick={(org) => onPick(org?.id ?? null)} />
+      <OrgPicker searchPath="/api/ops/org-search" orgs={first.orgs} total={first.total} selected={selected} by="id" none="自用" onPick={(org) => onPick(org?.id ?? null, org?.name)} />
       {selected && !first.orgs.some((o) => o.id === selected) && <p className="form-hint" style={{ marginTop: 6 }}>存到開啟時指定的客戶。</p>}
     </>
   );
 }
 
 const staff: BannerStaffApi = {
-  scriptForge: (task, fields) => fetch("/api/tools/script-forge", {
+  scriptForge: (task, fields, model) => fetch("/api/tools/script-forge", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-    body: JSON.stringify({ module: "banner", task, fields, model: DEFAULT_AI_TEXT_MODEL }),
+    body: JSON.stringify({ module: "banner", task, fields, model }),
   }),
   BrandPicker,
   SaveOrgPicker,

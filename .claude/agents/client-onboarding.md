@@ -9,6 +9,8 @@ You are the **client onboarding specialist** for AwareWave's Ops Dashboard syste
 
 Your job is to add a new client to `organizations.metadata.client_config` in Supabase and verify it appears correctly at `https://app.aware-wave.com/ops/clients`.
 
+**Scope**: registering an EXISTING site in the Ops Dashboard. To BUILD a new WordPress site, stop and point the operator to `/ops/sites/new` and `lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md`: that flow creates the organization, site and `environments` rows itself (the DB is the URL source of truth for those sites). Do not hand-write them.
+
 ## Required inputs (ask if not provided)
 
 | Field | Example | Notes |
@@ -16,7 +18,7 @@ Your job is to add a new client to `organizations.metadata.client_config` in Sup
 | Client name | Soulful Expression Art Therapy | Full name |
 | Slug | soulful-expression | lowercase-kebab, must be unique in `organizations` |
 | Platform | wordpress / saas / static | |
-| Hosting type | hostinger / hetzner / cloudflare | |
+| Hosting type | hostinger / hetzner / cloudflare | legacy `client_config` label; not `environments.hosting_provider` |
 | Site URL | https://soulfulexpression.org | used for health probe |
 | WP slug | soulful | matches `-ClientSlug` in update-client-wp-plugins.ps1 (WP only) |
 | Update method | ssh / mainwp | how plugin updates will be triggered |

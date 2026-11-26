@@ -5,6 +5,169 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql -c "select last_run_at, last_error, weekday_hours from client_schedules where job_key='claude_usage_window'" + RemoteTrigger get/list_runs | exit=0 | ms=3000
 - REVIEW_WAIVED: NA -- 無程式改動，只改 routine 設定與文件一行
 - BUGHUNT_WAIVED: NA -- 無程式改動
+## 2026-11-26（續30）— /tools/ai-models 實測紀錄：每項測試一個子分頁，依文字／圖片／影片／音訊分類，總覽卡片＋結論先行的版面
+
+[任務] 操作者：「把裡面的每種測試用 tab 分開，要按邏輯分類歸納，UI/UX 排版要有國際頂尖設計師水準」。
+
+[已修改]
+- `app/(shell)/tools/ai-models/MeasuredRuns.tsx`：七項測試各一個子分頁 `?tab=measured&test=<key>`，導覽列依 文字（文章生成／八種文案／橫幅文案）→ 圖片（文章配圖）→ 影片（破框貼文動畫）→ 音訊（音樂生成／語音與音效）分組；不帶 test 或未知 test = 總覽（七張卡：類別、日期、模型數、要回答的問題、結論、通過／未通過／待測）。測試頁：問題 → 日期／已測／判定 → 結論 → 做法 → 完整比較頁（K28 iframe）→ 結果列（模型＋判定標籤＋盲評名次｜實扣／標價｜結果）。全組相同的「做了什麼／出處」只在頁首或頁尾寫一次，不同的才在該列註明。資料列原文保留，只有三處改動：盲評名次從結果文字抽成 `rank`；文章配圖對照列的「做了什麼」改成實情「只給中文替代文字」（依 `agency-os/reports/model-bakeoff/2026-11-article-image/build_image_page.cjs:41`）；對照列加 `control`，不算進模型數。
+- `page.tsx`：把 `test` 傳給 MeasuredRuns。`app/globals.css`：新增 `.mr-*`，只用 token，≤760px 時結果列改成單欄。
+- `__tests__/bakeoff-pages.test.ts`：iframe 斷言改成逐個子分頁渲染；新增「總覽連到每個子分頁、沒有 iframe；未知 test = 總覽」。
+- 本機 main 落後 origin 91 個 commit，且被別的 session 的未追蹤檔擋住 ff；本次在 `D:\Worktrees\mr-tabs`（以 origin/main 為底）重做後直接推上去。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run "app/(shell)/tools/ai-models/__tests__/bakeoff-pages.test.ts"`（worktree） | exit=0 | ms=678 | result=7 passed
+- `npx tsc --noEmit`：ai-models 零錯誤；僅 `banner-layers.ts` 缺 `ag-psd`。原因是共用的 node_modules 比 origin 的 package.json 舊，跟本次改動無關。
+- 版面：用 tsx 把元件渲染成靜態 HTML、套 globals.css，再用 headless Chromium 截圖檢查 1440 寬，以及 375 寬 iframe 裡的手機寬度。手機寬 scrollWidth ≤ 視窗寬，沒有橫向捲動。dev server 需要 Supabase 登入，未代填密碼。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/6m/0n
+  - Codex 三輪（`agency-os/reports/oracle/2026-11-26-partialreview-1df97c49.md`、`-363d2654.md`、`-598b2f5b.md`）6 項全部成立且已修：對照組誤標同輸入、計數單位是列不是次、對照列算成模型、八種文案缺日期（取資料 commit `4066ff696` 的 2026-11-23）、語音四列是 API 不是模型（`unit`）、橫幅結論漏「自編折扣要換真的」。
+  - 不變量（同一 reviewer 第 3 輪前）：頁面上每個數字／日期的意思必須跟它的標籤一致。模型數 = 實際跑過的不同模型（排除待測與對照）；單位不是模型時由組自帶 `unit`；沒有資料列的組明寫 `date`／`models`。
+- ORACLE_WAIVED: 第 3 輪後的最後一次修改只套用該輪兩項 finding（`unit` 欄位與一句結論文字），tsc 與指名測試重跑皆綠；再跑一輪等於重審同一份程式，無效益。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=MeasuredRuns|tab=measured | hits=12
+  - 程式呼叫點只有 page.tsx 與測試，已更新。handoffs 文件提到的 `?tab=measured` 網址仍然有效（落在總覽）。
+
+[剩餘風險] 每項測試的完整比較頁 iframe 只在正式站實際載入（路由限員工）；今晚 03:00 自動部署後才會在線上看到。本機 `D:\Work` 仍落後 origin，要等 AO-RESUME 的 parity 或擋住的未追蹤檔處理後才會跟上。
+[rollback] `git revert <本 commit>`：只動 ai-models 三個檔＋globals.css 末段＋本條 WORKLOG。
+## 2026-11-26（續27）— 實測紀錄「橫幅：生成文案」改成依結論分組的卡片排版
+
+- 起因：操作者「要按邏輯分類歸納，UI/UX 排版要國際頂尖設計師水準」（兩頁都要；本條是實測紀錄頁，橫幅工具左欄另開 C13）。
+- 改動：新檔 `NA/app/(shell)/tools/ai-models/BannerCopyBakeoff.tsx`：測試條件膠囊列、結論框（建議 Sonnet 5.5）、四組（推薦／可用但普通／沒有促銷感／不能用），每個模型一張卡（價錢、秒數、一句判斷、5 組標題＋副標，自編優惠數字標紅字）。`MeasuredRuns.tsx`：Group 加 `body`，刪掉 BANNER_COPY／BANNER_COPIES／copies 欄位（資料搬進新檔，逐字不變）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . ; npx tsx renderToStaticMarkup(BannerCopyBakeoff) -> D:/tmp/bcb.html 47KB | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 展示頁排版，資料逐字搬移
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=BannerCopyBakeoff | hits=3
+- rollback：`git revert` 本 commit
+## 2026-11-26（續31）— 橫幅 C12／C13 第二輪審查修正：品牌色跟著客戶走、半透明字逐通道混色、空白提示只給沒動過的設計
+
+- 根因（Codex 第二輪 3 項，artifact `agency-os/reports/oracle/2026-11-26-partialreview-db050a3e.md`，監工確認）：1) `NA/app/(shell)/tools/banner/kit/useBrandKit.ts` 換 org 時沒清舊 kit，載入中／失敗時 AI 一鍵設計用上一個客戶的品牌色、卻存到新客戶；2) `design-colors.ts` 半透明字用亮度近似混色，彩色背景誤判（白字 0.7 在 #0000ff 實際 4.40、算成 5.29）；3) `BannerStudio.tsx` 空白提示的條件沒看背景，只改純色／漸層時預覽仍被蓋住。不變量：設計用的品牌色永遠屬於目前選的客戶；對比度照 canvas 實際畫法算；空白提示只在設計完全沒動過時出現。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 修：`useBrandKit` 每次換 org 先清 kit／saved／canEdit／externalLogo，網路失敗也清 kit；`BannerStudio` 載入中 AI 一鍵設計停用並顯示「正在載入品牌色…」、`generateFullDesign` 開頭擋載入中、AI 回來時客戶已換就不套用並說明；載入失敗顯示 `banner-kit-failed` 一行。`design-colors.ts`：`Zone.colors`（純色＝該色、漸層＝兩端＋3 個中間點、圖片＝量到的主要顏色），`zoneRatio` 對灰階亮度範圍與每個已知顏色逐 sRGB 通道混色後取最差；暗化／底襯也逐通道。新 `isUntouched(state)`（designSig 比對 INIT，主題／語氣／尺寸不算），`blank = isUntouched && !designing`。
+- 驗證：tsc 綠；vitest banner＋lib/theme＋blocks＋script-forge＋client-context＋ops/clients＋api/tools/presets 204 passed（新增指名：白字 0.7 在 #0000ff＝4.40 且原價時守衛開底襯、unmet 空；只改背景色／漸層 → 不是空白，主題與尺寸不算改動）。
+- 剩餘：kit 清除與載入中停用沒有自動化測試（hook，無 React 測試環境），靠讀碼；圖片背景用「整張」的主要顏色一起算，可能比文字那一帶實際更保守；本機沒實開確認。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme lib/systems/__tests__/blocks.test.ts lib/script-forge lib/client-context "app/(shell)/ops/clients" "app/api/tools/presets" | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/3m/0n（Codex 第二輪 3 項已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=(1 - alpha) ** 2.2 | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查（Codex 已審兩輪）
+## 2026-11-26（續29）— 橫幅 C13：右欄依做圖順序重排成「開始＋1–6」，收合時顯示目前的值
+
+- 根因／決策：右欄 9 張卡用 CSS `order` 排，編號亂（配色無編號在第 1、Step 0 文案在第 6、Step 4.5）；主入口（主題＋AI 一鍵設計）埋在第 6 張；「存到哪個客戶」在最底的匯出區且是一長串清單，但它同時決定品牌套組；預覽空白是一塊黑框。改為照做一張圖的順序：頂部「開始」（永遠展開、不編號）→ 1 尺寸 → 2 文字 → 3 畫面 → 4 行銷元素 → 5 風格 → 6 匯出；各區內容整塊搬移、控制項與 testId 不改。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 修：`NA/app/(shell)/tools/banner/BannerStudio.tsx`：`StepCard` 拿掉 `order`、改成圓形編號＋右側 `summary`（`banner-step-summary-<n>`）；新 `SubHead`（區內小標）、`BG_MODE_LABEL`、`useWide`（≥960px 預覽 sticky，窄時預覽在上、設定在下）；右欄 `flex: 1 1 340px; maxWidth 420; minWidth 0`、預覽 `minWidth 0`（375 寬無橫捲）；「開始」區：客戶名＋「更換」才展開 `SaveOrgPicker`（選完收起），文案描述改名「主題」；AI 一鍵設計按鈕拿掉 hex 漸層改單一 `btn-primary`；色票框 `#0002` → `var(--border)`；預覽棋盤格 hex 背景拿掉；設計全空時顯示 `banner-empty-hint`「先在「開始」輸入主題，再按 ✨ AI 一鍵設計」。`BannerStudioStaff.tsx`：`SaveOrgPicker.onPick` 多回傳客戶名稱。
+- 控制項對照（舊位置 → 新位置；區塊內容整塊搬移，原 testId 全保留）：
+  - 配色／品牌色卡（BrandKitPanel、logo 大小 `banner-logo-scale`、拿掉 logo、BrandPicker 其他客戶品牌色、從參考圖擷取配色、色票、自動套用整組配色、選中色套到 7 個目標）→ 5 風格「配色／品牌色」
+  - 版型模板卡（一般模板 6 個、影片片頭字卡 3 個）→ 5 風格「版型模板」
+  - Step 0 文案生成（描述→「主題」、語氣 4 鈕、文案模型 `banner-model-copy-*`、設計模型 `banner-model-design-*`、生成文案（新 `banner-ai-copy`）、AI 一鍵設計（新 `banner-ai-design`）、串流預覽、5 組文案選擇）→ 開始
+  - 匯出卡的「存到哪個客戶的我的設計」SaveOrgPicker → 開始「為哪個客戶做」（`banner-client-name`＋`banner-client-change`）
+  - Step 1 尺寸（`banner-size-<k>`、`banner-size-edit-<k>`）→ 1 尺寸
+  - Step 4 文字（標題、副標、字體配對、標題／內文字體 `banner-{headlineFont,fontFamily}-*`、字重 `banner-{headlineWeight,bodyWeight}-*`、字色、重點字色、重點字底色、標題字距、`banner-headline-leading`、`banner-body-tracking`、`banner-body-leading`、`banner-kinsoku`、`banner-cjk-spacing`、標題 px、副標 px、垂直、水平、描邊陰影、文字陰影 `banner-text-shadow-*`、文字底襯＋濃度、暗化背景＋濃度）→ 2 文字
+  - Step 3 背景（類型 4 鈕、背景色、漸層起／迄／方向、上傳圖、圖片位置 `banner-bg-scale`／`banner-bg-under-color`／`banner-bg-reset`、在畫布編輯 `banner-bg-canvas`、AI：圖片模型群組＋模型、產品場景模板、Subject、Vibe、打光、風格＋清除、參考圖、產品圖處理、提示詞預覽＋編輯＋還原、生成／合成背景）→ 3 畫面「背景」
+  - Step 2 產品圖（上傳／換圖、一鍵去背、`banner-product-canvas`、移除、位置 4 鈕、大小、商品擬真 `banner-ground-shadow`／`banner-ground-reflection`／`banner-ground-tone`＋各滑桿）→ 3 畫面「產品圖」
+  - Step 4.5 行銷元素（CTA 文字＋預設＋底色＋字色＋`banner-cta-shadow-*`、徽章文字＋預設＋樣式＋位置＋顏色＋大小＋`banner-badge-shadow-*`、價格開關＋現價＋原價、信任標記 4 鈕＋星數＋文字）→ 4 行銷元素
+  - Step 5 匯出（存到圖庫、PNG、`banner-download-jpg`、`banner-download-webp`、`banner-target-kb`、`banner-download-psd`、`banner-download-svg`、`banner-open-photo-pro`、`banner-open-vector-pro`、已儲存連結）→ 6 匯出
+  - 預覽欄（復原、重做、`banner-auto-layout`、`banner-preview`、`banner-drag-guides`、`banner-multi-done`、多尺寸卡 `banner-multi-*`）→ 不動
+  - 機械比對：舊／新檔 `data-testid`、`onClick`、`onChange`、`<input>`、`<textarea>`、`AccordionSection` 計數 diff 只有新增（5 個新 testId＋「更換」1 個 onClick），無減少。
+- 驗證：tsc 綠；vitest banner＋lib/theme＋blocks＋script-forge＋client-context＋ops/clients 192 passed；本機 dev（:3907）1440 寬：開始區在右上、1–6 連號、摘要「1.91:1／未填標題／純色／無／自訂配色／圖庫 · PNG…」、空白預覽顯示引導、捲動時預覽固定；375 寬：預覽在上、設定在下、`scrollWidth`=375；輸入標題 → 摘要「夏日限定咖啡」、引導消失；加 9:16 → 摘要「2 個 · 編輯 1.91:1」、多尺寸卡出現。截圖 `$env:TEMP/banner-c13-1440.jpg`、`$env:TEMP/banner-c13-375.jpg`。
+- 剩餘：「從其他客戶帶入配色」的 BrandPicker 仍是第二個客戶清單（借別家品牌色，功能不同，保留在 5 風格）；以 ?org= 開啟時客戶名稱顯示「開啟時指定的客戶」（清單 API 未回名稱前）；各區塊內部原有的小字級（11–13px）與間距未逐一改成 8 的倍數，只統一了區塊標題、區塊間距與內距；本機無資料庫，客戶選擇器的清單內容未實看。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme lib/systems/__tests__/blocks.test.ts lib/script-forge lib/client-context "app/(shell)/ops/clients" | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=空白引導寬度在 inline-block 父層被縮成 316px，已改父層 block）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=step="Step | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續28）— 橫幅 C12 審查修正：對比度守衛改用最壞點、半透明字、重點字底牌、徽章後備、百分位範圍
+
+- 根因（Codex 審查 5 項，監工讀碼確認）：`NA/app/(shell)/tools/banner/design-colors.ts` 1) 原價／副標／信任說明 renderer 以 0.7／0.95／0.92 透明度畫，守衛卻用原色碼算；2) accentHighlight 時字是 #1a1a1a、accentColor 是底牌，守衛卻比 accentColor 對背景；3) 徽章沒有套組色撐得住白字時只記 unmet 就放行；4) zoneRatio 只看 lo／hi 兩端，文字亮度落在區間內時漏判；5) 亮度範圍用平均±標準差，小亮斑被平均掉。不變量：守衛算的是畫出來的實際像素對比，且每個角色都有必定達標的最後手段（unmet 恆空）。
+- 修：`zoneRatio(hex, zone, alpha)` 取區間內最接近文字亮度的點（含 alpha 時先在 sRGB 空間混色再取樣）；`TEXT_ALPHA`（對照 banner-layers 副標 0.95、原價 0.7、信任說明 0.92）＋`TextContent` 讓文字色對每個實際出現的元素各自檢查（標題／現價 3:1，其餘 4.5:1）；底襯上限改 0.9（滑桿上限，白字在此必過）；accentHighlight 檢查 `PLATE_TEXT` 對 accentColor ≥3:1，無色可用退白；徽章、CTA 底無色可用退 #111111；`bgStatsFromPixels` 範圍改第 2／98 百分位（busy 照舊用標準差）。`BannerStudio.tsx` 傳 `content`。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋accent-not-text＋blocks＋script-forge 70 passed（新增指名 5 案：0.7 原價以混色判斷、底牌字對 accentColor、徽章退近黑且 unmet 空、黑白漸層上灰字 1:1、小亮斑計入而單一雜點不計）。
+- 剩餘：混色以亮度近似（非逐通道）；星星固定 #fbbf24 未檢查；本機無 AI 金鑰，按鈕整流程未實打。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts lib/systems/__tests__/blocks.test.ts lib/script-forge | exit=0 | ms=7000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/5m/0n（Codex 5 項已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=smallText | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查（Codex 已審 C12）
+## 2026-11-26（續26）— 橫幅 C12：AI 一鍵設計的配色看背景＋品牌色，對比度由程式把關
+
+- 根因：`generateFullDesign` 只送 brief／尺寸，AI 看不到背景與品牌套組；design prompt 寫死 `"bgMode":"gradient"`，`sanitizeDesign` 只擋 upload/ai 字面值，所以使用者上傳／AI 生的背景會被換成漸層；顏色對比沒有任何檢查。不變量：背景是圖片時永不被 AI 換掉；有品牌套組時 AI 只能用套組色；最後的文字顏色一定過 WCAG 對比（標題 3:1、副標／小字／CTA 文字 4.5:1）。
+- 修：新 `NA/app/(shell)/tools/banner/design-colors.ts`（純函式）：`relLum`／`contrastRatio`（WCAG）、`bgStatsFromPixels`（9 個文字區：上中下×左中右，亮度範圍＝平均±標準差）、`bgStatsFromColors`、`mergeBgInfo`（多尺寸各裁一次取最寬範圍）、`pickColorRoles`（色盤索引或 #hex；有 kit 時 kit 外的 hex 丟棄改 kit 預設分配；背景欄位只在 color/gradient 模式收）、`guardContrast`（文字對所在區塊，含暗化與底襯；不足時 1. 換色盤裡夠的另一色 2. 開 textScrim＋textOutline、底襯 0.5 起逐步加深到 0.85；CTA 文字對 ctaBg；徽章白字對 badgeColor）、`resolveDesignColors`、`usablePalette`、`bgForPrompt`。`BannerStudio.tsx`：`measureBackground`（瀏覽器內免費量測，圖片照 renderer 方式每個尺寸各畫一次）、送 `bg`／`palette`／`brandKit`，回答的所有顏色改走 `resolveDesignColors`（`sanitizeDesign` 不再收顏色欄位）。`NA/lib/script-forge/modules.ts`：`bannerBgFields`／`bannerColorPart`（背景資訊、色盤、60-30-10、CTA 一個焦點；圖片背景時不要求背景欄位）；沒送 bg 時 prompt 與舊版相同。`banner-design.ts` design 估算輸入 token 1000→1350（prompt 多約 430 字）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋accent-not-text＋blocks＋script-forge 65 passed（新增點名 8 案：WCAG 參考值、kit 外顏色被丟、kit 時背景色也限 kit、upload／ai 背景不被換、換色優先、無色可換時開底襯＋描邊後達標、CTA 文字換色）；突變：拔「upload/ai 不換背景」守衛 → 指名 2 案紅 → 還原綠；`npm run blocks:usage` usedBy 不變。
+- 剩餘：本機沒有 AI 金鑰與資料庫，整條按鈕流程未實打；有 kit 但沒有任何 kit 色能過對比時，退回白／近黑（kit 外）；被拖動過位置的文字仍以 textPos 那一帶量測；漸層以整段色彩範圍保守判斷，可能比實際更常開底襯。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts lib/systems/__tests__/blocks.test.ts lib/script-forge | exit=0 | ms=7000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=bgMode":"gradient|assign("bgMode" | hits=1
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續25）— 橫幅生成文案實測頁：每個模型回的 5 組標題／副標全部列出
+
+- 起因：操作者「每個模型回 5 組 都要列出」；原本每列只摘一例。
+- 改動：`NA/app/(shell)/tools/ai-models/MeasuredRuns.tsx` Row 加選填 `copies`，結果欄下方以編號清單列出；`BANNER_COPIES` 12 個模型各 5 組，逐字取自同次（11:05）script-forge 回應。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . (only pre-existing ag-psd module errors) | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 展示用資料＋一個選填欄位
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=BANNER_COPIES | hits=13
+- rollback：`git revert` 本 commit
+## 2026-11-26（續24）— 橫幅生成文案 12 模型實測（主題「塔羅牌」），結果寫進 /tools/ai-models 實測紀錄
+
+- 起因：操作者用 GPT-6.2 sol（生成文案預設）測「精油」判定不佳，要求各模型實測並寫進「AI 模型與成本」。
+- 實測：正式站 `/tools/banner` 頁內 fetch `/api/tools/script-forge`（module=banner, task=copy, brief=塔羅牌, tone=促銷, 1.91:1），12 個 AI_TEXT_MODELS 同時各一次，全部 200；實扣取自 `ai_call_logs` 11:05:24–33（NT$0.01–0.72，合計約 NT$2.3）。
+- 結論（Claude 初判）：照「促銷」寫且可用 = Sonnet 5.5（NT$0.14）、Fable 5.1（0.59）、Opus 5.5（0.72）；sol／astra／terra／luna 沒有促銷感；mini 把「分享預覽」寫進副標；nano 誇大。Claude 系會自編折扣數字。
+- 改動：`NA/app/(shell)/tools/ai-models/MeasuredRuns.tsx` 新增「橫幅：生成文案」12 列（便宜在前），頁首日期改 11-13～26。預設模型未改（待操作者決定）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=ssh psql select ai_call_logs where route like '%script-forge%' last 15 min | exit=0 | ms=2000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 只新增展示用資料列，無邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=BANNER_COPY | hits=13
+- rollback：`git revert` 本 commit
+## 2026-11-26（續23）— block-usage-refresh 首跑失敗（run 45744677662）：產生器載入內容積木 registry 需要 app 依賴，補 npm ci
+
+- 根因：`gen-block-usage.ts` import `lib/content/blocks/register-all` → `lib/supabase-server.ts` 需要 `@supabase/*`；workflow 只用 `npx tsx`、沒裝 next-admin 依賴 → MODULE_NOT_FOUND。本機有 node_modules 所以沒踩到。
+- 修正：`.github/workflows/block-usage-refresh.yml` setup-node 加 npm cache、新增 `npm ci`（同 next-admin-test.yml），改跑 `npm run -s blocks:usage`。
+- 驗證：YAML 解析步驟正確；推送後看該 workflow 的 run。
+- REALTEST_EVIDENCE: tool=Bash | cmd=gh run view 45744677662 --log-failed | exit=0 | ms=3000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: workflow 補安裝步驟，照抄 next-admin-test.yml 既有寫法
+- BUGHUNT_DONE: scope=.github,lobster-factory | grep=blocks:usage | hits=4
+- rollback：`git revert` 本 commit
+## 2026-11-26（續22）— 小工具不算積木＋積木目錄永不擋開發：5 個改共用小工具、目錄資料由 GitHub 每次推送後自動更新、跟不上的列「待處理」
+
+- 根因／決策：操作者「一個小功能就成為一個積木很怪」「我會一直增加修改功能」。原規則把「≥2 系統共用」當成「是積木」，21 行的分頁讀取也被編號；且 usedBy、覆蓋、方法數、entry 路徑全是 CI 閘，任何功能開發都可能被目錄擋（6b9032f09、5880756a8 兩次）。不變量改為：**只有改壞 blocks.ts 本身才會紅；跟著程式走的資料全自動產生；要人判斷的列待處理**。
+- 步驟（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+  - `NA/lib/systems/blocks.ts`：B-078／B-081／B-083／B-084／B-089 → `sharedTool()`（退場、保留編號）；積木定義寫進檔頭；`SHARED_TOOLS`／`PENDING` 匯出；認知方法數改讀產生檔（30 行手寫數字刪除）
+  - `agency-os/systems/registry.json`：上述 6 路徑進 `shared_paths`
+  - `NA/lib/systems/block-usage.ts`：`scanCatalog` → `{usedBy, methodCounts, shared, pending}`；pending 三類：shared（共用檔待歸類）／uncovered（新功能 id 未編號）／dead（entry 檔不見）；`fsFacts()`
+  - `NA/scripts/gen-block-usage.ts`：另載入內容積木 registry 取 id
+  - `NA/lib/systems/__tests__/blocks.test.ts`：刪 import 新鮮度、跨系統共用、4 個覆蓋、entry 存在檢查（全部移入產生檔）；只留目錄自身一致性＋產生檔格式（Codex：連值型別一起驗）
+  - `NA/app/(shell)/ops/systems/blocks/page.tsx`：清單底部「待處理」（依種類標籤）＋「共用小工具」；頁首有待處理時提示；退場卡不顯示空的使用系統
+  - `.github/workflows/block-usage-refresh.yml`（新）：push main（next-admin／registry）→ 重產 → 有變更就以 GITHUB_TOKEN 提交（被拒重試 3 次）→ dispatch next-admin-test／typecheck（check-ci-green 需要該提交的 run）
+- 驗證：在 origin/main 2e70c9934 拋棄式 worktree：`npm run blocks:usage`（方法數 30 族 306 個＝原手寫；待處理 0）；tsc 只剩 ag-psd（Banner 新依賴本機未裝）；vitest 86 passed；實測：新增未登記面板＋改壞 B-012 entry → 只進待處理（uncovered／dead），vitest lib/systems 41 passed 仍綠；本機 :3904 實看共用小工具清單、功能積木 69
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run blocks:usage; npx vitest run lib/systems "app/(shell)/ops/systems" app/__tests__/sidebar-coverage.test.ts lib/studio/__tests__/editor-ai-panels.test.ts | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-26-partialreview-3db38b19.md）：覆蓋檢查仍擋新功能、格式測試不驗值；2 項已修
+- ORACLE_WAIVED: 2m 修在 artifact 之後（覆蓋／方法數／entry 移入產生檔、格式測試驗值），突變實測覆蓋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=PENDING_SHARED|scanCatalog|sharedTool|block-usage-refresh | hits=18
+- 剩餘風險：bot「有變更→提交→dispatch」分支要等下一次真的有變更的推送才會實跑；若被擋只會讓目錄落後（不擋開發），屆時看 Actions
+- rollback：`git revert` 本 commit
+## 2026-11-26（續21）— 橫幅 C11：「尺寸」按鈕本身就是多選；刪掉獨立的「多尺寸輸出」勾選清單
+
+- 根因／決策：操作者「多尺寸輸出應該可以在尺寸選擇」。原本尺寸按鈕是單選、另有一份多尺寸勾選清單，兩處做同一件事。改：尺寸按鈕按一下加入、再按一下取消（至少留一個）；已選的亮起，編輯中的那張加外框與「✎ 編輯中（預覽顯示這張）」，其他已選的旁邊有「改這張」（沿用 enterSize／leaveSize 與 sizeOverrides）。資料結構不變：`preset`＝主尺寸、`multiSizes`＝其餘、`editingSize`＝正在微調的那張。`NA/app/(shell)/tools/banner/BannerStudio.tsx` 新增 `selectedSizes`、`editingSizeOf`、`toggleSizePick`、`promoteMain`：取消編輯中那張 → 改編輯剩下的第一張；取消主尺寸 → 剩下的第一張（或正在編輯的那張）以它當下的樣子變成主尺寸。多尺寸縮圖、全部下載、全部存到我的設計、AI 一鍵設計依尺寸排版都改讀已選尺寸；舊資料 `multiSizes` 含主尺寸時照常去重載入。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋accent-not-text＋blocks 39 passed（新增點名 3 案：加入與取消、取消編輯中那張時切換、只選一個時與舊行為一致）；本機實開：加 9:16、1:1 → 三張亮起、出現多尺寸卡；「改這張」9:16 → 預覽變 9:16；取消 9:16 → 編輯中改為 1:1；再加回 9:16（`$env:TEMP/banner-c11-size-multiselect.jpg`）。
+- 剩餘：要換成別的單一尺寸，現在是先加新尺寸再取消舊的（兩下）；取消主尺寸時其他尺寸的字級改以新主尺寸換算。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts lib/systems/__tests__/blocks.test.ts | exit=0 | ms=6000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=toggleSize|banner-multi- | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續19）— 橫幅 C10：AI 回答的 JSON 只要有一個完整物件就能用；解析失敗自動重試一次，再失敗才報錯並留原文
+
+- 根因：正式站 AI 一鍵設計（Opus、3 尺寸）第一次回 2,055 tokens、未截斷、已收費 NT$1.51，但前端只做 `JSON.parse(去 fence 後全文)`，答案前後若有說明文字、尾逗號、字串內未跳脫的換行或串流尾標記就整個失敗，且原文沒留下。不變量：答案裡只要有一個完整物件就要能用；真的壞了才失敗，失敗要留原文。
+- 修：`NA/app/(shell)/tools/banner/banner-design.ts` 新增 `parseAiJson`（先切 `[SF_BUDGET]`／`[ERROR]` 尾標記與 code fence，依括號配對且略過字串內容取第一個完整 `{…}`／`[…]`，parse 失敗再修尾逗號與字串內換行／tab 後重試）、`askJsonWithRetry`（同模型同參數再問一次）、`readAiStream`、`aiFormatError`（「AI 回傳格式錯誤（已重試一次），本次已計費約 NT$x」，x＝呼叫次數×按鈕估價，原文前 2,000 字 console.error）。`BannerStudio.tsx` 的 `generateFullDesign` 與 `generateCopy` 都改用它，重試時按鈕顯示「重試中…」；順手修 `if (!staff) return` 在 try 內讓「設計中…」卡住。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋accent-not-text＋blocks 36 passed（新增點名 5 案：前後說明文字、code fence、尾逗號、尾端 [SF_BUDGET] 都解析成功；第一次壞第二次好 → 套用成功、呼叫 2 次）。
+- 剩餘：當初那次失敗的原文沒攔到，修法依常見錯誤推測（說明文字、fence、尾逗號、字串內換行）；HTTP 錯誤（非 200）不重試；重試會再收一次費。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts lib/systems/__tests__/blocks.test.ts | exit=0 | ms=6000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=generateFullDesign/generateCopy 在 try 內 return 讓 designing 卡住，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=JSON.parse(full.replace | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續18）— main CI 紅（next-admin-test run 45736249682）：block-usage 產生檔落後 Banner 新 import，重產＋失敗訊息改顯示差異
+
+- 根因：續15 的產生檔取自較早的 origin/main 快照；合併時 Banner 已新增 design 對 AI 閘道（B-066）的 import → 產生檔過時，CI 正確擋下（機制本身按設計運作）。
+- 修正：`NA/lib/systems/block-usage.generated.json` 以合併後 e2242089f 重產（`+ B-066 design`）；`NA/lib/systems/__tests__/blocks.test.ts` 改比對解析後物件，失敗時直接列出哪顆積木／哪個系統不同（原本只印被截斷的 JSON 字串）（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）。
+- 驗證：在 e2242089f 拋棄式 worktree：舊產生檔 → 紅且輸出含 `"B-066"` 差異；新產生檔 → 綠；vitest lib/systems＋ops/systems 56 passed。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run blocks:usage; npx vitest run lib/systems "app/(shell)/ops/systems" | exit=0 | ms=15000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 產生資料重產＋一個斷言改比對物件，續15 已經 Codex 審查同一機制
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=block-usage.generated | hits=6
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續15）— 積木 usedBy 自動補：程式的 import 自己說誰在用，不再手抄進 blocks.ts
 
 - 根因：usedBy 是 import 已表達之事的手抄副本；新程式一用共用積木，CI 就擋到有人手改 blocks.ts（`6b9032f09` B-079 補 design，CI run 45729915966 擋 Banner 部署）。操作者開發中反映困擾 → 改成自動產生。
@@ -22,6 +185,34 @@
 - ORACLE_WAIVED: 1m 修在 artifact 之後（workflow 加一條 path＋registry 登記一行），YAML 解析確認
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=blocks:usage|block-usage | hits=19
 - rollback：`git revert` 本 commit（blocks.ts 手寫 usedBy 仍含全部既有使用者，回退後測試照舊）
+## 2026-11-26（續17）— 橫幅 C9 追加：每顆會花錢的按鈕標「約 NT$x」；生成文案預設改 GPT-6.2 sol
+
+- 根因／決策：操作者「會花錢的按鍵要標示台幣價格」。橫幅頁打付費 API 的按鈕（grep `fetch(`／`fetchAwaitingCodex(`／`scriptForge(`）：生成文案、AI 一鍵設計整張（script-forge）、一鍵去背（remove-bg，Replicate）、生成背景／重新生成／合成產品到場景／重新合成（studio/generate）。其餘（預覽、下載、存圖庫、品牌套組、開編輯器）不花 AI 錢不標。價格來源：背景＝所選圖片模型 `STUDIO_MODEL_OPTIONS.costNt`（studio 共用 image-models.js 單價）；去背＝cost-model TOOL_RATES `bg-remove`（toolCostUsd）；文字＝正式站 ai_call_logs 同一 brief 實測（Opus 0.60／Sonnet 0.39／sol 0.10／Haiku 0.01），一鍵設計依成本表價差按較長輸出（典型 1,000 入／1,100 出，每多一尺寸 +120／+250）放大，多尺寸仍是一次呼叫標一次價。按鈕取到 NT$0.1，不足 0.05 顯示「不到 NT$0.1」。依比較結果：生成文案預設 GPT-6.2 sol，一鍵設計維持 Claude Opus 5.5。（`NA/app/(shell)/tools/banner/banner-design.ts`、`BannerStudio.tsx`；`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋blocks＋script-forge＋accent-not-text 55 passed；本機實開讀出按鈕：生成文案（約 NT$0.1）、AI 一鍵設計整張（約 NT$0.8）、一鍵去背（不到 NT$0.1）、生成背景（約 NT$0.8，FLUX dev）、文案預設 GPT-6.2 sol（`$env:TEMP/banner-c9-prices.jpg`）。
+- 剩餘：一鍵設計價格為估算（文案為實測）；去背按秒計費、標的是典型一次；背景模型按鈕沿用 studio 既有顯示（兩位小數）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/systems/__tests__/blocks.test.ts lib/script-forge lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=8000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=DEFAULT_BANNER_AI_MODEL | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續16）— 橫幅 C9：AI 一鍵設計整張依勾選尺寸各排一個版面；文案／設計各一排模型按鈕（標每次約 NT$）
+
+- 根因／決策：操作者「選多張版面時 AI 須因應不同版面給予適當設計」。原 `generateFullDesign` 只用主尺寸呼叫一次，其他尺寸只靠 `variantOf` 按比例縮字。改：勾了多尺寸時一次呼叫帶 `sizes`，伺服器 `NA/lib/script-forge/modules.ts` banner `design` 任務加 `bannerSizesPart()`（只在有 sizes 時附加，單尺寸 prompt 一字不變），要求共用文案配色＋`layouts[<尺寸 key>]`（textPos、textAlignH、字級、商品位置縮放、元素座標），並寫明直式上文下圖、方形置中、橫式左文右圖。前端新純模組 `NA/app/(shell)/tools/banner/banner-design.ts`：`sanitizeLayout`（列舉／數值範圍／字級依短邊上限）、`designPlan`（主尺寸 layout 進主 state，其他勾選尺寸寫 `sizeOverrides[k]`；AI 漏給的尺寸用 `shapeLayout` 依形狀補）、模型子集 `BANNER_AI_MODELS`（Claude Opus 5.5／Sonnet 5.5／Haiku 5.5／GPT-6.2 sol，預設 Opus）與 `bannerCallNtd`（成本表 textCallCostUsd×usdToNtd 匯率 32，典型 token 數估算）。`BannerStudio.tsx` 文案生成卡加「文案模型」「設計模型」兩排按鈕；`BannerStudioStaff.tsx` 照選的模型送 `model`。`lib/systems/blocks.ts` B-066 usedBy 加 design。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋blocks＋script-forge＋accent-not-text 55 passed（新增指名 2 案：多尺寸時每個勾選尺寸都有自己的 override、未勾時無 layouts 且 prompt 與單尺寸相同）；本機實開（script-forge 本機無金鑰 → 頁內 mock 回應）：請求帶 model=claude-sonnet-5-5 與 4 個尺寸，9:16／1:1／16:9 都標「已微調」且排法不同；8 顆模型按鈕顯示約 NT$0.01–1.4（`$env:TEMP/banner-c9-ai-multisize.jpg`）。
+- 剩餘：真實模型回的 layouts 品質未驗（本機 mock）；NT$ 為典型 token 估算，非收據；多尺寸 10 個時輸出可能逼近 FORGE_MAX_TOKENS 4000。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/systems/__tests__/blocks.test.ts lib/script-forge lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=8000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=scriptForge|DEFAULT_AI_TEXT_MODEL | hits=13
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續20）— 橫幅 C1–C8 合併上線（f287df2c5 → 部署 6b9032f09）
+
+- 合併：worker 分支 `claude/modest-ellis-5bccc9`（含 `claude/busy-nash-b53413` C6/C7）→ main `f287df2c5`。Codex 審查 4 點：F1 ag-psd 不在清單、F2 字型未進建置 = 誤報（審查封包只含篩選後的程式差異，package.json 與 695 個 woff2 實際已 commit）；F3 CIS 外部 logo、F4 色調匹配取樣不一致 = 屬實，worker 修於 `ebe1fa65b`。
+- 部署第一次被 CI gate 擋：`lib/systems/__tests__/blocks.test.ts:140`（另一 session 新加的積木目錄）要求 B-079 usedBy 含 design（新 `app/api/tools/presets/brand-kit/route.ts` 引 `lib/tenant-guard.ts`）。補 `lib/systems/blocks.ts:256` → `6b9032f09`，第二次部署成功。
+- 線上實看 app.aware-wave.com/tools/banner：新按鈕（JPG/WebP 目標 KB、PSD/SVG、修圖／向量（專業版）開啟）、品牌套組面板、多尺寸勾選 10 個比例都在；片頭按鈕填「片頭標題／副標題」；`/banner-fonts/fonts.css` 200、woff2 200 `immutable`；品牌套組 GET 200（預設 org 尚無套組）；下載 SVG 含 `<text>` 片頭標題、副標題；PSD 含 2 個 `TySh` 文字層，UTF-16 內文各命中。
+- 未線上驗：品牌套組「存成套組／上傳 logo」寫入（避免在正式客戶資料寫測試值）；修圖／向量（專業版）開 PSD/SVG 改字只在本機驗過（worker C1）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin -> deployed 6b9032f09, healthy 15s, HTTP smoke 5/5; playwright-runner -Mode smoke 30 passed 0 failed 22 skipped | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=B-079|brand-kit | hits=9
+- 避免再發生：worker brief 加一句「新增 import 共用積木（lib/*）時同 commit 更新 `lib/systems/blocks.ts` usedBy，跑 `lib/systems/__tests__/blocks.test.ts`」；oracle 封包用 -Path 篩選時，二進位與 package.json 另行人工核對。
 ## 2026-11-26（續13）— 積木頁 UI/UX：系統卡片列產品模組、統計卡可點＋只看共用、編號變連結、手機統計卡並排、去重複標題
 
 - 根因／決策：操作者要「哪些系統用了什麼積木」，但 `blocksForSystem` 只取 B（`NA/lib/systems/blocks.ts:329` 舊版），系統卡看不到 M 產品模組；「沒用積木」9 系統其實是程式不在後台；統計卡不能點、說明裡的 B-xx 不能點、分頁名與框內 h2 重複、手機統計卡直排把分頁推出第一屏（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）。
@@ -69,6 +260,95 @@
 - ORACLE_WAIVED: 1m 修在 artifact 之後（解析副檔名＋補 B-017/B-090），由 13 項積木測試覆蓋
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=overviewGroup|catalogHref|CatalogGroup | hits=8
 - rollback：`git revert` 本 commit
+## 2026-11-26（續14）— 橫幅 Codex 審查 F3／F4：品牌套組只收畫布讀得到的 logo；色調匹配兩種匯出取樣同一畫面
+
+- F3 根因：品牌套組沒存過時以 CIS `cis.logo.primary` 帶入 logo（`NA/app/(shell)/tools/banner/kit/brand-kit.ts` kitFromClientConfig），那常是外部網站圖；套用時 `urlToBlob` 走 `/api/tools/designs/download`，該路由只收自家 bucket → 400，logo 套不上。不變量：只有畫布讀得到像素的 logo（自家 bucket）才進套組。修：`sanitizeBrandKit`／`kitFromClientConfig` 收 `ownLogo` 判斷（route 傳 `isPublicBucketAsset`；brand-kit.ts 也在瀏覽器跑，不能 import 伺服器的 r2），外部 logo 濾掉並回 `externalLogo`；面板顯示「CIS 的 logo 在外部網站，橫幅讀不到；請在這裡上傳一份。」；route 錯誤碼（orgId_required 等 9 個）轉繁中句子。`route.test.ts` 的 logo 改成自家 bucket 網址。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- F4 根因：`banner-layers.ts` 色調匹配取樣在平面模式是同一張畫布（含暗化），分層模式只含背景層 → 開暗化＋色調匹配時 PNG 與 PSD/SVG 商品顏色不同。不變量：兩模式取樣同一內容＝商品後方實際畫面（背景＋暗化）。修：`behindProduct()` 在暗化之後、商品之前合成目前已畫的層成快照，只在開色調匹配時做，兩模式都用它。
+- 驗證：tsc 綠；vitest presets＋banner＋accent-not-text 26 passed；瀏覽器：開暗化（0.6）＋色調匹配（強度 1）時分層疊回 vs 平面最大差 2/255（≤4），平面輸出與修前 0 差；預設值與修前 0 差。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/tools/presets "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=4000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（Codex 外部審查 F3/F4 的修正；書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=kitFromClientConfig|sanitizeBrandKit | hits=3
+- ORACLE_WAIVED: 審查來源即 Codex oracle（agency-os/reports/oracle/2026-11-26-partialreview-67d77480.md），監工合併前再看
+## 2026-11-26（續12）— 橫幅 C8：接上品牌套組（C6）與商品擬真（C7）；logo 成為可拖曳元素
+
+- 根因／決策：C6／C7 模組（banner-modules，13a718295）已完成但沒接進畫面。合併 `claude/busy-nash-b53413`（只新增檔＋design-upload 修正，無衝突）。`NA/app/(shell)/tools/banner/banner-layers.ts`：`grounding` 有任一開關時呼叫 `groundProduct`，輸出「商品陰影」「商品倒影」「商品圖」三層（背景層供色調取樣；全關走原 drawImage，PNG 不變）；新增 `logoImage`／`logoScale` → 「Logo」層，預設左下、可依 C4 拖曳、多尺寸各自可調大小。`BannerStudio.tsx`：配色步驟放 `BrandKitPanel`（`useBrandKit(saveOrg)`），套用時 主→漸層起＋徽章、輔→漸層迄、重點→重點字＋按鈕底、文字→字色、底→底色，字型字重照套，logo 經 `urlToBlob`（同網域下載路由）轉 data URL 再畫，匯出不被跨網域污染；logo 列有大小滑桿與拿掉；產品圖步驟加「商品擬真」：接觸陰影（濃度、柔和、下移）、倒影（長度、濃度、間距）、色調匹配（強度）皆為勾選＋滑桿。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 另修：合併進來的 `kit/BrandKitPanel.tsx` 錯誤訊息字色 `var(--red)` 違反 accent-not-text 閘，改 `var(--badge-red-text)`。
+- 驗證：tsc 綠；vitest banner＋presets＋lib/studio＋accent-not-text 456 passed；瀏覽器 C5(HEAD) vs C8 flat 預設 0/255（2 組）；開擬真＋logo 後圖層多出 商品陰影／商品倒影／Logo，分層 vs flat ≤2/255，PSD 1.7MB 寫出；本機實開杯子商品接觸陰影＋倒影正確（`$env:TEMP/banner-c8-grounding-brandkit.jpg`）。
+- 剩餘：本機無資料庫的 dev server 上品牌套組 API 回 `orgId_required`，「套用到這張」「存成套組」「上傳 logo」未實測，需上線後驗；面板直接顯示英文錯誤碼（C6 檔）；色調匹配在分層匯出取樣「背景層」、在 PNG 取樣「背景＋暗化」，開暗化時兩者色調微差。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" app/api/tools/presets lib/studio lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=合併檔 var(--red) 字色，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=groundProduct|useBrandKit|BrandKitPanel | hits=4
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續11）— 橫幅 C5：多尺寸輸出（勾選尺寸、縮圖、單一尺寸微調、全部下載 zip、全部存到我的設計）
+
+- 根因／決策：同一張 banner 要出 IG 直式、方形、橫式等多尺寸時只能一個一個切換重做。`NA/app/(shell)/tools/banner/BannerStudio.tsx`：`multiSizes`（勾選，看得到的勾選框）、`variantOf()`＝主設計換到該尺寸（C4 位置本來就是畫布比例並夾在畫面內，字級／字距依短邊比例縮放）再套該尺寸覆寫 `sizeOverrides[k]`；點縮圖＝`enterSize()` 把該尺寸當成目前設計編輯，主設計的尺寸欄位暫存在 `editingSize.main`，「完成，回主尺寸」`leaveSize()` 只存與推導結果不同的欄位（SIZE_KEYS：位置、字級、字距、商品圖大小／位置、徽章大小、文字位置／對齊、背景圖位置）；文字、顏色、圖片永遠全部尺寸共用。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：尺寸步驟加多尺寸勾選；預覽下方「多尺寸」卡：各尺寸縮圖（600ms 防抖、320px JPEG）、已微調／編輯中標記、清除微調、格式按鈕（PNG／JPG／WebP／PSD／SVG，沿用 C1 匯出，JPG/WebP 用匯出區目標 KB）、全部下載（jszip，`banner-9x16.psd` 等）、全部存到我的設計（逐張 saveDesign，帶目前選的客戶）。單張 JPG/WebP 下載改走共用 `encodeDesign`。
+- 驗證：tsc 綠；vitest banner＋accent-not-text 16 passed；本機實開：勾 1.91:1／9:16／1:1／16:9 四張縮圖正確比例，點 9:16 微調標題 160px→完成後主尺寸仍 64px、9:16 標「已微調」，PSD 全部下載 zip 3.3MB 含 4 個 `banner-*.psd`（`$env:TEMP/banner-c5-multisize.jpg`、`banner-c5-tweaked.jpg`）。繪圖程式未改，PNG 與 C4 一致。
+- 剩餘：直式尺寸商品圖沿用主設計「靠右」可能偏小，需要時點縮圖微調；縮圖每次改動會重繪所有勾選尺寸（已防抖）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=清除正在微調尺寸時會把未存改動重新存回→改為直接丟棄重開，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=handleDownloadLossy|encodeLossy | hits=1
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續10）— 橫幅 C4：標題、副標、價格、按鈕、評價、商品圖、徽章可在預覽上直接拖曳（格線／三分線／置中吸附）
+
+- 根因／決策：版面只能靠「上中下／左中右」與版型，元素無法自由擺放。`NA/app/(shell)/tools/banner/banner-layers.ts`：`positions`（元素外框中心佔畫布比例；沒有＝自動堆疊）→ `place()` 算位移並夾在畫面內（比畫面大則置中），位移以 ctx.translate 套到該元素所有圖層、TextSpec x/y（含旋轉中心）同步移動，所以 PNG／PSD／SVG 位置一致；被拖走的元素保留原堆疊位置不讓其他元素跳動，文字底襯與品牌色條只包住沒拖走的元素；渲染回傳每個元素實際外框 `boxes` 供點選。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`BannerStudio.tsx` 預覽改用 `renderPreview`（PNG＋boxes）；按下先判斷點到哪個元素（徽章>按鈕>評價>價格>副標>標題>商品圖），點到就拖元素，否則拖背景圖；中心靠近 1/3、1/2、2/3 吸附；拖曳中疊 SVG 參考線（10% 格線、三分虛線、吸附線與外框用主題 accent）；滑過元素游標變 move；標題列「回到自動排版」。
+- 驗證：tsc 綠；vitest banner＋accent-not-text 16 passed；瀏覽器 C3(HEAD) vs C4 flat 預設 0/255（2 組），拖過的元素分層 vs flat ≤2/255，外框夾在畫面內、PSD 標題文字座標跟著移；本機實開：拖商品圖到中央、拖徽章到左上、參考線出現（`$env:TEMP/banner-c4-dragged.jpg`、`banner-c4-guides.png`）。
+- 剩餘：預覽用上一張渲染的外框判斷點選（打字後 220ms 內外框是舊的）；手機觸控只做 pointer 拖曳，無雙指縮放。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n（書面自審，監工指示不派背景代理；M=拖走元素後底襯包住全部遠處元素→改只包沒拖走的，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=renderBannerLayers|exportToPng | hits=3
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續8）— 橫幅 C3：中文排版（字重五級、行距字距、避頭尾、中英間距）＋自架 OFL 字型 9 族
+
+- 根因／決策：操作者要專業設計師水準的中文排版。字重只有 bold、行距寫死、無避頭尾、字型只有 5 個且靠外部 CDN／系統字。改：`NA/app/(shell)/tools/banner/banner-layers.ts` 字重（300/400/500/700/900）、標題／內文行距、內文字距、`wrapChars`（換行時量寬：行首禁則字最多懸掛 1 個，第 2 個起連前一字推到下一行；行尾開括號下移；行首尾空格去掉）、`autospace`/`autospaceRuns`（中英數字間補半形空格，重點字邊界空格歸一般字）、`loadDesignFonts`（document.fonts.load 等需要的切片，4 秒逾時）。字型自架 `NA/public/banner-fonts/`（`NA/scripts/fetch-banner-fonts.mjs` 下載 Google Fonts 的 unicode-range 切片＋各族 OFL.txt，先下到暫存目錄成功才換上；黑體／明體可變字重、霞鶩文楷 300/400/700、粉圓、Inter、Montserrat、Playfair Display、Oswald、Bebas Neue，共 29MB，瀏覽器只抓用到的切片）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`BannerStudio.tsx` 字型下拉改成按鈕（各自用該字型顯示，操作者規則：不要下拉）、標題／內文字重按鈕、標題行距、內文字距、內文行距、避頭尾／中英間距開關、注入 `/banner-fonts/fonts.css` 並在字型載完重繪；EDITOR_FONTS 加新字族（粉圓→Noto Sans TC）；SVG generic 加 Playfair→serif；PSD 字重：PhotoCraft 實測 fauxBold 會畫粗、字型名帶 Bold 反而常規，所以 ≥600 用 fauxBold。`lib/portal/doors.ts` STATIC_PAGES 與 `lib/public-asset-cache.ts` 加 `/banner-fonts`（設計門與受限員工也能載字型）；`next.config.ts` woff2 切片（內容命名）長快取 immutable，fonts.css 仍 no-cache。
+- 驗證：tsc 綠；vitest（banner＋lib/portal＋public-asset-cache＋accent-not-text）102 passed（新增 wrap/避頭尾/間距 4 案）；瀏覽器 C2(HEAD) vs C3 flat 預設 4 組 0/255；本機實開：粉圓特粗標題、楷書內文加字距行距、「iPhone17 限定」「滿 999 送 100 元」自動間距、括號不落行尾（`$env:TEMP/banner-c3-typography.jpg`）。
+- 剩餘：預設開「中英間距」，中英混排的既有文案會多出半形空格（可關）；PSD 只分粗／不粗（300/500/900 在 PhotoCraft 無法表達）；repo 多 29MB 字型。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/__tests__/public-asset-cache.test.ts lib/portal lib/theme/__tests__/accent-not-text.test.ts | exit=0 | ms=6000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/8n（M=避頭尾連續標點無上限掛出畫面→改為換行中最多懸掛 1 字＋追い出し；n 全修：空行殘留禁則字、括號下移超寬、重點字邊界空格、行首尾空格、Playfair generic、woff2 快取、抓字型腳本路徑與原子性、補測試）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=STATIC_PAGES|UNVERSIONED_PUBLIC_DIRS|kinsoku | hits=9
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續7）— 橫幅 C2：背景圖在預覽上拖移／滾輪縮放；文字、CTA 按鈕、促銷徽章陰影可設定（PSD/SVG 帶圖層效果）
+
+- 根因／決策：操作者要「上傳圖後可拖移、放大縮小」與「文字／CTA／徽章可加陰影設定」。背景層 `NA/app/(shell)/tools/banner/banner-layers.ts` 依 `bgImgScale`（cover 倍數 0.5–3）、`bgImgX/Y`（畫布比例位移）畫，未蓋到處鋪 `bgColor`。陰影 `ShadowSpec` 的模糊／位移以元素高度為單位（換尺寸比例不變，C5 多尺寸直接沿用）；預設＝舊畫面（CTA 0.32/0.28/0.12、膠囊徽章 0.28/0.25/0.1、`badgeShadow=null` 表示依樣式預設、文字陰影預設關）。分層時陰影是圖層效果（`layer.shadow`，像素不含）：PSD `effects.dropShadow`（normal 混合、angle=atan2(y,-x)）、SVG `<filter><feDropShadow>`（userSpaceOnUse 整張畫布）；flat 模式文字陰影用一張重用暫存畫布整層套陰影。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 步驟：`banner-layers.ts` 背景變換、`applyShadow`／`px()`、`layer(name,text,shadow,whole)`、`compositeLayers` 套陰影、PSD/SVG 效果；`BannerStudio.tsx` State 6 欄（designSig 自動含）、`sanitizeDesign` 驗證陰影、上傳／AI 換圖歸零、預覽 pointer 拖曳（左鍵、capture）＋非 passive wheel 縮放、背景步驟「圖片位置」列（大小滑桿、底色、重設）、`ShadowControls` 三組（開關、色塊、不透明度、模糊、X、Y）；`banner-canvas-return.ts` PhotoCraft 傳回背景時位置歸零（＋測試）。
+- 驗證：tsc 綠；vitest banner 7 passed（新增：PSD dropShadow angle 90/180、distance、size、normal；SVG feDropShadow/filter）；瀏覽器比對 C1(HEAD) vs C2 flat 預設 0/255（3 組），陰影開時分層 vs flat ≤4/255；本機實開：拖曳後圖右移、滾輪縮到 65% 露出底色、重設回 100%、文字陰影開／按鈕陰影關／徽章陰影開（`$env:TEMP/banner-c2-bg-drag-zoom.jpg`、`banner-c2-shadows.jpg`）。
+- 剩餘：現價原有的固定小陰影保留在像素（改了會動預設畫面）；描邊光暈在 PSD/SVG 可編輯文字中仍不見（C1 起）；PhotoCraft／VectorCraft 對 dropShadow／feDropShadow 的支援未實測。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" | exit=0 | ms=500
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/7n（M=PSD 陰影 multiply→normal 已修；n 已修：SVG filter 範圍、傳回背景歸零、底色選擇器、只收左鍵、陰影換算測試、暫存畫布重用；保留：現價固定陰影）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=applyBannerCanvasReturn|bgImgScale|ctaShadow | hits=5
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續3）— 橫幅匯出可編輯圖層：拆層繪圖、PSD／SVG 文字保持文字、JPG／WebP 目標 KB、專業版兩顆按鈕、片頭按鈕填預設字
+
+- 根因／決策：操作者硬需求「PSD、SVG 裡的字要能改」。舊 `exportToPng` 把所有元素畫在一張畫布，只能出平面 PNG。改成一份繪圖程式產圖層清單（`NA/app/(shell)/tools/banner/banner-layers.ts` `renderBannerLayers`），每層一張全尺寸畫布，文字層帶 TextSpec（行、每段顏色、字型、錨點、首行基線、行高、字距、不透明度、旋轉）；PNG／預覽用同一程式的 `flat` 模式（全部畫在一張畫布，每層從乾淨 context 開始）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 為什麼 PNG 不用疊層：8-bit 預乘 alpha 疊回時柔邊陰影會二次取整，實測最大差 2/255（約 50 像素）> 卡片的 1/255；flat 模式實測 0 差，且預覽每格少建 ~15 張全尺寸畫布。
+- 步驟：`banner-layers.ts`（新）繪圖＋`buildBannerPsd`（ag-psd，文字層 = `layer.text` + 像素快取、不透明度移到圖層）＋`buildBannerSvg`（Inkscape layer `<g>`、像素層只放非透明裁切的 PNG、文字層 `<text>`/`<tspan>`）；字型對照表 `EDITOR_FONTS`（黑體→Noto Sans TC、明體→Noto Serif TC、楷書／圓體→Noto Sans TC（編輯器沒有）、Inter→Inter，依 `scripts/vectorcraft-pro/web-fonts.patch`）。`BannerStudio.tsx`：刪舊繪圖 460 行、匯出區加 JPG／WebP＋目標 KB（二分搜尋 quality，壓不到寫實際 KB）、下載 PSD／SVG、「在修圖（專業版）開啟」(PSD) 與「在向量（專業版）開啟」(SVG)；片頭三鈕標題空白時填「片頭標題」（標題＋副標再填「副標題」），說明改白話。`package.json` 加 `ag-psd ^34.2.3`。`tests/e2e/smoke/06-photo-pro.spec.ts` 跟著改按鈕名與 .psd。
+- 已知差異：「重點字底色」開＋標題換行時，所有行的底色現在都在所有文字下面（舊版第 2 行底色會蓋到第 1 行光暈），實測該情境差 18/255。
+- 驗證：
+  - tsc：`npx next typegen && npx tsc --noEmit` exit 0。
+  - 卡片 (b)(c)：`npx vitest run "app/(shell)/tools/banner/"` 5 passed（SVG 圖層數＝Layer 數、文字全是 `<text>`；`readPsd` 讀回 `layer.text.text` 等於原字）。
+  - 卡片 (a)：瀏覽器比對（HEAD 版 exportToPng vs 新版，同 state，5 組尺寸／版型）：flat 0/255 ×4；疊層 2/255；換行＋重點字底色 18/255（上列已知差異）。
+  - 本機實開 localhost:3907（編輯器靜態檔代理線上 /photo-pro、/vector-pro）：做含 **重點字**、副標、價格、按鈕、角標、商品圖的 banner；PhotoCraft 開 PSD，標題／按鈕文字／星星／角標文字是文字圖層，按鈕字改成「馬上搶購」成功（`$env:TEMP/banner-photocraft-edited.jpg`）；VectorCraft 開 SVG，按鈕文字是文字物件（Noto Sans TC Bold 33pt 置中），插字成功（`$env:TEMP/banner-vectorcraft-edited.jpg`）；JPG 目標 60KB→59.3KB、WebP 56KB、目標 3KB→提示實際 13KB。
+- 避免再發生：新增匯出格式只在 banner-layers.ts 加一個 build 函式吃 RasterDoc，不另寫繪圖。
+- 剩餘：PhotoCraft 把 PSD 粗體顯示成常規（ag-psd fauxBold 沒被讀）；Noto Serif TC 未載入時 PhotoCraft 警告並用替代字；文字的陰影光暈在編輯器重排後消失；彈窗被擋時退回同分頁開編輯器（現有慣例）會離開橫幅頁。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" | exit=0 | ms=439
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n（全修：Safari 不能編 WebP 時明說不出假檔；JPG 透明處先鋪 bgColor；SVG esc 剔除 XML 不合法控制字元；另採建議：開編輯器用 raster.composite 不重疊一次。accent-not-text 閘抓到 var(--red) 字色已改 --badge-red-text）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,.claude | grep=在 Canvas Editor 開啟|handleOpenInCanvas|影片片頭（存到我的設計後 | hits=3
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續5）— Banner C6 品牌套組＋C7 商品擬真（新模組，banner-layers 之後接線）
+
+- 決策：C6 套組存 `organizations.metadata.client_config.bannerKit`（與 brandColors／CIS brandKit 同一 JSONB，免 migration）；沒存過時由 brandColors＋CIS logo／字型組出初值。API `NA/app/api/tools/presets/brand-kit/route.ts`（掛設計門頁既有 /api/tools/presets 前綴）：GET 客戶只讀自己 org、指名他 org 403；PUT 限員工 owner/admin（canWriteTenantConfig，同 brand-colors／cis 路由），只換 bannerKit、其他 client_config 鍵保留；GET 只 select 品牌三鍵，不外流 SSH 等設定。logo 先經 saveDesign 存進我的設計，org 列只存 URL。
+- C7 `NA/app/(shell)/tools/banner/product-grounding.ts`：groundProduct → product／shadow／reflection 全畫布層；接觸陰影取 alpha 底部 18% 輪廓壓扁兩層模糊；倒影以接觸線鏡像漸淡；色調依背景環帶均色，每通道增益限 ±12%。全關＝直接 drawImage。
+- Codex F1（CONFIRMED，既有缺陷）：`NA/lib/studio/design-upload.ts` saveDesign 的 organizationId 只給上傳、沒給登記 → 存到指定客戶會被拒（BannerStudio「存到客戶」同樣受影響）；已修並加 `NA/lib/studio/__tests__/design-upload.test.ts`。
+- Codex F2：從我的設計刪掉 logo 圖會讓套組 URL 失效（刪除守衛不知道 bannerKit 引用）；本卡只做面板載入失敗提示，治本需改共用刪除守衛 → RISKS。F3：與 brand-colors／cis 並行讀改寫可互相覆蓋（既有同型）；原子更新需 migration（High）→ RISKS。
+- 驗證：`npx tsc --noEmit` exit 0；vitest brand-kit route 2＋design-upload 1＋registry-code 15＝18 passed。權限守衛突變：拔 `assertOrgAccess` → 「他 org 403」測試紅（expected 200 to be 403）→ 還原綠。C7 headless Chromium 臨時頁：全關與 drawImage 逐位元組比對 diff=0／2,880,000（整數與小數 box 各 2 組），截圖 `$env:TEMP\c7-grounding-demo.png`；臨時頁未 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run app/api/tools/presets/brand-kit/route.test.ts lib/studio/__tests__/design-upload.test.ts lib/portal/__tests__/registry-code.test.ts; chrome --headless --dump-dom c7-demo.html | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-26-review-f6a1fa0c.md），F1 已修，F2 面板提示＋RISKS，F3 RISKS
+- ORACLE_WAIVED: F1 修正與面板提示在 artifact 之後，由新測試與 18 passed＋tsc 覆蓋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=saveDesign\( | hits=15
+- rollback：`git revert` 本 commit（新檔＋design-upload 一行，無資料遷移；已存的 bannerKit 鍵無人讀即無作用）
 ## 2026-11-26（續2）— /ops/systems/blocks 改三分頁：系統卡片取代要左右捲的熱度表；積木目錄網址只由 catalogHref 產生
 
 - 根因／決策：操作者不要左右捲（10 欄熱度表在 1100px 版面必溢出）。改分頁（連結 ?view=）：系統用了哪些積木（預設，每系統一列：名稱／狀態／完成度＋各層顆數標籤自動換行、展開全部編號）／積木清單／圖解。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
@@ -168,6 +448,80 @@
 - ORACLE_WAIVED: critic Quick 一輪＋突變證據；改動限即時字幕斷句，已對真實 Gemini 實跑
 - 剩餘風險：今晚已存的場次逐字稿仍是一大則（會後整理會用錄音重新辨識）；不停講超過 9 分 50 秒時輪替會在句中切一刀；真實麥克風／系統音擷取仍未實測
 - rollback：`git revert` 本 commit
+## 2026-11-25（續15）— 影片工作台：肖像權保護／深度影片／去配樂三個工具接上並部署（`8f477587d`）
+
+- [根因] 三個工具畫面在、送出鈕被 `video-workbench/scripts/tools-0.js` 一張寫死的 `unsupported` 表鎖住：privacy、depth 後端零程式；sfx 有 ElevenLabs 後端但付費一律拒絕、無功能鍵、不看畫面。不變量：工具能不能按只由 `/capabilities` 決定；會花錢的列有許可才跑、成功才按實際成本扣。
+- [步驟] 監工派工（`agency-os/handoffs/2026-11-25-video-tools-unlock/`：PLAN／DISPATCH／briefs／RESEARCH）。P1 肖像權保護（本機 YuNet＋FFmpeg 遮罩）、D1 深度影片（本機 MiDaS v2.1 small＋跨格對齊）、S1a 功能鍵 `video.audio-tools`＋Gemini 看片→ElevenLabs、S1b Mirelo SFX 2.0、X1 刪寫死鎖＋逾時。整合工作區 detached，rebase 後 `git push origin HEAD:main`（9 個程式 commit＋oracle artifact，`git log 4a25006a7..8f477587d`）。
+- [驗證] 整合版：`node tests/{privacy,depth,sfx-billing,elevenlabs-free-tier,backend,p6-main-system,services,paid-price,u7-audio-policy,capabilities-boot,package-sources,awarewave-files}.cjs` 全 exit 0；next-admin `npx tsc --noEmit` 0、vitest 5944 passed（第一次全套 1 failed、重跑 0 failed＝既有不穩定測試，未定位）。真 Edge 實按：privacy、depth 工作成功並實看成品格；sfx 無金鑰正確鎖住。`docker build` 過，映像內兩個模型 sha256 相符。部署 `sg-deploy.sh next-admin video-workbench` → `.deployed-commit` `8f477587d`，兩容器 healthy，HTTP smoke 全 OK；Playwright smoke 30 passed／0 failed。正式機同映像臨時容器（`--cpus 8`）：34 秒片 privacy 28.4 秒（每格偵測 13.1 ms）；30 秒片 depth 68.7 秒（每格 66.1 ms）。
+- [Codex 審查] 3 條皆驗真並修（`0655120d6`）：貼邊人臉遮罩偏移漏蓋（新測試舊碼紅）；Mirelo `credits:null` 仍估價扣款（突變 `>=0`→`>0` 紅）；compose 對照檔缺 `MIRELO_API_KEY`。
+- [剩餘風險] Mirelo 路未實跑（無金鑰；正式機 compose 尚未加 `MIRELO_API_KEY`，給金鑰時走 `safe-infra-patch.sh compose`）；ElevenLabs 生成未實跑（帳號為免費方案，不可商用，`separate`「只留人聲」與 sfx B 路現為未啟用）；配音、字幕仍走 ElevenLabs 免費方案（本次未動）；正式站登入後頁面未由操作者實按；深度為逐格小模型，細節粗。逐條見 `DISPATCH.md` RISKS。
+- [rollback] 主機 `sg-deploy.sh` 回前一版 `67b4051c3`；程式 `git revert 0655120d6 be6017918 ba4a87a96` 及其前 6 個 P1／D1／S1a commit。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin video-workbench；docker run --rm <deployed image> node prod-time.cjs | exit=0 | ms=840000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI（`agency-os/reports/oracle/2026-11-25-partialreview-4bf6848e.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=尚未設定人臉偵測|尚未設定深度影片模型|尚未設定配樂分離 | hits=0
+## 2026-11-25（續14）— 建站流程：SF-O 手冊、SF-A 文件更正併入；第 9 步改在 WordPress 專屬路徑確認開放
+
+- [根因] ① SF-O／SF-A 兩張文件卡未做（批 5）。② 工人寫手冊時讀到 `NA/lib/site-flow/steps/open.ts` verify 打 `https://<domain>/`：共用網域站（`ingress=product-gateway`，oracle）首頁屬引擎，WordPress 仍建置中也回 200 → 「正式開放」假成功。不變量：開放的證明必須由該站自己回答。
+- [步驟] 工人 `wp-docs`（Sonnet 5.5）交 `548e1e5ae`、`58ff8ceb9` → `oracle-int` cherry-pick（`4fda08fdb` 手冊＋RUNNABLE_DEMOS＋impact map；`f19c3b752` 21 檔指向手冊）→ 監工 `95aa5ec19`：`open.ts` `publicSiteIsOpen` 改打 `OPEN_PROBE_PATH=/aw-open-check/`（404＝開放、503＋標記＝未開放）、`host-steps.test.ts` 加一測、手冊 §3-3／§6 對齊、`TOOL_TRIGGER_MAP.md` 加建站列→`gen-trigger-index.mjs --write`（`AGENTS.md` 產生區塊）。
+- [驗證] 在 `95aa5ec19` 上：`npx tsc --noEmit` exit 0；`npx vitest run lib/site-flow app/api/ops/site-flow` 10 檔 132 測試過；`node scripts/verify-governance-pointers.mjs` PASSED（180 pointers）；`git grep publicHomeIsOpen` 0 命中。第一次測試誤跑在 `f19c3b752`（commit 被 scope guard 擋、訊息檔未寫出），已在正確 sha 重跑。
+- [RISKS 總檢] 見 `data.mjs` 第五批 7 列。未處理並記錄：`backup-restore-drill.py` 不讀 `sites.d`（每晚 verify 含新站、SF-L 實際還原過一次、手冊有手動還原指令）；手冊正式機指令未逐條重跑；manual 憑證轉 nginx 續期未在流程 vhost 驗。SF-D 列「再執行一次即可」更正為需手動重載。
+- [剩餘風險] `95aa5ec19` 未部署（03:00 自動部署）；`/aw-open-check/` 在正式站未實打，GO-3 按第 9 步時驗。
+- [rollback] `git revert 95aa5ec19 f19c3b752 4fda08fdb`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run lib/site-flow app/api/ops/site-flow；node scripts/verify-governance-pointers.mjs | exit=0 | ms=20000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/3m/7n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=publicHomeIsOpen | hits=0
+- ORACLE_WAIVED: 程式改動 2 檔（確認網址常數＋一個測試），不涉 auth／個資／金流；讀回 diff 自審，132 測試；文件由工人 critic 一輪。
+## 2026-11-25（續13）— oracle WP：外掛 0.5.1（英文頁 `<title>` 走翻譯）發佈並裝到算命站
+
+- [根因] TranslatePress 免費版只翻 body；`/english/…` 的 `<title>` 仍中文（同日「英文頁定案」條的未解項）。
+- [步驟] 工人 `wp-plugin-051`（Sonnet 5.5）交 `a43511de5` → 監工讀 diff（`includes/Seo/TranslatedTitles.php` 一個類別、`aware-wave-oracle.php` 一處載入）→ `oracle-int` cherry-pick（`6ce09b1b7`）→ `scripts/release-wp-bridge.sh --plugin oracle`（dry-run 後真發：release repo CI 過、tag `v0.5.1`、主機鏡像 sha `233064ac…`）→ catalog `releaseVersion` 0.5.1（`b38af511b`）→ oracle 站 `docker cp` 鏡像 zip＋`wp plugin install --force`。
+- [驗證] `wp plugin list` aware-wave-oracle active 0.5.1；主機內臨時登入（只銷毀自己的 token）：`/english/tools/ziwei/` `<title>Zi Wei Dou Shu &#8211; oracle.aware-wave.com`、`/english/tools/` `Divination Tools`、`/english/daily-letter/` `Daily Fortune Letter`、`/tools/ziwei/` 仍 `紫微斗數`，iframe `src` 不變；工人 phpunit 30/30、`php -l` 7.4／8.3；next-admin vitest `wp-plugin-stack hosting` 4 檔 60 測試過。
+- [RISKS 總檢] ① 工人未做跨模型審查、未上真站 → 監工讀 diff＋真站實測。② 新發現：站 `blog_public=0`；中英文頁都無 meta description／og，`wp eval` 渲染 `wp_head` 無 Rank Math 輸出，`rank_math_is_configured` 不存在 → 原因未查明，列 GO-3 前置（WP-PLAN §0）。③ description／og 的翻譯路徑因此在真站未被執行，只有單元測試。
+- [rollback] 站：`wp plugin install /var/lib/awarewave/plugin-releases/aware-wave-oracle/v0.5.0/aware-wave-oracle-v0.5.0.zip --force`；repo：revert `b38af511b`、`6ce09b1b7`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin install <mirror zip> --force；curl -b <temp cookie> /english/tools/ziwei/ | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=releaseVersion: "0.5.0" | hits=0
+- ORACLE_WAIVED: 工人 critic Quick 一輪（1 Major 1 Minor 已修）＋監工讀 diff＋真站實測；非 auth／個資／金流，站尚未對外開放。
+## 2026-11-25（續12）— oracle：Cloudflare 限流不計引擎的 `/_next/static/`（操作者開 `/en` 遇 Error 1015）
+
+- [根因] `http_ratelimit` 規則 `b8ffa72d…`（同 IP＋colo 10 秒 50 次，擋 10 秒）對 oracle 只放行 WP 後台路徑；引擎一頁就接近上限：`/en` HTML 含 15 個 `/_next/static/` 檔＋12 條工具連結（Next 預先載入），連開兩頁即超過。無 Analytics Read 權限，未能讀該 Ray 的實際請求數（推定）。
+- [步驟] 操作者同意後，Cloudflare API `PATCH rulesets/<id>/rules/b8ffa72d…`：expression 尾端加 ` and not (http.host eq "oracle.aware-wave.com" and starts_with(http.request.uri.path, "/_next/static/"))`，其餘欄位原樣（1146→1250 字）。
+- [驗證] 讀回 `enabled=true action=block period=10 requests_per_period=50`、尾段為新增條件；本機同一來源平行 70 次 `GET /_next/static/chunks/01599w_myoj4b.js` 全 200，隨後 `GET /en` 200。
+- [剩餘風險] 非 static 的請求（HTML、RSC 預先載入、`/api/*`）仍計次：GO-3 後一個工具頁＝WP 頁＋引擎框，未量過真實瀏覽的計次；GO-3 驗收時用瀏覽器連開數頁確認。
+- [rollback] 刪掉 expression 尾端新增的那段。
+- REALTEST_EVIDENCE: tool=Bash | cmd=70x curl https://oracle.aware-wave.com/_next/static/chunks/01599w_myoj4b.js；curl /en | exit=0 | ms=8000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（Cloudflare 規則與文件）
+- ORACLE_WAIVED: 無 source 改動
+## 2026-11-25（續11）— 平台 U13、U14 上線＋風險盤點：主題未提交改動收進主線、down 副本檢查進 CI
+
+- 操作者 2026-11-25「看工人們反應的 RISKS 是否需要處理，先處理完風險再繼續做」「你決定」。
+- R1（根因）主線引用了從未提交的檔：`video-workbench/scripts/package.cjs:27`、`tests/appearance.cjs:18` 引用 `components/tools/AwareWaveThemeFrame.tsx`、`app/(shell)/tools/seedstar/page.tsx`，兩檔 2026-10-30 寫完只在 `D:\Work` 未追蹤，另有六個主題檔未提交（mtime 2026-11-23 10:41:08＝parity 帶過去的時間）。後果：`appearance.cjs` 在主線跑不過；U13／U14 被「主題 session」擋數週（無此 session）。處置 `1880e357c`：原樣搬入＋`lib/portal/products.ts` `STAFF_UTILITIES` 加 `tools/seedstar`（`tool: "tools/theme"`）＋可見名稱「影片工作台」；tsc 0、vitest 5855、`appearance.cjs` 3 PASS。`D:\Work` 六檔 `git show HEAD:f > f` 還原、兩個未追蹤檔移除（還原前 `git diff` 與 `D:\tmp\plat-briefs\theme-dirty.patch` 逐位元相同；hook 提示 `sidebar-coverage.test.ts` 62 分鐘前被 session 9c7e8634 寫過，內容已全在主線）。
+- R2 down 副本只放一處兩次（0181 `403b297d6`、0183 `0e4931dd8`）：`scripts/__tests__/down-migration-copies.test.mjs` 只有本機 `/verify` 跑。處置 `a1acc13c1`（補 0181）、`db6ac40f0`（補 0183＋該測試成為 `.github/workflows/shared-asset-gates.yml` 一步；CI 已綠）。
+- R3 工人只跑卡片點名測試（K14 弄紅 VW 閘）：`D:\tmp\plat-briefs\COMMON.md`、DISPATCH §0 加「改 VW 跑 `node tests/gate.cjs`、改外掛跑外掛全套」。
+- 判定不做（條件寫在 DISPATCH／監工台）：會員事件防重送（M10 開工第一項；今唯一事件 `member_invite` 冪等且入口在正式站關閉）；Cloudflare 限流（三入口皆關，W6 前加）；會員工作台實看（需 W6 後的測試會員，W7）。
+- U13 `1eff89930`：預設主題 5 組對比 ≥ 4.5:1（`globals.css` `:root`＋`lib/theme/tokens.ts`）；`accent-not-text.test.ts` 新增「狀態色不得當文字色」（每檔債務數只減不增，197 處）；刪 `app/SidebarNav.tsx`；`tools/theme/layout.tsx` 放 title；`.badge-blue`；刪 `.door-feature*`。
+- U14 `2e9758630`＋`6faf5f0f6`＋`b2b8659c3`＋`c44a06263`＋`1cee12873`：`app/MobileShell.tsx`（底列＋「更多」）、`app/bottom-items.ts`；≤ 640 `.sidebar`／`.door-side`／`.client-rail`／`.client-panel` 不佔位、`data-more="open"` 時覆蓋；客戶欄與 `ClientPanelNav` 行內版面樣式搬進 class（手機段零 `!important`）；`.client-tabs { overflow-x: auto }` 全寬度；文案不再寫「左側客戶欄」。
+- Codex 審查（`agency-os/reports/oracle/2026-11-25-partialreview-a28698cc.md`，3 項皆成立皆修）：① 底列絕對網址未經 `carry`，跨主機丟 `org`／`site` → 一律 `carry`；② 「更多」開啟時焦點可進被蓋住的頁 → 內容區 `inert`、焦點進選單、關閉回按鈕；③ 檢查器逐行掃漏跨行宣告 → 整段比對＋自我測試。
+- 上線：push `1cee12873` → CI 五項綠（含新的 Down-migration copies）→ `sg-deploy.sh next-admin` exit 0（smoke 5/5）。正式站內建瀏覽器：寬 375 `/tools/content` `scrollWidth`=375、底列三項各 125×55、`.sidebar` 與 `.client-rail` `display:none`；按「更多」→ `data-more=open`、一個 `[inert]`、焦點在選單首項、上半客戶欄下半選單；寬 1440 `/ops/clients/soulful-expression` `scrollWidth`=1440、`.client-tabs` client 924／scroll 1076。
+- 未做：手機仍擠窄的頁（5 個編輯器＝桌面工具不修；`/ops/billing` 280px 清單欄記 K15 量；outreach guide、costs、theme、social 不修）；video／content 子網域未登入未看；正式站用自訂主題，新預設色只在「重設」後可見。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (706 files passed) ; node tests/appearance.cjs ; node --test scripts/__tests__/down-migration-copies.test.mjs ; sg-deploy.sh next-admin ; 內建瀏覽器正式站 375／1440 量測 | exit=0 | ms=1500000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI (codex exec -s read-only)，3 項皆修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=MobileShell | hits=14
+## 2026-11-25（續10）— oracle WP：英文頁定案（TranslatePress，網址代稱 `english`）＋SF-I2 內容工具實測與修正
+
+- [根因] ① 英文頁未做：引擎佔 `/en`、`/zh-TW`（`nginx/default.conf` `map $uri $oracle_backend`），TranslatePress 能否用別的代稱未試（SPEC §6）。② SF-I2 第四批 RISK「只走 REST 的讀寫對登記站回找不到」未實測：`wp-post-core.ts` `writePost` 與 `app/api/content/wp-post/route.ts` DELETE 把「沒有這個站」與「站沒有 REST 憑證」合成一個 404。
+- [步驟] ① oracle 站 `wp plugin install translatepress-multilingual --version=3.4.1 --activate`（安裝輸出尾段有 wp-cli 堆疊，外掛 active、`/wp-json/` 200）；經外掛自己的 `sanitize_settings` 寫 `trp_settings`：`translation-languages=[zh_TW,en_US]`、`url-slugs={zh_TW:zh,en_US:english}`、預設語言不加子目錄（原值存 option `trp_settings_bak_20261125`）；逐頁以英文請求登記字串後，47 列翻譯寫入 `wp_trp_dictionary_zh_tw_en_us`（`status=2`）。② 正式站以操作者登入中的瀏覽器打 API（只讀＋一次無憑證即回的 PATCH）；修 `4d14a6a2a`：有站無憑證 → 503 `BRIDGE_ONLY_SITE_ERROR`，不送請求；`route.test.ts` 加兩個測試。
+- [驗證] ① 主機內經 `lobster-nginx`：未登入 `/english/tools/ziwei/` 503（建置中，WordPress 回應）、`/en/ziwei` 200（引擎）；五分鐘臨時登入：`/english/tools/ziwei/` 200 `lang="en-US"` iframe `src="/embed/en/ziwei"`、hreflang zh-TW／en-US／zh／en 四條、選單連結 `/english/tools/<slug>/`；`/tools/ziwei/` `lang="zh-TW"` `/embed/zh-TW/ziwei`；翻譯後 `/english/tools/bazi/`、`/english/tools/`、`/english/`、`/english/daily-letter/` 內文無中文，只剩 `<title>`。② `POST /api/tools/publish {action:"clients"}` 200 含 `env:878ea75e-17fe-4941-911f-5aff18db83e3` Oracle；`/api/content/categories`、`/tags`、`/api/video/wp-posts`（siteId `f787d53e…`）200 空清單；`PATCH /api/content/wp-post` 修前 404 `Site not found or token missing`。修後 `npx tsc --noEmit` exit 0；vitest 3 檔 23 測試全過。
+- [未做／剩餘風險] 英文頁 `<title>` 與 Rank Math description 仍中文（TranslatePress 免費版不翻）→ 定案由 oracle 外掛 0.5.1 過濾 `rank_math/frontend/title`／`description`（`trp_translate()`），GO-3 前做；`4d14a6a2a` 未部署（03:00 自動部署），部署後未重打；臨時登入第一次誤用 `destroy_all()`，操作者在 oracle 站的登入被清（要重登），第二次起只 `destroy($token)`；未登入訪客的英文頁要等 GO-3 開放才看得到；`/api/social/wp-article` 需 brand 參數，未試。
+- [避免再發生] 主機上代登入只銷毀自己建的那一筆 session token。REST 路徑新增時：`!resolved` 與 `!resolved.token` 分開回（後者 `BRIDGE_ONLY_SITE_ERROR`）。
+- [rollback] 英文頁：`wp plugin deactivate translatepress-multilingual`（資料表與 option 留著無害）；程式：`git revert 4d14a6a2a`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -H "Host: oracle.aware-wave.com" http://127.0.0.1:<lobster-nginx>/english/tools/ziwei/（含臨時登入 cookie）；瀏覽器 fetch PATCH /api/content/wp-post | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=Site not found or token missing | hits=2
+- ORACLE_WAIVED: 3 檔 32 行，只把一個既有的拒絕分成兩種訊息與狀態碼，兩條路徑都不送請求；非 auth／個資／金流。讀回 diff 自審＋兩個新測試。
 ## 2026-11-25（續9）— meeting-service「問 AI」改成先搜尋再請模型整理並附來源（操作者：「我要完整的答案」）
 
 - 根因／決策：操作者問「問哪個資料最齊全、最便宜」並要求實測。三題（句子意思／冷門技術名詞／今年十月的小眾產品名）× Claude Haiku 5.5、Gemini 3.5 Flash-Lite、OpenAI gpt-6-luna × 單獨回答與附搜尋結果，共 18 次：單獨回答時 Gemini 對不認識的產品名兩輪都編出不同的答案，Claude 與 OpenAI 答「不確定」；附上搜尋結果後三家都不編。每次花費皆 < NT$0.02。操作者選完整答案 → 問 AI 一律先搜尋。

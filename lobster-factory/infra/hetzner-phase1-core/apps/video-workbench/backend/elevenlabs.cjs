@@ -73,11 +73,12 @@ async function speak({ apiKey, model, voice, text, fetchImpl, signal }) {
   const r = await call("/v1/text-to-speech/" + encodeURIComponent(voice) + "?output_format=mp3_44100_128", { apiKey, json: { text, model_id: model }, fetchImpl, signal });
   return bytes(r, "配音服務");
 }
-// Sound effects (api-reference/text-to-sound-effects/convert): duration 0.5-22 s; MP3 bytes.
-const SOUND_MAX_SECONDS = 22;
+// Sound effects (api-reference/text-to-sound-effects/convert): MP3 bytes. model_id named: the default
+// eleven_text_to_sound_v2 is removed 2027-03-01 (capabilities/sound-effects, read 2026-11-25); v3 takes up to 30 s.
+const SOUND_MODEL = "eleven_text_to_sound_v3", SOUND_MAX_SECONDS = 30;
 async function soundEffect({ apiKey, prompt, seconds, fetchImpl, signal }) {
   const duration_seconds = Math.min(SOUND_MAX_SECONDS, Math.max(0.5, Math.round(Number(seconds) * 10) / 10 || 0.5));
-  const r = await call("/v1/sound-generation?output_format=mp3_44100_128", { apiKey, json: { text: prompt, duration_seconds }, fetchImpl, signal });
+  const r = await call("/v1/sound-generation?output_format=mp3_44100_128", { apiKey, json: { text: prompt, duration_seconds, model_id: SOUND_MODEL }, fetchImpl, signal });
   return { audio: await bytes(r, "音效服務"), seconds: duration_seconds };
 }
 // Voice isolator (api-reference/audio-isolation/convert): the voice only, MP3 bytes. The vendor refuses under 4.6 s.
@@ -103,4 +104,4 @@ async function compose({ apiKey, model, prompt, instrumental, seconds, fetchImpl
   return bytes(r, "音樂服務");
 }
 
-module.exports = { BASE, ACCOUNT_TTL_MS, SOUND_MAX_SECONDS, ISOLATE_MIN_SECONDS, keyOf, key, failure, call, account, known, freePlan, creditsNote, forget, speak, soundEffect, isolate, transcribe, compose };
+module.exports = { BASE, ACCOUNT_TTL_MS, SOUND_MODEL, SOUND_MAX_SECONDS,ISOLATE_MIN_SECONDS, keyOf, key, failure, call, account, known, freePlan, creditsNote, forget, speak, soundEffect, isolate, transcribe, compose };

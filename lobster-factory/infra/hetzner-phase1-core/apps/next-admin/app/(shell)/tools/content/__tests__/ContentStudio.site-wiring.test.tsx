@@ -88,7 +88,7 @@ describe("ContentStudio -- site from the client rail (K7)", () => {
     nav.search = `org=${A}`;
     mockFetch([SITE_1, SITE_2]);
     render(page());
-    await screen.findByText("請在左側客戶欄選網站。");
+    await screen.findByText("請在客戶欄選網站。");
     expect(called("/api/content/patterns")).toHaveLength(0);
     expect(called("/api/content/categories")).toHaveLength(0);
     expect(called("/api/content/tags")).toHaveLength(0);
@@ -98,7 +98,7 @@ describe("ContentStudio -- site from the client rail (K7)", () => {
   it("no client picked: says so, and never falls back to a site", async () => {
     mockFetch([SITE_1, SITE_2]);
     render(page());
-    await screen.findByText("請先在左側客戶欄選客戶。");
+    await screen.findByText("請先在客戶欄選客戶。");
     expect(called("/api/content/sites")).toHaveLength(0);
     expect(called("/api/content/categories")).toHaveLength(0);
   });
