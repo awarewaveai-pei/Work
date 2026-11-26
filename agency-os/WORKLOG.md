@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續19）— 橫幅 C10：AI 回答的 JSON 只要有一個完整物件就能用；解析失敗自動重試一次，再失敗才報錯並留原文
+
+- 根因：正式站 AI 一鍵設計（Opus、3 尺寸）第一次回 2,055 tokens、未截斷、已收費 NT$1.51，但前端只做 `JSON.parse(去 fence 後全文)`，答案前後若有說明文字、尾逗號、字串內未跳脫的換行或串流尾標記就整個失敗，且原文沒留下。不變量：答案裡只要有一個完整物件就要能用；真的壞了才失敗，失敗要留原文。
+- 修：`NA/app/(shell)/tools/banner/banner-design.ts` 新增 `parseAiJson`（先切 `[SF_BUDGET]`／`[ERROR]` 尾標記與 code fence，依括號配對且略過字串內容取第一個完整 `{…}`／`[…]`，parse 失敗再修尾逗號與字串內換行／tab 後重試）、`askJsonWithRetry`（同模型同參數再問一次）、`readAiStream`、`aiFormatError`（「AI 回傳格式錯誤（已重試一次），本次已計費約 NT$x」，x＝呼叫次數×按鈕估價，原文前 2,000 字 console.error）。`BannerStudio.tsx` 的 `generateFullDesign` 與 `generateCopy` 都改用它，重試時按鈕顯示「重試中…」；順手修 `if (!staff) return` 在 try 內讓「設計中…」卡住。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋accent-not-text＋blocks 36 passed（新增點名 5 案：前後說明文字、code fence、尾逗號、尾端 [SF_BUDGET] 都解析成功；第一次壞第二次好 → 套用成功、呼叫 2 次）。
+- 剩餘：當初那次失敗的原文沒攔到，修法依常見錯誤推測（說明文字、fence、尾逗號、字串內換行）；HTTP 錯誤（非 200）不重試；重試會再收一次費。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts lib/systems/__tests__/blocks.test.ts | exit=0 | ms=6000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/1n（書面自審；n=generateFullDesign/generateCopy 在 try 內 return 讓 designing 卡住，已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=JSON.parse(full.replace | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續18）— main CI 紅（next-admin-test run 45736249682）：block-usage 產生檔落後 Banner 新 import，重產＋失敗訊息改顯示差異
 
 - 根因：續15 的產生檔取自較早的 origin/main 快照；合併時 Banner 已新增 design 對 AI 閘道（B-066）的 import → 產生檔過時，CI 正確擋下（機制本身按設計運作）。
