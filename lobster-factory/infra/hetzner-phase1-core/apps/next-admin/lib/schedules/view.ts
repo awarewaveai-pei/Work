@@ -36,7 +36,7 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
     for (const org of orgs) {
       if (!jobAppliesTo(job, org.slug)) continue;
       const row = stored.find((s) => s.organizationId === org.id && s.jobKey === job.key);
-      const unavailable = job.unavailable?.({ siteUrl: org.site_url, chatwoot: org.chatwoot, wpSites: wpSites.get(org.id) ?? 0 }) ?? null;
+      const unavailable = job.unavailable?.({ siteUrl: org.site_url, chatwoot: org.chatwoot, wpSites: wpSites.get(org.id) ?? 0, slug: org.slug }) ?? null;
       cells.push(
         row
           ? { ...asRegistered(row), dailyLimit: dailyLimitOf(job, row.dailyLimit), perTopicCap: perTopicCapOf(job, row.perTopicCapTwd), stored: true, version: null, unavailable }

@@ -18,6 +18,7 @@ import type { JobMeta } from "./types";
 import type { Frequency, WeekdayHours } from "./schedule";
 import { CLAUDE_USAGE_WINDOW_JOB, claudeUsageWindowUnavailable, fireClaudeUsageWindow } from "./claude-usage-window";
 import type { StoredSchedule } from "./store";
+import { MAIL_QUOTA_JOB, mailQuotaUnavailable, runMailQuotaWatch } from "./mail-quota";
 
 /** A fixed USD price shown in NT$ (the page rule: every amount a person reads is NT$). */
 const ntd = (usd: number) => Math.ceil(usd * TWD_RATE * 10) / 10;
@@ -28,6 +29,8 @@ export interface JobClientFacts {
   chatwoot: unknown;
   /** Active WordPress sites (wp_sites) of the client. */
   wpSites?: number;
+  /** organizations.slug of the client. */
+  slug?: string;
 }
 
 /** The AwareWave platform organization (the same slug app/api/ops/clients/route.ts reads as first_party). */
@@ -178,6 +181,33 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     onlyOrgSlugs: [PLATFORM_ORG_SLUG],
     unavailable: () => claudeUsageWindowUnavailable(process.env),
     run: () => fireClaudeUsageWindow(process.env),
+  },
+  {
+    ...MAIL_QUOTA_JOB,
+    defaults: { frequency: "every_5m", hourUtc: 0, dayOfWeekUtc: 1, dayOfMonth: 1 },
+    unavailable: (c) => mailQuotaUnavailable(c.slug, process.env),
+    async run(organizationId) {
+      const sb = getSupabaseWriteClient();
+      if (!sb) throw new Error("mail_quota_watch:no_supabase_client");
+      const { data: org, error } = await sb.from("organizations").select("slug").eq("id", organizationId).maybeSingle();
+      if (error) throw new Error(`mail_quota_watch:org:${error.message}`);
+      const environment = process.env.NODE_ENV === "production" ? "production" : "development";
+      return runMailQuotaWatch({
+        orgSlug: (org?.slug as string | undefined) ?? null,
+        env: process.env,
+        async orgNames(slugs) {
+          const { data } = await sb.from("organizations").select("slug, name").in("slug", [...slugs]);
+          return new Map(((data ?? []) as Array<{ slug: string; name: string | null }>).map((o) => [o.slug, o.name ?? o.slug]));
+        },
+        async alreadyNotified(fingerprint) {
+          // same lookup ingestIncident makes (fingerprint + environment); a read failure fails the run, never a second notice
+          const { data, error: e } = await sb.from("ops_incidents").select("id").eq("fingerprint", fingerprint).eq("environment", environment).maybeSingle();
+          if (e) throw new Error(`mail_quota_watch:incident_read:${e.message}`);
+          return !!data;
+        },
+        raise: (n) => raiseNotice(sb, organizationId, n),
+      });
+    },
   },
 ];
 
