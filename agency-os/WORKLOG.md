@@ -56,6 +56,19 @@
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/3n（全修：Safari 不能編 WebP 時明說不出假檔；JPG 透明處先鋪 bgColor；SVG esc 剔除 XML 不合法控制字元；另採建議：開編輯器用 raster.composite 不重疊一次。accent-not-text 閘抓到 var(--red) 字色已改 --badge-red-text）
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,.claude | grep=在 Canvas Editor 開啟|handleOpenInCanvas|影片片頭（存到我的設計後 | hits=3
 - ORACLE_WAIVED: worker 分支，監工 session 合併前審查
+## 2026-11-26（續5）— Banner C6 品牌套組＋C7 商品擬真（新模組，banner-layers 之後接線）
+
+- 決策：C6 套組存 `organizations.metadata.client_config.bannerKit`（與 brandColors／CIS brandKit 同一 JSONB，免 migration）；沒存過時由 brandColors＋CIS logo／字型組出初值。API `NA/app/api/tools/presets/brand-kit/route.ts`（掛設計門頁既有 /api/tools/presets 前綴）：GET 客戶只讀自己 org、指名他 org 403；PUT 限員工 owner/admin（canWriteTenantConfig，同 brand-colors／cis 路由），只換 bannerKit、其他 client_config 鍵保留；GET 只 select 品牌三鍵，不外流 SSH 等設定。logo 先經 saveDesign 存進我的設計，org 列只存 URL。
+- C7 `NA/app/(shell)/tools/banner/product-grounding.ts`：groundProduct → product／shadow／reflection 全畫布層；接觸陰影取 alpha 底部 18% 輪廓壓扁兩層模糊；倒影以接觸線鏡像漸淡；色調依背景環帶均色，每通道增益限 ±12%。全關＝直接 drawImage。
+- Codex F1（CONFIRMED，既有缺陷）：`NA/lib/studio/design-upload.ts` saveDesign 的 organizationId 只給上傳、沒給登記 → 存到指定客戶會被拒（BannerStudio「存到客戶」同樣受影響）；已修並加 `NA/lib/studio/__tests__/design-upload.test.ts`。
+- Codex F2：從我的設計刪掉 logo 圖會讓套組 URL 失效（刪除守衛不知道 bannerKit 引用）；本卡只做面板載入失敗提示，治本需改共用刪除守衛 → RISKS。F3：與 brand-colors／cis 並行讀改寫可互相覆蓋（既有同型）；原子更新需 migration（High）→ RISKS。
+- 驗證：`npx tsc --noEmit` exit 0；vitest brand-kit route 2＋design-upload 1＋registry-code 15＝18 passed。權限守衛突變：拔 `assertOrgAccess` → 「他 org 403」測試紅（expected 200 to be 403）→ 還原綠。C7 headless Chromium 臨時頁：全關與 drawImage 逐位元組比對 diff=0／2,880,000（整數與小數 box 各 2 組），截圖 `$env:TEMP\c7-grounding-demo.png`；臨時頁未 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run app/api/tools/presets/brand-kit/route.test.ts lib/studio/__tests__/design-upload.test.ts lib/portal/__tests__/registry-code.test.ts; chrome --headless --dump-dom c7-demo.html | exit=0 | ms=40000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-26-review-f6a1fa0c.md），F1 已修，F2 面板提示＋RISKS，F3 RISKS
+- ORACLE_WAIVED: F1 修正與面板提示在 artifact 之後，由新測試與 18 passed＋tsc 覆蓋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=saveDesign\( | hits=15
+- rollback：`git revert` 本 commit（新檔＋design-upload 一行，無資料遷移；已存的 bannerKit 鍵無人讀即無作用）
 ## 2026-11-26（續2）— /ops/systems/blocks 改三分頁：系統卡片取代要左右捲的熱度表；積木目錄網址只由 catalogHref 產生
 
 - 根因／決策：操作者不要左右捲（10 欄熱度表在 1100px 版面必溢出）。改分頁（連結 ?view=）：系統用了哪些積木（預設，每系統一列：名稱／狀態／完成度＋各層顆數標籤自動換行、展開全部編號）／積木清單／圖解。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
