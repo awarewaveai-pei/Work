@@ -5,6 +5,17 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql -c "select last_run_at, last_error, weekday_hours from client_schedules where job_key='claude_usage_window'" + RemoteTrigger get/list_runs | exit=0 | ms=3000
 - REVIEW_WAIVED: NA -- 無程式改動，只改 routine 設定與文件一行
 - BUGHUNT_WAIVED: NA -- 無程式改動
+## 2026-11-26（續33）— oracle WP：Rank Math 前台未啟動的原因查明並修（站＋建站流程）；昨晚部署的兩個修正在正式站驗過
+
+- [根因] oracle 站中英文頁都沒有 meta description／og（2026-11-25 發現）。Rank Math `rank-math.php` `init_frontend()` 在 `registration->invalid` 時直接 return；`invalid`＝沒連帳號且沒有 `rank_math_registration_skip`（`includes/admin/class-registration.php:284` 的「略過」才會寫）。建站流程裝完外掛後沒人回答這一步 → 前台整個不輸出，`<title>` 是 WordPress 核心的。`rank_math_is_configured` 與此無關（只管後台提示）。同主機 `lobster-wordpress`（主站）也沒有這個 option，未查它是否已連帳號，不在本卡範圍。
+- [步驟] ① oracle 站 `wp option add rank_math_registration_skip 1`。② 類別修正：`aw-hosting-gate.sh` `site-wp <slug> plugins` 收尾，清單含 `seo-by-rank-math` 且該 option 為空時設 1；`hosting-gate-site.test.sh` 加兩個 check。
+- [驗證] ① 主機內臨時登入：`/tools/ziwei/` 有 `<meta name="description" content="十二宮命盤 …">`、`og:title`、`og:description`、`twitter:*`；`/english/tools/ziwei/`、`/english/`、`/english/tools/` 同組標籤皆英文（外掛 0.5.1 的 description／og 路徑首次在真站執行），`og:locale=en_US`；`robots` 仍 `noindex, nofollow`（`blog_public=0`，第 9 步 open 會改 1）。② `bash tests/host-scripts/hosting-gate-site.test.sh` 160 passed, 0 failed。③ 昨晚自動部署 `.deployed-commit=236b8fc60…`（含 `95aa5ec19`、`4d14a6a2a`）：`PATCH /api/content/wp-post`（oracle siteId）回 503「此站只支援 bridge 通道…」；`curl https://oracle.aware-wave.com/aw-open-check/` 503 且含建置中標記（由 WordPress 回應，第 9 步的確認路徑分流正確）。
+- [剩餘風險] 主機腳本改動要等 `sync-host-scripts.sh`（19:00／20:00 UTC 排程）才上主機；既有的站不會被回補（目前只有 oracle，已手動設）。
+- [rollback] 站：`wp option delete rank_math_registration_skip`；repo：revert 本 commit。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp option add rank_math_registration_skip 1；curl -b <temp cookie> /english/tools/ziwei/；bash hosting-gate-site.test.sh | exit=0 | ms=240000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=rank_math_registration_skip | hits=4
+- ORACLE_WAIVED: 主機腳本加 5 行（只在清單含 Rank Math 且 option 為空時寫一個 option），不涉 auth／個資／金流；160 個既有測試＋2 個新測試。
 ## 2026-11-26（續30）— /tools/ai-models 實測紀錄：每項測試一個子分頁，依文字／圖片／影片／音訊分類，總覽卡片＋結論先行的版面
 
 [任務] 操作者：「把裡面的每種測試用 tab 分開，要按邏輯分類歸納，UI/UX 排版要有國際頂尖設計師水準」。
