@@ -227,7 +227,7 @@ export const LEGO_BLOCKS: LegoBlock[] = [
 
   // ── 共用底座與營運（跨系統組裝最多的積木） ──
   block({ no: "B-066", layer: "platform", name: "AI 呼叫閘道與記帳", status: ["toolkit"], purpose: "所有 AI 呼叫走同一個閘道：選供應商、估成本、記每一次呼叫；OpenAI／Gemini／Claude／Replicate 共用參數與輪詢。",
-    entry: ["lib/ai/gateway.ts", "lib/ai/log-ai-call.ts", "lib/ai/cost-calculator.ts", "lib/ai/openai-text.ts", "lib/ai/gemini-models.ts", "lib/ai/claude-params.ts", "lib/ai/cheap-json.ts", "lib/ai/replicate-poll.ts", "lib/ai/replicate-output.ts", "lib/ai/model-comparison.ts"], deps: ["各家 AI 金鑰"], usedBy: ["app-platform", "ops-console", "content", "outbound-os", "video", "tarot", "repair-center", "cs", "provisioning", "social", "studio"] }),
+    entry: ["lib/ai/gateway.ts", "lib/ai/log-ai-call.ts", "lib/ai/cost-calculator.ts", "lib/ai/openai-text.ts", "lib/ai/gemini-models.ts", "lib/ai/claude-params.ts", "lib/ai/cheap-json.ts", "lib/ai/replicate-poll.ts", "lib/ai/replicate-output.ts", "lib/ai/model-comparison.ts"], deps: ["各家 AI 金鑰"], usedBy: ["app-platform", "ops-console", "content", "outbound-os", "video", "tarot", "repair-center", "cs", "provisioning", "social", "studio", "design"] }),
   block({ no: "B-067", layer: "ops", name: "AI 花費報表與匯率", status: ["toolkit"], purpose: "把 AI 花費依工具、供應商、客戶彙整，換算成新台幣。",
     entry: ["lib/ai/spend-report.ts", "lib/ai/spend-loader.ts", "lib/ai/fx-cbc.ts"], usedBy: ["app-platform", "ops-console", "commerce", "content"] }),
   block({ no: "B-068", layer: "ops", name: "事故收件匣與通知", status: ["toolkit"], purpose: "任何系統把事故丟進同一個收件匣：驗 token、去重、分類、遮蔽密鑰，再發 Telegram 通知。",

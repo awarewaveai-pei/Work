@@ -4,7 +4,6 @@
 // file, so its import closure names neither route (step-8 card §2 S1).
 import { useEffect, useState } from "react";
 import BannerStudio, { type BannerStaffApi } from "./BannerStudio";
-import { DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
 import { roleHeader } from "@/lib/ops-role";
 import type { PickOrg } from "../../ops/clients/nav-orgs";
 import { OrgPicker } from "../../ops/clients/OrgPicker";
@@ -71,10 +70,10 @@ function SaveOrgPicker({ selected, onPick }: { selected: string | null; onPick(o
 }
 
 const staff: BannerStaffApi = {
-  scriptForge: (task, fields) => fetch("/api/tools/script-forge", {
+  scriptForge: (task, fields, model) => fetch("/api/tools/script-forge", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-    body: JSON.stringify({ module: "banner", task, fields, model: DEFAULT_AI_TEXT_MODEL }),
+    body: JSON.stringify({ module: "banner", task, fields, model }),
   }),
   BrandPicker,
   SaveOrgPicker,
