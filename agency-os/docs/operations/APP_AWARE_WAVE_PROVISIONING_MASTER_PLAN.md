@@ -1,7 +1,7 @@
 # app.aware-wave.com 一鍵架站 / 企業佈建 — MASTER PLAN（總藍圖 SSOT）
 
 > **這份是什麼**：把「客戶填表 → 討論/報價 → 一鍵架出整個企業的網站 + 串接所有服務」的**完整願景 + 現況 + 分階段路線圖**寫死，讓任何 session（含未來的我）一讀就能接續，不重做、不遺忘。
-> **建立**：2026-06-06。**狀態**：Stage 0 ✅ 完成；Stage 1 起未動。
+> **建立**：2026-06-06。**本檔只留願景與路線圖**；建站現況＝程式＋[建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。
 > **相關 SSOT**：[`APP_AWARE_WAVE_BUILD_ENGINE_STAGE0.md`](APP_AWARE_WAVE_BUILD_ENGINE_STAGE0.md)（建站引擎診斷+修復）、[`../../../lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md`](../../../lobster-factory/docs/hosting/EMBED_PROVISION_INTO_APP.md)（機層租機 recipe，**已寫好+真機驗證**）、[`APP_AWARE_WAVE_ONBOARDING_IA_PLAN.md`](APP_AWARE_WAVE_ONBOARDING_IA_PLAN.md)、[`APP_AWARE_WAVE_CURRENT_STATE.md`](APP_AWARE_WAVE_CURRENT_STATE.md)。
 
 ---
@@ -9,6 +9,8 @@
 ## 🚀 開工必讀（按順序，讀完這 7 步即完全掌握狀況）
 
 > 操作者一說「繼續 app.aware-wave / 做 onboarding / 建站 / 佈建 / 做 Stage N」→ AI **依序**讀以下，不跳步。前 3 步給「藍圖+最新真相」，後 4 步給「程式+活資料」。
+
+> 開客戶 WordPress 站的工作先讀[建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)；下列第 4–6 步與 §1 是舊建站路徑（沒有頁面再用它建客戶站）。
 
 1. **本檔全文**（§1 架構地圖 → §2 現況矩陣 → §3 路線圖 → §4 護欄）= 願景 + 做到哪 + 下一步。
 2. **`git log --oneline -15`** + `agency-os/WORKLOG.md` 最近 2 個 `## YYYY-MM-DD` 區塊 = 最新發生什麼（**最新 commit 是真相，勝過任何文件聲稱**；多檔被平行 session 觸碰過，遵 VBC）。
@@ -32,6 +34,8 @@
 ---
 
 ## 1. 架構地圖（資料如何流動）
+
+> 歷史（2026-06）：舊建站路徑。現行架構見[建站流程手冊 §1](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。
 
 ```
 [公開收資料]                    [app.aware-wave 後台佈建引擎]                       [真實基礎設施]
@@ -76,22 +80,9 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 
 ---
 
-## 2. 現況矩陣（誠實版）
+## 2. 現況
 
-| 能力 | 狀態 | 證據 |
-|---|---|---|
-| 有 pending run → 建真 staging WP → 狀態 completed | ✅ **已驗證** | 2026-06-06 e2e run `655197bf` completed + curl 200（WORKLOG）|
-| **submit → generate-spec → trigger-build 全鏈自動建站（local_direct，不靠 Trigger.dev）** | ✅ **生產已驗**（2026-07-04）| e2e：submit 201 → spec 201（Claude 生成）→ trigger-build `local_direct` build_status=completed run `d21ab292`（~230s）→ https://aware-wave.com/staging/e2e-verify-0704-6e2b91/ curl 200 + seed 內容 + AI hero 圖。`bd135952` local_direct + 4 個 UI 吞錯修復（WORKLOG 2026-07-04）已 deploy `f9172be2`。⚠️ 限制：瀏覽器 UI 走 CF 的外層 request 會被 ~100s 上限切斷（建站仍完成，UI 拿不到回應）→ same-host worker 為 follow-up |
-| **ops /ops/onboarding 觸發建站按鈕（spec_generated → building → completed）** | ✅ **生產已驗**（2026-07-04）| Phase 3：intake 5c0b0307 spec_generated → trigger-build API（模擬按鈕） → ok=true, run cdfe06f8 completed → https://aware-wave.com/staging/test-wp-webhook-co-5c1bd1/ 200 ✅；c78a05c9 已 deploy |
-| ~~客戶填表 → 自動生出那個 pending run~~（已被 local_direct 取代：run 直接 running→completed，不經 pending）| ✅ 已通 | 同上；舊症狀「跳回第一步」前端 bug 已修（1c70853e + 2026-07-04 handleSubmit 硬化）|
-| Fluent Form（公開 WP）→ intake 橋接 | ✅ **E2E 完整**（2026-07-04）| FluentForms Pro 6.2.5 已裝；form_id=3（11 欄位）；webhook feed → `/api/onboarding/intake-public`（Bearer narrow token）；FluentCRM feed 已配置（contact+tag prospect/website-inquiry）；n8n bridge `RbrHNu3BUEmpNWeT` **已停用**（active=False，被直接 webhook 取代）；WORKLOG Phase 2+3 |
-| `app.aware-wave.com/intake` 公開 React 表單（`intake-browser` API）| 🟡 **已建 · feature gate OFF**（2026-07-04）| route group 重構（(shell)/(public)）；React 5-step 表單 + lib/onboarding/intake-form-steps.tsx 共用元件；`BROWSER_INTAKE_ENABLED` env gate（默認 OFF；待 Cloudflare Turnstile 接入後開）；tsc 0 error + 599 tests 通過；WORKLOG 2026-07-04 Phase 4 |
-| 中央 FluentCRM（收客資料進 CRM）| ✅ **已配置**（2026-07-04）| FluentForms FluentCRM feed：contact+tag prospect/website-inquiry，update_contact=yes；中央 CRM feed 跟 FluentForm 提交綁定 |
-| AI 自動報價 | ❌ 未做 | — |
-| 機層一鍵租機（Hetzner+硬化+DNS）| 🟡 **寫好未接** | provisionClient 真機驗證；EMBED 文件 ready；app 按鈕沒呼叫 |
-| 串接 Uptime Kuma / Sentry | 🟡 部分 | create-wp-site `input.integrations` 有走，但 onboarding 預設沒帶 token |
-| 串接 Supabase Studio / n8n / Netdata / PostHog Cloud | ❌ 未做 | — |
-| ops-console 一鍵架整套企業棧 | ❌ 未做 | UI 殼存在 |
+見[建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。本節原矩陣（2026-07 的 `local_direct` staging 建站）已過時，取法：`git log -p -- agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`。
 
 ---
 
@@ -102,14 +93,8 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 ### ✅ Stage 0 — 建站引擎閉環（DONE 2026-06-06）
 站層 timeout 45s→95s + blocked 狀態回寫；pending run → 真站 → completed 已證。詳 STAGE0 文件。
 
-### ✅ Stage 1 — ops 觸發建站（spec_generated → building → completed）（DONE 2026-07-04）
-**目標**：ops 看到公開 intake `spec_generated` → 一鍵觸發建站，不靠手塞 DB。
-**已完成**：
-- `submit/route.ts` GET：加入 `website_specs(id, generated_at)` embed + sort DESC → `website_spec_id` 確定性取最新 spec（critic Major 同日折入）
-- `app/ops/onboarding/page.tsx` IntakeHistory：`status=spec_generated && website_spec_id` 顯示「觸發建站」按鈕 → POST `/api/onboarding/trigger-build {website_spec_id, intake_form_id}`；成功前端 status 改 building + "已排入 ✓"；失敗行內錯誤
-- sg-deploy c78a05c9（2026-07-04）：healthy 8s；4 smoke 端點 200；playwright smoke 26/26
-- 生產驗收（2026-07-04）：intake `5c0b0307` spec_generated → trigger-build → ok=true, completed, run `cdfe06f8` → https://aware-wave.com/staging/test-wp-webhook-co-5c1bd1/ curl 200 ✅
-**限制**：intake_forms status 在 `building` 後無 terminal 轉換（known gap；run=completed + site live = 實質完成）
+### ✅ Stage 1 — ops 觸發建站（DONE 2026-07-04；舊觸發方式已於 2026-11-23 退場）
+現行做法見[建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。
 
 ### ✅ Stage 2 — Fluent Form → intake 橋接 + 中央 FluentCRM（DONE 2026-07-04）
 **目標**：公開 aware-wave.com 的 Fluent Form 收件 → 自動進 (a) app 的 intake_forms（含 AI 生規格）、(b) 中央 FluentCRM（做客戶關係）。
@@ -144,7 +129,7 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 **已完成（2026-07-02）**：
 - `app/api/provision/route.ts`：呼叫 `provisionClient()`，ops-role + sync-key auth，env-gated 安全。
 - `next.config.ts` + `tsconfig.json`：加入 `@workflows` webpack alias 讓 next-admin 可 import packages/workflows。
-- `BuildConsole.tsx`：Profile B 顯示「機層租機」可摺疊面板，tier/region 選擇，結果即時顯示。
+- （原 `BuildConsole.tsx`「機層租機」面板已隨 `/build` 頁刪除；`/api/provision` 目前沒有頁面呼叫，且它派的 `provision-machine` 任務不存在。）
 **env 設定（上線前 SG .env 加）**：`LOBSTER_SERVER_ADAPTER=hetzner_cloud`、`LOBSTER_SERVER_PROVISION_ENABLED=true`、`HETZNER_STAGING_TOKEN`。預設 none = idle 安全。
 **現況（2026-07-03 實查）**：SG .env 三個 flag 均未設（確認缺）；vault 無 `HETZNER_STAGING_TOKEN`（僅有主帳 `HETZNER_API_TOKEN`）→ 開閘前需決定：另開 Hetzner staging project 專用 token（建議，隔離爆炸半徑）或暫用主 token。Trigger.dev workflows 2026-07-02 已完整 deploy（WORKLOG AUTO_TASK_DONE），provision-machine 前置可能已就位，開閘時順驗。
 **驗收**：✅ step 1 dry-run 確認回 `status:idle`（adapter=none；2026-07-03 sync-key POST 實測 `{"outcome":"idle","adapter":"none"}`）→ 改 env 開 hetzner_cloud + mock 測 dry_run → 開真機（需明示 go-ahead）。
@@ -176,6 +161,5 @@ aware-wave.com (WP)            app.aware-wave.com (Next.js 15)
 - **本檔** = 總 SSOT（agency-os/docs/operations/）。
 - **TASKS.md** 有對應 open 任務（AO-RESUME 自動列）。
 - **memory** 有 pointer（每 session recall）。
-- AO-RESUME §7 下一步會點名 Stage 1。
 
-**下一個動作（給未來的我）**：直接做 **Stage 1 — 抓那 2 筆卡住的 intake_forms，retry trigger-build 看精確錯誤碼，對症修入口**。
+**下一個動作**：以 `agency-os/TASKS.md` 為準；建站操作見[建站流程手冊](../../../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md)。

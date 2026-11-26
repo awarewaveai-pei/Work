@@ -140,7 +140,7 @@ docker compose up -d next-admin
 
 # 5. 驗收
 docker ps --filter name=lobster-next-admin
-curl -sf http://127.0.0.1/ -H 'Host: app.aware-wave.com' | grep -c "Build Console"  # 預期 ≥ 1
+# 原本 grep 首頁的 "Build Console"；該字串已不在 next-admin。頁面驗收以 sg-deploy.sh 的 HTTP smoke 為準
 
 # 6. WORKLOG 留一行
 # "manual deploy next-admin <commit>, health PASS"

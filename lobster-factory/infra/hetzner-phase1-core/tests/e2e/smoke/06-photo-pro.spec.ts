@@ -464,10 +464,10 @@ test.describe('Photo Pro (PhotoCraft) smoke', () => {
     await entry('banner', async () => {
       await page.goto('/tools/banner', { waitUntil: 'domcontentloaded' });
       await hydrated();
-      await page.getByRole('button', { name: '在 Canvas Editor 開啟' }).click();
+      await page.getByRole('button', { name: '在修圖（專業版）開啟' }).click();
       const docs = await landed(/\/tools\/photo-pro/);
       expect(docs!.length).toBe(1);
-      expect(docs![0].name).toMatch(/^banner-.+\.png$/);
+      expect(docs![0].name).toMatch(/^banner-.+\.psd$/); // layered PSD: text stays editable type layers
     });
     await entry('mockup', async () => {
       await page.goto('/tools/mockup', { waitUntil: 'domcontentloaded' });

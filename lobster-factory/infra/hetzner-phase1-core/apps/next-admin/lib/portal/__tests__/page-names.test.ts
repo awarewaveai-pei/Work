@@ -62,7 +62,10 @@ const items: Item[] = PRODUCTS.flatMap((p) => {
 function mismatch({ name, file }: Item): string | null {
   const src = readFileSync(file, "utf8");
   const bad: string[] = [];
-  const title = /metadata\s*=\s*\{\s*title:\s*["']([^"']+)["']/.exec(src)?.[1];
+  // a client page cannot export metadata: Next takes the title from its segment's layout.tsx
+  const layout = path.join(path.dirname(file), "layout.tsx");
+  const meta = /^["']use client["']/.test(src) && existsSync(layout) ? readFileSync(layout, "utf8") : src;
+  const title = /metadata\s*=\s*\{\s*title:\s*["']([^"']+)["']/.exec(meta)?.[1];
   if (!title?.includes(name)) bad.push(`title ${title ? `"${title}"` : "(none)"} lacks "${name}" (${rel(file)}:${lineOf(file, /metadata/)})`);
   if (!/\bredirect\(/.test(src)) {
     const h1 = firstH1(file);
@@ -77,10 +80,8 @@ function mismatch({ name, file }: Item): string | null {
 const TODO: Record<string, { owner: string; until: string }> = {};
 
 // Staff sidebar pages (keyed by href) whose <title>/<h1> predate the rule: operations and back-office pages that mirror no
-// door page. /tools/theme is the theme session's (no other card edits it); U13 renames it.
-const STAFF_TODO: Record<string, { owner: string; until: string }> = {
-  "/tools/theme": { owner: "U13", until: "第 8 批" },
-};
+// door page.
+const STAFF_TODO: Record<string, { owner: string; until: string }> = {};
 
 // Staff sidebar links and the page file each opens (app/(shell) or app/(full)); an href with no page file is not checked.
 const staffItems: Item[] = DEFAULT_SECTIONS.flatMap((s) => s.items).flatMap((i) => {

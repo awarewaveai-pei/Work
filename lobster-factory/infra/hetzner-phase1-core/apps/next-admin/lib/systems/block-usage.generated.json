@@ -1,393 +1,492 @@
 {
-  "B-001": [
-    "ai-subscription-channel",
-    "app-platform",
-    "collect",
-    "commerce",
-    "content",
-    "cs",
-    "design",
-    "ops-console",
-    "outbound-os",
-    "provisioning",
-    "repair-center",
-    "social",
-    "studio",
-    "systems-control-center",
-    "tarot",
-    "video"
+  "usedBy": {
+    "B-001": [
+      "ai-subscription-channel",
+      "app-platform",
+      "collect",
+      "commerce",
+      "content",
+      "cs",
+      "design",
+      "ops-console",
+      "outbound-os",
+      "provisioning",
+      "repair-center",
+      "social",
+      "studio",
+      "systems-control-center",
+      "tarot",
+      "video"
+    ],
+    "B-002": [
+      "app-platform",
+      "commerce",
+      "content",
+      "ops-console",
+      "outbound-os",
+      "schedules",
+      "social",
+      "tarot",
+      "video"
+    ],
+    "B-003": [
+      "content",
+      "design",
+      "ops-console",
+      "outbound-os",
+      "social",
+      "studio",
+      "video"
+    ],
+    "B-004": [
+      "content",
+      "video"
+    ],
+    "B-005": [
+      "app-platform",
+      "commerce",
+      "content",
+      "design",
+      "ops-console",
+      "outbound-os",
+      "schedules",
+      "social",
+      "staff-access",
+      "studio",
+      "tarot",
+      "video"
+    ],
+    "B-006": [
+      "content",
+      "video"
+    ],
+    "B-007": [
+      "content"
+    ],
+    "B-008": [
+      "content"
+    ],
+    "B-009": [
+      "content"
+    ],
+    "B-010": [
+      "content"
+    ],
+    "B-011": [
+      "content"
+    ],
+    "B-013": [
+      "content",
+      "video"
+    ],
+    "B-015": [
+      "video"
+    ],
+    "B-016": [
+      "content",
+      "tarot",
+      "video"
+    ],
+    "B-017": [
+      "app-platform",
+      "content",
+      "design",
+      "studio",
+      "tarot",
+      "video"
+    ],
+    "B-024": [
+      "content",
+      "studio",
+      "tarot"
+    ],
+    "B-026": [
+      "design",
+      "studio",
+      "tarot"
+    ],
+    "B-028": [
+      "design",
+      "tarot"
+    ],
+    "B-029": [
+      "design"
+    ],
+    "B-033": [
+      "design"
+    ],
+    "B-035": [
+      "design",
+      "studio",
+      "tarot"
+    ],
+    "B-040": [
+      "studio"
+    ],
+    "B-066": [
+      "app-platform",
+      "content",
+      "cs",
+      "design",
+      "ops-console",
+      "outbound-os",
+      "provisioning",
+      "repair-center",
+      "social",
+      "studio",
+      "tarot",
+      "video"
+    ],
+    "B-067": [
+      "commerce",
+      "content",
+      "ops-console"
+    ],
+    "B-068": [
+      "app-platform",
+      "collect",
+      "commerce",
+      "content",
+      "cs",
+      "host-infra",
+      "ops-console",
+      "outbound-os",
+      "provisioning",
+      "repair-center",
+      "schedules",
+      "social"
+    ],
+    "B-069": [
+      "host-infra",
+      "ops-console",
+      "provisioning",
+      "repair-center",
+      "schedules"
+    ],
+    "B-070": [
+      "content",
+      "ops-console",
+      "schedules",
+      "social"
+    ],
+    "B-071": [
+      "commerce",
+      "content",
+      "cs",
+      "ops-console",
+      "outbound-os",
+      "provisioning",
+      "repair-center",
+      "social",
+      "studio",
+      "video"
+    ],
+    "B-072": [
+      "app-platform",
+      "commerce",
+      "content",
+      "ops-console",
+      "social",
+      "video"
+    ],
+    "B-073": [
+      "cognitive-os",
+      "collect",
+      "content",
+      "cs",
+      "hci30",
+      "ops-console"
+    ],
+    "B-074": [
+      "content",
+      "design",
+      "repair-center",
+      "studio",
+      "tarot",
+      "video"
+    ],
+    "B-075": [
+      "app-platform",
+      "commerce",
+      "content",
+      "ops-console",
+      "outbound-os",
+      "provisioning"
+    ],
+    "B-076": [
+      "app-platform",
+      "commerce",
+      "ops-console",
+      "social",
+      "staff-access"
+    ],
+    "B-077": [
+      "app-platform",
+      "cognitive-os",
+      "commerce",
+      "content",
+      "cs",
+      "design",
+      "ops-console",
+      "outbound-os",
+      "provisioning",
+      "repair-center",
+      "schedules",
+      "social",
+      "staff-access",
+      "studio",
+      "systems-control-center",
+      "tarot",
+      "video"
+    ],
+    "B-079": [
+      "app-platform",
+      "commerce",
+      "content",
+      "design",
+      "ops-console",
+      "outbound-os",
+      "provisioning",
+      "repair-center",
+      "social",
+      "staff-access",
+      "tarot",
+      "video"
+    ],
+    "B-080": [
+      "commerce",
+      "cs",
+      "ops-console",
+      "schedules"
+    ],
+    "B-082": [
+      "app-platform",
+      "commerce"
+    ],
+    "B-085": [
+      "host-infra",
+      "schedules"
+    ],
+    "B-086": [
+      "ops-console",
+      "provisioning"
+    ],
+    "B-087": [
+      "content",
+      "studio"
+    ],
+    "B-088": [
+      "commerce",
+      "content",
+      "outbound-os",
+      "schedules",
+      "social"
+    ],
+    "B-090": [
+      "content",
+      "video"
+    ],
+    "M-01": [
+      "ops-console",
+      "outbound-os",
+      "social"
+    ],
+    "M-02": [
+      "app-platform",
+      "commerce",
+      "content",
+      "ops-console",
+      "schedules",
+      "social",
+      "video"
+    ],
+    "M-03": [
+      "commerce",
+      "content",
+      "cs",
+      "ops-console",
+      "outbound-os",
+      "schedules",
+      "social",
+      "video"
+    ],
+    "M-04": [
+      "video"
+    ],
+    "M-05": [
+      "ai-subscription-channel",
+      "app-platform",
+      "content",
+      "ops-console",
+      "studio",
+      "tarot",
+      "video"
+    ],
+    "M-06": [
+      "ai-subscription-channel",
+      "app-platform",
+      "content",
+      "design",
+      "ops-console",
+      "studio",
+      "tarot",
+      "video"
+    ],
+    "M-08": [
+      "cs",
+      "ops-console",
+      "schedules",
+      "social"
+    ],
+    "M-09": [
+      "collect",
+      "content",
+      "ops-console",
+      "outbound-os",
+      "repair-center",
+      "schedules"
+    ],
+    "M-10": [
+      "hci30",
+      "ops-console"
+    ],
+    "M-11": [
+      "cognitive-os",
+      "collect",
+      "commerce",
+      "ops-console"
+    ]
+  },
+  "methodCounts": {
+    "architecture": 10,
+    "art_therapy": 17,
+    "association": 6,
+    "causal": 10,
+    "challenge": 10,
+    "computation": 1,
+    "database_data": 10,
+    "decision": 14,
+    "decomposition": 9,
+    "delivery": 11,
+    "devops_sre": 13,
+    "divergent": 16,
+    "epistemic": 10,
+    "evidence": 1,
+    "experiment": 11,
+    "feasibility": 9,
+    "finance": 1,
+    "foresight": 14,
+    "framing": 15,
+    "insight": 9,
+    "jurisdiction": 10,
+    "knowledge": 2,
+    "learning": 11,
+    "representation": 11,
+    "research": 17,
+    "root_cause": 9,
+    "security": 10,
+    "stakeholders": 10,
+    "strategy": 17,
+    "systems": 12
+  },
+  "shared": [
+    {
+      "path": "lib/supabase-server.ts",
+      "systems": [
+        "app-platform",
+        "cognitive-os",
+        "collect",
+        "commerce",
+        "content",
+        "cs",
+        "design",
+        "host-infra",
+        "ops-console",
+        "outbound-os",
+        "provisioning",
+        "repair-center",
+        "schedules",
+        "social",
+        "staff-access",
+        "studio",
+        "systems-control-center",
+        "tarot",
+        "video"
+      ]
+    },
+    {
+      "path": "components/",
+      "systems": [
+        "app-platform",
+        "commerce",
+        "content",
+        "design",
+        "schedules",
+        "studio",
+        "tarot",
+        "video"
+      ]
+    },
+    {
+      "path": "lib/security/",
+      "systems": [
+        "ai-subscription-channel",
+        "app-platform",
+        "cognitive-os",
+        "collect",
+        "commerce",
+        "content",
+        "cs",
+        "outbound-os",
+        "repair-center",
+        "schedules",
+        "social",
+        "studio",
+        "systems-control-center",
+        "tarot",
+        "video"
+      ]
+    },
+    {
+      "path": "lib/secret-vault.ts",
+      "systems": [
+        "commerce",
+        "cs",
+        "ops-console",
+        "outbound-os",
+        "provisioning",
+        "video"
+      ]
+    },
+    {
+      "path": "lib/research-bridges.ts",
+      "systems": [
+        "cognitive-os",
+        "collect",
+        "ops-console"
+      ]
+    },
+    {
+      "path": "lib/analytics.ts",
+      "systems": [
+        "app-platform",
+        "ops-console"
+      ]
+    },
+    {
+      "path": "app/AutoRefresh.tsx",
+      "systems": [
+        "ops-console",
+        "repair-center"
+      ]
+    },
+    {
+      "path": "lib/supabase-paging.ts",
+      "systems": [
+        "commerce",
+        "social"
+      ]
+    }
   ],
-  "B-002": [
-    "app-platform",
-    "commerce",
-    "content",
-    "ops-console",
-    "outbound-os",
-    "schedules",
-    "social",
-    "tarot",
-    "video"
-  ],
-  "B-003": [
-    "content",
-    "design",
-    "ops-console",
-    "outbound-os",
-    "social",
-    "studio",
-    "video"
-  ],
-  "B-004": [
-    "content",
-    "video"
-  ],
-  "B-005": [
-    "app-platform",
-    "commerce",
-    "content",
-    "design",
-    "ops-console",
-    "outbound-os",
-    "schedules",
-    "social",
-    "staff-access",
-    "studio",
-    "tarot",
-    "video"
-  ],
-  "B-006": [
-    "content",
-    "video"
-  ],
-  "B-007": [
-    "content"
-  ],
-  "B-008": [
-    "content"
-  ],
-  "B-009": [
-    "content"
-  ],
-  "B-010": [
-    "content"
-  ],
-  "B-011": [
-    "content"
-  ],
-  "B-013": [
-    "content",
-    "video"
-  ],
-  "B-015": [
-    "video"
-  ],
-  "B-016": [
-    "content",
-    "tarot",
-    "video"
-  ],
-  "B-017": [
-    "app-platform",
-    "content",
-    "design",
-    "studio",
-    "tarot",
-    "video"
-  ],
-  "B-024": [
-    "content",
-    "studio",
-    "tarot"
-  ],
-  "B-026": [
-    "design",
-    "studio",
-    "tarot"
-  ],
-  "B-028": [
-    "design",
-    "tarot"
-  ],
-  "B-029": [
-    "design"
-  ],
-  "B-033": [
-    "design"
-  ],
-  "B-035": [
-    "design",
-    "studio",
-    "tarot"
-  ],
-  "B-040": [
-    "studio"
-  ],
-  "B-066": [
-    "app-platform",
-    "content",
-    "cs",
-    "ops-console",
-    "outbound-os",
-    "provisioning",
-    "repair-center",
-    "social",
-    "studio",
-    "tarot",
-    "video"
-  ],
-  "B-067": [
-    "commerce",
-    "content",
-    "ops-console"
-  ],
-  "B-068": [
-    "app-platform",
-    "collect",
-    "commerce",
-    "content",
-    "cs",
-    "host-infra",
-    "ops-console",
-    "outbound-os",
-    "provisioning",
-    "repair-center",
-    "schedules",
-    "social"
-  ],
-  "B-069": [
-    "host-infra",
-    "ops-console",
-    "provisioning",
-    "repair-center",
-    "schedules"
-  ],
-  "B-070": [
-    "content",
-    "ops-console",
-    "schedules",
-    "social"
-  ],
-  "B-071": [
-    "commerce",
-    "content",
-    "cs",
-    "ops-console",
-    "outbound-os",
-    "provisioning",
-    "repair-center",
-    "social",
-    "studio",
-    "video"
-  ],
-  "B-072": [
-    "app-platform",
-    "commerce",
-    "content",
-    "ops-console",
-    "social",
-    "video"
-  ],
-  "B-073": [
-    "cognitive-os",
-    "collect",
-    "content",
-    "cs",
-    "hci30",
-    "ops-console"
-  ],
-  "B-074": [
-    "content",
-    "design",
-    "repair-center",
-    "studio",
-    "tarot",
-    "video"
-  ],
-  "B-075": [
-    "app-platform",
-    "commerce",
-    "content",
-    "ops-console",
-    "outbound-os",
-    "provisioning"
-  ],
-  "B-076": [
-    "app-platform",
-    "commerce",
-    "ops-console",
-    "social",
-    "staff-access"
-  ],
-  "B-077": [
-    "app-platform",
-    "cognitive-os",
-    "commerce",
-    "content",
-    "cs",
-    "design",
-    "ops-console",
-    "outbound-os",
-    "provisioning",
-    "repair-center",
-    "schedules",
-    "social",
-    "staff-access",
-    "studio",
-    "systems-control-center",
-    "tarot",
-    "video"
-  ],
-  "B-078": [
-    "ai-subscription-channel",
-    "app-platform",
-    "cognitive-os",
-    "collect",
-    "commerce",
-    "content",
-    "cs",
-    "ops-console",
-    "outbound-os",
-    "provisioning",
-    "repair-center",
-    "schedules",
-    "social",
-    "studio",
-    "systems-control-center",
-    "tarot",
-    "video"
-  ],
-  "B-079": [
-    "app-platform",
-    "commerce",
-    "content",
-    "design",
-    "ops-console",
-    "outbound-os",
-    "provisioning",
-    "repair-center",
-    "social",
-    "staff-access",
-    "tarot",
-    "video"
-  ],
-  "B-080": [
-    "commerce",
-    "cs",
-    "ops-console",
-    "schedules"
-  ],
-  "B-081": [
-    "cognitive-os",
-    "collect",
-    "ops-console"
-  ],
-  "B-082": [
-    "app-platform",
-    "commerce"
-  ],
-  "B-083": [
-    "app-platform",
-    "ops-console"
-  ],
-  "B-084": [
-    "ops-console",
-    "repair-center"
-  ],
-  "B-085": [
-    "host-infra",
-    "schedules"
-  ],
-  "B-086": [
-    "ops-console",
-    "provisioning"
-  ],
-  "B-087": [
-    "content",
-    "studio"
-  ],
-  "B-088": [
-    "commerce",
-    "content",
-    "outbound-os",
-    "schedules",
-    "social"
-  ],
-  "B-089": [
-    "commerce",
-    "social"
-  ],
-  "B-090": [
-    "content",
-    "video"
-  ],
-  "M-01": [
-    "ops-console",
-    "outbound-os",
-    "social"
-  ],
-  "M-02": [
-    "app-platform",
-    "commerce",
-    "content",
-    "ops-console",
-    "schedules",
-    "social",
-    "video"
-  ],
-  "M-03": [
-    "commerce",
-    "content",
-    "cs",
-    "ops-console",
-    "outbound-os",
-    "schedules",
-    "social",
-    "video"
-  ],
-  "M-04": [
-    "video"
-  ],
-  "M-05": [
-    "ai-subscription-channel",
-    "app-platform",
-    "content",
-    "ops-console",
-    "studio",
-    "tarot",
-    "video"
-  ],
-  "M-06": [
-    "ai-subscription-channel",
-    "app-platform",
-    "content",
-    "design",
-    "ops-console",
-    "studio",
-    "tarot",
-    "video"
-  ],
-  "M-08": [
-    "cs",
-    "ops-console",
-    "schedules",
-    "social"
-  ],
-  "M-09": [
-    "collect",
-    "content",
-    "ops-console",
-    "outbound-os",
-    "repair-center",
-    "schedules"
-  ],
-  "M-10": [
-    "hci30",
-    "ops-console"
-  ],
-  "M-11": [
-    "cognitive-os",
-    "collect",
-    "commerce",
-    "ops-console"
-  ]
+  "pending": []
 }
