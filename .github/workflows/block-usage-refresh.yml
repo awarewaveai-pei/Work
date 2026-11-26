@@ -1,0 +1,65 @@
+name: block usage refresh
+
+# Keeps apps/next-admin/lib/systems/block-usage.generated.json (積木 usedBy, 共用小工具, 待歸類 on /ops/systems/blocks) in step
+# with main, so feature work never has to touch the LEGO catalog: after every push that can change who imports what, it
+# regenerates the file and, when it changed, commits it to main. A GITHUB_TOKEN push starts no workflow, so it then asks for
+# the two next-admin gates on that commit (check-ci-green.sh in sg-deploy needs them green before a deploy).
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/**'
+      - 'agency-os/systems/registry.json'
+      - '.github/workflows/block-usage-refresh.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: block-usage-refresh
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP: lobster-factory/infra/hetzner-phase1-core/apps/next-admin
+      GEN: lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/systems/block-usage.generated.json
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20.x"
+
+      - name: Regenerate and commit when changed
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pushed=""
+          # a push in between rejects ours: start again from the new main (only this generated file is ever written)
+          for attempt in 1 2 3; do
+            git fetch -q --depth=1 origin main
+            git reset -q --hard origin/main
+            (cd "$APP" && npx -y tsx@4.23.15 scripts/gen-block-usage.ts)
+            if git diff --quiet -- "$GEN"; then echo "block usage unchanged"; exit 0; fi
+            git add -- "$GEN"
+            git commit -q -m "chore(systems): refresh LEGO block usage from the real imports (bot)" \
+              -m "System: systems-control-center"
+            if git push -q origin HEAD:main; then pushed="$(git rev-parse HEAD)"; break; fi
+            echo "push rejected (attempt $attempt), retrying on the new main"
+          done
+          [ -n "$pushed" ] || { echo "could not push after 3 attempts" >&2; exit 1; }
+          gh workflow run next-admin-test.yml --ref main
+          gh workflow run next-admin-typecheck.yml --ref main
+          echo "pushed $pushed; asked next-admin-test and next-admin-typecheck to run on it"

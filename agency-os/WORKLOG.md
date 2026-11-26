@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-26（續22）— 小工具不算積木＋積木目錄永不擋開發：5 個改共用小工具、目錄資料由 GitHub 每次推送後自動更新、跟不上的列「待處理」
+
+- 根因／決策：操作者「一個小功能就成為一個積木很怪」「我會一直增加修改功能」。原規則把「≥2 系統共用」當成「是積木」，21 行的分頁讀取也被編號；且 usedBy、覆蓋、方法數、entry 路徑全是 CI 閘，任何功能開發都可能被目錄擋（6b9032f09、5880756a8 兩次）。不變量改為：**只有改壞 blocks.ts 本身才會紅；跟著程式走的資料全自動產生；要人判斷的列待處理**。
+- 步驟（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）：
+  - `NA/lib/systems/blocks.ts`：B-078／B-081／B-083／B-084／B-089 → `sharedTool()`（退場、保留編號）；積木定義寫進檔頭；`SHARED_TOOLS`／`PENDING` 匯出；認知方法數改讀產生檔（30 行手寫數字刪除）
+  - `agency-os/systems/registry.json`：上述 6 路徑進 `shared_paths`
+  - `NA/lib/systems/block-usage.ts`：`scanCatalog` → `{usedBy, methodCounts, shared, pending}`；pending 三類：shared（共用檔待歸類）／uncovered（新功能 id 未編號）／dead（entry 檔不見）；`fsFacts()`
+  - `NA/scripts/gen-block-usage.ts`：另載入內容積木 registry 取 id
+  - `NA/lib/systems/__tests__/blocks.test.ts`：刪 import 新鮮度、跨系統共用、4 個覆蓋、entry 存在檢查（全部移入產生檔）；只留目錄自身一致性＋產生檔格式（Codex：連值型別一起驗）
+  - `NA/app/(shell)/ops/systems/blocks/page.tsx`：清單底部「待處理」（依種類標籤）＋「共用小工具」；頁首有待處理時提示；退場卡不顯示空的使用系統
+  - `.github/workflows/block-usage-refresh.yml`（新）：push main（next-admin／registry）→ 重產 → 有變更就以 GITHUB_TOKEN 提交（被拒重試 3 次）→ dispatch next-admin-test／typecheck（check-ci-green 需要該提交的 run）
+- 驗證：在 origin/main 2e70c9934 拋棄式 worktree：`npm run blocks:usage`（方法數 30 族 306 個＝原手寫；待處理 0）；tsc 只剩 ag-psd（Banner 新依賴本機未裝）；vitest 86 passed；實測：新增未登記面板＋改壞 B-012 entry → 只進待處理（uncovered／dead），vitest lib/systems 41 passed 仍綠；本機 :3904 實看共用小工具清單、功能積木 69
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run blocks:usage; npx vitest run lib/systems "app/(shell)/ops/systems" app/__tests__/sidebar-coverage.test.ts lib/studio/__tests__/editor-ai-panels.test.ts | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-11-26-partialreview-3db38b19.md）：覆蓋檢查仍擋新功能、格式測試不驗值；2 項已修
+- ORACLE_WAIVED: 2m 修在 artifact 之後（覆蓋／方法數／entry 移入產生檔、格式測試驗值），突變實測覆蓋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=PENDING_SHARED|scanCatalog|sharedTool|block-usage-refresh | hits=18
+- 剩餘風險：bot「有變更→提交→dispatch」分支要等下一次真的有變更的推送才會實跑；若被擋只會讓目錄落後（不擋開發），屆時看 Actions
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續21）— 橫幅 C11：「尺寸」按鈕本身就是多選；刪掉獨立的「多尺寸輸出」勾選清單
 
 - 根因／決策：操作者「多尺寸輸出應該可以在尺寸選擇」。原本尺寸按鈕是單選、另有一份多尺寸勾選清單，兩處做同一件事。改：尺寸按鈕按一下加入、再按一下取消（至少留一個）；已選的亮起，編輯中的那張加外框與「✎ 編輯中（預覽顯示這張）」，其他已選的旁邊有「改這張」（沿用 enterSize／leaveSize 與 sizeOverrides）。資料結構不變：`preset`＝主尺寸、`multiSizes`＝其餘、`editingSize`＝正在微調的那張。`NA/app/(shell)/tools/banner/BannerStudio.tsx` 新增 `selectedSizes`、`editingSizeOf`、`toggleSizePick`、`promoteMain`：取消編輯中那張 → 改編輯剩下的第一張；取消主尺寸 → 剩下的第一張（或正在編輯的那張）以它當下的樣子變成主尺寸。多尺寸縮圖、全部下載、全部存到我的設計、AI 一鍵設計依尺寸排版都改讀已選尺寸；舊資料 `multiSizes` 含主尺寸時照常去重載入。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
