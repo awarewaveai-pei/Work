@@ -6,8 +6,8 @@ import { BANNER_RETURN_TOOL, applyBannerCanvasReturn } from "./banner-canvas-ret
 import { renderBannerLayers, type ElemBox, type ElemKey } from "./banner-layers";
 import { useBrandKit } from "./kit/useBrandKit";
 import {
-  BANNER_FONTS_CSS, INIT, PRESETS, RATIO_PRESET, TEMPLATES, clearDesign, clearSizeTweak, designSig, editingSizeOf, enterSize, isUntouched, leaveSize,
-  presetLabel, selectedSizes, templatePatch, variantOf,
+  BANNER_FONTS_CSS, INIT, PRESETS, RATIO_PRESET, TEMPLATES, canClear, clearDesign, clearSizeTweak, editingSizeOf, enterSize, isUntouched, leaveSize,
+  presetLabel, pushHistory, selectedSizes, templatePatch, variantOf,
   type BannerStaffApi, type PresetKey, type State,
 } from "./banner-state";
 import { thumbOf } from "./steps/export-files";
@@ -135,21 +135,25 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const histIdxRef  = useRef(0);
   const restoringRef = useRef(false);
   const [, bumpHist] = useState(0);
+  const record = useCallback((st: State, oneClick = false) => {
+    const r = pushHistory(historyRef.current, histIdxRef.current, st, oneClick);
+    if (r.hist === historyRef.current) return;
+    historyRef.current = r.hist;
+    histIdxRef.current = r.idx;
+    bumpHist((v) => v + 1);
+  }, []);
+  // typing is recorded 500 ms after it stops; a one-click change goes through commitHistoryNow so the step before it is
+  // never lost to that pending timer, and both steps compare everything visible (undo must always return)
   useEffect(() => {
     if (restoringRef.current) { restoringRef.current = false; return; }
-    const t = setTimeout(() => {
-      const hist = historyRef.current;
-      const cur = hist[histIdxRef.current];
-      if (cur && designSig(cur) === designSig(s)) return;
-      const next = hist.slice(0, histIdxRef.current + 1);
-      next.push(s);
-      while (next.length > 25) next.shift();
-      historyRef.current = next;
-      histIdxRef.current = next.length - 1;
-      bumpHist((v) => v + 1);
-    }, 500);
+    const t = setTimeout(() => record(s), 500);
     return () => clearTimeout(t);
-  }, [s]);
+  }, [s, record]);
+  const commitHistoryNow = useCallback((next: State) => {
+    record(sRef.current, true);
+    record(next, true);
+    setS(next);
+  }, [record]);
   const undo = useCallback(() => {
     if (histIdxRef.current <= 0) return;
     histIdxRef.current -= 1;
@@ -275,8 +279,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }}
                   disabled={!canRedo} onClick={redo} title="重做">↪ 重做</button>
                 <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }} data-testid="banner-clear"
-                  disabled={busy || designSig(clearDesign(s)) === designSig(s)} title="回到空白設計（保留客戶與已選尺寸）"
-                  onClick={() => { const next = clearDesign(s); setCleared(next); setS(next); }}>清除設計</button>
+                  disabled={busy || !canClear(s)} title="回到空白設計（保留客戶與已選尺寸）"
+                  onClick={() => { const next = clearDesign(s); setCleared(next); commitHistoryNow(next); }}>清除設計</button>
                 {hasPositions && (
                   <button className="btn btn-ghost" style={{ fontSize: 13, padding: "2px 9px" }} data-testid="banner-auto-layout"
                     onClick={() => setS((prev) => ({ ...prev, positions: {}, saved: false, error: null }))}>回到自動排版</button>

@@ -69,3 +69,31 @@ describe("清除設計", () => {
     }
   });
 });
+
+// Codex review of R2-B1: clearing within the 500 ms typing debounce lost the step before it; a copy list alone could not
+// be cleared (designSig leaves copyVariants out).
+describe("清除設計 and undo", () => {
+  it("title typed then cleared at once -> undo returns the title", async () => {
+    const { clearDesign, pushHistory } = await import("./banner-state");
+    const typed: State = { ...INIT, headline: "夏日咖啡" };          // typed, the 500 ms timer not fired yet
+    let h = { hist: [INIT], idx: 0 };
+    h = pushHistory(h.hist, h.idx, typed, true);                   // commitHistoryNow: the current state first
+    h = pushHistory(h.hist, h.idx, clearDesign(typed), true);      // then the cleared design as its own step
+    expect(h.hist[h.idx].headline).toBe("");
+    expect(h.hist[h.idx - 1].headline).toBe("夏日咖啡");
+  });
+
+  it("a copy list alone can be cleared, and undo brings it back", async () => {
+    const { canClear, clearDesign, pushHistory } = await import("./banner-state");
+    const listed: State = { ...INIT, copyVariants: [{ headline: "甲", subtext: "乙" }] };
+    expect(canClear(INIT)).toBe(false);
+    expect(canClear(listed)).toBe(true);
+    // the list never got its own step: by design it equals the blank step before it
+    let h = { hist: [INIT], idx: 0 };
+    h = pushHistory(h.hist, h.idx, listed);
+    expect(h.idx).toBe(0);
+    h = pushHistory(h.hist, h.idx, listed, true);                  // commitHistoryNow
+    h = pushHistory(h.hist, h.idx, clearDesign(listed), true);
+    expect(h.hist[h.idx - 1].copyVariants).toHaveLength(1);
+  });
+});

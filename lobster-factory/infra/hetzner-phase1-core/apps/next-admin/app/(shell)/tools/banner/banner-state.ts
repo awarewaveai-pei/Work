@@ -509,6 +509,25 @@ export function clearDesign(st: State): State {
   const m = mainOf(st);
   return { ...INIT, preset: m.preset, multiSizes: m.multiSizes };
 }
+/** What the user sees differs: the design, or the copy list (designSig leaves copyVariants out -- history still records
+ *  typing by design only). */
+export function sameVisible(a: State, b: State): boolean {
+  return designSig(a) === designSig(b) && JSON.stringify(a.copyVariants) === JSON.stringify(b.copyVariants);
+}
+/** 清除設計 does something visible. */
+export const canClear = (st: State): boolean => !sameVisible(clearDesign(st), st);
+
+/** Undo history after recording `st` at `idx`: redo steps after `idx` go; a step equal to the current one is skipped --
+ *  equal by design, or for a one-click change (清除設計…) by everything visible, so the copy list comes back on undo. */
+export const HISTORY_MAX = 25;
+export function pushHistory(hist: State[], idx: number, st: State, oneClick = false): { hist: State[]; idx: number } {
+  const cur = hist[idx];
+  if (cur && (oneClick ? sameVisible(cur, st) : designSig(cur) === designSig(st))) return { hist, idx };
+  const next = hist.slice(0, idx + 1);
+  next.push(st);
+  while (next.length > HISTORY_MAX) next.shift();
+  return { hist: next, idx: next.length - 1 };
+}
 
 export function designSig(st: State): string {
   // typed → tsc catches any future transient field that's misspelled or forgotten here
