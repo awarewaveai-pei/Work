@@ -2,17 +2,18 @@
 // AI 文案與設計 (staff only): topic, tone, the two models and the two AI buttons; the copy pairs to pick from.
 import { useState, type MutableRefObject } from "react";
 import {
-  BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, aiFormatError, applyDesignLayout, askJsonWithRetry, bannerCallNtd, copyWords,
-  designPlan, ntdLabel, readAiStream, sanitizeCopyVariants, showsCopy, type BannerAiModel, type DesignCopy, type DesignState, type SizeSpec,
+  BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, aiFormatError, askJsonWithRetry, bannerCallNtd, copyWords,
+  designPlan, ntdLabel, readAiStream, sanitizeCopyVariants, showsCopy, type BannerAiModel, type DesignCopy, type SizeSpec,
 } from "../banner-design";
 import { renderBannerLayers } from "../banner-layers";
+import { applySemantic } from "../banner-layout";
 import { bgForPrompt, bgStatsFromColors, resolveDesignColors, usablePalette, type PxBox, type TextPlace } from "../design-colors";
 import { brandKitPatch } from "../kit/apply-kit";
 import type { useBrandKit } from "../kit/useBrandKit";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import {
-  COPY_TONES, PRESETS, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes, variantOf,
-  type BannerStaffApi, type CopyVariant, type PresetKey, type State,
+  COPY_TONES, PRESETS, applyLayout, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes, variantOf,
+  type BannerStaffApi, type CopyVariant, type PresetKey, type SizePatch, type State,
 } from "../banner-state";
 import type { StepSlot } from "./order";
 import { StepCard, type StepCtx } from "./ui";
@@ -70,12 +71,18 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
       if (saveOrgRef.current !== orgAtStart) throw new Error("設計途中換了客戶：這次結果用的是前一個客戶的品牌色，沒有套用，請再按一次。");
       const variants = sanitizeCopyVariants(raw.copyVariants);
       const plan = designPlan(raw, spec(m.preset), chosen);
-      // the design on a given state: the answer, the first word set, the kit's fonts / logo, and the layout through
-      // applySemantic (a moved element loses its drag at every size that inherits the move); type sized automatically
-      const build = (prev: State): DesignState => applyDesignLayout(leaveSize(prev) as DesignState, {
-        ...sanitizeDesign(raw), ...(variants[0] ? copyWords(variants[0]) : {}), ...(kitPart?.patch ?? {}),
-        ...(variants.length ? { copyVariants: variants } : {}), ...plan.main, typeAuto: true,
-      }, chosen.length ? plan.overrides : {});
+      // the design on a given state: the answer, the first word set, the kit's fonts / logo and type sized automatically,
+      // through applyLayout like any position button (a moved element loses its drag at every size that inherits the
+      // move); then each chosen size's own layout onto its tweak, the same way
+      const build = (prev: State): State => {
+        const main = applyLayout(leaveSize(prev), {
+          ...sanitizeDesign(raw), ...(variants[0] ? copyWords(variants[0]) : {}), ...(kitPart?.patch ?? {}),
+          ...(variants.length ? { copyVariants: variants } : {}), ...plan.main, typeAuto: true,
+        });
+        const sizeOverrides = { ...main.sizeOverrides };
+        for (const [k, l] of Object.entries(plan.overrides) as [PresetKey, SizePatch][]) sizeOverrides[k] = applySemantic(sizeOverrides[k] ?? {}, l);
+        return { ...main, sizeOverrides };
+      };
       // contrast: the colours are shared by every size, so the text must read where it is drawn at each of them --
       // the boxes the renderer draws, over that size's measured background (bg.grids[i] = sel[i])
       const draft = build(sRef.current);

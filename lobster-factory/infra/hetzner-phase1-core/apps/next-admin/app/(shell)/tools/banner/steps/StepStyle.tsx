@@ -4,9 +4,9 @@ import BrandKitPanel from "../kit/BrandKitPanel";
 import type { useBrandKit } from "../kit/useBrandKit";
 import type { BrandKit } from "../kit/brand-kit";
 import { brandKitPatch } from "../kit/apply-kit";
-import { applySemantic, type LogoPos } from "../banner-layout";
-import type { DesignState } from "../banner-design";
-import { extractPalette, luminance, saturation, type State } from "../banner-state";
+import type { LogoPos } from "../banner-layout";
+import { FIELD_RANGES } from "../field-ranges";
+import { applyLayout, extractPalette, luminance, saturation, type State } from "../banner-state";
 import type { StepSlot } from "./order";
 import { StepCard, SubHead, type StepCtx } from "./ui";
 
@@ -22,8 +22,8 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
     const { patch, logoError } = await brandKitPatch(kit, true);
     setS((prev) => ({ ...prev, ...patch, saved: false, ...(logoError ? { error: logoError } : {}) }));
   }
-  // a corner button moves the logo there and drops its drag (applySemantic), so the button always shows its effect
-  const logoPos: LogoPos = (s as DesignState).logoPos ?? "bl";
+  // a corner button goes through applyLayout like every position button: the logo's drag is dropped, so it always shows
+  const logoPos: LogoPos = s.logoPos ?? "bl";
   const LOGO_CORNERS: { pos: LogoPos; label: string }[] = [
     { pos: "tl", label: "左上" }, { pos: "tr", label: "右上" }, { pos: "bl", label: "左下" }, { pos: "br", label: "右下" },
   ];
@@ -82,7 +82,7 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={s.logoImage} alt="logo" style={{ height: 28, maxWidth: 80, objectFit: "contain" }} />
           <span style={{ fontSize: 12 }}>大小</span>
-          <input type="range" min={0.04} max={0.6} step={0.01} value={s.logoScale} data-testid="banner-logo-scale"
+          <input type="range" {...FIELD_RANGES.logoScale} value={s.logoScale} data-testid="banner-logo-scale"
             onChange={(e) => set("logoScale", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
           <span style={{ fontSize: 12, opacity: 0.7 }}>{Math.round(s.logoScale * 100)}%</span>
           <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => set("logoImage", null)}>拿掉 logo</button>
@@ -91,7 +91,7 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
             {LOGO_CORNERS.map((c) => (
               <button key={c.pos} type="button" className={logoPos === c.pos ? "btn btn-primary" : "btn btn-ghost"}
                 style={{ fontSize: 12, padding: "2px 8px" }} data-testid={`banner-logo-pos-${c.pos}`}
-                onClick={() => setS((prev) => ({ ...applySemantic(prev as DesignState, { logoPos: c.pos }), saved: false }))}>
+                onClick={() => setS((prev) => ({ ...applyLayout(prev, { logoPos: c.pos }), saved: false, error: null }))}>
                 {c.label}
               </button>
             ))}
