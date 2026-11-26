@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-26（續36）— oracle WP：外掛 0.5.2，每日信訂閱表單不再要訪客填經緯度（操作者訂閱被 400 退回）
+
+- [根因] 操作者在 `/daily-letter/` 訂閱：容器 access log 06:34:02 UTC `POST /wp-json/aworacle/v1/daily/subscribe` 400，無 `fc_subscribers`／`aworacle_daily_profiles` 新列、無寄信。表單（0.5.1 `assets/daily.js:78-81,150`）要訪客輸入緯度、經度，留空送 null → `Members/Record.php:153-160` 判無效；畫面只顯示「請檢查標示的欄位」。GO-3 前監工只測了表單之後的流程，沒有以訪客身分填表單（這一段當時標為「沒有人走過」）。
+- [步驟] 工人 `wp-plugin-051`（Sonnet 5.5）`a6ca1bd33` → `oracle-int` cherry-pick `96e1515c7`：`assets/birthplace.js`＋`includes/Places/Birthplace.php`（出生地＝搜引擎 `/api/v1/places`，預設瀏覽器時區的代表城市，否則台北；訂閱與會員兩個表單共用）、400 訊息改成「尚未訂閱成功」＋欄位名。`release-wp-bridge.sh --plugin oracle` → `v0.5.2`（鏡像 sha `9d85face…`）→ oracle 站 `wp plugin install <鏡像 zip> --force`；catalog 釘 `0.5.2`。
+- [驗證] `wp plugin list` active 0.5.2；`/daily-letter/`、`/english/daily-letter/` 載入 `birthplace.js`。正式站 `form-check.py`：表單預設內容（台北座標）→ 403 `aworacle_daily_captcha`（欄位檢查已過，停在人機驗證）；舊表單的空座標 → 400 `fields=[birth.place.lat, birth.place.lon]`（重現操作者的失敗）。瀏覽器：表單只有年月日時分 5 個數字欄，出生地顯示「台北 · Asia/Taipei」＋城市搜尋框，Turnstile 元件有出現。`GET /api/v1/places?q=taipei` 200。工人：phpunit 31/31、`php -l` 7.4／8.3。
+- [RISKS 總檢] ① 真人過 Turnstile→訂閱仍未走過 → 請操作者再訂閱一次。② 搜尋服務掛掉時只能用預設出生地 → 接受。③ 時區查不到代表城市時預設台北、訪客沒改就用台北算 → 接受（畫面上看得到、可改）。④ 會員表單的錯誤訊息未改 → 記錄，下次動該表單時一起改。⑤ 無跨模型審查 → 工人 critic Quick＋監工讀 `birthplace.js` 全文＋正式站實測。
+- [rollback] 站：`wp plugin install /var/lib/awarewave/plugin-releases/aware-wave-oracle/v0.5.1/aware-wave-oracle-v0.5.1.zip --force`；repo：revert 本次兩個 commit。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python form-check.py（正式站 subscribe 兩種 payload）；ssh wp plugin install v0.5.2 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=releaseVersion: "0.5.1" | hits=0
+- ORACLE_WAIVED: 前端表單與一個設定類別，資料層驗證未放寬；工人 critic 一輪＋監工讀全文＋正式站兩種 payload 實測。
 ## 2026-11-26（續35）— 平台第 11 批（K15、M10）上線，第一階段全部完成；第 12 批派出
 
 - [根因] P1 最後一批。K15＝「目前客戶」期末閘；M10＝WordPress 刪會員／改 email 時 app 跟著知道（ADR 021 G10），含會員事件防重送（0184 `member_events`）。
