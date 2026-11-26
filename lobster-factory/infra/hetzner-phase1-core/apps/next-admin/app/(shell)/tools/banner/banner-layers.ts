@@ -6,6 +6,7 @@
 
 import { writePsd, type Psd, type Layer as PsdLayer, type TextStyle, type TextStyleRun } from "ag-psd";
 import { groundProduct, type GroundingOpts } from "./product-grounding";
+import { autospace, layoutBanner, productShown, type AccentRun } from "./banner-layout";
 
 /** The design fields the drawing reads (BannerStudio's State has all of them). */
 export interface BannerFields {
@@ -35,6 +36,10 @@ export interface BannerFields {
   grounding?: GroundingOpts;
   /** C8 (C6 brand kit): a logo (same-origin data URL) and its width as a share of the canvas width. */
   logoImage?: string | null; logoScale?: number;
+  /** R2-A: the logo's corner (absent = bottom-left). */
+  logoPos?: "bl" | "br" | "tl" | "tr";
+  /** R2-A: title / subtitle sized by the layout to the canvas and the words (lines even); absent / false = the set sizes. */
+  typeAuto?: boolean;
 }
 
 /** The elements that can be dragged (each moves with all of its layers). */
@@ -43,53 +48,6 @@ export type ElemKey = (typeof ELEM_KEYS)[number];
 export type ElemPositions = Partial<Record<ElemKey, { x: number; y: number }>>;
 /** An element's drawn box in canvas pixels. */
 export interface ElemBox { x: number; y: number; w: number; h: number }
-
-// ── CJK typesetting ──
-/** May not start a line (closing punctuation) / may not end one (opening brackets). */
-const NO_START = new Set(Array.from("，。、；：！？）」』】〉》〕…‥・％,.;:!?)]}%"));
-const NO_END = new Set(Array.from("（「『【〈《〔([{"));
-/** Greedy wrap of characters with 避頭尾 (`rules`): a closing mark that no longer fits hangs past the edge (ぶら下げ, one
- *  mark at most); a second one pushes the marks and the character before them to the next line (追い出し); an opening
- *  bracket never ends a line. `fits(line)` = the line is within the width. Spaces at the edges of a wrapped line are
- *  dropped (a 中英間距 space must not indent or shift a line). Rules off = the plain greedy wrap. */
-export function wrapChars<T>(items: T[], ch: (t: T) => string, fits: (line: T[]) => boolean, rules: boolean): T[][] {
-  const lines: T[][] = [];
-  let line: T[] = [];
-  for (const it of items) {
-    const next = [...line, it];
-    if (!line.length || fits(next)) { line = next; continue; }
-    const c = ch(it);
-    if (rules && NO_START.has(c) && fits(line)) { line = next; continue; } // hang one closing mark
-    const carry: T[] = [];
-    if (rules) {
-      if (NO_START.has(c)) {
-        while (line.length > 1 && NO_START.has(ch(line[line.length - 1]))) carry.unshift(line.pop()!);
-        if (line.length > 1) carry.unshift(line.pop()!);
-      }
-      while (line.length > 1 && NO_END.has(ch(line[line.length - 1]))) carry.unshift(line.pop()!);
-    }
-    lines.push(line);
-    line = [...carry, it];
-  }
-  if (line.length) lines.push(line);
-  const blank = (t: T) => ch(t) === " ";
-  return lines
-    .map((l) => { let a = 0, b = l.length; while (a < b && blank(l[a])) a++; while (b > a && blank(l[b - 1])) b--; return l.slice(a, b); })
-    .filter((l) => l.length);
-}
-const CJK_CHAR = /[\u3040-\u30ff\u3100-\u312f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
-const LATIN_CHAR = /[A-Za-z0-9]/;
-/** 中英間距: a half-width space between a CJK character and a Latin letter / digit (either order), unless one is there. */
-export function autospace(text: string): string {
-  const cs = Array.from(text);
-  let out = "";
-  cs.forEach((c, i) => {
-    const prev = cs[i - 1];
-    if (prev && ((CJK_CHAR.test(prev) && LATIN_CHAR.test(c)) || (LATIN_CHAR.test(prev) && CJK_CHAR.test(c)))) out += " ";
-    out += c;
-  });
-  return out;
-}
 
 /** A drop shadow; blur / x / y are shares of the element's height (font size, button height, badge height), so the
  *  look stays the same at every banner size. */
@@ -199,66 +157,6 @@ export async function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, noBreakRules = false): string[] {
-  const isCjk   = /[　-鿿豈-﫿]/.test(text);
-  if (isCjk) {
-    const lines = wrapChars(Array.from(text), (c) => c, (l) => ctx.measureText(l.join("")).width <= maxWidth, noBreakRules).map((l) => l.join(""));
-    return lines.length ? lines : [text];
-  }
-  const tokens   = text.split(" ");
-  const lines: string[] = [];
-  let current = "";
-  for (const tok of tokens) {
-    const test = current ? `${current} ${tok}` : tok;
-    if (ctx.measureText(test).width <= maxWidth) { current = test; }
-    else { if (current) lines.push(current); current = tok; }
-  }
-  if (current) lines.push(current);
-  return lines.length ? lines : [text];
-}
-
-// `**字**` → accent runs.
-type AccentRun = { text: string; accent: boolean };
-export function parseAccentRuns(text: string): AccentRun[] {
-  const out: AccentRun[] = [];
-  const re = /\*\*([^*]+)\*\*/g;
-  let last = 0; let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push({ text: text.slice(last, m.index), accent: false });
-    out.push({ text: m[1], accent: true });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) out.push({ text: text.slice(last), accent: false });
-  return out.length ? out : [{ text, accent: false }];
-}
-
-/** autospace over accent runs (a space between an accent and a plain run is plain). */
-export function autospaceRuns(runs: AccentRun[]): AccentRun[] {
-  const chars = runs.flatMap((r) => Array.from(r.text).map((ch) => ({ ch, accent: r.accent })));
-  const out: AccentRun[] = [];
-  chars.forEach((c, i) => {
-    const prev = chars[i - 1];
-    const gap = prev && ((CJK_CHAR.test(prev.ch) && LATIN_CHAR.test(c.ch)) || (LATIN_CHAR.test(prev.ch) && CJK_CHAR.test(c.ch)));
-    for (const [ch, accent] of gap ? [[" ", prev.accent && c.accent], [c.ch, c.accent]] as const : [[c.ch, c.accent]] as const) {
-      const last = out[out.length - 1];
-      if (last && last.accent === accent) last.text += ch; else out.push({ text: ch, accent });
-    }
-  });
-  return out.length ? out : runs;
-}
-
-// Wrap accent runs into lines (char-level — robust for CJK + mixed digits). ctx.font + letterSpacing must be set first.
-function layoutAccentLines(ctx: CanvasRenderingContext2D, runs: AccentRun[], maxWidth: number, noBreakRules = false): AccentRun[][] {
-  const items = runs.flatMap((r) => Array.from(r.text).map((ch) => ({ ch, accent: r.accent, w: ctx.measureText(ch).width })));
-  const lines = wrapChars(items, (i) => i.ch, (l) => l.reduce((sum, i) => sum + i.w, 0) <= maxWidth, noBreakRules)
-    .map((ln) => ln.reduce<AccentRun[]>((acc, c) => {
-      const last = acc[acc.length - 1];
-      if (last && last.accent === c.accent) last.text += c.ch; else acc.push({ text: c.ch, accent: c.accent });
-      return acc;
-    }, []));
-  return lines.length ? lines : [[{ text: "", accent: false }]];
-}
-
 function setLetterSpacing(ctx: CanvasRenderingContext2D, px: number) {
   try { (ctx as unknown as { letterSpacing: string }).letterSpacing = `${px}px`; } catch { /* unsupported browser — no-op */ }
 }
@@ -294,9 +192,18 @@ async function loadDesignFonts(state: BannerFields): Promise<void> {
   await Promise.race([Promise.all(jobs).catch(() => undefined), new Promise((r) => setTimeout(r, 4000))]);
 }
 
+/** Glow behind outlined text: the opposite of the text's lightness, so 描邊陰影 shows on any background. */
+function haloOf(hex: string, alpha: number): string {
+  const { r, g, b } = rgb(hex);
+  const lin = (c: number) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const light = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.179; // equal contrast with black and white
+  return light ? `rgba(0,0,0,${alpha})` : `rgba(255,255,255,${alpha})`;
+}
+
 /** Every part of the banner on its own full-size canvas, bottom to top. `flat`: every part on ONE canvas instead (each
  *  part still starts from a fresh context state) -- the PNG / preview: stacking 8-bit layers re-rounds soft shadow edges
- *  (up to 2/255 on ~50 px, measured), and one canvas is also ~15x less memory per preview frame. */
+ *  (up to 2/255 on ~50 px, measured), and one canvas is also ~15x less memory per preview frame. Where things go is
+ *  layoutBanner's (banner-layout.ts); this only draws its boxes. */
 export async function renderBannerLayers(state: BannerFields, size: { w: number; h: number }, opts: { flat?: boolean } = {}): Promise<BannerLayers> {
   await loadDesignFonts(state);
   const p = size;
@@ -314,9 +221,6 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     flat.restore(); flat.save(); applyShadow(flat, pending.sh); flat.drawImage(pending.cv, 0, 0);
     pending = null;
   };
-  // C4: the offset of the element being drawn (dragged on the preview); every layer made while it is set is translated.
-  let shift = { dx: 0, dy: 0 };
-  const moved = (c: CanvasRenderingContext2D) => { if (shift.dx || shift.dy) c.translate(shift.dx, shift.dy); return c; };
   // `whole`: the shadow is the shadow of the finished layer (text: glyphs + their outline glow), not of each draw call.
   const layer = (name: string, text?: TextSpec, shadow?: LayerShadow, whole = false): CanvasRenderingContext2D => {
     flush();
@@ -326,34 +230,29 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       // restore() + save() = a fresh default state for this use (the scratch was saved once when made)
       c.restore(); c.save(); c.clearRect(0, 0, p.w, p.h);
       pending = { cv, sh: shadow };
-      return moved(c);
+      return c;
     }
-    if (flat) { flat.restore(); flat.save(); applyShadow(flat, shadow); return moved(flat); }
+    if (flat) { flat.restore(); flat.save(); applyShadow(flat, shadow); return flat; }
     const cv = newCanvas(p.w, p.h);
     const c = cv.getContext("2d");
     if (!c) throw new Error("canvas_unavailable");
     layers.push({ name, canvas: cv, ...(text ? { text } : {}), ...(shadow && !opts.flat ? { shadow } : {}) });
     if (opts.flat) { flat = c; c.save(); applyShadow(c, shadow); }
-    return moved(c);
-  };
-  // Where a dragged element goes: its box centre at the stored share of the canvas, then kept inside the canvas (a box
-  // larger than the canvas is centred). Records the drawn box of every element, dragged or not (preview hit-testing).
-  const boxes: Partial<Record<ElemKey, ElemBox>> = {};
-  const place = (key: ElemKey, r: ElemBox): { dx: number; dy: number } => {
-    const want = state.positions?.[key];
-    let dx = 0, dy = 0;
-    if (want) {
-      const fit = (pos: number, size: number, room: number) => (size >= room ? (room - size) / 2 : Math.max(0, Math.min(room - size, pos)));
-      dx = fit(want.x * p.w - r.w / 2, r.w, p.w) - r.x;
-      dy = fit(want.y * p.h - r.h / 2, r.h, p.h) - r.y;
-    }
-    boxes[key] = { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h };
-    return { dx, dy };
+    return c;
   };
   const px = (sp: ShadowSpec | null | undefined, unit: number): LayerShadow | undefined =>
     sp && sp.on ? { color: sp.color, opacity: sp.opacity, blur: sp.blur * unit, x: sp.x * unit, y: sp.y * unit } : undefined;
   const mctx = newCanvas(1, 1).getContext("2d"); // measuring only
   if (!mctx) throw new Error("canvas_unavailable");
+
+  // the pictures first: the layout needs their sizes
+  const pics = new Map<string, HTMLImageElement>();
+  for (const src of [productShown(state) ? state.productImage : null, state.logoImage]) if (src) pics.set(src, await loadImage(src));
+  setLetterSpacing(mctx, 0);
+  const L = layoutBanner(state, p, {
+    text: (f, t) => { mctx.font = f; return mctx.measureText(t).width; },
+    image: (src) => { const i = pics.get(src); return i ? { w: i.width, h: i.height } : null; },
+  });
 
   // 背景
   {
@@ -408,345 +307,208 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     return snap;
   };
 
-  // Skip overlaying the product when the active AI background already has it baked in (keyed off bgImageHasProduct,
-  // set at generation time, NOT the live toggle -- so flipping the toggle can't double-draw the product).
-  const aiComposited = state.bgImageHasProduct && state.bgMode === "ai" && !!state.bgImage;
-  if (state.productImage && !aiComposited) {
-    const img  = await loadImage(state.productImage);
-    const isCtr = state.productPos === "center";
-    const maxW  = p.w * state.productScale * (isCtr ? 0.7 : 0.45);
-    const maxH  = p.h * 0.85;
-    const scale = Math.min(maxW / img.width, maxH / img.height);
-    const sw    = img.width  * scale;
-    const sh    = img.height * scale;
-    const pad   = p.w * 0.05;
-    let x: number, y: number;
-    switch (state.productPos) {
-      case "left":         x = pad;              y = (p.h - sh) / 2;  break;
-      case "right":        x = p.w - sw - pad;   y = (p.h - sh) / 2;  break;
-      case "bottom-right": x = p.w - sw - pad;   y = p.h - sh - pad;  break;
-      default:             x = (p.w - sw) / 2;   y = (p.h - sh) / 2;
-    }
-    shift = place("product", { x, y, w: sw, h: sh });
+  if (L.product && state.productImage) {
+    const img = pics.get(state.productImage)!;
+    const box = L.product.box;
     const g = state.grounding;
     if (g?.shadow?.enabled || g?.reflection?.enabled || g?.tone?.enabled) {
-      // C7: shadow and reflection under the product, each its own layer (PSD / SVG keep them apart)
-      const out = groundProduct({ product: img, box: { x, y, w: sw, h: sh }, canvasW: p.w, canvasH: p.h, background: g.tone?.enabled ? behindProduct() : undefined, opts: g });
+      // C7: shadow and reflection under the product, each its own layer (PSD / SVG keep them apart). The box is the
+      // placed one and the layout left room for the reflection inside the canvas.
+      const out = groundProduct({ product: img, box, canvasW: p.w, canvasH: p.h, background: g.tone?.enabled ? behindProduct() : undefined, opts: g });
       if (out.shadow) layer("商品陰影").drawImage(out.shadow, 0, 0);
       if (out.reflection) layer("商品倒影").drawImage(out.reflection, 0, 0);
       layer("商品圖").drawImage(out.product, 0, 0);
     } else {
-      layer("商品圖").drawImage(img, x, y, sw, sh);
+      layer("商品圖").drawImage(img, box.x, box.y, box.w, box.h);
     }
-    shift = { dx: 0, dy: 0 };
   }
 
-  // ── unified content stack: headline → subtext → price → CTA → trust ──
-  const font     = state.fontFamily;
-  const padding  = Math.round(p.w * 0.06);
-  const maxWidth = p.w - padding * 2;
-  const align    = state.textAlignH;
-  const anchorX  = align === "left" ? padding : align === "right" ? p.w - padding : p.w / 2;
-  const gapV     = Math.round(state.subtextSize * 0.62);
-  const leftOf   = (w: number) => align === "left" ? anchorX : align === "right" ? anchorX - w : anchorX - w / 2;
-  const sp = (t: string) => (state.cjkSpacing ? autospace(t) : t);
+  const font  = state.fontFamily;
+  const align = L.align;
+  const sp    = (t: string) => (state.cjkSpacing ? autospace(t) : t);
   const hW = state.headlineWeight || 700, bW = state.bodyWeight || 400;
+  /** The x every line of a text block hangs from (left edge / centre / right edge, by the alignment). */
+  const anchorOf = (b: ElemBox) => (align === "left" ? b.x : align === "right" ? b.x + b.w : b.x + b.w / 2);
   const spec = (cssFamily: string, weight: number, sz: number, lines: TextRun[][], al: TextSpec["align"], x: number, y: number,
     extra: Partial<TextSpec> = {}): TextSpec =>
-    shifted({ lines, cssFamily, editorFont: editorFont(cssFamily), weight, size: sz, align: al, x, y, lineHeight: sz * 1.2, letterSpacing: 0, opacity: 1, ...extra });
-  function shifted(t: TextSpec): TextSpec {
-    if (!shift.dx && !shift.dy) return t;
-    return { ...t, x: t.x + shift.dx, y: t.y + shift.dy, ...(t.rotate ? { rotate: { ...t.rotate, cx: t.rotate.cx + shift.dx, cy: t.rotate.cy + shift.dy } } : {}) };
+    ({ lines, cssFamily, editorFont: editorFont(cssFamily), weight, size: sz, align: al, x, y, lineHeight: sz * 1.2, letterSpacing: 0, opacity: 1, ...extra });
+
+  // 文字底襯: behind the stack, and behind each text block dragged out of it -- on means drawn (the contrast guard counts on it)
+  if (state.textScrim) {
+    const sPadX = Math.round(L.subtextSize * 0.95), sPadY = Math.round(L.subtextSize * 0.75);
+    const dragged = (["headline", "subtext", "price", "trust"] as const).filter((k) => state.positions?.[k] && L.boxes[k]).map((k) => L.boxes[k]!);
+    const backs = [...(L.stack ? [L.stack] : []), ...dragged];
+    if (backs.length) {
+      const ctx = layer("文字底襯");
+      ctx.fillStyle = `rgba(0,0,0,${state.textScrimOpacity})`;
+      for (const b of backs) {
+        const sx = Math.max(0, b.x - sPadX), sy = Math.max(0, b.y - sPadY);
+        roundRectPath(ctx, sx, sy, Math.min(p.w - sx, b.w + sPadX * 2), Math.min(p.h - sy, b.h + sPadY * 2), Math.round(L.subtextSize * 0.6));
+        ctx.fill();
+      }
+    }
   }
 
-  type Block = { key: ElemKey; h: number; w: number; draw: (top: number) => void };
-  const blocks: Block[] = [];
+  // card R3: the brand colour bar beside a left-aligned stack, the stack's height, in the margin left of it
+  if (state.brandBar && L.stack && align === "left") {
+    const barW = Math.max(6, Math.round(L.headlineSize * 0.12));
+    const ctx = layer("品牌色條");
+    ctx.fillStyle = state.accentColor;
+    roundRectPath(ctx, Math.round(L.stack.x - L.padX * 0.45), L.stack.y, barW, L.stack.h, barW / 2);
+    ctx.fill();
+  }
 
   // headline — own font, letter-spacing, accent words (**字**), outlined for legibility
-  if (state.headline) {
+  if (L.headline) {
+    const { box, size: hs, lineH, lines, runW, lineWs } = L.headline;
     const hFont = state.headlineFont || font;
-    const fontStr = `${hW} ${state.headlineSize}px ${hFont}`;
+    const fontStr = `${hW} ${hs}px ${hFont}`;
     mctx.font = fontStr;
-    setLetterSpacing(mctx, state.letterSpacing);
-    const parsed = parseAccentRuns(state.headline);
-    const runs = state.cjkSpacing ? autospaceRuns(parsed) : parsed;
-    let lines = layoutAccentLines(mctx, runs, maxWidth, state.kinsoku);
-    // card R3: even lines -- the narrowest width that still gives this many lines (off = the wrap as before)
-    if (state.balanceTitle && lines.length > 1) {
-      let lo = maxWidth / lines.length, hi = maxWidth;
-      for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (layoutAccentLines(mctx, runs, mid, state.kinsoku).length > lines.length) lo = mid; else hi = mid; }
-      lines = layoutAccentLines(mctx, runs, hi, state.kinsoku);
-    }
-    const runW = lines.map((ln) => ln.map((r) => mctx.measureText(r.text).width));
-    const lineWs = runW.map((ws) => ws.reduce((a, b) => a + b, 0));
-    const lineH = state.headlineSize * (state.headlineLineHeight || 1.16);
-    const w = Math.min(maxWidth, Math.max(1, ...lineWs));
-    const below = baselineBelow(mctx, "top", state.headlineSize);
-    setLetterSpacing(mctx, 0);
+    const below = baselineBelow(mctx, "top", hs);
+    const ax = anchorOf(box);
+    const lineX = (i: number) => align === "left" ? ax : align === "right" ? ax - lineWs[i] : ax - lineWs[i] / 2;
     const plate = (r: AccentRun) => r.accent && state.accentHighlight;
-    blocks.push({ key: "headline",
-      h: lines.length * lineH, w,
-      draw: (top) => {
-        const lineX = (i: number) => align === "left" ? anchorX : align === "right" ? anchorX - lineWs[i] : anchorX - lineWs[i] / 2;
-        // accent highlight plates (behind the text)
-        if (state.accentHighlight && lines.some((ln) => ln.some((r) => r.accent && r.text.trim()))) {
-          const ctx = layer("標題重點字底色");
-          ctx.fillStyle = state.accentColor;
-          lines.forEach((ln, i) => {
-            let hx = lineX(i);
-            const y = top + i * lineH;
-            ln.forEach((r, j) => {
-              const rw = runW[i][j];
-              if (r.accent && r.text.trim()) {
-                roundRectPath(ctx, hx - state.headlineSize * 0.06, y - state.headlineSize * 0.08,
-                  rw + state.headlineSize * 0.12, state.headlineSize * 1.22, state.headlineSize * 0.12);
-                ctx.fill();
-              }
-              hx += rw;
-            });
-          });
-        }
-        const color = (r: AccentRun) => r.accent ? (plate(r) ? "#1a1a1a" : state.accentColor) : state.textColor;
-        const ctx = layer("標題", spec(hFont, hW, state.headlineSize,
-          lines.map((ln) => ln.map((r) => ({ text: r.text, color: color(r) }))), align, anchorX, top + below,
-          { lineHeight: lineH, letterSpacing: state.letterSpacing }), px(state.textShadow, state.headlineSize), true);
-        ctx.font = fontStr;
-        setLetterSpacing(ctx, state.letterSpacing);
-        ctx.textAlign = "left"; ctx.textBaseline = "top";
-        lines.forEach((ln, i) => {
-          let x = lineX(i);
-          const y = top + i * lineH;
-          ln.forEach((r, j) => {
-            ctx.fillStyle = color(r);
-            if (state.textOutline && !plate(r)) {
-              // Two-pass shadow halo: no strokeText (avoid per-stroke outline on CJK)
-              ctx.shadowColor = "rgba(0,0,0,0.85)";
-              ctx.shadowBlur = state.headlineSize * 0.22;
-              ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-              ctx.fillText(r.text, x, y);
-              ctx.shadowBlur = state.headlineSize * 0.08;
-            }
-            ctx.fillText(r.text, x, y);
-            ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-            x += runW[i][j];
-          });
+    // accent highlight plates (behind the text)
+    if (state.accentHighlight && lines.some((ln) => ln.some((r) => r.accent && r.text.trim()))) {
+      const ctx = layer("標題重點字底色");
+      ctx.fillStyle = state.accentColor;
+      lines.forEach((ln, i) => {
+        let hx = lineX(i);
+        const y = box.y + i * lineH;
+        ln.forEach((r, j) => {
+          const rw = runW[i][j];
+          if (r.accent && r.text.trim()) {
+            roundRectPath(ctx, hx - hs * 0.06, y - hs * 0.08, rw + hs * 0.12, hs * 1.22, hs * 0.12);
+            ctx.fill();
+          }
+          hx += rw;
         });
-      },
+      });
+    }
+    const color = (r: AccentRun) => r.accent ? (plate(r) ? "#1a1a1a" : state.accentColor) : state.textColor;
+    const ctx = layer("標題", spec(hFont, hW, hs,
+      lines.map((ln) => ln.map((r) => ({ text: r.text, color: color(r) }))), align, ax, box.y + below,
+      { lineHeight: lineH, letterSpacing: state.letterSpacing }), px(state.textShadow, hs), true);
+    ctx.font = fontStr;
+    setLetterSpacing(ctx, state.letterSpacing);
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    lines.forEach((ln, i) => {
+      let x = lineX(i);
+      const y = box.y + i * lineH;
+      ln.forEach((r, j) => {
+        ctx.fillStyle = color(r);
+        if (state.textOutline && !plate(r)) {
+          // Two-pass shadow halo: no strokeText (avoid per-stroke outline on CJK)
+          ctx.shadowColor = haloOf(color(r), 0.85);
+          ctx.shadowBlur = hs * 0.22;
+          ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+          ctx.fillText(r.text, x, y);
+          ctx.shadowBlur = hs * 0.08;
+        }
+        ctx.fillText(r.text, x, y);
+        ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+        x += runW[i][j];
+      });
     });
   }
 
   // subtext
-  if (state.subtext) {
-    const fontStr = `${bW} ${state.subtextSize}px ${font}`;
+  if (L.subtext) {
+    const { box, size: ss, lineH, lines } = L.subtext;
+    const fontStr = `${bW} ${ss}px ${font}`;
     const bodyLs = state.bodyLetterSpacing || 0;
     mctx.font = fontStr;
-    setLetterSpacing(mctx, bodyLs);
-    const lines = wrapText(mctx, sp(state.subtext), maxWidth, state.kinsoku);
-    const lineH = state.subtextSize * (state.bodyLineHeight || 1.32);
-    const w = Math.min(maxWidth, Math.max(1, ...lines.map((l) => mctx.measureText(l).width)));
-    setLetterSpacing(mctx, 0);
-    const below = baselineBelow(mctx, "top", state.subtextSize);
-    blocks.push({ key: "subtext",
-      h: lines.length * lineH, w,
-      draw: (top) => {
-        const ctx = layer("副標", spec(font, bW, state.subtextSize, lines.map((l) => [{ text: l, color: state.textColor }]),
-          align, anchorX, top + below, { lineHeight: lineH, opacity: 0.95, letterSpacing: bodyLs }), px(state.textShadow, state.subtextSize), true);
-        ctx.font = fontStr;
-        setLetterSpacing(ctx, bodyLs);
-        ctx.textAlign = align; ctx.textBaseline = "top";
-        let y = top;
-        for (const line of lines) {
-          if (state.textOutline) { ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = state.subtextSize * 0.18; }
-          ctx.fillStyle = state.textColor;
-          ctx.globalAlpha = 0.95;
-          ctx.fillText(line, anchorX, y);
-          ctx.globalAlpha = 1; ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
-          y += lineH;
-        }
-      },
-    });
+    const below = baselineBelow(mctx, "top", ss);
+    const ax = anchorOf(box);
+    const ctx = layer("副標", spec(font, bW, ss, lines.map((l) => [{ text: l, color: state.textColor }]),
+      align, ax, box.y + below, { lineHeight: lineH, opacity: 0.95, letterSpacing: bodyLs }), px(state.textShadow, ss), true);
+    ctx.font = fontStr;
+    setLetterSpacing(ctx, bodyLs);
+    ctx.textAlign = align; ctx.textBaseline = "top";
+    let y = box.y;
+    for (const line of lines) {
+      if (state.textOutline) { ctx.shadowColor = haloOf(state.textColor, 0.4); ctx.shadowBlur = ss * 0.18; }
+      ctx.fillStyle = state.textColor;
+      ctx.globalAlpha = 0.95;
+      ctx.fillText(line, ax, y);
+      ctx.globalAlpha = 1; ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+      y += lineH;
+    }
   }
 
   // price row (now big bold + was struck-through)
-  if (state.showPrice && (state.priceNow || state.priceWas)) {
-    const nowSize = Math.round(state.headlineSize * 0.78);
-    const wasSize = Math.round(state.subtextSize * 0.9);
-    mctx.font = `bold ${nowSize}px ${font}`;
-    const nowW = state.priceNow ? mctx.measureText(state.priceNow).width : 0;
-    mctx.font = `${bW} ${wasSize}px ${font}`;
-    const wasW = state.priceWas ? mctx.measureText(state.priceWas).width : 0;
-    const gapP = state.priceNow && state.priceWas ? Math.round(nowSize * 0.35) : 0;
-    const rowW = nowW + gapP + wasW;
-    blocks.push({ key: "price",
-      h: nowSize * 1.1, w: rowW,
-      draw: (top) => {
-        let x = leftOf(rowW);
-        const baseY = top + nowSize;
-        if (state.priceNow) {
-          const ctx = layer("現價", spec(font, 700, nowSize, [[{ text: state.priceNow, color: state.textColor }]], "left", x, baseY), px(state.textShadow, nowSize), true);
-          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-          ctx.font = `bold ${nowSize}px ${font}`;
-          ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = nowSize * 0.12;
-          ctx.fillStyle = state.textColor;
-          ctx.fillText(state.priceNow, x, baseY);
-          x += nowW + gapP;
-        }
-        if (state.priceWas) {
-          const wy = baseY;
-          const ctx = layer("原價", spec(font, bW, wasSize, [[{ text: state.priceWas, color: state.textColor }]], "left", x, wy, { opacity: 0.7 }), px(state.textShadow, wasSize), true);
-          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-          ctx.font = `${bW} ${wasSize}px ${font}`;
-          ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.7;
-          ctx.fillText(state.priceWas, x, wy);
-          const st = layer("原價刪除線");
-          st.globalAlpha = 0.7;
-          st.strokeStyle = state.textColor;
-          st.lineWidth = Math.max(2, wasSize * 0.08);
-          st.beginPath();
-          st.moveTo(x, wy - wasSize * 0.32);
-          st.lineTo(x + wasW, wy - wasSize * 0.32);
-          st.stroke();
-        }
-      },
-    });
+  if (L.price) {
+    const { box, nowSize, wasSize, nowW, gap } = L.price;
+    let x = box.x;
+    const baseY = box.y + nowSize;
+    if (state.priceNow) {
+      const ctx = layer("現價", spec(font, 700, nowSize, [[{ text: state.priceNow, color: state.textColor }]], "left", x, baseY), px(state.textShadow, nowSize), true);
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.font = `bold ${nowSize}px ${font}`;
+      ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = nowSize * 0.12;
+      ctx.fillStyle = state.textColor;
+      ctx.fillText(state.priceNow, x, baseY);
+      x += nowW + gap;
+    }
+    if (state.priceWas) {
+      const ctx = layer("原價", spec(font, bW, wasSize, [[{ text: state.priceWas, color: state.textColor }]], "left", x, baseY, { opacity: 0.7 }), px(state.textShadow, wasSize), true);
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.font = `${bW} ${wasSize}px ${font}`;
+      ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.7;
+      ctx.fillText(state.priceWas, x, baseY);
+      const st = layer("原價刪除線");
+      st.globalAlpha = 0.7;
+      st.strokeStyle = state.textColor;
+      st.lineWidth = Math.max(2, wasSize * 0.08);
+      st.beginPath();
+      st.moveTo(x, baseY - wasSize * 0.32);
+      st.lineTo(x + L.price.wasW, baseY - wasSize * 0.32);
+      st.stroke();
+    }
   }
 
   // CTA button (the conversion driver)
-  if (state.ctaText) {
-    const ctaText = sp(state.ctaText);
-    const bf   = Math.round(state.subtextSize * 1.02);
+  if (L.cta) {
+    const { box, size: bf, text } = L.cta;
     mctx.font = `bold ${bf}px ${font}`;
-    const tw   = mctx.measureText(ctaText).width;
     const below = baselineBelow(mctx, "middle", bf);
-    const padX = Math.round(bf * 0.95);
-    const padY = Math.round(bf * 0.56);
-    const bw   = tw + padX * 2;
-    const bh   = bf + padY * 2;
-    blocks.push({ key: "cta",
-      h: bh, w: bw,
-      draw: (top) => {
-        const left = leftOf(bw);
-        const bg = layer("按鈕底", undefined, px(state.ctaShadow ?? DEFAULT_CTA_SHADOW, bh));
-        roundRectPath(bg, left, top, bw, bh, bh / 2);
-        bg.fillStyle = state.ctaBg; bg.fill();
-        const cx = left + bw / 2, my = top + bh / 2 + bf * 0.06;
-        const ctx = layer("按鈕文字", spec(font, 700, bf, [[{ text: ctaText, color: state.ctaTextColor }]], "center", cx, my + below));
-        ctx.fillStyle = state.ctaTextColor;
-        ctx.font = `bold ${bf}px ${font}`;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText(ctaText, cx, my);
-      },
-    });
+    const bg = layer("按鈕底", undefined, px(state.ctaShadow ?? DEFAULT_CTA_SHADOW, box.h));
+    roundRectPath(bg, box.x, box.y, box.w, box.h, box.h / 2);
+    bg.fillStyle = state.ctaBg; bg.fill();
+    const cx = box.x + box.w / 2, my = box.y + box.h / 2 + bf * 0.06;
+    const ctx = layer("按鈕文字", spec(font, 700, bf, [[{ text, color: state.ctaTextColor }]], "center", cx, my + below));
+    ctx.fillStyle = state.ctaTextColor;
+    ctx.font = `bold ${bf}px ${font}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(text, cx, my);
   }
 
   // trust signals
-  if (state.trustType !== "none") {
-    const tSize = Math.round(state.subtextSize * 0.88);
-    let starsStr = "";
-    let label = "";
-    if (state.trustType === "stars" || state.trustType === "reviews") {
-      const n = Math.max(0, Math.min(5, Math.round(state.trustStars)));
-      starsStr = "★".repeat(n) + "☆".repeat(5 - n);
-      if (state.trustType === "reviews") label = state.trustText || "12,000+ 則好評";
-    } else {
-      label = "✓ " + (state.trustText || "30 天滿意保證");
+  if (L.trust) {
+    const { box, size: tSize, stars, label, starW, gap } = L.trust;
+    let x = box.x;
+    const by = box.y + tSize;
+    if (stars) {
+      const ctx = layer("星星", spec(font, bW, tSize, [[{ text: stars, color: "#fbbf24" }]], "left", x, by), px(state.textShadow, tSize), true);
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${bW} ${tSize}px ${font}`;
+      ctx.fillStyle = "#fbbf24"; ctx.fillText(stars, x, by); x += starW + gap;
     }
-    label = sp(label);
-    mctx.font = `${bW} ${tSize}px ${font}`;
-    const starW = starsStr ? mctx.measureText(starsStr).width : 0;
-    const labW  = label ? mctx.measureText(label).width : 0;
-    const gapT  = starsStr && label ? Math.round(tSize * 0.45) : 0;
-    const rowW  = starW + gapT + labW;
-    blocks.push({ key: "trust",
-      h: tSize * 1.1, w: rowW,
-      draw: (top) => {
-        let x = leftOf(rowW);
-        const by = top + tSize;
-        if (starsStr) {
-          const ctx = layer("星星", spec(font, bW, tSize, [[{ text: starsStr, color: "#fbbf24" }]], "left", x, by), px(state.textShadow, tSize), true);
-          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${bW} ${tSize}px ${font}`;
-          ctx.fillStyle = "#fbbf24"; ctx.fillText(starsStr, x, by); x += starW + gapT;
-        }
-        if (label) {
-          const ctx = layer("信任說明", spec(font, bW, tSize, [[{ text: label, color: state.textColor }]], "left", x, by, { opacity: 0.92 }), px(state.textShadow, tSize), true);
-          ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${bW} ${tSize}px ${font}`;
-          ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.92; ctx.fillText(label, x, by);
-        }
-      },
-    });
-  }
-
-  // position the whole stack
-  const stackH = blocks.reduce((sum, b) => sum + b.h, 0) + gapV * Math.max(0, blocks.length - 1);
-  let stackTop = state.textPos === "top" ? padding
-    : state.textPos === "bottom" ? p.h - padding - stackH
-    : (p.h - stackH) / 2;
-  stackTop = Math.max(padding, stackTop);
-  // each block keeps its slot in the automatic stack (dragging one never moves the others) and is offset from there
-  let slotY = stackTop;
-  const placed = blocks.map((b) => {
-    const top = slotY;
-    slotY += b.h + gapV;
-    return { b, top, off: place(b.key, { x: leftOf(b.w), y: top, w: b.w, h: b.h }) };
-  });
-  // The stack's box (scrim, brand bar): the automatic one; once something was dragged out, the union of the blocks still
-  // in the stack (a dragged block leaves the stack and its backing behind); none left = no scrim / bar.
-  let stackBox: ElemBox | null = blocks.length
-    ? { x: leftOf(Math.max(...blocks.map((b) => b.w))), y: stackTop, w: Math.max(...blocks.map((b) => b.w)), h: stackH } : null;
-  if (placed.some((q) => state.positions?.[q.b.key])) {
-    const bs = placed.filter((q) => !state.positions?.[q.b.key]).map((q) => boxes[q.b.key]!);
-    if (!bs.length) stackBox = null;
-    else {
-      const l = Math.min(...bs.map((b) => b.x)), t = Math.min(...bs.map((b) => b.y));
-      stackBox = { x: l, y: t, w: Math.max(...bs.map((b) => b.x + b.w)) - l, h: Math.max(...bs.map((b) => b.y + b.h)) - t };
+    if (label) {
+      const ctx = layer("信任說明", spec(font, bW, tSize, [[{ text: label, color: state.textColor }]], "left", x, by, { opacity: 0.92 }), px(state.textShadow, tSize), true);
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = `${bW} ${tSize}px ${font}`;
+      ctx.fillStyle = state.textColor; ctx.globalAlpha = 0.92; ctx.fillText(label, x, by);
     }
   }
 
-  // localized scrim behind the stack (cleaner than dimming the whole image)
-  if (state.textScrim && stackBox) {
-    const sPadX = Math.round(state.subtextSize * 0.95);
-    const sPadY = Math.round(state.subtextSize * 0.75);
-    const sx = Math.max(0, stackBox.x - sPadX);
-    const sw = Math.min(p.w - sx, stackBox.w + sPadX * 2);
-    const sy = Math.max(0, stackBox.y - sPadY);
-    const sh = Math.min(p.h - sy, stackBox.h + sPadY * 2);
-    const ctx = layer("文字底襯");
-    ctx.fillStyle = `rgba(0,0,0,${state.textScrimOpacity})`;
-    roundRectPath(ctx, sx, sy, sw, sh, Math.round(state.subtextSize * 0.6));
-    ctx.fill();
+  // C8: the brand logo (a corner; draggable like the rest)
+  if (L.logo && state.logoImage) {
+    const { box } = L.logo;
+    layer("Logo").drawImage(pics.get(state.logoImage)!, box.x, box.y, box.w, box.h);
   }
 
-  // card R3: the brand colour bar beside a left-aligned stack, the stack's height, in the left margin
-  if (state.brandBar && stackBox && align === "left") {
-    const barW = Math.max(6, Math.round(state.headlineSize * 0.12));
-    const ctx = layer("品牌色條");
-    ctx.fillStyle = state.accentColor;
-    roundRectPath(ctx, Math.round(padding * 0.55), stackBox.y, barW, stackBox.h, barW / 2);
-    ctx.fill();
-  }
-
-  // draw stack top-down
-  for (const q of placed) { shift = q.off; q.b.draw(q.top); shift = { dx: 0, dy: 0 }; }
-
-  // C8: the brand logo (bottom-left by default; draggable like the rest)
-  if (state.logoImage) {
-    const img = await loadImage(state.logoImage);
-    const lw = p.w * Math.max(0.04, Math.min(0.6, state.logoScale ?? 0.16)), lh = (lw * img.height) / Math.max(1, img.width);
-    const m = Math.round(p.w * 0.035);
-    const r = { x: m, y: p.h - m - lh, w: lw, h: lh };
-    shift = place("logo", r);
-    layer("Logo").drawImage(img, r.x, r.y, r.w, r.h);
-    shift = { dx: 0, dy: 0 };
-  }
-
-  // corner offer badge (independent of the stack)
-  if (state.badgeText) {
-    const badgeText = sp(state.badgeText);
-    const bf = Math.round(state.subtextSize * 0.95 * state.badgeScale);
-    const margin = Math.round(p.w * 0.035);
-    mctx.font = `bold ${bf}px ${font}`;
-    const tw = mctx.measureText(badgeText).width;
-    const onLeft = state.badgePos === "tl";
+  // corner offer badge
+  if (L.badge) {
+    const { box, size: bf, text: badgeText, textW: tw, onLeft } = L.badge;
     const badgeSh = px(badgeShadowOf(state.badgeStyle, state.badgeShadow), bf * 1.9);
     const white = (fs: number, x: number, y: number, extra: Partial<TextSpec> = {}) => {
       mctx.font = `bold ${fs}px ${font}`;
@@ -758,11 +520,8 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       return ctx;
     };
     if (state.badgeStyle === "burst") {
-      const r = Math.max(bf * 1.9, tw * 0.62 + bf * 0.4);
-      const cxb = onLeft ? margin + r : p.w - margin - r;
-      const cyb = margin + r;
+      const r = box.w / 2, cxb = box.x + r, cyb = box.y + r;
       const angle = (onLeft ? -1 : 1) * 0.18;
-      shift = place("badge", { x: cxb - r, y: cyb - r, w: r * 2, h: r * 2 });
       const ctx = layer("角標底", undefined, badgeSh);
       ctx.translate(cxb, cyb);
       ctx.rotate(angle);
@@ -781,11 +540,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       t.rotate(angle);
       t.fillText(badgeText, 0, 0);
     } else if (state.badgeStyle === "ribbon") {
-      const padX = bf * 0.7, bh = bf * 1.9, notch = bh * 0.45;
-      const bw = tw + padX * 2 + notch;
-      const x = onLeft ? margin : p.w - margin - bw;
-      const y = margin;
-      shift = place("badge", { x, y, w: bw, h: bh });
+      const { x, y, w: bw, h: bh } = box, notch = bh * 0.45;
       const ctx = layer("角標底", undefined, badgeSh);
       ctx.fillStyle = state.badgeColor;
       ctx.beginPath();
@@ -803,10 +558,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       white(bf, tx, y + bh / 2).fillText(badgeText, tx, y + bh / 2);
     } else {
       // pill
-      const padX = bf * 0.8, bh = bf * 1.9, bw = tw + padX * 2;
-      const x = onLeft ? margin : p.w - margin - bw;
-      const y = margin;
-      shift = place("badge", { x, y, w: bw, h: bh });
+      const { x, y, w: bw, h: bh } = box;
       const ctx = layer("角標底", undefined, badgeSh);
       roundRectPath(ctx, x, y, bw, bh, bh / 2);
       ctx.fillStyle = state.badgeColor; ctx.fill();
@@ -814,10 +566,9 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     }
   }
 
-  shift = { dx: 0, dy: 0 };
   flush();
   if (flat) (flat as CanvasRenderingContext2D).restore();
-  return { w: p.w, h: p.h, layers, boxes };
+  return { w: p.w, h: p.h, layers, boxes: L.boxes };
 }
 
 /** All layers stacked bottom to top on one canvas (source-over, as the old single canvas drew them). */
