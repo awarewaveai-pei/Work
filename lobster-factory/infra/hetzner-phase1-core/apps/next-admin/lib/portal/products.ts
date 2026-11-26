@@ -7,9 +7,10 @@ export const LOGIN_SOURCES: readonly LoginSource[] = ["local", "awarewave-wp", "
 // lib/portal/__tests__/products.test.ts reads the files under them).
 // nav: a multi-page door's menu (ADR 018 §2 rule 3), rendered by app/ProductDoorShell.tsx. path: the page below the door
 // ("" = its home), served from app<page>/<path>/page.tsx (route groups such as app/video/(wb) add no segment); staff: the staff page showing the same component, so
-// useDoorHref (app/DoorContext.tsx) can turn a shared component's staff link into the door link.
+// useDoorHref (app/DoorContext.tsx) can turn a shared component's staff link into the door link. Omitted = a page only the
+// door has (content's 概覽): no staff link maps to it.
 // under: the path of the item this one is a sub-page of; the door menu draws it indented right below it.
-export interface DoorNavItem { path: string; name: string; staff: string; under?: string }
+export interface DoorNavItem { path: string; name: string; staff?: string; under?: string }
 // uiService: a separate UI container that owns this door's host except next-admin's login, /_next and API paths (P6 D1,
 // video-workbench). nginx/default.conf must give that host its own server block (lib/portal/__tests__/products.test.ts).
 export type ProductDoor = { app: "next-admin"; page: string; api: readonly string[]; anonymous?: readonly string[]; enabled?: boolean; nav?: readonly DoorNavItem[]; uiService?: "video-workbench" } | { app: "external" };
@@ -90,7 +91,7 @@ const PRODUCT_DEFINITIONS = [
     modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-pro", "tools/photo-pro"] },
   { key: "content", catalog: { category: "content", tasks: ["write-seo-article", "plan-monthly-topics", "publish-to-site"], blurb: "寫 SEO 文章、排題目、發布到你的網站", icon: "article", addedAt: "2026-01-01" }, name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", api: ["/api/content"],
       // blueprint §15A: 寫文章 / 改寫 / 草稿 were tabs of one page; each is a menu page now.
-      nav: [{ path: "", name: "概覽", staff: "tools/events" },
+      nav: [{ path: "", name: "概覽" },
         { path: "write", name: "寫文章", staff: "tools/content" },
         { path: "rewrite", name: "改寫", staff: "tools/content/rewrite" },
         { path: "drafts", name: "草稿", staff: "tools/content/drafts" },

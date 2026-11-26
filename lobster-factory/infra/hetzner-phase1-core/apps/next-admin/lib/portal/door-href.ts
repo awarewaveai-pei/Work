@@ -6,6 +6,6 @@ import type { DoorNavItem } from "./products";
 export function doorHref(nav: readonly DoorNavItem[] | null, staffHref: string): string | null {
   if (nav === null) return staffHref;
   const [, pathname, rest] = /^([^?#]*)(.*)$/.exec(staffHref)!;
-  const hit = nav.find((n) => `/${n.staff}` === pathname.replace(/(.)\/$/, "$1"));
+  const hit = nav.find((n) => n.staff !== undefined && `/${n.staff}` === pathname.replace(/(.)\/$/, "$1"));
   return hit ? `/${hit.path}${rest}` : null;
 }

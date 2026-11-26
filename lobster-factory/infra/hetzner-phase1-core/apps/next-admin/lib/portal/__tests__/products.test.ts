@@ -108,7 +108,8 @@ describe("product registry", () => {
   });
 
   // ADR 018 §2 rule 3: a multi-page door lists its pages in door.nav (ProductDoorShell renders it); each is a built
-  // page that mirrors one of the product's staff pages or a platform page (useDoorHref maps links by it), and no staff page answers a
+  // page that mirrors one of the product's staff pages or a platform page (useDoorHref maps links by it; an item without
+  // `staff` is a door-only page and mirrors none), and no staff page answers a
   // built door page's path (a reserved, unbuilt door may still share one, see the shadowing test above).
   it("every door.nav page is built and mirrors one of the product's staff pages or a platform page; no staff page shares a door page's path", () => {
     const staffUrls = new Set(STAFF_ROUTE_GROUPS.flatMap((g) => pageUrls(path.join(APP_DIR, g), "")));
@@ -120,8 +121,10 @@ describe("product registry", () => {
         expect(n.path, p.key).toMatch(/^(?:[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*)?$/);
         expect(n.name.trim(), `${p.key} nav ${n.path}`).not.toBe("");
         expect(doorUrls, `${p.key} nav ${n.path}: no page`).toContain(n.path ? `${p.door.page}/${n.path}` : p.door.page);
-        expect(p.staffPaths.some((s) => under(n.staff, s)) || PLATFORM_PAGES.includes(n.staff), `${p.key} nav ${n.path}: ${n.staff} is neither its staff path nor a platform page`).toBe(true);
-        expect(staffUrls.has(`/${n.staff}`), `${p.key} nav ${n.path}: no staff page ${n.staff}`).toBe(true);
+        const staff = n.staff;
+        if (staff === undefined) continue;
+        expect(p.staffPaths.some((s) => under(staff, s)) || PLATFORM_PAGES.includes(staff), `${p.key} nav ${n.path}: ${n.staff} is neither its staff path nor a platform page`).toBe(true);
+        expect(staffUrls.has(`/${staff}`), `${p.key} nav ${n.path}: no staff page ${staff}`).toBe(true);
       }
       for (const url of doorUrls) expect(staffUrls.has(url), `${p.key}: a staff page answers door page ${url}`).toBe(false);
     }
