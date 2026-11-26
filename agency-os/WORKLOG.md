@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-26（續21）— 橫幅 C11：「尺寸」按鈕本身就是多選；刪掉獨立的「多尺寸輸出」勾選清單
+
+- 根因／決策：操作者「多尺寸輸出應該可以在尺寸選擇」。原本尺寸按鈕是單選、另有一份多尺寸勾選清單，兩處做同一件事。改：尺寸按鈕按一下加入、再按一下取消（至少留一個）；已選的亮起，編輯中的那張加外框與「✎ 編輯中（預覽顯示這張）」，其他已選的旁邊有「改這張」（沿用 enterSize／leaveSize 與 sizeOverrides）。資料結構不變：`preset`＝主尺寸、`multiSizes`＝其餘、`editingSize`＝正在微調的那張。`NA/app/(shell)/tools/banner/BannerStudio.tsx` 新增 `selectedSizes`、`editingSizeOf`、`toggleSizePick`、`promoteMain`：取消編輯中那張 → 改編輯剩下的第一張；取消主尺寸 → 剩下的第一張（或正在編輯的那張）以它當下的樣子變成主尺寸。多尺寸縮圖、全部下載、全部存到我的設計、AI 一鍵設計依尺寸排版都改讀已選尺寸；舊資料 `multiSizes` 含主尺寸時照常去重載入。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋accent-not-text＋blocks 39 passed（新增點名 3 案：加入與取消、取消編輯中那張時切換、只選一個時與舊行為一致）；本機實開：加 9:16、1:1 → 三張亮起、出現多尺寸卡；「改這張」9:16 → 預覽變 9:16；取消 9:16 → 編輯中改為 1:1；再加回 9:16（`$env:TEMP/banner-c11-size-multiselect.jpg`）。
+- 剩餘：要換成別的單一尺寸，現在是先加新尺寸再取消舊的（兩下）；取消主尺寸時其他尺寸的字級改以新主尺寸換算。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts lib/systems/__tests__/blocks.test.ts | exit=0 | ms=6000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=toggleSize|banner-multi- | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續19）— 橫幅 C10：AI 回答的 JSON 只要有一個完整物件就能用；解析失敗自動重試一次，再失敗才報錯並留原文
 
 - 根因：正式站 AI 一鍵設計（Opus、3 尺寸）第一次回 2,055 tokens、未截斷、已收費 NT$1.51，但前端只做 `JSON.parse(去 fence 後全文)`，答案前後若有說明文字、尾逗號、字串內未跳脫的換行或串流尾標記就整個失敗，且原文沒留下。不變量：答案裡只要有一個完整物件就要能用；真的壞了才失敗，失敗要留原文。

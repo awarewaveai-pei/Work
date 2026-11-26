@@ -153,7 +153,7 @@ const BADGE_PRESETS = ["限時優惠", "母親節限定", "新品上市", "買�
 
 interface CopyVariant { headline: string; subtext: string }
 
-interface State {
+export interface State {
   preset:       PresetKey;
   // copy generation
   copyBrief:    string;
@@ -257,7 +257,8 @@ interface State {
   error:     string | null;
 }
 
-const INIT: State = {
+/** The blank design (exported for the size-selection tests). */
+export const INIT: State = {
   preset:       "r191x1",
   copyBrief:    "",
   copyTone:     "促銷",
@@ -400,6 +401,44 @@ function clearSizeTweak(st: State, k: PresetKey): State {
   const back: State = { ...st, ...st.editingSize.main, editingSize: null, sizeOverrides };
   return enterSize(back, k);
 }
+// ── C11: the 尺寸 buttons are a multi-select. Picked = the main size (preset) + multiSizes; the one being edited is the main
+// size or the size being tweaked (editingSize). Same data as before, so a saved / undone state with multiSizes loads as is.
+const SIZE_ORDER = Object.keys(PRESETS) as PresetKey[];
+/** The picked sizes in button order (the main size always among them). */
+export function selectedSizes(st: State): PresetKey[] {
+  const main = mainOf(st).preset;
+  return SIZE_ORDER.filter((k) => k === main || st.multiSizes.includes(k));
+}
+/** The size shown and edited now. */
+export const editingSizeOf = (st: State): PresetKey => st.editingSize?.key ?? st.preset;
+/** Make picked size `k` the main one (the old main size was dropped): the design as it looked at `k` becomes the main design. */
+function promoteMain(st: State, k: PresetKey, dropped: PresetKey): State {
+  const m = leaveSize(st);
+  const v = variantOf(m, k);
+  const sizeOverrides = { ...m.sizeOverrides };
+  delete sizeOverrides[k];
+  return { ...v, preset: k, editingSize: null, sizeOverrides, multiSizes: m.multiSizes.filter((x) => x !== k && x !== dropped) };
+}
+/** Press a size button: not picked -> picked; picked -> dropped (the last one stays). Dropping the size being edited moves
+ *  editing to the first size left. */
+export function toggleSizePick(st: State, k: PresetKey): State {
+  const picked = selectedSizes(st);
+  if (!picked.includes(k)) {
+    const m = mainOf(st);
+    return { ...st, multiSizes: SIZE_ORDER.filter((x) => x !== m.preset && (x === k || st.multiSizes.includes(x))) };
+  }
+  if (picked.length === 1) return st;
+  const editing = editingSizeOf(st);
+  const main = mainOf(st).preset;
+  const left = picked.filter((x) => x !== k);
+  let next: State;
+  if (k === main) next = promoteMain(st, editing !== k ? editing : left[0], k);
+  else next = { ...leaveSize(st), multiSizes: st.multiSizes.filter((x) => x !== k) };
+  // keep editing what was edited; if that was the dropped size, the first size left
+  const target = editing === k ? left[0] : editing;
+  return editingSizeOf(next) === target ? next : enterSize(next, target);
+}
+
 /** Start tweaking size `k` (the main size = just leave any tweak). */
 function enterSize(st: State, k: PresetKey): State {
   const m = leaveSize(st);
@@ -1063,7 +1102,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       // 多尺寸 ticked: one call, shared words / colours + a layout per size (card C9); none = the single-size call as before
       const m = mainOf(s);
       const spec = (k: PresetKey): SizeSpec => ({ key: k, ratio: PRESETS[k].ratio, use: PRESETS[k].use, w: PRESETS[k].w, h: PRESETS[k].h });
-      const chosen = s.multiSizes.map(spec);
+      const sel = selectedSizes(s);
+      const chosen = sel.length > 1 ? sel.map(spec) : [];
       const mp = PRESETS[m.preset];
       const fields = {
         brief: s.copyBrief, label: presetLabel(m.preset), w: mp.w, h: mp.h,
@@ -1238,7 +1278,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       {BANNER_AI_MODELS.map((mo) => (
         <button key={mo.value} type="button" className={value === mo.value ? "btn btn-primary" : "btn btn-ghost"}
           style={{ fontSize: 11, padding: "2px 7px", lineHeight: 1.3 }} onClick={() => onPick(mo.value)} data-testid={`banner-model-${task}-${mo.value}`}>
-          {mo.label}<span style={{ opacity: 0.75, marginLeft: 4 }}>{ntdLabel(bannerCallNtd(mo.value, task, task === "design" ? Math.max(1, s.multiSizes.length) : 1))}</span>
+          {mo.label}<span style={{ opacity: 0.75, marginLeft: 4 }}>{ntdLabel(bannerCallNtd(mo.value, task, task === "design" ? selectedSizes(s).length : 1))}</span>
         </button>
       ))}
     </div>
@@ -1310,11 +1350,12 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const [multiNote, setMultiNote] = useState<string | null>(null);
   const [thumbs, setThumbs] = useState<Partial<Record<PresetKey, string>>>({});
   useEffect(() => {
-    if (!s.multiSizes.length) { setThumbs({}); return; }
+    const sel = selectedSizes(s);
+    if (sel.length < 2) { setThumbs({}); return; }
     let cancelled = false;
     const t = setTimeout(async () => {
       const out: Partial<Record<PresetKey, string>> = {};
-      for (const k of s.multiSizes) {
+      for (const k of sel) {
         try { out[k] = await thumbOf(variantOf(s, k)); } catch { /* mid-edit */ }
         if (cancelled) return;
       }
@@ -1322,26 +1363,22 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     }, 600);
     return () => { cancelled = true; clearTimeout(t); };
   }, [s, fontEpoch]);
-  const toggleSize = (k: PresetKey) => setS((prev) => {
-    const base = prev.editingSize?.key === k ? leaveSize(prev) : prev;
-    const has = base.multiSizes.includes(k);
-    const order = Object.keys(PRESETS) as PresetKey[];
-    return { ...base, multiSizes: has ? base.multiSizes.filter((x) => x !== k) : order.filter((x) => x === k || base.multiSizes.includes(x)), saved: false, error: null };
-  });
+  const picked = selectedSizes(s);
+  const multi = picked.length > 1;
   async function handleDownloadAll() {
     setMultiNote(null);
     try {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
       const kb = Number(targetKb), notes: string[] = [];
-      for (const [i, k] of s.multiSizes.entries()) {
-        setMultiBusy(`打包中 ${i + 1}/${s.multiSizes.length}…`);
+      for (const [i, k] of picked.entries()) {
+        setMultiBusy(`打包中 ${i + 1}/${picked.length}…`);
         const out = await encodeDesign(variantOf(s, k), multiFormat, Number.isFinite(kb) && kb > 0 ? kb : null);
         zip.file(sizeFileName(k, multiFormat), await urlToBlob(out.url));
         if (out.note) notes.push(`${PRESETS[k].ratio}：${out.note}`);
       }
       const url = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
-      downloadUrl(url, `banner-${s.multiSizes.length}-sizes.zip`);
+      downloadUrl(url, `banner-${picked.length}-sizes.zip`);
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
       if (notes.length) setMultiNote(notes.join("\n"));
     } catch (err) {
@@ -1353,15 +1390,15 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   async function handleSaveAll() {
     setMultiNote(null);
     try {
-      for (const [i, k] of s.multiSizes.entries()) {
-        setMultiBusy(`存到我的設計 ${i + 1}/${s.multiSizes.length}…`);
+      for (const [i, k] of picked.entries()) {
+        setMultiBusy(`存到我的設計 ${i + 1}/${picked.length}…`);
         const v = variantOf(s, k);
         const res = await saveDesign(await urlToBlob(await exportToPng(v)), {
           source: "banner", prompt: v.headline || undefined, modelName: v.bgMode === "ai" ? v.aiBgModel : undefined, subject: k,
         }, { organizationId: saveOrg ?? undefined });
         if (!res.ok) throw new Error(`${PRESETS[k].ratio}：${(res as { ok: false; error: string }).error}`);
       }
-      setMultiNote(`✓ ${s.multiSizes.length} 個尺寸都已存到我的設計`);
+      setMultiNote(`✓ ${picked.length} 個尺寸都已存到我的設計`);
     } catch (err) {
       setMultiNote(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1580,10 +1617,10 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || s.copyGenerating || !s.copyBrief.trim()) || !canUse("video.script")}
                   onClick={generateFullDesign}
                   style={{ background: "linear-gradient(135deg,#7c3aed,#ec4899)", border: "none" }}>
-                  {aiRetrying === "design" ? "重試中…" : s.designing ? "設計中…" : `✨ AI 一鍵設計整張（${ntdLabel(bannerCallNtd(designModel, "design", Math.max(1, s.multiSizes.length)))}）`}
+                  {aiRetrying === "design" ? "重試中…" : s.designing ? "設計中…" : `✨ AI 一鍵設計整張（${ntdLabel(bannerCallNtd(designModel, "design", picked.length))}）`}
                 </button>
               </div>
-              <p className="form-hint">「一鍵設計」讓 AI 直接配好標題/重點字/CTA/徽章/價格/配色/版面 — 再微調即可。{s.multiSizes.length > 0 ? `已勾 ${s.multiSizes.length} 個尺寸：文案配色共用，每個尺寸各排一個版面。` : ""}</p>
+              <p className="form-hint">「一鍵設計」讓 AI 直接配好標題/重點字/CTA/徽章/價格/配色/版面 — 再微調即可。{multi ? `已選 ${picked.length} 個尺寸：文案配色共用，每個尺寸各排一個版面。` : ""}</p>
               {s.copyGenerating && s.copyStream && (
                 <div style={{ fontSize: 11, opacity: 0.5, fontFamily: "monospace", maxHeight: 40, overflow: "hidden" }}>
                   {s.copyStream.slice(-80)}
@@ -1616,36 +1653,34 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                     .filter((k) => PRESETS[k].shape === grp.key)
                     .map((k) => {
                       const ps = PRESETS[k];
+                      const isPicked = picked.includes(k), isEditing = editingSizeOf(s) === k;
                       return (
-                        <button key={k}
-                          className={s.preset === k ? "btn btn-primary" : "btn btn-ghost"}
-                          style={{ fontSize: 11, padding: "5px 8px", display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", height: "auto", gap: 2 }}
-                          title={ps.use}
-                          onClick={() => setS((prev) => ({ ...leaveSize(prev), preset: k, saved: false, error: null }))}>
+                        <div key={k} style={{ display: "flex", gap: 4, alignItems: "stretch" }}>
+                        <button data-testid={`banner-size-${k}`} aria-pressed={isPicked}
+                          className={isPicked ? "btn btn-primary" : "btn btn-ghost"}
+                          style={{ fontSize: 11, padding: "5px 8px", display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", height: "auto", gap: 2, flex: 1,
+                            ...(isEditing && multi ? { outline: "2px solid var(--text-primary)", outlineOffset: 2 } : {}) }}
+                          title={isPicked ? (picked.length > 1 ? "再按一下：不輸出這個尺寸" : "至少要留一個尺寸") : "按一下：加入要輸出的尺寸"}
+                          onClick={() => setS((prev) => ({ ...toggleSizePick(prev, k), saved: false, error: null }))}>
                           <span>
                             <b style={{ fontSize: 12 }}>{ps.ratio}</b>{"star" in ps && ps.star ? " ★" : ""}
                             <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 10 }}>{ps.w}×{ps.h}</span>
                             <span style={{ opacity: 0.75, marginLeft: 6 }}>{ps.use}</span>
                           </span>
                           <span style={{ opacity: 0.6, fontSize: 10, whiteSpace: "normal" }}>{ps.where}</span>
+                          {isEditing && multi && <span style={{ fontSize: 10, fontWeight: 700 }}>✎ 編輯中（預覽顯示這張）</span>}
                         </button>
+                        {isPicked && !isEditing && (
+                          <button className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 6px", height: "auto" }} data-testid={`banner-size-edit-${k}`}
+                            onClick={() => setS((prev) => ({ ...enterSize(prev, k), saved: false }))}>改這張</button>
+                        )}
+                        </div>
                       );
                     })}
                 </div>
               </div>
             ))}
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 4 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>多尺寸輸出</div>
-              <p className="form-hint" style={{ margin: "0 0 6px" }}>勾選要一起做的尺寸：位置照比例換算、字依短邊縮放、商品圖和標題留在畫面內。縮圖在預覽下方，點縮圖可單獨微調那個尺寸。</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                {(Object.keys(PRESETS) as PresetKey[]).map((k) => (
-                  <label key={k} style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                    <input type="checkbox" checked={s.multiSizes.includes(k)} onChange={() => toggleSize(k)} data-testid={`banner-multi-${k}`} />
-                    <b>{PRESETS[k].ratio}</b><span style={{ opacity: 0.7 }}>{PRESETS[k].use}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            <p className="form-hint" style={{ margin: "4px 0 0" }}>可以選好幾個尺寸一起做：按一下加入、再按一下取消。位置照比例換算、字依短邊縮放；按「改這張」單獨微調那個尺寸，縮圖與全部下載在預覽下方。</p>
           </StepCard>
 
           {/* Step 2: 產品圖 */}
@@ -2525,11 +2560,11 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
             )}
           </div>
 
-          {s.multiSizes.length > 0 && (
+          {multi && (
             <div className="card" style={{ marginBottom: 16 }} data-testid="banner-multi-card">
-              <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>多尺寸 · {s.multiSizes.length} 個</h2>
+              <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>多尺寸 · {picked.length} 個</h2>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {s.multiSizes.map((k) => {
+                {picked.map((k) => {
                   const editing = s.editingSize ? s.editingSize.key === k : s.preset === k;
                   const tweaked = Object.keys(s.sizeOverrides[k] ?? {}).length > 0;
                   return (
