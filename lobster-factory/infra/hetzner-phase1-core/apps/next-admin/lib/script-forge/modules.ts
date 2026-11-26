@@ -95,6 +95,8 @@ function bannerColorPart(bg: unknown, palette: unknown, brandKit: unknown): stri
     `\n配色照 60-30-10：背景約 60%、文字等主色約 30%、重點約 10%；CTA 用最搶眼的一色，整張只留一個焦點。` +
     `文字顏色要和它所在那一帶的背景拉開明暗（亮背景用深字、暗背景用淺字）；那一帶很花時把 textScrim 設 true。顏色可填 #rrggbb 或色盤索引。`;
 }
+/** How many 標題＋副標 pairs one banner 生成文案 call asks for (operator 2026-11-26: 5 was too few). The button price reads it. */
+export const BANNER_COPY_VARIANTS = 7;
 /** The brand line the modules used to append themselves: "" without a client. */
 export const brandLine = (ctx: ForgeCtx): string => (ctx.brand?.voice ? `品牌語氣：${ctx.brand.voice}` : "");
 /** Field as a list (missing or non-list = []); builders join it the way the old page templates did. */
@@ -336,11 +338,11 @@ export const FORGE_MODULES: ForgeModule[] = [
           `用途：${s(f.platform)} · ${s(f.label)} (${s(f.w)}×${s(f.h)})\n` +
           `語氣風格：${s(f.tone)}\n` +
           `產品/服務描述：${s(f.brief)}\n\n` +
-          `請生成 5 組 banner 文案，每組包含：\n` +
+          `請生成 ${BANNER_COPY_VARIANTS} 組 banner 文案，每組切入角度都要不同，每組包含：\n` +
           `- headline：主標題，簡潔有力，8-15 字\n` +
           `- subtext：副標題或行動呼籲（CTA），10-25 字\n\n` +
           `輸出純 JSON，不含任何 markdown 包裹：\n` +
-          `{"variants":[{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."},{"headline":"...","subtext":"..."}]}`,
+          `{"variants":[{"headline":"...","subtext":"..."}, …共 ${BANNER_COPY_VARIANTS} 組]}`,
       },
     } }),
   // Tasks of the result card several modules share (platform versions, scoring): not a page entry.

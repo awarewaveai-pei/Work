@@ -100,6 +100,15 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=rank_math_registration_skip | hits=4
 - ORACLE_WAIVED: 主機腳本加 5 行（只在清單含 Rank Math 且 option 為空時寫一個 option），不涉 auth／個資／金流；160 個既有測試＋2 個新測試。
+## 2026-11-26（續39）— 橫幅生成文案：預設改 Claude Sonnet 5.5，一次 7 組
+
+- 起因：操作者看完 12 模型塔羅牌實測後決定「換 Claude Sonnet 5.5，提供 7 組，5 組太少」。
+- 改動：`NA/lib/script-forge/modules.ts` 新增 `BANNER_COPY_VARIANTS = 7`，copy prompt 改用它並要求每組切入角度不同；`NA/app/(shell)/tools/banner/banner-design.ts` `DEFAULT_COPY_MODEL` = claude-sonnet-5-5，按鈕估價依組數縮放（實測基準是 5 組的呼叫，copy 輸出 token = 152×組數）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . ; npx vitest run app/(shell)/tools/banner lib/script-forge (9 files, 60 passed) | exit=0 | ms=90000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 預設值與組數常數，估價公式等價改寫（5 組時結果不變）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=BANNER_COPY_VARIANTS | hits=5
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續30）— /tools/ai-models 實測紀錄：每項測試一個子分頁，依文字／圖片／影片／音訊分類，總覽卡片＋結論先行的版面
 
 [任務] 操作者：「把裡面的每種測試用 tab 分開，要按邏輯分類歸納，UI/UX 排版要有國際頂尖設計師水準」。
