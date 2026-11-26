@@ -60,9 +60,9 @@ for (const g of GO) {
 }
 for (const r of RISKS) { if (!byId.has(r.card)) fail(`RISKS 有不存在的卡 ${r.card}`); if (!r.said || !r.handling) fail(`RISKS ${r.card}: 缺 said／handling`); }
 
-// 5. DISPATCH §6.6 的高風險卡清單要跟 data.mjs 的第一階段高風險卡一致
+// 5. DISPATCH §6.6 的高風險卡清單要跟 data.mjs 已排批（b<數字>）的高風險卡一致
 const hi = (/High 卡（([^）]+)）/.exec(dispatch)?.[1] || '').split('、').map((x) => x.trim()).sort().join();
-const mine = BATCHES.filter((b) => b.phase === 'P1').flatMap((b) => b.cards).filter((c) => c.risk === 'High').map((c) => c.id).sort().join();
+const mine = BATCHES.filter((b) => /^b\d+$/.test(b.code)).flatMap((b) => b.cards).filter((c) => c.risk === 'High').map((c) => c.id).sort().join();
 if (hi !== mine) fail(`DISPATCH §6 高風險卡 ${hi} ≠ data.mjs ${mine}`);
 
 // 6. 頁面：62 張卡、13 個區段（11 批＋兩階段）都在；沒有下拉選單；沒有橫向捲動的寫死寬度

@@ -66,26 +66,26 @@
 | K14 | 新增產品入口零手改的驗收測試；補：collect／outreach／design 自己的挑客戶清單（org-search 不帶 category）仍列出 TEST 單位，換成客戶欄後消失；補：VW app（`apps/video-workbench`）內可見的「影音工作台」改「影片工作台」，同一次 VW 部署 | 新 NA `lib/client-context/__tests__/new-door.test.ts` | Low | Sonnet | K5、K13 | 10 | 已併（VW 已部署 2026-11-25） |
 | M6 | 代辦（外掛端）：會員驗證 email 後才連上；外掛按鈕自帶樣式不靠佈景、產品列狀態字靠近產品名（W5 本機實看）；啟用前換正式站佈景再跑一次 `scripts/local-member-flow.ps1` | PL 新 `includes/MemberInvite.php`、主檔註冊、`tests/*` | **High** | Opus | W2、M5 | 10 | 已併（另開 `app/api/webhooks/awarewave-wp-member`，付款事件不動；外掛仍停用，啟用在 W6） |
 | M8 | 轉移會員（換單位管理者）；補：把「一個單位一個管理會員」做成資料庫層規則（M5 的鎖只管邀請這條路，付款自動連結的舊路沒拿同一把鎖） | MIG 新 migration（轉移函式）；NA 新 `app/api/ops/clients/[slug]/member-transfer/route.ts`、`AccountsCard.tsx` | **High** | Opus | M5 | 10 | 已併（0182 已套用：一單位一 identity 唯一索引、`former_customer_identities`、轉移走 `member_invite_redeem`） |
-| K15 | 目前客戶期末閘＋P1 驗收；補：正式站寬 375 量 `/ops/billing`（頁內 280px 清單欄，`app/(shell)/ops/billing/page.tsx:29`、`:103`），擠窄就套 `.client-panel` 同一組規則 | 無程式；WORKLOG、本檔狀態欄 | — | Opus | 全部 K | 11 | |
-| M10 | WordPress 刪會員／改 email 時 app 跟著知道；補（開工第一項，未完成不得上線刪會員事件）：會員事件加時間戳／事件編號並擋重送（M6 路由 `app/api/webhooks/awarewave-wp-member/route.ts` 開頭註解已標明），刪會員事件上線前必做；轉移後舊會員的事件規則沿用 `former_customer_identities` | PL 新 `includes/MemberEvents.php`、主檔註冊；NA 新 `app/api/webhooks/awarewave-wp-member/route.ts`、`lib/entitlements/identities.ts` | **High** | Opus | M5、M6 | 11 |  |
+| K15 | 目前客戶期末閘＋P1 驗收；補：正式站寬 375 量 `/ops/billing`（頁內 280px 清單欄，`app/(shell)/ops/billing/page.tsx:29`、`:103`），擠窄就套 `.client-panel` 同一組規則 | 無程式；WORKLOG、本檔狀態欄 | — | Opus | 全部 K | 11 | 已併 |
+| M10 | WordPress 刪會員／改 email 時 app 跟著知道；補（開工第一項，未完成不得上線刪會員事件）：會員事件加時間戳／事件編號並擋重送（M6 路由 `app/api/webhooks/awarewave-wp-member/route.ts` 開頭註解已標明），刪會員事件上線前必做；轉移後舊會員的事件規則沿用 `former_customer_identities` | PL 新 `includes/MemberEvents.php`、主檔註冊；NA 新 `app/api/webhooks/awarewave-wp-member/route.ts`、`lib/entitlements/identities.ts` | **High** | Opus | M5、M6 | 11 | 已併 |
 
 ### P2（開放註冊前；P1 全部併完後才排批、展開）
 
 | 卡 | 白話 | 檔案 | 風險 | 模型 | 依賴 | 批 | 狀態 |
 |---|---|---|---|---|---|---|---|
+| U16 | 內容概覽首頁 | NA `app/content/page.tsx` | Medium | Sonnet | U11 | 12 | 進行中 |
+| U17 | 工作台「繼續上次」 | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U8 | 12 | 進行中 |
+| U19 | 客戶自己授權他人（＝G4） | 新 NA `app/portal/people/*`、新 API | **High** | Opus | M5 | 12 | 進行中 |
+| U28 | 付款後立即失效功能清單快取 | NA `lib/entitlements/features.ts`、付款事件處理 | Medium | Sonnet | U5 | 12 | 進行中 |
 | W6 | 正式站重開店外掛與兩把密鑰（＝G8）；補：檢查清單加「邀請落地頁 `/?aw_invite=` 打得開」（邀請掛在付款模組下）；啟用前換正式站佈景跑一次 `scripts/local-member-flow.ps1` | 正式站設定與 `seller_sites` 資料（非程式） | **High** | Opus＋操作者 go | W5 | P2 |  |
 | M9 | aware-wave.com 關掉訪客結帳（G6） | 正式站 WooCommerce 設定（非程式）；NA 無 | **High** | Sonnet（`wordpress-maintenance-agent` 備份閘） | — | P2 | |
 | M4 | 標籤寫進 FluentCRM、WordPress 加 TEST 角色（G3 寫入端） | 沿用既有 NA `lib/crm/fluentcrm.ts`＋wp-bridge `lobster-factory/packages/wp-bridge-plugin/includes/Crm/ContactUpserter.php`（加標籤寫入，不新建接頭）；TEST 角色註冊位置展開時定 | **High** | Opus | M3、W6 | P2 | |
 | M7 | 既有客戶逐一代辦成會員（G2） | 無程式；操作紀錄 | **High** | Opus＋操作者 | M5、M6、W6 | P2 | |
 | W7 | 真人走查：註冊→付款→進入→扣點；補：用測試會員實看 `/portal/launcher`（U8）與 `/portal/wallet`（U10，管理者與被授權的人各一次） | 無程式；走查紀錄 | Medium | 操作者 | W6、M5、M6、M8、M9、M10 | P2 | |
-| U16 | 內容概覽首頁 | NA `app/content/page.tsx` | Medium | Sonnet | U11 | P2 | |
-| U17 | 工作台「繼續上次」 | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U8 | P2 | |
 | U18 | 頂列搜尋 | NA `app/PlatformFrame.tsx`、新搜尋元件 | Low | Sonnet | K5、U22 | P2 | |
-| U19 | 客戶自己授權他人（＝G4） | 新 NA `app/portal/people/*`、新 API | **High** | Opus | M5 | P2 | |
 | U24 | 最近使用／常用 | 新 NA `app/api/portal/recent/route.ts`；可能 migration（索引） | **High** | Opus | U8 | P2 | |
 | U25 | 功能層分類欄位＋資料填寫 | NA `lib/portal/products.ts`、`catalog-vocab.ts`、匯入腳本 | Medium | Sonnet＋Haiku 填值 | U22 | P2 | |
 | U26 | 登記表匯出 `catalog.json` | 新腳本＋test | Low | Sonnet | U25 | P2 | |
-| U28 | 付款後立即失效功能清單快取 | NA `lib/entitlements/features.ts`、付款事件處理 | Medium | Sonnet | U5 | P2 | |
 
 ### P3（開放註冊時與之後；B §17.3）
 
@@ -139,7 +139,7 @@
 | M7 | 既有客戶（Soulful 等）逐一代辦成會員（G2） | 無程式 | 2 列測試 identities：屬 TEST 單位者保留；其餘列出給操作者決定 | 每個 active 客戶單位有一列 identities | **High**（正式資料） | M5、M6、W6 後（P2） |
 | M8 | 轉移會員（換管理者／聯絡人離職，C D5） | 新 security definer 函式（刪舊列＋寫新列＋稽核，同一交易；identities 本身仍不給 update）；新路由＋`AccountsCard.tsx` 按鈕 | 既有列只在轉移時被替換 | 轉移後舊帳號失去管理者、新帳號取得；稽核一列；非 owner／admin 員工 → 403 | **High** | M5 後 |
 | M9 | aware-wave.com 關訪客結帳（G6） | 正式站 WooCommerce 設定；先 `wordpress-maintenance-agent` 備份閘 | 已存在的訪客訂單不動 | 訪客結帳頁要求登入；登入後結帳照常 | **High**（正式站） | P2 |
-| M10 | WordPress 刪會員／改 email → 簽章事件 → app 標記或拒 | PL 新 `includes/MemberEvents.php`；NA 新 webhook 路由、`identities.ts` | 既有會員無事件即無變化 | 刪除事件後該 identities 不再能進門（`wp-handoff` 回 `not_a_member`）；改 email 事件記稽核、不改 identities | **High**（auth） | M5、M6 後 |
+| M10 | WordPress 刪會員／改 email → 簽章事件 → app 標記或拒 | PL 新 `includes/MemberEvents.php`；NA 新 webhook 路由、`identities.ts` | 既有會員無事件即無變化 | 刪除事件後該 identities 不再能進門（`wp-handoff` 回 `not_a_member`）；改 email 事件記稽核、不改 identities | **High**（auth） | 已併 |
 | M11 | aware-wave.com 也照 `loginSources` 進門（G11） | `awarewave-wp.ts:75-80` 的例外刪掉（現只檢查 `customer-wp`）；`products.ts` 其餘 8 列（`:54,59,65,72,81,86,90,97`）的 `loginSources` 加 `"awarewave-wp"`（現只有 `:43,46,49` 三列有） | 行為對 aware-wave.com 不變（今天全開，加完清單仍全開）；之後新產品要明寫才開 | 每個 served 門 `wp-handoff` 照舊 200；把某門的 `awarewave-wp` 拿掉 → 403 `login_source_not_allowed`（突變一次）；`products.test.ts` 綠 | **High**（登入通道） | W1、K8、U22 後 |
 
 M11 的依據：`awarewave-wp.ts:75-77` 註明「是否照清單是操作者的決定」；操作者 2026-11-21／22 定「會員從 aware-wave.com 登入，按『進入』到各產品」（`README.md` §2），所以清單全開、改為照清單判斷，行為不變。
@@ -159,8 +159,9 @@ M11 的依據：`awarewave-wp.ts:75-77` 註明「是否照清單是操作者的�
 | 9 | U14、W5、K13、M5 | 手機底列；員工在客戶頁「帳號」可對既有客戶發起代辦（外掛端未做，只會建立待驗證邀請） | ≤ 640px 底列 4 項、每項 ≥ 44px；W5 腳本本機跑完；K13 突變紅→綠；M5 測試 | revert；M5 down（High） |
 | 10 | K14、M6、M8 | 員工可轉移會員；外掛端代辦（外掛仍停用，正式站無變化） | K14 T1–T6；M6 外掛測試＋W5 腳本含代辦；M8 轉移測試 | revert；M8 down（High） |
 | 11 | K15、M10 | 沒有新畫面；P1 期末驗收 | K15 清單全過；M10 本機刪會員後 `wp-handoff` 回 `not_a_member` | revert |
+| 12 | U16、U17、U19、U28 | content 門首頁變「概覽」（三個數字＋寫文章鈕，寫文章頁搬到 `/content/write`）；工作台多「繼續上次」；客戶管理會員可在 `/portal/people` 自己邀人；買完點數按鈕立即解灰 | 各卡 TESTS；U19 他單位 org／userId → 404；部署後 content 門根看到概覽 | revert 單卡（皆無 migration） |
 
-P2、P3：P1 全部併入後，監工依 §1 依賴排批（同樣每批 ≤ 4、檔案不重疊），展開派工單後再派。
+P1 全部於 2026-11-26 併入。P2 派工單在 `D:	mp\plat-briefs\<卡>.md`；批 13 候選 U25、U24；U26、U18 依 U25 排其後。W6／M9／M7／M4／W7 動正式站，要操作者 go，另排。
 
 ## 5. 第一批派工單（全文，可直接貼給工人）
 
@@ -206,7 +207,7 @@ P2、P3：P1 全部併入後，監工依 §1 依賴排批（同樣每批 ≤ 4�
 3. 跑該卡 TESTS 行的同一指令（不跑全套）；`.ts/.tsx` 卡在 NA 跑 `npx tsc --noEmit`。
 4. RISKS 逐項處理：當場修、實測證明無事、或寫明為何不處理（記 WORKLOG），不轉述。
 5. critic 一個（`.claude/commands/review.md` 依風險選 tier）；High 卡加書面對抗自審＋卡內突變證據；Codex 2026-11-24 後改 `/codex-review`。
-6. High 卡（K6、K12、U4、U5、W1、M1、M2、M3、M5、M6、M8、M10、M11）：驗收過後**停下問操作者**「可以併 main 嗎」，附一句白話風險與 rollback；未獲 go 不併。
+6. High 卡（K6、K12、U4、U5、W1、M1、M2、M3、M5、M6、M8、M10、M11、U19）：驗收過後**停下問操作者**「可以併 main 嗎」，附一句白話風險與 rollback；未獲 go 不併。
 7. 併 main：`git -C D:\Work` 以 pathspec commit／cherry-pick 該卡 commit（AGENTS.md §8）；`agency-os/WORKLOG.md` 用 `scripts/git-partial-worktree-commit.py stage`；WORKLOG 四行證據（REALTEST／REVIEW／BUGHUNT／ORACLE）。
 8. 更新本檔 §1 狀態欄；若卡完成觸發 §7 的文件行，同一 commit 更新。
 9. 移除 worktree 前先 `rmdir` 其中的 junction（`node_modules` 等），再 `git worktree remove`。
@@ -233,9 +234,9 @@ P2、P3：P1 全部併入後，監工依 §1 依賴排批（同樣每批 ≤ 4�
 | M4 | C §3 G3 標「已關」 |
 | M5、M6 | C §3 G1 標「已關」；C §2「員工代辦（D4，未做）」改「已做」 |
 | M7、M8、M9、M10、M11 | C §3 G2、G5、G6、G10、G11 依序標「已關」；M11 同時刪 `lib/auth/sources/awarewave-wp.ts:75-77` 的「操作者決定」註解（卡內做） |
-| U19 | C §3 G4 標「已關」 |
+| 12 | 進行中 |
 | C 全部 G 關完 | C §3 末段「開放註冊的前置條件」改寫為已滿足＋W7 走查紀錄連結 |
-| K15 | `README.md` §1、§4 更新狀態；本檔 §1 全部 P1 標「已併」 |
+| K15 | 已併 |
 
 ## 8. 需要操作者決定
 

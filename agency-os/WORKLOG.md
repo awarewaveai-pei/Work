@@ -1,4 +1,26 @@
 # Worklog
+## 2026-11-26（續35）— 平台第 11 批（K15、M10）上線，第一階段全部完成；第 12 批派出
+
+- [根因] P1 最後一批。K15＝「目前客戶」期末閘；M10＝WordPress 刪會員／改 email 時 app 跟著知道（ADR 021 G10），含會員事件防重送（0184 `member_events`）。
+- [步驟]
+  - K15 已於 `3d917c91e`、`33cd5c998`、`2f95f7366` 推 main（六項驗收全過；`/ops/billing` 套 `.client-panel`；`.github/workflows/next-admin-door-host.yml` 用正式建置以自訂網域實打）。
+  - M10 風險裁決（操作者「先處理完風險可以併 main 再部署」）：
+    - C1 被刪會員在別單位品牌有角色 → `still_member` 409 終局、帳號仍可密碼進本單位（`social_add_member` 只按 email，0103:35-62，可達）。退回：sourceDeleted 移除所有品牌角色（`c42280ab9`）。
+    - M1 Codex：角色讀取受 PostgREST 1000 列上限、刪除卻按 user_id 全刪 → 刪的列≠稽核的列。退回：只刪讀到並稽核的（`a8246c8e4`），剩餘回 503 `brand_roles_remaining` 由重送處理。
+    - 保留：被拒邀請的空帳號（無自助忘記密碼入口，登入連結只有員工寄送才產生）；上千品牌時 `.in()` URL 過長（回可重試，不壞資料）。
+  - 0184 套用（`apply-db-migration.mjs 0184` APPLY_OK）→ `git push` `36ebbdfcb..a8246c8e4` → CI 全套＋tsc 綠 → `sg-deploy.sh next-admin`。
+  - 監工台 check.mjs §6 高風險卡比對改為「所有已排批 b<數字>」（原只算 P1，P2 排批後會誤報）。
+  - 批 12（U16、U17、U19〔High〕、U28）派工單 `D:\tmp\plat-briefs\U16|U17|U19|U28.md`；DISPATCH §4 加列。
+- [驗證]
+  - 整合樹 `npx tsc --noEmit` exit 0；`npx vitest run` 719 files／5969 passed／0 failed；`node --test scripts/__tests__/down-migration-copies.test.mjs` 2/2。
+  - psql：`member_events` 存在；`member_invite_redeem`／`member_event_prior`／`member_event_lock` service_role execute=false，`member_event_check|invite|deleted|email_changed`=true；`customer_identities` 2 列未動。
+  - sg-deploy：deployed commit `a8246c8e4`，smoke all endpoints OK；`POST /api/webhooks/awarewave-wp-member {}` → 404 `member_events_disabled`（外掛停用、未簽章）。
+- [未做／剩餘風險] 客戶頁「會員已被刪除」與品牌名單要等 W6 重開外掛後用測試會員實走；K12 影片工作台確認窗仍待登入 video.aware-wave.com 驗。
+- [rollback] `git revert a8246c8e4 c42280ab9 7fec1a074 3b6ee0165 537341f9c` 並部署，再跑 `0184_member_events.down.sql`（有 member_deleted 列時拒絕，只能往前修）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin；psql grants；npx vitest run | exit=0 | ms=900000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n
+  - external oracle = Codex CLI（2026-11-26-partialreview-50f8b4ce.md），M1 已修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=brand_roles_remaining | hits=2
 ## 2026-11-26（續34）— oracle WP：GO-3 完成，oracle.aware-wave.com 首頁換成 WordPress 並正式開放
 
 - [根因] WordPress 階段最後一步（待決 6）。操作者 2026-11-26「你去做」：四項前置由監工代做能做的部分，接著上線。
