@@ -711,6 +711,13 @@ function downloadUrl(url: string, name: string) {
 
 // History signature: excludes transient flags; reduces big image data-URLs to their length
 // (so comparing snapshots never stringifies multi-MB base64).
+/** C13: nothing about the picture changed yet -- the blank design (the topic / tone typed in 開始 and the sizes picked are
+ *  not the picture). Any other change (a background colour, a gradient, words, an image, a template…) shows the preview. */
+export function isUntouched(st: State): boolean {
+  const notPicture: Partial<State> = { copyBrief: INIT.copyBrief, copyTone: INIT.copyTone, preset: INIT.preset, multiSizes: [], sizeOverrides: {}, editingSize: null };
+  return designSig({ ...st, ...notPicture }) === designSig(INIT);
+}
+
 function designSig(st: State): string {
   // typed → tsc catches any future transient field that's misspelled or forgotten here
   const skip = new Set<keyof State>(["saving", "saved", "error", "generating", "designing", "productRemoving", "copyGenerating", "copyStream", "copyVariants"]);
@@ -1066,6 +1073,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const wide = useWide();
   // C8: the brand kit of the organization this banner is saved for (null = own / default organization)
   const brand = useBrandKit(saveOrg);
+  const saveOrgRef = useRef(saveOrg);
+  saveOrgRef.current = saveOrg;
   async function applyBrandKit(kit: BrandKit) {
     const [main, second, accent, text, bg] = kit.colors;
     let logoImage: string | null = null;
@@ -1140,7 +1149,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
 
   // ── AI 一鍵設計整張：LLM 回傳一個 State patch（renderer 直接吃 → 幾乎零渲染成本）──
   async function generateFullDesign() {
-    if (!s.copyBrief.trim() || !staff) return;
+    // the brand colours must be the picked client's: never design while its kit is still loading
+    if (!s.copyBrief.trim() || !staff || brand.status === "loading") return;
     setS((prev) => ({ ...prev, designing: true, error: null }));
     try {
       // 多尺寸 ticked: one call, shared words / colours + a layout per size (card C9); none = the single-size call as before
@@ -1153,6 +1163,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       // organization has one, else the background's colours
       const bg = await measureBackground(m, sel).catch(() => ({ ...bgStatsFromColors("color", m.bgColor), mode: m.bgMode }));
       const kitColors = brand.kit?.colors.length ? brand.kit.colors : null;
+      const orgAtStart = saveOrg;
       const palette = usablePalette(bg, kitColors);
       const fields = {
         brief: s.copyBrief, label: presetLabel(m.preset), w: mp.w, h: mp.h,
@@ -1168,6 +1179,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       setAiRetrying(null);
       if ("raw" in got) throw new Error(aiFormatError(got, bannerCallNtd(designModel, "design", Math.max(1, chosen.length))));
       const raw = (got.value && typeof got.value === "object" ? got.value : {}) as Record<string, unknown>;
+      // the client was changed while the AI answered: these colours are the previous client's -- not applied
+      if (saveOrgRef.current !== orgAtStart) throw new Error("設計途中換了客戶：這次結果用的是前一個客戶的品牌色，沒有套用，請再按一次。");
       const patch = sanitizeDesign(raw);
       const plan = designPlan(raw, spec(m.preset), chosen);
       setS((prev) => {
@@ -1528,7 +1541,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const endDrag = () => { bgDragRef.current = null; elemDragRef.current = null; setGuides(null); };
   const hasPositions = Object.keys(s.positions).length > 0;
   // C13: nothing designed yet (no words, pictures, button, badge or logo) -> a line of guidance instead of an empty canvas
-  const blank = !s.headline.trim() && !s.subtext.trim() && !s.productImage && !s.bgImage && !s.ctaText && !s.badgeText && !s.logoImage && !s.designing;
+  const blank = isUntouched(s) && !s.designing;
 
   const bgCanvasButton = s.bgImage && canvasHref ? (
     <button className="btn btn-ghost" style={{ fontSize: 12, marginLeft: 6 }} data-testid="banner-bg-canvas"
@@ -1606,11 +1619,14 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   onClick={generateCopy} data-testid="banner-ai-copy">
                   {aiRetrying === "copy" ? "重試中…" : s.copyGenerating ? "生成中…" : `生成文案（${ntdLabel(bannerCallNtd(copyModel, "copy"))}）`}
                 </button>
-                <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || s.copyGenerating || !s.copyBrief.trim()) || !canUse("video.script")}
+                <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || s.copyGenerating || !s.copyBrief.trim() || brand.status === "loading") || !canUse("video.script")}
                   onClick={generateFullDesign} data-testid="banner-ai-design">
-                  {aiRetrying === "design" ? "重試中…" : s.designing ? "設計中…" : `✨ AI 一鍵設計整張（${ntdLabel(bannerCallNtd(designModel, "design", picked.length))}）`}
+                  {aiRetrying === "design" ? "重試中…" : s.designing ? "設計中…" : brand.status === "loading" ? "正在載入品牌色…" : `✨ AI 一鍵設計整張（${ntdLabel(bannerCallNtd(designModel, "design", picked.length))}）`}
                 </button>
               </div>
+              {brand.status === "error" && !brand.kit && (
+                <p className="form-hint" data-testid="banner-kit-failed" style={{ margin: 0, color: "var(--badge-red-text)" }}>這個客戶的品牌色載入失敗：這次 AI 一鍵設計不套品牌色。</p>
+              )}
               <p className="form-hint">「一鍵設計」讓 AI 直接配好標題/重點字/CTA/徽章/價格/配色/版面 — 再微調即可。{multi ? `已選 ${picked.length} 個尺寸：文案配色共用，每個尺寸各排一個版面。` : ""}</p>
               {s.copyGenerating && s.copyStream && (
                 <div style={{ fontSize: 11, opacity: 0.5, fontFamily: "monospace", maxHeight: 40, overflow: "hidden" }}>

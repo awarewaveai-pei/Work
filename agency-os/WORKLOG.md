@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續31）— 橫幅 C12／C13 第二輪審查修正：品牌色跟著客戶走、半透明字逐通道混色、空白提示只給沒動過的設計
+
+- 根因（Codex 第二輪 3 項，artifact `agency-os/reports/oracle/2026-11-26-partialreview-db050a3e.md`，監工確認）：1) `NA/app/(shell)/tools/banner/kit/useBrandKit.ts` 換 org 時沒清舊 kit，載入中／失敗時 AI 一鍵設計用上一個客戶的品牌色、卻存到新客戶；2) `design-colors.ts` 半透明字用亮度近似混色，彩色背景誤判（白字 0.7 在 #0000ff 實際 4.40、算成 5.29）；3) `BannerStudio.tsx` 空白提示的條件沒看背景，只改純色／漸層時預覽仍被蓋住。不變量：設計用的品牌色永遠屬於目前選的客戶；對比度照 canvas 實際畫法算；空白提示只在設計完全沒動過時出現。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 修：`useBrandKit` 每次換 org 先清 kit／saved／canEdit／externalLogo，網路失敗也清 kit；`BannerStudio` 載入中 AI 一鍵設計停用並顯示「正在載入品牌色…」、`generateFullDesign` 開頭擋載入中、AI 回來時客戶已換就不套用並說明；載入失敗顯示 `banner-kit-failed` 一行。`design-colors.ts`：`Zone.colors`（純色＝該色、漸層＝兩端＋3 個中間點、圖片＝量到的主要顏色），`zoneRatio` 對灰階亮度範圍與每個已知顏色逐 sRGB 通道混色後取最差；暗化／底襯也逐通道。新 `isUntouched(state)`（designSig 比對 INIT，主題／語氣／尺寸不算），`blank = isUntouched && !designing`。
+- 驗證：tsc 綠；vitest banner＋lib/theme＋blocks＋script-forge＋client-context＋ops/clients＋api/tools/presets 204 passed（新增指名：白字 0.7 在 #0000ff＝4.40 且原價時守衛開底襯、unmet 空；只改背景色／漸層 → 不是空白，主題與尺寸不算改動）。
+- 剩餘：kit 清除與載入中停用沒有自動化測試（hook，無 React 測試環境），靠讀碼；圖片背景用「整張」的主要顏色一起算，可能比文字那一帶實際更保守；本機沒實開確認。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme lib/systems/__tests__/blocks.test.ts lib/script-forge lib/client-context "app/(shell)/ops/clients" "app/api/tools/presets" | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/3m/0n（Codex 第二輪 3 項已修）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=(1 - alpha) ** 2.2 | hits=0
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查（Codex 已審兩輪）
 ## 2026-11-26（續29）— 橫幅 C13：右欄依做圖順序重排成「開始＋1–6」，收合時顯示目前的值
 
 - 根因／決策：右欄 9 張卡用 CSS `order` 排，編號亂（配色無編號在第 1、Step 0 文案在第 6、Step 4.5）；主入口（主題＋AI 一鍵設計）埋在第 6 張；「存到哪個客戶」在最底的匯出區且是一長串清單，但它同時決定品牌套組；預覽空白是一塊黑框。改為照做一張圖的順序：頂部「開始」（永遠展開、不編號）→ 1 尺寸 → 2 文字 → 3 畫面 → 4 行銷元素 → 5 風格 → 6 匯出；各區內容整塊搬移、控制項與 testId 不改。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）

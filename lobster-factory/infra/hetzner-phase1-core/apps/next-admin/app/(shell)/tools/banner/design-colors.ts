@@ -17,8 +17,22 @@ const ratioOf = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a,
 /** WCAG contrast ratio of two colours (1..21). */
 export const contrastRatio = (a: string, b: string): number => ratioOf(relLum(a), relLum(b));
 
-/** The luminance range behind the text (lo..hi, relative luminance): the text must stand out against both ends. */
-export interface Zone { lo: number; hi: number }
+/** What is behind the text: a luminance range (lo..hi, relative luminance, checked as greys) and, when known, the actual
+ *  colours there (a flat colour, gradient samples, a picture's measured main colours). The text must stand out on all. */
+export interface Zone { lo: number; hi: number; colors?: string[] }
+
+// ── sRGB channels 0..1: the canvas blends translucent paint per channel in sRGB, so contrast is taken after that mix ──
+type Rgb = [number, number, number];
+const dec = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const enc = (l: number) => (l <= 0.0031308 ? 12.92 * l : 1.055 * l ** (1 / 2.4) - 0.055);
+const rgbOf = (hex: string): Rgb => {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return m ? [parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255] : [0, 0, 0];
+};
+const hexOf = (c: Rgb) => "#" + c.map((v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0")).join("");
+const lumRgb = (c: Rgb) => 0.2126 * dec(c[0]) + 0.7152 * dec(c[1]) + 0.0722 * dec(c[2]);
+const greyOf = (l: number): Rgb => { const v = enc(Math.max(0, Math.min(1, l))); return [v, v, v]; };
+const mix = (top: Rgb, under: Rgb, a: number): Rgb => [0, 1, 2].map((i) => a * top[i] + (1 - a) * under[i]) as Rgb;
 /** What the page measured of the background, before any AI call. zones = per text position / alignment. */
 export interface BgInfo {
   mode: BgMode;
@@ -73,7 +87,10 @@ export function mergeBgInfo(infos: readonly BgInfo[]): BgInfo {
 /** A flat colour / two-colour gradient background: the same zone everywhere (conservative: the gradient's whole range). */
 export function bgStatsFromColors(mode: "color" | "gradient", c1: string, c2 = c1): BgInfo {
   const a = relLum(c1), b = relLum(mode === "color" ? c1 : c2);
-  const z = { lo: Math.min(a, b), hi: Math.max(a, b), busy: Math.abs(a - b) / 2 };
+  // the actual colours: the flat colour, or the gradient's ends and points between (the canvas interpolates in sRGB)
+  const from = rgbOf(c1), to = rgbOf(c2);
+  const colors = mode === "color" ? [c1] : [0, 0.25, 0.5, 0.75, 1].map((t) => hexOf(mix(to, from, t)));
+  const z = { lo: Math.min(a, b), hi: Math.max(a, b), busy: Math.abs(a - b) / 2, colors };
   const zones = Object.fromEntries(POS.map((p) => [p, Object.fromEntries(ALIGN.map((al) => [al, z]))])) as BgInfo["zones"];
   return { mode, colors: mode === "color" ? [c1] : [c1, c2], meanLum: (a + b) / 2, zones };
 }
@@ -138,19 +155,22 @@ export function pickColorRoles(raw: Record<string, unknown>, bgMode: BgMode, pal
   return out;
 }
 
-/** Black over the background at `alpha` (dim overlay, text scrim) scales luminance about by (1 - alpha)^2.2. */
-const darken = (z: Zone, alpha: number): Zone => { const f = (1 - alpha) ** 2.2; return { lo: z.lo * f, hi: z.hi * f }; };
+/** Black over the background at `alpha` (dim overlay, text scrim): every channel times (1 - alpha), greys and colours alike. */
+const darken = (z: Zone, alpha: number): Zone => {
+  const d = (c: Rgb): Rgb => c.map((v) => v * (1 - alpha)) as Rgb;
+  return { lo: lumRgb(d(greyOf(z.lo))), hi: lumRgb(d(greyOf(z.hi))), colors: z.colors?.map((h) => hexOf(d(rgbOf(h)))) };
+};
 /**
- * Worst contrast of text colour `hex`, drawn at opacity `alpha`, over any background luminance in z. Opaque text: the worst
- * point is the one nearest the text's own luminance (inside the range = 1:1). Translucent text is first mixed with the
- * background under it (sRGB-space blend, as the canvas does), so the range is sampled.
+ * Worst contrast of text colour `hex`, drawn at opacity `alpha`, over what is behind it: greys across the luminance range
+ * (the point nearest the text's own luminance included: inside the range = 1:1 for opaque text) and every known colour.
+ * Translucent text is mixed with each background per sRGB channel first, as the canvas paints it.
  */
 export function zoneRatio(hex: string, z: Zone, alpha = 1): number {
-  const lt = relLum(hex);
+  const t = rgbOf(hex), lt = lumRgb(t);
   const lo = Math.min(z.lo, z.hi), hi = Math.max(z.lo, z.hi);
-  const pts = [lo, hi, Math.min(hi, Math.max(lo, lt)), ...Array.from({ length: 17 }, (_, i) => lo + ((hi - lo) * i) / 16)];
-  const g = (l: number) => l ** (1 / 2.2);
-  return Math.min(...pts.map((lb) => ratioOf(alpha >= 1 ? lt : (alpha * g(lt) + (1 - alpha) * g(lb)) ** 2.2, lb)));
+  const greys = [lo, hi, Math.min(hi, Math.max(lo, lt)), ...Array.from({ length: 17 }, (_, i) => lo + ((hi - lo) * i) / 16)].map(greyOf);
+  const unders = [...greys, ...(z.colors ?? []).map(rgbOf)];
+  return Math.min(...unders.map((b) => ratioOf(lumRgb(alpha >= 1 ? t : mix(t, b, alpha)), lumRgb(b))));
 }
 
 export interface GuardResult { patch: Partial<ColorFields>; fixes: string[]; unmet: string[] }
@@ -175,7 +195,9 @@ export function guardContrast(
     const zs = s.bgMode === "color" || s.bgMode === "gradient"
       ? [bgStatsFromColors(s.bgMode, s.bgMode === "color" ? s.bgColor : s.gradFrom, s.gradTo).zones.center.center]
       : (places.length ? places : [{ pos: "center", align: "center" } as TextPlace]).map((p) => bg.zones[p.pos][p.align]);
-    let z: Zone = { lo: Math.min(...zs.map((q) => q.lo)), hi: Math.max(...zs.map((q) => q.hi)) };
+    // a picture: its measured main colours too (wherever they sit), besides the text band's luminance range
+    const colors = [...new Set([...zs.flatMap((q) => q.colors ?? []), ...(s.bgMode === "color" || s.bgMode === "gradient" ? [] : bg.colors.filter(isHex))])];
+    let z: Zone = { lo: Math.min(...zs.map((q) => q.lo)), hi: Math.max(...zs.map((q) => q.hi)), colors };
     if (s.dimOverlay) z = darken(z, s.dimOverlayOpacity);
     return z;
   };

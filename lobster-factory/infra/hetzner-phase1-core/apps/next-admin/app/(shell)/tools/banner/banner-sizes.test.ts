@@ -39,3 +39,15 @@ describe("尺寸 multi-select", () => {
     expect(selectedSizes({ ...base, multiSizes: ["r191x1"] })).toEqual(["r191x1"]);
   });
 });
+
+// Codex round 2 (C13): the guidance line covers only a design nobody touched; a background colour alone shows the preview.
+describe("empty-preview guidance", () => {
+  it("only the untouched design counts as empty", async () => {
+    const { isUntouched } = await import("./BannerStudio");
+    expect(isUntouched(INIT)).toBe(true);
+    expect(isUntouched({ ...INIT, copyBrief: "咖啡", multiSizes: ["r9x16"] })).toBe(true);   // the topic and sizes are not the picture
+    expect(isUntouched({ ...INIT, bgColor: "#123456" })).toBe(false);
+    expect(isUntouched({ ...INIT, bgMode: "gradient" })).toBe(false);
+    expect(isUntouched({ ...INIT, gradFrom: "#000000" })).toBe(false);
+  });
+});

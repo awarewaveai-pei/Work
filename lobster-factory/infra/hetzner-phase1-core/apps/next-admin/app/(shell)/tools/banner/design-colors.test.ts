@@ -119,3 +119,14 @@ describe("C12 review fixes", () => {
     expect(img((x, y) => x === 25 && y === 25).hi).toBe(0);
   });
 });
+
+// Codex round 2: translucent text is mixed per sRGB channel, as the canvas paints it (luminance-only mixing misjudged colour).
+describe("translucent text on a coloured background", () => {
+  it("white at 0.7 on #0000ff is 4.40:1 (luminance-only mixing said 5.29) -> the old price fails 4.5 there", () => {
+    const blue = bgStatsFromColors("color", "#0000ff");
+    expect(zoneRatio("#ffffff", blue.zones.center.center, 0.7)).toBeCloseTo(4.40, 2);
+    const g = guardContrast({ ...base, bgColor: "#0000ff", textColor: "#ffffff" }, blue, center, ["#ffffff"], null, { ...ALL, priceWas: true });
+    expect(g.patch.textScrim).toBe(true);
+    expect(g.unmet).toEqual([]);
+  });
+});
