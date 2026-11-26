@@ -18,7 +18,7 @@ export const DEFAULT_DESIGN_MODEL: BannerAiModel = "claude-opus-5-5";
 const COPY_MEASURED_NTD: Record<BannerAiModel, number> = { "claude-opus-5-5": 0.6, "claude-sonnet-5-5": 0.39, "gpt-6.2-sol": 0.1, "claude-haiku-5-5": 0.01 };
 const typicalTokens = (task: "copy" | "design", sizes: number) => {
   const m = task === "design" && sizes > 1 ? sizes : 0; // one call whatever the size count; each size adds a layout
-  return task === "copy" ? { inputTokens: 900, outputTokens: 760 } : { inputTokens: 1000 + 120 * m, outputTokens: 1100 + 250 * m };
+  return task === "copy" ? { inputTokens: 900, outputTokens: 760 } : { inputTokens: 1350 + 120 * m, outputTokens: 1100 + 250 * m }; // C12: +~350 for the background / palette part
 };
 /** About what one call costs, NT$: the measured copy price, scaled for the design call by the cost-table price of its
  *  typical prompt / answer against the copy call's. An estimate on the button, not the bill. */

@@ -1,4 +1,14 @@
 # Worklog
+## 2026-11-26（續26）— 橫幅 C12：AI 一鍵設計的配色看背景＋品牌色，對比度由程式把關
+
+- 根因：`generateFullDesign` 只送 brief／尺寸，AI 看不到背景與品牌套組；design prompt 寫死 `"bgMode":"gradient"`，`sanitizeDesign` 只擋 upload/ai 字面值，所以使用者上傳／AI 生的背景會被換成漸層；顏色對比沒有任何檢查。不變量：背景是圖片時永不被 AI 換掉；有品牌套組時 AI 只能用套組色；最後的文字顏色一定過 WCAG 對比（標題 3:1、副標／小字／CTA 文字 4.5:1）。
+- 修：新 `NA/app/(shell)/tools/banner/design-colors.ts`（純函式）：`relLum`／`contrastRatio`（WCAG）、`bgStatsFromPixels`（9 個文字區：上中下×左中右，亮度範圍＝平均±標準差）、`bgStatsFromColors`、`mergeBgInfo`（多尺寸各裁一次取最寬範圍）、`pickColorRoles`（色盤索引或 #hex；有 kit 時 kit 外的 hex 丟棄改 kit 預設分配；背景欄位只在 color/gradient 模式收）、`guardContrast`（文字對所在區塊，含暗化與底襯；不足時 1. 換色盤裡夠的另一色 2. 開 textScrim＋textOutline、底襯 0.5 起逐步加深到 0.85；CTA 文字對 ctaBg；徽章白字對 badgeColor）、`resolveDesignColors`、`usablePalette`、`bgForPrompt`。`BannerStudio.tsx`：`measureBackground`（瀏覽器內免費量測，圖片照 renderer 方式每個尺寸各畫一次）、送 `bg`／`palette`／`brandKit`，回答的所有顏色改走 `resolveDesignColors`（`sanitizeDesign` 不再收顏色欄位）。`NA/lib/script-forge/modules.ts`：`bannerBgFields`／`bannerColorPart`（背景資訊、色盤、60-30-10、CTA 一個焦點；圖片背景時不要求背景欄位）；沒送 bg 時 prompt 與舊版相同。`banner-design.ts` design 估算輸入 token 1000→1350（prompt 多約 430 字）。（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）
+- 驗證：tsc 綠；vitest banner＋accent-not-text＋blocks＋script-forge 65 passed（新增點名 8 案：WCAG 參考值、kit 外顏色被丟、kit 時背景色也限 kit、upload／ai 背景不被換、換色優先、無色可換時開底襯＋描邊後達標、CTA 文字換色）；突變：拔「upload/ai 不換背景」守衛 → 指名 2 案紅 → 還原綠；`npm run blocks:usage` usedBy 不變。
+- 剩餘：本機沒有 AI 金鑰與資料庫，整條按鈕流程未實打；有 kit 但沒有任何 kit 色能過對比時，退回白／近黑（kit 外）；被拖動過位置的文字仍以 textPos 那一帶量測；漸層以整段色彩範圍保守判斷，可能比實際更常開底襯。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/banner/" lib/theme/__tests__/accent-not-text.test.ts lib/systems/__tests__/blocks.test.ts lib/script-forge | exit=0 | ms=7000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（書面自審）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=bgMode":"gradient|assign("bgMode" | hits=1
+- ORACLE_WAIVED: worker 分支，監工 session 合併前審查
 ## 2026-11-26（續25）— 橫幅生成文案實測頁：每個模型回的 5 組標題／副標全部列出
 
 - 起因：操作者「每個模型回 5 組 都要列出」；原本每列只摘一例。

@@ -11,6 +11,7 @@ import {
 } from "./banner-layers";
 import type { GroundingOpts } from "./product-grounding";
 import { BANNER_AI_MODELS, DEFAULT_COPY_MODEL, DEFAULT_DESIGN_MODEL, aiFormatError, askJsonWithRetry, bannerCallNtd, designPlan, ntdLabel, readAiStream, removeBgNtd, type BannerAiModel, type SizeSpec } from "./banner-design";
+import { bgForPrompt, bgStatsFromColors, bgStatsFromPixels, mergeBgInfo, resolveDesignColors, usablePalette, type BgInfo } from "./design-colors";
 import BrandKitPanel from "./kit/BrandKitPanel";
 import { useBrandKit } from "./kit/useBrandKit";
 import type { BrandKit } from "./kit/brand-kit";
@@ -735,12 +736,11 @@ function sanitizeDesign(raw: Record<string, unknown>): Partial<State> {
 
   assign("headline", str(raw.headline));
   assign("subtext", str(raw.subtext));
+  // C12: every colour (text / accent / CTA / badge / background, scrim, outline) is set by resolveDesignColors -- the
+  // palette, the picture background and contrast are checked there, not here
   assign("ctaText", str(raw.ctaText));
-  assign("ctaBg", hex(raw.ctaBg));
-  assign("ctaTextColor", hex(raw.ctaTextColor));
   assign("badgeText", str(raw.badgeText));
   assign("badgeStyle", enumOf<BadgeStyle>(raw.badgeStyle, ["ribbon", "pill", "burst"]));
-  assign("badgeColor", hex(raw.badgeColor));
   assign("badgePos", enumOf<BadgePos>(raw.badgePos, ["tl", "tr"]));
   assign("showPrice", bool(raw.showPrice));
   assign("priceNow", str(raw.priceNow));
@@ -748,16 +748,9 @@ function sanitizeDesign(raw: Record<string, unknown>): Partial<State> {
   assign("trustType", enumOf<TrustType>(raw.trustType, ["none", "stars", "reviews", "guarantee"]));
   if (typeof raw.trustStars === "number") assign("trustStars", Math.max(1, Math.min(5, Math.round(raw.trustStars))));
   assign("trustText", str(raw.trustText));
-  assign("textColor", hex(raw.textColor));
-  assign("accentColor", hex(raw.accentColor));
   assign("accentHighlight", bool(raw.accentHighlight));
   assign("textPos", enumOf<TextPos>(raw.textPos, ["top", "center", "bottom"]));
   assign("textAlignH", enumOf<TextAlignH>(raw.textAlignH, ["left", "center", "right"]));
-  assign("textScrim", bool(raw.textScrim));
-  assign("textOutline", bool(raw.textOutline));
-  assign("bgMode", enumOf<BgMode>(raw.bgMode, ["color", "gradient"])); // never let AI flip to upload/ai
-  assign("gradFrom", hex(raw.gradFrom));
-  assign("gradTo", hex(raw.gradTo));
   assign("aiBgSubject", str(raw.aiBgSubject));
   assign("aiBgVibe", str(raw.aiBgVibe));
   // shadows: a malformed object is dropped whole. The background picture's placement is never AI-set (the AI never
@@ -814,6 +807,31 @@ async function extractPalette(src: string, n = 6): Promise<string[]> {
     if (out.length >= n) break;
   }
   return out.map((c) => rgbToHex(c.r, c.g, c.b));
+}
+
+/** C12: the background as the AI and the contrast guard see it (free, before the call). A picture is drawn small the way
+ *  the renderer places it, once per size made (each crops it differently); a colour / gradient is read from its settings. */
+async function measureBackground(st: State, sizes: readonly PresetKey[]): Promise<BgInfo> {
+  if ((st.bgMode === "upload" || st.bgMode === "ai") && st.bgImage) {
+    const img = await loadImage(st.bgImage);
+    const colors = await extractPalette(st.bgImage, 6);
+    const infos = (sizes.length ? sizes : [st.preset]).map((k) => {
+      const v = variantOf(st, k), ps = PRESETS[k];
+      const w = 64, h = Math.max(8, Math.round((64 * ps.h) / ps.w));
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+      const ctx = cv.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return bgStatsFromColors("color", st.bgColor);
+      ctx.fillStyle = v.bgColor; ctx.fillRect(0, 0, w, h);
+      const sc = Math.max(w / img.width, h / img.height) * (v.bgImgScale || 1);
+      const sw = img.width * sc, sh = img.height * sc;
+      ctx.drawImage(img, (w - sw) / 2 + (v.bgImgX || 0) * w, (h - sh) / 2 + (v.bgImgY || 0) * h, sw, sh);
+      return bgStatsFromPixels(ctx.getImageData(0, 0, w, h).data, w, h, colors, st.bgMode);
+    });
+    return mergeBgInfo(infos);
+  }
+  if (st.bgMode === "gradient") return bgStatsFromColors("gradient", st.gradFrom, st.gradTo);
+  // a colour, or a picture mode with no picture yet (the renderer then fills the background colour)
+  return { ...bgStatsFromColors("color", st.bgColor), mode: st.bgMode };
 }
 
 // ---------------------------------------------------------------------------
@@ -1105,8 +1123,14 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       const sel = selectedSizes(s);
       const chosen = sel.length > 1 ? sel.map(spec) : [];
       const mp = PRESETS[m.preset];
+      // C12: the background (measured here, free) and the palette the AI assigns from: the brand kit's colours when the
+      // organization has one, else the background's colours
+      const bg = await measureBackground(m, sel).catch(() => ({ ...bgStatsFromColors("color", m.bgColor), mode: m.bgMode }));
+      const kitColors = brand.kit?.colors.length ? brand.kit.colors : null;
+      const palette = usablePalette(bg, kitColors);
       const fields = {
         brief: s.copyBrief, label: presetLabel(m.preset), w: mp.w, h: mp.h,
+        bg: bgForPrompt(bg), palette, brandKit: !!kitColors,
         ...(chosen.length ? { sizes: [spec(m.preset), ...chosen.filter((c) => c.key !== m.preset)] } : {}),
       };
       // C10: an answer that does not parse is asked once more; still broken = an error naming what was billed
@@ -1122,11 +1146,16 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       const plan = designPlan(raw, spec(m.preset), chosen);
       setS((prev) => {
         const base = leaveSize(prev);
-        return {
+        const next: State = {
           ...base, ...patch, ...plan.main,
           sizeOverrides: chosen.length ? { ...base.sizeOverrides, ...plan.overrides } : base.sizeOverrides,
-          designing: false, saved: false,
         };
+        // colours are shared by every size: the text must read where it sits at each of them
+        const places = selectedSizes(next).map((k) => { const v = variantOf(next, k); return { pos: v.textPos, align: v.textAlignH }; });
+        const smallText = !!next.subtext.trim() || (next.showPrice && !!(next.priceNow || next.priceWas)) || next.trustType !== "none";
+        const col = resolveDesignColors(raw, next, bg, places, palette, kitColors, { smallText });
+        if (col.unmet.length) console.warn("[banner] contrast not met after the guard:", col.unmet);
+        return { ...next, ...col.patch, designing: false, saved: false };
       });
     } catch (err) {
       setAiRetrying(null);
