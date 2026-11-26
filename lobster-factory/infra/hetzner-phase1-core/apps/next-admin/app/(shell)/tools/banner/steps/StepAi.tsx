@@ -6,19 +6,20 @@ import {
   designPlan, ntdLabel, readAiStream, sanitizeCopyVariants, showsCopy, type BannerAiModel, type DesignCopy, type SizeSpec,
 } from "../banner-design";
 import { renderBannerLayers } from "../banner-layers";
-import { guardLane } from "../contrast-run";
+import { guardLane, sameDrawInputs } from "../contrast-run";
 import { applySemantic } from "../banner-layout";
 import { bgForPrompt, bgStatsFromColors, guardDrawn, usablePalette, type GuardResult, type PxBox } from "../design-colors";
 import { brandKitPatch } from "../kit/apply-kit";
 import type { useBrandKit } from "../kit/useBrandKit";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import {
-  COPY_TONES, PRESETS, applyLayout, designSig, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes, variantOf,
+  COPY_TONES, PRESETS, applyLayout, leaveSize, mainOf, measureBackground, presetLabel, sanitizeDesign, selectedSizes, variantOf,
   type BannerStaffApi, type CopyVariant, type PresetKey, type SizePatch, type State,
 } from "../banner-state";
 import type { StepSlot } from "./order";
 import { StepCard, type StepCtx } from "./ui";
 
+const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 /** The elements drawn in textColor: the contrast guard measures the background under these boxes. */
 const TEXT_ELEMS = ["headline", "subtext", "price", "trust"] as const;
 
@@ -27,7 +28,7 @@ const TEXT_ELEMS = ["headline", "subtext", "price", "trust"] as const;
  *  guardLane (contrast-run.ts): to a design whose inputs are still the ones measured here, by the newest run. */
 async function guardOnDrawn(st: State, kit: readonly string[] | null, roles?: { raw: Record<string, unknown>; palette: readonly string[] }): Promise<GuardResult> {
   const sel = selectedSizes(st), m = mainOf(st);
-  const bg = await measureBackground(m, sel).catch(() => ({ ...bgStatsFromColors("color", m.bgColor), mode: m.bgMode }));
+  const bg = await measureBackground(m, sel); // a picture that cannot be read fails the check (no stand-in background)
   const drawn = await Promise.all(sel.map(async (k) => {
     const doc = await renderBannerLayers(variantOf(st, k), PRESETS[k], { flat: true });
     return { w: doc.w, h: doc.h, boxes: TEXT_ELEMS.map((e) => doc.boxes[e]).filter((b): b is PxBox => !!b) };
@@ -46,7 +47,7 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
   const picked = selectedSizes(s);
   const multi = picked.length > 1;
   // one lane per action: a newer AI design / word-set pick supersedes an older one still being checked
-  const lane = () => guardLane<State, GuardResult>({ sig: designSig, current: () => sRef.current, apply: setS });
+  const lane = () => guardLane<State, GuardResult>({ same: sameDrawInputs, current: () => sRef.current, apply: setS });
   const [designLane] = useState(lane);
   const [copyLane] = useState(lane);
 
@@ -105,10 +106,9 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
       };
       // contrast on what will be drawn: the latest state with the answer on it (a background changed while the AI answered
       // is measured again); the roles index the palette the prompt was given
-      await designLane.run(build, (st) => guardOnDrawn(st, kitColors, { raw, palette }), (built, col) => ({
-        ...built, ...(col?.patch ?? {}), designing: false, saved: false,
-        ...(col ? (kitPart?.logoError ? { error: kitPart.logoError } : {}) : { error: "對比檢查失敗：配色沒有套用，請再按一次。" }),
-      }));
+      await designLane.run(build, (st) => guardOnDrawn(st, kitColors, { raw, palette }),
+        (built, col) => ({ ...built, ...col.patch, designing: false, saved: false, ...(kitPart?.logoError ? { error: kitPart.logoError } : {}) }),
+        (prev, err) => ({ ...prev, designing: false, error: `對比檢查失敗（${errText(err)}）：這次設計沒有套用，請再按一次。` }));
     } catch (err) {
       setAiRetrying(null);
       setS((prev) => ({ ...prev, designing: false, error: err instanceof Error ? err.message : String(err) }));
@@ -120,7 +120,8 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
   async function pickCopy(v: DesignCopy) {
     const kitColors = brand.kit?.colors.length ? brand.kit.colors : null;
     await copyLane.run((prev) => ({ ...prev, ...copyWords(v) }), (st) => guardOnDrawn(st, kitColors),
-      (built, g) => ({ ...built, ...(g?.patch ?? {}), saved: false, error: null }));
+      (built, g) => ({ ...built, ...g.patch, saved: false, error: null }),
+      (prev, err) => ({ ...prev, error: `對比檢查失敗（${errText(err)}）：沒有換成這組字，請再點一次。` }));
   }
 
   // card C9: the model each AI button runs on (visible buttons, NT$ per call shown); defaults from the 2026-11-26 bake-off
