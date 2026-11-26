@@ -1,9 +1,9 @@
-// GET /api/ops/org-search — the client pickers' only data source (OrgPicker.tsx, the banner studio's brand picker).
+// GET /api/ops/org-search — the client pickers' only data source (OrgPicker.tsx).
 // Returns PickOrg fields and nothing else: the pickers' tools (collect, outreach, design) must not see what
 // GET /api/ops/clients returns (client_config holds SSH host / user / key name and the WordPress path).
 // Never the whole table (every WordPress buyer is an organization): no q = the first NAV_FIRST by created_at plus
-// `total`; ?q= = name or slug contains q, at most NAV_SEARCH_LIMIT rows; ?brandColors=1 = only clients with at least
-// one valid hex brand colour; ?include=<uuid> = that client is put first when the page would not have it.
+// `total`; ?q= = name or slug contains q, at most NAV_SEARCH_LIMIT rows; ?include=<uuid> = that client is put first
+// when the page would not have it.
 // ?category=<ORG_CATEGORIES> (the client rail, U3): the first page of that category, each row with `tags`, plus
 // `categories` (the buttons) and `internalOrgId` (「AwareWave 自己」, so a door's rail can draw it without reading the
 // database itself). Without ?category= the first page is as before. A search (?q=) never returns TEST organizations
@@ -27,10 +27,7 @@ export const dynamic = "force-dynamic";
  *  decide the tags and the TEST filter; toPickOrg drops them. */
 const ORG_SEARCH_COLUMNS = "id,slug,name,kind,parent_organization_id,color:metadata->>color,brandColors:metadata->client_config->brandColors";
 
-const BRAND = "metadata->client_config->brandColors";
-const HEX = `"^#[0-9a-fA-F]{6}$"`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const HAS_BRAND = ["primary", "secondary", "accent"].map((k) => `${BRAND}->>${k}.match.${HEX}`).join(",");
 
 /** The client rail's category buttons, in order: the one vocabulary (route.test.ts refuses any other value). Only what
  *  today's data can tell (blueprint §9.3): 需處理 / 訂閱 / 點數 follow billing_ledger's own filters (the /ops/billing tabs,
@@ -258,8 +255,6 @@ export async function GET(request: Request) {
     .select(ORG_SEARCH_COLUMNS, q ? undefined : { count: "exact" })
     .neq("status", "inactive")
     .order("created_at", { ascending: true });
-  if (params.get("brandColors") === "1") query = query.or(HAS_BRAND);
-  // a second or() is ANDed with the first (postgrest-js appends the param)
   query = q ? query.or(orgNameFilter(q)).limit(NAV_SEARCH_LIMIT) : query.limit(NAV_FIRST);
   if (q) query = testScope(query, category === "test" ? "only" : "hide", testIds);
   const { data, error, count } = await query;

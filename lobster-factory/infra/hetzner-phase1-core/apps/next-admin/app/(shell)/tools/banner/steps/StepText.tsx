@@ -1,9 +1,18 @@
 "use client";
-import { FONTS, FONT_PAIRS, WEIGHTS, type TextAlignH, type TextPos } from "../banner-state";
+import type { TypeSizes } from "../banner-layers";
+import { FIELD_RANGES } from "../field-ranges";
+import { FONTS, FONT_PAIRS, WEIGHTS, applyLayout, type State, type TextAlignH, type TextPos } from "../banner-state";
 import type { StepSlot } from "./order";
 import { ShadowControls, StepCard, type StepCtx } from "./ui";
 
-export default function StepText({ slot, s, set, setS }: StepCtx & { slot: StepSlot }) {
+/** `drawnType`: the px the preview drew -- with 自動字級 on, the sliders show the engine's sizes. */
+export default function StepText({ slot, s, set, setS, drawnType }: StepCtx & { slot: StepSlot; drawnType: TypeSizes | null }) {
+  const shown = { headlineSize: s.typeAuto && drawnType ? drawnType.headline : s.headlineSize,
+    subtextSize: s.typeAuto && drawnType ? drawnType.subtext : s.subtextSize };
+  // a moved px slider = fixed type from the sizes on screen (both, so the other one does not jump back to a stale value)
+  const setPx = (k: "headlineSize" | "subtextSize", v: number) =>
+    setS((prev) => ({ ...prev, ...shown, typeAuto: false, [k]: v, saved: false, error: null }));
+  const place = (patch: Partial<State>) => setS((prev) => ({ ...applyLayout(prev, patch), saved: false, error: null }));
   return (
     <StepCard title={slot.title} step={slot.no} icon="✍" summary={s.headline.replace(/\*\*/g, "").trim().slice(0, 14) || "未填標題"}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
@@ -72,25 +81,25 @@ export default function StepText({ slot, s, set, setS }: StepCtx & { slot: StepS
         </div>
         <div className="form-row">
           <label className="form-label">標題字距</label>
-          <input type="range" min={-2} max={16} value={s.letterSpacing}
+          <input type="range" {...FIELD_RANGES.letterSpacing} value={s.letterSpacing}
             onChange={(e) => set("letterSpacing", Number(e.target.value))} style={{ flex: 1 }} />
           <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.letterSpacing}</span>
         </div>
         <div className="form-row">
           <label className="form-label">標題行距</label>
-          <input type="range" min={0.9} max={2} step={0.02} value={s.headlineLineHeight} data-testid="banner-headline-leading"
+          <input type="range" {...FIELD_RANGES.headlineLineHeight} value={s.headlineLineHeight} data-testid="banner-headline-leading"
             onChange={(e) => set("headlineLineHeight", Number(e.target.value))} style={{ flex: 1 }} />
           <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.headlineLineHeight.toFixed(2)}</span>
         </div>
         <div className="form-row">
           <label className="form-label">內文字距</label>
-          <input type="range" min={-2} max={16} value={s.bodyLetterSpacing} data-testid="banner-body-tracking"
+          <input type="range" {...FIELD_RANGES.bodyLetterSpacing} value={s.bodyLetterSpacing} data-testid="banner-body-tracking"
             onChange={(e) => set("bodyLetterSpacing", Number(e.target.value))} style={{ flex: 1 }} />
           <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.bodyLetterSpacing}</span>
         </div>
         <div className="form-row">
           <label className="form-label">內文行距</label>
-          <input type="range" min={1} max={2.4} step={0.02} value={s.bodyLineHeight} data-testid="banner-body-leading"
+          <input type="range" {...FIELD_RANGES.bodyLineHeight} value={s.bodyLineHeight} data-testid="banner-body-leading"
             onChange={(e) => set("bodyLineHeight", Number(e.target.value))} style={{ flex: 1 }} />
           <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.bodyLineHeight.toFixed(2)}</span>
         </div>
@@ -105,17 +114,20 @@ export default function StepText({ slot, s, set, setS }: StepCtx & { slot: StepS
           </label>
         </div>
         <div className="form-row">
-          <label className="form-label">標題 px</label>
-          <input type="range" min={24} max={200} value={s.headlineSize}
-            onChange={(e) => set("headlineSize", Number(e.target.value))} style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.headlineSize}</span>
+          <label className="form-label">字級</label>
+          <button className={s.typeAuto ? "btn btn-primary" : "btn btn-ghost"} style={{ fontSize: 12, padding: "3px 10px" }}
+            data-testid="banner-type-auto" aria-pressed={s.typeAuto}
+            onClick={() => setS((prev) => ({ ...prev, typeAuto: true, saved: false, error: null }))}>自動字級</button>
+          <span className="form-hint" style={{ marginLeft: 6 }}>{s.typeAuto ? "依尺寸與字數自動放到最大；拉下面滑桿改手動" : "手動字級；按「自動字級」回到自動"}</span>
         </div>
-        <div className="form-row">
-          <label className="form-label">副標 px</label>
-          <input type="range" min={12} max={120} value={s.subtextSize}
-            onChange={(e) => set("subtextSize", Number(e.target.value))} style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{s.subtextSize}</span>
-        </div>
+        {([["標題 px", "headlineSize"], ["副標 px", "subtextSize"]] as const).map(([label, k]) => (
+          <div key={k} className="form-row">
+            <label className="form-label">{label}</label>
+            <input type="range" {...FIELD_RANGES[k]} value={shown[k]} data-testid={`banner-${k}`}
+              onChange={(e) => setPx(k, Number(e.target.value))} style={{ flex: 1 }} />
+            <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{shown[k]}</span>
+          </div>
+        ))}
         <div className="form-row">
           <label className="form-label">垂直</label>
           <div style={{ display: "flex", gap: 6 }}>
@@ -123,7 +135,7 @@ export default function StepText({ slot, s, set, setS }: StepCtx & { slot: StepS
               <button key={pos}
                 className={s.textPos === pos ? "btn btn-primary" : "btn btn-ghost"}
                 style={{ fontSize: 12, padding: "3px 10px" }}
-                onClick={() => set("textPos", pos)}>
+                data-testid={`banner-text-pos-${pos}`} onClick={() => place({ textPos: pos })}>
                 {{ top: "上", center: "中", bottom: "下" }[pos]}
               </button>
             ))}
@@ -136,7 +148,7 @@ export default function StepText({ slot, s, set, setS }: StepCtx & { slot: StepS
               <button key={a}
                 className={s.textAlignH === a ? "btn btn-primary" : "btn btn-ghost"}
                 style={{ fontSize: 12, padding: "3px 10px" }}
-                onClick={() => set("textAlignH", a)}>
+                data-testid={`banner-text-align-${a}`} onClick={() => place({ textAlignH: a })}>
                 {{ left: "左", center: "中", right: "右" }[a]}
               </button>
             ))}
@@ -157,7 +169,7 @@ export default function StepText({ slot, s, set, setS }: StepCtx & { slot: StepS
           <span className="form-hint" style={{ marginLeft: 6 }}>文字後方半透明板（比整張暗化高級）</span>
           {s.textScrim && (
             <>
-              <input type="range" min={0.05} max={0.9} step={0.05} value={s.textScrimOpacity}
+              <input type="range" {...FIELD_RANGES.textScrimOpacity} value={s.textScrimOpacity}
                 onChange={(e) => set("textScrimOpacity", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
               <span style={{ fontSize: 12, opacity: 0.7, minWidth: 32 }}>{Math.round(s.textScrimOpacity * 100)}%</span>
             </>
@@ -170,7 +182,7 @@ export default function StepText({ slot, s, set, setS }: StepCtx & { slot: StepS
           <span className="form-hint" style={{ marginLeft: 6 }}>整張壓暗</span>
           {s.dimOverlay && (
             <>
-              <input type="range" min={0.05} max={0.85} step={0.05} value={s.dimOverlayOpacity}
+              <input type="range" {...FIELD_RANGES.dimOverlayOpacity} value={s.dimOverlayOpacity}
                 onChange={(e) => set("dimOverlayOpacity", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
               <span style={{ fontSize: 12, opacity: 0.7, minWidth: 32 }}>{Math.round(s.dimOverlayOpacity * 100)}%</span>
             </>

@@ -3,10 +3,11 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useCanvasReturn } from "@/components/tools/useCanvasReturn";
 import { BANNER_RETURN_TOOL, applyBannerCanvasReturn } from "./banner-canvas-return";
-import { renderBannerLayers, type ElemBox, type ElemKey } from "./banner-layers";
+import { renderBannerLayers, type ElemBox, type ElemKey, type TypeSizes } from "./banner-layers";
+import { clampField } from "./field-ranges";
 import { useBrandKit } from "./kit/useBrandKit";
 import {
-  BANNER_FONTS_CSS, INIT, PRESETS, RATIO_PRESET, TEMPLATES, canClear, clearDesign, clearSizeTweak, editingSizeOf, enterSize, isUntouched, leaveSize,
+  BANNER_FONTS_CSS, INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, canClear, clearDesign, clearSizeTweak, editingSizeOf, enterSize, isUntouched, leaveSize,
   presetLabel, pushHistory, selectedSizes, templatePatch, variantOf,
   type BannerStaffApi, type PresetKey, type State,
 } from "./banner-state";
@@ -29,9 +30,9 @@ import StepExport from "./steps/StepExport";
 // ---------------------------------------------------------------------------
 
 /** The preview: the flat PNG plus where each element landed (hit-testing for dragging). */
-async function renderPreview(state: State): Promise<{ url: string; boxes: Partial<Record<ElemKey, ElemBox>> }> {
+async function renderPreview(state: State): Promise<{ url: string; boxes: Partial<Record<ElemKey, ElemBox>>; type: TypeSizes }> {
   const doc = await renderBannerLayers(state, PRESETS[state.preset], { flat: true });
-  return { url: doc.layers[0].canvas.toDataURL("image/png"), boxes: doc.boxes };
+  return { url: doc.layers[0].canvas.toDataURL("image/png"), boxes: doc.boxes, type: doc.type };
 }
 /** Topmost first: what a click on the preview grabs. */
 const HIT_ORDER: readonly ElemKey[] = ["badge", "logo", "cta", "trust", "price", "subtext", "headline", "product"];
@@ -70,6 +71,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   // C4: an element being dragged (pointer start, its centre then as a canvas share, the preview's on-screen size)
   const elemDragRef = useRef<{ key: ElemKey; x: number; y: number; cx: number; cy: number; w: number; h: number } | null>(null);
   const [previewBoxes, setPreviewBoxes] = useState<Partial<Record<ElemKey, ElemBox>>>({});
+  const [drawnType, setDrawnType] = useState<TypeSizes | null>(null);
   const [guides, setGuides] = useState<{ key: ElemKey; v: number | null; h: number | null } | null>(null);
   const [hoverHit, setHoverHit] = useState<ElemKey | null>(null);
   const previewImgRef = useRef<HTMLImageElement>(null);
@@ -104,7 +106,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(() => {
-      renderPreview(s).then(({ url, boxes }) => { if (!cancelled) { setPreviewUrl(url); setPreviewBoxes(boxes); } }).catch(() => { /* mid-edit, ignore */ });
+      renderPreview(s).then(({ url, boxes, type }) => { if (!cancelled) { setPreviewUrl(url); setPreviewBoxes(boxes); setDrawnType(type); } }).catch(() => { /* mid-edit, ignore */ });
     }, bgDragRef.current || elemDragRef.current ? 16 : 220);
     return () => { cancelled = true; clearTimeout(t); };
   }, [s, fontEpoch]);
@@ -126,7 +128,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     const preset = RATIO_PRESET[q.get("ratio") ?? ""], title = (q.get("title") ?? "").trim().slice(0, 80);
     const t = TEMPLATES.find((x) => x.group === "opener" && x.key === q.get("template"));
     if (!preset && !title && !t) return;
-    setS((prev) => ({ ...prev, ...(t ? { brandBar: false, balanceTitle: false, ...templatePatch(t, preset ?? prev.preset) } : {}), ...(preset ? { preset } : {}), ...(title ? { headline: title } : {}) }));
+    setS((prev) => ({ ...(t ? applyLayout(prev, templatePatch(t, preset ?? prev.preset)) : prev), ...(preset ? { preset } : {}), ...(title ? { headline: title } : {}) }));
   }, []);
 
   // ── undo / redo (Banner's whole design is ONE serializable State; unchanged image
@@ -200,7 +202,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      setS((prev) => ({ ...prev, bgImgScale: Math.min(3, Math.max(0.5, prev.bgImgScale * Math.exp(-e.deltaY * 0.0015))), saved: false, error: null }));
+      setS((prev) => ({ ...prev, bgImgScale: clampField("bgImgScale", prev.bgImgScale * Math.exp(-e.deltaY * 0.0015)) ?? prev.bgImgScale, saved: false, error: null }));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -229,7 +231,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
       case "ai": return staff && <StepAi slot={slot} {...ctx} staff={staff} brand={brand} saveOrg={saveOrg} saveOrgRef={saveOrgRef} />;
       case "template": return <StepTemplate slot={slot} {...ctx} />;
       case "size": return <StepSize slot={slot} {...ctx} />;
-      case "text": return <StepText slot={slot} {...ctx} />;
+      case "text": return <StepText slot={slot} {...ctx} drawnType={drawnType} />;
       case "canvas": return <StepCanvas slot={slot} {...ctx} />;
       case "marketing": return <StepMarketing slot={slot} {...ctx} />;
       case "style": return <StepStyle slot={slot} {...ctx} sRef={sRef} brand={brand} />;

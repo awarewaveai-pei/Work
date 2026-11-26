@@ -9,7 +9,8 @@ import { STYLE_CATALOG } from "../../tarot/tarotStyles";
 import { BANNER_RETURN_TOOL } from "../banner-canvas-return";
 import { ntdLabel, removeBgNtd } from "../banner-design";
 import type { GroundingOpts } from "../product-grounding";
-import { BG_PLACE_RESET, PRESETS, aiBgPromptOf, type BgMode, type ProductPos } from "../banner-state";
+import { FIELD_RANGES } from "../field-ranges";
+import { BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, type BgMode, type ProductPos } from "../banner-state";
 import type { StepSlot } from "./order";
 import { AccordionSection, PresetChips, StepCard, SubHead, type StepCtx } from "./ui";
 
@@ -250,7 +251,7 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
           <label className="form-label">圖片位置</label>
           <span className="form-hint" style={{ width: "100%" }}>在預覽圖上按住拖曳移動；按住 Ctrl（Mac 按 ⌘）再滾輪，或觸控板兩指開合，放大縮小。一般滾輪是捲動頁面。縮小露出的地方是背景色。</span>
           <span style={{ fontSize: 12 }}>大小</span>
-          <input type="range" min={0.5} max={3} step={0.05} value={s.bgImgScale} data-testid="banner-bg-scale"
+          <input type="range" {...FIELD_RANGES.bgImgScale} value={s.bgImgScale} data-testid="banner-bg-scale"
             onChange={(e) => set("bgImgScale", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
           <span style={{ fontSize: 12, opacity: 0.7, minWidth: 40 }}>{Math.round(s.bgImgScale * 100)}%</span>
           <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
@@ -518,7 +519,8 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
                   <button key={pos}
                     className={s.productPos === pos ? "btn btn-primary" : "btn btn-ghost"}
                     style={{ fontSize: 11, padding: "3px 8px" }}
-                    onClick={() => set("productPos", pos)}>
+                    data-testid={`banner-product-pos-${pos}`}
+                    onClick={() => setS((prev) => ({ ...applyLayout(prev, { productPos: pos }), saved: false, error: null }))}>
                     {{ center: "中央", left: "左", right: "右", "bottom-right": "右下" }[pos]}
                   </button>
                 ))}
@@ -526,7 +528,7 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
             </div>
             <div className="form-row">
               <label className="form-label">大小</label>
-              <input type="range" min={0.2} max={1.0} step={0.05} value={s.productScale}
+              <input type="range" {...FIELD_RANGES.productScale} value={s.productScale}
                 onChange={(e) => set("productScale", Number(e.target.value))} style={{ flex: 1 }} />
               <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 32 }}>
                 {Math.round(s.productScale * 100)}%
