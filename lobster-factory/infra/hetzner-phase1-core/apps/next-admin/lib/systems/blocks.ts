@@ -66,6 +66,9 @@ const PHOTO = "只在照片專業版（/photo-pro-dock）";
 const retired = (no: string, id: string, name: string, purpose: string): LegoBlock =>
   block({ no, layer: "ui", name, status: ["retired"], purpose, entry: [], usedBy: ["design"],
     note: `舊向量編輯器面板 ${id}；2026-11-05 隨舊編輯器刪除，由 VectorCraft 原生功能取代（agency-os/handoffs/2026-11-04-vectorcraft-pro/R0-PLAN.md §6 C4）` });
+const pageNotBlock = (no: string, name: string, page: string, system: string): LegoBlock =>
+  block({ no, layer: "ui", name, status: ["retired"], purpose: "整頁工作台，只屬一個系統。", entry: [], usedBy: [system],
+    note: `2026-11-26 移出目錄：${page} 是該系統自己的頁面，不能拿去組裝別的系統（頁面照常運作）` });
 const planned = (no: string, layer: BlockLayer, name: string, purpose: string, usedBy: string[]): LegoBlock =>
   block({ no, layer, name, status: ["planned"], purpose, entry: [], usedBy });
 const productModule = (no: string, id: string, name: string, purpose: string, usedBy: string[], more: string[] = []): LegoBlock =>
@@ -202,10 +205,10 @@ export const LEGO_BLOCKS: LegoBlock[] = [
   panel("B-047", "genfx", "擴圖／色調分離", "AI 擴圖與色調分離。", { note: PHOTO }),
   panel("B-048", "ai-edit", "AI 修圖", "一句話請 AI 改圖（呼叫 B-021）。", { note: PHOTO }),
   panel("B-049", "edge-mask", "邊緣遮罩", "替圖片加筆刷風格邊緣。", { note: PHOTO }),
-  block({ no: "B-050", layer: "ui", name: "畫布工具組", status: ["ui"], purpose: "基本形狀、物件鎖定、下載 PNG／WebP。",
-    entry: ["app/(shell)/tools/canvas/CanvasEditor.tsx"], usedBy: ["design"] }),
-  block({ no: "B-051", layer: "ui", name: "塔羅輸出軌", status: ["ui"], purpose: "塔羅印刷與匯出。", entry: ["app/(shell)/tools/tarot/TarotStudio.tsx"], usedBy: ["tarot"] }),
-  block({ no: "B-052", layer: "ui", name: "商品設計輸出軌", status: ["ui"], purpose: "Studio 網頁與匯出。", entry: ["app/(shell)/tools/studio/StudioWorkbench.tsx"], usedBy: ["studio"] }),
+  // 2026-11-26 退場：整頁工作台是單一系統自己的頁面，不是可組裝的零件；頁面照常運作，只是不列為積木。
+  pageNotBlock("B-050", "畫布工具組", "app/(shell)/tools/canvas/CanvasEditor.tsx", "design"),
+  pageNotBlock("B-051", "塔羅輸出軌", "app/(shell)/tools/tarot/TarotStudio.tsx", "tarot"),
+  pageNotBlock("B-052", "商品設計輸出軌", "app/(shell)/tools/studio/StudioWorkbench.tsx", "studio"),
   retired("B-053", "smart-guides", "智慧磁吸對齊", "拖動時自動對齊。"),
   retired("B-054", "arc-text", "弧形文字", "環形／弧形排字。"),
   retired("B-055", "crop-marks", "出血與裁切標記", "印刷出血與裁切線。"),

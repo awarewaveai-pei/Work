@@ -1,4 +1,13 @@
 # Worklog
+## 2026-11-26（續9）— 積木目錄退場 B-050／B-051／B-052：整頁工作台不是可組裝零件
+
+- 根因／決策：操作者定義積木＝可組裝到不同系統的零件。這三筆的 entry 是整頁（`CanvasEditor.tsx`／`TarotStudio.tsx`／`StudioWorkbench.tsx`），各只屬 1 系統；同查 B-002/B-017（價格已單一來源 `lib/ai/cost-model.ts:22`）、B-047→B-034（`genfx.js:12,99`）、B-048→B-021（`ai-edit.js:10`）皆已共用，程式面無需合併。操作者批准退場。
+- 修正：`NA/lib/systems/blocks.ts` 新 `pageNotBlock()`（status retired、entry 空、編號保留、note 寫原頁面）；`NA/app/(shell)/ops/systems/blocks/page.tsx` 已退場區說明改「已刪除或改為系統自己的頁面」。不動任何系統程式（`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run lib/systems "app/(shell)/ops/systems" app/__tests__/sidebar-coverage.test.ts lib/studio/__tests__/editor-ai-panels.test.ts | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 目錄資料 3 筆改退場＋一句說明，無邏輯；13 項目錄測試（編號連續、退場無 entry、跨系統共用必屬積木）覆蓋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=B-05[012]|pageNotBlock | hits=4
+- rollback：`git revert` 本 commit；今晚 03:00 自動部署上線
 ## 2026-11-26（續6）— 積木頁篩選數字與總控中心統計卡對齊：「沒用積木」不再搶走狀態類
 
 - 根因：正式站實看，總控中心卡 開發中16／待確認9／維護與已完成5，積木頁同名按鈕卻是 10／8／3——`blocks/page.tsx` 把沒用積木的系統 grp 設成 `"none"`，蓋掉 overviewGroup，同名分類兩處數字不同。

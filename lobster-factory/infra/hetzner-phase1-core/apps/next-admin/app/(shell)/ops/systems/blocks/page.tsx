@@ -215,7 +215,7 @@ function BlocksView({ f, nameOf }: { f: Filters; nameOf: (s: string) => string }
             <>
               {BLOCK_LAYERS.map((l) => <Section key={l.key} title={l.name} hint={l.hint} blocks={live.filter((b) => b.layer === l.key)} nameOf={nameOf} />)}
               <Section title="規劃中" hint="已預留編號，還沒做" blocks={filtered.filter((b) => b.status.includes("planned"))} nameOf={nameOf} open={false} />
-              <Section title="已退場" hint="已刪除，編號保留不再使用" blocks={filtered.filter((b) => b.status.includes("retired"))} nameOf={nameOf} open={false} />
+              <Section title="已退場" hint="已刪除或改為系統自己的頁面，不再列為積木；編號保留不再使用" blocks={filtered.filter((b) => b.status.includes("retired"))} nameOf={nameOf} open={false} />
             </>
           ) : <Section title={TIERS.find((t) => t.key === f.tier)?.name ?? ""} hint="" blocks={filtered} nameOf={nameOf} />}
       </div>
