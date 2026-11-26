@@ -21,7 +21,7 @@ describe("/ops/clients landing", () => {
     expect(html).toContain("/ops/clients/acme?tab=%E5%85%A7%E5%AE%B9%E5%B7%A5%E5%85%B7");
     expect(html).toContain("排程出錯：boom");
     expect(html).toContain("2 個題目失敗");
-    expect(html).toContain("還有更多，請用左側搜尋");
+    expect(html).toContain("還有更多，請用客戶清單的搜尋");
   });
   it("no problem: says so, and the note still says the list covers two kinds of problem only", async () => {
     const html = await draw();

@@ -92,6 +92,8 @@
 
 | `docs/operations/MONITORING_SYSTEMS_INVENTORY.md` | `docs/operations/AWARE_WAVE_OBSERVABILITY_BASELINE.md` |
 
+| `../lobster-factory/docs/hosting/CLIENT_SITE_FLOW.md` | `docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`, `tenants/NEW_TENANT_ONBOARDING_SOP.md`, `docs/operations/RUNNABLE_DEMOS.md` |
+
 ## 最小同步清單（每次改版）
 - [ ] `README.md` 路徑與入口已更新
 - [ ] `TASKS.md` 狀態已同步
@@ -115,3 +117,4 @@ _Last synced: 2026-10-25 21:42:01 UTC_
 # `scripts/check-change-impact-matrix-drift.ps1` excludes them from live drift
 # verdicts and records each exclusion in the skipped section of its report. The
 # current workflow SSOT is `CLAUDE.md` + `agency-os/AGENTS.md`.
+

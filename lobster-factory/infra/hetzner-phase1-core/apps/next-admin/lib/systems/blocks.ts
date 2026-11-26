@@ -236,7 +236,7 @@ export const LEGO_BLOCKS: LegoBlock[] = withImporters([
 
   // ── 共用底座與營運（跨系統組裝最多的積木） ──
   block({ no: "B-066", layer: "platform", name: "AI 呼叫閘道與記帳", status: ["toolkit"], purpose: "所有 AI 呼叫走同一個閘道：選供應商、估成本、記每一次呼叫；OpenAI／Gemini／Claude／Replicate 共用參數與輪詢。",
-    entry: ["lib/ai/gateway.ts", "lib/ai/log-ai-call.ts", "lib/ai/cost-calculator.ts", "lib/ai/openai-text.ts", "lib/ai/gemini-models.ts", "lib/ai/claude-params.ts", "lib/ai/cheap-json.ts", "lib/ai/replicate-poll.ts", "lib/ai/replicate-output.ts", "lib/ai/model-comparison.ts"], deps: ["各家 AI 金鑰"], usedBy: ["app-platform", "ops-console", "content", "outbound-os", "video", "tarot", "repair-center", "cs", "provisioning", "social", "studio"] }),
+    entry: ["lib/ai/gateway.ts", "lib/ai/log-ai-call.ts", "lib/ai/cost-calculator.ts", "lib/ai/openai-text.ts", "lib/ai/gemini-models.ts", "lib/ai/claude-params.ts", "lib/ai/cheap-json.ts", "lib/ai/replicate-poll.ts", "lib/ai/replicate-output.ts", "lib/ai/model-comparison.ts"], deps: ["各家 AI 金鑰"], usedBy: ["app-platform", "ops-console", "content", "outbound-os", "video", "tarot", "repair-center", "cs", "provisioning", "social", "studio", "design"] }),
   block({ no: "B-067", layer: "ops", name: "AI 花費報表與匯率", status: ["toolkit"], purpose: "把 AI 花費依工具、供應商、客戶彙整，換算成新台幣。",
     entry: ["lib/ai/spend-report.ts", "lib/ai/spend-loader.ts", "lib/ai/fx-cbc.ts"], usedBy: ["app-platform", "ops-console", "commerce", "content"] }),
   block({ no: "B-068", layer: "ops", name: "事故收件匣與通知", status: ["toolkit"], purpose: "任何系統把事故丟進同一個收件匣：驗 token、去重、分類、遮蔽密鑰，再發 Telegram 通知。",
@@ -262,7 +262,7 @@ export const LEGO_BLOCKS: LegoBlock[] = withImporters([
   block({ no: "B-078", layer: "platform", name: "安全基本件", status: ["toolkit"], purpose: "定時比對（防時序攻擊）、對外頁面 SRI、密鑰保管庫讀取。",
     entry: ["lib/security/", "lib/secret-vault.ts"], usedBy: ["app-platform", "commerce", "ai-subscription-channel", "cognitive-os", "collect", "cs", "content", "outbound-os", "schedules", "social", "tarot", "video", "ops-console", "provisioning", "repair-center", "studio", "systems-control-center"] }),
   block({ no: "B-079", layer: "platform", name: "租戶隔離", status: ["toolkit"], purpose: "每個請求只能碰自己組織的資料。",
-    entry: ["lib/tenant-guard.ts"], usedBy: ["app-platform", "ops-console", "repair-center", "content", "provisioning", "staff-access", "outbound-os", "social", "video", "tarot", "commerce"] }),
+    entry: ["lib/tenant-guard.ts"], usedBy: ["app-platform", "ops-console", "repair-center", "content", "provisioning", "staff-access", "outbound-os", "social", "video", "tarot", "commerce", "design"] }),
   block({ no: "B-080", layer: "ops", name: "營運稽核紀錄", status: ["toolkit"], purpose: "誰在什麼時候做了什麼營運動作。",
     entry: ["lib/ops-audit.ts"], usedBy: ["ops-console", "schedules", "cs", "commerce"] }),
   block({ no: "B-081", layer: "platform", name: "研究資料橋接", status: ["toolkit"], purpose: "研究資料在資料蒐集器、認知工程 OS、後台之間傳遞。",

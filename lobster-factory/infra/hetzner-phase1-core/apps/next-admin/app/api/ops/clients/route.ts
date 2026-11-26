@@ -16,6 +16,8 @@ import { NAV_FIRST } from "@/app/(shell)/ops/clients/nav-orgs";
 export const dynamic = "force-dynamic";
 
 export interface ClientConfig {
+  // Legacy free-form label. Sites built by the site flow are described by environments.hosting_provider instead
+  // ("ks-aw-01-docker" | "ks-aw-01-staging-subdir" | "external-ssh", lib/site-flow/records.ts HOSTING_PROVIDERS).
   hosting_type?: string;      // "hostinger" | "hetzner" | "cloudflare" | "saas"
   site_url?: string;
   platform?: string;          // "wordpress" | "saas" | "static"

@@ -10,8 +10,9 @@ describe("Banner 傳回格子", () => {
     expect(applyBannerCanvasReturn(base, "product", NEW)).toEqual({ ...base, productOrig: NEW, productImage: NEW, saved: false });
   });
 
-  it("背景：只換 bgImage，bgMode／bgImageHasProduct 不動", () => {
-    expect(applyBannerCanvasReturn(base, "bg", NEW)).toEqual({ ...base, bgImage: NEW, saved: false });
+  it("背景：換 bgImage、位置歸零，bgMode／bgImageHasProduct 不動", () => {
+    expect(applyBannerCanvasReturn({ ...base, bgImgScale: 2, bgImgX: 0.3, bgImgY: -0.1 }, "bg", NEW))
+      .toEqual({ ...base, bgImage: NEW, bgImgScale: 1, bgImgX: 0, bgImgY: 0, saved: false });
   });
 
   it("格子已清空 → null", () => {
