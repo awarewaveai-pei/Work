@@ -495,6 +495,11 @@ check "#4 tag that is not v<version> -> refused by the grammar (126), no export,
 in_c 'echo 0.22.0-beta > /t/state/plugin.s1-wp.aware-wave-wp-bridge; : > /t/calls.log'; gate "site-wp s1 plugins $REL/v0.22.0/aware-wave-wp-bridge-v0.22.0.zip"
 check "#4 installed pre-release is not compared -> refused (3), not replaced, DB untouched"   bash -c "[[ $rc == 3 && '$(installs)' == 0 ]] && grep -q 'not plain numbers' <<<'$err' && grep -q 'database not touched' <<<'$err'"
 
+# Rank Math's first-run answer: set when it is in the list, not otherwise (without it the plugin prints no <head> tags).
+created; gate "site-wp s1 plugins mainwp-child"
+check "plugins without Rank Math: its first-run option is not written" in_c '! test -e /t/state/opt.s1-wp.rank_math_registration_skip'
+gate "site-wp s1 plugins seo-by-rank-math"
+check "plugins with Rank Math: first-run option set" in_c 'test "$(cat /t/state/opt.s1-wp.rank_math_registration_skip)" = 1'
 # #5 plugins: DB export first (site dir, 0600, latest only); a failed step restores it.
 EXP=/root/sites/s1/pre-plugins.sql.gz
 created; gate "site-wp s1 plugins mainwp-child"
