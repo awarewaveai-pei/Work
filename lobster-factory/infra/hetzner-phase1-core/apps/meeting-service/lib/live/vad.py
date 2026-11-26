@@ -28,6 +28,10 @@ DISCARD = "discard"  # too short to be speech (a click, a cough)
 class VadEvent:
     kind: str
     audio: Optional[np.ndarray] = field(default=None, compare=False)
+    # START / END: where the speech itself began and (END) ended, as sample indexes into everything
+    # pushed so far; the preroll and the trailing silence in `audio` lie outside.
+    start: int = 0
+    end: int = 0
 
 
 _DISCARD = VadEvent(DISCARD)
@@ -51,18 +55,25 @@ class Segmenter:
         self.silent_frames = 0
         self.voiced_frames = 0
         self.total_frames = 0
+        self.pushed = 0      # samples pushed so far
+        self.done = 0        # samples cut into frames so far
+        self.onset = self.voiced_end = 0
 
     def in_speech(self) -> bool:
         return self._in_speech
 
     def push(self, chunk) -> list:
-        self.pending = np.concatenate([self.pending, _as_int16(chunk)])
+        samples = _as_int16(chunk)
+        self.pushed += len(samples)
+        self.pending = np.concatenate([self.pending, samples])
         events = []
         audio = []
         pos = 0
         while len(self.pending) - pos >= self.frame:
             frame = self.pending[pos: pos + self.frame]
             pos += self.frame
+            at = self.done
+            self.done += self.frame
             norm = frame.astype(np.float32) / 32768.0
             rms = float(np.sqrt(np.sum(norm * norm, dtype=np.float32) / len(frame)))
             voiced = rms > RMS_THRESHOLD
@@ -76,7 +87,8 @@ class Segmenter:
                     self.silent_frames = 0
                     self.voiced_frames = 1
                     self.total_frames = 1
-                    events.append(VadEvent(START, start))
+                    self.onset, self.voiced_end = at, at + self.frame
+                    events.append(VadEvent(START, start, self.onset, self.voiced_end))
                 else:
                     self.preroll.append(frame)
                     if len(self.preroll) > self.preroll_frames:
@@ -88,6 +100,7 @@ class Segmenter:
             if voiced:
                 self.voiced_frames += 1
                 self.silent_frames = 0
+                self.voiced_end = at + self.frame
             else:
                 self.silent_frames += 1
             ended = self.silent_frames * FRAME_MS >= END_SILENCE_MS or self.total_frames * FRAME_MS >= MAX_UTTERANCE_MS
@@ -99,7 +112,7 @@ class Segmenter:
                 utt = self.utterance
                 self.utterance = np.zeros(0, dtype=np.int16)
                 if self.voiced_frames * FRAME_MS >= MIN_VOICED_MS:
-                    events.append(VadEvent(END, utt))
+                    events.append(VadEvent(END, utt, self.onset, self.voiced_end))
                 else:
                     events.append(_DISCARD)
         self.pending = self.pending[pos:].copy()

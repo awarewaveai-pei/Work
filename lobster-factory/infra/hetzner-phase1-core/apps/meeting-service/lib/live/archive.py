@@ -3,20 +3,28 @@
   <base>/<YYYY-MM-DD HHMM[-N]>/NN-<segment>.wav  16 kHz mono PCM16, one file per segment
                                NN-<segment>.md   that segment's transcript
                                transcript.md     the whole session, segment by segment
+                               session.json      the same lines for programs (lib/ownvoice.py session_lines)
                                summary.md        the live summary (lib/live/summary.py)
 `Archive` is plain synchronous code driven from the event loop: audio chunks, caption callbacks and
 a once-a-second `tick()`. Every write is a few KB; the WAV header sizes are rewritten by `tick()`
 every 5 s and transcript files at most every 3 s while they change, so a crash loses at most that
-much and the files still open. `end()` writes the last versions. Times are seconds from `clock`."""
+much and the files still open. `end()` writes the last versions. Line and segment times are positions
+in the recording (samples / RATE, silence filled in included); `clock` only paces the writing and
+measures breaks in the audio."""
+import json
 import logging
 import os
 import shutil
 import struct
 import time
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Callable, Optional
+
+from lib.ownvoice import SIDECAR
+
+from .session import Segment as Line
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +40,7 @@ REPLACE_RETRIES, REPLACE_WAIT = 3, 0.05
 MIN_FREE_BYTES = 1 << 30
 NAME_MAX = 80
 U32_MAX = 0xFFFFFFFF
+SIDECAR_VERSION = 1
 
 
 class ArchiveError(Exception):
@@ -45,15 +54,6 @@ class Segment:
     wall: datetime
     # The recording file as it was opened (renamed when the segment closes, if the name changed).
     wav: Optional[str] = None
-
-
-@dataclass
-class Line:
-    at: float
-    seg: int
-    en: str
-    zh: str = ""
-    speaker: Optional[str] = None
 
 
 # ---- names (archive.rs) ----
@@ -111,12 +111,12 @@ def render(header: str, segments: list, lines: list, only: Optional[int] = None)
             continue
         out.append(f"\n## {i + 1:02d} · {seg.name}（{seg.wall.strftime('%H:%M')} 開始，{hms(seg.at)}）\n\n")
         for l in lines:
-            if l.seg != i or not l.en.strip():
+            if l.seg != i or not l.text.strip():
                 continue
             who = f"{l.speaker}：" if l.speaker else ""
-            out.append(f"[{hms(l.at)}] {who}{l.en.strip()}\n")
-            if l.zh.strip():
-                out.append(f"　{l.zh.strip()}\n")
+            out.append(f"[{hms(l.start)}] {who}{l.text.strip()}\n")
+            if l.tr.strip():
+                out.append(f"　{l.tr.strip()}\n")
             out.append("\n")
     return "".join(out)
 
@@ -155,16 +155,19 @@ class Wav:
         self.opened = self.last_header = clock()
         self.data_bytes = 0
 
-    def fill_gap(self, incoming: int) -> None:
+    def fill_gap(self, incoming: int) -> int:
         """Silence for a real break in the audio (the page reconnected), leaving room for `incoming`
-        samples about to be written: the file then covers the time since it was opened.
+        samples about to be written: the file then covers the time since it was opened. Returns the
+        samples of silence written.
         Unlike recorder.rs (0.3 s slack, a local device clock) only a lag of more than GAP_FILL_AFTER
         counts: this audio comes from a browser over a WebSocket and arrives with jitter, which must
         not be stretched into silence in the middle of speech."""
         due = int((self.clock() - self.opened) * self.rate)
         have = self.data_bytes // 2 + incoming
-        if due > have + int(GAP_FILL_AFTER * self.rate):
-            self.write(bytes((due - have) * 2))
+        if due <= have + int(GAP_FILL_AFTER * self.rate):
+            return 0
+        self.write(bytes((due - have) * 2))
+        return due - have
 
     def write(self, pcm: bytes) -> None:
         self.out.write(pcm)
@@ -192,11 +195,13 @@ class Wav:
 # ---- the session ----
 
 class Archive:
-    def __init__(self, base: str, about: list, agenda: list = (), clock: Callable[[], float] = time.monotonic,
+    def __init__(self, base: str, about: list, meta: dict, agenda: list = (), clock: Callable[[], float] = time.monotonic,
                  now: Callable[[], datetime] = datetime.now, on_problem: Callable[[str], None] = None,
                  on_segment: Callable[[dict], None] = None):
         """Opens the folder and the first recording file; raises ArchiveError (nothing is left behind).
+        `meta` = {listen, target, stt, channels}, written into session.json as is.
         `on_segment(info)` is called when a segment starts by itself (a recording reaching the WAV size limit)."""
+        self.meta = dict(meta)
         self.clock, self.on_problem = clock, on_problem or (lambda msg: None)
         self.on_segment = on_segment or (lambda info: None)
         self.agenda = list(agenda)
@@ -209,13 +214,14 @@ class Archive:
             raise ArchiveError(f"存檔資料夾所在的磁碟只剩 {free // (1 << 20)} MB（要有 1 GB），這場不存檔")
         self.started_at = now()
         self.now = now
-        self.started = clock()
         self.dir = unique_dir(base, self.started_at.strftime("%Y-%m-%d %H%M"))
         self.about = list(about)
         self.segments = [Segment(segment_name(self.agenda, 0), 0.0, self.started_at)]
         self.lines: list = []
         self.by_id: dict = {}
-        self.open: dict = {}           # id -> (start offset, segment index) of lines opened but not final yet
+        self.failed: dict = {}         # id -> the error shown in place of the line's translation
+        self.samples = 0               # the length of the recording so far: where the next chunk starts
+        self.dropped_sec = 0.0         # audio the speech service never got (lib/live/hub.py counts it)
         self.written: dict = {}        # segment index -> the per-segment transcript file written last time
         self.wav: Optional[Wav] = None
         self.dirty = True
@@ -246,20 +252,21 @@ class Archive:
 
     # ---- audio ----
 
-    def feed(self, pcm: bytes) -> None:
-        """One chunk of 16 kHz mono PCM16 from the page (also while the speech service is paused)."""
-        if self.wav is None:
-            return
-        pcm = pcm[: len(pcm) // 2 * 2]
-        try:
-            self.wav.fill_gap(len(pcm) // 2)
-            if self.wav.data_bytes + len(pcm) > WAV_MAX_BYTES:
-                self.on_segment(self.next_segment())
-                if self.wav is None:
-                    return
-            self.wav.write(pcm)
-        except OSError as e:
-            self._lose_audio(e)
+    def feed(self, pcm: bytes) -> int:
+        """One chunk of 16 kHz mono PCM16 from the page (also while the speech service is paused).
+        Returns where it starts in the recording, in samples (counted on after the recording is lost)."""
+        n = len(pcm) // 2
+        if self.wav is not None:
+            try:
+                self.samples += self.wav.fill_gap(n)
+                if self.wav.data_bytes + n * 2 > WAV_MAX_BYTES:
+                    self.on_segment(self.next_segment())
+                if self.wav is not None:
+                    self.wav.write(pcm[: n * 2])
+            except OSError as e:
+                self._lose_audio(e)
+        at, self.samples = self.samples, self.samples + n
+        return at
 
     def _lose_audio(self, e: Exception) -> None:
         wav, self.wav = self.wav, None
@@ -279,7 +286,7 @@ class Archive:
             return
         wav, self.wav = self.wav, None
         try:
-            wav.fill_gap(0)
+            self.samples += wav.fill_gap(0)
             wav.finish(self._closing_path(len(self.segments) - 1))
         except OSError as e:
             self._problem("wav", f"錄音檔收尾失敗（{e}）")
@@ -297,15 +304,18 @@ class Archive:
 
     def next_segment(self, name: Optional[str] = None) -> dict:
         i = len(self.segments)
-        seg = Segment(clean_name(name) or segment_name(self.agenda, i), self.clock() - self.started, self.now())
+        name = clean_name(name) or segment_name(self.agenda, i)
+        nxt = None
         if self.wav is not None:
-            nxt = os.path.join(self.dir, f"{stem(i + 1, seg.name)}.wav")
+            nxt = os.path.join(self.dir, f"{stem(i + 1, name)}.wav")
             wav, self.wav = self.wav, None
             try:
-                wav.fill_gap(0)
+                self.samples += wav.fill_gap(0)
                 wav.finish(self._closing_path(i - 1))
             except OSError as e:
                 self._problem("wav", f"錄音檔收尾失敗（{e}）")
+        seg = Segment(name, self.samples / RATE, self.now())
+        if nxt is not None:
             try:
                 self.wav = Wav(nxt, RATE, self.clock)
                 seg.wav = nxt
@@ -328,30 +338,33 @@ class Archive:
 
     # ---- captions ----
 
-    def open_line(self, id: int) -> None:
-        """A caption line started (speech began): remember when, and in which segment."""
-        self.open[id] = (self.clock() - self.started, len(self.segments) - 1)
-
-    def set_en(self, id: int, en: str) -> None:
-        at, seg = self.open.get(id, (self.clock() - self.started, len(self.segments) - 1))
-        if id in self.by_id:
-            self.lines[self.by_id[id]].en = en
+    def line_final(self, line: Line) -> None:
+        """A caption's text is final: it enters the transcript (a copy; the translation comes separately)."""
+        if line.id in self.by_id:
+            i = self.by_id[line.id]
+            self.lines[i] = replace(line, tr=self.lines[i].tr)
         else:
-            self.by_id[id] = len(self.lines)
-            self.lines.append(Line(at, seg, en))
+            self.by_id[line.id] = len(self.lines)
+            self.lines.append(replace(line, tr=""))
         self.dirty = True
 
-    def set_zh(self, id: int, zh: str) -> None:
+    def line_translated(self, id: int, tr: str, failed: bool) -> None:
+        """Its final translation, or (failed) the error shown in its place: transcript.md keeps showing
+        that error as today; session.json leaves `tr` empty and lists the line in `failed_lines`."""
         if id in self.by_id:
-            self.lines[self.by_id[id]].zh = zh
+            self.lines[self.by_id[id]].tr = tr
+            if failed:
+                self.failed[id] = tr
+            else:
+                self.failed.pop(id, None)
             self.dirty = True
 
     def drop_line(self, id: int) -> None:
         """A line that came to nothing never enters the transcript."""
-        self.open.pop(id, None)
+        self.failed.pop(id, None)
         if id in self.by_id:
             line = self.lines[self.by_id[id]]
-            line.en = line.zh = ""
+            line.text = line.tr = ""
             self.dirty = True
 
     def set_summary(self, text: str, updated: str) -> None:
@@ -363,9 +376,17 @@ class Archive:
 
     # ---- writing ----
 
+    def sidecar(self) -> dict:
+        """session.json: the lines that are in transcript.md, in the caption format, times rounded to the millisecond."""
+        lines = [{**asdict(l), "start": round(l.start, 3), "end": round(l.end, 3), "tr": "" if l.id in self.failed else l.tr}
+                 for l in self.lines if l.text.strip()]
+        return {"version": SIDECAR_VERSION, **self.meta, "lines": lines, "dropped_sec": round(self.dropped_sec, 3),
+                "failed_lines": [{"id": id, "error": msg} for id, msg in self.failed.items()]}
+
     def write(self) -> None:
         header = render_header(self.started_at, self.about)
         write_atomic(os.path.join(self.dir, "transcript.md"), render(header, self.segments, self.lines))
+        write_atomic(os.path.join(self.dir, SIDECAR), json.dumps(self.sidecar(), ensure_ascii=False, indent=1) + "\n")
         for i, seg in enumerate(self.segments):
             path = os.path.join(self.dir, f"{stem(i + 1, seg.name)}.md")
             old = self.written.get(i)

@@ -80,10 +80,10 @@
   .cap-list .divider { margin: 14px 0 10px; color: var(--muted); font-size: 0.8em; text-align: center; overflow-wrap: anywhere; }
   .cap-list { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px; line-height: 1.5; }
   .cap-list .seg { margin-bottom: 12px; }
-  .cap-list .en { color: var(--ink); }
-  .cap-list .interim .en { color: var(--muted); }
-  .cap-list .zh { color: var(--accent-hover); min-height: 1em; }
-  .cap-list.zh-only .en { display: none; }
+  .cap-list .text { color: var(--ink); }
+  .cap-list .interim .text { color: var(--muted); }
+  .cap-list .tr { color: var(--accent-hover); min-height: 1em; }
+  .cap-list.zh-only .text { display: none; }
   .cap-foot { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
   .cap-usage { white-space: nowrap; }
   .cap-sum { white-space: nowrap; color: var(--yellow); font-weight: 600; }
@@ -425,15 +425,15 @@ window.Workspace = (function () {
     if (!row) {
       row = document.createElement("div");
       row.dataset.seg = seg.id;
-      const en = document.createElement("div"); en.className = "en";
-      const zh = document.createElement("div"); zh.className = "zh";
-      row.append(en, zh);
+      const text = document.createElement("div"); text.className = "text";
+      const tr = document.createElement("div"); tr.className = "tr";
+      row.append(text, tr);
       el.append(row);
       while (el.querySelectorAll("[data-seg]").length > MAX_ROWS) el.querySelector("[data-seg]").remove();
     }
     row.className = "seg" + (seg.final ? "" : " interim");
-    row.querySelector(".en").textContent = seg.en;
-    row.querySelector(".zh").textContent = seg.zh || (seg.final ? "…" : "");
+    row.querySelector(".text").textContent = seg.text;
+    row.querySelector(".tr").textContent = seg.tr || (seg.final ? "…" : "");
     settle();
   }
   function paintLevel() {

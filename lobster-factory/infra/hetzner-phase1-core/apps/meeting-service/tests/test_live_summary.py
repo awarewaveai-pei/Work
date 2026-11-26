@@ -241,7 +241,7 @@ class HubSummarySwitch(unittest.IsolatedAsyncioTestCase):
         await hub.start(owner, "local", "en-US", **flags)
         s = hub.session
         for text in ("one two three.", "four five six.", "seven eight nine."):
-            s.finish(s.open(), text)
+            s.finish(s.open(0.0), text, 0.0)
         await s.drain()
         hub.summary.last -= 3600       # the interval is over
         hub.summary.tick()

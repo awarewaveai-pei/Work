@@ -44,6 +44,10 @@ def test_latest_and_missing_text(base):
     assert ownvoice.read_text("latest", "summary.md") == ""
 
 
+def test_a_session_without_session_json_is_an_old_one(base):
+    assert ownvoice.session_lines("latest") is None
+
+
 @pytest.mark.parametrize("bad", ["..", "not a session", "2026-11-22 1630-2/..", "2026-01-01 0000"])
 def test_only_existing_session_names_resolve(base, bad):
     with pytest.raises(KeyError):

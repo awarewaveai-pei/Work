@@ -12,7 +12,7 @@ class FakeSession:
         self.calls = []
         self.next_id = 0
 
-    def open(self):
+    def open(self, start):
         self.next_id += 1
         self.calls.append(("open", self.next_id))
         return self.next_id
@@ -20,7 +20,7 @@ class FakeSession:
     def interim(self, line, text):
         self.calls.append(("interim", line, text))
 
-    def finish(self, line, text):
+    def finish(self, line, text, end):
         self.calls.append(("finish", line, text))
 
 
