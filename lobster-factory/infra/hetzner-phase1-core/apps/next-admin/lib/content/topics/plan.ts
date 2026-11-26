@@ -15,7 +15,7 @@ import { trendGeosFor, type TrendingGeo } from "@/lib/content/geos";
 import { isSafePublicHttps } from "@/lib/content/public-https";
 import { buildDbSearchBlocks, runBlocks } from "@/lib/content/trending-sources";
 import { norm, recentTrends } from "./trends";
-import { listTopics, monthKey, proposeTopics, RECENT_TOPIC_DAYS, recentTopics, TOPIC_FORMATS, type NewTopic, type Topic, type TopicFormat } from "./store";
+import { listTopics, monthKey, normalizeFormats, proposeTopics, RECENT_TOPIC_DAYS, recentTopics, type NewTopic, type Topic, type TopicFormat } from "./store";
 
 export const PLAN_TOPICS = 28;
 /** Extra topics asked for so a few covered ones (N9) can be dropped and the month still gets PLAN_TOPICS. */
@@ -111,7 +111,7 @@ export function parsePlan(text: string, c: Pick<PlanContext, "month" | "daysInMo
     if (!keyword || !title || seen.has(keyword.toLowerCase())) continue;
     seen.add(keyword.toLowerCase());
     const day = Math.min(c.daysInMonth, Math.max(1, Math.round(Number(t.day) || 1)));
-    const formats = Array.isArray(t.formats) ? [...new Set(t.formats.filter((f): f is TopicFormat => (TOPIC_FORMATS as readonly string[]).includes(f as string)))] : [];
+    const formats = normalizeFormats(t.formats);
     const source = t.source === "trending" || t.source === "kb" ? t.source : "plan";
     out.push({
       title, keyword, angle: s(t.angle, 1000) || null, source,

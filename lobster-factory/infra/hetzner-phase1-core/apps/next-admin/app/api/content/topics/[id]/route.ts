@@ -9,7 +9,7 @@ import { canAccessOrg } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { redoTopic } from "@/lib/content/topics/redo";
 import { requestActor } from "@/lib/entitlements/subject";
-import { daysIn, fromTaipei, isMonth, move, reschedule, setFormats, topicById, TopicMoveRefused, TOPIC_FORMATS, type TopicFormat, type TopicStatus } from "@/lib/content/topics/store";
+import { daysIn, fromTaipei, isMonth, move, normalizeFormats, reschedule, setFormats, topicById, TopicMoveRefused, type TopicStatus } from "@/lib/content/topics/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!t || !canAccessOrg(req, t.organization_id)) return NextResponse.json({ ok: false, error: "topic not found" }, { status: 404 });
     if (t.version !== version) return NextResponse.json({ ok: false, error: "changed elsewhere; reload", topic: t }, { status: 409 });
     const moved = action === "redo" ? await redoTopic(sb, t, requestActor(req)) : action === "schedule" ? await reschedule(sb, t, at) : action === "formats"
-      ? await setFormats(sb, t, Array.isArray(b.formats) ? b.formats.filter((f): f is TopicFormat => (TOPIC_FORMATS as readonly string[]).includes(f as string)) : [])
+      ? await setFormats(sb, t, normalizeFormats(b.formats))
       : await move(sb, t, TARGET[action], action === "retry" || action === "approve" ? { last_error: null } : {});
     if (!moved) return NextResponse.json({ ok: false, error: "changed elsewhere; reload" }, { status: 409 });
     return NextResponse.json({ ok: true, topic: moved });

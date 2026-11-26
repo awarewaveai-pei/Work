@@ -72,6 +72,13 @@ export function pendingYoutubePostId(t: Pick<Topic, "artifacts">): string | null
   return typeof id === "string" && id && !a?.publish?.youtube?.url ? id : null;
 }
 
+/** K30: a video topic without its YouTube draft (made before every video went to YouTube): the draft is made before
+ *  it goes out (make.ts ensureYoutubeDraft). */
+export function youtubeDraftMissing(t: Pick<Topic, "formats" | "artifacts">): boolean {
+  const social = (t.artifacts as { social?: { youtube_post_id?: unknown } } | null)?.social;
+  return t.formats.includes("video") && !social?.youtube_post_id;
+}
+
 /** null = the draft could not be read; "mixed" = its YouTube channels differ. */
 export type DraftPrivacy = "public" | "unlisted" | "mixed" | null;
 
@@ -93,6 +100,7 @@ export function publishTargets(t: Pick<Topic, "formats" | "artifacts">, youtube:
   const a = t.artifacts as PublishArts;
   const out: string[] = [];
   if (pendingYoutubePostId(t)) out.push(`YouTube（這則草稿：${draftText(youtube)}）`);
+  else if (youtubeDraftMissing(t) && !a?.publish?.youtube) out.push("YouTube（發布時先建草稿，公開設定照網站設定；沒連 YouTube 頻道就停下來，什麼都不發）");
   if (t.formats.includes("article") && a?.article?.wp_post_id && !a.article.published) out.push("網站文章（WordPress 草稿改成公開）");
   if (a?.social?.post_id && !a.social.sent) out.push("其他社群頻道（排在文章上線後）");
   // K23: Facebook's / Instagram's own drafts, the article's link in their first comment

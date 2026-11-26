@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { TOPIC_BUDGET_EPOCH } from "./budget";
 import { ACTUAL_MIN_TOPICS, ACTUAL_WINDOW_DAYS, formatsKey, type TopicActual } from "./cost";
+import { normalizeFormats } from "./store";
 
 const DAY_MS = 86_400_000;
 const ID_CHUNK = 100;     // job_id list per ai_call_logs query (URL length)
@@ -58,7 +59,8 @@ export async function recentTopicActual(sb: SupabaseClient, organizationId: stri
     const groups = new Map<string, number[]>();
     for (const tp of topics) {
       const v = usd.get(tp.id) ?? 0;
-      if (v > 0 && tp.formats?.length) groups.set(formatsKey(tp.formats), [...(groups.get(formatsKey(tp.formats)) ?? []), v]);
+      const formats = normalizeFormats(tp.formats);   // an old "youtube" row is a video one (K30)
+      if (v > 0 && formats.length) groups.set(formatsKey(formats), [...(groups.get(formatsKey(formats)) ?? []), v]);
     }
     const out: Record<string, TopicActual> = {};
     for (const [key, spent] of groups) if (spent.length >= ACTUAL_MIN_TOPICS) out[key] = { twd: usdToNtd(medianOf(spent)), n: spent.length };

@@ -354,7 +354,7 @@ describe("publish in steps (N5a)", () => {
     return { calls, state };
   }
   const split = { article: { wp_post_id: 7 }, social: { post_id: "p", youtube_post_id: "y" } };
-  const due = (over: Partial<Topic> = {}) => topic("a", { status: "scheduled", review, formats: ["article", "social", "youtube"],
+  const due = (over: Partial<Topic> = {}) => topic("a", { status: "scheduled", review, formats: ["article", "social", "video"],
     scheduled_for: new Date(NOW.getTime() - 60_000).toISOString(), artifacts: split, ...over });
 
   it("order: YouTube is sent, the article waits for its link, then the article, then the other posts with the article's link", async () => {
@@ -403,7 +403,7 @@ describe("publish in steps (N5a)", () => {
 
   it("restart: a step already recorded is not done again", async () => {
     const at = new Date(NOW.getTime() - 10 * 60_000).toISOString();
-    const q = queue([topic("a", { status: "publishing", review, formats: ["article", "social", "youtube"], artifacts: {
+    const q = queue([topic("a", { status: "publishing", review, formats: ["article", "social", "video"], artifacts: {
       article: { wp_post_id: 7, published: { status: "publish", link: LINK, at } }, social: { post_id: "p", youtube_post_id: "y" },
       publish: { youtube: { post_id: "y", started_at: at, sent_at: at, since: at, url: YT }, article: { started_at: at, sent_at: at, url: LINK } },
     } })], undefined, undefined, { auto: true });

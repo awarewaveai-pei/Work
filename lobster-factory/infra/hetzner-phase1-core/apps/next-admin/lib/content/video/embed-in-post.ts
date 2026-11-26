@@ -49,7 +49,7 @@ export function deliveryEventForPostStatus(status: string | undefined): "publish
 }
 
 const DRAFT_ONLY_REFUSAL = "這篇文章已發布或已排程，嵌入會直接上線；請改用「建新草稿文章並嵌入」";
-const BRIDGE_LIVE_REFUSAL = "這篇文章已發布或已排程；這個網站經 WP Bridge 只能改草稿或待審文章，影片沒有嵌入";
+export const BRIDGE_LIVE_REFUSAL = "這篇文章已發布或已排程；這個網站經 WP Bridge 只能改草稿或待審文章，影片沒有嵌入";
 
 const CHANGED_SINCE_READ = "這篇草稿剛被別人改過，影片沒有嵌入；請重新整理後再按一次";
 
@@ -292,7 +292,8 @@ export async function embedVideoInPost(
     try { poster = await coverForRelease(posterDb, resolved.site.organizationId as string, releaseId, videoUrl); }
     catch (err) { console.error("[video/embed-to-wp] cover lookup failed; embedding without a poster", err); }
   }
-  const markup = videoMarkup(videoUrl, poster);
+  // K30: a YouTube link goes in as WordPress's YouTube embed block (the player), never as a file
+  const markup = isYoutubeUrl(videoUrl) ? youtubeMarkup(videoUrl) : videoMarkup(videoUrl, poster);
   if (!currentContent.includes("<!-- VIDEO_PLACEHOLDER -->")) {
     // Placeholder not found — append video at end instead of failing
     currentContent = currentContent.trimEnd() + `\n\n${markup}\n`;

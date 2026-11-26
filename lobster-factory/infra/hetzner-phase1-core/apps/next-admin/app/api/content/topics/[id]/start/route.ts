@@ -38,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const on = await listSchedules(t.organization_id).then((rows) => rows.some((r) => r.jobKey === "content_pipeline" && r.enabled),
       (e) => { console.error("[content/topics/start] schedule read failed:", e); return null; });
     if (on === null) return NextResponse.json({ ok: false, error: "schedule could not be read" }, { status: 500 });
-    if (!on) return NextResponse.json({ ok: false, error: "選了影片的題目要先在排程頁 Schedules 打開「自動內容管線」：影片做好、嵌進文章都靠它每 5 分鐘檢查" }, { status: 409 });
+    if (!on) return NextResponse.json({ ok: false, error: "選了影片的題目要先在排程頁 Schedules 打開「自動內容管線」：影片做好、發到 YouTube 都靠它每 5 分鐘檢查" }, { status: 409 });
   }
 
   const run = async (): Promise<Response> => {
@@ -65,6 +65,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // keys: the registry test reads them)
   const opts = { org: () => t.organization_id };
   if (t.formats.includes("article")) return withFeature("content.article", thenRun, opts)(req, run);
-  if (t.formats.includes("social") || t.formats.includes("youtube")) return withFeature("content.syndicate", thenRun, opts)(req, run);
+  if (t.formats.includes("social")) return withFeature("content.syndicate", thenRun, opts)(req, run);
   return withFeature("video.script", thenRun, opts)(req, run);
 }

@@ -63,9 +63,10 @@ describe("GET /api/content/topics", () => {
 });
 
 describe("POST /api/content/topics", () => {
+  // K30: an old page's "youtube" is stored as "video" (every video goes to YouTube), never as "youtube"
   it("adds one topic under the site's organization, dated in the month; a planned keyword is 409", async () => {
     m.proposeTopics.mockResolvedValueOnce([{ id: "n" }]).mockResolvedValueOnce([]);
-    const body = { siteId: "s1", month: "2026-02", title: "標題", keyword: "關鍵字", day: 31, formats: ["video", "nope"], source: "kb", sourceRef: { folder_id: "f1" } };
+    const body = { siteId: "s1", month: "2026-02", title: "標題", keyword: "關鍵字", day: 31, formats: ["video", "youtube", "nope"], source: "kb", sourceRef: { folder_id: "f1" } };
     expect((await POST(req("/api/content/topics", STAFF, "POST", body))).status).toBe(200);
     expect(m.proposeTopics.mock.calls[0][1][0]).toMatchObject({ organization_id: "org-a", site_id: "s1", month: "2026-02-01",
       scheduled_for: "2026-02-28T01:00:00.000Z", formats: ["video"], source: "kb", source_ref: { folder_id: "f1" } });
@@ -123,8 +124,8 @@ describe("PATCH /api/content/topics/[id]", () => {
 
   it("formats change without moving the topic; a refused move is 409", async () => {
     m.setFormats.mockResolvedValue({ id: "t1", version: 3 });
-    await PATCH(req("/api/content/topics/t1", STAFF, "PATCH", { action: "formats", version: 2, formats: ["social", "bad"] }), idParams);
-    expect(m.setFormats).toHaveBeenCalledWith({}, m.topic, ["social"]);
+    await PATCH(req("/api/content/topics/t1", STAFF, "PATCH", { action: "formats", version: 2, formats: ["social", "youtube", "bad"] }), idParams);
+    expect(m.setFormats).toHaveBeenCalledWith({}, m.topic, ["social", "video"]);   // K30: "youtube" is written as "video"
     m.topic = { ...m.topic!, status: "published" };
     const { TopicMoveRefused } = await import("@/lib/content/topics/store");
     m.move.mockRejectedValue(new TopicMoveRefused("published -> proposed is not a topic move"));

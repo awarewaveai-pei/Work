@@ -16,7 +16,7 @@ const post = vi.hoisted(() => ({ status: "draft", content: "" }));
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.stubGlobal("fetch", fetchMock);
 
-const { swapEmbeddedVideo, SWAP_NOT_FOUND, SWAP_SHAPE_UNKNOWN } = await import("../embed-in-post");
+const { embedVideoInPost, swapEmbeddedVideo, SWAP_NOT_FOUND, SWAP_SHAPE_UNKNOWN } = await import("../embed-in-post");
 
 const SEED_B64 = Buffer.alloc(32, 7).toString("base64");
 const savedEnv = { ...process.env };
@@ -50,6 +50,23 @@ afterEach(() => { process.env = { ...savedEnv }; });
 
 const swap = (to: { videoUrl: string } | { youtubeUrl: string }) => swapEmbeddedVideo(orgIdentity(ORG), { siteId: "s", postId: 7, fromUrl: OLD, to });
 
+// K30: a topic's article gets YouTube's player once YouTube is live, never the file
+describe("embedVideoInPost with a YouTube link", () => {
+  it("the placeholder becomes WordPress's YouTube embed block (the player), nothing else", async () => {
+    post.content = `<p>intro</p>
+<!-- VIDEO_PLACEHOLDER -->
+<p>end</p>`;
+    expect(await embedVideoInPost(orgIdentity(ORG), { siteId: "s", postId: 7, videoUrl: YT, once: true })).toEqual({ ok: true, postId: 7, videoUrl: YT });
+    const [w] = writes();
+    expect(w.content).toContain('<!-- wp:embed {"url":"https://www.youtube.com/watch?v=abc123","type":"video","providerNameSlug":"youtube"');
+    expect(w.content).toContain(`<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube"><div class="wp-block-embed__wrapper">
+${YT}
+</div></figure>`);
+    expect(w.content).not.toContain("VIDEO_PLACEHOLDER");
+    expect(w.content).not.toContain("<video");
+  });
+});
+
 describe("swapEmbeddedVideo", () => {
   it("to YouTube: the file becomes WordPress's YouTube embed block, over the content read; no .mp4 left", async () => {
     expect(await swap({ youtubeUrl: YT })).toEqual({ ok: true, postId: 7, swapped: true });
@@ -57,6 +74,9 @@ describe("swapEmbeddedVideo", () => {
     expect(w.expect_sha256).toBe(SHA);
     expect(w.content).toContain("<!-- wp:embed {\"url\":\"https://www.youtube.com/watch?v=abc123\"");
     expect(w.content).toContain(`\n${YT}\n`);
+    // K30: the core/embed YouTube block WordPress renders as the player (oEmbed iframe), not a bare link
+    expect(w.content).toContain('"providerNameSlug":"youtube"');
+    expect(w.content).toContain('<figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube">');
     expect(w.content).not.toContain(".mp4");
     expect(w.content.startsWith("<p>intro</p>") && w.content.endsWith("<p>end</p>")).toBe(true);
   });

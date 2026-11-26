@@ -16,7 +16,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { requestActor } from "@/lib/entitlements/subject";
 import { loadSiteBrand } from "@/lib/content/brand-voice-store";
 import { listFolders } from "@/lib/kb/folders";
-import { daysIn, fromTaipei, isMonth, listTopics, MAX_BULK_TOPICS, monthKey, proposeTopics, spreadDays, TOPIC_FORMATS, type TopicFormat } from "@/lib/content/topics/store";
+import { daysIn, fromTaipei, isMonth, listTopics, MAX_BULK_TOPICS, monthKey, normalizeFormats, proposeTopics, spreadDays } from "@/lib/content/topics/store";
 import { DAILY_START_CAP } from "@/lib/content/topics/tick";
 import { storedDailyLimit } from "@/lib/schedules/store";
 import { youtubeDraftPrivacies } from "@/lib/content/topics/youtube-draft-privacy";
@@ -62,7 +62,7 @@ export async function POST(req: Request): Promise<Response> {
   const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   const month = str(b.month, 7);
   const hour = b.hour === undefined ? 9 : Math.min(23, Math.max(0, Math.round(Number(b.hour) || 0)));
-  const formats = Array.isArray(b.formats) ? [...new Set(b.formats.filter((f): f is TopicFormat => (TOPIC_FORMATS as readonly string[]).includes(f as string)))] : [];
+  const formats = normalizeFormats(b.formats);   // an old page's "youtube" is stored as "video" (K30)
   if (Array.isArray(b.keywords)) {
     if (!isMonth(month)) return NextResponse.json({ ok: false, error: "month (YYYY-MM) required" }, { status: 400 });
     const keywords = [...new Set(b.keywords.map((k) => str(k, 200)).filter(Boolean))];

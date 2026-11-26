@@ -40,8 +40,8 @@ export interface PublishRun extends Published { done: boolean }
 export class MakeError extends Error {
   constructor(message: string, readonly artifacts: Record<string, unknown>) { super(message); }
 }
-/** What the pipeline makes: every format (youtube = the video, posted on the brand's YouTube channels, P7). */
-export const NOW_FORMATS: TopicFormat[] = ["article", "social", "video", "youtube"];
+/** What the pipeline makes: every format (video = also posted on the brand's YouTube channels, K30). */
+export const NOW_FORMATS: TopicFormat[] = ["article", "social", "video"];
 
 /** One look at a topic's video job (finalize.ts finalizeVideoJob behind it). */
 export type VideoPoll = { state: "running" } | { state: "error"; error: string } | { state: "done"; url: string };
@@ -87,7 +87,7 @@ export const brandDay = (now: Date, tz: string | null) => (tz ? zoned(now, tz).d
 
 export const makesNow = (t: Pick<Topic, "formats">) => t.formats.some((f) => NOW_FORMATS.includes(f));
 /** Video is made after the drafts (P6): such a topic stays 'drafted' until then. */
-export const waitsForVideo = (t: Pick<Topic, "formats">) => t.formats.includes("video") || t.formats.includes("youtube");
+export const waitsForVideo = (t: Pick<Topic, "formats">) => t.formats.includes("video");
 
 const failedPatch = (e: unknown) => ({ last_error: e instanceof Error ? e.message : String(e), ...(e instanceof MakeError ? { artifacts: e.artifacts } : {}) });
 

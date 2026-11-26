@@ -22,7 +22,7 @@ const YT = "https://www.youtube.com/watch?v=abc123";
 const youtubeDone = { youtube: { post_id: "y", started_at: "2026-11-19T00:00:00Z", sent_at: "2026-11-19T00:00:00Z", url: YT } };
 const row = (artifacts: Record<string, unknown>): Topic => ({
   id: "a", organization_id: ORG, site_id: "s1", title: "題目", keyword: "k", angle: null, source: "manual", source_ref: {},
-  month: "2026-11-01", scheduled_for: null, formats: ["article", "youtube"], status: "publishing", review: null,
+  month: "2026-11-01", scheduled_for: null, formats: ["article", "video"], status: "publishing", review: null,
   artifacts: { article: { wp_post_id: 5, required: [], checks: [{ name: "title_spacing", pass: true, detail: "" }] }, video: { job_id: "j", url: FILE, embedded_at: "2026-11-19T00:00:00Z" }, ...artifacts },
   version: 3, last_error: null, started_on: "2026-11-19", created_by: "staff:x", created_at: "2026-11-19T00:00:00Z", updated_at: "2026-11-19T00:00:00Z",
 });
@@ -52,12 +52,6 @@ describe("N5b (a): the article goes live with YouTube's link", () => {
     expect(await continuePublishing(d, db.row, false)).toBe("published");
     expect(calls).toEqual(["swap", "publish"]);
     expect(embed.swapEmbeddedVideo).toHaveBeenCalledWith(expect.anything(), { siteId: "s1", postId: 5, fromUrl: FILE, to: { youtubeUrl: YT } });
-  });
-
-  it("a site without YouTube: no swap, the article goes out with its file as before", async () => {
-    const { db, d } = deps(row({ social: { post_id: null } }));
-    expect(await continuePublishing(d, db.row, false)).toBe("published");
-    expect(calls).toEqual(["publish"]);
   });
 
   it("the swap could not be done (the draft changed meanwhile): the article is not published, the topic fails", async () => {

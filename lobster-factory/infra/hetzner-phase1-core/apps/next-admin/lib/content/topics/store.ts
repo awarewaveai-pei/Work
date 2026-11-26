@@ -8,8 +8,19 @@ import { isTimeZone } from "@/lib/social/time";
 export const TOPIC_STATUSES = ["proposed", "approved", "rejected", "generating", "drafted", "waiting_video", "embedded",
   "reviewed", "scheduled", "publishing", "published", "failed"] as const;
 export type TopicStatus = (typeof TOPIC_STATUSES)[number];
-export const TOPIC_FORMATS = ["article", "social", "video", "youtube"] as const;
+export const TOPIC_FORMATS = ["article", "social", "video"] as const;
 export type TopicFormat = (typeof TOPIC_FORMATS)[number];
+/** K30: "youtube" was its own format until 2026-11-26; a video now always goes to YouTube. Rows written before keep it
+ *  (not rewritten) and read as "video"; a write sending it stores "video". */
+const LEGACY_YOUTUBE = "youtube";
+/** The formats as the pipeline sees them: known ones only, "youtube" = "video", each once. Every read and write passes here. */
+export function normalizeFormats(raw: unknown): TopicFormat[] {
+  if (!Array.isArray(raw)) return [];
+  const out = raw.map((f) => (f === LEGACY_YOUTUBE ? "video" : f)).filter((f): f is TopicFormat => (TOPIC_FORMATS as readonly unknown[]).includes(f));
+  return [...new Set(out)];
+}
+const asTopic = (r: unknown): Topic => ({ ...(r as Topic), formats: normalizeFormats((r as Topic).formats) });
+const asTopics = (data: unknown[] | null): Topic[] => (data ?? []).map(asTopic);
 export type TopicSource = "trending" | "kb" | "plan" | "manual";
 
 /** Where a topic may go from each status (AUTO_CONTENT_EXECUTION_PLAN.md §3.2). Anything else is refused before the DB. */
@@ -103,7 +114,7 @@ export async function listTopics(sb: SupabaseClient, organizationId: string, mon
   const { data, error } = await sb.from("content_topics").select("*")
     .eq("organization_id", organizationId).eq("month", monthKey(month)).order("scheduled_for", { ascending: true, nullsFirst: false });
   if (error) fail("list", error);
-  return (data ?? []) as Topic[];
+  return asTopics(data);
 }
 
 /** Days a title or keyword stays "already covered": a topic proposed or scheduled in the last 90 days (any status, rejected
@@ -140,7 +151,7 @@ export async function recentTopics(sb: SupabaseClient, organizationId: string, s
 export async function topicById(sb: SupabaseClient, id: string): Promise<Topic | null> {
   const { data, error } = await sb.from("content_topics").select("*").eq("id", id).maybeSingle();
   if (error) fail("get", error);
-  return (data as Topic | null) ?? null;
+  return data ? asTopic(data) : null;
 }
 
 /** The topic a WordPress post was made from, keyed `siteId:postId`. The calendar uses it to route a made article's date change
@@ -151,7 +162,7 @@ export async function topicsByWpPost(sb: SupabaseClient, orgId: string, siteIds:
   const { data, error } = await sb.from("content_topics").select("*").eq("organization_id", orgId).in("site_id", siteIds)
     .in("artifacts->article->>wp_post_id", postIds.map(String));
   if (error) fail("by_wp_post", error);
-  for (const t of (data ?? []) as Topic[]) {
+  for (const t of asTopics(data)) {
     const id = (t.artifacts as { article?: { wp_post_id?: number | null } }).article?.wp_post_id;
     if (t.site_id && id) out.set(`${t.site_id}:${id}`, t);
   }
@@ -161,11 +172,11 @@ export async function topicsByWpPost(sb: SupabaseClient, orgId: string, siteIds:
 /** Inserts new topics; a keyword the brand already has that month is skipped, not an error. Returns what was added. */
 export async function proposeTopics(sb: SupabaseClient, rows: NewTopic[]): Promise<Topic[]> {
   if (!rows.length) return [];
-  const clean = rows.map((r) => ({ ...r, month: monthKey(r.month), keyword: r.keyword.trim(), title: r.title.trim() }));
+  const clean = rows.map((r) => ({ ...r, month: monthKey(r.month), keyword: r.keyword.trim(), title: r.title.trim(), ...(r.formats ? { formats: normalizeFormats(r.formats) } : {}) }));
   const { data, error } = await sb.from("content_topics")
     .upsert(clean, { onConflict: "organization_id,month,keyword", ignoreDuplicates: true }).select("*");
   if (error) fail("propose", error);
-  return (data ?? []) as Topic[];
+  return asTopics(data);
 }
 
 export class TopicMoveRefused extends Error {}
@@ -185,7 +196,7 @@ export async function move(sb: SupabaseClient, t: Pick<Topic, "id" | "organizati
     .eq("id", t.id).eq("organization_id", t.organization_id).eq("status", t.status).eq("version", t.version)
     .select("*");
   if (error) fail("move", error);
-  return ((data ?? []) as Topic[])[0] ?? null;
+  return asTopics(data)[0] ?? null;
 }
 
 /** Takes a row for a step that writes outside the database (auto publish): bumps the version it was read at, status
@@ -197,20 +208,20 @@ export async function claimTopic(sb: SupabaseClient, t: Pick<Topic, "id" | "orga
     .eq("id", t.id).eq("organization_id", t.organization_id).eq("status", t.status).eq("version", t.version)
     .select("*");
   if (error) fail("claim", error);
-  return ((data ?? []) as Topic[])[0] ?? null;
+  return asTopics(data)[0] ?? null;
 }
 
 /** Changes what will be made, only while nothing is made yet (proposed / approved); same status and version guard as move. */
 export async function setFormats(sb: SupabaseClient, t: Pick<Topic, "id" | "organization_id" | "status" | "version">, formats: TopicFormat[]): Promise<Topic | null> {
   if (!["proposed", "approved"].includes(t.status)) throw new TopicMoveRefused(`formats are fixed once a topic is ${t.status}`);
-  const clean = [...new Set(formats)].filter((f) => (TOPIC_FORMATS as readonly string[]).includes(f));
+  const clean = normalizeFormats(formats);
   if (!clean.length) throw new TopicMoveRefused("a topic needs at least one format");
   const { data, error } = await sb.from("content_topics")
     .update({ formats: clean, version: t.version + 1, updated_at: new Date().toISOString() })
     .eq("id", t.id).eq("organization_id", t.organization_id).eq("status", t.status).eq("version", t.version)
     .select("*");
   if (error) fail("formats", error);
-  return ((data ?? []) as Topic[])[0] ?? null;
+  return asTopics(data)[0] ?? null;
 }
 
 /** Whether a person may move the topic's time now. Never a row the publisher may be holding: it claims a 'scheduled' row
@@ -238,7 +249,7 @@ export async function reschedule(sb: SupabaseClient, t: Pick<Topic, "id" | "orga
   // (organization_id, month, keyword) is unique: that month already has this keyword
   if (error?.code === "23505") throw new TopicMoveRefused("那個月已經有同一個關鍵字的題目");
   if (error) fail("reschedule", error);
-  return ((data ?? []) as Topic[])[0] ?? null;
+  return asTopics(data)[0] ?? null;
 }
 
 /**
@@ -249,7 +260,7 @@ export async function reschedule(sb: SupabaseClient, t: Pick<Topic, "id" | "orga
 export async function startTopic(sb: SupabaseClient, t: Pick<Topic, "id" | "organization_id" | "version">, day: string, cap: number): Promise<Topic | null> {
   const { data, error } = await sb.rpc("content_topics_start", { p_org: t.organization_id, p_id: t.id, p_version: t.version, p_day: day, p_cap: cap });
   if (error) fail("start", error);
-  return ((data ?? []) as Topic[])[0] ?? null;
+  return asTopics(data)[0] ?? null;
 }
 
 /** How many topics of a brand left 'approved' on this day of the brand (tick.ts brandDay; the daily cap, plan I8). */
@@ -274,17 +285,19 @@ export async function orgTimeZone(sb: SupabaseClient, organizationId: string): P
 /** What a sweep may start now: approved, its day reached or none set, making one of `formats`, earliest first. The format
  *  filter is in the query, before the limit: topics nobody can make yet must not fill the page and hide the rest. */
 export async function dueApproved(sb: SupabaseClient, organizationId: string, now: Date, formats: TopicFormat[], limit = 10): Promise<Topic[]> {
+  // a row stored with only the old "youtube" is a video topic too (K30)
+  const stored = formats.includes("video") ? [...formats, LEGACY_YOUTUBE] : formats;
   const { data, error } = await sb.from("content_topics").select("*")
-    .eq("organization_id", organizationId).eq("status", "approved").overlaps("formats", formats)
+    .eq("organization_id", organizationId).eq("status", "approved").overlaps("formats", stored)
     .or(`scheduled_for.is.null,scheduled_for.lte.${now.toISOString()}`)
     .order("scheduled_for", { ascending: true, nullsFirst: true }).limit(limit);
   if (error) fail("due", error);
-  return (data ?? []) as Topic[];
+  return asTopics(data);
 }
 
 /** A brand's topics in these statuses (the sweep's in-progress rows). */
 export async function inStatus(sb: SupabaseClient, organizationId: string, statuses: TopicStatus[]): Promise<Topic[]> {
   const { data, error } = await sb.from("content_topics").select("*").eq("organization_id", organizationId).in("status", statuses);
   if (error) fail("in_status", error);
-  return (data ?? []) as Topic[];
+  return asTopics(data);
 }

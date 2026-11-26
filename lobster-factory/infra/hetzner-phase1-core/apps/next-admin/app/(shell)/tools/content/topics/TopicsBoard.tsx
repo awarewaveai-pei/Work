@@ -85,10 +85,10 @@ const folderKeyword = (name: string) => name.replace(/\s*\d{12}$/, "").trim() ||
 const STATUS: Record<TopicStatus, [string, string]> = {
   proposed: ["提案", "var(--text-muted)"], approved: ["已核准", "var(--accent-text)"], rejected: ["已退回", "var(--text-muted)"],
   generating: ["製作中", "var(--yellow)"], drafted: ["已有草稿", "var(--yellow)"], waiting_video: ["等影片", "var(--yellow)"],
-  embedded: ["影片已嵌入", "var(--yellow)"], reviewed: ["已審核", "var(--green)"], scheduled: ["已排程", "var(--green)"],
+  embedded: ["影片已附上", "var(--yellow)"], reviewed: ["已審核", "var(--green)"], scheduled: ["已排程", "var(--green)"],
   publishing: ["發布中", "var(--yellow)"], published: ["已發布", "var(--green)"], failed: ["失敗", "var(--red)"],
 };
-const FORMAT: Record<TopicFormat, string> = { article: "文章", social: "社群", video: "影片", youtube: "YouTube" };
+const FORMAT: Record<TopicFormat, string> = { article: "文章", social: "社群", video: "影片" };
 const SOURCE: Record<Topic["source"], string> = { trending: "熱門話題", kb: "知識庫", plan: "AI 規劃", manual: "手動" };
 const ACTION_FOR: Partial<Record<TopicStatus, Array<[string, string]>>> = {
   proposed: [["approve", "核准"], ["reject", "退回"]],
@@ -104,7 +104,7 @@ const chip = (on: boolean): React.CSSProperties => ({
   padding: "4px 10px", borderRadius: 999, border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`, cursor: "pointer",
   background: on ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "transparent", color: "var(--text-primary)", fontSize: "var(--font-size-sm)",
 });
-/** The four format toggles (add form and detail panel): selected ones are filled and ticked, with aria-pressed. */
+/** The three format toggles (add form and detail panel; K30: 影片 also goes to YouTube, no toggle of its own): selected ones are filled and ticked, with aria-pressed. */
 function FormatButtons({ value, disabled, onToggle }: { value: readonly TopicFormat[]; disabled?: boolean; onToggle: (f: TopicFormat) => void }) {
   return (
     <>

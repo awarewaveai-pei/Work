@@ -77,18 +77,17 @@ describe("pollTopicVideo", () => {
 describe("attachTopicVideo", () => {
   const topic = { ...t, site_id: "s1", artifacts: { article: { wp_post_id: 9 }, social: { post_id: "p1" }, video: { job_id: "j" } } } as unknown as Topic;
 
-  it("review passed: every ratio released, the embed carries the primary's Release; then the social post (media already there: not uploaded again)", async () => {
+  // K30: the file never goes into the article (YouTube's player does, at publish)
+  it("review passed: every ratio released, the file not put in the article; then the social post (media already there: not uploaded again)", async () => {
     const saved: Array<Record<string, unknown>> = [];
-    embedVideoInPost.mockResolvedValue({ ok: true, postId: 9, videoUrl: URL });
     social.getPost.mockResolvedValue({ id: "p1", state: "draft", version: 3, media: [{ media_id: "m0", position: 0, alt_text: null }] });
     const out = await attachTopicVideo(topic, URL, "schedule:x", async (a) => { saved.push(structuredClone(a)); return true; });
     expect(saved.map((a) => a.video)).toEqual([
       { job_id: "j", url: URL },
-      { job_id: "j", url: URL, embedded_at: expect.any(String) },
-      { job_id: "j", url: URL, embedded_at: expect.any(String), media_id: "m0" },
+      { job_id: "j", url: URL, media_id: "m0" },
     ]);
     expect(gate.release.mock.calls.map((c) => c[0].id)).toEqual(["v169", "v916"]);
-    expect(embedVideoInPost.mock.calls[0][1]).toMatchObject({ siteId: "s1", postId: 9, videoUrl: URL, releaseId: "rel-v169", once: true });
+    expect(embedVideoInPost).not.toHaveBeenCalled();
     expect(social.addVideo).not.toHaveBeenCalled();
     expect(out.artifacts.video).toMatchObject({ media_id: "m0" });
   });
@@ -124,12 +123,13 @@ describe("attachTopicVideo", () => {
   });
 });
 
-describe("topicTargets (P7.2)", () => {
-  it("a YouTube channel only when the topic chose youtube; the other channels only when it chose social", () => {
-    expect(topicTargets(["article", "social", "video"], "youtube")).toBe(false);
-    expect(topicTargets(["article", "youtube"], "youtube")).toBe(true);
-    expect(topicTargets(["article", "youtube"], "facebook")).toBe(false);
-    expect(topicTargets(["social", "youtube"], "facebook")).toBe(true);
+describe("topicTargets (K30)", () => {
+  it("a YouTube channel whenever the topic has a video; the other channels only when it chose social", () => {
+    expect(topicTargets(["article", "social", "video"], "youtube")).toBe(true);
+    expect(topicTargets(["article", "video"], "youtube")).toBe(true);
+    expect(topicTargets(["article", "social"], "youtube")).toBe(false);
+    expect(topicTargets(["article", "video"], "facebook")).toBe(false);
+    expect(topicTargets(["social", "video"], "facebook")).toBe(true);
   });
 });
 

@@ -40,7 +40,7 @@ import { startVideoJob } from "@/lib/content/video/start";
 import { ensureTopicProject, updateTopicProject } from "@/lib/content/video/topic-project";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { finalizeVideoJob } from "@/lib/content/video/finalize";
-import { embedVideoInPost, swapEmbeddedVideo } from "@/lib/content/video/embed-in-post";
+import { BRIDGE_LIVE_REFUSAL, embedVideoInPost, swapEmbeddedVideo } from "@/lib/content/video/embed-in-post";
 import { releaseTopicVideo } from "./video-release";
 import { ARTICLE_VIDEO_DEFAULTS, articleVideoVoice, parseVoiceModel } from "@/lib/content/video/defaults";
 import { TOPIC_ARTICLE_IMAGES, TOPIC_COVER_IMAGES } from "./cost";
@@ -49,11 +49,14 @@ import { DEFAULT_TOPIC_CAP_TWD, reserveStep, settleStep, spentSince, stepUpperTw
 import { usdToNtd } from "@/lib/ai/cost-calculator";
 import { MakeError, NOW_FORMATS, brandDay, personAsked, waitsForVideo, type Made, type Published, type PublishRun, type TickDeps, type VideoArtifact, type VideoPoll } from "./tick";
 import { publishSteps, type LinkInCommentPost, type PublishLog, type YoutubeLook } from "./publish-steps";
+import { youtubeDraftMissing } from "./lanes";
 import { linkInCommentChannel, linkInCommentTexts, withLinkInComment, type LinkInCommentChannel } from "@/lib/social/link-in-comment";
-import { commentsOverLimit, hashtagsOverLimit, overLimit } from "@/lib/social/limits";
+import { commentsOverLimit, hashtagsOverLimit, overLimit, youtubeParts } from "@/lib/social/limits";
 
 /** N5b: the article was published by a person before 發布 reached it; its video is still the file (artifacts.publish.article.note). */
 export const ARTICLE_LIVE_NOTE = "文章已先被手動發布，影片仍是原檔，沒有換成 YouTube 連結";
+/** K30: the same, for an article that never held the file: it went live without YouTube's player. */
+export const ARTICLE_LIVE_NO_PLAYER_NOTE = "文章已先被手動發布，沒有放進 YouTube 播放器";
 
 /** What content_topics.artifacts holds: one entry per made part; `published` / `sent` once auto publish put it out. */
 export interface TopicArtifacts {
@@ -323,9 +326,18 @@ export async function layChannelCovers(sizes: readonly CoverSize[], siteBase: st
   return { sizes: out, notes };
 }
 
-/** YouTube channels only for a topic that chose youtube (they need its video); the other channels only for social. */
+/** YouTube channels for every topic with a video (K30: they need its video); the other channels only for social. */
 export const topicTargets = (formats: readonly string[], platform: string) =>
-  platform === "youtube" ? formats.includes("youtube") : formats.includes("social");
+  platform === "youtube" ? formats.includes("video") : formats.includes("social");
+
+/** K30: a video goes out only on YouTube (the article carries YouTube's player, never the file): a brand with no YouTube
+ *  channel connected stops the topic (failed, the schedule's stop notice), nothing made or sent; 重試 goes on from here. */
+export const NO_YOUTUBE_TEXT = "這個網站沒有連 YouTube 頻道，請到社群連上 YouTube 後按重試";
+async function youtubeChannels(orgId: string) {
+  const yt = (await listAccounts(orgId, { hydrateProfile: false })).filter((a) => a.status === "connected" && a.platform === "youtube");
+  if (!yt.length) throw new Error(NO_YOUTUBE_TEXT);
+  return yt;
+}
 
 /** The social draft's shared text: the article's summary (its meta description), or the title when the summary is not in
  *  the posts' language (2026-10-29 a Chinese article's summary came back in English and went into the draft as it was). */
@@ -395,6 +407,41 @@ async function makeSocial(t: Topic, site: SiteBrand, article: TopicArtifacts["ar
     checks: socialChecks({ texts, channels: accounts.length, problems }, forbidden) };
 }
 
+/** K30: a video topic made before every video went to YouTube has no YouTube draft. It gets one here, before its first
+ *  publish step (publishDrafts) or on 重試 (makeDrafts): no AI call and nothing spent -- the article's title as the video's
+ *  title and its summary as the description, text the article's own checks already passed -- and the video when there is
+ *  one (the upload its other drafts got, else a new one); publish-steps then sends YouTube first and the article gets
+ *  YouTube's player. No channel: throws NO_YOUTUBE_TEXT. `step` saves the row once the draft exists, before its video
+ *  goes on (a rerun writes no second one). Returns whether anything changed. */
+export async function ensureYoutubeDraft(t: Topic, site: SiteBrand, artifacts: TopicArtifacts, actor: string, step: () => Promise<void>): Promise<boolean> {
+  const s = artifacts.social;
+  if (!youtubeDraftMissing({ formats: t.formats, artifacts: artifacts as Record<string, unknown> })) return false;
+  // made before N5a with YouTube inside the one shared draft: it goes out there, as before (a second draft = posted twice)
+  if (s?.post_id) {
+    const shared = await getPost(t.organization_id, s.post_id);
+    if ([...(await accountPlatforms(t.organization_id, shared.targets.map((x) => x.account_id))).values()].includes("youtube")) return false;
+  }
+  const accounts = await youtubeChannels(t.organization_id);
+  const title = artifacts.article?.title || t.title;
+  const text = `${title}\n\n${artifacts.article?.summary ?? ""}`.trim();
+  const problem = youtubeParts(text).problem;
+  if (problem) throw new Error(`YouTube 草稿沒有建：${problem}（什麼都沒發）`);
+  const base = s ?? { post_id: null, checks: [] };
+  const id = (await savePost(t.organization_id, null, null, { body: text, notes: `自動內容管線：題目「${t.title}」` },
+    accounts.map((a) => ({ account_id: a.id, custom_body: null, format: youtubeFormat(site.defaults) })), null, actor)).id;
+  artifacts.social = { ...base, youtube_post_id: id };
+  await step();
+  const url = artifacts.video?.url;
+  if (url) {
+    const video = { ...artifacts.video!, url };
+    artifacts.video = video;
+    await attachToDrafts(t.organization_id, [{ postId: id, done: () => video.youtube_media_id, record: (m) => { video.youtube_media_id = m; } }],
+      () => video.media_id ?? base.link_in_comment?.find((p) => p.media_id)?.media_id,
+      async () => (await addVideo(t.organization_id, url, `topic-${t.id}.mp4`, actor)).id, (mediaId) => ({ media_id: mediaId, position: 0 }), actor, step);
+  }
+  return true;
+}
+
 /** Which draft each channel goes in (makeSocial): YouTube its own; Facebook and Instagram their own only when the topic
  *  has an article (its link is what goes in their comment), otherwise with the rest. */
 export function draftGroups<A extends { platform: string }>(accounts: A[], withArticle: boolean): Record<"other" | "youtube" | LinkInCommentChannel, A[]> {
@@ -424,8 +471,11 @@ async function makeDrafts(sb: SupabaseClient, t: Topic, actor: string, capTwd: n
   const guard = capGuard(t, artifacts, capTwd, (startedAt) => spentSince(sb, t.id, startedAt));
   const spentAtStart = artifacts.budget!.spentTwd;
   try {
+    if (waitsForVideo(t)) await youtubeChannels(t.organization_id);   // K30: before anything is paid for
     if (t.formats.includes("article") && !artifacts.article) artifacts.article = await makeArticle(t, site, guard, maker, deadline);
-    if ((t.formats.includes("social") || t.formats.includes("youtube")) && !artifacts.social) artifacts.social = await makeSocial(t, site, artifacts.article, actor, guard);
+    if ((t.formats.includes("social") || t.formats.includes("video")) && !artifacts.social) artifacts.social = await makeSocial(t, site, artifacts.article, actor, guard);
+    // a topic made before K30, or a retry after its YouTube channel was connected: the draft its first making left out
+    await ensureYoutubeDraft(t, site, artifacts, actor, async () => {});
     // K27: the cover is laid in makeArticle, the social drafts made after it; here both exist (also on a retry, and for a
     // topic made before K27 that runs this step again)
     await attachTopicCover(t, artifacts, actor);
@@ -507,6 +557,18 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
     if (!personAsked(t.artifacts) && !(a.checks ?? []).some((c) => c.name === "title_spacing"))
       throw new MakeError("這篇文章做好時還沒有「標題空格」檢查，沒有自動發布；看過標題後按「發布」（草稿還在）", t.artifacts);
   }
+  // K30: an older video topic gets its YouTube draft before its first step goes out (ensureYoutubeDraft)
+  const log = (t.artifacts as TopicArtifacts).publish ?? {};
+  if (!log.youtube && !log.article && youtubeDraftMissing(t)) {
+    const artifacts: TopicArtifacts = { ...(t.artifacts as TopicArtifacts) };
+    const step = async () => { if (!(await save(artifacts as Record<string, unknown>))) throw new Error("另一次排程接手了這個題目"); };
+    try {
+      const changed = await ensureYoutubeDraft(t, site, artifacts, actor, step);
+      if (changed) { await step(); t = { ...t, artifacts: artifacts as Record<string, unknown> }; }
+    } catch (e) {
+      throw new MakeError(e instanceof Error ? e.message : String(e), artifacts as Record<string, unknown>);
+    }
+  }
   return publishSteps(t, {
     now: () => new Date(),
     sendPost: (postId, link, now, linkInComment) => sendSocial(t, postId, link, now, actor, siteLanguage(site.defaults), linkInComment),
@@ -515,8 +577,16 @@ async function publishDrafts(sb: SupabaseClient, t: Topic, actor: string, save: 
       if (!t.site_id) throw new Error("沒有 WordPress 草稿編號，無法發布");
       let note: string | undefined;
       const video = (t.artifacts as TopicArtifacts).video;
-      // N5b: the article goes live with YouTube's player, not the video file (a site without YouTube keeps the file)
-      if (youtubeUrl && video?.url && video.embedded_at) {
+      // K30: YouTube's player goes into the article now that YouTube is live (the article never held the file); an
+      // article made before K30 has the file embedded: it is swapped for the player (N5b)
+      if (youtubeUrl && video?.url && !video.embedded_at) {
+        const e = await embedVideoInPost(orgIdentity(t.organization_id), { siteId: t.site_id, postId: wpPostId, videoUrl: youtubeUrl, once: true });
+        if ("blockedMode" in e) throw new Error(`系統模式（${e.blockedMode}）不允許改網站，文章沒有發布`);
+        const f = e as { ok: boolean; error?: string };   // strict:false
+        // a person already published it (the bridge edits no live post): out as it is, the topic says so, the next steps go on
+        if (!f.ok && f.error === BRIDGE_LIVE_REFUSAL) note = ARTICLE_LIVE_NO_PLAYER_NOTE;
+        else if (!f.ok) throw new Error(`YouTube 影片沒插進文章，沒有發布：${f.error}`);
+      } else if (youtubeUrl && video?.url && video.embedded_at) {
         const s = await swapEmbeddedVideo(orgIdentity(t.organization_id), { siteId: t.site_id, postId: wpPostId, fromUrl: video.url, to: { youtubeUrl } });
         if ("blockedMode" in s) throw new Error(`系統模式（${s.blockedMode}）不允許改網站，文章沒有發布`);
         // no video file in the article any more (a person removed it), or a person already published it (live: it is
@@ -684,7 +754,7 @@ async function draftCover(orgId: string, postId: string, siteUrl: string, sizes:
   return { key: sizeKey(SITE_COVER_SIZE), url: siteUrl, off: platforms.filter((p) => !isSiteSize(coverSizeFor(p))) };
 }
 
-/** The finished video into the article draft and onto the social draft, each once: every step is saved on the row as it
+/** The finished video onto the social drafts (K30: not into the article -- it gets YouTube's player at publish), each once: every step is saved on the row as it
  *  is done, and each write also checks the outside state (the article already has the URL, the post already has media),
  *  so a restart between a write and its save does not do it twice. Before either, every time, the video passes the
  *  workbench's review and is approved (video-release.ts, N1): a topic leaves here only with a released video, also when
@@ -697,15 +767,8 @@ export async function attachTopicVideo(t: Topic, url: string, actor: string, sav
   const sb = getSupabaseWriteClient();
   try {
     if (prev.video?.url !== url) await step();   // the URL first: a retry attaches it instead of making another video
-    const releaseId = await releaseTopicVideo(sb, t, url, actor);
-    const a = artifacts.article;
-    if (a?.wp_post_id && t.site_id && !video.embedded_at) {
-      const r = await embedVideoInPost(orgIdentity(t.organization_id), { siteId: t.site_id, postId: a.wp_post_id, videoUrl: url, releaseId, once: true });
-      if ("blockedMode" in r) throw new Error(`系統模式（${r.blockedMode}）不允許改網站，影片沒有嵌入`);
-      if (!r.ok) throw new Error(`影片嵌入文章失敗：${(r as Extract<typeof r, { ok: false; status: number }>).error}`);   // strict:false
-      video.embedded_at = new Date().toISOString();
-      await step();
-    }
+    // K30: the file never goes into the article: YouTube's player does, once YouTube is live (publishDrafts)
+    await releaseTopicVideo(sb, t, url, actor);
     const s = artifacts.social;
     // each social draft (the other channels', YouTube's own since N5a, Facebook's and Instagram's since K23) gets the
     // video once; one upload serves them all. The first two record it on the video, the K23 ones on their own entry.
@@ -748,10 +811,7 @@ export function topicDeps(sb: SupabaseClient, organizationId: string, actor: str
       own(t);
       const s = await siteFor(sb, t);
       if (typeof s === "string") return s;
-      if (t.formats.every((f) => f === "youtube")) {   // its video would have nowhere to go
-        const yt = (await listAccounts(t.organization_id, { hydrateProfile: false })).some((a) => a.platform === "youtube" && a.status === "connected");
-        if (!yt) return "還沒連上 YouTube 頻道（社群工具 › 設定 › 連接 YouTube）";
-      }
+      if (waitsForVideo(t)) return youtubeChannels(t.organization_id).then(() => null, (e: Error) => e.message);   // K30
       return null;
     },
     start: async (t, cap) => {

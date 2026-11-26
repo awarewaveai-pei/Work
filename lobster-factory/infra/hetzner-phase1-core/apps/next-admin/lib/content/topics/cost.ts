@@ -64,8 +64,9 @@ export function topicCostUsd(formats: readonly string[] = ["article", "social"],
   const swap = hasArticle && road ? articleModelUsd(road) - articleModelUsd() : 0;   // no road = the feature's own price, as before
   const article = hasArticle ? unit("article") + swap + (TOPIC_ARTICLE_IMAGES + TOPIC_COVER_IMAGES + coverBases) * topicImageUsd(road) : 0;
   const saved = hasArticle && subFirst(road) ? articleModelUsd(road) : 0;
-  const social = formats.includes("social") || formats.includes("youtube") ? unit("syndicate") : 0;   // youtube's text is written too
-  const video = formats.includes("video") || formats.includes("youtube") ? articleVideoCostUsd() : 0;
+  // a video's YouTube title and description are written too (K30: every video goes to YouTube; posting there is free)
+  const social = formats.includes("social") || formats.includes("video") ? unit("syndicate") : 0;
+  const video = formats.includes("video") ? articleVideoCostUsd() : 0;
   return { usual: round(article - saved + social + video), max: round(article + social * MAX_WRITER_CALLS + video) };
 }
 
