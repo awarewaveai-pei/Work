@@ -20,7 +20,9 @@ const W5 = "2026-11-14（續5）破框：入口邊開格、照參考改寫提示
 
 const ART = "agency-os/reports/model-bakeoff/2026-11-article/（key.json、editor-review.md）";
 
-const ARTIMG = "agency-os/reports/model-bakeoff/2026-11-article-image/（runs.json、image-bakeoff.html）";
+const BANNER_COPY = "正式站 ai_call_logs 2026-11-26 11:05 的 12 筆（WORKLOG 2026-11-26 橫幅生成文案 12 模型實測）";
+
+const ARTIMG ="agency-os/reports/model-bakeoff/2026-11-article-image/（runs.json、image-bakeoff.html）";
 
 const GROUPS: Group[] = [
   {
@@ -61,6 +63,24 @@ const GROUPS: Group[] = [
     page: "copy",
     intro: "八種文案工作（標題、社群貼文、商品文案等）各用多個模型實際跑過的完整比較：每一種的原文、花費與耗時都在下面的頁面裡。",
     rows: [],
+  },
+  {
+    title: "橫幅：生成文案",
+    intro: "2026-11-26 正式站，橫幅工具的「生成文案」鈕。12 個模型同時各跑一次，條件都一樣：主題只打「塔羅牌」、語氣「促銷」、尺寸 1.91:1 連結分享預覽；每次回 5 組標題＋副標。操作者先前用 GPT-6.2 sol 測「精油」，判定不佳（只像心理測驗、沒有促銷感）。其餘好壞是 Claude 的初判，標準是有沒有照「促銷」寫、能不能直接放上橫幅。注意：主題沒給價錢或折扣，有些模型自己編了「85折」「299元」這類數字，用之前要換成真的。",
+    rows: [
+      { date: "2026-11-26", model: "Claude Haiku 5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.01", result: "例：「心中有疑問？塔羅給你答案／促銷期間加購解讀服務享八折」。有照促銷寫，但五組都是「限時」「限量」，變化少；自己編了半價、八折。4 秒。", src: BANNER_COPY, plain: true },
+      { date: "2026-11-26", model: "GPT-5.4 nano", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.01", result: "例：「今晚就問塔羅：準到爆」「抽一次就中」。誇大、廣告味重，不能用。5 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-6 luna", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.01", result: "例：「揭開命運指引，遇見更好的自己」。通順但空泛，五組都差不多，沒有促銷感。7 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-5.4 mini", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.03", result: "例：「塔羅牌揭曉你的答案／立即分享預覽，看看今天的關鍵訊息」。把尺寸名稱「分享預覽」寫進副標，不能用。4 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-6.1 terra", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.05", result: "例：「用塔羅探索你的下一步」。平淡，沒有照促銷寫。7 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-6.2 sol（目前預設）", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.10", result: "例：「抽張塔羅看看此刻的你」「從第一張牌開始學塔羅」。溫和、像生活提案，完全沒有促銷；操作者測「精油」也判定不佳。9 秒。", src: BANNER_COPY, plain: true, verdict: "bad" },
+      { date: "2026-11-26", model: "GPT-5.4", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.11", result: "例：「迷惘時刻讓塔羅指路／立即測問未來走向，把握關鍵時機」。短、可用，但用語普通。6 秒。", src: BANNER_COPY, plain: true },
+      { date: "2026-11-26", model: "Claude Sonnet 5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.14", result: "例：「愛情卡關？塔羅幫你找出關鍵／專業牌卡老師一對一解讀，今日預約再送牌陣解析報告」。五組角度都不同（新客、感情、年度運勢），促銷具體；有自編的 85 折。6 秒。", src: BANNER_COPY, plain: true, verdict: "good" },
+      { date: "2026-11-26", model: "GPT-5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.25", result: "例：「愛情事業一牌看清／立即抽牌，掌握你的轉機」。最短，可用但普通。7 秒。", src: BANNER_COPY, plain: true },
+      { date: "2026-11-26", model: "GPT-6.2 astra", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.38", result: "例：「送一副塔羅，聊一晚心事」。文字最有質感，但跟 sol 一樣沒有促銷。8 秒。", src: BANNER_COPY, plain: true },
+      { date: "2026-11-26", model: "Claude Fable 5.1", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.59", result: "例：「你的未來，牌早就知道／限量名額每日開放，點擊鎖定今日折扣」「三張牌，看透眼前的選擇」。標題最有記憶點，促銷具體；有自編的 299 元。9 秒。", src: BANNER_COPY, plain: true, verdict: "good" },
+      { date: "2026-11-26", model: "Claude Opus 5.5", asked: "「塔羅牌」、促銷、1.91:1", money: "實扣 NT$0.72", result: "例：「78張牌，解答你的心中疑問／零基礎也能上手，買牌加贈線上教學課程」。唯一把塔羅牌當商品賣，優惠具體；有自編的 75 折。12 秒，最慢最貴。", src: BANNER_COPY, plain: true, verdict: "good" },
+    ],
   },
   {
     title: "影片：破框貼文動畫",
@@ -106,7 +126,7 @@ export default function MeasuredRuns() {
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>實測紀錄</h2>
-          <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>2026-11-13／14／22 真實呼叫</span>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>2026-11-13～26 真實呼叫</span>
         </div>
         <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0, maxWidth: 900 }}>
           這一頁只放真的跑過的紀錄：哪一天、哪個模型、做了什麼、實際扣多少、標價是多少、結果如何。每個工具內便宜的排前面。

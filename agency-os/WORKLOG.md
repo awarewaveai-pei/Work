@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-26（續24）— 橫幅生成文案 12 模型實測（主題「塔羅牌」），結果寫進 /tools/ai-models 實測紀錄
+
+- 起因：操作者用 GPT-6.2 sol（生成文案預設）測「精油」判定不佳，要求各模型實測並寫進「AI 模型與成本」。
+- 實測：正式站 `/tools/banner` 頁內 fetch `/api/tools/script-forge`（module=banner, task=copy, brief=塔羅牌, tone=促銷, 1.91:1），12 個 AI_TEXT_MODELS 同時各一次，全部 200；實扣取自 `ai_call_logs` 11:05:24–33（NT$0.01–0.72，合計約 NT$2.3）。
+- 結論（Claude 初判）：照「促銷」寫且可用 = Sonnet 5.5（NT$0.14）、Fable 5.1（0.59）、Opus 5.5（0.72）；sol／astra／terra／luna 沒有促銷感；mini 把「分享預覽」寫進副標；nano 誇大。Claude 系會自編折扣數字。
+- 改動：`NA/app/(shell)/tools/ai-models/MeasuredRuns.tsx` 新增「橫幅：生成文案」12 列（便宜在前），頁首日期改 11-13～26。預設模型未改（待操作者決定）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=ssh psql select ai_call_logs where route like '%script-forge%' last 15 min | exit=0 | ms=2000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 只新增展示用資料列，無邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=BANNER_COPY | hits=13
+- rollback：`git revert` 本 commit
 ## 2026-11-26（續23）— block-usage-refresh 首跑失敗（run 45744677662）：產生器載入內容積木 registry 需要 app 依賴，補 npm ci
 
 - 根因：`gen-block-usage.ts` import `lib/content/blocks/register-all` → `lib/supabase-server.ts` 需要 `@supabase/*`；workflow 只用 `npx tsx`、沒裝 next-admin 依賴 → MODULE_NOT_FOUND。本機有 node_modules 所以沒踩到。
