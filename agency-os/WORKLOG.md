@@ -1,4 +1,34 @@
 # Worklog
+## 2026-11-26（續40）— 本機 D:\Work 落後 origin 139 個 commit 的根因：快轉被擋只印一行黃字＋doc-sync 每晚只改時間戳
+
+[任務] 操作者：「本機 D:\Work 落後 origin 91 個 commit?!」→「好，追上」→「好，修根因」。
+
+[根因]
+- C1：AO-RESUME 的 parity（`scripts/ao-resume.ps1:417` → `scripts/lib/git-safe-ops.ps1`）遇到一個衝突檔就拒絕快轉。這次擋住的是 `TASKS.md`：本機 10-30 的 AO-CLOSE 歸檔沒有提交，又剛好跟 origin 改的上一行相鄰。拒絕只在 console 印一行黃字，不會進 smoke `blockers[]`，所以 AO-RESUME §6 從來不提，擱了約一天、落後 139 個 commit。這段期間在本機開工的 session 讀到的都是舊程式（同日 續30 的實測紀錄分頁就是先做在舊版上）。
+- C2：`scripts/doc-sync-automation.ps1` 的「只差時間戳就不寫」比對是 CRLF 組出的新文字對 LF 的檔案，永遠判成不同，於是每晚 22:30（台灣時間）把約 20 份文件只改「Last synced」重寫一次，而且從不提交。這類孤兒 hunk 正是日後跟 origin 相鄰修改衝突的來源。
+- 報告類 `reports/status/*-LATEST` 不改：主機 `report-host-schedules.py:45` 用 `git log origin/main -- agency-os/reports/status` 判斷筆電巡檢是否還在跑，必須保持被追蹤；它們這次也都能 3-way 合併，沒有擋路。
+
+[已修改]
+- `scripts/git-parity-merge.py`：新增 `--check`（唯讀）。列出所有擋住快轉的檔與原因（不在第一個就停），已分歧（本機有 origin 沒有的 commit）也算擋住；輸出 `{ok, behind, ahead, blocking[]}`，被擋時 exit 1。
+- `scripts/check-smoke-tests.ps1`：新增 Check 8b `mainline_parity`，並列入 critical。被擋時每個擋路檔各一行寫進 `blockers[]`，§6 會逐行照印，直到解決為止。
+- `scripts/doc-sync-automation.ps1:107`：比對前先統一成 LF。
+- `.claude/commands/ao-resume.md`：blockers 來源清單補上 mainline_parity。
+- `tests/git-parity-merge-check.test.py`：新測試（衝突檔／不同的未追蹤檔／可合併檔／乾淨／分歧）。
+- 本機資料：用 `git-parity-merge.py` 追上 origin（d12ea211e）。`TASKS.md` 衝突依兩邊內容合併：取 origin 的新行，已歸檔的那條只留在歸檔區。banner 的 `DISPATCH.md` 保留本機多出的 C12／C13 行。67 個本機修改逐行驗證，0 遺失；備份在 `.git/parity-backup-2026-11-26-manual/`。另有 20 份只差「Last synced」的文件還原成 HEAD，裡面沒有內容。
+
+[驗證結果]
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python tests/git-parity-merge-check.test.py` | exit=0 | ms=3000 | result=PASS: 10 checks
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/check-smoke-tests.ps1 -WorkRoot D:/Work` | exit=0 | ms=60000 | result=mainline_parity=ok:up_to_date；另把同一段 smoke 程式跑在被擋的 fixture repo 上 → `warn:behind_1_blocked_by_1`＋`c.md: local edits conflict with origin/main`
+- REALTEST_EVIDENCE: tool=Bash | cmd=從舊版／新版 doc-sync 抽出 `Upsert-RelatedBlock`，跑在 README.md／AGENTS.md 的 HEAD 副本上 | exit=0 | ms=4000 | result=舊版 wrote=True（只改時間戳）；新版 wrote=False 且 bytes 不變；Related 清單有變時新版 wrote=True
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex `agency-os/reports/oracle/2026-11-26-partialreview-1d81262f.md`：分歧時 `--check` 誤報可快轉 → 已修，並加分歧測試。
+- ORACLE_WAIVED: review 之後的最後一次修改只套用該唯一 finding（分歧判斷 4 行＋對應測試），測試 10/10 綠。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory,tests,runbooks | grep=git-parity-merge|mainline_parity|noStamp | hits=201
+  - 呼叫點：`ao-resume.ps1`／`git-safe-ops.ps1`（不帶 --check，行為不變）、smoke（新）、ao-resume.md 已同步；其餘命中是 WORKLOG 歷史。
+
+[避免再發生] 只要快轉被擋，就會在每次 AO-RESUME 的 §6 逐檔點名，直到解決，不再能靜悄悄地擱著。doc-sync 不再每晚製造只改時間戳的修改。
+[剩餘風險] 本機還有約 43 個非本次的未提交修改（多半是 AO-RESUME 產生的狀態報告、memory/daily 和別的 session 進行中的工作），之後 origin 若改到同一行，仍會被擋；差別是現在會被點名。
+[rollback] `git revert <本 commit>`：三支腳本、一個測試、ao-resume.md 兩句。
 ## 2026-11-26（續38）— oracle WP：裝 Kadence Pro 1.1.16（操作者要求）
 
 - [根因] 操作者「裝 kadence、kadence pro」。Kadence 佈景 1.6.0.1 與 Kadence Blocks 3.9.1.2 建站流程已裝且啟用；缺的只有付費外掛 `kadence-pro`（catalog `installSource: "manual-zip"`，流程不自動裝）。

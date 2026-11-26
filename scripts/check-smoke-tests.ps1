@@ -581,6 +581,29 @@ try {
     $noEvidence["deploy_hold"] = $true
 }
 
+# --- Check 8b: shared checkout behind origin/main ---
+# AO-RESUME's parity (just before this script) fast-forwards D:\Work or refuses and prints one yellow line. That line
+# alone let the checkout sit 139 commits behind for a day (2026-11-26): every session there read stale code. So a
+# refused ff becomes blockers[] lines naming each file that blocks it (git-parity-merge.py --check: read-only), and
+# stays there every AO-RESUME until resolved. No fetch here: origin/main is what the last fetch left.
+$mainlineBlockers = @()
+try {
+    $pmOut = (Invoke-WithUtf8Console { & python (Join-Path $root "scripts\git-parity-merge.py") --root $root --target origin/main --check 2>$null } | Out-String).Trim()
+    $pm = $pmOut | ConvertFrom-Json
+    if ($pm.behind -eq 0) {
+        $results["mainline_parity"] = "ok:up_to_date"
+    } elseif ($pm.ok) {
+        $results["mainline_parity"] = "ok:behind_" + $pm.behind + "_ff_possible"   # next AO-RESUME parity takes it
+    } else {
+        $results["mainline_parity"] = "warn:behind_" + $pm.behind + "_blocked_by_" + @($pm.blocking).Count
+        $mainlineBlockers += ("本機 " + $root + " 落後 origin/main " + $pm.behind + " 個 commit，自動快轉被下列本機修改擋住；逐檔看完再處理（3-way 合併後跑 python scripts/git-parity-merge.py --root D:/Work --target origin/main），別讓它擱著：")
+        foreach ($b in @($pm.blocking)) { $mainlineBlockers += ("  - " + $b) }
+    }
+} catch {
+    $results["mainline_parity"]    = "warn:check_failed"
+    $noEvidence["mainline_parity"] = $true
+}
+
 # --- Check 9 / 10: CI health + nightly system-guard gate (via smoke-status-digest.ps1) ---
 # These two had NO prior AO-RESUME wiring at all (see the module's own header comment for
 # the WORKLOG incident that found this). BLIND here means the digest library itself could
@@ -616,7 +639,7 @@ if ($null -eq $statusDigest) {
 # Computed BEFORE the JSON write so the report carries the conclusion. Without it every
 # reader (Claude in AO-RESUME §1, a human skimming the file) has to re-derive the verdict
 # by hand, and each re-derivation is a chance to repeat the swallow-the-skip bug below.
-$checks    = @("n8n_mcp","repair_center","pod_order_inbox","client_sites","n8n_failures","client_mail","docker_watchdog","codex_parity","deploy_hold","ci_health","nightly_health")
+$checks    = @("n8n_mcp","repair_center","pod_order_inbox","client_sites","n8n_failures","client_mail","docker_watchdog","codex_parity","deploy_hold","mainline_parity","ci_health","nightly_health")
 
 # Checks that are the ONLY detector of a silent-failure class. For these, "skip" means
 # monitoring has stopped, so reporting PASS would repeat the mistake that caused the
@@ -626,7 +649,7 @@ $checks    = @("n8n_mcp","repair_center","pod_order_inbox","client_sites","n8n_f
 # the same reason (WORKLOG 2026-09-23): each is the only thing watching its class of gate.
 # repair_center: sole automated watcher of the Auto-Repair SSH probes (WORKLOG 2026-09-24).
 # pod_order_inbox: sole watcher of paid Woo orders whose Printful draft has not happened (2026-09-26).
-$criticalChecks = @("repair_center","pod_order_inbox","client_mail","docker_watchdog","codex_parity","ci_health","nightly_health")
+$criticalChecks = @("repair_center","pod_order_inbox","client_mail","docker_watchdog","codex_parity","mainline_parity","ci_health","nightly_health")
 
 $hasWarn    = @($checks | Where-Object { $results[$_] -like "warn:*" -or $results[$_] -like "fail:*" })
 # Keyed on "produced no measurement", not on the verdict prefix: warn:ssh_exit255 and
@@ -645,6 +668,7 @@ $allSkip    = @($checks | Where-Object { $results[$_] -notlike "skip:*" }).Count
 # traffic light can never disagree with what §6 is about to print.
 $blockers = @()
 if ($statusDigest) { $blockers = @($statusDigest.blockers) }
+$blockers += $mainlineBlockers
 $overall    = if ($hasWarn.Count -gt 0 -or $blindSpots.Count -gt 0 -or $blockers.Count -gt 0) { "WARN" } elseif ($allSkip) { "SKIP" } else { "PASS" }
 $colour     = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") { "DarkGray" } else { "Yellow" }
 

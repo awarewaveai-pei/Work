@@ -105,7 +105,9 @@ function Upsert-RelatedBlock {
     }
 
     # Only the stamp would change = nothing synced: a stamp-only rewrite kept shared files dirty for no content.
-    $noStamp = { param($t) ($t -replace '(?m)^_Last synced: [^\r\n]*', '').TrimEnd("`r", "`n") }
+    # Compared with LF line ends: $block is joined with CRLF but Write-RepoTextFile writes LF, so comparing raw text
+    # called every LF file "changed" and the nightly run re-stamped ~15 docs that were never committed (2026-11-26).
+    $noStamp = { param($t) (($t -replace "`r`n", "`n") -replace '(?m)^_Last synced: [^\n]*', '').TrimEnd("`n") }
     if ((& $noStamp $newContent) -ne (& $noStamp $content)) {
         Write-RepoTextFile -Path $full -Content ($newContent + "`n")   # + the newline Set-Content used to add
         return $true

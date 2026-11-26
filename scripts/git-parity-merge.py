@@ -23,6 +23,8 @@ checkout has no file locks, so an edit landing inside that read-to-write instant
 failure's restore, is the one window left (critic + Codex 2026-11-15).
 
   python scripts/git-parity-merge.py --root <repo> --target origin/main     prints one JSON line, exit 0 = caught up
+  ... --check   read-only: {"ok", "behind", "blocking": [every file that would stop the run, with why]}, exit 1 = blocked
+                (check-smoke-tests.ps1 puts that list in smoke blockers[]: a refused ff stays loud until it is resolved)
 """
 import argparse
 import json
@@ -38,7 +40,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True)
     ap.add_argument("--target", required=True)
+    ap.add_argument("--check", action="store_true", help="report every blocking file; change nothing")
     a = ap.parse_args()
+    blocked = []
+
+    def stop(msg):
+        # True = the caller returns now (a real run stops at the first blocker); --check collects them all instead.
+        blocked.append(msg)
+        return not a.check
 
     def git(*args, check=True, inp=None):
         r = subprocess.run(["git", "-C", a.root, "-c", "core.quotepath=false", *args], capture_output=True, input=inp)
@@ -106,12 +115,16 @@ def main():
         idx_seen[p] = idx
         if idx != head:
             if not os.path.exists(path) or idx != oid("hash-object", "--", path):
-                return done(False, f"{p}: staged content differs from the file")
+                if stop(f"{p}: staged content differs from the file"):
+                    return done(False, blocked[-1])
+                continue
             staged.append(p)
         base, theirs = blob("HEAD", p), blob(a.target, p)
         ours = open(path, "rb").read() if os.path.exists(path) else None
         if base is None or theirs is None or ours is None:
-            return done(False, f"{p}: added or deleted on one side")
+            if stop(f"{p}: added or deleted on one side"):
+                return done(False, blocked[-1])
+            continue
         with tempfile.TemporaryDirectory() as d:
             fs = []
             for n, data in (("ours", ours), ("base", base), ("theirs", theirs)):
@@ -124,7 +137,9 @@ def main():
         out = r.stdout
         if r.returncode:
             if not upstream_had(p, lf(ours)):
-                return done(False, f"{p}: local edits conflict with {a.target}")
+                if stop(f"{p}: local edits conflict with {a.target}"):
+                    return done(False, blocked[-1])
+                continue
             out = lf(theirs)                         # nothing local in it: the target's version replaces the old one
             stale.append(p)
         # None = the result is the target's own content: the ff checks that file out, nothing is written after it
@@ -134,7 +149,9 @@ def main():
         path = os.path.join(a.root, p)
         theirs, ours = blob(a.target, p), open(path, "rb").read()
         if theirs is None or lf(ours) != lf(theirs):
-            return done(False, f"{p}: untracked local file differs from {a.target}")
+            if stop(f"{p}: untracked local file differs from {a.target}"):
+                return done(False, blocked[-1])
+            continue
         moved.append((p, path, ours))                   # ours: the exact bytes, re-checked before the move
     # eol phantom: `git status` calls a file modified on SIZE alone (worktree CRLF, eol=lf blob) although its normalized
     # content equals the index, and ff-only then refuses it as "not uptodate" -- nothing local is in it. 2026-11-15:
@@ -157,6 +174,13 @@ def main():
         idx = git("ls-files", "-s", "--", p).stdout.decode().split()
         if len(idx) >= 2 and idx[1] == git("hash-object", f"--path={p}", "--", path).stdout.decode().strip():
             renorm.append((p, path, open(path, "rb").read()))
+    if a.check:
+        behind = int(git("rev-list", "--count", f"HEAD..{a.target}").stdout.decode().strip() or 0)
+        ahead = int(git("rev-list", "--count", f"{a.target}..HEAD").stdout.decode().strip() or 0)
+        if ahead and behind:                         # no ff at all, whatever the files say (AO-RESUME calls it diverged)
+            blocked.insert(0, f"HEAD has {ahead} commit(s) not on {a.target}: diverged, a fast-forward is impossible")
+        print(json.dumps({"ok": not blocked, "behind": behind, "ahead": ahead, "blocking": blocked}))
+        return 1 if blocked else 0
     if not plan and not moved and not renorm:
         return done(False, "nothing local blocks the fast-forward")
 
