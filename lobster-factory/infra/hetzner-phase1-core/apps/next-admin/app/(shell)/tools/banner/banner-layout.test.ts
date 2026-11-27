@@ -2,7 +2,7 @@
 // placement; a position control always moves its element (even over an old AI answer's coordinates); the automatic
 // title has no lone-character line and is legible on 3:1; the reflection grows with its length and stays in the canvas.
 import { describe, expect, it } from "vitest";
-import { applySemantic, layoutBanner, LOGO_AUTO, LOGO_CLEAR, LOGO_TITLE, REF_PX, type LayoutMeasure } from "./banner-layout";
+import { applySemantic, layoutBanner, reservedAreas, LOGO_AUTO, LOGO_CLEAR, LOGO_TITLE, REF_PX, type LayoutMeasure } from "./banner-layout";
 import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBox, type ElemKey, type ElemPositions } from "./banner-layers";
 import { INIT, PRESETS, TEMPLATES, applyLayout, enterSize, templatePatch, type PresetKey, type State } from "./banner-state";
 
@@ -43,8 +43,10 @@ const overlap = (a: ElemBox, b: ElemBox) => a.x < b.x + b.w - 0.5 && b.x < a.x +
 const inside = (a: ElemBox, s: { w: number; h: number }) => a.x >= -0.5 && a.y >= -0.5 && a.x + a.w <= s.w + 0.5 && a.y + a.h <= s.h + 0.5;
 
 describe("(a) the automatic layout never overlaps and stays inside", () => {
-  it("every size x badge tl/tr x logo 4 corners x product 4 places (wide and slim picture) x logo wide / tall x text top/center/bottom", () => {
+  it("every size x badge tl/tr x logo 4 corners x product 4 places (wide and slim picture, drawn / baked into the AI scene) x logo wide / tall x text top/center/bottom", () => {
     const bad: string[] = [];
+    // R3-D: a product baked into the AI background is not drawn, but its area stays reserved -- the text keeps clear of it
+    for (const baked of [false, true])
     for (const productImage of ["product", "slim"])
     for (const logoImage of ["logo", "tallLogo"])
     for (const [key, size] of Object.entries(SIZES))
@@ -52,7 +54,9 @@ describe("(a) the automatic layout never overlaps and stays inside", () => {
         for (const logoPos of ["tl", "tr", "bl", "br"] as const)
           for (const productPos of ["center", "left", "right", "bottom-right"] as const)
             for (const textPos of ["top", "center", "bottom"] as const) {
-              const L = layoutBanner({ ...everything, productImage, logoImage, badgePos, logoPos, productPos, textPos }, size, measure);
+              const bg = baked ? { bgMode: "ai" as const, bgImage: "scene", bgImageHasProduct: true } : {};
+              const L = layoutBanner({ ...everything, ...bg, productImage, logoImage, badgePos, logoPos, productPos, textPos }, size, measure);
+              if (L.product?.drawn === baked || (baked && L.boxes.product)) bad.push(`baked=${baked}: product drawn=${L.product?.drawn}`);
               // R3-A: the logo counts with its clear space (25% of its height on every side)
               const lb = L.boxes.logo!, c = lb ? lb.h * LOGO_CLEAR : 0;
               const named: [string, ElemBox][] = [
@@ -60,7 +64,7 @@ describe("(a) the automatic layout never overlaps and stays inside", () => {
                 ["logo+clear", lb && { x: lb.x - c, y: lb.y - c, w: lb.w + 2 * c, h: lb.h + 2 * c }],
                 ["product", L.product!.box], ["reflection", L.product!.reflection!],
               ];
-              const at = `${productImage} ${logoImage} ${key} badge=${badgePos} logo=${logoPos} product=${productPos} text=${textPos}`;
+              const at = `${baked ? "baked " : ""}${productImage} ${logoImage} ${key} badge=${badgePos} logo=${logoPos} product=${productPos} text=${textPos}`;
               for (const [n, b] of named) {
                 if (!b) { bad.push(`${at}: ${n} missing`); continue; }
                 if (!inside(b, size)) bad.push(`${at}: ${n} outside ${JSON.stringify(b)}`);
@@ -73,6 +77,20 @@ describe("(a) the automatic layout never overlaps and stays inside", () => {
                 }
             }
     expect(bad.slice(0, 20)).toEqual([]);
+  });
+});
+
+describe("R3-D: the product area a generation is asked for = the area the layout keeps once the product is baked in", () => {
+  it.each(Object.keys(SIZES))("%s, every product place: same box before (drawn, what the prompt gets) and after baking", (key) => {
+    for (const productPos of ["center", "left", "right", "bottom-right"] as const) {
+      const f: BannerFields = { ...everything, productPos };
+      const asked = reservedAreas(layoutBanner(f, SIZES[key], measure));
+      const after = layoutBanner({ ...f, bgMode: "ai", bgImage: "scene", bgImageHasProduct: true }, SIZES[key], measure);
+      expect(asked.product).not.toBeNull();
+      expect(reservedAreas(after)).toEqual(asked);
+      expect(after.product!.box).toEqual(asked.product);
+      expect(after.product!.drawn).toBe(false);
+    }
   });
 });
 

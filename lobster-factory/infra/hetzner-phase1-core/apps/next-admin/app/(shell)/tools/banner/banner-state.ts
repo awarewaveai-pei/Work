@@ -187,6 +187,7 @@ export interface State {
   grounding: GroundingOpts;
   logoImage: string | null;
   logoScale: number;
+  logoAuto:  boolean;   // R3: logo height by the logo rule (banner-layout logoHeight); the size slider turns it off
   logoPos:   LogoPos;
   // export
   saving:    boolean;
@@ -285,6 +286,7 @@ export const INIT: State = {
   },
   logoImage: null,
   logoScale: 0.16,
+  logoAuto:  true,
   logoPos:   "bl",
   saving:    false,
   saved:     false,
@@ -301,7 +303,7 @@ export const INIT: State = {
 /** The fields a size may set for itself; everything else (words, colours, images, fonts…) is shared by all sizes. */
 export const SIZE_KEYS = [
   "positions", "headlineSize", "subtextSize", "typeAuto", "letterSpacing", "bodyLetterSpacing", "productScale", "productPos",
-  "badgeScale", "textPos", "textAlignH", "badgePos", "logoPos", "bgImgScale", "bgImgX", "bgImgY", "logoScale",
+  "badgeScale", "textPos", "textAlignH", "badgePos", "logoPos", "bgImgScale", "bgImgX", "bgImgY", "logoScale", "logoAuto",
   // R3-C: 合成進場景 draws one picture per size at that size's ratio; a size without its own uses the main size's
   "bgImage", "bgImageHasProduct",
 ] as const;

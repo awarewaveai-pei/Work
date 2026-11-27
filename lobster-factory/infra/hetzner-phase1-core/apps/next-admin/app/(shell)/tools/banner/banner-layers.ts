@@ -6,7 +6,7 @@
 
 import { writePsd, type Psd, type Layer as PsdLayer, type TextStyle, type TextStyleRun } from "ag-psd";
 import { groundProduct, type GroundingOpts } from "./product-grounding";
-import { autospace, layoutBanner, productShown, type AccentRun } from "./banner-layout";
+import { autospace, layoutBanner, type AccentRun, type BannerLayout } from "./banner-layout";
 
 /** The design fields the drawing reads (BannerStudio's State has all of them). */
 export interface BannerFields {
@@ -99,7 +99,9 @@ export interface TextSpec {
 export interface BannerLayer { name: string; canvas: HTMLCanvasElement; text?: TextSpec; shadow?: LayerShadow }
 /** `type`: the title / subtitle px drawn (the engine's when typeAuto -- the 字級 sliders show these). */
 export interface BannerLayers { w: number; h: number; layers: BannerLayer[]; boxes: Partial<Record<ElemKey, ElemBox>>; type: TypeSizes }
-export interface TypeSizes { headline: number; subtext: number }
+/** What the drawing really used, for the sliders: title / subtitle px and the logo's height as a share of the short
+ *  side (null = no logo drawn). */
+export interface TypeSizes { headline: number; subtext: number; logo: number | null }
 
 /** Canvas family (first name in the CSS list) -> the family the pro editors ship (scripts/vectorcraft-pro/web-fonts.patch).
  *  楷書 (LXGW WenKai TC) and 圓體 (Huninn / jf-openhuninn) are not in the editors' list -> Noto Sans TC. */
@@ -195,6 +197,26 @@ async function loadDesignFonts(state: BannerFields): Promise<void> {
   await Promise.race([Promise.all(jobs).catch(() => undefined), new Promise((r) => setTimeout(r, 4000))]);
 }
 
+/** The fonts and pictures loaded, then the layout: what renderBannerLayers draws, and what the AI prompts reserve
+ *  (bannerLayout). */
+async function prepareLayout(state: BannerFields, size: { w: number; h: number }) {
+  await loadDesignFonts(state);
+  const pics = new Map<string, HTMLImageElement>();
+  for (const src of [state.productImage, state.logoImage]) if (src) pics.set(src, await loadImage(src));
+  const mctx = newCanvas(1, 1).getContext("2d"); // measuring only
+  if (!mctx) throw new Error("canvas_unavailable");
+  setLetterSpacing(mctx, 0);
+  const L = layoutBanner(state, size, {
+    text: (f, t) => { mctx.font = f; return mctx.measureText(t).width; },
+    image: (src) => { const i = pics.get(src); return i ? { w: i.width, h: i.height } : null; },
+  });
+  return { L, pics, mctx };
+}
+/** The layout of `state` at `size` as the preview draws it (fonts and pictures loaded). */
+export async function bannerLayout(state: BannerFields, size: { w: number; h: number }): Promise<BannerLayout> {
+  return (await prepareLayout(state, size)).L;
+}
+
 /** Glow behind outlined text: the opposite of the text's lightness, so 描邊陰影 shows on any background. */
 function haloOf(hex: string, alpha: number): string {
   const { r, g, b } = rgb(hex);
@@ -208,7 +230,7 @@ function haloOf(hex: string, alpha: number): string {
  *  (up to 2/255 on ~50 px, measured), and one canvas is also ~15x less memory per preview frame. Where things go is
  *  layoutBanner's (banner-layout.ts); this only draws its boxes. */
 export async function renderBannerLayers(state: BannerFields, size: { w: number; h: number }, opts: { flat?: boolean } = {}): Promise<BannerLayers> {
-  await loadDesignFonts(state);
+  const { L, pics, mctx } = await prepareLayout(state, size);
   const p = size;
   const layers: BannerLayer[] = [];
   let flat: CanvasRenderingContext2D | null = null;
@@ -245,17 +267,6 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
   };
   const px = (sp: ShadowSpec | null | undefined, unit: number): LayerShadow | undefined =>
     sp && sp.on ? { color: sp.color, opacity: sp.opacity, blur: sp.blur * unit, x: sp.x * unit, y: sp.y * unit } : undefined;
-  const mctx = newCanvas(1, 1).getContext("2d"); // measuring only
-  if (!mctx) throw new Error("canvas_unavailable");
-
-  // the pictures first: the layout needs their sizes
-  const pics = new Map<string, HTMLImageElement>();
-  for (const src of [productShown(state) ? state.productImage : null, state.logoImage]) if (src) pics.set(src, await loadImage(src));
-  setLetterSpacing(mctx, 0);
-  const L = layoutBanner(state, p, {
-    text: (f, t) => { mctx.font = f; return mctx.measureText(t).width; },
-    image: (src) => { const i = pics.get(src); return i ? { w: i.width, h: i.height } : null; },
-  });
 
   // 背景
   {
@@ -310,7 +321,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
     return snap;
   };
 
-  if (L.product && state.productImage) {
+  if (L.product?.drawn && state.productImage) {
     const img = pics.get(state.productImage)!;
     const box = L.product.box;
     const g = state.grounding;
@@ -571,7 +582,8 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
 
   flush();
   if (flat) (flat as CanvasRenderingContext2D).restore();
-  return { w: p.w, h: p.h, layers, boxes: L.boxes, type: { headline: L.headlineSize, subtext: L.subtextSize } };
+  return { w: p.w, h: p.h, layers, boxes: L.boxes, type: { headline: L.headlineSize, subtext: L.subtextSize,
+    logo: L.logo ? Math.round((L.logo.box.h / Math.min(p.w, p.h)) * 1000) / 1000 : null } };
 }
 
 /** All layers stacked bottom to top on one canvas (source-over, as the old single canvas drew them). */

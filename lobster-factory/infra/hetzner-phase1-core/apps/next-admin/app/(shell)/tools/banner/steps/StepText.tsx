@@ -5,13 +5,15 @@ import { FONTS, FONT_PAIRS, WEIGHTS, applyLayout, type State, type TextAlignH, t
 import type { StepSlot } from "./order";
 import { ShadowControls, StepCard, type StepCtx } from "./ui";
 
-/** `drawnType`: the px the preview drew -- with 自動字級 on, the sliders show the engine's sizes. */
+/** `drawnType`: the px the preview drew -- the sliders show them: the engine's sizes with 自動字級 on, and a size set by
+ *  hand that the layout shrank to fit (marked 已縮). */
 export default function StepText({ slot, s, set, setS, drawnType }: StepCtx & { slot: StepSlot; drawnType: TypeSizes | null }) {
-  const shown = { headlineSize: s.typeAuto && drawnType ? drawnType.headline : s.headlineSize,
-    subtextSize: s.typeAuto && drawnType ? drawnType.subtext : s.subtextSize };
-  // a moved px slider = fixed type from the sizes on screen (both, so the other one does not jump back to a stale value)
+  const shown = { headlineSize: drawnType?.headline ?? s.headlineSize, subtextSize: drawnType?.subtext ?? s.subtextSize };
+  const shrunk = (k: "headlineSize" | "subtextSize") => !s.typeAuto && shown[k] < s[k];
+  // from 自動字級, a moved px slider fixes both at the sizes on screen (the other one must not jump to a stale value);
+  // by hand, only the moved one changes (the other keeps what was set, shrunk or not)
   const setPx = (k: "headlineSize" | "subtextSize", v: number) =>
-    setS((prev) => ({ ...prev, ...shown, typeAuto: false, [k]: v, saved: false, error: null }));
+    setS((prev) => ({ ...prev, ...(prev.typeAuto ? shown : {}), typeAuto: false, [k]: v, saved: false, error: null }));
   const place = (patch: Partial<State>) => setS((prev) => ({ ...applyLayout(prev, patch), saved: false, error: null }));
   return (
     <StepCard title={slot.title} step={slot.no} icon="✍" summary={s.headline.replace(/\*\*/g, "").trim().slice(0, 14) || "未填標題"}>
@@ -125,7 +127,10 @@ export default function StepText({ slot, s, set, setS, drawnType }: StepCtx & { 
             <label className="form-label">{label}</label>
             <input type="range" {...FIELD_RANGES[k]} value={shown[k]} data-testid={`banner-${k}`}
               onChange={(e) => setPx(k, Number(e.target.value))} style={{ flex: 1 }} />
-            <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }}>{shown[k]}</span>
+            <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 6, minWidth: 28 }} data-testid={`banner-${k}-shown`}
+              title={shrunk(k) ? `設定 ${s[k]} px，放不下已縮到 ${shown[k]} px` : undefined}>
+              {shown[k]}{shrunk(k) ? `（已縮，設定 ${s[k]}）` : ""}
+            </span>
           </div>
         ))}
         <div className="form-row">

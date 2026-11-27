@@ -7,8 +7,9 @@ import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type AspectRatio, type StudioModel } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../../tarot/tarotStyles";
 import { BANNER_RETURN_TOOL } from "../banner-canvas-return";
-import { boxOnPicture, compositePrompt, ntdLabel, removeBgNtd, unionBox, type PicArea } from "../banner-design";
-import { renderBannerLayers } from "../banner-layers";
+import { boxOnPicture, compositePrompt, ntdLabel, removeBgNtd, type PicArea } from "../banner-design";
+import { bannerLayout } from "../banner-layers";
+import { reservedAreas } from "../banner-layout";
 import type { GroundingOpts } from "../product-grounding";
 import { FIELD_RANGES } from "../field-ranges";
 import {
@@ -91,16 +92,12 @@ export async function generateBgPicture(o: { model: StudioModel; prompt: string;
   return data.image;
 }
 
-const TEXT_STACK = ["headline", "subtext", "price", "cta", "trust"] as const;
-/** Where the layout engine puts the text stack and the product on size `k` of the design, as shares of a picture
- *  generated at that size's ratio. The product's area is the one it reserves when the product is drawn over the picture
- *  (null = no product picture). */
+/** The layout engine's reserved areas (reservedAreas) on size `k` of the design, as shares of a picture generated at
+ *  that size's ratio -- the same product area the layout keeps clear once the product is baked in (null = none). */
 export async function drawnAreas(v: State, k: PresetKey): Promise<{ text: PicArea | null; product: PicArea | null }> {
   const ps = PRESETS[k];
-  const doc = await renderBannerLayers({ ...v, bgImageHasProduct: false }, ps, { flat: true });
-  const text = unionBox(TEXT_STACK.map((e) => doc.boxes[e]));
-  const prod = doc.boxes.product;
-  return { text: text ? boxOnPicture(text, ps, ps.aspect) : null, product: prod ? boxOnPicture(prod, ps, ps.aspect) : null };
+  const { text, product } = reservedAreas(await bannerLayout(v, ps));
+  return { text: text ? boxOnPicture(text, ps, ps.aspect) : null, product: product ? boxOnPicture(product, ps, ps.aspect) : null };
 }
 
 /** 合成進場景 at each of `sizes` in parallel: the product (first ref) composited into `scene` at that size's ratio, inside

@@ -5,14 +5,15 @@ import type { useBrandKit } from "../kit/useBrandKit";
 import type { BrandKit } from "../kit/brand-kit";
 import { brandKitPatch } from "../kit/apply-kit";
 import { LOGO_AUTO, type LogoPos } from "../banner-layout";
-import type { BannerFields } from "../banner-layers";
+import type { TypeSizes } from "../banner-layers";
 import { FIELD_RANGES } from "../field-ranges";
 import { applyLayout, extractPalette, luminance, saturation, type State } from "../banner-state";
 import type { StepSlot } from "./order";
 import { StepCard, SubHead, type StepCtx } from "./ui";
 
-export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx & {
-  slot: StepSlot; sRef: MutableRefObject<State>; brand: ReturnType<typeof useBrandKit>;
+/** `drawnType.logo`: the logo height the preview drew (share of the short side) -- the slider shows it. */
+export default function StepStyle({ slot, s, set, setS, sRef, brand, drawnType }: StepCtx & {
+  slot: StepSlot; sRef: MutableRefObject<State>; brand: ReturnType<typeof useBrandKit>; drawnType: TypeSizes | null;
 }) {
   const colorRefFileRef   = useRef<HTMLInputElement>(null);
   // colour tools (not part of design State / undo history — derived/fetched data)
@@ -25,10 +26,12 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
   }
   // a corner button goes through applyLayout like every position button: the logo's drag is dropped, so it always shows
   const logoPos: LogoPos = s.logoPos ?? "bl";
-  // logoAuto is a BannerFields field (absent = automatic); the slider turns it off, 自動大小 back on
-  const fields: BannerFields = s;
-  const logoAuto = fields.logoAuto !== false;
-  const setLogo = (patch: Pick<BannerFields, "logoAuto"> & { logoScale?: number }) =>
+  // the slider turns logoAuto off, 自動大小 back on; it shows the drawn size (a corner's room / the width cap may shrink it)
+  const logoAuto = s.logoAuto;
+  const logoShown = drawnType?.logo ?? (logoAuto ? LOGO_AUTO : s.logoScale);
+  const logoShrunk = !logoAuto && logoShown < s.logoScale - 0.0005;
+  const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
+  const setLogo = (patch: Pick<State, "logoAuto"> & { logoScale?: number }) =>
     setS((prev) => ({ ...prev, ...patch, saved: false, error: null }));
   const LOGO_CORNERS: { pos: LogoPos; label: string }[] = [
     { pos: "tl", label: "左上" }, { pos: "tr", label: "右上" }, { pos: "bl", label: "左下" }, { pos: "br", label: "右下" },
@@ -88,9 +91,11 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={s.logoImage} alt="logo" style={{ height: 28, maxWidth: 80, objectFit: "contain" }} />
           <span style={{ fontSize: 12 }}>大小</span>
-          <input type="range" {...FIELD_RANGES.logoScale} value={logoAuto ? LOGO_AUTO : s.logoScale} data-testid="banner-logo-scale"
+          <input type="range" {...FIELD_RANGES.logoScale} value={logoShown} data-testid="banner-logo-scale"
             onChange={(e) => setLogo({ logoAuto: false, logoScale: Number(e.target.value) })} style={{ flex: 1, minWidth: 80 }} />
-          <span style={{ fontSize: 12, opacity: 0.7 }}>{logoAuto ? "自動" : `短邊 ${Math.round(s.logoScale * 1000) / 10}%`}</span>
+          <span style={{ fontSize: 12, opacity: 0.7 }} data-testid="banner-logo-scale-shown">
+            {`短邊 ${pct(logoShown)}`}{logoAuto ? "（自動）" : logoShrunk ? `（已縮，設定 ${pct(s.logoScale)}）` : ""}
+          </span>
           <button type="button" className={logoAuto ? "btn btn-primary" : "btn btn-ghost"} style={{ fontSize: 12, padding: "2px 8px" }}
             data-testid="banner-logo-auto" onClick={() => setLogo({ logoAuto: true })}>自動大小</button>
           <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => set("logoImage", null)}>拿掉 logo</button>
