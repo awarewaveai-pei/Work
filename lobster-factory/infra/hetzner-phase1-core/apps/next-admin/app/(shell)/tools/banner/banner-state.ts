@@ -623,8 +623,8 @@ export function openerPlaceholders(key: string, s: Pick<State, "headline" | "sub
   };
 }
 
-// History signature: excludes transient flags; reduces big image data-URLs to their length
-// (so comparing snapshots never stringifies multi-MB base64).
+// History signature: excludes transient flags; reduces big image data-URLs to imageSig (so comparing snapshots never
+// stringifies multi-MB base64).
 /** C13: nothing about the picture changed yet -- the blank design (the topic / tone typed in 開始 and the sizes picked are
  *  not the picture). Any other change (a background colour, a gradient, words, an image, a template…) shows the preview. */
 export function isUntouched(st: State): boolean {
@@ -646,6 +646,16 @@ export function sameVisible(a: State, b: State): boolean {
 /** 清除設計 does something visible. */
 export const canClear = (st: State): boolean => !sameVisible(clearDesign(st), st);
 
+/** Work in flight on the page (a paid run, a save, an AI call): not part of the design. Undo / redo never restore these
+ *  -- a snapshot taken before a paid run would otherwise clear `generating` mid-run and unlock 清除設計 / the sizes. */
+export const IN_FLIGHT = ["saving", "generating", "designing", "productRemoving", "copyGenerating", "copyStream"] as const satisfies readonly (keyof State)[];
+/** History step `snap` back on the page, keeping what is in flight now (IN_FLIGHT) from `cur`. */
+export function restoreSnapshot(snap: State, cur: State): State {
+  const keep: Partial<State> = {};
+  for (const k of IN_FLIGHT) (keep as Record<string, unknown>)[k] = cur[k];
+  return { ...snap, ...keep };
+}
+
 /** Undo history after recording `st` at `idx`: redo steps after `idx` go; a step equal to the current one is skipped --
  *  equal by design, or for a one-click change (清除設計…) by everything visible, so the copy list comes back on undo. */
 export const HISTORY_MAX = 25;
@@ -658,18 +668,33 @@ export function pushHistory(hist: State[], idx: number, st: State, oneClick = fa
   return { hist: next, idx: next.length - 1 };
 }
 
+/** A picture in the history signature: its length + an FNV-1a hash of EVERY character. Length alone (and a sampled hash)
+ *  let two different pictures count as one step -- a paid picture then never reached history and redo lost it. Hashed
+ *  once per picture: designSig runs on every render (canClear), so the last pictures' signatures are cached. */
+const IMAGE_SIG_CACHE = new Map<string, string>();
+export function imageSig(v: unknown): string | number {
+  if (typeof v !== "string") return 0;
+  const hit = IMAGE_SIG_CACHE.get(v);
+  if (hit) return hit;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < v.length; i++) { h ^= v.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  const sig = `${v.length}:${h.toString(36)}`;
+  if (IMAGE_SIG_CACHE.size >= 64) IMAGE_SIG_CACHE.delete(IMAGE_SIG_CACHE.keys().next().value!);
+  IMAGE_SIG_CACHE.set(v, sig);
+  return sig;
+}
+
 export function designSig(st: State): string {
   // typed → tsc catches any future transient field that's misspelled or forgotten here
-  const skip = new Set<keyof State>(["saving", "saved", "error", "generating", "designing", "productRemoving", "copyGenerating", "copyStream", "copyVariants"]);
+  const skip = new Set<keyof State>([...IN_FLIGHT, "saved", "error", "copyVariants"]);
   const imgKeys = new Set<keyof State>(["bgImage", "productImage", "productOrig", "aiBgRefImage"]);
-  const imgLen = (v: unknown) => (typeof v === "string" ? v.length : 0);
   // a size's own background (R3-C) sits in sizeOverrides / editingSize.main: reduced the same way
-  const slimSize = <T extends SizePatch>(p: T | undefined) => (p && "bgImage" in p ? { ...p, bgImage: imgLen(p.bgImage) } : p);
+  const slimSize = <T extends SizePatch>(p: T | undefined) => (p && "bgImage" in p ? { ...p, bgImage: imageSig(p.bgImage) } : p);
   const obj: Record<string, unknown> = {};
   for (const k of Object.keys(st) as (keyof State)[]) {
     if (skip.has(k)) continue;
     const v = st[k];
-    obj[k] = imgKeys.has(k) ? imgLen(v)
+    obj[k] = imgKeys.has(k) ? imageSig(v)
       : k === "sizeOverrides" ? Object.fromEntries(Object.entries(st.sizeOverrides).map(([sk, p]) => [sk, slimSize(p)]))
       : k === "editingSize" && st.editingSize ? { ...st.editingSize, main: slimSize(st.editingSize.main) }
       : v;

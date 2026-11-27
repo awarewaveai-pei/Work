@@ -6,9 +6,10 @@ import { BANNER_RETURN_TOOL, applyBannerCanvasReturn } from "./banner-canvas-ret
 import { renderBannerLayers, type ElemBox, type ElemKey, type TypeSizes } from "./banner-layers";
 import { clampField } from "./field-ranges";
 import { useBrandKit } from "./kit/useBrandKit";
+import { useSceneFlow } from "./steps/SceneFlow";
 import {
   BANNER_FONTS_CSS, INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, canClear, clearDesign, clearSizeTweak, editingSizeOf, enterSize, isUntouched, leaveSize,
-  presetLabel, pushHistory, selectedSizes, templatePatch, variantOf,
+  presetLabel, pushHistory, restoreSnapshot, selectedSizes, templatePatch, variantOf,
   type BannerStaffApi, type PresetKey, type State,
 } from "./banner-state";
 import { thumbOf } from "./steps/export-files";
@@ -124,6 +125,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const wide = useWide(rowRef);
   // C8: the brand kit of the organization this banner is saved for (null = own / default organization)
   const brand = useBrandKit(saveOrg);
+  // R4-D: ONE scene flow for both entries (AI 一鍵設計, 畫面「AI 合成進場景」): one lane, newest pick wins across them
+  const sceneFlow = useSceneFlow({ sRef, setS, kitColors: brand.kit?.colors.length ? brand.kit.colors : null });
   const saveOrgRef = useRef(saveOrg);
   saveOrgRef.current = saveOrg;
   useEffect(() => {
@@ -165,14 +168,16 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     if (histIdxRef.current <= 0) return;
     histIdxRef.current -= 1;
     restoringRef.current = true;
-    setS(historyRef.current[histIdxRef.current]);
+    const snap = historyRef.current[histIdxRef.current];
+    setS((prev) => restoreSnapshot(snap, prev));
     bumpHist((v) => v + 1);
   }, []);
   const redo = useCallback(() => {
     if (histIdxRef.current >= historyRef.current.length - 1) return;
     histIdxRef.current += 1;
     restoringRef.current = true;
-    setS(historyRef.current[histIdxRef.current]);
+    const snap = historyRef.current[histIdxRef.current];
+    setS((prev) => restoreSnapshot(snap, prev));
     bumpHist((v) => v + 1);
   }, []);
   const canUndo = histIdxRef.current > 0;
@@ -233,11 +238,11 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
     switch (slot.key) {
       case "start": return staff && <StepStart slot={slot} setS={setS} staff={staff} brand={brand} saveOrg={saveOrg} setSaveOrg={setSaveOrg}
         saveOrgName={saveOrgName} setSaveOrgName={setSaveOrgName} />;
-      case "ai": return staff && <StepAi slot={slot} {...ctx} sRef={sRef} staff={staff} brand={brand} saveOrg={saveOrg} saveOrgRef={saveOrgRef} />;
+      case "ai": return staff && <StepAi slot={slot} {...ctx} flow={sceneFlow} sRef={sRef} staff={staff} brand={brand} saveOrg={saveOrg} saveOrgRef={saveOrgRef} />;
       case "template": return <StepTemplate slot={slot} {...ctx} />;
       case "size": return <StepSize slot={slot} {...ctx} />;
       case "text": return <StepText slot={slot} {...ctx} drawnType={drawnType} />;
-      case "canvas": return <StepCanvas slot={slot} {...ctx} />;
+      case "canvas": return <StepCanvas slot={slot} {...ctx} flow={sceneFlow} />;
       case "marketing": return <StepMarketing slot={slot} {...ctx} />;
       case "style": return <StepStyle slot={slot} {...ctx} sRef={sRef} brand={brand} drawnType={drawnType} />;
       case "export": return <StepExport slot={slot} {...ctx} saveOrg={saveOrg} />;
