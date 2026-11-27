@@ -138,15 +138,19 @@ export function sceneFlow(deps: {
   const merge = (built: State, g: GuardResult): State => ({ ...built, ...g.patch, error: null });
   const failed = (what: string) => (prev: State, err: unknown): State => ({ ...prev, error: `對比檢查失敗（${errText(err)}）：${what}` });
   let drawId = 0, paidRuns = 0;
-  // paid work holds `generating` (save / export / 清除設計 / the other entry's buttons wait); a pick is refused meanwhile,
-  // so a free click can never supersede pictures already paid for
-  const paid = async (job: () => Promise<void>) => {
+  // Invariant: one paid run at a time, held from the click until its pictures are applied (contrast check included).
+  // It holds `generating` (save / export / 清除設計 / sizes / the other entry's buttons wait); meanwhile a pick and any
+  // other paid run are refused HERE, not only by disabled buttons, so nothing can supersede pictures already paid for
+  // or pay twice.
+  const paid = async (job: () => Promise<void>): Promise<boolean> => {
+    if (paidRuns) return false;
     paidRuns++; deps.apply((prev) => ({ ...prev, generating: true }));
-    try { await job(); } finally { if (--paidRuns === 0) deps.apply((prev) => ({ ...prev, generating: false })); }
+    try { await job(); return true; } finally { if (--paidRuns === 0) deps.apply((prev) => ({ ...prev, generating: false })); }
   };
 
-  /** Paid: `n` candidates for the main size of `st` (the product composited into its reserved area, or a plain scene). */
-  function draw(st: State, n: number, src: SceneSource): Promise<void> { return paid(() => drawNow(st, n, src)); }
+  /** Paid: `n` candidates for the main size of `st` (the product composited into its reserved area, or a plain scene).
+   *  false = refused (a paid run is still in progress), nothing sent. */
+  function draw(st: State, n: number, src: SceneSource): Promise<boolean> { return paid(() => drawNow(st, n, src)); }
   async function drawNow(st: State, n: number, src: SceneSource): Promise<void> {
     const id = ++drawId;
     lane.claim(); // a pick still checking or other sizes still drawing belong to the old candidates
@@ -185,9 +189,10 @@ export function sceneFlow(deps: {
     return ok;
   }
 
-  /** Paid: every other picked size from the picked cell (otherSizesOf), applied while the main picture is still it. */
-  function drawOthers(cell: OkCell, src: SceneSource, mode: OtherSizesMode): Promise<void> {
-    if (!otherSizesOf(deps.current(), cell).length) return Promise.resolve();
+  /** Paid: every other picked size from the picked cell (otherSizesOf), applied while stillPicked holds.
+   *  false = refused (nothing to draw, or a paid run is still in progress), nothing sent. */
+  function drawOthers(cell: OkCell, src: SceneSource, mode: OtherSizesMode): Promise<boolean> {
+    if (!otherSizesOf(deps.current(), cell).length) return Promise.resolve(false);
     return paid(() => drawOthersNow(cell, src, mode));
   }
   async function drawOthersNow(cell: OkCell, src: SceneSource, mode: OtherSizesMode): Promise<void> {

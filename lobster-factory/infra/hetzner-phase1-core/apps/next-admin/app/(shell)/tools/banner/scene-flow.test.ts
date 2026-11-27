@@ -133,3 +133,28 @@ describe("R4-D Codex F2 付費中取消的尺寸不寫入", () => {
     expect(variantOf(h.state(), "r16x9").bgProductArea).toEqual(areaOf.r16x9);
   });
 });
+
+describe("R4-D Codex 複審 付費進行中不能再付費", () => {
+  it("while the paid pictures are still being contrast-checked, a second paid click and a new candidate draw are refused", async () => {
+    let st: State = design, view: FlowView = EMPTY_VIEW, checking: (() => void) | null = null, checks = 0;
+    const generate = vi.fn(async () => SCENE);
+    const flow = sceneFlow({
+      current: () => st, apply: (fn) => { st = fn(st); }, view: (fn) => { view = fn(view); }, generate, areas,
+      check: () => { checks++; return checks === 1 ? Promise.resolve({ patch: {}, unmet: [] } as never)
+        : new Promise((r) => { checking = () => r({ patch: {}, unmet: [] } as never); }); },
+    });
+    await flow.pick(0, cell);
+    const run = flow.drawOthers(cell, src, "extend");
+    for (let i = 0; i < 20 && !checking; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(checking).not.toBeNull();               // pictures drawn, contrast check pending
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(st.generating).toBe(true);
+    expect(await flow.drawOthers(cell, src, "extend")).toBe(false);
+    expect(await flow.draw(st, 2, src)).toBe(false);
+    expect(generate).toHaveBeenCalledTimes(2);     // nothing paid twice
+    checking!(); expect(await run).toBe(true);
+    expect(st.generating).toBe(false);
+    expect(variantOf(st, "r9x16").bgProductArea).toEqual(areaOf.r9x16);
+    expect(view.sizeJobs).toEqual({});
+  });
+});

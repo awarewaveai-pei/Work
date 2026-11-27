@@ -52,7 +52,7 @@ export function ScenePicker({ flow, s }: { flow: SceneFlowHandle; s: State }) {
         : "點一張當背景（免費；每個尺寸都用它裁切）。"}</p>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))`, gap: 6 }}>
         {cells.map((c, i) => c.state === "ok" ? (
-          <button key={i} type="button" className="choice-card" aria-pressed={picked === i} data-testid={`banner-scene-${i}`} disabled={flow.busy}
+          <button key={i} type="button" className="choice-card" aria-pressed={picked === i} data-testid={`banner-scene-${i}`} disabled={flow.busy || s.generating}
             onClick={() => void flow.pick(i, c)} style={{ padding: 2 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={c.image} alt={`場景 ${i + 1}`} style={{ display: "block", width: "100%", aspectRatio: `${main.w} / ${main.h}`, objectFit: "cover", borderRadius: 4 }} />
@@ -65,7 +65,7 @@ export function ScenePicker({ flow, s }: { flow: SceneFlowHandle; s: State }) {
         ))}
       </div>
       {pickedCell?.state === "ok" && others.length > 0 && (
-        <button type="button" className="btn btn-primary" style={{ alignSelf: "flex-start", fontSize: 12 }} disabled={flow.busy}
+        <button type="button" className="btn btn-primary" style={{ alignSelf: "flex-start", fontSize: 12 }} disabled={flow.busy || s.generating}
           onClick={() => void flow.drawOthers(pickedCell, src, flow.mode)} data-testid="banner-scene-other-sizes">
           {otherSizesLabel(others.length, src.model, flow.mode)}
         </button>
