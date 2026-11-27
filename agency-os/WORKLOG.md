@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-27（續4）— oracle WP：首頁改成像樣的版面（操作者：「這啥小?」）
+
+- [根因] GO-3 把首頁換成 WordPress，但首頁內容是 2026-11-25 監工用 wp-cli 建的佔位版：一段文字＋十二項條列。監工在 GO-3 驗收時看過截圖卻判為「畫面正常」，只驗了功能沒驗設計；原本引擎首頁是有設計的版面，等於上線後變難看。
+- [步驟] `home.php`（`wp eval-file`）重寫首頁（post 18）`post_content`，全用核心區塊（後台可直接編輯）：主視覺（h1、說明、兩顆按鈕）→「選一個工具開始」十二張卡片（grid，最小欄寬 17rem，內容寬 1140px）→ 訂閱每日運勢信區塊；顏色用佈景色盤 slug，不寫色碼。Kadence 頁面設定：`_kad_post_title=hide`、`_kad_post_layout=fullwidth`、`_kad_post_content_style=unboxed`、`_kad_post_vertical_padding=hide`。三輪：第一版卡片滿版貼邊 → 加內容寬與左右留白；最後一張卡高 160 其餘 128（佈景給區塊 32px 下外距、末項沒有）→ 卡片外距歸零。TranslatePress 字典補三句英文。
+- [驗證] 瀏覽器（操作者的 Chrome）實看 `/` 與 `/english/`：主視覺、4 欄卡片、訂閱區塊；JS 量十二張卡片高度皆 128；英文首頁主內容無中文字；`curl /` 200。舊內容在文章修訂版本（3 筆）。
+- [未做] 手機寬度未實看（grid 會自動變 1–2 欄，未驗）；十二個工具頁、我的命盤、訂閱頁仍是「標題帶＋一句說明＋工具」的基本版；文案是監工寫的，未經操作者或 GPT 潤稿；沒有圖片。
+- [rollback] 後台首頁 → 修訂版本還原到最舊一筆；或 `wp post meta delete 18 _kad_post_title` 等四個 meta。
+- REALTEST_EVIDENCE: tool=Bash | cmd=ssh wp eval-file home.php；瀏覽器截圖 / 與 /english/；JS 量卡片高度 | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 無 repo 程式改動（站台頁面內容）
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-27（續3）— meeting-service 段 4 批 1：C12 每句格式＋場次旁檔、C13 統一設定＋跨站守衛（上線 8420）
 
 - 根因：兩個工具接不起來（存檔只有 markdown、時間用伺服器時鐘）；設定散在 6 處、只有 WebSocket 擋跨站。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。
