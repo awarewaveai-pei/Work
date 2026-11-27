@@ -34,8 +34,9 @@ export interface BannerFields {
   positions?: ElemPositions;
   /** C8 (C7 module): contact shadow / reflection / tone match of the product; all off = the plain draw. */
   grounding?: GroundingOpts;
-  /** C8 (C6 brand kit): a logo (same-origin data URL) and its width as a share of the canvas width. */
-  logoImage?: string | null; logoScale?: number;
+  /** C8 (C6 brand kit): a logo (same-origin data URL). R3-A: its height by the logo rule (banner-layout logoHeight) unless
+   *  logoAuto is false -- then logoScale x the canvas's short side (the slider sets both). Absent logoAuto = automatic. */
+  logoImage?: string | null; logoScale?: number; logoAuto?: boolean;
   /** R2-A: the logo's corner (absent = bottom-left). */
   logoPos?: "bl" | "br" | "tl" | "tr";
   /** R2-A: title / subtitle sized by the layout to the canvas and the words (lines even); absent / false = the set sizes. */

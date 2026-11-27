@@ -4,7 +4,8 @@ import BrandKitPanel from "../kit/BrandKitPanel";
 import type { useBrandKit } from "../kit/useBrandKit";
 import type { BrandKit } from "../kit/brand-kit";
 import { brandKitPatch } from "../kit/apply-kit";
-import type { LogoPos } from "../banner-layout";
+import { LOGO_AUTO, type LogoPos } from "../banner-layout";
+import type { BannerFields } from "../banner-layers";
 import { FIELD_RANGES } from "../field-ranges";
 import { applyLayout, extractPalette, luminance, saturation, type State } from "../banner-state";
 import type { StepSlot } from "./order";
@@ -24,6 +25,11 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
   }
   // a corner button goes through applyLayout like every position button: the logo's drag is dropped, so it always shows
   const logoPos: LogoPos = s.logoPos ?? "bl";
+  // logoAuto is a BannerFields field (absent = automatic); the slider turns it off, 自動大小 back on
+  const fields: BannerFields = s;
+  const logoAuto = fields.logoAuto !== false;
+  const setLogo = (patch: Pick<BannerFields, "logoAuto"> & { logoScale?: number }) =>
+    setS((prev) => ({ ...prev, ...patch, saved: false, error: null }));
   const LOGO_CORNERS: { pos: LogoPos; label: string }[] = [
     { pos: "tl", label: "左上" }, { pos: "tr", label: "右上" }, { pos: "bl", label: "左下" }, { pos: "br", label: "右下" },
   ];
@@ -82,9 +88,11 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={s.logoImage} alt="logo" style={{ height: 28, maxWidth: 80, objectFit: "contain" }} />
           <span style={{ fontSize: 12 }}>大小</span>
-          <input type="range" {...FIELD_RANGES.logoScale} value={s.logoScale} data-testid="banner-logo-scale"
-            onChange={(e) => set("logoScale", Number(e.target.value))} style={{ flex: 1, minWidth: 80 }} />
-          <span style={{ fontSize: 12, opacity: 0.7 }}>{Math.round(s.logoScale * 100)}%</span>
+          <input type="range" {...FIELD_RANGES.logoScale} value={logoAuto ? LOGO_AUTO : s.logoScale} data-testid="banner-logo-scale"
+            onChange={(e) => setLogo({ logoAuto: false, logoScale: Number(e.target.value) })} style={{ flex: 1, minWidth: 80 }} />
+          <span style={{ fontSize: 12, opacity: 0.7 }}>{logoAuto ? "自動" : `短邊 ${Math.round(s.logoScale * 1000) / 10}%`}</span>
+          <button type="button" className={logoAuto ? "btn btn-primary" : "btn btn-ghost"} style={{ fontSize: 12, padding: "2px 8px" }}
+            data-testid="banner-logo-auto" onClick={() => setLogo({ logoAuto: true })}>自動大小</button>
           <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }} onClick={() => set("logoImage", null)}>拿掉 logo</button>
           <div style={{ display: "flex", gap: 4, width: "100%", alignItems: "center" }} data-testid="banner-logo-pos">
             <span style={{ fontSize: 12, minWidth: 28 }}>位置</span>
@@ -96,7 +104,7 @@ export default function StepStyle({ slot, s, set, setS, sRef, brand }: StepCtx &
               </button>
             ))}
           </div>
-          <span className="form-hint" style={{ width: "100%" }}>也可在預覽上拖曳；按位置鈕會回到那個角落。</span>
+          <span className="form-hint" style={{ width: "100%" }}>自動大小＝高度取畫面短邊 10%，且不超過主標字高 1.5 倍，四周留 logo 高 25% 的淨空；拉滑桿改成手動。也可在預覽上拖曳；按位置鈕會回到那個角落。</span>
         </div>
       )}
 
