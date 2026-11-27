@@ -90,7 +90,8 @@ function bannerColorPart(bg: unknown, palette: unknown, brandKit: unknown): stri
     `主要顏色 ${b.colors.join(" ") || "（無）"}；平均亮度 ${b.meanLum}（0 黑 1 白）；文字區 ${zoneText}（花 = 亮度起伏，越大越花）。\n` +
     (pal.length ? `可用色盤（索引從 0）：${pal.map((c, i) => `${i}=${c}`).join(" ")}。` : "") +
     (brandKit === true && pal.length
-      ? `這是品牌色：textColor / accentColor / ctaBg / ctaTextColor / badgeColor${picture ? "" : " / bgColor / gradFrom / gradTo"} 只能用色盤裡的顏色（填索引或色盤裡的 #hex），不在色盤內的會被丟棄。`
+      ? `這是品牌色：accentColor / ctaBg / badgeColor 只能用色盤裡的顏色（填索引或色盤裡的 #hex），不在色盤內的會被丟棄；` +
+        `textColor / ctaTextColor${picture ? "" : " / bgColor / gradFrom / gradTo"} 不限品牌色，依背景對比自由配。`
       : `文字與按鈕顏色優先取自背景主要顏色，也可自由配色。`) +
     `\n配色照 60-30-10：背景約 60%、文字等主色約 30%、重點約 10%；CTA 用最搶眼的一色，整張只留一個焦點。` +
     `文字顏色要和它所在那一帶的背景拉開明暗（亮背景用深字、暗背景用淺字）；那一帶很花時把 textScrim 設 true。顏色可填 #rrggbb 或色盤索引。`;
@@ -342,7 +343,8 @@ export const FORGE_MODULES: ForgeModule[] = [
           `"textColor":"#rrggbb","accentColor":"#rrggbb","accentHighlight":false,` +
           `"textPos":"top|center|bottom","textAlignH":"left|center|right","textScrim":true,"textOutline":true,` +
           bannerBgFields(f.bg) +
-          `"aiBgSubject":"英文場景描述(供 AI 生背景)","aiBgVibe":"英文氛圍"}\n\n` +
+          `"aiBgSubject":"英文場景描述：頁面會依此生成背景場景照片供挑選，只寫環境與擺放商品的檯面，不含商品本身、不含任何文字",` +
+          `"aiBgVibe":"英文氛圍（光線、色調）"}\n\n` +
           `配色和諧、對比足夠、CTA 醒目；文字用繁體中文；只輸出 JSON。` + bannerColorPart(f.bg, f.palette, f.brandKit) +
           bannerElementsPart(f, !!bannerSizesPart(f.sizes)) + bannerSizesPart(f.sizes),
       },

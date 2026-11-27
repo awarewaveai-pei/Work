@@ -215,3 +215,69 @@ export function aiFormatError(got: { error: string; calls: number; raw: string }
   console.error("[banner] AI answer did not parse:", got.error, got.raw.slice(0, 2000));
   return `AI 回傳格式錯誤（已重試一次），本次已計費${ntdLabel(ntdPerCall * got.calls)}`;
 }
+
+// ── R3-C: AI scenes and the per-size product composite ──
+// Invariant: a generated picture is told where the layout engine puts the text and the product AT THAT SIZE, in the
+// picture's own coordinates (the model draws at its nearest ratio; the canvas shows a centred cover crop of it).
+
+/** An area as shares (0-1) of the generated picture. */
+export interface PicArea { x0: number; y0: number; x1: number; y1: number }
+type Box = { x: number; y: number; w: number; h: number };
+
+const ratioOf = (aspect: string): number => { const [a, b] = aspect.split(":").map(Number); return a > 0 && b > 0 ? a / b : 1; };
+/** A canvas box (px on a w×h canvas) as shares of a picture generated at `aspect` and drawn cover-centred (bgImgScale 1,
+ *  no offset): 3:1 is generated at 16:9, so its top / bottom ~20% are never seen. */
+export function boxOnPicture(box: Box, size: { w: number; h: number }, aspect: string): PicArea {
+  const pic = ratioOf(aspect), can = size.w / size.h;
+  const sx = pic > can ? can / pic : 1, sy = pic > can ? 1 : pic / can; // the visible share of the picture on each axis
+  const fx = (px: number) => 0.5 + (px / size.w - 0.5) * sx, fy = (py: number) => 0.5 + (py / size.h - 0.5) * sy;
+  const c = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 100) / 100;
+  return { x0: c(fx(box.x)), y0: c(fy(box.y)), x1: c(fx(box.x + box.w)), y1: c(fy(box.y + box.h)) };
+}
+/** The box around several (the text stack's blocks); null = none. */
+export function unionBox(boxes: readonly (Box | undefined)[]): Box | null {
+  const b = boxes.filter((x): x is Box => !!x);
+  if (!b.length) return null;
+  const x0 = Math.min(...b.map((v) => v.x)), y0 = Math.min(...b.map((v) => v.y));
+  return { x: x0, y: y0, w: Math.max(...b.map((v) => v.x + v.w)) - x0, h: Math.max(...b.map((v) => v.y + v.h)) - y0 };
+}
+const pct = (v: number) => `${Math.round(v * 100)}%`;
+const zoneWord = (a: PicArea) => {
+  const cx = (a.x0 + a.x1) / 2, cy = (a.y0 + a.y1) / 2;
+  const v = cy < 0.38 ? "upper" : cy > 0.62 ? "lower" : "middle", h = cx < 0.38 ? "left" : cx > 0.62 ? "right" : "centre";
+  return v === "middle" && h === "centre" ? "centre" : `${v} ${h}`;
+};
+/** "the lower right (x 55%-90%, y 40%-95% of the picture)". */
+export const areaText = (a: PicArea): string => `the ${zoneWord(a)} (x ${pct(a.x0)}-${pct(a.x1)}, y ${pct(a.y0)}-${pct(a.y1)} of the picture)`;
+
+/** One AI 一鍵設計 scene: the AI's subject / vibe, no product and no lettering; the text area kept calm and the product's
+ *  area left open (the page draws the product there later). */
+export function scenePrompt(o: { subject: string; vibe: string; textArea: PicArea | null; productArea: PicArea | null }): string {
+  const scene = [o.subject.trim(), o.vibe.trim()].filter(Boolean).join(", ") || "a clean professional studio background";
+  return `Advertising banner background photo. Scene: ${scene}. ` +
+    `No product, no packaging, no bottles, no people, no text, no letters, no logos, no watermark. ` +
+    (o.textArea ? `Keep ${areaText(o.textArea)} calm and uncluttered -- soft, low-detail, even tone -- a headline is set there. ` : "") +
+    (o.productArea ? `Leave ${areaText(o.productArea)} as an open, empty surface: a product is placed there later, nothing stands there. ` : "") +
+    `Professional commercial photography.`;
+}
+
+/** 合成進場景 at one size: the product composited into the scene inside the area the layout engine reserves for it at that
+ *  size, whole and inside the picture; the text area kept clear. */
+export function compositePrompt(o: { scene: string; productArea: PicArea; textArea: PicArea | null }): string {
+  const scene = o.scene.trim() || "a clean professional studio background";
+  const h = Math.round((o.productArea.y1 - o.productArea.y0) * 100);
+  return `Scene: ${scene}. Composite the provided product photo INTO this scene as the hero subject. ` +
+    `Place the product inside ${areaText(o.productArea)}: the WHOLE product inside that area and inside the picture, ` +
+    `never cropped by the edge, about ${h}% of the picture height tall -- not bigger. ` +
+    `Physically PLACE it resting on a real surface that belongs to the scene -- a table, counter or shelf -- ` +
+    `standing upright with its base actually touching the surface (a grounded contact shadow beneath it), ` +
+    `NOT floating, NOT pasted flat over the background. ` +
+    `Match the scene's camera perspective, depth of field, lighting direction and color temperature; ` +
+    `add soft contact shadows and subtle surface reflection so it looks physically present. ` +
+    `Keep the product's exact shape, label, colors, text and proportions unchanged -- do not distort, recolor, relabel or redraw it. ` +
+    (o.textArea ? `Keep ${areaText(o.textArea)} clean and uncluttered for a headline; nothing else in the picture carries text.` : `Keep clean negative space for a headline.`);
+}
+
+/** AI 一鍵設計's scene choice: how many pictures it draws (operator 2026-11-27: pick one of several; default 3). */
+export const SCENE_COUNTS = [1, 2, 3] as const;
+export const DEFAULT_SCENE_COUNT = 3;

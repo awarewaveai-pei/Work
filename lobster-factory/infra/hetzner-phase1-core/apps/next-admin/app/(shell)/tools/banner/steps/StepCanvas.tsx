@@ -4,13 +4,17 @@ import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
-import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct } from "@/lib/studio/model-options";
+import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type AspectRatio, type StudioModel } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../../tarot/tarotStyles";
 import { BANNER_RETURN_TOOL } from "../banner-canvas-return";
-import { ntdLabel, removeBgNtd } from "../banner-design";
+import { boxOnPicture, compositePrompt, ntdLabel, removeBgNtd, unionBox, type PicArea } from "../banner-design";
+import { renderBannerLayers } from "../banner-layers";
 import type { GroundingOpts } from "../product-grounding";
 import { FIELD_RANGES } from "../field-ranges";
-import { BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, type BgMode, type ProductPos } from "../banner-state";
+import {
+  BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, groundingOn, presetLabel, selectedSizes, variantOf, withSharedBackground, withSizeBackgrounds,
+  type BgMode, type PresetKey, type ProductPos, type State,
+} from "../banner-state";
 import type { StepSlot } from "./order";
 import { AccordionSection, PresetChips, StepCard, SubHead, type StepCtx } from "./ui";
 
@@ -72,6 +76,57 @@ const STYLE_GROUPS_ALL = Array.from(new Set(STYLE_CATALOG.map((s) => s.group)));
 
 const BG_MODE_LABEL: Record<BgMode, string> = { color: "純色", gradient: "漸層", upload: "上傳圖", ai: "AI 生成" };
 
+/** NT$ of one picture from `model` (the 圖片模型 button's price). */
+export const imageNtd = (model: StudioModel): number => STUDIO_MODEL_OPTIONS.find((m) => m.value === model)?.costNt ?? 0;
+
+/** One picture from the studio route (also AI 一鍵設計's scenes). Throws the route's message on failure. */
+export async function generateBgPicture(o: { model: StudioModel; prompt: string; aspect: AspectRatio; refs?: string[] }): Promise<string> {
+  const res = await fetchAwaitingCodex("/api/tools/studio/generate", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json", ...roleHeader("operator") },
+    body:    JSON.stringify({ model: o.model, prompt: o.prompt, referenceImages: o.refs ?? [], aspectRatio: o.aspect }),
+  });
+  const data = await res.json() as { ok: boolean; image?: string; error?: string };
+  if (!data.ok || !data.image) throw new Error(data.error ?? "generation_failed");
+  return data.image;
+}
+
+const TEXT_STACK = ["headline", "subtext", "price", "cta", "trust"] as const;
+/** Where the layout engine puts the text stack and the product on size `k` of the design, as shares of a picture
+ *  generated at that size's ratio. The product's area is the one it reserves when the product is drawn over the picture
+ *  (null = no product picture). */
+export async function drawnAreas(v: State, k: PresetKey): Promise<{ text: PicArea | null; product: PicArea | null }> {
+  const ps = PRESETS[k];
+  const doc = await renderBannerLayers({ ...v, bgImageHasProduct: false }, ps, { flat: true });
+  const text = unionBox(TEXT_STACK.map((e) => doc.boxes[e]));
+  const prod = doc.boxes.product;
+  return { text: text ? boxOnPicture(text, ps, ps.aspect) : null, product: prod ? boxOnPicture(prod, ps, ps.aspect) : null };
+}
+
+/** 合成進場景 at each of `sizes` in parallel: the product (first ref) composited into `scene` at that size's ratio, inside
+ *  the product area the layout engine reserves there. A failed size = its message with the at-most-billed amount. */
+export async function compositeSizes(st: State, sizes: readonly PresetKey[], o: { model: StudioModel; scene: string; refs: string[] }):
+  Promise<{ pics: Partial<Record<PresetKey, string>>; errs: Partial<Record<PresetKey, string>> }> {
+  const got = await Promise.all(sizes.map(async (k) => {
+    try {
+      const areas = await drawnAreas(variantOf(st, k), k);
+      if (!areas.product) throw new Error("no_product_area");
+      const prompt = compositePrompt({ scene: o.scene, productArea: areas.product, textArea: areas.text });
+      return [k, await generateBgPicture({ model: o.model, prompt, aspect: PRESETS[k].aspect, refs: o.refs })] as const;
+    } catch (err) {
+      return [k, err instanceof Error ? err : new Error(String(err))] as const;
+    }
+  }));
+  const pics: Partial<Record<PresetKey, string>> = {}, errs: Partial<Record<PresetKey, string>> = {};
+  for (const [k, v] of got) {
+    if (typeof v === "string") pics[k] = v;
+    else errs[k] = `${v.message}（最多已計費${ntdLabel(imageNtd(o.model))}）`;
+  }
+  return { pics, errs };
+}
+/** The model a product composite runs on: the picked one when it places a product as an object, else Nano Banana 2. */
+export const compositeModel = (m: StudioModel): StudioModel => (modelCompositesProduct(m) ? m : "nano-banana-2");
+
 export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: StepSlot }) {
   const canvasHref = useDoorHref(CANVAS_STAFF_HREF);
   const bgFileRef         = useRef<HTMLInputElement>(null);
@@ -91,7 +146,7 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload  = () => setS((prev) => ({ ...prev, bgImage: reader.result as string, bgMode: "upload", bgImageHasProduct: false, ...BG_PLACE_RESET, error: null }));
+    reader.onload  = () => setS((prev) => ({ ...withSharedBackground(prev, { bgImage: reader.result as string, bgMode: "upload", bgImageHasProduct: false }), error: null }));
     reader.onerror = () => setS((prev) => ({ ...prev, error: "upload_read_failed" }));
     reader.readAsDataURL(file);
   }
@@ -134,48 +189,42 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
     }
   }
 
+  // R3-C: 合成進場景 draws one picture per picked size at that size's ratio, the product inside the area the layout engine
+  // reserves for it there; a plain background is one picture every size crops
+  const picked = selectedSizes(s);
+  const compositing = s.aiBgCompositeProduct && !!s.productImage;
+  const calls = compositing ? picked.length : 1;
+  const [sizeErrors, setSizeErrors] = useState<Partial<Record<PresetKey, string>>>({});
+
   async function generateAiBg() {
-    const compositing = s.aiBgCompositeProduct && !!s.productImage;
     if (!effectiveBgPrompt.trim() && !compositing) return;
     setS((prev) => ({ ...prev, generating: true, error: null }));
-    try {
-      const maxRefs = STUDIO_MODEL_OPTIONS.find((m) => m.value === s.aiBgModel)?.maxRefs ?? 0;
-      // Product ref takes priority; a style ref is appended only if the model has spare ref slots.
-      const refs: string[] = [];
-      if (compositing && s.productImage) refs.push(s.productImage);
-      if (s.aiBgRefMode === "ref" && s.aiBgRefImage && refs.length < maxRefs) refs.push(s.aiBgRefImage);
-      const trimmedRefs = refs.slice(0, maxRefs);
-
-      let prompt = effectiveBgPrompt;
-      if (compositing) {
-        const scene = effectiveBgPrompt.trim() || "a clean professional studio background";
-        prompt =
-          `Scene: ${scene}. Composite the provided product photo INTO this scene as the hero subject. ` +
-          `Physically PLACE the product resting on a real surface in the foreground — a table, counter or shelf that belongs to the scene — ` +
-          `standing upright with its base actually touching the surface (a grounded contact shadow beneath it), ` +
-          `NOT floating, NOT pasted flat over the background. ` +
-          `Match the scene's camera perspective, depth of field, lighting direction and color temperature; ` +
-          `add soft contact shadows and subtle surface reflection so it looks physically present in the room. ` +
-          `Keep the product's exact shape, label, colors, text and proportions unchanged — do not distort, recolor, relabel, crop or redraw it. ` +
-          `Keep clean, uncluttered negative space for a headline.`;
+    setSizeErrors({});
+    const maxRefs = STUDIO_MODEL_OPTIONS.find((m) => m.value === s.aiBgModel)?.maxRefs ?? 0;
+    // Product ref takes priority; a style ref is appended only if the model has spare ref slots.
+    const refs: string[] = [];
+    if (compositing && s.productImage) refs.push(s.productImage);
+    if (s.aiBgRefMode === "ref" && s.aiBgRefImage && refs.length < maxRefs) refs.push(s.aiBgRefImage);
+    const trimmedRefs = refs.slice(0, maxRefs);
+    if (!compositing) {
+      try {
+        const image = await generateBgPicture({ model: s.aiBgModel, prompt: effectiveBgPrompt, aspect: p.aspect, refs: trimmedRefs });
+        // the product is drawn over this background (事後疊加): contact shadow, reflection, tone match on
+        setS((prev) => ({
+          ...withSharedBackground(prev, { bgImage: image, bgMode: "ai", bgImageHasProduct: false }), generating: false,
+          ...(prev.productImage ? { grounding: groundingOn(prev.grounding) } : {}),
+        }));
+      } catch (err) {
+        setS((prev) => ({ ...prev, generating: false, error: String(err) }));
       }
-
-      const res  = await fetchAwaitingCodex("/api/tools/studio/generate", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", ...roleHeader("operator") },
-        body:    JSON.stringify({
-          model:           s.aiBgModel,
-          prompt,
-          referenceImages: trimmedRefs,
-          aspectRatio:     p.aspect,
-        }),
-      });
-      const data = await res.json() as { ok: boolean; image?: string; error?: string };
-      if (!data.ok || !data.image) throw new Error(data.error ?? "generation_failed");
-      setS((prev) => ({ ...prev, bgImage: data.image!, bgMode: "ai", bgImageHasProduct: compositing, ...BG_PLACE_RESET, generating: false }));
-    } catch (err) {
-      setS((prev) => ({ ...prev, generating: false, error: String(err) }));
+      return;
     }
+    const { pics, errs } = await compositeSizes(s, picked, { model: s.aiBgModel, scene: effectiveBgPrompt, refs: trimmedRefs });
+    setSizeErrors(errs);
+    setS((prev) => ({
+      ...(Object.keys(pics).length ? withSizeBackgrounds(prev, pics, true) : prev), generating: false,
+      error: Object.keys(errs).length ? `${Object.keys(errs).length} 個尺寸合成失敗，那幾個尺寸沿用原本的背景。` : null,
+    }));
   }
 
   const bgCanvasButton = s.bgImage && canvasHref ? (
@@ -469,12 +518,12 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
             <button
               className="btn btn-primary"
               disabled={s.generating || !aiBgHasInput || (s.aiBgCompositeProduct && !!s.productImage && !modelCompositesProduct(s.aiBgModel))}
-              onClick={generateAiBg}>
+              onClick={generateAiBg} data-testid="banner-ai-bg-generate">
               {s.generating
                 ? "生成中…"
-                : `${s.aiBgCompositeProduct && s.productImage
-                  ? (s.bgImage && s.bgMode === "ai" ? "重新合成" : "合成產品到場景")
-                  : (s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景")}（${ntdLabel(STUDIO_MODEL_OPTIONS.find((m) => m.value === s.aiBgModel)?.costNt ?? 0)}）`}
+                : `${compositing
+                  ? `${s.bgImage && s.bgMode === "ai" ? "重新合成" : "合成產品到場景"}：${calls} 個尺寸各一張`
+                  : (s.bgImage && s.bgMode === "ai" ? "重新生成" : "生成背景")}（${calls > 1 ? `${calls} × ` : ""}${ntdLabel(imageNtd(s.aiBgModel))}${calls > 1 ? ` = ${ntdLabel(calls * imageNtd(s.aiBgModel))}` : ""}）`}
             </button>
             {s.bgImage && s.bgMode === "ai" && (
               <span className="form-hint" style={{ color: "var(--badge-green-text)" }}>
@@ -483,6 +532,14 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
             )}
             {s.bgMode === "ai" && bgCanvasButton}
           </div>
+          {compositing && picked.length > 1 && (
+            <p className="form-hint" style={{ margin: 0 }}>每個已選尺寸依自己的比例各生成一張，商品放在該尺寸預留的商品區，不被文字蓋到。</p>
+          )}
+          {Object.entries(sizeErrors).map(([k, e]) => (
+            <p key={k} className="form-hint" data-testid={`banner-composite-error-${k}`} style={{ margin: 0, color: "var(--badge-red-text)" }}>
+              {presetLabel(k as PresetKey)}：{e}
+            </p>
+          ))}
         </div>
       )}
       <SubHead first={false}>產品圖</SubHead>
