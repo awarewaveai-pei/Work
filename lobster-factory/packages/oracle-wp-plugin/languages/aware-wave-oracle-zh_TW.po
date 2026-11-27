@@ -34,7 +34,7 @@ msgid "Engine URL (server) must be an http(s):// address without query or fragme
 msgstr "引擎網址（伺服器用）必須是 http:// 或 https:// 開頭，且不可帶查詢字串或 #。"
 
 #: includes/Admin/SettingsPage.php:197
-#: includes/Admin/SettingsPage.php:354
+#: includes/Admin/SettingsPage.php:355
 msgid "Insufficient permissions."
 msgstr "權限不足。"
 
@@ -70,79 +70,79 @@ msgstr "工具頁面"
 msgid "One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page."
 msgstr "每行一筆：工具=頁面 ID。嵌入的工具連到另一個工具時，訪客會被帶到這個頁面。"
 
-#: includes/Admin/SettingsPage.php:230
+#: includes/Admin/SettingsPage.php:231
 msgid "Site key"
 msgstr "站台金鑰"
 
-#: includes/Admin/SettingsPage.php:231
+#: includes/Admin/SettingsPage.php:232
 msgid "This site signs its requests to the engine with an Ed25519 key. The private half never leaves this site; register the public key below with the engine under the key ID above."
 msgstr "本站以 Ed25519 金鑰為送往引擎的請求簽章。私鑰只留在本站；請把下方的公鑰以上面的金鑰名稱登記到引擎。"
 
-#: includes/Admin/SettingsPage.php:237
+#: includes/Admin/SettingsPage.php:238
 msgid "No key yet."
 msgstr "尚未建立金鑰。"
 
-#: includes/Admin/SettingsPage.php:244
+#: includes/Admin/SettingsPage.php:245
 msgid "I understand the old key stops working until the new public key is registered at the engine."
 msgstr "我了解：新公鑰登記到引擎之前，舊金鑰就會失效。"
 
-#: includes/Admin/SettingsPage.php:246
+#: includes/Admin/SettingsPage.php:247
 msgid "Rotate key"
 msgstr "更換金鑰"
 
-#: includes/Admin/SettingsPage.php:246
+#: includes/Admin/SettingsPage.php:247
 msgid "Generate key"
 msgstr "建立金鑰"
 
-#: includes/Admin/SettingsPage.php:257
+#: includes/Admin/SettingsPage.php:258
 msgid "Member pseudonyms"
 msgstr "會員代號"
 
-#: includes/Admin/SettingsPage.php:258
+#: includes/Admin/SettingsPage.php:259
 msgid "The engine never sees member IDs or e-mails, only HMAC(salt, user ID). Rotating the salt makes every member look new to the engine (usage limits restart)."
 msgstr "引擎看不到會員 ID 或電子郵件，只看到 HMAC(鹽, 使用者 ID)。更換鹽之後，每位會員在引擎看來都是新的（用量限制重新計算）。"
 
-#: includes/Admin/SettingsPage.php:260
+#: includes/Admin/SettingsPage.php:261
 msgid "Yes, rotate the salt."
 msgstr "是，更換鹽。"
 
-#: includes/Admin/SettingsPage.php:261
+#: includes/Admin/SettingsPage.php:262
 msgid "Rotate salt"
 msgstr "更換鹽"
 
-#: includes/Admin/SettingsPage.php:266
+#: includes/Admin/SettingsPage.php:267
 msgid "Tools available from the engine"
 msgstr "引擎提供的工具"
 
-#: includes/Admin/SettingsPage.php:267
+#: includes/Admin/SettingsPage.php:268
 msgid "None — check the engine URL."
 msgstr "沒有工具，請檢查引擎網址。"
 
-#: includes/Admin/SettingsPage.php:268
+#: includes/Admin/SettingsPage.php:269
 msgid "Shortcode:"
 msgstr "短碼："
 
-#: includes/Admin/SettingsPage.php:270
+#: includes/Admin/SettingsPage.php:271
 msgid "Refresh tool list"
 msgstr "重新取得工具清單"
 
-#: includes/Admin/SettingsPage.php:406
+#: includes/Admin/SettingsPage.php:407
 msgid "Tick the confirmation box to rotate the key."
 msgstr "要更換金鑰，請先勾選確認。"
 
-#: includes/Admin/SettingsPage.php:405
+#: includes/Admin/SettingsPage.php:406
 msgid "New key created. Register the public key below at the engine."
 msgstr "已建立新金鑰。請把下方公鑰登記到引擎。"
 
-#: includes/Admin/SettingsPage.php:409
+#: includes/Admin/SettingsPage.php:410
 msgid "Tick the confirmation box to rotate the salt."
 msgstr "要更換鹽，請先勾選確認。"
 
-#: includes/Admin/SettingsPage.php:408
+#: includes/Admin/SettingsPage.php:409
 msgid "Salt rotated."
 msgstr "已更換鹽。"
 
-#: includes/Admin/SettingsPage.php:410
+#: includes/Admin/SettingsPage.php:411
 msgid "Tool list refreshed."
 msgstr "已重新取得工具清單。"
 
@@ -229,57 +229,57 @@ msgstr "zh-TW 或 en。頁面語言兩者都不是、下方也沒有對照時使
 msgid "Optional, one per line: WordPress locale=engine language, e.g. zh_HK=zh-TW. zh_TW and en_* need no entry."
 msgstr "選填，一行一個：WordPress 語系=引擎語言，例如 zh_HK=zh-TW。zh_TW 與 en_* 不用填。"
 
-#: includes/Admin/SettingsPage.php:235
+#: includes/Admin/SettingsPage.php:236
 msgid "AWORACLE_SITE_KEYPAIR in wp-config.php is not a valid key."
 msgstr "wp-config.php 裡的 AWORACLE_SITE_KEYPAIR 不是有效的金鑰。"
 
-#: includes/Admin/SettingsPage.php:240
-#: includes/Admin/SettingsPage.php:407
+#: includes/Admin/SettingsPage.php:241
+#: includes/Admin/SettingsPage.php:408
 msgid "The key comes from the AWORACLE_SITE_KEYPAIR constant in wp-config.php; change it there."
 msgstr "金鑰來自 wp-config.php 的 AWORACLE_SITE_KEYPAIR 常數，請到那裡修改。"
 
-#: includes/Admin/SettingsPage.php:283
-#: includes/Admin/SettingsPage.php:326
+#: includes/Admin/SettingsPage.php:284
+#: includes/Admin/SettingsPage.php:327
 msgid "Settings → AwareWave Oracle"
 msgstr "設定 → AwareWave 命理"
 
-#: includes/Admin/SettingsPage.php:331
+#: includes/Admin/SettingsPage.php:332
 msgid "AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY in wp-config.php is not a valid key (base64 of 32 bytes)."
 msgstr "AwareWave 命理：會員目前無法存命盤——wp-config.php 裡的 AWORACLE_DATA_KEY 不是有效的金鑰（須為 32 位元組的 base64）。"
 
-#: includes/Admin/SettingsPage.php:332
+#: includes/Admin/SettingsPage.php:333
 msgid "AwareWave Oracle: members cannot save charts — AWORACLE_DATA_KEY is not set in wp-config.php."
 msgstr "AwareWave 命理：會員目前無法存命盤——wp-config.php 還沒設定 AWORACLE_DATA_KEY。"
 
-#: includes/Admin/SettingsPage.php:340
+#: includes/Admin/SettingsPage.php:341
 msgid "Member data"
 msgstr "會員資料"
 
-#: includes/Admin/SettingsPage.php:341
+#: includes/Admin/SettingsPage.php:342
 msgid "Members can save their own charts and the people they read for ([aw_oracle_my_charts], [aw_oracle_persons]). Names and birth data are encrypted with a key kept in wp-config.php, never in the database, so database backups hold only ciphertext."
 msgstr "會員可以存自己的命盤，以及為別人排盤時輸入的對象（[aw_oracle_my_charts]、[aw_oracle_persons]）。名字與出生資料用 wp-config.php 裡的金鑰加密，金鑰不進資料庫，所以資料庫備份裡只有密文。"
 
-#: includes/Admin/SettingsPage.php:343
+#: includes/Admin/SettingsPage.php:344
 msgid "Saving is on."
 msgstr "存檔功能已開啟。"
 
-#: includes/Admin/SettingsPage.php:343
+#: includes/Admin/SettingsPage.php:344
 msgid "Keep a copy of AWORACLE_DATA_KEY outside this server: without it the saved entries cannot be read."
 msgstr "請把 AWORACLE_DATA_KEY 另存一份在這台主機以外：少了它，已存的資料就讀不出來。"
 
-#: includes/Admin/SettingsPage.php:347
+#: includes/Admin/SettingsPage.php:348
 msgid "Add this line to wp-config.php above “That’s all, stop editing!”, and keep a copy outside this server:"
 msgstr "把這一行加進 wp-config.php 的「That’s all, stop editing!」上方，並另存一份在這台主機以外："
 
-#: includes/Admin/SettingsPage.php:431
+#: includes/Admin/SettingsPage.php:432
 msgid "Embedding"
 msgstr "嵌入方式"
 
-#: includes/Admin/SettingsPage.php:433
+#: includes/Admin/SettingsPage.php:434
 msgid "Same domain (recommended): the engine answers under this site’s address at /embed/, /api/, /_next/, /tarot/."
 msgstr "同網域（建議）：引擎在本站網址的 /embed/、/api/、/_next/、/tarot/ 下回應。"
 
-#: includes/Admin/SettingsPage.php:435
+#: includes/Admin/SettingsPage.php:436
 msgid "Another domain (not supported yet): the engine has its own address; the page and the tool would talk by messages."
 msgstr "其他網域（尚未支援）：引擎有自己的網址，頁面與工具之間要靠訊息溝通。"
 
@@ -313,12 +313,15 @@ msgstr "名字"
 msgid "Birth (local clock time)"
 msgstr "出生（當地鐘錶時間）"
 
+#: includes/Daily/FluentFormsDefinition.php:45
 #: includes/Daily/Signup.php:94
 #: includes/Members/Privacy.php:282
 #: includes/Members/Shortcodes.php:90
 msgid "Gender"
 msgstr "性別"
 
+#: includes/Daily/FluentFormsDefinition.php:46
+#: includes/Daily/FluentFormsDefinition.php:287
 #: includes/Daily/Signup.php:97
 #: includes/Members/Privacy.php:286
 #: includes/Members/Shortcodes.php:93
@@ -344,7 +347,7 @@ msgstr "這裡最多存 %d 筆，請先刪掉一筆。"
 msgid "Saving is not available on this site yet."
 msgstr "本站目前還不能存檔。"
 
-#: includes/Daily/Rest.php:178
+#: includes/Daily/Rest.php:204
 #: includes/Members/Rest.php:187
 msgid "Some fields are missing or not valid."
 msgstr "有欄位沒填或格式不對。"
@@ -405,7 +408,9 @@ msgstr "取消"
 msgid "This entry cannot be opened with the site’s current key. You can delete it."
 msgstr "這一筆無法用本站目前的金鑰開啟，可以刪除。"
 
-#: includes/Daily/Rest.php:102
+#: includes/Daily/FluentFormsEntry.php:90
+#: includes/Daily/FluentFormsEntry.php:186
+#: includes/Daily/Rest.php:118
 #: includes/Daily/Signup.php:106
 #: includes/Members/Rest.php:129
 #: includes/Members/Shortcodes.php:76
@@ -416,22 +421,27 @@ msgstr "出了點問題，請重新整理頁面再試一次。"
 msgid "Check the highlighted fields."
 msgstr "請檢查標出的欄位。"
 
+#: includes/Daily/FluentFormsDefinition.php:38
 #: includes/Daily/Signup.php:83
 #: includes/Members/Shortcodes.php:79
 msgid "Calendar"
 msgstr "曆法"
 
+#: includes/Daily/FluentFormsDefinition.php:55
 #: includes/Daily/Signup.php:84
 #: includes/Members/Shortcodes.php:80
 msgid "Solar (Gregorian)"
 msgstr "國曆"
 
 #: includes/Daily/Confirm.php:87
+#: includes/Daily/FluentFormsDefinition.php:56
 #: includes/Daily/Signup.php:85
 #: includes/Members/Shortcodes.php:81
 msgid "Lunar"
 msgstr "農曆"
 
+#: includes/Daily/FluentFormsDefinition.php:39
+#: includes/Daily/FluentFormsDefinition.php:62
 #: includes/Daily/Signup.php:86
 #: includes/Members/Shortcodes.php:82
 msgid "Leap month"
@@ -472,16 +482,20 @@ msgstr "時"
 msgid "Minute"
 msgstr "分"
 
+#: includes/Daily/FluentFormsDefinition.php:59
 #: includes/Daily/Signup.php:95
 #: includes/Members/Shortcodes.php:91
 msgid "Male"
 msgstr "男"
 
+#: includes/Daily/FluentFormsDefinition.php:60
 #: includes/Daily/Signup.php:96
 #: includes/Members/Shortcodes.php:92
 msgid "Female"
 msgstr "女"
 
+#: includes/Daily/FluentFormsDefinition.php:47
+#: includes/Daily/FluentFormsDefinition.php:63
 #: includes/Daily/Signup.php:98
 #: includes/Members/Shortcodes.php:94
 msgid "Use true solar time"
@@ -511,37 +525,37 @@ msgstr "已加密；本站目前的金鑰無法開啟（這筆是用別的金鑰
 msgid "Saving is for members of this site."
 msgstr "存檔只開放給本站會員。"
 
-#: includes/Admin/SettingsPage.php:441
+#: includes/Admin/SettingsPage.php:442
 #: includes/Daily/Confirm.php:65
 #: includes/Members/Privacy.php:103
 msgid "Daily fortune letter"
 msgstr "每日運勢信"
 
-#: includes/Admin/SettingsPage.php:443
+#: includes/Admin/SettingsPage.php:444
 msgid "Off: no signup form, nothing is sent."
 msgstr "關閉：不顯示訂閱表單，不寄任何信。"
 
-#: includes/Admin/SettingsPage.php:444
+#: includes/Admin/SettingsPage.php:445
 msgid "On, sent through FluentCRM (signup form [aw_oracle_daily], double opt-in, one letter a day at 07:00 in each subscriber’s time zone)."
 msgstr "開啟，經 FluentCRM 寄出（訂閱表單 [aw_oracle_daily]、雙重確認、每位訂閱者當地時間 07:00 後每天一封）。"
 
-#: includes/Admin/SettingsPage.php:452
+#: includes/Admin/SettingsPage.php:453
 msgid "FluentCRM is not active: the signup form is hidden and nothing is sent."
 msgstr "FluentCRM 未啟用：訂閱表單不顯示，也不寄信。"
 
-#: includes/Admin/SettingsPage.php:454
+#: includes/Admin/SettingsPage.php:455
 msgid "AWORACLE_DATA_KEY is missing (see Member data below): the signup form shows that subscribing is not available."
 msgstr "缺少 AWORACLE_DATA_KEY（見下方「會員資料」）：訂閱表單會顯示目前無法訂閱。"
 
-#: includes/Admin/SettingsPage.php:470
+#: includes/Admin/SettingsPage.php:471
 msgid "Resend webhook URL (events email.bounced, email.complained):"
 msgstr "Resend webhook 網址（事件 email.bounced、email.complained）："
 
-#: includes/Admin/SettingsPage.php:472
+#: includes/Admin/SettingsPage.php:473
 msgid "signing secret set."
 msgstr "簽章密鑰已設定。"
 
-#: includes/Admin/SettingsPage.php:473
+#: includes/Admin/SettingsPage.php:474
 msgid "set its signing secret in wp-config.php: define( 'AWORACLE_RESEND_WEBHOOK_SECRET', 'whsec_…' );"
 msgstr "請在 wp-config.php 設定簽章密鑰：define( 'AWORACLE_RESEND_WEBHOOK_SECRET', 'whsec_…' );"
 
@@ -575,16 +589,18 @@ msgid "This confirmation link has expired or was already used."
 msgstr "這個確認連結已過期或已用過。"
 
 #: includes/Daily/Confirm.php:70
-#: includes/Daily/Rest.php:62
+#: includes/Daily/FluentFormsEntry.php:212
+#: includes/Daily/Rest.php:80
 #: includes/Daily/Signup.php:54
 msgid "Subscribing is not available on this site yet."
 msgstr "本站目前還不能訂閱。"
 
-#: includes/Daily/Rest.php:64
+#: includes/Daily/Rest.php:68
 msgid "Almost done: check your inbox and confirm your e-mail address."
 msgstr "快完成了：請到信箱收信，確認您的 email。"
 
-#: includes/Daily/Rest.php:73
+#: includes/Daily/FluentFormsEntry.php:208
+#: includes/Daily/Rest.php:89
 msgid "Too many requests. Try again in an hour."
 msgstr "請求太多次，請一小時後再試。"
 
@@ -647,6 +663,7 @@ msgstr "您收到這封信，是因為您訂閱了每日運勢。要停止，請
 msgid "AwareWave daily fortune signup"
 msgstr "AwareWave 每日運勢訂閱"
 
+#: includes/Daily/FluentFormsDefinition.php:226
 #: includes/Daily/Signup.php:79
 msgid "Daily fortune by e-mail"
 msgstr "每日運勢 email"
@@ -655,6 +672,7 @@ msgstr "每日運勢 email"
 msgid "One letter every morning after 07:00 in your time zone, calculated from your birth data. You can unsubscribe from any letter."
 msgstr "每天早上 07:00（您所在時區）之後寄一封，依您的出生資料計算。每封信都可以取消訂閱。"
 
+#: includes/Daily/FluentFormsDefinition.php:37
 #: includes/Daily/Signup.php:81
 msgid "E-mail"
 msgstr "電子郵件"
@@ -663,6 +681,8 @@ msgstr "電子郵件"
 msgid "Your time zone (type to search)"
 msgstr "您所在的時區（可輸入搜尋）"
 
+#: includes/Daily/FluentFormsDefinition.php:161
+#: includes/Daily/FluentFormsDefinition.php:197
 #: includes/Daily/Signup.php:99
 msgid "Subscribe"
 msgstr "訂閱"
@@ -706,7 +726,7 @@ msgid ", "
 msgstr "、"
 
 #. translators: 1: date and time (UTC), 2: letters handed to FluentCRM, 3: put back for a later hour, 4: failed
-#: includes/Admin/SettingsPage.php:462
+#: includes/Admin/SettingsPage.php:463
 #, php-format
 msgid "Last hourly run %1$s UTC: %2$d handed to FluentCRM, %3$d put back for a later hour (engine or data problem), %4$d failed."
 msgstr "上次每小時排程 %1$s UTC：%2$d 封交給 FluentCRM，%3$d 封留待下個小時（引擎或資料問題），%4$d 封失敗。"
@@ -719,72 +739,73 @@ msgstr "您送出的出生資料與時區："
 msgid "Turnstile site key: paste the site key exactly as Cloudflare shows it (it starts with a digit and x, e.g. 0x4AAAA…)."
 msgstr "Turnstile 網站金鑰：請照 Cloudflare 顯示的原樣貼上（開頭是一個數字加 x，例如 0x4AAAA…）。"
 
-#: includes/Admin/SettingsPage.php:221
+#: includes/Admin/SettingsPage.php:222
 msgid "Turnstile site key"
 msgstr "Turnstile 網站金鑰"
 
-#: includes/Admin/SettingsPage.php:221
+#: includes/Admin/SettingsPage.php:222
 msgid "Optional: Cloudflare Turnstile human check on the daily-letter signup form. Site key here, secret key in the Human check section below."
 msgstr "選填：每日運勢信訂閱表單的 Cloudflare Turnstile 人機驗證。網站金鑰填這裡，密鑰填在下方「人機驗證」區塊。"
 
-#: includes/Admin/SettingsPage.php:288
+#: includes/Admin/SettingsPage.php:289
 msgid "AwareWave Oracle: the human check is not set up yet — Cloudflare Turnstile needs both the site key and the secret key. Until then the signup form relies on its rate limits, the hidden trap field and the daily cap on confirmation mails."
 msgstr "AwareWave 命理：尚未設定人機驗證——Cloudflare Turnstile 需要網站金鑰與密鑰兩把都設定。在那之前，訂閱表單只靠限流、隱藏的陷阱欄位與每日確認信上限防濫用。"
 
-#: includes/Admin/SettingsPage.php:289
+#: includes/Admin/SettingsPage.php:290
 msgid "AwareWave Oracle: the human check is not set up yet (Cloudflare Turnstile). Until then the signup form relies on its rate limits, the hidden trap field and the daily cap on confirmation mails."
 msgstr "AwareWave 命理：尚未設定人機驗證（Cloudflare Turnstile）。在那之前，訂閱表單只靠限流、隱藏的陷阱欄位與每日確認信上限防濫用。"
 
-#: includes/Admin/SettingsPage.php:294
+#: includes/Admin/SettingsPage.php:295
 msgid "Human check"
 msgstr "人機驗證"
 
-#: includes/Admin/SettingsPage.php:296
+#: includes/Admin/SettingsPage.php:297
 msgid "Cloudflare Turnstile is on: a signup that Cloudflare does not confirm is refused before anything is stored or mailed."
 msgstr "Cloudflare Turnstile 已啟用：Cloudflare 沒有確認通過的訂閱會被拒絕，不會儲存任何資料，也不會寄信。"
 
-#: includes/Admin/SettingsPage.php:301
-#: includes/Admin/SettingsPage.php:414
+#: includes/Admin/SettingsPage.php:302
+#: includes/Admin/SettingsPage.php:415
 msgid "The secret key comes from the AWORACLE_TURNSTILE_SECRET constant in wp-config.php; change it there."
 msgstr "密鑰來自 wp-config.php 的 AWORACLE_TURNSTILE_SECRET 常數；請到那裡修改。"
 
-#: includes/Admin/SettingsPage.php:305
+#: includes/Admin/SettingsPage.php:306
 msgid "A secret key is saved (not shown). Enter a new one to replace it."
 msgstr "已儲存一把密鑰（不顯示）。輸入新的即可取代。"
 
-#: includes/Admin/SettingsPage.php:305
+#: includes/Admin/SettingsPage.php:306
 msgid "No secret key yet."
 msgstr "尚未設定密鑰。"
 
-#: includes/Admin/SettingsPage.php:306
+#: includes/Admin/SettingsPage.php:307
 msgid "It can also be set in wp-config.php instead: define( 'AWORACLE_TURNSTILE_SECRET', '…' );"
 msgstr "也可以改寫在 wp-config.php：define( 'AWORACLE_TURNSTILE_SECRET', '…' );"
 
-#: includes/Admin/SettingsPage.php:308
+#: includes/Admin/SettingsPage.php:309
 msgid "Turnstile secret key"
 msgstr "Turnstile 密鑰"
 
-#: includes/Admin/SettingsPage.php:311
+#: includes/Admin/SettingsPage.php:312
 msgid "Remove the saved secret key (turns the human check off)."
 msgstr "移除已儲存的密鑰（人機驗證會關閉）。"
 
-#: includes/Admin/SettingsPage.php:313
+#: includes/Admin/SettingsPage.php:314
 msgid "Save secret key"
 msgstr "儲存密鑰"
 
-#: includes/Admin/SettingsPage.php:411
+#: includes/Admin/SettingsPage.php:412
 msgid "Turnstile secret key saved."
 msgstr "Turnstile 密鑰已儲存。"
 
-#: includes/Admin/SettingsPage.php:412
+#: includes/Admin/SettingsPage.php:413
 msgid "Turnstile secret key removed."
 msgstr "Turnstile 密鑰已移除。"
 
-#: includes/Admin/SettingsPage.php:413
+#: includes/Admin/SettingsPage.php:414
 msgid "That is not a Turnstile secret key (it starts with a digit and x, e.g. 0x4AAAA…); nothing was changed."
 msgstr "這不是 Turnstile 密鑰（開頭是一個數字加 x，例如 0x4AAAA…）；沒有做任何變更。"
 
-#: includes/Daily/Rest.php:93
+#: includes/Daily/FluentFormsEntry.php:210
+#: includes/Daily/Rest.php:109
 msgid "The human check did not pass. Try it again."
 msgstr "人機驗證沒有通過，請再試一次。"
 
@@ -796,6 +817,7 @@ msgstr "請先完成按鈕上方的人機驗證。"
 msgid "The human check could not load. Allow challenges.cloudflare.com (an ad or script blocker may stop it) or try another browser."
 msgstr "人機驗證載入失敗。請允許 challenges.cloudflare.com（廣告或指令碼封鎖工具可能擋住它），或改用其他瀏覽器。"
 
+#: includes/Daily/FluentFormsEntry.php:215
 #: includes/Daily/Signup.php:100
 msgid "You are not subscribed yet."
 msgstr "尚未訂閱成功。"
@@ -804,7 +826,9 @@ msgstr "尚未訂閱成功。"
 msgid "Please correct:"
 msgstr "請修改："
 
+#. translators: %s: names of the fields to correct
 #. translators: separator between field names in a list
+#: includes/Daily/FluentFormsEntry.php:205
 #: includes/Daily/Signup.php:103
 msgid ", "
 msgstr "、"
@@ -828,3 +852,58 @@ msgstr "城市搜尋暫時無法使用，請稍後再試。"
 #: includes/Places/Birthplace.php:60
 msgid "City data: GeoNames (CC BY 4.0)"
 msgstr "城市資料：GeoNames（CC BY 4.0）"
+
+#: includes/Admin/SettingsPage.php:221
+msgid "Signup form (Fluent Forms ID)"
+msgstr "訂閱表單（Fluent Forms ID）"
+
+#: includes/Admin/SettingsPage.php:221
+msgid "Optional: set by “wp aworacle daily-form”. Put that form’s shortcode on the signup page. Empty: the built-in form [aw_oracle_daily]."
+msgstr "選填：由「wp aworacle daily-form」設定。訂閱頁放該表單的短碼。空白＝使用內建表單 [aw_oracle_daily]。"
+
+#: includes/Daily/FluentFormsDefinition.php:40
+msgid "Birth year"
+msgstr "出生年（西元）"
+
+#: includes/Daily/FluentFormsDefinition.php:41
+msgid "Birth month"
+msgstr "出生月"
+
+#: includes/Daily/FluentFormsDefinition.php:42
+msgid "Birth day"
+msgstr "出生日"
+
+#: includes/Daily/FluentFormsDefinition.php:43
+msgid "Birth hour (0–23, local clock)"
+msgstr "出生時（0–23，當地鐘錶時間）"
+
+#: includes/Daily/FluentFormsDefinition.php:44
+msgid "Birth minute"
+msgstr "出生分"
+
+#: includes/Daily/FluentFormsDefinition.php:120
+msgid "Enter a valid e-mail address."
+msgstr "請輸入正確的電子郵件。"
+
+#: includes/Daily/FluentFormsDefinition.php:294
+msgid "This field is required."
+msgstr "此欄必填。"
+
+#: includes/Daily/FluentFormsEntry.php:117
+msgid "One more step: check your inbox and confirm your e-mail address."
+msgstr "還差一步：到信箱按確認。"
+
+#: includes/Daily/FluentFormsEntry.php:188
+msgid "The confirmation mail could not be sent. Try again later."
+msgstr "確認信寄不出去，請稍後再試。"
+
+#: includes/Daily/FluentFormsEntry.php:190
+msgid "Today’s confirmation mails are used up. Try again tomorrow."
+msgstr "今天的確認信已寄完，請明天再試。"
+
+#. translators: %s: names of the fields to correct
+#: includes/Daily/FluentFormsEntry.php:205
+#: includes/Daily/FluentFormsEntry.php:218
+#, php-format
+msgid "Please correct: %s"
+msgstr "請修改：%s"

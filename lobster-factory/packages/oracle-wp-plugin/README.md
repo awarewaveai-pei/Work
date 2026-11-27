@@ -1,6 +1,6 @@
 # aware-wave-oracle（WordPress 外掛）
 
-版本：0.5.2（與外掛檔頭 `Version:`、常數 `AWORACLE_VERSION` 同一個數字；`scripts/release-wp-bridge.sh --plugin oracle` 發佈前檢查三處一致）
+版本：0.5.3（與外掛檔頭 `Version:`、常數 `AWORACLE_VERSION` 同一個數字；`scripts/release-wp-bridge.sh --plugin oracle` 發佈前檢查三處一致）
 
 把 AwareWave 算命引擎的工具嵌進任何 WordPress 網站的頁面。oracle.aware-wave.com 只是第一個安裝的站；外掛內沒有任何網站專屬的網址或設定。設計正本：`agency-os/handoffs/2026-11-20-oracle-skills-supervisor/briefs/ORACLE-WP-SPEC.md`（§1、§2-1～§2-10、§2-13；本外掛卡 P1′、P2′、P3′）。
 
@@ -56,6 +56,20 @@
 ## 出生地（P6，0.5.2）
 
 訂閱表單與會員表單共用 `assets/birthplace.js`（`includes/Places/Birthplace.php`）：用引擎自己的城市資料搜尋（`GET /api/v1/places`，GeoNames CC BY 4.0），結果是按鈕；沒有緯度、經度、時區輸入。沒選時的預設＝瀏覽器時區的代表城市（同一個搜尋查），查不到就台北（座標同引擎 `components/PlaceField.tsx`），都顯示在畫面上、可改。已存的命盤打開時保留原座標，除非另選城市。資料層（`Members\Record`）仍要求完整座標。訂閱被拒時，按鈕旁寫明「尚未訂閱成功」與要改的欄位。
+
+## 用 Fluent Forms 當訂閱表單（P7，0.5.3）
+
+內建表單 `[aw_oracle_daily]` 照舊（沒有 Fluent Forms 的站用它）。要用 Fluent Forms：
+
+1. 每日運勢信照「設定步驟」開好後，執行 `wp aworacle daily-form`：從 `includes/Daily/FluentFormsDefinition.php` 建表單（重跑只更新同一張、不重複建）、發佈、把 ID 記到設定 `fluentform_id`。
+2. 訂閱頁放指令回報的 `[fluentform id="N"]`。
+
+- 送出走與內建表單同一條 `Daily\Rest::accept`（`includes/Daily/FluentFormsEntry.php`）。
+- Fluent Forms 不存任何送出內容：`fluentform/insert_response_data` 清空；`fluentform/before_insert_submission` 處理後直接回應並結束（同它自己的 honeypot），不寫 entry、明細、log，不寄通知、不跑整合。因此 Fluent Forms 後台看不到訂閱紀錄、它的整合與通知對這張表單無效。這張表單也不跑 Akismet／CleanTalk。
+- 認定訂閱表單＝設定的 ID，或任何含 `aw_place_lat` 欄位的複本。
+- 人機驗證用外掛自己的 Turnstile（金鑰只在本外掛設定）；開著時 Fluent Forms 的驗證碼對這張表單停用。不要在表單上加它的 Turnstile 欄位。
+- 停用本外掛時，訂閱表單和它的複本都改為未發佈（否則 Fluent Forms 會自己收件存明文），啟用時恢復。停用期間不要手動把它發佈回去。
+- 欄名、選項、按鈕文字顯示時換成頁面語言；版面可在 Fluent Forms 改，重跑指令會蓋回程式內的欄位。不要刪欄位或改欄位名稱。
 
 ## 每日運勢信（P3′）
 
@@ -129,6 +143,7 @@ Resend 不在 FluentCRM 內建的退信回報名單內，所以外掛自己收 w
 | 人機驗證 | `includes/Daily/Turnstile.php` |
 | 翻譯站的標題與描述 | `includes/Seo/TranslatedTitles.php` |
 | 出生地城市搜尋 | `includes/Places/Birthplace.php`、`assets/birthplace.js` |
+| Fluent Forms 訂閱表單 | `includes/Daily/{FluentFormsEntry,FluentFormsDefinition}.php`、`assets/ff-daily.js` |
 | 翻譯 | `languages/`：改字串後 `wp i18n make-pot . languages/aware-wave-oracle.pot --exclude=tests,bin,vendor`、`wp i18n update-po languages/aware-wave-oracle.pot languages`，補完 `.po` 的 `msgstr` 後 `wp i18n make-mo languages`、`wp i18n make-php languages` |
 | 打包與發佈 | `bin/build-zip.sh`（依 `.distignore`）；發佈 repo 的 CI／Release 在 `.github/workflows/`（由 `scripts/release-wp-bridge.sh --plugin oracle` 鏡像過去） |
 

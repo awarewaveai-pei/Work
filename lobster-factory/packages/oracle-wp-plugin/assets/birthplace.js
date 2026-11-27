@@ -1,5 +1,6 @@
 /**
- * Birthplace picker for the signup and member forms: window.awOraclePlace(saved) → { node, value() }.
+ * Birthplace picker for the signup and member forms: window.awOraclePlace(saved, changed) → { node, value() };
+ * changed(value) is called with the first value and every later one.
  * `saved` = a stored place {label, lat, lon, zone}, kept as it is until another city is picked; without it
  * the default is the main city of the browser's time zone, else cfg.fallback. Search results are visible
  * buttons (no dropdown); everything is written with textContent.
@@ -47,7 +48,7 @@
     });
   }
 
-  window.awOraclePlace = function (saved) {
+  window.awOraclePlace = function (saved, changed) {
     var current = saved && saved.zone ? saved : cfg.fallback;
     var picked = !!(saved && saved.zone);
     var shown = el('strong');
@@ -58,8 +59,12 @@
       node.appendChild(c);
     });
 
+    function value() {
+      return { label: String(current.label || '').slice(0, 100), lat: current.lat, lon: current.lon, zone: current.zone };
+    }
     function show() {
       shown.textContent = (current.label ? current.label + ' · ' : '') + current.zone;
+      if (changed) changed(value());
     }
     show();
 
@@ -124,11 +129,6 @@
       if (event.key === 'Enter') event.preventDefault();
     });
 
-    return {
-      node: node,
-      value: function () {
-        return { label: String(current.label || '').slice(0, 100), lat: current.lat, lon: current.lon, zone: current.zone };
-      }
-    };
+    return { node: node, value: value };
   };
 })();

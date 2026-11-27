@@ -29,6 +29,10 @@ final class Rest {
 	const IP_LIMIT         = 5;
 	const THROTTLE_SECONDS = 600;
 	const EMAIL_MAX        = 190;
+	/** accept() answers. The REST form answers all three the same way (no way to learn who is subscribed). */
+	const ACCEPTED    = 'accepted';
+	const MAIL_FAILED = 'mail_failed';
+	const MAIL_CAP    = 'mail_cap';
 
 	public function register(): void {
 		add_action( 'rest_api_init', array( $this, 'routes' ) );
@@ -57,17 +61,29 @@ final class Rest {
 
 	/** @return \WP_REST_Response|\WP_Error */
 	public function subscribe( \WP_REST_Request $request ) {
+		$result = self::accept( $request->get_json_params() );
+		if ( $result instanceof \WP_Error ) {
+			return $result;
+		}
+		return new \WP_REST_Response( array( 'message' => __( 'Almost done: check your inbox and confirm your e-mail address.', 'aware-wave-oracle' ) ), 202 );
+	}
+
+	/**
+	 * The one signup path, whatever drew the form (this REST route, or Fluent Forms through FluentFormsEntry).
+	 *
+	 * @param mixed $body { email, tz, locale, birth, turnstile, website }
+	 * @return string|\WP_Error ACCEPTED, MAIL_FAILED, MAIL_CAP, or why it was refused
+	 */
+	public static function accept( $body ) {
 		$off = Runner::offReason();
 		if ( $off !== '' ) {
 			return new \WP_Error( 'aworacle_daily_off', __( 'Subscribing is not available on this site yet.', 'aware-wave-oracle' ), array( 'status' => 503 ) );
 		}
-		$ok   = new \WP_REST_Response( array( 'message' => __( 'Almost done: check your inbox and confirm your e-mail address.', 'aware-wave-oracle' ) ), 202 );
-		$body = $request->get_json_params();
 		if ( ! is_array( $body ) ) {
 			return self::invalid( array( 'body' ) );
 		}
 		if ( ! empty( $body['website'] ) ) {
-			return $ok; // honeypot: bots fill every field
+			return self::ACCEPTED; // honeypot: bots fill every field
 		}
 		if ( ! self::takeIpSlot() ) {
 			return new \WP_Error( 'aworacle_daily_rate', __( 'Too many requests. Try again in an hour.', 'aware-wave-oracle' ), array( 'status' => 429 ) );
@@ -95,7 +111,7 @@ final class Rest {
 
 		$existing = Crm::findByEmail( $email );
 		if ( $existing && in_array( $existing['status'], array( 'bounced', 'complained', 'spammed' ), true ) ) {
-			return $ok;
+			return self::ACCEPTED;
 		}
 		$contact = ( $existing && $existing['status'] === 'subscribed' ) ? $existing : Crm::upsertPending( $email );
 		if ( ! $contact ) {
@@ -114,10 +130,21 @@ final class Rest {
 		// (a GET that mail scanners follow, valid for any later form) — it is not used.
 		$token = rtrim( strtr( base64_encode( random_bytes( 32 ) ), '+/', '-_' ), '=' );
 		// Site-wide cap reached: the request is kept (it expires unconfirmed) but no mail goes out today.
-		if ( Store::savePending( $contact['id'], $userId, $req, Options::dataKey(), hash( 'sha256', $token ), self::THROTTLE_SECONDS ) && Confirm::takeDailySlot() ) {
-			Confirm::mail( $contact['email'], $contact['id'], $token, $locale );
+		// Why this contact's last request got no mail, for as long as the throttle lasts.
+		$unsent = 'aworacle_daily_unsent_' . $contact['id'];
+		if ( ! Store::savePending( $contact['id'], $userId, $req, Options::dataKey(), hash( 'sha256', $token ), self::THROTTLE_SECONDS ) ) {
+			// Asked again within the throttle: if that mail never left, do not tell them to check their inbox.
+			$why = get_transient( $unsent );
+			return in_array( $why, array( self::MAIL_FAILED, self::MAIL_CAP ), true ) ? $why : self::ACCEPTED;
 		}
-		return $ok;
+		$why = ! Confirm::takeDailySlot() ? self::MAIL_CAP
+			: ( Confirm::mail( $contact['email'], $contact['id'], $token, $locale ) ? '' : self::MAIL_FAILED );
+		if ( $why !== '' ) {
+			set_transient( $unsent, $why, self::THROTTLE_SECONDS );
+			return $why;
+		}
+		delete_transient( $unsent );
+		return self::ACCEPTED;
 	}
 
 	/** @return \WP_REST_Response|\WP_Error */

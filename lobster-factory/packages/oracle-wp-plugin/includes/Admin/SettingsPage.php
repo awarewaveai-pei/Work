@@ -218,6 +218,7 @@ final class SettingsPage {
 		$this->areaRow( $name . '[locale_map]', Normalize::pairsToText( $s['locale_map'] ), __( 'Language map', 'aware-wave-oracle' ), __( 'Optional, one per line: WordPress locale=engine language, e.g. zh_HK=zh-TW. zh_TW and en_* need no entry.', 'aware-wave-oracle' ) );
 		$this->areaRow( $name . '[page_map]', Normalize::pairsToText( $s['page_map'] ), __( 'Tool pages', 'aware-wave-oracle' ), __( 'One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page.', 'aware-wave-oracle' ) );
 		$this->mailerRow( $name . '[mailer]', $s['mailer'] );
+		$this->textRow( $name . '[fluentform_id]', $s['fluentform_id'] ? (string) $s['fluentform_id'] : '', __( 'Signup form (Fluent Forms ID)', 'aware-wave-oracle' ), __( 'Optional: set by “wp aworacle daily-form”. Put that form’s shortcode on the signup page. Empty: the built-in form [aw_oracle_daily].', 'aware-wave-oracle' ) );
 		$this->textRow( $name . '[turnstile_site_key]', $s['turnstile_site_key'], __( 'Turnstile site key', 'aware-wave-oracle' ), __( 'Optional: Cloudflare Turnstile human check on the daily-letter signup form. Site key here, secret key in the Human check section below.', 'aware-wave-oracle' ) );
 		echo '</table>';
 		submit_button();

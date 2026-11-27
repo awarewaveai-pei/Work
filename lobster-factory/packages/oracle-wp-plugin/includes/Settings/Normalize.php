@@ -45,7 +45,7 @@ final class Normalize {
 	 *
 	 * @param array<string,mixed>                 $in
 	 * @param array<int,array{0:string,1:string}> $errors
-	 * @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>,mailer:string,turnstile_site_key:string}
+	 * @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>,mailer:string,turnstile_site_key:string,fluentform_id:int}
 	 */
 	public static function settings( array $in, array &$errors = array() ): array {
 		$out = Options::defaults();
@@ -81,6 +81,10 @@ final class Normalize {
 		}
 
 		$out['mailer'] = self::scalar( $in['mailer'] ?? '' ) === self::MAILER_FLUENTCRM ? self::MAILER_FLUENTCRM : self::MAILER_NONE;
+
+		// A stored value comes back as an int on the second sanitize pass; the form posts text.
+		$formRaw              = is_int( $in['fluentform_id'] ?? null ) ? (string) $in['fluentform_id'] : trim( self::scalar( $in['fluentform_id'] ?? '' ) );
+		$out['fluentform_id'] = preg_match( self::PAGE_ID_PATTERN, $formRaw ) ? (int) $formRaw : 0;
 
 		$turnstileRaw              = self::scalar( $in['turnstile_site_key'] ?? '' );
 		$out['turnstile_site_key'] = self::turnstileKey( $turnstileRaw );

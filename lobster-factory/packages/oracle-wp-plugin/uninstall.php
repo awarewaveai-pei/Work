@@ -27,6 +27,7 @@ function aworacle_uninstall_site(): void {
 	delete_transient( 'aworacle_tools_v2' );
 	delete_option( 'aworacle_daily_last_run' );
 	delete_option( 'aworacle_daily_confirm_count' );
+	delete_option( 'aworacle_ff_unpublished' ); // the Fluent Forms signup form stays, unpublished
 	\AwareWave\Oracle\Members\Store::drop();
 }
 
