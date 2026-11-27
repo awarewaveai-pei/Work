@@ -58,6 +58,8 @@ export const PROGRESS = {
   U17: 'done',
   U19: 'done',
   U28: 'done',
+  U25: 'doing',
+  U24: 'doing',
 };
 export const COMMITS = {
   K1: 'd2201ecf7',
@@ -476,6 +478,14 @@ export const BATCHES = [
       C('U19', 'High', 'Opus', 'M5', '客戶自己授權他人。'),
       C('U28', 'Medium', 'Sonnet', 'U5', '付款後立刻讓功能清單的快取失效。'),
     ] },
+  { code: 'b13', no: '第十三批', title: '找工具的基礎', phase: 'P2',
+    seen: '工作台多「最近使用」和「常用」（只看得到自己的）；登記表每個功能有了分類與「我想做…」的詞，之後的搜尋和分類頁用它。',
+    accept: '各卡測試；最近使用只回本人、別的單位一律沒有；每個功能的分類都在詞表裡。',
+    rollback: '單卡還原，沒有資料庫變更。',
+    cards: [
+      C('U25', 'Medium', 'Sonnet＋Haiku 填值', 'U22', '功能層分類欄位，並填入資料。'),
+      C('U24', 'Medium', 'Opus', 'U8', '最近使用與常用。'),
+    ] },
   { code: 'p2', no: '第二階段', title: '開放註冊前', phase: 'P2',
     seen: '第一階段全部併完後，才依卡之間的先後排批、展開派工單。',
     accept: '排批時再定。', rollback: '排批時再定。',
@@ -486,8 +496,6 @@ export const BATCHES = [
       C('M7', 'High', 'Opus＋你', 'M5、M6、W6', '既有客戶逐一代辦成會員。'),
       C('W7', 'Medium', '你本人', 'W6、M5、M6、M8、M9、M10', '真人走一遍：註冊、付款、進入、扣點。'),
       C('U18', 'Low', 'Sonnet', 'K5、U22', '頂列搜尋。'),
-      C('U24', 'High', 'Opus', 'U8', '最近使用與常用。'),
-      C('U25', 'Medium', 'Sonnet＋Haiku 填值', 'U22', '功能層分類欄位，並填入資料。'),
       C('U26', 'Low', 'Sonnet', 'U25', '登記表匯出成 catalog.json。'),
     ] },
   { code: 'p3', no: '第三階段', title: '開放註冊時與之後', phase: 'P3',
