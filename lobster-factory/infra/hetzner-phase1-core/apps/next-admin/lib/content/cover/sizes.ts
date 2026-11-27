@@ -1,7 +1,7 @@
 // K29: which size of article cover each social platform takes -- the ONE table (a new platform = one more row). The
 // website's featured image stays 1200x900 (K24/K25); a platform not in the table gets that one. YouTube is not here: it
 // takes videos only, so its draft never gets a cover (make.ts attachTopicCover). Browser-safe: pure, no server imports.
-import type { AspectRatio } from "@/lib/tarot/image-gen";
+import { VALID_ASPECT_RATIOS, type AspectRatio } from "@/lib/studio/model-options";
 import { layoutCover } from "./layout";
 
 export interface CoverSize { width: number; height: number }
@@ -55,8 +55,8 @@ export function coverSizesFor(drafts: ReadonlyArray<readonly string[]>): CoverSi
   return [...out.values()];
 }
 
-// The ratios the image models draw (lib/tarot/image-gen.ts VALID_ASPECT_RATIOS; that module is server-only).
-const RATIOS = ["2:3", "3:2", "4:5", "1:1", "9:16", "4:3", "3:4", "16:9"] as const satisfies readonly AspectRatio[];
+// The ratios every image model draws (the one list, browser-safe: lib/studio/model-options).
+const RATIOS = VALID_ASPECT_RATIOS;
 
 /** The drawable ratio closest to the cover's picture area at this size (K24's layout: the band takes the bottom quarter,
  *  so 1200x900 -> 1200x675 = 16:9, 1080x1350 -> 1080x1012 ~ 1:1). */
