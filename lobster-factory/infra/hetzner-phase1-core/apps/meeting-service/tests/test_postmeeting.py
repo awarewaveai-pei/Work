@@ -39,7 +39,7 @@ class Fakes:
         return {"segments": [{"id": 0, "start": 0.0, "end": 1.0, "text": "你好", "avg_logprob": -0.2, "no_speech_prob": 0.0}],
                 "audio_duration_sec": 1.0, "realtime_factor": 2.0, "backend": "cpu", "language": "zh", "model": "large-v3"}
 
-    def diarize(self, media_path, segments, spans_cache_path=None, log=print):
+    def diarize(self, media_path, segments, spans_cache_path=None, log=print, channel=None):
         self.diarized += 1
         for s in segments:
             s["speaker"] = "A"
@@ -129,6 +129,23 @@ class ChainSkipsWhatItHas(unittest.TestCase):
         self.assertEqual(status["steps"]["transcribe"], pipeline.REUSED)
         self.assertTrue(os.path.exists(os.path.join(self.job, postmeeting.SPEAKERS)))
 
+    def test_only_a_two_channel_listening_splits_speakers_on_the_right_channel(self):
+        # Codex 2026-11-27: an uploaded stereo file (A left, B right) lost speaker A.
+        seen = []
+        real = self.fakes.diarize
+        self.fakes.diarize = lambda *a, channel=None, **k: (seen.append(channel), real(*a, **k))[1]
+        start(self, [mock.patch.object(pipeline.diarize, "diarize", self.fakes.diarize)])
+        pipeline.run_pipeline_phase1(self.job, "input.wav", pipeline.Options())
+        os.remove(os.path.join(self.job, postmeeting.SPEAKERS))
+        pipeline.run_pipeline_phase1(self.job, "input.wav", pipeline.Options(me_them=True))
+        self.assertEqual(seen, [None, 1])
+
+    def test_me_and_them_never_share_a_paragraph(self):
+        # Codex 2026-11-27: lines from two channels were merged into one paragraph.
+        segs = [{"id": 0, "start": 0.0, "end": 1.0, "text": "Hello", "avg_logprob": 0, "who": "them"},
+                {"id": 1, "start": 1.1, "end": 2.0, "text": "你好", "avg_logprob": 0, "who": "me"}]
+        self.assertEqual(len(merge_segments.merge(segs)), 2)
+
     def test_speakers_marked_while_listening_mean_no_diarize(self):
         postmeeting.write_products(self.job, sidecar(lines=[{**l, "speaker": "我"} for l in LINES]), 5.0)
         status = self.run_chain()
@@ -158,8 +175,7 @@ class Entry(unittest.TestCase):
         start(self, self.fakes.patches() + [
             mock.patch.dict(os.environ, {"OWNVOICE_SESSIONS_DIR": self.sessions}),
             mock.patch.object(app_module, "JOBS_DIR", jobs_dir),
-            mock.patch.object(app_module.threading, "Thread", self.SyncThread),
-            mock.patch.object(app_module.settings, "pref", lambda name: "zh-TW")])
+            mock.patch.object(app_module.threading, "Thread", self.SyncThread)])   # settings: conftest's empty file (target zh-TW)
         self.client = TestClient(app_module.app, base_url="http://127.0.0.1:8420")
 
     def session(self, name, wav=True, side=None):

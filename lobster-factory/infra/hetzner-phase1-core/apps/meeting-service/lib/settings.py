@@ -5,6 +5,7 @@
 檔案裡不認得的鍵原樣保留（撤回到舊版、或新版加的欄位，彼此都讀得下去）。
 """
 import contextlib
+import copy
 import json
 import logging
 import math
@@ -66,6 +67,41 @@ def _lang_in(codes):
     return check
 
 
+def _recording_dir(v):
+    """"" = OwnVoice 的預設資料夾（ownvoice.base_dir）。這裡只驗寫法：讀取時也會跑，雲端規則改了不能讓已存的值
+    悄悄變回預設；「不可在雲端同步資料夾」在存檔時（update）與開始錄音時（ownvoice.recording_dir）檢查。"""
+    from lib import paths      # imported here for the same reason as _lang_in
+    return v if v == "" else paths.windows(v)
+
+
+def _refuse_cloud_recording(v: str) -> None:
+    """錄音不出這台電腦：要存的錄音資料夾（""＝OwnVoice 的資料夾）在雲端同步資料夾底下就拒絕。"""
+    from lib import ownvoice, paths
+    paths.refuse_cloud(v or ownvoice.base_dir())
+
+
+DESTINATIONS_MAX, NAME_MAX = 10, 40
+
+
+def _destinations(v):
+    """[{name, dir, sync}]：會後整理產出複製去的資料夾；sync＝「預設同步」（會後整理的同步選項預設勾）。"""
+    from lib import paths
+    if not isinstance(v, list) or len(v) > DESTINATIONS_MAX:
+        raise ValueError(f"要是清單，最多 {DESTINATIONS_MAX} 個")
+    out, names = [], set()
+    for d in v:
+        if not isinstance(d, dict) or set(d) - {"name", "dir", "sync"}:
+            raise ValueError("每一個要有名稱、資料夾、預設同步")
+        name = d.get("name")
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > NAME_MAX:
+            raise ValueError(f"的名稱要填，最多 {NAME_MAX} 個字")
+        if name.strip() in names:
+            raise ValueError(f"名稱重複：{name.strip()}")
+        names.add(name.strip())
+        out.append({"name": name.strip(), "dir": paths.windows(d.get("dir")), "sync": _flag(d.get("sync", False))})
+    return out
+
+
 # 偏好欄位 → (預設值, 驗證)。預設值＝今天頁面的行為。
 PREFS = {
     "listen": ("en-US", _lang_in("listen_codes")),
@@ -78,6 +114,8 @@ PREFS = {
     "summary": (False, _flag),
     "summary_min": (5, _number(1, 60, integer=True)),
     "save": (True, _flag),
+    "recording_dir": ("", _recording_dir),
+    "destinations": ([], _destinations),
 }
 
 LABELS = {
@@ -85,7 +123,10 @@ LABELS = {
     "serper_api_key": "Serper 搜尋金鑰", "listen": "聽的語言", "target": "翻譯成", "stt": "辨識方式",
     "pause_min": "安靜幾分鐘暫停", "end_min": "安靜幾分鐘結束", "caption_size": "字幕字級", "reply_size": "回覆字級",
     "summary": "會議中摘要", "summary_min": "摘要間隔", "save": "存檔",
+    "recording_dir": "錄音存檔資料夾", "destinations": "輸出目的地",
 }
+# 只由伺服器寫的鍵（PUT 不收）：用過的錄音資料夾（舊場次還列得出來），以及舊環境變數轉成的目的地。
+HISTORY, DRIVE_ENV, DRIVE_ENV_DONE = "recording_history", "MEETING_DRIVE_BASE", "drive_env_imported"
 
 
 # update() 的「讀、改、寫」整段持鎖：幾個面板同時 PUT（第一次載入搬舊資料時就是）不能互相蓋掉。
@@ -167,11 +208,68 @@ def pref(name: str, data=None):
     default, check = PREFS[name]
     data = _load() if data is None else data
     if name not in data:
-        return default
+        return copy.deepcopy(default)
     try:
         return check(data[name])
     except ValueError:
-        return default
+        return copy.deepcopy(default)
+
+
+def recording_history() -> list:
+    """以前設過的錄音資料夾（存檔寫法），舊到新。"""
+    v = _load().get(HISTORY)
+    return [p for p in v if isinstance(p, str)] if isinstance(v, list) else []
+
+
+def _import_drive_env() -> None:
+    """舊資料：環境變數 MEETING_DRIVE_BASE 第一次被看到時轉成一個輸出目的地（預設同步關＝以前要勾才同步），
+    記下轉過了，之後不再讀它（使用者刪掉這個目的地也不會再冒出來）。"""
+    raw = os.environ.get(DRIVE_ENV, "").strip()
+    if not raw or DRIVE_ENV_DONE in _load():
+        return
+    from lib import paths
+    try:
+        folder = paths.windows(raw)
+    except paths.PathError:
+        logging.getLogger(__name__).warning("%s is not a folder path, not imported", DRIVE_ENV)
+        return
+    with _WRITE_LOCK:
+        try:
+            data = _read()
+        except (OSError, ValueError):
+            return          # a broken file is dealt with by the next update(); try again then
+        if DRIVE_ENV_DONE in data:
+            return
+        dests = pref("destinations", data)
+        if all(d["dir"].lower() != folder.lower() for d in dests) and len(dests) < DESTINATIONS_MAX:
+            dests.append({"name": _free_name(dests, "Google Drive"), "dir": folder, "sync": False})
+        data["destinations"] = dests
+        data[DRIVE_ENV_DONE] = folder
+        _save(data)
+
+
+def _free_name(dests: list, name: str) -> str:
+    taken = {d["name"] for d in dests}
+    n = 1
+    while (name if n == 1 else f"{name} {n}") in taken:
+        n += 1
+    return name if n == 1 else f"{name} {n}"
+
+
+def destinations() -> list:
+    """輸出目的地（[{name, dir, sync}]，存檔寫法）；第一次呼叫時順便轉入舊環境變數。"""
+    _import_drive_env()
+    return pref("destinations")
+
+
+def legacy_destinations() -> list:
+    """C16 之前開始、只記了 sync_drive: true 的工作要同步去哪：當時的 MEETING_DRIVE_BASE（轉成的那個目的地）。"""
+    _import_drive_env()
+    folder = _load().get(DRIVE_ENV_DONE)
+    if not isinstance(folder, str):
+        return []
+    named = [d for d in pref("destinations") if d["dir"].lower() == folder.lower()]
+    return named or [{"name": "Google Drive", "dir": folder, "sync": False}]
 
 
 def _mask(value: str) -> str:
@@ -181,6 +279,7 @@ def _mask(value: str) -> str:
 
 def public() -> dict:
     """給頁面的樣子：偏好照值，金鑰只有遮罩與來源（settings／env／""），絕不回明文。"""
+    _import_drive_env()
     data = _load()
     out = {name: pref(name, data) for name in PREFS}
     out["stored"] = sorted(name for name in PREFS if name in data)   # the page's one-time migration skips these
@@ -211,8 +310,11 @@ def update(patch) -> dict:
         elif name in PREFS:
             try:
                 value = PREFS[name][1](value)
+                if name == "recording_dir":
+                    _refuse_cloud_recording(value)
             except ValueError as e:
-                raise ValueError(f"{LABELS[name]}{e}") from None
+                # A path problem is a whole sentence (lib/paths.PathError); the others continue the label.
+                raise ValueError(f"{LABELS[name]}{'：' if getattr(e, 'sentence', False) else ''}{e}") from None
         else:
             raise ValueError(f"不認得的設定：{str(name)[:40]}")
         clean[name] = value
@@ -228,6 +330,10 @@ def update(patch) -> dict:
                 data = {}
             except OSError as e:
                 raise OSError(f"設定檔讀不到，這次沒有存（{type(e).__name__}）") from None
+            old_dir = pref("recording_dir", data)
+            if "recording_dir" in clean and old_dir and old_dir.lower() != clean["recording_dir"].lower():
+                history = [p for p in data.get(HISTORY, []) if isinstance(p, str) and p.lower() != old_dir.lower()]
+                data[HISTORY] = history + [old_dir]
             for name, value in clean.items():
                 if name in KEYS and not value:
                     data.pop(name, None)

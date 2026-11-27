@@ -201,7 +201,7 @@ class FolderCompatibility(TempDir):
         a.line_final(arc.Line(3, seg=1, text="Any questions?", final=True))
         a.end()
 
-        self.assertEqual(ownvoice.sessions(), [{"id": "2026-11-24 1003", "wavs": 2, "transcript": True, "summary": False}])
+        self.assertEqual(ownvoice.sessions(), [{"id": "2026-11-24 1003", "root": self.base, "wavs": 2, "transcript": True, "summary": False}])
         text = ownvoice.read_text("latest", "transcript.md")
         self.assertIn("Hello everyone.", text)
         self.assertIn("大家好。", text)
@@ -276,7 +276,8 @@ class SaveSwitch(unittest.IsolatedAsyncioTestCase):
                   mock.patch.object(arc, "MIN_FREE_BYTES", 0),
                   mock.patch.object(hub_mod.script_store, "load", lambda: {"script": "", "glossary": ""}),
                   mock.patch.object(hub_mod.settings, "get_api_key", lambda: ""),
-                  mock.patch.object(hub_mod.stt_local, "run", self.idle_stt)):
+                  mock.patch.object(hub_mod.stt_local, "run", self.idle_stt),
+                  mock.patch.object(hub_mod.stt_local, "Recognizer", self.NoModel)):
             p.start()
             self.addCleanup(p.stop)
         self.hub = hub_mod.Hub(Usage(os.path.join(self._tmp.name, "usage.json")))
@@ -289,8 +290,18 @@ class SaveSwitch(unittest.IsolatedAsyncioTestCase):
         async def __call__(self, system, user, on_delta, stop, early, target="zh-TW"):
             return "譯文"
 
+    class NoModel:
+        """The shared local recognizer without a model (the fake run never hands it an utterance)."""
+        failed = False
+
+        def __init__(self, session, usage):
+            pass
+
+        async def close(self):
+            pass
+
     @staticmethod
-    async def idle_stt(session, usage, language, audio):
+    async def idle_stt(session, recognizer, language, audio, who="them"):
         while await audio.get() is not None:
             pass
 

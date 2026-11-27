@@ -25,7 +25,7 @@ class _TempSettings(unittest.TestCase):
         patcher = mock.patch.object(settings, "SETTINGS_PATH", self.path)
         patcher.start()
         self.addCleanup(patcher.stop)
-        env = mock.patch.dict(os.environ, {"GEMINI_API_KEY": "", "HF_TOKEN": "", "SERPER_API_KEY": ""})
+        env = mock.patch.dict(os.environ, {"GEMINI_API_KEY": "", "HF_TOKEN": "", "SERPER_API_KEY": "", "MEETING_DRIVE_BASE": ""})
         env.start()
         self.addCleanup(env.stop)
 

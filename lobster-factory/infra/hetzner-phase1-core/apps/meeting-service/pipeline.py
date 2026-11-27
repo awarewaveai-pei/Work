@@ -24,8 +24,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from lib import (archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, postmeeting, speaker_notes,
-                 summarize, word)
+from lib import (archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, postmeeting, settings,
+                 speaker_notes, summarize, word)
 from lib.live import vad
 from lib.transcribe import transcribe, write_srt, write_vtt
 
@@ -114,25 +114,34 @@ class Options:
     diarize: bool = True
     model: str = "large-v3"
     language: str = "zh"
-    sync_drive: bool = False
+    # 這個工作要同步去的輸出目的地，((名稱, 資料夾存檔寫法), …)；空＝不同步。
+    destinations: tuple = ()
     use_api: bool = False
     target: str = "zh-TW"
+    # The recording is a two-channel listening (left me, right them): speakers are split on the right only.
+    me_them: bool = False
 
 
 def _reanchor(result: dict, media_path: str, log) -> None:
-    """Gemini 聆聽逐字稿的句子時間是文字到達的時間：用錄音的發聲區段對回發聲位置（lib/live/vad.reanchor）。"""
+    """Gemini 聆聽逐字稿的句子時間是文字到達的時間：用錄音的發聲區段對回發聲位置（lib/live/vad.reanchor）。
+    只動 arrival 的句子；雙聲道錄音每一路用自己那一聲道（左我、右對方）。"""
     with wave.open(media_path, "rb") as w:
-        if w.getnchannels() != 1 or w.getsampwidth() != 2:
-            log("[對齊] 錄音不是單聲道 16 位元，句子時間維持文字到達的時間")
+        nch = w.getnchannels()
+        if nch > 2 or w.getsampwidth() != 2:
+            log("[對齊] 錄音不是 16 位元單／雙聲道，句子時間維持文字到達的時間")
             return
         rate = w.getframerate()
-        pcm = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2")
-    regions = vad.speech_regions(pcm, rate)
-    segs = result["segments"]
-    for s, (start, end) in zip(segs, vad.reanchor([(s["start"], s["end"]) for s in segs], regions)):
-        s["start"], s["end"] = start, end
+        pcm = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").reshape(-1, nch)
+    for who in ("me", "them"):
+        segs = [s for s in result["segments"] if s.get("arrival") and s.get("who", "them") == who]
+        if not segs:
+            continue
+        regions = vad.speech_regions(pcm[:, (0 if who == "me" else 1) if nch == 2 else 0], rate)
+        for s, (start, end) in zip(segs, vad.reanchor([(s["start"], s["end"]) for s in segs], regions)):
+            s["start"], s["end"], s["arrival"] = start, end, False
+        log(f"[對齊] {'我' if who == 'me' else '對方'} {len(segs)} 句對回錄音的 {len(regions)} 個發聲區段")
+    result["segments"].sort(key=lambda s: s["start"])
     result["times"] = postmeeting.SPEECH
-    log(f"[對齊] {len(segs)} 句對回錄音的 {len(regions)} 個發聲區段")
 
 
 def run_pipeline_phase1(job_dir: str, media_path, opts: Options, api_key: str = "") -> None:
@@ -143,9 +152,9 @@ def run_pipeline_phase1(job_dir: str, media_path, opts: Options, api_key: str = 
     app.py 事先用 lib/postmeeting.py 寫好），有就沿用、沒有才跑。合併與幻覺偵測一律跑。
     media_path＝None：這場沒有錄音（只能沿用聆聽逐字稿，不能分講者）。
 
-    sync_drive 在上傳當下就決定（勾選框），要持久化到 status.json，
-    因為 resume_after_summary() 是後續另一次 HTTP 請求才觸發，
-    中間隔著使用者去別的對話貼摘要，不能靠記憶體變數傳遞。
+    同步去哪幾個目的地在開始當下就決定（勾選），連名稱與資料夾一起存進 status.json：
+    resume_after_summary() 是後續另一次 HTTP 請求才觸發，中間隔著使用者去別的對話貼摘要，
+    不能靠記憶體變數傳遞，之後改了設定也不影響這個工作要去的地方。
 
     api_key 同理在上傳當下由 app.py 讀出、當參數傳進來，不在這裡才去讀
     settings.py 目前的值——轉錄+講者分離常跑好幾分鐘，這段時間夠使用者在
@@ -154,7 +163,7 @@ def run_pipeline_phase1(job_dir: str, media_path, opts: Options, api_key: str = 
     log = JobLogger(job_dir)
     steps = {}
     write_status(job_dir, stage="preflight", error=None, done=False, started_at=time.time(),
-                 sync_drive=opts.sync_drive, steps=steps)
+                 destinations=[{"name": n, "dir": d} for n, d in opts.destinations], steps=steps)
     keep_awake.prevent_sleep()
 
     try:
@@ -211,7 +220,9 @@ def run_pipeline_phase1(job_dir: str, media_path, opts: Options, api_key: str = 
             write_status(job_dir, stage="diarize", steps=steps)
             try:
                 spans_cache = os.path.join(job_dir, "diarize_spans.json")
-                dr = diarize.diarize(media_path, result["segments"], spans_cache_path=spans_cache, log=log)
+                # 雙聲道（兩路聆聽）只分對方那一聲道；「我」的句子已經標好。
+                dr = diarize.diarize(media_path, result["segments"], spans_cache_path=spans_cache, log=log,
+                                     channel=1 if opts.me_them else None)
                 turns = dr["turns"]
                 product = {"speakers": dr["speakers"], "overlap_sec": dr["overlap_sec"], "source": "pyannote"}
                 postmeeting.write_json(speakers_path, product)
@@ -354,25 +365,52 @@ def _finalize_from_minutes(job_dir: str, minutes: dict, log) -> list:
     word.build_coach(minutes["coaching"], minutes, os.path.join(job_dir, "coach.docx"))
     log("[Word] 報告教練 -> coach.docx")
 
-    # 讀失敗不該讓已經產出的 PPT/Word/Excel 全部作廢——同步是選配功能，
-    # 讀不到旗標時保守地當作「不同步」（不會誤傳到雲端），繼續走完 done。
-    try:
-        with open(_status_path(job_dir), encoding="utf-8") as f:
-            sync_drive = json.load(f).get("sync_drive", False)
-    except (OSError, json.JSONDecodeError) as e:
-        log(f"[warn] 讀不到 sync_drive 旗標（{type(e).__name__}），本次不同步 Drive")
-        sync_drive = False
-    if sync_drive:
-        write_status(job_dir, stage="sync_drive")
-        result = archive.sync_to_drive(job_dir, minutes, os.path.basename(job_dir))
-        if result["ok"]:
-            log(f"[Drive 同步] {len(result['files'])} 個檔案 -> {result['dest']}")
-        else:
-            log(f"[warn] Drive 同步失敗（本地產出不受影響）: {result['error']}")
-        write_status(job_dir, drive_sync_result=result)
+    _sync(job_dir, minutes, log)
 
     write_status(job_dir, stage="done", done=True, finished_at=time.time())
     log("[完成] 全流程結束")
+    return []
+
+
+def _sync(job_dir: str, minutes: dict, log) -> None:
+    """產出複製到這個工作選的每個目的地；一個目的地失敗不影響其他的，結果各記一筆（status.json sync_results）。"""
+    dests = _sync_destinations(job_dir, log)
+    if not dests:
+        return
+    write_status(job_dir, stage="sync_drive")
+    results = []
+    for dest in dests:
+        result = archive.sync_to(dest, job_dir, minutes, os.path.basename(job_dir))
+        results.append(result)
+        if result["ok"]:
+            log(f"[同步] {dest['name']}：{len(result['files'])} 個檔案 -> {result['dest']}")
+        else:
+            log(f"[warn] 同步到 {dest['name']} 有問題（本地產出不受影響）: {result['error']}"
+                + "".join(f"\n  {f['file']}: {f['error']}" for f in result["failed"]))
+    write_status(job_dir, sync_results=results)
+
+
+def _sync_destinations(job_dir: str, log) -> list:
+    """這個工作開始時選的目的地（status.json destinations）。C16 之前開始的工作只有 sync_drive：
+    true＝當時的 MEETING_DRIVE_BASE（已轉成設定裡的目的地）。
+    讀不到 status.json 時當作不同步：不該讓已經產出的 PPT/Word/Excel 作廢，也不會誤傳到雲端。"""
+    try:
+        with open(_status_path(job_dir), encoding="utf-8") as f:
+            status = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        log(f"[warn] 讀不到同步設定（{type(e).__name__}），本次不同步")
+        return []
+    dests = status.get("destinations")
+    if isinstance(dests, list):
+        return [d for d in dests if isinstance(d, dict) and d.get("dir")]
+    if status.get("sync_drive") is True:
+        legacy = [{"name": d["name"], "dir": d["dir"]} for d in settings.legacy_destinations()]
+        if not legacy:
+            msg = "這個工作開始時勾了同步，但找不到當時的雲端資料夾（環境變數 MEETING_DRIVE_BASE）：到「設定」加一個輸出目的地，再重做一次"
+            log(f"[warn] {msg}")
+            write_status(job_dir, sync_results=[{"name": "Google Drive", "ok": False, "dest": None, "files": [],
+                                                  "failed": [], "error": msg}])
+        return legacy
     return []
 
 

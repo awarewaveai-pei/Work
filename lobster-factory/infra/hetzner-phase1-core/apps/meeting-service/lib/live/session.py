@@ -20,6 +20,8 @@ from .translate import TranslateError
 MAX_SEGMENTS = 500
 # Same default as OwnVoice Meet settings.rs (context_lines).
 CONTEXT_LINES = 12
+# The speaker name of every line from the user's own channel (C17, lib/live/hub.py).
+ME = "我"
 
 
 @dataclass
@@ -71,6 +73,9 @@ class Session:
         self.on_clear: list = []
         # on_lost(seconds) for audio the speech service never got (it fell behind, or the line was down).
         self.on_lost: list = []
+        # echo(start, end) -> True when a 「我」 line there is the others' voice heard by the microphone
+        # (lib/live/echo.py; set by the hub only while two channels listen). Such a line is dropped.
+        self.echo: Optional[Callable[[float, float], bool]] = None
         self._seg_seq = 0
         self._lines: dict = {}
         self._tasks: set = set()
@@ -174,26 +179,35 @@ class Session:
 
     # ---- caption bookkeeping (captions.rs) ----
 
-    def open(self, start: float) -> int:
-        """Speech began `start` seconds into the recording: a new gray line."""
+    def open(self, start: float, who: str = "them") -> int:
+        """Speech began `start` seconds into the recording on channel `who`: a new gray line.
+        The user's own lines carry the speaker name ME."""
         self._seg_seq = max(self._seg_seq, self.segments[-1].id if self.segments else 0) + 1
         id = self._seg_seq
-        self._upsert(Segment(id, start=start, end=start, seg=self.seg, text="…"))
+        self._upsert(Segment(id, start=start, end=start, seg=self.seg, who=who, speaker=ME if who == "me" else None, text="…"))
         self._lines[id] = Line(self.clock())
         return id
 
-    def _language(self, text: str, detected: Optional[str]) -> tuple:
-        """(text in Traditional Chinese where it is Chinese, its language)."""
-        lang = langs.line_lang(self.listen, text, detected)
+    def _language(self, id: int, text: str, detected: Optional[str]) -> tuple:
+        """(text in Traditional Chinese where it is Chinese, its language). The user's own channel is
+        recognized in whatever language they speak (their language, or the others' when reading a reply)."""
+        cur = self._find(id)
+        listen = "auto" if cur is not None and cur.who == "me" else self.listen
+        lang = langs.line_lang(listen, text, detected)
         return langs.taiwan(text, lang), lang
+
+    def _translates(self, id: int, lang: str) -> bool:
+        """The user's own lines are never translated; the others' as langs.translates says."""
+        cur = self._find(id)
+        return (cur is None or cur.who != "me") and langs.translates(lang, self.target)
 
     def interim(self, id: int, text: str) -> None:
         """The sentence so far (gray). Translated early when it keeps growing."""
-        text, lang = self._language(text, None)
+        text, lang = self._language(id, text, None)
         self._set_text(id, text, False, lang=lang)
         now = self.clock()
         line = self._lines.setdefault(id, Line(now))
-        if langs.translates(lang, self.target) and line.wants_early(text, now):
+        if self._translates(id, lang) and line.wants_early(text, now):
             seq, stop = line.start(text, True, now)
             self._spawn(id, text, seq, stop, True)
 
@@ -204,11 +218,14 @@ class Session:
         text = text.strip()
         if not text:
             return self.drop(id)
-        text, lang = self._language(text, lang)
+        cur = self._find(id)
+        if cur is not None and cur.who == "me" and self.echo is not None and self.echo(cur.start, end):
+            return self.drop(id)
+        text, lang = self._language(id, text, lang)
         seg = self._set_text(id, text, True, end, lang)
         for cb in self.on_final:
             cb(seg)
-        if not langs.translates(lang, self.target):
+        if not self._translates(id, lang):
             self._forget(id)
             if seg.tr:
                 self._set_tr(id, "")

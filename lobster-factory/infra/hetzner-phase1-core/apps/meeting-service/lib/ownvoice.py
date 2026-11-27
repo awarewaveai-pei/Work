@@ -11,6 +11,7 @@ import re
 import time
 import wave
 
+from lib import paths, settings
 from lib.live.langs import LANGS
 
 APP_ID = "io.github.zaious.ownvoice-meet"
@@ -33,26 +34,36 @@ def _settings() -> dict:
         return {}
 
 
-def _documents() -> str:
-    # 「文件」可能被 OneDrive 轉向，問 Windows 才準；非 Windows 退回家目錄。
-    try:
-        import ctypes
-        buf = ctypes.create_unicode_buffer(260)
-        ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf)  # CSIDL_PERSONAL
-        if buf.value:
-            return buf.value
-    except (AttributeError, OSError):
-        pass
-    return os.path.join(os.path.expanduser("~"), "Documents")
-
-
 def base_dir() -> str:
-    """與 archive.rs base_dir() 同序；OWNVOICE_SESSIONS_DIR 只給測試指到暫存資料夾。"""
+    """OwnVoice app 的資料夾，與 archive.rs base_dir() 同序；OWNVOICE_SESSIONS_DIR 只給測試指到暫存資料夾。"""
     override = os.environ.get("OWNVOICE_SESSIONS_DIR", "").strip()
     if override:
         return override
     custom = str(_settings().get("archive_dir", "")).strip()
-    return custom or os.path.join(_documents(), "OwnVoice Meet")
+    # 非 Windows 問不到「文件」，退回家目錄。
+    return custom or os.path.join(paths.documents() or os.path.join(os.path.expanduser("~"), "Documents"), "OwnVoice Meet")
+
+
+def recording_dir() -> str:
+    """聆聽存檔寫到哪：設定的錄音存檔資料夾，沒設＝OwnVoice app 的資料夾（「文件」可能被 OneDrive 轉向）。
+    打不開（WSL 沒掛載）或在雲端同步資料夾底下時丟 paths.PathError：錄音不出這台電腦。"""
+    chosen = settings.pref("recording_dir")
+    folder = chosen or base_dir()
+    paths.refuse_cloud(folder)
+    return paths.local(chosen) if chosen else folder
+
+
+def roots() -> list:
+    """場次可能在的資料夾：現在的錄音資料夾、OwnVoice app 的、以前設過的（新到舊）；同一個資料夾只列一次，打不開的略過。"""
+    out = []
+    for get in [recording_dir, base_dir] + [lambda p=p: paths.local(p) for p in reversed(settings.recording_history())]:
+        try:
+            root = get()
+        except paths.PathError:
+            continue
+        if all(os.path.normcase(os.path.normpath(root)) != os.path.normcase(os.path.normpath(r)) for r in out):
+            out.append(root)
+    return out
 
 
 def language() -> str:
@@ -62,20 +73,27 @@ def language() -> str:
 
 
 def sessions() -> list:
-    """新到舊。wavs=0 代表 OwnVoice 當時只存逐字稿（存檔模式不是「錄音」），不能做會後整理。"""
-    base = base_dir()
-    try:
-        names = sorted((n for n in os.listdir(base) if _SESSION.match(n)), reverse=True)
-    except OSError:
-        return []
-    out = []
-    for name in names:
-        files = os.listdir(os.path.join(base, name))
-        out.append({"id": name,
-                    "wavs": sum(f.lower().endswith(".wav") for f in files),
-                    "transcript": "transcript.md" in files,
-                    "summary": "summary.md" in files})
-    return out
+    """所有已知資料夾（roots）裡的場次，新到舊；每筆帶 root（它在哪個資料夾）。
+    wavs=0 代表當時只存逐字稿（存檔模式不是「錄音」），不能重新辨識。
+    同名的場次（同一分鐘開始）只列前面那個資料夾的。"""
+    found = {}
+    for base in roots():
+        try:
+            names = [n for n in os.listdir(base) if _SESSION.match(n)]
+        except OSError:
+            continue
+        for name in names:
+            if name in found:
+                continue
+            try:
+                files = os.listdir(os.path.join(base, name))
+            except OSError:
+                continue
+            found[name] = {"id": name, "root": base,
+                           "wavs": sum(f.lower().endswith(".wav") for f in files),
+                           "transcript": "transcript.md" in files,
+                           "summary": "summary.md" in files}
+    return [found[n] for n in sorted(found, reverse=True)]
 
 
 def session_dir(session_id: str) -> str:
@@ -85,11 +103,13 @@ def session_dir(session_id: str) -> str:
         if not found:
             raise KeyError("還沒有 OwnVoice 會議資料夾" if os.name == "nt" else
                            "OwnVoice 整合只在 Windows 原生模式可用（伺服器現在不是跑在 Windows 上，讀不到它的資料夾）")
-        session_id = found[0]["id"]
-    path = os.path.join(base_dir(), session_id)
-    if not _SESSION.match(session_id) or not os.path.isdir(path):
-        raise KeyError(f"找不到 OwnVoice 會議：{session_id}")
-    return path
+        return os.path.join(found[0]["root"], found[0]["id"])
+    if _SESSION.match(session_id):
+        for base in roots():
+            path = os.path.join(base, session_id)
+            if os.path.isdir(path):
+                return path
+    raise KeyError(f"找不到 OwnVoice 會議：{session_id}")
 
 
 def read_text(session_id: str, name: str) -> str:
@@ -103,10 +123,10 @@ def read_text(session_id: str, name: str) -> str:
         return ""
 
 
-def session_lines(session_id: str):
+def session_lines(session_id: str, folder: str = None):
     """session.json 的內容（version、listen、target、stt、channels、lines、dropped_sec、failed_lines）；
-    沒有或讀不懂這個檔＝當舊場次，回 None（會後整理就整條重跑）。"""
-    path = os.path.join(session_dir(session_id), SIDECAR)
+    沒有或讀不懂這個檔＝當舊場次，回 None（會後整理就整條重跑）。folder：已知的場次資料夾（清單逐筆讀時省掉再找一次）。"""
+    path = os.path.join(folder or session_dir(session_id), SIDECAR)
     for _ in range(3):
         try:
             with open(path, encoding="utf-8") as f:
