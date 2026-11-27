@@ -99,6 +99,8 @@ export const STEPS = [
     gate: '全套測試通過；部署後下一篇有影片的自動文章：YouTube 先發，文章裡是 YouTube 播放器，WP 媒體庫沒有影片檔。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: '433149b71', depends: ['K29'], card: 'briefs/K30-video-always-youtube.md' },
   { n: 32, code: 'K30b', group: 'B3d', title: '題目開始前就檢查每一項權限', plain: 'K30 驗收時發現：題目開始時只檢查一項權限，其他權限要到製作中途才發現不夠，那時前面的錢已經花了。改成開始之前把會用到的每一項都檢查過，缺的話就不開始、不花錢，並寫明缺哪一項。排程自動開始的題目也一樣。',
     gate: '全套測試通過；缺權限的題目在開始前就停下來，什麼都沒花。', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'f3b3c621a', depends: ['K30'], card: 'briefs/K30b-start-checks-every-feature.md' },
+  { n: 33, code: 'K31', group: 'B3d', title: '人按開始的影片題目，排程沒開也要做完', plain: '你 11-27 說手動產文章也會勾影片。現在影片題目一定要先開「自動內容管線」排程才能開始，因為影片做好、發 YouTube、放連結回文章都靠排程每 5 分鐘接著做。改成：人按開始的題目，系統一定接著做完；排程開關只管自動的部分（自動規劃、自動開始、自動發布）。',
+    gate: '全套測試通過；排程關著的網站，人按開始的影片題目能一路做到 YouTube 發出、文章放好連結；不會自動開始或自動發布任何題目。', risk: 'Medium', model: 'Opus 5.5', status: 'in_progress', depends: ['K30b'], card: 'briefs/K31-video-followup-without-schedule.md' },
 ];
 
 const ASK = (yes, no) => [{ k: '同意', t: yes, pick: true }, { k: '先不要', t: no }];
