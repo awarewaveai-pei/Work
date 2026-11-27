@@ -12,7 +12,7 @@ class FakeSession:
         self.calls = []
         self.next_id = 0
 
-    def open(self, start):
+    def open(self, start, who="them"):
         self.next_id += 1
         self.calls.append(("open", self.next_id))
         return self.next_id
