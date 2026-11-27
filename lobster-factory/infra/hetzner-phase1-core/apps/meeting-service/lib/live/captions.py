@@ -5,6 +5,8 @@ from the caller."""
 import re
 import threading
 
+from . import langs
+
 # A sentence still growing after this long is translated before it ends.
 EARLY_AFTER = 4.0
 # At most one early translation of a line this often.
@@ -76,10 +78,15 @@ class Line:
         return self.finished and not self.running
 
 
-def reads_as_subtitle(zh: str) -> bool:
-    """An early translation is a guess at half a sentence; one that came back as notes or English
-    (more English words than Chinese characters, or several lines) is not shown, and the final one
-    will come."""
-    han = sum(1 for c in zh if "一" <= c <= "鿿")
-    words = len(re.findall(r"[A-Za-z]+", zh))
-    return "\n" not in zh.strip() and han > 0 and han >= words
+def reads_as_subtitle(tr: str, target: str = langs.MINE) -> bool:
+    """An early translation is a guess at half a sentence; one that came back as notes (several lines)
+    or not in the target language is not shown, and the final one will come. Chinese: more Chinese
+    characters than English words; other targets: written in the target's script (langs.py)."""
+    if "\n" in tr.strip():
+        return False
+    script = langs.find(target).script
+    if script != langs.HAN:
+        return langs.script_of(tr) == script
+    han = sum(1 for c in tr if "一" <= c <= "鿿")
+    words = len(re.findall(r"[A-Za-z]+", tr))
+    return han > 0 and han >= words

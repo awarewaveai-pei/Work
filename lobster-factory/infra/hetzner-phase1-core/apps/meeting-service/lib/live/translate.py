@@ -12,7 +12,7 @@ from typing import Callable, Optional
 import httpx
 
 from .usage import Tally, Usage
-from .zh import to_taiwan
+from .langs import MINE, taiwan
 
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 GEMINI_COMPAT_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
@@ -93,7 +93,8 @@ def error_message(text: str) -> str:
 
 class Translator:
     """`await translator(system, user, on_delta, stop, early)` is the contract Session expects.
-    `on_delta` gets the whole Chinese so far (Taiwan Traditional) each time text arrives."""
+    `on_delta` gets the whole translation so far each time text arrives (Taiwan Traditional when the
+    target is Chinese: langs.taiwan)."""
 
     def __init__(self, usage: Usage, anthropic_key: str, gemini_key: str):
         self._usage = usage
@@ -188,13 +189,14 @@ class Translator:
             raise TranslateError(f"{'stream' if connected else 'network'}: {str(e) or type(e).__name__}") from None
         return (ANTHROPIC_MODEL if anthropic else GEMINI_MODEL), usage
 
-    async def __call__(self, system: list, user: str, on_delta: Callable[[str], None], stop: threading.Event, early: bool) -> str:
+    async def __call__(self, system: list, user: str, on_delta: Callable[[str], None], stop: threading.Event, early: bool,
+                       target: str = MINE) -> str:
         zh = ""
 
         def on_text(d: str) -> None:
             nonlocal zh
             zh += d
-            on_delta(to_taiwan(zh))
+            on_delta(taiwan(zh, target))
 
         self._use_anthropic()  # a missing key is its own message, not "translation failed"
         try:
@@ -203,7 +205,7 @@ class Translator:
             raise TranslateError(f"翻譯失敗：{e}") from None
         usage.early = int(early)
         self._usage.add_tokens(model, usage)
-        return to_taiwan(zh)
+        return taiwan(zh, target)
 
     async def stream_text(self, system: list, user: str, on_delta: Optional[Callable[[str], None]] = None) -> str:
         """One completion as the model wrote it (no Chinese conversion: for English replies); `on_delta`
@@ -220,7 +222,7 @@ class Translator:
         self._usage.add_tokens(model, usage)
         return text
 
-    async def complete(self, system: list, user: str) -> str:
+    async def complete(self, system: list, user: str, target: str = MINE) -> str:
         """The whole answer without streaming it anywhere (summaries, script glosses), in Taiwan
         Traditional Chinese where it is Chinese; raises TranslateError."""
-        return to_taiwan(await self.stream_text(system, user))
+        return taiwan(await self.stream_text(system, user), target)

@@ -122,6 +122,8 @@
       <span style="color:var(--muted)">會議語言</span>
       <label><input type="radio" name="langOpt" value="zh" checked> 中文</label>
       <label><input type="radio" name="langOpt" value="en"> 英文</label>
+      <label><input type="radio" name="langOpt" value="ja"> 日文</label>
+      <label><input type="radio" name="langOpt" value="ko"> 韓文</label>
       <label><input type="radio" name="langOpt" value="auto"> 自動判斷</label>
     </div>
     <div class="opts" style="margin-top:10px">
@@ -247,7 +249,7 @@ startBtn.addEventListener("click", async () => {
 });
 
 // --- OwnVoice 會議 ---
-const LANGUAGE_LABELS = { zh: "中文", en: "英文", auto: "自動判斷" };
+const LANGUAGE_LABELS = { zh: "中文", en: "英文", ja: "日文", ko: "韓文", auto: "自動判斷" };      // 鍵＝lib/transcribe.py LANGUAGES
 async function loadOwnvoice() {
   const data = await (await fetch("/api/ownvoice/sessions")).json();
   if (!data.sessions.length) return;

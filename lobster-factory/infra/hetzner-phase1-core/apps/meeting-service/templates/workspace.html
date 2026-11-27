@@ -70,6 +70,9 @@
   .cap-bar { flex: none; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); }
   .cap-bar .tbtn { padding: 5px 10px; font-size: 12px; }
   .cap-group { display: inline-flex; gap: 2px; padding-left: 6px; border-left: 1px solid var(--border); }
+  .cap-langs .cap-group { flex-wrap: wrap; align-items: center; }
+  .cap-langs .cap-group:first-child { padding-left: 0; border-left: none; }
+  .cap-langs .cap-lbl { font-size: 12px; color: var(--muted); margin-right: 4px; }
   .cap-listen[aria-pressed="true"] { background: var(--red); border-color: var(--red); }
   .cap-listen[aria-pressed="true"]:hover { background: var(--red); }
   .cap-level { font-size: 12px; color: var(--green); letter-spacing: 1px; min-width: 52px; }
@@ -83,7 +86,7 @@
   .cap-list .text { color: var(--ink); }
   .cap-list .interim .text { color: var(--muted); }
   .cap-list .tr { color: var(--accent-hover); min-height: 1em; }
-  .cap-list.zh-only .text { display: none; }
+  .cap-list.tr-only .text { display: none; }
   .cap-foot { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
   .cap-usage { white-space: nowrap; }
   .cap-sum { white-space: nowrap; color: var(--yellow); font-weight: 600; }
@@ -225,10 +228,14 @@ window.Workspace = (function () {
       </span>
       <span class="cap-level" aria-hidden="true"></span>
       <span class="spacer"></span>
-      <button type="button" class="tbtn" data-act="zh-only" aria-pressed="false">只看中文</button>
+      <button type="button" class="tbtn" data-act="tr-only" aria-pressed="false">只看翻譯</button>
       <button type="button" class="tbtn" data-act="smaller" title="字小一點">A−</button>
       <button type="button" class="tbtn" data-act="bigger" title="字大一點">A＋</button>
       <button type="button" class="tbtn" data-act="clear">清除</button>
+    </div>
+    <div class="cap-bar cap-langs">
+      <span class="cap-group" data-langs="listen" title="對方說的語言。「自動」讓辨識自己判斷。聆聽中不能改"><span class="cap-lbl">聽的語言</span></span>
+      <span class="cap-group" data-langs="target" title="字幕翻譯成什麼語言；已經是這個語言的句子不翻譯、不計費。聆聽中不能改"><span class="cap-lbl">翻譯成</span></span>
     </div>
     <div class="cap-list" aria-live="polite"></div>
     <div class="cap-foot">
@@ -245,14 +252,15 @@ window.Workspace = (function () {
 // 貼底捲動移植自 OwnVoice Meet src/shared/follow.ts（Apache-2.0）。
 (function () {
   const RATE = 16000, CHUNK = RATE / 10, MAX_ROWS = 500, NEAR_BOTTOM_PX = 30;
-  const EMPTY = "按「聆聽」開始。對方說的英文會出現在這裡，中文跟在下面。";
-  // mic／tab／zhOnly 只存在這個瀏覽器；其餘是伺服器設定（兩頁共用，見 templates/_settings.html）。
+  const EMPTY = "按「聆聽」開始。對方說的話會出現在這裡，翻譯跟在下面。";
+  // mic／tab／trOnly 只存在這個瀏覽器；其餘是伺服器設定（兩頁共用，見 templates/_settings.html）。
   const store = window.Settings.prefs("ws-captions",
-    { stt: "stt", pauseMin: "pause_min", endMin: "end_min", size: "caption_size", save: "save" },
-    { mic: true, tab: false, stt: "gemini", zhOnly: false, size: 18, pauseMin: 3, endMin: 30, save: true }, () => paintBar());
+    { stt: "stt", pauseMin: "pause_min", endMin: "end_min", size: "caption_size", save: "save", listen: "listen", target: "target" },
+    { mic: true, tab: false, stt: "gemini", trOnly: false, size: 18, pauseMin: 3, endMin: 30, save: true, listen: "en-US", target: "zh-TW" }, () => paintBar());
+  store.rename("zhOnly", "trOnly");      // 「只看中文」改成「只看翻譯」之前存的鍵
   const prefs = store.values;
   // segment：伺服器正在存的段落（index 0 = 沒在存）；dividers：新段落的分隔線，after = 開新段時最後一句字幕的代號
-  const state = { segs: new Map(), status: "", listening: false, usage: null, level: 0, segment: { index: 0, name: "", recording: false, dir: "" }, dividers: [], renaming: false, summaryOn: false };
+  const state = { langs: null, segs: new Map(), status: "", listening: false, usage: null, level: 0, segment: { index: 0, name: "", recording: false, dir: "" }, dividers: [], renaming: false, summaryOn: false };
   let root = null, audio = null, following = true, ours = false;
   const live = window.Workspace.live;
 
@@ -274,7 +282,7 @@ window.Workspace = (function () {
     if (ev.type === "snapshot") {
       state.segs = new Map(ev.segments.map(s => [s.id, s]));
       state.status = ev.status; state.listening = ev.listening; state.usage = ev.usage;
-      state.segment = ev.segment; state.renaming = false; state.summaryOn = ev.summary.enabled;
+      state.segment = ev.segment; state.renaming = false; state.summaryOn = ev.summary.enabled; state.langs = ev.langs;
       if (!ev.listening) stopAudio();
       paintAll();
     } else if (ev.type === "caption") {
@@ -374,7 +382,7 @@ window.Workspace = (function () {
     if (!prefs.mic && !prefs.tab) { state.status = "「麥克風」和「電腦聲音」至少要開一個"; return paintBar(); }
     if (!live.ready()) { state.status = "還沒連上會議工具，等一下再按"; return paintBar(); }
     if (await startAudio()) {
-      send(Object.assign({ type: "start", stt: prefs.stt, language: "en-US", pause_min: prefs.pauseMin, end_min: prefs.endMin, save: prefs.save },
+      send(Object.assign({ type: "start", stt: prefs.stt, listen: prefs.listen, target: prefs.target, pause_min: prefs.pauseMin, end_min: prefs.endMin, save: prefs.save },
         ...window.Workspace.startExtras.map(f => f())));
     }
   }
@@ -450,6 +458,24 @@ window.Workspace = (function () {
     const bars = audio ? Math.min(5, Math.round(Math.sqrt(state.level) * 12)) : 0;
     el.textContent = audio ? "▮".repeat(bars) + "▯".repeat(5 - bars) : "";
   }
+  // 兩排語言按鈕：聽的語言（含自動）、翻譯成（不含自動，多一顆不翻譯）。按鈕照伺服器的語言表產生。
+  function paintLangs() {
+    const L = state.langs;
+    if (!L) return;
+    const rows = { listen: L.rows, target: L.rows.filter(r => r.code !== "auto").concat([{ code: L.none, label: "不翻譯" }]) };
+    root.querySelectorAll("[data-langs]").forEach(g => {
+      const name = g.dataset.langs;
+      if (g.querySelectorAll("button").length !== rows[name].length) {
+        g.querySelectorAll("button").forEach(x => x.remove());
+        rows[name].forEach(r => {
+          const x = document.createElement("button");
+          x.type = "button"; x.className = "tbtn"; x.dataset.lang = r.code; x.textContent = r.label;
+          g.append(x);
+        });
+      }
+      g.querySelectorAll("button").forEach(x => { x.setAttribute("aria-pressed", String(prefs[name] === x.dataset.lang)); x.disabled = state.listening; });
+    });
+  }
   function paintBar() {
     if (!root) return;
     const b = root.querySelector('[data-act="listen"]');
@@ -457,7 +483,8 @@ window.Workspace = (function () {
     b.textContent = state.listening ? "■ 停止" : "▶ 聆聽";
     root.querySelectorAll("[data-src]").forEach(x => { x.setAttribute("aria-pressed", String(prefs[x.dataset.src])); x.disabled = state.listening; });
     root.querySelectorAll("[data-stt]").forEach(x => { x.setAttribute("aria-pressed", String(prefs.stt === x.dataset.stt)); x.disabled = state.listening; });
-    root.querySelector('[data-act="zh-only"]').setAttribute("aria-pressed", String(prefs.zhOnly));
+    root.querySelector('[data-act="tr-only"]').setAttribute("aria-pressed", String(prefs.trOnly));
+    paintLangs();
     root.querySelectorAll("[data-idle]").forEach(x => { if (document.activeElement !== x) x.value = prefs[x.dataset.idle]; x.disabled = state.listening; });
     const save = root.querySelector('[data-act="save"]');
     save.setAttribute("aria-pressed", String(prefs.save));
@@ -465,7 +492,7 @@ window.Workspace = (function () {
     paintSegment();
     root.querySelector(".cap-sum").hidden = !(state.listening && state.summaryOn);
     const l = list();
-    l.classList.toggle("zh-only", prefs.zhOnly);
+    l.classList.toggle("tr-only", prefs.trOnly);
     l.style.fontSize = prefs.size + "px";
     root.querySelector(".cap-status").textContent = state.status;
     const u = state.usage;
@@ -490,13 +517,19 @@ window.Workspace = (function () {
     const l = list();
     l.addEventListener("scroll", () => { if (!ours) following = l.scrollTop + l.clientHeight >= l.scrollHeight - NEAR_BOTTOM_PX; });
     new ResizeObserver(settle).observe(l);
+    el.querySelector(".cap-langs").addEventListener("click", e => {
+      const b = e.target.closest("button[data-lang]");
+      if (!b || b.disabled) return;
+      setPref(b.closest("[data-langs]").dataset.langs, b.dataset.lang);
+      paintBar();
+    });
     el.querySelector(".cap-bar").addEventListener("click", e => {
       const b = e.target.closest("button");
       if (!b || b.disabled) return;
       if (b.dataset.src) setPref(b.dataset.src, !prefs[b.dataset.src]);
       else if (b.dataset.stt) setPref("stt", b.dataset.stt);
       else if (b.dataset.act === "listen") return void listen(!state.listening);
-      else if (b.dataset.act === "zh-only") setPref("zhOnly", !prefs.zhOnly);
+      else if (b.dataset.act === "tr-only") setPref("trOnly", !prefs.trOnly);
       else if (b.dataset.act === "smaller") setPref("size", Math.max(12, prefs.size - 2));
       else if (b.dataset.act === "bigger") setPref("size", Math.min(40, prefs.size + 2));
       else if (b.dataset.act === "clear") return send({ type: "clear" });
@@ -554,20 +587,36 @@ window.Workspace = (function () {
   const store = window.Settings.prefs("ws-reply", { size: "reply_size" }, { size: 28 }, () => paint());
   const prefs = store.values;
   const live = window.Workspace.live;
+  let langs = null;       // 語言表（snapshot 的 langs）；面板說明寫「我的語言」→「對方的語言」
   let reply = null;       // 最近一則 { id, zh, en, done }
   let seen = 0;           // 看過的最大回覆代號（伺服器每則回覆給一個遞增的新代號）
   let awaiting = null;    // 剛送出、伺服器還沒回第一個事件的中文；這段時間舊回覆（代號 ≤ seen）的事件不能蓋掉它
   let root = null;
 
+  function label(code) {
+    const r = langs.rows.find(x => x.code === code);
+    return r ? r.label : code;
+  }
+  // 我的語言＝翻譯成（不翻譯時用預設）；對方的語言＝聽的語言（自動時用預設）。規則同 lib/live/langs.py mine／theirs。
+  function paintLangs() {
+    const d = window.Settings.data;
+    if (!root || !langs || !d) return;
+    const mine = label(d.target === langs.none ? langs.mine : d.target), theirs = label(d.listen === "auto" ? langs.theirs : d.listen);
+    root.querySelector(".rp-bar .placeholder").textContent = "打" + mine + "，下面出現可以照唸的" + theirs;
+    root.querySelector(".rp-in").placeholder = "打下你想說的" + mine + "，按 Enter 送出（Shift+Enter 換行）";
+  }
+  window.Settings.on(paintLangs);
+
   function paint() {
     if (!root) return;
+    paintLangs();
     const en = root.querySelector(".rp-en");
     en.style.fontSize = prefs.size + "px";
     root.querySelector(".rp-zh").textContent = reply ? reply.zh : "";
     en.textContent = reply ? (reply.en || "…") : "";
   }
 
-  live.on("snapshot", ev => { reply = ev.reply; seen = reply ? reply.id : 0; awaiting = null; paint(); });
+  live.on("snapshot", ev => { langs = ev.langs; reply = ev.reply; seen = reply ? reply.id : 0; awaiting = null; paint(); });
   live.on("reply", ev => {
     if (awaiting !== null && ev.id <= seen) return;
     awaiting = null;

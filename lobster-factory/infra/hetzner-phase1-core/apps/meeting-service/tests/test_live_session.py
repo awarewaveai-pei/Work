@@ -46,8 +46,9 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.s.on_translated.append(lambda id, tr, failed: self.translated.append((id, tr)))
 
     @staticmethod
-    def cap(id, text, tr, final):
-        return {"type": "caption", **asdict(Segment(id, text=text, tr=tr, final=final))}
+    def cap(id, text, tr, final, lang="en-US"):
+        # lang: the language listened to (Session's default); "" on the gray "…" line before any text
+        return {"type": "caption", **asdict(Segment(id, text=text, tr=tr, final=final, lang=lang))}
 
     async def test_one_sentence_event_order(self):
         s = self.s
@@ -65,7 +66,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             self.events,
             [
-                self.cap(1, "…", "", False),
+                self.cap(1, "…", "", False, ""),
                 self.cap(1, "hello there", "", False),
                 self.cap(1, "hello there.", "", True),
                 self.cap(1, "hello there.", "你好", True),
@@ -103,7 +104,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         i = s.open(0.0)
         s.finish(i, "   ", 0.0)
         await settle()
-        self.assertEqual(self.events, [self.cap(1, "…", "", False), {"type": "caption-remove", "id": 1}])
+        self.assertEqual(self.events, [self.cap(1, "…", "", False, ""), {"type": "caption-remove", "id": 1}])
         self.assertEqual(s.segments, [])
         self.assertEqual(self.fake.calls, [])
         self.assertEqual(s._lines, {})
@@ -131,6 +132,36 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         for c in self.fake.calls:
             c.fut.set_result("好")
         await s.drain()
+
+
+class LanguageTests(unittest.IsolatedAsyncioTestCase):
+    """C14: the translation rule and the Simplified-to-Traditional rule (lib/live/langs.py)."""
+    setUp = SessionTests.setUp
+
+    async def say(self, listen, target, text):
+        self.s.listen, self.s.target = listen, target
+        self.s.finish(self.s.open(0.0), text, 1.0)
+        await settle()
+        return self.s.segments[-1]
+
+    async def test_a_line_already_in_the_target_language_calls_no_model(self):
+        seg = await self.say("zh-TW", "zh-TW", "我們今天開會。")
+        self.assertEqual((len(self.fake.calls), seg.lang, seg.tr), (0, "zh-TW", ""))
+        await self.say("auto", "zh-TW", "下一個議題。")       # auto: the language comes from the script
+        await self.say("en-US", "none", "No translation.")    # 不翻譯
+        self.assertEqual(len(self.fake.calls), 0)
+
+    async def test_simplified_chinese_in_traditional_out(self):
+        seg = await self.say("zh-TW", "en-US", "这个会议讨论预算。")
+        self.assertEqual(seg.text, "這個會議討論預算。")
+        self.assertEqual(len(self.fake.calls), 1, "Chinese into English is translated")
+
+    async def test_japanese_kanji_stay_as_they_are(self):
+        seg = await self.say("ja-JP", "zh-TW", "会議で学ぶことが来る")
+        self.assertEqual((seg.text, seg.lang), ("会議で学ぶことが来る", "ja-JP"))
+        seg = await self.say("auto", "zh-TW", "会議で学ぶ")
+        self.assertEqual((seg.text, seg.lang), ("会議で学ぶ", "ja-JP"))
+        self.assertEqual(len(self.fake.calls), 2)
 
 
 if __name__ == "__main__":

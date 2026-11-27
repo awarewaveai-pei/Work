@@ -3,29 +3,59 @@
 # meeting: the caption prompt never comments on recognition errors (its output is the subtitle),
 # replies are short spoken sentences, and the script reaches both directions as a cached block.
 
-LISTEN_SYSTEM = """You are a live interpreter in an online meeting. Translate the latest utterance into natural Traditional Chinese as used in Taiwan.
+from . import langs
+
+
+def _name(code: str) -> str:
+    """How a model is told the language (the table's prompt name)."""
+    return langs.find(code).prompt
+
+
+def _short(code: str) -> str:
+    """The language as an adjective in a sentence ("the Chinese translation")."""
+    lang = langs.find(code)
+    return "Chinese" if lang.to_taiwan else lang.prompt
+
+
+def _asked(code: str) -> str:
+    """The language named in a request; Chinese also by its own name: with only the system prompt
+    saying so, a long line now and then came back in Simplified Chinese."""
+    return _name(code) + (" (繁體中文)" if langs.find(code).to_taiwan else "")
+
+
+# The prompts take langs.py codes; for zh-TW (mine) and en-US (theirs) they are word for word the
+# ones checked in a live meeting (tests/test_live_prompts.py holds those texts).
+def listen_system(target: str) -> str:
+    return f"""You are a live interpreter in an online meeting. Translate the latest utterance into natural {_name(target)}.
 The utterance comes from speech recognition: it may contain recognition errors or be a sentence fragment. Translate the most plausible meaning and keep a fragment as a fragment; do not complete it or add anything.
 When a word looks misrecognized, silently use the most plausible reading; keep an unknown name as heard. Never comment on the recognition or on your translation.
-Your entire output is shown as a subtitle: output only the Chinese translation, with no quotes, labels or notes."""
+Your entire output is shown as a subtitle: output only the {_short(target)} translation, with no quotes, labels or notes."""
 
-REPLY_SYSTEM = """You help a Taiwanese participant speak in an English-language meeting. They type what they want to say in Chinese (it may be casual, incomplete, or mixed with English). Write the English they will read aloud word for word.
+
+def reply_system(mine: str, theirs: str) -> str:
+    """`mine`: what the user types in; `theirs`: what they will read aloud (langs.mine / langs.theirs)."""
+    t = _short(theirs)
+    a = "an" if t[0] in "AEIOU" else "a"
+    return f"""You help a Taiwanese participant speak in {a} {t}-language meeting. They type what they want to say in {_short(mine)} (it may be casual, incomplete, or mixed with {t}). Write the {t} they will read aloud word for word.
 - Spoken style: short sentences of at most about 15 words, plain words that are easy to pronounce, natural meeting register.
 - Keep their meaning, stance and tone. Do not add points, greetings, or filler they did not imply.
 - Use the conversation context to pick the right terms and refer to what others said.
-- If their prepared script is provided and what they type matches a point in it, reuse the script's English wording and terms.
-Output only the English script, with no quotes, labels or notes."""
+- If their prepared script is provided and what they type matches a point in it, reuse the script's {t} wording and terms.
+Output only the {t} script, with no quotes, labels or notes."""
 
-SUMMARY_SYSTEM = """You keep a running summary of a meeting or talk for a Taiwanese participant who follows it in English.
+
+def summary_system(mine: str, theirs: str) -> str:
+    return f"""You keep a running summary of a meeting or talk for a Taiwanese participant who follows it in {_short(theirs)}.
 You get the summary so far (it may be empty) and the newest stretch of the transcript, which comes from speech recognition and may contain recognition errors.
-Return the whole summary brought up to date, in Traditional Chinese as used in Taiwan (繁體中文): at most 8 short bullet points, each starting with "- ", about what was actually said: main points, decisions, numbers and dates, open questions, and who said what when speakers are named.
+Return the whole summary brought up to date, in {_asked(mine)}: at most 8 short bullet points, each starting with "- ", about what was actually said: main points, decisions, numbers and dates, open questions, and who said what when speakers are named.
 Keep names and technical terms as they are; merge new points into the existing ones rather than repeating them; drop small talk. Do not invent anything, do not give advice and do not suggest what the participant should say.
 Output only the bullet points."""
 
 
-def summary_user(before: str, transcript: str) -> str:
-    """The summary so far and the newest lines, for SUMMARY_SYSTEM."""
+def summary_user(before: str, transcript: str, theirs: str = langs.THEIRS, mine: str = langs.MINE) -> str:
+    """The summary so far and the newest lines, for summary_system."""
     before = before.strip() or "(none yet)"
-    return f"Summary so far:\n{before}\n\nNewest transcript lines (time, English, then the Chinese meaning):\n{transcript}"
+    return f"Summary so far:\n{before}\n\nNewest transcript lines (time, {_short(theirs)}, then the {_short(mine)} meaning):\n{transcript}"
 
 
 def parse_glossary(text: str) -> list:
@@ -67,18 +97,16 @@ def system_blocks(instructions: str, glossary: list, script: str) -> list:
     return blocks
 
 
-def listen_user(context: list, utterance: str, unfinished: bool) -> str:
+def listen_user(context: list, utterance: str, unfinished: bool, target: str = langs.MINE) -> str:
     """`unfinished`: the speaker is still in the middle of this sentence (an early translation)."""
     ctx = "\n".join(context) if context else "(none)"
-    # The script is named in the request itself: with only the system prompt saying so, a long
-    # line now and then came back in Simplified Chinese.
     if unfinished:
-        ask = "The speaker is still talking: this utterance stops mid-sentence. Translate only what is there, as a fragment, into Traditional Chinese as used in Taiwan (繁體中文), and output only that"
+        ask = f"The speaker is still talking: this utterance stops mid-sentence. Translate only what is there, as a fragment, into {_asked(target)}, and output only that"
     else:
-        ask = "Translate this utterance into Traditional Chinese as used in Taiwan (繁體中文)"
+        ask = f"Translate this utterance into {_asked(target)}"
     return f"Recent conversation, for context only (do not translate):\n{ctx}\n\n{ask}:\n{utterance}"
 
 
-def reply_user(context: list, chinese: str) -> str:
+def reply_user(context: list, text: str, mine: str = langs.MINE) -> str:
     ctx = "\n".join(context) if context else "(none)"
-    return f"Recent conversation (speech-recognized, may have errors):\n{ctx}\n\nWhat I want to say (Chinese):\n{chinese}"
+    return f"Recent conversation (speech-recognized, may have errors):\n{ctx}\n\nWhat I want to say ({_short(mine)}):\n{text}"

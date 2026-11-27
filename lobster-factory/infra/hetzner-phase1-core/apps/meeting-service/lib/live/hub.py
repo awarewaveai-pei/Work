@@ -13,7 +13,7 @@ the Session's own (caption, caption-remove, status, clear) plus
       index 0 (name "", dir "") = nothing is being saved
   {"type":"summary","text","updated","lines","working","error","enabled"}  the live summary (enabled = on for this listening) (lib/live/summary.py)
 Commands from the page include {"type":"reply","zh":str} (works without listening),
-{"type":"start", ..., "save":bool, "summary":bool, "summary_min":number} (both off unless true),
+{"type":"start", "stt", "listen", "target" (lib/live/langs.py codes), ..., "save":bool, "summary":bool, "summary_min":number} (both off unless true),
 {"type":"segment-next","name":str|null} and {"type":"segment-rename","name":str} (while saving).
 Keys never leave the server; they are read through lib/settings.py (settings panel, else environment)."""
 import asyncio
@@ -26,9 +26,9 @@ from urllib.parse import urlsplit
 
 from lib import ownvoice, settings
 
-from . import gloss, idle, script_store, stt_gemini, stt_local
+from . import gloss, idle, langs, script_store, stt_gemini, stt_local
 from .archive import RATE, Archive, ArchiveError
-from .prompts import SUMMARY_SYSTEM, parse_glossary, system_blocks
+from .prompts import parse_glossary, summary_system, system_blocks
 from .session import Session
 from .summary import DEFAULT_EVERY_MIN, Summary
 from .translate import ANTHROPIC_MODEL, GEMINI_MODEL, Translator
@@ -51,8 +51,6 @@ ARCHIVE_TICK = 1.0
 # At the end of listening: how long to wait for the translations still running, and for the last summary update.
 DRAIN_TIMEOUT, SUMMARY_TIMEOUT = 15.0, 20.0
 NOT_SAVING = {"index": 0, "name": "", "recording": False, "dir": ""}
-# What listening translates into today (lib/live/langs.py codes; the page chooses from C14 on).
-TARGET = "zh-TW"
 
 
 def origin_allowed(origin: str, host: str) -> bool:
@@ -114,7 +112,9 @@ class Hub:
             s = self.session = Session(self._translate, self.emit, compose=self._compose)
             saved = script_store.load()
             s.script, s.glossary = saved["script"], saved["glossary"]
-            self.summary = Summary(self._complete, lambda: system_blocks(SUMMARY_SYSTEM, parse_glossary(s.glossary), s.script), self.emit)
+            self.summary = Summary(self._complete, lambda: system_blocks(summary_system(langs.mine(s.target), langs.theirs(s.listen)),
+                                                                         parse_glossary(s.glossary), s.script), self.emit)
+            self.summary.languages = lambda: (langs.theirs(s.listen), langs.mine(s.target))
             s.on_final.append(self._line_final)
             s.on_translated.append(self._line_translated)
             s.on_drop.append(lambda id: self.archive and self.archive.drop_line(id))
@@ -127,7 +127,7 @@ class Hub:
             self.archive.dropped_sec += seconds
 
     def _complete(self, system, user):
-        return self.translator.complete(system, user)
+        return self.translator.complete(system, user, langs.mine(self._session().target))
 
     def _line_final(self, line) -> None:
         if self.archive is not None:
@@ -148,11 +148,11 @@ class Hub:
     def _problem(self, text: str) -> None:
         self._session().status(text)
 
-    def _begin_archive(self, stt: str, language: str):
+    def _begin_archive(self, stt: str, listen: str, target: str):
         """Open the folder for this listening, or say why not and carry on without saving."""
         about = ["收音：瀏覽器（麥克風／電腦聲音）", "辨識：" + ("Gemini Live" if stt == "gemini" else "本機 faster-whisper"),
                  "翻譯：" + (ANTHROPIC_MODEL if settings.get_api_key() else GEMINI_MODEL)]
-        meta = {"listen": language, "target": TARGET, "stt": stt, "channels": 1}
+        meta = {"listen": listen, "target": target, "stt": stt, "channels": 1}
         try:
             return Archive(ownvoice.base_dir(), about, meta, on_problem=self._problem, on_segment=self._segment_changed)
         except ArchiveError as e:
@@ -163,7 +163,7 @@ class Hub:
         return self.archive.info() if self.archive is not None else NOT_SAVING
 
     async def _translate(self, system, user, on_delta, stop, early):
-        return await self.translator(system, user, on_delta, stop, early)
+        return await self.translator(system, user, on_delta, stop, early, self._session().target)
 
     def _refresh_keys(self) -> str:
         """Read the keys now (the settings page may have changed them); returns the Gemini key."""
@@ -217,6 +217,10 @@ class Hub:
         s = self._session()
         return {
             "type": "snapshot",
+            # The language buttons (lib/live/langs.py): every row; target also offers `none` (不翻譯);
+            # mine / theirs = what 不翻譯 and auto fall back to.
+            "langs": {"rows": [{"code": l.code, "label": l.label} for l in langs.LANGS], "none": langs.NONE,
+                      "mine": langs.MINE, "theirs": langs.THEIRS},
             "segments": [asdict(g) for g in s.segments],
             "status": s.status_text,
             "listening": self.listening,
@@ -242,8 +246,9 @@ class Hub:
 
     # ---- listening ----
 
-    async def start(self, owner, stt: str, language: str, pause_min: float = PAUSE_MIN, end_min: float = END_MIN,
-                    save: bool = False, summary: bool = False, summary_min: float = DEFAULT_EVERY_MIN) -> None:
+    async def start(self, owner, stt: str, listen: str, pause_min: float = PAUSE_MIN, end_min: float = END_MIN,
+                    save: bool = False, summary: bool = False, summary_min: float = DEFAULT_EVERY_MIN,
+                    target: str = langs.MINE) -> None:
         """`save`: keep the recording and transcript in OwnVoice's folder format (archive.py);
         `summary`: the live summary (paid model call every `summary_min` minutes, summary.py). Both off unless asked."""
         # No await between this check and `self.task = ...`: two pages pressing 聆聽 at once must not
@@ -255,10 +260,13 @@ class Hub:
             return self._refuse("上一場還在收尾存檔，幾秒後再按「聆聽」")
         if stt not in STT:
             return self._refuse(f"不認得的辨識方式：{stt}")
+        if listen not in langs.listen_codes() or target not in langs.target_codes():
+            return self._refuse(f"不認得的語言：{listen} → {target}")
         gemini_key = self._refresh_keys()
         if stt == "gemini" and not gemini_key:
             return self._refuse("還沒填 Gemini 金鑰：到「設定」面板填，或改用「本機（免費）」")
-        self.archive = self._begin_archive(stt, language) if save else None
+        session.listen, session.target = listen, target
+        self.archive = self._begin_archive(stt, listen, target) if save else None
         if self.archive is not None:
             self.archive_task = asyncio.ensure_future(self._archive_loop(self.archive))
         self.samples = 0
@@ -271,14 +279,14 @@ class Hub:
         self.owner, self.stt = owner, stt
         if stt == "gemini":
             def run(audio):
-                return stt_gemini.run(session, self.usage, gemini_key, language, audio)
+                return stt_gemini.run(session, self.usage, gemini_key, listen, audio)
         else:
             # Local recognition costs nothing while quiet, and pausing would unload the model:
             # only the end time applies.
             pause_min = 0
 
             def run(audio):
-                return stt_local.run(session, self.usage, language, audio)
+                return stt_local.run(session, self.usage, listen, audio)
         self.ticker = asyncio.ensure_future(self._tick())
         self.task = asyncio.ensure_future(self._supervise(run, pause_min, end_min))
         # This listening's own archive and ticker: by the time the callback runs `self` may hold the next one's.
@@ -477,10 +485,11 @@ class Hub:
         except (ValueError, KeyError, TypeError):
             return
         if kind == "start":
-            await self.start(ws, str(cmd.get("stt", "")), str(cmd.get("language", "en-US"))[:16],
+            await self.start(ws, str(cmd.get("stt", "")), str(cmd.get("listen", langs.THEIRS))[:16],
                              _minutes(cmd.get("pause_min"), PAUSE_MIN), _minutes(cmd.get("end_min"), END_MIN),
                              cmd.get("save") is True, cmd.get("summary") is True,
-                             min(max(_minutes(cmd.get("summary_min"), DEFAULT_EVERY_MIN), 1.0), 60.0))
+                             min(max(_minutes(cmd.get("summary_min"), DEFAULT_EVERY_MIN), 1.0), 60.0),
+                             str(cmd.get("target", langs.MINE))[:16])
         elif kind == "stop":
             await self.stop()
         elif kind in ("segment-next", "segment-rename"):
@@ -490,4 +499,8 @@ class Hub:
         elif kind == "reply":
             zh = clean_text(str(cmd.get("zh", ""))).strip()[:REPLY_MAX].strip()
             if zh:
-                self._session().compose_reply(zh)
+                s = self._session()
+                # While listening or closing out (the last summary still runs), the languages it started with.
+                if not self.listening and self.finalizing is None:
+                    s.listen, s.target = settings.pref("listen"), settings.pref("target")
+                s.compose_reply(zh)
