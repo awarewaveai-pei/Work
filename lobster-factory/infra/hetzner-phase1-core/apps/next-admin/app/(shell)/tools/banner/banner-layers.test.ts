@@ -82,14 +82,15 @@ describe("banner layered PSD", () => {
 
 // C3 critic findings: 避頭尾 never leaves a mark at a line start, and the 中英間距 space at an accent boundary stays plain.
 // R3-A: no mark hangs past the edge (a hung full-width comma drew 圖二's title one em past the column) -- a closing mark
-// that does not fit takes the character before it down; only a line with no such character left stays wider.
+// that does not fit takes the character before it down; with no such character left, the mark starts the next line
+// (the width wins; the layout shrinks the type first -- kinsokuBroken).
 describe("banner CJK wrap (C3)", () => {
   const wrap = (text: string, perLine: number, rules = true) =>
     wrapChars(Array.from(text), (c) => c, (l) => l.length <= perLine, rules).map((l) => l.join(""));
   it("a closing mark that does not fit takes the last character down with it", () => {
     expect(wrap("限時優惠！", 4)).toEqual(["限時優", "惠！"]);
     expect(wrap("限時優惠！」", 4)).toEqual(["限時優", "惠！」"]);
-    expect(wrap("好好好！！！", 3)).toEqual(["好好", "好！！！"]);
+    expect(wrap("好好好！！！", 3)).toEqual(["好好", "好！！", "！"]);
     for (const line of wrap("數量有限！！！今天開賣，「限量」款！", 4).slice(1)) expect("，。、；：！？）」』…".includes(line[0])).toBe(false);
   });
   it("an opening bracket moves down; no line is wider than the width", () => {

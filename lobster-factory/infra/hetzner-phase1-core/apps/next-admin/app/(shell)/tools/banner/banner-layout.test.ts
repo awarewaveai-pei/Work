@@ -227,6 +227,44 @@ describe("R3-A 一3: no title line is drawn past the text column or the canvas",
   });
 });
 
+// Codex on R3-A (F2): a size set by hand shrank only for the title / subtitle / stack height, so a price / button / trust
+// row (sized from the title) ran past the canvas -- 600x600, title 600 px, NT$999 drew the price at ~468 px. Same
+// inRoom as the automatic type: every block of the stack inside the text column.
+// (F3) at the smallest size a subtitle with no space (a long URL) was one line past the column: a word wider than the
+// column breaks between characters, so every drawn line is within the column at the floor too.
+describe("R3-A Codex F2 / F3: every text block inside the column, a size set by hand and at the floor too", () => {
+  const sizes = { ...SIZES, sq600: { w: 600, h: 600 } };
+  const colOf = (L: ReturnType<typeof layoutBanner>) => [L.padX - 0.5, L.w - L.padX + 0.5] as const;
+  it("F2: price / button / trust rows stay in the column at every size, title 40..600 px by hand", () => {
+    const f: BannerFields = { ...base, typeAuto: false, showPrice: true, priceNow: "NT$999", priceWas: "NT$1,999", trustType: "reviews" };
+    const bad: string[] = [];
+    for (const [key, size] of Object.entries(sizes))
+      for (let hs = 40; hs <= 600; hs += 20) {
+        const L = layoutBanner({ ...f, headlineSize: hs, subtextSize: Math.round(hs / 2) }, size, measure), [x0, x1] = colOf(L);
+        for (const k of ["headline", "subtext", "price", "cta", "trust"] as const) {
+          const b = L.boxes[k]!;
+          if (b.x < x0 || b.x + b.w > x1) bad.push(`${key} hs=${hs} ${k}: ${Math.round(b.x)}..${Math.round(b.x + b.w)} col ${x0 + 0.5}..${x1 - 0.5}`);
+        }
+      }
+    expect(bad.slice(0, 10)).toEqual([]);
+    const L = layoutBanner({ ...f, trustType: "none", ctaText: "", headlineSize: 600, priceNow: "NT$999", priceWas: "" }, sizes.sq600, measure);
+    expect(L.headlineSize).toBeLessThan(600);
+  });
+  it("F3: a subtitle that is one long URL is broken inside the column, automatic and by hand, at every size", () => {
+    const url = "https://example.com/products/aromatherapy-art-workshop/registration?utm_source=banner&utm_campaign=weekend";
+    const f: BannerFields = { ...base, subtext: url };
+    const bad: string[] = [];
+    for (const [key, size] of Object.entries(sizes))
+      for (const typing of [{ typeAuto: true }, { typeAuto: false, headlineSize: 600, subtextSize: 300 }]) {
+        const L = layoutBanner({ ...f, ...typing }, size, measure), [x0, x1] = colOf(L), sub = L.subtext!;
+        const lw = (t: string) => measure.text(`400 ${REF_PX}px Noto Sans TC`, t) * sub.size / REF_PX;
+        if (sub.lines.join("") !== url) bad.push(`${key}: characters lost`);
+        for (const ln of sub.lines) if (lw(ln) > x1 - x0) bad.push(`${key} ${typing.typeAuto ? "auto" : "hand"}: ${Math.round(lw(ln))} > ${Math.round(x1 - x0)}`);
+      }
+    expect(bad.slice(0, 10)).toEqual([]);
+  });
+});
+
 // Card R3-A 二: the logo's height by the rule at every size -- automatic = min(short side x 10%, title px x 1.5), set by
 // hand = short side x logoScale -- so it keeps the same proportion on every size (within the pixel rounding).
 describe("R3-A 二: logo size rule", () => {
