@@ -1,7 +1,8 @@
 """The one live meeting of this process, and the browser pages watching it.
 
 A page connects over WebSocket (/api/live/ws). Text frames are JSON commands, binary frames are audio
-(16 kHz mono PCM16) from the page that pressed 聆聽. Everything a page shows comes back as JSON events:
+(16 kHz mono PCM16) from the page that pressed 聆聽; the speech service gets each chunk as (its start
+in the recording in samples, pcm). Everything a page shows comes back as JSON events:
 the Session's own (caption, caption-remove, status, clear) plus
   {"type":"snapshot","segments":[...],"status":str,"listening":bool,"stt":str,"usage":{...},
    "reply":{id,zh,en,done}|null,"script":str,"glossary":str,
@@ -14,19 +15,19 @@ the Session's own (caption, caption-remove, status, clear) plus
 Commands from the page include {"type":"reply","zh":str} (works without listening),
 {"type":"start", ..., "save":bool, "summary":bool, "summary_min":number} (both off unless true),
 {"type":"segment-next","name":str|null} and {"type":"segment-rename","name":str} (while saving).
-Keys never leave the server: Gemini from the environment, Anthropic from the settings page."""
+Keys never leave the server; they are read through lib/settings.py (settings panel, else environment)."""
 import asyncio
 import functools
 import json
 import logging
-import os
 import time
+from dataclasses import asdict
 from urllib.parse import urlsplit
 
 from lib import ownvoice, settings
 
 from . import gloss, idle, script_store, stt_gemini, stt_local
-from .archive import Archive, ArchiveError
+from .archive import RATE, Archive, ArchiveError
 from .prompts import SUMMARY_SYSTEM, parse_glossary, system_blocks
 from .session import Session
 from .summary import DEFAULT_EVERY_MIN, Summary
@@ -50,6 +51,8 @@ ARCHIVE_TICK = 1.0
 # At the end of listening: how long to wait for the translations still running, and for the last summary update.
 DRAIN_TIMEOUT, SUMMARY_TIMEOUT = 15.0, 20.0
 NOT_SAVING = {"index": 0, "name": "", "recording": False, "dir": ""}
+# What listening translates into today (lib/live/langs.py codes; the page chooses from C14 on).
+TARGET = "zh-TW"
 
 
 def origin_allowed(origin: str, host: str) -> bool:
@@ -100,6 +103,7 @@ class Hub:
         self.last_caption = time.monotonic()
         self.archive = None          # the Archive of the session being saved (until it is closed out)
         self.archive_task = None
+        self.samples = 0             # this listening's recording position: where the next chunk starts
         self.finalizing = None       # the task closing out the session that just ended
         self.summary = None
 
@@ -111,36 +115,46 @@ class Hub:
             saved = script_store.load()
             s.script, s.glossary = saved["script"], saved["glossary"]
             self.summary = Summary(self._complete, lambda: system_blocks(SUMMARY_SYSTEM, parse_glossary(s.glossary), s.script), self.emit)
-            s.on_open.append(lambda id: self.archive and self.archive.open_line(id))
             s.on_final.append(self._line_final)
             s.on_translated.append(self._line_translated)
             s.on_drop.append(lambda id: self.archive and self.archive.drop_line(id))
             s.on_clear.append(self.summary.clear)
+            s.on_lost.append(self._audio_lost)
         return self.session
+
+    def _audio_lost(self, seconds: float) -> None:
+        if self.archive is not None:
+            self.archive.dropped_sec += seconds
 
     def _complete(self, system, user):
         return self.translator.complete(system, user)
 
-    def _line_final(self, id: int, en: str) -> None:
+    def _line_final(self, line) -> None:
         if self.archive is not None:
-            self.archive.set_en(id, en)
-        self.summary.line_finished(id, en)
+            self.archive.line_final(line)
+        self.summary.line_finished(line.id, line.text)
 
-    def _line_translated(self, id: int, zh: str) -> None:
+    def _line_translated(self, id: int, tr: str, failed: bool) -> None:
         if self.archive is not None:
-            self.archive.set_zh(id, zh)
-        self.summary.line_translated(id, zh)
+            self.archive.line_translated(id, tr, failed)
+        self.summary.line_translated(id, tr)
+
+    def _segment_changed(self, info: dict) -> None:
+        """The recording segment began (by the page, or a WAV reaching its size limit) or was renamed:
+        new lines belong to it."""
+        self._session().seg = info["index"] - 1
+        self.emit({"type": "segment", **info})
 
     def _problem(self, text: str) -> None:
         self._session().status(text)
 
-    def _begin_archive(self, stt: str):
+    def _begin_archive(self, stt: str, language: str):
         """Open the folder for this listening, or say why not and carry on without saving."""
         about = ["收音：瀏覽器（麥克風／電腦聲音）", "辨識：" + ("Gemini Live" if stt == "gemini" else "本機 faster-whisper"),
                  "翻譯：" + (ANTHROPIC_MODEL if settings.get_api_key() else GEMINI_MODEL)]
+        meta = {"listen": language, "target": TARGET, "stt": stt, "channels": 1}
         try:
-            return Archive(ownvoice.base_dir(), about, on_problem=self._problem,
-                           on_segment=lambda info: self.emit({"type": "segment", **info}))
+            return Archive(ownvoice.base_dir(), about, meta, on_problem=self._problem, on_segment=self._segment_changed)
         except ArchiveError as e:
             self._session().status(str(e))
             return None
@@ -153,7 +167,7 @@ class Hub:
 
     def _refresh_keys(self) -> str:
         """Read the keys now (the settings page may have changed them); returns the Gemini key."""
-        gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        gemini_key = settings.key("gemini_api_key")
         self.translator.set_keys(settings.get_api_key(), gemini_key)
         return gemini_key
 
@@ -203,7 +217,7 @@ class Hub:
         s = self._session()
         return {
             "type": "snapshot",
-            "segments": [{"id": g.id, "en": g.en, "zh": g.zh, "final": g.final} for g in s.segments],
+            "segments": [asdict(g) for g in s.segments],
             "status": s.status_text,
             "listening": self.listening,
             "stt": self.stt,
@@ -224,7 +238,7 @@ class Hub:
         """What has been said so far in this page's meeting (finished lines), for 問 AI's context."""
         if self.session is None:
             return ""
-        return "\n".join(f"{g.en}\n{g.zh}".strip() for g in self.session.segments if g.final)
+        return "\n".join(f"{g.text}\n{g.tr}".strip() for g in self.session.segments if g.final)
 
     # ---- listening ----
 
@@ -243,10 +257,12 @@ class Hub:
             return self._refuse(f"不認得的辨識方式：{stt}")
         gemini_key = self._refresh_keys()
         if stt == "gemini" and not gemini_key:
-            return self._refuse("這台電腦沒有設定 Gemini 金鑰（環境變數 GEMINI_API_KEY），請改用「本機（免費）」")
-        self.archive = self._begin_archive(stt) if save else None
+            return self._refuse("還沒填 Gemini 金鑰：到「設定」面板填，或改用「本機（免費）」")
+        self.archive = self._begin_archive(stt, language) if save else None
         if self.archive is not None:
             self.archive_task = asyncio.ensure_future(self._archive_loop(self.archive))
+        self.samples = 0
+        session.seg = 0
         if summary:
             self.summary.begin(summary_min)
         self.summary.on_update = self.archive.set_summary if summary and self.archive is not None else None
@@ -288,9 +304,7 @@ class Hub:
             nonlocal inner, task
             if task is None:
                 return
-            if inner.full():
-                inner.get_nowait()
-            inner.put_nowait(None)
+            self._put(inner, None)
             await task
             inner = task = None
 
@@ -298,19 +312,17 @@ class Hub:
         try:
             while True:
                 try:
-                    chunk = await asyncio.wait_for(self.audio.get(), IDLE_TICK)
+                    item = await asyncio.wait_for(self.audio.get(), IDLE_TICK)
                 except asyncio.TimeoutError:
-                    chunk = b""
-                if chunk is None:
+                    item = ()
+                if item is None:
                     return await end()
                 if task is not None and task.done():
                     return  # the speech service gave up on its own (a rejected key, say) and said why
                 quiet = time.monotonic() - self.last_caption
-                step, payload = gate.on_chunk(chunk, idle.rms(chunk), quiet) if chunk else gate.on_tick(quiet)
+                step, payload = gate.on_chunk(item, idle.rms(item[1]), quiet) if item else gate.on_tick(quiet)
                 if step == idle.FORWARD:
-                    if inner.full():
-                        inner.get_nowait()
-                    inner.put_nowait(payload)
+                    self._put(inner, payload)
                 elif step == idle.PAUSE:
                     await end()
                     session.status(f"已暫停辨識：安靜超過 {idle.minutes_label(pause_min)} 分鐘，不再送出聲音、不計費；有人說話會自動接上")
@@ -384,22 +396,28 @@ class Hub:
                 # One failed write must not end the writing for the rest of the meeting.
                 log.exception("archive tick failed")
 
+    def _put(self, queue: asyncio.Queue, item) -> None:
+        """Into a queue on the way to the speech service; when it is full (the service fell behind) the
+        oldest chunk goes, and is reported lost (the saved session's dropped_sec)."""
+        if queue.full():
+            old = queue.get_nowait()
+            if old:
+                self._session().lost(len(old[1]) // 2 / RATE)
+        queue.put_nowait(item)
+
     def feed(self, sender, chunk: bytes) -> None:
         if not self.listening or sender is not self.owner:
             return
-        if self.archive is not None:
-            self.archive.feed(chunk)
-        if self.audio.full():
-            self.audio.get_nowait()
-        self.audio.put_nowait(chunk)
+        # Saving: the recording says where the chunk lands (silence it filled in for a break counts).
+        at = self.archive.feed(chunk) if self.archive is not None else self.samples
+        self.samples = at + len(chunk) // 2
+        self._put(self.audio, (at, chunk))
 
     async def stop(self) -> None:
         if not self.listening:
             return
         task = self.task
-        if self.audio.full():
-            self.audio.get_nowait()
-        self.audio.put_nowait(None)
+        self._put(self.audio, None)
         done, _ = await asyncio.wait({task}, timeout=STOP_TIMEOUT)
         if not done:
             task.cancel()
@@ -450,7 +468,7 @@ class Hub:
             info = self.archive.next_segment(name) if kind == "segment-next" else self.archive.rename_segment(name)
         except ValueError as e:
             return self._session().status(str(e))
-        self.emit({"type": "segment", **info})
+        self._segment_changed(info)
 
     async def _command(self, ws, text: str) -> None:
         try:

@@ -19,6 +19,7 @@ import uuid
 from fastapi import Body, Depends, FastAPI, File, Header, HTTPException, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import Headers
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from lib import gpu_gate, lookup, mindmap, ownvoice, settings, summarize, workspace
@@ -45,10 +46,29 @@ async def _lifespan(_app):
         await asyncio.wait({LIVE.finalizing}, timeout=LIVE_SHUTDOWN_WAIT)
 
 
+class _SameOriginWrites:
+    """跨站寫入守衛（唯一一處）：GET／HEAD 以外的請求，帶了 Origin 或 Sec-Fetch-Site 就必須是本服務自己的頁面。
+    兩個都沒帶的放行：瀏覽器送出的寫入一定帶其中之一；curl、影片工人（/api/video/transcribe 走 Bearer token）與測試不帶。"""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["method"] not in ("GET", "HEAD"):
+            h = Headers(scope=scope)
+            origin, site = h.get("origin"), h.get("sec-fetch-site")
+            if (origin is not None and not live_hub.origin_allowed(origin, h.get("host", ""))) or                     (site is not None and site != "same-origin"):
+                await JSONResponse({"detail": "只接受這個服務自己的頁面送出的修改"}, status_code=403)(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 app = FastAPI(title="Meeting Service (local only)", lifespan=_lifespan)
 # 只認本機的主機名：別的網域就算解析到 127.0.0.1（DNS rebinding），瀏覽器送來的 Host 也不會過，
 # 那個網頁就讀不到逐字稿、也叫不動會計費的端點。
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+# 別的網頁不能替使用者對這裡送出會計費或改設定的請求（/api/upload?use_api=true、/api/lookup/ask、/api/settings…）。
+app.add_middleware(_SameOriginWrites)
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 MAX_UPLOAD_MB = 500
@@ -65,9 +85,17 @@ def _job_dir(job_id: str) -> str:
     return d
 
 
+SETTINGS_SLOT = "<!-- settings-panel -->"
+
+
 def _page(name: str) -> str:
+    """頁面裡的 SETTINGS_SLOT 換成 templates/_settings.html（設定面板只有這一份，兩頁共用）。"""
     with open(os.path.join(BASE_DIR, "templates", name), encoding="utf-8") as f:
-        return f.read()
+        page = f.read()
+    if SETTINGS_SLOT in page:
+        with open(os.path.join(BASE_DIR, "templates", "_settings.html"), encoding="utf-8") as f:
+            page = page.replace(SETTINGS_SLOT, f.read(), 1)
+    return page
 
 
 def _check_language(language: str) -> None:
@@ -109,7 +137,7 @@ def _api_key_for(use_api: bool) -> str:
     """key 在請求當下讀出、往下傳給背景 thread（理由見 upload()）。"""
     api_key = settings.get_api_key() if use_api else ""
     if use_api and not api_key:
-        raise HTTPException(400, "尚未在設定頁填入 API key，無法使用 API 自動處理")
+        raise HTTPException(400, "還沒在「設定」填 Anthropic 金鑰，無法使用 API 自動處理")
     return api_key
 
 
@@ -273,9 +301,9 @@ def lookup_search(body: dict = Body(...)):
     query = str(body.get("q", "")).strip()
     if not query:
         raise HTTPException(400, "沒有要搜尋的文字")
-    key = os.environ.get("SERPER_API_KEY", "").strip()
+    key = settings.key("serper_api_key")
     if not key:
-        raise HTTPException(400, "這台電腦沒有設定搜尋金鑰（環境變數 SERPER_API_KEY）")
+        raise HTTPException(400, "還沒填搜尋金鑰：到「設定」填 Serper 搜尋金鑰")
     try:
         return {"results": lookup.search(query, key)}
     except Exception as e:
@@ -289,14 +317,14 @@ async def lookup_ask(body: dict = Body(...)):
     if not text:
         raise HTTPException(400, "沒有要問的文字")
     results, note = [], ""
-    key = os.environ.get("SERPER_API_KEY", "").strip()
+    key = settings.key("serper_api_key")
     if key:
         try:
             results = await asyncio.to_thread(lookup.search, text, key)
         except Exception as e:
             note = f"這次沒搜尋到網路（{type(e).__name__}），以下只根據會議內容"
     else:
-        note = "這台電腦沒有設定搜尋金鑰，以下只根據會議內容"
+        note = "還沒填搜尋金鑰（「設定」可以填），以下只根據會議內容"
     # 上下文：會議工作區這場的字幕；沒有的話才看 OwnVoice 正在寫的逐字稿。
     try:
         # 讀檔放到執行緒：這個端點在事件迴圈上跑，不能讓即時字幕等磁碟。
@@ -364,7 +392,7 @@ def mindmap_make(body: dict = Body(...)):
     else:
         api_key = settings.get_api_key()
         if not api_key:
-            raise HTTPException(400, "還沒在「API 設定」填 key；請用「複製 prompt → 貼回」的做法")
+            raise HTTPException(400, "還沒在「設定」填 Anthropic 金鑰；請用「複製 prompt → 貼回」的做法")
         try:
             tree = mindmap.generate(transcript, api_key)
         except Exception as e:
@@ -414,16 +442,20 @@ async def video_transcribe(file: UploadFile = File(...), model: str = "large-v3"
 
 @app.get("/api/settings")
 def get_settings():
-    """回傳是否已設定 key + 遮罩版本，絕不回傳明文。"""
-    return {"has_api_key": settings.has_api_key(), "masked_api_key": settings.masked_api_key()}
+    """全部設定；金鑰只回遮罩與來源，絕不回明文（見 lib/settings.py public）。"""
+    return settings.public()
 
 
-@app.post("/api/settings")
+@app.put("/api/settings")
+@app.post("/api/settings")      # 舊頁面用 POST 存 key，同一個函式
 def save_settings(body: dict = Body(...)):
-    """設定頁存 API key。空字串等同清除設定，退回人工回路模式。"""
-    key = (body.get("anthropic_api_key") or "").strip()
-    settings.set_api_key(key)
-    return {"has_api_key": settings.has_api_key(), "masked_api_key": settings.masked_api_key()}
+    """部分更新：只送要改的欄位；未知欄位、型別或長度不對回 400，整包不寫。金鑰空字串＝清除。"""
+    try:
+        return settings.update(body)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except OSError as e:
+        raise HTTPException(503, str(e))
 
 
 @app.get("/api/prompt/{job_id}")

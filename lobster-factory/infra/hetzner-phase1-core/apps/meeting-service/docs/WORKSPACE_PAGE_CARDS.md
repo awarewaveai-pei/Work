@@ -80,7 +80,7 @@
 - C11 與卡片不同：摘要面板疊在查詢旁、預設版面把查詢設為作用中分頁；清除字幕時還在跑的更新結果會被丟掉（batch.rs 沒有這條）；頁面的 start 欄位由面板登記（`Workspace.startExtras`），字幕面板不認識摘要
 - 未實測：真實麥克風／電腦聲音收音；Anthropic 翻譯與摘要對真實 API；存檔／摘要面板在真實瀏覽器裡的點擊操作（只驗過頁面 200、五段內嵌 script 語法、WebSocket snapshot 與指令）
 
-## 段 4：兩個工具合成一套（計畫 v2，2026-11-26 檢視後重寫，未開工）
+## 段 4：兩個工具合成一套（計畫 v2，2026-11-26 檢視後重寫）
 
 v1（2026-11-25，`af92d5382`）經 critic 25 條＋Codex 19 條檢視（`agency-os/reports/oracle/2026-11-26-inspect-60d4b1ef.md`）後重寫。v1 的錯：`to_taiwan`「沒有呼叫者」不對（`lib/live/translate.py:197`、`:206`、`:226` 已呼叫，缺的是辨識原文）；合併與幻覺偵測不算重複（聆聽時沒跑過）；存檔沒有機器可讀的逐字稿（只有 markdown，`lib/live/archive.py:105-121`），會後整理無從接起；只補設定 API 的來源檢查是補一個洞不是關一類。
 
@@ -103,7 +103,7 @@ v1（2026-11-25，`af92d5382`）經 critic 25 條＋Codex 19 條檢視（`agency
 ### 架構定案
 
 - **每句一種格式**（取代寫死英翻中的 `lib/live/session.py:25-29`）：`id, start, end, seg, who("me"|"them"), speaker(str|None), lang(BCP-47|""), text, tr, final`。`caption` 事件同欄位。
-- **時間只有一個基準＝錄音的取樣位置**（不是伺服器時鐘）。今天 `open_line` 用 `clock()`（`lib/live/archive.py:331-341`），辨識佇列落後會丟音訊（`lib/live/hub.py:311-313`）而 WAV 不丟，兩者越差越多。每路數自己收到的取樣數；本機辨識由 VAD 給起訖取樣；Gemini 用文字到達當下的取樣數（有延遲，C12 量出來寫成常數補正）。
+- **時間只有一個基準＝錄音的取樣位置**（不是伺服器時鐘）。今天 `open_line` 用 `clock()`（`lib/live/archive.py:331-341`），辨識佇列落後會丟音訊（`lib/live/hub.py:311-313`）而 WAV 不丟，兩者越差越多。每路數自己收到的取樣數；本機辨識由 VAD 給起訖取樣；Gemini 用文字到達當下的取樣數。實測（C12，`her1912.wav`）Gemini 晚 3.9–4.9 秒（第 1 句 start 6.7 vs 實際發聲 2.85；最後一句 end 64.4 vs 59.5），不用常數補正（斷句器的等待時間每句不同）：要配講者時用錄音的發聲區段重新對齊（C15 一個函式，C18 沿用）。
 - **場次旁檔 `session.json`**（機器讀；`transcript.md` 照舊給人讀，格式不變）：`version, listen, target, stt, channels, lines[...], dropped_sec, failed_lines`，與 `transcript.md` 同一次原子寫入。寫入＝`lib/live/archive.py`，讀取＝`lib/ownvoice.py`（仍是唯一讀取點）。沒有這個檔＝舊場次。
 - **語言表一處** `lib/live/langs.py`：一列一語言 `(code, 按鈕名, 提示詞用名, whisper 碼, 文字系統, 要不要簡轉繁)`。加語言＝加一列。`lib/transcribe.py:25` `LANGUAGES`、`app.py:73-75` `_check_language`、`lib/ownvoice.py:54-57` 都改由它推導（否則選日文後上傳回 400）。首批：自動、zh-TW、en-US、ja-JP、ko-KR。
 - **簡轉繁只對中文**：`lang` 或翻譯目標是中文才過 `zh.to_taiwan`（日文漢字 会 学 来 区 医 号 声 都在觸發字集 `lib/live/zh.py:8-9`，一律轉會弄壞日文）。規則函式一個、在 `langs.py`；原文在 `Session` 寫入處呼叫，翻譯在 `translate.py` 現有三處呼叫（帶目標語言）。
@@ -135,7 +135,7 @@ v1（2026-11-25，`af92d5382`）經 critic 25 條＋Codex 19 條檢視（`agency
 
 **C13 一份設定＋跨站寫入守衛**
 - 現況散在：`MS/.settings.json`（Anthropic key，`lib/settings.py:14`）；環境變數 `GEMINI_API_KEY`（`lib/live/hub.py:156`）、`HF_TOKEN`（`lib/diarize.py:60`）、`SERPER_API_KEY`（`app.py:276`、`:292`）、`MEETING_DRIVE_BASE`（`lib/archive.py:26`，import 時讀一次）、`VIDEO_WORKER_TOKEN`；OwnVoice app 的 `%APPDATA%` 設定（`lib/ownvoice.py:23-57`：`archive_dir`、`stt_language`）；瀏覽器 localStorage（`templates/workspace.html:252-253`、`:555-556`、`:1038-1039`）。
-- `lib/settings.py` 擴成有欄位定義的設定檔（同一個 `.settings.json`；`anthropic_api_key` 鍵名不變，revert 後舊程式仍讀得到）。欄位：金鑰 Anthropic／Gemini／Hugging Face／Serper（只回遮罩；優先序一條：設定檔有值用設定檔，否則環境變數）；聽的語言、翻譯成、辨識方式、暫停／結束分鐘、字級、摘要開關與間隔、存檔開關。`VIDEO_WORKER_TOKEN` 留環境變數（機器對機器，不進頁面）。
+- `lib/settings.py` 擴成有欄位定義的設定檔（同一個 `.settings.json`；`anthropic_api_key` 鍵名不變，revert 後舊程式仍讀得到）。欄位：金鑰 Anthropic／Gemini／Hugging Face／Serper（只回遮罩；優先序一條：設定檔有值用設定檔，否則環境變數；Anthropic 例外，不讀環境變數：系統可能留著給 Claude CLI 用的過期 `ANTHROPIC_API_KEY`，拿來備援會讓翻譯失敗而不改走 Gemini，`lib/settings.py:18-22`）；聽的語言、翻譯成、辨識方式、暫停／結束分鐘、字級、摘要開關與間隔、存檔開關。`VIDEO_WORKER_TOKEN` 留環境變數（機器對機器，不進頁面）。
 - 每個金鑰的讀取點改接設定（上列 `hub.py:156`、`diarize.py:60`、`app.py:276`、`:292`），否則面板填了 key 聆聽仍說沒設定。
 - API：`GET /api/settings`、`PUT /api/settings`（部分更新、逐欄驗證、未知欄位拒絕）；舊 `POST /api/settings` 改呼叫同一個函式。
 - 跨站寫入守衛 middleware（見架構定案），突變一次。
@@ -198,6 +198,13 @@ v1（2026-11-25，`af92d5382`）經 critic 25 條＋Codex 19 條檢視（`agency
 - C12 → C13 → C14 → C15 → C16 → C17 → C18 → C19。一卡一 commit、critic 一次、`tools/feed.py` 真實鏈測一次，過了才換 8420。
 - C15 做完＝兩個工具的結合成立（聆聽場次不重複轉錄；上傳照舊）。C17／C18 只是讓更多步驟被跳過，不改 C15。
 - 撤回：每卡 `git revert`；旁檔與設定檔的新欄位舊程式會忽略。
+
+### 進度（段 4）
+
+- 批 1 完成：C12 `24af2d9cc`、C13 `486e1ae13`，合併 `ce19c86a1`。144→145 測試；真實 Gemini（8434，存檔）13 句、翻譯 +0.5–1.0 秒、`session.json` 13 句齊。
+- 處理過的工人風險：Gemini 重連時清掉的音訊沒算進 `dropped_sec` → 改成 `Session.lost()` 一個出口（`lib/live/session.py`、`hub.py` `_put`、`stt_gemini.py` `_drain`）；閒置暫停時不送的聲音是靜音，不算遺失。
+- 交給後面的卡：C14 語言欄位對照 `langs.py` 驗證（C13 只驗格式，`lib/settings.py:56-57`）、「只看中文」改成「只看翻譯」（偏好鍵 `zhOnly`）；C15 Gemini 場次配 pyannote 前用發聲區段重新對齊（見架構定案）。
+- 接受不改：舊瀏覽器兩個標頭都不帶時跨站守衛放行（`app.py:52-56`，現行瀏覽器跨站寫入都帶 `Origin`）；`lib/diarize.py:58-66` 用路徑載入 `settings.py`（另一專案單獨載入 `diarize.py`）；麥克風／電腦聲音／只看中文留在瀏覽器（各台裝置不同）。
 
 ### 派工（操作者 2026-11-26 批准；監工＝主 session）
 

@@ -80,10 +80,10 @@
   .cap-list .divider { margin: 14px 0 10px; color: var(--muted); font-size: 0.8em; text-align: center; overflow-wrap: anywhere; }
   .cap-list { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px; line-height: 1.5; }
   .cap-list .seg { margin-bottom: 12px; }
-  .cap-list .en { color: var(--ink); }
-  .cap-list .interim .en { color: var(--muted); }
-  .cap-list .zh { color: var(--accent-hover); min-height: 1em; }
-  .cap-list.zh-only .en { display: none; }
+  .cap-list .text { color: var(--ink); }
+  .cap-list .interim .text { color: var(--muted); }
+  .cap-list .tr { color: var(--accent-hover); min-height: 1em; }
+  .cap-list.zh-only .text { display: none; }
   .cap-foot { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
   .cap-usage { white-space: nowrap; }
   .cap-sum { white-space: nowrap; color: var(--yellow); font-weight: 600; }
@@ -161,6 +161,7 @@
   <button class="tbtn" type="button" data-panel="script" aria-pressed="true">講稿</button>
   <button class="tbtn" type="button" data-panel="lookup" aria-pressed="true">查詢</button>
   <button class="tbtn" type="button" data-panel="summary" aria-pressed="true">摘要</button>
+  <button class="tbtn" type="button" data-panel="settings" aria-pressed="true">設定</button>
   <span class="sep"></span>
   <button class="tbtn" type="button" id="resetLayout">恢復預設版面</button>
   <span class="spacer"></span>
@@ -201,6 +202,8 @@ window.Workspace = (function () {
   };
 })();
 </script>
+<!-- settings-panel -->
+<script>window.Workspace.onPanel("settings", root => window.Settings.mount(root));</script>
 
 <template id="tpl-captions">
   <div class="cap">
@@ -243,14 +246,19 @@ window.Workspace = (function () {
 (function () {
   const RATE = 16000, CHUNK = RATE / 10, MAX_ROWS = 500, NEAR_BOTTOM_PX = 30;
   const EMPTY = "按「聆聽」開始。對方說的英文會出現在這裡，中文跟在下面。";
-  const prefs = Object.assign({ mic: true, tab: false, stt: "gemini", zhOnly: false, size: 18, pauseMin: 3, endMin: 30, save: true }, loadPrefs());
+  // mic／tab／zhOnly 只存在這個瀏覽器；其餘是伺服器設定（兩頁共用，見 templates/_settings.html）。
+  const store = window.Settings.prefs("ws-captions",
+    { stt: "stt", pauseMin: "pause_min", endMin: "end_min", size: "caption_size", save: "save" },
+    { mic: true, tab: false, stt: "gemini", zhOnly: false, size: 18, pauseMin: 3, endMin: 30, save: true }, () => paintBar());
+  const prefs = store.values;
   // segment：伺服器正在存的段落（index 0 = 沒在存）；dividers：新段落的分隔線，after = 開新段時最後一句字幕的代號
   const state = { segs: new Map(), status: "", listening: false, usage: null, level: 0, segment: { index: 0, name: "", recording: false, dir: "" }, dividers: [], renaming: false, summaryOn: false };
   let root = null, audio = null, following = true, ours = false;
   const live = window.Workspace.live;
 
-  function loadPrefs() { try { return JSON.parse(localStorage.getItem("ws-captions") || "{}"); } catch (e) { return {}; } }
-  function savePrefs() { try { localStorage.setItem("ws-captions", JSON.stringify(prefs)); } catch (e) {} }
+  function setPref(name, value) {
+    store.set(name, value).catch(e => { state.status = e.message; paintBar(); });
+  }
 
   // ---------- 與伺服器的連線（連線本體在 Workspace.live，三個面板共用） ----------
   function send(obj) { live.send(obj); }
@@ -425,15 +433,15 @@ window.Workspace = (function () {
     if (!row) {
       row = document.createElement("div");
       row.dataset.seg = seg.id;
-      const en = document.createElement("div"); en.className = "en";
-      const zh = document.createElement("div"); zh.className = "zh";
-      row.append(en, zh);
+      const text = document.createElement("div"); text.className = "text";
+      const tr = document.createElement("div"); tr.className = "tr";
+      row.append(text, tr);
       el.append(row);
       while (el.querySelectorAll("[data-seg]").length > MAX_ROWS) el.querySelector("[data-seg]").remove();
     }
     row.className = "seg" + (seg.final ? "" : " interim");
-    row.querySelector(".en").textContent = seg.en;
-    row.querySelector(".zh").textContent = seg.zh || (seg.final ? "…" : "");
+    row.querySelector(".text").textContent = seg.text;
+    row.querySelector(".tr").textContent = seg.tr || (seg.final ? "…" : "");
     settle();
   }
   function paintLevel() {
@@ -485,14 +493,14 @@ window.Workspace = (function () {
     el.querySelector(".cap-bar").addEventListener("click", e => {
       const b = e.target.closest("button");
       if (!b || b.disabled) return;
-      if (b.dataset.src) prefs[b.dataset.src] = !prefs[b.dataset.src];
-      else if (b.dataset.stt) prefs.stt = b.dataset.stt;
+      if (b.dataset.src) setPref(b.dataset.src, !prefs[b.dataset.src]);
+      else if (b.dataset.stt) setPref("stt", b.dataset.stt);
       else if (b.dataset.act === "listen") return void listen(!state.listening);
-      else if (b.dataset.act === "zh-only") prefs.zhOnly = !prefs.zhOnly;
-      else if (b.dataset.act === "smaller") prefs.size = Math.max(12, prefs.size - 2);
-      else if (b.dataset.act === "bigger") prefs.size = Math.min(40, prefs.size + 2);
+      else if (b.dataset.act === "zh-only") setPref("zhOnly", !prefs.zhOnly);
+      else if (b.dataset.act === "smaller") setPref("size", Math.max(12, prefs.size - 2));
+      else if (b.dataset.act === "bigger") setPref("size", Math.min(40, prefs.size + 2));
       else if (b.dataset.act === "clear") return send({ type: "clear" });
-      else if (b.dataset.act === "save") prefs.save = !prefs.save;
+      else if (b.dataset.act === "save") setPref("save", !prefs.save);
       else if (b.dataset.act === "segnext") return send({ type: "segment-next", name: null });
       else if (b.dataset.act === "segname") {
         state.renaming = true;
@@ -503,7 +511,6 @@ window.Workspace = (function () {
         edit.select();
         return;
       }
-      savePrefs();
       paintBar();
       settle();
     });
@@ -521,8 +528,7 @@ window.Workspace = (function () {
     edit.addEventListener("blur", () => { if (state.renaming) { state.renaming = false; paintSegment(); } });
     el.querySelectorAll("[data-idle]").forEach(x => x.addEventListener("change", () => {
       const v = Number(x.value);
-      prefs[x.dataset.idle] = Number.isFinite(v) && v >= 0 ? v : 0;
-      savePrefs();
+      setPref(x.dataset.idle, Number.isFinite(v) && v >= 0 ? Math.min(v, Number(x.max)) : 0);
       paintBar();
     }));
     paintAll();
@@ -545,15 +551,13 @@ window.Workspace = (function () {
 // 回覆面板：打中文 → 大字英文（照 OwnVoice Meet src/reply/main.ts，Apache-2.0）。回覆內容在頁面層，
 // 面板關掉再開還在；聆聽中與否都能用。
 (function () {
-  const prefs = Object.assign({ size: 28 }, loadPrefs());
+  const store = window.Settings.prefs("ws-reply", { size: "reply_size" }, { size: 28 }, () => paint());
+  const prefs = store.values;
   const live = window.Workspace.live;
   let reply = null;       // 最近一則 { id, zh, en, done }
   let seen = 0;           // 看過的最大回覆代號（伺服器每則回覆給一個遞增的新代號）
   let awaiting = null;    // 剛送出、伺服器還沒回第一個事件的中文；這段時間舊回覆（代號 ≤ seen）的事件不能蓋掉它
   let root = null;
-
-  function loadPrefs() { try { return JSON.parse(localStorage.getItem("ws-reply") || "{}"); } catch (e) { return {}; } }
-  function savePrefs() { try { localStorage.setItem("ws-reply", JSON.stringify(prefs)); } catch (e) {} }
 
   function paint() {
     if (!root) return;
@@ -603,8 +607,8 @@ window.Workspace = (function () {
     el.querySelector(".rp-bar").addEventListener("click", e => {
       const b = e.target.closest("button");
       if (!b) return;
-      prefs.size = Math.max(14, Math.min(72, prefs.size + (b.dataset.act === "bigger" ? 2 : -2)));
-      savePrefs();
+      store.set("size", Math.max(14, Math.min(72, prefs.size + (b.dataset.act === "bigger" ? 2 : -2))))
+        .catch(err => { el.querySelector(".rp-bar .placeholder").textContent = err.message; });
       paint();
     });
     paint();
@@ -1025,18 +1029,21 @@ Sorry, could you repeat the question?
 </template>
 <script>
 // 摘要面板：條列顯示與狀態列照 OwnVoice Meet src/summary/main.ts（Apache-2.0）；整理的排程在伺服器（lib/live/summary.py）。
-// 開關與間隔存在 localStorage，按「聆聽」時由字幕面板併進 start 指令；預設關。
+// 開關與間隔是伺服器設定（templates/_settings.html），按「聆聽」時由字幕面板併進 start 指令；預設關。
 (function () {
   const live = window.Workspace.live;
   const EMPTY_OFF = "還沒有開啟。打開上面的「會議中摘要」再按「聆聽」，每隔幾分鐘就會把新的字幕整理成要點（每次都計費）。";
   // 條件同 lib/live/summary.py：每 N 分鐘一次，且至少 3 句新字幕（MIN_LINES）。
   const emptyOn = () => "還沒有摘要。每 " + prefs.every + " 分鐘整理一次，而且要累積至少 3 句新字幕；停止聆聽時會把剩下的再整理一次。";
-  const prefs = Object.assign({ on: false, every: 5 }, loadPrefs());
+  const store = window.Settings.prefs("ws-summary", { on: "summary", every: "summary_min" }, { on: false, every: 5 }, () => paint());
+  const prefs = store.values;
   const view = { text: "", updated: "", lines: 0, working: false, error: "", enabled: false };
-  let listening = false, root = null;
+  let listening = false, root = null, note = "";
 
-  function loadPrefs() { try { return JSON.parse(localStorage.getItem("ws-summary") || "{}"); } catch (e) { return {}; } }
-  function savePrefs() { try { localStorage.setItem("ws-summary", JSON.stringify(prefs)); } catch (e) {} }
+  function setPref(name, value) {
+    note = "";
+    store.set(name, value).catch(e => { note = e.message; paint(); });
+  }
 
   window.Workspace.startExtras.push(() => ({ summary: prefs.on, summary_min: prefs.every }));
   live.on("snapshot", ev => { Object.assign(view, ev.summary); listening = ev.listening; paint(); });
@@ -1067,6 +1074,7 @@ Sorry, could you repeat the question?
     if (view.working) parts.push("整理中…");
     else if (view.updated) parts.push(view.updated + " 更新，共 " + view.lines + " 句");
     if (view.error) parts.push(view.error);
+    if (note) parts.push(note);
     root.querySelector(".sm-foot").textContent = parts.join("　");
   }
 
@@ -1074,14 +1082,12 @@ Sorry, could you repeat the question?
     root = el;
     el.querySelector('[data-act="on"]').addEventListener("click", e => {
       if (e.currentTarget.disabled) return;
-      prefs.on = !prefs.on;
-      savePrefs();
+      setPref("on", !prefs.on);
       paint();
     });
     el.querySelector("[data-every]").addEventListener("change", e => {
       const v = Math.round(Number(e.target.value));
-      if (Number.isFinite(v)) prefs.every = Math.min(60, Math.max(1, v));
-      savePrefs();
+      if (Number.isFinite(v)) setPref("every", Math.min(60, Math.max(1, v)));
       paint();
     });
     paint();
@@ -1093,7 +1099,7 @@ Sorry, could you repeat the question?
 <script>
 (function () {
   const dv = window["dockview-core"];
-  const PANELS = { captions: "字幕", reply: "回覆", script: "講稿", lookup: "查詢", summary: "摘要" };
+  const PANELS = { captions: "字幕", reply: "回覆", script: "講稿", lookup: "查詢", summary: "摘要", settings: "設定" };
   // 重新打開被關掉的面板時，優先併在這些面板旁邊；都不在就加進目前的群組。
   const REOPEN_NEXT_TO = {
     captions: [["reply", "above"], ["lookup", "left"]],
@@ -1101,6 +1107,7 @@ Sorry, could you repeat the question?
     script: [["lookup", "below"], ["reply", "right"]],
     lookup: [["script", "above"], ["captions", "right"]],
     summary: [["lookup", "within"], ["captions", "right"]],
+    settings: [["lookup", "within"], ["captions", "right"]],
   };
   const el = document.getElementById("dock");
 
@@ -1133,6 +1140,7 @@ Sorry, could you repeat the question?
     addPanel("reply", { referencePanel: "captions", direction: "below" }, { initialHeight: Math.round(h * 0.35) });
     addPanel("script", { referencePanel: "lookup", direction: "below" }, { initialHeight: Math.round(h * 0.5) });
     addPanel("summary", { referencePanel: "lookup", direction: "within" });
+    addPanel("settings", { referencePanel: "lookup", direction: "within" });
     api.getPanel("lookup").api.setActive();
   }
 
