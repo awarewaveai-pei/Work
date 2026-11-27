@@ -111,18 +111,19 @@ describe("場景與合成 prompt", () => {
     expect(p).toContain("Leave the lower centre (x 30%-70%, y 50%-95% of the picture) as an open, empty surface");
   });
 
-  it("phone group: the whole product in that size's product area on the lower-right thirds crossing, text area clear", () => {
-    const p = compositePrompt({ scene: "spa counter", group: "phone",
+  it("stacked areas: the whole product in its area on the lower-right thirds crossing, the text band clear above it", () => {
+    const p = compositePrompt({ scene: "spa counter",
       productArea: { x0: 0.5, y0: 0.5, x1: 0.85, y1: 0.9 }, textArea: { x0: 0.05, y0: 0.05, x1: 0.95, y1: 0.4 } });
     expect(p).toContain("Place the product inside the lower right (x 50%-85%, y 50%-90% of the picture) -- the lower-right crossing of the rule-of-thirds lines");
     expect(p).toContain("WHOLE product inside that area and inside the picture");
     expect(p).toContain("about 40% of the picture height");
-    expect(p).toContain("Keep the upper centre (x 5%-95%, y 5%-40% of the picture) clean");
+    expect(p).toContain("Keep the top band y 5%-40% of the picture, across its whole width, clean");
+    expect(p).toContain("the product stays below it");
   });
 
-  it("R4-B card / web group: zoned by x only -- product column for the shown height, ~half that tall, text column clear top to bottom", () => {
+  it("R4-B side-by-side areas: zoned by x only -- product column for the shown height, ~half that tall, text column clear top to bottom", () => {
     const productArea = { x0: 0.6, y0: 0.3, x1: 0.9, y1: 0.8 }, textArea = { x0: 0.05, y0: 0.2, x1: 0.55, y1: 0.8 };
-    const p = compositePrompt({ scene: "spa counter", group: "card", productArea, textArea });
+    const p = compositePrompt({ scene: "spa counter", productArea, textArea });
     expect(p).toContain("Place the product in the column x 60%-90% of the picture");
     expect(p).toContain("between y 0% and 100%");
     expect(p).toContain("about 50% of the picture height tall -- about half of the shown height");
@@ -131,7 +132,7 @@ describe("場景與合成 prompt", () => {
     // 3:1 drawn at 21:9: the shown band is y 11%-89% of the picture, so half of it is 39% of the picture
     const visible = boxOnPicture({ x: 0, y: 0, w: 1920, h: 640 }, { w: 1920, h: 640 }, "21:9");
     expect(visible).toEqual({ x0: 0, y0: 0.11, x1: 1, y1: 0.89 });
-    const w = compositePrompt({ scene: "s", group: "web", productArea, textArea, visible });
+    const w = compositePrompt({ scene: "s", productArea, textArea, visible });
     expect(w).toContain("between y 11% and 89% (the part of the picture that is shown)");
     expect(w).toContain("about 39% of the picture height tall");
   });

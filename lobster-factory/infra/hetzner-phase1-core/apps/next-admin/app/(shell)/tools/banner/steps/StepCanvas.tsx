@@ -112,7 +112,7 @@ export async function compositeSizes(st: State, sizes: readonly PresetKey[], o: 
     try {
       const areas = await drawnAreas(variantOf(st, k), k, o.model);
       if (!areas.product) throw new Error("no_product_area");
-      const prompt = compositePrompt({ scene: o.scene, productArea: areas.product, textArea: areas.text, group: PRESETS[k].group, visible: areas.visible });
+      const prompt = compositePrompt({ scene: o.scene, productArea: areas.product, textArea: areas.text, visible: areas.visible });
       return [k, { image: await generateBgPicture({ model: o.model, prompt, aspect: areas.aspect, refs: o.refs }), area: areas.product }] as const;
     } catch (err) {
       return [k, err instanceof Error ? err : new Error(String(err))] as const;

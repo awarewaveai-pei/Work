@@ -5,7 +5,7 @@ import { BANNER_COPY_VARIANTS, BANNER_DESIGN_COPY_VARIANTS } from "@/lib/script-
 import { AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
 import { textCallCostUsd, toolCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { PRESETS, type CopyVariant, type PresetKey, type State } from "./banner-state";
-import { COMPOSITION, type CompGroup } from "./composition";
+import { COMPOSITION } from "./composition";
 
 /** The models offered on the banner's AI buttons (operator 2026-11-26). Defaults from the bake-off on production
  *  (ai_call_logs, same brief, 2026-11-26): 一鍵設計 stays Claude Opus 5.5. 生成文案 = Claude Sonnet 5.5 (operator 2026-11-26,
@@ -254,24 +254,37 @@ export function scenePrompt(o: { subject: string; vibe: string; textArea: PicAre
 /** 合成進場景 at one size: the product composited into the scene inside the area the layout engine reserves for it at that
  *  size (reservedAreas via drawnAreas), whole and inside the picture; the text area kept clear. R4 (T1 決定 3, measured
  *  2026-11-27 t1/T1-measure.md): the AI follows x (centres within 2 points) but not size or y -- landscape products came
- *  out 49-57% tall whatever was asked and their tops ran into the text. So by composition group (composition.ts):
- *  - phone: the reserved area as asked (portrait sizes came out 0.94-1.24x the asked height); it sits on the lower third
- *    line's right crossing because the layout put it there.
- *  - card / web: zoned by x ONLY -- the product in its column for the visible height, about half that height tall, the
- *    text column kept clear top to bottom. `visible` = the band of the picture the canvas shows (3:1 cuts the rest). */
-export function compositePrompt(o: { scene: string; productArea: PicArea; textArea: PicArea | null; group: CompGroup; visible?: PicArea }): string {
+ *  out 49-57% tall whatever was asked and their tops ran into the text.
+ *  Invariant: the zoning words come from the two areas' geometry, never from the size's group, so the prompt cannot ask
+ *  for two things the layout does not do (Codex on R4-B: a landscape size with the product centred stacks text and
+ *  product in one column).
+ *  - side by side (their x ranges do not overlap): zoned by x ONLY -- the product in its column inside the shown band,
+ *    about half the shown height tall; the text column kept clear top to bottom.
+ *  - otherwise (stacked, or no text): the product inside its area at that area's height (portrait sizes came out
+ *    0.94-1.24x the asked height); the text band kept clear across the whole width, on its side of the product.
+ *  `visible` = the band of the picture the canvas shows (3:1 cuts the rest). */
+export function compositePrompt(o: { scene: string; productArea: PicArea; textArea: PicArea | null; visible?: PicArea }): string {
   const scene = o.scene.trim() || "a clean professional studio background";
   const v = o.visible ?? { x0: 0, y0: 0, x1: 1, y1: 1 };
   const a = o.productArea, t = o.textArea;
-  const placement = o.group === "phone"
-    ? `Place the product inside ${areaText(a)} -- the lower-right crossing of the rule-of-thirds lines: the WHOLE product inside that area and inside the picture, ` +
-      `never cropped by the edge, about ${pct(a.y1 - a.y0)} of the picture height tall -- not bigger. `
-    : `Place the product in the column x ${pct(a.x0)}-${pct(a.x1)} of the picture, centred in it, the WHOLE product inside that column ` +
+  const sideBySide = !!t && (t.x1 <= a.x0 || a.x1 <= t.x0);
+  let placement: string, keepClear: string;
+  if (sideBySide) {
+    placement = `Place the product in the column x ${pct(a.x0)}-${pct(a.x1)} of the picture, centred in it, the WHOLE product inside that column ` +
       `and between y ${pct(v.y0)} and ${pct(v.y1)} (the part of the picture that is shown), never cropped by an edge; ` +
       `the product about ${pct((v.y1 - v.y0) * 0.5)} of the picture height tall -- about half of the shown height, not bigger. `;
-  const keepClear = !t ? `Keep clean negative space for a headline.`
-    : o.group === "phone" ? `Keep ${areaText(t)} clean and uncluttered for a headline; nothing else in the picture carries text.`
-    : `Keep the whole column x ${pct(t.x0)}-${pct(t.x1)}, top to bottom, clean and uncluttered for a headline -- the product and anything tall stay out of it; nothing else in the picture carries text.`;
+    keepClear = `Keep the whole column x ${pct(t!.x0)}-${pct(t!.x1)}, top to bottom, clean and uncluttered for a headline -- the product and anything tall stay out of it; nothing else in the picture carries text.`;
+  } else {
+    // the lower-right rule-of-thirds crossing, named only when the layout put the product there (shares of the shown band)
+    const cx = ((a.x0 + a.x1) / 2 - v.x0) / (v.x1 - v.x0), cy = ((a.y0 + a.y1) / 2 - v.y0) / (v.y1 - v.y0);
+    const crossing = Math.abs(cx - 2 / 3) <= 0.1 && Math.abs(cy - 2 / 3) <= 0.1 ? " -- the lower-right crossing of the rule-of-thirds lines" : "";
+    placement = `Place the product inside ${areaText(a)}${crossing}: the WHOLE product inside that area and inside the picture, ` +
+      `never cropped by the edge, about ${pct(a.y1 - a.y0)} of the picture height tall -- not bigger. `;
+    const above = !!t && (t.y0 + t.y1) / 2 < (a.y0 + a.y1) / 2;
+    keepClear = !t ? `Keep clean negative space for a headline.`
+      : `Keep the ${above ? "top" : "bottom"} band y ${pct(t.y0)}-${pct(t.y1)} of the picture, across its whole width, clean and uncluttered for a headline -- ` +
+        `the product stays ${above ? "below" : "above"} it; nothing else in the picture carries text.`;
+  }
   return `Scene: ${scene}. Composite the provided product photo INTO this scene as the hero subject. ` + placement +
     `Physically PLACE it resting on a real surface that belongs to the scene -- a table, counter or shelf -- ` +
     `standing upright with its base actually touching the surface (a grounded contact shadow beneath it), ` +
