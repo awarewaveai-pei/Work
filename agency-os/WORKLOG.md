@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-27（續3）— meeting-service 段 4 批 1：C12 每句格式＋場次旁檔、C13 統一設定＋跨站守衛（上線 8420）
+
+- 根因：兩個工具接不起來（存檔只有 markdown、時間用伺服器時鐘）；設定散在 6 處、只有 WebSocket 擋跨站。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。
+- 步驟：工人 C12 `24af2d9cc`、C13 `486e1ae13`（各自 worktree、Opus）；監工合併 `ce19c86a1`（`hub.py` start() 一處衝突）；審查修正 `4c41dc268`；推 main `e25c092dd`。
+  - C12：每句 `id,start,end,seg,who,speaker,lang,text,tr,final`；時間＝錄音取樣位置；`session.json` 旁檔（`lib/live/archive.py`）＋`lib/ownvoice.py` `session_lines()`；`lib/live/langs.py`；`tools/feed.py`（加 `save` 參數）
+  - C13：`lib/settings.py` 欄位定義＋`key()`；`GET/PUT /api/settings`；`app.py` `_SameOriginWrites`；`templates/_settings.html` 兩頁共用
+  - 審查修正（critic 0c/2m/4n＋Codex 4m）：M1 重連時清掉的音訊沒進 `dropped_sec` → `Session.lost()` 一個出口；M2 壞掉的 `.settings.json` 讓所有存檔失敗 → 移到 `.settings.json.bad-<時間>`（git 忽略）重新開始，寫入 fsync；m1 旁檔先寫、兩檔 fsync；m2 `session_lines()` 讀不懂旁檔＝舊場次；m3 設定 PUT 依序送出、GET 一次讀檔、拒絕無限大；m4 舊瀏覽器偏好不蓋伺服器已存的欄位；m5 遮罩只露後 4 碼
+  - 8420 本機工作目錄因別線 `agency-os/TASKS.md` 衝突無法快轉：只用 `git restore --source=origin/main --worktree` 換 `MS/` 檔案（不動暫存區；`git-parity-merge.py --check` 確認只剩 TASKS.md 擋）
+- 驗證：
+  - `python -m pytest tests -q` → 147 passed；突變：遮罩改回舊式 → `test_settings` 紅，還原綠
+  - 真實 Gemini（8434，`tools/feed.py her1912.wav gemini 8434 save`）：13 句、13 句有翻譯、翻譯 +0.5–1.6 秒、`dropped_sec` 0.0；Gemini 每句時間晚實際發聲 3.9–4.9 秒（計畫已寫：C15 用發聲區段重新對齊）
+  - 瀏覽器（8434）：工作區設定面板顯示遮罩金鑰，主控台無錯；8420 重啟後 `/workspace` 200、`/api/settings` 有 `stored`
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tools/feed.py her1912.wav gemini 8434 save; python -m pytest tests -q | exit=0 | ms=95000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/4n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=session_lines|dropped_sec|on_lost|_SameOriginWrites|settings\.key\( | hits=30
+- ORACLE: Codex review `agency-os/reports/oracle/2026-11-27-partialreview-5b97c254.md`（4 條全查證，3 條修、1 條＝m1 同類一起修）
+- 接受不改：舊瀏覽器兩個標頭都不帶時守衛放行（`MS/app.py:52-56`）；`MS/lib/diarize.py` 用路徑載入 settings（外部專案單獨載入 diarize）；Anthropic 金鑰不讀環境變數（過期 CLI key）
+- 剩餘風險：真實麥克風／系統聲音仍未實測；字級、摘要開關從設定面板改值後重新整理未逐一點過
+- rollback：`git revert 4c41dc268 ce19c86a1`（再 revert 兩張卡的 commit）；設定檔新欄位舊程式忽略
 ## 2026-11-27（續1）— 橫幅 R2：操作者十點回饋全部上線（排版引擎、九步流程、AI 文案五組、品牌 logo）
 - 計畫／根因 file:line：`agency-os/handoffs/2026-11-26-banner-pro-design/PLAN-R2.md`；監工台 artifact 5gGjausYwzjkPtc8UkTkKS（data.mjs RISKS 逐條處置）。
 - 根因：AI／拖曳的絕對座標靜默蓋掉位置按鈕（banner-layers.ts:342 place()）；自動排版不預留徽章／logo／商品；字級固定 64px；AI 只出一版且不帶 logo。
