@@ -120,7 +120,7 @@ export default function StepText({ slot, s, set, setS, drawnType }: StepCtx & { 
           <button className={s.typeAuto ? "btn btn-primary" : "btn btn-ghost"} style={{ fontSize: 12, padding: "3px 10px" }}
             data-testid="banner-type-auto" aria-pressed={s.typeAuto}
             onClick={() => setS((prev) => ({ ...prev, typeAuto: true, saved: false, error: null }))}>自動字級</button>
-          <span className="form-hint" style={{ marginLeft: 6 }}>{s.typeAuto ? "依尺寸與字數自動放到最大；拉下面滑桿改手動" : "手動字級；按「自動字級」回到自動"}</span>
+          <span className="form-hint" style={{ marginLeft: 6 }}>{s.typeAuto ? "在這個尺寸的範圍內自動；拉下面滑桿改手動（只改這個尺寸）" : "手動字級；按「自動字級」回到自動"}</span>
         </div>
         {s.typeAuto && drawnType?.belowMin != null && (
           <div className="form-hint" data-testid="banner-type-below-min" style={{ color: "var(--danger)", fontWeight: 600 }}>

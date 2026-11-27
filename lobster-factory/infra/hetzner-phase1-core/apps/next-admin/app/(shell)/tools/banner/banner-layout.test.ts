@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { applySemantic, areaOnCanvas, layoutBanner, reservedAreas, LOGO_AUTO, LOGO_CLEAR, LOGO_TITLE, REF_PX, type LayoutMeasure } from "./banner-layout";
 import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBox, type ElemKey, type ElemPositions } from "./banner-layers";
-import { INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, enterSize, templatePatch, variantOf, withSizeBackgrounds, type PresetKey, type State } from "./banner-state";
+import { INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, enterSize, mainOf, templatePatch, variantOf, withSizeBackgrounds, type PresetKey, type State } from "./banner-state";
 import { COMPOSITION, TEXT_SHARE_MAX, type LayoutSize } from "./composition";
 import { SUB_RATIO, titleRange } from "./field-ranges";
 import { shapeLayout } from "./banner-design";
@@ -252,6 +252,35 @@ describe("R4-A: title range, composition groups, 9:16 safe bands", () => {
           if (p.box.y < size.h * 0.14 - 0.5 || bottom > size.h * 0.65 + 0.5) bad.push(`${productPos}/${textPos}: product ${Math.round(p.box.y)}-${Math.round(bottom)}`);
         }
     expect(bad).toEqual([]);
+  });
+  // operator 2026-11-27「每個尺寸要套自己的字級」: type is each size's own -- never derived from the main size
+  it("main size set by hand to 120 px: every other size stays automatic in its own range; 9:16 by hand 150 px leaves 1:1 alone", () => {
+    const keys = Object.keys(PRESETS) as PresetKey[];
+    let st: State = { ...INIT, ...(t1 as Partial<State>), preset: "r4x5", multiSizes: keys.filter((k) => k !== "r4x5") } as State;
+    st = { ...st, typeAuto: false, headlineSize: 120, subtextSize: 96 };
+    for (const k of keys.filter((k) => k !== "r4x5")) {
+      const v = variantOf(st, k), size = SIZES[k], r = titleRange(size.w, size.displayW);
+      expect(v.typeAuto).toBe(true);
+      const hs = layoutBanner(v, size, measure).headlineSize;
+      if (k !== "r16x9") { expect(hs).toBeGreaterThanOrEqual(r.min); expect(hs).toBeLessThanOrEqual(r.max); }
+    }
+    expect(layoutBanner(variantOf(st, "r4x5"), SIZES.r4x5, measure).headlineSize).toBe(120);
+    // 9:16 by hand: only 9:16 keeps it (stored with typeAuto); 1:1 and the main size are untouched
+    const edited = enterSize(st, "r9x16");
+    const back = enterSize({ ...edited, typeAuto: false, headlineSize: 150, subtextSize: 120 }, "r1x1");
+    expect(back.typeAuto).toBe(true);
+    expect(variantOf(back, "r9x16")).toMatchObject({ typeAuto: false, headlineSize: 150 });
+    expect(back.sizeOverrides.r9x16).toMatchObject({ typeAuto: false, headlineSize: 150, subtextSize: 120 });
+    expect(mainOf(back)).toMatchObject({ typeAuto: false, headlineSize: 120 });
+    // an override saved before sizes owned their type (px, no typeAuto) is still the hand-set size
+    expect(variantOf({ ...st, sizeOverrides: { r1x1: { headlineSize: 90 } } }, "r1x1")).toMatchObject({ typeAuto: false, headlineSize: 90 });
+  });
+  // Codex on R4-A (F1): a baked background edited in the canvas -- the reservation is productPos (not a guessed area)
+  it("canvas-edited baked background: reserved area = the productPos place, not drawn", () => {
+    const size = SIZES.r4x5, f = { ...t1, productPos: "right" as const };
+    const baked = layoutBanner({ ...f, bgMode: "ai", bgImage: "scene", bgImageHasProduct: true, bgProductArea: null }, size, measure);
+    expect(baked.product!.box).toEqual(layoutBanner(f, size, measure).product!.box);
+    expect(baked.product!.drawn).toBe(false);
   });
   it("phone default: words on top, the product under them centred on the lower-right thirds crossing where it fits", () => {
     const size = SIZES.r4x5, L = layoutBanner({ ...t1, ...COMPOSITION.phone.layout }, size, measure), p = L.product!.box;

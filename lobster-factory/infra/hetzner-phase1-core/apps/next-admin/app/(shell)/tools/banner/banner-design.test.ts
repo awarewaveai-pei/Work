@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { forgePrompt } from "@/lib/script-forge/modules";
 import { askJsonWithRetry, designPlan, parseAiJson, sanitizeCopyVariants, type SizeSpec } from "./banner-design";
 import type { PresetKey } from "./banner-state";
+import { COMPOSITION } from "./composition";
 
 const ctx = { lang: "繁體中文", sceneCount: 6, customScenes: 3, brand: null };
 const size = (key: PresetKey, w: number, h: number): SizeSpec => ({ key, ratio: key, use: "x", w, h });
@@ -24,6 +25,13 @@ describe("AI 一鍵設計 across sizes", () => {
     expect(plan.overrides.r1x1.textAlignH).toBe("center");   // left out / unusable -> square = centred
     expect(plan.overrides.r16x9.productPos).toBe("right");   // wide = words left, product right
     expect(plan.main).toEqual({ textAlignH: "left", productPos: "right" });
+  });
+
+  // Codex on R4-A (F3): the answer left the MAIN size out -> its group's default too, not the old places
+  it("the main size missing from the answer gets its composition group's layout", () => {
+    const plan = designPlan({ headline: "x", layouts: { r9x16: { textPos: "top" } } }, MAIN, [MAIN, TALL]);
+    expect(plan.main).toEqual(COMPOSITION.card.layout);
+    expect(designPlan({ headline: "x", layouts: { r191x1: { nonsense: 1 } } }, MAIN, [MAIN, TALL]).main).toEqual(COMPOSITION.card.layout);
   });
 
   it("nothing ticked = no layouts: the answer's top-level intent, and the same single-size prompt", () => {

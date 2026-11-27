@@ -116,6 +116,7 @@ export interface State {
   bgImage:   string | null;
   bgImageHasProduct: boolean;   // true 當 bgImage 已由 AI 把產品合成進去（決定是否略過事後疊加）
   bgProductArea: PicArea | null; // R3-E: 烤進的商品在 bgImage 裡的位置（圖片比例，生成時要求的商品區）；與 bgImage 同生同滅
+  bgCanvasEdited: boolean;       // R4: 含商品的背景在畫布改過 -> 商品真正位置未知，預留照 productPos，畫面步驟提醒確認；與 bgImage 同生同滅
   generating: boolean;
   designing: boolean;   // AI 一鍵設計整張進行中
   // AI bg blocks
@@ -222,6 +223,7 @@ export const INIT: State = {
   bgImage:   null,
   bgImageHasProduct: false,
   bgProductArea: null,
+  bgCanvasEdited: false,
   generating: false,
   designing: false,
   aiBgSubject:       "",
@@ -310,12 +312,12 @@ export const SIZE_KEYS = [
   "positions", "headlineSize", "subtextSize", "typeAuto", "letterSpacing", "bodyLetterSpacing", "productScale", "productPos",
   "badgeScale", "textPos", "textAlignH", "badgePos", "logoPos", "bgImgScale", "bgImgX", "bgImgY", "logoScale", "logoAuto",
   // R3-C: 合成進場景 draws one picture per size at that size's ratio; a size without its own uses the main size's
-  "bgImage", "bgImageHasProduct", "bgProductArea",
+  "bgImage", "bgImageHasProduct", "bgProductArea", "bgCanvasEdited",
 ] as const;
 export type SizePatch = Partial<Pick<State, (typeof SIZE_KEYS)[number]>>;
 export const pickSize = (st: State): SizePatch => Object.fromEntries(SIZE_KEYS.map((k) => [k, st[k]])) as SizePatch;
 /** The background fields a size may hold for itself (its own picture and where it sits). */
-const BG_SIZE_KEYS = ["bgImage", "bgImageHasProduct", "bgProductArea", "bgImgScale", "bgImgX", "bgImgY"] as const satisfies readonly (typeof SIZE_KEYS)[number][];
+const BG_SIZE_KEYS = ["bgImage", "bgImageHasProduct", "bgProductArea", "bgCanvasEdited", "bgImgScale", "bgImgX", "bgImgY"] as const satisfies readonly (typeof SIZE_KEYS)[number][];
 // pictures are multi-MB data URLs: compare by reference first, never stringify one that is the same
 const sameField = (a: unknown, b: unknown) => a === b || (typeof a !== "string" && typeof b !== "string" && JSON.stringify(a) === JSON.stringify(b));
 
@@ -323,28 +325,41 @@ const sameField = (a: unknown, b: unknown) => a === b || (typeof a !== "string" 
 export function mainOf(st: State): State {
   return st.editingSize ? { ...st, ...st.editingSize.main, editingSize: null } : st;
 }
+/** The type fields each size owns (operator 2026-11-27「每個尺寸要套自己的字級」): never derived from the main size. */
+const OWN_TYPE = ["typeAuto", "headlineSize", "subtextSize"] as const satisfies readonly (typeof SIZE_KEYS)[number][];
 /** Size `k` of the design (the live state itself while `k` is being tweaked). R4: a size of another composition group
- *  than the main size starts from its group's layout (a phone layout does not fit a web banner); its own tweaks win. */
+ *  than the main size starts from its group's layout (a phone layout does not fit a web banner); its type is its own --
+ *  automatic in its own range (field-ranges titleRange) unless that size set it by hand. Tracking scales with the short
+ *  side (a shared look, not a size). Its own tweaks win. */
 export function variantOf(st: State, k: PresetKey, withTweaks = true): State {
   if (withTweaks && st.editingSize?.key === k) return st;
   const m = mainOf(st);
   const a = PRESETS[m.preset], b = PRESETS[k];
   const f = Math.min(b.w, b.h) / Math.min(a.w, a.h);
   const r = (v: number) => Math.round(v * f);
+  const own = withTweaks ? m.sizeOverrides[k] : undefined;
+  // an override saved before sizes owned their type holds px without typeAuto: those px were set by hand
+  const legacyHand = own && own.typeAuto === undefined && (own.headlineSize !== undefined || own.subtextSize !== undefined);
   return {
     ...m, preset: k, editingSize: null,
     ...(a.group === b.group ? {} : COMPOSITION[b.group].layout),
-    headlineSize: r(m.headlineSize), subtextSize: r(m.subtextSize), letterSpacing: r(m.letterSpacing), bodyLetterSpacing: r(m.bodyLetterSpacing),
-    ...(withTweaks ? m.sizeOverrides[k] : {}),
+    // the main size's type is the main design's own
+    ...(k === m.preset ? {} : { typeAuto: true, headlineSize: INIT.headlineSize, subtextSize: INIT.subtextSize }),
+    letterSpacing: r(m.letterSpacing), bodyLetterSpacing: r(m.bodyLetterSpacing),
+    ...own,
+    ...(legacyHand ? { typeAuto: false } : {}),
   };
 }
-/** End a size tweak: store what differs from the derived size, put the main design's size fields back. */
+/** End a size tweak: store what differs from the derived size, put the main design's size fields back. Type px are
+ *  stored with typeAuto, so a size's own type always says whether it is automatic. */
 export function leaveSize(st: State): State {
   if (!st.editingSize) return st;
   const { key, main } = st.editingSize;
   const back: State = { ...st, ...main, editingSize: null };
   const base = variantOf(back, key, false);
-  const patch = Object.fromEntries(SIZE_KEYS.filter((f) => !sameField(st[f], base[f])).map((f) => [f, st[f]])) as SizePatch;
+  const diff = SIZE_KEYS.filter((f) => !sameField(st[f], base[f]));
+  const keys = diff.some((f) => (OWN_TYPE as readonly string[]).includes(f)) ? [...new Set([...diff, ...OWN_TYPE])] : diff;
+  const patch = Object.fromEntries(keys.map((f) => [f, st[f]])) as SizePatch;
   return { ...back, sizeOverrides: { ...st.sizeOverrides, [key]: patch } };
 }
 
@@ -355,10 +370,11 @@ function onMain(st: State, fn: (m: State) => State): State {
   return editing ? enterSize(next, editing) : next;
 }
 /** The one way a background picture is set: the picture, whether the product is baked into it and where (shares of the
- *  picture; null = unknown -> the layout falls back to productPos) change together, placement back to centred cover.
+ *  picture; null = unknown -> the layout falls back to productPos), whether it was edited in the canvas editor (the
+ *  baked product may have moved: the page asks the user to check) change together, placement back to centred cover.
  *  Every bgImage write goes through this (withSharedBackground, withSizeBackgrounds, the canvas editor's return). */
-export function backgroundFields(image: string | null, hasProduct: boolean, area: PicArea | null) {
-  return { bgImage: image, bgImageHasProduct: hasProduct, bgProductArea: hasProduct ? area : null, ...BG_PLACE_RESET };
+export function backgroundFields(image: string | null, hasProduct: boolean, area: PicArea | null, canvasEdited = false) {
+  return { bgImage: image, bgImageHasProduct: hasProduct, bgProductArea: hasProduct ? area : null, bgCanvasEdited: hasProduct && canvasEdited, ...BG_PLACE_RESET };
 }
 /** R3-C: one background for every size (uploaded, generated, an AI 一鍵設計 scene picked): the main size gets it centred,
  *  every size's own picture and placement go, so each size crops this one. */
