@@ -3,6 +3,7 @@
  * PG-1 English copy for TranslatePress (zh_TW → en_US), written as human-reviewed rows (status 2)
  * through TranslatePress's own query component, same table as the 2026-11-25 "英文頁定案" rows.
  * Run after apply.php: wp eval-file translations.php   (re-runnable; existing rows are updated in place)
+ *                     wp eval-file translations.php rollback   (puts back the rows' previous values)
  * Tool names and one-line descriptions follow Projects/internal/ziwei-doushu/messages/en.json.
  * Keys must match the page text exactly (TranslatePress looks up whole text nodes).
  */
@@ -109,6 +110,27 @@ if ( ! in_array( $lang, (array) $settings['translation-languages'], true ) ) {
 $query->check_original_table();
 $query->check_table( $default, $lang ); // both create the tables only when missing
 
+// Rows are shared site-wide (e.g. 登入 also appears outside these pages): the first value of every row this
+// script changes is kept in an option; "wp eval-file translations.php rollback" puts those values back.
+$backup_key = 'aworacle_pg1_trp_backup';
+$table      = $query->get_table_name( $lang );
+$backup     = get_option( $backup_key );
+$backup     = is_array( $backup ) ? $backup : array();
+$pg1_args   = isset( $args ) && is_array( $args ) ? $args : array();
+
+if ( in_array( 'rollback', $pg1_args, true ) ) {
+	$rows = array();
+	foreach ( $backup as $zh => $old ) {
+		$rows[] = array( 'id' => (int) $old['id'], 'original' => $zh, 'translated' => (string) $old['translated'], 'status' => (int) $old['status'] );
+	}
+	if ( $rows && ! $query->update_strings( $rows, $lang, array( 'id', 'original', 'translated', 'status' ) ) ) {
+		WP_CLI::error( 'Restore failed; backup option ' . $backup_key . ' kept.' );
+	}
+	delete_option( $backup_key );
+	WP_CLI::success( count( $rows ) . ' rows restored in ' . $table . '.' );
+	return;
+}
+
 $originals = array_keys( $pg1_en );
 $ids       = $query->get_string_ids( $originals, $lang );
 $missing   = array_values( array_diff( $originals, array_keys( (array) $ids ) ) );
@@ -117,13 +139,23 @@ if ( $missing ) {
 	$ids = $query->get_string_ids( $originals, $lang );
 }
 
+global $wpdb;
 $rows = array();
 foreach ( $pg1_en as $zh => $en ) {
 	if ( empty( $ids[ $zh ] ) ) {
 		WP_CLI::warning( "Not stored: $zh" );
 		continue;
 	}
-	$rows[] = array( 'id' => (int) $ids[ $zh ]->id, 'original' => $zh, 'translated' => $en, 'status' => $query::HUMAN_REVIEWED );
+	$id = (int) $ids[ $zh ]->id;
+	if ( ! isset( $backup[ $zh ] ) ) {
+		$cur           = $wpdb->get_row( $wpdb->prepare( "SELECT translated, status FROM `$table` WHERE id = %d", $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$backup[ $zh ] = array( 'id' => $id, 'translated' => $cur ? (string) $cur->translated : '', 'status' => $cur ? (int) $cur->status : 0 );
+		if ( $cur && 2 === (int) $cur->status && '' !== (string) $cur->translated && $cur->translated !== $en ) {
+			WP_CLI::log( "Replacing reviewed translation: $zh: \"{$cur->translated}\" -> \"$en\"" );
+		}
+	}
+	$rows[] = array( 'id' => $id, 'original' => $zh, 'translated' => $en, 'status' => $query::HUMAN_REVIEWED );
 }
+update_option( $backup_key, $backup, false ); // saved before writing, so a failed write can still be rolled back
 $query->update_strings( $rows, $lang, array( 'id', 'original', 'translated', 'status' ) );
-WP_CLI::success( count( $rows ) . ' rows written (' . count( $missing ) . ' new) in ' . $query->get_table_name( $lang ) . '.' );
+WP_CLI::success( count( $rows ) . ' rows written (' . count( $missing ) . ' new) in ' . $table . '.' );
