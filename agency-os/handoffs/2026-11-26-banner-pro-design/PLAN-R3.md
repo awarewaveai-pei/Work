@@ -62,4 +62,4 @@
 | R3-A | 已合併 49ca9251f | banner-r2a | 0ddfaf3d3 |
 | R3-B | 已合併 029434ab4 | banner-r2b1 | 81200595c |
 | R3-C | 已合併 47b69ae08 | banner-layers | 6b87fc32d |
-| R3-D | 進行中（烤進場景的商品區、logoAuto 進各尺寸、滑桿顯示實際值） | banner-r2a | — |
+| R3-D | 已合併 e8697fc50 | banner-r2a | 9c83527c2 |
