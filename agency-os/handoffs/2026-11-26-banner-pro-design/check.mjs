@@ -16,7 +16,7 @@ const table = (file, sec) => {
   const t = readFileSync(path.resolve(here, '../../..', file), 'utf8').split(new RegExp(`^## ${sec}\. `, 'm'))[1] || '';
   return [...t.matchAll(/^\|\s*(R\d-[A-Z]\d?)\s*\|/gm)].map((m) => m[1]);
 };
-const rows = [...table(META.plan, 7), ...table(META.plan3, 6)];
+const rows = [...table(META.plan, 7), ...table(META.plan3, 6), ...table(META.plan4, 3)];
 if (rows.join() !== ids.join()) fail(`PLAN 狀態表卡號 ${rows.join()} ≠ data.mjs ${ids.join()}`);
 for (const [k, v] of Object.entries(PROGRESS)) {
   if (!ids.includes(k)) fail(`PROGRESS ${k} 不是卡`);
