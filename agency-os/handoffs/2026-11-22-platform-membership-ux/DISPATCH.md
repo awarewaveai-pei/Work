@@ -80,7 +80,7 @@
 | U25 | 功能層分類欄位＋資料填寫 | NA `lib/portal/products.ts`、`catalog-vocab.ts`、匯入腳本 | Medium | Sonnet＋Haiku 填值 | U22 | 13 | 已併 |
 | U24 | 最近使用／常用 | 新 NA `app/portal/api/recent/route.ts`（索引已有 0011:98，不加 migration） | Medium | Opus | U8 | 13 | 已併 |
 | U26 | 登記表匯出 `catalog.json` | 新腳本＋test | Low | Sonnet | U25 | 14 | 已併 |
-| U18 | 頂列搜尋 | NA `app/PlatformFrame.tsx`、新搜尋元件 | Low | Sonnet | K5、U22 | 14 | 進行中 |
+| U18 | 頂列搜尋 | NA `app/PlatformFrame.tsx`、新搜尋元件 | Low | Sonnet | K5、U22 | 14 | 已併 |
 | W6 | 正式站重開店外掛與兩把密鑰（＝G8）；補：檢查清單加「邀請落地頁 `/?aw_invite=` 打得開」（邀請掛在付款模組下）；啟用前換正式站佈景跑一次 `scripts/local-member-flow.ps1` | 正式站設定與 `seller_sites` 資料（非程式） | **High** | Opus＋操作者 go | W5 | P2 |  |
 | M9 | aware-wave.com 關掉訪客結帳（G6） | 正式站 WooCommerce 設定（非程式）；NA 無 | **High** | Sonnet（`wordpress-maintenance-agent` 備份閘） | — | P2 | |
 | M4 | 標籤寫進 FluentCRM、WordPress 加 TEST 角色（G3 寫入端） | 沿用既有 NA `lib/crm/fluentcrm.ts`＋wp-bridge `lobster-factory/packages/wp-bridge-plugin/includes/Crm/ContactUpserter.php`（加標籤寫入，不新建接頭）；TEST 角色註冊位置展開時定 | **High** | Opus | M3、W6 | P2 | |
@@ -163,7 +163,7 @@ M11 的依據：`awarewave-wp.ts:75-77` 註明「是否照清單是操作者的�
 | 13 | U25、U24 | 工作台多「最近使用／常用」（只看自己的）；登記表功能層有分類與任務詞 | 各卡 TESTS；U24 他人／他單位不出現 | revert 單卡（無 migration） |
 | 14 | U26、U18 | 頂列搜尋；登記表匯出公開清單（只列客人可用） | `node scripts/export-catalog.mjs --check`；U18 打「文章」到「寫文章」 | revert 單卡（無 migration） |
 
-P1 全部於 2026-11-26 併入。P2 派工單在 `D:	mp\plat-briefs\<卡>.md`；批 12 於 2026-11-26 上線（e3ec3c494）；批 13（U25、U24）2026-11-27 併 main（447c9c822，03:00 自動上線）；批 14：U26 已併（4b924fe36），U18 進行中（用 U26 的 buildCatalogIndex）。W6／M9／M7／M4／W7 動正式站，要操作者 go，另排。
+P1 全部於 2026-11-26 併入。P2 派工單在 `D:	mp\plat-briefs\<卡>.md`；批 12 於 2026-11-26 上線（e3ec3c494）；批 13（U25、U24）2026-11-27 併 main（447c9c822，03:00 自動上線）；批 14：U26 已併（4b924fe36），U18 已併（用 U26 的 buildCatalogIndex）。W6／M9／M7／M4／W7 動正式站，要操作者 go，另排。
 
 ## 5. 第一批派工單（全文，可直接貼給工人）
 
