@@ -5,7 +5,8 @@
 // (`positions`) sits where it was dropped and takes no part in the avoidance; a position button / template clears the
 // drag of the elements it moves (applySemantic), so a button always shows its effect.
 
-import { clampField, FIELD_RANGES } from "./field-ranges";
+import { clampField, FIELD_RANGES, SUB_RATIO, titleRange } from "./field-ranges";
+import { COMPOSITION, safeBand, type LayoutSize } from "./composition";
 import type { BannerFields, ElemBox, ElemKey, ElemPositions } from "./banner-layers";
 
 // ── CJK typesetting (moved here from banner-layers.ts) ──
@@ -131,7 +132,8 @@ type StackKey = (typeof STACK_KEYS)[number];
 
 /** Whether the product picture is drawn: not when the active AI background already has it baked in (keyed off
  *  bgImageHasProduct set at generation time, not the live toggle, so flipping it can't double-draw the product). */
-export const productDrawn = (f: BannerFields) => !!f.productImage && !(f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage);
+const bgHasProduct = (f: BannerFields) => f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage;
+export const productDrawn = (f: BannerFields) => !!f.productImage && !bgHasProduct(f);
 
 /** R3-E: a baked-in product's box on the canvas -- `area` (shares of the background picture, natural size `pic`) through
  *  the background's cover fit and its bgImgScale / X / Y, as renderBannerLayers draws it; clipped to the canvas (null =
@@ -177,14 +179,14 @@ function dropAt(want: { x: number; y: number }, w: number, h: number, W: number,
   return { x: fit(want.x * W - w / 2, w, W), y: fit(want.y * H - h / 2, h, H), w, h };
 }
 
-export function layoutBanner(f: BannerFields, size: { w: number; h: number }, measure: LayoutMeasure): BannerLayout {
-  const W = size.w, H = size.h, short = Math.min(W, H);
+export function layoutBanner(f: BannerFields, size: LayoutSize, measure: LayoutMeasure): BannerLayout {
+  const W = size.w;
   const fixed = (k: "headlineSize" | "subtextSize") => clampField(k, f[k]) ?? (k === "headlineSize" ? 64 : 32);
   /** The largest title size <= hs (the subtitle, price, button and trust row scaled with it) at which every text block
    *  is inside its room (compose's inRoom) -- a size set by hand too; the layout returns the sizes drawn. */
   const settle = (hs: number, ss: number, balance: boolean) => {
     const minH: number = FIELD_RANGES.headlineSize.min;
-    const at = (h: number) => compose(f, W, H, measure, h, Math.max(FIELD_RANGES.subtextSize.min, Math.round((ss * h) / hs)), balance);
+    const at = (h: number) => compose(f, size, measure, h, Math.max(FIELD_RANGES.subtextSize.min, Math.round((ss * h) / hs)), balance);
     const full = at(hs);
     if (full.inRoom || hs <= minH) return full.layout;
     let lo = minH, hi = hs; // at(hi) does not fit; at(lo) is the floor whether or not it fits
@@ -192,17 +194,19 @@ export function layoutBanner(f: BannerFields, size: { w: number; h: number }, me
     return at(lo).layout;
   };
   if (!f.typeAuto) return settle(fixed("headlineSize"), fixed("subtextSize"), f.balanceTitle);
-  // automatic type: the largest title that fits (lines, height), then smaller until no line is a lone character
-  const subFor = (hs: number) => Math.max(Math.round(hs * 0.42), Math.round(short * 0.024));
-  const at = (hs: number) => compose(f, W, H, measure, hs, subFor(hs), true);
-  let lo = Math.max(16, Math.round(short * 0.03)), hi = Math.min(600, Math.round(H * 0.3));
+  // automatic type (R4): within the size's title range (titleRange: 36-57 px as shown), the largest title that fits
+  // (lines, height), then smaller until no line is a lone character; the subtitle = title / SUB_RATIO. Words too long
+  // for the smallest size in range: settle shrinks below it rather than let them leave the canvas.
+  const range = titleRange(W, size.displayW);
+  const subFor = (hs: number) => Math.round(hs / SUB_RATIO);
+  const at = (hs: number) => compose(f, size, measure, hs, subFor(hs), true);
+  let lo = range.min, hi = range.max;
   if (!at(lo).fits) return settle(lo, subFor(lo), true);
   while (hi - lo > 1) { const mid = Math.floor((lo + hi) / 2); if (at(mid).fits) lo = mid; else hi = mid; }
   if (at(hi).fits) lo = hi;
-  for (let hs = lo; hs >= 16; hs = Math.floor(hs * 0.97)) {
+  for (let hs = lo; hs >= range.min; hs = Math.min(hs - 1, Math.floor(hs * 0.97))) {
     const c = at(hs);
     if (c.fits && !c.orphan) return c.layout;
-    if (hs < lo * 0.6) break;
   }
   return settle(lo, subFor(lo), true);
 }
@@ -210,12 +214,15 @@ export function layoutBanner(f: BannerFields, size: { w: number; h: number }, me
 /** `inRoom`: every text block inside its room -- each title / subtitle line within the column (避頭尾 kept), each block
  *  within the column (a dragged one within the canvas), the title / subtitle within the height between the margins, the
  *  stack within its free span. `fits` (automatic type) = inRoom and the look: few title lines, room for the product. */
-function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, hs: number, ss: number, balance: boolean):
+function compose(f: BannerFields, size: LayoutSize, measure: LayoutMeasure, hs: number, ss: number, balance: boolean):
   { layout: BannerLayout; fits: boolean; inRoom: boolean; orphan: boolean } {
-  const short = Math.min(W, H), tall = H / W > 1.1;
+  const W = size.w, H = size.h, short = Math.min(W, H), tall = H / W > 1.1;
+  const comp = COMPOSITION[size.group];
   const pos: ElemPositions = f.positions ?? {};
   const padX = Math.round(W * 0.06), padY = Math.round(Math.min(W * 0.06, H * 0.08));
   const margin = Math.round(W * 0.035);
+  // the text and the product keep inside the size's safe band (9:16: Meta Reels' top 14% / bottom 35%)
+  const { top: safeT, bottom: safeB } = safeBand(size, padY);
   const gapV = Math.round(ss * 0.62);
   // gaps around reserved areas are at least the scrim's padding, so the scrim never runs under a badge / logo / product
   const gapY = Math.max(Math.round(short * 0.02), Math.round(ss * 0.75));
@@ -244,7 +251,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     if (f.badgeStyle === "burst") { const r = Math.max(bf * 1.9, tw * 0.62 + bf * 0.4); bw = bh = r * 2; }
     else if (f.badgeStyle === "ribbon") { bh = bf * 1.9; bw = tw + bf * 1.4 + bh * 0.45; }
     else { bh = bf * 1.9; bw = tw + bf * 1.6; }
-    const box = pos.badge ? dropAt(pos.badge, bw, bh, W, H) : { x: onLeft ? margin : W - margin - bw, y: margin, w: bw, h: bh };
+    const box = pos.badge ? dropAt(pos.badge, bw, bh, W, H) : { x: onLeft ? margin : W - margin - bw, y: safeBand(size, margin).top, w: bw, h: bh };
     if (!pos.badge) obstacles.push(box);
     badge = { box, size: bf, text, textW: tw, onLeft };
     boxes.badge = box;
@@ -264,10 +271,10 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     // a top corner the badge already holds: the logo goes under the badge (and shrinks to the room left there)
     const under = badge && !pos.badge && lp[0] === "t" &&
       overlapX(badge.box, xAt(lh) - lh * LOGO_CLEAR, xAt(lh) + lh * aspect + lh * LOGO_CLEAR)
-      ? badge.box.y + badge.box.h + Math.max(gapY, lh * LOGO_CLEAR) : inset(lh);
-    if (lp[0] === "t" && !pos.logo) lh = hOf(Math.max(1, H - inset(lh) - under));
+      ? badge.box.y + badge.box.h + Math.max(gapY, lh * LOGO_CLEAR) : safeBand(size, inset(lh)).top;
+    if (lp[0] === "t" && !pos.logo) lh = hOf(Math.max(1, safeBand(size, inset(lh)).bottom - under));
     const lw = lh * aspect;
-    const box = pos.logo ? dropAt(pos.logo, lw, lh, W, H) : { x: xAt(lh), y: lp[0] === "t" ? under : H - inset(lh) - lh, w: lw, h: lh };
+    const box = pos.logo ? dropAt(pos.logo, lw, lh, W, H) : { x: xAt(lh), y: lp[0] === "t" ? under : safeBand(size, inset(lh)).bottom - lh, w: lw, h: lh };
     // the rest keeps clear of the logo's clear space (a dragged logo takes no part, like every dragged element)
     const c = lh * LOGO_CLEAR;
     if (!pos.logo) obstacles.push({ x: box.x - c, y: box.y - c, w: lw + 2 * c, h: lh + 2 * c });
@@ -277,7 +284,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
 
   /** The free vertical span for something spanning x0..x1: the margins, minus every obstacle over that span. */
   const band = (x0: number, x1: number, extra: ElemBox[] = []) => {
-    let t = padY, b = H - padY;
+    let t = safeT, b = safeB;
     for (const o of [...obstacles, ...extra]) {
       if (!overlapX(o, x0, x1)) continue;
       if (o.y + o.h / 2 < H / 2) t = Math.max(t, o.y + o.h + gapY);
@@ -290,7 +297,8 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
   // Reserved whether drawn or baked into the background. Baked with its area known (R3-E): the box is where the product
   // is in the picture as drawn now (`baked`, null = out of view) -- not productPos; older pictures fall back to productPos.
   const drawn = productDrawn(f);
-  const bgNat = !drawn && f.productImage && f.bgProductArea && f.bgImage ? picture(measure, f.bgImage) : null;
+  // the background decides it, not productImage: a product removed after baking is still in the picture
+  const bgNat = bgHasProduct(f) && f.bgProductArea ? picture(measure, f.bgImage!) : null;
   const baked = bgNat ? areaOnCanvas(f.bgProductArea!, bgNat, f, W, H) : undefined;
   const nat = f.productImage && baked === undefined ? picture(measure, f.productImage) : null;
   const g = f.grounding?.reflection;
@@ -298,9 +306,13 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
   const reflGap = refl ? Math.max(0, g?.gap ?? 0) : 0;
   const pScale = clampField("productScale", f.productScale) ?? 0.6;
   const pCentre = f.productPos === "center";
-  const pBelow = f.productPos === "bottom-right" && tall; // tall: under the text; else beside it
+  // phone group: under the text, centred on the composition's crossing (comp.productAt); else beside it
+  const pBelow = f.productPos === "bottom-right" && size.group === "phone";
   const pPad = W * 0.05;
-  const pMaxW = W * pScale * (pCentre ? 0.7 : 0.45);
+  const pMaxW = W * pScale * (pCentre ? 0.7 : 1 - comp.textShare);
+  const aim = pBelow ? comp.productAt : null;
+  /** The product's left edge at width sw: centred on the aim when there is one (kept inside the padding), else right. */
+  const belowX = (sw: number) => (aim ? Math.max(pPad, Math.min(W - pPad - sw, aim.x * W - sw / 2)) : W - pPad - sw);
   const productAt = (maxH: number, x: (sw: number) => number, top: (gh: number) => number): ProductLayout | undefined => {
     if (!nat) return undefined;
     const k = Math.max(0, Math.min(pMaxW / nat.w, Math.min(H * 0.85, maxH) / nat.h));
@@ -328,8 +340,8 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     // the text takes the larger free room: beside the product (a narrower column, full height) or above / below it
     product = { box: baked, reflection: null, drawn: false };
     const left = baked.x - gapX - padX, right = W - padX - (baked.x + baked.w + gapX);
-    const above = baked.y - gapY - padY, below = H - padY - (baked.y + baked.h + gapY);
-    if (Math.max(left, right) * (H - 2 * padY) >= (W - 2 * padX) * Math.max(above, below)) {
+    const above = baked.y - gapY - safeT, below = safeB - (baked.y + baked.h + gapY);
+    if (Math.max(left, right) * (safeB - safeT) >= (W - 2 * padX) * Math.max(above, below)) {
       if (left >= right) cx1 = Math.min(cx1, baked.x - gapX); else cx0 = Math.max(cx0, baked.x + baked.w + gapX);
     } else obstacles.push(baked);
   } else if (product && !pos.product && !pBelow) {
@@ -373,7 +385,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     const solid = (ln: { ch: string }[]) => ln.filter((c) => c.ch.trim() && !NO_START.has(c.ch) && !NO_END.has(c.ch)).length;
     orphan = lines.length > 1 && lines.some((ln) => solid(ln) < 2);
     headline = { size: hs, lineH, lines: runLines, runW, lineWs };
-    linesIn &&= Math.max(...lineWs) <= colW + 0.5 && lines.length * lineH <= H - 2 * padY + 0.5 &&
+    linesIn &&= Math.max(...lineWs) <= colW + 0.5 && lines.length * lineH <= safeB - safeT + 0.5 &&
       !(f.kinsoku && kinsokuBroken(lines.map((ln) => ln.map((c) => c.ch).join(""))));
     blocks.push({ key: "headline", w: Math.max(1, ...lineWs), h: lines.length * lineH });
   }
@@ -401,7 +413,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     if (!lines.length) lines = [text];
     const lineH = ss * (f.bodyLineHeight || 1.32);
     subtext = { size: ss, lineH, lines };
-    linesIn &&= Math.max(...lines.map(w)) <= colW + 0.5 && lines.length * lineH <= H - 2 * padY + 0.5 && !(f.kinsoku && kinsokuBroken(lines));
+    linesIn &&= Math.max(...lines.map(w)) <= colW + 0.5 && lines.length * lineH <= safeB - safeT + 0.5 && !(f.kinsoku && kinsokuBroken(lines));
     blocks.push({ key: "subtext", w: Math.max(1, ...lines.map(w)), h: lines.length * lineH });
   }
   if (f.showPrice && (f.priceNow || f.priceWas)) {
@@ -440,7 +452,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
   const stackW = Math.max(0, ...inStack.map((b) => b.w));
   const sx0 = Math.min(...inStack.map((b) => leftOf(b.w)), anchorX), sx1 = Math.max(...inStack.map((b) => leftOf(b.w) + b.w), anchorX);
   // the product shares the column: centred = above / below the stack by textPos; tall bottom-right = under it, right
-  const pX0 = pCentre ? (W - pMaxW) / 2 : W - pPad - pMaxW, pX1 = pCentre ? (W + pMaxW) / 2 : W - pPad;
+  const pX0 = pCentre ? (W - pMaxW) / 2 : belowX(pMaxW), pX1 = pX0 + pMaxW;
   const { t, b } = shares ? band(Math.min(sx0, pX0), Math.max(sx1, pX1)) : band(sx0, sx1);
   const span = b - t;
   let stackTop: number;
@@ -451,13 +463,14 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     const gh = nat!.h * k * (1 + refl) + reflGap;
     let pTop: number;
     if (pBelow) {
-      pTop = b - gh;
+      // on the aim's height when that leaves room above for the stack, never past the band's bottom
+      pTop = aim ? Math.max(t + stackH + gap, Math.min(b - gh, aim.y * H - gh / 2)) : b - gh;
       const free = pTop - gap - t;
       stackTop = f.textPos === "top" ? t : f.textPos === "bottom" ? pTop - gap - stackH : t + (free - stackH) / 2;
     } else if (f.textPos === "top") { stackTop = t; pTop = t + stackH + gap + (span - stackH - gap - gh) / 2; }
     else if (f.textPos === "bottom") { stackTop = b - stackH; pTop = t + (span - stackH - gap - gh) / 2; }
     else { stackTop = t + (span - stackH - gap - gh) / 2; pTop = stackTop + stackH + gap; }
-    product = productAt(room, (sw) => (pCentre ? (W - sw) / 2 : W - pPad - sw), () => pTop);
+    product = productAt(room, (sw) => (pCentre ? (W - sw) / 2 : belowX(sw)), () => pTop);
     if (product?.drawn) boxes.product = product.box;
   } else {
     stackTop = f.textPos === "top" ? t : f.textPos === "bottom" ? b - stackH : t + (span - stackH) / 2;

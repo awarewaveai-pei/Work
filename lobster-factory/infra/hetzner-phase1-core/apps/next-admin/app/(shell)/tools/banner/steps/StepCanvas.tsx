@@ -219,7 +219,7 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
     const { pics, errs } = await compositeSizes(s, picked, { model: s.aiBgModel, scene: effectiveBgPrompt, refs: trimmedRefs });
     setSizeErrors(errs);
     setS((prev) => ({
-      ...(Object.keys(pics).length ? withSizeBackgrounds(prev, pics) : prev), generating: false,
+      ...(Object.keys(pics).length ? withSizeBackgrounds(prev, pics, picked) : prev), generating: false,
       error: Object.keys(errs).length ? `${Object.keys(errs).length} 個尺寸合成失敗，那幾個尺寸沿用原本的背景。` : null,
     }));
   }

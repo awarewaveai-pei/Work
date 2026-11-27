@@ -8,6 +8,7 @@ import { writePsd, type Psd, type Layer as PsdLayer, type TextStyle, type TextSt
 import { groundProduct, type GroundingOpts } from "./product-grounding";
 import { autospace, layoutBanner, type AccentRun, type BannerLayout } from "./banner-layout";
 import type { PicArea } from "./banner-design";
+import type { LayoutSize } from "./composition";
 
 /** The design fields the drawing reads (BannerStudio's State has all of them). */
 export interface BannerFields {
@@ -203,7 +204,7 @@ async function loadDesignFonts(state: BannerFields): Promise<void> {
 
 /** The fonts and pictures loaded, then the layout: what renderBannerLayers draws, and what the AI prompts reserve
  *  (bannerLayout). */
-async function prepareLayout(state: BannerFields, size: { w: number; h: number }) {
+async function prepareLayout(state: BannerFields, size: LayoutSize) {
   await loadDesignFonts(state);
   const pics = new Map<string, HTMLImageElement>();
   // a background with the product baked in: its size maps the product's area onto the canvas
@@ -218,7 +219,7 @@ async function prepareLayout(state: BannerFields, size: { w: number; h: number }
   return { L, pics, mctx };
 }
 /** The layout of `state` at `size` as the preview draws it (fonts and pictures loaded). */
-export async function bannerLayout(state: BannerFields, size: { w: number; h: number }): Promise<BannerLayout> {
+export async function bannerLayout(state: BannerFields, size: LayoutSize): Promise<BannerLayout> {
   return (await prepareLayout(state, size)).L;
 }
 
@@ -234,7 +235,7 @@ function haloOf(hex: string, alpha: number): string {
  *  part still starts from a fresh context state) -- the PNG / preview: stacking 8-bit layers re-rounds soft shadow edges
  *  (up to 2/255 on ~50 px, measured), and one canvas is also ~15x less memory per preview frame. Where things go is
  *  layoutBanner's (banner-layout.ts); this only draws its boxes. */
-export async function renderBannerLayers(state: BannerFields, size: { w: number; h: number }, opts: { flat?: boolean } = {}): Promise<BannerLayers> {
+export async function renderBannerLayers(state: BannerFields, size: LayoutSize, opts: { flat?: boolean } = {}): Promise<BannerLayers> {
   const { L, pics, mctx } = await prepareLayout(state, size);
   const p = size;
   const layers: BannerLayer[] = [];

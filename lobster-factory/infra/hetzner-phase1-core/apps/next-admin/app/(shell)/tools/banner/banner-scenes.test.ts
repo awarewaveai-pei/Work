@@ -10,18 +10,19 @@ import {
 
 const A = "data:image/png;base64,AAAA", B = "data:image/png;base64,BBBBBB", C = "data:image/png;base64,CCCCCCCC";
 const pic = (image: string) => ({ image, area: null });
+const ALL = ["r4x5", "r9x16", "r16x9"] as const;
 const base: State = { ...INIT, preset: "r4x5", multiSizes: ["r9x16", "r16x9"], bgMode: "ai", bgImage: A };
 
 describe("SIZE_KEYS 背景：沿用與覆寫", () => {
   it("a size without its own picture uses the main size's; one with its own keeps it", () => {
-    const st = withSizeBackgrounds(base, { r9x16: pic(B) });
+    const st = withSizeBackgrounds(base, { r9x16: pic(B) }, ALL);
     expect(variantOf(st, "r9x16")).toMatchObject({ bgImage: B, bgImageHasProduct: true });
     expect(variantOf(st, "r16x9")).toMatchObject({ bgImage: A, bgImageHasProduct: false });
     expect(st).toMatchObject({ bgImage: A, bgMode: "ai" });
   });
 
   it("composite per size: the main size's picture is the main design's, each other size holds its own", () => {
-    const st = withSizeBackgrounds(base, { r4x5: pic(C), r9x16: pic(B), r16x9: pic(A) });
+    const st = withSizeBackgrounds(base, { r4x5: pic(C), r9x16: pic(B), r16x9: pic(A) }, ALL);
     expect(st).toMatchObject({ bgImage: C, bgImageHasProduct: true });
     expect(st.sizeOverrides.r4x5).toBeUndefined();
     expect(variantOf(st, "r9x16").bgImage).toBe(B);
@@ -29,7 +30,7 @@ describe("SIZE_KEYS 背景：沿用與覆寫", () => {
   });
 
   it("a shared background (upload / scene picked) replaces every size's own picture and placement", () => {
-    const own = withSizeBackgrounds(base, { r9x16: pic(B) });
+    const own = withSizeBackgrounds(base, { r9x16: pic(B) }, ALL);
     const moved: State = { ...own, sizeOverrides: { ...own.sizeOverrides, r9x16: { ...own.sizeOverrides.r9x16, bgImgX: 0.2, headlineSize: 90 } } };
     const st = withSharedBackground(moved, { bgImage: C, bgMode: "ai", bgImageHasProduct: false });
     for (const k of ["r4x5", "r9x16", "r16x9"] as const) expect(variantOf(st, k)).toMatchObject({ bgImage: C, bgImageHasProduct: false, bgImgX: 0 });
@@ -38,7 +39,7 @@ describe("SIZE_KEYS 背景：沿用與覆寫", () => {
 
   it("while a size is tweaked, a new picture lands in its override and the size stays open", () => {
     const editing = enterSize(base, "r9x16");
-    const st = withSizeBackgrounds(editing, { r9x16: pic(B) });
+    const st = withSizeBackgrounds(editing, { r9x16: pic(B) }, ALL);
     expect(st.editingSize?.key).toBe("r9x16");
     expect(st.bgImage).toBe(B);                           // the live state is that size
     expect(leaveSize(st).sizeOverrides.r9x16?.bgImage).toBe(B);
@@ -46,9 +47,21 @@ describe("SIZE_KEYS 背景：沿用與覆寫", () => {
   });
 
   it("history signature counts a size's picture by length, never its data", () => {
-    const sig = designSig(withSizeBackgrounds(base, { r9x16: pic(B) }));
+    const sig = designSig(withSizeBackgrounds(base, { r9x16: pic(B) }, ALL));
     expect(sig).not.toContain("BBBBBB");
     expect(sig).not.toContain(B);
+  });
+});
+
+// Codex on R3-E (F2): a size whose composite failed this run drops the picture and area an older run left it, and
+// crops this run's main picture (with its area) -- never shows a stale scene with a stale product area.
+describe("R3-E Codex F2: a size that failed this run inherits this run's main picture", () => {
+  it("an older run's own picture of r9x16 goes when r9x16 fails now; a size not in this run keeps its own", () => {
+    const area1 = { x0: 0.1, y0: 0.5, x1: 0.5, y1: 0.9 }, area2 = { x0: 0.5, y0: 0.4, x1: 0.9, y1: 0.9 };
+    const old = withSizeBackgrounds(base, { r9x16: { image: B, area: area1 }, r16x9: { image: B, area: area1 } }, ALL);
+    const now = withSizeBackgrounds(old, { r4x5: { image: C, area: area2 } }, ["r4x5", "r9x16"]); // r9x16 failed; r16x9 not run
+    expect(variantOf(now, "r9x16")).toMatchObject({ bgImage: C, bgImageHasProduct: true, bgProductArea: area2 });
+    expect(variantOf(now, "r16x9")).toMatchObject({ bgImage: B, bgProductArea: area1 });
   });
 });
 

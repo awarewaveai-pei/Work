@@ -7,6 +7,7 @@ import {
 } from "./banner-layers";
 import { applySemantic, dropPositions, semanticElems } from "./banner-layout";
 import type { GroundingOpts } from "./product-grounding";
+import { COMPOSITION, type LayoutSize } from "./composition";
 import type { BannerAiModel, PicArea } from "./banner-design";
 import { bgStatsFromColors, bgStatsFromPixels, mergeBgInfo, type BgInfo } from "./design-colors";
 import type { StudioModel, AspectRatio } from "@/lib/studio/model-options";
@@ -19,20 +20,24 @@ import { resolveStylePrompt } from "../tarot/cards";
 // One button per ratio; `where` lists every platform that takes it (checked 2026-11 against Sprout Social / Buffer /
 // Metricool guides). 2:1: X documents its large-image link card as 2:1
 // (https://dev.twitter.com/cards/types/summary-large-image, min 300x157); no other platform found documenting 2:1.
-// `aspect` = nearest ratio the AI background models accept (lib/studio/model-options).
+// `aspect` = nearest ratio the AI background models accept (lib/studio/model-options). R4 (T1 決定 1/2): `displayW` = the
+// width it is shown at in CSS px (手機 393 / 連結卡 500 / 內文 700 / Hero 1920) -> the title's range; `group` = its row of
+// the composition table (composition.ts). 16:9 is two sizes: 社群／縮圖 (the old key r16x9) and 網站 Hero (r16x9hero).
+// `file` = the export file name part when the ratio alone is not unique.
 export const PRESETS = {
-  "r9x16":  { ratio: "9:16",   w: 1080, h: 1920, aspect: "9:16", shape: "tall",   use: "限時動態、Reels、直式圖片貼文",   where: "IG Story／Reels、FB Story、TikTok 圖文、YouTube Shorts" },
-  "r2x3":   { ratio: "2:3",    w: 1000, h: 1500, aspect: "2:3",  shape: "tall",   use: "Pin 圖",                          where: "Pinterest" },
-  "r3x4":   { ratio: "3:4",    w: 1080, h: 1440, aspect: "3:4",  shape: "tall",   use: "個人頁格狀不裁切的直式貼文",      where: "IG" },
-  "r4x5":   { ratio: "4:5",    w: 1080, h: 1350, aspect: "4:5",  shape: "tall",   use: "直式貼文、多圖貼文",              where: "IG、FB、Threads、X、LinkedIn、Bluesky", star: true },
-  "r1x1":   { ratio: "1:1",    w: 1080, h: 1080, aspect: "1:1",  shape: "square", use: "方形貼文、商品圖、手機版 Hero",    where: "IG、FB、Threads、X、LinkedIn、Bluesky、WooCommerce" },
-  "r4x3":   { ratio: "4:3",    w: 1200, h: 900,  aspect: "4:3",  shape: "wide",   use: "部落格封面（特色圖片）",          where: "WP 部落格列表卡片；文章頁由佈景主題裁成 3:2" },
-  "r3x2":   { ratio: "3:2",    w: 1200, h: 800,  aspect: "3:2",  shape: "wide",   use: "部落格內文圖",                    where: "WP 文章內文" },
-  "r16x9":  { ratio: "16:9",   w: 1920, h: 1080, aspect: "16:9", shape: "wide",   use: "橫式貼文、影片縮圖、網站全版 Hero", where: "IG、FB、Threads、X、LinkedIn、Bluesky、YouTube 縮圖、WP 網站" },
-  "r191x1": { ratio: "1.91:1", w: 1200, h: 630,  aspect: "16:9", shape: "wide",   use: "連結分享預覽（OG）",              where: "FB／LinkedIn／X／LINE 連結預覽（Rank Math 另設的分享圖）" },
-  "r2x1":   { ratio: "2:1",    w: 1200, h: 600,  aspect: "16:9", shape: "wide",   use: "X 大圖連結卡",                    where: "X 連結預覽（summary_large_image）" },
-  "r3x1":   { ratio: "3:1",    w: 1920, h: 640,  aspect: "16:9", shape: "wide",   use: "網站橫幅",                        where: "WP 網站桌機 Hero" },
-} as const satisfies Record<string, { ratio: string; w: number; h: number; aspect: AspectRatio; shape: "tall" | "square" | "wide"; use: string; where: string; star?: boolean }>;
+  "r9x16":  { ratio: "9:16",   w: 1080, h: 1920, aspect: "9:16", shape: "tall",   displayW: 393,  group: "phone", use: "限時動態、Reels、直式圖片貼文",   where: "IG Story／Reels、FB Story、TikTok 圖文、YouTube Shorts" },
+  "r2x3":   { ratio: "2:3",    w: 1000, h: 1500, aspect: "2:3",  shape: "tall",   displayW: 393,  group: "phone", use: "Pin 圖",                          where: "Pinterest" },
+  "r3x4":   { ratio: "3:4",    w: 1080, h: 1440, aspect: "3:4",  shape: "tall",   displayW: 393,  group: "phone", use: "個人頁格狀不裁切的直式貼文",      where: "IG" },
+  "r4x5":   { ratio: "4:5",    w: 1080, h: 1350, aspect: "4:5",  shape: "tall",   displayW: 393,  group: "phone", use: "直式貼文、多圖貼文",              where: "IG、FB、Threads、X、LinkedIn、Bluesky", star: true },
+  "r1x1":   { ratio: "1:1",    w: 1080, h: 1080, aspect: "1:1",  shape: "square", displayW: 393,  group: "phone", use: "方形貼文、商品圖、手機版 Hero",    where: "IG、FB、Threads、X、LinkedIn、Bluesky、WooCommerce" },
+  "r4x3":   { ratio: "4:3",    w: 1200, h: 900,  aspect: "4:3",  shape: "wide",   displayW: 700,  group: "card",  use: "部落格封面（特色圖片）",          where: "WP 部落格列表卡片；文章頁由佈景主題裁成 3:2" },
+  "r3x2":   { ratio: "3:2",    w: 1200, h: 800,  aspect: "3:2",  shape: "wide",   displayW: 700,  group: "web",   use: "部落格內文圖",                    where: "WP 文章內文" },
+  "r16x9":  { ratio: "16:9",   w: 1920, h: 1080, aspect: "16:9", shape: "wide",   displayW: 393,  group: "card",  use: "橫式貼文、影片縮圖",              where: "IG、FB、Threads、X、LinkedIn、Bluesky、YouTube 縮圖" },
+  "r16x9hero": { ratio: "16:9", w: 1920, h: 1080, aspect: "16:9", shape: "wide",  displayW: 1920, group: "web",   use: "網站全版 Hero",                   where: "WP 網站桌機全版 Hero", file: "16x9-hero" },
+  "r191x1": { ratio: "1.91:1", w: 1200, h: 630,  aspect: "16:9", shape: "wide",   displayW: 500,  group: "card",  use: "連結分享預覽（OG）",              where: "FB／LinkedIn／X／LINE 連結預覽（Rank Math 另設的分享圖）" },
+  "r2x1":   { ratio: "2:1",    w: 1200, h: 600,  aspect: "16:9", shape: "wide",   displayW: 500,  group: "card",  use: "X 大圖連結卡",                    where: "X 連結預覽（summary_large_image）" },
+  "r3x1":   { ratio: "3:1",    w: 1920, h: 640,  aspect: "16:9", shape: "wide",   displayW: 1920, group: "web",   use: "網站橫幅",                        where: "WP 網站桌機 Hero" },
+} as const satisfies Record<string, LayoutSize & { aspect: AspectRatio; shape: "tall" | "square" | "wide"; use: string; where: string; star?: boolean; file?: string }>;
 export type PresetKey = keyof typeof PRESETS;
 export const presetLabel = (k: PresetKey) => `${PRESETS[k].ratio} ${PRESETS[k].use}`;
 
@@ -199,6 +204,7 @@ export interface State {
 /** The blank design (exported for the size-selection tests). */
 export const INIT: State = {
   preset:       "r4x5",
+  ...COMPOSITION[PRESETS.r4x5.group].layout,   // textPos, textAlignH, productPos
   copyBrief:    "",
   copyTone:     "促銷",
   copyGenerating: false,
@@ -207,7 +213,6 @@ export const INIT: State = {
   productOrig:     null,
   productImage:    null,
   productRemoving: false,
-  productPos:      "center",
   productScale:    0.6,
   bgMode:    "color",
   bgColor:   "#1a1a2e",
@@ -241,8 +246,6 @@ export const INIT: State = {
   headlineSize: 64,
   subtextSize:  32,
   typeAuto:     true,
-  textPos:   "center",
-  textAlignH: "center",
   dimOverlay: true,
   textScrim:  false,
   textOutline: true,
@@ -320,7 +323,8 @@ const sameField = (a: unknown, b: unknown) => a === b || (typeof a !== "string" 
 export function mainOf(st: State): State {
   return st.editingSize ? { ...st, ...st.editingSize.main, editingSize: null } : st;
 }
-/** Size `k` of the design (the live state itself while `k` is being tweaked). */
+/** Size `k` of the design (the live state itself while `k` is being tweaked). R4: a size of another composition group
+ *  than the main size starts from its group's layout (a phone layout does not fit a web banner); its own tweaks win. */
 export function variantOf(st: State, k: PresetKey, withTweaks = true): State {
   if (withTweaks && st.editingSize?.key === k) return st;
   const m = mainOf(st);
@@ -329,6 +333,7 @@ export function variantOf(st: State, k: PresetKey, withTweaks = true): State {
   const r = (v: number) => Math.round(v * f);
   return {
     ...m, preset: k, editingSize: null,
+    ...(a.group === b.group ? {} : COMPOSITION[b.group].layout),
     headlineSize: r(m.headlineSize), subtextSize: r(m.subtextSize), letterSpacing: r(m.letterSpacing), bodyLetterSpacing: r(m.bodyLetterSpacing),
     ...(withTweaks ? m.sizeOverrides[k] : {}),
   };
@@ -349,6 +354,12 @@ function onMain(st: State, fn: (m: State) => State): State {
   const next = fn(leaveSize(st));
   return editing ? enterSize(next, editing) : next;
 }
+/** The one way a background picture is set: the picture, whether the product is baked into it and where (shares of the
+ *  picture; null = unknown -> the layout falls back to productPos) change together, placement back to centred cover.
+ *  Every bgImage write goes through this (withSharedBackground, withSizeBackgrounds, the canvas editor's return). */
+export function backgroundFields(image: string | null, hasProduct: boolean, area: PicArea | null) {
+  return { bgImage: image, bgImageHasProduct: hasProduct, bgProductArea: hasProduct ? area : null, ...BG_PLACE_RESET };
+}
 /** R3-C: one background for every size (uploaded, generated, an AI 一鍵設計 scene picked): the main size gets it centred,
  *  every size's own picture and placement go, so each size crops this one. */
 export function withSharedBackground(st: State, bg: SharedBackground): State {
@@ -359,23 +370,29 @@ export function withSharedBackground(st: State, bg: SharedBackground): State {
       for (const f of BG_SIZE_KEYS) delete rest[f];
       sizeOverrides[k] = rest;
     }
-    return { ...m, bgProductArea: null, ...bg, ...BG_PLACE_RESET, sizeOverrides, saved: false };
+    return { ...m, bgMode: bg.bgMode, ...backgroundFields(bg.bgImage, bg.bgImageHasProduct, bg.bgProductArea ?? null), sizeOverrides, saved: false };
   });
 }
 /** A background every size shares; `bgProductArea` only with the product baked in (absent = none). */
 export type SharedBackground = Pick<State, "bgImage" | "bgMode" | "bgImageHasProduct"> & { bgProductArea?: PicArea | null };
 /** A picture with the product composited in and the area its generation asked the product into (shares of the picture). */
 export interface BakedPicture { image: string; area: PicArea | null }
-/** R3-C: 合成進場景 per size -- each size that got a picture holds it (centred) with its product area as its own
- *  background; a size missing from `pics` (its call failed) keeps what it had -- with no picture of its own it crops the
- *  main size's, whose product area then maps onto it (R3-E). The main size's picture is the main design's. */
-export function withSizeBackgrounds(st: State, pics: Partial<Record<PresetKey, BakedPicture>>): State {
-  const bg = (p: BakedPicture) => ({ bgImage: p.image, bgImageHasProduct: true, bgProductArea: p.area, ...BG_PLACE_RESET });
+/** R3-C: 合成進場景 per size over the `sizes` it ran for -- each size that got a picture holds it (centred) with its
+ *  product area as its own background; a size of this run whose call failed loses its own background (an older run's
+ *  picture and area are stale) and crops the main size's, whose product area maps onto it (R3-E). The main size's
+ *  picture is the main design's; the main size failing keeps the main picture it had. */
+export function withSizeBackgrounds(st: State, pics: Partial<Record<PresetKey, BakedPicture>>, sizes: readonly PresetKey[]): State {
+  const bg = (p: BakedPicture) => backgroundFields(p.image, true, p.area);
   return onMain(st, (m) => {
     const own = pics[m.preset];
     const sizeOverrides = { ...m.sizeOverrides };
-    for (const [k, p] of Object.entries(pics) as [PresetKey, BakedPicture][]) {
-      if (k !== m.preset) sizeOverrides[k] = { ...sizeOverrides[k], ...bg(p) };
+    for (const k of sizes) {
+      if (k === m.preset) continue;
+      const p = pics[k];
+      if (p) { sizeOverrides[k] = { ...sizeOverrides[k], ...bg(p) }; continue; }
+      const rest = { ...sizeOverrides[k] };
+      for (const f of BG_SIZE_KEYS) delete rest[f];
+      sizeOverrides[k] = rest;
     }
     return { ...m, ...(own ? bg(own) : {}), bgMode: "ai", sizeOverrides, saved: false };
   });

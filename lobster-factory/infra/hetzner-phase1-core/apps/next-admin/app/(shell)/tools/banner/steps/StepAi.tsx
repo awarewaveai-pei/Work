@@ -191,7 +191,7 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
     if (!sceneLane.isLatest(token)) return; // a newer pick owns the sizes now
     setSizeJobs(errs);
     if (Object.keys(pics).length) {
-      await sceneLane.runAs(token, (prev) => withSizeBackgrounds(prev, pics), check, (built, g) => ({ ...built, ...g.patch }), failed);
+      await sceneLane.runAs(token, (prev) => withSizeBackgrounds(prev, pics, others), check, (built, g) => ({ ...built, ...g.patch }), failed);
     }
   }
   const scenesBusy = scenes.some((c) => c.state === "wait") || Object.values(sizeJobs).includes("生成中…");

@@ -171,7 +171,7 @@ describe("guard on what is drawn last", () => {
     textScrim: false, dimOverlay: false, accentHighlight: false,
   });
   const drawnAt = (st: State) => {
-    const L = layoutBanner(st, { w: 800, h: 400 }, measure);
+    const L = layoutBanner(st, { w: 800, h: 400, ratio: "2:1", displayW: 500, group: "card" }, measure);
     return [{ w: 800, h: 400, boxes: [L.boxes.headline!] }];
   };
 
