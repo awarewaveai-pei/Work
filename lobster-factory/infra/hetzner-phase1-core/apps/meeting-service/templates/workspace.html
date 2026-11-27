@@ -481,7 +481,8 @@ window.Workspace = (function () {
     // 「我／對方」只在兩路的時候標（看到過「我」的句子就是兩路）；一路時和以前一樣不標。
     const two = [...state.segs.values()].some(x => x.who === "me");
     row.querySelector(".who").textContent = two ? (seg.who === "me" ? "我" : "對方") : "";
-    row.querySelector(".tr").textContent = seg.tr || (seg.final ? "…" : "");
+    row.querySelector(".text").textContent = seg.text;
+    row.querySelector(".tr").textContent = seg.tr;   // empty when the line is not translated (own line, same language, 不翻譯)
     settle();
   }
   function paintLevel() {
