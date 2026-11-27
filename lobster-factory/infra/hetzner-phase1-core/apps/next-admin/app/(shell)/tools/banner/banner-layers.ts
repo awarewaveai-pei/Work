@@ -104,9 +104,9 @@ export interface TextSpec {
 export interface BannerLayer { name: string; canvas: HTMLCanvasElement; text?: TextSpec; shadow?: LayerShadow }
 /** `type`: the title / subtitle px drawn (the engine's when typeAuto -- the 字級 sliders show these). */
 export interface BannerLayers { w: number; h: number; layers: BannerLayer[]; boxes: Partial<Record<ElemKey, ElemBox>>; type: TypeSizes }
-/** What the drawing really used, for the sliders: title / subtitle px and the logo's height as a share of the short
- *  side (null = no logo drawn). */
-export interface TypeSizes { headline: number; subtext: number; logo: number | null }
+/** What the drawing really used, for the sliders: title / subtitle px, the logo's height as a share of the short side
+ *  (null = no logo drawn) and belowMin (the automatic title shrunk under its range: the floor, else null). */
+export interface TypeSizes { headline: number; subtext: number; logo: number | null; belowMin: number | null }
 
 /** Canvas family (first name in the CSS list) -> the family the pro editors ship (scripts/vectorcraft-pro/web-fonts.patch).
  *  楷書 (LXGW WenKai TC) and 圓體 (Huninn / jf-openhuninn) are not in the editors' list -> Noto Sans TC. */
@@ -589,7 +589,7 @@ export async function renderBannerLayers(state: BannerFields, size: LayoutSize, 
   flush();
   if (flat) (flat as CanvasRenderingContext2D).restore();
   return { w: p.w, h: p.h, layers, boxes: L.boxes, type: { headline: L.headlineSize, subtext: L.subtextSize,
-    logo: L.logo ? Math.round((L.logo.box.h / Math.min(p.w, p.h)) * 1000) / 1000 : null } };
+    logo: L.logo ? Math.round((L.logo.box.h / Math.min(p.w, p.h)) * 1000) / 1000 : null, belowMin: L.belowMin } };
 }
 
 /** All layers stacked bottom to top on one canvas (source-over, as the old single canvas drew them). */

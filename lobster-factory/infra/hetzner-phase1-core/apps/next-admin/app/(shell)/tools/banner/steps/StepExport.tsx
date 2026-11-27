@@ -4,7 +4,7 @@ import { CANVAS_STAFF_HREF, canvasTarget, openInCanvas } from "@/components/tool
 import { useDoorHref } from "@/app/DoorContext";
 import { saveDesign, urlToBlob } from "@/lib/studio/design-upload";
 import { buildBannerPsd, buildBannerSvg, rasterize } from "../banner-layers";
-import { PRESETS, aiBgPromptOf, selectedSizes, variantOf } from "../banner-state";
+import { aiBgPromptOf, presetLabel, selectedSizes, variantOf } from "../banner-state";
 import { EXPORT_FORMATS, bannerLayers, bytesToDataUrl, downloadUrl, encodeDesign, exportToPng, exportToPsd, exportToSvg, pngOfPixels, sizeFileName, textDataUrl, type ExportFormat } from "./export-files";
 import type { StepSlot } from "./order";
 import { StepCard, type StepCtx } from "./ui";
@@ -31,7 +31,7 @@ export default function StepExport({ slot, s, setS, saveOrg }: StepCtx & { slot:
         setMultiBusy(`打包中 ${i + 1}/${picked.length}…`);
         const out = await encodeDesign(variantOf(s, k), multiFormat, Number.isFinite(kb) && kb > 0 ? kb : null);
         zip.file(sizeFileName(k, multiFormat), await urlToBlob(out.url));
-        if (out.note) notes.push(`${PRESETS[k].ratio}：${out.note}`);
+        if (out.note) notes.push(`${presetLabel(k)}：${out.note}`);
       }
       const url = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
       downloadUrl(url, `banner-${picked.length}-sizes.zip`);
@@ -52,7 +52,7 @@ export default function StepExport({ slot, s, setS, saveOrg }: StepCtx & { slot:
         const res = await saveDesign(await urlToBlob(await exportToPng(v)), {
           source: "banner", prompt: v.headline || undefined, modelName: v.bgMode === "ai" ? v.aiBgModel : undefined, subject: k,
         }, { organizationId: saveOrg ?? undefined });
-        if (!res.ok) throw new Error(`${PRESETS[k].ratio}：${(res as { ok: false; error: string }).error}`);
+        if (!res.ok) throw new Error(`${presetLabel(k)}：${(res as { ok: false; error: string }).error}`);
       }
       setMultiNote(`✓ ${picked.length} 個尺寸都已存到我的設計`);
     } catch (err) {

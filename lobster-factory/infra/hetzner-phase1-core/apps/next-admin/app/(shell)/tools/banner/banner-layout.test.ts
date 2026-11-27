@@ -4,8 +4,8 @@
 import { describe, expect, it } from "vitest";
 import { applySemantic, areaOnCanvas, layoutBanner, reservedAreas, LOGO_AUTO, LOGO_CLEAR, LOGO_TITLE, REF_PX, type LayoutMeasure } from "./banner-layout";
 import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBox, type ElemKey, type ElemPositions } from "./banner-layers";
-import { INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, enterSize, templatePatch, variantOf, withSizeBackgrounds, type PresetKey, type State } from "./banner-state";
-import { COMPOSITION, type LayoutSize } from "./composition";
+import { INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, enterSize, mainOf, templatePatch, variantOf, withSizeBackgrounds, type PresetKey, type State } from "./banner-state";
+import { COMPOSITION, TEXT_SHARE_MAX, type LayoutSize } from "./composition";
 import { SUB_RATIO, titleRange } from "./field-ranges";
 import { shapeLayout } from "./banner-design";
 import { sizeFileName } from "./steps/export-files";
@@ -196,14 +196,27 @@ describe("R4-A: title range, composition groups, 9:16 safe bands", () => {
         expect(hs).toBeLessThanOrEqual(r.max);
       }
   });
-  // Open for the supervisor (T1 決定 1 x 決定 2): 16:9 社群 shown 393 wide wants a 176-278 px title; in the card group's
-  // left ~55% column the T1 words need 3 + 3 lines (> the height). The engine shrinks them (inside the canvas) instead.
-  it("r16x9 社群, card layout: the T1 words cannot reach the floor -> shrunk below it, inside the canvas; centred product reaches it", () => {
+  // Supervisor's rule (R4-A follow-up): the floor wins over the layout's proportions -- too-long words first widen the
+  // text column beside the product (55% -> at most 65%), and only then shrink, with belowMin set for the page's notice.
+  it("r16x9 社群 + T1 words, card layout: title >= its floor, or belowMin set with the text column <= 65% of the width", () => {
     const size = SIZES.r16x9, r = titleRange(size.w, size.displayW);
     const L = layoutBanner({ ...t1, ...COMPOSITION.card.layout }, size, measure);
-    expect(L.headlineSize).toBeLessThan(r.min);
+    const right = Math.max(...(["headline", "subtext"] as const).map((k) => L.boxes[k]!.x + L.boxes[k]!.w));
+    expect(L.headlineSize >= r.min || (L.belowMin === r.min && L.textShare === TEXT_SHARE_MAX && right <= size.w * TEXT_SHARE_MAX + 0.5)).toBe(true);
     for (const k of ["headline", "subtext"] as const) expect(inside(L.boxes[k]!, size)).toBe(true);
-    expect(layoutBanner(t1, size, measure).headlineSize).toBeGreaterThanOrEqual(r.min);
+    // words that fit at the floor: no flag, the composition's own share
+    const short = layoutBanner({ ...t1, ...COMPOSITION.card.layout, headline: "療癒心", subtext: "立即報名" }, size, measure);
+    expect(short).toMatchObject({ belowMin: null, textShare: COMPOSITION.card.textShare });
+    expect(short.headlineSize).toBeGreaterThanOrEqual(r.min);
+  });
+  it("the column widens before the title shrinks: a size whose words fit only wider keeps the floor with a share > 55%", () => {
+    // 1.91:1 (link card, floor 87 px): a title that needs the wider column
+    const size = SIZES.r191x1, r = titleRange(size.w, size.displayW);
+    const words = { ...t1, ...COMPOSITION.card.layout, subtext: "" };
+    const found = ["用香氣與色彩療癒心", "用香氣與色彩療癒疲憊", "用香氣與色彩，療癒疲憊的心", "用香氣與色彩，療癒疲憊的心與身體"]
+      .map((headline) => layoutBanner({ ...words, headline }, size, measure))
+      .find((L) => L.textShare > COMPOSITION.card.textShare && L.belowMin === null);
+    expect(found?.headlineSize).toBeGreaterThanOrEqual(r.min);
   });
   it("each size's group and shown width (16:9 = 社群 card at 393 + Hero web at 1920; ?ratio=16:9 opens 社群)", () => {
     const groups = Object.fromEntries(Object.entries(PRESETS).map(([k, p]) => [k, `${p.group} ${p.displayW}`]));
@@ -239,6 +252,35 @@ describe("R4-A: title range, composition groups, 9:16 safe bands", () => {
           if (p.box.y < size.h * 0.14 - 0.5 || bottom > size.h * 0.65 + 0.5) bad.push(`${productPos}/${textPos}: product ${Math.round(p.box.y)}-${Math.round(bottom)}`);
         }
     expect(bad).toEqual([]);
+  });
+  // operator 2026-11-27「每個尺寸要套自己的字級」: type is each size's own -- never derived from the main size
+  it("main size set by hand to 120 px: every other size stays automatic in its own range; 9:16 by hand 150 px leaves 1:1 alone", () => {
+    const keys = Object.keys(PRESETS) as PresetKey[];
+    let st: State = { ...INIT, ...(t1 as Partial<State>), preset: "r4x5", multiSizes: keys.filter((k) => k !== "r4x5") } as State;
+    st = { ...st, typeAuto: false, headlineSize: 120, subtextSize: 96 };
+    for (const k of keys.filter((k) => k !== "r4x5")) {
+      const v = variantOf(st, k), size = SIZES[k], r = titleRange(size.w, size.displayW);
+      expect(v.typeAuto).toBe(true);
+      const hs = layoutBanner(v, size, measure).headlineSize;
+      if (k !== "r16x9") { expect(hs).toBeGreaterThanOrEqual(r.min); expect(hs).toBeLessThanOrEqual(r.max); }
+    }
+    expect(layoutBanner(variantOf(st, "r4x5"), SIZES.r4x5, measure).headlineSize).toBe(120);
+    // 9:16 by hand: only 9:16 keeps it (stored with typeAuto); 1:1 and the main size are untouched
+    const edited = enterSize(st, "r9x16");
+    const back = enterSize({ ...edited, typeAuto: false, headlineSize: 150, subtextSize: 120 }, "r1x1");
+    expect(back.typeAuto).toBe(true);
+    expect(variantOf(back, "r9x16")).toMatchObject({ typeAuto: false, headlineSize: 150 });
+    expect(back.sizeOverrides.r9x16).toMatchObject({ typeAuto: false, headlineSize: 150, subtextSize: 120 });
+    expect(mainOf(back)).toMatchObject({ typeAuto: false, headlineSize: 120 });
+    // an override saved before sizes owned their type (px, no typeAuto) is still the hand-set size
+    expect(variantOf({ ...st, sizeOverrides: { r1x1: { headlineSize: 90 } } }, "r1x1")).toMatchObject({ typeAuto: false, headlineSize: 90 });
+  });
+  // Codex on R4-A (F1): a baked background edited in the canvas -- the reservation is productPos (not a guessed area)
+  it("canvas-edited baked background: reserved area = the productPos place, not drawn", () => {
+    const size = SIZES.r4x5, f = { ...t1, productPos: "right" as const };
+    const baked = layoutBanner({ ...f, bgMode: "ai", bgImage: "scene", bgImageHasProduct: true, bgProductArea: null }, size, measure);
+    expect(baked.product!.box).toEqual(layoutBanner(f, size, measure).product!.box);
+    expect(baked.product!.drawn).toBe(false);
   });
   it("phone default: words on top, the product under them centred on the lower-right thirds crossing where it fits", () => {
     const size = SIZES.r4x5, L = layoutBanner({ ...t1, ...COMPOSITION.phone.layout }, size, measure), p = L.product!.box;

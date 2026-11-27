@@ -6,7 +6,7 @@
 // drag of the elements it moves (applySemantic), so a button always shows its effect.
 
 import { clampField, FIELD_RANGES, SUB_RATIO, titleRange } from "./field-ranges";
-import { COMPOSITION, safeBand, type LayoutSize } from "./composition";
+import { COMPOSITION, TEXT_SHARE_MAX, safeBand, type LayoutSize } from "./composition";
 import type { BannerFields, ElemBox, ElemKey, ElemPositions } from "./banner-layers";
 
 // ── CJK typesetting (moved here from banner-layers.ts) ──
@@ -125,6 +125,10 @@ export interface BannerLayout {
   stack: ElemBox | null;
   /** Every element's drawn box (preview hit-testing). */
   boxes: Partial<Record<ElemKey, ElemBox>>;
+  /** The text's share of the width beside a product (the composition's, widened up to TEXT_SHARE_MAX for long words). */
+  textShare: number;
+  /** below_min: the automatic title was shrunk under its size's range (words too long) -> the range's floor, else null. */
+  belowMin: number | null;
 }
 
 const STACK_KEYS = ["headline", "subtext", "price", "cta", "trust"] as const;
@@ -180,13 +184,13 @@ function dropAt(want: { x: number; y: number }, w: number, h: number, W: number,
 }
 
 export function layoutBanner(f: BannerFields, size: LayoutSize, measure: LayoutMeasure): BannerLayout {
-  const W = size.w;
+  const W = size.w, baseShare = COMPOSITION[size.group].textShare;
   const fixed = (k: "headlineSize" | "subtextSize") => clampField(k, f[k]) ?? (k === "headlineSize" ? 64 : 32);
   /** The largest title size <= hs (the subtitle, price, button and trust row scaled with it) at which every text block
    *  is inside its room (compose's inRoom) -- a size set by hand too; the layout returns the sizes drawn. */
-  const settle = (hs: number, ss: number, balance: boolean) => {
+  const settle = (hs: number, ss: number, balance: boolean, share = baseShare) => {
     const minH: number = FIELD_RANGES.headlineSize.min;
-    const at = (h: number) => compose(f, size, measure, h, Math.max(FIELD_RANGES.subtextSize.min, Math.round((ss * h) / hs)), balance);
+    const at = (h: number) => compose(f, size, measure, h, Math.max(FIELD_RANGES.subtextSize.min, Math.round((ss * h) / hs)), balance, share);
     const full = at(hs);
     if (full.inRoom || hs <= minH) return full.layout;
     let lo = minH, hi = hs; // at(hi) does not fit; at(lo) is the floor whether or not it fits
@@ -195,13 +199,21 @@ export function layoutBanner(f: BannerFields, size: LayoutSize, measure: LayoutM
   };
   if (!f.typeAuto) return settle(fixed("headlineSize"), fixed("subtextSize"), f.balanceTitle);
   // automatic type (R4): within the size's title range (titleRange: 36-57 px as shown), the largest title that fits
-  // (lines, height), then smaller until no line is a lone character; the subtitle = title / SUB_RATIO. Words too long
-  // for the smallest size in range: settle shrinks below it rather than let them leave the canvas.
+  // (lines, height), then smaller until no line is a lone character; the subtitle = title / SUB_RATIO. The floor wins
+  // over the layout's proportions: words that do not fit at it first widen the text beside a product (up to
+  // TEXT_SHARE_MAX); still too long -> settle shrinks them below it (inside the canvas) and belowMin tells the page.
   const range = titleRange(W, size.displayW);
   const subFor = (hs: number) => Math.round(hs / SUB_RATIO);
-  const at = (hs: number) => compose(f, size, measure, hs, subFor(hs), true);
+  const shares: number[] = [];
+  for (let sh = baseShare; sh < TEXT_SHARE_MAX - 1e-9; sh += 0.05) shares.push(sh);
+  shares.push(Math.max(baseShare, TEXT_SHARE_MAX));
+  const share = shares.find((sh) => compose(f, size, measure, range.min, subFor(range.min), true, sh).fits);
+  if (share === undefined) {
+    const L = settle(range.min, subFor(range.min), true, shares[shares.length - 1]);
+    return { ...L, belowMin: L.headlineSize < range.min ? range.min : null };
+  }
+  const at = (hs: number) => compose(f, size, measure, hs, subFor(hs), true, share);
   let lo = range.min, hi = range.max;
-  if (!at(lo).fits) return settle(lo, subFor(lo), true);
   while (hi - lo > 1) { const mid = Math.floor((lo + hi) / 2); if (at(mid).fits) lo = mid; else hi = mid; }
   if (at(hi).fits) lo = hi;
   for (let hs = lo; hs >= range.min; hs = Math.min(hs - 1, Math.floor(hs * 0.97))) {
@@ -214,7 +226,7 @@ export function layoutBanner(f: BannerFields, size: LayoutSize, measure: LayoutM
 /** `inRoom`: every text block inside its room -- each title / subtitle line within the column (避頭尾 kept), each block
  *  within the column (a dragged one within the canvas), the title / subtitle within the height between the margins, the
  *  stack within its free span. `fits` (automatic type) = inRoom and the look: few title lines, room for the product. */
-function compose(f: BannerFields, size: LayoutSize, measure: LayoutMeasure, hs: number, ss: number, balance: boolean):
+function compose(f: BannerFields, size: LayoutSize, measure: LayoutMeasure, hs: number, ss: number, balance: boolean, share: number):
   { layout: BannerLayout; fits: boolean; inRoom: boolean; orphan: boolean } {
   const W = size.w, H = size.h, short = Math.min(W, H), tall = H / W > 1.1;
   const comp = COMPOSITION[size.group];
@@ -309,7 +321,7 @@ function compose(f: BannerFields, size: LayoutSize, measure: LayoutMeasure, hs: 
   // phone group: under the text, centred on the composition's crossing (comp.productAt); else beside it
   const pBelow = f.productPos === "bottom-right" && size.group === "phone";
   const pPad = W * 0.05;
-  const pMaxW = W * pScale * (pCentre ? 0.7 : 1 - comp.textShare);
+  const pMaxW = W * pScale * (pCentre ? 0.7 : 1 - share);
   const aim = pBelow ? comp.productAt : null;
   /** The product's left edge at width sw: centred on the aim when there is one (kept inside the padding), else right. */
   const belowX = (sw: number) => (aim ? Math.max(pPad, Math.min(W - pPad - sw, aim.x * W - sw / 2)) : W - pPad - sw);
@@ -346,7 +358,9 @@ function compose(f: BannerFields, size: LayoutSize, measure: LayoutMeasure, hs: 
     } else obstacles.push(baked);
   } else if (product && !pos.product && !pBelow) {
     const pb = groupBox(product);
-    if (f.productPos === "left") cx0 = Math.max(cx0, pb.x + pb.w + gapX); else cx1 = Math.min(cx1, pb.x - gapX);
+    // the text keeps to its share of the width; the product's column is the rest
+    if (f.productPos === "left") cx0 = Math.max(cx0, pb.x + pb.w + gapX, W * (1 - share));
+    else cx1 = Math.min(cx1, pb.x - gapX, W * share);
   }
   const colW = Math.max(1, cx1 - cx0);
   const align = f.textAlignH;
@@ -502,7 +516,7 @@ function compose(f: BannerFields, size: LayoutSize, measure: LayoutMeasure, hs: 
     ...(cta ? { cta: { ...cta, box: placed.cta! } } : {}),
     ...(trust ? { trust: { ...trust, box: placed.trust! } } : {}),
     ...(badge ? { badge } : {}), ...(product ? { product } : {}), ...(logo ? { logo } : {}),
-    stack, boxes,
+    stack, boxes, textShare: share, belowMin: null,
   };
   return { layout, fits, inRoom, orphan };
 }

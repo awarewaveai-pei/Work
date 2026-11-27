@@ -389,7 +389,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
               <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, minHeight: 24 }}>
                 <b style={{ flexShrink: 0 }}>{picked.length} 個尺寸</b>
                 <span style={{ color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
-                  {s.editingSize ? `單獨微調 ${PRESETS[s.editingSize.key].ratio}：位置、字級、對齊只改這張` : "點縮圖單獨微調那個尺寸"}
+                  {s.editingSize ? `單獨微調 ${presetLabel(s.editingSize.key)}：位置、字級、對齊只改這張` : "點縮圖單獨微調那個尺寸"}
                 </span>
                 {Object.keys(s.sizeOverrides[editing] ?? {}).length > 0 && (
                   <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 6px", flexShrink: 0 }} data-testid="banner-multi-clear-tweak"
@@ -409,9 +409,9 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                       onClick={() => setS((prev) => ({ ...enterSize(prev, k), saved: false }))} title="點一下單獨微調這個尺寸">
                       {thumbs[k]
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={thumbs[k]} alt={PRESETS[k].ratio} style={{ display: "block", flex: "1 1 0", minHeight: 0, maxWidth: "none", aspectRatio: `${PRESETS[k].w} / ${PRESETS[k].h}` }} />
+                        ? <img src={thumbs[k]} alt={presetLabel(k)} style={{ display: "block", flex: "1 1 0", minHeight: 0, maxWidth: "none", aspectRatio: `${PRESETS[k].w} / ${PRESETS[k].h}` }} />
                         : <span style={{ display: "flex", alignItems: "center", flex: 1, fontSize: 11 }}>產生中…</span>}
-                      <span style={{ fontSize: 11 }}><b>{PRESETS[k].ratio}</b>{tweaked ? "・已微調" : ""}</span>
+                      <span style={{ fontSize: 11 }}><b>{presetLabel(k)}</b>{tweaked ? "・已微調" : ""}</span>
                     </button>
                   );
                 })}

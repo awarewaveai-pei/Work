@@ -385,6 +385,11 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
         </div>
       )}
 
+      {s.bgMode === "ai" && s.bgImage && s.bgImageHasProduct && s.bgCanvasEdited && (
+        <p className="form-hint" data-testid="banner-bg-canvas-edited" style={{ marginTop: 10, color: "var(--danger)", fontWeight: 600 }}>
+          背景在畫布改過，商品位置以「商品位置」按鈕為準，請確認文字沒有壓到商品
+        </p>
+      )}
       {(s.bgMode === "upload" || s.bgMode === "ai") && s.bgImage && (
         <div className="form-row" style={{ marginTop: 10, flexWrap: "wrap", gap: 6 }}>
           <label className="form-label">圖片位置</label>

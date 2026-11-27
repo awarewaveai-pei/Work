@@ -74,14 +74,14 @@ export function shapeLayout(key: PresetKey): LayoutPatch {
 }
 
 /** The AI answer's per-size layouts -> the main size's layout and an override for every other chosen size (a size the
- *  answer left out gets shapeLayout). No chosen sizes = the single-size answer: its top-level intent fields, no overrides. */
+ *  answer left out, the main one too, gets shapeLayout). No chosen sizes = the single-size answer: its top-level intent fields, no overrides. */
 export function designPlan(raw: Record<string, unknown>, main: SizeSpec, chosen: readonly SizeSpec[]): { main: LayoutPatch; overrides: Record<string, LayoutPatch> } {
   if (!chosen.length) return { main: sanitizeLayout(raw), overrides: {} };
   const layouts = raw.layouts && typeof raw.layouts === "object" ? (raw.layouts as Record<string, unknown>) : {};
   const layoutOf = (s: SizeSpec) => { const l = sanitizeLayout(layouts[s.key]); return Object.keys(l).length ? l : shapeLayout(s.key); };
   const overrides: Record<string, LayoutPatch> = {};
   for (const s of chosen) if (s.key !== main.key) overrides[s.key] = layoutOf(s);
-  return { main: layouts[main.key] ? sanitizeLayout(layouts[main.key]) : {}, overrides };
+  return { main: layoutOf(main), overrides };
 }
 
 // ── R2-C: the word sets and applying the design ──
