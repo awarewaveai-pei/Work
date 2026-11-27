@@ -48,6 +48,31 @@ describe("applying an asynchronous contrast check", () => {
     expect(p.box.st).toMatchObject({ headline: "B", trustText: "#1" });
   });
 
+  it("(F3) run tells whether its design was applied: true when applied, false when the check failed", async () => {
+    const p = page(start);
+    const ok = p.pick("A");
+    p.answer(0);
+    expect(await ok).toBe(true);
+    const bad = p.pick("B");
+    p.waits[1].fail(new Error("image_load_failed"));
+    expect(await bad).toBe(false);
+    expect(p.box.st.headline).toBe("A");
+  });
+
+  it("(F2) pick A then B: A's later step under its claim is dropped and A is no longer the latest", async () => {
+    const p = page(start);
+    const lane = guardLane<State, string>({ same: sameDrawInputs, current: () => p.box.st, apply: (fn) => { p.box.st = fn(p.box.st); } });
+    const step = (token: number, headline: string) => lane.runAs(token, (prev) => ({ ...prev, headline }), async () => "ok",
+      (built) => built, (prev) => prev);
+    const a = lane.claim();
+    expect(await step(a, "A main")).toBe(true);
+    const b = lane.claim();                                  // B picked while A's other sizes are drawing
+    expect(await step(b, "B main")).toBe(true);
+    expect(lane.isLatest(a)).toBe(false);                   // A sends no further paid step
+    expect(await step(a, "A sizes")).toBe(false);           // A's late size pictures do not land
+    expect(p.box.st.headline).toBe("B main");
+  });
+
   it("the check fails (picture decode / canvas): the design is not applied, the error is shown", async () => {
     const p = page(start);
     void p.pick("B");

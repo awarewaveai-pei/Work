@@ -372,6 +372,12 @@ export function withSizeBackgrounds(st: State, pics: Partial<Record<PresetKey, s
     return { ...m, ...(own ? { bgImage: own, bgImageHasProduct: hasProduct, ...BG_PLACE_RESET } : {}), bgMode: "ai", sizeOverrides, saved: false };
   });
 }
+/** R3-C: the background a picked AI 一鍵設計 candidate becomes. It has the product baked in only when it was drawn with
+ *  the product picture the design has now; else (drawn without one, or the product was replaced / removed since) it is
+ *  a plain scene and the product is drawn over it. */
+export function sceneBackground(image: string, drawnWith: string | null, product: string | null): Pick<State, "bgImage" | "bgMode" | "bgImageHasProduct"> {
+  return { bgImage: image, bgMode: "ai", bgImageHasProduct: !!drawnWith && drawnWith === product };
+}
 /** R3-C: a product drawn over an AI design gets contact shadow, reflection and tone match on (their settings kept). */
 export function groundingOn(g: GroundingOpts): GroundingOpts {
   const on = { enabled: true };
