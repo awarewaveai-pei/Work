@@ -1,4 +1,23 @@
 # Worklog
+## 2026-11-27（續2）— 平台第 12 批（U16、U17、U19、U28）上線
+
+- [根因] P2 第一批：內容門首頁「概覽」、工作台「繼續上次」、客戶管理會員自己授權同事（ADR 021 G4）、付款後立即失效功能清單／門快取。
+- [步驟]
+  - 派工單錯誤（監工）：portal 網域客戶只能打 `/portal/*`（`middleware.ts:231-233`）→ U17 改伺服器端讀、U19 API 放 `app/portal/api/people`。
+  - 退回裁決：U16 借 `staff: "tools/events"` → `DoorNavItem.staff` 選填；`/content?draft=` 轉 `/write`；Codex C：草稿數只按 site 篩 → 一律帶 org；context 非 ok 不讀；改 org 層。U19：稽核記成員工 `viewer` → 0185 加 `client`；管理會員判斷單一模組 `lib/entitlements/account-manager.ts` 登記 `DOOR_OWN_ORG_READS`。U17：草稿查詢抽 `lib/content/drafts-list.ts`，不放寬 door `next`。
+  - 保留：稽核寫失敗不擋請求（`ops-audit.ts:25` 既定）；actor_user_id 放 payload（`staff-accounts.ts:159` 慣例）；middleware edge 門快取付款後最多 10 秒；題目 >1000／月少算。
+  - 0185 套用（操作者「可以」）→ push `152cabe4f`、`e9ae14716`；部署隨 `e3ec3c494`（banner 線 2026-11-26 16:52Z sg-deploy）上線。
+- [驗證]
+  - 整合樹 `npx tsc --noEmit` 0；`npx vitest run` 726 files／5992 passed／0 failed；down 副本 2/2。
+  - psql：兩個 actor_role check 含 'client'。
+  - curl：`portal.aware-wave.com/people`、`/launcher` 307 登入；`/api/people` GET／POST 401；`content.aware-wave.com/`、`/write`、`/?draft=x` 307 登入。
+  - CI `cce5df72d` tsc 失敗＝runner heap OOM（非型別錯誤，banner 線提交），已 `gh run rerun --failed`。
+- [未做／剩餘風險] 登入後畫面（概覽三數字、繼續上次、成員頁）要測試客戶帳號，併 W7 走查。
+- [rollback] revert U16（c424a9c49..e9ae14716）、U19（aefc58539、152cabe4f；再跑 0185 down，有 client 列則拒絕）、U17（66f375638）、U28（6ff8a6ebc）並部署。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl portal/content 路由；psql 0185 constraint；npx vitest run | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/6m/0n
+  - external oracle = Codex CLI（2026-11-26-partialreview-eba71952.md、-4185a87c.md）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=callerManagesUnit | hits=9
 ## 2026-11-26（續41）— oracle WP：裝 Kadence Blocks Pro 2.8.17（操作者要求）
 
 - [根因] 操作者「Kadence Blocks Pro 裝」；同日已裝 Kadence Pro 1.1.16，Blocks Pro 當時未裝。

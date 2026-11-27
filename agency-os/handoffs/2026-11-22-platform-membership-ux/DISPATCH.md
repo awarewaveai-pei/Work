@@ -73,10 +73,10 @@
 
 | 卡 | 白話 | 檔案 | 風險 | 模型 | 依賴 | 批 | 狀態 |
 |---|---|---|---|---|---|---|---|
-| U16 | 內容概覽首頁 | NA `app/content/page.tsx` | Medium | Sonnet | U11 | 12 | 進行中 |
-| U17 | 工作台「繼續上次」 | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U8 | 12 | 進行中 |
-| U19 | 客戶自己授權他人（＝G4） | 新 NA `app/portal/people/*`、新 API | **High** | Opus | M5 | 12 | 進行中 |
-| U28 | 付款後立即失效功能清單快取 | NA `lib/entitlements/features.ts`、付款事件處理 | Medium | Sonnet | U5 | 12 | 進行中 |
+| U16 | 內容概覽首頁 | NA `app/content/page.tsx` | Medium | Sonnet | U11 | 12 | 已併 |
+| U17 | 工作台「繼續上次」 | NA `app/portal/launcher/page.tsx` | Medium | Sonnet | U8 | 12 | 已併 |
+| U19 | 客戶自己授權他人（＝G4） | 新 NA `app/portal/people/*`、新 API | **High** | Opus | M5 | 12 | 已併 |
+| U28 | 付款後立即失效功能清單快取 | NA `lib/entitlements/features.ts`、付款事件處理 | Medium | Sonnet | U5 | 12 | 已併 |
 | W6 | 正式站重開店外掛與兩把密鑰（＝G8）；補：檢查清單加「邀請落地頁 `/?aw_invite=` 打得開」（邀請掛在付款模組下）；啟用前換正式站佈景跑一次 `scripts/local-member-flow.ps1` | 正式站設定與 `seller_sites` 資料（非程式） | **High** | Opus＋操作者 go | W5 | P2 |  |
 | M9 | aware-wave.com 關掉訪客結帳（G6） | 正式站 WooCommerce 設定（非程式）；NA 無 | **High** | Sonnet（`wordpress-maintenance-agent` 備份閘） | — | P2 | |
 | M4 | 標籤寫進 FluentCRM、WordPress 加 TEST 角色（G3 寫入端） | 沿用既有 NA `lib/crm/fluentcrm.ts`＋wp-bridge `lobster-factory/packages/wp-bridge-plugin/includes/Crm/ContactUpserter.php`（加標籤寫入，不新建接頭）；TEST 角色註冊位置展開時定 | **High** | Opus | M3、W6 | P2 | |
@@ -161,7 +161,7 @@ M11 的依據：`awarewave-wp.ts:75-77` 註明「是否照清單是操作者的�
 | 11 | K15、M10 | 沒有新畫面；P1 期末驗收 | K15 清單全過；M10 本機刪會員後 `wp-handoff` 回 `not_a_member` | revert |
 | 12 | U16、U17、U19、U28 | content 門首頁變「概覽」（三個數字＋寫文章鈕，寫文章頁搬到 `/content/write`）；工作台多「繼續上次」；客戶管理會員可在 `/portal/people` 自己邀人；買完點數按鈕立即解灰 | 各卡 TESTS；U19 他單位 org／userId → 404；部署後 content 門根看到概覽 | revert 單卡（皆無 migration） |
 
-P1 全部於 2026-11-26 併入。P2 派工單在 `D:	mp\plat-briefs\<卡>.md`；批 13 候選 U25、U24；U26、U18 依 U25 排其後。W6／M9／M7／M4／W7 動正式站，要操作者 go，另排。
+P1 全部於 2026-11-26 併入。P2 派工單在 `D:	mp\plat-briefs\<卡>.md`；批 12 於 2026-11-26 上線（e3ec3c494）；批 13 候選 U25、U24；U26、U18 依 U25 排其後。W6／M9／M7／M4／W7 動正式站，要操作者 go，另排。
 
 ## 5. 第一批派工單（全文，可直接貼給工人）
 
