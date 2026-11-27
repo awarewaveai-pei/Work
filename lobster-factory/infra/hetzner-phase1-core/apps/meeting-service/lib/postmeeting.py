@@ -50,14 +50,13 @@ def transcript(sidecar: dict, audio_duration_sec) -> dict:
 
 
 def speakers(segs: list):
-    """聆聽時就標了講者（C17 聲音來源、C18 即時分群）→ 講者產物；一句都沒標＝None（要分就跑 pyannote）。
+    """聆聽時每一句都標了講者（C17 聲音來源、C18 即時分群）→ 講者產物；有任何一句沒標＝None（跑 pyannote）。
     重疊語音只有 pyannote 算得出，不填 0。"""
+    if not segs or any(not s.get("speaker") for s in segs):
+        return None
     total = {}
     for s in segs:
-        if s.get("speaker"):
-            total[s["speaker"]] = total.get(s["speaker"], 0.0) + s["end"] - s["start"]
-    if not total:
-        return None
+        total[s["speaker"]] = total.get(s["speaker"], 0.0) + s["end"] - s["start"]
     return {"speakers": sorted(total, key=lambda n: -total[n]), "overlap_sec": None, "source": "聆聽時標的（聲音來源或即時分群）"}
 
 

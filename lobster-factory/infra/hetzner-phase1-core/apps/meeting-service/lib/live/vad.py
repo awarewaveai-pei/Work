@@ -145,6 +145,8 @@ def speech_regions(samples, rate: int) -> list:
 
 # reanchor: the largest delay looked for, the step, and how far an edge may move to meet a pause.
 MAX_LAG, LAG_STEP, SNAP = 8.0, 0.05, 1.0
+# The Gemini delay measured on her1912.wav (3.9-4.9 s): breaks ties when the speech has no pauses to align on.
+PRIOR_LAG = 4.4
 
 
 def reanchor(spans: list, regions: list) -> list:
@@ -168,7 +170,8 @@ def reanchor(spans: list, regions: list) -> list:
         # speech the shifted lines cover, minus silence they cover
         return sum(2 * (voiced_until(e - lag) - voiced_until(s - lag)) - (e - s) for s, e in spans)
 
-    lag = max((k * LAG_STEP for k in range(int(MAX_LAG / LAG_STEP) + 1)), key=score)
+    lag = max((k * LAG_STEP for k in range(int(MAX_LAG / LAG_STEP) + 1)),
+              key=lambda lag: (round(score(lag), 2), -abs(lag - PRIOR_LAG)))
 
     def nearest(t, edges, floor):
         near = [x for x in edges if abs(x - t) <= SNAP and x >= floor]

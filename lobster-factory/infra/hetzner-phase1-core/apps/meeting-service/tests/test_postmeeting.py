@@ -77,6 +77,22 @@ class Adapter(unittest.TestCase):
         self.assertIn("秒", r["reason"])
 
 
+    def test_speakers_are_reused_only_when_every_line_has_one(self):
+        # Codex 2026-11-27: one labelled line used to skip pyannote for all the others (they became 「?」).
+        segs = [{"start": 0.0, "end": 1.0, "speaker": "我"}, {"start": 1.0, "end": 2.0}]
+        self.assertIsNone(postmeeting.speakers(segs))
+        segs[1]["speaker"] = "講者 1"
+        self.assertEqual(postmeeting.speakers(segs)["speakers"], ["我", "講者 1"])
+
+    def test_gemini_lines_in_speech_without_pauses_are_moved_back_by_the_measured_delay(self):
+        # Codex 2026-11-27: every shift scored the same and the lines kept their 4 s late arrival times.
+        from lib.live import vad
+        spans = [(4.4 + a, 4.4 + b) for a, b in ((1.0, 5.0), (5.0, 9.0), (9.0, 13.0))]
+        moved = vad.reanchor(spans, [(1.0, 20.0)])
+        self.assertAlmostEqual(moved[0][0], 1.0, delta=0.1)
+        self.assertAlmostEqual(moved[-1][1], 13.0, delta=0.1)
+
+
 class ChainSkipsWhatItHas(unittest.TestCase):
     def setUp(self):
         self.fakes = Fakes()
