@@ -1,16 +1,18 @@
 <?php
 /**
- * Reads this site's theme colours, fonts and corner radius as the engine's host-theme tokens and hands them to
- * the embed URL as aw-<token>=<value> (engine contract: ziwei-doushu lib/theme/hostTheme.ts, deploy/DEPLOY.md
- * "宿主主題代碼"). Read on every render, so a palette change in the Customizer reaches the tools without a new
- * plugin release. Nothing found = nothing sent = the engine keeps its own look.
- *  - Kadence active: its global palette (option kadence_global_palette; KADENCE_DEFAULT_PALETTE while never
- *    saved) through KADENCE_MAP, fonts from the base_font / heading_font theme mods, radius from
+ * Reads this site's theme as the engine's host-theme tokens and hands them to the embed URL as
+ * aw-<token>=<value>. The tokens ARE Kadence's global settings: palette1…palette9 (Kadence's --global-paletteN),
+ * body font, heading font, button radius (engine contract: ziwei-doushu lib/theme/hostTheme.ts, deploy/DEPLOY.md
+ * "宿主主題代碼", with the table of where each slot shows in the tools). Read on every render, so a change in the
+ * Customizer reaches the tools without a new plugin release. Nothing found = nothing sent = the engine keeps its
+ * own look.
+ *  - Kadence active: its active global palette slot for slot (option kadence_global_palette;
+ *    KADENCE_DEFAULT_PALETTE while never saved), fonts from base_font / heading_font, radius from
  *    buttons_border_radius. Web fonts: assets/embed-same-origin.js copies the page's same-origin @font-face
  *    rules into the frame (the engine CSP allows fonts from this origin only).
- *  - Any other theme: theme.json global styles (wp_get_global_styles) resolved against the palette and font
- *    presets (wp_get_global_settings).
- *  - Setting theme_map (token=palette slug lines) overrides single tokens on either path.
+ *  - Any other theme: theme.json global styles (wp_get_global_styles) mapped onto the nine slots through
+ *    GLOBAL_STYLE_PATHS, resolved against the palette and font presets (wp_get_global_settings).
+ *  - Setting theme_map (paletteN=site palette slug lines) fills or replaces single slots on either path.
  * Values are filtered here with the same rules the engine applies (the engine re-validates; this only keeps
  * junk out of the URL).
  *
@@ -22,27 +24,9 @@ namespace AwareWave\Oracle\Embed;
 final class ThemeTokens {
 
 	/** Same tokens, same order as the engine's THEME_TOKENS. Change both sides together. */
-	const TOKENS = array( 'bg', 'surface', 'border', 'heading', 'text', 'muted', 'accent', 'on-accent', 'accent-2', 'font', 'font-heading', 'radius' );
-	const COLOR_TOKENS = array( 'bg', 'surface', 'border', 'heading', 'text', 'muted', 'accent', 'on-accent', 'accent-2' );
+	const TOKENS = array( 'palette1', 'palette2', 'palette3', 'palette4', 'palette5', 'palette6', 'palette7', 'palette8', 'palette9', 'body-font', 'heading-font', 'button-radius' );
+	const COLOR_TOKENS = array( 'palette1', 'palette2', 'palette3', 'palette4', 'palette5', 'palette6', 'palette7', 'palette8', 'palette9' );
 	const QUERY_PREFIX = 'aw-';
-
-	/**
-	 * Kadence palette slot → token, by Kadence's own palette meaning (1–2 accents, 3–6 text from strongest to
-	 * subtle, 7–9 backgrounds from subtle to base). The iframe sits in the content area, whose background is
-	 * palette9; cards sit on palette8. The one place this mapping lives; a site overrides single rows with
-	 * the theme_map setting.
-	 */
-	const KADENCE_MAP = array(
-		'accent'    => 'palette1',
-		'accent-2'  => 'palette2',
-		'heading'   => 'palette3',
-		'text'      => 'palette4',
-		'muted'     => 'palette5',
-		'border'    => 'palette7',
-		'surface'   => 'palette8',
-		'bg'        => 'palette9',
-		'on-accent' => 'palette9',
-	);
 
 	/**
 	 * Kadence's built-in palette (components/color_palette defaults), used while the site has never saved one:
@@ -60,20 +44,23 @@ final class ThemeTokens {
 		'palette9' => '#ffffff',
 	);
 
-	/** theme.json global-styles path per token (block themes and anything else with theme.json). */
+	/**
+	 * theme.json global-styles path per slot, for themes that are not Kadence, by the same slot meaning
+	 * (1 button = accent, 2 link = second accent, 3 heading text, 4 body text, 9 background). Slots with no
+	 * theme.json counterpart (5–8) are derived by the engine or set with theme_map.
+	 */
 	const GLOBAL_STYLE_PATHS = array(
-		'bg'           => array( 'color', 'background' ),
-		'text'         => array( 'color', 'text' ),
-		'heading'      => array( 'elements', 'heading', 'color', 'text' ),
-		'accent'       => array( 'elements', 'button', 'color', 'background' ),
-		'on-accent'    => array( 'elements', 'button', 'color', 'text' ),
-		'accent-2'     => array( 'elements', 'link', 'color', 'text' ),
-		'font'         => array( 'typography', 'fontFamily' ),
-		'font-heading' => array( 'elements', 'heading', 'typography', 'fontFamily' ),
-		'radius'       => array( 'elements', 'button', 'border', 'radius' ),
+		'palette9'      => array( 'color', 'background' ),
+		'palette4'      => array( 'color', 'text' ),
+		'palette3'      => array( 'elements', 'heading', 'color', 'text' ),
+		'palette1'      => array( 'elements', 'button', 'color', 'background' ),
+		'palette2'      => array( 'elements', 'link', 'color', 'text' ),
+		'body-font'     => array( 'typography', 'fontFamily' ),
+		'heading-font'  => array( 'elements', 'heading', 'typography', 'fontFamily' ),
+		'button-radius' => array( 'elements', 'button', 'border', 'radius' ),
 	);
 
-	const TOKEN_PATTERN = '/^(?:bg|surface|border|heading|text|muted|accent|on-accent|accent-2)$/';
+	const TOKEN_PATTERN = '/^palette[1-9]$/';
 	const SLUG_PATTERN  = '/^[a-z0-9][a-z0-9_-]{0,39}$/';
 
 	private const HEX    = '/^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i';
@@ -187,7 +174,7 @@ final class ThemeTokens {
 
 	/**
 	 * @param array<string,string> $palette   slug => colour
-	 * @param array<string,string> $overrides token => palette slug (replaces KADENCE_MAP rows)
+	 * @param array<string,string> $overrides slot => Kadence palette slug (replaces that slot)
 	 * @param array<string,mixed>  $mods      base_font, heading_font, radius (theme mods as stored)
 	 * @return array<string,string>
 	 */
@@ -196,16 +183,20 @@ final class ThemeTokens {
 			return array();
 		}
 		$raw = array();
-		foreach ( array_merge( self::KADENCE_MAP, self::validOverrides( $overrides ) ) as $token => $slug ) {
+		$slots = array();
+		foreach ( self::COLOR_TOKENS as $slot ) {
+			$slots[ $slot ] = $slot; // Kadence: slot N is palette N
+		}
+		foreach ( array_merge( $slots, self::validOverrides( $overrides ) ) as $token => $slug ) {
 			if ( isset( $palette[ $slug ] ) ) {
 				$raw[ $token ] = $palette[ $slug ];
 			}
 		}
 		$base    = self::familyOf( $mods['base_font'] ?? null );
 		$heading = self::familyOf( $mods['heading_font'] ?? null );
-		$raw['font']         = $base;
-		$raw['font-heading'] = ( $heading === '' || in_array( strtolower( $heading ), self::RESERVED, true ) ) ? $base : $heading;
-		$raw['radius']       = self::kadenceRadius( $mods['radius'] ?? null );
+		$raw['body-font']     = $base;
+		$raw['heading-font']  = ( $heading === '' || in_array( strtolower( $heading ), self::RESERVED, true ) ) ? $base : $heading;
+		$raw['button-radius'] = self::kadenceRadius( $mods['radius'] ?? null );
 		return self::clean( $raw );
 	}
 
@@ -222,7 +213,7 @@ final class ThemeTokens {
 			if ( ! is_string( $value ) || $value === '' ) {
 				continue;
 			}
-			$out[ $token ] = self::resolvePreset( $value, $token === 'font' || $token === 'font-heading' ? $fonts : $palette );
+			$out[ $token ] = self::resolvePreset( $value, $token === 'body-font' || $token === 'heading-font' ? $fonts : $palette );
 		}
 		foreach ( self::validOverrides( $overrides ) as $token => $slug ) {
 			if ( isset( $palette[ $slug ] ) ) {
@@ -248,7 +239,7 @@ final class ThemeTokens {
 			}
 			if ( in_array( $t, self::COLOR_TOKENS, true ) ) {
 				$v = self::color( $v );
-			} elseif ( $t === 'radius' ) {
+			} elseif ( $t === 'button-radius' ) {
 				$v = preg_match( self::LENGTH, $v ) ? $v : '';
 			} else {
 				$v = self::font( $v );

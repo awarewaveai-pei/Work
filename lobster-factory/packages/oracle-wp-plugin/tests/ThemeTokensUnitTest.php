@@ -1,6 +1,6 @@
 <?php
 /**
- * WP-free units for Embed\ThemeTokens: Kadence palette → engine host-theme tokens, override map, nothing
+ * WP-free units for Embed\ThemeTokens: Kadence palette slot for slot → engine host-theme tokens, override map, nothing
  * sent when the site has no palette, junk never reaches the URL.
  */
 
@@ -22,44 +22,45 @@ final class ThemeTokensUnitTest extends TestCase {
 		$tokens = ThemeTokens::fromKadence( ThemeTokens::kadencePalette( self::KADENCE_OPTION ), array(), $mods );
 		$this->assertSame(
 			array(
-				'bg'           => '#ffffff',
-				'surface'      => '#F7FAFC',
-				'border'       => '#EDF2F7',
-				'heading'      => '#1A202C',
-				'text'         => '#2D3748',
-				'muted'        => '#4A5568',
-				'accent'       => '#3182CE',
-				'on-accent'    => '#ffffff',
-				'accent-2'     => '#2B6CB0',
-				'font'         => 'BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
-				'font-heading' => 'BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
-				'radius'       => '3px',
+				'palette1'      => '#3182CE',
+				'palette2'      => '#2B6CB0',
+				'palette3'      => '#1A202C',
+				'palette4'      => '#2D3748',
+				'palette5'      => '#4A5568',
+				'palette6'      => '#718096',
+				'palette7'      => '#EDF2F7',
+				'palette8'      => '#F7FAFC',
+				'palette9'      => '#ffffff',
+				'body-font'     => 'BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+				'heading-font'  => 'BlinkMacSystemFont, Segoe UI, Roboto, sans-serif',
+				'button-radius' => '3px',
 			),
 			$tokens
 		);
-		// The site's override map replaces single rows; illegal override lines are ignored.
-		$over = ThemeTokens::fromKadence( ThemeTokens::kadencePalette( self::KADENCE_OPTION ), array( 'surface' => 'palette7', 'bg;x' => 'palette1', 'text' => 'Palette 1' ), array() );
-		$this->assertSame( '#EDF2F7', $over['surface'] );
-		$this->assertSame( '#2D3748', $over['text'] );
+		// The site's override map replaces single slots; illegal override lines are ignored.
+		$over = ThemeTokens::fromKadence( ThemeTokens::kadencePalette( self::KADENCE_OPTION ), array( 'palette8' => 'palette7', 'palette9;x' => 'palette1', 'palette4' => 'Palette 1', 'bg' => 'palette1' ), array() );
+		$this->assertSame( '#EDF2F7', $over['palette8'] );
+		$this->assertSame( '#2D3748', $over['palette4'] );
+		$this->assertSame( '#ffffff', $over['palette9'] );
 		// The active palette wins.
 		$second = ThemeTokens::kadencePalette( str_replace( '"active":"palette"', '"active":"second-palette"', self::KADENCE_OPTION ) );
 		$this->assertSame( array( 'palette9' => '#000000' ), $second );
 		$this->assertSame(
-			'/embed/zh-TW/ziwei?aw-bg=%23ffffff&aw-accent=%233182CE&aw-font=Segoe%20UI%2C%20sans-serif',
-			ThemeTokens::withQuery( '/embed/zh-TW/ziwei', array( 'accent' => '#3182CE', 'bg' => '#ffffff', 'font' => 'Segoe UI, sans-serif' ) )
+			'/embed/zh-TW/ziwei?aw-palette1=%233182CE&aw-palette9=%23ffffff&aw-body-font=Segoe%20UI%2C%20sans-serif',
+			ThemeTokens::withQuery( '/embed/zh-TW/ziwei', array( 'palette9' => '#ffffff', 'palette1' => '#3182CE', 'body-font' => 'Segoe UI, sans-serif' ) )
 		);
 	}
 
 	public function testNoPaletteSendsNothing(): void {
 		$this->assertSame( array(), ThemeTokens::fromKadence( ThemeTokens::kadencePalette( '' ), array(), array( 'base_font' => array( 'family' => 'Inter' ) ) ) );
 		// Kadence never saved a palette: read() falls back to Kadence's built-in one, which maps cleanly.
-		$this->assertSame( '#3182CE', ThemeTokens::fromKadence( ThemeTokens::KADENCE_DEFAULT_PALETTE, array(), array() )['accent'] );
+		$this->assertSame( '#3182CE', ThemeTokens::fromKadence( ThemeTokens::KADENCE_DEFAULT_PALETTE, array(), array() )['palette1'] );
 		$this->assertSame( array(), ThemeTokens::fromKadence( ThemeTokens::kadencePalette( 'not json' ), array(), array() ) );
-		$this->assertSame( array(), ThemeTokens::fromGlobalStyles( array( 'bg' => '', 'text' => null ), array(), array(), array() ) );
+		$this->assertSame( array(), ThemeTokens::fromGlobalStyles( array( 'palette9' => '', 'palette4' => null ), array(), array(), array() ) );
 		$this->assertSame( '/embed/en/daily', ThemeTokens::withQuery( '/embed/en/daily', array() ) );
 		// Junk in a palette never reaches the URL.
 		$bad = ThemeTokens::fromKadence( array( 'palette9' => 'red;}', 'palette4' => 'url(x)', 'palette1' => '#3182CE' ), array(), array( 'base_font' => array( 'family' => '"x</style>"' ) ) );
-		$this->assertSame( array( 'accent' => '#3182CE' ), $bad );
+		$this->assertSame( array( 'palette1' => '#3182CE' ), $bad );
 	}
 
 	public function testGlobalStylesResolvePresets(): void {
@@ -73,18 +74,18 @@ final class ThemeTokensUnitTest extends TestCase {
 		$fonts   = ThemeTokens::presets( array( 'theme' => array( array( 'slug' => 'manrope', 'fontFamily' => 'Manrope, sans-serif' ) ) ), 'fontFamily' );
 		$tokens  = ThemeTokens::fromGlobalStyles(
 			array(
-				'bg'     => 'var:preset|color|base',
-				'text'   => 'var(--wp--preset--color--contrast)',
-				'accent' => 'var:preset|color|missing',
-				'font'   => 'var:preset|font-family|manrope',
-				'radius' => '0.5rem',
+				'palette9'      => 'var:preset|color|base',
+				'palette4'      => 'var(--wp--preset--color--contrast)',
+				'palette1'      => 'var:preset|color|missing',
+				'body-font'     => 'var:preset|font-family|manrope',
+				'button-radius' => '0.5rem',
 			),
 			$palette,
 			$fonts,
-			array( 'accent-2' => 'accent-1' )
+			array( 'palette2' => 'accent-1' )
 		);
 		$this->assertSame(
-			array( 'bg' => '#FFFFFF', 'text' => '#111111', 'accent-2' => 'rgb(10, 20, 30)', 'font' => 'Manrope, sans-serif', 'radius' => '0.5rem' ),
+			array( 'palette2' => 'rgb(10, 20, 30)', 'palette4' => '#111111', 'palette9' => '#FFFFFF', 'body-font' => 'Manrope, sans-serif', 'button-radius' => '0.5rem' ),
 			$tokens
 		);
 	}

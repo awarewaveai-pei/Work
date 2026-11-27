@@ -60,7 +60,7 @@
   }
 
   /**
-   * Host theme fonts (ThemeTokens → --aw-font / --aw-font-heading in the frame) are only names; the frame does
+   * Host theme fonts (ThemeTokens → --global-body-font-family / --global-heading-font-family in the frame) are only names; the frame does
    * not load this page's web fonts. Copy this page's @font-face rules for those families into the frame as
    * FontFace objects. Only same-origin font files load (the engine CSP is font-src 'self'): fonts served by
    * WordPress itself (theme.json fonts, Kadence "load fonts locally") work, third-party font hosts fall back.
@@ -69,7 +69,7 @@
     if (!doc.fonts || typeof win.FontFace !== 'function' || doc.__awOracleFonts) return;
     doc.__awOracleFonts = true;
     var css = win.getComputedStyle(doc.documentElement);
-    var want = familyNames(css.getPropertyValue('--aw-font') + ',' + css.getPropertyValue('--aw-font-heading'));
+    var want = familyNames(css.getPropertyValue('--global-body-font-family') + ',' + css.getPropertyValue('--global-heading-font-family'));
     if (!want.length) return;
     var sheets = document.styleSheets;
     for (var i = 0; i < sheets.length; i++) {
