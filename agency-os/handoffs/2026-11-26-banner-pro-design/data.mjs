@@ -5,10 +5,11 @@ export const META = {
   title: '橫幅工具第二輪監工台',
   updated: '2026-11-27',
   plan: 'agency-os/handoffs/2026-11-26-banner-pro-design/PLAN-R2.md',
+  plan3: 'agency-os/handoffs/2026-11-26-banner-pro-design/PLAN-R3.md',
 };
 
 // todo｜doing｜review｜done（done 要在 COMMITS 填 commit）
-export const PROGRESS = { 'R2-A': 'done', 'R2-B1': 'done', 'R2-B2': 'done', 'R2-C': 'done' };
+export const PROGRESS = { 'R2-A': 'done', 'R2-B1': 'done', 'R2-B2': 'done', 'R2-C': 'done', 'R3-A': 'doing', 'R3-B': 'doing', 'R3-C': 'doing' };
 export const COMMITS = { 'R2-A': 'ef6572105', 'R2-B1': '528cb59d5', 'R2-B2': '06c46341e', 'R2-C': 'e2d125cd9' };
 
 // 等你決定：要提前手動部署或高風險時才放這裡。{ card, what, rollback }
@@ -54,9 +55,9 @@ export const DECIDE = [
 ];
 
 export const COPY = {
-  sub: '你的十點回饋，共 {total} 張卡，分兩批做；每批交回後先處理風險再上線。',
+  sub: '你的十點回饋與第三輪修改清單，共 {total} 張卡；每批交回後先處理風險再上線。',
   updated: '更新於 {date}',
-  nav: { now: '現況', open: '等你決定', b1: '第一批', b2: '第二批', risks: '風險' },
+  nav: { now: '現況', open: '等你決定', b1: '第一批', b2: '第二批', b3: '第三輪', risks: '風險' },
   now: { h: '現況', lead: '做到哪。' },
   steps: { h: '卡片', count: '{done}／{total} 完成' },
   open: { h: '等你決定', lead: '要你點頭才往下的事。', none: '目前沒有要你點頭的事。', count: '{n} 項' },
@@ -88,6 +89,15 @@ export const BATCHES = [
     cards: [
       C('R2-B2', 'Medium', 'Opus 5.5', 'R2-A、R2-B1', '把位置按鈕、模板、字級滑桿接上引擎：按了就一定有效，手拖的位置被按鈕取代。'),
       C('R2-C', 'Medium', 'Opus 5.5', 'R2-A、R2-B1', 'AI 一鍵設計附五組文案可換；品牌 logo 與字體一起進設計；對比檢查改量真實文字位置。'),
+    ] },
+  { code: 'b3', no: '第三輪', title: '預覽欄、文字不出畫布、Logo 規範、AI 場景與合成適配（三個工人同時做）',
+    seen: '頂部「橫幅」列不見了；左邊預覽從標題列開始固定，高度不變，縮圖列填滿畫面；9:16 字不會跑出畫布；Logo 依短邊與主標自動配大小並留白；AI 一鍵設計會直接生出場景縮圖讓你挑，商品帶陰影倒影；「AI 合成進場景」每個尺寸各生一張、商品完整在畫面內。',
+    accept: '型別檢查與測試全綠；本機截圖對照你的三張圖；AI 場景與合成實打一次並先印總價；Codex 審過。',
+    rollback: '每張卡一個 commit，單獨還原。',
+    cards: [
+      C('R3-A', 'Medium', 'Opus 5.5', '', '排版引擎：文字一定留在畫布內（手動字級也一樣）；Logo 依短邊與主標自動配大小、四周留白、手動調整優先。'),
+      C('R3-B', 'Low', 'Sonnet 5.5', '', '版面：拿掉頂部「橫幅」列；預覽欄固定在畫面上、高度不變；尺寸縮圖列填滿剩下的高度。'),
+      C('R3-C', 'Medium', 'Opus 5.5', '', 'AI：一鍵設計直接生場景讓你挑、商品擬真預設開；「AI 合成進場景」每個已選尺寸各依比例生成，商品不被字遮住。'),
     ] },
 ];
 
