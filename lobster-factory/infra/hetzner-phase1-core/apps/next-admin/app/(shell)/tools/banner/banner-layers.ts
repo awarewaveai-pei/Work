@@ -7,12 +7,16 @@
 import { writePsd, type Psd, type Layer as PsdLayer, type TextStyle, type TextStyleRun } from "ag-psd";
 import { groundProduct, type GroundingOpts } from "./product-grounding";
 import { autospace, layoutBanner, type AccentRun, type BannerLayout } from "./banner-layout";
+import type { PicArea } from "./banner-design";
 
 /** The design fields the drawing reads (BannerStudio's State has all of them). */
 export interface BannerFields {
   bgMode: "color" | "gradient" | "upload" | "ai";
   bgColor: string; gradFrom: string; gradTo: string; gradAngle: string;
   bgImage: string | null; bgImageHasProduct: boolean;
+  /** R3-E: where the product is IN bgImage (shares of the picture) when it is baked in -- the area its generation asked
+   *  for; travels with bgImage. Absent / null on a baked picture (older designs) = the layout falls back to productPos. */
+  bgProductArea?: PicArea | null;
   dimOverlay: boolean; dimOverlayOpacity: number;
   productImage: string | null; productPos: "center" | "left" | "right" | "bottom-right"; productScale: number;
   headline: string; subtext: string; textColor: string; fontFamily: string; headlineFont: string;
@@ -202,7 +206,8 @@ async function loadDesignFonts(state: BannerFields): Promise<void> {
 async function prepareLayout(state: BannerFields, size: { w: number; h: number }) {
   await loadDesignFonts(state);
   const pics = new Map<string, HTMLImageElement>();
-  for (const src of [state.productImage, state.logoImage]) if (src) pics.set(src, await loadImage(src));
+  // a background with the product baked in: its size maps the product's area onto the canvas
+  for (const src of [state.productImage, state.logoImage, state.bgImageHasProduct ? state.bgImage : null]) if (src) pics.set(src, await loadImage(src));
   const mctx = newCanvas(1, 1).getContext("2d"); // measuring only
   if (!mctx) throw new Error("canvas_unavailable");
   setLetterSpacing(mctx, 0);
@@ -289,7 +294,7 @@ export async function renderBannerLayers(state: BannerFields, size: { w: number;
       ctx.fillStyle = grd;
       ctx.fillRect(0, 0, p.w, p.h);
     } else if (state.bgImage) {
-      const img   = await loadImage(state.bgImage);
+      const img   = pics.get(state.bgImage) ?? await loadImage(state.bgImage);
       // moved / zoomed by the user (dragged on the preview): what the picture no longer covers shows the background colour
       const k = state.bgImgScale || 1, ox = (state.bgImgX || 0) * p.w, oy = (state.bgImgY || 0) * p.h;
       if (k !== 1 || ox || oy) { ctx.fillStyle = state.bgColor; ctx.fillRect(0, 0, p.w, p.h); }

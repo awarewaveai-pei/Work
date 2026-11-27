@@ -7,7 +7,7 @@ import {
 } from "./banner-layers";
 import { applySemantic, dropPositions, semanticElems } from "./banner-layout";
 import type { GroundingOpts } from "./product-grounding";
-import type { BannerAiModel } from "./banner-design";
+import type { BannerAiModel, PicArea } from "./banner-design";
 import { bgStatsFromColors, bgStatsFromPixels, mergeBgInfo, type BgInfo } from "./design-colors";
 import type { StudioModel, AspectRatio } from "@/lib/studio/model-options";
 import { resolveStylePrompt } from "../tarot/cards";
@@ -110,6 +110,7 @@ export interface State {
   gradAngle: string;
   bgImage:   string | null;
   bgImageHasProduct: boolean;   // true 當 bgImage 已由 AI 把產品合成進去（決定是否略過事後疊加）
+  bgProductArea: PicArea | null; // R3-E: 烤進的商品在 bgImage 裡的位置（圖片比例，生成時要求的商品區）；與 bgImage 同生同滅
   generating: boolean;
   designing: boolean;   // AI 一鍵設計整張進行中
   // AI bg blocks
@@ -215,6 +216,7 @@ export const INIT: State = {
   gradAngle: "135deg",
   bgImage:   null,
   bgImageHasProduct: false,
+  bgProductArea: null,
   generating: false,
   designing: false,
   aiBgSubject:       "",
@@ -305,12 +307,12 @@ export const SIZE_KEYS = [
   "positions", "headlineSize", "subtextSize", "typeAuto", "letterSpacing", "bodyLetterSpacing", "productScale", "productPos",
   "badgeScale", "textPos", "textAlignH", "badgePos", "logoPos", "bgImgScale", "bgImgX", "bgImgY", "logoScale", "logoAuto",
   // R3-C: 合成進場景 draws one picture per size at that size's ratio; a size without its own uses the main size's
-  "bgImage", "bgImageHasProduct",
+  "bgImage", "bgImageHasProduct", "bgProductArea",
 ] as const;
 export type SizePatch = Partial<Pick<State, (typeof SIZE_KEYS)[number]>>;
 export const pickSize = (st: State): SizePatch => Object.fromEntries(SIZE_KEYS.map((k) => [k, st[k]])) as SizePatch;
 /** The background fields a size may hold for itself (its own picture and where it sits). */
-const BG_SIZE_KEYS = ["bgImage", "bgImageHasProduct", "bgImgScale", "bgImgX", "bgImgY"] as const satisfies readonly (typeof SIZE_KEYS)[number][];
+const BG_SIZE_KEYS = ["bgImage", "bgImageHasProduct", "bgProductArea", "bgImgScale", "bgImgX", "bgImgY"] as const satisfies readonly (typeof SIZE_KEYS)[number][];
 // pictures are multi-MB data URLs: compare by reference first, never stringify one that is the same
 const sameField = (a: unknown, b: unknown) => a === b || (typeof a !== "string" && typeof b !== "string" && JSON.stringify(a) === JSON.stringify(b));
 
@@ -349,7 +351,7 @@ function onMain(st: State, fn: (m: State) => State): State {
 }
 /** R3-C: one background for every size (uploaded, generated, an AI 一鍵設計 scene picked): the main size gets it centred,
  *  every size's own picture and placement go, so each size crops this one. */
-export function withSharedBackground(st: State, bg: Pick<State, "bgImage" | "bgMode" | "bgImageHasProduct">): State {
+export function withSharedBackground(st: State, bg: SharedBackground): State {
   return onMain(st, (m) => {
     const sizeOverrides: State["sizeOverrides"] = {};
     for (const [k, o] of Object.entries(m.sizeOverrides) as [PresetKey, SizePatch][]) {
@@ -357,26 +359,33 @@ export function withSharedBackground(st: State, bg: Pick<State, "bgImage" | "bgM
       for (const f of BG_SIZE_KEYS) delete rest[f];
       sizeOverrides[k] = rest;
     }
-    return { ...m, ...bg, ...BG_PLACE_RESET, sizeOverrides, saved: false };
+    return { ...m, bgProductArea: null, ...bg, ...BG_PLACE_RESET, sizeOverrides, saved: false };
   });
 }
-/** R3-C: 合成進場景 per size -- each size that got a picture holds it (centred) as its own background; a size missing from
- *  `pics` (its call failed) keeps what it had. The main size's picture is the main design's. */
-export function withSizeBackgrounds(st: State, pics: Partial<Record<PresetKey, string>>, hasProduct: boolean): State {
+/** A background every size shares; `bgProductArea` only with the product baked in (absent = none). */
+export type SharedBackground = Pick<State, "bgImage" | "bgMode" | "bgImageHasProduct"> & { bgProductArea?: PicArea | null };
+/** A picture with the product composited in and the area its generation asked the product into (shares of the picture). */
+export interface BakedPicture { image: string; area: PicArea | null }
+/** R3-C: 合成進場景 per size -- each size that got a picture holds it (centred) with its product area as its own
+ *  background; a size missing from `pics` (its call failed) keeps what it had -- with no picture of its own it crops the
+ *  main size's, whose product area then maps onto it (R3-E). The main size's picture is the main design's. */
+export function withSizeBackgrounds(st: State, pics: Partial<Record<PresetKey, BakedPicture>>): State {
+  const bg = (p: BakedPicture) => ({ bgImage: p.image, bgImageHasProduct: true, bgProductArea: p.area, ...BG_PLACE_RESET });
   return onMain(st, (m) => {
     const own = pics[m.preset];
     const sizeOverrides = { ...m.sizeOverrides };
-    for (const [k, img] of Object.entries(pics) as [PresetKey, string][]) {
-      if (k !== m.preset) sizeOverrides[k] = { ...sizeOverrides[k], bgImage: img, bgImageHasProduct: hasProduct, ...BG_PLACE_RESET };
+    for (const [k, p] of Object.entries(pics) as [PresetKey, BakedPicture][]) {
+      if (k !== m.preset) sizeOverrides[k] = { ...sizeOverrides[k], ...bg(p) };
     }
-    return { ...m, ...(own ? { bgImage: own, bgImageHasProduct: hasProduct, ...BG_PLACE_RESET } : {}), bgMode: "ai", sizeOverrides, saved: false };
+    return { ...m, ...(own ? bg(own) : {}), bgMode: "ai", sizeOverrides, saved: false };
   });
 }
 /** R3-C: the background a picked AI 一鍵設計 candidate becomes. It has the product baked in only when it was drawn with
  *  the product picture the design has now; else (drawn without one, or the product was replaced / removed since) it is
  *  a plain scene and the product is drawn over it. */
-export function sceneBackground(image: string, drawnWith: string | null, product: string | null): Pick<State, "bgImage" | "bgMode" | "bgImageHasProduct"> {
-  return { bgImage: image, bgMode: "ai", bgImageHasProduct: !!drawnWith && drawnWith === product };
+export function sceneBackground(image: string, drawnWith: string | null, product: string | null, area: PicArea | null): SharedBackground {
+  const baked = !!drawnWith && drawnWith === product;
+  return { bgImage: image, bgMode: "ai", bgImageHasProduct: baked, bgProductArea: baked ? area : null };
 }
 /** R3-C: a product drawn over an AI design gets contact shadow, reflection and tone match on (their settings kept). */
 export function groundingOn(g: GroundingOpts): GroundingOpts {

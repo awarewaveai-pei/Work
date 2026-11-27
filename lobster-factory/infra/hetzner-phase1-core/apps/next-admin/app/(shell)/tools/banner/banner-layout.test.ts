@@ -2,9 +2,9 @@
 // placement; a position control always moves its element (even over an old AI answer's coordinates); the automatic
 // title has no lone-character line and is legible on 3:1; the reflection grows with its length and stays in the canvas.
 import { describe, expect, it } from "vitest";
-import { applySemantic, layoutBanner, reservedAreas, LOGO_AUTO, LOGO_CLEAR, LOGO_TITLE, REF_PX, type LayoutMeasure } from "./banner-layout";
+import { applySemantic, areaOnCanvas, layoutBanner, reservedAreas, LOGO_AUTO, LOGO_CLEAR, LOGO_TITLE, REF_PX, type LayoutMeasure } from "./banner-layout";
 import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBox, type ElemKey, type ElemPositions } from "./banner-layers";
-import { INIT, PRESETS, TEMPLATES, applyLayout, enterSize, templatePatch, type PresetKey, type State } from "./banner-state";
+import { INIT, PRESETS, TEMPLATES, applyLayout, enterSize, templatePatch, variantOf, withSizeBackgrounds, type PresetKey, type State } from "./banner-state";
 
 // Every size of the tool: a new preset is covered by the overlap matrix automatically.
 const SIZES: Record<string, { w: number; h: number }> = PRESETS;
@@ -93,6 +93,47 @@ describe("R3-D: the product area a generation is asked for = the area the layout
     }
   });
 });
+
+// Codex on R3-D (R3-E): a baked-in product's reserved area follows THE PICTURE, not productPos -- (F1) the background
+// dragged / zoomed moves the product with it; (F2) a size whose composite failed crops the main size's picture, so its
+// product is where the main picture's product lands on that size. The text keeps clear of that box.
+describe("R3-E: a baked product's reserved area = where the product is in the picture as drawn", () => {
+  const pics: Record<string, { w: number; h: number }> = { scene45: { w: 864, h: 1080 }, scene916: { w: 1080, h: 1920 } };
+  const m2: LayoutMeasure = { text: measure.text, image: (src) => pics[src] ?? measure.image(src) };
+  const area = { x0: 0.55, y0: 0.35, x1: 0.92, y1: 0.85 }; // asked for at the right of a 4:5 picture
+  const bakedF: BannerFields = { ...everything, productPos: "right", bgMode: "ai", bgImage: "scene45", bgImageHasProduct: true, bgProductArea: area };
+  const clear = (L: ReturnType<typeof layoutBanner>) => (["headline", "subtext", "price", "cta", "trust"] as const)
+    .filter((k) => L.boxes[k] && overlap(L.boxes[k]!, L.product!.box));
+  it("F1: the background dragged / zoomed -> the reserved box moves / grows with the picture; text keeps clear", () => {
+    const size = SIZES.r4x5;
+    const still = layoutBanner(bakedF, size, m2).product!.box;
+    expect(still).toEqual(areaOnCanvas(area, pics.scene45, bakedF, size.w, size.h));
+    const moved = layoutBanner({ ...bakedF, bgImgX: -0.3 }, size, m2);
+    expect(moved.product!.box.x).toBeCloseTo(still.x - 0.3 * size.w, 5);
+    expect(clear(moved)).toEqual([]);
+    const zoomed = layoutBanner({ ...bakedF, bgImgScale: 1.4 }, size, m2);
+    expect(zoomed.product!.box.w).toBeGreaterThan(still.w);
+    expect(clear(zoomed)).toEqual([]);
+    // productPos no longer decides it: a left button press does not move the reservation off the product
+    expect(layoutBanner({ ...bakedF, productPos: "left" }, size, m2).product!.box).toEqual(still);
+  });
+  it("F2: a size whose composite failed uses the main picture -> its reservation is the main product on that size", () => {
+    const st: State = { ...INIT, ...bakedF, preset: "r4x5", multiSizes: ["r9x16", "r16x9", "r1x1"], typeAuto: true } as State;
+    const done = withSizeBackgrounds(st, { r4x5: { image: "scene45", area }, r9x16: { image: "scene916", area: { x0: 0.2, y0: 0.55, x1: 0.8, y1: 0.95 } } });
+    for (const k of ["r16x9", "r1x1"] as const) { // failed: no picture of their own
+      const v = variantOf(done, k), size = SIZES[k];
+      expect(v).toMatchObject({ bgImage: "scene45", bgProductArea: area });
+      const L = layoutBanner(v, size, m2);
+      expect(L.product!.box).toEqual(areaOnCanvas(area, pics.scene45, v, size.w, size.h));
+      expect(L.product!.drawn).toBe(false);
+      expect(clear(L)).toEqual([]);
+    }
+    const own = layoutBanner(variantOf(done, "r9x16"), SIZES.r9x16, m2);
+    expect(own.product!.box).toEqual(areaOnCanvas({ x0: 0.2, y0: 0.55, x1: 0.8, y1: 0.95 }, pics.scene916, BASE_PLACE, SIZES.r9x16.w, SIZES.r9x16.h));
+    expect(clear(own)).toEqual([]);
+  });
+});
+const BASE_PLACE = { bgImgScale: 1, bgImgX: 0, bgImgY: 0 };
 
 describe("(b) a position control moves its element over an old AI answer's coordinates", () => {
   // the old multi-size answer pinned every element
