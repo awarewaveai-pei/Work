@@ -28,6 +28,9 @@ export const COMPOSITION: Record<CompGroup, Composition> = {
   web: { label: "網頁", layout: { textPos: "center", textAlignH: "left", productPos: "right" }, textShare: 0.55, productAt: null, safe: {} },
 };
 
+/** Long words: the text beside a product may widen to this share before the title goes under its range's floor. */
+export const TEXT_SHARE_MAX = 0.65;
+
 /** The size a layout is made for: canvas px, its ratio, the width it is shown at (CSS px) and its group. */
 export interface LayoutSize { w: number; h: number; ratio: string; displayW: number; group: CompGroup }
 

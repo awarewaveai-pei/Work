@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { applySemantic, areaOnCanvas, layoutBanner, reservedAreas, LOGO_AUTO, LOGO_CLEAR, LOGO_TITLE, REF_PX, type LayoutMeasure } from "./banner-layout";
 import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBox, type ElemKey, type ElemPositions } from "./banner-layers";
 import { INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, enterSize, templatePatch, variantOf, withSizeBackgrounds, type PresetKey, type State } from "./banner-state";
-import { COMPOSITION, type LayoutSize } from "./composition";
+import { COMPOSITION, TEXT_SHARE_MAX, type LayoutSize } from "./composition";
 import { SUB_RATIO, titleRange } from "./field-ranges";
 import { shapeLayout } from "./banner-design";
 import { sizeFileName } from "./steps/export-files";
@@ -196,14 +196,27 @@ describe("R4-A: title range, composition groups, 9:16 safe bands", () => {
         expect(hs).toBeLessThanOrEqual(r.max);
       }
   });
-  // Open for the supervisor (T1 決定 1 x 決定 2): 16:9 社群 shown 393 wide wants a 176-278 px title; in the card group's
-  // left ~55% column the T1 words need 3 + 3 lines (> the height). The engine shrinks them (inside the canvas) instead.
-  it("r16x9 社群, card layout: the T1 words cannot reach the floor -> shrunk below it, inside the canvas; centred product reaches it", () => {
+  // Supervisor's rule (R4-A follow-up): the floor wins over the layout's proportions -- too-long words first widen the
+  // text column beside the product (55% -> at most 65%), and only then shrink, with belowMin set for the page's notice.
+  it("r16x9 社群 + T1 words, card layout: title >= its floor, or belowMin set with the text column <= 65% of the width", () => {
     const size = SIZES.r16x9, r = titleRange(size.w, size.displayW);
     const L = layoutBanner({ ...t1, ...COMPOSITION.card.layout }, size, measure);
-    expect(L.headlineSize).toBeLessThan(r.min);
+    const right = Math.max(...(["headline", "subtext"] as const).map((k) => L.boxes[k]!.x + L.boxes[k]!.w));
+    expect(L.headlineSize >= r.min || (L.belowMin === r.min && L.textShare === TEXT_SHARE_MAX && right <= size.w * TEXT_SHARE_MAX + 0.5)).toBe(true);
     for (const k of ["headline", "subtext"] as const) expect(inside(L.boxes[k]!, size)).toBe(true);
-    expect(layoutBanner(t1, size, measure).headlineSize).toBeGreaterThanOrEqual(r.min);
+    // words that fit at the floor: no flag, the composition's own share
+    const short = layoutBanner({ ...t1, ...COMPOSITION.card.layout, headline: "療癒心", subtext: "立即報名" }, size, measure);
+    expect(short).toMatchObject({ belowMin: null, textShare: COMPOSITION.card.textShare });
+    expect(short.headlineSize).toBeGreaterThanOrEqual(r.min);
+  });
+  it("the column widens before the title shrinks: a size whose words fit only wider keeps the floor with a share > 55%", () => {
+    // 1.91:1 (link card, floor 87 px): a title that needs the wider column
+    const size = SIZES.r191x1, r = titleRange(size.w, size.displayW);
+    const words = { ...t1, ...COMPOSITION.card.layout, subtext: "" };
+    const found = ["用香氣與色彩療癒心", "用香氣與色彩療癒疲憊", "用香氣與色彩，療癒疲憊的心", "用香氣與色彩，療癒疲憊的心與身體"]
+      .map((headline) => layoutBanner({ ...words, headline }, size, measure))
+      .find((L) => L.textShare > COMPOSITION.card.textShare && L.belowMin === null);
+    expect(found?.headlineSize).toBeGreaterThanOrEqual(r.min);
   });
   it("each size's group and shown width (16:9 = 社群 card at 393 + Hero web at 1920; ?ratio=16:9 opens 社群)", () => {
     const groups = Object.fromEntries(Object.entries(PRESETS).map(([k, p]) => [k, `${p.group} ${p.displayW}`]));
