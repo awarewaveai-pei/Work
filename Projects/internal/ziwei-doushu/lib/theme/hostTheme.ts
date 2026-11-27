@@ -1,7 +1,10 @@
 /**
  * 宿主主題代碼契約(嵌入頁 /embed/<語言>/<工具> 的外觀唯一來源;deploy/DEPLOY.md「宿主主題代碼」節)。
+ * 代碼就是 Kadence 的全域設定:色盤九格(Kadence 前台的 --global-palette1…9)、內文字體、標題字體、按鈕圓角,
+ * 嵌入頁 :root 設同名變數,引擎自己的變數都由這九格推出;「Kadence 的 palette3 是什麼色,工具裡的 palette3
+ * 就是什麼色」。九格用途照 Kadence 慣例:1–2 強調、3–6 文字由深到淺、7–9 背景(DEPLOY.md 有對照表)。
  * 宿主(WordPress 外掛 includes/Embed/ThemeTokens.php)把代碼放在 iframe 網址查詢字串 `aw-<代碼>=<值>`;
- * 引擎在伺服端逐項驗證,合格的寫成 `:root` 自訂屬性,不合格或沒給的那項用 app/globals.css 的預設(獨立站的紫金)。
+ * 引擎在伺服端逐項驗證,合格的寫成 `:root` 自訂屬性,不合格或沒給的那項見 hostThemeCss()。
  * 安全邊界:值只能是資料。顏色只收 hex／rgb()／rgba()／hsl()／hsla(),字體只收字母數字空白與 - _ 的字族名
  * (引擎自己加引號),長度只收數字＋px/rem/em;所以輸出不可能含 ; { } < > \ url( 或註解。改這裡 = 改安全邊界,
  * 測試 lib/theme/hostTheme.test.ts 必須一起改。
@@ -9,18 +12,18 @@
 
 /** 契約代碼(順序 = 文件順序)。改名或增減 = 外掛 ThemeTokens::TOKENS 一起改。 */
 export const THEME_TOKENS = [
-  'bg', // 工具底色
-  'surface', // 卡片、命盤宮位等表面
-  'border', // 卡片邊框
-  'heading', // 標題文字
-  'text', // 內文
-  'muted', // 次要文字
-  'accent', // 強調色(主要按鈕、重點數值)
-  'on-accent', // 強調色上的文字(主要按鈕字)
-  'accent-2', // 第二強調色(輸入框焦點、分隔線、次要按鈕)
-  'font', // 內文字體
-  'font-heading', // 標題字體
-  'radius', // 基準圓角(卡片 = 1×;小元件 2/3×;大元件 4/3×、5/3×)
+  'palette1', // 強調:主要按鈕、重點數值
+  'palette2', // 第二強調:焦點框、分隔線、次要按鈕
+  'palette3', // 標題字
+  'palette4', // 內文
+  'palette5', // 次要字
+  'palette6', // 最淡的字
+  'palette7', // 邊框
+  'palette8', // 卡片、命盤表面
+  'palette9', // 底色;主要按鈕上的字
+  'body-font', // 內文字體
+  'heading-font', // 標題字體
+  'button-radius', // 按鈕圓角(卡片 = 1×;小元件 2/3×;大元件 4/3×、5/3×)
 ] as const;
 
 export type ThemeToken = (typeof THEME_TOKENS)[number];
@@ -28,21 +31,37 @@ export type HostTheme = Partial<Record<ThemeToken, string>>;
 
 type Kind = 'color' | 'font' | 'length';
 const KIND: Record<ThemeToken, Kind> = {
-  bg: 'color',
-  surface: 'color',
-  border: 'color',
-  heading: 'color',
-  text: 'color',
-  muted: 'color',
-  accent: 'color',
-  'on-accent': 'color',
-  'accent-2': 'color',
-  font: 'font',
-  'font-heading': 'font',
-  radius: 'length',
+  palette1: 'color',
+  palette2: 'color',
+  palette3: 'color',
+  palette4: 'color',
+  palette5: 'color',
+  palette6: 'color',
+  palette7: 'color',
+  palette8: 'color',
+  palette9: 'color',
+  'body-font': 'font',
+  'heading-font': 'font',
+  'button-radius': 'length',
 };
 
-/** 查詢字串鍵的前綴:`aw-bg`、`aw-font-heading`… */
+/** 代碼 → :root 變數名;字體用 Kadence 的變數名,色盤 = --global-paletteN。 */
+const VAR_NAME: Record<ThemeToken, string> = {
+  palette1: '--global-palette1',
+  palette2: '--global-palette2',
+  palette3: '--global-palette3',
+  palette4: '--global-palette4',
+  palette5: '--global-palette5',
+  palette6: '--global-palette6',
+  palette7: '--global-palette7',
+  palette8: '--global-palette8',
+  palette9: '--global-palette9',
+  'body-font': '--global-body-font-family',
+  'heading-font': '--global-heading-font-family',
+  'button-radius': '--aw-button-radius',
+};
+
+/** 查詢字串鍵的前綴:`aw-palette1`、`aw-heading-font`… */
 export const QUERY_PREFIX = 'aw-';
 
 const MAX_LEN = 120;
@@ -128,8 +147,8 @@ export function parseHostTheme(params: Record<string, string | string[] | undefi
     const raw = params[QUERY_PREFIX + token];
     if (typeof raw !== 'string') continue;
     const ok = VALIDATE[KIND[token]](raw);
-    // 底色決定整套墨色(deriveColors),半透明底的實際顏色取決於框外,無從判斷對比:不收。
-    if (ok !== null && !(token === 'bg' && !opaque(ok))) out[token] = ok;
+    // 底色(第 9 格)決定整套墨色(deriveColors),半透明底的實際顏色取決於框外,無從判斷對比:不收。
+    if (ok !== null && !(token === 'palette9' && !opaque(ok))) out[token] = ok;
   }
   return out;
 }
@@ -143,42 +162,41 @@ export function parseHostTheme(params: Record<string, string | string[] | undefi
 const HOSTED_RULES = [
   '--aw-backdrop:none',
   '--aw-stars:none',
-  '--glass-bg:color-mix(in srgb,var(--aw-surface) 80%,transparent)',
-  '--glass-bg-hover:var(--aw-surface)',
-  '--glass-border-hover:var(--aw-accent)',
-  '--violet-400:color-mix(in srgb,var(--aw-accent-2) 70%,var(--aw-heading))',
-  '--violet-600:var(--aw-accent-2)',
-  '--gold-500:var(--aw-accent)',
+  '--glass-bg:color-mix(in srgb,var(--global-palette8) 80%,transparent)',
+  '--glass-bg-hover:var(--global-palette8)',
+  '--glass-border-hover:var(--global-palette1)',
+  '--violet-400:color-mix(in srgb,var(--global-palette2) 70%,var(--global-palette3))',
+  '--violet-600:var(--global-palette2)',
+  '--gold-500:var(--global-palette1)',
   '--violet-glow:transparent',
   '--gold-glow:transparent',
   '--gold-glow-strong:transparent',
-  '--text-dim:var(--aw-muted)',
-  '--jade-400:color-mix(in srgb,#6ee7b7 45%,var(--aw-heading))',
-  '--rose-400:color-mix(in srgb,#fb7185 45%,var(--aw-heading))',
-  '--sky-400:color-mix(in srgb,#7dd3fc 45%,var(--aw-heading))',
-  '--amber-400:color-mix(in srgb,#fbbf24 45%,var(--aw-heading))',
+  '--jade-400:color-mix(in srgb,#6ee7b7 45%,var(--global-palette3))',
+  '--rose-400:color-mix(in srgb,#fb7185 45%,var(--global-palette3))',
+  '--sky-400:color-mix(in srgb,#7dd3fc 45%,var(--global-palette3))',
+  '--amber-400:color-mix(in srgb,#fbbf24 45%,var(--global-palette3))',
   '--jade-bg:color-mix(in srgb,var(--jade-400) 8%,transparent)',
   '--jade-border:color-mix(in srgb,var(--jade-400) 25%,transparent)',
   '--rose-bg:color-mix(in srgb,var(--rose-400) 8%,transparent)',
   '--rose-border:color-mix(in srgb,var(--rose-400) 25%,transparent)',
-  '--shadow-ink:color-mix(in srgb,var(--aw-heading) 30%,transparent)',
-  '--btn-primary-bg:var(--aw-accent)',
-  '--btn-primary-bg-hover:color-mix(in srgb,var(--aw-accent) 85%,var(--aw-heading))',
-  '--btn-primary-border:var(--aw-accent)',
-  '--btn-primary-fg:var(--aw-on-accent)',
+  '--shadow-ink:color-mix(in srgb,var(--global-palette3) 30%,transparent)',
+  '--btn-primary-bg:var(--global-palette1)',
+  '--btn-primary-bg-hover:color-mix(in srgb,var(--global-palette1) 85%,var(--global-palette3))',
+  '--btn-primary-border:var(--global-palette1)',
+  '--btn-primary-fg:var(--global-palette9)',
   '--btn-secondary-bg:transparent',
-  '--btn-secondary-bg-hover:color-mix(in srgb,var(--aw-accent-2) 12%,transparent)',
-  '--palace-bg:var(--aw-bg)',
-  '--palace-bg-hover:color-mix(in srgb,var(--aw-surface) 88%,var(--aw-accent-2))',
-  '--palace-center-bg:var(--aw-surface)',
+  '--btn-secondary-bg-hover:color-mix(in srgb,var(--global-palette2) 12%,transparent)',
+  '--palace-bg:var(--global-palette9)',
+  '--palace-bg-hover:color-mix(in srgb,var(--global-palette8) 88%,var(--global-palette2))',
+  '--palace-center-bg:var(--global-palette8)',
   '--picker-filter:none',
-  '--divider:linear-gradient(to right,transparent,color-mix(in srgb,var(--aw-accent-2) 40%,transparent),color-mix(in srgb,var(--aw-accent) 40%,transparent),transparent)',
+  '--divider:linear-gradient(to right,transparent,color-mix(in srgb,var(--global-palette2) 40%,transparent),color-mix(in srgb,var(--global-palette1) 40%,transparent),transparent)',
 ].join(';');
 
 /** 字體代碼後面接引擎預設字族:宿主字型在框內沒載入時退回引擎字型,不直接掉到系統字。 */
 const FONT_TAIL: Partial<Record<ThemeToken, string>> = {
-  font: 'var(--font-geist-sans)',
-  'font-heading': 'var(--font-noto-serif-tc)',
+  'body-font': 'var(--font-geist-sans)',
+  'heading-font': 'var(--font-noto-serif-tc)',
 };
 
 const COLOR_TOKENS: readonly ThemeToken[] = THEME_TOKENS.filter((t) => KIND[t] === 'color');
@@ -227,25 +245,32 @@ function inkOn(color: string): string {
 }
 
 /**
- * 不變量:宿主給了任一顏色代碼,九個顏色代碼就全部由宿主的值推出,絕不混用紫金預設
- * (例:只給白底卻沿用預設淺紫內文 = 白底淺字)。底色與內文缺項以亮度挑深／淺墨色,其餘由兩者混出。
+ * 不變量:宿主給了任一格顏色,九格就全部由宿主的值推出,絕不混用紫金預設
+ * (例:只給白底卻沿用預設淺紫內文 = 白底淺字)。底色(9)與內文(4)缺項以亮度挑深／淺墨色,其餘由兩者混出。
  * 只給字體／圓角 = 只換字體／圓角,顏色與裝飾維持獨立站。
  */
 function deriveColors(theme: HostTheme): Partial<Record<ThemeToken, string>> {
   const out: Partial<Record<ThemeToken, string>> = {};
-  let bg = theme.bg;
-  let text = theme.text ?? theme.heading;
-  if (bg === undefined) bg = text !== undefined ? inkOn(text) : inkOn(theme.accent ?? theme['accent-2'] ?? DARK_INK);
+  let bg = theme.palette9;
+  let text = theme.palette4 ?? theme.palette3;
+  if (bg === undefined) bg = text !== undefined ? inkOn(text) : inkOn(theme.palette1 ?? theme.palette2 ?? DARK_INK);
   if (text === undefined) text = inkOn(bg);
-  if (theme.bg === undefined) out.bg = bg;
-  if (theme.text === undefined) out.text = text;
-  if (theme.heading === undefined) out.heading = 'var(--aw-text)';
-  if (theme.surface === undefined) out.surface = 'color-mix(in srgb,var(--aw-bg) 94%,var(--aw-text))';
-  if (theme.border === undefined) out.border = 'color-mix(in srgb,var(--aw-text) 18%,transparent)';
-  if (theme.muted === undefined) out.muted = 'color-mix(in srgb,var(--aw-text) 70%,var(--aw-bg))';
-  if (theme.accent === undefined) out.accent = theme['accent-2'] !== undefined ? 'var(--aw-accent-2)' : 'var(--aw-heading)';
-  if (theme['on-accent'] === undefined) out['on-accent'] = theme.accent !== undefined ? inkOn(theme.accent) : 'var(--aw-bg)';
-  if (theme['accent-2'] === undefined) out['accent-2'] = 'var(--aw-accent)';
+  const mix = (a: string, pct: number, b: string) => `color-mix(in srgb,var(${a}) ${pct}%,${b})`;
+  const derived: Record<ThemeToken, string | undefined> = {
+    palette9: bg,
+    palette4: text,
+    palette3: 'var(--global-palette4)',
+    palette5: mix('--global-palette4', 70, 'var(--global-palette9)'),
+    palette6: mix('--global-palette4', 55, 'var(--global-palette9)'),
+    palette7: mix('--global-palette4', 18, 'var(--global-palette9)'),
+    palette8: mix('--global-palette9', 94, 'var(--global-palette4)'),
+    palette1: theme.palette2 !== undefined ? 'var(--global-palette2)' : 'var(--global-palette3)',
+    palette2: 'var(--global-palette1)',
+    'body-font': undefined,
+    'heading-font': undefined,
+    'button-radius': undefined,
+  };
+  for (const t of COLOR_TOKENS) if (theme[t] === undefined) out[t] = derived[t];
   return out;
 }
 
@@ -256,10 +281,10 @@ export function hostThemeCss(theme: HostTheme): string {
     const v = theme[token];
     if (v === undefined) continue;
     const tail = FONT_TAIL[token];
-    decls.push(`--aw-${token}:${tail ? `${v}, ${tail}` : v}`);
+    decls.push(`${VAR_NAME[token]}:${tail ? `${v}, ${tail}` : v}`);
   }
   if (decls.length === 0) return '';
   if (!COLOR_TOKENS.some((t) => theme[t] !== undefined)) return `:root:root{${decls.join(';')}}`;
-  for (const [token, expr] of Object.entries(deriveColors(theme))) decls.push(`--aw-${token}:${expr}`);
+  for (const [token, expr] of Object.entries(deriveColors(theme))) decls.push(`${VAR_NAME[token as ThemeToken]}:${expr}`);
   return `:root:root{${decls.join(';')};${HOSTED_RULES}}`;
 }

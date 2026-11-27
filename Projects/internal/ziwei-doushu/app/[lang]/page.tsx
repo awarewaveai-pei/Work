@@ -49,7 +49,7 @@ export default async function Hub({
               fontWeight: 700,
               color: "var(--text-heading)",
               letterSpacing: "0.06em",
-              textShadow: "0 0 40px color-mix(in srgb, var(--aw-accent-2) 40%, transparent)",
+              textShadow: "0 0 40px color-mix(in srgb, var(--global-palette2) 40%, transparent)",
               lineHeight: 1.2,
               marginBottom: "0.75rem",
             }}

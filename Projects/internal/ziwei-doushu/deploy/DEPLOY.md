@@ -88,12 +88,28 @@ curl -s https://oracle.aware-wave.com/api/mcp -H 'content-type: application/json
 - 驗證：`curl -sI https://<站>/zh-TW/ziwei | grep -ic content-security-policy` → `1`；`/embed/zh-TW/ziwei` 另有 `x-robots-tag`；`/api/v1/systems` 的 CSP 是 `default-src 'none'…`。
 
 ## 宿主主題代碼（嵌入頁跟著網站佈景）
-- 嵌入頁 `/embed/<語言>/<工具>` 的外觀唯一來源＝宿主給的一組代碼；沒給或不合格的那項用引擎預設（獨立站紫金，外觀逐像素不變）。程式 `lib/theme/hostTheme.ts`（契約＋驗證＋輸出），測試 `lib/theme/hostTheme.test.ts`；預設值與衍生變數在 `app/globals.css` 開頭兩個 `:root`。
-- 傳法：iframe 網址查詢字串 `aw-<代碼>=<值>`（WordPress 外掛 `includes/Embed/ThemeTokens.php` 每次輸出頁面時從佈景讀出來附上）。引擎伺服端驗證後輸出一個 `<style>`（React 提到 `<head>`，選擇器 `:root:root`），首次繪製就是宿主顏色；宿主改色盤不必重發外掛。CSP 不變（`style-src` 本來就有 `'unsafe-inline'`）。
-- 契約（12 項）：`bg` 底色／`surface` 卡片與命盤表面／`border` 卡片邊框／`heading` 標題字／`text` 內文／`muted` 次要字／`accent` 強調（主要按鈕、重點數值）／`on-accent` 強調色上的字／`accent-2` 第二強調（焦點框、分隔線、次要按鈕）／`font` 內文字體／`font-heading` 標題字體／`radius` 基準圓角（卡片 1×，小元件 ⅔×，大元件 4/3×、5/3×）。
-- 驗證（安全邊界，值只能是資料）：顏色只收 `#rgb[a]`／`#rrggbb[aa]`／`rgb[a]()`／`hsl[a]()`（只含數字、`%`、`deg`），`bg` 另須不透明（墨色依它決定）；字體最多 4 個字族，字族只收字母數字空白 `-` `_`，引擎自己加引號，CSS 全域字（`inherit` 等）不收；長度只收 `0` 或數字＋`px|rem|em`。任何 `;` `{` `}` `<` `>` `\` `url(` `/*` 都過不了。
-- 缺項推導（不變量：宿主給了任一顏色，九個顏色全由宿主值推出，不混紫金預設）：`bg`／`text` 缺 → 依對方（或強調色）的 WCAG 亮度挑深墨 `#1f2328` 或淺墨 `#f0f0f0`；`heading`←`text`；`surface`←`bg` 混 6% `text`；`border`←`text` 18%；`muted`←`text` 70% 混 `bg`；`accent`←`accent-2` 或 `heading`；`on-accent`←強調色上對比較高的墨色；`accent-2`←`accent`。只給字體／圓角＝只換那兩項。有顏色代碼時獨立站裝飾（宇宙背景、星點、光暈、深紫宮位底）一律改由代碼推出或關掉；語意色 宜/忌/科/權 往 `heading` 混 55%，深淺底都可讀。
-- 驗證指令：`curl -s "https://<站>/embed/zh-TW/daily?aw-bg=%23ffffff&aw-text=%23222222" | grep -o 'data-href="aw-host-theme"'` → 一行；不帶參數 → 無輸出。
+- 代碼＝Kadence 的全域設定：色盤九格（Kadence 前台的 `--global-palette1`…`9`）、內文字體、標題字體、按鈕圓角。嵌入頁 `/embed/<語言>/<工具>` 的 `:root` 設同名變數，引擎自己的變數（`--bg-void`、`--violet-*`、`--text-*`…）全由這九格推出：Kadence 的 palette3 是什麼色，工具裡的 palette3 就是什麼色。沒給或不合格的那項：見下方「缺項」；完全沒有代碼＝獨立站紫金（外觀逐像素不變）。程式 `lib/theme/hostTheme.ts`，測試 `lib/theme/hostTheme.test.ts`，預設值在 `app/globals.css` 開頭。
+- 傳法：iframe 網址 `aw-palette1`…`aw-palette9`、`aw-body-font`、`aw-heading-font`、`aw-button-radius`（WordPress 外掛 `includes/Embed/ThemeTokens.php` 每次輸出頁面時從佈景讀；Kadence 直接一格對一格，其他佈景由外掛把 theme.json 對到九格）。引擎伺服端驗證後輸出一個 `<style>`（React 提到 `<head>`，選擇器 `:root:root`），首次繪製就是宿主顏色；改色盤不必重發外掛。CSP 不變（`style-src` 本來就有 `'unsafe-inline'`）。Kadence 的 class 名稱不搬進引擎（框內沒有 Kadence 樣式表），連動只靠變數值。
+- 九格用途（Kadence 慣例：1–2 強調、3–6 文字由深到淺、7–9 背景）與工具裡用在哪：
+
+| 格 | 用途 | 工具裡的位置 | 獨立站預設 |
+|---|---|---|---|
+| palette1 | 強調 | 選中的按鈕底（排盤、選中的性別／曆法）、重點數值（宮名、星級、幸運數字）、卡片滑過時的邊框、分隔線右半 | #f5d76e |
+| palette2 | 第二強調 | 未選按鈕的邊框與字、輸入框焦點框、分隔線左半、命盤格線、大限文字、易經爻線 | #a855f7 |
+| palette3 | 標題字 | 標題、主星名、輸入框文字；宜／忌／科／權的語意色往這色混以保可讀 | #f5f3ff |
+| palette4 | 內文 | 內文、副星 | #b8b0d0 |
+| palette5 | 次要字 | 說明字、宮位干支、雜曜、輸入框邊框 | #8980a8 |
+| palette6 | 最淡的字 | 真太陽時狀態、塔羅序號、輸入提示字 | #8077a0 |
+| palette7 | 邊框 | 卡片邊框 | rgba(168,85,247,.25) |
+| palette8 | 卡片底 | 卡片底、命盤中宮、宮位滑過 | #12102a |
+| palette9 | 底色 | 頁面底、命盤宮位底、主要按鈕上的字 | #0a0a14 |
+| 內文字體 | `--global-body-font-family` | 全部內文 | Geist |
+| 標題字體 | `--global-heading-font-family` | 標題、命盤中的大字 | Noto Serif TC |
+| 按鈕圓角 | `--aw-button-radius`（Kadence 沒有同名變數） | 卡片 1×、小元件 ⅔×、大元件 4/3×、5/3× | 12px |
+
+- 驗證（安全邊界，值只能是資料）：顏色只收 `#rgb[a]`／`#rrggbb[aa]`／`rgb[a]()`／`hsl[a]()`（只含數字、`%`、`deg`），palette9 另須不透明（墨色依它決定）；字體最多 4 個字族，字族只收字母數字空白 `-` `_`，引擎自己加引號，CSS 全域字（`inherit` 等）不收；長度只收 `0` 或數字＋`px|rem|em`。任何 `;` `{` `}` `<` `>` `\` `url(` `/*` 都過不了。
+- 缺項（不變量：宿主給了任一格顏色，九格全由宿主值推出，不混紫金預設）：9／4 缺 → 依對方（或強調色）的 WCAG 亮度挑深墨 `#1f2328` 或淺墨 `#f0f0f0`；3←4；5←4 混 30% 9；6←4 混 45% 9；7←4 18% 混 9；8←9 混 6% 4；1←2 或 3；2←1。只給字體／圓角＝只換那兩項。有顏色代碼時獨立站裝飾（宇宙背景、星點、光暈、深紫宮位底）一律改由九格推出或關掉。
+- 驗證指令：`curl -s "https://<站>/embed/zh-TW/daily?aw-palette9=%23ffffff&aw-palette4=%23222222" | grep -o 'data-href="aw-host-theme"'` → 一行；不帶參數 → 無輸出。
 
 ## 注意
 - `NEXT_PUBLIC_*` 在 build 時內嵌；網域預設值在 `lib/site.ts`。

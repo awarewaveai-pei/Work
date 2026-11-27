@@ -1,55 +1,57 @@
 @import "tailwindcss";
 
 /* ─── Design Tokens ─────────────────────────────────────────────────────────── */
-/* 契約代碼 --aw-*:嵌入頁外觀的唯一入口(lib/theme/hostTheme.ts;deploy/DEPLOY.md「宿主主題代碼」)。
-   預設值 = 獨立站的紫金;嵌入頁有宿主代碼時由 hostThemeCss() 以 :root:root 覆寫。 */
+/* 主題代碼 = Kadence 全域設定同名變數:色盤九格 --global-palette1…9、內文／標題字體、按鈕圓角
+   (lib/theme/hostTheme.ts;deploy/DEPLOY.md「宿主主題代碼」有九格用途表)。預設值 = 獨立站的紫金;
+   嵌入頁有宿主代碼時由 hostThemeCss() 以 :root:root 覆寫。九格用途照 Kadence 慣例:
+   1–2 強調、3–6 文字由深到淺(標題／內文／次要／最淡)、7–9 背景(邊框／卡片／底色)。 */
 :root {
-  --aw-bg:           #0a0a14;
-  --aw-surface:      #12102a;
-  --aw-border:       rgba(168, 85, 247, 0.25);
-  --aw-heading:      #f5f3ff;
-  --aw-text:         #b8b0d0;
-  --aw-muted:        #8980a8;
-  --aw-accent:       #f5d76e;
-  --aw-on-accent:    #0a0a14;
-  --aw-accent-2:     #a855f7;
-  --aw-font:         var(--font-geist-sans);
-  --aw-font-heading: var(--font-noto-serif-tc);
-  --aw-radius:       12px;
+  --global-palette1: #f5d76e;                 /* 強調:主要按鈕、重點數值 */
+  --global-palette2: #a855f7;                 /* 第二強調:焦點框、分隔線、次要按鈕 */
+  --global-palette3: #f5f3ff;                 /* 標題字 */
+  --global-palette4: #b8b0d0;                 /* 內文 */
+  --global-palette5: #8980a8;                 /* 次要字 */
+  --global-palette6: #8077a0;                 /* 最淡的字 */
+  --global-palette7: rgba(168, 85, 247, 0.25); /* 邊框 */
+  --global-palette8: #12102a;                 /* 卡片、命盤表面 */
+  --global-palette9: #0a0a14;                 /* 底色;主要按鈕上的字 */
+  --global-body-font-family:    var(--font-geist-sans);
+  --global-heading-font-family: var(--font-noto-serif-tc);
+  --aw-button-radius: 12px;                   /* Kadence 按鈕圓角;卡片 1×、小元件 ⅔×、大元件 4/3×、5/3× */
 }
 
 /* 由代碼推出的變數。預設值與改版前相同:color-mix(in srgb, x N%, transparent) = x 的 rgba(N%)。
    標「獨立站裝飾」的是無法由代碼逐像素推出的紫金藝術值,宿主時 hostThemeCss() 一律改由代碼推出或關掉。 */
 :root {
   /* Background */
-  --bg-void: var(--aw-bg);
+  --bg-void: var(--global-palette9);
 
   /* Glass surface */
   --glass-bg:       rgba(255, 255, 255, 0.04);   /* 獨立站裝飾 */
   --glass-bg-hover: rgba(255, 255, 255, 0.07);   /* 獨立站裝飾 */
-  --glass-border:   var(--aw-border);
-  --glass-border-hover: color-mix(in srgb, var(--aw-accent) 50%, transparent);
+  --glass-border:   var(--global-palette7);
+  --glass-border-hover: color-mix(in srgb, var(--global-palette1) 50%, transparent);
   --glass-blur:     12px;
 
   /* Primary — Violet (紫微星) = 第二強調色 */
   --violet-400:  #c084fc;                        /* 獨立站裝飾 */
-  --violet-500:  var(--aw-accent-2);
+  --violet-500:  var(--global-palette2);
   --violet-600:  #9333ea;                        /* 獨立站裝飾 */
-  --violet-glow: color-mix(in srgb, var(--aw-accent-2) 35%, transparent);
+  --violet-glow: color-mix(in srgb, var(--global-palette2) 35%, transparent);
 
   /* Accent — Imperial Gold (帝星金) = 強調色 */
-  --gold-400: var(--aw-accent);
+  --gold-400: var(--global-palette1);
   --gold-500: #e8c468;                           /* 獨立站裝飾 */
-  --gold-glow: color-mix(in srgb, var(--aw-accent) 40%, transparent);
-  --gold-glow-strong: color-mix(in srgb, var(--aw-accent) 60%, transparent);
+  --gold-glow: color-mix(in srgb, var(--global-palette1) 40%, transparent);
+  --gold-glow-strong: color-mix(in srgb, var(--global-palette1) 60%, transparent);
 
   /* Text */
-  --text-heading: var(--aw-heading);
-  --text-body:    var(--aw-text);
-  --text-caption: var(--aw-muted);
+  --text-heading: var(--global-palette3);
+  --text-body:    var(--global-palette4);
+  --text-caption: var(--global-palette5);
   /* WCAG AA: lightened from #5c5478 (2.6:1) → ~4.6:1 on dark glass; used by
-     真太陽時狀態字 (.no-correction-text) 與塔羅牌序號等真實內容,須可讀。獨立站裝飾。 */
-  --text-dim:     #8077a0;
+     真太陽時狀態字 (.no-correction-text) 與塔羅牌序號等真實內容,須可讀。= 色盤第 6 格。 */
+  --text-dim:     var(--global-palette6);
 
   /* 語意色(宜/忌/科/權):獨立站原色;宿主時往標題色混,深淺底都可讀 */
   --jade-400: #6ee7b7;
@@ -68,7 +70,7 @@
   /* 背景漸層 = 獨立站裝飾(宿主時改實心強調色/透明) */
   --btn-primary-bg: linear-gradient(135deg, rgba(245, 215, 110, 0.18) 0%, rgba(232, 196, 104, 0.12) 100%);
   --btn-primary-bg-hover: linear-gradient(135deg, rgba(245, 215, 110, 0.28) 0%, rgba(232, 196, 104, 0.22) 100%);
-  --btn-primary-border: color-mix(in srgb, var(--aw-accent) 40%, transparent);
+  --btn-primary-border: color-mix(in srgb, var(--global-palette1) 40%, transparent);
   --btn-primary-fg: var(--gold-400);
   --btn-secondary-bg: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(139, 92, 246, 0.12) 100%);
   --btn-secondary-bg-hover: linear-gradient(135deg, rgba(168, 85, 247, 0.28) 0%, rgba(139, 92, 246, 0.22) 100%);
@@ -93,14 +95,14 @@
   --aw-stars: block;
 
   /* Fonts(退回字型寫在使用處,與改版前相同) */
-  --font-body:    var(--aw-font);
-  --font-heading: var(--aw-font-heading);
+  --font-body:    var(--global-body-font-family);
+  --font-heading: var(--global-heading-font-family);
 
   /* Radius:基準 = 代碼 radius(預設 12px → 8/12/16/20) */
-  --radius-sm: calc(var(--aw-radius) * 2 / 3);
-  --radius-md: var(--aw-radius);
-  --radius-lg: calc(var(--aw-radius) * 4 / 3);
-  --radius-xl: calc(var(--aw-radius) * 5 / 3);
+  --radius-sm: calc(var(--aw-button-radius) * 2 / 3);
+  --radius-md: var(--aw-button-radius);
+  --radius-lg: calc(var(--aw-button-radius) * 4 / 3);
+  --radius-xl: calc(var(--aw-button-radius) * 5 / 3);
 
   /* Motion */
   --dur-fast:   150ms;
@@ -250,7 +252,7 @@ h1, h2, h3 {
 .glass-card:hover {
   background: var(--glass-bg-hover);
   border-color: var(--glass-border-hover);
-  box-shadow: 0 0 24px color-mix(in srgb, var(--aw-accent) 15%, transparent), 0 8px 32px color-mix(in srgb, var(--shadow-ink) 40%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--global-palette1) 15%, transparent), 0 8px 32px color-mix(in srgb, var(--shadow-ink) 40%, transparent);
   transform: translateY(-2px);
 }
 
@@ -279,7 +281,7 @@ h1, h2, h3 {
 
 .btn-gold:hover {
   background: var(--btn-primary-bg-hover);
-  border-color: color-mix(in srgb, var(--aw-accent) 70%, transparent);
+  border-color: color-mix(in srgb, var(--global-palette1) 70%, transparent);
   box-shadow: 0 0 20px var(--gold-glow), 0 4px 16px color-mix(in srgb, var(--shadow-ink) 30%, transparent);
 }
 
@@ -300,7 +302,7 @@ h1, h2, h3 {
   width: 100%;
   padding: 0.7rem 1.5rem;
   border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--aw-accent-2) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--global-palette2) 40%, transparent);
   background: var(--btn-secondary-bg);
   color: var(--violet-400);
   font-weight: 600;
@@ -314,7 +316,7 @@ h1, h2, h3 {
 .btn-violet:hover {
   background: var(--btn-secondary-bg-hover);
   box-shadow: 0 0 20px var(--violet-glow), 0 4px 16px color-mix(in srgb, var(--shadow-ink) 30%, transparent);
-  border-color: color-mix(in srgb, var(--aw-accent-2) 70%, transparent);
+  border-color: color-mix(in srgb, var(--global-palette2) 70%, transparent);
 }
 
 .btn-violet:focus-visible {
@@ -330,7 +332,7 @@ h1, h2, h3 {
 .field-dark {
   width: 100%;
   border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--aw-muted) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--global-palette5) 30%, transparent);
   background: var(--glass-bg);
   color: var(--text-heading);
   padding: 0.5rem 0.75rem;
@@ -349,7 +351,7 @@ h1, h2, h3 {
 .field-dark:focus {
   outline: none;
   border-color: var(--violet-500);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aw-accent-2) 20%, transparent), 0 0 12px color-mix(in srgb, var(--aw-accent-2) 15%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--global-palette2) 20%, transparent), 0 0 12px color-mix(in srgb, var(--global-palette2) 15%, transparent);
 }
 
 /* Date/time inputs: force light text on dark bg in Webkit */
@@ -371,7 +373,7 @@ input[type="checkbox"].field-check {
   width: 1rem;
   height: 1rem;
   border-radius: 3px;
-  border: 1px solid color-mix(in srgb, var(--aw-muted) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--global-palette5) 50%, transparent);
   background: var(--glass-bg);
   accent-color: var(--violet-500);
   cursor: pointer;
@@ -431,7 +433,7 @@ input[type="checkbox"].field-check {
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, 1fr);
   gap: 2px;
-  background: color-mix(in srgb, var(--aw-accent-2) 15%, transparent);
+  background: color-mix(in srgb, var(--global-palette2) 15%, transparent);
   border-radius: var(--radius-md);
   padding: 2px;
   overflow: hidden;
@@ -569,7 +571,7 @@ input[type="checkbox"].field-check {
   justify-content: space-between;
   align-items: center;
   padding: 0.375rem 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--aw-muted) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--global-palette5) 10%, transparent);
 }
 
 .fortune-row:last-child {
@@ -622,7 +624,7 @@ input[type="checkbox"].field-check {
   background: rgba(10, 10, 20, 0.75);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid color-mix(in srgb, var(--aw-accent-2) 20%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--global-palette2) 20%, transparent);
 }
 
 .nav-brand {
@@ -661,14 +663,14 @@ input[type="checkbox"].field-check {
 
 .nav-link:hover {
   color: var(--text-body);
-  background: color-mix(in srgb, var(--aw-accent-2) 10%, transparent);
+  background: color-mix(in srgb, var(--global-palette2) 10%, transparent);
 }
 
 .nav-link.active {
   color: var(--gold-400);
   font-weight: 600;
-  background: color-mix(in srgb, var(--aw-accent) 8%, transparent);
-  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--aw-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--global-palette1) 8%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--global-palette1) 50%, transparent);
   text-shadow: 0 0 10px var(--gold-glow);
 }
 
@@ -676,7 +678,7 @@ input[type="checkbox"].field-check {
   margin-left: auto;
   font-size: 0.75rem;
   color: var(--text-caption);
-  border: 1px solid color-mix(in srgb, var(--aw-muted) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--global-palette5) 30%, transparent);
   border-radius: var(--radius-sm);
   padding: 0.2rem 0.6rem;
   text-decoration: none;
@@ -684,6 +686,6 @@ input[type="checkbox"].field-check {
 }
 
 .nav-lang:hover {
-  border-color: color-mix(in srgb, var(--aw-accent-2) 50%, transparent);
+  border-color: color-mix(in srgb, var(--global-palette2) 50%, transparent);
   color: var(--violet-400);
 }
