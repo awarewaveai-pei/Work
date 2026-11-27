@@ -14,9 +14,10 @@ const NO_START = new Set(Array.from("，。、；：！？）」』】〉》〕�
 const NO_END = new Set(Array.from("（「『【〈《〔([{"));
 /** Greedy wrap of characters with 避頭尾 (`rules`): a closing mark that does not fit takes the character before it to the
  *  next line (追い出し; no ぶら下げ -- a hung full-width mark is one em past the column, and centred it pushed the line past
- *  both canvas edges, R3 一3); an opening bracket never ends a line. Only when no character is left to go down with the
- *  marks does a line stay wider than `fits` -- the layout measures every line and shrinks the type then. Spaces at the
- *  edges of a wrapped line are dropped (a 中英間距 space must not indent or shift a line). Rules off = the plain greedy wrap. */
+ *  both canvas edges, R3 一3); an opening bracket never ends a line. When no character is left to go down with the marks,
+ *  the mark starts the next line (the width wins over 避頭尾; kinsokuBroken tells the layout, which shrinks the type
+ *  first). Only a single item wider than `fits` makes a wider line. Spaces at the edges of a wrapped line are dropped (a
+ *  中英間距 space must not indent or shift a line). Rules off = the plain greedy wrap. */
 export function wrapChars<T>(items: T[], ch: (t: T) => string, fits: (line: T[]) => boolean, rules: boolean): T[][] {
   const lines: T[][] = [];
   let line: T[] = [];
@@ -28,8 +29,7 @@ export function wrapChars<T>(items: T[], ch: (t: T) => string, fits: (line: T[])
       if (NO_START.has(ch(it))) {
         let k = line.length;
         while (k > 0 && NO_START.has(ch(line[k - 1]))) k--;
-        if (k < 2) { line = next; continue; } // nothing to take down without emptying the line
-        carry = line.splice(k - 1);
+        if (k >= 2) carry = line.splice(k - 1); // else nothing to take down without emptying the line: break before it
       }
       while (line.length > 1 && NO_END.has(ch(line[line.length - 1]))) carry.unshift(line.pop()!);
     }
@@ -55,6 +55,9 @@ export function autospace(text: string): string {
   });
   return out;
 }
+
+/** A wrapped line (after the first) that starts with a closing mark: 避頭尾 gave way to the column width. */
+export const kinsokuBroken = (lines: string[]): boolean => lines.slice(1).some((l) => NO_START.has(Array.from(l)[0] ?? ""));
 
 // `**字**` → accent runs.
 export type AccentRun = { text: string; accent: boolean };
@@ -164,16 +167,15 @@ function dropAt(want: { x: number; y: number }, w: number, h: number, W: number,
 export function layoutBanner(f: BannerFields, size: { w: number; h: number }, measure: LayoutMeasure): BannerLayout {
   const W = size.w, H = size.h, short = Math.min(W, H);
   const fixed = (k: "headlineSize" | "subtextSize") => clampField(k, f[k]) ?? (k === "headlineSize" ? 64 : 32);
-  /** The largest title size <= hs (the subtitle scaled with it) at which the title / subtitle fit the column and the
-   *  text stack its span -- a size set by hand too; the layout returns the sizes drawn. */
+  /** The largest title size <= hs (the subtitle, price, button and trust row scaled with it) at which every text block
+   *  is inside its room (compose's inRoom) -- a size set by hand too; the layout returns the sizes drawn. */
   const settle = (hs: number, ss: number, balance: boolean) => {
     const minH: number = FIELD_RANGES.headlineSize.min;
     const at = (h: number) => compose(f, W, H, measure, h, Math.max(FIELD_RANGES.subtextSize.min, Math.round((ss * h) / hs)), balance);
-    const ok = (c: ReturnType<typeof at>) => Math.max(c.over.headline, c.over.subtext, c.over.stack) <= 1;
     const full = at(hs);
-    if (ok(full) || hs <= minH) return full.layout;
+    if (full.inRoom || hs <= minH) return full.layout;
     let lo = minH, hi = hs; // at(hi) does not fit; at(lo) is the floor whether or not it fits
-    while (hi - lo > 1) { const mid = Math.floor((lo + hi) / 2); if (ok(at(mid))) lo = mid; else hi = mid; }
+    while (hi - lo > 1) { const mid = Math.floor((lo + hi) / 2); if (at(mid).inRoom) lo = mid; else hi = mid; }
     return at(lo).layout;
   };
   if (!f.typeAuto) return settle(fixed("headlineSize"), fixed("subtextSize"), f.balanceTitle);
@@ -192,10 +194,11 @@ export function layoutBanner(f: BannerFields, size: { w: number; h: number }, me
   return settle(lo, subFor(lo), true);
 }
 
-/** `over`: how far the title / subtitle overrun their room -- the widest line over the column width, or the block over
- *  the canvas height between the margins; `stack`: the text stack over its free span (> 1 = drawn past it). */
+/** `inRoom`: every text block inside its room -- each title / subtitle line within the column (避頭尾 kept), each block
+ *  within the column (a dragged one within the canvas), the title / subtitle within the height between the margins, the
+ *  stack within its free span. `fits` (automatic type) = inRoom and the look: few title lines, room for the product. */
 function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, hs: number, ss: number, balance: boolean):
-  { layout: BannerLayout; fits: boolean; orphan: boolean; over: { headline: number; subtext: number; stack: number } } {
+  { layout: BannerLayout; fits: boolean; inRoom: boolean; orphan: boolean } {
   const short = Math.min(W, H), tall = H / W > 1.1;
   const pos: ElemPositions = f.positions ?? {};
   const padX = Math.round(W * 0.06), padY = Math.round(Math.min(W * 0.06, H * 0.08));
@@ -320,7 +323,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
   let headline: Omit<HeadlineLayout, "box"> | undefined, subtext: Omit<SubtextLayout, "box"> | undefined;
   let price: Omit<PriceLayout, "box"> | undefined, cta: Omit<CtaLayout, "box"> | undefined, trust: Omit<TrustLayout, "box"> | undefined;
   let orphan = false;
-  const over = { headline: 0, subtext: 0, stack: 0 };
+  let linesIn = true; // every title / subtitle line within the column, 避頭尾 kept, the blocks within the height
   if (f.headline) {
     const parsed = parseAccentRuns(f.headline);
     const runs = f.cjkSpacing ? autospaceRuns(parsed) : parsed;
@@ -346,7 +349,8 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     const solid = (ln: { ch: string }[]) => ln.filter((c) => c.ch.trim() && !NO_START.has(c.ch) && !NO_END.has(c.ch)).length;
     orphan = lines.length > 1 && lines.some((ln) => solid(ln) < 2);
     headline = { size: hs, lineH, lines: runLines, runW, lineWs };
-    over.headline = Math.max(Math.max(...lineWs) / colW, (lines.length * lineH) / (H - 2 * padY));
+    linesIn &&= Math.max(...lineWs) <= colW + 0.5 && lines.length * lineH <= H - 2 * padY + 0.5 &&
+      !(f.kinsoku && kinsokuBroken(lines.map((ln) => ln.map((c) => c.ch).join(""))));
     blocks.push({ key: "headline", w: Math.max(1, ...lineWs), h: lines.length * lineH });
   }
   if (f.subtext) {
@@ -360,14 +364,20 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
       let cur = "";
       for (const tok of text.split(" ")) {
         const test = cur ? `${cur} ${tok}` : tok;
-        if (w(test) <= colW) cur = test; else { if (cur) lines.push(cur); cur = tok; }
+        if (w(test) <= colW) { cur = test; continue; }
+        if (cur) lines.push(cur);
+        if (w(tok) <= colW) { cur = tok; continue; }
+        // a word wider than the column (a long URL): broken between characters, as no smaller size may help
+        const parts = wrapChars(Array.from(tok), (c) => c, (l) => w(l.join("")) <= colW, false).map((l) => l.join(""));
+        lines.push(...parts.slice(0, -1));
+        cur = parts[parts.length - 1] ?? "";
       }
       if (cur) lines.push(cur);
     }
     if (!lines.length) lines = [text];
     const lineH = ss * (f.bodyLineHeight || 1.32);
     subtext = { size: ss, lineH, lines };
-    over.subtext = Math.max(Math.max(...lines.map(w)) / colW, (lines.length * lineH) / (H - 2 * padY));
+    linesIn &&= Math.max(...lines.map(w)) <= colW + 0.5 && lines.length * lineH <= H - 2 * padY + 0.5 && !(f.kinsoku && kinsokuBroken(lines));
     blocks.push({ key: "subtext", w: Math.max(1, ...lines.map(w)), h: lines.length * lineH });
   }
   if (f.showPrice && (f.priceNow || f.priceWas)) {
@@ -429,7 +439,6 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     stackTop = f.textPos === "top" ? t : f.textPos === "bottom" ? b - stackH : t + (span - stackH) / 2;
   }
   stackTop = Math.max(t, stackTop);
-  over.stack = stackH > 0 ? stackH / Math.max(1, span) : 0;
   const placed: Partial<Record<StackKey, ElemBox>> = {};
   let y = stackTop;
   for (const bl of blocks) {
@@ -442,8 +451,9 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
   const stack = inStack.length ? { x: leftOf(stackW), y: stackTop, w: stackW, h: stackH } : null;
 
   const maxLines = tall ? 3 : 2;
-  // price / button / trust rows do not wrap: they must fit the column too
-  const fits = stackH <= span + 0.5 && stackW <= colW + 0.5 && over.headline <= 1 && over.subtext <= 1 &&
+  // price / button / trust rows do not wrap: their width counts like a line's (a dragged block: the canvas width)
+  const inRoom = linesIn && stackH <= span + 0.5 && blocks.every((bl) => bl.w <= (pos[bl.key] ? W : colW) + 0.5);
+  const fits = inRoom &&
     (headline?.lines.length ?? 0) <= maxLines &&
     (!shares || (stackH <= span * 0.6 && !!product && product.box.h >= H * 0.12));
 
@@ -457,7 +467,7 @@ function compose(f: BannerFields, W: number, H: number, measure: LayoutMeasure, 
     ...(badge ? { badge } : {}), ...(product ? { product } : {}), ...(logo ? { logo } : {}),
     stack, boxes,
   };
-  return { layout, fits, orphan, over };
+  return { layout, fits, inRoom, orphan };
 }
 
 // ── semantic controls ──
