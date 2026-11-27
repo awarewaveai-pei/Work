@@ -102,5 +102,30 @@ class OneChannel(unittest.IsolatedAsyncioTestCase):
             ("listening", False), ("status", None), ("segment", None)])
 
 
+    async def test_a_listening_started_long_after_the_last_caption_is_not_ended_at_once(self):
+        # critic 2026-11-27: the "quiet for 30 minutes" clock was the server's, not the listening's.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+
+        async def fake_gemini(session, usage, key, language, audio, who="them"):
+            while await audio.get() is not None:
+                pass
+
+        for p in (mock.patch.object(hub_mod.script_store, "load", lambda: {"script": "", "glossary": ""}),
+                  mock.patch.object(hub_mod.stt_gemini, "run", fake_gemini),
+                  mock.patch.object(hub_mod.settings, "key", lambda name: "k")):
+            p.start()
+            self.addCleanup(p.stop)
+        hub = hub_mod.Hub(Usage(os.path.join(tmp.name, "usage.json")))
+        hub.translator = type("T", (), {"set_keys": lambda *a: None, "__call__": None})()
+        owner = object()
+        hub.last_caption -= 3 * 3600                  # the server has been quiet for hours
+        await hub.start(owner, "gemini", "en-US", end_min=30)
+        for _ in range(3):
+            hub.feed(owner, b"\x00\x00" * 1600)
+            await asyncio.sleep(0.05)
+        self.assertTrue(hub.listening)
+        await hub.stop()
+
 if __name__ == "__main__":
     unittest.main()

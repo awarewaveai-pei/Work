@@ -46,6 +46,19 @@ U32_MAX = 0xFFFFFFFF
 SIDECAR_VERSION = 1
 
 
+def align_stereo(pos: list, ch: int, n: int) -> tuple:
+    """Two channels' recording positions (samples; `pos` updated in place) after `n` samples of channel `ch`:
+    (where they start, silence added to the other channel). A channel that sent nothing for GAP_FILL_AFTER
+    while the other did is moved up with silence, so the two stay aligned (computer sound shared and then
+    stopped, a stalled device)."""
+    at = pos[ch]
+    pos[ch] += n
+    other = 1 - ch
+    fill = pos[ch] - pos[other] if pos[ch] - pos[other] > GAP_FILL_AFTER * RATE else 0
+    pos[other] += fill
+    return at, fill
+
+
 class ArchiveError(Exception):
     """Saving could not start; the message is shown to the user."""
 
@@ -283,14 +296,9 @@ class Archive:
         """The two channels arrive separately: what both have is written as stereo frames, the rest waits.
         A channel that sent nothing for GAP_FILL_AFTER while the other did is filled with silence, so they
         stay aligned (computer sound shared and then stopped, a stalled device)."""
-        at = self.pos[ch]
-        self.pos[ch] += len(pcm) // 2
+        at, fill = align_stereo(self.pos, ch, len(pcm) // 2)
         self.pending[ch].extend(pcm)
-        other = 1 - ch
-        ahead = len(self.pending[ch]) - len(self.pending[other])
-        if ahead > GAP_FILL_AFTER * RATE * 2:
-            self.pending[other].extend(bytes(ahead))
-            self.pos[other] += ahead // 2
+        self.pending[1 - ch].extend(bytes(fill * 2))
         self._write_frames(min(len(p) for p in self.pending) // 2)
         return at
 

@@ -156,6 +156,9 @@ def check(path: str, recording: bool) -> dict:
 
 def refuse_cloud(path: str) -> None:
     """錄音不出這台電腦（lib/archive.py 的原則）：錄音資料夾在雲端同步資料夾底下就拒絕。"""
+    if os.name == "nt" and not _DRIVE.match(path):
+        # \\nas\share, \\?\C:\..., \\localhost\c$: the cloud check cannot see where these go.
+        raise PathError("錄音資料夾要是這台電腦的磁碟路徑（例如 D:\\會議錄音），不能是網路路徑：錄音不離開這台電腦。")
     name = cloud(path)
     if name:
         raise PathError(f"錄音資料夾不能放在 {name} 同步的資料夾裡：錄音（含聲紋）不離開這台電腦。"

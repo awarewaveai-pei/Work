@@ -31,7 +31,7 @@ from urllib.parse import urlsplit
 from lib import gpu_gate, ownvoice, settings
 
 from . import echo, gloss, idle, langs, script_store, stt_gemini, stt_local
-from .archive import RATE, Archive, ArchiveError
+from .archive import RATE, Archive, ArchiveError, align_stereo
 from .prompts import parse_glossary, summary_system, system_blocks
 from .session import Session
 from .summary import DEFAULT_EVERY_MIN, Summary
@@ -309,6 +309,8 @@ class Hub:
         self.emit({"type": "segment", **self._segment()})
         self.owner, self.stt, self.proto = owner, stt, 1 if stt_me is None else 2
         recognizer = stt_local.Recognizer(session, self.usage) if local else None
+        self.last_caption = time.monotonic()      # "quiet for end_min" counts from this listening's start
+        self.positions = [0] * len(kinds)          # recording positions when nothing is saved
         self.channels = {}
         for i, (who, kind) in enumerate(kinds.items()):
             # The user's own channel is recognised in whatever language they speak (lib/live/session.py).
@@ -428,11 +430,16 @@ class Hub:
             return
         pcm = frame[1]
         # Saving: the recording says where the chunk lands (silence it filled in for a break counts).
-        at = self.archive.feed(pcm, ch.index) if self.archive is not None else ch.samples
-        ch.samples = at + len(pcm) // 2
+        if self.archive is not None:
+            at = self.archive.feed(pcm, ch.index)
+        elif len(self.positions) == 2:
+            at, _ = align_stereo(self.positions, ch.index, len(pcm) // 2)
+        else:
+            at, self.positions[0] = self.positions[0], self.positions[0] + len(pcm) // 2
         if self.proto == 2:
             ch.ring.add(at, pcm)
-        self._put(ch.audio, (at, pcm))
+        if not ch.closed:
+            self._put(ch.audio, (at, pcm))   # a channel whose recogniser gave up takes no more (not "lost" audio)
 
     async def stop(self) -> None:
         if not self.listening:
@@ -529,7 +536,7 @@ class Channel:
     def __init__(self, hub: "Hub", who: str, index: int, run, pause_min: float):
         self.hub, self.who, self.index, self.run, self.pause_min = hub, who, index, run, pause_min
         self.audio = asyncio.Queue(maxsize=AUDIO_QUEUE)
-        self.samples = 0                 # recording position when nothing is being saved
+        self.closed = False              # its recogniser ended (stopped, or gave up on its own)
         self.ring = echo.Ring()          # recent audio, for the echo guard (two channels only)
         self.last_caption = time.monotonic()
 
@@ -582,5 +589,6 @@ class Channel:
                     session.status("有聲音，重新連線中…")
                     begin(payload)
         finally:
+            self.closed = True
             if task is not None and not task.done():
                 task.cancel()

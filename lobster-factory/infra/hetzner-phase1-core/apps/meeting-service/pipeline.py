@@ -404,7 +404,13 @@ def _sync_destinations(job_dir: str, log) -> list:
     if isinstance(dests, list):
         return [d for d in dests if isinstance(d, dict) and d.get("dir")]
     if status.get("sync_drive") is True:
-        return [{"name": d["name"], "dir": d["dir"]} for d in settings.legacy_destinations()]
+        legacy = [{"name": d["name"], "dir": d["dir"]} for d in settings.legacy_destinations()]
+        if not legacy:
+            msg = "這個工作開始時勾了同步，但找不到當時的雲端資料夾（環境變數 MEETING_DRIVE_BASE）：到「設定」加一個輸出目的地，再重做一次"
+            log(f"[warn] {msg}")
+            write_status(job_dir, sync_results=[{"name": "Google Drive", "ok": False, "dest": None, "files": [],
+                                                  "failed": [], "error": msg}])
+        return legacy
     return []
 
 
