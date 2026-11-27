@@ -139,6 +139,25 @@ type StackKey = (typeof STACK_KEYS)[number];
 const bgHasProduct = (f: BannerFields) => f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage;
 export const productDrawn = (f: BannerFields) => !!f.productImage && !bgHasProduct(f);
 
+/** The product the layout reserves room for -- the one place that decides it (Codex hit this class three times).
+ *  Invariant: reserved iff the product is drawn or baked into the background (bgImageHasProduct), never by productImage
+ *  alone. Its box, in order: the baked area mapped onto the canvas (`area`; null = dragged out of view) -> a box of the
+ *  product picture's proportions at productPos (`shape`) -> a box of the composition's productFrame at productPos. */
+export function reservedProduct(f: BannerFields, measure: LayoutMeasure, size: LayoutSize):
+  { area: ElemBox | null } | { shape: { w: number; h: number } } | null {
+  const baked = bgHasProduct(f);
+  if (!baked && !productDrawn(f)) return null;
+  const pic = baked && f.bgProductArea ? picture(measure, f.bgImage!) : null;
+  if (pic) return { area: areaOnCanvas(f.bgProductArea!, pic, f, size.w, size.h) };
+  const own = f.productImage ? picture(measure, f.productImage) : null;
+  if (own) return { shape: own };
+  return baked ? { shape: COMPOSITION[size.group].productFrame } : null;
+}
+/** The text sits beside the product (left / right; bottom-right off the phone group): only then does widening the text
+ *  share help long words -- under the text it would only shrink the product. */
+const besideText = (f: BannerFields, size: LayoutSize) => !f.positions?.product &&
+  (f.productPos === "left" || f.productPos === "right" || (f.productPos === "bottom-right" && size.group !== "phone"));
+
 /** R3-E: a baked-in product's box on the canvas -- `area` (shares of the background picture, natural size `pic`) through
  *  the background's cover fit and its bgImgScale / X / Y, as renderBannerLayers draws it; clipped to the canvas (null =
  *  dragged out of view). */
@@ -204,9 +223,11 @@ export function layoutBanner(f: BannerFields, size: LayoutSize, measure: LayoutM
   // TEXT_SHARE_MAX); still too long -> settle shrinks them below it (inside the canvas) and belowMin tells the page.
   const range = titleRange(W, size.displayW);
   const subFor = (hs: number) => Math.round(hs / SUB_RATIO);
-  const shares: number[] = [];
-  for (let sh = baseShare; sh < TEXT_SHARE_MAX - 1e-9; sh += 0.05) shares.push(sh);
-  shares.push(Math.max(baseShare, TEXT_SHARE_MAX));
+  const shares: number[] = [baseShare];
+  if (besideText(f, size)) {
+    for (let sh = baseShare + 0.05; sh < TEXT_SHARE_MAX - 1e-9; sh += 0.05) shares.push(sh);
+    shares.push(Math.max(baseShare, TEXT_SHARE_MAX));
+  }
   const share = shares.find((sh) => compose(f, size, measure, range.min, subFor(range.min), true, sh).fits);
   if (share === undefined) {
     const L = settle(range.min, subFor(range.min), true, shares[shares.length - 1]);
@@ -306,13 +327,11 @@ function compose(f: BannerFields, size: LayoutSize, measure: LayoutMeasure, hs: 
   };
 
   // product: its size and, beside the text, its place; centred, it shares the column with the stack (placed below).
-  // Reserved whether drawn or baked into the background. Baked with its area known (R3-E): the box is where the product
-  // is in the picture as drawn now (`baked`, null = out of view) -- not productPos; older pictures fall back to productPos.
+  // What is reserved and its box come from reservedProduct only (`baked` = a known baked area, null = out of view).
   const drawn = productDrawn(f);
-  // the background decides it, not productImage: a product removed after baking is still in the picture
-  const bgNat = bgHasProduct(f) && f.bgProductArea ? picture(measure, f.bgImage!) : null;
-  const baked = bgNat ? areaOnCanvas(f.bgProductArea!, bgNat, f, W, H) : undefined;
-  const nat = f.productImage && baked === undefined ? picture(measure, f.productImage) : null;
+  const reserve = reservedProduct(f, measure, size);
+  const baked = reserve && "area" in reserve ? reserve.area : undefined;
+  const nat = reserve && "shape" in reserve ? reserve.shape : null;
   const g = f.grounding?.reflection;
   const refl = g?.enabled && (g.fade ?? 0.3) > 0 ? Math.max(0, Math.min(1, g.height ?? 0.35)) : 0;
   const reflGap = refl ? Math.max(0, g?.gap ?? 0) : 0;

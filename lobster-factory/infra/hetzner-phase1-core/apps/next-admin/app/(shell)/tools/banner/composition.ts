@@ -12,6 +12,8 @@ export interface Composition {
   textShare: number;
   /** Where the product's centre aims (shares of the canvas): phone = the lower third line's right crossing. */
   productAt: { x: number; y: number } | null;
+  /** The proportions reserved for a product baked into the background when neither its area nor its picture is known. */
+  productFrame: { w: number; h: number };
   /** Bands no automatic element may enter (shares of the height), by ratio: 9:16 = Meta Reels' top 14% / bottom 35%. */
   safe: Partial<Record<string, { top: number; bottom: number }>>;
 }
@@ -20,12 +22,12 @@ export const COMPOSITION: Record<CompGroup, Composition> = {
   // 9:16, 2:3, 3:4, 4:5, 1:1 -- words in the top third, the product under them on the lower-right thirds crossing
   phone: {
     label: "手機直式", layout: { textPos: "top", textAlignH: "center", productPos: "bottom-right" }, textShare: 0.55,
-    productAt: { x: 2 / 3, y: 2 / 3 }, safe: { "9:16": { top: 0.14, bottom: 0.35 } },
+    productAt: { x: 2 / 3, y: 2 / 3 }, productFrame: { w: 4, h: 5 }, safe: { "9:16": { top: 0.14, bottom: 0.35 } },
   },
   // 4:3, 16:9 社群, 1.91:1, 2:1 -- words left (~55%), product right
-  card: { label: "卡片橫式", layout: { textPos: "center", textAlignH: "left", productPos: "right" }, textShare: 0.55, productAt: null, safe: {} },
+  card: { label: "卡片橫式", layout: { textPos: "center", textAlignH: "left", productPos: "right" }, textShare: 0.55, productAt: null, productFrame: { w: 4, h: 5 }, safe: {} },
   // 16:9 Hero, 3:1, 3:2 -- words left, product right; small type comes from displayW (field-ranges titleRange)
-  web: { label: "網頁", layout: { textPos: "center", textAlignH: "left", productPos: "right" }, textShare: 0.55, productAt: null, safe: {} },
+  web: { label: "網頁", layout: { textPos: "center", textAlignH: "left", productPos: "right" }, textShare: 0.55, productAt: null, productFrame: { w: 4, h: 5 }, safe: {} },
 };
 
 /** Long words: the text beside a product may widen to this share before the title goes under its range's floor. */

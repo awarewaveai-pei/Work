@@ -9,6 +9,7 @@ import { COMPOSITION, TEXT_SHARE_MAX, type LayoutSize } from "./composition";
 import { SUB_RATIO, titleRange } from "./field-ranges";
 import { shapeLayout } from "./banner-design";
 import { sizeFileName } from "./steps/export-files";
+import { applyBannerCanvasReturn } from "./banner-canvas-return";
 
 // Every size of the tool: a new preset is covered by the overlap matrix automatically.
 const SIZES: Record<string, LayoutSize> = PRESETS;
@@ -281,6 +282,45 @@ describe("R4-A: title range, composition groups, 9:16 safe bands", () => {
     const baked = layoutBanner({ ...f, bgMode: "ai", bgImage: "scene", bgImageHasProduct: true, bgProductArea: null }, size, measure);
     expect(baked.product!.box).toEqual(layoutBanner(f, size, measure).product!.box);
     expect(baked.product!.drawn).toBe(false);
+  });
+  // Codex on R4-A (F1, third time this class): the reservation is decided in one place (reservedProduct) -- by whether the
+  // background holds the product, sized from its area, else the product picture, else the group's frame
+  it("reservation: baked x area known / canvas-edited (null) x product picture kept / removed, and not baked", () => {
+    const pics: Record<string, { w: number; h: number }> = { scene45: { w: 864, h: 1080 } };
+    const m2: LayoutMeasure = { text: measure.text, image: (src) => pics[src] ?? measure.image(src) };
+    const size = SIZES.r4x5, area = { x0: 0.55, y0: 0.35, x1: 0.92, y1: 0.85 };
+    const f: BannerFields = { ...t1, productPos: "right", bgMode: "ai", bgImage: "scene45", bgImageHasProduct: true, bgProductArea: area };
+    const textClear = (L: ReturnType<typeof layoutBanner>) => (["headline", "subtext"] as const).every((k) => !overlap(L.boxes[k]!, L.product!.box));
+    const edited = { ...f, ...applyBannerCanvasReturn({ ...f, productOrig: "product", saved: true }, "bg", "scene45")! } as BannerFields;
+    expect(edited.bgProductArea).toBeNull();
+    const drawnBox = layoutBanner({ ...f, bgMode: "color", bgImage: null, bgImageHasProduct: false }, size, m2).product!.box;
+    for (const productImage of ["product", null]) {
+      // area known: the area, whatever productImage is
+      const known = layoutBanner({ ...f, productImage }, size, m2);
+      expect(known.product).toMatchObject({ box: areaOnCanvas(area, pics.scene45, f, size.w, size.h), drawn: false });
+      expect(textClear(known)).toBe(true);
+      // canvas-edited (area unknown): still reserved at productPos -- the picture's proportions, else the group frame
+      const L = layoutBanner({ ...edited, productImage }, size, m2), p = L.product!;
+      expect(p.drawn).toBe(false);
+      if (productImage) expect(p.box).toEqual(drawnBox);
+      else expect(p.box.w / p.box.h).toBeCloseTo(COMPOSITION.phone.productFrame.w / COMPOSITION.phone.productFrame.h, 5);
+      expect(p.box.x + p.box.w).toBeGreaterThan(size.w / 2);   // productPos right
+      expect(textClear(L)).toBe(true);
+    }
+    // not baked: drawn with a picture, nothing without one
+    expect(layoutBanner({ ...f, bgImageHasProduct: false }, size, m2).product).toMatchObject({ box: drawnBox, drawn: true });
+    expect(layoutBanner({ ...f, bgImageHasProduct: false, productImage: null }, size, m2).product).toBeUndefined();
+  });
+  // Codex on R4-A (F2): widening the text share is for a product beside the words; under them (phone) it only shrank it
+  it("9:16 phone layout, a long title: the share stays 55% and the product keeps its width", () => {
+    // productScale 0.3: the product's width is set by its column (pScale x (1 - share)), not by the height left
+    const size = SIZES.r9x16, f = { ...t1, ...COMPOSITION.phone.layout, productScale: 0.3 };
+    const long = "用香氣與色彩，療癒疲憊的心，找回平靜的自己，每一天都更好一點點";
+    const a = layoutBanner(f, size, measure), b = layoutBanner({ ...f, headline: long }, size, measure);
+    expect(b.headline!.lines.length).toBeGreaterThan(3);   // does not fit at the floor: the case that used to widen
+    expect(b.textShare).toBe(COMPOSITION.phone.textShare);
+    expect(b.product!.box.w).toBeCloseTo(a.product!.box.w, 5);
+    expect(b.product!.box.w).toBeCloseTo(size.w * 0.3 * (1 - COMPOSITION.phone.textShare), 5);
   });
   it("phone default: words on top, the product under them centred on the lower-right thirds crossing where it fits", () => {
     const size = SIZES.r4x5, L = layoutBanner({ ...t1, ...COMPOSITION.phone.layout }, size, measure), p = L.product!.box;
