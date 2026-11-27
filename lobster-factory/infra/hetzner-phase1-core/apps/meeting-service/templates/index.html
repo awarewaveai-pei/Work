@@ -111,12 +111,9 @@
     </div>
     <div class="opts">
       <label><input type="checkbox" id="diarizeOpt" checked> 講者分離（需 Hugging Face 金鑰，較慢）</label>
-      <label>模型
-        <select id="modelOpt">
-          <option value="large-v3" selected>large-v3（準）</option>
-          <option value="medium">medium（快）</option>
-        </select>
-      </label>
+      <span style="color:var(--muted)">模型</span>
+      <label><input type="radio" name="modelOpt" value="large-v3" checked> large-v3（準）</label>
+      <label><input type="radio" name="modelOpt" value="medium"> medium（快）</label>
     </div>
     <div class="opts" style="margin-top:10px">
       <span style="color:var(--muted)">會議語言</span>
@@ -218,7 +215,7 @@ startBtn.addEventListener("click", async () => {
   if (!file) return;
   startBtn.disabled = true;
   const diarize = document.getElementById("diarizeOpt").checked;
-  const model = document.getElementById("modelOpt").value;
+  const model = document.querySelector("input[name=modelOpt]:checked").value;
   const syncDrive = document.getElementById("syncDriveOpt").checked;
   const useApi = document.getElementById("useApiOpt").checked;
   const language = document.querySelector("input[name=langOpt]:checked").value;
@@ -271,6 +268,8 @@ document.getElementById("ownvoiceList").addEventListener("click", async (e) => {
   const resp = await fetch("/api/ownvoice/import", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session, diarize: document.getElementById("diarizeOpt").checked,
+                           model: document.querySelector("input[name=modelOpt]:checked").value,
+                           sync_drive: document.getElementById("syncDriveOpt").checked,
                            use_api: document.getElementById("useApiOpt").checked }),
   });
   const body = await resp.json().catch(() => ({}));
@@ -427,9 +426,11 @@ function showResult(jobId, status) {
   let html = "";
   if (status.transcribe_stats) {
     const s = status.transcribe_stats;
-    html += `<p class="hint">轉錄 ${s.realtime_factor}x realtime（${s.backend}）`;
+    // 聆聽場次沿用聆聽逐字稿時沒有轉錄速度；講者是聆聽時標的就沒有重疊語音（只有 pyannote 算得出）。
+    html += s.realtime_factor == null ? `<p class="hint">逐字稿：${s.backend}` : `<p class="hint">轉錄 ${s.realtime_factor}x realtime（${s.backend}）`;
     if (status.diarize_stats) {
-      html += ` · 講者 ${status.diarize_stats.speakers.join("/")} · 重疊語音 ${status.diarize_stats.overlap_sec.toFixed(0)}s`;
+      const ov = status.diarize_stats.overlap_sec;
+      html += ` · 講者 ${status.diarize_stats.speakers.join("/")}` + (ov == null ? "" : ` · 重疊語音 ${ov.toFixed(0)}s`);
     }
     if (status.diarize_error) {
       html += ` · <span style="color:var(--red)">講者分離失敗，已略過（${status.diarize_error}）</span>`;

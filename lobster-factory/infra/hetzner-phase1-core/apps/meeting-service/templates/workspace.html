@@ -162,6 +162,7 @@
   <button class="tbtn" type="button" data-panel="lookup" aria-pressed="true">查詢</button>
   <button class="tbtn" type="button" data-panel="summary" aria-pressed="true">摘要</button>
   <button class="tbtn" type="button" data-panel="settings" aria-pressed="true">設定</button>
+  <button class="tbtn" type="button" data-panel="post" aria-pressed="true">會後整理</button>
   <span class="sep"></span>
   <button class="tbtn" type="button" id="resetLayout">恢復預設版面</button>
   <span class="spacer"></span>
@@ -1095,11 +1096,297 @@ Sorry, could you repeat the question?
 })();
 </script>
 
+<style>
+  .po { height: 100%; overflow: auto; padding: 12px 14px; font-size: 13px; color: var(--ink); }
+  .po h3 { font-size: 13px; margin: 16px 0 6px; color: var(--muted); }
+  .po h3:first-child { margin-top: 0; }
+  .po-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .po-row .tbtn { padding: 4px 10px; font-size: 12px; }
+  .po-label { color: var(--muted); min-width: 64px; }
+  .po-item { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; background: var(--card); }
+  .po-item.focus { border-color: var(--accent); }
+  .po-item .po-name { font-weight: 600; }
+  .po-note { color: var(--muted); font-size: 12px; margin: 4px 0; }
+  .po-warn { color: var(--red); font-size: 12px; margin: 4px 0; }
+  .po-links a { color: var(--accent); font-size: 12px; margin-right: 10px; text-decoration: none; }
+  .po-stages { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+  .po-stage { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+  .po-stage.done { color: var(--green); border-color: var(--green); }
+  .po-stage.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+  .po-log { max-height: 160px; overflow: auto; background: var(--bg); border-radius: 8px; padding: 8px; font-size: 11px; white-space: pre-wrap; margin: 6px 0; }
+  .po textarea { width: 100%; min-height: 90px; font: inherit; font-size: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 6px; }
+  .po-msg { color: var(--red); font-size: 12px; min-height: 1em; }
+  .po-notice { flex: none; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .po-notice[hidden] { display: none; }
+  .po-notice .tbtn { padding: 4px 10px; font-size: 12px; }
+</style>
+<template id="tpl-post">
+  <div class="po">
+    <div class="po-msg" aria-live="polite"></div>
+    <h3>選項（三種來源共用）</h3>
+    <div class="po-opts"></div>
+    <h3>聆聽與 OwnVoice 的場次</h3>
+    <div class="po-sessions"><p class="placeholder">讀取中…</p></div>
+    <h3>上傳音檔或影片</h3>
+    <div class="po-row">
+      <input type="file" class="po-file" accept=".mp4,.m4a,.mp3,.wav,.mov,.mkv,.webm,.aac,.flac">
+      <button type="button" class="tbtn" data-act="upload">開始處理</button>
+    </div>
+    <h3>目前這個工作</h3>
+    <div class="po-job"><p class="placeholder">從上面開始一個，或在下面的工作清單按「打開」。</p></div>
+    <h3>工作清單</h3>
+    <div class="po-jobs"></div>
+  </div>
+</template>
+<script>
+// 會後整理面板：場次、上傳、工作清單、進度與貼上會議記錄。流程只有 pipeline.run_pipeline_phase1 一條，
+// 這裡只選來源與選項（/api/upload、/api/ownvoice/import），看 /api/status 的 stage 與 steps。
+(function () {
+  const STAGES = [["preflight", "準備"], ["transcribe", "逐字稿"], ["merge", "合併"], ["hallucination_check", "幻覺偵測"],
+    ["diarize", "分講者"], ["preparing_prompt", "會議記錄提示"], ["summarize_via_api", "AI 寫會議記錄"],
+    ["awaiting_summary", "等你貼上會議記錄"], ["build_deck", "PPT"], ["build_notes", "講稿"], ["build_excel", "Excel"],
+    ["build_word", "Word"], ["sync_drive", "同步"], ["done", "完成"]];
+  const STEP_OF = { transcribe: "transcribe", diarize: "diarize" };
+  const DOWNLOAD_LABELS = { word: "會議記錄", slides: "PPT", excel: "Excel", coach: "報告教練", diarized_txt: "分角色逐字稿",
+    merged_txt: "逐字稿", transcript_srt: "字幕 srt", transcript_vtt: "字幕 vtt", transcript_json: "逐字稿 json" };
+  const opts = { diarize: true, model: "large-v3", language: null, sync_drive: false, use_api: false };
+  let options = null, sessions = [], jobs = [], current = null, focus = null, timer = null, root = null;
+
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    Object.entries(attrs || {}).forEach(([k, v]) => {
+      if (k === "on") Object.entries(v).forEach(([ev, fn]) => el.addEventListener(ev, fn));
+      else if (k === "class") el.className = v;
+      else if (v !== false && v != null) el.setAttribute(k, v === true ? "" : v);
+    });
+    return fill(el, ...kids);
+  }
+  // replaceChildren 會把 null 寫成文字「null」：選擇性的子元素一律經過這裡。
+  function fill(el, ...kids) {
+    el.replaceChildren(...kids.flat().filter(c => c != null));
+    return el;
+  }
+  function btn(text, on, pressed, disabled) {
+    return h("button", { type: "button", class: "tbtn", "aria-pressed": pressed == null ? false : String(pressed), disabled: !!disabled, on: { click: on } }, text);
+  }
+  function say(text) { if (root) root.querySelector(".po-msg").textContent = text || ""; }
+  async function call(url, init) {
+    const resp = await fetch(url, init);
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(body.detail || ("HTTP " + resp.status));
+    return body;
+  }
+  function when(t) { const d = new Date(t * 1000); return (d.getMonth() + 1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+  function stageLabel(stage) { const s = STAGES.find(([k]) => k === stage); return s ? s[1] : stage; }
+  function links(job) {
+    return h("div", { class: "po-links" }, job.downloads.map(k => h("a", { href: "/api/download/" + job.id + "/" + k, target: "_blank" }, DOWNLOAD_LABELS[k] || k)),
+      job.downloads.includes("merged_txt") ? h("a", { href: "/mindmap?job=" + job.id, target: "_blank" }, "心智圖") : null);
+  }
+
+  // ---------- 選項 ----------
+  function paintOptions() {
+    const box = root && root.querySelector(".po-opts");
+    if (!box || !options) return;
+    const toggle = (name, text) => btn(text, () => { opts[name] = !opts[name]; paintOptions(); paintSessions(); }, opts[name]);
+    fill(box,
+      h("div", { class: "po-row" }, h("span", { class: "po-label" }, "講者"), toggle("diarize", "分講者（要 Hugging Face 金鑰）")),
+      h("div", { class: "po-row" }, h("span", { class: "po-label" }, "模型"),
+        options.models.map(m => btn(m === "large-v3" ? "large-v3（準）" : m === "medium" ? "medium（快）" : m,
+          () => { opts.model = m; paintOptions(); paintSessions(); }, opts.model === m))),
+      h("div", { class: "po-row" }, h("span", { class: "po-label" }, "會議語言"),
+        options.languages.map(l => btn(l.label, () => { opts.language = l.code; paintOptions(); }, opts.language === l.code))),
+      h("div", { class: "po-row" }, h("span", { class: "po-label" }, "同步"), toggle("sync_drive", "完成後同步到雲端硬碟")),
+      opts.sync_drive ? h("p", { class: "po-warn" }, "會把 PPT／會議記錄／逐字稿複製到雲端，敏感會議不要開。") : null,
+      options.has_api_key ? h("div", { class: "po-row" }, h("span", { class: "po-label" }, "會議記錄"), toggle("use_api", "自動處理（用 API，會計費）")) : null);
+  }
+  function body(extra) {
+    return JSON.stringify(Object.assign({ diarize: opts.diarize, model: opts.model, language: opts.language, sync_drive: opts.sync_drive, use_api: opts.use_api }, extra));
+  }
+
+  // ---------- 場次 ----------
+  function paintSessions() {
+    const box = root && root.querySelector(".po-sessions");
+    if (!box) return;
+    if (!sessions.length) { box.replaceChildren(h("p", { class: "placeholder" }, "還沒有存下來的場次（聆聽時開「存檔」就會出現在這裡）。")); return; }
+    box.replaceChildren(...sessions.map(s => {
+      const rec = s.recommend, last = s.jobs[0];
+      const actions = [];
+      if (s.live) {
+        actions.push(btn("用聆聽的逐字稿（快）" + (rec.reuse ? "　建議" : ""), () => start(s.id, true), rec.reuse));
+        actions.push(btn("重新辨識（慢，" + opts.model + "）" + (rec.reuse ? "" : "　建議"), () => start(s.id, false), !rec.reuse, !s.wavs));
+      } else {
+        actions.push(btn("會後整理（從錄音辨識）", () => start(s.id, false), false, !s.wavs));
+      }
+      return h("div", { class: "po-item" + (focus === s.id ? " focus" : ""), "data-session": s.id },
+        h("div", { class: "po-row" }, h("span", { class: "po-name" }, s.id),
+          h("span", { class: "po-note" }, (s.live ? "有聆聽逐字稿" : "只有錄音") + (s.wavs ? "" : "、沒有錄音") + (s.jobs.length ? "・已整理 " + s.jobs.length + " 次" : ""))),
+        rec.reason ? h("p", { class: rec.reuse ? "po-note" : "po-warn" }, rec.reason) : null,
+        !s.live && !s.wavs ? h("p", { class: "po-note" }, "沒有錄音也沒有聆聽逐字稿，不能整理。") : null,
+        h("div", { class: "po-row" }, actions, last ? btn("看最近一次", () => open(last.id)) : null),
+        last && last.downloads.length ? links(last) : null);
+    }));
+    const f = focus && box.querySelector('[data-session="' + CSS.escape(focus) + '"]');
+    if (f) f.scrollIntoView({ block: "nearest" });
+  }
+  async function start(session, reuse) {
+    say("");
+    try {
+      const r = await call("/api/ownvoice/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: body({ session, reuse }) });
+      open(r.job_id);
+      refresh();
+    } catch (e) { say("沒有開始：" + e.message); }
+  }
+  async function upload() {
+    const input = root.querySelector(".po-file");
+    if (!input.files.length) { say("先選一個音檔或影片"); return; }
+    const fd = new FormData();
+    fd.append("file", input.files[0]);
+    const q = new URLSearchParams({ diarize: opts.diarize, model: opts.model, language: opts.language, sync_drive: opts.sync_drive, use_api: opts.use_api });
+    say("上傳中…");
+    try {
+      const r = await call("/api/upload?" + q, { method: "POST", body: fd });
+      say(""); input.value = "";
+      open(r.job_id);
+      refresh();
+    } catch (e) { say("上傳失敗：" + e.message); }
+  }
+
+  // ---------- 工作 ----------
+  function sourceLabel(job) {
+    const s = job.source || {};
+    if (s.kind === "upload") return "上傳：" + s.name;
+    if (s.kind === "session") return "場次 " + s.session + (s.reuse ? "（聆聽逐字稿）" : "（重新辨識）");
+    return job.kind === "video_transcription" ? "影片字幕" : "工作 " + job.id;
+  }
+  function paintJobs() {
+    const box = root && root.querySelector(".po-jobs");
+    if (!box) return;
+    if (!jobs.length) { box.replaceChildren(h("p", { class: "placeholder" }, "還沒有工作。")); return; }
+    box.replaceChildren(...jobs.map(j => h("div", { class: "po-item" + (current === j.id ? " focus" : "") },
+      h("div", { class: "po-row" }, h("span", { class: "po-name" }, sourceLabel(j)),
+        h("span", { class: "po-note" }, when(j.started_at) + "・" + (j.error ? "失敗" : stageLabel(j.stage))),
+        btn("打開", () => open(j.id))),
+      j.downloads.length ? links(j) : null)));
+  }
+  function open(id) { current = id; clearTimeout(timer); paintJobs(); poll(); }
+  async function poll() {
+    const id = current;
+    if (!id) return;
+    let status, log;
+    try {
+      [status, log] = await Promise.all([call("/api/status/" + id), call("/api/log/" + id + "?lines=30")]);
+    } catch (e) { say("讀不到工作狀態：" + e.message); return; }
+    const finished = status.done || status.error || status.stage === "awaiting_summary";
+    if (finished) await refresh();
+    if (id !== current) return;
+    paintJob(id, status, log.lines);
+    if (!finished) timer = setTimeout(poll, 1500);
+  }
+  async function paintJob(id, status, lines) {
+    const box = root && root.querySelector(".po-job");
+    if (!box) return;
+    const at = STAGES.findIndex(([k]) => k === status.stage), steps = status.steps || {};
+    const chips = STAGES.filter(([k]) => k !== "summarize_via_api" || status.stage === k).map(([k, label], i) => {
+      const step = steps[STEP_OF[k]];
+      const done = status.done || STAGES.findIndex(([kk]) => kk === k) < at;
+      return h("span", { class: "po-stage" + (k === status.stage && !status.done ? " active" : done ? " done" : "") }, label + (step && step !== "done" ? "（" + step + "）" : ""));
+    });
+    const parts = [h("div", { class: "po-stages" }, chips)];
+    if (status.error) parts.push(h("p", { class: "po-warn" }, status.error));
+    if (status.diarize_error) parts.push(h("p", { class: "po-warn" }, "分講者失敗，已改用沒分講者的逐字稿：" + status.diarize_error));
+    if (status.api_error) parts.push(h("p", { class: "po-warn" }, "API 自動處理失敗，改成手動貼上（逐字稿與講者的結果都還在）：" + status.api_error));
+    if (status.stage === "awaiting_summary" && !status.done) parts.push(await pasteLoop(id));
+    const job = jobs.find(j => j.id === id);
+    if (status.done && job) parts.push(links(job));
+    parts.push(h("div", { class: "po-log" }, lines.join("\n")));
+    if (id === current) box.replaceChildren(...parts);
+  }
+  async function pasteLoop(id) {
+    let prompt = "";
+    try { prompt = await (await fetch("/api/prompt/" + id)).text(); } catch (e) { prompt = ""; }
+    const promptBox = h("textarea", { readonly: true }, prompt);
+    const paste = h("textarea", { placeholder: "把 AI 回傳的 JSON 貼在這裡" });
+    const err = h("p", { class: "po-warn" });
+    const send = btn("送出，產生 PPT 與會議記錄", async () => {
+      if (!paste.value.trim()) { err.textContent = "還沒貼東西"; return; }
+      send.disabled = true; err.textContent = "處理中…";
+      try {
+        await call("/api/submit-summary/" + id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: paste.value }) });
+        await refresh(); open(id);
+      } catch (e) { err.textContent = e.message; send.disabled = false; }
+    });
+    return h("div", null,
+      h("p", { class: "po-note" }, "1. 複製下面的提示，貼進任一 AI 對話（用你自己的訂閱，不計 API 費）。"),
+      promptBox, h("div", { class: "po-row" }, btn("複製提示", () => navigator.clipboard.writeText(promptBox.value).then(() => say("已複製")))),
+      h("p", { class: "po-note" }, "2. 把 AI 回傳的 JSON 貼回來。"), paste, h("div", { class: "po-row" }, send), err);
+  }
+
+  async function refresh() {
+    try {
+      const [s, j] = await Promise.all([call("/api/ownvoice/sessions"), call("/api/jobs")]);
+      sessions = s.sessions; jobs = j.jobs.filter(x => x.kind !== "video_transcription");
+    } catch (e) { say("讀不到場次或工作：" + e.message); }
+    paintSessions(); paintJobs();
+  }
+
+  window.Workspace.onPanel("post", async el => {
+    root = el;
+    root.querySelector('[data-act="upload"]').addEventListener("click", upload);
+    if (!options) {
+      try {
+        options = await call("/api/postmeeting/options");
+        if (opts.language === null) opts.language = options.language;
+      } catch (e) { say("讀不到選項：" + e.message); }
+    }
+    paintOptions();
+    await refresh();
+    if (current) open(current);
+  });
+  // 字幕面板帶過來的場次（聆聽停止後的「整理這一場」）。
+  window.Workspace.openPost = function (session) {
+    focus = session;
+    window.Workspace.show("post");
+    if (root) refresh();
+  };
+
+  // ---------- 字幕面板：聆聽停止後的一行說明（只在這頁看過一次聆聽從開到停才出現） ----------
+  // 存檔的 segment 事件比 listening 早到（lib/live/hub.py start）：先記在 pending，聆聽開始時才算這一場的。
+  const run = { seen: false, listening: false, saved: "", closed: false };
+  let pending = "";
+  function paintOne(n) {
+    n.hidden = !run.seen || run.listening;
+    if (n.hidden) return;
+    fill(n, run.saved
+      ? h("span", null, "這場存在「" + run.saved + "」。")
+      : h("span", null, "這場沒有存檔，沒有東西可以整理（要整理，聆聽前在「設定」開「存檔」）。"),
+      run.saved ? btn(run.closed ? "整理這一場" : "存檔收尾中…", () => window.Workspace.openPost(run.saved), null, !run.closed) : null);
+  }
+  // 面板關掉再開會換一個新的說明列：每次都找頁面上現有的。
+  function paintNotice() { document.querySelectorAll(".po-notice").forEach(paintOne); }
+  window.Workspace.live.on("listening", ev => {
+    if (ev.on && !run.listening) { Object.assign(run, { seen: true, saved: pending, closed: false }); pending = ""; }
+    run.listening = ev.on;
+    paintNotice();
+  });
+  window.Workspace.live.on("segment", ev => {
+    const name = ev.dir.split(/[\\/]/).pop();
+    if (ev.index > 0) { if (run.listening) run.saved = name; else pending = name; }
+    else if (!run.listening) { run.closed = true; pending = ""; }
+    paintNotice();
+  });
+  window.Workspace.onPanel("captions", el => {
+    const n = h("div", { class: "po-notice", hidden: true });
+    (el.querySelector(".cap-bar") || el.firstElementChild).after(n);
+    paintOne(n);     // dockview 在面板放進頁面之前就呼叫這裡
+  });
+})();
+</script>
+
 <script src="/static/vendor/dockview-core-8.9.1.min.js"></script>
 <script>
 (function () {
   const dv = window["dockview-core"];
-  const PANELS = { captions: "字幕", reply: "回覆", script: "講稿", lookup: "查詢", summary: "摘要", settings: "設定" };
+  const PANELS = { captions: "字幕", reply: "回覆", script: "講稿", lookup: "查詢", summary: "摘要", settings: "設定", post: "會後整理" };
   // 重新打開被關掉的面板時，優先併在這些面板旁邊；都不在就加進目前的群組。
   const REOPEN_NEXT_TO = {
     captions: [["reply", "above"], ["lookup", "left"]],
@@ -1108,6 +1395,7 @@ Sorry, could you repeat the question?
     lookup: [["script", "above"], ["captions", "right"]],
     summary: [["lookup", "within"], ["captions", "right"]],
     settings: [["lookup", "within"], ["captions", "right"]],
+    post: [["lookup", "within"], ["captions", "right"]],
   };
   const el = document.getElementById("dock");
 
@@ -1141,6 +1429,7 @@ Sorry, could you repeat the question?
     addPanel("script", { referencePanel: "lookup", direction: "below" }, { initialHeight: Math.round(h * 0.5) });
     addPanel("summary", { referencePanel: "lookup", direction: "within" });
     addPanel("settings", { referencePanel: "lookup", direction: "within" });
+    addPanel("post", { referencePanel: "lookup", direction: "within" });
     api.getPanel("lookup").api.setActive();
   }
 
@@ -1171,6 +1460,13 @@ Sorry, could you repeat the question?
     });
   });
   document.getElementById("resetLayout").addEventListener("click", () => { buildDefault(); scheduleSave(); });
+  // 別的面板叫出一個面板（例如字幕面板的「整理這一場」）：開著就切過去，關著就照 REOPEN_NEXT_TO 打開。
+  window.Workspace.show = function (id) {
+    const existing = api.getPanel(id);
+    if (existing) { existing.api.setActive(); return; }
+    const next = REOPEN_NEXT_TO[id].find(([ref]) => api.getPanel(ref));
+    addPanel(id, next ? { referencePanel: next[0], direction: next[1] } : undefined);
+  };
 
   async function init() {
     let saved = null;
