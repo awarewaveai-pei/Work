@@ -35,7 +35,7 @@ def base(tmp_path, monkeypatch):
 def test_sessions_are_newest_first_and_only_ownvoice_folders(base):
     found = ownvoice.sessions()
     assert [s["id"] for s in found] == ["2026-11-22 1630-2", "2026-11-21 0900"]
-    assert found[0] == {"id": "2026-11-22 1630-2", "wavs": 2, "transcript": True, "summary": False}
+    assert found[0] == {"id": "2026-11-22 1630-2", "root": str(base), "wavs": 2, "transcript": True, "summary": False}
     assert found[1]["wavs"] == 0
 
 

@@ -1198,8 +1198,15 @@ Sorry, could you repeat the question?
   const STEP_OF = { transcribe: "transcribe", diarize: "diarize" };
   const DOWNLOAD_LABELS = { word: "會議記錄", slides: "PPT", excel: "Excel", coach: "報告教練", diarized_txt: "分角色逐字稿",
     merged_txt: "逐字稿", transcript_srt: "字幕 srt", transcript_vtt: "字幕 vtt", transcript_json: "逐字稿 json" };
-  const opts = { diarize: true, model: "large-v3", language: null, sync_drive: false, use_api: false };
+  // sync：這次要同步去的輸出目的地名稱；null＝還沒動過，用設定裡打開「預設同步」的那幾個。
+  const opts = { diarize: true, model: "large-v3", language: null, sync: null, use_api: false };
+  function syncNames() {
+    const dests = (window.Settings.data && window.Settings.data.destinations) || [];
+    const names = dests.map(d => d.name);
+    return opts.sync === null ? dests.filter(d => d.sync).map(d => d.name) : opts.sync.filter(n => names.includes(n));
+  }
   let options = null, sessions = [], jobs = [], current = null, focus = null, timer = null, root = null;
+  window.Settings.on(() => paintOptions());      // 輸出目的地改了，同步按鈕跟著改
 
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
@@ -1246,12 +1253,20 @@ Sorry, could you repeat the question?
         btn("依來源", () => { opts.language = null; paintOptions(); }, opts.language === null),
         options.languages.map(l => btn(l.label, () => { opts.language = l.code; paintOptions(); }, opts.language === l.code))),
       opts.language === null ? h("p", { class: "po-note" }, "上傳的檔案當中文；聆聽場次用當時聽的語言。") : null,
-      h("div", { class: "po-row" }, h("span", { class: "po-label" }, "同步"), toggle("sync_drive", "完成後同步到雲端硬碟")),
-      opts.sync_drive ? h("p", { class: "po-warn" }, "會把 PPT／會議記錄／逐字稿複製到雲端，敏感會議不要開。") : null,
+      syncRow(),
+      syncNames().length ? h("p", { class: "po-warn" }, "完成後會把 PPT／會議記錄／逐字稿複製到勾選的目的地；是雲端資料夾時，敏感會議不要勾。") : null,
       options.has_api_key ? h("div", { class: "po-row" }, h("span", { class: "po-label" }, "會議記錄"), toggle("use_api", "自動處理（用 API，會計費）")) : null);
   }
+  function syncRow() {
+    const dests = (window.Settings.data && window.Settings.data.destinations) || [];
+    const chosen = syncNames();
+    const flip = name => { opts.sync = chosen.includes(name) ? chosen.filter(n => n !== name) : chosen.concat([name]); paintOptions(); };
+    return h("div", { class: "po-row" }, h("span", { class: "po-label" }, "同步"),
+      dests.length ? dests.map(d => btn(d.name, () => flip(d.name), chosen.includes(d.name)))
+        : h("span", { class: "po-note" }, "沒有輸出目的地（在「設定」新增），產出只留在這台電腦。"));
+  }
   function body(extra) {
-    const o = { diarize: opts.diarize, model: opts.model, sync_drive: opts.sync_drive, use_api: opts.use_api };
+    const o = { diarize: opts.diarize, model: opts.model, sync: syncNames(), use_api: opts.use_api };
     if (opts.language !== null) o.language = opts.language;
     return JSON.stringify(Object.assign(o, extra));
   }
@@ -1294,7 +1309,8 @@ Sorry, could you repeat the question?
     if (!input.files.length) { say("先選一個音檔或影片"); return; }
     const fd = new FormData();
     fd.append("file", input.files[0]);
-    const q = new URLSearchParams({ diarize: opts.diarize, model: opts.model, language: opts.language || "zh", sync_drive: opts.sync_drive, use_api: opts.use_api });
+    const q = new URLSearchParams({ diarize: opts.diarize, model: opts.model, language: opts.language || "zh", use_api: opts.use_api });
+    syncNames().forEach(n => q.append("sync", n));
     say("上傳中…");
     try {
       const r = await call("/api/upload?" + q, { method: "POST", body: fd });
@@ -1348,6 +1364,9 @@ Sorry, could you repeat the question?
     if (status.error) parts.push(h("p", { class: "po-warn" }, status.error));
     if (status.diarize_error) parts.push(h("p", { class: "po-warn" }, "分講者失敗，已改用沒分講者的逐字稿：" + status.diarize_error));
     if (status.api_error) parts.push(h("p", { class: "po-warn" }, "API 自動處理失敗，改成手動貼上（逐字稿與講者的結果都還在）：" + status.api_error));
+    (status.sync_results || []).forEach(r => parts.push(h("p", { class: r.ok ? "po-note" : "po-warn" },
+      r.ok ? "已同步到「" + r.name + "」" + r.dest + "（" + r.files.length + " 個檔）"
+        : "同步到「" + r.name + "」有問題：" + r.error + (r.failed || []).map(f => "；" + f.file + "：" + f.error).join("") + (r.files.length ? "（其餘 " + r.files.length + " 個檔已複製）" : ""))));
     if (status.stage === "awaiting_summary" && !status.done) parts.push(await pasteLoop(id));
     const job = jobs.find(j => j.id === id);
     if (status.done && job) parts.push(links(job));

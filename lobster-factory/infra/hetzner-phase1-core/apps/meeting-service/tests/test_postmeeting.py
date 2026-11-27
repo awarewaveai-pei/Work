@@ -158,8 +158,7 @@ class Entry(unittest.TestCase):
         start(self, self.fakes.patches() + [
             mock.patch.dict(os.environ, {"OWNVOICE_SESSIONS_DIR": self.sessions}),
             mock.patch.object(app_module, "JOBS_DIR", jobs_dir),
-            mock.patch.object(app_module.threading, "Thread", self.SyncThread),
-            mock.patch.object(app_module.settings, "pref", lambda name: "zh-TW")])
+            mock.patch.object(app_module.threading, "Thread", self.SyncThread)])   # settings: conftest's empty file (target zh-TW)
         self.client = TestClient(app_module.app, base_url="http://127.0.0.1:8420")
 
     def session(self, name, wav=True, side=None):

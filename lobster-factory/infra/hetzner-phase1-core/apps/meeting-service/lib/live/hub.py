@@ -154,8 +154,8 @@ class Hub:
                  "翻譯：" + (ANTHROPIC_MODEL if settings.get_api_key() else GEMINI_MODEL)]
         meta = {"listen": listen, "target": target, "stt": stt, "channels": 1}
         try:
-            return Archive(ownvoice.base_dir(), about, meta, on_problem=self._problem, on_segment=self._segment_changed)
-        except ArchiveError as e:
+            return Archive(ownvoice.recording_dir(), about, meta, on_problem=self._problem, on_segment=self._segment_changed)
+        except (ArchiveError, ValueError) as e:      # ValueError: the recording folder cannot be opened (lib/paths.PathError)
             self._session().status(str(e))
             return None
 

@@ -123,10 +123,8 @@
       <label><input type="radio" name="langOpt" value="ko"> 韓文</label>
       <label><input type="radio" name="langOpt" value="auto"> 自動判斷</label>
     </div>
-    <div class="opts" style="margin-top:10px">
-      <label><input type="checkbox" id="syncDriveOpt"> 完成後同步到 Google Drive（ECT/會議記錄/日期）</label>
-    </div>
-    <p class="hint">⚠️ 勾選會把 PPT/會議記錄/逐字稿複製到雲端，跟「音檔絕不外流」的原則相反。敏感會議請不要勾。</p>
+    <div class="opts" id="syncOpts" style="margin-top:10px"></div>
+    <p class="hint">⚠️ 勾選的目的地若是雲端資料夾，PPT/會議記錄/逐字稿會複製到雲端，跟「音檔絕不外流」的原則相反。敏感會議請不要勾。</p>
     <div class="opts" id="useApiRow" style="margin-top:10px;display:none">
       <label><input type="checkbox" id="useApiOpt"> 自動處理（用 API，會計費，跳過手動貼上）</label>
     </div>
@@ -186,12 +184,31 @@ const DOWNLOAD_LABELS = {
   const mount = document.getElementById("settingsMount");
   mount.append(document.getElementById("tpl-settings").content.cloneNode(true));
   Settings.mount(mount);
+  // 同步：每個輸出目的地一個勾選框，預設勾「預設同步」的（設定改了才重畫，不蓋掉這次手動的勾選）。
+  let shown = "";
+  Settings.on(d => {
+    const key = JSON.stringify(d.destinations);
+    if (key === shown) return;
+    shown = key;
+    const box = document.getElementById("syncOpts");
+    box.replaceChildren(...d.destinations.map(dest => {
+      const label = document.createElement("label"), input = document.createElement("input");
+      input.type = "checkbox"; input.name = "syncOpt"; input.value = dest.name; input.checked = dest.sync;
+      label.append(input, " 完成後同步到「" + dest.name + "」");
+      label.title = dest.dir;
+      return label;
+    }));
+    if (!d.destinations.length) box.textContent = "沒有輸出目的地（在上面「設定」新增），產出只留在這台電腦。";
+  });
   // 沒填 Anthropic 金鑰就不提供「自動處理」。
   Settings.on(d => {
     document.getElementById("useApiRow").style.display = d.anthropic_api_key.set ? "flex" : "none";
     if (!d.anthropic_api_key.set) document.getElementById("useApiOpt").checked = false;
   });
 }
+
+// 這次勾選要同步去的輸出目的地名稱。
+const syncChoice = () => [...document.querySelectorAll("input[name=syncOpt]:checked")].map(x => x.value);
 
 let file = null;
 const drop = document.getElementById("drop");
@@ -218,7 +235,6 @@ startBtn.addEventListener("click", async () => {
   startBtn.disabled = true;
   const diarize = document.getElementById("diarizeOpt").checked;
   const model = document.querySelector("input[name=modelOpt]:checked").value;
-  const syncDrive = document.getElementById("syncDriveOpt").checked;
   const useApi = document.getElementById("useApiOpt").checked;
   const language = document.querySelector("input[name=langOpt]:checked").value;
 
@@ -231,7 +247,9 @@ startBtn.addEventListener("click", async () => {
 
   let resp;
   try {
-    resp = await fetch(`/api/upload?diarize=${diarize}&model=${model}&sync_drive=${syncDrive}&use_api=${useApi}&language=${language}`, { method: "POST", body: fd });
+    const q = new URLSearchParams({ diarize, model, use_api: useApi, language });
+    syncChoice().forEach(n => q.append("sync", n));
+    resp = await fetch(`/api/upload?${q}`, { method: "POST", body: fd });
   } catch (e) {
     showError("上傳失敗：" + e);
     return;
@@ -271,7 +289,7 @@ document.getElementById("ownvoiceList").addEventListener("click", async (e) => {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session, diarize: document.getElementById("diarizeOpt").checked,
                            model: document.querySelector("input[name=modelOpt]:checked").value,
-                           sync_drive: document.getElementById("syncDriveOpt").checked,
+                           sync: syncChoice(),
                            use_api: document.getElementById("useApiOpt").checked }),
   });
   const body = await resp.json().catch(() => ({}));
@@ -440,14 +458,16 @@ function showResult(jobId, status) {
     }
     html += "</p>";
   }
-  if (status.drive_sync_result) {
-    const r = status.drive_sync_result;
+  // sync_results：每個目的地一筆（C16 起）；drive_sync_result：之前的工作只有一筆。
+  (status.sync_results || (status.drive_sync_result ? [status.drive_sync_result] : [])).forEach(r => {
+    const name = r.name ? `「${escapeHtml(r.name)}」` : "";
     if (r.ok) {
-      html += `<p class="hint">☁ 已同步到 ${r.dest}（${r.files.length} 個檔案）</p>`;
+      html += `<p class="hint">☁ 已同步到${name} ${escapeHtml(r.dest)}（${r.files.length} 個檔案）</p>`;
     } else {
-      html += `<p class="hint" style="color:var(--red)">☁ Drive 同步失敗：${r.error}（本地檔案不受影響）</p>`;
+      const failed = (r.failed || []).map(f => `；${escapeHtml(f.file)}：${escapeHtml(f.error)}`).join("");
+      html += `<p class="hint" style="color:var(--red)">☁ 同步到${name}有問題：${escapeHtml(r.error)}${failed}（本地檔案不受影響）</p>`;
     }
-  }
+  });
   html += `<div class="downloads">${Object.entries(DOWNLOAD_LABELS).map(([kind, label]) =>
     `<a href="/api/download/${jobId}/${kind}" target="_blank">${label}</a>`).join("")}<a href="/mindmap?job=${jobId}" target="_blank">心智圖</a></div>`;
   document.getElementById("resultBody").innerHTML = html;
