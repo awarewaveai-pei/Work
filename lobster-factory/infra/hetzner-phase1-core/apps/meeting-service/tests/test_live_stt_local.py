@@ -26,14 +26,14 @@ class FakeSession:
     def __init__(self):
         self.calls = []
 
-    def open(self):
+    def open(self, start):
         self.calls.append(("open",))
         return len([c for c in self.calls if c[0] == "open"])
 
     def interim(self, line, text):
         self.calls.append(("interim", line, text))
 
-    def finish(self, line, text):
+    def finish(self, line, text, end):
         self.calls.append(("finish", line, text))
 
     def drop(self, line):
@@ -70,7 +70,7 @@ class FakeModel:
 
 async def feed(audio, queue):
     for i in range(0, len(audio), 1600):
-        queue.put_nowait(audio[i:i + 1600].tobytes())
+        queue.put_nowait((i, audio[i:i + 1600].tobytes()))
     queue.put_nowait(None)
 
 

@@ -13,6 +13,8 @@ import wave
 
 APP_ID = "io.github.zaious.ownvoice-meet"
 TEXT_FILES = ("transcript.md", "summary.md")
+# 聆聽場次的機器可讀逐字稿（lib/live/archive.py 寫）；OwnVoice app 與 C12 之前的場次沒有。
+SIDECAR = "session.json"
 # 錄音中，OwnVoice 每 5 秒才把資料長度回填進檔頭（recorder.rs HEADER_EVERY）：
 # 檔案比檔頭宣告的多出一截、或剛剛才被寫過，都代表還在錄。
 WAV_HEADER_SLACK_BYTES = 4096
@@ -97,6 +99,24 @@ def read_text(session_id: str, name: str) -> str:
             return f.read()
     except FileNotFoundError:
         return ""
+
+
+def session_lines(session_id: str):
+    """session.json 的內容（version、listen、target、stt、channels、lines、dropped_sec、failed_lines）；
+    沒有或讀不懂這個檔＝當舊場次，回 None（會後整理就整條重跑）。"""
+    path = os.path.join(session_dir(session_id), SIDECAR)
+    for _ in range(3):
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else None
+        except FileNotFoundError:
+            return None
+        except PermissionError:
+            time.sleep(0.05)   # Windows: the recorder is replacing the file this instant
+        except ValueError:
+            return None
+    return None
 
 
 def live_transcript(max_age_sec: int = 1800) -> str:

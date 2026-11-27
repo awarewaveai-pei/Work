@@ -6,7 +6,9 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from lib.live.session import Session  # noqa: E402
+from dataclasses import asdict  # noqa: E402
+
+from lib.live.session import Segment, Session  # noqa: E402
 from lib.live.translate import TranslateError  # noqa: E402
 
 LONG = "so the plan for the next quarter is to move"
@@ -40,18 +42,18 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.s = Session(self.fake, self.events.append, clock=lambda: self.now[0])
         self.final = []
         self.translated = []
-        self.s.on_final.append(lambda i, en: self.final.append((i, en)))
-        self.s.on_translated.append(lambda i, zh: self.translated.append((i, zh)))
+        self.s.on_final.append(lambda seg: self.final.append((seg.id, seg.text)))
+        self.s.on_translated.append(lambda id, tr, failed: self.translated.append((id, tr)))
 
     @staticmethod
-    def cap(id, en, zh, final):
-        return {"type": "caption", "id": id, "en": en, "zh": zh, "final": final}
+    def cap(id, text, tr, final):
+        return {"type": "caption", **asdict(Segment(id, text=text, tr=tr, final=final))}
 
     async def test_one_sentence_event_order(self):
         s = self.s
-        i = s.open()
+        i = s.open(0.0)
         s.interim(i, "hello there")
-        s.finish(i, " hello there. ")
+        s.finish(i, " hello there. ", 0.0)
         await settle()
         self.assertEqual(len(self.fake.calls), 1)
         call = self.fake.calls[0]
@@ -76,13 +78,13 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_early_result_after_the_final_one_does_not_overwrite(self):
         s = self.s
-        i = s.open()
+        i = s.open(0.0)
         self.now[0] = 5.0
         s.interim(i, LONG)
         await settle()
         early = self.fake.calls[0]
         self.assertTrue(early.early)
-        s.finish(i, LONG + " the whole deployment.")
+        s.finish(i, LONG + " the whole deployment.", 0.0)
         await settle()
         final = self.fake.calls[1]
         self.assertTrue(early.stop.is_set(), "the final request cancels the early one")
@@ -91,15 +93,15 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         await settle()
         early.fut.set_result("早期譯文")
         await s.drain()
-        self.assertEqual(s.segments[0].zh, "最終翻譯")
-        self.assertNotIn("早期譯文", [e.get("zh") for e in self.events])
+        self.assertEqual(s.segments[0].tr, "最終翻譯")
+        self.assertNotIn("早期譯文", [e.get("tr") for e in self.events])
         self.assertEqual(self.translated, [(1, "最終翻譯")])
         self.assertEqual(s._lines, {})
 
     async def test_empty_final_text_drops_the_line(self):
         s = self.s
-        i = s.open()
-        s.finish(i, "   ")
+        i = s.open(0.0)
+        s.finish(i, "   ", 0.0)
         await settle()
         self.assertEqual(self.events, [self.cap(1, "…", "", False), {"type": "caption-remove", "id": 1}])
         self.assertEqual(s.segments, [])
@@ -108,8 +110,8 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_final_translation_shows_the_error_in_the_chinese_field(self):
         s = self.s
-        i = s.open()
-        s.finish(i, "good morning")
+        i = s.open(0.0)
+        s.finish(i, "good morning", 0.0)
         await settle()
         self.fake.calls[0].fut.set_exception(TranslateError("翻譯失敗：boom"))
         await s.drain()
@@ -118,9 +120,9 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_context_excludes_the_line_and_what_follows(self):
         s = self.s
-        for en in ("a", "b", "c"):
-            s.finish(s.open(), en)
-        s.open()
+        for text in ("a", "b", "c"):
+            s.finish(s.open(0.0), text, 0.0)
+        s.open(0.0)
         self.assertEqual(s.context(2), ["Them: a"])
         self.assertEqual(s.context(3), ["Them: a", "Them: b"])
         self.assertEqual(s.context(None), ["Them: a", "Them: b", "Them: c"])
