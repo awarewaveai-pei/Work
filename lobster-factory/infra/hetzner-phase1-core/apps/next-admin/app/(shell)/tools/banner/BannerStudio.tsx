@@ -44,9 +44,10 @@ const snap = (v: number) => {
   return hit === undefined ? { v, line: null } : { v: hit, line: hit };
 };
 
-/** The size strip under the preview: a fixed height (thumbnail + label + header line) so preview + strip fit the window. */
-const THUMB_H = 64;
+/** Narrow layout only: the size strip is a fixed band. Wide layout: the column is one window-high sticky box, the strip takes what the preview card leaves. */
 const STRIP_H = 132;
+/** Wide + several sizes: the preview card's share of the column (fixed, whatever the canvas ratio). */
+const PREVIEW_SHARE = "58%";
 
 /** Desktop width: the preview stays in view (sticky) while the controls scroll; narrower, it sits above them. */
 function useWide(minPx = 960): boolean {
@@ -218,8 +219,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
   const hasPositions = Object.keys(s.positions).length > 0;
   // C13: nothing designed yet (no words, pictures, button, badge or logo) -> a line of guidance instead of an empty canvas
   const blank = isUntouched(s) && !s.designing;
-  // the left column (preview card + size strip) never runs past the window: the preview gives up the strip's height
-  const previewMaxH = `calc(100vh - ${230 + (multi ? STRIP_H + 16 : 0)}px)`;
+  // preview card height never follows the canvas ratio: wide = fixed share of the window-high column (all of it for one size); narrow = 60vh
+  const previewCardH = wide ? (multi ? PREVIEW_SHARE : "100%") : "60vh";
   // 清除設計: the cleared state itself, so the note shows until the next change (or 復原)
   const [cleared, setCleared] = useState<State | null>(null);
   const busy = s.generating || s.designing || s.productRemoving || s.saving || s.copyGenerating;
@@ -241,11 +242,6 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
 
   return (
     <div className="page">
-      <h2 style={{ fontSize: 22, margin: "0 0 4px" }}>🖼 橫幅</h2>
-      <p className="form-hint" style={{ marginBottom: 20 }}>
-        WP 網站 + 社交平台 · AI 文案 + 產品圖去背 + AI 背景 · 匯出高解析 PNG
-      </p>
-
       {s.error && (
         <div className="form-message" style={{ marginBottom: 16, color: "var(--badge-red-text)" }}>
           ⚠ {s.error}
@@ -265,12 +261,14 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
         {/* ── Preview (left side, sticky) ── */}
         <div style={{
           order: 1, flex: "1.7 1 520px", minWidth: 0,
-          ...(wide ? { position: "sticky" as const, top: 16, alignSelf: "flex-start" } : {}),
+          ...(wide ? { position: "sticky" as const, top: 16, alignSelf: "flex-start", height: "calc(100vh - 32px)",
+            display: "flex", flexDirection: "column", gap: 16 } : {}),
         }}>
 
           {/* Preview */}
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div className="card" style={{ margin: 0, height: previewCardH, flex: wide ? (multi ? "0 0 auto" : 1) : undefined,
+            boxSizing: "border-box", display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 }}>
               <h2 style={{ fontSize: 15, margin: 0 }}>
                 預覽 · {presetLabel(s.preset)}
                 <span style={{ fontWeight: 400, opacity: 0.6, fontSize: 12, marginLeft: 6 }}>{p.w}×{p.h}</span>
@@ -289,14 +287,16 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 )}
               </div>
             </div>
+            {/* the card's free area is the size box (cq units): the canvas scales to fit it, centred */}
+            <div style={{ flex: 1, minHeight: 0, containerType: "size", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{
-              display: blank ? "block" : "inline-block", maxWidth: "100%", minHeight: previewUrl || blank ? undefined : 240,
+              display: blank ? "block" : "inline-block", maxWidth: "100%", maxHeight: "100%", minHeight: previewUrl || blank ? undefined : 240,
               position: "relative", borderRadius: 6, overflow: "hidden",
               background: "var(--chip-surface)",
             }}>
               {blank && (
                 <div data-testid="banner-empty-hint" style={{
-                  width: 720, maxWidth: "100%", aspectRatio: `${p.w} / ${p.h}`, maxHeight: previewMaxH, minHeight: 160,
+                  width: 720, maxWidth: "100%", aspectRatio: `${p.w} / ${p.h}`, maxHeight: "100cqh", minHeight: 160,
                   display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 16,
                   border: "1px dashed var(--border)", borderRadius: 6, color: "var(--text-muted)", fontSize: 14,
                 }}>
@@ -337,7 +337,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                   onPointerUp={endDrag}
                   onPointerCancel={endDrag}
                   onPointerLeave={() => setHoverHit(null)}
-                  style={{ display: "block", maxWidth: "100%", maxHeight: previewMaxH, width: "auto", height: "auto",
+                  style={{ display: "block", maxHeight: "100cqh", maxWidth: "100cqw", width: "auto", height: "auto",
                     cursor: hoverHit || guides ? "move" : bgMovable ? "grab" : undefined, touchAction: "none" }} />
               )}
               {previewUrl && !blank && guides && (
@@ -373,14 +373,15 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                 </div>
               )}
             </div>
+            </div>
             {cleared === s && (
-              <p className="form-hint" role="status" data-testid="banner-cleared" style={{ margin: "8px 0 0" }}>已清除，可按「↩ 復原」找回。</p>
+              <p className="form-hint" role="status" data-testid="banner-cleared" style={{ margin: "8px 0 0", flexShrink: 0 }}>已清除，可按「↩ 復原」找回。</p>
             )}
           </div>
 
           {multi && (
             <div className="card" data-testid="banner-multi-card"
-              style={{ height: STRIP_H, boxSizing: "border-box", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6, overflow: "hidden" }}>
+              style={{ margin: 0, ...(wide ? { flex: 1, minHeight: 0 } : { height: STRIP_H }), boxSizing: "border-box", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6, overflow: "hidden" }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, minHeight: 24 }}>
                 <b style={{ flexShrink: 0 }}>{picked.length} 個尺寸</b>
                 <span style={{ color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
@@ -395,7 +396,7 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                     onClick={() => setS((prev) => ({ ...leaveSize(prev), saved: false }))}>完成，回主尺寸</button>
                 )}
               </div>
-              <div style={{ display: "flex", gap: 8, overflowX: "auto", flex: 1, minHeight: 0, alignItems: "stretch" }}>
+              <div style={{ display: "flex", gap: 8, overflow: "auto", flex: 1, minHeight: 0, alignItems: "stretch" }}>
                 {picked.map((k) => {
                   const tweaked = Object.keys(s.sizeOverrides[k] ?? {}).length > 0;
                   return (
@@ -404,8 +405,8 @@ export default function BannerStudio({ staff }: { staff?: BannerStaffApi }) {
                       onClick={() => setS((prev) => ({ ...enterSize(prev, k), saved: false }))} title="點一下單獨微調這個尺寸">
                       {thumbs[k]
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={thumbs[k]} alt={PRESETS[k].ratio} style={{ display: "block", height: THUMB_H, width: "auto" }} />
-                        : <span style={{ display: "flex", alignItems: "center", height: THUMB_H, fontSize: 11 }}>產生中…</span>}
+                        ? <img src={thumbs[k]} alt={PRESETS[k].ratio} style={{ display: "block", flex: "1 1 0", minHeight: 0, maxWidth: "none", aspectRatio: `${PRESETS[k].w} / ${PRESETS[k].h}` }} />
+                        : <span style={{ display: "flex", alignItems: "center", flex: 1, fontSize: 11 }}>產生中…</span>}
                       <span style={{ fontSize: 11 }}><b>{PRESETS[k].ratio}</b>{tweaked ? "・已微調" : ""}</span>
                     </button>
                   );
