@@ -47,9 +47,17 @@ const entry = (key: string, name: string, c: FeatureCatalog, p: PortalProduct): 
   icon: c.icon, keywords: [...(c.keywords ?? [])], addedAt: c.addedAt, door: { subdomain: p.subdomain },
 });
 
-export function buildCatalogIndex(products: readonly PortalProduct[] = PRODUCTS): CatalogIndex {
+// What a customer can use, from registry fields only (no product keys here): a SAFETY_GATE feature is never sold
+// (ADR 017 :71); a product is listed when its door is not switched off (enabled: false; an external door counts as
+// open) and it keeps at least one sellable feature -- rights are granted per feature_key, so none = nothing to get.
+const sellableFeatures = (p: PortalProduct) => p.features.filter((f) => f.limitKind !== "SAFETY_GATE");
+const doorOpen = (p: PortalProduct) => p.door.app === "external" || p.door.enabled !== false;
+export const isPublicProduct = (p: PortalProduct): boolean => doorOpen(p) && sellableFeatures(p).length > 0;
+
+export function buildCatalogIndex(all: readonly PortalProduct[] = PRODUCTS): CatalogIndex {
+  const products = all.filter(isPublicProduct);
   const productEntries = products.map((p) => entry(p.key, p.name, p.catalog, p));
-  const featureEntries = products.flatMap((p) => p.features.map((f): CatalogFeatureEntry => {
+  const featureEntries = products.flatMap((p) => sellableFeatures(p).map((f): CatalogFeatureEntry => {
     const c = featureCatalog(p, f);
     const blurb = p.key === "cognitive" && !f.catalog?.blurb ? chineseBlurb(f.name, c.blurb) : c.blurb;
     return { ...entry(f.feature_key, f.name, { ...c, blurb }, p), product: p.key };

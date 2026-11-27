@@ -42,29 +42,6 @@
       }
     },
     {
-      "key": "collect",
-      "name": "資料蒐集器",
-      "category": "research",
-      "categoryName": "研究",
-      "tasks": [
-        {
-          "key": "collect-web-data",
-          "name": "蒐集網站資料",
-          "synonyms": [
-            "爬蟲",
-            "研究資料"
-          ]
-        }
-      ],
-      "blurb": "蒐集外部網站與研究資料",
-      "icon": "search",
-      "keywords": [],
-      "addedAt": "2026-01-01",
-      "door": {
-        "subdomain": "collect"
-      }
-    },
-    {
       "key": "content",
       "name": "內容行銷",
       "category": "content",
@@ -106,37 +83,6 @@
       }
     },
     {
-      "key": "cs",
-      "name": "AI 客服",
-      "category": "service",
-      "categoryName": "客服",
-      "tasks": [
-        {
-          "key": "answer-customer-questions",
-          "name": "回答客人問題",
-          "synonyms": [
-            "客服",
-            "知識庫"
-          ]
-        },
-        {
-          "key": "hand-off-to-human",
-          "name": "轉交真人",
-          "synonyms": [
-            "客服交接",
-            "轉人工"
-          ]
-        }
-      ],
-      "blurb": "依知識庫回答客人並轉交真人",
-      "icon": "chat",
-      "keywords": [],
-      "addedAt": "2026-01-01",
-      "door": {
-        "subdomain": "cs"
-      }
-    },
-    {
       "key": "design",
       "name": "設計編輯器",
       "category": "design",
@@ -173,29 +119,6 @@
       "addedAt": "2026-01-01",
       "door": {
         "subdomain": "design"
-      }
-    },
-    {
-      "key": "hci",
-      "name": "HCI-30",
-      "category": "insight",
-      "categoryName": "洞察",
-      "tasks": [
-        {
-          "key": "continuous-monitoring",
-          "name": "持續監測",
-          "synonyms": [
-            "監控",
-            "人機互動"
-          ]
-        }
-      ],
-      "blurb": "人機互動與持續監測",
-      "icon": "pulse",
-      "keywords": [],
-      "addedAt": "2026-01-01",
-      "door": {
-        "subdomain": "hci"
       }
     },
     {
@@ -1817,30 +1740,6 @@
       "product": "cognitive"
     },
     {
-      "key": "collect.fetch",
-      "name": "資料蒐集",
-      "category": "research",
-      "categoryName": "研究",
-      "tasks": [
-        {
-          "key": "collect-web-data",
-          "name": "蒐集網站資料",
-          "synonyms": [
-            "爬蟲",
-            "研究資料"
-          ]
-        }
-      ],
-      "blurb": "蒐集外部網站與研究資料",
-      "icon": "search",
-      "keywords": [],
-      "addedAt": "2026-01-01",
-      "door": {
-        "subdomain": "collect"
-      },
-      "product": "collect"
-    },
-    {
       "key": "computation.monte_carlo",
       "name": "蒙地卡羅模擬",
       "category": "insight",
@@ -2176,126 +2075,6 @@
         "subdomain": "content"
       },
       "product": "content"
-    },
-    {
-      "key": "cs.answer",
-      "name": "客服回答與工具呼叫",
-      "category": "service",
-      "categoryName": "客服",
-      "tasks": [
-        {
-          "key": "answer-customer-questions",
-          "name": "回答客人問題",
-          "synonyms": [
-            "客服",
-            "知識庫"
-          ]
-        }
-      ],
-      "blurb": "依知識庫回答客人並轉交真人",
-      "icon": "chat",
-      "keywords": [],
-      "addedAt": "2026-01-01",
-      "door": {
-        "subdomain": "cs"
-      },
-      "product": "cs"
-    },
-    {
-      "key": "cs.eval",
-      "name": "回答評測",
-      "category": "service",
-      "categoryName": "客服",
-      "tasks": [
-        {
-          "key": "evaluate-answers",
-          "name": "評測回答",
-          "synonyms": [
-            "品質檢查",
-            "回答評分"
-          ]
-        }
-      ],
-      "blurb": "依知識庫回答客人並轉交真人",
-      "icon": "chat",
-      "keywords": [],
-      "addedAt": "2026-01-01",
-      "door": {
-        "subdomain": "cs"
-      },
-      "product": "cs"
-    },
-    {
-      "key": "cs.exam",
-      "name": "客服模擬考",
-      "category": "service",
-      "categoryName": "客服",
-      "tasks": [
-        {
-          "key": "practice-support",
-          "name": "練習客服對答",
-          "synonyms": [
-            "模擬考",
-            "客服訓練"
-          ]
-        }
-      ],
-      "blurb": "依知識庫回答客人並轉交真人",
-      "icon": "chat",
-      "keywords": [],
-      "addedAt": "2026-01-01",
-      "door": {
-        "subdomain": "cs"
-      },
-      "product": "cs"
-    },
-    {
-      "key": "cs.intent",
-      "name": "意圖分類",
-      "category": "service",
-      "categoryName": "客服",
-      "tasks": [
-        {
-          "key": "classify-messages",
-          "name": "分類訊息",
-          "synonyms": [
-            "意圖分類",
-            "分流"
-          ]
-        }
-      ],
-      "blurb": "依知識庫回答客人並轉交真人",
-      "icon": "chat",
-      "keywords": [],
-      "addedAt": "2026-01-01",
-      "door": {
-        "subdomain": "cs"
-      },
-      "product": "cs"
-    },
-    {
-      "key": "cs.translate",
-      "name": "訊息翻譯",
-      "category": "service",
-      "categoryName": "客服",
-      "tasks": [
-        {
-          "key": "translate-messages",
-          "name": "翻譯訊息",
-          "synonyms": [
-            "翻譯",
-            "多語"
-          ]
-        }
-      ],
-      "blurb": "依知識庫回答客人並轉交真人",
-      "icon": "chat",
-      "keywords": [],
-      "addedAt": "2026-01-01",
-      "door": {
-        "subdomain": "cs"
-      },
-      "product": "cs"
     },
     {
       "key": "database_data.backup_restore_drill",

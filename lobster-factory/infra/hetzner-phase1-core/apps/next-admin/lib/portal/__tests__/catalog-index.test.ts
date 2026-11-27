@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildCatalogIndex, chineseBlurb, encodeCatalogIndex } from "../catalog-index";
+import { PRODUCTS, type PortalProduct } from "../products";
 
 describe("public catalog index (U26)", () => {
   it("catalog.json equals a fresh export of the registry", () => {
@@ -19,6 +20,15 @@ describe("public catalog index (U26)", () => {
     for (const banned of ["price", "prices", "billing", "limitKind", "buyout", "plans", "loginSources", "staffPaths", "status", "modules", "accessChannels"]) {
       expect(keys.has(banned), banned).toBe(false);
     }
+  });
+
+  it("a product whose door is off, or with nothing sellable, is not listed and neither are its features", () => {
+    const base = PRODUCTS.find((p) => p.key === "social")!;
+    const closed = { ...base, key: "closed", door: { ...base.door, enabled: false }, features: [{ ...base.features[0], feature_key: "closed.x" }] } as unknown as PortalProduct;
+    const gated = { ...base, key: "gated", features: [{ ...base.features[0], feature_key: "gated.x", limitKind: "SAFETY_GATE" }] } as unknown as PortalProduct;
+    const index = buildCatalogIndex([base, closed, gated]);
+    expect(index.products.map((p) => p.key)).toEqual(["social"]);
+    expect(index.features.filter((f) => f.product !== "social")).toEqual([]);
   });
 
   it("a cognitive method's blurb is the Chinese part of its name, else the product's", () => {
