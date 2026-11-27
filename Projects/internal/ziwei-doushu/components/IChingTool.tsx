@@ -35,7 +35,7 @@ function HexView({ h, label, hexagramNo }: { h: Hexagram; label: string; hexagra
           fontWeight: 700,
           color: 'var(--gold-400)',
           textShadow: '0 0 10px var(--gold-glow)',
-          fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+          fontFamily: "var(--font-heading), 'PingFang TC', serif",
           fontSize: '1rem',
         }}
       >
@@ -48,7 +48,7 @@ function HexView({ h, label, hexagramNo }: { h: Hexagram; label: string; hexagra
   );
 }
 
-const SERIF = "var(--font-noto-serif-tc), 'PingFang TC', serif";
+const SERIF = "var(--font-heading), 'PingFang TC', serif";
 
 /** 依變爻讀法該讀的經文(中文原文;英文頁只換標籤與說明)。 */
 function ReadingView({

@@ -87,6 +87,14 @@ curl -s https://oracle.aware-wave.com/api/mcp -H 'content-type: application/json
 - 加外部來源（例：新的分析腳本、外部圖片或 API）：只改 `lib/http/csp.ts` 對應指令＋`lib/http/csp.test.ts`；外部腳本用 Next `<Script nonce={(await headers()).get('x-nonce')}>` 或確保由帶 nonce 的腳本載入（`'strict-dynamic'`）。不要加 `'unsafe-inline'`／`'unsafe-eval'` 到 `script-src`。
 - 驗證：`curl -sI https://<站>/zh-TW/ziwei | grep -ic content-security-policy` → `1`；`/embed/zh-TW/ziwei` 另有 `x-robots-tag`；`/api/v1/systems` 的 CSP 是 `default-src 'none'…`。
 
+## 宿主主題代碼（嵌入頁跟著網站佈景）
+- 嵌入頁 `/embed/<語言>/<工具>` 的外觀唯一來源＝宿主給的一組代碼；沒給或不合格的那項用引擎預設（獨立站紫金，外觀逐像素不變）。程式 `lib/theme/hostTheme.ts`（契約＋驗證＋輸出），測試 `lib/theme/hostTheme.test.ts`；預設值與衍生變數在 `app/globals.css` 開頭兩個 `:root`。
+- 傳法：iframe 網址查詢字串 `aw-<代碼>=<值>`（WordPress 外掛 `includes/Embed/ThemeTokens.php` 每次輸出頁面時從佈景讀出來附上）。引擎伺服端驗證後輸出一個 `<style>`（React 提到 `<head>`，選擇器 `:root:root`），首次繪製就是宿主顏色；宿主改色盤不必重發外掛。CSP 不變（`style-src` 本來就有 `'unsafe-inline'`）。
+- 契約（12 項）：`bg` 底色／`surface` 卡片與命盤表面／`border` 卡片邊框／`heading` 標題字／`text` 內文／`muted` 次要字／`accent` 強調（主要按鈕、重點數值）／`on-accent` 強調色上的字／`accent-2` 第二強調（焦點框、分隔線、次要按鈕）／`font` 內文字體／`font-heading` 標題字體／`radius` 基準圓角（卡片 1×，小元件 ⅔×，大元件 4/3×、5/3×）。
+- 驗證（安全邊界，值只能是資料）：顏色只收 `#rgb[a]`／`#rrggbb[aa]`／`rgb[a]()`／`hsl[a]()`（只含數字、`%`、`deg`），`bg` 另須不透明（墨色依它決定）；字體最多 4 個字族，字族只收字母數字空白 `-` `_`，引擎自己加引號，CSS 全域字（`inherit` 等）不收；長度只收 `0` 或數字＋`px|rem|em`。任何 `;` `{` `}` `<` `>` `\` `url(` `/*` 都過不了。
+- 缺項推導（不變量：宿主給了任一顏色，九個顏色全由宿主值推出，不混紫金預設）：`bg`／`text` 缺 → 依對方（或強調色）的 WCAG 亮度挑深墨 `#1f2328` 或淺墨 `#f0f0f0`；`heading`←`text`；`surface`←`bg` 混 6% `text`；`border`←`text` 18%；`muted`←`text` 70% 混 `bg`；`accent`←`accent-2` 或 `heading`；`on-accent`←強調色上對比較高的墨色；`accent-2`←`accent`。只給字體／圓角＝只換那兩項。有顏色代碼時獨立站裝飾（宇宙背景、星點、光暈、深紫宮位底）一律改由代碼推出或關掉；語意色 宜/忌/科/權 往 `heading` 混 55%，深淺底都可讀。
+- 驗證指令：`curl -s "https://<站>/embed/zh-TW/daily?aw-bg=%23ffffff&aw-text=%23222222" | grep -o 'data-href="aw-host-theme"'` → 一行；不帶參數 → 無輸出。
+
 ## 注意
 - `NEXT_PUBLIC_*` 在 build 時內嵌；網域預設值在 `lib/site.ts`。
 - 付費牆：`/api/interpret` 的 `premium` 回 402；`light`／`deep` 放行；每日次數計量未接。

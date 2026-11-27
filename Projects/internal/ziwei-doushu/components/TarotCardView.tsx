@@ -83,7 +83,7 @@ export default function TarotCardView({
               fontWeight: 600,
               color: 'var(--text-heading)',
               marginBottom: '0.5rem',
-              fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+              fontFamily: "var(--font-heading), 'PingFang TC', serif",
             }}
           >
             {name}

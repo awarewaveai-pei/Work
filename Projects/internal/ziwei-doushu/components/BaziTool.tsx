@@ -69,7 +69,7 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
                   color: 'var(--gold-400)',
                   textShadow: '0 0 10px var(--gold-glow)',
                   fontSize: '1.125rem',
-                  fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+                  fontFamily: "var(--font-heading), 'PingFang TC', serif",
                 }}
               >
                 {result.dayMaster}
@@ -118,7 +118,7 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
                     fontWeight: 700,
                     color: 'var(--gold-400)',
                     textShadow: '0 0 12px var(--gold-glow)',
-                    fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+                    fontFamily: "var(--font-heading), 'PingFang TC', serif",
                     lineHeight: 1.2,
                     marginBottom: '0.5rem',
                   }}
@@ -182,7 +182,7 @@ export default function BaziTool({ dict, locale }: { dict: Dictionary; locale: L
                         fontSize: '1.125rem',
                         fontWeight: 700,
                         color: current ? 'var(--gold-400)' : 'var(--text-heading)',
-                        fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+                        fontFamily: "var(--font-heading), 'PingFang TC', serif",
                       }}
                     >
                       {s.ganZhi}

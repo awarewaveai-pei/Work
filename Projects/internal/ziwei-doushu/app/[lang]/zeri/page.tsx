@@ -30,7 +30,7 @@ export default async function ZeriPage({
           <span className="page-header-glyph">☑</span>
           <h1
             style={{
-              fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+              fontFamily: "var(--font-heading), 'PingFang TC', serif",
               fontSize: "clamp(1.5rem, 4vw, 2.25rem)",
               fontWeight: 700,
               color: "var(--text-heading)",

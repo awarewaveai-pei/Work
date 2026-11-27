@@ -199,7 +199,7 @@ export default function FengshuiTool({ dict, locale }: { dict: Dictionary; local
                       flex: 1,
                       fontSize: '1.5rem',
                       color: 'var(--text-heading)',
-                      fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+                      fontFamily: "var(--font-heading), 'PingFang TC', serif",
                     }}
                   >
                     {s.period}

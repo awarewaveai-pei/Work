@@ -1,62 +1,106 @@
 @import "tailwindcss";
 
 /* ─── Design Tokens ─────────────────────────────────────────────────────────── */
+/* 契約代碼 --aw-*:嵌入頁外觀的唯一入口(lib/theme/hostTheme.ts;deploy/DEPLOY.md「宿主主題代碼」)。
+   預設值 = 獨立站的紫金;嵌入頁有宿主代碼時由 hostThemeCss() 以 :root:root 覆寫。 */
 :root {
-  /* Background layers */
-  --bg-void:    #0a0a14;
-  --bg-deep:    #0f0d1f;
-  --bg-nebula:  #1a1035;
-  --bg-surface: #12102a;
+  --aw-bg:           #0a0a14;
+  --aw-surface:      #12102a;
+  --aw-border:       rgba(168, 85, 247, 0.25);
+  --aw-heading:      #f5f3ff;
+  --aw-text:         #b8b0d0;
+  --aw-muted:        #8980a8;
+  --aw-accent:       #f5d76e;
+  --aw-on-accent:    #0a0a14;
+  --aw-accent-2:     #a855f7;
+  --aw-font:         var(--font-geist-sans);
+  --aw-font-heading: var(--font-noto-serif-tc);
+  --aw-radius:       12px;
+}
+
+/* 由代碼推出的變數。預設值與改版前相同:color-mix(in srgb, x N%, transparent) = x 的 rgba(N%)。
+   標「獨立站裝飾」的是無法由代碼逐像素推出的紫金藝術值,宿主時 hostThemeCss() 一律改由代碼推出或關掉。 */
+:root {
+  /* Background */
+  --bg-void: var(--aw-bg);
 
   /* Glass surface */
-  --glass-bg:      rgba(255, 255, 255, 0.04);
-  --glass-bg-hover: rgba(255, 255, 255, 0.07);
-  --glass-border:  rgba(168, 85, 247, 0.25);
-  --glass-border-hover: rgba(245, 215, 110, 0.5);
-  --glass-blur:    12px;
+  --glass-bg:       rgba(255, 255, 255, 0.04);   /* 獨立站裝飾 */
+  --glass-bg-hover: rgba(255, 255, 255, 0.07);   /* 獨立站裝飾 */
+  --glass-border:   var(--aw-border);
+  --glass-border-hover: color-mix(in srgb, var(--aw-accent) 50%, transparent);
+  --glass-blur:     12px;
 
-  /* Primary — Violet (紫微星) */
-  --violet-400: #c084fc;
-  --violet-500: #a855f7;
-  --violet-600: #9333ea;
-  --violet-glow: rgba(168, 85, 247, 0.35);
+  /* Primary — Violet (紫微星) = 第二強調色 */
+  --violet-400:  #c084fc;                        /* 獨立站裝飾 */
+  --violet-500:  var(--aw-accent-2);
+  --violet-600:  #9333ea;                        /* 獨立站裝飾 */
+  --violet-glow: color-mix(in srgb, var(--aw-accent-2) 35%, transparent);
 
-  /* Accent — Imperial Gold (帝星金) */
-  --gold-300: #fde68a;
-  --gold-400: #f5d76e;
-  --gold-500: #e8c468;
-  --gold-glow: rgba(245, 215, 110, 0.4);
-  --gold-glow-strong: rgba(245, 215, 110, 0.6);
+  /* Accent — Imperial Gold (帝星金) = 強調色 */
+  --gold-400: var(--aw-accent);
+  --gold-500: #e8c468;                           /* 獨立站裝飾 */
+  --gold-glow: color-mix(in srgb, var(--aw-accent) 40%, transparent);
+  --gold-glow-strong: color-mix(in srgb, var(--aw-accent) 60%, transparent);
 
   /* Text */
-  --text-heading: #f5f3ff;
-  --text-body:    #b8b0d0;
-  --text-caption: #8980a8;
+  --text-heading: var(--aw-heading);
+  --text-body:    var(--aw-text);
+  --text-caption: var(--aw-muted);
   /* WCAG AA: lightened from #5c5478 (2.6:1) → ~4.6:1 on dark glass; used by
-     真太陽時狀態字 (.no-correction-text) 與塔羅牌序號等真實內容,須可讀。 */
+     真太陽時狀態字 (.no-correction-text) 與塔羅牌序號等真實內容,須可讀。獨立站裝飾。 */
   --text-dim:     #8077a0;
 
-  /* Auspicious — Jade Green (宜) */
+  /* 語意色(宜/忌/科/權):獨立站原色;宿主時往標題色混,深淺底都可讀 */
   --jade-400: #6ee7b7;
   --jade-bg:  rgba(110, 231, 183, 0.08);
   --jade-border: rgba(110, 231, 183, 0.25);
-
-  /* Inauspicious — Deep Rose (忌) */
   --rose-400: #fb7185;
   --rose-bg:  rgba(251, 113, 133, 0.08);
   --rose-border: rgba(251, 113, 133, 0.25);
-
-  /* Sky Blue (科) */
   --sky-400: #7dd3fc;
-
-  /* Amber (權) */
   --amber-400: #fbbf24;
 
-  /* Spacing / Radius */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  /* 陰影墨色(獨立站裝飾:黑) */
+  --shadow-ink: #000;
+
+  /* 按鈕(選中 = primary,未選 = secondary) */
+  /* 背景漸層 = 獨立站裝飾(宿主時改實心強調色/透明) */
+  --btn-primary-bg: linear-gradient(135deg, rgba(245, 215, 110, 0.18) 0%, rgba(232, 196, 104, 0.12) 100%);
+  --btn-primary-bg-hover: linear-gradient(135deg, rgba(245, 215, 110, 0.28) 0%, rgba(232, 196, 104, 0.22) 100%);
+  --btn-primary-border: color-mix(in srgb, var(--aw-accent) 40%, transparent);
+  --btn-primary-fg: var(--gold-400);
+  --btn-secondary-bg: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(139, 92, 246, 0.12) 100%);
+  --btn-secondary-bg-hover: linear-gradient(135deg, rgba(168, 85, 247, 0.28) 0%, rgba(139, 92, 246, 0.22) 100%);
+
+  /* 分隔線(獨立站裝飾;宿主時由兩個強調色推出) */
+  --divider: linear-gradient(to right, transparent, rgba(168, 85, 247, 0.4), rgba(245, 215, 110, 0.4), transparent);
+
+  /* 紫微命盤宮位底(獨立站裝飾:深紫) */
+  --palace-bg: rgba(10, 10, 30, 0.85);
+  --palace-bg-hover: rgba(30, 20, 60, 0.95);
+  --palace-center-bg: rgba(20, 12, 50, 0.9);
+
+  /* 日期欄選擇器圖示(獨立站裝飾:深底才反白) */
+  --picker-filter: invert(0.7) sepia(1) saturate(5) hue-rotate(220deg);
+
+  /* 獨立站裝飾:宇宙背景與星點 */
+  --aw-backdrop:
+    radial-gradient(ellipse 80% 60% at 50% 0%,   rgba(88, 28, 135, 0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 30%,  rgba(168, 85, 247, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 50% at 20% 70%,  rgba(139, 92, 246, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 80% at 50% 100%,rgba(45, 27, 78, 0.5) 0%, transparent 70%);
+  --aw-stars: block;
+
+  /* Fonts(退回字型寫在使用處,與改版前相同) */
+  --font-body:    var(--aw-font);
+  --font-heading: var(--aw-font-heading);
+
+  /* Radius:基準 = 代碼 radius(預設 12px → 8/12/16/20) */
+  --radius-sm: calc(var(--aw-radius) * 2 / 3);
+  --radius-md: var(--aw-radius);
+  --radius-lg: calc(var(--aw-radius) * 4 / 3);
+  --radius-xl: calc(var(--aw-radius) * 5 / 3);
 
   /* Motion */
   --dur-fast:   150ms;
@@ -86,17 +130,13 @@ html, body {
 body {
   background-color: var(--bg-void);
   color: var(--text-body);
-  font-family: var(--font-geist-sans), "PingFang TC", "Microsoft JhengHei",
+  font-family: var(--font-body), "PingFang TC", "Microsoft JhengHei",
     "Noto Sans TC", "Noto Sans SC", "Hiragino Sans", sans-serif;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Cosmic background gradient */
-  background-image:
-    radial-gradient(ellipse 80% 60% at 50% 0%,   rgba(88, 28, 135, 0.35) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 30%,  rgba(168, 85, 247, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 50% at 20% 70%,  rgba(139, 92, 246, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse 100% 80% at 50% 100%,rgba(45, 27, 78, 0.5) 0%, transparent 70%);
+  background-image: var(--aw-backdrop);
   background-attachment: fixed;
   background-size: cover;
   overflow-x: hidden;
@@ -105,6 +145,7 @@ body {
 /* ─── Star Field ─────────────────────────────────────────────────────────────── */
 body::before {
   content: '';
+  display: var(--aw-stars);
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -142,6 +183,7 @@ body::before {
 
 body::after {
   content: '';
+  display: var(--aw-stars);
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -187,7 +229,7 @@ nav, main, footer {
 /* ─── Headings ───────────────────────────────────────────────────────────────── */
 h1, h2, h3 {
   color: var(--text-heading);
-  font-family: var(--font-noto-serif-tc), "PingFang TC", "Microsoft JhengHei", serif;
+  font-family: var(--font-heading), "PingFang TC", "Microsoft JhengHei", serif;
   line-height: 1.3;
 }
 
@@ -208,7 +250,7 @@ h1, h2, h3 {
 .glass-card:hover {
   background: var(--glass-bg-hover);
   border-color: var(--glass-border-hover);
-  box-shadow: 0 0 24px rgba(245, 215, 110, 0.15), 0 8px 32px rgba(0,0,0,0.4);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--aw-accent) 15%, transparent), 0 8px 32px color-mix(in srgb, var(--shadow-ink) 40%, transparent);
   transform: translateY(-2px);
 }
 
@@ -221,9 +263,9 @@ h1, h2, h3 {
   width: 100%;
   padding: 0.7rem 1.5rem;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(245, 215, 110, 0.4);
-  background: linear-gradient(135deg, rgba(245, 215, 110, 0.18) 0%, rgba(232, 196, 104, 0.12) 100%);
-  color: var(--gold-400);
+  border: 1px solid var(--btn-primary-border);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   font-weight: 600;
   font-size: 0.875rem;
   letter-spacing: 0.02em;
@@ -236,9 +278,9 @@ h1, h2, h3 {
 }
 
 .btn-gold:hover {
-  background: linear-gradient(135deg, rgba(245, 215, 110, 0.28) 0%, rgba(232, 196, 104, 0.22) 100%);
-  border-color: rgba(245, 215, 110, 0.7);
-  box-shadow: 0 0 20px var(--gold-glow), 0 4px 16px rgba(0,0,0,0.3);
+  background: var(--btn-primary-bg-hover);
+  border-color: color-mix(in srgb, var(--aw-accent) 70%, transparent);
+  box-shadow: 0 0 20px var(--gold-glow), 0 4px 16px color-mix(in srgb, var(--shadow-ink) 30%, transparent);
 }
 
 .btn-gold:focus-visible {
@@ -258,8 +300,8 @@ h1, h2, h3 {
   width: 100%;
   padding: 0.7rem 1.5rem;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(168, 85, 247, 0.4);
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(139, 92, 246, 0.12) 100%);
+  border: 1px solid color-mix(in srgb, var(--aw-accent-2) 40%, transparent);
+  background: var(--btn-secondary-bg);
   color: var(--violet-400);
   font-weight: 600;
   font-size: 0.875rem;
@@ -270,9 +312,9 @@ h1, h2, h3 {
 }
 
 .btn-violet:hover {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.28) 0%, rgba(139, 92, 246, 0.22) 100%);
-  box-shadow: 0 0 20px var(--violet-glow), 0 4px 16px rgba(0,0,0,0.3);
-  border-color: rgba(168, 85, 247, 0.7);
+  background: var(--btn-secondary-bg-hover);
+  box-shadow: 0 0 20px var(--violet-glow), 0 4px 16px color-mix(in srgb, var(--shadow-ink) 30%, transparent);
+  border-color: color-mix(in srgb, var(--aw-accent-2) 70%, transparent);
 }
 
 .btn-violet:focus-visible {
@@ -288,8 +330,8 @@ h1, h2, h3 {
 .field-dark {
   width: 100%;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(137, 128, 168, 0.3);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--aw-muted) 30%, transparent);
+  background: var(--glass-bg);
   color: var(--text-heading);
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
@@ -307,12 +349,12 @@ h1, h2, h3 {
 .field-dark:focus {
   outline: none;
   border-color: var(--violet-500);
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2), 0 0 12px rgba(168, 85, 247, 0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aw-accent-2) 20%, transparent), 0 0 12px color-mix(in srgb, var(--aw-accent-2) 15%, transparent);
 }
 
 /* Date/time inputs: force light text on dark bg in Webkit */
 .field-dark::-webkit-calendar-picker-indicator {
-  filter: invert(0.7) sepia(1) saturate(5) hue-rotate(220deg);
+  filter: var(--picker-filter);
   cursor: pointer;
 }
 
@@ -329,8 +371,8 @@ input[type="checkbox"].field-check {
   width: 1rem;
   height: 1rem;
   border-radius: 3px;
-  border: 1px solid rgba(137, 128, 168, 0.5);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid color-mix(in srgb, var(--aw-muted) 50%, transparent);
+  background: var(--glass-bg);
   accent-color: var(--violet-500);
   cursor: pointer;
   flex-shrink: 0;
@@ -357,7 +399,7 @@ input[type="checkbox"].field-check {
 .star-divider {
   border: none;
   height: 1px;
-  background: linear-gradient(to right, transparent, rgba(168, 85, 247, 0.4), rgba(245, 215, 110, 0.4), transparent);
+  background: var(--divider);
   margin: 1.5rem 0;
 }
 
@@ -389,14 +431,14 @@ input[type="checkbox"].field-check {
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, 1fr);
   gap: 2px;
-  background: rgba(168, 85, 247, 0.15);
+  background: color-mix(in srgb, var(--aw-accent-2) 15%, transparent);
   border-radius: var(--radius-md);
   padding: 2px;
   overflow: hidden;
 }
 
 .ziwei-palace {
-  background: rgba(10, 10, 30, 0.85);
+  background: var(--palace-bg);
   backdrop-filter: blur(4px);
   padding: 0.375rem;
   display: flex;
@@ -407,11 +449,11 @@ input[type="checkbox"].field-check {
 }
 
 .ziwei-palace:hover {
-  background: rgba(30, 20, 60, 0.95);
+  background: var(--palace-bg-hover);
 }
 
 .ziwei-center {
-  background: rgba(20, 12, 50, 0.9);
+  background: var(--palace-center-bg);
   backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
@@ -459,7 +501,7 @@ input[type="checkbox"].field-check {
   font-size: 0.55rem;
   border-radius: 3px;
   padding: 0.05rem 0.25rem;
-  background: rgba(251, 113, 133, 0.15);
+  background: color-mix(in srgb, var(--rose-400) 15%, transparent);
   border: 1px solid var(--rose-border);
   color: var(--rose-400);
 }
@@ -508,17 +550,17 @@ input[type="checkbox"].field-check {
 
 .tarot-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 16px var(--violet-glow);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow-ink) 50%, transparent), 0 0 16px var(--violet-glow);
 }
 
 .tarot-card.reversed {
   border-color: var(--rose-border);
-  box-shadow: 0 0 10px rgba(251, 113, 133, 0.15);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--rose-400) 15%, transparent);
 }
 
 .tarot-card.upright {
   border-color: var(--jade-border);
-  box-shadow: 0 0 10px rgba(110, 231, 183, 0.1);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--jade-400) 10%, transparent);
 }
 
 /* ─── Daily Fortune ──────────────────────────────────────────────────────────── */
@@ -527,7 +569,7 @@ input[type="checkbox"].field-check {
   justify-content: space-between;
   align-items: center;
   padding: 0.375rem 0;
-  border-bottom: 1px solid rgba(137, 128, 168, 0.1);
+  border-bottom: 1px solid color-mix(in srgb, var(--aw-muted) 10%, transparent);
 }
 
 .fortune-row:last-child {
@@ -580,7 +622,7 @@ input[type="checkbox"].field-check {
   background: rgba(10, 10, 20, 0.75);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+  border-bottom: 1px solid color-mix(in srgb, var(--aw-accent-2) 20%, transparent);
 }
 
 .nav-brand {
@@ -619,14 +661,14 @@ input[type="checkbox"].field-check {
 
 .nav-link:hover {
   color: var(--text-body);
-  background: rgba(168, 85, 247, 0.1);
+  background: color-mix(in srgb, var(--aw-accent-2) 10%, transparent);
 }
 
 .nav-link.active {
   color: var(--gold-400);
   font-weight: 600;
-  background: rgba(245, 215, 110, 0.08);
-  box-shadow: inset 0 -2px 0 rgba(245, 215, 110, 0.5);
+  background: color-mix(in srgb, var(--aw-accent) 8%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--aw-accent) 50%, transparent);
   text-shadow: 0 0 10px var(--gold-glow);
 }
 
@@ -634,7 +676,7 @@ input[type="checkbox"].field-check {
   margin-left: auto;
   font-size: 0.75rem;
   color: var(--text-caption);
-  border: 1px solid rgba(137, 128, 168, 0.3);
+  border: 1px solid color-mix(in srgb, var(--aw-muted) 30%, transparent);
   border-radius: var(--radius-sm);
   padding: 0.2rem 0.6rem;
   text-decoration: none;
@@ -642,6 +684,6 @@ input[type="checkbox"].field-check {
 }
 
 .nav-lang:hover {
-  border-color: rgba(168, 85, 247, 0.5);
+  border-color: color-mix(in srgb, var(--aw-accent-2) 50%, transparent);
   color: var(--violet-400);
 }

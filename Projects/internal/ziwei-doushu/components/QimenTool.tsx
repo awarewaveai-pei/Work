@@ -220,7 +220,7 @@ export default function QimenTool({ dict, locale }: { dict: Dictionary; locale: 
                         style={{
                           marginTop: 'auto',
                           color: 'var(--text-heading)',
-                          fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+                          fontFamily: "var(--font-heading), 'PingFang TC', serif",
                         }}
                       >
                         <span>

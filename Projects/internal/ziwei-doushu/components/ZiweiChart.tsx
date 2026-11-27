@@ -120,7 +120,7 @@ export default function ZiweiChart({
               fontSize: '0.8125rem',
               fontWeight: 700,
               color: 'var(--text-heading)',
-              fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+              fontFamily: "var(--font-heading), 'PingFang TC', serif",
             }}
           >
             {t.soulInfo}

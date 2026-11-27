@@ -19,7 +19,7 @@ const VERDICT_COLOR: Record<Verdict, string> = {
   沖: 'var(--amber-400)',
 };
 
-const SERIF = "var(--font-noto-serif-tc), 'PingFang TC', serif";
+const SERIF = "var(--font-heading), 'PingFang TC', serif";
 
 function parseDate(v: string): BirthDay {
   const [year, month, day] = v.split('-').map(Number);

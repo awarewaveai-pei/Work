@@ -8,7 +8,7 @@ import type { Locale } from '@/lib/i18n/config';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 const TOPIC_IDS = Object.keys(QIAN_TOPICS) as QianTopic[];
-const SERIF = "var(--font-noto-serif-tc), 'PingFang TC', serif";
+const SERIF = "var(--font-heading), 'PingFang TC', serif";
 
 export default function QianTool({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   const [topic, setTopic] = useState<QianTopic>('general');

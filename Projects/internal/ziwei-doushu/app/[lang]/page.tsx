@@ -44,12 +44,12 @@ export default async function Hub({
           <span className="page-header-glyph">✦</span>
           <h1
             style={{
-              fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+              fontFamily: "var(--font-heading), 'PingFang TC', serif",
               fontSize: "clamp(2rem, 5vw, 3.5rem)",
               fontWeight: 700,
               color: "var(--text-heading)",
               letterSpacing: "0.06em",
-              textShadow: "0 0 40px rgba(168, 85, 247, 0.4)",
+              textShadow: "0 0 40px color-mix(in srgb, var(--aw-accent-2) 40%, transparent)",
               lineHeight: 1.2,
               marginBottom: "0.75rem",
             }}
@@ -80,7 +80,7 @@ export default async function Hub({
               <span className="system-glyph">{GLYPHS[id]}</span>
               <h2
                 style={{
-                  fontFamily: "var(--font-noto-serif-tc), 'PingFang TC', serif",
+                  fontFamily: "var(--font-heading), 'PingFang TC', serif",
                   fontSize: "1.125rem",
                   fontWeight: 700,
                   color: "var(--text-heading)",
