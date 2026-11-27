@@ -9,7 +9,6 @@ import json
 import logging
 import math
 import os
-import re
 import tempfile
 import threading
 import time
@@ -27,7 +26,6 @@ KEYS = {
     "serper_api_key": "SERPER_API_KEY",
 }
 KEY_MAX = 512
-LANG_RE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}")
 
 
 def _number(lo, hi, integer=False):
@@ -56,16 +54,22 @@ def _flag(v):
     return v
 
 
-def _lang(v):
-    if not isinstance(v, str) or len(v) > 16 or not LANG_RE.fullmatch(v):
-        raise ValueError("要是語言代碼，例如 en-US")
-    return v
+def _lang_in(codes):
+    def check(v):
+        # Imported here, not at the top: lib/diarize.py loads this file by path from another project,
+        # where the lib package does not exist (and only key() is ever called).
+        from lib.live import langs
+        options = getattr(langs, codes)()
+        if v not in options:
+            raise ValueError("只能是 " + "、".join(options))
+        return v
+    return check
 
 
 # 偏好欄位 → (預設值, 驗證)。預設值＝今天頁面的行為。
 PREFS = {
-    "listen": ("en-US", _lang),
-    "target": ("zh-TW", _lang),
+    "listen": ("en-US", _lang_in("listen_codes")),
+    "target": ("zh-TW", _lang_in("target_codes")),
     "stt": ("gemini", _choice("gemini", "local")),
     "pause_min": (3, _number(0, 120)),
     "end_min": (30, _number(0, 600)),

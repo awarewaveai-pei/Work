@@ -13,6 +13,7 @@ import time
 import numpy as np
 
 from lib import gpu_gate, transcribe
+from lib.live import langs
 from lib.live.vad import END, DISCARD, START, Segmenter
 
 RATE = 16_000
@@ -28,10 +29,6 @@ _model_lock = threading.Lock()
 _infer_lock = threading.Lock()
 
 
-def iso639(bcp47: str) -> str:
-    return (bcp47 or "").replace("_", "-").split("-")[0].strip().lower()
-
-
 def default_model():
     """The resident model, loaded on first use through transcribe.pick_device."""
     global _model
@@ -41,11 +38,12 @@ def default_model():
         return _model
 
 
-def _recognize(model_provider, utterance, language) -> str:
+def _recognize(model_provider, utterance, language) -> tuple:
+    """(text, the langs.py code whisper detected, "" when not in the table; None when `language` was given)."""
     with _infer_lock:
         model = model_provider()
         samples = utterance.astype(np.float32) / 32768.0
-        segments, _info = model.transcribe(
+        segments, info = model.transcribe(
             samples,
             beam_size=1,
             condition_on_previous_text=False,
@@ -54,7 +52,11 @@ def _recognize(model_provider, utterance, language) -> str:
             # Without it Whisper writes Simplified Chinese (same prompt as the batch pipeline).
             initial_prompt=transcribe.ZH_PROMPT if language == "zh" else None,
         )
-        return transcribe.joined_text(s.text for s in segments)
+        text = transcribe.joined_text(s.text for s in segments)
+        if language:
+            return text, None
+        found = langs.from_whisper(getattr(info, "language", "") or "")
+        return text, found.code if found else ""
 
 
 def _unload() -> None:
@@ -95,7 +97,7 @@ async def _worker(session, usage, jobs, model_provider, language):
             return
         line, utterance, end = job
         try:
-            text = await asyncio.to_thread(_recognize, model_provider, utterance, language)
+            text, detected = await asyncio.to_thread(_recognize, model_provider, utterance, language)
         except asyncio.CancelledError:
             session.drop(line)
             raise
@@ -105,7 +107,7 @@ async def _worker(session, usage, jobs, model_provider, language):
             session.status(msg)
         else:
             usage.add_audio("local-whisper", len(utterance) / RATE)
-            session.finish(line, text, end)
+            session.finish(line, text, end, detected)
 
 
 async def run(session, usage, language: str, audio: asyncio.Queue, model_provider=None):
@@ -123,7 +125,7 @@ async def run(session, usage, language: str, audio: asyncio.Queue, model_provide
             session.status(f"本機辨識模型載入失敗：{type(e).__name__}: {e}")
             return
         session.status("聆聽中（本機辨識）")
-        lang = iso639(language) or None
+        lang = (langs.find(language).whisper if langs.find(language) else "") or None
         jobs = asyncio.Queue()
         worker = asyncio.ensure_future(_worker(session, usage, jobs, provider, lang))
         seg = Segmenter(RATE)

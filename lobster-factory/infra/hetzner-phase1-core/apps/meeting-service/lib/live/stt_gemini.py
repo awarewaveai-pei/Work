@@ -181,7 +181,8 @@ async def _connect(key: str, language: str):
         raise (_Fatal if code in (401, 403, 404) else _Retry)(msg)
     except Exception as e:
         raise _Retry(f"{type(e).__name__}: {e}")
-    languages = [language.strip()] if language.strip() else []
+    # langs.py code; auto = no hint (Gemini decides; the line's language then comes from its script).
+    languages = [] if language in ("", "auto") else [language]
     setup = {
         "setup": {
             "model": f"models/{MODEL}",

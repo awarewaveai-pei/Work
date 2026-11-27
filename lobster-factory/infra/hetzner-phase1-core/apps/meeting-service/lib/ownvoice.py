@@ -11,6 +11,8 @@ import re
 import time
 import wave
 
+from lib.live.langs import LANGS
+
 APP_ID = "io.github.zaious.ownvoice-meet"
 TEXT_FILES = ("transcript.md", "summary.md")
 # 聆聽場次的機器可讀逐字稿（lib/live/archive.py 寫）；OwnVoice app 與 C12 之前的場次沒有。
@@ -54,9 +56,9 @@ def base_dir() -> str:
 
 
 def language() -> str:
-    """OwnVoice 設定的會議語言 -> lib.transcribe.LANGUAGES 的鍵。"""
+    """OwnVoice 設定的會議語言 -> lib.transcribe.LANGUAGES 的鍵（語言表 lib/live/langs.py 的 whisper 碼）。"""
     code = str(_settings().get("stt_language", "")).lower()
-    return "en" if code.startswith("en") else "zh" if code.startswith("zh") else "auto"
+    return next((l.whisper for l in LANGS if l.whisper and code.startswith(l.whisper)), "auto")
 
 
 def sessions() -> list:

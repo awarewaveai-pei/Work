@@ -20,9 +20,23 @@ import time
 
 ZH_PROMPT = "以下是一場繁體中文會議的錄音，請以臺灣用語的繁體中文輸出逐字稿。"
 
-# 上傳時選的語言 -> whisper 的 language 參數。"auto" = None，whisper 用前 30 秒判斷；
-# 會議前 30 秒常是寒暄或靜音，判錯就整場錯，所以預設維持 zh，auto 只在使用者選時用。
-LANGUAGES = {"zh": "zh", "en": "en", "auto": None}
+
+def _lang_table():
+    # 本檔也會被別的專案按檔案路徑單獨載入（不在 lib 套件裡），不能 `from lib.live import langs`；
+    # 改按路徑載入語言表 lib/live/langs.py（只用標準庫）。
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "live", "langs.py")
+    spec = importlib.util.spec_from_file_location("_meeting_service_langs", path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod      # dataclass 定義時要從 sys.modules 找到自己的模組
+    spec.loader.exec_module(mod)
+    return mod.LANGS
+
+
+# 上傳時選的語言（whisper 碼）-> whisper 的 language 參數，由語言表 lib/live/langs.py 推導。
+# "auto" = None，whisper 用前 30 秒判斷；會議前 30 秒常是寒暄或靜音，判錯就整場錯，
+# 所以預設維持 zh，auto 只在使用者選時用。
+LANGUAGES = {(l.whisper or "auto"): (l.whisper or None) for l in _lang_table()}
 
 
 def joined_text(texts) -> str:

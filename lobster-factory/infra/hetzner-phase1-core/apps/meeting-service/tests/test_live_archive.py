@@ -286,7 +286,7 @@ class SaveSwitch(unittest.IsolatedAsyncioTestCase):
         def set_keys(self, anthropic_key, gemini_key):
             pass
 
-        async def __call__(self, system, user, on_delta, stop, early):
+        async def __call__(self, system, user, on_delta, stop, early, target="zh-TW"):
             return "譯文"
 
     @staticmethod

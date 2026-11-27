@@ -227,7 +227,7 @@ class HubSummarySwitch(unittest.IsolatedAsyncioTestCase):
         async def __call__(self, system, user, on_delta, stop, early):
             return "譯文"
 
-        async def complete(self, system, user):
+        async def complete(self, system, user, target="zh-TW"):
             self.completes.append(user)
             return "- 重點"
 
