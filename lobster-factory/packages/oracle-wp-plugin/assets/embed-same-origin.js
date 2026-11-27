@@ -14,7 +14,9 @@
  *    calls window.parent.awOracleTicket() right before an AI reading and sends the two values as headers
  *    X-AwareWave-Oracle-Ticket / X-AwareWave-Oracle-Signature (never in a URL). Each call is a fresh,
  *    single-use, 60-second ticket. Not defined for anonymous visitors: the engine then reads anonymously.
- * Config: window.AWORACLE_SAME = { rootId, minHeight, pages: { slug: url }, ticket: { url, nonce } | null }.
+ *  - Theme fonts: the frame's host-theme font names (Embed\ThemeTokens) get this page's same-origin
+ *    @font-face files copied in (copyFonts); colours need no script, they are in the frame URL.
+ * Config: window.AWORACLE_SAME ={ rootId, minHeight, pages: { slug: url }, ticket: { url, nonce } | null }.
  */
 (function () {
   'use strict';
@@ -45,6 +47,65 @@
           return null;
         });
     };
+  }
+
+  /** Lower-cased family names in a font-family list ('"Inter", Roboto, sans-serif' -> ['inter','roboto','sans-serif']). */
+  function familyNames(list) {
+    return String(list || '')
+      .split(',')
+      .map(function (f) {
+        return f.trim().replace(/^["']|["']$/g, '').toLowerCase();
+      })
+      .filter(Boolean);
+  }
+
+  /**
+   * Host theme fonts (ThemeTokens → --aw-font / --aw-font-heading in the frame) are only names; the frame does
+   * not load this page's web fonts. Copy this page's @font-face rules for those families into the frame as
+   * FontFace objects. Only same-origin font files load (the engine CSP is font-src 'self'): fonts served by
+   * WordPress itself (theme.json fonts, Kadence "load fonts locally") work, third-party font hosts fall back.
+   */
+  function copyFonts(doc, win) {
+    if (!doc.fonts || typeof win.FontFace !== 'function' || doc.__awOracleFonts) return;
+    doc.__awOracleFonts = true;
+    var css = win.getComputedStyle(doc.documentElement);
+    var want = familyNames(css.getPropertyValue('--aw-font') + ',' + css.getPropertyValue('--aw-font-heading'));
+    if (!want.length) return;
+    var sheets = document.styleSheets;
+    for (var i = 0; i < sheets.length; i++) {
+      var rules;
+      try {
+        rules = sheets[i].cssRules; // a third-party stylesheet throws: skip it
+      } catch (e) {
+        continue;
+      }
+      var base = sheets[i].href || document.baseURI;
+      for (var j = 0; rules && j < rules.length; j++) {
+        var r = rules[j];
+        if (r.type !== 5 /* CSSRule.FONT_FACE_RULE */) continue;
+        var family = familyNames(r.style.getPropertyValue('font-family'))[0];
+        if (!family || want.indexOf(family) < 0) continue;
+        var src = r.style.getPropertyValue('src').replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/g, function (m, q, u) {
+          try {
+            return 'url("' + new URL(u, base).href + '")';
+          } catch (e) {
+            return m;
+          }
+        });
+        try {
+          var face = new win.FontFace(r.style.getPropertyValue('font-family').replace(/^["']|["']$/g, ''), src, {
+            weight: r.style.getPropertyValue('font-weight') || 'normal',
+            style: r.style.getPropertyValue('font-style') || 'normal',
+            unicodeRange: r.style.getPropertyValue('unicode-range') || 'U+0-10FFFF',
+            display: 'swap'
+          });
+          doc.fonts.add(face);
+          face.load().catch(function () {});
+        } catch (e) {
+          /* a rule the frame cannot use: the engine's own fallback font stays */
+        }
+      }
+    }
   }
 
   function attach(frame) {
@@ -146,6 +207,11 @@
       }
       state.root = root;
       state.height = 0;
+      try {
+        copyFonts(doc, win);
+      } catch (e) {
+        /* fonts are cosmetic: never let them stop height tracking */
+      }
       // Observers from the frame's own window: they are tied to the frame document's rendering.
       state.observer = new win.ResizeObserver(measure);
       state.observer.observe(root);

@@ -137,7 +137,7 @@ Resend 不在 FluentCRM 內建的退信回報名單內，所以外掛自己收 w
 | 設定頁 | `includes/Admin/SettingsPage.php`（金鑰／鹽／工具清單動作走 `admin-post.php` 後轉回，重新整理不會重做） |
 | 設定驗證（不依賴 WordPress） | `includes/Settings/Normalize.php`；儲存 `includes/Settings/Options.php` |
 | 金鑰與簽章 | `includes/Crypto/SiteKey.php` |
-| 嵌入 | `includes/Embed/{Renderer,EmbedUrl,LocaleMap,Shortcode,Block}.php`、`assets/{embed-same-origin,embed,block}.js` |
+| 嵌入 | `includes/Embed/{Renderer,EmbedUrl,LocaleMap,Shortcode,Block}.php`、`assets/{embed-same-origin,embed,block}.js`；佈景顏色／字體／圓角 → 引擎主題代碼 `includes/Embed/ThemeTokens.php`（Kadence 色盤對應表 `KADENCE_MAP`；設定「Theme colour map」逐列覆寫；契約見引擎 `deploy/DEPLOY.md`「宿主主題代碼」） |
 | 會員存檔 | `includes/Members/{Store,Rest,Shortcodes,Privacy,Record}.php`、`includes/Crypto/Vault.php`、`assets/members.js` |
 | 會員票 | `includes/Members/Ticket.php` |
 | 每日運勢信 | `includes/Daily/{Schedule,Letter,Svix}.php`（不依賴 WordPress）、`includes/Daily/{Store,Crm,Runner,Rest,Confirm,Signup,Hooks,Lang}.php`、`assets/daily.js` |

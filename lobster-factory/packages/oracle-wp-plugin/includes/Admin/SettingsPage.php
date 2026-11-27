@@ -113,6 +113,9 @@ final class SettingsPage {
 				return esc_html__( 'Turnstile site key: paste the site key exactly as Cloudflare shows it (it starts with a digit and x, e.g. 0x4AAAA…).', 'aware-wave-oracle' );
 			case 'cross_unsupported':
 				return esc_html__( 'Embedding from another domain is not supported yet; same domain was saved.', 'aware-wave-oracle' );
+			case 'theme_map':
+				/* translators: %s: the lines that were not saved */
+				return sprintf( esc_html__( 'Theme colour map: these lines were not saved (use token=palette slug, e.g. bg=palette9): %s', 'aware-wave-oracle' ), esc_html( $detail ) );
 			case 'maps':
 				/* translators: %s: the lines that were not saved */
 				return sprintf( esc_html__( 'These lines were not saved (wrong format, or a language the engine does not have — zh-TW, en): %s', 'aware-wave-oracle' ), esc_html( $detail ) );
@@ -217,6 +220,7 @@ final class SettingsPage {
 		$this->textRow( $name . '[default_locale]', $s['default_locale'], __( 'Default engine language', 'aware-wave-oracle' ), __( 'zh-TW or en. Used when the page language is neither and has no entry below.', 'aware-wave-oracle' ) );
 		$this->areaRow( $name . '[locale_map]', Normalize::pairsToText( $s['locale_map'] ), __( 'Language map', 'aware-wave-oracle' ), __( 'Optional, one per line: WordPress locale=engine language, e.g. zh_HK=zh-TW. zh_TW and en_* need no entry.', 'aware-wave-oracle' ) );
 		$this->areaRow( $name . '[page_map]', Normalize::pairsToText( $s['page_map'] ), __( 'Tool pages', 'aware-wave-oracle' ), __( 'One per line: tool=page ID. When the embedded tool links to another tool, the visitor goes to that page.', 'aware-wave-oracle' ) );
+		$this->areaRow( $name . '[theme_map]', Normalize::pairsToText( $s['theme_map'] ), __( 'Theme colour map', 'aware-wave-oracle' ), __( 'Optional, one per line: token=palette slug, e.g. surface=palette7. Tokens: bg, surface, border, heading, text, muted, accent, on-accent, accent-2. Empty: Kadence palette 1–2 accents, 3–5 text, 7–9 backgrounds; other themes use their theme.json styles.', 'aware-wave-oracle' ) );
 		$this->mailerRow( $name . '[mailer]', $s['mailer'] );
 		$this->textRow( $name . '[fluentform_id]', $s['fluentform_id'] ? (string) $s['fluentform_id'] : '', __( 'Signup form (Fluent Forms ID)', 'aware-wave-oracle' ), __( 'Optional: set by “wp aworacle daily-form”. Put that form’s shortcode on the signup page. Empty: the built-in form [aw_oracle_daily].', 'aware-wave-oracle' ) );
 		$this->textRow( $name . '[turnstile_site_key]', $s['turnstile_site_key'], __( 'Turnstile site key', 'aware-wave-oracle' ), __( 'Optional: Cloudflare Turnstile human check on the daily-letter signup form. Site key here, secret key in the Human check section below.', 'aware-wave-oracle' ) );

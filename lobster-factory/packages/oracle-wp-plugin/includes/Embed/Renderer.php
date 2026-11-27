@@ -31,6 +31,8 @@ final class Renderer {
 		$same  = $s['embed'] !== Normalize::EMBED_CROSS_ORIGIN;
 		$local = self::locale();
 		$src   = $same ? EmbedUrl::path( $local, $tool ) : EmbedUrl::build( $s['browser_engine_url'], $local, $tool );
+		// The site's theme colours/fonts ride on the URL so the engine paints them on first render (ThemeTokens).
+		$src = ThemeTokens::withQuery( $src, ThemeTokens::read( $s['theme_map'] ) );
 		if ( $src === '' ) {
 			// Only people who can fix it see why nothing renders.
 			return current_user_can( 'manage_options' )

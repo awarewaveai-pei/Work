@@ -13,6 +13,7 @@
 namespace AwareWave\Oracle\Settings;
 
 use AwareWave\Oracle\Embed\EmbedUrl;
+use AwareWave\Oracle\Embed\ThemeTokens;
 
 final class Normalize {
 
@@ -45,7 +46,7 @@ final class Normalize {
 	 *
 	 * @param array<string,mixed>                 $in
 	 * @param array<int,array{0:string,1:string}> $errors
-	 * @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>,mailer:string,turnstile_site_key:string,fluentform_id:int}
+	 * @return array{embed:string,browser_engine_url:string,server_engine_url:string,key_id:string,default_locale:string,locale_map:array<string,string>,page_map:array<string,int>,mailer:string,turnstile_site_key:string,fluentform_id:int,theme_map:array<string,string>}
 	 */
 	public static function settings( array $in, array &$errors = array() ): array {
 		$out = Options::defaults();
@@ -98,6 +99,12 @@ final class Normalize {
 		$out['page_map']   = array_map( 'intval', $pages );
 		if ( $rejected ) {
 			$errors[] = array( 'maps', implode( ' | ', $rejected ) );
+		}
+
+		$themeRejected    = array();
+		$out['theme_map'] = self::pairs( $in['theme_map'] ?? '', ThemeTokens::TOKEN_PATTERN, ThemeTokens::SLUG_PATTERN, $themeRejected );
+		if ( $themeRejected ) {
+			$errors[] = array( 'theme_map', implode( ' | ', $themeRejected ) );
 		}
 		return $out;
 	}
