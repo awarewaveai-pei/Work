@@ -566,6 +566,9 @@ window.Workspace = (function () {
   function paintSpeakers() {
     const bar = root && root.querySelector(".cap-spk");
     if (!bar) return;
+    // Every usage or speakers event repaints: keep the rename box (and what is typed in it) while it is open.
+    const editing = bar.querySelector("input[data-renaming]");
+    if (editing && renamingSpeaker === editing.dataset.renaming) return;
     const sp = state.speakers || { on: false, list: [], voices: [] };
     bar.hidden = !sp.on && !sp.voices.length;
     if (bar.hidden) return;

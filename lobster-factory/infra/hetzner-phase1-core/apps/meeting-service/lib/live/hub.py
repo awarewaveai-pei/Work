@@ -56,6 +56,9 @@ REPLY_MAX = 2000
 ARCHIVE_TICK = 1.0
 # At the end of listening: how long to wait for the translations still running, and for the last summary update.
 DRAIN_TIMEOUT, SUMMARY_TIMEOUT = 15.0, 20.0
+# At the end of listening: how long the last save waits for the recognizer and the speakers to close (a model
+# still loading, the regroup); the closing itself is never cut short (the GPU claim goes after both unload).
+CLOSE_TIMEOUT = 60.0
 NOT_SAVING = {"index": 0, "name": "", "recording": False, "dir": ""}
 # proto 2: the first byte of every audio frame says which channel it is.
 SOURCES = {0: "me", 1: "them"}
@@ -123,6 +126,9 @@ class Hub:
         self.last_caption = time.monotonic()
         self.archive = None          # the Archive of the session being saved (until it is closed out)
         self.tracker = None          # live speakers of the 對方 channel (lib/live/speakers.py), when on
+        self.closing = None          # the task closing this listening's recognizer and speakers (never cancelled)
+        self.recognizer = None       # this listening's shared local recognizer (lib/live/stt_local.py)
+        self._voices = None          # the saved voices, read once and again after a save or delete
         self.archive_task = None
         self.finalizing = None       # the task closing out the session that just ended
         self.summary = None
@@ -162,7 +168,13 @@ class Hub:
     def _line_label(self, id: int, speaker: str, guess: bool) -> None:
         if self.archive is not None:
             self.archive.line_label(id, speaker, guess)
-        self.emit(self._speakers_view())
+
+    def _saved_voices(self) -> list:
+        """The saved voices (lib/live/speakers.py Voices), not read again on every line. Raises
+        speakers.VoicesUnreadable / ValueError (the file is in a forbidden place) for the caller to say."""
+        if self._voices is None:
+            self._voices = speakers.Voices().load()
+        return self._voices
 
     def _speakers_view(self) -> dict:
         names = {}
@@ -173,8 +185,8 @@ class Hub:
         else:
             voices = {}
         try:
-            saved = [{"id": v["id"], "name": v["name"]} for v in speakers.Voices().load()]
-        except ValueError:
+            saved = [{"id": v["id"], "name": v["name"]} for v in self._saved_voices()]
+        except (speakers.VoicesUnreadable, ValueError):
             saved = []
         return {"type": "speakers", "on": self.tracker is not None,
                 "list": [{"name": n, "lines": c, "voice": voices.get(n)} for n, c in names.items()], "voices": saved}
@@ -334,6 +346,23 @@ class Hub:
             if local:
                 return self._refuse(BUSY_TEXT)
             live_speakers, gpu, note = False, False, "顯卡正在跑會後整理，這場不即時分講者，字幕照常"
+        try:
+            self._begin(session, owner, stt, listen, target, kinds, gemini_key, local, live_speakers, gpu, note,
+                        pause_min, end_min, save, summary, summary_min, stt_me)
+        except BaseException:
+            # Nothing after the claim may keep it: a listening that did not start gives the GPU back, after
+            # closing a recognizer it already created (its model may be loading).
+            if self.task is None or self.task.done():
+                if self.recognizer is not None:
+                    self.closing = asyncio.ensure_future(self._close(self.recognizer, None, gpu))
+                elif gpu:
+                    gpu_gate.release_live()
+            raise
+
+    def _begin(self, session, owner, stt, listen, target, kinds, gemini_key, local, live_speakers, gpu, note,
+               pause_min, end_min, save, summary, summary_min, stt_me) -> None:
+        """The rest of start(), after the GPU claim (start() gives the claim back if this raises)."""
+        self.task = self.recognizer = None
         session.listen, session.target = listen, target
         self.archive = self._begin_archive(stt, listen, target, stt_me) if save else None
         if self.archive is not None:
@@ -344,7 +373,7 @@ class Hub:
         self.summary.on_update = self.archive.set_summary if summary and self.archive is not None else None
         self.emit({"type": "segment", **self._segment()})
         self.owner, self.stt, self.proto = owner, stt, 1 if stt_me is None else 2
-        recognizer = stt_local.Recognizer(session, self.usage) if local else None
+        recognizer = self.recognizer = stt_local.Recognizer(session, self.usage) if local else None
         self.last_caption = time.monotonic()      # "quiet for end_min" counts from this listening's start
         self.positions = [0] * len(kinds)          # recording positions when nothing is saved
         self.channels = {}
@@ -361,11 +390,22 @@ class Hub:
                 pause = 0
             self.channels[who] = Channel(self, who, i, run, pause)
         session.echo = self._echo if stt_me is not None else None
-        try:
-            self.tracker = speakers.Tracker(session, self.channels["them"].ring, kinds["them"] == "gemini",
-                                            speakers.Voices(), speakers.Embedder(settings.key("hf_token"))) if live_speakers else None
-        except ValueError as e:      # the voices file would land in a forbidden folder
-            self.tracker, note = None, f"{e}，這場不即時分講者"
+        self.tracker = None
+        if live_speakers:
+            self._voices = None
+            try:
+                saved = self._saved_voices()
+            except speakers.VoicesUnreadable as e:
+                saved, note = [], f"{e}；這場不認已記住的聲音"
+            except ValueError as e:      # the voices file would land in a forbidden folder
+                saved, note = None, f"{e}，這場不即時分講者"
+            if saved is not None:
+                self.tracker = speakers.Tracker(session, self.channels["them"].ring, kinds["them"] == "gemini", saved,
+                                                speakers.Embedder(settings.key("hf_token")),
+                                                on_change=lambda: self.emit(self._speakers_view()))
+            elif gpu and not local:
+                gpu_gate.release_live()      # the claim was only for the speakers
+                gpu = False
         if note:
             session.status(note)
         if self.tracker is not None:
@@ -392,14 +432,27 @@ class Hub:
             if any(ended):
                 self._session().status(f"安靜超過 {idle.minutes_label(end_min)} 分鐘，已自動結束聆聽")
         finally:
-            try:
-                if recognizer is not None:
+            # Stop's timeout may cancel this task: the closing runs on in its own task regardless.
+            self.closing = asyncio.ensure_future(self._close(recognizer, tracker, gpu))
+            await asyncio.shield(self.closing)
+
+    async def _close(self, recognizer, tracker, gpu: bool) -> None:
+        """The recognizer's queued sentences and model, then the speakers' regroup and model; each waits
+        for a model still loading. Only then is the GPU claim given back."""
+        try:
+            if recognizer is not None:
+                try:
                     await recognizer.close()
-                if tracker is not None:
+                except Exception:
+                    log.exception("closing the local recognizer failed")
+            if tracker is not None:
+                try:
                     await tracker.finish()
-            finally:
-                if gpu:
-                    gpu_gate.release_live()
+                except Exception:
+                    log.exception("closing the live speakers failed")
+        finally:
+            if gpu:
+                gpu_gate.release_live()
 
     def _refuse(self, why: str) -> None:
         """Not started: say why, and tell the page so it lets go of the microphone it already opened."""
@@ -434,6 +487,9 @@ class Hub:
                 await asyncio.wait_for(asyncio.shield(self.summary.finish()), SUMMARY_TIMEOUT)
             except asyncio.TimeoutError:
                 pass
+            if self.closing is not None:
+                # The regrouped speakers go into the last save.
+                await asyncio.wait({self.closing}, timeout=CLOSE_TIMEOUT)
             if archive is not None:
                 archive.end()
         finally:
@@ -443,6 +499,10 @@ class Hub:
                 self.archive = self.archive_task = None
             self.finalizing = None
             self.emit({"type": "segment", **NOT_SAVING})
+            if self.tracker is not None:
+                # Its vectors stay no longer than the listening; the page shows speakers off.
+                self.tracker = None
+                self.emit(self._speakers_view())
 
     async def _tick(self) -> None:
         while True:
@@ -553,27 +613,35 @@ class Hub:
         if kind == "voice-delete":
             try:
                 speakers.delete_voice(speakers.Voices(), t.clusters if t is not None else None, str(cmd.get("id", "")))
-            except (OSError, ValueError) as e:
+            except (OSError, ValueError, speakers.VoicesUnreadable) as e:
                 return s.status(f"刪不掉這個聲音：{e}")
+            finally:
+                self._voices = None
+            if t is not None:
+                for line, (who, guess) in t.clusters.labels().items():
+                    s.label(line, who, guess)
             return self.emit(self._speakers_view())
         if t is None or not (self.listening or self.finalizing is not None):
             return s.status("要在開了「即時分講者」的聆聽中（或剛停止、還在存檔時）才能改名或記住聲音")
+        if t.regrouping:
+            return s.status("正在重新分出講者，幾秒後再改")
         name = clean_text(str(cmd.get("name", ""))).strip()[:NAME_MAX].strip()
         if not name:
             return s.status("名字不能是空的")
         if kind == "speaker-rename":
             if t.clusters.rename(str(cmd.get("old", "")), name):
                 for line, (who, guess) in t.clusters.labels().items():
-                    if who == name:
-                        s.label(line, who, guess)
+                    s.label(line, who, guess)
             return self.emit(self._speakers_view())
         centre = t.clusters.centre_of(name)
         if centre is None:
             return s.status(f"「{name}」還沒有足夠的聲音可以記住")
         try:
             item = speakers.Voices().save(name, centre)
-        except (OSError, ValueError) as e:
+        except (OSError, ValueError, speakers.VoicesUnreadable) as e:
             return s.status(f"記不住這個聲音：{e}")
+        finally:
+            self._voices = None
         t.clusters.remember(name, item)
         s.status(f"記住了「{name}」的聲音（只存聲紋與名字，不存錄音）")
         self.emit(self._speakers_view())
