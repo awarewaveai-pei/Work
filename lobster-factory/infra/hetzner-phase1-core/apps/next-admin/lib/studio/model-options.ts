@@ -32,12 +32,24 @@ export type EditTool = "flux-fill-pro" | "ideogram-4-5-edit" | "ideogram-4-5-edi
 
 export type ModelUse = "generate" | "edit" | "fill" | "remove" | "outpaint";
 
+/** The ratios every model takes (image-models.js ASPECT_RATIOS). The ONE copy; lib/tarot/image-gen.ts re-exports it. */
 export type AspectRatio = "2:3" | "3:2" | "4:5" | "1:1" | "9:16" | "4:3" | "3:4" | "16:9";
+/** A ratio some model takes on top of those (its catalog row's `ratios`). */
+export type ModelAspectRatio = AspectRatio | "21:9";
 
 export const VALID_ASPECT_RATIOS = shared.ASPECT_RATIOS as readonly AspectRatio[];
 
+/** A ratio every model takes. Callers that do not check per model (tarot, content) stay on this one. */
 export function isAspectRatio(v: unknown): v is AspectRatio {
   return typeof v === "string" && (VALID_ASPECT_RATIOS as readonly string[]).includes(v);
+}
+
+/** The ratios `model` takes (empty for an unknown id). */
+export const ratiosFor = shared.ratiosFor as (model: string) => readonly ModelAspectRatio[];
+
+/** Does `model` take ratio `v`? The generate route and the engine both ask this. */
+export function modelTakesRatio(model: string, v: unknown): v is ModelAspectRatio {
+  return typeof v === "string" && (ratiosFor(model) as readonly string[]).includes(v);
 }
 
 /** The supported ratio closest to an image's own, so an edit of it keeps its framing. */

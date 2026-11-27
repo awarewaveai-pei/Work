@@ -23,6 +23,7 @@ import { imageCostUsd } from "@/lib/ai/cost-calculator";
 import { CODEX_JOB_MS, codexAllowed, codexDeferred, runOnLaptop, type CodexRef } from "./codex-bridge";
 import { IMAGE_MODELS, imageRunUsd } from "../../public/editor-shared/image-models.js";
 import { GEMINI_IMAGE_TOKEN_RATES, OPENAI_IMAGE_MODEL, OPENAI_IMAGE_TOKEN_RATES, geminiMediaUsd, type GeminiMediaUsage } from "@/lib/ai/cost-model";
+import { isAspectRatio, modelTakesRatio, VALID_ASPECT_RATIOS, type AspectRatio, type ModelAspectRatio } from "@/lib/studio/model-options";
 
 const GEN_TIMEOUT_MS = 58_000; // default; a model sets ModelConfig.timeoutMs when its route allows more (app nginx proxy_read_timeout is 300s)
 // Replicate holds a "Prefer: wait" request up to this many seconds, then answers with the running prediction: shorter
@@ -55,8 +56,8 @@ export type TarotModel =
   | "flux-2-max"
   | "codex-image";
 
-/** Canonical aspect ratio options. "2:3" is the traditional tarot portrait format. */
-export type AspectRatio = "2:3" | "3:2" | "4:5" | "1:1" | "9:16" | "4:3" | "3:4" | "16:9";
+// Ratios: one list, lib/studio/model-options.ts (catalog image-models.js). "2:3" is the traditional tarot portrait format.
+export { isAspectRatio, VALID_ASPECT_RATIOS, type AspectRatio };
 
 /** Input to a model's buildInput function — shared across all apps using this combo-pack. */
 export interface BuildInputParams {
@@ -287,10 +288,6 @@ export function isTarotModel(v: unknown): v is TarotModel {
   return typeof v === "string" && Object.prototype.hasOwnProperty.call(TAROT_MODELS, v);
 }
 
-export const VALID_ASPECT_RATIOS: readonly AspectRatio[] = ["2:3", "3:2", "4:5", "1:1", "9:16", "4:3", "3:4", "16:9"];
-export function isAspectRatio(v: unknown): v is AspectRatio {
-  return typeof v === "string" && (VALID_ASPECT_RATIOS as string[]).includes(v);
-}
 
 export interface TarotGenParams {
   model: TarotModel;
@@ -305,8 +302,9 @@ export interface TarotGenParams {
   mask?: string;
   /** Reproducibility seed (most Replicate models; gpt-image-2 ignores it). */
   seed?: number | null;
-  /** Output aspect ratio. Defaults to "2:3" (traditional tarot portrait). */
-  aspectRatio?: AspectRatio;
+  /** Output aspect ratio. Defaults to "2:3" (traditional tarot portrait). One the model does not take is refused
+   *  (runGeneration, modelTakesRatio): only a catalog row with `ratios` reaches past AspectRatio. */
+  aspectRatio?: ModelAspectRatio;
   /** When true, FLUX models use explicit print-quality pixel dims instead of megapixels:"1".
    *  Tarot cards: 300 DPI @ 7.6×12.6 cm = 896×1488 px. Studio/Mockup: omit (stays 1 MP). */
   printQuality?: boolean;
@@ -525,7 +523,7 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
   const seed = params.seed ?? Math.floor(Math.random() * 1_000_000_000);
   const input = config.buildInput({
     prompt: params.prompt,
-    aspectRatio: params.aspectRatio ?? "2:3",
+    aspectRatio: (params.aspectRatio ?? "2:3") as AspectRatio, // a Replicate row lists no model-only ratio (runGeneration)
     seed,
     referenceImages: params.referenceImages ?? [],
   });
@@ -580,7 +578,7 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
     "3:4": "1024x1536", // portrait → nearest (2:3)
     "16:9": "1536x1024", // widescreen → nearest landscape
   };
-  const SIZE = sizeMap[params.aspectRatio ?? "2:3"];
+  const SIZE = sizeMap[(params.aspectRatio ?? "2:3") as AspectRatio]; // OpenAI rows list no model-only ratio (runGeneration)
   const quality = config.quality ?? "medium";
   let res: Response;
 
@@ -699,6 +697,8 @@ function openaiImageCostUsd(u: OpenAiImageUsage | undefined): number | undefined
 
 /** Shared by tarot, studio, content and video: the caller asks for its own product's feature (e.g. grantFor("studio.image")). */
 export async function generateTarotImage(params: TarotGenParams, grant: Grant): Promise<TarotGenResult> {
+  // Before any hold: a ratio this model does not take (image-models.js ratiosFor) never reaches a provider.
+  if (params.aspectRatio != null && !modelTakesRatio(params.model, params.aspectRatio)) return { ok: false, error: "aspect_ratio_unsupported" };
   // Credits are held at the per-image price before the provider runs (Grant.hold); the settle uses the reported cost.
   // A per-megapixel row (image-models.js imageRunUsd) is held for its measured references + the most output it can return
   // (maxOutputMp), and charged for the output it actually returned.

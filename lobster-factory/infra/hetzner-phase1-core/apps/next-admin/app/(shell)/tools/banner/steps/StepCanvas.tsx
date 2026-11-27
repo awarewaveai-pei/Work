@@ -4,7 +4,7 @@ import { roleHeader } from "@/lib/ops-role";
 import { CANVAS_STAFF_HREF, openInCanvas } from "@/components/tools/canvas-handoff";
 import { useDoorHref } from "@/app/DoorContext";
 import { fetchAwaitingCodex } from "@/lib/studio/codex-wait";
-import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type AspectRatio, type StudioModel } from "@/lib/studio/model-options";
+import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type ModelAspectRatio, type StudioModel } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../../tarot/tarotStyles";
 import { BANNER_RETURN_TOOL } from "../banner-canvas-return";
 import { boxOnPicture, compositePrompt, ntdLabel, removeBgNtd, type PicArea } from "../banner-design";
@@ -13,7 +13,7 @@ import { reservedAreas } from "../banner-layout";
 import type { GroundingOpts } from "../product-grounding";
 import { FIELD_RANGES } from "../field-ranges";
 import {
-  BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, groundingOn, presetLabel, selectedSizes, variantOf, withSharedBackground, withSizeBackgrounds,
+  BG_PLACE_RESET, PRESETS, aiBgPromptOf, applyLayout, groundingOn, narrowedSizes, pictureAspect, presetLabel, selectedSizes, variantOf, withSharedBackground, withSizeBackgrounds,
   type BakedPicture, type BgMode, type PresetKey, type ProductPos, type State,
 } from "../banner-state";
 import type { StepSlot } from "./order";
@@ -81,7 +81,7 @@ const BG_MODE_LABEL: Record<BgMode, string> = { color: "純色", gradient: "漸�
 export const imageNtd = (model: StudioModel): number => STUDIO_MODEL_OPTIONS.find((m) => m.value === model)?.costNt ?? 0;
 
 /** One picture from the studio route (also AI 一鍵設計's scenes). Throws the route's message on failure. */
-export async function generateBgPicture(o: { model: StudioModel; prompt: string; aspect: AspectRatio; refs?: string[] }): Promise<string> {
+export async function generateBgPicture(o: { model: StudioModel; prompt: string; aspect: ModelAspectRatio; refs?: string[] }): Promise<string> {
   const res = await fetchAwaitingCodex("/api/tools/studio/generate", {
     method:  "POST",
     headers: { "Content-Type": "application/json", ...roleHeader("operator") },
@@ -92,12 +92,16 @@ export async function generateBgPicture(o: { model: StudioModel; prompt: string;
   return data.image;
 }
 
-/** The layout engine's reserved areas (reservedAreas) on size `k` of the design, as shares of a picture generated at
- *  that size's ratio -- the same product area the layout keeps clear once the product is baked in (null = none). */
-export async function drawnAreas(v: State, k: PresetKey): Promise<{ text: PicArea | null; product: PicArea | null }> {
-  const ps = PRESETS[k];
+/** The layout engine's reserved areas (reservedAreas) on size `k` of the design, as shares of the picture `model` draws
+ *  for that size, and that picture's ratio (pictureAspect). Invariant: the prompt's areas and the generated ratio come
+ *  from this one call, so a 3:1 drawn at 21:9 is told 21:9 coordinates. The product area is the one the layout keeps
+ *  clear once the product is baked in (null = none). */
+export async function drawnAreas(v: State, k: PresetKey, model: StudioModel):
+  Promise<{ text: PicArea | null; product: PicArea | null; aspect: ModelAspectRatio; visible: PicArea }> {
+  const ps = PRESETS[k], aspect = pictureAspect(k, model);
   const { text, product } = reservedAreas(await bannerLayout(v, ps));
-  return { text: text ? boxOnPicture(text, ps, ps.aspect) : null, product: product ? boxOnPicture(product, ps, ps.aspect) : null };
+  return { text: text ? boxOnPicture(text, ps, aspect) : null, product: product ? boxOnPicture(product, ps, aspect) : null, aspect,
+    visible: boxOnPicture({ x: 0, y: 0, w: ps.w, h: ps.h }, ps, aspect) };
 }
 
 /** 合成進場景 at each of `sizes` in parallel: the product (first ref) composited into `scene` at that size's ratio, inside
@@ -106,10 +110,10 @@ export async function compositeSizes(st: State, sizes: readonly PresetKey[], o: 
   Promise<{ pics: Partial<Record<PresetKey, BakedPicture>>; errs: Partial<Record<PresetKey, string>> }> {
   const got = await Promise.all(sizes.map(async (k) => {
     try {
-      const areas = await drawnAreas(variantOf(st, k), k);
+      const areas = await drawnAreas(variantOf(st, k), k, o.model);
       if (!areas.product) throw new Error("no_product_area");
-      const prompt = compositePrompt({ scene: o.scene, productArea: areas.product, textArea: areas.text });
-      return [k, { image: await generateBgPicture({ model: o.model, prompt, aspect: PRESETS[k].aspect, refs: o.refs }), area: areas.product }] as const;
+      const prompt = compositePrompt({ scene: o.scene, productArea: areas.product, textArea: areas.text, group: PRESETS[k].group, visible: areas.visible });
+      return [k, { image: await generateBgPicture({ model: o.model, prompt, aspect: areas.aspect, refs: o.refs }), area: areas.product }] as const;
     } catch (err) {
       return [k, err instanceof Error ? err : new Error(String(err))] as const;
     }
@@ -582,6 +586,11 @@ export default function StepCanvas({ slot, s, set, setS }: StepCtx & { slot: Ste
                   ? "AI 把產品放進場景（放在桌面、真實光影），匯出時不再事後疊加產品。"
                   : "AI 只生背景，產品圖事後疊在上層（可調位置/大小）。"}
               </p>
+              {s.aiBgCompositeProduct && modelCompositesProduct(s.aiBgModel) && narrowedSizes(picked, s.aiBgModel).length > 0 && (
+                <p className="form-hint" style={{ marginTop: 4 }} data-testid="banner-wide-ratio-hint">
+                  {narrowedSizes(picked, s.aiBgModel).map((k) => PRESETS[k].ratio).join("、")} 用這個模型會以 16:9 生成再裁，上下約 20% 看不到；改選 Nano Banana 2 會用 21:9 生成，看得到的高度從 59% 變 78%。
+                </p>
+              )}
               {s.aiBgCompositeProduct && !modelCompositesProduct(s.aiBgModel) && (
                 <p className="form-hint" style={{ marginTop: 4, color: "var(--badge-red-text)" }}>
                   ⚠ 此模型不會把產品「放進場景」（flux-dev 是 img2img、ideogram-character 是人臉參考）。請在「圖片模型」改選 Nano Banana 2/Pro、FLUX Kontext 或 GPT-Image-1。

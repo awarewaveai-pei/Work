@@ -5,7 +5,7 @@ import { BANNER_COPY_VARIANTS, BANNER_DESIGN_COPY_VARIANTS } from "@/lib/script-
 import { AI_TEXT_MODELS, type AiTextModel } from "@/lib/ai/text-model-options";
 import { textCallCostUsd, toolCostUsd, usdToNtd } from "@/lib/ai/cost-calculator";
 import { PRESETS, type CopyVariant, type PresetKey, type State } from "./banner-state";
-import { COMPOSITION } from "./composition";
+import { COMPOSITION, type CompGroup } from "./composition";
 
 /** The models offered on the banner's AI buttons (operator 2026-11-26). Defaults from the bake-off on production
  *  (ai_call_logs, same brief, 2026-11-26): 一鍵設計 stays Claude Opus 5.5. 生成文案 = Claude Sonnet 5.5 (operator 2026-11-26,
@@ -252,20 +252,34 @@ export function scenePrompt(o: { subject: string; vibe: string; textArea: PicAre
 }
 
 /** 合成進場景 at one size: the product composited into the scene inside the area the layout engine reserves for it at that
- *  size, whole and inside the picture; the text area kept clear. */
-export function compositePrompt(o: { scene: string; productArea: PicArea; textArea: PicArea | null }): string {
+ *  size (reservedAreas via drawnAreas), whole and inside the picture; the text area kept clear. R4 (T1 決定 3, measured
+ *  2026-11-27 t1/T1-measure.md): the AI follows x (centres within 2 points) but not size or y -- landscape products came
+ *  out 49-57% tall whatever was asked and their tops ran into the text. So by composition group (composition.ts):
+ *  - phone: the reserved area as asked (portrait sizes came out 0.94-1.24x the asked height); it sits on the lower third
+ *    line's right crossing because the layout put it there.
+ *  - card / web: zoned by x ONLY -- the product in its column for the visible height, about half that height tall, the
+ *    text column kept clear top to bottom. `visible` = the band of the picture the canvas shows (3:1 cuts the rest). */
+export function compositePrompt(o: { scene: string; productArea: PicArea; textArea: PicArea | null; group: CompGroup; visible?: PicArea }): string {
   const scene = o.scene.trim() || "a clean professional studio background";
-  const h = Math.round((o.productArea.y1 - o.productArea.y0) * 100);
-  return `Scene: ${scene}. Composite the provided product photo INTO this scene as the hero subject. ` +
-    `Place the product inside ${areaText(o.productArea)}: the WHOLE product inside that area and inside the picture, ` +
-    `never cropped by the edge, about ${h}% of the picture height tall -- not bigger. ` +
+  const v = o.visible ?? { x0: 0, y0: 0, x1: 1, y1: 1 };
+  const a = o.productArea, t = o.textArea;
+  const placement = o.group === "phone"
+    ? `Place the product inside ${areaText(a)} -- the lower-right crossing of the rule-of-thirds lines: the WHOLE product inside that area and inside the picture, ` +
+      `never cropped by the edge, about ${pct(a.y1 - a.y0)} of the picture height tall -- not bigger. `
+    : `Place the product in the column x ${pct(a.x0)}-${pct(a.x1)} of the picture, centred in it, the WHOLE product inside that column ` +
+      `and between y ${pct(v.y0)} and ${pct(v.y1)} (the part of the picture that is shown), never cropped by an edge; ` +
+      `the product about ${pct((v.y1 - v.y0) * 0.5)} of the picture height tall -- about half of the shown height, not bigger. `;
+  const keepClear = !t ? `Keep clean negative space for a headline.`
+    : o.group === "phone" ? `Keep ${areaText(t)} clean and uncluttered for a headline; nothing else in the picture carries text.`
+    : `Keep the whole column x ${pct(t.x0)}-${pct(t.x1)}, top to bottom, clean and uncluttered for a headline -- the product and anything tall stay out of it; nothing else in the picture carries text.`;
+  return `Scene: ${scene}. Composite the provided product photo INTO this scene as the hero subject. ` + placement +
     `Physically PLACE it resting on a real surface that belongs to the scene -- a table, counter or shelf -- ` +
     `standing upright with its base actually touching the surface (a grounded contact shadow beneath it), ` +
     `NOT floating, NOT pasted flat over the background. ` +
     `Match the scene's camera perspective, depth of field, lighting direction and color temperature; ` +
     `add soft contact shadows and subtle surface reflection so it looks physically present. ` +
     `Keep the product's exact shape, label, colors, text and proportions unchanged -- do not distort, recolor, relabel or redraw it. ` +
-    (o.textArea ? `Keep ${areaText(o.textArea)} clean and uncluttered for a headline; nothing else in the picture carries text.` : `Keep clean negative space for a headline.`);
+    keepClear;
 }
 
 /** AI 一鍵設計's scene choice: how many pictures it draws (operator 2026-11-27: pick one of several; default 3). */

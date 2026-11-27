@@ -152,13 +152,13 @@ export default function StepAi({ slot, s, set, setS, sRef, staff, brand, saveOrg
     const model = product ? compositeModel(m.aiBgModel) : m.aiBgModel;
     const cell = (i: number, c: SceneCell) => setScenes((prev) => prev.map((x, j) => (j === i ? c : x)));
     try {
-      const areas = await drawnAreas(variantOf(m, k), k);
+      const areas = await drawnAreas(variantOf(m, k), k, model);
       if (product && !areas.product) throw new Error("no_product_area");
       const prompt = product
-        ? compositePrompt({ scene: sceneOf(m), productArea: areas.product!, textArea: areas.text })
+        ? compositePrompt({ scene: sceneOf(m), productArea: areas.product!, textArea: areas.text, group: PRESETS[k].group, visible: areas.visible })
         : scenePrompt({ subject: m.aiBgSubject, vibe: m.aiBgVibe, textArea: areas.text, productArea: null });
       await Promise.all(Array.from({ length: n }, async (_, i) => {
-        try { cell(i, { state: "ok", product, area: product ? areas.product : null, image: await generateBgPicture({ model, prompt, aspect: PRESETS[k].aspect, refs: product ? [product] : [] }) }); }
+        try { cell(i, { state: "ok", product, area: product ? areas.product : null, image: await generateBgPicture({ model, prompt, aspect: areas.aspect, refs: product ? [product] : [] }) }); }
         catch (err) { cell(i, { state: "err", error: `${errText(err)}（最多已計費${ntdLabel(imageNtd(model))}）` }); }
       }));
     } catch (err) {

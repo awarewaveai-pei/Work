@@ -3,7 +3,7 @@ import { friendlyImageError as friendlyError } from "@/lib/studio/image-errors";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
-import { generateTarotImage, isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
+import { generateTarotImage, isTarotModel, isAspectRatio, VALID_ASPECT_RATIOS } from "../../../../../lib/tarot/image-gen";
 import { checkAndConsumeQuota } from "../../../../../lib/tarot/quota";
 import { MAX_REFS_PER_REQUEST } from "../../../../../lib/tarot/model-specs";
 import { deferIfCodex } from "@/lib/tarot/codex-bridge";
@@ -46,7 +46,7 @@ async function handlePost(request: Request, grant: Grant): Promise<Response> {
   }
   if (body.aspectRatio != null && !isAspectRatio(body.aspectRatio)) {
     return NextResponse.json(
-      { ok: false, error: "aspectRatio must be one of: 1:1 2:3 3:2 4:3 3:4 4:5 9:16 16:9" },
+      { ok: false, error: `aspectRatio must be one of: ${VALID_ASPECT_RATIOS.join(" ")}` },
       { status: 400 },
     );
   }

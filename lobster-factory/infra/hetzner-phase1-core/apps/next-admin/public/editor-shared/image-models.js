@@ -19,6 +19,9 @@ export const TWD_RATE = 32;
 /** Price in NT$, two decimals — one decimal rounded the cheapest row (US$0.001 = NT$0.03) down to NT$0.0 on the buttons. */
 export const nt = (usd) => Math.round(usd * TWD_RATE * 100) / 100;
 
+/** The ratios EVERY model takes (and the only candidates of nearestAspectRatio). A row with `ratios` takes more. */
+export const ASPECT_RATIOS = Object.freeze(["2:3", "3:2", "4:5", "1:1", "9:16", "4:3", "3:4", "16:9"]);
+
 export const IMAGE_MODELS = Object.freeze([
   { value: "flux-schnell", label: "FLUX schnell", group: "BFL", vendor: "BFL/Replicate", usd: 0.003, maxRefs: 0, note: "最便宜，草稿用", uses: ["generate"] },
   { value: "flux-dev", label: "FLUX dev", group: "BFL", vendor: "BFL/Replicate", usd: 0.025, maxRefs: 1, note: "便宜，吃一張參考圖", uses: ["generate"] },
@@ -47,7 +50,9 @@ export const IMAGE_MODELS = Object.freeze([
   // video-workbench compositeRegions). zh: 2026-11-13 two real 1K 繁中 box edits (video-workbench 圖片局部編輯器) drew the asked night sky.
   // blank: not measured; a mask-less row has no area for an empty description (the two measured ones returned the image
   // untouched), so it counts as "no".
-  { value: "nano-banana-2", label: "Nano Banana 2.1", group: "Google+", vendor: "Google", usd: 0.057, maxRefs: 14, note: "優：14 張參考圖、修圖最乾淨；缺：較貴", uses: ["generate", "edit", "fill"], zh: "ok", blank: "no" },
+  // ratios: 21:9 measured 2026-11-27 on the direct Gemini Interactions call (2K, one product ref): 3168x1344 (2.357:1),
+  // 1680 image tokens like every other 2K ratio; Vertex lists it (docs.cloud.google.com .../gemini/3-1-flash-image).
+  { value: "nano-banana-2", label: "Nano Banana 2.1", group: "Google+", vendor: "Google", usd: 0.057, maxRefs: 14, note: "優：14 張參考圖、修圖最乾淨；缺：較貴", uses: ["generate", "edit", "fill"], zh: "ok", blank: "no", ratios: Object.freeze([...ASPECT_RATIOS, "21:9"]) },
   { value: "nano-banana-pro", label: "Nano Banana Pro", group: "Google+", vendor: "Google/Replicate", usd: 0.15, maxRefs: 8, note: "Google 最強，人物與文字穩", uses: ["generate", "edit"] },
   { value: "openai-low", label: "GPT-Image-2 低", group: "OpenAI", vendor: "OpenAI", usd: 0.02, maxRefs: 5, note: "最省，先看構圖", uses: ["generate"] },
   { value: "openai-medium", label: "GPT-Image-2 中", group: "OpenAI", vendor: "OpenAI", usd: 0.07, maxRefs: 5, note: "日常品質", uses: ["generate"] },
@@ -122,7 +127,12 @@ export function modelsFor(use) {
   return [...EDIT_TOOLS, ...IMAGE_MODELS].filter((m) => m.uses.includes(use)).sort((a, b) => a.usd - b.usd);
 }
 
-export const ASPECT_RATIOS = Object.freeze(["2:3", "3:2", "4:5", "1:1", "9:16", "4:3", "3:4", "16:9"]);
+/** The ratios model `value` takes: its row's `ratios`, else ASPECT_RATIOS; none for an unknown id. */
+export function ratiosFor(value) {
+  const m = IMAGE_MODELS.find((r) => r.value === value);
+  return m ? m.ratios ?? ASPECT_RATIOS : Object.freeze([]);
+}
+// Only ASPECT_RATIOS: a model-only ratio (21:9) would let an edit of a wide photo pick a ratio its model may refuse.
 const ASPECT_VALUES = [["2:3", 2 / 3], ["3:4", 3 / 4], ["4:5", 4 / 5], ["1:1", 1], ["9:16", 9 / 16], ["3:2", 3 / 2], ["4:3", 4 / 3], ["16:9", 16 / 9]];
 /** The supported ratio closest to an image's own, so an edit of it keeps its framing. */
 export function nearestAspectRatio(width, height) {

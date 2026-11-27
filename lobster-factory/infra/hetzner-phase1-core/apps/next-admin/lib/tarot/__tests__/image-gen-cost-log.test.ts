@@ -65,6 +65,19 @@ describe("generateTarotImage logs its cost", () => {
     expect((r as { image: string }).image).toMatch(/^data:image\/png;base64,iVBOR/);
   });
 
+  it("R4-B: a ratio the model does not take is refused before any hold or provider call; nano-banana-2 sends 21:9", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const r = await generateTarotImage({ model: "flux-kontext-pro", prompt: "p", aspectRatio: "21:9" }, grant);
+    expect(r).toEqual({ ok: false, error: "aspect_ratio_unsupported" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(m.held).toEqual([]);
+    vi.stubEnv("GEMINI_API_KEY", "g");
+    fetchMock.mockResolvedValueOnce(json({ steps: [] }));
+    await generateTarotImage({ model: "nano-banana-2", prompt: "p", aspectRatio: "21:9" }, grant);
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body)).response_format).toMatchObject({ aspect_ratio: "21:9" });
+  });
+
   it("a prediction still running at our deadline is cancelled and logged as billed (F2)", async () => {
     vi.useFakeTimers();
     try {

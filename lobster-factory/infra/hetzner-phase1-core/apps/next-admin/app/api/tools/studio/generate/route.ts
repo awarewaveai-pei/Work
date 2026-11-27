@@ -5,7 +5,8 @@ import type { Grant } from "@/lib/entitlements/can";
 import {
   generateImage,
   isStudioModel,
-  isAspectRatio,
+  modelTakesRatio,
+  ratiosFor,
   STUDIO_MODEL_OPTIONS,
 } from "../../../../../lib/studio/image-provider";
 import { getDesignsPublicBase } from "../../../../../lib/storage/r2";
@@ -58,9 +59,9 @@ async function handlePost(request: Request, grant: Grant): Promise<Response> {
   if (!isStudioModel(body.model)) {
     return NextResponse.json({ ok: false, error: "unknown_model" }, { status: 400 });
   }
-  if (body.aspectRatio != null && !isAspectRatio(body.aspectRatio)) {
+  if (body.aspectRatio != null && !modelTakesRatio(body.model, body.aspectRatio)) {
     return NextResponse.json(
-      { ok: false, error: "aspectRatio must be one of: 1:1 2:3 3:2 4:3 3:4 4:5 9:16 16:9" },
+      { ok: false, error: `aspectRatio must be one of: ${ratiosFor(body.model).join(" ")}` },
       { status: 400 },
     );
   }
@@ -114,7 +115,7 @@ async function handlePost(request: Request, grant: Grant): Promise<Response> {
       prompt: body.prompt,
       referenceImages,
       seed: body.seed ?? null,
-      aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
+      aspectRatio: modelTakesRatio(model, body.aspectRatio) ? body.aspectRatio : undefined,
       costLog: { route: "tools/studio/generate", tool: "studio", jobId: typeof body._jobId === "string" ? body._jobId : null },
     }, grant);
 

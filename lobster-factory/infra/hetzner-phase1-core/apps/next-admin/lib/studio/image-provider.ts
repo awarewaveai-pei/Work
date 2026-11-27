@@ -16,10 +16,12 @@ export {
   isAspectRatio,
   isStudioModel,
   modelSupportsRefs,
+  modelTakesRatio,
+  ratiosFor,
   STUDIO_MODEL_OPTIONS,
   VALID_ASPECT_RATIOS,
 } from "./model-options";
-export type { AspectRatio, StudioModel, StudioModelOption } from "./model-options";
+export type { AspectRatio, ModelAspectRatio, StudioModel, StudioModelOption } from "./model-options";
 
 export type StudioGenParams = TarotGenParams;
 export type StudioGenResult = TarotGenResult;

@@ -10,7 +10,7 @@ import type { GroundingOpts } from "./product-grounding";
 import { COMPOSITION, type LayoutSize } from "./composition";
 import type { BannerAiModel, PicArea } from "./banner-design";
 import { bgStatsFromColors, bgStatsFromPixels, mergeBgInfo, type BgInfo } from "./design-colors";
-import type { StudioModel, AspectRatio } from "@/lib/studio/model-options";
+import { modelTakesRatio, type StudioModel, type AspectRatio, type ModelAspectRatio } from "@/lib/studio/model-options";
 import { resolveStylePrompt } from "../tarot/cards";
 
 // ---------------------------------------------------------------------------
@@ -23,7 +23,10 @@ import { resolveStylePrompt } from "../tarot/cards";
 // `aspect` = nearest ratio the AI background models accept (lib/studio/model-options). R4 (T1 決定 1/2): `displayW` = the
 // width it is shown at in CSS px (手機 393 / 連結卡 500 / 內文 700 / Hero 1920) -> the title's range; `group` = its row of
 // the composition table (composition.ts). 16:9 is two sizes: 社群／縮圖 (the old key r16x9) and 網站 Hero (r16x9hero).
-// `file` = the export file name part when the ratio alone is not unique.
+// `file` = the export file name part when the ratio alone is not unique. `wideAspect` = the wider ratio a picture of this
+// size is drawn at when its model takes it (pictureAspect). Only 3:1: generated at 16:9 a 3:1 crop shows 59% of the
+// picture's height, at 21:9 78%. 2:1 and 1.91:1 stay 16:9: a 21:9 picture would lose more width (14% / 18%) than 16:9
+// loses height (11% / 7%).
 export const PRESETS = {
   "r9x16":  { ratio: "9:16",   w: 1080, h: 1920, aspect: "9:16", shape: "tall",   displayW: 393,  group: "phone", use: "限時動態、Reels、直式圖片貼文",   where: "IG Story／Reels、FB Story、TikTok 圖文、YouTube Shorts" },
   "r2x3":   { ratio: "2:3",    w: 1000, h: 1500, aspect: "2:3",  shape: "tall",   displayW: 393,  group: "phone", use: "Pin 圖",                          where: "Pinterest" },
@@ -36,9 +39,18 @@ export const PRESETS = {
   "r16x9hero": { ratio: "16:9", w: 1920, h: 1080, aspect: "16:9", shape: "wide",  displayW: 1920, group: "web",   use: "網站全版 Hero",                   where: "WP 網站桌機全版 Hero", file: "16x9-hero" },
   "r191x1": { ratio: "1.91:1", w: 1200, h: 630,  aspect: "16:9", shape: "wide",   displayW: 500,  group: "card",  use: "連結分享預覽（OG）",              where: "FB／LinkedIn／X／LINE 連結預覽（Rank Math 另設的分享圖）" },
   "r2x1":   { ratio: "2:1",    w: 1200, h: 600,  aspect: "16:9", shape: "wide",   displayW: 500,  group: "card",  use: "X 大圖連結卡",                    where: "X 連結預覽（summary_large_image）" },
-  "r3x1":   { ratio: "3:1",    w: 1920, h: 640,  aspect: "16:9", shape: "wide",   displayW: 1920, group: "web",   use: "網站橫幅",                        where: "WP 網站桌機 Hero" },
-} as const satisfies Record<string, LayoutSize & { aspect: AspectRatio; shape: "tall" | "square" | "wide"; use: string; where: string; star?: boolean; file?: string }>;
+  "r3x1":   { ratio: "3:1",    w: 1920, h: 640,  aspect: "16:9", wideAspect: "21:9", shape: "wide",   displayW: 1920, group: "web",   use: "網站橫幅",                        where: "WP 網站桌機 Hero" },
+} as const satisfies Record<string, LayoutSize & { aspect: AspectRatio; wideAspect?: ModelAspectRatio; shape: "tall" | "square" | "wide"; use: string; where: string; star?: boolean; file?: string }>;
 export type PresetKey = keyof typeof PRESETS;
+/** The ratio a picture of size `k` is drawn at by `model`: its wider ratio when the model takes it, else its `aspect`. */
+export function pictureAspect(k: PresetKey, model: StudioModel): ModelAspectRatio {
+  const wide = wideAspectOf(k);
+  return wide && modelTakesRatio(model, wide) ? wide : PRESETS[k].aspect;
+}
+const wideAspectOf = (k: PresetKey): ModelAspectRatio | undefined => { const p = PRESETS[k]; return "wideAspect" in p ? p.wideAspect : undefined; };
+/** Sizes of `keys` that would be drawn wider by a model that takes their wider ratio, but not by `model`. */
+export const narrowedSizes = (keys: readonly PresetKey[], model: StudioModel): PresetKey[] =>
+  keys.filter((k) => { const wide = wideAspectOf(k); return !!wide && pictureAspect(k, model) !== wide; });
 export const presetLabel = (k: PresetKey) => `${PRESETS[k].ratio} ${PRESETS[k].use}`;
 
 export const PRESET_GROUPS: { key: "tall" | "square" | "wide"; label: string }[] = [
