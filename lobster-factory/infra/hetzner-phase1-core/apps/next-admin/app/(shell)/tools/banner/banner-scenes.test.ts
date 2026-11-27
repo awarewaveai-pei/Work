@@ -3,7 +3,10 @@
 import { describe, expect, it } from "vitest";
 import { forgePrompt } from "@/lib/script-forge/modules";
 import { boxOnPicture, compositePrompt, scenePrompt } from "./banner-design";
-import { INIT, designSig, enterSize, leaveSize, variantOf, withSharedBackground, withSizeBackgrounds, type State } from "./banner-state";
+import { productDrawn } from "./banner-layout";
+import {
+  INIT, designSig, enterSize, groundingOn, leaveSize, sceneBackground, variantOf, withSharedBackground, withSizeBackgrounds, type State,
+} from "./banner-state";
 
 const A = "data:image/png;base64,AAAA", B = "data:image/png;base64,BBBBBB", C = "data:image/png;base64,CCCCCCCC";
 const base: State = { ...INIT, preset: "r4x5", multiSizes: ["r9x16", "r16x9"], bgMode: "ai", bgImage: A };
@@ -45,6 +48,25 @@ describe("SIZE_KEYS 背景：沿用與覆寫", () => {
     const sig = designSig(withSizeBackgrounds(base, { r9x16: B }, true));
     expect(sig).not.toContain("BBBBBB");
     expect(sig).not.toContain(B);
+  });
+});
+
+describe("(F1) 選候選圖：只有含目前這張商品圖才算商品已烤進", () => {
+  it("baked only when drawn with the current product picture; else a plain scene with the product drawn over it", () => {
+    expect(sceneBackground(A, "P1", "P1")).toEqual({ bgImage: A, bgMode: "ai", bgImageHasProduct: true });
+    expect(sceneBackground(A, "P1", "P2").bgImageHasProduct).toBe(false);   // product replaced since
+    expect(sceneBackground(A, "P1", null).bgImageHasProduct).toBe(false);   // product removed since
+    expect(sceneBackground(A, null, "P2").bgImageHasProduct).toBe(false);   // drawn as a plain scene, product added since
+  });
+});
+
+describe("(F4) 商品由程式疊加時開擬真三項", () => {
+  it("an uploaded background with a product picture: the product is drawn over it, so grounding turns on", () => {
+    const st: State = { ...INIT, bgMode: "upload", bgImage: A, productImage: "P1" };
+    expect(productDrawn(st)).toBe(true);
+    const g = groundingOn(st.grounding);
+    expect([g.shadow?.enabled, g.reflection?.enabled, g.tone?.enabled]).toEqual([true, true, true]);
+    expect(productDrawn({ ...st, bgMode: "ai", bgImageHasProduct: true })).toBe(false); // baked: nothing drawn over
   });
 });
 

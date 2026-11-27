@@ -18,11 +18,17 @@ export function sameDrawInputs(a: State, b: State): boolean {
   return true;
 }
 
+type Run<S, P> = (build: (prev: S) => S, check: (st: S) => Promise<P>, merge: (built: S, result: P) => S, fail: (prev: S, err: unknown) => S) => Promise<boolean>;
 export interface GuardLane<S, P> {
   /** `build(prev)` = the design to check / apply on top of `prev`; `check` measures it; `merge` puts the result on the
    *  built design; `fail` = what the page shows when the check could not run (the built design is NOT applied).
-   *  Resolves when this run is applied, failed, superseded, or redone (the redo runs on its own). */
-  run(build: (prev: S) => S, check: (st: S) => Promise<P>, merge: (built: S, result: P) => S, fail: (prev: S, err: unknown) => S): Promise<void>;
+   *  Resolves true when this run's design was applied; false when the check failed or a newer run superseded it. */
+  run: Run<S, P>;
+  /** R3-C: one action made of several runs (pick a scene, then each size's picture): `claim()` makes it the newest;
+   *  `runAs(token, …)` applies only while no newer claim / run exists; `isLatest(token)` before paying for a next step. */
+  claim(): number;
+  runAs(token: number, ...args: Parameters<Run<S, P>>): Promise<boolean>;
+  isLatest(token: number): boolean;
 }
 
 export function guardLane<S, P>(deps: {
@@ -34,20 +40,31 @@ export function guardLane<S, P>(deps: {
   apply(fn: (prev: S) => S): void;
 }): GuardLane<S, P> {
   let latest = 0;
-  async function attempt(token: number, build: (prev: S) => S, check: (st: S) => Promise<P>, merge: (built: S, result: P) => S, fail: (prev: S, err: unknown) => S): Promise<void> {
+  async function attempt(token: number, build: (prev: S) => S, check: (st: S) => Promise<P>, merge: (built: S, result: P) => S, fail: (prev: S, err: unknown) => S): Promise<boolean> {
+    if (token !== latest) return false;
     const input = build(deps.current());
     const got = await check(input).then((result) => ({ result }), (err: unknown) => ({ err }));
-    if (token !== latest) return;
-    let redo = false; // React may call an updater twice: one redo per attempt
-    deps.apply((prev) => {
-      if (token !== latest) return prev;
-      const built = build(prev);
-      if (!deps.same(built, input)) {
-        if (!redo) { redo = true; queueMicrotask(() => void attempt(token, build, check, merge, fail)); }
-        return prev;
-      }
-      return "result" in got ? merge(built, got.result) : fail(prev, got.err);
+    if (token !== latest) return false;
+    // the outcome is known only inside the updater (React runs it later, maybe twice): resolve from there
+    return new Promise<boolean>((resolve) => {
+      let redo = false; // one redo per attempt
+      deps.apply((prev) => {
+        if (token !== latest) { resolve(false); return prev; }
+        const built = build(prev);
+        if (!deps.same(built, input)) {
+          if (!redo) { redo = true; queueMicrotask(() => void attempt(token, build, check, merge, fail).then(resolve)); }
+          return prev;
+        }
+        if ("result" in got) { resolve(true); return merge(built, got.result); }
+        resolve(false);
+        return fail(prev, got.err);
+      });
     });
   }
-  return { run: (build, check, merge, fail) => attempt(++latest, build, check, merge, fail) };
+  return {
+    run: (build, check, merge, fail) => attempt(++latest, build, check, merge, fail),
+    claim: () => ++latest,
+    runAs: (token, build, check, merge, fail) => attempt(token, build, check, merge, fail),
+    isLatest: (token) => token === latest,
+  };
 }

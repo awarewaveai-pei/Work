@@ -131,7 +131,7 @@ type StackKey = (typeof STACK_KEYS)[number];
 
 /** Whether the product picture is drawn: not when the active AI background already has it baked in (keyed off
  *  bgImageHasProduct set at generation time, not the live toggle, so flipping it can't double-draw the product). */
-const productDrawn = (f: BannerFields) => !!f.productImage && !(f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage);
+export const productDrawn = (f: BannerFields) => !!f.productImage && !(f.bgImageHasProduct && f.bgMode === "ai" && !!f.bgImage);
 
 /** The areas a generated picture is asked to keep: the text stack's box and the product's (canvas px; null = none).
  *  Scene / 合成進場景 prompts and the reservation the layout keeps after baking are this one box (R3-D 三3). */
