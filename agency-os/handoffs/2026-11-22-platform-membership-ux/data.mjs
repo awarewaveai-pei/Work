@@ -60,6 +60,8 @@ export const PROGRESS = {
   U28: 'done',
   U25: 'done',
   U24: 'done',
+  U26: 'done',
+  U18: 'doing',
 };
 export const COMMITS = {
   K1: 'd2201ecf7',
@@ -104,6 +106,7 @@ export const COMMITS = {
   U16: 'c424a9c49',
   U25: 'd6a09291c',
   U24: 'e2fa33ce7',
+  U26: '1289bc7bc',
   M6: '71b50a370',
   M8: '3a721e688',
   U13: '1eff89930',
@@ -335,6 +338,10 @@ export const RISKS = [
   { card: 'U24', said: 'Codex：同一人 30 天用超過 1000 次時，「常用」可能排錯。', handling: '保留：現實不會發生。' },
   { card: 'U24', said: '沒有經過計費檢查的頁面（例如「題目」）不會出現在最近使用；點了只開該產品的首頁。', handling: '記下：卡片範圍如此；要涵蓋所有頁得另建事件表（第三階段）。' },
   { card: 'U24', said: '監工流程：這次先推 main 才把風險寫上監工台，順序反了。', handling: '已補寫；規則不變：先寫監工台再推。' },
+  { card: 'U26', said: '公開清單把入口沒開的 AI 客服、資料蒐集器，以及不對外的 HCI-30 也列進去。', handling: '已處理：監工退回。只列客人用得到的產品，判斷用登記表既有欄位（入口開關、可賣的功能），不寫死產品名；剩 8 個產品、344 個功能。' },
+  { card: 'U26', said: '以後改登記表要重跑匯出，否則測試會紅。', handling: '記下：這就是守門；新增產品的腳本目前不會自動重跑匯出。' },
+  { card: 'U26', said: '10 個認知方法的名稱還是英文；清單約 214 KB。', handling: '記下：名稱要不要翻成中文留給推到 WordPress 那張（U29）；搜尋直接呼叫函式，不讀這個檔。' },
+  { card: 'U26', said: '監工流程：這次又先推 main 才寫監工台。', handling: '已補寫。之後每次整合前先寫監工台，再推。' },
 ];
 
 // 已有預設、沒答就照做的題目（DISPATCH §8）。
@@ -494,6 +501,14 @@ export const BATCHES = [
       C('U25', 'Medium', 'Sonnet＋Haiku 填值', 'U22', '功能層分類欄位，並填入資料。'),
       C('U24', 'Medium', 'Opus', 'U8', '最近使用與常用。'),
     ] },
+  { code: 'b14', no: '第十四批', title: '找工具', phase: 'P2',
+    seen: '頂列多一個搜尋框：打「文章」能找到「寫文章」，結果分產品、功能、頁面；登記表也能匯出成公開清單（只列客人用得到的）。',
+    accept: '公開清單與登記表一致（不一致測試就紅）、不含價格；搜尋用同一份清單。',
+    rollback: '單卡還原，沒有資料庫變更。',
+    cards: [
+      C('U26', 'Low', 'Sonnet', 'U25', '登記表匯出成 catalog.json。'),
+      C('U18', 'Low', 'Sonnet', 'K5、U22', '頂列搜尋。'),
+    ] },
   { code: 'p2', no: '第二階段', title: '開放註冊前', phase: 'P2',
     seen: '第一階段全部併完後，才依卡之間的先後排批、展開派工單。',
     accept: '排批時再定。', rollback: '排批時再定。',
@@ -503,8 +518,6 @@ export const BATCHES = [
       C('M4', 'High', 'Opus', 'M3、W6', '標籤寫進 FluentCRM，WordPress 加測試角色。'),
       C('M7', 'High', 'Opus＋你', 'M5、M6、W6', '既有客戶逐一代辦成會員。'),
       C('W7', 'Medium', '你本人', 'W6、M5、M6、M8、M9、M10', '真人走一遍：註冊、付款、進入、扣點。'),
-      C('U18', 'Low', 'Sonnet', 'K5、U22', '頂列搜尋。'),
-      C('U26', 'Low', 'Sonnet', 'U25', '登記表匯出成 catalog.json。'),
     ] },
   { code: 'p3', no: '第三階段', title: '開放註冊時與之後', phase: 'P3',
     seen: '第一階段全部併完後，才依卡之間的先後排批、展開派工單。',

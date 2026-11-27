@@ -79,13 +79,13 @@
 | U28 | 付款後立即失效功能清單快取 | NA `lib/entitlements/features.ts`、付款事件處理 | Medium | Sonnet | U5 | 12 | 已併 |
 | U25 | 功能層分類欄位＋資料填寫 | NA `lib/portal/products.ts`、`catalog-vocab.ts`、匯入腳本 | Medium | Sonnet＋Haiku 填值 | U22 | 13 | 已併 |
 | U24 | 最近使用／常用 | 新 NA `app/portal/api/recent/route.ts`（索引已有 0011:98，不加 migration） | Medium | Opus | U8 | 13 | 已併 |
+| U26 | 登記表匯出 `catalog.json` | 新腳本＋test | Low | Sonnet | U25 | 14 | 已併 |
+| U18 | 頂列搜尋 | NA `app/PlatformFrame.tsx`、新搜尋元件 | Low | Sonnet | K5、U22 | 14 | 進行中 |
 | W6 | 正式站重開店外掛與兩把密鑰（＝G8）；補：檢查清單加「邀請落地頁 `/?aw_invite=` 打得開」（邀請掛在付款模組下）；啟用前換正式站佈景跑一次 `scripts/local-member-flow.ps1` | 正式站設定與 `seller_sites` 資料（非程式） | **High** | Opus＋操作者 go | W5 | P2 |  |
 | M9 | aware-wave.com 關掉訪客結帳（G6） | 正式站 WooCommerce 設定（非程式）；NA 無 | **High** | Sonnet（`wordpress-maintenance-agent` 備份閘） | — | P2 | |
 | M4 | 標籤寫進 FluentCRM、WordPress 加 TEST 角色（G3 寫入端） | 沿用既有 NA `lib/crm/fluentcrm.ts`＋wp-bridge `lobster-factory/packages/wp-bridge-plugin/includes/Crm/ContactUpserter.php`（加標籤寫入，不新建接頭）；TEST 角色註冊位置展開時定 | **High** | Opus | M3、W6 | P2 | |
 | M7 | 既有客戶逐一代辦成會員（G2） | 無程式；操作紀錄 | **High** | Opus＋操作者 | M5、M6、W6 | P2 | |
 | W7 | 真人走查：註冊→付款→進入→扣點；補：用測試會員實看 `/portal/launcher`（U8）與 `/portal/wallet`（U10，管理者與被授權的人各一次） | 無程式；走查紀錄 | Medium | 操作者 | W6、M5、M6、M8、M9、M10 | P2 | |
-| U18 | 頂列搜尋 | NA `app/PlatformFrame.tsx`、新搜尋元件 | Low | Sonnet | K5、U22 | P2 | |
-| U26 | 登記表匯出 `catalog.json` | 新腳本＋test | Low | Sonnet | U25 | P2 | |
 
 ### P3（開放註冊時與之後；B §17.3）
 
@@ -161,8 +161,9 @@ M11 的依據：`awarewave-wp.ts:75-77` 註明「是否照清單是操作者的�
 | 11 | K15、M10 | 沒有新畫面；P1 期末驗收 | K15 清單全過；M10 本機刪會員後 `wp-handoff` 回 `not_a_member` | revert |
 | 12 | U16、U17、U19、U28 | content 門首頁變「概覽」（三個數字＋寫文章鈕，寫文章頁搬到 `/content/write`）；工作台多「繼續上次」；客戶管理會員可在 `/portal/people` 自己邀人；買完點數按鈕立即解灰 | 各卡 TESTS；U19 他單位 org／userId → 404；部署後 content 門根看到概覽 | revert 單卡（皆無 migration） |
 | 13 | U25、U24 | 工作台多「最近使用／常用」（只看自己的）；登記表功能層有分類與任務詞 | 各卡 TESTS；U24 他人／他單位不出現 | revert 單卡（無 migration） |
+| 14 | U26、U18 | 頂列搜尋；登記表匯出公開清單（只列客人可用） | `node scripts/export-catalog.mjs --check`；U18 打「文章」到「寫文章」 | revert 單卡（無 migration） |
 
-P1 全部於 2026-11-26 併入。P2 派工單在 `D:	mp\plat-briefs\<卡>.md`；批 12 於 2026-11-26 上線（e3ec3c494）；批 13（U25、U24）2026-11-27 併 main（447c9c822，03:00 自動上線）；U26、U18 依 U25 排批 14。W6／M9／M7／M4／W7 動正式站，要操作者 go，另排。
+P1 全部於 2026-11-26 併入。P2 派工單在 `D:	mp\plat-briefs\<卡>.md`；批 12 於 2026-11-26 上線（e3ec3c494）；批 13（U25、U24）2026-11-27 併 main（447c9c822，03:00 自動上線）；批 14：U26 已併（4b924fe36），U18 進行中（用 U26 的 buildCatalogIndex）。W6／M9／M7／M4／W7 動正式站，要操作者 go，另排。
 
 ## 5. 第一批派工單（全文，可直接貼給工人）
 
