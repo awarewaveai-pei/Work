@@ -2,7 +2,7 @@
 // the start under the per-day cap (0121 content_topics_start).
 import { describe, expect, it } from "vitest";
 import { NEXT, type Topic, type TopicStatus } from "../store";
-import { DAILY_START_CAP, MakeError, brandDay, STALE_GENERATING_MS, VIDEO_TIMEOUT_MS, tickTopics, type Made, type Published, type PublishRun, type TickDeps, type VideoPoll } from "../tick";
+import { DAILY_START_CAP, MakeError, advanceStartedTopics, brandDay, requestPublish, STALE_GENERATING_MS, VIDEO_TIMEOUT_MS, tickTopics, type Made, type Published, type PublishRun, type TickDeps, type VideoPoll } from "../tick";
 import { publishSteps, STEP_LEASE_MS, YOUTUBE_LIVE_TIMEOUT_MS, YOUTUBE_TIMEOUT_TEXT, type PublishPorts, type YoutubeLook } from "../publish-steps";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -430,5 +430,41 @@ describe("publish in steps (N5a)", () => {
     expect(await tickTopics(q.deps)).toContain("published=1");
     expect(f.calls).toEqual(["article:7", `send:p:${LINK}`]);
     expect(q.db.get("a")?.status).toBe("published");
+  });
+});
+
+// K31: the brand's content_pipeline schedule is off. A topic a person started runs to the end; nothing else moves.
+describe("advanceStartedTopics: schedule off (K31)", () => {
+  const withVideo = (id: string, over: Partial<Topic> = {}) => topic(id, { formats: ["article", "social", "video"], ...over });
+
+  it("a person-started video topic: video started, attached, reviewed; the pressed 發布 goes on until YouTube's link is back", async () => {
+    let youtubeLive = false;
+    const q = queue([withVideo("a", { status: "drafted", review, artifacts: { wp_post_id: 1 } })], undefined, undefined,
+      { auto: true, publish: async (t) => ({ artifacts: { ...t.artifacts, youtube: youtubeLive }, done: youtubeLive }) });
+    expect(await advanceStartedTopics(q.deps)).toContain("video_started=1");
+    expect(q.db.get("a")).toMatchObject({ status: "waiting_video", artifacts: { video: { job_id: "job1" } } });
+    q.video.polls.set("job1", { state: "done", url: "https://cdn.example/v.mp4" });
+    await advanceStartedTopics(q.deps);
+    // the site is set to auto publish, but without the schedule only a person's press sends it
+    expect(q.db.get("a")?.status).toBe("reviewed");
+    expect(q.published).toEqual([]);
+    expect(await requestPublish(q.deps, q.db.get("a")!, "staff:u1")).toMatchObject({ status: "publishing" });
+    expect(await advanceStartedTopics(q.deps)).toContain("publishing=1");   // YouTube sent, its link not back yet
+    youtubeLive = true;
+    expect(await advanceStartedTopics(q.deps)).toContain("published=1");
+    expect(q.db.get("a")?.status).toBe("published");
+  });
+
+  it("nothing the schedule alone does: an approved topic is not started, a stale proposal not returned, a reviewed or scheduled one not published", async () => {
+    const q = queue([
+      topic("due"),
+      topic("old", { status: "proposed", scheduled_for: "2026-10-19T17:00:00Z" }),
+      topic("rev", { status: "reviewed", review }),
+      topic("sch", { status: "scheduled", review, scheduled_for: "2026-11-01T00:00:00Z" }),
+    ], undefined, undefined, { auto: true });
+    await advanceStartedTopics(q.deps);
+    expect([...q.db.values()].map((t) => [t.id, t.status])).toEqual([["due", "approved"], ["old", "proposed"], ["rev", "reviewed"], ["sch", "scheduled"]]);
+    expect(q.made).toEqual([]);
+    expect(q.published).toEqual([]);
   });
 });
