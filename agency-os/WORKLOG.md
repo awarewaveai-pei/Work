@@ -1,4 +1,15 @@
 # Worklog
+## 2026-11-26（續41）— oracle WP：裝 Kadence Blocks Pro 2.8.17（操作者要求）
+
+- [根因] 操作者「Kadence Blocks Pro 裝」；同日已裝 Kadence Pro 1.1.16，Blocks Pro 當時未裝。
+- [步驟] 本機 `D:\Work\_paid-plugins\kadence-blocks-pro.zip`（檔頭 Version 2.8.17）→ scp 主機 `/tmp` → `docker cp` → `wp plugin install --activate` → 兩處暫存檔刪除。
+- [驗證] `wp plugin list`：`kadence-blocks-pro active 2.8.17`、`kadence-blocks active 3.9.1.2`、`kadence-pro active 1.1.16`；外部 `/`、`/tools/ziwei/`、`/english/`、`/daily-letter/`、`/wp-json/` 皆 200、無 fatal 字樣；容器 log 近 2 分鐘無 PHP Fatal／Warning。
+- [未做] 授權碼未輸入（Kadence Pro 與 Blocks Pro 皆同：可用，不自動更新）。
+- [rollback] `wp plugin deactivate kadence-blocks-pro && wp plugin delete kadence-blocks-pro`。
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp plugin install /tmp/kbp.zip --activate；curl 五個網址 | exit=0 | ms=30000
+- REVIEW_WAIVED: NA -- 無 repo 程式改動（站台外掛安裝）
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-11-27（續1）— 橫幅 R2：操作者十點回饋全部上線（排版引擎、九步流程、AI 文案五組、品牌 logo）
 - 計畫／根因 file:line：`agency-os/handoffs/2026-11-26-banner-pro-design/PLAN-R2.md`；監工台 artifact 5gGjausYwzjkPtc8UkTkKS（data.mjs RISKS 逐條處置）。
 - 根因：AI／拖曳的絕對座標靜默蓋掉位置按鈕（banner-layers.ts:342 place()）；自動排版不預留徽章／logo／商品；字級固定 64px；AI 只出一版且不帶 logo。
