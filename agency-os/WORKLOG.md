@@ -1,4 +1,25 @@
 # Worklog
+## 2026-11-27（續5）— meeting-service 段 4 批 2：C14 語言、C15 會後整理＝產物鏈進工作區（上線 8420）
+
+- 根因：簡體字幕、語言寫死英翻中；聆聽場次做會後整理會整段重新轉錄（重複），兩個工具各一套流程。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。
+- 步驟：工人 C14 `4e6c147f3`、C15 `c4e2ba695`＋`b43292a61`（沿用批 1 兩位工人）；監工合併 `0180877b8`（無衝突）；整合修正 `c30f85f8c`；Codex 修正 `412811545`；critic 修正 `a4648fa96`；推 main `b9c435da7`
+  - C14：`lib/live/langs.py` 一張語言表（`transcribe.LANGUAGES`、`app._check_language`、`ownvoice.language` 由它推導）；聽的語言／翻譯成按鈕；只有中文轉繁體；同語言或不翻譯不呼叫模型；提示詞依目標語言（zh-TW 與原本逐字相同）
+  - C15：`pipeline.run_pipeline_phase1` 產物已在就跳過；`lib/postmeeting.py` 旁檔→逐字稿；`lib/live/vad.py` `reanchor`（Gemini 時間對回發聲）；`lib/jobs.py` 工作清單＋場次對照；工作區「會後整理」面板
+  - 整合修正：重新辨識用場次當時的語言；Gemini 中文灰字字間空格（`sentences._cj_spaces`）；場次路徑一種寫法；`tools/feed.py` 送 listen/target
+  - Codex（0c/3m）：M1 講者產物要每句都有才沿用；M2 連續講話無停頓時對齊用量到的 4.4 秒；M3 自動模式純漢字日文＝已知限制
+  - critic（0c/2m/5n）：M1/M2 面板不再強塞語言（「依來源」：上傳＝中文同舊頁、場次＝當時語言）；m 吸附不越過下一句、超長先拿掉翻譯、「自動」不當語言名、上傳中斷不留空工作、舊頁講者名跳脫
+- 驗證：
+  - `python -m pytest tests -q` → 163 passed；突變：拿掉對齊的延遲預設 → 新測試紅，還原綠
+  - 真實 Gemini（8434）：`zh_test.wav` 聽中文翻中文 → 繁體、無空格、翻譯 0 次；聽自動翻英文 → 3/3；`her1912.wav` 英翻中 13/13
+  - 會後整理同一場 Gemini：沿用 26 秒、重新辨識 90 秒，兩者都有 transcript/srt/vtt/merged/diarized/prompt；large-v3 多編一句沒說的話，聆聽逐字稿沒有；上傳檔整條舊流程照跑（沒有任何「沿用」）；亂填模型 400
+  - 瀏覽器（8434）：面板「依來源」、場次「用聆聽的逐字稿（快）建議」、主控台無錯；8420 重啟後 `/workspace`、`/api/postmeeting/options`、`/api/jobs` 200
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tools/feed.py zh_test.wav gemini 8434 save listen=zh-TW target=zh-TW; curl POST /api/ownvoice/import reuse true/false; python -m pytest tests -q | exit=0 | ms=420000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/5n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=transcribe_language|reanchor|PRIOR_LAG|session_index|for_session|_cj_spaces|language_name | hits=23
+- ORACLE: Codex review `agency-os/reports/oracle/2026-11-27-partialreview-781ee1c4.md`（3 條：2 修、1 已知限制）
+- 接受不改：自動模式純漢字日文當中文；`DROPPED_MAX_SEC` 5 秒無實測依據；自動模式中文偶有半形逗號
+- 剩餘風險：Gemini 場次對齊後的講者準度只在單人錄音驗過（多人要 C18 的 3 人錄音）；日文、韓文語音沒測（本機沒有日文語音合成）；本機辨識載入模型期間丟聲音 → C17
+- rollback：`git revert a4648fa96 412811545 c30f85f8c 0180877b8`；新欄位舊程式忽略，`jobs/sessions.json` 可刪
 ## 2026-11-27（續3）— meeting-service 段 4 批 1：C12 每句格式＋場次旁檔、C13 統一設定＋跨站守衛（上線 8420）
 
 - 根因：兩個工具接不起來（存檔只有 markdown、時間用伺服器時鐘）；設定散在 6 處、只有 WebSocket 擋跨站。計畫 `MS/docs/WORKSPACE_PAGE_CARDS.md` 段 4（`MS` = `lobster-factory/infra/hetzner-phase1-core/apps/meeting-service`）。
