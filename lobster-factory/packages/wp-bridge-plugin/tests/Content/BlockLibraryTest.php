@@ -16,11 +16,11 @@ use PHPUnit\Framework\TestCase;
 
 final class BlockLibraryTest extends TestCase {
 
-	/** The 17 canonical block types compose() supports (aliases excluded). */
+	/** The 22 canonical block types compose() supports (aliases excluded). */
 	private const CANONICAL = array(
 		'heading', 'paragraph', 'button', 'list', 'quote', 'form', 'image', 'spacer',
 		'divider', 'icon_list', 'table', 'accordion', 'tabs', 'youtube', 'infobox', 'gallery',
-		'pattern',
+		'pattern', 'section', 'buttons', 'card', 'plugin_block', 'shortcode',
 	);
 
 	// ---- Manifest -----------------------------------------------------------
