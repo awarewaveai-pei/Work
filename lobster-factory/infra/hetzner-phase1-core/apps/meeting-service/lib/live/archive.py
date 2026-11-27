@@ -423,6 +423,13 @@ class Archive:
                 self.failed.pop(id, None)
             self.dirty = True
 
+    def line_label(self, id: int, speaker: str, guess: bool) -> None:
+        """Its speaker, decided while listening or at the regroup at stop (lib/live/speakers.py)."""
+        if id in self.by_id:
+            line = self.lines[self.by_id[id]]
+            line.speaker, line.guess = speaker, guess
+            self.dirty = True
+
     def drop_line(self, id: int) -> None:
         """A line that came to nothing never enters the transcript."""
         self.failed.pop(id, None)

@@ -87,6 +87,10 @@
   .cap-list .who { font-size: 0.7em; font-weight: 600; color: var(--muted); }
   .cap-list .seg.me .who, .cap-list .seg.me .text { color: var(--green); }
   .cap-stt-me[hidden], .cap-stt-who[hidden] { display: none; }
+  .cap-spk[hidden] { display: none; }
+  .cap-spk .tbtn { padding: 3px 9px; font-size: 12px; }
+  .cap-spk input { width: 120px; font: inherit; font-size: 12px; padding: 3px 8px; border: 1px solid var(--accent); border-radius: 8px; color: var(--ink); background: var(--card); }
+  .cap-list .who .guess { font-weight: 400; }
   .cap-list.tr-only .text { display: none; }
   .cap-foot { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
   .cap-usage { white-space: nowrap; }
@@ -235,6 +239,7 @@ window.Workspace = (function () {
       </span>
       <span class="cap-level" aria-hidden="true"></span>
       <span class="spacer"></span>
+      <button type="button" class="tbtn" data-act="speakers" aria-pressed="false" title="聆聽時分出對方每一個人（本機顯卡，免費；要 Hugging Face 金鑰）。聆聽中不能改">即時分講者</button>
       <button type="button" class="tbtn" data-act="tr-only" aria-pressed="false">只看翻譯</button>
       <button type="button" class="tbtn" data-act="smaller" title="字小一點">A−</button>
       <button type="button" class="tbtn" data-act="bigger" title="字大一點">A＋</button>
@@ -244,6 +249,7 @@ window.Workspace = (function () {
       <span class="cap-group" data-langs="listen" title="對方說的語言。「自動」讓辨識自己判斷。聆聽中不能改"><span class="cap-lbl">聽的語言</span></span>
       <span class="cap-group" data-langs="target" title="字幕翻譯成什麼語言；已經是這個語言的句子不翻譯、不計費。聆聽中不能改"><span class="cap-lbl">翻譯成</span></span>
     </div>
+    <div class="cap-bar cap-spk" hidden title="點名字可以改名（只改這一場）。「記住這個聲音」只存聲紋和名字，不存錄音，存在這台電腦的使用者資料夾"></div>
     <div class="cap-list" aria-live="polite"></div>
     <div class="cap-foot">
       <span class="cap-status"></span><span class="spacer"></span>
@@ -264,7 +270,7 @@ window.Workspace = (function () {
   // 麥克風和電腦聲音都開＝兩路（我／對方）各自辨識，預設我＝本機（免費）、對方＝stt（操作者 2026-11-25 的省錢組合）。
   const store = window.Settings.prefs("ws-captions",
     { stt: "stt", pauseMin: "pause_min", endMin: "end_min", size: "caption_size", save: "save", listen: "listen", target: "target" },
-    { mic: true, tab: false, stt: "gemini", sttMe: "local", trOnly: false, size: 18, pauseMin: 3, endMin: 30, save: true, listen: "en-US", target: "zh-TW" }, () => paintBar());
+    { mic: true, tab: false, stt: "gemini", sttMe: "local", speakers: false, trOnly: false, size: 18, pauseMin: 3, endMin: 30, save: true, listen: "en-US", target: "zh-TW" }, () => paintBar());
   store.rename("zhOnly", "trOnly");      // 「只看中文」改成「只看翻譯」之前存的鍵
   const prefs = store.values;
   // segment：伺服器正在存的段落（index 0 = 沒在存）；dividers：新段落的分隔線，after = 開新段時最後一句字幕的代號
@@ -278,7 +284,7 @@ window.Workspace = (function () {
 
   // ---------- 與伺服器的連線（連線本體在 Workspace.live，三個面板共用） ----------
   function send(obj) { live.send(obj); }
-  ["snapshot", "caption", "caption-remove", "clear", "status", "listening", "usage", "segment", "summary"].forEach(t => live.on(t, handle));
+  ["snapshot", "caption", "caption-remove", "clear", "status", "listening", "usage", "segment", "summary", "speakers"].forEach(t => live.on(t, handle));
   live.on("close", () => {
     stopAudio();
     state.listening = false;
@@ -287,10 +293,13 @@ window.Workspace = (function () {
   });
 
   function handle(ev) {
-    if (ev.type === "snapshot") {
+    if (ev.type === "speakers") {
+      state.speakers = ev; paintSpeakers();
+    } else if (ev.type === "snapshot") {
       state.segs = new Map(ev.segments.map(s => [s.id, s]));
       state.status = ev.status; state.listening = ev.listening; state.usage = ev.usage;
       state.segment = ev.segment; state.renaming = false; state.summaryOn = ev.summary.enabled; state.langs = ev.langs;
+      state.speakers = ev.speakers;
       if (!ev.listening) stopAudio();
       paintAll();
     } else if (ev.type === "caption") {
@@ -408,7 +417,7 @@ window.Workspace = (function () {
     if (!live.ready()) { state.status = "還沒連上會議工具，等一下再按"; return paintBar(); }
     if (await startAudio()) {
       send(Object.assign({ type: "start", stt: prefs.stt, listen: prefs.listen, target: prefs.target, pause_min: prefs.pauseMin, end_min: prefs.endMin, save: prefs.save },
-        prefs.mic && prefs.tab ? { proto: 2, stt_me: prefs.sttMe } : {},
+        prefs.mic && prefs.tab ? { proto: 2, stt_me: prefs.sttMe } : {}, prefs.speakers ? { speakers: true } : {},
         ...window.Workspace.startExtras.map(f => f())));
     }
   }
@@ -477,7 +486,12 @@ window.Workspace = (function () {
     row.className = "seg" + (seg.final ? "" : " interim") + (seg.who === "me" ? " me" : "");
     // 「我／對方」只在兩路的時候標（看到過「我」的句子就是兩路）；一路時和以前一樣不標。
     const two = [...state.segs.values()].some(x => x.who === "me");
-    row.querySelector(".who").textContent = two ? (seg.who === "me" ? "我" : "對方") : "";
+    const who = row.querySelector(".who");
+    who.textContent = two ? (seg.who === "me" ? "我" : "對方") : "";
+    if (seg.who === "them" && seg.speaker) {      // 即時分講者（lib/live/speakers.py）
+      who.append((two ? " · " : "") + seg.speaker);
+      if (seg.guess) { const g = document.createElement("span"); g.className = "guess"; g.textContent = "（推定）"; who.append(g); }
+    }
     row.querySelector(".text").textContent = seg.text;
     row.querySelector(".tr").textContent = seg.tr;   // empty when the line is not translated (own line, same language, 不翻譯)
     settle();
@@ -516,6 +530,10 @@ window.Workspace = (function () {
     root.querySelectorAll("[data-stt-me]").forEach(x => { x.setAttribute("aria-pressed", String(prefs.sttMe === x.dataset.sttMe)); x.disabled = state.listening; });
     root.querySelector(".cap-stt-me").hidden = root.querySelector(".cap-stt-who").hidden = !(prefs.mic && prefs.tab);
     root.querySelector('[data-act="tr-only"]').setAttribute("aria-pressed", String(prefs.trOnly));
+    const spk = root.querySelector('[data-act="speakers"]');
+    spk.setAttribute("aria-pressed", String(prefs.speakers));
+    spk.disabled = state.listening;
+    paintSpeakers();
     paintLangs();
     root.querySelectorAll("[data-idle]").forEach(x => { if (document.activeElement !== x) x.value = prefs[x.dataset.idle]; x.disabled = state.listening; });
     const save = root.querySelector('[data-act="save"]');
@@ -543,8 +561,71 @@ window.Workspace = (function () {
     paintBar();
   }
 
+  // ---------- 講者列：這一場的講者（點名字改名）、記住聲音、已記住的聲音（可刪） ----------
+  let renamingSpeaker = null;
+  function paintSpeakers() {
+    const bar = root && root.querySelector(".cap-spk");
+    if (!bar) return;
+    const sp = state.speakers || { on: false, list: [], voices: [] };
+    bar.hidden = !sp.on && !sp.voices.length;
+    if (bar.hidden) return;
+    const kids = [];
+    const lbl = t => { const x = document.createElement("span"); x.className = "cap-lbl"; x.textContent = t; return x; };
+    const btn = (t, data, title) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "tbtn"; b.textContent = t;
+      Object.assign(b.dataset, data);
+      if (title) b.title = title;
+      return b;
+    };
+    if (sp.on) {
+      kids.push(lbl("講者"));
+      sp.list.forEach(x => {
+        if (renamingSpeaker === x.name) {
+          const input = document.createElement("input");
+          input.value = x.name; input.maxLength = 40; input.dataset.renaming = x.name;
+          input.setAttribute("aria-label", "新的名字，Enter 確認，Esc 取消");
+          kids.push(input);
+        } else {
+          kids.push(btn(x.name + "（" + x.lines + " 句）", { spkName: x.name }, "點一下改名（只改這一場）"));
+        }
+        if (!x.voice) kids.push(btn("記住這個聲音", { spkSave: x.name }, "只存聲紋和名字，不存錄音；下次聆聽會認出這個人"));
+      });
+    }
+    if (sp.voices.length) {
+      kids.push(lbl("已記住"));
+      sp.voices.forEach(v => kids.push(btn(v.name + " ✕", { voiceDelete: v.id }, "刪除這個聲音：從檔案和比對裡拿掉，之後不會再認出")));
+    }
+    bar.replaceChildren(...kids);
+    const input = bar.querySelector("input[data-renaming]");
+    if (input) { input.focus(); input.select(); }
+  }
+  function finishRename(input, ok) {
+    const old = input.dataset.renaming, name = input.value.trim();
+    renamingSpeaker = null;
+    if (ok && name && name !== old) send({ type: "speaker-rename", old, name });
+    paintSpeakers();
+  }
+
   window.Workspace.onPanel("captions", el => {
     root = el;
+    const spkBar = el.querySelector(".cap-spk");
+    spkBar.addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      if (b.dataset.spkName) { renamingSpeaker = b.dataset.spkName; paintSpeakers(); }
+      else if (b.dataset.spkSave) send({ type: "voice-save", name: b.dataset.spkSave });
+      else if (b.dataset.voiceDelete && confirm("刪除「" + b.textContent.replace(" ✕", "") + "」的聲音？之後不會再認出這個人。")) {
+        send({ type: "voice-delete", id: b.dataset.voiceDelete });
+      }
+    });
+    spkBar.addEventListener("keydown", e => {
+      const input = e.target.closest("input[data-renaming]");
+      if (!input) return;
+      if (e.key === "Enter") finishRename(input, true);
+      else if (e.key === "Escape") finishRename(input, false);
+    });
+    spkBar.addEventListener("focusout", e => { if (e.target.matches("input[data-renaming]") && renamingSpeaker) finishRename(e.target, true); });
     following = true;
     const l = list();
     l.addEventListener("scroll", () => { if (!ours) following = l.scrollTop + l.clientHeight >= l.scrollHeight - NEAR_BOTTOM_PX; });
@@ -561,6 +642,7 @@ window.Workspace = (function () {
       if (b.dataset.src) setPref(b.dataset.src, !prefs[b.dataset.src]);
       else if (b.dataset.stt) setPref("stt", b.dataset.stt);
       else if (b.dataset.sttMe) setPref("sttMe", b.dataset.sttMe);
+      else if (b.dataset.act === "speakers") setPref("speakers", !prefs.speakers);
       else if (b.dataset.act === "listen") return void listen(!state.listening);
       else if (b.dataset.act === "tr-only") setPref("trOnly", !prefs.trOnly);
       else if (b.dataset.act === "smaller") setPref("size", Math.max(12, prefs.size - 2));
