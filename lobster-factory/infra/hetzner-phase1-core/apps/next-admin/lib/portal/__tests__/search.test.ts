@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { noResultHelp, rankItems, searchCatalog } from "../search";
 import { buildSearchIndex } from "../search-index";
 
-const index = buildSearchIndex({});
+const index = buildSearchIndex("door", {});
 const top = (q: string) => rankItems(index, q).map((i) => i.name);
 
 describe("top-bar search matching (U18, blueprint §4.5)", () => {
@@ -29,6 +29,15 @@ describe("top-bar search matching (U18, blueprint §4.5)", () => {
     const groups = searchCatalog(index, "文章人性化");
     expect(groups[0].group).toBe("feature");
     expect(groups[0].items[0].crumb).toEqual(["內容行銷", "文章人性化"]);
+  });
+
+  it("the staff frame opens staff pages, a door opens the door", () => {
+    const write = (ix: ReturnType<typeof buildSearchIndex>) => ix.items.find((i) => i.group === "page" && i.name === "寫文章")!.href;
+    expect(write(buildSearchIndex("staff", {}))).toBe("/tools/content");
+    expect(write(index)).toBe("https://content.aware-wave.com/write");
+    const staff = buildSearchIndex("staff", {});
+    expect(staff.items.find((i) => i.key === "content:")!.href).toBe("https://content.aware-wave.com/"); // 概覽: door only
+    expect(staff.items.find((i) => i.key === "content.humanize")!.href).toBe("/tools/content");
   });
 
   it("no result: nothing found, then task entries and every category", () => {
