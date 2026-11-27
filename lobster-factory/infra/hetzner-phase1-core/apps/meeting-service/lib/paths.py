@@ -69,6 +69,12 @@ def local(path: str, wsl=None) -> str:
 def cloud(path: str) -> str:
     """路徑在哪個雲端同步資料夾底下（"OneDrive"、"Google Drive"…）；不在就回 ""。
     不是 Windows 磁碟路徑（WSL 裡的 /home/...）就不是 Windows 的雲端資料夾。"""
+    real = os.path.realpath(path) if os.path.exists(path) else path
+    if real != path:
+        # A junction or symbolic link: what counts is where the files really go.
+        found = cloud(real)
+        if found:
+            return found
     try:
         p = windows(path)
     except PathError:

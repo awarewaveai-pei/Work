@@ -51,6 +51,13 @@ class RecordingFolderTests(_Folders):
         self.assertFalse(paths.check(self.folder("OneDrive", "rec"), recording=True)["ok"])
         self.assertTrue(paths.check(self.folder("OneDrive", "rec"), recording=False)["ok"], "outputs may go to the cloud")
 
+    def test_a_link_into_a_synced_folder_is_refused(self):
+        # Codex 2026-11-27: C:\\Recordings as a junction into OneDrive passed the name check.
+        plain = self.folder("Recordings")
+        into_cloud = self.folder("OneDrive", "rec")
+        with mock.patch.object(paths.os.path, "realpath", lambda p: into_cloud if p == plain else p):
+            self.assertEqual(paths.cloud(plain), "OneDrive")
+
     def test_ownvoices_default_folder_inside_onedrive_is_not_recorded_into(self):
         # 「文件」被 OneDrive 轉向時，OwnVoice 的預設資料夾就在雲端裡（critic C16 Major）。
         synced = self.folder("OneDrive", "Documents", "OwnVoice Meet")

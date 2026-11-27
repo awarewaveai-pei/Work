@@ -118,15 +118,8 @@ class Options:
     destinations: tuple = ()
     use_api: bool = False
     target: str = "zh-TW"
-
-
-def _channels(media_path: str) -> int:
-    """錄音的聲道數：兩路聆聽存成雙聲道（左我、右對方）；讀不出來（上傳的影片等）＝1。"""
-    try:
-        with wave.open(media_path, "rb") as w:
-            return w.getnchannels()
-    except (wave.Error, EOFError, OSError):
-        return 1
+    # The recording is a two-channel listening (left me, right them): speakers are split on the right only.
+    me_them: bool = False
 
 
 def _reanchor(result: dict, media_path: str, log) -> None:
@@ -147,6 +140,7 @@ def _reanchor(result: dict, media_path: str, log) -> None:
         for s, (start, end) in zip(segs, vad.reanchor([(s["start"], s["end"]) for s in segs], regions)):
             s["start"], s["end"], s["arrival"] = start, end, False
         log(f"[對齊] {'我' if who == 'me' else '對方'} {len(segs)} 句對回錄音的 {len(regions)} 個發聲區段")
+    result["segments"].sort(key=lambda s: s["start"])
     result["times"] = postmeeting.SPEECH
 
 
@@ -228,7 +222,7 @@ def run_pipeline_phase1(job_dir: str, media_path, opts: Options, api_key: str = 
                 spans_cache = os.path.join(job_dir, "diarize_spans.json")
                 # 雙聲道（兩路聆聽）只分對方那一聲道；「我」的句子已經標好。
                 dr = diarize.diarize(media_path, result["segments"], spans_cache_path=spans_cache, log=log,
-                                     channel=1 if _channels(media_path) == 2 else None)
+                                     channel=1 if opts.me_them else None)
                 turns = dr["turns"]
                 product = {"speakers": dr["speakers"], "overlap_sec": dr["overlap_sec"], "source": "pyannote"}
                 postmeeting.write_json(speakers_path, product)

@@ -143,7 +143,7 @@ def _batch_gpu():
         yield claim
 
 
-def _options(diarize, model, language, sync, use_api) -> Options:
+def _options(diarize, model, language, sync, use_api, me_them: bool = False) -> Options:
     """會後整理的選項，三個入口（上傳、舊場次、聆聽場次）共用這一個檢查。
     sync＝要同步去的輸出目的地名稱清單；在這裡換成名稱與資料夾，之後改設定不影響這個工作。"""
     if model not in MODELS:
@@ -157,7 +157,7 @@ def _options(diarize, model, language, sync, use_api) -> Options:
         raise HTTPException(400, f"沒有這個輸出目的地：{'、'.join(missing)[:80]}（在「設定」裡新增）")
     return Options(diarize=bool(diarize), model=model, language=language,
                    destinations=tuple((n, known[n]) for n in dict.fromkeys(sync)),
-                   use_api=bool(use_api), target=settings.pref("target"))
+                   use_api=bool(use_api), target=settings.pref("target"), me_them=me_them)
 
 
 def _new_job(source: dict) -> tuple:
@@ -329,7 +329,8 @@ def ownvoice_import(body: dict = Body(...)):
     # 沒指定語言：聆聽場次用它當時聽的語言，舊場次用 OwnVoice 的設定。
     language = body.get("language") or postmeeting.transcribe_language(sidecar) or ownvoice.language()
     opts = _options(body.get("diarize", True), str(body.get("model") or "large-v3"),
-                    language, body.get("sync", []), body.get("use_api"))
+                    language, body.get("sync", []), body.get("use_api"),
+                    me_them=bool(sidecar) and sidecar.get("channels") == 2)
     api_key = _api_key_for(opts.use_api)
     reuse = body["reuse"] if isinstance(body.get("reuse"), bool) else postmeeting.recommend(sidecar, wavs)["reuse"]
     if reuse and sidecar is None:

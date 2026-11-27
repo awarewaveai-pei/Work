@@ -324,13 +324,19 @@ class Archive:
             pass
         self._problem("wav", f"錄音寫入失敗（{e}），這場之後不再錄音，逐字稿照常存")
 
+    def _flush_pending(self) -> None:
+        """Stereo: the channel that is behind gets silence up to the other, and everything is written."""
+        if self.channels != 2:
+            return
+        longest = max(len(p) for p in self.pending)
+        for c, p in enumerate(self.pending):
+            self.pos[c] += (longest - len(p)) // 2
+            p.extend(bytes(longest - len(p)))
+        self._write_frames(longest // 2)
+
     def close_audio(self) -> None:
         """No more chunks will come: close the current recording under its segment's name."""
-        if self.channels == 2:
-            longest = max(len(p) for p in self.pending)
-            for p in self.pending:
-                p.extend(bytes(longest - len(p)))
-            self._write_frames(longest // 2)
+        self._flush_pending()
         if self.wav is None:
             return
         wav, self.wav = self.wav, None
@@ -355,6 +361,7 @@ class Archive:
         i = len(self.segments)
         name = clean_name(name) or segment_name(self.agenda, i)
         nxt = None
+        self._flush_pending()      # audio received before the change belongs to the segment that is closing
         if self.wav is not None:
             nxt = os.path.join(self.dir, f"{stem(i + 1, name)}.wav")
             wav, self.wav = self.wav, None
