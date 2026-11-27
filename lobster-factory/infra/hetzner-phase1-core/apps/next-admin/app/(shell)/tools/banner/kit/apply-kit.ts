@@ -4,15 +4,13 @@ import { urlToBlob } from "@/lib/studio/design-upload";
 import type { State } from "../banner-state";
 import type { BrandKit } from "./brand-kit";
 
-/** The kit's colours in their roles (main -> background start / badge, second -> background end, accent -> accent / CTA). */
+/** The kit's colours in the brand roles only (main -> badge, accent -> accent / CTA). Text and background colours are the
+ *  design's own (operator 2026-11-27), so the kit's text / background entries are not applied. */
 function kitColorPatch(kit: BrandKit): Partial<State> {
-  const [main, second, accent, text, bg] = kit.colors;
+  const [main, , accent] = kit.colors;
   return {
-    ...(main ? { gradFrom: main, badgeColor: main } : {}),
-    ...(second ? { gradTo: second } : {}),
+    ...(main ? { badgeColor: main } : {}),
     ...(accent ? { accentColor: accent, ctaBg: accent } : {}),
-    ...(text ? { textColor: text } : {}),
-    ...(bg ? { bgColor: bg } : {}),
   };
 }
 

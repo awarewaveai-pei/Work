@@ -27,22 +27,22 @@ describe("contrast ratio (WCAG)", () => {
   });
 });
 
-describe("brand kit limits the colours", () => {
+describe("brand kit limits only the brand roles (accent, CTA, badge)", () => {
   const kit = ["#0b3d91", "#4f86f7", "#ffb703", "#fefefe", "#0a0a0a"];
-  it("a hex outside the kit is dropped for the kit default; an index picks from the palette", () => {
-    const raw = { textColor: "#ff00ff", accentColor: 2, ctaBg: "#ffb703", ctaTextColor: 4, badgeColor: "#00ff00" };
+  it("a brand role outside the kit falls back to the kit default; text and background colours are free", () => {
+    const raw = { textColor: "#ff00ff", accentColor: 2, ctaBg: "#ffb703", ctaTextColor: "#0a0a0a", badgeColor: "#00ff00" };
     const { patch } = resolveDesignColors(raw, base, bgStatsFromColors("color", "#1a1a2e"), center, kit, kit, ALL);
-    for (const k of ["textColor", "accentColor", "ctaBg", "ctaTextColor", "badgeColor"] as const)
+    for (const k of ["accentColor", "ctaBg", "badgeColor"] as const)
       expect(kit.map((c) => c.toLowerCase())).toContain(patch[k]!.toLowerCase());
-    expect(patch.textColor).toBe("#fefefe");                 // kit 文字 role, not the off-kit magenta
     expect(patch.accentColor).toBe("#ffb703");
-    expect(patch.ctaTextColor).toBe("#0a0a0a");
+    expect(patch.badgeColor).toBe("#0b3d91");                // off-kit green -> kit main
+    expect(patch.textColor).not.toBe("#fefefe");             // the kit's text colour is not forced
   });
-  it("on a colour background the AI's background colour must be a kit colour too", () => {
-    const { patch } = resolveDesignColors({ bgMode: "gradient", gradFrom: "#123456", gradTo: 0 }, base, bgStatsFromColors("color", "#1a1a2e"), center, kit, kit, ALL);
+  it("on a colour background the AI's background colour is taken as given (not limited to the kit)", () => {
+    const { patch } = resolveDesignColors({ bgMode: "gradient", gradFrom: "#123456", gradTo: "#654321" }, base, bgStatsFromColors("color", "#1a1a2e"), center, kit, kit, ALL);
     expect(patch.bgMode).toBe("gradient");
-    expect(patch.gradFrom).toBeUndefined();
-    expect(patch.gradTo).toBe("#0b3d91");
+    expect(patch.gradFrom).toBe("#123456");
+    expect(patch.gradTo).toBe("#654321");
   });
 });
 

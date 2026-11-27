@@ -155,31 +155,36 @@ const sat = (hex: string) => {
   return mx === 0 ? 0 : (mx - mn) / mx;
 };
 
-/** Role assignment with no usable AI answer: the brand kit's own mapping (main / accent / text, as 套用品牌), else nothing. */
+/** The roles a brand kit owns (operator 2026-11-27: the kit does not set text or background colours). */
+export const BRAND_ROLES = ["accentColor", "ctaBg", "badgeColor"] as const;
+type BrandRole = (typeof BRAND_ROLES)[number];
+const isBrandRole = (r: string): r is BrandRole => (BRAND_ROLES as readonly string[]).includes(r);
+
+/** Role assignment with no usable AI answer: the brand kit's own mapping for the brand roles (as 套用到這張), else nothing. */
 export function defaultRoles(kit: readonly string[] | null): Partial<ColorFields> {
   if (!kit?.length) return {};
-  const [main, , accent, text] = kit;
+  const [main, , accent] = kit;
   const loud = [...kit].sort((a, b) => sat(b) - sat(a))[0];
-  return { textColor: text ?? main, accentColor: accent ?? loud, ctaBg: loud, badgeColor: main };
+  return { accentColor: accent ?? loud, ctaBg: loud, badgeColor: main };
 }
 
-/** The AI's colour answer as a patch: a palette index or a #hex; with a brand kit a hex outside the kit is dropped (that
- *  role then gets the kit's default). The background colours / mode only when the background is a colour or gradient. */
+/** The AI's colour answer as a patch: a palette index or a #hex. With a brand kit, a brand role (accent / CTA / badge)
+ *  outside the kit is dropped for the kit's default; text and background colours are free. The background colours / mode
+ *  only when the background is a colour or gradient. */
 export function pickColorRoles(raw: Record<string, unknown>, bgMode: BgMode, palette: readonly string[], kit: readonly string[] | null): Partial<ColorFields> {
-  const pick = (v: unknown): string | undefined => {
-    if (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < palette.length) return palette[v];
-    if (!isHex(v)) return undefined;
-    if (kit && !kit.some((k) => sameHex(k, v))) return undefined;
-    return v;
+  const pick = (v: unknown, brand: boolean): string | undefined => {
+    const hex = typeof v === "number" && Number.isInteger(v) && v >= 0 && v < palette.length ? palette[v] : isHex(v) ? v : undefined;
+    if (!hex || (brand && kit && !kit.some((k) => sameHex(k, hex)))) return undefined;
+    return hex;
   };
   const roles = ["textColor", "accentColor", "ctaBg", "ctaTextColor", "badgeColor"] as const;
   const fallback = defaultRoles(kit);
   const out: Partial<ColorFields> = {};
-  for (const r of roles) { const v = pick(raw[r]) ?? fallback[r]; if (v) out[r] = v; }
+  for (const r of roles) { const v = pick(raw[r], isBrandRole(r)) ?? (isBrandRole(r) ? fallback[r] : undefined); if (v) out[r] = v; }
   // an uploaded / AI picture is the user's background: mode and colours stay as they are, whatever the answer says
   if (bgMode === "color" || bgMode === "gradient") {
     if (raw.bgMode === "color" || raw.bgMode === "gradient") out.bgMode = raw.bgMode;
-    for (const k of ["bgColor", "gradFrom", "gradTo"] as const) { const v = pick(raw[k]); if (v) out[k] = v; }
+    for (const k of ["bgColor", "gradFrom", "gradTo"] as const) { const v = pick(raw[k], false); if (v) out[k] = v; }
   }
   return out;
 }
@@ -209,7 +214,8 @@ export interface GuardResult { patch: Partial<ColorFields>; fixes: string[]; unm
  * dim overlay and scrim, at its renderer opacity); the accent against the background, or the plate text against the accent
  * when highlighted; CTA text against ctaBg; badge (white text) against badgeColor. Too little -> 1) another palette colour
  * that passes, 2) for the text the scrim (darker step by step, up to the slider max) plus outline, 3) white / near-black.
- * An uploaded / AI background is never changed; with a kit only kit colours are picked before step 3.
+ * An uploaded / AI background is never changed; with a kit the brand roles (accent, CTA, badge) take only kit colours
+ * before step 3, text colours are free.
  */
 export function guardContrast(
   c: ColorFields, bg: BgInfo, places: readonly TextPlace[], palette: readonly string[], kit: readonly string[] | null,
@@ -242,7 +248,10 @@ export function guardContrast(
     return z;
   };
   const textZone = () => { const s = cur(); return s.textScrim ? darken(baseZone(), s.textScrimOpacity) : baseZone(); };
-  const choices = (kit ? [...kit] : [...palette, ...bg.colors]).filter(isHex);
+  // text colours come from the palette / background (white / near-black only as the last resort below); the brand roles
+  // (accent, CTA, badge) from the kit when the client has one
+  const choices = [...new Set([...palette, ...bg.colors].filter(isHex))];
+  const brandChoices = (kit ? [...kit] : choices).filter(isHex);
   const best = (cands: string[], score: (h: string) => number, need: number) =>
     cands.filter((h) => score(h) >= need).sort((a, b) => score(b) - score(a))[0];
 
@@ -280,11 +289,11 @@ export function guardContrast(
   // it is PLATE_TEXT, so that pair is what must read; else the accent word against the background.
   if (cur().accentHighlight) {
     if (contrastRatio(PLATE_TEXT, cur().accentColor) < MIN_HEADLINE) {
-      const alt = best(choices, (h) => contrastRatio(PLATE_TEXT, h), MIN_HEADLINE) ?? "#ffffff";
+      const alt = best(brandChoices, (h) => contrastRatio(PLATE_TEXT, h), MIN_HEADLINE) ?? "#ffffff";
       patch.accentColor = alt; fixes.push(`accentColor(plate)→${alt}`);
     }
   } else if (zoneRatio(cur().accentColor, textZone()) < MIN_HEADLINE) {
-    const alt = best(choices, (h) => zoneRatio(h, textZone()), MIN_HEADLINE) ?? cur().textColor;
+    const alt = best(brandChoices, (h) => zoneRatio(h, textZone()), MIN_HEADLINE) ?? cur().textColor;
     patch.accentColor = alt; fixes.push(`accentColor→${alt}`);
   }
   // CTA text on its button
@@ -294,7 +303,7 @@ export function guardContrast(
     if (alt) { patch.ctaTextColor = alt; fixes.push(`ctaTextColor→${alt}`); }
     else {
       // no text colour reads on that button: the button takes a palette colour white / near-black reads on, else near-black
-      const btn = best(choices, (h) => Math.max(...NEUTRALS.map((n) => contrastRatio(n, h))), MIN_SMALL) ?? "#111111";
+      const btn = best(brandChoices, (h) => Math.max(...NEUTRALS.map((n) => contrastRatio(n, h))), MIN_SMALL) ?? "#111111";
       patch.ctaBg = btn;
       patch.ctaTextColor = [...NEUTRALS].sort((a, b) => contrastRatio(b, btn) - contrastRatio(a, btn))[0];
       fixes.push(`ctaBg→${btn}`);
@@ -302,7 +311,7 @@ export function guardContrast(
   }
   // the badge's text is always white (renderer): its colour must carry white; no palette colour does -> near-black
   if (contrastRatio("#ffffff", cur().badgeColor) < MIN_SMALL) {
-    const alt = best(choices, (h) => contrastRatio("#ffffff", h), MIN_SMALL) ?? "#111111";
+    const alt = best(brandChoices, (h) => contrastRatio("#ffffff", h), MIN_SMALL) ?? "#111111";
     patch.badgeColor = alt; fixes.push(`badgeColor→${alt}`);
   }
   return { patch, fixes, unmet };
@@ -321,9 +330,10 @@ export function resolveDesignColors(
   return { patch: { ...roles, ...g.patch }, fixes: g.fixes, unmet: g.unmet };
 }
 
-/** The palette the AI may assign from: the kit's colours; no kit = the background's colours plus white / near-black. */
+/** The palette the AI may assign from: the kit's colours (brand roles) first, then the background's colours plus white /
+ *  near-black (text and background colours are free of the kit). */
 export const usablePalette = (bg: BgInfo, kit: readonly string[] | null): string[] =>
-  kit?.length ? kit.filter(isHex) : [...new Set([...bg.colors.filter(isHex), ...NEUTRALS].map((h) => h.toLowerCase()))].slice(0, 8);
+  [...new Set([...(kit ?? []), ...bg.colors, ...NEUTRALS].filter(isHex).map((h) => h.toLowerCase()))].slice(0, 10);
 
 /** What the prompt gets (kept short): the background, each text band's brightness / busyness, and the palette. */
 export function bgForPrompt(bg: BgInfo): { mode: BgMode; colors: string[]; meanLum: number; zones: Record<TextPos, { lum: number; busy: number }> } {
