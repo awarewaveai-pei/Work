@@ -1,7 +1,9 @@
 """Real-chain test: stream a 16 kHz mono WAV to a running meeting-service's /api/live/ws at real-time
 pace and print caption timings, each final line with its start..end in the recording (= seconds into
 the WAV, comparable with where the speech really is).
-usage: python tools/feed.py <wav> <gemini|local> [port]   (default port 8431; never point it at 8420 while in use)"""
+usage: python tools/feed.py <wav> <gemini|local> [port] [save]   (default port 8431; never point it at 8420 while in use)
+`save` keeps the session (recording, transcript.md, session.json) in the server's OWNVOICE_SESSIONS_DIR:
+only against a server started with that pointed at a temp folder."""
 import asyncio
 import json
 import sys
@@ -14,7 +16,7 @@ from websockets.asyncio.client import connect
 RATE = 16000
 
 
-async def main(wav_path: str, stt: str, port: str) -> None:
+async def main(wav_path: str, stt: str, port: str, save: bool) -> None:
     with wave.open(wav_path, "rb") as w:
         assert (w.getframerate(), w.getnchannels(), w.getsampwidth()) == (RATE, 1, 2), w.getparams()
         pcm = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
@@ -46,7 +48,7 @@ async def main(wav_path: str, stt: str, port: str) -> None:
                     marks["usage"] = ev
 
         r = asyncio.ensure_future(reader())
-        await ws.send(json.dumps({"type": "start", "stt": stt, "language": "en-US"}))
+        await ws.send(json.dumps({"type": "start", "stt": stt, "language": "en-US", "save": save}))
         await asyncio.sleep(3.0 if stt == "gemini" else 1.0)
         t0 = time.monotonic()
         data = np.concatenate([pcm, np.zeros(RATE * 8, dtype=np.int16)])
@@ -76,4 +78,4 @@ async def main(wav_path: str, stt: str, port: str) -> None:
 if __name__ == "__main__":
     if len(sys.argv) < 3 or sys.argv[2] not in ("gemini", "local"):
         sys.exit(__doc__)
-    asyncio.run(main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "8431"))
+    asyncio.run(main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "8431", sys.argv[4:5] == ["save"]))

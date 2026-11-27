@@ -1,0 +1,148 @@
+<!-- 設定面板（唯一一份）：app.py _page() 把它放進 index.html 與 workspace.html 的 SETTINGS_SLOT 位置。
+     window.Settings = 伺服器設定（/api/settings）的頁面端：ready、put(patch)、on(fn)、prefs(...)、mount(root)。
+     金鑰只有遮罩會到頁面。 -->
+<style>
+  .st { display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--ink); }
+  .st-hint { margin: 0; color: var(--muted); line-height: 1.6; }
+  .st-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 10px 0; border-top: 1px solid var(--border); }
+  .st-name { font-weight: 600; min-width: 96px; }
+  .st-state { color: var(--muted); font-family: Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
+  .st-state.on { color: var(--green); }
+  .st-use { flex-basis: 100%; color: var(--muted); font-size: 12px; }
+  .st-in {
+    flex: 1 1 220px; min-width: 0; font: 12px Consolas, monospace; padding: 6px 8px;
+    border: 1px solid var(--border); border-radius: 8px; color: var(--ink); background: var(--card);
+  }
+  .st-in:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .st-btn {
+    background: var(--bg); color: var(--muted); border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; margin: 0;
+  }
+  .st-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+  .st-btn[hidden] { display: none; }
+  .st-msg { margin: 0; min-height: 1.4em; color: var(--muted); }
+  .st-msg.bad { color: var(--red); }
+</style>
+<template id="tpl-settings">
+  <div class="st panel-body">
+    <p class="st-hint">金鑰只存在這台電腦（不進版本控制），頁面上只看得到前後幾個字。用到 AI 的功能會把金鑰當認證送到那家服務，逐字稿也會一起送出，每次呼叫都計費；敏感會議請用「複製 prompt → 貼回」的做法。</p>
+    <div class="st-keys"></div>
+    <p class="st-msg" aria-live="polite"></p>
+  </div>
+</template>
+<script>
+window.Settings = (function () {
+  const KEY_ROWS = [
+    ["anthropic_api_key", "Anthropic", "翻譯、回覆、會後自動整理、心智圖。沒填時翻譯改用 Gemini。", "sk-ant-..."],
+    ["gemini_api_key", "Gemini", "即時辨識選 Gemini 時要用；沒填 Anthropic 時也負責翻譯。", "AIza..."],
+    ["hf_token", "Hugging Face", "會後整理的講者分離。", "hf_..."],
+    ["serper_api_key", "Serper 搜尋", "查詢面板的網路搜尋。", ""],
+  ];
+  let data = null, root = null, msg = "", bad = false;
+  const subs = [];
+  function notify() { subs.forEach(fn => fn(data)); }
+  const ready = fetch("/api/settings")
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d) { data = d; notify(); } return d; })
+    .catch(() => null);
+
+  async function put(patch) {
+    const r = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(typeof body.detail === "string" ? body.detail : "設定沒存到（" + r.status + "）"), { status: r.status });
+    data = body;
+    notify();
+    return body;
+  }
+
+  function on(fn) { subs.push(fn); if (data) fn(data); }
+
+  // 一個面板的偏好：map（頁面名 → 設定欄位）列的存在伺服器，其餘只存在這個瀏覽器的 localStorage[storageKey]。
+  // 舊資料：storageKey 裡 map 列到的欄位逐欄 PUT 上去，伺服器回成功才從本機刪掉那一欄；連不上的下次載入再試，
+  // 400（舊版沒擋的值，例如超過上限的分鐘數）永遠存不進去，也刪掉，改用伺服器的值。
+  function prefs(storageKey, map, defaults, onChange) {
+    const read = () => { try { const v = JSON.parse(localStorage.getItem(storageKey) || "{}"); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } };
+    const write = v => { try { Object.keys(v).length ? localStorage.setItem(storageKey, JSON.stringify(v)) : localStorage.removeItem(storageKey); } catch (e) {} };
+    const old = read();
+    const forget = k => { delete old[k]; const cur = read(); delete cur[k]; write(cur); };
+    const values = Object.assign({}, defaults, old);
+    const fromServer = d => { Object.entries(map).forEach(([k, s]) => { values[k] = d[s]; }); onChange(); };
+    ready.then(async () => {
+      for (const [k, s] of Object.entries(map)) {
+        if (!(k in old)) continue;
+        try { await put({ [s]: old[k] }); forget(k); } catch (e) { if (e.status === 400) forget(k); }
+      }
+      on(fromServer);
+    });
+    return {
+      values,
+      // 改一個值：伺服器欄位走 PUT（失敗時退回伺服器的值並把錯誤往外丟），其餘寫回本機。
+      set(name, value) {
+        values[name] = value;
+        if (name in map) {
+          forget(name);      // 使用者剛改的值優先，搬移不能再拿舊值把它蓋回去
+          return put({ [map[name]]: value }).catch(e => { if (data) fromServer(data); throw e; });
+        }
+        const cur = read(); cur[name] = value; write(cur);
+        return Promise.resolve();
+      },
+    };
+  }
+
+  function say(text, isBad) { msg = text; bad = !!isBad; paint(); }
+
+  function paint() {
+    if (!root) return;
+    const m = root.querySelector(".st-msg");
+    m.textContent = msg;
+    m.classList.toggle("bad", bad);
+    KEY_ROWS.forEach(([name]) => {
+      const row = root.querySelector('[data-key="' + name + '"]');
+      const k = data && data[name];
+      const state = row.querySelector(".st-state");
+      state.textContent = !data ? "讀取中…" : !k.set ? "未填" : (k.source === "env" ? "用環境變數 " : "已填 ") + k.masked;
+      state.classList.toggle("on", !!(k && k.set));
+      row.querySelector('[data-act="clear"]').hidden = !(k && k.source === "settings");
+    });
+  }
+
+  function mount(el) {
+    root = el;
+    const box = el.querySelector(".st-keys");
+    box.replaceChildren(...KEY_ROWS.map(([name, label, use, hint]) => {
+      const row = document.createElement("div");
+      row.className = "st-row";
+      row.dataset.key = name;
+      row.innerHTML = '<span class="st-name"></span><span class="st-state"></span><span class="st-use"></span>' +
+        '<input type="password" class="st-in" autocomplete="off" spellcheck="false">' +
+        '<button type="button" class="st-btn" data-act="save">儲存</button><button type="button" class="st-btn" data-act="clear">清除</button>';
+      row.querySelector(".st-name").textContent = label;
+      row.querySelector(".st-use").textContent = use;
+      row.querySelector(".st-in").placeholder = hint ? "貼上金鑰，例如 " + hint : "貼上金鑰";
+      row.querySelector(".st-in").setAttribute("aria-label", label + " 金鑰");
+      return row;
+    }));
+    box.addEventListener("click", async e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      const row = b.closest(".st-row"), input = row.querySelector(".st-in"), label = row.querySelector(".st-name").textContent;
+      const value = b.dataset.act === "save" ? input.value.trim() : "";
+      if (b.dataset.act === "save" && !value) return say("先貼上 " + label + " 金鑰再按儲存", true);
+      try {
+        await put({ [row.dataset.key]: value });
+        input.value = "";
+        say(label + (value ? " 金鑰已儲存" : " 金鑰已清除"));
+      } catch (err) {
+        say(err.message, true);
+      }
+    });
+    box.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.isComposing && e.target.matches(".st-in")) e.target.closest(".st-row").querySelector('[data-act="save"]').click();
+    });
+    paint();
+  }
+
+  on(paint);
+  return { ready, put, on, prefs, mount, get data() { return data; } };
+})();
+</script>

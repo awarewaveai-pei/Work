@@ -90,28 +90,12 @@
   <p style="margin:-8px 0 20px"><a href="/workspace" style="display:inline-block;background:var(--accent);color:#fff;text-decoration:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:600">會議工作區 →</a></p>
 
   <div class="card" id="settingsCard">
-    <div id="settingsHeader" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">
-      <b style="font-size:14px">⚙ API 設定 <span id="apiStatusBadge" class="badge" style="background:#f1f5f9;color:var(--muted)">檢查中...</span></b>
-      <span id="settingsToggle" style="font-size:12px;color:var(--muted)">展開 ▾</span>
-    </div>
-    <div id="settingsBody" style="display:none;margin-top:14px">
-      <p class="hint" style="margin-top:0">
-        選填。填入自己的 Anthropic API key 後，上傳時可勾選「自動處理」，
-        不用手動貼 prompt——但每次呼叫會真的計費（不是訂閱額度）。
-        不填就只能用下面「貼上」的免費做法。<b>key 存檔只存在這台電腦本機</b>
-        （不進版本控制、不會被其他頁面讀到）；但勾選「自動處理」時，key 本身
-        會當作認證資訊送到 Anthropic 的伺服器——這是呼叫 API 本來就需要的，
-        逐字稿內容也會一起送出去，跟下面「貼上」做法音檔/逐字稿完全不外流
-        不是同一回事，敏感會議請用「貼上」。
-      </p>
-      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:Consolas,monospace">
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-        <button class="copyBtn" id="saveApiKeyBtn" style="margin-top:0">儲存</button>
-        <button class="copyBtn" id="clearApiKeyBtn" style="margin-top:0">清除</button>
-        <span id="apiKeySaveMsg" class="hint" style="margin:0"></span>
-      </div>
-    </div>
+    <details>
+      <summary style="cursor:pointer;font-size:14px;font-weight:600">⚙ 設定（金鑰）</summary>
+      <div id="settingsMount" style="margin-top:12px"></div>
+    </details>
   </div>
+<!-- settings-panel -->
 
   <div class="card" id="ownvoiceCard" style="display:none">
     <b style="font-size:14px">OwnVoice 會議</b>
@@ -126,7 +110,7 @@
       <input type="file" id="fileInput" accept=".mp4,.m4a,.mp3,.wav,.mov,.mkv,.webm,.aac,.flac">
     </div>
     <div class="opts">
-      <label><input type="checkbox" id="diarizeOpt" checked> 講者分離（需 HF_TOKEN，較慢）</label>
+      <label><input type="checkbox" id="diarizeOpt" checked> 講者分離（需 Hugging Face 金鑰，較慢）</label>
       <label>模型
         <select id="modelOpt">
           <option value="large-v3" selected>large-v3（準）</option>
@@ -198,55 +182,17 @@ const DOWNLOAD_LABELS = {
   transcript_srt: "字幕檔 (.srt)", diarized_txt: "逐字稿-含講者 (.txt)", merged_txt: "逐字稿 (.txt)",
 };
 
-// --- API 設定 ---
-async function loadApiSettings() {
-  const s = await (await fetch("/api/settings")).json();
-  const badge = document.getElementById("apiStatusBadge");
-  if (s.has_api_key) {
-    badge.textContent = `已設定 (${s.masked_api_key})`;
-    badge.style.background = "#dcfce7"; badge.style.color = "#166534";
-    document.getElementById("useApiRow").style.display = "flex";
-  } else {
-    badge.textContent = "未設定";
-    badge.style.background = "#f1f5f9"; badge.style.color = "var(--muted)";
-    document.getElementById("useApiRow").style.display = "none";
-  }
-  return s;
+// --- 設定（面板本體在 templates/_settings.html，與會議工作區共用） ---
+{
+  const mount = document.getElementById("settingsMount");
+  mount.append(document.getElementById("tpl-settings").content.cloneNode(true));
+  Settings.mount(mount);
+  // 沒填 Anthropic 金鑰就不提供「自動處理」。
+  Settings.on(d => {
+    document.getElementById("useApiRow").style.display = d.anthropic_api_key.set ? "flex" : "none";
+    if (!d.anthropic_api_key.set) document.getElementById("useApiOpt").checked = false;
+  });
 }
-loadApiSettings();
-
-document.getElementById("settingsHeader").addEventListener("click", () => {
-  const body = document.getElementById("settingsBody");
-  const toggle = document.getElementById("settingsToggle");
-  const open = body.style.display !== "none";
-  body.style.display = open ? "none" : "block";
-  toggle.textContent = open ? "展開 ▾" : "收合 ▴";
-});
-
-document.getElementById("saveApiKeyBtn").addEventListener("click", async () => {
-  const key = document.getElementById("apiKeyInput").value.trim();
-  const msg = document.getElementById("apiKeySaveMsg");
-  if (!key) { msg.textContent = "先貼上 key 再儲存"; msg.style.color = "var(--red)"; return; }
-  await fetch("/api/settings", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ anthropic_api_key: key }),
-  });
-  document.getElementById("apiKeyInput").value = "";
-  msg.textContent = "已儲存 ✓"; msg.style.color = "var(--green)";
-  await loadApiSettings();
-});
-
-document.getElementById("clearApiKeyBtn").addEventListener("click", async () => {
-  const msg = document.getElementById("apiKeySaveMsg");
-  await fetch("/api/settings", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ anthropic_api_key: "" }),
-  });
-  document.getElementById("apiKeyInput").value = "";
-  document.getElementById("useApiOpt").checked = false;
-  msg.textContent = "已清除"; msg.style.color = "var(--muted)";
-  await loadApiSettings();
-});
 
 let file = null;
 const drop = document.getElementById("drop");
