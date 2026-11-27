@@ -7,7 +7,7 @@ import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBo
 import { INIT, PRESETS, RATIO_PRESET, TEMPLATES, applyLayout, enterSize, mainOf, templatePatch, variantOf, withSizeBackgrounds, type PresetKey, type State } from "./banner-state";
 import { COMPOSITION, TEXT_SHARE_MAX, type LayoutSize } from "./composition";
 import { SUB_RATIO, titleRange } from "./field-ranges";
-import { shapeLayout } from "./banner-design";
+import { boxOnPicture, compositePrompt, shapeLayout } from "./banner-design";
 import { sizeFileName } from "./steps/export-files";
 
 // Every size of the tool: a new preset is covered by the overlap matrix automatically.
@@ -440,5 +440,40 @@ describe("R3-A 二: logo size rule", () => {
     expect(Math.abs(noTitle.boxes.logo!.h - short * LOGO_AUTO)).toBeLessThanOrEqual(1);
     const hand = layoutBanner({ ...withLogo, logoAuto: false, logoScale: 0.08 }, size, measure);
     expect(Math.abs(hand.boxes.logo!.h - short * 0.08)).toBeLessThanOrEqual(1);
+  });
+});
+
+// Codex on R4-B: the composite prompt's zoning follows the layout's real areas, so it never asks for two exclusive things.
+describe("R4-B 合成 prompt 分區跟著版面幾何", () => {
+  const f: BannerFields = { ...base, typeAuto: true, headline: "用香氣與色彩，療癒疲憊的心", subtext: "精油芳療×藝術治療體驗課｜立即報名",
+    ctaText: "", productImage: "product", productScale: 0.6 };
+  const promptAt = (key: string, patch: Partial<BannerFields>) => {
+    const size = SIZES[key], { text, product } = reservedAreas(layoutBanner({ ...f, ...patch }, size, measure));
+    const on = (b: ElemBox) => boxOnPicture(b, size, (PRESETS as Record<string, { aspect: string }>)[key].aspect);
+    return { text: on(text!), product: on(product!), p: compositePrompt({ scene: "s", productArea: on(product!), textArea: on(text!) }) };
+  };
+  const xApart = (a: { x0: number; x1: number }, b: { x0: number; x1: number }) => a.x1 <= b.x0 || b.x1 <= a.x0;
+
+  it("card group, product centred: stacked in one column -> band words, no product column and no clear text column", () => {
+    const r = promptAt("r16x9", { ...COMPOSITION.card.layout, productPos: "center" });
+    expect(xApart(r.text, r.product)).toBe(false);
+    expect(r.p).not.toContain("column");
+    expect(r.p).toMatch(/Keep the (top|bottom) band y \d+%-\d+% of the picture, across its whole width/);
+  });
+
+  it("web group, product right: side by side -> column words; the product column is outside the text column", () => {
+    const r = promptAt("r3x1", COMPOSITION.web.layout);
+    expect(xApart(r.text, r.product)).toBe(true);
+    expect(r.p).toContain(`Place the product in the column x ${Math.round(r.product.x0 * 100)}%-${Math.round(r.product.x1 * 100)}%`);
+    expect(r.p).toContain(`Keep the whole column x ${Math.round(r.text.x0 * 100)}%-${Math.round(r.text.x1 * 100)}%, top to bottom`);
+    expect(r.p).not.toContain("band y");
+  });
+
+  it("phone group default: text on top, product under it -> top band kept clear, product below; no column words", () => {
+    const r = promptAt("r4x5", COMPOSITION.phone.layout);
+    expect(xApart(r.text, r.product)).toBe(false);
+    expect(r.p).toContain(`Keep the top band y ${Math.round(r.text.y0 * 100)}%-${Math.round(r.text.y1 * 100)}%`);
+    expect(r.p).toContain("the product stays below it");
+    expect(r.p).not.toContain("column");
   });
 });
