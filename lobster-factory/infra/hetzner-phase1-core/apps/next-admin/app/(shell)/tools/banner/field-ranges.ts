@@ -15,7 +15,8 @@ export const FIELD_RANGES = {
   dimOverlayOpacity: { min: 0.05, max: 0.85, step: 0.05 },
   productScale: { min: 0.2, max: 1, step: 0.05 },
   badgeScale: { min: 0.5, max: 2.5, step: 0.1 },
-  logoScale: { min: 0.04, max: 0.6, step: 0.01 },
+  /** R3-A: the logo's height as a share of the canvas's short side (set by hand; automatic = banner-layout LOGO_AUTO). */
+  logoScale: { min: 0.04, max: 0.25, step: 0.005 },
   bgImgScale: { min: 0.5, max: 3, step: 0.05 },
   trustStars: { min: 1, max: 5, step: 1 },
 } as const satisfies Record<string, FieldRange>;

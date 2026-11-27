@@ -2,7 +2,7 @@
 // placement; a position control always moves its element (even over an old AI answer's coordinates); the automatic
 // title has no lone-character line and is legible on 3:1; the reflection grows with its length and stays in the canvas.
 import { describe, expect, it } from "vitest";
-import { applySemantic, layoutBanner, REF_PX, type LayoutMeasure } from "./banner-layout";
+import { applySemantic, layoutBanner, LOGO_AUTO, LOGO_CLEAR, LOGO_TITLE, REF_PX, type LayoutMeasure } from "./banner-layout";
 import { DEFAULT_CTA_SHADOW, DEFAULT_TEXT_SHADOW, type BannerFields, type ElemBox, type ElemKey, type ElemPositions } from "./banner-layers";
 import { INIT, PRESETS, TEMPLATES, applyLayout, enterSize, templatePatch, type PresetKey, type State } from "./banner-state";
 
@@ -53,8 +53,11 @@ describe("(a) the automatic layout never overlaps and stays inside", () => {
           for (const productPos of ["center", "left", "right", "bottom-right"] as const)
             for (const textPos of ["top", "center", "bottom"] as const) {
               const L = layoutBanner({ ...everything, productImage, logoImage, badgePos, logoPos, productPos, textPos }, size, measure);
+              // R3-A: the logo counts with its clear space (25% of its height on every side)
+              const lb = L.boxes.logo!, c = lb ? lb.h * LOGO_CLEAR : 0;
               const named: [string, ElemBox][] = [
-                ...(["headline", "subtext", "price", "cta", "trust", "badge", "logo"] as const).map((k) => [k, L.boxes[k]!] as [string, ElemBox]),
+                ...(["headline", "subtext", "price", "cta", "trust", "badge"] as const).map((k) => [k, L.boxes[k]!] as [string, ElemBox]),
+                ["logo+clear", lb && { x: lb.x - c, y: lb.y - c, w: lb.w + 2 * c, h: lb.h + 2 * c }],
                 ["product", L.product!.box], ["reflection", L.product!.reflection!],
               ];
               const at = `${productImage} ${logoImage} ${key} badge=${badgePos} logo=${logoPos} product=${productPos} text=${textPos}`;
@@ -167,5 +170,56 @@ describe("R2-B2: every position button and template moves its element over a dra
     expect(o.typeAuto).toBe(false);
     expect(o.headlineSize).toBe(Math.round(Math.min(1080 * 0.1, 1350 * 0.15)));
     expect(applyLayout(o, templatePatch(plain, "r4x5"))).toMatchObject({ typeAuto: true, balanceTitle: false, brandBar: false });
+  });
+});
+
+// Card R3-A 一3: 圖二 (9:16, centred, a full-width comma at the end of line 1) drew the line one em past the column --
+// the comma hung past the edge (ぶら下げ) and the block width was clamped to the column, so neither the automatic size
+// nor a size set by hand noticed. Every drawn line must be inside the text column, at every size, both ways.
+describe("R3-A 一3: no title line is drawn past the text column or the canvas", () => {
+  const fig2: BannerFields = { ...base, headline: "用香氣與色彩，療癒疲憊的心", subtext: "精油調香結合藝術創作，一堂課找回內在平靜",
+    badgeText: "名額有限", badgePos: "tr", trustType: "guarantee", trustText: "專業芳療師與藝術治療師帶領" };
+  const outside = (f: BannerFields, key: string) => {
+    const size = SIZES[key], L = layoutBanner(f, size, measure), h = L.headline!;
+    const x0 = L.padX - 0.5, x1 = size.w - L.padX + 0.5;
+    const ax = f.textAlignH === "left" ? h.box.x : f.textAlignH === "right" ? h.box.x + h.box.w : h.box.x + h.box.w / 2;
+    const tall = h.box.y < -0.5 || h.box.y + h.box.h > size.h + 0.5 ? [`${key} ${f.typeAuto ? "auto" : f.headlineSize}: title ${Math.round(h.box.y)}..${Math.round(h.box.y + h.box.h)} past the height`] : [];
+    return tall.concat(h.lineWs.flatMap((lw, i) => {
+      const lx = f.textAlignH === "left" ? ax : f.textAlignH === "right" ? ax - lw : ax - lw / 2;
+      return lx < x0 || lx + lw > x1 ? [`${key} ${f.typeAuto ? "auto" : f.headlineSize} ${f.textAlignH} ls=${f.letterSpacing} line ${i}: ${Math.round(lx)}..${Math.round(lx + lw)} col ${x0 + 0.5}..${x1 - 0.5}`] : [];
+    }));
+  };
+  it("11 sizes x 自動字級 and set sizes 40..600 x alignment x letter spacing x balance", () => {
+    const bad: string[] = [];
+    for (const key of Object.keys(SIZES))
+      for (const textAlignH of ["left", "center", "right"] as const)
+        for (const letterSpacing of [0, 8])
+          for (const balanceTitle of [false, true]) {
+            bad.push(...outside({ ...fig2, textAlignH, letterSpacing, balanceTitle, typeAuto: true }, key));
+            for (let hs = 40; hs <= 600; hs += 5) bad.push(...outside({ ...fig2, textAlignH, letterSpacing, balanceTitle, typeAuto: false, headlineSize: hs }, key));
+          }
+    expect(bad.slice(0, 10)).toEqual([]);
+  });
+  it("a set size that fits is drawn as set; one that does not is drawn smaller and the layout says which", () => {
+    const at = (hs: number) => layoutBanner({ ...fig2, typeAuto: false, headlineSize: hs }, SIZES.r9x16, measure);
+    expect(at(120).headlineSize).toBe(120);
+    const big = at(600);
+    expect(big.headlineSize).toBeLessThan(600);
+    expect(big.headline!.size).toBe(big.headlineSize);
+  });
+});
+
+// Card R3-A 二: the logo's height by the rule at every size -- automatic = min(short side x 10%, title px x 1.5), set by
+// hand = short side x logoScale -- so it keeps the same proportion on every size (within the pixel rounding).
+describe("R3-A 二: logo size rule", () => {
+  const withLogo: BannerFields = { ...base, logoImage: "logo", typeAuto: true };
+  it.each(Object.keys(SIZES))("%s: automatic = min(10% short side, 1.5 x title); by hand = logoScale x short side", (key) => {
+    const size = SIZES[key], short = Math.min(size.w, size.h);
+    const L = layoutBanner(withLogo, size, measure);
+    expect(Math.abs(L.boxes.logo!.h - Math.min(short * LOGO_AUTO, L.headlineSize * LOGO_TITLE))).toBeLessThanOrEqual(1);
+    const noTitle = layoutBanner({ ...withLogo, headline: "" }, size, measure);
+    expect(Math.abs(noTitle.boxes.logo!.h - short * LOGO_AUTO)).toBeLessThanOrEqual(1);
+    const hand = layoutBanner({ ...withLogo, logoAuto: false, logoScale: 0.08 }, size, measure);
+    expect(Math.abs(hand.boxes.logo!.h - short * 0.08)).toBeLessThanOrEqual(1);
   });
 });
